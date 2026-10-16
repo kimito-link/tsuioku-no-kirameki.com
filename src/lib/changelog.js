@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1630',
+    date: '2026-10-16',
+    summary: 'パネルの保存データの読み直しを半分以下に',
+    items: Object.freeze([
+      'パネルが、同じ保存データ(ユーザーのプロフィール約330KB・同接の校正の記録約820KB)を、何度も読み直していたのをやめました。40秒間の読み出し量が約46MBから約19MBに減ります(実測)。',
+      '他のページが書いた最新の値は、保存データの変更の通知で受け取り、60秒たったら必ず読み直します。段ごとの人数・画像の数・表示は、前後で同じです(実測)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1629',
     date: '2026-10-15',
     summary: '状態速報の自動送信が状態画面のタブなしで動く',
@@ -179,14 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場の人数の増減を状態速報に出す',
     items: Object.freeze([
       '会場で人数が減ったとき、いつ・何人から何人に・何が原因かを状態速報に出すようにしました(観測だけで、ふだんの動きは変えません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1610',
-    date: '2026-10-08',
-    summary: 'サムネが出ない人の顔をPOPと会場で揃える',
-    items: Object.freeze([
-      'アイコン未設定の人が、POPでは白い丸、会場ではゆっくり顔と別々の見た目になっていました。どちらも同じ、その人ごとのゆっくり顔に揃えました。'
     ])
   })
 ]);
