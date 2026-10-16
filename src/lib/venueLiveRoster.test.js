@@ -278,3 +278,35 @@ describe('名簿の本文と最終発言時刻(2026-10-16・発言の証拠 v4)'
     expect(roster.get('444').recentTexts).toEqual(['今', '昔']);
   });
 });
+
+import { rosterSpeechRows } from './venueLiveRoster.js';
+import { pickTickerHighlightEntry } from './pickTickerHighlight.js';
+import { buildVenuePickupView } from './venuePickupBanner.js';
+
+describe('ピックアップ枠は名簿の本文から選ぶ(2026-10-16・鏡由来の表示行は本文が空で枠が動かなかった)', () => {
+  const T = Date.now();
+  it('★本文のある人だけの行を返す(本文・時刻・userId・name)。本文の無い人(支援者のみ)は含めない', () => {
+    const roster = new Map();
+    touchRoster(roster, { userId: '111', name: 'a', text: 'こんばんは今日も楽しいね' }, T - 2000);
+    hydrateRosterFromCandidates(roster, [{ userId: '222', nickname: 'ad', commentCount: 0, _laneSortAt: T, recentTexts: [] }]);
+    const rows = rosterSpeechRows(roster);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ userId: '111', name: 'a', text: 'こんばんは今日も楽しいね', capturedAt: T - 2000 });
+  });
+  it('★流れたコメントが、枠に出る(案内文でなく本文)', () => {
+    const roster = new Map();
+    touchRoster(roster, { userId: '111', name: 'a', text: 'こんばんは今日も楽しいね' }, T - 3000);
+    touchRoster(roster, { userId: '222', name: 'b', text: 'ナイスプレイですね' }, T - 1000);
+    const view = buildVenuePickupView(pickTickerHighlightEntry(rosterSpeechRows(roster), T));
+    expect(view.empty).toBe(false);
+    expect(view.text).toMatch(/こんばんは今日も楽しいね|ナイスプレイですね/);
+  });
+  it('名簿が空・Map でない入力は空配列', () => {
+    expect(rosterSpeechRows(new Map())).toEqual([]);
+    expect(rosterSpeechRows(null)).toEqual([]);
+  });
+  it('比較: 鏡由来の表示行(text が空)だけだと枠は案内文のまま=今回の症状の再現', () => {
+    const rows = [{ userId: '111', name: 'a', text: '', capturedAt: T - 1000 }];
+    expect(buildVenuePickupView(pickTickerHighlightEntry(rows, T)).empty).toBe(true);
+  });
+});

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1634',
+    date: '2026-10-16',
+    summary: '会場のピックアップ枠にコメントが出る',
+    items: Object.freeze([
+      '会場の上のほうの「PICK UP」枠が、コメントが流れても「コメントが流れると、ここに1件ずつ大きく出るよ」のままで動かないことがありました。会場の表示行が本文を持たない鏡由来のときに枠が空になっていたのが原因で、在席名簿(ライブで届いた本文)から選ぶように直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1633',
     date: '2026-10-16',
     summary: '会場カードに発言した人のセリフがちゃんと出る',
@@ -183,14 +191,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '忙しい配信で読み上げ文を短くする',
     items: Object.freeze([
       'コメントが速くて読み上げが追いつかないとき、速度を上げるのと同じ段で、読み上げる文字数も短く(最短30文字)するようにしました。長いコメントを長いまま合成して詰まる状態を減らします。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1614',
-    date: '2026-10-08',
-    summary: 'IDなしコメントを同じ人扱いしない',
-    items: Object.freeze([
-      '応援コメントのアイコングリッドで、ID が取れていない匿名コメントが「同じ人の×2〜×75」のように並んで見えていたのを直しました。ID が分からないコメントは、1件ずつ別の人として数えます。'
     ])
   })
 ]);
