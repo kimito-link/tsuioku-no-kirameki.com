@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 922 件
+## ⚠️ 役割コメントが無いソース 8 / 923 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -719,7 +719,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (87)
+- 📁 **scripts/** (88)
   - 📁 **lib/** (4)
     - `council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
     - `council-scout-dir.test.js`
@@ -786,6 +786,7 @@
   - `layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
   - `live-comment-tally.mjs` — `/live/` の 3 枠目「💬 コメントで応援した人」を集める I/O 係。
   - `live-og-bake.mjs` — 配信ごとの OGP カード画像(配信サムネ＋数字帯)を焼いて投入する I/O 係(v0.1.1519)。
+  - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
@@ -835,7 +836,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1970)
+- 📁 **src/** (1971)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1117,7 +1118,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1732)
+  - 📁 **lib/** (1733)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1965,6 +1966,7 @@
     - `longTaskTracker.test.js`
     - `lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `lpContentStaleness.test.js`
+    - `lpImages.test.js`
     - `lpIndexAnonymousIdenticon.test.js`
     - `lpIndexBoardDarkContrast.test.js`
     - `lpIndexExtensionLiveScene.test.js`
@@ -2971,7 +2973,7 @@
   - `gen-og-live-ranking.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (45)
+- 📁 **tsuioku-no-kirameki/** (65)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -2995,7 +2997,13 @@
       - `yukkuri-thread.css`
     - 📁 **js/** (1)
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (18)
+  - 📁 **images/** (38)
+    - 📁 **lp/** (5)
+      - `kimito-link-color.webp`
+      - `kimito-link-ginga-color.webp`
+      - `kimito-maru-black.webp`
+      - `nc321221_creatorcross.webp`
+      - `twitter-icon.webp`
     - 📁 **venue/** (6)
       - `venue-living-overview.jpg`
       - `venue-living-overview.mp4`
@@ -3003,6 +3011,22 @@
       - `venue-living-vip.mp4`
       - `venue-mode.mp4`
       - `venue-poster.jpg`
+    - 📁 **yukkuri/** (15)
+      - `kitsune-yukkuri-half-eyes-mouth-closed.webp`
+      - `kitsune-yukkuri-half-eyes-mouth-open.webp`
+      - `kitsune-yukkuri-normal.webp`
+      - `kitsune-yukkuri-smile-mouth-closed.webp`
+      - `kitsune-yukkuri-smile-mouth-open.webp`
+      - `link-yukkuri-half-eyes-mouth-closed.webp`
+      - `link-yukkuri-half-eyes-mouth-open.webp`
+      - `link-yukkuri-normal-mouth-open.webp`
+      - `link-yukkuri-smile-mouth-closed.webp`
+      - `link-yukkuri-smile-mouth-open.webp`
+      - `tanuki-yukkuri-half-eyes-mouth-closed.webp`
+      - `tanuki-yukkuri-half-eyes-mouth-open.webp`
+      - `tanuki-yukkuri-normal-mouth-closed.webp`
+      - `tanuki-yukkuri-smile-mouth-closed.webp`
+      - `tanuki-yukkuri-smile-mouth-open.webp`
     - `apple-touch-icon.png`
     - `favicon-16.png`
     - `favicon-180.png`
