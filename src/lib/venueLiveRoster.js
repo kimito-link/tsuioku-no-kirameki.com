@@ -21,6 +21,7 @@
  * @module venueLiveRoster
  */
 
+import { speechEvidenceFromRoster } from './speechEvidence.js';
 import { hasRealThumbnail, VENUE_FULLSCREEN_MAX_SEATS } from './venueSeats.js';
 import { pushRecentText } from './recentTextRing.js';
 
@@ -43,6 +44,7 @@ export const VENUE_ROSTER_MAX_SEATS = VENUE_FULLSCREEN_MAX_SEATS;
  *   firstSeen: number,
  *   lastSeen: number,
  *   commentCount: number,
+ *   realComments?: number|null,
  *   giftCount: number,
  *   vip: boolean
  * }} RosterEntry
@@ -96,6 +98,8 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
       firstSeen: now,
       lastSeen: now,
       commentCount: 1,
+      // 発言の証拠(2026-10-16): 実際に本文のある発言を受けた回数。commentCount は並び/VIP 用の下駄込み(hydrate は最低1)で、発言の根拠にしない。
+      realComments: isGift ? 0 : 1,
       giftCount: isGift ? 1 : 0,
       vip: false
     };
@@ -106,6 +110,7 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
   // 既存: 加算・lastSeen更新(firstSeen不変)・name/avatar はベター選択。
   e.lastSeen = Math.max(e.lastSeen || 0, now);
   e.commentCount = (e.commentCount || 0) + 1;
+  if (!isGift) e.realComments = (Number.isFinite(Number(e.realComments)) ? Number(e.realComments) : 0) + 1;
   if (isGift) e.giftCount = (e.giftCount || 0) + 1;
   // 発言があれば最新の本文で上書き(ホバーカードは「直前の発言」を出す仕様)。
   //   ギフトだけの行では上書きしない=直前の発言を投擲で消さない。
@@ -196,7 +201,8 @@ export function rosterToVenueRows(roster) {
       capturedAt: Math.max(0, Number(e.lastSeen) || 0),
       preCount: Math.max(1, Math.floor(Number(e.commentCount) || 0) || 1),
       preHasGift: giftCount > 0,
-      preGiftCount: giftCount
+      preGiftCount: giftCount,
+      speech: speechEvidenceFromRoster(e) // 発言の証拠(2026-10-16)
     });
   }
   out.sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0));
@@ -231,6 +237,8 @@ export function hydrateRosterFromCandidates(roster, candidates, opts = {}) {
       firstSeen: lastSeen,
       lastSeen,
       commentCount: Math.max(1, Math.floor(Number(c.commentCount) || 0) || 1),
+      // 候補の【実数】(0 も有効な答え・不明は null)。下の commentCount の下駄(最低1)を発言の証拠に化けさせない。
+      realComments: Number.isFinite(Number(c.commentCount)) ? Math.max(0, Math.floor(Number(c.commentCount))) : null,
       giftCount: Math.max(0, Math.floor(Number(c.giftCount) || 0)),
       vip: false
     };

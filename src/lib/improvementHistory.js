@@ -2200,5 +2200,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1630', metric: 'cross-checked-claims', value: 25,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562 の note と同じ理由)。今回も変異テスト14種で赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1631', metric: 'bundle-kb', value: 1431,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の追加は発言の証拠(speechEvidence.js 約180行・純関数)と、行/参加者/census への持ち回し数十行。表示は変えず、嘘の件数を測れるようにするための増分。過去最良との差の大半は 1618 以降の /live/ 取り込みなどで、今回は +2KB。'
+  }),
+  Object.freeze({
+    version: '0.1.1631', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1631', metric: 'cross-checked-claims', value: 24,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630 の note と同じ理由)。今回も変異テスト(鏡の speech 落とし・件数の下駄 Math.max(1)混入)で赤を確認して復元している。'
   })
 ]);

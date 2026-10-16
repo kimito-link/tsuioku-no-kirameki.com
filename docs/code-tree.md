@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 923 件
+## ⚠️ 役割コメントが無いソース 8 / 924 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -836,7 +836,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1971)
+- 📁 **src/** (1974)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1118,7 +1118,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1733)
+  - 📁 **lib/** (1736)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2436,6 +2436,8 @@
     - `sourceProvenance.test.js`
     - `specializedCells.wiring.test.js`
     - `specializedCellsInputs.wiring.test.js`
+    - `speechEvidence.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `speechEvidence.test.js`
     - `standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
     - `standalonePopupClose.test.js`
     - `statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
@@ -2733,6 +2735,7 @@
     - `venueResidents.test.js`
     - `venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
     - `venueRoster.test.js`
+    - `venueRowSpeechCarry.test.js`
     - `venueSeatDomState.js` — 【層】L0 判定層(DOM を触るが「値が違うときだけ書く」だけの薄い部品。chrome.*・storage・fetch は無い)
     - `venueSeatDomState.test.js`
     - `venueSeatLinkParity.js` — 会場タイルの「リンク欠落」実害確定計器(診断先行アプローチ)。
