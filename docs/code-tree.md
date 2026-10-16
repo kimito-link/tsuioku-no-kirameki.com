@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (348)
+- 📁 **docs/** (349)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (165)
+  - 📁 **handoff/** (166)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -457,6 +457,7 @@
     - `stable-update-model-IMPLEMENTATION-HANDOFF.md`
     - `status-diag-608s-freeze-DESIGN.md`
     - `status-diag-608s-freeze-IMPLEMENTATION-HANDOFF.md`
+    - `storage-get-batching-DESIGN-and-HANDOFF-2026-10-16.md`
     - `storage-stall-council-MATERIAL.md`
     - `storage-stall-council-MINUTES.md`
     - `story-diag-realtime-sync-DESIGN.md`
