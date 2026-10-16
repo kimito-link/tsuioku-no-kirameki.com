@@ -91,3 +91,11 @@ describe('空だったカードの手がかり(detail)の配線', () => {
     expect(body).toMatch(/出所\$\{String\(data\.factsSource/);
   });
 });
+
+describe('ピックアップ枠の入力(2026-10-16)', () => {
+  it('★名簿駆動のときは名簿の本文行から選ぶ(鏡由来の表示行は text が空)・名簿に本文が無ければ従来の表示行', () => {
+    const venueSrc = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8').split('\r\n').join('\n');
+    expect(venueSrc).toContain('const speechRows = rosterDriven ? rosterSpeechRows(liveRoster) : [];');
+    expect(venueSrc).toContain('pickTickerHighlightEntry(speechRows.length ? speechRows : resolved.rows, Date.now())');
+  });
+});
