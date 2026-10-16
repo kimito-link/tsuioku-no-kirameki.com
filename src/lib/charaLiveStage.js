@@ -73,6 +73,21 @@ export function toThumbPath(fullPath) {
 export const CHARA_LIVE_SIZE_PX = 116;
 
 /**
+ * 立ち絵の一辺(px)・上端配置のとき(2026-10-17)。以前の常駐レイヤー(.nlsb-residents)の上限値と同じ=実機で顔が判別できていた大きさ。
+ */
+export const CHARA_LIVE_COMPACT_SIZE_PX = 64;
+
+/**
+ * 3人の居場所(2026-10-17・ユーザー要望「ゆっくり3人がこの位置だと PICK UP 枠に重なって邪魔」)。
+ *   'top'          = 会場ステージ上端(ニコ生ページ上端の帯の辺り・stage の padding-top が空けている余白)に 64px で右寄せ横一列。
+ *   'bottom-right' = 従来(右下固定・116px)。
+ * 座標はニコ生の実ヘッダー要素を測らず stage 相対の固定値(第三者の画面の変更に壊れない・§3.6)。1行で戻せる。
+ * 設計: docs/handoff/yukkuri-float-and-celebrate-DESIGN-2026-10-17.md
+ * @type {'top'|'bottom-right'}
+ */
+export const CHARA_LIVE_PLACEMENT = 'top';
+
+/**
  * 先読みすべき画像パスの一覧。
  *
  * 実際に使う組み合わせだけに絞る(全 24 通りは要らない):
@@ -137,6 +152,31 @@ export function charaLiveStageCss() {
   /* transform の原点を足元に。浮遊しても「立っている」感じが崩れない。 */
   transform-origin: 50% 90%;
   will-change: transform;
+}
+/*
+ * ★上端配置(2026-10-17): data-placement="top" のとき、会場の上端の余白に 64px で右寄せ横一列。
+ *   吹き出しと「…」は画面外に出ないよう下向きにする(しっぽの向きも反転)。従来の右下配置は data-placement 無し/bottom-right のまま変わらない。
+ */
+.nlcl-stage[data-placement="top"] {
+  top: 4px;
+  bottom: auto;
+  align-items: flex-start;
+}
+.nlcl-stage[data-placement="top"] .nlcl-chara {
+  width: ${CHARA_LIVE_COMPACT_SIZE_PX}px;
+  height: ${CHARA_LIVE_COMPACT_SIZE_PX}px;
+  transform-origin: 50% 50%;
+}
+.nlcl-stage[data-placement="top"] .nlcl-chara__bubble,
+.nlcl-stage[data-placement="top"] .nlcl-chara__think {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+.nlcl-stage[data-placement="top"] .nlcl-chara__bubble::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #2f3a46;
 }
 .nlcl-chara__img {
   width: 100%;
@@ -253,6 +293,7 @@ export function charaLiveStageCss() {
 export function buildCharaLiveStageDom(doc, resolveUrl) {
   const root = doc.createElement('div');
   root.className = 'nlcl-stage';
+  root.dataset.placement = CHARA_LIVE_PLACEMENT;
   // 読み上げと同じ内容を SR にも届ける。会話が流れるので polite(割り込まない)。
   root.setAttribute('aria-live', 'polite');
 
