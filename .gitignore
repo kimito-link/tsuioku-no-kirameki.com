@@ -102,3 +102,6 @@ surechigai-user-needs-question.txt
 # Python bytecode cache (stage-submission.py 等)
 __pycache__/
 *.pyc
+
+# 自己改善ループの実データ置き場（症状カード・提案書・承認台帳）。実データが混ざりうるのでコミットしない
+_loop/
