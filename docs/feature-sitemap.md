@@ -306,8 +306,9 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 251</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 252</summary>
 
+- `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/perf-ab/lane-import-diff.mjs` — lane-import-diff — 「/live/ の集計を拡張へ輸入したら、いまの応援レーンと何が違うか」を数字にする(読み取り専用)。
 - `scripts/perf-ab/parity.mjs` — 会場(venue.html)が「POP(popup.html)の鏡の投影」になっているかを、時系列で測る。
@@ -896,13 +897,15 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 224</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 226</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
 - `scripts/audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
+- `scripts/audit/make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
+- `scripts/audit/static-dead-selectors.mjs` — 「CSSはあるのに対応するクラス/ID/属性を作るコードが無い(デッドな規則)」と
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
