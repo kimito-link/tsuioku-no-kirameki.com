@@ -597,6 +597,21 @@ const VENUE_CSS = `
   html.nlsb-venue-open .nlsb-toggle {
     display: none;
   }
+  /*
+   * v0.1.1654: 「しまう/戻す」(tuck)。コメント入力のあいだ、会場を閉じずに箱だけ一時的に隠す。
+   *   ・ニコ生のコメント入力欄はページ側の固定位置で、会場の箱(画面の下端固定)が高さ×表示幅しだいで覆う(実測: 9格子のうち5つ)。
+   *   ・✕で閉じると DOM と集計を捨てて再描画になる(clearDisplay)。しまうだけなら集計・DOM・席順は保持され、戻すのは瞬時。
+   *   ・hidden 属性は使わない(v0.1.1650 の安全網で display:none になり、席の幅の計算が変わる)=visibility で隠す(レイアウトは保つ)。
+   *   ・トグルは root の子。html.nlsb-venue-open 側の新しいクラスは作らず(契約を1本に保つ)、root の is-tucked で詳細度を上げて出す。
+   *   ・LANE_CSS_SYNC 区間の外。
+   */
+  .nlsb-root.nlsb-is-open.nlsb-is-tucked .nlsb-stage {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  html.nlsb-venue-open .nlsb-root.nlsb-is-tucked .nlsb-toggle {
+    display: inline-block;
+  }
   /* 動きを減らす設定の人には拡大アニメを出さない(a11y)。 */
   @media (prefers-reduced-motion: reduce) {
     .nlsb-toggle {
@@ -2700,6 +2715,18 @@ export function mountVenueBarButton(options = {}) {
     });
   }
 
+  // v0.1.1654: コメントを打つあいだ会場をしまう。押すと箱だけ隠れ、右下のピル『▲ 会場に戻る』で瞬時に戻る(集計・席順は保持)。
+  //   別窓(standalone)の会場は映像の埋め込みと同居していて、戻す導線(トグル)も無いので出さない。
+  /** @type {HTMLButtonElement|null} */
+  let tuckBtn = null;
+  if (!isStandalone) {
+    tuckBtn = document.createElement('button');
+    tuckBtn.type = 'button';
+    tuckBtn.className = 'nlsb-comeview-btn';
+    tuckBtn.textContent = '✍ しまう';
+    tuckBtn.title = 'コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます';
+    tuckBtn.addEventListener('click', () => setTucked(true));
+  }
   const note = document.createElement('div');
   note.className = 'nlsb-note';
   // 2026-06-22 会場「全員500人」: 席上限の表示も実定数に追従させる(150 固定の取り残しを是正)。
@@ -2707,9 +2734,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
+    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
   } else {
-    headerRight.append(rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
+    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
   }
   header.append(title, headerRight);
 
@@ -6973,6 +7000,26 @@ export function mountVenueBarButton(options = {}) {
     reflowListening = false;
   };
 
+  /** v0.1.1654: 会場を一時的にしまっているか(会場自体は開いたまま・閉じると必ず解除)。 */
+  let tucked = false;
+  const TOGGLE_LABEL_OPEN = toggle.textContent || '🏟 会場モード';
+  /** @param {boolean} next */
+  const setTucked = (next) => {
+    tucked = next === true;
+    root.classList.toggle('nlsb-is-tucked', tucked);
+    toggle.textContent = tucked ? '▲ 会場に戻る' : TOGGLE_LABEL_OPEN;
+    toggle.setAttribute('aria-label', tucked ? '会場に戻る' : '会場モード');
+    if (tucked) {
+      // しまう前に開いていたパネル・ホバーカードは閉じる(入力中に残さない)。
+      try {
+        closeSpeechPanel();
+        if (!rosterPanel.hidden) toggleRosterPanel(false);
+        if (!diagPanel.hidden) toggleDiagPanel(false);
+        closeHoverCard();
+      } catch { /* パネルの後始末の失敗でしまう処理を止めない */ }
+    }
+  };
+
   /**
    * @param {boolean} nextOpen
    * @param {boolean} persist
@@ -7000,6 +7047,7 @@ export function mountVenueBarButton(options = {}) {
       startAggregation();
       startSpeechPolling();
     } else {
+      setTucked(false); // v0.1.1654: 閉じたらしまい状態も解除(開き直しは必ず通常状態から)
       // v0.1.1645: 会場を閉じたらパネル・ホバーカードも閉じる(以前は開いたまま残り、再オープンで復活した)。
       try {
         closeSpeechPanel();
@@ -7032,6 +7080,11 @@ export function mountVenueBarButton(options = {}) {
   };
 
   toggle.addEventListener('click', () => {
+    // v0.1.1654: しまい中のトグルは『会場に戻る』(会場は開いたまま・閉じない)。
+    if (tucked) {
+      setTucked(false);
+      return;
+    }
     userChangedOpen = true;
     setOpen(!open, true);
   });
