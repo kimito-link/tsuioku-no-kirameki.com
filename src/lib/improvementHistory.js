@@ -2368,5 +2368,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1642', metric: 'cross-checked-claims', value: 27,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1641 の note と同じ理由)。今回は実際のニコ生配信(lv351604395)を開いたテスト環境で、通常クリックはタブが増えず発言パネルが開く・Ctrl+クリックは新規タブでパネルは開かないことを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1643', metric: 'bundle-kb', value: 1435,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場のクリック処理(venueBar.js 数十行)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1643', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1643', metric: 'cross-checked-claims', value: 28,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1642 の note と同じ理由)。今回は実配信(lv351612268)を開いたテスト環境で、席なしの広告・ギフト列のクリックでも新規タブが開かず発言パネルが開く・パネルを開いたまま別のアイコンをクリックしても閉じないことを確認した。'
   })
 ]);
