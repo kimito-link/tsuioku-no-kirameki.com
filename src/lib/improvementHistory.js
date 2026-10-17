@@ -2550,5 +2550,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1655', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1654 の note と同じ理由)。今回は、実配信の保存データ(公式ギフト貢献度65行・あかねこ。さんは33番目=11位・10pt)で原因を確かめ、全行を渡すと11位以下にも giftPt が付く単体テストと、10位で切ると付かないことの再現(先に赤)で確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1656', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は発言パネルのCSS(venueBar.js・数行)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1656', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1656', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1655 の note と同じ理由)。今回は実配信の前後比較(本文の幅 44px→470px・見出し3行→1行)で確認し、CSSの配線テストは元に戻すと赤くなることを確認した。'
   })
 ]);
