@@ -169,23 +169,30 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
  * 同一 userId が既に baseRows に居れば lastAt(capturedAt)を now に更新するだけ(重複行を作らない)。
  * 名前のある発言者はアリーナ席、名前の無い匿名は観客のまま(venueParticipantKey の規約に従う)。
  *
- * @param {ReadonlyArray<{userId?: string, name?: string, avatar?: string, capturedAt?: number}>} baseRows
+ * @param {ReadonlyArray<{userId?: string, name?: string, avatar?: string, capturedAt?: number, [k: string]: any}>} baseRows
  * @param {ReadonlyArray<{userId?: string, name?: string, text?: string}>} speeches pickNewVenueSpeech の speeches
  * @param {number} nowMs 現在時刻(発言を最新に並べるため)
- * @returns {Array<{userId: string, name: string, avatar: string, text: string, capturedAt: number}>}
+ * @returns {Array<{userId: string, name: string, avatar: string, text: string, capturedAt: number, [k: string]: any}>}
  */
 export function mergeSpeakersIntoVenueRows(baseRows, speeches, nowMs) {
   const base = Array.isArray(baseRows) ? baseRows : [];
   const talks = Array.isArray(speeches) ? speeches : [];
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
 
-  /** @type {Map<string, {userId: string, name: string, avatar: string, text: string, capturedAt: number}>} */
+  /** @type {Map<string, {userId: string, name: string, avatar: string, text: string, capturedAt: number, [k: string]: any}>} */
   const byUid = new Map();
   const out = [];
   for (const r of base) {
     if (!r || typeof r !== 'object') continue;
     const uid = String(r.userId ?? '').trim();
+    /*
+     * ★v0.1.1641: 既存行は【全フィールドを引き継ぐ】(spread)。以前は 5 項目だけで作り直していたため、発言が1件届くたびに
+     *   全員の speech(発言の証拠)・recentTexts(本文)・preCount・preHasGift・preGiftCount が消え、ホバーカードが次の集計
+     *   (最長30秒)まで『会場に居る』だけに崩れた。『個別列挙で作り直すと項目が黙って落ちる』型の再発防止。
+     *   正規化する 5 項目だけを上書きする(新しい項目が増えても自動で通る)。
+     */
     const row = {
+      ...r,
       userId: uid,
       name: String(r.name ?? '').trim(),
       avatar: String(r.avatar ?? '').trim(),

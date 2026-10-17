@@ -160,6 +160,26 @@ describe('mergeSpeakersIntoVenueRows', () => {
     expect(merged[0].capturedAt).toBe(5000);
   });
 
+  it('★既存行の speech・recentTexts・preCount・preHasGift・preGiftCount を落とさない(発言のたびに証拠が消えてカードが「会場に居る」に崩れた・v0.1.1641)', () => {
+    const speech = { comments: 3, lastAt: 90, texts: ['やあ', 'こんばんは'] };
+    const base = [
+      { userId: 'a', name: 'A', capturedAt: 100, text: '', speech, recentTexts: ['やあ'], preCount: 12, preHasGift: true, preGiftCount: 2 },
+      { userId: 'c', name: 'C', capturedAt: 50, preCount: 7 }
+    ];
+    const merged = mergeSpeakersIntoVenueRows(base, [{ userId: 'a', name: 'A', text: 'また' }], 5000);
+    const a = merged.find((r) => r.userId === 'a');
+    expect(a.capturedAt).toBe(5000); // 最終発言は now に進む(従来どおり)
+    expect(a.speech).toBe(speech);
+    expect(a.recentTexts).toEqual(['やあ']);
+    expect(a.preCount).toBe(12);
+    expect(a.preHasGift).toBe(true);
+    expect(a.preGiftCount).toBe(2);
+    // しゃべっていない人の行も同様に保たれる
+    expect(merged.find((r) => r.userId === 'c').preCount).toBe(7);
+    // 呼び出し元の行は変更しない(純関数)
+    expect(base[0].capturedAt).toBe(100);
+  });
+
   it('匿名(userIdあり・名前なし)もマージする', () => {
     const merged = mergeSpeakersIntoVenueRows([], [{ userId: 'x', name: '', text: 'y' }], 7);
     expect(merged).toHaveLength(1);

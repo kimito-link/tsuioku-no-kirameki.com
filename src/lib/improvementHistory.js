@@ -2340,5 +2340,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1640', metric: 'cross-checked-claims', value: 25,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1639 の note と同じ理由)。今回は暫定→確定の遷移を模擬した単体テストと、ガードを外す変異テスト(配線2件・追跡器2件が赤)で確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1641', metric: 'bundle-kb', value: 1434,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は発言者を会場行へ足す純関数(venueSpeech.js)の数行。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1641', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1641', metric: 'cross-checked-claims', value: 26,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1640 の note と同じ理由)。今回は、既存行の項目が落ちることを再現する単体テストと、該当の1行を外す変異テスト(赤になる)で確認した。'
   })
 ]);
