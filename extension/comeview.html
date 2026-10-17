@@ -335,6 +335,9 @@
       .cv-panel-body {
         flex: 1 1 auto;
         overflow-y: auto;
+        /* ★本文の下限(.cv-panel-text の min-width)を下回る狭さでは行が溢れる。
+           横に逃がして読めるようにする(潰して 1 文字ずつ折り返すより読める)。 */
+        overflow-x: auto;
         padding: 8px 12px 12px;
       }
       .cv-panel-note {
@@ -358,7 +361,11 @@
         min-width: 38px;
       }
       .cv-panel-text {
-        min-width: 0;
+        /* ★パネルが狭いと本文が 1〜2 文字ずつ折り返されて読めなくなる(2026-10-17 実測)。
+           原因は min-width:0 で本文が 0px まで潰れること。番号と時刻は flex:0 0 auto で
+           幅を譲らないため、狭い窓では本文だけが犠牲になっていた。
+           下限を置いて、それ以下なら行ごと横スクロールさせる(読めない状態を作らない)。 */
+        min-width: 8em;
         flex: 1 1 auto;
         word-break: break-word;
         white-space: pre-wrap;
