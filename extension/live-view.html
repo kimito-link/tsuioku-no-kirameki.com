@@ -19,6 +19,15 @@
         しない)+ 全画面。lv は live-view-entry.js が ?lv= から焼く。status の ensureStatusPopupIframe と同型。
     -->
     <style>
+      /*
+       * v0.1.1650: hidden 属性の安全網。作者 CSS の display(flex/grid/block)は UA の [hidden]{display:none} に勝つため、
+       *   hidden を付けても表示され続ける要素が繰り返し出た(閉じた発言パネル・案内の空 iframe・閉じたはずの枠 等・要素ごとに
+       *   [hidden]{display:none} を足すモグラ叩きになっていた)。全要素に対して hidden を必ず効かせる。
+       *   display を出すのは hidden を外したときだけ(JS が hidden=false にする経路は従来どおり)。
+       */
+      [hidden] {
+        display: none !important;
+      }
       :root {
         color-scheme: light;
       }
