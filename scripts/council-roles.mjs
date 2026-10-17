@@ -268,6 +268,25 @@ export function taskSpecifiesFormat(taskText) {
 }
 
 /**
+ * 会議の判断基準（全員に必ず渡す）。
+ * 正本: web-ios-android/CLAUDE.md「設計方針」節（CVR/LTV最大化 × 100年メンテナンスのいらない設計
+ * ＝根本解決 × 商品としてのインパクト）。ここは会議用の短縮コピー（配布境界をまたぐ意図的な複製）。
+ * なぜ要るか（2026-10-18 本人指摘）: 会議の system にこの基準が一語も無く、会議が「A案とB案、どちらにしますか」と
+ * 選択肢を並べて問い返す・対症療法を勧める・抜け漏れの多い案を出す、が起きていた。
+ * 基準は「迷ったときに自分で決めるための物差し」であり、利用者に選ばせる選択肢にしない。
+ */
+export const DESIGN_STANCE =
+  "【判断基準（必ず従う）】\n" +
+  "1. ユーザーの目的到達率(CVR)と使い続ける理由(LTV)を最大にする案を選ぶ。実装の都合を優先しない。\n" +
+  "2. 100年メンテナンスのいらない設計＝根本解決を選ぶ。症状だけ消す対症療法・ハードコード・抜け漏れのある検査は選ばない。\n" +
+  "3. 判断が割れたら、上の2つの基準で自分が1つに決め、理由を添えて断定する。「どちらにしますか」と問い返さない。" +
+  "選択肢を並べるのは、(a)事実として存在せず調べようがない情報（本人だけが知る事業判断）、" +
+  "(b)課金・公開・削除など取り消せない対外的な操作、のときだけ。それ以外は推奨を1つ決める。\n" +
+  "4. 「抜け漏れ」を点検する: 対象の全項目を先に列挙し、足りないものは『未対応』と明記する。省略したまま完成扱いにしない。\n" +
+  "5. 数値・実績・調査結果は、出典（実測・公式文書）を示せないなら断定しない。『仮説』と明記するか書かない。数字を創作しない。\n" +
+  "6. 提案がストア審査（Apple/Google）・法令・プラットフォーム規約の禁止事項に触れないかを先に確認する。確認できないものは『要確認』と明記し、触れる案は推奨しない。";
+
+/**
  * 役割と(必要なら)既定フォーマットを足した system を組み立てる。
  * @param {object} opts
  * @param {string} [opts.baseSystem]    会議の土台 system（無くてもよい）
@@ -282,7 +301,7 @@ export function buildSystem({ baseSystem = "", modelName, taskText = "", addForm
   // critic は自前の(0)〜(3)構造が出力フォーマットそのもの。DEFAULT_FORMATの4ブロックを
   // 追加で強制すると二重フォーマット指定になり指示過多で質が下がる（2026-07-04設計の結論）。
   const wantFormat = addFormat && key !== "critic" && !taskSpecifiesFormat(taskText);
-  const parts = [baseSystem, `【あなたの役割】${directive}`];
+  const parts = [baseSystem, DESIGN_STANCE, `【あなたの役割】${directive}`];
   if (wantFormat) parts.push(`【出力の型】\n${DEFAULT_FORMAT}`);
   return {
     system: parts.filter(Boolean).join("\n\n"),
