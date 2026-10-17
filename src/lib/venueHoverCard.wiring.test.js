@@ -215,6 +215,30 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
       expect(block.split('e.preventDefault()').length - 1).toBe(1);
     });
 
+    it('★席なしタイル(広告・ギフト列)は、段の索引に居なくてもタイル自身の href の数値IDで発言パネルを開く(新規タブだけ開く症状・v0.1.1643)', () => {
+      const wireAt = venueBarSrc.indexOf('const wireSpeechPanelDelegation');
+      const end = venueBarSrc.indexOf('wireSpeechPanelDelegation(seatsHost)', wireAt);
+      const block = venueBarSrc.slice(wireAt, end);
+      expect(venueBarSrc).toContain('const tileIdentityFromAnchor = (el) =>');
+      // 索引(data)に uid が無いときだけ href から拾う(索引にあるならそちらが正本)。
+      expect(block).toContain('data?.uid ? { uid: \'\', name: \'\' } : tileIdentityFromAnchor(anchorEl)');
+      expect(block).toContain('fromTile.uid');
+      // 匿名(リンク無し)は拾わない=本登録の数値IDだけ。
+      const fnAt = venueBarSrc.indexOf('const tileIdentityFromAnchor');
+      const fn = venueBarSrc.slice(fnAt, venueBarSrc.indexOf('const wireSpeechPanelDelegation', fnAt));
+      expect(fn).toContain('isNumericNicoUserId(cand)');
+    });
+
+    it('★開いているパネルがあれば先に閉じてから開く(旧パネルの stage リスナーが新パネルを即閉じて「読み込み中…」のまま残る症状・v0.1.1643)', () => {
+      const wireAt = venueBarSrc.indexOf('const wireSpeechPanelDelegation');
+      const end = venueBarSrc.indexOf('wireSpeechPanelDelegation(seatsHost)', wireAt);
+      const block = venueBarSrc.slice(wireAt, end);
+      const closeAt = block.indexOf('if (!speechPanel.hidden) closeSpeechPanel();');
+      const openAt = block.indexOf('openSpeechPanelFor(');
+      expect(closeAt).toBeGreaterThan(0);
+      expect(openAt).toBeGreaterThan(closeAt);
+    });
+
     it('★テール(ctail)の読みにもタイムアウトがある(保存領域が詰まっても「読み込み中…」のまま固まらない・v0.1.1642)', () => {
       const fnAt = venueBarSrc.indexOf('const readVenueCommentRowsForSpeech');
       const fnEnd = venueBarSrc.indexOf('const onSpeechOutsideClick', fnAt);
