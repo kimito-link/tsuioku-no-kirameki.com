@@ -199,6 +199,31 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
       expect(paintBlock).not.toContain('readVenueCommentRowsForSpeech(');
     });
 
+    it('★通常クリックはリンクを止めて発言パネルだけ開く(プロフィールの新規タブを同時に開かない)・修飾キー/中クリックはリンクのまま(v0.1.1642)', () => {
+      const wireAt = venueBarSrc.indexOf('const wireSpeechPanelDelegation');
+      const end = venueBarSrc.indexOf('wireSpeechPanelDelegation(seatsHost)', wireAt);
+      const block = venueBarSrc.slice(wireAt, end);
+      // uid が無い人(広告主等)の早期 return より【後ろ】で preventDefault する=広告主のリンクは従来どおり動く。
+      const uidAt = block.indexOf('if (!uid) return');
+      const modAt = block.indexOf('e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;');
+      const pdAt = block.indexOf('e.preventDefault()');
+      const openAt = block.indexOf('openSpeechPanelFor(');
+      expect(uidAt).toBeGreaterThan(0);
+      expect(modAt).toBeGreaterThan(uidAt);
+      expect(pdAt).toBeGreaterThan(modAt);
+      expect(openAt).toBeGreaterThan(pdAt);
+      expect(block.split('e.preventDefault()').length - 1).toBe(1);
+    });
+
+    it('★テール(ctail)の読みにもタイムアウトがある(保存領域が詰まっても「読み込み中…」のまま固まらない・v0.1.1642)', () => {
+      const fnAt = venueBarSrc.indexOf('const readVenueCommentRowsForSpeech');
+      const fnEnd = venueBarSrc.indexOf('const onSpeechOutsideClick', fnAt);
+      const body = venueBarSrc.slice(fnAt, fnEnd);
+      // 素の chrome.storage.local.get(tKey) を await しない(タイムアウトの外に出さない)。
+      expect(body).not.toContain('await chrome.storage.local.get(tKey)');
+      expect(body).toContain('runStorageOpWithTimeout(() => chrome.storage.local.get(tKey), 8000)');
+    });
+
     it('uid が無い人(広告主等)ではパネルを開かない(発言記録に紐づかない)', () => {
       const wireAt = venueBarSrc.indexOf('const wireSpeechPanelDelegation');
       const block = venueBarSrc.slice(wireAt, wireAt + 900);
