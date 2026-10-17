@@ -6956,9 +6956,26 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  /**
+   * v0.1.1657: 会場の【外】の入力欄(ニコ生のコメント欄など)にいるか。会場内の入力(あれば)は対象外。
+   * @param {EventTarget | null} t
+   */
+  const isEditableOutsideVenue = (t) => {
+    if (!(t instanceof HTMLElement)) return false;
+    if (root.contains(t)) return false;
+    return t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT';
+  };
+
   /** @param {KeyboardEvent} event */
   const onEscapeKey = (event) => {
     if (event.key !== 'Escape' || !open) return;
+    // v0.1.1657: 日本語入力の変換取消の Esc や、コメント欄での Esc で会場ごと閉じない。
+    if (event.isComposing || event.keyCode === 229 || isEditableOutsideVenue(event.target)) return;
+    // v0.1.1657: 「しまう」中の Esc は戻すだけ(記録と表示を保ったまま、コメントを打つための機能なので閉じない)。
+    if (tucked) {
+      setTucked(false);
+      return;
+    }
     // v0.1.738: 診断パネルが開いていれば、まずそれだけ閉じる(会場ごと閉じない)。
     //   × が反応しない時の確実な代替手段(ユーザー報告対策)。
     // v0.1.1645: 発言パネル・状態パネルも同じ扱い(以前は一覧パネルだけで、他が開いていると会場ごと閉じた)。

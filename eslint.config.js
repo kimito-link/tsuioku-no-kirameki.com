@@ -417,8 +417,9 @@ export default [
   {
     // 安全網のみ。分割は別地図。
     // v0.1.1656: 発言パネルの本文が狭い不具合のCSS(+15行・大半は【なぜ】のコメント)。VENUE_CSS は文字列なのでコメントを削ると原因が残らない。
+    // v0.1.1657: Esc の入口の判定(変換中・入力欄・しまい中)=+17行(大半は【なぜ】のコメント)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7211, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7228, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
