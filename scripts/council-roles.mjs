@@ -350,6 +350,10 @@ export function weightOf(label) {
     // 2026-07-14 追加: NIM超大型の予備層。CF勢(weight4・並列FAILED実績あり)より上、
     // 本線(weight1)とnvidia既存枠(weight2)より下。deepseekは実測5〜15秒と遅いが
     // 並列会議では律速にならないため遅さでの格下げはしない。
+    // ★2026-10-17 追加: cloudflare/deepseek-v4-pro は nvidia の deepseek-v4 と名前が同じで、下の
+    //  "deepseek-v4"→3 に先に当たってしまう。新規は予備の最下位(weight4)から入れる規約（CF勢と同じ）なので、
+    //  この1行を "deepseek-v4"→3 より【前】に置く（ifは先勝ち）。他のCF勢の重みは変えない（"cloudflare" 全体ではなく狭く指定）。
+    if (n.includes("cloudflare/deepseek-v4")) return 4;
     if (n.includes("deepseek-v4")) return 3;
     // ★2026-09-02 昇格(3→1): magistral-medium を lead 主力にする。
     //  実測(統括プロンプト・3回): magistral-medium 1745/2176/2496ms に対し、

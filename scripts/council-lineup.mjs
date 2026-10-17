@@ -147,7 +147,12 @@ export const LINEUP = [
   //   groq全滅時に共倒れして冗長化の目的を果たさない（恒久ルール5違反）。速さより経路分散。
   //  ラベルは 'cloudflare/gpt-oss-20b' 必須: 'oss-20b' 等に略すとroleOfがgeneralist誤判定する
   //  （roleOfは部分一致・先勝ちのため。実行検証済み）。
-  { label: 'cloudflare/gpt-oss-20b', provider: 'cloudflare', rawId: '@cf/openai/gpt-oss-20b', apiModel: '@cf/openai/gpt-oss-20b', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+  // ★2026-10-17 opts を実測で決めた（推論モデルが本番の上限 max_tokens 1600 を推論で使い切り、最終回答に至らない問題）:
+  //   実会議(COUNCIL_FULL・本番と同じコードパス)で、本文が空・finish_reason=length の reasoning を回答に採用していたため、
+  //   日報の成績では「失敗0%」に見えていた（実際は推論の独白が回答になっていた）。meeting.mjs 側で正直に失敗として数えるよう直した。
+  //   この枠: 既定は 9570ms・finish=length・推論4700字・本文0字 → reasoning_effort:'low' で 4415ms・finish=stop・702トークン・本文978字（groq/gpt-oss-20b と同じ設定）。
+  //   他の変種(chat_template_kwargs / enable_thinking / reasoning.effort)は効かなかった（いずれも finish=length）。
+  { label: 'cloudflare/gpt-oss-20b', provider: 'cloudflare', rawId: '@cf/openai/gpt-oss-20b', apiModel: '@cf/openai/gpt-oss-20b', opts: { reasoning_effort: 'low' }, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
   // ★2026-09-03 追加（fast役のクラウド不在を解消＋Llama系0体の是正）:
   //  それまで **fast役はクラウドに1体も居らず**、ローカル local/qwen3.5:9b の単騎だった。
@@ -201,7 +206,30 @@ export const LINEUP = [
   // 実IDは /ai/models/search で実機確認済み(@cf/zai-org/glm-4.7-flash)。単発疎通は200 OK確認済み。
   // 2026-07-31: glm-5.2が有料化により強制撤去されたため、このモデルがcritic役の一本に
   // 確定した（トライアル判定は事実上「合格」で終了）。rawId埋め＋liveProbe追加は上記と同じ理由。
-  { label: 'cloudflare/glm-4.7-flash', provider: 'cloudflare', rawId: '@cf/zai-org/glm-4.7-flash', apiModel: '@cf/zai-org/glm-4.7-flash', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+  // ★2026-10-17 入れ替え（cloudflare/glm-4.7-flash → cloudflare/deepseek-v4-pro-0813・同プロバイダ/同役割critic/同weight4）:
+  //  足すのではなく【入れ替え】（同プロバイダ・同役割の予備を重ねない恒久ルール5に触れない）。
+  //  実測A: 実会議(COUNCIL_FULL=1・本番と同じ meeting.mjs のコードパス・20体)で glm-4.7-flash の「回答」は
+  //   推論の独白だった（先頭が "1.  **Analyze the Request:** ..."・5975字・42670ms）。content が空で
+  //   reasoning を回答に採用する経路（openaiChat）が、最終回答に至る前の思考メモをそのまま会議に流していた。
+  //   同じ会議の nvidia/deepseek-v4.1-flash も独白（"We need answer in Japanese..."・5898字・105759ms）。
+  //   ★この経路の修正は meeting.mjs 側にも入れた（本文が空で finish_reason=length の reasoning は採用しない＝正直に失敗にする）。
+  //  実測B（同じ設計判断・本番と同じ指示文・2並列・max_tokens 4000・2026-10-17）:
+  //   cloudflare/deepseek-v4-pro-0813 → 21517ms / 26752ms・finish=stop・1106/1658トークン・4見出しを守る。
+  //    ★ただし2回に1回は content が空で reasoning のみ(finish=stop)＝不安定。opts.max_tokens を3000に上げて余裕を持たせた。
+  //   cloudflare/glm-4.7-flash(旧) → 56021ms(推論で4000を使い切り本文空) / 31532ms(3566トークンでやっと回答)＝遅く不安定。
+  //  ★不採用（同条件の実測。"新しい＝使える"ではない）:
+  //   - cloudflare/glm-5.3・kimi-k2.6・deepseek-v4-flash-0731: max_tokens 4000でも推論で使い切り本文が空（66〜81秒）。
+  //   - gemini-4-argon・gemini-3.1-pro-preview: 429（無料枠にquota無し・恒久ルール1違反）。
+  //   - mistral-medium-3.5: 429（Mistral無料枠は全モデル同じ上限に当たる）。
+  //   - openrouter/thinkingmachines/inkling:free: 403「agentic harnesses専用」＝API経由では使えない。
+  //   - nvidia/moonshotai/kimi-k2.6: 404（このアカウントでは未提供）。nvidia/z-ai/glm-5.3: 157秒で上限・タイムアウト。
+  //  昇格基準は新規予備と同じ: 7日以上空けた実会議2回でFAILEDゼロなら正規化。降格基準: weight4のまま据え置き。
+  //  旧: { label: 'cloudflare/glm-4.7-flash', rawId/apiModel: '@cf/zai-org/glm-4.7-flash', timeoutMs: 60000 }（2026-07-04採用）
+  // ★2026-10-17 追補（上の入れ替えの設定）: 既定・reasoning_effort=low・enable_thinking=false(直下)・reasoning.effort=low は
+  //   いずれも推論で1600を使い切り finish=length・本文0字（max_tokens 3000でも実会議で上限に当たる回があった）。
+  //   chat_template_kwargs.enable_thinking=false だけが finish=stop・1045トークン・本文1624字・推論0字・20310ms。
+  //   ★推論を切って直接答えさせる設定（深い推論は捨てる）。max_tokens は余裕を見て2400。
+  { label: 'cloudflare/deepseek-v4-pro', provider: 'cloudflare', rawId: '@cf/deepseek-ai/deepseek-v4-pro-0813', apiModel: '@cf/deepseek-ai/deepseek-v4-pro-0813', opts: { chat_template_kwargs: { enable_thinking: false }, max_tokens: 2400 }, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
   // 2026-06-?? 追加 → 2026-07-31 撤去（nvidia/qwen3.5-122b）:
   //   本改修でrawIdを空('')からapiModelと同値('qwen/qwen3.5-122b-a10b')に埋め、
@@ -228,7 +256,12 @@ export const LINEUP = [
   //  恒久ルール3と一致するため個別の重み付けは足さない（weightOfに例外行を増やさない）。
   //  つまり平常時はgroq/qwen3.6-27b(weight1)が選ばれ、本エントリはgroqが落ちた時だけ浮上する。
   //  rawId=apiModelなのでcouncil-scoutの健康診断とliveProbeの対象に入る。
-  { label: 'cloudflare/qwen3-30b-a3b', provider: 'cloudflare', rawId: '@cf/qwen/qwen3-30b-a3b-fp8', apiModel: '@cf/qwen/qwen3-30b-a3b-fp8', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+  // ★2026-10-17 opts を実測で決めた（推論モデルが本番の上限 max_tokens 1600 を推論で使い切り、最終回答に至らない問題）:
+  //   実会議(COUNCIL_FULL・本番と同じコードパス)で、本文が空・finish_reason=length の reasoning を回答に採用していたため、
+  //   日報の成績では「失敗0%」に見えていた（実際は推論の独白が回答になっていた）。meeting.mjs 側で正直に失敗として数えるよう直した。
+  //   この枠: 既定でも収まる回があるが不安定(実会議で推論6855字・finish=length の回あり)。reasoning_effort:'low' で 1006→609トークン・本文は同等(485字)に減った。
+  // ★2026-10-17 max_tokens: 3000 を追加: reasoning_effort:'low' でも実会議で推論6855字・finish=length に当たる回があった(3回中2回)。余裕を持たせる。
+  { label: 'cloudflare/qwen3-30b-a3b', provider: 'cloudflare', rawId: '@cf/qwen/qwen3-30b-a3b-fp8', apiModel: '@cf/qwen/qwen3-30b-a3b-fp8', opts: { reasoning_effort: 'low', max_tokens: 3000 }, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
   // 2026-07-14 追加 → 2026-07-23 EOL（nvidia/mistral-large-3-675b）:
   //   会議のlead(統括)枠が従来local/gemma4(8B)頼みで全役割中最弱だった穴を埋める本命として
@@ -315,7 +348,15 @@ export const LINEUP = [
   //   groq・cloudflare の2種で、nvidia は critic に**居ない**ので抵触しない。
   //  ★nvidia枠のlead(nemotron)と同じプロバイダになるが、役割が違うので重ね積みではない。
   //   NVIDIA障害時に critic が groq/cloudflare の2体で残ることは実測の生存表で確認済み。
-  { label: 'nvidia/deepseek-v4.1-flash', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4.1-flash', apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: {}, requires: ['N'], liveProbe: true },
+  // ★2026-10-17 opts を実測で決めた（推論モデルが本番の上限 max_tokens 1600 を推論で使い切り、最終回答に至らない問題）:
+  //   実会議(COUNCIL_FULL・本番と同じコードパス)で、本文が空・finish_reason=length の reasoning を回答に採用していたため、
+  //   日報の成績では「失敗0%」に見えていた（実際は推論の独白が回答になっていた）。meeting.mjs 側で正直に失敗として数えるよう直した。
+  //   この枠: 既定は推論5818字で finish=length（実会議 105759ms・独白5898字が回答になっていた）。
+  //   chat_template_kwargs.enable_thinking=false で finish=stop・955トークン・本文1328字・推論0字（ただし NIM の応答が遅く 83589ms）。
+  //   reasoning_effort:'low' は効かない（79363ms・finish=length）。enable_thinking 単体 / reasoning.effort は 400（NIMが未対応のパラメータ）。
+  // ★2026-10-17 timeoutMs: 90000 を追加: 推論を切っても NIM の応答が遅く、実会議(COUNCIL_FULL)で 267243ms（既定150秒のabort後の再試行で完走）。
+  //   1体の遅さが会議全体を止める（会議は並列で、律速は最も遅いメンバー）。scout の実疎通と同じ90秒で諦めて失敗として数える（採用基準: 遅さで会議を止める枠は置かない）。
+  { label: 'nvidia/deepseek-v4.1-flash', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4.1-flash', apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
 
   // 2026-07-31 追加: NVIDIA lead正規(nemotron-3-ultra-550b)の別経路予備。OpenRouterの無料
   // モデル一覧(:freeサフィックス)に同一モデルが存在することを発見し、3並列200 OK(360/402/2140ms)
