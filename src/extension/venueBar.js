@@ -1627,7 +1627,16 @@ const VENUE_CSS = `
     left: 50%;
     transform: translateX(-50%);
     width: min(560px, 92vw);
-    max-height: 72vh;
+    /*
+     * v0.1.1653: パネルの下端を【会場の箱の最大上端】より上に収める(ヘッダーの6ボタンを覆わない)。
+     *   以前は max-height:72vh で、top:8% から画面の80%まで伸び、画面の下半分にある会場ヘッダーを覆っていた
+     *   (実測: 420/640 で6/6、1280 で4/6のボタンが押せない)。
+     *   計算: 上端 8vh から、会場の箱の上端(= 100vh − 箱の最大高 var(--nlsb-venue-max-h) − 下余白79px実測 − 余白9px)まで。
+     *   → 92vh − var(--nlsb-venue-max-h) − 88px。top と bottom の両方を指定すると中身が少なくても枠いっぱいに伸びるので、上限(max-height)で表す。
+     *   --nlsb-venue-max-h は stage に注入する(パネルは stage の子。seating の inline に置くとパネルから見えない)。
+     *   短い窓で負になっても 160px は確保(中身は .nlsb-roster-list がスクロール)。
+     */
+    max-height: max(160px, calc(92vh - var(--nlsb-venue-max-h, 48vh) - 88px));
     z-index: 6;
     display: flex;
     flex-direction: column;
@@ -3844,7 +3853,8 @@ export function mountVenueBarButton(options = {}) {
   const onRosterOutsideClick = (event) => {
     if (rosterPanel.hidden) return;
     const target = /** @type {Node|null} */ (event.target);
-    if (target && rosterPanel.contains(target)) return; // パネル内は維持
+    // v0.1.1653: 自分の開閉ボタンも除外(ボタン側がトグルする)。除外しないと『開いている状態で押す→ここで閉じる→ボタンが再び開く』=閉じられない。
+    if (target && (rosterPanel.contains(target) || rosterBtn.contains(target))) return; // パネル内・自分のボタンは維持
     toggleRosterPanel(false);
   };
   // ───────── 発言パネル(アイコンクリックで開く・v0.1.1205) ─────────
@@ -4110,7 +4120,8 @@ export function mountVenueBarButton(options = {}) {
   const onDiagOutsideClick = (event) => {
     if (diagPanel.hidden) return;
     const target = /** @type {Node|null} */ (event.target);
-    if (target && diagPanel.contains(target)) return;
+    // v0.1.1653: 自分の開閉ボタンも除外(理由は onRosterOutsideClick と同じ)。
+    if (target && (diagPanel.contains(target) || diagBtn.contains(target))) return;
     toggleDiagPanel(false);
   };
   /** @param {boolean} [force] */
@@ -5320,13 +5331,12 @@ export function mountVenueBarButton(options = {}) {
     //   満席感は面積でなく「全員の顔(overflow-y)+入場演出」で表現する方針に変更。
     //   経緯の正本は src/lib/venueViewport.js の resolveVenueMaxHeightVh JSDoc。
     //   ここは呼び出し署名を変えずに残す(参加者数は将来の密度表現で使う余地がある)。
-    const seatingHostEl = seatsHost.parentElement;
-    if (seatingHostEl) {
-      seatingHostEl.style.setProperty(
-        '--nlsb-venue-max-h',
-        `${resolveVenueMaxHeightVh(seating.participantCount)}vh`
-      );
-    }
+    // v0.1.1653: 注入先を seating から stage へ。カスタムプロパティは継承するので seating の max-height(var(--nlsb-venue-max-h,48vh))は
+    //   そのまま効き、stage の子であるパネル(.nlsb-roster-panel)の max-height からも同じ値が見える(会場の箱の上端と同じ基準)。
+    stage.style.setProperty(
+      '--nlsb-venue-max-h',
+      `${resolveVenueMaxHeightVh(seating.participantCount)}vh`
+    );
     // 会議確定B(横スクロール根絶+映像セーフエリア): 論理席は維持しつつ、同時表示は
     //   行に収まる数に絞る。縮小でなく表示人数を減らす(名前/ID/サムネを潰さない)。
     //   直近発言者は selectStableVisibleMembers で必ず表示に含め、席順は安定(ちらつかない)。
