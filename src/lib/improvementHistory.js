@@ -2508,5 +2508,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1652', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1651 の note と同じ理由)。今回は実配信(lv351562946)を開いたテスト環境で、会場の広告段の器が修正前は --gift で行の幅が器より14px狭く(1144/1158)、修正後は --ad で器と同じ幅(1158/1158)になることを前後比較し、スクリーンショットでも確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1653', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場のパネルのCSS 1規則と、パネルの外側クリックの処理(venueBar.js 数行)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1653', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1653', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1652 の note と同じ理由)。今回は実配信(lv351562946)を表示幅×高さの5格子(420x900・640x900・1280x900・1280x720・1280x1000)で開いたテスト環境で、一覧パネルを開いた状態のヘッダー6ボタンのうち押せない数が修正前 6・6・2・2・2 から、修正後は全格子で 0 になることを前後比較し、会場の箱の最大高(432/345.6/480px)が変わらないこと、ボタンを押すたびに開閉が切り替わること(二重トグルなし)も確認した。'
   })
 ]);
