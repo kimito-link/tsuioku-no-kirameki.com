@@ -541,8 +541,15 @@ const VENUE_CSS = `
     color: #f7f7f7;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
+  /*
+   * v0.1.1648: 会場を開いている間も、透明な所のクリックはニコ生の画面へ通す。
+   *   以前は root/stage/stage-layout が全面 pointer-events:auto で、映像・再生ボタン・音量・コメント入力欄の上を会場が覆い、
+   *   会場を閉じるまで押せなかった(実測: 映像の中心を elementFromPoint すると .nlsb-root 配下が返った)。
+   *   → 全面を覆う3枚(root / stage / stage-layout)は none。押す必要がある所(ヘッダー・席・パネル・トグル)だけ auto を明示する。
+   *   pointer-events は子へ継承されるので、auto の箱(.nlsb-seating)の中身はそのまま押せる。
+   */
   .nlsb-root.nlsb-is-open {
-    pointer-events: auto;
+    pointer-events: none;
   }
   /* ★2026-08-11 v0.1.1323 ユーザー報告「会場モードにするボタンがないかも？どこ？」:
      見つけられなかったのは position:absolute + 暗色 + 13px の三重苦だった。
@@ -721,7 +728,7 @@ const VENUE_CSS = `
     opacity: 1;
     transform: translateY(0);
     visibility: visible;
-    pointer-events: auto;
+    pointer-events: none; /* v0.1.1648: 透明な所は素通し(押せる箱は個別に auto) */
     transition-delay: 0s;
   }
   /*
@@ -806,11 +813,11 @@ const VENUE_CSS = `
       "seating";
     gap: clamp(8px, 1.5vh, 16px);
     /*
-     * 親は pointer-events:auto のまま(none にすると実マウスのヒットテストが親で止まり、
-     * 子の <a> リンクが「クリックできない」になる=ユーザー不満の原因だった)。
-     * 中央の映像を触りたいときは下の .nlsb-safe-area だけ none で透過させる。
+     * v0.1.1648: 旧コメント『none にすると子の <a> がクリックできなくなる』は誤り(pointer-events:auto を子で明示すれば押せる)。
+     *   親を none にしないと、子の safe-area を none にしても親が受けてしまい、映像へクリックが通らなかった。
+     *   押せる箱(.nlsb-seating)は auto を明示済み(下)。
      */
-    pointer-events: auto;
+    pointer-events: none;
   }
   /* 中央の映像セーフエリア: UI を一切置かず、クリックを透過して映像/本家UIを直接触れる。 */
   .nlsb-safe-area {
@@ -1606,6 +1613,7 @@ const VENUE_CSS = `
   }
   /* 診断: メンバー一覧パネル(モーダル風)。会場の上に重ねて出す。 */
   .nlsb-roster-panel {
+    pointer-events: auto; /* v0.1.1648: 親(stage)が none なので、パネルは自分で受ける */
     position: absolute;
     top: 8%;
     left: 50%;
@@ -3869,6 +3877,12 @@ export function mountVenueBarButton(options = {}) {
     return rows;
   };
 
+  /*
+   * v0.1.1648: 3枚のパネル(発言・一覧・状態)の『外側クリックで閉じる』は document の【キャプチャ段階】で受ける。
+   *   ・stage は透明な所のクリックを通す(pointer-events:none)ので、stage の click リスナーには来ない。
+   *   ・ニコ生のプレーヤーは映像のクリックを自分で止める(stopPropagation)ことがあり、バブリング段階の document には届かない。
+   *   キャプチャなら先に受けられる。タイルのクリックでは、先に旧パネルが閉じ、続いてタイルの処理が新しいパネルを開く(順序は意図どおり)。
+   */
   /** @param {MouseEvent} event */
   const onSpeechOutsideClick = (event) => {
     if (speechPanel.hidden) return;
@@ -3881,7 +3895,7 @@ export function mountVenueBarButton(options = {}) {
   const closeSpeechPanel = () => {
     speechOpenGen += 1; // 読込中に閉じた/別の人を開いた場合、古い読込の結果を捨てさせる
     speechPanel.hidden = true;
-    stage.removeEventListener('click', onSpeechOutsideClick);
+    document.removeEventListener('click', onSpeechOutsideClick, true);
   };
   /**
    * 発言パネルの見出しを組む（★§3.5 の「セットで出す」をここで満たす）。
@@ -3948,7 +3962,7 @@ export function mountVenueBarButton(options = {}) {
     const closeBtnEl = speechPanel.querySelector('.nlsb-roster-close');
     if (closeBtnEl) closeBtnEl.addEventListener('click', () => closeSpeechPanel());
     setTimeout(() => {
-      if (!speechPanel.hidden) stage.addEventListener('click', onSpeechOutsideClick);
+      if (!speechPanel.hidden) document.addEventListener('click', onSpeechOutsideClick, true);
     }, 0);
 
     /** @type {Array<{ text?: unknown, capturedAt?: unknown }>} */
@@ -4033,10 +4047,10 @@ export function mountVenueBarButton(options = {}) {
     if (next) {
       // 開いたクリックが即座に外側判定されないよう、次tickでリスナーを張る。
       setTimeout(() => {
-        if (!rosterPanel.hidden) stage.addEventListener('click', onRosterOutsideClick);
+        if (!rosterPanel.hidden) document.addEventListener('click', onRosterOutsideClick, true);
       }, 0);
     } else {
-      stage.removeEventListener('click', onRosterOutsideClick);
+      document.removeEventListener('click', onRosterOutsideClick, true);
     }
   };
 
@@ -4086,10 +4100,10 @@ export function mountVenueBarButton(options = {}) {
     diagPanel.hidden = !next;
     if (next) {
       setTimeout(() => {
-        if (!diagPanel.hidden) stage.addEventListener('click', onDiagOutsideClick);
+        if (!diagPanel.hidden) document.addEventListener('click', onDiagOutsideClick, true);
       }, 0);
     } else {
-      stage.removeEventListener('click', onDiagOutsideClick);
+      document.removeEventListener('click', onDiagOutsideClick, true);
     }
   };
   // ユーザー方針「しゃべった匿名もアリーナに出して吹かせる」: 発言した userId を蓄積し、
