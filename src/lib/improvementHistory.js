@@ -2606,5 +2606,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1659', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1658 の note と同じ理由)。今回は実配信で、記名の人の明細と注記が出ること・IDのない人には何も出ないことを確認し、判定 lib の各ガードは外すと赤になることを変異テストで確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1660', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は書き出しHTMLの演出を既定で無効にするスイッチ1つ(marketingChartsHtml.js)。拡張本体の描画には影響しない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1660', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1660', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1659 の note と同じ理由)。今回は生成HTMLに演出の部品が入っていないことをテストで固定し、スイッチを戻すと赤になることを変異テストで確認した。'
   })
 ]);
