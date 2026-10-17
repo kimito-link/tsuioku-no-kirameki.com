@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1617',
+    date: '2026-10-08',
+    summary: 'ギフト・広告の列が一瞬消えるのを防ぐ',
+    items: Object.freeze([
+      '視聴中の配信が一瞬なくなって同じ配信へ戻ると、ギフト列・広告列の人が一度消えて、取り直すまで29人→14人のように減って見えていました。同じ配信へ戻るときは、前の人たちを引き継ぐようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1616',
     date: '2026-10-08',
     summary: 'グリッドの中身の入替を数える',
