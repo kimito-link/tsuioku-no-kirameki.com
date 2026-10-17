@@ -2711,9 +2711,25 @@ export function mountVenueBarButton(options = {}) {
   //   ドラッグ判定(moved)が立ったら席リンクの click を1回だけ抑止し、誤遷移を防ぐ。
   let venueDrag = initVenueDragState();
   const venueDragMaxScroll = () => Math.max(0, seatsHost.scrollHeight - seatsHost.clientHeight);
+  /*
+   * v0.1.1646: ドラッグ直後の click を飲み込む仕掛けは、click が来ないと【残り続けて】次の正規クリックを1回食っていた
+   *   (ボタンを会場の外で離す=pointerleave、pointercancel、タッチのネイティブスクロールで終わる場合は click が来ない)。
+   *   ・寿命を持たせる: 飲み込みは短時間(VENUE_DRAG_SWALLOW_MS)だけ。click は pointerup の直後に来るので十分。
+   *   ・次の pointerdown でも必ず外す。
+   */
+  const VENUE_DRAG_SWALLOW_MS = 400;
+  /** @type {{ fn: (ev: Event) => void, timer: number }|null} */
+  let venueSwallow = null;
+  const clearVenueSwallow = () => {
+    if (!venueSwallow) return;
+    seatsHost.removeEventListener('click', venueSwallow.fn, true);
+    window.clearTimeout(venueSwallow.timer);
+    venueSwallow = null;
+  };
   seatsHost.addEventListener('pointerdown', (e) => {
     // 左ボタンのみ。スクロールバー上のドラッグは OS に任せる(配信操作を邪魔しない)。
     if (e.button !== 0) return;
+    clearVenueSwallow(); // 前のドラッグの飲み込みが残っていても、新しい操作の click は通す
     venueDrag = beginVenueDrag(e.clientY, seatsHost.scrollTop);
     seatsHost.classList.add('nlsb-is-grabbing');
   });
@@ -2733,12 +2749,14 @@ export function mountVenueBarButton(options = {}) {
     seatsHost.classList.remove('nlsb-is-grabbing');
     if (wasDrag) {
       // 直後の click(席リンク)を1回だけ飲み込む(ドラッグで指を離した位置のリンクへ飛ばない)。
+      clearVenueSwallow();
       /** @param {Event} ev */
       const swallow = (ev) => {
         ev.stopPropagation();
         if (typeof ev.preventDefault === 'function') ev.preventDefault();
-        seatsHost.removeEventListener('click', swallow, true);
+        clearVenueSwallow();
       };
+      venueSwallow = { fn: swallow, timer: window.setTimeout(clearVenueSwallow, VENUE_DRAG_SWALLOW_MS) };
       seatsHost.addEventListener('click', swallow, true);
     }
   };

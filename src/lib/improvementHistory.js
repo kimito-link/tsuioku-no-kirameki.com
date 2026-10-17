@@ -2410,5 +2410,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1645', metric: 'cross-checked-claims', value: 30,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1644 の note と同じ理由)。今回は実配信(lv351612268)を開いたテスト環境で、Escが発言パネルだけを閉じ会場は残る・2回目のEscで会場が閉じる・パネルを開いたまま会場を閉じて開き直してもパネルが復活しないことを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1646', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場のドラッグ処理(venueBar.js 数十行)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1646', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1646', metric: 'cross-checked-claims', value: 31,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1645 の note と同じ理由)。今回は実配信(lv351612268)を開いたテスト環境で、ドラッグして会場の外でボタンを離したあとの最初のクリックが、修正前は発言パネルが開かず、修正後は開くことを前後比較で確認した。'
   })
 ]);
