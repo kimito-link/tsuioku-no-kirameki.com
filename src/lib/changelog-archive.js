@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1637',
+    date: '2026-10-17',
+    summary: 'ゆっくり3人を会場の上のほうへ移した',
+    items: Object.freeze([
+      '会場の右下にいたゆっくり3人(りんく・こん太・たぬ姉)が、PICK UP 枠やコメントに重なって邪魔だったので、ニコ生ページの上のほう(メニューの帯のあたり)へ移しました。大きさは約半分(64px)で、右寄せで並んでふわふわ浮かびます。配信の操作は邪魔しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1636',
     date: '2026-10-17',
     summary: 'ピックアップ枠に発言者のサムネとIDを出す',

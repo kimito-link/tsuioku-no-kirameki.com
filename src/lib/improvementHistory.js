@@ -2564,5 +2564,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1656', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1655 の note と同じ理由)。今回は実配信の前後比較(本文の幅 44px→470px・見出し3行→1行)で確認し、CSSの配線テストは元に戻すと赤くなることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1657', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版(0.1.1656)と同じ 1439KB で、今回の変更による増加はゼロ。変更は comeview.html の CSS 2 行(min-width と overflow-x)だけで、バンドルされる JS に触れていない。過去最良との差は 1618 以降の /live/ 取り込みなど別要因。'
+  }),
+  Object.freeze({
+    version: '0.1.1657', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1657', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(1630〜1656 の note と同じ理由)。今回は実測で確かめている: パネル幅150pxで本文が23行(1文字ずつ)になることを再現し、修正後に3行へ戻ることを同じ環境で測った。'
   })
 ]);
