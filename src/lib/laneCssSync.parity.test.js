@@ -31,6 +31,7 @@ const EXPECTED_SELECTOR_DIFFS = [
   { sel: "#sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']", has: 'PL-', status: 'intended', why: '後列LOD(直接子形)。会場は下の子孫形(laneDensityLod.wiring.test.js)' },
   { sel: "#sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0'] .nl-story-userlane-avatar", has: 'PL-', status: 'intended', why: '同上' },
   { sel: "#sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0'] .nl-story-userlane-meta", has: 'PL-', status: 'intended', why: '同上' },
+  { sel: ".nl-story-userlane--tanu", has: '--V', status: 'intended', why: 'たぬ姉段の gap:4px。popup/live-view は id セレクタ(#sceneStoryUserLaneTanu)で同じ値を持ち、会場は段の器が id を持たないためクラス(makeLane が --tanu を付ける・venueTanuLane.wiring.test.js)で書く。v0.1.1651' },
   { sel: ".nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0']", has: '--V', status: 'intended', why: '後列LOD(子孫形)。会場は席ラッパ(.nlsb-seat)で包むため' },
   { sel: ".nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0'] .nl-story-userlane-avatar", has: '--V', status: 'intended', why: '同上' },
   { sel: ".nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0'] .nl-story-userlane-meta", has: '--V', status: 'intended', why: '同上' },
