@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 931 件
+## ⚠️ 役割コメントが無いソース 8 / 932 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -847,7 +847,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2002)
+- 📁 **src/** (2005)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1129,7 +1129,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1764)
+  - 📁 **lib/** (1767)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2709,6 +2709,9 @@
     - `venueFullscreenWiring.wiring.test.js`
     - `venueGeometryVerdict.js` — 会場と①POPのタイル寸法差が「CSS不整合」か「測定対象ズレ」かを見分ける純関数(v0.1.1212)。
     - `venueGeometryVerdict.test.js`
+    - `venueGiftThrowsForUser.js` — 会場の発言パネルに出す「この人のギフトの1回ごとの明細」を、別人のものを貼らないよう安全に作る(純関数)。v0.1.1659。
+    - `venueGiftThrowsForUser.test.js`
+    - `venueGiftThrowsWiring.test.js`
     - `venueHeaderWrap.wiring.test.js`
     - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
     - `venueHeat.test.js`
