@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 930 件
+## ⚠️ 役割コメントが無いソース 8 / 931 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (353)
+- 📁 **docs/** (354)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -565,6 +565,7 @@
   - `repo-tree-map.html`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
+  - `self-improvement-loop-DESIGN.md`
   - `site-health.md`
   - `story-user-lane-pipeline.md`
   - `surechigai-lite-improvement-plan.md`
@@ -846,7 +847,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1999)
+- 📁 **src/** (2002)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1128,7 +1129,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1761)
+  - 📁 **lib/** (1764)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2784,8 +2785,11 @@
     - `venueSpeechCensusWiring.wiring.test.js`
     - `venueSpeechPanelIdentity.wiring.test.js`
     - `venueSpeechPanelWidth.wiring.test.js`
+    - `venueSpeechStats.js` — 会場の発言パネルに出す「この人の応援(ギフト・広告)」の一行(純関数・DOM 非依存)。v0.1.1658。
+    - `venueSpeechStats.test.js`
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
+    - `venueSpeechSupport.wiring.test.js`
     - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
     - `venueStoryDiagMirrorPanel.test.js`
     - `venueTanuLane.wiring.test.js`
