@@ -514,6 +514,33 @@ export function triggerCharaReaction(state, input) {
 }
 
 /**
+ * お祝い(応援コメント100件など)で 3 体を同時に「笑顔+口パク」にする(2026-10-17)。
+ *   相槌(triggerCharaReaction)と違い 1 体ではなく【全員】・既に idle/react の子だけ(返事/考え込み中の意図は潰さない)。
+ *   吹き出しは出さない(text 空)。見た目の弾みは CSS(.is-cheering)と badge が担い、ここは表情だけ。
+ *
+ * @param {CharaLiveState} state 破壊的に更新する
+ * @param {{ nowMs: number, durationMs?: number }} input
+ * @returns {CharaId[]} お祝いに入った子
+ */
+export function triggerCharaCheer(state, input) {
+  const now = Number(input?.nowMs) || 0;
+  const duration = Number.isFinite(input?.durationMs) ? Math.max(REACT_MIN_MS, Number(input.durationMs)) : 2400;
+  /** @type {CharaId[]} */
+  const out = [];
+  for (const id of CHARA_LIVE_IDS) {
+    const slot = state?.slots?.[id];
+    if (!slot) continue;
+    if (slot.mode !== 'idle' && slot.mode !== 'react') continue;
+    slot.mode = 'react';
+    slot.modeStartedAtMs = now;
+    slot.untilMs = now + duration;
+    slot.text = '';
+    out.push(id);
+  }
+  return out;
+}
+
+/**
  * 配信者の呼びかけへの返事を始める。
  *
  * 名指しがあればその子。無ければ「直前に喋った子以外」から選ぶ。

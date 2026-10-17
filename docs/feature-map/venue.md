@@ -32,6 +32,7 @@ graph LR
   n_venue --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
   n_venue --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
   n_venue --> n_src_lib_charaLiveCensus_js["lib/charaLiveCensus.js"]:::shared
+  n_venue --> n_src_lib_charaLiveCheerTrigger_js["lib/charaLiveCheerTrigger.js"]:::shared
   n_venue --> n_src_lib_charaLiveController_js["lib/charaLiveController.js"]:::shared
   n_venue --> n_src_lib_charaLiveStage_js["lib/charaLiveStage.js"]:::shared
   n_venue --> n_src_lib_charaLiveState_js["lib/charaLiveState.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_venue --> n_src_lib_extDocBusyCensusBoot_js["lib/extDocBusyCensusBoot.js"]:::shared
   n_venue --> n_src_lib_extProcessCensusKey_js["lib/extProcessCensusKey.js"]:::shared
   n_venue --> n_src_lib_giftDeltaFallback_js["lib/giftDeltaFallback.js"]:::shared
-  n_venue --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 116 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 118 ファイル省略（全件は storage-bus.md / metafile 参照）。

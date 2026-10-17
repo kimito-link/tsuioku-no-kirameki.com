@@ -26,9 +26,11 @@ import {
   triggerCharaAnswer,
   startCharaThinking,
   endCharaThinking,
+  triggerCharaCheer,
   buildCharaLiveRenderModel,
   REACT_MIN_MS
 } from './charaLiveState.js';
+import { cheerLabel } from './charaLiveCheerTrigger.js';
 import {
   buildCharaLiveStageDom,
   applyCharaLiveFrame,
@@ -61,6 +63,9 @@ export const FRAME_MIN_GAP_MS = Math.round(1000 / CHARA_LIVE_FPS);
  */
 export const REACTION_MIN_GAP_MS = 2600;
 
+/** お祝い(cheer)の長さ(ms)。映像を覆う時間の上限でもある(上端の約150px以内・この間だけ)。 */
+export const CHEER_DURATION_MS = 2400;
+
 /**
  * キャラライブを起動する。
  *
@@ -82,6 +87,7 @@ export const REACTION_MIN_GAP_MS = 2600;
  *   setVisible: (next: boolean) => void,
  *   onCommentSpoken: (input: { commentKey: string, text?: string }) => void,
  *   onCommentSpokenEnd: () => void,
+ *   cheer: (input: { milestone: number }) => boolean,
  *   onStreamerAddressed: (input: { prompt: string, answer?: string, durationMs?: number }) => string,
  *   beginThinking: (input?: { prompt?: string, charaId?: string|null }) => string,
  *   endThinking: (input?: { charaId?: string|null }) => string[],
@@ -143,7 +149,7 @@ export function startCharaLive(deps) {
     (doc.head || doc.documentElement).appendChild(style);
   }
 
-  const { root, nodes } = buildCharaLiveStageDom(doc, resolveUrl);
+  const { root, badge, nodes } = buildCharaLiveStageDom(doc, resolveUrl);
   (deps.mount || doc.body || doc.documentElement).appendChild(root);
 
   // 表情差分を先読み(初回のちらつき防止)。
@@ -163,6 +169,8 @@ export function startCharaLive(deps) {
   let speakingChara = /** @type {import('./charaLiveState.js').CharaId|null} */ (null);
   let frameId = 0;
   let destroyed = false;
+  /** お祝いの終了時刻(0=していない)。tick が見て畳む(timer を増やさない)。 */
+  let cheerUntilMs = 0;
 
   // ---- 毎フレーム ----------------------------------------------------------
   const tick = () => {
@@ -182,6 +190,11 @@ export function startCharaLive(deps) {
     }
     needsImmediateDraw = false;
     lastDrawMs = t;
+    if (cheerUntilMs && t >= cheerUntilMs) {
+      cheerUntilMs = 0;
+      root.classList.remove('is-cheering');
+      badge.hidden = true;
+    }
     expireCharaModes(state, t);
     const model = buildCharaLiveRenderModel(state, {
       timeMs: t,
@@ -254,6 +267,31 @@ export function startCharaLive(deps) {
         needsImmediateDraw = true;
       }
       speakingChara = null;
+    },
+
+    /**
+     * お祝い(応援コメント100件など): 3人が笑顔+口パクで弾み、「100件!」のバッジを出す(2026-10-17)。
+     *   しゃべる設定(talk)とは独立=talk:false でも効く。お祝い中の再入は無視する(キューしない=節目は数分に1回以下)。
+     *   判定(いつ祝うか)は charaLiveCheerTrigger.js、ここは見せるだけ。
+     * @param {{ milestone: number }} input
+     * @returns {boolean} 始めたか(中・不正・非表示は false)
+     */
+    cheer(input) {
+      if (destroyed || !visible) return false;
+      const label = cheerLabel(input?.milestone);
+      if (!label) return false;
+      const t = now();
+      if (cheerUntilMs && t < cheerUntilMs) return false;
+      cheerUntilMs = t + CHEER_DURATION_MS;
+      triggerCharaCheer(state, { nowMs: t, durationMs: CHEER_DURATION_MS });
+      badge.textContent = label;
+      badge.hidden = false;
+      // CSS animation を最初から再生させる(同じ要素で2回目のお祝いが動かない事故を防ぐ)。
+      root.classList.remove('is-cheering');
+      void root.offsetWidth;
+      root.classList.add('is-cheering');
+      needsImmediateDraw = true;
+      return true;
     },
 
     /**
