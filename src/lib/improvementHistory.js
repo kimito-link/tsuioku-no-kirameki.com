@@ -2382,5 +2382,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1643', metric: 'cross-checked-claims', value: 28,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1642 の note と同じ理由)。今回は実配信(lv351612268)を開いたテスト環境で、席なしの広告・ギフト列のクリックでも新規タブが開かず発言パネルが開く・パネルを開いたまま別のアイコンをクリックしても閉じないことを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1644', metric: 'bundle-kb', value: 1435,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場のCSS 1規則(venueBar.js)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1644', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1644', metric: 'cross-checked-claims', value: 29,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1643 の note と同じ理由)。今回は実配信(lv351612268)を開いたテスト環境で、閉じた発言パネルが修正前は 562×520 で表示され続け、修正後は display:none・0×0 になることを実測で確認した。'
   })
 ]);
