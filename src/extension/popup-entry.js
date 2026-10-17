@@ -6267,6 +6267,14 @@ const _laneHeat = createLaneHeatTracker();
 /** koken 貢献度行を最後に取得した時刻(storage の capturedAt)。refreshNorthStarContributionRankingLaneAsync が更新する。 */
 let _kokenRowsCapturedAtMs = 0;
 /**
+ * v0.1.1655: タイル 3 行目の 🎁pt 用に、公式ギフト貢献度【全行】を控える(配信 ID つき)。
+ *   北極星レーン/鏡(_northStarMirrorLanes.contributionRanking)は UI の都合で 10 位までに切ってある。タイルの 🎁pt をそこから作ると、
+ *   11 位以下の人には 🎁pt が付かない(実機: 10pt 投げたあかねこ。さんがギフト列に出ているのに pt が無かった・公式は 65 行・彼女は 33 番目=11位)。
+ *   タイルの値は uid→pt の表引きなので全行を使っても UI は膨らまない(ランキングの描画は従来どおり 10 位まで)。
+ * @type {{ liveId: string, rows: any[] }}
+ */
+let _kokenRowsAllForTileStats = { liveId: '', rows: [] };
+/**
  * v0.1.1562: タイル 3 行目(🎁📣💬)の値を【ここで 1 回だけ】合成して各段のアイテムに載せる。
  *   ②会場・③別窓は再計算せず、鏡(nls_lane_mirror_v2)の additive な stats を読むだけ。
  *   付加情報なので失敗してもレーン描画は止めない(素の buckets をそのまま返す)。
@@ -6276,7 +6284,12 @@ function withLaneTileStats(buckets) {
   try {
     const withStats = attachLaneTileStats(buckets, buildLaneTileStatsIndex({
       aggregates: STORY_SOURCE_STATE.laneAggregates,
-      kokenRows: _northStarMirrorLanes.contributionRanking,
+      // v0.1.1655: 同じ配信の全行があればそれを使う(10位までの鏡は 11位以下の 🎁pt を落とす)。別配信の控えは使わない。
+      kokenRows:
+        _kokenRowsAllForTileStats.rows.length > 0 &&
+        _kokenRowsAllForTileStats.liveId === String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase()
+          ? _kokenRowsAllForTileStats.rows
+          : _northStarMirrorLanes.contributionRanking,
       nicoadRows: _northStarMirrorLanes.adRanking
     }));
     // v0.1.1565: ギフト増分(公式 koken の標本間差分)。標本時刻は koken storage の capturedAt(既存の読みで控えた値)。
@@ -11937,6 +11950,7 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
     // v0.1.284: 10 位までで打ち切り（koken API は rank=20 で取るが UI は 1-10 位
     // が正本＝ニコ生本体表示と並びを揃え、11位以降のノイズで横が膨らむのを防ぐ）。
     const top10 = ranking.slice(0, 10);
+    _kokenRowsAllForTileStats = { liveId: String(liveId || '').trim().toLowerCase(), rows: ranking }; // v0.1.1655: タイルの 🎁pt 用(全行)
     const rooms = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'contrib' });
     // 縦リスト専用 host class が前回付いていたら剥がしてから横カードへ切替。
     body.classList.remove('nl-contrib-ranking-list-host');
