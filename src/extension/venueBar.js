@@ -133,6 +133,7 @@ import { highlightLedgerReadKeys, isHighlightWorthyKind, planHighlightAppend } f
 // anonymousIdenticonDataUrl は P3(v0.1.1117)で venueLaneBuckets(①正本委譲)側へ移動=venueBar 直参照なし。
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
+import { speechSupportLine, speechEmptyMessage } from '../lib/venueSpeechStats.js';
 import { isContextInvalidatedError } from '../lib/reportSilentError.js';
 // v0.1.1080: マイ効果音・ボイス/BGM計器が直接 chrome.storage.local を叩くと、拡張リロード後の
 //   古い会場レイヤーで同期 TypeError(chrome.storage が undefined)が uncaught のまま残る。
@@ -1767,6 +1768,14 @@ const VENUE_CSS = `
     flex-wrap: wrap;
     gap: 8px;
   }
+  /* v0.1.1658: 発言パネルの「ギフト・広告」の一行(タイル3行目と同じ値)。 */
+  .nlsb-speech-panel .nlsb-speech-support {
+    padding: 2px 14px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffd98a;
+    overflow-wrap: anywhere;
+  }
   .nlsb-speech-panel .nlsb-roster-title {
     flex: 1 1 0;
     min-width: 0;
@@ -3217,7 +3226,12 @@ export function mountVenueBarButton(options = {}) {
       // v0.1.1643: 開いているパネルがあれば先に閉じる(=旧パネルの stage リスナーを外す)。外さないと、この同じクリックが
       //   stage へ伝わった時に旧リスナーが『外側クリック』と判定し、開いたばかりの新パネルを即閉じて『読み込み中…』のまま残る。
       if (!speechPanel.hidden) closeSpeechPanel();
-      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc });
+      // v0.1.1658: タイル3行目(🎁📣💬)の文字列をそのまま渡す=新しい取得ゼロ・タイルと同じ値(venueSpeechStats.js)。
+      let statsText = '';
+      try {
+        statsText = String(anchorEl.querySelector('[data-stats]')?.getAttribute('data-stats') || '');
+      } catch { /* 取れなくてもパネルは開く */ }
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc, statsText });
     });
   };
   wireSpeechPanelDelegation(seatsHost);
@@ -4021,7 +4035,7 @@ export function mountVenueBarButton(options = {}) {
   /**
    * その人の全発言を読み込んでパネルに出す。
    * ★storage read はこの関数の中だけ=クリックした瞬間だけ(常時readを増やさない)。
-   * @param {{ uid: string, displayName: string, avatarSrc?: string }} who
+   * @param {{ uid: string, displayName: string, avatarSrc?: string, statsText?: string }} who
    */
   const openSpeechPanelFor = async (who) => {
     const uid = String(who?.uid || '').trim();
@@ -4037,6 +4051,7 @@ export function mountVenueBarButton(options = {}) {
       '(名前なし)';
     if (!uid) return; // uid が無い人(広告主等)は発言記録に紐づかない
     const avatarSrc = String(who?.avatarSrc || '').trim();
+    const statsText = String(who?.statsText || '');
     const gen = (speechOpenGen += 1);
     const head = buildSpeechPanelHeadHtml(uid, name, avatarSrc, '', '');
     speechPanel.innerHTML = `${head}<div class="nlsb-roster-list"><div class="nlsb-roster-empty">読み込み中…</div></div>`;
@@ -4116,7 +4131,11 @@ export function mountVenueBarButton(options = {}) {
     }
     speechPanel.innerHTML =
       buildSpeechPanelHeadHtml(uid, name, avatarSrc, presenceNote, total ? note : '') +
-      `<div class="nlsb-roster-list">${listHtml || '<div class="nlsb-roster-empty">この配信の記録にはまだ発言がありません</div>'}</div>`;
+      // v0.1.1658: ギフト・広告の応援の一行(タイルと同じ値)。コメントが0件でも、応援している人にはそれを見せる。
+      (speechSupportLine(statsText)
+        ? `<div class="nlsb-speech-support">${escapeHtml(speechSupportLine(statsText))}</div>`
+        : '') +
+      `<div class="nlsb-roster-list">${listHtml || `<div class="nlsb-roster-empty">${escapeHtml(speechEmptyMessage(statsText))}</div>`}</div>`;
     const closeBtn2 = speechPanel.querySelector('.nlsb-roster-close');
     if (closeBtn2) closeBtn2.addEventListener('click', () => closeSpeechPanel());
   };

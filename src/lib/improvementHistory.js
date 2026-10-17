@@ -2578,5 +2578,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1657', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1656 の note と同じ理由)。今回は実配信で、変換中・入力欄・しまい中・通常の4通りのEscを送って確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は発言パネルの表示(venueBar.js 数行+新規の小さな lib 1つ)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1657 の note と同じ理由)。今回は実配信で、ギフト・広告だけの人をクリックして、応援の一行と文言が出ることを確認した。'
   })
 ]);
