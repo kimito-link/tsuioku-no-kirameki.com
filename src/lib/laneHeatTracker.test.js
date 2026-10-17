@@ -28,11 +28,50 @@ describe('createLaneHeatTracker(直近60秒にコメントが増えた人・v0.1
     expect(t.observe('lv1', rows({ a: 4 }), T0 + 3_000 + LANE_HEAT_WINDOW_MS).has('a')).toBe(false);
   });
 
-  it('減少は無視し、基準だけ更新する(負の heat を作らない)', () => {
+  it('減少は無視する(負の heat を作らない)', () => {
     const t = createLaneHeatTracker();
     t.observe('lv1', rows({ a: 10 }), T0);
     expect(t.observe('lv1', rows({ a: 7 }), T0 + 3_000).size).toBe(0);
-    expect(t.observe('lv1', rows({ a: 8 }), T0 + 6_000).get('a').heat).toBe(1);
+    expect(t.observe('lv1', rows({ a: 8 }), T0 + 6_000).size).toBe(0);
+  });
+
+  it('★一時的な減少(暫定供給)から元の件数に戻っても、戻った分を増分として数えない(+N件の誤爆・v0.1.1640)', () => {
+    const t = createLaneHeatTracker();
+    t.observe('lv1', rows({ a: 10, b: 5 }), T0);
+    expect(t.observe('lv1', rows({ a: 3, b: 1 }), T0 + 3_000).size).toBe(0); // 暫定で小さい件数
+    expect(t.observe('lv1', rows({ a: 10, b: 5 }), T0 + 6_000).size).toBe(0); // 確定で戻る=増分ではない
+    // 本当に増えたら、基準(10)からの差だけが出る
+    expect(t.observe('lv1', rows({ a: 11, b: 5 }), T0 + 9_000).get('a').heat).toBe(1);
+  });
+
+  it('★減少が窓(60秒)以上続いたら本当に減ったとみなして基準を下げる(固着しない)', () => {
+    const t = createLaneHeatTracker();
+    t.observe('lv1', rows({ a: 10 }), T0);
+    t.observe('lv1', rows({ a: 7 }), T0 + 3_000);
+    t.observe('lv1', rows({ a: 7 }), T0 + 3_000 + LANE_HEAT_WINDOW_MS); // 窓以上続いた→基準7
+    expect(t.observe('lv1', rows({ a: 8 }), T0 + 6_000 + LANE_HEAT_WINDOW_MS).get('a').heat).toBe(1);
+  });
+
+  it('★peek は状態を進めない(基準・観測時刻を変えず、窓内の増分だけ返す)', () => {
+    const t = createLaneHeatTracker();
+    t.observe('lv1', rows({ a: 1 }), T0);
+    t.observe('lv1', rows({ a: 4 }), T0 + 3_000);
+    expect(t.peek('lv1', T0 + 6_000).get('a').heat).toBe(3);
+    // peek は基準を触らない: 暫定の小さい値を観測せず peek しただけなので、続く observe の差分は変わらない
+    expect(t.observe('lv1', rows({ a: 5 }), T0 + 9_000).get('a').heat).toBe(4);
+    // 窓を過ぎれば peek でも失効、観測が長く止まっていたら溜まった増分は出さない
+    expect(t.peek('lv1', T0 + 9_000 + LANE_HEAT_WINDOW_MS).has('a')).toBe(false);
+    expect(createLaneHeatTracker().peek('lv1', T0).size).toBe(0);
+    const t2 = createLaneHeatTracker();
+    t2.observe('lv1', rows({ a: 1 }), T0);
+    t2.observe('lv1', rows({ a: 4 }), T0 + 1_000);
+    expect(t2.peek('lv1', T0 + 1_000 + 200_000).size).toBe(0);
+    // 別の配信なら、窓内でも旧配信の増分を返さない(配信切替直後の暫定供給)
+    const t3 = createLaneHeatTracker();
+    t3.observe('lv1', rows({ a: 1 }), T0);
+    t3.observe('lv1', rows({ a: 4 }), T0 + 1_000);
+    expect(t3.peek('lv1', T0 + 2_000).size).toBe(1);
+    expect(t3.peek('lv2', T0 + 2_000).size).toBe(0);
   });
 
   it('後から現れた人も初回はベースライン(出現時のコメント数を「増分」と誤認しない)', () => {

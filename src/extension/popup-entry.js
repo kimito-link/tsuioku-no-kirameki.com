@@ -6287,13 +6287,17 @@ function withLaneTileStats(buckets) {
       _kokenRowsCapturedAtMs
     );
     // v0.1.1566: 熱い人(直近60秒のコメント増分)。鏡 publish は sig 判定より前なので裏タブでも会場へ届く。
-    const heat = _laneHeat.observe(
-      STORY_SOURCE_STATE.liveId,
-      (Array.isArray(STORY_SOURCE_STATE.laneAggregates) ? STORY_SOURCE_STATE.laneAggregates : []).map(
-        (a) => ({ uid: String(/** @type {any} */ (a)?.userId || ''), commentCount: Number(/** @type {any} */ (a)?.commentCount) })
-      ),
-      Date.now()
-    );
+    // v0.1.1640: 暫定供給(LIGHT/FALLBACK/暫定HEAVY)は件数が確定より小さい。ここで observe すると基準が揺れて +N件 が誤爆するので、
+    //   暫定の間は状態を進めない peek だけ(影運用 observeLaneImportShadowNow の『確定供給のときだけ』と同じ判定)。
+    const heat = STORY_SOURCE_STATE.entriesProvisional
+      ? _laneHeat.peek(STORY_SOURCE_STATE.liveId, Date.now())
+      : _laneHeat.observe(
+        STORY_SOURCE_STATE.liveId,
+        (Array.isArray(STORY_SOURCE_STATE.laneAggregates) ? STORY_SOURCE_STATE.laneAggregates : []).map(
+          (a) => ({ uid: String(/** @type {any} */ (a)?.userId || ''), commentCount: Number(/** @type {any} */ (a)?.commentCount) })
+        ),
+        Date.now()
+      );
     return attachLaneTilePulse(withStats, mergeLanePulseMaps(giftPulseByUid(gift), heatPulseByUid(heat)));
   } catch {
     return buckets;
