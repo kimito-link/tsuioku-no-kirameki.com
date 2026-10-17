@@ -2452,5 +2452,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1648', metric: 'cross-checked-claims', value: 33,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1647 の note と同じ理由)。今回は実配信(lv351612268)を開いたテスト環境で、会場を開いたまま映像の位置の elementFromPoint が修正前は会場配下・修正後はページ(VIDEO)を返すこと、ヘッダーボタンとタイルは会場が受けること、パネルの外をクリックするとパネルだけ閉じ会場は残ることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1649', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場のCSS 1規則(venueBar.js)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1649', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1649', metric: 'cross-checked-claims', value: 34,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1648 の note と同じ理由)。今回は実配信(lv351562946)を開いたテスト環境で、会場を開いたときのポップアップの iframe が修正前は visible・修正後は hidden、閉じると元の visible に戻ることを前後比較し、スクリーンショットでも透けが消えたことを確認した。'
   })
 ]);
