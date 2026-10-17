@@ -325,6 +325,7 @@ import { venueHoverCardPresenceVerdict } from '../lib/venueHoverCardProbe.js';
 import { resolveVenueHoverFacts } from '../lib/venueHoverFacts.js';
 import { hasSpeech, speechWithFallbackTexts } from '../lib/speechEvidence.js';
 import { appendPickupRows } from '../lib/venuePickupRing.js';
+import { resolvePickupSpeaker } from '../lib/venuePickupSpeaker.js';
 // キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
 import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
@@ -602,7 +603,7 @@ const VENUE_CSS = `
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 34px;
+    min-height: 44px;
     margin: 4px 0 6px;
     padding: 6px 10px;
     border-radius: 8px;
@@ -635,6 +636,23 @@ const VENUE_CSS = `
     background: rgba(255, 152, 0, 0.9);
     color: #fff;
   }
+  .nlsb-pickup__face {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 0 1px rgba(255, 245, 232, 0.45);
+  }
+  .nlsb-pickup__face[hidden] { display: none; }
+  .nlsb-pickup__main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
   .nlsb-pickup__body {
     flex: 1 1 auto;
     min-width: 0;
@@ -646,8 +664,15 @@ const VENUE_CSS = `
   .nlsb-pickup__meta {
     flex: 0 0 auto;
     font-size: 11px;
-    opacity: 0.75;
+    opacity: 0.8;
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+  .nlsb-pickup__meta:empty { display: none; }
+  a.nlsb-pickup__meta[href] { text-decoration: underline; text-underline-offset: 2px; }
   .nlsb-stage {
     position: fixed;
     inset: 0;
@@ -3282,7 +3307,7 @@ export function mountVenueBarButton(options = {}) {
   //   退化し、以降の在席描画(rosterToVenueRows→commitDisplay)が補強を素通り→記名段が白円、の退行を塞ぐ。
   //   更新元=aggregateParticipants(初回/standalone 30秒)+storage.onChanged(newValue直採用=追加readゼロ)。
   //   消費=commitDisplay が毎描画で enrich(冪等)。
-  /** @type {Record<string, { avatarUrl?: unknown }>|null} */
+  /** @type {Record<string, { avatarUrl?: unknown, nickname?: unknown }>|null} */
   let profileAvatarMap = null;
   // v0.1.1111 会場=①レーン鏡映: ①の実paint鏡(KEY_LANE_MIRROR)のキャッシュ。
   //   laneMirrorSnap=最新(開時catch-up 1回+onChangedのnewValue直採用=追加readゼロ)。
@@ -6136,7 +6161,7 @@ export function mountVenueBarButton(options = {}) {
       );
       if (!open || liveIdFromPathname() !== liveId) return;
       const profileMap =
-        /** @type {Record<string, { avatarUrl?: unknown }>|null} */ (
+        /** @type {Record<string, { avatarUrl?: unknown, nickname?: unknown }>|null} */ (
           profileBag?.[KEY_USER_COMMENT_PROFILE_CACHE] || null
         );
       // v0.1.1110: 補強は commitDisplay(全描画の関所)が毎回行う。ここでは閉包キャッシュの
@@ -6354,7 +6379,10 @@ export function mountVenueBarButton(options = {}) {
     };
     // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
     if (result.speeches.length > 0) {
-      pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now());
+      pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now(), {
+        // 発言者のサムネ・ハンドル名・ID・リンクをセットで(§3.5)。サムネは観測済みのプロフィール > uid から導出 > 匿名は identicon。
+        resolveSpeaker: (sp) => resolvePickupSpeaker(sp, { profileAvatarUrl: profileAvatarMap && profileAvatarMap[String(sp?.userId || '')]?.avatarUrl, profileNickname: profileAvatarMap && profileAvatarMap[String(sp?.userId || '')]?.nickname })
+      });
       updatePickupBanner(null);
     }
     // ユーザー方針「しゃべった人を席に出して吹かせる」: 新着発言者を会場行にマージして
@@ -6592,7 +6620,7 @@ export function mountVenueBarButton(options = {}) {
       typeof profChange.newValue === 'object' &&
       !Array.isArray(profChange.newValue)
     ) {
-      profileAvatarMap = /** @type {Record<string, { avatarUrl?: unknown }>} */ (profChange.newValue);
+      profileAvatarMap = /** @type {Record<string, { avatarUrl?: unknown, nickname?: unknown }>} */ (profChange.newValue);
       if (rosterDriven) scheduleRosterCommit();
     }
     // v0.1.1111 会場=①レーン鏡映: ①が publish した実paint鏡の新着を newValue 直採用(追加readゼロ)。

@@ -394,6 +394,7 @@
 | `src/lib/venueOpenLatency.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venuePickupBanner.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venuePickupRing.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venuePickupSpeaker.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venuePresenceNote.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueResidents.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueRoster.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |

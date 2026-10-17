@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1636',
+    date: '2026-10-17',
+    summary: 'ピックアップ枠に発言者のサムネとIDを出す',
+    items: Object.freeze([
+      '会場の「PICK UP」枠に、誰の発言かが分かるように、発言者のサムネ・ハンドルネーム・IDを出すようにしました。数字のIDの人は、IDからユーザーページへ飛べます。匿名の人は「匿名NNN」と代替の顔で出し、IDやリンクは作りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1635',
     date: '2026-10-17',
     summary: '会場のピックアップ枠に本当にコメントが出る',
@@ -183,14 +191,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'ギフト・広告の列が一瞬消えるのを防ぐ',
     items: Object.freeze([
       '視聴中の配信が一瞬なくなって同じ配信へ戻ると、ギフト列・広告列の人が一度消えて、取り直すまで29人→14人のように減って見えていました。同じ配信へ戻るときは、前の人たちを引き継ぐようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1616',
-    date: '2026-10-08',
-    summary: 'グリッドの中身の入替を数える',
-    items: Object.freeze([
-      '応援コメントのアイコングリッドで、同じマスに別のコメントが入った回数と、ID が後から付いた回数を数えて状態速報に出すようにしました(ちらつきの原因を調べるための計器です)。'
     ])
   })
 ]);
