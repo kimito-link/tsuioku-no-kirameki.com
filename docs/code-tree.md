@@ -839,7 +839,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1983)
+- 📁 **src/** (1984)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1121,7 +1121,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1745)
+  - 📁 **lib/** (1746)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1845,6 +1845,7 @@
     - `laneDomSelfMeasure.js` — ⚠️ 役割コメント無し
     - `laneDomSelfMeasure.test.js`
     - `laneDomTileCount.probe.test.js`
+    - `laneHeatProvisionalGuard.wiring.test.js`
     - `laneHeatTracker.js` — 応援レーンの「熱い人」: 直近 60 秒にコメント件数が増えた人を見つける(純関数的な器・乱数もタイマーも無い)。
     - `laneHeatTracker.test.js`
     - `laneImportContract.test.js`
