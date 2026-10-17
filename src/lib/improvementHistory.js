@@ -2466,5 +2466,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1649', metric: 'cross-checked-claims', value: 34,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1648 の note と同じ理由)。今回は実配信(lv351562946)を開いたテスト環境で、会場を開いたときのポップアップの iframe が修正前は visible・修正後は hidden、閉じると元の visible に戻ることを前後比較し、スクリーンショットでも透けが消えたことを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1650', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は各ページ先頭のCSS 1規則(popup.html・状態画面・別窓・コメビュ・会場)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1650', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1650', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1649 の note と同じ理由)。今回は拡張の7ページ(popup・状態・コメビュ・別窓・会場・サイドパネル)を実ブラウザで開き、hidden 属性なのに表示扱いの要素数を前後比較した(修正前: popup 20・status 12・live-view 1、修正後: 全ページ 0)。実配信でポップアップが正常に描画される(557タイル・統計カード・起動の幕は非表示)ことと、会場の Esc・クリック透過・パネルの開閉が退行しないことも確認した。'
   })
 ]);
