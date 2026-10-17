@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1618',
+    date: '2026-10-08',
+    summary: '拡張が/live/と同じ数え方で差を測る',
+    items: Object.freeze([
+      '拡張の中でも、/live/ と同じ数え方(配信者を除く・ID なしは数えない・コメントの多い順)で応援レーンを作り、いまの応援レーンと並べて違いを数えるようにしました(表示はまだ変えません。状態速報の「/live/規則との差」の行で確認できます)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1617',
     date: '2026-10-08',
     summary: 'ギフト・広告の列が一瞬消えるのを防ぐ',
