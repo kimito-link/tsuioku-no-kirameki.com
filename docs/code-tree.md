@@ -839,7 +839,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1991)
+- 📁 **src/** (1992)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1121,7 +1121,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1753)
+  - 📁 **lib/** (1754)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2775,6 +2775,7 @@
     - `venueSpeechStreak.test.js`
     - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
     - `venueStoryDiagMirrorPanel.test.js`
+    - `venueTanuLane.wiring.test.js`
     - `venueTileCountCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `venueTileCountCensus.test.js`
     - `venueTileCountCensusWiring.wiring.test.js`

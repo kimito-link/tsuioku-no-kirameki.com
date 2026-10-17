@@ -1434,6 +1434,10 @@ const VENUE_CSS = `
      ★会場はタイルが wrapTileEl でラップされる(renderStoryUserLaneDom.js:402)ので
      【子孫形】で書く(①popup は直接子形)。ここを直接子形にすると会場だけ効かない。
      根拠と実測(1,615px→598px)は popup.html の同名ブロックのコメント参照。 */
+  /* v0.1.1651: タイル間の間隔も popup(#sceneStoryUserLaneTanu{gap:4px})に揃える。popup は id セレクタなので会場へは来なかった。 */
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu {
+    gap: 4px;
+  }
   .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] {
     gap: 0;
     padding-right: 0;
@@ -2389,7 +2393,10 @@ function createVenueStoryLaneDom() {
   /** @param {string} laneName */
   const makeLane = (laneName) => {
     const lane = document.createElement('div');
-    lane.className = 'nl-story-userlane';
+    // v0.1.1651: たぬ姉段には popup の静的HTML(popup.html の #sceneStoryUserLaneTanu)と同じ修飾クラス --tanu を付ける。
+    //   後列LOD(25人目以降の匿名はアイコンのみ・v0.1.1376)の CSS は .nl-story-userlane--tanu を前提に書かれていたが、
+    //   会場の makeLane は一度も付けず、そのCSSが【会場では一度も効いていなかった】(実測: 552人すべて名前つきの横長タイル・高さ1474px)。
+    lane.className = laneName === 'tanu' ? 'nl-story-userlane nl-story-userlane--tanu' : 'nl-story-userlane';
     lane.dataset.laneName = laneName;
     lane.hidden = true;
     return lane;

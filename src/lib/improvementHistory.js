@@ -2480,5 +2480,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1650', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1649 の note と同じ理由)。今回は拡張の7ページ(popup・状態・コメビュ・別窓・会場・サイドパネル)を実ブラウザで開き、hidden 属性なのに表示扱いの要素数を前後比較した(修正前: popup 20・status 12・live-view 1、修正後: 全ページ 0)。実配信でポップアップが正常に描画される(557タイル・統計カード・起動の幕は非表示)ことと、会場の Esc・クリック透過・パネルの開閉が退行しないことも確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1651', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場のたぬ姉の列の目印クラス1つとCSS 1規則(venueBar.js)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1651', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1651', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1650 の note と同じ理由)。今回は実配信(lv351562946)を開いたテスト環境で、会場のたぬ姉の列の高さが修正前 1474px・タイルの間隔 8px/6px・26人目の幅 66px(名前つき)から、修正後 656px・4px/4px・22px(アイコンのみ)になることを前後比較で確認した。'
   })
 ]);
