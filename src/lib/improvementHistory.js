@@ -2494,5 +2494,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1651', metric: 'cross-checked-claims', value: 36,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1650 の note と同じ理由)。今回は実配信(lv351562946)を開いたテスト環境で、会場のたぬ姉の列の高さが修正前 1474px・タイルの間隔 8px/6px・26人目の幅 66px(名前つき)から、修正後 656px・4px/4px・22px(アイコンのみ)になることを前後比較で確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1652', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場の広告段の器のクラス名1語(venueBar.js)。popup.js への影響はありません。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1652', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1652', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1651 の note と同じ理由)。今回は実配信(lv351562946)を開いたテスト環境で、会場の広告段の器が修正前は --gift で行の幅が器より14px狭く(1144/1158)、修正後は --ad で器と同じ幅(1158/1158)になることを前後比較し、スクリーンショットでも確認した。'
   })
 ]);

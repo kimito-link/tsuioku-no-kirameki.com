@@ -2416,7 +2416,10 @@ function createVenueStoryLaneDom() {
 
   const linkWrap = makeWrap();
   const giftWrap = makeWrap('nl-story-userlane-tier-wrap--gift');
-  const adWrap = makeWrap('nl-story-userlane-tier-wrap--gift');
+  // v0.1.1652(ユーザー決定 2026-10-17「ギフトが上」): 広告段の器は popup/別窓と同じ --ad(CSS 規則なし=飾りなし)にする。
+  //   以前は v0.1.1047 で会場だけ --gift(金色カード)を広告にも付けていた=ギフト(金色)と広告が同格に見え、popup より内幅が14px狭かった。
+  //   価値の序列は ギフト > 広告(ギフトだけが金色カード)。3画面(popup/別窓/会場)で同じ見た目になる。
+  const adWrap = makeWrap('nl-story-userlane-tier-wrap--ad');
   const kontaWrap = makeWrap();
   const tanuWrap = makeWrap();
 
