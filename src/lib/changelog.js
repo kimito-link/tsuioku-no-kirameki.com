@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1637',
+    date: '2026-10-17',
+    summary: 'ゆっくり3人を会場の上のほうへ移した',
+    items: Object.freeze([
+      '会場の右下にいたゆっくり3人(りんく・こん太・たぬ姉)が、PICK UP 枠やコメントに重なって邪魔だったので、ニコ生ページの上のほう(メニューの帯のあたり)へ移しました。大きさは約半分(64px)で、右寄せで並んでふわふわ浮かびます。配信の操作は邪魔しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1636',
     date: '2026-10-17',
     summary: 'ピックアップ枠に発言者のサムネとIDを出す',
@@ -183,14 +191,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '拡張が/live/と同じ数え方で差を測る',
     items: Object.freeze([
       '拡張の中でも、/live/ と同じ数え方(配信者を除く・ID なしは数えない・コメントの多い順)で応援レーンを作り、いまの応援レーンと並べて違いを数えるようにしました(表示はまだ変えません。状態速報の「/live/規則との差」の行で確認できます)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1617',
-    date: '2026-10-08',
-    summary: 'ギフト・広告の列が一瞬消えるのを防ぐ',
-    items: Object.freeze([
-      '視聴中の配信が一瞬なくなって同じ配信へ戻ると、ギフト列・広告列の人が一度消えて、取り直すまで29人→14人のように減って見えていました。同じ配信へ戻るときは、前の人たちを引き継ぐようにしました。'
     ])
   })
 ]);
