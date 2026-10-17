@@ -95,9 +95,13 @@ describe('空だったカードの手がかり(detail)の配線', () => {
 describe('ピックアップ枠の入力(2026-10-17)', () => {
   const venueSrc = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8').split('\r\n').join('\n');
   it('★発言が届いたら(processSpeechRows)リングに積んでその場で枠を更新する', () => {
-    expect(venueSrc).toContain('pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now());');
-    const at = venueSrc.indexOf('pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now());');
-    expect(venueSrc.slice(at, at + 200)).toContain('updatePickupBanner(null);');
+    expect(venueSrc).toContain('pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now(), {');
+    const at = venueSrc.indexOf('pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now(), {');
+    const tail = venueSrc.slice(at, at + 700);
+    // 発言者のサムネ・ハンドル名・ID・リンクをセットで(§3.5)。観測済みのプロフィールのサムネを渡す
+    expect(tail).toContain('resolveSpeaker: (sp) => resolvePickupSpeaker(sp, { profileAvatarUrl: profileAvatarMap');
+    expect(tail).toContain('profileNickname: profileAvatarMap');
+    expect(tail).toContain('updatePickupBanner(null);');
   });
   it('★commitDisplay は枠を updatePickupBanner(表示行は空のときだけの従来入力)で更新し、枠を直接 pick しない', () => {
     expect(venueSrc).toContain('updatePickupBanner(resolved.rows);');

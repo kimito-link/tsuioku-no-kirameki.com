@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1616',
+    date: '2026-10-08',
+    summary: 'グリッドの中身の入替を数える',
+    items: Object.freeze([
+      '応援コメントのアイコングリッドで、同じマスに別のコメントが入った回数と、ID が後から付いた回数を数えて状態速報に出すようにしました(ちらつきの原因を調べるための計器です)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1615',
     date: '2026-10-08',
     summary: '忙しい配信で読み上げ文を短くする',
