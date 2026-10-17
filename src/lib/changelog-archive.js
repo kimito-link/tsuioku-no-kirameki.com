@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1623',
+    date: '2026-10-14',
+    summary: 'りんく段にコメントしていない応援者も出す',
+    items: Object.freeze([
+      'ギフトや広告で応援して本物のサムネが分かっている人は、コメントしていなくても、りんく段に並びます(/live/ と同じ)。前の版では、コメントした応援者しか出ず、りんく段が空になる配信がありました。',
+      'ギフト列・広告列にも引き続き出ます(両方に出るのは /live/ と同じ)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1622',
     date: '2026-10-14',
     summary: '開いた直後から応援レーンが件数順に並ぶ',
