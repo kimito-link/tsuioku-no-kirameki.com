@@ -411,7 +411,8 @@ export default [
     // v0.1.1583: パネルの表示/非表示を popup iframe へ伝える配線(+23行)。判定は lib(panelActivity.js)。通知は display を書く唯一の入口から出す。
     // v0.1.1585: コメントタイムライン鏡の書き込み頻度の天井の配線(+11行)。判定は lib(timelineMirrorWriteGate.js)。
     // v0.1.1607: 『最後に視聴した URL』を毎ティック書き直さない(URL変化時・前面に来た時だけ)=+18行(大半は【なぜ】のコメント)。複数タブの書き合いで配信が入れ替わるのを止める。
-    rules: { 'max-lines': ['error', { max: 19460, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1638: 応援コメント100件でゆっくり3人がお祝いするとき、会場を開いている間は中継の降りものシャワーを止める配線(+7行)。判定は lib(charaLiveCheerTrigger.js の shouldSkipShowerForCheer)。
+    rules: { 'max-lines': ['error', { max: 19467, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

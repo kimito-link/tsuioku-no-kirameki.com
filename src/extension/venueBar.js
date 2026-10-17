@@ -325,6 +325,8 @@ import { venueHoverCardPresenceVerdict } from '../lib/venueHoverCardProbe.js';
 import { resolveVenueHoverFacts } from '../lib/venueHoverFacts.js';
 import { hasSpeech, speechWithFallbackTexts } from '../lib/speechEvidence.js';
 import { appendPickupRows } from '../lib/venuePickupRing.js';
+import { resolveCommentCheer } from '../lib/charaLiveCheerTrigger.js';
+import { selectDisplayRecordedCount } from '../lib/displayRecordedCount.js';
 import { resolvePickupSpeaker } from '../lib/venuePickupSpeaker.js';
 // キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
 import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
@@ -3241,6 +3243,15 @@ export function mountVenueBarButton(options = {}) {
   } catch { /* 計器の失敗で会場を止めない */ }
 
   /*
+   * ★お祝いの手動確認フック(2026-10-17)。100件を待たずに演出を出せる:
+   *       __nls_chara_cheer_probe__(100)
+   *   件数や記録には一切触れない(見せるだけ)。会場が閉じていると false。
+   */
+  try {
+    /** @type {any} */ (globalThis).__nls_chara_cheer_probe__ = (n = 100) => ({ started: charaLive.cheer({ milestone: Number(n) }) });
+  } catch { /* 計器の失敗で会場を止めない */ }
+
+  /*
    * ★ホバーカードの一言 実測フック(2026-08-29)。
    *   「出ていません」に対して★推測で「リロードしてください」と答えたのを反省して作った。
    *   ★カードを出したまま（アイコンにカーソルを乗せたまま）実行すると、
@@ -3390,6 +3401,24 @@ export function mountVenueBarButton(options = {}) {
   //   この経路だけで件数は動き続ける(本設計の根治点)。
   /** @type {Record<string, unknown>|null} */
   let panelSummarySnap = null;
+  /*
+   * 応援コメント100件などの節目で、会場の常駐ゆっくり3人がお祝いする(2026-10-17・ユーザー要望・設計=council-fable)。
+   *   件数は数え直さず、会場が購読済みの記録件数(panel_summary の recordedCount)を使う。判定=charaLiveCheerTrigger.js(節目表は既存を再利用)。
+   *   一回性は会場ローカルの前回件数(単調に進む)で保つ=storage に書かない。開いて最初の観測は基準を採るだけで祝わない。
+   *   音・告知は popup 側の既存の祝い(supportCelebration)が担う。ここは3人の反応だけ。
+   */
+  /** @type {number|null} */
+  let cheerPrevCount = null;
+  let cheerLiveId = '';
+  const noteCheerCount = () => {
+    try {
+      const lid = String(activeLiveId || liveIdFromPathname() || '');
+      if (lid !== cheerLiveId) { cheerLiveId = lid; cheerPrevCount = null; }
+      const r = resolveCommentCheer(cheerPrevCount, selectDisplayRecordedCount(panelSummarySnap));
+      cheerPrevCount = r.baseline;
+      if (r.cheer) charaLive.cheer({ milestone: r.cheer.milestone });
+    } catch { /* お祝いの失敗で会場を止めない */ }
+  };
   let _panelSummaryLastSeenAt = 0;
   /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */
   /** @type {Map<string, number>} */
@@ -4871,6 +4900,7 @@ export function mountVenueBarButton(options = {}) {
     hasRenderedNonEmpty = false;
     liveRoster.clear(); // v0.1.754: 在席も持ち越さない(再オープンで storage から再 hydrate)
     pickupRing = []; // ピックアップ枠の入力も前配信から持ち越さない
+    cheerPrevCount = null; // お祝いの基準も取り直す(前配信の件数を持ち越して祝わない)
     clearBubbles();
   };
 
@@ -6294,6 +6324,7 @@ export function mountVenueBarButton(options = {}) {
         if (open && panelSnap && typeof panelSnap === 'object') {
           panelSummarySnap = /** @type {Record<string, unknown>} */ (panelSnap);
           _panelSummaryLastSeenAt = Date.now();
+          noteCheerCount();
         }
         if (open && ((storySnap && typeof storySnap === 'object') || (panelSnap && typeof panelSnap === 'object'))) {
           renderStoryDiagMirrorPanel();
@@ -6564,6 +6595,7 @@ export function mountVenueBarButton(options = {}) {
         if (panelSnap && typeof panelSnap === 'object') {
           panelSummarySnap = /** @type {Record<string, unknown>} */ (panelSnap);
           _panelSummaryLastSeenAt = Date.now();
+          noteCheerCount();
           renderStoryDiagMirrorPanel();
         }
       }
@@ -6693,6 +6725,7 @@ export function mountVenueBarButton(options = {}) {
     if (panelChange && panelChange.newValue && typeof panelChange.newValue === 'object') {
       panelSummarySnap = /** @type {Record<string, unknown>} */ (panelChange.newValue);
       _panelSummaryLastSeenAt = Date.now();
+      noteCheerCount();
       renderStoryDiagMirrorPanel();
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。

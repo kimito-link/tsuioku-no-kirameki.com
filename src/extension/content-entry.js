@@ -584,6 +584,7 @@ import {
   NLS_PLAY_WATCH_CELEBRATION,
   playWatchCelebrationRelay
 } from '../lib/watchCelebrationOverlay.js';
+import { shouldSkipShowerForCheer } from '../lib/charaLiveCheerTrigger.js';
 import {
   STORAGE_OP_TIMED_OUT,
   runStorageOpWithTimeout
@@ -10175,6 +10176,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     try {
       if (!isNicoLiveWatchUrl(window.location.href)) {
         sendResponse({ ok: false, error: 'not_watch' });
+        return false;
+      }
+      // 2026-10-17: 応援コメント100件以上の節目は、会場を開いている間は会場のゆっくり3人がお祝いする(ユーザー決定「3人だけ」)=この降りものシャワーは止める。
+      //   音・告知は popup 側の既存の祝いが担うので変えない。会場が閉じていれば従来どおり出す。
+      if (shouldSkipShowerForCheer(msg.payload, document.documentElement.classList.contains('nlsb-venue-open'))) {
+        sendResponse({ ok: true, skipped: 'venue_cheer' });
         return false;
       }
       playWatchCelebrationRelay(
