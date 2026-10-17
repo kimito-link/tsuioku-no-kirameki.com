@@ -1746,9 +1746,31 @@ const VENUE_CSS = `
     font-size: 11px;
     white-space: nowrap;
   }
+  /*
+   * v0.1.1656: 発言パネルの行は2列(本文 | 時刻)。名簿(.nlsb-roster-row)の3列 44px 1fr auto(順位|名前|バッジ)のままだと、
+   *   子が2つ(本文と時刻)しか無いので本文が 44px の列に入り、1行5文字ほどで折り返されていた(実測: 本文の幅 44px・時刻が 457px の列)。
+   *   minmax(0,1fr) で縮められるようにし、長い語・URL でも枠から出ないよう overflow-wrap:anywhere。
+   */
   .nlsb-speech-panel .nlsb-roster-row {
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
     gap: 8px;
+  }
+  .nlsb-speech-panel .nlsb-roster-who {
+    overflow-wrap: anywhere;
+  }
+  /*
+   * v0.1.1656: 見出しの注記(「ここまで422回」・flex:1 1 100%・order:9)が1行目に居座り、タイトルを 160px・3行へ押しつぶしていた。
+   *   折り返し可にして注記を次の行へ送り、タイトルは残りの幅を使う。
+   */
+  .nlsb-speech-panel .nlsb-roster-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .nlsb-speech-panel .nlsb-roster-title {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   /*
    * ★発言パネルの見出し（2026-08-30）。
