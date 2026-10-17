@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (353)
+- 📁 **docs/** (355)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (170)
+  - 📁 **handoff/** (172)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -486,6 +486,8 @@
     - `venue-transport-effect-SPEC-2026-08-08.md`
     - `voicevox-any-pc-DESIGN.md`
     - `winv-clipboard-freeze-synthesis.md`
+    - `yukkuri-react-DESIGN-2026-10-18.md`
+    - `yukkuri-react-IMPLEMENTATION-HANDOFF-2026-10-18.md`
   - 📁 **marketing/** (1)
     - `x-article-live-ranking-2026-09-14.md`
   - 📁 **patent-unique-voice-reading-filing-final/** (1)
