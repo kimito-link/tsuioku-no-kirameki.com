@@ -3041,13 +3041,37 @@ export function mountVenueBarButton(options = {}) {
    *   ★storage read はクリックの瞬間だけ(openSpeechPanelFor の中)=常時readは増えない。
    * @param {HTMLElement} host
    */
+  /**
+   * v0.1.1643: タイル自身(<a href=…/user/<数値ID>>)から uid と名前を拾う。
+   *   席なしタイル(広告・ギフト列)は _hoverCardDataByEl にも段の索引(resolveSeatlessHoverData)にも無いことがあり(DOM の並びと
+   *   items の索引がずれる/名簿に居ない)、uid が空のままクリックがリンクの標準動作(新規タブ)になっていた。
+   *   リンクは本登録の数値 ID のときだけ付く(personTileDom.js)ので、href の数値 ID が最も確かな根拠。匿名(リンク無し)は拾わない。
+   * @param {HTMLElement} el
+   * @returns {{ uid: string, name: string }}
+   */
+  const tileIdentityFromAnchor = (el) => {
+    try {
+      const a = el.matches('a.nl-story-userlane-cell') ? el : el.querySelector('a.nl-story-userlane-cell');
+      if (!(a instanceof HTMLElement)) return { uid: '', name: '' };
+      const tail = String(a.getAttribute('href') || '').split('/user/')[1] || '';
+      const cand = tail.split(/[?#/]/)[0];
+      const uid = isNumericNicoUserId(cand) ? cand : '';
+      const nameEl = a.querySelector('.nl-story-userlane-meta__name');
+      const name = String(nameEl?.textContent || '').trim() || String(a.getAttribute('title') || '').split(' | ')[0].trim();
+      return { uid, name };
+    } catch {
+      return { uid: '', name: '' };
+    }
+  };
+  /** @param {HTMLElement} host */
   const wireSpeechPanelDelegation = (host) => {
     host.addEventListener('click', (e) => {
       const anchorEl = resolveHoverAnchor(e.target);
       if (!(anchorEl instanceof HTMLElement)) return;
       const data = _hoverCardDataByEl.get(anchorEl) || resolveSeatlessHoverData(anchorEl);
-      const uid = String(data?.uid || '').trim();
-      if (!uid) return; // uid が無い(広告主等)は発言記録に紐づかない=何も開かない
+      const fromTile = data?.uid ? { uid: '', name: '' } : tileIdentityFromAnchor(anchorEl);
+      const uid = String(data?.uid || fromTile.uid || '').trim();
+      if (!uid) return; // uid が無い(匿名・リンク無し)は発言記録に紐づかない=何も開かない
       /*
        * ★v0.1.1642(ユーザー決定 2026-10-17「発言パネルだけ開く」): タイルは新規タブで開くリンク(<a target=_blank>)なので、
        *   何もしないと発言パネルとプロフィールが【同時に】開いていた。通常のクリックはリンクを止めて発言パネルだけ開く。
@@ -3067,7 +3091,10 @@ export function mountVenueBarButton(options = {}) {
         const imgEl = anchorEl.querySelector('.nl-story-userlane-avatar');
         if (imgEl instanceof HTMLImageElement) avatarSrc = imgEl.currentSrc || imgEl.src || '';
       } catch { /* サムネが取れなくてもパネルは開く */ }
-      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || ''), avatarSrc });
+      // v0.1.1643: 開いているパネルがあれば先に閉じる(=旧パネルの stage リスナーを外す)。外さないと、この同じクリックが
+      //   stage へ伝わった時に旧リスナーが『外側クリック』と判定し、開いたばかりの新パネルを即閉じて『読み込み中…』のまま残る。
+      if (!speechPanel.hidden) closeSpeechPanel();
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc });
     });
   };
   wireSpeechPanelDelegation(seatsHost);
