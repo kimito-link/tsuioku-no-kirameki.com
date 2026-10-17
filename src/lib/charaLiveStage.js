@@ -178,6 +178,53 @@ export function charaLiveStageCss() {
   border-top-color: transparent;
   border-bottom-color: #2f3a46;
 }
+/*
+ * ★お祝い(2026-10-17・応援コメント100件など): 3人が弾んで「100件!」のバッジが出る。
+ *   CSS animation は inline transform(浮遊)より優先されるので競合しない。終わると浮遊に戻る(fill-mode なし)。
+ *   transform/opacity のみ・DOM 追加はバッジ1個だけ。prefers-reduced-motion では弾みを止め、バッジの fade だけ残す。
+ */
+.nlcl-stage.is-cheering .nlcl-chara {
+  animation: nlcl-cheer 2.4s ease-in-out;
+}
+.nlcl-cheer-badge {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: #ff9800;
+  color: #fff;
+  border: 3px solid #fff;
+  box-shadow: 0 3px 0 rgba(150, 70, 0, 0.9), 0 6px 14px rgba(0, 0, 0, 0.35);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transform-origin: 100% 100%;
+  animation: nlcl-cheer-badge 2.2s ease-out forwards;
+}
+.nlcl-stage[data-placement="top"] .nlcl-cheer-badge {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform-origin: 100% 0;
+}
+.nlcl-cheer-badge[hidden] { display: none; }
+@keyframes nlcl-cheer {
+  0%   { transform: scale(1) translateY(0); }
+  14%  { transform: scale(1.35) translateY(-10px); }
+  28%  { transform: scale(1) translateY(0); }
+  44%  { transform: scale(1.25) translateY(-7px); }
+  60%  { transform: scale(1) translateY(0); }
+  76%  { transform: scale(1.15) translateY(-4px); }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes nlcl-cheer-badge {
+  0%   { opacity: 0; transform: scale(0.4); }
+  12%  { opacity: 1; transform: scale(1.18); }
+  22%  { transform: scale(1); }
+  80%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
 .nlcl-chara__img {
   width: 100%;
   height: 100%;
@@ -269,11 +316,19 @@ export function charaLiveStageCss() {
   from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
 }
+@keyframes nlcl-cheer-badge-calm {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
 @keyframes nlcl-think {
   0%, 100% { opacity: 0.28; transform: translateY(0); }
   50%      { opacity: 1;    transform: translateY(-3px); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .nlcl-stage.is-cheering .nlcl-chara { animation: none; }
+  .nlcl-cheer-badge { animation: nlcl-cheer-badge-calm 2.2s linear forwards; }
   .nlcl-chara__bubble { animation: none; }
   .nlcl-chara__think i { animation: none; opacity: 0.7; }
 }
@@ -287,6 +342,7 @@ export function charaLiveStageCss() {
  * @param {(path: string) => string} resolveUrl chrome.runtime.getURL 相当(テストで差し替え可能に)
  * @returns {{
  *   root: HTMLElement,
+ *   badge: HTMLElement,
  *   nodes: Record<string, { el: HTMLElement, img: HTMLImageElement, bubble: HTMLElement, think: HTMLElement }>
  * }}
  */
@@ -325,7 +381,13 @@ export function buildCharaLiveStageDom(doc, resolveUrl) {
     root.appendChild(el);
     nodes[member.id] = { el, img, bubble, think };
   }
-  return { root, nodes };
+  // お祝いのバッジ(100件! など)。普段は hidden。textContent だけで出す(innerHTML を使わない)。
+  const badge = doc.createElement('div');
+  badge.className = 'nlcl-cheer-badge';
+  badge.hidden = true;
+  badge.setAttribute('aria-hidden', 'true');
+  root.appendChild(badge);
+  return { root, badge, nodes };
 }
 
 /**
