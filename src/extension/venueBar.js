@@ -3849,7 +3849,10 @@ export function mountVenueBarButton(options = {}) {
     if (target && speechPanel.contains(target)) return;
     closeSpeechPanel();
   };
+  /** v0.1.1645: 発言パネルを開くたびに進める世代。読込(非同期)が戻ったとき、世代が違えば捨てる。 */
+  let speechOpenGen = 0;
   const closeSpeechPanel = () => {
+    speechOpenGen += 1; // 読込中に閉じた/別の人を開いた場合、古い読込の結果を捨てさせる
     speechPanel.hidden = true;
     stage.removeEventListener('click', onSpeechOutsideClick);
   };
@@ -3911,6 +3914,7 @@ export function mountVenueBarButton(options = {}) {
       '(名前なし)';
     if (!uid) return; // uid が無い人(広告主等)は発言記録に紐づかない
     const avatarSrc = String(who?.avatarSrc || '').trim();
+    const gen = (speechOpenGen += 1);
     const head = buildSpeechPanelHeadHtml(uid, name, avatarSrc, '', '');
     speechPanel.innerHTML = `${head}<div class="nlsb-roster-list"><div class="nlsb-roster-empty">読み込み中…</div></div>`;
     speechPanel.hidden = false;
@@ -3942,7 +3946,7 @@ export function mountVenueBarButton(options = {}) {
       rows = [];
       total = 0;
     }
-    if (speechPanel.hidden) return; // 読み込み中に閉じられた
+    if (speechPanel.hidden || gen !== speechOpenGen) return; // 読み込み中に閉じられた/別の人のパネルに替わった
 
     const listHtml = rows.length
       ? rows
@@ -6834,10 +6838,22 @@ export function mountVenueBarButton(options = {}) {
     if (event.key !== 'Escape' || !open) return;
     // v0.1.738: 診断パネルが開いていれば、まずそれだけ閉じる(会場ごと閉じない)。
     //   × が反応しない時の確実な代替手段(ユーザー報告対策)。
+    // v0.1.1645: 発言パネル・状態パネルも同じ扱い(以前は一覧パネルだけで、他が開いていると会場ごと閉じた)。
+    //   手前に出ているものから1枚ずつ閉じる: 発言 → 状態 → 一覧 → ホバーカード → 最後に会場。
+    if (!speechPanel.hidden) {
+      closeSpeechPanel();
+      return;
+    }
+    if (!diagPanel.hidden) {
+      toggleDiagPanel(false);
+      return;
+    }
     if (!rosterPanel.hidden) {
       toggleRosterPanel(false);
       return;
     }
+    // 別窓(standalone)の会場は閉じても戻る手段(トグル)が無く黒い画面だけ残る。パネルが無いときの Esc は何もしない。
+    if (isStandalone) return;
     userChangedOpen = true;
     setOpen(false, true);
   };
@@ -6910,6 +6926,13 @@ export function mountVenueBarButton(options = {}) {
       startAggregation();
       startSpeechPolling();
     } else {
+      // v0.1.1645: 会場を閉じたらパネル・ホバーカードも閉じる(以前は開いたまま残り、再オープンで復活した)。
+      try {
+        closeSpeechPanel();
+        if (!rosterPanel.hidden) toggleRosterPanel(false);
+        if (!diagPanel.hidden) toggleDiagPanel(false);
+        closeHoverCard();
+      } catch { /* パネルの後始末の失敗で閉じる処理を止めない */ }
       removeEscapeListener();
       removeBubbleReflowListener();
       stopAggregation();

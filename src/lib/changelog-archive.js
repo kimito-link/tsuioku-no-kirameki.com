@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1625',
+    date: '2026-10-14',
+    summary: '共有キーを貼り付けなしでファイルから入れる',
+    items: Object.freeze([
+      '状態画面の「WEB共有の設定」に「鍵ファイルを読み込む」ボタンを追加しました。貼り付けができない環境でも、鍵のファイル(JSON)を選ぶだけで設定できます。',
+      '形が正しくないファイル(鍵が欠けている・送信先が https でない・長すぎる)は保存せずに断ります。鍵の値は画面には出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1624',
     date: '2026-10-14',
     summary: '共有キーの入力が貼った直後に消えない',
