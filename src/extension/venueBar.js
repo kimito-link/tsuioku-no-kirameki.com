@@ -3048,6 +3048,14 @@ export function mountVenueBarButton(options = {}) {
       const data = _hoverCardDataByEl.get(anchorEl) || resolveSeatlessHoverData(anchorEl);
       const uid = String(data?.uid || '').trim();
       if (!uid) return; // uid が無い(広告主等)は発言記録に紐づかない=何も開かない
+      /*
+       * ★v0.1.1642(ユーザー決定 2026-10-17「発言パネルだけ開く」): タイルは新規タブで開くリンク(<a target=_blank>)なので、
+       *   何もしないと発言パネルとプロフィールが【同時に】開いていた。通常のクリックはリンクを止めて発言パネルだけ開く。
+       *   Ctrl/Cmd/Shift/Alt+クリックはブラウザ標準のリンク動作(新規タブでプロフィール)に任せ、パネルは開かない。
+       *   中クリックは click ではなく auxclick なのでここに来ない(標準動作のまま)。プロフィールへはパネル見出しの名前リンクからも行ける。
+       */
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
       closeHoverCard();
       /*
        * ★サムネはクリック元タイルからそのまま取る＝★新規取得ゼロ。
@@ -3791,8 +3799,9 @@ export function mountVenueBarButton(options = {}) {
      */
     try {
       const tKey = tailStorageKey(lid);
-      const bag = await chrome.storage.local.get(tKey);
-      rows = combineCanonicalComeviewRows(rows, Array.isArray(bag[tKey]) ? bag[tKey] : []);
+      // v0.1.1642: テールの読みにもタイムアウト(チャンクの 8 秒と同じ流儀)。保存領域が詰まっていても『読み込み中…』のまま固まらない。
+      const bag = await runStorageOpWithTimeout(() => chrome.storage.local.get(tKey), 8000);
+      rows = combineCanonicalComeviewRows(rows, Array.isArray(bag?.[tKey]) ? bag[tKey] : []);
     } catch {
       /* テールは任意=読めなくてもチャンク分で動く */
     }

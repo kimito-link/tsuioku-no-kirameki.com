@@ -74,7 +74,8 @@ describe('★配線: 会場の発言パネルがテールを読んでいる', ()
   it('★readVenueCommentRowsForSpeech の中でテールを読んで合流している', () => {
     // アンカーを前後まで固定する(緩めると別の場所の tail 読みで素通りする)。
     expect(venueBarSrc).toMatch(
-      /const tKey = tailStorageKey\(lid\);\n\s*const bag = await chrome\.storage\.local\.get\(tKey\);\n\s*rows = combineCanonicalComeviewRows\(rows, Array\.isArray\(bag\[tKey\]\) \? bag\[tKey\] : \[\]\);/
+      // v0.1.1642: テールの読みにもタイムアウト(runStorageOpWithTimeout)を付けた。読んで合流する本筋は同じ。
+      /const tKey = tailStorageKey\(lid\);\n(?:\s*\/\/[^\n]*\n)*\s*const bag = await runStorageOpWithTimeout\(\(\) => chrome\.storage\.local\.get\(tKey\), 8000\);\n\s*rows = combineCanonicalComeviewRows\(rows, Array\.isArray\(bag\?\.\[tKey\]\) \? bag\[tKey\] : \[\]\);/
     );
   });
 
