@@ -222,9 +222,21 @@ async function openaiChat(url, key, model, prompt, system = '', extra = {}, time
       throw new Error(msg);
     }
     const msg = j?.choices?.[0]?.message;
+    const finish = j?.choices?.[0]?.finish_reason;
+    const reasoningText = msg?.reasoning_content || msg?.reasoning || '';
+    // ★2026-10-17: 本文が空で reasoning だけ、かつ finish_reason が 'length' のときは採用しない。
+    //  それは「最終回答に至る前に上限を使い切った推論の途中経過」で、回答ではなく独白。
+    //  実会議(COUNCIL_FULL・20体)で cloudflare/glm-4.7-flash(5975字)と nvidia/deepseek-v4.1-flash(5898字)が
+    //  "Analyze the Request: ..." / "We need answer in Japanese..." をそのまま回答として出し、統合(digest)を
+    //  9109字に膨らませていた。失敗(FAILED)として正直に数えれば、日報の成績にも出て撤去判断の材料になる。
+    //  ★finish が 'stop' で本文が空のときは従来どおり reasoning を回答に使う（glm-4.7-flash 等が
+    //  最終回答を reasoning フィールドに入れる型。2026-07-04 実機確認）。
+    if (!msg?.content && reasoningText && finish === 'length') {
+      throw new Error('reasoning-only (finish=length): 推論で上限を使い切り最終回答なし (reasoning_len=' + String(reasoningText).length + ')');
+    }
     // reasoning系モデル(glm-4.7-flash等)は content が null で reasoning フィールドに
     // 中身を返すことがある(2026-07-04 実機確認)。content優先だが、無ければreasoningで救う。
-    const content = msg?.content || msg?.reasoning_content || msg?.reasoning || '';
+    const content = msg?.content || reasoningText || '';
     if (!content) throw new Error('empty content (reasoning_len=' + String(msg?.reasoning_content || msg?.reasoning || '').length + ')');
     return stripThinking(content);
   } finally { clearTimeout(timer); }
@@ -237,7 +249,10 @@ async function geminiChat(model, prompt, system = '', timeoutMs = 90000) {
   try {
     const body = {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 2048, temperature: 0.6 },
+      // ★2026-10-17: 2048 → 4096。Gemini 2.5 系は思考トークンが出力上限に含まれるため、2048だと
+      //  回答が途中で切れる。実会議(COUNCIL_FULL)で gemini-2.5-flash(weight1)の本文が118字で途切れていた
+      //  （同じ会議の gemini-3.7-flash は1220字）。上限を上げても短い回答は短いまま＝費用は増えない。
+      generationConfig: { maxOutputTokens: 4096, temperature: 0.6 },
     };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${E}`, {
