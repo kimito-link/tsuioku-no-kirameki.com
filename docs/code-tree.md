@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 927 件
+## ⚠️ 役割コメントが無いソース 8 / 930 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -722,7 +722,12 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (88)
+- 📁 **scripts/** (92)
+  - 📁 **audit/** (4)
+    - `dead-selector-baseline.json`
+    - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
+    - `runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
+    - `static-dead-selectors.mjs` — 「CSSはあるのに対応するクラス/ID/属性を作るコードが無い(デッドな規則)」と
   - 📁 **lib/** (4)
     - `council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
     - `council-scout-dir.test.js`
@@ -839,7 +844,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1992)
+- 📁 **src/** (1993)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1121,7 +1126,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1754)
+  - 📁 **lib/** (1755)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1504,6 +1509,7 @@
     - `customSoundPreset.test.js`
     - `customSoundStore.js` — council/pachinko-ultimate-SYNTHESIS.md §1.2/§1.4/§1.5(Phase A)の実装。
     - `customSoundStore.test.js`
+    - `deadSelectorRatchet.test.js`
     - `deepExportPolicy.js` — popup からの deep export 要求時に、仮想リスト走査を行うかを判定する。
     - `deepExportPolicy.test.js`
     - `deepHarvestReason.js` — 深掘り収穫(deep harvest)の発動理由(起動/記録ON/配信切替/タブ可視)の定義と判定。

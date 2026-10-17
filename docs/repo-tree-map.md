@@ -48,9 +48,10 @@ graph LR
   d9 --> d9_0["archive/ 〔メモリ/履歴〕"]
   d9 --> d9_1["avatar-parts/ 〔アバター/画像〕"]
   ROOT --> d10["scripts/ 〔ビルド/自動生成〕"]
-  d10 --> d10_0["lib/ 〔ビルド/共有〕"]
-  d10 --> d10_1["perf-ab/ 〔性能/計測〕"]
-  d10 --> d10_2["xserver/ 〔デプロイ/webhook〕"]
+  d10 --> d10_0["audit/ 〔監査/CSS/会場〕"]
+  d10 --> d10_1["lib/ 〔ビルド/共有〕"]
+  d10 --> d10_2["perf-ab/ 〔性能/計測〕"]
+  d10 --> d10_3["xserver/ 〔デプロイ/webhook〕"]
   ROOT --> d11["sound-src/ 〔音声/素材〕"]
   d11 --> d11_0["soundeffect-lab/ 〔音声/素材〕"]
   ROOT --> d12["src/ 〔ソース〕"]
@@ -332,8 +333,9 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 88 件</sub>
+<sub>ファイル 92 件</sub>
 
+- `audit/`（4 件） — 「面(popup/会場/別窓/・live)の間でCSSとDOMがずれていないか」を機械で洗う監査(静的=一度も効かないCSSの検出+基準値のラチェット / 実ブラウザ=hidden・押せない・はみ出し・クリック透過)  〔監査 / CSS / 会場〕
 - `lib/`（4 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
 - `perf-ab/`（13 件） — 「重い」を前後比較で測る道具(一時プロファイルの Chromium で拡張プロセスの CPU を採取・プロファイル)  〔性能 / 計測〕
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
@@ -344,14 +346,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1992 件</sub>
+<sub>ファイル 1993 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（62 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1754 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1755 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（4 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
