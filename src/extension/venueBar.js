@@ -1614,6 +1614,13 @@ const VENUE_CSS = `
     font-size: 13px;
     overflow: hidden;
   }
+  /*
+   * v0.1.1644: hidden 属性のパネルを実際に隠す。上の display:flex が UA の [hidden]{display:none} に勝つため、閉じた(hidden=true の)
+   *   発言/一覧/診断パネルが幅560×高さ数百px のまま画面に残っていた(閉じたはずの『読み込み中…』が居座る症状・実測で確認)。
+   */
+  .nlsb-roster-panel[hidden] {
+    display: none;
+  }
   .nlsb-roster-head {
     display: flex;
     align-items: center;
