@@ -1017,6 +1017,9 @@ const VENUE_CSS = `
     box-sizing: border-box;
     padding: 7px 14px;
     gap: 12px;
+    /* v0.1.1647: 狭い幅(サイドパネル等)で右端のボタンが画面外へ出ないよう折り返す。 */
+    flex-wrap: wrap;
+    row-gap: 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(14, 19, 27, 0.55);
   }
@@ -1118,8 +1121,14 @@ const VENUE_CSS = `
   .nlsb-header-right {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex: 0 0 auto;
+    gap: 6px 12px;
+    /* v0.1.1647: 縮めない(0 0 auto)と幅855px のまま画面外へはみ出し『✕閉じる』が押せなかった(表示幅640px以下で実測)。
+       折り返して収める。min-width:0 で親の幅に従う。 */
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+    max-width: 100%;
   }
   /* コメビュ起動ボタン(会場ヘッダー右)。読み上げ付きコメントビューアを別窓で開く。 */
   .nlsb-comeview-btn {
