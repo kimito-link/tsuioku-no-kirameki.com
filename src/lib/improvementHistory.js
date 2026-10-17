@@ -2620,5 +2620,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1660', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1659 の note と同じ理由)。今回は生成HTMLに演出の部品が入っていないことをテストで固定し、スイッチを戻すと赤になることを変異テストで確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1661', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更はマーケ書き出しタブの設定の読み込み数行(marketing-export-entry.js)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1661', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1661', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1660 の note と同じ理由)。今回は配線テスト3件(先に赤→緑)で、固定値に戻すと赤になることを確認した。'
   })
 ]);

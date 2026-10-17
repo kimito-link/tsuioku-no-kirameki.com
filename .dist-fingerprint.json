@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "c8b14b221bc6ada883400d6c0e9f7d3a830e0ac6aec4f8e9ecc1d186bd38dc7b",
+  "fingerprint": "4bd6affe92cf894fd64f5479226db7b61a8043a81f753e0a6261b1621646a8fa",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -811,17 +811,17 @@
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
     "extension/dist/content.js": "e3138163dab9a3da2d1e9edcf745d7419d4b7c1676a630a7d087be22d53ea0d2",
-    "extension/dist/popup.js": "4c330d61f8ffafbd6e0649fbf73a702b3f9634fab34f54501008ac5bd0fe19e6",
+    "extension/dist/popup.js": "98585d25b04e9b5daa8c61936be09fa652faa42ebbe8211d5df57e5dc07c2364",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "715e9cd1d8ed53c84a3db741078f219647fb8040fe87dc3ac501999936998248",
+    "extension/dist/status.js": "1b1305a9346436001b06ff70b0beae8461e1fc6266e387a2b1d445038c1ca407",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
-    "extension/dist/marketing-export.js": "d7e685c9461532d3a50efdd97a198c5d0ba45fc3ff5f554d6fe5597a6d8d989a",
+    "extension/dist/marketing-export.js": "e89224f95e0776dc7ed8525a7587840737c2f97aad0ebf7b56dd2fb841619c86",
     "extension/dist/comeview.js": "6baa817d621acff3b04400ecf79f682a9fc2a9852b7c97795b5ffdd28abe8e30",
     "extension/dist/venue.js": "d75a1948f00163e35376c6432e0d31a0971f87dea5c3087e260a91fbea01ffe2",
     "extension/dist/sidepanel.js": "08c71a049913562d3d6107bb8476a1adc8b9aa741f071fdaac7b05e8c5b1b2ca",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "287220eff38c12255c09aa8b189ab2bbf534454e274d7894c5bab437a23969f1",
+    "app/dist/live-view.js": "45f23eb0caabf5b605586a681efb138fcc9903e2c06c4c0611a487801fa07695",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }
