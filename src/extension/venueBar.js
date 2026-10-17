@@ -2258,6 +2258,15 @@ const VENUE_CSS = `
     visibility: hidden !important;
     pointer-events: none !important;
   }
+  /*
+   * v0.1.1649: ①POP の iframe 自身も隠す。親(host)の visibility:hidden は子へ継承されるが、iframe は読み込み完了時に
+   *   インラインで visibility:visible を付ける(content-entry.js の reveal)ため、継承が上書きされて【会場の半透明な背景越しに
+   *   ①POP(HTML・マーケ・メディアキット・スクショのボタン等)が透けて見えていた】(実測: iframe#nls-inline-popup-iframe が全幅で visible)。
+   *   display:none は上のコメントのとおり不可(再読込の誘発)。インラインより !important の規則が勝つ。
+   */
+  html.nlsb-venue-open #nls-inline-popup-host iframe {
+    visibility: hidden !important;
+  }
   /* v0.1.1119 見た目①化(P5・reference_venue_pop_copy_SYNTHESIS.md §C-3): 段(レーン帯)配下は
      ①応援レーンと同じ見た目に=会場独自の席装飾(VIP金縁・連鎖発光)を段の中では無効化する。
      順位バッジ(🥇🥈🥉)と発話の一拍(speaking)は残す(既存ユーザー指示=光る演出なし・バッジのみ)。
