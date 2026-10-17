@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1619',
+    date: '2026-10-08',
+    summary: 'ギフト・広告の列が空で消えないように',
+    items: Object.freeze([
+      'ギフトの列・広告の列は、保存データを読み直す一瞬に空で返ると、その回だけ列ごと消えて(人数が29人→14人のように)減って見えていました。前の回に人がいたのに今回が空のときは、前の人たちを残すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1618',
     date: '2026-10-08',
     summary: '拡張が/live/と同じ数え方で差を測る',

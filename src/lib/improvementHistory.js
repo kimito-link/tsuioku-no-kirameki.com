@@ -2312,5 +2312,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1638', metric: 'cross-checked-claims', value: 24,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1637 の note と同じ理由)。今回は実配信を開いた headless で、記録件数 97→101 の跨ぎで3人が弾み「100件!」が出て自動で消える・102 と一括流入(500)では再発火しないことを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1639', metric: 'bundle-kb', value: 1433,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の追加は会場のキャラ層のお祝いの節目判定の差し替え(lib 数十行のみ)。popup.js への影響は小さい。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1639', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1639', metric: 'cross-checked-claims', value: 25,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1638 の note と同じ理由)。今回は節目判定の単体テスト(1000件ごと・間は祝わない)で確認した。'
   })
 ]);
