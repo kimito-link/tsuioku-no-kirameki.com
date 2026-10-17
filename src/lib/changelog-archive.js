@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1636',
+    date: '2026-10-17',
+    summary: 'ピックアップ枠に発言者のサムネとIDを出す',
+    items: Object.freeze([
+      '会場の「PICK UP」枠に、誰の発言かが分かるように、発言者のサムネ・ハンドルネーム・IDを出すようにしました。数字のIDの人は、IDからユーザーページへ飛べます。匿名の人は「匿名NNN」と代替の顔で出し、IDやリンクは作りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1635',
     date: '2026-10-17',
     summary: '会場のピックアップ枠に本当にコメントが出る',
