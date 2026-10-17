@@ -533,6 +533,10 @@ function buildVenuePersonTile(participant, fallbackLabel = '会場') {
 /** @typedef {ReturnType<typeof venueRowsFromUserLaneCandidates>[number]} VenueRow */
 
 const VENUE_CSS = `
+  /* v0.1.1650: hidden 属性の安全網(会場配下)。.nlsb-roster-panel / .nl-story-userlane 等の display が UA の [hidden] に勝って残るのを型ごと防ぐ。 */
+  .nlsb-root [hidden] {
+    display: none !important;
+  }
   .nlsb-root {
     position: fixed;
     inset: 0;
