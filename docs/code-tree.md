@@ -847,7 +847,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2005)
+- 📁 **src/** (2006)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1129,7 +1129,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1767)
+  - 📁 **lib/** (1768)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2013,6 +2013,7 @@
     - `marketingChartsHtml.test.js`
     - `marketingChartsHtmlAnalyticsDedup.test.js`
     - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
+    - `marketingExportMaskWiring.test.js`
     - `marketingGiftThrowLedger.js` — マーケ分析 HTML 用: 「誰が・どのアイテムを・いくら投げたか」の投げ履歴台帳を組み立てる純関数。
     - `marketingGiftThrowLedger.test.js`
     - `marketingHtmlAdvisorAvatars.js` — マーケ分析HTML内のキャラアイコン（単体HTMLで表示するため data URI）。
