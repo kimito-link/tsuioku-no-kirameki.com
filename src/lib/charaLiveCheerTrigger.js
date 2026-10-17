@@ -8,15 +8,37 @@
  * ★設計(2026-10-17・council-fable・docs/handoff/yukkuri-float-and-celebrate-DESIGN-2026-10-17.md §E):
  *   「アプリ記録 N 件達成!」の告知・効果音・降りものシャワーは popup 側に既にある(supportCelebration.js)。
  *   足りないのは【常駐の3人が反応する】ことだけ。件数は数え直さず、会場が購読済みの記録件数(panel_summary の recordedCount)を使い、
- *   節目の判定も既存の pickHighestCrossedMilestone / COMMENT_MILESTONES を再利用する(新しい節目表を作らない)。
+ *   節目の判定は既存の pickHighestCrossedMilestone を再利用する。節目は 100/200/500 と、以降 1000 件ごと(長い配信でうるさくしない・ユーザー決定)。
  *   一回性は「会場ローカルの前回件数(baseline)」が単調に進むことで保つ(storage に書かない)。
  * @module charaLiveCheerTrigger
  */
 
-import { COMMENT_MILESTONES, pickHighestCrossedMilestone } from './supportCelebration.js';
+import { pickHighestCrossedMilestone } from './supportCelebration.js';
 
 /** 3人がお祝いする最小の節目。ユーザー要望は100件(10/25/50 は従来どおり既存の演出のみ)。 */
 export const CHEER_MIN_MILESTONE = 100;
+
+/** 100・200・500 のあとは、この件数ごとに祝う(2026-10-17 ユーザー決定「A」: 長い配信でうるさくしない)。 */
+export const CHEER_STEP_AFTER_FIXED = 1000;
+
+/** 固定の節目(1000 未満)。1000 以降は CHEER_STEP_AFTER_FIXED ごと。 */
+const CHEER_FIXED_MILESTONES = Object.freeze([100, 200, 500]);
+
+/**
+ * prev 超え・next 以下の祝う節目を列挙する(100/200/500、そして 1000 ごと)。
+ * @param {number} prev
+ * @param {number} next
+ * @param {number} minMilestone
+ * @returns {number[]}
+ */
+function cheerMilestonesBetween(prev, next, minMilestone) {
+  /** @type {number[]} */
+  const out = [];
+  for (const m of CHEER_FIXED_MILESTONES) if (m >= minMilestone && m > prev && m <= next) out.push(m);
+  const first = Math.max(CHEER_STEP_AFTER_FIXED, Math.floor(prev / CHEER_STEP_AFTER_FIXED + 1) * CHEER_STEP_AFTER_FIXED);
+  for (let m = first; m <= next && out.length < 64; m += CHEER_STEP_AFTER_FIXED) if (m >= minMilestone) out.push(m);
+  return out;
+}
 
 /** 1回の観測でこれ以上件数が増えたら、過去ログの一括流入(backfill/タイムシフト)とみなして祝わない。 */
 export const CHEER_JUMP_GUARD = 300;
@@ -40,7 +62,7 @@ export function resolveCommentCheer(prev, next, opts = {}) {
   if (prev == null || !Number.isFinite(prev)) return { baseline: cur, cheer: null };
   if (cur < prev) return { baseline: cur, cheer: null };
   if (cur - prev >= jumpGuard) return { baseline: cur, cheer: null };
-  const hit = pickHighestCrossedMilestone(prev, cur, COMMENT_MILESTONES.filter((m) => m >= minMilestone));
+  const hit = pickHighestCrossedMilestone(prev, cur, cheerMilestonesBetween(prev, cur, minMilestone));
   return { baseline: cur, cheer: hit == null ? null : { milestone: hit } };
 }
 

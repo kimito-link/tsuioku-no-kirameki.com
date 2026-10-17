@@ -23,10 +23,18 @@ describe('resolveCommentCheer', () => {
     expect(resolveCommentCheer(49, 51).cheer).toBeNull();
     expect(CHEER_MIN_MILESTONE).toBe(100);
   });
-  it('★200/500/1000 など上の節目も一般化されて祝う(一度に複数跨いだら最大の節目)', () => {
+  it('★200/500 も祝う(一度に複数跨いだら最大の節目)', () => {
     expect(resolveCommentCheer(199, 201).cheer).toEqual({ milestone: 200 });
     expect(resolveCommentCheer(499, 500).cheer).toEqual({ milestone: 500 });
     expect(resolveCommentCheer(90, 210).cheer).toEqual({ milestone: 200 });
+  });
+  it('★500 のあとは 1000 件ごと(1000,2000,3000,4000…)・その間は祝わない(長い配信でうるさくしない)', () => {
+    expect(resolveCommentCheer(999, 1000).cheer).toEqual({ milestone: 1000 });
+    expect(resolveCommentCheer(1500, 1999).cheer).toBeNull();
+    expect(resolveCommentCheer(1999, 2000).cheer).toEqual({ milestone: 2000 });
+    expect(resolveCommentCheer(3999, 4000).cheer).toEqual({ milestone: 4000 });
+    expect(resolveCommentCheer(5900, 6100).cheer).toEqual({ milestone: 6000 });
+    expect(resolveCommentCheer(600, 900).cheer).toBeNull();
   });
   it('★一括流入(jumpGuard 以上の増加=backfill/タイムシフト)は基準を更新するだけで祝わない', () => {
     expect(resolveCommentCheer(50, 50 + CHEER_JUMP_GUARD)).toEqual({ baseline: 350, cheer: null });
