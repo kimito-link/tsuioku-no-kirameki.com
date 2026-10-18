@@ -69,6 +69,7 @@ import {
   supportGrowthMetricsForAdvice
 } from './supportGrowthInsights.js';
 import { analyzeGiftMomentum } from './giftMomentumAnalytics.js';
+import { analyzeGiftMoments, buildGiftMomentNextActions } from './giftMomentAnalytics.js';
 import {
   buildMarketingGiftThrowLedger,
   MARKETING_GIFT_LEDGER_DISPLAY_RULE_NOTE
@@ -1879,6 +1880,88 @@ function wrapThumbWithProfileLink(userId, innerHtml, maskShare = false) {
     `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}"` +
     ` target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`
   );
+}
+
+/** @param {number} ms */
+function giftMomentClock(ms) {
+  const d = new Date(ms);
+  const p2 = (/** @type {number} */ n) => String(n).padStart(2, '0');
+  return `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+}
+
+/**
+ * v0.1.1672: 「ギフトの瞬間」章。ギフトが飛んだ時刻の前5分・後5分のコメント件数と同接の差を、瞬間ごとのカードで出す。
+ *   計算は giftMomentAnalytics.js(純関数)。ここは表示だけ。共有用に伏せるときは、実名・サムネ・話題語(本文由来)を出さない。
+ * @param {ReturnType<typeof analyzeGiftMoments>|null} analysis
+ * @param {string[]} nextLines
+ * @param {boolean} maskShare
+ * @param {any} [identiconResolver]
+ */
+function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = undefined) {
+  if (!analysis || analysis.hasHistory !== true) return '';
+  const head = `<h2>ギフトの瞬間</h2>
+<p class="mkt-note">ギフトが飛んだ時刻の前5分と後5分で、コメントと同時接続がどう動いたかを並べます。</p>`;
+  const notesHtml = analysis.notes.length
+    ? `<ul class="mkt-gm-notes">${analysis.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>`
+    : '';
+  if (!analysis.axisOk || analysis.moments.length === 0) {
+    return `<section class="mkt-section mkt-gift-moments">${head}${notesHtml}</section>`;
+  }
+  const sm = analysis.summary;
+  const summaryLine =
+    sm.k != null && sm.medianDelta != null
+      ? `ギフトの瞬間 ${analysis.moments.length}件のうち、前後の窓がそろう ${sm.n}件で、後5分のコメントが前5分より増えたのは ${sm.k}件(後−前の中央値 ${sm.medianDelta >= 0 ? '+' : ''}${sm.medianDelta}件)でした。`
+      : `ギフトの瞬間は ${analysis.moments.length}件でした。`;
+  const SHOW = 12;
+  const cards = analysis.moments
+    .slice(0, SHOW)
+    .map((m) => {
+      const giftLines = m.gifts
+        .map((g) => {
+          const rawLabel = g.userId && /^\d+$/.test(g.userId) ? displayUserLabel(g.userId, g.senderName) : g.senderName || '名無し';
+          const nameHtml = maskShare
+            ? escapeHtml(maskLabelForShare(rawLabel))
+            : g.userId && /^\d+$/.test(g.userId)
+              ? buildUserProfileLinkedLabelHtml(g.userId, rawLabel)
+              : escapeHtml(rawLabel);
+          const thumbSrc = maskShare
+            ? ''
+            : resolveReportUserThumbSrc({ userId: g.userId || '', avatarUrl: g.avatarUrl || '', identiconResolver });
+          const thumbImg = thumbSrc
+            ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+            : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
+          const thumbCell = wrapThumbWithProfileLink(g.userId, thumbImg, maskShare);
+          return `<li class="mkt-gm-gift">${thumbCell}<span class="mkt-gm-sender">${nameHtml}</span><span class="mkt-gm-item">${escapeHtml(g.itemName || '(名称未取得)')}</span><span class="mkt-gm-pt">${escapeHtml(formatEventRankingNumber(g.points))}pt</span></li>`;
+        })
+        .join('');
+      const bC = m.before.comments;
+      const aC = m.after.comments;
+      const diff = aC - bC;
+      const diffTxt = `${diff >= 0 ? '+' : ''}${diff}`;
+      const viewers = m.viewers
+        ? `<span class="mkt-gm-viewers">同接 ${escapeHtml(formatEventRankingNumber(m.viewers.before))}→${escapeHtml(formatEventRankingNumber(m.viewers.after))}(${m.viewers.diff >= 0 ? '+' : ''}${escapeHtml(formatEventRankingNumber(m.viewers.diff))}・${m.viewers.kind === 'official' ? '公式' : m.viewers.kind === 'estimated' ? '推定' : '公式/推定'})</span>`
+        : '<span class="mkt-gm-viewers mkt-gm-viewers--none">同接 —</span>';
+      const topics = !maskShare && m.topics.length
+        ? `<div class="mkt-gm-topics">この10分に多かった話題: ${m.topics.map((t) => escapeHtml(t)).join('・')}</div>`
+        : '';
+      const badges = [
+        m.chain ? '<span class="mkt-gm-badge">連鎖</span>' : '',
+        m.fullWindow ? '' : '<span class="mkt-gm-badge mkt-gm-badge--warn">窓が足りない</span>'
+      ].join('');
+      return `<div class="mkt-gm-card">
+<div class="mkt-gm-time">${escapeHtml(giftMomentClock(m.startAt))}${m.chain ? `〜${escapeHtml(giftMomentClock(m.endAt))}` : ''} ${badges}</div>
+<ul class="mkt-gm-gifts">${giftLines}</ul>
+<div class="mkt-gm-delta">前5分 <strong>${bC}</strong>件 → 後5分 <strong>${aC}</strong>件(${escapeHtml(diffTxt)}) ${viewers}</div>
+${topics}
+</div>`;
+    })
+    .join('');
+  const more = analysis.moments.length > SHOW ? `<p class="mkt-note">ほか ${analysis.moments.length - SHOW}件の瞬間は、台帳(ギフト投げ履歴)を見てください。</p>` : '';
+  const nextHtml = nextLines.length
+    ? `<div class="mkt-gm-next"><h3>次回に試すこと</h3><ul>${nextLines.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul></div>`
+    : '';
+  return `<section class="mkt-section mkt-gift-moments">${head}<p class="mkt-gm-summary">${escapeHtml(summaryLine)}</p>
+<div class="mkt-gm-cards">${cards}</div>${more}${notesHtml}${nextHtml}</section>`;
 }
 
 /**
@@ -4525,6 +4608,16 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     officialGiftHistory: officialGiftHistoryForAnalytics,
     giftEvents: giftEventsForAnalytics
   });
+  // v0.1.1672: ギフトの瞬間(公式の公開時刻×このPCのコメント時刻)。入力は既に手元にある=書き出し側は無変更。
+  const giftMomentsAnalysis = analyzeGiftMoments({
+    history: Array.isArray(opts.giftSubAppHistory?.history) ? opts.giftSubAppHistory.history : [],
+    comments: currentCommentsForLayer,
+    concurrentPoints: concurrentSeries.points,
+    officialTotalPoint: /** @type {any} */ (opts.giftSubAppHistory)?.officialTotalPoint ?? null,
+    officialRemaining: /** @type {any} */ (opts.giftSubAppHistory)?.officialRemaining ?? 0,
+    sampled: opts.slimForHeavyExport === true
+  });
+  const giftMomentNextLines = giftMomentsAnalysis.axisOk ? buildGiftMomentNextActions(giftMomentsAnalysis.summary) : [];
   const supporterChikuran = buildSupporterChikuranRows({
     liveId: r.liveId,
     comments: currentCommentsForLayer,
@@ -4635,6 +4728,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // 何も起こらない／謎のスクロール挙動になる問題を解消する。
   const allTocItems = [
     { id: 'mkt-participation-lead', label: '来場とコメント参加' },
+    { id: 'mkt-gift-moments', label: 'ギフトの瞬間' },
     { id: 'mkt-analysis-skills', label: '分析スキルボード' },
     { id: 'mkt-harness-scaling', label: '分析ハーネス設計' },
     { id: 'mkt-next-actions', label: 'りんく達の作戦会議' },
@@ -4717,6 +4811,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const bodyHtml = `${sectionFeaturesOverview()}
 __NL_TOC_PLACEHOLDER__
 ${sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
+${idWrap('mkt-gift-moments', sectionGiftMoments(giftMomentsAnalysis, giftMomentNextLines, maskShare, identiconResolver))}
 ${sectionAdviceIntro()}
 ${sectionAnalysisSkillBoard(analysisSkillBoard)}
 ${sectionHarnessScalingBoard(harnessScalingBoard)}
@@ -6753,6 +6848,25 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-gift-type{display:inline-block;border:1px solid rgba(251,146,60,.45);background:rgba(251,146,60,.12);color:#fed7aa;border-radius:999px;padding:.1rem .45rem;font-size:.74rem;line-height:1.35}
 .mkt-gift-evidence{font-size:.78rem;color:#cbd5e1;min-width:150px}
 .mkt-gift-window-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem}
+.mkt-gift-moments .mkt-gm-summary{font-weight:700;margin:.4rem 0}
+.mkt-gm-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:.7rem;margin:.6rem 0}
+.mkt-gm-card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.7rem .8rem;min-width:0}
+.mkt-gm-time{font-size:.8rem;color:#93c5fd;font-variant-numeric:tabular-nums;margin-bottom:.35rem}
+.mkt-gm-gifts{list-style:none;margin:0 0 .4rem;padding:0}
+.mkt-gm-gift{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;margin:.15rem 0;font-size:.85rem}
+.mkt-gm-sender{font-weight:700;overflow-wrap:anywhere}
+.mkt-gm-item{color:#cbd5e1}
+.mkt-gm-pt{margin-left:auto;font-variant-numeric:tabular-nums;color:#fde68a}
+.mkt-gm-delta{font-size:.85rem}
+.mkt-gm-delta strong{font-size:1.05rem}
+.mkt-gm-viewers{display:inline-block;margin-left:.4rem;font-size:.78rem;color:#aab6c8}
+.mkt-gm-topics{margin-top:.35rem;font-size:.78rem;color:#aab6c8}
+.mkt-gm-badge{display:inline-block;margin-left:.3rem;border:1px solid #475569;border-radius:999px;padding:.02rem .45rem;font-size:.7rem;color:#dbeafe}
+.mkt-gm-badge--warn{border-color:rgba(251,191,36,.55);color:#fde68a}
+.mkt-gm-notes{font-size:.8rem;color:#aab6c8;margin:.4rem 0;padding-left:1.1rem}
+.mkt-gm-next{margin-top:.6rem;border-left:3px solid #38bdf8;padding:.3rem .7rem;background:rgba(15,23,42,.55)}
+.mkt-gm-next h3{margin:.1rem 0 .3rem;font-size:.95rem}
+.mkt-gm-next ul{margin:0;padding-left:1.1rem;font-size:.88rem}
 .mkt-gift-window{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.8rem;min-width:0}
 .mkt-gift-window__head{display:flex;justify-content:space-between;gap:.5rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:.5rem}
 .mkt-gift-window__head strong{color:#f8fafc;font-size:.95rem}
