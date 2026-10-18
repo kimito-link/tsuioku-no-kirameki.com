@@ -690,6 +690,9 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   try {
     const spLine = String(sidepanelSelfDiag?.line || '');
     if (spLine) lines.push(spLine);
+    // v0.1.1675: 押してからパネルが描かれるまでの実測(中央値・最大・直近)。無ければ出ない。
+    const openLine = String(sidepanelSelfDiag?.openTimingLine || '');
+    if (openLine) lines.push(openLine);
   } catch {
     /* no-op: 自己診断の失敗は状態速報を壊さない */
   }

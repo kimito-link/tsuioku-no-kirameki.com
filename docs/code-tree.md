@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 937 件
+## ⚠️ 役割コメントが無いソース 8 / 938 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -857,7 +857,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2017)
+- 📁 **src/** (2020)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1140,7 +1140,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1778)
+  - 📁 **lib/** (1781)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2459,6 +2459,9 @@
     - `sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
     - `sidepanelIframeSrc.test.js`
     - `sidepanelLvForward.wiring.test.js`
+    - `sidepanelOpenTiming.js` — sidepanelOpenTiming — ツールバーを押してからサイドパネルが描かれるまでの【実機の時間】を測る純ロジック。
+    - `sidepanelOpenTiming.test.js`
+    - `sidepanelOpenTiming.wiring.test.js`
     - `sidepanelResizeBlack.test.js`
     - `sidepanelSelfDiag.js` — sidepanelSelfDiag — サイドパネルが「自分がいま黒くないか」を自己申告するための純ロジック。
     - `sidepanelSelfDiag.test.js`

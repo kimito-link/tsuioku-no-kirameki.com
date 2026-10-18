@@ -19,6 +19,13 @@ import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
 import { buildCommentWriteModeDiagLine } from '../lib/commentWriteModeDiag.js';
 import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
+import {
+  SP_CLICK_KEY,
+  SP_OPEN_TIMING_KEY,
+  buildOpenTiming,
+  formatOpenTimingLine,
+  mergeOpens
+} from '../lib/sidepanelOpenTiming.js';
 import { startStatusPublisherHost } from './statusPublisherHost.js';
 import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
 import { SIDE_PANEL_WATCH_TAB_QUERY, pickLvFromTabs } from '../lib/sidePanelLvFromTabs.js';
@@ -38,6 +45,65 @@ import {
  * @type {{ reason: string, loadAt: number|null, paintAt: number|null, revealAt: number|null }}
  */
 const _revealDiag = { reason: '', loadAt: null, paintAt: null, revealAt: null };
+
+/*
+ * ★v0.1.1675: ツールバーを押してからパネルが描かれるまでの【実機の時間】を測る(状態速報に1行出る)。
+ *   押した時刻は SW が chrome.storage.session に控える(open() のあと・await なし)。ここでは読むだけ。
+ *   縞の並びがウィンドウの余白と一致した(=拡張の絵ではない)ため、拡張に決められる
+ *   「パネルが描かれず下地が透けている時間」が実機で何msなのかを、まず数字にする。区間の定義は sidepanelOpenTiming.js。
+ *   ★描画には関与しない・fire-and-forget・失敗しても何も変わらない。履歴を読み終えるまでは書かない(上書きで消さない)。
+ */
+/** @type {{ at?: number, swAgeMs?: number, armed?: boolean, hasLv?: boolean } | null} */
+let _openClick = null;
+/** @type {any[]} 起動時に読んだ【これまでの】履歴(今回分は含まない)。 */
+let _openHistory = [];
+let _openHistoryLoaded = false;
+let _openLine = '';
+let _openLastSig = '';
+
+function publishOpenTiming() {
+  try {
+    if (!_openHistoryLoaded) return;
+    const nav = performance.timeOrigin;
+    const fp = performance.getEntriesByName('first-paint')[0];
+    const cur = buildOpenTiming({
+      click: _openClick,
+      docStartEpoch: nav,
+      firstPaintEpoch: fp ? nav + fp.startTime : null,
+      contentPaintEpoch: _revealDiag.paintAt != null ? nav + _revealDiag.paintAt : null
+    });
+    const merged = mergeOpens(_openHistory, cur);
+    _openLine = formatOpenTimingLine(merged);
+    const sig = JSON.stringify(cur);
+    if (sig === _openLastSig) return; // 変化が無ければ書かない(storage_changed の再描画を増やさない)
+    _openLastSig = sig;
+    // ★自己診断の書き込み(KEY_SIDEPANEL_SELF_DIAG)より前に同じ形の呼び出しを置かない配線テストがあるので、書き方を変えている。
+    void chrome.storage.local.set({ [SP_OPEN_TIMING_KEY]: merged }).catch(() => {});
+  } catch {
+    /* best-effort: 計測の失敗でパネルは止めない */
+  }
+}
+
+try {
+  const pc = chrome?.storage?.session?.get?.(SP_CLICK_KEY);
+  if (pc && typeof pc.then === 'function') {
+    pc.then((b) => {
+      _openClick = (b && b[SP_CLICK_KEY]) || null;
+      publishOpenTiming();
+    }).catch(() => {});
+  }
+  const ph = chrome?.storage?.local?.get?.(SP_OPEN_TIMING_KEY);
+  if (ph && typeof ph.then === 'function') {
+    ph.then((b) => {
+      const v = b && b[SP_OPEN_TIMING_KEY];
+      _openHistory = Array.isArray(v) ? v : [];
+      _openHistoryLoaded = true;
+      publishOpenTiming();
+    }).catch(() => {});
+  }
+} catch {
+  /* no-op */
+}
 
 /*
  * ★v0.1.1419: iframe に配信ID(lv)を渡してから読み込ませる。【描画に関与する唯一の処理】。
@@ -425,6 +491,7 @@ function renderSelfDiagOverlay(v) {
  *   ★実発火時刻との差が「イベントループが止まっていた長さ」になる。
  */
 function collectAndPublish(phase, schedMs = null) {
+  publishOpenTiming();
   // ★v0.1.1382: 測るたびに最新値を取りに行く(記録中は値が動く)。
   //   await しない=この読みが遅くても観測そのものは止まらない。
   refreshCommentWriteModeDiag();
@@ -730,6 +797,8 @@ function collectAndPublish(phase, schedMs = null) {
         at: Date.now(),
         // ★v0.1.1561: 隠す→見せる の実測(reason / loadAt / paintAt / revealAt)。黒の窓=revealAt<paintAt。
         reveal: { ..._revealDiag },
+        // ★v0.1.1675: 押してからパネルが描かれるまでの実測の1行(中央値・最大・直近)。
+        openTimingLine: _openLine,
         // ok は「この起動で一度も黒くなかった」を意味する(瞬間の黒も見逃さない)。
         // ★未レイアウトは黒として数えない(偽陽性を永久保持しない)。
         // ★v0.1.1351: あとから黒くなった場合も ok=false。ここを入れ忘れると、行には
