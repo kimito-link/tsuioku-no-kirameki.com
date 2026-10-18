@@ -2886,5 +2886,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1679', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1678 の note と同じ理由)。今回は配線テスト2件(起動時に呼ばない・書き出しでは呼ぶ)。実機データの V8 CPU プロファイルで arrayBufferToBase64 が上位から消え、GC 時間も 670ms→442ms(別走行どうしで揺れあり)。先読み削除で露見した記録件数の二重(v1678 で修正)を直したうえで、ローカル e2e(snapshot-fetch-hang-resilient)が緑であることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1680', metric: 'bundle-kb', value: 1451,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は、新規 avatarFaceStore.js(IndexedDB の永続キャッシュ)と avatarPartsComposer.js の2か所(作る前に読む・作ったら書く)のみ。顔の見た目(最終的な画像)は変えていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1680', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1680', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1679 の note と同じ理由)。今回は単体9件+配線4件(書いた顔を読める・無ければ空・読みをまとめる・PNG以外は書かない・版でキーを分ける・上限で古いものを捨てる・IDB無し/故障でも落ちない)。実機データの V8 CPU プロファイルで、拡張プロセスの忙しい区間の合計(関数 blob=canvas.toBlob)が 3回の開閉で 8,025→4,658 サンプルに減り、3回目は ≥150ms の忙しい区間が無くなった。'
   })
 ]);

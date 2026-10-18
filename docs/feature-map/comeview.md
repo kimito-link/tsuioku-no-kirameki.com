@@ -16,6 +16,7 @@ graph LR
   n_comeview --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_comeview --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_comeview --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
+  n_comeview --> n_src_lib_avatarFaceStore_js["lib/avatarFaceStore.js"]:::shared
   n_comeview --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_comeview --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
   n_comeview --> n_src_lib_comeviewInstantRender_js["lib/comeviewInstantRender.js"]
@@ -52,8 +53,7 @@ graph LR
   n_comeview --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
   n_comeview --> n_src_lib_voiceFailureTaxonomy_js["lib/voiceFailureTaxonomy.js"]:::shared
   n_comeview --> n_src_lib_voiceKeys_js["lib/voiceKeys.js"]:::shared
-  n_comeview --> n_src_lib_voiceLagBudget_js["lib/voiceLagBudget.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 8 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 9 ファイル省略（全件は storage-bus.md / metafile 参照）。

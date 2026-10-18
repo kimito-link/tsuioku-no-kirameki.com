@@ -1,5 +1,6 @@
 // avatarPartsComposer.js — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { getDefaultAvatarFaceStore } from './avatarFaceStore.js';
 
 export const AVATAR_PART_KEYS = Object.freeze({
   hair: Object.freeze([
@@ -274,6 +275,20 @@ function colorizeHair(image, hairHue, size) {
 }
 
 /**
+ * メモリ上の顔キャッシュに入れ、上限を超えたら古い順に捨てる。
+ * @param {string} key
+ * @param {string} dataUrl
+ */
+function rememberFace(key, dataUrl) {
+  avatarDataUrlCache.set(key, dataUrl);
+  while (avatarDataUrlCache.size > AVATAR_DATA_URL_CACHE_MAX) {
+    const oldestKey = avatarDataUrlCache.keys().next().value;
+    if (oldestKey == null) break;
+    avatarDataUrlCache.delete(oldestKey);
+  }
+}
+
+/**
  * @param {unknown} userKey
  * @returns {Promise<string>} 失敗時は reject。呼び出し側が SVG 即時表示を維持する。
  */
@@ -292,6 +307,17 @@ export function composeAvatarPartsDataUrl(userKey) {
   if (inFlight) return inFlight;
 
   const promise = (async () => {
+    // v0.1.1680: 作り済みの顔は IndexedDB から読む(パネルを開くたびに同じ顔を canvas で作り直さない)。
+    //   読めない・無いときは従来どおり作る。見た目(最終的な画像)は同じ。
+    const faceStore = getDefaultAvatarFaceStore();
+    if (faceStore) {
+      const persisted = await faceStore.get(key);
+      if (persisted) {
+        avatarComposeStats.persistedHit += 1;
+        rememberFace(key, persisted);
+        return persisted;
+      }
+    }
     if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
       throw new Error('document canvas is unavailable');
     }
@@ -325,12 +351,8 @@ export function composeAvatarPartsDataUrl(userKey) {
     ctx.drawImage(colorizeHair(hair, selected.hairHue, size), 0, 0);
 
     const dataUrl = await canvasToImageUrl(canvas);
-    avatarDataUrlCache.set(key, dataUrl);
-    while (avatarDataUrlCache.size > AVATAR_DATA_URL_CACHE_MAX) {
-      const oldestKey = avatarDataUrlCache.keys().next().value;
-      if (oldestKey == null) break;
-      avatarDataUrlCache.delete(oldestKey);
-    }
+    rememberFace(key, dataUrl);
+    if (faceStore) faceStore.put(key, dataUrl);
     return dataUrl;
   })();
 
@@ -507,7 +529,7 @@ export function createViewportGate(deps = {}) {
 
 const avatarComposeLimiter = createComposeLimiter();
 const avatarViewportGate = createViewportGate();
-const avatarComposeStats = { requested: 0, cacheHit: 0, composedAfterNear: 0, skippedDetached: 0, failed: 0 };
+const avatarComposeStats = { requested: 0, cacheHit: 0, persistedHit: 0, composedAfterNear: 0, skippedDetached: 0, failed: 0 };
 
 /** 状態速報用: 顔の合成の要求・実行・見送りの内訳。 */
 export function getAvatarComposeStats() {
