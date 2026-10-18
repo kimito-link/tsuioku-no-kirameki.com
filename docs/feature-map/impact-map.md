@@ -600,6 +600,7 @@
 | `src/lib/giftHistorySourcePreference.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryViewModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftLaneOfficialFill.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftMomentAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentumAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftQuickStatsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftRankStripConfig.js` | 1 | ポップアップ(応援レーン) |
