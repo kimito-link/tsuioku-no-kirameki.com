@@ -17,6 +17,28 @@ function c(no, uid, text, offsetMs = 0, extra = {}) {
   };
 }
 
+describe('参加者数: ID のあるユーザーだけを人として数える(v0.1.1668)', () => {
+  it('★userId 空のコメントは別人にせず、人数には入れずに件数だけ別に出す', () => {
+    const comments = [c(1, 'u1', 'a'), c(2, 'u1', 'b', 1000), c(3, '', 'x', 2000), c(4, '', 'y', 3000), c(5, 'u2', 'z', 4000)];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    expect(r.identifiedUsers).toBe(2);
+    expect(r.unattributedComments).toBe(2);
+    // 後方互換: 従来の uniqueUsers(ID 空を1コメント=1人と数える)は残す
+    expect(r.uniqueUsers).toBe(4);
+  });
+  it('ID 空が無ければ identifiedUsers と uniqueUsers は一致する', () => {
+    const r = aggregateMarketingReport([c(1, 'u1', 'a'), c(2, 'u2', 'b', 1000)], 'lv1');
+    expect(r.identifiedUsers).toBe(2);
+    expect(r.unattributedComments).toBe(0);
+    expect(r.uniqueUsers).toBe(2);
+  });
+  it('空配列は 0', () => {
+    const r = aggregateMarketingReport([], 'lv1');
+    expect(r.identifiedUsers).toBe(0);
+    expect(r.unattributedComments).toBe(0);
+  });
+});
+
 describe('aggregateMarketingReport', () => {
   it('空配列で安全に返る', () => {
     const r = aggregateMarketingReport([], 'lv1');
