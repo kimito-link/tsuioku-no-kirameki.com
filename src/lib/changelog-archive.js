@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1658',
+    date: '2026-10-17',
+    summary: 'Escで会場が意図せず閉じる不具合を修正',
+    items: Object.freeze([
+      '日本語入力の変換を取り消すつもりでEscを押すと、会場ごと閉じてしまうことがありました。ニコ生のコメント欄で入力中のEscも同じでした。',
+      '「しまう」を押してコメントを打っている最中にEscを押すと、会場が閉じて表示も捨てられていました。いまは、変換中や入力欄のEscでは何も起きず、しまい中のEscは「戻す」だけになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1657',
     date: '2026-10-18',
     summary: 'コメビュの発言一覧が読めない不具合を修正',

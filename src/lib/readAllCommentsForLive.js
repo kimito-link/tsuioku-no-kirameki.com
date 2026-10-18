@@ -14,6 +14,7 @@
 import { readChunkedComments } from './commentChunkStore.js';
 import { commentsStorageKey } from './storageKeys.js';
 import { tailStorageKey } from './commentTailBuffer.js';
+import { mergeTailRowsIntoDisplay } from './mergeTailRowsIntoDisplay.js';
 
 /**
  * テール行を表示用に正規化(text 空除去・id/liveId/capturedAt 補完)。popup の同名ヘルパと同一。
@@ -80,7 +81,7 @@ export async function readAllCommentsForLive(lv, deps) {
       lv,
       nowMs
     );
-    if (tail.length) rows = rows.concat(tail);
+    if (tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
   } catch {
     /* テールは任意（取れなければ本体のみ） */
   }
