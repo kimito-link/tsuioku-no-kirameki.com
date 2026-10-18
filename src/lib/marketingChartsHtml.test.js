@@ -72,6 +72,30 @@ function eventRankingFixture(overrides = {}) {
   };
 }
 
+describe('参加者の人数(v0.1.1668): ID のない人を別人にして増やさない', () => {
+  const mk = (no, uid, off = 0) => ({
+    id: `p-${no}`, liveId: 'lv9', commentNo: String(no), text: `t${no}`, userId: uid, nickname: '', avatarUrl: '', selfPosted: false,
+    capturedAt: Date.now() - 3_600_000 + off
+  });
+  it('★ヒーローの「参加者」は ID のある人数。ID 空のコメントは人数に入れず、件数として別に注記する', () => {
+    const report = aggregateMarketingReport([mk(1, 'u1'), mk(2, 'u1', 1000), mk(3, '', 2000), mk(4, '', 3000), mk(5, '', 4000)], 'lv9');
+    expect(report.uniqueUsers).toBe(4); // 旧: ID 空を1コメント=1人
+    const html = buildMarketingDashboardHtml(report, { maskShareLabels: true });
+    // 一言まとめ(共有用): 人数は ID のある 1 人。過大な 4 人にしない
+    expect(html).toContain('5件 / 1人');
+    expect(html).not.toContain('5件 / 4人');
+    // ヒーローの参加者の数字
+    const m = /mkt-hero-stat__val">1<\/span><span class="mkt-hero-stat__label">参加者/.exec(html);
+    expect(m).toBeTruthy();
+    expect(html).toContain('ID不明のコメント 3件');
+  });
+  it('ID 空が無ければ注記を出さない', () => {
+    const report = aggregateMarketingReport([mk(1, 'u1'), mk(2, 'u2', 1000)], 'lv9');
+    const html = buildMarketingDashboardHtml(report, { maskShareLabels: true });
+    expect(html).not.toContain('ID不明のコメント');
+  });
+});
+
 describe('buildMarketingDashboardHtml', () => {
   it('完全な HTML ドキュメントを返す', () => {
     const html = buildMarketingDashboardHtml(minimal());
