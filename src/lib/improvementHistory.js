@@ -2802,5 +2802,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1673', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1672 の note と同じ理由)。今回は単体テスト5件+配線テスト2件で、章の出し分け・位置・注記・未検知の表示・伏せ字・名前が分からない人をIDで出す、を固定し、伏せ字を壊すと赤になることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1674', metric: 'bundle-kb', value: 1445,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は extension/background.js のサイドパネル事前用意(既存ページ一括・タブ切替・押下時の差し替え省略)のみ。画面描画の経路は触っていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1674', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1674', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1673 の note と同じ理由)。今回は配線テスト3件を足し、押下時の条件や起動時の呼び出しを消すと赤になることを確認した。'
   })
 ]);

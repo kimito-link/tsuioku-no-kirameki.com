@@ -1103,18 +1103,64 @@ function prearmSidePanelForTab(tabId, url) {
     // ★watch以外では何もしない(空のパネルを出す事故を避ける)
     if (!m || !SIDE_PANEL_LV_RE.test(m[1])) return;
     if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function') return;
+    const lv = m[1];
     void chrome.sidePanel
-      .setOptions({ tabId, path: `sidepanel.html?lv=${m[1]}`, enabled: true })
+      .setOptions({ tabId, path: `sidepanel.html?lv=${lv}`, enabled: true })
+      .then(() => {
+        // 成功したときだけ「用意済み」と覚える(押下時に同じ path の差し替えを省く)。
+        __sidePanelArmedLv.set(tabId, lv);
+      })
       .catch(() => {});
   } catch {
     /* no-op: 事前用意に失敗しても従来の押下経路で開く */
   }
 }
 
+/**
+ * v0.1.1674: 事前用意済みのタブ(tabId→lv)。SW が眠ると空になる=空なら従来どおり押下時に差し替える。
+ * 何回呼んでも結果が同じ(べき等)で、メモが無くても壊れない。
+ */
+const __sidePanelArmedLv = new Map();
+
+/**
+ * 既に開いている watch タブを一括で用意する(べき等)。
+ * onUpdated が来ない場面(拡張の更新直後・ブラウザ起動後・SW 再起動後)の穴埋め。
+ */
+function prearmAllWatchTabs() {
+  try {
+    void chrome.tabs
+      .query({}) // url の絞り込みは prearmSidePanelForTab の正規表現が担う(host 権限外のタブは url が無く素通り)
+      .then((tabs) => {
+        for (const t of tabs || []) prearmSidePanelForTab(t.id, t.url);
+      })
+      .catch(() => {});
+  } catch {
+    /* no-op */
+  }
+}
+prearmAllWatchTabs(); // SW が起きるたびに1回(拡張更新・起動・再起動すべてここを通る)
+
 /* watchページになった瞬間に用意する(押される前に済ませる)。 */
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!changeInfo || (changeInfo.status !== 'complete' && !changeInfo.url)) return;
   prearmSidePanelForTab(tabId, (tab && tab.url) || changeInfo.url);
+});
+
+/* 別タブから切り替えただけのタブも、押される前に用意する。 */
+chrome.tabs.onActivated.addListener((info) => {
+  try {
+    if (!info || info.tabId == null) return;
+    void chrome.tabs
+      .get(info.tabId)
+      .then((t) => prearmSidePanelForTab(t && t.id, t && t.url))
+      .catch(() => {});
+  } catch {
+    /* no-op */
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  __sidePanelArmedLv.delete(tabId);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -3586,7 +3632,8 @@ chrome.action.onClicked.addListener((tab) => {
           return '';
         }
       })();
-      if (lvFromTab) {
+      // v0.1.1674: 事前用意で同じ lv の path が確定済みなら、押下時は path に触らない(差し替えの競合を作らない)。
+      if (lvFromTab && __sidePanelArmedLv.get(tid) !== lvFromTab) {
         void chrome.sidePanel
           .setOptions({ tabId: tid, path: `sidepanel.html?lv=${lvFromTab}`, enabled: true })
           .catch(() => {});
