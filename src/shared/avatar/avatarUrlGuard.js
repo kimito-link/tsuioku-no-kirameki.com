@@ -7,6 +7,19 @@
  */
 
 /**
+ * avatarCompareKey の記憶(同じ文字列 → 同じキー)。
+ *
+ * ★v0.1.1677: 全コメント分(数千件)を毎回の再描画で回す呼び手(popup の countResolvedAvatarEntries 等)が、
+ *   同じ人のアイコン URL を何千回も `new URL` で解析し直していた。実機の保存データを写したヘッドレスの
+ *   CPU プロファイルで、拡張プロセスの JS 自己時間 11.4 秒のうち 1.8 秒(16%)がこの関数だった。
+ *   純粋関数(同じ入力は同じ出力)なので、入力文字列ごとに結果を覚える。
+ *   上限を超えたら全部捨てて作り直す(大きくなり続けない・捨てても答えは同じ)。
+ */
+const COMPARE_KEY_CACHE_MAX = 3000;
+/** @type {Map<string, string>} */
+const _compareKeyCache = new Map();
+
+/**
  * URL の query/hash を取り除いた href を返す（比較キー用）。
  *
  * @param {unknown} raw
@@ -15,14 +28,21 @@
 export function avatarCompareKey(raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (!s) return '';
+  const hit = _compareKeyCache.get(s);
+  if (hit !== undefined) return hit;
+  /** @type {string} */
+  let key;
   try {
     const u = new URL(s);
     u.search = '';
     u.hash = '';
-    return u.href;
+    key = u.href;
   } catch {
-    return s;
+    key = s;
   }
+  if (_compareKeyCache.size >= COMPARE_KEY_CACHE_MAX) _compareKeyCache.clear();
+  _compareKeyCache.set(s, key);
+  return key;
 }
 
 /**
