@@ -88,8 +88,12 @@ describe('JS: setTucked とボタン・トグルの配線', () => {
     expect(body).toContain('setTucked(false)');
   });
 
-  it('★Esc の連鎖に tucked を足さない(入力中の Esc を奪わない)', () => {
+  it('★Esc: 入力中(変換中・会場外の入力欄)は何もしない。その後の「しまい中」だけ戻す(v0.1.1657 で方針を明確化)', () => {
     const body = slice('const onEscapeKey = (event) =>', 'const addEscapeListener');
-    expect(body).not.toContain('tucked');
+    // 入力中の Esc は奪わない=ガードが tucked の判定より前にある。
+    expect(body.indexOf('isEditableOutsideVenue(event.target)')).toBeGreaterThan(0);
+    expect(body.indexOf('isEditableOutsideVenue(event.target)')).toBeLessThan(body.indexOf('if (tucked)'));
+    // しまい中の Esc は会場を閉じず戻すだけ(閉じると記録の表示が捨てられる)。
+    expect(body).toContain('setTucked(false)');
   });
 });
