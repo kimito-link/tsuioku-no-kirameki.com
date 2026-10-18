@@ -2844,5 +2844,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1676', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1675 の note と同じ理由)。今回は単体27件で、押した時刻が無い回の数字・壊れた組の除外・押下なし回数の表示を固定。実機の保存データを一時プロファイルに写したヘッドレスで、記録から速報の行まで通ることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1677', metric: 'bundle-kb', value: 1445,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は src/shared/avatar/avatarUrlGuard.js の avatarCompareKey に結果の記憶(上限3000件・超えたら全部捨てて作り直す)を足しただけ。結果は変わらない純粋関数。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1677', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1677', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1676 の note と同じ理由)。今回は単体5件(同じ文字列で URL を作り直さない・答えが同じ・失敗の記憶・空は記憶しない・大量でも壊れない)。実機の保存データを一時プロファイルに写した V8 CPU プロファイルで、avatarCompareKey の自己時間 1829ms→上位から消滅・全体 11.4秒→6.7秒を確認(別走行どうしで揺れはある)。'
   })
 ]);
