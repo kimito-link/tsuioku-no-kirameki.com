@@ -60,6 +60,30 @@ let _openHistory = [];
 let _openHistoryLoaded = false;
 let _openLine = '';
 let _openLastSig = '';
+// ★文書の中だけで測れる値(押した時刻が無い回=Chrome のサイドパネルボタン経由でも残る)。
+//   scriptAt: 文書作成(ナビゲーション開始から)→このスクリプトが走るまで / ownLongTasks: この文書の長い処理(>50ms) /
+//   stalls: 最初の3秒に主スレッドが止まった区間(25msごとの心拍が120ms超ずれた所)。誰が止めたかは別(拡張の他文書の可能性)。
+const _openScriptAtMs = Math.round(performance.now());
+/** @type {Array<[number, number]>} */
+const _openOwnLongTasks = [];
+/** @type {Array<[number, number]>} */
+const _openStalls = [];
+try {
+  const po = new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) if (_openOwnLongTasks.length < 6) _openOwnLongTasks.push([Math.round(e.startTime), Math.round(e.duration)]);
+  });
+  po.observe({ type: 'longtask', buffered: true });
+  let last = performance.now();
+  const stop = last + 3000;
+  const iv = setInterval(() => {
+    const t = performance.now();
+    if (t - last > 145 && _openStalls.length < 6) _openStalls.push([Math.round(last), Math.round(t - last - 25)]);
+    last = t;
+    if (t > stop) clearInterval(iv);
+  }, 25);
+} catch {
+  /* no-op */
+}
 
 function publishOpenTiming() {
   try {
@@ -70,7 +94,18 @@ function publishOpenTiming() {
       click: _openClick,
       docStartEpoch: nav,
       firstPaintEpoch: fp ? nav + fp.startTime : null,
-      contentPaintEpoch: _revealDiag.paintAt != null ? nav + _revealDiag.paintAt : null
+      contentPaintEpoch: _revealDiag.paintAt != null ? nav + _revealDiag.paintAt : null,
+      scriptAtMs: _openScriptAtMs,
+      domInteractiveMs: (() => {
+        try {
+          const n = /** @type {any} */ (performance.getEntriesByType('navigation')[0]);
+          return n && n.domInteractive > 0 ? n.domInteractive : null;
+        } catch {
+          return null;
+        }
+      })(),
+      ownLongTasks: _openOwnLongTasks,
+      stalls: _openStalls
     });
     const merged = mergeOpens(_openHistory, cur);
     _openLine = formatOpenTimingLine(merged);

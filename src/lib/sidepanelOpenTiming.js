@@ -31,6 +31,17 @@ export const OPEN_HISTORY_CAP = 8;
 
 /** @param {unknown} v */
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+/** [開始ms, 長さms] の配列だけ通す(最大6組・壊れた要素は捨てる)。 @param {unknown} v @returns {Array<[number, number]>} */
+function pairs(v) {
+  if (!Array.isArray(v)) return [];
+  /** @type {Array<[number, number]>} */
+  const out = [];
+  for (const e of v) {
+    if (Array.isArray(e) && num(e[0]) != null && num(e[1]) != null) out.push([Math.round(e[0]), Math.round(e[1])]);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
 /** @param {number|null} a @param {number|null} b */
 const diff = (a, b) => (a == null || b == null ? null : Math.round(a - b));
 
@@ -39,9 +50,13 @@ const diff = (a, b) => (a == null || b == null ? null : Math.round(a - b));
  *   click?: { at?: number, swAgeMs?: number, armed?: boolean, hasLv?: boolean } | null,
  *   docStartEpoch?: number|null,
  *   firstPaintEpoch?: number|null,
- *   contentPaintEpoch?: number|null
+ *   contentPaintEpoch?: number|null,
+ *   scriptAtMs?: number|null,
+ *   domInteractiveMs?: number|null,
+ *   ownLongTasks?: Array<[number, number]>,
+ *   stalls?: Array<[number, number]>
  * }} i
- * @returns {{ id: number, clickMissing: boolean, clickToDocMs: number|null, docToFirstPaintMs: number|null, clickToFirstPaintMs: number|null, clickToContentMs: number|null, swAgeMs: number|null, armed: boolean|null, hasLv: boolean|null }}
+ * @returns {{ id: number, clickMissing: boolean, clickToDocMs: number|null, docToFirstPaintMs: number|null, clickToFirstPaintMs: number|null, clickToContentMs: number|null, swAgeMs: number|null, armed: boolean|null, hasLv: boolean|null, scriptAtMs: number|null, domInteractiveMs: number|null, ownLongTasks: Array<[number, number]>, stalls: Array<[number, number]> }}
  */
 export function buildOpenTiming(i) {
   const doc = num(i && i.docStartEpoch);
@@ -59,7 +74,12 @@ export function buildOpenTiming(i) {
     clickToContentMs: usable ? diff(cp, clickAt) : null,
     swAgeMs: usable ? num(i.click && i.click.swAgeMs) : null,
     armed: usable && i.click && typeof i.click.armed === 'boolean' ? i.click.armed : null,
-    hasLv: usable && i.click && typeof i.click.hasLv === 'boolean' ? i.click.hasLv : null
+    hasLv: usable && i.click && typeof i.click.hasLv === 'boolean' ? i.click.hasLv : null,
+    // 押した時刻が無くても測れる「文書の中だけ」の値(ツールバー以外から開いた回も数字が残る)
+    scriptAtMs: num(i && i.scriptAtMs) == null ? null : Math.round(/** @type {number} */ (num(i.scriptAtMs))),
+    domInteractiveMs: num(i && i.domInteractiveMs) == null ? null : Math.round(/** @type {number} */ (num(i.domInteractiveMs))),
+    ownLongTasks: pairs(i && i.ownLongTasks),
+    stalls: pairs(i && i.stalls)
   };
 }
 
@@ -101,8 +121,24 @@ export function formatOpenTimingLine(opens) {
     const xs = col(k);
     return xs.length ? `${label} 中央値${median(xs)}ms(最大${Math.max(...xs)}ms)` : `${label} 未測定`;
   };
+  /** 押した時刻が無くても出せる文書内の数字(全回)。 @param {string} k */
+  const docCol = (k) => all.map((e) => e[k]).filter((v) => typeof v === 'number');
+  const docPart = () => {
+    const fp = docCol('docToFirstPaintMs');
+    const sa = docCol('scriptAtMs');
+    if (!fp.length && !sa.length) return '';
+    const stalls = all.reduce((n, e) => n + (Array.isArray(e.stalls) ? e.stalls.length : 0), 0);
+    const lts = all.reduce((n, e) => n + (Array.isArray(e.ownLongTasks) ? e.ownLongTasks.length : 0), 0);
+    const last = all[all.length - 1];
+    const lastStalls = Array.isArray(last.stalls) && last.stalls.length ? last.stalls.map((/** @type {[number, number]} */ x) => `${x[0]}ms地点で${x[1]}ms`).join('・') : 'なし';
+    return (
+      ` / 全${all.length}回の文書内: 開始→最初の描画${fp.length ? ` 中央値${median(fp)}ms(最大${Math.max(...fp)}ms)` : ' 未測定'}` +
+      ` / 文書作成→スクリプト開始${sa.length ? ` 中央値${median(sa)}ms(最大${Math.max(...sa)}ms)` : ' 未測定'}` +
+      ` / 最初の3秒の主スレッド停止(120ms超)${stalls}件・自文書の長い処理${lts}件 / 直近の停止: ${lastStalls}`
+    );
+  };
   if (!ok.length) {
-    return `サイドパネルを開く時間: 押した時刻が取れた回が0/${all.length}回(ツールバー以外で開いた・SW が控えられなかった等)`;
+    return `サイドパネルを開く時間: 押した時刻が取れた回が0/${all.length}回(ツールバー以外で開いた・SW が控えられなかった等)${docPart()}`;
   }
   const cold = ok.filter((e) => typeof e.swAgeMs === 'number' && e.swAgeMs < 3000).length;
   const armed = ok.filter((e) => e.armed === true).length;
@@ -111,6 +147,8 @@ export function formatOpenTimingLine(opens) {
   return (
     `サイドパネルを開く時間(押下から・${ok.length}回): ` +
     [part('文書開始', 'clickToDocMs'), part('親の最初の描画', 'clickToFirstPaintMs'), part('中身の描画', 'clickToContentMs')].join(' / ') +
-    ` / SW起こし直し直後${cold}回 / 事前用意済み${armed}回 / ${lastTxt}`
+    ` / SW起こし直し直後${cold}回 / 事前用意済み${armed}回 / ${lastTxt}` +
+    (ok.length < all.length ? ` / 押した時刻なし${all.length - ok.length}回` : '') +
+    docPart()
   );
 }
