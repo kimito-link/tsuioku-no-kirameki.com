@@ -2662,5 +2662,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1663', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1662 の note と同じ理由)。今回は実配信で、ギフトの記録に「時計の時刻(○時間前) ・ 配信○」が出ることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1664', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更はギフト明細の保存に公開時刻を足す数行(kokenGiftHistoryApi.js)と、発言パネルの時刻表示(lib)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1664', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1664', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1663 の note と同じ理由)。今回は実配信で、ギフトの記録に「時計の時刻(○時間前) ・ 配信○」が出ることを確認した。'
   })
 ]);
