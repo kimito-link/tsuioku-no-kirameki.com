@@ -147,3 +147,28 @@ describe('いつ投げたか(v0.1.1663)', () => {
     expect(html).toContain(`${clock}(12分前)`);
   });
 });
+
+describe('ギフトがあるのに記録が出ない人の説明(v0.1.1665)', () => {
+  const esc = (s) => String(s);
+  it('★ギフトptがあるのに、この人のIDの記録が履歴に無いときは、理由を出す(区画ごと消さない)', () => {
+    const r = call([row({ userId: '222', kokenHistoryId: 'z' })]); // 別の人の行だけ
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('empty');
+    const html = giftThrowsSectionHtml(r, esc, NOW, true);
+    expect(html).toContain('記録がありません');
+    expect(html).toContain('直近10件');
+    expect(html).toContain('匿名');
+  });
+  it('★履歴をまだ取得できていないときは、そう言う', () => {
+    const r = giftThrowsForUser({ payload: null, uid: '111', liveId: LV, tileGiftPt: 50, nowMs: NOW });
+    expect(giftThrowsSectionHtml(r, esc, NOW, true)).toContain('まだ取得できていません');
+  });
+  it('★ギフトptが無い人(広告だけ等)には何も足さない', () => {
+    const r = call([row({ userId: '222', kokenHistoryId: 'z' })]);
+    expect(giftThrowsSectionHtml(r, esc, NOW, false)).toBe('');
+  });
+  it('★uid が数値でない(押した人がuid無し)ときは何も出さない', () => {
+    const r = call([row({})], { uid: '' });
+    expect(giftThrowsSectionHtml(r, esc, NOW, true)).toBe('');
+  });
+});
