@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (355)
+- 📁 **docs/** (356)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -504,6 +504,7 @@
     - `gift-related-deep-research.md`
   - 📁 **workflows/** (1)
     - `tdd-ui-ux-roadmap.md`
+  - `LOOP-HOWTO.md`
   - `MAP.md`
   - `agents-session-history-archive.md`
   - `backfill-complete-loading-flow.html`
@@ -853,7 +854,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2013)
+- 📁 **src/** (2014)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1136,7 +1137,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1774)
+  - 📁 **lib/** (1775)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2098,6 +2099,7 @@
     - `nicoUserPage.test.js`
     - `nicoUserProfileApi.js` — ニコニコのユーザープロフィール取得用メッセージ型と uid 妥当性判定(background と文字列同期)。
     - `nicoUserProfileApi.test.js`
+    - `nicoUserProfileHeaderContract.test.js`
     - `nicoUserProfilePage.js` — www.nicovideo.jp/user/<id> のプロフィールページに表示されている
     - `nicoUserProfilePage.test.js`
     - `nicoadCelebrationKey.js` — ニコ広/ギフトのシステムコメント演出を「同じコメントで二度光らせない」ための

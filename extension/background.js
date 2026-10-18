@@ -2578,11 +2578,12 @@ function _nicoUserProfileLruNote(uid, now) {
   }
 }
 
-async function fetchNicoUserProfileJson(uid) {
+async function fetchNicoUserProfileJson(uid, force) {
   const id = String(uid == null ? '' : uid).trim();
   if (!NICO_USER_PROFILE_UID_RE.test(id) || Number(id) <= 0) return { ok: false };
   const now = Date.now();
-  if (_nicoUserProfileLruShouldSkip(id, now)) return { ok: false, skipped: true };
+  // v0.1.1670: force (report export) skips the 10-minute throttle so the report always gets the latest profile.
+  if (force !== true && _nicoUserProfileLruShouldSkip(id, now)) return { ok: false, skipped: true };
   _nicoUserProfileLruNote(id, now);
   const url = 'https://nvapi.nicovideo.jp/v1/users/' + encodeURIComponent(id);
   const ac = new AbortController();
@@ -2596,6 +2597,9 @@ async function fetchNicoUserProfileJson(uid) {
   try {
     const res = await fetch(url, {
       method: 'GET',
+      // v0.1.1670: nvapi returns HTTP 400 (INVALID_PARAMETER) without X-Frontend-Id (measured 2026-10-18, also inside the SW).
+      //   Without it the broadcaster name / icon / bio were never fetched. Host permission lets the SW send custom headers.
+      headers: { 'X-Frontend-Id': '6', 'X-Frontend-Version': '0' },
       credentials: 'omit',
       cache: 'no-store',
       redirect: 'error',
@@ -2636,7 +2640,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       /* port already closed: best-effort */
     }
   };
-  fetchNicoUserProfileJson(msg.uid)
+  fetchNicoUserProfileJson(msg.uid, msg.force === true)
     .then(reply)
     .catch(() => reply({ ok: false }));
   return true;

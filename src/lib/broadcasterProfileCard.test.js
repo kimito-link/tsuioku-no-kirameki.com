@@ -124,3 +124,39 @@ describe('report renderers', () => {
     expect(rows).not.toContain('累計配信日数');
   });
 });
+
+describe('配信者プロフィールの全項目(v0.1.1670)', () => {
+  const base = { userId: '144967552', nickname: '鈴木働かない', avatarUrl: 'https://img.nicoprofile.nimg.jp/a.jpg', level: 56, isPremium: true, followerCount: 4593, followeeCount: 0,
+    description: '切り抜きは<script>alert(1)</script>お願いします\nほしりす https://example.com/x',
+    sns: [{ label: 'X', screenName: 'majinojob3150', url: 'https://x.com/majinojob3150' }, { label: 'bad', screenName: 'x', url: 'javascript:alert(1)' }],
+    levelExp: { current: 6020, threshold: 11500 } };
+  it('★自己紹介・SNS・経験値を正規化して持つ(SNS は http(s) のみ)', () => {
+    const m = normalizeBroadcasterProfileModel(base);
+    expect(m.description).toContain('切り抜き');
+    expect(m.sns).toEqual([{ label: 'X', screenName: 'majinojob3150', url: 'https://x.com/majinojob3150' }]);
+    expect(m.levelExp).toEqual({ current: 6020, threshold: 11500 });
+  });
+  it('★マーケのカードに、名前・自己紹介(エスケープ)・SNSリンク・経験値が出る', () => {
+    const html = buildBroadcasterProfileMarketingCardHtml(normalizeBroadcasterProfileModel(base));
+    expect(html).toContain('鈴木働かない');
+    expect(html).toContain('mkt-bcaster__bio');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('href="https://x.com/majinojob3150"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).not.toContain('javascript:');
+    expect(html).toContain('6,020');
+    expect(html).toContain('11,500');
+  });
+  it('★HTMLレポートの概要表にも自己紹介とSNSが出る', () => {
+    const html = buildBroadcasterProfileReportRowsHtml(normalizeBroadcasterProfileModel(base));
+    expect(html).toContain('自己紹介');
+    expect(html).toContain('SNS');
+    expect(html).toContain('https://x.com/majinojob3150');
+    expect(html).not.toContain('javascript:');
+  });
+  it('項目が無い人では出さない(誤情報ゼロ)', () => {
+    const html = buildBroadcasterProfileMarketingCardHtml(normalizeBroadcasterProfileModel({ userId: '1', nickname: 'a' }));
+    expect(html).not.toContain('mkt-bcaster__bio');
+  });
+});

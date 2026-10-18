@@ -29,7 +29,10 @@ import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
  *   broadcastStartDate: string,
  *   cumulativeBroadcastDays: number|null,
  *   wishlistUrl: string,
- *   broadcastRequestEnabled: boolean|null
+ *   broadcastRequestEnabled: boolean|null,
+ *   description: string,
+ *   sns: { label: string, screenName: string, url: string }[],
+ *   levelExp: { current: number, threshold: number }|null
  * }} BroadcasterProfileModel
  */
 
@@ -81,6 +84,22 @@ export function normalizeBroadcasterProfileModel(raw) {
   );
   const wishlistUrl = httpUrl(o.wishlistUrl ?? o.wishlist);
   const broadcastRequestEnabled = boolOrNull(o.broadcastRequestEnabled ?? o.broadcastRequest);
+  // v0.1.1670: 公式プロフィールの全項目(自己紹介・SNS・経験値)。取れたものだけ。SNS は http(s) のみ。
+  const description = str(o.description).slice(0, 2000);
+  /** @type {{ label: string, screenName: string, url: string }[]} */
+  const sns = [];
+  if (Array.isArray(o.sns)) {
+    for (const raw of o.sns.slice(0, 8)) {
+      const r = raw && typeof raw === 'object' ? /** @type {Record<string, unknown>} */ (raw) : {};
+      const url = httpUrl(r.url);
+      if (!url) continue;
+      sns.push({ label: str(r.label).slice(0, 40), screenName: str(r.screenName).slice(0, 80), url });
+    }
+  }
+  const lx = o.levelExp && typeof o.levelExp === 'object' ? /** @type {Record<string, unknown>} */ (o.levelExp) : null;
+  const lxCur = lx ? nonNegInt(lx.current) : null;
+  const lxThr = lx ? nonNegInt(lx.threshold) : null;
+  const levelExp = lxCur != null && lxThr != null && lxThr > 0 ? { current: lxCur, threshold: lxThr } : null;
 
   const model = {
     userId,
@@ -95,7 +114,10 @@ export function normalizeBroadcasterProfileModel(raw) {
     broadcastStartDate,
     cumulativeBroadcastDays,
     wishlistUrl,
-    broadcastRequestEnabled
+    broadcastRequestEnabled,
+    description,
+    sns,
+    levelExp
   };
 
   const hasAnything =
@@ -111,7 +133,10 @@ export function normalizeBroadcasterProfileModel(raw) {
     broadcastStartDate ||
     cumulativeBroadcastDays != null ||
     wishlistUrl ||
-    broadcastRequestEnabled != null;
+    broadcastRequestEnabled != null ||
+    description ||
+    sns.length > 0 ||
+    levelExp != null;
 
   return hasAnything ? model : null;
 }
@@ -169,6 +194,10 @@ export function buildBroadcasterProfileMarketingCardHtml(model) {
   /** @type {string[]} */
   const chips = [];
   if (m.level != null) chips.push(`<span class="mkt-bcaster__chip">LV${escapeHtml(String(m.level))}</span>`);
+  if (m.levelExp) {
+    // 公式の値: 現レベルの経験値 / 次のレベルに必要な経験値(ユーザーページと同じ)。
+    chips.push(`<span class="mkt-bcaster__chip" title="公式の値(現レベルの経験値 / 次のレベルに必要な経験値)">経験値 ${escapeHtml(jp(m.levelExp.current))} / ${escapeHtml(jp(m.levelExp.threshold))}</span>`);
+  }
   if (m.isPremium === true) chips.push('<span class="mkt-bcaster__chip mkt-bcaster__chip--prem">プレミアム会員</span>');
   else if (m.isPremium === false) chips.push('<span class="mkt-bcaster__chip mkt-bcaster__chip--reg">一般会員</span>');
   if (m.followerCount != null) chips.push(`<span class="mkt-bcaster__chip">フォロワー ${escapeHtml(jp(m.followerCount))}</span>`);
@@ -201,6 +230,16 @@ export function buildBroadcasterProfileMarketingCardHtml(model) {
       `<a class="mkt-bcaster__link mkt-bcaster__link--wish" href="${escapeAttr(m.wishlistUrl)}" target="_blank" rel="noopener noreferrer">欲しいものリスト</a>`
     );
   }
+  for (const sn of m.sns || []) {
+    const label = `${sn.label || 'SNS'}${sn.screenName ? ` ${sn.screenName}` : ''}`;
+    links.push(
+      `<a class="mkt-bcaster__link mkt-bcaster__link--sns" href="${escapeAttr(sn.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+    );
+  }
+  // 自己紹介(公式のプロフィールの本文・タグ除去済み・エスケープ・長いときは折りたたむ)。
+  const bio = m.description
+    ? `<div class="mkt-bcaster__bio">${escapeHtml(m.description).replace(/\n/g, '<br>')}</div>`
+    : '';
 
   return `<section class="mkt-section mkt-section--bcaster" aria-label="配信者プロフィール">
 <h2>配信者プロフィール</h2>
@@ -210,6 +249,7 @@ ${avatar}
 <p class="mkt-bcaster__name">${broadcasterNameLinkedHtml(m)}</p>
 ${metaLines.length ? `<div class="mkt-bcaster__metas">${metaLines.join('')}</div>` : ''}
 ${chips.length ? `<div class="mkt-bcaster__chips">${chips.join('')}</div>` : ''}
+${bio}
 ${links.length ? `<div class="mkt-bcaster__links">${links.join('')}</div>` : ''}
 </div>
 </div>
@@ -234,6 +274,8 @@ export const BROADCASTER_PROFILE_MARKETING_CSS = `
 .mkt-bcaster__links{display:flex;flex-wrap:wrap;gap:.6rem;margin:.5rem 0 0}
 .mkt-bcaster__link{font-size:.8rem;color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
 .mkt-bcaster__link--wish{color:#fdba74}
+.mkt-bcaster__link--sns{color:#86efac}
+.mkt-bcaster__bio{margin:.5rem 0 0;padding:.5rem .7rem;border-left:3px solid #334155;background:rgba(15,23,42,.55);color:#cbd5e1;font-size:.82rem;line-height:1.6;overflow-wrap:anywhere;max-height:12em;overflow:auto}
 .mkt-acct-badge{display:inline-block;margin-left:.4rem;border-radius:999px;padding:.02rem .42rem;font-size:.66rem;font-weight:700;line-height:1.5;vertical-align:middle;white-space:nowrap}
 .mkt-acct-badge--prem{border:1px solid rgba(251,191,36,.55);background:rgba(251,191,36,.16);color:#fde68a}
 .mkt-acct-badge--reg{border:1px solid #475569;background:#0f172a;color:#cbd5e1}
@@ -275,6 +317,18 @@ export function buildBroadcasterProfileReportRowsHtml(model) {
   }
   if (m.followeeCount != null) {
     rows.push(`<tr><th>フォロー中</th><td>${escapeHtml(jp(m.followeeCount))}</td></tr>`);
+  }
+  if (m.levelExp) {
+    rows.push(`<tr><th>経験値</th><td>${escapeHtml(jp(m.levelExp.current))} / ${escapeHtml(jp(m.levelExp.threshold))}(公式の値)</td></tr>`);
+  }
+  if (m.description) {
+    rows.push(`<tr><th>自己紹介</th><td>${escapeHtml(m.description).replace(/\n/g, '<br>')}</td></tr>`);
+  }
+  if (m.sns && m.sns.length) {
+    const links = m.sns
+      .map((sn) => `<a class="nl-user-profile-link" href="${escapeAttr(sn.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(`${sn.label || 'SNS'}${sn.screenName ? ` ${sn.screenName}` : ''}`)}</a>`)
+      .join(' / ');
+    rows.push(`<tr><th>SNS</th><td>${links}</td></tr>`);
   }
   if (m.broadcastStartDate) {
     rows.push(`<tr><th>配信開始日</th><td>${escapeHtml(m.broadcastStartDate)}</td></tr>`);
