@@ -1121,6 +1121,8 @@ function prearmSidePanelForTab(tabId, url) {
  * 何回呼んでも結果が同じ(べき等)で、メモが無くても壊れない。
  */
 const __sidePanelArmedLv = new Map();
+/** このSWが起きた時刻(押下時の「SWが起きた直後か」を記録するため)。 */
+const __swBootAt = Date.now();
 
 /**
  * 既に開いている watch タブを一括で用意する(べき等)。
@@ -3599,6 +3601,7 @@ chrome.action.onClicked.addListener((tab) => {
    *     問題で撤退した記録があるため、その回避を最初から入れておく。
    */
   const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
+  const clickAtMs = Date.now(); // v0.1.1675: 押した時刻(パネル側が「押してから描かれるまで」を測るために控える)
   /*
    * ★v0.1.1275: 判定を【反転】した。
    *   旧: キャッシュが 'side_panel' のときだけ開く
@@ -3640,6 +3643,22 @@ chrome.action.onClicked.addListener((tab) => {
       }
       // ★同期的に開く(await を挟まない=ユーザー操作の文脈を保つ)。
       chrome.sidePanel.open({ tabId: tid });
+      // v0.1.1675: open() の【あと】に控える(押下の経路を遅らせない・await しない・失敗しても開く)。
+      //   キーは src/lib/sidepanelOpenTiming.js の SP_CLICK_KEY と同じ(契約テストが照合)。
+      try {
+        void chrome.storage.session
+          .set({
+            nls_sp_click_at_v1: {
+              at: clickAtMs,
+              swAgeMs: clickAtMs - __swBootAt,
+              armed: !!lvFromTab && __sidePanelArmedLv.get(tid) === lvFromTab,
+              hasLv: !!lvFromTab
+            }
+          })
+          .catch(() => {});
+      } catch {
+        /* no-op: 計測の失敗でパネルを止めない */
+      }
       return;
     } catch {
       // 開けなければ従来動作へ落ちる(消えたまま何も出ない、を避ける)
