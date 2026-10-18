@@ -24,6 +24,19 @@ export const KNOWN_SYMPTOM_IDS = Object.freeze([
   'thumb-white', 'avatar-all-failed', 'lane-never-rendered', 'lane-painted-zero', 'lane-heavy-race', 'panel-black', 'status-slow',
 ]);
 export const PROJECT = 'tsuioku';
+
+/**
+ * このアダプタが出すカードの id・metrics の意味（用語集の元。loop-glossary-status-live.mjs が使う）。
+ * 出す指標を増やしたら、ここにも足す（足し忘れは loop-adapter-status-live.test.js が赤にする）。
+ */
+export const CARD_GLOSSARY = Object.freeze({
+  'status-snapshot': '状態速報の取得そのものの健全性を表すカード。症状ではなく土台の指標（ok=速報本文あり／unmeasured=速報本文が無く測れていない）',
+  snapshotAgeSec: '速報が生成されてからの経過秒。大きいほど速報が古い',
+  livesCount: '視聴中の配信タブの数',
+  reportPresent: '速報本文(statusReport)があるか',
+  symptomCount: 'このスナップショットで異常として列挙された症状の数',
+  unknownSymptomCount: 'このアダプタの許可リストに無い症状IDの数（0でなければ、拡張側に新しい症状が増えて許可リストが古い）',
+});
 export const SOURCE = 'status-live-adapter';
 
 /**
