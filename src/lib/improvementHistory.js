@@ -2788,5 +2788,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1672', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1671 の note と同じ理由)。今回は単体テスト19件+HTML統合4件で、前後5分の件数・連鎖の束ね・窓不足の除外・n<5で中央値を出さない・軸が合わないときの抑止・共有用に伏せる、を固定し、各ガードを壊すと赤になることを変異テストで確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1673', metric: 'bundle-kb', value: 1445,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更はレポートに章を1つ追加する表示(marketingChartsHtml.js)と、書き出し時に記録を1キー読んで渡す1行(marketing-export-entry.js)。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1673', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1673', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1672 の note と同じ理由)。今回は単体テスト5件+配線テスト2件で、章の出し分け・位置・注記・未検知の表示・伏せ字・名前が分からない人をIDで出す、を固定し、伏せ字を壊すと赤になることを確認した。'
   })
 ]);

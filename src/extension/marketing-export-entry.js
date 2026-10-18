@@ -42,6 +42,7 @@ import {
   normalizeMarketingExportMaskLabels
 } from '../lib/storageKeys.js';
 import { giftHistoryThrowsStorageKey } from '../lib/kokenGiftHistoryApi.js';
+import { adObservationStorageKey } from '../lib/adObservationLog.js';
 import {
   buildGiftSubAppPayloadFromKokenJson,
   mergeGiftSubAppHistoryPayload,
@@ -491,11 +492,13 @@ async function runExport(lid) {
     const giftEventsKey = `nls_gift_events_${lid}`;
     const giftThrowsKey = giftHistoryThrowsStorageKey(lid);
     const giftSubKey = giftSubAppHistoryStorageKey(lid);
+    // v0.1.1673: 広告の「気づいた時刻」(拡張が配信中に記録・読むだけ。無ければレポートに章が出ないだけ)。
+    const adObsKey = adObservationStorageKey(lid);
     const [commentsRaw, data] = /** @type {[unknown, Record<string, any>]} */ (
       await withTimeout(
         Promise.all([
           resolveCommentsForHtmlExport(lid),
-          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey])
+          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey, adObsKey])
         ]),
         30_000,
         'marketing_storage_timeout'
@@ -624,6 +627,7 @@ async function runExport(lid) {
       giftEvents: giftEventsForMarketing,
       giftHistoryThrows: giftHistoryThrowsForMarketing,
       giftSubAppHistory: giftSubAppHistoryForMarketing,
+      adObservations: data[adObsKey],
       officialEventDomBundle: bundleForMkt,
       broadcastTitle: String(snapshot?.broadcastTitle || snapshot?.title || ''),
       broadcasterName: String(snapshot?.broadcasterName || ''),
