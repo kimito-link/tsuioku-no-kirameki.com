@@ -2746,5 +2746,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1669', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1668 の note と同じ理由)。今回は実配信で、保存される行が10→84になり、明細の合計=公式の合計(4,880pt)・記名25人すべてで明細の貢献度の合計=ランキングの値になることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1670', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は公式プロフィール取得の1行(必要なヘッダ)と、プロフィールの項目を増やして表示する部分(lib)、書き出し時の取得。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1670', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1670', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1669 の note と同じ理由)。今回は実際の拡張の中で、ヘッダ無しは400・ヘッダ有りは200で名前が取れること、強制取得が10分の間引きを飛ばすことを確認した。'
   })
 ]);

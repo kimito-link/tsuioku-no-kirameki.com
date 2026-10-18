@@ -54,6 +54,7 @@ import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
 import { normalizeBroadcasterProfileModel } from '../lib/broadcasterProfileCard.js';
+import { NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, normalizeNicoUserProfileResponse } from '../lib/nicoUserProfileApi.js';
 import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
 import { buildMarketingReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import { createExportStageProfiler, logExportStageProfileIfEnabled } from '../lib/exportStageProfiler.js';
@@ -253,6 +254,31 @@ function mergeBroadcasterProfileRaw(snapshot, stored) {
   };
 }
 
+/**
+ * v0.1.1670: 配信者の公式プロフィール(ユーザーページと同じ情報)をその場で取る。失敗・タイムアウトは null(取れた分だけで描く)。
+ *   force: true = SW の10分間引きを飛ばす(レポートは最新を載せる)。nvapi は X-Frontend-Id が無いと400になるので SW 側で付ける。
+ * @param {string} uid
+ */
+function fetchBroadcasterProfileFresh(uid) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), 6000);
+    try {
+      chrome.runtime.sendMessage({ type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid, force: true }, (r) => {
+        clearTimeout(timer);
+        if (chrome.runtime.lastError || !r || r.ok !== true || r.json == null) return resolve(null);
+        try {
+          resolve(normalizeNicoUserProfileResponse(r.json));
+        } catch {
+          resolve(null);
+        }
+      });
+    } catch {
+      clearTimeout(timer);
+      resolve(null);
+    }
+  });
+}
+
 /** @param {WatchMetaSnapshot|null} snapshot @param {string} liveId */
 async function resolveBroadcasterProfileModel(snapshot, liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
@@ -266,7 +292,24 @@ async function resolveBroadcasterProfileModel(snapshot, liveId) {
   } catch {
     stored = null;
   }
-  return normalizeBroadcasterProfileModel(mergeBroadcasterProfileRaw(snapshot, stored));
+  const raw = mergeBroadcasterProfileRaw(snapshot, stored);
+  // v0.1.1670: 配信者の数値ID があれば、公式プロフィールを取り直して重ねる(名前・アイコン・自己紹介・SNS・経験値・フォロワー等)。
+  const uid = String(raw.broadcasterUserId || '').trim();
+  if (/^\d{1,18}$/.test(uid)) {
+    const api = await fetchBroadcasterProfileFresh(uid);
+    if (api) {
+      if (api.nickname) raw.nickname = api.nickname;
+      if (api.avatarUrl) raw.avatarUrl = api.avatarUrl;
+      if (api.level != null) raw.level = api.level;
+      if (api.isPremium != null) raw.isPremium = api.isPremium;
+      if (api.followeeCount != null) raw.followeeCount = api.followeeCount;
+      if (api.followerCount != null) raw.followerCount = api.followerCount;
+      if (api.description) raw.description = api.description;
+      if (api.sns) raw.sns = api.sns;
+      if (api.levelExp) raw.levelExp = api.levelExp;
+    }
+  }
+  return normalizeBroadcasterProfileModel(raw);
 }
 
 // 匿名identicon: 起動時にstorageから1回だけ設定値を読む(popupのcreateBooleanSettingController相当は
