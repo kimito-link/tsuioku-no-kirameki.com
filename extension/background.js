@@ -2338,6 +2338,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 const KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE = 'NLS_KOKEN_GIFT_HISTORY_FETCH';
 const KOKEN_GIFT_HISTORY_LIVE_ID_RE = /^lv\d{1,15}$/;
 const KOKEN_GIFT_HISTORY_FETCH_TIMEOUT_MS = 8000;
+// v0.1.1669: /histories?limit=100 (the official max; 200+ -> HTTP 400). Default was 10 rows; limit=100 returns the whole history in one request
+// (measured: 80 rows, sum == official totalPoint). Must equal KOKEN_GIFT_HISTORY_LIMIT in src/lib/kokenGiftHistoryApi.js (checked by a contract test).
+const KOKEN_GIFT_HISTORY_LIMIT = 100;
 
 async function fetchKokenGiftHistoryJson(liveId, nextCursor) {
   const lid = String(liveId == null ? '' : liveId)
@@ -2347,13 +2350,13 @@ async function fetchKokenGiftHistoryJson(liveId, nextCursor) {
   let url =
     'https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/' +
     encodeURIComponent(lid) +
-    '/histories';
+    '/histories?limit=' + KOKEN_GIFT_HISTORY_LIMIT;
   const cursor =
     nextCursor != null && Number.isFinite(Number(nextCursor)) && Number(nextCursor) > 0
       ? Math.floor(Number(nextCursor))
       : null;
   if (cursor != null) {
-    url += '?nextCount=' + encodeURIComponent(String(cursor));
+    url += '&nextCount=' + encodeURIComponent(String(cursor));
   }
   const ac = new AbortController();
   const timer = setTimeout(() => {

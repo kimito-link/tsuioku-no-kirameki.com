@@ -4,6 +4,7 @@ import {
   GIFT_HISTORY_THROWS_STORAGE_PREFIX,
   giftHistoryThrowsStorageKey,
   buildKokenGiftHistoryUrl,
+  KOKEN_GIFT_HISTORY_LIMIT,
   isLikelyKokenGiftHistoryShape,
   formatKokenGiftStreamTimeLabel,
   buildGiftSubAppPayloadFromKokenJson,
@@ -63,11 +64,12 @@ const REAL_SHAPED = {
 describe('buildKokenGiftHistoryUrl', () => {
   it('組み立てる（histories エンドポイント）', () => {
     expect(buildKokenGiftHistoryUrl('lv350658954')).toBe(
-      'https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/lv350658954/histories'
+      'https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/lv350658954/histories?limit=100'
     );
   });
   it('nextCount cursor 付き URL', () => {
     expect(buildKokenGiftHistoryUrl('lv350658954', 60)).toContain('nextCount=60');
+    expect(buildKokenGiftHistoryUrl('lv350658954', 60)).toContain('limit=100');
   });
   it('不正 liveId は null（SSRF 面遮断）', () => {
     expect(buildKokenGiftHistoryUrl('')).toBeNull();
@@ -317,5 +319,39 @@ describe('履歴の公開時刻(v0.1.1663)', () => {
     const m = mergeGiftSubAppHistoryPayload(old, neu);
     expect(m.history).toHaveLength(1);
     expect(m.history[0].publishedAt).toBe(1780320114);
+  });
+});
+
+describe('履歴は limit=100 で1回で全件取る(v0.1.1669・実測: 既定10件・limit=100で80件全部・明細合計=公式totalPoint)', () => {
+  it('★取得件数の定数は公式の上限100以下(200以上は HTTP 400)', () => {
+    expect(KOKEN_GIFT_HISTORY_LIMIT).toBe(100);
+  });
+  it('★SW(background.js・ESM import 不可)が lib と同じ件数を指定している(手で書き写した値のずれを赤くする)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../../extension/background.js', import.meta.url), 'utf8');
+    const m = /const KOKEN_GIFT_HISTORY_LIMIT = (\d+);/.exec(src);
+    expect(m, 'background.js に KOKEN_GIFT_HISTORY_LIMIT が見つからない').toBeTruthy();
+    expect(Number(m[1])).toBe(KOKEN_GIFT_HISTORY_LIMIT);
+    expect(src).toContain("?limit=' + KOKEN_GIFT_HISTORY_LIMIT");
+  });
+  it('★公式の合計ptと残り件数を保存する(明細の合計と照合するため・additive)', () => {
+    const json = { meta: { status: 200 }, data: { totalPoint: 3980, nextCount: 0, showTimeBeginAt: 1780319000, histories: [
+      { id: 1, supporterId: 10, supporterName: 'a', itemName: 'x', point: 3000, publishedAt: 1780320114 },
+      { id: 2, supporterName: '名無し', itemName: 'y', point: 980, publishedAt: 1780320200 }
+    ] } };
+    const p = buildGiftSubAppPayloadFromKokenJson(json, { now: 1, liveId: 'lv1' });
+    expect(p.officialTotalPoint).toBe(3980);
+    expect(p.officialRemaining).toBe(0);
+  });
+  it('★重ねて保存しても、最新の取得の公式合計・残り件数が残る', () => {
+    const old = { liveId: 'lv1', capturedAt: 1, source: 'koken-api', totalCounts: [], officialTotalPoint: 100, officialRemaining: 0, history: [
+      { kokenHistoryId: '1', userId: '10', senderName: 'a', itemName: 'x', points: 100, time: '0:01:00', sortKey: 60, publishedAt: 1780320114 } ] };
+    const neu = { liveId: 'lv1', capturedAt: 2, source: 'koken-api', totalCounts: [], officialTotalPoint: 400, officialRemaining: 0, history: [
+      { kokenHistoryId: '1', userId: '10', senderName: 'a', itemName: 'x', points: 100, time: '0:01:00', sortKey: 60, publishedAt: 1780320114 },
+      { kokenHistoryId: '2', userId: '11', senderName: 'b', itemName: 'y', points: 300, time: '0:02:00', sortKey: 120, publishedAt: 1780320200 } ] };
+    const m = mergeGiftSubAppHistoryPayload(old, neu);
+    expect(m.officialTotalPoint).toBe(400);
+    expect(m.officialRemaining).toBe(0);
+    expect(m.history).toHaveLength(2);
   });
 });

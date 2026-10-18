@@ -48,6 +48,9 @@
  */
 export const KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE = 'NLS_KOKEN_GIFT_HISTORY_FETCH';
 
+/** /histories に指定する取得件数(公式の上限。200 以上は HTTP 400)。background.js(SW)の同名定数と一致が必要=契約テストで照合。 */
+export const KOKEN_GIFT_HISTORY_LIMIT = 100;
+
 /** ニコ生 liveId（`lv` + 数字）の厳格パターン。任意 URL 注入 / SSRF 面を塞ぐ。 */
 const LIVE_ID_RE = /^lv\d{1,15}$/;
 
@@ -103,8 +106,11 @@ export function buildKokenGiftHistoryUrl(liveId, nextCursor) {
     nextCursor != null && Number.isFinite(Number(nextCursor)) && Number(nextCursor) > 0
       ? Math.floor(Number(nextCursor))
       : null;
-  if (cursor == null) return base;
-  return `${base}?nextCount=${encodeURIComponent(String(cursor))}`;
+  // v0.1.1669: ?limit=100(公式の上限)。既定は10件で、実測 limit=100 で全件(80件・明細合計=公式 totalPoint)が1回で取れる。
+  //   nextCount は『次ページの cursor』ではなく【残り件数】(limit=50 で nextCount=30)。2ページ目を取る指定は見つからなかった(実測)。
+  const limited = `${base}?limit=${KOKEN_GIFT_HISTORY_LIMIT}`;
+  if (cursor == null) return limited;
+  return `${limited}&nextCount=${encodeURIComponent(String(cursor))}`;
 }
 
 /**
@@ -235,7 +241,10 @@ export function buildGiftSubAppPayloadFromKokenJson(json, options = {}) {
       userId: hasUid ? sidRaw : '',
       kokenHistoryId: String(h.id == null ? '' : h.id).trim(),
       // v0.1.1663: 公式の公開時刻(epoch 秒)。「いつ投げたか」を時計の時刻で出すため(配信内の経過時間 time とは別)。
-      publishedAt: Number(h.publishedAt) > 0 ? Math.floor(Number(h.publishedAt)) : 0
+      publishedAt: Number(h.publishedAt) > 0 ? Math.floor(Number(h.publishedAt)) : 0,
+      // v0.1.1669: 貢献度(contribution)。公式ランキング(タイルの🎁)は人ごとの contribution の合計=pt の10倍(実測: 記名25人すべて一致)。
+      //   明細とタイルを同じ単位で照合するため保存する(additive)。
+      contribution: nonNegativeInt(h.contribution)
     });
     const key = itemName.toLowerCase();
     const cur = itemMap.get(key) || { itemName, count: 0, thumbnailUrl: '' };
@@ -250,12 +259,17 @@ export function buildGiftSubAppPayloadFromKokenJson(json, options = {}) {
       Number(/** @type {{ sortKey?: number }} */ (a).sortKey)
   );
 
+  const officialTotal = Number(data.totalPoint);
   return {
     liveId,
     capturedAt: now,
     source: 'koken-api',
     history,
-    totalCounts: [...itemMap.values()].sort((a, b) => b.count - a.count)
+    totalCounts: [...itemMap.values()].sort((a, b) => b.count - a.count),
+    // v0.1.1669: 公式の合計ptと残り件数(明細の合計と照合するため・additive)。残り件数 0 = 全件取得。
+    ...(Number.isFinite(officialTotal) && officialTotal >= 0
+      ? { officialTotalPoint: Math.floor(officialTotal), officialRemaining: nonNegativeInt(data.nextCount) }
+      : {})
   };
 }
 
@@ -427,6 +441,7 @@ function pickRicherGiftSubAppHistoryRow(a, b) {
     if (name && name !== '（名称未取得）') s += 6;
     // v0.1.1663: 公開時刻を持つ行を優先(古い保存に時刻が無くても、再取得した行で補われる)。
     if (Number(r.publishedAt) > 0) s += 1;
+    if (Number(r.contribution) > 0) s += 1;
     return s;
   };
   return score(a) >= score(b) ? /** @type {object} */ (a) : /** @type {object} */ (b);
@@ -447,9 +462,26 @@ function giftSubAppHistoryItemKey(item) {
  *
  * @param {{ history?: readonly unknown[], totalCounts?: readonly unknown[], capturedAt?: number, source?: string, liveId?: string }|null|undefined} prev
  * @param {{ history?: readonly unknown[], totalCounts?: readonly unknown[], capturedAt?: number, source?: string, liveId?: string }|null|undefined} next
- * @returns {{ history: object[], totalCounts: object[], capturedAt: number, source: string, liveId: string }|null}
+ * @returns {{ history: object[], totalCounts: object[], capturedAt: number, source: string, liveId: string, officialTotalPoint?: number, officialRemaining?: number }|null}
  */
 export function mergeGiftSubAppHistoryPayload(prev, next) {
+  const out = mergeGiftSubAppHistoryPayloadCore(prev, next);
+  if (!out || typeof out !== 'object') return out;
+  // v0.1.1669: 公式の合計pt・残り件数は【最新の取得】を残す(next にあれば next、無ければ prev)。
+  const pick = (/** @type {any} */ o) => (o && typeof o === 'object' && Number.isFinite(Number(o.officialTotalPoint)) ? o : null);
+  const src = pick(next) || pick(prev);
+  if (src) {
+    return { ...out, officialTotalPoint: Math.floor(Number(src.officialTotalPoint)), officialRemaining: nonNegativeInt(src.officialRemaining) };
+  }
+  return out;
+}
+
+/**
+ * @param {any} prev
+ * @param {any} next
+ * @returns {any}
+ */
+function mergeGiftSubAppHistoryPayloadCore(prev, next) {
   const n = next && typeof next === 'object' ? next : null;
   const p = prev && typeof prev === 'object' ? prev : null;
   if (!n || !Array.isArray(n.history) || n.history.length === 0) {
