@@ -2900,5 +2900,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1680', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1679 の note と同じ理由)。今回は単体9件+配線4件(書いた顔を読める・無ければ空・読みをまとめる・PNG以外は書かない・版でキーを分ける・上限で古いものを捨てる・IDB無し/故障でも落ちない)。実機データの V8 CPU プロファイルで、拡張プロセスの忙しい区間の合計(関数 blob=canvas.toBlob)が 3回の開閉で 8,025→4,658 サンプルに減り、3回目は ≥150ms の忙しい区間が無くなった。'
+  }),
+  Object.freeze({
+    version: '0.1.1681', metric: 'bundle-kb', value: 1455,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は、顔の合成を専用 Worker へ移した(新規 avatarFaceRender・avatarFaceWorkerClient・avatar-face-worker-entry・avatarPartAnchors と、avatarPartsComposer の経路追加)。画像の中身は変えていない(60/60 完全一致)。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1681', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1681', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1680 の note と同じ理由)。今回は単体 render8+client12+配線9。実機データを写したヘッドレスで、永続キャッシュを空にした冷スタートの3回の開閉の主スレッドの忙しい区間(60ms超)が 30 件超→5 件に、合成由来(blob)のサンプルが 4,000〜8,000→0 になった。残る最大は自己診断の elementFromPoint(初回約0.5秒)。'
   })
 ]);
