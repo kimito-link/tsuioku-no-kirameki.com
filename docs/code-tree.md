@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 938 件
+## ⚠️ 役割コメントが無いソース 8 / 939 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -857,7 +857,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2020)
+- 📁 **src/** (2023)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1140,7 +1140,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1781)
+  - 📁 **lib/** (1784)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2049,6 +2049,8 @@
     - `mergeGiftHistoryThrows.test.js`
     - `mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
     - `mergeProgramStatsWatchIntoWatchMetaSnapshot.test.js`
+    - `mergeTailRowsIntoDisplay.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `mergeTailRowsIntoDisplay.test.js`
     - `metricConfidence.js` — 診断の各数値に「どういう意味か・どれだけ信頼できるか」の短い注釈を付ける純関数(v0.1.861)。
     - `metricConfidence.test.js`
     - `migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
@@ -2641,6 +2643,7 @@
     - `tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
     - `tabLeaderLock.test.js`
     - `tabsQuerySlowPipeline.test.js`
+    - `tailRowsMergeWiring.wiring.test.js`
     - `thumbDb.js` — サムネイル用 IndexedDB（コンテンツスクリプトのみで使用）
     - `thumbFifo.js` — サムネ IndexedDB の FIFO トリム用純関数（古い capturedAt 順＝先頭が最古）
     - `thumbFifo.test.js`
