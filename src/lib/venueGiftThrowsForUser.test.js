@@ -13,7 +13,9 @@ const row = (o) => ({
   thumbnailUrl: 'https://example.com/i.png',
   userId: '111',
   kokenHistoryId: 'h1',
-  ...o
+  ...o,
+  // 公式のランキング(タイルの🎁)は contribution の合計=pt の10倍(実測: 記名25人すべてで Σ明細の contribution = ランキングの contribution)。
+  contribution: o.contribution ?? Number(o.points ?? 900) * 10
 });
 const payload = (history, extra = {}) => ({ liveId: LV, capturedAt: NOW - 5_000, source: 'koken-api', history, totalCounts: [], ...extra });
 const call = (history, over = {}) =>
@@ -59,16 +61,16 @@ describe('合計の整合(嘘の明細を出さない)', () => {
     expect(r.reason).toBe('over-total');
   });
   it('明細の合計がタイルと一致すれば注記なしで出す', () => {
-    const r = call([row({ points: 900 })], { tileGiftPt: 900 });
+    const r = call([row({ points: 900 })], { tileGiftPt: 9000 });
     expect(r.ok).toBe(true);
     expect(r.notes.join('')).not.toContain('全部ではありません');
   });
   it('★明細の合計がタイルより少なければ「全部ではありません」と明記する', () => {
-    const r = call([row({ points: 900 })], { tileGiftPt: 2000 });
+    const r = call([row({ points: 900 })], { tileGiftPt: 20000 });
     expect(r.ok).toBe(true);
     expect(r.notes.join('')).toContain('全部ではありません');
-    expect(r.notes.join('')).toContain('900');
-    expect(r.notes.join('')).toContain('2,000');
+    expect(r.notes.join('')).toContain('9,000');
+    expect(r.notes.join('')).toContain('20,000');
   });
   it('タイルの値が不明(null)でも出せる(照合はしない)', () => {
     expect(call([row({})], { tileGiftPt: null }).ok).toBe(true);
@@ -156,7 +158,7 @@ describe('ギフトがあるのに記録が出ない人の説明(v0.1.1665)', ()
     expect(r.reason).toBe('empty');
     const html = giftThrowsSectionHtml(r, esc, NOW, true);
     expect(html).toContain('記録がありません');
-    expect(html).toContain('直近10件');
+    expect(html).not.toContain('直近10件'); // 公式の履歴は limit=100 で全件取れる(v0.1.1669)=「直近10件ほど」は誤りだった
     expect(html).toContain('匿名');
   });
   it('★履歴をまだ取得できていないときは、そう言う', () => {
@@ -170,5 +172,53 @@ describe('ギフトがあるのに記録が出ない人の説明(v0.1.1665)', ()
   it('★uid が数値でない(押した人がuid無し)ときは何も出さない', () => {
     const r = call([row({})], { uid: '' });
     expect(giftThrowsSectionHtml(r, esc, NOW, true)).toBe('');
+  });
+});
+
+describe('匿名の投げの集計と公式の合計との照合(v0.1.1669)', () => {
+  const full = (rows, extra = {}) => ({ liveId: LV, capturedAt: NOW - 5_000, source: 'koken-api', history: rows, totalCounts: [], ...extra });
+  it('★匿名の投げは「N件・合計Mpt」と数で出す(誰のものか分からないため含まない旨つき)', () => {
+    const p = full([row({}), row({ userId: '', kokenHistoryId: 'a1', points: 30 }), row({ userId: '', kokenHistoryId: 'a2', points: 10 })]);
+    const r = giftThrowsForUser({ payload: p, uid: '111', liveId: LV, tileGiftPt: null, nowMs: NOW });
+    expect(r.anonCount).toBe(2);
+    expect(r.anonPoints).toBe(40);
+    expect(r.notes.join('')).toContain('匿名のギフト 2件・合計 40pt');
+  });
+  it('★明細の合計(記名+匿名)が公式の合計と一致し残り0なら、一致を明記する', () => {
+    const p = full([row({ points: 900 }), row({ userId: '', kokenHistoryId: 'a1', points: 100 })], { officialTotalPoint: 1000, officialRemaining: 0 });
+    const r = giftThrowsForUser({ payload: p, uid: '111', liveId: LV, tileGiftPt: null, nowMs: NOW });
+    expect(r.official).toBe('match');
+    expect(r.notes.join('')).toContain('公式の合計 1,000pt と一致');
+  });
+  it('★合計が一致しないときは一致と言わない(不足を明記)', () => {
+    const p = full([row({ points: 900 })], { officialTotalPoint: 1000, officialRemaining: 0 });
+    const r = giftThrowsForUser({ payload: p, uid: '111', liveId: LV, tileGiftPt: null, nowMs: NOW });
+    expect(r.official).toBe('short');
+    expect(r.notes.join('')).not.toContain('と一致');
+  });
+  it('★公式の履歴が100件を超えている(残りあり)ときは、古い分を含まないと明記する', () => {
+    const p = full([row({})], { officialTotalPoint: 99999, officialRemaining: 30 });
+    const r = giftThrowsForUser({ payload: p, uid: '111', liveId: LV, tileGiftPt: null, nowMs: NOW });
+    expect(r.official).toBe('truncated');
+    expect(r.notes.join('')).toContain('残り 30件');
+  });
+  it('公式の合計が無い保存(旧形式)では照合しない', () => {
+    const r = giftThrowsForUser({ payload: full([row({})]), uid: '111', liveId: LV, tileGiftPt: null, nowMs: NOW });
+    expect(r.official).toBeNull();
+  });
+});
+
+describe('タイルの🎁はランキングの値(contribution=ptの10倍)と照合する(v0.1.1669)', () => {
+  it('★明細の contribution の合計がタイルと一致すれば、全部の記録と言える(ptではなく contribution で比べる)', () => {
+    const r = call([row({ points: 300 }), row({ points: 400, kokenHistoryId: 'h2' })], { tileGiftPt: 7000 });
+    expect(r.ok).toBe(true);
+    expect(r.notes.join('')).not.toContain('全部ではありません');
+    expect(r.notes.join('')).toContain('ランキングの値)と一致');
+  });
+  it('★contribution を持たない古い保存では照合しない(単位が分からないので超過・不足を言わない)', () => {
+    const r = call([row({ points: 900, contribution: undefined })].map((x) => { const y = { ...x }; delete y.contribution; return y; }), { tileGiftPt: 50 });
+    expect(r.ok).toBe(true);
+    expect(r.notes.join('')).not.toContain('全部ではありません');
+    expect(r.notes.join('')).not.toContain('ランキングの値)と一致');
   });
 });
