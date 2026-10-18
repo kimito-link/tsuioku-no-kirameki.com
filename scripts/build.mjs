@@ -179,6 +179,13 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // v0.1.1681: 匿名の顔(PNG)の合成を担う専用 Worker。メインスレッドの canvas.toBlob の詰まりを外へ出す。
+    //   classic Worker(IIFE)で足りる。拡張ページが chrome.runtime.getURL('dist/avatar-face-worker.js') で起動する。
+    entryPoints: ['src/extension/avatar-face-worker-entry.js'],
+    outfile: 'extension/dist/avatar-face-worker.js',
+    target: 'chrome100'
+  },
+  {
     // ★v0.1.1354: 幕(cloak)を外す最速の保険だけを担う極小エントリ。
     //   popup.js(2.3MB)より前に読ませて、保険タイマーの起点を t≈0 にするのが目的
     //   (バンドル末尾の保険は「読み終えてから400ms」になり実測922msだった)。

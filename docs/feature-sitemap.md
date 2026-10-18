@@ -308,9 +308,10 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 255</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 260</summary>
 
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
+- `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/perf-ab/lane-import-diff.mjs` — lane-import-diff — 「/live/ の集計を拡張へ輸入したら、いまの応援レーンと何が違うか」を数字にする(読み取り専用)。
 - `scripts/perf-ab/parity.mjs` — 会場(venue.html)が「POP(popup.html)の鏡の投影」になっているかを、時系列で測る。
@@ -326,6 +327,7 @@
 - `src/domain/user/avatar.js` — ユーザーのアバター観測信号と表示 URL を 1 箇所で組み立てる純関数。
 - `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
+- `src/extension/avatar-face-worker-entry.js` — 匿名の顔を合成する専用 Worker(v0.1.1681)。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
@@ -334,9 +336,12 @@
 - `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
 - `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
 - `src/lib/avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
+- `src/lib/avatarFaceRender.js` — 【層】L0 判定層(純粋関数・I/O は deps で注入=Worker でもテストでも同じ手順を走らせる)
 - `src/lib/avatarFaceStore.js` — 【層】L2 配線層(IndexedDB へ読み書きする・DOM/chrome.* には触れない)
+- `src/lib/avatarFaceWorkerClient.js` — 【層】L2 配線層(Worker を持つ・DOM/chrome.* には触れない。Worker の作り方は deps で注入)
 - `src/lib/avatarFallbackFromUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
+- `src/lib/avatarPartAnchors.js` — 128x128 の正規化座標。素材差し替え後もここだけで位置と大きさを調整する。
 - `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
 - `src/lib/avatarRetrySweepThrottle.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
@@ -1157,7 +1162,8 @@
 - `v0.1.1664` 2026-10-17 — ギフトの記録に投げた時刻を表示
 - `v0.1.1663` 2026-10-17 — ギフトの記録に投げた時刻を表示
 
-### 🙂 匿名(184) (3版)
+### 🙂 匿名(184) (4版)
+- `v0.1.1681` 2026-10-17 — 匿名の顔の作成を別スレッドへ移す
 - `v0.1.1680` 2026-10-17 — 匿名アイコンの顔を作り直さず使い回す
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
@@ -1182,10 +1188,9 @@
 - `v0.1.1676` 2026-10-17 — パネルが描かれるまでの計測を全回分にする
 - `v0.1.1675` 2026-10-17 — サイドパネルが開くまでの時間を実機で測る
 
-### ⚡ 描画・性能 (3版)
+### ⚡ 描画・性能 (2版)
 - `v0.1.1679` 2026-10-17 — パネル起動時の画像の先読みをやめる
 - `v0.1.1677` 2026-10-17 — アイコンURL比較の無駄な再計算を省く
-- `v0.1.1661` 2026-10-17 — 書き出しHTMLの自動スクロール演出をやめた
 
 ### その他 (3版)
 - `v0.1.1674` 2026-10-17 — サイドパネルを開く直前の用意を取りこぼさない
