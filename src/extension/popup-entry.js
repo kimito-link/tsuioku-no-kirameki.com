@@ -19363,9 +19363,9 @@ async function initPopup() {
     if (supportVisualDetails) supportVisualDetails.open = true;
   }
   void applyUsageTermsGateState();
-  // マーケ分析DLボタンの即応性向上: popup 起動時に画像キャッシュを warm-up する。
-  // buildYukkuriImageDataUrlMap は Promise キャッシュ済みなので複数呼びは無害。
-  void buildYukkuriImageDataUrlMap();
+  // v0.1.1678: 起動時の画像(PNG約24枚)の base64 化=先読みはやめた。パネルを開くたびに拡張プロセスの
+  //   メインスレッドを使い、GC 圧も作っていた(実機データのプロファイルで上位)。書き出しが要るとき
+  //   (downloadCommentsHtml)に1回だけ作る(Promise キャッシュ済み)。マーケ分析は専用ページが自分で作る。
   if (INLINE_MODE) {
     const watchDetails = /** @type {HTMLDetailsElement|null} */ (
       document.querySelector('.nl-watch-settings-details')

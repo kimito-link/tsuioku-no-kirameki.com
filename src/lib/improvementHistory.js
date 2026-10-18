@@ -2858,5 +2858,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1677', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1676 の note と同じ理由)。今回は単体5件(同じ文字列で URL を作り直さない・答えが同じ・失敗の記憶・空は記憶しない・大量でも壊れない)。実機の保存データを一時プロファイルに写した V8 CPU プロファイルで、avatarCompareKey の自己時間 1829ms→上位から消滅・全体 11.4秒→6.7秒を確認(別走行どうしで揺れはある)。'
+  }),
+  Object.freeze({
+    version: '0.1.1678', metric: 'bundle-kb', value: 1445,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は popup-entry.js の起動処理から先読みの1行を外しただけ(書き出し側の呼び出しは残す)。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1678', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1678', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1677 の note と同じ理由)。今回は配線テスト2件(起動時に呼ばない・書き出しでは呼ぶ)。実機データの V8 CPU プロファイルで arrayBufferToBase64 が上位から消え、GC 時間も 670ms→442ms(別走行どうしで揺れあり)。'
   })
 ]);
