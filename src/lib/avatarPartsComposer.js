@@ -1,6 +1,11 @@
 // avatarPartsComposer.js — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 import { getDefaultAvatarFaceStore } from './avatarFaceStore.js';
+import { AVATAR_PART_ANCHORS } from './avatarPartAnchors.js';
+import { createAvatarFaceWorkerClient } from './avatarFaceWorkerClient.js';
+
+// ★v0.1.1681: 座標の正本は avatarPartAnchors.js(Worker の合成と共有)。従来の import 先のために再エクスポートする。
+export { AVATAR_PART_ANCHORS };
 
 export const AVATAR_PART_KEYS = Object.freeze({
   hair: Object.freeze([
@@ -31,44 +36,6 @@ export const AVATAR_PART_KEYS = Object.freeze({
   ]),
   cheek: Object.freeze([null, '0', '1']),
   hairHue: Object.freeze([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330])
-});
-
-/**
- * 128x128 の正規化座標。素材差し替え後もここだけで位置と大きさを調整する。
- * 各パーツは width だけ指定し、高さは素材のアスペクト比から自動算出する
- * (drawPart 参照)。固定 height で歪ませない=これがゆっくり顔の自然さの肝。
- * v0.1.704 実機24面プレビュー(chrome-devtools-mcp)で確定した値。
- */
-export const AVATAR_PART_ANCHORS = Object.freeze({
-  canvasSize: 128,
-  face: Object.freeze({
-    cx: 0.5,
-    cy: 0.53,
-    radius: 0.34,
-    fill: '#ffe6cf',
-    stroke: '#332a26',
-    strokeWidth: 0.02
-  }),
-  cheek: Object.freeze({
-    cx: 0.5,
-    cy: 0.6,
-    width: 0.58
-  }),
-  eyes: Object.freeze({
-    cx: 0.5,
-    cy: 0.5,
-    width: 0.52
-  }),
-  mouth: Object.freeze({
-    cx: 0.5,
-    cy: 0.66,
-    width: 0.24
-  }),
-  hair: Object.freeze({
-    cx: 0.5,
-    cy: 0.39,
-    width: 0.92
-  })
 });
 
 const AVATAR_DATA_URL_CACHE_MAX = 256;
@@ -275,6 +242,51 @@ function colorizeHair(image, hairHue, size) {
 }
 
 /**
+ * 顔の合成を Worker に頼むかどうか。false にすると v0.1.1680 と同じ(メインスレッド合成のみ)に戻る(撤回スイッチ)。
+ */
+const FACE_WORKER_ENABLED = true;
+/** @type {ReturnType<typeof createAvatarFaceWorkerClient> | null} */
+let faceWorkerClient = null;
+
+/** 文書ごとに1つ(遅延起動)。Worker も chrome.runtime も無い環境は null=従来どおり。 */
+function getFaceWorkerClient() {
+  if (!FACE_WORKER_ENABLED || typeof Worker !== 'function') return null;
+  const runtime = globalThis.chrome?.runtime;
+  if (!runtime || typeof runtime.getURL !== 'function') return null;
+  if (!faceWorkerClient) {
+    faceWorkerClient = createAvatarFaceWorkerClient({
+      makeWorker: () => new Worker(runtime.getURL('dist/avatar-face-worker.js'))
+    });
+  }
+  return faceWorkerClient;
+}
+
+/**
+ * 専用 Worker で顔を作る。使えない・失敗・タイムアウトのときは '' を返す(呼び手は従来のメインスレッド合成へ)。
+ * @param {{ hairKey: string, hairHue: number, eyesKey: string, mouthKey: string, cheekKey: string|null }} selected
+ * @returns {Promise<string>}
+ */
+async function composeFaceViaWorker(selected) {
+  const client = getFaceWorkerClient();
+  if (!client) return '';
+  try {
+    return await client.render({
+      baseUrl: avatarPartUrl(''),
+      files: {
+        hair: `hair-${selected.hairKey}.png`,
+        eyes: `eyes-${selected.eyesKey}.png`,
+        mouth: `mouth-${selected.mouthKey}.png`,
+        cheek: selected.cheekKey == null ? null : `cheek-${selected.cheekKey}.png`
+      },
+      hairHue: selected.hairHue
+    });
+  } catch {
+    avatarComposeStats.workerFallback += 1;
+    return '';
+  }
+}
+
+/**
  * メモリ上の顔キャッシュに入れ、上限を超えたら古い順に捨てる。
  * @param {string} key
  * @param {string} dataUrl
@@ -317,6 +329,15 @@ export function composeAvatarPartsDataUrl(userKey) {
         rememberFace(key, persisted);
         return persisted;
       }
+    }
+    // v0.1.1681: 無ければまず専用 Worker に作らせる(メインスレッドの canvas.toBlob を使わない=冷スタートでも詰まらない)。
+    //   Worker 不可・故障・タイムアウト・失敗は '' が返り、下の従来のメインスレッド合成へ(見た目も機能も同じ)。
+    const viaWorker = await composeFaceViaWorker(selected);
+    if (viaWorker) {
+      avatarComposeStats.workerComposed += 1;
+      rememberFace(key, viaWorker);
+      if (faceStore) faceStore.put(key, viaWorker);
+      return viaWorker;
     }
     if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
       throw new Error('document canvas is unavailable');
@@ -529,12 +550,12 @@ export function createViewportGate(deps = {}) {
 
 const avatarComposeLimiter = createComposeLimiter();
 const avatarViewportGate = createViewportGate();
-const avatarComposeStats = { requested: 0, cacheHit: 0, persistedHit: 0, composedAfterNear: 0, skippedDetached: 0, failed: 0 };
+const avatarComposeStats = { requested: 0, cacheHit: 0, persistedHit: 0, workerComposed: 0, workerFallback: 0, composedAfterNear: 0, skippedDetached: 0, failed: 0 };
 
 /** 状態速報用: 顔の合成の要求・実行・見送りの内訳。 */
 export function getAvatarComposeStats() {
   const lim = avatarComposeLimiter.snapshot();
-  return { ...avatarComposeStats, waitingNear: avatarViewportGate.pendingCount(), active: lim.active, queued: lim.queued, maxQueued: lim.maxQueued, cacheSize: avatarDataUrlCache.size };
+  return { ...avatarComposeStats, waitingNear: avatarViewportGate.pendingCount(), active: lim.active, queued: lim.queued, maxQueued: lim.maxQueued, cacheSize: avatarDataUrlCache.size, worker: faceWorkerClient ? faceWorkerClient.snapshot() : { state: 'unused' } };
 }
 
 /**

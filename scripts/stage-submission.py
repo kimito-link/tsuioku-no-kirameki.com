@@ -338,7 +338,9 @@ def verify_zip(zip_path: Path) -> None:
         'dist/content.js',
         'dist/page-intercept.js',
         'dist/popup.js',
-        'dist/offscreen.js'
+        'dist/offscreen.js',
+        # v0.1.1681: 匿名の顔の合成 Worker。無いと全部メインスレッド合成(数秒の詰まり)へ黙って戻るので必須にする。
+        'dist/avatar-face-worker.js'
     }
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = set(zf.namelist())

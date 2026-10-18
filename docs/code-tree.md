@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 940 件
+## ⚠️ 役割コメントが無いソース 8 / 945 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (359)
+- 📁 **docs/** (361)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (174)
+  - 📁 **handoff/** (176)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -399,6 +399,8 @@
     - `VOICE-BASELINE-2026-08-11.md`
     - `asset-import-DESIGN.md`
     - `asset-import-IMPLEMENTATION-HANDOFF.md`
+    - `avatar-face-worker-DESIGN-2026-10-19.md`
+    - `avatar-face-worker-FABLE-BRIEF-2026-10-19.md`
     - `clip-history-persistence-synthesis.md`
     - `comment-pickup-ticker-DESIGN.md`
     - `comment-pickup-ticker-IMPLEMENTATION-HANDOFF.md`
@@ -730,7 +732,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (97)
+- 📁 **scripts/** (98)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -768,6 +770,7 @@
   - `_run-romi-local.ps1`
   - `_summarize-council.ps1`
   - `audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
+  - `avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
   - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
@@ -857,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2027)
+- 📁 **src/** (2034)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -894,7 +897,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (63)
+  - 📁 **extension/** (64)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -917,6 +920,7 @@
       - `laneShrinkScenario.test.js`
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
       - `renderStoryUserLaneDom.test.js`
+    - `avatar-face-worker-entry.js` — 匿名の顔を合成する専用 Worker(v0.1.1681)。
     - `backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
     - `cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
@@ -1140,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1788)
+  - 📁 **lib/** (1794)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1215,12 +1219,18 @@
     - `avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
     - `avatarEntryCounts.test.js`
     - `avatarFacePersistWiring.wiring.test.js`
+    - `avatarFaceRender.js` — 【層】L0 判定層(純粋関数・I/O は deps で注入=Worker でもテストでも同じ手順を走らせる)
+    - `avatarFaceRender.test.js`
     - `avatarFaceStore.js` — 【層】L2 配線層(IndexedDB へ読み書きする・DOM/chrome.* には触れない)
     - `avatarFaceStore.test.js`
+    - `avatarFaceWorkerClient.js` — 【層】L2 配線層(Worker を持つ・DOM/chrome.* には触れない。Worker の作り方は deps で注入)
+    - `avatarFaceWorkerClient.test.js`
+    - `avatarFaceWorkerWiring.wiring.test.js`
     - `avatarFallbackFromUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `avatarFallbackFromUrl.test.js`
     - `avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
     - `avatarLoadReport.test.js`
+    - `avatarPartAnchors.js` — 128x128 の正規化座標。素材差し替え後もここだけで位置と大きさを調整する。
     - `avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
     - `avatarPartsComposer.test.js`
     - `avatarRetrySweepThrottle.js` — 【層】L0 判定層(純粋関数・I/O禁止)
