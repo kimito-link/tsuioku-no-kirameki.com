@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { KNOWN_SYMPTOM_IDS, buildCardsFromBlob } from './loop-adapter-status-live.mjs';
+import { KNOWN_SYMPTOM_IDS, STALE_SEC, buildCardsFromBlob, extractJson } from './loop-adapter-status-live.mjs';
 import { SYMPTOM_SIGNATURE_LABEL } from '../src/lib/symptomVerdicts.js';
 
 const NOW = new Date('2026-10-18T06:00:10Z');
@@ -44,6 +44,17 @@ describe('buildCardsFromBlob', () => {
     }
   });
 
+  it('速報が古ければ（STALE_SEC超）「測れていない」。ちょうど STALE_SEC は ok（実データで1時間前の速報が ok になっていた不具合の再発防止）', () => {
+    const at = (secAgo) => new Date(NOW.getTime() - secAgo * 1000).toISOString();
+    const snap = (secAgo) => buildCardsFromBlob({ ...blob(), statusReport: 'x', generatedAt: at(secAgo) }, ctx).at(-1);
+    expect(snap(STALE_SEC).verdict).toBe('ok');
+    expect(snap(STALE_SEC + 1).verdict).toBe('unmeasured');
+    expect(snap(3591).verdict).toBe('unmeasured');
+  });
+  it('生成時刻が無い・壊れている速報も「測れていない」（古さが分からないものを ok にしない）', () => {
+    expect(buildCardsFromBlob({ ...blob(), generatedAt: undefined }, ctx).at(-1).verdict).toBe('unmeasured');
+    expect(buildCardsFromBlob({ ...blob(), generatedAt: 'x' }, ctx).at(-1).verdict).toBe('unmeasured');
+  });
   it('速報本文が無ければ「測れていない」（緑にしない）・症状カードは作らない', () => {
     const cards = buildCardsFromBlob({ generatedAt: '2026-10-18T06:00:00Z', lives: [] }, ctx);
     expect(cards).toHaveLength(1);
@@ -126,5 +137,27 @@ describe('CLI', () => {
 
   it('壊れた入力は exit 2', () => {
     expect(run('not json', { LOOP_KIT_DIR: KIT }).status).toBe(2);
+  });
+});
+
+describe('extractJson（status-live --json は JSON の前に人向けの見出しを付ける）', () => {
+  const obj = { generatedAt: '2026-10-18T06:00:00Z', lives: [], statusReport: 'x' };
+  it('全体が JSON ならそのまま読む', () => {
+    expect(extractJson(JSON.stringify(obj))).toEqual(obj);
+    expect(extractJson(JSON.stringify(obj, null, 2))).toEqual(obj);
+  });
+  it('見出し（日本語・記号・警告）の後ろの JSON を読む。見出しの中身は使わない', () => {
+    const text = '── 状態速報(生成: 59分前) ──────\n⚠️ このスナップショットは5分以上古いです\n\n' + JSON.stringify(obj, null, 2) + '\n';
+    expect(extractJson(text)).toEqual(obj);
+  });
+  it('見出しの途中に { を含む行があっても、行頭が { の行から読む', () => {
+    const text = '見出し {途中の波括弧}\n' + JSON.stringify(obj);
+    expect(extractJson(text)).toEqual(obj);
+  });
+  it('JSON が無い・壊れている・空なら null（呼び出し側が測れていないと扱う）', () => {
+    expect(extractJson('エラー: トークンがありません')).toBeNull();
+    expect(extractJson('見出し\n{ 壊れた')).toBeNull();
+    expect(extractJson('')).toBeNull();
+    expect(extractJson(undefined)).toBeNull();
   });
 });
