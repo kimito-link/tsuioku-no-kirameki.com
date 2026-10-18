@@ -160,3 +160,37 @@ describe('配信者プロフィールの全項目(v0.1.1670)', () => {
     expect(html).not.toContain('mkt-bcaster__bio');
   });
 });
+
+describe('自己紹介の中のURLをリンクにする(v0.1.1671)', () => {
+  const mk = (description) => normalizeBroadcasterProfileModel({ userId: '1', nickname: 'a', description });
+  it('★http(s) のURLをリンクにする(新しいタブ・noopener noreferrer nofollow)', () => {
+    const html = buildBroadcasterProfileMarketingCardHtml(mk('本垢→https://live.nicovideo.jp/watch/user/142924562?ref=x&a=1 です'));
+    expect(html).toContain('<a class="mkt-bcaster__bio-link" href="https://live.nicovideo.jp/watch/user/142924562?ref=x&amp;a=1"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer nofollow"');
+    expect(html).toContain('本垢→');
+  });
+  it('★URL の直後の句読点・閉じ括弧はリンクに含めない', () => {
+    const html = buildBroadcasterProfileMarketingCardHtml(mk('見てね(https://example.com/a)。https://example.com/b、以上'));
+    expect(html).toContain('href="https://example.com/a"');
+    expect(html).toContain('href="https://example.com/b"');
+    expect(html).not.toContain('href="https://example.com/a)');
+    expect(html).not.toContain('href="https://example.com/b、');
+  });
+  it('★javascript: など http(s) 以外はリンクにしない・本文のHTMLはエスケープされたまま', () => {
+    const html = buildBroadcasterProfileMarketingCardHtml(mk('javascript:alert(1) <b>x</b> data:text/html,hi'));
+    expect(html).not.toContain('href="javascript:');
+    expect(html).not.toContain('href="data:');
+    expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+  it('★HTMLレポートの概要表の自己紹介でも同じ', () => {
+    const html = buildBroadcasterProfileReportRowsHtml(mk('ほしりす https://www.amazon.co.jp/hz/wishlist/ls/X'));
+    expect(html).toContain('href="https://www.amazon.co.jp/hz/wishlist/ls/X"');
+    expect(html).toContain('rel="noopener noreferrer nofollow"');
+  });
+  it('URL が無い本文は従来どおり(改行は <br>)', () => {
+    const html = buildBroadcasterProfileMarketingCardHtml(mk('1行目\n2行目'));
+    expect(html).toContain('1行目<br>2行目');
+    expect(html).not.toContain('mkt-bcaster__bio-link');
+  });
+});

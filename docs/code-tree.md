@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (356)
+- 📁 **docs/** (359)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (171)
+  - 📁 **handoff/** (174)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -437,6 +437,9 @@
     - `live-to-extension-absorb-MAP.md`
     - `live-to-extension-absorb-SPEC.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
+    - `marketing-report-redesign-FABLE-BRIEF-2026-10-18.md`
+    - `marketing-report-redesign-IMPLEMENTATION-HANDOFF-2026-10-18.md`
+    - `marketing-report-redesign-SPEC-2026-10-18.md`
     - `mirror-writer-decoupling-PLAN-2026-08-08.md`
     - `panel-flicker-council-brief-2026-08-05.md`
     - `panel-flicker-culprit-trap-DESIGN.md`
