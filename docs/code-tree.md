@@ -853,7 +853,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2012)
+- 📁 **src/** (2013)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1136,7 +1136,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1773)
+  - 📁 **lib/** (1774)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2104,6 +2104,7 @@
     - `nicoadCelebrationKey.test.js`
     - `nicoadContributionRankingApi.js` — ニコニ広告(nicoad)「貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
     - `nicoadContributionRankingApi.test.js`
+    - `nicoadLimitContract.test.js`
     - `nicoliveDom.js` — ニコ生 watch ページのコメント一覧からの抽出（セレクタは実機で要調整）
     - `nicoliveDom.test.js`
     - `nicoliveRankingPick.js` — 公式ランキングから【検証に使う配信を1つ選ぶ】純関数。
