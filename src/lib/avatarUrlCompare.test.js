@@ -100,3 +100,62 @@ describe('isSameAvatarUrl', () => {
     )).toBe(false);
   });
 });
+
+describe('avatarCompareKey の記憶(v0.1.1677・同じURLで URL を作り直さない)', () => {
+  /** @param {() => void} fn @returns {number} その間に new URL が呼ばれた回数 */
+  const countUrlConstructions = (fn) => {
+    const Orig = globalThis.URL;
+    let n = 0;
+    globalThis.URL = /** @type {any} */ (
+      class extends Orig {
+        /** @param {any[]} a */
+        constructor(...a) {
+          // @ts-expect-error - テスト用の計数(引数は素通し)
+          super(...a);
+          n += 1;
+        }
+      }
+    );
+    try {
+      fn();
+    } finally {
+      globalThis.URL = Orig;
+    }
+    return n;
+  };
+
+  it('★同じ文字列を何度渡しても URL の解析は1回だけ(全コメントぶん呼ばれる経路の CPU 対策)', () => {
+    const u = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1234/12345678.jpg?1700000000';
+    const n = countUrlConstructions(() => {
+      for (let i = 0; i < 500; i += 1) avatarCompareKey(u);
+    });
+    expect(n).toBeLessThanOrEqual(1);
+  });
+
+  it('★記憶しても答えは同じ(初回と2回目以降・クエリ違いは同じキー)', () => {
+    const a = 'https://example.com/i/9.jpg?v=1#x';
+    const first = avatarCompareKey(a);
+    expect(avatarCompareKey(a)).toBe(first);
+    expect(first).toBe('https://example.com/i/9.jpg');
+    expect(avatarCompareKey('https://example.com/i/9.jpg?v=2')).toBe(first);
+  });
+
+  it('★解析できない文字列は、そのまま返す答えも変わらない(失敗を記憶しても同じ)', () => {
+    expect(avatarCompareKey('not a url')).toBe('not a url');
+    expect(avatarCompareKey('not a url')).toBe('not a url');
+  });
+
+  it('★空・null は常に空(記憶に入れない)', () => {
+    expect(avatarCompareKey('')).toBe('');
+    expect(avatarCompareKey('   ')).toBe('');
+    expect(avatarCompareKey(null)).toBe('');
+  });
+
+  it('★大量の別URLでも壊れない・古い記憶を捨てても答えは同じ', () => {
+    const keep = 'https://example.com/keep.jpg?z=1';
+    const want = avatarCompareKey(keep);
+    for (let i = 0; i < 6000; i += 1) avatarCompareKey(`https://example.com/u/${i}.jpg?v=${i}`);
+    expect(avatarCompareKey(keep)).toBe(want);
+    expect(avatarCompareKey('https://example.com/u/17.jpg?v=3')).toBe('https://example.com/u/17.jpg');
+  });
+});
