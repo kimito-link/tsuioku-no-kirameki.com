@@ -294,3 +294,28 @@ describe('mergeGiftSubAppHistoryPayload', () => {
     expect(merged?.source).toBe('merged');
   });
 });
+
+
+describe('履歴の公開時刻(v0.1.1663)', () => {
+  it('★保存する行に公式の公開時刻(epoch秒)を持たせる(時計の時刻で「いつ投げたか」を出すため)', () => {
+    const json = { meta: { status: 200 }, data: { showTimeBeginAt: 1780319000, histories: [
+      { id: 1, supporterId: 10, supporterName: 'a', itemName: 'x', point: 10, publishedAt: 1780320114 },
+      { id: 2, supporterId: 11, supporterName: 'b', itemName: 'y', point: 20 }
+    ] } };
+    const p = buildGiftSubAppPayloadFromKokenJson(json, { now: 1, liveId: 'lv1' });
+    const byId = Object.fromEntries(p.history.map((h) => [h.kokenHistoryId, h]));
+    expect(byId['1'].publishedAt).toBe(1780320114);
+    expect(byId['2'].publishedAt).toBe(0);
+  });
+  it('★古い保存(時刻なし)と新しい取得(時刻あり)が重なったら、時刻のある行を残す', () => {
+    const old = { liveId: 'lv1', capturedAt: 1, source: 'koken-api', totalCounts: [], history: [
+      { kokenHistoryId: '1', userId: '10', senderName: 'a', itemName: 'x', points: 10, time: '0:01:00', sortKey: 60 }
+    ] };
+    const neu = { liveId: 'lv1', capturedAt: 2, source: 'koken-api', totalCounts: [], history: [
+      { kokenHistoryId: '1', userId: '10', senderName: 'a', itemName: 'x', points: 10, time: '0:01:00', sortKey: 60, publishedAt: 1780320114 }
+    ] };
+    const m = mergeGiftSubAppHistoryPayload(old, neu);
+    expect(m.history).toHaveLength(1);
+    expect(m.history[0].publishedAt).toBe(1780320114);
+  });
+});

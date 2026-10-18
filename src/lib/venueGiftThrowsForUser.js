@@ -15,6 +15,7 @@
  */
 
 import { ageMsOf } from './timeAuthority.js';
+import { formatVenueHoverRelativeTime } from './venueHoverCard.js';
 
 const NUMERIC_UID_RE = /^[1-9]\d{0,17}$/;
 const STALE_MS = 5 * 60_000;
@@ -34,7 +35,7 @@ function httpUrlOrEmpty(v) {
 const ja = (n) => Math.floor(n).toLocaleString('en-US');
 
 /**
- * @typedef {{ itemName: string, points: number, time: string, thumbnailUrl: string }} GiftThrowRow
+ * @typedef {{ itemName: string, points: number, time: string, at: number, thumbnailUrl: string }} GiftThrowRow
  * @typedef {{ ok: boolean, reason?: string, rows: GiftThrowRow[], sumPoints: number, count: number, notes: string[] }} GiftThrowsResult
  */
 
@@ -74,6 +75,8 @@ export function giftThrowsForUser(p) {
         itemName: String(h.itemName == null ? '' : h.itemName).trim() || '(名称未取得)',
         points,
         time: String(h.time == null ? '' : h.time).trim(),
+        // 公式の公開時刻(epoch 秒→ms)。無ければ 0=時計の時刻は出さず、配信内の経過だけを出す。
+        at: Number(h.publishedAt) > 0 ? Math.floor(Number(h.publishedAt)) * 1000 : 0,
         thumbnailUrl: httpUrlOrEmpty(h.thumbnailUrl)
       }
     });
@@ -96,13 +99,34 @@ export function giftThrowsForUser(p) {
   return { ok: true, rows: all.slice(0, GIFT_THROWS_PANEL_MAX), sumPoints, count: all.length, notes };
 }
 
+/** @param {number} n */
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/**
+ * 「いつ投げたか」の表示文字列。時計の時刻(例 10:03)・何分前・配信内の経過(例 配信1:16:43)を、分かるものだけ並べる。
+ * 時刻が不明なら配信内の経過だけを「配信○」と明示して出す(単なる数字だけにしない)。
+ * @param {{ time: string, at: number }} row @param {number} nowMs @returns {string}
+ */
+export function giftThrowWhenLabel(row, nowMs) {
+  const parts = [];
+  if (row.at > 0) {
+    const d = new Date(row.at);
+    const clock = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const rel = formatVenueHoverRelativeTime(row.at, nowMs);
+    parts.push(rel ? `${clock}(${rel})` : clock);
+  }
+  const el = String(row.time || '').trim();
+  if (el && el !== '—') parts.push(`配信${el}`);
+  return parts.join(' ・ ');
+}
+
 /**
  * パネルの「ギフトの記録」区画の HTML。出せない理由が over-total のときだけ文言を出し、それ以外(取れていない等)は空。
  * @param {GiftThrowsResult} r
  * @param {(s: unknown) => string} escapeHtml
  * @returns {string}
  */
-export function giftThrowsSectionHtml(r, escapeHtml) {
+export function giftThrowsSectionHtml(r, escapeHtml, nowMs = Date.now()) {
   if (!r) return '';
   if (!r.ok) {
     return r.reason === 'over-total'
@@ -116,7 +140,7 @@ export function giftThrowsSectionHtml(r, escapeHtml) {
         `<div class="nlsb-speech-gifts__row">${thumb}` +
         `<span class="nlsb-speech-gifts__item">${escapeHtml(x.itemName)}</span>` +
         `<span class="nlsb-speech-gifts__pt">${escapeHtml(ja(x.points))}pt</span>` +
-        `<span class="nlsb-speech-gifts__time">${escapeHtml(x.time)}</span></div>`
+        `<span class="nlsb-speech-gifts__time">${escapeHtml(giftThrowWhenLabel(x, nowMs))}</span></div>`
       );
     })
     .join('');
