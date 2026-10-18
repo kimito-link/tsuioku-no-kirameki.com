@@ -36,6 +36,7 @@ graph LR
   n_comeview --> n_src_lib_htmlText_js["lib/htmlText.js"]:::shared
   n_comeview --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_comeview --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
+  n_comeview --> n_src_lib_noSpeechNote_js["lib/noSpeechNote.js"]
   n_comeview --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
   n_comeview --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_comeview --> n_src_lib_storageRefreshTriggerKey_js["lib/storageRefreshTriggerKey.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_comeview --> n_src_lib_voiceFailureTaxonomy_js["lib/voiceFailureTaxonomy.js"]:::shared
   n_comeview --> n_src_lib_voiceKeys_js["lib/voiceKeys.js"]:::shared
   n_comeview --> n_src_lib_voiceLagBudget_js["lib/voiceLagBudget.js"]:::shared
-  n_comeview --> n_src_lib_voiceLoadingState_js["lib/voiceLoadingState.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 7 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 8 ファイル省略（全件は storage-bus.md / metafile 参照）。

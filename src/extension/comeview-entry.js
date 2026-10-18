@@ -62,6 +62,7 @@ import {
   extractUserCommentRows,
   COMEVIEW_NG_STORAGE_KEY
 } from '../lib/comeviewActions.js';
+import { buildNoSpeechNote } from '../lib/noSpeechNote.js';
 import { USER_SPEECH_ROWS_MAX } from '../lib/comeviewUserDetailLink.js';
 import {
   normalizeComeviewUserNotes,
@@ -1192,7 +1193,7 @@ async function showUserDetail(row) {
   countNote.className = 'cv-panel-note';
   countNote.textContent = total
     ? `この配信での発言 全 ${total} 件${total > rows.length ? `(新しい ${rows.length} 件を表示)` : ''}`
-    : 'この配信の記録にはまだ発言がありません';
+    : buildNoSpeechNote(row);
   bodyEl.appendChild(countNote);
   const frag = document.createDocumentFragment();
   for (const r of rows) {
