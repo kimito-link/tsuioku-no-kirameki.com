@@ -2872,5 +2872,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1678', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1677 の note と同じ理由)。今回は単体11件+配線3件で、二重の再現(25+25→25)・投稿者情報の引き継ぎ・大きい配信でも定数オーダー・連投の保持を固定。ローカル e2e(snapshot-fetch-hang-resilient)は先読みを外した構成で修正前 2/2 赤→修正後 3/3 緑。'
+  }),
+  Object.freeze({
+    version: '0.1.1679', metric: 'bundle-kb', value: 1447,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は popup-entry.js の起動処理から先読みの1行を外しただけ(書き出し側の呼び出しは残す)。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1679', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1679', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1678 の note と同じ理由)。今回は配線テスト2件(起動時に呼ばない・書き出しでは呼ぶ)。実機データの V8 CPU プロファイルで arrayBufferToBase64 が上位から消え、GC 時間も 670ms→442ms(別走行どうしで揺れあり)。先読み削除で露見した記録件数の二重(v1678 で修正)を直したうえで、ローカル e2e(snapshot-fetch-hang-resilient)が緑であることを確認した。'
   })
 ]);
