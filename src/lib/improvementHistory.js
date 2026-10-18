@@ -2690,5 +2690,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1665', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1664 の note と同じ理由)。今回は実配信で、ギフトの記録が出ない人に理由、広告の人に「初めて検知」の時刻が出ることを確認した。公式の履歴 API が直近10件ほどしか返さないことは、実際に取得して確かめた。'
+  }),
+  Object.freeze({
+    version: '0.1.1666', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は広告ランキングの帯の描画を上位10行に絞る数行(popup-entry.js)と契約テストだけ。見た目は変わらない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1666', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1666', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1665 の note と同じ理由)。今回は挙動を変えない準備の版で、取得件数を増やす次の版の前提(帯の固定・社数と合計は全行・SW と lib の値の照合)をテストで固定した。'
   })
 ]);
