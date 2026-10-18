@@ -126,12 +126,17 @@ export function giftThrowWhenLabel(row, nowMs) {
  * @param {(s: unknown) => string} escapeHtml
  * @returns {string}
  */
-export function giftThrowsSectionHtml(r, escapeHtml, nowMs = Date.now()) {
+export function giftThrowsSectionHtml(r, escapeHtml, nowMs = Date.now(), hasGift = false) {
   if (!r) return '';
   if (!r.ok) {
-    return r.reason === 'over-total'
-      ? `<div class="nlsb-speech-gifts"><div class="nlsb-speech-gifts__note">ギフトの明細は、累計と照合できません</div></div>`
-      : '';
+    /** @param {string} t */
+    const note = (t) => `<div class="nlsb-speech-gifts"><div class="nlsb-speech-gifts__note">${escapeHtml(t)}</div></div>`;
+    if (r.reason === 'over-total') return note('ギフトの明細は、累計と照合できません');
+    // ★v0.1.1665(2026-10-18 実機「出る時と出ない時がある」): ギフトptがあるのに記録の区画が丸ごと消えると、壊れて見える。理由を言う。
+    //   実測: 公式の履歴 API は直近10件ほどしか返さず、匿名の投げは誰のものか分からない。拡張を開く前・取得の合間の投げは出せない。
+    if (hasGift && r.reason === 'empty') return note('公式のギフト履歴には、この人のIDがついた投げの記録がありません。公式の履歴は直近10件ほどしか返さず、匿名の投げは誰のものか分からないため、拡張を開く前や取得の合間の投げは出せません');
+    if (hasGift && (r.reason === 'no-history' || r.reason === 'live-mismatch')) return note('ギフトの履歴をまだ取得できていません(しばらくして開き直すと出ることがあります)');
+    return '';
   }
   const rows = r.rows
     .map((x) => {
