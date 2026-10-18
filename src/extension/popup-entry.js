@@ -540,6 +540,7 @@ import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTil
 import { createGiftAdPicksCarry, keepPicksIfEmptied, resolvePicksOnLiveChange } from '../lib/giftAdPicksCarry.js';
 import { createLaneImportShadowState, observeLaneImportShadow, formatLaneImportShadowLine } from '../lib/laneImportShadow.js';
 import { makeLaneResult } from '../lib/northStarLaneResult.js';
+import { NICOAD_RANKING_STRIP_ROWS } from '../lib/nicoadContributionRankingApi.js';
 import {
   buildTickerTextAndTip,
   decorateTickerLine,
@@ -11798,7 +11799,8 @@ async function refreshNorthStarAdRankingLane(liveId) {
   const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
   if (adRows.length > 0 && body instanceof HTMLElement) {
     trackAdAdvertiserCountForCelebration(lid, adRows.length);
-    const rooms = officialDomRankingRowsToStripRooms(adRows, { userKeyKind: 'ad' });
+    // v0.1.1666: 帯は上位 N 行だけ描く(取得を増やしても伸びない)。社数・合計は全行(adRows)から。
+    const rooms = officialDomRankingRowsToStripRooms(adRows.slice(0, NICOAD_RANKING_STRIP_ROWS), { userKeyKind: 'ad' });
     let rankingSum = 0;
     for (const row of adRows) {
       const c = Number(row?.contribution);
@@ -11870,7 +11872,7 @@ async function refreshNorthStarAdRankingLane(liveId) {
   }
   if (nicoadApiRows && body instanceof HTMLElement) {
     trackAdAdvertiserCountForCelebration(lid, nicoadApiRows.length);
-    const rooms = officialDomRankingRowsToStripRooms(nicoadApiRows, { userKeyKind: 'ad' });
+    const rooms = officialDomRankingRowsToStripRooms(nicoadApiRows.slice(0, NICOAD_RANKING_STRIP_ROWS), { userKeyKind: 'ad' });
     let rankingSum = 0;
     for (const row of nicoadApiRows) {
       const c = Number(row?.contribution);
