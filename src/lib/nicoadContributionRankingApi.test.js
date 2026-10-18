@@ -15,7 +15,7 @@ describe('nicoadContributionRankingApi', () => {
       // background.js（手書き成果物）が同じリテラルを使うので、ここで凍結する。
       expect(NICOAD_CONTRIB_FETCH_MESSAGE_TYPE).toBe('NLS_NICOAD_CONTRIB_FETCH');
       expect(NICOAD_CONTRIB_STORAGE_PREFIX).toBe('nls_nicoad_api_ranking_');
-      expect(NICOAD_CONTRIB_DEFAULT_LIMIT).toBe(10);
+      expect(NICOAD_CONTRIB_DEFAULT_LIMIT).toBe(100);
     });
 
     it('storage キーは scrape 由来 nls_nicoad_ranking_ とは別（clobber 防止）', () => {
@@ -29,7 +29,7 @@ describe('nicoadContributionRankingApi', () => {
   describe('buildNicoadContributionRankingUrl', () => {
     it('正しい liveId で URL を組む（live パス・ranking/contribution）', () => {
       expect(buildNicoadContributionRankingUrl('lv345479988')).toBe(
-        'https://api.nicoad.nicovideo.jp/v1/contents/live/lv345479988/ranking/contribution?limit=10'
+        'https://api.nicoad.nicovideo.jp/v1/contents/live/lv345479988/ranking/contribution?limit=100'
       );
     });
 

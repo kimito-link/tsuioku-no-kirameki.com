@@ -540,7 +540,7 @@ import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTil
 import { createGiftAdPicksCarry, keepPicksIfEmptied, resolvePicksOnLiveChange } from '../lib/giftAdPicksCarry.js';
 import { createLaneImportShadowState, observeLaneImportShadow, formatLaneImportShadowLine } from '../lib/laneImportShadow.js';
 import { makeLaneResult } from '../lib/northStarLaneResult.js';
-import { NICOAD_RANKING_STRIP_ROWS } from '../lib/nicoadContributionRankingApi.js';
+import { NICOAD_RANKING_STRIP_ROWS, NICOAD_CONTRIB_DEFAULT_LIMIT } from '../lib/nicoadContributionRankingApi.js';
 import {
   buildTickerTextAndTip,
   decorateTickerLine,
@@ -7764,7 +7764,8 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
        */
       resolveAvatarForUid: (uid) =>
         storyGrowthAvatarSrcCandidate({ userId: uid, avatarUrl: '' }, lid, storageRows),
-      limit: giftLimit
+      // v0.1.1667: 広告段は取得した広告主を全員出す(ユーザー決定: 正確な数を知りたい)。ギフト段の giftLimit(16/24)では切らない。
+      limit: NICOAD_CONTRIB_DEFAULT_LIMIT
     }
   );
   {
