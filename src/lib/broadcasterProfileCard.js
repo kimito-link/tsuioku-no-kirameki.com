@@ -173,6 +173,32 @@ function profileHref(m) {
   return m.pageUrl || '';
 }
 
+/**
+ * v0.1.1671: 自己紹介の本文を HTML にする。本文は必ずエスケープし、http(s) の URL だけをリンクにする(javascript: や data: は対象外)。
+ *   URL の直後の句読点・閉じ括弧は含めない。リンクは新しいタブ・rel="noopener noreferrer nofollow"。改行は <br>。
+ * @param {string} text
+ * @param {string} linkClass
+ * @returns {string}
+ */
+function linkifyBioHtml(text, linkClass) {
+  const re = /https?:\/\/[^\s<>"'`、。，．）)」』】\]]+/g;
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    let url = m[0];
+    // 末尾に付きがちな記号は URL に含めない
+    const trimmed = url.replace(/[.,;:!?]+$/, '');
+    url = trimmed;
+    out += escapeHtml(text.slice(last, m.index));
+    out += `<a class="${linkClass}" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer nofollow">${escapeHtml(url)}</a>`;
+    last = m.index + url.length;
+    re.lastIndex = last;
+  }
+  out += escapeHtml(text.slice(last));
+  return out.replace(/\n/g, '<br>');
+}
+
 /** @param {number} n */
 function jp(n) {
   return Number(n).toLocaleString('ja-JP');
@@ -238,7 +264,7 @@ export function buildBroadcasterProfileMarketingCardHtml(model) {
   }
   // 自己紹介(公式のプロフィールの本文・タグ除去済み・エスケープ・長いときは折りたたむ)。
   const bio = m.description
-    ? `<div class="mkt-bcaster__bio">${escapeHtml(m.description).replace(/\n/g, '<br>')}</div>`
+    ? `<div class="mkt-bcaster__bio">${linkifyBioHtml(m.description, 'mkt-bcaster__bio-link')}</div>`
     : '';
 
   return `<section class="mkt-section mkt-section--bcaster" aria-label="配信者プロフィール">
@@ -275,6 +301,7 @@ export const BROADCASTER_PROFILE_MARKETING_CSS = `
 .mkt-bcaster__link{font-size:.8rem;color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
 .mkt-bcaster__link--wish{color:#fdba74}
 .mkt-bcaster__link--sns{color:#86efac}
+.mkt-bcaster__bio-link{color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
 .mkt-bcaster__bio{margin:.5rem 0 0;padding:.5rem .7rem;border-left:3px solid #334155;background:rgba(15,23,42,.55);color:#cbd5e1;font-size:.82rem;line-height:1.6;overflow-wrap:anywhere;max-height:12em;overflow:auto}
 .mkt-acct-badge{display:inline-block;margin-left:.4rem;border-radius:999px;padding:.02rem .42rem;font-size:.66rem;font-weight:700;line-height:1.5;vertical-align:middle;white-space:nowrap}
 .mkt-acct-badge--prem{border:1px solid rgba(251,191,36,.55);background:rgba(251,191,36,.16);color:#fde68a}
@@ -322,7 +349,7 @@ export function buildBroadcasterProfileReportRowsHtml(model) {
     rows.push(`<tr><th>経験値</th><td>${escapeHtml(jp(m.levelExp.current))} / ${escapeHtml(jp(m.levelExp.threshold))}(公式の値)</td></tr>`);
   }
   if (m.description) {
-    rows.push(`<tr><th>自己紹介</th><td>${escapeHtml(m.description).replace(/\n/g, '<br>')}</td></tr>`);
+    rows.push(`<tr><th>自己紹介</th><td>${linkifyBioHtml(m.description, 'nl-user-profile-link')}</td></tr>`);
   }
   if (m.sns && m.sns.length) {
     const links = m.sns
