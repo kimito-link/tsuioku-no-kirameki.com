@@ -233,7 +233,9 @@ export function buildGiftSubAppPayloadFromKokenJson(json, options = {}) {
       thumbnailUrl,
       senderAvatarUrl: sanitizeHttpUrl(h.supporterThumbnailUrl),
       userId: hasUid ? sidRaw : '',
-      kokenHistoryId: String(h.id == null ? '' : h.id).trim()
+      kokenHistoryId: String(h.id == null ? '' : h.id).trim(),
+      // v0.1.1663: 公式の公開時刻(epoch 秒)。「いつ投げたか」を時計の時刻で出すため(配信内の経過時間 time とは別)。
+      publishedAt: Number(h.publishedAt) > 0 ? Math.floor(Number(h.publishedAt)) : 0
     });
     const key = itemName.toLowerCase();
     const cur = itemMap.get(key) || { itemName, count: 0, thumbnailUrl: '' };
@@ -423,6 +425,8 @@ function pickRicherGiftSubAppHistoryRow(a, b) {
     if (sanitizeHttpUrl(r.senderAvatarUrl)) s += 2;
     const name = String(r.itemName || '').trim();
     if (name && name !== '（名称未取得）') s += 6;
+    // v0.1.1663: 公開時刻を持つ行を優先(古い保存に時刻が無くても、再取得した行で補われる)。
+    if (Number(r.publishedAt) > 0) s += 1;
     return s;
   };
   return score(a) >= score(b) ? /** @type {object} */ (a) : /** @type {object} */ (b);

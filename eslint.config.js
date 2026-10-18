@@ -421,7 +421,7 @@ export default [
     // v0.1.1658: 発言パネルのギフト・広告の一行の配線とCSS=+19行(判定は lib の venueSpeechStats.js)。
     // v0.1.1659: 発言パネルのギフト明細の配線とCSS=+68行(判定は lib の venueGiftThrowsForUser.js)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7315, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7316, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
