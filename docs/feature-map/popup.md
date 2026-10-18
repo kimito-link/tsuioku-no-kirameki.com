@@ -48,12 +48,12 @@ graph LR
   n_popup --> n_src_lib_autoSectionCensus_js["lib/autoSectionCensus.js"]
   n_popup --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
   n_popup --> n_src_lib_avatarEntryCounts_js["lib/avatarEntryCounts.js"]
+  n_popup --> n_src_lib_avatarFaceStore_js["lib/avatarFaceStore.js"]:::shared
   n_popup --> n_src_lib_avatarFallbackFromUrl_js["lib/avatarFallbackFromUrl.js"]:::shared
   n_popup --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_popup --> n_src_lib_avatarRetrySweepThrottle_js["lib/avatarRetrySweepThrottle.js"]
   n_popup --> n_src_lib_avatarUrlCompare_js["lib/avatarUrlCompare.js"]:::shared
-  n_popup --> n_src_lib_backfillOptIn_js["lib/backfillOptIn.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 440 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 441 ファイル省略（全件は storage-bus.md / metafile 参照）。

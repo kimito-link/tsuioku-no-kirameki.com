@@ -308,7 +308,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 254</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 255</summary>
 
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
@@ -334,6 +334,7 @@
 - `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
 - `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
 - `src/lib/avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
+- `src/lib/avatarFaceStore.js` — 【層】L2 配線層(IndexedDB へ読み書きする・DOM/chrome.* には触れない)
 - `src/lib/avatarFallbackFromUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
 - `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
@@ -1157,20 +1158,19 @@
 - `v0.1.1663` 2026-10-17 — ギフトの記録に投げた時刻を表示
 
 ### 🙂 匿名(184) (3版)
+- `v0.1.1680` 2026-10-17 — 匿名アイコンの顔を作り直さず使い回す
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
-- `v0.1.1660` 2026-10-17 — 発言パネルにギフトの1回ごとの記録を表示
 
 ### 🏟 会場・席 (1版)
 - `v0.1.1668` 2026-10-17 — マーケレポートの参加者を実際の人数にした
 
-### 🎁 ギフト (6版)
+### 🎁 ギフト (5版)
 - `v0.1.1672` 2026-10-17 — マーケレポートに「ギフトの瞬間」の章を追加
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 - `v0.1.1664` 2026-10-17 — ギフトの記録に投げた時刻を表示
 - `v0.1.1663` 2026-10-17 — ギフトの記録に投げた時刻を表示
-- `v0.1.1660` 2026-10-17 — 発言パネルにギフトの1回ごとの記録を表示
 
 ### 🪟 応援レーン・タイル (4版)
 - `v0.1.1671` 2026-10-17 — 自己紹介の中のURLをリンクにした
