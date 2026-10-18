@@ -51,6 +51,38 @@ describe('事前用意の配線', () => {
     expect(s).not.toMatch(/openPanelOnActionClick:\s*true/);
   });
 
+  it('★v0.1.1674: 拡張更新・起動・SW再起動・タブ切替でも既存の watch タブを用意する(onUpdated だけに頼らない)', () => {
+    const s = sw();
+    expect(s).toContain('function prearmAllWatchTabs');
+    // 関数の外(トップレベル)で SW が起きるたびに1回呼ぶ
+    expect(s).toMatch(/\nprearmAllWatchTabs\(\);/);
+    expect(s).toContain('chrome.tabs.onActivated.addListener');
+    const i = s.indexOf('function prearmAllWatchTabs');
+    const body = s.slice(i, i + 1000);
+    expect(body).toContain('chrome.tabs');
+    expect(body).toContain('prearmSidePanelForTab(t.id, t.url)');
+  });
+
+  it('★v0.1.1674: 押下時、用意済みと分かる lv では path に触らない(差し替え競合を作らない)', () => {
+    const s = sw();
+    expect(s).toMatch(/lvFromTab && __sidePanelArmedLv\.get\(tid\) !== lvFromTab/);
+    // 用意に成功したときだけ「用意済み」と覚える(失敗を成功扱いにしない)
+    const i = s.indexOf('function prearmSidePanelForTab');
+    const body = s.slice(i, i + 1100);
+    expect(body).toMatch(/\.then\(\(\) => \{\s*__sidePanelArmedLv\.set\(tabId, lv\);/);
+    // タブが閉じたら忘れる
+    expect(s).toMatch(/chrome\.tabs\.onRemoved\.addListener\(\(tabId\) => \{\s*__sidePanelArmedLv\.delete\(tabId\);/);
+  });
+
+  it('★v0.1.1674: 押下ハンドラに await を足していない(ユーザー操作の文脈を切らない)', () => {
+    const s = sw();
+    const i = s.indexOf('__sidePanelArmedLv.get(tid)');
+    const j = s.indexOf('chrome.sidePanel.open({ tabId: tid })', i);
+    expect(i).toBeGreaterThan(-1);
+    expect(j).toBeGreaterThan(i);
+    expect(s.slice(i, j)).not.toContain('await');
+  });
+
   it('★事前用意が失敗しても押下経路は残る(単一障害点にしない)', () => {
     const raw = read('extension/background.js');
     const i = raw.indexOf('function prearmSidePanelForTab');

@@ -77,8 +77,8 @@ describe('サイドパネルへの lv 受け渡し', () => {
     const code = stripComments(read('extension/background.js'));
     const at = code.indexOf('chrome.action.onClicked');
     const body = code.slice(at, at + 2600);
-    // if (lvFromTab) { ... setOptions ... } の形で条件つきになっている
-    const ifAt = body.indexOf('if (lvFromTab)');
+    // if (lvFromTab && 未用意) { ... setOptions ... } の形で条件つきになっている(v0.1.1674: 用意済みなら触らない条件を追加)
+    const ifAt = body.indexOf('if (lvFromTab &&');
     expect(ifAt).toBeGreaterThan(-1);
     expect(ifAt).toBeLessThan(body.indexOf('setOptions'));
   });
