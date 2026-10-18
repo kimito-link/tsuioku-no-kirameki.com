@@ -17,6 +17,8 @@
  *
  * @module prunableStorageKeys
  */
+import { AD_OBS_STORAGE_PREFIX } from './adObservationLog.js';
+
 
 /**
  * 定期 prune が対象にする storage キーの prefix 一覧（正本）。
@@ -28,6 +30,8 @@ export const PRUNABLE_STORAGE_KEY_PREFIXES = Object.freeze([
   'nls_event_dom_',
   'nls_koken_api_contrib_',
   'nls_nicoad_api_ranking_',
+  // v0.1.1665: 広告の「気づいた時刻」(adObservationLog.js)も配信ごとに増えるので TTL/LRU 巡回に載せる。
+  AD_OBS_STORAGE_PREFIX,
   'nls_event_participation_',
   'nls_event_score_ranking_',
   'nls_event_voting_ranking_',

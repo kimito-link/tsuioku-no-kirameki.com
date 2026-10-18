@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 934 件
+## ⚠️ 役割コメントが無いソース 8 / 936 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (354)
+- 📁 **docs/** (355)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (170)
+  - 📁 **handoff/** (171)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -452,6 +452,7 @@
     - `side-panel-spike-HOWTO.md`
     - `sidepanel-black-council-MATERIAL.md`
     - `sidepanel-black-council-MINUTES.md`
+    - `sidepanel-open-100year-DESIGN-2026-10-18.md`
     - `sidepanel-width-DESIGN.md`
     - `sidepanel-width-IMPLEMENTATION-HANDOFF.md`
     - `snippet-manager-clibor-parity-synthesis.md`
@@ -725,7 +726,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (95)
+- 📁 **scripts/** (97)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -800,6 +801,8 @@
   - `live-og-bake.mjs` — 配信ごとの OGP カード画像(配信サムネ＋数字帯)を焼いて投入する I/O 係(v0.1.1519)。
   - `loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
   - `loop-adapter-status-live.test.js`
+  - `loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
+  - `loop-glossary-status-live.test.js`
   - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
@@ -850,7 +853,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2009)
+- 📁 **src/** (2012)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1133,7 +1136,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1770)
+  - 📁 **lib/** (1773)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1164,6 +1167,9 @@
     - `adMessageCensus.wiring.test.js`
     - `adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
     - `adMessageLines.test.js`
+    - `adObservationLog.js` — 広告(ニコニ広告)の「いつ増えたか」を、拡張が【気づいた時刻】として残す(純関数)。v0.1.1665。
+    - `adObservationLog.test.js`
+    - `adObservationWiring.test.js`
     - `aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
     - `aiShareDiagnosticsMarkdown.js` — AI 共有用「診断バンドル」Markdown の整形（純粋関数）。
     - `aiShareDiagnosticsMarkdown.test.js`
