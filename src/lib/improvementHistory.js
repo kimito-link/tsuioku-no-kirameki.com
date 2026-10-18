@@ -2578,5 +2578,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1657', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(1630〜1656 の note と同じ理由)。今回は実測で確かめている: パネル幅150pxで本文が23行(1文字ずつ)になることを再現し、修正後に3行へ戻ることを同じ環境で測った。'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版(0.1.1657)と同じ 1439KB で、今回の変更による増加はゼロ。追加は純関数1本(noSpeechNote.js・約50行)と文言の差し替えだけ。過去最良との差は 1618 以降の /live/ 取り込みなど別要因。'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(1630〜1657 の note と同じ理由)。今回は配線を変異させて赤になること(2件)を確認し、ギフト表記の実際の組み立て(全角括弧・pt)をソースで裏取りしてから正規表現を決めた。'
   })
 ]);

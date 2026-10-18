@@ -6892,6 +6892,16 @@
       ]
     },
     {
+      "file": "src/lib/noSpeechNote.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
       "file": "src/lib/numberConsistency.js",
       "featureCount": 1,
       "features": [

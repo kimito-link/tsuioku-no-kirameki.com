@@ -676,11 +676,12 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 82</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 83</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
+- `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
 - `scripts/perf-ab/profile-status.mjs` — 診断ページ(status.html)自身のメインスレッド CPU プロファイル。「診断ページが重くて出てこない」の原因探し用。
 - `scripts/perf-ab/status-publish-repro.mjs` — 状態画面(status.html)が「自動公開(WEBへ2分ごとに送信)」を実際に試みるかを、一時プロファイルで再現する。
 - `scripts/run-verify-cc.mjs` — Claude Code 向け verify ランナー。
@@ -897,7 +898,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 226</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 227</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1030,6 +1031,7 @@
 - `src/lib/noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
 - `src/lib/northStarMirror.js` — 北極星レーン鏡(公式値レーン)のスナップショット純関数。
+- `src/lib/noSpeechNote.js` — 「発言がありません」のときに、代わりに何を伝えるかを決める唯一の正本。
 - `src/lib/objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
 - `src/lib/observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
 - `src/lib/officialEventDomBundle.js` — watch ページの DOM から「配信者の番組周辺の正本値」を 1 関数で総取りするオーケストレータ。
@@ -1137,13 +1139,10 @@
 - `v0.1.1640` 2026-10-17 — 会場タイルの+N件が一瞬出て消えるのを修正
 - `v0.1.1639` 2026-10-17 — お祝いは100・200・500のあと1000件ごと
 
-### 📥 コメント取得 (1版)
-- `v0.1.1638` 2026-10-17 — 応援コメント100件でゆっくり3人がお祝い
-
 ### 🙂 匿名(184) (1版)
 - `v0.1.1651` 2026-10-17 — 会場のたぬ姉の列で後列を小さく表示するよう修正
 
-### 🏟 会場・席 (16版)
+### 🏟 会場・席 (15版)
 - `v0.1.1655` 2026-10-17 — ギフトのptが11位以下の人にも付くよう修正
 - `v0.1.1654` 2026-10-17 — コメントを打つあいだ会場をしまえるボタン追加
 - `v0.1.1653` 2026-10-17 — 一覧パネルが会場のボタンを覆わないよう修正
@@ -1159,9 +1158,9 @@
 - `v0.1.1642` 2026-10-17 — 会場アイコンのクリックは発言パネルだけ開く
 - `v0.1.1641` 2026-10-17 — 発言のたびに会場の発言記録が消えるのを修正
 - `v0.1.1640` 2026-10-17 — 会場タイルの+N件が一瞬出て消えるのを修正
-- `v0.1.1638` 2026-10-17 — 応援コメント100件でゆっくり3人がお祝い
 
-### 🎁 ギフト (4版)
+### 🎁 ギフト (5版)
+- `v0.1.1658` 2026-10-18 — ギフトだけの人の表示を分かりやすく
 - `v0.1.1655` 2026-10-17 — ギフトのptが11位以下の人にも付くよう修正
 - `v0.1.1652` 2026-10-17 — 会場の広告列をポップアップと同じ飾りなしに
 - `v0.1.1643` 2026-10-17 — 広告・ギフト列のアイコンも発言パネルが開く
