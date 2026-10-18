@@ -72,6 +72,62 @@ function eventRankingFixture(overrides = {}) {
   };
 }
 
+describe('広告の「気づいた時刻」の章(v0.1.1673)', () => {
+  const T0 = Date.now() - 3 * 3_600_000;
+  const MIN = 60_000;
+  const cm = [];
+  for (let m = 0; m < 30; m++) cm.push({ id: `ad-${m}`, liveId: 'lv9', commentNo: `${m}`, text: `t${m}`, userId: `u${m % 3}`, nickname: '', avatarUrl: '', selfPosted: false, capturedAt: T0 + m * MIN });
+  const adRows = [
+    { rank: 1, name: '広告主A', contribution: 800, isAnonymous: false, userPageUrl: 'https://www.nicovideo.jp/user/111', thumbnailUrl: 'https://example.com/ad.png' },
+    { rank: 2, name: '広告主B', contribution: 100, isAnonymous: false, userPageUrl: 'https://www.nicovideo.jp/user/222' }
+  ];
+  const obs = {
+    '111': { firstAt: T0 + 5 * MIN, firstTotal: 500, lastAt: T0 + 20 * MIN + 12_000, lastDelta: 300, lastTotal: 800, n: 2 },
+    '222': { firstAt: T0 + 6 * MIN, firstTotal: 100, lastAt: 0, lastDelta: 0, lastTotal: 100, n: 0 }
+  };
+  const opts = (extra = {}) => ({ commentsForAnalytics: cm, officialEventDomBundle: { adContributionRanking: adRows }, adObservations: obs, ...extra });
+  it('★記録があると章が出る。公式の時刻ではなく「気づいた時刻」であること・誤差を必ず注記する', () => {
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(cm, 'lv9'), opts());
+    const i = html.indexOf('id="mkt-ad-observed"');
+    expect(i).toBeGreaterThan(0);
+    const sec = html.slice(i, html.indexOf('</section>', i));
+    expect(sec).toContain('広告主A');
+    expect(sec).toContain('広告主B');
+    expect(sec).toContain('+300');
+    expect(sec).toContain('増えたのは未検知'); // 増加を検知していない人は「未検知」と言う(0を捏造しない)
+    expect(sec).toContain('拡張が気づいた時刻');
+    expect(sec).toContain('約30秒');
+    expect(html).toContain('href="#mkt-ad-observed"');
+  });
+  it('★位置はギフトの瞬間の後・分析スキルボードの前(履歴が無くても広告の章は出る)', () => {
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(cm, 'lv9'), opts());
+    const i = html.indexOf('id="mkt-ad-observed"');
+    expect(i).toBeLessThan(html.indexOf('id="mkt-analysis-skills"'));
+    expect(i).toBeGreaterThan(html.indexOf('id="mkt-participation-lead"'));
+  });
+  it('★記録が無い・空なら章も目次も出さない', () => {
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(cm, 'lv9'), opts({ adObservations: {} }));
+    expect(html).not.toContain('id="mkt-ad-observed"');
+    expect(html).not.toContain('href="#mkt-ad-observed"');
+    const html2 = buildMarketingDashboardHtml(aggregateMarketingReport(cm, 'lv9'), { commentsForAnalytics: cm });
+    expect(html2).not.toContain('id="mkt-ad-observed"');
+  });
+  it('★共有用に伏せるとき、広告主の実名・サムネURLを出さない', () => {
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(cm, 'lv9'), opts({ maskShareLabels: true }));
+    const i = html.indexOf('id="mkt-ad-observed"');
+    expect(i).toBeGreaterThan(0);
+    const sec = html.slice(i, html.indexOf('</section>', i));
+    expect(sec).not.toContain('広告主A');
+    expect(sec).not.toContain('example.com/ad.png');
+  });
+  it('★名前の分からない uid は ID で出す(名前では引かない)', () => {
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(cm, 'lv9'), opts({ officialEventDomBundle: { adContributionRanking: [] } }));
+    const i = html.indexOf('id="mkt-ad-observed"');
+    expect(i).toBeGreaterThan(0);
+    expect(html.slice(i, html.indexOf('</section>', i))).toContain('ID 111');
+  });
+});
+
 describe('ギフトの瞬間の章(v0.1.1672)', () => {
   const T0 = Date.now() - 3 * 3_600_000;
   const MIN = 60_000;

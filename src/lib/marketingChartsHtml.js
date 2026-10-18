@@ -70,6 +70,7 @@ import {
 } from './supportGrowthInsights.js';
 import { analyzeGiftMomentum } from './giftMomentumAnalytics.js';
 import { analyzeGiftMoments, buildGiftMomentNextActions } from './giftMomentAnalytics.js';
+import { adRowUid } from './adObservationLog.js';
 import {
   buildMarketingGiftThrowLedger,
   MARKETING_GIFT_LEDGER_DISPLAY_RULE_NOTE
@@ -1880,6 +1881,55 @@ function wrapThumbWithProfileLink(userId, innerHtml, maskShare = false) {
     `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}"` +
     ` target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`
   );
+}
+
+/**
+ * v0.1.1673: 広告の「気づいた時刻」章。公式の広告 API は人ごとの合計ptだけで、1回ごとの時刻が無い。
+ *   拡張が約25〜30秒ごとに合計を見て、増えたのに気づいた時刻(誤差あり・開く前の分は不明)を人別に出す。
+ *   結びつけは数値uid(記録=adObservationLog.js)。名前は広告ランキングの行から uid で引き、無ければ「ID n」。
+ * @param {Record<string, any>|null|undefined} obs uid→{firstAt,firstTotal,lastAt,lastDelta,lastTotal,n}
+ * @param {readonly any[]} adRows 広告ランキング行(name/userPageUrl/thumbnailUrl/contribution)
+ * @param {boolean} maskShare
+ * @param {any} [identiconResolver]
+ */
+function sectionAdObserved(obs, adRows, maskShare, identiconResolver = undefined) {
+  if (!obs || typeof obs !== 'object') return '';
+  const entries = Object.entries(obs).filter(([uid, e]) => /^\d+$/.test(uid) && e && Number(e.firstAt) > 0);
+  if (!entries.length) return '';
+  /** @type {Map<string, any>} */
+  const rowByUid = new Map();
+  for (const row of adRows || []) {
+    const u = adRowUid(row);
+    if (u && !rowByUid.has(u)) rowByUid.set(u, row);
+  }
+  // 最後に増えた時刻が新しい順→初検知の早い順。表示は最大15人(ほかは件数で)。
+  entries.sort((a, b) => Number(b[1].lastAt || 0) - Number(a[1].lastAt || 0) || Number(a[1].firstAt) - Number(b[1].firstAt));
+  const SHOW = 15;
+  const items = entries
+    .slice(0, SHOW)
+    .map(([uid, e]) => {
+      const row = rowByUid.get(uid);
+      const rawLabel = row && String(row.name || '').trim() ? String(row.name).trim() : `ID ${uid}`;
+      const nameHtml = maskShare ? escapeHtml(maskLabelForShare(rawLabel)) : buildUserProfileLinkedLabelHtml(uid, rawLabel);
+      const thumbSrc = maskShare
+        ? ''
+        : resolveReportUserThumbSrc({ userId: uid, avatarUrl: row && row.thumbnailUrl ? String(row.thumbnailUrl) : '', identiconResolver });
+      const thumbImg = thumbSrc
+        ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+        : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink(uid, thumbImg, maskShare);
+      const last =
+        Number(e.lastAt) > 0
+          ? `最後に増えたのを検知 ${escapeHtml(giftMomentClock(Number(e.lastAt)))}・+${escapeHtml(formatEventRankingNumber(Number(e.lastDelta) || 0))}pt(増加を検知した回数 ${escapeHtml(String(Number(e.n) || 0))}回)`
+          : '増えたのは未検知';
+      return `<li class="mkt-ad-obs-item">${thumbCell}<span class="mkt-gm-sender">${nameHtml}</span><span class="mkt-ad-obs-text">初めて検知 ${escapeHtml(giftMomentClock(Number(e.firstAt)))}・そのとき ${escapeHtml(formatEventRankingNumber(Number(e.firstTotal) || 0))}pt ／ ${last}・いま ${escapeHtml(formatEventRankingNumber(Number(e.lastTotal) || 0))}pt</span></li>`;
+    })
+    .join('');
+  const more = entries.length > SHOW ? `<p class="mkt-note">ほか ${entries.length - SHOW}社は載せていません。</p>` : '';
+  return `<section class="mkt-section mkt-ad-observed"><h2>広告の気づいた時刻</h2>
+<p class="mkt-note">公式の広告データは、人ごとの合計ptだけで、いつ入れたかの時刻はありません。この章の時刻は、拡張が約25〜30秒ごとに合計を見て、増えたのに気づいた時刻です(公式の時刻ではありません)。</p>
+<ul class="mkt-ad-obs-list">${items}</ul>${more}
+<p class="mkt-note">拡張が気づいた時刻です(最大約30秒の誤差があり、拡張を開く前に入った分は分かりません)。</p></section>`;
 }
 
 /** @param {number} ms */
@@ -4326,6 +4376,7 @@ function buildSectionRevealScriptHtml() {
  *   giftEvents?: import('./giftEventStore.js').StoredGiftEvent[],
  *   giftHistoryThrows?: Array<{ userId?: string, nickname?: string, throwCount?: number, totalPoints?: number, capturedAt?: number }>,
  *   giftSubAppHistory?: { history?: readonly unknown[], totalCounts?: readonly unknown[] } | null,
+ *   adObservations?: Record<string, { firstAt?: number, firstTotal?: number, lastAt?: number, lastDelta?: number, lastTotal?: number, n?: number }> | null,
  *   officialEventDomBundle?: import('./officialEventDomBundle.js').OfficialEventDomBundle | null,
  *   broadcastTitle?: string,
  *   broadcasterName?: string,
@@ -4618,6 +4669,12 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     sampled: opts.slimForHeavyExport === true
   });
   const giftMomentNextLines = giftMomentsAnalysis.axisOk ? buildGiftMomentNextActions(giftMomentsAnalysis.summary) : [];
+  const adObservedHtml = sectionAdObserved(
+    opts.adObservations,
+    adContributionRankingForAnalytics,
+    maskShare,
+    identiconResolver
+  );
   const supporterChikuran = buildSupporterChikuranRows({
     liveId: r.liveId,
     comments: currentCommentsForLayer,
@@ -4729,6 +4786,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const allTocItems = [
     { id: 'mkt-participation-lead', label: '来場とコメント参加' },
     { id: 'mkt-gift-moments', label: 'ギフトの瞬間' },
+    { id: 'mkt-ad-observed', label: '広告の気づいた時刻' },
     { id: 'mkt-analysis-skills', label: '分析スキルボード' },
     { id: 'mkt-harness-scaling', label: '分析ハーネス設計' },
     { id: 'mkt-next-actions', label: 'りんく達の作戦会議' },
@@ -4812,6 +4870,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
 __NL_TOC_PLACEHOLDER__
 ${sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
 ${idWrap('mkt-gift-moments', sectionGiftMoments(giftMomentsAnalysis, giftMomentNextLines, maskShare, identiconResolver))}
+${idWrap('mkt-ad-observed', adObservedHtml)}
 ${sectionAdviceIntro()}
 ${sectionAnalysisSkillBoard(analysisSkillBoard)}
 ${sectionHarnessScalingBoard(harnessScalingBoard)}
@@ -6864,6 +6923,9 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-gm-badge{display:inline-block;margin-left:.3rem;border:1px solid #475569;border-radius:999px;padding:.02rem .45rem;font-size:.7rem;color:#dbeafe}
 .mkt-gm-badge--warn{border-color:rgba(251,191,36,.55);color:#fde68a}
 .mkt-gm-notes{font-size:.8rem;color:#aab6c8;margin:.4rem 0;padding-left:1.1rem}
+.mkt-ad-obs-list{list-style:none;margin:.4rem 0;padding:0}
+.mkt-ad-obs-item{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.3rem 0;border-bottom:1px solid #1e293b;font-size:.85rem}
+.mkt-ad-obs-text{color:#cbd5e1;font-variant-numeric:tabular-nums}
 .mkt-gm-next{margin-top:.6rem;border-left:3px solid #38bdf8;padding:.3rem .7rem;background:rgba(15,23,42,.55)}
 .mkt-gm-next h3{margin:.1rem 0 .3rem;font-size:.95rem}
 .mkt-gm-next ul{margin:0;padding-left:1.1rem;font-size:.88rem}
