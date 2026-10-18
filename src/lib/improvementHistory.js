@@ -2718,5 +2718,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1667', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1666 の note と同じ理由)。今回は実配信で、公式の広告主25社が保存25行・広告段25人になることを確認した。広告の取得は1回あたり約5KB。'
+  }),
+  Object.freeze({
+    version: '0.1.1668', metric: 'bundle-kb', value: 1440,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更はマーケレポートの人数の数え方と表示(marketingAggregate.js に2項目追加・marketingChartsHtml.js の表示を1つの関数に集約)。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1668', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1668', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1667 の note と同じ理由)。今回は単体テストで、ID空3件を含む5コメントが「5件/1人(ID不明3件)」になることを固定した。従来の uniqueUsers は後方互換のため残した。'
   })
 ]);
