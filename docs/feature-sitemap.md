@@ -118,7 +118,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 53</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
@@ -147,6 +147,7 @@
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
 - `src/lib/liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
 - `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
+- `src/lib/mergeTailRowsIntoDisplay.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/northStarDetailCells.js` — 公式値レーン(ギフト/広告/イベント)の【実績】をセルにする(純関数)。
 - `src/lib/northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
 - `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
@@ -1140,7 +1141,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (3版)
+### 💾 記録件数 (4版)
+- `v0.1.1678` 2026-10-17 — 記録件数が一瞬二重になる不具合を直す
 - `v0.1.1672` 2026-10-17 — マーケレポートに「ギフトの瞬間」の章を追加
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1666` 2026-10-17 — 広告ランキングの帯を10行に固定し数字は全行から
@@ -1160,9 +1162,8 @@
 - `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 - `v0.1.1660` 2026-10-17 — 発言パネルにギフトの1回ごとの記録を表示
 
-### 🏟 会場・席 (2版)
+### 🏟 会場・席 (1版)
 - `v0.1.1668` 2026-10-17 — マーケレポートの参加者を実際の人数にした
-- `v0.1.1658` 2026-10-17 — Escで会場が意図せず閉じる不具合を修正
 
 ### 🎁 ギフト (7版)
 - `v0.1.1672` 2026-10-17 — マーケレポートに「ギフトの瞬間」の章を追加

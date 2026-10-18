@@ -71,6 +71,7 @@ import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { exportWaitLinesForKind } from '../lib/exportWaitNarration.js';
+import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 
 /**
  * @typedef {{
@@ -182,7 +183,7 @@ async function readAllCommentsForLive(lv) {
       perAttemptTimeoutMs: 900
     });
     const tail = /** @type {Record<string, unknown>} */ (tailBag)[tKey];
-    if (Array.isArray(tail) && tail.length) rows = rows.concat(tail);
+    if (Array.isArray(tail) && tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
   } catch {
     /* テールは任意 */
   }

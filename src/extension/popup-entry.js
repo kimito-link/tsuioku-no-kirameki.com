@@ -497,6 +497,7 @@ import {
 import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
 import { normalizeStoredCommentEntries } from '../lib/storedCommentEntriesNormalize.js';
+import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 import {
   formatAiShareDiagnosticsMarkdown,
   romiDebugDataChecklist
@@ -6977,7 +6978,7 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
     ? normalizeTailRowsForDisplay(summaryRaw.recent, live)
     : [];
   const tail = normalizeTailRowsForDisplay(tailRaw, live);
-  const merged = recent.concat(tail);
+  const merged = mergeTailRowsIntoDisplay(recent, tail, { liveId: live }); // v0.1.1678: recent と tail の重なりを畳む
   if (!merged.length) return; // 現配信の軽い源がまだ無い=出すものが無い(heavy/onChanged の次回に委ねる)
   const entries = buildDisplayCommentEntries(merged, live);
   if (!entries.length) return;
@@ -8312,7 +8313,7 @@ async function readAllCommentsForLive(lv) {
       /** @type {Record<string, unknown>} */ (tailBag)[tKey],
       lv
     );
-    if (tail.length) rows = rows.concat(tail);
+    if (tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
   } catch {
     /* テールは任意（取れなければ本体のみ） */
   }
@@ -15737,7 +15738,8 @@ async function refresh() {
   // v0.1.505: メイン書き戻し後にテール（未畳み込み新着）を表示用に concat。書き戻しは
   //   メインのみなので、テールがメインへ二重永続することはない。
   if (tailDisplayRows.length) {
-    arr = /** @type {unknown[]} */ (arr).concat(tailDisplayRows);
+    // v0.1.1678: summary 由来の arr と tail は同じ直近コメントを指す=重複を畳む(25+25=50 の二重を防ぐ)。
+    arr = mergeTailRowsIntoDisplay(arr, tailDisplayRows, { liveId: lv });
   }
   // v0.1.117x(story-diag-realtime-sync設計 §E-箇所2): 件数の正本はnls_panel_summary_<lv>
   //   (content-entry.jsのpopup非依存publish)。不在時のみarr.lengthへfallback(§12.8: maxで
@@ -16152,7 +16154,7 @@ async function refresh() {
     arr = await applyStoredCommentEntries(arr, true);
     // v0.1.505: heavy 再描画でもテール（未畳み込み新着）を表示用に concat（書き戻しはメインのみ）。
     if (tailDisplayRows.length) {
-      arr = /** @type {unknown[]} */ (arr).concat(tailDisplayRows);
+      arr = mergeTailRowsIntoDisplay(arr, tailDisplayRows, { liveId: lv });
     }
     watchPopupHeavyCommentsSettled = true;
     recordStoryUserLaneHeavySettle(_storyUserLaneRenderProbe, STORY_USER_LANE_HEAVY_SETTLE.SETTLED);
