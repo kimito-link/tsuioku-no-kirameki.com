@@ -69,7 +69,10 @@ function asPosIntOrNull(v) {
  *   level?: number,
  *   isPremium?: boolean,
  *   followeeCount?: number,
- *   followerCount?: number
+ *   followerCount?: number,
+ *   description?: string,
+ *   sns?: { label: string, screenName: string, url: string }[],
+ *   levelExp?: { current: number, threshold: number }
  * }|null}
  */
 export function normalizeNicoUserProfileResponse(json) {
@@ -94,7 +97,9 @@ export function normalizeNicoUserProfileResponse(json) {
 
   /**
    * @type {{ userId: string, nickname: string, avatarUrl: string,
-   *   level?: number, isPremium?: boolean, followeeCount?: number, followerCount?: number }}
+   *   level?: number, isPremium?: boolean, followeeCount?: number, followerCount?: number,
+   *   description?: string, sns?: { label: string, screenName: string, url: string }[],
+   *   levelExp?: { current: number, threshold: number } }}
    */
   const out = { userId, nickname, avatarUrl };
 
@@ -115,6 +120,41 @@ export function normalizeNicoUserProfileResponse(json) {
   const followerCount =
     asPosIntOrNull(data.followerCount) ?? asPosIntOrNull(user.followerCount);
   if (followerCount != null) out.followerCount = followerCount;
+
+  // v0.1.1670: ユーザーページに出ている項目をそろえる(自己紹介・SNS・経験値)。取れたものだけ付ける。
+  //   公式の strippedDescription(タグ除去済み)を使い、無ければ description からタグを落とす。上限つき。
+  const rawDesc =
+    typeof user.strippedDescription === 'string'
+      ? user.strippedDescription
+      : typeof user.description === 'string'
+        ? user.description.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
+        : '';
+  const description = rawDesc.replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 2000);
+  if (description) out.description = description;
+
+  if (Array.isArray(user.sns)) {
+    const sns = [];
+    for (const raw of user.sns.slice(0, 8)) {
+      const o = raw && typeof raw === 'object' ? raw : {};
+      const url = sanitizeHttpUrl(o.url);
+      if (!url) continue; // javascript: などは捨てる
+      sns.push({
+        label: String(o.label == null ? '' : o.label).trim().slice(0, 40) || String(o.type || '').slice(0, 40),
+        screenName: String(o.screenName == null ? '' : o.screenName).trim().slice(0, 80),
+        url
+      });
+    }
+    if (sns.length) out.sns = sns;
+  }
+
+  const ul = user.userLevel && typeof user.userLevel === 'object' ? user.userLevel : null;
+  if (ul) {
+    const current = Number(ul.currentLevelExperience);
+    const threshold = Number(ul.nextLevelThresholdExperience);
+    if (Number.isFinite(current) && current >= 0 && Number.isFinite(threshold) && threshold > 0) {
+      out.levelExp = { current: Math.trunc(current), threshold: Math.trunc(threshold) };
+    }
+  }
 
   return out;
 }
