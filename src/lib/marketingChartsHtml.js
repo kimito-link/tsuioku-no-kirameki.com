@@ -2269,6 +2269,20 @@ function formatShortClock(ms) {
 }
 
 /**
+ * v0.1.1668: 「参加者」として出す人数。userId のある人だけ(全件から数えた r.identifiedUsers)。
+ *   従来の r.uniqueUsers は userId 空のコメントを 1 コメント=1 人と数えるので過大になる。ID 空は人に混ぜず【件数】で別に出す(§12.8)。
+ *   古い形の report(identifiedUsers が無い)では従来の uniqueUsers にフォールバックする。
+ * @param {MarketingReport} r
+ * @returns {{ people: number, unattributed: number }}
+ */
+function resolveParticipantPeople(r) {
+  const rr = /** @type {Record<string, any>} */ (r || {});
+  const people = typeof rr.identifiedUsers === 'number' ? rr.identifiedUsers : Number(rr.uniqueUsers) || 0;
+  const unattributed = Number(rr.unattributedComments) > 0 ? Math.floor(Number(rr.unattributedComments)) : 0;
+  return { people, unattributed };
+}
+
+/**
  * @param {MarketingReport} r
  * @param {import('./audienceEngagementGap.js').AudienceEngagementGap} gap
  */
@@ -2280,8 +2294,11 @@ function resolveCommentParticipation(r, gap) {
   //   - r.uniqueUsers は userId 空を `anon:commentNo` で別人カウントするため過大になりうる。
   //   匿名除外を解消した gap.uniqueCommenters を単一の正本にして、サマリと文章を一致させる。
   //   gap が無い場合のみ r.uniqueUsers にフォールバック。
+  // v0.1.1668: 重量時の gap は均等サンプル(2,500件)由来で過小になりうる。全件から数えた identifiedUsers(同じ userId ベース)と大きい方を取る。
   const uniqueCommenters =
-    typeof gap?.uniqueCommenters === 'number' ? gap.uniqueCommenters : r?.uniqueUsers ?? 0;
+    typeof gap?.uniqueCommenters === 'number'
+      ? Math.max(gap.uniqueCommenters, resolveParticipantPeople(r).people)
+      : resolveParticipantPeople(r).people;
   const totalVisitors = gap?.totalVisitors ?? 0;
   const commentParticipationPct =
     totalVisitors > 0 ? computeCommentParticipationPct(uniqueCommenters, totalVisitors) : 0;
@@ -2460,7 +2477,7 @@ function sectionAudienceEngagementGap(gap, report) {
           ? `${formatEventRankingNumber(participation.uniqueCommenters)}人 / ${formatEventRankingNumber(participation.totalVisitors)}来場（${participation.commentParticipationPct}%）`
           : participation && participation.uniqueCommenters > 0
             ? `${formatEventRankingNumber(participation.uniqueCommenters)}人`
-            : `${formatEventRankingNumber(Math.max(gap.uniqueCommenters, report?.uniqueUsers ?? 0))}人`,
+            : `${formatEventRankingNumber(Math.max(gap.uniqueCommenters, resolveParticipantPeople(/** @type {any} */ (report)).people))}人`,
       hint: '来場者のうち発言した人数と比率（必須指標）'
     },
     {
@@ -2671,7 +2688,7 @@ function buildMarketingDataSummary(input) {
     {
       source: 'コメント本文',
       status: r.totalComments > 0 ? 'あり' : 'なし',
-      value: `${formatEventRankingNumber(r.totalComments)}件 / ${formatEventRankingNumber(r.uniqueUsers)}人`,
+      value: `${formatEventRankingNumber(r.totalComments)}件 / ${formatEventRankingNumber(resolveParticipantPeople(r).people)}人`,
       detail: `CPM ${r.commentsPerMinute}、ピーク ${r.peakMinute}分 ${r.peakMinuteCount}件`
     },
     {
@@ -2733,7 +2750,7 @@ function buildMarketingDataSummary(input) {
     }
   ];
 
-  const participationUnique = Math.max(input.audienceGap.uniqueCommenters, r.uniqueUsers);
+  const participationUnique = Math.max(input.audienceGap.uniqueCommenters, resolveParticipantPeople(r).people);
   const participationVisitors = input.audienceGap.totalVisitors || officialVisitors;
   const participationPct =
     participationVisitors > 0
@@ -2752,7 +2769,7 @@ function buildMarketingDataSummary(input) {
     },
     {
       area: '反応',
-      main: `${formatEventRankingNumber(r.totalComments)}件 / ${formatEventRankingNumber(r.uniqueUsers)}人`,
+      main: `${formatEventRankingNumber(r.totalComments)}件 / ${formatEventRankingNumber(resolveParticipantPeople(r).people)}人`,
       sub: `CPM ${r.commentsPerMinute}、最長間隔 ${formatSilenceMs(r.maxSilenceGapMs)}`,
       reading: `ピークは ${r.peakMinute}分目 ${r.peakMinuteCount}件`
     },
@@ -2973,7 +2990,7 @@ function buildMarketingFunnelBoard(input) {
     r.totalComments,
     positiveMarketingNumber(programStats.commentCount)
   );
-  const uniqueCommenters = Math.max(input.audienceGap.uniqueCommenters, r.uniqueUsers);
+  const uniqueCommenters = Math.max(input.audienceGap.uniqueCommenters, resolveParticipantPeople(r).people);
   const supporterCount = input.supporterChikuran.totals.supporterCount;
   const giftSenderCount = input.giftMomentum.totals.senderCount;
   const adRowCount = input.adContributionRanking.length;
@@ -3446,7 +3463,7 @@ function buildAnalysisSkillBoard(input) {
     {
       name: 'コメントKPI',
       status: marketingSkillStatus(r.totalComments > 0),
-      input: `${formatEventRankingNumber(r.totalComments)}件 / ${formatEventRankingNumber(r.uniqueUsers)}人`,
+      input: `${formatEventRankingNumber(r.totalComments)}件 / ${formatEventRankingNumber(resolveParticipantPeople(r).people)}人`,
       output: 'KPI、速度、セグメント、本文傾向',
       next: '配信全体の温度を最初に読む'
     },
@@ -5178,7 +5195,8 @@ function sectionHeroCard(r, summaryLine, maskShare, gap) {
     participation && participation.totalVisitors > 0
       ? `来場${participation.totalVisitors.toLocaleString()}人中${participation.uniqueCommenters.toLocaleString()}人がコメント（${participation.commentParticipationPct}%）`
       : '';
-  const baseLine = `${r.totalComments.toLocaleString()}件 / ${r.uniqueUsers.toLocaleString()}人 / ${r.durationMinutes}分`;
+  const participantPeople = resolveParticipantPeople(r);
+  const baseLine = `${r.totalComments.toLocaleString()}件 / ${participantPeople.people.toLocaleString()}人 / ${r.durationMinutes}分`;
   const copyText = maskShare
     ? participationLine ? `${participationLine} · ${baseLine}` : baseLine
     : (summaryLine || (participationLine ? `${participationLine} · ${baseLine}` : baseLine));
@@ -5203,10 +5221,11 @@ function sectionHeroCard(r, summaryLine, maskShare, gap) {
 <div class="mkt-hero-stats">
 ${participationStat}<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(r.totalComments.toLocaleString())}</span><span class="mkt-hero-stat__label">コメント</span></span>
 <span class="mkt-hero-stat__sep">·</span>
-<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(r.uniqueUsers.toLocaleString())}</span><span class="mkt-hero-stat__label">参加者</span></span>
+<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(participantPeople.people.toLocaleString())}</span><span class="mkt-hero-stat__label">参加者</span></span>
 <span class="mkt-hero-stat__sep">·</span>
 <span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(String(r.durationMinutes))}</span><span class="mkt-hero-stat__label">分</span></span>
 </div>
+${participantPeople.unattributed > 0 ? `<div class="mkt-hero-note">※ID不明のコメント ${escapeHtml(participantPeople.unattributed.toLocaleString())}件は、誰の発言か分からないため参加者の人数に含めていません</div>` : ''}
 <button id="${copyId}" class="mkt-hero-copy">📋 一言まとめをコピー</button>
 ${copyScript}
 </section>`;
@@ -5232,7 +5251,7 @@ function sectionKpi(r, gap) {
   }
   cards.push(
     { label: '総コメント数', value: r.totalComments.toLocaleString(), icon: '💬' },
-    { label: 'ユニークユーザー', value: r.uniqueUsers.toLocaleString(), icon: '👥' },
+    { label: 'ユニークユーザー', value: resolveParticipantPeople(r).people.toLocaleString(), icon: '👥' },
     { label: 'コメント/分', value: String(r.commentsPerMinute), icon: '⚡' },
     { label: '平均コメント/人', value: String(r.avgCommentsPerUser), icon: '📈' },
     { label: '中央値/人', value: String(r.medianCommentsPerUser), icon: '📊' },
@@ -6366,6 +6385,7 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-hero-stat__val{font-size:clamp(1.4rem,5vw,2rem);font-weight:700;color:#38bdf8;line-height:1}
 .mkt-hero-stat__label{font-size:.72rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em}
 .mkt-hero-stat__sep{color:#475569;font-size:1.5rem;line-height:1;margin:0 .25rem}
+.mkt-hero-note{font-size:.75rem;opacity:.8;margin:.4rem 0 .2rem}
 .mkt-hero-copy{background:#0284c7;color:#fff;border:none;border-radius:8px;padding:.5rem 1.1rem;font-size:.85rem;cursor:pointer;transition:background .15s}
 .mkt-hero-copy:hover{background:#0369a1}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}

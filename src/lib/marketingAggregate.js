@@ -81,6 +81,8 @@ import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
  *   liveId: string,
  *   totalComments: number,
  *   uniqueUsers: number,
+ *   identifiedUsers: number,
+ *   unattributedComments: number,
  *   avgCommentsPerUser: number,
  *   medianCommentsPerUser: number,
  *   peakMinute: number,
@@ -321,10 +323,22 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   const vposThirds = computeVposThirds(engagementComments);
   const quarterEngagement = computeQuarterEngagement(engagementComments, minT, maxT);
 
+  // v0.1.1668: 「人」として数えるのは userId のあるユーザーだけ。userId 空のコメントは、uniqueUsers では 1 コメント=1 人と
+  //   数えられて参加者が過大になる(従来の値は後方互換のため残す)。ID 空は【件数】として別に出し、人には混ぜない(§12.8)。
+  const identifiedSet = new Set();
+  let unattributedComments = 0;
+  for (const c of engagementComments) {
+    const u = String(c.userId || '').trim();
+    if (u) identifiedSet.add(u);
+    else unattributedComments += 1;
+  }
+
   return {
     liveId,
     totalComments: engagementComments.length,
     uniqueUsers: users.length,
+    identifiedUsers: identifiedSet.size,
+    unattributedComments,
     avgCommentsPerUser:
       users.length > 0
         ? Math.round((engagementComments.length / users.length) * 10) / 10

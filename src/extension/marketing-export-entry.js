@@ -619,7 +619,8 @@ async function runExport(lid) {
 
     playReportCompleteVoiceSequence();
     showDoneStage(
-      `${mktFilename}\n${report.totalComments}件 / ${report.uniqueUsers}人\nこのタブは閉じて大丈夫です。`
+      // v0.1.1668: 人数は userId のある人だけ(ID 空のコメントを別人として数えない)。
+      `${mktFilename}\n${report.totalComments}件 / ${typeof report.identifiedUsers === 'number' ? report.identifiedUsers : report.uniqueUsers}人\nこのタブは閉じて大丈夫です。`
     );
   } catch (e) {
     const msg = String(
