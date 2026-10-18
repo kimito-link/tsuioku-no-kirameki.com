@@ -72,6 +72,63 @@ function eventRankingFixture(overrides = {}) {
   };
 }
 
+describe('ギフトの瞬間の章(v0.1.1672)', () => {
+  const T0 = Date.now() - 3 * 3_600_000;
+  const MIN = 60_000;
+  const cmt = (m, k) => ({
+    id: `gm-${m}-${k}`, liveId: 'lv9', commentNo: `${m * 10 + k}`, text: `こんにちは${m}`, userId: `u${k}`, nickname: '', avatarUrl: '', selfPosted: false,
+    capturedAt: T0 + m * MIN + k * 1000
+  });
+  const comments = [];
+  for (let m = 0; m < 40; m++) for (let k = 0; k < 3; k++) comments.push(cmt(m, k));
+  const hist = (extra = {}) => ({
+    history: [
+      { kokenHistoryId: 'h1', userId: '111', senderName: '花子さん', itemName: 'シャンパーン', points: 900, contribution: 9000, publishedAt: Math.floor((T0 + 20 * MIN) / 1000), senderAvatarUrl: 'https://example.com/a.png' }
+    ],
+    totalCounts: [],
+    ...extra
+  });
+  it('★履歴を渡すと章が出る。位置は来場とコメント参加の後・分析スキルボードの前。相関の注記を含む', () => {
+    const report = aggregateMarketingReport(comments, 'lv9');
+    const html = buildMarketingDashboardHtml(report, { giftSubAppHistory: hist(), commentsForAnalytics: comments });
+    const i = html.indexOf('id="mkt-gift-moments"');
+    expect(i).toBeGreaterThan(0);
+    expect(i).toBeGreaterThan(html.indexOf('id="mkt-participation-lead"'));
+    expect(i).toBeLessThan(html.indexOf('id="mkt-analysis-skills"'));
+    expect(html).toContain('ギフトの瞬間');
+    expect(html).toContain('花子さん');
+    expect(html).toContain('ギフトが原因とは限りません');
+    expect(html).toContain('href="#mkt-gift-moments"'); // 目次にも出る
+  });
+  it('★履歴が無いと章も目次も出ない', () => {
+    const report = aggregateMarketingReport(comments, 'lv9');
+    const html = buildMarketingDashboardHtml(report, { commentsForAnalytics: comments });
+    expect(html).not.toContain('id="mkt-gift-moments"');
+    expect(html).not.toContain('href="#mkt-gift-moments"');
+  });
+  it('★共有用に伏せるとき、送り主の実名・サムネURL・話題語を出さない', () => {
+    const report = aggregateMarketingReport(comments, 'lv9');
+    const html = buildMarketingDashboardHtml(report, { giftSubAppHistory: hist(), maskShareLabels: true, commentsForAnalytics: comments });
+    const i = html.indexOf('id="mkt-gift-moments"');
+    expect(i).toBeGreaterThan(0);
+    const sec = html.slice(i, html.indexOf('</section>', i));
+    expect(sec).not.toContain('花子さん');
+    expect(sec).not.toContain('example.com/a.png');
+    expect(sec).not.toContain('話題');
+  });
+  it('★軸が合わない(別の時期)ときは瞬間カードを出さず、理由を出す', () => {
+    const report = aggregateMarketingReport(comments, 'lv9');
+    const h = hist();
+    h.history[0].publishedAt = Math.floor((T0 + 400 * 24 * 60 * MIN) / 1000);
+    const html = buildMarketingDashboardHtml(report, { giftSubAppHistory: h, commentsForAnalytics: comments });
+    const i = html.indexOf('id="mkt-gift-moments"');
+    expect(i).toBeGreaterThan(0);
+    const sec = html.slice(i, html.indexOf('</section>', i));
+    expect(sec).toContain('重なりません');
+    expect(sec).not.toContain('mkt-gm-card');
+  });
+});
+
 describe('参加者の人数(v0.1.1668): ID のない人を別人にして増やさない', () => {
   const mk = (no, uid, off = 0) => ({
     id: `p-${no}`, liveId: 'lv9', commentNo: String(no), text: `t${no}`, userId: uid, nickname: '', avatarUrl: '', selfPosted: false,

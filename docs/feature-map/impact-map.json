@@ -5562,6 +5562,16 @@
       ]
     },
     {
+      "file": "src/lib/giftMomentAnalytics.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/giftMomentumAnalytics.js",
       "featureCount": 1,
       "features": [
