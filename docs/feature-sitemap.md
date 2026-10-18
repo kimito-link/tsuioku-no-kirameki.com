@@ -900,7 +900,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 226</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 227</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1033,6 +1033,7 @@
 - `src/lib/noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
 - `src/lib/northStarMirror.js` — 北極星レーン鏡(公式値レーン)のスナップショット純関数。
+- `src/lib/noSpeechNote.js` — 「発言がありません」のときに、代わりに何を伝えるかを決める唯一の正本。
 - `src/lib/objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
 - `src/lib/observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
 - `src/lib/officialEventDomBundle.js` — watch ページの DOM から「配信者の番組周辺の正本値」を 1 関数で総取りするオーケストレータ。

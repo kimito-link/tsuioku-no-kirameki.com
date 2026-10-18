@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 933 件
+## ⚠️ 役割コメントが無いソース 8 / 934 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -850,7 +850,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2006)
+- 📁 **src/** (2009)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -887,7 +887,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (62)
+  - 📁 **extension/** (63)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -929,6 +929,7 @@
     - `ndgrHiddenFlush.wiring.test.js`
     - `ndgrStatisticsPointsSanityGuard.wiring.test.js`
     - `ndgrViewBasePick.wiring.test.js`
+    - `noSpeechNote.wiring.test.js`
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
@@ -1132,7 +1133,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1768)
+  - 📁 **lib/** (1770)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2112,6 +2113,8 @@
     - `noActiveWatchDecision.wiring.test.js`
     - `noDarkFullscreenFallback.test.js`
     - `noLobbyString.test.js`
+    - `noSpeechNote.js` — 「発言がありません」のときに、代わりに何を伝えるかを決める唯一の正本。
+    - `noSpeechNote.test.js`
     - `northStarAcquisitionGauge.js` — 北極星レーン左ガジェット「取得率」メーター用の純関数。
     - `northStarAcquisitionGauge.test.js`
     - `northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。

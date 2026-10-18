@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "dcfd9ce53da9452d5e7dc4c7b73e45ae54730daf71646cedf95f56fc9b347c79",
+  "fingerprint": "ad757b97f53cb926e4f3e671b05412d5a58f03370046be19e60ef6a67b08c721",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -454,6 +454,7 @@
     "src/lib/nlMainScrollReveal.js",
     "src/lib/nlsInterceptAuth.js",
     "src/lib/noActiveWatchDecision.js",
+    "src/lib/noSpeechNote.js",
     "src/lib/northStarAcquisitionGauge.js",
     "src/lib/northStarCharaTrioConfig.js",
     "src/lib/northStarDetailCells.js",
@@ -816,7 +817,7 @@
     "extension/dist/status.js": "9d0a8a96236e8f8f541304383b34664c40efa0a7611869cf3405fb4464c07c2a",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "7e583d6c43fe865b95a12e16d96e19e074ce53fb75457e6dfe91d98bce001577",
-    "extension/dist/comeview.js": "6baa817d621acff3b04400ecf79f682a9fc2a9852b7c97795b5ffdd28abe8e30",
+    "extension/dist/comeview.js": "3962f91600a1e6ca1fcf6c4e89f46a2284115fa561385b3da118aaed79a0ab2d",
     "extension/dist/venue.js": "f5f7d1a0e9d08c14517712989f0d4e6bf37d0327ee7a4c5fd800d5d4010a5960",
     "extension/dist/sidepanel.js": "08c71a049913562d3d6107bb8476a1adc8b9aa741f071fdaac7b05e8c5b1b2ca",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
