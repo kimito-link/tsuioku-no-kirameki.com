@@ -1,0 +1,10 @@
+{
+  "project": "tsuioku",
+  "model": "qwen2.5:7b-instruct",
+  "cwd": ".",
+  "adapter": ["node", "scripts/loop-adapter-status-live.mjs"],
+  "source": ["node", "scripts/status-live.mjs", "--json"],
+  "glossary": "_loop/tsuioku/glossary.txt",
+  "repo": ".",
+  "ollama": "http://127.0.0.1:11434"
+}
