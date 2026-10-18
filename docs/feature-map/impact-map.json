@@ -1120,6 +1120,20 @@
       ]
     },
     {
+      "file": "src/lib/avatarFaceStore.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/avatarFallbackFromUrl.js",
       "featureCount": 3,
       "features": [
