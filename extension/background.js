@@ -2175,7 +2175,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 const NICOAD_CONTRIB_FETCH_MESSAGE_TYPE = 'NLS_NICOAD_CONTRIB_FETCH';
 const NICOAD_LIVE_ID_RE = /^lv\d{1,15}$/;
 const NICOAD_CONTRIB_FETCH_TIMEOUT_MS = 8000;
-const NICOAD_CONTRIB_DEFAULT_LIMIT = 10;
+// v0.1.1667: 10→100(ユーザー決定 2026-10-18「正確な数を知りたい」)。公式 API は limit=100 でも実際の広告主の数だけ返す(実測: 23行・約5KB)。
+//   帯の表示は NICOAD_RANKING_STRIP_ROWS(10)で絞り、社数・合計・タイルの📣ptは全行から出す。lib の値との一致は nicoadLimitContract.test.js が見る。
+const NICOAD_CONTRIB_DEFAULT_LIMIT = 100;
 
 async function fetchNicoadContribRankingJson(liveId) {
   const lid = String(liveId == null ? '' : liveId)
