@@ -48,7 +48,7 @@ export const NICOAD_CONTRIB_FETCH_MESSAGE_TYPE = 'NLS_NICOAD_CONTRIB_FETCH';
 const LIVE_ID_RE = /^lv\d{1,15}$/;
 
 /** 既定の取得件数。広告ランキングは上位のみ表示なので 10。SW の URL 自作と同期。 */
-export const NICOAD_CONTRIB_DEFAULT_LIMIT = 10;
+export const NICOAD_CONTRIB_DEFAULT_LIMIT = 100;
 
 /** 広告ランキングの【帯】に描く最大行数。取得件数(limit)を増やしても帯は伸ばさない(数字=社数・合計は全行から出す)。 */
 export const NICOAD_RANKING_STRIP_ROWS = 10;

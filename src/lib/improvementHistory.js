@@ -2704,5 +2704,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1666', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1665 の note と同じ理由)。今回は挙動を変えない準備の版で、取得件数を増やす次の版の前提(帯の固定・社数と合計は全行・SW と lib の値の照合)をテストで固定した。'
+  }),
+  Object.freeze({
+    version: '0.1.1667', metric: 'bundle-kb', value: 1440,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は広告の取得件数10→100と、広告段の表示件数の上限を外す数行(background.js・lib・popup-entry.js)。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1667', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1667', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1666 の note と同じ理由)。今回は実配信で、公式の広告主25社が保存25行・広告段25人になることを確認した。広告の取得は1回あたり約5KB。'
   })
 ]);

@@ -21,6 +21,13 @@ describe('広告取得件数の契約', () => {
   it('★取得件数は帯の表示行数以上(帯より少なく取らない)', () => {
     expect(NICOAD_CONTRIB_DEFAULT_LIMIT).toBeGreaterThanOrEqual(NICOAD_RANKING_STRIP_ROWS);
   });
+  it('★広告段(タイル)は取得した広告主を全員出す=ギフト段の giftLimit(16/24)で切らない(正確な数を出す)', () => {
+    const src = read('src/extension/popup-entry.js');
+    const i = src.indexOf('STORY_SOURCE_STATE.adThrowerPicks = adLanePicksFromRooms(');
+    const block = src.slice(i, i + 2200);
+    expect(block).toContain('limit: NICOAD_CONTRIB_DEFAULT_LIMIT');
+    expect(block).not.toContain('limit: giftLimit');
+  });
   it('★popup の広告ランキング帯は、表示行を上位 N 行に絞り、数字は全行から出す(取得を増やしても帯が伸びない)', () => {
     const src = read('src/extension/popup-entry.js');
     expect(src).toContain('NICOAD_RANKING_STRIP_ROWS');
