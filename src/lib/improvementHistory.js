@@ -2830,5 +2830,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1675', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1674 の note と同じ理由)。今回は単体14件+配線9件で、区間の捏造禁止(押した時刻が無い・古いときは出さない)・履歴を読み終えるまで書かない・SW→パネル→速報の接続を固定し、接続を切ると赤になることを確認した。ヘッドレスで SW→パネル→履歴→行まで通ることを確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1676', metric: 'bundle-kb', value: 1445,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は計測のみ(sidepanel-entry.js に文書内の値の採取・lib に全回分の集計と行)。描画の経路は触っていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1676', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1676', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1675 の note と同じ理由)。今回は単体27件で、押した時刻が無い回の数字・壊れた組の除外・押下なし回数の表示を固定。実機の保存データを一時プロファイルに写したヘッドレスで、記録から速報の行まで通ることを確認した。'
   })
 ]);

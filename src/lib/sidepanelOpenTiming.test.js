@@ -122,6 +122,55 @@ describe('formatOpenTimingLine', () => {
   it('★押した時刻が全回で取れなかったら、そう言う(0 ms と読ませない)', () => {
     const line = formatOpenTimingLine([buildOpenTiming({ click: null, docStartEpoch: T, firstPaintEpoch: T + 5 })]);
     expect(line).toContain('押した時刻が取れた回が0/1回');
-    expect(line).not.toContain('中央値');
+    // 押下基準の区間(文書開始/親の最初の描画/中身の描画)は出さない。文書内の統計の「中央値」は別物。
+    expect(line).not.toContain('文書開始 中央値');
+    expect(line).not.toContain('親の最初の描画 中央値');
+    expect(line).not.toContain('中身の描画 中央値');
+  });
+});
+
+describe('文書内の値(押した時刻が無い回でも残る・v0.1.1676)', () => {
+  it('★押した時刻が無くても scriptAt・長い処理・停止区間は残る', () => {
+    const e = buildOpenTiming({
+      click: null,
+      docStartEpoch: T,
+      firstPaintEpoch: T + 636,
+      scriptAtMs: 412.4,
+      domInteractiveMs: 520,
+      ownLongTasks: [[100, 80], [300.4, 60]],
+      stalls: [[40, 400]]
+    });
+    expect(e.clickMissing).toBe(true);
+    expect(e.docToFirstPaintMs).toBe(636);
+    expect(e.scriptAtMs).toBe(412);
+    expect(e.domInteractiveMs).toBe(520);
+    expect(e.ownLongTasks).toEqual([[100, 80], [300, 60]]);
+    expect(e.stalls).toEqual([[40, 400]]);
+  });
+
+  it('壊れた組は捨て、6組までに切る', () => {
+    const e = buildOpenTiming({
+      docStartEpoch: T,
+      stalls: /** @type {any} */ ([[1, 2], 'x', [NaN, 3], [4], ...Array.from({ length: 10 }, (_, i) => [i, 150])])
+    });
+    expect(e.stalls).toHaveLength(6);
+    expect(e.stalls[0]).toEqual([1, 2]);
+  });
+
+  it('★押した時刻が全回で無くても、文書内の数字を行に出す(0回と書いて終わりにしない)', () => {
+    const mkDoc = (id, fp, sa, stalls) =>
+      buildOpenTiming({ click: null, docStartEpoch: T + id * 1000, firstPaintEpoch: T + id * 1000 + fp, scriptAtMs: sa, stalls });
+    const line = formatOpenTimingLine([mkDoc(1, 100, 50, []), mkDoc(2, 636, 900, [[40, 400]])]);
+    expect(line).toContain('押した時刻が取れた回が0/2回');
+    expect(line).toContain('開始→最初の描画 中央値368ms(最大636ms)');
+    expect(line).toContain('文書作成→スクリプト開始 中央値475ms(最大900ms)');
+    expect(line).toContain('主スレッド停止(120ms超)1件');
+    expect(line).toContain('40ms地点で400ms');
+  });
+
+  it('押した時刻が取れない回が混ざるときは、その回数を言う', () => {
+    const a = buildOpenTiming({ click: { at: T, swAgeMs: 9000, armed: true, hasLv: true }, docStartEpoch: T + 8, firstPaintEpoch: T + 600, contentPaintEpoch: T + 900 });
+    const b = buildOpenTiming({ click: null, docStartEpoch: T + 5000, firstPaintEpoch: T + 5100 });
+    expect(formatOpenTimingLine([a, b])).toContain('押した時刻なし1回');
   });
 });
