@@ -384,6 +384,7 @@ import {
   NICOAD_CONTRIB_STORAGE_PREFIX,
   NICOAD_CONTRIB_FETCH_MESSAGE_TYPE
 } from '../lib/nicoadContributionRankingApi.js';
+import { observeAdRanking, adObservationStorageKey } from '../lib/adObservationLog.js';
 import {
   normalizeEventParticipationResponse,
   eventParticipationStorageKey,
@@ -15341,6 +15342,7 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
           .trim()
           .toLowerCase();
         if (curLid !== lid) return;
+        void recordAdObservation(lid, rowsSafe);
         try {
           chrome.storage.local
             .set({
@@ -15462,6 +15464,38 @@ let _kokenGiftHistoryApiLastAttemptAt = 0;
  * 制約は koken/nicoad と同一（iframe 内では走らない・SW 経由 fetch・rows>0 のみ書込＝
  * fail-soft・liveId echo 一致確認・min-gap 再入抑止・callback 喪失時も次 tick で自己回復）。
  */
+/** v0.1.1665: 広告の「気づいた時刻」の記録用(このページの前回の標本・記録の写し)。判定は lib(adObservationLog.js)。 */
+let _adObsPrevRows = null;
+/** @type {Record<string, any>|null} */
+let _adObsLog = null;
+let _adObsLid = '';
+
+/**
+ * 公式の広告ランキングは人ごとの合計ptだけで時刻が無い。約25秒ごとの標本で「増えた」のに気づいた時刻を残す(増えたときだけ書く)。
+ * @param {string} lid @param {unknown[]} rows
+ */
+async function recordAdObservation(lid, rows) {
+  try {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    const key = adObservationStorageKey(lid);
+    if (_adObsLid !== lid) {
+      _adObsLid = lid;
+      _adObsPrevRows = null;
+      _adObsLog = null;
+      const bag = await chrome.storage.local.get(key);
+      if (_adObsLid !== lid) return;
+      _adObsLog = bag?.[key] && typeof bag[key] === 'object' ? bag[key] : {};
+    }
+    const next = observeAdRanking(_adObsLog, _adObsPrevRows, rows, Date.now());
+    _adObsPrevRows = rows;
+    const changed = JSON.stringify(next) !== JSON.stringify(_adObsLog);
+    _adObsLog = next;
+    if (changed) await chrome.storage.local.set({ [key]: next });
+  } catch {
+    /* 付加情報: 記録できなくても取得・描画は止めない */
+  }
+}
+
 function maybeFetchKokenGiftHistoryMirrorOnce() {
   try {
     if (!hasExtensionContext()) return;

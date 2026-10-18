@@ -678,12 +678,13 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 83</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 84</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
 - `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
+- `scripts/loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
 - `scripts/perf-ab/profile-status.mjs` — 診断ページ(status.html)自身のメインスレッド CPU プロファイル。「診断ページが重くて出てこない」の原因探し用。
 - `scripts/perf-ab/status-publish-repro.mjs` — 状態画面(status.html)が「自動公開(WEBへ2分ごとに送信)」を実際に試みるかを、一時プロファイルで再現する。
 - `scripts/run-verify-cc.mjs` — Claude Code 向け verify ランナー。
@@ -900,7 +901,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 227</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 228</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -957,6 +958,7 @@
 - `src/extension/popup/init/frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
 - `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
+- `src/lib/adObservationLog.js` — 広告(ニコニ広告)の「いつ増えたか」を、拡張が【気づいた時刻】として残す(純関数)。v0.1.1665。
 - `src/lib/aiShareTextChanged.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/anomalyVerdict.js` — 計器の値に「正常域」を持たせ、異常を【名指し】する純関数群。
 - `src/lib/arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
@@ -1136,16 +1138,18 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 📥 コメント取得 (3版)
+### 📥 コメント取得 (4版)
+- `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 - `v0.1.1664` 2026-10-17 — ギフトの記録に投げた時刻を表示
 - `v0.1.1663` 2026-10-17 — ギフトの記録に投げた時刻を表示
 - `v0.1.1659` 2026-10-17 — 発言パネルにギフト・広告の応援も表示
 
-### 🙂 匿名(184) (2版)
+### 🙂 匿名(184) (3版)
+- `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 - `v0.1.1660` 2026-10-17 — 発言パネルにギフトの1回ごとの記録を表示
 - `v0.1.1651` 2026-10-17 — 会場のたぬ姉の列で後列を小さく表示するよう修正
 
-### 🏟 会場・席 (11版)
+### 🏟 会場・席 (10版)
 - `v0.1.1658` 2026-10-17 — Escで会場が意図せず閉じる不具合を修正
 - `v0.1.1655` 2026-10-17 — ギフトのptが11位以下の人にも付くよう修正
 - `v0.1.1654` 2026-10-17 — コメントを打つあいだ会場をしまえるボタン追加
@@ -1156,9 +1160,9 @@
 - `v0.1.1648` 2026-10-17 — 会場を開いたまま映像や入力欄が押せるように
 - `v0.1.1647` 2026-10-17 — 狭い幅で会場の閉じるボタンが見切れるのを修正
 - `v0.1.1646` 2026-10-17 — ドラッグ後に次のクリックが効かない不具合を修正
-- `v0.1.1645` 2026-10-17 — Escと閉じるでパネルも順に閉じるよう改善
 
-### 🎁 ギフト (6版)
+### 🎁 ギフト (7版)
+- `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 - `v0.1.1664` 2026-10-17 — ギフトの記録に投げた時刻を表示
 - `v0.1.1663` 2026-10-17 — ギフトの記録に投げた時刻を表示
 - `v0.1.1660` 2026-10-17 — 発言パネルにギフトの1回ごとの記録を表示

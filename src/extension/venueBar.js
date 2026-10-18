@@ -136,6 +136,7 @@ import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
 import { speechSupportLine, speechEmptyMessage, parseTileStatsText } from '../lib/venueSpeechStats.js';
 import { giftThrowsForUser, giftThrowsSectionHtml } from '../lib/venueGiftThrowsForUser.js';
+import { adObservationNote, adObservationStorageKey } from '../lib/adObservationLog.js';
 import { isContextInvalidatedError } from '../lib/reportSilentError.js';
 // v0.1.1080: マイ効果音・ボイス/BGM計器が直接 chrome.storage.local を叩くと、拡張リロード後の
 //   古い会場レイヤーで同期 TypeError(chrome.storage が undefined)が uncaught のまま残る。
@@ -4087,10 +4088,17 @@ export function mountVenueBarButton(options = {}) {
     try {
       const lidG = String(activeLiveId || liveIdFromPathname() || '');
       const gKey = giftSubAppHistoryStorageKey(lidG);
-      const gBag = await runStorageOpWithTimeout(() => chrome.storage.local.get(gKey), 4000);
-      return giftThrowsSectionHtml(
+      const aKey = adObservationStorageKey(lidG);
+      const gBag = await runStorageOpWithTimeout(() => chrome.storage.local.get([gKey, aKey]), 4000);
+      // v0.1.1665: 広告の「拡張が気づいた時刻」。広告があるときだけ・数値uidの完全一致だけ(adObservationLog.js)。
+      const adLog = /** @type {Record<string, any>} */ (gBag?.[aKey] || {});
+      const adNote = parseTileStatsText(statsText).ad != null ? adObservationNote(adLog[uid], Date.now()) : '';
+      const adHtml = adNote ? `<div class="nlsb-speech-gifts"><div class="nlsb-speech-gifts__head">📣 広告の動き</div><div class="nlsb-speech-gifts__note">${escapeHtml(adNote)}</div></div>` : '';
+      return adHtml + giftThrowsSectionHtml(
         giftThrowsForUser({ payload: gBag?.[gKey], uid, liveId: lidG, tileGiftPt: parseTileStatsText(statsText).gift, nowMs: Date.now() }),
-        escapeHtml
+        escapeHtml,
+        Date.now(),
+        parseTileStatsText(statsText).gift != null
       );
     } catch {
       return '';
