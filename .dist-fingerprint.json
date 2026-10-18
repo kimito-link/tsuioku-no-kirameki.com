@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "18870e0af8c16a2acc45faf0dca2f57006b2e97b2113702f1f89ae4dc23f1b47",
+  "fingerprint": "97e0970f7b5e01a9b24bc70c89f80eff1b6eb5a6e3205698b14427a67d6da4fb",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -722,6 +722,7 @@
     "src/lib/venueDragScroll.js",
     "src/lib/venueEntryQueue.js",
     "src/lib/venueGeometryVerdict.js",
+    "src/lib/venueGiftThrowsForUser.js",
     "src/lib/venueHeat.js",
     "src/lib/venueHoverCard.js",
     "src/lib/venueHoverCardProbe.js",
@@ -750,6 +751,7 @@
     "src/lib/venueSeatsDiagKey.js",
     "src/lib/venueSpeech.js",
     "src/lib/venueSpeechCensus.js",
+    "src/lib/venueSpeechStats.js",
     "src/lib/venueSpeechStreak.js",
     "src/lib/venueStoryDiagMirrorPanel.js",
     "src/lib/venueTileCountCensus.js",
@@ -809,18 +811,18 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
-    "extension/dist/content.js": "f14fc4f618521c75d94d4689e73ce883048ccfc6622e7a218b314b5c06136d6b",
-    "extension/dist/popup.js": "3e0d528727e802a01c96d5cbaee1d6b55ae79a108b2fe2bf8858fe9a5cee60f4",
+    "extension/dist/content.js": "e3138163dab9a3da2d1e9edcf745d7419d4b7c1676a630a7d087be22d53ea0d2",
+    "extension/dist/popup.js": "a8e430161d7499d4f934a3aea4d27c3af0c780c6978cdb5544e58143d962e0e3",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "623d83a2f8a25751705e68da8b6573bcfa69478117f0a3fb09115bb28ec2fa16",
+    "extension/dist/status.js": "9d0a8a96236e8f8f541304383b34664c40efa0a7611869cf3405fb4464c07c2a",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
-    "extension/dist/marketing-export.js": "314ad193891a12bfbe0fbf40d01040de396fd241c50c4ccf279a91a42cc55cb3",
+    "extension/dist/marketing-export.js": "e89224f95e0776dc7ed8525a7587840737c2f97aad0ebf7b56dd2fb841619c86",
     "extension/dist/comeview.js": "3962f91600a1e6ca1fcf6c4e89f46a2284115fa561385b3da118aaed79a0ab2d",
-    "extension/dist/venue.js": "62e43de54851a4c739543dc5e08eb51d2da506477c48810e818565c2497dccc1",
+    "extension/dist/venue.js": "d75a1948f00163e35376c6432e0d31a0971f87dea5c3087e260a91fbea01ffe2",
     "extension/dist/sidepanel.js": "08c71a049913562d3d6107bb8476a1adc8b9aa741f071fdaac7b05e8c5b1b2ca",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "52e798662622aa64237034d2503a62044e7077e213fec91e31a7b8fe0045bd92",
+    "app/dist/live-view.js": "77f40552bcc9dbfe499b43fefc9465e72b125d3e0a6a6bd1e73319c4a1077dde",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 932 件
+## ⚠️ 役割コメントが無いソース 8 / 934 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (353)
+- 📁 **docs/** (354)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -565,6 +565,7 @@
   - `repo-tree-map.html`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
+  - `self-improvement-loop-DESIGN.md`
   - `site-health.md`
   - `story-user-lane-pipeline.md`
   - `surechigai-lite-improvement-plan.md`
@@ -849,7 +850,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2001)
+- 📁 **src/** (2009)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1132,7 +1133,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1762)
+  - 📁 **lib/** (1770)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2016,6 +2017,7 @@
     - `marketingChartsHtml.test.js`
     - `marketingChartsHtmlAnalyticsDedup.test.js`
     - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
+    - `marketingExportMaskWiring.test.js`
     - `marketingGiftThrowLedger.js` — マーケ分析 HTML 用: 「誰が・どのアイテムを・いくら投げたか」の投げ履歴台帳を組み立てる純関数。
     - `marketingGiftThrowLedger.test.js`
     - `marketingHtmlAdvisorAvatars.js` — マーケ分析HTML内のキャラアイコン（単体HTMLで表示するため data URI）。
@@ -2710,9 +2712,13 @@
     - `venueEntryEffect.wiring.test.js`
     - `venueEntryQueue.js` — venueEntryQueue — 会場「入場演出」の差分検出と間引き（純ロジック・DOM を触らない）。
     - `venueEntryQueue.test.js`
+    - `venueEscapeKey.wiring.test.js`
     - `venueFullscreenWiring.wiring.test.js`
     - `venueGeometryVerdict.js` — 会場と①POPのタイル寸法差が「CSS不整合」か「測定対象ズレ」かを見分ける純関数(v0.1.1212)。
     - `venueGeometryVerdict.test.js`
+    - `venueGiftThrowsForUser.js` — 会場の発言パネルに出す「この人のギフトの1回ごとの明細」を、別人のものを貼らないよう安全に作る(純関数)。v0.1.1659。
+    - `venueGiftThrowsForUser.test.js`
+    - `venueGiftThrowsWiring.test.js`
     - `venueHeaderWrap.wiring.test.js`
     - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
     - `venueHeat.test.js`
@@ -2789,8 +2795,11 @@
     - `venueSpeechCensusWiring.wiring.test.js`
     - `venueSpeechPanelIdentity.wiring.test.js`
     - `venueSpeechPanelWidth.wiring.test.js`
+    - `venueSpeechStats.js` — 会場の発言パネルに出す「この人の応援(ギフト・広告)」の一行(純関数・DOM 非依存)。v0.1.1658。
+    - `venueSpeechStats.test.js`
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
+    - `venueSpeechSupport.wiring.test.js`
     - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
     - `venueStoryDiagMirrorPanel.test.js`
     - `venueTanuLane.wiring.test.js`
