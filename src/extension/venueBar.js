@@ -1812,9 +1812,10 @@ const VENUE_CSS = `
     white-space: nowrap;
   }
   .nlsb-speech-panel .nlsb-speech-gifts__time {
-    opacity: 0.65;
-    white-space: nowrap;
+    opacity: 0.8;
     font-size: 11px;
+    text-align: right;
+    max-width: 11em;
   }
   .nlsb-speech-panel .nlsb-speech-gifts__note {
     font-size: 11px;
