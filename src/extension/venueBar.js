@@ -101,7 +101,8 @@ import {
   KEY_CUSTOM_SOUND_REV,
   isEffectSoundEnabled,
   // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(giftDeltaFallback.js)向け。
-  officialGiftPointsAggregateStorageKey
+  officialGiftPointsAggregateStorageKey,
+  giftSubAppHistoryStorageKey
 } from '../lib/storageKeys.js';
 import {
   EFFECT_SOUND_KINDS,
@@ -133,6 +134,8 @@ import { highlightLedgerReadKeys, isHighlightWorthyKind, planHighlightAppend } f
 // anonymousIdenticonDataUrl は P3(v0.1.1117)で venueLaneBuckets(①正本委譲)側へ移動=venueBar 直参照なし。
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
+import { speechSupportLine, speechEmptyMessage, parseTileStatsText } from '../lib/venueSpeechStats.js';
+import { giftThrowsForUser, giftThrowsSectionHtml } from '../lib/venueGiftThrowsForUser.js';
 import { isContextInvalidatedError } from '../lib/reportSilentError.js';
 // v0.1.1080: マイ効果音・ボイス/BGM計器が直接 chrome.storage.local を叩くと、拡張リロード後の
 //   古い会場レイヤーで同期 TypeError(chrome.storage が undefined)が uncaught のまま残る。
@@ -1767,6 +1770,57 @@ const VENUE_CSS = `
     flex-wrap: wrap;
     gap: 8px;
   }
+  /* v0.1.1658: 発言パネルの「ギフト・広告」の一行(タイル3行目と同じ値)。 */
+  .nlsb-speech-panel .nlsb-speech-support {
+    padding: 2px 14px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffd98a;
+    overflow-wrap: anywhere;
+  }
+  /* v0.1.1659: ギフトの記録(1回ごとの明細)。最大でも約6行ぶんでスクロールし、発言一覧を押し出さない。 */
+  .nlsb-speech-panel .nlsb-speech-gifts {
+    padding: 0 14px 8px;
+    max-height: 150px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .nlsb-speech-panel .nlsb-speech-gifts__head {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffd98a;
+    margin-bottom: 4px;
+  }
+  .nlsb-speech-panel .nlsb-speech-gifts__row {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 2px 0;
+  }
+  .nlsb-speech-panel .nlsb-speech-gifts__img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+  }
+  .nlsb-speech-panel .nlsb-speech-gifts__item {
+    overflow-wrap: anywhere;
+  }
+  .nlsb-speech-panel .nlsb-speech-gifts__pt {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .nlsb-speech-panel .nlsb-speech-gifts__time {
+    opacity: 0.65;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .nlsb-speech-panel .nlsb-speech-gifts__note {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 4px;
+  }
   .nlsb-speech-panel .nlsb-roster-title {
     flex: 1 1 0;
     min-width: 0;
@@ -3217,7 +3271,12 @@ export function mountVenueBarButton(options = {}) {
       // v0.1.1643: 開いているパネルがあれば先に閉じる(=旧パネルの stage リスナーを外す)。外さないと、この同じクリックが
       //   stage へ伝わった時に旧リスナーが『外側クリック』と判定し、開いたばかりの新パネルを即閉じて『読み込み中…』のまま残る。
       if (!speechPanel.hidden) closeSpeechPanel();
-      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc });
+      // v0.1.1658: タイル3行目(🎁📣💬)の文字列をそのまま渡す=新しい取得ゼロ・タイルと同じ値(venueSpeechStats.js)。
+      let statsText = '';
+      try {
+        statsText = String(anchorEl.querySelector('[data-stats]')?.getAttribute('data-stats') || '');
+      } catch { /* 取れなくてもパネルは開く */ }
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc, statsText });
     });
   };
   wireSpeechPanelDelegation(seatsHost);
@@ -4019,9 +4078,27 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
+   * v0.1.1659: 発言パネルに出すギフトの1回ごとの明細の HTML。結びつけは数値uidの完全一致だけ・配信ID一致・合計の照合は
+   *   lib に集約(venueGiftThrowsForUser.js)。読むのはクリックした瞬間の1回だけ。取れなくても発言一覧は出す(区画が出ないだけ)。
+   * @param {string} uid @param {string} statsText タイルの data-stats
+   */
+  const readGiftHtmlForSpeech = async (uid, statsText) => {
+    try {
+      const lidG = String(activeLiveId || liveIdFromPathname() || '');
+      const gKey = giftSubAppHistoryStorageKey(lidG);
+      const gBag = await runStorageOpWithTimeout(() => chrome.storage.local.get(gKey), 4000);
+      return giftThrowsSectionHtml(
+        giftThrowsForUser({ payload: gBag?.[gKey], uid, liveId: lidG, tileGiftPt: parseTileStatsText(statsText).gift, nowMs: Date.now() }),
+        escapeHtml
+      );
+    } catch {
+      return '';
+    }
+  };
+  /**
    * その人の全発言を読み込んでパネルに出す。
    * ★storage read はこの関数の中だけ=クリックした瞬間だけ(常時readを増やさない)。
-   * @param {{ uid: string, displayName: string, avatarSrc?: string }} who
+   * @param {{ uid: string, displayName: string, avatarSrc?: string, statsText?: string }} who
    */
   const openSpeechPanelFor = async (who) => {
     const uid = String(who?.uid || '').trim();
@@ -4037,6 +4114,7 @@ export function mountVenueBarButton(options = {}) {
       '(名前なし)';
     if (!uid) return; // uid が無い人(広告主等)は発言記録に紐づかない
     const avatarSrc = String(who?.avatarSrc || '').trim();
+    const statsText = String(who?.statsText || '');
     const gen = (speechOpenGen += 1);
     const head = buildSpeechPanelHeadHtml(uid, name, avatarSrc, '', '');
     speechPanel.innerHTML = `${head}<div class="nlsb-roster-list"><div class="nlsb-roster-empty">読み込み中…</div></div>`;
@@ -4116,9 +4194,18 @@ export function mountVenueBarButton(options = {}) {
     }
     speechPanel.innerHTML =
       buildSpeechPanelHeadHtml(uid, name, avatarSrc, presenceNote, total ? note : '') +
-      `<div class="nlsb-roster-list">${listHtml || '<div class="nlsb-roster-empty">この配信の記録にはまだ発言がありません</div>'}</div>`;
+      // v0.1.1658: ギフト・広告の応援の一行(タイルと同じ値)。
+      (speechSupportLine(statsText)
+        ? `<div class="nlsb-speech-support">${escapeHtml(speechSupportLine(statsText))}</div>`
+        : '') +
+      `<div class="nlsb-roster-list">${listHtml || `<div class="nlsb-roster-empty">${escapeHtml(speechEmptyMessage(statsText))}</div>`}</div>`;
     const closeBtn2 = speechPanel.querySelector('.nlsb-roster-close');
     if (closeBtn2) closeBtn2.addEventListener('click', () => closeSpeechPanel());
+    // v0.1.1659: ギフトの明細は発言一覧とは別に後から差し込む(パネルを待たせない・取れなくても発言一覧はそのまま)。
+    void readGiftHtmlForSpeech(uid, statsText).then((html) => {
+      if (!html || speechPanel.hidden || gen !== speechOpenGen) return;
+      speechPanel.querySelector('.nlsb-roster-list')?.insertAdjacentHTML('beforebegin', html);
+    });
   };
 
   /** @param {boolean} [force] */
@@ -6956,9 +7043,26 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  /**
+   * v0.1.1657: 会場の【外】の入力欄(ニコ生のコメント欄など)にいるか。会場内の入力(あれば)は対象外。
+   * @param {EventTarget | null} t
+   */
+  const isEditableOutsideVenue = (t) => {
+    if (!(t instanceof HTMLElement)) return false;
+    if (root.contains(t)) return false;
+    return t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT';
+  };
+
   /** @param {KeyboardEvent} event */
   const onEscapeKey = (event) => {
     if (event.key !== 'Escape' || !open) return;
+    // v0.1.1657: 日本語入力の変換取消の Esc や、コメント欄での Esc で会場ごと閉じない。
+    if (event.isComposing || event.keyCode === 229 || isEditableOutsideVenue(event.target)) return;
+    // v0.1.1657: 「しまう」中の Esc は戻すだけ(記録と表示を保ったまま、コメントを打つための機能なので閉じない)。
+    if (tucked) {
+      setTucked(false);
+      return;
+    }
     // v0.1.738: 診断パネルが開いていれば、まずそれだけ閉じる(会場ごと閉じない)。
     //   × が反応しない時の確実な代替手段(ユーザー報告対策)。
     // v0.1.1645: 発言パネル・状態パネルも同じ扱い(以前は一覧パネルだけで、他が開いていると会場ごと閉じた)。

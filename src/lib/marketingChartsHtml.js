@@ -3961,7 +3961,17 @@ function sectionCrossSupporterRanking(rows, pastBroadcastCount) {
  * 本体 script が動かない環境では class が付かないため、レポートは通常表示のまま残る。
  * @returns {string}
  */
+/**
+ * v0.1.1660: セクション順次発表(自動スクロール・順番に現れる・音)は【既定で無効】。
+ *   ユーザー(2026-10-18)「ゆっくりスクロールするような動きは邪魔だからやめたい」。読み込み後に勝手に
+ *   smooth スクロールで画面が動き、読み始めの邪魔になっていた。レポートは最初から全部の区画を見せる。
+ *   演出の実装(boot script・本体 script・CSS)は残してあり、true に戻せば元の挙動に戻る(CSS は html に
+ *   mkt-section-reveal-enabled が付いたときだけ効くので、boot script を埋めなければ何も起きない)。
+ */
+export const MKT_SECTION_REVEAL_ENABLED = false;
+
 function buildSectionRevealBootScriptHtml() {
+  if (!MKT_SECTION_REVEAL_ENABLED) return '';
   return `<script>
 (function(){
   try{document.documentElement.classList.add('mkt-section-reveal-enabled');}catch(e){}
@@ -3975,6 +3985,7 @@ function buildSectionRevealBootScriptHtml() {
  * @returns {string}
  */
 function buildSectionRevealScriptHtml() {
+  if (!MKT_SECTION_REVEAL_ENABLED) return '';
   return `<div id="mktRevealControl" class="mkt-reveal-control" role="group" aria-label="セクション発表">
 <span id="mktRevealStatus" class="mkt-reveal-control__status">発表準備中…</span>
 <button id="mktRevealSoundBtn" class="mkt-reveal-btn mkt-reveal-btn--sound" type="button">音ON</button>

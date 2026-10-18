@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildMarketingDashboardHtml,
-  buildAudienceParticipationLeadSectionHtml
+  buildAudienceParticipationLeadSectionHtml,
+  MKT_SECTION_REVEAL_ENABLED
 } from './marketingChartsHtml.js';
 import { aggregateMarketingReport } from './marketingAggregate.js';
 import { analyzeAudienceEngagementGap } from './audienceEngagementGap.js';
@@ -78,27 +79,16 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('lv123');
   });
 
-  it('単独HTML内にセクション順次発表・音・スキップの演出を埋め込む', () => {
+  it('★既定ではセクション順次発表(自動スクロール・音・操作パネル)を埋め込まない(ユーザー: ゆっくりスクロールは邪魔)', () => {
     const html = buildMarketingDashboardHtml(minimal());
-    expect(html).toContain('mkt-section-reveal-enabled');
-    expect(html).toContain('id="mktRevealControl"');
-    expect(html).toContain('id="mktRevealSoundBtn"');
-    expect(html).toContain('id="mktRevealSkipBtn"');
-    expect(html).toContain("document.querySelectorAll('.mkt-section')");
-    expect(html).toContain('window.AudioContext');
-    expect(html).toContain('createOscillator');
-    expect(html).toContain('prefers-reduced-motion:reduce');
-    expect(html).toContain('mkt-section--reveal');
-
-    const revealBlock = html.slice(html.indexOf('id="mktRevealControl"'));
-    expect(revealBlock).not.toContain('chrome.');
-  });
-
-  it('目次リンクのジャンプ先が演出未到達でも空白に見えないよう hashchange で先行 reveal する', () => {
-    const html = buildMarketingDashboardHtml(minimal());
-    expect(html).toContain("addEventListener('hashchange'");
-    expect(html).toContain('revealTargetFromHash');
-    expect(html).toContain('location.hash');
+    expect(MKT_SECTION_REVEAL_ENABLED).toBe(false);
+    expect(html).not.toContain('id="mktRevealControl"');
+    expect(html).not.toContain('id="mktRevealSkipBtn"');
+    expect(html).not.toContain('window.AudioContext');
+    expect(html).not.toContain("scrollIntoView({behavior:'smooth'");
+    // 区画を隠す CSS は html に mkt-section-reveal-enabled が付くときだけ効く。付ける script を埋めない=最初から全部見える。
+    expect(html).not.toContain("classList.add('mkt-section-reveal-enabled')");
+    expect(html).toContain('id="mkt-json"');
   });
 
   it('eventRanking opt が無いときはイベント順位セクションを出さない', () => {
