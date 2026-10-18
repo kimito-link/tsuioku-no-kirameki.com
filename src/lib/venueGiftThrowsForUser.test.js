@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { giftThrowsForUser, giftThrowsSectionHtml } from './venueGiftThrowsForUser.js';
+import { giftThrowsForUser, giftThrowsSectionHtml, giftThrowWhenLabel } from './venueGiftThrowsForUser.js';
 
 const LV = 'lv351615340';
 const NOW = 1_800_000_000_000;
@@ -119,5 +119,31 @@ describe('giftThrowsSectionHtml(外部入力の検疫)', () => {
   it('出せないとき(ok:false)は、照合できない理由だけ・over-total のみ文言を出し、他は空', () => {
     expect(giftThrowsSectionHtml(call([row({})], { tileGiftPt: 1 }), esc)).toContain('照合できません');
     expect(giftThrowsSectionHtml(call([]), esc)).toBe('');
+  });
+});
+
+describe('いつ投げたか(v0.1.1663)', () => {
+  const at = Math.floor((NOW - 12 * 60_000) / 1000);
+  const clock = (() => {
+    const d = new Date(at * 1000);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  })();
+  it('★公開時刻があれば、時計の時刻・何分前・配信内の経過を並べる', () => {
+    const r = call([row({ publishedAt: at })]);
+    expect(r.rows[0].at).toBe(at * 1000);
+    expect(giftThrowWhenLabel(r.rows[0], NOW)).toBe(`${clock}(12分前) ・ 配信0:10:00`);
+  });
+  it('★公開時刻が無い古い保存は、配信内の経過だけを「配信○」と明示する(数字だけにしない)', () => {
+    const r = call([row({})]);
+    expect(r.rows[0].at).toBe(0);
+    expect(giftThrowWhenLabel(r.rows[0], NOW)).toBe('配信0:10:00');
+  });
+  it('どちらも無ければ空', () => {
+    expect(giftThrowWhenLabel({ time: '—', at: 0 }, NOW)).toBe('');
+  });
+  it('区画のHTMLに時刻ラベルが入る', () => {
+    const esc = (s) => String(s);
+    const html = giftThrowsSectionHtml(call([row({ publishedAt: at })]), esc, NOW);
+    expect(html).toContain(`${clock}(12分前)`);
   });
 });
