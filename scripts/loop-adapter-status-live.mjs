@@ -24,14 +24,16 @@ export const KNOWN_SYMPTOM_IDS = Object.freeze([
   'thumb-white', 'avatar-all-failed', 'lane-never-rendered', 'lane-painted-zero', 'lane-heavy-race', 'panel-black', 'status-slow',
 ]);
 export const PROJECT = 'tsuioku';
+/** 速報がこの秒数より古ければ「測れていない」。status-live 自身も「5分以上古い」と警告する。 */
+export const STALE_SEC = 300;
 
 /**
  * このアダプタが出すカードの id・metrics の意味（用語集の元。loop-glossary-status-live.mjs が使う）。
  * 出す指標を増やしたら、ここにも足す（足し忘れは loop-adapter-status-live.test.js が赤にする）。
  */
 export const CARD_GLOSSARY = Object.freeze({
-  'status-snapshot': '状態速報の取得そのものの健全性を表すカード。症状ではなく土台の指標（ok=速報本文あり／unmeasured=速報本文が無く測れていない）',
-  snapshotAgeSec: '速報が生成されてからの経過秒。大きいほど速報が古い',
+  'status-snapshot': '状態速報の取得そのものの健全性を表すカード。症状ではなく土台の指標（ok=速報本文があり5分以内／unmeasured=速報本文が無い、または5分以上古い、生成時刻が不明で測れていない。unmeasured は異常なしの意味ではない）',
+  snapshotAgeSec: '速報が生成されてからの経過秒。300を超えると古すぎて測れていない扱い',
   livesCount: '視聴中の配信タブの数',
   reportPresent: '速報本文(statusReport)があるか',
   symptomCount: 'このスナップショットで異常として列挙された症状の数',
@@ -70,10 +72,35 @@ export function buildCardsFromBlob(blob, ctx) {
   cards.push({
     ...base,
     id: 'status-snapshot',
-    verdict: report ? 'ok' : 'unmeasured', // 速報本文が無ければ「測れていない」（緑にしない）
+    // 速報本文が無い・古い（STALE_SEC 超）・生成時刻が不明、のどれかなら「測れていない」。古い速報で「異常なし」と言わない（実データで、1時間前の速報が ok になっていた）
+    verdict: report && common.snapshotAgeSec !== undefined && common.snapshotAgeSec <= STALE_SEC ? 'ok' : 'unmeasured',
     metrics: { ...common, reportPresent: report !== '', symptomCount: found.length, unknownSymptomCount: unknownCount },
   });
   return cards;
+}
+
+/**
+ * status-live の出力から JSON 部分を取り出す（純関数）。
+ * `status-live --json` は、JSONの前に人が読む見出し（「── 状態速報(生成: 59分前) ──」「⚠️ このスナップショットは…古いです」など）を付ける
+ * （実データで初めて分かった）。全体が JSON ならそのまま、そうでなければ「行頭が { の行」から後ろを JSON として読む。読めなければ null。
+ * 見出しの内容は使わない（捨てる）。
+ * @param {string} text
+ * @returns {any|null}
+ */
+export function extractJson(text) {
+  const t = String(text ?? '');
+  try {
+    return JSON.parse(t);
+  } catch {
+    /* 見出し付き */
+  }
+  const m = /(^|\n){/.exec(t);
+  if (!m) return null;
+  try {
+    return JSON.parse(t.slice(m.index + (m[1] ? 1 : 0)));
+  } catch {
+    return null;
+  }
 }
 
 /** @param {Date} d */
@@ -90,11 +117,9 @@ async function main() {
     console.error('[loop-adapter] 症状カードの検査器が見つからない（測れていない）。環境変数 LOOP_KIT_DIR に web-ios-android/templates/scripts を指定する');
     process.exit(2);
   }
-  let blob;
-  try {
-    blob = JSON.parse(readFileSync(0, 'utf8'));
-  } catch {
-    console.error('[loop-adapter] stdin が JSON として読めない（測れていない）');
+  const blob = extractJson(readFileSync(0, 'utf8'));
+  if (blob === null || typeof blob !== 'object') {
+    console.error('[loop-adapter] stdin から JSON を取り出せない（測れていない）');
     process.exit(2);
   }
   const version = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version;
