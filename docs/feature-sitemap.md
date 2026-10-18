@@ -306,7 +306,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 252</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 254</summary>
 
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
@@ -521,6 +521,7 @@
 - `src/lib/venueDomCensus.js` — 会場5段の【実DOM国勢調査(census)】。
 - `src/lib/venueEntryQueue.js` — venueEntryQueue — 会場「入場演出」の差分検出と間引き（純ロジック・DOM を触らない）。
 - `src/lib/venueGeometryVerdict.js` — 会場と①POPのタイル寸法差が「CSS不整合」か「測定対象ズレ」かを見分ける純関数(v0.1.1212)。
+- `src/lib/venueGiftThrowsForUser.js` — 会場の発言パネルに出す「この人のギフトの1回ごとの明細」を、別人のものを貼らないよう安全に作る(純関数)。v0.1.1659。
 - `src/lib/venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
 - `src/lib/venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
 - `src/lib/venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
@@ -544,6 +545,7 @@
 - `src/lib/venueSeatsDiagKey.js` — 会場モードの「座席健全度」観測値を会場(venueBar.js)が書き、status が読む storage キー。
 - `src/lib/venueSpeech.js` — v0.1.711: ライブ会場モードの「発言→吹き出し」純関数。
 - `src/lib/venueSpeechCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/venueSpeechStats.js` — 会場の発言パネルに出す「この人の応援(ギフト・広告)」の一行(純関数・DOM 非依存)。v0.1.1658。
 - `src/lib/venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
 - `src/lib/venueTileCountCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
@@ -676,11 +678,12 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 82</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 83</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
+- `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
 - `scripts/perf-ab/profile-status.mjs` — 診断ページ(status.html)自身のメインスレッド CPU プロファイル。「診断ページが重くて出てこない」の原因探し用。
 - `scripts/perf-ab/status-publish-repro.mjs` — 状態画面(status.html)が「自動公開(WEBへ2分ごとに送信)」を実際に試みるかを、一時プロファイルで再現する。
 - `scripts/run-verify-cc.mjs` — Claude Code 向け verify ランナー。
