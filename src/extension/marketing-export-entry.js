@@ -37,7 +37,9 @@ import {
   commentsStorageKey,
   watchSnapshotStorageKey,
   broadcasterProfileStorageKey,
-  KEY_ANONYMOUS_IDENTICON_ENABLED
+  KEY_ANONYMOUS_IDENTICON_ENABLED,
+  KEY_MARKETING_EXPORT_MASK_LABELS,
+  normalizeMarketingExportMaskLabels
 } from '../lib/storageKeys.js';
 import { giftHistoryThrowsStorageKey } from '../lib/kokenGiftHistoryApi.js';
 import {
@@ -559,8 +561,17 @@ async function runExport(lid) {
 
     setWaitStageText('分析中… (3/3) HTML生成', 75);
     await yieldToBrowserPaint();
+    // v0.1.1661: popup の「共有用に伏せる」設定を使う。別タブ化後は false 固定で、伏せたつもりのHTMLに実名・サムネURLが出ていた。
+    //   読めないとき(storage エラー)は伏せる側に倒す(実名を出さない)。
+    let maskShareLabels = true;
+    try {
+      const maskBag = await chrome.storage.local.get(KEY_MARKETING_EXPORT_MASK_LABELS);
+      maskShareLabels = normalizeMarketingExportMaskLabels(maskBag?.[KEY_MARKETING_EXPORT_MASK_LABELS]);
+    } catch {
+      maskShareLabels = true;
+    }
     const html = buildMarketingDashboardHtml(report, {
-      maskShareLabels: false,
+      maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
       sessionSummaryRows,

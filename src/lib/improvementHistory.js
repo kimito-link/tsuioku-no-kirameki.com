@@ -2578,5 +2578,75 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1657', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(1630〜1656 の note と同じ理由)。今回は実測で確かめている: パネル幅150pxで本文が23行(1文字ずつ)になることを再現し、修正後に3行へ戻ることを同じ環境で測った。'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は会場のEscキーの入口の判定(venueBar.js・十数行)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1658', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1657 の note と同じ理由)。今回は実配信で、変換中・入力欄・しまい中・通常の4通りのEscを送って確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1659', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は発言パネルの表示(venueBar.js 数行+新規の小さな lib 1つ)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1659', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1659', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1658 の note と同じ理由)。今回は実配信で、ギフト・広告だけの人をクリックして、応援の一行と文言が出ることを確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1660', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は発言パネルの表示(venueBar.js 数十行+新規の判定 lib 1つ)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1660', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1660', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1659 の note と同じ理由)。今回は実配信で、記名の人の明細と注記が出ること・IDのない人には何も出ないことを確認し、判定 lib の各ガードは外すと赤になることを変異テストで確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1661', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は書き出しHTMLの演出を既定で無効にするスイッチ1つ(marketingChartsHtml.js)。拡張本体の描画には影響しない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1661', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1661', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1660 の note と同じ理由)。今回は生成HTMLに演出の部品が入っていないことをテストで固定し、スイッチを戻すと赤になることを変異テストで確認した。'
+  }),
+  Object.freeze({
+    version: '0.1.1662', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更はマーケ書き出しタブの設定の読み込み数行(marketing-export-entry.js)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1662', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1662', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1661 の note と同じ理由)。今回は配線テスト3件(先に赤→緑)で、固定値に戻すと赤になることを確認した。'
   })
 ]);
