@@ -35,8 +35,8 @@ function httpUrlOrEmpty(v) {
 const ja = (n) => Math.floor(n).toLocaleString('en-US');
 
 /**
- * @typedef {{ itemName: string, points: number, time: string, at: number, thumbnailUrl: string }} GiftThrowRow
- * @typedef {{ ok: boolean, reason?: string, rows: GiftThrowRow[], sumPoints: number, count: number, notes: string[] }} GiftThrowsResult
+ * @typedef {{ itemName: string, points: number, contribution: number, time: string, at: number, thumbnailUrl: string }} GiftThrowRow
+ * @typedef {{ ok: boolean, reason?: string, rows: GiftThrowRow[], sumPoints: number, count: number, notes: string[], anonCount?: number, anonPoints?: number, official?: 'match'|'short'|'truncated'|null }} GiftThrowsResult
  */
 
 /**
@@ -56,14 +56,27 @@ export function giftThrowsForUser(p) {
   /** @type {Map<string, { r: GiftThrowRow, sortKey: number }>} */
   const byId = new Map();
   let anonCount = 0;
+  let anonPoints = 0;
+  /** @type {Set<string>} 公式の合計との照合用(記名+匿名の全行・重複排除) */
+  const allSeen = new Set();
+  let allPoints = 0;
   for (const raw of payload.history) {
     if (!raw || typeof raw !== 'object') continue;
     const h = /** @type {Record<string, any>} */ (raw);
     const rowUid = String(h.userId == null ? '' : h.userId).trim();
-    if (!rowUid) {
-      anonCount += 1;
-      continue;
+    {
+      const pts = Math.floor(Number(h.points));
+      const k = String(h.kokenHistoryId || '').trim() || `${h.itemName}|${h.time}|${pts}|${h.sortKey}`;
+      if (Number.isFinite(pts) && pts > 0 && !allSeen.has(k)) {
+        allSeen.add(k);
+        allPoints += pts;
+        if (!rowUid) {
+          anonCount += 1;
+          anonPoints += pts;
+        }
+      }
     }
+    if (!rowUid) continue;
     if (rowUid !== uid) continue; // ★完全一致だけ
     const points = Math.floor(Number(h.points));
     if (!Number.isFinite(points) || points <= 0) continue;
@@ -74,6 +87,8 @@ export function giftThrowsForUser(p) {
       r: {
         itemName: String(h.itemName == null ? '' : h.itemName).trim() || '(名称未取得)',
         points,
+        // 公式ランキング(タイルの🎁)と同じ単位(contribution=ptの10倍)。古い保存には無い=0。
+        contribution: Math.max(0, Math.floor(Number(h.contribution)) || 0),
         time: String(h.time == null ? '' : h.time).trim(),
         // 公式の公開時刻(epoch 秒→ms)。無ければ 0=時計の時刻は出さず、配信内の経過だけを出す。
         at: Number(h.publishedAt) > 0 ? Math.floor(Number(h.publishedAt)) * 1000 : 0,
@@ -84,19 +99,42 @@ export function giftThrowsForUser(p) {
   const all = [...byId.values()].sort((a, b) => b.sortKey - a.sortKey).map((x) => x.r);
   if (all.length === 0) return no('empty');
   const sumPoints = all.reduce((s, r) => s + r.points, 0);
+  // v0.1.1669: タイルの🎁は公式ランキングの値=人ごとの contribution の合計(ptの10倍)。ptではなく contribution で照合する。
+  //   contribution を持たない古い保存の行が1つでもあれば、単位が分からないので照合しない(超過・不足を言わない)。
+  const hasContribution = all.every((r) => r.contribution > 0);
+  const sumContribution = all.reduce((s, r) => s + r.contribution, 0);
   const tile = Number(p.tileGiftPt);
-  if (Number.isFinite(tile) && tile > 0 && sumPoints > tile) return { ...no('over-total'), sumPoints, count: all.length };
+  const canReconcile = hasContribution && Number.isFinite(tile) && tile > 0;
+  if (canReconcile && sumContribution > tile) return { ...no('over-total'), sumPoints, count: all.length };
 
   /** @type {string[]} */
   const notes = [];
-  if (Number.isFinite(tile) && tile > 0 && sumPoints < tile) {
-    notes.push(`全部ではありません(明細の合計 ${ja(sumPoints)}pt / 累計 ${ja(tile)}pt)`);
+  if (canReconcile && sumContribution < tile) {
+    notes.push(`全部ではありません(明細の合計 ${ja(sumContribution)} / ランキングの値 ${ja(tile)}・どちらもタイルと同じ単位)`);
+  } else if (canReconcile && sumContribution === tile) {
+    notes.push(`この人の明細は、タイルの🎁 ${ja(tile)}(ランキングの値)と一致しています`);
   }
-  if (anonCount > 0) notes.push('ID のない匿名のギフトは、誰のものか分からないため含みません');
+  if (anonCount > 0) notes.push(`匿名のギフト ${anonCount}件・合計 ${ja(anonPoints)}pt は、誰のものか分からないため含みません`);
+  // v0.1.1669: 公式の合計ptと、記名+匿名の全明細の合計を照合する(残り件数 0=全件取得のときだけ「一致」と言える)。
+  /** @type {'match'|'short'|'truncated'|null} */
+  let official = null;
+  const offTotal = Number(payload.officialTotalPoint);
+  if (Number.isFinite(offTotal) && offTotal >= 0) {
+    const remaining = Math.max(0, Math.floor(Number(payload.officialRemaining) || 0));
+    if (remaining > 0) {
+      official = 'truncated';
+      notes.push(`公式の履歴が100件を超えています(残り ${remaining}件)。古い分は含みません`);
+    } else if (allPoints === Math.floor(offTotal)) {
+      official = 'match';
+      notes.push(`公式の合計 ${ja(offTotal)}pt と一致(全件を取得できています)`);
+    } else {
+      official = 'short';
+    }
+  }
   // 保存時点の齢は timeAuthority に委ねる(取れなければ null=古いとも新しいとも言わない)。
   const ageMs = ageMsOf(payload.capturedAt, p.nowMs);
   if (ageMs != null && ageMs > STALE_MS) notes.push(`${Math.floor(ageMs / 60_000)}分前の記録です`);
-  return { ok: true, rows: all.slice(0, GIFT_THROWS_PANEL_MAX), sumPoints, count: all.length, notes };
+  return { ok: true, rows: all.slice(0, GIFT_THROWS_PANEL_MAX), sumPoints, count: all.length, notes, anonCount, anonPoints, official };
 }
 
 /** @param {number} n */
@@ -134,7 +172,7 @@ export function giftThrowsSectionHtml(r, escapeHtml, nowMs = Date.now(), hasGift
     if (r.reason === 'over-total') return note('ギフトの明細は、累計と照合できません');
     // ★v0.1.1665(2026-10-18 実機「出る時と出ない時がある」): ギフトptがあるのに記録の区画が丸ごと消えると、壊れて見える。理由を言う。
     //   実測: 公式の履歴 API は直近10件ほどしか返さず、匿名の投げは誰のものか分からない。拡張を開く前・取得の合間の投げは出せない。
-    if (hasGift && r.reason === 'empty') return note('公式のギフト履歴には、この人のIDがついた投げの記録がありません。公式の履歴は直近10件ほどしか返さず、匿名の投げは誰のものか分からないため、拡張を開く前や取得の合間の投げは出せません');
+    if (hasGift && r.reason === 'empty') return note('公式のギフト履歴には、この人のIDがついた投げの記録がありません。匿名(名無し)で投げた分は、誰のものか分からないため出せません');
     if (hasGift && (r.reason === 'no-history' || r.reason === 'live-mismatch')) return note('ギフトの履歴をまだ取得できていません(しばらくして開き直すと出ることがあります)');
     return '';
   }
