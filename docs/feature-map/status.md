@@ -23,6 +23,7 @@ graph LR
   n_status --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_status --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_status --> n_src_lib_autoPublishDecision_js["lib/autoPublishDecision.js"]
+  n_status --> n_src_lib_avatarComposeDiagLine_js["lib/avatarComposeDiagLine.js"]:::shared
   n_status --> n_src_lib_avatarFaceStore_js["lib/avatarFaceStore.js"]:::shared
   n_status --> n_src_lib_avatarFaceWorkerClient_js["lib/avatarFaceWorkerClient.js"]:::shared
   n_status --> n_src_lib_avatarLoadReport_js["lib/avatarLoadReport.js"]
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_commentTimelineMirrorKey_js["lib/commentTimelineMirrorKey.js"]:::shared
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
-  n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 136 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 137 ファイル省略（全件は storage-bus.md / metafile 参照）。

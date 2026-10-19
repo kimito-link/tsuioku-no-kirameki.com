@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 945 件
+## ⚠️ 役割コメントが無いソース 8 / 946 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2034)
+- 📁 **src/** (2037)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1144,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1794)
+  - 📁 **lib/** (1797)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1215,6 +1215,9 @@
     - `avatarBroadcasterGuard.test.js`
     - `avatarCanvasToImageUrl.test.js`
     - `avatarCanvasToImageUrl.wiring.test.js`
+    - `avatarComposeDiagLine.js` — 匿名の顔の合成の状況(Worker・永続キャッシュ・フォールバック)を状態速報に出す1行を作る純関数(v0.1.1682)。
+    - `avatarComposeDiagLine.test.js`
+    - `avatarComposeDiagWiring.wiring.test.js`
     - `avatarComposeGate.test.js`
     - `avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
     - `avatarEntryCounts.test.js`

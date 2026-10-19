@@ -3,6 +3,7 @@ import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 import { getDefaultAvatarFaceStore } from './avatarFaceStore.js';
 import { AVATAR_PART_ANCHORS } from './avatarPartAnchors.js';
 import { createAvatarFaceWorkerClient } from './avatarFaceWorkerClient.js';
+import { KEY_AVATAR_COMPOSE_DIAG } from './avatarComposeDiagLine.js';
 
 // ★v0.1.1681: 座標の正本は avatarPartAnchors.js(Worker の合成と共有)。従来の import 先のために再エクスポートする。
 export { AVATAR_PART_ANCHORS };
@@ -558,6 +559,34 @@ export function getAvatarComposeStats() {
   return { ...avatarComposeStats, waitingNear: avatarViewportGate.pendingCount(), active: lim.active, queued: lim.queued, maxQueued: lim.maxQueued, cacheSize: avatarDataUrlCache.size, worker: faceWorkerClient ? faceWorkerClient.snapshot() : { state: 'unused' } };
 }
 
+/** @type {any} */
+let composeDiagTimer = null;
+let composeDiagSig = '';
+
+/**
+ * 合成の統計を chrome.storage.session へ書く(サイドパネルの自己診断が読んで状態速報の1行にする=v0.1.1682)。
+ *   popup の診断は開いて約0.5秒後に1回だけで、顔が要求された後の Worker の状態が実機で読めなかったため。
+ *   要求が来たときだけ 4秒ごとに書き、統計が変わらなくなったら止まる(次の要求で再開)。session が無い環境は何もしない。
+ */
+function noteComposeDiag() {
+  if (composeDiagTimer != null) return;
+  const session = globalThis.chrome?.storage?.session;
+  if (!session || typeof session.set !== 'function') return;
+  composeDiagTimer = setTimeout(() => {
+    composeDiagTimer = null;
+    try {
+      const stats = getAvatarComposeStats();
+      const sig = JSON.stringify(stats);
+      if (sig === composeDiagSig) return;
+      composeDiagSig = sig;
+      void session.set({ [KEY_AVATAR_COMPOSE_DIAG]: { at: Date.now(), stats } }).catch(() => {});
+      noteComposeDiag();
+    } catch {
+      /* 診断の失敗で合成を止めない */
+    }
+  }, 4000);
+}
+
 /**
  * img が画面の近くに来てから(キャッシュ済みなら即)合成する。取り外されたら合成しない。失敗時は即時の SVG のまま。
  * @param {any} img
@@ -567,6 +596,7 @@ export function getAvatarComposeStats() {
  */
 function composeWhenNear(img, key, immediate) {
   avatarComposeStats.requested += 1;
+  noteComposeDiag();
   if (avatarDataUrlCache.has(key)) {
     avatarComposeStats.cacheHit += 1;
     return composeAvatarPartsDataUrl(key).catch(() => immediate);
