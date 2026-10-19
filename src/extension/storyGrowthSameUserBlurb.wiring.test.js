@@ -74,8 +74,9 @@ describe('story growth same-user blurb wiring (popup-entry.js)', () => {
   it('組み立てた注記が aria-label と title の両方で使われている', () => {
     const block = blockOf();
     // この関数内での img への設定であることまで見る(他所の aria-label に釣られない)。
-    expect(block).toMatch(/img\.setAttribute\(\s*'aria-label',/);
-    expect(block).toMatch(/img\.title\s*=\s*entry/);
+    // v0.1.1688: 同値なら書かない部品(setAttrIfChanged)経由。
+    expect(block).toMatch(/setAttrIfChanged\(\s*img,\s*'aria-label',/);
+    expect(block).toMatch(/setAttrIfChanged\(\s*img,\s*'title',\s*entry/);
     // 1度組み立てた変数を両方で使い回す(ホットパスで呼び出しを増やさない)。
     const uses = block.match(/\$\{sameUserBlurb\}/g) || [];
     expect(uses.length).toBe(2);

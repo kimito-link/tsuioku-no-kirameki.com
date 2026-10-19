@@ -5318,6 +5318,16 @@
       ]
     },
     {
+      "file": "src/lib/domWriteIfChanged.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/effectDetailCells.js",
       "featureCount": 1,
       "features": [
