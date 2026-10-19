@@ -311,7 +311,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 262</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 264</summary>
 
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
@@ -332,6 +332,7 @@
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
 - `src/extension/avatar-face-worker-entry.js` — 匿名の顔を合成する専用 Worker(v0.1.1681)。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
+- `src/extension/sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませるだけの【極小エントリ】。v0.1.1693
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -494,6 +495,7 @@
 - `src/lib/scrollWhiteoutReport.js` — スクロール白化(下にスクロールすると重く・一瞬白くなって・遅れて描画される)を状態速報の
 - `src/lib/selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
 - `src/lib/sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
+- `src/lib/sidepanelIframeLoader.js` — サイドパネルの iframe(中の popup)の読み込みを「親の最初の描画のあと」まで遅らせる、読み込み役(時計・iframe は引数で受け取る)。v0.1.1693
 - `src/lib/storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
 - `src/lib/storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
 - `src/lib/storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
@@ -1187,14 +1189,14 @@
 - `v0.1.1676` 2026-10-17 — パネルが描かれるまでの計測を全回分にする
 - `v0.1.1675` 2026-10-17 — サイドパネルが開くまでの時間を実機で測る
 
-### ⚡ 描画・性能 (5版)
+### ⚡ 描画・性能 (6版)
+- `v0.1.1693` 2026-10-17 — サイドパネルの縞を縮めるため中身を後から読む
 - `v0.1.1687` 2026-10-17 — 起動直後の描き直しの連発を1回にまとめる
 - `v0.1.1686` 2026-10-17 — ちらつき計と黒い幕の年表を入れる
 - `v0.1.1684` 2026-10-17 — 自己診断が最初の描画を遅らせないようにする
 - `v0.1.1679` 2026-10-17 — パネル起動時の画像の先読みをやめる
 - `v0.1.1677` 2026-10-17 — アイコンURL比較の無駄な再計算を省く
 
-### その他 (3版)
+### その他 (2版)
 - `v0.1.1689` 2026-10-17 — 応援マスが増えても既存のマスを作り直さない
 - `v0.1.1674` 2026-10-17 — サイドパネルを開く直前の用意を取りこぼさない
-- `v0.1.1673` 2026-10-17 — マーケレポートに広告の気づいた時刻を表示

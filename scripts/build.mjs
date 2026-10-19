@@ -179,6 +179,13 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // v0.1.1693: サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませるだけの極小エントリ。
+    //   重い本体(sidepanel.js)より前に読ませる=本体が壊れても動く。拡張の CSP でインラインに書けないので別ファイル。
+    entryPoints: ['src/extension/sidepanel-iframe-boot-entry.js'],
+    outfile: 'extension/dist/sidepanel-iframe-boot.js',
+    target: 'chrome100'
+  },
+  {
     // v0.1.1681: 匿名の顔(PNG)の合成を担う専用 Worker。メインスレッドの canvas.toBlob の詰まりを外へ出す。
     //   classic Worker(IIFE)で足りる。拡張ページが chrome.runtime.getURL('dist/avatar-face-worker.js') で起動する。
     entryPoints: ['src/extension/avatar-face-worker-entry.js'],

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 955 件
+## ⚠️ 役割コメントが無いソース 8 / 957 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2064)
+- 📁 **src/** (2067)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -897,7 +897,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (64)
+  - 📁 **extension/** (65)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -950,6 +950,7 @@
     - `popupUserLaneAvatarObservedFlow.test.js`
     - `repaintLoopGuard.wiring.test.js`
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
+    - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませるだけの【極小エントリ】。v0.1.1693
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
     - `statusCopyFreshness.wiring.test.js`
     - `statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
@@ -1144,7 +1145,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1824)
+  - 📁 **lib/** (1826)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2495,6 +2496,8 @@
     - `sidepanelCloakWiring.test.js`
     - `sidepanelFlashNotOverwritten.wiring.test.js`
     - `sidepanelFlashSurvives.behavior.test.js`
+    - `sidepanelIframeLoader.js` — サイドパネルの iframe(中の popup)の読み込みを「親の最初の描画のあと」まで遅らせる、読み込み役(時計・iframe は引数で受け取る)。v0.1.1693
+    - `sidepanelIframeLoader.test.js`
     - `sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
     - `sidepanelIframeReveal.test.js`
     - `sidepanelIframeReveal.wiring.test.js`

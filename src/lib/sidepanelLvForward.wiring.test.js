@@ -25,45 +25,69 @@ describe('サイドパネルの lv 受け渡し', () => {
   });
 
   /**
-   * ★v0.1.1421: v1419 の data-nl-src 方式は【撤回】した。
-   *
-   * 実機で「パネルが全面真っ黒(ヘッダも中身も無い)」が続き、
-   * 同じ拡張の診断ページは正常だった＝この iframe だけが空だった。
-   * src を JS で立てる設計は【単一障害点】で、スクリプトが走らなければ
-   * パネルが永久に出ない。描画は JS を1行も待たずに始まらねばならない。
+   * ★v0.1.1421: v1419 の data-nl-src 方式は【撤回】した(src を JS で付ける設計は単一障害点。スクリプトが走らなければ
+   *   パネルが永久に空=全面真っ黒になった)。
+   * ★v0.1.1693: 縞(黒い幕)を縮めるため、ユーザー判断で「親の最初の描画のあとに src を付ける」方式へ【再度】移した。
+   *   v1419 と違い、単一障害点にしない守りを重ねている(この検査が機械で固定する):
+   *     ①極小の別スクリプト(sidepanel-iframe-boot)へ隔離し、重い本体より【前】に読む
+   *     ②保険タイマーで必ず読み込ませる(関門が開かなくても・壊れても)
+   *     ③出荷物にそのスクリプトが入っていることを stage-submission が必須にする
    */
-  it('★★iframe は必ず src を持つ(描画を JS に依存させない=単一障害点を作らない)', () => {
+  it('★★iframe の src は極小の別スクリプトが必ず付ける(v0.1.1693: 守りを重ねた data-nl-src 方式)', () => {
     expect(sidepanelHtml).toMatch(
-      /<iframe[^>]*\ssrc="popup\.html\?inline=1&amp;dock=sidepanel"/
+      /<iframe[^>]*\sdata-nl-src="popup\.html\?inline=1&amp;dock=sidepanel"/
     );
-    // data-nl-src 方式へ戻していないこと(戻すと黒が再発する)。
-    expect(sidepanelHtml).not.toMatch(/<iframe[^>]*data-nl-src=/);
+    // 静的な src は持たない(持つと二重ロード=親の最初の描画が再び遅れる)。
+    expect(sidepanelHtml).not.toMatch(/<iframe[^>]*\ssrc=/);
   });
 
-  it('★lv があるときだけ src を書き換える(無いときは触らない=二重ロード防止)', () => {
-    expect(sidepanelEntry).toMatch(/querySelector\(\s*['"]iframe\[src\]['"]\s*\)/);
-    expect(sidepanelEntry).toMatch(/buildSidePanelIframeSrc\(/);
-    // 「変わったときだけ」書き換える条件があること。
-    expect(sidepanelEntry).toMatch(/next\s*&&\s*next\s*!==\s*base/);
+  it('★★守り①: 極小スクリプトは本体より【前】に読む・どちらも外部ファイル(CSP でインライン不可)', () => {
+    const bootAt = sidepanelHtml.indexOf('<script src="dist/sidepanel-iframe-boot.js"></script>');
+    const mainAt = sidepanelHtml.indexOf('<script src="dist/sidepanel.js"></script>');
+    expect(bootAt).toBeGreaterThan(-1);
+    expect(mainAt).toBeGreaterThan(-1);
+    expect(bootAt).toBeLessThan(mainAt);
+  });
+
+  it('★★守り②: 保険(必ず読み込ませる)・失敗しても素の src(ローダーと極小スクリプト)', () => {
+    const loader = readFileSync(join(root, 'src', 'lib', 'sidepanelIframeLoader.js'), 'utf8');
+    const boot = readFileSync(join(root, 'src', 'extension', 'sidepanel-iframe-boot-entry.js'), 'utf8');
+    // 保険タイマーを最初に立てる(以降の処理が失敗しても動く)
+    const failsafeAt = loader.indexOf('IFRAME_FAILSAFE_MS);');
+    const gateAt = loader.indexOf('const gateDone');
+    expect(failsafeAt).toBeGreaterThan(-1);
+    expect(failsafeAt).toBeLessThan(gateAt);
+    // 極小スクリプトの catch でも素の src を付ける
+    expect(boot).toMatch(/\} catch \{[\s\S]*setAttribute\('src'/);
+  });
+
+  it('★★守り③: 出荷物に dist/sidepanel-iframe-boot.js が入っていることを必須にする(無いとパネルが空)', () => {
+    const stage = readFileSync(join(root, 'scripts', 'stage-submission.py'), 'utf8');
+    expect(stage).toContain("'dist/sidepanel-iframe-boot.js'");
+    const build = readFileSync(join(root, 'scripts', 'build.mjs'), 'utf8');
+    expect(build).toContain("entryPoints: ['src/extension/sidepanel-iframe-boot-entry.js']");
+    expect(build).toContain("outfile: 'extension/dist/sidepanel-iframe-boot.js'");
+  });
+
+  it('★lv を付ける・無いときだけ自力探索する(極小スクリプトが担う。本体は src に触れない=二重に付けない)', () => {
+    const boot = readFileSync(join(root, 'src', 'extension', 'sidepanel-iframe-boot-entry.js'), 'utf8');
+    expect(boot).toMatch(/querySelector\(\s*['"]iframe\[data-nl-src\]['"]\s*\)/);
+    expect(boot).toMatch(/buildSidePanelIframeSrc\(/);
+    expect(sidepanelEntry).not.toMatch(/setAttribute\(\s*['"]src['"]/);
+    // 本体は iframe を src の有無に関係なく見つける(覆い・診断のため)
+    expect(sidepanelEntry).toMatch(/document\.querySelector\(\s*['"]iframe['"]\s*\)/);
   });
 
   it('★判定は純関数へ隔離されている(entry に正規表現を書かない)', () => {
-    expect(sidepanelEntry).toMatch(
+    const boot = readFileSync(join(root, 'src', 'extension', 'sidepanel-iframe-boot-entry.js'), 'utf8');
+    expect(boot).toMatch(
       /import\s*\{[^}]*buildSidePanelIframeSrc[^}]*\}\s*from\s*'\.\.\/lib\/sidepanelIframeSrc\.js'/
     );
   });
 
-  it('★lv を足す処理は自己診断より前にある(読み込み開始を遅らせない)', () => {
-    const wireAt = sidepanelEntry.indexOf('buildSidePanelIframeSrc(');
-    const diagAt = sidepanelEntry.indexOf('function probeCenterPainter');
-    expect(wireAt).toBeGreaterThan(-1);
-    expect(diagAt).toBeGreaterThan(-1);
-    expect(wireAt).toBeLessThan(diagAt);
-  });
-
   it('★dock=sidepanel は保たれる(モード判定を変えない)', () => {
-    // src に dock=sidepanel が入っていること。ここが消えると
+    // data-nl-src に dock=sidepanel が入っていること。ここが消えると
     // popup が INLINE_SIDE_PANEL ではなく embedWatch と誤判定される。
-    expect(sidepanelHtml).toMatch(/<iframe[^>]*src="[^"]*dock=sidepanel/);
+    expect(sidepanelHtml).toMatch(/<iframe[^>]*data-nl-src="[^"]*dock=sidepanel/);
   });
 });

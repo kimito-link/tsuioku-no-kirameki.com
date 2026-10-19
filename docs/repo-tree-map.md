@@ -319,10 +319,10 @@ graph LR
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 153 件</sub>
+<sub>ファイル 154 件</sub>
 
 - `data/`（1 件） — 拡張同梱の静的データ(応援バナー定義 json)  〔データ / 応援〕
-- `dist/`（14 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
+- `dist/`（15 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
@@ -346,14 +346,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2064 件</sub>
+<sub>ファイル 2067 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（64 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（65 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1824 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1826 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（4 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
