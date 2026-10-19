@@ -38,7 +38,8 @@ import { nicoUserPageUrl } from './nicoUserPage.js';
  *   storyAvatarLoadGuard: { pickDisplaySrc: (s: string) => string, noteRemoteAttempt: (img: HTMLImageElement, requested: string) => void },
  *   isHttpOrHttpsUrl: (u: unknown) => boolean,
  *   storyTileUsesYukkuriTvStyle: (requested: string, display: string) => boolean,
- *   upgradeAnonymousAvatarImage?: (img: HTMLImageElement, userKey: string, sizePx?: number) => unknown
+ *   upgradeAnonymousAvatarImage?: (img: HTMLImageElement, userKey: string, sizePx?: number) => unknown,
+ *   cachedAnonymousFace?: (userKey: string) => string
  * }} PersonTileIo
  */
 
@@ -72,7 +73,15 @@ export function buildPersonTileEl(p, io) {
   img.className = 'nl-story-userlane-avatar';
   const requestedLane = p.displaySrc;
   const displayLane = io.storyAvatarLoadGuard.pickDisplaySrc(requestedLane);
-  img.src = displayLane;
+  // v0.1.1685: 合成済みの顔(PNG)がメモリにあれば、最初から顔を出す(SVG の仮の顔→PNG の差し替えちらつきを出さない)。
+  //   匿名の仮の顔(SVG)が要求されたときだけ。本物のアイコン URL・会場(注入しない)は従来どおり。
+  const cachedFace =
+    fullUid &&
+    requestedLane.startsWith('data:image/svg+xml') &&
+    typeof io.cachedAnonymousFace === 'function'
+      ? io.cachedAnonymousFace(fullUid)
+      : '';
+  img.src = cachedFace || displayLane;
   io.storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
   img.classList.toggle(
     'nl-avatar--tv-fallback',
