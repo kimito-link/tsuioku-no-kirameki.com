@@ -840,7 +840,6 @@
 | `src/lib/resolveVisitorCount.js` | 1 | 状態速報ページ |
 | `src/lib/roomCardInnerHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/roomHeatMirror.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/runAfterNextPaint.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/sameOriginContribRankingDomShape.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/sanitizeRoomAvatarsForBroadcaster.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/scoreAnnounce.js` | 1 | ポップアップ(応援レーン) |

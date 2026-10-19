@@ -49,8 +49,7 @@ describe('★可視復帰の catch-up にサイドパネルを含める', () => 
 
   it('復帰時に refresh を蹴る(判定だけで終わらせない)', () => {
     const i = src.indexOf('const visGapMs =');
-    // v0.1.1695: サイドパネルでは resume(=safeRefresh)を次の描画のあとへ送るため、判定から少し離れた(900字以内)。
-    const after = src.slice(i, i + 900);
+    const after = src.slice(i, i + 500);
     expect(after).toContain('safeRefresh()');
     expect(after).toContain('visibility_resume');
   });
