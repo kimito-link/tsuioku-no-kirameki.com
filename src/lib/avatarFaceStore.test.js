@@ -23,6 +23,7 @@ describe('avatarFaceStore', () => {
     const a = createAvatarFaceStore({ indexedDBRef: idb, setTimeoutRef: t1.later });
     a.put('a:user1', PNG(1));
     await t1.run();
+    await a.idle();
     const t2 = manualTimer();
     const b = createAvatarFaceStore({ indexedDBRef: idb, setTimeoutRef: t2.later });
     const p = b.get('a:user1');
@@ -43,6 +44,7 @@ describe('avatarFaceStore', () => {
     const store = createAvatarFaceStore({ indexedDBRef: idb, setTimeoutRef: t.later });
     for (let i = 0; i < 50; i += 1) store.put(`a:u${i}`, PNG(i));
     await t.run();
+    await store.idle();
     let txCount = 0;
     const origOpen = idb.open.bind(idb);
     idb.open = (...args) => {
@@ -67,6 +69,7 @@ describe('avatarFaceStore', () => {
     const { store, t } = fresh();
     store.put('a:dup', PNG(7));
     await t.run();
+    await store.idle();
     const p1 = store.get('a:dup');
     const p2 = store.get('a:dup');
     await t.run();
@@ -93,6 +96,7 @@ describe('avatarFaceStore', () => {
     const a = createAvatarFaceStore({ indexedDBRef: idb, setTimeoutRef: t1.later });
     a.put('a:ver', PNG(3));
     await t1.run();
+    await a.idle();
     // 直接 DB を開いて、保存キーに版が入っていることを確かめる
     const db = await new Promise((res) => { const r = idb.open('nls_avatar_face_v1', 1); r.onsuccess = () => res(r.result); });
     const keys = await new Promise((res) => { const r = db.transaction('faces').objectStore('faces').getAllKeys(); r.onsuccess = () => res(r.result); });
@@ -108,6 +112,7 @@ describe('avatarFaceStore', () => {
     for (let round = 0; round < 3; round += 1) {
       for (let i = 0; i < 4; i += 1) store.put(`a:r${round}-${i}`, PNG(round * 10 + i));
       await t.run();
+      await store.idle();
     }
     const old = store.get('a:r0-0');
     const recent = store.get('a:r2-3');
