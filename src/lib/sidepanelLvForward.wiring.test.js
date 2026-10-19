@@ -20,8 +20,13 @@ const sidepanelEntry = readFileSync(join(root, 'src', 'extension', 'sidepanel-en
 const backgroundJs = readFileSync(join(root, 'extension', 'background.js'), 'utf8');
 
 describe('サイドパネルの lv 受け渡し', () => {
-  it('★background が sidepanel.html へ lv を渡している(送り手が居る)', () => {
-    expect(backgroundJs).toMatch(/sidepanel\.html\?lv=/);
+  it('★v0.1.1696: background はタブ専用の path(?lv=)を焼かない(グローバルのパネル)。lv はパネル自身が決める', () => {
+    expect(backgroundJs).not.toMatch(/sidepanel\.html\?lv=/);
+    const boot = readFileSync(join(root, 'src', 'extension', 'sidepanel-iframe-boot-entry.js'), 'utf8');
+    expect(boot).toContain('pickPanelLv');
+    // パネルが lv を決める経路: アクティブなタブ・タブの切り替えへの追従
+    expect(boot).toContain('chrome.tabs.onActivated.addListener');
+    expect(boot).toContain('loader.update(');
   });
 
   /**

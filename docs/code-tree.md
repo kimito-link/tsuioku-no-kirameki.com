@@ -950,7 +950,7 @@
     - `popupUserLaneAvatarObservedFlow.test.js`
     - `repaintLoopGuard.wiring.test.js`
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
-    - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませるだけの【極小エントリ】。v0.1.1693
+    - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
     - `statusCopyFreshness.wiring.test.js`
     - `statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)

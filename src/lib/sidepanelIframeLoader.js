@@ -42,13 +42,15 @@ export const IFRAME_FAILSAFE_MS = 1500;
  *   base=素の src / target=lv が取れているときの lv 付きの src(取れていなければ base) /
  *   needsPick=lv が無く自力探索が要るか / pickSrc=探索して lv 付きの src を返す(取れなければ '') /
  *   gatePromise=親の最初の描画(か上限の時間)で解決する関門
- * @returns {{ run: () => void }}
+ * @returns {{ run: () => void, update: (src: string) => void }}
  */
 export function createSidepanelIframeLoader(deps) {
   const { iframe, base, target, needsPick, pickSrc, gatePromise, setTimer } = deps;
   let loaded = false;
   let started = false;
   let current = '';
+  /** v0.1.1696: 読み込む前に「見せる配信が変わった」と分かったときの src(次に付ける src をこれに差し替える)。 */
+  let override = '';
 
   /** 最初は付ける。付けたあとは「違う src のときだけ」付け替える(同じ値を付け直して再読み込みさせない)。 @param {string} src */
   const load = (src) => {
@@ -72,7 +74,7 @@ export function createSidepanelIframeLoader(deps) {
       started = true;
       // ★保険を最初に立てる(以降の処理が何で失敗しても、ここは動く)。
       setTimer(() => {
-        if (!loaded) load(target || base);
+        if (!loaded) load(override || target || base);
       }, IFRAME_FAILSAFE_MS);
 
       const gateDone = Promise.resolve(gatePromise).then(
@@ -80,7 +82,7 @@ export function createSidepanelIframeLoader(deps) {
         () => {}
       );
       if (!needsPick || typeof pickSrc !== 'function') {
-        void gateDone.then(() => load(target));
+        void gateDone.then(() => load(override || target));
         return;
       }
       let pickedSrc = '';
@@ -95,11 +97,25 @@ export function createSidepanelIframeLoader(deps) {
           }
         );
       const pickCapped = Promise.race([pickP, new Promise((resolve) => { setTimer(() => resolve(undefined), IFRAME_PICK_MAX_WAIT_MS); })]);
-      void Promise.all([gateDone, pickCapped]).then(() => load(pickedSrc || target));
+      void Promise.all([gateDone, pickCapped]).then(() => load(override || pickedSrc || target));
       // 遅れて lv が分かったら付け替える(読み込み済みで、違う src のときだけ)。
       void pickP.then(() => {
         if (loaded && pickedSrc && pickedSrc !== current) load(pickedSrc);
       });
+    },
+    /**
+     * v0.1.1696: 見せる配信が変わったとき(別の watch タブがアクティブになった)に呼ぶ。
+     *   まだ読み込む前なら、次に付ける src を差し替える。読み込み済みなら、違う src のときだけ付け替える(同じなら何もしない)。
+     * @param {string} src
+     */
+    update(src) {
+      const s = String(src || '');
+      if (!s) return;
+      if (!loaded) {
+        override = s;
+        return;
+      }
+      load(s);
     }
   };
 }

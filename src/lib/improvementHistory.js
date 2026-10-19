@@ -3110,5 +3110,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1695', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1694 の note と同じ理由)。今回は単体10+配線5。ヘッドレスの交互比較は差が小さく(中央値 2ms→1ms・外れ値が減る)、実機の再表示の記録で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1696', metric: 'bundle-kb', value: 1474,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更はサイドパネルの開き方の構造(タブ専用の path をやめてグローバルにする・見せる配信をパネルが決める=新規 pickPanelLv・ローダーに update)。popup・描画・保存は触らない。v0.1.1695 の再表示の更新の後ろ送りと計器は、グローバルになれば再表示自体が起きないので不要になるが、今回は残す(計器で再表示が起きないことを確かめるため)。'
+  }),
+  Object.freeze({
+    version: '0.1.1696', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1696', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1695 の note と同じ理由)。今回は単体 +7(pickPanelLv 4・loader.update 3)・配線テストを新構造へ書き換え(旧『setOptions が3か所』の固定は意図ごと置換)。実機のタブ切り替えで確認(ヘッドレスは Chrome の実サイドパネルを再現できない)。'
   })
 ]);
