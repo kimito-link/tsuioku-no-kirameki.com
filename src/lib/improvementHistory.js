@@ -2970,5 +2970,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1686', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1684 の note と同じ理由)。今回は単体 meter13+boot7+配線6。実機データを写したヘッドレスで、計器が本物のちらつきを検出できることを確認した: v1683 の修正を外した昔の挙動で .nl-story-growth-icon の往復 7,506 回(12秒)、今の版で 2 回。計器自身は 12 秒で約 45ms。'
+  }),
+  Object.freeze({
+    version: '0.1.1687', metric: 'bundle-kb', value: 1463,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は計器のみ(新規 bootTimeline・bootTimelineBoot。popup が自分の節目・長い処理・段階を session へ・サイドパネルが親の起点に直して速報へ。watchPopupLoadDiagnostics に段階の年表を追加)。描画は触っていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1687', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1687', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1686 の note と同じ理由)。今回は単体15+配線5。ヘッドレスで、親の最初の描画+48ms・子のDOM構築+327ms・子の長い処理8件と段階の並びが速報の1行に出ることを確認。LoAF は子 iframe のスクリプトを親へ教えない(scripts が空)ため関数名は出さず、親子を同じ線上に並べる方式にした(先に試した『子の LoAF』は iframe では観測できず、常に『無し』と誤って出るため採用しなかった)。'
   })
 ]);

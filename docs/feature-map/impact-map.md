@@ -478,6 +478,8 @@
 | `src/lib/bandScaleBoot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/blackScreenOwnerCells.js` | 1 | 状態速報ページ |
 | `src/lib/blobDownload.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/bootTimeline.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/bootTimelineBoot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastCrossCompare.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastDurationLabel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcasterCommentCount.js` | 1 | ポップアップ(応援レーン) |

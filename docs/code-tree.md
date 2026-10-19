@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 949 件
+## ⚠️ 役割コメントが無いソース 8 / 951 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2045)
+- 📁 **src/** (2049)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1144,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1805)
+  - 📁 **lib/** (1809)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1283,6 +1283,10 @@
     - `blobDownload.test.js`
     - `blockerSectionNamed.test.js`
     - `bootReadBudgetWiring.wiring.test.js`
+    - `bootTimeline.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない。時刻・記録は呼び出し側が渡す)
+    - `bootTimeline.test.js`
+    - `bootTimelineBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
+    - `bootTimelineWiring.wiring.test.js`
     - `broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
     - `broadcastContext.test.js`
     - `broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。

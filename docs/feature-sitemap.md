@@ -118,7 +118,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 55</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 56</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
@@ -126,6 +126,7 @@
 - `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
+- `src/lib/bootTimeline.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない。時刻・記録は呼び出し側が渡す)
 - `src/lib/broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）
 - `src/lib/broadcastSessionSummaryFlush.js` — サマリ IndexedDB への間欠フラッシュ（ポップアップから呼ぶ）
 - `src/lib/commentChunkStore.js` — v0.1.509: コメント本体の「追記専用チャンク分割」純関数群＋ストレージ orchestration。
@@ -912,7 +913,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 230</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 231</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -979,6 +980,7 @@
 - `src/lib/bandScale.js` — 「大きく見せる枠(PICK UP 帯)」の倍率(純関数)。
 - `src/lib/bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
 - `src/lib/blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
+- `src/lib/bootTimelineBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
 - `src/lib/buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
 - `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
 - `src/lib/bundleBuildId.js` — dist バンドル本文から NL_BUILD_ID(JST, MMDD-HHmmss)の焼き込み値を
@@ -1151,17 +1153,15 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (4版)
+### 💾 記録件数 (3版)
 - `v0.1.1678` 2026-10-17 — 記録件数が一瞬二重になる不具合を直す
 - `v0.1.1672` 2026-10-17 — マーケレポートに「ギフトの瞬間」の章を追加
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
-- `v0.1.1666` 2026-10-17 — 広告ランキングの帯を10行に固定し数字は全行から
 
-### 📥 コメント取得 (4版)
+### 📥 コメント取得 (3版)
 - `v0.1.1670` 2026-10-17 — 配信者の名前・自己紹介・SNSを取得して表示
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1667` 2026-10-17 — 広告主を11社目以降も取得し全員表示
-- `v0.1.1666` 2026-10-17 — 広告ランキングの帯を10行に固定し数字は全行から
 
 ### 🙂 匿名(184) (5版)
 - `v0.1.1683` 2026-10-17 — 成長アイコンの顔を毎回戻して差し替えない
@@ -1183,14 +1183,16 @@
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1667` 2026-10-17 — 広告主を11社目以降も取得し全員表示
 
-### 🩺 診断・状態速報 (5版)
+### 🩺 診断・状態速報 (6版)
+- `v0.1.1687` 2026-10-17 — 黒い幕の間に何が動いたかを年表で出す
 - `v0.1.1686` 2026-10-17 — ちらつきを場所ごとに数える計器を入れる
 - `v0.1.1684` 2026-10-17 — 自己診断が最初の描画を遅らせないようにする
 - `v0.1.1682` 2026-10-17 — 顔の合成の状況を状態速報に出す
 - `v0.1.1676` 2026-10-17 — パネルが描かれるまでの計測を全回分にする
 - `v0.1.1675` 2026-10-17 — サイドパネルが開くまでの時間を実機で測る
 
-### ⚡ 描画・性能 (3版)
+### ⚡ 描画・性能 (4版)
+- `v0.1.1687` 2026-10-17 — 黒い幕の間に何が動いたかを年表で出す
 - `v0.1.1684` 2026-10-17 — 自己診断が最初の描画を遅らせないようにする
 - `v0.1.1679` 2026-10-17 — パネル起動時の画像の先読みをやめる
 - `v0.1.1677` 2026-10-17 — アイコンURL比較の無駄な再計算を省く
