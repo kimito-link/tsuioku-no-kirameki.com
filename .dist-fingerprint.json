@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "c91981973e52327fe76b859e9a7e027e8b1f7c0e31785c7f964975d48a7c1d67",
+  "fingerprint": "174f5a98ab42d9d730d83af29d05748c56160088239cb6903149362eaf5407e4",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -597,6 +597,7 @@
     "src/lib/roomCardInnerHtml.js",
     "src/lib/roomHeatMirror.js",
     "src/lib/roomHeatMirrorKey.js",
+    "src/lib/runAfterNextPaint.js",
     "src/lib/safeStorageLocal.js",
     "src/lib/sameOriginContribRankingDomShape.js",
     "src/lib/sanitizeRoomAvatarsForBroadcaster.js",
@@ -621,6 +622,7 @@
     "src/lib/shouldRearmBackfillForOfficialGap.js",
     "src/lib/shouldSkipDeepHarvest.js",
     "src/lib/shouldTriggerOfficialGapDeepHarvest.js",
+    "src/lib/showToFrameLedger.js",
     "src/lib/sidePanelLvFromTabs.js",
     "src/lib/sidepanelCloakDuration.js",
     "src/lib/sidepanelIframeLoader.js",
@@ -834,19 +836,19 @@
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
     "extension/dist/content.js": "e976bd134674507ed97bf626514b4fe024b3147151ac33ff943ed1f4ac5d0daa",
-    "extension/dist/popup.js": "c18bdc3a2b3ac39fb40d972a16d48d9040f6fd9d027be40a4b3671f966295d90",
+    "extension/dist/popup.js": "8ca14c82f3941424b7dba2225fb498c59b4c80ca803b3b00a45335b61e5db0e0",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "d2514622d0639f3296c7e3b66f1eb3e7de67657f7d8cdb5062759fd8bf6a0687",
+    "extension/dist/status.js": "e3687bc6b4de4404fe993264233771553f816e33cdb7d5217bbbdef9fb64ee14",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "6b01415908f3b538f197198c312c2395f36636a9dd982a267a47ec9a4c35d230",
     "extension/dist/comeview.js": "728e085810ee9282c2c232a44f48541774bbe1fba35f1f5f706be82f42bb90ba",
     "extension/dist/venue.js": "81aed6d9d09a19c38288ad5215232b46e4b7f7ac97a0c94c49986ba53b9877ab",
-    "extension/dist/sidepanel.js": "1bd231ca0f45852e92df99ae365de49f65ff440e99d16541ba9f69d2714ec68a",
+    "extension/dist/sidepanel.js": "5b1e9612aed4b6eb49c1e7bd93c362e1402987e99cca1a99e5e9b6251513c45b",
     "extension/dist/sidepanel-iframe-boot.js": "58a66e30b8c759d780435163ae81b3f2e45324bc6afff145a5c00ccf8ed4d6f0",
     "extension/dist/avatar-face-worker.js": "7d17a9a9d2f53cf8c90373ccb940ee2e458b0b9f04ed5bb83b349ab394945af9",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "e71b710715c7b528ad235177d468407a5094d6051b1c37daf5359a0c25e0b8d1",
+    "app/dist/live-view.js": "aa4e2162a63446328dde4fcba3b4b9e21e5da1a521f307e1c00ddbdd35d807f3",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }

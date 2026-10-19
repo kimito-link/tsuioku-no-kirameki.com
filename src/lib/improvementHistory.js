@@ -3096,5 +3096,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1694', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1693 の note と同じ理由)。今回は単体 +7(fastDiagFullGate 5・ingestLog 2)・配線4。効果は実機の census で確認(ヘッドレスは content の書き込みが再現しない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1695', metric: 'bundle-kb', value: 1473,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は、サイドパネル再表示時の更新を描画のあとへ送ること(新規 runAfterNextPaint)と、再表示の記録の計器(新規 showToFrameLedger・sidepanel-entry と aiShareFullText に数行)。popup の描画・保存は触らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1695', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1695', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1694 の note と同じ理由)。今回は単体10+配線5。ヘッドレスの交互比較は差が小さく(中央値 2ms→1ms・外れ値が減る)、実機の再表示の記録で確認。'
   })
 ]);

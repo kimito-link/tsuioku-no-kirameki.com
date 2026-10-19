@@ -69,6 +69,7 @@ import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
+import { runAfterNextPaint } from '../lib/runAfterNextPaint.js';
 import { canAppendStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
@@ -21735,9 +21736,15 @@ async function initPopup() {
       // 0.1.94: 0.1.92 polling 側で snapshot=null を撤去したのに合わせて
       //   visibilitychange でも snapshot を残す（stale-while-revalidate）。
       //   タブ切替で戻った瞬間に「接続中…」が再点灯する症状を防ぐ。
-      watchMetaCache.key = '';
-      tagRefreshReason('visibility_resume');
-      safeRefresh();
+      // v0.1.1695: サイドパネルの再表示では、重い refresh を【次の描画のあと】へ送る(再表示後の最初のフレームを遅らせない=タブ切り替えの縞)。
+      const resume = () => {
+        if (document.visibilityState !== 'visible') return;
+        watchMetaCache.key = '';
+        tagRefreshReason('visibility_resume');
+        safeRefresh();
+      };
+      if (INLINE_SIDE_PANEL) runAfterNextPaint(resume);
+      else resume();
     });
   }
 
