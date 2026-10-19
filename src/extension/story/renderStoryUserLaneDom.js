@@ -95,7 +95,10 @@ const _laneTierLastKey = new WeakMap();
  * @param {HTMLElement|null|undefined} laneEl
  */
 export function invalidateStoryUserLaneTierKey(laneEl) {
-  if (laneEl) _laneTierLastKey.delete(laneEl);
+  if (laneEl) {
+    _laneTierLastKey.delete(laneEl);
+    _laneTierTileKeys.delete(laneEl); // v0.1.1692: 作り直しを求められた段は、タイルも使い回さない
+  }
 }
 
 /**
@@ -106,6 +109,13 @@ export function invalidateStoryUserLaneTierKey(laneEl) {
  * @type {WeakMap<HTMLElement, Array<HTMLElement|null>>}
  */
 const _laneTileNodes = new WeakMap();
+
+/**
+ * v0.1.1692: 段(lane el)ごとに「前回描いた人ごとの見た目の鍵(items と同じ並び)」を持つ。
+ *   段の貼り替えで、鍵が同じ人のタイル(=_laneTileNodes の同じ並びの要素)をそのまま使い回すため。
+ * @type {WeakMap<HTMLElement, string[]>}
+ */
+const _laneTierTileKeys = new WeakMap();
 
 /**
  * タイル本体の meta に data-stats を付け外しする。値が同じなら DOM に書かない。
@@ -422,18 +432,24 @@ export function shouldKeepStoryUserLaneTilesOnShrink(
  * @returns {string}
  */
 function storyLaneTierBodyKey(items) {
-  return items
-    .map((p) => {
-      const it = p && typeof p === 'object' ? p : {};
-      return [
-        String(it.entry?.userId || ''),
-        String(it.displaySrc || ''),
-        String(it.meta?.idLine || ''),
-        String(it.meta?.nameLine || ''),
-        String(it.title || '')
-      ].join('');
-    })
-    .join('');
+  return items.map(storyLaneTileKey).join('');
+}
+
+/**
+ * 段の中の1人ぶんの「見た目の鍵」(storyLaneTierBodyKey の1要素と同じ出力)。v0.1.1692
+ *   段の貼り替え時に「前回と同じ見た目の人のタイルは作り直さず、そのまま使う」ための照合に使う。
+ * @param {{ displaySrc?: any, title?: any, meta?: { idLine?: any, nameLine?: any }, entry?: { userId?: any } }} p
+ * @returns {string}
+ */
+function storyLaneTileKey(p) {
+  const it = p && typeof p === 'object' ? p : {};
+  return [
+    String(it.entry?.userId || ''),
+    String(it.displaySrc || ''),
+    String(it.meta?.idLine || ''),
+    String(it.meta?.nameLine || ''),
+    String(it.title || '')
+  ].join('');
 }
 
 /** @param {HTMLElement | null} root */
@@ -537,7 +553,7 @@ export function resetStoryUserLaneDom(els) {
   for (const laneEl of [laneLink, laneGift, laneAd, laneKonta, laneTanu]) {
     // ★中身LOD: DOM を消す前に観測を解く(IO がターゲット参照を握る=リーク防止)。
     if (laneEl) forgetLaneContentLod(laneEl);
-    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); _laneTileNodes.delete(laneEl); }
+    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); _laneTileNodes.delete(laneEl); _laneTierTileKeys.delete(laneEl); }
   }
   laneLink.hidden = true;
   laneGift.hidden = true;
@@ -577,6 +593,7 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     el.hidden = true;
     _laneTierLastKey.set(el, '');
     _laneTileNodes.delete(el);
+    _laneTierTileKeys.delete(el);
     return;
   }
   // ★diff-skip: 前回と同一 items(見た目の body key 一致)なら DOM を一切触らない=img 温存で churn 消滅。
@@ -593,6 +610,25 @@ function fillLaneTier(el, items, io, wrapTileEl) {
   const frag = document.createDocumentFragment();
   /** @type {Array<HTMLElement|null>} */
   const tileNodes = new Array(items.length).fill(null);
+  // v0.1.1692: 前回と見た目の鍵が同じ人のタイルは作り直さず使い回す(1人変わるたびに段の全員の <img> が新品になり、
+  //   合成済みの顔が仮の顔に戻る=ちらつきを止める)。会場(wrapTileEl あり)は席ごとの包みがあるので従来どおり全部作る。
+  const tileKeys = items.map(storyLaneTileKey);
+  /** @type {Map<string, HTMLElement[]> | null} */
+  let reusePool = null;
+  if (typeof wrapTileEl !== 'function') {
+    const prevNodes = _laneTileNodes.get(el);
+    const prevKeys = _laneTierTileKeys.get(el);
+    if (prevNodes && prevKeys && prevNodes.length === prevKeys.length) {
+      reusePool = new Map();
+      for (let j = 0; j < prevNodes.length; j += 1) {
+        const n = prevNodes[j];
+        if (!n || n.parentNode !== el) continue; // 枠だけ(hollow)・外れたタイルは使い回さない
+        const list = reusePool.get(prevKeys[j]);
+        if (list) list.push(n);
+        else reusePool.set(prevKeys[j], [n]);
+      }
+    }
+  }
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
     // ★中身LOD(枠は残す・中身だけ空にする): 後列の匿名は「枠だけ」を作り、
@@ -629,6 +665,15 @@ function fillLaneTier(el, items, io, wrapTileEl) {
         hollowEl.replaceWith(realEl);
       });
       frag.appendChild(hollowEl);
+      continue;
+    }
+    // v0.1.1692: 前回と見た目の鍵が同じ人のタイルがあれば、新しく作らずそれを入れる(stats だけ追従)。
+    const reuseList = reusePool ? reusePool.get(tileKeys[i]) : undefined;
+    const reused = reuseList && reuseList.length ? reuseList.shift() : null;
+    if (reused) {
+      applyLaneTileStatsAttr(reused, p);
+      tileNodes[i] = reused;
+      frag.appendChild(reused);
       continue;
     }
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
@@ -672,6 +717,7 @@ function fillLaneTier(el, items, io, wrapTileEl) {
   el.hidden = false;
   _laneTierLastKey.set(el, key);
   _laneTileNodes.set(el, tileNodes);
+  _laneTierTileKeys.set(el, tileKeys);
   // 計器(観測のみ): 実際に貼り替えた段を数える=churn の実測。
   const laneName = laneNameOfEl(el);
   _laneTierRepaintCount[laneName] = (_laneTierRepaintCount[laneName] || 0) + 1;
@@ -900,7 +946,7 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   for (const laneEl of [laneLink, laneGift, laneAd, laneKonta, laneTanu]) {
     // ★中身LOD: DOM を消す前に観測を解く(IO がターゲット参照を握る=リーク防止)。
     if (laneEl) forgetLaneContentLod(laneEl);
-    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); _laneTileNodes.delete(laneEl); }
+    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); _laneTileNodes.delete(laneEl); _laneTierTileKeys.delete(laneEl); }
   }
   laneLink.hidden = true;
   laneGift.hidden = true;

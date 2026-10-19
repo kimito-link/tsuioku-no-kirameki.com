@@ -3054,5 +3054,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1691', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1690 の note と同じ理由)。今回は単体10+配線3。効果は実機で確認(ヘッドレス交互比較は環境の不調で未実施)。'
+  }),
+  Object.freeze({
+    version: '0.1.1692', metric: 'bundle-kb', value: 1470,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は応援レーンの段の貼り替え(fillLaneTier)だけ(人ごとの鍵を取り出して控え、同じ鍵のタイルを使い回す)。段全体の diff-skip の鍵(storyLaneTierBodyKey)の出力は不変・会場の経路も不変。直前の v0.1.1691 は削る版、この版も削る版。'
+  }),
+  Object.freeze({
+    version: '0.1.1692', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1692', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1691 の note と同じ理由)。今回は単体 +7(renderStoryUserLaneDom)。ヘッドレスの交互比較(各5回)は作り直しが起きず差が出ない(実機で確認)。'
   })
 ]);

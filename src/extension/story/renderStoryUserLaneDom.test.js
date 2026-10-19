@@ -778,3 +778,92 @@ describe('案内帯・空段ノートは【同じ内容なら DOM に触らな�
     expect(els.guideLinesBottom.innerHTML).not.toBe(a);
   });
 });
+
+describe('fillLaneTier — 1人変わっても、同じ見た目の人のタイルは作り直さず使い回す(v0.1.1692)', () => {
+  const A = cell('a:AAA', 'ident-a.svg', '匿名A');
+  const B = cell('a:BBB', 'ident-b.svg', '匿名B');
+  const C = cell('a:CCC', 'ident-c.svg', '匿名C');
+  const D = cell('a:DDD', 'ident-d.svg', '匿名D');
+  const tanu = (els) => Array.from(els.laneTanu.children);
+  const buckets = (tanuItems) => ({ link: [], gift: [], ad: [], konta: [], tanu: tanuItems });
+
+  it('★1人増えても、すでにいる人のタイル(=img)は同じ要素のまま・増えた人だけ新しい', () => {
+    const els = makeEls();
+    paint(els, buckets([A, B, C]));
+    const [a0, b0, c0] = tanu(els);
+    paint(els, buckets([A, B, C, D]));
+    const after = tanu(els);
+    expect(after.length).toBe(4);
+    expect(after[0]).toBe(a0);
+    expect(after[1]).toBe(b0);
+    expect(after[2]).toBe(c0);
+    expect(after[3]).not.toBe(c0);
+  });
+
+  it('★真ん中の1人が消えても、残る人のタイルは同じ要素のまま', () => {
+    const els = makeEls();
+    paint(els, buckets([A, B, C]));
+    const [a0, , c0] = tanu(els);
+    paint(els, buckets([A, C]));
+    const after = tanu(els);
+    expect(after.length).toBe(2);
+    expect(after[0]).toBe(a0);
+    expect(after[1]).toBe(c0);
+  });
+
+  it('★1人だけ見た目(displaySrc)が変わったら、その人だけ新しいタイル・ほかは温存', () => {
+    const els = makeEls();
+    paint(els, buckets([A, B, C]));
+    const [a0, b0, c0] = tanu(els);
+    const B2 = cell('a:BBB', 'ident-b-new.svg', '匿名B');
+    paint(els, buckets([A, B2, C]));
+    const after = tanu(els);
+    expect(after[0]).toBe(a0);
+    expect(after[1]).not.toBe(b0);
+    expect(after[2]).toBe(c0);
+  });
+
+  it('★並びが入れ替わっても、同じ人のタイルを並べ替えて使う(作り直さない)', () => {
+    const els = makeEls();
+    paint(els, buckets([A, B, C]));
+    const [a0, b0, c0] = tanu(els);
+    paint(els, buckets([C, A, B]));
+    const after = tanu(els);
+    expect(after[0]).toBe(c0);
+    expect(after[1]).toBe(a0);
+    expect(after[2]).toBe(b0);
+  });
+
+  it('★使い回したタイルの data-userKey と data-thumb は、そのまま正しい', () => {
+    const els = makeEls();
+    paint(els, buckets([A, B]));
+    paint(els, buckets([B, C]));
+    const after = tanu(els);
+    expect(after.length).toBe(2);
+    expect(after[0].getAttribute('data-thumb')).toBe('0');
+    expect(after[0].getAttribute('data-user-key')).toBeTruthy();
+  });
+
+  it('★会場(wrapTileEl あり)は席ごとの包みがあるので、従来どおり毎回作り直す(使い回さない)', () => {
+    const els = makeEls();
+    const wrap = (tileEl) => { const w = document.createElement('div'); w.appendChild(tileEl); return w; };
+    paintStoryUserLaneDomFilled(els, FACES, buckets([A, B]), 2, IO, { wrapTileEl: wrap });
+    const before = tanu(els);
+    paintStoryUserLaneDomFilled(els, FACES, buckets([A, B, C]), 3, IO, { wrapTileEl: wrap });
+    const after = tanu(els);
+    expect(after.length).toBe(3);
+    expect(after[0]).not.toBe(before[0]);
+  });
+
+  it('★作り直しを求められた段(invalidate)は、同じ人でも新しいタイルにする', async () => {
+    const { invalidateStoryUserLaneTierKey } = await import('./renderStoryUserLaneDom.js');
+    const els = makeEls();
+    paint(els, buckets([A, B]));
+    const before = tanu(els);
+    invalidateStoryUserLaneTierKey(els.laneTanu);
+    paint(els, buckets([A, B, C]));
+    const after = tanu(els);
+    expect(after[0]).not.toBe(before[0]);
+    expect(after[1]).not.toBe(before[1]);
+  });
+});

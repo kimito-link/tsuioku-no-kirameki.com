@@ -38,7 +38,8 @@ describe('会場: 重複する人の席の持ち主', () => {
   });
 
   it('★段の貼り替え判定を無効化する口が render 側から export されている', () => {
-    expect(render).toMatch(/export function invalidateStoryUserLaneTierKey\(laneEl\) \{\n {2}if \(laneEl\) _laneTierLastKey\.delete\(laneEl\);\n\}/);
+    // v0.1.1692: 作り直しを求められた段は、段の鍵に加えて、使い回すタイルの控え(人ごとの鍵)も捨てる。
+    expect(render).toMatch(/export function invalidateStoryUserLaneTierKey\(laneEl\) \{\n {2}if \(laneEl\) \{\n {4}_laneTierLastKey\.delete\(laneEl\);\n {4}_laneTierTileKeys\.delete\(laneEl\);/);
     expect(src).toMatch(/invalidateStoryUserLaneTierKey,\n {2}paintStoryUserLaneDomFilled,/);
   });
 });
