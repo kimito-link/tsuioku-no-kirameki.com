@@ -340,7 +340,9 @@ def verify_zip(zip_path: Path) -> None:
         'dist/popup.js',
         'dist/offscreen.js',
         # v0.1.1681: 匿名の顔の合成 Worker。無いと全部メインスレッド合成(数秒の詰まり)へ黙って戻るので必須にする。
-        'dist/avatar-face-worker.js'
+        'dist/avatar-face-worker.js',
+        # v0.1.1693: サイドパネルの iframe を読み込ませる極小スクリプト。無いとパネルの中身が永久に空になるので必須にする。
+        'dist/sidepanel-iframe-boot.js'
     }
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = set(zf.namelist())
