@@ -27,7 +27,9 @@ describe('診断ページは通知で描き直さない(設計 V2)', () => {
 
   it('★2秒周期の自前ループは残っている(鮮度はこれが担う)', () => {
     expect(code).toContain('startRefreshLoop();');
-    expect(code).toContain('const REFRESH_INTERVAL_MS = 2000;');
+    // v0.1.1698: 間隔は statusRefreshIntervalMs で決める(通常=2秒・見えない送信担当=10秒)。
+    expect(code).toContain('const REFRESH_INTERVAL_MS = statusRefreshIntervalMs({ publisher: isStatusPublisherMode(location.search) });');
+    expect(readFileSync(join(here, 'statusRefreshInterval.js'), 'utf8')).toContain('export const STATUS_REFRESH_INTERVAL_MS = 2000;');
     expect(code).toMatch(/function startRefreshLoop\(\) \{/);
   });
 

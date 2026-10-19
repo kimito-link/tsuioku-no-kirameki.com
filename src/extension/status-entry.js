@@ -273,11 +273,13 @@ import {
 import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
 import { popupSnapshotAgeMs } from '../lib/aiShareFullText.js';
 import { acquireStatusPublisherLock, isStatusPublisherMode } from '../lib/statusPublisherPlan.js';
+import { statusRefreshIntervalMs } from '../lib/statusRefreshInterval.js';
 // ★v0.1.1389: 33セルを症状の言葉(コメント記録/人の識別/レーン/公式値/演出/健全性)で枠に分ける。
 import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
 /** 自動更新間隔(ms)。 */
-const REFRESH_INTERVAL_MS = 2000;
+// v0.1.1698: 見えない送信担当(?publisher=1)は10秒周期(送信間隔120秒に影響しない)。通常の状態画面は従来どおり2秒。
+const REFRESH_INTERVAL_MS = statusRefreshIntervalMs({ publisher: isStatusPublisherMode(location.search) });
 
 /** panel_summary キーのプレフィックス。 */
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
@@ -648,7 +650,7 @@ function updateAutoRefreshMeta() {
   const meta = document.getElementById('metaAutoRefresh');
   if (!meta) return;
   if (_refreshPausedByUser) { meta.textContent = '自動更新: 停止中'; return; }
-  if (_refreshBackoffTicks <= 0) { meta.textContent = '自動更新: 2秒'; return; }
+  if (_refreshBackoffTicks <= 0) { meta.textContent = `自動更新: ${Math.round(REFRESH_INTERVAL_MS / 1000)}秒`; return; }
   const waitSec = Math.round(((_refreshBackoffTicks + 1) * REFRESH_INTERVAL_MS) / 1000);
   meta.textContent = `自動更新: 混雑中→約${waitSec}秒に自動調整`;
 }

@@ -3138,5 +3138,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1697', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1696 の note と同じ理由)。単体 -10・配線 -5(撤去した部品のぶん)。'
+  }),
+  Object.freeze({
+    version: '0.1.1698', metric: 'bundle-kb', value: 1474,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は削る版: 見えない送信担当(status.html?publisher=1)の更新間隔を 2秒→10秒(新規 statusRefreshInterval・status-entry.js に2行)。描画・送信の中身は触らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1698', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1698', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1697 の note と同じ理由)。今回は単体 +3・配線の書き換え1。効果は実機の census(status の稼働%)で確認。'
   })
 ]);
