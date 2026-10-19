@@ -68,6 +68,7 @@ import { summarizeDevMonitorGiftRanking } from '../lib/summarizeDevMonitorGiftRa
 import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
+import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
 import { isSlowStorageKey, isThrottledExtraStorageKey } from '../lib/storageTriggerPolicy.js';
@@ -19418,9 +19419,11 @@ async function initPopup() {
   const dismissErr = $('dismissStorageError');
   // 枠テーマの DOM 取得・listener は frameTheme.wireFrameTheme(下で 1 回呼ぶ)へ移設。
 
+  // v0.1.1687: refresh は並走させない(実行中に来た要求は「あとで1回」にまとめる=起動直後の約0.1秒おき10回超の連発を断つ)。
+  const refreshCoalescer = createRefreshCoalescer(() => refresh());
   const safeRefresh = () => {
     if (!hasExtensionContext()) return Promise.resolve();
-    return refresh()
+    return refreshCoalescer.request()
       .catch((e) => {
         if (!isExtensionContextInvalidatedError(e)) {
           // no-op
