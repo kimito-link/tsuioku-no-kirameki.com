@@ -2984,5 +2984,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1686', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1685 の note と同じ理由)。今回は単体 meter13+boot7+timeline15 と配線 6+5。ヘッドレスで、計器が本物のちらつきを検出できることを確認した(v1683 の修正を外した昔の挙動で .nl-story-growth-icon の往復 7,506 回/12秒、今の版で 2 回・計器自身は約45ms)。年表は親の最初の描画+48ms・子のDOM構築+327ms・子の長い処理8件が行に出る。'
+  }),
+  Object.freeze({
+    version: '0.1.1687', metric: 'bundle-kb', value: 1465,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は popup の描き直し(refresh)の入り口に合流器を1つ足しただけ(新規 src/lib/refreshCoalescer.js・popup-entry.js は 2 行追加 1 行置換)。描画の中身は触っていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1687', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1687', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1686 の note と同じ理由)。今回は単体 6+配線 2。ヘッドレスの交互比較(各5回): 起動後6秒の storage 読み出し 607→551(中央値)・長い処理合計 576→459ms。ばらつき40%超のため、強い効果とは言わない。'
   })
 ]);
