@@ -913,7 +913,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 232</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 233</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1003,6 +1003,7 @@
 - `src/lib/devMonitorVizHtml.js` — dev monitor セカンダリ可視化（renderDevMonitorSecondaryViz の <div class="nl-dev-monitor-viz">）の
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
 - `src/lib/domTreeCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/domWriteIfChanged.js` — 「値が同じなら DOM に書かない」小さな書き込み部品(純粋寄り・DOM 要素を引数で受け取る)。v0.1.1688
 - `src/lib/embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
 - `src/lib/eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/executeScriptWithTimeout.js` — v0.1.441: `chrome.scripting.executeScript` を timeout 付きで実行する純関数ラッパ。
@@ -1170,10 +1171,8 @@
 - `v0.1.1680` 2026-10-17 — 匿名アイコンの顔を作り直さず使い回す
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 
-### 🏟 会場・席 (1版)
-- `v0.1.1668` 2026-10-17 — マーケレポートの参加者を実際の人数にした
-
-### 🎁 ギフト (2版)
+### 🎁 ギフト (3版)
+- `v0.1.1688` 2026-10-17 — 応援マスとギフト履歴の同じ値の書き直しを止める
 - `v0.1.1672` 2026-10-17 — マーケレポートに「ギフトの瞬間」の章を追加
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 

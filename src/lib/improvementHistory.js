@@ -2998,5 +2998,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1687', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1686 の note と同じ理由)。今回は単体 6+配線 2。ヘッドレスの交互比較(各5回): 起動後6秒の storage 読み出し 607→551(中央値)・長い処理合計 576→459ms。ばらつき40%超のため、強い効果とは言わない。'
+  }),
+  Object.freeze({
+    version: '0.1.1688', metric: 'bundle-kb', value: 1466,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は応援マスの属性反映(applyStoryGrowthIconAttributes)とギフト履歴の描画の「同値なら書かない」化のみ(新規 src/lib/domWriteIfChanged.js・popup-entry.js は置換中心)。見た目は変えていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1688', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1688', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1687 の note と同じ理由)。今回は単体8+配線6。ヘッドレスの交互比較(各5回): 起動後6秒の属性書き込み 10,912→4,972(中央値)。長い処理合計は 950→829ms だがばらつき40%超で、強い効果とは言わない。'
   })
 ]);
