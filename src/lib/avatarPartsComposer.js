@@ -39,7 +39,14 @@ export const AVATAR_PART_KEYS = Object.freeze({
   hairHue: Object.freeze([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330])
 });
 
-const AVATAR_DATA_URL_CACHE_MAX = 256;
+/**
+ * メモリ上の顔キャッシュの上限。v0.1.1691 で 256→512(1件約23KB=最大約12MB)。
+ *   応援マス(最大360)+応援レーンの人数を載せると256では足りず、互いに追い出し合っていた。
+ *   先読み(AVATAR_FACE_HYDRATE_COUNT)はこの上限より小さくする(先読みした顔を自分で追い出さない)。
+ */
+export const AVATAR_DATA_URL_CACHE_MAX = 512;
+/** 開いた瞬間に永続キャッシュ(IndexedDB)から先読みする顔の数。応援マスの上限(STORY_GROWTH_MAX_CELLS=360)以上。 */
+export const AVATAR_FACE_HYDRATE_COUNT = 360;
 /** @type {Map<string, string>} */
 const avatarDataUrlCache = new Map();
 
@@ -298,6 +305,40 @@ function rememberFace(key, dataUrl) {
     const oldestKey = avatarDataUrlCache.keys().next().value;
     if (oldestKey == null) break;
     avatarDataUrlCache.delete(oldestKey);
+  }
+}
+
+let faceHydrateDone = false;
+
+/**
+ * 開いた瞬間に、前回までの合成済みの顔(IndexedDB の永続キャッシュ)を、メモリのキャッシュへ先読みする。v0.1.1691
+ *
+ * ■ なぜ要るか(2026-10-19・実機のちらつき計): パネルを開くたびに popup は新しい文書で、メモリの顔キャッシュは空から始まる。
+ *   応援マスの顔は「仮の顔(SVG)で出す→永続キャッシュを読んで本顔(PNG)に差し替える」が約360枚ぶん起き(開いて4秒で src が約370回変化)、
+ *   灰色の仮顔と本顔が混ざって見えた。先に読んでおけば、cachedAnonymousFace(同期)で最初から本顔を出せる。
+ * ■ 守ること: 1文書につき1回(force で上書き可=テスト用)・すでにメモリにある顔は上書きしない・失敗は握る(従来どおり作るだけ)・
+ *   古い順に入れて、新しく書かれた顔ほど追い出されにくくする(LRU)・読むだけ(永続側は変えない)。
+ * @param {{ getRecent?: (n: number) => Promise<Array<{ userKey: string, url: string }>> } | null} [store] 既定は永続キャッシュ
+ * @param {{ force?: boolean }} [opts]
+ * @returns {Promise<number>} メモリへ入れた件数
+ */
+export async function hydrateRecentAnonymousFaces(store = getDefaultAvatarFaceStore(), opts = {}) {
+  if (faceHydrateDone && opts.force !== true) return 0;
+  faceHydrateDone = true;
+  if (!store || typeof store.getRecent !== 'function') return 0;
+  try {
+    const recs = await store.getRecent(AVATAR_FACE_HYDRATE_COUNT);
+    let added = 0;
+    for (let i = recs.length - 1; i >= 0; i -= 1) {
+      const r = recs[i];
+      if (!r || typeof r.userKey !== 'string' || typeof r.url !== 'string' || avatarDataUrlCache.has(r.userKey)) continue;
+      rememberFace(r.userKey, r.url);
+      added += 1;
+    }
+    avatarComposeStats.hydrated += added;
+    return added;
+  } catch {
+    return 0;
   }
 }
 
@@ -584,7 +625,7 @@ export function createViewportGate(deps = {}) {
 
 const avatarComposeLimiter = createComposeLimiter();
 const avatarViewportGate = createViewportGate();
-const avatarComposeStats = { requested: 0, cacheHit: 0, persistedHit: 0, workerComposed: 0, workerFallback: 0, composedAfterNear: 0, skippedDetached: 0, failed: 0 };
+const avatarComposeStats = { requested: 0, cacheHit: 0, persistedHit: 0, hydrated: 0, workerComposed: 0, workerFallback: 0, composedAfterNear: 0, skippedDetached: 0, failed: 0 };
 
 /** 状態速報用: 顔の合成の要求・実行・見送りの内訳。 */
 export function getAvatarComposeStats() {
