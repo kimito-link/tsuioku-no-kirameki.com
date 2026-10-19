@@ -2942,5 +2942,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1683', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1682 の note と同じ理由)。今回は単体4件+配線3件。実機データを写したヘッドレスで、img.src の代入を呼び出し元別に数えた: 12秒で SVG 約3,200+PNG 約3,700 回(75タイルなのに)→ SVG 約425+PNG 約250〜500 回。'
+  }),
+  Object.freeze({
+    version: '0.1.1684', metric: 'bundle-kb', value: 1456,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は、sidepanel-entry.js の早い自己診断の測定を、最初の描画のあとまで待たせる(新規 firstPaintGate.js・関門は600msで必ず開く)。測定の内容は変えていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1684', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1684', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1683 の note と同じ理由)。今回は単体5件。ヘッドレスで『先に別のパネルを開いて起動の最中にしておく』競合を再現した A/B(各7回×2周)で、最初の描画の中央値が約414ms→約244ms(平均 約413→約285)。競合なしの A/B では差が出ない(約72ms同士)。既存の挙動テスト1件は、node に paint が無いため『描画は起動直後に済んだ』ブラウザを模すスタブを足した。'
   })
 ]);
