@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AVATAR_PART_KEYS,
   anonymousAvatarDataUrlUpgrade,
+  isAnonymousFaceShown,
   selectAvatarParts
 } from './avatarPartsComposer.js';
 
@@ -58,5 +59,31 @@ describe('anonymousAvatarDataUrlUpgrade', () => {
     const upgrade = anonymousAvatarDataUrlUpgrade(null);
     expect(upgrade.immediate).toBe('');
     await expect(upgrade.promise).resolves.toBe('');
+  });
+});
+
+describe('isAnonymousFaceShown(合成済みの顔が出ている<img>を、SVG の仮の顔で上書きしない・v0.1.1683)', () => {
+  const SVG = 'data:image/svg+xml;charset=utf-8,%3Csvg%3E';
+  const PNG = 'data:image/png;base64,AAAA';
+  const fakeImg = (src, key) => ({ dataset: key == null ? {} : { nlAnonymousAvatarKey: key }, getAttribute: (n) => (n === 'src' ? src : null) });
+
+  it('★同じ人の顔(PNG)が出ていて、次の候補が SVG の仮の顔なら、上書きしない(true)', () => {
+    expect(isAnonymousFaceShown(fakeImg(PNG, 'a:user1'), 'a:user1', SVG)).toBe(true);
+  });
+
+  it('★別の人・キー未設定・まだ SVG のままなら、通常どおり上書きする(false)', () => {
+    expect(isAnonymousFaceShown(fakeImg(PNG, 'a:user2'), 'a:user1', SVG)).toBe(false);
+    expect(isAnonymousFaceShown(fakeImg(PNG, null), 'a:user1', SVG)).toBe(false);
+    expect(isAnonymousFaceShown(fakeImg(SVG, 'a:user1'), 'a:user1', SVG)).toBe(false);
+  });
+
+  it('★次の候補が SVG でない(本物のアイコン URL 等)なら、必ず通常どおり上書きする(false)', () => {
+    expect(isAnonymousFaceShown(fakeImg(PNG, 'a:user1'), 'a:user1', 'https://example.com/icon.jpg')).toBe(false);
+  });
+
+  it('空・壊れた入力でも落ちない', () => {
+    expect(isAnonymousFaceShown(null, 'a:user1', SVG)).toBe(false);
+    expect(isAnonymousFaceShown(fakeImg(PNG, 'a:user1'), '', SVG)).toBe(false);
+    expect(isAnonymousFaceShown(fakeImg(PNG, 'a:user1'), 'a:user1', '')).toBe(false);
   });
 });
