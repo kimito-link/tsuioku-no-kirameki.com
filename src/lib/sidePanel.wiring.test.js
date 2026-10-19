@@ -40,17 +40,13 @@ describe('サイドパネルの配線', () => {
     expect(swSrc).not.toMatch(/openPanelOnActionClick:\s*true/);
   });
 
-  it('★タブ固有に設定している(全タブ共有のままだと別配信を掴む)', () => {
+  it('★v0.1.1696: タブ専用にしない(グローバルのパネル=タブを切り替えても隠れない)。open({tabId}) だけを無条件に呼ぶ', () => {
     const block = sidePanelBlock();
     expect(block).not.toBe('');
-    // ★存在の断言だけだと `if (false) await ...` を通してしまう(2026-08-05 に実際に通した)。
-    //   無条件に実行される文であることまで断言する。
-    expect(block).toMatch(
-      /\n\s*await chrome\.sidePanel\.setOptions\(\{\n\s*tabId,/
-    );
+    // v0.1.1696 より前は setOptions({tabId, path}) でタブ専用にしていた=タブ切り替えのたびに隠れて再表示=縞。
+    expect(block).not.toMatch(/sidePanel\.setOptions\(/);
+    // ★存在の断言だけだと `if (false) await ...` を通してしまう(2026-08-05 に実際に通した)。無条件に実行される文であることまで断言する。
     expect(block).toMatch(/\n\s*await chrome\.sidePanel\.open\(\{ tabId \}\);/);
-    // setOptions を条件で無効化していないこと。
-    expect(block).not.toMatch(/if\s*\([^)]*\)\s*await chrome\.sidePanel\.setOptions/);
   });
 
   it('★配信IDを正規化してから path に載せている(injection 面を作らない)', () => {

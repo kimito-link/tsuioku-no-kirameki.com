@@ -4,20 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * サイドパネルに配信ID(lv)を渡す経路の【配線】検査。
+ * サイドパネルが「どの配信を見せるか」を決める経路の【配線】検査。
  *
- * ■ なぜ要るか(2026-08-18 実機で真因確定)
- *   状態速報: 🔴 描画関数が一度も呼ばれていません
- *             laneTickProbe: lidMiss=4 / lidFromInline=0 / lidFromSnapshot=0 /
- *                            lidFromLastPainted=0
- *
- *   v0.1.1419 は「パネル内ボタン」経路にだけ ?lv= を焼いていた。
- *   ★サイドパネルを開く入口は【2つ】あり、
- *     ②ツールバーのアイコン(chrome.action.onClicked)は素の 'sidepanel.html' のままだった。
- *   ＝いちばん普通の開き方をすると必ずレーンが描かれない状態が残っていた。
- *
- * ★このテストは「入口の数」を固定する。入口が増えたのに lv を焼き忘れたら赤にする
- *   ([[wiring-test-must-assert-counts-2026-08-04]]: 配線が複数箇所なら数で断言する)。
+ * ■ 経緯
+ *   2026-08-18: 描画関数が一度も呼ばれない(lidMiss=4)。iframe に配信ID(lv)が渡っていなかった。
+ *   v0.1.1439〜1695: background が watch タブごとに setOptions({tabId, path:'sidepanel.html?lv='}) で lv を焼いていた(タブ専用のパネル)。
+ *   v0.1.1696: 公式の仕様(タブ専用のパネルはタブを移ると隠れ・戻ると再表示される)で、タブ切り替えのたびに縞が出ていたため、
+ *   パネルを【グローバル】にした。lv の決定はパネル自身(sidepanel-iframe-boot-entry・pickPanelLv)が担う。
+ *   この検査は「lv が必ずパネルに届く」ことを、新しい構造で固定する(旧い『setOptions が3か所』の固定は、意図ごと置き換えた)。
  */
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -25,107 +19,77 @@ const read = (rel) => readFileSync(path.join(repoRoot, rel), 'utf8').replace(/\r
 const stripComments = (s) =>
   s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 
-describe('サイドパネルへの lv 受け渡し', () => {
-  /*
-   * ★v0.1.1439: 入口が【2つ→ 3つ】になった。
-   *   ①パネル内ボタン ②ツールバーアイコン ③★事前用意(watchページを開いた時)
-   *   ③は「押される前に path を確定させておく」ためのもの。
-   *   SWが寝ている/詰まっているとパネルがなかなか出ない問題への対策。
-   *   ★数を固定し続ける意味: 入口が増えたのに lv を焼き忘れたら赤にする。
-   */
-  it('★setOptions で path を設定する箇所は【3つ】(パネル内ボタン / ツールバー / 事前用意)', () => {
+describe('サイドパネルがグローバルで、lv をパネル自身が決める', () => {
+  it('★background は sidePanel.setOptions を呼ばない(タブ専用にしない)', () => {
     const code = stripComments(read('extension/background.js'));
-    const hits = code.match(/setOptions\s*\(/g) || [];
-    expect(hits.length).toBe(3);
+    expect(code).not.toMatch(/setOptions\s*\(/);
   });
 
-  it('★どの setOptions も、lv が取れたら ?lv= を焼く(素の sidepanel.html で終わらせない)', () => {
+  it('★ツールバー経路・パネル内ボタン経路は open({tabId}) だけ(グローバルのパネルを開く)', () => {
     const code = stripComments(read('extension/background.js'));
-    // `sidepanel.html?lv=${...}` の形が2箇所に在ること＝両方の入口が lv を渡す。
-    const baked = code.match(/sidepanel\.html\?lv=\$\{/g) || [];
-    expect(baked.length).toBe(3);
+    const opens = code.match(/chrome\.sidePanel\.open\(\{ tabId(?:: tid)? \}\)/g) || [];
+    expect(opens.length).toBe(2);
   });
 
-  it('★ツールバー経路は tab.url から lv を取り出す', () => {
+  it('★ツールバー経路は tab.url から lv を取り出して【押下の記録】に残す(パネルの黒い幕の記録が使う)', () => {
     const code = stripComments(read('extension/background.js'));
     const at = code.indexOf('chrome.action.onClicked');
     expect(at).toBeGreaterThan(-1);
     const body = code.slice(at);
     // watch URL から lv を抜く正規表現が在る
     expect(body).toMatch(/\\\/watch\\\/\(lv/);
-  });
-
-  /*
-   * ★v0.1.1434(実機で自分の目で見て確定した退化の防止):
-   *   v0.1.1427 で open() の【あと】に setOptions({path}) を置いてしまい、
-   *   パネルが読み込み直しになって Chrome の「読み込み中」表示
-   *   (ダークでは黒地に灰色の横縞)が居座った=ユーザー報告の真っ黒の正体。
-   *   ★path は open より【先】に確定させる。この順序を機械で固定する。
-   */
-  it('★setOptions(パス確定) は open より【先】に呼ぶ', () => {
-    const code = stripComments(read('extension/background.js'));
-    const at = code.indexOf('chrome.action.onClicked');
-    const body = code.slice(at, at + 2600);
-    const setAt = body.indexOf('setOptions');
-    const openAt = body.indexOf('sidePanel.open');
-    expect(setAt).toBeGreaterThan(-1);
-    expect(openAt).toBeGreaterThan(-1);
-    expect(setAt).toBeLessThan(openAt);
-  });
-
-  it('★lv が取れないときは setOptions を呼ばない(無駄な読み込み直しを起こさない)', () => {
-    const code = stripComments(read('extension/background.js'));
-    const at = code.indexOf('chrome.action.onClicked');
-    const body = code.slice(at, at + 2600);
-    // if (lvFromTab && 未用意) { ... setOptions ... } の形で条件つきになっている(v0.1.1674: 用意済みなら触らない条件を追加)
-    const ifAt = body.indexOf('if (lvFromTab &&');
-    expect(ifAt).toBeGreaterThan(-1);
-    expect(ifAt).toBeLessThan(body.indexOf('setOptions'));
+    expect(body).toContain('hasLv: !!lvFromTab');
   });
 
   it('★lv の形式規約は1つ(SIDE_PANEL_LV_RE)を共用する — 片方だけ通る穴を作らない', () => {
     const code = stripComments(read('extension/background.js'));
     const defs = code.match(/const SIDE_PANEL_LV_RE\s*=/g) || [];
     expect(defs.length).toBe(1);
-    // 2箇所(パネル内ボタン / ツールバー)から参照される
     const uses = code.match(/SIDE_PANEL_LV_RE\.test\(/g) || [];
-    expect(uses.length).toBe(3);
+    expect(uses.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('★受け取り側(sidepanel-iframe-boot-entry)は iframe に lv を載せる(v0.1.1693: 本体 sidepanel-entry からこの極小スクリプトへ移した)', () => {
+  it('★受け取り側(sidepanel-iframe-boot-entry)が iframe に lv を載せる。本体 sidepanel-entry は src に触れない(二重に付けない)', () => {
     const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
     expect(boot).toContain('buildSidePanelIframeSrc');
-    // 本体は src を触らない(二重に付けて二重ロードしない)
     const entry = stripComments(read('src/extension/sidepanel-entry.js'));
     expect(entry).not.toMatch(/setAttribute\('src'/);
   });
 });
 
-describe('★SWを待たない自力解決(v0.1.1435)', () => {
+describe('★パネル自身が lv を決める(v0.1.1696)', () => {
   /*
-   * ユーザーの訴え:「サービスワーカーが無効になる確率が多すぎて確認に時間がかかる」
-   *              「会場モードはすぐにうごくけど」
-   * ＝サイドパネルは SW の onClicked を必ず起こすので、SWが寝ていると待たされる。
-   * → ①(?lv=)が空のときだけ、パネル自身が chrome.tabs.query で watchタブを探す。
+   * 掟: 「速いが違う配信」より「遅いが正しい」(ユーザー確定)。曖昧なら選ばない=別の配信のコメントが出るのは、使う人にとって壊れている。
    */
-  it('パネルが自力で lv を探す経路を持つ(sidepanel-iframe-boot-entry)', () => {
+  it('パネルが自力で lv を決める経路を持つ(アクティブなタブ・watch タブ一覧)', () => {
     const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
-    expect(boot).toContain('pickLvFromTabs');
-    expect(boot).toContain('chrome.tabs.query');
+    expect(boot).toContain('pickPanelLv');
+    expect(boot).toContain('chrome.tabs.query(SIDE_PANEL_WATCH_TAB_QUERY)');
+    expect(boot).toContain('chrome.tabs.query({ active: true, currentWindow: true })');
   });
 
   it('★①(?lv=)が在るときは自力探索を走らせない(順序の固定)', () => {
     const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
-    // v0.1.1693: needsPick: !hasLv の形 = ①(lv)が空のときだけ探索する(ローダーが needsPick が偽なら pickSrc を呼ばない)
     expect(boot).toMatch(/const hasLv = readSidePanelLv\(search\) !== '';/);
     expect(boot).toMatch(/needsPick: !hasLv,/);
     const loader = stripComments(read('src/lib/sidepanelIframeLoader.js'));
     expect(loader).toMatch(/if \(!needsPick \|\| typeof pickSrc !== 'function'\) \{/);
   });
 
-  it('★active を条件にしない(裏タブで別タブを掴む事故の再発防止)', () => {
+  it('★タブの切り替えに追従する: アクティブなタブが【別の watch】になったときだけ付け替え・同じ配信なら何もしない', () => {
+    const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
+    expect(boot).toContain('chrome.tabs.onActivated.addListener');
+    expect(boot).toContain('chrome.tabs.onUpdated.addListener');
+    expect(boot).toMatch(/if \(!lv \|\| lv === shownLv\(\)\) return;/);
+    expect(boot).toContain('loader.update(buildSidePanelIframeSrc(base, `?lv=${lv}`));');
+    // このパネルが居るウィンドウのタブだけ
+    expect(boot).toContain('tab.windowId !== ownWindowId');
+  });
+
+  it('★active を使うのは pickPanelLv の中だけ・watch 以外へ移ったら直前の配信を保つ(隠さない・作り直さない)', () => {
     const lib = stripComments(read('src/lib/sidePanelLvFromTabs.js'));
-    // 問い合わせ条件は url だけ
+    expect(lib).toContain("reason: 'keep'");
+    // 一覧(pickLvFromTabs)の問い合わせ条件は url だけ(active を根拠にしない)
     expect(lib).toContain('SIDE_PANEL_WATCH_TAB_QUERY');
     expect(lib).not.toMatch(/active:\s*true/);
   });
@@ -137,10 +101,12 @@ describe('★SWを待たない自力解決(v0.1.1435)', () => {
   });
 
   it('★失敗しても素の src に倒れる(描画をJSに依存させない)', () => {
-    // ★コメント内の言及ではなく【実際の呼び出し】を見る(await 付き)。失敗(reject)はローダーが握って素の src で読み込む。
     const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
-    expect(boot).toContain('await chrome.tabs.query');
+    expect(boot).toContain('chrome.tabs.query(SIDE_PANEL_WATCH_TAB_QUERY)');
+    // 探索の失敗(reject)は、ローダーが握って素の src で読み込む
     const loader = stripComments(read('src/lib/sidepanelIframeLoader.js'));
-    expect(loader).toMatch(/\(\) => \{\s*pickedSrc = '';\s*\}/);
+    expect(loader).toMatch(/pickedSrc = '';/);
+    // 極小スクリプトの catch でも素の src を付ける
+    expect(boot).toMatch(/\} catch \{[\s\S]*setAttribute\('src'/);
   });
 });
