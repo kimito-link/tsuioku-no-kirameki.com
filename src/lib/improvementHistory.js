@@ -2914,5 +2914,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1681', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1680 の note と同じ理由)。今回は単体 render8+client12+配線9。実機データを写したヘッドレスで、永続キャッシュを空にした冷スタートの3回の開閉の主スレッドの忙しい区間(60ms超)が 30 件超→5 件に、合成由来(blob)のサンプルが 4,000〜8,000→0 になった。残る最大は自己診断の elementFromPoint(初回約0.5秒)。'
+  }),
+  Object.freeze({
+    version: '0.1.1682', metric: 'bundle-kb', value: 1455,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は診断だけ(新規 avatarComposeDiagLine と、composer が統計を session へ書く・サイドパネルの自己診断が読む・速報に1行)。描画の経路は触っていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1682', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1682', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1681 の note と同じ理由)。今回は単体5件+配線4件。ヘッドレス(実機データを写した一時プロファイル)で、サイドパネルの中の画面から Worker が起動し(ready・成功53・失敗0)、速報の1行まで届くことを確認した。'
   })
 ]);

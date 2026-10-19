@@ -47,13 +47,13 @@ graph LR
   n_popup --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
   n_popup --> n_src_lib_autoSectionCensus_js["lib/autoSectionCensus.js"]
   n_popup --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
+  n_popup --> n_src_lib_avatarComposeDiagLine_js["lib/avatarComposeDiagLine.js"]:::shared
   n_popup --> n_src_lib_avatarEntryCounts_js["lib/avatarEntryCounts.js"]
   n_popup --> n_src_lib_avatarFaceStore_js["lib/avatarFaceStore.js"]:::shared
   n_popup --> n_src_lib_avatarFaceWorkerClient_js["lib/avatarFaceWorkerClient.js"]:::shared
   n_popup --> n_src_lib_avatarFallbackFromUrl_js["lib/avatarFallbackFromUrl.js"]:::shared
   n_popup --> n_src_lib_avatarPartAnchors_js["lib/avatarPartAnchors.js"]:::shared
-  n_popup --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 443 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 444 ファイル省略（全件は storage-bus.md / metafile 参照）。

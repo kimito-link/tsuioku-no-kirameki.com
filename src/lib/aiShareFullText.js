@@ -693,6 +693,9 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.1675: 押してからパネルが描かれるまでの実測(中央値・最大・直近)。無ければ出ない。
     const openLine = String(sidepanelSelfDiag?.openTimingLine || '');
     if (openLine) lines.push(openLine);
+    // v0.1.1682: 匿名の顔の合成の状況(Worker・永続キャッシュ・フォールバック)。無ければ出ない。
+    const composeLine = String(sidepanelSelfDiag?.avatarComposeLine || '');
+    if (composeLine) lines.push(composeLine);
   } catch {
     /* no-op: 自己診断の失敗は状態速報を壊さない */
   }
