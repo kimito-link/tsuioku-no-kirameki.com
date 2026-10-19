@@ -69,6 +69,7 @@ import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
+import { canAppendStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
 import { isSlowStorageKey, isThrottledExtraStorageKey } from '../lib/storageTriggerPolicy.js';
@@ -8741,6 +8742,23 @@ function rebuildStoryGrowthImpl(root, total) {
 }
 
 /**
+ * v0.1.1689: 応援マスが増えたとき、既存のマスは残し、増えた分(from..to-1)だけ足す(全マスの作り直しをしない)。
+ * 作り直すと <img> が新品になり、合成済みの顔が仮の顔に戻る(灰色の仮顔と合成済みの顔が混ざるちらつき)。
+ * 追加後の属性・同一ユーザーの合計・pulse の追従は、呼び元が続けて呼ぶ patchStoryGrowthIconsFromSource が行う。
+ * @param {HTMLElement} root
+ * @param {number} from 描いてある数
+ * @param {number} to 目標の数
+ */
+function appendStoryGrowthCells(root, from, to) {
+  const accent = buildStoryAccentForWindow(to);
+  const frag = document.createDocumentFragment();
+  for (let i = from; i < to; i += 1) {
+    frag.appendChild(createStoryGrowthCell(false, i, { ordinal: accent.ordinals[i] || 0, total: accent.totals[i] || 0 }));
+  }
+  root.appendChild(frag);
+}
+
+/**
  * @param {string} liveId
  * @param {number} count
  * @param {HTMLElement|null} root
@@ -8813,7 +8831,14 @@ function syncStoryGrowth(liveId, count, root) {
    */
   if (rnd < tgt && tgt > 0) {
     clearStoryGrowthTimer();
-    rebuildStoryGrowth(root, tgt);
+    // v0.1.1689: 条件が揃うときは増えた分だけ足す(揃わなければ従来どおり全部作り直す)。
+    if (canAppendStoryGrowthCells({
+      renderedCount: rnd,
+      targetCount: tgt,
+      domCount: root.querySelectorAll('img.nl-story-growth-icon').length,
+      sourceOffset: STORY_GROWTH_STATE.sourceOffset
+    })) appendStoryGrowthCells(root, rnd, tgt);
+    else rebuildStoryGrowth(root, tgt);
     STORY_GROWTH_STATE.renderedCount = tgt;
     patchStoryGrowthIconsFromSource(root, { pulseLast: true });
     STORY_GROWTH_STATE.sourceSig = storySourceSignature();
