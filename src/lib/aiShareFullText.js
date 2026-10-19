@@ -696,6 +696,12 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.1682: 匿名の顔の合成の状況(Worker・永続キャッシュ・フォールバック)。無ければ出ない。
     const composeLine = String(sidepanelSelfDiag?.avatarComposeLine || '');
     if (composeLine) lines.push(composeLine);
+    // v0.1.1686: ちらつき計(どの場所を何回書き換えたか)。無ければ出ない。
+    const flickerLine = String(sidepanelSelfDiag?.flickerMeterLine || '');
+    if (flickerLine) lines.push(flickerLine);
+    // v0.1.1687: 黒い幕の年表(親の最初の描画と、子の長い処理・段階を同じ線上に)。無ければ出ない。
+    const timelineLine = String(sidepanelSelfDiag?.bootTimelineLine || '');
+    if (timelineLine) lines.push(timelineLine);
   } catch {
     /* no-op: 自己診断の失敗は状態速報を壊さない */
   }
