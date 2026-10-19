@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 958 件
+## ⚠️ 役割コメントが無いソース 8 / 960 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2070)
+- 📁 **src/** (2076)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1145,7 +1145,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1829)
+  - 📁 **lib/** (1835)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2434,6 +2434,9 @@
     - `roomHeatMirror.js` — 室温(ルーム熱度・5分増減)の「鏡」スナップショット純関数
     - `roomHeatMirror.test.js`
     - `roomHeatMirrorKey.js` — 室温(ルーム熱度・5分増減)鏡の storage キー正本
+    - `runAfterNextPaint.js` — 重い処理を「次の描画のあと」へ送る(時計・rAF は引数で受け取る純関数寄りの部品)。v0.1.1695
+    - `runAfterNextPaint.test.js`
+    - `runAfterNextPaintWiring.wiring.test.js`
     - `safeStorageLocal.js` — v0.1.1080: 拡張リロード後の古いタブ(stale content script / iframe)が
     - `safeStorageLocal.test.js`
     - `sameOriginContribRankingDomShape.js` — watch ページ（live.nicovideo.jp＝content script と同一 origin）の gift
@@ -2484,6 +2487,9 @@
     - `shouldSkipDeepHarvest.test.js`
     - `shouldTriggerOfficialGapDeepHarvest.js` — ライブ中に「公式 statistics コメント数」と「記録件数」の差が大きいとき、
     - `shouldTriggerOfficialGapDeepHarvest.test.js`
+    - `showToFrameLedger.js` — サイドパネルが「隠れてから再表示された」回ごとの、次の描画までの時間の記録(純粋関数)。v0.1.1695
+    - `showToFrameLedger.test.js`
+    - `showToFrameWiring.wiring.test.js`
     - `sidePanel.wiring.test.js`
     - `sidePanelLvFromTabs.js` — サイドパネルが【自力で】配信IDを見つけるための純関数。
     - `sidePanelLvFromTabs.test.js`
