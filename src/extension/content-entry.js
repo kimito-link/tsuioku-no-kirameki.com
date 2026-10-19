@@ -480,6 +480,7 @@ import {
   COMMENT_INGEST_SOURCE,
   maybeAppendCommentIngestLog
 } from '../lib/commentIngestLog.js';
+import { shouldWriteFastDiagFull } from '../lib/fastDiagFullGate.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import {
   crawlNdgrBackward,
@@ -7365,7 +7366,9 @@ function scheduleFastDiagPersistIdle() {
   }
 }
 
-function persistAiShareFastDiagnostics() {
+let aiShareFastDiagLastFullAt = 0; // 全文を最後に書いた時刻(lite は別)
+/** @param {{ forceFull?: boolean }} [opts] */
+function persistAiShareFastDiagnostics(opts) {
   if (!hasExtensionContext()) return;
   const now = Date.now();
   const hidden =
@@ -7374,7 +7377,7 @@ function persistAiShareFastDiagnostics() {
   const minGap = hidden
     ? AI_SHARE_FAST_DIAG_HIDDEN_MIN_MS
     : AI_SHARE_FAST_DIAG_VISIBLE_MIN_MS;
-  if (now - aiShareFastDiagLastPersistAt < minGap) return;
+  if (!(opts && opts.forceFull) && now - aiShareFastDiagLastPersistAt < minGap) return;
   aiShareFastDiagLastPersistAt = now;
   try {
     const payload = {
@@ -7388,10 +7391,14 @@ function persistAiShareFastDiagnostics() {
     // status.html 用の軽量ダイジェスト(~1KB)を同時に書く。status の2秒ループは full(~40KB)でなく
     //   これを read する=read 回数を増やさずサイズだけ ~40分の1(council/status-heavy-open-SYNTHESIS.md)。
     //   full は AI共有ボタン押下時だけ読まれる。set を1回にまとめる=write I/O も増やしすぎない。
-    setStorageLocalSilent({
-      [KEY_AI_SHARE_FAST_DIAG]: payload,
-      [KEY_STATUS_FAST_DIAG_LITE]: buildStatusFastDiagLite(payload)
-    });
+    // v0.1.1694: 全文は30秒に1回(判定=fastDiagFullGate)。lite は従来の頻度。
+    const writeFull = shouldWriteFastDiagFull({ now, lastFullAt: aiShareFastDiagLastFullAt, forceFull: !!(opts && opts.forceFull) });
+    if (writeFull) aiShareFastDiagLastFullAt = now;
+    setStorageLocalSilent(
+      writeFull
+        ? { [KEY_AI_SHARE_FAST_DIAG]: payload, [KEY_STATUS_FAST_DIAG_LITE]: buildStatusFastDiagLite(payload) }
+        : { [KEY_STATUS_FAST_DIAG_LITE]: buildStatusFastDiagLite(payload) }
+    );
   } catch {
     // no-op: payload 構築（buildAiShareFastDiagnosticsPayload 等）の同期失敗のみ
   }
@@ -8943,8 +8950,8 @@ function bindNativeSelfPostedRecorder() {
 /* PII は積まない（数値・liveId・platform・ts・source のみ）。                    */
 /* ------------------------------------------------------------------ */
 
-/** 較正サンプルの記録を試みる最小間隔（appendCalibrationSample 側 30s と整合）。 */
-const CALIBRATION_LOG_ATTEMPT_INTERVAL_MS = 25000;
+/** 較正サンプルの記録を試みる最小間隔。v0.1.1694: 25s→120s(1回約830KB が全ページへ配られるため・best-effort)。 */
+const CALIBRATION_LOG_ATTEMPT_INTERVAL_MS = 120000;
 let _lastCalibrationLogAttemptAt = 0;
 let _calibrationLogInFlight = false;
 
@@ -10480,7 +10487,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === 'NLS_AI_SHARE_PAGE_DIAGNOSTICS') {
     try {
-      persistAiShareFastDiagnostics();
+      persistAiShareFastDiagnostics({ forceFull: true });
       // 0.1.178: 応答に liveId / frameHref を含める（混線防止）
       sendResponse({
         ok: true,

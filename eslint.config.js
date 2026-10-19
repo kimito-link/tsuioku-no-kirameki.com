@@ -413,7 +413,8 @@ export default [
     // v0.1.1607: 『最後に視聴した URL』を毎ティック書き直さない(URL変化時・前面に来た時だけ)=+18行(大半は【なぜ】のコメント)。複数タブの書き合いで配信が入れ替わるのを止める。
     // v0.1.1638: 応援コメント100件でゆっくり3人がお祝いするとき、会場を開いている間は中継の降りものシャワーを止める配線(+7行)。判定は lib(charaLiveCheerTrigger.js の shouldSkipShowerForCheer)。
     // v0.1.1665: 広告の「気づいた時刻」の記録(+34行・判定は lib の adObservationLog.js・大半は【なぜ】のコメント)。
-    rules: { 'max-lines': ['error', { max: 19501, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1694: 全ページへ配られる巨大キーの書き込みを減らす配線(+7行)。較正リングの試行間隔(25s→120s)と fastDiag 全文の間引き(判定は lib の fastDiagFullGate.js)。
+    rules: { 'max-lines': ['error', { max: 19508, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
