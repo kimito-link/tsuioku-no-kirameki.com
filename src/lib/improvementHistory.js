@@ -3026,5 +3026,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1689', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1688 の note と同じ理由)。今回は単体6+配線4。ヘッドレスでは作り直しの減少を再現できず(全配信が360個で頭打ち)、実機のちらつき計で確認する。'
+  }),
+  Object.freeze({
+    version: '0.1.1690', metric: 'bundle-kb', value: 1467,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は状態速報に行を足すだけ(新規 src/lib/blackCurtainLedger.js・sidepanel-entry.js と aiShareFullText.js に数行)。描画・保存の経路は触らない。直前の v0.1.1687〜1689 は削る版で、この版は計器の版(2連続ではない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1690', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1690', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1689 の note と同じ理由)。今回は単体11+配線2。'
   })
 ]);
