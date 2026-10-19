@@ -4,7 +4,13 @@
  */
 
 export const COMMENT_INGEST_LOG_VERSION = 1;
-export const COMMENT_INGEST_LOG_MAX_ITEMS = 500;
+/**
+ * 履歴の保持数。v0.1.1694 で 500→60。
+ *   実機の census(2026-10-19): このキーは取込のたびに全体(500件=約57KB)が書き直され、全拡張画面へ旧値+新値で配られていた
+ *   (10秒に12回=約680KB。全文書の主スレッドを占有して、サイドパネルの最初の描画を遅らせる根本原因の1つ)。
+ *   読み手は popup の「最終取り込み N秒前・経路」の1行(最新1件)と開発者コピーだけ=500件は不要。60件なら約7KB。
+ */
+export const COMMENT_INGEST_LOG_MAX_ITEMS = 60;
 
 /** @enum {string} */
 export const COMMENT_INGEST_SOURCE = {
