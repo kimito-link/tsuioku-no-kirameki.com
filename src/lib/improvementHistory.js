@@ -2970,5 +2970,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1685', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1684 の note と同じ理由)。今回は単体5+配線3。実機データを写したヘッドレスで、開いて12秒の PNG の代入が約250〜500→約180〜410回に減り、タイルの再描画時の SVG→PNG の差し替えがなくなったことを確認(初回の描画は顔が無いので SVG から始まる)。'
+  }),
+  Object.freeze({
+    version: '0.1.1686', metric: 'bundle-kb', value: 1463,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は計器のみ(新規 flickerMeter・flickerMeterBoot・bootTimeline・bootTimelineBoot。popup が MutationObserver/longtask で数え session へ・サイドパネルが読んで速報に1行ずつ。watchPopupLoadDiagnostics に段階の年表を追加)。描画は触っていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1686', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1686', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1685 の note と同じ理由)。今回は単体 meter13+boot7+timeline15 と配線 6+5。ヘッドレスで、計器が本物のちらつきを検出できることを確認した(v1683 の修正を外した昔の挙動で .nl-story-growth-icon の往復 7,506 回/12秒、今の版で 2 回・計器自身は約45ms)。年表は親の最初の描画+48ms・子のDOM構築+327ms・子の長い処理8件が行に出る。'
   })
 ]);
