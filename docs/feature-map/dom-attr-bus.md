@@ -29,6 +29,7 @@
 - 🟠 **data-nls-page-intercept-href** — 書く人だけ: extension/page-intercept-entry.js
 - 🟠 **data-nls-page-intercept-referrer** — 書く人だけ: extension/page-intercept-entry.js
 - 🟠 **data-nls-warmup-state** — 書く人だけ: extension/content-entry.js
+- 🔵 **data-nl-src** — 読む人だけ: extension/sidepanel-iframe-boot-entry.js
 - 🔵 **data-nl-trio-slot** — 読む人だけ: extension/popup-entry.js
 
 ## 全属性
@@ -52,6 +53,7 @@
 | `data-nl-recording` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-score-final` | lib/broadcastScoreHtml.js | — |
 | `data-nl-scroll-perf-bound` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-src` | — | extension/sidepanel-iframe-boot-entry.js |
 | `data-nl-state` | extension/popup-entry.js | — |
 | `data-nl-status-publisher` | extension/statusPublisherHost.js | extension/statusPublisherHost.js |
 | `data-nl-story-growth-bound` | extension/popup-entry.js | extension/popup-entry.js |
