@@ -85,6 +85,34 @@ export function pickLvFromTabs(tabs) {
 }
 
 /**
+ * watch URL から配信ID(lv)を取り出す。watch でなければ ''。
+ * @param {unknown} url
+ * @returns {string}
+ */
+export function lvFromWatchUrl(url) {
+  const m = WATCH_URL_RE.exec(String(url ?? ''));
+  return m && LV_RE.test(m[1]) ? m[1] : '';
+}
+
+/**
+ * v0.1.1696: パネルが【グローバル】になり(タブを切り替えても隠れない)、どの配信を見せるかはパネル自身が決める。
+ *   ①現在のウィンドウのアクティブなタブが watch ならその配信 ②それ以外のタブを見ている間は、いま見せている配信を保つ
+ *   ③まだ何も見せていないなら、watch タブがちょうど1つのときだけそれ(複数・無しは選ばない=「別の配信を掴む」過去事故の再発防止)。
+ *   ★active を見るのは、実際のサイドパネルの中(パネル自身がウィンドウの中にいる)だけ。呼び出し側がそう使う。
+ * @param {{ activeUrl?: unknown, currentLv?: unknown, watchTabs?: ReadonlyArray<{ url?: unknown }>|null }} s
+ * @returns {{ lv: string, reason: 'active' | 'keep' | 'single' | 'none' | 'ambiguous' }}
+ */
+export function pickPanelLv(s) {
+  const a = s && typeof s === 'object' ? s : /** @type {any} */ ({});
+  const active = lvFromWatchUrl(a.activeUrl);
+  if (active) return { lv: active, reason: 'active' };
+  const cur = typeof a.currentLv === 'string' && LV_RE.test(a.currentLv) ? a.currentLv : '';
+  if (cur) return { lv: cur, reason: 'keep' };
+  const p = pickLvFromTabs(a.watchTabs);
+  return { lv: p.lv, reason: p.reason };
+}
+
+/**
  * chrome.tabs.query に渡す条件(呼び出し側が使う)。
  * ★`url` で絞る = active を根拠にしない。
  */

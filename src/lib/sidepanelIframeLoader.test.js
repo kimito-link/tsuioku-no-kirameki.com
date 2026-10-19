@@ -118,3 +118,34 @@ describe('createSidepanelIframeLoader', () => {
     expect(IFRAME_FAILSAFE_MS).toBeLessThanOrEqual(3000);
   });
 });
+
+describe('createSidepanelIframeLoader.update(v0.1.1696: 見せる配信が変わったとき)', () => {
+  const OTHER = `${BASE}&lv=lv999`;
+  it('★読み込み前に update されたら、次に付ける src を差し替える(古い src を付けて付け直さない)', async () => {
+    const ifr = fakeIframe(); const t = manualTimers(); const g = gate();
+    const loader = createSidepanelIframeLoader({ iframe: ifr, base: BASE, target: WITH_LV, needsPick: false, gatePromise: g.promise, setTimer: t.setTimer });
+    loader.run();
+    loader.update(OTHER);
+    g.open();
+    await flush();
+    expect(ifr.writes).toEqual([OTHER]);
+  });
+  it('★読み込み済みなら、違う src のときだけ付け替える・同じ src は付け直さない(再読み込みしない)', async () => {
+    const ifr = fakeIframe(); const t = manualTimers(); const g = gate();
+    const loader = createSidepanelIframeLoader({ iframe: ifr, base: BASE, target: WITH_LV, needsPick: false, gatePromise: g.promise, setTimer: t.setTimer });
+    loader.run(); g.open(); await flush();
+    loader.update(WITH_LV);
+    expect(ifr.writes).toEqual([WITH_LV]);
+    loader.update(OTHER);
+    expect(ifr.writes).toEqual([WITH_LV, OTHER]);
+    loader.update(OTHER);
+    expect(ifr.writes).toEqual([WITH_LV, OTHER]);
+  });
+  it('空の src は無視する', async () => {
+    const ifr = fakeIframe(); const t = manualTimers();
+    const loader = createSidepanelIframeLoader({ iframe: ifr, base: BASE, target: BASE, needsPick: false, gatePromise: Promise.resolve(), setTimer: t.setTimer });
+    loader.run(); await flush();
+    loader.update('');
+    expect(ifr.writes).toEqual([BASE]);
+  });
+});

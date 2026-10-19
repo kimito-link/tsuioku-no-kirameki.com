@@ -1071,99 +1071,25 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 /* ================================================================== */
-/* ★サイドパネルの【事前用意】(v0.1.1439)                                */
+/* ★サイドパネルは【グローバル】(v0.1.1696)                              */
 /*                                                                      */
-/* ■ ユーザーの訴え(2026-08-19)                                       */
-/*   「また会場モードがたちあがるけど サイドパネルなかなか出ない現象ですよ」 */
-/*                                                                      */
-/* ■ なぜ会場モードだけ速いか(コードで確認済)                          */
-/*   会場モード   … watchページ内のクラス付け外しだけ = SWを起こさない      */
-/*   サイドパネル … 押下 → SWの onClicked → setOptions → open              */
-/*                    = SWが寝ていれば起動待ちがそのまま体感の遅さになる   */
-/*   ★実測(2026-08-19): SWが【応答不能】に陥ることもある。               */
-/*     同じ拡張のSWが2つ生きており、片方は `() => 1` すら返せずタイムアウトした。*/
-/*     その間ツールバーを押しても onClicked が処理されない = パネルが出ない。 */
-/*                                                                      */
-/* ■ 直し方: 押される前に setOptions を済ませておく                       */
-/*   watchページを開いた/遷移した時点で path と enabled を確定させる。    */
-/*   押下時に SW がやることが減り、Chrome側に用意ができている。          */
-/*                                                                      */
-/* ■ ★やらないこと(既存の判断を壊さない)                                */
-/*   openPanelOnActionClick を true にはしない。そうすると                */
-/*   action.onClicked が発火せず、埋め込み派のツールバーが死〆。          */
-/*   (src/lib/sidePanel.wiring.test.js が禁止として機械照合している)      */
+/* ■ 公式の仕様(developer.chrome.com/docs/extensions/reference/api/sidePanel) */
+/*   - open({tabId}) は、そのタブにタブ専用のパネルがあればそのタブだけで開く。    */
+/*     無ければ【グローバルのパネル】を、そのタブと、タブ専用が開いていない全タブで開く。*/
+/*   - タブ専用のパネルは、別のタブへ移ると【隠れ】、戻ると【再表示】される。     */
+/* ■ 今まで(v0.1.1439〜1695)は watch タブごとに setOptions({tabId, path:'…?lv='}) で  */
+/*   タブ専用にしていた。タブを切り替えるたびに隠れて再表示され、再表示のたびに Chrome 標準の */
+/*   【読み込み中表示】(ダークでは黒地に灰色の横縞)が最初のフレームまで見えていた=縞。   */
+/* ■ 今回: タブ専用の path を焼かない。パネルはグローバル(manifest の default_path)で、 */
+/*   タブを切り替えても隠れない(再表示そのものが起きない)。どの配信を見せるかは、        */
+/*   パネル自身が決める(src/extension/sidepanel-iframe-boot-entry.js が、現在のウィンドウの */
+/*   アクティブなタブの lv を優先し、タブの切り替えに追従する=src/lib/sidePanelLvFromTabs.js)。*/
+/*   「別の配信を掴む」過去事故の再発防止は、パネル側の pickPanelLv(曖昧なら空)が担う。  */
+/* ■ ★やらないこと: openPanelOnActionClick を true にはしない(onClicked が発火せず、    */
+/*   埋め込み派のツールバーが死ぬ。src/lib/sidePanel.wiring.test.js が機械照合)。       */
 /* ================================================================== */
-const SIDE_PANEL_PREARM_WATCH_RE = /\/watch\/(lv\d{1,15})(?:[/?#]|$)/;
-
-/** このタブに対してパネルを事前用意する(watchページのときだけ)。 */
-function prearmSidePanelForTab(tabId, url) {
-  try {
-    if (tabId == null || tabId === chrome.tabs.TAB_ID_NONE) return;
-    const m = SIDE_PANEL_PREARM_WATCH_RE.exec(String(url || ''));
-    // ★watch以外では何もしない(空のパネルを出す事故を避ける)
-    if (!m || !SIDE_PANEL_LV_RE.test(m[1])) return;
-    if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function') return;
-    const lv = m[1];
-    void chrome.sidePanel
-      .setOptions({ tabId, path: `sidepanel.html?lv=${lv}`, enabled: true })
-      .then(() => {
-        // 成功したときだけ「用意済み」と覚える(押下時に同じ path の差し替えを省く)。
-        __sidePanelArmedLv.set(tabId, lv);
-      })
-      .catch(() => {});
-  } catch {
-    /* no-op: 事前用意に失敗しても従来の押下経路で開く */
-  }
-}
-
-/**
- * v0.1.1674: 事前用意済みのタブ(tabId→lv)。SW が眠ると空になる=空なら従来どおり押下時に差し替える。
- * 何回呼んでも結果が同じ(べき等)で、メモが無くても壊れない。
- */
-const __sidePanelArmedLv = new Map();
 /** このSWが起きた時刻(押下時の「SWが起きた直後か」を記録するため)。 */
 const __swBootAt = Date.now();
-
-/**
- * 既に開いている watch タブを一括で用意する(べき等)。
- * onUpdated が来ない場面(拡張の更新直後・ブラウザ起動後・SW 再起動後)の穴埋め。
- */
-function prearmAllWatchTabs() {
-  try {
-    void chrome.tabs
-      .query({}) // url の絞り込みは prearmSidePanelForTab の正規表現が担う(host 権限外のタブは url が無く素通り)
-      .then((tabs) => {
-        for (const t of tabs || []) prearmSidePanelForTab(t.id, t.url);
-      })
-      .catch(() => {});
-  } catch {
-    /* no-op */
-  }
-}
-prearmAllWatchTabs(); // SW が起きるたびに1回(拡張更新・起動・再起動すべてここを通る)
-
-/* watchページになった瞬間に用意する(押される前に済ませる)。 */
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (!changeInfo || (changeInfo.status !== 'complete' && !changeInfo.url)) return;
-  prearmSidePanelForTab(tabId, (tab && tab.url) || changeInfo.url);
-});
-
-/* 別タブから切り替えただけのタブも、押される前に用意する。 */
-chrome.tabs.onActivated.addListener((info) => {
-  try {
-    if (!info || info.tabId == null) return;
-    void chrome.tabs
-      .get(info.tabId)
-      .then((t) => prearmSidePanelForTab(t && t.id, t && t.url))
-      .catch(() => {});
-  } catch {
-    /* no-op */
-  }
-});
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  __sidePanelArmedLv.delete(tabId);
-});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm?.name === AUTO_BACKUP_ALARM) {
@@ -2154,14 +2080,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       // lv は呼び出し元から渡る生値。固定リテラル path に正規化済み lv だけ載せる。
       const lv = SIDE_PANEL_LV_RE.test(String(msg.liveId || '')) ? String(msg.liveId) : '';
-      // ★タブ固有にする。これをしないと全タブ共有のまま=別配信を掴む(過去の事故)。
-      if (typeof chrome.sidePanel.setOptions === 'function') {
-        await chrome.sidePanel.setOptions({
-          tabId,
-          path: lv ? `sidepanel.html?lv=${lv}` : 'sidepanel.html',
-          enabled: true
-        });
-      }
+      // v0.1.1696: タブ専用にしない(グローバルのパネル=タブを切り替えても隠れない)。どの配信を見せるかはパネル自身が決める
+      //   (アクティブなタブの lv を優先・曖昧なら空=別配信を掴まない)。
       // open() はユーザー操作への応答でのみ許される(公式仕様)。
       // 呼び出し元はパネル内のボタン=ユーザー操作なので満たす。
       await chrome.sidePanel.open({ tabId });
@@ -3635,12 +3555,7 @@ chrome.action.onClicked.addListener((tab) => {
           return '';
         }
       })();
-      // v0.1.1674: 事前用意で同じ lv の path が確定済みなら、押下時は path に触らない(差し替えの競合を作らない)。
-      if (lvFromTab && __sidePanelArmedLv.get(tid) !== lvFromTab) {
-        void chrome.sidePanel
-          .setOptions({ tabId: tid, path: `sidepanel.html?lv=${lvFromTab}`, enabled: true })
-          .catch(() => {});
-      }
+      // v0.1.1696: タブ専用の path は焼かない(グローバルのパネルを開く=タブを切り替えても隠れない)。lv はパネル自身が決める。
       // ★同期的に開く(await を挟まない=ユーザー操作の文脈を保つ)。
       chrome.sidePanel.open({ tabId: tid });
       // v0.1.1675: open() の【あと】に控える(押下の経路を遅らせない・await しない・失敗しても開く)。
@@ -3651,7 +3566,7 @@ chrome.action.onClicked.addListener((tab) => {
             nls_sp_click_at_v1: {
               at: clickAtMs,
               swAgeMs: clickAtMs - __swBootAt,
-              armed: !!lvFromTab && __sidePanelArmedLv.get(tid) === lvFromTab,
+              armed: false, // v0.1.1696: 事前用意は廃止(グローバルのパネル)。記録の形(契約テスト)を保つため残す
               hasLv: !!lvFromTab
             }
           })

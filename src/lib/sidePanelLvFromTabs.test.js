@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIDE_PANEL_WATCH_TAB_QUERY, pickLvFromTabs } from './sidePanelLvFromTabs.js';
+import { SIDE_PANEL_WATCH_TAB_QUERY, lvFromWatchUrl, pickLvFromTabs, pickPanelLv } from './sidePanelLvFromTabs.js';
 
 /**
  * ★この検査が守っているのは「速くすること」ではなく
@@ -96,5 +96,27 @@ describe('★問い合わせ条件は url で絞る(active を条件にしない
   it('watch の URL パターンだけを条件にしている', () => {
     expect(SIDE_PANEL_WATCH_TAB_QUERY.url).toContain('https://live.nicovideo.jp/watch/*');
     expect(Object.keys(SIDE_PANEL_WATCH_TAB_QUERY)).toEqual(['url']);
+  });
+});
+
+describe('pickPanelLv / lvFromWatchUrl(v0.1.1696: グローバルのパネルが、見せる配信を自分で決める)', () => {
+  const W = (lv) => ({ url: `https://live.nicovideo.jp/watch/${lv}` });
+  it('★アクティブなタブが watch なら、その配信(最優先)', () => {
+    expect(pickPanelLv({ activeUrl: 'https://live.nicovideo.jp/watch/lv111?ref=x', currentLv: 'lv999', watchTabs: [W('lv111'), W('lv999')] })).toEqual({ lv: 'lv111', reason: 'active' });
+  });
+  it('★ほかのタブ(watch 以外)を見ている間は、いま見せている配信を保つ', () => {
+    expect(pickPanelLv({ activeUrl: 'https://example.com/', currentLv: 'lv111', watchTabs: [W('lv111'), W('lv222')] })).toEqual({ lv: 'lv111', reason: 'keep' });
+  });
+  it('★まだ何も見せていないとき: watch タブがちょうど1つならそれ・複数や無しは選ばない(別の配信を掴まない)', () => {
+    expect(pickPanelLv({ activeUrl: 'https://example.com/', currentLv: '', watchTabs: [W('lv111')] })).toEqual({ lv: 'lv111', reason: 'single' });
+    expect(pickPanelLv({ activeUrl: '', currentLv: '', watchTabs: [W('lv111'), W('lv222')] })).toEqual({ lv: '', reason: 'ambiguous' });
+    expect(pickPanelLv({ activeUrl: '', currentLv: '', watchTabs: [] })).toEqual({ lv: '', reason: 'none' });
+  });
+  it('壊れた入力・不正な lv は採らない', () => {
+    expect(pickPanelLv(null)).toEqual({ lv: '', reason: 'none' });
+    expect(pickPanelLv({ currentLv: 'not-an-lv', watchTabs: [] })).toEqual({ lv: '', reason: 'none' });
+    expect(lvFromWatchUrl('https://live.nicovideo.jp/watch/lv12345678901234567')).toBe('');
+    expect(lvFromWatchUrl('https://live.nicovideo.jp/watch/lv123#x')).toBe('lv123');
+    expect(lvFromWatchUrl(undefined)).toBe('');
   });
 });
