@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 953 件
+## ⚠️ 役割コメントが無いソース 8 / 954 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2056)
+- 📁 **src/** (2059)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1144,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1816)
+  - 📁 **lib/** (1819)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2596,6 +2596,9 @@
     - `storyDiagMonotonic.test.js`
     - `storyDiagTotalSource.js` — 「記録している応援コメント N 件」の N を1箇所で決める純関数。
     - `storyDiagTotalSource.test.js`
+    - `storyGrowthAppendPlan.js` — 応援マス(グリッド)を「増えた分だけ足す」か「全部作り直す」かの判定(純関数・I/O禁止)。v0.1.1689
+    - `storyGrowthAppendPlan.test.js`
+    - `storyGrowthAppendWiring.wiring.test.js`
     - `storyGrowthCellSwap.js` — アイコングリッドの「既存マスの中身がすり替わった回数」を観測する純関数(v0.1.1215)。
     - `storyGrowthCellSwap.test.js`
     - `storyGrowthChurn.js` — アイコングリッド(story growth)の「作り直し」を観測する純関数(v0.1.1208)。

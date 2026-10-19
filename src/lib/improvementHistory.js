@@ -3012,5 +3012,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1688', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1687 の note と同じ理由)。今回は単体8+配線6。ヘッドレスの交互比較(各5回): 起動後6秒の属性書き込み 10,912→4,972(中央値)。長い処理合計は 950→829ms だがばらつき40%超で、強い効果とは言わない。'
+  }),
+  Object.freeze({
+    version: '0.1.1689', metric: 'bundle-kb', value: 1467,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は応援マスの増加時の経路(syncStoryGrowth)だけ(新規 src/lib/storyGrowthAppendPlan.js・popup-entry.js は関数1つ追加+分岐1つ)。rebuildStoryGrowth・縮小・切り替えは触らない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1689', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1689', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1688 の note と同じ理由)。今回は単体6+配線4。ヘッドレスでは作り直しの減少を再現できず(全配信が360個で頭打ち)、実機のちらつき計で確認する。'
   })
 ]);
