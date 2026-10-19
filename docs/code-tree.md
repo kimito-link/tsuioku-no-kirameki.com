@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2062)
+- 📁 **src/** (2064)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1144,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1822)
+  - 📁 **lib/** (1824)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1221,6 +1221,8 @@
     - `avatarComposeGate.test.js`
     - `avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
     - `avatarEntryCounts.test.js`
+    - `avatarFaceHydrate.test.js`
+    - `avatarFaceHydrateComposer.test.js`
     - `avatarFacePersistWiring.wiring.test.js`
     - `avatarFaceRender.js` — 【層】L0 判定層(純粋関数・I/O は deps で注入=Worker でもテストでも同じ手順を走らせる)
     - `avatarFaceRender.test.js`

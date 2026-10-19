@@ -215,6 +215,48 @@ export function createAvatarFaceStore(deps = {}) {
         later(() => { lastFlush = flushPuts(); }, flushMs);
       }
     },
+    /**
+     * 直近に書いた顔を新しい順に最大 limit 件返す(読むだけ・1回のトランザクション)。v0.1.1691
+     *   パネルを開いた瞬間に、前回までの顔をメモリへ先読みするために使う(avatarPartsComposer.hydrateRecentAnonymousFaces)。
+     *   今の合成の版(FACE_RENDER_VERSION)の PNG だけ返す。IndexedDB が無い・空・壊れた値・失敗は、空配列(従来どおり作るだけ)。
+     *   スキーマは変えない(byTime 索引を逆順に読むだけ=古い版の DB でもそのまま動く)。
+     * @param {number} limit
+     * @returns {Promise<Array<{ userKey: string, url: string }>>}
+     */
+    async getRecent(limit) {
+      const n = Math.floor(Number(limit));
+      if (!idb || !Number.isFinite(n) || n <= 0) return [];
+      try {
+        const db = await openDb();
+        if (!db) return [];
+        const cap = Math.min(n, maxEntries);
+        const prefix = `${FACE_RENDER_VERSION}:`;
+        return await new Promise((resolve) => {
+          /** @type {Array<{ userKey: string, url: string }>} */
+          const out = [];
+          try {
+            const tx = db.transaction(AVATAR_FACE_STORE_NAME, 'readonly');
+            const cur = tx.objectStore(AVATAR_FACE_STORE_NAME).index('byTime').openCursor(null, 'prev');
+            cur.onsuccess = () => {
+              const c = cur.result;
+              if (!c || out.length >= cap) return;
+              const rec = c.value;
+              if (rec && typeof rec.k === 'string' && rec.k.startsWith(prefix) && typeof rec.u === 'string' && rec.u.startsWith(PNG_PREFIX)) {
+                out.push({ userKey: rec.k.slice(prefix.length), url: rec.u });
+              }
+              c.continue();
+            };
+            tx.oncomplete = () => resolve(out);
+            tx.onerror = () => resolve([]);
+            tx.onabort = () => resolve([]);
+          } catch {
+            resolve([]);
+          }
+        });
+      } catch {
+        return [];
+      }
+    },
     /** テスト用: 書きをいま流す。 */
     flushNow: async () => {
       putScheduled = false;

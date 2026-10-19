@@ -17,13 +17,21 @@ describe('成長アイコンは出ている顔を上書きしない', () => {
 
   it('★applyStoryGrowthIconAttributes: 顔が出ていなければ、従来どおり代入・失敗記録・アップグレードを行う', () => {
     const f = src.indexOf('function applyStoryGrowthIconAttributes');
-    const body = src.slice(f, f + 1400);
+    const body = src.slice(f, f + 1900);
     const guard = body.indexOf('if (!isAnonymousFaceShown(img, entry?.userId, displayTile)) {');
     expect(guard).toBeGreaterThan(-1);
     const block = body.slice(guard, guard + 420);
     expect(block).toContain('storyGrowthImgAssignSrc(img, displayTile);');
     expect(block).toContain('storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);');
     expect(block).toContain('upgradeAnonymousAvatarImageFromFallback(img, entry?.userId, requestedTile, 64);');
+  });
+
+  it('★v0.1.1691: 匿名の仮顔(SVG)が要求されたとき、メモリの合成済みの顔を最初から使う(cachedAnonymousFace)', () => {
+    const f = src.indexOf('function applyStoryGrowthIconAttributes');
+    const body = src.slice(f, f + 1900);
+    expect(body).toMatch(/const cachedFace = requestedTile\.startsWith\('data:image\/svg\+xml'\) \? cachedAnonymousFace\(entry\?\.userId\) : '';/);
+    expect(body).toContain('const displayTile = cachedFace || storyAvatarLoadGuard.pickDisplaySrc(requestedTile);');
+    expect(src).toMatch(/import \{[^}]*cachedAnonymousFace[^}]*\} from '\.\.\/lib\/avatarPartsComposer\.js';/);
   });
 
   it('★判定の関数は composer に1つ(popup 側に複製しない)', () => {

@@ -690,7 +690,7 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
-import { cachedAnonymousFace, getAvatarComposeStats, isAnonymousFaceShown, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
+import { cachedAnonymousFace, getAvatarComposeStats, hydrateRecentAnonymousFaces, isAnonymousFaceShown, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { noteHtmlWrittenElsewhere, removeAttrIfPresent, removeStylePropIfSet, setAttrIfChanged, setClassFlag, setInnerHtmlIfChanged } from '../lib/domWriteIfChanged.js';
 import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import {
@@ -8530,7 +8530,9 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   const selected = Boolean(stable && STORY_GROWTH_STATE.pinnedCommentId === stable);
 
   const requestedTile = storyGrowthTileSrcForEntry(entry, STORY_SOURCE_STATE.liveId);
-  const displayTile = storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
+  // v0.1.1691: 匿名の仮の顔(SVG)が要求されたとき、メモリに合成済みの顔(PNG)があれば最初からそれを出す(作り直したマスでも仮顔→本顔の差し替えが出ない。レーンと同じ型)。
+  const cachedFace = requestedTile.startsWith('data:image/svg+xml') ? cachedAnonymousFace(entry?.userId) : '';
+  const displayTile = cachedFace || storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
   // v0.1.1683: 同じ人の合成済みの顔(PNG)が出ているマスは、SVG の仮の顔へ戻して差し替え直さない(無駄な代入とちらつきを止める)。
   if (!isAnonymousFaceShown(img, entry?.userId, displayTile)) {
     storyGrowthImgAssignSrc(img, displayTile);
@@ -19321,6 +19323,8 @@ function bridgeToolbarPopupToInlinePanel() {
 }
 
 async function initPopup() {
+  // v0.1.1691: 前回までの合成済みの顔を、最初の描きより前に(非同期で)メモリへ先読みする=応援マス/レーンが最初から本顔で出る。
+  void hydrateRecentAnonymousFaces();
   // feat/multitab-scale-globalcap: ビルドバッジは「ローカル値（manifest + NL_BUILD_ID）」だけで
   //   塗れる＝データ取得や content readiness に一切依存しない。多タブで描画スレッドが混んでも
   //   「ビルド —」固定にならないよう、initPopup の最初に無条件で塗る（以降の setup が遅延/失敗
