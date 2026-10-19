@@ -595,6 +595,7 @@
 | `src/lib/exportWaitNarration.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/externalFetchCells.js` | 1 | 状態速報ページ |
 | `src/lib/externalLinksSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/fastDiagFullGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/finalDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/flickerMeter.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/flickerMeterBoot.js` | 1 | ポップアップ(応援レーン) |

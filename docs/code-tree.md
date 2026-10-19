@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 957 件
+## ⚠️ 役割コメントが無いソース 8 / 958 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2067)
+- 📁 **src/** (2070)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1145,7 +1145,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1826)
+  - 📁 **lib/** (1829)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1664,6 +1664,8 @@
     - `externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
     - `externalLinksSectionHtml.test.js`
     - `failOpenGuardCensus.test.js`
+    - `fastDiagFullGate.js` — AI共有用の診断(fastDiag)の【全文】を、storage へ書くかどうかの判定(純関数・I/O禁止)。v0.1.1694
+    - `fastDiagFullGate.test.js`
     - `finalDetailCells.js` — 100個化の最終弾(識別・効果音・BGM・記録の質)。
     - `finalDetailCells.test.js`
     - `firstPaintGate.js` — 「最初の描画が済むまで」待つ関門(純粋寄り・時計と PerformanceObserver は deps で注入)。v0.1.1684
@@ -1789,6 +1791,7 @@
     - `htmlReportConceptGuide.test.js`
     - `htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
     - `htmlText.test.js`
+    - `hugeKeyWriteReductionWiring.wiring.test.js`
     - `identityAcquisitionCensus.js` — サムネ / 数値ID / アカウント名 の【取得率】を数える純関数。
     - `identityAcquisitionCensus.test.js`
     - `iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の

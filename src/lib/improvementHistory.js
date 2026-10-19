@@ -3082,5 +3082,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1693', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1692 の note と同じ理由)。今回は単体9+配線(書き換え)。ヘッドレスは外枠の最初の描画が約70msで競合が再現せず、効果は実機の記録で確認する。'
+  }),
+  Object.freeze({
+    version: '0.1.1694', metric: 'bundle-kb', value: 1472,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は書き込みの頻度とサイズだけ(取り込みログの保持数・較正リングの間隔・fastDiag 全文の間引き=新規 fastDiagFullGate)。読み手の挙動は変えない。この版は削る版。'
+  }),
+  Object.freeze({
+    version: '0.1.1694', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1694', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1693 の note と同じ理由)。今回は単体 +7(fastDiagFullGate 5・ingestLog 2)・配線4。効果は実機の census で確認(ヘッドレスは content の書き込みが再現しない)。'
   })
 ]);
