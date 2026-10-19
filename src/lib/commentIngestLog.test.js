@@ -60,7 +60,30 @@ describe('commentIngestLog', () => {
     expect(cur.items).toHaveLength(cap);
     expect(cur.items[0].t).toBe(total - cap);
     expect(cur.items[cap - 1].t).toBe(total - 1);
-    expect(COMMENT_INGEST_LOG_MAX_ITEMS).toBeGreaterThan(100);
+    // v0.1.1694: 履歴は小さく(全体書き直し+全画面への配信が主スレッドを占有する=census で確定)。ただし直近の取り込みの経路を読むには足りる数。
+    expect(COMMENT_INGEST_LOG_MAX_ITEMS).toBeGreaterThanOrEqual(30);
+    expect(COMMENT_INGEST_LOG_MAX_ITEMS).toBeLessThanOrEqual(100);
+  });
+
+  it('★v0.1.1694: 満杯のログを JSON にしても 10KB 未満(毎回全画面へ配られる量を小さく保つ)', () => {
+    let cur = { v: 1, items: [] };
+    for (let i = 0; i < COMMENT_INGEST_LOG_MAX_ITEMS * 3; i += 1) {
+      cur = appendCommentIngestLog(cur, { t: 1_800_000_000_000 + i, liveId: 'lv351428823', source: 'ndgr_forward', batchIn: 12, added: 12, totalAfter: 100000 + i, official: 123456 });
+    }
+    expect(cur.items).toHaveLength(COMMENT_INGEST_LOG_MAX_ITEMS);
+    expect(JSON.stringify(cur).length).toBeLessThan(10_000);
+  });
+
+  it('★読み手が使う「配信ごとの最新1件」は、満杯でも取れる(履歴を縮めても最終取り込みの行は変わらない)', () => {
+    let cur = { v: 1, items: [] };
+    for (let i = 0; i < COMMENT_INGEST_LOG_MAX_ITEMS * 2; i += 1) {
+      cur = appendCommentIngestLog(cur, { t: i + 1, liveId: i % 2 ? 'lvaaa' : 'lvbbb', source: 'tail', batchIn: 1, added: 1, totalAfter: i + 1, official: null });
+    }
+    const parsed = parseCommentIngestLog(cur);
+    const lastA = [...parsed.items].reverse().find((it) => it.liveId === 'lvaaa');
+    const lastB = [...parsed.items].reverse().find((it) => it.liveId === 'lvbbb');
+    expect(lastA && lastA.t).toBe(COMMENT_INGEST_LOG_MAX_ITEMS * 2);
+    expect(lastB && lastB.t).toBe(COMMENT_INGEST_LOG_MAX_ITEMS * 2 - 1);
   });
 
   it('maybeAppendCommentIngestLog は ndgr の短間隔・小増分を間引く', () => {
