@@ -3040,5 +3040,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1690', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1689 の note と同じ理由)。今回は単体11+配線2。'
+  }),
+  Object.freeze({
+    version: '0.1.1691', metric: 'bundle-kb', value: 1469,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は顔の先読み(新規は getRecent と hydrateRecentAnonymousFaces のみ・avatarFaceStore のスキーマは不変)と、応援マスでメモリの顔を最初から使うこと。直前の v0.1.1690 は計器の版で、この版は削る版。'
+  }),
+  Object.freeze({
+    version: '0.1.1691', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1691', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1690 の note と同じ理由)。今回は単体10+配線3。効果は実機で確認(ヘッドレス交互比較は環境の不調で未実施)。'
   })
 ]);

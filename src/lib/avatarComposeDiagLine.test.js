@@ -11,6 +11,11 @@ describe('formatAvatarComposeDiagLine', () => {
     expect(formatAvatarComposeDiagLine(/** @type {any} */ ('x'), NOW)).toBe('');
   });
 
+  it('★開いた瞬間の先読みの件数を出す(先読みが効いたかを速報で読める)', () => {
+    expect(formatAvatarComposeDiagLine(rec({ requested: 10, hydrated: 342 }), NOW)).toContain('先読み342');
+    expect(formatAvatarComposeDiagLine(rec({ requested: 10 }), NOW)).toContain('先読み0');
+  });
+
   it('★Worker が動いた回の数・フォールバックの数・永続キャッシュの数を出す', () => {
     const line = formatAvatarComposeDiagLine(
       rec({ requested: 40, cacheHit: 3, persistedHit: 20, workerComposed: 15, workerFallback: 2, worker: { state: 'ready', started: 1, rendered: 15, failed: 2, timedOut: 0, lastError: '' } }),

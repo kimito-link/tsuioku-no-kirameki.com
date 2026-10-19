@@ -34,9 +34,28 @@ describe('顔の永続キャッシュの配線', () => {
     expect(src).toMatch(/if \(faceStore\) faceStore\.put\(/);
   });
 
-  it('読み込んだ顔はメモリのキャッシュにも入れ、上限(256)を守る(rememberFace)', () => {
+  it('読み込んだ顔はメモリのキャッシュにも入れ、上限(512)を守る(rememberFace)', () => {
     expect(src).toContain('function rememberFace(');
     expect(src).toMatch(/rememberFace\(key, persisted\)/);
     expect(src).toMatch(/rememberFace\(key, dataUrl\)/);
+  });
+});
+
+describe('開いた瞬間の顔の先読み(v0.1.1691)', () => {
+  const popup = read('src/extension/popup-entry.js');
+  it('★popup は initPopup の先頭で hydrateRecentAnonymousFaces を(待たずに)呼ぶ', () => {
+    expect(popup).toMatch(/import \{[^}]*hydrateRecentAnonymousFaces[^}]*\} from '\.\.\/lib\/avatarPartsComposer\.js';/);
+    const f = popup.indexOf('async function initPopup() {');
+    expect(f).toBeGreaterThan(-1);
+    const head = popup.slice(f, f + 900);
+    expect(head).toContain('void hydrateRecentAnonymousFaces();');
+    // 最初の描き(paintVersionBadge)より前
+    expect(head.indexOf('void hydrateRecentAnonymousFaces();')).toBeLessThan(head.indexOf('paintVersionBadge();'));
+  });
+  it('★composer の先読みは永続側を読むだけ(getRecent 以外の書き込みを呼ばない)', () => {
+    const f = src.indexOf('export async function hydrateRecentAnonymousFaces(');
+    const body = src.slice(f, src.indexOf('\n}\n', f));
+    expect(body).toContain('store.getRecent(AVATAR_FACE_HYDRATE_COUNT)');
+    expect(body).not.toMatch(/\.put\(|\.delete\(|\.clear\(/);
   });
 });

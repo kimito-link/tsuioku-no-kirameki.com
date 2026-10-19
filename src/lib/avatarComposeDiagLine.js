@@ -30,6 +30,7 @@ export function formatAvatarComposeDiagLine(rec, nowMs) {
     `顔の合成(${ago}の記録): 要求${n(s.requested)}`,
     `メモリ${n(s.cacheHit)}`,
     `永続キャッシュ${n(s.persistedHit)}`,
+    `先読み${n(s.hydrated)}`,
     `Worker成功${n(s.workerComposed)}`,
     `Worker失敗→従来合成${n(s.workerFallback)}`,
     `Worker=${String(w.state || 'unused')}`
