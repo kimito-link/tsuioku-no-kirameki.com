@@ -311,7 +311,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 266</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 264</summary>
 
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
@@ -487,7 +487,6 @@
 - `src/lib/repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。
 - `src/lib/reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
 - `src/lib/resolveVisitorCount.js` — v0.1.646: 「来場(累計来場者数)」の単一定義。表示場所(popup / status / レポート)で
-- `src/lib/runAfterNextPaint.js` — 重い処理を「次の描画のあと」へ送る(時計・rAF は引数で受け取る純関数寄りの部品)。v0.1.1695
 - `src/lib/sanitizeRoomAvatarsForBroadcaster.js` — 集計済み user room の avatarUrl から「broadcaster icon の取り違え」を除去する純粋関数。
 - `src/lib/scoreCountUp.js` — 配信採点パネルの点数カウントアップ演出(council/broadcast-scoring-SYNTHESIS.md §5・SC2)。
 - `src/lib/scrapeGiftHistoryList.js` — niconico ギフト sub-app の `gift-history-list` から個別ギフトを抽出する純関数（v0.1.198）。
@@ -496,7 +495,6 @@
 - `src/lib/scrollWhiteoutReport.js` — スクロール白化(下にスクロールすると重く・一瞬白くなって・遅れて描画される)を状態速報の
 - `src/lib/selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
 - `src/lib/sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
-- `src/lib/showToFrameLedger.js` — サイドパネルが「隠れてから再表示された」回ごとの、次の描画までの時間の記録(純粋関数)。v0.1.1695
 - `src/lib/sidepanelIframeLoader.js` — サイドパネルの iframe(中の popup)の読み込みを「親の最初の描画のあと」まで遅らせる、読み込み役(時計・iframe は引数で受け取る)。v0.1.1693
 - `src/lib/storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
 - `src/lib/storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
@@ -1196,6 +1194,7 @@
 - `v0.1.1694` 2026-10-17 — 全ページへ配る巨大な保存の書き込みを減らす
 
 ### ⚡ 描画・性能 (9版)
+- `v0.1.1697` 2026-10-17 — 不要になった再表示まわりの処理を撤去
 - `v0.1.1696` 2026-10-17 — サイドパネルを全タブ共通にしてタブ切替の縞を無くす
 - `v0.1.1695` 2026-10-17 — タブ切り替えで戻った瞬間の重い更新を後ろへ
 - `v0.1.1694` 2026-10-17 — 全ページへ配る巨大な保存の書き込みを減らす
@@ -1204,7 +1203,6 @@
 - `v0.1.1686` 2026-10-17 — ちらつき計と黒い幕の年表を入れる
 - `v0.1.1684` 2026-10-17 — 自己診断が最初の描画を遅らせないようにする
 - `v0.1.1679` 2026-10-17 — パネル起動時の画像の先読みをやめる
-- `v0.1.1677` 2026-10-17 — アイコンURL比較の無駄な再計算を省く
 
 ### その他 (1版)
 - `v0.1.1689` 2026-10-17 — 応援マスが増えても既存のマスを作り直さない
