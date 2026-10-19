@@ -21,6 +21,8 @@ import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
 import { createFirstPaintGate } from '../lib/firstPaintGate.js';
 import { KEY_AVATAR_COMPOSE_DIAG, formatAvatarComposeDiagLine } from '../lib/avatarComposeDiagLine.js';
+import { FLICKER_METER_STORAGE_KEY, formatFlickerLine } from '../lib/flickerMeter.js';
+import { BOOT_TIMELINE_STORAGE_KEY, formatBootTimelineLine } from '../lib/bootTimeline.js';
 import {
   SP_CLICK_KEY,
   SP_OPEN_TIMING_KEY,
@@ -530,6 +532,8 @@ function renderSelfDiagOverlay(v) {
 function collectAndPublish(phase, schedMs = null) {
   publishOpenTiming();
   refreshAvatarComposeLine();
+  refreshFlickerLine();
+  refreshBootTimelineLine();
   // ★v0.1.1382: 測るたびに最新値を取りに行く(記録中は値が動く)。
   //   await しない=この読みが遅くても観測そのものは止まらない。
   refreshCommentWriteModeDiag();
@@ -839,6 +843,10 @@ function collectAndPublish(phase, schedMs = null) {
         openTimingLine: _openLine,
         // ★v0.1.1682: 匿名の顔の合成の状況(Worker が動いたか・フォールバックしたか)。
         avatarComposeLine: _avatarComposeLine,
+        // ★v0.1.1686: ちらつき計(どの場所を何回書き換えたか・往復=明滅の数)。
+        flickerMeterLine: _flickerLine,
+        // ★v0.1.1687: 黒い幕の年表(親の最初の描画までに、子の長い処理・段階がどう並んでいたか)。
+        bootTimelineLine: _bootTimelineLine,
         // ok は「この起動で一度も黒くなかった」を意味する(瞬間の黒も見逃さない)。
         // ★未レイアウトは黒として数えない(偽陽性を永久保持しない)。
         // ★v0.1.1351: あとから黒くなった場合も ok=false。ここを入れ忘れると、行には
@@ -976,6 +984,43 @@ try {
  *      boot の無界awaitは1箇所でもページを永久に白紙にする。
  *   3. 失敗しても黙って諦める(値は null のまま=「未観測」と正しく表示される)。
  */
+/** v0.1.1687: 黒い幕の年表(子 popup の節目・長い処理・段階を、親の起点に直して親の最初の描画と並べる)。読むだけ。 */
+let _bootTimelineLine = '';
+function refreshBootTimelineLine() {
+  try {
+    const p = chrome?.storage?.session?.get?.(BOOT_TIMELINE_STORAGE_KEY);
+    if (!p || typeof p.then !== 'function') return;
+    p.then((bag) => {
+      const fp = performance.getEntriesByName('first-paint')[0];
+      _bootTimelineLine = formatBootTimelineLine(
+        bag && bag[BOOT_TIMELINE_STORAGE_KEY],
+        { timeOrigin: performance.timeOrigin, firstPaintMs: fp ? Math.round(fp.startTime) : null },
+        Date.now()
+      );
+    }).catch(() => {
+      /* 読めなければ空のまま(何も足さない) */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+/** v0.1.1686: ちらつき計(popup が session に書いた写し)を状態速報の1行にする。読むだけ。 */
+let _flickerLine = '';
+function refreshFlickerLine() {
+  try {
+    const p = chrome?.storage?.session?.get?.(FLICKER_METER_STORAGE_KEY);
+    if (!p || typeof p.then !== 'function') return;
+    p.then((bag) => {
+      _flickerLine = formatFlickerLine(bag && bag[FLICKER_METER_STORAGE_KEY], Date.now());
+    }).catch(() => {
+      /* 読めなければ空のまま(何も足さない) */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
 /** v0.1.1682: 匿名の顔の合成(Worker・永続キャッシュ・フォールバック)の状況の1行。popup が session に書いた統計を読むだけ。 */
 let _avatarComposeLine = '';
 function refreshAvatarComposeLine() {
