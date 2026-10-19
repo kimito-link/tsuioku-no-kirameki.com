@@ -429,7 +429,8 @@ export default [
     // 安全網のみ。分割は別地図。
     // v0.1.1629: サイドパネル内の送信担当(?publisher=1)のロック取得(+2行)と、自動送信の連打止め(自分の送信開始時刻の保持・+約5行、残りは【なぜ】のコメント)。判定は lib(statusPublisherPlan.js / autoPublishDecision.js)。
     files: ['src/extension/status-entry.js'],
-    rules: { 'max-lines': ['error', { max: 4547, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1698: 送信担当の更新間隔(10秒)を lib(statusRefreshInterval.js)から引く配線(+2行)。
+    rules: { 'max-lines': ['error', { max: 4550, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

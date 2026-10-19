@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 958 件
+## ⚠️ 役割コメントが無いソース 8 / 959 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2070)
+- 📁 **src/** (2072)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1145,7 +1145,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1829)
+  - 📁 **lib/** (1831)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2568,6 +2568,8 @@
     - `statusReadPolicy.wiring.test.js`
     - `statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
     - `statusRefreshBackoff.test.js`
+    - `statusRefreshInterval.js` — 状態画面(status.html)の自動更新の間隔を決める(純関数)。v0.1.1698
+    - `statusRefreshInterval.test.js`
     - `statusShareFormDraft.wiring.test.js`
     - `statusShareKeysImport.wiring.test.js`
     - `statusShareKeysSeed.wiring.test.js`
