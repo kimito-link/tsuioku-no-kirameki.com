@@ -872,6 +872,7 @@
 | `src/lib/statusPublisherPlan.js` | 1 | 状態速報ページ |
 | `src/lib/statusReadPolicy.js` | 1 | 状態速報ページ |
 | `src/lib/statusRefreshBackoff.js` | 1 | 状態速報ページ |
+| `src/lib/statusRefreshInterval.js` | 1 | 状態速報ページ |
 | `src/lib/statusShareUrls.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrend.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrendKey.js` | 1 | 状態速報ページ |
