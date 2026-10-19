@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2037)
+- 📁 **src/** (2038)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1144,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1797)
+  - 📁 **lib/** (1798)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2583,6 +2583,7 @@
     - `storyGrowthChurn.js` — アイコングリッド(story growth)の「作り直し」を観測する純関数(v0.1.1208)。
     - `storyGrowthChurn.test.js`
     - `storyGrowthIdentityWiring.wiring.test.js`
+    - `storyGrowthKeepFace.wiring.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
     - `storyGrowthLimits.test.js`
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。

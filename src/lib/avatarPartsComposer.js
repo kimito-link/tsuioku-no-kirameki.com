@@ -439,6 +439,26 @@ export function upgradeAnonymousAvatarImage(img, userKey, sizePx = 64) {
 }
 
 /**
+ * 合成済みの顔(PNG)が既に出ている <img> を、同じ人の SVG の仮の顔で【上書きしない】ための判定(v0.1.1683)。
+ *   story の成長アイコン(patchStoryGrowthIconsFromSource)は、更新のたびに全マスの src を「SVG の仮の顔」へ
+ *   戻してから顔(PNG)へ差し替え直していた。実機データを写したヘッドレスで、開いて12秒に SVG 約3,200回・PNG 約3,700回の
+ *   代入(75タイルなのに)=無駄な作業と、SVG→PNG の「ちらつき」の元だった。同じ人の顔が出ているなら触らない。
+ *   次の候補が SVG の仮の顔でないとき(本物のアイコン URL 等)は、必ず通常どおり上書きする。
+ * @param {{ dataset?: Record<string, string|undefined>, getAttribute?: (n: string) => string|null }|null|undefined} img
+ * @param {unknown} userKey
+ * @param {unknown} nextSrc これから代入しようとしている src
+ * @returns {boolean}
+ */
+export function isAnonymousFaceShown(img, userKey, nextSrc) {
+  if (!img || typeof img.getAttribute !== 'function') return false;
+  const key = normalizeUserKey(userKey);
+  if (!key) return false;
+  if (!String(nextSrc || '').startsWith('data:image/svg+xml')) return false;
+  if ((img.dataset && img.dataset.nlAnonymousAvatarKey) !== key) return false;
+  return String(img.getAttribute('src') || '').startsWith('data:image/png;base64,');
+}
+
+/**
  * 現在の表示元が従来SVGのときだけ非同期アップグレードを始める。
  * @param {HTMLImageElement|null|undefined} img
  * @param {unknown} userKey
