@@ -881,6 +881,7 @@
 | `src/lib/storedCommentEntriesNormalize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDiagMonotonic.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyGrowthAppendPlan.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthCellSwap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthChurn.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthLimits.js` | 1 | ポップアップ(応援レーン) |
