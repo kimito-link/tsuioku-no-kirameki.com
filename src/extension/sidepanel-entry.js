@@ -23,6 +23,7 @@ import { createFirstPaintGate } from '../lib/firstPaintGate.js';
 import { KEY_AVATAR_COMPOSE_DIAG, formatAvatarComposeDiagLine } from '../lib/avatarComposeDiagLine.js';
 import { FLICKER_METER_STORAGE_KEY, formatFlickerLine } from '../lib/flickerMeter.js';
 import { BOOT_TIMELINE_STORAGE_KEY, formatBootTimelineLine } from '../lib/bootTimeline.js';
+import { formatBlackCurtainLedger } from '../lib/blackCurtainLedger.js';
 import {
   SP_CLICK_KEY,
   SP_OPEN_TIMING_KEY,
@@ -63,6 +64,9 @@ let _openClick = null;
 let _openHistory = [];
 let _openHistoryLoaded = false;
 let _openLine = '';
+// v0.1.1690: 黒い幕の記録の元(開き方の履歴)。診断を組み立てる時刻で「何分前」を出すため、行ではなく履歴を持つ。
+/** @type {any[]} */
+let _curtainOpens = [];
 let _openLastSig = '';
 // ★文書の中だけで測れる値(押した時刻が無い回=Chrome のサイドパネルボタン経由でも残る)。
 //   scriptAt: 文書作成(ナビゲーション開始から)→このスクリプトが走るまで / ownLongTasks: この文書の長い処理(>50ms) /
@@ -113,6 +117,7 @@ function publishOpenTiming() {
     });
     const merged = mergeOpens(_openHistory, cur);
     _openLine = formatOpenTimingLine(merged);
+    _curtainOpens = merged;
     const sig = JSON.stringify(cur);
     if (sig === _openLastSig) return; // 変化が無ければ書かない(storage_changed の再描画を増やさない)
     _openLastSig = sig;
@@ -841,6 +846,8 @@ function collectAndPublish(phase, schedMs = null) {
         reveal: { ..._revealDiag },
         // ★v0.1.1675: 押してからパネルが描かれるまでの実測の1行(中央値・最大・直近)。
         openTimingLine: _openLine,
+        // ★v0.1.1690: 黒い幕の記録(回ごとの黒かった時間・時間を食った区間・直近N回の結論)=ユーザーが言わなくても読める。
+        blackCurtainLine: formatBlackCurtainLedger(_curtainOpens, Date.now()),
         // ★v0.1.1682: 匿名の顔の合成の状況(Worker が動いたか・フォールバックしたか)。
         avatarComposeLine: _avatarComposeLine,
         // ★v0.1.1686: ちらつき計(どの場所を何回書き換えたか・往復=明滅の数)。
