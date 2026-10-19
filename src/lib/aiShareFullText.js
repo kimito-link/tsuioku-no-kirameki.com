@@ -696,6 +696,9 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.1682: 匿名の顔の合成の状況(Worker・永続キャッシュ・フォールバック)。無ければ出ない。
     const composeLine = String(sidepanelSelfDiag?.avatarComposeLine || '');
     if (composeLine) lines.push(composeLine);
+    // v0.1.1686: ちらつき計(どの場所を何回書き換えたか)。無ければ出ない。
+    const flickerLine = String(sidepanelSelfDiag?.flickerMeterLine || '');
+    if (flickerLine) lines.push(flickerLine);
   } catch {
     /* no-op: 自己診断の失敗は状態速報を壊さない */
   }

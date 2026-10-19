@@ -2956,5 +2956,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1684', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1683 の note と同じ理由)。今回は単体5件。ヘッドレスで『先に別のパネルを開いて起動の最中にしておく』競合を再現した A/B(各7回×2周)で、最初の描画の中央値が約414ms→約244ms(平均 約413→約285)。競合なしの A/B では差が出ない(約72ms同士)。既存の挙動テスト1件は、node に paint が無いため『描画は起動直後に済んだ』ブラウザを模すスタブを足した。'
+  }),
+  Object.freeze({
+    version: '0.1.1686', metric: 'bundle-kb', value: 1460,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は計器のみ(新規 flickerMeter・flickerMeterBoot。popup が MutationObserver で数え session へ書く・サイドパネルの自己診断が読む・速報に1行)。描画は触っていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1686', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1686', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1684 の note と同じ理由)。今回は単体 meter13+boot7+配線6。実機データを写したヘッドレスで、計器が本物のちらつきを検出できることを確認した: v1683 の修正を外した昔の挙動で .nl-story-growth-icon の往復 7,506 回(12秒)、今の版で 2 回。計器自身は 12 秒で約 45ms。'
   })
 ]);

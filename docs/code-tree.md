@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 947 件
+## ⚠️ 役割コメントが無いソース 8 / 949 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2040)
+- 📁 **src/** (2045)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1144,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1800)
+  - 📁 **lib/** (1805)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1655,6 +1655,11 @@
     - `finalDetailCells.test.js`
     - `firstPaintGate.js` — 「最初の描画が済むまで」待つ関門(純粋寄り・時計と PerformanceObserver は deps で注入)。v0.1.1684
     - `firstPaintGate.test.js`
+    - `flickerMeter.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない。変化の記録は呼び出し側が渡す)
+    - `flickerMeter.test.js`
+    - `flickerMeterBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
+    - `flickerMeterBoot.test.js`
+    - `flickerMeterWiring.wiring.test.js`
     - `formatDateTime.js` — 日時の数値（epoch ms）を日本語ロケールで `YYYY/MM/DD HH:MM:SS` 形式に整形する
     - `formatDateTime.test.js`
     - `formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に

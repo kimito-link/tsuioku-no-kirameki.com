@@ -118,7 +118,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 55</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
@@ -140,6 +140,7 @@
 - `src/lib/effectDetailCells.js` — 演出・効果音・コメント送信の観測を割る(純関数)。
 - `src/lib/extProcessCensusKey.js` — 拡張プロセスの忙しさ台帳の storage キーとメッセージ型(書き手と読み手が同じ名前を使うための1か所)。
 - `src/lib/finalDetailCells.js` — 100個化の最終弾(識別・効果音・BGM・記録の質)。
+- `src/lib/flickerMeter.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない。変化の記録は呼び出し側が渡す)
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
 - `src/lib/heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
 - `src/lib/inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
@@ -911,7 +912,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 229</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 230</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1006,6 +1007,7 @@
 - `src/lib/extDocBusyCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/extDocBusyCensusBoot.js` — 【層】L2 配線層(副作用あり・各拡張文書から1行 import で起動する)
 - `src/lib/externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
+- `src/lib/flickerMeterBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
 - `src/lib/formatDateTime.js` — 日時の数値（epoch ms）を日本語ロケールで `YYYY/MM/DD HH:MM:SS` 形式に整形する
 - `src/lib/formatOfficialStreamAgeMinutes.js` — 視聴ページ由来の「放送開始からの経過（分）」を短い日本語にする。
 - `src/lib/forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
@@ -1155,28 +1157,25 @@
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1666` 2026-10-17 — 広告ランキングの帯を10行に固定し数字は全行から
 
-### 📥 コメント取得 (5版)
+### 📥 コメント取得 (4版)
 - `v0.1.1670` 2026-10-17 — 配信者の名前・自己紹介・SNSを取得して表示
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1667` 2026-10-17 — 広告主を11社目以降も取得し全員表示
 - `v0.1.1666` 2026-10-17 — 広告ランキングの帯を10行に固定し数字は全行から
-- `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 
-### 🙂 匿名(184) (6版)
+### 🙂 匿名(184) (5版)
 - `v0.1.1683` 2026-10-17 — 成長アイコンの顔を毎回戻して差し替えない
 - `v0.1.1682` 2026-10-17 — 顔の合成の状況を状態速報に出す
 - `v0.1.1681` 2026-10-17 — 匿名の顔の作成を別スレッドへ移す
 - `v0.1.1680` 2026-10-17 — 匿名アイコンの顔を作り直さず使い回す
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
-- `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 
 ### 🏟 会場・席 (1版)
 - `v0.1.1668` 2026-10-17 — マーケレポートの参加者を実際の人数にした
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (2版)
 - `v0.1.1672` 2026-10-17 — マーケレポートに「ギフトの瞬間」の章を追加
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
-- `v0.1.1665` 2026-10-17 — ギフト・広告の記録が出ない理由と広告の検知時刻を表示
 
 ### 🪟 応援レーン・タイル (4版)
 - `v0.1.1671` 2026-10-17 — 自己紹介の中のURLをリンクにした
@@ -1184,7 +1183,8 @@
 - `v0.1.1669` 2026-10-17 — ギフトの履歴を全件取得し公式の合計と照合
 - `v0.1.1667` 2026-10-17 — 広告主を11社目以降も取得し全員表示
 
-### 🩺 診断・状態速報 (4版)
+### 🩺 診断・状態速報 (5版)
+- `v0.1.1686` 2026-10-17 — ちらつきを場所ごとに数える計器を入れる
 - `v0.1.1684` 2026-10-17 — 自己診断が最初の描画を遅らせないようにする
 - `v0.1.1682` 2026-10-17 — 顔の合成の状況を状態速報に出す
 - `v0.1.1676` 2026-10-17 — パネルが描かれるまでの計測を全回分にする
