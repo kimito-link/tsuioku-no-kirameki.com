@@ -19,6 +19,7 @@ import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
 import { buildCommentWriteModeDiagLine } from '../lib/commentWriteModeDiag.js';
 import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
+import { createFirstPaintGate } from '../lib/firstPaintGate.js';
 import { KEY_AVATAR_COMPOSE_DIAG, formatAvatarComposeDiagLine } from '../lib/avatarComposeDiagLine.js';
 import {
   SP_CLICK_KEY,
@@ -913,9 +914,21 @@ const SAMPLE_AT_MS = [
   0, 60, 120, 200, 300, 450, 600, 800, 1100, 1500, 2000, 2500, 3500,
   5000, 8000, 12000, 18000, 25000, 30000
 ];
+/*
+ * ★v0.1.1684: 早い測定(450ms 以内)は【最初の描画のあと】まで待たせる(関門=src/lib/firstPaintGate.js)。
+ *   測定は画面中央で elementFromPoint を呼ぶ=子 iframe(popup)のレイアウトを同期で強制する。起動直後(sidepanel.js が走る
+ *   時点=まだ最初の描画の前)にこれが走ると、実機では 150〜470ms 主スレッドが止まり、最初の描画(=縞の終わり)がその分遅れていた
+ *   (実機の履歴: 最初の描画は「最初の停止の終わり+約50ms」にほぼ一致)。計器が症状を延ばしていた。
+ *   最初の描画が来ない(黒いまま)場合の測定が失われないよう、関門は 600ms で必ず開く。
+ *   待たされた測定は予定時刻を渡さない(遅延の測定=イベントループ停止の判定を壊さない)。
+ */
+const _firstPaintGate = createFirstPaintGate();
 for (const ms of SAMPLE_AT_MS) {
   // ★予定時刻(ms)を渡す=実発火との差でイベントループの停止を測る唯一の材料。
-  setTimeout(() => collectAndPublish(ms === 0 ? 'immediate' : `t+${ms}ms`, ms), ms);
+  setTimeout(() => {
+    if (ms > 450 || _firstPaintGate.isOpen()) collectAndPublish(ms === 0 ? 'immediate' : `t+${ms}ms`, ms);
+    else void _firstPaintGate.promise.then(() => collectAndPublish(ms === 0 ? 'immediate' : `t+${ms}ms`, null));
+  }, ms);
 }
 // iframe の load 直後も1点(タイマー格子とズレた瞬間を拾う)。
 try {
