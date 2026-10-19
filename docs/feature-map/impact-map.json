@@ -4318,6 +4318,26 @@
       ]
     },
     {
+      "file": "src/lib/bootTimeline.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/bootTimelineBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/broadcastCrossCompare.js",
       "featureCount": 1,
       "features": [
@@ -5465,6 +5485,26 @@
       ],
       "labels": [
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/flickerMeter.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/flickerMeterBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
