@@ -59,6 +59,10 @@ describe('サイドパネル自己診断: 黒→正常 の経過で🔴が残る
       storage: { local: { set: (obj) => { writes.push(obj); return Promise.resolve(); } } }
     };
 
+    // ★v0.1.1684: 早い測定は「最初の描画のあと」まで待つ(src/lib/firstPaintGate.js)。この実行環境(node)には paint が無いので、
+    //   「描画は起動直後に済んだ」ブラウザを模す=黒い瞬間(最初の300ms)の測定が従来どおり走る。待つ側の動きは firstPaintGate.test.js が固定。
+    const paintSpy = vi.spyOn(performance, 'getEntriesByName').mockImplementation((n) => (n === 'first-paint' ? [{ name: n }] : []));
+
     // モジュールを毎回新しく読み込む(トップレベルのタイマーが走る)。
     const url = path.join(root, 'extension/sidepanel-entry.js');
     await import(`file://${url.replace(/\\/g, '/')}?t=${Math.random()}`);
@@ -79,6 +83,7 @@ describe('サイドパネル自己診断: 黒→正常 の経過で🔴が残る
      */
     vi.advanceTimersByTime(30000);
     vi.useRealTimers();
+    paintSpy.mockRestore();
     return writes;
   }
 
