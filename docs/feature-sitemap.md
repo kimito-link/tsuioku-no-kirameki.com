@@ -311,7 +311,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 264</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 266</summary>
 
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
@@ -487,6 +487,7 @@
 - `src/lib/repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。
 - `src/lib/reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
 - `src/lib/resolveVisitorCount.js` — v0.1.646: 「来場(累計来場者数)」の単一定義。表示場所(popup / status / レポート)で
+- `src/lib/runAfterNextPaint.js` — 重い処理を「次の描画のあと」へ送る(時計・rAF は引数で受け取る純関数寄りの部品)。v0.1.1695
 - `src/lib/sanitizeRoomAvatarsForBroadcaster.js` — 集計済み user room の avatarUrl から「broadcaster icon の取り違え」を除去する純粋関数。
 - `src/lib/scoreCountUp.js` — 配信採点パネルの点数カウントアップ演出(council/broadcast-scoring-SYNTHESIS.md §5・SC2)。
 - `src/lib/scrapeGiftHistoryList.js` — niconico ギフト sub-app の `gift-history-list` から個別ギフトを抽出する純関数（v0.1.198）。
@@ -495,6 +496,7 @@
 - `src/lib/scrollWhiteoutReport.js` — スクロール白化(下にスクロールすると重く・一瞬白くなって・遅れて描画される)を状態速報の
 - `src/lib/selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
 - `src/lib/sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
+- `src/lib/showToFrameLedger.js` — サイドパネルが「隠れてから再表示された」回ごとの、次の描画までの時間の記録(純粋関数)。v0.1.1695
 - `src/lib/sidepanelIframeLoader.js` — サイドパネルの iframe(中の popup)の読み込みを「親の最初の描画のあと」まで遅らせる、読み込み役(時計・iframe は引数で受け取る)。v0.1.1693
 - `src/lib/storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
 - `src/lib/storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
@@ -1182,6 +1184,7 @@
 - `v0.1.1685` 2026-10-17 — 応援レーンの顔が差し替わるちらつきを止める
 
 ### 🩺 診断・状態速報 (8版)
+- `v0.1.1695` 2026-10-17 — タブ切り替えで戻った瞬間の重い更新を後ろへ
 - `v0.1.1694` 2026-10-17 — 全ページへ配る巨大な保存の書き込みを減らす
 - `v0.1.1691` 2026-10-17 — 開いた瞬間から応援マスの顔を本顔で出す
 - `v0.1.1690` 2026-10-17 — 黒い幕の回ごとの記録を状態速報に出す
@@ -1189,12 +1192,12 @@
 - `v0.1.1684` 2026-10-17 — 自己診断が最初の描画を遅らせないようにする
 - `v0.1.1682` 2026-10-17 — 顔の合成の状況を状態速報に出す
 - `v0.1.1676` 2026-10-17 — パネルが描かれるまでの計測を全回分にする
-- `v0.1.1675` 2026-10-17 — サイドパネルが開くまでの時間を実機で測る
 
 ### 🧊 storage安定 (1版)
 - `v0.1.1694` 2026-10-17 — 全ページへ配る巨大な保存の書き込みを減らす
 
-### ⚡ 描画・性能 (7版)
+### ⚡ 描画・性能 (8版)
+- `v0.1.1695` 2026-10-17 — タブ切り替えで戻った瞬間の重い更新を後ろへ
 - `v0.1.1694` 2026-10-17 — 全ページへ配る巨大な保存の書き込みを減らす
 - `v0.1.1693` 2026-10-17 — サイドパネルの縞を縮めるため中身を後から読む
 - `v0.1.1687` 2026-10-17 — 起動直後の描き直しの連発を1回にまとめる
