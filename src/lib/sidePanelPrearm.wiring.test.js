@@ -3,46 +3,34 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * サイドパネル「事前用意」の配線検査。
+ * サイドパネルがグローバルであることの配線検査(v0.1.1696。旧「事前用意」の検査を、新しい構造と意図ごと置き換えた)。
  *
- * ★守っているのは【速さのために既存を壊さないこと】。
- *   openPanelOnActionClick:true にすれば速いが、埋め込み派のツールバーが死ぬ。
- *   ここでは「事前用意は足す / その禁は破らない」を両方固定する。
+ * ■ 経緯
+ *   v0.1.1439〜1695 は watch タブごとに setOptions({tabId, path:'sidepanel.html?lv='}) で【タブ専用】にしていた(事前用意)。
+ *   公式の仕様では、タブ専用のパネルはタブを移ると【隠れ】、戻ると【再表示】される。再表示のたびに Chrome 標準の
+ *   読み込み中表示(黒地に灰色の横縞)が最初のフレームまで見え、タブ切り替えの縞になっていた(実機で確認)。
+ *   → タブ専用の path を焼かない(グローバル)。どの配信を見せるかはパネル自身が決める(sidepanel-iframe-boot-entry)。
+ *
+ * ★守っていること: ①タブ専用に戻していない ②ツールバーの禁(openPanelOnActionClick:true にしない)を破らない
+ *   ③押下ハンドラの同期性(await を挟まない=ユーザー操作の文脈を切らない)と、事前用意の撤去で押下経路が壊れていないこと。
  */
 
 const read = (rel) => readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
 const sw = () => read('extension/background.js')
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 
-describe('事前用意の配線', () => {
-  it('watchページになった時点で用意する経路がある', () => {
+describe('グローバルのパネル(タブ専用の path を焼かない)', () => {
+  it('★★background.js は sidePanel.setOptions を一度も呼ばない(タブ専用にすると、タブ切り替えで隠れて再表示=縞)', () => {
     const s = sw();
-    expect(s).toContain('chrome.tabs.onUpdated.addListener');
-    expect(s).toContain('prearmSidePanelForTab');
+    expect(s).not.toMatch(/sidePanel\s*\.\s*setOptions\s*\(/);
+    expect(s).not.toMatch(/sidepanel\.html\?lv=/);
   });
 
-  it('★用意は setOptions で path と enabled を確定させる', () => {
+  it('★事前用意(prearm)と用意済みメモは撤去されている(戻すと、タブ専用に戻る)', () => {
     const s = sw();
-    const i = s.indexOf('function prearmSidePanelForTab');
-    expect(i).toBeGreaterThan(-1);
-    const body = s.slice(i, i + 900);
-    expect(body).toMatch(/setOptions\(\{\s*tabId,\s*path:\s*`sidepanel\.html\?lv=\$\{[^}]+\}`,\s*enabled:\s*true\s*\}\)/);
-  });
-
-  it('★watch以外では何もしない(空のパネルを出さない)', () => {
-    const s = sw();
-    const i = s.indexOf('function prearmSidePanelForTab');
-    const body = s.slice(i, i + 900);
-    // URL を正規表現で判定し、外れたら return している
-    expect(body).toMatch(/SIDE_PANEL_PREARM_WATCH_RE\.exec/);
-    expect(body).toMatch(/if \(!m \|\| !SIDE_PANEL_LV_RE\.test\(m\[1\]\)\) return;/);
-  });
-
-  it('★配信IDは既存の規約(SIDE_PANEL_LV_RE)で検査してから path に載せる', () => {
-    const s = sw();
-    const i = s.indexOf('function prearmSidePanelForTab');
-    const body = s.slice(i, i + 900);
-    expect(body).toContain('SIDE_PANEL_LV_RE.test');
+    expect(s).not.toContain('prearmSidePanelForTab');
+    expect(s).not.toContain('prearmAllWatchTabs');
+    expect(s).not.toContain('__sidePanelArmedLv');
   });
 
   it('★★openPanelOnActionClick を true にしていない(埋め込み派のツールバーを殺さない)', () => {
@@ -51,44 +39,24 @@ describe('事前用意の配線', () => {
     expect(s).not.toMatch(/openPanelOnActionClick:\s*true/);
   });
 
-  it('★v0.1.1674: 拡張更新・起動・SW再起動・タブ切替でも既存の watch タブを用意する(onUpdated だけに頼らない)', () => {
+  it('★押下ハンドラ: open は同期的に(await を挟まない=ユーザー操作の文脈を切らない)・tabId を渡す', () => {
     const s = sw();
-    expect(s).toContain('function prearmAllWatchTabs');
-    // 関数の外(トップレベル)で SW が起きるたびに1回呼ぶ
-    expect(s).toMatch(/\nprearmAllWatchTabs\(\);/);
-    expect(s).toContain('chrome.tabs.onActivated.addListener');
-    const i = s.indexOf('function prearmAllWatchTabs');
-    const body = s.slice(i, i + 1000);
-    expect(body).toContain('chrome.tabs');
-    expect(body).toContain('prearmSidePanelForTab(t.id, t.url)');
-  });
-
-  it('★v0.1.1674: 押下時、用意済みと分かる lv では path に触らない(差し替え競合を作らない)', () => {
-    const s = sw();
-    expect(s).toMatch(/lvFromTab && __sidePanelArmedLv\.get\(tid\) !== lvFromTab/);
-    // 用意に成功したときだけ「用意済み」と覚える(失敗を成功扱いにしない)
-    const i = s.indexOf('function prearmSidePanelForTab');
-    const body = s.slice(i, i + 1100);
-    expect(body).toMatch(/\.then\(\(\) => \{\s*__sidePanelArmedLv\.set\(tabId, lv\);/);
-    // タブが閉じたら忘れる
-    expect(s).toMatch(/chrome\.tabs\.onRemoved\.addListener\(\(tabId\) => \{\s*__sidePanelArmedLv\.delete\(tabId\);/);
-  });
-
-  it('★v0.1.1674: 押下ハンドラに await を足していない(ユーザー操作の文脈を切らない)', () => {
-    const s = sw();
-    const i = s.indexOf('__sidePanelArmedLv.get(tid)');
+    const i = s.indexOf('const wantsInline');
     const j = s.indexOf('chrome.sidePanel.open({ tabId: tid })', i);
     expect(i).toBeGreaterThan(-1);
     expect(j).toBeGreaterThan(i);
     expect(s.slice(i, j)).not.toContain('await');
   });
 
-  it('★事前用意が失敗しても押下経路は残る(単一障害点にしない)', () => {
+  it('★押下の経路(onClicked)は残る・押下の記録の形は保つ(armed は常に false)', () => {
     const raw = read('extension/background.js');
-    const i = raw.indexOf('function prearmSidePanelForTab');
-    const body = raw.slice(i, i + 1200);
-    expect(body).toMatch(/catch\s*\{/);
-    // 押下経路(onClicked)は従来どおり存在する
     expect(raw).toContain('chrome.action.onClicked');
+    expect(raw).toContain('nls_sp_click_at_v1');
+    expect(raw).toMatch(/armed: false,/);
+  });
+
+  it('★manifest の default_path がグローバルのパネルの文書(sidepanel.html)', () => {
+    const manifest = JSON.parse(read('extension/manifest.json'));
+    expect(manifest.side_panel && manifest.side_panel.default_path).toBe('sidepanel.html');
   });
 });

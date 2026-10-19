@@ -106,7 +106,7 @@ describe('サイドパネル自己診断: 黒→正常 の経過で🔴が残る
     expect(rec.flashed).toBe(true);
     expect(rec.cause).toContain('外側');
     expect(rec.line).toContain('出た直後だけ黒い');
-  });
+  }, 30_000); // v0.1.1696: ビルド済みの本体(sidepanel.js)を丸ごと評価する=全体テストで負荷が高いと 5秒を超えるため余裕を持たせる
 
   it('★最初から最後まで正常なら ✅ のまま(誤検知しない)', async () => {
     const writes = await runEntry(() => ({ outerBg: PAINTED, innerBg: PAINTED }));
@@ -115,5 +115,5 @@ describe('サイドパネル自己診断: 黒→正常 の経過で🔴が残る
     expect(rec.ok).toBe(true);
     expect(rec.flashed).toBe(false);
     expect(rec.line).toContain('✅正常');
-  });
+  }, 30_000);
 });
