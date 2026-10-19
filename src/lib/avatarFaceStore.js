@@ -122,6 +122,8 @@ export function createAvatarFaceStore(deps = {}) {
   let pendingPuts = new Map();
   let putScheduled = false;
   let lastPruneAt = 0;
+  /** 直近の書き込み(と掃除)の完了。テストが「書き終わった」を確実に待つため。 @type {Promise<void>} */
+  let lastFlush = Promise.resolve();
 
   const flushPuts = async () => {
     putScheduled = false;
@@ -210,14 +212,17 @@ export function createAvatarFaceStore(deps = {}) {
       pendingPuts.set(key, dataUrl);
       if (!putScheduled) {
         putScheduled = true;
-        later(() => void flushPuts(), flushMs);
+        later(() => { lastFlush = flushPuts(); }, flushMs);
       }
     },
     /** テスト用: 書きをいま流す。 */
     flushNow: async () => {
       putScheduled = false;
-      await flushPuts();
-    }
+      lastFlush = flushPuts();
+      await lastFlush;
+    },
+    /** テスト用: 予約済みの書き込みが終わるまで待つ(掃除を含む)。 */
+    idle: () => lastFlush
   };
 }
 
