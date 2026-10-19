@@ -433,9 +433,22 @@ export function upgradeAnonymousAvatarImage(img, userKey, sizePx = 64) {
     if ('isConnected' in img && !img.isConnected) return;
     const currentSrc = img.getAttribute('src') || '';
     if (currentSrc !== expectedSrc && currentSrc !== upgrade.immediate) return;
+    if (currentSrc === dataUrl) return; // v0.1.1685: 既に同じ顔が出ているなら何もしない(同じ値の再代入をしない)
     img.src = dataUrl;
   });
   return upgrade;
+}
+
+/**
+ * メモリに合成済みの顔(PNG の data URL)があれば返す。無ければ ''(呼び手は従来どおり SVG の仮の顔から始める)。
+ *   応援レーンのタイルは更新のたびに作り直される。そのたびに「SVG の仮の顔 → 合成済みの顔(PNG)」の差し替えが起きるのが、
+ *   タイルのちらつきの元だった(v0.1.1685)。メモリにある顔は最初から出す。同期・副作用なし(メモリキャッシュの順序も動かさない)。
+ * @param {unknown} userKey
+ * @returns {string}
+ */
+export function cachedAnonymousFace(userKey) {
+  const key = normalizeUserKey(userKey);
+  return key ? avatarDataUrlCache.get(key) || '' : '';
 }
 
 /**

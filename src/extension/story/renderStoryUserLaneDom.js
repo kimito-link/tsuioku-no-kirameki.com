@@ -75,7 +75,8 @@ import {
  *   storyAvatarLoadGuard: { pickDisplaySrc: (s: string) => string, noteRemoteAttempt: (img: HTMLImageElement, requested: string) => void },
  *   isHttpOrHttpsUrl: (u: unknown) => boolean,
  *   storyTileUsesYukkuriTvStyle: (requested: string, display: string) => boolean,
- *   upgradeAnonymousAvatarImage?: (img: HTMLImageElement, userKey: string, sizePx?: number) => unknown
+ *   upgradeAnonymousAvatarImage?: (img: HTMLImageElement, userKey: string, sizePx?: number) => unknown,
+ *   cachedAnonymousFace?: (userKey: string) => string
  * }} StoryUserLaneDomIo
  */
 
