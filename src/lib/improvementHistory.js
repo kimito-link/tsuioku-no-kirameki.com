@@ -2956,5 +2956,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1684', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1683 の note と同じ理由)。今回は単体5件。ヘッドレスで『先に別のパネルを開いて起動の最中にしておく』競合を再現した A/B(各7回×2周)で、最初の描画の中央値が約414ms→約244ms(平均 約413→約285)。競合なしの A/B では差が出ない(約72ms同士)。既存の挙動テスト1件は、node に paint が無いため『描画は起動直後に済んだ』ブラウザを模すスタブを足した。'
+  }),
+  Object.freeze({
+    version: '0.1.1685', metric: 'bundle-kb', value: 1456,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は、personTileDom が、メモリに合成済みの顔があれば最初の src にする(composer に cachedAnonymousFace を足し、popup のレーン描画3経路で注入)・upgrade が同じ値を再代入しない、だけ。会場は注入しない。見える絵は変えていない。過去最良との差の大半は 1618 以降の /live/ 取り込みなど。'
+  }),
+  Object.freeze({
+    version: '0.1.1685', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1685', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1684 の note と同じ理由)。今回は単体5+配線3。実機データを写したヘッドレスで、開いて12秒の PNG の代入が約250〜500→約180〜410回に減り、タイルの再描画時の SVG→PNG の差し替えがなくなったことを確認(初回の描画は顔が無いので SVG から始まる)。'
   })
 ]);

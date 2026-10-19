@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AVATAR_PART_KEYS,
   anonymousAvatarDataUrlUpgrade,
+  cachedAnonymousFace,
   isAnonymousFaceShown,
   selectAvatarParts
 } from './avatarPartsComposer.js';
@@ -85,5 +86,13 @@ describe('isAnonymousFaceShown(合成済みの顔が出ている<img>を、SVG �
     expect(isAnonymousFaceShown(null, 'a:user1', SVG)).toBe(false);
     expect(isAnonymousFaceShown(fakeImg(PNG, 'a:user1'), '', SVG)).toBe(false);
     expect(isAnonymousFaceShown(fakeImg(PNG, 'a:user1'), 'a:user1', '')).toBe(false);
+  });
+});
+
+describe('cachedAnonymousFace / upgrade の同値スキップ(v0.1.1685)', () => {
+  it('★メモリに無い人は空文字(呼び手は従来どおり SVG から始める)', () => {
+    expect(cachedAnonymousFace('a:never-composed')).toBe('');
+    expect(cachedAnonymousFace('')).toBe('');
+    expect(cachedAnonymousFace(null)).toBe('');
   });
 });
