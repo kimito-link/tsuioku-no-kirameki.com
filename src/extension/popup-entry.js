@@ -684,7 +684,7 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
-import { getAvatarComposeStats, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
+import { getAvatarComposeStats, isAnonymousFaceShown, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import {
   createExportStageProfiler,
@@ -8522,9 +8522,12 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   if (selected) img.classList.add('is-selected');
   const requestedTile = storyGrowthTileSrcForEntry(entry, STORY_SOURCE_STATE.liveId);
   const displayTile = storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
-  storyGrowthImgAssignSrc(img, displayTile);
-  storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
-  upgradeAnonymousAvatarImageFromFallback(img, entry?.userId, requestedTile, 64);
+  // v0.1.1683: 同じ人の合成済みの顔(PNG)が出ているマスは、SVG の仮の顔へ戻して差し替え直さない(無駄な代入とちらつきを止める)。
+  if (!isAnonymousFaceShown(img, entry?.userId, displayTile)) {
+    storyGrowthImgAssignSrc(img, displayTile);
+    storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
+    upgradeAnonymousAvatarImageFromFallback(img, entry?.userId, requestedTile, 64);
+  }
   img.classList.toggle(
     'nl-story-growth-icon--tv-fallback',
     storyTileUsesYukkuriTvStyle(requestedTile, displayTile)
