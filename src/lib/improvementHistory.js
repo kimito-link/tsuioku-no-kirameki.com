@@ -3068,5 +3068,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1692', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1691 の note と同じ理由)。今回は単体 +7(renderStoryUserLaneDom)。ヘッドレスの交互比較(各5回)は作り直しが起きず差が出ない(実機で確認)。'
+  }),
+  Object.freeze({
+    version: '0.1.1693', metric: 'bundle-kb', value: 1471,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更はサイドパネルの iframe の読み込み時刻だけ(新規 sidepanel-iframe-boot と sidepanelIframeLoader・本体 sidepanel-entry は src に触れなくなった)。popup 本体・描画・保存は触らない。直前の v0.1.1692 までは削る版、この版も縞を縮める版。'
+  }),
+  Object.freeze({
+    version: '0.1.1693', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1693', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1692 の note と同じ理由)。今回は単体9+配線(書き換え)。ヘッドレスは外枠の最初の描画が約70msで競合が再現せず、効果は実機の記録で確認する。'
   })
 ]);

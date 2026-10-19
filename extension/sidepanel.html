@@ -205,7 +205,14 @@
       ★中身は隠さない(z-index で iframe の下に潜るだけ)。
     -->
     <div id="nl-underlay"></div>
-    <iframe title="ニコ生ログ" src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
+    <!--
+      v0.1.1693: 中の popup は【親の最初の描画のあと】に読み込ませる(src は dist/sidepanel-iframe-boot.js が data-nl-src から付ける)。
+      親は無地なのに、中の popup(HTML 495KB・スクリプト 1.5MB)の解析・スタイル計算が同じ主スレッドで先に走り、
+      親の最初のフレーム(=縞が終わる時刻)を遅らせていたため(実機の記録で、親と中の最初の描画の差が 1〜2ms)。
+      ★v0.1.1421 の教訓(src を JS で付ける設計は単一障害点)を守る仕掛け: ①極小の別スクリプトに隔離して本体より前に読む
+        ②保険タイマー(1.5秒で必ず読み込ませる) ③出荷物にこのスクリプトが入っていることを stage-submission が必須にする。
+    -->
+    <iframe title="ニコ生ログ" data-nl-src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
     <!-- ★v0.1.1561: iframe の上に置く覆い。iframe が nl-ifr-loading の間だけ CSS で現れる(JS では作らない)。 -->
     <div id="nl-ifr-cover" aria-hidden="true"></div>
     <!--
@@ -213,6 +220,7 @@
       これが無いと「いま黒いか」を測る手段が消え、また推測に戻ってしまう。
       CSP は script-src 'self' なので外部ファイルであること(インライン不可)。
     -->
+    <script src="dist/sidepanel-iframe-boot.js"></script>
     <script src="dist/sidepanel.js"></script>
   </body>
 </html>

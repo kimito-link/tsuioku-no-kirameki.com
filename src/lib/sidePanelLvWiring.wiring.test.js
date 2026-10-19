@@ -92,9 +92,12 @@ describe('サイドパネルへの lv 受け渡し', () => {
     expect(uses.length).toBe(3);
   });
 
-  it('★受け取り側(sidepanel-entry)は iframe に lv を載せ替える', () => {
+  it('★受け取り側(sidepanel-iframe-boot-entry)は iframe に lv を載せる(v0.1.1693: 本体 sidepanel-entry からこの極小スクリプトへ移した)', () => {
+    const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
+    expect(boot).toContain('buildSidePanelIframeSrc');
+    // 本体は src を触らない(二重に付けて二重ロードしない)
     const entry = stripComments(read('src/extension/sidepanel-entry.js'));
-    expect(entry).toContain('buildSidePanelIframeSrc');
+    expect(entry).not.toMatch(/setAttribute\('src'/);
   });
 });
 
@@ -105,20 +108,19 @@ describe('★SWを待たない自力解決(v0.1.1435)', () => {
    * ＝サイドパネルは SW の onClicked を必ず起こすので、SWが寝ていると待たされる。
    * → ①(?lv=)が空のときだけ、パネル自身が chrome.tabs.query で watchタブを探す。
    */
-  it('パネルが自力で lv を探す経路を持つ', () => {
-    const entry = stripComments(read('src/extension/sidepanel-entry.js'));
-    expect(entry).toContain('pickLvFromTabs');
-    expect(entry).toContain('chrome.tabs.query');
+  it('パネルが自力で lv を探す経路を持つ(sidepanel-iframe-boot-entry)', () => {
+    const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
+    expect(boot).toContain('pickLvFromTabs');
+    expect(boot).toContain('chrome.tabs.query');
   });
 
   it('★①(?lv=)が在るときは自力探索を走らせない(順序の固定)', () => {
-    const entry = stripComments(read('src/extension/sidepanel-entry.js'));
-    // else if (!readSidePanelLv(...)) の形 = ①が空のときだけ②へ行く
-    expect(entry).toMatch(/else if \(!readSidePanelLv\(/);
-    const elseAt = entry.indexOf('else if (!readSidePanelLv(');
-    const queryAt = entry.indexOf('chrome.tabs.query');
-    expect(elseAt).toBeGreaterThan(-1);
-    expect(elseAt).toBeLessThan(queryAt);
+    const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
+    // v0.1.1693: needsPick: !hasLv の形 = ①(lv)が空のときだけ探索する(ローダーが needsPick が偽なら pickSrc を呼ばない)
+    expect(boot).toMatch(/const hasLv = readSidePanelLv\(search\) !== '';/);
+    expect(boot).toMatch(/needsPick: !hasLv,/);
+    const loader = stripComments(read('src/lib/sidepanelIframeLoader.js'));
+    expect(loader).toMatch(/if \(!needsPick \|\| typeof pickSrc !== 'function'\) \{/);
   });
 
   it('★active を条件にしない(裏タブで別タブを掴む事故の再発防止)', () => {
@@ -135,10 +137,10 @@ describe('★SWを待たない自力解決(v0.1.1435)', () => {
   });
 
   it('★失敗しても素の src に倒れる(描画をJSに依存させない)', () => {
-    // ★コメント内の言及ではなく【実際の呼び出し】を見る(await 付き)
-    const entry = stripComments(read('src/extension/sidepanel-entry.js'));
-    const at = entry.indexOf('await chrome.tabs.query');
-    expect(at).toBeGreaterThan(-1);
-    expect(entry.slice(at, at + 500)).toContain('catch');
+    // ★コメント内の言及ではなく【実際の呼び出し】を見る(await 付き)。失敗(reject)はローダーが握って素の src で読み込む。
+    const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
+    expect(boot).toContain('await chrome.tabs.query');
+    const loader = stripComments(read('src/lib/sidepanelIframeLoader.js'));
+    expect(loader).toMatch(/\(\) => \{\s*pickedSrc = '';\s*\}/);
   });
 });
