@@ -168,3 +168,44 @@ describe('buildPersonTileEl', () => {
     ).not.toThrow();
   });
 });
+
+describe('buildPersonTileEl: 合成済みの顔があるなら、最初から顔(PNG)を出す(v0.1.1685・ちらつき対策)', () => {
+  const SVG = 'data:image/svg+xml;charset=utf-8,%3Csvg%3E';
+  const PNG = 'data:image/png;base64,AAAA';
+
+  it('★匿名の仮の顔(SVG)が要求され、合成済みの顔(PNG)がメモリにあれば、img は最初から PNG(SVG→PNG の差し替えちらつきを出さない)', () => {
+    const upgrade = vi.fn();
+    const cell = buildPersonTileEl(
+      makeItem({ displaySrc: SVG, entry: { userId: 'a:anon1' }, meta: { idLine: 'a:anon1', nameLine: '匿名' } }),
+      makeIo({ upgradeAnonymousAvatarImage: upgrade, cachedAnonymousFace: (k) => (k === 'a:anon1' ? PNG : '') })
+    );
+    const img = cell.querySelector('img');
+    expect(img.getAttribute('src')).toBe(PNG);
+    // 顔の管理(キー付け・あとの差し替え)は従来どおり呼ぶ
+    expect(upgrade).toHaveBeenCalledTimes(1);
+  });
+
+  it('★合成済みの顔が無ければ、従来どおり SVG から始まる(変化なし)', () => {
+    const cell = buildPersonTileEl(
+      makeItem({ displaySrc: SVG, entry: { userId: 'a:anon2' }, meta: { idLine: 'a:anon2', nameLine: '匿名' } }),
+      makeIo({ upgradeAnonymousAvatarImage: vi.fn(), cachedAnonymousFace: () => '' })
+    );
+    expect(cell.querySelector('img').getAttribute('src')).toBe(SVG);
+  });
+
+  it('★本物のアイコン URL(SVG でない)は、顔のキャッシュがあっても触らない', () => {
+    const cell = buildPersonTileEl(
+      makeItem({ displaySrc: 'https://example.test/a.png' }),
+      makeIo({ upgradeAnonymousAvatarImage: vi.fn(), cachedAnonymousFace: () => PNG })
+    );
+    expect(cell.querySelector('img').getAttribute('src')).toBe('https://example.test/a.png');
+  });
+
+  it('cachedAnonymousFace を渡さない呼び出し(会場など)は従来どおり', () => {
+    const cell = buildPersonTileEl(
+      makeItem({ displaySrc: SVG, entry: { userId: 'a:anon3' }, meta: { idLine: 'a:anon3', nameLine: '匿名' } }),
+      makeIo({ upgradeAnonymousAvatarImage: vi.fn() })
+    );
+    expect(cell.querySelector('img').getAttribute('src')).toBe(SVG);
+  });
+});
