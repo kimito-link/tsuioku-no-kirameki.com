@@ -690,6 +690,7 @@ import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
 import { cachedAnonymousFace, getAvatarComposeStats, isAnonymousFaceShown, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
+import { noteHtmlWrittenElsewhere, removeAttrIfPresent, removeStylePropIfSet, setAttrIfChanged, setClassFlag, setInnerHtmlIfChanged } from '../lib/domWriteIfChanged.js';
 import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import {
   createExportStageProfiler,
@@ -4033,6 +4034,7 @@ async function renderGiftSubAppHistoryPanel(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) {
     mount.innerHTML = '';
+    noteHtmlWrittenElsewhere(mount);
     if (summaryEl) summaryEl.textContent = 'ギフトサイドバー履歴（未取得）';
     return;
   }
@@ -4047,6 +4049,7 @@ async function renderGiftSubAppHistoryPanel(liveId) {
     }
   } catch {
     mount.textContent = '読み込みに失敗しました。';
+    noteHtmlWrittenElsewhere(mount);
     return;
   }
   const summary = summarizeGiftSubAppHistory(payload);
@@ -4057,14 +4060,16 @@ async function renderGiftSubAppHistoryPanel(liveId) {
   if (!summary.hasData) {
     mount.innerHTML =
       '<p class="nl-sub">koken 公式 API からギフト履歴を自動取得中です（記録開始後、数十秒以内に表示されます）。公式サイドバーの「履歴」タブを開くと、一覧の追記が速くなる場合があります。</p>';
+    noteHtmlWrittenElsewhere(mount);
     return;
   }
   // C-7 pure refactor: history/totalCounts→ブロック HTML 組み立ては giftSubAppHistoryBlocksHtml.js に
   //   抽出（挙動不変・test 済）。storage read・summary ラベル・空状態・innerHTML 代入は popup に残す。
-  mount.innerHTML = buildGiftSubAppHistoryBlocksHtml({
+  // v0.1.1688: 同じ HTML なら入れ直さない(約180個の子の作り直しを止める)。
+  setInnerHtmlIfChanged(mount, buildGiftSubAppHistoryBlocksHtml({
     history: payload?.history,
     totalCounts: payload?.totalCounts
-  });
+  }));
 }
 
 // 開発モニタの DL 系 4 関数(downloadMcpSnapshotJson / downloadSessionSummaryJson /
@@ -8523,8 +8528,6 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   const stable = commentStableId(entry);
   const selected = Boolean(stable && STORY_GROWTH_STATE.pinnedCommentId === stable);
 
-  img.className = isNew ? 'nl-story-growth-icon is-new' : 'nl-story-growth-icon';
-  if (selected) img.classList.add('is-selected');
   const requestedTile = storyGrowthTileSrcForEntry(entry, STORY_SOURCE_STATE.liveId);
   const displayTile = storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
   // v0.1.1683: 同じ人の合成済みの顔(PNG)が出ているマスは、SVG の仮の顔へ戻して差し替え直さない(無駄な代入とちらつきを止める)。
@@ -8533,16 +8536,19 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
     storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
     upgradeAnonymousAvatarImageFromFallback(img, entry?.userId, requestedTile, 64);
   }
-  img.classList.toggle(
-    'nl-story-growth-icon--tv-fallback',
-    storyTileUsesYukkuriTvStyle(requestedTile, displayTile)
-  );
-  if (isHttpOrHttpsUrl(img.src)) {
-    img.referrerPolicy = 'no-referrer';
-    img.classList.add('nl-story-growth-icon--remote');
+  // v0.1.1688: class は最終の形を1回だけ組み立て、違うときだけ代入する(同値の書き直しを止める)。
+  const remote = isHttpOrHttpsUrl(img.src);
+  const cls =
+    'nl-story-growth-icon' +
+    (isNew ? ' is-new' : '') +
+    (selected ? ' is-selected' : '') +
+    (storyTileUsesYukkuriTvStyle(requestedTile, displayTile) ? ' nl-story-growth-icon--tv-fallback' : '') +
+    (remote ? ' nl-story-growth-icon--remote' : '');
+  if (img.className !== cls) img.className = cls;
+  if (remote) {
+    if (img.referrerPolicy !== 'no-referrer') img.referrerPolicy = 'no-referrer';
   } else {
-    img.removeAttribute('referrerpolicy');
-    img.classList.remove('nl-story-growth-icon--remote');
+    removeAttrIfPresent(img, 'referrerpolicy');
   }
 
   const entries = STORY_SOURCE_STATE.entries;
@@ -8550,30 +8556,23 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   const ordinal = accent
     ? accent.ordinal
     : supportOrdinalForIndex(entries, absIndex);
-  img.classList.remove('nl-story-growth-icon--user-accent');
 
   const cell = img.closest('.nl-story-growth-cell');
   if (cell instanceof HTMLElement) {
-    cell.style.removeProperty('--nl-user-accent');
-    cell.classList.remove('nl-story-growth-cell--accent');
-    cell.classList.remove('nl-story-growth-cell--user-accent');
-    if (ordinal > 1) {
-      cell.classList.add('nl-story-growth-cell--repeat');
-      cell.setAttribute('data-support-ordinal', String(ordinal));
-    } else {
-      cell.classList.remove('nl-story-growth-cell--repeat');
-      cell.removeAttribute('data-support-ordinal');
-    }
-    cell.classList.toggle('nl-story-growth-cell--selected', selected);
+    removeStylePropIfSet(cell, '--nl-user-accent');
+    setClassFlag(cell, 'nl-story-growth-cell--repeat', ordinal > 1);
+    if (ordinal > 1) setAttrIfChanged(cell, 'data-support-ordinal', String(ordinal));
+    else removeAttrIfPresent(cell, 'data-support-ordinal');
+    setClassFlag(cell, 'nl-story-growth-cell--selected', selected);
   }
 
   const userLabel = storyGrowthDisplayLabel(entry, STORY_SOURCE_STATE.liveId);
   const text = truncateText(entry?.text || '', 26);
-  img.setAttribute('data-comment-index', String(index));
-  if (stable) img.setAttribute('data-comment-id', stable);
-  else img.removeAttribute('data-comment-id');
-  img.setAttribute('role', 'button');
-  img.setAttribute('tabindex', '0');
+  setAttrIfChanged(img, 'data-comment-index', String(index));
+  if (stable) setAttrIfChanged(img, 'data-comment-id', stable);
+  else removeAttrIfPresent(img, 'data-comment-id');
+  setAttrIfChanged(img, 'role', 'button');
+  setAttrIfChanged(img, 'tabindex', '0');
   const hoverHint = storyHoverPreviewEnabled()
     ? 'マウスを乗せるとプレビュー、'
     : '';
@@ -8589,16 +8588,21 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
         windowed: (STORY_GROWTH_STATE.sourceOffset || 0) > 0
       })
     : '';
-  img.setAttribute(
+  setAttrIfChanged(
+    img,
     'aria-label',
     entry
       ? `${index + 1}件目 ${userLabel} ${text || 'コメント'}。${sameUserBlurb}${hoverHint}Enter または Space で詳細の固定・解除`
       : `${index + 1}件目のコメント`
   );
-  img.title = entry
-    ? `#${entry.commentNo || '-'} ${userLabel}（${sameUserBlurb}${hoverHint}クリックで詳細）`
-    : `${index + 1}件目`;
-  img.alt = '';
+  setAttrIfChanged(
+    img,
+    'title',
+    entry
+      ? `#${entry.commentNo || '-'} ${userLabel}（${sameUserBlurb}${hoverHint}クリックで詳細）`
+      : `${index + 1}件目`
+  );
+  setAttrIfChanged(img, 'alt', '');
 }
 
 /**

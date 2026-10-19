@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 952 件
+## ⚠️ 役割コメントが無いソース 8 / 953 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -860,7 +860,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2053)
+- 📁 **src/** (2056)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1144,7 +1144,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1813)
+  - 📁 **lib/** (1816)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1605,6 +1605,9 @@
     - `domTreeCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `domTreeCensus.test.js`
     - `domTreeCensusWiring.test.js`
+    - `domWriteIfChanged.js` — 「値が同じなら DOM に書かない」小さな書き込み部品(純粋寄り・DOM 要素を引数で受け取る)。v0.1.1688
+    - `domWriteIfChanged.test.js`
+    - `domWriteIfChangedWiring.wiring.test.js`
     - `effectDetailCells.js` — 演出・効果音・コメント送信の観測を割る(純関数)。
     - `effectDetailCells.test.js`
     - `effectDirector.js` — 「演出ディレクター」層(パチンコ的ゲーム性 Phase 1・Fable設計 2026-07-04)。
