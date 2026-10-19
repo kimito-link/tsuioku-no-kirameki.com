@@ -694,9 +694,6 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.1690: 黒い幕の記録(回ごとの黒かった時間と時間を食った区間・直近N回の結論)。openLine より先に出す=最初に読まれる。
     const curtainLine = String(sidepanelSelfDiag?.blackCurtainLine || '');
     if (curtainLine) lines.push(curtainLine);
-    // v0.1.1695: 再表示の記録(隠れていたパネルが戻った回の、次の描画までの時間)。無ければ出ない。
-    const showLine = String(sidepanelSelfDiag?.showToFrameLine || '');
-    if (showLine) lines.push(showLine);
     const openLine = String(sidepanelSelfDiag?.openTimingLine || '');
     if (openLine) lines.push(openLine);
     // v0.1.1682: 匿名の顔の合成の状況(Worker・永続キャッシュ・フォールバック)。無ければ出ない。

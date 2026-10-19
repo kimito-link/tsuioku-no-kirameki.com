@@ -3124,5 +3124,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1696', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1695 の note と同じ理由)。今回は単体 +7(pickPanelLv 4・loader.update 3)・配線テストを新構造へ書き換え(旧『setOptions が3か所』の固定は意図ごと置換)。実機のタブ切り替えで確認(ヘッドレスは Chrome の実サイドパネルを再現できない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1697', metric: 'bundle-kb', value: 1474,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は削る版: v0.1.1695 で入れた runAfterNextPaint(再表示の更新の後ろ送り)と showToFrameLedger(再表示の記録)を撤去。popup-entry.js・sidepanel-entry.js・aiShareFullText.js と2つの検査を v0.1.1694 の状態へ戻した(差分は v0.1.1695 の追加分とぴったり一致することを確認)。'
+  }),
+  Object.freeze({
+    version: '0.1.1697', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1697', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1696 の note と同じ理由)。単体 -10・配線 -5(撤去した部品のぶん)。'
   })
 ]);

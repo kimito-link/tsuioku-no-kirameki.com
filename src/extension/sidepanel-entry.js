@@ -24,7 +24,6 @@ import { KEY_AVATAR_COMPOSE_DIAG, formatAvatarComposeDiagLine } from '../lib/ava
 import { FLICKER_METER_STORAGE_KEY, formatFlickerLine } from '../lib/flickerMeter.js';
 import { BOOT_TIMELINE_STORAGE_KEY, formatBootTimelineLine } from '../lib/bootTimeline.js';
 import { formatBlackCurtainLedger } from '../lib/blackCurtainLedger.js';
-import { addShowEvent, formatShowToFrameLine } from '../lib/showToFrameLedger.js';
 import {
   SP_CLICK_KEY,
   SP_OPEN_TIMING_KEY,
@@ -810,8 +809,6 @@ function collectAndPublish(phase, schedMs = null) {
         openTimingLine: _openLine,
         // ★v0.1.1690: 黒い幕の記録(回ごとの黒かった時間・時間を食った区間・直近N回の結論)=ユーザーが言わなくても読める。
         blackCurtainLine: formatBlackCurtainLedger(_curtainOpens, Date.now()),
-        // ★v0.1.1695: 再表示の記録(タブ切り替えなどで隠れて戻った回の、次の描画までの時間)。
-        showToFrameLine: formatShowToFrameLine(_showEvents, Date.now()),
         // ★v0.1.1682: 匿名の顔の合成の状況(Worker が動いたか・フォールバックしたか)。
         avatarComposeLine: _avatarComposeLine,
         // ★v0.1.1686: ちらつき計(どの場所を何回書き換えたか・往復=明滅の数)。
@@ -1037,39 +1034,9 @@ try {
   /* no-op */
 }
 
-/** v0.1.1695: 再表示の記録(隠れていたパネルが戻った回ごとの、次の描画までの時間)。文書が生きている間だけ(storage には書かない)。 @type {import('../lib/showToFrameLedger.js').ShowEvent[]} */
-let _showEvents = [];
-let _hiddenAtMs = 0;
-
 try {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      _hiddenAtMs = Date.now();
-      return;
-    }
     if (document.visibilityState === 'visible') {
-      // v0.1.1695: 再表示の瞬間から次の描画の合図(rAF)までの遅れと、直後1秒の長い処理を控える(縞の長さの実測)。
-      try {
-        const t0 = performance.now();
-        const hiddenMs = _hiddenAtMs ? Date.now() - _hiddenAtMs : null;
-        /** @type {number[]} */
-        const longs = [];
-        let po = null;
-        try {
-          po = new PerformanceObserver((list) => { for (const e of list.getEntries()) longs.push(Math.round(e.duration)); });
-          po.observe({ type: 'longtask' });
-        } catch { po = null; }
-        requestAnimationFrame(() => {
-          const toFrameMs = Math.round(performance.now() - t0);
-          setTimeout(() => {
-            try { if (po) po.disconnect(); } catch { /* no-op */ }
-            _showEvents = addShowEvent(_showEvents, {
-              at: Date.now(), hiddenMs, toFrameMs, longN: longs.length,
-              longMs: longs.reduce((a, b) => a + b, 0), longMax: longs.length ? Math.max(...longs) : 0
-            });
-          }, 1000);
-        });
-      } catch { /* 計器の失敗で何も変えない */ }
       // 表示された直後はレイアウトが確定していないことがあるので少し待つ。
       setTimeout(() => collectAndPublish('visible'), 120);
     }

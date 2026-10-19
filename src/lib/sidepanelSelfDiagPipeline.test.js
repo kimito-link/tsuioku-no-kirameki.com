@@ -108,15 +108,8 @@ describe('サイドパネル自己診断: storage → 状態速報 の通し', (
       expect(loadHandlers.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('★rAF で経過を測らない(タブ非表示で止まる=G5)。例外は【再表示の記録】の1か所だけ(visible になった瞬間に始めるので隠れて止まる心配が無く、止まっても何も失わない)', () => {
-      const uses = panelSrc.match(/requestAnimationFrame/g) || [];
-      expect(uses.length).toBeLessThanOrEqual(1);
-      if (uses.length === 1) {
-        // 唯一の使用は、再表示の記録(showToFrameLedger)の中
-        const at = panelSrc.indexOf('requestAnimationFrame');
-        expect(panelSrc.slice(Math.max(0, at - 1200), at)).toContain("document.visibilityState === 'visible'");
-        expect(panelSrc.slice(at, at + 200)).toContain('toFrameMs');
-      }
+    it('★rAF で経過を測らない(タブ非表示で止まる=G5)', () => {
+      expect(panelSrc).not.toContain('requestAnimationFrame');
     });
 
     it('late の黒は _worst と別の箱に持つ(「出た直後だけ黒い」と誤表示しない)', () => {
