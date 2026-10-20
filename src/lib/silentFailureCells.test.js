@@ -67,6 +67,15 @@ describe('無音で死ぬ故障のセル', () => {
       expect(c?.text.length).toBeGreaterThan('2回失敗: refused'.length);
     });
 
+    it('★失敗の累計>0でも理由が空(=その後ONに成功して復旧)なら ok(直ったのに警告を居座らせない)', () => {
+      const c = cellOf({ voiceDiag: { enableFailTotal: 3, lastEnableFailReason: '' } }, 'voice-start-fail');
+      expect(c?.level).toBe('ok');
+      expect(c?.text).toContain('3回失敗');
+      expect(c?.text).toContain('復旧');
+      // 理由が残っている(いま失敗中)なら従来どおり bad
+      expect(cellOf({ voiceDiag: { enableFailTotal: 3, lastEnableFailReason: 'refused' } }, 'voice-start-fail')?.level).toBe('bad');
+    });
+
     it('★失敗ゼロなら ok(正常時に警告を居座らせない)', () => {
       const c = cellOf({ voiceDiag: { enableFailTotal: 0 } }, 'voice-start-fail');
       expect(c?.level).toBe('ok');
