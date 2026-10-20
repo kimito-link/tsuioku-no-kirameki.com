@@ -3334,5 +3334,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1711', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1710 の note と同じ理由)。今回は単体 +7・配線 +2(変異3件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1712', metric: 'bundle-kb', value: 1450,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は統合の版: marketing-export-entry.js が buildMediaKitDocument(注入)で作ったメディアキットを buildUnifiedReportHtml(新規 lib・CSS だけのタブ+iframe srcdoc・script 無し)で分析レポートと1つにして保存。mediaKitHtml に maskSupporters。popup の downloadMediaKitHtml 系は撤去(行数 21775→21724)。'
+  }),
+  Object.freeze({
+    version: '0.1.1712', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1712', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1711 の note と同じ理由)。今回は単体 +9・配線 +5(変異8件を検出)。'
   })
 ]);
