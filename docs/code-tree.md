@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 967 件
+## ⚠️ 役割コメントが無いソース 8 / 968 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2096)
+- 📁 **src/** (2099)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1855)
+  - 📁 **lib/** (1858)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2706,6 +2706,9 @@
     - `supporterRowToPersonTile.integration.test.js`
     - `supporterRowToPersonTile.js` — 応援者ランキングの行(SupporterRow)を、本物の人物タイル(buildPersonTileEl)が要求する
     - `supporterRowToPersonTile.test.js`
+    - `supportersGiftsSection.js` — マーケレポートの章「応援者とギフト(誰がどんなコメントをして・どんなギフトを出したか)」(2026-10-20)。
+    - `supportersGiftsSection.test.js`
+    - `supportersGiftsWiring.wiring.test.js`
     - `supportersParity.js` — popup の応援ランキング(鏡)と、診断のレポート集計の【上位の値】を突き合わせる純関数(2026-10-20)。
     - `supportersParity.test.js`
     - `supportersParity.wiring.test.js`
