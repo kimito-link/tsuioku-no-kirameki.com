@@ -19,6 +19,14 @@ V1 → V2 → V3 の3版。V4 は測定先行(出さない可能性が高い)。
 5. PR を作る(CI 緑を確認)。マージ・`npm run build`→`npm run copy:ext`→`npm run verify:deploy` はユーザーの「マージして配置して」の後。
 6. 配置後、実機の測定(DESIGN §C)。効かない/悪化なら撤回してメモリに記録。
 
+## 測定の自動化(2026-10-20 追加): `npm run census:watch`
+配置後の「更新→F5→3分待つ→『おした』→速報を読む→比べる」は機械化済み(`scripts/census-watch.mjs`・判定の本体は `src/lib/censusWatch.js`)。
+- 基準線を保存: `npm run census:watch -- --version v0.1.1700 --save v1700`(版が実機に届き、census の窓が3分溜まり、コメントが流れる(取得≥0.2件/秒)まで自動で待って測る)。
+- 比べる: `npm run census:watch -- --version v0.1.1701 --vs v1700 --expect "nls_comments_*:0.7"`。
+- 人の操作は【拡張の更新ボタンと視聴ページの F5 だけ】。「おした」は不要(版が届いたのを機械が検知する)。
+- 終了コード: 0=合格 / 1=期待を破った / 2=測れていない / 3=上位3族に無く証明できない(=0回とは限らない。族別の回数は測定用ブラウザで数える)。
+- 注意: 台帳は【上位3族】しか出ない。コメント流量が基準線と×2以上違う比較は結論に使わない(ツールが警告を出す)。
+
 ## V0 基準線(コードを変えない・最初に1回)
 v1698 の状態で DESIGN §C の (a) 実機 と (b) 測定用ブラウザ A/B を取る。`nls_comments_*` の回数/KB、profile の回数/KB、記録件数と公式件数、STORY_AVATAR_DIAG の selfShown / withAvatar / resolvedAvatar。測定タブは事前に閉じる。
 
