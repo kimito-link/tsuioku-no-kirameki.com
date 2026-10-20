@@ -171,24 +171,27 @@ const SUPPORTER_MEDALS = ['🥇', '🥈', '🥉'];
 /**
  * @param {Array<Record<string, unknown>>} entries
  * @param {(entry: Record<string, unknown>) => string} valueLabel
+ * @param {boolean} [masked] 共有用に伏せる: 名前・サムネ・リンクを出さず「応援者N」にする(v0.1.1712・マーケレポートの伏せ字設定と揃える)
  */
-function supporterListHtml(entries, valueLabel) {
+function supporterListHtml(entries, valueLabel, masked = false) {
   if (!entries.length) {
     return '<p class="s-empty">この期間の記録はまだありません</p>';
   }
   return `<ol class="s-list">${entries
     .map((entry, index) => {
-      const displayName = supporterDisplayName(entry);
+      const displayName = masked ? `応援者${index + 1}` : supporterDisplayName(entry);
       const medal = SUPPORTER_MEDALS[index] || `${index + 1}`;
       // 情報セットの原則: 記名 uid はユーザーページへのリンクも付ける(匿名はリンク先が無いので span)。
-      const pageUrl = nicoUserPageUrl(entry?.userId);
+      const pageUrl = masked ? '' : nicoUserPageUrl(entry?.userId);
       const nameHtml = pageUrl
         ? `<a class="s-name" href="${escapeAttr(pageUrl)}" rel="noopener noreferrer">${escapeHtml(displayName)}</a>`
         : `<span class="s-name">${escapeHtml(displayName)}</span>`;
       return (
         `<li class="s-row">` +
         `<span class="s-rank">${escapeHtml(medal)}</span>` +
-        supporterAvatarHtml(entry, displayName) +
+        (masked
+          ? `<span class="s-avatar s-avatar--fallback" aria-hidden="true">${escapeHtml(Array.from(displayName)[0] || '応')}</span>`
+          : supporterAvatarHtml(entry, displayName)) +
         nameHtml +
         `<span class="s-value">${escapeHtml(valueLabel(entry))}</span>` +
         `</li>`
@@ -200,8 +203,9 @@ function supporterListHtml(entries, valueLabel) {
 /**
  * 「この配信を支えた応援者たち」セクション(表彰トーン)。supporters が無ければ空文字。
  * @param {unknown} supportersRaw
+ * @param {boolean} [masked]
  */
-function supportersSectionHtml(supportersRaw) {
+function supportersSectionHtml(supportersRaw, masked = false) {
   if (!supportersRaw || typeof supportersRaw !== 'object') return '';
   const supporters = /** @type {{ giftTop?: unknown, commentTop?: unknown, regulars?: unknown }} */ (
     supportersRaw
@@ -232,11 +236,11 @@ function supportersSectionHtml(supportersRaw) {
         <div class="s-grid">
           <div class="s-col">
             <h3>🎁 ギフト応援</h3>
-            ${supporterListHtml(giftTop, (entry) => `${formatInteger(entry.points)} pt・${formatInteger(entry.count)} 件`)}
+            ${supporterListHtml(giftTop, (entry) => `${formatInteger(entry.points)} pt・${formatInteger(entry.count)} 件`, masked)}
           </div>
           <div class="s-col">
             <h3>💬 コメント応援</h3>
-            ${supporterListHtml(commentTop, (entry) => `${formatInteger(entry.count)} 件・${formatInteger(entry.liveCount)} 配信`)}
+            ${supporterListHtml(commentTop, (entry) => `${formatInteger(entry.count)} 件・${formatInteger(entry.liveCount)} 配信`, masked)}
           </div>
         </div>
         ${regularsLine}
@@ -262,7 +266,8 @@ function metricCells(windows, formatter) {
  *   generatedAtMs?: number,
  *   broadcasterIconDataUrl?: string,
  *   sourceLiveLimit?: number,
- *   sourceLiveLimitReached?: boolean
+ *   sourceLiveLimitReached?: boolean,
+ *   maskSupporters?: boolean
  * }} [options]
  * @returns {string}
  */
@@ -479,7 +484,7 @@ export function buildMediaKitHtml(stats, options = {}) {
           </tbody>
         </table>
       </div>
-      ${supportersSectionHtml(/** @type {any} */ (stats)?.supporters)}
+      ${supportersSectionHtml(/** @type {any} */ (stats)?.supporters, options.maskSupporters === true)}
       <aside class="sources">
         <h2>データの出所</h2>
         <p><strong>以下の統計データは、追憶のきらめきが配信中にこのPCへ記録した公式値・実測値です。</strong></p>
