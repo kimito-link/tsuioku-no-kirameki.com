@@ -12,6 +12,7 @@
  *   npm run census:watch -- --version v0.1.1701 --vs v1700 --expect nls_comments_*:0.7
  *   npm run census:watch -- --once                                            # 待たず、いまの速報を1回読む
  *   主なオプション: --min-minutes 3(窓の最低長) --timeout-min 15 --interval-sec 20 --expect <キー>:<毎分の上限>(複数可)
+ *   --save は条件(速報が新しい・窓が十分・コメントが流れている)を満たした窓でだけ保存する。弱い窓で強制するなら --force-save。
  * 終了コード: 0=合格(期待が無ければ測れた) / 1=期待を破った / 2=測れていない(タイムアウト・取得失敗) / 3=上位3族に無く証明できない
  *
  * 取得は既存の `scripts/status-live.mjs --json` を子プロセスで呼ぶ(.env の NL_STATUS_VIEW_TOKEN。新しい通信路は作らない)。
@@ -134,12 +135,17 @@ if (vsName) {
 
 if (saveName) {
   const p = baselinePath(saveName);
-  mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(
-    p,
-    JSON.stringify({ savedAt: new Date().toISOString(), version: report.version, commentRatePerSec: report.commentRatePerSec, ready: decision.ready, agg }, null, 2) + '\n'
-  );
-  console.log(`\n💾 基準線 ${saveName} を保存しました: ${p}${decision.ready ? '' : '  ※条件未達の窓で保存(基準線として弱い)'}`);
+  // 条件未達(速報が古い・窓が短い・コメントが流れていない)の窓は、基準線にしない(後で比較に使い誤るため)。--force-save で強制。
+  if (!decision.ready && !args.includes('--force-save')) {
+    console.log(`\n⚠️ 条件未達のため基準線 ${saveName} は保存しませんでした(弱い基準線を作らない)。強制するなら --force-save`);
+  } else {
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(
+      p,
+      JSON.stringify({ savedAt: new Date().toISOString(), version: report.version, commentRatePerSec: report.commentRatePerSec, ready: decision.ready, agg }, null, 2) + '\n'
+    );
+    console.log(`\n💾 基準線 ${saveName} を保存しました: ${p}${decision.ready ? '' : '  ※--force-save: 条件未達の窓で保存(基準線として弱い)'}`);
+  }
 }
 
 let code = 0;
