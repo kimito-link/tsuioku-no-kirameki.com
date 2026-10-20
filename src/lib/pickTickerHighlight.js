@@ -29,6 +29,8 @@
  */
 
 import { pickLatestCommentEntry } from './pickLatestComment.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { isAnonymousStyleNicoUserId } from './supportGrowthTileSrc.js';
 
 /** バケット幅(=最小表示秒数)。これ未満の頻度では切り替わらない。 */
 export const TICKER_BUCKET_MS = 7000;
@@ -342,15 +344,19 @@ export function decorateTickerLine(segA, opts = {}) {
  * 鏡row(②passive/③純Web)から `buildCommentTickerLatestHtml` の引数を組み立てる純関数
  * (v0.1.1226抽出)。②③で同じ整形を二重に書かないための共通化。
  *
- * @param {{ name?: unknown, avatarUrl?: unknown, text?: unknown }|null|undefined} row
+ * @param {{ name?: unknown, avatarUrl?: unknown, text?: unknown, userId?: unknown }|null|undefined} row
  * @param {string} [userPageHref] 純Webは '' 固定(referrer 露出を避ける)
  * @param {number} [maxChars]
  * @returns {{ label: string, avatarSrc: string, textShown: string, userPageHref: string }}
  */
 export function tickerArgsFromMirrorRow(row, userPageHref = '', maxChars = 72) {
+  // v0.1.1717: 鏡は匿名 identicon を載せない(容量)ので、顔が空で匿名の userId なら、同じ絵を userId から作る(見た目は従来どおり)。
+  const uid = String(row?.userId ?? '').trim();
+  const avatarFromRow = String(row?.avatarUrl ?? '');
+  const avatarSrc = avatarFromRow || (uid && isAnonymousStyleNicoUserId(uid) ? anonymousIdenticonDataUrl(uid) : '');
   return {
     label: String(row?.name ?? ''),
-    avatarSrc: String(row?.avatarUrl ?? ''),
+    avatarSrc,
     textShown: String(row?.text ?? '').slice(0, maxChars),
     userPageHref: String(userPageHref || '')
   };

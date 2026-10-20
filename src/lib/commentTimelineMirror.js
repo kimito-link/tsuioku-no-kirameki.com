@@ -17,6 +17,7 @@
  *
  * @module commentTimelineMirror
  */
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 
 /** 鏡に載せる最新件数の上限(純Webで「流れ」を見せるのに十分・容量を抑える)。 */
 export const TIMELINE_MIRROR_CAP = 60;
@@ -42,11 +43,14 @@ function toTimelineRow(item, resolveName, resolveAvatar) {
   const kind = s(it.kind) || (it.isGift ? 'gift' : 'comment');
   // 本文も名前も顔も無い行は鏡に載せても無意味=捨てる。
   if (!text && !name && !avatarUrl) return null;
+  // v0.1.1717: userId から決定的に作れる匿名 identicon(data: SVG・約2KB)は鏡に載せない(消費側が userId から同じ絵を作る)。
+  //   実測: 1回144KBのうち137KB(95%)がこれで、全拡張画面へ全文配信されていた。一致するときだけ省く=別の絵(合成した顔など)は残す。
+  const avatarSlim = userId && avatarUrl.startsWith('data:image/svg+xml') && avatarUrl === anonymousIdenticonDataUrl(userId) ? '' : avatarUrl;
   const row = {
     at: Number.isFinite(at) && at > 0 ? at : 0,
     name,
     text,
-    avatarUrl,
+    avatarUrl: avatarSlim,
     userId,
     kind
   };
