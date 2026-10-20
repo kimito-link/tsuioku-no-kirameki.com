@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1682',
+    date: '2026-10-17',
+    summary: '顔の合成の状況を状態速報に出す',
+    items: Object.freeze([
+      '匿名の顔のアイコンを別スレッド(Worker)で作るようにした v0.1.1681 が、実機で動いているかを読めるようにしました。',
+      '状態速報に1行を足します。顔を作った要求の数・保存済みの顔から出せた数・Worker で作れた数・Worker に失敗して従来の作り方に戻った数・Worker の状態(ready か dead か)・最後のエラーが出ます。',
+      '画面の見た目や動きは変えていません。動いているつもりで確認できない状態をなくすための表示です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1681',
     date: '2026-10-17',
     summary: '匿名の顔の作成を別スレッドへ移す',

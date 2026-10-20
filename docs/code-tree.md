@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 961 件
+## ⚠️ 役割コメントが無いソース 8 / 962 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2077)
+- 📁 **src/** (2080)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1836)
+  - 📁 **lib/** (1839)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2339,6 +2339,7 @@
     - `popupMainKeyWritebackGuard.wiring.test.js`
     - `popupMainScrollDefer.js` — 拡張ポップアップ `.nl-main` スクロール中に重い DOM 更新を見送るかどうか。
     - `popupMainScrollDefer.test.js`
+    - `popupRankingFullCountStable.wiring.test.js`
     - `popupStorageRefreshCoalesce.js` — popup / inline のコメント再描画スケジューラ。
     - `popupStorageRefreshCoalesce.test.js`
     - `popupVisibilityGate.js` — popup / inline コメント再描画の可視性ゲート（v0.1.440）。
@@ -2378,6 +2379,8 @@
     - `pruneLiveViewPublishBlob.test.js`
     - `pruneStaleEventDomLvs.js` — v0.1.203 Patch 4: 古い event-dom snapshot 残骸を cleanup 対象として識別する純関数。
     - `pruneStaleEventDomLvs.test.js`
+    - `rankedRoomsOrder.js` — 応援ランキング(ユーザー別の記録内件数の多い順)の並びを安定させる純関数(2026-10-20)。
+    - `rankedRoomsOrder.test.js`
     - `rankingPatrolMessages.js` — ランキング巡回(「次の上位配信へ」/ 自動巡回トグル)の共有定数と純関数。
     - `rankingPatrolMessages.test.js`
     - `rankingVisibleRetryDecision.js` — 「タブが可視に復帰したとき、貢献度ランキング取得を再試行すべきか」を決める純関数。
