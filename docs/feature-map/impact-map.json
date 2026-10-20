@@ -6918,6 +6918,16 @@
       ]
     },
     {
+      "file": "src/lib/newVsRepeatBasis.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/nicoadCelebrationKey.js",
       "featureCount": 1,
       "features": [

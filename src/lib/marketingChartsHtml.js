@@ -39,6 +39,7 @@ import {
   buildCommenterAttendanceMatrix
 } from './commenterHistoricalAnalytics.js';
 import { buildCommenterSurvivalCurve } from './commenterSurvivalCurve.js';
+import { judgeNewVsRepeatBasis } from './newVsRepeatBasis.js';
 import { buildCrossSupporterRanking } from './crossSupporterRanking.js';
 import { diagnoseKeyboardTypes } from './keyboardTypeDiagnostic.js';
 import {
@@ -1166,6 +1167,18 @@ function sectionNewVsRepeat(c) {
 <tr><th>うちヘビー常連（過去 5+ コメ）</th><td>${c.heavyCount}</td><td>${pct(c.heavyRatio)}</td></tr>
 </tbody>
 </table>
+</section>`;
+}
+
+/**
+ * v0.1.1708: 過去の配信を読んでいない(コメントの多い配信)ときの、新規 vs 常連の代わりの注記。
+ *   空の履歴で分類すると全員が「新規」に化けるので、数字は出さない(newVsRepeatBasis.js)。
+ * @param {string} note
+ */
+function sectionNewVsRepeatUnavailable(note) {
+  return `<section class="mkt-section" id="mkt-new-vs-repeat">
+<h2>新規 vs 常連 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">${escapeHtml(note)}</p>
 </section>`;
 }
 
@@ -4467,6 +4480,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const crossSupporterRanking = buildCrossSupporterRanking(pastBroadcastsForLayer, r.liveId, {
     limit: 10
   });
+  const newVsRepeatBasis = judgeNewVsRepeatBasis(pastBroadcastsForLayer.length);
   const newVsRepeat = classifyCommentersAgainstHistory({
     currentLiveId: r.liveId,
     currentComments: currentCommentsForLayer,
@@ -4908,8 +4922,8 @@ ${silenceZones.length ? dynamicAdviceCardsHtml('silence', metricsForAdvice) : ''
 ${sectionLaughterDensity(laughterDensity)}
 ${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ''}
 ${laughterDensity.buckets.length >= 2 ? dynamicAdviceCardsHtml('laughter', metricsForAdvice) : ''}
-${sectionNewVsRepeat(newVsRepeat)}
-${newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ''}
+${newVsRepeatBasis.ok ? sectionNewVsRepeat(newVsRepeat) : sectionNewVsRepeatUnavailable(newVsRepeatBasis.note)}
+${newVsRepeatBasis.ok && newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ''}
 ${newVsRepeat.totalCurrent > 0 ? dynamicAdviceCardsHtml('newVsRepeat', metricsForAdvice) : ''}
 ${sectionSurvivalCurve(survivalCurve)}
 ${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ''}

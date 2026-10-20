@@ -190,7 +190,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 100</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 99</summary>
 
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
@@ -213,7 +213,6 @@
 - `src/lib/broadcastUrl.js` — ニコニコ生放送 URL / パスから lv ID を取り出す（純関数・DOM非依存）
 - `src/lib/broadcastWaveformFingerprint.js` — L3: コメ波形フィンガープリント。
 - `src/lib/buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。
-- `src/lib/capCommentsForAnalytics.js` — マーケ分析・タイムライン用のコメント上限（heavy 時の全件再走査を防ぐ）
 - `src/lib/channelBroadcasterMeta.js` — 公式チャンネル放送（運営・業者）の broadcaster メタを embedded-data から
 - `src/lib/channelSwitchDiag.js` — 配信切替(SPA遷移)の「送信N/受信N/初描画ms」観測値を組み立てる純関数群。
 - `src/lib/channelSwitchDiagKey.js` — 配信切替(SPA遷移でパネルを作り直さず in-place 切替する経路)の「切替回数/初描画ms」観測値を
@@ -623,7 +622,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
@@ -651,6 +650,7 @@
 - `src/lib/marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
 - `src/lib/mediaKitHtml.js` — 追憶メディアキットの共有用 single-file HTML。
 - `src/lib/mediaKitStats.js` — 追憶メディアキット向けの期間集計。
+- `src/lib/newVsRepeatBasis.js` — マーケレポートの「新規 vs 常連」を出してよいか判定する純関数(2026-10-20)。
 - `src/lib/northStarFallbackHtml.js` — v0.1.241: 北極星「鏡のように貼り付け」レーンの fallback HTML 生成。
 - `src/lib/panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
 - `src/lib/reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。
@@ -1180,13 +1180,11 @@
 - `v0.1.1699` 2026-10-20 — フォロー先一覧の読み先をチャンクへ移す
 - `v0.1.1691` 2026-10-17 — 開いた瞬間から応援マスの顔を本顔で出す
 
-### 🏟 会場・席 (3版)
+### 🏟 会場・席 (4版)
+- `v0.1.1708` 2026-10-20 — マーケ分析を全件で行い、新規100%を出さない
 - `v0.1.1706` 2026-10-20 — 件数カードの同じ値の書き直しを止める
 - `v0.1.1705` 2026-10-20 — 応援者ランキングの値を診断で突き合わせる
 - `v0.1.1692` 2026-10-17 — 応援レーンの段で、同じ人のタイルを作り直さない
-
-### 🎁 ギフト (1版)
-- `v0.1.1688` 2026-10-17 — 応援マスとギフト履歴の同じ値の書き直しを止める
 
 ### 🪟 応援レーン・タイル (5版)
 - `v0.1.1705` 2026-10-20 — 応援者ランキングの値を診断で突き合わせる
@@ -1195,7 +1193,8 @@
 - `v0.1.1692` 2026-10-17 — 応援レーンの段で、同じ人のタイルを作り直さない
 - `v0.1.1691` 2026-10-17 — 開いた瞬間から応援マスの顔を本顔で出す
 
-### 🩺 診断・状態速報 (9版)
+### 🩺 診断・状態速報 (10版)
+- `v0.1.1708` 2026-10-20 — マーケ分析を全件で行い、新規100%を出さない
 - `v0.1.1705` 2026-10-20 — 応援者ランキングの値を診断で突き合わせる
 - `v0.1.1704` 2026-10-20 — 見出しの記録件数をサマリ一本にする
 - `v0.1.1703` 2026-10-20 — ランキングの並び変化の回数を状態速報へ
