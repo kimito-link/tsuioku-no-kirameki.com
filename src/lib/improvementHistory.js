@@ -3250,5 +3250,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1705', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1704 の note と同じ理由)。今回は単体 +9・配線 +4(変異6件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1706', metric: 'bundle-kb', value: 1480,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は削る版: popup-entry.js の syncLiveStatThreeCardsCharLoadingOverlays の setOne(無条件の hidden/aria-hidden 代入)を、新規 lib overlayShown.js(値が違うときだけ書く)に置換。popup-entry.js は行数が増えない(置換+import 1行)。'
+  }),
+  Object.freeze({
+    version: '0.1.1706', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1706', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1705 の note と同じ理由)。今回は単体 +5・配線 +2(変異4件を検出)。'
   })
 ]);

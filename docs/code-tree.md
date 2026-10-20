@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 966 件
+## ⚠️ 役割コメントが無いソース 8 / 967 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2091)
+- 📁 **src/** (2094)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1850)
+  - 📁 **lib/** (1853)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2241,6 +2241,8 @@
     - `ouenBanner.test.js`
     - `ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
     - `ouenBannerDom.test.js`
+    - `overlayShown.js` — ローディング重ね(キャラ重ね)の表示/非表示を、値が【違うときだけ】DOM に書く(2026-10-20)。
+    - `overlayShown.test.js`
     - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
     - `ownPostedUserIdSet.test.js`
     - `pageColorSchemeGate.test.js`
@@ -2342,6 +2344,7 @@
     - `popupMainKeyWritebackGuard.wiring.test.js`
     - `popupMainScrollDefer.js` — 拡張ポップアップ `.nl-main` スクロール中に重い DOM 更新を見送るかどうか。
     - `popupMainScrollDefer.test.js`
+    - `popupOverlayShownWiring.wiring.test.js`
     - `popupRankingFullCountStable.wiring.test.js`
     - `popupStorageRefreshCoalesce.js` — popup / inline のコメント再描画スケジューラ。
     - `popupStorageRefreshCoalesce.test.js`
