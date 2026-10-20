@@ -7198,6 +7198,16 @@
       ]
     },
     {
+      "file": "src/lib/overlayShown.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/ownPostedUserIdSet.js",
       "featureCount": 1,
       "features": [
