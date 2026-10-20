@@ -111,7 +111,10 @@ export function buildSilentFailureCells(data) {
         why ? `${failTotal}回失敗: ${why} [${rawReason}]` : `${failTotal}回失敗: ${rawReason}`
       ));
     } else if (failTotal > 0) {
-      out.push(cell('voice-start-fail', '読み上げのON失敗', 'warn', `${failTotal}回失敗(理由が記録されていません)`));
+      // v0.1.1719: 失敗の度に理由は必ず書かれ(voicePlayer.js / comeview-entry.js は `|| 'unknown'`)、ON に成功すると理由だけが空に戻る。
+      //   つまり「失敗の累計>0 かつ理由が空」=【その後 ON に成功して復旧した】状態。従来は「理由が記録されていません」と警告のまま
+      //   居座り、直った後も黄色が消えなかった(診断が実態より悪く見える嘘)。累計は事実として残し、色は ok にする。
+      out.push(cell('voice-start-fail', '読み上げのON失敗', 'ok', `過去に${failTotal}回失敗・その後ONに成功(復旧済み)`));
     } else {
       out.push(cell('voice-start-fail', '読み上げのON失敗', 'ok', '失敗なし'));
     }

@@ -3432,5 +3432,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1718', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1717 の note と同じ理由)。今回は配線テストの差し替えのみ。'
+  }),
+  Object.freeze({
+    version: '0.1.1719', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の嘘の是正(B3 の3件目): silentFailureCells.js の voice-start-fail で、failTotal>0 かつ理由が空のとき warn(理由が記録されていません)→ ok(復旧済み)。'
+  }),
+  Object.freeze({
+    version: '0.1.1719', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1719', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1718 の note と同じ理由)。今回は単体 +1(変異1件を検出)。'
   })
 ]);
