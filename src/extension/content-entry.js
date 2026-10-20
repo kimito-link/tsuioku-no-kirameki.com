@@ -15930,7 +15930,7 @@ async function maybeResolveNamedUserProfilesOnce() {
       const applied = applyUserCommentProfileMapToEntries(comments, pruned);
       if (applied.patched > 0) comments = applied.next;
       save[KEY_USER_COMMENT_PROFILE_CACHE] = pruned;
-      if (applied.patched > 0) save[commentsKey] = comments;
+      if (applied.patched > 0 && chunkRead?.fromChunks !== true) save[commentsKey] = comments; // v0.1.1701: チャンクから読んだ配列は本体キー(複製)へ書き戻さない
     }
     if (followTouched) {
       save[KEY_COMMENTER_FOLLOW_CACHE] = followMap;

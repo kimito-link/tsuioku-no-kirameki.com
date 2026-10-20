@@ -3180,5 +3180,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1700', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1699 の note と同じ理由)。今回は配線テスト +5(新規 popupMainKeyWritebackGuard.wiring.test.js・変異4件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1701', metric: 'bundle-kb', value: 1475,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は削る版: content-entry.js の maybeResolveNamedUserProfilesOnce が、チャンクから読んだ配列を本体キーへ書き戻さない(1行の条件追加・fromChunks)。前版 v0.1.1700(popup 4か所)の続き。'
+  }),
+  Object.freeze({
+    version: '0.1.1701', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1701', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1700 の note と同じ理由)。今回は配線テスト +4(新規 contentMainKeyWritebackGuard.wiring.test.js・変異2件を検出)。'
   })
 ]);
