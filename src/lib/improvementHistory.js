@@ -3320,5 +3320,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1710', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1709 の note と同じ理由)。今回は単体 +1・配線 +3(変異4件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1711', metric: 'bundle-kb', value: 1480,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は整理の版(挙動不変): popup-entry.js の downloadMediaKitHtml 約120行を src/lib/mediaKitExport.js へ移し、依存(storage・コメント全件読み・タイムアウト・辞書)を注入にした。popup の行数 22096→21775。'
+  }),
+  Object.freeze({
+    version: '0.1.1711', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1711', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1710 の note と同じ理由)。今回は単体 +7・配線 +2(変異3件を検出)。'
   })
 ]);
