@@ -415,7 +415,8 @@ export default [
     // v0.1.1665: 広告の「気づいた時刻」の記録(+34行・判定は lib の adObservationLog.js・大半は【なぜ】のコメント)。
     // v0.1.1694: 全ページへ配られる巨大キーの書き込みを減らす配線(+7行)。較正リングの試行間隔(25s→120s)と fastDiag 全文の間引き(判定は lib の fastDiagFullGate.js)。
     // v0.1.1699: フォロー先一覧の読み先を本体キーの直読みから readChunkedComments へ(+4行・すべて【なぜ】のコメント)。本体キーの書き戻し停止(次版)で直読みだけが黙って死ぬのを先に防ぐ。ロジックは既存の readChunkedComments。
-    rules: { 'max-lines': ['error', { max: 19512, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1718: 較正リングの試行間隔 120s→300s と保持件数 2000→400(+2行・1回約830KB→約170KB)。読み手は開発モニタの書き出しだけ。
+    rules: { 'max-lines': ['error', { max: 19514, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
