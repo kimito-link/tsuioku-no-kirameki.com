@@ -864,7 +864,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2105)
+- 📁 **src/** (2106)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1149,7 +1149,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1864)
+  - 📁 **lib/** (1865)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2086,6 +2086,8 @@
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
     - `marketingSupportParticipationCounts.test.js`
+    - `mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
+    - `mediaKitEmbed.test.js`
     - `mediaKitExport.js` — ⚠️ 役割コメント無し
     - `mediaKitExport.test.js`
     - `mediaKitExportWiring.wiring.test.js`
@@ -2710,6 +2712,7 @@
     - `supporterRowToPersonTile.integration.test.js`
     - `supporterRowToPersonTile.js` — 応援者ランキングの行(SupporterRow)を、本物の人物タイル(buildPersonTileEl)が要求する
     - `supporterRowToPersonTile.test.js`
+    - `supportersGiftsSearch.dom.test.js`
     - `supportersGiftsSection.js` — マーケレポートの章「応援者とギフト(誰がどんなコメントをして・どんなギフトを出したか)」(2026-10-20)。
     - `supportersGiftsSection.test.js`
     - `supportersGiftsWiring.wiring.test.js`
@@ -2763,8 +2766,6 @@
     - `trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
     - `trimMap.test.js`
     - `uiUxRoadmapTdd.test.js`
-    - `unifiedReportHtml.js` — 分析レポート(マーケ)とメディアキットを、1つの HTML にまとめる(CSS だけのタブ・script 無し)。
-    - `unifiedReportHtml.test.js`
     - `unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `unknownVsAbsent.test.js`
     - `userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、

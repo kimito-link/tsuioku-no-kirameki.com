@@ -3348,5 +3348,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1712', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1711 の note と同じ理由)。今回は単体 +9・配線 +5(変異8件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1713', metric: 'bundle-kb', value: 1449,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は直す版(前版 v0.1.1712 の見た目の不具合の是正): タブ+iframe をやめ、メディアキットを mediaKitEmbed.js(CSS を #mkt-media-kit で囲って本文を取り出す)でマーケ HTML の1章にした。応援者とギフトの章を暗い配色にし、検索窓+絞り込み script を追加。unifiedReportHtml.js は撤去。'
+  }),
+  Object.freeze({
+    version: '0.1.1713', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1713', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1712 の note と同じ理由)。今回は単体・DOM 計 +14(変異8件を検出)。'
   })
 ]);
