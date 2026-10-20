@@ -84,6 +84,7 @@ import {
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
 import { orderRankedRooms } from '../lib/rankedRoomsOrder.js';
 import { pickCountToShow } from '../lib/pickCountToShow.js';
+import { setOverlayShown } from '../lib/overlayShown.js';
 import { noteRankOrder } from '../lib/rankOrderMeterBoot.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
@@ -2773,9 +2774,8 @@ function syncLiveStatThreeCardsCharLoadingOverlays() {
   const setOne = (id, show) => {
     const el = $(id);
     if (!(el instanceof HTMLElement)) return;
-    const on = Boolean(show);
-    el.hidden = !on;
-    el.setAttribute('aria-hidden', on ? 'false' : 'true');
+    // v0.1.1706: 値が違うときだけ書く(同値書き直しが4分で約6,500回あった=ちらつき計)。
+    setOverlayShown(el, show);
   };
   // empty 履歴ゼロでは CSS で stat 群ごと非表示。ローディングだけ残さない。
   if (document.documentElement.classList.contains('nl-empty-no-history')) {
