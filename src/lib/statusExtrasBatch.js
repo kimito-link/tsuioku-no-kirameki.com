@@ -31,7 +31,7 @@ import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
 import { KEY_SESSION_SUMMARY_MIRROR } from './sessionSummaryMirrorKey.js';
 import { KEY_PREVIEW_RENDER_ACK } from './previewRenderAckKey.js';
-import { KEY_BACKFILL_LIVE_METRIC } from './storageKeys.js';
+import { KEY_BACKFILL_LIVE_METRIC, KEY_TOP_SUPPORTERS_MIRROR } from './storageKeys.js';
 import { KEY_GIFT_EFFECT_DIAG } from './giftEffectDiagKey.js';
 import { KEY_MILESTONE_EFFECT_DIAG } from './milestoneEffectDiagKey.js';
 import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
@@ -81,7 +81,9 @@ export const EXTRAS_BATCH_KEYS = [
   KEY_SCORE_ANNOUNCE_DIAG,
   KEY_SIDEPANEL_SELF_DIAG,
   // v0.1.1580: 拡張プロセスの忙しさ台帳(同じ get に同梱=読み取り回数は増えない・約4KB)。
-  KEY_EXT_PROCESS_CENSUS
+  KEY_EXT_PROCESS_CENSUS,
+  // v0.1.1705: popup の応援者ランキング鏡(上位10行・小さい)。診断のレポート集計と値を突き合わせる(supportersParity.js)。
+  KEY_TOP_SUPPORTERS_MIRROR
 ];
 
 /**
@@ -99,7 +101,7 @@ export const EXTRAS_BATCH_KEYS = [
  *   previewRenderAck: any, backfillLiveMetric: any, giftEffectDiag: any, milestoneEffectDiag: any,
  *   opSoundEffectDiag: any, commentPostDiag: any,
  *   instantPushDiag: any, channelSwitchDiag: any, highlightLedger: any, scoreAnnounceDiag: any, sidepanelSelfDiag: any
- *   panelWakeCurtainDiag: any, processCensus: any,
+ *   panelWakeCurtainDiag: any, processCensus: any, topSupportersMirror: any,
  * }}
  */
 export function pickExtrasBatchValues(bag, nowMs) {
@@ -132,6 +134,8 @@ export function pickExtrasBatchValues(bag, nowMs) {
     // 2026-08-08: サイドパネルの自己診断(黒画面の切り分け用・sidepanel-entry.js が書く)。
     sidepanelSelfDiag: b[KEY_SIDEPANEL_SELF_DIAG] || null,
     // v0.1.1580: 拡張プロセスの忙しさ台帳(SW が文書別の報告を束ねて書く・ext-census-sw.js)。
-    processCensus: b[KEY_EXT_PROCESS_CENSUS] || null
+    processCensus: b[KEY_EXT_PROCESS_CENSUS] || null,
+    // v0.1.1705: popup の応援者ランキング鏡(診断のレポート集計との値の突き合わせ用)。
+    topSupportersMirror: b[KEY_TOP_SUPPORTERS_MIRROR] || null
   };
 }

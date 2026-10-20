@@ -25,6 +25,7 @@ import { KEY_HIGHLIGHT_LEDGER } from './highlightLedgerKey.js';
 import { KEY_SCORE_ANNOUNCE_DIAG } from './scoreAnnounceDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from './sidepanelSelfDiagKey.js';
 import { KEY_PANEL_WAKE_CURTAIN_DIAG } from './panelWakeCurtainDiagKey.js';
+import { KEY_TOP_SUPPORTERS_MIRROR } from './storageKeys.js';
 
 describe('EXTRAS_BATCH_KEYS', () => {
   // 会議設計時点の列挙(16キー)+ v0.1.1083 の commentPostDiag + v0.1.1092 の instantPushDiag +
@@ -32,7 +33,7 @@ describe('EXTRAS_BATCH_KEYS', () => {
   //   第2号(③WEB投げ一覧丸写し)の giftHistoryMirror + 第4号(③WEB室温丸写し)の roomHeatMirror +
   //   第5号(③WEB記録サマリ推移丸写し)の sessionSummaryMirror で実際は24キー。
   //   「漏れなく統合したか」を人力の数え間違いに頼らず固定するため、実装済みの全キーを列挙して突合する。
-  it('25キーすべてを含む(commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror / 第5号 sessionSummaryMirror も含む)', () => {
+  it('26キーすべてを含む(v0.1.1705 の topSupportersMirror・commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror / 第5号 sessionSummaryMirror も含む)', () => {
     const expectedKeys = [
       KEY_VOICE_DIAG,
       KEY_VENUE_SEATS_DIAG,
@@ -67,10 +68,12 @@ describe('EXTRAS_BATCH_KEYS', () => {
        */
       KEY_PANEL_WAKE_CURTAIN_DIAG,
       // v0.1.1580: 拡張プロセスの忙しさ台帳(SW が書く・同じ get に同梱=読み取り回数は増えない)
-      KEY_EXT_PROCESS_CENSUS
+      KEY_EXT_PROCESS_CENSUS,
+      // v0.1.1705: popup の応援者ランキング鏡(診断のレポート集計との値の突き合わせ用)
+      KEY_TOP_SUPPORTERS_MIRROR
     ];
-    expect(expectedKeys).toHaveLength(25);
-    expect(EXTRAS_BATCH_KEYS).toHaveLength(25);
+    expect(expectedKeys).toHaveLength(26);
+    expect(EXTRAS_BATCH_KEYS).toHaveLength(26);
     expect(EXTRAS_BATCH_KEYS).toEqual(expect.arrayContaining(expectedKeys));
   });
 
