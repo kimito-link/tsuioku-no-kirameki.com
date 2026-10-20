@@ -3208,5 +3208,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1702', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1701 の note と同じ理由)。今回は単体 +9(rankedRoomsOrder・性質テスト含む)・配線 +5(変異6件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1703', metric: 'bundle-kb', value: 1479,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は計器の版(前版 v0.1.1702 が直す版なので連続ではない): 順位計(rankOrderMeter.js・rankOrderMeterBoot.js)を popup の描画(1行)とサイドパネルの状態速報(約15行)へ配線。読むだけ・描画に触れない。'
+  }),
+  Object.freeze({
+    version: '0.1.1703', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1703', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1702 の note と同じ理由)。今回は単体 +13・配線 +3(変異4件を検出)。'
   })
 ]);

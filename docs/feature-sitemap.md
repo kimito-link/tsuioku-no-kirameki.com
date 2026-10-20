@@ -189,7 +189,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 98</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 99</summary>
 
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
@@ -271,6 +271,7 @@
 - `src/lib/popupWatchUrlResolveMultiTab.js` — popup が参照する watch URL を「複数の候補ソース」から決める純粋関数。
 - `src/lib/rankingPatrolMessages.js` — ランキング巡回(「次の上位配信へ」/ 自動巡回トグル)の共有定数と純関数。
 - `src/lib/rankingVisibleRetryDecision.js` — 「タブが可視に復帰したとき、貢献度ランキング取得を再試行すべきか」を決める純関数。
+- `src/lib/rankOrderMeter.js` — 応援ランキング(上位10人)の【並びが変わった回数】を数える計器(2026-10-20)。
 - `src/lib/recentBroadcastLiveIds.js` — 最近の放送 liveId を `broadcastSessionSummary_v1` IDB から取得する純粋関数群。
 - `src/lib/sameOriginContribRankingDomShape.js` — watch ページ（live.nicovideo.jp＝content script と同一 origin）の gift
 - `src/lib/scrapeEventScoreRankingFromRichviewDom.js` — audition richview（イベント💎順位リスト想定）の DOM から順位つきスコア行を掬う純関数（PR2）。
@@ -920,7 +921,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 235</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 236</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1096,6 +1097,7 @@
 - `src/lib/protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
 - `src/lib/pruneLiveViewPublishBlob.js` — 純Web公開ペイロード(jsonBlob)の容量 prune はしご純関数
 - `src/lib/pruneStaleEventDomLvs.js` — v0.1.203 Patch 4: 古い event-dom snapshot 残骸を cleanup 対象として識別する純関数。
+- `src/lib/rankOrderMeterBoot.js` — 順位計(rankOrderMeter.js)を popup から1行で呼べるようにする薄い層(2026-10-20)。
 - `src/lib/recentTextRing.js` — 「その人の直近N件の発言」を保持する固定長リングの純関数(v0.1.1218)。
 - `src/lib/refreshCoalescer.js` — 描き直し(refresh)の「実行中に来た要求は、あとで1回にまとめる」合流器(時計は deps で注入)。v0.1.1687
 - `src/lib/refreshCycleDeadline.js` — 1サイクル全体の締切を持ち、各 read の timeout を残り時間に切り詰める。
@@ -1171,9 +1173,6 @@
 - `v0.1.1699` 2026-10-20 — フォロー先一覧の読み先をチャンクへ移す
 - `v0.1.1691` 2026-10-17 — 開いた瞬間から応援マスの顔を本顔で出す
 
-### 🙂 匿名(184) (1版)
-- `v0.1.1683` 2026-10-17 — 成長アイコンの顔を毎回戻して差し替えない
-
 ### 🏟 会場・席 (1版)
 - `v0.1.1692` 2026-10-17 — 応援レーンの段で、同じ人のタイルを作り直さない
 
@@ -1187,7 +1186,8 @@
 - `v0.1.1691` 2026-10-17 — 開いた瞬間から応援マスの顔を本顔で出す
 - `v0.1.1685` 2026-10-17 — 応援レーンの顔が差し替わるちらつきを止める
 
-### 🩺 診断・状態速報 (8版)
+### 🩺 診断・状態速報 (9版)
+- `v0.1.1703` 2026-10-20 — ランキングの並び変化の回数を状態速報へ
 - `v0.1.1702` 2026-10-20 — 応援ランキングの入れ替わりを止め件数を実数に
 - `v0.1.1698` 2026-10-17 — 見えない送信担当の更新を2秒から10秒に
 - `v0.1.1695` 2026-10-17 — タブ切り替えで戻った瞬間の重い更新を後ろへ
