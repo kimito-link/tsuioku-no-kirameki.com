@@ -83,6 +83,7 @@ import {
   recordCommentSubmitTotal } from '../lib/commentSubmitProfiling.js';
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
 import { orderRankedRooms } from '../lib/rankedRoomsOrder.js';
+import { noteRankOrder } from '../lib/rankOrderMeterBoot.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
 import {
@@ -13373,6 +13374,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   _rankOrderLiveId = lvPrimed;
   _rankOrderKeys = rankOrder.keys;
   const rankedRooms = rankOrder.ordered;
+  noteRankOrder(rankedRooms.slice(0, TOP_SUPPORT_RANK_STRIP_MAX).map((r) => r.userKey)); // v0.1.1703: 順位計(並び変化の回数)
 
   const denseLayout =
     document.body?.classList.contains('nl-tight') ||
