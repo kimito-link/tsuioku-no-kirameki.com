@@ -23,12 +23,11 @@ describe('★メディアキット生成の共有化と統合', () => {
     expect(popup).not.toContain('async function downloadMediaKitHtml');
   });
 
-  it('popup のメディアキットボタンは、マーケ保存ボタンと同じフローへ案内する', () => {
-    const at = popup.indexOf("$('exportMediaKitBtn')?.addEventListener('click'");
-    expect(at).toBeGreaterThan(0);
-    const body = popup.slice(at, at + 700);
-    expect(body).toContain("$('devMonitorExportMarketingBtn')");
-    expect(body).toContain('original.click();');
+  it('popup にメディアキット専用のボタンは無い(マーケ保存1つに統合)', () => {
+    expect(popup).not.toContain('exportMediaKitBtn');
+    const html = read('extension/popup.html');
+    expect(html).not.toContain('exportMediaKitBtn');
+    expect(html).toContain('マーケ分析+メディアキットを1つのHTMLで保存');
   });
 
   it('マーケ生成は、メディアキットを依存注入で作り、分析レポートの1章として同じ HTML に入れる(タブ・iframe は使わない)', () => {
