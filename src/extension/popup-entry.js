@@ -82,7 +82,7 @@ import {
   createCommentSubmitProfiler,
   recordCommentSubmitTotal } from '../lib/commentSubmitProfiling.js';
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
-import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
+import { orderRankedRooms } from '../lib/rankedRoomsOrder.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
 import {
@@ -583,7 +583,6 @@ import {
   isWeakNiconicoUserIconHttpUrl,
   pickSupportGrowthTileWithOptionalIdenticon,
   userLaneDedupeKey,
-  userLaneResolvedThumbScore,
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
 import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
@@ -1466,6 +1465,9 @@ let _celebrationStateCache = null;
 
 /** @type {string|null} */
 let _lastTopSupportRankStripStableKey = null;
+/** v0.1.1702: 応援ランキングの前回の並び(配信ごと)。同数は前回順位を保つ(rankedRoomsOrder.js)。 */
+let _rankOrderLiveId = '';
+let _rankOrderKeys = /** @type {string[]} */ ([]);
 
 /**
  * 直近に renderUserRooms を完走した liveId。
@@ -13255,7 +13257,8 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     }
   })();
 
-  const list = capCommentsForAnalytics(Array.isArray(entries) ? entries : []);
+  // v0.1.1702: 全件で数える(旧: 総数/2500 の均等サンプルで、コメントが1件増えるたびに僅差の順位が入れ替わり、件数も実数より小さかった)。
+  const list = Array.isArray(entries) ? entries : [];
   const latestAt = list.reduce((max, e) => {
     const at = Number(e?.capturedAt || 0);
     return at > max ? at : max;
@@ -13350,8 +13353,9 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   // 個人サムネが落ちる。りんく列（story user lane）と同じく popupUserCommentProfileMap
   // から後追いで補完しておくと、ランクストリップ／上位カード両方で個人サムネが復活し、
   // 下のソートで使う userLaneResolvedThumbScore のスコアも正しく上がる。
-  const rankedRooms = rooms
-    .map((room) => {
+  // v0.1.1702: 並びは件数の降順・同数は前回の順位を保つ(時間で動くサムネ評価・直近5分・最終発言では並べ替えない)。
+  const rankOrder = orderRankedRooms(
+    rooms.map((room) => {
       const ownAvatar = String(room.avatarUrl || '').trim();
       const enrichedAvatar =
         ownAvatar ||
@@ -13363,17 +13367,12 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
         avatarUrl: enrichedAvatar,
         recentCount: recentMap.get(room.userKey) || 0
       };
-    })
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      const uidA = a.userKey === UNKNOWN_USER_KEY ? '' : a.userKey;
-      const uidB = b.userKey === UNKNOWN_USER_KEY ? '' : b.userKey;
-      const scoreA = userLaneResolvedThumbScore(uidA, a.avatarUrl);
-      const scoreB = userLaneResolvedThumbScore(uidB, b.avatarUrl);
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      if (b.recentCount !== a.recentCount) return b.recentCount - a.recentCount;
-      return b.lastAt - a.lastAt;
-    });
+    }),
+    _rankOrderLiveId === lvPrimed ? _rankOrderKeys : []
+  );
+  _rankOrderLiveId = lvPrimed;
+  _rankOrderKeys = rankOrder.keys;
+  const rankedRooms = rankOrder.ordered;
 
   const denseLayout =
     document.body?.classList.contains('nl-tight') ||
