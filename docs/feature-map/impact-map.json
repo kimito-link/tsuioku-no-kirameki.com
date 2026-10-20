@@ -4518,16 +4518,6 @@
       ]
     },
     {
-      "file": "src/lib/capCommentsForAnalytics.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/captureAuditionRichviewEventScoreDiagProbe.js",
       "featureCount": 1,
       "features": [
@@ -7685,6 +7675,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/rankedRoomsOrder.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
