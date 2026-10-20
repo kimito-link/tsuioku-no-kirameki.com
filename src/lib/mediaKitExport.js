@@ -28,6 +28,7 @@ export const MEDIA_KIT_SUPPORTER_SCAN_TIMEOUT_MS = 15_000;
  *   readAllCommentsForLive: (liveId: string) => Promise<unknown[]>,
  *   withTimeout: <T>(p: Promise<T>, ms: number, code: string) => Promise<T>,
  *   resolveProfileMap: () => Promise<Record<string, any>>,
+ *   maskSupporters?: boolean,
  *   openDb?: () => Promise<IDBDatabase>,
  *   listLiveIds?: (db: IDBDatabase, opts: { limit: number }) => Promise<string[]>,
  *   listSummaryForLive?: (db: IDBDatabase, liveId: string, limit: number) => Promise<unknown[]>
@@ -127,7 +128,8 @@ export async function buildMediaKitDocument(deps) {
   const html = buildMediaKitHtml(/** @type {any} */ ({ ...stats, supporters }), {
     generatedAtMs: nowMs,
     sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
-    sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT
+    sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT,
+    maskSupporters: deps.maskSupporters === true
   });
   const date = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Tokyo',

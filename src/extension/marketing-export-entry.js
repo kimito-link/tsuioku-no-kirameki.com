@@ -29,6 +29,8 @@
 import '../lib/extDocBusyCensusBoot.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
+import { buildMediaKitDocument } from '../lib/mediaKitExport.js';
+import { buildUnifiedReportHtml } from '../lib/unifiedReportHtml.js';
 import { attachCommenterFollowToReport, buildYukkuriImageDataUrlMap } from './popup/report/htmlReportDocument.js';
 import {
   giftUsersStorageKey,
@@ -38,6 +40,7 @@ import {
   watchSnapshotStorageKey,
   broadcasterProfileStorageKey,
   KEY_ANONYMOUS_IDENTICON_ENABLED,
+  KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_MARKETING_EXPORT_MASK_LABELS,
   normalizeMarketingExportMaskLabels
 } from '../lib/storageKeys.js';
@@ -65,7 +68,7 @@ import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { isCommentDbAvailable, openCommentDb, countCommentsForLive, readAllCommentsForLive as readAllCommentsFromDb } from '../lib/commentDb.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
-import { readStorageBagWithRetry } from '../lib/userCommentProfileCache.js';
+import { readStorageBagWithRetry, normalizeUserCommentProfileMap } from '../lib/userCommentProfileCache.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -642,9 +645,39 @@ async function runExport(lid) {
     });
     mktProf.mark('build_html');
 
+    // v0.1.1712: メディアキットも同じ HTML にタブで入れる(1ファイルに統合)。失敗・打ち切りでも分析レポートは必ず出す(fail-soft)。
+    //   応援者の名前は、分析レポートと同じ「共有用に伏せる」設定に従う。
+    setWaitStageText('メディアキットをまとめています…', 85);
+    let mediaKitHtml = '';
+    try {
+      const kit = await withTimeout(
+        buildMediaKitDocument({
+          storageGet: (keys) => chrome.storage.local.get(keys),
+          readAllCommentsForLive,
+          withTimeout,
+          resolveProfileMap: async () => {
+            const bag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
+            return normalizeUserCommentProfileMap(bag?.[KEY_USER_COMMENT_PROFILE_CACHE]);
+          },
+          maskSupporters: maskShareLabels
+        }),
+        60_000,
+        'media_kit_build_timeout'
+      );
+      mediaKitHtml = kit.html;
+    } catch {
+      mediaKitHtml = '';
+    }
+    mktProf.mark('media_kit');
+    const unifiedHtml = buildUnifiedReportHtml({
+      title: String(snapshot?.broadcastTitle || snapshot?.title || lid),
+      marketingHtml: html,
+      mediaKitHtml
+    });
+
     const mktFilename = buildMarketingReportDownloadFilename(lid, { comments, snapshot });
     setWaitStageText(`DL開始: ${mktFilename}`, 95);
-    await downloadBlobViaChromeDownloads(new Blob([html], { type: 'text/html;charset=utf-8' }), mktFilename);
+    await downloadBlobViaChromeDownloads(new Blob([unifiedHtml], { type: 'text/html;charset=utf-8' }), mktFilename);
     mktProf.mark('download');
     const mktDone = mktProf.finish('マーケ');
     logExportStageProfileIfEnabled('マーケ', mktDone.rows);
