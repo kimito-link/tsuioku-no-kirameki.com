@@ -3292,5 +3292,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1708', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1707 の note と同じ理由)。今回は単体 +3・配線 +2(変異5件を検出・既存の marketing テスト緑)。'
+  }),
+  Object.freeze({
+    version: '0.1.1709', metric: 'bundle-kb', value: 1481,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は機能追加の版: 新規 lib supportersGiftsSection.js(ユーザーごとのコメント+ギフトのまとめ・畳める HTML・CSS)と、marketingChartsHtml.js への章の追加(目次・CSS・全件のギフト台帳)。既存の約60章は不変。'
+  }),
+  Object.freeze({
+    version: '0.1.1709', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1709', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1708 の note と同じ理由)。今回は単体 +11・配線 +4(変異9件を検出・既存の marketing テスト緑)。'
   })
 ]);

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "75ebb586b121e2dc9a542ee9194bebbed17c013aad1ad61ee0020f9da70b1c09",
+  "fingerprint": "96bfe0dd5d1ad065ad20a4690a2543dfa6d96eea741540191b84b4c7f9f04c5d",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -707,6 +707,7 @@
     "src/lib/supporterRanking.js",
     "src/lib/supporterRankingDom.js",
     "src/lib/supporterRowToPersonTile.js",
+    "src/lib/supportersGiftsSection.js",
     "src/lib/supportersParity.js",
     "src/lib/swBackfillStaging.js",
     "src/lib/swBackfillTrigger.js",
@@ -841,11 +842,11 @@
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
     "extension/dist/content.js": "6b6ee1bee010eeceec9293bfb2068b4cebe2a736b9944d066cbfe1b23c371c9e",
-    "extension/dist/popup.js": "aeaa60fffac3eab5f78298102519248e9b99181858472cfa871583b1306d3dce",
+    "extension/dist/popup.js": "1a5bad34c1f1ae5e628f5a587d5431a7bf820f31281030fa6c8152cb88056a9b",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "d7c9ccc1229fed9d40e8fe325ed88b8dc9944e6917f7a0f8d5f7a61cb1af582d",
+    "extension/dist/status.js": "59eb3a7051f6983f90f371054c4bb6c1771fa8bef3e76917d682387a0f4f14ea",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
-    "extension/dist/marketing-export.js": "dd3a5ccd45e6788242b8fac8afad039d435065b692e74da3d6b3fdc4bd100947",
+    "extension/dist/marketing-export.js": "d4543419408dc3db9b1e04a0870eade9d3373ae33b578a39577fb5a5bd49b92f",
     "extension/dist/comeview.js": "728e085810ee9282c2c232a44f48541774bbe1fba35f1f5f706be82f42bb90ba",
     "extension/dist/venue.js": "81aed6d9d09a19c38288ad5215232b46e4b7f7ac97a0c94c49986ba53b9877ab",
     "extension/dist/sidepanel.js": "7fbcd1bea5a0590746b4f34c0e0144f42453de7b4e347d0812155f00757a0b5a",
@@ -853,7 +854,7 @@
     "extension/dist/avatar-face-worker.js": "7d17a9a9d2f53cf8c90373ccb940ee2e458b0b9f04ed5bb83b349ab394945af9",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "9e9d007348646d8390093a49c53b15ccc8f49a4192ba541c1d01a905ba057bba",
+    "app/dist/live-view.js": "926fab3821558ac1d537400057f32c70313bff0a02a7801ee254c156e8757674",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }

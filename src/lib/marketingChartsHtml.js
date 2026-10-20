@@ -40,6 +40,11 @@ import {
 } from './commenterHistoricalAnalytics.js';
 import { buildCommenterSurvivalCurve } from './commenterSurvivalCurve.js';
 import { judgeNewVsRepeatBasis } from './newVsRepeatBasis.js';
+import {
+  buildSupportersGiftsRows,
+  sectionSupportersGiftsHtml,
+  SUPPORTERS_GIFTS_CSS
+} from './supportersGiftsSection.js';
 import { buildCrossSupporterRanking } from './crossSupporterRanking.js';
 import { diagnoseKeyboardTypes } from './keyboardTypeDiagnostic.js';
 import {
@@ -4673,6 +4678,19 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     officialGiftHistory: officialGiftHistoryForAnalytics,
     giftEvents: giftEventsForAnalytics
   });
+  // v0.1.1709: 章「応援者とギフト」(誰がどんなコメントをして・どんなギフトを出したか)。ギフトは【全件】の台帳から(上の台帳は表示用に200行まで)。
+  const supportersGiftsRows = buildSupportersGiftsRows({
+    comments: currentCommentsForLayer,
+    giftRows: buildMarketingGiftThrowLedger(
+      {
+        giftSubAppHistory: opts.giftSubAppHistory || null,
+        officialGiftHistory: officialGiftHistoryForAnalytics,
+        giftEvents: giftEventsForAnalytics
+      },
+      { maxRows: 1_000_000 }
+    ).rows,
+    broadcasterUserId
+  });
   // v0.1.1672: ギフトの瞬間(公式の公開時刻×このPCのコメント時刻)。入力は既に手元にある=書き出し側は無変更。
   const giftMomentsAnalysis = analyzeGiftMoments({
     history: Array.isArray(opts.giftSubAppHistory?.history) ? opts.giftSubAppHistory.history : [],
@@ -4814,6 +4832,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-gift-flow', label: 'ギフトの流れ' },
     { id: 'mkt-gift-deep', label: 'ギフト深掘り' },
     { id: 'mkt-gift-ledger', label: 'ギフト投げ履歴' },
+    { id: 'mkt-supporters-gifts', label: '応援者とギフト' },
     { id: 'mkt-onboarding', label: '初見さんの手がかり' },
     { id: 'mkt-clip-promo', label: '切り抜き・告知候補' },
     { id: 'mkt-listener-care', label: 'リスナーお返し' },
@@ -4897,6 +4916,10 @@ ${sectionSupporterChikuranBeta(supporterChikuran, maskShare, identiconResolver)}
 ${sectionCrossSupporterRanking(crossSupporterRanking, pastBroadcastsForLayer.length)}
 ${sectionGiftMomentum(giftMomentum, maskShare, identiconResolver)}
 ${sectionGiftThrowLedger(giftThrowLedger, maskShare, identiconResolver)}
+${sectionSupportersGiftsHtml(supportersGiftsRows, {
+  maskShare,
+  renderIdentity: (row) => giftLedgerUserIdentityCells({ userId: row.userId, senderLabel: row.label, senderAvatarUrl: row.avatarUrl }, maskShare, identiconResolver)
+})}
 ${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
 ${idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
 ${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, audienceGap)}
@@ -5014,7 +5037,7 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
 ${buildSectionRevealBootScriptHtml()}
-<style>${CSS_BODY}${BROADCASTER_PROFILE_MARKETING_CSS}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
+<style>${CSS_BODY}${SUPPORTERS_GIFTS_CSS}${BROADCASTER_PROFILE_MARKETING_CSS}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
 </head>
 <body>
 <header class="mkt-header">
