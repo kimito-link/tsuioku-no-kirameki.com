@@ -3418,5 +3418,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1717', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1716 の note と同じ理由)。今回は単体 +3(変異3件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1718', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は削る版: content-entry.js の較正リングの試行間隔 120s→300s・保持件数 appendCalibrationSample の cap=400(定数 CALIBRATION_LOG_KEEP_ITEMS)。読み手は開発モニタの書き出し(devMonitorExport.js)だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1718', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1718', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1717 の note と同じ理由)。今回は配線テストの差し替えのみ。'
   })
 ]);
