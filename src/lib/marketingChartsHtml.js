@@ -45,6 +45,7 @@ import {
   sectionSupportersGiftsHtml,
   SUPPORTERS_GIFTS_CSS
 } from './supportersGiftsSection.js';
+import { sectionMediaKitHtml } from './mediaKitEmbed.js';
 import { buildCrossSupporterRanking } from './crossSupporterRanking.js';
 import { diagnoseKeyboardTypes } from './keyboardTypeDiagnostic.js';
 import {
@@ -4404,6 +4405,7 @@ function buildSectionRevealScriptHtml() {
  *   streamAgeMin?: number,
  *   yukkuriImageDataUrlMap?: Record<string, string>,
  *   eventRanking?: EventRankingReportModel | null,
+ *   mediaKitHtml?: string,
  *   slimForHeavyExport?: boolean
  * }} [opts]
  * @returns {string}
@@ -4833,6 +4835,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-gift-deep', label: 'ギフト深掘り' },
     { id: 'mkt-gift-ledger', label: 'ギフト投げ履歴' },
     { id: 'mkt-supporters-gifts', label: '応援者とギフト' },
+    { id: 'mkt-media-kit-section', label: 'メディアキット' },
     { id: 'mkt-onboarding', label: '初見さんの手がかり' },
     { id: 'mkt-clip-promo', label: '切り抜き・告知候補' },
     { id: 'mkt-listener-care', label: 'リスナーお返し' },
@@ -4920,6 +4923,7 @@ ${sectionSupportersGiftsHtml(supportersGiftsRows, {
   maskShare,
   renderIdentity: (row) => giftLedgerUserIdentityCells({ userId: row.userId, senderLabel: row.label, senderAvatarUrl: row.avatarUrl }, maskShare, identiconResolver)
 })}
+${typeof opts.mediaKitHtml === 'string' ? sectionMediaKitHtml(opts.mediaKitHtml) : ''}
 ${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
 ${idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
 ${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, audienceGap)}

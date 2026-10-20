@@ -29,17 +29,72 @@ export const SUPPORTERS_GIFTS_OPEN_TOP = 10;
 /** 章専用の CSS(マーケの CSS 文字列へ連結する)。 */
 export const SUPPORTERS_GIFTS_CSS = `
 .mkt-sg-list{display:flex;flex-direction:column;gap:6px}
-.mkt-sg{border:1px solid var(--mkt-line,#ddd);border-radius:8px;background:var(--mkt-card,#fff)}
+.mkt-sg{border:1px solid #334155;border-radius:8px;background:#0f172a;color:#e2e8f0}
 .mkt-sg>summary{cursor:pointer;padding:8px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.mkt-sg__rank{font-weight:700;min-width:2.2em}
-.mkt-sg__meta{opacity:.85;font-size:.92em}
+.mkt-sg>summary:hover{background:#162033}
+.mkt-sg a{color:#7dd3fc}
+.mkt-sg__rank{font-weight:700;min-width:2.2em;color:#fbbf24}
+.mkt-sg__meta{color:#aab6c8;font-size:.92em}
 .mkt-sg__body{padding:4px 12px 10px}
-.mkt-sg__body h4{margin:8px 0 4px;font-size:.95em}
-.mkt-sg__table{width:100%;border-collapse:collapse;font-size:.92em}
-.mkt-sg__table th,.mkt-sg__table td{padding:3px 6px;text-align:left;border-bottom:1px solid var(--mkt-line,#eee);vertical-align:top;word-break:break-word}
-.mkt-sg__time{white-space:nowrap;opacity:.8}
-.mkt-sg__more{opacity:.75;font-size:.9em}
+.mkt-sg__body h4{margin:8px 0 4px;font-size:.95em;color:#cbd5e1}
+.mkt-sg__table{width:100%;border-collapse:collapse;font-size:.92em;color:#e2e8f0}
+.mkt-sg__table th{color:#94a3b8;font-weight:600}
+.mkt-sg__table th,.mkt-sg__table td{padding:3px 6px;text-align:left;border-bottom:1px solid #334155;vertical-align:top;word-break:break-word}
+.mkt-sg__time{white-space:nowrap;color:#94a3b8}
+.mkt-sg__more{color:#94a3b8;font-size:.9em}
+.mkt-sg-search{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:.4rem 0 .8rem}
+.mkt-sg-search input{flex:1 1 260px;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.95rem}
+.mkt-sg-search input:focus{outline:2px solid #38bdf8;border-color:#38bdf8}
+.mkt-sg-search__result{color:#aab6c8;font-size:.85rem}
+@media print{.mkt-sg,.mkt-sg__table{background:#fff;color:#111}.mkt-sg__table th,.mkt-sg__table td{border-bottom-color:#ccc}.mkt-sg__meta,.mkt-sg__time,.mkt-sg__more,.mkt-sg__body h4,.mkt-sg__table th{color:#333}.mkt-sg-search{display:none}}
 `;
+
+/**
+ * 検索窓の動き(外部送信なし・入力は端末内で絞り込むだけ)。
+ * 名前・ID・コメント本文・ギフトのアイテムのどれかに含まれる人だけ残し、その人の表では一致した行だけ残す。
+ * 空に戻せば元に戻る(開閉も戻す)。textContent は初回に1度だけ読んで控える(入力のたびにDOMを読まない)。
+ */
+const SUPPORTERS_GIFTS_SEARCH_SCRIPT = `<script>
+(function () {
+  var input = document.getElementById('mktSgSearch');
+  var result = document.getElementById('mktSgSearchResult');
+  var list = document.getElementById('mktSgList');
+  if (!input || !result || !list) return;
+  var items = Array.prototype.slice.call(list.querySelectorAll('details.mkt-sg'));
+  var hays = null;
+  var wasOpen = items.map(function (d) { return d.hasAttribute('open'); });
+  var timer = 0;
+  function norm(s) { return String(s || '').toLowerCase(); }
+  function apply() {
+    var q = norm(input.value).trim();
+    var rows = list.querySelectorAll('tbody tr');
+    if (!q) {
+      items.forEach(function (d, i) { d.hidden = false; if (wasOpen[i]) d.setAttribute('open', ''); else d.removeAttribute('open'); });
+      for (var r = 0; r < rows.length; r++) rows[r].hidden = false;
+      result.textContent = '';
+      return;
+    }
+    if (!hays) hays = items.map(function (d) { return norm(d.textContent); });
+    var hit = 0;
+    items.forEach(function (d, i) {
+      var ok = hays[i].indexOf(q) >= 0;
+      d.hidden = !ok;
+      if (!ok) return;
+      hit++;
+      d.setAttribute('open', '');
+      var sm = d.querySelector('summary');
+      var summaryHit = norm(sm ? sm.textContent : '').indexOf(q) >= 0;
+      var trs = d.querySelectorAll('tbody tr');
+      for (var k = 0; k < trs.length; k++) trs[k].hidden = !summaryHit && norm(trs[k].textContent).indexOf(q) < 0;
+    });
+    result.textContent = hit + '名が一致(全' + items.length + '名)';
+  }
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(apply, 150);
+  });
+})();
+</script>`;
 
 const NUMERIC_UID = /^\d{1,18}$/;
 
@@ -232,11 +287,16 @@ ${head}
     return `<details class="mkt-sg"${i < openTop ? ' open' : ''}><summary><span class="mkt-sg__rank">#${i + 1}</span>${idc.thumbCell} ${idc.accountHtml} ${idc.idHtml} ${meta}</summary><div class="mkt-sg__body">${giftsHtml}${commentsHtml}</div></details>`;
   });
 
+  const searchBox = mask
+    ? ''
+    : `<div class="mkt-sg-search"><input type="search" id="mktSgSearch" placeholder="コメント・名前・ID・ギフトのアイテムを検索" aria-label="応援者とギフトの検索" autocomplete="off"><span class="mkt-sg-search__result" id="mktSgSearchResult" aria-live="polite"></span></div>`;
   return `<section class="mkt-section" id="mkt-supporters-gifts">
 ${head}
 ${note}
-<div class="mkt-sg-list">
+${searchBox}
+<div class="mkt-sg-list" id="mktSgList">
 ${items.join('\n')}
 </div>
+${mask ? '' : SUPPORTERS_GIFTS_SEARCH_SCRIPT}
 </section>`;
 }

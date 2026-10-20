@@ -31,12 +31,13 @@ describe('★メディアキット生成の共有化と統合', () => {
     expect(body).toContain('original.click();');
   });
 
-  it('マーケ生成は、メディアキットを依存注入で作り、統合HTMLを保存する', () => {
+  it('マーケ生成は、メディアキットを依存注入で作り、分析レポートの1章として同じ HTML に入れる(タブ・iframe は使わない)', () => {
     expect(mkt).toContain("from '../lib/mediaKitExport.js'");
-    expect(mkt).toContain("from '../lib/unifiedReportHtml.js'");
+    expect(mkt).not.toContain('unifiedReportHtml');
     expect(mkt).toContain('maskSupporters: maskShareLabels');
-    expect(mkt).toContain('new Blob([unifiedHtml]');
-    expect(mkt).not.toContain('new Blob([html]');
+    const call = mkt.slice(mkt.indexOf('const html = buildMarketingDashboardHtml(report, {'));
+    expect(call.slice(0, 200)).toContain('mediaKitHtml,');
+    expect(mkt).toContain('new Blob([html]');
   });
 
   it('メディアキットの生成が失敗・打ち切りでも分析レポートは必ず出す(fail-soft)', () => {
