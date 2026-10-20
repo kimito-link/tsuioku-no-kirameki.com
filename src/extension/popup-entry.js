@@ -19712,17 +19712,6 @@ async function initPopup() {
     if (original && !original.disabled) original.click();
   });
 
-  // v0.1.1712: メディアキットは分析レポートと1つの HTML(タブ)になった。ここは同じ保存フローへ案内するだけ。
-  $('exportMediaKitBtn')?.addEventListener('click', () => {
-    const original = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
-    if (original && !original.disabled) {
-      original.click();
-      return;
-    }
-    const postStatus = /** @type {HTMLElement|null} */ ($('postStatus'));
-    if (postStatus) postStatus.textContent = 'ニコ生の配信ページを開いてから押してください(分析レポートとメディアキットが1つのHTMLで保存されます)';
-  });
-
   $('devMonitorExportMarketingBtn')?.addEventListener('click', async () => {
     const prm = lastDevMonitorPanelParams;
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
