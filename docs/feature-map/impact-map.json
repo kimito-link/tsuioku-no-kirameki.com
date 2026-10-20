@@ -6708,6 +6708,16 @@
       ]
     },
     {
+      "file": "src/lib/mediaKitEmbed.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/memoryPressureProbe.js",
       "featureCount": 1,
       "features": [
