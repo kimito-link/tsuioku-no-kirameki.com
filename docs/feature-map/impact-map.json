@@ -8548,6 +8548,16 @@
       ]
     },
     {
+      "file": "src/lib/supportersGiftsSection.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/supportersParity.js",
       "featureCount": 1,
       "features": [
