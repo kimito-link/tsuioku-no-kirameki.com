@@ -54,6 +54,7 @@ import { buildChannelSwitchDiagLines } from './channelSwitchDiag.js';
 //   (extras 12秒間引き)をAI共有本文にも併記。
 import { buildHighlightLedgerDiagLines } from './highlightLedger.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
+import { formatSupportersParityLine } from './supportersParity.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
 // v0.1.1026: アイコン画像(usericon)のロード失敗を状態速報で名指し(画像が壊れて見える理由=CDN側404を説明)。
@@ -244,6 +245,9 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
         nowMs: Date.now()
       });
       lines.push(formatParityVerdictLine(parity));
+      // v0.1.1705: 応援者ランキングの【値】の突き合わせ(popup鏡 vs レポート集計)。観測のみ・取れなければ保留の1行。
+      const supportersLine = formatSupportersParityLine(jsonBlob && typeof jsonBlob === 'object' ? /** @type {any} */ (jsonBlob).supportersParity : null);
+      if (supportersLine) lines.push(supportersLine);
       lines.push('');
       // v0.1.1015: ②応援プレビューの画面最上部に「パリティ・バッジ」を色付きで出すための構造化結果を
       //   jsonBlob に1個だけ相乗りさせる(新規 storage キーを増やさない=②③は statusReport と同じ経路で読む)。

@@ -8528,6 +8528,16 @@
       ]
     },
     {
+      "file": "src/lib/supportersParity.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/supportGrowthInsights.js",
       "featureCount": 1,
       "features": [

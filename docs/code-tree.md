@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 965 件
+## ⚠️ 役割コメントが無いソース 8 / 966 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2088)
+- 📁 **src/** (2091)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1847)
+  - 📁 **lib/** (1850)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2701,6 +2701,9 @@
     - `supporterRowToPersonTile.integration.test.js`
     - `supporterRowToPersonTile.js` — 応援者ランキングの行(SupporterRow)を、本物の人物タイル(buildPersonTileEl)が要求する
     - `supporterRowToPersonTile.test.js`
+    - `supportersParity.js` — popup の応援ランキング(鏡)と、診断のレポート集計の【上位の値】を突き合わせる純関数(2026-10-20)。
+    - `supportersParity.test.js`
+    - `supportersParity.wiring.test.js`
     - `swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
     - `swBackfillStaging.test.js`
     - `swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
