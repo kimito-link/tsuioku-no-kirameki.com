@@ -199,3 +199,33 @@ describe('restoreTimelineItemsForHtml — 鏡rows→TimelineItem[](③応援タ�
     expect(gifts.reduce((s, g) => s + g.point, 0)).toBe(300);
   });
 });
+
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { buildCommentTimelineMirrorSnapshot as _build } from './commentTimelineMirror.js';
+import { tickerArgsFromMirrorRow } from './pickTickerHighlight.js';
+
+describe('★v0.1.1717 匿名 identicon を鏡に載せない(容量の95%)', () => {
+  const uid = 'a:bPDpXW2hcBVE_CAX';
+  const mk = (avatarUrl, userId = uid) => ({ at: 1000, text: 'こんにちは', userId, nickname: '', avatarUrl });
+  it('userId から作れる identicon は省く(鏡が大きく減る)', () => {
+    const id = anonymousIdenticonDataUrl(uid);
+    expect(id.startsWith('data:image/svg+xml')).toBe(true);
+    const full = _build({ liveId: 'lv1', comments: [mk(id)], capturedAt: 1, resolveName: () => '匿名', resolveAvatar: (c) => c.avatarUrl });
+    expect(full.rows[0].avatarUrl).toBe('');
+    expect(JSON.stringify(full).length).toBeLessThan(id.length / 2);
+  });
+  it('https の顔・別の data: 画像(合成した顔など)・userId 無しは残す', () => {
+    const keep = (avatarUrl, userId) => _build({ liveId: 'lv1', comments: [mk(avatarUrl, userId)], capturedAt: 1, resolveName: () => 'x', resolveAvatar: (c) => c.avatarUrl }).rows[0].avatarUrl;
+    expect(keep('https://secure-dcdn.cdn.nimg.jp/a.jpg', uid)).toBe('https://secure-dcdn.cdn.nimg.jp/a.jpg');
+    expect(keep('data:image/png;base64,AAAA', uid)).toBe('data:image/png;base64,AAAA');
+    expect(keep(anonymousIdenticonDataUrl(uid), '')).toBe(anonymousIdenticonDataUrl(uid));
+    expect(keep(anonymousIdenticonDataUrl('a:other'), uid)).toBe(anonymousIdenticonDataUrl('a:other'));
+  });
+  it('ティッカーは顔が空の匿名 userId なら、同じ identicon を userId から作る(見た目は従来どおり)', () => {
+    const a = tickerArgsFromMirrorRow({ name: 'x', text: 't', avatarUrl: '', userId: uid });
+    expect(a.avatarSrc).toBe(anonymousIdenticonDataUrl(uid));
+    expect(tickerArgsFromMirrorRow({ name: 'x', text: 't', avatarUrl: 'https://e/a.jpg', userId: uid }).avatarSrc).toBe('https://e/a.jpg');
+    expect(tickerArgsFromMirrorRow({ name: 'x', text: 't', avatarUrl: '', userId: '4046119' }).avatarSrc).toBe('');
+    expect(tickerArgsFromMirrorRow({ name: 'x', text: 't', avatarUrl: '' }).avatarSrc).toBe('');
+  });
+});
