@@ -219,6 +219,7 @@ import {
 } from '../lib/statusFormat.js';
 import { backfillLiveThroughputLine } from '../lib/backfillRinkuNarration.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
+import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/liveEndedFlag.js';
 import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
@@ -3515,8 +3516,9 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     viewerCountFromDom: snap?.viewerCountFromDom,
     panelWatchCount: s?.watchCount
   });
-  const adPoints = numOrNull(snap?.officialAdPointsNdgr) ?? numOrNull(s?.adPoints);
-  const giftPoints = numOrNull(snap?.officialGiftPointsNdgr) ?? numOrNull(s?.giftPoints);
+  // v0.1.1720: pt は DOM 優先・NDGR fallback(popup と共有・正本 resolveOfficialPoints.js)
+  const adPoints = resolveOfficialPoints({ domValue: s?.adPoints, ndgrValue: snap?.officialAdPointsNdgr });
+  const giftPoints = resolveOfficialPoints({ domValue: s?.giftPoints, ndgrValue: snap?.officialGiftPointsNdgr });
   // 経過時間は snapshot.streamAgeMin(分)→秒に変換、無ければ panel_summary.elapsedSec。
   const elapsedSecLive =
     snap && typeof snap.streamAgeMin === 'number' && Number.isFinite(snap.streamAgeMin)
