@@ -27,12 +27,13 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 968 件
+## ⚠️ 役割コメントが無いソース 9 / 969 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
+- `src/lib/mediaKitExport.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 - `src/lib/venueStoryDiagMirrorPanel.js`
@@ -863,7 +864,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2100)
+- 📁 **src/** (2103)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1149,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1859)
+  - 📁 **lib/** (1862)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2085,6 +2086,9 @@
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
     - `marketingSupportParticipationCounts.test.js`
+    - `mediaKitExport.js` — ⚠️ 役割コメント無し
+    - `mediaKitExport.test.js`
+    - `mediaKitExportWiring.wiring.test.js`
     - `mediaKitHtml.js` — 追憶メディアキットの共有用 single-file HTML。
     - `mediaKitHtml.test.js`
     - `mediaKitStats.js` — 追憶メディアキット向けの期間集計。

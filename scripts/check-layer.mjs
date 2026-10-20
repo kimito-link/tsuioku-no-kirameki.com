@@ -122,7 +122,7 @@ export const IMPURE_BASELINE = new Set([
   'supporterRankingDom.js', 'venueDomCensus.js', 'videoCapture.js',
   'watchCelebrationOverlay.js',
   // ── HTML を組み立てて window/document を見る箱 ────────────────
-  'marketingChartsHtml.js', 'mediaKitHtml.js',
+  'marketingChartsHtml.js', 'mediaKitExport.js', 'mediaKitHtml.js',
   // ── 保存(IndexedDB / storage)を持つ箱 ───────────────────────
   'broadcastSessionSummaryDb.js', 'broadcastSessionSummaryFlush.js', 'commentDb.js',
   'customSoundStore.js', 'diagnosticRingStore.js', 'globalBackfillQueue.js',
@@ -160,7 +160,7 @@ export const IMPURE_REASONS = /** @type {Record<string,{group:string,why:string}
     'supporterRankingDom.js', 'venueDomCensus.js', 'videoCapture.js', 'watchCelebrationOverlay.js'
   ]);
   g('HTML を作る', '出力先が複数(レポート / プレビュー)なので、組み立てを1箇所に置く。', [
-    'marketingChartsHtml.js', 'mediaKitHtml.js'
+    'marketingChartsHtml.js', 'mediaKitExport.js', 'mediaKitHtml.js'
   ]);
   g('保存する', '書き手が複数コンテキスト(content / offscreen / SW)にまたがる。正本を1つにするため。', [
     'broadcastSessionSummaryDb.js', 'broadcastSessionSummaryFlush.js', 'commentDb.js',
