@@ -314,7 +314,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 265</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 266</summary>
 
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
@@ -518,6 +518,7 @@
 - `src/lib/suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。
 - `src/lib/supportCelebration.js` — 配信中のマイルストーン演出（コメント件数・イベント順位 UP・ギフト件数）の判定。
 - `src/lib/supporterRowToPersonTile.js` — 応援者ランキングの行(SupporterRow)を、本物の人物タイル(buildPersonTileEl)が要求する
+- `src/lib/supportersGiftsSection.js` — マーケレポートの章「応援者とギフト(誰がどんなコメントをして・どんなギフトを出したか)」(2026-10-20)。
 - `src/lib/supportGridDisplayTier.js` — 応援ユーザーの「表示の立ち位置」（LP モック・ユーザーレーン並びの共通ルール）
 - `src/lib/supportGrowthAvatarLoad.js` — 応援グリッド等のリモート avatar img の読み込みガード。
 - `src/lib/supportGrowthTileSrc.js` — 応援グリッド用タイル画像 URL の優先解決（純関数）
@@ -1169,7 +1170,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (9版)
+### 💾 記録件数 (10版)
+- `v0.1.1709` 2026-10-20 — マーケレポートに『応援者とギフト』の章を追加
 - `v0.1.1707` 2026-10-20 — HTMLレポートのユーザー別件数を全件で数える
 - `v0.1.1706` 2026-10-20 — 件数カードの同じ値の書き直しを止める
 - `v0.1.1705` 2026-10-20 — 応援者ランキングの値を診断で突き合わせる
@@ -1185,6 +1187,9 @@
 - `v0.1.1706` 2026-10-20 — 件数カードの同じ値の書き直しを止める
 - `v0.1.1705` 2026-10-20 — 応援者ランキングの値を診断で突き合わせる
 - `v0.1.1692` 2026-10-17 — 応援レーンの段で、同じ人のタイルを作り直さない
+
+### 🎁 ギフト (1版)
+- `v0.1.1709` 2026-10-20 — マーケレポートに『応援者とギフト』の章を追加
 
 ### 🪟 応援レーン・タイル (5版)
 - `v0.1.1705` 2026-10-20 — 応援者ランキングの値を診断で突き合わせる
@@ -1218,6 +1223,3 @@
 
 ### 🔁 自己検証・規律 (1版)
 - `v0.1.1704` 2026-10-20 — 見出しの記録件数をサマリ一本にする
-
-### その他 (1版)
-- `v0.1.1689` 2026-10-17 — 応援マスが増えても既存のマスを作り直さない
