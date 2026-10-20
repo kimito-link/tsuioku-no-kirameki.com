@@ -3264,5 +3264,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1706', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1705 の note と同じ理由)。今回は単体 +5・配線 +2(変異4件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1707', metric: 'bundle-kb', value: 1480,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は直す版: htmlReportDocument.js の heavy 時の集計から sampleMaxEntries(4000件サンプル)を外し、未使用になった定数 HTML_REPORT_AGGREGATE_SAMPLE_MAX を削除(行数は減る向き)。'
+  }),
+  Object.freeze({
+    version: '0.1.1707', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1707', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1706 の note と同じ理由)。今回は配線 +3(実件数と合計が一致する性質テストを含む・修正前は赤を確認)。'
   })
 ]);

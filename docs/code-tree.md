@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2094)
+- 📁 **src/** (2095)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1853)
+  - 📁 **lib/** (1854)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1796,6 +1796,7 @@
     - `htmlReportCommenterFollowSection.test.js`
     - `htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
     - `htmlReportConceptGuide.test.js`
+    - `htmlReportFullCount.wiring.test.js`
     - `htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
     - `htmlText.test.js`
     - `hugeKeyWriteReductionWiring.wiring.test.js`

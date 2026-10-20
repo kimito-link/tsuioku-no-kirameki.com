@@ -74,7 +74,6 @@ import { buildReportCommentsCsv } from '../../../lib/reportCommentsCsv.js';
 import {
   buildReportCommentsTableSectionHtml,
   HTML_REPORT_AGGREGATE_ROOM_CAP,
-  HTML_REPORT_AGGREGATE_SAMPLE_MAX,
   HTML_REPORT_HEAVY_COMMENT_THRESHOLD
 } from '../../../lib/reportCommentsTableSection.js';
 import { escapeHtml, escapeAttr } from '../../../lib/htmlEscape.js';
@@ -614,8 +613,8 @@ export async function buildHtmlReportDocument(
             requireText: true,
             trackCharTotals: true,
             maxRooms: HTML_REPORT_AGGREGATE_ROOM_CAP,
-            sortByCount: true,
-            sampleMaxEntries: HTML_REPORT_AGGREGATE_SAMPLE_MAX
+            sortByCount: true
+            // v0.1.1707: 集計の入力は【全件】(旧: 4000件の均等サンプル=件数・字数・賞が縮んでいた)。maxRooms は表示のための切り。
           }
         : { requireText: true }
     ),
