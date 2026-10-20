@@ -16066,13 +16066,17 @@ async function maybeFetchCommenterFollowingListBatchOnce() {
     _commenterFollowingListFetchLastAt = now;
 
     const commentsKey = commentsStorageKey(lid);
+    // v0.1.1699: 本体キー(nls_comments_<lv>)の直読みをやめ、表示経路と同じ readChunkedComments(チャンク優先・
+    //   無ければ main)で読む。v0.1.509 以降の配信では本体キーは popup/content の書き戻しが作った【複製】で、
+    //   その書き戻しを止める(設計 docs/handoff/storage-writeback-reduction-DESIGN-2026-10-20.md V2/V3)と
+    //   直読みだけが「コメント0件」で黙って死ぬ。先にここを移す(隣の2関数は v0.1.807 で移行済み)。
     const bag = await chrome.storage.local.get([
-      commentsKey,
       KEY_USER_COMMENT_PROFILE_CACHE,
       KEY_COMMENTER_FOLLOW_CACHE,
       KEY_COMMENTER_FOLLOWING_LIST_CACHE
     ]);
-    const comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    const chunkRead = await readChunkedComments(lid, commentsKey, chunkGetMany);
+    const comments = Array.isArray(chunkRead?.rows) ? chunkRead.rows : [];
     const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
     const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
     const followingListMap = normalizeFollowingListMap(bag[KEY_COMMENTER_FOLLOWING_LIST_CACHE]);

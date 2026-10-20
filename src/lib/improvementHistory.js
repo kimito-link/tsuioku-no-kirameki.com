@@ -3152,5 +3152,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1698', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1697 の note と同じ理由)。今回は単体 +3・配線の書き換え1。効果は実機の census(status の稼働%)で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1699', metric: 'bundle-kb', value: 1474,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は読み先の移行版: content-entry.js の maybeFetchCommenterFollowingListBatchOnce が本体キーを直読みするのをやめ readChunkedComments へ(隣の2関数と同じ型・数行の置換)。バンドル増減は誤差。通知量を削るのは次の版(popup の書き戻しガード)。'
+  }),
+  Object.freeze({
+    version: '0.1.1699', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1699', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1698 の note と同じ理由)。今回は配線テスト +4(新規 followingListReadsChunks.wiring.test.js)。'
   })
 ]);
