@@ -37,7 +37,8 @@ describe('popup-entry: 巨大なキーの読み直しをやめる(記憶)', () =
   it('★deferred hydrate と、空のときのフォールバック2か所は、記憶経由(readUserCommentProfileCacheRaw)で読む', () => {
     expect(popup).toContain('const profRaw = await readUserCommentProfileCacheRaw(() =>');
     expect(popup).toContain('timelineProfileMap = normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());');
-    expect(popup).toContain('supporterProfileMap = normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());');
+    // v0.1.1711: メディアキットの応援者辞書は resolveProfileMap(注入)経由で、やはり記憶経由で読む
+    expect(popup).toContain('return normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());');
   });
   it('★readUserCommentProfileCacheRaw: 新しければ get しない・読んだら記憶・記憶のほうが新しければそちらを返す', () => {
     const at = popup.indexOf('async function readUserCommentProfileCacheRaw(readBag) {');

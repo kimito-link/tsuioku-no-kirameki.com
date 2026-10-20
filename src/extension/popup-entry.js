@@ -870,13 +870,7 @@ import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
-import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
-import {
-  buildMediaKitStats,
-  buildMediaKitSupporters,
-  MEDIA_KIT_COMMENT_LIVE_CAP
-} from '../lib/mediaKitStats.js';
-import { buildMediaKitHtml } from '../lib/mediaKitHtml.js';
+import { buildMediaKitDocument } from '../lib/mediaKitExport.js';
 import {
   buildLastBroadcastReviewView,
   formatLastBroadcastIndicator,
@@ -17665,131 +17659,26 @@ async function downloadBlobViaChromeDownloads(blob, filename) {
   exportBlobRevokeQueue.enqueue(blobUrl);
 }
 
-const MEDIA_KIT_LIVE_LIMIT = 60;
-
 /**
- * broadcast summary IDB と配信単位の軽量 storage からメディアキットを作る。
- * PR4(応援者が主役): 応援者セクション用にギフトイベント(全期間lv)と、直近最大12配信の
- * コメント(readAllCommentsForLive・15秒で打ち切り)も集計する。ニコ生上で公開されている
- * 応援情報(OSINT)の集計であり、堂々と表彰として載せる方針(ユーザー指示 2026-06-10)。
+ * メディアキットを作ってダウンロードする。生成本体は lib/mediaKitExport.js(依存はここで注入)。
  */
 async function downloadMediaKitHtml() {
-  const nowMs = Date.now();
-  /** @type {IDBDatabase|undefined} */
-  let db;
-  /** @type {string[]} */
-  let liveIds = [];
-  /** @type {unknown[]} */
-  let summaryRows = [];
-  try {
-    db = await openBroadcastSessionSummaryDb();
-    liveIds = await listRecentUniqueBroadcastLiveIds(db, {
-      limit: MEDIA_KIT_LIVE_LIMIT
-    });
-    const rowsByLive = await Promise.all(
-      liveIds.map((liveId) =>
-        listBroadcastSessionSummaryForLive(db, liveId, 200).catch(() => [])
-      )
-    );
-    summaryRows = rowsByLive.flat();
-  } finally {
-    try {
-      db?.close();
-    } catch {
-      /* no-op */
+  const { html, filename, liveCount } = await buildMediaKitDocument({
+    storageGet: (keys) => chrome.storage.local.get(keys),
+    readAllCommentsForLive,
+    withTimeout,
+    resolveProfileMap: async () => {
+      if (popupUserCommentProfileMap && Object.keys(popupUserCommentProfileMap).length) {
+        return popupUserCommentProfileMap;
+      }
+      return normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());
     }
-  }
-
-  const storageKeys = liveIds.flatMap((liveId) => [
-    broadcasterProfileStorageKey(liveId),
-    `nls_gift_events_${liveId}`
-  ]);
-  const bag = storageKeys.length
-    ? await chrome.storage.local.get(storageKeys)
-    : {};
-  const profileSnapshots = liveIds
-    .map((liveId) => {
-      const key = broadcasterProfileStorageKey(liveId);
-      const value = bag[key];
-      return value && typeof value === 'object'
-        ? { ...value, liveId }
-        : null;
-    })
-    .filter(Boolean);
-  /** @type {Record<string, unknown[]>} */
-  const giftEventsByLive = {};
-  for (const liveId of liveIds) {
-    const value = bag[`nls_gift_events_${liveId}`];
-    if (Array.isArray(value)) giftEventsByLive[liveId] = value;
-  }
-
-  const stats = buildMediaKitStats({
-    summaryRows,
-    profileSnapshots,
-    giftEventsByLive,
-    nowMs,
-    windowsDays: [30, 60, 90]
   });
-
-  // PR4: 応援者セクション。コメント全件読みは直近12配信のみ・15秒で打ち切り(取れた分で出す)。
-  /** @type {Record<string, unknown[]>} */
-  const commentRowsByLive = {};
-  try {
-    const commentLives = liveIds.slice(0, MEDIA_KIT_COMMENT_LIVE_CAP);
-    await withTimeout(
-      (async () => {
-        const arrays = await Promise.all(
-          commentLives.map((lid) => readAllCommentsForLive(lid).catch(() => []))
-        );
-        commentLives.forEach((lid, index) => {
-          commentRowsByLive[lid] = Array.isArray(arrays[index]) ? arrays[index] : [];
-        });
-      })(),
-      15_000,
-      'media_kit_supporter_scan_timeout'
-    );
-  } catch {
-    /* 打ち切り: 取れた配信ぶんだけで表彰する */
-  }
-  let supporterProfileMap = popupUserCommentProfileMap;
-  if (!supporterProfileMap || !Object.keys(supporterProfileMap).length) {
-    try {
-      supporterProfileMap = normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());
-    } catch {
-      supporterProfileMap = {};
-    }
-  }
-  const supporters = buildMediaKitSupporters({
-    liveIds,
-    giftEventsByLive,
-    commentRowsByLive,
-    profileMap: supporterProfileMap
-  });
-
-  // v0.1.682: 配信者アイコンの fetch→data URL 化を廃止。拡張に host permission の無い
-  //   CDN への fetch は CORS で拒否され、chrome://extensions のエラーログに残っていた
-  //   (実機報告)。応援者サムネと同じ「HTML 側が img で直接参照」(CSP で当該CDNのみ許可)に
-  //   統一する=fetch ゼロでエラーも出ない。manifest 権限は触らない(CWS 審査中)。
-  const html = buildMediaKitHtml({ ...stats, supporters }, {
-    generatedAtMs: nowMs,
-    sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
-    sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT
-  });
-  const date = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date(nowMs));
-  const filename = `${date}_tsuioku-media-kit.html`;
   await downloadBlobViaChromeDownloads(
     new Blob([html], { type: 'text/html;charset=utf-8' }),
     filename
   );
-  return {
-    filename,
-    liveCount: stats.windows.find((window) => window.days === 90)?.liveCount || 0
-  };
+  return { filename, liveCount };
 }
 
 /**
