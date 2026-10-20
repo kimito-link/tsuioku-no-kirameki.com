@@ -414,7 +414,8 @@ export default [
     // v0.1.1638: 応援コメント100件でゆっくり3人がお祝いするとき、会場を開いている間は中継の降りものシャワーを止める配線(+7行)。判定は lib(charaLiveCheerTrigger.js の shouldSkipShowerForCheer)。
     // v0.1.1665: 広告の「気づいた時刻」の記録(+34行・判定は lib の adObservationLog.js・大半は【なぜ】のコメント)。
     // v0.1.1694: 全ページへ配られる巨大キーの書き込みを減らす配線(+7行)。較正リングの試行間隔(25s→120s)と fastDiag 全文の間引き(判定は lib の fastDiagFullGate.js)。
-    rules: { 'max-lines': ['error', { max: 19508, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1699: フォロー先一覧の読み先を本体キーの直読みから readChunkedComments へ(+4行・すべて【なぜ】のコメント)。本体キーの書き戻し停止(次版)で直読みだけが黙って死ぬのを先に防ぐ。ロジックは既存の readChunkedComments。
+    rules: { 'max-lines': ['error', { max: 19512, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
