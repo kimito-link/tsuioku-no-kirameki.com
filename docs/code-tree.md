@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2099)
+- 📁 **src/** (2100)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1858)
+  - 📁 **lib/** (1859)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2753,6 +2753,7 @@
     - `topSupportRankStripStableKey.test.js`
     - `topSupportersMirror.js` — 応援者ランキング(🥇🥈🥉)鏡の純関数(v0.1.1024)。
     - `topSupportersMirror.test.js`
+    - `topSupportersMirrorProvisional.wiring.test.js`
     - `trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
     - `trackedImports.test.js`
     - `trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
