@@ -83,6 +83,7 @@ import {
   recordCommentSubmitTotal } from '../lib/commentSubmitProfiling.js';
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
 import { orderRankedRooms } from '../lib/rankedRoomsOrder.js';
+import { pickCountToShow } from '../lib/pickCountToShow.js';
 import { noteRankOrder } from '../lib/rankOrderMeterBoot.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
@@ -15941,10 +15942,8 @@ async function refresh() {
     // index/summary total が取れている場合は、それを件数カードの正本として扱う。
     const hasReliableFullArray =
       commentReadState === 'storage_ok' && !commentsChunked && !idbMode;
-    const countToShow =
-      summaryRecordedCount != null
-        ? Math.max(summaryRecordedCount, displayEntriesBase.length)
-        : displayEntriesBase.length;
+    // v0.1.1704: 見出し件数の正本はサマリ。表示用配列の長さは混ぜない(count-simplify 第2・過大値の居座り防止)。
+    const countToShow = pickCountToShow(summaryRecordedCount, displayEntriesBase.length);
     const officialChunkTotalForGate =
       currentChunkTotal != null
         ? currentChunkTotal
