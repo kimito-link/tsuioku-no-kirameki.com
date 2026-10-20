@@ -157,6 +157,33 @@ describe('応援者セクション(PR4)', () => {
     expect(html).toMatch(/匿名\d{1,3}/);
     expect(html).toContain('常連さん');
   });
+  it('maskSupporters: 名前・サムネ・ユーザーリンクを出さず「応援者N」にする(件数は残す)', () => {
+    const html = buildMediaKitHtml(
+      {
+        ...baseStats,
+        supporters: {
+          giftTop: [{ userId: '4046119', name: 'たろう', points: 700, count: 2 }],
+          commentTop: [{ userId: '777', name: 'はなこ', count: 10, liveCount: 3 }],
+          regulars: null
+        }
+      },
+      { maskSupporters: true }
+    );
+    expect(html).toContain('応援者1');
+    expect(html).toContain('700 pt');
+    expect(html).not.toContain('たろう');
+    expect(html).not.toContain('はなこ');
+    expect(html).not.toContain('usericon/s/404/4046119.jpg');
+    expect(html).not.toContain('https://www.nicovideo.jp/user/4046119');
+    expect(html).not.toContain('https://www.nicovideo.jp/user/777');
+  });
+  it('maskSupporters 既定(未指定)は従来どおり名前を出す', () => {
+    const html = buildMediaKitHtml({
+      ...baseStats,
+      supporters: { giftTop: [{ userId: '4046119', name: 'たろう', points: 1, count: 1 }], commentTop: [], regulars: null }
+    });
+    expect(html).toContain('たろう');
+  });
   it('supporters が無ければセクションを出さない(後方互換)', () => {
     const html = buildMediaKitHtml(baseStats);
     expect(html).not.toContain('この配信を支えた応援者たち');

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 969 件
+## ⚠️ 役割コメントが無いソース 9 / 970 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -864,7 +864,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2103)
+- 📁 **src/** (2105)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1149,7 +1149,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1862)
+  - 📁 **lib/** (1864)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2763,6 +2763,8 @@
     - `trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
     - `trimMap.test.js`
     - `uiUxRoadmapTdd.test.js`
+    - `unifiedReportHtml.js` — 分析レポート(マーケ)とメディアキットを、1つの HTML にまとめる(CSS だけのタブ・script 無し)。
+    - `unifiedReportHtml.test.js`
     - `unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `unknownVsAbsent.test.js`
     - `userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、

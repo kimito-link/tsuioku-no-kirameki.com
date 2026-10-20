@@ -870,7 +870,6 @@ import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
-import { buildMediaKitDocument } from '../lib/mediaKitExport.js';
 import {
   buildLastBroadcastReviewView,
   formatLastBroadcastIndicator,
@@ -17660,28 +17659,6 @@ async function downloadBlobViaChromeDownloads(blob, filename) {
 }
 
 /**
- * メディアキットを作ってダウンロードする。生成本体は lib/mediaKitExport.js(依存はここで注入)。
- */
-async function downloadMediaKitHtml() {
-  const { html, filename, liveCount } = await buildMediaKitDocument({
-    storageGet: (keys) => chrome.storage.local.get(keys),
-    readAllCommentsForLive,
-    withTimeout,
-    resolveProfileMap: async () => {
-      if (popupUserCommentProfileMap && Object.keys(popupUserCommentProfileMap).length) {
-        return popupUserCommentProfileMap;
-      }
-      return normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());
-    }
-  });
-  await downloadBlobViaChromeDownloads(
-    new Blob([html], { type: 'text/html;charset=utf-8' }),
-    filename
-  );
-  return { filename, liveCount };
-}
-
-/**
  * popup / inline の再描画スケジューラ（バグ #4 "コメント数がスムーズに撮れてない" の修正）。
  *
  * 旧実装は storage.onChanged のたびに 550ms のデバウンスを張り直し、2200ms の
@@ -19735,43 +19712,15 @@ async function initPopup() {
     if (original && !original.disabled) original.click();
   });
 
-  $('exportMediaKitBtn')?.addEventListener('click', async () => {
-    const btn = /** @type {HTMLButtonElement|null} */ ($('exportMediaKitBtn'));
-    const postStatus = /** @type {HTMLElement|null} */ ($('postStatus'));
-    if (!btn || btn.disabled) return;
-    btn.disabled = true;
-    btn.setAttribute('aria-busy', 'true');
-    showExportWaitPanel('marketing');
-    setExportWaitTechStatus('メディアキット用の過去配信データを集計中…');
-    if (postStatus) postStatus.textContent = 'メディアキットを準備しています…';
-    try {
-      await yieldToBrowserPaint();
-      const result = await downloadMediaKitHtml();
-      const done = `メディアキットを保存しました（過去90日 ${result.liveCount}枠）`;
-      setExportWaitTechStatus(done);
-      if (postStatus) postStatus.textContent = done;
-      // v0.1.806: 保存成功の直後に完了音声(完成しました→ゆっくりみていってね)。
-      playReportCompleteVoiceSequence();
-    } catch (error) {
-      if (isExtensionContextInvalidatedError(error)) {
-        renderExtensionContextBanner(true);
-        if (postStatus) {
-          postStatus.textContent =
-            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
-        }
-      } else {
-        const reason = String(error?.message || error || '').trim();
-        if (postStatus) {
-          postStatus.textContent = reason
-            ? `メディアキットの保存に失敗しました: ${reason.slice(0, 100)}`
-            : 'メディアキットの保存に失敗しました';
-        }
-      }
-    } finally {
-      hideExportWaitPanel();
-      btn.disabled = false;
-      btn.removeAttribute('aria-busy');
+  // v0.1.1712: メディアキットは分析レポートと1つの HTML(タブ)になった。ここは同じ保存フローへ案内するだけ。
+  $('exportMediaKitBtn')?.addEventListener('click', () => {
+    const original = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
+    if (original && !original.disabled) {
+      original.click();
+      return;
     }
+    const postStatus = /** @type {HTMLElement|null} */ ($('postStatus'));
+    if (postStatus) postStatus.textContent = 'ニコ生の配信ページを開いてから押してください(分析レポートとメディアキットが1つのHTMLで保存されます)';
   });
 
   $('devMonitorExportMarketingBtn')?.addEventListener('click', async () => {
