@@ -817,6 +817,8 @@
 | `src/lib/rankedRoomsOrder.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/rankingPatrolMessages.js` | 1 | 状態速報ページ |
 | `src/lib/rankingVisibleRetryDecision.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/rankOrderMeter.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/rankOrderMeterBoot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/recentBroadcastLiveIds.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/recordingStallWatchdog.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/recordRate.js` | 1 | ポップアップ(応援レーン) |
