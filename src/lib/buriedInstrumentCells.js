@@ -27,6 +27,8 @@
  * @module buriedInstrumentCells
  */
 
+import { DOM_NODES_WARN, DOM_NODES_BAD } from './memoryPressureProbe.js';
+
 /** @param {unknown} v @returns {number|null} */
 function num(v) {
   const n = Number(v);
@@ -238,7 +240,8 @@ export function buildBuriedCells(data) {
       : cell(
         'dom-nodes', '画面の部品数',
         mem.domLevel === 'bad' ? 'bad' : mem.domLevel === 'warn' ? 'warn' : 'ok',
-        `${dom}個${mem.domLevel === 'ok' ? '' : '(推奨1,500)'}`
+        // v0.1.1716: 「推奨1,500」は廃止済みの基準(Lighthouse dom-size は13.0で廃止)。実際に判定に使う閾値を出す。
+        `${dom}個${mem.domLevel === 'bad' ? `(${DOM_NODES_BAD.toLocaleString('en-US')}超)` : mem.domLevel === 'warn' ? `(${DOM_NODES_WARN.toLocaleString('en-US')}超)` : ''}`
       ));
   }
 

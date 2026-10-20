@@ -341,6 +341,7 @@
 | `src/lib/liveChannelSwitch.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveLaneBuckets.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/liveRankingView.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
+| `src/lib/memoryPressureProbe.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/metricConfidence.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/milestoneEffectDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/milestoneEffectDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -718,7 +719,6 @@
 | `src/lib/mcpBridge/schema.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/mcpBridge/validateLiveMcpSnapshot.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/mediaKitEmbed.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/memoryPressureProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/mergeGiftHistoryThrows.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mergeTailRowsIntoDisplay.js` | 1 | ポップアップ(応援レーン) |
