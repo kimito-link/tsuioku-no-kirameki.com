@@ -8,6 +8,7 @@ import '../lib/flickerMeterBoot.js';
 import '../lib/bootTimelineBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
+import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
 import {
   buildYukkuriImageDataUrlMap,
@@ -9432,14 +9433,11 @@ function paintOfficialNicoStatsStrip(snapshot) {
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
 
-  const adPtsNum =
-    typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
-      ? ps.adPoints
-      : typeof snapshot?.officialAdPointsNdgr === 'number' &&
-          Number.isFinite(snapshot.officialAdPointsNdgr) &&
-          snapshot.officialAdPointsNdgr >= 0
-        ? snapshot.officialAdPointsNdgr
-        : null;
+  // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+  const adPtsNum = resolveOfficialPoints({
+    domValue: ps?.adPoints,
+    ndgrValue: snapshot?.officialAdPointsNdgr
+  });
   trackAdPointsForCelebration(adPtsNum);
 }
 
@@ -11847,14 +11845,11 @@ async function refreshNorthStarAdRankingLane(liveId) {
       if (Number.isFinite(c) && c > 0) rankingSum += c;
     }
     const ps = bundle?.programStats || null;
-    const programAdPts =
-      typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
-        ? ps.adPoints
-        : typeof snap?.officialAdPointsNdgr === 'number' &&
-            Number.isFinite(snap.officialAdPointsNdgr) &&
-            snap.officialAdPointsNdgr >= 0
-          ? snap.officialAdPointsNdgr
-          : null;
+    // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+    const programAdPts = resolveOfficialPoints({
+      domValue: ps?.adPoints,
+      ndgrValue: snap?.officialAdPointsNdgr
+    });
     const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
       programAdPts,
       rankingContributionSum: rankingSum,
@@ -11919,14 +11914,11 @@ async function refreshNorthStarAdRankingLane(liveId) {
       if (Number.isFinite(c) && c > 0) rankingSum += c;
     }
     const ps = bundle?.programStats || null;
-    const programAdPts =
-      typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
-        ? ps.adPoints
-        : typeof snap?.officialAdPointsNdgr === 'number' &&
-            Number.isFinite(snap.officialAdPointsNdgr) &&
-            snap.officialAdPointsNdgr >= 0
-          ? snap.officialAdPointsNdgr
-          : null;
+    // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+    const programAdPts = resolveOfficialPoints({
+      domValue: ps?.adPoints,
+      ndgrValue: snap?.officialAdPointsNdgr
+    });
     const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
       programAdPts,
       rankingContributionSum: rankingSum,
@@ -12426,14 +12418,11 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
-  const officialGiftPts =
-    typeof bundle?.programStats?.giftPoints === 'number' &&
-    Number.isFinite(bundle.programStats.giftPoints)
-      ? bundle.programStats.giftPoints
-      : typeof snap?.officialGiftPointsNdgr === 'number' &&
-          Number.isFinite(snap.officialGiftPointsNdgr)
-        ? snap.officialGiftPointsNdgr
-        : null;
+  // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+  const officialGiftPts = resolveOfficialPoints({
+    domValue: bundle?.programStats?.giftPoints,
+    ndgrValue: snap?.officialGiftPointsNdgr
+  });
   syncGiftHistoryHeaderProgramPt(officialGiftPts);
   const ctxRaw = await computeGiftHistoryNorthStarRoomsContext(liveId, {
     officialProgramGiftPts: officialGiftPts
@@ -12642,13 +12631,11 @@ function syncGiftHistoryHeaderProgramPt(value) {
 function refreshNorthStarProgramPointsLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
-  const domValue = typeof bundle?.programStats?.giftPoints === 'number'
-    ? bundle.programStats.giftPoints
-    : null;
-  const ndgrValue = typeof snap?.officialGiftPointsNdgr === 'number'
-    ? snap.officialGiftPointsNdgr
-    : null;
-  const value = domValue != null ? domValue : ndgrValue;
+  // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+  const value = resolveOfficialPoints({
+    domValue: bundle?.programStats?.giftPoints,
+    ndgrValue: snap?.officialGiftPointsNdgr
+  });
   // ギフト履歴ヘッダの inline 累計pt を同期（独立レーンは CSS で非表示・下記は従来通り）。
   syncGiftHistoryHeaderProgramPt(value);
   const fallback = buildNorthStarProgramPointsFallbackHtml(value);

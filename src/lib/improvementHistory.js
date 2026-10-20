@@ -3446,5 +3446,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1719', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1718 の note と同じ理由)。今回は単体 +1(変異1件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1720', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の嘘の是正(B3): 広告pt/ギフトpt の DOM↔NDGR 優先順位を lib(resolveOfficialPoints.js)へ集約。status が NDGR 先頭 fallback で popup と逆転していた逆順を正す。popup の6箇所も同じ関数へ統一。前版 v0.1.1719 の 1443KB より 1KB 小(過去最良 1360 超は v0.1.1454 以降の継続状態)。'
+  }),
+  Object.freeze({
+    version: '0.1.1720', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1720', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1719 の note と同じ理由)。今回は単体テスト +8(resolveOfficialPoints の境界・逆順・負値)と probe 実行で確認。※この版はクラウドの浅いクローンで記録したため --auto が一旦 0 を書いたが、履歴を深くして再実測し 41(v0.1.1719 と同窓)へ訂正した。'
   })
 ]);

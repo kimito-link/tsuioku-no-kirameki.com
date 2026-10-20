@@ -367,6 +367,7 @@
 | `src/lib/previewRenderAckKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/reportPreview.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/reportPreviewKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/resolveOfficialPoints.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/roomHeatMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/scoreAnnounceDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/scoreAnnounceDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |

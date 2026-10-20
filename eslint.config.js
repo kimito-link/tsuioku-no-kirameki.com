@@ -433,7 +433,8 @@ export default [
     files: ['src/extension/status-entry.js'],
     // v0.1.1698: 送信担当の更新間隔(10秒)を lib(statusRefreshInterval.js)から引く配線(+2行)。
     // v0.1.1705: popup の応援者鏡とレポート集計の値の突き合わせを extras の統合 get から通す配線(+3行・判定は lib の supportersParity.js)。
-    rules: { 'max-lines': ['error', { max: 4553, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1720: 広告pt/ギフトpt の DOM↔NDGR 優先順位を lib(resolveOfficialPoints.js)へ集約し import(+1)、呼び出しを統一(+1)。status が NDGR 先頭 fallback で popup と逆転していた診断の嘘の是正。
+    rules: { 'max-lines': ['error', { max: 4555, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

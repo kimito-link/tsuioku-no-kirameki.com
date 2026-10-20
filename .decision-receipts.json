@@ -175,6 +175,17 @@
         "src/lib/marketingChartsHtml.test.js"
       ],
       "note": "上位計画(elegant-crunching-quokka.md 段B)のデバイス内・横断応援者ランキング。既存のindexPastUsers(commenterHistoricalAnalytics.js)とbuildSupporterRanking(supporterRanking.js、既に単一配信専用として自律tick経由で実運用中)を無改変のまま組み合わせるだけの薄い合成層=REUSE。broadcastCountは既存のSupporterRow型を拡張せず外側で合成する設計にし、実運用中の自律tick経路(popup-entry.js:15762→status-entry.js#buildSupporterExpander)への波及をゼロにした。UIはmarketing-export.html側(応援レーン描画経路と実行コンテキストが完全分離)に新規セクションとして追加。Explore2本+Plan1本で既存関数のexport化/型非改変/UI配置を裏取り・設計した。"
+    },
+    {
+      "at": "2026-10-20T21:00:00.000Z",
+      "responsibility": "official-points-dom-vs-ndgr-priority",
+      "decision": "ESTABLISH_REHOME",
+      "canonicalSource": "src/lib/resolveOfficialPoints.js",
+      "scopePaths": [
+        "src/lib/resolveOfficialPoints.js",
+        "src/lib/resolveOfficialPoints.test.js"
+      ],
+      "note": "広告pt/ギフトptの『DOM値 と NDGR値 のどちら優先か』の判断が、status-entry.js(NDGR先頭fallback)とpopup-entry.js(DOM優先・JSDocに明記)で逆転していた診断の嘘(B3)。既存のwatchSnapshotOfficialFields.jsはNDGRフィールドの正規化(nnInt)専任で優先順位解決は別責務、popupは6箇所にインライン重複と調査済み=新規に正本を確立(ESTABLISH_REHOME)。前例resolveVisitorCount.js(来場者数の単一定義・watchCount統一)と同型。status 2箇所とpopupの純粋2段(DOM→NDGR)の5箇所を新関数へ統一、pickNumクラスタ(ev/rk共用・gift3段balloon優先)は別責務として非対象(§12.2.3外科的)。ユニット8件+probe実行で裏取り。"
     }
   ]
 }
