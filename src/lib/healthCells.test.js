@@ -23,6 +23,18 @@ describe('buildHealthCells', () => {
     expect(c.value).toBe(99);
   });
 
+  it('取得率: 記録が公式を上回ったら over を立てる(ちょうど100%と区別・色は ok のまま)', () => {
+    const over = cellById(buildHealthCells({ livesData: [{ recordedCount: 5200, officialCommentCount: 4000 }] }), 'capture-rate');
+    expect(over.value).toBe(100);
+    expect(over.over).toBe(true);
+    expect(over.level).toBe('ok');
+    const exact = cellById(buildHealthCells({ livesData: [{ recordedCount: 4000, officialCommentCount: 4000 }] }), 'capture-rate');
+    expect(exact.value).toBe(100);
+    expect(exact.over).toBeUndefined();
+    const under = cellById(buildHealthCells({ livesData: [{ recordedCount: 3598, officialCommentCount: 3643 }] }), 'capture-rate');
+    expect(under.over).toBeUndefined();
+  });
+
   it('取得率: 30%は bad', () => {
     const c = cellById(buildHealthCells({ livesData: [{ recordedCount: 30, officialCommentCount: 100 }] }), 'capture-rate');
     expect(c.level).toBe('bad');
