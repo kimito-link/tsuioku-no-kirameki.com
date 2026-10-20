@@ -13,10 +13,15 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/
 const content = strip(read('src/extension/content-entry.js'));
 
 describe('巨大キーの書き込み削減', () => {
-  it('★較正リングの試行間隔は 120 秒以上(25 秒に戻さない)', () => {
+  it('★較正リングの試行間隔は 300 秒以上・保持は 400 件以下(25 秒/2000件に戻さない)', () => {
     const m = /const CALIBRATION_LOG_ATTEMPT_INTERVAL_MS = (\d+);/.exec(content);
     expect(m).not.toBeNull();
-    expect(Number(/** @type {RegExpExecArray} */ (m)[1])).toBeGreaterThanOrEqual(120000);
+    expect(Number(/** @type {RegExpExecArray} */ (m)[1])).toBeGreaterThanOrEqual(300000);
+    const k = /const CALIBRATION_LOG_KEEP_ITEMS = (\d+);/.exec(content);
+    expect(k).not.toBeNull();
+    expect(Number(/** @type {RegExpExecArray} */ (k)[1])).toBeLessThanOrEqual(400);
+    // 保持件数は書き込みに実際に渡している(定数だけ作って使わない形を防ぐ)
+    expect(content).toContain('{ nowMs: now, cap: CALIBRATION_LOG_KEEP_ITEMS }');
   });
 
   it('★fastDiag の全文は fastDiagFullGate の判定を通して書き、lite は毎回書く', () => {

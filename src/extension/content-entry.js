@@ -8950,8 +8950,10 @@ function bindNativeSelfPostedRecorder() {
 /* PII は積まない（数値・liveId・platform・ts・source のみ）。                    */
 /* ------------------------------------------------------------------ */
 
-/** 較正サンプルの記録を試みる最小間隔。v0.1.1694: 25s→120s(1回約830KB が全ページへ配られるため・best-effort)。 */
-const CALIBRATION_LOG_ATTEMPT_INTERVAL_MS = 120000;
+/** 較正サンプルの記録を試みる最小間隔。v0.1.1694: 25s→120s(1回約830KB が全ページへ配られるため・best-effort)。
+ *  v0.1.1718: 120s→300s、保持件数 2000→400(1回約170KB。約33時間ぶん)。読み手は開発モニタの書き出し(JSON/CSV)だけ。 */
+const CALIBRATION_LOG_ATTEMPT_INTERVAL_MS = 300000;
+const CALIBRATION_LOG_KEEP_ITEMS = 400;
 let _lastCalibrationLogAttemptAt = 0;
 let _calibrationLogInFlight = false;
 
@@ -9020,7 +9022,7 @@ function maybeLogConcurrentCalibrationSample() {
         const next = appendCalibrationSample(
           bag[KEY_CONCURRENT_CALIBRATION_RING_V1],
           sample,
-          { nowMs: now }
+          { nowMs: now, cap: CALIBRATION_LOG_KEEP_ITEMS }
         );
         if (next) {
           await chrome.storage.local.set({ [KEY_CONCURRENT_CALIBRATION_RING_V1]: next });
