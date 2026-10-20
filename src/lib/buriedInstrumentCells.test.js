@@ -2,6 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { buildBuriedCells } from './buriedInstrumentCells.js';
 
 describe('buriedInstrumentCells', () => {
+  it('★画面の部品数の注記は、廃止済みの「推奨1,500」でなく実際の判定閾値を出す', () => {
+    const at = (domNodes, domLevel) =>
+      buildBuriedCells({ fastDiag: { content: { memoryPressure: { level: 'ok', pct: 10, usedMB: 100, domNodes, domLevel } } } })
+        .find((x) => x.id === 'dom-nodes');
+    expect(at(1000, 'ok').text).toBe('1000個');
+    expect(at(4200, 'warn').text).toBe('4200個(3,900超)');
+    expect(at(5200, 'bad').text).toBe('5200個(5,000超)');
+    for (const c of [at(4200, 'warn'), at(5200, 'bad')]) expect(c.text).not.toContain('1,500');
+  });
+
   it('★未観測なら1つも出さない(使っていない機能を赤くしない)', () => {
     expect(buildBuriedCells({})).toEqual([]);
     expect(buildBuriedCells({ popupDiag: {} })).toEqual([]);
