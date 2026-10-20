@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 964 件
+## ⚠️ 役割コメントが無いソース 8 / 965 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2085)
+- 📁 **src/** (2088)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1844)
+  - 📁 **lib/** (1847)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2295,6 +2295,8 @@
     - `pickBroadcasterNameForReputation.test.js`
     - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。
     - `pickCommentsForExport.test.js`
+    - `pickCountToShow.js` — popup の見出し「記録コメント N 件」の元の値を選ぶ純関数(2026-10-20)。
+    - `pickCountToShow.test.js`
     - `pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
     - `pickLatestComment.test.js`
     - `pickTickerHighlight.js` — コメントティッカーに「留める1件」を選ぶ純関数(v0.1.1226)。
@@ -2318,6 +2320,7 @@
     - `popupConcurrentEstimateGate.test.js`
     - `popupContextBarModel.js` — popup 上部の接続コンテキスト表示・復旧バー表示・stat 表面状態の純粋ロジック。
     - `popupContextBarModel.test.js`
+    - `popupCountToShowSummary.wiring.test.js`
     - `popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
     - `popupDiagAutoPublish.test.js`
     - `popupDiagUptimeNote.js` — popup 固有診断が「popup 起動から何秒後の値か」を明示する注記を作る純関数(v0.1.1211)。

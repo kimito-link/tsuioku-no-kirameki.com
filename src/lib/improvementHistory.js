@@ -3222,5 +3222,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1703', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1702 の note と同じ理由)。今回は単体 +13・配線 +3(変異4件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1704', metric: 'bundle-kb', value: 1479,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は直す版: popup-entry.js の countToShow を新規 lib pickCountToShow(サマリが正本・0以下は未取得として配列の長さへ)に置換。1行の置換+import 1行。'
+  }),
+  Object.freeze({
+    version: '0.1.1704', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1704', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1703 の note と同じ理由)。今回は単体 +6・配線 +2(変異3件を検出)。'
   })
 ]);
