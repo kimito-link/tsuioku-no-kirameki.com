@@ -2774,6 +2774,18 @@
       ]
     },
     {
+      "file": "src/lib/memoryPressureProbe.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/metricConfidence.js",
       "featureCount": 2,
       "features": [
@@ -6715,16 +6727,6 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/memoryPressureProbe.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
       ]
     },
     {
