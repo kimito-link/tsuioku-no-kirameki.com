@@ -7324,7 +7324,7 @@ function publishStatCardsMirror(input) {
  * @param {string} liveId
  * @param {any[]} rooms strip rooms({userKey,nickname,count,avatarUrl})
  */
-function publishTopSupportersMirror(liveId, rooms) {
+function publishTopSupportersMirror(liveId, rooms, provisional = false) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
@@ -7332,7 +7332,8 @@ function publishTopSupportersMirror(liveId, rooms) {
     const arr = Array.isArray(rooms) ? rooms : [];
     if (!/^lv\d{1,15}$/.test(lid) || !arr.length) return;
     const cells = buildTopSupportersMirrorCells(arr);
-    mergeAndScheduleFlush('topSupporters', { liveId: lid, capturedAt: now, rooms: cells }, lid, now);
+    // v0.1.1710: 暫定供給(読み込み中の直近コメントだけで組んだ順位)の印も載せる(診断の値の突き合わせが偽の🔴を出さないため)。
+    mergeAndScheduleFlush('topSupporters', { liveId: lid, capturedAt: now, rooms: cells, provisional: provisional === true }, lid, now);
   } catch {
     /* no-op */
   }
@@ -13403,13 +13404,15 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   const stripKey =
     topSupportRankStripStableKey(liveId, list.length, stripSlice) +
     '::caster=' +
-    casterKeyPart;
+    casterKeyPart +
+    // v0.1.1710: 暫定→確定に戻った瞬間も差分として検出する(鏡の「暫定」の印が残り続けないように)。
+    (rankingProvisional ? '::prov' : '');
   if (stripKey !== _lastTopSupportRankStripStableKey) {
     _lastTopSupportRankStripStableKey = stripKey;
     renderTopSupportRankStrip(stripSlice);
     // v0.1.1024: ②応援プレビューは refresh を走らせない(v0.1.1023)ため、応援者ランキングを鏡から描く。
     //   ①が描いた strip rooms を鏡に publish→②が読んで同じ本物 lib で描く(lane/northStar 鏡と同じ轍)。
-    publishTopSupportersMirror(liveId, stripSlice);
+    publishTopSupportersMirror(liveId, stripSlice, rankingProvisional);
   }
   const visibleRooms = rankedRooms.slice(0, MAX_VISIBLE_ROOMS);
   const maxTotal = Math.max(1, ...visibleRooms.map((v) => v.count));

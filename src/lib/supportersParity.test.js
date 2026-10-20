@@ -48,6 +48,16 @@ describe('judgeSupportersParity: popup の応援ランキング(鏡)とレポー
     expect(judgeSupportersParity(mirror(rows([['a:x', 150]]), { capturedAt: NOW - 900_000 }), ok, 'lv1', NOW).state).toBe('pending');
   });
 
+  it('popup の鏡が【暫定】(読み込み中の直近コメントだけで組んだ順位)なら、全件のレポートと比べず pending(開いた直後の偽の🔴を出さない)', () => {
+    const prov = mirror(rows([['a:p1', 16], ['a:p2', 12], ['a:p3', 9]]), { provisional: true });
+    const r = judgeSupportersParity(prov, { liveId: 'lv1', topSupporters: rows([['a:x', 150], ['u2', 140], ['u3', 130]]) }, 'lv1', NOW);
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('supporters_provisional');
+    // 暫定でなければ、同じ入力は不一致になる(判定そのものは生きている)
+    const full = mirror(rows([['a:p1', 16], ['a:p2', 12], ['a:p3', 9]]), { provisional: false });
+    expect(judgeSupportersParity(full, { liveId: 'lv1', topSupporters: rows([['a:x', 150], ['u2', 140], ['u3', 130]]) }, 'lv1', NOW).state).toBe('mismatch');
+  });
+
   it('レポート側が2人しか無い等で比べる人数が足りないときは、比べられる人数だけで判定する', () => {
     const r = judgeSupportersParity(popup, { liveId: 'lv1', topSupporters: rows([['a:x', 150], ['u2', 140]]) }, 'lv1', NOW);
     expect(r.state).toBe('match');
