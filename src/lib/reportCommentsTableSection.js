@@ -25,9 +25,6 @@ export const HTML_REPORT_COMMENTS_TABLE_INITIAL_ROWS = 80;
  */
 export const HTML_REPORT_HEAVY_COMMENT_THRESHOLD = 2500;
 
-/** heavy 時のルーム集計に使うコメントの均等サンプル上限（全件走査回避） */
-export const HTML_REPORT_AGGREGATE_SAMPLE_MAX = 4000;
-
 /** overflow JSON に載せる最大行数（超過分は CSV 案内のみ）。 */
 export const HTML_REPORT_OVERFLOW_JSON_MAX_ROWS = 1500;
 
