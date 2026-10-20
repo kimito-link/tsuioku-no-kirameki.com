@@ -3278,5 +3278,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1707', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1706 の note と同じ理由)。今回は配線 +3(実件数と合計が一致する性質テストを含む・修正前は赤を確認)。'
+  }),
+  Object.freeze({
+    version: '0.1.1708', metric: 'bundle-kb', value: 1481,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は直す版: marketing-export-entry.js の commentsForAnalytics を全件に・marketingChartsHtml.js の新規 vs 常連を過去配信ありのときだけ出す(新規 lib newVsRepeatBasis.js)・未使用になった capCommentsForAnalytics(lib+テスト)を削除。'
+  }),
+  Object.freeze({
+    version: '0.1.1708', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1708', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1707 の note と同じ理由)。今回は単体 +3・配線 +2(変異5件を検出・既存の marketing テスト緑)。'
   })
 ]);
