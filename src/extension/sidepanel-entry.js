@@ -22,6 +22,7 @@ import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
 import { createFirstPaintGate } from '../lib/firstPaintGate.js';
 import { KEY_AVATAR_COMPOSE_DIAG, formatAvatarComposeDiagLine } from '../lib/avatarComposeDiagLine.js';
 import { FLICKER_METER_STORAGE_KEY, formatFlickerLine } from '../lib/flickerMeter.js';
+import { RANK_ORDER_METER_STORAGE_KEY, formatRankOrderLine } from '../lib/rankOrderMeter.js';
 import { BOOT_TIMELINE_STORAGE_KEY, formatBootTimelineLine } from '../lib/bootTimeline.js';
 import { formatBlackCurtainLedger } from '../lib/blackCurtainLedger.js';
 import {
@@ -500,6 +501,7 @@ function collectAndPublish(phase, schedMs = null) {
   refreshAvatarComposeLine();
   refreshFlickerLine();
   refreshBootTimelineLine();
+  refreshRankOrderLine();
   // ★v0.1.1382: 測るたびに最新値を取りに行く(記録中は値が動く)。
   //   await しない=この読みが遅くても観測そのものは止まらない。
   refreshCommentWriteModeDiag();
@@ -812,7 +814,7 @@ function collectAndPublish(phase, schedMs = null) {
         // ★v0.1.1682: 匿名の顔の合成の状況(Worker が動いたか・フォールバックしたか)。
         avatarComposeLine: _avatarComposeLine,
         // ★v0.1.1686: ちらつき計(どの場所を何回書き換えたか・往復=明滅の数)。
-        flickerMeterLine: _flickerLine,
+        flickerMeterLine: [_flickerLine, _rankOrderLine].filter(Boolean).join(' / '),
         // ★v0.1.1687: 黒い幕の年表(親の最初の描画までに、子の長い処理・段階がどう並んでいたか)。
         bootTimelineLine: _bootTimelineLine,
         // ok は「この起動で一度も黒くなかった」を意味する(瞬間の黒も見逃さない)。
@@ -974,6 +976,22 @@ function refreshBootTimelineLine() {
 }
 
 /** v0.1.1686: ちらつき計(popup が session に書いた写し)を状態速報の1行にする。読むだけ。 */
+/** v0.1.1703: 順位計(応援ランキング上位10の並び変化の回数)。popup が session に書いた写しを読むだけ。 */
+let _rankOrderLine = '';
+function refreshRankOrderLine() {
+  try {
+    const p = chrome?.storage?.session?.get?.(RANK_ORDER_METER_STORAGE_KEY);
+    if (!p || typeof p.then !== 'function') return;
+    p.then((bag) => {
+      _rankOrderLine = formatRankOrderLine(bag && bag[RANK_ORDER_METER_STORAGE_KEY], Date.now());
+    }).catch(() => {
+      /* 読めなければ空のまま */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
 let _flickerLine = '';
 function refreshFlickerLine() {
   try {

@@ -34,7 +34,8 @@ describe('ちらつき計の配線', () => {
   it('★サイドパネルの自己診断が写しを読み、flickerMeterLine に載せる', () => {
     const p = strip(read('src/extension/sidepanel-entry.js'));
     expect(p).toMatch(/refreshAvatarComposeLine\(\);\s*refreshFlickerLine\(\);/);
-    expect(p).toMatch(/flickerMeterLine:\s*_flickerLine/);
+    // v0.1.1703: 順位計の行を続けて載せる合成になった。ちらつき計の写し(_flickerLine)が載ることは保つ。
+    expect(p).toMatch(/flickerMeterLine:\s*\[_flickerLine,\s*_rankOrderLine\]/);
     expect(p).toContain('chrome?.storage?.session?.get?.(FLICKER_METER_STORAGE_KEY)');
   });
 
