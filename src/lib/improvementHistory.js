@@ -3236,5 +3236,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1704', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1703 の note と同じ理由)。今回は単体 +6・配線 +2(変異3件を検出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1705', metric: 'bundle-kb', value: 1480,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の版(前々版 v0.1.1702 が直す版・前版 v0.1.1704 も直す版なので計器の連続ではない): supportersParity.js(純関数)と status の extras の統合 get に応援者鏡を1キー同梱・jsonBlob.supportersParity・AI共有全文に1行。読み取り回数は増えない(同じ get に同梱)。'
+  }),
+  Object.freeze({
+    version: '0.1.1705', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1705', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1704 の note と同じ理由)。今回は単体 +9・配線 +4(変異6件を検出)。'
   })
 ]);
