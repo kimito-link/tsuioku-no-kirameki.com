@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (361)
+- 📁 **docs/** (363)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (176)
+  - 📁 **handoff/** (178)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -468,6 +468,8 @@
     - `status-diag-608s-freeze-IMPLEMENTATION-HANDOFF.md`
     - `storage-stall-council-MATERIAL.md`
     - `storage-stall-council-MINUTES.md`
+    - `storage-writeback-reduction-DESIGN-2026-10-20.md`
+    - `storage-writeback-reduction-IMPLEMENTATION-HANDOFF-2026-10-20.md`
     - `story-diag-realtime-sync-DESIGN.md`
     - `story-diag-realtime-sync-IMPLEMENTATION-HANDOFF.md`
     - `sw-reload-toil-council-MATERIAL.md`
@@ -860,7 +862,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2072)
+- 📁 **src/** (2073)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1145,7 +1147,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1831)
+  - 📁 **lib/** (1832)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1675,6 +1677,7 @@
     - `flickerMeterBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
     - `flickerMeterBoot.test.js`
     - `flickerMeterWiring.wiring.test.js`
+    - `followingListReadsChunks.wiring.test.js`
     - `formatDateTime.js` — 日時の数値（epoch ms）を日本語ロケールで `YYYY/MM/DD HH:MM:SS` 形式に整形する
     - `formatDateTime.test.js`
     - `formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
