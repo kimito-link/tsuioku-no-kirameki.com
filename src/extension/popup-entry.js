@@ -4913,13 +4913,14 @@ function popupMergeUserCommentProfileCache(arr) {
  * @param {{
  *   refreshGen: number,
  *   commentsKey: string,
+ *   mainWriteAllowed: boolean,
  *   getArr: () => PopupCommentEntry[],
  *   setArr: (next: PopupCommentEntry[]) => void,
  *   paint: () => void
  * }} ctx
  */
 async function runDeferredUserCommentProfileHydrate(ctx) {
-  const { refreshGen, commentsKey, getArr, setArr, paint } = ctx;
+  const { refreshGen, commentsKey, getArr, setArr, paint, mainWriteAllowed } = ctx;
   try {
     if (!hasExtensionContext()) return;
     if (refreshGen !== watchPopupRefreshGeneration) return;
@@ -4941,7 +4942,7 @@ async function runDeferredUserCommentProfileHydrate(ctx) {
     const prof = popupMergeUserCommentProfileCache(getArr());
     setArr(prof.arr);
     const save = {};
-    if (prof.commentsPatched) save[commentsKey] = prof.arr;
+    if (prof.commentsPatched && mainWriteAllowed) save[commentsKey] = prof.arr;
     if (prof.cacheTouched || hydrated) {
       save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
     }
@@ -16344,7 +16345,7 @@ async function refresh() {
       arr = strippedAfterSnap.next;
       // v0.1.437: storage.set ハングで「—」固まり再発を防ぐ。
       await refreshTaskGuarded(
-        storageSetSafe({ [key]: arr }),
+        commentsChunked ? Promise.resolve(true) : storageSetSafe({ [key]: arr }),
         1500,
         'refresh_story_avatar_post_snap_storage_set_timeout',
         false
@@ -16400,6 +16401,7 @@ async function refresh() {
   scheduleDeferredUserCommentProfileHydrate({
     refreshGen,
     commentsKey: key,
+    mainWriteAllowed: !commentsChunked,
     getArr: () => arr,
     setArr: (next) => {
       arr = next;
@@ -16484,7 +16486,7 @@ async function refresh() {
           interceptCacheTouched
         ) {
           const saveIc = {};
-          if (merged.patched > 0 || profAfterIntercept.commentsPatched) {
+          if (!commentsChunked && (merged.patched > 0 || profAfterIntercept.commentsPatched)) {
             saveIc[key] = arr;
           }
           if (
@@ -16539,7 +16541,7 @@ async function refresh() {
         // v0.1.437: storage.set ハング根治。
         await refreshTaskGuarded(
           storageSetSafe({
-            [key]: arr,
+            ...(commentsChunked ? {} : { [key]: arr }),
             [KEY_SELF_POSTED_RECENTS]: { items: selfPostedRecentsCache }
           }),
           1500,
