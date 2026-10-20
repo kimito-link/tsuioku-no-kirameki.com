@@ -2520,7 +2520,7 @@ function renderHealthCells(data) {
    */
   const sig =
     `${v.level}|${v.text}|${_symptomSig}|` +
-    cells.map((c) => `${c.id}:${c.level}:${c.kind === 'pct' ? c.value : ''}`).join('~');
+    cells.map((c) => `${c.id}:${c.level}:${c.kind === 'pct' ? `${c.value}${c.over ? '+' : ''}` : ''}`).join('~');
   if (sig === _lastHealthSig) return; // 変化なし=再描画しない。
   _lastHealthSig = sig;
   // v0.1.846: 先頭に総合判定バッジ。満点=「全部緑」でなく「異常ゼロ」(進行中/対象外は正常)。
@@ -2643,7 +2643,7 @@ function renderHealthCells(data) {
       const val = document.createElement('div');
       val.className = 'hc-val';
       val.textContent = c.kind === 'pct'
-        ? (c.value == null ? '—' : `${c.value}%`)
+        ? (c.value == null ? '—' : `${c.value}%${c.over ? '超' : ''}`)
         : (c.text || '—');
       div.title = `${c.label}: ${val.textContent}`;
       div.appendChild(label);

@@ -864,7 +864,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2106)
+- 📁 **src/** (2107)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1149,7 +1149,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1865)
+  - 📁 **lib/** (1866)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1764,6 +1764,7 @@
     - `googleSuggest.test.js`
     - `healthCellGroups.js` — 健全度セルを【症状の言葉】で枠に分ける(純関数)。
     - `healthCellGroups.test.js`
+    - `healthCellOverWiring.wiring.test.js`
     - `healthCells.js` — v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
     - `healthCells.test.js`
     - `healthCellsSignature.test.js`

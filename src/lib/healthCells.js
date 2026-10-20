@@ -100,10 +100,14 @@ function pctCell(id, label, value, opts = {}) {
   const okAt = opts.okAt ?? 80;
   const warnAt = opts.warnAt ?? 40;
   if (value == null) return { id, label, kind: 'pct', value: null, level: 'na', text: '—' };
-  const v = Math.max(0, Math.min(100, Math.round(value)));
-  if (opts.processing) return { id, label, kind: 'pct', value: v, level: 'processing' };
+  const rounded = Math.round(value);
+  const v = Math.max(0, Math.min(100, rounded));
+  // v0.1.1715: 100 を超えた(記録 > 公式)ときは over を立てる。0〜100 に丸めただけだと「ちょうど100%」と区別が付かず、
+  //   記録のほうが多い(自分の投稿・公式の集計遅れ等)という事実が画面から消えていた。色の判定は従来どおり丸めた値。
+  const over = rounded > 100;
+  if (opts.processing) return { id, label, kind: 'pct', value: v, level: 'processing', ...(over ? { over: true } : {}) };
   const level = v >= okAt ? 'ok' : v >= warnAt ? 'warn' : 'bad';
-  return { id, label, kind: 'pct', value: v, level };
+  return { id, label, kind: 'pct', value: v, level, ...(over ? { over: true } : {}) };
 }
 
 /**
