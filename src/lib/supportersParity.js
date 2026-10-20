@@ -34,7 +34,7 @@ const num = (v) => {
 };
 
 /**
- * @param {{ liveId?: string, capturedAt?: number, rooms?: Array<{ userKey?: string, count?: number }> }|null|undefined} popupMirror popup が publish した応援者ランキング鏡
+ * @param {{ liveId?: string, capturedAt?: number, provisional?: boolean, rooms?: Array<{ userKey?: string, count?: number }> }|null|undefined} popupMirror popup が publish した応援者ランキング鏡
  * @param {{ liveId?: string, topSupporters?: Array<{ userKey?: string, userId?: string, count?: number }> }|null|undefined} reportPreview 診断のレポート集計
  * @param {string} curLid 現配信ID(小文字)
  * @param {number} nowMs
@@ -49,6 +49,8 @@ export function judgeSupportersParity(popupMirror, reportPreview, curLid, nowMs)
   const rooms = Array.isArray(m.rooms) ? m.rooms : [];
   const reportRows = Array.isArray(r.topSupporters) ? r.topSupporters : [];
   if (!rooms.length) return pend('supporters_mirror_empty', 'popup の応援者ランキング鏡が空');
+  // 暫定(読み込み中の直近コメントだけで組んだ順位)は、全件のレポートと比べない(開いた直後の偽の🔴を出さない)。
+  if (m.provisional === true) return pend('supporters_provisional', 'popup の応援者ランキングが暫定(コメントを読み込み中)');
   if (!reportRows.length) return pend('supporters_report_empty', 'レポート集計の応援者が0人');
   const mLid = String(m.liveId || '').trim().toLowerCase();
   const rLid = String(r.liveId || '').trim().toLowerCase();
