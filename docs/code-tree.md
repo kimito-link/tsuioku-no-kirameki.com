@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 959 件
+## ⚠️ 役割コメントが無いソース 8 / 961 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -734,7 +734,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (98)
+- 📁 **scripts/** (99)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -778,6 +778,7 @@
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
   - `build.mjs` — ⚠️ 役割コメント無し
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+  - `census-watch.mjs` — 配置後の「更新→F5→溜まるまで待つ→速報を読む→基準線と比べる」を機械にする(2026-10-20)。
   - `check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。
   - `check-chrome-load-path.mjs` — Chrome が拡張を「同期フォルダ配下から」読み込んでいないか検査する(リロード固着の再発防止・v0.1.1529)。
   - `check-dist-fresh.mjs` — 「その tree の dist は、その tree のソースから build されたものか」。
@@ -862,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2074)
+- 📁 **src/** (2076)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1147,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1833)
+  - 📁 **lib/** (1835)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1362,6 +1363,8 @@
     - `celebrationFlyText.test.js`
     - `celebrationPika.js` — パチンコ／ボカロ MV 風 — 画面全体「ぴかっ」フラッシュ spec（純関数）。
     - `celebrationPika.test.js`
+    - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
+    - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`

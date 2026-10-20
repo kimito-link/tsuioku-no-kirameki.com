@@ -693,7 +693,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 86</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 87</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -715,6 +715,7 @@
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
 - `src/lib/aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
 - `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
+- `src/lib/censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
 - `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
 - `src/lib/changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
 - `src/lib/changelogConsistency.js` — 版番号の三者一致を機械照合する純関数(v0.1.835)。
@@ -918,7 +919,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 234</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 235</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -930,6 +931,7 @@
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+- `scripts/census-watch.mjs` — 配置後の「更新→F5→溜まるまで待つ→速報を読む→基準線と比べる」を機械にする(2026-10-20)。
 - `scripts/check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。
 - `scripts/check-chrome-load-path.mjs` — Chrome が拡張を「同期フォルダ配下から」読み込んでいないか検査する(リロード固着の再発防止・v0.1.1529)。
 - `scripts/check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。

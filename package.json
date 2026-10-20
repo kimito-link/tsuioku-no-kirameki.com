@@ -34,6 +34,7 @@
     "copy:ext": "node scripts/copy-ext.mjs && node scripts/install-local-sounds.mjs",
     "sounds:install": "node scripts/install-local-sounds.mjs",
     "status:live": "node scripts/status-live.mjs",
+    "census:watch": "node scripts/census-watch.mjs",
     "sound:build": "node scripts/build-sounds.mjs",
     "sound:build:all": "node scripts/build-sounds.mjs --normalize-all",
     "sound:preview": "node scripts/build-sound-preview.mjs",
