@@ -863,7 +863,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2095)
+- 📁 **src/** (2096)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1148,7 +1148,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1854)
+  - 📁 **lib/** (1855)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1346,8 +1346,6 @@
     - `bundleFixesPresent.test.js`
     - `buriedInstrumentCells.js` — 速報の文章に埋もれていた判定を【セル】として掘り起こす(純関数)。
     - `buriedInstrumentCells.test.js`
-    - `capCommentsForAnalytics.js` — マーケ分析・タイムライン用のコメント上限（heavy 時の全件再走査を防ぐ）
-    - `capCommentsForAnalytics.test.js`
     - `captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
     - `captureAuditionRichviewEventScoreDiagProbe.test.js`
     - `cardFreshnessNote.js` — カードの「鮮度」表示（最終更新からの経過）を作る純関数。
@@ -2079,6 +2077,7 @@
     - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
     - `marketingExportAdObsWiring.test.js`
     - `marketingExportMaskWiring.test.js`
+    - `marketingFullCount.wiring.test.js`
     - `marketingGiftThrowLedger.js` — マーケ分析 HTML 用: 「誰が・どのアイテムを・いくら投げたか」の投げ履歴台帳を組み立てる純関数。
     - `marketingGiftThrowLedger.test.js`
     - `marketingHtmlAdvisorAvatars.js` — マーケ分析HTML内のキャラアイコン（単体HTMLで表示するため data URI）。
@@ -2145,6 +2144,8 @@
     - `ndgrViewBasePick.test.js`
     - `networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
     - `networkErrorProbe.test.js`
+    - `newVsRepeatBasis.js` — マーケレポートの「新規 vs 常連」を出してよいか判定する純関数(2026-10-20)。
+    - `newVsRepeatBasis.test.js`
     - `nicoAnonymousDisplay.js` — ニコ生の匿名ユーザーID（a: で始まる内部ID）向けの表示補完。
     - `nicoAnonymousDisplay.test.js`
     - `nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。

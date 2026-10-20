@@ -56,7 +56,6 @@ import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
 import { normalizeBroadcasterProfileModel } from '../lib/broadcasterProfileCard.js';
 import { NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, normalizeNicoUserProfileResponse } from '../lib/nicoUserProfileApi.js';
-import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
 import { buildMarketingReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import { createExportStageProfiler, logExportStageProfileIfEnabled } from '../lib/exportStageProfiler.js';
 import { playReportCompleteVoiceSequence } from '../lib/reportCompleteVoice.js';
@@ -622,7 +621,8 @@ async function runExport(lid) {
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
       sessionSummaryRows,
-      commentsForAnalytics: heavyMkt ? capCommentsForAnalytics(comments) : comments,
+      // v0.1.1708: 分析の入力は全件(旧: heavy のとき2,500件の均等サンプル=速度・沈黙・笑い・疲労・離脱・出席などが無注記で縮んだ)。
+      commentsForAnalytics: comments,
       pastBroadcasts,
       giftUsers: giftUsersForMarketing,
       giftEvents: giftEventsForMarketing,
