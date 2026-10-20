@@ -3376,5 +3376,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1714', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1713 の note と同じ理由)。今回は配線テスト差し替えのみ。'
+  }),
+  Object.freeze({
+    version: '0.1.1715', metric: 'bundle-kb', value: 1445,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の嘘の是正(B3 の1件目): healthCells.js の pctCell が 0〜100 に丸めた値だけを返していたのを、100 を超えたとき over を立てる。status-entry.js が「%超」と描き、再描画の署名にも入れる。'
+  }),
+  Object.freeze({
+    version: '0.1.1715', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1715', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1714 の note と同じ理由)。今回は単体 +1・配線 +1(変異2件を検出)。'
   })
 ]);
