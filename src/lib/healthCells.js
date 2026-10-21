@@ -964,10 +964,13 @@ function buildGiftEffectHealthCells(giftEffectDiag, openLiveIds) {
   const giftSoundCoalesced = num(/** @type {any} */ (snap).giftSoundCoalesced) || 0;
   const adThrown = num(snap.adThrown) || 0;
   const adSoundPlayed = num(snap.adSoundPlayed) || 0;
+  // v0.1.1725: 広告は音の戻り値を見て数えるようになった。ガード(同種600ms)と OFF の間の分は
+  //   意図した動きなので漏れにしない(ギフトの置換と同じ扱い)。未割当/エラーは本当に鳴っていないので漏れのまま。
+  const adSoundIntended = (num(/** @type {any} */ (snap).adSoundGuarded) || 0) + (num(/** @type {any} */ (snap).adSoundOff) || 0);
 
   const throwMissing = Math.max(0, giftDetected - giftThrown) + Math.max(0, adDetected - adThrown);
   const soundMissing = soundEnabled
-    ? Math.max(0, giftThrown - giftSoundPlayed - giftSoundCoalesced) + Math.max(0, adThrown - adSoundPlayed)
+    ? Math.max(0, giftThrown - giftSoundPlayed - giftSoundCoalesced) + Math.max(0, adThrown - adSoundPlayed - adSoundIntended)
     : 0; // 効果音OFFは鳴らないのが正常=不合格にしない(誤診断防止)
 
   const missing = throwMissing + soundMissing;

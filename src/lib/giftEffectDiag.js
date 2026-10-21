@@ -18,7 +18,11 @@
  *   giftSoundOff: number,      // v0.1.1091: 効果音設定OFFで即returnした回数。従来この'off'はどこにも計上されず「内訳が全部ゼロなのに音が消える」根因だった
  *   adDetected: number,        // 広告を検知した回数
  *   adThrown: number,          // 広告の投擲演出が実際に走った回数
- *   adSoundPlayed: number,     // 広告効果音の再生を試みた回数
+ *   adSoundPlayed: number,     // 広告効果音を実際に鳴らした回数(v0.1.1725: 「試みた」でなく戻り値'played'のみ)
+ *   adSoundGuarded: number,    // v0.1.1725: 広告版の giftSoundGuarded(同種600msガード=正常動作)
+ *   adSoundNoPath: number,     // v0.1.1725: 広告版の giftSoundNoPath(未割当/パス解決失敗)
+ *   adSoundError: number,      // v0.1.1725: 広告版の giftSoundError(再生失敗)
+ *   adSoundOff: number,        // v0.1.1725: 広告版の giftSoundOff(効果音OFFの間に投げた=鳴らないのが正常)
  *   soundEnabled: boolean,     // 効果音設定が ON か(OFF なら鳴らないのが正常=誤診断防止)
  *   lastEventAt: number,       // 最後にギフト/広告いずれかを検知した時刻(epoch ms・0=未検知)
  *   lastSoundGapMs: number,    // v0.1.1088: 直近1件の「検知→音」体感遅延ms(-1=未計測)
@@ -52,6 +56,10 @@ export function makeInitialGiftEffectDiag() {
     adDetected: 0,
     adThrown: 0,
     adSoundPlayed: 0,
+    adSoundGuarded: 0,
+    adSoundNoPath: 0,
+    adSoundError: 0,
+    adSoundOff: 0,
     soundEnabled: true,
     lastEventAt: 0,
     lastSoundGapMs: -1,
@@ -98,10 +106,30 @@ export function computeGiftGapAverage(prevAvgMs, sampleMs, alpha = 0.3) {
  * @returns {'giftSoundGuarded'|'giftSoundNoPath'|'giftSoundError'|null}
  */
 export function giftSoundDiagFieldForPlayResult(playResult) {
+  return soundDiagFieldForPlayResult('gift', playResult);
+}
+
+/**
+ * v0.1.1725: 広告版の giftSoundDiagFieldForPlayResult。広告音は scheduleGiftSound を通らず
+ *   playEffectSound を直接呼ぶため、従来は戻り値を見ずに adSoundPlayed へ数えていた
+ *   (guarded/no-path/error でも「鳴った」扱い=診断の嘘)。同じ規律で内訳へ振り分ける。
+ * @param {'played'|'guarded'|'no-path'|'error'} playResult
+ * @returns {'adSoundGuarded'|'adSoundNoPath'|'adSoundError'|null}
+ */
+export function adSoundDiagFieldForPlayResult(playResult) {
+  return /** @type {'adSoundGuarded'|'adSoundNoPath'|'adSoundError'|null} */ (soundDiagFieldForPlayResult('ad', playResult));
+}
+
+/**
+ * @param {'gift'|'ad'} prefix
+ * @param {unknown} playResult
+ * @returns {any}
+ */
+function soundDiagFieldForPlayResult(prefix, playResult) {
   const r = String(playResult || '');
-  if (r === 'guarded') return 'giftSoundGuarded';
-  if (r === 'no-path') return 'giftSoundNoPath';
-  if (r === 'error') return 'giftSoundError';
+  if (r === 'guarded') return `${prefix}SoundGuarded`;
+  if (r === 'no-path') return `${prefix}SoundNoPath`;
+  if (r === 'error') return `${prefix}SoundError`;
   return null;
 }
 
@@ -134,6 +162,10 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs, liveId) {
     adDetected: num(d.adDetected, base.adDetected),
     adThrown: num(d.adThrown, base.adThrown),
     adSoundPlayed: num(d.adSoundPlayed, base.adSoundPlayed),
+    adSoundGuarded: num(d.adSoundGuarded, base.adSoundGuarded),
+    adSoundNoPath: num(d.adSoundNoPath, base.adSoundNoPath),
+    adSoundError: num(d.adSoundError, base.adSoundError),
+    adSoundOff: num(d.adSoundOff, base.adSoundOff),
     soundEnabled: d.soundEnabled !== false,
     lastEventAt: num(d.lastEventAt, base.lastEventAt),
     lastSoundGapMs: num(d.lastSoundGapMs, base.lastSoundGapMs),
@@ -288,12 +320,27 @@ export function buildGiftEffectDiagLines(snap, nowMs, openLiveIds) {
     const adThrown = Number(snap.adThrown) || 0;
     const adSoundPlayed = Number(snap.adSoundPlayed) || 0;
     const adThrowCapGuarded = Number(snap.adThrowCapGuarded) || 0;
-    const { throwMissing, soundMissing } = diffCounts(adDetected, adThrown, adSoundPlayed, 0, 0, adThrowCapGuarded);
+    // v0.1.1725: ギフトと同じく、内訳(ガード/未割当/エラー/OFF時)で説明できる分は取りこぼしに数えない。
+    //   広告は置換(coalesced)をしない経路なので第4引数は 0 のまま(MAP の想定と違い、実コードは
+    //   scheduleGiftSound を通らない=置換が起きない)。
+    const adSoundGuarded = Number(snap.adSoundGuarded) || 0;
+    const adSoundNoPath = Number(snap.adSoundNoPath) || 0;
+    const adSoundError = Number(snap.adSoundError) || 0;
+    const adSoundOff = Number(snap.adSoundOff) || 0;
+    const { throwMissing, soundMissing } = diffCounts(
+      adDetected, adThrown, adSoundPlayed, 0, adSoundGuarded + adSoundNoPath + adSoundError + adSoundOff, adThrowCapGuarded
+    );
     const throwMark = throwMissing > 0 ? `⚠${throwMissing}件飛んでいない` : '✅';
     const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
     // 2026-07-30: ギフトと同じ思想(同時投擲上限超過は性能ガード=正常動作の内訳表示)。
     const throwCapText = adThrowCapGuarded > 0 ? ` / 上限超過${adThrowCapGuarded}` : '';
-    lines.push(`  → 広告: 検知${adDetected} → 演出${adThrown} ${throwMark}${throwCapText} → 音${adSoundPlayed} ${soundMark}`);
+    const adExplainedParts = [];
+    if (adSoundGuarded > 0) adExplainedParts.push(`ガード${adSoundGuarded}`);
+    if (adSoundNoPath > 0) adExplainedParts.push(`未割当${adSoundNoPath}`);
+    if (adSoundError > 0) adExplainedParts.push(`エラー${adSoundError}`);
+    if (adSoundOff > 0) adExplainedParts.push(`OFF時${adSoundOff}`);
+    const adExplainedText = adExplainedParts.length > 0 ? ` / ${adExplainedParts.join(' ')}` : '';
+    lines.push(`  → 広告: 検知${adDetected} → 演出${adThrown} ${throwMark}${throwCapText} → 音${adSoundPlayed} ${soundMark}${adExplainedText}`);
   }
   if (arrivalDetected > 0) {
     // 2026-07-06: 来場入賞演出の内訳。CDスキップは意図した動き(積み増し禁止)なので取りこぼしに
@@ -369,7 +416,7 @@ export function giftEffectDiagToActionCards(snap, openLiveIds) {
     Number(snap.adThrown) || 0,
     Number(snap.adSoundPlayed) || 0,
     0,
-    0,
+    (Number(snap.adSoundGuarded) || 0) + (Number(snap.adSoundNoPath) || 0) + (Number(snap.adSoundError) || 0) + (Number(snap.adSoundOff) || 0),
     Number(snap.adThrowCapGuarded) || 0
   );
   return cards;

@@ -5,6 +5,7 @@ import {
   buildGiftEffectDiagLines,
   giftEffectDiagToActionCards,
   giftSoundDiagFieldForPlayResult,
+  adSoundDiagFieldForPlayResult,
   computeGiftGapAverage,
   isGiftEffectDiagForOpenLive
 } from './giftEffectDiag.js';
@@ -609,5 +610,38 @@ describe('2026-07-06: 投擲座標フォールバック計器(throwPointFallback
   it('欠損フィールドは0で埋まる', () => {
     const snap = buildGiftEffectDiagSnapshot({ giftDetected: 1 }, 1000);
     expect(snap.throwPointFallbackUsed).toBe(0);
+  });
+});
+
+describe('v0.1.1725: 広告の効果音を戻り値で数える(内訳で説明できる分は取りこぼしにしない)', () => {
+  it('adSoundDiagFieldForPlayResult は広告用のフィールドへ振り分ける', () => {
+    expect(adSoundDiagFieldForPlayResult('guarded')).toBe('adSoundGuarded');
+    expect(adSoundDiagFieldForPlayResult('no-path')).toBe('adSoundNoPath');
+    expect(adSoundDiagFieldForPlayResult('error')).toBe('adSoundError');
+    expect(adSoundDiagFieldForPlayResult('played')).toBe(null);
+    // ギフト版は従来どおり
+    expect(giftSoundDiagFieldForPlayResult('guarded')).toBe('giftSoundGuarded');
+  });
+  it('snapshot が広告の内訳4種を運ぶ(欠損は0)', () => {
+    const snap = buildGiftEffectDiagSnapshot({ adSoundGuarded: 1, adSoundOff: 2 }, 1);
+    expect(snap.adSoundGuarded).toBe(1);
+    expect(snap.adSoundOff).toBe(2);
+    expect(snap.adSoundNoPath).toBe(0);
+    expect(snap.adSoundError).toBe(0);
+  });
+  it('★ガード/OFF時で説明できる広告音は「鳴っていない」にせず内訳を出す', () => {
+    const snap = buildGiftEffectDiagSnapshot({ adDetected: 4, adThrown: 4, adSoundPlayed: 1, adSoundGuarded: 1, adSoundOff: 2 }, 1000);
+    const adLine = buildGiftEffectDiagLines(snap, 1000).find((l) => l.includes('広告:'));
+    expect(adLine).not.toContain('鳴っていない');
+    expect(adLine).toContain('ガード1');
+    expect(adLine).toContain('OFF時2');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-ad')).toBe(false);
+  });
+  it('★内訳で説明できない残りは従来どおり⚠とカードを出す', () => {
+    const snap = buildGiftEffectDiagSnapshot({ adDetected: 3, adThrown: 3, adSoundPlayed: 1, adSoundError: 1 }, 1000);
+    const adLine = buildGiftEffectDiagLines(snap, 1000).find((l) => l.includes('広告:'));
+    expect(adLine).toContain('⚠1件鳴っていない');
+    expect(adLine).toContain('エラー1');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-ad')).toBe(true);
   });
 });

@@ -425,8 +425,9 @@ export default [
     // v0.1.1658: 発言パネルのギフト・広告の一行の配線とCSS=+19行(判定は lib の venueSpeechStats.js)。
     // v0.1.1659: 発言パネルのギフト明細の配線とCSS=+68行(判定は lib の venueGiftThrowsForUser.js)。
     // v0.1.1721: giftEffectDiag スナップショットに liveId を刻む1行(+コメント1行)。別配信の値の居残り根治(判定は lib の giftEffectDiag.js)。
+    // v0.1.1725: 広告効果音を戻り値で数える分岐=+6行(+import 1行)。振り分けは lib の adSoundDiagFieldForPlayResult。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7325, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7331, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

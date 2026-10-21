@@ -3,6 +3,18 @@ import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 
 const cellById = (cells, id) => cells.find((c) => c.id === id);
 
+describe('buildHealthCells: 広告音のガード/OFF時は音漏れにしない (v0.1.1725)', () => {
+  const base = { adDetected: 3, adThrown: 3, soundEnabled: true, lastEventAt: Date.now() };
+  it('ガードと OFF 時で説明できれば ok', () => {
+    const c = cellById(buildHealthCells({ giftEffectDiag: { ...base, adSoundPlayed: 1, adSoundGuarded: 1, adSoundOff: 1 } }), 'gift-effect');
+    expect(c?.level).toBe('ok');
+  });
+  it('未割当/エラーは本当に鳴っていないので warn のまま', () => {
+    const c = cellById(buildHealthCells({ giftEffectDiag: { ...base, adSoundPlayed: 1, adSoundNoPath: 1, adSoundError: 1 } }), 'gift-effect');
+    expect(c?.level).toBe('warn');
+  });
+});
+
 describe('buildHealthCells: gift-effect の liveId ゲート (v0.1.1722)', () => {
   const g = { giftDetected: 2, giftThrown: 2, giftSoundPlayed: 0, soundEnabled: true, lastEventAt: Date.now() };
   it('別配信(liveId が開いている配信に無い)は na「別の配信の記録です」', () => {
