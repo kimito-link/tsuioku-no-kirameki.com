@@ -30,12 +30,14 @@
  *   avgEchoMs: number,     // echo の EMA 平均ms(-1=未計測)
  *   lastOptimisticPaintMs: number, // 直近1回の「押下→楽観表示(pending-self)がレーンに描画完了」ms(-1=未計測。echoとは別物=体感速度の直接指標)
  *   avgOptimisticPaintMs: number,  // 楽観表示描画の EMA 平均ms(-1=未計測)
- *   instantPaintRuns: number       // scheduleImmediate(即時paint)が実行された累計回数(Phase 1導入前は常に0)
+ *   instantPaintRuns: number,      // scheduleImmediate(即時paint)が実行された累計回数(Phase 1導入前は常に0)
+ *   liveId?: string                // v0.1.1724: このカウンタがどの配信への送信の記録か(単一グローバルキーの居残り判定用・snapshot 時に付与)
  * }} CommentPostDiagState
  */
 
 import { makeInitialFromSchema, copyDiagBySchema } from './diagSchemaCopy.js';
 import { CANONICAL_TIME_FIELD } from './timeAuthority.js';
+import { isGiftEffectDiagForOpenLive } from './giftEffectDiag.js';
 
 /**
  * ★フィールド表(唯一の正本)。HANDOFF-instrument-channels-2026-08-12.md §2 の必須5点セット①。
@@ -146,18 +148,19 @@ export function commentPostOutcomeKindForResult(result) {
  * storage 書き込み用の軽量スナップショット(欠損は初期値で埋める)。
  * @param {Partial<CommentPostDiagState>|null|undefined} diag
  * @param {number} [nowMs]
+ * @param {unknown} [liveId] v0.1.1724: カウンタが記録している送信先の配信。nls_comment_post_diag_v1 は
+ *   単一グローバルキーで、別/閉じた配信の取消数が居残るため、読み手が isGiftEffectDiagForOpenLive で照合する。
+ *   ★渡したときだけ liveId キーを足す(未指定の出力は v0.1.1350 移行ゴールデンと同一のまま=旧データ扱い)。
  * @returns {CommentPostDiagState & { capturedAt: number }}
  */
-export function buildCommentPostDiagSnapshot(diag, nowMs) {
+export function buildCommentPostDiagSnapshot(diag, nowMs, liveId) {
   // ★v0.1.1350: 個別列挙(14行の手書き)を廃止し schema の反復に置き換えた。
   //   これで「schema にフィールドを足したのに snapshot に足し忘れる」事故が構造的に起きない
   //   (失敗#3・2026-08-12 時点で6回踏んだ型)。挙動は移行前と同値(ゴールデン検査で担保)。
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
-  return /** @type {CommentPostDiagState & { capturedAt: number }} */ (
-    /** @type {unknown} */ (
-      copyDiagBySchema(COMMENT_POST_DIAG_SCHEMA, diag, { [CANONICAL_TIME_FIELD]: now })
-    )
-  );
+  const out = copyDiagBySchema(COMMENT_POST_DIAG_SCHEMA, diag, { [CANONICAL_TIME_FIELD]: now });
+  if (liveId !== undefined) out.liveId = String(liveId ?? '').trim().toLowerCase();
+  return /** @type {CommentPostDiagState & { capturedAt: number }} */ (/** @type {unknown} */ (out));
 }
 
 /**
@@ -165,10 +168,13 @@ export function buildCommentPostDiagSnapshot(diag, nowMs) {
  * (ノイズにしない・opSoundEffectDiag.js と同方針)。
  * @param {(CommentPostDiagState & { capturedAt?: number })|null|undefined} snap
  * @param {number} nowMs 現在時刻(最終イベント ago の算出用)
+ * @param {Iterable<unknown>} [openLiveIds] v0.1.1724: 渡されたときだけ、snap の liveId が開いている配信に
+ *   無ければ空配列(別/閉じた配信の送信記録を現在の状態として出さない)。未タグの旧データは従来どおり出す。
  * @returns {string[]}
  */
-export function buildCommentPostDiagLines(snap, nowMs) {
+export function buildCommentPostDiagLines(snap, nowMs, openLiveIds) {
   if (!snap || typeof snap !== 'object') return [];
+  if (openLiveIds !== undefined && !isGiftEffectDiagForOpenLive(snap, openLiveIds)) return [];
   const attempts = Number(snap.attempts) || 0;
   if (attempts === 0) return []; // 未観測=このセッションで送信操作が無かった
   const okCount = Number(snap.okCount) || 0;

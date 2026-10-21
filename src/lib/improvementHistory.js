@@ -3502,5 +3502,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1723', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1721/1722 の note と同じ理由)。今回は単体テスト +5(snapshot liveId 正規化・2セルの別配信/現配信/未タグ)で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1724', metric: 'bundle-kb', value: 1440,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の嘘の是正(B3 follow-up): commentPostDiag snapshot に送信先 liveId を刻み、送信先が変わればカウンタを捨て、行と comment-revert セルを照合。popup.js は前版 1440KB と同値(過去最良 1360 超は v0.1.1454 以降の継続状態)。'
+  }),
+  Object.freeze({
+    version: '0.1.1724', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1724', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1723 の note と同じ理由)。今回は単体テスト +6(snapshot liveId・行ゲート・comment-revert セル)で確認。'
   })
 ]);

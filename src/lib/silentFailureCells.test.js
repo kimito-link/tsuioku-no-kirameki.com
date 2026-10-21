@@ -166,6 +166,19 @@ describe('無音で死ぬ故障のセル', () => {
     });
   });
 
+  // v0.1.1724: commentPostDiag も単一グローバルキー。別/閉じた配信への送信の取消数を現在の問題にしない。
+  describe('送信の取り消しの liveId 照合', () => {
+    it('★別の配信の記録は na「別の配信」', () => {
+      const c = cellOf({ commentPostDiag: { revertCount: 2, attempts: 3, liveId: 'lv_old' }, livesData: [{ lv: 'lv_now' }] }, 'comment-revert');
+      expect(c?.level).toBe('na');
+      expect(c?.text).toContain('別の配信');
+    });
+    it('★今の配信のタグ・未タグ旧データは従来どおり bad', () => {
+      expect(cellOf({ commentPostDiag: { revertCount: 2, liveId: 'lv_now' }, livesData: [{ lv: 'lv_now' }] }, 'comment-revert')?.level).toBe('bad');
+      expect(cellOf({ commentPostDiag: { revertCount: 2 }, livesData: [{ lv: 'lv_now' }] }, 'comment-revert')?.level).toBe('bad');
+    });
+  });
+
   describe('送信の取り消し(comment-revert)', () => {
     it('★取り消しがあれば bad(送れたように見えて届いていない)', () => {
       const c = cellOf({ commentPostDiag: { revertCount: 1, attempts: 4 } }, 'comment-revert');

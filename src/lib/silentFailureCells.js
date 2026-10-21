@@ -179,6 +179,9 @@ export function buildSilentFailureCells(data) {
   const cp = data?.commentPostDiag ?? null;
   if (!cp || typeof cp !== 'object') {
     out.push(cell('comment-revert', '送信の取り消し', 'na', '—'));
+  } else if (!isGiftEffectDiagForOpenLive(cp, openLiveIds)) {
+    // v0.1.1724: commentPostDiag も単一グローバルキー。別/閉じた配信への送信の取消数を現在の問題にしない。
+    out.push(cell('comment-revert', '送信の取り消し', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const revert = n0(cp.revertCount);
     const attempts = n0(cp.attempts);
