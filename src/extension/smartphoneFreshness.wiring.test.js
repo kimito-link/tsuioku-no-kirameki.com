@@ -45,9 +45,24 @@ describe('配線: スマホ版の利用者ごとの鍵(v0.1.1731)', () => {
     expect(src).not.toMatch(/'x-share-key': ingestKey/);
   });
   it('同意 OFF でサーバーの利用者データを消す・401 で鍵を捨てる・同意 ON で鍵をもらう', () => {
-    expect(src).toMatch(/if \(!value\) void deleteDeviceOnServer\(/);
+    expect(src).toMatch(/if \(!value\) await deleteDeviceOnServer\(/);
     expect(src).toMatch(/shouldForgetDeviceCred\(creds\.mode, res\.status\)\) void forgetDeviceCred\(\)/);
     expect(src).toMatch(/maybeRegisterDevice\(\{ optedIn: _webPublishOptIn === true/);
     expect(src).toContain('hasKeys: Boolean(getPublishCredentials(getUploadConfig()))');
+  });
+});
+
+describe('配線: 📱 スマホで見る(v0.1.1732)', () => {
+  const src = readFileSync(new URL('./status-entry.js', import.meta.url), 'utf8');
+  it('同意スイッチは共有キーが無くても出す(null を返さない)・発行と作り直しを渡す', () => {
+    const at = src.indexOf('function buildAutoPublishConsentToggle() {');
+    const body = src.slice(at, src.indexOf('function buildWebUrlButton() {'));
+    expect(body).toContain('return buildSmartphoneCard({');
+    expect(body).not.toMatch(/return null/);
+    expect(body).toContain('setOptIn: (next) => setWebPublishOptIn(next)');
+    expect(body).toContain('rotate: rotateDeviceViewToken');
+  });
+  it('手動の共有ボタンも利用者の鍵で出る', () => {
+    expect(src).toContain('if (!getPublishCredentials(getUploadConfig())) return null;');
   });
 });

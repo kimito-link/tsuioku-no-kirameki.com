@@ -437,7 +437,8 @@ export default [
     // v0.1.1705: popup の応援者鏡とレポート集計の値の突き合わせを extras の統合 get から通す配線(+3行・判定は lib の supportersParity.js)。
     // v0.1.1720: 広告pt/ギフトpt の DOM↔NDGR 優先順位を lib(resolveOfficialPoints.js)へ集約し import(+1)、呼び出しを統一(+1)。status が NDGR 先頭 fallback で popup と逆転していた診断の嘘の是正。
     // v0.1.1731: スマホ版の利用者ごとの鍵の配線(+4行: import・起動時の読み込み・同意OFFで削除・401で鍵を捨てる)。発行・削除・判定は statusDeviceCred.js / lib の devicePublishCredentials.js。
-    rules: { 'max-lines': ['error', { max: 4557, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1732: 同意スイッチの描画を statusSmartphoneCard.js へ移して -11行=上限も 4546 へ下げる。
+    rules: { 'max-lines': ['error', { max: 4546, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と
