@@ -220,7 +220,8 @@ import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/
 import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
-import { buildPublishBody, deleteDeviceOnServer, forgetDeviceCred, getPublishCredentials, maybeRegisterDevice, refreshDeviceCredCache, shouldForgetDeviceCred } from './statusDeviceCred.js';
+import { buildPublishBody, deleteDeviceOnServer, forgetDeviceCred, getPublishCredentials, maybeRegisterDevice, refreshDeviceCredCache, rotateDeviceViewToken, shouldForgetDeviceCred } from './statusDeviceCred.js';
+import { buildSmartphoneCard } from './statusSmartphoneCard.js';
 /*
  * ★v0.1.1371: boot(init)で await する storage read の上限[ms]。
  *   ここが無界だと storage stall のとき init が止まり、refresh にも到達せず【画面が白紙】になる
@@ -341,7 +342,7 @@ async function setWebPublishOptIn(next) {
   _webPublishOptIn = value;
   try {
     await chrome.storage.local.set({ [KEY_WEB_PUBLISH_OPT_IN]: value });
-    if (!value) void deleteDeviceOnServer(getUploadConfig().appOrigin); // v0.1.1731: 同意 OFF=サーバーの利用者データも消す
+    if (!value) await deleteDeviceOnServer(getUploadConfig().appOrigin); // v0.1.1731: 同意 OFF=サーバーの利用者データも消す(v0.1.1732: 消し終わってから画面に出す)
   } catch {
     /* best-effort: 保存に失敗してもキャッシュは反映済み(次回起動で既定OFFに戻る=安全側) */
   }
@@ -3139,22 +3140,22 @@ function buildUploadConfigEditor() {
   details.style.cssText =
     'margin-top:8px;padding:6px 8px;border-radius:6px;font-size:11px;line-height:1.5;' +
     'border:1px solid var(--nl-border);background:var(--nl-card-bg);';
-  // 未設定なら開いた状態で出す（何をすればいいか一目で分かる）
-  details.open = _uploadConfigDraft.open !== null ? _uploadConfigDraft.open : !(cfg.ingestKey && cfg.viewToken);
+  // v0.1.1732: 開発者向けの欄になったので、既定は閉じる(利用者は「📱 スマホで見る」だけで足りる)。
+  details.open = _uploadConfigDraft.open !== null ? _uploadConfigDraft.open : false;
   details.addEventListener('toggle', () => { _uploadConfigDraft.open = details.open; });
 
   const summary = document.createElement('summary');
   summary.style.cssText = 'cursor:pointer;font-weight:600;';
   summary.textContent = cfg.ingestKey && cfg.viewToken
-    ? '🔑 WEB共有の設定（設定済み）'
-    : '🔑 WEB共有の設定（未設定＝共有機能は使えません）';
+    ? '🔑 開発者向け: 共有キーの設定（設定済み）'
+    : '🔑 開発者向け: 共有キーの設定（ふつうは不要）';
   details.appendChild(summary);
 
   const note = document.createElement('p');
   note.style.cssText = 'margin:6px 0;color:var(--nl-muted);';
   note.textContent =
-    '記録をスマホや他の人に見せる「WEB共有」を使うときだけ必要です。空のままでも記録・表示は問題なく動きます。' +
-    'この値はこのPCの中だけに保存され、外部には送られません。';
+    '開発者が診断用の送信先を固定するための欄です。スマホで見るだけなら、上の「📱 スマホで見る」で足ります。' +
+    '空のままでも記録・表示は問題なく動きます。この値はこのPCの中だけに保存されます。';
   details.appendChild(note);
 
   /** @param {'ingestKey'|'viewToken'|'appOrigin'} draftKey @param {string} label @param {string} value @param {string} hint */
@@ -3242,31 +3243,19 @@ function buildUploadConfigEditor() {
 }
 
 function buildAutoPublishConsentToggle() {
-  const { ingestKey, viewToken } = getUploadConfig();
-  if (!ingestKey || !viewToken) return null; // キー未設定=公開機能なし=出さない
-  const wrap = document.createElement('label');
-  wrap.style.cssText =
-    'display:flex;align-items:flex-start;gap:6px;margin-top:8px;padding:6px 8px;border-radius:6px;' +
-    'font-size:11px;line-height:1.5;cursor:pointer;border:1px solid var(--nl-border);background:var(--nl-card-bg);';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = _webPublishOptIn === true;
-  cb.style.cssText = 'margin-top:2px;flex:0 0 auto;cursor:pointer;';
-  const text = document.createElement('span');
-  text.textContent =
-    '配信中、この画面の内容(視聴者のID・表示名・コメント本文を含みます)を2分ごとに自動でWEBへ公開する。' +
-    'OFFのあいだは自動送信しません(「🔗 WEBサイトURLで共有」を押したときだけ送信します)。';
-  cb.addEventListener('change', () => {
-    void setWebPublishOptIn(cb.checked === true);
+  // v0.1.1732: 共有キーが無くても出す=ストア版の利用者の「📱 スマホで見る」。説明・URL・作り直しは statusSmartphoneCard.js。
+  return buildSmartphoneCard({
+    optedIn: _webPublishOptIn === true,
+    getCreds: () => getPublishCredentials(getUploadConfig()),
+    setOptIn: (next) => setWebPublishOptIn(next),
+    registerNow: () => maybeRegisterDevice({ optedIn: _webPublishOptIn === true, uploadCfg: getUploadConfig() }),
+    rotate: rotateDeviceViewToken,
+    openUrl: (url) => { try { chrome.tabs.create({ url }); } catch { window.open(url, '_blank', 'noopener'); } }
   });
-  wrap.appendChild(cb);
-  wrap.appendChild(text);
-  return wrap;
 }
 
 function buildWebUrlButton() {
-  const { ingestKey, viewToken } = getUploadConfig();
-  if (!ingestKey || !viewToken) return null; // キー未設定ビルド=出さない。
+  if (!getPublishCredentials(getUploadConfig())) return null; // 鍵が無い(共有キーも利用者の鍵も無い)=出さない。
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = '🔗 WEBサイトURLで共有';
