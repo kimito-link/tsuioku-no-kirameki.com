@@ -41,6 +41,7 @@
 - `src/lib/customSoundStore.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/effectSoundPlayer.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/giftDeltaFallback.js` → **4 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/giftEffectDiag.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/giftEffectDiagKey.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/highlightLedger.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/highlightLedgerKey.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -93,7 +94,6 @@
 - `src/lib/concurrentEstimate.js` → **3 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン)
 - `src/lib/displayRecordedCount.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/effectDirector.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
-- `src/lib/giftEffectDiag.js` → **3 機能**: 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/instantPushDiag.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/instantPushDiagKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/kokenContributionRankingApi.js` → **3 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン)
@@ -182,6 +182,7 @@
 | `src/lib/customSoundStore.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/effectSoundPlayer.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/giftDeltaFallback.js` | 4 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/giftEffectDiag.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/giftEffectDiagKey.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/highlightLedger.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/highlightLedgerKey.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -234,7 +235,6 @@
 | `src/lib/concurrentEstimate.js` | 3 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/displayRecordedCount.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/effectDirector.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
-| `src/lib/giftEffectDiag.js` | 3 | 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/instantPushDiag.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/instantPushDiagKey.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/kokenContributionRankingApi.js` | 3 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |

@@ -1872,7 +1872,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   //   載って消える」の切り分けに、締切超過件数と取消件数を1枚で確認できる。
   let commentPostLine = '';
   safeSection('コメント送信計器', () => {
-    const cLines = buildCommentPostDiagLines(commentPostDiag, Date.now());
+    const cLines = buildCommentPostDiagLines(commentPostDiag, Date.now(), livesData.map((/** @type {any} */ l) => l?.lv));
     commentPostLine = cLines.length ? `\n${cLines.join('\n')}` : '';
   });
   // v0.1.1092: コメント即時プッシュレーン(storage迂回)の送信N/受信N/表示遅延msを概要に併記

@@ -1276,6 +1276,16 @@ function publishOpSoundEffectDiag() {
 //   目的: 「送信中…」張り付き・自コメ「一瞬載って消える」を状態速報1枚で切り分ける。
 const _commentPostDiagCounters = makeInitialCommentPostDiag();
 let _commentPostDiagLastWriteAt = 0;
+// v0.1.1724: カウンタがどの配信への送信を数えているか。送信先は submitComment の lvPost
+//   (exportBtn.dataset.liveId)であり watchPopupLastPaintedLiveId とは別物になり得るので、表示中の配信ではなく
+//   **実際に送った先**で刻む。送信先が変わったらカウンタを捨てる=別配信の取消数を新しい配信の名で出さない。
+let _commentPostDiagLiveId = '';
+/** @param {string} lvPost submitComment が実際に送る配信(空なら刻まない) */
+function scopeCommentPostDiagToLive(lvPost) {
+  if (!lvPost || lvPost === _commentPostDiagLiveId) return;
+  if (_commentPostDiagLiveId) Object.assign(_commentPostDiagCounters, makeInitialCommentPostDiag());
+  _commentPostDiagLiveId = lvPost;
+}
 // comment-post-speed-DESIGN.md §F(Phase 0計器・§B-2/D Phase 1で消費): submitComment の楽観追記
 //   時に押下時刻を積む。renderStoryUserLane の paint 直後に pending-self エントリの capturedAt と
 //   突合し、成立分だけ「押下→楽観表示がレーンに描画完了」のサンプルにする(嘘をつかない=
@@ -1321,7 +1331,7 @@ function publishCommentPostDiag() {
   const now = Date.now();
   if (now - _commentPostDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
   _commentPostDiagLastWriteAt = now;
-  const snap = { ...buildCommentPostDiagSnapshot(_commentPostDiagCounters, now), source: 'popup' };
+  const snap = { ...buildCommentPostDiagSnapshot(_commentPostDiagCounters, now, _commentPostDiagLiveId), source: 'popup' };
   void safeStorageLocalSet({ [KEY_COMMENT_POST_DIAG]: snap });
 }
 
@@ -20422,6 +20432,7 @@ async function initPopup() {
       //   5秒の総締切で有界化する。締切超過は{ok:false, timedOut:true}という「不明」を
       //   区別できる形で返る(失敗と断定しない=嘘をつかない)。
       const submitT0 = Date.now();
+      scopeCommentPostDiagToLive(lvPost);
       _commentPostDiagCounters.attempts += 1;
       const result = await withCommentPostDeadline(
         requestPostCommentToOpenTab(text, watchUrl),

@@ -486,7 +486,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     }
     // 感度パッチ(2026-07-06): コメント送信(所要ms/結果/フレーム試行回数)観測値(未観測なら空=ノイズにしない)。
     try {
-      const cpLines = buildCommentPostDiagLines(commentPostDiag, Date.now());
+      const cpLines = buildCommentPostDiagLines(commentPostDiag, Date.now(), (Array.isArray(livesData) ? livesData : []).map((/** @type {any} */ l) => l?.lv));
       for (const l of cpLines) lines.push(l);
     } catch {
       /* no-op */
