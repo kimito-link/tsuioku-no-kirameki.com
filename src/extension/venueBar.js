@@ -3791,7 +3791,8 @@ export function mountVenueBarButton(options = {}) {
     _giftEffectDiagLastWriteAt = now;
     _giftEffectDiagDirty = false;
     _giftEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
-    const snap = buildGiftEffectDiagSnapshot(_giftEffectDiagCounters, now);
+    // v0.1.1721: どの配信の計測かを liveId で刻む(別配信の値が居残る根治=読み手が照合する)。
+    const snap = buildGiftEffectDiagSnapshot(_giftEffectDiagCounters, now, liveIdFromPathname());
     void chrome.storage.local.set({ [KEY_GIFT_EFFECT_DIAG]: snap }).catch(() => {});
   };
   const publishGiftEffectDiag = () => {

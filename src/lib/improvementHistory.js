@@ -3460,5 +3460,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1720', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1719 の note と同じ理由)。今回は単体テスト +8(resolveOfficialPoints の境界・逆順・負値)と probe 実行で確認。※この版はクラウドの浅いクローンで記録したため --auto が一旦 0 を書いたが、履歴を深くして再実測し 41(v0.1.1719 と同窓)へ訂正した。'
+  }),
+  Object.freeze({
+    version: '0.1.1721', metric: 'bundle-kb', value: 1441,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の嘘の是正(B3): giftEffectDiag を liveId でスコープ化し、別/終了済み配信のギフト音エラーを現配信の問題として出さない。前版 v0.1.1720 の 1442KB より 1KB 小(過去最良 1360 超は v0.1.1454 以降の継続状態)。'
+  }),
+  Object.freeze({
+    version: '0.1.1721', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1721', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630〜1720 の note と同じ理由)。今回は単体テスト +9(liveId タグ・isGiftEffectDiagForOpenLive の境界・ゲート)で確認。'
   })
 ]);

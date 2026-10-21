@@ -118,6 +118,29 @@ describe('無音で死ぬ故障のセル', () => {
       const c = cellOf({ giftEffectDiag: { soundEnabled: false, giftSoundOff: 12 } }, 'gift-sound-fail');
       expect(c?.level).toBe('ok');
     });
+
+    // v0.1.1721: 単一グローバルキーで別配信の値が居残る根治。liveId タグを開いている配信と照合する。
+    it('★別/終了済み配信の記録(liveId が開いている配信に無い)は na にして現在の問題にしない', () => {
+      const c = cellOf({
+        giftEffectDiag: { giftSoundError: 9, liveId: 'lv_old' },
+        livesData: [{ lv: 'lv_now' }]
+      }, 'gift-sound-fail');
+      expect(c?.level).toBe('na');
+      expect(c?.text).toContain('別の配信');
+    });
+
+    it('★今開いている配信のタグなら従来どおり bad を出す', () => {
+      const c = cellOf({
+        giftEffectDiag: { giftSoundError: 9, liveId: 'lv_now' },
+        livesData: [{ lv: 'lv_now' }]
+      }, 'gift-sound-fail');
+      expect(c?.level).toBe('bad');
+    });
+
+    it('★未タグ(旧データ)は従来挙動を維持する=回帰なし', () => {
+      const c = cellOf({ giftEffectDiag: { giftSoundError: 1 }, livesData: [{ lv: 'lv_now' }] }, 'gift-sound-fail');
+      expect(c?.level).toBe('bad');
+    });
   });
 
   describe('送信の取り消し(comment-revert)', () => {

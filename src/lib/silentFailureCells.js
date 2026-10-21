@@ -27,6 +27,7 @@
  */
 
 import { canonicalLabel, fromAliveFailure } from './voiceFailureTaxonomy.js';
+import { isGiftEffectDiagForOpenLive } from './giftEffectDiag.js';
 // ★v0.1.1405: 会場が鏡を受け取れているかの判定(a/b/c)。判定はあちらが正本。
 import { judgeVenueMirrorIntake } from './venueMirrorIntakeDiag.js';
 
@@ -145,8 +146,13 @@ export function buildSilentFailureCells(data) {
    *   coalesced/guarded は **防御が効いた回数**なので異常にしない(掟1)。
    */
   const g = data?.giftEffectDiag ?? null;
+  const openLiveIds = (Array.isArray(data?.livesData) ? data.livesData : []).map((/** @type {any} */ e) => e?.lv);
   if (!g || typeof g !== 'object') {
     out.push(cell('gift-sound-fail', 'ギフト音の失敗', 'na', '—'));
+  } else if (!isGiftEffectDiagForOpenLive(g, openLiveIds)) {
+    // v0.1.1721: giftEffectDiag は単一グローバルキーで配信ごとにリセットされない。今開いている
+    //   配信の計測でなければ(=別/終了済み配信の値の居残り)、現在の問題として断定しない(診断の嘘の是正)。
+    out.push(cell('gift-sound-fail', 'ギフト音の失敗', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const err = n0(g.giftSoundError);
     const noPath = n0(g.giftSoundNoPath);

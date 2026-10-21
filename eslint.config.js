@@ -424,8 +424,9 @@ export default [
     // v0.1.1657: Esc の入口の判定(変換中・入力欄・しまい中)=+17行(大半は【なぜ】のコメント)。
     // v0.1.1658: 発言パネルのギフト・広告の一行の配線とCSS=+19行(判定は lib の venueSpeechStats.js)。
     // v0.1.1659: 発言パネルのギフト明細の配線とCSS=+68行(判定は lib の venueGiftThrowsForUser.js)。
+    // v0.1.1721: giftEffectDiag スナップショットに liveId を刻む1行(+コメント1行)。別配信の値の居残り根治(判定は lib の giftEffectDiag.js)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7324, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7325, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
