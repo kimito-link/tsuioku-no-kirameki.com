@@ -3,6 +3,23 @@ import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 
 const cellById = (cells, id) => cells.find((c) => c.id === id);
 
+describe('buildHealthCells: gift-effect の liveId ゲート (v0.1.1722)', () => {
+  const g = { giftDetected: 2, giftThrown: 2, giftSoundPlayed: 0, soundEnabled: true, lastEventAt: Date.now() };
+  it('別配信(liveId が開いている配信に無い)は na「別の配信の記録です」', () => {
+    const c = cellById(buildHealthCells({ giftEffectDiag: { ...g, liveId: 'lv_old' }, livesData: [{ lv: 'lv_now' }] }), 'gift-effect');
+    expect(c?.level).toBe('na');
+    expect(c?.text).toContain('別の配信');
+  });
+  it('今開いている配信のタグなら従来どおり判定(音漏れで warn)', () => {
+    const c = cellById(buildHealthCells({ giftEffectDiag: { ...g, liveId: 'lv_now' }, livesData: [{ lv: 'lv_now' }] }), 'gift-effect');
+    expect(c?.level).toBe('warn');
+  });
+  it('未タグ(旧データ)は従来挙動=回帰なし', () => {
+    const c = cellById(buildHealthCells({ giftEffectDiag: { ...g }, livesData: [{ lv: 'lv_now' }] }), 'gift-effect');
+    expect(c?.level).toBe('warn');
+  });
+});
+
 describe('buildHealthCells', () => {
   it('空入力でも落ちず、全セルが na(対象外)で赤を作らない', () => {
     const cells = buildHealthCells({});

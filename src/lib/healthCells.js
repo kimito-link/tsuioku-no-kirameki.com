@@ -11,6 +11,7 @@ import { buildVenueModeCensus } from './venueModeCensus.js';
 import { buildBuriedCells } from './buriedInstrumentCells.js';
 // ★v0.1.1403: 無音で死ぬ故障(カスタム音源全滅・読み上げON失敗など)を画面へ。
 import { buildSilentFailureCells } from './silentFailureCells.js';
+import { isGiftEffectDiagForOpenLive } from './giftEffectDiag.js';
 // ★v0.1.1404: 黒画面の当人(累計/合計/スリープ明け)とビルドの古さ。
 import { buildBlackScreenOwnerCells } from './blackScreenOwnerCells.js';
 import { buildBuildAgeCell } from './buildAgeCell.js';
@@ -708,7 +709,7 @@ export function buildHealthCells(data) {
   for (const c of buildLaneHealthCells(data?.laneDiag)) cells.push(c);
 
   // 24. v0.1.1054: ギフト/広告の「検知→演出→効果音」整合(giftEffectDiag 未観測なら空)。
-  for (const c of buildGiftEffectHealthCells(data?.giftEffectDiag)) cells.push(c);
+  for (const c of buildGiftEffectHealthCells(data?.giftEffectDiag, livesData.map((/** @type {any} */ l) => l?.lv))) cells.push(c);
 
   // 25-26. v0.1.1056: パリティ根本修正(①②の世代同期)自体が動いているかの自己診断。
   for (const c of buildPreviewGenSyncHealthCells(data?.previewRenderAck, data?.laneMirror, nowMs)) cells.push(c);
@@ -941,14 +942,20 @@ function buildPreviewGenSyncHealthCells(previewRenderAck, laneMirror, nowMs) {
  *   これまで aiShareFullText(文章の対処カード)にだけ統合されており、completenessScore(数値の
  *   達成率)には反映されない「片翼統合」だった(v0.1.1054 全機能診断監査で発見)。
  * @param {import('./giftEffectDiag.js').GiftEffectDiagState|null|undefined} giftEffectDiag
+ * @param {Iterable<unknown>} [openLiveIds] v0.1.1722: 渡されたときだけ、別/過去の配信の計測を弾く。
  * @returns {HealthCell[]}
  */
-function buildGiftEffectHealthCells(giftEffectDiag) {
+function buildGiftEffectHealthCells(giftEffectDiag, openLiveIds) {
   const snap = giftEffectDiag && typeof giftEffectDiag === 'object' ? giftEffectDiag : null;
   if (!snap) return [];
   const giftDetected = num(snap.giftDetected) || 0;
   const adDetected = num(snap.adDetected) || 0;
   if (giftDetected === 0 && adDetected === 0) return []; // 未観測=このセッションでギフト/広告が無かった
+  // v0.1.1722: 中身はあるが別/過去の配信の計測なら、現在の達成率に混ぜず na セルにする
+  //   (既存の化石ゲート=lastEventAt 日数、の liveId 精密版。消さず出す=掟5)。
+  if (openLiveIds !== undefined && !isGiftEffectDiagForOpenLive(snap, openLiveIds)) {
+    return [stateCell('gift-effect', 'ギフト演出/効果音', 'na', '別の配信の記録です')];
+  }
 
   const soundEnabled = snap.soundEnabled !== false;
   const giftThrown = num(snap.giftThrown) || 0;

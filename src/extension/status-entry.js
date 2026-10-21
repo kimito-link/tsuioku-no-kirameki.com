@@ -1843,7 +1843,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   //   ギフト無し配信なら空=ノイズにしない)。「ギフトがちゃんと飛ぶか・音が出るか」を目視せず確認できる。
   let giftEffectLine = '';
   safeSection('ギフト効果音診断', () => {
-    const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
+    const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now(), livesData.map((/** @type {any} */ l) => l?.lv));
     giftEffectLine = gLines.length ? `\n${gLines.join('\n')}` : '';
   });
   // v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合診断も概要に併記
@@ -2901,7 +2901,7 @@ function renderActionCards(data) {
     cards = buildStatusActions(data);
     // v0.1.1054: ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを症状カードに昇格。
     //   aiShareFullText.js には既に配線済みだったが、status画面の対処候補パネル側は漏れていた(片翼統合)。
-    try { cards.push(...giftEffectDiagToActionCards(data.giftEffectDiag)); } catch { /* no-op */ }
+    try { cards.push(...giftEffectDiagToActionCards(data.giftEffectDiag, (Array.isArray(data.livesData) ? data.livesData : []).map((/** @type {any} */ l) => l?.lv))); } catch { /* no-op */ }
     // v0.1.1058: コメント数マイルストーンの検知はしたが演出/効果音が出ていない取りこぼしも同様に昇格。
     try { cards.push(...milestoneEffectDiagToActionCards(data.milestoneEffectDiag)); } catch { /* no-op */ }
   } catch (err) {
