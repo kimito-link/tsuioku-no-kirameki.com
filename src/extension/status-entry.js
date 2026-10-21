@@ -3482,7 +3482,9 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     snap?.broadcasterName || snap?.programProvider?.name || s?.broadcasterName || ''
   );
   const title = String(snap?.title || snap?.programTitle || s?.title || '');
-  const recordedCount = numOr(s?.recordedCount, 0);
+  // v0.1.1727(B3 項目4 第1版): 未観測(panel_summary がまだ無い/値が無い)を 0 件に潰さない(§3.6)。
+  //   null は「まだ分からない」=表示は「—」・率は出さない。観測した 0 は 0 のまま。
+  const recordedCount = numOrNull(s?.recordedCount);
   // 公式コメ数は panel_summary.officialCount にあるが、snapshot.officialCommentCount も
   //   読みに行く(片方しか入っていないケースに耐える)。
   const officialCommentCount =
@@ -3524,7 +3526,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
       ? Math.max(0, Date.now() - officialCommentStatsUpdatedAt)
       : null;
   const officialRatePct =
-    recordedCount > 0 && officialCommentCount && officialCommentCount > 0
+    recordedCount != null && recordedCount > 0 && officialCommentCount && officialCommentCount > 0
       ? Math.round((recordedCount / officialCommentCount) * 100)
       : null;
 
@@ -3565,10 +3567,6 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     //   self-verifying 違反・ユーザー指摘)。配信中(endedAt 無し=列挙された視聴中タブ)を記録中とみなす。
     recording: !endedAt
   };
-}
-
-function numOr(v, dflt) {
-  return typeof v === 'number' && Number.isFinite(v) ? v : dflt;
 }
 
 function numOrNull(v) {

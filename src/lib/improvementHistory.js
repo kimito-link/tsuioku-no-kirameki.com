@@ -3544,5 +3544,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1726', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1725 の note と同じ理由)。今回は全テスト実行+デッドセレクタラチェットで確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1727', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の嘘の是正(B3 項目4 第1版): summarizeOneLive の recordedCount を未観測なら null にし、表示「—」・出どころ/乖離判定で 0 扱いしない。前版 1438KB より 1KB 小(過去最良 1360 超は v0.1.1454 以降の継続状態)。'
+  }),
+  Object.freeze({
+    version: '0.1.1727', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1727', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1726 の note と同じ理由)。今回は単体テスト +4 と全テスト実行で確認。'
   })
 ]);
