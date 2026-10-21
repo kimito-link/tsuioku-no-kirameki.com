@@ -102,13 +102,17 @@ TDD で赤→緑。venueBar 側のカウンタ加算は wiring テストで固�
   - `silentFailureCells.js`: gift-sound-fail を「開いている配信(`data.livesData[].lv`)の記録でなければ
     `na`『別の配信の記録です』」にゲート。
   - ユニット +9(タグ・helper 境界・ゲート)。`verify:cc` 緑。
-- **残り(follow-up・同じ helper を使い回す)**:
-  1. giftEffectDiag の**他の読み手**(`buildGiftEffectDiagLines`・`giftEffectDiagToActionCards`・
-     `buildGiftEffectHealthCells`)にも同じ照合を適用(今は silentFailure の1セルのみ是正)。
-  2. 同じ単一グローバルキー病を持つ他 diag(`voiceDiag`=`nls_voice_diag_v1`・
+- **実装済み(v0.1.1722・giftEffectDiag の全読み手へ展開)**:
+  - `buildGiftEffectDiagLines`・`giftEffectDiagToActionCards`(giftEffectDiag.js)・
+    `buildGiftEffectHealthCells`(healthCells.js)に `openLiveIds` 引数を追加し、同じ helper で
+    opt-in ゲート(渡されたときだけ照合・未タグ旧データは通す=回帰なし)。呼び出し元5箇所
+    (status-entry ×2・aiShareFullText ×2・healthCells ×1)で `livesData[].lv` を渡す。
+    健全度セルは掟5に従い消さず `na`「別の配信の記録です」を出す。ユニット +9。
+- **残り(follow-up)**:
+  1. 同じ単一グローバルキー病を持つ他 diag(`voiceDiag`=`nls_voice_diag_v1`・
      `commentPostDiag`=`nls_comment_post_diag_v1`)の対応セル(voice-start-fail・comment-revert)も
      liveId スコープ化。
-  3. 真の多配信正本化(キー自体を per-live にする)は大きい変更=別途設計。
+  2. 真の多配信正本化(キー自体を per-live にする)は大きい変更=別途設計。
 - ★**最終検証はライブ実機必須**: 配信A→配信B 切替で、Aのギフト音エラーがBで『別の配信の記録』に
   なること、Bで本物のエラーが従来どおり出ることを census/実機で確認(クラウドでは未検証)。
 

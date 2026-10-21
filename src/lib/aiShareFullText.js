@@ -450,7 +450,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     }
     // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断(使用時のみ)。「ちゃんと飛ぶか・音が出るか」を共有に載せる。
     try {
-      const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
+      const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now(), (Array.isArray(livesData) ? livesData : []).map((/** @type {any} */ l) => l?.lv));
       for (const l of gLines) lines.push(l);
     } catch {
       /* no-op */
@@ -534,7 +534,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.1026: アイコン画像のロード失敗(usericon 404/削除済み=画像が壊れて見える)を名指し(失敗0なら出さない)。
     try { actions.push(...avatarLoadDiagToActionCards((popupDiag?.popup ?? popupDiag)?.avatarLoadDiag)); } catch { /* no-op */ }
     // v0.1.1054: ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを症状カードに昇格。
-    try { actions.push(...giftEffectDiagToActionCards(giftEffectDiag)); } catch { /* no-op */ }
+    try { actions.push(...giftEffectDiagToActionCards(giftEffectDiag, (Array.isArray(livesData) ? livesData : []).map((/** @type {any} */ l) => l?.lv))); } catch { /* no-op */ }
     // v0.1.1058: コメント数マイルストーンの検知はしたが演出/効果音が出ていない取りこぼしを症状カードに昇格。
     try { actions.push(...milestoneEffectDiagToActionCards(milestoneEffectDiag)); } catch { /* no-op */ }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');

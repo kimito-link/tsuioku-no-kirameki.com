@@ -33,7 +33,8 @@
  *   arrivalSkippedCd: number,  // 来場演出専用20秒CD中でスキップした回数(積み増し禁止=正常動作)
  *   throwPointFallbackUsed: number, // 2026-07-06: 投擲の起点/着弾座標が(0,0)/領域外/NaN等でresolveVisibleThrowPointの既定位置へ差し替わった回数(=「音は鳴るが飛翔が見えない」の元凶を可視の既定へ救済した回数)
  *   giftThrowCapGuarded: number, // 2026-07-30: ギフトがcanLaunchGiftThrow(同時投擲上限GIFT_THROW_MAX_CONCURRENT)超過でlaunchGiftThrowがfalseを返し、演出を意図的に捨てた回数(性能ガード=正常動作)
- *   adThrowCapGuarded: number   // 2026-07-30: 広告版のgiftThrowCapGuarded(投擲上限は種別を問わず共有=giftProjActiveが同一カウンタのため)
+ *   adThrowCapGuarded: number,   // 2026-07-30: 広告版のgiftThrowCapGuarded(投擲上限は種別を問わず共有=giftProjActiveが同一カウンタのため)
+ *   liveId?: string             // v0.1.1721: この計測がどの配信のものか(別配信の値の居残り根治用タグ・snapshot 時に付与)
  * }} GiftEffectDiagState
  */
 
@@ -207,10 +208,14 @@ function diffCounts(detected, thrown, soundPlayed, soundCoalesced = 0, soundExpl
  * (ノイズにしない・voiceDiag と同方針)。
  * @param {(GiftEffectDiagState & { capturedAt?: number })|null|undefined} snap
  * @param {number} nowMs 現在時刻(最終イベント ago の算出用)
+ * @param {Iterable<unknown>} [openLiveIds] v0.1.1722: 渡されたときだけ、snap の liveId が
+ *   開いている配信に含まれるか照合し、別/過去の配信なら空(=未観測扱い)にする。
  * @returns {string[]}
  */
-export function buildGiftEffectDiagLines(snap, nowMs) {
+export function buildGiftEffectDiagLines(snap, nowMs, openLiveIds) {
   if (!snap || typeof snap !== 'object') return [];
+  // v0.1.1722: 別配信の値の居残りを出さない(isGiftEffectDiagForOpenLive 正本。未タグ旧データは通す)。
+  if (openLiveIds !== undefined && !isGiftEffectDiagForOpenLive(snap, openLiveIds)) return [];
   const giftDetected = Number(snap.giftDetected) || 0;
   const adDetected = Number(snap.adDetected) || 0;
   const deltaSynthesized = Number(snap.deltaSynthesized) || 0;
@@ -310,10 +315,14 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
 /**
  * 致命カード(症状→原因→次の一手)用の判定。buildStatusActions の結果に結合する形。
  * @param {(GiftEffectDiagState & { capturedAt?: number })|null|undefined} snap
+ * @param {Iterable<unknown>} [openLiveIds] v0.1.1722: 渡されたときだけ、別/過去の配信の計測なら
+ *   カードを出さない(isGiftEffectDiagForOpenLive 正本。未タグ旧データは通す)。
  * @returns {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>}
  */
-export function giftEffectDiagToActionCards(snap) {
+export function giftEffectDiagToActionCards(snap, openLiveIds) {
   if (!snap || typeof snap !== 'object') return [];
+  // v0.1.1722: 別配信の値の居残りを現在の症状カードにしない。
+  if (openLiveIds !== undefined && !isGiftEffectDiagForOpenLive(snap, openLiveIds)) return [];
   const soundEnabled = snap.soundEnabled !== false;
   /** @type {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>} */
   const cards = [];

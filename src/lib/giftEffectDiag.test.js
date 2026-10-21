@@ -63,6 +63,35 @@ describe('isGiftEffectDiagForOpenLive (v0.1.1721)', () => {
   });
 });
 
+describe('読み手の liveId ゲート (v0.1.1722・opt-in)', () => {
+  const tagged = { giftDetected: 2, giftThrown: 2, giftSoundPlayed: 2, giftSoundError: 1, soundEnabled: true, liveId: 'lv_old' };
+
+  it('buildGiftEffectDiagLines: openLiveIds 未指定なら従来どおり出す(後方互換)', () => {
+    expect(buildGiftEffectDiagLines(tagged, 1000).length).toBeGreaterThan(0);
+  });
+  it('buildGiftEffectDiagLines: openLiveIds に含まれない配信なら空(別配信の居残りを出さない)', () => {
+    expect(buildGiftEffectDiagLines(tagged, 1000, ['lv_now'])).toEqual([]);
+  });
+  it('buildGiftEffectDiagLines: openLiveIds に含まれる配信なら出す', () => {
+    expect(buildGiftEffectDiagLines(tagged, 1000, ['lv_old']).length).toBeGreaterThan(0);
+  });
+
+  it('giftEffectDiagToActionCards: openLiveIds 未指定なら従来どおり(後方互換)', () => {
+    // soundMissing を立てるため演出>音にする
+    const s = { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 0, soundEnabled: true, liveId: 'lv_old' };
+    expect(giftEffectDiagToActionCards(s).length).toBeGreaterThan(0);
+  });
+  it('giftEffectDiagToActionCards: 別配信ならカードを出さない', () => {
+    const s = { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 0, soundEnabled: true, liveId: 'lv_old' };
+    expect(giftEffectDiagToActionCards(s, ['lv_now'])).toEqual([]);
+  });
+  it('未タグ(旧データ)は openLiveIds を渡しても通す=回帰なし', () => {
+    const s = { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 0, soundEnabled: true };
+    expect(giftEffectDiagToActionCards(s, ['lv_now']).length).toBeGreaterThan(0);
+    expect(buildGiftEffectDiagLines(s, 1000, ['lv_now']).length).toBeGreaterThan(0);
+  });
+});
+
 describe('buildGiftEffectDiagLines', () => {
   it('未観測(検知0件)なら空配列(ノイズにしない)', () => {
     expect(buildGiftEffectDiagLines(makeInitialGiftEffectDiag(), 1000)).toEqual([]);
