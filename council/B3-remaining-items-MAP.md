@@ -81,21 +81,36 @@ TDD で赤→緑。venueBar 側のカウンタ加算は wiring テストで固�
 - 対照(鮮度ゲートがある例): `src/lib/buriedInstrumentCells.js:120-130` の `boot-shade` は
   `shadeAgeMs` を見て present/解除を判定している。**ゲートの型は同ファイルに手本がある**。
 
-### 修正方針
-- 各セルの入力 `data` に**計測元の鮮度(capturedAt もしくは最終更新 ago)を渡し**、
-  閾値より古ければ **bad/ok を断定せず `na`('—' か「測定が古い」)に落とす**。
-  - 鮮度の正本は計器ごとに違う(ギフト音は giftEffectDiag の `lastEventAt`/`capturedAt`、
-    読み上げは voiceDiag の更新時刻 等)。**実コードでどの時刻が正本かを grep/Read で裏取りしてから**
-    閾値を決める(§12.7。推測で「混乱する」等の因果語を書かない)。
-- ★**一斉改修をしない**。セル1つ=1版で、まず最も嘘が痛いもの(gift-sound-fail か voice-start-fail)
-  から鮮度ゲートを入れ、回帰テストで「古い入力なら na」を固定してから次へ。
-- 機械ゲートの考え方: `diagWordingGuard.js`(§12.7)と同じく「鮮度未確認で bad を出していないか」は
-  意味判断が絡むので全自動化しない。セル関数に capturedAt 引数を**必須化**し、渡し忘れを
-  型/テストで止める形が現実的。
+### ★実装中に判明した設計の訂正(2026-10-21・実コード裏取り)
+当初の「capturedAt に時間窓を当てる鮮度ゲート」は **gift-sound-fail には不適**と判明した:
+- 前例 `buildVoiceHealthCells`(healthCells.js:207)は voiceDiag が comeview の**ハートビートで
+  高頻度 publish される**から 90s 窓が効く。
+- しかし **`giftEffectDiag` は定期ハートビートが無く、ギフト/広告イベント時にしか publish しない**
+  (venueBar.js の publishGiftEffectDiag は全てイベントハンドラ経由)。capturedAt に時間窓を当てると
+  「最近ギフトが無いだけ(=配信中の大半)」を「古い」と誤判定し、**今の配信の本物のエラーを隠す
+  新しい嘘**になる。
+- 本当の問題は「`giftEffectDiag` が**単一グローバルキー**(`nls_gift_effect_diag_v1`)で配信ごとに
+  リセットされず、別/終了済み配信のエラーが居残る」こと。時間窓では消せず、**配信スコープ化が本筋**。
 
-### テスト
-`silentFailureCells.test.js` に「同じカウンタでも capturedAt が古ければ na」ケースを追加(純関数なので
-ブラウザ不要で固定できる)。ただし**「どの時刻が鮮度の正本か」はライブ実機で最終確認**。
+### 採った根本設計(100年クリーン)= liveId スコープ化
+計測に「どの配信か」の目印(liveId)を持たせ、読み手は「今開いている配信の計測か」で照合する。
+単配信でも多配信でも破綻しない(時間窓・一斉クリアは多配信で破綻する対症療法)。
+- **実装済み(v0.1.1721・gift-sound-fail に適用)**:
+  - `giftEffectDiag.js`: `buildGiftEffectDiagSnapshot(…, liveId)` が snapshot に `liveId` を刻む +
+    純関数 `isGiftEffectDiagForOpenLive(snap, openLiveIds)`(未タグの旧データは判定保留 true=回帰なし)。
+  - `venueBar.js`: `writeGiftEffectDiagSnapshot` が `liveIdFromPathname()` を渡す。
+  - `silentFailureCells.js`: gift-sound-fail を「開いている配信(`data.livesData[].lv`)の記録でなければ
+    `na`『別の配信の記録です』」にゲート。
+  - ユニット +9(タグ・helper 境界・ゲート)。`verify:cc` 緑。
+- **残り(follow-up・同じ helper を使い回す)**:
+  1. giftEffectDiag の**他の読み手**(`buildGiftEffectDiagLines`・`giftEffectDiagToActionCards`・
+     `buildGiftEffectHealthCells`)にも同じ照合を適用(今は silentFailure の1セルのみ是正)。
+  2. 同じ単一グローバルキー病を持つ他 diag(`voiceDiag`=`nls_voice_diag_v1`・
+     `commentPostDiag`=`nls_comment_post_diag_v1`)の対応セル(voice-start-fail・comment-revert)も
+     liveId スコープ化。
+  3. 真の多配信正本化(キー自体を per-live にする)は大きい変更=別途設計。
+- ★**最終検証はライブ実機必須**: 配信A→配信B 切替で、Aのギフト音エラーがBで『別の配信の記録』に
+  なること、Bで本物のエラーが従来どおり出ることを census/実機で確認(クラウドでは未検証)。
 
 ---
 

@@ -108,9 +108,11 @@ export function giftSoundDiagFieldForPlayResult(playResult) {
  * storage 書き込み用の軽量スナップショット。
  * @param {Partial<GiftEffectDiagState>|null|undefined} diag
  * @param {number} [nowMs]
- * @returns {GiftEffectDiagState & { capturedAt: number }}
+ * @param {unknown} [liveId] v0.1.1721: この計測がどの配信のものか(単一グローバルキーのため
+ *   別配信の値が居残る問題の根治用タグ)。読み手は isGiftEffectDiagForOpenLive で照合する。
+ * @returns {GiftEffectDiagState & { capturedAt: number, liveId: string }}
  */
-export function buildGiftEffectDiagSnapshot(diag, nowMs) {
+export function buildGiftEffectDiagSnapshot(diag, nowMs, liveId) {
   const base = makeInitialGiftEffectDiag();
   const d = /** @type {any} */ (diag && typeof diag === 'object' ? diag : {});
   /** @param {unknown} x @param {number} fallback @returns {number} */
@@ -146,8 +148,36 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     throwPointFallbackUsed: num(d.throwPointFallbackUsed, base.throwPointFallbackUsed),
     giftThrowCapGuarded: num(d.giftThrowCapGuarded, base.giftThrowCapGuarded),
     adThrowCapGuarded: num(d.adThrowCapGuarded, base.adThrowCapGuarded),
-    capturedAt: now
+    capturedAt: now,
+    // v0.1.1721: どの配信の計測か。未指定/非文字列は '' (= 旧データと同じ扱い=判定保留)。
+    liveId: String(liveId ?? d.liveId ?? '').trim().toLowerCase()
   };
+}
+
+/**
+ * このスナップショットが「今まさに開いている配信」の計測か。
+ *
+ * v0.1.1721: giftEffectDiag は単一グローバルキー(nls_gift_effect_diag_v1)で、配信ごとに
+ *   リセットされない。前の配信のギフト音エラーが、次の配信の最初のギフトで上書きされるまで
+ *   居残り、状態速報が「別配信のエラー」を現在の問題として出していた(診断の嘘)。
+ *   snapshot に付けた liveId を、現在開いている配信の liveId 群と照合して弾く。
+ *
+ * ★未タグ(liveId が空=このタグ導入前に書かれた旧データ)は **判定保留で true** を返す
+ *   (既存挙動を壊さない=回帰なし。次のギフトイベントでタグ付きに上書きされ自己治癒する)。
+ *
+ * @param {{liveId?: unknown}|null|undefined} snap
+ * @param {Iterable<unknown>|null|undefined} openLiveIds 現在開いている配信の liveId 群
+ * @returns {boolean} 今の配信の計測として信じてよいなら true。別/過去の配信なら false。
+ */
+export function isGiftEffectDiagForOpenLive(snap, openLiveIds) {
+  const tag = String(snap?.liveId ?? '').trim().toLowerCase();
+  if (!tag) return true; // 未タグ(旧データ)は照合できない=既存挙動維持
+  const set = new Set();
+  for (const id of openLiveIds || []) {
+    const s = String(id ?? '').trim().toLowerCase();
+    if (s) set.add(s);
+  }
+  return set.has(tag);
 }
 
 /**

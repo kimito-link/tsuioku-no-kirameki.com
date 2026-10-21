@@ -5,7 +5,8 @@ import {
   buildGiftEffectDiagLines,
   giftEffectDiagToActionCards,
   giftSoundDiagFieldForPlayResult,
-  computeGiftGapAverage
+  computeGiftGapAverage,
+  isGiftEffectDiagForOpenLive
 } from './giftEffectDiag.js';
 
 describe('makeInitialGiftEffectDiag', () => {
@@ -28,6 +29,37 @@ describe('buildGiftEffectDiagSnapshot', () => {
     expect(buildGiftEffectDiagSnapshot({ soundEnabled: false }, 1).soundEnabled).toBe(false);
     expect(buildGiftEffectDiagSnapshot({ soundEnabled: true }, 1).soundEnabled).toBe(true);
     expect(buildGiftEffectDiagSnapshot({}, 1).soundEnabled).toBe(true);
+  });
+});
+
+describe('buildGiftEffectDiagSnapshot: liveId タグ (v0.1.1721)', () => {
+  it('liveId を小文字trimで刻む', () => {
+    expect(buildGiftEffectDiagSnapshot({}, 1, '  LV123  ').liveId).toBe('lv123');
+  });
+  it('未指定/非文字列は空文字(=旧データ扱い)', () => {
+    expect(buildGiftEffectDiagSnapshot({}, 1).liveId).toBe('');
+    expect(buildGiftEffectDiagSnapshot({}, 1, null).liveId).toBe('');
+    expect(buildGiftEffectDiagSnapshot({}, 1, 123).liveId).toBe('123');
+  });
+});
+
+describe('isGiftEffectDiagForOpenLive (v0.1.1721)', () => {
+  it('タグ付きで開いている配信に含まれる → true', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv1' }, ['lv1', 'lv2'])).toBe(true);
+  });
+  it('タグ付きで開いている配信に無い(=別/過去の配信) → false', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv9' }, ['lv1', 'lv2'])).toBe(false);
+  });
+  it('開いている配信が無い + タグ付き → false(現在の配信ではあり得ない)', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv1' }, [])).toBe(false);
+  });
+  it('未タグ(旧データ) → true(判定保留=既存挙動維持・回帰なし)', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: '' }, [])).toBe(true);
+    expect(isGiftEffectDiagForOpenLive({}, ['lv1'])).toBe(true);
+    expect(isGiftEffectDiagForOpenLive(null, ['lv1'])).toBe(true);
+  });
+  it('照合は大文字小文字・前後空白を無視する', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv1' }, [' LV1 '])).toBe(true);
   });
 });
 

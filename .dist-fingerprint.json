@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "9ff0b1b6a9dfeebc633aab56fbbdecec034fed724948e464d2117f4ca7daf412",
+  "fingerprint": "63eaaab1a6231dab75d33934f0d00b986b7262525473031fe1aa70e20210a0f0",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -844,20 +844,20 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
-    "extension/dist/content.js": "48b3e65fc9186dca3f81aed2e50f261050b9d8efa0892bbc7c233749f83327d7",
-    "extension/dist/popup.js": "a6aa00dcc03bc9ba60441b0700040a0ba6111e8ea4bf8b0230d692fcbdb3fe08",
+    "extension/dist/content.js": "9460737ba90b16cc810f43d873ab05ffa78fdef215f342f56cbc23566de83805",
+    "extension/dist/popup.js": "724864ef630c5f798d823b151424714e5a302be505b8d20474b1d9caec30c0e3",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "7e3f734b056c258f1217b7ef8bea4866c25f885511515e85c1dfbcf3ea6cc8d2",
+    "extension/dist/status.js": "1b1ada890df35d184230d498d687de8eae95aad7cf16d8d2a9fb8d0a1beb1bb0",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "082c3efa4faca84e47537d9e3d010bb11cfb5a4111364c9527caf430229b5d6a",
     "extension/dist/comeview.js": "728e085810ee9282c2c232a44f48541774bbe1fba35f1f5f706be82f42bb90ba",
-    "extension/dist/venue.js": "7ea7b503cf982b2c65c295bf493f0db91b81a8cee44382f4057774d704b3ef54",
+    "extension/dist/venue.js": "7929e080aa5f60feef6355d3c67c90dd9821747940405d7a1652f5c6019f7923",
     "extension/dist/sidepanel.js": "7fbcd1bea5a0590746b4f34c0e0144f42453de7b4e347d0812155f00757a0b5a",
     "extension/dist/sidepanel-iframe-boot.js": "7beb6d34161c022787e23ab36b93bd5fd3b6cb6495492935573c0986bf84132a",
     "extension/dist/avatar-face-worker.js": "7d17a9a9d2f53cf8c90373ccb940ee2e458b0b9f04ed5bb83b349ab394945af9",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "2d0545f94e4ec79d62fb148c7eaf7da1540567c30c3bc61910fce6d818086b88",
+    "app/dist/live-view.js": "ce0b2902ac052fb05dcd2a77eb94caa35d087d62f827b66f01ced52fc2b46793",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }
