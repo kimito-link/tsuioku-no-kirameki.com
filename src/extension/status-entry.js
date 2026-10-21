@@ -199,7 +199,7 @@ import {
   KEY_REPORT_PREVIEW,
   isReportPreviewFresh
 } from '../lib/reportPreviewKey.js';
-import { appendTrendSample, analyzeTrend } from '../lib/statusTrend.js';
+import { appendTrendSample, analyzeTrend, sumTrendKpiTotals } from '../lib/statusTrend.js';
 import { KEY_STATUS_TREND } from '../lib/statusTrendKey.js';
 import { pickOpenAction } from '../lib/watchLink.js';
 import { buildChikuranCardModel } from '../lib/chikuranCard.js';
@@ -1601,18 +1601,18 @@ async function loadReportPreviewSafe() {
 async function recordAndAnalyzeTrendSafe(lvList, summaries) {
   try {
     const lvs = Array.isArray(lvList) ? lvList : [];
-    let recorded = 0;
-    let official = 0;
+    /** @type {Array<{ recordedCount: unknown, officialCount: unknown }>} */
+    const kpiRows = [];
     let watch = 0;
     let hasWatch = false;
     let catchingUp = false; // v0.1.887: 放送中×追いつき中(率<100)の配信が1つでもあるか。
     for (const lv of lvs) {
       const s = summaries[PANEL_SUMMARY_PREFIX + lv];
       const snap = summaries[WATCH_SNAPSHOT_PREFIX + lv];
-      const rec = Number(s?.recordedCount) || 0;
+      // v0.1.1728: 未観測の記録件数は 0 に潰さず生のまま渡す(合計/率の扱いは sumTrendKpiTotals が正本)。
+      const rec = s?.recordedCount;
       const off = Number(s?.officialCount ?? snap?.officialCommentCount) || 0;
-      recorded += rec;
-      official += off;
+      kpiRows.push({ recordedCount: rec, officialCount: off });
       const w = Number(snap?.viewerCountFromDom);
       if (Number.isFinite(w)) { watch += w; hasWatch = true; }
       // 追いつき中判定は buildBackfillProgressLine の正本(放送中×記録あり×率<100)に揃える。
@@ -1631,7 +1631,7 @@ async function recordAndAnalyzeTrendSafe(lvList, summaries) {
        */
       if (isCatchingUp({ endedAt: ended, recordedCount: rec, officialCount: off })) catchingUp = true;
     }
-    const ratePct = official > 0 ? Math.round((recorded / official) * 100) : null;
+    const { recorded, official, ratePct } = sumTrendKpiTotals(kpiRows);
     const kpi = { recorded, official, ratePct, watch: hasWatch ? watch : null, catchingUp };
 
     const bag = await chrome.storage.local.get(KEY_STATUS_TREND);
