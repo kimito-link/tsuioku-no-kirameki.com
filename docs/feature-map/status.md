@@ -34,8 +34,6 @@ graph LR
   n_status --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
   n_status --> n_src_lib_backgroundWatchTab_js["lib/backgroundWatchTab.js"]
   n_status --> n_src_lib_blackScreenOwnerCells_js["lib/blackScreenOwnerCells.js"]
-  n_status --> n_src_lib_broadcastScore_js["lib/broadcastScore.js"]:::shared
-  n_status --> n_src_lib_broadcastScorePanelViewModel_js["lib/broadcastScorePanelViewModel.js"]:::shared
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_buildAgeCell_js["lib/buildAgeCell.js"]
@@ -53,7 +51,9 @@ graph LR
   n_status --> n_src_lib_commentTimelineMirrorKey_js["lib/commentTimelineMirrorKey.js"]:::shared
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
+  n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
+  n_status --> n_src_lib_currentLiveIdOrigin_js["lib/currentLiveIdOrigin.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 141 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 138 ファイル省略（全件は storage-bus.md / metafile 参照）。

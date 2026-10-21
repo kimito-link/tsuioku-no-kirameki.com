@@ -309,7 +309,6 @@ import {
   buildScoreAnnounceDiagSnapshot
 } from '../lib/scoreAnnounceDiag.js';
 import { KEY_SCORE_ANNOUNCE_DIAG } from '../lib/scoreAnnounceDiagKey.js';
-import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 // Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。コメント投稿=玉の打ち出し。
 //   検知点は拡張自身の投稿経路(押下=op_handle・成功=op_shot)。乱数ゼロ・全て決定論。
 import {
@@ -3994,38 +3993,6 @@ async function runScoreAnnounceSequence(liveId, trigger) {
   }
 }
 
-/** 配信終了フラグ(nls_live_ended_<lv>)を購読し、初回検知で発表シーケンスを1回だけ自動起動する。
- *   §2.1「配信終了フラグ初回検知で1回だけ自動」。1配信1回きりの判定自体はscoreAnnounceGate側が持つ
- *   (このリスナーは「検知したら呼ぶだけ」の薄いラッパー・bindXxxStorageListenerOnceパターン)。 */
-let _liveEndedScoreListenerBound = false;
-function bindLiveEndedScoreListenerOnce() {
-  if (_liveEndedScoreListenerBound) return;
-  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
-  _liveEndedScoreListenerBound = true;
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    for (const key of Object.keys(changes)) {
-      if (!key.startsWith(LIVE_ENDED_PREFIX)) continue;
-      const flag = changes[key].newValue;
-      if (!isLiveEndedFlag(flag)) continue;
-      const lid = String(flag.liveId || '').trim().toLowerCase();
-      if (!lid) continue;
-      // 確定値でカウントアップするため、発表前に1回だけreportPreviewをforce publishする
-      //   (§2.1「force 1回」・軽量制約は維持=通常間引きの経路をこの1回だけ迂回する)。
-      try {
-        publishReportPreviewThrottled(lid, {
-          resolveComments: resolveCommentsForHtmlExport,
-          getSnapshot: () => watchMetaCache.snapshot,
-          now: () => Date.now(),
-          force: true
-        });
-      } catch {
-        /* best-effort。force publishが失敗しても直近のreportPreviewで発表を続行する。 */
-      }
-      void runScoreAnnounceSequence(lid, 'auto');
-    }
-  });
-}
 
 /**
  * v0.1.198: ギフトサブアプリ DOM 由来の「個別ギフト履歴 + 種類別集計」を描画する。
@@ -10367,7 +10334,7 @@ async function refreshBackfillRecordCardHint(liveId) {
   bindGiftHistoryStorageListenerOnce();
   bindGiftUsersLaneStorageListenerOnce();
   bindCommentsCelebrationStorageListenerOnce();
-  bindLiveEndedScoreListenerOnce();
+  // v0.1.1726: 配信採点パネルを外したので、配信終了時の自動発表(演出+音)も起動しない。
   void refreshRecordingRecoveryHint(lid);
   // caught_up 確定済みの配信なら再表示しない（refresh のたびに「届いてるよ」が出るのを防ぐ）。
   if (_backfillCaughtUpForLiveId === lid) return;

@@ -10067,10 +10067,6 @@
          nl-score 系CSS（配信採点パネル）を live-view.html にも同期。①専用の発表シーケンス演出
          （.nl-score-announce-btn / .nl-score-panel--announcing / @keyframes nl-score-announce-shake）は
          ③では発表しないため除外。radar/rank/parts/highlights 等の表示CSSは必須。 */
-      .nl-score-mount {
-        margin-top: 4px;
-      }
-
       .nl-score-panel {
         font-size: 11px;
       }
@@ -11885,17 +11881,7 @@
                 aria-live="off"
               ></div>
             </details>
-            <!--
-              ③WEB配信採点丸写し（第3号・reference_full_mirror_SYNTHESIS.md M2/C-2）:
-              ①popup.html の #broadcastScoreDetails を drift 解消のため live-view.html にも同期。
-              ★①専用UI（#broadcastScoreAnnounceBtn「▶発表を再生」）は③受動ビューには持ち込まない
-                （地雷 C2-b・③は発表しない）。summary と mount だけ残す。中身は status が組んだ
-                jsonBlob.broadcastScoreVm から paintBroadcastScorePanel が buildBroadcastScorePanelHtml で描く。
-            -->
-            <details id="broadcastScoreDetails" class="nl-score-panel-details">
-              <summary>配信採点（カラオケ採点風）</summary>
-              <div id="broadcastScoreMount" class="nl-score-mount"></div>
-            </details>
+            <!-- v0.1.1726: 配信採点パネルは popup と揃えて外した(drift 解消のため両方から削除)。 -->
           </div>
           <div id="roomHeatSummary" class="room-heat nl-heat-summary" role="status" aria-live="polite">
             <div class="room-heat-head">
