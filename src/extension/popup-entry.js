@@ -49,6 +49,7 @@ import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
 import { detectVersionMismatch } from '../lib/versionMismatch.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
+import { startStatusPublisherHost } from './statusPublisherHost.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { buildWatchSnapshotKey, heavyResultStillTargetsThisWatch } from '../lib/watchSnapshotKey.js';
 import { decideNoActiveWatch } from '../lib/noActiveWatchDecision.js';
@@ -5900,6 +5901,20 @@ if (INLINE_EMBED_WATCH && typeof window !== 'undefined') {
   window.addEventListener('message', handleInstantCommentPushMessage);
   window.addEventListener('message', handleLiveChannelSwitchMessage);
   window.addEventListener('message', handlePanelVisibilityMessage);
+}
+// v0.1.1733: スマホへの送信担当を、watch ページに埋め込んだパネルにも置く(サイドパネルを閉じても送り続ける)。
+//   同意・鍵・ほかの担当の有無(Web Locks で1つ)は statusPublisherHost.js が判定。受動ビュー(状態画面/ライブビュー埋め込み)には置かない。
+if (INLINE_EMBED_WATCH && !INLINE_PASSIVE && typeof window !== 'undefined') {
+  try {
+    startStatusPublisherHost({
+      document,
+      storage: chrome.storage.local,
+      locks: typeof navigator !== 'undefined' ? navigator.locks : undefined,
+      getUrl: (p) => chrome.runtime.getURL(p)
+    });
+  } catch {
+    /* no-op: 送信の準備の失敗でパネルを止めない */
+  }
 }
 
 /** initPopup の途中失敗後も DevTools から呼べるよう、読み込み直後に束縛する（観測のみ） */

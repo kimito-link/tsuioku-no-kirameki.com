@@ -278,7 +278,8 @@ import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
 /** 自動更新間隔(ms)。 */
 // v0.1.1698: 見えない送信担当(?publisher=1)は10秒周期(送信間隔120秒に影響しない)。通常の状態画面は従来どおり2秒。
-const REFRESH_INTERVAL_MS = statusRefreshIntervalMs({ publisher: isStatusPublisherMode(location.search) });
+const IS_STATUS_PUBLISHER = isStatusPublisherMode(location.search);
+const REFRESH_INTERVAL_MS = statusRefreshIntervalMs({ publisher: IS_STATUS_PUBLISHER });
 
 /** panel_summary キーのプレフィックス。 */
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
@@ -695,7 +696,8 @@ function runRefreshTick(opts) {
   if (_refreshPausedByUser) return;
   // ★初回は hidden でも描く。開いた直後は hidden 判定が true になりうるうえ、
   //   ここで降りると「開いたのに永久に白い」を作る(降りた後に誰も再挑戦しない)。
-  if (!first && document.hidden) return;
+  // v0.1.1733: 送信担当(?publisher=1)は見えない部品=watch ページに置かれてタブが裏に回っても止めない(スマホへ送り続ける)。
+  if (!first && document.hidden && !IS_STATUS_PUBLISHER) return;
   if (_refreshInFlight) return;
   if (!first && _refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
   _refreshInFlight = true;

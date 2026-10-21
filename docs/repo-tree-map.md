@@ -160,6 +160,8 @@ graph LR
   f21 --> f21_6["extension/status-entry.js"]
   f21 --> f21_7["extension/statusPublisherHost.js"]
   f21 --> f21_8["extension/statusSmartphoneCard.js"]
+  f21 --> f21_9["extension/popup-entry.js"]
+  f21 --> f21_10["lib/statusPublisherPlan.js"]
   HUB --> f22["応援ライブビュー(リアルタイム盛り上がり・新規タブ)"]
   f22 --> f22_0["live-view.html"]
   f22 --> f22_1["extension/live-view-entry.js"]
@@ -532,7 +534,7 @@ paintOfficialNicoStatsStrip(popup-entry.js)が公式コメント累計の実測(
 - [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
 
 ### スマホ版の利用者ごとの鍵(発行・削除・上限)  〔スマホ / WEB公開 / サーバー〕
-POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッシュだけ保持)・閲覧トークンを発行、?action=rotate で閲覧URLを作り直し、DELETE で本体・ETag・鍵を消す。/api/status は x-device-id+x-write-key のとき書き込み先をサーバーが鍵から決め(他人の閲覧トークンへ書けない)、利用者ごと1日4,000回・全体上限で429、診断の全文(statusReport/fastDiag)を落として保存。保存は24時間。判定は deviceAuth.js、乱数・ハッシュ・Redis は deviceStore.js(v0.1.1730)。拡張側は同意 ON・共有キーなしのとき statusDeviceCred.js が鍵をもらい(Web Locks で1つ)、送信は devicePublishCredentials.js が決めた鍵で送る(共有キー優先)。同意 OFF で DELETE→鍵を消す・401 で鍵を捨ててもらい直す(v0.1.1731)。状態画面の「📱 スマホで見る」スイッチ(同意・閲覧URL・URLの作り直し)は statusSmartphoneCard.js(v0.1.1732)
+POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッシュだけ保持)・閲覧トークンを発行、?action=rotate で閲覧URLを作り直し、DELETE で本体・ETag・鍵を消す。/api/status は x-device-id+x-write-key のとき書き込み先をサーバーが鍵から決め(他人の閲覧トークンへ書けない)、利用者ごと1日4,000回・全体上限で429、診断の全文(statusReport/fastDiag)を落として保存。保存は24時間。判定は deviceAuth.js、乱数・ハッシュ・Redis は deviceStore.js(v0.1.1730)。拡張側は同意 ON・共有キーなしのとき statusDeviceCred.js が鍵をもらい(Web Locks で1つ)、送信は devicePublishCredentials.js が決めた鍵で送る(共有キー優先)。同意 OFF で DELETE→鍵を消す・401 で鍵を捨ててもらい直す(v0.1.1731)。状態画面の「📱 スマホで見る」スイッチ(同意・閲覧URL・URLの作り直し)は statusSmartphoneCard.js(v0.1.1732)。送信担当はサイドパネルに加え watch ページ埋め込みのパネル(popup-entry.js・受動ビュー以外)にも置き、送信担当は document.hidden で止めない=サイドパネルを閉じても送り続ける(v0.1.1733)
 
 - [`api/device.js`](../api/device.js)
 - [`api/status.js`](../api/status.js)
@@ -543,6 +545,8 @@ POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッ
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 - [`src/extension/statusPublisherHost.js`](../src/extension/statusPublisherHost.js)
 - [`src/extension/statusSmartphoneCard.js`](../src/extension/statusSmartphoneCard.js)
+- [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
+- [`src/lib/statusPublisherPlan.js`](../src/lib/statusPublisherPlan.js)
 
 ### 応援ライブビュー(リアルタイム盛り上がり・新規タブ)  〔表示 / リアルタイム / レポート〕
 ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
