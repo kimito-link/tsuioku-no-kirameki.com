@@ -66,3 +66,15 @@ describe('配線: 📱 スマホで見る(v0.1.1732)', () => {
     expect(src).toContain('if (!getPublishCredentials(getUploadConfig())) return null;');
   });
 });
+
+describe('配線: サイドパネルを閉じても送り続ける(v0.1.1733)', () => {
+  const popup = readFileSync(new URL('./popup-entry.js', import.meta.url), 'utf8');
+  it('watch ページに埋め込んだパネル(受動ビュー以外)でも送信担当を置く', () => {
+    expect(popup).toContain("import { startStatusPublisherHost } from './statusPublisherHost.js';");
+    expect(popup).toMatch(/if \(INLINE_EMBED_WATCH && !INLINE_PASSIVE && typeof window !== 'undefined'\) \{\s*try \{\s*startStatusPublisherHost\(/);
+  });
+  it('送信担当はタブが裏に回っても更新を止めない', () => {
+    expect(status).toContain('const IS_STATUS_PUBLISHER = isStatusPublisherMode(location.search);');
+    expect(status).toContain('if (!first && document.hidden && !IS_STATUS_PUBLISHER) return;');
+  });
+});
