@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 976 件
+## ⚠️ 役割コメントが無いソース 9 / 978 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -893,7 +893,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2101)
+- 📁 **src/** (2105)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -930,7 +930,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (66)
+  - 📁 **extension/** (68)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -987,6 +987,8 @@
     - `smartphoneFreshness.wiring.test.js`
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
     - `statusCopyFreshness.wiring.test.js`
+    - `statusDeviceCred.js` — スマホ版の「利用者ごとの鍵」を拡張側で持つ部品(v0.1.1731・スマホ化 利用者ごとの鍵 第b段)。
+    - `statusDeviceCred.test.js`
     - `statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
     - `statusPublisherHost.test.js`
     - `storyDiagTotalSourcePopupEntry.wiring.test.js`
@@ -1154,7 +1156,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1874)
+  - 📁 **lib/** (1876)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1588,6 +1590,8 @@
     - `devReloadSignal.test.js`
     - `deviceAuth.js` — 【層】L0 判定層(純粋関数)
     - `deviceAuth.test.js`
+    - `devicePublishCredentials.js` — 【層】L0 判定層(純粋関数)
+    - `devicePublishCredentials.test.js`
     - `diagChannelRegistry.contract.test.js`
     - `diagChannelRegistry.js` — 計器チャンネルの台帳。HANDOFF-instrument-channels-2026-08-12.md §3。
     - `diagFlushThrottle.js` — 2026-07-06: 即時プッシュ計器(instantPushDiag)が「コメント送信バッチ毎に

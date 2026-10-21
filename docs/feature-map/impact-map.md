@@ -449,6 +449,7 @@
 | `src/extension/popup/report/htmlReportDocument.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireLaneUserDetailOpen.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/status-entry.js` | 1 | 状態速報ページ |
+| `src/extension/statusDeviceCred.js` | 1 | 状態速報ページ |
 | `src/extension/venue-entry.js` | 1 | 会場モード(standalone) |
 | `src/lib/acquisitionDashboardChart.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/adLanePicksFromRooms.js` | 1 | ポップアップ(応援レーン) |
@@ -560,6 +561,8 @@
 | `src/lib/customSoundPreset.js` | 1 | 状態速報ページ |
 | `src/lib/deepExportPolicy.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/deepHarvestReason.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/deviceAuth.js` | 1 | 状態速報ページ |
+| `src/lib/devicePublishCredentials.js` | 1 | 状態速報ページ |
 | `src/lib/devMonitorAvatarStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorDebugSubset.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorGiftRankingExtrasHtml.js` | 1 | ポップアップ(応援レーン) |

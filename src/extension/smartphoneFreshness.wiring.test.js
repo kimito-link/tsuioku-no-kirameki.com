@@ -36,3 +36,18 @@ describe('スマホは1配信だけ映す配線(2026-10-21)', () => {
     expect(liveView).toMatch(/u\.searchParams\.set\('lv', lv\);\s*location\.replace\(u\.href\);/);
   });
 });
+
+describe('配線: スマホ版の利用者ごとの鍵(v0.1.1731)', () => {
+  const src = readFileSync(new URL('./status-entry.js', import.meta.url), 'utf8');
+  it('送信は getPublishCredentials の鍵とヘッダで送る(共有キーのヘッダを直書きしない)', () => {
+    expect(src).toContain('headers: creds.headers');
+    expect(src).toContain('buildPublishBody(creds, jsonBlob)');
+    expect(src).not.toMatch(/'x-share-key': ingestKey/);
+  });
+  it('同意 OFF でサーバーの利用者データを消す・401 で鍵を捨てる・同意 ON で鍵をもらう', () => {
+    expect(src).toMatch(/if \(!value\) void deleteDeviceOnServer\(/);
+    expect(src).toMatch(/shouldForgetDeviceCred\(creds\.mode, res\.status\)\) void forgetDeviceCred\(\)/);
+    expect(src).toMatch(/maybeRegisterDevice\(\{ optedIn: _webPublishOptIn === true/);
+    expect(src).toContain('hasKeys: Boolean(getPublishCredentials(getUploadConfig()))');
+  });
+});
