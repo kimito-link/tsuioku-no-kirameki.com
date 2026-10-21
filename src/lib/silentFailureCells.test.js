@@ -95,6 +95,29 @@ describe('無音で死ぬ故障のセル', () => {
     });
   });
 
+  // v0.1.1723: voiceDiag も単一グローバルキー。閉じた/別配信の面の累計を現在の問題にしない。
+  describe('読み上げ2セルの liveId 照合', () => {
+    const bad = { enableFailTotal: 2, lastEnableFailReason: 'timeout', audioBlockedTotal: 3 };
+    it('★別/終了済み配信の記録は2セルとも na「別の配信」', () => {
+      const data = { voiceDiag: { ...bad, liveId: 'lv_old' }, livesData: [{ lv: 'lv_now' }] };
+      for (const id of ['voice-start-fail', 'voice-audio-blocked']) {
+        const c = cellOf(data, id);
+        expect(c?.level).toBe('na');
+        expect(c?.text).toContain('別の配信');
+      }
+    });
+    it('★今開いている配信のタグなら従来どおり bad / warn', () => {
+      const data = { voiceDiag: { ...bad, liveId: 'LV_NOW' }, livesData: [{ lv: 'lv_now' }] };
+      expect(cellOf(data, 'voice-start-fail')?.level).toBe('bad');
+      expect(cellOf(data, 'voice-audio-blocked')?.level).toBe('warn');
+    });
+    it('★未タグ(旧データ)は従来挙動を維持する=回帰なし', () => {
+      const data = { voiceDiag: { ...bad }, livesData: [{ lv: 'lv_now' }] };
+      expect(cellOf(data, 'voice-start-fail')?.level).toBe('bad');
+      expect(cellOf(data, 'voice-audio-blocked')?.level).toBe('warn');
+    });
+  });
+
   describe('ギフト音の失敗(gift-sound-fail)', () => {
     it('★再生エラーは bad', () => {
       const c = cellOf({ giftEffectDiag: { giftSoundError: 1 } }, 'gift-sound-fail');

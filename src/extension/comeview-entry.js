@@ -274,7 +274,7 @@ function publishVoiceDiag() {
     _voiceDiagLastWriteAt = now;
     // ★v0.1.1328: どの面が書いたかを残す(会場は 'venue' を書いている)。
     //   化石値を見たとき「どちらの実装のものか」が分からないと調査が始められない。
-    const snap = { ...buildVoiceDiagSnapshot(_voiceDiag, now), source: 'comeview' };
+    const snap = { ...buildVoiceDiagSnapshot(_voiceDiag, now, _liveId), source: 'comeview' };
     chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {
       /* best-effort: storage 不可・context 消失 */
     });

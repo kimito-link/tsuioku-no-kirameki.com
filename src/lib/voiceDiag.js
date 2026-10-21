@@ -58,6 +58,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   audioBlockedTotal: number,   // v0.1.1327計器: ブラウザの自動再生ブロック(NotAllowedError)で鳴らせなかった累計
  *   lastEnableFailReason: string,// v0.1.1331計器: 読み上げONに失敗した理由(timeout/refused/http-error/no-fetch)
  *   enableFailTotal: number,     // v0.1.1331計器: 読み上げONに失敗した累計回数
+ *   liveId?: string,             // v0.1.1723: 書き手の面がどの配信を開いていたか(単一グローバルキーの居残り判定用・snapshot 時に付与)
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
@@ -122,9 +123,11 @@ export function makeInitialVoiceDiag() {
  * storage 書き込み用の軽量スナップショット(ago は読み手側で算出するため base を渡す)。
  * @param {Partial<VoiceDiagState>|null|undefined} diag
  * @param {number} [nowMs]
- * @returns {VoiceDiagState & { capturedAt: number, source: string }}
+ * @param {unknown} [liveId] v0.1.1723: 書き手の面が今開いている配信。nls_voice_diag_v1 は単一グローバル
+ *   キーで、閉じた/別配信の面が最後に書いた値が居残るため、読み手が isGiftEffectDiagForOpenLive で照合する。
+ * @returns {VoiceDiagState & { capturedAt: number, source: string, liveId: string }}
  */
-export function buildVoiceDiagSnapshot(diag, nowMs) {
+export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
   const base = makeInitialVoiceDiag();
   const d = /** @type {any} */ (diag && typeof diag === 'object' ? diag : {});
   /** @param {unknown} x @param {number} fallback @returns {number} */
@@ -184,7 +187,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
      *   venueBar は従来から 'venue' を後付けしていたが、comeview は無印だった=非対称。
      *   ここで既定を持たせ、呼び出し側が上書きする形に揃える。
      */
-    source: String(d.source || '')
+    source: String(d.source || ''),
+    liveId: String(liveId ?? d.liveId ?? '').trim().toLowerCase()
   };
 }
 

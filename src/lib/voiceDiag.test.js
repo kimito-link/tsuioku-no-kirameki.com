@@ -152,6 +152,16 @@ describe('buildVoiceDiagSnapshot source', () => {
   });
 });
 
+describe('buildVoiceDiagSnapshot liveId(v0.1.1723)', () => {
+  it('第3引数の liveId を正規化して刻む', () => {
+    expect(buildVoiceDiagSnapshot({}, 1, ' LV123 ').liveId).toBe('lv123');
+  });
+  it('未指定なら空文字=旧データ扱い(読み手は照合を保留)', () => {
+    expect(buildVoiceDiagSnapshot({}, 1).liveId).toBe('');
+    expect(buildVoiceDiagSnapshot({}, 1, null).liveId).toBe('');
+  });
+});
+
 describe('makeInitialVoiceDiag', () => {
   it('全項目が安全な初期値', () => {
     const d = makeInitialVoiceDiag();

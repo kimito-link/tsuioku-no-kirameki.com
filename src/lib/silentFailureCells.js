@@ -99,8 +99,14 @@ export function buildSilentFailureCells(data) {
    *   持っていなかったのが v0.1.1331。値は取れているがセルが無かった。
    */
   const v = data?.voiceDiag ?? null;
+  const openLiveIds = (Array.isArray(data?.livesData) ? data.livesData : []).map((/** @type {any} */ e) => e?.lv);
+  // v0.1.1723: voiceDiag も単一グローバルキー。閉じた/別配信の面が最後に書いた累計が居残るので、
+  //   開いている配信の記録でなければ現在の問題として断定しない(gift-sound-fail と同じ照合)。
+  const voiceForOpenLive = !!v && typeof v === 'object' && isGiftEffectDiagForOpenLive(v, openLiveIds);
   if (!v || typeof v !== 'object') {
     out.push(cell('voice-start-fail', '読み上げのON失敗', 'na', '—'));
+  } else if (!voiceForOpenLive) {
+    out.push(cell('voice-start-fail', '読み上げのON失敗', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const failTotal = n0(v.enableFailTotal);
     const rawReason = String(v.lastEnableFailReason || '').trim();
@@ -127,6 +133,8 @@ export function buildSilentFailureCells(data) {
    */
   if (!v || typeof v !== 'object') {
     out.push(cell('voice-audio-blocked', '音の再生ブロック', 'na', '—'));
+  } else if (!voiceForOpenLive) {
+    out.push(cell('voice-audio-blocked', '音の再生ブロック', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const blocked = n0(v.audioBlockedTotal);
     out.push(cell(
@@ -146,7 +154,6 @@ export function buildSilentFailureCells(data) {
    *   coalesced/guarded は **防御が効いた回数**なので異常にしない(掟1)。
    */
   const g = data?.giftEffectDiag ?? null;
-  const openLiveIds = (Array.isArray(data?.livesData) ? data.livesData : []).map((/** @type {any} */ e) => e?.lv);
   if (!g || typeof g !== 'object') {
     out.push(cell('gift-sound-fail', 'ギフト音の失敗', 'na', '—'));
   } else if (!isGiftEffectDiagForOpenLive(g, openLiveIds)) {

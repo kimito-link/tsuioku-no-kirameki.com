@@ -3338,7 +3338,7 @@ export function mountVenueBarButton(options = {}) {
     const now = Date.now();
     if (now - _venueVoiceDiagLastWriteAt < 3000) return;
     _venueVoiceDiagLastWriteAt = now;
-    const snap = { ...buildVoiceDiagSnapshot(diag, now), source: 'venue' };
+    const snap = { ...buildVoiceDiagSnapshot(diag, now, liveIdFromPathname()), source: 'venue' };
     void chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {});
   };
 
