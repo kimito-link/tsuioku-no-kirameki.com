@@ -3516,5 +3516,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1724', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1723 の note と同じ理由)。今回は単体テスト +6(snapshot liveId・行ゲート・comment-revert セル)で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1725', metric: 'bundle-kb', value: 1439,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は診断の嘘の是正(B3 項目1): 広告効果音を playEffectSound の戻り値で数え、ガード/未割当/エラー/OFF時の内訳を追加。前版 1440KB より 1KB 小(過去最良 1360 超は v0.1.1454 以降の継続状態)。'
+  }),
+  Object.freeze({
+    version: '0.1.1725', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1725', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1724 の note と同じ理由)。今回は単体テスト +6(広告内訳の振り分け・行/カード/健全度セル)で確認。'
   })
 ]);

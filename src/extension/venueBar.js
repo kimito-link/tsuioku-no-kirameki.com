@@ -127,6 +127,7 @@ import {
   makeInitialGiftEffectDiag,
   buildGiftEffectDiagSnapshot,
   giftSoundDiagFieldForPlayResult,
+  adSoundDiagFieldForPlayResult,
   computeGiftGapAverage
 } from '../lib/giftEffectDiag.js';
 // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出だけ記録)。
@@ -4911,9 +4912,14 @@ export function mountVenueBarButton(options = {}) {
       if (p) {
         if (launchGiftThrow(speech.speakerKey, p)) {
           _giftEffectDiagCounters.adThrown += 1;
-          if (_effectSoundEnabledCache) {
-            playEffectSound(EFFECT_SOUND_KINDS.AD, buildEffectSoundDeps(EFFECT_SOUND_KINDS.AD));
-            _giftEffectDiagCounters.adSoundPlayed += 1;
+          // v0.1.1725: 戻り値で数える(従来は無条件に played 扱い)。OFF の間に投げた分も adSoundOff に残す。
+          if (!_effectSoundEnabledCache) {
+            _giftEffectDiagCounters.adSoundOff += 1;
+          } else {
+            let playResult = /** @type {any} */ ('error');
+            try { playResult = playEffectSound(EFFECT_SOUND_KINDS.AD, buildEffectSoundDeps(EFFECT_SOUND_KINDS.AD)); } catch { /* error として計上 */ }
+            const field = playResult === 'played' ? 'adSoundPlayed' : adSoundDiagFieldForPlayResult(playResult);
+            if (field) _giftEffectDiagCounters[field] += 1;
           }
         }
       }
