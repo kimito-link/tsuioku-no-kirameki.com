@@ -15,7 +15,12 @@
  *   ※ 概要だけスコープ。コメント全文は将来。
  */
 
+import { createHash } from 'node:crypto';
+import { isEtagMatch } from '../src/lib/statusEtag.js';
+
 const TTL_SECONDS = 7 * 24 * 60 * 60; // 7 日
+/** 受け付ける送信の上限(バイト)。ふだんは約130KB。Upstash の1件あたりの上限(1MB)より手前で止める。 */
+export const MAX_INGEST_BYTES = 900_000;
 const VIEW_TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
 
 /** Upstash REST へ 1 コマンド送る。失敗時は例外。 */
@@ -73,6 +78,11 @@ export function logIngest(req, outcome) {
   }
 }
 
+/** 保存文字列から ETag(引用符つき)を作る。同じ文字列なら必ず同じ値。 */
+export function etagOf(stored) {
+  return `"${createHash('sha1').update(String(stored)).digest('base64url')}"`;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
@@ -82,6 +92,12 @@ export default async function handler(req, res) {
       if (!ingestKey || sent !== ingestKey) {
         logIngest(req, 'unauthorized');
         res.status(401).json({ ok: false, error: 'unauthorized' });
+        return;
+      }
+      // ★v0.1.1729: 大きすぎる送信は保存しない(Upstash の1件あたりの上限・無料枠を守る)。理由は記録に残す。
+      if (Number(req.headers?.['content-length']) > MAX_INGEST_BYTES) {
+        logIngest(req, 'too_large');
+        res.status(413).json({ ok: false, error: 'too large' });
         return;
       }
       const body = readBody(req);
@@ -99,7 +115,15 @@ export default async function handler(req, res) {
       // v はストレージに含めない(ペイロードのみ保存)。
       const payload = { ...body };
       delete payload.v;
-      await upstash(['SET', `status:latest:${token}`, JSON.stringify(payload), 'EX', String(TTL_SECONDS)]);
+      const stored = JSON.stringify(payload);
+      await upstash(['SET', `status:latest:${token}`, stored, 'EX', String(TTL_SECONDS)]);
+      // ★v0.1.1729: 中身のハッシュを別キーに置く=GET が本体を読まずに「変わっていない(304)」を返せる。
+      //   失敗しても本体の保存は済んでいる=GET は ETag 無しの 200 に倒れるだけ(取りこぼさない)。
+      try {
+        await upstash(['SET', `status:etag:${token}`, etagOf(stored), 'EX', String(TTL_SECONDS)]);
+      } catch {
+        /* ETag は最適化。失敗で受け口を止めない */
+      }
       logIngest(req, 'ok');
       res.status(200).json({ ok: true });
       return;
@@ -110,6 +134,21 @@ export default async function handler(req, res) {
       if (!VIEW_TOKEN_RE.test(token)) {
         res.status(400).json({ ok: false, error: 'bad view token' });
         return;
+      }
+      // ★v0.1.1729: スマホが持っている版と同じなら本文なしの 304(本体は読まない=Redis も通信も軽い)。
+      const ifNoneMatch = req.headers?.['if-none-match'];
+      if (ifNoneMatch) {
+        let savedEtag = null;
+        try {
+          savedEtag = await upstash(['GET', `status:etag:${token}`]);
+        } catch {
+          savedEtag = null; // 照合できなければ本文を返す側に倒す
+        }
+        if (isEtagMatch(ifNoneMatch, savedEtag)) {
+          res.setHeader('ETag', savedEtag);
+          res.status(304).end();
+          return;
+        }
       }
       const raw = await upstash(['GET', `status:latest:${token}`]);
       if (!raw) {
@@ -122,6 +161,8 @@ export default async function handler(req, res) {
       } catch {
         data = null;
       }
+      // ETag は「保存された文字列」から作る=POST 時に別キーへ置いた値と同じになる。
+      res.setHeader('ETag', etagOf(raw));
       res.status(200).json({ ok: true, data });
       return;
     }
