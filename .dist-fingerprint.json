@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "d95b7dbd50dacd950f95e528e45d34855a7fead0dc60c3d05be8d170f3a87849",
+  "fingerprint": "4ab99a7536bc5b926e1fdaca24a8aa7bdb4f52fc02f2a26f103066ff7d644851",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -845,9 +845,9 @@
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
     "extension/dist/content.js": "9780f37955119b68c30739bb8a17134fb7c134302498b8874a922585dcd9114b",
-    "extension/dist/popup.js": "51d3a4492db127c6b68eb92bb3397632de7b3b9e35877f28ff9877108f33e3a5",
+    "extension/dist/popup.js": "d5f9da7e6deef396c9755ec60413dd2ea0ca9107b4050ccf9279f4c6d0dfd58d",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "4daae3ee4f7f737d21f5a672837765345e6b5fd59c604f67eb447e27ebb9c3b9",
+    "extension/dist/status.js": "0021b107883238429338af7412e12edae97fe3d00819d5f093e628ebd9794229",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "082c3efa4faca84e47537d9e3d010bb11cfb5a4111364c9527caf430229b5d6a",
     "extension/dist/comeview.js": "5b4143c5f952ed87d2dead93663b4162467993bcadf935445c7b20a941a76ea2",
@@ -857,7 +857,7 @@
     "extension/dist/avatar-face-worker.js": "7d17a9a9d2f53cf8c90373ccb940ee2e458b0b9f04ed5bb83b349ab394945af9",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "8da4b72f1dd2460241059b8e8f348cd322cbcaff13640b55f8e7a481f191463f",
+    "app/dist/live-view.js": "7361ab02928aa0f4b34ac3e34a17ceca8fcae4b5b6cca05b35ac66c1c90e9e07",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }
