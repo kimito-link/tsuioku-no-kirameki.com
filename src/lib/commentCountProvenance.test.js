@@ -406,3 +406,9 @@ describe('commentCountProvenanceToActionCards', () => {
     expect(commentCountProvenanceToActionCards(null)).toEqual([]);
   });
 });
+
+describe('v0.1.1727: 未観測(null)を 0 件にしない', () => {
+  it('記録も本家も null なら出どころ無し(null)', () => {
+    expect(buildCommentCountProvenance({ lv: 'lv1', recordedCount: null, officialCommentCount: null })).toBe(null);
+  });
+});

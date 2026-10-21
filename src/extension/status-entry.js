@@ -144,11 +144,6 @@ import { buildHighlightLedgerDiagLines } from '../lib/highlightLedger.js';
 //   起動/完走/中断観測値を extras(12秒間引き)で読む。popup が書く純観測値。キー定数自体は
 //   statusExtrasBatch.js が EXTRAS_BATCH_KEYS へ統合済み(直接importは不要)。
 import { buildScoreAnnounceDiagLines } from '../lib/scoreAnnounceDiag.js';
-// ③WEB配信採点丸写し(第3号・reference_full_mirror_SYNTHESIS.md M2/A-3・路線2): status が既に extras で
-//   読んでいる4値(reportPreview/giftEffectDiag/voiceDiag/highlightLedger)から①と同じ純lib
-//   で view-model を組み、jsonBlob.broadcastScoreVm に載せる(新規 storage read ゼロ・publish ゼロ)。
-//   R-1: VM 戻りは score/radar/highlights 等の構造化データのみ=HTML文字列を含まない(③で buildBroadcastScorePanelHtml が HTML 化)。
-import { buildBroadcastScorePanelViewModel } from '../lib/broadcastScorePanelViewModel.js';
 // Phase D1(2026-07-05): 操作音(opSoundDirector.js)の「押下→成功→発音」観測値を extras(12秒間引き)で
 //   読む。popup が書く純観測値=「押下は鳴るのに成功が無い/成功しているのに未割当」を1枚で見分ける。
 import { buildOpSoundEffectDiagLines } from '../lib/opSoundEffectDiag.js';
@@ -204,7 +199,7 @@ import {
   KEY_REPORT_PREVIEW,
   isReportPreviewFresh
 } from '../lib/reportPreviewKey.js';
-import { appendTrendSample, analyzeTrend } from '../lib/statusTrend.js';
+import { appendTrendSample, analyzeTrend, sumTrendKpiTotals } from '../lib/statusTrend.js';
 import { KEY_STATUS_TREND } from '../lib/statusTrendKey.js';
 import { pickOpenAction } from '../lib/watchLink.js';
 import { buildChikuranCardModel } from '../lib/chikuranCard.js';
@@ -219,6 +214,7 @@ import {
 } from '../lib/statusFormat.js';
 import { backfillLiveThroughputLine } from '../lib/backfillRinkuNarration.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
+import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/liveEndedFlag.js';
 import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
@@ -1605,18 +1601,18 @@ async function loadReportPreviewSafe() {
 async function recordAndAnalyzeTrendSafe(lvList, summaries) {
   try {
     const lvs = Array.isArray(lvList) ? lvList : [];
-    let recorded = 0;
-    let official = 0;
+    /** @type {Array<{ recordedCount: unknown, officialCount: unknown }>} */
+    const kpiRows = [];
     let watch = 0;
     let hasWatch = false;
     let catchingUp = false; // v0.1.887: 放送中×追いつき中(率<100)の配信が1つでもあるか。
     for (const lv of lvs) {
       const s = summaries[PANEL_SUMMARY_PREFIX + lv];
       const snap = summaries[WATCH_SNAPSHOT_PREFIX + lv];
-      const rec = Number(s?.recordedCount) || 0;
+      // v0.1.1728: 未観測の記録件数は 0 に潰さず生のまま渡す(合計/率の扱いは sumTrendKpiTotals が正本)。
+      const rec = s?.recordedCount;
       const off = Number(s?.officialCount ?? snap?.officialCommentCount) || 0;
-      recorded += rec;
-      official += off;
+      kpiRows.push({ recordedCount: rec, officialCount: off });
       const w = Number(snap?.viewerCountFromDom);
       if (Number.isFinite(w)) { watch += w; hasWatch = true; }
       // 追いつき中判定は buildBackfillProgressLine の正本(放送中×記録あり×率<100)に揃える。
@@ -1635,7 +1631,7 @@ async function recordAndAnalyzeTrendSafe(lvList, summaries) {
        */
       if (isCatchingUp({ endedAt: ended, recordedCount: rec, officialCount: off })) catchingUp = true;
     }
-    const ratePct = official > 0 ? Math.round((recorded / official) * 100) : null;
+    const { recorded, official, ratePct } = sumTrendKpiTotals(kpiRows);
     const kpi = { recorded, official, ratePct, watch: hasWatch ? watch : null, catchingUp };
 
     const bag = await chrome.storage.local.get(KEY_STATUS_TREND);
@@ -1842,7 +1838,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   //   ギフト無し配信なら空=ノイズにしない)。「ギフトがちゃんと飛ぶか・音が出るか」を目視せず確認できる。
   let giftEffectLine = '';
   safeSection('ギフト効果音診断', () => {
-    const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
+    const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now(), livesData.map((/** @type {any} */ l) => l?.lv));
     giftEffectLine = gLines.length ? `\n${gLines.join('\n')}` : '';
   });
   // v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合診断も概要に併記
@@ -1871,7 +1867,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   //   載って消える」の切り分けに、締切超過件数と取消件数を1枚で確認できる。
   let commentPostLine = '';
   safeSection('コメント送信計器', () => {
-    const cLines = buildCommentPostDiagLines(commentPostDiag, Date.now());
+    const cLines = buildCommentPostDiagLines(commentPostDiag, Date.now(), livesData.map((/** @type {any} */ l) => l?.lv));
     commentPostLine = cLines.length ? `\n${cLines.join('\n')}` : '';
   });
   // v0.1.1092: コメント即時プッシュレーン(storage迂回)の送信N/受信N/表示遅延msを概要に併記
@@ -2279,25 +2275,9 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     ? currentLiveId
     : '';
 
-  // ③WEB配信採点丸写し(第3号・reference_full_mirror_SYNTHESIS.md M2・路線2): status 既読の5値から①と同じ
-  //   純lib(buildBroadcastScorePanelViewModel)で view-model を組み、jsonBlob に載せる。③は
-  //   buildBroadcastScorePanelHtml を呼ぶだけ(VM ロジックは①と1回で共有)。
-  //   ★VM が liveId 未一致/鮮度落ち/未観測で null を返す設計(空パネルにしない)なので null なら載せない。
-  //   ★VM 戻りは構造化データのみ(score/radar/highlights)=innerHTML 行きの HTML 文字列は含まない(R-1 遵守)。
-  //   liveId は鏡優先→無ければ reportPreview.liveId にフォールバック(VM 側でも previewRec.liveId と突合される)。
+  // v0.1.1726: 配信採点パネルを popup/WEB版から外したので、WEB版向けの採点 view-model は載せない。
+  //   scoreLiveId は応援者ランキングの突き合わせ(supportersParity)が使うので残す(鏡優先→reportPreview)。
   const scoreLiveId = currentLiveId || String(reportPreview?.liveId || '');
-  const broadcastScoreVm = scoreLiveId
-    ? buildBroadcastScorePanelViewModel({
-        liveId: scoreLiveId,
-        nowMs: Date.now(),
-        previewRec: reportPreview,
-        phaseStats: null,
-        giftDiag: giftEffectDiag,
-        voiceDiag,
-        ledger: highlightLedger && typeof highlightLedger === 'object' ? highlightLedger : null
-      })
-    : null;
-  if (broadcastScoreVm) jsonBlob.broadcastScoreVm = broadcastScoreVm;
   // v0.1.1705: popup の応援者ランキング(鏡)と診断のレポート集計の上位の値を突き合わせる(取れなければ保留)。
   jsonBlob.supportersParity = judgeSupportersParity(topSupportersMirror, reportPreview, scoreLiveId, Date.now());
 
@@ -2900,7 +2880,7 @@ function renderActionCards(data) {
     cards = buildStatusActions(data);
     // v0.1.1054: ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを症状カードに昇格。
     //   aiShareFullText.js には既に配線済みだったが、status画面の対処候補パネル側は漏れていた(片翼統合)。
-    try { cards.push(...giftEffectDiagToActionCards(data.giftEffectDiag)); } catch { /* no-op */ }
+    try { cards.push(...giftEffectDiagToActionCards(data.giftEffectDiag, (Array.isArray(data.livesData) ? data.livesData : []).map((/** @type {any} */ l) => l?.lv))); } catch { /* no-op */ }
     // v0.1.1058: コメント数マイルストーンの検知はしたが演出/効果音が出ていない取りこぼしも同様に昇格。
     try { cards.push(...milestoneEffectDiagToActionCards(data.milestoneEffectDiag)); } catch { /* no-op */ }
   } catch (err) {
@@ -3502,7 +3482,9 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     snap?.broadcasterName || snap?.programProvider?.name || s?.broadcasterName || ''
   );
   const title = String(snap?.title || snap?.programTitle || s?.title || '');
-  const recordedCount = numOr(s?.recordedCount, 0);
+  // v0.1.1727(B3 項目4 第1版): 未観測(panel_summary がまだ無い/値が無い)を 0 件に潰さない(§3.6)。
+  //   null は「まだ分からない」=表示は「—」・率は出さない。観測した 0 は 0 のまま。
+  const recordedCount = numOrNull(s?.recordedCount);
   // 公式コメ数は panel_summary.officialCount にあるが、snapshot.officialCommentCount も
   //   読みに行く(片方しか入っていないケースに耐える)。
   const officialCommentCount =
@@ -3515,8 +3497,9 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     viewerCountFromDom: snap?.viewerCountFromDom,
     panelWatchCount: s?.watchCount
   });
-  const adPoints = numOrNull(snap?.officialAdPointsNdgr) ?? numOrNull(s?.adPoints);
-  const giftPoints = numOrNull(snap?.officialGiftPointsNdgr) ?? numOrNull(s?.giftPoints);
+  // v0.1.1720: pt は DOM 優先・NDGR fallback(popup と共有・正本 resolveOfficialPoints.js)
+  const adPoints = resolveOfficialPoints({ domValue: s?.adPoints, ndgrValue: snap?.officialAdPointsNdgr });
+  const giftPoints = resolveOfficialPoints({ domValue: s?.giftPoints, ndgrValue: snap?.officialGiftPointsNdgr });
   // 経過時間は snapshot.streamAgeMin(分)→秒に変換、無ければ panel_summary.elapsedSec。
   const elapsedSecLive =
     snap && typeof snap.streamAgeMin === 'number' && Number.isFinite(snap.streamAgeMin)
@@ -3543,7 +3526,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
       ? Math.max(0, Date.now() - officialCommentStatsUpdatedAt)
       : null;
   const officialRatePct =
-    recordedCount > 0 && officialCommentCount && officialCommentCount > 0
+    recordedCount != null && recordedCount > 0 && officialCommentCount && officialCommentCount > 0
       ? Math.round((recordedCount / officialCommentCount) * 100)
       : null;
 
@@ -3584,10 +3567,6 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     //   self-verifying 違反・ユーザー指摘)。配信中(endedAt 無し=列挙された視聴中タブ)を記録中とみなす。
     recording: !endedAt
   };
-}
-
-function numOr(v, dflt) {
-  return typeof v === 'number' && Number.isFinite(v) ? v : dflt;
 }
 
 function numOrNull(v) {

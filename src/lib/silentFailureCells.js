@@ -27,6 +27,7 @@
  */
 
 import { canonicalLabel, fromAliveFailure } from './voiceFailureTaxonomy.js';
+import { isGiftEffectDiagForOpenLive } from './giftEffectDiag.js';
 // ★v0.1.1405: 会場が鏡を受け取れているかの判定(a/b/c)。判定はあちらが正本。
 import { judgeVenueMirrorIntake } from './venueMirrorIntakeDiag.js';
 
@@ -98,8 +99,14 @@ export function buildSilentFailureCells(data) {
    *   持っていなかったのが v0.1.1331。値は取れているがセルが無かった。
    */
   const v = data?.voiceDiag ?? null;
+  const openLiveIds = (Array.isArray(data?.livesData) ? data.livesData : []).map((/** @type {any} */ e) => e?.lv);
+  // v0.1.1723: voiceDiag も単一グローバルキー。閉じた/別配信の面が最後に書いた累計が居残るので、
+  //   開いている配信の記録でなければ現在の問題として断定しない(gift-sound-fail と同じ照合)。
+  const voiceForOpenLive = !!v && typeof v === 'object' && isGiftEffectDiagForOpenLive(v, openLiveIds);
   if (!v || typeof v !== 'object') {
     out.push(cell('voice-start-fail', '読み上げのON失敗', 'na', '—'));
+  } else if (!voiceForOpenLive) {
+    out.push(cell('voice-start-fail', '読み上げのON失敗', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const failTotal = n0(v.enableFailTotal);
     const rawReason = String(v.lastEnableFailReason || '').trim();
@@ -126,6 +133,8 @@ export function buildSilentFailureCells(data) {
    */
   if (!v || typeof v !== 'object') {
     out.push(cell('voice-audio-blocked', '音の再生ブロック', 'na', '—'));
+  } else if (!voiceForOpenLive) {
+    out.push(cell('voice-audio-blocked', '音の再生ブロック', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const blocked = n0(v.audioBlockedTotal);
     out.push(cell(
@@ -147,6 +156,10 @@ export function buildSilentFailureCells(data) {
   const g = data?.giftEffectDiag ?? null;
   if (!g || typeof g !== 'object') {
     out.push(cell('gift-sound-fail', 'ギフト音の失敗', 'na', '—'));
+  } else if (!isGiftEffectDiagForOpenLive(g, openLiveIds)) {
+    // v0.1.1721: giftEffectDiag は単一グローバルキーで配信ごとにリセットされない。今開いている
+    //   配信の計測でなければ(=別/終了済み配信の値の居残り)、現在の問題として断定しない(診断の嘘の是正)。
+    out.push(cell('gift-sound-fail', 'ギフト音の失敗', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const err = n0(g.giftSoundError);
     const noPath = n0(g.giftSoundNoPath);
@@ -166,6 +179,9 @@ export function buildSilentFailureCells(data) {
   const cp = data?.commentPostDiag ?? null;
   if (!cp || typeof cp !== 'object') {
     out.push(cell('comment-revert', '送信の取り消し', 'na', '—'));
+  } else if (!isGiftEffectDiagForOpenLive(cp, openLiveIds)) {
+    // v0.1.1724: commentPostDiag も単一グローバルキー。別/閉じた配信への送信の取消数を現在の問題にしない。
+    out.push(cell('comment-revert', '送信の取り消し', 'na', '別の配信の記録です(現在の配信ではありません)'));
   } else {
     const revert = n0(cp.revertCount);
     const attempts = n0(cp.attempts);

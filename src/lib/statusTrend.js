@@ -38,6 +38,34 @@ function num(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * v0.1.1728(B3 項目4 第2版): 配信ごとの記録/公式から trend 用の合計と取得率を作る純関数。
+ *   ★記録件数が未観測(panel_summary がまだ無い・値が数でない)の配信は【取得率の分子・分母から外す】。
+ *   従来は status-entry が `Number(s?.recordedCount) || 0` で未観測を 0 件に潰し、公式だけ分母に入れて
+ *   「取得率0%」の点を trend に積んでいた(=まだ分からないを劣化の材料にする型・§3.6)。
+ *   公式合計(official)は事実なので全配信ぶん足す。観測済みの配信が1つも無ければ ratePct は null。
+ * @param {Array<{ recordedCount?: unknown, officialCount?: unknown }>} rows
+ * @returns {{ recorded: number, official: number, ratePct: number|null }}
+ */
+export function sumTrendKpiTotals(rows) {
+  let recorded = 0;
+  let official = 0;
+  let rateRec = 0;
+  let rateOff = 0;
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const rawRec = r?.recordedCount;
+    const rec = rawRec == null || rawRec === '' ? null : num(rawRec);
+    const off = num(r?.officialCount) ?? 0;
+    official += off;
+    if (rec == null) continue; // 未観測=合計にも率にも入れない(0件と混同しない)
+    recorded += rec;
+    rateRec += rec;
+    rateOff += off;
+  }
+  const ratePct = rateOff > 0 ? Math.round((rateRec / rateOff) * 100) : null;
+  return { recorded, official, ratePct };
+}
+
 /** raw を安全に TrendSample[] へ正規化(壊れた値は捨てる)。 @param {unknown} raw @returns {TrendSample[]} */
 function normalizeLog(raw) {
   const items =

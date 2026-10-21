@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveOfficialPoints } from './resolveOfficialPoints.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -99,7 +100,11 @@ describe('広告レーン: 出荷バンドルを実行して鏡に積まれる�
         ok: input?.ok ?? null,
         status: input?.status ?? null,
         rows: Array.isArray(input?.rows) ? input.rows : null
-      })
+      }),
+      // v0.1.1720: 広告pt の DOM↔NDGR 優先順位を解決する純関数(resolveOfficialPoints.js)。
+      //   出荷バンドルは module スコープで import 済みだが、関数本体だけを切り出す
+      //   このハーネスには入らないので、makeLaneResult と同じ理由で実関数を渡す。
+      resolveOfficialPoints
     };
     const names = Object.keys(scope);
     const factory = new Function(...names, `${fnSrc}; return refreshNorthStarAdRankingLane;`);

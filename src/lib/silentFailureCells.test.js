@@ -95,6 +95,29 @@ describe('無音で死ぬ故障のセル', () => {
     });
   });
 
+  // v0.1.1723: voiceDiag も単一グローバルキー。閉じた/別配信の面の累計を現在の問題にしない。
+  describe('読み上げ2セルの liveId 照合', () => {
+    const bad = { enableFailTotal: 2, lastEnableFailReason: 'timeout', audioBlockedTotal: 3 };
+    it('★別/終了済み配信の記録は2セルとも na「別の配信」', () => {
+      const data = { voiceDiag: { ...bad, liveId: 'lv_old' }, livesData: [{ lv: 'lv_now' }] };
+      for (const id of ['voice-start-fail', 'voice-audio-blocked']) {
+        const c = cellOf(data, id);
+        expect(c?.level).toBe('na');
+        expect(c?.text).toContain('別の配信');
+      }
+    });
+    it('★今開いている配信のタグなら従来どおり bad / warn', () => {
+      const data = { voiceDiag: { ...bad, liveId: 'LV_NOW' }, livesData: [{ lv: 'lv_now' }] };
+      expect(cellOf(data, 'voice-start-fail')?.level).toBe('bad');
+      expect(cellOf(data, 'voice-audio-blocked')?.level).toBe('warn');
+    });
+    it('★未タグ(旧データ)は従来挙動を維持する=回帰なし', () => {
+      const data = { voiceDiag: { ...bad }, livesData: [{ lv: 'lv_now' }] };
+      expect(cellOf(data, 'voice-start-fail')?.level).toBe('bad');
+      expect(cellOf(data, 'voice-audio-blocked')?.level).toBe('warn');
+    });
+  });
+
   describe('ギフト音の失敗(gift-sound-fail)', () => {
     it('★再生エラーは bad', () => {
       const c = cellOf({ giftEffectDiag: { giftSoundError: 1 } }, 'gift-sound-fail');
@@ -117,6 +140,42 @@ describe('無音で死ぬ故障のセル', () => {
     it('★設定でOFFなのは正常(掟2)', () => {
       const c = cellOf({ giftEffectDiag: { soundEnabled: false, giftSoundOff: 12 } }, 'gift-sound-fail');
       expect(c?.level).toBe('ok');
+    });
+
+    // v0.1.1721: 単一グローバルキーで別配信の値が居残る根治。liveId タグを開いている配信と照合する。
+    it('★別/終了済み配信の記録(liveId が開いている配信に無い)は na にして現在の問題にしない', () => {
+      const c = cellOf({
+        giftEffectDiag: { giftSoundError: 9, liveId: 'lv_old' },
+        livesData: [{ lv: 'lv_now' }]
+      }, 'gift-sound-fail');
+      expect(c?.level).toBe('na');
+      expect(c?.text).toContain('別の配信');
+    });
+
+    it('★今開いている配信のタグなら従来どおり bad を出す', () => {
+      const c = cellOf({
+        giftEffectDiag: { giftSoundError: 9, liveId: 'lv_now' },
+        livesData: [{ lv: 'lv_now' }]
+      }, 'gift-sound-fail');
+      expect(c?.level).toBe('bad');
+    });
+
+    it('★未タグ(旧データ)は従来挙動を維持する=回帰なし', () => {
+      const c = cellOf({ giftEffectDiag: { giftSoundError: 1 }, livesData: [{ lv: 'lv_now' }] }, 'gift-sound-fail');
+      expect(c?.level).toBe('bad');
+    });
+  });
+
+  // v0.1.1724: commentPostDiag も単一グローバルキー。別/閉じた配信への送信の取消数を現在の問題にしない。
+  describe('送信の取り消しの liveId 照合', () => {
+    it('★別の配信の記録は na「別の配信」', () => {
+      const c = cellOf({ commentPostDiag: { revertCount: 2, attempts: 3, liveId: 'lv_old' }, livesData: [{ lv: 'lv_now' }] }, 'comment-revert');
+      expect(c?.level).toBe('na');
+      expect(c?.text).toContain('別の配信');
+    });
+    it('★今の配信のタグ・未タグ旧データは従来どおり bad', () => {
+      expect(cellOf({ commentPostDiag: { revertCount: 2, liveId: 'lv_now' }, livesData: [{ lv: 'lv_now' }] }, 'comment-revert')?.level).toBe('bad');
+      expect(cellOf({ commentPostDiag: { revertCount: 2 }, livesData: [{ lv: 'lv_now' }] }, 'comment-revert')?.level).toBe('bad');
     });
   });
 
