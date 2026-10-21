@@ -199,3 +199,10 @@ describe('★比べてよいかを判定より前に確かめる(2026-08-21 実�
     expect(f.message).toContain('判定しないこと');
   });
 });
+
+describe('v0.1.1727: 記録件数が未観測(null)なら取得率の乖離を判定しない', () => {
+  it('recordedCount null は 0% 扱いにしない', () => {
+    const f = detectNumberInconsistencies({ livesData: [{ lv: 'lv1', recordedCount: null, officialCommentCount: 500 }] });
+    expect(f.filter((x) => String(x.id).includes('lv1'))).toEqual([]);
+  });
+});
