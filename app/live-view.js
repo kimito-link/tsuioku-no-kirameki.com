@@ -97,6 +97,8 @@ import { restoreSessionSummaryMirror } from '../src/lib/sessionSummaryMirror.js'
 import { buildSessionSummaryCompareTableHtml } from '../src/lib/sessionSummaryCompareTableHtml.js';
 // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
+// 2026-10-21: スマホは1配信だけ映す。映す配信=鏡が指す配信(PC で最後に操作した配信)。
+import { isLiveSwitched, pickLiveForCard, pickSnapshotLiveId } from '../src/lib/liveviewCurrentLive.js';
 import {
   evaluateSnapshotFreshness,
   formatSnapshotStalenessBanner
@@ -107,6 +109,8 @@ import {
 const POLL_INTERVAL_MS = 15_000;
 /** 最後に受け取った版の ETag。次の取得で If-None-Match に載せる(同じなら 304=本文なし)。 */
 let _lastEtag = '';
+/** 2026-10-21: いま映している配信の lv(起動時に決める)。まとめの配信が変わったら取り直す。 */
+let _shownLiveId = '';
 /** 表に戻ったときの即時取得を1回だけ配線したか。 */
 let _visibilityRefreshWired = false;
 /** fetchSnapshot の戻り値: サーバーの中身が前回から変わっていない(304)。 */
@@ -666,7 +670,7 @@ function paintAllMirrors(jsonBlob) {
   if (!jsonBlob || typeof jsonBlob !== 'object') return;
   refreshStaleBanner(jsonBlob);
   // 古くても「全レーンを揃えて」塗る(バラバラに消すより、古い旨を1枚で伝えた上で丸ごと見せる方が誠実)。
-  paintBroadcasterCard(Array.isArray(jsonBlob.lives) ? jsonBlob.lives[0] : null);
+  paintBroadcasterCard(pickLiveForCard(jsonBlob));
   paintStatCardsMirror(jsonBlob.statCardsMirror || null);
   paintLaneMirror(jsonBlob.laneMirror || null);
   paintNorthStarMirror(jsonBlob.northStarMirror || null);
@@ -751,17 +755,7 @@ function forcePaintAllMirrors() {
 /* ───────────────────────── データ取得 ───────────────────────── */
 
 function liveIdFromSnapshot(jsonBlob) {
-  try {
-    const fromLane = String(jsonBlob?.laneMirror?.liveId || '').trim().toLowerCase();
-    if (/^lv\d{1,15}$/.test(fromLane)) return fromLane;
-    const fromLive = String(jsonBlob?.lives?.[0]?.liveId || jsonBlob?.lives?.[0]?.lv || '')
-      .trim()
-      .toLowerCase();
-    if (/^lv\d{1,15}$/.test(fromLive)) return fromLive;
-  } catch {
-    /* no-op */
-  }
-  return '';
+  return pickSnapshotLiveId(jsonBlob);
 }
 
 async function fetchSnapshot(token) {
@@ -794,7 +788,8 @@ async function bootWithSnapshot(token) {
   hideError();
   _latestSnapshot = jsonBlob;
   seedMirrorsIntoStore(jsonBlob);
-  seedLocationParams(liveIdFromSnapshot(jsonBlob));
+  _shownLiveId = liveIdFromSnapshot(jsonBlob);
+  seedLocationParams(_shownLiveId);
 
   if (!_bootStarted) {
     _bootStarted = true;
@@ -880,10 +875,30 @@ async function refresh(token) {
     return;
   }
   if (!jsonBlob) return;
+  // ★2026-10-21: PC で映す配信が変わったら、URL の lv を新しい配信にして丸ごと起動し直す
+  //   (受動ビューは起動時の lv で描くため、差分を足すだけでは古い配信のまま残る)。
+  //   PC 側の送信は最短20秒間隔なので、タブを行き来しただけで何度も切り替わることはない。
+  const nextLiveId = liveIdFromSnapshot(jsonBlob);
+  // 起動時に配信が分からなかった(鏡がまだ無かった)ときも、分かった時点で一度だけ起動し直す。
+  if (isLiveSwitched(_shownLiveId, nextLiveId) || (!_shownLiveId && nextLiveId)) {
+    switchToLive(nextLiveId);
+    return;
+  }
   hideError();
   _latestSnapshot = jsonBlob;
   seedMirrorsIntoStore(jsonBlob); // onChanged 橋渡しで popup の受動再描画も促す
   forcePaintAllMirrors(); // poll でも clobber を踏み消して鏡を確実に出す
+}
+
+/** 2026-10-21: 映す配信を切り替える(URL の lv を差し替えて読み直す)。 */
+function switchToLive(lv) {
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set('lv', lv);
+    location.replace(u.href);
+  } catch {
+    /* no-op: 切り替えられなければ次の取得で再試行 */
+  }
 }
 
 function startPolling(token) {

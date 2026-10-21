@@ -25,3 +25,14 @@ describe('スマホの WEB版を早く新しくする配線', () => {
     expect(status).toMatch(/_autoPublishFailStreak = r && r\.ok \? 0 : _autoPublishFailStreak \+ 1;/);
   });
 });
+
+describe('スマホは1配信だけ映す配線(2026-10-21)', () => {
+  it('配信者カードは映している配信の lives を使う(lives[0] 固定ではない)', () => {
+    expect(liveView).toMatch(/paintBroadcasterCard\(pickLiveForCard\(jsonBlob\)\)/);
+    expect(liveView).not.toMatch(/paintBroadcasterCard\(Array\.isArray\(jsonBlob\.lives\) \? jsonBlob\.lives\[0\]/);
+  });
+  it('映す配信が変わったら lv を差し替えて起動し直す', () => {
+    expect(liveView).toMatch(/isLiveSwitched\(_shownLiveId, nextLiveId\) \|\| \(!_shownLiveId && nextLiveId\)\) \{\s*switchToLive\(nextLiveId\);\s*return;/);
+    expect(liveView).toMatch(/u\.searchParams\.set\('lv', lv\);\s*location\.replace\(u\.href\);/);
+  });
+});
