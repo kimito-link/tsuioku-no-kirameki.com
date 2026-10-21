@@ -2345,10 +2345,24 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
  *   それだけを見ると、2秒ごとの描画のたびに「2分たった」と判定されて送信が連打された(2分ごとに4〜6回)。
  */
 let _autoPublishLastLaunchAtMs = 0;
+/**
+ * v0.1.1729: 最後に自動送信した jsonBlob のシグネチャ。変わっていれば20秒・同じなら120秒間隔(autoPublishDecision)。
+ *   ★「変わったか」の材料は buildLiveViewPublishSignature(liveViewPublishSignature.js)だけ:
+ *     使う = snapshotMeta.capturedAt・laneMirror/statCardsMirror/northStarMirror/commentTimelineMirror の capturedAt・
+ *            lives の件数・lives の記録件数の合計・overview の文字数。
+ *     使わない = generatedAt(毎回変わる)・statusReport(経過秒を含む本文=毎回変わる)・上記以外の鏡
+ *            (topSupporters・giftHistoryMirror・roomHeatMirror・sessionSummaryMirror・parityVerdict 等)。
+ *   使わない鏡だけが変わったときは「同じ」と判定され、120秒の生存確認で届く(取りこぼしはしない・遅れるだけ)。
+ *   鏡を増やして20秒で届けたいときは、その鏡の capturedAt をシグネチャに足すこと。
+ */
+let _autoPublishLastSentSig = '';
+/** v0.1.1729: 自動送信が続けて失敗した回数。失敗が続くと間隔を 20→40→80→120秒 と広げる。 */
+let _autoPublishFailStreak = 0;
 
 function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
   try {
     const { ingestKey, viewToken } = getUploadConfig();
+    const sig = buildLiveViewPublishSignature(_lastRenderedBundle?.jsonBlob);
     const hasWatchTab = Array.isArray(livesData) && livesData.some((l) => l && l.recording);
     const outcome = summarizeLiveviewPublishOutcomeRecord(publishOutcomeRec || null, Date.now());
     const decision = shouldAutoPublish({
@@ -2360,14 +2374,21 @@ function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
       inFlight: _autoPublishInFlight,
       everSent: outcome.everSent || _autoPublishLastLaunchAtMs > 0,
       lastSentAtMs: latestPublishTime(publishOutcomeRec && publishOutcomeRec.at, _autoPublishLastLaunchAtMs),
-      nowMs: Date.now()
+      nowMs: Date.now(),
+      changed: Boolean(sig) && sig !== _autoPublishLastSentSig,
+      failStreak: _autoPublishFailStreak
     });
     if (!decision.publish) return;
     _autoPublishLastLaunchAtMs = Date.now();
+    _autoPublishLastSentSig = sig;
     _autoPublishInFlight = true;
-    void uploadStatusSnapshot().finally(() => {
-      _autoPublishInFlight = false;
-    });
+    void uploadStatusSnapshot()
+      .then((r) => {
+        _autoPublishFailStreak = r && r.ok ? 0 : _autoPublishFailStreak + 1;
+      })
+      .finally(() => {
+        _autoPublishInFlight = false;
+      });
   } catch {
     _autoPublishInFlight = false;
     /* best-effort: 自動 publish の失敗は status を止めない */
