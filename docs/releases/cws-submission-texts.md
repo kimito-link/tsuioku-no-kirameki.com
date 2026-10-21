@@ -113,6 +113,20 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
 >
 > 拡張はユーザーが読み上げを ON にしたときだけ、ローカルで起動中の VOICEVOX に対しテキストの音声合成をリクエストし、返ってきた音声をその場で再生します。通信はユーザー自身の端末内（127.0.0.1）で完結し、コメント本文や個人情報が外部サーバーへ送信されることは一切ありません。VOICEVOX が起動していない場合、機能は自動的に無効のままです。
 
+### 2-8d. ホスト権限 `https://app.tsuioku-no-kirameki.com/*` が必要な理由
+
+> 利用者が「WEB で共有」機能を自分で使った場合に限り、状態速報画面に表示されている内容のコピーを、当プロジェクトが運営する共有サーバー (app.tsuioku-no-kirameki.com) へ送信するために必要です。
+>
+> 送信は (a) 共有ボタンを押した回だけの手動共有、(b) 利用者が自分でチェックを入れた場合のみ配信中に約 2 分間隔で送る自動公開の 2 通りで、いずれも既定 OFF です。共有用のキーと利用者の同意がそろわない限り、この宛先への通信は一切発生しません。送信内容と保持の扱いはプライバシーポリシー §4-3 に記載しています。
+>
+> 広告配信・行動トラッキング・第三者への提供には使用しません。
+
+### 2-8e. ホスト権限 `https://suggestqueries.google.com/*` が必要な理由
+
+> 状態画面の「配信者の評判チェック」で、利用者が入力欄に入れて実行した (ボタンまたは Enter) 配信者名について、Google の検索候補 (サジェスト) を取得するために必要です。応援する配信者を安心して追えるよう、候補に注意すべき語が含まれていないかを 3 キャラが案内します。
+>
+> 送信されるのは利用者が入力した語句 (100 文字以内) のみで、記録したコメント・ユーザー ID・閲覧履歴は送信しません。利用者が実行操作をしたときだけ通信し、自動では発生しません。プライバシーポリシー §4-4 に記載しています。
+
 ### 2-9. ホスト権限 `https://*.nicovideo.jp/*` が必要な理由
 
 > 本拡張機能は、ニコニコ生放送 (live.nicovideo.jp / live2.nicovideo.jp / www.nicovideo.jp 等) の配信ページ上でユーザー本人が視聴中の応援コメントをローカル記録・可視化することが単一用途であり、この用途を満たすためには nicovideo.jp ドメイン配下の watch ページに対して content script を注入し、コメント DOM・配信メタ情報 (タイトル・配信者 ID・同時接続数・コメント時刻等) を取得する必要があります。
@@ -162,7 +176,8 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
    （`privacy.html` §6 と整合）
 2. ✅ 「データ使用 → 個人を特定できる情報」にチェックが入っているか
    （`privacy.html` §2 のユーザー ID 保存と整合）
-3. ✅ scripting / downloads / alarms / tabs / sidePanel / offscreen の理由欄が空欄でないか
+3. ✅ scripting / downloads / alarms / tabs / webNavigation / sidePanel / offscreen と、4 つのホスト権限
+   （nicovideo.jp / app.tsuioku-no-kirameki.com / suggestqueries.google.com / 127.0.0.1:50021）の理由欄が空欄でないか
 4. ✅ アップロード ZIP は `python scripts/stage-submission.py <version>` で生成した
    `build/tsuioku-no-kirameki-X.X.X.zip` で、master の version と一致しているか
 5. ✅ 「審査の合格後に自動的に公開する」が意図通りか（再確認）
