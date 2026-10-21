@@ -700,9 +700,8 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 88</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 87</summary>
 
-- `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
 - `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
@@ -831,6 +830,11 @@
 - **公式「本家コメ」チップの速さ(+N/分)** — paintOfficialNicoStatsStrip(popup-entry.js)が公式コメント累計の実測(値が変わったときだけ標本)を officialCommentRate.js に積み、20秒以上離れた2標本の差を「+66/分」としてチップ隣の span に出す。補間はしない・出せない間は空(span ごと非表示)・配信切替で標本を捨てる。officialNicoStatsStripDigest.js は無変更
   - `src/lib/officialCommentRate.js`
   - `src/extension/popup-entry.js`
+- **スマホ版の利用者ごとの鍵(発行・削除・上限)** — POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッシュだけ保持)・閲覧トークンを発行、?action=rotate で閲覧URLを作り直し、DELETE で本体・ETag・鍵を消す。/api/status は x-device-id+x-write-key のとき書き込み先をサーバーが鍵から決め(他人の閲覧トークンへ書けない)、利用者ごと1日4,000回・全体上限で429、診断の全文(statusReport/fastDiag)を落として保存。保存は24時間。判定は deviceAuth.js、乱数・ハッシュ・Redis は deviceStore.js(v0.1.1730・第a段=拡張からは未使用)
+  - `api/device.js`
+  - `api/status.js`
+  - `src/lib/deviceAuth.js`
+  - `src/server/deviceStore.js`
 - **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
   - `extension/live-view.html`
   - `src/extension/live-view-entry.js`
@@ -1201,6 +1205,7 @@
 - `v0.1.1719` 2026-10-20 — 読み上げ失敗の警告が復旧後も残らない
 
 ### 🩺 診断・状態速報 (12版)
+- `v0.1.1730` 2026-10-21 — スマホ版の利用者ごとの鍵をサーバーに用意
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
@@ -1212,7 +1217,6 @@
 - `v0.1.1719` 2026-10-20 — 読み上げ失敗の警告が復旧後も残らない
 - `v0.1.1716` 2026-10-20 — 画面の部品数の注記を実際の基準に
 - `v0.1.1715` 2026-10-20 — 取得率の100%超を隠さない
-- `v0.1.1710` 2026-10-20 — 開いた直後の偽の不一致を出さない
 
 ### その他 (5版)
 - `v0.1.1729` 2026-10-21 — スマホのWEB版を変化があれば20秒で更新
