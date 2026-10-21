@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1711',
+    date: '2026-10-20',
+    summary: 'メディアキット生成を共有部品に切り出し',
+    items: Object.freeze([
+      'メディアキットの作り方を、ポップアップの中から専用の部品に移しました。画面の見た目や出力される HTML は変えていません。',
+      'この部品を、マーケレポートの生成からも使えるようになります(次の版で、メディアキットとマーケレポートを1つの HTML にまとめる準備です)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1710',
     date: '2026-10-20',
     summary: '開いた直後の偽の不一致を出さない',

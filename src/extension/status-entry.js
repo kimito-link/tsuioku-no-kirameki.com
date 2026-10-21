@@ -220,6 +220,7 @@ import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/
 import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+import { buildPublishBody, deleteDeviceOnServer, forgetDeviceCred, getPublishCredentials, maybeRegisterDevice, refreshDeviceCredCache, shouldForgetDeviceCred } from './statusDeviceCred.js';
 /*
  * ★v0.1.1371: boot(init)で await する storage read の上限[ms]。
  *   ここが無界だと storage stall のとき init が止まり、refresh にも到達せず【画面が白紙】になる
@@ -340,6 +341,7 @@ async function setWebPublishOptIn(next) {
   _webPublishOptIn = value;
   try {
     await chrome.storage.local.set({ [KEY_WEB_PUBLISH_OPT_IN]: value });
+    if (!value) void deleteDeviceOnServer(getUploadConfig().appOrigin); // v0.1.1731: 同意 OFF=サーバーの利用者データも消す
   } catch {
     /* best-effort: 保存に失敗してもキャッシュは反映済み(次回起動で既定OFFに戻る=安全側) */
   }
@@ -604,6 +606,7 @@ async function bootstrap() {
   if (isStatusPublisherMode(location.search) && !(await acquireStatusPublisherLock(navigator.locks))) return;
   // v0.1.1626: 拡張フォルダに鍵ファイルがあれば一度だけ取り込む(貼り付け・クリック不要)。
   if (await seedShareKeysFromLocalFile()) await refreshUploadConfigCache();
+  await refreshDeviceCredCache(getUploadConfig().appOrigin); // v0.1.1731: 利用者ごとの鍵(共有キーが無いときだけ使う)
 
   try {
     checkVersionMismatchBanner();
@@ -2361,14 +2364,14 @@ let _autoPublishFailStreak = 0;
 
 function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
   try {
-    const { ingestKey, viewToken } = getUploadConfig();
+    maybeRegisterDevice({ optedIn: _webPublishOptIn === true, uploadCfg: getUploadConfig() }); // v0.1.1731: 同意 ON・鍵なしなら鍵をもらう
     const sig = buildLiveViewPublishSignature(_lastRenderedBundle?.jsonBlob);
     const hasWatchTab = Array.isArray(livesData) && livesData.some((l) => l && l.recording);
     const outcome = summarizeLiveviewPublishOutcomeRecord(publishOutcomeRec || null, Date.now());
     const decision = shouldAutoPublish({
       // ★v0.1.1242: 明示同意(既定OFF)が最優先ゲート。未同意なら他が揃っていても送らない。
       optedIn: _webPublishOptIn === true,
-      hasKeys: Boolean(ingestKey && viewToken),
+      hasKeys: Boolean(getPublishCredentials(getUploadConfig())),
       hasPayload: Boolean(_lastRenderedBundle?.jsonBlob),
       hasWatchTab,
       inFlight: _autoPublishInFlight,
@@ -3725,8 +3728,8 @@ function persistLiveviewPublishOutcome(outcome) {
 }
 
 async function uploadStatusSnapshot() {
-  const { ingestKey, viewToken, appOrigin } = getUploadConfig();
-  if (!ingestKey || !viewToken) {
+  const creds = getPublishCredentials(getUploadConfig()); // v0.1.1731: 共有キー優先・無ければ利用者ごとの鍵
+  if (!creds) {
     return { ok: false, error: 'キー未設定(この画面の「🔑 WEB共有の設定」で書き込みキーと閲覧トークンを入力してください)' };
   }
   const jsonBlob = _lastRenderedBundle?.jsonBlob;
@@ -3738,14 +3741,15 @@ async function uploadStatusSnapshot() {
     jsonBlob?.northStarMirror?.liveId || jsonBlob?.laneMirror?.liveId || jsonBlob?.statCardsMirror?.liveId || ''
   );
   // 共有 URL 組み立ては純関数 buildStatusShareUrls(src/lib)に抽出済み(挙動同値・テストで固定)。
-  const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(appOrigin, viewToken);
+  const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(creds.appOrigin, creds.viewToken);
   try {
     const res = await fetch(ingestUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-share-key': ingestKey },
-      body: JSON.stringify({ ...jsonBlob, v: viewToken })
+      headers: creds.headers,
+      body: JSON.stringify(buildPublishBody(creds, jsonBlob))
     });
     if (!res.ok) {
+      if (shouldForgetDeviceCred(creds.mode, res.status)) void forgetDeviceCred(); // 鍵の記録が無い=もらい直す
       // POST 失敗を globalThis + storage 両方に記録=どのページからも「純Webが古い」を検知できる。
       recordLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, at: Date.now() });
       persistLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, liveId: sentLiveId });

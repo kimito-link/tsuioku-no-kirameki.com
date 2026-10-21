@@ -5,7 +5,7 @@ import { startStatusPublisherHost } from './statusPublisherHost.js';
 
 /** 2026-10-15: サイドパネルの中へ、見えない状態画面(送信担当)を1つ置く処理。 */
 
-const makeEnv = ({ cfg, optIn, lockHeld = false, hidden = false, existingMarker = false } = {}) => {
+const makeEnv = ({ cfg, optIn, deviceCred, lockHeld = false, hidden = false, existingMarker = false } = {}) => {
   const appended = [];
   const document = {
     visibilityState: hidden ? 'hidden' : 'visible',
@@ -16,7 +16,7 @@ const makeEnv = ({ cfg, optIn, lockHeld = false, hidden = false, existingMarker 
       return { attrs, style: { cssText: '' }, setAttribute: (k, v) => { attrs[k] = v; } };
     }
   };
-  const store = { nls_status_upload_config_v1: cfg, nls_web_publish_opt_in: optIn };
+  const store = { nls_status_upload_config_v1: cfg, nls_web_publish_opt_in: optIn, nls_status_device_cred_v1: deviceCred };
   const state = { held: lockHeld };
   return {
     appended, state,
@@ -63,6 +63,21 @@ describe('startStatusPublisherHost', () => {
       await tick();
       expect(env.appended).toHaveLength(0);
     }
+  });
+  it('★v0.1.1731: 共有キーが無くても、利用者ごとの鍵があれば置く(壊れた鍵では置かない)', async () => {
+    const cred = { deviceId: 'd'.repeat(22), writeKey: 'w'.repeat(43), viewToken: 'v'.repeat(32) };
+    const env = makeEnv({ cfg: undefined, optIn: true, deviceCred: cred });
+    startStatusPublisherHost(env.deps);
+    await tick();
+    expect(env.appended).toHaveLength(1);
+    const broken = makeEnv({ cfg: undefined, optIn: true, deviceCred: { deviceId: 'x' } });
+    startStatusPublisherHost(broken.deps);
+    await tick();
+    expect(broken.appended).toHaveLength(0);
+    const noConsent = makeEnv({ cfg: undefined, optIn: false, deviceCred: cred });
+    startStatusPublisherHost(noConsent.deps);
+    await tick();
+    expect(noConsent.appended).toHaveLength(0);
   });
   it('★別のパネルが担当している(ロック保持中)なら置かない', async () => {
     const env = makeEnv({ cfg: KEYS, optIn: true, lockHeld: true });
