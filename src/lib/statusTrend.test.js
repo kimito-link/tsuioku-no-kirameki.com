@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  sumTrendKpiTotals,
   appendTrendSample,
   analyzeTrend,
   STATUS_TREND_VERSION,
@@ -146,5 +147,22 @@ describe('analyzeTrend', () => {
     expect(analyzeTrend(null, T0)).toEqual([]);
     expect(analyzeTrend({ items: 'x' }, T0)).toEqual([]);
     expect(analyzeTrend({ items: [] }, NaN)).toEqual([]);
+  });
+});
+
+describe('sumTrendKpiTotals(v0.1.1728: 未観測の記録件数を率に混ぜない)', () => {
+  it('★未観測の配信は取得率の分子・分母から外す(公式合計には入れる)', () => {
+    const r = sumTrendKpiTotals([
+      { recordedCount: 90, officialCount: 100 },
+      { recordedCount: undefined, officialCount: 400 }
+    ]);
+    expect(r).toEqual({ recorded: 90, official: 500, ratePct: 90 });
+  });
+  it('★観測した 0 件は率に入れる(本当の 0 は劣化の材料になる)', () => {
+    expect(sumTrendKpiTotals([{ recordedCount: 0, officialCount: 100 }]).ratePct).toBe(0);
+  });
+  it('観測済みが1つも無ければ ratePct は null', () => {
+    expect(sumTrendKpiTotals([{ recordedCount: null, officialCount: 100 }]).ratePct).toBe(null);
+    expect(sumTrendKpiTotals([]).ratePct).toBe(null);
   });
 });

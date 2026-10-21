@@ -16,66 +16,68 @@
 ```mermaid
 graph LR
   ROOT["リポジトリ"]
-  ROOT --> d0[".codex/ 〔Codex/エージェント〕"]
-  d0 --> d0_0["agents/ 〔Codex/エージェント〕"]
-  ROOT --> d1[".codex-osint/ 〔OSINT/調査〕"]
-  ROOT --> d2["_docs/ 〔横断/KB〕"]
-  ROOT --> d3["api/ 〔API〕"]
-  ROOT --> d4["app/ 〔Web版〕"]
-  d4 --> d4_0["dist/ 〔ビルド成果物〕"]
-  d4 --> d4_1["images/ 〔Web版/画像〕"]
-  ROOT --> d5["council/ 〔会議/設計〕"]
-  d5 --> d5_0["auto/ 〔会議/自動生成〕"]
-  ROOT --> d6["council-scout/ 〔会議/調査〕"]
-  d6 --> d6_0["briefs/ 〔会議/原稿〕"]
-  ROOT --> d7["docs/ 〔設計/レポート〕"]
-  d7 --> d7_0["article-assets/ 〔記事/画像〕"]
-  d7 --> d7_1["article-drafts/ 〔記事/下書き〕"]
-  d7 --> d7_2["feature-map/ 〔依存図/自動生成〕"]
-  d7 --> d7_3["handoff/ 〔引継ぎ/設計〕"]
-  d7 --> d7_4["marketing/ 〔マーケ/原稿〕"]
-  d7 --> d7_5["patent-unique-voice-reading-filing-final/ 〔特許/履歴〕"]
-  d7 --> d7_6["policies/ 〔方針〕"]
-  d7 --> d7_7["releases/ 〔リリース〕"]
-  d7 --> d7_8["research/ 〔調査/レポート〕"]
-  d7 --> d7_9["workflows/ 〔ワークフロー〕"]
-  ROOT --> d8["extension/ 〔配布/manifest〕"]
-  d8 --> d8_0["data/ 〔データ/応援〕"]
-  d8 --> d8_1["dist/ 〔ビルド成果物〕"]
-  d8 --> d8_2["images/ 〔画像〕"]
-  d8 --> d8_3["sound/ 〔音声〕"]
-  ROOT --> d9["memory/ 〔メモリ/知見〕"]
-  d9 --> d9_0["archive/ 〔メモリ/履歴〕"]
-  d9 --> d9_1["avatar-parts/ 〔アバター/画像〕"]
-  ROOT --> d10["scripts/ 〔ビルド/自動生成〕"]
-  d10 --> d10_0["audit/ 〔監査/CSS/会場〕"]
-  d10 --> d10_1["lib/ 〔ビルド/共有〕"]
-  d10 --> d10_2["perf-ab/ 〔性能/計測〕"]
-  d10 --> d10_3["xserver/ 〔デプロイ/webhook〕"]
-  ROOT --> d11["sound-src/ 〔音声/素材〕"]
-  d11 --> d11_0["soundeffect-lab/ 〔音声/素材〕"]
-  ROOT --> d12["src/ 〔ソース〕"]
-  d12 --> d12_0["data/ 〔コメント/取得〕"]
-  d12 --> d12_1["domain/ 〔応援/集約/識別子〕"]
-  d12 --> d12_2["extension/ 〔entry/記録/会場/応援〕"]
-  d12 --> d12_3["fixtures/ 〔テスト〕"]
-  d12 --> d12_4["images/ 〔画像〕"]
-  d12 --> d12_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
-  d12 --> d12_6["server/ 〔API/公開/ランキング〕"]
-  d12 --> d12_7["shared/ 〔共有/アバター〕"]
-  d12 --> d12_8["sound/ 〔音声〕"]
-  ROOT --> d13["tests/ 〔テスト〕"]
-  d13 --> d13_0["contract/ 〔テスト/契約〕"]
-  d13 --> d13_1["e2e/ 〔テスト/E2E/描画〕"]
-  d13 --> d13_2["helpers/ 〔テスト/共有〕"]
-  ROOT --> d14["tools/ 〔ツール〕"]
-  d14 --> d14_0["mcp-nicolive/ 〔MCP/診断〕"]
-  ROOT --> d15["tsuioku-no-kirameki/ 〔LP/公開〕"]
-  d15 --> d15_0["articles/ 〔記事/公開〕"]
-  d15 --> d15_1["assets/ 〔LP/共有〕"]
-  d15 --> d15_2["images/ 〔画像〕"]
-  d15 --> d15_3["live/ 〔LP/公開/ランキング〕"]
-  d15 --> d15_4["sound/ 〔音声/公開〕"]
+  ROOT --> d0["”src/"]
+  d0 --> d0_0["images/"]
+  ROOT --> d1[".codex/ 〔Codex/エージェント〕"]
+  d1 --> d1_0["agents/ 〔Codex/エージェント〕"]
+  ROOT --> d2[".codex-osint/ 〔OSINT/調査〕"]
+  ROOT --> d3["_docs/ 〔横断/KB〕"]
+  ROOT --> d4["api/ 〔API〕"]
+  ROOT --> d5["app/ 〔Web版〕"]
+  d5 --> d5_0["dist/ 〔ビルド成果物〕"]
+  d5 --> d5_1["images/ 〔Web版/画像〕"]
+  ROOT --> d6["council/ 〔会議/設計〕"]
+  d6 --> d6_0["auto/ 〔会議/自動生成〕"]
+  ROOT --> d7["council-scout/ 〔会議/調査〕"]
+  d7 --> d7_0["briefs/ 〔会議/原稿〕"]
+  ROOT --> d8["docs/ 〔設計/レポート〕"]
+  d8 --> d8_0["article-assets/ 〔記事/画像〕"]
+  d8 --> d8_1["article-drafts/ 〔記事/下書き〕"]
+  d8 --> d8_2["feature-map/ 〔依存図/自動生成〕"]
+  d8 --> d8_3["handoff/ 〔引継ぎ/設計〕"]
+  d8 --> d8_4["marketing/ 〔マーケ/原稿〕"]
+  d8 --> d8_5["patent-unique-voice-reading-filing-final/ 〔特許/履歴〕"]
+  d8 --> d8_6["policies/ 〔方針〕"]
+  d8 --> d8_7["releases/ 〔リリース〕"]
+  d8 --> d8_8["research/ 〔調査/レポート〕"]
+  d8 --> d8_9["workflows/ 〔ワークフロー〕"]
+  ROOT --> d9["extension/ 〔配布/manifest〕"]
+  d9 --> d9_0["data/ 〔データ/応援〕"]
+  d9 --> d9_1["dist/ 〔ビルド成果物〕"]
+  d9 --> d9_2["images/ 〔画像〕"]
+  d9 --> d9_3["sound/ 〔音声〕"]
+  ROOT --> d10["memory/ 〔メモリ/知見〕"]
+  d10 --> d10_0["archive/ 〔メモリ/履歴〕"]
+  d10 --> d10_1["avatar-parts/ 〔アバター/画像〕"]
+  ROOT --> d11["scripts/ 〔ビルド/自動生成〕"]
+  d11 --> d11_0["audit/ 〔監査/CSS/会場〕"]
+  d11 --> d11_1["lib/ 〔ビルド/共有〕"]
+  d11 --> d11_2["perf-ab/ 〔性能/計測〕"]
+  d11 --> d11_3["xserver/ 〔デプロイ/webhook〕"]
+  ROOT --> d12["sound-src/ 〔音声/素材〕"]
+  d12 --> d12_0["soundeffect-lab/ 〔音声/素材〕"]
+  ROOT --> d13["src/ 〔ソース〕"]
+  d13 --> d13_0["data/ 〔コメント/取得〕"]
+  d13 --> d13_1["domain/ 〔応援/集約/識別子〕"]
+  d13 --> d13_2["extension/ 〔entry/記録/会場/応援〕"]
+  d13 --> d13_3["fixtures/ 〔テスト〕"]
+  d13 --> d13_4["images/ 〔画像〕"]
+  d13 --> d13_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
+  d13 --> d13_6["server/ 〔API/公開/ランキング〕"]
+  d13 --> d13_7["shared/ 〔共有/アバター〕"]
+  d13 --> d13_8["sound/ 〔音声〕"]
+  ROOT --> d14["tests/ 〔テスト〕"]
+  d14 --> d14_0["contract/ 〔テスト/契約〕"]
+  d14 --> d14_1["e2e/ 〔テスト/E2E/描画〕"]
+  d14 --> d14_2["helpers/ 〔テスト/共有〕"]
+  ROOT --> d15["tools/ 〔ツール〕"]
+  d15 --> d15_0["mcp-nicolive/ 〔MCP/診断〕"]
+  ROOT --> d16["tsuioku-no-kirameki/ 〔LP/公開〕"]
+  d16 --> d16_0["articles/ 〔記事/公開〕"]
+  d16 --> d16_1["assets/ 〔LP/共有〕"]
+  d16 --> d16_2["images/ 〔画像〕"]
+  d16 --> d16_3["live/ 〔LP/公開/ランキング〕"]
+  d16 --> d16_4["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -274,6 +276,11 @@ graph LR
 
 ---
 
+## `"src/` — ⚠️ 未記入（ROLES に追記）
+<sub>ファイル 17 件</sub>
+
+- `images/`（17 件） — ⚠️ 未記入（ROLES に追記）
+
 ## `.codex/` — Codex CLI 用のエージェント定義(司令塔から呼ぶ実装役)  〔Codex / エージェント〕
 <sub>ファイル 5 件</sub>
 
@@ -295,7 +302,7 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 394 件</sub>
+<sub>ファイル 396 件</sub>
 
 - `auto/`（8 件） — 会議の自動実行ログ(code/design の JSON)  〔会議 / 自動生成〕
 
@@ -346,14 +353,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2107 件</sub>
+<sub>ファイル 2092 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（65 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
-- `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1866 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `images/`（117 件） — LP / CWS 提出物のマスター画像  〔画像〕
+- `lib/`（1868 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（4 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -725,4 +732,9 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 
 ---
 
-✅ すべてのディレクトリに役割が記入済み。
+## ⚠️ 役割が未記入のディレクトリ（2）
+
+以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
+
+- `"src/`
+- `"src/images/`

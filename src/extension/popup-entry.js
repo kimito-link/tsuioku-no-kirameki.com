@@ -8,6 +8,7 @@ import '../lib/flickerMeterBoot.js';
 import '../lib/bootTimelineBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
+import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
 import {
   buildYukkuriImageDataUrlMap,
@@ -308,7 +309,6 @@ import {
   buildScoreAnnounceDiagSnapshot
 } from '../lib/scoreAnnounceDiag.js';
 import { KEY_SCORE_ANNOUNCE_DIAG } from '../lib/scoreAnnounceDiagKey.js';
-import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 // Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。コメント投稿=玉の打ち出し。
 //   検知点は拡張自身の投稿経路(押下=op_handle・成功=op_shot)。乱数ゼロ・全て決定論。
 import {
@@ -1275,6 +1275,16 @@ function publishOpSoundEffectDiag() {
 //   目的: 「送信中…」張り付き・自コメ「一瞬載って消える」を状態速報1枚で切り分ける。
 const _commentPostDiagCounters = makeInitialCommentPostDiag();
 let _commentPostDiagLastWriteAt = 0;
+// v0.1.1724: カウンタがどの配信への送信を数えているか。送信先は submitComment の lvPost
+//   (exportBtn.dataset.liveId)であり watchPopupLastPaintedLiveId とは別物になり得るので、表示中の配信ではなく
+//   **実際に送った先**で刻む。送信先が変わったらカウンタを捨てる=別配信の取消数を新しい配信の名で出さない。
+let _commentPostDiagLiveId = '';
+/** @param {string} lvPost submitComment が実際に送る配信(空なら刻まない) */
+function scopeCommentPostDiagToLive(lvPost) {
+  if (!lvPost || lvPost === _commentPostDiagLiveId) return;
+  if (_commentPostDiagLiveId) Object.assign(_commentPostDiagCounters, makeInitialCommentPostDiag());
+  _commentPostDiagLiveId = lvPost;
+}
 // comment-post-speed-DESIGN.md §F(Phase 0計器・§B-2/D Phase 1で消費): submitComment の楽観追記
 //   時に押下時刻を積む。renderStoryUserLane の paint 直後に pending-self エントリの capturedAt と
 //   突合し、成立分だけ「押下→楽観表示がレーンに描画完了」のサンプルにする(嘘をつかない=
@@ -1320,7 +1330,7 @@ function publishCommentPostDiag() {
   const now = Date.now();
   if (now - _commentPostDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
   _commentPostDiagLastWriteAt = now;
-  const snap = { ...buildCommentPostDiagSnapshot(_commentPostDiagCounters, now), source: 'popup' };
+  const snap = { ...buildCommentPostDiagSnapshot(_commentPostDiagCounters, now, _commentPostDiagLiveId), source: 'popup' };
   void safeStorageLocalSet({ [KEY_COMMENT_POST_DIAG]: snap });
 }
 
@@ -3983,38 +3993,6 @@ async function runScoreAnnounceSequence(liveId, trigger) {
   }
 }
 
-/** 配信終了フラグ(nls_live_ended_<lv>)を購読し、初回検知で発表シーケンスを1回だけ自動起動する。
- *   §2.1「配信終了フラグ初回検知で1回だけ自動」。1配信1回きりの判定自体はscoreAnnounceGate側が持つ
- *   (このリスナーは「検知したら呼ぶだけ」の薄いラッパー・bindXxxStorageListenerOnceパターン)。 */
-let _liveEndedScoreListenerBound = false;
-function bindLiveEndedScoreListenerOnce() {
-  if (_liveEndedScoreListenerBound) return;
-  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
-  _liveEndedScoreListenerBound = true;
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    for (const key of Object.keys(changes)) {
-      if (!key.startsWith(LIVE_ENDED_PREFIX)) continue;
-      const flag = changes[key].newValue;
-      if (!isLiveEndedFlag(flag)) continue;
-      const lid = String(flag.liveId || '').trim().toLowerCase();
-      if (!lid) continue;
-      // 確定値でカウントアップするため、発表前に1回だけreportPreviewをforce publishする
-      //   (§2.1「force 1回」・軽量制約は維持=通常間引きの経路をこの1回だけ迂回する)。
-      try {
-        publishReportPreviewThrottled(lid, {
-          resolveComments: resolveCommentsForHtmlExport,
-          getSnapshot: () => watchMetaCache.snapshot,
-          now: () => Date.now(),
-          force: true
-        });
-      } catch {
-        /* best-effort。force publishが失敗しても直近のreportPreviewで発表を続行する。 */
-      }
-      void runScoreAnnounceSequence(lid, 'auto');
-    }
-  });
-}
 
 /**
  * v0.1.198: ギフトサブアプリ DOM 由来の「個別ギフト履歴 + 種類別集計」を描画する。
@@ -9432,14 +9410,11 @@ function paintOfficialNicoStatsStrip(snapshot) {
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
 
-  const adPtsNum =
-    typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
-      ? ps.adPoints
-      : typeof snapshot?.officialAdPointsNdgr === 'number' &&
-          Number.isFinite(snapshot.officialAdPointsNdgr) &&
-          snapshot.officialAdPointsNdgr >= 0
-        ? snapshot.officialAdPointsNdgr
-        : null;
+  // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+  const adPtsNum = resolveOfficialPoints({
+    domValue: ps?.adPoints,
+    ndgrValue: snapshot?.officialAdPointsNdgr
+  });
   trackAdPointsForCelebration(adPtsNum);
 }
 
@@ -10359,7 +10334,7 @@ async function refreshBackfillRecordCardHint(liveId) {
   bindGiftHistoryStorageListenerOnce();
   bindGiftUsersLaneStorageListenerOnce();
   bindCommentsCelebrationStorageListenerOnce();
-  bindLiveEndedScoreListenerOnce();
+  // v0.1.1726: 配信採点パネルを外したので、配信終了時の自動発表(演出+音)も起動しない。
   void refreshRecordingRecoveryHint(lid);
   // caught_up 確定済みの配信なら再表示しない（refresh のたびに「届いてるよ」が出るのを防ぐ）。
   if (_backfillCaughtUpForLiveId === lid) return;
@@ -11847,14 +11822,11 @@ async function refreshNorthStarAdRankingLane(liveId) {
       if (Number.isFinite(c) && c > 0) rankingSum += c;
     }
     const ps = bundle?.programStats || null;
-    const programAdPts =
-      typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
-        ? ps.adPoints
-        : typeof snap?.officialAdPointsNdgr === 'number' &&
-            Number.isFinite(snap.officialAdPointsNdgr) &&
-            snap.officialAdPointsNdgr >= 0
-          ? snap.officialAdPointsNdgr
-          : null;
+    // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+    const programAdPts = resolveOfficialPoints({
+      domValue: ps?.adPoints,
+      ndgrValue: snap?.officialAdPointsNdgr
+    });
     const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
       programAdPts,
       rankingContributionSum: rankingSum,
@@ -11919,14 +11891,11 @@ async function refreshNorthStarAdRankingLane(liveId) {
       if (Number.isFinite(c) && c > 0) rankingSum += c;
     }
     const ps = bundle?.programStats || null;
-    const programAdPts =
-      typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
-        ? ps.adPoints
-        : typeof snap?.officialAdPointsNdgr === 'number' &&
-            Number.isFinite(snap.officialAdPointsNdgr) &&
-            snap.officialAdPointsNdgr >= 0
-          ? snap.officialAdPointsNdgr
-          : null;
+    // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+    const programAdPts = resolveOfficialPoints({
+      domValue: ps?.adPoints,
+      ndgrValue: snap?.officialAdPointsNdgr
+    });
     const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
       programAdPts,
       rankingContributionSum: rankingSum,
@@ -12426,14 +12395,11 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
-  const officialGiftPts =
-    typeof bundle?.programStats?.giftPoints === 'number' &&
-    Number.isFinite(bundle.programStats.giftPoints)
-      ? bundle.programStats.giftPoints
-      : typeof snap?.officialGiftPointsNdgr === 'number' &&
-          Number.isFinite(snap.officialGiftPointsNdgr)
-        ? snap.officialGiftPointsNdgr
-        : null;
+  // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+  const officialGiftPts = resolveOfficialPoints({
+    domValue: bundle?.programStats?.giftPoints,
+    ndgrValue: snap?.officialGiftPointsNdgr
+  });
   syncGiftHistoryHeaderProgramPt(officialGiftPts);
   const ctxRaw = await computeGiftHistoryNorthStarRoomsContext(liveId, {
     officialProgramGiftPts: officialGiftPts
@@ -12642,13 +12608,11 @@ function syncGiftHistoryHeaderProgramPt(value) {
 function refreshNorthStarProgramPointsLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
-  const domValue = typeof bundle?.programStats?.giftPoints === 'number'
-    ? bundle.programStats.giftPoints
-    : null;
-  const ndgrValue = typeof snap?.officialGiftPointsNdgr === 'number'
-    ? snap.officialGiftPointsNdgr
-    : null;
-  const value = domValue != null ? domValue : ndgrValue;
+  // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
+  const value = resolveOfficialPoints({
+    domValue: bundle?.programStats?.giftPoints,
+    ndgrValue: snap?.officialGiftPointsNdgr
+  });
   // ギフト履歴ヘッダの inline 累計pt を同期（独立レーンは CSS で非表示・下記は従来通り）。
   syncGiftHistoryHeaderProgramPt(value);
   const fallback = buildNorthStarProgramPointsFallbackHtml(value);
@@ -20435,6 +20399,7 @@ async function initPopup() {
       //   5秒の総締切で有界化する。締切超過は{ok:false, timedOut:true}という「不明」を
       //   区別できる形で返る(失敗と断定しない=嘘をつかない)。
       const submitT0 = Date.now();
+      scopeCommentPostDiagToLive(lvPost);
       _commentPostDiagCounters.attempts += 1;
       const result = await withCommentPostDeadline(
         requestPostCommentToOpenTab(text, watchUrl),

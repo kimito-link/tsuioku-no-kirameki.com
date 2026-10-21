@@ -20,6 +20,8 @@
 
 /** 数値化(取れなければ null)。 */
 function num(v) {
+  // v0.1.1727: null/undefined/'' は Number() で 0 になるが「未観測」なので null(0 件と混同しない・§3.6)。
+  if (v == null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }

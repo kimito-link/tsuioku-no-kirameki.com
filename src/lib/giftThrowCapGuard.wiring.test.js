@@ -47,7 +47,8 @@ describe('同時投擲上限超過の内訳計上(配線忘れ=CI赤)', () => {
 
   it('buildGiftEffectDiagLinesがギフト/広告両方でgiftThrowCapGuarded/adThrowCapGuardedをdiffCountsへ渡している', () => {
     expect(giftEffectDiagSrc).toMatch(/diffCounts\(giftDetected,\s*giftThrown,\s*giftSoundPlayed,\s*giftSoundCoalesced,\s*soundExplained,\s*giftThrowCapGuarded\)/);
-    expect(giftEffectDiagSrc).toMatch(/diffCounts\(adDetected,\s*adThrown,\s*adSoundPlayed,\s*0,\s*0,\s*adThrowCapGuarded\)/);
+    // v0.1.1725: 広告も音の内訳(ガード/未割当/エラー/OFF時)を第5引数で渡す。throwExplained は従来どおり第6引数。
+    expect(giftEffectDiagSrc).toMatch(/diffCounts\(\s*adDetected,\s*adThrown,\s*adSoundPlayed,\s*0,\s*adSoundGuarded \+ adSoundNoPath \+ adSoundError \+ adSoundOff,\s*adThrowCapGuarded\s*\)/);
   });
 
   it('giftEffectDiagToActionCardsのcheck呼び出しもthrowExplainedを渡している(致命カードの誤検知防止)', () => {

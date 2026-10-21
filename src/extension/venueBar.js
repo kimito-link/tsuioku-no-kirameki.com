@@ -127,6 +127,7 @@ import {
   makeInitialGiftEffectDiag,
   buildGiftEffectDiagSnapshot,
   giftSoundDiagFieldForPlayResult,
+  adSoundDiagFieldForPlayResult,
   computeGiftGapAverage
 } from '../lib/giftEffectDiag.js';
 // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出だけ記録)。
@@ -3338,7 +3339,7 @@ export function mountVenueBarButton(options = {}) {
     const now = Date.now();
     if (now - _venueVoiceDiagLastWriteAt < 3000) return;
     _venueVoiceDiagLastWriteAt = now;
-    const snap = { ...buildVoiceDiagSnapshot(diag, now), source: 'venue' };
+    const snap = { ...buildVoiceDiagSnapshot(diag, now, liveIdFromPathname()), source: 'venue' };
     void chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {});
   };
 
@@ -3791,7 +3792,8 @@ export function mountVenueBarButton(options = {}) {
     _giftEffectDiagLastWriteAt = now;
     _giftEffectDiagDirty = false;
     _giftEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
-    const snap = buildGiftEffectDiagSnapshot(_giftEffectDiagCounters, now);
+    // v0.1.1721: どの配信の計測かを liveId で刻む(別配信の値が居残る根治=読み手が照合する)。
+    const snap = buildGiftEffectDiagSnapshot(_giftEffectDiagCounters, now, liveIdFromPathname());
     void chrome.storage.local.set({ [KEY_GIFT_EFFECT_DIAG]: snap }).catch(() => {});
   };
   const publishGiftEffectDiag = () => {
@@ -4910,9 +4912,14 @@ export function mountVenueBarButton(options = {}) {
       if (p) {
         if (launchGiftThrow(speech.speakerKey, p)) {
           _giftEffectDiagCounters.adThrown += 1;
-          if (_effectSoundEnabledCache) {
-            playEffectSound(EFFECT_SOUND_KINDS.AD, buildEffectSoundDeps(EFFECT_SOUND_KINDS.AD));
-            _giftEffectDiagCounters.adSoundPlayed += 1;
+          // v0.1.1725: 戻り値で数える(従来は無条件に played 扱い)。OFF の間に投げた分も adSoundOff に残す。
+          if (!_effectSoundEnabledCache) {
+            _giftEffectDiagCounters.adSoundOff += 1;
+          } else {
+            let playResult = /** @type {any} */ ('error');
+            try { playResult = playEffectSound(EFFECT_SOUND_KINDS.AD, buildEffectSoundDeps(EFFECT_SOUND_KINDS.AD)); } catch { /* error として計上 */ }
+            const field = playResult === 'played' ? 'adSoundPlayed' : adSoundDiagFieldForPlayResult(playResult);
+            if (field) _giftEffectDiagCounters[field] += 1;
           }
         }
       }

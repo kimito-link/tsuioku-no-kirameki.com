@@ -119,17 +119,8 @@ export const LIVEVIEW_MIRROR_SECTIONS = /** @type {const} */ ([
     prunePolicy: 'never', // データは commentTimeline 側の prune が効く(二重に削らない)
     inBundle: false, // 独立の鏡ではない=SECTION_KEYS に載せない
     driftGuardHost: true // ①popup.html の応援タイムライン host を live-view.html に同期した節
-  },
-  // ── status 直載せ(路線2・read追加ゼロ・鏡でなく計算 VM) ──
-  {
-    key: 'broadcastScore',
-    blobField: 'broadcastScoreVm',
-    paintFn: 'paintBroadcastScorePanel',
-    hostIds: ['broadcastScoreMount'],
-    prunePolicy: 'never', // VM はコンパクト(score+radar+highlights≤3)=公開 prune 対象外
-    inBundle: false, // status が extras 既読値から VM を組んで直載せ(バンドル経由でない)
-    driftGuardHost: true // ①popup.html の配信採点 host を live-view.html に同期した節(466行drift根治)
   }
+  // v0.1.1726: broadcastScore(配信採点・status 直載せ VM)の節は、採点パネルを外したため削除。
 ]);
 
 /** バンドル(mirrorBundle SECTION_KEYS)に載るべき節キー一覧(inBundle:true のみ)。 */

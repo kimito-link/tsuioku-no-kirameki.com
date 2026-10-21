@@ -604,6 +604,22 @@
       ]
     },
     {
+      "file": "src/lib/giftEffectDiag.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/giftEffectDiagKey.js",
       "featureCount": 4,
       "features": [
@@ -1386,20 +1402,6 @@
       ]
     },
     {
-      "file": "src/lib/giftEffectDiag.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/instantPushDiag.js",
       "featureCount": 3,
       "features": [
@@ -1509,20 +1511,6 @@
         "バックフィル SW",
         "記録エンジン(watchページ常駐)",
         "ページ傍受"
-      ]
-    },
-    {
-      "file": "src/lib/liveEndedFlag.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
       ]
     },
     {
@@ -2258,30 +2246,6 @@
       ]
     },
     {
-      "file": "src/lib/broadcastScore.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/broadcastScorePanelViewModel.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/broadcastUrl.js",
       "featureCount": 2,
       "features": [
@@ -2750,6 +2714,18 @@
       ]
     },
     {
+      "file": "src/lib/liveEndedFlag.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/liveLaneBuckets.js",
       "featureCount": 2,
       "features": [
@@ -3086,6 +3062,18 @@
       ]
     },
     {
+      "file": "src/lib/resolveOfficialPoints.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/roomHeatMirrorKey.js",
       "featureCount": 2,
       "features": [
@@ -3111,18 +3099,6 @@
     },
     {
       "file": "src/lib/scoreAnnounceDiagKey.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/scoreRadar.js",
       "featureCount": 2,
       "features": [
         "popup",
@@ -4450,7 +4426,27 @@
       ]
     },
     {
+      "file": "src/lib/broadcastScore.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/broadcastScoreHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/broadcastScorePanelViewModel.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -8011,6 +8007,16 @@
     },
     {
       "file": "src/lib/scoreCountUp.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/scoreRadar.js",
       "featureCount": 1,
       "features": [
         "popup"

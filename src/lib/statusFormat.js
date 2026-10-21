@@ -148,11 +148,14 @@ export function buildLiveBlockText(live) {
  * @returns {string}
  */
 export function buildCaptureRateLine(live) {
-  const rec = Number(live?.recordedCount) || 0;
+  // v0.1.1727: 記録件数が未観測(null/undefined)なら 0 と書かず「—」(まだ分からない)。
+  const recRaw = live?.recordedCount;
+  const recKnown = recRaw != null && Number.isFinite(Number(recRaw));
+  const rec = recKnown ? Number(recRaw) : 0;
   const off = live?.officialCommentCount;
   const pct = live?.officialRatePct;
   const counts =
-    `記録 ${rec.toLocaleString('ja-JP')}` +
+    `記録 ${recKnown ? rec.toLocaleString('ja-JP') : '—'}` +
     (off != null ? ` / 公式 ${Number(off).toLocaleString('ja-JP')}` : '');
   // 取得率が取れないとき(公式件数未取得)は従来どおり件数のみ。
   if (pct == null || !Number.isFinite(Number(pct))) {

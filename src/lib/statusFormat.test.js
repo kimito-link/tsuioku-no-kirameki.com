@@ -400,3 +400,13 @@ describe('★取得率が100%を超えたら比を出さない(2026-08-21 実損
     expect(text).toContain('取得率 98%');
   });
 });
+
+describe('v0.1.1727: 記録件数が未観測なら 0 と書かない', () => {
+  it('recordedCount が null/undefined なら「記録 —」', () => {
+    expect(buildCaptureRateLine({ recordedCount: null, officialCommentCount: 100, officialRatePct: null })).toBe('記録 — / 公式 100');
+    expect(buildCaptureRateLine({ officialCommentCount: null })).toBe('記録 —');
+  });
+  it('観測した 0 は 0 のまま', () => {
+    expect(buildCaptureRateLine({ recordedCount: 0, officialCommentCount: null })).toBe('記録 0');
+  });
+});

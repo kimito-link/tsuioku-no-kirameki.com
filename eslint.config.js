@@ -424,8 +424,10 @@ export default [
     // v0.1.1657: Esc の入口の判定(変換中・入力欄・しまい中)=+17行(大半は【なぜ】のコメント)。
     // v0.1.1658: 発言パネルのギフト・広告の一行の配線とCSS=+19行(判定は lib の venueSpeechStats.js)。
     // v0.1.1659: 発言パネルのギフト明細の配線とCSS=+68行(判定は lib の venueGiftThrowsForUser.js)。
+    // v0.1.1721: giftEffectDiag スナップショットに liveId を刻む1行(+コメント1行)。別配信の値の居残り根治(判定は lib の giftEffectDiag.js)。
+    // v0.1.1725: 広告効果音を戻り値で数える分岐=+6行(+import 1行)。振り分けは lib の adSoundDiagFieldForPlayResult。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7324, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7331, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -433,7 +435,8 @@ export default [
     files: ['src/extension/status-entry.js'],
     // v0.1.1698: 送信担当の更新間隔(10秒)を lib(statusRefreshInterval.js)から引く配線(+2行)。
     // v0.1.1705: popup の応援者鏡とレポート集計の値の突き合わせを extras の統合 get から通す配線(+3行・判定は lib の supportersParity.js)。
-    rules: { 'max-lines': ['error', { max: 4553, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1720: 広告pt/ギフトpt の DOM↔NDGR 優先順位を lib(resolveOfficialPoints.js)へ集約し import(+1)、呼び出しを統一(+1)。status が NDGR 先頭 fallback で popup と逆転していた診断の嘘の是正。
+    rules: { 'max-lines': ['error', { max: 4555, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

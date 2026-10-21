@@ -5,7 +5,9 @@ import {
   buildGiftEffectDiagLines,
   giftEffectDiagToActionCards,
   giftSoundDiagFieldForPlayResult,
-  computeGiftGapAverage
+  adSoundDiagFieldForPlayResult,
+  computeGiftGapAverage,
+  isGiftEffectDiagForOpenLive
 } from './giftEffectDiag.js';
 
 describe('makeInitialGiftEffectDiag', () => {
@@ -28,6 +30,66 @@ describe('buildGiftEffectDiagSnapshot', () => {
     expect(buildGiftEffectDiagSnapshot({ soundEnabled: false }, 1).soundEnabled).toBe(false);
     expect(buildGiftEffectDiagSnapshot({ soundEnabled: true }, 1).soundEnabled).toBe(true);
     expect(buildGiftEffectDiagSnapshot({}, 1).soundEnabled).toBe(true);
+  });
+});
+
+describe('buildGiftEffectDiagSnapshot: liveId タグ (v0.1.1721)', () => {
+  it('liveId を小文字trimで刻む', () => {
+    expect(buildGiftEffectDiagSnapshot({}, 1, '  LV123  ').liveId).toBe('lv123');
+  });
+  it('未指定/非文字列は空文字(=旧データ扱い)', () => {
+    expect(buildGiftEffectDiagSnapshot({}, 1).liveId).toBe('');
+    expect(buildGiftEffectDiagSnapshot({}, 1, null).liveId).toBe('');
+    expect(buildGiftEffectDiagSnapshot({}, 1, 123).liveId).toBe('123');
+  });
+});
+
+describe('isGiftEffectDiagForOpenLive (v0.1.1721)', () => {
+  it('タグ付きで開いている配信に含まれる → true', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv1' }, ['lv1', 'lv2'])).toBe(true);
+  });
+  it('タグ付きで開いている配信に無い(=別/過去の配信) → false', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv9' }, ['lv1', 'lv2'])).toBe(false);
+  });
+  it('開いている配信が無い + タグ付き → false(現在の配信ではあり得ない)', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv1' }, [])).toBe(false);
+  });
+  it('未タグ(旧データ) → true(判定保留=既存挙動維持・回帰なし)', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: '' }, [])).toBe(true);
+    expect(isGiftEffectDiagForOpenLive({}, ['lv1'])).toBe(true);
+    expect(isGiftEffectDiagForOpenLive(null, ['lv1'])).toBe(true);
+  });
+  it('照合は大文字小文字・前後空白を無視する', () => {
+    expect(isGiftEffectDiagForOpenLive({ liveId: 'lv1' }, [' LV1 '])).toBe(true);
+  });
+});
+
+describe('読み手の liveId ゲート (v0.1.1722・opt-in)', () => {
+  const tagged = { giftDetected: 2, giftThrown: 2, giftSoundPlayed: 2, giftSoundError: 1, soundEnabled: true, liveId: 'lv_old' };
+
+  it('buildGiftEffectDiagLines: openLiveIds 未指定なら従来どおり出す(後方互換)', () => {
+    expect(buildGiftEffectDiagLines(tagged, 1000).length).toBeGreaterThan(0);
+  });
+  it('buildGiftEffectDiagLines: openLiveIds に含まれない配信なら空(別配信の居残りを出さない)', () => {
+    expect(buildGiftEffectDiagLines(tagged, 1000, ['lv_now'])).toEqual([]);
+  });
+  it('buildGiftEffectDiagLines: openLiveIds に含まれる配信なら出す', () => {
+    expect(buildGiftEffectDiagLines(tagged, 1000, ['lv_old']).length).toBeGreaterThan(0);
+  });
+
+  it('giftEffectDiagToActionCards: openLiveIds 未指定なら従来どおり(後方互換)', () => {
+    // soundMissing を立てるため演出>音にする
+    const s = { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 0, soundEnabled: true, liveId: 'lv_old' };
+    expect(giftEffectDiagToActionCards(s).length).toBeGreaterThan(0);
+  });
+  it('giftEffectDiagToActionCards: 別配信ならカードを出さない', () => {
+    const s = { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 0, soundEnabled: true, liveId: 'lv_old' };
+    expect(giftEffectDiagToActionCards(s, ['lv_now'])).toEqual([]);
+  });
+  it('未タグ(旧データ)は openLiveIds を渡しても通す=回帰なし', () => {
+    const s = { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 0, soundEnabled: true };
+    expect(giftEffectDiagToActionCards(s, ['lv_now']).length).toBeGreaterThan(0);
+    expect(buildGiftEffectDiagLines(s, 1000, ['lv_now']).length).toBeGreaterThan(0);
   });
 });
 
@@ -548,5 +610,38 @@ describe('2026-07-06: 投擲座標フォールバック計器(throwPointFallback
   it('欠損フィールドは0で埋まる', () => {
     const snap = buildGiftEffectDiagSnapshot({ giftDetected: 1 }, 1000);
     expect(snap.throwPointFallbackUsed).toBe(0);
+  });
+});
+
+describe('v0.1.1725: 広告の効果音を戻り値で数える(内訳で説明できる分は取りこぼしにしない)', () => {
+  it('adSoundDiagFieldForPlayResult は広告用のフィールドへ振り分ける', () => {
+    expect(adSoundDiagFieldForPlayResult('guarded')).toBe('adSoundGuarded');
+    expect(adSoundDiagFieldForPlayResult('no-path')).toBe('adSoundNoPath');
+    expect(adSoundDiagFieldForPlayResult('error')).toBe('adSoundError');
+    expect(adSoundDiagFieldForPlayResult('played')).toBe(null);
+    // ギフト版は従来どおり
+    expect(giftSoundDiagFieldForPlayResult('guarded')).toBe('giftSoundGuarded');
+  });
+  it('snapshot が広告の内訳4種を運ぶ(欠損は0)', () => {
+    const snap = buildGiftEffectDiagSnapshot({ adSoundGuarded: 1, adSoundOff: 2 }, 1);
+    expect(snap.adSoundGuarded).toBe(1);
+    expect(snap.adSoundOff).toBe(2);
+    expect(snap.adSoundNoPath).toBe(0);
+    expect(snap.adSoundError).toBe(0);
+  });
+  it('★ガード/OFF時で説明できる広告音は「鳴っていない」にせず内訳を出す', () => {
+    const snap = buildGiftEffectDiagSnapshot({ adDetected: 4, adThrown: 4, adSoundPlayed: 1, adSoundGuarded: 1, adSoundOff: 2 }, 1000);
+    const adLine = buildGiftEffectDiagLines(snap, 1000).find((l) => l.includes('広告:'));
+    expect(adLine).not.toContain('鳴っていない');
+    expect(adLine).toContain('ガード1');
+    expect(adLine).toContain('OFF時2');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-ad')).toBe(false);
+  });
+  it('★内訳で説明できない残りは従来どおり⚠とカードを出す', () => {
+    const snap = buildGiftEffectDiagSnapshot({ adDetected: 3, adThrown: 3, adSoundPlayed: 1, adSoundError: 1 }, 1000);
+    const adLine = buildGiftEffectDiagLines(snap, 1000).find((l) => l.includes('広告:'));
+    expect(adLine).toContain('⚠1件鳴っていない');
+    expect(adLine).toContain('エラー1');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-ad')).toBe(true);
   });
 });

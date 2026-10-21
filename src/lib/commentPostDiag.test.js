@@ -324,3 +324,20 @@ describe('buildCommentPostDiagLines', () => {
     expect(lines).toHaveLength(2);
   });
 });
+
+describe('liveId スコープ(v0.1.1724)', () => {
+  it('liveId を渡したときだけ正規化して刻む(未指定はゴールデン同一=キー無し)', () => {
+    expect(buildCommentPostDiagSnapshot({}, 1, ' LV9 ').liveId).toBe('lv9');
+    expect(Object.prototype.hasOwnProperty.call(buildCommentPostDiagSnapshot({}, 1), 'liveId')).toBe(false);
+  });
+  const snap = buildCommentPostDiagSnapshot({ attempts: 2, revertCount: 1 }, 1000, 'lv_old');
+  it('★開いている配信に無い記録は行を出さない', () => {
+    expect(buildCommentPostDiagLines(snap, 2000, ['lv_now'])).toEqual([]);
+  });
+  it('★開いている配信の記録・openLiveIds 未指定・未タグ旧データは従来どおり出す', () => {
+    expect(buildCommentPostDiagLines(snap, 2000, ['lv_old']).length).toBeGreaterThan(0);
+    expect(buildCommentPostDiagLines(snap, 2000).length).toBeGreaterThan(0);
+    const untagged = buildCommentPostDiagSnapshot({ attempts: 2 }, 1000);
+    expect(buildCommentPostDiagLines(untagged, 2000, ['lv_now']).length).toBeGreaterThan(0);
+  });
+});

@@ -18,7 +18,11 @@
  *   giftSoundOff: number,      // v0.1.1091: 効果音設定OFFで即returnした回数。従来この'off'はどこにも計上されず「内訳が全部ゼロなのに音が消える」根因だった
  *   adDetected: number,        // 広告を検知した回数
  *   adThrown: number,          // 広告の投擲演出が実際に走った回数
- *   adSoundPlayed: number,     // 広告効果音の再生を試みた回数
+ *   adSoundPlayed: number,     // 広告効果音を実際に鳴らした回数(v0.1.1725: 「試みた」でなく戻り値'played'のみ)
+ *   adSoundGuarded: number,    // v0.1.1725: 広告版の giftSoundGuarded(同種600msガード=正常動作)
+ *   adSoundNoPath: number,     // v0.1.1725: 広告版の giftSoundNoPath(未割当/パス解決失敗)
+ *   adSoundError: number,      // v0.1.1725: 広告版の giftSoundError(再生失敗)
+ *   adSoundOff: number,        // v0.1.1725: 広告版の giftSoundOff(効果音OFFの間に投げた=鳴らないのが正常)
  *   soundEnabled: boolean,     // 効果音設定が ON か(OFF なら鳴らないのが正常=誤診断防止)
  *   lastEventAt: number,       // 最後にギフト/広告いずれかを検知した時刻(epoch ms・0=未検知)
  *   lastSoundGapMs: number,    // v0.1.1088: 直近1件の「検知→音」体感遅延ms(-1=未計測)
@@ -33,7 +37,8 @@
  *   arrivalSkippedCd: number,  // 来場演出専用20秒CD中でスキップした回数(積み増し禁止=正常動作)
  *   throwPointFallbackUsed: number, // 2026-07-06: 投擲の起点/着弾座標が(0,0)/領域外/NaN等でresolveVisibleThrowPointの既定位置へ差し替わった回数(=「音は鳴るが飛翔が見えない」の元凶を可視の既定へ救済した回数)
  *   giftThrowCapGuarded: number, // 2026-07-30: ギフトがcanLaunchGiftThrow(同時投擲上限GIFT_THROW_MAX_CONCURRENT)超過でlaunchGiftThrowがfalseを返し、演出を意図的に捨てた回数(性能ガード=正常動作)
- *   adThrowCapGuarded: number   // 2026-07-30: 広告版のgiftThrowCapGuarded(投擲上限は種別を問わず共有=giftProjActiveが同一カウンタのため)
+ *   adThrowCapGuarded: number,   // 2026-07-30: 広告版のgiftThrowCapGuarded(投擲上限は種別を問わず共有=giftProjActiveが同一カウンタのため)
+ *   liveId?: string             // v0.1.1721: この計測がどの配信のものか(別配信の値の居残り根治用タグ・snapshot 時に付与)
  * }} GiftEffectDiagState
  */
 
@@ -51,6 +56,10 @@ export function makeInitialGiftEffectDiag() {
     adDetected: 0,
     adThrown: 0,
     adSoundPlayed: 0,
+    adSoundGuarded: 0,
+    adSoundNoPath: 0,
+    adSoundError: 0,
+    adSoundOff: 0,
     soundEnabled: true,
     lastEventAt: 0,
     lastSoundGapMs: -1,
@@ -97,10 +106,30 @@ export function computeGiftGapAverage(prevAvgMs, sampleMs, alpha = 0.3) {
  * @returns {'giftSoundGuarded'|'giftSoundNoPath'|'giftSoundError'|null}
  */
 export function giftSoundDiagFieldForPlayResult(playResult) {
+  return soundDiagFieldForPlayResult('gift', playResult);
+}
+
+/**
+ * v0.1.1725: 広告版の giftSoundDiagFieldForPlayResult。広告音は scheduleGiftSound を通らず
+ *   playEffectSound を直接呼ぶため、従来は戻り値を見ずに adSoundPlayed へ数えていた
+ *   (guarded/no-path/error でも「鳴った」扱い=診断の嘘)。同じ規律で内訳へ振り分ける。
+ * @param {'played'|'guarded'|'no-path'|'error'} playResult
+ * @returns {'adSoundGuarded'|'adSoundNoPath'|'adSoundError'|null}
+ */
+export function adSoundDiagFieldForPlayResult(playResult) {
+  return /** @type {'adSoundGuarded'|'adSoundNoPath'|'adSoundError'|null} */ (soundDiagFieldForPlayResult('ad', playResult));
+}
+
+/**
+ * @param {'gift'|'ad'} prefix
+ * @param {unknown} playResult
+ * @returns {any}
+ */
+function soundDiagFieldForPlayResult(prefix, playResult) {
   const r = String(playResult || '');
-  if (r === 'guarded') return 'giftSoundGuarded';
-  if (r === 'no-path') return 'giftSoundNoPath';
-  if (r === 'error') return 'giftSoundError';
+  if (r === 'guarded') return `${prefix}SoundGuarded`;
+  if (r === 'no-path') return `${prefix}SoundNoPath`;
+  if (r === 'error') return `${prefix}SoundError`;
   return null;
 }
 
@@ -108,9 +137,11 @@ export function giftSoundDiagFieldForPlayResult(playResult) {
  * storage 書き込み用の軽量スナップショット。
  * @param {Partial<GiftEffectDiagState>|null|undefined} diag
  * @param {number} [nowMs]
- * @returns {GiftEffectDiagState & { capturedAt: number }}
+ * @param {unknown} [liveId] v0.1.1721: この計測がどの配信のものか(単一グローバルキーのため
+ *   別配信の値が居残る問題の根治用タグ)。読み手は isGiftEffectDiagForOpenLive で照合する。
+ * @returns {GiftEffectDiagState & { capturedAt: number, liveId: string }}
  */
-export function buildGiftEffectDiagSnapshot(diag, nowMs) {
+export function buildGiftEffectDiagSnapshot(diag, nowMs, liveId) {
   const base = makeInitialGiftEffectDiag();
   const d = /** @type {any} */ (diag && typeof diag === 'object' ? diag : {});
   /** @param {unknown} x @param {number} fallback @returns {number} */
@@ -131,6 +162,10 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     adDetected: num(d.adDetected, base.adDetected),
     adThrown: num(d.adThrown, base.adThrown),
     adSoundPlayed: num(d.adSoundPlayed, base.adSoundPlayed),
+    adSoundGuarded: num(d.adSoundGuarded, base.adSoundGuarded),
+    adSoundNoPath: num(d.adSoundNoPath, base.adSoundNoPath),
+    adSoundError: num(d.adSoundError, base.adSoundError),
+    adSoundOff: num(d.adSoundOff, base.adSoundOff),
     soundEnabled: d.soundEnabled !== false,
     lastEventAt: num(d.lastEventAt, base.lastEventAt),
     lastSoundGapMs: num(d.lastSoundGapMs, base.lastSoundGapMs),
@@ -146,8 +181,36 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     throwPointFallbackUsed: num(d.throwPointFallbackUsed, base.throwPointFallbackUsed),
     giftThrowCapGuarded: num(d.giftThrowCapGuarded, base.giftThrowCapGuarded),
     adThrowCapGuarded: num(d.adThrowCapGuarded, base.adThrowCapGuarded),
-    capturedAt: now
+    capturedAt: now,
+    // v0.1.1721: どの配信の計測か。未指定/非文字列は '' (= 旧データと同じ扱い=判定保留)。
+    liveId: String(liveId ?? d.liveId ?? '').trim().toLowerCase()
   };
+}
+
+/**
+ * このスナップショットが「今まさに開いている配信」の計測か。
+ *
+ * v0.1.1721: giftEffectDiag は単一グローバルキー(nls_gift_effect_diag_v1)で、配信ごとに
+ *   リセットされない。前の配信のギフト音エラーが、次の配信の最初のギフトで上書きされるまで
+ *   居残り、状態速報が「別配信のエラー」を現在の問題として出していた(診断の嘘)。
+ *   snapshot に付けた liveId を、現在開いている配信の liveId 群と照合して弾く。
+ *
+ * ★未タグ(liveId が空=このタグ導入前に書かれた旧データ)は **判定保留で true** を返す
+ *   (既存挙動を壊さない=回帰なし。次のギフトイベントでタグ付きに上書きされ自己治癒する)。
+ *
+ * @param {{liveId?: unknown}|null|undefined} snap
+ * @param {Iterable<unknown>|null|undefined} openLiveIds 現在開いている配信の liveId 群
+ * @returns {boolean} 今の配信の計測として信じてよいなら true。別/過去の配信なら false。
+ */
+export function isGiftEffectDiagForOpenLive(snap, openLiveIds) {
+  const tag = String(snap?.liveId ?? '').trim().toLowerCase();
+  if (!tag) return true; // 未タグ(旧データ)は照合できない=既存挙動維持
+  const set = new Set();
+  for (const id of openLiveIds || []) {
+    const s = String(id ?? '').trim().toLowerCase();
+    if (s) set.add(s);
+  }
+  return set.has(tag);
 }
 
 /**
@@ -177,10 +240,14 @@ function diffCounts(detected, thrown, soundPlayed, soundCoalesced = 0, soundExpl
  * (ノイズにしない・voiceDiag と同方針)。
  * @param {(GiftEffectDiagState & { capturedAt?: number })|null|undefined} snap
  * @param {number} nowMs 現在時刻(最終イベント ago の算出用)
+ * @param {Iterable<unknown>} [openLiveIds] v0.1.1722: 渡されたときだけ、snap の liveId が
+ *   開いている配信に含まれるか照合し、別/過去の配信なら空(=未観測扱い)にする。
  * @returns {string[]}
  */
-export function buildGiftEffectDiagLines(snap, nowMs) {
+export function buildGiftEffectDiagLines(snap, nowMs, openLiveIds) {
   if (!snap || typeof snap !== 'object') return [];
+  // v0.1.1722: 別配信の値の居残りを出さない(isGiftEffectDiagForOpenLive 正本。未タグ旧データは通す)。
+  if (openLiveIds !== undefined && !isGiftEffectDiagForOpenLive(snap, openLiveIds)) return [];
   const giftDetected = Number(snap.giftDetected) || 0;
   const adDetected = Number(snap.adDetected) || 0;
   const deltaSynthesized = Number(snap.deltaSynthesized) || 0;
@@ -253,12 +320,27 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
     const adThrown = Number(snap.adThrown) || 0;
     const adSoundPlayed = Number(snap.adSoundPlayed) || 0;
     const adThrowCapGuarded = Number(snap.adThrowCapGuarded) || 0;
-    const { throwMissing, soundMissing } = diffCounts(adDetected, adThrown, adSoundPlayed, 0, 0, adThrowCapGuarded);
+    // v0.1.1725: ギフトと同じく、内訳(ガード/未割当/エラー/OFF時)で説明できる分は取りこぼしに数えない。
+    //   広告は置換(coalesced)をしない経路なので第4引数は 0 のまま(MAP の想定と違い、実コードは
+    //   scheduleGiftSound を通らない=置換が起きない)。
+    const adSoundGuarded = Number(snap.adSoundGuarded) || 0;
+    const adSoundNoPath = Number(snap.adSoundNoPath) || 0;
+    const adSoundError = Number(snap.adSoundError) || 0;
+    const adSoundOff = Number(snap.adSoundOff) || 0;
+    const { throwMissing, soundMissing } = diffCounts(
+      adDetected, adThrown, adSoundPlayed, 0, adSoundGuarded + adSoundNoPath + adSoundError + adSoundOff, adThrowCapGuarded
+    );
     const throwMark = throwMissing > 0 ? `⚠${throwMissing}件飛んでいない` : '✅';
     const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
     // 2026-07-30: ギフトと同じ思想(同時投擲上限超過は性能ガード=正常動作の内訳表示)。
     const throwCapText = adThrowCapGuarded > 0 ? ` / 上限超過${adThrowCapGuarded}` : '';
-    lines.push(`  → 広告: 検知${adDetected} → 演出${adThrown} ${throwMark}${throwCapText} → 音${adSoundPlayed} ${soundMark}`);
+    const adExplainedParts = [];
+    if (adSoundGuarded > 0) adExplainedParts.push(`ガード${adSoundGuarded}`);
+    if (adSoundNoPath > 0) adExplainedParts.push(`未割当${adSoundNoPath}`);
+    if (adSoundError > 0) adExplainedParts.push(`エラー${adSoundError}`);
+    if (adSoundOff > 0) adExplainedParts.push(`OFF時${adSoundOff}`);
+    const adExplainedText = adExplainedParts.length > 0 ? ` / ${adExplainedParts.join(' ')}` : '';
+    lines.push(`  → 広告: 検知${adDetected} → 演出${adThrown} ${throwMark}${throwCapText} → 音${adSoundPlayed} ${soundMark}${adExplainedText}`);
   }
   if (arrivalDetected > 0) {
     // 2026-07-06: 来場入賞演出の内訳。CDスキップは意図した動き(積み増し禁止)なので取りこぼしに
@@ -280,10 +362,14 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
 /**
  * 致命カード(症状→原因→次の一手)用の判定。buildStatusActions の結果に結合する形。
  * @param {(GiftEffectDiagState & { capturedAt?: number })|null|undefined} snap
+ * @param {Iterable<unknown>} [openLiveIds] v0.1.1722: 渡されたときだけ、別/過去の配信の計測なら
+ *   カードを出さない(isGiftEffectDiagForOpenLive 正本。未タグ旧データは通す)。
  * @returns {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>}
  */
-export function giftEffectDiagToActionCards(snap) {
+export function giftEffectDiagToActionCards(snap, openLiveIds) {
   if (!snap || typeof snap !== 'object') return [];
+  // v0.1.1722: 別配信の値の居残りを現在の症状カードにしない。
+  if (openLiveIds !== undefined && !isGiftEffectDiagForOpenLive(snap, openLiveIds)) return [];
   const soundEnabled = snap.soundEnabled !== false;
   /** @type {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>} */
   const cards = [];
@@ -330,7 +416,7 @@ export function giftEffectDiagToActionCards(snap) {
     Number(snap.adThrown) || 0,
     Number(snap.adSoundPlayed) || 0,
     0,
-    0,
+    (Number(snap.adSoundGuarded) || 0) + (Number(snap.adSoundNoPath) || 0) + (Number(snap.adSoundError) || 0) + (Number(snap.adSoundOff) || 0),
     Number(snap.adThrowCapGuarded) || 0
   );
   return cards;
