@@ -395,7 +395,9 @@ export default [
     //   ★計器自身を重くしない工夫: 深さは「親の深さ+1」で求める(文書順なので親は処理済み)。
     //     親を毎回辿る版は 2,844要素で約34,000回の参照になる。上限4,000要素。
     //   判定は `src/lib/domTreeCensus.js`(純関数)。ここは採取だけ。
-    rules: { 'max-lines': ['error', { max: 21713, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1734: スマホの WEB版だけの「PC に中継して投稿する」口(+30行: 口の取り出し・送信ボタンの可否・預ける分岐・Enter 送信の無効化・起動時の配線)。
+    //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
+    rules: { 'max-lines': ['error', { max: 21743, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -436,7 +438,16 @@ export default [
     // v0.1.1698: 送信担当の更新間隔(10秒)を lib(statusRefreshInterval.js)から引く配線(+2行)。
     // v0.1.1705: popup の応援者鏡とレポート集計の値の突き合わせを extras の統合 get から通す配線(+3行・判定は lib の supportersParity.js)。
     // v0.1.1720: 広告pt/ギフトpt の DOM↔NDGR 優先順位を lib(resolveOfficialPoints.js)へ集約し import(+1)、呼び出しを統一(+1)。status が NDGR 先頭 fallback で popup と逆転していた診断の嘘の是正。
-    rules: { 'max-lines': ['error', { max: 4555, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1731: スマホ版の利用者ごとの鍵の配線(+4行: import・起動時の読み込み・同意OFFで削除・401で鍵を捨てる)。発行・削除・判定は statusDeviceCred.js / lib の devicePublishCredentials.js。
+    // v0.1.1732: 同意スイッチの描画を statusSmartphoneCard.js へ移して -11行=上限も 4546 へ下げる。
+    // v0.1.1733: スマホへの送信担当(status.html?publisher=1)は document.hidden で更新を止めない(+2行)。サイドパネルを閉じても送り続けるため。
+    // v0.1.1734: スマホから預かったコメントを投稿する係の起動・スイッチの配線・同意 OFF で止める(+5行)。本体は phonePostRelay.js。
+    // v0.1.1735: スマホへの送信を速く・軽く(+21行)。送信担当の補助データ9秒・中身が同じなら送らない・gzip で送り 400 なら JSON に戻す。
+    //   判定は lib(liveViewPublishSignature.js の buildLiveViewContentSignature / gzipBody.js)に置き、ここは配線とその理由の注記だけ。
+    // v0.1.1736: スマホが開いている間だけ5秒で描き直し・送る(+17行)。判定は lib(statusRefreshInterval.js の shouldRunPublisherTick)。
+    // v0.1.1738: gzip は受け口の返事(gzipOk)を見てから・スマホの目印を150秒保持(+3行)。判定は lib(autoPublishDecision.js の readPublishAck)。
+    // v0.1.1740: スマホの読み上げ(返事の voiceWanted で声を作って送る・+6行)。判定と順番は lib(phoneVoiceSender.js)、配線は phoneVoicePublisher.js。
+    rules: { 'max-lines': ['error', { max: 4600, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

@@ -17,7 +17,12 @@ import {
   decideStatusPublisherStart,
   isStatusPublisherLockHeld
 } from '../lib/statusPublisherPlan.js';
-import { KEY_STATUS_UPLOAD_CONFIG as KEY_UPLOAD_CONFIG, KEY_WEB_PUBLISH_OPT_IN as KEY_OPT_IN } from '../lib/storageKeys.js';
+import {
+  KEY_STATUS_DEVICE_CRED as KEY_DEVICE_CRED,
+  KEY_STATUS_UPLOAD_CONFIG as KEY_UPLOAD_CONFIG,
+  KEY_WEB_PUBLISH_OPT_IN as KEY_OPT_IN
+} from '../lib/storageKeys.js';
+import { parseDeviceCred } from '../lib/devicePublishCredentials.js';
 
 /**
  * @param {{
@@ -42,10 +47,13 @@ export function startStatusPublisherHost(deps) {
         state.lastReason = 'already_in_dom';
         return state;
       }
-      const bag = await deps.storage.get([KEY_UPLOAD_CONFIG, KEY_OPT_IN]);
+      const bag = await deps.storage.get([KEY_UPLOAD_CONFIG, KEY_OPT_IN, KEY_DEVICE_CRED]);
       const cfg = bag?.[KEY_UPLOAD_CONFIG];
       const decision = decideStatusPublisherStart({
-        hasKeys: Boolean(cfg && String(cfg.ingestKey || '').trim() && String(cfg.viewToken || '').trim()),
+        // ★v0.1.1731: 共有キー、または利用者ごとの鍵(状態画面が同意 ON のときにもらう)があれば送信担当を置く。
+        hasKeys:
+          Boolean(cfg && String(cfg.ingestKey || '').trim() && String(cfg.viewToken || '').trim()) ||
+          Boolean(parseDeviceCred(bag?.[KEY_DEVICE_CRED], '')),
         optedIn: bag?.[KEY_OPT_IN] === true,
         lockHeld: await isStatusPublisherLockHeld(deps.locks),
         alreadyStarted: state.started,

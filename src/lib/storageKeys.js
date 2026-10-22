@@ -761,3 +761,13 @@ export function commenterFollowLiveStorageKey(liveId) {
 export const KEY_STATUS_UPLOAD_CONFIG = 'nls_status_upload_config_v1';
 /** 自動送信(WEBへ2分ごと)の明示同意。true のときだけ自動送信する(既定OFF)。 */
 export const KEY_WEB_PUBLISH_OPT_IN = 'nls_web_publish_opt_in';
+/**
+ * ★v0.1.1731: スマホ版の利用者ごとの鍵(api/device.js が発行)。値: { deviceId, writeKey, viewToken, appOrigin }。
+ *   共有キー(KEY_STATUS_UPLOAD_CONFIG)が無いときだけ使う。同意を外すとサーバーのデータごと消して、ここも消す。
+ */
+export const KEY_STATUS_DEVICE_CRED = 'nls_status_device_cred_v1';
+/**
+ * ★v0.1.1734: 「✍️ スマホからコメントする」(api/post.js が発行した投稿用の鍵)。値: { postKey, enabledAt }。
+ *   あるときだけ送信担当がスマホのコメントを受け取りに行く(phonePostRelay.js)。OFF・同意を外す・URL を作り直すと消す。
+ */
+export const KEY_PHONE_POST = 'nls_phone_post_v1';

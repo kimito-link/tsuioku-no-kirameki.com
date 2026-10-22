@@ -3572,5 +3572,187 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1728', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1727 の note と同じ理由)。今回は単体テスト +3 で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1729', metric: 'bundle-kb', value: 1435,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回はスマホ化 第1段(送信間隔・304)で status 側と app/api の変更=popup は実質不変。過去最良 1360 超は v0.1.1454 以降の継続状態。'
+  }),
+  Object.freeze({
+    version: '0.1.1729', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1729', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1728 の note と同じ理由)。'
+  }),
+  Object.freeze({
+    version: '0.1.1730', metric: 'bundle-kb', value: 1435,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回はサーバー側(api/device・api/status)だけの変更=popup は不変。過去最良 1360 超は v0.1.1454 以降の継続状態。'
+  }),
+  Object.freeze({
+    version: '0.1.1730', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1730', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1729 の note と同じ理由)。今回は単体テスト17本で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1731', metric: 'bundle-kb', value: 1435,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は status 側の送信の配線(利用者ごとの鍵)=popup は不変。過去最良 1360 超は v0.1.1454 以降の継続状態。'
+  }),
+  Object.freeze({
+    version: '0.1.1731', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1731', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1730 の note と同じ理由)。今回は単体テスト16本で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1732', metric: 'bundle-kb', value: 1434,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は status 側の画面(スマホで見るスイッチ)=popup は実質不変。過去最良 1360 超は v0.1.1454 以降の継続状態。'
+  }),
+  Object.freeze({
+    version: '0.1.1732', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1732', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1731 の note と同じ理由)。今回は画面の単体テスト7本+配線テストで確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1733', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★popup に送信担当の起動(statusPublisherHost)を取り込んだ分の +3KB。過去最良 1360 超は v0.1.1454 以降の継続状態。'
+  }),
+  Object.freeze({
+    version: '0.1.1733', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1733', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1732 の note と同じ理由)。今回は配線テストで確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1734', metric: 'bundle-kb', value: 1440,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★popup にスマホの WEB版用の「PC に中継して投稿する」口を足した分の +3KB。過去最良 1360 超は v0.1.1454 以降の継続状態。'
+  }),
+  Object.freeze({
+    version: '0.1.1734', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1734', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1733 の note と同じ理由)。今回は単体テストに加え、模擬サーバー+ブラウザで ⏱→✓→✓✓ を通しで確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1735', metric: 'bundle-kb', value: 1441,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB。今回の変更は status 側(gzip 送信・中身の比較)が主で、popup に入るのはコメント鏡の番号1行ぶん。'
+  }),
+  Object.freeze({
+    version: '0.1.1735', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1735', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1734 の note と同じ理由)。gzip は Node の gunzip で往復を確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1736', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB。popup.js は status と共有の lib(更新間隔・自動送信の判定)を含むため、その分。'
+  }),
+  Object.freeze({
+    version: '0.1.1736', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1736', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1735 の note と同じ理由)。'
+  }),
+  Object.freeze({
+    version: '0.1.1737', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '±0。効果音の係は WEB版(app/live-view-sound.js)だけに入り、popup には入らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1737', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1737', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1721〜1736 の note と同じ理由)。模擬サーバー+ブラウザで音なし→タップ→2件で1回鳴るを確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1738', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '±0。経過の補間は WEB版(app/)だけ、送信の返事の読み取りは status だけに入り、popup には入らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1738', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1738', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'v0.1.1735〜1737 を別の目(Grok)で点検し、実コードで裏取りした4件を直した版。'
+  }),
+  Object.freeze({
+    version: '0.1.1739', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB は丸めの揺れ。会場モードの係は WEB版(app/live-view-venue.js)だけに入り、popup には入らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1739', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1739', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '模擬サーバー+スマホ幅のブラウザで、開いた瞬間は吹き出さない→コメントで吹き出し・ギフトで真ん中に品名を画面で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1740', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。読み上げを送る係は状態速報(status.js)だけ、受け取る係は WEB版(app/live-view-voice.js)だけに入る。'
+  }),
+  Object.freeze({
+    version: '0.1.1740', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1740', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '本物の受け口+模擬 Redis+ブラウザ2枚(PC役・スマホ役)で、WAV→Opus→預かり→スマホで2件を順に再生(各1.67秒)を確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1741', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。片付けは WEB版(app/live-view-phone-fit.js)だけに入る。'
+  }),
+  Object.freeze({
+    version: '0.1.1741', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1741', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'Android 実機で全ボタンを押した結果(無反応12個)を、模擬サーバーのブラウザで再現(応援者アイコンの押下が popup に止められていた)してから直した。'
   })
 ]);

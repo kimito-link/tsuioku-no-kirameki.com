@@ -132,3 +132,69 @@ describe('latestPublishTime(送信の連打を止める)', () => {
     expect(run(true)).toBe(1); // 新: 1回だけ
   });
 });
+
+import { CHANGED_AUTO_PUBLISH_INTERVAL_MS } from './autoPublishDecision.js';
+
+describe('shouldAutoPublish — 中身が変わったときだけ短い間隔(v0.1.1729 スマホ化 第1段)', () => {
+  const recent = { ...base, nowMs: base.lastSentAtMs + CHANGED_AUTO_PUBLISH_INTERVAL_MS };
+  it('中身が変わっていて20秒たてば送る', () => {
+    expect(shouldAutoPublish({ ...recent, changed: true })).toEqual({ publish: true, reason: 'changed' });
+  });
+  it('中身が変わっていても20秒未満なら送らない(連打しない)', () => {
+    expect(shouldAutoPublish({ ...recent, changed: true, nowMs: base.lastSentAtMs + 19_999 }).publish).toBe(false);
+  });
+  it('中身が同じなら20秒では送らず、120秒の生存確認まで待つ', () => {
+    expect(shouldAutoPublish({ ...recent, changed: false }).reason).toBe('fresh_enough');
+    expect(shouldAutoPublish({ ...recent }).reason).toBe('fresh_enough'); // 不明=同じ扱い
+    expect(shouldAutoPublish({ ...recent, changed: 'yes' }).reason).toBe('fresh_enough');
+  });
+  it('★同意が無ければ中身が変わっていても送らない(最優先ゲートは不変)', () => {
+    expect(shouldAutoPublish({ ...recent, changed: true, optedIn: false }).reason).toBe('no_consent');
+    expect(shouldAutoPublish({ ...recent, changed: true, hasWatchTab: false }).reason).toBe('no_watch');
+    expect(shouldAutoPublish({ ...recent, changed: true, inFlight: true }).reason).toBe('in_flight');
+  });
+  it('短い間隔は生存確認の間隔より長くならない', () => {
+    expect(
+      shouldAutoPublish({ ...base, changed: true, intervalMs: 10_000, changedIntervalMs: 60_000, nowMs: base.lastSentAtMs + 10_000 }).publish
+    ).toBe(true);
+  });
+});
+
+import { changedIntervalWithBackoff } from './autoPublishDecision.js';
+
+describe('送信失敗が続いたら間隔を広げる(v0.1.1729)', () => {
+  it('20→40→80→120秒(上限は生存確認の120秒)', () => {
+    const f = (n) => changedIntervalWithBackoff(20_000, 120_000, n);
+    expect([f(0), f(1), f(2), f(3), f(9), f(undefined), f(-1)]).toEqual([20_000, 40_000, 80_000, 120_000, 120_000, 20_000, 20_000]);
+  });
+  it('★2回続けて失敗していると、中身が変わっていても80秒までは送らない', () => {
+    const at = (ms) => shouldAutoPublish({ ...base, changed: true, failStreak: 2, nowMs: base.lastSentAtMs + ms });
+    expect(at(79_999).publish).toBe(false);
+    expect(at(80_000)).toEqual({ publish: true, reason: 'changed' });
+  });
+  it('★変化が20秒ごとに続いても、送信中は次を始めない(重ならない)', () => {
+    let inFlight = false; let started = 0; let lastAt = 1_000;
+    for (let t = 21_000; t <= 200_000; t += 2_000) {
+      const d = shouldAutoPublish({ ...base, changed: true, inFlight, lastSentAtMs: lastAt, nowMs: t });
+      if (d.publish) { started += 1; inFlight = true; lastAt = t; }
+      if (inFlight && t - lastAt >= 30_000) inFlight = false; // 送信に30秒かかる遅い回線
+    }
+    // 30秒かかる送信が終わるまで次を始めないので、20秒間隔より少ない回数になる
+    expect(started).toBeLessThanOrEqual(Math.ceil(180_000 / 30_000));
+  });
+});
+
+import { readPublishAck, VIEWER_ACTIVE_STICKY_MS } from './autoPublishDecision.js';
+describe('readPublishAck(v0.1.1738)', () => {
+  it('viewerActive:true なら次の送信(最長120秒)の返事まで持つ期限を返す', () => {
+    expect(VIEWER_ACTIVE_STICKY_MS).toBeGreaterThan(120_000);
+    expect(readPublishAck({ ok: true, viewerActive: true, gzipOk: true }, 1000)).toEqual({ viewingUntilMs: 1000 + VIEWER_ACTIVE_STICKY_MS, gzipOk: true, voiceWanted: false });
+  });
+  it('false・返さない古いサーバー・壊れた返事はどちらも false(gzip を解けない受け口に送らない)', () => {
+    expect(readPublishAck({ ok: true, viewerActive: false, gzipOk: true }, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: true, voiceWanted: false });
+    expect(readPublishAck({ ok: true }, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: false, voiceWanted: false });
+    expect(readPublishAck(null, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: false, voiceWanted: false });
+    expect(readPublishAck({ ok: true, voiceWanted: true }, 1000).voiceWanted).toBe(true);
+    expect(readPublishAck({ gzipOk: 'yes', viewerActive: 1 }, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: false, voiceWanted: false });
+  });
+});

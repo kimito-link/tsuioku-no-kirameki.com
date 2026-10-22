@@ -12,7 +12,7 @@
 - **コメント送信(確認/プロファイル)** — 拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも
   - `src/lib/commentSubmitConfirm.js`
   - `src/lib/commentSubmitProfiling.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 11</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 12</summary>
 
 - `src/lib/commentComposeShortcuts.js` — コメント欄の Enter 系キーで送信するか／既定動作に任せるか。
 - `src/lib/commentKindnessNudge.js` — 送信前コメントの攻撃的表現を検知し「やさしく一言」確認を促す純ロジック。
@@ -22,6 +22,7 @@
 - `src/lib/commentPostUi.js` — ポップアップのコメント送信 UI を、watch 接続状態と入力状態から一貫して決める。
 - `src/lib/commentSendTroubleshootHint.js` — コメント送信エラー文に「再読み込み案内」を 1 回だけ追加する純関数。
 - `src/lib/commentSubmitSteps.js` — コメント送信パイプラインの純粋な判定ロジック。
+- `src/lib/gzipBody.js` — v0.1.1735: 送信本文を gzip に縮める(状態速報 → api/status)。
 - `src/lib/liveviewPublishOutcomeKey.js` — 純Web公開送信(POST /api/status)結果の【ページ横断】記録キー（council/diagnostics-completeness-root-SYNTHESIS.md 第3段）。
 - `src/lib/ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
 - `src/lib/selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の
@@ -314,8 +315,10 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 266</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 269</summary>
 
+- `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
+- `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
@@ -476,6 +479,7 @@
 - `src/lib/paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
 - `src/lib/paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
 - `src/lib/parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
+- `src/lib/phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
 - `src/lib/pickTickerHighlight.js` — コメントティッカーに「留める1件」を選ぶ純関数(v0.1.1226)。
 - `src/lib/popupAvatarResolver.js` — v0.1.206 Phase B: popup 表示の avatar URL を統一的に解決する純関数。
 - `src/lib/popupCelebrationGate.js` — popup / watch 埋め込みパネル再描画時の応援演出ゲート（単一の開幕判定）。
@@ -595,8 +599,13 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 15</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 21</summary>
 
+- `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
+- `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
+- `src/lib/phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
+- `src/lib/phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
+- `src/lib/phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/venuePickupSpeaker.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
@@ -612,6 +621,7 @@
 - `src/lib/voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
 - `src/lib/voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
+- `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 
 </details>
 
@@ -700,9 +710,8 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 87</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 85</summary>
 
-- `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
 - `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
@@ -716,7 +725,6 @@
 - `scripts/verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
 - `src/extension/popup/attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
 - `src/extension/sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
-- `src/extension/statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
 - `src/lib/aiShareDiagnosticsMarkdown.js` — AI 共有用「診断バンドル」Markdown の整形（純粋関数）。
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
@@ -775,10 +783,10 @@
 - `src/lib/sidepanelSelfDiagKey.js` — サイドパネル自己診断の storage キー。
 - `src/lib/statusCopyFreshness.js` — 状態速報の「コピーした本文がどれくらい古いか」を、コピーする側に伝える純関数(v0.1.1222)。
 - `src/lib/statusCoreBatch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/statusEtag.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
 - `src/lib/statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
 - `src/lib/statusMindmapSignature.js` — マインドマップの再描画を止める署名を作る純関数。
-- `src/lib/statusPublisherPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止。locks 等は引数で受け取る)
 - `src/lib/statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusRefreshInterval.js` — 状態画面(status.html)の自動更新の間隔を決める(純関数)。v0.1.1698
@@ -829,6 +837,25 @@
   - `src/extension/story/renderStoryUserLaneDom.js`
 - **公式「本家コメ」チップの速さ(+N/分)** — paintOfficialNicoStatsStrip(popup-entry.js)が公式コメント累計の実測(値が変わったときだけ標本)を officialCommentRate.js に積み、20秒以上離れた2標本の差を「+66/分」としてチップ隣の span に出す。補間はしない・出せない間は空(span ごと非表示)・配信切替で標本を捨てる。officialNicoStatsStripDigest.js は無変更
   - `src/lib/officialCommentRate.js`
+  - `src/extension/popup-entry.js`
+- **スマホ版の利用者ごとの鍵(発行・削除・上限)** — POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッシュだけ保持)・閲覧トークンを発行、?action=rotate で閲覧URLを作り直し、DELETE で本体・ETag・鍵を消す。/api/status は x-device-id+x-write-key のとき書き込み先をサーバーが鍵から決め(他人の閲覧トークンへ書けない)、利用者ごと1日4,000回・全体上限で429、診断の全文(statusReport/fastDiag)を落として保存。保存は24時間。判定は deviceAuth.js、乱数・ハッシュ・Redis は deviceStore.js(v0.1.1730)。拡張側は同意 ON・共有キーなしのとき statusDeviceCred.js が鍵をもらい(Web Locks で1つ)、送信は devicePublishCredentials.js が決めた鍵で送る(共有キー優先)。同意 OFF で DELETE→鍵を消す・401 で鍵を捨ててもらい直す(v0.1.1731)。状態画面の「📱 スマホで見る」スイッチ(同意・閲覧URL・URLの作り直し)は statusSmartphoneCard.js(v0.1.1732)。送信担当はサイドパネルに加え watch ページ埋め込みのパネル(popup-entry.js・受動ビュー以外)にも置き、送信担当は document.hidden で止めない=サイドパネルを閉じても送り続ける(v0.1.1733)
+  - `api/device.js`
+  - `api/status.js`
+  - `src/lib/deviceAuth.js`
+  - `src/server/deviceStore.js`
+  - `src/lib/devicePublishCredentials.js`
+  - `src/extension/statusDeviceCred.js`
+  - `src/extension/status-entry.js`
+  - `src/extension/statusPublisherHost.js`
+  - `src/extension/statusSmartphoneCard.js`
+  - `src/extension/popup-entry.js`
+  - `src/lib/statusPublisherPlan.js`
+- **スマホから生放送にコメント(PC中継)** — スマホのWEB版の本物の入力欄(popup-entry.js の submitComment)が、受動ビューで globalThis.__nlsWebCommentRelay があるときだけ /api/post に預ける(拡張の中では常に null=PCの送信経路は不変)。サーバー(api/post.js)は投稿用の鍵(#pk=・ハッシュだけ保存)で照合し待ち行列に最長60秒・20秒8件まで。PCの送信担当(status.html?publisher=1)の phonePostRelay.js がふだん10秒/入力中2秒で取りに行き、NLS_POST_COMMENT で放送タブのコメント欄から投稿して結果を返す。スマホは接続の帯と ⏱→✓→✓✓(放送のコメントに流れたのを鏡で確認)の印を app/live-view-post.js で出す。PC の「✍️ スマホからコメントする」スイッチ・自分専用URL・QR は statusSmartphoneCard.js。判定は phonePost.js(v0.1.1734)
+  - `api/post.js`
+  - `src/lib/phonePost.js`
+  - `src/extension/phonePostRelay.js`
+  - `app/live-view-post.js`
+  - `src/extension/statusSmartphoneCard.js`
   - `src/extension/popup-entry.js`
 - **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
   - `extension/live-view.html`
@@ -926,9 +953,10 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 237</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 242</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
+- `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
@@ -1043,8 +1071,10 @@
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
 - `src/lib/lastWatchUrlAdoption.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
+- `src/lib/liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
 - `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
+- `src/lib/liveviewCurrentLive.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/liveviewPublishTarget.js` — 応援ライブビュー(live-view.html?lv=X)の公開ボタンが、別の配信のデータを送らないための判定(純関数)。
 - `src/lib/liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
 - `src/lib/lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1072,6 +1102,7 @@
 - `src/lib/officialEventRankSoundEffect.js` — v0.1.1053: 配信者が参加中のニコニコイベント順位が上下したら効果音(rank_up/rank_down)を鳴らす。
 - `src/lib/officialNicoStatsStripDigest.js` — text: string,
 - `src/lib/officialStatsWindow.js` — at?: number|null,
+- `src/lib/oggOpusMux.js` — v0.1.1740: Opus の音のかたまり(パケット)を Ogg に包む(純関数)。
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
 - `src/lib/ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
@@ -1086,6 +1117,7 @@
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
 - `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
 - `src/lib/passiveMirrorLiveIdGuard.js` — 受動ビュー(status 埋め込み / live-view)が「別配信の古い鏡」を貼らないための判定。
+- `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -1172,50 +1204,56 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (4版)
+### 💾 記録件数 (3版)
+- `v0.1.1740` 2026-10-22 — スマホでVOICEVOXの読み上げを聞ける
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
-- `v0.1.1718` 2026-10-20 — 同接の補正データの書き込みを約12分の1に
-- `v0.1.1709` 2026-10-20 — マーケレポートに『応援者とギフト』の章を追加
 
-### 📥 コメント取得 (4版)
+### 📥 コメント取得 (3版)
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
-- `v0.1.1715` 2026-10-20 — 取得率の100%超を隠さない
 
-### 🙂 匿名(184) (1版)
-- `v0.1.1717` 2026-10-20 — コメント一覧の共有データを95%小さく
+### 🏟 会場・席 (2版)
+- `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
+- `v0.1.1737` 2026-10-22 — スマホでギフトの効果音が鳴る
 
-### 🎁 ギフト (7版)
+### 🎈 吹き出し (1版)
+- `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
+
+### 🎁 ギフト (6版)
+- `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
+- `v0.1.1737` 2026-10-22 — スマホでギフトの効果音が鳴る
+- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
 - `v0.1.1722` 2026-10-21 — 別配信のギフト音記録を全画面で分離
-- `v0.1.1721` 2026-10-21 — 別配信のギフト音エラーを現配信に出さない
-- `v0.1.1720` 2026-10-20 — 広告pt・ギフトptの数字を画面間でそろえた
-- `v0.1.1713` 2026-10-20 — メディアキットを1つに・検索窓・色の修正
-- `v0.1.1709` 2026-10-20 — マーケレポートに『応援者とギフト』の章を追加
 
-### 🔊 読み上げ (2版)
+### 🔊 読み上げ (3版)
+- `v0.1.1740` 2026-10-22 — スマホでVOICEVOXの読み上げを聞ける
+- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
-- `v0.1.1719` 2026-10-20 — 読み上げ失敗の警告が復旧後も残らない
 
-### 🩺 診断・状態速報 (12版)
+### 🪟 応援レーン・タイル (1版)
+- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
+
+### 🩺 診断・状態速報 (8版)
+- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
+- `v0.1.1730` 2026-10-21 — スマホ版の利用者ごとの鍵をサーバーに用意
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
 - `v0.1.1724` 2026-10-21 — 別配信の送信取り消しを現配信に出さない
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
 - `v0.1.1722` 2026-10-21 — 別配信のギフト音記録を全画面で分離
-- `v0.1.1721` 2026-10-21 — 別配信のギフト音エラーを現配信に出さない
-- `v0.1.1720` 2026-10-20 — 広告pt・ギフトptの数字を画面間でそろえた
-- `v0.1.1719` 2026-10-20 — 読み上げ失敗の警告が復旧後も残らない
-- `v0.1.1716` 2026-10-20 — 画面の部品数の注記を実際の基準に
-- `v0.1.1715` 2026-10-20 — 取得率の100%超を隠さない
-- `v0.1.1710` 2026-10-20 — 開いた直後の偽の不一致を出さない
 
-### その他 (4版)
+### その他 (9版)
+- `v0.1.1741` 2026-10-22 — スマホで動かないボタンを片付けた
+- `v0.1.1738` 2026-10-22 — スマホの速さを点検して4か所を直した
+- `v0.1.1736` 2026-10-22 — スマホで見ている間は約5秒で更新
+- `v0.1.1734` 2026-10-22 — スマホから生放送にコメントできる
+- `v0.1.1733` 2026-10-21 — サイドパネルを閉じてもスマホへ送り続ける
+- `v0.1.1732` 2026-10-21 — 状態画面に「スマホで見る」スイッチ
+- `v0.1.1731` 2026-10-21 — スマホ版の利用者ごとの鍵を拡張で受け取る準備
+- `v0.1.1729` 2026-10-21 — スマホのWEB版を変化があれば20秒で更新
 - `v0.1.1726` 2026-10-21 — 配信採点パネルを外しました
-- `v0.1.1714` 2026-10-20 — マーケとメディアキットのボタンを1つに
-- `v0.1.1712` 2026-10-20 — 分析レポートとメディアキットを1つに統合
-- `v0.1.1711` 2026-10-20 — メディアキット生成を共有部品に切り出し

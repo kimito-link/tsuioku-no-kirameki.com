@@ -302,6 +302,24 @@
       ]
     },
     {
+      "file": "src/lib/comeviewRows.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/extDocBusyCensusBoot.js",
       "featureCount": 5,
       "features": [
@@ -492,18 +510,18 @@
       ]
     },
     {
-      "file": "src/lib/comeviewRows.js",
+      "file": "src/lib/comeviewActions.js",
       "featureCount": 4,
       "features": [
         "comeview",
         "content",
-        "popup",
+        "status",
         "venue"
       ],
       "labels": [
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
+        "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
@@ -956,6 +974,22 @@
       ]
     },
     {
+      "file": "src/lib/voiceAssignment.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceDiag.js",
       "featureCount": 4,
       "features": [
@@ -988,6 +1022,22 @@
       ]
     },
     {
+      "file": "src/lib/voiceKeys.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceSynthFailure.js",
       "featureCount": 4,
       "features": [
@@ -1005,6 +1055,22 @@
     },
     {
       "file": "src/lib/voiceSynthFailureReason.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voicevoxClient.js",
       "featureCount": 4,
       "features": [
         "comeview",
@@ -1248,6 +1314,20 @@
       ]
     },
     {
+      "file": "src/lib/broadcastUrl.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/celebrationCharaAssets.js",
       "featureCount": 3,
       "features": [
@@ -1287,20 +1367,6 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/comeviewActions.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
       ]
     },
     {
@@ -1976,34 +2042,6 @@
       ]
     },
     {
-      "file": "src/lib/voiceAssignment.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceKeys.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/voiceLagBudget.js",
       "featureCount": 3,
       "features": [
@@ -2047,20 +2085,6 @@
     },
     {
       "file": "src/lib/voiceReadQueue.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voicevoxClient.js",
       "featureCount": 3,
       "features": [
         "comeview",
@@ -2235,18 +2259,6 @@
     },
     {
       "file": "src/lib/broadcasterProfileCard.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "popup"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/broadcastUrl.js",
       "featureCount": 2,
       "features": [
         "content",
@@ -2483,6 +2495,30 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/deviceAuth.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/devicePublishCredentials.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
       ]
     },
     {
@@ -3203,6 +3239,18 @@
       "labels": [
         "状態速報ページ",
         "Web版 状態(スマホ)"
+      ]
+    },
+    {
+      "file": "src/lib/statusPublisherPlan.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
       ]
     },
     {
@@ -3956,6 +4004,26 @@
       ]
     },
     {
+      "file": "src/extension/phonePostRelay.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/extension/phoneVoicePublisher.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/extension/popup-entry.js",
       "featureCount": 1,
       "features": [
@@ -4027,6 +4095,36 @@
     },
     {
       "file": "src/extension/status-entry.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/extension/statusDeviceCred.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/extension/statusPublisherHost.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/statusSmartphoneCard.js",
       "featureCount": 1,
       "features": [
         "status"
@@ -5816,6 +5914,16 @@
       ]
     },
     {
+      "file": "src/lib/gzipBody.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/healthCellGroups.js",
       "featureCount": 1,
       "features": [
@@ -6433,6 +6541,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/liveElapsedExtrapolate.js",
+      "featureCount": 1,
+      "features": [
+        "web-status"
+      ],
+      "labels": [
+        "Web版 状態(スマホ)"
       ]
     },
     {
@@ -7156,6 +7274,16 @@
       ]
     },
     {
+      "file": "src/lib/oggOpusMux.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/openingFiveMinuteCorrelation.js",
       "featureCount": 1,
       "features": [
@@ -7333,6 +7461,46 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/phonePost.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/phoneVoice.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/phoneVoiceEncode.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/phoneVoiceSender.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -8267,16 +8435,6 @@
     },
     {
       "file": "src/lib/statusMindmapSignature.js",
-      "featureCount": 1,
-      "features": [
-        "status"
-      ],
-      "labels": [
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/statusPublisherPlan.js",
       "featureCount": 1,
       "features": [
         "status"

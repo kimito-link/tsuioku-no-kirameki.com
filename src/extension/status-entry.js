@@ -63,7 +63,7 @@ import { parseShareKeysFile, shareKeysFingerprint } from '../lib/shareKeysFile.j
 //   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
 import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
 // v0.1.1016: ③WEB が古くなる前に自動で再 publish すべきかの判定(手動ボタンの往復を無くす)。
-import { latestPublishTime, shouldAutoPublish } from '../lib/autoPublishDecision.js';
+import { VIEWER_ACTIVE_PUBLISH_INTERVAL_MS, latestPublishTime, readPublishAck, shouldAutoPublish } from '../lib/autoPublishDecision.js';
 // 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→送信時の記録に使う。
 import {
   recordLiveviewPublishOutcome
@@ -89,6 +89,7 @@ import { shouldUpdateAiShareText } from '../lib/aiShareTextChanged.js';
 import { buildCoreBatchKeys, pickCoreBatchValues } from '../lib/statusCoreBatch.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
+import { createPcPhoneVoice } from './phoneVoicePublisher.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
 import {
   KEY_BACKFILL_LIVE_METRIC,
@@ -220,6 +221,9 @@ import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/
 import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+import { disablePhonePost, enablePhonePost, forgetPhonePostKey, readPhonePostKey, startPhonePostRelay } from './phonePostRelay.js';
+import { buildPublishBody, deleteDeviceOnServer, forgetDeviceCred, getPublishCredentials, maybeRegisterDevice, refreshDeviceCredCache, rotateDeviceViewToken, shouldForgetDeviceCred } from './statusDeviceCred.js';
+import { buildSmartphoneCard } from './statusSmartphoneCard.js';
 /*
  * ★v0.1.1371: boot(init)で await する storage read の上限[ms]。
  *   ここが無界だと storage stall のとき init が止まり、refresh にも到達せず【画面が白紙】になる
@@ -234,7 +238,8 @@ const BOOT_STORAGE_TIMEOUT_MS = 1_500;
 //   in-flight ガードを掛けて新規発行を抑止する。popup-entry.js の heavyReadActive と同型。
 import { createInFlightGuard, createStaleGuardedRead } from '../lib/inFlightGuard.js';
 // 重さ根治 P4(2026-07-06): publishLiveViewPublishPayload の dirty check(内容不変なら set 省略)用。
-import { buildLiveViewPublishSignature } from '../lib/liveViewPublishSignature.js';
+import { buildLiveViewContentSignature, buildLiveViewPublishSignature } from '../lib/liveViewPublishSignature.js';
+import { buildPublishInit } from '../lib/gzipBody.js';
 // Phase 1 MVP(2026-07-07): 純Web公開ペイロードを1枚あたり上限で段階的に削る純関数。
 //   min-gap 3000→12000 と対で「set 頻度」だけでなく「1枚のサイズ」も絞り、KEY_LIVEVIEW_PUBLISH_PAYLOAD
 //   の onChanged ファンアウト(browser process 輻輳の真犯人)を細くする。
@@ -270,13 +275,14 @@ import {
 import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
 import { popupSnapshotAgeMs } from '../lib/aiShareFullText.js';
 import { acquireStatusPublisherLock, isStatusPublisherMode } from '../lib/statusPublisherPlan.js';
-import { statusRefreshIntervalMs } from '../lib/statusRefreshInterval.js';
+import { shouldRunPublisherTick, statusRefreshIntervalMs } from '../lib/statusRefreshInterval.js';
 // ★v0.1.1389: 33セルを症状の言葉(コメント記録/人の識別/レーン/公式値/演出/健全性)で枠に分ける。
 import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
 /** 自動更新間隔(ms)。 */
 // v0.1.1698: 見えない送信担当(?publisher=1)は10秒周期(送信間隔120秒に影響しない)。通常の状態画面は従来どおり2秒。
-const REFRESH_INTERVAL_MS = statusRefreshIntervalMs({ publisher: isStatusPublisherMode(location.search) });
+const IS_STATUS_PUBLISHER = isStatusPublisherMode(location.search);
+const REFRESH_INTERVAL_MS = statusRefreshIntervalMs({ publisher: IS_STATUS_PUBLISHER });
 
 /** panel_summary キーのプレフィックス。 */
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
@@ -340,6 +346,8 @@ async function setWebPublishOptIn(next) {
   _webPublishOptIn = value;
   try {
     await chrome.storage.local.set({ [KEY_WEB_PUBLISH_OPT_IN]: value });
+    if (!value) await disablePhonePost(getPublishCredentials(getUploadConfig())); // v0.1.1734: スマホからのコメントも止める
+    if (!value) await deleteDeviceOnServer(getUploadConfig().appOrigin); // v0.1.1731: 同意 OFF=サーバーの利用者データも消す(v0.1.1732: 消し終わってから画面に出す)
   } catch {
     /* best-effort: 保存に失敗してもキャッシュは反映済み(次回起動で既定OFFに戻る=安全側) */
   }
@@ -355,6 +363,18 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 // v0.1.868: 「スムーズじゃない」対策。追加データ(reportPreview/watchTabMap/trend)は 2 秒ごとに毎回
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
+/**
+ * v0.1.1735: 送信担当(?publisher=1)は補助データを描き直しのたびに読む(12秒だと10秒周期と噛み合わず実効20秒だった)。
+ *   v0.1.1736: 周期が5秒になったので 9秒→4.5秒(スマホが開いていなければ描き直し自体が10秒ごと)。
+ */
+const PUBLISHER_EXTRAS_REFETCH_MS = 4500;
+/** v0.1.1736: サーバーが「いまスマホで開いている」と返した期限(ms)。この間は送信担当が5秒ごとに描き直し・5秒で送る。 */
+let _phoneViewingUntilMs = 0;
+/** v0.1.1736: 送信担当の描き直しの回数(スマホが開いていなければ2回に1回だけ描く)。 */
+let _publisherTickNo = 0;
+function isPhoneViewing() {
+  return _phoneViewingUntilMs > Date.now();
+}
 let _extrasCacheAt = 0;
 /**
  * ★v0.1.1446: コアread を最後に【実際に読んだ】時刻(キー名→ms)。
@@ -604,6 +624,9 @@ async function bootstrap() {
   if (isStatusPublisherMode(location.search) && !(await acquireStatusPublisherLock(navigator.locks))) return;
   // v0.1.1626: 拡張フォルダに鍵ファイルがあれば一度だけ取り込む(貼り付け・クリック不要)。
   if (await seedShareKeysFromLocalFile()) await refreshUploadConfigCache();
+  await refreshDeviceCredCache(getUploadConfig().appOrigin); // v0.1.1731: 利用者ごとの鍵(共有キーが無いときだけ使う)
+  // v0.1.1734: 送信担当だけが、スマホから預かったコメントを PC の放送タブへ投稿する(「スマホからコメントする」ON のときだけ通信)。
+  if (IS_STATUS_PUBLISHER) startPhonePostRelay({ getCreds: () => getPublishCredentials(getUploadConfig()), isOptedIn: () => _webPublishOptIn === true });
 
   try {
     checkVersionMismatchBanner();
@@ -689,9 +712,12 @@ function dismissStatusBootNotice() {
 function runRefreshTick(opts) {
   const first = opts?.first === true;
   if (_refreshPausedByUser) return;
+  // v0.1.1736: 送信担当は5秒周期。スマホが開いていなければ2回に1回だけ描く(=10秒・今までと同じ重さ)。
+  if (!first && IS_STATUS_PUBLISHER && !shouldRunPublisherTick({ tickNo: _publisherTickNo++, viewerActive: isPhoneViewing() })) return;
   // ★初回は hidden でも描く。開いた直後は hidden 判定が true になりうるうえ、
   //   ここで降りると「開いたのに永久に白い」を作る(降りた後に誰も再挑戦しない)。
-  if (!first && document.hidden) return;
+  // v0.1.1733: 送信担当(?publisher=1)は見えない部品=watch ページに置かれてタブが裏に回っても止めない(スマホへ送り続ける)。
+  if (!first && document.hidden && !IS_STATUS_PUBLISHER) return;
   if (_refreshInFlight) return;
   if (!first && _refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
   _refreshInFlight = true;
@@ -869,7 +895,7 @@ async function refresh(opts = {}) {
     //     ここへ移動。真因=この2つが v0.1.902 以降ずっと毎回の直列 read で、laneDiag を間引いた後も
     //     残っていたため診断ページが重いままだった(ユーザー実機「v0.1.923 を入れる前から遅い」)。
     //     どちらも健全度パネルの色セル用の補助情報で、2秒ごとの即時更新は不要=laneDiag と同じ間引きへ。
-    const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
+    const extrasStale = Date.now() - _extrasCacheAt >= (IS_STATUS_PUBLISHER ? PUBLISHER_EXTRAS_REFETCH_MS : EXTRAS_REFETCH_MS);
     if (extrasStale) {
       // 重さ根治 P2(2026-07-06): 単一キー get のみの17項目(voiceDiag〜commentPostDiag)を
       //   従来は個別に runStorageOpWithTimeout(=直列 await 17回)していたのを、1回の
@@ -2345,29 +2371,65 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
  *   それだけを見ると、2秒ごとの描画のたびに「2分たった」と判定されて送信が連打された(2分ごとに4〜6回)。
  */
 let _autoPublishLastLaunchAtMs = 0;
+/**
+ * v0.1.1729: 最後に自動送信した jsonBlob のシグネチャ。変わっていれば20秒・同じなら120秒間隔(autoPublishDecision)。
+ *   ★「変わったか」の材料は buildLiveViewPublishSignature(liveViewPublishSignature.js)だけ:
+ *     使う = snapshotMeta.capturedAt・laneMirror/statCardsMirror/northStarMirror/commentTimelineMirror の capturedAt・
+ *            lives の件数・lives の記録件数の合計・overview の文字数。
+ *     使わない = generatedAt(毎回変わる)・statusReport(経過秒を含む本文=毎回変わる)・上記以外の鏡
+ *            (topSupporters・giftHistoryMirror・roomHeatMirror・sessionSummaryMirror・parityVerdict 等)。
+ *   使わない鏡だけが変わったときは「同じ」と判定され、120秒の生存確認で届く(取りこぼしはしない・遅れるだけ)。
+ *   鏡を増やして20秒で届けたいときは、その鏡の capturedAt をシグネチャに足すこと。
+ */
+let _autoPublishLastSentSig = '';
+/** v0.1.1735: 最後に自動送信した jsonBlob の【中身】のシグネチャ(buildLiveViewContentSignature)。 */
+let _autoPublishLastContentSig = '';
+/** v0.1.1729: 自動送信が続けて失敗した回数。失敗が続くと間隔を 20→40→80→120秒 と広げる。 */
+let _autoPublishFailStreak = 0;
 
+/**
+ * v0.1.1736: 判定の changedIntervalMs = スマホが開いている間は、中身が変わったら5秒で送る(誰も見ていなければ20秒のまま)。
+ * v0.1.1735: 「変わった」でも、鏡を書き直しただけ(中身のシグネチャが前回の送信と同じ)なら送らない。
+ */
 function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
   try {
-    const { ingestKey, viewToken } = getUploadConfig();
+    maybeRegisterDevice({ optedIn: _webPublishOptIn === true, uploadCfg: getUploadConfig() }); // v0.1.1731: 同意 ON・鍵なしなら鍵をもらう
+    const sig = buildLiveViewPublishSignature(_lastRenderedBundle?.jsonBlob);
     const hasWatchTab = Array.isArray(livesData) && livesData.some((l) => l && l.recording);
     const outcome = summarizeLiveviewPublishOutcomeRecord(publishOutcomeRec || null, Date.now());
+    const changedIntervalMs = isPhoneViewing() ? VIEWER_ACTIVE_PUBLISH_INTERVAL_MS : undefined;
     const decision = shouldAutoPublish({
-      // ★v0.1.1242: 明示同意(既定OFF)が最優先ゲート。未同意なら他が揃っていても送らない。
+      // ★v0.1.1242: 同意が最優先(既定OFF)
       optedIn: _webPublishOptIn === true,
-      hasKeys: Boolean(ingestKey && viewToken),
+      hasKeys: Boolean(getPublishCredentials(getUploadConfig())),
       hasPayload: Boolean(_lastRenderedBundle?.jsonBlob),
       hasWatchTab,
       inFlight: _autoPublishInFlight,
       everSent: outcome.everSent || _autoPublishLastLaunchAtMs > 0,
       lastSentAtMs: latestPublishTime(publishOutcomeRec && publishOutcomeRec.at, _autoPublishLastLaunchAtMs),
-      nowMs: Date.now()
+      nowMs: Date.now(),
+      changed: Boolean(sig) && sig !== _autoPublishLastSentSig,
+      changedIntervalMs,
+      failStreak: _autoPublishFailStreak
     });
     if (!decision.publish) return;
+    const contentSig = buildLiveViewContentSignature(_lastRenderedBundle?.jsonBlob);
+    if (decision.reason === 'changed' && contentSig && contentSig === _autoPublishLastContentSig) {
+      _autoPublishLastSentSig = sig;
+      return;
+    }
     _autoPublishLastLaunchAtMs = Date.now();
+    _autoPublishLastSentSig = sig;
+    _autoPublishLastContentSig = contentSig;
     _autoPublishInFlight = true;
-    void uploadStatusSnapshot().finally(() => {
-      _autoPublishInFlight = false;
-    });
+    void uploadStatusSnapshot()
+      .then((r) => {
+        _autoPublishFailStreak = r && r.ok ? 0 : _autoPublishFailStreak + 1;
+        if (!(r && r.ok)) _autoPublishLastContentSig = ''; // 届かなかった中身は「同じ」扱いにしない
+      })
+      .finally(() => {
+        _autoPublishInFlight = false;
+      });
   } catch {
     _autoPublishInFlight = false;
     /* best-effort: 自動 publish の失敗は status を止めない */
@@ -3115,22 +3177,22 @@ function buildUploadConfigEditor() {
   details.style.cssText =
     'margin-top:8px;padding:6px 8px;border-radius:6px;font-size:11px;line-height:1.5;' +
     'border:1px solid var(--nl-border);background:var(--nl-card-bg);';
-  // 未設定なら開いた状態で出す（何をすればいいか一目で分かる）
-  details.open = _uploadConfigDraft.open !== null ? _uploadConfigDraft.open : !(cfg.ingestKey && cfg.viewToken);
+  // v0.1.1732: 開発者向けの欄になったので、既定は閉じる(利用者は「📱 スマホで見る」だけで足りる)。
+  details.open = _uploadConfigDraft.open !== null ? _uploadConfigDraft.open : false;
   details.addEventListener('toggle', () => { _uploadConfigDraft.open = details.open; });
 
   const summary = document.createElement('summary');
   summary.style.cssText = 'cursor:pointer;font-weight:600;';
   summary.textContent = cfg.ingestKey && cfg.viewToken
-    ? '🔑 WEB共有の設定（設定済み）'
-    : '🔑 WEB共有の設定（未設定＝共有機能は使えません）';
+    ? '🔑 開発者向け: 共有キーの設定（設定済み）'
+    : '🔑 開発者向け: 共有キーの設定（ふつうは不要）';
   details.appendChild(summary);
 
   const note = document.createElement('p');
   note.style.cssText = 'margin:6px 0;color:var(--nl-muted);';
   note.textContent =
-    '記録をスマホや他の人に見せる「WEB共有」を使うときだけ必要です。空のままでも記録・表示は問題なく動きます。' +
-    'この値はこのPCの中だけに保存され、外部には送られません。';
+    '開発者が診断用の送信先を固定するための欄です。スマホで見るだけなら、上の「📱 スマホで見る」で足ります。' +
+    '空のままでも記録・表示は問題なく動きます。この値はこのPCの中だけに保存されます。';
   details.appendChild(note);
 
   /** @param {'ingestKey'|'viewToken'|'appOrigin'} draftKey @param {string} label @param {string} value @param {string} hint */
@@ -3218,31 +3280,20 @@ function buildUploadConfigEditor() {
 }
 
 function buildAutoPublishConsentToggle() {
-  const { ingestKey, viewToken } = getUploadConfig();
-  if (!ingestKey || !viewToken) return null; // キー未設定=公開機能なし=出さない
-  const wrap = document.createElement('label');
-  wrap.style.cssText =
-    'display:flex;align-items:flex-start;gap:6px;margin-top:8px;padding:6px 8px;border-radius:6px;' +
-    'font-size:11px;line-height:1.5;cursor:pointer;border:1px solid var(--nl-border);background:var(--nl-card-bg);';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = _webPublishOptIn === true;
-  cb.style.cssText = 'margin-top:2px;flex:0 0 auto;cursor:pointer;';
-  const text = document.createElement('span');
-  text.textContent =
-    '配信中、この画面の内容(視聴者のID・表示名・コメント本文を含みます)を2分ごとに自動でWEBへ公開する。' +
-    'OFFのあいだは自動送信しません(「🔗 WEBサイトURLで共有」を押したときだけ送信します)。';
-  cb.addEventListener('change', () => {
-    void setWebPublishOptIn(cb.checked === true);
+  // v0.1.1732: 共有キーが無くても出す=ストア版の利用者の「📱 スマホで見る」。説明・URL・作り直しは statusSmartphoneCard.js。
+  return buildSmartphoneCard({
+    optedIn: _webPublishOptIn === true,
+    getCreds: () => getPublishCredentials(getUploadConfig()),
+    setOptIn: (next) => setWebPublishOptIn(next),
+    registerNow: () => maybeRegisterDevice({ optedIn: _webPublishOptIn === true, uploadCfg: getUploadConfig() }),
+    rotate: rotateDeviceViewToken,
+    phonePost: { readKey: readPhonePostKey, enable: () => enablePhonePost(getPublishCredentials(getUploadConfig())), disable: () => disablePhonePost(getPublishCredentials(getUploadConfig())), forget: forgetPhonePostKey }, // v0.1.1734
+    openUrl: (url) => { try { chrome.tabs.create({ url }); } catch { window.open(url, '_blank', 'noopener'); } }
   });
-  wrap.appendChild(cb);
-  wrap.appendChild(text);
-  return wrap;
 }
 
 function buildWebUrlButton() {
-  const { ingestKey, viewToken } = getUploadConfig();
-  if (!ingestKey || !viewToken) return null; // キー未設定ビルド=出さない。
+  if (!getPublishCredentials(getUploadConfig())) return null; // 鍵が無い(共有キーも利用者の鍵も無い)=出さない。
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = '🔗 WEBサイトURLで共有';
@@ -3703,9 +3754,16 @@ function persistLiveviewPublishOutcome(outcome) {
   }
 }
 
+/** v0.1.1735: 受け口が gzip を解けなかった(400)ら true=このページでは以後 JSON のまま送る。 */
+let _publishGzipRefused = false;
+/** v0.1.1738: 受け口が「gzip を解ける」と返したら true(古い受け口は gzip を黙って壊して保存するので、それまで JSON)。 */
+let _publishGzipOk = false;
+/** v0.1.1740: スマホで 🗣 が ON の間、新しいコメントを VOICEVOX の声にして送る(送り先は直近の送信と同じ)。 */
+let _phoneVoiceTarget = null;
+const _phoneVoice = createPcPhoneVoice(() => _phoneVoiceTarget);
 async function uploadStatusSnapshot() {
-  const { ingestKey, viewToken, appOrigin } = getUploadConfig();
-  if (!ingestKey || !viewToken) {
+  const creds = getPublishCredentials(getUploadConfig()); // v0.1.1731: 共有キー優先・無ければ利用者ごとの鍵
+  if (!creds) {
     return { ok: false, error: 'キー未設定(この画面の「🔑 WEB共有の設定」で書き込みキーと閲覧トークンを入力してください)' };
   }
   const jsonBlob = _lastRenderedBundle?.jsonBlob;
@@ -3717,19 +3775,29 @@ async function uploadStatusSnapshot() {
     jsonBlob?.northStarMirror?.liveId || jsonBlob?.laneMirror?.liveId || jsonBlob?.statCardsMirror?.liveId || ''
   );
   // 共有 URL 組み立ては純関数 buildStatusShareUrls(src/lib)に抽出済み(挙動同値・テストで固定)。
-  const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(appOrigin, viewToken);
+  const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(creds.appOrigin, creds.viewToken);
   try {
-    const res = await fetch(ingestUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-share-key': ingestKey },
-      body: JSON.stringify({ ...jsonBlob, v: viewToken })
-    });
+    // v0.1.1735: gzip で縮めて送る(約5分の1)。受け口が解けず 400 なら、このページでは以後 JSON のまま送り直す。
+    const jsonText = JSON.stringify({ ...buildPublishBody(creds, jsonBlob), phoneVoice: _phoneVoice.state() });
+    const sent = await buildPublishInit(creds.headers, jsonText, { allowGzip: _publishGzipOk && !_publishGzipRefused });
+    let res = await fetch(ingestUrl, sent.init);
+    if (sent.gzip && res.status === 400 && (await res.clone().json().catch(() => null))?.error === 'bad body') {
+      _publishGzipRefused = true;
+      res = await fetch(ingestUrl, (await buildPublishInit(creds.headers, jsonText, { allowGzip: false })).init);
+    }
     if (!res.ok) {
+      if (shouldForgetDeviceCred(creds.mode, res.status)) void forgetDeviceCred(); // 鍵の記録が無い=もらい直す
       // POST 失敗を globalThis + storage 両方に記録=どのページからも「純Webが古い」を検知できる。
       recordLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, at: Date.now() });
       persistLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, liveId: sentLiveId });
       return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
     }
+    // v0.1.1736/1738: 返事の viewerActive=いまスマホで開いている・gzipOk=gzip を解ける(古いサーバーはどちらも返さない)。
+    const ack = readPublishAck(await res.json().catch(() => null), Date.now());
+    _phoneViewingUntilMs = ack.viewingUntilMs;
+    _publishGzipOk = ack.gzipOk;
+    _phoneVoiceTarget = { creds, ingestUrl };
+    void _phoneVoice.tick({ wanted: ack.voiceWanted, liveId: sentLiveId, rows: jsonBlob.commentTimelineMirror?.rows });
     recordLiveviewPublishOutcome({ ok: true, httpStatus: res.status, at: Date.now() });
     persistLiveviewPublishOutcome({ ok: true, httpStatus: res.status, liveId: sentLiveId });
     // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。

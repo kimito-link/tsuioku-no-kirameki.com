@@ -36,8 +36,44 @@
 
 /** web_stale と判定される既定閾値(parityVerdict.js の DEFAULT_FRESH_MS と揃える)。 */
 export const WEB_STALE_MS = 180_000;
-/** 自動 publish の既定間隔。web_stale 閾値より短くして「古い」判定の前に先回りする。 */
+/** 自動 publish の既定間隔。web_stale 閾値より短くして「古い」判定の前に先回りする。
+ *  ★v0.1.1729 から「中身が前回の送信と同じとき」の生存確認の間隔(=変化が無くても最長これで1回送る)。 */
 export const DEFAULT_AUTO_PUBLISH_INTERVAL_MS = 120_000;
+/**
+ * ★v0.1.1729(スマホ化 第1段): 中身が前回の送信から【変わったとき】の最短間隔。
+ *   スマホの WEB版が「最大3分遅れて動いていないように見える」原因の片方が 120秒間隔だった。
+ *   変化があるときだけ 20秒まで縮め、変化が無いときは 120秒のまま(通信量を増やさない)。
+ *   送信担当の描き直しは、スマホが開いていなければ10秒周期(statusRefreshInterval.js)なので、これより短くしても意味が無い。
+ */
+export const CHANGED_AUTO_PUBLISH_INTERVAL_MS = 20_000;
+/**
+ * ★v0.1.1736(速さ 第2段): スマホが開いている間(サーバーの目印・30秒)は、中身が変わったら5秒で送る。
+ *   送信担当もその間は5秒ごとに描き直す(statusRefreshInterval.js shouldRunPublisherTick)。誰も見ていなければ20秒のまま。
+ */
+export const VIEWER_ACTIVE_PUBLISH_INTERVAL_MS = 5_000;
+/**
+ * v0.1.1738: 「スマホで開いている」を覚えておく長さ。中身が変わらないと送信は120秒ごとなので、
+ *   サーバーの目印(30秒)のままだと30秒で速い送信が切れていた。次の送信の返事が来るまで持つよう 150秒。
+ *   閉じたら、その後の送信の返事(viewerActive:false)ですぐ解除する。
+ */
+export const VIEWER_ACTIVE_STICKY_MS = 150_000;
+
+/**
+ * v0.1.1738: 送信の返事から「スマホで開いている期限」と「gzip で送ってよいか」を決める。
+ *   古いサーバーは viewerActive / gzipOk を返さない=どちらも false 扱い(gzip を解けないサーバーに送らない)。
+ * @param {unknown} ack POST の返事(JSON)
+ * @param {number} nowMs
+ *   v0.1.1740: voiceWanted=スマホで 🗣(読み上げ)が ON。古いサーバーは返さない=声を作らない。
+ * @returns {{ viewingUntilMs: number, gzipOk: boolean, voiceWanted: boolean }}
+ */
+export function readPublishAck(ack, nowMs) {
+  const a = ack && typeof ack === 'object' ? /** @type {Record<string, unknown>} */ (ack) : {};
+  return {
+    viewingUntilMs: a.viewerActive === true ? (Number(nowMs) || 0) + VIEWER_ACTIVE_STICKY_MS : 0,
+    gzipOk: a.gzipOk === true,
+    voiceWanted: a.voiceWanted === true
+  };
+}
 
 /**
  * @param {{
@@ -49,13 +85,18 @@ export const DEFAULT_AUTO_PUBLISH_INTERVAL_MS = 120_000;
  *   everSent?: boolean,         // 過去に一度でも送信したか
  *   lastSentAtMs?: number,      // 前回送信時刻(ms)。0/未定義なら未送信扱い
  *   nowMs?: number,
- *   intervalMs?: number         // 自動送信の最短間隔(既定 DEFAULT_AUTO_PUBLISH_INTERVAL_MS)
+ *   intervalMs?: number,        // 中身が同じときの間隔(既定 DEFAULT_AUTO_PUBLISH_INTERVAL_MS)
+ *   changed?: boolean,          // ★v0.1.1729 中身が前回の送信から変わったか(true のときだけ短い間隔)
+ *   changedIntervalMs?: number, // 中身が変わったときの間隔(既定 CHANGED_AUTO_PUBLISH_INTERVAL_MS)
+ *   failStreak?: number         // ★v0.1.1729 自動送信が続けて失敗した回数(0=直近は成功)
  * }} input
  * @returns {{ publish: boolean, reason: string }}
  */
 export function shouldAutoPublish(input) {
   const a = input && typeof input === 'object' ? input : {};
   const intervalMs = Number(a.intervalMs) > 0 ? Number(a.intervalMs) : DEFAULT_AUTO_PUBLISH_INTERVAL_MS;
+  const changedIntervalMs =
+    Number(a.changedIntervalMs) > 0 ? Number(a.changedIntervalMs) : CHANGED_AUTO_PUBLISH_INTERVAL_MS;
   const nowMs = Number(a.nowMs) || 0;
 
   // ★最優先ゲート: 明示同意が無ければ、他の条件が何であれ送らない(既定OFF)。
@@ -75,8 +116,25 @@ export function shouldAutoPublish(input) {
 
   const ageMs = nowMs - lastAt;
   if (ageMs >= intervalMs) return { publish: true, reason: 'interval_elapsed' };
+  // ★v0.1.1729: 中身が変わっていれば短い間隔で送る(`=== true` のみ。不明は「同じ」側=送りすぎない)。
+  //   続けて失敗しているときは 20→40→80→120秒 と広げる(サーバーが落ちているときに20秒おきに叩き続けない)。
+  if (a.changed === true && ageMs >= changedIntervalWithBackoff(changedIntervalMs, intervalMs, a.failStreak)) {
+    return { publish: true, reason: 'changed' };
+  }
 
   return { publish: false, reason: 'fresh_enough' };
+}
+
+/**
+ * ★v0.1.1729: 中身が変わったときの間隔に、失敗の連続回数ぶんの待ちを足す(倍々・上限は生存確認の間隔)。
+ * @param {number} changedIntervalMs
+ * @param {number} intervalMs
+ * @param {unknown} failStreak
+ * @returns {number}
+ */
+export function changedIntervalWithBackoff(changedIntervalMs, intervalMs, failStreak) {
+  const n = Number(failStreak) > 0 ? Math.min(Math.floor(Number(failStreak)), 10) : 0;
+  return Math.min(changedIntervalMs * 2 ** n, intervalMs);
 }
 
 /**

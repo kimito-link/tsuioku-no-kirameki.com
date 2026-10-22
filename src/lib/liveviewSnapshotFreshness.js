@@ -77,5 +77,6 @@ export function formatSnapshotStalenessBanner(ev) {
   if (!e || e.fresh || !e.hasTimestamp || e.ageMs == null) return '';
   const sec = Math.round(e.ageMs / 1000);
   const ago = sec < 90 ? `${sec}秒前` : `${Math.round(sec / 60)}分前`;
-  return `この画面は${ago}の状態です。最新にするには PC 側で「🌐このURLをWEBでも公開する」をもう一度押してください。`;
+  // ★v0.1.1729: 送信は自動(同意済みなら配信中ずっと)になったので、ボタンを押す案内ではなく「止まっている可能性」を伝える。
+  return `この画面は${ago}の状態です。PC 側の送信が止まっている可能性があります(サイドパネルを閉じた・PC がスリープした・配信を閉じた など)。`;
 }
