@@ -23,13 +23,13 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **拡張 ID（公開版/CWS）**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **拡張 ID（開発版/unpacked・恒久固定）**: `ohifblceplfkfajfecaoaclmkiahfflm`
   （v0.1.1529 で manifest に `key` を追加して固定。以前はフォルダパス由来で不安定（旧 `edpellgokebgpjboflekdmmlnjgajnfn`）＝リロード固着の一因だった。`key` の公開鍵は秘密でないので git 管理。CRX秘密鍵 `dev-extension.pem` は gitignore 済＝コミットしない。提出版には `stage-submission.py` が `key` を落とす。`scripts/check-chrome-load-path.mjs` がこの恒久IDを参照する）
-- **公開中**: **0.1.7**（2026-04-23 提出 / 2026-04-29 公開）
-- **直近提出**: **0.1.102**（2026-05-01 23 時台 / 自動公開 ON / 審査結果は要確認）
-- **次回提出準備済**: **0.1.663**（2026-06-08 ZIP 生成済: `build/tsuioku-no-kirameki-0.1.663.zip` / localhost・開発識別子 除去済 / 説明文・権限理由 反映済 / ダッシュボード貼り付け＋提出はユーザー手動）
-- **ローカル開発**: `feature/broadcaster-reputation-check` ブランチで **v0.1.663** まで進行中（2026-06-08 時点）
+- **公開中**: **0.1.1728**（2026-10-21 `cws-publish.mjs --publish` で提出→同日通過・公開。権限は前回 0.1.1473 と同一）
+- **前回公開**: 0.1.1473（2026-08-22）
+- **審査状況の確認**: v1.1 API は審査状態を返さない（`projection=DRAFT` のみ）・v2 fetchStatus は現在の認証では 403。公開ストアページの「バージョン」表示で確認する
+- **提出履歴・ストア掲載文の正本**: [docs/releases/cws-store-listing.md](docs/releases/cws-store-listing.md) 冒頭（★ここの版番号は提出のたびに更新する）
 - **CWS Developer Dashboard 入力の正本**: [docs/releases/cws-submission-texts.md](docs/releases/cws-submission-texts.md)
   - 提出時に毎回そこから貼り直す運用（再構築コスト削減）
-- **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost`/`127.0.0.1` は提出版から除外）
+- **ホスト権限（提出版）**: `https://*.nicovideo.jp/*`・`https://app.tsuioku-no-kirameki.com/*`（WEBで共有・既定OFF）・`https://suggestqueries.google.com/*`（評判チェック）・`http://127.0.0.1:50021/*`（VOICEVOX）。開発用 `localhost`/`127.0.0.1:3456` は `stage-submission.py` が除外
 ### ★提出は「全自動」（AI も人間もここを最初に読むこと）
 
 **Chrome Web Store への提出は、審査送信までコマンド1本で完了する。**
