@@ -3712,5 +3712,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1738', metric: 'cross-checked-claims', value: 36,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'v0.1.1735〜1737 を別の目(Grok)で点検し、実コードで裏取りした4件を直した版。'
+  }),
+  Object.freeze({
+    version: '0.1.1739', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB は丸めの揺れ。会場モードの係は WEB版(app/live-view-venue.js)だけに入り、popup には入らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1739', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1739', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '模擬サーバー+スマホ幅のブラウザで、開いた瞬間は吹き出さない→コメントで吹き出し・ギフトで真ん中に品名を画面で確認。'
   })
 ]);
