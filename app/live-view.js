@@ -1048,6 +1048,9 @@ function bootstrap() {
       paintCommentTimelineMirror(_lastTimelineSnap);
     }, Math.max(1000, Number(ms) || 0) + 600);
     paintCommentTimelineMirror(_lastTimelineSnap);
+    // v0.1.1751: 声が鏡より先に届いた(鏡は5秒ごと・声は3秒ごと)=その場で鏡を取り直す。
+    //   PC は鏡を送ってから声を作るので、取り直せば必ず載っている(実機で欄の一致が17回中7回だった)。
+    if (!pickSpokenTickerRow(restoreCommentTimelineRows(_lastTimelineSnap), _spokenNo)) refresh(token).catch(() => {});
   });
   bootWithSnapshot(token).catch((err) => {
     showError('通信エラー: ' + String((err && err.message) || err));

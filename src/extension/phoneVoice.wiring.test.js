@@ -66,6 +66,11 @@ describe('配線: 会場の吹き出しを読み上げの声に合わせる(v0.1
     expect(liveView).toContain('const latest = spoken || picked.entry || rows[rows.length - 1];');
     expect(liveView).toMatch(/_voice\.onPlay\(\(no, ms\) => \{\s*_spokenNo = String\(no \|\| ''\);/);
   });
+  it('★v0.1.1751: 声が鏡より先に届いたら、鏡を取り直し・吹き出しは鏡に来た瞬間に出す(15秒待たせない)', () => {
+    expect(liveView).toContain('if (!pickSpokenTickerRow(restoreCommentTimelineRows(_lastTimelineSnap), _spokenNo)) refresh(token).catch(() => {});');
+    expect(venue).toContain('playedEarly.set(String(no), Date.now() + Math.max(0, Number(durationMs) || 0));');
+    expect(venue).toContain('} else if (ev.no && playedEarly.has(ev.no)) {');
+  });
   it('★「読み上げ」ボタンの説明文もスマホの読み上げに合わせる', () => {
     expect(voiceSrc).toContain("popupBtn.setAttribute('aria-label', l.aria);");
   });

@@ -192,3 +192,25 @@ export function restoreTimelineItemsForHtml(snap) {
   items.reverse();
   return /** @type {any} */ (items);
 }
+
+/**
+ * v0.1.1753: 保存済みの鏡のほうが新しければ、書こうとしている鏡で上書きしない(古い中身の巻き戻し防止)。
+ *   ★なぜ: この鏡は content(視聴タブの手元の最新N件)と popup(鏡バンドルの flush)の2か所が同じキーに書く。
+ *   popup の合流バッファは鏡が変わらなくても15秒ごとに書き直すため、popup 側が配信の最初の頃(1件・no 75)で
+ *   止まっていると、content が書いた新しい鏡(30件・no 509→523)を交互に古い物へ戻していた
+ *   (2026-10-22 実機: スマホ会場の席が約2分半0になった。サーバーの中身を10秒ごとに見て、2種類が交互に入るのを確認)。
+ *   同じ配信で保存済みの capturedAt が新しいときだけ書かない。配信が違う・形が読めないときは従来どおり書く。
+ * @param {unknown} stored 今 storage にある鏡
+ * @param {unknown} next 書こうとしている鏡
+ * @returns {boolean} true=書かない
+ */
+export function isStoredTimelineMirrorNewer(stored, next) {
+  if (!stored || typeof stored !== 'object' || !next || typeof next !== 'object') return false;
+  const s = /** @type {Record<string, unknown>} */ (stored);
+  const n = /** @type {Record<string, unknown>} */ (next);
+  const sLive = String(s.liveId || '').trim().toLowerCase();
+  if (!sLive || sLive !== String(n.liveId || '').trim().toLowerCase()) return false;
+  const sAt = Number(s.capturedAt) || 0;
+  const nAt = Number(n.capturedAt) || 0;
+  return sAt > 0 && nAt > 0 && sAt > nAt;
+}

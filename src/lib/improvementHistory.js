@@ -3868,6 +3868,48 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '30日窓の数え方で前版+1。今回は新しい配線テストを、呼び出しを消した変異で赤になることを確かめてから採用した。'
   }),
   Object.freeze({
+    version: '0.1.1751', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは WEB版(app/live-view.js・live-view-venue.js)だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1751', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1751', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '模擬サーバーで声と鏡を同時に足す競争を6回: 直す前は欄4/6・吹き出し2/6、直した後は6/6・6/6(Android 実測は欄7/17)。'
+  }),
+  Object.freeze({
+    version: '0.1.1752', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは送る前の絞り込み(deviceAuth.js)だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1752', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1752', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '拡張側(送る前)とサーバー側(保存前)の両方で同じ関数が絞る=古い拡張から来ても他の配信は残らない。単体テストで固定。'
+  }),
+  Object.freeze({
+    version: '0.1.1753', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB。popup の鏡の書き込み前に、保存済みのコメント鏡が新しいかを1回読むだけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1753', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1753', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '原因は実機でサーバーの中身を10秒ごとに見た結果(2種類が交互)と、コード読み(content と popup の2か所が同じキーに書く・popup は15秒ごとに書き直す)が一致。'
+  }),
+  Object.freeze({
     version: '0.1.1754', metric: 'bundle-kb', value: 1443,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
     note: '変化なし。遅れの一言は会場(venue.js)とコメビュ(comeview.js)だけで、popup には入らない。'

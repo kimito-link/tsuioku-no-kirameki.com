@@ -347,6 +347,7 @@
 | `src/lib/liveEndedFlag.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/liveLaneBuckets.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/liveRankingView.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
+| `src/lib/liveviewCurrentLive.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/memoryPressureProbe.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/metricConfidence.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/milestoneEffectDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -744,6 +745,7 @@
 | `src/lib/migrateSuggestInitialInlinePanelPlacement.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/mirrorBundle.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mirrorBundleFlushScheduler.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/mirrorPayloadWrite.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mirrorSanitize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/nameplateToggleBoot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/nameplateToggleFinder.js` | 1 | 記録エンジン(watchページ常駐) |

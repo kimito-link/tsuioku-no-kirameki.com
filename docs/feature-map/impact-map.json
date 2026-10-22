@@ -2836,6 +2836,18 @@
       ]
     },
     {
+      "file": "src/lib/liveviewCurrentLive.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/memoryPressureProbe.js",
       "featureCount": 2,
       "features": [
@@ -6975,6 +6987,16 @@
     },
     {
       "file": "src/lib/mirrorBundleFlushScheduler.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/mirrorPayloadWrite.js",
       "featureCount": 1,
       "features": [
         "popup"

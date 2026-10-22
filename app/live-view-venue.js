@@ -103,6 +103,12 @@ export function createPhoneVenue() {
   /** v0.1.1742: 読み上げ(🗣)が鳴っているか。鳴っている間はコメントの吹き出しを声に合わせる。 */
   /** @type {() => boolean} */
   let voiceActive = () => false;
+  /**
+   * v0.1.1751: 声がコメント鏡より先に届いた番号(番号 → 声が終わる時刻)。スマホは声を3秒ごと・鏡を5秒ごとに
+   *   取るので、声が先に鳴ることがある。そのとき吹き出しを15秒待たせず、鏡に来た瞬間に出す(実機で6個が一度に出ていた)。
+   * @type {Map<string, number>}
+   */
+  const playedEarly = new Map();
   /** 声を待っている吹き出し(コメント番号 → 出す内容と、声が来なかったときの保険のタイマー)。 */
   /** @type {Map<string, { personKey: string, text: string, timer: any }>} */
   const waitingVoice = new Map();
@@ -260,6 +266,7 @@ export function createPhoneVenue() {
       giftQueue.length = 0;
       for (const w of waitingVoice.values()) clearTimeout(w.timer);
       waitingVoice.clear();
+      playedEarly.clear();
       void holdScreen(false);
     },
     /** v0.1.1742: 読み上げが鳴っているかを教える口。 @param {() => boolean} fn */
@@ -273,7 +280,12 @@ export function createPhoneVenue() {
      */
     onVoicePlay(no, durationMs = 0) {
       const w = waitingVoice.get(String(no));
-      if (!w) return;
+      if (!w) {
+        // 鏡にまだ無い番号=声が先に来た。鏡に来たら残りの長さで出す。
+        playedEarly.set(String(no), Date.now() + Math.max(0, Number(durationMs) || 0));
+        while (playedEarly.size > 50) playedEarly.delete(/** @type {string} */ (playedEarly.keys().next().value));
+        return;
+      }
       clearTimeout(w.timer);
       waitingVoice.delete(String(no));
       if (isOpen()) bubble(w.personKey, w.text, Math.max(BUBBLE_MS, (Number(durationMs) || 0) + VOICE_TAIL_MS));
@@ -290,6 +302,11 @@ export function createPhoneVenue() {
           const pt = ev.point > 0 ? ` (${ev.point.toLocaleString('ja-JP')}pt)` : '';
           giftQueue.push({ item: ev.itemName || 'ギフト', who: `${ev.name || '名無し'} さんから${pt}`, tier: tierFromPoints(ev.point) });
           bounce(ev.personKey); // 品名は真ん中に大きく出すので、席は跳ねるだけ(吹き出しを重ねない)
+        } else if (ev.no && playedEarly.has(ev.no)) {
+          // 声はもう鳴った(鳴っている)=待たずに出す。声が残っていればその分まで残す。
+          const left = /** @type {number} */ (playedEarly.get(ev.no)) - Date.now();
+          playedEarly.delete(ev.no);
+          bubble(ev.personKey, ev.text, Math.max(BUBBLE_MS, left + VOICE_TAIL_MS));
         } else if (ev.no && voiceActive()) {
           // 声は PC が作って届くまで数秒遅れる=吹き出しは声が鳴った瞬間に出す。声が来なければ保険で出す。
           const timer = setTimeout(() => {
