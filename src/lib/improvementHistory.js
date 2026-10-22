@@ -3922,5 +3922,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1754', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日窓の数え方で前版+1。今回は文言の「8秒」を voiceAgeGate の実際の基準(VOICE_STALE_MS_NORMAL)とテストで突き合わせた(§12.7)。'
+  }),
+  Object.freeze({
+    version: '0.1.1755', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。変更はサーバー(api/status.js)と判定(deviceAuth.js)だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1755', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1755', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '上限は判定の単体テストと、模擬 Redis を使った受け口のテスト(2人目が 429・Retry-After 120)の両方で固定。'
   })
 ]);

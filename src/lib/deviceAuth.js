@@ -32,6 +32,16 @@ export const DEFAULT_DEVICE_DAILY_LIMIT = 12_000;
 export const VIEWER_ACTIVE_TTL_SEC = 30;
 /** 全体の1日の書き込み上限の既定(env STATUS_GLOBAL_DAILY_LIMIT で上書き)。超えたら全員を生存確認の間隔に落とす。 */
 export const DEFAULT_GLOBAL_DAILY_LIMIT = 200_000;
+/**
+ * v0.1.1755: 全体の【月】の書き込み上限の既定(env STATUS_GLOBAL_MONTHLY_LIMIT で上書き)。
+ *   ★費用の天井(設計書 design-3 §8: 月$50〜70)。1回の書き込みで Upstash を約9コマンド使う
+ *   (鍵の照合・上限3つの INCR・本体と ETag の SET・期限の延長・スマホの目印2つ)。
+ *   200万回 × 9 = 1,800万コマンド ≒ 月$36(従量 $0.2/10万)。残りを読み取り(スマホの取りに行く分)と通信量に残す。
+ *   1日の上限(20万回)を30日続けると600万回=月の上限が先に効く。超えたら全員を生存確認の間隔に落とす(1日の上限と同じ)。
+ */
+export const DEFAULT_GLOBAL_MONTHLY_LIMIT = 2_000_000;
+/** 月の数え直しのキーの寿命(秒)。月をまたいでも残るよう40日。 */
+export const MONTH_QUOTA_TTL_SECONDS = 40 * 24 * 60 * 60;
 /** 発行(register)の乱発対策: 送信元ごとの1時間あたりの回数。 */
 export const DEFAULT_REGISTER_HOURLY_LIMIT = 5;
 /** 上限に当たったときに拡張へ伝える「次に送るまでの秒数」(拡張の生存確認の間隔=120秒と揃える)。 */
@@ -52,6 +62,11 @@ export function utcDay(nowMs) {
   return new Date(nowMs).toISOString().slice(0, 10).replace(/-/g, '');
 }
 
+/** UTC の年月(YYYYMM)。月の上限の区切り。 @param {number} nowMs */
+export function utcMonth(nowMs) {
+  return new Date(nowMs).toISOString().slice(0, 7).replace(/-/g, '');
+}
+
 /** UTC の日付+時(YYYYMMDDHH)。 @param {number} nowMs */
 export function utcHour(nowMs) {
   return new Date(nowMs).toISOString().slice(0, 13).replace(/[-T]/g, '');
@@ -65,6 +80,8 @@ export const deviceKeys = {
   deviceQuota: (id, nowMs) => `quota:dev:${id}:${utcDay(nowMs)}`,
   /** @param {number} nowMs */
   globalQuota: (nowMs) => `quota:all:${utcDay(nowMs)}`,
+  /** v0.1.1755: 全体の月の書き込み回数。 @param {number} nowMs */
+  globalMonthQuota: (nowMs) => `quota:allm:${utcMonth(nowMs)}`,
   /** @param {string} who 送信元のハッシュ @param {number} nowMs */
   registerRate: (who, nowMs) => `rl:reg:${who}:${utcHour(nowMs)}`,
   /** @param {string} token */
@@ -107,18 +124,22 @@ export function hexEqual(a, b) {
 }
 
 /**
- * 1日の上限の判定。INCR した【後】の値で判定する(超えた1回目から断る)。
- * @param {{ deviceCount: number, deviceLimit?: number, globalCount: number, globalLimit?: number }} a
- * @returns {{ allow: boolean, reason: 'ok' | 'device_quota' | 'global_quota', globalWarn: boolean }}
+ * 上限の判定(利用者の1日・全体の1日・全体の月)。INCR した【後】の値で判定する(超えた1回目から断る)。
+ *   monthCount を渡さない古い呼び出しは月の判定を飛ばす(0 扱い)。
+ * @param {{ deviceCount: number, deviceLimit?: number, globalCount: number, globalLimit?: number, monthCount?: number, monthLimit?: number }} a
+ * @returns {{ allow: boolean, reason: 'ok' | 'device_quota' | 'global_quota' | 'global_month_quota', globalWarn: boolean }}
  */
 export function quotaVerdict(a) {
   const deviceLimit = Number(a.deviceLimit) > 0 ? Number(a.deviceLimit) : DEFAULT_DEVICE_DAILY_LIMIT;
   const globalLimit = Number(a.globalLimit) > 0 ? Number(a.globalLimit) : DEFAULT_GLOBAL_DAILY_LIMIT;
+  const monthLimit = Number(a.monthLimit) > 0 ? Number(a.monthLimit) : DEFAULT_GLOBAL_MONTHLY_LIMIT;
   const d = Number(a.deviceCount) || 0;
   const g = Number(a.globalCount) || 0;
-  const globalWarn = g >= globalLimit * 0.8;
+  const m = Number(a.monthCount) || 0;
+  const globalWarn = g >= globalLimit * 0.8 || m >= monthLimit * 0.8;
   if (d > deviceLimit) return { allow: false, reason: 'device_quota', globalWarn };
   if (g > globalLimit) return { allow: false, reason: 'global_quota', globalWarn };
+  if (m > monthLimit) return { allow: false, reason: 'global_month_quota', globalWarn };
   return { allow: true, reason: 'ok', globalWarn };
 }
 

@@ -8,6 +8,7 @@ import {
   isValidWriteKey,
   parseDeviceRecord,
   quotaVerdict,
+  utcMonth,
   stripDeviceBody,
   utcDay,
   utcHour
@@ -54,6 +55,18 @@ describe('deviceAuth(スマホ版の利用者ごとの鍵・v0.1.1730)', () => {
     expect(quotaVerdict({ deviceCount: 1, globalCount: 11, globalLimit: 10 })).toMatchObject({ allow: false, reason: 'global_quota' });
     expect(quotaVerdict({ deviceCount: 1, globalCount: 8, globalLimit: 10 })).toMatchObject({ allow: true, globalWarn: true });
     expect(quotaVerdict({ deviceCount: 1, globalCount: 7, globalLimit: 10 }).globalWarn).toBe(false);
+  });
+  it('★v0.1.1755: 全体の月の上限(既定200万回)を超えたら断る・8割で警告・渡さなければ月は見ない', () => {
+    expect(quotaVerdict({ deviceCount: 1, globalCount: 1, monthCount: 2_000_000 }).allow).toBe(true);
+    expect(quotaVerdict({ deviceCount: 1, globalCount: 1, monthCount: 2_000_001 })).toMatchObject({ allow: false, reason: 'global_month_quota' });
+    expect(quotaVerdict({ deviceCount: 1, globalCount: 1, monthCount: 8, monthLimit: 10 })).toMatchObject({ allow: true, globalWarn: true });
+    expect(quotaVerdict({ deviceCount: 1, globalCount: 1 })).toMatchObject({ allow: true, globalWarn: false });
+    expect(quotaVerdict({ deviceCount: 13_000, globalCount: 1, monthCount: 99, monthLimit: 10 }).reason).toBe('device_quota');
+  });
+  it('月の区切りは UTC の年月・キーは月ごとに別', () => {
+    expect(utcMonth(Date.UTC(2026, 9, 31, 23, 59))).toBe('202610');
+    expect(utcMonth(Date.UTC(2026, 10, 1, 0, 0))).toBe('202611');
+    expect(deviceKeys.globalMonthQuota(Date.UTC(2026, 9, 22))).toBe('quota:allm:202610');
   });
   it('★利用者経由の送信からは診断の全文と v を落とす(元の物は変えない)', () => {
     const body = { v: 'x', statusReport: 'long', fastDiag: {}, overview: 'o', supportersParity: {}, northStarMirror: { a: 1 } };
