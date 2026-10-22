@@ -23,8 +23,9 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **拡張 ID（公開版/CWS）**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **拡張 ID（開発版/unpacked・恒久固定）**: `ohifblceplfkfajfecaoaclmkiahfflm`
   （v0.1.1529 で manifest に `key` を追加して固定。以前はフォルダパス由来で不安定（旧 `edpellgokebgpjboflekdmmlnjgajnfn`）＝リロード固着の一因だった。`key` の公開鍵は秘密でないので git 管理。CRX秘密鍵 `dev-extension.pem` は gitignore 済＝コミットしない。提出版には `stage-submission.py` が `key` を落とす。`scripts/check-chrome-load-path.mjs` がこの恒久IDを参照する）
-- **公開中**: **0.1.1473**（2026-08-22 一般公開・審査送信から約1時間で通過）
-- **直近提出**: **0.1.1728**（2026-10-21 `cws-publish.mjs --publish` で審査へ提出・権限は 0.1.1473 と同一）
+- **公開中**: **0.1.1728**（2026-10-21 `cws-publish.mjs --publish` で提出→同日通過・公開。権限は前回 0.1.1473 と同一）
+- **前回公開**: 0.1.1473（2026-08-22）
+- **審査状況の確認**: v1.1 API は審査状態を返さない（`projection=DRAFT` のみ）・v2 fetchStatus は現在の認証では 403。公開ストアページの「バージョン」表示で確認する
 - **提出履歴・ストア掲載文の正本**: [docs/releases/cws-store-listing.md](docs/releases/cws-store-listing.md) 冒頭（★ここの版番号は提出のたびに更新する）
 - **CWS Developer Dashboard 入力の正本**: [docs/releases/cws-submission-texts.md](docs/releases/cws-submission-texts.md)
   - 提出時に毎回そこから貼り直す運用（再構築コスト削減）
