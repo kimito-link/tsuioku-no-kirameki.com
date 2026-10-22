@@ -25,7 +25,7 @@ Chrome Web Store の「ストアの掲載情報 → 詳細な説明」に貼り�
 "このPCの中だけに" 静かに記録して、あとから眺められるように整理してくれる
 Chrome 拡張機能です。
 
-記録はこのPCの中だけ。「WEBで共有」を自分で使ったときだけ送信します（初期状態はOFF）。
+記録はこのPCの中だけ。「📱 スマホで見る」を自分でONにしたときだけ送信します（初期状態はOFF）。
 広告も、トラッキング計測も、クラッシュレポートも、いっさい組み込んでいません。
 ただ、キミのPCの中に「きらめきの欠片」を積み重ねて、
 放送が終わったあとでも、大切な応援を眺め直せるようにするだけ。
@@ -123,7 +123,7 @@ S/A/B/C/D/E の階級で見える化（HTML レポートに表示・集計はロ
 
 ▼ 記録は、すべてこの PC のローカル保存のみ
 chrome.storage.local にだけ保存されます。
-このPC以外へ出るのは、「WEBで共有」を自分で使ったときだけです（初期状態はOFF）。
+このPC以外へ出るのは、「📱 スマホで見る」を自分でONにしたときだけです（初期状態はOFF）。
 
 ▼ 広告・行動トラッキング計測は一切ありません
 Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリは
@@ -143,7 +143,7 @@ Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリ�
 　　依頼します。インターネット上のサーバーではなく「お使いのPC自身」への通信
 　　なので、コメント本文が外部に送られることはありません。
 ・共有サーバー（app.tsuioku-no-kirameki.com）
-　… 「WEBで共有」を自分で使ったときだけ。初期状態はOFFです。
+　… 「📱 スマホで見る」を自分でONにしたときだけ。初期状態はOFFです。
 ・検索補助（suggestqueries.google.com）
 　… 配信者名などを入力したときの候補取得（入力語句のみ送信）。
 
@@ -158,7 +158,7 @@ Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリ�
 ・sidePanel … サイドパネルUI表示
 ・offscreen … 大量コメントを安定して保存（ローカル保存の集約）
 ・host_permissions（*.nicovideo.jp） … コメント取得の対象をニコ生ドメインに限定
-・host_permissions（app.tsuioku-no-kirameki.com） … 「WEBで共有」を使ったときの
+・host_permissions（app.tsuioku-no-kirameki.com） … 「📱 スマホで見る」をONにしたときの
 　送信先（初期状態はOFF）
 ・host_permissions（suggestqueries.google.com） … 入力補助の候補取得
 ・host_permissions（127.0.0.1:50021） … 読み上げ ON 時のみ、このPC内の

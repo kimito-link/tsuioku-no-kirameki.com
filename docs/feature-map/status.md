@@ -5,8 +5,8 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_LIVEVIEW_PUBLISH_PAYLOAD`, `KEY_SHARE_KEYS_SEEDED`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_WEB_PUBLISH_OPT_IN`
-- 読むキー: `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_POST_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_OP_SOUND_EFFECT_DIAG`, `KEY_REPORT_PREVIEW`, `KEY_SHARE_KEYS_SEEDED`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_WEB_PUBLISH_OPT_IN`, `nls_last_auto_tab_reload`
+- 書くキー: `KEY_LIVEVIEW_PUBLISH_PAYLOAD`, `KEY_SHARE_KEYS_SEEDED`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_DEVICE_CRED`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_WEB_PUBLISH_OPT_IN`
+- 読むキー: `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_POST_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_OP_SOUND_EFFECT_DIAG`, `KEY_REPORT_PREVIEW`, `KEY_SHARE_KEYS_SEEDED`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_DEVICE_CRED`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_WEB_PUBLISH_OPT_IN`, `nls_last_auto_tab_reload`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -15,6 +15,8 @@ graph LR
   n_status["状態速報ページ"]
   n_status --> n_src_domain_observations_vocabulary_js["domain/observations/vocabulary.js"]
   n_status --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
+  n_status --> n_src_extension_statusDeviceCred_js["extension/statusDeviceCred.js"]
+  n_status --> n_src_extension_statusSmartphoneCard_js["extension/statusSmartphoneCard.js"]
   n_status --> n_src_lib_adMessageLines_js["lib/adMessageLines.js"]:::shared
   n_status --> n_src_lib_adObservationLog_js["lib/adObservationLog.js"]:::shared
   n_status --> n_src_lib_aiShareFullText_js["lib/aiShareFullText.js"]
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_commentTimelineMirrorKey_js["lib/commentTimelineMirrorKey.js"]:::shared
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
-  n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
-  n_status --> n_src_lib_currentLiveIdOrigin_js["lib/currentLiveIdOrigin.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 138 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 142 ファイル省略（全件は storage-bus.md / metafile 参照）。

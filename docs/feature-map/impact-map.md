@@ -316,6 +316,8 @@
 | `src/lib/concurrentCalibrationLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/consoleErrorBuffer.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/crowdRasterizer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/deviceAuth.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/devicePublishCredentials.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/diagFlushThrottle.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/diagSchemaCopy.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/eventScoreRankingRelay.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -376,6 +378,7 @@
 | `src/lib/statCardsMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/statusFastDiagLite.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/statusFormat.js` | 2 | 状態速報ページ / Web版 状態(スマホ) |
+| `src/lib/statusPublisherPlan.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/storageErrorState.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneRenderProbe.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/supportActivityTimeline.js` | 2 | コメビュ(別窓) / ポップアップ(応援レーン) |
@@ -449,6 +452,9 @@
 | `src/extension/popup/report/htmlReportDocument.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireLaneUserDetailOpen.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/status-entry.js` | 1 | 状態速報ページ |
+| `src/extension/statusDeviceCred.js` | 1 | 状態速報ページ |
+| `src/extension/statusPublisherHost.js` | 1 | ポップアップ(応援レーン) |
+| `src/extension/statusSmartphoneCard.js` | 1 | 状態速報ページ |
 | `src/extension/venue-entry.js` | 1 | 会場モード(standalone) |
 | `src/lib/acquisitionDashboardChart.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/adLanePicksFromRooms.js` | 1 | ポップアップ(応援レーン) |
@@ -873,7 +879,6 @@
 | `src/lib/statusExtrasBatch.js` | 1 | 状態速報ページ |
 | `src/lib/statusMindmapModel.js` | 1 | 状態速報ページ |
 | `src/lib/statusMindmapSignature.js` | 1 | 状態速報ページ |
-| `src/lib/statusPublisherPlan.js` | 1 | 状態速報ページ |
 | `src/lib/statusReadPolicy.js` | 1 | 状態速報ページ |
 | `src/lib/statusRefreshBackoff.js` | 1 | 状態速報ページ |
 | `src/lib/statusRefreshInterval.js` | 1 | 状態速報ページ |

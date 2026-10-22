@@ -97,7 +97,7 @@ describe('formatSnapshotStalenessBanner', () => {
   it('古ければ経過つきバナー(秒)', () => {
     const s = formatSnapshotStalenessBanner({ fresh: false, hasTimestamp: true, ageMs: 75 * 1000 });
     expect(s).toContain('75秒前');
-    expect(s).toContain('もう一度押してください');
+    expect(s).toContain('PC 側の送信が止まっている可能性');
   });
 
   it('古ければ経過つきバナー(分)', () => {
