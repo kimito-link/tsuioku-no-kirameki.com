@@ -3866,5 +3866,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1750', metric: 'cross-checked-claims', value: 37,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日窓の数え方で前版+1。今回は新しい配線テストを、呼び出しを消した変異で赤になることを確かめてから採用した。'
+  }),
+  Object.freeze({
+    version: '0.1.1752', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。遅れの一言は会場(venue.js)とコメビュ(comeview.js)だけで、popup には入らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1752', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1752', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日窓の数え方で前版+1。今回は文言の「8秒」を voiceAgeGate の実際の基準(VOICE_STALE_MS_NORMAL)とテストで突き合わせた(§12.7)。'
   })
 ]);
