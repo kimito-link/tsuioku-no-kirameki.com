@@ -250,6 +250,33 @@ export async function isVoicevoxAlive(opts = {}) {
 }
 
 /**
+ * P3 下準備(2026-10-22・まだどこからも呼ばない): 声のモデルを先に読み込む(VOICEVOX の /initialize_speaker)。
+ *   初めて使う声は合成の前にモデル読み込みが走り、ノートPCでは7.7秒かかった(計画書 2-1)。
+ *   読み上げ ON の直後に、使う声だけ裏で読み込んでおくための口。失敗しても読み上げは続ける(false を返すだけ)。
+ * @param {number} styleId
+ * @param {{ fetchFn?: FetchFn, baseUrl?: string, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function initializeVoicevoxSpeaker(styleId, opts = {}) {
+  const id = Number(styleId);
+  if (!Number.isInteger(id) || id < 0) return false;
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  if (typeof fetchFn !== 'function') return false;
+  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  try {
+    const response = await fetchWithTimeout(
+      fetchFn,
+      `${baseUrl}/initialize_speaker?speaker=${id}&skip_reinit=true`,
+      { method: 'POST' },
+      positiveTimeout(opts.timeoutMs, 30000)
+    );
+    return !!response && response.ok !== false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * VOICEVOX のスタイル名が「ささやき声」系か判定する純関数。
  * ユーザー方針(2026-06-13)「ささやくような声は入れない方がいい」: ささやき/ウィスパー系は
  *   小さく聞き取りにくいので読み上げの声候補から外す。
