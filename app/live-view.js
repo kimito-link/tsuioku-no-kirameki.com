@@ -104,6 +104,7 @@ import { isLiveSwitched, pickLiveForCard, pickSnapshotLiveId } from '../src/lib/
 import { createPhonePostClient, mountPhonePostUi, takePostKey } from './live-view-post.js';
 // v0.1.1737: ギフトの効果音(右下の 🔇/🔊・既定は音なし)。拡張の会場モードと同じ音を、増えたギフトの金額帯で選ぶ。
 import { createPhoneSoundPlayer, mountPhoneSoundUi } from './live-view-sound.js';
+import { createPhoneVenue, mountPhoneVenueUi } from './live-view-venue.js';
 import {
   evaluateSnapshotFreshness,
   formatSnapshotStalenessBanner
@@ -126,6 +127,8 @@ const SNAPSHOT_NOT_MODIFIED = Symbol('not-modified');
 let _postClient = null;
 /** v0.1.1737: ギフトの効果音。 */
 const _soundPlayer = createPhoneSoundPlayer();
+/** v0.1.1739: かんたん会場モード(🎪)。 */
+const _venue = createPhoneVenue();
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
 const MIRROR_FRESH_MS = 3 * 60 * 1000;
 
@@ -691,6 +694,8 @@ function paintAllMirrors(jsonBlob) {
   if (_postClient) _postClient.updateSeen(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null));
   // v0.1.1737: 増えたギフトがあれば効果音(音なしのときは覚えるだけ=ONにした瞬間に過去分は鳴らない)。
   try { _soundPlayer.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 音は閲覧を止めない */ }
+  // v0.1.1739: かんたん会場モード(閉じている間も「見た」ことは覚える=開いた瞬間に一斉に吹き出さない)。
+  try { _venue.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 会場は閲覧を止めない */ }
   // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // ③WEB投げ一覧丸写し(第2号): 北極星 giftHistory レーン(貢献者 strip + 投げ明細テーブル)を描く。
@@ -814,6 +819,7 @@ async function bootWithSnapshot(token) {
     // v0.1.1734: 本物の入力欄の上に「PC とつながっているか」の帯、下に自分のコメントの印を付ける。
     try { mountPhonePostUi(_postClient); } catch { /* 付けられなくても閲覧は続ける */ }
     try { mountPhoneSoundUi(_soundPlayer); } catch { /* 付けられなくても閲覧は続ける */ }
+    try { mountPhoneVenueUi(_venue); } catch { /* 付けられなくても閲覧は続ける */ }
     // ★popup は生コメントデータを持たないので、応援レーン/数字カードを「空」に塗り直す。
     //   その空描画が【私の鏡 paint を上書き（clobber）する】。clobber は (a) 初回 refresh と
     //   (b) ユーザーが <details> を開く等で起きる再描画、の両方で発生する。
