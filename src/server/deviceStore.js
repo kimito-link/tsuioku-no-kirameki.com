@@ -17,6 +17,7 @@ import {
   isValidWriteKey,
   parseDeviceRecord
 } from '../lib/deviceAuth.js';
+import { phonePostKeys } from '../lib/phonePost.js';
 
 /** Upstash REST へ 1 コマンド送る。失敗時は例外。 */
 export async function upstash(command) {
@@ -96,4 +97,16 @@ export function requesterHash(req) {
   const fwd = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
   const ip = fwd || String(req.headers?.['x-real-ip'] || '') || 'unknown';
   return sha256Hex(`reg:${ip}`).slice(0, 24);
+}
+
+/**
+ * スマホからのコメント(v0.1.1734)の投稿用の鍵・待ち行列を消す。
+ *   閲覧URLの作り直し・同意 OFF(削除)のときに呼ぶ=古いURLからはコメントもできなくなる。
+ * @param {string} token 閲覧トークン
+ */
+export async function revokePhonePost(token) {
+  const prev = await upstash(['GET', phonePostKeys.owner(token)]);
+  const keys = [phonePostKeys.owner(token), phonePostKeys.queue(token), phonePostKeys.active(token)];
+  if (typeof prev === 'string' && prev) keys.push(phonePostKeys.key(prev));
+  await upstash(['DEL', ...keys]);
 }

@@ -22,6 +22,7 @@ import {
   newDeviceCredentials,
   randomToken,
   requesterHash,
+  revokePhonePost,
   saveDeviceRecord,
   upstash
 } from '../src/server/deviceStore.js';
@@ -48,6 +49,8 @@ export default async function handler(req, res) {
         return;
       }
       const viewToken = randomToken(24);
+      // v0.1.1734: スマホからコメントする鍵も古いURLに紐づく=一緒に無効にする(PC で ON にし直すと新しいURLが出る)。
+      await revokePhonePost(auth.record.v);
       // 古い閲覧URLの中身を先に消す(作り直した瞬間から古いURLは 404)。
       await upstash(['DEL', deviceKeys.latest(auth.record.v), deviceKeys.etag(auth.record.v)]);
       // writeKey は変えない(ハッシュはそのまま)=記録を直接書き換える。
@@ -85,6 +88,7 @@ export default async function handler(req, res) {
         res.status(401).json({ ok: false, error: 'unauthorized' });
         return;
       }
+      await revokePhonePost(auth.record.v);
       await upstash([
         'DEL',
         deviceKeys.latest(auth.record.v),

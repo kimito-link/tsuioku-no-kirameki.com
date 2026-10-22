@@ -395,7 +395,9 @@ export default [
     //   ★計器自身を重くしない工夫: 深さは「親の深さ+1」で求める(文書順なので親は処理済み)。
     //     親を毎回辿る版は 2,844要素で約34,000回の参照になる。上限4,000要素。
     //   判定は `src/lib/domTreeCensus.js`(純関数)。ここは採取だけ。
-    rules: { 'max-lines': ['error', { max: 21713, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1734: スマホの WEB版だけの「PC に中継して投稿する」口(+30行: 口の取り出し・送信ボタンの可否・預ける分岐・Enter 送信の無効化・起動時の配線)。
+    //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
+    rules: { 'max-lines': ['error', { max: 21743, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -439,7 +441,8 @@ export default [
     // v0.1.1731: スマホ版の利用者ごとの鍵の配線(+4行: import・起動時の読み込み・同意OFFで削除・401で鍵を捨てる)。発行・削除・判定は statusDeviceCred.js / lib の devicePublishCredentials.js。
     // v0.1.1732: 同意スイッチの描画を statusSmartphoneCard.js へ移して -11行=上限も 4546 へ下げる。
     // v0.1.1733: スマホへの送信担当(status.html?publisher=1)は document.hidden で更新を止めない(+2行)。サイドパネルを閉じても送り続けるため。
-    rules: { 'max-lines': ['error', { max: 4548, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1734: スマホから預かったコメントを投稿する係の起動・スイッチの配線・同意 OFF で止める(+5行)。本体は phonePostRelay.js。
+    rules: { 'max-lines': ['error', { max: 4553, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と
