@@ -12,6 +12,8 @@
  * @module deviceAuth
  */
 
+import { pickLiveForCard } from './liveviewCurrentLive.js';
+
 /** 利用者の鍵の形(base64url)。deviceId は16バイト=22文字・writeKey は32バイト=43文字で発行する。 */
 const DEVICE_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const WRITE_KEY_RE = /^[A-Za-z0-9_-]{32,128}$/;
@@ -130,6 +132,9 @@ export const DEVICE_DROPPED_FIELDS = Object.freeze(['statusReport', 'fastDiag', 
 /**
  * 利用者経由の送信から、保存しない欄を落とす(元の物は変えない)。
  * 共有キー経路(開発者の診断用)には使わない。
+ *   v0.1.1752: lives[] は【スマホが映す1配信だけ】に絞る(pickLiveForCard=鏡が指す配信・無ければ先頭)。
+ *   PC で同時に開いている他の配信をサーバーへ送らない=送る量と第三者情報を減らし、
+ *   リアルタイム化で「1配信=チャンネル1本」にできる(design-3-realtime-DRAFT.md の準備)。
  * @param {Record<string, unknown>} body
  * @returns {Record<string, unknown>}
  */
@@ -137,5 +142,9 @@ export function stripDeviceBody(body) {
   const out = { ...body };
   delete out.v;
   for (const k of DEVICE_DROPPED_FIELDS) delete out[k];
+  if (Array.isArray(out.lives)) {
+    const shown = pickLiveForCard(out);
+    out.lives = shown ? [shown] : [];
+  }
   return out;
 }
