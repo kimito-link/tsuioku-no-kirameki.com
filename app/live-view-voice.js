@@ -53,6 +53,9 @@ export function createPhoneVoice(a) {
   /** @type {any} */
   let timer = null;
   const listeners = new Set();
+  /** v0.1.1742: 声が鳴り始めたときに知らせる先(会場の吹き出しを声に合わせる)。v0.1.1743: 声の長さ(ms)も渡す。 */
+  /** @type {Set<(no: string, durationMs: number) => void>} */
+  const playListeners = new Set();
   const notify = () => listeners.forEach((f) => { try { f(); } catch { /* 描き直しの失敗は無視 */ } });
 
   function unlock() {
@@ -88,6 +91,7 @@ export function createPhoneVoice(a) {
           src.connect(ctx.destination);
           src.onended = done;
           src.start(0);
+          playListeners.forEach((f) => { try { f(clip.no, Math.round((buf.duration || 0) * 1000)); } catch { /* 知らせ先の失敗で読み上げを止めない */ } });
         } catch { done(); }
       }, done);
     } catch { done(); }
@@ -151,6 +155,8 @@ export function createPhoneVoice(a) {
       if (s !== pcState) { pcState = s; notify(); }
     },
     poll,
+    /** 声が鳴り始めたら番号を知らせる。 @param {(no: string) => void} f */
+    onPlay: (f) => playListeners.add(f),
     onChange: (/** @type {() => void} */ f) => listeners.add(f)
   };
 }
@@ -195,6 +201,12 @@ export function mountPhoneVoiceUi(voice) {
     btn.setAttribute('aria-label', l.aria);
     const word = document.querySelector('#openComeviewVoiceBtn .nl-compose-qbtn__word');
     if (word) word.textContent = voice.isOn() ? '読み上げ中' : '読み上げ';
+    // v0.1.1742: 説明文も スマホの読み上げに合わせる(元は「コメビュを別ウィンドウで開きます」のままだった)。
+    const popupBtn = document.getElementById('openComeviewVoiceBtn');
+    if (popupBtn) {
+      popupBtn.setAttribute('aria-label', l.aria);
+      popupBtn.title = l.aria;
+    }
   };
   const press = () => {
     if (voice.isOn() && !voice.isReady()) voice.wake();

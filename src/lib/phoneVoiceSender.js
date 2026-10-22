@@ -14,6 +14,13 @@ import { comeviewUserKeyForRow } from './comeviewActions.js';
 const STYLE_RETRY_MS = 30_000;
 
 /**
+ * v0.1.1743: 声にする順番待ちの上限。PC の会場の読み上げの列(voiceLagBudget の最大8)と同じ。
+ *   以前は1回の送信で新着の新しい5件だけを読み、残りは「読んだ」扱いで二度と読まなかった
+ *   (実機で3分にコメント約60件・声19本)。今は合成中に来た分も列に残し、溢れたときだけ古い方を捨てる。
+ */
+export const PHONE_VOICE_BACKLOG_MAX = 8;
+
+/**
  * 失敗を既定値にたたむ(部品の失敗でその1件を捨てるだけにする)。
  * @template T
  * @param {() => Promise<T>} fn
@@ -57,6 +64,8 @@ export function createPhoneVoiceSender(deps) {
   let seen = null;
   let liveId = '';
   let busy = false;
+  /** @type {{ no: string, userId: string, name: string, text: string }[]} */
+  let pending = [];
   /** @type {number[]} */
   let styleIds = [];
   let styleAt = 0;
@@ -71,6 +80,7 @@ export function createPhoneVoiceSender(deps) {
     // 欲しがられていない間は覚えたことを忘れる=次に ON にしたとき過去のコメントをまとめて読まない。
     if (!a || !a.wanted) {
       seen = null;
+      pending = [];
       state = '';
       return 0;
     }
@@ -78,11 +88,13 @@ export function createPhoneVoiceSender(deps) {
     if (lv !== liveId) {
       liveId = lv;
       seen = null;
+      pending = [];
     }
-    if (busy) return 0;
-    const r = pickNewVoiceRows({ rows: Array.isArray(a.rows) ? a.rows : [], seen });
+    // 合成中でも新着は列に足す(以前は合成中の回を丸ごと飛ばし、次の回で新しい5件だけ読んでいた)。
+    const r = pickNewVoiceRows({ rows: Array.isArray(a.rows) ? a.rows : [], seen, max: PHONE_VOICE_BACKLOG_MAX });
     seen = r.seen;
-    if (!r.picks.length) return 0;
+    pending = pending.concat(r.picks).slice(-PHONE_VOICE_BACKLOG_MAX);
+    if (busy || !pending.length) return 0;
     busy = true;
     let sent = 0;
     try {
@@ -92,10 +104,13 @@ export function createPhoneVoiceSender(deps) {
       }
       if (!styleIds.length) {
         state = 'voicevox_down';
+        pending = [];
         return 0;
       }
       const settings = (await safe(deps.loadSettings, null)) || {};
-      for (const p of r.picks) {
+      // 合成している間に次の回が列へ足した分も、この回のうちに続けて読む。
+      while (pending.length) {
+        const p = /** @type {{ no: string, userId: string, name: string, text: string }} */ (pending.shift());
         const voice = resolveVoiceForUser(comeviewUserKeyForRow(p) || 'anon', settings.assignments, styleIds);
         const text = buildVoiceReadingText({ name: settings.readName ? p.name : '', text: p.text });
         const wav = await safe(() => deps.synth(text, voice), null);
@@ -103,11 +118,13 @@ export function createPhoneVoiceSender(deps) {
           // 合成できない=VOICEVOX が止まった可能性。次の回に声の一覧から確かめ直す。
           styleIds = [];
           state = 'voicevox_down';
+          pending = [];
           break;
         }
         const ogg = await safe(() => deps.encode(wav), null);
         if (!ogg) {
           state = 'no_encoder';
+          pending = [];
           break;
         }
         state = 'ok';
