@@ -84,6 +84,7 @@ const ROLES = {
   'tools': { role: '補助ツール(LP overflow 監査・MCP サーバ・OG カード画像合成 等)', tags: ['ツール'] },
   'tools/mcp-nicolive': { role: 'ニコ生状態を読む MCP サーバ(司令塔の状態取得用)', tags: ['MCP', '診断'] },
   'app': { role: 'Web 版状態ページのアプリ(app.js + dist)', tags: ['Web版'] },
+  'app/audio-test': { role: 'スマホで鳴る音声形式の実機テスト用の短い声(audio-test.html が使う・同じ声を形式ごとに用意)', tags: ['Web版'] },
   'app/dist': { role: 'Web 版アプリのビルド成果物', tags: ['ビルド成果物'] },
   'app/images': { role: '純Web版 応援ライブビューの同梱画像(ゆっくり顔)', tags: ['Web版', '画像'] },
   'api': { role: 'サーバレス API(status / live-ranking / live-recent-comments / live-og / live-platforms)', tags: ['API'] },

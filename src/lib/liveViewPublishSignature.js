@@ -51,3 +51,35 @@ export function buildLiveViewPublishSignature(jsonBlob) {
     overviewLen
   ].join('|');
 }
+
+/** 中身の比較で見ない欄(診断の全文・毎回変わる文章)。 */
+const CONTENT_SIG_SKIP_KEYS = new Set(['generatedAt', 'snapshotMeta', 'statusReport', 'fastDiag', 'overview', 'supportersParity']);
+/** 時刻・経過の欄(capturedAt・measuredAt・elapsedMs 等)。中身が同じでも書き直すたびに変わる。行の時刻 `at` は対象外。 */
+const CONTENT_SIG_TIME_KEY_RE = /[a-z](At|AtMs|Ms|Sec)$/;
+
+/**
+ * ★v0.1.1735: 自動送信の「中身が変わったか」を【中身そのもの】で判定するシグネチャ。
+ *   buildLiveViewPublishSignature は各鏡の capturedAt を見るので、鏡を書き直しただけ(応援レーン鏡は
+ *   60秒ごとに必ず書き直す)でも「変わった」になり、変化の無い配信でも20秒ごとに送っていた。
+ *   ここでは時刻の欄と診断の欄を除いた JSON を 32bit FNV-1a で縮める(130KB で1ms未満)。
+ *   呼ぶのは送信の間隔を満たしたときだけ(2秒ごとの描画のたびには呼ばない)。
+ * @param {Record<string, unknown>|null|undefined} jsonBlob
+ * @returns {string} 16進8桁。jsonBlob が無い・JSON にできないときは空文字(=「変わった」扱いにしない)。
+ */
+export function buildLiveViewContentSignature(jsonBlob) {
+  if (!jsonBlob || typeof jsonBlob !== 'object') return '';
+  let text = '';
+  try {
+    text = JSON.stringify(jsonBlob, (key, value) =>
+      CONTENT_SIG_SKIP_KEYS.has(key) || CONTENT_SIG_TIME_KEY_RE.test(key) ? undefined : value
+    );
+  } catch {
+    return '';
+  }
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}

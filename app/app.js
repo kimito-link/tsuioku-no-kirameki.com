@@ -12,6 +12,7 @@
  */
 
 import { buildOverviewText, buildLiveBlockText } from '../src/lib/statusFormat.js';
+import { extrapolateLiveForDisplay } from '../src/lib/liveElapsedExtrapolate.js';
 
 const POLL_INTERVAL_MS = 60_000;
 let _timerId = null;
@@ -71,7 +72,9 @@ async function refresh(token) {
 }
 
 function render(jsonBlob) {
-  const lives = Array.isArray(jsonBlob.lives) ? jsonBlob.lives : [];
+  // v0.1.1738: 「経過」「最終取り込み」は送った時刻からの分を足して見せる(PC は時刻だけの変化では送らない)。
+  const now = Date.now();
+  const lives = (Array.isArray(jsonBlob.lives) ? jsonBlob.lives : []).map((l) => extrapolateLiveForDisplay(l, jsonBlob.generatedAt, now));
 
   // 概要
   const overviewEl = document.getElementById('overviewBody');

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import deviceHandler from '../../api/device.js';
+import { gzipSync } from 'node:zlib';
 import statusHandler from '../../api/status.js';
 
 /** Upstash REST を Map で模す(SET/GET/DEL/INCR/EXPIRE)。 */
@@ -139,5 +140,26 @@ describe('api/device + api/status: 利用者ごとの鍵(v0.1.1730)', () => {
     await call(statusHandler, { method: 'POST', headers: { 'x-share-key': 'k' }, body: { v: 'tokentoken123', statusReport: 'r' } });
     expect((await view('tokentoken123')).body.data).toEqual({ statusReport: 'r' });
     delete process.env.STATUS_INGEST_KEY;
+  });
+
+  it('★v0.1.1735: gzip で送った本文(x-nls-body: gzip)も保存できる。壊れた gzip・膨らみすぎは 400', async () => {
+    const c = (await register()).body;
+    const zip = (o) => gzipSync(Buffer.from(JSON.stringify(o)));
+    const ok = await call(statusHandler, { method: 'POST', headers: { ...auth(c), 'x-nls-body': 'gzip' }, body: zip({ a: 1, fastDiag: {} }) });
+    expect(ok.code).toBe(200);
+    expect((await view(c.viewToken)).body.data).toEqual({ a: 1 });
+    const broken = await call(statusHandler, { method: 'POST', headers: { ...auth(c), 'x-nls-body': 'gzip' }, body: Buffer.from('not gzip') });
+    expect(broken.code).toBe(400);
+    const bomb = await call(statusHandler, { method: 'POST', headers: { ...auth(c), 'x-nls-body': 'gzip' }, body: zip({ s: 'a'.repeat(1_000_000) }) });
+    expect(bomb.code).toBe(400);
+  });
+
+  it('★v0.1.1736: スマホが取りに来たら(GET)30秒の目印を置き、送信の返事で viewerActive を返す', async () => {
+    const c = (await register()).body;
+    expect((await postAs(c, { a: 1 })).body).toEqual({ ok: true, viewerActive: false, gzipOk: true });
+    await view(c.viewToken);
+    expect(store.get(`status:viewing:${c.viewToken}`)).toBe('1');
+    expect(ttl.get(`status:viewing:${c.viewToken}`)).toBe(30);
+    expect((await postAs(c, { a: 2 })).body).toEqual({ ok: true, viewerActive: true, gzipOk: true });
   });
 });

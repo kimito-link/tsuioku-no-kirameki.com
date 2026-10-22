@@ -10,11 +10,29 @@ describe('スマホの WEB版を早く新しくする配線', () => {
     expect(status).toMatch(/changed:\s*Boolean\(sig\)\s*&&\s*sig\s*!==\s*_autoPublishLastSentSig/);
     expect(status).toMatch(/_autoPublishLastLaunchAtMs = Date\.now\(\);\s*_autoPublishLastSentSig = sig;/);
   });
+  it('★v0.1.1735: 鏡を書き直しただけ(中身が同じ)なら「変わった」で送らない・届かなかった中身は忘れる', () => {
+    expect(status).toMatch(/decision\.reason === 'changed' && contentSig && contentSig === _autoPublishLastContentSig\) \{\s*_autoPublishLastSentSig = sig;\s*return;/);
+    expect(status).toContain("if (!(r && r.ok)) _autoPublishLastContentSig = '';");
+  });
+  it('★v0.1.1735: 送信担当は補助データを描き直しのたびに読む(v0.1.1736 で周期5秒に合わせて4.5秒)', () => {
+    expect(status).toContain('(IS_STATUS_PUBLISHER ? PUBLISHER_EXTRAS_REFETCH_MS : EXTRAS_REFETCH_MS)');
+    expect(status).toContain('const PUBLISHER_EXTRAS_REFETCH_MS = 4500;');
+  });
+  it('★v0.1.1736: スマホが開いている間(送信の返事 viewerActive)だけ、5秒ごとに描き直し・5秒で送る', () => {
+    expect(status).toContain("const ack = readPublishAck(await res.json().catch(() => null), Date.now());");
+    expect(status).toContain("_phoneViewingUntilMs = ack.viewingUntilMs;");
+    expect(status).toContain("allowGzip: _publishGzipOk && !_publishGzipRefused");
+    expect(status).toContain('const changedIntervalMs = isPhoneViewing() ? VIEWER_ACTIVE_PUBLISH_INTERVAL_MS : undefined;');
+    expect(status).toContain('if (!first && IS_STATUS_PUBLISHER && !shouldRunPublisherTick({ tickNo: _publisherTickNo++, viewerActive: isPhoneViewing() })) return;');
+  });
+  it('★v0.1.1735: gzip で送り、受け口が解けなければ(400 bad body)JSON で送り直して以後は縮めない', () => {
+    expect(status).toMatch(/if \(sent\.gzip && res\.status === 400 && [^\n]*'bad body'\) \{\s*_publishGzipRefused = true;/);
+  });
   it('③WEB は前回の ETag を If-None-Match に載せ、304 なら塗り直さずバナーだけ進める', () => {
     expect(liveView).toMatch(/'If-None-Match': _lastEtag/);
     expect(liveView).toMatch(/res\.status === 304\) return SNAPSHOT_NOT_MODIFIED/);
     expect(liveView).toMatch(/jsonBlob === SNAPSHOT_NOT_MODIFIED\) \{\s*\/\/[^\n]*\n\s*refreshStaleBanner\(_latestSnapshot\);/);
-    expect(liveView).toMatch(/const POLL_INTERVAL_MS = 15_000;/);
+    expect(liveView).toMatch(/const POLL_INTERVAL_MS = 5_000;/);
   });
   it('③WEB は画面が表に戻ったら即1回取る(裏にある間は周期が取らない)', () => {
     expect(liveView).toMatch(/addEventListener\('visibilitychange', \(\) => \{\s*if \(!document\.hidden\) refresh\(token\)/);
@@ -28,7 +46,9 @@ describe('スマホの WEB版を早く新しくする配線', () => {
 
 describe('スマホは1配信だけ映す配線(2026-10-21)', () => {
   it('配信者カードは映している配信の lives を使う(lives[0] 固定ではない)', () => {
-    expect(liveView).toMatch(/paintBroadcasterCard\(pickLiveForCard\(jsonBlob\)\)/);
+    expect(liveView).toMatch(/paintBroadcasterCard\(extrapolateLiveForDisplay\(pickLiveForCard\(jsonBlob\), jsonBlob\.generatedAt, Date\.now\(\)\)\)/);
+    // v0.1.1738: 304(中身同じ)でも「経過」を進めて描き直す。
+    expect(liveView).toContain("if (_latestSnapshot) paintBroadcasterCard(extrapolateLiveForDisplay(pickLiveForCard(_latestSnapshot), _latestSnapshot.generatedAt, Date.now()));");
     expect(liveView).not.toMatch(/paintBroadcasterCard\(Array\.isArray\(jsonBlob\.lives\) \? jsonBlob\.lives\[0\]/);
   });
   it('映す配信が変わったら lv を差し替えて起動し直す', () => {
@@ -40,7 +60,7 @@ describe('スマホは1配信だけ映す配線(2026-10-21)', () => {
 describe('配線: スマホ版の利用者ごとの鍵(v0.1.1731)', () => {
   const src = readFileSync(new URL('./status-entry.js', import.meta.url), 'utf8');
   it('送信は getPublishCredentials の鍵とヘッダで送る(共有キーのヘッダを直書きしない)', () => {
-    expect(src).toContain('headers: creds.headers');
+    expect(src).toContain('buildPublishInit(creds.headers, jsonText');
     expect(src).toContain('buildPublishBody(creds, jsonBlob)');
     expect(src).not.toMatch(/'x-share-key': ingestKey/);
   });

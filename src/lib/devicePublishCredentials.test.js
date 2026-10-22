@@ -50,6 +50,10 @@ describe('devicePublishCredentials(スマホ版の利用者ごとの鍵・v0.1.1
     const device = resolvePublishCredentials({}, CRED);
     expect(buildPublishBody(/** @type {any} */ (shared), { a: 1 })).toEqual({ a: 1, v: 'tok' });
     expect(buildPublishBody(/** @type {any} */ (device), { a: 1 })).toEqual({ a: 1 });
+    // v0.1.1735: 利用者の鍵では、サーバーが保存しない欄を送る前に落とす(共有キーは診断用に全部送る)
+    const big = { a: 1, statusReport: 's', fastDiag: {}, overview: 'o', supportersParity: {} };
+    expect(buildPublishBody(/** @type {any} */ (device), big)).toEqual({ a: 1 });
+    expect(buildPublishBody(/** @type {any} */ (shared), big)).toEqual({ ...big, v: 'tok' });
   });
   it('送信先 URL は末尾のスラッシュを落とす', () => {
     expect(deviceApiUrl('https://a.example/')).toBe('https://a.example/api/device');

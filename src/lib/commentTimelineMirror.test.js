@@ -14,6 +14,33 @@ function cmt(at, text, name = '匿名', avatarUrl = '', userId = 'u1') {
 }
 
 describe('buildCommentTimelineMirrorSnapshot', () => {
+  it('★v0.1.1735: コメント番号があれば no として載せ、戻すと commentNo になる(無い・数字でない行・ギフトには付けない)', () => {
+    const snap = buildCommentTimelineMirrorSnapshot({
+      liveId: 'lv1',
+      comments: [
+        { at: 1, text: 'a', commentNo: 12 },
+        { at: 2, text: 'b', no: '13' },
+        { at: 3, text: 'c' },
+        { at: 4, text: 'd', commentNo: 'x' }
+      ],
+      giftEvents: [{ at: 5, kind: 'gift', nickname: 'n', itemName: 'g', commentNo: 99 }],
+      capturedAt: 10
+    });
+    expect(snap.rows.map((r) => r.no)).toEqual(['12', '13', undefined, undefined, undefined]);
+    const items = restoreTimelineItemsForHtml(snap);
+    expect(items.filter((i) => i.kind === 'comment').map((i) => i.commentNo)).toEqual(['', '', '13', '12']);
+  });
+
+  it('v0.1.1738: コメント番号は取り込みと同じ10桁まで載せる(11桁は載せない)', () => {
+    const snap = buildCommentTimelineMirrorSnapshot({
+      liveId: 'lv1',
+      comments: [{ at: 1, text: 'a', commentNo: '1234567890' }, { at: 2, text: 'b', commentNo: '12345678901' }],
+      giftEvents: [],
+      capturedAt: 10
+    });
+    expect(snap.rows.map((r) => r.no)).toEqual(['1234567890', undefined]);
+  });
+
   it('コメント配列から最新N件を時刻順(古→新)で組む', () => {
     const comments = [cmt(NOW - 3000, 'c'), cmt(NOW - 1000, 'a'), cmt(NOW - 2000, 'b')];
     const snap = buildCommentTimelineMirrorSnapshot({ liveId: 'LV1', comments, capturedAt: NOW });
@@ -68,6 +95,13 @@ describe('buildCommentTimelineMirrorSnapshot', () => {
     expect(snap.rows[0].kind).toBe('gift');
     expect(snap.rows[0].itemName).toBe('スーパーコメット');
     expect(snap.rows[0].point).toBe(14280);
+  });
+
+  it('★v0.1.1736: 実際に保存されるギフト(kind/isGift/at が無く capturedAt を持つ)もギフト行になる', () => {
+    const stored = [{ userId: 'u1', nickname: 'りんく', itemId: 'x', itemName: 'スター', point: 500, message: '', contributionRank: null, capturedAt: NOW }];
+    const snap = buildCommentTimelineMirrorSnapshot({ liveId: 'lv1', comments: [cmt(NOW - 1000, 'c')], giftEvents: stored, capturedAt: NOW });
+    const g = snap.rows[1];
+    expect(g).toMatchObject({ kind: 'gift', at: NOW, itemName: 'スター', point: 500, name: 'りんく', userId: 'u1' });
   });
 
   it('コメント行には itemName/point を付けない(容量ムダを避ける)', () => {
