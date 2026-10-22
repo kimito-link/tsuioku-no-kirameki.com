@@ -31,16 +31,19 @@ function s(v) {
 }
 
 /** コメント1件 → 鏡 row(最小フィールド)。表示名/本文/顔/時刻のみ。null は捨てる。 */
-function toTimelineRow(item, resolveName, resolveAvatar) {
+function toTimelineRow(item, resolveName, resolveAvatar, asGift = false) {
   const it = item && typeof item === 'object' ? item : null;
   if (!it) return null;
-  const at = Number(it.at ?? it.date ?? it.vpos ?? 0);
+  // v0.1.1736: 保存されたギフト(nls_gift_events_<lv>・giftEventStore.normalizeGiftEvent)は at ではなく capturedAt を持つ。
+  const at = Number(it.at ?? it.date ?? it.vpos ?? it.capturedAt ?? 0);
   const text = s(it.text).slice(0, TIMELINE_TEXT_MAX);
   const userId = s(it.userId);
   // name/avatar は「既に手元で解決済みの値」を呼び出し側から渡す(新たな名寄せ・fetch はしない)。
   const name = typeof resolveName === 'function' ? s(resolveName(it)) : s(it.nickname);
   const avatarUrl = typeof resolveAvatar === 'function' ? s(resolveAvatar(it)) : s(it.avatarUrl);
-  const kind = s(it.kind) || (it.isGift ? 'gift' : 'comment');
+  // v0.1.1736: ギフト配列から来た行は必ずギフト扱い(保存されたギフトは kind も isGift も持たない=
+  //   従来はコメント扱いになり、品名と pt が落ちて時刻 0 の行になっていた)。
+  const kind = s(it.kind) || (asGift || it.isGift ? 'gift' : 'comment');
   // 本文も名前も顔も無い行は鏡に載せても無意味=捨てる。
   if (!text && !name && !avatarUrl) return null;
   // v0.1.1717: userId から決定的に作れる匿名 identicon(data: SVG・約2KB)は鏡に載せない(消費側が userId から同じ絵を作る)。
@@ -89,9 +92,10 @@ export function buildCommentTimelineMirrorSnapshot(args) {
   const capturedAt = Number(a.capturedAt) || 0;
   if (!comments.length && !gifts.length) return null;
 
-  const merged = [...comments, ...gifts]
-    .map((it) => toTimelineRow(it, a.resolveName, a.resolveAvatar))
-    .filter(Boolean);
+  const merged = [
+    ...comments.map((it) => toTimelineRow(it, a.resolveName, a.resolveAvatar)),
+    ...gifts.map((it) => toTimelineRow(it, a.resolveName, a.resolveAvatar, true))
+  ].filter(Boolean);
   if (!merged.length) return null;
 
   // 時刻順(古→新)に並べ、最新 cap 件を取る(末尾=最新)。at が 0 の行は元の順序を保つ安定ソート。

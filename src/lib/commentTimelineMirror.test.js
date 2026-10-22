@@ -87,6 +87,13 @@ describe('buildCommentTimelineMirrorSnapshot', () => {
     expect(snap.rows[0].point).toBe(14280);
   });
 
+  it('★v0.1.1736: 実際に保存されるギフト(kind/isGift/at が無く capturedAt を持つ)もギフト行になる', () => {
+    const stored = [{ userId: 'u1', nickname: 'りんく', itemId: 'x', itemName: 'スター', point: 500, message: '', contributionRank: null, capturedAt: NOW }];
+    const snap = buildCommentTimelineMirrorSnapshot({ liveId: 'lv1', comments: [cmt(NOW - 1000, 'c')], giftEvents: stored, capturedAt: NOW });
+    const g = snap.rows[1];
+    expect(g).toMatchObject({ kind: 'gift', at: NOW, itemName: 'スター', point: 500, name: 'りんく', userId: 'u1' });
+  });
+
   it('コメント行には itemName/point を付けない(容量ムダを避ける)', () => {
     const snap = buildCommentTimelineMirrorSnapshot({ liveId: 'lv1', comments: [cmt(NOW, 'ただのコメント')], capturedAt: NOW });
     expect(snap.rows[0].kind).toBe('comment');

@@ -315,8 +315,9 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 266</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 267</summary>
 
+- `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
@@ -944,7 +945,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 238</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 239</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1105,6 +1106,7 @@
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
 - `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
 - `src/lib/passiveMirrorLiveIdGuard.js` — 受動ビュー(status 埋め込み / live-view)が「別配信の古い鏡」を貼らないための判定。
+- `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -1201,10 +1203,11 @@
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
 
-### 🙂 匿名(184) (1版)
-- `v0.1.1717` 2026-10-20 — コメント一覧の共有データを95%小さく
+### 🏟 会場・席 (1版)
+- `v0.1.1737` 2026-10-22 — スマホでギフトの効果音が鳴る
 
-### 🎁 ギフト (6版)
+### 🎁 ギフト (7版)
+- `v0.1.1737` 2026-10-22 — スマホでギフトの効果音が鳴る
 - `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
