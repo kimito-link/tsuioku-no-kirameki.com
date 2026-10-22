@@ -24,8 +24,9 @@ graph LR
   ROOT --> d3["_docs/ 〔横断/KB〕"]
   ROOT --> d4["api/ 〔API〕"]
   ROOT --> d5["app/ 〔Web版〕"]
-  d5 --> d5_0["dist/ 〔ビルド成果物〕"]
-  d5 --> d5_1["images/ 〔Web版/画像〕"]
+  d5 --> d5_0["audio-test/ 〔Web版〕"]
+  d5 --> d5_1["dist/ 〔ビルド成果物〕"]
+  d5 --> d5_2["images/ 〔Web版/画像〕"]
   ROOT --> d6["council/ 〔会議/設計〕"]
   d6 --> d6_0["auto/ 〔会議/自動生成〕"]
   ROOT --> d7["council-scout/ 〔会議/調査〕"]
@@ -315,8 +316,9 @@ graph LR
 <sub>ファイル 8 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
-<sub>ファイル 101 件</sub>
+<sub>ファイル 109 件</sub>
 
+- `audio-test/`（7 件） — スマホで鳴る音声形式の実機テスト用の短い声(audio-test.html が使う・同じ声を形式ごとに用意)  〔Web版〕
 - `dist/`（3 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
