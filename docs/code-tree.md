@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 987 件
+## ⚠️ 役割コメントが無いソース 9 / 989 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -93,7 +93,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (107)
+- 📁 **app/** (108)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -214,6 +214,7 @@
   - `index.html`
   - `live-view-post.js` — スマホの WEB版から生放送にコメントを届ける(v0.1.1734)。
   - `live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
+  - `live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
 - 📁 **council-scout/** (26)
@@ -905,7 +906,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2120)
+- 📁 **src/** (2123)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -942,7 +943,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (74)
+  - 📁 **extension/** (75)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -993,6 +994,7 @@
     - `phonePostRelay.js` — 【層】L2 拡張の配線(chrome.* と fetch。判定は src/lib/phonePost.js)
     - `phonePostRelay.test.js`
     - `phoneSound.wiring.test.js`
+    - `phoneVenue.wiring.test.js`
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
     - `popupAvatarRetry.wiring.test.js`
     - `popupBackfillCompleteState.wiring.test.js`
@@ -1174,7 +1176,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1884)
+  - 📁 **lib/** (1886)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2341,6 +2343,8 @@
     - `phonePost.test.js`
     - `phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
     - `phoneSoundCues.test.js`
+    - `phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
+    - `phoneVenueModel.test.js`
     - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
     - `pickBroadcasterNameForReputation.test.js`
     - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。
