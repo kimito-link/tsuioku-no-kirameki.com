@@ -1029,7 +1029,7 @@ function bootstrap() {
   _voice = createPhoneVoice({ token });
   // v0.1.1742: 会場の吹き出しを読み上げの声に合わせる(声が鳴った瞬間に、その人の吹き出しを出す)。
   _venue.setVoiceActive(() => Boolean(_voice && _voice.isOn() && _voice.isReady() && _voice.pcState() === 'ok'));
-  _voice.onPlay((no) => _venue.onVoicePlay(no));
+  _voice.onPlay((no, ms) => _venue.onVoicePlay(no, ms));
   bootWithSnapshot(token).catch((err) => {
     showError('通信エラー: ' + String((err && err.message) || err));
   });
