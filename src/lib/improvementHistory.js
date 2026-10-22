@@ -3810,5 +3810,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1746', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '数え方は単体テストで固定。実機の内訳はこの版を入れて配信で測る(推測で直さないための計器)。'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは WEB版(app/live-view-venue.js)と純関数 phoneVenueModel.js だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '原因は PC 実機側のコード読みと、こちらのコード読みの両方で一致(DEFAULT_FACE 固定)。代わりの顔は単体テストで固定。'
   })
 ]);
