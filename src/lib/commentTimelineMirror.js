@@ -62,7 +62,7 @@ function toTimelineRow(item, resolveName, resolveAvatar, asGift = false) {
   // v0.1.1735: コメント番号(放送内で一意・増える)を載せる=スマホが「新しく来た1件」を確実に見分けられる
   //   (読み上げ・効果音で同じコメントを2度扱わない)。番号が無い行には付けない(偽番号を作らない)。
   const no = s(it.commentNo ?? it.no);
-  if (kind !== 'gift' && /^\d{1,9}$/.test(no)) row.no = no;
+  if (kind !== 'gift' && /^\d{1,10}$/.test(no)) row.no = no;
   if (kind === 'gift') {
     const itemName = s(it.itemName ?? it.giftName ?? it.name).slice(0, TIMELINE_TEXT_MAX);
     const point = Math.max(0, Math.floor(Number(it.point ?? it.contribution) || 0));

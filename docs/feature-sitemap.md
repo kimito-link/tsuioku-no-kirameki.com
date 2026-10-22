@@ -945,7 +945,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 239</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 240</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1062,6 +1062,7 @@
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
 - `src/lib/lastWatchUrlAdoption.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
+- `src/lib/liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
 - `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
 - `src/lib/liveviewCurrentLive.js` — 【層】L0 判定層(純粋関数)
@@ -1193,10 +1194,9 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (3版)
+### 💾 記録件数 (2版)
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
-- `v0.1.1718` 2026-10-20 — 同接の補正データの書き込みを約12分の1に
 
 ### 📥 コメント取得 (3版)
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
@@ -1236,7 +1236,8 @@
 - `v0.1.1720` 2026-10-20 — 広告pt・ギフトptの数字を画面間でそろえた
 - `v0.1.1719` 2026-10-20 — 読み上げ失敗の警告が復旧後も残らない
 
-### その他 (7版)
+### その他 (8版)
+- `v0.1.1738` 2026-10-22 — スマホの速さを点検して4か所を直した
 - `v0.1.1736` 2026-10-22 — スマホで見ている間は約5秒で更新
 - `v0.1.1734` 2026-10-22 — スマホから生放送にコメントできる
 - `v0.1.1733` 2026-10-21 — サイドパネルを閉じてもスマホへ送り続ける

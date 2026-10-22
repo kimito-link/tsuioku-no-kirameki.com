@@ -19,7 +19,9 @@ describe('スマホの WEB版を早く新しくする配線', () => {
     expect(status).toContain('const PUBLISHER_EXTRAS_REFETCH_MS = 4500;');
   });
   it('★v0.1.1736: スマホが開いている間(送信の返事 viewerActive)だけ、5秒ごとに描き直し・5秒で送る', () => {
-    expect(status).toContain("_phoneViewingUntilMs = ack && ack.viewerActive === true ? Date.now() + 30_000 : 0;");
+    expect(status).toContain("const ack = readPublishAck(await res.json().catch(() => null), Date.now());");
+    expect(status).toContain("_phoneViewingUntilMs = ack.viewingUntilMs;");
+    expect(status).toContain("allowGzip: _publishGzipOk && !_publishGzipRefused");
     expect(status).toContain('const changedIntervalMs = isPhoneViewing() ? VIEWER_ACTIVE_PUBLISH_INTERVAL_MS : undefined;');
     expect(status).toContain('if (!first && IS_STATUS_PUBLISHER && !shouldRunPublisherTick({ tickNo: _publisherTickNo++, viewerActive: isPhoneViewing() })) return;');
   });
@@ -44,7 +46,9 @@ describe('スマホの WEB版を早く新しくする配線', () => {
 
 describe('スマホは1配信だけ映す配線(2026-10-21)', () => {
   it('配信者カードは映している配信の lives を使う(lives[0] 固定ではない)', () => {
-    expect(liveView).toMatch(/paintBroadcasterCard\(pickLiveForCard\(jsonBlob\)\)/);
+    expect(liveView).toMatch(/paintBroadcasterCard\(extrapolateLiveForDisplay\(pickLiveForCard\(jsonBlob\), jsonBlob\.generatedAt, Date\.now\(\)\)\)/);
+    // v0.1.1738: 304(中身同じ)でも「経過」を進めて描き直す。
+    expect(liveView).toContain("if (_latestSnapshot) paintBroadcasterCard(extrapolateLiveForDisplay(pickLiveForCard(_latestSnapshot), _latestSnapshot.generatedAt, Date.now()));");
     expect(liveView).not.toMatch(/paintBroadcasterCard\(Array\.isArray\(jsonBlob\.lives\) \? jsonBlob\.lives\[0\]/);
   });
   it('映す配信が変わったら lv を差し替えて起動し直す', () => {

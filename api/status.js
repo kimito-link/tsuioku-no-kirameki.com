@@ -160,7 +160,7 @@ async function handleDevicePost(req, res) {
     /* 期限の延長は最適化 */
   }
   logIngest(req, 'device_ok');
-  res.status(200).json({ ok: true, viewerActive: await isViewerActive(auth.record.v) });
+  res.status(200).json({ ok: true, viewerActive: await isViewerActive(auth.record.v), gzipOk: true });
 }
 
 export default async function handler(req, res) {
@@ -202,7 +202,7 @@ export default async function handler(req, res) {
       delete payload.v;
       await saveSnapshot(token, JSON.stringify(payload));
       logIngest(req, 'ok');
-      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token) });
+      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token), gzipOk: true });
       return;
     }
 
