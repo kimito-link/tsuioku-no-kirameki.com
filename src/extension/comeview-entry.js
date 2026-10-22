@@ -107,6 +107,12 @@ import {
   measureVoiceGapMs,
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
+import {
+  applyVoiceVolumeToWav,
+  KEY_VOICE_VOLUME_PERCENT,
+  normalizeVoiceVolumePercent,
+  VOICE_VOLUME_DEFAULT
+} from '../lib/voiceVolume.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
@@ -590,6 +596,9 @@ function voiceUserKeyForItem(item) {
   );
 }
 
+/** 2026-10-22(P2): 読み上げ音量(%)。ポップアップのスライダーが storage へ書き、onChanged で追従する。 */
+let _voiceVolumePercent = VOICE_VOLUME_DEFAULT;
+
 /** 2026-10-22計器(P1・会場 VoicePlayer と同じ物差し): エンジン待ち・初めての声を測る。 */
 const _voiceSynthTracker = createVoiceSynthTracker();
 
@@ -776,7 +785,10 @@ async function drainVoiceQueue() {
       let objectUrl = '';
       try {
         markVoicePhase('await_playback'); // v0.1.895: 再生待ちに入る(watchdog 付き)。
-        objectUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+        // 2026-10-22(P2): 文ごとに最大振幅を揃え、音量設定を掛ける(会場と同じ純関数)。
+        objectUrl = URL.createObjectURL(
+          new Blob([applyVoiceVolumeToWav(wav, _voiceVolumePercent)], { type: 'audio/wav' })
+        );
         const audio = new Audio(objectUrl);
         await new Promise((resolve) => {
           let settled = false;
@@ -945,7 +957,8 @@ async function initializeVoiceReading() {
         chrome.storage.local.get([
           VOICE_READING_ENABLED_KEY,
           VOICE_ASSIGNMENTS_KEY,
-          VOICE_READ_NAME_KEY
+          VOICE_READ_NAME_KEY,
+          KEY_VOICE_VOLUME_PERCENT
         ]),
       COMEVIEW_BOOT_READ_TIMEOUT_MS
     );
@@ -955,6 +968,7 @@ async function initializeVoiceReading() {
   if (!bag || typeof bag !== 'object') bag = {};
   _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
   _voiceReadNameEnabled = bag[VOICE_READ_NAME_KEY] === true;
+  _voiceVolumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
   updateVoiceToggle();
   // ?voice=1 で起動された(パネルの「読み上げ」ボタン経由)場合は、保存状態に関わらず読み上げON。
   let forceVoiceOn = false;
@@ -2037,6 +2051,9 @@ function wireStorageChanges() {
         updateNgButton();
         void requestFullRefresh();
       }
+    }
+    if (changes[KEY_VOICE_VOLUME_PERCENT]) {
+      _voiceVolumePercent = normalizeVoiceVolumePercent(changes[KEY_VOICE_VOLUME_PERCENT].newValue);
     }
     if (!isObsMode() && changes[VOICE_ASSIGNMENTS_KEY]) {
       _voiceAssignments = normalizeVoiceAssignments(

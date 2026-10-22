@@ -3796,5 +3796,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1744', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日窓の数え方で前版と同値。今回は「エンジン待ち」の物差しが前提とする VOICEVOX の直列処理を、自宅PCの実測(3件同時でも15%しか縮まない)で確かめてから、時計を手で進める単体テストで固定した。'
+  }),
+  Object.freeze({
+    version: '0.1.1746', metric: 'bundle-kb', value: 1444,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB。ポップアップの読み上げ音量スライダー(配線と正規化の純関数)。利用者が要望した設定画面の項目そのもの。'
+  }),
+  Object.freeze({
+    version: '0.1.1746', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1746', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日窓の数え方で前版+1。今回は増幅の基準(長文48%・短文19%)を、自宅PCの VOICEVOX 実測 WAV の振幅で確かめてから、合成した WAV の単体テストで固定した。'
   })
 ]);

@@ -3345,6 +3345,7 @@ export function mountVenueBarButton(options = {}) {
 
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
+    storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
     onDiag: publishVenueVoiceDiag,
     onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
       voiceBtn.disabled = toggleBusy;

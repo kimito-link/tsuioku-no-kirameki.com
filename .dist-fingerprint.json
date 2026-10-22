@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "f0296abdc28db09df1c9d8a336052b257087c3f55662b1b3e76aa2fedbaf3c77",
+  "fingerprint": "33e89ed3792729f28c13f4d2f167f01918bb9a961cd77a0fb9d0c9cc83388293",
   "inputs": [
     "app/app.js",
     "app/live-view-phone-fit.js",
@@ -46,6 +46,7 @@
     "src/extension/popup/renderAcquisitionDashboard.js",
     "src/extension/popup/report/htmlReportDocument.js",
     "src/extension/popup/wireLaneUserDetailOpen.js",
+    "src/extension/popup/wireVoiceVolumeSlider.js",
     "src/extension/sidepanel-entry.js",
     "src/extension/sidepanel-iframe-boot-entry.js",
     "src/extension/status-entry.js",
@@ -835,6 +836,7 @@
     "src/lib/voiceStageTiming.js",
     "src/lib/voiceSynthFailure.js",
     "src/lib/voiceSynthFailureReason.js",
+    "src/lib/voiceVolume.js",
     "src/lib/voicevoxClient.js",
     "src/lib/watchAudienceCopy.js",
     "src/lib/watchCelebrationOverlay.js",
@@ -866,20 +868,20 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
-    "extension/dist/content.js": "4179829b12921c397fbc57d9479b17b77f0077c1d64389f399e917cb6256f305",
-    "extension/dist/popup.js": "4083becde6869008c52ec97c2f3466d60f5aa6e8228b3c0e71cc267cec794e91",
+    "extension/dist/content.js": "0b5bc0739fb752bb9053856711c1e7ee13e6dea49e7f4f6788878cfabc69cac2",
+    "extension/dist/popup.js": "9497d860572a21282c7db2b0bd190cfe0339da806ee5bb262551c4cb9fcbc5b1",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "3c5385638cf7713dd7ea2260760d9b959fd810021cd3e0b1ced4ab91cab85c1b",
+    "extension/dist/status.js": "ab745ff6fbbce312316e1624e1cdd5467c64a3e3707156590f84acb15eb2d17b",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "082c3efa4faca84e47537d9e3d010bb11cfb5a4111364c9527caf430229b5d6a",
-    "extension/dist/comeview.js": "1e3d0e9e6647657dd6e05716c2ca72f6135f0fe19b4e9b52f60a1a3bfaa82c64",
-    "extension/dist/venue.js": "11d409ae822244830adf573d8cfd46fa6b6311d3e343cbda8b67349558cf511b",
+    "extension/dist/comeview.js": "9f930543e54003975f221eda39c20abcd803a85e2c90229363f5611ed77915b1",
+    "extension/dist/venue.js": "db6462b527961479912a43c1b4a4bf39e01a661751b5acc02255562173ebd2f1",
     "extension/dist/sidepanel.js": "bb0d09e05b38cf6f6fb3d08fcff0a0f6e35432e6251e622f189bd5b624ee9965",
     "extension/dist/sidepanel-iframe-boot.js": "7beb6d34161c022787e23ab36b93bd5fd3b6cb6495492935573c0986bf84132a",
     "extension/dist/avatar-face-worker.js": "7d17a9a9d2f53cf8c90373ccb940ee2e458b0b9f04ed5bb83b349ab394945af9",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "92625ae889f4bae9de70b2f3d8a8acd9d144eb1a5f92c71807f6eb6d496e8b41",
-    "app/dist/live-view.js": "2a730e1b251f4587ecf97aa4edf1a1ebf11222872552716fdd4238730cb800f5",
+    "app/dist/live-view.js": "c8f8ef08f552bbd6441ee7799ebbc356540251dc60775a8074d26cf6b028dd32",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }
