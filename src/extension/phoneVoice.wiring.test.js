@@ -60,6 +60,11 @@ describe('配線: 会場の吹き出しを読み上げの声に合わせる(v0.1
     expect(voiceSrc).toContain('f(clip.no, Math.round((buf.duration || 0) * 1000))');
     expect(venue).toContain('bubble(w.personKey, w.text, Math.max(BUBBLE_MS, (Number(durationMs) || 0) + VOICE_TAIL_MS))');
   });
+  it('★v0.1.1745: 最新コメント欄は、声が鳴っている間そのコメントを出す', () => {
+    expect(liveView).toContain('const spoken = pickSpokenTickerRow(rows, _spokenNo);');
+    expect(liveView).toContain('const latest = spoken || picked.entry || rows[rows.length - 1];');
+    expect(liveView).toMatch(/_voice\.onPlay\(\(no, ms\) => \{\s*_spokenNo = String\(no \|\| ''\);/);
+  });
   it('★「読み上げ」ボタンの説明文もスマホの読み上げに合わせる', () => {
     expect(voiceSrc).toContain("popupBtn.setAttribute('aria-label', l.aria);");
   });
