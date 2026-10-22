@@ -32,6 +32,9 @@ import {
 import {
   createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, recordVoiceSynthStage
 } from './voiceStageTiming.js';
+import {
+  applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT
+} from './voiceVolume.js';
 
 /**
  * ★v0.1.1326: 生存確認の再試行バックオフ(ms)。初回失敗後にこの間隔で最大3回試す。
@@ -170,6 +173,10 @@ export class VoicePlayer {
     };
     // 2026-10-22計器(P1): 合成1件ごとのエンジン待ち・初めての声を測る(印字専用)。
     this._synthTracker = createVoiceSynthTracker();
+    // 2026-10-22(P2): 読み上げ音量(%)。ポップアップのスライダーが storage へ書き、変わった瞬間に効く。
+    this.volumePercent = VOICE_VOLUME_DEFAULT;
+    /** chrome.storage.onChanged 互換(addListener を持つもの)。無ければ起動時の値のまま。 */
+    this.storageOnChanged = deps.storageOnChanged || null;
   }
 
   _emitDiag() {
@@ -199,7 +206,8 @@ export class VoicePlayer {
         bag = await this.storage.get([
           this.VOICE_READING_ENABLED_KEY,
           this.VOICE_ASSIGNMENTS_KEY,
-          this.VOICE_READ_NAME_KEY
+          this.VOICE_READ_NAME_KEY,
+          KEY_VOICE_VOLUME_PERCENT
         ]);
       }
     } catch {
@@ -208,6 +216,8 @@ export class VoicePlayer {
     const rawAssignments = bag[this.VOICE_ASSIGNMENTS_KEY];
     this.assignments = (!rawAssignments || typeof rawAssignments !== 'object' || Array.isArray(rawAssignments)) ? {} : rawAssignments;
     this.readNameEnabled = bag[this.VOICE_READ_NAME_KEY] === true;
+    this.volumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
+    this._watchVolumeSetting();
 
     this._emitToggle();
 
@@ -216,6 +226,20 @@ export class VoicePlayer {
       // forceOn のときは storage にも残す(persist:true)。保存復元のときは false(既存挙動維持)。
       await this.enable({ persist: forceOn });
     }
+  }
+
+  /** ポップアップで音量が変わったら、次に鳴らす声から反映する(1回だけ購読)。 */
+  _watchVolumeSetting() {
+    const ev = this.storageOnChanged;
+    if (this._volumeWatched || !ev || typeof ev.addListener !== 'function') return;
+    this._volumeWatched = true;
+    try {
+      ev.addListener((changes, areaName) => {
+        if (areaName && areaName !== 'local') return;
+        const c = changes && changes[KEY_VOICE_VOLUME_PERCENT];
+        if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
+      });
+    } catch { /* 購読できなくても起動時の値で鳴らす */ }
   }
 
   _emitToggle() {
@@ -645,7 +669,8 @@ export class VoicePlayer {
 
         let objectUrl = '';
         try {
-          const blob = new Blob([wav], { type: 'audio/wav' });
+          // 2026-10-22(P2): 文ごとに最大振幅を揃え、音量設定を掛ける(音割れしない範囲)。
+          const blob = new Blob([applyVoiceVolumeToWav(wav, this.volumePercent)], { type: 'audio/wav' });
           objectUrl = this.createObjectURL(blob);
           const AudioCtor = this.audioConstructor;
           const audio = new AudioCtor(objectUrl);
