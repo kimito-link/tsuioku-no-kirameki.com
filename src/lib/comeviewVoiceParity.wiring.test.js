@@ -152,4 +152,20 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     expect(nullTotalAt).toBeGreaterThan(nullAt);
     expect(publishAt).toBeGreaterThan(nullTotalAt);
   });
+
+  it('★10項目目: コメビュも届いた瞬間に先読み合成を起動する(会場 v0.1.800 と同じ)', () => {
+    // 会場: enqueue の末尾で _startPrefetch を呼ぶ。
+    const vpEnq = vp.slice(vp.indexOf('  enqueue('), vp.indexOf('  kickPrefetch()'));
+    expect(vpEnq).toMatch(/this\._startPrefetch\(this\.generation\)/);
+    // コメビュ: enqueueVoiceTimelineItems の中で、drain より前に startVoicePrefetch を呼ぶ。
+    const start = cv.indexOf('function enqueueVoiceTimelineItems');
+    const end = cv.indexOf('\nasync function initializeVoiceReading', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const enq = cv.slice(start, end);
+    const prefetchAt = enq.indexOf('startVoicePrefetch(_voiceGeneration)');
+    const drainAt = enq.lastIndexOf('void drainVoiceQueue()');
+    expect(prefetchAt).toBeGreaterThan(-1);
+    expect(drainAt).toBeGreaterThan(prefetchAt);
+  });
 });
