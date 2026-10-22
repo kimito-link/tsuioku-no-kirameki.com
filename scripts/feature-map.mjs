@@ -229,6 +229,11 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   chrome.storage.local.get(KEY_OP_SOUND_ENABLED)(起動時キャッシュ)+ openBag 経由(refresh時)。
   //   経路は実在(storageKeys.test.js の isOpSoundEnabled テストで純関数側は確認済み)。
   'KEY_OP_SOUND_ENABLED',
+  // 読み上げ音量(2026-10-22・v0.1.1746): producer は src/extension/popup/wireVoiceVolumeSlider.js が
+  //   引数の storage.set({[KEY_VOICE_VOLUME_PERCENT]:...}) で書く(呼び出し元が safeStorageLocalSet を渡す)ため
+  //   静的解析が producer を取りこぼす偽陽性。consumer は voicePlayer.js(会場)と comeview-entry.js。
+  //   経路は src/lib/voiceVolume.test.js の配線テストが断言する。
+  'KEY_VOICE_VOLUME_PERCENT',
   // 結果発表シーケンス計器(2026-07-06・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1):
   //   producer は popup-entry.js:publishScoreAnnounceDiag が safeStorageLocalSet({[KEY]:...})で
   //   書く(検出対象・実際に見えている)。consumer は status-entry.js が直接 safeStorageLocalGet(KEY)

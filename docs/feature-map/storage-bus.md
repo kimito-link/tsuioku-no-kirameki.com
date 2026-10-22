@@ -67,6 +67,7 @@
 - 🔵 **KEY_VENUE_BUTTON_VISIBLE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_VOICE_ASSIGNMENTS** — 読む人だけ（書く経路が無い疑い）: src/extension/phoneVoicePublisher.js
 - 🔵 **KEY_VOICE_READ_NAME_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/phoneVoicePublisher.js
+- 🔵 **KEY_VOICE_VOLUME_PERCENT** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
@@ -165,6 +166,7 @@
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_VOICE_READ_NAME_ENABLED` | — | extension/phoneVoicePublisher.js |
+| `KEY_VOICE_VOLUME_PERCENT` | — | extension/comeview-entry.js |
 | `KEY_WEB_PUBLISH_OPT_IN` | extension/status-entry.js | extension/status-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |
 | `fn:chunkIndexKey` | extension/content-entry.js | extension/popup-entry.js |

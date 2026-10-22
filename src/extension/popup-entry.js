@@ -912,6 +912,7 @@ import { createRememberedAvatarLookup } from '../lib/rememberedAvatarIndex.js';
 import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
+import { wireVoiceVolumeSlider } from './popup/wireVoiceVolumeSlider.js';
 import {
   applyPopupFrameFallback,
   loadPopupFrameSettings,
@@ -19806,6 +19807,7 @@ async function initPopup() {
     }
   });
 
+  wireVoiceVolumeSlider(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P2: 読み上げ音量
   const effectSoundToggle = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));
   effectSoundToggle?.addEventListener('change', async () => {
     try {
