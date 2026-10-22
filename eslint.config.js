@@ -397,7 +397,7 @@ export default [
     //   判定は `src/lib/domTreeCensus.js`(純関数)。ここは採取だけ。
     // v0.1.1734: スマホの WEB版だけの「PC に中継して投稿する」口(+30行: 口の取り出し・送信ボタンの可否・預ける分岐・Enter 送信の無効化・起動時の配線)。
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
-    // v0.1.1746: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
+    // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     rules: { 'max-lines': ['error', { max: 21745, skipBlankLines: false, skipComments: false }] }
   },
   {
@@ -429,8 +429,8 @@ export default [
     // v0.1.1659: 発言パネルのギフト明細の配線とCSS=+68行(判定は lib の venueGiftThrowsForUser.js)。
     // v0.1.1721: giftEffectDiag スナップショットに liveId を刻む1行(+コメント1行)。別配信の値の居残り根治(判定は lib の giftEffectDiag.js)。
     // v0.1.1725: 広告効果音を戻り値で数える分岐=+6行(+import 1行)。振り分けは lib の adSoundDiagFieldForPlayResult。
-    // v0.1.1744: 読み上げの受信時刻を VoicePlayer へ渡す1行(+コメント1行)。遅れの段階計測(判定は lib の voiceStageTiming.js)。
-    // v0.1.1746: 読み上げ音量の追従(storage.onChanged を VoicePlayer へ渡す1行)。正規化は lib の voiceVolume.js。
+    // v0.1.1748: 読み上げの受信時刻を VoicePlayer へ渡す1行(+コメント1行)。遅れの段階計測(判定は lib の voiceStageTiming.js)。
+    // v0.1.1749: 読み上げ音量の追従(storage.onChanged を VoicePlayer へ渡す1行)。正規化は lib の voiceVolume.js。
     files: ['src/extension/venueBar.js'],
     rules: { 'max-lines': ['error', { max: 7334, skipBlankLines: false, skipComments: false }] }
   },

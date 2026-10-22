@@ -76,6 +76,15 @@ describe('createPhoneVoiceSender', () => {
     expect(await running).toBe(2);
     expect(d.post.mock.calls.map((c) => c[0].no)).toEqual(['2', '3']);
   });
+  it('v0.1.1746: 声にならなかった内訳を数える(溢れ・番号なし・失敗・送れた数)', async () => {
+    const d = deps({ post: vi.fn(async (c) => c.no !== '3') });
+    const s = createPhoneVoiceSender(d);
+    await s.tick({ wanted: true, rows: rows(1) });
+    await s.tick({ wanted: true, rows: [...rows(1, 2, 3), { text: '番号なし' }] });
+    expect(s.stats()).toMatchObject({ ticks: 2, picked: 2, overflow: 0, noNumber: 1, failed: 1, sent: 1, pending: 0 });
+    await s.tick({ wanted: true, rows: rows(...Array.from({ length: 13 }, (_, i) => i + 1)) });
+    expect(s.stats()).toMatchObject({ picked: 12, overflow: 2, noNumber: 0 });
+  });
   it('bytesToBase64', () => {
     expect(bytesToBase64(new Uint8Array([1, 2, 3]))).toBe('AQID');
   });
