@@ -99,6 +99,8 @@ import { buildSessionSummaryCompareTableHtml } from '../src/lib/sessionSummaryCo
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
 // 2026-10-21: スマホは1配信だけ映す。映す配信=鏡が指す配信(PC で最後に操作した配信)。
 import { isLiveSwitched, pickLiveForCard, pickSnapshotLiveId } from '../src/lib/liveviewCurrentLive.js';
+// v0.1.1734: スマホから生放送にコメントを届ける(PC の拡張が中継)。入力欄は本物 popup のまま・帯と印だけ足す。
+import { createPhonePostClient, mountPhonePostUi, takePostKey } from './live-view-post.js';
 import {
   evaluateSnapshotFreshness,
   formatSnapshotStalenessBanner
@@ -115,6 +117,8 @@ let _shownLiveId = '';
 let _visibilityRefreshWired = false;
 /** fetchSnapshot の戻り値: サーバーの中身が前回から変わっていない(304)。 */
 const SNAPSHOT_NOT_MODIFIED = Symbol('not-modified');
+/** v0.1.1734: スマホからコメントする口(URL の #pk= の鍵があるときだけ)。無ければ null=見るだけ。 */
+let _postClient = null;
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
 const MIRROR_FRESH_MS = 3 * 60 * 1000;
 
@@ -676,6 +680,8 @@ function paintAllMirrors(jsonBlob) {
   paintNorthStarMirror(jsonBlob.northStarMirror || null);
   paintSupporterRanking(jsonBlob.topSupporters || null);
   paintCommentTimelineMirror(jsonBlob.commentTimelineMirror || null);
+  // v0.1.1734: 自分が送ったコメントが放送に流れたら ✓✓(届いた)にする。
+  if (_postClient) _postClient.updateSeen(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null));
   // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // ③WEB投げ一覧丸写し(第2号): 北極星 giftHistory レーン(貢献者 strip + 投げ明細テーブル)を描く。
@@ -796,6 +802,8 @@ async function bootWithSnapshot(token) {
     // ★本物 popup-entry を起動（chrome シムは設置済み）。dock=liveview=受動ビュー。
     //   import 後、popup の initPopup が DOMContentLoaded で走り、初回ロード幕を外す。
     await import('../src/extension/popup-entry.js');
+    // v0.1.1734: 本物の入力欄の上に「PC とつながっているか」の帯、下に自分のコメントの印を付ける。
+    try { mountPhonePostUi(_postClient); } catch { /* 付けられなくても閲覧は続ける */ }
     // ★popup は生コメントデータを持たないので、応援レーン/数字カードを「空」に塗り直す。
     //   その空描画が【私の鏡 paint を上書き（clobber）する】。clobber は (a) 初回 refresh と
     //   (b) ユーザーが <details> を開く等で起きる再描画、の両方で発生する。
@@ -984,6 +992,13 @@ function bootstrap() {
   if (!token) {
     showError('URL に閲覧トークン（?v=...）がありません。PC の拡張の状態速報ページから「📱 スマホへ送信」してください。');
     return;
+  }
+  // v0.1.1734: 投稿用の鍵(#pk=)は popup を起動する【前に】口として置く(popup の送信ボタンがこれを使う)。
+  const postKey = takePostKey(token);
+  if (postKey) {
+    _postClient = createPhonePostClient({ token, postKey });
+    globalThis.__nlsWebCommentRelay = _postClient;
+    _postClient.start();
   }
   bootWithSnapshot(token).catch((err) => {
     showError('通信エラー: ' + String((err && err.message) || err));

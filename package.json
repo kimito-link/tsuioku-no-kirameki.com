@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.1733",
+  "version": "0.1.1734",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -89,6 +89,7 @@
     "globals": "^15.15.0",
     "happy-dom": "^20.14.5",
     "husky": "^9.1.7",
+    "qrcode-generator": "2.0.4",
     "serve": "^14.2.4",
     "typescript": "^6.0.2",
     "vitest": "^3.0.0"
