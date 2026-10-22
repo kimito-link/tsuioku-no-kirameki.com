@@ -247,7 +247,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (363)
+- 📁 **docs/** (364)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -545,8 +545,9 @@
     - `MOVED.md`
   - 📁 **policies/** (1)
     - `STATS_FAILURE_MODES.md`
-  - 📁 **releases/** (5)
+  - 📁 **releases/** (6)
     - `0.1.7-x-article.md`
+    - `cws-next-submission.md`
     - `cws-publish-api-setup.md`
     - `cws-store-listing.md`
     - `cws-submission-texts.md`
