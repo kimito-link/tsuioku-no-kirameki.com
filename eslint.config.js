@@ -431,7 +431,7 @@ export default [
     // v0.1.1725: 広告効果音を戻り値で数える分岐=+6行(+import 1行)。振り分けは lib の adSoundDiagFieldForPlayResult。
     // v0.1.1748: 読み上げの受信時刻を VoicePlayer へ渡す1行(+コメント1行)。遅れの段階計測(判定は lib の voiceStageTiming.js)。
     // v0.1.1749: 読み上げ音量の追従(storage.onChanged を VoicePlayer へ渡す1行)。正規化は lib の voiceVolume.js。
-    // v0.1.1752: 読み上げの遅れの一言(span 1つと onLagNotice の配線)=+3行。判定と文言は lib の voiceLagNotice.js。
+    // v0.1.1754: 読み上げの遅れの一言(span 1つと onLagNotice の配線)=+3行。判定と文言は lib の voiceLagNotice.js。
     files: ['src/extension/venueBar.js'],
     rules: { 'max-lines': ['error', { max: 7337, skipBlankLines: false, skipComments: false }] }
   },

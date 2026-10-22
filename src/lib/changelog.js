@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1752',
+    version: '0.1.1754',
     date: '2026-10-23',
     summary: '読み上げが遅れているときに秒数を出す',
     items: Object.freeze([
