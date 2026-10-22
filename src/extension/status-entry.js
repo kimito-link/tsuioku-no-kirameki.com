@@ -63,7 +63,7 @@ import { parseShareKeysFile, shareKeysFingerprint } from '../lib/shareKeysFile.j
 //   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
 import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
 // v0.1.1016: ③WEB が古くなる前に自動で再 publish すべきかの判定(手動ボタンの往復を無くす)。
-import { latestPublishTime, shouldAutoPublish } from '../lib/autoPublishDecision.js';
+import { VIEWER_ACTIVE_PUBLISH_INTERVAL_MS, latestPublishTime, shouldAutoPublish } from '../lib/autoPublishDecision.js';
 // 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→送信時の記録に使う。
 import {
   recordLiveviewPublishOutcome
@@ -274,7 +274,7 @@ import {
 import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
 import { popupSnapshotAgeMs } from '../lib/aiShareFullText.js';
 import { acquireStatusPublisherLock, isStatusPublisherMode } from '../lib/statusPublisherPlan.js';
-import { statusRefreshIntervalMs } from '../lib/statusRefreshInterval.js';
+import { shouldRunPublisherTick, statusRefreshIntervalMs } from '../lib/statusRefreshInterval.js';
 // ★v0.1.1389: 33セルを症状の言葉(コメント記録/人の識別/レーン/公式値/演出/健全性)で枠に分ける。
 import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
@@ -363,10 +363,17 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 /**
- * v0.1.1735: 送信担当(?publisher=1)だけは 9秒。描画は10秒ごとなので、12秒だと「12秒たったか」を
- *   10秒ごとに見る=実際の読み込みは20秒ごとになり、スマホへの反映が最大10秒遅れていた。9秒なら毎回読む。
+ * v0.1.1735: 送信担当(?publisher=1)は補助データを描き直しのたびに読む(12秒だと10秒周期と噛み合わず実効20秒だった)。
+ *   v0.1.1736: 周期が5秒になったので 9秒→4.5秒(スマホが開いていなければ描き直し自体が10秒ごと)。
  */
-const PUBLISHER_EXTRAS_REFETCH_MS = 9000;
+const PUBLISHER_EXTRAS_REFETCH_MS = 4500;
+/** v0.1.1736: サーバーが「いまスマホで開いている」と返した期限(ms)。この間は送信担当が5秒ごとに描き直し・5秒で送る。 */
+let _phoneViewingUntilMs = 0;
+/** v0.1.1736: 送信担当の描き直しの回数(スマホが開いていなければ2回に1回だけ描く)。 */
+let _publisherTickNo = 0;
+function isPhoneViewing() {
+  return _phoneViewingUntilMs > Date.now();
+}
 let _extrasCacheAt = 0;
 /**
  * ★v0.1.1446: コアread を最後に【実際に読んだ】時刻(キー名→ms)。
@@ -704,6 +711,8 @@ function dismissStatusBootNotice() {
 function runRefreshTick(opts) {
   const first = opts?.first === true;
   if (_refreshPausedByUser) return;
+  // v0.1.1736: 送信担当は5秒周期。スマホが開いていなければ2回に1回だけ描く(=10秒・今までと同じ重さ)。
+  if (!first && IS_STATUS_PUBLISHER && !shouldRunPublisherTick({ tickNo: _publisherTickNo++, viewerActive: isPhoneViewing() })) return;
   // ★初回は hidden でも描く。開いた直後は hidden 判定が true になりうるうえ、
   //   ここで降りると「開いたのに永久に白い」を作る(降りた後に誰も再挑戦しない)。
   // v0.1.1733: 送信担当(?publisher=1)は見えない部品=watch ページに置かれてタブが裏に回っても止めない(スマホへ送り続ける)。
@@ -2377,14 +2386,19 @@ let _autoPublishLastContentSig = '';
 /** v0.1.1729: 自動送信が続けて失敗した回数。失敗が続くと間隔を 20→40→80→120秒 と広げる。 */
 let _autoPublishFailStreak = 0;
 
+/**
+ * v0.1.1736: 判定の changedIntervalMs = スマホが開いている間は、中身が変わったら5秒で送る(誰も見ていなければ20秒のまま)。
+ * v0.1.1735: 「変わった」でも、鏡を書き直しただけ(中身のシグネチャが前回の送信と同じ)なら送らない。
+ */
 function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
   try {
     maybeRegisterDevice({ optedIn: _webPublishOptIn === true, uploadCfg: getUploadConfig() }); // v0.1.1731: 同意 ON・鍵なしなら鍵をもらう
     const sig = buildLiveViewPublishSignature(_lastRenderedBundle?.jsonBlob);
     const hasWatchTab = Array.isArray(livesData) && livesData.some((l) => l && l.recording);
     const outcome = summarizeLiveviewPublishOutcomeRecord(publishOutcomeRec || null, Date.now());
+    const changedIntervalMs = isPhoneViewing() ? VIEWER_ACTIVE_PUBLISH_INTERVAL_MS : undefined;
     const decision = shouldAutoPublish({
-      // ★v0.1.1242: 明示同意(既定OFF)が最優先ゲート。未同意なら他が揃っていても送らない。
+      // ★v0.1.1242: 同意が最優先(既定OFF)
       optedIn: _webPublishOptIn === true,
       hasKeys: Boolean(getPublishCredentials(getUploadConfig())),
       hasPayload: Boolean(_lastRenderedBundle?.jsonBlob),
@@ -2394,10 +2408,10 @@ function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
       lastSentAtMs: latestPublishTime(publishOutcomeRec && publishOutcomeRec.at, _autoPublishLastLaunchAtMs),
       nowMs: Date.now(),
       changed: Boolean(sig) && sig !== _autoPublishLastSentSig,
+      changedIntervalMs,
       failStreak: _autoPublishFailStreak
     });
     if (!decision.publish) return;
-    // v0.1.1735: 鏡を書き直しただけ(capturedAt だけ変わった)なら送らない=中身で比べる(送る間隔を満たしたときだけ計算)。
     const contentSig = buildLiveViewContentSignature(_lastRenderedBundle?.jsonBlob);
     if (decision.reason === 'changed' && contentSig && contentSig === _autoPublishLastContentSig) {
       _autoPublishLastSentSig = sig;
@@ -3772,6 +3786,9 @@ async function uploadStatusSnapshot() {
       persistLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, liveId: sentLiveId });
       return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
     }
+    // v0.1.1736: 返事の viewerActive=いまスマホで開いている(30秒の目印)。古いサーバーは返さない=false 扱い。
+    const ack = await res.json().catch(() => null);
+    _phoneViewingUntilMs = ack && ack.viewerActive === true ? Date.now() + 30_000 : 0;
     recordLiveviewPublishOutcome({ ok: true, httpStatus: res.status, at: Date.now() });
     persistLiveviewPublishOutcome({ ok: true, httpStatus: res.status, liveId: sentLiveId });
     // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。

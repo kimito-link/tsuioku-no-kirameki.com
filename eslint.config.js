@@ -444,7 +444,8 @@ export default [
     // v0.1.1734: スマホから預かったコメントを投稿する係の起動・スイッチの配線・同意 OFF で止める(+5行)。本体は phonePostRelay.js。
     // v0.1.1735: スマホへの送信を速く・軽く(+21行)。送信担当の補助データ9秒・中身が同じなら送らない・gzip で送り 400 なら JSON に戻す。
     //   判定は lib(liveViewPublishSignature.js の buildLiveViewContentSignature / gzipBody.js)に置き、ここは配線とその理由の注記だけ。
-    rules: { 'max-lines': ['error', { max: 4574, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1736: スマホが開いている間だけ5秒で描き直し・送る(+17行)。判定は lib(statusRefreshInterval.js の shouldRunPublisherTick)。
+    rules: { 'max-lines': ['error', { max: 4591, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

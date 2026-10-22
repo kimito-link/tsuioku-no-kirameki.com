@@ -16,9 +16,9 @@ import {
 const H = 'a'.repeat(64);
 
 describe('deviceAuth(スマホ版の利用者ごとの鍵・v0.1.1730)', () => {
-  it('保存期間は24時間・利用者ごとの上限は1日4,000回(2026-10-21 了承)', () => {
+  it('保存期間は24時間・利用者ごとの上限は1日12,000回(v0.1.1736・スマホで開いている間は約5秒間隔)', () => {
     expect(STATUS_TTL_SECONDS).toBe(86_400);
-    expect(DEFAULT_DEVICE_DAILY_LIMIT).toBe(4_000);
+    expect(DEFAULT_DEVICE_DAILY_LIMIT).toBe(12_000);
   });
   it('鍵の形の検査(短すぎる・記号入りは不可)', () => {
     expect(isValidDeviceId('abcdefghijklmnopqrstuv')).toBe(true);
@@ -48,9 +48,9 @@ describe('deviceAuth(スマホ版の利用者ごとの鍵・v0.1.1730)', () => {
     expect(hexEqual(H, 'a'.repeat(63))).toBe(false);
     expect(hexEqual('', '')).toBe(false);
   });
-  it('★上限: 4,000回目までは通し、4,001回目から断る。全体の上限が先なら全体で断る', () => {
-    expect(quotaVerdict({ deviceCount: 4000, globalCount: 1 }).allow).toBe(true);
-    expect(quotaVerdict({ deviceCount: 4001, globalCount: 1 })).toMatchObject({ allow: false, reason: 'device_quota' });
+  it('★上限: 12,000回目までは通し、12,001回目から断る。全体の上限が先なら全体で断る', () => {
+    expect(quotaVerdict({ deviceCount: 12_000, globalCount: 1 }).allow).toBe(true);
+    expect(quotaVerdict({ deviceCount: 12_001, globalCount: 1 })).toMatchObject({ allow: false, reason: 'device_quota' });
     expect(quotaVerdict({ deviceCount: 1, globalCount: 11, globalLimit: 10 })).toMatchObject({ allow: false, reason: 'global_quota' });
     expect(quotaVerdict({ deviceCount: 1, globalCount: 8, globalLimit: 10 })).toMatchObject({ allow: true, globalWarn: true });
     expect(quotaVerdict({ deviceCount: 1, globalCount: 7, globalLimit: 10 }).globalWarn).toBe(false);
