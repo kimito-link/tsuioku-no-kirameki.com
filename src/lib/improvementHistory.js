@@ -3726,5 +3726,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1739', metric: 'cross-checked-claims', value: 36,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '模擬サーバー+スマホ幅のブラウザで、開いた瞬間は吹き出さない→コメントで吹き出し・ギフトで真ん中に品名を画面で確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1740', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。読み上げを送る係は状態速報(status.js)だけ、受け取る係は WEB版(app/live-view-voice.js)だけに入る。'
+  }),
+  Object.freeze({
+    version: '0.1.1740', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1740', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '本物の受け口+模擬 Redis+ブラウザ2枚(PC役・スマホ役)で、WAV→Opus→預かり→スマホで2件を順に再生(各1.67秒)を確認。'
   })
 ]);

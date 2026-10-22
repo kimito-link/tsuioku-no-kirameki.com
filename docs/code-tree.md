@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 989 件
+## ⚠️ 役割コメントが無いソース 9 / 996 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -93,7 +93,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (108)
+- 📁 **app/** (109)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -215,6 +215,7 @@
   - `live-view-post.js` — スマホの WEB版から生放送にコメントを届ける(v0.1.1734)。
   - `live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
   - `live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
+  - `live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
 - 📁 **council-scout/** (26)
@@ -906,7 +907,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2123)
+- 📁 **src/** (2135)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -943,7 +944,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (75)
+  - 📁 **extension/** (77)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -995,6 +996,8 @@
     - `phonePostRelay.test.js`
     - `phoneSound.wiring.test.js`
     - `phoneVenue.wiring.test.js`
+    - `phoneVoice.wiring.test.js`
+    - `phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
     - `popupAvatarRetry.wiring.test.js`
     - `popupBackfillCompleteState.wiring.test.js`
@@ -1176,7 +1179,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1886)
+  - 📁 **lib/** (1894)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2275,6 +2278,8 @@
     - `officialNicoStatsStripDigest.test.js`
     - `officialStatsWindow.js` — at?: number|null,
     - `officialStatsWindow.test.js`
+    - `oggOpusMux.js` — v0.1.1740: Opus の音のかたまり(パケット)を Ogg に包む(純関数)。
+    - `oggOpusMux.test.js`
     - `opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
     - `opSoundDirector.test.js`
     - `opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
@@ -2345,6 +2350,12 @@
     - `phoneSoundCues.test.js`
     - `phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
     - `phoneVenueModel.test.js`
+    - `phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
+    - `phoneVoice.test.js`
+    - `phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
+    - `phoneVoiceEncode.test.js`
+    - `phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
+    - `phoneVoiceSender.test.js`
     - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
     - `pickBroadcasterNameForReputation.test.js`
     - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。
@@ -3065,7 +3076,7 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (7)
+  - 📁 **server/** (9)
     - `deviceApi.test.js`
     - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
@@ -3073,6 +3084,8 @@
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
     - `phonePostApi.test.js`
+    - `phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `phoneVoiceApi.test.js`
   - 📁 **shared/** (7)
     - 📁 **avatar/** (3)
       - `avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
