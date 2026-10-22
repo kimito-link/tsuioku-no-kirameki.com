@@ -86,7 +86,7 @@ export function diffPhoneVenueEvents(a) {
   const rows = Array.isArray(a && a.rows) ? a.rows : [];
   const first = !(a && a.seen instanceof Set);
   const seen = first ? new Set() : new Set(a.seen);
-  /** @type {{ type: 'comment'|'gift', personKey: string, name: string, text: string, itemName: string, point: number }[]} */
+  /** @type {{ type: 'comment'|'gift', personKey: string, name: string, text: string, itemName: string, point: number, no: string }[]} */
   const events = [];
   for (const row of rows) {
     if (!row || typeof row !== 'object') continue;
@@ -101,7 +101,9 @@ export function diffPhoneVenueEvents(a) {
       name: s(row.name),
       text: s(row.text),
       itemName: gift ? s(row.itemName || row.text) : '',
-      point: gift ? Math.max(0, Math.floor(Number(row.point) || 0)) : 0
+      point: gift ? Math.max(0, Math.floor(Number(row.point) || 0)) : 0,
+      // v0.1.1742: コメント番号(読み上げの声と吹き出しを合わせる目印)。無ければ空。
+      no: gift ? '' : /^\d{1,10}$/.test(s(row.no)) ? s(row.no) : ''
     });
   }
   while (seen.size > SEEN_CAP) seen.delete(/** @type {string} */ (seen.values().next().value));
