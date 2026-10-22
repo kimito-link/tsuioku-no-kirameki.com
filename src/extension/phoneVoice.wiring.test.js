@@ -19,6 +19,7 @@ describe('配線: スマホの読み上げ(v0.1.1740)', () => {
   it('★PC: 送信の返事の voiceWanted で声を作る・状態をスマホへ載せる', () => {
     expect(statusEntry).toContain('void _phoneVoice.tick({ wanted: ack.voiceWanted, liveId: sentLiveId, rows: jsonBlob.commentTimelineMirror?.rows });');
     expect(statusEntry).toContain('phoneVoice: _phoneVoice.state()');
+    expect(statusEntry).toContain('phoneVoiceStats: _phoneVoice.stats()');
   });
 });
 
