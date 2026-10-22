@@ -60,4 +60,17 @@ describe('deviceAuth(スマホ版の利用者ごとの鍵・v0.1.1730)', () => {
     expect(stripDeviceBody(body)).toEqual({ northStarMirror: { a: 1 } });
     expect(body.statusReport).toBe('long');
   });
+  it('★v0.1.1752: lives は鏡が指す1配信だけに絞る(他の配信は送らない・元の物は変えない)', () => {
+    const lives = [{ liveId: 'lv1', title: 'A' }, { liveId: 'lv2', title: 'B' }, { liveId: 'lv3', title: 'C' }];
+    const body = { lives, laneMirror: { liveId: 'lv2' } };
+    expect(stripDeviceBody(body).lives).toEqual([{ liveId: 'lv2', title: 'B' }]);
+    expect(body.lives).toHaveLength(3);
+  });
+  it('★v0.1.1752: 鏡が無い・鏡の配信が lives に無いときは先頭の1件、空なら空のまま', () => {
+    const lives = [{ liveId: 'lv1' }, { liveId: 'lv2' }];
+    expect(stripDeviceBody({ lives }).lives).toEqual([{ liveId: 'lv1' }]);
+    expect(stripDeviceBody({ lives, northStarMirror: { liveId: 'lv9' } }).lives).toEqual([{ liveId: 'lv1' }]);
+    expect(stripDeviceBody({ lives: [] }).lives).toEqual([]);
+    expect(stripDeviceBody({ a: 1 })).toEqual({ a: 1 });
+  });
 });

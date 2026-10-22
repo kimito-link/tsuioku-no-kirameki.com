@@ -522,10 +522,8 @@ import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { buildCommentTickerLatestHtml } from '../lib/commentTickerLatestHtml.js';
 // コメントタイムライン鏡(council/liveview-wholesale-root-SYNTHESIS.md 第2段): 純Webで「コメントが進む動き」を
 //   出すため、popup が手元に持つ displayEntries の最新N件を鏡として publish→status 経由で純Webへ。
-import {
-  buildCommentTimelineMirrorSnapshot,
-  restoreCommentTimelineRows
-} from '../lib/commentTimelineMirror.js';
+import { buildCommentTimelineMirrorSnapshot, restoreCommentTimelineRows } from '../lib/commentTimelineMirror.js';
+import { writeMirrorPayloadKeepingNewerTimeline } from '../lib/mirrorPayloadWrite.js'; // v0.1.1753: 古いコメント鏡で巻き戻さない
 import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
 import { createCommentMirrorPublishGate } from '../lib/commentMirrorPublishGate.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
@@ -7228,7 +7226,7 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
         const out = _mirrorFlushScheduler.takeFlushPayload(Date.now());
         try { observeNorthStarFlushOutcome(_northStarMirrorPublishRace, Boolean(out)); } catch { /* 計器失敗はflushを止めない */ }
         if (!out) { if (_mirrorFlushScheduler.isDirty()) mergeAndScheduleFlush(sectionKey, null, liveId, Date.now()); return; }
-        if (Object.keys(out.legacyPayload).length) void chrome.storage.local.set(out.legacyPayload).catch(() => { /* best-effort */ }); // 変わった鏡だけ(全部同じなら書かない)
+        if (Object.keys(out.legacyPayload).length) void writeMirrorPayloadKeepingNewerTimeline(chrome.storage.local, out.legacyPayload).catch(() => { /* best-effort */ }); // 変わった鏡だけ(全部同じなら書かない)
       } catch { /* no-op */ }
     }, 400);
   } catch { /* no-op */ }
