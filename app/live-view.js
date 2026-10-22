@@ -106,6 +106,7 @@ import { createPhonePostClient, mountPhonePostUi, takePostKey } from './live-vie
 import { createPhoneSoundPlayer, mountPhoneSoundUi } from './live-view-sound.js';
 import { createPhoneVenue, mountPhoneVenueUi } from './live-view-venue.js';
 import { createPhoneVoice, mountPhoneVoiceUi } from './live-view-voice.js';
+import { mountPhoneFit } from './live-view-phone-fit.js';
 import {
   evaluateSnapshotFreshness,
   formatSnapshotStalenessBanner
@@ -825,6 +826,8 @@ async function bootWithSnapshot(token) {
     try { mountPhoneSoundUi(_soundPlayer); } catch { /* 付けられなくても閲覧は続ける */ }
     try { mountPhoneVenueUi(_venue); } catch { /* 付けられなくても閲覧は続ける */ }
     try { if (_voice) mountPhoneVoiceUi(_voice); } catch { /* 付けられなくても閲覧は続ける */ }
+    // v0.1.1741: スマホで働かない拡張専用のボタンを隠し、応援者アイコンはプロフィールを開く。
+    try { mountPhoneFit(); } catch { /* 付けられなくても閲覧は続ける */ }
     // ★popup は生コメントデータを持たないので、応援レーン/数字カードを「空」に塗り直す。
     //   その空描画が【私の鏡 paint を上書き（clobber）する】。clobber は (a) 初回 refresh と
     //   (b) ユーザーが <details> を開く等で起きる再描画、の両方で発生する。
