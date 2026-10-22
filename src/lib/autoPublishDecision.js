@@ -51,6 +51,27 @@ export const CHANGED_AUTO_PUBLISH_INTERVAL_MS = 20_000;
  *   送信担当もその間は5秒ごとに描き直す(statusRefreshInterval.js shouldRunPublisherTick)。誰も見ていなければ20秒のまま。
  */
 export const VIEWER_ACTIVE_PUBLISH_INTERVAL_MS = 5_000;
+/**
+ * v0.1.1738: 「スマホで開いている」を覚えておく長さ。中身が変わらないと送信は120秒ごとなので、
+ *   サーバーの目印(30秒)のままだと30秒で速い送信が切れていた。次の送信の返事が来るまで持つよう 150秒。
+ *   閉じたら、その後の送信の返事(viewerActive:false)ですぐ解除する。
+ */
+export const VIEWER_ACTIVE_STICKY_MS = 150_000;
+
+/**
+ * v0.1.1738: 送信の返事から「スマホで開いている期限」と「gzip で送ってよいか」を決める。
+ *   古いサーバーは viewerActive / gzipOk を返さない=どちらも false 扱い(gzip を解けないサーバーに送らない)。
+ * @param {unknown} ack POST の返事(JSON)
+ * @param {number} nowMs
+ * @returns {{ viewingUntilMs: number, gzipOk: boolean }}
+ */
+export function readPublishAck(ack, nowMs) {
+  const a = ack && typeof ack === 'object' ? /** @type {Record<string, unknown>} */ (ack) : {};
+  return {
+    viewingUntilMs: a.viewerActive === true ? (Number(nowMs) || 0) + VIEWER_ACTIVE_STICKY_MS : 0,
+    gzipOk: a.gzipOk === true
+  };
+}
 
 /**
  * @param {{

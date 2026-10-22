@@ -31,6 +31,16 @@ describe('buildCommentTimelineMirrorSnapshot', () => {
     expect(items.filter((i) => i.kind === 'comment').map((i) => i.commentNo)).toEqual(['', '', '13', '12']);
   });
 
+  it('v0.1.1738: コメント番号は取り込みと同じ10桁まで載せる(11桁は載せない)', () => {
+    const snap = buildCommentTimelineMirrorSnapshot({
+      liveId: 'lv1',
+      comments: [{ at: 1, text: 'a', commentNo: '1234567890' }, { at: 2, text: 'b', commentNo: '12345678901' }],
+      giftEvents: [],
+      capturedAt: 10
+    });
+    expect(snap.rows.map((r) => r.no)).toEqual(['1234567890', undefined]);
+  });
+
   it('コメント配列から最新N件を時刻順(古→新)で組む', () => {
     const comments = [cmt(NOW - 3000, 'c'), cmt(NOW - 1000, 'a'), cmt(NOW - 2000, 'b')];
     const snap = buildCommentTimelineMirrorSnapshot({ liveId: 'LV1', comments, capturedAt: NOW });

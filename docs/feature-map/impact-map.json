@@ -6524,6 +6524,16 @@
       ]
     },
     {
+      "file": "src/lib/liveElapsedExtrapolate.js",
+      "featureCount": 1,
+      "features": [
+        "web-status"
+      ],
+      "labels": [
+        "Web版 状態(スマホ)"
+      ]
+    },
+    {
       "file": "src/lib/liveHealthScore.js",
       "featureCount": 1,
       "features": [

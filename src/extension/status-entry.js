@@ -63,7 +63,7 @@ import { parseShareKeysFile, shareKeysFingerprint } from '../lib/shareKeysFile.j
 //   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
 import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
 // v0.1.1016: ③WEB が古くなる前に自動で再 publish すべきかの判定(手動ボタンの往復を無くす)。
-import { VIEWER_ACTIVE_PUBLISH_INTERVAL_MS, latestPublishTime, shouldAutoPublish } from '../lib/autoPublishDecision.js';
+import { VIEWER_ACTIVE_PUBLISH_INTERVAL_MS, latestPublishTime, readPublishAck, shouldAutoPublish } from '../lib/autoPublishDecision.js';
 // 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→送信時の記録に使う。
 import {
   recordLiveviewPublishOutcome
@@ -3755,6 +3755,8 @@ function persistLiveviewPublishOutcome(outcome) {
 
 /** v0.1.1735: 受け口が gzip を解けなかった(400)ら true=このページでは以後 JSON のまま送る。 */
 let _publishGzipRefused = false;
+/** v0.1.1738: 受け口が「gzip を解ける」と返したら true(古い受け口は gzip を黙って壊して保存するので、それまで JSON)。 */
+let _publishGzipOk = false;
 async function uploadStatusSnapshot() {
   const creds = getPublishCredentials(getUploadConfig()); // v0.1.1731: 共有キー優先・無ければ利用者ごとの鍵
   if (!creds) {
@@ -3773,7 +3775,7 @@ async function uploadStatusSnapshot() {
   try {
     // v0.1.1735: gzip で縮めて送る(約5分の1)。受け口が解けず 400 なら、このページでは以後 JSON のまま送り直す。
     const jsonText = JSON.stringify(buildPublishBody(creds, jsonBlob));
-    const sent = await buildPublishInit(creds.headers, jsonText, { allowGzip: !_publishGzipRefused });
+    const sent = await buildPublishInit(creds.headers, jsonText, { allowGzip: _publishGzipOk && !_publishGzipRefused });
     let res = await fetch(ingestUrl, sent.init);
     if (sent.gzip && res.status === 400 && (await res.clone().json().catch(() => null))?.error === 'bad body') {
       _publishGzipRefused = true;
@@ -3786,9 +3788,10 @@ async function uploadStatusSnapshot() {
       persistLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, liveId: sentLiveId });
       return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
     }
-    // v0.1.1736: 返事の viewerActive=いまスマホで開いている(30秒の目印)。古いサーバーは返さない=false 扱い。
-    const ack = await res.json().catch(() => null);
-    _phoneViewingUntilMs = ack && ack.viewerActive === true ? Date.now() + 30_000 : 0;
+    // v0.1.1736/1738: 返事の viewerActive=いまスマホで開いている・gzipOk=gzip を解ける(古いサーバーはどちらも返さない)。
+    const ack = readPublishAck(await res.json().catch(() => null), Date.now());
+    _phoneViewingUntilMs = ack.viewingUntilMs;
+    _publishGzipOk = ack.gzipOk;
     recordLiveviewPublishOutcome({ ok: true, httpStatus: res.status, at: Date.now() });
     persistLiveviewPublishOutcome({ ok: true, httpStatus: res.status, liveId: sentLiveId });
     // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。

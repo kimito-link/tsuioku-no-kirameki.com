@@ -698,6 +698,7 @@
 | `src/lib/lightSupplyOverwriteGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveCommenterStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveCommentTally.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/liveElapsedExtrapolate.js` | 1 | Web版 状態(スマホ) |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/liveMotion.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |

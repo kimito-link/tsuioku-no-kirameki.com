@@ -65,6 +65,7 @@ import {
 import { paintStatCardsMirrorValues } from '../src/lib/statCardsMirrorDom.js';
 import { buildStatCardsMirrorSignature } from '../src/lib/statCardsMirror.js';
 import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
+import { extrapolateLiveForDisplay } from '../src/lib/liveElapsedExtrapolate.js';
 import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
 import { anonymousIdenticonDataUrl } from '../src/lib/anonymousIdenticon.js';
 // 公式値レーン(ギフト貢献度ランキング/広告ランキング)を本物の strip 描画で出す。popup と同じ lib を再利用(似せて自作しない)。
@@ -680,7 +681,7 @@ function paintAllMirrors(jsonBlob) {
   if (!jsonBlob || typeof jsonBlob !== 'object') return;
   refreshStaleBanner(jsonBlob);
   // 古くても「全レーンを揃えて」塗る(バラバラに消すより、古い旨を1枚で伝えた上で丸ごと見せる方が誠実)。
-  paintBroadcasterCard(pickLiveForCard(jsonBlob));
+  paintBroadcasterCard(extrapolateLiveForDisplay(pickLiveForCard(jsonBlob), jsonBlob.generatedAt, Date.now()));
   paintStatCardsMirror(jsonBlob.statCardsMirror || null);
   paintLaneMirror(jsonBlob.laneMirror || null);
   paintNorthStarMirror(jsonBlob.northStarMirror || null);
@@ -889,6 +890,8 @@ async function refresh(token) {
   if (jsonBlob === SNAPSHOT_NOT_MODIFIED) {
     // 中身は同じ=塗り直さない。ただし「何秒前の状態か」のバナーだけは時間とともに進める(古さを隠さない)。
     refreshStaleBanner(_latestSnapshot);
+    // v0.1.1738: PC は時刻だけの変化では送らない=「経過」は送った時刻からスマホ側で進めて描き直す。
+    if (_latestSnapshot) paintBroadcasterCard(extrapolateLiveForDisplay(pickLiveForCard(_latestSnapshot), _latestSnapshot.generatedAt, Date.now()));
     return;
   }
   if (!jsonBlob) return;
