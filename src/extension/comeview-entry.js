@@ -107,6 +107,7 @@ import {
   measureVoiceGapMs,
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
+import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
 import {
   applyVoiceVolumeToWav,
   KEY_VOICE_VOLUME_PERCENT,
@@ -501,6 +502,17 @@ function stopVoicePlayback() {
   _voicePrefetches.clear();
   if (typeof _voiceStopCurrent === 'function') _voiceStopCurrent();
   _voiceStopCurrent = null;
+  updateVoiceLagNotice(); // 止めたら遅れの一言も消す(待ちは空)。
+}
+
+/** P5: 読み上げが大きく遅れているときの一言(会場の VoicePlayer と同じ判定=voiceLagNotice.js)。 */
+let _voiceLagNoticeShown = false;
+function updateVoiceLagNotice() {
+  const r = decideVoiceLagNotice(_voiceLagNoticeShown, { ..._voiceDiag, queueNow: _voiceQueue.length });
+  if (r.shown === _voiceLagNoticeShown && !r.shown) return;
+  _voiceLagNoticeShown = r.shown;
+  const el = document.getElementById('cvVoiceLag');
+  if (el) el.textContent = r.text;
 }
 
 function disableVoiceReading({ persist = true } = {}) {
@@ -845,6 +857,7 @@ async function drainVoiceQueue() {
               _voiceDiag.lastE2eMs = _e2eMs;
               _voiceDiag.e2eAvgMs = computeVoiceE2eAverage(_voiceDiag.e2eAvgMs, _e2eMs);
             }
+            updateVoiceLagNotice();
             if (playResult && typeof playResult.catch === 'function') {
               playResult.catch((err) => {
                 if (err && err.name === 'NotAllowedError') {
@@ -882,6 +895,7 @@ async function drainVoiceQueue() {
   } finally {
     _voicePlaying = false;
     markVoicePhase('drain_exit'); // v0.1.895: ループ正常終了(キュー空 or 無効化)=固着でない。
+    updateVoiceLagNotice(); // 待ちが空になったら遅れの一言を消す。
     if (_voiceDrainStuckTimer !== null) { clearTimeout(_voiceDrainStuckTimer); _voiceDrainStuckTimer = null; }
     if (_voiceReadingEnabled && _voiceQueue.length) void drainVoiceQueue();
   }

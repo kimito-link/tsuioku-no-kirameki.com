@@ -2773,6 +2773,8 @@ export function mountVenueBarButton(options = {}) {
   voiceStatus.style.marginLeft = '8px';
   voiceStatus.style.fontSize = '12px';
   voiceStatus.style.color = '#7a828e';
+  const voiceLag = /** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()); // P5: 読み上げの遅れの一言(文言と判定は lib の voiceLagNotice.js)
+  voiceLag.className = 'nlsb-voice-lag';
 
   let venueWindowBtn = null;
   if (!isStandalone) {
@@ -2813,9 +2815,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
+    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, venueWindowBtn, note, close);
   } else {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
+    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, note, close);
   }
   header.append(title, headerRight);
 
@@ -3365,6 +3367,7 @@ export function mountVenueBarButton(options = {}) {
       /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
     ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
+    onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; },
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
     },

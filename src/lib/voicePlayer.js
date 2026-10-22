@@ -35,6 +35,7 @@ import {
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT
 } from './voiceVolume.js';
+import { decideVoiceLagNotice } from './voiceLagNotice.js';
 
 /**
  * ★v0.1.1326: 生存確認の再試行バックオフ(ms)。初回失敗後にこの間隔で最大3回試す。
@@ -65,6 +66,9 @@ export class VoicePlayer {
     //   onStatus(テキスト)も従来どおり呼ぶので既存表示は壊れない。
     this.onLoadingState = deps.onLoadingState || (() => {});
     this.onSkip = deps.onSkip || (() => {});
+    /** P5: 遅れが大きいときの一言(空文字=消す)。判定は voiceLagNotice.js。 */
+    this.onLagNotice = deps.onLagNotice || (() => {});
+    this._lagNoticeShown = false;
     this.isObsMode = deps.isObsMode || (() => false);
     this.audioConstructor = deps.audioConstructor;
     /*
@@ -273,6 +277,7 @@ export class VoicePlayer {
     for (const item of dropped) this._notifyDropped(item);
     if (typeof this.stopCurrent === 'function') this.stopCurrent();
     this.stopCurrent = null;
+    this._updateLagNotice(); // 止めたら遅れの一言も消す(待ちは空)。
   }
 
   /**
@@ -761,6 +766,7 @@ export class VoicePlayer {
                 this.diag.lastE2eMs = e2e;
                 this.diag.e2eAvgMs = computeVoiceE2eAverage(this.diag.e2eAvgMs, e2e);
               }
+              this._updateLagNotice();
               // v0.1.771: 実際に再生が始まった瞬間だけ通知(drop/merge/失敗では呼ばれない)。
               //   吹き出しはここで speaking になり、onAudioEnd まで消えない。
               if (typeof item.onAudioStart === 'function') item.onAudioStart();
@@ -838,8 +844,17 @@ export class VoicePlayer {
       }
     } finally {
       this.playing = false;
+      this._updateLagNotice(); // 待ちが空になったら遅れの一言を消す。
       if (this.enabled && this.queue.length) void this._drainQueue();
     }
+  }
+
+  /** P5: 遅れの一言を出す/消す(状態が変わったときだけ通知)。 */
+  _updateLagNotice() {
+    const r = decideVoiceLagNotice(this._lagNoticeShown, { ...this.diag, queueNow: this.queue.length });
+    if (r.shown === this._lagNoticeShown && !r.shown) return;
+    this._lagNoticeShown = r.shown;
+    try { this.onLagNotice(r.text); } catch { /* no-op: 表示の失敗は読み上げに影響させない */ }
   }
 
   enqueue(items) {
