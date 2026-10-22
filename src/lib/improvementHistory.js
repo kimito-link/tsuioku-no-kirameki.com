@@ -3754,5 +3754,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1741', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'Android 実機で全ボタンを押した結果(無反応12個)を、模擬サーバーのブラウザで再現(応援者アイコンの押下が popup に止められていた)してから直した。'
+  }),
+  Object.freeze({
+    version: '0.1.1744', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。読み上げの段階計測は会場(venue.js)とコメビュ(comeview.js)に入り、popup には入らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1744', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1744', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日窓の数え方で前版と同値。今回は「エンジン待ち」の物差しが前提とする VOICEVOX の直列処理を、自宅PCの実測(3件同時でも15%しか縮まない)で確かめてから、時計を手で進める単体テストで固定した。'
   })
 ]);

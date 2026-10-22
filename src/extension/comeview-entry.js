@@ -95,11 +95,18 @@ import {
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
   computeVoiceCongestion,
+  computeVoiceE2eAverage,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
   resolveVoiceSynthDepth
 } from '../lib/voiceReadQueue.js';
 import { makeInitialVoiceDiag, buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import {
+  createVoiceSynthTracker,
+  foldVoiceStageEma,
+  measureVoiceGapMs,
+  recordVoiceSynthStage
+} from '../lib/voiceStageTiming.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
@@ -583,6 +590,33 @@ function voiceUserKeyForItem(item) {
   );
 }
 
+/** 2026-10-22計器(P1・会場 VoicePlayer と同じ物差し): エンジン待ち・初めての声を測る。 */
+const _voiceSynthTracker = createVoiceSynthTracker();
+
+/**
+ * 合成を依頼し、段階計測を _voiceDiag へ記録する(戻り値・例外は synthesizeVoice と同じ)。
+ * @param {string} text
+ * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
+ */
+function synthesizeVoiceTracked(text, voice) {
+  const track = _voiceSynthTracker.begin(voice?.styleId);
+  /** @type {{ queryMs?: number, synthMs?: number }} */
+  let timing = {};
+  return synthesizeVoice(text, voice, {
+    onFailure: (info) => recordVoiceSynthFailureReason(info),
+    onTiming: (t) => { timing = t || {}; }
+  }).then(
+    (wav) => {
+      try { recordVoiceSynthStage(_voiceDiag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
+      return wav;
+    },
+    (err) => {
+      try { track.end(timing, false); } catch { /* no-op */ }
+      throw err;
+    }
+  );
+}
+
 /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ)。 */
 function ensureVoicePrefetch(item, generation) {
   if (!item || generation !== _voiceGeneration) return null;
@@ -594,13 +628,12 @@ function ensureVoicePrefetch(item, generation) {
     _voiceAssignments,
     _voiceStyleIds
   );
-  const promise = synthesizeVoice(
+  const promise = synthesizeVoiceTracked(
     buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
     {
       ...assigned,
       speedOffset: assigned.speedOffset + congestion.speedBoost
-    },
-    { onFailure: (info) => recordVoiceSynthFailureReason(info) }
+    }
   ).catch(() => null);
   _voicePrefetches.set(item, { generation, promise });
   return promise;
@@ -689,6 +722,8 @@ async function drainVoiceQueue() {
 
       const item = _voiceQueue.shift();
       if (!item) continue;
+      // 2026-10-22計器(P1): キュー投入→取り出し(順番待ち)。
+      foldVoiceStageEma(_voiceDiag, 'queueWaitEmaMs', measureVoiceGapMs(item.enqueuedAt, Date.now()));
 
       // PR-V1: 合成前の鮮度ゲート判定
       const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
@@ -714,13 +749,12 @@ async function drainVoiceQueue() {
       markVoicePhase(prefetch ? 'await_prefetch' : 'await_synth'); // v0.1.895: 合成待ちで止まったか。
       const wav = prefetch
         ? await prefetch.promise
-        : await synthesizeVoice(
+        : await synthesizeVoiceTracked(
             buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
             {
               ...assigned,
               speedOffset: assigned.speedOffset + congestion.speedBoost
-            },
-            { onFailure: (info) => recordVoiceSynthFailureReason(info) }
+            }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
       markVoicePhase('synth_done'); // v0.1.895: 合成は通過した(ここで止まれば下の continue/再生で詰まり)。
@@ -793,6 +827,12 @@ async function drainVoiceQueue() {
           armWatchdog(VOICE_PLAYBACK_HARD_CAP_MS); // 先に固定上限で必ず張る(メタ未取得でも固着しない)。
           try {
             const playResult = audio.play();
+            // 2026-10-22計器(P1): 体感遅延(キュー投入→再生開始)。会場と同じ物差し(コメビュは未計測だった)。
+            const _e2eMs = measureVoiceGapMs(item.enqueuedAt, Date.now());
+            if (_e2eMs >= 0) {
+              _voiceDiag.lastE2eMs = _e2eMs;
+              _voiceDiag.e2eAvgMs = computeVoiceE2eAverage(_voiceDiag.e2eAvgMs, _e2eMs);
+            }
             if (playResult && typeof playResult.catch === 'function') {
               playResult.catch((err) => {
                 if (err && err.name === 'NotAllowedError') {
@@ -855,6 +895,12 @@ function enqueueVoiceTimelineItems(items) {
     }
 
     if (!buildVoiceReadingText({ name, text: body })) continue;
+    // 2026-10-22計器(P1): 受信(item.at=capturedAt)→キュー投入。
+    const _upstreamMs = measureVoiceGapMs(item.at, Date.now());
+    if (_upstreamMs >= 0) {
+      _voiceDiag.lastUpstreamMs = _upstreamMs;
+      foldVoiceStageEma(_voiceDiag, 'upstreamEmaMs', _upstreamMs);
+    }
     const candidate = {
       userKey: voiceUserKeyForItem(item),
       name,
