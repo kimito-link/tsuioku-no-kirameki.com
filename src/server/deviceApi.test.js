@@ -46,7 +46,7 @@ describe('api/device + api/status: 利用者ごとの鍵(v0.1.1730)', () => {
   afterEach(() => {
     vi.unstubAllGlobals(); logSpy.mockRestore();
     delete process.env.KV_REST_API_URL; delete process.env.KV_REST_API_TOKEN;
-    delete process.env.DEVICE_DAILY_LIMIT; delete process.env.STATUS_GLOBAL_DAILY_LIMIT;
+    delete process.env.DEVICE_DAILY_LIMIT; delete process.env.STATUS_GLOBAL_DAILY_LIMIT; delete process.env.STATUS_GLOBAL_MONTHLY_LIMIT;
   });
 
   it('★発行した鍵で書くと、自分の閲覧URLで見える(保存は24時間)。writeKey そのものはサーバーに残らない', async () => {
@@ -106,6 +106,17 @@ describe('api/device + api/status: 利用者ごとの鍵(v0.1.1730)', () => {
     const r = await postAs(b, { n: 1 });
     expect(r.code).toBe(429);
     expect(r.body.error).toBe('global_quota');
+  });
+
+  it('★v0.1.1755: 全体の月の上限を超えたら、誰でも 429(global_month_quota)', async () => {
+    process.env.STATUS_GLOBAL_MONTHLY_LIMIT = '1';
+    const a = (await register('1.1.1.1')).body;
+    const b = (await register('2.2.2.2')).body;
+    expect((await postAs(a, { n: 1 })).code).toBe(200);
+    const r = await postAs(b, { n: 1 });
+    expect(r.code).toBe(429);
+    expect(r.body.error).toBe('global_month_quota');
+    expect(r.headers['Retry-After']).toBe('120');
   });
 
   it('★削除するとスマホは 404・鍵も使えなくなる', async () => {
