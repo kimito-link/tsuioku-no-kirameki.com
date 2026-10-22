@@ -136,9 +136,11 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     expect(end).toBeGreaterThan(start);
     const synthBranch = cv.slice(start, end);
 
-    // 合成経路は先読みとその場合成の2つだけ。両方に同じ失敗理由計器を固定する。
-    expect((synthBranch.match(/synthesizeVoice\(/g) || []).length).toBe(2);
-    expect((synthBranch.match(/onFailure:\s*\(info\)\s*=>\s*recordVoiceSynthFailureReason\(info\)/g) || []).length).toBe(2);
+    // 合成経路は先読みとその場合成の2つだけ。両方が同じ計測つき合成(synthesizeVoiceTracked)を通り、
+    //   その中で失敗理由計器を1か所だけ配線する(2026-10-22 P1 で集約)。
+    expect((synthBranch.match(/(?<!function )synthesizeVoiceTracked\(/g) || []).length).toBe(2);
+    expect((synthBranch.match(/(?<!function )synthesizeVoice\(/g) || []).length).toBe(1);
+    expect((synthBranch.match(/onFailure:\s*\(info\)\s*=>\s*recordVoiceSynthFailureReason\(info\)/g) || []).length).toBe(1);
     // 理由bagは初期化を含む2参照、null累計は1つの失敗分岐だけに限定する。
     expect((synthBranch.match(/_voiceDiag\.synthFailReasons/g) || []).length).toBe(2);
     expect((synthBranch.match(/_voiceDiag\.synthNullTotal\s*=/g) || []).length).toBe(1);
@@ -149,5 +151,21 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     expect(nullAt).toBeGreaterThan(-1);
     expect(nullTotalAt).toBeGreaterThan(nullAt);
     expect(publishAt).toBeGreaterThan(nullTotalAt);
+  });
+
+  it('★10項目目: コメビュも届いた瞬間に先読み合成を起動する(会場 v0.1.800 と同じ)', () => {
+    // 会場: enqueue の末尾で _startPrefetch を呼ぶ。
+    const vpEnq = vp.slice(vp.indexOf('  enqueue('), vp.indexOf('  kickPrefetch()'));
+    expect(vpEnq).toMatch(/this\._startPrefetch\(this\.generation\)/);
+    // コメビュ: enqueueVoiceTimelineItems の中で、drain より前に startVoicePrefetch を呼ぶ。
+    const start = cv.indexOf('function enqueueVoiceTimelineItems');
+    const end = cv.indexOf('\nasync function initializeVoiceReading', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const enq = cv.slice(start, end);
+    const prefetchAt = enq.indexOf('startVoicePrefetch(_voiceGeneration)');
+    const drainAt = enq.lastIndexOf('void drainVoiceQueue()');
+    expect(prefetchAt).toBeGreaterThan(-1);
+    expect(drainAt).toBeGreaterThan(prefetchAt);
   });
 });

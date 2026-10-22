@@ -11816,6 +11816,26 @@
               </span>
             </label>
           </div>
+          <!-- 2026-10-22(P2・ユーザー要望「ノートPCだと読み上げが小さい。POPから音量調整」):
+               読み上げ(VOICEVOX)の音量。100% で長い文が今までと同じ大きさ。配線は popup/wireVoiceVolumeSlider.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceVolumeRange" class="nl-record-sub__label">
+              <span>
+                読み上げの音量 <strong id="voiceVolumeValue">100%</strong>
+                <input
+                  type="range"
+                  id="voiceVolumeRange"
+                  min="0"
+                  max="300"
+                  step="10"
+                  value="100"
+                  aria-label="読み上げの音量(0〜300%)"
+                />
+                <span class="nl-record-sub__hint"
+                  >VOICEVOX の読み上げの大きさです。ノートPCで小さく聞こえるときは上げてください。音が割れない範囲で大きくします。</span>
+              </span>
+            </label>
+          </div>
           <!-- v0.1.1271(ユーザー要望): 視聴ページに「🏟 会場モード」ボタンを出すか（既定 ON＝出す）。
                「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、会場の画面ではなく
                ボタンが常時表示されていることだった。会場を使わない人は隠せるようにする。 -->
