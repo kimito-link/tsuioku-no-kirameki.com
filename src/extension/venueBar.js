@@ -3345,6 +3345,7 @@ export function mountVenueBarButton(options = {}) {
 
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
+    storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
     onDiag: publishVenueVoiceDiag,
     onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
       voiceBtn.disabled = toggleBusy;
@@ -6754,6 +6755,8 @@ export function mountVenueBarButton(options = {}) {
           nickname: speech.name,
           key: speech.key,
           text: speech.text,
+          // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
+          receivedAt: speech.capturedAt,
           // ★キャラライブの相槌はここに乗せる(2026-08-25)。
           //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
           //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で

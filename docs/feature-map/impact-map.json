@@ -446,6 +446,24 @@
       ]
     },
     {
+      "file": "src/lib/voiceKeys.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/domain/user/nickname.js",
       "featureCount": 4,
       "features": [
@@ -1022,7 +1040,23 @@
       ]
     },
     {
-      "file": "src/lib/voiceKeys.js",
+      "file": "src/lib/voiceLagBudget.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceStageTiming.js",
       "featureCount": 4,
       "features": [
         "comeview",
@@ -1066,6 +1100,22 @@
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
         "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceVolume.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
         "会場モード(standalone)"
       ]
     },
@@ -2029,20 +2079,6 @@
     },
     {
       "file": "src/lib/voiceAgeGate.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceLagBudget.js",
       "featureCount": 3,
       "features": [
         "comeview",
@@ -4085,6 +4121,16 @@
     },
     {
       "file": "src/extension/popup/wireLaneUserDetailOpen.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/wireVoiceVolumeSlider.js",
       "featureCount": 1,
       "features": [
         "popup"

@@ -59,12 +59,23 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   lastEnableFailReason: string,// v0.1.1331計器: 読み上げONに失敗した理由(timeout/refused/http-error/no-fetch)
  *   enableFailTotal: number,     // v0.1.1331計器: 読み上げONに失敗した累計回数
  *   liveId?: string,             // v0.1.1723: 書き手の面がどの配信を開いていたか(単一グローバルキーの居残り判定用・snapshot 時に付与)
+ *   upstreamEmaMs: number,       // 2026-10-22計器(P1): 受信(capturedAt)→キュー投入のEMA(-1=未計測)
+ *   lastUpstreamMs: number,      // 同上の直近1件
+ *   queueWaitEmaMs: number,      // 2026-10-22計器: キュー投入→取り出しのEMA(順番待ち)
+ *   engineWaitEmaMs: number,     // 2026-10-22計器: 前の合成が終わるまでエンジン内で待たされた推定EMA
+ *   audioQueryEmaMs: number,     // 2026-10-22計器: audio_query の所要EMA
+ *   synthesisEmaMs: number,      // 2026-10-22計器: synthesis の所要EMA(エンジン待ちを除く)
+ *   warmSynthEmaMs: number,      // 2026-10-22計器: 2回目以降の声の合成所要EMA(エンジン待ちを除く)
+ *   coldSynthTotal: number,      // 2026-10-22計器: 初めて使う声(styleId)の合成件数
+ *   coldSynthMaxMs: number,      // 同上の最大所要ms(モデル初回読み込みの疑いを数字で確かめる)
+ *   lastColdSynthMs: number,     // 同上の直近1件
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
  */
 
 import { formatVoiceSynthFailureLine } from './voiceSynthFailure.js';
+import { formatVoiceStageBreakdown } from './voiceStageTiming.js';
 import {
   adviseVoiceSynthFailure,
   formatVoiceSynthFailureReasonLine
@@ -114,6 +125,17 @@ export function makeInitialVoiceDiag() {
     //   ユーザー報告に理由が乗らず、原因特定ができなかった反省から計器へ載せる。
     lastEnableFailReason: '',
     enableFailTotal: 0,
+    // 2026-10-22計器(P1・voiceStageTiming.js): 遅れを段階ごとに分ける(-1=未計測)。
+    upstreamEmaMs: -1,
+    lastUpstreamMs: -1,
+    queueWaitEmaMs: -1,
+    engineWaitEmaMs: -1,
+    audioQueryEmaMs: -1,
+    synthesisEmaMs: -1,
+    warmSynthEmaMs: -1,
+    coldSynthTotal: 0,
+    coldSynthMaxMs: 0,
+    lastColdSynthMs: -1,
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -176,6 +198,16 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
     dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
+    upstreamEmaMs: num(d.upstreamEmaMs, base.upstreamEmaMs),
+    lastUpstreamMs: num(d.lastUpstreamMs, base.lastUpstreamMs),
+    queueWaitEmaMs: num(d.queueWaitEmaMs, base.queueWaitEmaMs),
+    engineWaitEmaMs: num(d.engineWaitEmaMs, base.engineWaitEmaMs),
+    audioQueryEmaMs: num(d.audioQueryEmaMs, base.audioQueryEmaMs),
+    synthesisEmaMs: num(d.synthesisEmaMs, base.synthesisEmaMs),
+    warmSynthEmaMs: num(d.warmSynthEmaMs, base.warmSynthEmaMs),
+    coldSynthTotal: num(d.coldSynthTotal, base.coldSynthTotal),
+    coldSynthMaxMs: num(d.coldSynthMaxMs, base.coldSynthMaxMs),
+    lastColdSynthMs: num(d.lastColdSynthMs, base.lastColdSynthMs),
     lagVerdict: String(d.lagVerdict || base.lagVerdict),
     diagBornAt: num(d.diagBornAt, base.diagBornAt),
     capturedAt: now,
@@ -350,6 +382,9 @@ export function buildVoiceDiagLine(snap, nowMs) {
   if (Number.isFinite(playPrep) && playPrep >= 0) breakdownParts.push(`準備${Math.round(playPrep)}`);
   if (Number.isFinite(playback) && playback >= 0) breakdownParts.push(`実再生${Math.round(playback)}`);
   if (breakdownParts.length > 0) parts.push(`内訳(${breakdownParts.join('/')}ms)`);
+  // 2026-10-22計器(P1): 受信→キュー/順番待ち/エンジン詰まり/合成/初めての声 を分けて出す。
+  const stageLine = formatVoiceStageBreakdown(snap);
+  if (stageLine) parts.push(stageLine);
   // 需要(到着レート)vs供給(1/serviceTime)。どちらも計測済みのときだけ出す。
   const arrivalPerMin = Number(snap.arrivalPerMin);
   if (Number.isFinite(arrivalPerMin) && arrivalPerMin >= 0 && Number.isFinite(serviceTimeEma) && serviceTimeEma > 0) {

@@ -95,11 +95,24 @@ import {
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
   computeVoiceCongestion,
+  computeVoiceE2eAverage,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
   resolveVoiceSynthDepth
 } from '../lib/voiceReadQueue.js';
 import { makeInitialVoiceDiag, buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import {
+  createVoiceSynthTracker,
+  foldVoiceStageEma,
+  measureVoiceGapMs,
+  recordVoiceSynthStage
+} from '../lib/voiceStageTiming.js';
+import {
+  applyVoiceVolumeToWav,
+  KEY_VOICE_VOLUME_PERCENT,
+  normalizeVoiceVolumePercent,
+  VOICE_VOLUME_DEFAULT
+} from '../lib/voiceVolume.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
@@ -583,6 +596,36 @@ function voiceUserKeyForItem(item) {
   );
 }
 
+/** 2026-10-22(P2): 読み上げ音量(%)。ポップアップのスライダーが storage へ書き、onChanged で追従する。 */
+let _voiceVolumePercent = VOICE_VOLUME_DEFAULT;
+
+/** 2026-10-22計器(P1・会場 VoicePlayer と同じ物差し): エンジン待ち・初めての声を測る。 */
+const _voiceSynthTracker = createVoiceSynthTracker();
+
+/**
+ * 合成を依頼し、段階計測を _voiceDiag へ記録する(戻り値・例外は synthesizeVoice と同じ)。
+ * @param {string} text
+ * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
+ */
+function synthesizeVoiceTracked(text, voice) {
+  const track = _voiceSynthTracker.begin(voice?.styleId);
+  /** @type {{ queryMs?: number, synthMs?: number }} */
+  let timing = {};
+  return synthesizeVoice(text, voice, {
+    onFailure: (info) => recordVoiceSynthFailureReason(info),
+    onTiming: (t) => { timing = t || {}; }
+  }).then(
+    (wav) => {
+      try { recordVoiceSynthStage(_voiceDiag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
+      return wav;
+    },
+    (err) => {
+      try { track.end(timing, false); } catch { /* no-op */ }
+      throw err;
+    }
+  );
+}
+
 /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ)。 */
 function ensureVoicePrefetch(item, generation) {
   if (!item || generation !== _voiceGeneration) return null;
@@ -594,13 +637,12 @@ function ensureVoicePrefetch(item, generation) {
     _voiceAssignments,
     _voiceStyleIds
   );
-  const promise = synthesizeVoice(
+  const promise = synthesizeVoiceTracked(
     buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
     {
       ...assigned,
       speedOffset: assigned.speedOffset + congestion.speedBoost
-    },
-    { onFailure: (info) => recordVoiceSynthFailureReason(info) }
+    }
   ).catch(() => null);
   _voicePrefetches.set(item, { generation, promise });
   return promise;
@@ -689,6 +731,8 @@ async function drainVoiceQueue() {
 
       const item = _voiceQueue.shift();
       if (!item) continue;
+      // 2026-10-22計器(P1): キュー投入→取り出し(順番待ち)。
+      foldVoiceStageEma(_voiceDiag, 'queueWaitEmaMs', measureVoiceGapMs(item.enqueuedAt, Date.now()));
 
       // PR-V1: 合成前の鮮度ゲート判定
       const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
@@ -714,13 +758,12 @@ async function drainVoiceQueue() {
       markVoicePhase(prefetch ? 'await_prefetch' : 'await_synth'); // v0.1.895: 合成待ちで止まったか。
       const wav = prefetch
         ? await prefetch.promise
-        : await synthesizeVoice(
+        : await synthesizeVoiceTracked(
             buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
             {
               ...assigned,
               speedOffset: assigned.speedOffset + congestion.speedBoost
-            },
-            { onFailure: (info) => recordVoiceSynthFailureReason(info) }
+            }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
       markVoicePhase('synth_done'); // v0.1.895: 合成は通過した(ここで止まれば下の continue/再生で詰まり)。
@@ -742,7 +785,10 @@ async function drainVoiceQueue() {
       let objectUrl = '';
       try {
         markVoicePhase('await_playback'); // v0.1.895: 再生待ちに入る(watchdog 付き)。
-        objectUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+        // 2026-10-22(P2): 文ごとに最大振幅を揃え、音量設定を掛ける(会場と同じ純関数)。
+        objectUrl = URL.createObjectURL(
+          new Blob([applyVoiceVolumeToWav(wav, _voiceVolumePercent)], { type: 'audio/wav' })
+        );
         const audio = new Audio(objectUrl);
         await new Promise((resolve) => {
           let settled = false;
@@ -793,6 +839,12 @@ async function drainVoiceQueue() {
           armWatchdog(VOICE_PLAYBACK_HARD_CAP_MS); // 先に固定上限で必ず張る(メタ未取得でも固着しない)。
           try {
             const playResult = audio.play();
+            // 2026-10-22計器(P1): 体感遅延(キュー投入→再生開始)。会場と同じ物差し(コメビュは未計測だった)。
+            const _e2eMs = measureVoiceGapMs(item.enqueuedAt, Date.now());
+            if (_e2eMs >= 0) {
+              _voiceDiag.lastE2eMs = _e2eMs;
+              _voiceDiag.e2eAvgMs = computeVoiceE2eAverage(_voiceDiag.e2eAvgMs, _e2eMs);
+            }
             if (playResult && typeof playResult.catch === 'function') {
               playResult.catch((err) => {
                 if (err && err.name === 'NotAllowedError') {
@@ -855,6 +907,12 @@ function enqueueVoiceTimelineItems(items) {
     }
 
     if (!buildVoiceReadingText({ name, text: body })) continue;
+    // 2026-10-22計器(P1): 受信(item.at=capturedAt)→キュー投入。
+    const _upstreamMs = measureVoiceGapMs(item.at, Date.now());
+    if (_upstreamMs >= 0) {
+      _voiceDiag.lastUpstreamMs = _upstreamMs;
+      foldVoiceStageEma(_voiceDiag, 'upstreamEmaMs', _upstreamMs);
+    }
     const candidate = {
       userKey: voiceUserKeyForItem(item),
       name,
@@ -885,6 +943,11 @@ function enqueueVoiceTimelineItems(items) {
   _voiceDiag.queueNow = _voiceQueue.length;
   if (_voiceQueue.length > _voiceDiag.queueMax) _voiceDiag.queueMax = _voiceQueue.length;
   publishVoiceDiag();
+  // 2026-10-22(P4): 会場(VoicePlayer v0.1.800)に揃え、届いた瞬間に先頭群の合成を起動する。
+  //   これまでは再生中に届いた声の合成が、前の声の再生が終わるまで始まらなかった。深さ有界・FIFO不変。
+  if (_voiceQueue.length) {
+    try { startVoicePrefetch(_voiceGeneration); } catch { /* no-op: 先回し合成の失敗は再生に影響させない */ }
+  }
   if (_voiceQueue.length) void drainVoiceQueue();
 }
 
@@ -899,7 +962,8 @@ async function initializeVoiceReading() {
         chrome.storage.local.get([
           VOICE_READING_ENABLED_KEY,
           VOICE_ASSIGNMENTS_KEY,
-          VOICE_READ_NAME_KEY
+          VOICE_READ_NAME_KEY,
+          KEY_VOICE_VOLUME_PERCENT
         ]),
       COMEVIEW_BOOT_READ_TIMEOUT_MS
     );
@@ -909,6 +973,7 @@ async function initializeVoiceReading() {
   if (!bag || typeof bag !== 'object') bag = {};
   _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
   _voiceReadNameEnabled = bag[VOICE_READ_NAME_KEY] === true;
+  _voiceVolumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
   updateVoiceToggle();
   // ?voice=1 で起動された(パネルの「読み上げ」ボタン経由)場合は、保存状態に関わらず読み上げON。
   let forceVoiceOn = false;
@@ -1991,6 +2056,9 @@ function wireStorageChanges() {
         updateNgButton();
         void requestFullRefresh();
       }
+    }
+    if (changes[KEY_VOICE_VOLUME_PERCENT]) {
+      _voiceVolumePercent = normalizeVoiceVolumePercent(changes[KEY_VOICE_VOLUME_PERCENT].newValue);
     }
     if (!isObsMode() && changes[VOICE_ASSIGNMENTS_KEY]) {
       _voiceAssignments = normalizeVoiceAssignments(

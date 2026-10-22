@@ -80,7 +80,7 @@ export function liveFeedSpeechRows(rows) {
  *   seenKeys=既に処理済みのコメントキー集合 / primed=初回シード済みか(false なら初回=吹き出さない)
  * @param {{ maxEmit?: number, primeEmit?: number }} [opts] maxEmit=1回の抽出で返す最大件数(同時多発の洪水を防ぐ・既定8)/ primeEmit=初回に出す直近件数(既定0=初回無音)
  * @returns {{
- *   speeches: Array<{ key: string, speakerKey: string, userId: string, name: string, text: string }>,
+ *   speeches: Array<{ key: string, speakerKey: string, userId: string, name: string, text: string, capturedAt: number }>,
  *   seenKeys: Set<string>,
  *   primed: boolean
  * }}
@@ -126,7 +126,7 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
   }
 
   // 2回目以降(or 初回の直近 N 件): まだ見ていないキーだけを新着として返す。
-  /** @type {Array<{ key: string, speakerKey: string, userId: string, name: string, text: string }>} */
+  /** @type {Array<{ key: string, speakerKey: string, userId: string, name: string, text: string, capturedAt: number }>} */
   const fresh = [];
   for (const s of speakable) {
     if (seen.has(s.key)) continue;
@@ -138,7 +138,9 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
       speakerKey,
       userId: String(s.row.userId ?? '').trim(),
       name: String(s.row.name ?? '').trim(),
-      text: s.text
+      text: s.text,
+      // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測るために渡す(0=不明)。
+      capturedAt: Number(s.row.capturedAt) > 0 ? Number(s.row.capturedAt) : 0
     });
   }
 
