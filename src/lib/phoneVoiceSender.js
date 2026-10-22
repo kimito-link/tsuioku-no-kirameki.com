@@ -43,6 +43,19 @@ export function bytesToBase64(u8) {
 }
 
 /**
+ * 鏡の行のうち、コメントなのに番号が無い行の数(番号が無いと声にできない)。
+ * @param {unknown} rows
+ */
+function countRowsWithoutNumber(rows) {
+  if (!Array.isArray(rows)) return 0;
+  let n = 0;
+  for (const r of rows) {
+    if (r && typeof r === 'object' && /** @type {any} */ (r).kind !== 'gift' && !/^\d{1,10}$/.test(String(/** @type {any} */ (r).no ?? ''))) n += 1;
+  }
+  return n;
+}
+
+/**
  * スマホに見せる読み上げの状態。
  *   'ok' = 声を作れている / 'voicevox_down' = PC の VOICEVOX が起動していない / 'no_encoder' = この Chrome で声を縮められない
  * @typedef {'ok'|'voicevox_down'|'no_encoder'} PhoneVoiceState
@@ -71,6 +84,12 @@ export function createPhoneVoiceSender(deps) {
   let styleAt = 0;
   /** @type {PhoneVoiceState|''} */
   let state = '';
+  /**
+   * v0.1.1746: 声にならなかったコメントがどこで落ちたかを数える(実機で3分にコメント55件・声28本だったため)。
+   *   picked=声にする列に入れた / overflow=列が溢れて捨てた / noNumber=最新の鏡でコメント番号が無い行(声にできない)
+   *   failed=合成・縮め・送信のどれかで失敗 / sent=送れた / ticks=呼ばれた回数(送信の返事の回数)
+   */
+  const counts = { ticks: 0, picked: 0, overflow: 0, noNumber: 0, failed: 0, sent: 0, since: now() };
 
   /**
    * @param {{ wanted: boolean, liveId?: string, rows?: unknown[] }} a
@@ -84,6 +103,7 @@ export function createPhoneVoiceSender(deps) {
       state = '';
       return 0;
     }
+    counts.ticks += 1;
     const lv = String(a.liveId || '');
     if (lv !== liveId) {
       liveId = lv;
@@ -91,9 +111,14 @@ export function createPhoneVoiceSender(deps) {
       pending = [];
     }
     // 合成中でも新着は列に足す(以前は合成中の回を丸ごと飛ばし、次の回で新しい5件だけ読んでいた)。
-    const r = pickNewVoiceRows({ rows: Array.isArray(a.rows) ? a.rows : [], seen, max: PHONE_VOICE_BACKLOG_MAX });
+    // 溢れはこの下で数えてから捨てる(pickNewVoiceRows の中で黙って切らない)。
+    const r = pickNewVoiceRows({ rows: Array.isArray(a.rows) ? a.rows : [], seen, max: 1000 });
     seen = r.seen;
-    pending = pending.concat(r.picks).slice(-PHONE_VOICE_BACKLOG_MAX);
+    counts.picked += r.picks.length;
+    counts.noNumber = countRowsWithoutNumber(a.rows);
+    const merged = pending.concat(r.picks);
+    counts.overflow += Math.max(0, merged.length - PHONE_VOICE_BACKLOG_MAX);
+    pending = merged.slice(-PHONE_VOICE_BACKLOG_MAX);
     if (busy || !pending.length) return 0;
     busy = true;
     let sent = 0;
@@ -104,6 +129,7 @@ export function createPhoneVoiceSender(deps) {
       }
       if (!styleIds.length) {
         state = 'voicevox_down';
+        counts.failed += pending.length;
         pending = [];
         return 0;
       }
@@ -116,6 +142,7 @@ export function createPhoneVoiceSender(deps) {
         const wav = await safe(() => deps.synth(text, voice), null);
         if (!wav) {
           // 合成できない=VOICEVOX が止まった可能性。次の回に声の一覧から確かめ直す。
+          counts.failed += 1 + pending.length;
           styleIds = [];
           state = 'voicevox_down';
           pending = [];
@@ -123,22 +150,27 @@ export function createPhoneVoiceSender(deps) {
         }
         const ogg = await safe(() => deps.encode(wav), null);
         if (!ogg) {
+          counts.failed += 1 + pending.length;
           state = 'no_encoder';
           pending = [];
           break;
         }
         state = 'ok';
         if (await safe(() => deps.post({ no: p.no, ogg: bytesToBase64(ogg) }), false)) sent += 1;
+        else counts.failed += 1;
       }
     } finally {
       busy = false;
     }
+    counts.sent += sent;
     return sent;
   }
 
   return {
     tick,
     /** スマホに見せる状態(まだ1件も試していなければ '')。 */
-    state: () => state
+    state: () => state,
+    /** v0.1.1746: 声にならなかったコメントの内訳(スナップショットの phoneVoiceStats で読める)。 */
+    stats: () => ({ ...counts, pending: pending.length })
   };
 }
