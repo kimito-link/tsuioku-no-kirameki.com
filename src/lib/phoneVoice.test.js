@@ -5,6 +5,7 @@ import {
   pickNewVoiceRows,
   enqueuePhoneVoice,
   phoneVoiceKeys,
+  pickSpokenTickerRow,
   PHONE_VOICE_MAX_B64
 } from './phoneVoice.js';
 
@@ -69,5 +70,18 @@ describe('phoneVoiceKeys', () => {
     expect(phoneVoiceKeys.list('t')).toBe('voice:list:t');
     expect(phoneVoiceKeys.want('t')).toBe('voice:want:t');
     expect(phoneVoiceKeys.quota('d', '20261022')).toBe('quota:voice:d:20261022');
+  });
+});
+
+describe('pickSpokenTickerRow', () => {
+  const rows = [{ no: 1, text: 'a' }, { no: 2, kind: 'gift', text: 'g' }, { no: 3, text: 'c' }];
+  it('いま読んでいる番号の行を返す', () => {
+    expect(pickSpokenTickerRow(rows, '3')).toBe(rows[2]);
+  });
+  it('鳴っていない・鏡に無い・ギフト・壊れた入力は null', () => {
+    expect(pickSpokenTickerRow(rows, '')).toBeNull();
+    expect(pickSpokenTickerRow(rows, '9')).toBeNull();
+    expect(pickSpokenTickerRow(rows, '2')).toBeNull();
+    expect(pickSpokenTickerRow(/** @type {any} */ (null), '1')).toBeNull();
   });
 });

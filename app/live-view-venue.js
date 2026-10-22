@@ -8,7 +8,7 @@
  *
  * @module live-view-venue
  */
-import { buildPhoneVenueSeats, diffPhoneVenueEvents } from '../src/lib/phoneVenueModel.js';
+import { buildPhoneVenueSeats, diffPhoneVenueEvents, phoneVenueFallbackFace } from '../src/lib/phoneVenueModel.js';
 import { tierFromPoints } from '../src/lib/giftThrowProjectile.js';
 
 const DEFAULT_FACE = '/app/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png';
@@ -65,13 +65,20 @@ function ensureStyle() {
   document.head.appendChild(style);
 }
 
-/** @param {HTMLImageElement} img @param {string} src */
-function setFace(img, src) {
+/**
+ * v0.1.1747: 顔が無い・読めないときは、その人ごとのゆっくり顔(PC の会場と同じ)。それも作れないときだけ既定の顔。
+ * @param {HTMLImageElement} img @param {string} src @param {{ userId?: string, key?: string }} seat
+ */
+function setFace(img, src, seat) {
+  const fallback = () => phoneVenueFallbackFace(src, seat) || DEFAULT_FACE;
   img.onerror = () => {
-    img.onerror = null;
-    img.src = DEFAULT_FACE;
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = DEFAULT_FACE;
+    };
+    img.src = fallback();
   };
-  img.src = src || DEFAULT_FACE;
+  img.src = src || fallback();
 }
 
 export function createPhoneVenue() {
@@ -130,7 +137,7 @@ export function createPhoneVenue() {
       img.alt = '';
       img.loading = 'lazy';
       img.referrerPolicy = 'no-referrer';
-      setFace(img, seat.avatarUrl);
+      setFace(img, seat.avatarUrl, seat);
       const name = document.createElement('div');
       name.className = 's-name';
       name.textContent = seat.name || '名無し';
