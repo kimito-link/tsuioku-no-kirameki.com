@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 983 件
+## ⚠️ 役割コメントが無いソース 9 / 987 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -93,7 +93,15 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (98)
+- 📁 **app/** (107)
+  - 📁 **audio-test/** (7)
+    - `t-opus.mp4`
+    - `t.caf`
+    - `t.m4a`
+    - `t.mp3`
+    - `t.ogg`
+    - `t.wav`
+    - `t.webm`
   - 📁 **images/** (93)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -202,8 +210,10 @@
     - `nico-retro-tv-placeholder.svg`
     - `toumeilink.png`
   - `app.js` — スマホ閲覧用 status Web 版。
+  - `audio-test.html`
   - `index.html`
   - `live-view-post.js` — スマホの WEB版から生放送にコメントを届ける(v0.1.1734)。
+  - `live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
 - 📁 **council-scout/** (26)
@@ -895,7 +905,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2113)
+- 📁 **src/** (2120)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -932,7 +942,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (73)
+  - 📁 **extension/** (74)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -982,6 +992,7 @@
     - `phonePost.wiring.test.js`
     - `phonePostRelay.js` — 【層】L2 拡張の配線(chrome.* と fetch。判定は src/lib/phonePost.js)
     - `phonePostRelay.test.js`
+    - `phoneSound.wiring.test.js`
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
     - `popupAvatarRetry.wiring.test.js`
     - `popupBackfillCompleteState.wiring.test.js`
@@ -1163,7 +1174,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1878)
+  - 📁 **lib/** (1884)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1780,6 +1791,8 @@
     - `globalFetchRateLimiter.test.js`
     - `googleSuggest.js` — Google サジェスト取得の契約 (URL組み立て + レスポンスパース + message type)
     - `googleSuggest.test.js`
+    - `gzipBody.js` — v0.1.1735: 送信本文を gzip に縮める(状態速報 → api/status)。
+    - `gzipBody.test.js`
     - `healthCellGroups.js` — 健全度セルを【症状の言葉】で枠に分ける(純関数)。
     - `healthCellGroups.test.js`
     - `healthCellOverWiring.wiring.test.js`
@@ -2015,6 +2028,8 @@
     - `liveCommentTally.test.js`
     - `liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
     - `liveCommenterStats.test.js`
+    - `liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
+    - `liveElapsedExtrapolate.test.js`
     - `liveEndedFlag.js` — 配信終了フラグ。
     - `liveEndedFlag.test.js`
     - `liveGiftPulse.js` — この間隔を超えた2実測は差分を出さない(15分)。
@@ -2324,6 +2339,8 @@
     - `personTileDom.test.js`
     - `phonePost.js` — 【層】L0 判定層(純粋関数)
     - `phonePost.test.js`
+    - `phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
+    - `phoneSoundCues.test.js`
     - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
     - `pickBroadcasterNameForReputation.test.js`
     - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。

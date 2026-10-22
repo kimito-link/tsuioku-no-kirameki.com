@@ -442,7 +442,11 @@ export default [
     // v0.1.1732: 同意スイッチの描画を statusSmartphoneCard.js へ移して -11行=上限も 4546 へ下げる。
     // v0.1.1733: スマホへの送信担当(status.html?publisher=1)は document.hidden で更新を止めない(+2行)。サイドパネルを閉じても送り続けるため。
     // v0.1.1734: スマホから預かったコメントを投稿する係の起動・スイッチの配線・同意 OFF で止める(+5行)。本体は phonePostRelay.js。
-    rules: { 'max-lines': ['error', { max: 4553, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1735: スマホへの送信を速く・軽く(+21行)。送信担当の補助データ9秒・中身が同じなら送らない・gzip で送り 400 なら JSON に戻す。
+    //   判定は lib(liveViewPublishSignature.js の buildLiveViewContentSignature / gzipBody.js)に置き、ここは配線とその理由の注記だけ。
+    // v0.1.1736: スマホが開いている間だけ5秒で描き直し・送る(+17行)。判定は lib(statusRefreshInterval.js の shouldRunPublisherTick)。
+    // v0.1.1738: gzip は受け口の返事(gzipOk)を見てから・スマホの目印を150秒保持(+3行)。判定は lib(autoPublishDecision.js の readPublishAck)。
+    rules: { 'max-lines': ['error', { max: 4594, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

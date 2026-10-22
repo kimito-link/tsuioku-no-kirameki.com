@@ -5894,6 +5894,16 @@
       ]
     },
     {
+      "file": "src/lib/gzipBody.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/healthCellGroups.js",
       "featureCount": 1,
       "features": [
@@ -6511,6 +6521,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/liveElapsedExtrapolate.js",
+      "featureCount": 1,
+      "features": [
+        "web-status"
+      ],
+      "labels": [
+        "Web版 状態(スマホ)"
       ]
     },
     {

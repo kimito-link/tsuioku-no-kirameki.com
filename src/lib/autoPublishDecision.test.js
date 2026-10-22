@@ -183,3 +183,17 @@ describe('送信失敗が続いたら間隔を広げる(v0.1.1729)', () => {
     expect(started).toBeLessThanOrEqual(Math.ceil(180_000 / 30_000));
   });
 });
+
+import { readPublishAck, VIEWER_ACTIVE_STICKY_MS } from './autoPublishDecision.js';
+describe('readPublishAck(v0.1.1738)', () => {
+  it('viewerActive:true なら次の送信(最長120秒)の返事まで持つ期限を返す', () => {
+    expect(VIEWER_ACTIVE_STICKY_MS).toBeGreaterThan(120_000);
+    expect(readPublishAck({ ok: true, viewerActive: true, gzipOk: true }, 1000)).toEqual({ viewingUntilMs: 1000 + VIEWER_ACTIVE_STICKY_MS, gzipOk: true });
+  });
+  it('false・返さない古いサーバー・壊れた返事はどちらも false(gzip を解けない受け口に送らない)', () => {
+    expect(readPublishAck({ ok: true, viewerActive: false, gzipOk: true }, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: true });
+    expect(readPublishAck({ ok: true }, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: false });
+    expect(readPublishAck(null, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: false });
+    expect(readPublishAck({ gzipOk: 'yes', viewerActive: 1 }, 1000)).toEqual({ viewingUntilMs: 0, gzipOk: false });
+  });
+});

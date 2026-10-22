@@ -65,6 +65,7 @@ import {
 import { paintStatCardsMirrorValues } from '../src/lib/statCardsMirrorDom.js';
 import { buildStatCardsMirrorSignature } from '../src/lib/statCardsMirror.js';
 import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
+import { extrapolateLiveForDisplay } from '../src/lib/liveElapsedExtrapolate.js';
 import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
 import { anonymousIdenticonDataUrl } from '../src/lib/anonymousIdenticon.js';
 // 公式値レーン(ギフト貢献度ランキング/広告ランキング)を本物の strip 描画で出す。popup と同じ lib を再利用(似せて自作しない)。
@@ -101,6 +102,8 @@ import { buildSessionSummaryCompareTableHtml } from '../src/lib/sessionSummaryCo
 import { isLiveSwitched, pickLiveForCard, pickSnapshotLiveId } from '../src/lib/liveviewCurrentLive.js';
 // v0.1.1734: スマホから生放送にコメントを届ける(PC の拡張が中継)。入力欄は本物 popup のまま・帯と印だけ足す。
 import { createPhonePostClient, mountPhonePostUi, takePostKey } from './live-view-post.js';
+// v0.1.1737: ギフトの効果音(右下の 🔇/🔊・既定は音なし)。拡張の会場モードと同じ音を、増えたギフトの金額帯で選ぶ。
+import { createPhoneSoundPlayer, mountPhoneSoundUi } from './live-view-sound.js';
 import {
   evaluateSnapshotFreshness,
   formatSnapshotStalenessBanner
@@ -108,7 +111,9 @@ import {
 
 // ★v0.1.1729(スマホ化 第1段): 60秒→15秒。中身が変わっていなければサーバーは本文なしの 304 を返す
 //   (ETag・api/status.js)ので、短くしても通信量はほぼ増えない。
-const POLL_INTERVAL_MS = 15_000;
+// ★v0.1.1736(第2段): 15秒→5秒。取りに来ること自体が「いま開いている」の目印になり、PC はその間だけ5秒で送る。
+//   画面が裏にある間は取りに行かない(visibilitychange)=目印も30秒で消え、PC はふだんの間隔に戻る。
+const POLL_INTERVAL_MS = 5_000;
 /** 最後に受け取った版の ETag。次の取得で If-None-Match に載せる(同じなら 304=本文なし)。 */
 let _lastEtag = '';
 /** 2026-10-21: いま映している配信の lv(起動時に決める)。まとめの配信が変わったら取り直す。 */
@@ -119,6 +124,8 @@ let _visibilityRefreshWired = false;
 const SNAPSHOT_NOT_MODIFIED = Symbol('not-modified');
 /** v0.1.1734: スマホからコメントする口(URL の #pk= の鍵があるときだけ)。無ければ null=見るだけ。 */
 let _postClient = null;
+/** v0.1.1737: ギフトの効果音。 */
+const _soundPlayer = createPhoneSoundPlayer();
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
 const MIRROR_FRESH_MS = 3 * 60 * 1000;
 
@@ -674,7 +681,7 @@ function paintAllMirrors(jsonBlob) {
   if (!jsonBlob || typeof jsonBlob !== 'object') return;
   refreshStaleBanner(jsonBlob);
   // 古くても「全レーンを揃えて」塗る(バラバラに消すより、古い旨を1枚で伝えた上で丸ごと見せる方が誠実)。
-  paintBroadcasterCard(pickLiveForCard(jsonBlob));
+  paintBroadcasterCard(extrapolateLiveForDisplay(pickLiveForCard(jsonBlob), jsonBlob.generatedAt, Date.now()));
   paintStatCardsMirror(jsonBlob.statCardsMirror || null);
   paintLaneMirror(jsonBlob.laneMirror || null);
   paintNorthStarMirror(jsonBlob.northStarMirror || null);
@@ -682,6 +689,8 @@ function paintAllMirrors(jsonBlob) {
   paintCommentTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // v0.1.1734: 自分が送ったコメントが放送に流れたら ✓✓(届いた)にする。
   if (_postClient) _postClient.updateSeen(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null));
+  // v0.1.1737: 増えたギフトがあれば効果音(音なしのときは覚えるだけ=ONにした瞬間に過去分は鳴らない)。
+  try { _soundPlayer.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 音は閲覧を止めない */ }
   // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // ③WEB投げ一覧丸写し(第2号): 北極星 giftHistory レーン(貢献者 strip + 投げ明細テーブル)を描く。
@@ -804,6 +813,7 @@ async function bootWithSnapshot(token) {
     await import('../src/extension/popup-entry.js');
     // v0.1.1734: 本物の入力欄の上に「PC とつながっているか」の帯、下に自分のコメントの印を付ける。
     try { mountPhonePostUi(_postClient); } catch { /* 付けられなくても閲覧は続ける */ }
+    try { mountPhoneSoundUi(_soundPlayer); } catch { /* 付けられなくても閲覧は続ける */ }
     // ★popup は生コメントデータを持たないので、応援レーン/数字カードを「空」に塗り直す。
     //   その空描画が【私の鏡 paint を上書き（clobber）する】。clobber は (a) 初回 refresh と
     //   (b) ユーザーが <details> を開く等で起きる再描画、の両方で発生する。
@@ -880,6 +890,8 @@ async function refresh(token) {
   if (jsonBlob === SNAPSHOT_NOT_MODIFIED) {
     // 中身は同じ=塗り直さない。ただし「何秒前の状態か」のバナーだけは時間とともに進める(古さを隠さない)。
     refreshStaleBanner(_latestSnapshot);
+    // v0.1.1738: PC は時刻だけの変化では送らない=「経過」は送った時刻からスマホ側で進めて描き直す。
+    if (_latestSnapshot) paintBroadcasterCard(extrapolateLiveForDisplay(pickLiveForCard(_latestSnapshot), _latestSnapshot.generatedAt, Date.now()));
     return;
   }
   if (!jsonBlob) return;
