@@ -943,6 +943,11 @@ function enqueueVoiceTimelineItems(items) {
   _voiceDiag.queueNow = _voiceQueue.length;
   if (_voiceQueue.length > _voiceDiag.queueMax) _voiceDiag.queueMax = _voiceQueue.length;
   publishVoiceDiag();
+  // 2026-10-22(P4): 会場(VoicePlayer v0.1.800)に揃え、届いた瞬間に先頭群の合成を起動する。
+  //   これまでは再生中に届いた声の合成が、前の声の再生が終わるまで始まらなかった。深さ有界・FIFO不変。
+  if (_voiceQueue.length) {
+    try { startVoicePrefetch(_voiceGeneration); } catch { /* no-op: 先回し合成の失敗は再生に影響させない */ }
+  }
   if (_voiceQueue.length) void drainVoiceQueue();
 }
 

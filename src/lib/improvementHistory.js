@@ -3852,5 +3852,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1749', metric: 'cross-checked-claims', value: 36,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日窓の数え方で前版+1。今回は増幅の基準(長文48%・短文19%)を、自宅PCの VOICEVOX 実測 WAV の振幅で確かめてから、合成した WAV の単体テストで固定した。'
+  }),
+  Object.freeze({
+    version: '0.1.1750', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '-1KB(四捨五入の境目)。popup の処理は変えていない。変更はコメビュ(comeview.js)の先読み起動だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1750', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1750', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日窓の数え方で前版+1。今回は新しい配線テストを、呼び出しを消した変異で赤になることを確かめてから採用した。'
   })
 ]);
