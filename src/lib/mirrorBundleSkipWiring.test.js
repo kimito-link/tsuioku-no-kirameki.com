@@ -11,7 +11,10 @@ const sched = read('lib/mirrorBundleFlushScheduler.js');
 
 describe('鏡のまとめ書き', () => {
   it('★popup は空のペイロードを書かない(全部同じなら storage.set を呼ばない)', () => {
-    expect(popup).toMatch(/if \(Object\.keys\(out\.legacyPayload\)\.length\) void chrome\.storage\.local\.set\(out\.legacyPayload\)/);
+    expect(popup).toMatch(/if \(Object\.keys\(out\.legacyPayload\)\.length\) void writeMirrorPayloadKeepingNewerTimeline\(chrome\.storage\.local, out\.legacyPayload\)/);
+  });
+  it('★v0.1.1753: popup の鏡書き込みは古いコメント鏡で巻き戻さない口を通す', () => {
+    expect(popup).toMatch(/import \{ writeMirrorPayloadKeepingNewerTimeline \} from '\.\.\/lib\/mirrorPayloadWrite\.js';/);
   });
   it('★署名の正本は laneMirrorWriteSignature(時刻・受領証を除く)を使い、自前で作らない', () => {
     expect(sched).toMatch(/import \{ laneMirrorWriteSignature, laneMirrorStructureKey \} from '\.\/laneMirrorWriteGate\.js';/);

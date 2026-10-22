@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  isStoredTimelineMirrorNewer,
   TIMELINE_MIRROR_CAP,
   buildCommentTimelineMirrorSnapshot,
   isTimelineMirrorRowRenderable,
@@ -261,5 +262,21 @@ describe('★v0.1.1717 匿名 identicon を鏡に載せない(容量の95%)', ()
     expect(tickerArgsFromMirrorRow({ name: 'x', text: 't', avatarUrl: 'https://e/a.jpg', userId: uid }).avatarSrc).toBe('https://e/a.jpg');
     expect(tickerArgsFromMirrorRow({ name: 'x', text: 't', avatarUrl: '', userId: '4046119' }).avatarSrc).toBe('');
     expect(tickerArgsFromMirrorRow({ name: 'x', text: 't', avatarUrl: '' }).avatarSrc).toBe('');
+  });
+});
+
+describe('isStoredTimelineMirrorNewer(v0.1.1753: 古い鏡で新しい鏡を巻き戻さない)', () => {
+  it('★同じ配信で保存済みが新しければ書かない(実機: 1件・no 75 の古い鏡が30件の鏡を交互に戻していた)', () => {
+    const stored = { liveId: 'lv351650593', capturedAt: 2000, rows: new Array(30) };
+    const stale = { liveId: 'lv351650593', capturedAt: 1000, rows: [{ no: 75 }] };
+    expect(isStoredTimelineMirrorNewer(stored, stale)).toBe(true);
+    expect(isStoredTimelineMirrorNewer(stale, stored)).toBe(false);
+  });
+  it('配信が違う・時刻が無い・同じ時刻・形が読めないときは従来どおり書く', () => {
+    expect(isStoredTimelineMirrorNewer({ liveId: 'lv1', capturedAt: 2 }, { liveId: 'lv2', capturedAt: 1 })).toBe(false);
+    expect(isStoredTimelineMirrorNewer({ liveId: 'lv1' }, { liveId: 'lv1', capturedAt: 1 })).toBe(false);
+    expect(isStoredTimelineMirrorNewer({ liveId: 'lv1', capturedAt: 5 }, { liveId: 'lv1', capturedAt: 5 })).toBe(false);
+    expect(isStoredTimelineMirrorNewer(null, { liveId: 'lv1', capturedAt: 1 })).toBe(false);
+    expect(isStoredTimelineMirrorNewer({ liveId: 'lv1', capturedAt: 5 }, null)).toBe(false);
   });
 });

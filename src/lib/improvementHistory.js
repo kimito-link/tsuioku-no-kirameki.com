@@ -3852,5 +3852,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1752', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '拡張側(送る前)とサーバー側(保存前)の両方で同じ関数が絞る=古い拡張から来ても他の配信は残らない。単体テストで固定。'
+  }),
+  Object.freeze({
+    version: '0.1.1753', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB。popup の鏡の書き込み前に、保存済みのコメント鏡が新しいかを1回読むだけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1753', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1753', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '原因は実機でサーバーの中身を10秒ごとに見た結果(2種類が交互)と、コード読み(content と popup の2か所が同じキーに書く・popup は15秒ごとに書き直す)が一致。'
   })
 ]);
