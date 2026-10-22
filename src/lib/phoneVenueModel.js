@@ -11,6 +11,7 @@
  */
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { identiconFallbackForAvatarUrl } from './avatarFallbackFromUrl.js';
 import { giftRowSoundKey } from './phoneSoundCues.js';
 
 /** 席の上限(スマホ1画面に顔が判別できる大きさで並ぶ数)。 */
@@ -55,6 +56,20 @@ export function phoneVenueAvatar(row) {
   const uid = s(r.userId);
   if (/^\d{2,15}$/.test(uid)) return deriveAvatarUrlFromUid(uid);
   return uid ? anonymousIdenticonDataUrl(uid, 64) : '';
+}
+
+/**
+ * v0.1.1747: 顔が読めなかった(404・アイコン未設定・退会)ときの代わりの顔。PC の会場と同じく
+ *   「その人ごとのゆっくり顔」(identicon)にする。以前は全員ゆっくりりんく(配信者側のキャラ)になっていた。
+ *   URL の数値ID → 席の userId → 席のキー の順で、その人に決まる顔を作る。作れなければ ''(呼び出し側の既定)。
+ * @param {string} failedSrc 読めなかった顔の URL
+ * @param {{ userId?: string, key?: string }} seat
+ */
+export function phoneVenueFallbackFace(failedSrc, seat) {
+  const fromUrl = identiconFallbackForAvatarUrl(failedSrc);
+  if (fromUrl) return fromUrl;
+  const id = s(seat && seat.userId) || s(seat && seat.key);
+  return id ? anonymousIdenticonDataUrl(id, 64) || '' : '';
 }
 
 /**
