@@ -89,6 +89,7 @@ import { shouldUpdateAiShareText } from '../lib/aiShareTextChanged.js';
 import { buildCoreBatchKeys, pickCoreBatchValues } from '../lib/statusCoreBatch.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
+import { createPcPhoneVoice } from './phoneVoicePublisher.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
 import {
   KEY_BACKFILL_LIVE_METRIC,
@@ -3757,6 +3758,9 @@ function persistLiveviewPublishOutcome(outcome) {
 let _publishGzipRefused = false;
 /** v0.1.1738: 受け口が「gzip を解ける」と返したら true(古い受け口は gzip を黙って壊して保存するので、それまで JSON)。 */
 let _publishGzipOk = false;
+/** v0.1.1740: スマホで 🗣 が ON の間、新しいコメントを VOICEVOX の声にして送る(送り先は直近の送信と同じ)。 */
+let _phoneVoiceTarget = null;
+const _phoneVoice = createPcPhoneVoice(() => _phoneVoiceTarget);
 async function uploadStatusSnapshot() {
   const creds = getPublishCredentials(getUploadConfig()); // v0.1.1731: 共有キー優先・無ければ利用者ごとの鍵
   if (!creds) {
@@ -3774,7 +3778,7 @@ async function uploadStatusSnapshot() {
   const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(creds.appOrigin, creds.viewToken);
   try {
     // v0.1.1735: gzip で縮めて送る(約5分の1)。受け口が解けず 400 なら、このページでは以後 JSON のまま送り直す。
-    const jsonText = JSON.stringify(buildPublishBody(creds, jsonBlob));
+    const jsonText = JSON.stringify({ ...buildPublishBody(creds, jsonBlob), phoneVoice: _phoneVoice.state() });
     const sent = await buildPublishInit(creds.headers, jsonText, { allowGzip: _publishGzipOk && !_publishGzipRefused });
     let res = await fetch(ingestUrl, sent.init);
     if (sent.gzip && res.status === 400 && (await res.clone().json().catch(() => null))?.error === 'bad body') {
@@ -3792,6 +3796,8 @@ async function uploadStatusSnapshot() {
     const ack = readPublishAck(await res.json().catch(() => null), Date.now());
     _phoneViewingUntilMs = ack.viewingUntilMs;
     _publishGzipOk = ack.gzipOk;
+    _phoneVoiceTarget = { creds, ingestUrl };
+    void _phoneVoice.tick({ wanted: ack.voiceWanted, liveId: sentLiveId, rows: jsonBlob.commentTimelineMirror?.rows });
     recordLiveviewPublishOutcome({ ok: true, httpStatus: res.status, at: Date.now() });
     persistLiveviewPublishOutcome({ ok: true, httpStatus: res.status, liveId: sentLiveId });
     // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。

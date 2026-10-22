@@ -63,13 +63,15 @@ export const VIEWER_ACTIVE_STICKY_MS = 150_000;
  *   古いサーバーは viewerActive / gzipOk を返さない=どちらも false 扱い(gzip を解けないサーバーに送らない)。
  * @param {unknown} ack POST の返事(JSON)
  * @param {number} nowMs
- * @returns {{ viewingUntilMs: number, gzipOk: boolean }}
+ *   v0.1.1740: voiceWanted=スマホで 🗣(読み上げ)が ON。古いサーバーは返さない=声を作らない。
+ * @returns {{ viewingUntilMs: number, gzipOk: boolean, voiceWanted: boolean }}
  */
 export function readPublishAck(ack, nowMs) {
   const a = ack && typeof ack === 'object' ? /** @type {Record<string, unknown>} */ (ack) : {};
   return {
     viewingUntilMs: a.viewerActive === true ? (Number(nowMs) || 0) + VIEWER_ACTIVE_STICKY_MS : 0,
-    gzipOk: a.gzipOk === true
+    gzipOk: a.gzipOk === true,
+    voiceWanted: a.voiceWanted === true
   };
 }
 
