@@ -220,6 +220,7 @@ import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/
 import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+import { disablePhonePost, enablePhonePost, forgetPhonePostKey, readPhonePostKey, startPhonePostRelay } from './phonePostRelay.js';
 import { buildPublishBody, deleteDeviceOnServer, forgetDeviceCred, getPublishCredentials, maybeRegisterDevice, refreshDeviceCredCache, rotateDeviceViewToken, shouldForgetDeviceCred } from './statusDeviceCred.js';
 import { buildSmartphoneCard } from './statusSmartphoneCard.js';
 /*
@@ -343,6 +344,7 @@ async function setWebPublishOptIn(next) {
   _webPublishOptIn = value;
   try {
     await chrome.storage.local.set({ [KEY_WEB_PUBLISH_OPT_IN]: value });
+    if (!value) await disablePhonePost(getPublishCredentials(getUploadConfig())); // v0.1.1734: スマホからのコメントも止める
     if (!value) await deleteDeviceOnServer(getUploadConfig().appOrigin); // v0.1.1731: 同意 OFF=サーバーの利用者データも消す(v0.1.1732: 消し終わってから画面に出す)
   } catch {
     /* best-effort: 保存に失敗してもキャッシュは反映済み(次回起動で既定OFFに戻る=安全側) */
@@ -609,6 +611,8 @@ async function bootstrap() {
   // v0.1.1626: 拡張フォルダに鍵ファイルがあれば一度だけ取り込む(貼り付け・クリック不要)。
   if (await seedShareKeysFromLocalFile()) await refreshUploadConfigCache();
   await refreshDeviceCredCache(getUploadConfig().appOrigin); // v0.1.1731: 利用者ごとの鍵(共有キーが無いときだけ使う)
+  // v0.1.1734: 送信担当だけが、スマホから預かったコメントを PC の放送タブへ投稿する(「スマホからコメントする」ON のときだけ通信)。
+  if (IS_STATUS_PUBLISHER) startPhonePostRelay({ getCreds: () => getPublishCredentials(getUploadConfig()), isOptedIn: () => _webPublishOptIn === true });
 
   try {
     checkVersionMismatchBanner();
@@ -3252,6 +3256,7 @@ function buildAutoPublishConsentToggle() {
     setOptIn: (next) => setWebPublishOptIn(next),
     registerNow: () => maybeRegisterDevice({ optedIn: _webPublishOptIn === true, uploadCfg: getUploadConfig() }),
     rotate: rotateDeviceViewToken,
+    phonePost: { readKey: readPhonePostKey, enable: () => enablePhonePost(getPublishCredentials(getUploadConfig())), disable: () => disablePhonePost(getPublishCredentials(getUploadConfig())), forget: forgetPhonePostKey }, // v0.1.1734
     openUrl: (url) => { try { chrome.tabs.create({ url }); } catch { window.open(url, '_blank', 'noopener'); } }
   });
 }

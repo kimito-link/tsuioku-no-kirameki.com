@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { SMARTPHONE_CONSENT_TEXT, buildSmartphoneCard } from './statusSmartphoneCard.js';
+import { PHONE_POST_CONSENT_TEXT, SMARTPHONE_CONSENT_TEXT, buildSmartphoneCard } from './statusSmartphoneCard.js';
 
 const DEVICE = { mode: 'device', viewToken: 'v'.repeat(32), appOrigin: 'https://app.example', headers: {} };
 const SHARED = { mode: 'shared', viewToken: 'tok12345', appOrigin: 'https://app.example', headers: {} };
@@ -78,5 +78,51 @@ describe('📱 スマホで見る(v0.1.1732)', () => {
     btn.click();
     await flush();
     expect(el.textContent).toContain(`v=${'n'.repeat(32)}`);
+  });
+});
+
+describe('✍️ スマホからコメントする(v0.1.1734)', () => {
+  const PK = 'p'.repeat(43);
+  const phone = (key = '') => {
+    let cur = key;
+    return {
+      readKey: vi.fn(async () => cur),
+      enable: vi.fn(async () => { cur = PK; return PK; }),
+      disable: vi.fn(async () => { cur = ''; }),
+      forget: vi.fn(async () => { cur = ''; })
+    };
+  };
+  it('★説明に「誰のアカウントで流れるか・本文がどれだけ残るか」を書く', () => {
+    for (const w of ['このPCのブラウザでログインしているアカウント', '最長1分', 'PCが受け取ったら消します']) {
+      expect(PHONE_POST_CONSENT_TEXT).toContain(w);
+    }
+  });
+  it('★既定は OFF。ON にすると自分専用のURL(#pk=)と QR を出す。見るだけのURLは別に残る', async () => {
+    const pp = phone();
+    const { el } = mk({ creds: DEVICE, deps: { optedIn: true, phonePost: pp } });
+    await flush(); await flush();
+    const boxes = el.querySelectorAll('input[type=checkbox]');
+    expect(boxes.length).toBe(2);
+    expect(boxes[1].checked).toBe(false);
+    expect(el.textContent).not.toContain('#pk=');
+    boxes[1].checked = true;
+    boxes[1].dispatchEvent(new Event('change'));
+    await flush(); await flush();
+    expect(pp.enable).toHaveBeenCalled();
+    expect(el.textContent).toContain('自分専用');
+    expect(el.querySelector('img')?.getAttribute('src')).toMatch(/^data:image\//);
+    expect(el.textContent).toContain(`https://app.example/live-view?v=${DEVICE.viewToken}`);
+  });
+  it('★OFF にするとサーバーの鍵を消し、もう送れないと書く', async () => {
+    const pp = phone(PK);
+    const { el } = mk({ creds: DEVICE, deps: { optedIn: true, phonePost: pp } });
+    await flush(); await flush();
+    const cb = el.querySelectorAll('input[type=checkbox]')[1];
+    expect(cb.checked).toBe(true);
+    cb.checked = false;
+    cb.dispatchEvent(new Event('change'));
+    await flush(); await flush();
+    expect(pp.disable).toHaveBeenCalled();
+    expect(el.textContent).toContain('もう送れません');
   });
 });
