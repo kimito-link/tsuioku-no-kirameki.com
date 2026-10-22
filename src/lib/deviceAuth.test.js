@@ -56,7 +56,7 @@ describe('deviceAuth(スマホ版の利用者ごとの鍵・v0.1.1730)', () => {
     expect(quotaVerdict({ deviceCount: 1, globalCount: 7, globalLimit: 10 }).globalWarn).toBe(false);
   });
   it('★利用者経由の送信からは診断の全文と v を落とす(元の物は変えない)', () => {
-    const body = { v: 'x', statusReport: 'long', fastDiag: {}, northStarMirror: { a: 1 } };
+    const body = { v: 'x', statusReport: 'long', fastDiag: {}, overview: 'o', supportersParity: {}, northStarMirror: { a: 1 } };
     expect(stripDeviceBody(body)).toEqual({ northStarMirror: { a: 1 } });
     expect(body.statusReport).toBe('long');
   });

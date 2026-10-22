@@ -19,6 +19,8 @@
  */
 
 import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
+import { GZIP_BODY_HEADER } from '../src/lib/gzipBody.js';
 import { isEtagMatch } from '../src/lib/statusEtag.js';
 import {
   DEVICE_TTL_SECONDS,
@@ -36,9 +38,22 @@ const TTL_SECONDS = STATUS_TTL_SECONDS;
 export const MAX_INGEST_BYTES = 900_000;
 const VIEW_TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
 
-function readBody(req) {
+export function readBody(req) {
+  // ★v0.1.1735: gzip の本文(Content-Type: application/octet-stream → Vercel は Buffer で渡す)。
+  //   Content-Encoding は使わない(途中で解かれると二重に解くことになる)=専用ヘッダで伝える。
+  //   解いた後の大きさも MAX_INGEST_BYTES で止める(小さな圧縮で巨大に膨らむ本文を受けない)。壊れていたら null=400。
+  if (String(req.headers?.[GZIP_BODY_HEADER] || '') === 'gzip') {
+    const raw = req.body;
+    if (!(raw instanceof Uint8Array)) return null;
+    try {
+      return JSON.parse(gunzipSync(raw, { maxOutputLength: MAX_INGEST_BYTES }).toString('utf8'));
+    } catch {
+      return null;
+    }
+  }
   // Vercel Node Functions は req.body を自動 parse することがあるが、
   // 念のため両対応(既に object ならそのまま)。
+  if (req.body instanceof Uint8Array) return null;
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string' && req.body) {
     try {

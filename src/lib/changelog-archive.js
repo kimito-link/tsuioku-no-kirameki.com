@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1715',
+    date: '2026-10-20',
+    summary: '取得率の100%超を隠さない',
+    items: Object.freeze([
+      '診断(状態画面)の「取得率」が、記録が公式のコメント数を上回っているときも「100%」としか出ず、ちょうど100%と見分けが付きませんでした。',
+      '記録のほうが多いときは「100%超」と出すようにしました。色の判定は今までどおりです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1714',
     date: '2026-10-20',
     summary: 'マーケとメディアキットのボタンを1つに',

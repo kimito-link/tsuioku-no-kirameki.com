@@ -14,6 +14,23 @@ function cmt(at, text, name = '匿名', avatarUrl = '', userId = 'u1') {
 }
 
 describe('buildCommentTimelineMirrorSnapshot', () => {
+  it('★v0.1.1735: コメント番号があれば no として載せ、戻すと commentNo になる(無い・数字でない行・ギフトには付けない)', () => {
+    const snap = buildCommentTimelineMirrorSnapshot({
+      liveId: 'lv1',
+      comments: [
+        { at: 1, text: 'a', commentNo: 12 },
+        { at: 2, text: 'b', no: '13' },
+        { at: 3, text: 'c' },
+        { at: 4, text: 'd', commentNo: 'x' }
+      ],
+      giftEvents: [{ at: 5, kind: 'gift', nickname: 'n', itemName: 'g', commentNo: 99 }],
+      capturedAt: 10
+    });
+    expect(snap.rows.map((r) => r.no)).toEqual(['12', '13', undefined, undefined, undefined]);
+    const items = restoreTimelineItemsForHtml(snap);
+    expect(items.filter((i) => i.kind === 'comment').map((i) => i.commentNo)).toEqual(['', '', '13', '12']);
+  });
+
   it('コメント配列から最新N件を時刻順(古→新)で組む', () => {
     const comments = [cmt(NOW - 3000, 'c'), cmt(NOW - 1000, 'a'), cmt(NOW - 2000, 'b')];
     const snap = buildCommentTimelineMirrorSnapshot({ liveId: 'LV1', comments, capturedAt: NOW });

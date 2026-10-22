@@ -11,7 +11,7 @@
  * @module devicePublishCredentials
  */
 
-import { isValidDeviceId, isValidWriteKey } from './deviceAuth.js';
+import { isValidDeviceId, isValidWriteKey, stripDeviceBody } from './deviceAuth.js';
 
 const VIEW_TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
 /** 鍵をもらいに行くのに失敗したあと、次に試すまでの間隔(サーバーの乱発制限は1時間5回)。 */
@@ -104,11 +104,13 @@ export function shouldForgetDeviceCred(mode, httpStatus) {
 
 /**
  * 送る本文。共有キー経路は従来どおり閲覧トークン v を載せる。利用者の鍵ではサーバーが書き込み先を決めるので載せない。
+ *   v0.1.1735: 利用者の鍵では、サーバーが保存しない欄(DEVICE_DROPPED_FIELDS)を送る前に落とす=送る量を減らす。
+ *   共有キー経路(開発者の診断 status:live が statusReport/fastDiag を読む)は従来どおり全部送る。
  * @param {PublishCredentials} creds
  * @param {Record<string, unknown>} jsonBlob
  */
 export function buildPublishBody(creds, jsonBlob) {
-  return creds.mode === 'shared' ? { ...jsonBlob, v: creds.viewToken } : { ...jsonBlob };
+  return creds.mode === 'shared' ? { ...jsonBlob, v: creds.viewToken } : stripDeviceBody(jsonBlob);
 }
 
 /** @param {string} appOrigin */

@@ -10,6 +10,17 @@ describe('スマホの WEB版を早く新しくする配線', () => {
     expect(status).toMatch(/changed:\s*Boolean\(sig\)\s*&&\s*sig\s*!==\s*_autoPublishLastSentSig/);
     expect(status).toMatch(/_autoPublishLastLaunchAtMs = Date\.now\(\);\s*_autoPublishLastSentSig = sig;/);
   });
+  it('★v0.1.1735: 鏡を書き直しただけ(中身が同じ)なら「変わった」で送らない・届かなかった中身は忘れる', () => {
+    expect(status).toMatch(/decision\.reason === 'changed' && contentSig && contentSig === _autoPublishLastContentSig\) \{\s*_autoPublishLastSentSig = sig;\s*return;/);
+    expect(status).toContain("if (!(r && r.ok)) _autoPublishLastContentSig = '';");
+  });
+  it('★v0.1.1735: 送信担当は補助データを毎回(9秒)読む=スマホへの反映を最大10秒縮める', () => {
+    expect(status).toContain('(IS_STATUS_PUBLISHER ? PUBLISHER_EXTRAS_REFETCH_MS : EXTRAS_REFETCH_MS)');
+    expect(status).toContain('const PUBLISHER_EXTRAS_REFETCH_MS = 9000;');
+  });
+  it('★v0.1.1735: gzip で送り、受け口が解けなければ(400 bad body)JSON で送り直して以後は縮めない', () => {
+    expect(status).toMatch(/if \(sent\.gzip && res\.status === 400 && [^\n]*'bad body'\) \{\s*_publishGzipRefused = true;/);
+  });
   it('③WEB は前回の ETag を If-None-Match に載せ、304 なら塗り直さずバナーだけ進める', () => {
     expect(liveView).toMatch(/'If-None-Match': _lastEtag/);
     expect(liveView).toMatch(/res\.status === 304\) return SNAPSHOT_NOT_MODIFIED/);
@@ -40,7 +51,7 @@ describe('スマホは1配信だけ映す配線(2026-10-21)', () => {
 describe('配線: スマホ版の利用者ごとの鍵(v0.1.1731)', () => {
   const src = readFileSync(new URL('./status-entry.js', import.meta.url), 'utf8');
   it('送信は getPublishCredentials の鍵とヘッダで送る(共有キーのヘッダを直書きしない)', () => {
-    expect(src).toContain('headers: creds.headers');
+    expect(src).toContain('buildPublishInit(creds.headers, jsonText');
     expect(src).toContain('buildPublishBody(creds, jsonBlob)');
     expect(src).not.toMatch(/'x-share-key': ingestKey/);
   });
