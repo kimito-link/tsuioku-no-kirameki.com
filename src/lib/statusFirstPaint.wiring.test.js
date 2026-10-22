@@ -60,7 +60,8 @@ describe('status 初回描画の配線 — 2秒の白紙を作らない', () => 
   it('★初回は document.hidden でも降りない(降りると誰も再挑戦せず永久に白い)', () => {
     const start = entrySrc.indexOf('function runRefreshTick(');
     const body = entrySrc.slice(start, entrySrc.indexOf('\n}\n', start));
-    expect(body).toMatch(/if \(!first && document\.hidden\) return;/);
+    // v0.1.1733: 送信担当(?publisher=1)だけは hidden でも止めない。通常の状態画面は従来どおり。
+    expect(body).toMatch(/if \(!first && document\.hidden && !IS_STATUS_PUBLISHER\) return;/);
   });
 
   it('interval 経路も同じ関数を通る(判断が2箇所に割れない)', () => {

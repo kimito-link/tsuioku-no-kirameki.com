@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 971 件
+## ⚠️ 役割コメントが無いソース 9 / 997 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -84,14 +84,24 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (6)
+- 📁 **api/** (8)
+  - `device.js` — スマホ版の「利用者ごとの鍵」の受け口(v0.1.1730・スマホ化 利用者ごとの鍵 第a段)。
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
   - `live-platforms.js` — /api/live-platforms — /live/ の「ほかの配信サービス」セクション(Kick・後で YouTube)のデータ。
   - `live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
+  - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (97)
+- 📁 **app/** (110)
+  - 📁 **audio-test/** (7)
+    - `t-opus.mp4`
+    - `t.caf`
+    - `t.m4a`
+    - `t.mp3`
+    - `t.ogg`
+    - `t.wav`
+    - `t.webm`
   - 📁 **images/** (93)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -200,7 +210,13 @@
     - `nico-retro-tv-placeholder.svg`
     - `toumeilink.png`
   - `app.js` — スマホ閲覧用 status Web 版。
+  - `audio-test.html`
   - `index.html`
+  - `live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
+  - `live-view-post.js` — スマホの WEB版から生放送にコメントを届ける(v0.1.1734)。
+  - `live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
+  - `live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
+  - `live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
 - 📁 **council-scout/** (26)
@@ -892,7 +908,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2092)
+- 📁 **src/** (2136)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -929,7 +945,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (65)
+  - 📁 **extension/** (78)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -976,6 +992,14 @@
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
+    - `phoneFit.wiring.test.js`
+    - `phonePost.wiring.test.js`
+    - `phonePostRelay.js` — 【層】L2 拡張の配線(chrome.* と fetch。判定は src/lib/phonePost.js)
+    - `phonePostRelay.test.js`
+    - `phoneSound.wiring.test.js`
+    - `phoneVenue.wiring.test.js`
+    - `phoneVoice.wiring.test.js`
+    - `phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
     - `popupAvatarRetry.wiring.test.js`
     - `popupBackfillCompleteState.wiring.test.js`
@@ -983,10 +1007,15 @@
     - `repaintLoopGuard.wiring.test.js`
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
+    - `smartphoneFreshness.wiring.test.js`
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
     - `statusCopyFreshness.wiring.test.js`
+    - `statusDeviceCred.js` — スマホ版の「利用者ごとの鍵」を拡張側で持つ部品(v0.1.1731・スマホ化 利用者ごとの鍵 第b段)。
+    - `statusDeviceCred.test.js`
     - `statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
     - `statusPublisherHost.test.js`
+    - `statusSmartphoneCard.js` — 【層】L2 画面層(DOM を組む。鍵の発行・削除・送信は statusDeviceCred.js、判定は lib)
+    - `statusSmartphoneCard.test.js`
     - `storyDiagTotalSourcePopupEntry.wiring.test.js`
     - `storyGrowthSameUserBlurb.wiring.test.js`
     - `symptomVerdictsOnScreen.wiring.test.js`
@@ -1152,7 +1181,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1868)
+  - 📁 **lib/** (1894)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1584,6 +1613,10 @@
     - `devMonitorVizHtml.test.js`
     - `devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
     - `devReloadSignal.test.js`
+    - `deviceAuth.js` — 【層】L0 判定層(純粋関数)
+    - `deviceAuth.test.js`
+    - `devicePublishCredentials.js` — 【層】L0 判定層(純粋関数)
+    - `devicePublishCredentials.test.js`
     - `diagChannelRegistry.contract.test.js`
     - `diagChannelRegistry.js` — 計器チャンネルの台帳。HANDOFF-instrument-channels-2026-08-12.md §3。
     - `diagFlushThrottle.js` — 2026-07-06: 即時プッシュ計器(instantPushDiag)が「コメント送信バッチ毎に
@@ -1765,6 +1798,8 @@
     - `globalFetchRateLimiter.test.js`
     - `googleSuggest.js` — Google サジェスト取得の契約 (URL組み立て + レスポンスパース + message type)
     - `googleSuggest.test.js`
+    - `gzipBody.js` — v0.1.1735: 送信本文を gzip に縮める(状態速報 → api/status)。
+    - `gzipBody.test.js`
     - `healthCellGroups.js` — 健全度セルを【症状の言葉】で枠に分ける(純関数)。
     - `healthCellGroups.test.js`
     - `healthCellOverWiring.wiring.test.js`
@@ -2000,6 +2035,8 @@
     - `liveCommentTally.test.js`
     - `liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
     - `liveCommenterStats.test.js`
+    - `liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
+    - `liveElapsedExtrapolate.test.js`
     - `liveEndedFlag.js` — 配信終了フラグ。
     - `liveEndedFlag.test.js`
     - `liveGiftPulse.js` — この間隔を超えた2実測は差分を出さない(15分)。
@@ -2031,6 +2068,8 @@
     - `liveViewPublishSignature.test.js`
     - `livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
     - `livesCardSignature.test.js`
+    - `liveviewCurrentLive.js` — 【層】L0 判定層(純粋関数)
+    - `liveviewCurrentLive.test.js`
     - `liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
     - `liveviewErrorReport.test.js`
     - `liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
@@ -2241,6 +2280,8 @@
     - `officialNicoStatsStripDigest.test.js`
     - `officialStatsWindow.js` — at?: number|null,
     - `officialStatsWindow.test.js`
+    - `oggOpusMux.js` — v0.1.1740: Opus の音のかたまり(パケット)を Ogg に包む(純関数)。
+    - `oggOpusMux.test.js`
     - `opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
     - `opSoundDirector.test.js`
     - `opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
@@ -2305,6 +2346,18 @@
     - `personProfiles.test.js`
     - `personTileDom.js` — 人物タイル(丸サムネ＋ID＋ニックネーム)の DOM ビルダー（person-tile-unify 第2コミット・2026-06-17）。
     - `personTileDom.test.js`
+    - `phonePost.js` — 【層】L0 判定層(純粋関数)
+    - `phonePost.test.js`
+    - `phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
+    - `phoneSoundCues.test.js`
+    - `phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
+    - `phoneVenueModel.test.js`
+    - `phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
+    - `phoneVoice.test.js`
+    - `phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
+    - `phoneVoiceEncode.test.js`
+    - `phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
+    - `phoneVoiceSender.test.js`
     - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
     - `pickBroadcasterNameForReputation.test.js`
     - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。
@@ -2581,6 +2634,8 @@
     - `statusCoreBatch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `statusCoreBatch.test.js`
     - `statusCoreBatch.wiring.test.js`
+    - `statusEtag.js` — 【層】L0 判定層(純粋関数)
+    - `statusEtag.test.js`
     - `statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
     - `statusExtrasBatch.test.js`
     - `statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
@@ -3023,11 +3078,16 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (4)
+  - 📁 **server/** (9)
+    - `deviceApi.test.js`
+    - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
     - `kickApi.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
+    - `phonePostApi.test.js`
+    - `phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `phoneVoiceApi.test.js`
   - 📁 **shared/** (7)
     - 📁 **avatar/** (3)
       - `avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。

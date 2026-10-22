@@ -65,6 +65,8 @@
 - 🔵 **KEY_THUMB_INTERVAL_MS** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_TOP_SUPPORTERS_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_VENUE_BUTTON_VISIBLE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
+- 🔵 **KEY_VOICE_ASSIGNMENTS** — 読む人だけ（書く経路が無い疑い）: src/extension/phoneVoicePublisher.js
+- 🔵 **KEY_VOICE_READ_NAME_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/phoneVoicePublisher.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
@@ -131,6 +133,7 @@
 | `KEY_OP_SOUND_ENABLED` | — | extension/popup-entry.js |
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
 | `KEY_PANEL_WAKE_CURTAIN_DIAG` | lib/panelWakeCurtainDom.js | — |
+| `KEY_PHONE_POST` | extension/phonePostRelay.js | extension/phonePostRelay.js |
 | `KEY_POPUP_FRAME` | extension/popup/init/frameTheme.js | extension/content-entry.js<br>extension/popup/init/frameTheme.js |
 | `KEY_POPUP_FRAME_CUSTOM` | extension/popup/init/frameTheme.js | extension/content-entry.js<br>extension/popup/init/frameTheme.js |
 | `KEY_PREVIEW_RENDER_ACK` | extension/popup-entry.js | extension/popup-entry.js |
@@ -142,6 +145,7 @@
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_SHARE_KEYS_SEEDED` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_SOURCE_PROVENANCE` | extension/status-entry.js | extension/status-entry.js |
+| `KEY_STATUS_DEVICE_CRED` | extension/statusDeviceCred.js | extension/statusDeviceCred.js |
 | `KEY_STATUS_FAST_DIAG_LITE` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_STATUS_UPLOAD_CONFIG` | extension/status-entry.js | extension/status-entry.js |
@@ -157,8 +161,10 @@
 | `KEY_VENUE_BUTTON_VISIBLE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | — |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
+| `KEY_VOICE_ASSIGNMENTS` | — | extension/phoneVoicePublisher.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
+| `KEY_VOICE_READ_NAME_ENABLED` | — | extension/phoneVoicePublisher.js |
 | `KEY_WEB_PUBLISH_OPT_IN` | extension/status-entry.js | extension/status-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |
 | `fn:chunkIndexKey` | extension/content-entry.js | extension/popup-entry.js |

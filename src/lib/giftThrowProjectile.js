@@ -55,7 +55,7 @@ export function resolveGiftImageUrl(itemId) {
 }
 
 /** ポイント→帯(giftBahamut と同じ閾値で揃える)。 @param {unknown} point */
-function tierFromPoints(point) {
+export function tierFromPoints(point) {
   const pt = Number(point) || 0;
   if (pt >= 5000) return 'mega';
   if (pt >= 500) return 'large';
