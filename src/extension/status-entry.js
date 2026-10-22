@@ -3778,7 +3778,7 @@ async function uploadStatusSnapshot() {
   const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(creds.appOrigin, creds.viewToken);
   try {
     // v0.1.1735: gzip で縮めて送る(約5分の1)。受け口が解けず 400 なら、このページでは以後 JSON のまま送り直す。
-    const jsonText = JSON.stringify({ ...buildPublishBody(creds, jsonBlob), phoneVoice: _phoneVoice.state() });
+    const jsonText = JSON.stringify({ ...buildPublishBody(creds, jsonBlob), phoneVoice: _phoneVoice.state(), phoneVoiceStats: _phoneVoice.stats() });
     const sent = await buildPublishInit(creds.headers, jsonText, { allowGzip: _publishGzipOk && !_publishGzipRefused });
     let res = await fetch(ingestUrl, sent.init);
     if (sent.gzip && res.status === 400 && (await res.clone().json().catch(() => null))?.error === 'bad body') {

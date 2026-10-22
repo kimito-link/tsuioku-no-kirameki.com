@@ -8,11 +8,15 @@
  *
  * @module live-view-venue
  */
-import { buildPhoneVenueSeats, diffPhoneVenueEvents } from '../src/lib/phoneVenueModel.js';
+import { buildPhoneVenueSeats, diffPhoneVenueEvents, phoneVenueFallbackFace } from '../src/lib/phoneVenueModel.js';
 import { tierFromPoints } from '../src/lib/giftThrowProjectile.js';
 
 const DEFAULT_FACE = '/app/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png';
 const BUBBLE_MS = 4500;
+/** v0.1.1743: 声が終わってから吹き出しを消すまでの余韻。 */
+const VOICE_TAIL_MS = 600;
+/** v0.1.1742: 読み上げ中、声を待つ最長(PC の合成→送信→スマホの取得で ふつう数秒)。過ぎたら声なしで吹き出しを出す。 */
+const VOICE_WAIT_MAX_MS = 15_000;
 /** @type {Record<string, number>} */
 const GIFT_MS = { small: 2500, medium: 3500, large: 5000, mega: 7000 };
 
@@ -61,13 +65,20 @@ function ensureStyle() {
   document.head.appendChild(style);
 }
 
-/** @param {HTMLImageElement} img @param {string} src */
-function setFace(img, src) {
+/**
+ * v0.1.1747: 顔が無い・読めないときは、その人ごとのゆっくり顔(PC の会場と同じ)。それも作れないときだけ既定の顔。
+ * @param {HTMLImageElement} img @param {string} src @param {{ userId?: string, key?: string }} seat
+ */
+function setFace(img, src, seat) {
+  const fallback = () => phoneVenueFallbackFace(src, seat) || DEFAULT_FACE;
   img.onerror = () => {
-    img.onerror = null;
-    img.src = DEFAULT_FACE;
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = DEFAULT_FACE;
+    };
+    img.src = fallback();
   };
-  img.src = src || DEFAULT_FACE;
+  img.src = src || fallback();
 }
 
 export function createPhoneVenue() {
@@ -89,6 +100,12 @@ export function createPhoneVenue() {
   const giftQueue = [];
   let giftBusy = false;
   let seatsSig = '';
+  /** v0.1.1742: 読み上げ(🗣)が鳴っているか。鳴っている間はコメントの吹き出しを声に合わせる。 */
+  /** @type {() => boolean} */
+  let voiceActive = () => false;
+  /** 声を待っている吹き出し(コメント番号 → 出す内容と、声が来なかったときの保険のタイマー)。 */
+  /** @type {Map<string, { personKey: string, text: string, timer: any }>} */
+  const waitingVoice = new Map();
 
   const isOpen = () => !!root && !root.hidden;
 
@@ -120,7 +137,7 @@ export function createPhoneVenue() {
       img.alt = '';
       img.loading = 'lazy';
       img.referrerPolicy = 'no-referrer';
-      setFace(img, seat.avatarUrl);
+      setFace(img, seat.avatarUrl, seat);
       const name = document.createElement('div');
       name.className = 's-name';
       name.textContent = seat.name || '名無し';
@@ -131,8 +148,8 @@ export function createPhoneVenue() {
     seatsEl.replaceChildren(...nodes);
   }
 
-  /** @param {string} personKey @param {string} text */
-  function bubble(personKey, text) {
+  /** @param {string} personKey @param {string} text @param {number} [ms] 出しておく長さ(声の長さに合わせるとき) */
+  function bubble(personKey, text, ms = BUBBLE_MS) {
     const seat = seatByKey.get(personKey);
     if (!seat || !text) return;
     seat.querySelector('.v-bubble')?.remove();
@@ -149,7 +166,7 @@ export function createPhoneVenue() {
       b.style.setProperty('--tail', `calc(50% - ${shift}px)`);
     }
     bounce(personKey);
-    setTimeout(() => b.remove(), BUBBLE_MS);
+    setTimeout(() => b.remove(), ms);
   }
 
   /** @param {string} personKey */
@@ -241,7 +258,25 @@ export function createPhoneVenue() {
     close() {
       if (root) root.hidden = true;
       giftQueue.length = 0;
+      for (const w of waitingVoice.values()) clearTimeout(w.timer);
+      waitingVoice.clear();
       void holdScreen(false);
+    },
+    /** v0.1.1742: 読み上げが鳴っているかを教える口。 @param {() => boolean} fn */
+    setVoiceActive(fn) {
+      voiceActive = typeof fn === 'function' ? fn : () => false;
+    },
+    /**
+     * v0.1.1742: そのコメントの声が鳴り始めた=待たせていた吹き出しを出す。
+     * v0.1.1743: 声が終わるまで出しておく(長い声の途中で吹き出しが消えていた)。
+     * @param {string} no @param {number} [durationMs]
+     */
+    onVoicePlay(no, durationMs = 0) {
+      const w = waitingVoice.get(String(no));
+      if (!w) return;
+      clearTimeout(w.timer);
+      waitingVoice.delete(String(no));
+      if (isOpen()) bubble(w.personKey, w.text, Math.max(BUBBLE_MS, (Number(durationMs) || 0) + VOICE_TAIL_MS));
     },
     /** 鏡の行(古→新)が届くたびに呼ぶ。閉じている間も「見た」ことは覚える(開いた瞬間に一斉に出さない)。 @param {any[]} rows */
     onRows(rows) {
@@ -255,6 +290,13 @@ export function createPhoneVenue() {
           const pt = ev.point > 0 ? ` (${ev.point.toLocaleString('ja-JP')}pt)` : '';
           giftQueue.push({ item: ev.itemName || 'ギフト', who: `${ev.name || '名無し'} さんから${pt}`, tier: tierFromPoints(ev.point) });
           bounce(ev.personKey); // 品名は真ん中に大きく出すので、席は跳ねるだけ(吹き出しを重ねない)
+        } else if (ev.no && voiceActive()) {
+          // 声は PC が作って届くまで数秒遅れる=吹き出しは声が鳴った瞬間に出す。声が来なければ保険で出す。
+          const timer = setTimeout(() => {
+            waitingVoice.delete(ev.no);
+            bubble(ev.personKey, ev.text);
+          }, VOICE_WAIT_MAX_MS);
+          waitingVoice.set(ev.no, { personKey: ev.personKey, text: ev.text, timer });
         } else {
           bubble(ev.personKey, ev.text);
         }

@@ -19,6 +19,7 @@ describe('配線: スマホの読み上げ(v0.1.1740)', () => {
   it('★PC: 送信の返事の voiceWanted で声を作る・状態をスマホへ載せる', () => {
     expect(statusEntry).toContain('void _phoneVoice.tick({ wanted: ack.voiceWanted, liveId: sentLiveId, rows: jsonBlob.commentTimelineMirror?.rows });');
     expect(statusEntry).toContain('phoneVoice: _phoneVoice.state()');
+    expect(statusEntry).toContain('phoneVoiceStats: _phoneVoice.stats()');
   });
 });
 
@@ -45,3 +46,32 @@ describe('createPhoneVoice', () => {
     expect(phoneVoiceLabel(/** @type {any} */ (on))).toMatchObject({ warn: true, text: '🗣 PCのVOICEVOXが起動していません' });
   });
 });
+
+describe('配線: 会場の吹き出しを読み上げの声に合わせる(v0.1.1742)', () => {
+  const venue = readFileSync(new URL('../../app/live-view-venue.js', import.meta.url), 'utf8');
+  it('★読み上げが鳴っている(PC も声を作れている)間だけ、吹き出しを声の再生開始まで待たせる', () => {
+    expect(liveView).toContain("_venue.setVoiceActive(() => Boolean(_voice && _voice.isOn() && _voice.isReady() && _voice.pcState() === 'ok'));");
+    expect(liveView).toContain('_voice.onPlay((no, ms) => _venue.onVoicePlay(no, ms));');
+    expect(venueSrcHas(venue, '} else if (ev.no && voiceActive()) {')).toBe(true);
+  });
+  it('★声が来なくても保険で吹き出しを出す(永久に出ない事故を作らない・PC 会場 v0.1.757 と同じ考え)', () => {
+    expect(venue).toMatch(/setTimeout\(\(\) => \{\s*waitingVoice\.delete\(ev\.no\);\s*bubble\(ev\.personKey, ev\.text\);\s*\}, VOICE_WAIT_MAX_MS\)/);
+  });
+  it('★v0.1.1743: 声が終わるまで吹き出しを出しておく(声の長さを再生開始で渡す)', () => {
+    expect(voiceSrc).toContain('f(clip.no, Math.round((buf.duration || 0) * 1000))');
+    expect(venue).toContain('bubble(w.personKey, w.text, Math.max(BUBBLE_MS, (Number(durationMs) || 0) + VOICE_TAIL_MS))');
+  });
+  it('★v0.1.1745: 最新コメント欄は、声が鳴っている間そのコメントを出す', () => {
+    expect(liveView).toContain('const spoken = pickSpokenTickerRow(rows, _spokenNo);');
+    expect(liveView).toContain('const latest = spoken || picked.entry || rows[rows.length - 1];');
+    expect(liveView).toMatch(/_voice\.onPlay\(\(no, ms\) => \{\s*_spokenNo = String\(no \|\| ''\);/);
+  });
+  it('★「読み上げ」ボタンの説明文もスマホの読み上げに合わせる', () => {
+    expect(voiceSrc).toContain("popupBtn.setAttribute('aria-label', l.aria);");
+  });
+});
+
+/** @param {string} src @param {string} needle */
+function venueSrcHas(src, needle) {
+  return src.includes(needle);
+}

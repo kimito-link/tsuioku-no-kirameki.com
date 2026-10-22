@@ -3754,5 +3754,75 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1741', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'Android 実機で全ボタンを押した結果(無反応12個)を、模擬サーバーのブラウザで再現(応援者アイコンの押下が popup に止められていた)してから直した。'
+  }),
+  Object.freeze({
+    version: '0.1.1742', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは WEB版(app/live-view-venue.js・live-view-voice.js)だけに入る。'
+  }),
+  Object.freeze({
+    version: '0.1.1742', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1742', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '模擬サーバー+スマホ幅のブラウザで、声が9秒遅れて届いたとき吹き出しが声の再生と同時(差0.1秒)に出る・声が来ないときは約15秒で出るのを確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1743', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは送信担当(status.js)の phoneVoiceSender と WEB版(app/live-view-*.js)だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1743', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1743', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '読み飛ばしの原因は PC 実機の計測(3分でコメント約60件・声19本)と、別の目(Grok)のコード読みの両方で確かめた。'
+  }),
+  Object.freeze({
+    version: '0.1.1745', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは WEB版(app/live-view.js)と純関数 phoneVoice.js だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1745', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1745', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '模擬サーバー+スマホ幅のブラウザで、新しいコメントが来た後でも声が鳴っている間は読んでいるコメントが出て、声が終わると新しい方に戻るのを確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1746', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。数える処理は送信担当(status.js)の phoneVoiceSender だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1746', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1746', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '数え方は単体テストで固定。実機の内訳はこの版を入れて配信で測る(推測で直さないための計器)。'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは WEB版(app/live-view-venue.js)と純関数 phoneVenueModel.js だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '原因は PC 実機側のコード読みと、こちらのコード読みの両方で一致(DEFAULT_FACE 固定)。代わりの顔は単体テストで固定。'
   })
 ]);
