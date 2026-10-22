@@ -106,6 +106,7 @@ import { createPhonePostClient, mountPhonePostUi, takePostKey } from './live-vie
 import { createPhoneSoundPlayer, mountPhoneSoundUi } from './live-view-sound.js';
 import { createPhoneVenue, mountPhoneVenueUi } from './live-view-venue.js';
 import { createPhoneVoice, mountPhoneVoiceUi } from './live-view-voice.js';
+import { pickSpokenTickerRow } from '../src/lib/phoneVoice.js';
 import { mountPhoneFit } from './live-view-phone-fit.js';
 import {
   evaluateSnapshotFreshness,
@@ -515,7 +516,12 @@ function paintSupporterRanking(topSupporters) {
  *   poll/onChanged のたびに最新行が変わる=純Webでも「コメントが進む動き」が見える。本物 lib
  *   buildCommentTickerLatestHtml を再利用(似せて自作しない)。 */
 let _lastTimelineSig = ' init';
+/** v0.1.1745: いま声で読んでいるコメント番号(鳴っていなければ '')。最新コメント欄を声にそろえる。 */
+let _spokenNo = '';
+/** @type {any} */
+let _lastTimelineSnap = null;
 function paintCommentTimelineMirror(snap) {
+  _lastTimelineSnap = snap;
   const segA = document.getElementById('commentTickerSegA');
   const segB = document.getElementById('commentTickerSegB');
   const scroll = document.getElementById('commentTickerScroll');
@@ -526,8 +532,10 @@ function paintCommentTimelineMirror(snap) {
   // v0.1.1226: ①②と【同一の純関数】で選ぶ。バケット丸めが決定的なので、
   //   3画面が別タイミングで呼んでも同じ7秒窓なら同じ1件になる(鏡への新フィールド追加ゼロ)。
   const picked = pickTickerHighlightEntry(rows, Date.now());
-  const latest = picked.entry || rows[rows.length - 1];
-  const sig = `${String(snap?.liveId || '')}|${Number(snap?.capturedAt) || 0}|${rows.length}|${tickerHighlightKey(picked)}`;
+  // v0.1.1745: 読み上げ中は、いま読んでいるコメントを出す(新着ごとに切り替わって声とずれていた)。
+  const spoken = pickSpokenTickerRow(rows, _spokenNo);
+  const latest = spoken || picked.entry || rows[rows.length - 1];
+  const sig = `${String(snap?.liveId || '')}|${Number(snap?.capturedAt) || 0}|${rows.length}|${spoken ? `voice:${_spokenNo}` : tickerHighlightKey(picked)}`;
   if (sig === _lastTimelineSig) return;
   _lastTimelineSig = sig;
   try {
@@ -1027,6 +1035,20 @@ function bootstrap() {
     _postClient.start();
   }
   _voice = createPhoneVoice({ token });
+  // v0.1.1742: 会場の吹き出しを読み上げの声に合わせる(声が鳴った瞬間に、その人の吹き出しを出す)。
+  _venue.setVoiceActive(() => Boolean(_voice && _voice.isOn() && _voice.isReady() && _voice.pcState() === 'ok'));
+  _voice.onPlay((no, ms) => _venue.onVoicePlay(no, ms));
+  // v0.1.1745: 最新コメント欄も、声が鳴っている間はそのコメントにする(声が終わったら従来の選び方)。
+  let spokenTimer = 0;
+  _voice.onPlay((no, ms) => {
+    _spokenNo = String(no || '');
+    clearTimeout(spokenTimer);
+    spokenTimer = setTimeout(() => {
+      _spokenNo = '';
+      paintCommentTimelineMirror(_lastTimelineSnap);
+    }, Math.max(1000, Number(ms) || 0) + 600);
+    paintCommentTimelineMirror(_lastTimelineSnap);
+  });
   bootWithSnapshot(token).catch((err) => {
     showError('通信エラー: ' + String((err && err.message) || err));
   });

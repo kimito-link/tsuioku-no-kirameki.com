@@ -11,6 +11,7 @@
  */
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { identiconFallbackForAvatarUrl } from './avatarFallbackFromUrl.js';
 import { giftRowSoundKey } from './phoneSoundCues.js';
 
 /** 席の上限(スマホ1画面に顔が判別できる大きさで並ぶ数)。 */
@@ -58,6 +59,20 @@ export function phoneVenueAvatar(row) {
 }
 
 /**
+ * v0.1.1747: 顔が読めなかった(404・アイコン未設定・退会)ときの代わりの顔。PC の会場と同じく
+ *   「その人ごとのゆっくり顔」(identicon)にする。以前は全員ゆっくりりんく(配信者側のキャラ)になっていた。
+ *   URL の数値ID → 席の userId → 席のキー の順で、その人に決まる顔を作る。作れなければ ''(呼び出し側の既定)。
+ * @param {string} failedSrc 読めなかった顔の URL
+ * @param {{ userId?: string, key?: string }} seat
+ */
+export function phoneVenueFallbackFace(failedSrc, seat) {
+  const fromUrl = identiconFallbackForAvatarUrl(failedSrc);
+  if (fromUrl) return fromUrl;
+  const id = s(seat && seat.userId) || s(seat && seat.key);
+  return id ? anonymousIdenticonDataUrl(id, 64) || '' : '';
+}
+
+/**
  * 最近コメント/ギフトした人を新しい順に席へ(同じ人は1席・最大 max)。
  * @param {any[]} rows 鏡の行(古→新)
  * @param {number} [max]
@@ -86,7 +101,7 @@ export function diffPhoneVenueEvents(a) {
   const rows = Array.isArray(a && a.rows) ? a.rows : [];
   const first = !(a && a.seen instanceof Set);
   const seen = first ? new Set() : new Set(a.seen);
-  /** @type {{ type: 'comment'|'gift', personKey: string, name: string, text: string, itemName: string, point: number }[]} */
+  /** @type {{ type: 'comment'|'gift', personKey: string, name: string, text: string, itemName: string, point: number, no: string }[]} */
   const events = [];
   for (const row of rows) {
     if (!row || typeof row !== 'object') continue;
@@ -101,7 +116,9 @@ export function diffPhoneVenueEvents(a) {
       name: s(row.name),
       text: s(row.text),
       itemName: gift ? s(row.itemName || row.text) : '',
-      point: gift ? Math.max(0, Math.floor(Number(row.point) || 0)) : 0
+      point: gift ? Math.max(0, Math.floor(Number(row.point) || 0)) : 0,
+      // v0.1.1742: コメント番号(読み上げの声と吹き出しを合わせる目印)。無ければ空。
+      no: gift ? '' : /^\d{1,10}$/.test(s(row.no)) ? s(row.no) : ''
     });
   }
   while (seen.size > SEEN_CAP) seen.delete(/** @type {string} */ (seen.values().next().value));
