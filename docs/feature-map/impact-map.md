@@ -341,6 +341,7 @@
 | `src/lib/liveEndedFlag.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/liveLaneBuckets.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/liveRankingView.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
+| `src/lib/liveviewCurrentLive.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/memoryPressureProbe.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/metricConfidence.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/milestoneEffectDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
