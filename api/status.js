@@ -15,6 +15,9 @@
  *     書き込み先の閲覧トークンは【サーバーが鍵の記録から決める】=他人のトークンを指定して上書きできない。
  *     利用者ごとの1日の上限・全体の上限を超えたら 429(Retry-After 120)。
  *
+ *   ★v0.1.1740: スマホの読み上げ(?action=voice)。声は最新20件を2分だけ預かる(src/server/phoneVoiceApi.js)。
+ *     送信の返事の voiceWanted:true は「スマホで 🗣 が ON」=PC はその間だけ声を作って送る。
+ *
  *   ※ 概要だけスコープ。コメント全文は将来。
  */
 
@@ -32,6 +35,7 @@ import {
   stripDeviceBody
 } from '../src/lib/deviceAuth.js';
 import { authenticateDevice, incrWithExpiry, upstash } from '../src/server/deviceStore.js';
+import { MAX_VOICE_BODY_BYTES, isVoiceWanted, loadVoiceClips, markVoiceWanted, saveVoiceClip } from '../src/server/phoneVoiceApi.js';
 
 /** ★v0.1.1730: 保存期間 7日→24時間(2026-10-21 りんく了承)。共有キー経路も利用者経路も同じ。 */
 const TTL_SECONDS = STATUS_TTL_SECONDS;
@@ -160,12 +164,52 @@ async function handleDevicePost(req, res) {
     /* 期限の延長は最適化 */
   }
   logIngest(req, 'device_ok');
-  res.status(200).json({ ok: true, viewerActive: await isViewerActive(auth.record.v), gzipOk: true });
+  const v = auth.record.v;
+  res.status(200).json({ ok: true, viewerActive: await isViewerActive(v), gzipOk: true, voiceWanted: await isVoiceWanted(v) });
+}
+
+/**
+ * v0.1.1740: 声1件の受け口。鍵の照合は概要の送信と同じ(利用者の鍵なら書き込み先はサーバーが決める)。
+ *   上限は概要の送信とは別枠(鍵ごとに1日3,000件)。
+ */
+async function handleVoicePost(req, res) {
+  if (Number(req.headers?.['content-length']) > MAX_VOICE_BODY_BYTES) {
+    res.status(413).json({ ok: false, error: 'too large' });
+    return;
+  }
+  let token = '';
+  let quotaId = '';
+  if (req.headers?.['x-device-id']) {
+    const auth = await authenticateDevice(req.headers);
+    if (auth) {
+      token = auth.record.v;
+      quotaId = auth.deviceId;
+    }
+  } else {
+    const ingestKey = process.env.STATUS_INGEST_KEY;
+    if (ingestKey && req.headers?.['x-share-key'] === ingestKey) quotaId = 'shared';
+  }
+  if (!quotaId) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  const body = readBody(req);
+  if (quotaId === 'shared') token = String(body?.v || '');
+  if (!VIEW_TOKEN_RE.test(token)) {
+    res.status(400).json({ ok: false, error: 'bad view token' });
+    return;
+  }
+  const r = await saveVoiceClip({ token, quotaId, body, nowMs: Date.now() });
+  res.status(r.code).json(r.json);
 }
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
+    if (req.method === 'POST' && req.query?.action === 'voice') {
+      await handleVoicePost(req, res);
+      return;
+    }
     if (req.method === 'POST' && req.headers?.['x-device-id']) {
       await handleDevicePost(req, res);
       return;
@@ -202,7 +246,7 @@ export default async function handler(req, res) {
       delete payload.v;
       await saveSnapshot(token, JSON.stringify(payload));
       logIngest(req, 'ok');
-      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token), gzipOk: true });
+      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token), gzipOk: true, voiceWanted: await isVoiceWanted(token) });
       return;
     }
 
@@ -210,6 +254,13 @@ export default async function handler(req, res) {
       const token = String(req.query?.v || '');
       if (!VIEW_TOKEN_RE.test(token)) {
         res.status(400).json({ ok: false, error: 'bad view token' });
+        return;
+      }
+      // ★v0.1.1740: スマホの読み上げ。声だけを返す(概要の目印・ETag とは別)。
+      //   取りに来ること自体が「声がほしい」目印(30秒)=PC は送信の返事でそれを知り、その間だけ声を作る。
+      if (req.query?.action === 'voice') {
+        await markVoiceWanted(token);
+        res.status(200).json({ ok: true, clips: await loadVoiceClips(token, req.query?.after) });
         return;
       }
       // ★v0.1.1736: 「いまスマホで開いている」目印を置く(30秒で消える・中身は '1' だけ)。
