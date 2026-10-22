@@ -29,6 +29,9 @@ import {
   updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict,
   computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
+import {
+  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, recordVoiceSynthStage
+} from './voiceStageTiming.js';
 
 /**
  * ★v0.1.1326: 生存確認の再試行バックオフ(ms)。初回失敗後にこの間隔で最大3回試す。
@@ -160,8 +163,13 @@ export class VoicePlayer {
       //   実配信の「合成失敗17件(その他16)」の正体を誰も答えられなかった。
       //   原因ごとに打つ手が正反対(接続不能=拡張では直せない / HTTP拒否=絞れば直る)。
       synthFailReasons: {},
+      upstreamEmaMs: -1, lastUpstreamMs: -1, queueWaitEmaMs: -1, engineWaitEmaMs: -1,
+      audioQueryEmaMs: -1, synthesisEmaMs: -1, warmSynthEmaMs: -1,
+      coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
+    // 2026-10-22計器(P1): 合成1件ごとのエンジン待ち・初めての声を測る(印字専用)。
+    this._synthTracker = createVoiceSynthTracker();
   }
 
   _emitDiag() {
@@ -401,14 +409,13 @@ export class VoicePlayer {
     //   pressure(需要/供給比)由来のブーストで埋める。上げるだけ・落ち着いていれば0。
     const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
     const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
-    const promise = this.fetchSynthesizeVoice(
+    // v0.1.1224: 失敗理由を計器へ(_synthesizeTracked が onFailure を渡す)。
+    const promise = this._synthesizeTracked(
       buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) }),
       {
         ...assigned,
         speedOffset: assigned.speedOffset + effBoost
-      },
-      // v0.1.1224: 失敗理由を計器へ。第3引数(opts)は既存呼び出しに無くても壊れない。
-      { onFailure: (info) => this._recordSynthFailureReason(info) }
+      }
     ).catch(() => null);
     // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
@@ -421,6 +428,39 @@ export class VoicePlayer {
    * v0.1.1224: 合成失敗の理由を1件記録する。voicevoxClient の onFailure から呼ばれる。
    * @param {{ stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }} info
    */
+  /**
+   * 合成を依頼し、段階計測(エンジン待ち・audio_query/synthesis・初めての声)を diag へ記録する。
+   * 戻り値・例外は fetchSynthesizeVoice と同じ(計器は読み上げの挙動を変えない)。
+   * @param {string} text
+   * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
+   */
+  _synthesizeTracked(text, voice) {
+    const track = this._synthTracker.begin(voice?.styleId);
+    /** @type {{ queryMs?: number, synthMs?: number }} */
+    let timing = {};
+    // 同期で呼ぶ(enqueue 直後に合成が起動していることを既存テストが固定している=v0.1.800)。
+    let started;
+    try {
+      started = this.fetchSynthesizeVoice(text, voice, {
+        onFailure: (info) => this._recordSynthFailureReason(info),
+        onTiming: (t) => { timing = t || {}; }
+      });
+    } catch (err) {
+      started = Promise.reject(err);
+    }
+    return Promise.resolve(started)
+      .then(
+        (wav) => {
+          try { recordVoiceSynthStage(this.diag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
+          return wav;
+        },
+        (err) => {
+          try { track.end(timing, false); } catch { /* no-op */ }
+          throw err;
+        }
+      );
+  }
+
   _recordSynthFailureReason(info) {
     try {
       const reason = classifyVoiceSynthFailureReason(info);
@@ -538,6 +578,8 @@ export class VoicePlayer {
         // 2026-07-24計器(段階0=shadow): 1件あたり処理時間(shift〜再生完了)の起点。
         //   staleで即時破棄されたitemは合成/再生を伴わないため計測対象外(下のstale分岐でreturn)。
         const _serviceStart = Date.now();
+        // 2026-10-22計器(P1): キュー投入→取り出し(順番待ち)。
+        foldVoiceStageEma(this.diag, 'queueWaitEmaMs', measureVoiceGapMs(item.enqueuedAt, _serviceStart));
 
         const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
         if (ageCheck.stale) {
@@ -569,13 +611,12 @@ export class VoicePlayer {
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const wav = pf
           ? await pf.promise
-          : await this.fetchSynthesizeVoice(
+          : await this._synthesizeTracked(
               buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) }),
               {
                 ...assigned,
                 speedOffset: assigned.speedOffset + effBoostNow
-              },
-              { onFailure: (info) => this._recordSynthFailureReason(info) }
+              }
             );
         this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
         this.diag.lastSpeedBoost = effBoostNow;
@@ -795,6 +836,14 @@ export class VoicePlayer {
       }
 
       if (!buildVoiceReadingText({ name, text: body })) continue;
+
+      // 2026-10-22計器(P1): 受信→キュー投入。保存のまとめ書き(最大1.5秒)等の上流の遅れ。
+      //   receivedAt は呼び出し側(会場)が渡す受信時刻(無ければ計測しない)。
+      const _upstreamMs = measureVoiceGapMs(item.receivedAt, Date.now());
+      if (_upstreamMs >= 0) {
+        this.diag.lastUpstreamMs = _upstreamMs;
+        foldVoiceStageEma(this.diag, 'upstreamEmaMs', _upstreamMs);
+      }
 
       // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-3): 有効候補
       //   (テキスト構築に成功した=読み上げ対象になりうる)ごとに到着窓を畳む(件/分)。

@@ -310,7 +310,8 @@ export async function listVoicevoxStyleIds(opts = {}) {
  *   audioQueryTimeoutMs?: number,
  *   synthesisTimeoutMs?: number,
  *   baseUrl?: string,
- *   onFailure?: (info: { stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }) => void
+ *   onFailure?: (info: { stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }) => void,
+ *   onTiming?: (t: { queryMs: number, synthMs: number }) => void
  * }} [opts]
  *   v0.1.1224: onFailure は「null を返す理由」を呼び出し側へ伝える任意コールバック。
  *   戻り値の型(ArrayBuffer|null)は変えないので既存の呼び出しは無改修で動く。
@@ -346,6 +347,9 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     speaker: String(styleId)
   });
 
+  // 2026-10-22 計器(P1・印字専用): audio_query と synthesis の所要を分けて呼び出し側へ渡す。
+  const nowMs = () => Date.now();
+  const queryStartAt = nowMs();
   try {
     const queryResponse = await fetchWithTimeout(
       fetchFn,
@@ -373,6 +377,8 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     audioQuery.outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
     audioQuery.outputStereo = false;
 
+    const queryMs = nowMs() - queryStartAt;
+    const synthStartAt = nowMs();
     const synthesisRes = await fetchWithTimeout(
       fetchBufferFn,
       `${baseUrl}/synthesis?speaker=${styleId}`,
@@ -392,10 +398,14 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     }
     // v0.1.1004: body 読み取りもタイムアウト保護(リクエストのみの保護では本体配信途中停止で
     //   永遠 pending → 読み上げが await_prefetch 固着する)。超過/失敗時は catch で null=この1件を捨てる。
-    return await arrayBufferWithTimeout(
+    const wav = await arrayBufferWithTimeout(
       synthesisRes,
       positiveTimeout(opts.synthesisTimeoutMs, 8000)
     );
+    try {
+      if (typeof opts.onTiming === 'function') opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
+    } catch { /* 計器の失敗は読み上げを止めない */ }
+    return wav;
   } catch (err) {
     // v0.1.1224: ここは「接続不能(VOICEVOX未起動)」と「時間切れ」と「本文読み取り失敗」が
     //   全部落ちてくる。error をそのまま渡し、分類は純関数(voiceSynthFailureReason)に任せる。
