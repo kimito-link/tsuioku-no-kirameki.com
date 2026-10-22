@@ -3784,30 +3784,72 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '読み飛ばしの原因は PC 実機の計測(3分でコメント約60件・声19本)と、別の目(Grok)のコード読みの両方で確かめた。'
   }),
   Object.freeze({
-    version: '0.1.1744', metric: 'bundle-kb', value: 1443,
+    version: '0.1.1745', metric: 'bundle-kb', value: 1443,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '変化なし。読み上げの段階計測は会場(venue.js)とコメビュ(comeview.js)に入り、popup には入らない。'
+    note: '変化なし。直しは WEB版(app/live-view.js)と純関数 phoneVoice.js だけ。'
   }),
   Object.freeze({
-    version: '0.1.1744', metric: 'gate-selftest', value: 4,
+    version: '0.1.1745', metric: 'gate-selftest', value: 4,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.1744', metric: 'cross-checked-claims', value: 35,
+    version: '0.1.1745', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: '30日窓の数え方で前版と同値。今回は「エンジン待ち」の物差しが前提とする VOICEVOX の直列処理を、自宅PCの実測(3件同時でも15%しか縮まない)で確かめてから、時計を手で進める単体テストで固定した。'
+    note: '模擬サーバー+スマホ幅のブラウザで、新しいコメントが来た後でも声が鳴っている間は読んでいるコメントが出て、声が終わると新しい方に戻るのを確認。'
   }),
   Object.freeze({
-    version: '0.1.1746', metric: 'bundle-kb', value: 1444,
+    version: '0.1.1746', metric: 'bundle-kb', value: 1442,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '+1KB。ポップアップの読み上げ音量スライダー(配線と正規化の純関数)。利用者が要望した設定画面の項目そのもの。'
+    note: '変化なし。数える処理は送信担当(status.js)の phoneVoiceSender だけ。'
   }),
   Object.freeze({
     version: '0.1.1746', metric: 'gate-selftest', value: 4,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.1746', metric: 'cross-checked-claims', value: 36,
+    version: '0.1.1746', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '数え方は単体テストで固定。実機の内訳はこの版を入れて配信で測る(推測で直さないための計器)。'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは WEB版(app/live-view-venue.js)と純関数 phoneVenueModel.js だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1747', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '原因は PC 実機側のコード読みと、こちらのコード読みの両方で一致(DEFAULT_FACE 固定)。代わりの顔は単体テストで固定。'
+  }),
+  Object.freeze({
+    version: '0.1.1748', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。読み上げの段階計測は会場(venue.js)とコメビュ(comeview.js)に入り、popup には入らない。'
+  }),
+  Object.freeze({
+    version: '0.1.1748', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1748', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日窓の数え方で前版と同値。今回は「エンジン待ち」の物差しが前提とする VOICEVOX の直列処理を、自宅PCの実測(3件同時でも15%しか縮まない)で確かめてから、時計を手で進める単体テストで固定した。'
+  }),
+  Object.freeze({
+    version: '0.1.1749', metric: 'bundle-kb', value: 1444,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+1KB。ポップアップの読み上げ音量スライダー(配線と正規化の純関数)。利用者が要望した設定画面の項目そのもの。'
+  }),
+  Object.freeze({
+    version: '0.1.1749', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1749', metric: 'cross-checked-claims', value: 36,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日窓の数え方で前版+1。今回は増幅の基準(長文48%・短文19%)を、自宅PCの VOICEVOX 実測 WAV の振幅で確かめてから、合成した WAV の単体テストで固定した。'
   })

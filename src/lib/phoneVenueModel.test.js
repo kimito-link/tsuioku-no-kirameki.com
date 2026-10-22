@@ -4,8 +4,7 @@ import {
   diffPhoneVenueEvents,
   phoneVenueAvatar,
   phoneVenueRowKey,
-  PHONE_VENUE_MAX_EVENTS
-} from './phoneVenueModel.js';
+  PHONE_VENUE_MAX_EVENTS, phoneVenueFallbackFace } from './phoneVenueModel.js';
 
 const c = (no, userId, name, text, extra = {}) => ({ at: no * 1000, no: String(no), userId, name, text, avatarUrl: '', kind: 'comment', ...extra });
 
@@ -52,5 +51,19 @@ describe('diffPhoneVenueEvents', () => {
   it('番号が無いコメントは送り主・時刻・本文で見分ける', () => {
     expect(phoneVenueRowKey({ userId: '1', at: 3, text: 'x' })).toBe('c:1:3:x');
     expect(phoneVenueRowKey({ no: '9', text: 'x' })).toBe('c:#9');
+  });
+});
+
+describe('phoneVenueFallbackFace(v0.1.1747)', () => {
+  it('読めなかった公式の顔 URL の数値IDから、その人のゆっくり顔(ゆっくりりんくにしない)', () => {
+    const f = phoneVenueFallbackFace('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/12/122085475.jpg', {});
+    expect(f.startsWith('data:image/svg+xml')).toBe(true);
+    expect(f).not.toContain('link-yukkuri');
+    expect(phoneVenueFallbackFace('', { userId: '122085475' })).toBe(f);
+  });
+  it('URL に数値IDが無ければ席の userId → キーで作る・何も無ければ空', () => {
+    expect(phoneVenueFallbackFace('', { userId: 'a:xyz' }).startsWith('data:image/svg+xml')).toBe(true);
+    expect(phoneVenueFallbackFace('', { key: 'n:はなこ' }).startsWith('data:image/svg+xml')).toBe(true);
+    expect(phoneVenueFallbackFace('', {})).toBe('');
   });
 });
