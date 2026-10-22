@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1003 件
+## ⚠️ 役割コメントが無いソース 9 / 1004 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -909,7 +909,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2147)
+- 📁 **src/** (2149)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1183,7 +1183,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1904)
+  - 📁 **lib/** (1906)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2041,6 +2041,8 @@
     - `liveElapsedExtrapolate.test.js`
     - `liveEndedFlag.js` — 配信終了フラグ。
     - `liveEndedFlag.test.js`
+    - `liveEventBatch.js` — 【層】L0 判定層(純粋関数)
+    - `liveEventBatch.test.js`
     - `liveGiftPulse.js` — この間隔を超えた2実測は差分を出さない(15分)。
     - `liveGiftPulse.test.js`
     - `liveGiftPulse.wiring.test.js`
