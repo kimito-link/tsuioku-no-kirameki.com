@@ -29,3 +29,6 @@ export const KEY_VOICE_ASSIGNMENTS = 'nls_voice_assignments_v1';
 
 /** 名前も読み上げるか。 */
 export const KEY_VOICE_READ_NAME_ENABLED = 'nls_voice_read_name_enabled_v1';
+
+/** 読み上げの音量(%・0〜300・既定100)。2026-10-22 P2。正規化は voiceVolume.js。 */
+export const KEY_VOICE_VOLUME_PERCENT = 'nls_voice_volume_percent_v1';
