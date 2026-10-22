@@ -42,6 +42,12 @@ export function createPhoneSoundPlayer(deps = {}) {
   function unlock() {
     if (!Ctx) return false;
     try {
+      // v0.1.1740: iPhone はマナーモード(消音スイッチ)中だと Web Audio が鳴らない。'playback' にすると
+      //   音楽アプリと同じ扱いになり、消音スイッチに関係なく鳴る(Safari 17+・無い端末では何もしない)。
+      try {
+        const session = /** @type {any} */ (globalThis.navigator)?.audioSession;
+        if (session && session.type !== 'playback') session.type = 'playback';
+      } catch { /* 設定できなくても鳴らす(マナーモードでなければ鳴る) */ }
       if (!ctx) ctx = new Ctx();
       if (ctx.state === 'suspended') void ctx.resume();
       const b = ctx.createBuffer(1, 1, 22050);

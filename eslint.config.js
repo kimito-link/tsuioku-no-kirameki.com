@@ -446,7 +446,8 @@ export default [
     //   判定は lib(liveViewPublishSignature.js の buildLiveViewContentSignature / gzipBody.js)に置き、ここは配線とその理由の注記だけ。
     // v0.1.1736: スマホが開いている間だけ5秒で描き直し・送る(+17行)。判定は lib(statusRefreshInterval.js の shouldRunPublisherTick)。
     // v0.1.1738: gzip は受け口の返事(gzipOk)を見てから・スマホの目印を150秒保持(+3行)。判定は lib(autoPublishDecision.js の readPublishAck)。
-    rules: { 'max-lines': ['error', { max: 4594, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1740: スマホの読み上げ(返事の voiceWanted で声を作って送る・+6行)。判定と順番は lib(phoneVoiceSender.js)、配線は phoneVoicePublisher.js。
+    rules: { 'max-lines': ['error', { max: 4600, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

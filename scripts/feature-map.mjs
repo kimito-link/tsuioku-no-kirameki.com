@@ -161,6 +161,10 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   import済み)。KEY_EFFECT_SOUND_ENABLED は producer=popup-entry.js/consumer=venueBar.js、
   //   KEY_VENUE_EFFECT_SOUND_PRESENCE は producer=venueBar.js/consumer=officialEventRankSoundEffect.js。
   'KEY_EFFECT_SOUND_ENABLED', 'KEY_VENUE_EFFECT_SOUND_PRESENCE',
+  // v0.1.1740: スマホの読み上げ(phoneVoicePublisher.js)が PC と同じ声の割り当て・名前読みを読む。
+  //   producer=comeview-entry.js だが、別名(VOICE_ASSIGNMENTS_KEY / VOICE_READ_NAME_KEY)で set するため
+  //   静的解析が書き手を取りこぼす偽陽性(読み手が KEY_ 名で get したので今回初めて片側だけ見えた)。
+  'KEY_VOICE_ASSIGNMENTS', 'KEY_VOICE_READ_NAME_ENABLED',
   // v0.1.991: 応援レーン(アイコン列)を heavy 非依存で起動する renderStoryUserLaneFromLightCommentsForCurrentLive が
   //   nls_csummary_<lv> を read。producer は content-entry.js(記録のたびに書く)=popup は consumer のみ=意図的な分離。
   'fn:summaryStorageKey',

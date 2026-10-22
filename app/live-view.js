@@ -105,6 +105,8 @@ import { createPhonePostClient, mountPhonePostUi, takePostKey } from './live-vie
 // v0.1.1737: ギフトの効果音(右下の 🔇/🔊・既定は音なし)。拡張の会場モードと同じ音を、増えたギフトの金額帯で選ぶ。
 import { createPhoneSoundPlayer, mountPhoneSoundUi } from './live-view-sound.js';
 import { createPhoneVenue, mountPhoneVenueUi } from './live-view-venue.js';
+import { createPhoneVoice, mountPhoneVoiceUi } from './live-view-voice.js';
+import { mountPhoneFit } from './live-view-phone-fit.js';
 import {
   evaluateSnapshotFreshness,
   formatSnapshotStalenessBanner
@@ -129,6 +131,8 @@ let _postClient = null;
 const _soundPlayer = createPhoneSoundPlayer();
 /** v0.1.1739: かんたん会場モード(🎪)。 */
 const _venue = createPhoneVenue();
+/** v0.1.1740: PC の VOICEVOX の声で読み上げ(🗣)。トークンが決まってから作る。 */
+let _voice = null;
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
 const MIRROR_FRESH_MS = 3 * 60 * 1000;
 
@@ -696,6 +700,7 @@ function paintAllMirrors(jsonBlob) {
   try { _soundPlayer.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 音は閲覧を止めない */ }
   // v0.1.1739: かんたん会場モード(閉じている間も「見た」ことは覚える=開いた瞬間に一斉に吹き出さない)。
   try { _venue.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 会場は閲覧を止めない */ }
+  if (_voice) _voice.onSnapshot(jsonBlob);
   // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // ③WEB投げ一覧丸写し(第2号): 北極星 giftHistory レーン(貢献者 strip + 投げ明細テーブル)を描く。
@@ -820,6 +825,9 @@ async function bootWithSnapshot(token) {
     try { mountPhonePostUi(_postClient); } catch { /* 付けられなくても閲覧は続ける */ }
     try { mountPhoneSoundUi(_soundPlayer); } catch { /* 付けられなくても閲覧は続ける */ }
     try { mountPhoneVenueUi(_venue); } catch { /* 付けられなくても閲覧は続ける */ }
+    try { if (_voice) mountPhoneVoiceUi(_voice); } catch { /* 付けられなくても閲覧は続ける */ }
+    // v0.1.1741: スマホで働かない拡張専用のボタンを隠し、応援者アイコンはプロフィールを開く。
+    try { mountPhoneFit(); } catch { /* 付けられなくても閲覧は続ける */ }
     // ★popup は生コメントデータを持たないので、応援レーン/数字カードを「空」に塗り直す。
     //   その空描画が【私の鏡 paint を上書き（clobber）する】。clobber は (a) 初回 refresh と
     //   (b) ユーザーが <details> を開く等で起きる再描画、の両方で発生する。
@@ -1018,6 +1026,7 @@ function bootstrap() {
     globalThis.__nlsWebCommentRelay = _postClient;
     _postClient.start();
   }
+  _voice = createPhoneVoice({ token });
   bootWithSnapshot(token).catch((err) => {
     showError('通信エラー: ' + String((err && err.message) || err));
   });

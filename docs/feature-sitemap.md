@@ -599,8 +599,13 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 15</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 21</summary>
 
+- `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
+- `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
+- `src/lib/phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
+- `src/lib/phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
+- `src/lib/phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/venuePickupSpeaker.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
@@ -616,6 +621,7 @@
 - `src/lib/voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
 - `src/lib/voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
+- `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 
 </details>
 
@@ -947,9 +953,10 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 240</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 242</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
+- `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
@@ -1095,6 +1102,7 @@
 - `src/lib/officialEventRankSoundEffect.js` — v0.1.1053: 配信者が参加中のニコニコイベント順位が上下したら効果音(rank_up/rank_down)を鳴らす。
 - `src/lib/officialNicoStatsStripDigest.js` — text: string,
 - `src/lib/officialStatsWindow.js` — at?: number|null,
+- `src/lib/oggOpusMux.js` — v0.1.1740: Opus の音のかたまり(パケット)を Ogg に包む(純関数)。
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
 - `src/lib/ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
@@ -1196,7 +1204,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (2版)
+### 💾 記録件数 (3版)
+- `v0.1.1740` 2026-10-22 — スマホでVOICEVOXの読み上げを聞ける
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
 
@@ -1212,24 +1221,23 @@
 ### 🎈 吹き出し (1版)
 - `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
 
-### 🎁 ギフト (8版)
+### 🎁 ギフト (6版)
 - `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
 - `v0.1.1737` 2026-10-22 — スマホでギフトの効果音が鳴る
 - `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
 - `v0.1.1722` 2026-10-21 — 別配信のギフト音記録を全画面で分離
-- `v0.1.1721` 2026-10-21 — 別配信のギフト音エラーを現配信に出さない
-- `v0.1.1720` 2026-10-20 — 広告pt・ギフトptの数字を画面間でそろえた
 
-### 🔊 読み上げ (2版)
+### 🔊 読み上げ (3版)
+- `v0.1.1740` 2026-10-22 — スマホでVOICEVOXの読み上げを聞ける
 - `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 
-### 🩺 診断・状態速報 (10版)
+### 🩺 診断・状態速報 (8版)
 - `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 - `v0.1.1730` 2026-10-21 — スマホ版の利用者ごとの鍵をサーバーに用意
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
@@ -1238,10 +1246,9 @@
 - `v0.1.1724` 2026-10-21 — 別配信の送信取り消しを現配信に出さない
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
 - `v0.1.1722` 2026-10-21 — 別配信のギフト音記録を全画面で分離
-- `v0.1.1721` 2026-10-21 — 別配信のギフト音エラーを現配信に出さない
-- `v0.1.1720` 2026-10-20 — 広告pt・ギフトptの数字を画面間でそろえた
 
-### その他 (8版)
+### その他 (9版)
+- `v0.1.1741` 2026-10-22 — スマホで動かないボタンを片付けた
 - `v0.1.1738` 2026-10-22 — スマホの速さを点検して4か所を直した
 - `v0.1.1736` 2026-10-22 — スマホで見ている間は約5秒で更新
 - `v0.1.1734` 2026-10-22 — スマホから生放送にコメントできる
