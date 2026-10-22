@@ -1,0 +1,52 @@
+// voiceNarrowing.js — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
+//
+// ★まだどこからも呼ばない(下書き)。使うかどうか・何人に絞るかは、レッツノートで P1 の計器
+//   (初めての声の件数と最大時間)を測ってから、りんくさんと数字を見て決める(計画書 §9)。
+//
+// りんくさんの条件(計画書 §9):
+//   1. 絞るのは弱いPCのときだけ。速いPCは今の割り当てのまま。
+//   2. 絞り方は固定。版を上げても常連の「いつもの声」が入れ替わらないこと。
+//      → 候補は下の固定表だけ(エンジンにある全スタイルを数えない)。表の順番と中身は変えない。
+//        変えると絞った人全員の声が変わるので、変えるときは版を分けて changelog に書く。
+//      → 表の中での割り当ては assignVoiceForUser(FNV-1a の決定論ハッシュ)をそのまま使う。
+
+/**
+ * 絞ったときに使う声(VOICEVOX の styleId)。固定。順番も意味を持つ(ハッシュの割り当て先)。
+ *   3=ずんだもん ノーマル / 2=四国めたん ノーマル / 8=春日部つむぎ / 10=雨晴はう / 13=青山龍星 / 14=冥鳴ひまり
+ *   (どれも VOICEVOX 標準の早い番号で、ささやき系を含まない)
+ */
+export const VOICE_NARROW_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14]);
+
+/** 2回目以降の合成がこれ以上かかるPCを「弱い」とみなす(ms)。自宅PC 120〜160ms、ノートPC 700ms。 */
+export const VOICE_WEAK_PC_WARM_SYNTH_MS = 500;
+
+/** 初めての声の合成がこれ以上かかったら「弱い」とみなす(ms)。ノートPC 7.7秒。 */
+export const VOICE_WEAK_PC_COLD_SYNTH_MS = 3000;
+
+/**
+ * P1 の計器から「弱いPC」かを決める。まだ測れていなければ false(=絞らない・今のまま)。
+ * @param {{ warmSynthEmaMs?: number, coldSynthMaxMs?: number }} diag
+ * @returns {boolean}
+ */
+export function isWeakVoicePc(diag) {
+  const warm = Number(diag?.warmSynthEmaMs);
+  const cold = Number(diag?.coldSynthMaxMs);
+  if (Number.isFinite(warm) && warm >= VOICE_WEAK_PC_WARM_SYNTH_MS) return true;
+  if (Number.isFinite(cold) && cold >= VOICE_WEAK_PC_COLD_SYNTH_MS) return true;
+  return false;
+}
+
+/**
+ * 割り当てに使う声の一覧を返す。弱いPCでは固定表のうちエンジンにある声だけ(表の順番のまま)。
+ *   固定表の声が2つ未満しか無いエンジン(古い版・別エンジン)では絞らずにそのまま返す。
+ * @param {readonly number[]} availableStyleIds エンジンにある声(listVoicevoxStyleIds の結果)
+ * @param {boolean} weak
+ * @returns {number[]}
+ */
+export function narrowVoiceStyleIds(availableStyleIds, weak) {
+  const available = Array.isArray(availableStyleIds) ? availableStyleIds.map(Number) : [];
+  if (!weak) return available;
+  const have = new Set(available);
+  const narrowed = VOICE_NARROW_STYLE_IDS.filter((id) => have.has(id));
+  return narrowed.length >= 2 ? narrowed : available;
+}
