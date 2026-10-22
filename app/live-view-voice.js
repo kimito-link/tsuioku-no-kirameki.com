@@ -53,8 +53,8 @@ export function createPhoneVoice(a) {
   /** @type {any} */
   let timer = null;
   const listeners = new Set();
-  /** v0.1.1742: 声が鳴り始めたときに知らせる先(会場の吹き出しを声に合わせる)。 */
-  /** @type {Set<(no: string) => void>} */
+  /** v0.1.1742: 声が鳴り始めたときに知らせる先(会場の吹き出しを声に合わせる)。v0.1.1743: 声の長さ(ms)も渡す。 */
+  /** @type {Set<(no: string, durationMs: number) => void>} */
   const playListeners = new Set();
   const notify = () => listeners.forEach((f) => { try { f(); } catch { /* 描き直しの失敗は無視 */ } });
 
@@ -91,7 +91,7 @@ export function createPhoneVoice(a) {
           src.connect(ctx.destination);
           src.onended = done;
           src.start(0);
-          playListeners.forEach((f) => { try { f(clip.no); } catch { /* 知らせ先の失敗で読み上げを止めない */ } });
+          playListeners.forEach((f) => { try { f(clip.no, Math.round((buf.duration || 0) * 1000)); } catch { /* 知らせ先の失敗で読み上げを止めない */ } });
         } catch { done(); }
       }, done);
     } catch { done(); }

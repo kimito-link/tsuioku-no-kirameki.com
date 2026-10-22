@@ -13,6 +13,8 @@ import { tierFromPoints } from '../src/lib/giftThrowProjectile.js';
 
 const DEFAULT_FACE = '/app/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png';
 const BUBBLE_MS = 4500;
+/** v0.1.1743: 声が終わってから吹き出しを消すまでの余韻。 */
+const VOICE_TAIL_MS = 600;
 /** v0.1.1742: 読み上げ中、声を待つ最長(PC の合成→送信→スマホの取得で ふつう数秒)。過ぎたら声なしで吹き出しを出す。 */
 const VOICE_WAIT_MAX_MS = 15_000;
 /** @type {Record<string, number>} */
@@ -139,8 +141,8 @@ export function createPhoneVenue() {
     seatsEl.replaceChildren(...nodes);
   }
 
-  /** @param {string} personKey @param {string} text */
-  function bubble(personKey, text) {
+  /** @param {string} personKey @param {string} text @param {number} [ms] 出しておく長さ(声の長さに合わせるとき) */
+  function bubble(personKey, text, ms = BUBBLE_MS) {
     const seat = seatByKey.get(personKey);
     if (!seat || !text) return;
     seat.querySelector('.v-bubble')?.remove();
@@ -157,7 +159,7 @@ export function createPhoneVenue() {
       b.style.setProperty('--tail', `calc(50% - ${shift}px)`);
     }
     bounce(personKey);
-    setTimeout(() => b.remove(), BUBBLE_MS);
+    setTimeout(() => b.remove(), ms);
   }
 
   /** @param {string} personKey */
@@ -257,13 +259,17 @@ export function createPhoneVenue() {
     setVoiceActive(fn) {
       voiceActive = typeof fn === 'function' ? fn : () => false;
     },
-    /** v0.1.1742: そのコメントの声が鳴り始めた=待たせていた吹き出しを出す。 @param {string} no */
-    onVoicePlay(no) {
+    /**
+     * v0.1.1742: そのコメントの声が鳴り始めた=待たせていた吹き出しを出す。
+     * v0.1.1743: 声が終わるまで出しておく(長い声の途中で吹き出しが消えていた)。
+     * @param {string} no @param {number} [durationMs]
+     */
+    onVoicePlay(no, durationMs = 0) {
       const w = waitingVoice.get(String(no));
       if (!w) return;
       clearTimeout(w.timer);
       waitingVoice.delete(String(no));
-      if (isOpen()) bubble(w.personKey, w.text);
+      if (isOpen()) bubble(w.personKey, w.text, Math.max(BUBBLE_MS, (Number(durationMs) || 0) + VOICE_TAIL_MS));
     },
     /** 鏡の行(古→新)が届くたびに呼ぶ。閉じている間も「見た」ことは覚える(開いた瞬間に一斉に出さない)。 @param {any[]} rows */
     onRows(rows) {

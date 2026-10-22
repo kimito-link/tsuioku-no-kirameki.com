@@ -3768,5 +3768,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1742', metric: 'cross-checked-claims', value: 35,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '模擬サーバー+スマホ幅のブラウザで、声が9秒遅れて届いたとき吹き出しが声の再生と同時(差0.1秒)に出る・声が来ないときは約15秒で出るのを確認。'
+  }),
+  Object.freeze({
+    version: '0.1.1743', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。直しは送信担当(status.js)の phoneVoiceSender と WEB版(app/live-view-*.js)だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1743', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1743', metric: 'cross-checked-claims', value: 35,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '読み飛ばしの原因は PC 実機の計測(3分でコメント約60件・声19本)と、別の目(Grok)のコード読みの両方で確かめた。'
   })
 ]);
