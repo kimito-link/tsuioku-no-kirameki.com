@@ -12,7 +12,7 @@
  *   最小フィールドだけ取る」純データ整形=毎paintで全DOM sanitize するような重い同期処理ではない。
  * ★最小フィールド = 表示に要る分だけ(時刻順表示+名前+本文+顔)。個人を新たに名寄せしない(既にある値のみ)。
  *
- * @typedef {{ at: number, name: string, text: string, avatarUrl: string, userId: string, kind: string }} TimelineMirrorRow
+ * @typedef {{ at: number, name: string, text: string, avatarUrl: string, userId: string, kind: string, no?: string }} TimelineMirrorRow
  * @typedef {{ liveId: string, capturedAt: number, rows: TimelineMirrorRow[], totalSeen: number }} CommentTimelineMirrorSnapshot
  *
  * @module commentTimelineMirror
@@ -56,6 +56,10 @@ function toTimelineRow(item, resolveName, resolveAvatar) {
   };
   // ③応援タイムライン丸写し(第1号): ギフト行は itemName/point を保持=③でも「誰が何を(何pt)」を出す。
   //   コメント行には付けない(容量ムダ)。値が無ければフィールドごと省く(鏡を膨らませない)。
+  // v0.1.1735: コメント番号(放送内で一意・増える)を載せる=スマホが「新しく来た1件」を確実に見分けられる
+  //   (読み上げ・効果音で同じコメントを2度扱わない)。番号が無い行には付けない(偽番号を作らない)。
+  const no = s(it.commentNo ?? it.no);
+  if (kind !== 'gift' && /^\d{1,9}$/.test(no)) row.no = no;
   if (kind === 'gift') {
     const itemName = s(it.itemName ?? it.giftName ?? it.name).slice(0, TIMELINE_TEXT_MAX);
     const point = Math.max(0, Math.floor(Number(it.point ?? it.contribution) || 0));
@@ -175,7 +179,7 @@ export function restoreTimelineItemsForHtml(snap) {
       userId,
       nickname,
       text,
-      commentNo: '', // 鏡は commentNo を持たない(丸写しで偽番号を作らない)
+      commentNo: s(r.no), // v0.1.1735: 鏡が番号を持てば透過(無ければ空=偽番号を作らない)
       avatarUrl,
       selfPosted: false // ③は視聴専用=自分の投稿という概念が無い
     };

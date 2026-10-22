@@ -237,7 +237,8 @@ const BOOT_STORAGE_TIMEOUT_MS = 1_500;
 //   in-flight ガードを掛けて新規発行を抑止する。popup-entry.js の heavyReadActive と同型。
 import { createInFlightGuard, createStaleGuardedRead } from '../lib/inFlightGuard.js';
 // 重さ根治 P4(2026-07-06): publishLiveViewPublishPayload の dirty check(内容不変なら set 省略)用。
-import { buildLiveViewPublishSignature } from '../lib/liveViewPublishSignature.js';
+import { buildLiveViewContentSignature, buildLiveViewPublishSignature } from '../lib/liveViewPublishSignature.js';
+import { buildPublishInit } from '../lib/gzipBody.js';
 // Phase 1 MVP(2026-07-07): 純Web公開ペイロードを1枚あたり上限で段階的に削る純関数。
 //   min-gap 3000→12000 と対で「set 頻度」だけでなく「1枚のサイズ」も絞り、KEY_LIVEVIEW_PUBLISH_PAYLOAD
 //   の onChanged ファンアウト(browser process 輻輳の真犯人)を細くする。
@@ -361,6 +362,11 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 // v0.1.868: 「スムーズじゃない」対策。追加データ(reportPreview/watchTabMap/trend)は 2 秒ごとに毎回
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
+/**
+ * v0.1.1735: 送信担当(?publisher=1)だけは 9秒。描画は10秒ごとなので、12秒だと「12秒たったか」を
+ *   10秒ごとに見る=実際の読み込みは20秒ごとになり、スマホへの反映が最大10秒遅れていた。9秒なら毎回読む。
+ */
+const PUBLISHER_EXTRAS_REFETCH_MS = 9000;
 let _extrasCacheAt = 0;
 /**
  * ★v0.1.1446: コアread を最後に【実際に読んだ】時刻(キー名→ms)。
@@ -879,7 +885,7 @@ async function refresh(opts = {}) {
     //     ここへ移動。真因=この2つが v0.1.902 以降ずっと毎回の直列 read で、laneDiag を間引いた後も
     //     残っていたため診断ページが重いままだった(ユーザー実機「v0.1.923 を入れる前から遅い」)。
     //     どちらも健全度パネルの色セル用の補助情報で、2秒ごとの即時更新は不要=laneDiag と同じ間引きへ。
-    const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
+    const extrasStale = Date.now() - _extrasCacheAt >= (IS_STATUS_PUBLISHER ? PUBLISHER_EXTRAS_REFETCH_MS : EXTRAS_REFETCH_MS);
     if (extrasStale) {
       // 重さ根治 P2(2026-07-06): 単一キー get のみの17項目(voiceDiag〜commentPostDiag)を
       //   従来は個別に runStorageOpWithTimeout(=直列 await 17回)していたのを、1回の
@@ -2366,6 +2372,8 @@ let _autoPublishLastLaunchAtMs = 0;
  *   鏡を増やして20秒で届けたいときは、その鏡の capturedAt をシグネチャに足すこと。
  */
 let _autoPublishLastSentSig = '';
+/** v0.1.1735: 最後に自動送信した jsonBlob の【中身】のシグネチャ(buildLiveViewContentSignature)。 */
+let _autoPublishLastContentSig = '';
 /** v0.1.1729: 自動送信が続けて失敗した回数。失敗が続くと間隔を 20→40→80→120秒 と広げる。 */
 let _autoPublishFailStreak = 0;
 
@@ -2389,12 +2397,20 @@ function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
       failStreak: _autoPublishFailStreak
     });
     if (!decision.publish) return;
+    // v0.1.1735: 鏡を書き直しただけ(capturedAt だけ変わった)なら送らない=中身で比べる(送る間隔を満たしたときだけ計算)。
+    const contentSig = buildLiveViewContentSignature(_lastRenderedBundle?.jsonBlob);
+    if (decision.reason === 'changed' && contentSig && contentSig === _autoPublishLastContentSig) {
+      _autoPublishLastSentSig = sig;
+      return;
+    }
     _autoPublishLastLaunchAtMs = Date.now();
     _autoPublishLastSentSig = sig;
+    _autoPublishLastContentSig = contentSig;
     _autoPublishInFlight = true;
     void uploadStatusSnapshot()
       .then((r) => {
         _autoPublishFailStreak = r && r.ok ? 0 : _autoPublishFailStreak + 1;
+        if (!(r && r.ok)) _autoPublishLastContentSig = ''; // 届かなかった中身は「同じ」扱いにしない
       })
       .finally(() => {
         _autoPublishInFlight = false;
@@ -3723,6 +3739,8 @@ function persistLiveviewPublishOutcome(outcome) {
   }
 }
 
+/** v0.1.1735: 受け口が gzip を解けなかった(400)ら true=このページでは以後 JSON のまま送る。 */
+let _publishGzipRefused = false;
 async function uploadStatusSnapshot() {
   const creds = getPublishCredentials(getUploadConfig()); // v0.1.1731: 共有キー優先・無ければ利用者ごとの鍵
   if (!creds) {
@@ -3739,11 +3757,14 @@ async function uploadStatusSnapshot() {
   // 共有 URL 組み立ては純関数 buildStatusShareUrls(src/lib)に抽出済み(挙動同値・テストで固定)。
   const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(creds.appOrigin, creds.viewToken);
   try {
-    const res = await fetch(ingestUrl, {
-      method: 'POST',
-      headers: creds.headers,
-      body: JSON.stringify(buildPublishBody(creds, jsonBlob))
-    });
+    // v0.1.1735: gzip で縮めて送る(約5分の1)。受け口が解けず 400 なら、このページでは以後 JSON のまま送り直す。
+    const jsonText = JSON.stringify(buildPublishBody(creds, jsonBlob));
+    const sent = await buildPublishInit(creds.headers, jsonText, { allowGzip: !_publishGzipRefused });
+    let res = await fetch(ingestUrl, sent.init);
+    if (sent.gzip && res.status === 400 && (await res.clone().json().catch(() => null))?.error === 'bad body') {
+      _publishGzipRefused = true;
+      res = await fetch(ingestUrl, (await buildPublishInit(creds.headers, jsonText, { allowGzip: false })).init);
+    }
     if (!res.ok) {
       if (shouldForgetDeviceCred(creds.mode, res.status)) void forgetDeviceCred(); // 鍵の記録が無い=もらい直す
       // POST 失敗を globalThis + storage 両方に記録=どのページからも「純Webが古い」を検知できる。

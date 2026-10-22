@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 983 件
+## ⚠️ 役割コメントが無いソース 9 / 984 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -895,7 +895,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2113)
+- 📁 **src/** (2115)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1163,7 +1163,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1878)
+  - 📁 **lib/** (1880)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1780,6 +1780,8 @@
     - `globalFetchRateLimiter.test.js`
     - `googleSuggest.js` — Google サジェスト取得の契約 (URL組み立て + レスポンスパース + message type)
     - `googleSuggest.test.js`
+    - `gzipBody.js` — v0.1.1735: 送信本文を gzip に縮める(状態速報 → api/status)。
+    - `gzipBody.test.js`
     - `healthCellGroups.js` — 健全度セルを【症状の言葉】で枠に分ける(純関数)。
     - `healthCellGroups.test.js`
     - `healthCellOverWiring.wiring.test.js`

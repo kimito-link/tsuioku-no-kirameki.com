@@ -112,8 +112,12 @@ export function quotaVerdict(a) {
   return { allow: true, reason: 'ok', globalWarn };
 }
 
-/** 利用者経由の送信では保存しない欄(診断の全文=利用者のスマホに不要・第三者情報を減らす)。 */
-export const DEVICE_DROPPED_FIELDS = Object.freeze(['statusReport', 'fastDiag']);
+/**
+ * 利用者経由の送信では保存しない欄(診断の全文=利用者のスマホに不要・第三者情報を減らす)。
+ *   v0.1.1735: スマホが読まない overview(配信一覧の文章・WEB版は lives から作り直す)と
+ *   supportersParity(PC の診断用の突き合わせ)も落とす。拡張も送る前に同じ表で落とす=送る量も減る。
+ */
+export const DEVICE_DROPPED_FIELDS = Object.freeze(['statusReport', 'fastDiag', 'overview', 'supportersParity']);
 
 /**
  * 利用者経由の送信から、保存しない欄を落とす(元の物は変えない)。
