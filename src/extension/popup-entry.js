@@ -3235,6 +3235,16 @@ function paintCommentKindnessUi(rawText) {
   return view;
 }
 
+/**
+ * v0.1.1734: スマホの WEB版だけにある「PC の拡張に中継してもらって投稿する」口(app/live-view-post.js が置く)。
+ *   拡張の中では常に null=PC の送信経路は何も変わらない。
+ * @returns {{ post: (text: string, lv: string) => Promise<{ ok: boolean, error?: string, queued?: boolean }>, canSend: () => boolean, hasPending?: () => boolean, onChange: (fn: () => void) => void } | null}
+ */
+function webCommentRelay() {
+  const r = INLINE_PASSIVE ? /** @type {any} */ (globalThis).__nlsWebCommentRelay : null;
+  return r && typeof r.post === 'function' && typeof r.canSend === 'function' ? r : null;
+}
+
 function canUseCommentPostWatchTools() {
   return Boolean(
     String(COMMENT_POST_UI_STATE.watchUrl || '').trim() &&
@@ -3281,13 +3291,18 @@ function paintCommentComposeUi() {
   const postBtn = /** @type {HTMLButtonElement|null} */ ($('postCommentBtn'));
   const rawText = String(commentInput?.value || '');
   const kindnessView = paintCommentKindnessUi(rawText);
-  const baseState = deriveCommentPostUiState({
+  let baseState = deriveCommentPostUiState({
     hasWatchUrl: Boolean(COMMENT_POST_UI_STATE.watchUrl),
     hasLiveId: Boolean(COMMENT_POST_UI_STATE.liveId),
     hasText: Boolean(rawText.trim()),
     isSubmitting: COMMENT_POST_UI_STATE.submitting,
     panelStatusCode: COMMENT_POST_UI_STATE.panelStatusCode
   });
+  // v0.1.1734: スマホの WEB版は PC とつながっている間だけ送れる(理由は入力欄の上の帯に出る)。
+  const relay = webCommentRelay();
+  if (relay && !relay.canSend() && !COMMENT_POST_UI_STATE.submitting) {
+    baseState = { ...baseState, buttonDisabled: true, placeholder: 'PCとつながると送れます(上の帯を見てね)' };
+  }
 
   if (commentInput) {
     commentInput.placeholder = baseState.placeholder;
@@ -20367,7 +20382,7 @@ async function initPopup() {
 
   async function submitComment() {
     const text = String(commentInput?.value || '').trim();
-    const watchUrl = exportBtn.dataset.watchUrl || '';
+    const watchUrl = exportBtn.dataset.watchUrl || (webCommentRelay() ? INLINE_OWN_WATCH_URL : ''); // v0.1.1734: WEB版は URL の lv
     if (!text) {
       clearCommentPostNotice();
       paintCommentComposeUi();
@@ -20387,6 +20402,28 @@ async function initPopup() {
       requestCommentKindnessHop();
       setCommentPostNotice('送信の前に、りんくのひとことを見てね。', 'idle');
       paintCommentComposeUi();
+      return;
+    }
+    // v0.1.1734: スマホの WEB版は PC の拡張に預ける(届いたかは帯の下の ⏱/✓/✓✓ で後から出す=ここでは「届いた」と言わない)。
+    const relay = webCommentRelay();
+    if (relay) {
+      COMMENT_POST_UI_STATE.submitting = true;
+      clearCommentPostNotice();
+      paintCommentComposeUi();
+      try {
+        const r = await relay.post(text, COMMENT_POST_UI_STATE.liveId);
+        if (r.ok) {
+          if (commentInput) commentInput.value = '';
+          COMMENT_KINDNESS_UI_STATE.armedText = '';
+          triggerOpSoundHandlePress();
+          setCommentPostNotice('⏱ PCに渡しました。放送に流れたら ✓✓ が付きます。', 'success');
+        } else {
+          setCommentPostNotice(r.error || '送れませんでした。', 'error');
+        }
+      } finally {
+        COMMENT_POST_UI_STATE.submitting = false;
+        paintCommentComposeUi();
+      }
       return;
     }
     const lvPost = String(exportBtn.dataset.liveId || '').trim().toLowerCase();
@@ -20966,6 +21003,18 @@ async function initPopup() {
     });
   });
 
+  // v0.1.1734: スマホの WEB版: 送り先は URL の lv(映している配信)。PC とのつながりが変わるたびに送信ボタンを塗り直す。
+  const webRelay = webCommentRelay();
+  if (webRelay) {
+    updateCommentPostUiContext(INLINE_OWN_WATCH_URL, extractLiveIdFromUrl(INLINE_OWN_WATCH_URL) || '', '');
+    webRelay.onChange(() => {
+      // 「PCに渡しました」は、印(⏱→✓→✓✓)が行き着いたら消す(古い案内を残さない)。
+      if (COMMENT_POST_UI_STATE.notice?.kind === 'success' && !webRelay.hasPending?.()) clearCommentPostNotice();
+      paintCommentComposeUi();
+    });
+    paintCommentComposeUi();
+  }
+
   postBtn?.addEventListener('click', () => {
     if (postBtn.disabled) return;
     submitComment().catch(() => {
@@ -20981,7 +21030,8 @@ async function initPopup() {
       metaKey: e.metaKey,
       shiftKey: e.shiftKey,
       isComposing: Boolean(e.isComposing) || e.keyCode === 229,
-      enterSendsComment: Boolean(commentEnterSend?.checked)
+      // v0.1.1734: スマホ(WEB版)では Enter で送らない(改行・変換確定のつもりの誤爆を防ぐ)。
+      enterSendsComment: Boolean(commentEnterSend?.checked) && !webCommentRelay()
     });
     if (action !== 'submit') return;
     e.preventDefault();

@@ -10,8 +10,10 @@
  * @module statusSmartphoneCard
  */
 
+import qrcode from 'qrcode-generator';
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 import { copyTextWithFallback } from '../lib/copyTextWithFallback.js';
+import { buildPhonePostUrl } from '../lib/phonePost.js';
 
 /** 同意の説明文。privacy.html 4-3 と揃える(変えるときは両方)。 */
 export const SMARTPHONE_CONSENT_TEXT =
@@ -20,13 +22,48 @@ export const SMARTPHONE_CONSENT_TEXT =
   'サーバーには最新の1件が24時間だけ残り、URLを知っている人が見られます。OFFにすると送信を止め、サーバーのデータも消します。';
 
 /**
+ * v0.1.1734: 「✍️ スマホからコメントする」の説明。privacy.html 4-3 と揃える(変えるときは両方)。
+ *   ★誰のアカウントで流れるか・URL が自分専用であること・本文がどれだけ残るかを、スイッチの横に書く。
+ */
+export const PHONE_POST_CONSENT_TEXT =
+  '✍️ スマホからコメントする：スマホで書いたコメントを、このPCで開いている放送タブのコメント欄から投稿します' +
+  '(このPCのブラウザでログインしているアカウントで流れます)。本文はサーバーに最長1分だけ置き、PCが受け取ったら消します。';
+
+/**
+ * PC の画面の QR(スマホのカメラで読むだけで開ける=URL を手で送らなくてよい)。
+ * @param {string} url
+ * @returns {HTMLImageElement | null}
+ */
+export function buildUrlQrImage(url) {
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    const img = document.createElement('img');
+    img.src = qr.createDataURL(4, 2);
+    img.alt = 'スマホのカメラで読み取ると開きます';
+    img.style.cssText = 'display:block;margin-top:6px;width:168px;height:168px;image-rendering:pixelated;background:#fff;border-radius:6px;';
+    return img;
+  } catch {
+    return null; // 長すぎる等で作れなくても、URL のコピーで代わりになる
+  }
+}
+
+/**
+ * @typedef {{
+ *   readKey: () => Promise<string>,
+ *   enable: () => Promise<string>,
+ *   disable: () => Promise<void>,
+ *   forget: () => Promise<void>
+ * }} PhonePostDeps
  * @typedef {{
  *   optedIn: boolean,
  *   getCreds: () => (import('../lib/devicePublishCredentials.js').PublishCredentials | null),
  *   setOptIn: (next: boolean) => Promise<unknown>,
  *   registerNow: () => (Promise<unknown> | undefined),
  *   rotate: () => Promise<string | null>,
- *   openUrl: (url: string) => void
+ *   openUrl: (url: string) => void,
+ *   phonePost?: PhonePostDeps
  * }} SmartphoneCardDeps
  */
 
@@ -94,12 +131,78 @@ export function buildSmartphoneCard(deps) {
       urlArea.appendChild(
         mkBtn('🔄 URLを作り直す', async () => {
           const next = await deps.rotate();
+          if (next) await deps.phonePost?.forget(); // 古いURLのコメントの鍵はサーバーで消えている
           renderUrl();
           if (!next) urlArea.appendChild(document.createTextNode(' 作り直せませんでした。時間をおいてもう一度試してください。'));
         })
       );
     }
     if (note) urlArea.appendChild(document.createTextNode(' ' + note));
+    if (deps.phonePost) void renderPhonePost(liveViewUrl, deps.phonePost);
+  };
+
+  /**
+   * v0.1.1734: 「✍️ スマホからコメントする」。ON のときは見るだけのURLとは別の【自分専用】URL と QR を出す。
+   * @param {string} liveViewUrl
+   * @param {PhonePostDeps} pp
+   */
+  const renderPhonePost = async (liveViewUrl, pp) => {
+    const box = document.createElement('div');
+    box.style.cssText = 'margin-top:8px;padding-top:6px;border-top:1px dashed var(--nl-border);';
+    urlArea.appendChild(box);
+    const lab = document.createElement('label');
+    lab.style.cssText = 'display:flex;align-items:flex-start;gap:6px;cursor:pointer;';
+    const pcb = document.createElement('input');
+    pcb.type = 'checkbox';
+    pcb.style.cssText = 'margin-top:2px;flex:0 0 auto;cursor:pointer;';
+    const ptxt = document.createElement('span');
+    ptxt.textContent = PHONE_POST_CONSENT_TEXT;
+    lab.appendChild(pcb);
+    lab.appendChild(ptxt);
+    box.appendChild(lab);
+    const out = document.createElement('div');
+    box.appendChild(out);
+    const show = (/** @type {string} */ pk) => {
+      out.replaceChildren();
+      const url = pk ? buildPhonePostUrl(liveViewUrl, pk) : '';
+      if (!url) return;
+      const head = document.createElement('div');
+      head.textContent = '🔒 コメントもできるURL(自分専用。人に教えないでください。見せるだけなら上のURLを):';
+      head.style.cssText = 'margin-top:6px;font-weight:600;';
+      out.appendChild(head);
+      const qr = buildUrlQrImage(url);
+      if (qr) {
+        out.appendChild(qr);
+        const cap = document.createElement('div');
+        cap.textContent = '📷 スマホのカメラで読み取ると開きます(一度開けばスマホが覚えます)。';
+        out.appendChild(cap);
+      }
+      out.appendChild(mkBtn('📱 開く', () => deps.openUrl(url)));
+      const cp = mkBtn('📋 URLをコピー', async () => {
+        const r = await copyTextWithFallback(url);
+        cp.textContent = r === 'clipboard' || r === 'execCommand' ? '✓ コピーしました' : '× コピー不可';
+        setTimeout(() => { cp.textContent = '📋 URLをコピー'; }, 1800);
+      });
+      out.appendChild(cp);
+    };
+    const current = await pp.readKey();
+    pcb.checked = Boolean(current);
+    show(current);
+    pcb.addEventListener('change', async () => {
+      pcb.disabled = true;
+      if (pcb.checked) {
+        out.textContent = 'サーバーからコメント用の鍵を受け取っています…';
+        const pk = await pp.enable();
+        if (!pk) {
+          pcb.checked = false;
+          out.textContent = '鍵を受け取れませんでした。時間をおいてもう一度ONにしてください。';
+        } else show(pk);
+      } else {
+        await pp.disable();
+        out.textContent = 'スマホからのコメントを止めました(さっきのURLではもう送れません)。';
+      }
+      pcb.disabled = false;
+    });
   };
 
   cb.addEventListener('change', async () => {

@@ -840,6 +840,13 @@
   - `src/extension/statusSmartphoneCard.js`
   - `src/extension/popup-entry.js`
   - `src/lib/statusPublisherPlan.js`
+- **スマホから生放送にコメント(PC中継)** — スマホのWEB版の本物の入力欄(popup-entry.js の submitComment)が、受動ビューで globalThis.__nlsWebCommentRelay があるときだけ /api/post に預ける(拡張の中では常に null=PCの送信経路は不変)。サーバー(api/post.js)は投稿用の鍵(#pk=・ハッシュだけ保存)で照合し待ち行列に最長60秒・20秒8件まで。PCの送信担当(status.html?publisher=1)の phonePostRelay.js がふだん10秒/入力中2秒で取りに行き、NLS_POST_COMMENT で放送タブのコメント欄から投稿して結果を返す。スマホは接続の帯と ⏱→✓→✓✓(放送のコメントに流れたのを鏡で確認)の印を app/live-view-post.js で出す。PC の「✍️ スマホからコメントする」スイッチ・自分専用URL・QR は statusSmartphoneCard.js。判定は phonePost.js(v0.1.1734)
+  - `api/post.js`
+  - `src/lib/phonePost.js`
+  - `src/extension/phonePostRelay.js`
+  - `app/live-view-post.js`
+  - `src/extension/statusSmartphoneCard.js`
+  - `src/extension/popup-entry.js`
 - **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
   - `extension/live-view.html`
   - `src/extension/live-view-entry.js`
@@ -1223,9 +1230,9 @@
 - `v0.1.1715` 2026-10-20 — 取得率の100%超を隠さない
 
 ### その他 (6版)
+- `v0.1.1734` 2026-10-22 — スマホから生放送にコメントできる
 - `v0.1.1733` 2026-10-21 — サイドパネルを閉じてもスマホへ送り続ける
 - `v0.1.1732` 2026-10-21 — 状態画面に「スマホで見る」スイッチ
 - `v0.1.1731` 2026-10-21 — スマホ版の利用者ごとの鍵を拡張で受け取る準備
 - `v0.1.1729` 2026-10-21 — スマホのWEB版を変化があれば20秒で更新
 - `v0.1.1726` 2026-10-21 — 配信採点パネルを外しました
-- `v0.1.1714` 2026-10-20 — マーケとメディアキットのボタンを1つに
