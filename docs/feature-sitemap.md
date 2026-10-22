@@ -959,7 +959,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 242</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 243</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
@@ -1079,6 +1079,7 @@
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
+- `src/lib/liveEventBatch.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
 - `src/lib/liveviewCurrentLive.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/liveviewPublishTarget.js` — 応援ライブビュー(live-view.html?lv=X)の公開ボタンが、別の配信のデータを送らないための判定(純関数)。
@@ -1260,8 +1261,8 @@
 - `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 
 ### その他 (5版)
+- `v0.1.1755` 2026-10-22 — スマホ版のサーバーに月の上限を足す
 - `v0.1.1752` 2026-10-22 — スマホ用の送信は映している配信だけに
 - `v0.1.1741` 2026-10-22 — スマホで動かないボタンを片付けた
 - `v0.1.1738` 2026-10-22 — スマホの速さを点検して4か所を直した
 - `v0.1.1736` 2026-10-22 — スマホで見ている間は約5秒で更新
-- `v0.1.1734` 2026-10-22 — スマホから生放送にコメントできる

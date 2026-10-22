@@ -32,6 +32,7 @@ import {
   VIEWER_ACTIVE_TTL_SEC,
   deviceKeys,
   quotaVerdict,
+  MONTH_QUOTA_TTL_SECONDS,
   stripDeviceBody
 } from '../src/lib/deviceAuth.js';
 import { authenticateDevice, incrWithExpiry, upstash } from '../src/server/deviceStore.js';
@@ -143,11 +144,15 @@ async function handleDevicePost(req, res) {
   const nowMs = Date.now();
   const deviceCount = await incrWithExpiry(deviceKeys.deviceQuota(auth.deviceId, nowMs), 2 * 24 * 60 * 60);
   const globalCount = await incrWithExpiry(deviceKeys.globalQuota(nowMs), 2 * 24 * 60 * 60);
+  // v0.1.1755: 全体の月の上限(費用の天井)。
+  const monthCount = await incrWithExpiry(deviceKeys.globalMonthQuota(nowMs), MONTH_QUOTA_TTL_SECONDS);
   const verdict = quotaVerdict({
     deviceCount,
     deviceLimit: Number(process.env.DEVICE_DAILY_LIMIT) || undefined,
     globalCount,
-    globalLimit: Number(process.env.STATUS_GLOBAL_DAILY_LIMIT) || undefined
+    globalLimit: Number(process.env.STATUS_GLOBAL_DAILY_LIMIT) || undefined,
+    monthCount,
+    monthLimit: Number(process.env.STATUS_GLOBAL_MONTHLY_LIMIT) || undefined
   });
   if (verdict.globalWarn) logIngest(req, 'global_quota_warn');
   if (!verdict.allow) {
