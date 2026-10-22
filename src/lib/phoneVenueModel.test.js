@@ -39,6 +39,7 @@ describe('diffPhoneVenueEvents', () => {
       ['comment', 'b', '', 0],
       ['gift', '', '花', 500]
     ]);
+    expect(r2.events.map((e) => e.no)).toEqual(['2', '']); // v0.1.1742: 声と合わせる目印(ギフトは無し)
     expect(diffPhoneVenueEvents({ rows: [c(2, '11', 'A', 'b'), gift], seen: r2.seen }).events).toEqual([]);
   });
   it('一度にたくさん来ても新しい方から上限件数だけ', () => {

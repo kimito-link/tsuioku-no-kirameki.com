@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createPhoneVoiceSender, bytesToBase64 } from './phoneVoiceSender.js';
+import { createPhoneVoiceSender, bytesToBase64, PHONE_VOICE_BACKLOG_MAX } from './phoneVoiceSender.js';
 
 const deps = (over = {}) => ({
   listStyleIds: vi.fn(async () => [3, 8]),
@@ -47,6 +47,34 @@ describe('createPhoneVoiceSender', () => {
     await noEnc.tick({ wanted: true, rows: rows(1) });
     await noEnc.tick({ wanted: true, rows: rows(1, 2) });
     expect(noEnc.state()).toBe('no_encoder');
+  });
+  it('v0.1.1743: 1回に6件以上来ても読み捨てない(上限8まで)・溢れたら古い方を捨てる', async () => {
+    const d = deps();
+    const s = createPhoneVoiceSender(d);
+    await s.tick({ wanted: true, rows: rows(1) });
+    expect(await s.tick({ wanted: true, rows: rows(1, 2, 3, 4, 5, 6, 7, 8) })).toBe(7);
+    expect(await s.tick({ wanted: true, rows: rows(...Array.from({ length: 20 }, (_, i) => i + 1)) })).toBe(PHONE_VOICE_BACKLOG_MAX);
+    expect(d.post.mock.calls.at(-1)[0].no).toBe('20');
+    expect(d.post.mock.calls.at(-PHONE_VOICE_BACKLOG_MAX)[0].no).toBe('13');
+  });
+  it('v0.1.1743: 合成中に来た新着は飛ばさず、その回のうちに続けて読む', async () => {
+    /** @type {() => void} */
+    let release = () => {};
+    let first = true;
+    const d = deps({
+      synth: vi.fn(async () => {
+        if (first) { first = false; await new Promise((r) => { release = () => r(undefined); }); }
+        return new ArrayBuffer(8);
+      })
+    });
+    const s = createPhoneVoiceSender(d);
+    await s.tick({ wanted: true, rows: rows(1) });
+    const running = s.tick({ wanted: true, rows: rows(1, 2) });
+    await new Promise((r) => setTimeout(r, 0)); // 1件目の合成の途中まで進める
+    expect(await s.tick({ wanted: true, rows: rows(1, 2, 3) })).toBe(0);
+    release();
+    expect(await running).toBe(2);
+    expect(d.post.mock.calls.map((c) => c[0].no)).toEqual(['2', '3']);
   });
   it('bytesToBase64', () => {
     expect(bytesToBase64(new Uint8Array([1, 2, 3]))).toBe('AQID');
