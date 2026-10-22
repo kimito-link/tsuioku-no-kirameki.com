@@ -117,3 +117,20 @@ export function enqueuePhoneVoice(queue, incoming, max = PHONE_VOICE_QUEUE_MAX) 
   }
   return next.slice(-max);
 }
+
+/**
+ * v0.1.1745: 読み上げ中は「最新コメント」欄に、いま声で読んでいるコメントを出す(声と画面をそろえる)。
+ *   番号が鏡の行に無い(鏡から流れ落ちた・番号なし)なら null=呼び出し側は従来の選び方に戻る。
+ * @param {any[]} rows 鏡の行(古→新)
+ * @param {string} spokenNo いま鳴っている声のコメント番号('' なら鳴っていない)
+ * @returns {any|null}
+ */
+export function pickSpokenTickerRow(rows, spokenNo) {
+  const no = String(spokenNo ?? '');
+  if (!NO_RE.test(no) || !Array.isArray(rows)) return null;
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const r = rows[i];
+    if (r && typeof r === 'object' && r.kind !== 'gift' && String(r.no ?? '') === no) return r;
+  }
+  return null;
+}
