@@ -14,9 +14,14 @@ describe('スマホの WEB版を早く新しくする配線', () => {
     expect(status).toMatch(/decision\.reason === 'changed' && contentSig && contentSig === _autoPublishLastContentSig\) \{\s*_autoPublishLastSentSig = sig;\s*return;/);
     expect(status).toContain("if (!(r && r.ok)) _autoPublishLastContentSig = '';");
   });
-  it('★v0.1.1735: 送信担当は補助データを毎回(9秒)読む=スマホへの反映を最大10秒縮める', () => {
+  it('★v0.1.1735: 送信担当は補助データを描き直しのたびに読む(v0.1.1736 で周期5秒に合わせて4.5秒)', () => {
     expect(status).toContain('(IS_STATUS_PUBLISHER ? PUBLISHER_EXTRAS_REFETCH_MS : EXTRAS_REFETCH_MS)');
-    expect(status).toContain('const PUBLISHER_EXTRAS_REFETCH_MS = 9000;');
+    expect(status).toContain('const PUBLISHER_EXTRAS_REFETCH_MS = 4500;');
+  });
+  it('★v0.1.1736: スマホが開いている間(送信の返事 viewerActive)だけ、5秒ごとに描き直し・5秒で送る', () => {
+    expect(status).toContain("_phoneViewingUntilMs = ack && ack.viewerActive === true ? Date.now() + 30_000 : 0;");
+    expect(status).toContain('const changedIntervalMs = isPhoneViewing() ? VIEWER_ACTIVE_PUBLISH_INTERVAL_MS : undefined;');
+    expect(status).toContain('if (!first && IS_STATUS_PUBLISHER && !shouldRunPublisherTick({ tickNo: _publisherTickNo++, viewerActive: isPhoneViewing() })) return;');
   });
   it('★v0.1.1735: gzip で送り、受け口が解けなければ(400 bad body)JSON で送り直して以後は縮めない', () => {
     expect(status).toMatch(/if \(sent\.gzip && res\.status === 400 && [^\n]*'bad body'\) \{\s*_publishGzipRefused = true;/);
@@ -25,7 +30,7 @@ describe('スマホの WEB版を早く新しくする配線', () => {
     expect(liveView).toMatch(/'If-None-Match': _lastEtag/);
     expect(liveView).toMatch(/res\.status === 304\) return SNAPSHOT_NOT_MODIFIED/);
     expect(liveView).toMatch(/jsonBlob === SNAPSHOT_NOT_MODIFIED\) \{\s*\/\/[^\n]*\n\s*refreshStaleBanner\(_latestSnapshot\);/);
-    expect(liveView).toMatch(/const POLL_INTERVAL_MS = 15_000;/);
+    expect(liveView).toMatch(/const POLL_INTERVAL_MS = 5_000;/);
   });
   it('③WEB は画面が表に戻ったら即1回取る(裏にある間は周期が取らない)', () => {
     expect(liveView).toMatch(/addEventListener\('visibilitychange', \(\) => \{\s*if \(!document\.hidden\) refresh\(token\)/);

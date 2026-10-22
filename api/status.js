@@ -26,6 +26,7 @@ import {
   DEVICE_TTL_SECONDS,
   QUOTA_RETRY_AFTER_SEC,
   STATUS_TTL_SECONDS,
+  VIEWER_ACTIVE_TTL_SEC,
   deviceKeys,
   quotaVerdict,
   stripDeviceBody
@@ -89,6 +90,18 @@ export function etagOf(stored) {
   return `"${createHash('sha1').update(String(stored)).digest('base64url')}"`;
 }
 
+/**
+ * v0.1.1736: いまスマホがこのトークンを開いているか(GET が30秒以内に来たか)。拡張は true の間だけ約5秒間隔で送る。
+ *   読めなければ false(=ふだんの間隔に倒す・送りすぎない)。
+ */
+async function isViewerActive(token) {
+  try {
+    return Boolean(await upstash(['GET', deviceKeys.viewing(token)]));
+  } catch {
+    return false;
+  }
+}
+
 /** 本体と ETag(別キー)を保存する。 */
 async function saveSnapshot(token, stored) {
   await upstash(['SET', deviceKeys.latest(token), stored, 'EX', String(TTL_SECONDS)]);
@@ -147,7 +160,7 @@ async function handleDevicePost(req, res) {
     /* 期限の延長は最適化 */
   }
   logIngest(req, 'device_ok');
-  res.status(200).json({ ok: true });
+  res.status(200).json({ ok: true, viewerActive: await isViewerActive(auth.record.v) });
 }
 
 export default async function handler(req, res) {
@@ -189,7 +202,7 @@ export default async function handler(req, res) {
       delete payload.v;
       await saveSnapshot(token, JSON.stringify(payload));
       logIngest(req, 'ok');
-      res.status(200).json({ ok: true });
+      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token) });
       return;
     }
 
@@ -199,6 +212,10 @@ export default async function handler(req, res) {
         res.status(400).json({ ok: false, error: 'bad view token' });
         return;
       }
+      // ★v0.1.1736: 「いまスマホで開いている」目印を置く(30秒で消える・中身は '1' だけ)。
+      //   拡張はこれを見て、開いている間だけ約5秒間隔で送る(誰も見ていないときは今までどおり)。最適化なので失敗は無視。
+      //   ★await する(返事を返した後の通信は、関数が止められて届かないことがある)。
+      await upstash(['SET', deviceKeys.viewing(token), '1', 'EX', String(VIEWER_ACTIVE_TTL_SEC)]).catch(() => {});
       // ★v0.1.1729: スマホが持っている版と同じなら本文なしの 304(本体は読まない=Redis も通信も軽い)。
       const ifNoneMatch = req.headers?.['if-none-match'];
       if (ifNoneMatch) {

@@ -153,4 +153,13 @@ describe('api/device + api/status: 利用者ごとの鍵(v0.1.1730)', () => {
     const bomb = await call(statusHandler, { method: 'POST', headers: { ...auth(c), 'x-nls-body': 'gzip' }, body: zip({ s: 'a'.repeat(1_000_000) }) });
     expect(bomb.code).toBe(400);
   });
+
+  it('★v0.1.1736: スマホが取りに来たら(GET)30秒の目印を置き、送信の返事で viewerActive を返す', async () => {
+    const c = (await register()).body;
+    expect((await postAs(c, { a: 1 })).body).toEqual({ ok: true, viewerActive: false });
+    await view(c.viewToken);
+    expect(store.get(`status:viewing:${c.viewToken}`)).toBe('1');
+    expect(ttl.get(`status:viewing:${c.viewToken}`)).toBe(30);
+    expect((await postAs(c, { a: 2 })).body).toEqual({ ok: true, viewerActive: true });
+  });
 });

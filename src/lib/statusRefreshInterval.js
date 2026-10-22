@@ -12,8 +12,22 @@
 
 /** 人が見る通常の状態画面の更新間隔(ms)。 */
 export const STATUS_REFRESH_INTERVAL_MS = 2000;
-/** 見えない送信担当の更新間隔(ms)。自動送信の間隔(120秒)・web_stale(180秒)より十分短い。 */
-export const STATUS_PUBLISHER_REFRESH_INTERVAL_MS = 10_000;
+/**
+ * 見えない送信担当の更新間隔(ms)。v0.1.1736: 10秒→5秒。ただし実際に描き直すのは
+ *   スマホが開いている間だけ5秒ごと、それ以外は2回に1回(=10秒ごと・今までと同じ重さ)。shouldRunPublisherTick 参照。
+ */
+export const STATUS_PUBLISHER_REFRESH_INTERVAL_MS = 5_000;
+
+/**
+ * v0.1.1736: 送信担当のこの回を描き直すか。スマホが開いている(サーバーの目印が30秒以内)なら毎回=5秒、
+ *   開いていなければ偶数回だけ=10秒。誰も見ていないときに PC を重くしない。
+ * @param {{ tickNo: number, viewerActive: boolean }} a
+ * @returns {boolean}
+ */
+export function shouldRunPublisherTick(a) {
+  if (a && a.viewerActive === true) return true;
+  return (Math.floor(Number(a && a.tickNo) || 0) % 2) === 0;
+}
 
 /**
  * @param {{ publisher?: boolean }} [opts]

@@ -20,8 +20,14 @@ const WRITE_KEY_RE = /^[A-Za-z0-9_-]{32,128}$/;
 export const STATUS_TTL_SECONDS = 24 * 60 * 60;
 /** 鍵の記録の保存期間(秒)。送信のたびに延ばす=使っている間は消えない。30日使わなければ消える(拡張は発行し直す)。 */
 export const DEVICE_TTL_SECONDS = 30 * 24 * 60 * 60;
-/** 利用者ごとの1日の送信上限。20秒間隔で約22時間分(2026-10-21 りんく了承)。 */
-export const DEFAULT_DEVICE_DAILY_LIMIT = 4_000;
+/**
+ * 利用者ごとの1日の送信上限。v0.1.1736: 4,000→12,000(スマホで開いている間は約5秒間隔=約16時間分)。
+ *   4,000 は 20秒間隔で約22時間分として 2026-10-21 りんく了承。12,000 は速さ 第2段(2026-10-22 りんく「ぜんぶやって」)。
+ *   全体の上限(DEFAULT_GLOBAL_DAILY_LIMIT)は据え置き=1日の費用の天井は変わらない。
+ */
+export const DEFAULT_DEVICE_DAILY_LIMIT = 12_000;
+/** v0.1.1736: スマホが開いている目印の寿命(秒)。スマホは約5秒ごとに取りに来るので、来なくなって30秒で消える。 */
+export const VIEWER_ACTIVE_TTL_SEC = 30;
 /** 全体の1日の書き込み上限の既定(env STATUS_GLOBAL_DAILY_LIMIT で上書き)。超えたら全員を生存確認の間隔に落とす。 */
 export const DEFAULT_GLOBAL_DAILY_LIMIT = 200_000;
 /** 発行(register)の乱発対策: 送信元ごとの1時間あたりの回数。 */
@@ -62,7 +68,9 @@ export const deviceKeys = {
   /** @param {string} token */
   latest: (token) => `status:latest:${token}`,
   /** @param {string} token */
-  etag: (token) => `status:etag:${token}`
+  etag: (token) => `status:etag:${token}`,
+  /** v0.1.1736: いまスマホがこの閲覧トークンを開いているかの目印(中身は '1' だけ・30秒で消える)。 @param {string} token */
+  viewing: (token) => `status:viewing:${token}`
 };
 
 /**

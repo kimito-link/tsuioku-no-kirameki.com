@@ -43,9 +43,14 @@ export const DEFAULT_AUTO_PUBLISH_INTERVAL_MS = 120_000;
  * ★v0.1.1729(スマホ化 第1段): 中身が前回の送信から【変わったとき】の最短間隔。
  *   スマホの WEB版が「最大3分遅れて動いていないように見える」原因の片方が 120秒間隔だった。
  *   変化があるときだけ 20秒まで縮め、変化が無いときは 120秒のまま(通信量を増やさない)。
- *   送信担当の描き直しは10秒周期(statusRefreshInterval.js)なので、これより短くしても意味が無い。
+ *   送信担当の描き直しは、スマホが開いていなければ10秒周期(statusRefreshInterval.js)なので、これより短くしても意味が無い。
  */
 export const CHANGED_AUTO_PUBLISH_INTERVAL_MS = 20_000;
+/**
+ * ★v0.1.1736(速さ 第2段): スマホが開いている間(サーバーの目印・30秒)は、中身が変わったら5秒で送る。
+ *   送信担当もその間は5秒ごとに描き直す(statusRefreshInterval.js shouldRunPublisherTick)。誰も見ていなければ20秒のまま。
+ */
+export const VIEWER_ACTIVE_PUBLISH_INTERVAL_MS = 5_000;
 
 /**
  * @param {{
