@@ -93,7 +93,15 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (98)
+- 📁 **app/** (106)
+  - 📁 **audio-test/** (7)
+    - `t-opus.mp4`
+    - `t.caf`
+    - `t.m4a`
+    - `t.mp3`
+    - `t.ogg`
+    - `t.wav`
+    - `t.webm`
   - 📁 **images/** (93)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -202,6 +210,7 @@
     - `nico-retro-tv-placeholder.svg`
     - `toumeilink.png`
   - `app.js` — スマホ閲覧用 status Web 版。
+  - `audio-test.html`
   - `index.html`
   - `live-view-post.js` — スマホの WEB版から生放送にコメントを届ける(v0.1.1734)。
   - `live-view.html`

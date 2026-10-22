@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>音声テスト(スマホ)</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --fg: #222; --muted: #666; --ok: #157f3b; --ng: #b3261e; --line: #ddd; --accent: #e8618c; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16161a; --fg: #eee; --muted: #aaa; --ok: #5bd17f; --ng: #ff8a80; --line: #333; } }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Hiragino Sans", sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  button { font: inherit; font-weight: 700; padding: 14px 18px; border-radius: 12px; border: 0; background: var(--accent); color: #fff; width: 100%; }
+  button:disabled { opacity: .5; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .ok { color: var(--ok); font-weight: 700; }
+  .ng { color: var(--ng); font-weight: 700; }
+  textarea { width: 100%; box-sizing: border-box; height: 140px; font: 12px/1.4 ui-monospace, monospace; background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 8px; }
+  #copy { margin-top: 8px; background: #555; }
+</style>
+</head>
+<body>
+<h1>🔊 音声テスト(スマホ)</h1>
+<p>スマホで読み上げを鳴らすとき、どの形式の音が鳴るかを調べます。下のボタンを押すと、短い声が何回か鳴ります(音量に気をつけてください)。終わったら「結果をコピー」を押して、りんくのスレッドに貼ってください。</p>
+<button id="run" type="button">▶ テストを始める(音が鳴ります)</button>
+<table id="out"><thead><tr><th>形式</th><th>再生(audio)</th><th>Web Audio</th><th>大きさ</th></tr></thead><tbody></tbody></table>
+<div id="extra"></div>
+<textarea id="result" readonly placeholder="ここに結果が出ます"></textarea>
+<button id="copy" type="button">📋 結果をコピー</button>
+<script>
+(function () {
+  // v0.1.1735: スマホ読み上げ(PC の VOICEVOX 音声を送る案)の前に、iPhone/Android が鳴らせる形式を実機で確かめる。
+  //   同じ声(拡張の voice-watch.mp3 の先頭3秒・24kHz モノラル)を形式ごとに作ってある(app/audio-test/)。
+  const FORMATS = [
+    { name: 'WAV (PCM)', file: 't.wav', mime: 'audio/wav' },
+    { name: 'MP3', file: 't.mp3', mime: 'audio/mpeg' },
+    { name: 'AAC (m4a)', file: 't.m4a', mime: 'audio/mp4; codecs="mp4a.40.2"' },
+    { name: 'Opus (WebM)', file: 't.webm', mime: 'audio/webm; codecs="opus"' },
+    { name: 'Opus (Ogg)', file: 't.ogg', mime: 'audio/ogg; codecs="opus"' },
+    { name: 'Opus (CAF)', file: 't.caf', mime: 'audio/x-caf; codecs="opus"' },
+    { name: 'Opus (MP4)', file: 't-opus.mp4', mime: 'audio/mp4; codecs="opus"' }
+  ];
+  const tbody = document.querySelector('#out tbody');
+  const result = /** @type {HTMLTextAreaElement} */ (document.getElementById('result'));
+  const lines = [];
+  const mark = (ok) => (ok ? '<span class="ok">○</span>' : '<span class="ng">×</span>');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  function playAudioEl(url) {
+    return new Promise((resolve) => {
+      const a = new Audio();
+      let done = false;
+      const finish = (ok, why) => { if (!done) { done = true; resolve({ ok, why }); } };
+      a.addEventListener('ended', () => finish(true, 'ended'));
+      a.addEventListener('error', () => finish(false, 'error ' + (a.error ? a.error.code : '')));
+      setTimeout(() => finish(!a.paused && a.currentTime > 0, 'timeout t=' + a.currentTime.toFixed(2)), 6000);
+      a.src = url;
+      const p = a.play();
+      if (p && p.catch) p.catch((e) => finish(false, 'play: ' + (e && e.name)));
+    });
+  }
+
+  async function playWebAudio(ctx, url) {
+    try {
+      const buf = await (await fetch(url)).arrayBuffer();
+      const audio = await ctx.decodeAudioData(buf);
+      const src = ctx.createBufferSource();
+      src.buffer = audio;
+      src.connect(ctx.destination);
+      await new Promise((r) => { src.onended = r; src.start(); setTimeout(r, 6000); });
+      return { ok: true, why: audio.duration.toFixed(2) + 's ' + audio.sampleRate + 'Hz' };
+    } catch (e) {
+      return { ok: false, why: String((e && (e.name || e.message)) || e) };
+    }
+  }
+
+  async function codecSupport(cfg) {
+    try {
+      const AD = /** @type {any} */ (window).AudioDecoder;
+      if (typeof AD !== 'function') return 'AudioDecoder なし';
+      const r = await AD.isConfigSupported(cfg);
+      return r && r.supported ? '○' : '×';
+    } catch (e) {
+      return 'エラー ' + (e && e.name);
+    }
+  }
+
+  document.getElementById('run').addEventListener('click', async (ev) => {
+    const btn = /** @type {HTMLButtonElement} */ (ev.currentTarget);
+    btn.disabled = true;
+    tbody.innerHTML = '';
+    lines.length = 0;
+    lines.push('音声テスト ' + new Date().toISOString());
+    lines.push('UA: ' + navigator.userAgent);
+    const Ctx = window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
+    const ctx = Ctx ? new Ctx() : null;
+    if (ctx && ctx.state === 'suspended') await ctx.resume();
+    for (const f of FORMATS) {
+      const url = 'audio-test/' + f.file;
+      const can = new Audio().canPlayType(f.mime) || '""';
+      const el = await playAudioEl(url);
+      const wa = ctx ? await playWebAudio(ctx, url) : { ok: false, why: 'AudioContext なし' };
+      const size = (await (await fetch(url, { method: 'HEAD' })).headers.get('content-length')) || '?';
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + esc(f.name) + '<br><small>canPlayType: ' + esc(can) + '</small></td><td>' + mark(el.ok) + ' <small>' + esc(el.why) + '</small></td><td>' + mark(wa.ok) + ' <small>' + esc(wa.why) + '</small></td><td>' + esc(size) + '</td>';
+      tbody.appendChild(tr);
+      lines.push([f.name, 'can=' + can, 'audio=' + (el.ok ? 'OK' : 'NG') + '(' + el.why + ')', 'webaudio=' + (wa.ok ? 'OK' : 'NG') + '(' + wa.why + ')', 'bytes=' + size].join(' | '));
+    }
+    const opus = await codecSupport({ codec: 'opus', sampleRate: 48000, numberOfChannels: 1 });
+    const aac = await codecSupport({ codec: 'mp4a.40.2', sampleRate: 24000, numberOfChannels: 1 });
+    const voices = (window.speechSynthesis && speechSynthesis.getVoices ? speechSynthesis.getVoices() : []).filter((v) => /^ja/i.test(v.lang));
+    const extra = 'WebCodecs AudioDecoder: opus=' + opus + ' aac=' + aac + ' / 端末の日本語の声: ' + voices.length + '種類' + (voices.length ? '(' + voices.map((v) => v.name).join(', ') + ')' : '');
+    document.getElementById('extra').textContent = extra;
+    lines.push(extra);
+    result.value = lines.join('\n');
+    btn.disabled = false;
+    btn.textContent = '▶ もう一度';
+  });
+
+  document.getElementById('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(result.value); } catch { result.select(); document.execCommand('copy'); }
+  });
+})();
+</script>
+</body>
+</html>
