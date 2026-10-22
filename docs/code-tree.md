@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 971 件
+## ⚠️ 役割コメントが無いソース 9 / 979 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -84,7 +84,8 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (6)
+- 📁 **api/** (7)
+  - `device.js` — スマホ版の「利用者ごとの鍵」の受け口(v0.1.1730・スマホ化 利用者ごとの鍵 第a段)。
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
   - `live-platforms.js` — /api/live-platforms — /live/ の「ほかの配信サービス」セクション(Kick・後で YouTube)のデータ。
@@ -892,7 +893,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2092)
+- 📁 **src/** (2107)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -929,7 +930,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (65)
+  - 📁 **extension/** (70)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -983,10 +984,15 @@
     - `repaintLoopGuard.wiring.test.js`
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
+    - `smartphoneFreshness.wiring.test.js`
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
     - `statusCopyFreshness.wiring.test.js`
+    - `statusDeviceCred.js` — スマホ版の「利用者ごとの鍵」を拡張側で持つ部品(v0.1.1731・スマホ化 利用者ごとの鍵 第b段)。
+    - `statusDeviceCred.test.js`
     - `statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
     - `statusPublisherHost.test.js`
+    - `statusSmartphoneCard.js` — 【層】L2 画面層(DOM を組む。鍵の発行・削除・送信は statusDeviceCred.js、判定は lib)
+    - `statusSmartphoneCard.test.js`
     - `storyDiagTotalSourcePopupEntry.wiring.test.js`
     - `storyGrowthSameUserBlurb.wiring.test.js`
     - `symptomVerdictsOnScreen.wiring.test.js`
@@ -1152,7 +1158,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1868)
+  - 📁 **lib/** (1876)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1584,6 +1590,10 @@
     - `devMonitorVizHtml.test.js`
     - `devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
     - `devReloadSignal.test.js`
+    - `deviceAuth.js` — 【層】L0 判定層(純粋関数)
+    - `deviceAuth.test.js`
+    - `devicePublishCredentials.js` — 【層】L0 判定層(純粋関数)
+    - `devicePublishCredentials.test.js`
     - `diagChannelRegistry.contract.test.js`
     - `diagChannelRegistry.js` — 計器チャンネルの台帳。HANDOFF-instrument-channels-2026-08-12.md §3。
     - `diagFlushThrottle.js` — 2026-07-06: 即時プッシュ計器(instantPushDiag)が「コメント送信バッチ毎に
@@ -2031,6 +2041,8 @@
     - `liveViewPublishSignature.test.js`
     - `livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
     - `livesCardSignature.test.js`
+    - `liveviewCurrentLive.js` — 【層】L0 判定層(純粋関数)
+    - `liveviewCurrentLive.test.js`
     - `liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
     - `liveviewErrorReport.test.js`
     - `liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
@@ -2581,6 +2593,8 @@
     - `statusCoreBatch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `statusCoreBatch.test.js`
     - `statusCoreBatch.wiring.test.js`
+    - `statusEtag.js` — 【層】L0 判定層(純粋関数)
+    - `statusEtag.test.js`
     - `statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
     - `statusExtrasBatch.test.js`
     - `statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
@@ -3023,7 +3037,9 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (4)
+  - 📁 **server/** (6)
+    - `deviceApi.test.js`
+    - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
     - `kickApi.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。

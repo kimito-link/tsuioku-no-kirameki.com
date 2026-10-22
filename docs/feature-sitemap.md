@@ -700,9 +700,8 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 87</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 85</summary>
 
-- `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
 - `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
@@ -716,7 +715,6 @@
 - `scripts/verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
 - `src/extension/popup/attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
 - `src/extension/sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
-- `src/extension/statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
 - `src/lib/aiShareDiagnosticsMarkdown.js` — AI 共有用「診断バンドル」Markdown の整形（純粋関数）。
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
@@ -775,10 +773,10 @@
 - `src/lib/sidepanelSelfDiagKey.js` — サイドパネル自己診断の storage キー。
 - `src/lib/statusCopyFreshness.js` — 状態速報の「コピーした本文がどれくらい古いか」を、コピーする側に伝える純関数(v0.1.1222)。
 - `src/lib/statusCoreBatch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/statusEtag.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
 - `src/lib/statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
 - `src/lib/statusMindmapSignature.js` — マインドマップの再描画を止める署名を作る純関数。
-- `src/lib/statusPublisherPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止。locks 等は引数で受け取る)
 - `src/lib/statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusRefreshInterval.js` — 状態画面(status.html)の自動更新の間隔を決める(純関数)。v0.1.1698
@@ -830,6 +828,18 @@
 - **公式「本家コメ」チップの速さ(+N/分)** — paintOfficialNicoStatsStrip(popup-entry.js)が公式コメント累計の実測(値が変わったときだけ標本)を officialCommentRate.js に積み、20秒以上離れた2標本の差を「+66/分」としてチップ隣の span に出す。補間はしない・出せない間は空(span ごと非表示)・配信切替で標本を捨てる。officialNicoStatsStripDigest.js は無変更
   - `src/lib/officialCommentRate.js`
   - `src/extension/popup-entry.js`
+- **スマホ版の利用者ごとの鍵(発行・削除・上限)** — POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッシュだけ保持)・閲覧トークンを発行、?action=rotate で閲覧URLを作り直し、DELETE で本体・ETag・鍵を消す。/api/status は x-device-id+x-write-key のとき書き込み先をサーバーが鍵から決め(他人の閲覧トークンへ書けない)、利用者ごと1日4,000回・全体上限で429、診断の全文(statusReport/fastDiag)を落として保存。保存は24時間。判定は deviceAuth.js、乱数・ハッシュ・Redis は deviceStore.js(v0.1.1730)。拡張側は同意 ON・共有キーなしのとき statusDeviceCred.js が鍵をもらい(Web Locks で1つ)、送信は devicePublishCredentials.js が決めた鍵で送る(共有キー優先)。同意 OFF で DELETE→鍵を消す・401 で鍵を捨ててもらい直す(v0.1.1731)。状態画面の「📱 スマホで見る」スイッチ(同意・閲覧URL・URLの作り直し)は statusSmartphoneCard.js(v0.1.1732)。送信担当はサイドパネルに加え watch ページ埋め込みのパネル(popup-entry.js・受動ビュー以外)にも置き、送信担当は document.hidden で止めない=サイドパネルを閉じても送り続ける(v0.1.1733)
+  - `api/device.js`
+  - `api/status.js`
+  - `src/lib/deviceAuth.js`
+  - `src/server/deviceStore.js`
+  - `src/lib/devicePublishCredentials.js`
+  - `src/extension/statusDeviceCred.js`
+  - `src/extension/status-entry.js`
+  - `src/extension/statusPublisherHost.js`
+  - `src/extension/statusSmartphoneCard.js`
+  - `src/extension/popup-entry.js`
+  - `src/lib/statusPublisherPlan.js`
 - **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
   - `extension/live-view.html`
   - `src/extension/live-view-entry.js`
@@ -926,7 +936,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 237</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 238</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1045,6 +1055,7 @@
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
 - `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
+- `src/lib/liveviewCurrentLive.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/liveviewPublishTarget.js` — 応援ライブビュー(live-view.html?lv=X)の公開ボタンが、別の配信のデータを送らないための判定(純関数)。
 - `src/lib/liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
 - `src/lib/lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1172,11 +1183,10 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (4版)
+### 💾 記録件数 (3版)
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
 - `v0.1.1718` 2026-10-20 — 同接の補正データの書き込みを約12分の1に
-- `v0.1.1709` 2026-10-20 — マーケレポートに『応援者とギフト』の章を追加
 
 ### 📥 コメント取得 (4版)
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
@@ -1187,20 +1197,19 @@
 ### 🙂 匿名(184) (1版)
 - `v0.1.1717` 2026-10-20 — コメント一覧の共有データを95%小さく
 
-### 🎁 ギフト (7版)
+### 🎁 ギフト (5版)
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
 - `v0.1.1722` 2026-10-21 — 別配信のギフト音記録を全画面で分離
 - `v0.1.1721` 2026-10-21 — 別配信のギフト音エラーを現配信に出さない
 - `v0.1.1720` 2026-10-20 — 広告pt・ギフトptの数字を画面間でそろえた
-- `v0.1.1713` 2026-10-20 — メディアキットを1つに・検索窓・色の修正
-- `v0.1.1709` 2026-10-20 — マーケレポートに『応援者とギフト』の章を追加
 
 ### 🔊 読み上げ (2版)
 - `v0.1.1723` 2026-10-21 — 別配信の読み上げ失敗を現配信に出さない
 - `v0.1.1719` 2026-10-20 — 読み上げ失敗の警告が復旧後も残らない
 
 ### 🩺 診断・状態速報 (12版)
+- `v0.1.1730` 2026-10-21 — スマホ版の利用者ごとの鍵をサーバーに用意
 - `v0.1.1728` 2026-10-21 — 未取得の配信を取得率の推移に混ぜない
 - `v0.1.1727` 2026-10-21 — 未取得の記録件数を0件と出さない
 - `v0.1.1725` 2026-10-21 — 広告の効果音の内訳を正しく数える
@@ -1212,10 +1221,11 @@
 - `v0.1.1719` 2026-10-20 — 読み上げ失敗の警告が復旧後も残らない
 - `v0.1.1716` 2026-10-20 — 画面の部品数の注記を実際の基準に
 - `v0.1.1715` 2026-10-20 — 取得率の100%超を隠さない
-- `v0.1.1710` 2026-10-20 — 開いた直後の偽の不一致を出さない
 
-### その他 (4版)
+### その他 (6版)
+- `v0.1.1733` 2026-10-21 — サイドパネルを閉じてもスマホへ送り続ける
+- `v0.1.1732` 2026-10-21 — 状態画面に「スマホで見る」スイッチ
+- `v0.1.1731` 2026-10-21 — スマホ版の利用者ごとの鍵を拡張で受け取る準備
+- `v0.1.1729` 2026-10-21 — スマホのWEB版を変化があれば20秒で更新
 - `v0.1.1726` 2026-10-21 — 配信採点パネルを外しました
 - `v0.1.1714` 2026-10-20 — マーケとメディアキットのボタンを1つに
-- `v0.1.1712` 2026-10-20 — 分析レポートとメディアキットを1つに統合
-- `v0.1.1711` 2026-10-20 — メディアキット生成を共有部品に切り出し
