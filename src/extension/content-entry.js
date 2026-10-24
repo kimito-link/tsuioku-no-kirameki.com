@@ -128,6 +128,7 @@ import {
 //   最新N件の鏡を publish する。popup の描画に依存しない=star Romi の「cron がクライアント不在でも生成」型。
 import { buildCommentTimelineMirrorSnapshot } from '../lib/commentTimelineMirror.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
+import { buildLiveEventsTail, KEY_LIVE_EVENTS_TAIL, KEY_LIVE_EVENTS_WANTED, LIVE_EVENTS_TAIL_MIN_MS, shouldWriteLiveEventsTail } from '../lib/liveEvents.js';
 import {
   buildPanelMetricsResponse,
   PANEL_METRICS_MESSAGE_TYPE
@@ -11455,6 +11456,28 @@ const _lastTimelineMirrorSigByLive = new Map();
 const _timelineMirrorWriteAt = new Map();
 const _timelineMirrorRetry = new Map();
 
+/**
+ * v0.1.1757: スマホが見ていてサーバーに Ably のキーがある間だけ(期限は送信担当が置く)、直近20件の小さな TAIL を
+ *   最短2秒ごとに書く=鏡(約145KB・最短8秒)を待たずに送信担当が3秒ごとに新着を送れる。期限が無ければ何もしない。
+ */
+let _liveEventsWantedUntil = 0;
+let _liveTailWriteAt = 0;
+let _liveTailSig = '';
+let _liveTailRetry = null;
+/** @param {any} snap @param {string} sig @param {number} nowMs */
+function writeLiveEventsTailIfWanted(snap, sig, nowMs) {
+  if (!(_liveEventsWantedUntil > nowMs) || sig === _liveTailSig) return;
+  if (!shouldWriteLiveEventsTail({ wantedUntilMs: _liveEventsWantedUntil, nowMs, lastWriteAt: _liveTailWriteAt, sig, lastSig: _liveTailSig })) {
+    if (!_liveTailRetry) _liveTailRetry = setTimeout(() => { _liveTailRetry = null; void publishCommentTimelineMirrorFromContent(Date.now()); }, LIVE_EVENTS_TAIL_MIN_MS);
+    return;
+  }
+  const tail = buildLiveEventsTail(snap, nowMs);
+  if (!tail) return;
+  _liveTailWriteAt = nowMs;
+  _liveTailSig = sig;
+  void chrome.storage.local.set({ [KEY_LIVE_EVENTS_TAIL]: tail }).catch(() => { /* best-effort */ });
+}
+
 /** content からコメントタイムライン鏡を publish(best-effort=記録を妨げない)。 */
 async function publishCommentTimelineMirrorFromContent(nowMs) {
   try {
@@ -11475,6 +11498,7 @@ async function publishCommentTimelineMirrorFromContent(nowMs) {
     const rows = Array.isArray(snap.rows) ? snap.rows : [];
     const last = rows.length ? rows[rows.length - 1] : null;
     const sig = `${snap.liveId}|${Number(snap.totalSeen) || 0}|${rows.length}|${String(last?.id || last?.at || '')}`;
+    writeLiveEventsTailIfWanted(snap, sig, nowMs);
     if (_lastTimelineMirrorSigByLive.get(lid) === sig) return; // 内容変化なし=書込スキップ
     // 頻度の天井(全拡張画面に約145KBが全文で配られる=35分で242MB・実機 census)。間引いた分は最短間隔の後に最新で1回書く。
     const gate = decideTimelineMirrorWrite({ nowMs, lastWriteAt: _timelineMirrorWriteAt.get(lid) || 0 });
@@ -14449,9 +14473,11 @@ async function start() {
     }).catch(() => { /* OFF default を維持 */ });
   } catch { /* no-op */ }
 
+  void chrome.storage.local.get(KEY_LIVE_EVENTS_WANTED).then((b) => { _liveEventsWantedUntil = Number(b?.[KEY_LIVE_EVENTS_WANTED]) || 0; }).catch(() => {});
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!hasExtensionContext()) return;
     if (area !== 'local') return;
+    if (changes[KEY_LIVE_EVENTS_WANTED]) _liveEventsWantedUntil = Number(changes[KEY_LIVE_EVENTS_WANTED].newValue) || 0;
 
     // v0.1.228: ギフトランキング opt-in flag の同期。popup ボタン押下から伝播。
     // false → true への遷移で、初回 autoOpen を 1 秒遅延で起動する（page load 後

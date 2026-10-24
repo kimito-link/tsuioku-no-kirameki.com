@@ -5,7 +5,7 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_LIVEVIEW_PUBLISH_PAYLOAD`, `KEY_PHONE_POST`, `KEY_SHARE_KEYS_SEEDED`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_DEVICE_CRED`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_WEB_PUBLISH_OPT_IN`
+- 書くキー: `KEY_LIVEVIEW_PUBLISH_PAYLOAD`, `KEY_LIVE_EVENTS_WANTED`, `KEY_PHONE_POST`, `KEY_SHARE_KEYS_SEEDED`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_DEVICE_CRED`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_WEB_PUBLISH_OPT_IN`
 - 読むキー: `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_POST_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_OP_SOUND_EFFECT_DIAG`, `KEY_PHONE_POST`, `KEY_REPORT_PREVIEW`, `KEY_SHARE_KEYS_SEEDED`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_DEVICE_CRED`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_ASSIGNMENTS`, `KEY_VOICE_DIAG`, `KEY_VOICE_READ_NAME_ENABLED`, `KEY_WEB_PUBLISH_OPT_IN`, `nls_last_auto_tab_reload`
 
 ## 構成ファイル（import 到達・最大40件表示）
@@ -15,6 +15,7 @@ graph LR
   n_status["状態速報ページ"]
   n_status --> n_src_domain_observations_vocabulary_js["domain/observations/vocabulary.js"]
   n_status --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
+  n_status --> n_src_extension_liveEventsPublisher_js["extension/liveEventsPublisher.js"]
   n_status --> n_src_extension_phonePostRelay_js["extension/phonePostRelay.js"]
   n_status --> n_src_extension_phoneVoicePublisher_js["extension/phoneVoicePublisher.js"]
   n_status --> n_src_extension_statusDeviceCred_js["extension/statusDeviceCred.js"]
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_status --> n_src_lib_commentCountProvenance_js["lib/commentCountProvenance.js"]
   n_status --> n_src_lib_commentPostDiag_js["lib/commentPostDiag.js"]:::shared
-  n_status --> n_src_lib_commentPostDiagKey_js["lib/commentPostDiagKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 159 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 163 ファイル省略（全件は storage-bus.md / metafile 参照）。

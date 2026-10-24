@@ -419,7 +419,8 @@ export default [
     // v0.1.1694: 全ページへ配られる巨大キーの書き込みを減らす配線(+7行)。較正リングの試行間隔(25s→120s)と fastDiag 全文の間引き(判定は lib の fastDiagFullGate.js)。
     // v0.1.1699: フォロー先一覧の読み先を本体キーの直読みから readChunkedComments へ(+4行・すべて【なぜ】のコメント)。本体キーの書き戻し停止(次版)で直読みだけが黙って死ぬのを先に防ぐ。ロジックは既存の readChunkedComments。
     // v0.1.1718: 較正リングの試行間隔 120s→300s と保持件数 2000→400(+2行・1回約830KB→約170KB)。読み手は開発モニタの書き出しだけ。
-    rules: { 'max-lines': ['error', { max: 19514, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1757: スマホのリアルタイム化の小さな TAIL を書く配線(+26行・大半は【なぜ】のコメント)。判定は lib(liveEvents.js の shouldWriteLiveEventsTail)。
+    rules: { 'max-lines': ['error', { max: 19540, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -452,7 +453,8 @@ export default [
     // v0.1.1736: スマホが開いている間だけ5秒で描き直し・送る(+17行)。判定は lib(statusRefreshInterval.js の shouldRunPublisherTick)。
     // v0.1.1738: gzip は受け口の返事(gzipOk)を見てから・スマホの目印を150秒保持(+3行)。判定は lib(autoPublishDecision.js の readPublishAck)。
     // v0.1.1740: スマホの読み上げ(返事の voiceWanted で声を作って送る・+6行)。判定と順番は lib(phoneVoiceSender.js)、配線は phoneVoicePublisher.js。
-    rules: { 'max-lines': ['error', { max: 4600, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1757: スマホへ新着を3秒ごとに送る係の配線(+4行: import・生成・返事を渡す・統計)。本体は liveEventsPublisher.js / lib の liveEventSender.js。
+    rules: { 'max-lines': ['error', { max: 4604, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

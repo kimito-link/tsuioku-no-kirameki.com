@@ -2828,6 +2828,18 @@
       ]
     },
     {
+      "file": "src/lib/liveEvents.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/liveLaneBuckets.js",
       "featureCount": 2,
       "features": [
@@ -4059,6 +4071,16 @@
       ],
       "labels": [
         "Web版 追憶のきらめき ランキング(/live/)"
+      ]
+    },
+    {
+      "file": "src/extension/liveEventsPublisher.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -6649,6 +6671,26 @@
       ],
       "labels": [
         "Web版 状態(スマホ)"
+      ]
+    },
+    {
+      "file": "src/lib/liveEventBatch.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/liveEventSender.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {

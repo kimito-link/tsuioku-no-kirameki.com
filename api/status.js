@@ -18,6 +18,9 @@
  *   ★v0.1.1740: スマホの読み上げ(?action=voice)。声は最新20件を2分だけ預かる(src/server/phoneVoiceApi.js)。
  *     送信の返事の voiceWanted:true は「スマホで 🗣 が ON」=PC はその間だけ声を作って送る。
  *
+ *   ★v0.1.1756: リアルタイム化(?action=events / ?action=realtime・Ably)。env ABLY_API_KEY が無ければ何もしない。
+ *     送信の返事の realtime:true は「サーバーにキーがある」=PC はスマホが開いている間だけ新着を3秒ごとに送る。
+ *
  *   ※ 概要だけスコープ。コメント全文は将来。
  */
 
@@ -37,6 +40,8 @@ import {
 } from '../src/lib/deviceAuth.js';
 import { authenticateDevice, incrWithExpiry, upstash } from '../src/server/deviceStore.js';
 import { MAX_VOICE_BODY_BYTES, isVoiceWanted, loadVoiceClips, markVoiceWanted, saveVoiceClip } from '../src/server/phoneVoiceApi.js';
+import { isRealtimeEnabled, issueRealtimeToken, publishLiveEvents } from '../src/server/liveEventsApi.js';
+import { LIVE_EVENTS_MAX_BODY_BYTES } from '../src/lib/liveEvents.js';
 
 /** ★v0.1.1730: 保存期間 7日→24時間(2026-10-21 りんく了承)。共有キー経路も利用者経路も同じ。 */
 const TTL_SECONDS = STATUS_TTL_SECONDS;
@@ -170,18 +175,14 @@ async function handleDevicePost(req, res) {
   }
   logIngest(req, 'device_ok');
   const v = auth.record.v;
-  res.status(200).json({ ok: true, viewerActive: await isViewerActive(v), gzipOk: true, voiceWanted: await isVoiceWanted(v) });
+  res.status(200).json({ ok: true, viewerActive: await isViewerActive(v), gzipOk: true, voiceWanted: await isVoiceWanted(v), realtime: isRealtimeEnabled() });
 }
 
 /**
- * v0.1.1740: 声1件の受け口。鍵の照合は概要の送信と同じ(利用者の鍵なら書き込み先はサーバーが決める)。
- *   上限は概要の送信とは別枠(鍵ごとに1日3,000件)。
+ * 声・イベントの送り手の照合(概要の送信と同じ鍵)。利用者の鍵なら書き込み先はサーバーが決める。
+ * @returns {Promise<{ token: string, quotaId: string } | null>} 鍵が合わなければ null
  */
-async function handleVoicePost(req, res) {
-  if (Number(req.headers?.['content-length']) > MAX_VOICE_BODY_BYTES) {
-    res.status(413).json({ ok: false, error: 'too large' });
-    return;
-  }
+async function resolveSideWriter(req, body) {
   let token = '';
   let quotaId = '';
   if (req.headers?.['x-device-id']) {
@@ -194,17 +195,51 @@ async function handleVoicePost(req, res) {
     const ingestKey = process.env.STATUS_INGEST_KEY;
     if (ingestKey && req.headers?.['x-share-key'] === ingestKey) quotaId = 'shared';
   }
-  if (!quotaId) {
-    res.status(401).json({ ok: false, error: 'unauthorized' });
+  if (!quotaId) return null;
+  if (quotaId === 'shared') token = String(body?.v || '');
+  return { token, quotaId };
+}
+
+/**
+ * v0.1.1740: 声1件の受け口。鍵の照合は概要の送信と同じ(利用者の鍵なら書き込み先はサーバーが決める)。
+ *   上限は概要の送信とは別枠(鍵ごとに1日3,000件)。
+ */
+async function handleVoicePost(req, res) {
+  if (Number(req.headers?.['content-length']) > MAX_VOICE_BODY_BYTES) {
+    res.status(413).json({ ok: false, error: 'too large' });
     return;
   }
   const body = readBody(req);
-  if (quotaId === 'shared') token = String(body?.v || '');
-  if (!VIEW_TOKEN_RE.test(token)) {
+  const w = await resolveSideWriter(req, body);
+  if (!w) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!VIEW_TOKEN_RE.test(w.token)) {
     res.status(400).json({ ok: false, error: 'bad view token' });
     return;
   }
-  const r = await saveVoiceClip({ token, quotaId, body, nowMs: Date.now() });
+  const r = await saveVoiceClip({ token: w.token, quotaId: w.quotaId, body, nowMs: Date.now() });
+  res.status(r.code).json(r.json);
+}
+
+/** v0.1.1756: 新着のまとめ(3秒ごと)の受け口 → Ably。キーが無ければ realtime:false だけ返す(Redis も使わない)。 */
+async function handleEventsPost(req, res) {
+  if (Number(req.headers?.['content-length']) > LIVE_EVENTS_MAX_BODY_BYTES) {
+    res.status(413).json({ ok: false, error: 'too large' });
+    return;
+  }
+  const body = readBody(req);
+  const w = await resolveSideWriter(req, body);
+  if (!w) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!VIEW_TOKEN_RE.test(w.token)) {
+    res.status(400).json({ ok: false, error: 'bad view token' });
+    return;
+  }
+  const r = await publishLiveEvents({ token: w.token, quotaId: w.quotaId, body, nowMs: Date.now() });
   res.status(r.code).json(r.json);
 }
 
@@ -213,6 +248,10 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'POST' && req.query?.action === 'voice') {
       await handleVoicePost(req, res);
+      return;
+    }
+    if (req.method === 'POST' && req.query?.action === 'events') {
+      await handleEventsPost(req, res);
       return;
     }
     if (req.method === 'POST' && req.headers?.['x-device-id']) {
@@ -251,7 +290,7 @@ export default async function handler(req, res) {
       delete payload.v;
       await saveSnapshot(token, JSON.stringify(payload));
       logIngest(req, 'ok');
-      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token), gzipOk: true, voiceWanted: await isVoiceWanted(token) });
+      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token), gzipOk: true, voiceWanted: await isVoiceWanted(token), realtime: isRealtimeEnabled() });
       return;
     }
 
@@ -263,6 +302,12 @@ export default async function handler(req, res) {
       }
       // ★v0.1.1740: スマホの読み上げ。声だけを返す(概要の目印・ETag とは別)。
       //   取りに来ること自体が「声がほしい」目印(30秒)=PC は送信の返事でそれを知り、その間だけ声を作る。
+      // ★v0.1.1756: リアルタイム化の購読の許可(キーが無ければ realtime:false=ポーリングのまま)。
+      if (req.query?.action === 'realtime') {
+        const r = await issueRealtimeToken(token, Date.now());
+        res.status(r.code).json(r.json);
+        return;
+      }
       if (req.query?.action === 'voice') {
         await markVoiceWanted(token);
         res.status(200).json({ ok: true, clips: await loadVoiceClips(token, req.query?.after) });

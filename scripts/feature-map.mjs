@@ -257,7 +257,13 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   引数領域に識別子が現れず静的解析が consumer を取りこぼす偽陽性。
   //   ★経路は実在し、panelWakeCurtain.wiring.test.js が
   //   【書き手2箇所と読み手】の両方を機械照合している(変異で赤を確認済)。
-  'KEY_PANEL_WAKE_CURTAIN_DIAG'
+  'KEY_PANEL_WAKE_CURTAIN_DIAG',
+  // スマホのリアルタイム化の小さな控え(2026-10-24・v0.1.1757):
+  //   producer=content-entry.js(writeLiveEventsTailIfWanted が chrome.storage.local.set で書く・検出対象)。
+  //   consumer=src/extension/liveEventsPublisher.js が get ではなく storage.onChanged の changes[KEY] で受け取る
+  //   (変わった瞬間だけ読めばよい)ため、静的解析が consumer を取りこぼす偽陽性。
+  //   ★経路は実在し、liveEvents.wiring.test.js が書き手と読み手の両方を照合している。
+  'KEY_LIVE_EVENTS_TAIL'
 ]);
 
 /**
