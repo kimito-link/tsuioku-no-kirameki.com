@@ -4006,5 +4006,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1760', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '前版と同じ。吹き出しの置き方は単体テスト(純関数)に加え、拡張を読み込んだ実ブラウザで会場とスマホ会場を開いて吹き出しの位置を測った(PICK UP・案内文に被らない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1761', metric: 'bundle-kb', value: 1441,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版から1KB減(popup は触っていない)。過去最良より大きいのは 0.1.1454 以降の機能追加の累積。'
+  }),
+  Object.freeze({
+    version: '0.1.1761', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1761', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '前版と同じ。PC 実機の確認(段の上の案内文に被った)を、拡張を読み込んだ Chromium の再現で確かめてから直し、案内文との重なり 0% を実測。'
   })
 ]);
