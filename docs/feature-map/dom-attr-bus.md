@@ -67,7 +67,7 @@
 | `data-nl-uname` | lib/supportTimelineHtml.js | extension/comeview-entry.js<br>extension/popup-entry.js |
 | `data-nl-usage-terms-ack` | extension/popup-entry.js<br>lib/cloakNotForSidePanel.js | — |
 | `data-nl-user-detail-wired` | extension/popup-entry.js | extension/popup-entry.js |
-| `data-nl-wired` | extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceVolumeSlider.js |
+| `data-nl-wired` | extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceVolumeSlider.js |
 | `data-nls-active` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-audition-fetch` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-auto-open` | extension/content-entry.js | extension/content-entry.js |

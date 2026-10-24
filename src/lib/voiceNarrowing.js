@@ -50,3 +50,74 @@ export function narrowVoiceStyleIds(availableStyleIds, weak) {
   const narrowed = VOICE_NARROW_STYLE_IDS.filter((id) => have.has(id));
   return narrowed.length >= 2 ? narrowed : available;
 }
+
+export { KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC } from './voiceKeys.js';
+
+/** 絞り込みの設定。既定は 'off'(=今までどおり全部の声)。 */
+export const VOICE_NARROW_MODES = Object.freeze(['off', 'auto', 'on']);
+
+/**
+ * @param {unknown} raw
+ * @returns {'off'|'auto'|'on'}
+ */
+export function normalizeVoiceNarrowMode(raw) {
+  return raw === 'auto' || raw === 'on' ? raw : 'off';
+}
+
+/**
+ * 設定と「このPCは遅い」の記録から、今回絞るかを決める。
+ * @param {unknown} mode
+ * @param {unknown} weakRemembered
+ * @returns {boolean}
+ */
+export function isVoiceNarrowActive(mode, weakRemembered) {
+  const m = normalizeVoiceNarrowMode(mode);
+  return m === 'on' || (m === 'auto' && weakRemembered === true);
+}
+
+/**
+ * 読み上げ ON のときに呼ぶ。使う声を決め、絞るときは裏でモデルを先に読み込む(待たない)。
+ *   設定が読めない・先読みが失敗しても、読み上げは今までどおり続ける。
+ * @param {readonly number[]} allStyleIds
+ * @param {{
+ *   readSettings: () => Promise<{ mode?: unknown, weak?: unknown }>,
+ *   initSpeaker?: (styleId: number) => Promise<unknown>
+ * }} deps
+ * @returns {Promise<{ styleIds: number[], narrowed: boolean }>}
+ */
+export async function prepareVoiceStyleIds(allStyleIds, deps) {
+  const all = Array.isArray(allStyleIds) ? allStyleIds.map(Number) : [];
+  /** @type {{ mode?: unknown, weak?: unknown }} */
+  let settings = {};
+  try {
+    settings = (await deps.readSettings()) || {};
+  } catch {
+    settings = {};
+  }
+  const active = isVoiceNarrowActive(settings.mode, settings.weak);
+  const styleIds = narrowVoiceStyleIds(all, active);
+  const narrowed = active && styleIds.length < all.length;
+  if (narrowed && typeof deps.initSpeaker === 'function') {
+    const init = deps.initSpeaker;
+    // エンジンは1件ずつ処理するので、順番に読み込む(並べて投げない)。
+    void (async () => {
+      for (const id of styleIds) {
+        try { await init(id); } catch { /* 先読みの失敗は無視(初回の合成で読み込まれる) */ }
+      }
+    })();
+  }
+  return { styleIds, narrowed };
+}
+
+/**
+ * 合成のたびに呼ぶ。遅いPCと分かったら一度だけ記録する('auto' のとき次の読み上げ ON から絞る)。
+ *   同じセッションの途中で声を入れ替えない(常連の声が配信の途中で変わらないように)。
+ * @param {{ warmSynthEmaMs?: number, coldSynthMaxMs?: number }} diag
+ * @param {{ saved: boolean }} state
+ * @param {(weak: true) => unknown} write
+ */
+export function rememberWeakVoicePc(diag, state, write) {
+  if (state.saved || !isWeakVoicePc(diag)) return;
+  state.saved = true;
+  Promise.resolve().then(() => write(true)).catch(() => { /* 記録の失敗は読み上げに影響させない */ });
+}
