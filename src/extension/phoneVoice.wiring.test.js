@@ -8,7 +8,7 @@ const statusEntry = readFileSync(new URL('./status-entry.js', import.meta.url), 
 
 describe('配線: スマホの読み上げ(v0.1.1740)', () => {
   it('★スマホ: トークンで作り、スナップショットの PC 状態を渡し、🗣 を付ける(閲覧は止めない)', () => {
-    expect(liveView).toContain('_voice = createPhoneVoice({ token });');
+    expect(liveView).toContain('_voice = createPhoneVoice({ token, ');
     expect(liveView).toContain('if (_voice) _voice.onSnapshot(jsonBlob);');
     expect(liveView).toContain('try { if (_voice) mountPhoneVoiceUi(_voice); } catch');
   });

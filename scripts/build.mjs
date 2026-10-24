@@ -223,6 +223,13 @@ const targets = [
     define: popupDefine
   },
   {
+    // iPhone アプリ(mobile/)が最初に開く開始画面(app.tsuioku-no-kirameki.com/phone)。リンクを貼る・デモを見る。
+    entryPoints: ['app/phone.js'],
+    outfile: 'app/dist/phone.js',
+    target: 'es2020',
+    format: 'esm'
+  },
+  {
     // 2026-09-14 /live/「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)。
     //   純Web(拡張非依存)。ページ内 inline JS をやめ、src/lib の共有部品(htmlText / liveRankingView /
     //   koken・nicoad の正規化 / concurrentEstimate)を import する形にした(コンポーネント化)。

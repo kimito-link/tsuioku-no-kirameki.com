@@ -107,6 +107,13 @@ import { createPhoneSoundPlayer, mountPhoneSoundUi } from './live-view-sound.js'
 import { createPhoneVenue, mountPhoneVenueUi } from './live-view-venue.js';
 import { createPhoneVoice, mountPhoneVoiceUi } from './live-view-voice.js';
 import { createPhoneRealtime } from './live-view-realtime.js';
+// iPhone アプリ(mobile/)の中だけ: ギフトの通知・振動・共有・画面を閉じても続く読み上げ(アプリの外では何もしない)。
+import { createPhoneNative, mountPhoneNativeUi } from './live-view-native.js';
+// PC が無くても試せるデモ(/live-view?v=demo)。作り物の配信を端末の中だけで流す(サーバーに取りに行かない)。
+import { createDemoSource, isDemoToken } from './live-view-demo.js';
+// iPhone アプリの「🚩 見たくない人を隠す・報告する」(審査 1.2)。隠すのはこの端末の画面だけ。
+import { mountPhoneBlockUi, readBlocklist } from './live-view-block.js';
+import { applyPhoneBlocklist } from '../src/lib/phoneBlocklist.js';
 import { mergeLiveRowsIntoMirror } from '../src/lib/liveEvents.js';
 import { pickSpokenTickerRow } from '../src/lib/phoneVoice.js';
 import { mountPhoneFit } from './live-view-phone-fit.js';
@@ -136,6 +143,13 @@ const _soundPlayer = createPhoneSoundPlayer();
 const _venue = createPhoneVenue();
 /** v0.1.1740: PC の VOICEVOX の声で読み上げ(🗣)。トークンが決まってから作る。 */
 let _voice = null;
+const _native = createPhoneNative();
+/** @type {ReturnType<typeof createDemoSource>|null} */
+let _demo = null;
+/** 画面が裏にある間も取りに行くか(アプリの中で読み上げ中だけ true=読み上げと通知を止めない)。 */
+function isPausedInBackground() {
+  return typeof document !== 'undefined' && document.hidden && !_native.keepAliveInBackground();
+}
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
 const MIRROR_FRESH_MS = 3 * 60 * 1000;
 
@@ -710,6 +724,7 @@ function paintAllMirrors(jsonBlob) {
   try { _soundPlayer.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 音は閲覧を止めない */ }
   // v0.1.1739: かんたん会場モード(閉じている間も「見た」ことは覚える=開いた瞬間に一斉に吹き出さない)。
   try { _venue.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 会場は閲覧を止めない */ }
+  try { _native.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 通知は閲覧を止めない */ }
   if (_voice) _voice.onSnapshot(jsonBlob);
   // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
@@ -794,6 +809,7 @@ function liveIdFromSnapshot(jsonBlob) {
 }
 
 async function fetchSnapshot(token) {
+  if (_demo) return applyPhoneBlocklist(await _demo.snapshot(), readBlocklist());
   /** @type {Record<string, string>} */
   const headers = _lastEtag && _latestSnapshot ? { 'If-None-Match': _lastEtag } : {};
   const res = await fetch(`/api/status?v=${encodeURIComponent(token)}`, { cache: 'no-store', headers });
@@ -813,7 +829,7 @@ async function fetchSnapshot(token) {
     return null;
   }
   _lastEtag = res.headers.get('ETag') || '';
-  return data;
+  return applyPhoneBlocklist(data, readBlocklist());
 }
 
 /** 初回: snapshot を取得→鏡を storage へ→lv を URL に焼く→本物 popup を起動。 */
@@ -838,6 +854,16 @@ async function bootWithSnapshot(token) {
     try { if (_voice) mountPhoneVoiceUi(_voice); } catch { /* 付けられなくても閲覧は続ける */ }
     // v0.1.1741: スマホで働かない拡張専用のボタンを隠し、応援者アイコンはプロフィールを開く。
     try { mountPhoneFit(); } catch { /* 付けられなくても閲覧は続ける */ }
+    try {
+      if (_native.isNative()) {
+        mountPhoneBlockUi({
+          getRows: () => restoreCommentTimelineRows((_latestSnapshot && _latestSnapshot.commentTimelineMirror) || null),
+          // 隠す人が変わったら、取り直して塗り直す(同じ版でも 304 にしない)。
+          onChange: () => { _lastEtag = ''; _realtimeRows = []; refresh(token).catch(() => {}); }
+        });
+      }
+    } catch { /* 付けられなくても閲覧は続ける */ }
+    try { mountPhoneNativeUi(_native, () => ({ title: '追憶のきらめきで見ている配信', url: _demo ? 'https://tsuioku-no-kirameki.com/' : `https://live.nicovideo.jp/watch/${_shownLiveId}` })); } catch { /* 付けられなくても閲覧は続ける */ }
     // ★popup は生コメントデータを持たないので、応援レーン/数字カードを「空」に塗り直す。
     //   その空描画が【私の鏡 paint を上書き（clobber）する】。clobber は (a) 初回 refresh と
     //   (b) ユーザーが <details> を開く等で起きる再描画、の両方で発生する。
@@ -923,6 +949,8 @@ function withRealtimeRows(jsonBlob) {
 /** @param {string} liveId @param {any[]} rows */
 function onRealtimeRows(liveId, rows) {
   if (!_latestSnapshot || !_shownLiveId || liveId !== _shownLiveId) return;
+  const blocked = new Set(readBlocklist());
+  if (blocked.size) rows = rows.filter((r) => !blocked.has(String(r && r.userId || '')));
   _realtimeRows = [..._realtimeRows, ...rows].slice(-60);
   const next = withRealtimeRows(_latestSnapshot);
   if (next === _latestSnapshot) return;
@@ -979,7 +1007,7 @@ function startPolling(token) {
     });
   }
   _timerId = setInterval(() => {
-    if (typeof document !== 'undefined' && document.hidden) return;
+    if (isPausedInBackground()) return;
     refresh(token).catch(() => {});
   }, POLL_INTERVAL_MS);
 }
@@ -1054,13 +1082,15 @@ function bootstrap() {
     return;
   }
   // v0.1.1734: 投稿用の鍵(#pk=)は popup を起動する【前に】口として置く(popup の送信ボタンがこれを使う)。
-  const postKey = takePostKey(token);
+  if (isDemoToken(token)) _demo = createDemoSource();
+  const postKey = _demo ? '' : takePostKey(token);
   if (postKey) {
     _postClient = createPhonePostClient({ token, postKey });
     globalThis.__nlsWebCommentRelay = _postClient;
     _postClient.start();
   }
-  _voice = createPhoneVoice({ token });
+  _voice = createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground(), ...(_demo ? { fetchImpl: _demo.voiceFetch } : {}) });
+  _native.setVoiceOn(() => Boolean(_voice && _voice.isOn()));
   // v0.1.1742: 会場の吹き出しを読み上げの声に合わせる(声が鳴った瞬間に、その人の吹き出しを出す)。
   _venue.setVoiceActive(() => Boolean(_voice && _voice.isOn() && _voice.isReady() && _voice.pcState() === 'ok'));
   _voice.onPlay((no, ms) => _venue.onVoicePlay(no, ms));
@@ -1083,7 +1113,7 @@ function bootstrap() {
   });
   startPolling(token);
   // v0.1.1758: サーバーに Ably のキーがあれば、新着を3秒ごとに受け取る(無ければ何もしない=ポーリングだけ)。
-  createPhoneRealtime({ token, onRows: onRealtimeRows, onLiveChanged: () => { refresh(token).catch(() => {}); } }).start();
+  if (!_demo) createPhoneRealtime({ token, onRows: onRealtimeRows, onLiveChanged: () => { refresh(token).catch(() => {}); }, isHidden: isPausedInBackground }).start();
 }
 
 if (typeof document !== 'undefined') {
