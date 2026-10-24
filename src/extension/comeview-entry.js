@@ -87,6 +87,7 @@ import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
   buildVoiceReadingText,
+  initializeVoicevoxSpeaker,
   listVoicevoxStyleIds,
   probeVoicevoxAlive,
   synthesizeVoice
@@ -108,6 +109,9 @@ import {
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
 import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
+import {
+  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc
+} from '../lib/voiceNarrowing.js';
 import {
   applyVoiceVolumeToWav,
   KEY_VOICE_VOLUME_PERCENT,
@@ -583,7 +587,14 @@ async function enableVoiceReading({ persist = true } = {}) {
     return;
   }
 
-  _voiceStyleIds = await listVoicevoxStyleIds();
+  // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする(会場と同じ)。
+  _voiceStyleIds = (await prepareVoiceStyleIds(await listVoicevoxStyleIds(), {
+    readSettings: async () => {
+      const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
+      return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
+    },
+    initSpeaker: (id) => initializeVoicevoxSpeaker(id)
+  })).styleIds;
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
   _voiceToggleBusy = false;
@@ -619,6 +630,8 @@ const _voiceSynthTracker = createVoiceSynthTracker();
  * @param {string} text
  * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
  */
+/** P3: 遅いPCの記録は1タブで1回だけ書く。 */
+const _voiceWeakPcState = { saved: false };
 function synthesizeVoiceTracked(text, voice) {
   const track = _voiceSynthTracker.begin(voice?.styleId);
   /** @type {{ queryMs?: number, synthMs?: number }} */
@@ -629,6 +642,8 @@ function synthesizeVoiceTracked(text, voice) {
   }).then(
     (wav) => {
       try { recordVoiceSynthStage(_voiceDiag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
+      // P3: 遅いPCと分かったら一度だけ記録(会場の VoicePlayer と同じ判定=voiceNarrowing.js)。
+      rememberWeakVoicePc(_voiceDiag, _voiceWeakPcState, () => chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: true }));
       return wav;
     },
     (err) => {

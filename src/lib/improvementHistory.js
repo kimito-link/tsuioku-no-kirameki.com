@@ -3978,5 +3978,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1758', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '受け取り口を模擬の EventSource と fetch で試験(キー無し・届いたまとめ・配信切替・切断とつなぎ直し・http は拒否)。'
+  }),
+  Object.freeze({
+    version: '0.1.1759', metric: 'bundle-kb', value: 1443,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版から変化なし(1KB 未満)。popup には設定の選択肢1つと配線(wireVoiceNarrowSelect.js)を足しただけで、絞り方の判定は lib の voiceNarrowing.js。'
+  }),
+  Object.freeze({
+    version: '0.1.1759', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1759', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '前版と同じ。絞り込みは単体テスト(固定表の順・2件未満なら絞らない・先読みの順序)と、会場/コメビュ/popup の配線テストの両方で固定。'
   })
 ]);
