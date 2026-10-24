@@ -106,6 +106,8 @@ import { createPhonePostClient, mountPhonePostUi, takePostKey } from './live-vie
 import { createPhoneSoundPlayer, mountPhoneSoundUi } from './live-view-sound.js';
 import { createPhoneVenue, mountPhoneVenueUi } from './live-view-venue.js';
 import { createPhoneVoice, mountPhoneVoiceUi } from './live-view-voice.js';
+import { createPhoneRealtime } from './live-view-realtime.js';
+import { mergeLiveRowsIntoMirror } from '../src/lib/liveEvents.js';
 import { pickSpokenTickerRow } from '../src/lib/phoneVoice.js';
 import { mountPhoneFit } from './live-view-phone-fit.js';
 import {
@@ -907,6 +909,30 @@ function startSelfHealingRepaint() {
   }, 2500);
 }
 
+/**
+ * v0.1.1758: Ably で届いた新着の行(映している配信の分だけ・最新60件)。ポーリングの鏡は PC で最短8秒ごとなので、
+ *   届いた鏡がこれより古くても、足した行が消えて巻き戻らないように取っておいて足し直す。
+ */
+let _realtimeRows = [];
+/** @param {any} jsonBlob */
+function withRealtimeRows(jsonBlob) {
+  if (!_realtimeRows.length || !jsonBlob || !_shownLiveId) return jsonBlob;
+  const merged = mergeLiveRowsIntoMirror(jsonBlob.commentTimelineMirror || null, _realtimeRows, { liveId: _shownLiveId });
+  return merged === jsonBlob.commentTimelineMirror ? jsonBlob : { ...jsonBlob, commentTimelineMirror: merged };
+}
+/** @param {string} liveId @param {any[]} rows */
+function onRealtimeRows(liveId, rows) {
+  if (!_latestSnapshot || !_shownLiveId || liveId !== _shownLiveId) return;
+  _realtimeRows = [..._realtimeRows, ...rows].slice(-60);
+  const next = withRealtimeRows(_latestSnapshot);
+  if (next === _latestSnapshot) return;
+  _latestSnapshot = next;
+  // 変わったのはコメント鏡だけ=署名つきの通常の塗り(変化した欄だけ描き直す)。自分の塗りは自己修復に拾わせない。
+  const wasPainting = _painting;
+  _painting = true;
+  try { paintAllMirrors(_latestSnapshot); } finally { if (!wasPainting) setTimeout(() => { _painting = false; }, 0); }
+}
+
 async function refresh(token) {
   const jsonBlob = await fetchSnapshot(token);
   if (jsonBlob === SNAPSHOT_NOT_MODIFIED) {
@@ -927,7 +953,7 @@ async function refresh(token) {
     return;
   }
   hideError();
-  _latestSnapshot = jsonBlob;
+  _latestSnapshot = withRealtimeRows(jsonBlob);
   seedMirrorsIntoStore(jsonBlob); // onChanged 橋渡しで popup の受動再描画も促す
   forcePaintAllMirrors(); // poll でも clobber を踏み消して鏡を確実に出す
 }
@@ -1056,6 +1082,8 @@ function bootstrap() {
     showError('通信エラー: ' + String((err && err.message) || err));
   });
   startPolling(token);
+  // v0.1.1758: サーバーに Ably のキーがあれば、新着を3秒ごとに受け取る(無ければ何もしない=ポーリングだけ)。
+  createPhoneRealtime({ token, onRows: onRealtimeRows, onLiveChanged: () => { refresh(token).catch(() => {}); } }).start();
 }
 
 if (typeof document !== 'undefined') {
