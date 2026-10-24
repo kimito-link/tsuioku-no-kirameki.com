@@ -22,6 +22,7 @@ graph LR
   n_venue --> n_src_extension_story_laneContentLod_js["extension/story/laneContentLod.js"]:::shared
   n_venue --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_venue --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
+  n_venue --> n_src_extension_venueBubblePlacer_js["extension/venueBubblePlacer.js"]:::shared
   n_venue --> n_src_lib_adObservationLog_js["lib/adObservationLog.js"]:::shared
   n_venue --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_venue --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
@@ -31,6 +32,7 @@ graph LR
   n_venue --> n_src_lib_avatarUrlCompare_js["lib/avatarUrlCompare.js"]:::shared
   n_venue --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_venue --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
+  n_venue --> n_src_lib_bubblePlacement_js["lib/bubblePlacement.js"]:::shared
   n_venue --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
   n_venue --> n_src_lib_charaLiveCensus_js["lib/charaLiveCensus.js"]:::shared
   n_venue --> n_src_lib_charaLiveCheerTrigger_js["lib/charaLiveCheerTrigger.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_venue --> n_src_lib_effectDirector_js["lib/effectDirector.js"]:::shared
   n_venue --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
   n_venue --> n_src_lib_extDocBusyCensus_js["lib/extDocBusyCensus.js"]:::shared
-  n_venue --> n_src_lib_extDocBusyCensusBoot_js["lib/extDocBusyCensusBoot.js"]:::shared
-  n_venue --> n_src_lib_extProcessCensusKey_js["lib/extProcessCensusKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 125 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 126 ファイル省略（全件は storage-bus.md / metafile 参照）。

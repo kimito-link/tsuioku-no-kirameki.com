@@ -3992,5 +3992,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1759', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '前版と同じ。絞り込みは単体テスト(固定表の順・2件未満なら絞らない・先読みの順序)と、会場/コメビュ/popup の配線テストの両方で固定。'
+  }),
+  Object.freeze({
+    version: '0.1.1760', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版から1KB減(popup は触っていない)。過去最良 1360 より大きいのは 0.1.1454 以降の機能追加の累積で、この版の悪化ではない。'
+  }),
+  Object.freeze({
+    version: '0.1.1760', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1760', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '前版と同じ。吹き出しの置き方は単体テスト(純関数)に加え、拡張を読み込んだ実ブラウザで会場とスマホ会場を開いて吹き出しの位置を測った(PICK UP・案内文に被らない)。'
   })
 ]);
