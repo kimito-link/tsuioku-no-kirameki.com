@@ -293,11 +293,8 @@ import {
   endVenueDrag
 } from '../lib/venueDragScroll.js';
 import { buildVenueRoster, formatVenueRosterSummary } from '../lib/venueRoster.js';
-import {
-  bubbleAnchorForSeatRect,
-  resolveBubbleY,
-  BUBBLE_ANCHOR_GAP
-} from '../lib/venueBubbleLayout.js';
+import { placeVenueBubble, VENUE_BUBBLE_OBSTACLE_WEIGHTS } from './venueBubblePlacer.js';
+import { coveredBubbleIndexes } from '../lib/bubblePlacement.js';
 import { drawCrowdOnCanvas } from '../lib/crowdRasterizer.js';
 import {
   resolveVenueHeatLevel,
@@ -2226,7 +2223,7 @@ const VENUE_CSS = `
   .nlsb-bubble::after {
     position: absolute;
     top: 100%;
-    left: var(--nlsb-bubble-tail-x, 50%);
+    left: var(--nlsb-bubble-tail, 50%);
     width: 0;
     height: 0;
     border: 7px solid transparent;
@@ -2234,6 +2231,16 @@ const VENUE_CSS = `
     content: "";
     transform: translateX(-50%);
   }
+  /* v0.1.1760: 吹き出しの向き(data-side=席から見てどちら側か)。尻尾は席の方の辺に付ける。 */
+  .nlsb-bubble[data-side='bottom']::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: rgba(255, 255, 255, 0.97); }
+  .nlsb-bubble[data-side='right']::after,
+  .nlsb-bubble[data-side='left']::after { top: var(--nlsb-bubble-tail, 50%); transform: translateY(-50%); border-top-color: transparent; }
+  .nlsb-bubble[data-side='right']::after { left: auto; right: 100%; border-right-color: rgba(255, 255, 255, 0.97); }
+  .nlsb-bubble[data-side='left']::after { left: 100%; border-left-color: rgba(255, 255, 255, 0.97); }
+  .nlsb-bubble-who { display: none; font-size: 11px; font-weight: 700; color: #5b6b80; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nlsb-bubble--away .nlsb-bubble-who { display: block; }
+  .nlsb-bubble--away .nlsb-bubble-who::after { content: " ↓"; }
+  .nlsb-bubble--away[data-side='bottom'] .nlsb-bubble-who::after { content: " ↑"; }
   .nlsb-bubble.nlsb-is-leaving {
     opacity: 0;
   }
@@ -4310,7 +4317,7 @@ export function mountVenueBarButton(options = {}) {
    * @typedef {{ bubbleKey?: number|string, seatIndex: number, fallbackAnchor?: {x:number,y:number}|null,
    *   element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean,
    *   voiceState?: string, createdAt?: number, flowLifetimeMs?: number, reducedMotion?: boolean,
-   *   speakingCapTimer?: number, _x?: number, _y?: number, _h?: number }} VenueBubble
+   *   speakingCapTimer?: number, _box?: {left:number,top:number,right:number,bottom:number}, _side?: any }} VenueBubble
    */
   /** @type {Map<number|string, VenueBubble>} */
   const bubbleBySeat = new Map();
@@ -4440,10 +4447,14 @@ export function mountVenueBarButton(options = {}) {
     const element = document.createElement('div');
     element.className = 'nlsb-bubble';
 
+    // v0.1.1760: 席が一覧の外にいるとき(.nlsb-bubble--away)だけ見える発言者名(誰の吹き出しか分かるように)。
+    const whoSpan = document.createElement('span');
+    whoSpan.className = 'nlsb-bubble-who';
+    whoSpan.textContent = String(/** @type {any} */ (speech).name || '').trim() || 'コメント';
     const textSpan = document.createElement('span');
     textSpan.className = 'nlsb-bubble-text';
     textSpan.textContent = text;
-    element.appendChild(textSpan);
+    element.append(whoSpan, textSpan);
 
     element.setAttribute('aria-hidden', 'true');
     // 会議確定A: 席ノードでなく最上位レイヤーへ描く(overflow:hidden に切られない)。
@@ -4462,6 +4473,7 @@ export function mountVenueBarButton(options = {}) {
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    /** @type {VenueBubble} */
     const bubble = {
       bubbleKey,
       seatIndex: seatUsable ? seatIndex : -1,
@@ -4483,8 +4495,10 @@ export function mountVenueBarButton(options = {}) {
     bubbleBySeat.set(bubbleKey, bubble);
     activeBubbles.push(bubble);
 
-    // 席の座標を測ってレイヤー基準の頭上へ配置。既存吹き出しと重なれば上へ逃がす(衝突回避)。
+    // 席の座標を測って被らない場所へ配置。v0.1.1760: 混んで置き場が無く古い吹き出しを隠したら、隠れた方(読み上げ中以外)を先に消す。
     positionBubble(bubble);
+    const others = activeBubbles.filter((b) => b !== bubble && !b.removed && b.voiceState !== 'speaking');
+    for (const i of coveredBubbleIndexes(bubble._box, others.map((b) => b._box))) scheduleBubbleFade(others[i], BUBBLE_FADE_MS);
 
     // 初期(pending)の寿命。読み上げONなら合成遅れに備えて床(BUBBLE_PENDING_VOICE_FLOOR_MS)を効かせ、
     //   「声が鳴り始める前に流速寿命で消える」隙間を塞ぐ。speaking になればこのタイマーは解除される。
@@ -5095,70 +5109,42 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
-   * 1つの吹き出しを、対応する席の頭上(レイヤー基準)へ絶対配置する。
-   * 既に表示中の吹き出しと縦に重なる場合は上方向へオフセットして読めるようにする。
+   * 1つの吹き出しを、対応する席の近く(レイヤー基準)へ絶対配置する。
+   * v0.1.1760: 頭上固定+上へ逃がすだけ、をやめた。PICK UP・見出し・案内文・他の吹き出しに被らない
+   *   向き(上/下/横)を選ぶ。席が一覧の外へスクロールしていれば見えている縁に寄せ名前を添える(判定は lib の bubblePlacement.js)。
    * v0.1.757: 席が無い発言者(fallbackAnchor あり)は席矩形でなくその決定座標へ置く。
-   * @param {{ seatIndex:number, fallbackAnchor?:{x:number,y:number}|null, element:HTMLDivElement, removed:boolean, _x?:number, _y?:number, _h?:number }} bubble
+   * @param {{ seatIndex:number, fallbackAnchor?:{x:number,y:number}|null, element:HTMLDivElement, removed:boolean, _box?:any, _side?:any }} bubble
    */
   const positionBubble = (bubble) => {
     if (!bubble || bubble.removed) return;
-    /** @type {{x:number,y:number}} レイヤー基準の吹き出しアンカー(席下端中央 or 観客フォールバック)。 */
-    let anchor;
     const node = bubble.seatIndex >= 0 ? seatNodes[bubble.seatIndex] : null;
-    if (node) {
-      // 保険(PR3): 段の再描画中など席ノードが一瞬 DOM から外れていると getBoundingClientRect が
-      //   0 を返し、吹き出しが画面外へ飛んで消えて見える。未接続なら座標計算せず一時的に隠す。
-      // person-tile-unify 第3コミット: 旧 node.icon は廃止。座標の基準は本物タイルのアバター要素
-      //   (.nl-story-userlane-avatar)・無ければタイル全体にフォールバック(seatAnchorEl)。
-      const anchorEl = seatAnchorEl(node);
-      if (!node.seat.isConnected || !anchorEl || !anchorEl.isConnected) {
-        bubble.element.style.visibility = 'hidden';
-        return;
-      }
-      bubble.element.style.visibility = '';
-      const layerRect = bubbleLayer.getBoundingClientRect();
-      const seatRect = anchorEl.getBoundingClientRect();
-      const rel = {
-        left: seatRect.left - layerRect.left,
-        top: seatRect.top - layerRect.top,
-        width: seatRect.width,
-        height: seatRect.height
-      };
-      anchor = bubbleAnchorForSeatRect(rel, BUBBLE_ANCHOR_GAP);
-    } else if (bubble.fallbackAnchor) {
-      // 席無し: 観客領域の決定座標へ(席矩形が無いので衝突回避だけ後段で効かせる)。
-      bubble.element.style.visibility = '';
-      anchor = bubble.fallbackAnchor;
-    } else {
-      return; // 席も座標も無い=描けない(従来どおり)
+    // 保険(PR3): 段の再描画中など席ノードが一瞬 DOM から外れていると座標が 0 になり吹き出しが飛ぶ。未接続なら一時的に隠す。
+    // person-tile-unify 第3コミット: 座標の基準は本物タイルのアバター要素(無ければタイル全体・seatAnchorEl)。
+    const anchorEl = node ? seatAnchorEl(node) : null;
+    if (node && (!node.seat.isConnected || !anchorEl || !anchorEl.isConnected)) {
+      bubble.element.style.visibility = 'hidden';
+      return;
     }
-    const h = bubble.element.offsetHeight || 40;
-    const bw = bubble.element.offsetWidth || 160;
-    // 既存の表示中吹き出し(自分以外)の占有帯を集めて衝突回避。
-    const placed = [];
-    for (const b of activeBubbles) {
-      if (b === bubble || b.removed || !b._x) continue;
-      placed.push({ x: b._x, y: b._y, h: b._h || 40 });
-    }
-    const y = resolveBubbleY({ x: anchor.x, y: anchor.y, h }, placed, {
-      xThreshold: 130,
-      vGap: 8,
-      minY: 8
+    if (!node && !bubble.fallbackAnchor) return; // 席も座標も無い=描けない(従来どおり)
+    bubble.element.style.visibility = '';
+    const W = VENUE_BUBBLE_OBSTACLE_WEIGHTS;
+    const placed = placeVenueBubble({
+      layer: bubbleLayer,
+      bubbleEl: bubble.element,
+      anchorEl: anchorEl instanceof HTMLElement ? anchorEl : null,
+      fallback: node ? null : bubble.fallbackAnchor,
+      seating,
+      obstacleEls: [
+        { el: pickupEls.root, weight: W.pickup },
+        { el: header, weight: W.header },
+        ...Array.from(seatsHost.querySelectorAll('.nl-story-userlane-guide'), (el) => ({ el, weight: W.guide, clipToSeats: true }))
+      ],
+      otherBubbles: activeBubbles.filter((b) => b !== bubble && !b.removed && b._box).map((b) => b._box),
+      prefer: bubble._side || null
     });
-    
-    // 画面端で見切れないようにX座標をクランプする
-    let targetLeft = anchor.x - bw / 2;
-    const maxLeft = window.innerWidth - bw - 8;
-    if (targetLeft < 8) targetLeft = 8;
-    if (targetLeft > maxLeft) targetLeft = maxLeft;
-    const tailOffset = anchor.x - targetLeft;
-
-    bubble._x = anchor.x;
-    bubble._y = y;
-    bubble._h = h;
-    bubble.element.style.setProperty('--nlsb-bubble-tail-x', `${tailOffset}px`);
-    bubble.element.style.left = `${targetLeft}px`;
-    bubble.element.style.top = `${y}px`;
+    if (!placed) return;
+    bubble._box = placed.box;
+    bubble._side = placed.side;
   };
 
   /** 表示中の全吹き出しを席座標へ再追従(スクロール/リサイズ/段再描画後)。 */

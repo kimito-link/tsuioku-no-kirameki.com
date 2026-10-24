@@ -434,8 +434,9 @@ export default [
     // v0.1.1749: 読み上げ音量の追従(storage.onChanged を VoicePlayer へ渡す1行)。正規化は lib の voiceVolume.js。
     // v0.1.1754: 読み上げの遅れの一言(span 1つと onLagNotice の配線)=+3行。判定と文言は lib の voiceLagNotice.js。
     // v0.1.1759: 声の絞り込みの先読み(initVoiceSpeaker を VoicePlayer へ渡す import 1行+配線1行)。判定は lib の voiceNarrowing.js。
+    // v0.1.1760: 吹き出しの置き場所の判定を venueBubblePlacer.js / lib の bubblePlacement.js へ出した=7339→7325(下げた)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7339, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7325, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

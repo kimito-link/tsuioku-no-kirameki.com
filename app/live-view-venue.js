@@ -10,6 +10,7 @@
  */
 import { buildPhoneVenueSeats, diffPhoneVenueEvents, phoneVenueFallbackFace } from '../src/lib/phoneVenueModel.js';
 import { tierFromPoints } from '../src/lib/giftThrowProjectile.js';
+import { chooseBubblePlacement, coveredBubbleIndexes } from '../src/lib/bubblePlacement.js';
 
 const DEFAULT_FACE = '/app/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png';
 const BUBBLE_MS = 4500;
@@ -49,12 +50,17 @@ const STYLE = `
 #lvWebVenue .v-seat .s-name{max-width:100%;font-size:11px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #lvWebVenue .v-seat.bounce img{animation:lvVenueBounce .5s ease}
 @keyframes lvVenueBounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
-#lvWebVenue .v-bubble{position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);z-index:2;
+#lvWebVenue .v-bubble{position:absolute;left:0;top:0;z-index:2;
   width:max-content;max-width:min(60vw,220px);padding:6px 10px;border-radius:12px;background:#fff;color:#222;
   font-size:13px;line-height:1.35;box-shadow:0 2px 8px rgba(0,0,0,.35);word-break:break-word;
-  animation:lvVenuePop .25s ease-out}
+  animation:lvVenuePop .25s ease-out;transition:opacity .3s}
+#lvWebVenue .v-bubble.leaving{opacity:0}
 #lvWebVenue .v-bubble::after{content:"";position:absolute;top:100%;left:var(--tail,50%);margin-left:-6px;border:6px solid transparent;border-top-color:#fff}
-@keyframes lvVenuePop{from{opacity:0;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%)}}
+#lvWebVenue .v-bubble[data-side="bottom"]::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:#fff}
+#lvWebVenue .v-bubble[data-side="right"]::after,#lvWebVenue .v-bubble[data-side="left"]::after{left:auto;top:var(--tail,50%);margin:-6px 0 0;border-top-color:transparent}
+#lvWebVenue .v-bubble[data-side="right"]::after{right:100%;border-right-color:#fff}
+#lvWebVenue .v-bubble[data-side="left"]::after{left:100%;border-left-color:#fff}
+@keyframes lvVenuePop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 `;
 
 function ensureStyle() {
@@ -152,9 +158,14 @@ export function createPhoneVenue() {
       return el;
     });
     seatsEl.replaceChildren(...nodes);
+    relayoutBubbles();
   }
 
-  /** @param {string} personKey @param {string} text @param {number} [ms] 出しておく長さ(声の長さに合わせるとき) */
+  /**
+   * v0.1.1760: 吹き出しを「他の吹き出し・見出し・ギフトの札」に被らない向き(上/下/横)へ置く(判定は lib の bubblePlacement.js)。
+   *   置き場が無く古い吹き出しを隠したら、隠れた方を先に消す(重なった文字は読めない=新しい発言が主役)。
+   * @param {string} personKey @param {string} text @param {number} [ms] 出しておく長さ(声の長さに合わせるとき)
+   */
   function bubble(personKey, text, ms = BUBBLE_MS) {
     const seat = seatByKey.get(personKey);
     if (!seat || !text) return;
@@ -162,17 +173,66 @@ export function createPhoneVenue() {
     const b = document.createElement('div');
     b.className = 'v-bubble';
     b.textContent = text;
+    b.dataset.born = String(Date.now());
     seat.appendChild(b);
-    // 端の席の吹き出しが画面の外にはみ出さないよう、はみ出た分だけ内側へずらす。
-    const r = b.getBoundingClientRect();
-    const vw = document.documentElement.clientWidth || globalThis.innerWidth || 0;
-    const shift = r.left < 6 ? 6 - r.left : vw && r.right > vw - 6 ? vw - 6 - r.right : 0;
-    if (shift) {
-      b.style.marginLeft = `${shift}px`;
-      b.style.setProperty('--tail', `calc(50% - ${shift}px)`);
-    }
+    const others = liveBubbles().filter((x) => x !== b);
+    const box = placeBubble(b, others);
+    const otherBoxes = others.map((x) => x.getBoundingClientRect());
+    for (const i of coveredBubbleIndexes(box, otherBoxes)) fadeOut(others[i]);
     bounce(personKey);
-    setTimeout(() => b.remove(), ms);
+    setTimeout(() => fadeOut(b), ms);
+  }
+
+  const liveBubbles = () => /** @type {HTMLElement[]} */ (Array.from(root?.querySelectorAll('.v-bubble:not(.leaving)') || []));
+
+  /**
+   * 吹き出し1つを、その席の近くの被らない場所へ置く(席の中の絶対配置)。戻り値=置いた箱(画面座標)。
+   * @param {HTMLElement} b @param {HTMLElement[]} others 避ける吹き出し
+   */
+  function placeBubble(b, others) {
+    const seat = /** @type {HTMLElement} */ (b.parentElement);
+    const face = seat.querySelector('img') || seat;
+    const s = seat.getBoundingClientRect();
+    const obstacles = others.map((x) => {
+      const r = x.getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, weight: 5 };
+    });
+    const head = root?.querySelector('.v-head')?.getBoundingClientRect();
+    if (head) obstacles.push({ left: head.left, top: head.top, right: head.right, bottom: head.bottom, weight: 3 });
+    if (giftEl?.classList.contains('show')) {
+      const g = giftEl.getBoundingClientRect();
+      obstacles.push({ left: g.left, top: g.top, right: g.right, bottom: g.bottom, weight: 2 });
+    }
+    const vw = document.documentElement.clientWidth || globalThis.innerWidth || 0;
+    const vh = document.documentElement.clientHeight || globalThis.innerHeight || 0;
+    const w = b.offsetWidth || 120;
+    const h = b.offsetHeight || 30;
+    const pl = chooseBubblePlacement({
+      anchor: face.getBoundingClientRect(),
+      size: { w, h },
+      bounds: { left: 6, top: 6, right: Math.max(12, vw - 6), bottom: Math.max(12, vh - 6) },
+      obstacles,
+      gap: 8,
+      prefer: /** @type {any} */ (b.dataset.side) || null
+    });
+    b.dataset.side = pl.side;
+    b.style.left = `${pl.left - s.left}px`;
+    b.style.top = `${pl.top - s.top}px`;
+    b.style.setProperty('--tail', `${pl.tail}px`);
+    return { left: pl.left, top: pl.top, right: pl.left + w, bottom: pl.top + h };
+  }
+
+  /** 席の並びが変わったら、出ている吹き出しを古い順に置き直す(席と一緒に動いて画面の外へはみ出さないように)。 */
+  function relayoutBubbles() {
+    const all = liveBubbles().sort((a, b) => Number(a.dataset.born) - Number(b.dataset.born));
+    all.forEach((b, i) => placeBubble(b, all.slice(0, i)));
+  }
+
+  /** @param {Element} el */
+  function fadeOut(el) {
+    if (el.classList.contains('leaving')) return;
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 300);
   }
 
   /** @param {string} personKey */
