@@ -4020,5 +4020,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1761', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '前版と同じ。PC 実機の確認(段の上の案内文に被った)を、拡張を読み込んだ Chromium の再現で確かめてから直し、案内文との重なり 0% を実測。'
+  }),
+  Object.freeze({
+    version: '0.1.1762', metric: 'bundle-kb', value: 1441,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版と同じ(popup は触っていない。変えたのはスマホの WEB版 app/ と iPhone アプリの mobile/)。'
+  }),
+  Object.freeze({
+    version: '0.1.1762', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1762', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '前版から増えた分は、スマホのデモ・通知・隠す機能の単体テスト(作り物の見本に実在の画像サーバーや実在の桁の ID が無いことも確かめる)。'
   })
 ]);

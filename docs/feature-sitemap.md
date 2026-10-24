@@ -720,9 +720,12 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 85</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 88</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
+- `mobile/scripts/verify-ios-splash-not-default.mjs` — iOS スプラッシュ「Capacitor デフォルト出荷事故」防止ゲート（直接証拠方式）。
+- `mobile/scripts/verify-team-distinction.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」を、姉妹リポを横断して点検する（4.3(a) の自己点検）。
+- `mobile/scripts/verify-webdir-consistency.mjs` — 「capacitor.config.ts の webDir」と「CI の Prepare webDir が実際に作る場所」の
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
 - `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
 - `scripts/loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
@@ -963,17 +966,51 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 246</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 283</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
+- `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
+- `app/live-view-demo-feed.js` — スマホ版(app/live-view)の「デモ」= PC が無くても動く作り物の配信(純関数)。
+- `app/live-view-demo.js` — スマホ版のデモ(/live-view?v=demo)の配線。PC が無くても動く作り物の配信を、端末の中だけで流す。
+- `app/live-view-native.js` — iPhone アプリ(mobile/・Capacitor の server.url 型)の中でだけ動く「アプリだけの機能」。
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
 - `app/live-view.js` — global NL_BUILD_ID
+- `app/phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
 - `extension/background.js` — MV3 Service Worker
+- `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
+- `mobile/scripts/appstore-submit.mjs` — 移植元: partnership_program_website/scripts/appstore-submit.mjs
+- `mobile/scripts/asc-create-app.mjs` — 移植元: partnership_program_website/scripts/asc-create-app.mjs
+- `mobile/scripts/asc-create-profile.mjs` — App Store 用 Provisioning Profile を App Store Connect API で作成する。
+- `mobile/scripts/asc-review-check.mjs` — 移植元: partnership_program_website/scripts/asc-review-check.mjs
+- `mobile/scripts/asc-set-content-rights.mjs` — App Store Connect の app リソースに contentRightsDeclaration を設定する。
+- `mobile/scripts/capture-appstore-screenshots.mjs` — 移植元: partnership_program_website/scripts/capture-appstore-screenshots.mjs
+- `mobile/scripts/check-splash-config.mjs` — scripts/check-splash-config.mjs
+- `mobile/scripts/check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」を機械検出する出荷事故ゲート。
+- `mobile/scripts/generate-release-notes.mjs` — Generate release-notes/CURRENT-ja.txt from conventional-style commit
+- `mobile/scripts/lib/app-config.mjs` — 移植元: partnership_program_website/scripts/lib/app-config.mjs
+- `mobile/scripts/lib/apple-guideline-checks.mjs` — lint-pre-submission CHECK 31・32 の判定（純関数）。
+- `mobile/scripts/lib/asc-api.mjs` — 移植元: partnership_program_website/scripts/lib/asc-api.mjs
+- `mobile/scripts/lib/asc-availability.mjs` — 配信地域(App Availability)の自動設定。
+- `mobile/scripts/lib/asc-listing-diff.mjs` — 役割: 審査提出の直前に、App Store Connect(ASC)で「これから公開される項目」が、リポの正本と一致しているかを比べる純関数。
+- `mobile/scripts/lib/asc-localization-attrs.mjs` — 役割: App Store 版ローカライズ(ja)に送る description / keywords / promotionalText 等の属性を決める純関数。
+- `mobile/scripts/lib/asc-pricing.mjs` — 移植元: partnership_program_website/scripts/lib/asc-pricing.mjs
+- `mobile/scripts/lib/asc-readonly-checks.mjs` — ASC の「UI 手動項目」を提出前に **GET のみ** で検証する読み取り専用チェック群。
+- `mobile/scripts/lib/asc-rejection-classify.mjs` — 移植元: partnership_program_website/scripts/lib/asc-rejection-classify.mjs
+- `mobile/scripts/lib/asc-screenshot-upload.mjs` — 移植元: partnership_program_website/scripts/lib/asc-screenshot-upload.mjs
+- `mobile/scripts/lib/creative-asset-specs.mjs` — 役割: App Store の「商品ページヘッダー」「検索結果」素材(2.3.14)の画像が、Apple の仕様どおりかを調べる純関数。
+- `mobile/scripts/lib/distinction-checks.mjs` — lint-pre-submission CHECK 24〜30 の判定（純関数）。
+- `mobile/scripts/lib/former-names-check.mjs` — 役割: 改名したアプリで、旧名称が「宣言した面」に残っていないかを調べる純関数(lint-pre-submission の CHECK 33)。
+- `mobile/scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
+- `mobile/scripts/lib/listing-source-files.mjs` — 役割: 審査提出で ASC に送る掲載文の「正本ファイル」がリポに揃っているかを調べる純関数(lint-pre-submission の CHECK 34)。
+- `mobile/scripts/lib/team-distinction-core.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」の判定（純関数）。
+- `mobile/scripts/lint-pre-submission.mjs` — 移植元: partnership_program_website/scripts/lint-pre-submission.mjs
+- `mobile/scripts/patch-ios-launch-dark.mjs` — iOS 起動時の白フラッシュ対策（最小・必要十分）。
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
 - `scripts/audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
 - `scripts/audit/make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
 - `scripts/audit/static-dead-selectors.mjs` — 「CSSはあるのに対応するクラス/ID/属性を作るコードが無い(デッドな規則)」と
+- `scripts/build-phone-demo-snapshot.mjs` — スマホ版のデモ(/live-view?v=demo)の土台 app/demo/snapshot.json を作る。
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
@@ -1130,7 +1167,10 @@
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
 - `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
 - `src/lib/passiveMirrorLiveIdGuard.js` — 受動ビュー(status 埋め込み / live-view)が「別配信の古い鏡」を貼らないための判定。
+- `src/lib/phoneBlocklist.js` — スマホで「この人を隠す」(純関数)。iPhone アプリの審査(ほかの人の書き込みを見せるアプリは、
+- `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
+- `src/lib/phoneStartLink.js` — スマホの開始画面(app/phone.html)で貼られた「PC の拡張のスマホ用リンク」を読む(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -1246,7 +1286,11 @@
 - `v0.1.1743` 2026-10-22 — スマホの読み上げが読み飛ばさなくなった
 - `v0.1.1742` 2026-10-22 — スマホの会場の吹き出しを声に合わせた
 
-### 🔊 読み上げ (10版)
+### 🎁 ギフト (1版)
+- `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
+
+### 🔊 読み上げ (11版)
+- `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
 - `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
 - `v0.1.1759` 2026-10-24 — 読み上げの声を絞る設定を追加(既定オフ)
 - `v0.1.1754` 2026-10-23 — 読み上げが遅れているときに秒数を出す
@@ -1265,8 +1309,7 @@
 - `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
 - `v0.1.1757` 2026-10-24 — スマホへ新着を3秒ごとに送る係(PC)
 
-### その他 (4版)
+### その他 (3版)
 - `v0.1.1756` 2026-10-24 — スマホへすぐ届けるサーバーの受け口
 - `v0.1.1755` 2026-10-22 — スマホ版のサーバーに月の上限を足す
 - `v0.1.1752` 2026-10-22 — スマホ用の送信は映している配信だけに
-- `v0.1.1741` 2026-10-22 — スマホで動かないボタンを片付けた

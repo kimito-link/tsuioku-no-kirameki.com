@@ -1,0 +1,92 @@
+{
+  "identity": {
+    "displayName": "追憶のきらめき ライブビュー",
+    "displayNameEn": "Tsuioku LiveView",
+    "shortName": "Tsuioku",
+    "bundleId": "com.kimito.link.tsuioku",
+    "iosScheme": "tsuioku",
+    "appleSiwaServiceId": null,
+    "productionDomain": "app.tsuioku-no-kirameki.com",
+    "stagingDomain": null
+  },
+  "stores": {
+    "ascAppId": "",
+    "playAppId": null,
+    "playPackageName": null,
+    "appleTeamId": "8922HQ842P",
+    "playDeveloperId": null,
+    "primaryCategory": "ENTERTAINMENT",
+    "ageRating": "TWELVE_PLUS",
+    "contentRights": "USES_THIRD_PARTY_CONTENT",
+    "marketingVersion": "1.0.0",
+    "buildNumberOffset": 0
+  },
+  "brand": {
+    "primaryColor": "#F06AA0",
+    "accentColor": "#F06AA0",
+    "splashBackgroundColor": "#FFF7EC",
+    "splashBackgroundColorDark": "#FFF7EC",
+    "iconSource": "store-assets/appstore/app-icon-1024.png"
+  },
+  "contact": {
+    "email": "info@best-trust.biz",
+    "phoneE164": "+81 90 0000 0000",
+    "firstName": "Takashi",
+    "lastName": "Kobayashi",
+    "supportUrl": "https://tsuioku-no-kirameki.com/",
+    "privacyUrl": "https://tsuioku-no-kirameki.com/privacy.html",
+    "dataDeletionUrl": "https://tsuioku-no-kirameki.com/privacy.html",
+    "termsUrl": "https://tsuioku-no-kirameki.com/privacy.html",
+    "marketingUrl": "https://tsuioku-no-kirameki.com/"
+  },
+  "auth": {
+    "provider": "none",
+    "loginRequired": false,
+    "thirdPartyProvidersOnWeb": [],
+    "thirdPartyProvidersOnIos": [],
+    "thirdPartyProvidersOnAndroid": [],
+    "siwaEnabled": false,
+    "brandPreset": null,
+    "clerkCustomDomain": null,
+    "xCallbackUrl": null,
+    "requiredXScopes": [],
+    "shareInstanceAcrossApps": null
+  },
+  "businessModel": {
+    "kind": "free",
+    "hasInAppPurchase": false,
+    "hasSubscription": false,
+    "hasPaidContent": false,
+    "summaryJa": "PC の Chrome 拡張「君斗りんくの追憶のきらめき」が記録した応援を、スマホで見るための無料アプリ。アプリ内課金・広告はありません。アカウント登録は不要です。",
+    "summaryEn": "A free companion app to view, on iPhone, the live-stream support (comments and gifts) recorded by the Chrome extension on your PC. No in-app purchase, no ads, no account."
+  },
+  "ownership": {
+    "organization": "Best Trust",
+    "country": "JP",
+    "githubOrg": "kimito-link",
+    "githubRepo": "tsuioku-no-kirameki.com",
+    "vercelTeamSlug": "kimito-link",
+    "vercelProjectName": "tsuioku-no-kirameki-com-i5pp"
+  },
+  "distinction": {
+    "oneLiner": "PC で見ているニコニコ生放送の応援コメントとギフトを、スマホで一緒に見て、通知と読み上げで逃さないアプリです。",
+    "audience": "ニコニコ生放送を PC で見ながら、応援の動きをスマホでも追いたい視聴者・配信者",
+    "subject": "ニコニコ生放送の応援(コメント・ギフト)の見える化",
+    "coreFeatures": [
+      "応援コメント",
+      "ギフトの通知",
+      "読み上げ",
+      "応援者の並び",
+      "スマホからコメント"
+    ],
+    "notThisApp": [
+      "動画の再生・配信",
+      "ニコニコのアカウントでのログイン",
+      "コメントをサーバーに集めて保存すること",
+      "課金・ポイントの販売"
+    ],
+    "sharedFoundation": [],
+    "sharedFoundationPaths": [],
+    "allowedSiblingMentions": []
+  }
+}

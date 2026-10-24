@@ -1,0 +1,25 @@
+{
+  "name": "tsuioku-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "追憶のきらめき ライブビュー(iPhone アプリ)。Capacitor の server.url 型で https://app.tsuioku-no-kirameki.com/phone を開く。",
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "lint:submission": "node scripts/lint-pre-submission.mjs"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/local-notifications": "8.3.1",
+    "@capacitor/share": "8.0.3",
+    "@capacitor/splash-screen": "8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3",
+    "@playwright/test": "1.64.1",
+    "typescript": "5.9.3"
+  }
+}
