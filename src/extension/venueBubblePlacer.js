@@ -16,13 +16,21 @@ export const VENUE_BUBBLE_OBSTACLE_WEIGHTS = { bubble: 5, pickup: 3, header: 3, 
 function visibleClipRect(el, stopAt) {
   /** @type {{left:number,top:number,right:number,bottom:number}|null} */
   let clip = null;
+  /** @type {DOMRect|null} 一番外側のスクロール枠(会場の一覧) */
+  let outerScroll = null;
   for (let p = el.parentElement; p && p !== stopAt; p = p.parentElement) {
     const cs = getComputedStyle(p);
     if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
     const r = p.getBoundingClientRect();
+    if (/auto|scroll/.test(cs.overflowY)) outerScroll = r;
     clip = clip
       ? { left: Math.max(clip.left, r.left), top: Math.max(clip.top, r.top), right: Math.min(clip.right, r.right), bottom: Math.min(clip.bottom, r.bottom) }
       : { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  }
+  // ★v0.1.1761: 段がまるごと一覧の外(下)にあると、枠の重なりが空(上端>下端)になる。そのまま使うと縁が段の位置=
+  //   一覧の外になり、吹き出しが PICK UP 枠より下(会場の外)に出ていた。空なら一覧のスクロール枠そのものの縁に寄せる。
+  if (clip && (clip.bottom <= clip.top || clip.right <= clip.left) && outerScroll) {
+    return { left: outerScroll.left, top: outerScroll.top, right: outerScroll.right, bottom: outerScroll.bottom };
   }
   return clip;
 }
@@ -38,7 +46,7 @@ const rel = (r, o) => ({ left: r.left - o.left, top: r.top - o.top, right: r.rig
  * @param {HTMLElement|null} p.anchorEl 話した人のアバター(無ければ fallback を使う)
  * @param {{x:number,y:number}|null} [p.fallback] 席が無い人の決定座標(レイヤー基準)
  * @param {HTMLElement|null} p.seating 会場の席の帯(ここから外=配信映像は軽く避ける)
- * @param {Array<{ el: Element|null, weight: number, clipToSeats?: boolean }>} p.obstacleEls
+ * @param {Array<{ el: Element|null, weight: number, clipTo?: Element|null }>} p.obstacleEls clipTo=その枠(一覧のスクロール)で見えている部分だけを避ける
  * @param {Array<{left:number,top:number,right:number,bottom:number}>} p.otherBubbles 他の吹き出しの箱(レイヤー基準)
  * @param {import('../lib/bubblePlacement.js').BubbleSide|null} [p.prefer]
  * @returns {{ box: {left:number,top:number,right:number,bottom:number}, side: string }|null}
@@ -66,14 +74,16 @@ export function placeVenueBubble(p) {
   bubbleEl.classList.toggle('nlsb-bubble--away', away);
   const w = bubbleEl.offsetWidth || 160;
   const h = bubbleEl.offsetHeight || 40;
-  const clipRel = clip ? rel(clip, L) : null;
   const obstacles = [];
   for (const o of p.obstacleEls) {
     if (!o.el || !o.el.isConnected) continue;
     let r = rel(o.el.getBoundingClientRect(), L);
-    if (o.clipToSeats && clipRel) {
-      // 一覧の中の案内文は、スクロールで見えている部分だけを避ける。
-      r = { left: Math.max(r.left, clipRel.left), top: Math.max(r.top, clipRel.top), right: Math.min(r.right, clipRel.right), bottom: Math.min(r.bottom, clipRel.bottom) };
+    if (o.clipTo) {
+      // 一覧の中の案内文は、一覧のスクロールで見えている部分だけを避ける。
+      // ★v0.1.1761: 以前は「話した人の席を切り取る枠」で切っていた。その枠には段(.nl-story-userlane・overflow:auto)
+      //   自身が入るため、段の外にある案内文は面積0になって避ける物から消え、たぬ姉段の真上の案内文に被っていた(実機)。
+      const c = rel(o.clipTo.getBoundingClientRect(), L);
+      r = { left: Math.max(r.left, c.left), top: Math.max(r.top, c.top), right: Math.min(r.right, c.right), bottom: Math.min(r.bottom, c.bottom) };
     }
     if (r.right > r.left && r.bottom > r.top) obstacles.push({ ...r, weight: o.weight });
   }
