@@ -130,7 +130,7 @@ export function liveEventToMirrorRow(ev) {
 }
 
 /** 行の同じさの目印: 番号があれば番号、無ければ時刻+人+本文。 @param {any} r */
-function rowKey(r) {
+export function liveRowKey(r) {
   return r && r.no ? `n:${r.no}` : `t:${Number(r?.at) || 0}|${String(r?.userId || '')}|${String(r?.text || '')}`;
 }
 
@@ -150,9 +150,9 @@ export function mergeLiveRowsIntoMirror(snap, rows, opts) {
   const base = snap && typeof snap === 'object' ? snap : null;
   if (base && String(base.liveId || '').toLowerCase() !== liveId) return snap;
   const baseRows = Array.isArray(base?.rows) ? base.rows : [];
-  const seen = new Set(baseRows.map(rowKey));
+  const seen = new Set(baseRows.map(liveRowKey));
   const add = extra.filter((r) => {
-    const k = rowKey(r);
+    const k = liveRowKey(r);
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
@@ -208,3 +208,39 @@ export const liveEventKeys = {
   /** @param {string} month YYYYMM */
   monthly: (month) => `quota:evm:${month}`
 };
+
+/**
+ * v0.1.1757: PC の中の受け渡し(chrome.storage.local)のキー。
+ *   WANTED = 送信担当が「いまスマホが見ていて、サーバーにキーがある」と知った間だけ置く期限(ms)。
+ *   TAIL   = 視聴ページ(content)が、その期限の間だけ最短2秒ごとに書く「直近のコメント数件」。
+ *   ★コメント鏡(約145KB・最短8秒)とは別の小さなキー=全画面に配られても軽い。期限が切れたら書かない。
+ */
+export const KEY_LIVE_EVENTS_WANTED = 'nls_live_events_wanted_until_v1';
+export const KEY_LIVE_EVENTS_TAIL = 'nls_live_events_tail_v1';
+/** TAIL を書く最短の間隔(ms)と、載せる行数。 */
+export const LIVE_EVENTS_TAIL_MIN_MS = 2000;
+export const LIVE_EVENTS_TAIL_ROWS = 20;
+
+/**
+ * content: コメント鏡の形(buildCommentTimelineMirrorSnapshot の結果)から、小さな TAIL を作る。
+ * @param {any} snap
+ * @param {number} nowMs
+ * @returns {{ liveId: string, rows: any[], at: number } | null}
+ */
+export function buildLiveEventsTail(snap, nowMs) {
+  const liveId = String(snap?.liveId || '').toLowerCase();
+  const rows = Array.isArray(snap?.rows) ? snap.rows : [];
+  if (!LV_RE.test(liveId) || !rows.length) return null;
+  return { liveId, rows: rows.slice(-LIVE_EVENTS_TAIL_ROWS), at: Number(nowMs) || 0 };
+}
+
+/**
+ * content: いま TAIL を書いてよいか。期限内・最短間隔を過ぎた・中身が変わった、のすべてを満たすときだけ。
+ * @param {{ wantedUntilMs: number, nowMs: number, lastWriteAt: number, sig: string, lastSig: string }} a
+ */
+export function shouldWriteLiveEventsTail(a) {
+  const now = Number(a?.nowMs) || 0;
+  if (!(Number(a?.wantedUntilMs) > now)) return false;
+  if (a.sig && a.sig === a.lastSig) return false;
+  return now - (Number(a?.lastWriteAt) || 0) >= LIVE_EVENTS_TAIL_MIN_MS;
+}

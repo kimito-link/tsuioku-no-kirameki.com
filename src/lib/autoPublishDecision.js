@@ -64,14 +64,16 @@ export const VIEWER_ACTIVE_STICKY_MS = 150_000;
  * @param {unknown} ack POST の返事(JSON)
  * @param {number} nowMs
  *   v0.1.1740: voiceWanted=スマホで 🗣(読み上げ)が ON。古いサーバーは返さない=声を作らない。
- * @returns {{ viewingUntilMs: number, gzipOk: boolean, voiceWanted: boolean }}
+ * @returns {{ viewingUntilMs: number, gzipOk: boolean, voiceWanted: boolean, realtime: boolean }}
  */
 export function readPublishAck(ack, nowMs) {
   const a = ack && typeof ack === 'object' ? /** @type {Record<string, unknown>} */ (ack) : {};
   return {
     viewingUntilMs: a.viewerActive === true ? (Number(nowMs) || 0) + VIEWER_ACTIVE_STICKY_MS : 0,
     gzipOk: a.gzipOk === true,
-    voiceWanted: a.voiceWanted === true
+    voiceWanted: a.voiceWanted === true,
+    // v0.1.1757: サーバーに Ably のキーがある(=新着を3秒ごとに送ってよい)。古いサーバーは返さない=false。
+    realtime: a.realtime === true
   };
 }
 

@@ -345,6 +345,7 @@
 | `src/lib/liveAudienceDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveChannelSwitch.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveEndedFlag.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
+| `src/lib/liveEvents.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/liveLaneBuckets.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/liveRankingView.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/liveviewCurrentLive.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -450,6 +451,7 @@
 | `src/extension/content-entry.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/ext-census-sw.js` | 1 | バックフィル SW |
 | `src/extension/live-ranking-entry.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
+| `src/extension/liveEventsPublisher.js` | 1 | 状態速報ページ |
 | `src/extension/offscreen-entry.js` | 1 | コメント IDB 書き手 |
 | `src/extension/page-intercept-entry.js` | 1 | ページ傍受 |
 | `src/extension/phonePostRelay.js` | 1 | 状態速報ページ |
@@ -708,6 +710,8 @@
 | `src/lib/liveCommenterStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveCommentTally.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveElapsedExtrapolate.js` | 1 | Web版 状態(スマホ) |
+| `src/lib/liveEventBatch.js` | 1 | 状態速報ページ |
+| `src/lib/liveEventSender.js` | 1 | 状態速報ページ |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/liveMotion.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
