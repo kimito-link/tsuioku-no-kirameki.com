@@ -5137,7 +5137,7 @@ export function mountVenueBarButton(options = {}) {
       obstacleEls: [
         { el: pickupEls.root, weight: W.pickup },
         { el: header, weight: W.header },
-        ...Array.from(seatsHost.querySelectorAll('.nl-story-userlane-guide'), (el) => ({ el, weight: W.guide, clipToSeats: true }))
+        ...Array.from(seatsHost.querySelectorAll('.nl-story-userlane-guide'), (el) => ({ el, weight: W.guide, clipTo: seatsHost }))
       ],
       otherBubbles: activeBubbles.filter((b) => b !== bubble && !b.removed && b._box).map((b) => b._box),
       prefer: bubble._side || null
