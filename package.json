@@ -92,6 +92,6 @@
     "qrcode-generator": "2.0.4",
     "serve": "^14.2.4",
     "typescript": "^6.0.2",
-    "vitest": "^3.0.0"
+    "vitest": "^5.0.5"
   }
 }
