@@ -22,6 +22,7 @@ graph LR
   n_content --> n_src_extension_story_laneContentLod_js["extension/story/laneContentLod.js"]:::shared
   n_content --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_content --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
+  n_content --> n_src_extension_venueBubblePlacer_js["extension/venueBubblePlacer.js"]:::shared
   n_content --> n_src_lib_adObservationLog_js["lib/adObservationLog.js"]:::shared
   n_content --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_content --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
@@ -46,14 +47,13 @@ graph LR
   n_content --> n_src_lib_broadcastUrl_js["lib/broadcastUrl.js"]:::shared
   n_content --> n_src_lib_broadcasterProfileCard_js["lib/broadcasterProfileCard.js"]:::shared
   n_content --> n_src_lib_broadcasterUserId_js["lib/broadcasterUserId.js"]
+  n_content --> n_src_lib_bubblePlacement_js["lib/bubblePlacement.js"]:::shared
   n_content --> n_src_lib_captureAuditionRichviewEventScoreDiagProbe_js["lib/captureAuditionRichviewEventScoreDiagProbe.js"]
   n_content --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
   n_content --> n_src_lib_celebrationFlyText_js["lib/celebrationFlyText.js"]:::shared
   n_content --> n_src_lib_celebrationPika_js["lib/celebrationPika.js"]:::shared
   n_content --> n_src_lib_channelBroadcasterMeta_js["lib/channelBroadcasterMeta.js"]
-  n_content --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
-  n_content --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 310 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 311 ファイル省略（全件は storage-bus.md / metafile 参照）。

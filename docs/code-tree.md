@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1010 件
+## ⚠️ 役割コメントが無いソース 9 / 1011 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -910,7 +910,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2159)
+- 📁 **src/** (2161)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -947,7 +947,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (83)
+  - 📁 **extension/** (85)
     - 📁 **popup/** (14)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1031,6 +1031,8 @@
     - `venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
     - `venueBarGiftDeltaSoundWiring.test.js`
     - `venueBarPopupOcclusion.wiring.test.js`
+    - `venueBubblePlacement.wiring.test.js`
+    - `venueBubblePlacer.js` — 会場(PC)の吹き出しを DOM の実寸から置く薄い層。
     - `venueLaneEmptyKeep.wiring.test.js`
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
@@ -1375,6 +1377,8 @@
     - `broadcasterUidTracker.test.js`
     - `broadcasterUserId.js` — 配信者 userId を embedded-data / DOM から純粋関数で抽出する。
     - `broadcasterUserId.test.js`
+    - `bubblePlacement.js` — v0.1.1760: 吹き出しを「大事な表示に被らない場所」へ置く配置純関数(PC 会場・スマホ会場の共通)。
+    - `bubblePlacement.test.js`
     - `buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
     - `buildAgeCell.test.js`
     - `buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。
@@ -2877,8 +2881,6 @@
     - `venueAvatarSvgOnly.wiring.test.js`
     - `venueBubbleChurn.js` — 会場「応援TOP」吹き出しchurnの実測計器(診断先行アプローチ)。
     - `venueBubbleChurn.test.js`
-    - `venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
-    - `venueBubbleLayout.test.js`
     - `venueBubbleLifecycle.js` — 吹き出しの寿命を「読み上げ(TTS)」に連動させる純関数群。
     - `venueBubbleLifecycle.test.js`
     - `venueButtonVisible.wiring.test.js`
