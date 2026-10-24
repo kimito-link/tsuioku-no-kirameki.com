@@ -32,3 +32,7 @@ export const KEY_VOICE_READ_NAME_ENABLED = 'nls_voice_read_name_enabled_v1';
 
 /** 読み上げの音量(%・0〜300・既定100)。2026-10-22 P2。正規化は voiceVolume.js。 */
 export const KEY_VOICE_VOLUME_PERCENT = 'nls_voice_volume_percent_v1';
+/** P3: 弱いPCで声の種類を絞るか('off' 既定 | 'auto' 遅いPCと分かったら次から | 'on' 常に)。判定は voiceNarrowing.js。 */
+export const KEY_VOICE_NARROW_MODE = 'nls_voice_narrow_mode_v1';
+/** P3: このPCで合成が遅いと一度でも測れたか(true のみ書く)。'auto' のときだけ使う。 */
+export const KEY_VOICE_WEAK_PC = 'nls_voice_weak_pc_v1';

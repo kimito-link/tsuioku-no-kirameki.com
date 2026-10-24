@@ -368,6 +368,7 @@ import {
   isVoicevoxAlive,
   probeVoicevoxAlive,
   listVoicevoxStyleIds,
+  initializeVoicevoxSpeaker,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
 
@@ -3379,6 +3380,7 @@ export function mountVenueBarButton(options = {}) {
     //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
     probeVoicevoxAlive,
     fetchVoiceStyleIds: listVoicevoxStyleIds,
+    initVoiceSpeaker: (/** @type {number} */ id) => initializeVoicevoxSpeaker(id), // P3: 絞った声の先読み(判定は lib の voiceNarrowing.js)
     fetchSynthesizeVoice: synthesizeVoice,
     resolveVoice: resolveVoiceForUser
   });
