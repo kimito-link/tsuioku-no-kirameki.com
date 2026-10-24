@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>追憶のきらめき ライブビュー</title>
+    <style>
+      /* 配色の正本は リポジトリ直下 DESIGN.md(Tsuioku Warm Pastel)。app/index.html と同じトークン。 */
+      :root {
+        color-scheme: light;
+        --nl-bg: #fff7ec;
+        --nl-text: #4a3b34;
+        --nl-text-soft: #8a7568;
+        --nl-border: #e3c9b5;
+        --nl-card-bg: #fffdf9;
+        --nl-accent: #f06aa0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--nl-bg);
+        color: var(--nl-text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+        line-height: 1.6;
+        padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+      }
+      main { max-width: 460px; margin: 0 auto; }
+      .hero { text-align: center; margin-bottom: 18px; }
+      .hero img { width: 96px; height: 96px; }
+      h1 { font-size: 20px; margin: 8px 0 4px; }
+      .lead { color: var(--nl-text-soft); font-size: 14px; margin: 0; }
+      .card {
+        background: var(--nl-card-bg);
+        border: 1px solid var(--nl-border);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 14px;
+        box-shadow: 0 1px 6px rgba(120, 80, 50, 0.08);
+      }
+      .card h2 { font-size: 15px; margin: 0 0 8px; }
+      .card p { font-size: 13.5px; margin: 0 0 10px; }
+      input {
+        width: 100%;
+        font-size: 16px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--nl-border);
+        background: #fff;
+        color: var(--nl-text);
+      }
+      .row { display: flex; gap: 8px; margin-top: 10px; }
+      button {
+        flex: 1 1 0;
+        min-height: 44px;
+        border-radius: 10px;
+        border: 1px solid var(--nl-border);
+        background: #fff;
+        color: var(--nl-text);
+        font: 600 15px/1.2 inherit;
+      }
+      button.primary { background: var(--nl-accent); border-color: var(--nl-accent); color: #fff; }
+      #linkMsg { font-size: 13px; margin: 8px 0 0; min-height: 1em; }
+      #linkMsg[data-kind='error'] { color: #9a2c2c; }
+      ul.features { margin: 0; padding-left: 1.2em; font-size: 13.5px; }
+      .foot { text-align: center; font-size: 12px; color: var(--nl-text-soft); }
+      .foot a { color: inherit; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="hero">
+        <img src="/app/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.thumb128.png" alt="" />
+        <h1>追憶のきらめき ライブビュー</h1>
+        <p class="lead">PC で見ているニコニコ生放送の応援を、スマホで一緒に見るアプリです。</p>
+      </div>
+
+      <section class="card" id="resumeCard" hidden>
+        <h2>前回の配信を開きます</h2>
+        <p>この端末で覚えているリンクを、すぐに開きます。</p>
+        <div class="row">
+          <button type="button" id="resumeChange">リンクを変える</button>
+          <button type="button" class="primary" id="resumeOpen">いま開く</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>PC とつなぐ</h2>
+        <p>PC の Chrome 拡張「君斗りんくの追憶のきらめき」の状態画面で「📱 スマホへ送信」を押すと、リンクが出ます。そのリンクを貼ってください。</p>
+        <input id="linkInput" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="https://app.tsuioku-no-kirameki.com/live-view?v=…" aria-label="スマホ用のリンク" />
+        <div class="row">
+          <button type="button" id="pasteBtn">📋 貼り付け</button>
+          <button type="button" class="primary" id="openBtn">開く</button>
+        </div>
+        <p id="linkMsg" role="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>PC が無くても試せます</h2>
+        <p>作り物の配信で、コメントの流れ・ギフト・応援者の並びを試せます。</p>
+        <div class="row"><button type="button" class="primary" id="demoBtn">デモを見る</button></div>
+      </section>
+
+      <section class="card">
+        <h2>アプリでできること</h2>
+        <ul class="features">
+          <li>🔔 ギフトが届いたら通知と振動でお知らせ</li>
+          <li>🗣 画面を閉じても、コメントの読み上げを続けて聞ける</li>
+          <li>📤 見ている配信を共有シートで送る</li>
+          <li>✍️ スマホから配信にコメント(PC の拡張が届けます)</li>
+        </ul>
+      </section>
+
+      <p class="foot">
+        記録は PC の中だけに残ります。<a href="https://tsuioku-no-kirameki.com/privacy.html">プライバシーポリシー</a>
+      </p>
+    </main>
+    <script type="module" src="/app/dist/phone.js"></script>
+  </body>
+</html>

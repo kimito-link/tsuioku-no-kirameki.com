@@ -1,0 +1,126 @@
+[
+  {
+    "source": "config",
+    "bundleId": "com.kimito.link.doinchallenge",
+    "displayName": "君斗りんくの動員ちゃれんじ",
+    "shortName": "doin-challenge",
+    "productionDomain": "doin.kimito.link",
+    "ascAppId": "6808515868",
+    "repo": "doin-challenge.com",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.kimito.link.linktree",
+    "displayName": "kimito.link（キミトリンク）",
+    "shortName": "KimitoLink",
+    "productionDomain": "kimito.link",
+    "ascAppId": "6782380276",
+    "repo": "kimitolink-linktree",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.kimito.link.surechigai",
+    "displayName": "君斗りんくのすれ違ひ通信",
+    "shortName": "surechigai",
+    "productionDomain": "surechigai.kimito.link",
+    "ascAppId": "6796909175",
+    "repo": "surechigai-romi.link",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.kimito.link.voice",
+    "displayName": "Kimito Link Voice",
+    "shortName": "KimiVoice",
+    "productionDomain": "voice.kimito.link",
+    "ascAppId": "6809058070",
+    "repo": "kimito-Link-Voice",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.kimito.link.webhealthcheck",
+    "displayName": "君斗りんくのWEBサイト健康診断",
+    "shortName": "WebHealthCheck",
+    "productionDomain": "app.web-health-check.link",
+    "ascAppId": "6779860644",
+    "repo": "web-health-check-app",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.kimito.link.yukkuriexosome",
+    "displayName": "ゆっくりエクソソーム",
+    "shortName": "YukkuriExosome",
+    "productionDomain": "exosome.kimito.link",
+    "ascAppId": "6775201794",
+    "repo": "yukkuri-exosome.link",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.reversehack.malwarecheck",
+    "displayName": "マルウェアチェック.site",
+    "shortName": "MalwareCheck",
+    "productionDomain": "malwarecheck.site",
+    "ascAppId": "6785846826",
+    "repo": "malwarecheck-02c4",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.reversehack.partner",
+    "displayName": "リバースハック",
+    "shortName": "ReverseHack",
+    "productionDomain": "partner.reverse-re-birth-hack.com",
+    "ascAppId": "6769407908",
+    "repo": "partnership_program_website",
+    "file": "app.config.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "com.reversehack.webhealth",
+    "displayName": "リバースハック WEB健康診断",
+    "shortName": "ReverseHackWeb",
+    "productionDomain": "app.reverse-re-birth-hack.com",
+    "ascAppId": "6780161483",
+    "repo": "web-health-check-app",
+    "file": "app.config.reverse-hack.json"
+  },
+  {
+    "source": "config",
+    "bundleId": "link.sakkino.sakkino",
+    "displayName": "さっきの",
+    "shortName": "Sakkino",
+    "productionDomain": "sakkino.link",
+    "ascAppId": null,
+    "repo": "sakkino.link",
+    "file": "app.config.json"
+  },
+  {
+    "source": "inventory",
+    "bundleId": "com.kimito.link.resend",
+    "displayName": "CC/BCC再送信 - 君斗りんくのAI返信サジェスト",
+    "shortName": "resend",
+    "productionDomain": "resend.kimito-link.com",
+    "ascAppId": "6786996042"
+  },
+  {
+    "source": "inventory",
+    "bundleId": "jp.besttrust.henshinhisho",
+    "displayName": "君斗りんくのAI返信秘書",
+    "shortName": "henshinhisho",
+    "productionDomain": null,
+    "ascAppId": "6787949833"
+  },
+  {
+    "source": "inventory",
+    "bundleId": "com.kimito.link.fujisancompass",
+    "displayName": "富士山コンパス",
+    "shortName": "compass",
+    "productionDomain": null,
+    "ascAppId": "6760695314"
+  }
+]

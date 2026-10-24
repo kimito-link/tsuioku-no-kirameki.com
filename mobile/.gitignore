@@ -1,0 +1,7 @@
+node_modules/
+ios/
+android/
+dist/
+ios-screenshots/
+assets/icon-only.png
+build/
