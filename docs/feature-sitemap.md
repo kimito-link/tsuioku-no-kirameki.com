@@ -12,7 +12,7 @@
 - **コメント送信(確認/プロファイル)** — 拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも
   - `src/lib/commentSubmitConfirm.js`
   - `src/lib/commentSubmitProfiling.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 12</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 13</summary>
 
 - `src/lib/commentComposeShortcuts.js` — コメント欄の Enter 系キーで送信するか／既定動作に任せるか。
 - `src/lib/commentKindnessNudge.js` — 送信前コメントの攻撃的表現を検知し「やさしく一言」確認を促す純ロジック。
@@ -23,6 +23,7 @@
 - `src/lib/commentSendTroubleshootHint.js` — コメント送信エラー文に「再読み込み案内」を 1 回だけ追加する純関数。
 - `src/lib/commentSubmitSteps.js` — コメント送信パイプラインの純粋な判定ロジック。
 - `src/lib/gzipBody.js` — v0.1.1735: 送信本文を gzip に縮める(状態速報 → api/status)。
+- `src/lib/liveEventSender.js` — v0.1.1757: PC 側の「スマホへ新着をすぐ届ける係」。status.html?publisher=1 の送信の返事が
 - `src/lib/liveviewPublishOutcomeKey.js` — 純Web公開送信(POST /api/status)結果の【ページ横断】記録キー（council/diagnostics-completeness-root-SYNTHESIS.md 第3段）。
 - `src/lib/ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
 - `src/lib/selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の
@@ -119,12 +120,13 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
+- `src/extension/liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -1256,10 +1258,12 @@
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1748` 2026-10-22 — 読み上げの遅れを段階ごとに測れるように
 
-### その他 (6版)
+### ⚡ 描画・性能 (1版)
+- `v0.1.1757` 2026-10-24 — スマホへ新着を3秒ごとに送る係(PC)
+
+### その他 (5版)
 - `v0.1.1756` 2026-10-24 — スマホへすぐ届けるサーバーの受け口
 - `v0.1.1755` 2026-10-22 — スマホ版のサーバーに月の上限を足す
 - `v0.1.1752` 2026-10-22 — スマホ用の送信は映している配信だけに
 - `v0.1.1741` 2026-10-22 — スマホで動かないボタンを片付けた
 - `v0.1.1738` 2026-10-22 — スマホの速さを点検して4か所を直した
-- `v0.1.1736` 2026-10-22 — スマホで見ている間は約5秒で更新

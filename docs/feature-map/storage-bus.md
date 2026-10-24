@@ -15,6 +15,7 @@
 > 1件ずつ実コードで確認すること(将来は `verify:map` で機械判定する=会議 Q4)。
 
 - 🟠 **KEY_COMMENT_WRITE_MODE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
+- 🟠 **KEY_LIVE_EVENTS_TAIL** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_PANEL_WAKE_CURTAIN_DIAG** — 書く人だけ（読む経路が無い疑い）: src/lib/panelWakeCurtainDom.js
 - 🟠 **KEY_SCORE_ANNOUNCE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
@@ -125,6 +126,8 @@
 | `KEY_LIVEVIEW_PUBLISH_OUTCOME` | — | extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | extension/status-entry.js | extension/live-view-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
+| `KEY_LIVE_EVENTS_TAIL` | extension/content-entry.js | — |
+| `KEY_LIVE_EVENTS_WANTED` | extension/liveEventsPublisher.js | extension/content-entry.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/marketing-export-entry.js<br>extension/popup-entry.js |
 | `KEY_MILESTONE_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_NDGR_DETERMINISTIC_BACKFILL` | — | extension/content-entry.js |

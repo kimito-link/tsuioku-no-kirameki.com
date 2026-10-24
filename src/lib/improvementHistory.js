@@ -3950,5 +3950,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1756', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'Ably の API の形は公式ドキュメント(SSE・requestToken・publish)で確かめ、模擬の Ably と Redis で受け口を試験。'
+  }),
+  Object.freeze({
+    version: '0.1.1757', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。変更は状態速報(status.js)と視聴ページ(content.js)の配線で、popup は触っていない。'
+  }),
+  Object.freeze({
+    version: '0.1.1757', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1757', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '送る係は模擬の送信で試験(最初は送らない・配信切替・無効化・サーバーがキー無し)。配線は文字列の配線試験で固定。'
   })
 ]);
