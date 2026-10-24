@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1011 件
+## ⚠️ 役割コメントが無いソース 9 / 1051 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -93,7 +93,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (111)
+- 📁 **app/** (118)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -102,6 +102,8 @@
     - `t.ogg`
     - `t.wav`
     - `t.webm`
+  - 📁 **demo/** (1)
+    - `snapshot.json`
   - 📁 **images/** (93)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -212,6 +214,10 @@
   - `app.js` — スマホ閲覧用 status Web 版。
   - `audio-test.html`
   - `index.html`
+  - `live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
+  - `live-view-demo-feed.js` — スマホ版(app/live-view)の「デモ」= PC が無くても動く作り物の配信(純関数)。
+  - `live-view-demo.js` — スマホ版のデモ(/live-view?v=demo)の配線。PC が無くても動く作り物の配信を、端末の中だけで流す。
+  - `live-view-native.js` — iPhone アプリ(mobile/・Capacitor の server.url 型)の中でだけ動く「アプリだけの機能」。
   - `live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
   - `live-view-post.js` — スマホの WEB版から生放送にコメントを届ける(v0.1.1734)。
   - `live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
@@ -220,6 +226,8 @@
   - `live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
+  - `phone.html`
+  - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
 - 📁 **council-scout/** (26)
   - 📁 **briefs/** (26)
     - `2026-07-16.md`
@@ -781,7 +789,59 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (99)
+- 📁 **mobile/** (45)
+  - 📁 **assets/** (1)
+    - `splash.png`
+  - 📁 **release-notes/** (1)
+    - `CURRENT-ja.txt`
+  - 📁 **scripts/** (30)
+    - 📁 **lib/** (16)
+      - `app-config.mjs` — 移植元: partnership_program_website/scripts/lib/app-config.mjs
+      - `apple-guideline-checks.mjs` — lint-pre-submission CHECK 31・32 の判定（純関数）。
+      - `asc-api.mjs` — 移植元: partnership_program_website/scripts/lib/asc-api.mjs
+      - `asc-availability.mjs` — 配信地域(App Availability)の自動設定。
+      - `asc-listing-diff.mjs` — 役割: 審査提出の直前に、App Store Connect(ASC)で「これから公開される項目」が、リポの正本と一致しているかを比べる純関数。
+      - `asc-localization-attrs.mjs` — 役割: App Store 版ローカライズ(ja)に送る description / keywords / promotionalText 等の属性を決める純関数。
+      - `asc-pricing.mjs` — 移植元: partnership_program_website/scripts/lib/asc-pricing.mjs
+      - `asc-readonly-checks.mjs` — ASC の「UI 手動項目」を提出前に **GET のみ** で検証する読み取り専用チェック群。
+      - `asc-rejection-classify.mjs` — 移植元: partnership_program_website/scripts/lib/asc-rejection-classify.mjs
+      - `asc-screenshot-upload.mjs` — 移植元: partnership_program_website/scripts/lib/asc-screenshot-upload.mjs
+      - `creative-asset-specs.mjs` — 役割: App Store の「商品ページヘッダー」「検索結果」素材(2.3.14)の画像が、Apple の仕様どおりかを調べる純関数。
+      - `distinction-checks.mjs` — lint-pre-submission CHECK 24〜30 の判定（純関数）。
+      - `former-names-check.mjs` — 役割: 改名したアプリで、旧名称が「宣言した面」に残っていないかを調べる純関数(lint-pre-submission の CHECK 33)。
+      - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
+      - `listing-source-files.mjs` — 役割: 審査提出で ASC に送る掲載文の「正本ファイル」がリポに揃っているかを調べる純関数(lint-pre-submission の CHECK 34)。
+      - `team-distinction-core.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」の判定（純関数）。
+    - `appstore-submit.mjs` — 移植元: partnership_program_website/scripts/appstore-submit.mjs
+    - `asc-create-app.mjs` — 移植元: partnership_program_website/scripts/asc-create-app.mjs
+    - `asc-create-profile.mjs` — App Store 用 Provisioning Profile を App Store Connect API で作成する。
+    - `asc-review-check.mjs` — 移植元: partnership_program_website/scripts/asc-review-check.mjs
+    - `asc-set-content-rights.mjs` — App Store Connect の app リソースに contentRightsDeclaration を設定する。
+    - `capture-appstore-screenshots.mjs` — 移植元: partnership_program_website/scripts/capture-appstore-screenshots.mjs
+    - `check-splash-config.mjs` — scripts/check-splash-config.mjs
+    - `check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」を機械検出する出荷事故ゲート。
+    - `generate-release-notes.mjs` — Generate release-notes/CURRENT-ja.txt from conventional-style commit
+    - `lint-pre-submission.mjs` — 移植元: partnership_program_website/scripts/lint-pre-submission.mjs
+    - `patch-ios-launch-dark.mjs` — iOS 起動時の白フラッシュ対策（最小・必要十分）。
+    - `verify-ios-splash-not-default.mjs` — iOS スプラッシュ「Capacitor デフォルト出荷事故」防止ゲート（直接証拠方式）。
+    - `verify-team-distinction.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」を、姉妹リポを横断して点検する（4.3(a) の自己点検）。
+    - `verify-webdir-consistency.mjs` — 「capacitor.config.ts の webDir」と「CI の Prepare webDir が実際に作る場所」の
+  - 📁 **store-assets/** (8)
+    - 📁 **appstore/** (6)
+      - `app-icon-1024.png`
+      - `description-ja.txt`
+      - `keywords-ja.txt`
+      - `promotional-text-ja.txt`
+      - `review-notes.txt`
+      - `subtitle-ja.txt`
+    - `screenshot-plan.json`
+    - `team-apps.json`
+  - `.gitignore`
+  - `app.config.json`
+  - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
+  - `package.json`
+  - `pnpm-lock.yaml`
+- 📁 **scripts/** (100)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -820,6 +880,7 @@
   - `_summarize-council.ps1`
   - `audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
   - `avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
+  - `build-phone-demo-snapshot.mjs` — スマホ版のデモ(/live-view?v=demo)の土台 app/demo/snapshot.json を作る。
   - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
@@ -910,7 +971,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2161)
+- 📁 **src/** (2167)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -947,7 +1008,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (85)
+  - 📁 **extension/** (87)
     - 📁 **popup/** (14)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -999,7 +1060,9 @@
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
+    - `phoneDemoFeed.test.js`
     - `phoneFit.wiring.test.js`
+    - `phoneNative.test.js`
     - `phonePost.wiring.test.js`
     - `phonePostRelay.js` — 【層】L2 拡張の配線(chrome.* と fetch。判定は src/lib/phonePost.js)
     - `phonePostRelay.test.js`
@@ -1190,7 +1253,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1910)
+  - 📁 **lib/** (1914)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2365,10 +2428,14 @@
     - `personProfiles.test.js`
     - `personTileDom.js` — 人物タイル(丸サムネ＋ID＋ニックネーム)の DOM ビルダー（person-tile-unify 第2コミット・2026-06-17）。
     - `personTileDom.test.js`
+    - `phoneBlocklist.js` — スマホで「この人を隠す」(純関数)。iPhone アプリの審査(ほかの人の書き込みを見せるアプリは、
+    - `phoneBlocklist.test.js`
+    - `phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
     - `phonePost.js` — 【層】L0 判定層(純粋関数)
     - `phonePost.test.js`
     - `phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
     - `phoneSoundCues.test.js`
+    - `phoneStartLink.js` — スマホの開始画面(app/phone.html)で貼られた「PC の拡張のスマホ用リンク」を読む(純関数)。
     - `phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
     - `phoneVenueModel.test.js`
     - `phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。

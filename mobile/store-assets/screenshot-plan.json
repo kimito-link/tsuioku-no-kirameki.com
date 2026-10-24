@@ -1,0 +1,44 @@
+{
+  "_README": "撮影計画(キットの capture-appstore-screenshots.mjs が読む)。ログイン不要。デモ(/live-view?v=demo)と開始画面を撮る。",
+  "publicPages": [
+    {
+      "slot": 1,
+      "path": "/live-view?v=demo",
+      "label": "comments",
+      "title": "応援コメントを、スマホで一緒に",
+      "subtitle": "PC と同じ並びで届く",
+      "scrollToSelector": null
+    },
+    {
+      "slot": 2,
+      "path": "/live-view?v=demo",
+      "label": "supporters",
+      "title": "応援者の並びを顔つきで",
+      "subtitle": "ギフトの通知もお知らせ",
+      "scrollToSelector": "#sceneStoryUserLaneStack"
+    },
+    {
+      "slot": 3,
+      "path": "/phone",
+      "label": "start",
+      "title": "リンクを貼るだけ",
+      "subtitle": "読み上げは画面を閉じても続く",
+      "scrollToSelector": null
+    }
+  ],
+  "authTabs": [],
+  "framedCaptions": {
+    "1": {
+      "headline": "{応援コメント}を、スマホで",
+      "sub": "PC と同じ並びで届く"
+    },
+    "2": {
+      "headline": "{応援者の並び}を顔つきで",
+      "sub": "{ギフトの通知}でお知らせ"
+    },
+    "3": {
+      "headline": "画面を閉じても{読み上げ}",
+      "sub": "リンクを貼るだけではじまる"
+    }
+  }
+}

@@ -32,12 +32,14 @@ function base64ToBuffer(b64) {
 }
 
 /**
- * @param {{ token: string, fetchImpl?: typeof fetch, Ctx?: any, setIntervalImpl?: typeof setInterval }} a
+ * @param {{ token: string, fetchImpl?: typeof fetch, Ctx?: any, setIntervalImpl?: typeof setInterval, keepWhenHidden?: () => boolean }} a
+ *   keepWhenHidden: iPhone アプリ(live-view-native.js)の中では、画面を閉じても声を取りに行き続ける。
  */
 export function createPhoneVoice(a) {
   const fetchImpl = a.fetchImpl || ((u, i) => fetch(u, i));
   const Ctx = a.Ctx || globalThis.AudioContext || /** @type {any} */ (globalThis).webkitAudioContext;
   const every = a.setIntervalImpl || setInterval;
+  const keepWhenHidden = a.keepWhenHidden || (() => false);
   /** @type {any} */
   let ctx = null;
   let on = readOn();
@@ -98,7 +100,7 @@ export function createPhoneVoice(a) {
   }
 
   async function poll() {
-    if (!on || inFlight || (typeof document !== 'undefined' && document.hidden)) return;
+    if (!on || inFlight || (typeof document !== 'undefined' && document.hidden && !keepWhenHidden())) return;
     inFlight = true;
     try {
       const q = `/api/status?v=${encodeURIComponent(a.token)}&action=voice&after=${encodeURIComponent(lastNo || '')}`;

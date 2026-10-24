@@ -36,7 +36,9 @@ describe('スマホの WEB版を早く新しくする配線', () => {
   });
   it('③WEB は画面が表に戻ったら即1回取る(裏にある間は周期が取らない)', () => {
     expect(liveView).toMatch(/addEventListener\('visibilitychange', \(\) => \{\s*if \(!document\.hidden\) refresh\(token\)/);
-    expect(liveView).toMatch(/if \(typeof document !== 'undefined' && document\.hidden\) return;\s*refresh\(token\)/);
+    // 裏にある間は取らない(iPhone アプリで読み上げ中だけは例外=isPausedInBackground)。
+    expect(liveView).toMatch(/if \(isPausedInBackground\(\)\) return;\s*refresh\(token\)/);
+    expect(liveView).toContain("return typeof document !== 'undefined' && document.hidden && !_native.keepAliveInBackground();");
   });
   it('送信の成否で失敗の連続回数を数え、判定に渡す', () => {
     expect(status).toMatch(/failStreak: _autoPublishFailStreak/);
