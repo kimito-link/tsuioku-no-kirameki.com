@@ -3936,5 +3936,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1755', metric: 'cross-checked-claims', value: 39,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '上限は判定の単体テストと、模擬 Redis を使った受け口のテスト(2人目が 429・Retry-After 120)の両方で固定。'
+  }),
+  Object.freeze({
+    version: '0.1.1756', metric: 'bundle-kb', value: 1442,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '変化なし。変更はサーバー(api/status.js・liveEventsApi.js)と共有の判定(liveEvents.js)だけ。'
+  }),
+  Object.freeze({
+    version: '0.1.1756', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1756', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'Ably の API の形は公式ドキュメント(SSE・requestToken・publish)で確かめ、模擬の Ably と Redis で受け口を試験。'
   })
 ]);

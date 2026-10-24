@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1004 件
+## ⚠️ 役割コメントが無いソース 9 / 1006 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -909,7 +909,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2149)
+- 📁 **src/** (2153)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1183,7 +1183,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1906)
+  - 📁 **lib/** (1908)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2043,6 +2043,8 @@
     - `liveEndedFlag.test.js`
     - `liveEventBatch.js` — 【層】L0 判定層(純粋関数)
     - `liveEventBatch.test.js`
+    - `liveEvents.js` — 【層】L0 判定層(純粋関数)
+    - `liveEvents.test.js`
     - `liveGiftPulse.js` — この間隔を超えた2実測は差分を出さない(15分)。
     - `liveGiftPulse.test.js`
     - `liveGiftPulse.wiring.test.js`
@@ -3092,11 +3094,13 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (9)
+  - 📁 **server/** (11)
     - `deviceApi.test.js`
     - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
     - `kickApi.test.js`
+    - `liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `liveEventsApi.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
     - `phonePostApi.test.js`

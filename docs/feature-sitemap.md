@@ -959,7 +959,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 243</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 245</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
@@ -1080,6 +1080,7 @@
 - `src/lib/liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
 - `src/lib/liveEventBatch.js` — 【層】L0 判定層(純粋関数)
+- `src/lib/liveEvents.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
 - `src/lib/liveviewCurrentLive.js` — 【層】L0 判定層(純粋関数)
 - `src/lib/liveviewPublishTarget.js` — 応援ライブビュー(live-view.html?lv=X)の公開ボタンが、別の配信のデータを送らないための判定(純関数)。
@@ -1194,6 +1195,7 @@
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
+- `src/server/liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
 - `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
 - `tests/e2e/constants.js` — E2E モック視聴ページ（playwright.config の webServer・manifest の host_permissions と一致させる）
@@ -1236,12 +1238,11 @@
 - `v0.1.1742` 2026-10-22 — スマホの会場の吹き出しを声に合わせた
 - `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (2版)
 - `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
 - `v0.1.1737` 2026-10-22 — スマホでギフトの効果音が鳴る
-- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 
-### 🔊 読み上げ (10版)
+### 🔊 読み上げ (9版)
 - `v0.1.1754` 2026-10-23 — 読み上げが遅れているときに秒数を出す
 - `v0.1.1750` 2026-10-22 — コメビュの読み上げを届いた瞬間に準備
 - `v0.1.1749` 2026-10-22 — 読み上げの音量をポップアップで変えられるように
@@ -1251,16 +1252,12 @@
 - `v0.1.1743` 2026-10-22 — スマホの読み上げが読み飛ばさなくなった
 - `v0.1.1742` 2026-10-22 — スマホの会場の吹き出しを声に合わせた
 - `v0.1.1740` 2026-10-22 — スマホでVOICEVOXの読み上げを聞ける
-- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 
-### 🪟 応援レーン・タイル (1版)
-- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
-
-### 🩺 診断・状態速報 (2版)
+### 🩺 診断・状態速報 (1版)
 - `v0.1.1748` 2026-10-22 — 読み上げの遅れを段階ごとに測れるように
-- `v0.1.1735` 2026-10-22 — スマホへの反映を速く・軽く
 
-### その他 (5版)
+### その他 (6版)
+- `v0.1.1756` 2026-10-24 — スマホへすぐ届けるサーバーの受け口
 - `v0.1.1755` 2026-10-22 — スマホ版のサーバーに月の上限を足す
 - `v0.1.1752` 2026-10-22 — スマホ用の送信は映している配信だけに
 - `v0.1.1741` 2026-10-22 — スマホで動かないボタンを片付けた
