@@ -5,8 +5,8 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_VOICE_DIAG`, `fn:comeviewPinStorageKey`
-- 読むキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VOICE_VOLUME_PERCENT`
+- 書くキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_VOICE_DIAG`, `KEY_VOICE_WEAK_PC`, `fn:comeviewPinStorageKey`
+- 読むキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VOICE_NARROW_MODE`, `KEY_VOICE_VOLUME_PERCENT`, `KEY_VOICE_WEAK_PC`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -56,4 +56,4 @@ graph LR
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 15 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 16 ファイル省略（全件は storage-bus.md / metafile 参照）。
