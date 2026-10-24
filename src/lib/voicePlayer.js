@@ -36,6 +36,9 @@ import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT
 } from './voiceVolume.js';
 import { decideVoiceLagNotice } from './voiceLagNotice.js';
+import {
+  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc
+} from './voiceNarrowing.js';
 
 /**
  * ★v0.1.1326: 生存確認の再試行バックオフ(ms)。初回失敗後にこの間隔で最大3回試す。
@@ -97,6 +100,9 @@ export class VoicePlayer {
         return { ok: !!ok, reason: ok ? '' : 'refused' };
       });
     this.fetchVoiceStyleIds = deps.fetchVoiceStyleIds;
+    /** P3: 声のモデルの先読み(/initialize_speaker)。無ければ先読みしない。 */
+    this.initVoiceSpeaker = deps.initVoiceSpeaker || null;
+    this._weakPcState = { saved: false };
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
 
@@ -407,7 +413,16 @@ export class VoicePlayer {
       return;
     }
 
-    this.styleIds = await this.fetchVoiceStyleIds();
+    // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする。
+    const prepared = await prepareVoiceStyleIds(await this.fetchVoiceStyleIds(), {
+      readSettings: async () => {
+        const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
+        return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
+      },
+      initSpeaker: this.initVoiceSpeaker
+    });
+    this.styleIds = prepared.styleIds;
+    this.diag.voiceNarrowed = prepared.narrowed;
     this.generation += 1;
     this.enabled = true;
     // ★v0.1.1331: 成功したら理由を消す(古い失敗が残り続けて誤診させない)。
@@ -481,6 +496,8 @@ export class VoicePlayer {
       .then(
         (wav) => {
           try { recordVoiceSynthStage(this.diag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
+          // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
+          if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
           return wav;
         },
         (err) => {

@@ -11836,6 +11836,22 @@
               </span>
             </label>
           </div>
+          <!-- 2026-10-24(P3・ユーザー条件「絞るのは弱いPCだけ・絞り方は固定」): 読み上げの声の種類を絞るか。
+               既定はオフ(今までどおり全部の声)。配線は popup/wireVoiceNarrowSelect.js、判定は lib の voiceNarrowing.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceNarrowSelect" class="nl-record-sub__label">
+              <span>
+                読み上げの声を絞る
+                <select id="voiceNarrowSelect" aria-label="読み上げの声を絞る">
+                  <option value="off">しない</option>
+                  <option value="auto">遅いPCと分かったら</option>
+                  <option value="on">いつも</option>
+                </select>
+                <span class="nl-record-sub__hint"
+                  >ノートPCで読み上げが遅れるときに。声を6種類に絞り、読み上げを始めたときに先に読み込んでおきます。同じ人はいつも同じ声のままです。次に読み上げを ON にしたときから効きます。</span>
+              </span>
+            </label>
+          </div>
           <!-- v0.1.1271(ユーザー要望): 視聴ページに「🏟 会場モード」ボタンを出すか（既定 ON＝出す）。
                「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、会場の画面ではなく
                ボタンが常時表示されていることだった。会場を使わない人は隠せるようにする。 -->

@@ -234,6 +234,10 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   静的解析が producer を取りこぼす偽陽性。consumer は voicePlayer.js(会場)と comeview-entry.js。
   //   経路は src/lib/voiceVolume.test.js の配線テストが断言する。
   'KEY_VOICE_VOLUME_PERCENT',
+  // 読み上げの声の絞り込み(2026-10-24・v0.1.1759): producer は src/extension/popup/wireVoiceNarrowSelect.js が
+  //   引数の storage.set({[KEY_VOICE_NARROW_MODE]:...}) で書く(上の音量と同じ形)ため静的解析が取りこぼす偽陽性。
+  //   consumer は voicePlayer.js(会場)と comeview-entry.js。経路は src/lib/voiceNarrowing.test.js の配線テストが断言する。
+  'KEY_VOICE_NARROW_MODE',
   // 結果発表シーケンス計器(2026-07-06・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1):
   //   producer は popup-entry.js:publishScoreAnnounceDiag が safeStorageLocalSet({[KEY]:...})で
   //   書く(検出対象・実際に見えている)。consumer は status-entry.js が直接 safeStorageLocalGet(KEY)

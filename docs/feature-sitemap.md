@@ -602,10 +602,11 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 26</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 27</summary>
 
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
+- `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
 - `src/lib/phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
 - `src/lib/phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
@@ -1245,7 +1246,8 @@
 ### 🎁 ギフト (1版)
 - `v0.1.1739` 2026-10-22 — スマホにかんたん会場モード
 
-### 🔊 読み上げ (9版)
+### 🔊 読み上げ (10版)
+- `v0.1.1759` 2026-10-24 — 読み上げの声を絞る設定を追加(既定オフ)
 - `v0.1.1754` 2026-10-23 — 読み上げが遅れているときに秒数を出す
 - `v0.1.1750` 2026-10-22 — コメビュの読み上げを届いた瞬間に準備
 - `v0.1.1749` 2026-10-22 — 読み上げの音量をポップアップで変えられるように
@@ -1262,9 +1264,8 @@
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1757` 2026-10-24 — スマホへ新着を3秒ごとに送る係(PC)
 
-### その他 (5版)
+### その他 (4版)
 - `v0.1.1756` 2026-10-24 — スマホへすぐ届けるサーバーの受け口
 - `v0.1.1755` 2026-10-22 — スマホ版のサーバーに月の上限を足す
 - `v0.1.1752` 2026-10-22 — スマホ用の送信は映している配信だけに
 - `v0.1.1741` 2026-10-22 — スマホで動かないボタンを片付けた
-- `v0.1.1738` 2026-10-22 — スマホの速さを点検して4か所を直した
