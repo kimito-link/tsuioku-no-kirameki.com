@@ -65,7 +65,7 @@ describe('iPhone アプリだけの機能(live-view-native.js)', () => {
 
   it('配線: 鏡の行を通知の係へ渡し、裏でも止めない判定を読み上げ・ポーリング・新着の3つに使う', () => {
     expect(liveView).toContain('_native.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null));');
-    expect(liveView).toContain("_voice = createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground()");
+    expect(liveView).toContain("|| createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground()");
     expect(liveView).toContain('if (isPausedInBackground()) return;');
     expect(liveView).toContain('isHidden: isPausedInBackground }).start();');
     expect(voice).toContain("document.hidden && !keepWhenHidden()");

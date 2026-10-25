@@ -173,8 +173,14 @@ const STYLE = `
 #openComeviewBtn{display:none!important}
 `;
 
-/** ボタンの文字。 @param {ReturnType<typeof createPhoneVoice>} v */
+/** ボタンの文字。 @param {ReturnType<typeof createPhoneVoice> | NonNullable<ReturnType<typeof import('./live-view-native-voice.js').createNativeSpeechVoice>>} v */
 export function phoneVoiceLabel(v) {
+  // v0.1.1763: iPhone アプリの中は iPhone 内蔵の声(live-view-native-voice.js)。PC の VOICEVOX は使わない。
+  if (/** @type {any} */ (v).kind === 'native') {
+    if (!v.isOn()) return { text: '🗣', warn: false, aria: '読み上げ: なし(押すと iPhone の声で読む・画面を閉じても続く)' };
+    if (!v.isReady()) return { text: '🗣 タップで声', warn: false, aria: '読み上げ: あり(タップで画面を閉じても読めるようにする)' };
+    return { text: '🗣 読み上げ中', warn: false, aria: '読み上げ: あり(iPhone の声・押すと止める)' };
+  }
   if (!v.isOn()) return { text: '🗣', warn: false, aria: '読み上げ: なし(押すと PC の VOICEVOX の声で読む)' };
   if (!v.isReady()) return { text: '🗣 タップで声', warn: false, aria: '読み上げ: あり(タップで音を出せるようにする)' };
   if (v.pcState() === 'voicevox_down') return { text: '🗣 PCのVOICEVOXが起動していません', warn: true, aria: 'PC の VOICEVOX が起動していません' };

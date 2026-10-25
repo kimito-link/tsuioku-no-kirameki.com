@@ -1,0 +1,357 @@
+/*
+ * 追憶のきらめき ランキング(/live/)の見た目。
+ *   LP の /live/(tsuioku-no-kirameki/live/index.html)と iPhone アプリの /live(app/live.html)が同じ1本を読む。
+ *   描画は app/dist/live-ranking.js(src/extension/live-ranking-entry.js)。
+ */
+:root {
+  /* ★共有ヘッダー/フッター(site-chrome-lp.css)が参照する変数。LP と同じ名前・値。 */
+  --gold: #c98e2b;
+  --shell-pad: 16px;
+  --maxw: 1160px;
+  --lp-yoz-petal-mid: rgba(220,150,185,.32);
+  --lp-yoz-mist: rgba(140,95,150,.1);
+  --bg: #fffaf4;
+  --bg-soft: #fff3e6;
+  --line: #eadbc7;
+  --ink: #1a1208;
+  --ink-sub: #4f4338;
+  --navy: #1c4b7d;
+  --navy-deep: #14375c;
+  --orange: #c8721c;
+  --card: #ffffff;
+  /* ★共有コンポーネント(yukkuri-thread.css)が参照する変数。LP と同じ名前で用意する。 */
+  --lh-body: 1.7;
+  --text-secondary: var(--ink-sub);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+/* ★共有ヘッダー/フッターが使う LP の骨組みクラス(LP と同じ式)。 */
+.shell { width: min(calc(100% - 2 * var(--shell-pad)), var(--maxw)); margin: 0 auto; }
+@media (min-width: 480px) { :root { --shell-pad: clamp(16px, 3.2vw, 28px); } }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+body {
+  background:
+    radial-gradient(ellipse 60% 30% at 50% -6%, rgba(255, 228, 196, .55), transparent 70%),
+    var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--navy); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 18px 16px 64px; }
+.home { display: inline-block; font-size: .85rem; color: var(--ink-sub); text-decoration: none; margin-bottom: 10px; }
+.home:hover { text-decoration: underline; }
+
+/* ── ブランド(ロゴが主役) ───────────────────────────── */
+.brand {
+  display: grid; grid-template-columns: 1fr; gap: 14px; align-items: center;
+  padding: 18px; border-radius: 22px; background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(20, 55, 92, .08), inset 0 1px 0 rgba(255,255,255,.9);
+}
+@media (min-width: 760px) { .brand { grid-template-columns: 260px 1fr; gap: 22px; padding: 22px 26px; } }
+.rank-top { margin: 4px 0 14px; }
+.rank-top h1 { font-size: clamp(1.2rem, 3.4vw, 1.6rem); margin: 0 0 2px; }
+.rank-top h1 small { font-size: .85rem; }
+.rank-top .meta { margin-top: 6px; }
+.brand--foot { margin-top: 28px; }
+.brand__logo {
+  display: block; justify-self: center; text-decoration: none; line-height: 0;
+  padding: 10px 14px; border-radius: 18px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255,255,255,.95) 0.6px, transparent 1.2px),
+    radial-gradient(circle at 82% 22%, rgba(220,235,255,.9) 0.5px, transparent 1.1px),
+    radial-gradient(circle at 30% 88%, rgba(255,230,240,.85) 0.5px, transparent 1px),
+    radial-gradient(ellipse 70% 60% at 50% 50%, #fff, rgba(255,250,244,.9));
+  border: 1px solid rgba(28, 75, 125, .12);
+  box-shadow: 0 0 36px rgba(120,170,255,.16), 0 0 60px rgba(200,130,165,.08);
+}
+.brand__logo img { display: block; width: 240px; height: auto; max-width: 70vw; object-fit: contain; }
+.brand__eyebrow { margin: 0; font-size: .78rem; letter-spacing: .12em; color: var(--orange); font-weight: 700; text-transform: uppercase; }
+h1 { font-size: clamp(1.45rem, 4.2vw, 2.1rem); margin: 2px 0 6px; letter-spacing: .02em; color: var(--navy-deep); line-height: 1.3; }
+h1 small { display: block; font-size: .95rem; font-weight: 500; color: var(--ink-sub); letter-spacing: 0; margin-top: 2px; }
+.lede { margin: 0; color: var(--ink-sub); font-size: .95rem; }
+.meta { margin: 10px 0 0; font-size: .86rem; color: var(--ink-sub); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.meta b { color: var(--navy-deep); font-weight: 700; }
+.meta .face { width: 28px; height: 28px; object-fit: contain; }
+.meta .stale { color: #a13d0a; font-weight: 600; }
+.meta .pin-missing { color: #a13d0a; font-weight: 600; }
+
+/* ── 本体(Chrome 拡張)への導線。★このページは「入口」。本体は拡張(リアルタイム記録)。 ── */
+.cta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; font-size: .88rem; font-weight: 700; text-decoration: none; line-height: 1.2; border: 1px solid transparent; }
+.btn--primary { background: linear-gradient(135deg, #f0a24a, var(--orange)); color: #fff; box-shadow: 0 6px 16px rgba(200,114,28,.28); }
+.btn--primary:hover { filter: brightness(1.05); }
+.btn--ghost { background: #fff; color: var(--navy-deep); border-color: var(--line); }
+.btn--ghost:hover { border-color: var(--navy); }
+.btn img { width: 22px; height: 22px; object-fit: contain; }
+.cta-band {
+  display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin: 14px 0 0;
+  padding: 12px 14px; border-radius: 16px; background: linear-gradient(135deg, #fff7ec, #ffefdc);
+  border: 1px solid rgba(200,114,28,.35); box-shadow: 0 8px 20px rgba(20,55,92,.08);
+}
+.cta-band img.face { width: 64px; height: 64px; object-fit: contain; }
+.cta-band p { margin: 0 0 8px; font-size: .9rem; color: var(--ink); }
+.cta-band p b { color: var(--navy-deep); }
+.cta-band .cta-row { margin-top: 0; }
+.stats-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.ext-link, .share-x { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--navy); text-decoration: none; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
+.ext-link:hover, .share-x:hover { border-color: var(--orange); color: var(--orange); }
+.cta-foot { margin-top: 26px; text-align: center; }
+
+/* ── リアルタイム更新(自動 60 秒＋手動ボタン) ── */
+.refresh-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.btn--refresh { background: var(--navy-deep); color: #fff; border-color: var(--navy-deep); }
+.btn--refresh:hover { background: var(--navy); }
+.btn--refresh:disabled, .btn--refresh.is-busy { opacity: .7; cursor: progress; }
+.btn--refresh.is-busy::before { content: ""; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.5); border-top-color: #fff; border-radius: 50%; animation: nl-spin .8s linear infinite; }
+@keyframes nl-spin { to { transform: rotate(360deg); } }
+.countdown { font-size: .8rem; color: var(--ink-sub); font-variant-numeric: tabular-nums; }
+.realtime-badge { font-size: .74rem; font-weight: 800; letter-spacing: .04em; color: #b3400f; background: #fff1e6; border: 1px solid rgba(200,114,28,.35); border-radius: 999px; padding: 3px 9px; }
+.fab-refresh {
+  position: fixed; right: 14px; bottom: 16px; z-index: 30; width: 52px; height: 52px; border-radius: 50%;
+  border: 1px solid rgba(20,55,92,.25); background: var(--navy-deep); color: #fff; font-size: 1.3rem; line-height: 1;
+  box-shadow: 0 8px 22px rgba(20,55,92,.35); cursor: pointer;
+}
+.fab-refresh:disabled, .fab-refresh.is-busy { opacity: .7; cursor: progress; animation: nl-spin 1s linear infinite; }
+@media (min-width: 760px) { .fab-refresh { display: none; } }
+@media (prefers-reduced-motion: reduce) { .btn--refresh.is-busy::before, .fab-refresh.is-busy { animation: none; } }
+
+/* ── 3キャラの説明: 見た目は共有 CSS。ここはこのページ固有の間隔・色・揺れだけ ── */
+.yukkuri-thread { margin: 16px 0 6px; gap: 12px; }
+.bubble strong { color: var(--orange); }
+.speaker img { animation: yukkuriFloat 4.4s ease-in-out infinite; }
+.y-row:nth-child(2) .speaker img { animation-delay: .6s; }
+.y-row:nth-child(3) .speaker img { animation-delay: 1.2s; }
+
+/* ── 配信カード(ちくわちゃん風: 順位・サムネ・配信者・時間) ── */
+.list { display: grid; gap: 16px; margin-top: 18px; }
+.live {
+  border: 1px solid var(--line); border-radius: 16px; background: var(--card); overflow: hidden;
+  box-shadow: 0 6px 20px rgba(20, 55, 92, .06);
+}
+.live__head {
+  display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px 14px;
+  background: linear-gradient(180deg, #fff, var(--bg-soft)); border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+@media (min-width: 640px) { .live__head { grid-template-columns: auto 1fr auto; align-items: center; } }
+.shot {
+  position: relative; display: block; width: 152px; border-radius: 10px; overflow: hidden;
+  background: var(--bg-soft); border: 1px solid var(--line); line-height: 0; text-decoration: none;
+}
+@media (min-width: 640px) { .shot { width: 200px; } }
+/* ★height:auto を明示: width/height 属性(352x198)は「初期値のヒント」だが aspect-ratio は
+   height が auto のときしか効かない。実測で 200x200 の正方形になった(2026-09-14)。 */
+.shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.shot .rankno {
+  position: absolute; left: 6px; top: 6px; min-width: 30px; height: 30px; padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--navy-deep); color: #fff; font-weight: 800; font-size: .95rem;
+  line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-variant-numeric: tabular-nums;
+}
+.shot .rankno.r1 { background: linear-gradient(135deg, #f6c453, #c8721c); color: #2a1a06; }
+.shot .rankno.r2 { background: linear-gradient(135deg, #e8e8e8, #a9a9a9); color: #222; }
+.shot .rankno.r3 { background: linear-gradient(135deg, #e0a070, #9a5a2a); color: #fff; }
+.shot .onair {
+  position: absolute; right: 6px; top: 6px; font-size: .68rem; font-weight: 800; letter-spacing: .08em;
+  padding: 3px 7px; border-radius: 6px; background: #d3302f; color: #fff; line-height: 1;
+}
+.shot .noimg {
+  display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; width: 100%;
+  background: linear-gradient(135deg, #fff3e6, #ffe6d2);
+}
+.shot .noimg img { width: 56px; height: 56px; object-fit: contain; animation: none; }
+
+.live__info { min-width: 0; }
+.streamer { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sicon { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); border: 1px solid var(--line); flex: 0 0 auto; }
+.sname { font-weight: 700; color: var(--navy-deep); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 1rem; }
+.sname:hover { text-decoration: underline; }
+.live__info h2 { margin: 4px 0 2px; font-size: .95rem; font-weight: 500; line-height: 1.45; color: var(--ink); }
+.live__info h2 a { color: inherit; text-decoration: none; }
+.live__info h2 a:hover { text-decoration: underline; }
+.times { font-size: .82rem; color: var(--ink-sub); display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+.times b { color: var(--orange); font-weight: 700; }
+.url { font-size: .78rem; color: var(--navy); word-break: break-all; text-decoration: none; }
+.url:hover { text-decoration: underline; }
+.now { text-align: center; padding: 8px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--line); min-width: 110px; grid-column: 1 / -1; }
+@media (min-width: 640px) { .now { grid-column: auto; } }
+.now b { display: block; font-size: 1.35rem; color: #c02a2a; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.now span { font-size: .7rem; color: var(--ink-sub); }
+
+.stats { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 14px; font-size: .82rem; color: var(--ink-sub); border-bottom: 1px solid var(--line); background: #fff; font-variant-numeric: tabular-nums; }
+.stats b { color: var(--ink); font-weight: 600; }
+
+/* ── サムネ付きで応援した人(数値ID＋個人サムネが揃った人だけ。サイドパネルの「アイコン列」と同じ枠) ── */
+.known { padding: 10px 14px 12px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fffdf9, #fff7ec); }
+.known h3 { margin: 0 0 8px; font-size: .84rem; color: var(--navy-deep); font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.known h3 img { width: 30px; height: 30px; object-fit: contain; }
+.known h3 .cnt { color: var(--orange); font-variant-numeric: tabular-nums; }
+.known h3 .hint { font-size: .72rem; font-weight: 500; color: var(--ink-sub); }
+.tiles { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tile { display: flex; flex-direction: column; align-items: center; width: 84px; padding: 8px 4px 6px; border-radius: 12px; background: #fff; border: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.tile:hover { border-color: var(--orange); box-shadow: 0 4px 12px rgba(200,114,28,.16); }
+.tava { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
+.tname { margin-top: 5px; max-width: 76px; font-size: .74rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tid { font-size: .64rem; color: var(--ink-sub); font-variant-numeric: tabular-nums; }
+.tpt { font-size: .66rem; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.lanes { padding: 10px 14px 12px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fffdf9, #fff7ec); }
+.lanes h3 { margin: 0 0 8px; min-height: 30px; font-size: .84rem; color: var(--navy-deep); font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lanes h3 + h3 { margin-top: 6px; }
+.lanes .tiles + h3 { margin-top: 10px; }
+.lanes h3 img { width: 30px; height: 30px; object-fit: contain; }
+.lanes h3 .cnt { color: var(--orange); font-variant-numeric: tabular-nums; }
+.lanes h3 .hint, .lanes h3 .lane-more { font-size: .72rem; font-weight: 500; color: var(--ink-sub); }
+.lanes h3.lane-gift .cnt { color: #c02a2a; }
+.tile.tile-anon { cursor: help; }
+.tiles li.is-new { animation: nl-live-enter 420ms ease-out; }
+.tiles li.is-bumped .tile { animation: nl-live-pop 900ms ease-out; }
+.tiles li.is-gifted .tile { background: linear-gradient(180deg, #fff, #fff2df); border-color: var(--orange); }
+.tiles li.is-gifted.tier-mega .tile { border-color: #c02a2a; }
+.lane-pick { margin-left: auto; font-size: .76rem; font-weight: 800; color: var(--orange); }
+@media (prefers-reduced-motion: reduce) { .tiles li.is-new, .tiles li.is-bumped .tile { animation: none; } }
+
+/* ── ハンドルネームで応援した人(サムネ未確定・名前は分かる人。2026-09-25追加の第2段) ── */
+/* ★2026-09-25: ギフト/広告経由(アイコン未設定)の人も合流させ、ゆっくり顔(identicon)
+   付きで表示するよう拡張。第1段(.tava=本物サムネ)と視覚的に混同しないよう、枠線の色を
+   変え、identicon画像には点線の枠を付けて「本物のサムネではない」ことを示す。 */
+.known h3.named { margin-top: 10px; }
+.tile.tile-identicon { border-style: dashed; }
+.tava-identicon { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); border: 2px dashed var(--ink-sub); }
+
+.cols { display: grid; grid-template-columns: 1fr; gap: 0; }
+/* ★minmax(0,1fr): 素の 1fr は中身の最小幅(長い名前・件数)で列が押し広がり、800px 幅で 3 列目がはみ出た(実測 302/346/176px)。
+   0 を下限にすると 3 等分に収まり、長い名前は .nm の ellipsis が受ける。 */
+@media (min-width: 720px) { .cols { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.col { padding: 10px 14px 12px; }
+.col + .col { border-top: 1px solid var(--line); }
+@media (min-width: 720px) { .col + .col { border-top: 0; border-left: 1px solid var(--line); } }
+.col h3 { margin: 0 0 6px; font-size: .84rem; color: var(--ink-sub); font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.col h3 img { width: 30px; height: 30px; object-fit: contain; }
+.col h3 .sum { color: var(--orange); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+ol.rank { list-style: none; margin: 0; padding: 0; }
+ol.rank li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dotted var(--line); }
+ol.rank li:last-child { border-bottom: 0; }
+.no { flex: 0 0 1.6em; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-sub); font-size: .85rem; }
+.no.top { color: var(--orange); font-weight: 800; }
+.ava { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); display: inline-block; border: 1px solid var(--line); }
+.nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.nm a { color: var(--ink); text-decoration: none; }
+.nm a:hover { text-decoration: underline; }
+.pt { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-sub); }
+/* ★行全体を 1 つのリンクに(サムネ+名前+件数)。色は継承し、下線は hover のときだけ。 */
+.rank-link { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; color: inherit; text-decoration: none; }
+.rank-link:hover { background: var(--bg-soft); border-radius: 8px; }
+.rank-link:hover .nm { text-decoration: underline; }
+.empty { display: flex; align-items: center; gap: 8px; color: var(--ink-sub); font-size: .85rem; margin: 0; }
+.empty img { width: 40px; height: 40px; object-fit: contain; opacity: .85; }
+/* ★上限に当たった配信の注記(「全部を数えた」と誤解させないための小さな但し書き)。 */
+.col-note { margin: 6px 0 0; font-size: .72rem; color: var(--ink-sub); }
+/* ★ホバーで出す「その人の直近の発言」カード(body 直下・1 個を使い回す・position:fixed)。 */
+.recent-card { position: fixed; z-index: 50; max-width: 320px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(20, 55, 92, .14); padding: 8px 10px; font-size: .82rem; color: var(--ink); }
+.recent-card ul { margin: 4px 0 0; padding-left: 1.1em; }
+.recent-card li { margin: 2px 0; }
+.recent-card .st { margin: 2px 0 0; color: var(--ink-sub); }
+/* ★スケルトン(取得中の骨格)。届いたら発言の <ul> に差し替わる。 */
+.recent-card ul.recent-skeleton { list-style: none; margin: 2px 0 0; padding: 0; min-width: 180px; }
+.recent-card ul.recent-skeleton li.sk { height: .78em; margin: 6px 0; border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-soft) 25%, var(--line) 37%, var(--bg-soft) 63%);
+  background-size: 400% 100%; animation: nl-shimmer 1.2s ease-in-out infinite; }
+.recent-card ul.recent-skeleton li.sk2 { width: 82%; }
+.recent-card ul.recent-skeleton li.sk3 { width: 64%; }
+@keyframes nl-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .recent-card ul.recent-skeleton li.sk { animation: none; } }
+/* ★コメント列の行は「マウスを乗せると発言が出る」ことを help カーソルで示す(匿名行にも uid はある)。 */
+ol.rank li[data-uid] { cursor: help; }
+ol.rank li[data-uid] .rank-link { cursor: pointer; }
+
+/*
+  ★「動いている感じ」を出す。
+  ★POP(extension/popup.html の nl-story-pop)と同じ流儀にする:
+    scale は 1.045 程度までの【控えめ】な値。派手にしない。
+  ★光らせるのは【実際に数字が変わった行だけ】(判定は src/lib/liveRankingView.js の追跡器)。
+*/
+@keyframes nl-live-pop {
+  0% { transform: scale(1); background-color: transparent; }
+  40% { transform: scale(1.045); background-color: rgba(200, 114, 28, .16); }
+  100% { transform: scale(1); background-color: transparent; }
+}
+ol.rank li.is-bumped { animation: nl-live-pop 900ms ease-out; transform-origin: left center; }
+@keyframes nl-live-enter {
+  0% { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+ol.rank li.is-new { animation: nl-live-enter 420ms ease-out; }
+/* ── ギフトの増分(前回取得との差)。帯の色は共有のギフト帯と同じ序列 ── */
+.delta { flex: 0 0 auto; margin-left: 4px; font-size: .74rem; font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
+ol.rank li.is-gifted { background: linear-gradient(90deg, rgba(200,114,28,.10), transparent 70%); border-radius: 8px; }
+ol.rank li.is-gifted.tier-large { background: linear-gradient(90deg, rgba(200,114,28,.22), transparent 70%); }
+ol.rank li.is-gifted.tier-mega { background: linear-gradient(90deg, rgba(192,42,42,.22), transparent 70%); }
+ol.rank li.is-gifted.tier-mega .delta { color: #c02a2a; font-size: .84rem; }
+.col h3 .sum-delta { font-size: .78rem; font-weight: 800; margin-left: 4px; }
+/* ── コメントの増分(前回取得との差)。ギフトの is-gifted と同じ視覚言語・別クラス(意味の混同防止) ── */
+ol.rank li.is-talking { background: linear-gradient(90deg, rgba(200,114,28,.10), transparent 70%); border-radius: 8px; }
+ol.rank li.is-talking.tier-large { background: linear-gradient(90deg, rgba(200,114,28,.22), transparent 70%); }
+ol.rank li.is-talking.tier-mega { background: linear-gradient(90deg, rgba(192,42,42,.22), transparent 70%); }
+ol.rank li.is-talking.tier-mega .delta { color: #c02a2a; font-size: .84rem; }
+/* ── 脈拍レーン(応援した「誰が」が丸サムネ＋名前で流れる。本文は出さない) ── */
+/* .delta は既存のギフト増分バッジ専用。コメント速度は .rate で分離する。 */
+.stats .rate { font-size: .74rem; color: var(--orange); font-weight: 700; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.pulse-lane { position: relative; height: 30px; overflow: hidden; background: linear-gradient(90deg, transparent, #fff7ec 20%, #fff7ec 80%, transparent); border-bottom: 1px solid var(--line); }
+.pulse-dot { position: absolute; top: 3px; right: -140px; display: flex; align-items: center; gap: 4px; max-width: 160px;
+  padding: 2px 8px 2px 3px; border-radius: 999px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  font-size: .72rem; color: var(--ink-sub); white-space: nowrap; opacity: .95;
+  animation: nl-pulse-flow 6s linear forwards; will-change: transform; }
+.pulse-dot-avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex: none; background: #f2e9dc; }
+.pulse-dot-name { overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+.pulse-dot.is-comment { border-color: rgba(200,114,28,.35); }
+.pulse-dot.is-gift::before { content: '🎁'; font-size: .8rem; }
+.pulse-dot.is-ad::before { content: '📣'; font-size: .8rem; }
+/* ── 熱いチップ(直近の実測2点間でコメントが増えた人。本文は出さない・件数のみ) ── */
+.pulse-dot.is-hot { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(200,114,28,.18), 0 1px 3px rgba(0,0,0,.1); }
+.pulse-dot.is-hot.tier-medium { --dot-scale: 1.06; }
+.pulse-dot.is-hot.tier-large { --dot-scale: 1.12; }
+.pulse-dot.is-hot.tier-mega { --dot-scale: 1.18; animation-duration: 7s; }
+.pulse-dot-delta { font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; margin-left: 2px; }
+@keyframes nl-pulse-flow { to { transform: translateX(calc(-100vw - 160px)) scale(var(--dot-scale, 1)); opacity: .2; } }
+/* 240 件/分超: 点を増やさず帯の濃さで(点の数=負荷を天井で止める) */
+.pulse-lane.is-band { background: repeating-linear-gradient(90deg, rgba(200,114,28,.35) 0 6px, transparent 6px 14px); background-size: 200% 100%; animation: nl-band 1.2s linear infinite; }
+@keyframes nl-band { to { background-position: -28px 0; } }
+@media (prefers-reduced-motion: reduce) { .pulse-lane { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  ol.rank li.is-bumped, ol.rank li.is-new, .speaker img { animation: none; }
+}
+
+.state { display: flex; align-items: center; gap: 12px; padding: 18px; border: 1px dashed var(--line); border-radius: 16px; background: #fff; color: var(--ink-sub); margin-top: 18px; }
+.state img { width: 64px; height: 64px; object-fit: contain; }
+
+/* ── ほかの配信サービス(Kick・後で YouTube)。カード内は .live__head 以下をニコ生と共用 ── */
+.platforms { display: grid; gap: 16px; margin-top: 24px; }
+.platforms:empty { display: none; }
+.platform__title { margin: 0 0 4px; font-size: 1.15rem; color: var(--navy-deep); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.platform__title small { font-size: .8rem; font-weight: 500; color: var(--ink-sub); }
+.platform__badge { font-size: .72rem; font-weight: 800; letter-spacing: .06em; padding: 3px 8px; border-radius: 6px; background: var(--navy-deep); color: #fff; line-height: 1.2; }
+.platform__badge--kick { background: #53fc18; color: #0b0e0b; }
+.platform__meta { margin: 0 0 10px; font-size: .86rem; color: var(--ink-sub); display: flex; gap: 4px 8px; flex-wrap: wrap; }
+.platform__meta .stale { color: #b3261e; }
+.platform__list { display: grid; gap: 12px; }
+.plive { border: 1px solid var(--line); border-radius: 16px; background: var(--card); overflow: hidden; box-shadow: 0 6px 20px rgba(20, 55, 92, .06); }
+.plive .live__head { border-bottom: 0; }
+.plive .live__info h3 { margin: 4px 0 2px; font-size: .95rem; font-weight: 500; line-height: 1.45; color: var(--ink); }
+.plive .live__info h3 a { color: inherit; text-decoration: none; }
+.plive .live__info h3 a:hover { text-decoration: underline; }
+.plive .category { display: inline-block; margin-top: 4px; font-size: .74rem; color: var(--ink-sub); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.platform__source { margin: 8px 0 0; font-size: .74rem; color: var(--ink-sub); }
+
+.note { margin-top: 28px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg-soft); font-size: .84rem; color: var(--ink-sub); }
+.note p { margin: 0 0 6px; }
+.note p:last-child { margin-bottom: 0; }
+.note b { color: var(--ink); }
+footer.foot { margin-top: 26px; text-align: center; font-size: .8rem; color: var(--ink-sub); }
+footer.foot a { color: var(--navy); text-decoration: none; }
+footer.foot a:hover { text-decoration: underline; }
+footer.foot img { width: 120px; height: auto; display: block; margin: 0 auto 6px; opacity: .95; }

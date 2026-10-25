@@ -9,6 +9,7 @@
     "lint:submission": "node scripts/lint-pre-submission.mjs"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "8.0.2",
     "@capacitor/core": "8.5.3",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/ios": "8.5.3",
