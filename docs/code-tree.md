@@ -93,7 +93,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (119)
+- 📁 **app/** (120)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -227,6 +227,7 @@
   - `live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
+  - `live.html`
   - `phone.html`
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
 - 📁 **council-scout/** (26)
@@ -973,7 +974,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2168)
+- 📁 **src/** (2169)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1010,7 +1011,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (88)
+  - 📁 **extension/** (89)
     - 📁 **popup/** (14)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1064,6 +1065,7 @@
     - `pageInterceptFetchHookCatch.wiring.test.js`
     - `phoneDemoFeed.test.js`
     - `phoneFit.wiring.test.js`
+    - `phoneLiveRanking.test.js`
     - `phoneNative.test.js`
     - `phoneNativeVoice.test.js`
     - `phonePost.wiring.test.js`
@@ -3299,7 +3301,7 @@
   - `gen-og-live-ranking.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (65)
+- 📁 **tsuioku-no-kirameki/** (66)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -3317,8 +3319,9 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
-  - 📁 **assets/** (3)
-    - 📁 **css/** (2)
+  - 📁 **assets/** (4)
+    - 📁 **css/** (3)
+      - `live-ranking.css`
       - `site-chrome-lp.css`
       - `yukkuri-thread.css`
     - 📁 **js/** (1)

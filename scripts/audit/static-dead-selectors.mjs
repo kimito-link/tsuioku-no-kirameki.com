@@ -669,8 +669,8 @@ const SURFACES = [
     label: '/live/ (tsuioku-no-kirameki/live/index.html)',
     entries: ['src/extension/live-ranking-entry.js'],
     extraProducerFiles: ['tsuioku-no-kirameki/assets/js/site-chrome-lp.js'],
-    htmls: ['tsuioku-no-kirameki/live/index.html'],
-    cssFiles: ['tsuioku-no-kirameki/assets/css/yukkuri-thread.css', 'tsuioku-no-kirameki/assets/css/site-chrome-lp.css'],
+    htmls: ['tsuioku-no-kirameki/live/index.html', 'app/live.html'],
+    cssFiles: ['tsuioku-no-kirameki/assets/css/yukkuri-thread.css', 'tsuioku-no-kirameki/assets/css/site-chrome-lp.css', 'tsuioku-no-kirameki/assets/css/live-ranking.css'],
     sharedCss: new Set(['tsuioku-no-kirameki/assets/css/yukkuri-thread.css', 'tsuioku-no-kirameki/assets/css/site-chrome-lp.css']),
     jsCssFiles: [],
     dist: 'app/dist/live-ranking.js'

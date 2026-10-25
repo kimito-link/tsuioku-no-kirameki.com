@@ -2,6 +2,7 @@
  * スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
  *   PC の拡張の「📱 スマホへ送信」で出たリンクを貼ると、この端末で覚えて次から自動で開く。
  *   PC が無くても「デモを見る」で中身を試せる(/live-view?v=demo・作り物の配信)。
+ *   v0.1.1764: PC が無くても「いま配信中の応援ランキング」(/live・app/live.html)を見られる。
  *
  * @module phone-start
  */
@@ -56,6 +57,7 @@ function boot() {
     }
   });
   $('demoBtn').addEventListener('click', () => go('/live-view?v=demo'));
+  $('rankingBtn').addEventListener('click', () => go('/live'));
 
   const saved = readSaved();
   if (saved && !new URLSearchParams(location.search).has('change')) {
@@ -68,6 +70,7 @@ function boot() {
       input.focus();
     });
     $('resumeOpen').addEventListener('click', () => { clearTimeout(autoTimer); go(saved); });
+    $('resumeRanking').addEventListener('click', () => { clearTimeout(autoTimer); go('/live'); });
   }
 }
 
