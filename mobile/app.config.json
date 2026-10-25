@@ -10,7 +10,7 @@
     "stagingDomain": null
   },
   "stores": {
-    "ascAppId": "",
+    "ascAppId": "6826728669",
     "playAppId": null,
     "playPackageName": null,
     "appleTeamId": "8922HQ842P",
@@ -19,7 +19,8 @@
     "ageRating": "TWELVE_PLUS",
     "contentRights": "USES_THIRD_PARTY_CONTENT",
     "marketingVersion": "1.0.0",
-    "buildNumberOffset": 0
+    "buildNumberOffset": 0,
+    "iosPrivacyPublishedAt": "2026-10-25"
   },
   "brand": {
     "primaryColor": "#F06AA0",
