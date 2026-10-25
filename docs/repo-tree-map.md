@@ -368,11 +368,11 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `mobile/` — iPhone アプリ(Capacitor の server.url 型・/phone を開く)。ios/ は CI が毎回作る  〔iOS〕
-<sub>ファイル 45 件</sub>
+<sub>ファイル 46 件</sub>
 
 - `assets/`（1 件） — iPhone アプリの起動画面の原版(splash.png 2732px)  〔iOS / 画像〕
 - `release-notes/`（1 件） — App Store の「新機能」文(CURRENT-ja.txt)  〔iOS / ストア〕
-- `scripts/`（30 件） — App Store 提出の道具(web-ios-android キットからコピー・提出前 lint・ASC API)  〔iOS / ストア〕
+- `scripts/`（31 件） — App Store 提出の道具(web-ios-android キットからコピー・提出前 lint・ASC API)  〔iOS / ストア〕
 - `store-assets/`（8 件） — App Store の掲載文・アイコン・撮影計画・審査メモの正本  〔iOS / ストア〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕

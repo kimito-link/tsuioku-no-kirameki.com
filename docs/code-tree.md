@@ -789,12 +789,12 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **mobile/** (45)
+- 📁 **mobile/** (46)
   - 📁 **assets/** (1)
     - `splash.png`
   - 📁 **release-notes/** (1)
     - `CURRENT-ja.txt`
-  - 📁 **scripts/** (30)
+  - 📁 **scripts/** (31)
     - 📁 **lib/** (16)
       - `app-config.mjs` — 移植元: partnership_program_website/scripts/lib/app-config.mjs
       - `apple-guideline-checks.mjs` — lint-pre-submission CHECK 31・32 の判定（純関数）。
@@ -817,6 +817,7 @@
     - `asc-create-profile.mjs` — App Store 用 Provisioning Profile を App Store Connect API で作成する。
     - `asc-review-check.mjs` — 移植元: partnership_program_website/scripts/asc-review-check.mjs
     - `asc-set-content-rights.mjs` — App Store Connect の app リソースに contentRightsDeclaration を設定する。
+    - `build-live-icon.py`
     - `capture-appstore-screenshots.mjs` — 移植元: partnership_program_website/scripts/capture-appstore-screenshots.mjs
     - `check-splash-config.mjs` — scripts/check-splash-config.mjs
     - `check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」を機械検出する出荷事故ゲート。
