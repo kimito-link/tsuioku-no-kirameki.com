@@ -109,6 +109,7 @@ import { createPhoneVoice, mountPhoneVoiceUi } from './live-view-voice.js';
 import { createPhoneRealtime } from './live-view-realtime.js';
 // iPhone アプリ(mobile/)の中だけ: ギフトの通知・振動・共有・画面を閉じても続く読み上げ(アプリの外では何もしない)。
 import { createPhoneNative, mountPhoneNativeUi } from './live-view-native.js';
+import { createNativeSpeechVoice } from './live-view-native-voice.js';
 // PC が無くても試せるデモ(/live-view?v=demo)。作り物の配信を端末の中だけで流す(サーバーに取りに行かない)。
 import { createDemoSource, isDemoToken } from './live-view-demo.js';
 // iPhone アプリの「🚩 見たくない人を隠す・報告する」(審査 1.2)。隠すのはこの端末の画面だけ。
@@ -726,6 +727,7 @@ function paintAllMirrors(jsonBlob) {
   try { _venue.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 会場は閲覧を止めない */ }
   try { _native.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 通知は閲覧を止めない */ }
   if (_voice) _voice.onSnapshot(jsonBlob);
+  try { if (_voice && 'onRows' in _voice) _voice.onRows(restoreCommentTimelineRows(jsonBlob.commentTimelineMirror || null)); } catch { /* 読み上げは閲覧を止めない */ }
   // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // ③WEB投げ一覧丸写し(第2号): 北極星 giftHistory レーン(貢献者 strip + 投げ明細テーブル)を描く。
@@ -1089,7 +1091,10 @@ function bootstrap() {
     globalThis.__nlsWebCommentRelay = _postClient;
     _postClient.start();
   }
-  _voice = createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground(), ...(_demo ? { fetchImpl: _demo.voiceFetch } : {}) });
+  // v0.1.1763: iPhone アプリの中は iPhone 内蔵の声で読む(画面を閉じても続く・PC の VOICEVOX が無くても読める)。
+  //   プラグインが無い古いアプリ・Safari・PC のブラウザは今までどおり PC の VOICEVOX の声。
+  _voice = createNativeSpeechVoice()
+    || createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground(), ...(_demo ? { fetchImpl: _demo.voiceFetch } : {}) });
   _native.setVoiceOn(() => Boolean(_voice && _voice.isOn()));
   // v0.1.1742: 会場の吹き出しを読み上げの声に合わせる(声が鳴った瞬間に、その人の吹き出しを出す)。
   _venue.setVoiceActive(() => Boolean(_voice && _voice.isOn() && _voice.isReady() && _voice.pcState() === 'ok'));

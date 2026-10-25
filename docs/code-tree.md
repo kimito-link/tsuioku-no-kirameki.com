@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1051 件
+## ⚠️ 役割コメントが無いソース 9 / 1052 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -93,7 +93,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (118)
+- 📁 **app/** (119)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -217,6 +217,7 @@
   - `live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
   - `live-view-demo-feed.js` — スマホ版(app/live-view)の「デモ」= PC が無くても動く作り物の配信(純関数)。
   - `live-view-demo.js` — スマホ版のデモ(/live-view?v=demo)の配線。PC が無くても動く作り物の配信を、端末の中だけで流す。
+  - `live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
   - `live-view-native.js` — iPhone アプリ(mobile/・Capacitor の server.url 型)の中でだけ動く「アプリだけの機能」。
   - `live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
   - `live-view-post.js` — スマホの WEB版から生放送にコメントを届ける(v0.1.1734)。
@@ -972,7 +973,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2167)
+- 📁 **src/** (2168)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1009,7 +1010,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (87)
+  - 📁 **extension/** (88)
     - 📁 **popup/** (14)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1064,6 +1065,7 @@
     - `phoneDemoFeed.test.js`
     - `phoneFit.wiring.test.js`
     - `phoneNative.test.js`
+    - `phoneNativeVoice.test.js`
     - `phonePost.wiring.test.js`
     - `phonePostRelay.js` — 【層】L2 拡張の配線(chrome.* と fetch。判定は src/lib/phonePost.js)
     - `phonePostRelay.test.js`

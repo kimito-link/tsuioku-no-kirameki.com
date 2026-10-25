@@ -603,8 +603,9 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 27</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 28</summary>
 
+- `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
@@ -1256,7 +1257,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 21 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 📥 コメント取得 (2版)
 - `v0.1.1758` 2026-10-24 — スマホで新着をすぐ受け取る
@@ -1289,7 +1290,8 @@
 ### 🎁 ギフト (1版)
 - `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
 
-### 🔊 読み上げ (11版)
+### 🔊 読み上げ (12版)
+- `v0.1.1763` 2026-10-25 — アプリは iPhone の声で読み上げ
 - `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
 - `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
 - `v0.1.1759` 2026-10-24 — 読み上げの声を絞る設定を追加(既定オフ)
