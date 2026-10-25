@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>いま配信中の応援ランキング ― 追憶のきらめき ライブビュー</title>
+    <meta name="robots" content="noindex" />
+    <!--
+      iPhone アプリ(とスマホ)用の「いま配信中の応援ランキング」(app.tsuioku-no-kirameki.com/live)。
+        PC の拡張が無くても使える。中身は LP の /live/(tsuioku-no-kirameki/live/index.html)と同じ:
+        - 見た目は共有の tsuioku-no-kirameki/assets/css/live-ranking.css(2箇所目を書かない)
+        - 描画は app/dist/live-ranking.js(src/extension/live-ranking-entry.js)・データは /api/live-ranking
+        LP のヘッダー/フッター・Chrome 拡張の案内は付けず、アプリの開始画面(/phone)へ戻れる上の帯だけにする。
+    -->
+    <link rel="stylesheet" href="/tsuioku-no-kirameki/assets/css/live-ranking.css" />
+    <style>
+      body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+      .appbar {
+        position: sticky; top: 0; z-index: 50;
+        display: flex; align-items: center; gap: 8px;
+        padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
+        background: rgba(255, 250, 244, .94);
+        border-bottom: 1px solid var(--line);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+      }
+      .appbar a.back {
+        min-width: 44px; min-height: 44px; display: inline-flex; align-items: center;
+        color: var(--navy); text-decoration: none; font-weight: 700;
+      }
+      .appbar h1 { flex: 1; margin: 0; font-size: 1rem; text-align: center; }
+      .appbar .spacer { min-width: 44px; }
+      .wrap { padding-top: 10px; }
+      .app-note { margin-top: 20px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-soft); font-size: .8rem; color: var(--ink-sub); }
+      .app-note p { margin: 0 0 6px; }
+      .app-note p:last-child { margin-bottom: 0; }
+    </style>
+  </head>
+  <body>
+    <div class="appbar">
+      <a class="back" href="/phone?change=1" aria-label="開始画面へ戻る">← 戻る</a>
+      <h1>いま配信中の応援ランキング</h1>
+      <span class="spacer" aria-hidden="true"></span>
+    </div>
+    <div class="wrap">
+      <header class="rank-top">
+        <p class="meta" id="meta"><img class="face" src="/extension/images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.thumb128.png" alt="">読み込み中…</p>
+        <div class="refresh-row">
+          <button type="button" class="btn btn--refresh" data-refresh aria-label="ランキングをいま更新する">🔄 いま更新</button>
+          <span class="countdown" id="refreshCountdown" aria-live="polite">自動更新: 60 秒ごと</span>
+        </div>
+      </header>
+
+      <main id="list" class="list" aria-live="polite"></main>
+      <section id="platforms" class="platforms" aria-live="polite"></section>
+
+      <button type="button" class="fab-refresh" data-refresh aria-label="ランキングをいま更新する" title="いま更新">🔄</button>
+
+      <div class="app-note">
+        <p>ニコニコ生放送でいま放送中の個人配信について、<b>ギフトと広告で応援した人</b>をニコ生が公開している順位表のまま並べています。</p>
+        <p>「コメントで応援した人」の件数だけは、公開されているコメントを当サイトが数えた値です(本文・時刻は保存していません)。「約○人(推定)」と並び順も当サイトの推定です。</p>
+        <p>PC の Chrome 拡張とつなぐと、自分が見ている配信のコメント・ギフト・読み上げをこのアプリで追えます。<a href="/phone?change=1">つなぎ方</a> ／ <a href="https://tsuioku-no-kirameki.com/privacy.html#s14">掲載の停止について</a></p>
+      </div>
+    </div>
+    <script src="/app/dist/live-ranking.js" defer></script>
+  </body>
+</html>
