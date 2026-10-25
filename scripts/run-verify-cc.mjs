@@ -167,5 +167,35 @@ if (ok) {
   }
 }
 
+/*
+ * ★「報」ステップ(止めない): 拡張を本物のブラウザに読み込んで全画面・差し込み先を確かめる
+ *   (全拡張共通の物差し・web-ios-android/templates/extension-verify・2026-10-25)。
+ *   AI が自分で確かめる手段。人に「再読み込みして開き直して」と頼む前にここを見る。
+ *   診断と同じく隣のキットを直接呼ぶので、キットが無ければ skip(合格ではない)。
+ *   CI では e2e ジョブが同じものを門として走らせる。
+ */
+if (ok) {
+  const verifier = path.join(ROOT, '..', 'web-ios-android', 'templates', 'extension-verify', 'run.mjs');
+  if (fs.existsSync(verifier)) {
+    log('REPORT verify:extension start (止めない)');
+    const r = spawnSync(process.execPath, [verifier, '.'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+      env: { ...process.env, FORCE_COLOR: '0', NODE_NO_WARNINGS: '1' }
+    });
+    if (r.stdout) fs.appendFileSync(logFile, r.stdout);
+    if (r.stderr) fs.appendFileSync(logFile, r.stderr);
+    for (const l of String(r.stdout || '').split(/\r?\n/).filter((x) => /^\s+FAIL |^結果:|測れず/.test(x))) {
+      log(`REPORT verify:extension ${l.trim()}`);
+    }
+    log(r.status === 0
+      ? 'REPORT verify:extension OK'
+      : `REPORT verify:extension に指摘あり(exit=${r.status ?? 'null'})。証拠は .artifacts/extension-verify/`);
+  } else {
+    log('REPORT verify:extension skip(隣に web-ios-android キットが無い。★対象外であって合格ではない)');
+  }
+}
+
 log(ok ? 'verify:cc OK' : 'verify:cc FAILED — see .artifacts/verify-cc.log');
 process.exit(ok ? 0 : 1);

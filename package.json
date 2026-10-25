@@ -13,6 +13,8 @@
     "verify": "npm test && npm run lint && npm run typecheck && npm run build",
     "verify:cc": "node scripts/run-verify-cc.mjs",
     "verify:bump": "node scripts/verify-bump.mjs",
+    "verify:extension": "node ../web-ios-android/templates/extension-verify/run.mjs .",
+    "verify:extension:headed": "node ../web-ios-android/templates/extension-verify/run.mjs . --headed",
     "setup:claude": "node scripts/setup-claude-code.mjs",
     "build": "node scripts/build.mjs",
     "check:dist-fresh": "node scripts/check-dist-fresh.mjs",
