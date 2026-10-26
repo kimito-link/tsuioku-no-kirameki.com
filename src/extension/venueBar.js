@@ -305,6 +305,7 @@ import {
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import { wireVenueVoiceTestHook } from './voiceTestHook.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
@@ -368,7 +369,7 @@ import {
   synthesizeVoice,
   probeVoicevoxStreaming
 } from '../lib/voicevoxClient.js';
-import { createVoicevoxWarmup, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3390,13 +3391,14 @@ export function mountVenueBarButton(options = {}) {
     //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
     probeVoicevoxAlive,
     fetchVoiceStyleIds: listVoicevoxStyleIds,
-    initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensure(id), // P3 の先読みも温めと同じ1本の列
+    initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensureWhenIdle(id), // P3 の先読みは合成の合間に裏で
     voiceWarmup: venueVoiceWarmup,
     probeVoiceStreaming: probeVoicevoxStreaming, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
     fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
     resolveVoice: resolveVoiceForUser
   });
-  
+  wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag); // 裏の読み込みは手が空いた時だけ
+  wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {
       voicePlayer.disable();
@@ -6679,6 +6681,7 @@ export function mountVenueBarButton(options = {}) {
       primed: result.primed
     };
     // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
+    if (result.speeches.length > 0) voicePlayer.diag.venueGate = voicePlayer.enabled ? 'ok' : 'voice-off';
     if (result.speeches.length > 0) {
       pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now(), {
         // 発言者のサムネ・ハンドル名・ID・リンクをセットで(§3.5)。サムネは観測済みのプロフィール > uid から導出 > 匿名は identicon。
@@ -7167,6 +7170,7 @@ export function mountVenueBarButton(options = {}) {
    */
   const setOpen = (nextOpen, persist) => {
     open = nextOpen === true;
+    voicePlayer.diag.venueGate = open ? 'no-input' : 'panel-closed';
     root.classList.toggle('nlsb-is-open', open);
     // v0.1.1115 ①POP遮蔽: 会場open中だけ document ルートに印を付け、CSS(VENUE_CSS末尾)が
     //   ①POPホスト(#nls-inline-popup-host)を visibility:hidden にする。open→close 往復で

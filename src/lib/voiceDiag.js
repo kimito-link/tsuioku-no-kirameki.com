@@ -71,11 +71,32 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   lastColdSynthMs: number,     // 同上の直近1件
  *   speakerInitTotal: number,    // 2026-10-26計器: 合成の前に声を読み込んだ件数(voiceWarmup)
  *   speakerInitMaxMs: number,    // 同上の最大所要ms(初めての声の読み込みにかかった時間)
+ *   voiceBorrowTotal: number,    // v0.1.1772計器: 温まっていない声の代わりに温まった声で読んだ件数
+ *   e2eSampleTotal: number,      // v0.1.1774計器: 声が出るまでを測った件数(試験の回ごとの平均用)
+ *   e2eSumMsTotal: number,       // 同上の合計ms
+ *   e2eMaxMs: number,            // 同上の最大ms
+ *   bgInitTotal: number,         // v0.1.1777計器: 合成の合間に裏で声を読み込んだ件数
+ *   bgInitMaxMs: number,         // 同上の最長ms
  *   streamTotal: number,         // 2026-10-26計器: 少しずつ受け取って読んだ件数(voiceStream)
  *   warmSynthSamples: number,    // 2026-10-26計器: warmSynthEmaMs に入れた件数(弱い PC の判定はこれが5件から)
  *   contendedSynthTotal: number, // 2026-10-26計器: 別の声の準備と重なって速さの物差しから外した件数
  *   warmSynthRtfPermille: number, // 2026-10-26計器: 合成時間÷声の長さ(×1000)のEMA。弱い PC の判定はこれで見る
  *   warmRtfSamples: number,      // 同上に入れた件数
+ *   playCheckedTotal: number,    // 2026-10-26計器(voicePlaybackQuality.js): 聞こえ方を数えた再生の件数
+ *   playCutShortTotal: number,   // 同上: 途中で切れた(鳴った時間が声の長さより短い・届いた分だけ読んだ)
+ *   playStallTotal: number,      // 同上: 丸ごと再生が声の長さより明らかに長くかかった(つっかえ)
+ *   streamUnderrunTotal: number, // 同上: 少しずつ鳴らす途中で無音が挟まった件数
+ *   streamUnderrunMaxMs: number, // 同上の最長の無音
+ *   playErrorAfterStartTotal: number, // 同上: 鳴り始めた後に再生エラー
+ *   clipItemTotal: number,       // 同上: 音割れ(最大振幅が天井)
+ *   quietItemTotal: number,      // 同上: 小さすぎ(音量設定の狙いの6割未満)
+ *   streamGainDropTotal: number, // 同上: 1文の途中で倍率を下げた(声が急に小さくなった)
+ *   outPeakEmaPermille: number,  // 同上: 鳴らした最大振幅のEMA(×1000)
+ *   outRmsDbMin: number,         // 同上: 声ごとの大きさ(RMS dBFS)の最小(未計測 999)
+ *   outRmsDbMax: number,         // 同上の最大(未計測 -999)
+ *   lastOutRmsDb: number,        // 同上の直近
+ *   lastPlayIssue: string,       // 同上: 直近の問題(cut/stall/gap/clip/quiet/drop/partial)
+ *   venueGate: string,           // 2026-10-26計器: 会場の読み上げが鳴らない理由(panel-closed/no-input/ok)
  *   streamFirstAudioEmaMs: number, // 同上の「最初の声が届くまで」のEMA
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
@@ -84,6 +105,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
 
 import { formatVoiceSynthFailureLine } from './voiceSynthFailure.js';
 import { formatVoiceStageBreakdown } from './voiceStageTiming.js';
+import { formatVoicePlaybackQuality } from './voicePlaybackQuality.js';
 import {
   adviseVoiceSynthFailure,
   formatVoiceSynthFailureReasonLine
@@ -146,12 +168,33 @@ export function makeInitialVoiceDiag() {
     lastColdSynthMs: -1,
     speakerInitTotal: 0,
     speakerInitMaxMs: 0,
+    voiceBorrowTotal: 0,
+    e2eSampleTotal: 0,
+    e2eSumMsTotal: 0,
+    e2eMaxMs: 0,
+    bgInitTotal: 0,
+    bgInitMaxMs: 0,
     streamTotal: 0,
     streamFirstAudioEmaMs: -1,
     warmSynthSamples: 0,
     contendedSynthTotal: 0,
     warmSynthRtfPermille: -1,
     warmRtfSamples: 0,
+    playCheckedTotal: 0,
+    playCutShortTotal: 0,
+    playStallTotal: 0,
+    streamUnderrunTotal: 0,
+    streamUnderrunMaxMs: 0,
+    playErrorAfterStartTotal: 0,
+    clipItemTotal: 0,
+    quietItemTotal: 0,
+    streamGainDropTotal: 0,
+    outPeakEmaPermille: -1,
+    outRmsDbMin: 999,
+    outRmsDbMax: -999,
+    lastOutRmsDb: 0,
+    lastPlayIssue: '',
+    venueGate: '',
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -226,11 +269,32 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     lastColdSynthMs: num(d.lastColdSynthMs, base.lastColdSynthMs),
     speakerInitTotal: num(d.speakerInitTotal, base.speakerInitTotal),
     speakerInitMaxMs: num(d.speakerInitMaxMs, base.speakerInitMaxMs),
+    voiceBorrowTotal: num(d.voiceBorrowTotal, base.voiceBorrowTotal),
+    e2eSampleTotal: num(d.e2eSampleTotal, base.e2eSampleTotal),
+    e2eSumMsTotal: num(d.e2eSumMsTotal, base.e2eSumMsTotal),
+    e2eMaxMs: num(d.e2eMaxMs, base.e2eMaxMs),
+    bgInitTotal: num(d.bgInitTotal, base.bgInitTotal),
+    bgInitMaxMs: num(d.bgInitMaxMs, base.bgInitMaxMs),
     streamTotal: num(d.streamTotal, base.streamTotal),
     warmSynthSamples: num(d.warmSynthSamples, base.warmSynthSamples),
     contendedSynthTotal: num(d.contendedSynthTotal, base.contendedSynthTotal),
     warmSynthRtfPermille: num(d.warmSynthRtfPermille, base.warmSynthRtfPermille),
     warmRtfSamples: num(d.warmRtfSamples, base.warmRtfSamples),
+    playCheckedTotal: num(d.playCheckedTotal, base.playCheckedTotal),
+    playCutShortTotal: num(d.playCutShortTotal, base.playCutShortTotal),
+    playStallTotal: num(d.playStallTotal, base.playStallTotal),
+    streamUnderrunTotal: num(d.streamUnderrunTotal, base.streamUnderrunTotal),
+    streamUnderrunMaxMs: num(d.streamUnderrunMaxMs, base.streamUnderrunMaxMs),
+    playErrorAfterStartTotal: num(d.playErrorAfterStartTotal, base.playErrorAfterStartTotal),
+    clipItemTotal: num(d.clipItemTotal, base.clipItemTotal),
+    quietItemTotal: num(d.quietItemTotal, base.quietItemTotal),
+    streamGainDropTotal: num(d.streamGainDropTotal, base.streamGainDropTotal),
+    outPeakEmaPermille: num(d.outPeakEmaPermille, base.outPeakEmaPermille),
+    outRmsDbMin: num(d.outRmsDbMin, base.outRmsDbMin),
+    outRmsDbMax: num(d.outRmsDbMax, base.outRmsDbMax),
+    lastOutRmsDb: num(d.lastOutRmsDb, base.lastOutRmsDb),
+    lastPlayIssue: typeof d.lastPlayIssue === 'string' ? d.lastPlayIssue : '',
+    venueGate: typeof d.venueGate === 'string' ? d.venueGate : '',
     streamFirstAudioEmaMs: num(d.streamFirstAudioEmaMs, base.streamFirstAudioEmaMs),
     lagVerdict: String(d.lagVerdict || base.lagVerdict),
     diagBornAt: num(d.diagBornAt, base.diagBornAt),
@@ -409,6 +473,10 @@ export function buildVoiceDiagLine(snap, nowMs) {
   // 2026-10-22計器(P1): 受信→キュー/順番待ち/エンジン詰まり/合成/初めての声 を分けて出す。
   const stageLine = formatVoiceStageBreakdown(snap);
   if (stageLine) parts.push(stageLine);
+  // 2026-10-26計器: 聞こえ方(途切れ・つっかえ・音割れ・小さすぎ・声ごとの差)。
+  const qualityLine = formatVoicePlaybackQuality(snap);
+  if (qualityLine) parts.push(qualityLine);
+  if (snap.venueGate && snap.venueGate !== 'ok') parts.push(`会場の読み上げ=${snap.venueGate}`);
   // 需要(到着レート)vs供給(1/serviceTime)。どちらも計測済みのときだけ出す。
   const arrivalPerMin = Number(snap.arrivalPerMin);
   if (Number.isFinite(arrivalPerMin) && arrivalPerMin >= 0 && Number.isFinite(serviceTimeEma) && serviceTimeEma > 0) {
