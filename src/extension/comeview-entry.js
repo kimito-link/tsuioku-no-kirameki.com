@@ -94,7 +94,7 @@ import {
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
-import { createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
@@ -650,7 +650,7 @@ const _voiceSynthTracker = createVoiceSynthTracker();
 const _voiceWarmup = createVoicevoxWarmup();
 const synthesizeVoiceWarm = withVoiceWarmup(_voiceWarmup, synthesizeVoice);
 // v0.1.1777: 裏の声の読み込みは、鳴らしても待たせてもいない時だけ(次のコメントを待たせない)。
-wireVoiceWarmupHooks(_voiceWarmup, () => !_voicePlaying && _voiceQueue.length === 0, () => _voiceDiag);
+wireVoiceWarmupHooks(_voiceWarmup, () => !_voicePlaying && _voiceQueue.length === 0, () => _voiceDiag, chromeVoiceEngineLink());
 
 /**
  * 合成を依頼し、段階計測を _voiceDiag へ記録する(戻り値・例外は synthesizeVoice と同じ)。
