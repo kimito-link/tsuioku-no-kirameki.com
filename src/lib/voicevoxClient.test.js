@@ -5,7 +5,9 @@ import {
   buildVoiceReadingText,
   classifyVoicevoxAliveFailure,
   defaultVoicevoxAliveTimeoutMs,
+  initializeVoicevoxSpeaker,
   isVoicevoxAlive,
+  proxyTextResponse,
   probeVoicevoxAlive,
   isWhisperStyleName,
   listVoicevoxStyleIds,
@@ -430,5 +432,30 @@ describe('buildMergedVoiceText', () => {
         { maxChars: 40 }
       )
     ).toBe(`りすなー、${'あ'.repeat(40)}、ほか2件`);
+  });
+});
+
+describe('proxyTextResponse(Background 経由の応答)', () => {
+  it('204(中身なし)でも例外にならず ok の Response になる', () => {
+    const r = proxyTextResponse({ text: '', status: 204 });
+    expect(r.ok).toBe(true);
+    expect(r.status).toBe(204);
+  });
+  it('本文つきの 200 はそのまま読める', async () => {
+    const r = proxyTextResponse({ text: '{"a":1}', status: 200 });
+    expect(await r.text()).toBe('{"a":1}');
+  });
+  it('状態が壊れていたら 502(失敗扱い)', () => {
+    expect(proxyTextResponse({ text: 'x', status: 0 }).ok).toBe(false);
+  });
+  it('content script から initialize_speaker(204)を頼んでも打ち切りを待たずに true', async () => {
+    const sendMessage = vi.fn((_msg, cb) => cb({ text: '', status: 204, ok: true }));
+    vi.stubGlobal('chrome', { runtime: { sendMessage, lastError: undefined } });
+    try {
+      expect(await initializeVoicevoxSpeaker(8, { timeoutMs: 1000 })).toBe(true);
+      expect(sendMessage.mock.calls[0][0].url).toContain('/initialize_speaker?speaker=8');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
