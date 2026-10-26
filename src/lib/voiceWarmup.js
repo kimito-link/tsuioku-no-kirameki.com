@@ -26,6 +26,7 @@
 
 import { initializeVoicevoxSpeaker, warmupVoicevoxQuery } from './voicevoxClient.js';
 import { VOICE_NARROW_STYLE_IDS } from './voiceNarrowing.js';
+export { chromeVoiceEngineLink } from './voiceEngineActivity.js';
 import { isStreamedVoice, rememberVoiceStylePeak } from './voiceStream.js';
 import { measureVoiceWavLevel } from './voiceVolume.js';
 
@@ -81,8 +82,15 @@ export function createVoiceWarmup(deps) {
   let pumpTimer = null;
   /** 最後に合成を始めた・終えた時刻。 */
   let lastActivityAt = -Infinity;
-  /** @type {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void }} */
+  /** @type {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void, onActivity?: () => void, engineQuietMs?: () => Promise<number>, onRemoteBusy?: () => void }} */
   let hooks = {};
+  /** もう片方のページが VOICEVOX を使っていないか聞いている最中(v0.1.1781)。 */
+  let remoteChecking = false;
+
+  /** 合成・読み込みの合図(もう片方のページへ・v0.1.1781)。 */
+  function signalActivity() {
+    try { if (typeof hooks.onActivity === 'function') hooks.onActivity(); } catch { /* 合図は本体を止めない */ }
+  }
   /** 少しずつ受け取り中の声が届き終わるのを待つ約束(無ければ null)。 */
   /** @type {Promise<unknown>|null} */
   let streamGate = null;
@@ -112,21 +120,48 @@ export function createVoiceWarmup(deps) {
 
   /** 合成が走っていなければ、裏の読み込みを1つ始める。 */
   function pump() {
-    if (pumpTimer !== null || later.size === 0) return;
+    if (pumpTimer !== null || remoteChecking || later.size === 0) return;
     pumpTimer = setT(() => {
       pumpTimer = null;
       if (later.size === 0) return;
-      let playerIdle = true;
-      try { playerIdle = typeof hooks.isIdle === 'function' ? hooks.isIdle() !== false : true; } catch { playerIdle = true; }
       // 合成・再生・読む順番待ちのどれかがある、または動きが止まって間もない時は、少し後でもう一度見る。
-      if (active > 0 || pending > 0 || !playerIdle || now() - lastActivityAt < VOICE_IDLE_INIT_DELAY_MS) {
+      if (!locallyIdle()) {
         pump();
         return;
       }
-      const key = /** @type {string} */ (later.values().next().value);
-      later.delete(key);
-      void ensureInternal(Number(key), true).then(() => {}, () => {});
+      if (typeof hooks.engineQuietMs !== 'function') {
+        startNext();
+        return;
+      }
+      // v0.1.1781: もう片方のページ(会場/コメビュ)が読んでいる最中なら待つ(VOICEVOX は1本の列)。
+      remoteChecking = true;
+      const ask = /** @type {() => Promise<number>} */ (hooks.engineQuietMs);
+      void Promise.resolve().then(ask).then((q) => q, () => Infinity).then((q) => {
+        remoteChecking = false;
+        if (!(Number(q) >= VOICE_IDLE_INIT_DELAY_MS)) {
+          try { if (typeof hooks.onRemoteBusy === 'function') hooks.onRemoteBusy(); } catch { /* 計器 */ }
+          pump();
+          return;
+        }
+        if (!locallyIdle()) { pump(); return; }
+        startNext();
+      });
     }, VOICE_IDLE_INIT_DELAY_MS);
+  }
+
+  /** このページで合成・再生・順番待ちが無く、静かになって VOICE_IDLE_INIT_DELAY_MS たったか。 */
+  function locallyIdle() {
+    let playerIdle = true;
+    try { playerIdle = typeof hooks.isIdle === 'function' ? hooks.isIdle() !== false : true; } catch { playerIdle = true; }
+    return active === 0 && pending === 0 && playerIdle && now() - lastActivityAt >= VOICE_IDLE_INIT_DELAY_MS;
+  }
+
+  /** 裏で読み込む列の先頭を1つ始める。 */
+  function startNext() {
+    if (later.size === 0) return;
+    const key = /** @type {string} */ (later.values().next().value);
+    later.delete(key);
+    void ensureInternal(Number(key), true).then(() => {}, () => {});
   }
 
   /**
@@ -163,7 +198,9 @@ export function createVoiceWarmup(deps) {
       if (warm.has(key)) return true;
       let ok = false;
       const t0 = now();
+      signalActivity();
       try { ok = !!(await deps.initSpeaker(id)); } catch { ok = false; }
+      signalActivity();
       try { if (typeof hooks.onInit === 'function') hooks.onInit(Math.max(0, now() - t0), background); } catch { /* 計器は本体を止めない */ }
       if (myEpoch === epoch) (ok ? warm : failed).add(key);
       return ok;
@@ -267,6 +304,7 @@ export function createVoiceWarmup(deps) {
     beforeSynth() {
       active += 1;
       lastActivityAt = now();
+      signalActivity();
       const gate = streamGate;
       if (!gate) return null;
       return waitGate(gate);
@@ -291,7 +329,8 @@ export function createVoiceWarmup(deps) {
     /**
      * 再生側の様子と計器をつなぐ(v0.1.1777)。isIdle: 再生も順番待ちも無い時 true。
      *   onInit: 声を読み込んだ時間(ms)と、裏の読み込みだったか。
-     * @param {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void }} h
+     *   v0.1.1781: onActivity(合成・読み込みの合図) / engineQuietMs(両ページ通して静かな時間) / onRemoteBusy(計器)。
+     * @param {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void, onActivity?: () => void, engineQuietMs?: () => Promise<number>, onRemoteBusy?: () => void }} h
      */
     setHooks(h) {
       hooks = h && typeof h === 'object' ? h : {};
@@ -305,7 +344,7 @@ export function createVoiceWarmup(deps) {
      * @param {unknown} result
      */
     afterSynth(result) {
-      const done = () => { active = Math.max(0, active - 1); lastActivityAt = now(); pump(); };
+      const done = () => { active = Math.max(0, active - 1); lastActivityAt = now(); signalActivity(); pump(); };
       if (isStreamedVoice(result)) {
         void result.whenDone.then(done, done);
         return;
@@ -439,11 +478,19 @@ export function startVoiceWarmup(warmup, allStyleIds) {
  * @param {ReturnType<typeof createVoiceWarmup>|null|undefined} warmup
  * @param {() => boolean} isPlayerIdle 再生中でも順番待ちでもない時 true
  * @param {() => Record<string, any>} getDiag
+ * @param {{ ping: () => void, quietMs: () => Promise<number> } | null} [engine] 両ページで VOICEVOX の使用中を分け合う口(voiceEngineActivity.js)
  */
-export function wireVoiceWarmupHooks(warmup, isPlayerIdle, getDiag) {
+export function wireVoiceWarmupHooks(warmup, isPlayerIdle, getDiag, engine) {
   if (!warmup) return;
   warmup.setHooks({
     isIdle: isPlayerIdle,
+    onActivity: engine ? () => engine.ping() : undefined,
+    engineQuietMs: engine ? () => engine.quietMs() : undefined,
+    onRemoteBusy: () => {
+      const d = getDiag();
+      // もう片方のページが VOICEVOX を使っていたので裏の読み込みを見送った回数(v0.1.1781)。
+      if (d && typeof d === 'object') d.bgInitYieldTotal = (Number(d.bgInitYieldTotal) || 0) + 1;
+    },
     onInit: (ms, background) => {
       if (!background) return;
       const d = getDiag();

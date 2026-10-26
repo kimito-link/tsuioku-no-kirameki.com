@@ -2170,6 +2170,20 @@
       ]
     },
     {
+      "file": "src/lib/voiceEngineActivity.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceLagNotice.js",
       "featureCount": 3,
       "features": [

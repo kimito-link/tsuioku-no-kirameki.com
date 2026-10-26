@@ -77,6 +77,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   e2eMaxMs: number,            // 同上の最大ms
  *   bgInitTotal: number,         // v0.1.1777計器: 合成の合間に裏で声を読み込んだ件数
  *   bgInitMaxMs: number,         // 同上の最長ms
+ *   bgInitYieldTotal: number,    // もう片方のページが使用中で裏の読み込みを見送った回数(v0.1.1781)
  *   streamTotal: number,         // 2026-10-26計器: 少しずつ受け取って読んだ件数(voiceStream)
  *   warmSynthSamples: number,    // 2026-10-26計器: warmSynthEmaMs に入れた件数(弱い PC の判定はこれが5件から)
  *   contendedSynthTotal: number, // 2026-10-26計器: 別の声の準備と重なって速さの物差しから外した件数
@@ -174,6 +175,7 @@ export function makeInitialVoiceDiag() {
     e2eMaxMs: 0,
     bgInitTotal: 0,
     bgInitMaxMs: 0,
+    bgInitYieldTotal: 0,
     streamTotal: 0,
     streamFirstAudioEmaMs: -1,
     warmSynthSamples: 0,
@@ -275,6 +277,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     e2eMaxMs: num(d.e2eMaxMs, base.e2eMaxMs),
     bgInitTotal: num(d.bgInitTotal, base.bgInitTotal),
     bgInitMaxMs: num(d.bgInitMaxMs, base.bgInitMaxMs),
+    bgInitYieldTotal: num(d.bgInitYieldTotal, base.bgInitYieldTotal),
     streamTotal: num(d.streamTotal, base.streamTotal),
     warmSynthSamples: num(d.warmSynthSamples, base.warmSynthSamples),
     contendedSynthTotal: num(d.contendedSynthTotal, base.contendedSynthTotal),
