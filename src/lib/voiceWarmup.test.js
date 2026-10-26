@@ -404,4 +404,30 @@ describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本�
     expect(diag.bgInitTotal).toBe(1);
     expect(diag.bgInitMaxMs).toBe(700);
   });
+  it('v0.1.1781: もう片方のページが VOICEVOX を使っている間は裏の読み込みを見送り、静かになってから始める', async () => {
+    vi.useFakeTimers();
+    const calls = [];
+    const w = createVoiceWarmup({ initSpeaker: async (id) => { calls.push(id); return true; } });
+    let remoteQuiet = 0;
+    const diag = {};
+    wireVoiceWarmupHooks(w, () => true, () => diag, { ping: () => {}, quietMs: async () => remoteQuiet });
+    void w.ensureWhenIdle(8);
+    for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(calls).toEqual([]);
+    expect(diag.bgInitYieldTotal).toBeGreaterThanOrEqual(2);
+    remoteQuiet = VOICE_IDLE_INIT_DELAY_MS;
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(calls).toEqual([8]);
+  });
+
+  it('v0.1.1781: 合成と声の読み込みの前後で、もう片方のページへ合図を送る', async () => {
+    const ping = vi.fn();
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    wireVoiceWarmupHooks(w, () => true, () => ({}), { ping, quietMs: async () => Infinity });
+    await w.ensure(3);
+    expect(ping).toHaveBeenCalledTimes(2);
+    const f = withVoiceWarmup(w, async () => new ArrayBuffer(4));
+    await f('こんにちは', { styleId: 3 }, {});
+    expect(ping).toHaveBeenCalledTimes(4);
+  });
 });
