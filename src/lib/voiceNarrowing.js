@@ -24,14 +24,26 @@ export const VOICE_WEAK_PC_WARM_SYNTH_MS = 500;
 export const VOICE_WEAK_PC_COLD_SYNTH_MS = 3000;
 
 /**
+ * 2回目以降の合成を、これだけの件数測ってから判定する(2026-10-26)。
+ *   PC 実測で、速い PC が最初の数件(声の準備と重なった回)だけで「弱い」と記録された。
+ */
+export const VOICE_WEAK_PC_MIN_WARM_SAMPLES = 5;
+
+/** 速い PC と分かったら、誤って残った「弱い」の記録を消す件数。 */
+export const VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
+
+/**
  * P1 の計器から「弱いPC」かを決める。まだ測れていなければ false(=絞らない・今のまま)。
- * @param {{ warmSynthEmaMs?: number, coldSynthMaxMs?: number }} diag
+ *   2回目以降の合成は VOICE_WEAK_PC_MIN_WARM_SAMPLES 件そろってから見る。
+ *   計器(voiceStageTiming)は、声の準備と重なった回を warm/cold に入れない。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
  * @returns {boolean}
  */
 export function isWeakVoicePc(diag) {
   const warm = Number(diag?.warmSynthEmaMs);
+  const samples = Number(diag?.warmSynthSamples) || 0;
   const cold = Number(diag?.coldSynthMaxMs);
-  if (Number.isFinite(warm) && warm >= VOICE_WEAK_PC_WARM_SYNTH_MS) return true;
+  if (samples >= VOICE_WEAK_PC_MIN_WARM_SAMPLES && Number.isFinite(warm) && warm >= VOICE_WEAK_PC_WARM_SYNTH_MS) return true;
   if (Number.isFinite(cold) && cold >= VOICE_WEAK_PC_COLD_SYNTH_MS) return true;
   return false;
 }
@@ -120,4 +132,31 @@ export function rememberWeakVoicePc(diag, state, write) {
   if (state.saved || !isWeakVoicePc(diag)) return;
   state.saved = true;
   Promise.resolve().then(() => write(true)).catch(() => { /* 記録の失敗は読み上げに影響させない */ });
+}
+
+/**
+ * 速い PC と十分に分かったか(2回目以降の合成が十分な件数そろって速く、初めての声も遅くない)。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
+ * @returns {boolean}
+ */
+export function isFastVoicePc(diag) {
+  const warm = Number(diag?.warmSynthEmaMs);
+  const samples = Number(diag?.warmSynthSamples) || 0;
+  const cold = Number(diag?.coldSynthMaxMs) || 0;
+  return samples >= VOICE_FAST_PC_MIN_WARM_SAMPLES
+    && Number.isFinite(warm) && warm >= 0 && warm < VOICE_WEAK_PC_WARM_SYNTH_MS
+    && cold < VOICE_WEAK_PC_COLD_SYNTH_MS;
+}
+
+/**
+ * 2026-10-26: 「弱い」と誤って記録された速い PC の記録を一度だけ消す(PC 実測で起きた)。
+ *   消さないと、短いコメントまで少しずつ受け取り、かえって遅くなる(0.3秒→0.7秒)。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
+ * @param {{ cleared?: boolean }} state
+ * @param {() => unknown} clear
+ */
+export function forgetWeakVoicePcIfFast(diag, state, clear) {
+  if (state.cleared || !isFastVoicePc(diag)) return;
+  state.cleared = true;
+  Promise.resolve().then(() => clear()).catch(() => { /* 記録の失敗は読み上げに影響させない */ });
 }

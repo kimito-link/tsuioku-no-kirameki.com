@@ -121,7 +121,7 @@ describe('withVoiceWarmup', () => {
     expect(withVoiceWarmup(null, synth)).toBe(synth);
   });
 
-  it('温まった声は待たずに合成し、打ち切りを延ばさない', async () => {
+  it('温まった声は待たずに合成する(打ち切りは割り込みに備えて常に8秒)', async () => {
     const initSpeaker = vi.fn(async () => true);
     const w = createVoiceWarmup({ initSpeaker });
     w.markWarm(3);
@@ -132,7 +132,7 @@ describe('withVoiceWarmup', () => {
     expect(synth).toHaveBeenCalledTimes(1);
     await p;
     expect(initSpeaker).not.toHaveBeenCalled();
-    expect(synth.mock.calls[0][2].audioQueryTimeoutMs).toBeUndefined();
+    expect(synth.mock.calls[0][2].audioQueryTimeoutMs).toBe(VOICE_WARMUP_QUERY_TIMEOUT_MS);
   });
 
   it('初めての声は読み込んでから合成し、initMs を onTiming に足す', async () => {
@@ -145,7 +145,7 @@ describe('withVoiceWarmup', () => {
     });
     const f = withVoiceWarmup(w, synth);
     await f('こんにちは', { styleId: 2 }, { onTiming: (x) => timings.push(x) });
-    expect(timings).toEqual([{ queryMs: 100, synthMs: 200, initMs: 3500 }]);
+    expect(timings).toEqual([{ queryMs: 100, synthMs: 200, initMs: 3500, contended: false }]);
     expect(w.isWarm(2)).toBe(true);
   });
 
@@ -164,6 +164,18 @@ describe('withVoiceWarmup', () => {
     const synth2 = vi.fn(async () => new ArrayBuffer(1));
     await withVoiceWarmup(w2, synth2)('あ', { styleId: 3 }, {});
     expect(synth2.mock.calls[0][2].audioQueryTimeoutMs).toBe(VOICE_WARMUP_QUERY_TIMEOUT_MS);
+    d.resolve(true);
+  });
+
+  it('別の声の読み込みと重なった回は contended を付ける(弱い PC の判定から外すため)', async () => {
+    const d = deferred();
+    const w = createVoiceWarmup({ initSpeaker: async (id) => { if (id === 8) await d.promise; return true; } });
+    w.markWarm(3);
+    void w.ensure(8);
+    const timings = [];
+    const synth = async (_t, _v, opts) => { opts.onTiming({ queryMs: 1, synthMs: 1 }); return new ArrayBuffer(1); };
+    await withVoiceWarmup(w, synth)('あ', { styleId: 3 }, { onTiming: (x) => timings.push(x) });
+    expect(timings[0].contended).toBe(true);
     d.resolve(true);
   });
 
