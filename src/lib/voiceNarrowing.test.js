@@ -81,9 +81,14 @@ describe('initializeVoicevoxSpeaker', () => {
 });
 
 describe('設定(しない/遅いPCと分かったら/いつも)', () => {
-  it('既定と壊れた値は「しない」', () => {
-    expect(normalizeVoiceNarrowMode(undefined)).toBe('off');
-    expect(normalizeVoiceNarrowMode('weird')).toBe('off');
+  it('既定と壊れた値は「遅いPCと分かったら」・自分で選んだ「しない」はそのまま', () => {
+    expect(normalizeVoiceNarrowMode(undefined)).toBe('auto');
+    expect(normalizeVoiceNarrowMode('weird')).toBe('auto');
+    expect(normalizeVoiceNarrowMode('off')).toBe('off');
+  });
+  it('既定のままでも、遅いPCと記録されたら絞る', () => {
+    expect(isVoiceNarrowActive(undefined, true)).toBe(true);
+    expect(isVoiceNarrowActive(undefined, false)).toBe(false);
   });
   it('auto は「遅いPC」と記録されたときだけ絞る', () => {
     expect(isVoiceNarrowActive('off', true)).toBe(false);
