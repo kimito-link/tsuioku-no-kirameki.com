@@ -33,7 +33,7 @@ import {
   computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 import {
-  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, recordVoiceSynthStage
+  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceSynthStage
 } from './voiceStageTiming.js';
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT
@@ -195,6 +195,7 @@ export class VoicePlayer {
       coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
       speakerInitTotal: 0, speakerInitMaxMs: 0,
       streamTotal: 0, streamFirstAudioEmaMs: -1, warmSynthSamples: 0, contendedSynthTotal: 0,
+      warmSynthRtfPermille: -1, warmRtfSamples: 0,
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
     // 2026-10-22計器(P1): 合成1件ごとのエンジン待ち・初めての声を測る(印字専用)。
@@ -533,7 +534,7 @@ export class VoicePlayer {
     return Promise.resolve(started)
       .then(
         (wav) => {
-          try { recordVoiceSynthStage(this.diag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
+          try { recordVoiceSynthStage(this.diag, track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav)); } catch { /* 計器は本体を止めない */ }
           // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
           if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
           // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す。

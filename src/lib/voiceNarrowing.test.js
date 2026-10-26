@@ -36,6 +36,16 @@ describe('isWeakVoicePc', () => {
     expect(isFastVoicePc({ warmSynthEmaMs: 600, warmSynthSamples: 20 })).toBe(false);
     expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 20, coldSynthMaxMs: 8000 })).toBe(false);
   });
+  it('2026-10-26 PC実測: 声の長さで割った比があれば比で見る(長文の多いグラボ有りPCを弱いとしない)', () => {
+    // グラボ有り: 長文で合成 900ms でも、声が 7秒なら比は約130
+    expect(isWeakVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 8, warmSynthRtfPermille: 130, warmRtfSamples: 8 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 12, warmSynthRtfPermille: 130, warmRtfSamples: 12 })).toBe(true);
+    // グラボ無し: 比は約800
+    expect(isWeakVoicePc({ warmSynthEmaMs: 1400, warmSynthSamples: 6, warmSynthRtfPermille: 800, warmRtfSamples: 5 })).toBe(true);
+    // 比が測れ始めたら、そろうまで ms には戻らない
+    expect(isWeakVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 8, warmSynthRtfPermille: 130, warmRtfSamples: 4 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 12, warmSynthRtfPermille: 900, warmRtfSamples: 3 })).toBe(false);
+  });
 });
 
 describe('narrowVoiceStyleIds', () => {

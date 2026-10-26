@@ -4,6 +4,7 @@ import {
   foldVoiceStageEma,
   formatVoiceStageBreakdown,
   measureVoiceGapMs,
+  measureWavAudioMs,
   recordVoiceSynthStage,
   VOICE_UPSTREAM_SANE_MAX_MS
 } from './voiceStageTiming.js';
@@ -177,5 +178,41 @@ describe('状態速報への表示', () => {
     const snap = buildVoiceDiagSnapshot(diag, now, 'lv1');
     expect(snap.speakerInitMaxMs).toBe(3500);
     expect(formatVoiceStageBreakdown(snap)).toBe('遅れの段階(声の読み込み2件(最大3.5秒))');
+  });
+});
+
+describe('2026-10-26 声の長さで割った合成の速さ', () => {
+  /** @param {number} sampleRate @param {number} samples */
+  function wav(sampleRate, samples) {
+    const buf = new ArrayBuffer(44 + samples * 2);
+    const v = new DataView(buf);
+    const tag = (o, s) => { for (let i = 0; i < 4; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    tag(0, 'RIFF'); v.setUint32(4, 36 + samples * 2, true); tag(8, 'WAVE');
+    tag(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    tag(36, 'data'); v.setUint32(40, samples * 2, true);
+    return buf;
+  }
+  it('measureWavAudioMs は WAV の声の長さを返し、読めなければ -1', () => {
+    expect(measureWavAudioMs(wav(24000, 48000))).toBe(2000);
+    expect(measureWavAudioMs(wav(16000, 8000))).toBe(500);
+    expect(measureWavAudioMs(new ArrayBuffer(10))).toBe(-1);
+    expect(measureWavAudioMs(null)).toBe(-1);
+    expect(measureWavAudioMs(new ArrayBuffer(64))).toBe(-1);
+  });
+  it('warm の合成は比(×1000)も残す・短すぎる声は比に入れない', () => {
+    const diag = makeInitialVoiceDiag();
+    const base = { cold: false, ok: true, engineWaitMs: 0, queryMs: 10, synthMs: 100, initMs: 0, streamed: false, contended: false };
+    recordVoiceSynthStage(diag, { ...base, totalMs: 900, audioMs: 6000 });
+    expect(diag.warmSynthRtfPermille).toBe(150);
+    expect(diag.warmRtfSamples).toBe(1);
+    recordVoiceSynthStage(diag, { ...base, totalMs: 100, audioMs: 200 });
+    expect(diag.warmRtfSamples).toBe(1);
+    expect(diag.warmSynthSamples).toBe(2);
+  });
+  it('tracker は audioMs を通す', () => {
+    const t = createVoiceSynthTracker({ now: () => 0 });
+    expect(t.begin(1).end({ audioMs: 1234 }).audioMs).toBe(1234);
+    expect(t.begin(1).end({}).audioMs).toBe(-1);
   });
 });

@@ -33,6 +33,33 @@ export const VOICE_WEAK_PC_MIN_WARM_SAMPLES = 5;
 export const VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
 
 /**
+ * 合成時間÷声の長さ(×1000)がこれ以上なら「弱い」(2026-10-26 PC 実測: グラボ有り約120・無し約800)。
+ *   ms だけで見ると、長いコメントの多い配信で速い PC が「弱い」と記録された(v0.1.1768 実測)。
+ */
+export const VOICE_WEAK_PC_RTF_PERMILLE = 400;
+
+/**
+ * 2回目以降の合成が遅いか。声の長さで割った比が十分そろっていれば比で、
+ *   比が1件も無ければ(古い計器・短い声ばかり)今までどおり ms で見る。まだ測れていなければ null。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, warmSynthRtfPermille?: number, warmRtfSamples?: number }} diag
+ * @param {number} minSamples
+ * @returns {boolean|null}
+ */
+function isWarmSynthSlow(diag, minSamples) {
+  const rtf = Number(diag?.warmSynthRtfPermille);
+  const rtfSamples = Number(diag?.warmRtfSamples) || 0;
+  if (rtfSamples > 0) {
+    // 比が1件でも測れていれば比だけで見る(ms に戻ると長文の多い配信で速い PC を見誤る)。
+    if (rtfSamples < minSamples || !Number.isFinite(rtf) || rtf < 0) return null;
+    return rtf >= VOICE_WEAK_PC_RTF_PERMILLE;
+  }
+  const warm = Number(diag?.warmSynthEmaMs);
+  const samples = Number(diag?.warmSynthSamples) || 0;
+  if (samples >= minSamples && Number.isFinite(warm) && warm >= 0) return warm >= VOICE_WEAK_PC_WARM_SYNTH_MS;
+  return null;
+}
+
+/**
  * P1 の計器から「弱いPC」かを決める。まだ測れていなければ false(=絞らない・今のまま)。
  *   2回目以降の合成は VOICE_WEAK_PC_MIN_WARM_SAMPLES 件そろってから見る。
  *   計器(voiceStageTiming)は、声の準備と重なった回を warm/cold に入れない。
@@ -40,10 +67,8 @@ export const VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
  * @returns {boolean}
  */
 export function isWeakVoicePc(diag) {
-  const warm = Number(diag?.warmSynthEmaMs);
-  const samples = Number(diag?.warmSynthSamples) || 0;
   const cold = Number(diag?.coldSynthMaxMs);
-  if (samples >= VOICE_WEAK_PC_MIN_WARM_SAMPLES && Number.isFinite(warm) && warm >= VOICE_WEAK_PC_WARM_SYNTH_MS) return true;
+  if (isWarmSynthSlow(diag, VOICE_WEAK_PC_MIN_WARM_SAMPLES) === true) return true;
   if (Number.isFinite(cold) && cold >= VOICE_WEAK_PC_COLD_SYNTH_MS) return true;
   return false;
 }
@@ -144,11 +169,8 @@ export function rememberWeakVoicePc(diag, state, write) {
  * @returns {boolean}
  */
 export function isFastVoicePc(diag) {
-  const warm = Number(diag?.warmSynthEmaMs);
-  const samples = Number(diag?.warmSynthSamples) || 0;
   const cold = Number(diag?.coldSynthMaxMs) || 0;
-  return samples >= VOICE_FAST_PC_MIN_WARM_SAMPLES
-    && Number.isFinite(warm) && warm >= 0 && warm < VOICE_WEAK_PC_WARM_SYNTH_MS
+  return isWarmSynthSlow(diag, VOICE_FAST_PC_MIN_WARM_SAMPLES) === false
     && cold < VOICE_WEAK_PC_COLD_SYNTH_MS;
 }
 
