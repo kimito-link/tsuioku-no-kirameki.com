@@ -26,7 +26,8 @@
 
 import { initializeVoicevoxSpeaker, warmupVoicevoxQuery } from './voicevoxClient.js';
 import { VOICE_NARROW_STYLE_IDS } from './voiceNarrowing.js';
-import { isStreamedVoice } from './voiceStream.js';
+import { isStreamedVoice, rememberVoiceStylePeak } from './voiceStream.js';
+import { measureVoiceWavLevel } from './voiceVolume.js';
 
 /** 合成が終わってから、裏の読み込みを始めるまで待つ時間(ms)。次の先読みが始まる隙を残す。 */
 export const VOICE_IDLE_INIT_DELAY_MS = 400;
@@ -260,6 +261,10 @@ export function createVoiceWarmup(deps) {
       };
     },
 
+    /** 走っている合成の数(少しずつ受け取り中も含む)。 */
+    activeCount() {
+      return active;
+    },
     /**
      * 合成が終わったら呼ぶ。少しずつ受け取った声は、届き終わってから「終わった」にする。
      * @param {unknown} result
@@ -330,17 +335,23 @@ export function withVoiceWarmup(warmup, synth) {
       }
     }
     const initMs = Math.max(0, warmup.now() - startAt);
+    // v0.1.1775: 他の合成がまだエンジンで走っている時は、少しずつ受け取らず丸ごと作る
+    //   (先に始まった合成とエンジンを取り合い、鳴っている声の続きが間に合わなかった・グラボ無しのコメビュ)。
+    const streamOk = opts?.stream === true && warmup.activeCount() === 0 && !warmup.busy();
+    /** @type {any} */
+    const callOpts = { ...opts };
+    if (!streamOk) delete callOpts.stream;
     const gate = warmup.beforeSynth();
     if (gate) await gate;
     // 少しずつ受け取る合成は、頼んだ時点で次の合成を待たせる(届き終わるまで)。
-    const releaseStream = opts?.stream === true ? warmup.closeStreamGate() : null;
+    const releaseStream = streamOk ? warmup.closeStreamGate() : null;
     const busyAtStart = warmup.busy();
     const onTiming = opts?.onTiming;
     /** @type {any} */
     let wav = null;
     try {
       wav = await synth(text, borrowed ? { ...voice, styleId: useStyle } : voice, {
-        ...opts,
+        ...callOpts,
         audioQueryTimeoutMs: Math.max(Number(opts?.audioQueryTimeoutMs) || 0, VOICE_WARMUP_QUERY_TIMEOUT_MS),
         onTiming: (/** @type {any} */ t) => {
           // contended: 別の声の準備と重なった=エンジンを取り合った回。弱い PC の判定に使わない。
@@ -353,6 +364,17 @@ export function withVoiceWarmup(warmup, synth) {
       if (releaseStream) releaseStream(wav);
     }
     if (wav) warmup.markWarm(useStyle);
+    // v0.1.1775: 声ごとの素の大きさを覚える(次に少しずつ読む時の最初の倍率に使う)。
+    try {
+      if (isStreamedVoice(wav)) {
+        wav.styleId = useStyle;
+        const sv = wav;
+        void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak); }, () => {});
+      } else if (wav instanceof ArrayBuffer) {
+        const level = measureVoiceWavLevel(wav);
+        if (level) rememberVoiceStylePeak(useStyle, level.peak);
+      }
+    } catch { /* 計器・補助は本体を止めない */ }
     return wav;
   };
 }

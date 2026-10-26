@@ -116,7 +116,7 @@ export async function runVoiceTest(o) {
   while (!o.isIdle() && now() < settleBy) await sleep(250);
   // 声ごとの大きさの最小/最大は「その回の分」だけを見る(差分にできない値なので、始めに戻す)。
   const live = o.getDiag();
-  if (live && typeof live === 'object') { live.outRmsDbMin = 999; live.outRmsDbMax = -999; live.e2eMaxMs = 0; }
+  if (live && typeof live === 'object') { live.outRmsDbMin = 999; live.outRmsDbMax = -999; live.e2eMaxMs = 0; live.lastPlayIssue = ''; }
   const before = JSON.parse(JSON.stringify(o.getDiag() || {}));
   const startedAt = now();
   for (const { gapMs, item } of plan) {
