@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1752',
+    date: '2026-10-22',
+    summary: 'スマホ用の送信は映している配信だけに',
+    items: Object.freeze([
+      'PC で複数の配信を同時に開いていると、スマホ用に送るまとめに、スマホでは映さない他の配信の情報も入っていました。',
+      'スマホで映している1配信(PC で最後に操作した配信)だけを送るようにしました。送る量が減り、他の配信の情報がサーバーに残りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1751',
     date: '2026-10-22',
     summary: 'スマホで声が先に届いても画面を合わせる',
