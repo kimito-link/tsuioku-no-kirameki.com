@@ -127,6 +127,16 @@ describe('recordVoiceSynthStage', () => {
     expect(d.synthesisEmaMs).toBe(-1);
     expect(formatVoiceStageBreakdown(d)).toContain('少しずつ1件(最初の声まで0.9秒)');
   });
+  it('別の声の準備と重なった回は warm/cold に入れず、別に数える', () => {
+    const d = makeInitialVoiceDiag();
+    recordVoiceSynthStage(d, { cold: false, ok: true, totalMs: 4000, engineWaitMs: 0, queryMs: 3800, synthMs: 200, initMs: 0, streamed: false, contended: true });
+    expect(d.warmSynthEmaMs).toBe(-1);
+    expect(d.warmSynthSamples).toBe(0);
+    expect(d.contendedSynthTotal).toBe(1);
+    recordVoiceSynthStage(d, { cold: false, ok: true, totalMs: 300, engineWaitMs: 0, queryMs: 100, synthMs: 200, initMs: 0, streamed: false, contended: false });
+    expect(d.warmSynthEmaMs).toBe(300);
+    expect(d.warmSynthSamples).toBe(1);
+  });
   it('tracker は onTiming の initMs を返す(無ければ 0)', () => {
     const c = clock(0);
     const t = createVoiceSynthTracker({ now: c.now });

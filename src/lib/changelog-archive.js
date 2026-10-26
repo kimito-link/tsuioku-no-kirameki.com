@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1747',
+    date: '2026-10-22',
+    summary: 'スマホ会場の顔なしの人をその人の顔に',
+    items: Object.freeze([
+      'スマホの会場(🎪)で、アイコンを設定していない人などの顔が、ゆっくりりんく(配信者側のキャラ)になっていました。PC の会場と同じく、その人ごとに決まるゆっくり顔を出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1746',
     date: '2026-10-22',
     summary: 'スマホ読み上げの取りこぼしを数える',

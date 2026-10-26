@@ -58,7 +58,7 @@ export function createVoiceSynthTracker(deps = {}) {
   return {
     /**
      * @param {unknown} styleId
-     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean } }}
+     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean } }}
      */
     begin(styleId) {
       const startAt = now();
@@ -91,7 +91,9 @@ export function createVoiceSynthTracker(deps = {}) {
           // 2026-10-26: 合成の前に声を読み込んだ時間(voiceWarmup)。無ければ 0。
           initMs: Number.isFinite(i) && i > 0 ? Math.round(i) : 0,
           // 2026-10-26: 少しずつ受け取った(voiceStream)。時間は「最初の声が届くまで」。
-          streamed: timing?.streamed === true
+          streamed: timing?.streamed === true,
+          // 2026-10-26: 別の声の準備と重なった(voiceWarmup)。速さの物差しに入れない。
+          contended: timing?.contended === true
         };
       };
       return { cold, end };
@@ -127,12 +129,18 @@ export function recordVoiceSynthStage(diag, r) {
     diag.speakerInitMaxMs = Math.max(Number(diag.speakerInitMaxMs) || 0, Math.round(initMs));
   }
   const ownMs = Math.max(0, r.totalMs - r.engineWaitMs - initMs);
+  if (r.contended) {
+    // 別の声の準備でエンジンが埋まっていた回。PC 実測で、ここを数えて速い PC が「弱い」と記録された。
+    diag.contendedSynthTotal = (Number(diag.contendedSynthTotal) || 0) + 1;
+    return;
+  }
   if (r.cold) {
     diag.coldSynthTotal = (Number(diag.coldSynthTotal) || 0) + 1;
     diag.coldSynthMaxMs = Math.max(Number(diag.coldSynthMaxMs) || 0, Math.round(ownMs));
     diag.lastColdSynthMs = Math.round(ownMs);
   } else {
     foldVoiceStageEma(diag, 'warmSynthEmaMs', ownMs);
+    diag.warmSynthSamples = (Number(diag.warmSynthSamples) || 0) + 1;
   }
 }
 

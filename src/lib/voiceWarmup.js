@@ -10,14 +10,15 @@
 // ■ やること
 //   - 合成の前に、まだ温まっていない声だけ /initialize_speaker を呼んで待つ(読み込みは1本の列で順番に)。
 //   - 読み上げ ON の直後に、捨てる audio_query を1回投げる(primeEngine)。
-//   - 列で読み込み中の間に別の声を合成するときは、エンジンが1件ずつしか処理しないので
-//     audio_query の打ち切りを延ばす(読み込みの後ろで待つ時間まで数えて捨てないように)。
+//   - audio_query の打ち切りを 3秒→8秒に延ばす。エンジンは1件ずつしか処理しないので、合成を
+//     頼んだ後に別の声の読み込みが割り込むと、その後ろで待つ(PC 実測: 打ち切り後に始まった読み込み
+//     でも時間切れが出た)。古くなったコメントは8秒の鮮度ゲートが別に捨てる。
 //   - 読み込みにかかった時間は onTiming の initMs で返す。計器(voiceStageTiming)は合成の時間から
 //     これを引く=速いPCが「初めての声が遅い=弱いPC」と誤って記録されないように。
 
 import { initializeVoicevoxSpeaker, warmupVoicevoxQuery } from './voicevoxClient.js';
 
-/** 読み込み中・初めての声のときの audio_query の打ち切り(ms)。普段は voicevoxClient の 3秒。 */
+/** 温めを通す合成の audio_query の打ち切り(ms)。voicevoxClient だけで使うときは 3秒のまま。 */
 export const VOICE_WARMUP_QUERY_TIMEOUT_MS = 8000;
 
 /**
@@ -157,13 +158,14 @@ export function withVoiceWarmup(warmup, synth) {
       try { ready = await warmup.ensure(styleId); } catch { ready = false; }
     }
     const initMs = Math.max(0, warmup.now() - startAt);
-    const slow = !ready || warmup.busy();
+    const busyAtStart = warmup.busy();
     const onTiming = opts?.onTiming;
     const wav = await synth(text, voice, {
       ...opts,
-      ...(slow ? { audioQueryTimeoutMs: Math.max(Number(opts?.audioQueryTimeoutMs) || 0, VOICE_WARMUP_QUERY_TIMEOUT_MS) } : {}),
+      audioQueryTimeoutMs: Math.max(Number(opts?.audioQueryTimeoutMs) || 0, VOICE_WARMUP_QUERY_TIMEOUT_MS),
       onTiming: (/** @type {any} */ t) => {
-        if (typeof onTiming === 'function') onTiming({ ...(t || {}), initMs });
+        // contended: 別の声の準備と重なった=エンジンを取り合った回。弱い PC の判定に使わない。
+        if (typeof onTiming === 'function') onTiming({ ...(t || {}), initMs, contended: busyAtStart || warmup.busy() });
       }
     });
     if (wav) warmup.markWarm(styleId);

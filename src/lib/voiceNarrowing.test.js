@@ -9,6 +9,8 @@ import {
   normalizeVoiceNarrowMode,
   prepareVoiceStyleIds,
   rememberWeakVoicePc,
+  isFastVoicePc,
+  forgetWeakVoicePcIfFast,
   VOICE_NARROW_STYLE_IDS
 } from './voiceNarrowing.js';
 import { assignVoiceForUser } from './voiceAssignment.js';
@@ -20,9 +22,19 @@ describe('isWeakVoicePc', () => {
     expect(isWeakVoicePc({})).toBe(false);
   });
   it('自宅PC(150ms)は弱くない・ノートPC(700ms/初回7.7秒)は弱い', () => {
-    expect(isWeakVoicePc({ warmSynthEmaMs: 150, coldSynthMaxMs: 900 })).toBe(false);
-    expect(isWeakVoicePc({ warmSynthEmaMs: 700 })).toBe(true);
+    expect(isWeakVoicePc({ warmSynthEmaMs: 150, warmSynthSamples: 9, coldSynthMaxMs: 900 })).toBe(false);
+    expect(isWeakVoicePc({ warmSynthEmaMs: 700, warmSynthSamples: 5 })).toBe(true);
     expect(isWeakVoicePc({ warmSynthEmaMs: 300, coldSynthMaxMs: 7700 })).toBe(true);
+  });
+  it('2026-10-26: 2回目以降の合成は5件そろうまで判定に使わない(速い PC が最初の数件で弱いと記録された)', () => {
+    expect(isWeakVoicePc({ warmSynthEmaMs: 700, warmSynthSamples: 4 })).toBe(false);
+    expect(isWeakVoicePc({ warmSynthEmaMs: 700 })).toBe(false);
+  });
+  it('isFastVoicePc は10件そろって速く、初めての声も遅くないときだけ', () => {
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 10, coldSynthMaxMs: 2300 })).toBe(true);
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 9 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 600, warmSynthSamples: 20 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 20, coldSynthMaxMs: 8000 })).toBe(false);
   });
 });
 
@@ -131,11 +143,20 @@ describe('rememberWeakVoicePc', () => {
   it('遅いと分かったら1回だけ書く・速いPCでは書かない', async () => {
     const writes = [];
     const state = { saved: false };
-    rememberWeakVoicePc({ warmSynthEmaMs: 150 }, state, () => writes.push(1));
-    rememberWeakVoicePc({ warmSynthEmaMs: 700 }, state, () => writes.push(2));
-    rememberWeakVoicePc({ warmSynthEmaMs: 900 }, state, () => writes.push(3));
+    rememberWeakVoicePc({ warmSynthEmaMs: 150, warmSynthSamples: 5 }, state, () => writes.push(1));
+    rememberWeakVoicePc({ warmSynthEmaMs: 700, warmSynthSamples: 5 }, state, () => writes.push(2));
+    rememberWeakVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 6 }, state, () => writes.push(3));
     await new Promise((r) => setTimeout(r, 0));
     expect(writes).toEqual([2]);
+  });
+  it('forgetWeakVoicePcIfFast は速いと分かったら1回だけ消す', async () => {
+    const clears = [];
+    const state = { cleared: false };
+    forgetWeakVoicePcIfFast({ warmSynthEmaMs: 300, warmSynthSamples: 3 }, state, () => clears.push(1));
+    forgetWeakVoicePcIfFast({ warmSynthEmaMs: 300, warmSynthSamples: 10 }, state, () => clears.push(2));
+    forgetWeakVoicePcIfFast({ warmSynthEmaMs: 300, warmSynthSamples: 11 }, state, () => clears.push(3));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(clears).toEqual([2]);
   });
   it('書き込みが失敗しても投げない', async () => {
     expect(() => rememberWeakVoicePc({ coldSynthMaxMs: 8000 }, { saved: false }, async () => { throw new Error('x'); })).not.toThrow();

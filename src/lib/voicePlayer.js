@@ -40,7 +40,7 @@ import {
 } from './voiceVolume.js';
 import { decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
-  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc
+  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, forgetWeakVoicePcIfFast
 } from './voiceNarrowing.js';
 
 /**
@@ -194,7 +194,7 @@ export class VoicePlayer {
       audioQueryEmaMs: -1, synthesisEmaMs: -1, warmSynthEmaMs: -1,
       coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
       speakerInitTotal: 0, speakerInitMaxMs: 0,
-      streamTotal: 0, streamFirstAudioEmaMs: -1,
+      streamTotal: 0, streamFirstAudioEmaMs: -1, warmSynthSamples: 0, contendedSynthTotal: 0,
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
     // 2026-10-22計器(P1): 合成1件ごとのエンジン待ち・初めての声を測る(印字専用)。
@@ -536,6 +536,13 @@ export class VoicePlayer {
           try { recordVoiceSynthStage(this.diag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
           // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
           if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
+          // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す。
+          if (this.storage) {
+            forgetWeakVoicePcIfFast(this.diag, this._weakPcState, () => {
+              this._slowEngine = false;
+              return this.storage.set({ [KEY_VOICE_WEAK_PC]: false });
+            });
+          }
           return wav;
         },
         (err) => {

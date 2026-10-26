@@ -113,7 +113,8 @@ import {
 } from '../lib/voiceStageTiming.js';
 import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
 import {
-  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, isWeakVoicePc
+  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, isWeakVoicePc,
+  forgetWeakVoicePcIfFast
 } from '../lib/voiceNarrowing.js';
 import {
   applyVoiceVolumeToWav,
@@ -662,6 +663,11 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
       try { recordVoiceSynthStage(_voiceDiag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
       // P3: 遅いPCと分かったら一度だけ記録(会場の VoicePlayer と同じ判定=voiceNarrowing.js)。
       rememberWeakVoicePc(_voiceDiag, _voiceWeakPcState, () => chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: true }));
+      // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す(会場と同じ)。
+      forgetWeakVoicePcIfFast(_voiceDiag, _voiceWeakPcState, () => {
+        _voiceSlowEngine = false;
+        return chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: false });
+      });
       return wav;
     },
     (err) => {
