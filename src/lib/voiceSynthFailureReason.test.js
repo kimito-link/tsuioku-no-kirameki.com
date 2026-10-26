@@ -12,6 +12,7 @@ import {
  */
 const SYNTH_LABEL_CONTRACT = Object.freeze([
   { reason: 'timeout', oldLabel: '時間切れ', newLabel: '音声合成が時間切れ' },
+  { reason: 'query_timeout', oldLabel: '時間切れ(解析)', newLabel: '音声解析が時間切れ' },
   { reason: 'unreachable', oldLabel: '接続不能(VOICEVOX未起動/落ちた)', newLabel: '音声合成時にVOICEVOXへ接続できない' },
   { reason: 'query_http', oldLabel: '解析拒否(過負荷の疑い)', newLabel: '音声解析がエラーを返した(過負荷の疑い)' },
   { reason: 'query_body', oldLabel: '解析応答が不正', newLabel: '音声解析の応答が不正' },
@@ -26,8 +27,13 @@ const SYNTH_LABEL_CONTRACT = Object.freeze([
  * 一括りにすると必ず対処を間違える。
  */
 describe('classifyVoiceSynthFailureReason', () => {
-  it('時間切れは stage を問わず timeout', () => {
-    expect(classifyVoiceSynthFailureReason({ stage: 'query', error: new Error('voicevox_timeout') })).toBe('timeout');
+  it('audio_query の時間切れは query_timeout に分ける(初めての声の取りこぼしを数える・2026-10-26)', () => {
+    expect(classifyVoiceSynthFailureReason({ stage: 'query', error: new Error('voicevox_timeout') })).toBe('query_timeout');
+    expect(adviseVoiceSynthFailure({ query_timeout: 5 })).toContain('時間内に終わって');
+  });
+
+  it('synthesis 側と段階不明の時間切れは timeout', () => {
+    expect(classifyVoiceSynthFailureReason({ error: new Error('voicevox_timeout') })).toBe('timeout');
     expect(classifyVoiceSynthFailureReason({ stage: 'synth', error: new Error('voicevox_body_timeout') })).toBe('timeout');
     expect(classifyVoiceSynthFailureReason({ stage: 'synth', error: new Error('The operation was aborted') })).toBe('timeout');
   });
@@ -55,7 +61,7 @@ describe('classifyVoiceSynthFailureReason', () => {
 });
 
 describe('formatVoiceSynthFailureReasonLine', () => {
-  it('公開理由トークンの全7値域を契約表に固定する', () => {
+  it('公開理由トークンの全8値域を契約表に固定する', () => {
     expect(VOICE_SYNTH_FAIL_REASONS).toEqual(SYNTH_LABEL_CONTRACT.map(({ reason }) => reason));
   });
 

@@ -3663,6 +3663,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return undefined;
 });
 
+// 2026-10-26: VOICEVOX の声を少しずつ中継する(会場モードの content script 用・/streaming_synthesis)。
+//   sendMessage は1往復で丸ごとしか返せないので、ポートで届いた分ずつ送る。宛先は VOICEVOX だけ。
+chrome.runtime.onConnect.addListener((port) => {
+  if (!port || port.name !== 'NLS_VOICEVOX_STREAM') return;
+  if (!port.sender || port.sender.id !== chrome.runtime.id) {
+    try { port.disconnect(); } catch { /* no-op */ }
+    return;
+  }
+  const controller = new AbortController();
+  let closed = false;
+  const send = (m) => {
+    if (closed) return;
+    try { port.postMessage(m); } catch { closed = true; controller.abort(); }
+  };
+  port.onDisconnect.addListener(() => { closed = true; controller.abort(); });
+  port.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'start') return;
+    let targetUrl;
+    try { targetUrl = new URL(String(msg.url || '')); } catch { send({ type: 'error', error: 'Invalid URL' }); return; }
+    if (!(targetUrl.hostname === '127.0.0.1' && targetUrl.port === '50021' && targetUrl.pathname === '/streaming_synthesis')) {
+      send({ type: 'error', error: 'URL not allowed' });
+      return;
+    }
+    const init = { ...(msg.init || {}), signal: controller.signal };
+    fetch(targetUrl.toString(), init)
+      .then(async (res) => {
+        send({ type: 'head', ok: res.ok, status: res.status });
+        if (!res.ok || !res.body) { send({ type: 'end' }); return; }
+        const reader = res.body.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done || closed) break;
+          send({ type: 'chunk', data: Array.from(value) });
+        }
+        send({ type: 'end' });
+      })
+      .catch((err) => send({ type: 'error', error: String(err && err.message || err) }));
+  });
+});
+
 // v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== 'NLS_FETCH_PROXY') return undefined;

@@ -4,10 +4,13 @@ import {
   foldVoiceStageEma,
   formatVoiceStageBreakdown,
   measureVoiceGapMs,
+  measureWavAudioMs,
+  recordVoiceStreamDone,
   recordVoiceSynthStage,
   VOICE_UPSTREAM_SANE_MAX_MS
 } from './voiceStageTiming.js';
 import { buildVoiceDiagLine, buildVoiceDiagSnapshot, makeInitialVoiceDiag } from './voiceDiag.js';
+import { isWeakVoicePc } from './voiceNarrowing.js';
 
 /** 手で進める時計。 */
 function clock(start = 1000) {
@@ -108,6 +111,43 @@ describe('recordVoiceSynthStage', () => {
     expect(d.coldSynthTotal).toBe(0);
     expect(d.warmSynthEmaMs).toBe(-1);
   });
+  it('声の読み込み(initMs)は合成の時間から引き、別に数える=速いPCを弱いPCと記録しない', () => {
+    const d = makeInitialVoiceDiag();
+    // 実測: 読み込み 3.5秒 + 合成 0.3秒。引かないと 3.8秒で isWeakVoicePc の 3秒を超える。
+    recordVoiceSynthStage(d, { cold: true, ok: true, totalMs: 3800, engineWaitMs: 0, queryMs: 100, synthMs: 200, initMs: 3500 });
+    expect(d.coldSynthMaxMs).toBe(300);
+    expect(isWeakVoicePc(d)).toBe(false);
+    expect(d.speakerInitTotal).toBe(1);
+    expect(d.speakerInitMaxMs).toBe(3500);
+  });
+  it('少しずつ受け取った声は別に数え、丸ごと合成の物差し(弱い PC の判定)に混ぜない', () => {
+    const d = makeInitialVoiceDiag();
+    recordVoiceSynthStage(d, { cold: false, ok: true, totalMs: 900, engineWaitMs: 0, queryMs: 300, synthMs: 600, initMs: 0, streamed: true });
+    expect(d.streamTotal).toBe(1);
+    expect(d.streamFirstAudioEmaMs).toBe(900);
+    expect(d.warmSynthEmaMs).toBe(-1);
+    expect(d.synthesisEmaMs).toBe(-1);
+    expect(formatVoiceStageBreakdown(d)).toContain('少しずつ1件(最初の声まで0.9秒)');
+  });
+  it('別の声の準備と重なった回は warm/cold に入れず、別に数える', () => {
+    const d = makeInitialVoiceDiag();
+    recordVoiceSynthStage(d, { cold: false, ok: true, totalMs: 4000, engineWaitMs: 0, queryMs: 3800, synthMs: 200, initMs: 0, streamed: false, contended: true });
+    expect(d.warmSynthEmaMs).toBe(-1);
+    expect(d.warmSynthSamples).toBe(0);
+    expect(d.contendedSynthTotal).toBe(1);
+    recordVoiceSynthStage(d, { cold: false, ok: true, totalMs: 300, engineWaitMs: 0, queryMs: 100, synthMs: 200, initMs: 0, streamed: false, contended: false });
+    expect(d.warmSynthEmaMs).toBe(300);
+    expect(d.warmSynthSamples).toBe(1);
+  });
+  it('tracker は onTiming の initMs を返す(無ければ 0)', () => {
+    const c = clock(0);
+    const t = createVoiceSynthTracker({ now: c.now });
+    const a = t.begin(3);
+    c.set(100);
+    expect(a.end({ queryMs: 10, synthMs: 20, initMs: 40 }).initMs).toBe(40);
+    const b = t.begin(2);
+    expect(b.end({}).initMs).toBe(0);
+  });
 });
 
 describe('状態速報への表示', () => {
@@ -132,5 +172,76 @@ describe('状態速報への表示', () => {
     expect(snap.upstreamEmaMs).toBe(1200);
     expect(snap.coldSynthMaxMs).toBe(6000);
     expect(buildVoiceDiagLine(snap, now)).toContain('遅れの段階(受信→キュー1.2秒・初めての声2件(最大6.0秒))');
+  });
+  it('声の読み込みもスナップショットを通って表示される', () => {
+    const now = 10_000_000;
+    const diag = { ...makeInitialVoiceDiag(), enabled: true, spokenTotal: 1, speakerInitTotal: 2, speakerInitMaxMs: 3500 };
+    const snap = buildVoiceDiagSnapshot(diag, now, 'lv1');
+    expect(snap.speakerInitMaxMs).toBe(3500);
+    expect(formatVoiceStageBreakdown(snap)).toBe('遅れの段階(声の読み込み2件(最大3.5秒))');
+  });
+});
+
+describe('2026-10-26 声の長さで割った合成の速さ', () => {
+  /** @param {number} sampleRate @param {number} samples */
+  function wav(sampleRate, samples) {
+    const buf = new ArrayBuffer(44 + samples * 2);
+    const v = new DataView(buf);
+    const tag = (o, s) => { for (let i = 0; i < 4; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    tag(0, 'RIFF'); v.setUint32(4, 36 + samples * 2, true); tag(8, 'WAVE');
+    tag(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    tag(36, 'data'); v.setUint32(40, samples * 2, true);
+    return buf;
+  }
+  it('measureWavAudioMs は WAV の声の長さを返し、読めなければ -1', () => {
+    expect(measureWavAudioMs(wav(24000, 48000))).toBe(2000);
+    expect(measureWavAudioMs(wav(16000, 8000))).toBe(500);
+    expect(measureWavAudioMs(new ArrayBuffer(10))).toBe(-1);
+    expect(measureWavAudioMs(null)).toBe(-1);
+    expect(measureWavAudioMs(new ArrayBuffer(64))).toBe(-1);
+  });
+  it('warm の合成は比(×1000・決まった 250ms を引く)も残す・短すぎる声は比に入れない', () => {
+    const diag = makeInitialVoiceDiag();
+    const base = { cold: false, ok: true, engineWaitMs: 0, queryMs: 10, synthMs: 100, initMs: 0, streamed: false, contended: false };
+    recordVoiceSynthStage(diag, { ...base, totalMs: 850, audioMs: 6000 });
+    expect(diag.warmSynthRtfPermille).toBe(100);
+    expect(diag.warmRtfSamples).toBe(1);
+    recordVoiceSynthStage(diag, { ...base, totalMs: 300, audioMs: 500 });
+    expect(diag.warmRtfSamples).toBe(1);
+    expect(diag.warmSynthSamples).toBe(2);
+  });
+  it('PC 実測(グラボ有り): 1秒の短いコメントで 420ms かかっても「弱い」しきい値(400)を超えない', () => {
+    const diag = makeInitialVoiceDiag();
+    const base = { cold: false, ok: true, engineWaitMs: 0, queryMs: 10, synthMs: 100, initMs: 0, streamed: false, contended: false };
+    recordVoiceSynthStage(diag, { ...base, totalMs: 420, audioMs: 1000 });
+    expect(diag.warmSynthRtfPermille).toBeLessThan(400);
+    // グラボ無し: 1.7秒の声に 1400ms
+    const cpu = makeInitialVoiceDiag();
+    recordVoiceSynthStage(cpu, { ...base, totalMs: 1400, audioMs: 1700 });
+    expect(cpu.warmSynthRtfPermille).toBeGreaterThan(400);
+  });
+  it('少しずつ受け取った声は、届き終わった時に全体の時間で比を数える', async () => {
+    const diag = makeInitialVoiceDiag();
+    let resolve = (_v) => {};
+    const voice = { whenDone: new Promise((r) => { resolve = r; }), failed: false, totalSamples: 32000, sampleRate: 16000 };
+    let judged = 0;
+    const r = { cold: false, ok: true, startAt: 1000, totalMs: 300, engineWaitMs: 0, queryMs: 10, synthMs: -1, initMs: 0, streamed: true, contended: false, audioMs: -1 };
+    const p = recordVoiceStreamDone(diag, r, voice, () => 1650, () => { judged++; });
+    resolve(true);
+    await p;
+    expect(diag.warmSynthRtfPermille).toBe(200);
+    expect(diag.warmRtfSamples).toBe(1);
+    expect(judged).toBe(1);
+    // 途中で止めた・初めての声は数えない
+    const failed = { ...voice, whenDone: Promise.resolve(false) };
+    await recordVoiceStreamDone(diag, r, failed, () => 9999);
+    await recordVoiceStreamDone(diag, { ...r, cold: true }, { ...voice, whenDone: Promise.resolve(true) }, () => 9999);
+    expect(diag.warmRtfSamples).toBe(1);
+  });
+  it('tracker は audioMs を通す', () => {
+    const t = createVoiceSynthTracker({ now: () => 0 });
+    expect(t.begin(1).end({ audioMs: 1234 }).audioMs).toBe(1234);
+    expect(t.begin(1).end({}).audioMs).toBe(-1);
   });
 });

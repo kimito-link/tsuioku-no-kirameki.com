@@ -69,6 +69,14 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   coldSynthTotal: number,      // 2026-10-22計器: 初めて使う声(styleId)の合成件数
  *   coldSynthMaxMs: number,      // 同上の最大所要ms(モデル初回読み込みの疑いを数字で確かめる)
  *   lastColdSynthMs: number,     // 同上の直近1件
+ *   speakerInitTotal: number,    // 2026-10-26計器: 合成の前に声を読み込んだ件数(voiceWarmup)
+ *   speakerInitMaxMs: number,    // 同上の最大所要ms(初めての声の読み込みにかかった時間)
+ *   streamTotal: number,         // 2026-10-26計器: 少しずつ受け取って読んだ件数(voiceStream)
+ *   warmSynthSamples: number,    // 2026-10-26計器: warmSynthEmaMs に入れた件数(弱い PC の判定はこれが5件から)
+ *   contendedSynthTotal: number, // 2026-10-26計器: 別の声の準備と重なって速さの物差しから外した件数
+ *   warmSynthRtfPermille: number, // 2026-10-26計器: 合成時間÷声の長さ(×1000)のEMA。弱い PC の判定はこれで見る
+ *   warmRtfSamples: number,      // 同上に入れた件数
+ *   streamFirstAudioEmaMs: number, // 同上の「最初の声が届くまで」のEMA
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
@@ -136,6 +144,14 @@ export function makeInitialVoiceDiag() {
     coldSynthTotal: 0,
     coldSynthMaxMs: 0,
     lastColdSynthMs: -1,
+    speakerInitTotal: 0,
+    speakerInitMaxMs: 0,
+    streamTotal: 0,
+    streamFirstAudioEmaMs: -1,
+    warmSynthSamples: 0,
+    contendedSynthTotal: 0,
+    warmSynthRtfPermille: -1,
+    warmRtfSamples: 0,
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -208,6 +224,14 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     coldSynthTotal: num(d.coldSynthTotal, base.coldSynthTotal),
     coldSynthMaxMs: num(d.coldSynthMaxMs, base.coldSynthMaxMs),
     lastColdSynthMs: num(d.lastColdSynthMs, base.lastColdSynthMs),
+    speakerInitTotal: num(d.speakerInitTotal, base.speakerInitTotal),
+    speakerInitMaxMs: num(d.speakerInitMaxMs, base.speakerInitMaxMs),
+    streamTotal: num(d.streamTotal, base.streamTotal),
+    warmSynthSamples: num(d.warmSynthSamples, base.warmSynthSamples),
+    contendedSynthTotal: num(d.contendedSynthTotal, base.contendedSynthTotal),
+    warmSynthRtfPermille: num(d.warmSynthRtfPermille, base.warmSynthRtfPermille),
+    warmRtfSamples: num(d.warmRtfSamples, base.warmRtfSamples),
+    streamFirstAudioEmaMs: num(d.streamFirstAudioEmaMs, base.streamFirstAudioEmaMs),
     lagVerdict: String(d.lagVerdict || base.lagVerdict),
     diagBornAt: num(d.diagBornAt, base.diagBornAt),
     capturedAt: now,
