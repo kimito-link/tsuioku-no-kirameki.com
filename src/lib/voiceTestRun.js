@@ -39,7 +39,7 @@ const LONG_TEXTS = Object.freeze([
 
 /**
  * 試験で流すコメントと、前のコメントからの間隔(ms)。userId は毎回新しい(=初めての声も試す)。
- * @param {unknown} kind 'short'(1.5秒おき)/ 'long'(40字以上・4秒おき)/ 'burst'(1秒以内に全部)
+ * @param {unknown} kind 'short'(1.5秒おき)/ 'long'(40字以上・7秒おき=読み終わるより先に次が来ない間隔)/ 'burst'(1秒以内に全部)
  * @param {unknown} count
  * @param {string} runId
  * @returns {{ gapMs: number, item: { kind: 'comment', userId: string, nickname: string, text: string } }[]}
@@ -48,7 +48,8 @@ export function buildVoiceTestItems(kind, count, runId) {
   const k = VOICE_TEST_KINDS.includes(/** @type {any} */ (kind)) ? /** @type {string} */ (kind) : 'short';
   const n = Math.max(1, Math.min(30, Math.floor(Number(count)) || 10));
   const texts = k === 'long' ? LONG_TEXTS : SHORT_TEXTS;
-  const gap = k === 'long' ? 4000 : k === 'burst' ? 100 : 1500;
+  // v0.1.1773: 長文は1件約5〜6秒の声なので、4秒おきだと読むより来る方が速く、どの PC でも遅れが積もった。
+  const gap = k === 'long' ? 7000 : k === 'burst' ? 100 : 1500;
   return Array.from({ length: n }, (_, i) => ({
     gapMs: i === 0 ? 0 : gap,
     item: {
@@ -70,6 +71,17 @@ export function diffVoiceDiag(before, after) {
   const out = {};
   for (const [key, v] of Object.entries(after || {})) {
     if (typeof v === 'string') { out[key] = v; continue; }
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      // 失敗の理由別の数(synthFailReasons)など、1段下の数も差分にする(v0.1.1773)。
+      const prev = before?.[key] && typeof before[key] === 'object' ? before[key] : {};
+      for (const [sub, sv] of Object.entries(v)) {
+        const n = Number(sv);
+        if (!Number.isFinite(n)) continue;
+        const d = n - (Number(prev[sub]) || 0);
+        if (d !== 0) out[`${key}.${sub}`] = d;
+      }
+      continue;
+    }
     const a = Number(v);
     if (!Number.isFinite(a)) continue;
     const cumulative = /Total$|Samples$|^spoken|Count$/.test(key);
@@ -85,6 +97,7 @@ export function diffVoiceDiag(before, after) {
  *   enqueue: (items: Record<string, any>[]) => void,
  *   getDiag: () => Record<string, any>,
  *   isIdle: () => boolean,
+ *   prepare?: () => void,
  *   write?: (report: Record<string, any>) => Promise<unknown> | unknown,
  *   now?: () => number,
  *   sleep?: (ms: number) => Promise<void>,
@@ -96,6 +109,14 @@ export async function runVoiceTest(o) {
   const sleep = typeof o.sleep === 'function' ? o.sleep : (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
   const runId = `${now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
   const plan = buildVoiceTestItems(o.kind, o.count, runId);
+  // v0.1.1773: 開いた時に読み込んだ昔のコメント(待ち行列)を捨て、鳴り終わるのを待ってから始める
+  //   (コメビュは配信のさかのぼり分が試験の前に並び、声までの時間を5〜7秒に見せていた)。
+  if (typeof o.prepare === 'function') { try { o.prepare(); } catch { /* no-op */ } }
+  const settleBy = now() + 15_000;
+  while (!o.isIdle() && now() < settleBy) await sleep(250);
+  // 声ごとの大きさの最小/最大は「その回の分」だけを見る(差分にできない値なので、始めに戻す)。
+  const live = o.getDiag();
+  if (live && typeof live === 'object') { live.outRmsDbMin = 999; live.outRmsDbMax = -999; }
   const before = JSON.parse(JSON.stringify(o.getDiag() || {}));
   const startedAt = now();
   for (const { gapMs, item } of plan) {

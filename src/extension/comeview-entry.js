@@ -1084,6 +1084,7 @@ async function initializeVoiceReading() {
     enqueue: (items) => enqueueVoiceTimelineItems(items),
     getDiag: () => _voiceDiag,
     isIdle: () => !_voicePlaying && _voiceQueue.length === 0,
+    prepare: () => { _voiceQueue = []; _voicePrefetches.clear(); }, // 開いた時のさかのぼり分を捨てる
     ensureEnabled: async () => _voiceReadingEnabled
   });
 }
