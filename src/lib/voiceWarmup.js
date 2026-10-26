@@ -404,10 +404,10 @@ export function withVoiceWarmup(warmup, synth) {
       if (isStreamedVoice(wav)) {
         wav.styleId = useStyle;
         const sv = wav;
-        void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak); }, () => {});
+        void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms); }, () => {});
       } else if (wav instanceof ArrayBuffer) {
         const level = measureVoiceWavLevel(wav);
-        if (level) rememberVoiceStylePeak(useStyle, level.peak);
+        if (level) rememberVoiceStylePeak(useStyle, level.peak, level.rms);
       }
     } catch { /* 計器・補助は本体を止めない */ }
     return wav;
