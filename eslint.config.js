@@ -439,8 +439,9 @@ export default [
     // v0.1.1759: 声の絞り込みの先読み(initVoiceSpeaker を VoicePlayer へ渡す import 1行+配線1行)。判定は lib の voiceNarrowing.js。
     // v0.1.1760: 吹き出しの置き場所の判定を venueBubblePlacer.js / lib の bubblePlacement.js へ出した=7339→7325(下げた)。
     // v0.1.1765: 声の温め(warmup の生成1行+import 1行+VoicePlayer への1行)=+2。中身は lib の voiceWarmup.js。
+    // v0.1.1766: 声を少しずつ鳴らす(import 2行+VoicePlayer への1行)=+3。中身は lib の voiceStream.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7327, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7330, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

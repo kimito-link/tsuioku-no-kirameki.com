@@ -141,10 +141,10 @@ export function createVoicevoxWarmup() {
 /**
  * 合成関数(voicevoxClient.synthesizeVoice と同じ形)を包み、合成の前に声を温める。
  *   呼び出しは同期で始まる(合成の起動を enqueue 直後に固定している既存の約束 v0.1.800 を崩さない)。
- * @template {(text: string, voice: any, opts?: any) => Promise<ArrayBuffer|null>} F
+ * @template {(text: string, voice: any, opts?: any) => Promise<any>} F
  * @param {ReturnType<typeof createVoiceWarmup>|null|undefined} warmup
  * @param {F} synth
- * @returns {(text: string, voice: any, opts?: any) => Promise<ArrayBuffer|null>}
+ * @returns {(text: string, voice: any, opts?: any) => Promise<any>}
  */
 export function withVoiceWarmup(warmup, synth) {
   if (!warmup) return synth;
