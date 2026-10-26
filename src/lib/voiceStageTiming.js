@@ -11,8 +11,29 @@ import { updateVoiceServiceTimeEma } from './voiceLagBudget.js';
 /** 受信→キューの値として信じる上限(ms)。これを超えるのは時計ずれ・過去ログ再生等=計測から除外。 */
 export const VOICE_UPSTREAM_SANE_MAX_MS = 60_000;
 
-/** これより短い声は比が揺れるので、比の物差しに入れない(ms)。 */
-export const VOICE_RTF_MIN_AUDIO_MS = 300;
+/**
+ * これより短い声は比が揺れるので、比の物差しに入れない(ms)。
+ *   PC 実測(v0.1.1769・グラボ有り): 1秒前後の短いコメントだけで比が 200〜477 に揺れた。
+ */
+export const VOICE_RTF_MIN_AUDIO_MS = 600;
+
+/**
+ * どんなに速い PC でも1回の合成にかかる時間(ms)。比を出す前に引く(同じ実測で 0.2〜0.3秒)。
+ *   引かないと、短いコメントが多い配信で速い PC が「弱い」と記録される。
+ */
+export const VOICE_RTF_FIXED_OVERHEAD_MS = 250;
+
+/**
+ * 2回目以降の合成1件を「声の長さで割った速さ」(×1000)の物差しに入れる。
+ * @param {Record<string, any>} diag
+ * @param {number} ownMs
+ * @param {number} audioMs
+ */
+function foldWarmSynthRtf(diag, ownMs, audioMs) {
+  if (!Number.isFinite(audioMs) || audioMs < VOICE_RTF_MIN_AUDIO_MS || !Number.isFinite(ownMs)) return;
+  foldVoiceStageEma(diag, 'warmSynthRtfPermille', (Math.max(0, ownMs - VOICE_RTF_FIXED_OVERHEAD_MS) / audioMs) * 1000);
+  diag.warmRtfSamples = (Number(diag.warmRtfSamples) || 0) + 1;
+}
 
 /**
  * 2つの時刻の間隔(ms)。受信→キュー投入、キュー投入→取り出し などに使う。
@@ -61,7 +82,7 @@ export function createVoiceSynthTracker(deps = {}) {
   return {
     /**
      * @param {unknown} styleId
-     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number } }}
+     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number }, ok?: boolean) => { cold: boolean, ok: boolean, startAt: number, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number } }}
      */
     begin(styleId) {
       const startAt = now();
@@ -88,6 +109,7 @@ export function createVoiceSynthTracker(deps = {}) {
         return {
           cold,
           ok: ok === true,
+          startAt,
           totalMs: Math.max(0, endAt - startAt),
           engineWaitMs: prevDoneAt > startAt ? Math.min(prevDoneAt, endAt) - startAt : 0,
           queryMs: Number.isFinite(q) && q >= 0 ? Math.round(q) : -1,
@@ -149,12 +171,30 @@ export function recordVoiceSynthStage(diag, r) {
     diag.warmSynthSamples = (Number(diag.warmSynthSamples) || 0) + 1;
     // 2026-10-26(PC 実測 v0.1.1768): 長いコメントはグラボ有りでも 0.8〜1.2秒かかり、ms だけで見ると
     //   速い PC が「弱い」と記録された。声の長さで割った比(グラボ有り約0.12・無し約0.8)も残す。
-    const audioMs = Number(r.audioMs);
-    if (Number.isFinite(audioMs) && audioMs >= VOICE_RTF_MIN_AUDIO_MS) {
-      foldVoiceStageEma(diag, 'warmSynthRtfPermille', (ownMs / audioMs) * 1000);
-      diag.warmRtfSamples = (Number(diag.warmRtfSamples) || 0) + 1;
-    }
+    foldWarmSynthRtf(diag, ownMs, Number(r.audioMs));
   }
+}
+
+/**
+ * 少しずつ受け取った声が届き終わったら、全体の時間を声の長さで割って同じ物差しに入れる(2026-10-26)。
+ *   PC 実測: 「弱い」と記録された PC はほとんどのコメントを少しずつ受け取るので、ここで数えないと
+ *   速い PC だと分かるまで(誤った記録が消えるまで)6分以上かかった。
+ * @param {Record<string, any>} diag
+ * @param {ReturnType<ReturnType<ReturnType<typeof createVoiceSynthTracker>['begin']>['end']>} r
+ * @param {{ whenDone: Promise<boolean>, failed?: boolean, totalSamples: number, sampleRate: number }} voice
+ * @param {() => number} now
+ * @param {() => void} [after] 物差しに入れた後に呼ぶ(弱い/速い PC の記録)
+ * @returns {Promise<void>}
+ */
+export function recordVoiceStreamDone(diag, r, voice, now, after) {
+  if (!diag || !r || !r.ok || !r.streamed || !voice || typeof voice.whenDone?.then !== 'function') return Promise.resolve();
+  return voice.whenDone.then((ok) => {
+    if (ok !== true || voice.failed || r.cold || r.contended) return;
+    const audioMs = voice.sampleRate > 0 ? (voice.totalSamples / voice.sampleRate) * 1000 : -1;
+    const ownMs = now() - r.startAt - r.engineWaitMs - (Number(r.initMs) > 0 ? Number(r.initMs) : 0);
+    foldWarmSynthRtf(diag, ownMs, audioMs);
+    if (typeof after === 'function') after();
+  }).catch(() => { /* 計器は本体を止めない */ });
 }
 
 /**

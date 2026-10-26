@@ -33,7 +33,7 @@ import {
   computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 import {
-  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceSynthStage
+  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceStreamDone, recordVoiceSynthStage
 } from './voiceStageTiming.js';
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT
@@ -534,16 +534,23 @@ export class VoicePlayer {
     return Promise.resolve(started)
       .then(
         (wav) => {
-          try { recordVoiceSynthStage(this.diag, track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav)); } catch { /* 計器は本体を止めない */ }
-          // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
-          if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
-          // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す。
-          if (this.storage) {
-            forgetWeakVoicePcIfFast(this.diag, this._weakPcState, () => {
-              this._slowEngine = false;
-              return this.storage.set({ [KEY_VOICE_WEAK_PC]: false });
-            });
-          }
+          /** @type {any} */
+          let r = null;
+          try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(this.diag, r); } catch { /* 計器は本体を止めない */ }
+          const judge = () => {
+            // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
+            if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
+            // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す。
+            if (this.storage) {
+              forgetWeakVoicePcIfFast(this.diag, this._weakPcState, () => {
+                this._slowEngine = false;
+                return this.storage.set({ [KEY_VOICE_WEAK_PC]: false });
+              });
+            }
+          };
+          judge();
+          // 少しずつ受け取った声は、届き終わった時に速さを数える。
+          if (r && isStreamedVoice(wav)) void recordVoiceStreamDone(this.diag, r, wav, () => Date.now(), judge);
           return wav;
         },
         (err) => {
