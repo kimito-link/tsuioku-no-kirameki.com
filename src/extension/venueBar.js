@@ -3391,7 +3391,7 @@ export function mountVenueBarButton(options = {}) {
     //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
     probeVoicevoxAlive,
     fetchVoiceStyleIds: listVoicevoxStyleIds,
-    initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensure(id), // P3 の先読みも温めと同じ1本の列
+    initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensureWhenIdle(id), // P3 の先読みは合成の合間に裏で
     voiceWarmup: venueVoiceWarmup,
     probeVoiceStreaming: probeVoicevoxStreaming, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
     fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む

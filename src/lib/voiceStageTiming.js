@@ -82,7 +82,7 @@ export function createVoiceSynthTracker(deps = {}) {
   return {
     /**
      * @param {unknown} styleId
-     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number }, ok?: boolean) => { cold: boolean, ok: boolean, startAt: number, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number } }}
+     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number, borrowed?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, startAt: number, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number, borrowed: boolean } }}
      */
     begin(styleId) {
       const startAt = now();
@@ -106,8 +106,10 @@ export function createVoiceSynthTracker(deps = {}) {
         const s = Number(timing?.synthMs);
         const i = Number(timing?.initMs);
         const a = Number(timing?.audioMs);
+        const borrowed = timing?.borrowed === true;
         return {
-          cold,
+          // 借りた声は温まっている声で読んだので「初めての声」に入れない(v0.1.1772)。
+          cold: cold && !borrowed,
           ok: ok === true,
           startAt,
           totalMs: Math.max(0, endAt - startAt),
@@ -121,7 +123,9 @@ export function createVoiceSynthTracker(deps = {}) {
           // 2026-10-26: 別の声の準備と重なった(voiceWarmup)。速さの物差しに入れない。
           contended: timing?.contended === true,
           // 2026-10-26: できた声の長さ(ms)。合成の速さを文の長さで割るのに使う。分からなければ -1。
-          audioMs: Number.isFinite(a) && a > 0 ? Math.round(a) : -1
+          audioMs: Number.isFinite(a) && a > 0 ? Math.round(a) : -1,
+          // v0.1.1772: まだ温まっていない声の代わりに、温まった声で読んだ(voiceWarmup)。
+          borrowed
         };
       };
       return { cold, end };
@@ -138,6 +142,7 @@ export function createVoiceSynthTracker(deps = {}) {
 export function recordVoiceSynthStage(diag, r) {
   if (!diag || typeof diag !== 'object' || !r) return;
   if (!r.ok) return;
+  if (r.borrowed) diag.voiceBorrowTotal = (Number(diag.voiceBorrowTotal) || 0) + 1;
   foldVoiceStageEma(diag, 'engineWaitEmaMs', r.engineWaitMs);
   foldVoiceStageEma(diag, 'audioQueryEmaMs', r.queryMs);
   const initMs = Number(r.initMs) > 0 ? Number(r.initMs) : 0;
@@ -251,6 +256,8 @@ export function formatVoiceStageBreakdown(snap) {
   if (cold > 0) parts.push(`初めての声${cold}件(最大${sec(snap.coldSynthMaxMs)})`);
   const init = Number(snap.speakerInitTotal) || 0;
   if (init > 0) parts.push(`声の読み込み${init}件(最大${sec(snap.speakerInitMaxMs)})`);
+  const borrowed = Number(snap.voiceBorrowTotal) || 0;
+  if (borrowed > 0) parts.push(`借りた声${borrowed}件`);
   if (!parts.length) return '';
   return `遅れの段階(${parts.join('・')})`;
 }

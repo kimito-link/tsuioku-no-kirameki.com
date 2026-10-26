@@ -613,7 +613,7 @@ async function enableVoiceReading({ persist = true } = {}) {
       _voiceSlowEngine = b[KEY_VOICE_WEAK_PC] === true;
       return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
     },
-    initSpeaker: (id) => _voiceWarmup.ensure(id)
+    initSpeaker: (id) => _voiceWarmup.ensureWhenIdle(id) // 合成が走っていない時に裏で(v0.1.1772)
   })).styleIds;
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;

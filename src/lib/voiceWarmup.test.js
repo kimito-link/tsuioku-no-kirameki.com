@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createVoiceWarmup,
   startVoiceWarmup,
   withVoiceWarmup,
+  VOICE_IDLE_INIT_DELAY_MS,
+  VOICE_STREAM_GATE_MAX_MS,
   VOICE_WARMUP_QUERY_TIMEOUT_MS
 } from './voiceWarmup.js';
+import { StreamedVoice } from './voiceStream.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -145,7 +148,7 @@ describe('withVoiceWarmup', () => {
     });
     const f = withVoiceWarmup(w, synth);
     await f('こんにちは', { styleId: 2 }, { onTiming: (x) => timings.push(x) });
-    expect(timings).toEqual([{ queryMs: 100, synthMs: 200, initMs: 3500, contended: false }]);
+    expect(timings).toEqual([{ queryMs: 100, synthMs: 200, initMs: 3500, contended: false, borrowed: false }]);
     expect(w.isWarm(2)).toBe(true);
   });
 
@@ -184,5 +187,132 @@ describe('withVoiceWarmup', () => {
     const w = createVoiceWarmup({ initSpeaker });
     await withVoiceWarmup(w, async () => null)('あ', {}, {});
     expect(initSpeaker).toHaveBeenCalledWith(3);
+  });
+});
+
+describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本来の声は手が空いた時に裏で読み込む', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('温まった声があれば待たずに借りて合成し、読み込みは合成が終わってから', async () => {
+    vi.useFakeTimers();
+    const initSpeaker = vi.fn(async () => true);
+    const w = createVoiceWarmup({ initSpeaker });
+    w.markWarm(3);
+    const timings = [];
+    const synth = vi.fn(async (_t, _v, opts) => { opts.onTiming({}); return new ArrayBuffer(4); });
+    const p = withVoiceWarmup(w, synth)('あ', { styleId: 47, pitchOffset: 0.1 }, { onTiming: (x) => timings.push(x) });
+    await vi.advanceTimersByTimeAsync(0);
+    // 47 は温まっていないので、温まっている 3 で読む(他の声の設定はそのまま)
+    expect(synth.mock.calls[0][1]).toEqual({ styleId: 3, pitchOffset: 0.1 });
+    expect(initSpeaker).not.toHaveBeenCalled();
+    await p;
+    expect(timings[0].borrowed).toBe(true);
+    expect(timings[0].initMs).toBe(0);
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(initSpeaker).toHaveBeenCalledWith(47);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.isWarm(47)).toBe(true);
+  });
+
+  it('合成が走っている間は裏の読み込みを始めない', async () => {
+    vi.useFakeTimers();
+    const initSpeaker = vi.fn(async () => true);
+    const w = createVoiceWarmup({ initSpeaker });
+    w.markWarm(3);
+    const d = deferred();
+    const synth = vi.fn(async () => { await d.promise; return new ArrayBuffer(4); });
+    const f = withVoiceWarmup(w, synth);
+    const p = f('あ', { styleId: 50 }, {});
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS * 3);
+    expect(initSpeaker).not.toHaveBeenCalled();
+    d.resolve(true);
+    await p;
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(initSpeaker).toHaveBeenCalledTimes(1);
+  });
+
+  it('借りる声は決まった順(固定表→番号順)から、頼まれた声の番号で選ぶ', () => {
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    expect(w.borrowFor(47)).toBe(null);
+    w.markWarm(20); w.markWarm(8); w.markWarm(3);
+    // 並び = [3, 8, 20]
+    expect(w.borrowFor(0)).toBe(3);
+    expect(w.borrowFor(1)).toBe(8);
+    expect(w.borrowFor(47)).toBe(20);
+    expect(w.borrowFor(47)).toBe(20);
+  });
+
+  it('温まった声が1つも無い時だけ、読み込んでから読む', async () => {
+    const initSpeaker = vi.fn(async () => true);
+    const w = createVoiceWarmup({ initSpeaker });
+    const synth = vi.fn(async () => new ArrayBuffer(4));
+    await withVoiceWarmup(w, synth)('あ', { styleId: 12 }, {});
+    expect(initSpeaker).toHaveBeenCalledWith(12);
+    expect(synth.mock.calls[0][1].styleId).toBe(12);
+  });
+
+  it('エンジンを起こしている最中の1件目は、起こし終わるのを待ってその声を借りる', async () => {
+    const d = deferred();
+    const initSpeaker = vi.fn(async () => true);
+    const w = createVoiceWarmup({ initSpeaker, warmQuery: async () => { await d.promise; return true; } });
+    void w.primeEngine(3);
+    const synth = vi.fn(async () => new ArrayBuffer(4));
+    const p = withVoiceWarmup(w, synth)('あ', { styleId: 30 }, {});
+    await flush();
+    expect(synth).not.toHaveBeenCalled();
+    d.resolve(true);
+    await p;
+    expect(synth.mock.calls[0][1].styleId).toBe(3);
+  });
+
+  it('ensureWhenIdle は読み込めたら true で返り、reset で false', async () => {
+    vi.useFakeTimers();
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    const p = w.ensureWhenIdle(9);
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(await p).toBe(true);
+    const w2 = createVoiceWarmup({ initSpeaker: async () => true });
+    const p2 = w2.ensureWhenIdle(9);
+    w2.reset();
+    expect(await p2).toBe(false);
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS * 2);
+    expect(w2.isWarm(9)).toBe(false);
+  });
+
+  it('startVoiceWarmup は固定表の声を裏で読み込む列に入れる', async () => {
+    vi.useFakeTimers();
+    const calls = [];
+    const w = createVoiceWarmup({ initSpeaker: async (id) => { calls.push(id); return true; }, warmQuery: async () => true });
+    startVoiceWarmup(w, [2, 3, 8, 99]);
+    for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(calls).toEqual([2, 8]);
+  });
+
+  it('少しずつ受け取り中の声が届き終わるまで、次の合成を始めない(上限つき)', async () => {
+    vi.useFakeTimers();
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    w.markWarm(3);
+    const voice = new StreamedVoice(24000);
+    const synth = vi.fn(async (text) => (text === '長文' ? voice : new ArrayBuffer(4)));
+    const f = withVoiceWarmup(w, synth);
+    expect(await f('長文', { styleId: 3 }, { stream: true })).toBe(voice);
+    const p = f('次', { styleId: 3 }, {});
+    await vi.advanceTimersByTimeAsync(100);
+    expect(synth).toHaveBeenCalledTimes(1);
+    voice.finish();
+    await p;
+    expect(synth).toHaveBeenCalledTimes(2);
+
+    // 届き終わらないままでも、上限で次へ進む
+    const stuck = new StreamedVoice(24000);
+    const synth2 = vi.fn(async (text) => (text === '長文' ? stuck : new ArrayBuffer(4)));
+    const w2 = createVoiceWarmup({ initSpeaker: async () => true });
+    w2.markWarm(3);
+    const f2 = withVoiceWarmup(w2, synth2);
+    await f2('長文', { styleId: 3 }, {});
+    const p2 = f2('次', { styleId: 3 }, {});
+    await vi.advanceTimersByTimeAsync(VOICE_STREAM_GATE_MAX_MS);
+    await p2;
+    expect(synth2).toHaveBeenCalledTimes(2);
   });
 });
