@@ -33,7 +33,7 @@ export const VOICE_WEAK_PC_MIN_WARM_SAMPLES = 5;
 export const VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
 
 /**
- * 合成時間÷声の長さ(×1000)がこれ以上なら「弱い」(2026-10-26 PC 実測: グラボ有り約120・無し約800)。
+ * (合成時間−決まった 250ms)÷声の長さ(×1000)がこれ以上なら「弱い」(2026-10-26 PC 実測: グラボ有り約100〜230・無し約650以上)。
  *   ms だけで見ると、長いコメントの多い配信で速い PC が「弱い」と記録された(v0.1.1768 実測)。
  */
 export const VOICE_WEAK_PC_RTF_PERMILLE = 400;
