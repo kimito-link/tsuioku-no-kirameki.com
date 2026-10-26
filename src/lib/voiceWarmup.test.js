@@ -3,6 +3,7 @@ import {
   createVoiceWarmup,
   startVoiceWarmup,
   withVoiceWarmup,
+  wireVoiceWarmupHooks,
   VOICE_IDLE_INIT_DELAY_MS,
   VOICE_STREAM_GATE_MAX_MS,
   VOICE_WARMUP_QUERY_TIMEOUT_MS
@@ -375,5 +376,32 @@ describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本�
     voice.finish();
     await flush();
     expect(knownVoiceStylePeak(13)).toBeCloseTo(0.5);
+  });
+  it('再生中・順番待ちの間は裏の読み込みを始めず、静かになって少し経ってから始める', async () => {
+    vi.useFakeTimers();
+    const calls = [];
+    const w = createVoiceWarmup({ initSpeaker: async (id) => { calls.push(id); return true; } });
+    let idle = false;
+    w.setHooks({ isIdle: () => idle });
+    void w.ensureWhenIdle(8);
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS * 4);
+    expect(calls).toEqual([]);
+    idle = true;
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS * 2);
+    expect(calls).toEqual([8]);
+  });
+
+  it('wireVoiceWarmupHooks は裏の読み込みだけを件数と最長に数える', async () => {
+    vi.useFakeTimers();
+    let t = 0;
+    const w = createVoiceWarmup({ initSpeaker: async () => { t += 700; return true; }, now: () => t });
+    const diag = {};
+    wireVoiceWarmupHooks(w, () => true, () => diag);
+    await w.ensure(3);
+    expect(diag.bgInitTotal).toBeUndefined();
+    void w.ensureWhenIdle(8);
+    for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(diag.bgInitTotal).toBe(1);
+    expect(diag.bgInitMaxMs).toBe(700);
   });
 });
