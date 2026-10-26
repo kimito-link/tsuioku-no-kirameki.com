@@ -1007,6 +1007,7 @@ export class VoicePlayer {
         onDropped: item.onDropped
       };
 
+      this.diag.voiceEnqueuedTotal = (Number(this.diag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
       const merged = mergeRepeatedVoiceItem(this.queue, candidate);
       this.queue = merged.queue;
       if (merged.merged) {
