@@ -20,6 +20,8 @@ import { canonicalLabel, fromSynthFailure } from './voiceFailureTaxonomy.js';
  *   3. synthesis が応答なし/HTTPエラー         → 'synth_http'
  *   4. synthesis の body 読み取り失敗          → 'synth_body'
  *   5. いずれかが時間切れ(AbortController)     → 'timeout'
+ *      (2026-10-26: audio_query の時間切れだけは 'query_timeout' に分ける。初めての声は
+ *       audio_query の中でモデル読み込みが走り 3.7秒かかった=3秒の打ち切りで捨てられていた疑いを数えるため)
  *   6. 例外(接続拒否=VOICEVOX 未起動/落ちた)   → 'unreachable'
  *
  * 「その他」に落ちていた大半は 6(接続不能) か 1(拒否) のはずで、この2つは意味が正反対:
@@ -33,6 +35,7 @@ import { canonicalLabel, fromSynthFailure } from './voiceFailureTaxonomy.js';
 /** 失敗理由トークン(状態速報の内訳ラベルにそのまま使う)。 */
 export const VOICE_SYNTH_FAIL_REASONS = Object.freeze([
   'timeout',
+  'query_timeout',
   'unreachable',
   'query_http',
   'query_body',
@@ -50,7 +53,7 @@ export const VOICE_SYNTH_FAIL_REASONS = Object.freeze([
  *   httpStatus?: unknown,
  *   bodyInvalid?: unknown
  * }} [ev]
- * @returns {'timeout'|'unreachable'|'query_http'|'query_body'|'synth_http'|'synth_body'|'unknown'}
+ * @returns {'timeout'|'query_timeout'|'unreachable'|'query_http'|'query_body'|'synth_http'|'synth_body'|'unknown'}
  */
 export function classifyVoiceSynthFailureReason(ev) {
   const stage = String(ev?.stage || '');
@@ -58,8 +61,8 @@ export function classifyVoiceSynthFailureReason(ev) {
     /** @type {any} */ (ev?.error)?.message ?? ev?.error ?? ''
   ).toLowerCase();
 
-  // 時間切れは stage を問わず最優先(AbortController が投げる名前で判る)。
-  if (msg.includes('timeout') || msg.includes('abort')) return 'timeout';
+  // 時間切れは最優先(AbortController が投げる名前で判る)。audio_query の時間切れだけは分けて数える。
+  if (msg.includes('timeout') || msg.includes('abort')) return stage === 'query' ? 'query_timeout' : 'timeout';
 
   // 接続そのものが張れない=VOICEVOX が居ない。fetch の TypeError('Failed to fetch') 等。
   if (
@@ -119,7 +122,7 @@ export function adviseVoiceSynthFailure(counts) {
     Math.max(0, Math.floor(Number(/** @type {any} */ (c)[k]) || 0));
   const unreachable = n('unreachable');
   const overload = n('query_http') + n('synth_http');
-  const timeout = n('timeout');
+  const timeout = n('timeout') + n('query_timeout');
   const total = unreachable + overload + timeout + n('query_body') + n('synth_body') + n('unknown');
   if (total <= 0) return '';
   // 最も多い系統で助言を決める(拮抗時は「拡張では直せない」側を優先=誤った実装変更を防ぐ)。

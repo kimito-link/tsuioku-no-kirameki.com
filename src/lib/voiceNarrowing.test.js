@@ -158,7 +158,16 @@ describe('配線(会場・コメビュ・ポップアップ)', () => {
       expect(src).toMatch(/rememberWeakVoicePc\(/);
     }
     expect(vb).toMatch(/initVoiceSpeaker:\s*\(/);
-    expect(cv).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*initializeVoicevoxSpeaker\(id\)/);
+    // 2026-10-26: 先読みは voiceWarmup の1本の列を通す(合成前の読み込みと重ならないように)。
+    expect(cv).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*_voiceWarmup\.ensure\(id\)/);
+    expect(vb).toMatch(/initVoiceSpeaker:[^\n]*venueVoiceWarmup\.ensure\(id\)/);
+    for (const src of [vb, cv]) {
+      expect(src).toMatch(/createVoicevoxWarmup\(\)/);
+      expect(src).toMatch(/withVoiceWarmup\(/);
+    }
+    expect(read('voiceWarmup.js')).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*initializeVoicevoxSpeaker\(id/);
+    expect(cv).toMatch(/startVoiceWarmup\(_voiceWarmup,/);
+    expect(vp).toMatch(/startVoiceWarmup\(this\.voiceWarmup,/);
   });
 
   it('ポップアップの設定は既定「しない」で、詳細設定の中にある(スマホでは隠れる)', () => {

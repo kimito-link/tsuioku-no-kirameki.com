@@ -87,11 +87,11 @@ import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
   buildVoiceReadingText,
-  initializeVoicevoxSpeaker,
   listVoicevoxStyleIds,
   probeVoicevoxAlive,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
+import { createVoicevoxWarmup, startVoiceWarmup, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
@@ -588,12 +588,15 @@ async function enableVoiceReading({ persist = true } = {}) {
   }
 
   // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする(会場と同じ)。
-  _voiceStyleIds = (await prepareVoiceStyleIds(await listVoicevoxStyleIds(), {
+  const allStyleIds = await listVoicevoxStyleIds();
+  // 起動直後のエンジンを捨てる audio_query で起こす(待たない・voiceWarmup.js)。
+  startVoiceWarmup(_voiceWarmup, allStyleIds);
+  _voiceStyleIds = (await prepareVoiceStyleIds(allStyleIds, {
     readSettings: async () => {
       const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
       return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
     },
-    initSpeaker: (id) => initializeVoicevoxSpeaker(id)
+    initSpeaker: (id) => _voiceWarmup.ensure(id)
   })).styleIds;
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
@@ -625,6 +628,10 @@ let _voiceVolumePercent = VOICE_VOLUME_DEFAULT;
 /** 2026-10-22計器(P1・会場 VoicePlayer と同じ物差し): エンジン待ち・初めての声を測る。 */
 const _voiceSynthTracker = createVoiceSynthTracker();
 
+/** 2026-10-26: 初めての声を合成の前に読み込む(会場と同じ voiceWarmup.js)。 */
+const _voiceWarmup = createVoicevoxWarmup();
+const synthesizeVoiceWarm = withVoiceWarmup(_voiceWarmup, synthesizeVoice);
+
 /**
  * 合成を依頼し、段階計測を _voiceDiag へ記録する(戻り値・例外は synthesizeVoice と同じ)。
  * @param {string} text
@@ -636,7 +643,7 @@ function synthesizeVoiceTracked(text, voice) {
   const track = _voiceSynthTracker.begin(voice?.styleId);
   /** @type {{ queryMs?: number, synthMs?: number }} */
   let timing = {};
-  return synthesizeVoice(text, voice, {
+  return synthesizeVoiceWarm(text, voice, {
     onFailure: (info) => recordVoiceSynthFailureReason(info),
     onTiming: (t) => { timing = t || {}; }
   }).then(
