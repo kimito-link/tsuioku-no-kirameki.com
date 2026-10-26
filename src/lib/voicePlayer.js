@@ -34,7 +34,7 @@ import {
   computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 import {
-  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceStreamDone, recordVoiceSynthStage
+  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage
 } from './voiceStageTiming.js';
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, measureVoiceWavLevel, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT, voiceTargetPeak
@@ -194,7 +194,7 @@ export class VoicePlayer {
       upstreamEmaMs: -1, lastUpstreamMs: -1, queueWaitEmaMs: -1, engineWaitEmaMs: -1,
       audioQueryEmaMs: -1, synthesisEmaMs: -1, warmSynthEmaMs: -1,
       coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
-      speakerInitTotal: 0, speakerInitMaxMs: 0, voiceBorrowTotal: 0,
+      speakerInitTotal: 0, speakerInitMaxMs: 0, voiceBorrowTotal: 0, e2eSampleTotal: 0, e2eSumMsTotal: 0, e2eMaxMs: 0,
       streamTotal: 0, streamFirstAudioEmaMs: -1, warmSynthSamples: 0, contendedSynthTotal: 0,
       warmSynthRtfPermille: -1, warmRtfSamples: 0,
       playCheckedTotal: 0, playCutShortTotal: 0, playStallTotal: 0, streamUnderrunTotal: 0, streamUnderrunMaxMs: 0,
@@ -863,6 +863,7 @@ export class VoicePlayer {
                 const e2e = Math.max(0, Date.now() - _enqueuedAt);
                 this.diag.lastE2eMs = e2e;
                 this.diag.e2eAvgMs = computeVoiceE2eAverage(this.diag.e2eAvgMs, e2e);
+                recordVoiceE2eSample(this.diag, e2e);
               }
               this._updateLagNotice();
               // v0.1.771: 実際に再生が始まった瞬間だけ通知(drop/merge/失敗では呼ばれない)。

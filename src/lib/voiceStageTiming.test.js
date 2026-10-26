@@ -5,6 +5,7 @@ import {
   formatVoiceStageBreakdown,
   measureVoiceGapMs,
   measureWavAudioMs,
+  recordVoiceE2eSample,
   recordVoiceStreamDone,
   recordVoiceSynthStage,
   VOICE_UPSTREAM_SANE_MAX_MS
@@ -260,5 +261,18 @@ describe('v0.1.1772: 借りた声', () => {
     expect(d.voiceBorrowTotal).toBe(1);
     expect(d.coldSynthTotal).toBe(0);
     expect(formatVoiceStageBreakdown(buildVoiceDiagSnapshot(d, Date.now(), 'lv1'))).toContain('借りた声1件');
+  });
+});
+
+describe('v0.1.1774: recordVoiceE2eSample', () => {
+  it('件数・合計・最大を残し、おかしな値は無視する', () => {
+    const d = makeInitialVoiceDiag();
+    recordVoiceE2eSample(d, 200);
+    recordVoiceE2eSample(d, 900);
+    recordVoiceE2eSample(d, -1);
+    recordVoiceE2eSample(d, NaN);
+    expect(d.e2eSampleTotal).toBe(2);
+    expect(d.e2eSumMsTotal).toBe(1100);
+    expect(d.e2eMaxMs).toBe(900);
   });
 });

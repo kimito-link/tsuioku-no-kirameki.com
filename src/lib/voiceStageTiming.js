@@ -261,3 +261,17 @@ export function formatVoiceStageBreakdown(snap) {
   if (!parts.length) return '';
   return `遅れの段階(${parts.join('・')})`;
 }
+
+/**
+ * v0.1.1774計器: 声が出るまで(キュー投入→再生開始)の1件を、回ごとに集計できる形でも残す。
+ *   e2eAvgMs は過去の回を引きずる EMA なので、試験の1回分の平均・最大がこれまで取れなかった。
+ * @param {Record<string, any>} diag
+ * @param {number} ms
+ */
+export function recordVoiceE2eSample(diag, ms) {
+  const v = Number(ms);
+  if (!diag || typeof diag !== 'object' || !Number.isFinite(v) || v < 0) return;
+  diag.e2eSampleTotal = (Number(diag.e2eSampleTotal) || 0) + 1;
+  diag.e2eSumMsTotal = (Number(diag.e2eSumMsTotal) || 0) + Math.round(v);
+  diag.e2eMaxMs = Math.max(Number(diag.e2eMaxMs) || 0, Math.round(v));
+}

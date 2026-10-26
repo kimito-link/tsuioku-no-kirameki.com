@@ -79,4 +79,15 @@ describe('voiceTestRun', () => {
     expect(report.delta.outRmsDbMax).toBe(-18);
     expect(report.delta['synthFailReasons.synthNull']).toBe(1);
   });
+  it('v0.1.1774: この回だけの声が出るまでの平均・最大を出す', async () => {
+    let t = 0;
+    const diag = { e2eSampleTotal: 5, e2eSumMsTotal: 50000, e2eMaxMs: 9000 };
+    const report = await runVoiceTest({
+      kind: 'short', count: 2, mode: 'venue',
+      enqueue: () => { diag.e2eSampleTotal += 1; diag.e2eSumMsTotal += 300; diag.e2eMaxMs = Math.max(diag.e2eMaxMs, 300); },
+      getDiag: () => diag, isIdle: () => true, now: () => t, sleep: async (ms) => { t += ms; }
+    });
+    expect(report.e2eRunAvgMs).toBe(300);
+    expect(report.e2eRunMaxMs).toBe(300);
+  });
 });

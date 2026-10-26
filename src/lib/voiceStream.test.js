@@ -123,6 +123,21 @@ describe('createStreamGain', () => {
     g.process(Int16Array.from([10, -10]));
     expect(g.gain).toBe(after);
   });
+  it('v0.1.1774: もともと小さい声は、最初に届いた分の大きさから倍率を上げて狙いに近づける', () => {
+    const g = createStreamGain(100);
+    // 素の最大振幅 7%(ささやき系)。仮定(45%)のままだと狙いの約15%しか出なかった。
+    const out = g.process(Int16Array.from([2300, -2300]));
+    const peak = Math.max(...Array.from(out, Math.abs));
+    expect(peak / g.targetPeak).toBeGreaterThan(0.5);
+    expect(g.outPeak).toBeLessThanOrEqual(VOICE_PEAK_CEILING);
+  });
+  it('v0.1.1774: 普段の大きさの声は、最初の分から決めても狙いの近く', () => {
+    const g = createStreamGain(100);
+    const out = g.process(Int16Array.from([12000, -12000]));
+    const peak = Math.max(...Array.from(out, Math.abs));
+    expect(peak / g.targetPeak).toBeGreaterThan(0.7);
+    expect(peak / g.targetPeak).toBeLessThan(0.9);
+  });
   it('音量0%なら無音', () => {
     expect(Array.from(createStreamGain(0).process(Int16Array.from([1000])))).toEqual([0]);
   });
