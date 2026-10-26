@@ -109,3 +109,41 @@ export function applyVoiceVolumeToWav(wav, volumePercent) {
   }
   return out;
 }
+
+/**
+ * 音量設定での狙いの最大振幅(0〜1)。聞こえ方の計器(voicePlaybackQuality.js)が「小さすぎ」を見るのに使う。
+ * @param {unknown} volumePercent
+ * @returns {number}
+ */
+export function voiceTargetPeak(volumePercent) {
+  const pct = normalizeVoiceVolumePercent(volumePercent);
+  return Math.min(VOICE_PEAK_CEILING, (VOICE_TARGET_PEAK_AT_100 * pct) / 100);
+}
+
+/**
+ * WAV(16bit PCM)の最大振幅と RMS(どちらも 0〜1)。読めなければ null。鳴らす直前の WAV に使う(2026-10-26計器)。
+ *   RMS は無音(|x|<1%)を除いて測る(文の前後の無音で小さく出ないように)。
+ * @param {unknown} wav
+ * @returns {{ peak: number, rms: number } | null}
+ */
+export function measureVoiceWavLevel(wav) {
+  if (!(wav instanceof ArrayBuffer)) return null;
+  let dv;
+  try {
+    dv = new DataView(wav);
+  } catch {
+    return null;
+  }
+  const data = findPcm16Data(dv);
+  if (!data || data.length < 2) return null;
+  let peak = 0;
+  let sumSq = 0;
+  let n = 0;
+  for (let i = data.offset; i < data.offset + data.length; i += 2) {
+    const v = dv.getInt16(i, true);
+    const a = Math.abs(v);
+    if (a > peak) peak = a;
+    if (a >= 328) { sumSq += (v / 32768) * (v / 32768); n++; }
+  }
+  return { peak: Math.min(1, peak / 32767), rms: n > 0 ? Math.sqrt(sumSq / n) : 0 };
+}

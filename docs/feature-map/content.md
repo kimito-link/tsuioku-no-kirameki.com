@@ -24,6 +24,7 @@ graph LR
   n_content --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_content --> n_src_extension_venueBubblePlacer_js["extension/venueBubblePlacer.js"]:::shared
   n_content --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
+  n_content --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
   n_content --> n_src_lib_adObservationLog_js["lib/adObservationLog.js"]:::shared
   n_content --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_content --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_content --> n_src_lib_captureAuditionRichviewEventScoreDiagProbe_js["lib/captureAuditionRichviewEventScoreDiagProbe.js"]
   n_content --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
   n_content --> n_src_lib_celebrationFlyText_js["lib/celebrationFlyText.js"]:::shared
-  n_content --> n_src_lib_celebrationPika_js["lib/celebrationPika.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 314 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 317 ファイル省略（全件は storage-bus.md / metafile 参照）。

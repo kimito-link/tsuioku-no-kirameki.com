@@ -305,6 +305,7 @@ import {
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import { wireVenueVoiceTestHook } from './voiceTestHook.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
@@ -3397,6 +3398,7 @@ export function mountVenueBarButton(options = {}) {
     resolveVoice: resolveVoiceForUser
   });
   
+  wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {
       voicePlayer.disable();
@@ -6679,6 +6681,7 @@ export function mountVenueBarButton(options = {}) {
       primed: result.primed
     };
     // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
+    if (result.speeches.length > 0) voicePlayer.diag.venueGate = voicePlayer.enabled ? 'ok' : 'voice-off';
     if (result.speeches.length > 0) {
       pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now(), {
         // 発言者のサムネ・ハンドル名・ID・リンクをセットで(§3.5)。サムネは観測済みのプロフィール > uid から導出 > 匿名は identicon。
@@ -7167,6 +7170,7 @@ export function mountVenueBarButton(options = {}) {
    */
   const setOpen = (nextOpen, persist) => {
     open = nextOpen === true;
+    voicePlayer.diag.venueGate = open ? 'no-input' : 'panel-closed';
     root.classList.toggle('nlsb-is-open', open);
     // v0.1.1115 ①POP遮蔽: 会場open中だけ document ルートに印を付け、CSS(VENUE_CSS末尾)が
     //   ①POPホスト(#nls-inline-popup-host)を visibility:hidden にする。open→close 往復で

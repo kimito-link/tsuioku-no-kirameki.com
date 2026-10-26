@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { measureVoiceWavLevel, voiceTargetPeak } from './voiceVolume.js';
 import { fileURLToPath } from 'node:url';
 import {
   applyVoiceVolumeToWav,
@@ -85,8 +86,9 @@ describe('配線(会場・コメビュ・ポップアップ)', () => {
   const read = (/** @type {string} */ p) => fs.readFileSync(path.join(root, p), 'utf8');
   it('会場とコメビュの両方が、再生直前に同じ純関数で音量を掛ける', () => {
     // 2026-10-26: 少しずつ届いた声を丸ごと再生に戻すときも同じ関数を通す(whole = 丸ごとの WAV)。
-    expect(read('src/lib/voicePlayer.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(whole, this\.volumePercent\)\]/);
-    expect(read('src/extension/comeview-entry.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(whole, _voiceVolumePercent\)\]/);
+    // 2026-10-26: 鳴らす直前の大きさを計器(measureVoiceWavLevel)で測るため、一度 loud に受けてから Blob にする。
+    expect(read('src/lib/voicePlayer.js')).toMatch(/const loud = applyVoiceVolumeToWav\(whole, this\.volumePercent\);[\s\S]{0,120}new Blob\(\[loud\]/);
+    expect(read('src/extension/comeview-entry.js')).toMatch(/const loud = applyVoiceVolumeToWav\(wav, _voiceVolumePercent\);[\s\S]{0,160}new Blob\(\[loud\]/);
     expect(read('src/extension/comeview-entry.js')).toMatch(/changes\[KEY_VOICE_VOLUME_PERCENT\]/);
     expect(read('src/extension/venueBar.js')).toMatch(/storageOnChanged: .*chrome\.storage\.onChanged/);
   });
@@ -114,5 +116,29 @@ describe('VoicePlayer の音量設定', () => {
     expect(player.volumePercent).toBe(250);
     await player.initialize();
     expect(listeners.length).toBe(1); // 二重購読しない
+  });
+});
+
+describe('2026-10-26 聞こえ方の計器: measureVoiceWavLevel / voiceTargetPeak', () => {
+  function wav(samples) {
+    const buf = new ArrayBuffer(44 + samples.length * 2);
+    const v = new DataView(buf);
+    const tag = (o, s) => { for (let i = 0; i < 4; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    tag(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); tag(8, 'WAVE');
+    tag(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    tag(36, 'data'); v.setUint32(40, samples.length * 2, true);
+    samples.forEach((s, i) => v.setInt16(44 + i * 2, s, true));
+    return buf;
+  }
+  it('最大振幅と、無音を除いた RMS', () => {
+    const lv = measureVoiceWavLevel(wav([0, 0, 16384, -16384]));
+    expect(lv?.peak).toBeCloseTo(0.5, 2);
+    expect(lv?.rms).toBeCloseTo(0.5, 2);
+    expect(measureVoiceWavLevel(new ArrayBuffer(4))).toBeNull();
+  });
+  it('音量設定の狙い', () => {
+    expect(voiceTargetPeak(100)).toBeCloseTo(0.48);
+    expect(voiceTargetPeak(300)).toBeCloseTo(0.98);
   });
 });
