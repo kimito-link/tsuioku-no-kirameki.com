@@ -94,7 +94,7 @@ import {
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
-import { createVoicevoxWarmup, startVoiceWarmup, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
@@ -110,6 +110,7 @@ import {
   foldVoiceStageEma,
   measureVoiceGapMs,
   measureWavAudioMs,
+  recordVoiceE2eSample,
   recordVoiceStreamDone,
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
@@ -121,9 +122,13 @@ import {
 import {
   applyVoiceVolumeToWav,
   KEY_VOICE_VOLUME_PERCENT,
+  measureVoiceWavLevel,
   normalizeVoiceVolumePercent,
-  VOICE_VOLUME_DEFAULT
+  VOICE_VOLUME_DEFAULT,
+  voiceTargetPeak
 } from '../lib/voiceVolume.js';
+import { observeVoicePlayback } from '../lib/voicePlaybackQuality.js';
+import { wireVoiceTestHook } from './voiceTestHook.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
@@ -609,7 +614,7 @@ async function enableVoiceReading({ persist = true } = {}) {
       _voiceSlowEngine = b[KEY_VOICE_WEAK_PC] === true;
       return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
     },
-    initSpeaker: (id) => _voiceWarmup.ensure(id)
+    initSpeaker: (id) => _voiceWarmup.ensureWhenIdle(id) // 合成が走っていない時に裏で(v0.1.1772)
   })).styleIds;
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
@@ -644,6 +649,8 @@ const _voiceSynthTracker = createVoiceSynthTracker();
 /** 2026-10-26: 初めての声を合成の前に読み込む(会場と同じ voiceWarmup.js)。 */
 const _voiceWarmup = createVoicevoxWarmup();
 const synthesizeVoiceWarm = withVoiceWarmup(_voiceWarmup, synthesizeVoice);
+// v0.1.1777: 裏の声の読み込みは、鳴らしても待たせてもいない時だけ(次のコメントを待たせない)。
+wireVoiceWarmupHooks(_voiceWarmup, () => !_voicePlaying && _voiceQueue.length === 0, () => _voiceDiag);
 
 /**
  * 合成を依頼し、段階計測を _voiceDiag へ記録する(戻り値・例外は synthesizeVoice と同じ)。
@@ -860,13 +867,22 @@ async function drainVoiceQueue() {
         // 2026-10-26: 少しずつ届く声は Web Audio で鳴らす(voiceStreamAudio.js・使えなければ丸ごと再生)。
         /** @type {any} */
         let audio = isStreamedVoice(wav) ? createBrowserStreamedAudio(wav, _voiceVolumePercent) : null;
+        /** @type {{ peak: number, rms: number } | null} */
+        let wholeLevel = null;
         if (!audio) {
-          const whole = wav;
-          objectUrl = URL.createObjectURL(
-            new Blob([applyVoiceVolumeToWav(whole, _voiceVolumePercent)], { type: 'audio/wav' })
-          );
+          const loud = applyVoiceVolumeToWav(wav, _voiceVolumePercent);
+          wholeLevel = measureVoiceWavLevel(loud);
+          objectUrl = URL.createObjectURL(new Blob([loud], { type: 'audio/wav' }));
           audio = new Audio(objectUrl);
         }
+        // 2026-10-26計器: 聞こえ方(途切れ・つっかえ・音割れ・小さすぎ)を数える(会場と同じ・再生には触れない)。
+        observeVoicePlayback(audio, {
+          diag: _voiceDiag,
+          outPeak: wholeLevel ? wholeLevel.peak : -1,
+          outRms: wholeLevel ? wholeLevel.rms : -1,
+          targetPeak: voiceTargetPeak(_voiceVolumePercent),
+          onRecorded: () => publishVoiceDiag()
+        });
         await new Promise((resolve) => {
           let settled = false;
           // v0.1.883: 再生完了の安全網(watchdog)。'ended'/'error' が一度も来ないケース
@@ -921,6 +937,7 @@ async function drainVoiceQueue() {
             if (_e2eMs >= 0) {
               _voiceDiag.lastE2eMs = _e2eMs;
               _voiceDiag.e2eAvgMs = computeVoiceE2eAverage(_voiceDiag.e2eAvgMs, _e2eMs);
+              recordVoiceE2eSample(_voiceDiag, _e2eMs);
             }
             updateVoiceLagNotice();
             if (playResult && typeof playResult.catch === 'function') {
@@ -1000,6 +1017,7 @@ function enqueueVoiceTimelineItems(items) {
       enqueuedAt: Date.now(),
       priority: isHighPriority ? 'high' : 'normal'
     };
+    _voiceDiag.voiceEnqueuedTotal = (Number(_voiceDiag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
     _voiceQueue = merged.queue;
     if (merged.merged) continue;
@@ -1064,6 +1082,16 @@ async function initializeVoiceReading() {
   if (forceVoiceOn || bag[VOICE_READING_ENABLED_KEY] === true) {
     await enableVoiceReading({ persist: forceVoiceOn });
   }
+  // 2026-10-26: 決まった形のコメントで読み上げを試す入口(開発版だけ・voiceTestHook.js)。
+  wireVoiceTestHook({
+    target: 'comeview',
+    readUrl: true,
+    enqueue: (items) => enqueueVoiceTimelineItems(items),
+    getDiag: () => _voiceDiag,
+    isIdle: () => !_voicePlaying && _voiceQueue.length === 0,
+    prepare: () => { _voiceQueue = []; _voicePrefetches.clear(); }, // 開いた時のさかのぼり分を捨てる
+    ensureEnabled: async () => _voiceReadingEnabled
+  });
 }
 
 /**

@@ -49,6 +49,20 @@ function isExtensionPage() {
 }
 
 /**
+ * Background から届いた {text, status} を Response にする(v0.1.1778)。
+ *   204 などの「中身なし」の状態で本文つき Response を作ると例外になり、約束が決着せず打ち切りまで待っていた
+ *   (/initialize_speaker は 204 を返す=会場の裏読み込みが毎回15秒止まっていた・PC 実測)。
+ * @param {{ text?: unknown, status?: unknown }} res
+ * @returns {Response}
+ */
+export function proxyTextResponse(res) {
+  const raw = Number(res && res.status);
+  const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
+  const noBody = status === 204 || status === 205 || status === 304;
+  return new Response(noBody ? null : String(res && res.text != null ? res.text : ''), { status });
+}
+
+/**
  * Chrome 拡張の Background 経由で fetch を行い CSP / Mixed Content を回避する。
  * 拡張ページ(comeview.html 等)では直接 fetch を使う(プロキシ不要・タイムアウトが効く)。
  * @param {string|URL} url
@@ -69,7 +83,7 @@ async function proxyFetchFn(url, init) {
         (res) => {
           if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
           if (!res || res.error) return reject(new Error(res?.error || 'Proxy fetch failed'));
-          resolve(new Response(res.text, { status: res.status }));
+          try { resolve(proxyTextResponse(res)); } catch (e) { reject(e); }
         }
       );
     });

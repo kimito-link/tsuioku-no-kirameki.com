@@ -22,7 +22,8 @@ import {
   normalizeVoiceVolumePercent,
   VOICE_MAX_BOOST,
   VOICE_PEAK_CEILING,
-  VOICE_TARGET_PEAK_AT_100
+  VOICE_TARGET_PEAK_AT_100,
+  VOICE_TARGET_RMS_RATIO
 } from './voiceVolume.js';
 
 /** エンジンに頼む区切りの長さ(秒)。 */
@@ -39,6 +40,74 @@ export const VOICE_STREAM_STALL_MS = 5000;
 
 /** 少しずつ流すときに仮定する、素の声の最大振幅(満振幅比)。長文の実測 43〜48%。 */
 export const VOICE_STREAM_ASSUMED_PEAK = 0.45;
+
+/** 初めての声の聞こえの大きさを、最初に届いた分から見積もるのに要る有音サンプル数(24kHz で約0.08秒・v0.1.1780)。 */
+export const VOICE_STREAM_MIN_RMS_SAMPLES = 2000;
+
+/** 最初に届いた分の最大振幅に掛ける余裕(文の後半の方が大きくなりがち・v0.1.1774)。 */
+export const VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
+
+/**
+ * 最初の分から見積もる最大振幅の下限(ほぼ無音で始まる声を上げすぎない)。
+ *   v0.1.1775: 0.1 だと静かな出だしで倍率を上げすぎ、文の途中で 44% まで下げ直していた(PC 試験)。
+ */
+export const VOICE_STREAM_MIN_EST_PEAK = 0.2;
+
+/** 声(styleId)ごとに、これまで鳴らした素の最大振幅(v0.1.1775)。少しずつ読む時の最初の倍率に使う。 */
+/** @type {Map<string, number>} */
+const stylePeaks = new Map();
+/** @type {Map<string, number>} 声ごとの素の RMS(無音を除く・v0.1.1779) */
+const styleRms = new Map();
+
+/**
+ * 1件読み終えた声の素の最大振幅を覚える(直近寄りの平均)。
+ * @param {unknown} styleId
+ * @param {unknown} peak 0〜1
+ * @param {unknown} [rms] 0〜1(無音を除く)。分かれば一緒に覚える
+ */
+export function rememberVoiceStylePeak(styleId, peak, rms) {
+  const id = Number(styleId);
+  const p = Number(peak);
+  if (!Number.isInteger(id) || id < 0 || !Number.isFinite(p) || p <= 0 || p > 1) return;
+  const key = String(id);
+  const prev = stylePeaks.get(key);
+  stylePeaks.set(key, prev === undefined ? p : prev + 0.5 * (p - prev));
+  const r = Number(rms);
+  if (Number.isFinite(r) && r > 0 && r <= 1) {
+    const pr = styleRms.get(key);
+    styleRms.set(key, pr === undefined ? r : pr + 0.5 * (r - pr));
+  }
+}
+
+/**
+ * 覚えている声の素の RMS。知らなければ -1。
+ * @param {unknown} styleId
+ * @returns {number}
+ */
+export function knownVoiceStyleRms(styleId) {
+  const id = Number(styleId);
+  if (!Number.isInteger(id) || id < 0) return -1;
+  const v = styleRms.get(String(id));
+  return v === undefined ? -1 : v;
+}
+
+/**
+ * 覚えている声の素の最大振幅。知らなければ -1。
+ * @param {unknown} styleId
+ * @returns {number}
+ */
+export function knownVoiceStylePeak(styleId) {
+  const id = Number(styleId);
+  if (!Number.isInteger(id) || id < 0) return -1;
+  const v = stylePeaks.get(String(id));
+  return v === undefined ? -1 : v;
+}
+
+/** テスト用: 覚えた大きさを消す。 */
+export function resetVoiceStylePeaksForTest() {
+  stylePeaks.clear();
+  styleRms.clear();
+}
 
 /**
  * 少しずつ流すかを決める。
@@ -150,6 +219,12 @@ export class StreamedVoice {
     /** @type {Int16Array[]} */
     this.chunks = [];
     this.totalSamples = 0;
+    /** 届いた分の素の最大振幅(0〜1)。 */
+    this.peak = 0;
+    this._sumSq = 0;
+    this._voiced = 0;
+    /** この声の styleId(分かれば・v0.1.1775)。 */
+    this.styleId = -1;
     this.done = false;
     this.failed = false;
     /** @type {Set<() => void>} */
@@ -162,6 +237,11 @@ export class StreamedVoice {
     this.whenDone = new Promise((r) => { this._resolveDone = r; });
   }
 
+  /** 届いた分の素の RMS(0〜1・無音を除く)。 */
+  get rms() {
+    return this._voiced > 0 ? Math.sqrt(this._sumSq / this._voiced) : 0;
+  }
+
   /** ためた長さ(秒)。 */
   get bufferedSec() {
     return this.sampleRate > 0 ? this.totalSamples / this.sampleRate : 0;
@@ -172,6 +252,12 @@ export class StreamedVoice {
     if (this.done || !samples || samples.length === 0) return;
     this.chunks.push(samples);
     this.totalSamples += samples.length;
+    let m = 0;
+    for (let i = 0; i < samples.length; i++) { const a = Math.abs(samples[i]); if (a > m) m = a; }
+    if (m / 32768 > this.peak) this.peak = m / 32768;
+    for (let i = 0; i < samples.length; i++) {
+      if (Math.abs(samples[i]) >= 328) { const x = samples[i] / 32768; this._sumSq += x * x; this._voiced++; }
+    }
     this._emit();
   }
 
@@ -239,13 +325,29 @@ export function isStreamedVoice(x) {
 /**
  * 少しずつ流すときの音量。仮定の大きさで始め、天井を超えそうな分が届いたら倍率を下げる(上げない)。
  * @param {unknown} volumePercent
+ * @param {{ knownPeak?: number, knownRms?: number }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)と RMS(v0.1.1779)
  */
-export function createStreamGain(volumePercent) {
+export function createStreamGain(volumePercent, opts = {}) {
+  const knownPeak = Number(opts?.knownPeak) > 0 ? Number(opts.knownPeak) : -1;
+  const knownRms = Number(opts?.knownRms) > 0 ? Number(opts.knownRms) : -1;
   const pct = normalizeVoiceVolumePercent(volumePercent);
   const target = Math.min(VOICE_PEAK_CEILING, (VOICE_TARGET_PEAK_AT_100 * pct) / 100);
   let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
+  const startGain = gain;
+  // 2026-10-26計器: 実際に鳴らした最大振幅(0〜1)と、最初に鳴らした時の倍率(途中で下げたかを見る)。
+  let outPeak = 0;
+  let firstGain = -1;
+  let sumSq = 0;
+  let voiced = 0;
   return {
     get gain() { return gain; },
+    get outPeak() { return outPeak; },
+    /** 鳴らした音の RMS(無音を除く・0〜1)。 */
+    get outRms() { return voiced > 0 ? Math.sqrt(sumSq / voiced) : 0; },
+    /** 鳴らし始めた倍率に対する今の倍率(1=下げていない)。まだ鳴らしていなければ 1。 */
+    get dropRatio() { return firstGain > 0 ? gain / firstGain : 1; },
+    targetPeak: target,
+    startGain,
     /**
      * @param {Int16Array} samples
      * @returns {Float32Array}
@@ -256,9 +358,36 @@ export function createStreamGain(volumePercent) {
         const a = Math.abs(samples[i]);
         if (a > peak) peak = a;
       }
+      if (firstGain < 0 && peak > 0) {
+        // v0.1.1774: 最初に届いた分(約0.3秒)の大きさから倍率を決め直す。仮定の大きさ(45%)のままだと、
+        //   もともと小さい声(ささやき系など)は狙いの14〜28%しか出ず「小さすぎ」になった(PC 試験)。
+        //   文の後半はもう少し大きくなりがちなので 1.25倍の余裕を見る。天井を超えそうなら下で下げる。
+        //   v0.1.1775: 同じ声を前に鳴らしていれば、その大きさを基準にする(出だしだけでは分からないため)。
+        const first = (peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM;
+        const est = knownPeak > 0 ? Math.max(knownPeak, first) : Math.max(first, VOICE_STREAM_MIN_EST_PEAK);
+        gain = Math.min(VOICE_MAX_BOOST, target / est);
+        // v0.1.1779: 前に鳴らした声の聞こえの大きさが分かれば、詰まった声を狙いの RMS まで下げる(voiceVolume.js)。
+        //   初めての声は、最初に届いた分の RMS で見積もる(出だしは文全体より静かなことが多い=下げすぎにはなりにくい)。
+        let firstRms = -1;
+        if (knownRms <= 0) {
+          let sq = 0;
+          let n = 0;
+          for (let i = 0; i < samples.length; i++) {
+            if (Math.abs(samples[i]) >= 328) { const x = samples[i] / 32768; sq += x * x; n++; }
+          }
+          if (n >= VOICE_STREAM_MIN_RMS_SAMPLES) firstRms = Math.sqrt(sq / n);
+        }
+        const estRms = knownRms > 0 ? knownRms : firstRms;
+        if (estRms > 0) gain = Math.min(gain, (target * VOICE_TARGET_RMS_RATIO) / estRms);
+      }
       if (peak > 0 && (peak / 32768) * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
+      if (firstGain < 0) firstGain = gain;
+      outPeak = Math.max(outPeak, (peak / 32768) * gain);
       const out = new Float32Array(samples.length);
-      for (let i = 0; i < samples.length; i++) out[i] = (samples[i] / 32768) * gain;
+      for (let i = 0; i < samples.length; i++) {
+        out[i] = (samples[i] / 32768) * gain;
+        if (Math.abs(samples[i]) >= 328) { sumSq += out[i] * out[i]; voiced++; }
+      }
       return out;
     }
   };
@@ -295,7 +424,13 @@ export function createStreamedVoiceAudio(voice, deps) {
   let unsubscribe = null;
   /** @type {any} */
   let whole = null;
-  const gain = createStreamGain(deps.volumePercent);
+  const gain = createStreamGain(deps.volumePercent, {
+    knownPeak: knownVoiceStylePeak(voice.styleId),
+    knownRms: knownVoiceStyleRms(voice.styleId)
+  });
+  // 2026-10-26計器(voicePlaybackQuality.js): 次の分が間に合わず無音が挟まった回数と最長の無音。
+  let underruns = 0;
+  let underrunMaxMs = 0;
 
   const finishEnded = () => {
     if (ended) return;
@@ -325,6 +460,10 @@ export function createStreamedVoiceAudio(voice, deps) {
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       src.connect(ctx.destination);
+      if (started && nextAt > 0 && nextAt < ctx.currentTime) {
+        underruns += 1;
+        underrunMaxMs = Math.max(underrunMaxMs, Math.round((ctx.currentTime + 0.02 - nextAt) * 1000));
+      }
       const at = Math.max(nextAt, ctx.currentTime + 0.02);
       nextAt = at + count / voice.sampleRate;
       scheduledSamples += count;
@@ -360,6 +499,17 @@ export function createStreamedVoiceAudio(voice, deps) {
     /** 少しずつ流すときは再生速度を変えない(変えると声の高さも変わるため)。 */
     playbackRate: 1,
     preservesPitch: true,
+    /** 聞こえ方の計器(voicePlaybackQuality.js の observeVoicePlayback が読む)。 */
+    get quality() {
+      return {
+        underruns,
+        underrunMaxMs,
+        outPeak: started && !whole ? gain.outPeak : -1,
+        outRms: started && !whole ? gain.outRms : -1,
+        gainDropRatio: started && !whole ? gain.dropRatio : 1,
+        partial: voice.failed === true && voice.totalSamples > 0
+      };
+    },
     get duration() {
       return voice.done && voice.sampleRate > 0 ? voice.totalSamples / voice.sampleRate : NaN;
     },

@@ -7,7 +7,11 @@ import {
   isStreamedVoice,
   shouldStreamVoice,
   VOICE_STREAM_LONG_TEXT_CHARS,
-  VOICE_STREAM_PREBUFFER_SEC
+  VOICE_STREAM_PREBUFFER_SEC,
+  knownVoiceStylePeak,
+  knownVoiceStyleRms,
+  rememberVoiceStylePeak,
+  resetVoiceStylePeaksForTest
 } from './voiceStream.js';
 import { VOICE_PEAK_CEILING } from './voiceVolume.js';
 import {
@@ -122,6 +126,67 @@ describe('createStreamGain', () => {
     expect(after).toBeLessThan(start);
     g.process(Int16Array.from([10, -10]));
     expect(g.gain).toBe(after);
+  });
+  it('v0.1.1774: もともと小さい声は、最初に届いた分の大きさから倍率を上げる(知らない声は上げすぎない)', () => {
+    const g = createStreamGain(100);
+    // 素の最大振幅 7%(ささやき系)。仮定(45%)のままだと狙いの約15%しか出なかった。
+    const out = g.process(Int16Array.from([2300, -2300]));
+    const peak = Math.max(...Array.from(out, Math.abs));
+    expect(peak / g.targetPeak).toBeGreaterThan(0.3);
+    expect(g.outPeak).toBeLessThanOrEqual(VOICE_PEAK_CEILING);
+  });
+  it('v0.1.1775: 前に鳴らした同じ声の大きさを知っていれば、それを基準に狙いへ合わせる', () => {
+    const g = createStreamGain(100, { knownPeak: 0.08 });
+    const out = g.process(Int16Array.from([2300, -2300]));
+    const peak = Math.max(...Array.from(out, Math.abs));
+    // 倍率の上限(VOICE_MAX_BOOST=4)まで上げて狙いの約6割
+    expect(peak / g.targetPeak).toBeGreaterThan(0.55);
+  });
+  it('v0.1.1775: 静かな出だしでも、知っている声なら途中で倍率を下げ直さない', () => {
+    const g = createStreamGain(100, { knownPeak: 0.45 });
+    g.process(Int16Array.from([300, -300]));
+    g.process(Int16Array.from([14700, -14700]));
+    expect(g.dropRatio).toBe(1);
+  });
+  it('v0.1.1779: 前に鳴らした声の RMS が大きければ、聞こえの大きさの狙いまで下げる', () => {
+    const g = createStreamGain(100, { knownPeak: 0.45, knownRms: 0.3 });
+    g.process(Int16Array.from([9000, -9000]));
+    expect(g.gain).toBeCloseTo((g.targetPeak * 0.25) / 0.3, 3);
+  });
+  it('v0.1.1780: 初めての声でも、最初に届いた分の RMS が大きければ下げる(短すぎる出だしでは判断しない)', () => {
+    const g = createStreamGain(100);
+    g.process(Int16Array.from({ length: 2400 }, (_, i) => (i % 2 ? 9830 : -9830)));
+    expect(g.gain).toBeCloseTo((g.targetPeak * 0.25) / 0.3, 2);
+    const g2 = createStreamGain(100);
+    g2.process(Int16Array.from([9830, -9830]));
+    expect(g2.gain).toBeGreaterThan((g2.targetPeak * 0.25) / 0.3 + 0.1);
+  });
+  it('v0.1.1779: 声ごとの RMS も覚える。少しずつ届いた声は届いた分の RMS を測る', () => {
+    resetVoiceStylePeaksForTest();
+    expect(knownVoiceStyleRms(8)).toBe(-1);
+    rememberVoiceStylePeak(8, 0.4, 0.1);
+    rememberVoiceStylePeak(8, 0.4, 0.2);
+    expect(knownVoiceStyleRms(8)).toBeCloseTo(0.15);
+    const v = new StreamedVoice(24000);
+    v.append(Int16Array.from([16384, -16384, 0]));
+    expect(v.rms).toBeCloseTo(0.5);
+  });
+  it('v0.1.1775: 声ごとの大きさを覚える(直近寄りの平均)', () => {
+    resetVoiceStylePeaksForTest();
+    expect(knownVoiceStylePeak(8)).toBe(-1);
+    rememberVoiceStylePeak(8, 0.4);
+    rememberVoiceStylePeak(8, 0.2);
+    expect(knownVoiceStylePeak(8)).toBeCloseTo(0.3);
+    rememberVoiceStylePeak(8, 5);
+    rememberVoiceStylePeak('x', 0.3);
+    expect(knownVoiceStylePeak(8)).toBeCloseTo(0.3);
+  });
+  it('v0.1.1774: 普段の大きさの声は、最初の分から決めても狙いの近く', () => {
+    const g = createStreamGain(100);
+    const out = g.process(Int16Array.from([12000, -12000]));
+    const peak = Math.max(...Array.from(out, Math.abs));
+    expect(peak / g.targetPeak).toBeGreaterThan(0.7);
+    expect(peak / g.targetPeak).toBeLessThan(0.9);
   });
   it('音量0%なら無音', () => {
     expect(Array.from(createStreamGain(0).process(Int16Array.from([1000])))).toEqual([0]);
@@ -347,5 +412,34 @@ describe('synthesizeVoice({ stream: true })', () => {
     const onFailure = vi.fn();
     await expect(synthesizeVoice('あ', { styleId: 3 }, { fetchFn, streamFetchFn, stream: true, onFailure })).resolves.toBeNull();
     expect(onFailure.mock.calls[0][0].stage).toBe('synth');
+  });
+});
+
+describe('2026-10-26 聞こえ方の計器(quality)', () => {
+  it('次の分が間に合わず無音が挟まったら underrun を数え、鳴らした大きさを残す', async () => {
+    const f = fakeContext();
+    const v = new StreamedVoice(1000);
+    const audio = createStreamedVoiceAudio(v, { audioContext: () => f.ctx, volumePercent: 100 });
+    v.append(Int16Array.from({ length: 400 }, () => 8000));
+    await audio.play();
+    expect(audio.quality.underruns).toBe(0);
+    f.ctx.currentTime = 1.0; // 0.4秒分しか並べていないのに1秒たった=0.6秒の無音
+    v.append(Int16Array.from({ length: 200 }, () => 8000));
+    expect(audio.quality.underruns).toBe(1);
+    expect(audio.quality.underrunMaxMs).toBeGreaterThan(500);
+    expect(audio.quality.outPeak).toBeGreaterThan(0);
+    expect(audio.quality.outRms).toBeGreaterThan(0);
+    expect(audio.quality.gainDropRatio).toBe(1);
+  });
+  it('途中で大きな音が来て倍率を下げたら gainDropRatio が1未満、途中で止まったら partial', async () => {
+    const f = fakeContext();
+    const v = new StreamedVoice(1000);
+    const audio = createStreamedVoiceAudio(v, { audioContext: () => f.ctx, volumePercent: 300 });
+    v.append(Int16Array.from({ length: 400 }, () => 3000));
+    await audio.play();
+    v.append(Int16Array.from({ length: 100 }, () => 30000));
+    expect(audio.quality.gainDropRatio).toBeLessThan(0.8);
+    v.fail();
+    expect(audio.quality.partial).toBe(true);
   });
 });

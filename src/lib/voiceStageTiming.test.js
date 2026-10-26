@@ -5,6 +5,7 @@ import {
   formatVoiceStageBreakdown,
   measureVoiceGapMs,
   measureWavAudioMs,
+  recordVoiceE2eSample,
   recordVoiceStreamDone,
   recordVoiceSynthStage,
   VOICE_UPSTREAM_SANE_MAX_MS
@@ -243,5 +244,35 @@ describe('2026-10-26 声の長さで割った合成の速さ', () => {
     const t = createVoiceSynthTracker({ now: () => 0 });
     expect(t.begin(1).end({ audioMs: 1234 }).audioMs).toBe(1234);
     expect(t.begin(1).end({}).audioMs).toBe(-1);
+  });
+});
+
+describe('v0.1.1772: 借りた声', () => {
+  it('借りた声は「初めての声」に入れず、件数を数えて速報に出す', () => {
+    const c = clock();
+    const tracker = createVoiceSynthTracker({ now: c.now });
+    const t = tracker.begin(47);
+    c.set(1200);
+    const r = t.end({ queryMs: 50, synthMs: 150, borrowed: true }, true);
+    expect(r.cold).toBe(false);
+    expect(r.borrowed).toBe(true);
+    const d = makeInitialVoiceDiag();
+    recordVoiceSynthStage(d, r);
+    expect(d.voiceBorrowTotal).toBe(1);
+    expect(d.coldSynthTotal).toBe(0);
+    expect(formatVoiceStageBreakdown(buildVoiceDiagSnapshot(d, Date.now(), 'lv1'))).toContain('借りた声1件');
+  });
+});
+
+describe('v0.1.1774: recordVoiceE2eSample', () => {
+  it('件数・合計・最大を残し、おかしな値は無視する', () => {
+    const d = makeInitialVoiceDiag();
+    recordVoiceE2eSample(d, 200);
+    recordVoiceE2eSample(d, 900);
+    recordVoiceE2eSample(d, -1);
+    recordVoiceE2eSample(d, NaN);
+    expect(d.e2eSampleTotal).toBe(2);
+    expect(d.e2eSumMsTotal).toBe(1100);
+    expect(d.e2eMaxMs).toBe(900);
   });
 });
