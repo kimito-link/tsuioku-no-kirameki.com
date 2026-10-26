@@ -17,6 +17,7 @@ import {
  *   enqueue: (items: Record<string, any>[]) => void,
  *   getDiag: () => Record<string, any>,
  *   isIdle: () => boolean,
+ *   prepare?: () => void,
  *   ensureEnabled?: () => Promise<boolean>,
  *   readUrl?: boolean
  * }} o
@@ -40,6 +41,7 @@ export function wireVoiceTestHook(o) {
         enqueue: o.enqueue,
         getDiag: o.getDiag,
         isIdle: o.isIdle,
+        prepare: o.prepare,
         write: (r) => appendVoiceTestReport(chrome.storage.local, r)
       });
       return { ok: true, report };
@@ -74,6 +76,7 @@ export function wireVenueVoiceTestHook(voicePlayer) {
     enqueue: (items) => voicePlayer.enqueue(items),
     getDiag: () => voicePlayer.diag,
     isIdle: () => !voicePlayer.playing && voicePlayer.queue.length === 0,
+    prepare: () => { voicePlayer.queue = []; voicePlayer.prefetches.clear(); }, // 試験の前の待ち行列を捨てる
     ensureEnabled: async () => {
       if (!voicePlayer.enabled) await voicePlayer.enable({ persist: false });
       return voicePlayer.enabled === true;

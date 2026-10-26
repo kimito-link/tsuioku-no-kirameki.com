@@ -57,4 +57,26 @@ describe('voiceTestRun', () => {
     expect(store[VOICE_TEST_REPORT_KEY]).toHaveLength(20);
     expect(store[VOICE_TEST_REPORT_KEY][19]).toEqual({ i: 99 });
   });
+  it('v0.1.1773: 長文は7秒おき(読み終わる前に次が来ない)', () => {
+    const plan = buildVoiceTestItems('long', 3, 'r');
+    expect(plan.map((p) => p.gapMs)).toEqual([0, 7000, 7000]);
+  });
+  it('v0.1.1773: 始める前に待ち行列を捨て、声の大きさの最小/最大をその回の分にする', async () => {
+    let t = 0;
+    const order = [];
+    const diag = { outRmsDbMin: -30, outRmsDbMax: -10, synthFailReasons: { synthNull: 2 } };
+    const report = await runVoiceTest({
+      kind: 'short', count: 1, mode: 'comeview',
+      prepare: () => order.push('prepare'),
+      enqueue: () => { order.push('enqueue'); diag.outRmsDbMin = -20; diag.outRmsDbMax = -18; diag.synthFailReasons.synthNull += 1; },
+      getDiag: () => diag,
+      isIdle: () => true,
+      now: () => t,
+      sleep: async (ms) => { t += ms; }
+    });
+    expect(order).toEqual(['prepare', 'enqueue']);
+    expect(report.delta.outRmsDbMin).toBe(-20);
+    expect(report.delta.outRmsDbMax).toBe(-18);
+    expect(report.delta['synthFailReasons.synthNull']).toBe(1);
+  });
 });

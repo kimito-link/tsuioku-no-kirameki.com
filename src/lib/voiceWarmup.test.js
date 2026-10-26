@@ -309,10 +309,41 @@ describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本�
     const w2 = createVoiceWarmup({ initSpeaker: async () => true });
     w2.markWarm(3);
     const f2 = withVoiceWarmup(w2, synth2);
-    await f2('長文', { styleId: 3 }, {});
+    await f2('長文', { styleId: 3 }, { stream: true });
     const p2 = f2('次', { styleId: 3 }, {});
     await vi.advanceTimersByTimeAsync(VOICE_STREAM_GATE_MAX_MS);
     await p2;
     expect(synth2).toHaveBeenCalledTimes(2);
+  });
+
+  it('少しずつ受け取る合成を頼んだ直後(まだ返事が無い間)に並んだ合成も待たせる', async () => {
+    vi.useFakeTimers();
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    w.markWarm(3);
+    const voice = new StreamedVoice(24000);
+    const first = deferred();
+    const synth = vi.fn(async (text) => (text === '長文' ? first.promise : new ArrayBuffer(4)));
+    const f = withVoiceWarmup(w, synth);
+    const p1 = f('長文', { styleId: 3 }, { stream: true });
+    const p2 = f('次', { styleId: 3 }, {});
+    await vi.advanceTimersByTimeAsync(100);
+    expect(synth).toHaveBeenCalledTimes(1);
+    first.resolve(voice);
+    await p1;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(synth).toHaveBeenCalledTimes(1);
+    voice.finish();
+    await p2;
+    expect(synth).toHaveBeenCalledTimes(2);
+  });
+
+  it('少しずつ受け取れず丸ごと返ってきたら、すぐ門を開ける', async () => {
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    w.markWarm(3);
+    const synth = vi.fn(async () => new ArrayBuffer(4));
+    const f = withVoiceWarmup(w, synth);
+    await f('長文', { styleId: 3 }, { stream: true });
+    await f('次', { styleId: 3 }, {});
+    expect(synth).toHaveBeenCalledTimes(2);
   });
 });

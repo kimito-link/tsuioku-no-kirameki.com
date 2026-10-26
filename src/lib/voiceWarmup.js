@@ -87,6 +87,20 @@ export function createVoiceWarmup(deps) {
     for (const fn of list) fn(ok);
   }
 
+  /**
+   * 少しずつ受け取り中の声が届き終わるまで待つ(上限 VOICE_STREAM_GATE_MAX_MS)。
+   * @param {Promise<unknown>} gate
+   * @returns {Promise<void>}
+   */
+  function waitGate(gate) {
+    /** @type {unknown} */
+    let timer = null;
+    return Promise.race([
+      gate.then(() => {}, () => {}),
+      new Promise((r) => { timer = setT(() => r(undefined), VOICE_STREAM_GATE_MAX_MS); })
+    ]).then(() => { if (timer !== null) clearT(timer); });
+  }
+
   /** 合成が走っていなければ、裏の読み込みを1つ始める。 */
   function pump() {
     if (pumpTimer !== null || later.size === 0) return;
@@ -227,13 +241,25 @@ export function createVoiceWarmup(deps) {
       active += 1;
       const gate = streamGate;
       if (!gate) return null;
-      /** @type {unknown} */
-      let timer = null;
-      return Promise.race([
-        gate.then(() => {}, () => {}),
-        new Promise((r) => { timer = setT(() => r(undefined), VOICE_STREAM_GATE_MAX_MS); })
-      ]).then(() => { if (timer !== null) clearT(timer); });
+      return waitGate(gate);
     },
+    /**
+     * 少しずつ受け取る合成を【頼む時点】で門を閉じる(v0.1.1773)。返事を待つ間に並んで始まった先読みが
+     *   エンジンを取り合い、鳴り始めた声の続きが間に合わなかった(グラボ無し・一気に10件で 1.1秒の無音)。
+     * @returns {(result: unknown) => void} 合成の結果を渡すと、届き終わった時に門を開ける
+     */
+    closeStreamGate() {
+      /** @type {(v?: unknown) => void} */
+      let open = () => {};
+      const g = new Promise((r) => { open = r; });
+      streamGate = g;
+      return (result) => {
+        const release = () => { if (streamGate === g) streamGate = null; open(); };
+        if (isStreamedVoice(result)) void result.whenDone.then(release, release);
+        else release();
+      };
+    },
+
     /**
      * 合成が終わったら呼ぶ。少しずつ受け取った声は、届き終わってから「終わった」にする。
      * @param {unknown} result
@@ -241,9 +267,7 @@ export function createVoiceWarmup(deps) {
     afterSynth(result) {
       const done = () => { active = Math.max(0, active - 1); pump(); };
       if (isStreamedVoice(result)) {
-        const g = result.whenDone.then(() => {}, () => {});
-        streamGate = g;
-        void g.then(() => { if (streamGate === g) streamGate = null; done(); });
+        void result.whenDone.then(done, done);
         return;
       }
       done();
@@ -308,6 +332,8 @@ export function withVoiceWarmup(warmup, synth) {
     const initMs = Math.max(0, warmup.now() - startAt);
     const gate = warmup.beforeSynth();
     if (gate) await gate;
+    // 少しずつ受け取る合成は、頼んだ時点で次の合成を待たせる(届き終わるまで)。
+    const releaseStream = opts?.stream === true ? warmup.closeStreamGate() : null;
     const busyAtStart = warmup.busy();
     const onTiming = opts?.onTiming;
     /** @type {any} */
@@ -324,6 +350,7 @@ export function withVoiceWarmup(warmup, synth) {
       });
     } finally {
       warmup.afterSynth(wav);
+      if (releaseStream) releaseStream(wav);
     }
     if (wav) warmup.markWarm(useStyle);
     return wav;
