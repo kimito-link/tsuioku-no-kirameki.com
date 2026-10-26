@@ -9,6 +9,7 @@ import {
   VOICE_STREAM_LONG_TEXT_CHARS,
   VOICE_STREAM_PREBUFFER_SEC,
   knownVoiceStylePeak,
+  knownVoiceStyleRms,
   rememberVoiceStylePeak,
   resetVoiceStylePeaksForTest
 } from './voiceStream.js';
@@ -146,6 +147,21 @@ describe('createStreamGain', () => {
     g.process(Int16Array.from([300, -300]));
     g.process(Int16Array.from([14700, -14700]));
     expect(g.dropRatio).toBe(1);
+  });
+  it('v0.1.1779: 前に鳴らした声の RMS が大きければ、聞こえの大きさの狙いまで下げる', () => {
+    const g = createStreamGain(100, { knownPeak: 0.45, knownRms: 0.3 });
+    g.process(Int16Array.from([9000, -9000]));
+    expect(g.gain).toBeCloseTo((g.targetPeak * 0.25) / 0.3, 3);
+  });
+  it('v0.1.1779: 声ごとの RMS も覚える。少しずつ届いた声は届いた分の RMS を測る', () => {
+    resetVoiceStylePeaksForTest();
+    expect(knownVoiceStyleRms(8)).toBe(-1);
+    rememberVoiceStylePeak(8, 0.4, 0.1);
+    rememberVoiceStylePeak(8, 0.4, 0.2);
+    expect(knownVoiceStyleRms(8)).toBeCloseTo(0.15);
+    const v = new StreamedVoice(24000);
+    v.append(Int16Array.from([16384, -16384, 0]));
+    expect(v.rms).toBeCloseTo(0.5);
   });
   it('v0.1.1775: 声ごとの大きさを覚える(直近寄りの平均)', () => {
     resetVoiceStylePeaksForTest();

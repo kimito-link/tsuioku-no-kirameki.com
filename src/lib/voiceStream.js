@@ -22,7 +22,8 @@ import {
   normalizeVoiceVolumePercent,
   VOICE_MAX_BOOST,
   VOICE_PEAK_CEILING,
-  VOICE_TARGET_PEAK_AT_100
+  VOICE_TARGET_PEAK_AT_100,
+  VOICE_TARGET_RMS_RATIO
 } from './voiceVolume.js';
 
 /** エンジンに頼む区切りの長さ(秒)。 */
@@ -52,19 +53,39 @@ export const VOICE_STREAM_MIN_EST_PEAK = 0.2;
 /** 声(styleId)ごとに、これまで鳴らした素の最大振幅(v0.1.1775)。少しずつ読む時の最初の倍率に使う。 */
 /** @type {Map<string, number>} */
 const stylePeaks = new Map();
+/** @type {Map<string, number>} 声ごとの素の RMS(無音を除く・v0.1.1779) */
+const styleRms = new Map();
 
 /**
  * 1件読み終えた声の素の最大振幅を覚える(直近寄りの平均)。
  * @param {unknown} styleId
  * @param {unknown} peak 0〜1
+ * @param {unknown} [rms] 0〜1(無音を除く)。分かれば一緒に覚える
  */
-export function rememberVoiceStylePeak(styleId, peak) {
+export function rememberVoiceStylePeak(styleId, peak, rms) {
   const id = Number(styleId);
   const p = Number(peak);
   if (!Number.isInteger(id) || id < 0 || !Number.isFinite(p) || p <= 0 || p > 1) return;
   const key = String(id);
   const prev = stylePeaks.get(key);
   stylePeaks.set(key, prev === undefined ? p : prev + 0.5 * (p - prev));
+  const r = Number(rms);
+  if (Number.isFinite(r) && r > 0 && r <= 1) {
+    const pr = styleRms.get(key);
+    styleRms.set(key, pr === undefined ? r : pr + 0.5 * (r - pr));
+  }
+}
+
+/**
+ * 覚えている声の素の RMS。知らなければ -1。
+ * @param {unknown} styleId
+ * @returns {number}
+ */
+export function knownVoiceStyleRms(styleId) {
+  const id = Number(styleId);
+  if (!Number.isInteger(id) || id < 0) return -1;
+  const v = styleRms.get(String(id));
+  return v === undefined ? -1 : v;
 }
 
 /**
@@ -82,6 +103,7 @@ export function knownVoiceStylePeak(styleId) {
 /** テスト用: 覚えた大きさを消す。 */
 export function resetVoiceStylePeaksForTest() {
   stylePeaks.clear();
+  styleRms.clear();
 }
 
 /**
@@ -196,6 +218,8 @@ export class StreamedVoice {
     this.totalSamples = 0;
     /** 届いた分の素の最大振幅(0〜1)。 */
     this.peak = 0;
+    this._sumSq = 0;
+    this._voiced = 0;
     /** この声の styleId(分かれば・v0.1.1775)。 */
     this.styleId = -1;
     this.done = false;
@@ -208,6 +232,11 @@ export class StreamedVoice {
     this._resolveDone = () => {};
     /** 届き終わったら true(途中で途切れたら false)。 */
     this.whenDone = new Promise((r) => { this._resolveDone = r; });
+  }
+
+  /** 届いた分の素の RMS(0〜1・無音を除く)。 */
+  get rms() {
+    return this._voiced > 0 ? Math.sqrt(this._sumSq / this._voiced) : 0;
   }
 
   /** ためた長さ(秒)。 */
@@ -223,6 +252,9 @@ export class StreamedVoice {
     let m = 0;
     for (let i = 0; i < samples.length; i++) { const a = Math.abs(samples[i]); if (a > m) m = a; }
     if (m / 32768 > this.peak) this.peak = m / 32768;
+    for (let i = 0; i < samples.length; i++) {
+      if (Math.abs(samples[i]) >= 328) { const x = samples[i] / 32768; this._sumSq += x * x; this._voiced++; }
+    }
     this._emit();
   }
 
@@ -290,10 +322,11 @@ export function isStreamedVoice(x) {
 /**
  * 少しずつ流すときの音量。仮定の大きさで始め、天井を超えそうな分が届いたら倍率を下げる(上げない)。
  * @param {unknown} volumePercent
- * @param {{ knownPeak?: number }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)
+ * @param {{ knownPeak?: number, knownRms?: number }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)と RMS(v0.1.1779)
  */
 export function createStreamGain(volumePercent, opts = {}) {
   const knownPeak = Number(opts?.knownPeak) > 0 ? Number(opts.knownPeak) : -1;
+  const knownRms = Number(opts?.knownRms) > 0 ? Number(opts.knownRms) : -1;
   const pct = normalizeVoiceVolumePercent(volumePercent);
   const target = Math.min(VOICE_PEAK_CEILING, (VOICE_TARGET_PEAK_AT_100 * pct) / 100);
   let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
@@ -330,6 +363,8 @@ export function createStreamGain(volumePercent, opts = {}) {
         const first = (peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM;
         const est = knownPeak > 0 ? Math.max(knownPeak, first) : Math.max(first, VOICE_STREAM_MIN_EST_PEAK);
         gain = Math.min(VOICE_MAX_BOOST, target / est);
+        // v0.1.1779: 前に鳴らした声の聞こえの大きさが分かれば、詰まった声を狙いの RMS まで下げる(voiceVolume.js)。
+        if (knownRms > 0) gain = Math.min(gain, (target * VOICE_TARGET_RMS_RATIO) / knownRms);
       }
       if (peak > 0 && (peak / 32768) * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
       if (firstGain < 0) firstGain = gain;
@@ -375,7 +410,10 @@ export function createStreamedVoiceAudio(voice, deps) {
   let unsubscribe = null;
   /** @type {any} */
   let whole = null;
-  const gain = createStreamGain(deps.volumePercent, { knownPeak: knownVoiceStylePeak(voice.styleId) });
+  const gain = createStreamGain(deps.volumePercent, {
+    knownPeak: knownVoiceStylePeak(voice.styleId),
+    knownRms: knownVoiceStyleRms(voice.styleId)
+  });
   // 2026-10-26計器(voicePlaybackQuality.js): 次の分が間に合わず無音が挟まった回数と最長の無音。
   let underruns = 0;
   let underrunMaxMs = 0;

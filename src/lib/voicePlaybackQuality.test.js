@@ -24,6 +24,13 @@ describe('recordVoicePlaybackQuality', () => {
     expect(d.quietItemTotal).toBe(1);
     expect(d.lastPlayIssue).toMatch(/quiet/);
   });
+  it('v0.1.1779: 最大振幅が低くても、聞こえの大きさ(RMS)が足りていれば小さすぎにしない', () => {
+    const d = makeInitialVoiceDiag();
+    recordVoicePlaybackQuality(d, /** @type {any} */ ({ ...base, outPeak: 0.2, outRms: 0.1 }));
+    expect(d.quietItemTotal).toBe(0);
+    recordVoicePlaybackQuality(d, /** @type {any} */ ({ ...base, outPeak: 0.2, outRms: 0.03 }));
+    expect(d.quietItemTotal).toBe(1);
+  });
   it('少しずつ鳴らす声: 無音のすき間・届いた分だけ・途中で小さく', () => {
     const d = makeInitialVoiceDiag();
     recordVoicePlaybackQuality(d, /** @type {any} */ ({ ...base, streamed: true, playedMs: 3500, underruns: 2, underrunMaxMs: 180, gainDropRatio: 0.5 }));
