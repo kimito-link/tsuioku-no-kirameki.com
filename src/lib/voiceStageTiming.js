@@ -11,6 +11,9 @@ import { updateVoiceServiceTimeEma } from './voiceLagBudget.js';
 /** 受信→キューの値として信じる上限(ms)。これを超えるのは時計ずれ・過去ログ再生等=計測から除外。 */
 export const VOICE_UPSTREAM_SANE_MAX_MS = 60_000;
 
+/** これより短い声は比が揺れるので、比の物差しに入れない(ms)。 */
+export const VOICE_RTF_MIN_AUDIO_MS = 300;
+
 /**
  * 2つの時刻の間隔(ms)。受信→キュー投入、キュー投入→取り出し などに使う。
  * 測れない/信用できない値(欠損・時計の逆転・上限超え)は -1。
@@ -58,7 +61,7 @@ export function createVoiceSynthTracker(deps = {}) {
   return {
     /**
      * @param {unknown} styleId
-     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean } }}
+     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number } }}
      */
     begin(styleId) {
       const startAt = now();
@@ -81,6 +84,7 @@ export function createVoiceSynthTracker(deps = {}) {
         const q = Number(timing?.queryMs);
         const s = Number(timing?.synthMs);
         const i = Number(timing?.initMs);
+        const a = Number(timing?.audioMs);
         return {
           cold,
           ok: ok === true,
@@ -93,7 +97,9 @@ export function createVoiceSynthTracker(deps = {}) {
           // 2026-10-26: 少しずつ受け取った(voiceStream)。時間は「最初の声が届くまで」。
           streamed: timing?.streamed === true,
           // 2026-10-26: 別の声の準備と重なった(voiceWarmup)。速さの物差しに入れない。
-          contended: timing?.contended === true
+          contended: timing?.contended === true,
+          // 2026-10-26: できた声の長さ(ms)。合成の速さを文の長さで割るのに使う。分からなければ -1。
+          audioMs: Number.isFinite(a) && a > 0 ? Math.round(a) : -1
         };
       };
       return { cold, end };
@@ -141,7 +147,41 @@ export function recordVoiceSynthStage(diag, r) {
   } else {
     foldVoiceStageEma(diag, 'warmSynthEmaMs', ownMs);
     diag.warmSynthSamples = (Number(diag.warmSynthSamples) || 0) + 1;
+    // 2026-10-26(PC 実測 v0.1.1768): 長いコメントはグラボ有りでも 0.8〜1.2秒かかり、ms だけで見ると
+    //   速い PC が「弱い」と記録された。声の長さで割った比(グラボ有り約0.12・無し約0.8)も残す。
+    const audioMs = Number(r.audioMs);
+    if (Number.isFinite(audioMs) && audioMs >= VOICE_RTF_MIN_AUDIO_MS) {
+      foldVoiceStageEma(diag, 'warmSynthRtfPermille', (ownMs / audioMs) * 1000);
+      diag.warmRtfSamples = (Number(diag.warmRtfSamples) || 0) + 1;
+    }
   }
+}
+
+/**
+ * WAV(16bit PCM)の声の長さ(ms)。読めなければ -1。
+ * @param {unknown} wav
+ * @returns {number}
+ */
+export function measureWavAudioMs(wav) {
+  if (!(wav instanceof ArrayBuffer) || wav.byteLength < 44) return -1;
+  try {
+    const v = new DataView(wav);
+    if (v.getUint32(0, false) !== 0x52494646 || v.getUint32(8, false) !== 0x57415645) return -1;
+    let off = 12;
+    let bytesPerSec = 0;
+    while (off + 8 <= wav.byteLength) {
+      const id = v.getUint32(off, false);
+      const size = v.getUint32(off + 4, true);
+      if (id === 0x666d7420 && off + 16 <= wav.byteLength) bytesPerSec = v.getUint32(off + 16, true);
+      if (id === 0x64617461) {
+        if (bytesPerSec <= 0) return -1;
+        const dataBytes = Math.min(size, wav.byteLength - off - 8);
+        return Math.round((dataBytes / bytesPerSec) * 1000);
+      }
+      off += 8 + size + (size % 2);
+    }
+  } catch { /* 壊れた WAV は測らない */ }
+  return -1;
 }
 
 /**

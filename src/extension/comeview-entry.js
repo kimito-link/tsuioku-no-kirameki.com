@@ -109,6 +109,7 @@ import {
   createVoiceSynthTracker,
   foldVoiceStageEma,
   measureVoiceGapMs,
+  measureWavAudioMs,
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
 import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
@@ -660,7 +661,7 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
     ...(extra.stream === true ? { stream: true } : {})
   }).then(
     (wav) => {
-      try { recordVoiceSynthStage(_voiceDiag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
+      try { recordVoiceSynthStage(_voiceDiag, track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav)); } catch { /* 計器は本体を止めない */ }
       // P3: 遅いPCと分かったら一度だけ記録(会場の VoicePlayer と同じ判定=voiceNarrowing.js)。
       rememberWeakVoicePc(_voiceDiag, _voiceWeakPcState, () => chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: true }));
       // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す(会場と同じ)。
