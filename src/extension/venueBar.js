@@ -369,7 +369,7 @@ import {
   synthesizeVoice,
   probeVoicevoxStreaming
 } from '../lib/voicevoxClient.js';
-import { createVoicevoxWarmup, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3397,7 +3397,7 @@ export function mountVenueBarButton(options = {}) {
     fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
     resolveVoice: resolveVoiceForUser
   });
-  
+  wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag); // 裏の読み込みは手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {

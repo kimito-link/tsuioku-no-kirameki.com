@@ -29,8 +29,12 @@ import { VOICE_NARROW_STYLE_IDS } from './voiceNarrowing.js';
 import { isStreamedVoice, rememberVoiceStylePeak } from './voiceStream.js';
 import { measureVoiceWavLevel } from './voiceVolume.js';
 
-/** 合成が終わってから、裏の読み込みを始めるまで待つ時間(ms)。次の先読みが始まる隙を残す。 */
-export const VOICE_IDLE_INIT_DELAY_MS = 400;
+/**
+ * 合成も再生も止まってから、裏の読み込みを始めるまで待つ時間(ms)。
+ *   v0.1.1777: 400ms だと、声を鳴らしている間や次のコメントが来る直前に読み込みが始まり、
+ *   次の audio_query がその後ろで 0.5〜0.9秒待った(PC 試験: 先に試したコメビュだけ遅く見えた)。
+ */
+export const VOICE_IDLE_INIT_DELAY_MS = 1500;
 
 /** 少しずつ受け取っている声を、次の合成が待つ上限(ms)。 */
 export const VOICE_STREAM_GATE_MAX_MS = 8000;
@@ -75,6 +79,10 @@ export function createVoiceWarmup(deps) {
   let active = 0;
   /** @type {unknown} */
   let pumpTimer = null;
+  /** 最後に合成を始めた・終えた時刻。 */
+  let lastActivityAt = -Infinity;
+  /** @type {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void }} */
+  let hooks = {};
   /** 少しずつ受け取り中の声が届き終わるのを待つ約束(無ければ null)。 */
   /** @type {Promise<unknown>|null} */
   let streamGate = null;
@@ -107,10 +115,17 @@ export function createVoiceWarmup(deps) {
     if (pumpTimer !== null || later.size === 0) return;
     pumpTimer = setT(() => {
       pumpTimer = null;
-      if (active > 0 || pending > 0 || later.size === 0) return;
+      if (later.size === 0) return;
+      let playerIdle = true;
+      try { playerIdle = typeof hooks.isIdle === 'function' ? hooks.isIdle() !== false : true; } catch { playerIdle = true; }
+      // 合成・再生・読む順番待ちのどれかがある、または動きが止まって間もない時は、少し後でもう一度見る。
+      if (active > 0 || pending > 0 || !playerIdle || now() - lastActivityAt < VOICE_IDLE_INIT_DELAY_MS) {
+        pump();
+        return;
+      }
       const key = /** @type {string} */ (later.values().next().value);
       later.delete(key);
-      void api.ensure(Number(key)).then(() => {}, () => {});
+      void ensureInternal(Number(key), true).then(() => {}, () => {});
     }, VOICE_IDLE_INIT_DELAY_MS);
   }
 
@@ -128,6 +143,35 @@ export function createVoiceWarmup(deps) {
 
   /** @param {unknown} styleId */
   const keyOf = (styleId) => String(Number(styleId));
+
+  /**
+   * @param {unknown} styleId
+   * @param {boolean} background 合成の合間に裏で読み込んだか
+   * @returns {Promise<boolean>}
+   */
+  function ensureInternal(styleId, background) {
+    const id = Number(styleId);
+    if (!Number.isInteger(id) || id < 0) return Promise.resolve(false);
+    const key = keyOf(id);
+    if (warm.has(key)) return Promise.resolve(true);
+    if (failed.has(key)) return Promise.resolve(false);
+    const existing = inflight.get(key);
+    if (existing) return existing;
+    const myEpoch = epoch;
+    const p = enqueue(async () => {
+      if (myEpoch !== epoch) return false;
+      if (warm.has(key)) return true;
+      let ok = false;
+      const t0 = now();
+      try { ok = !!(await deps.initSpeaker(id)); } catch { ok = false; }
+      try { if (typeof hooks.onInit === 'function') hooks.onInit(Math.max(0, now() - t0), background); } catch { /* 計器は本体を止めない */ }
+      if (myEpoch === epoch) (ok ? warm : failed).add(key);
+      return ok;
+    }).then((ok) => { if (myEpoch === epoch) settle(key, ok); return ok; })
+      .finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
+    inflight.set(key, p);
+    return p;
+  }
 
   const api = {
     /** @param {unknown} styleId */
@@ -149,25 +193,7 @@ export function createVoiceWarmup(deps) {
      * @returns {Promise<boolean>} 読み込めたら true(すでに温まっていても true)
      */
     ensure(styleId) {
-      const id = Number(styleId);
-      if (!Number.isInteger(id) || id < 0) return Promise.resolve(false);
-      const key = keyOf(id);
-      if (warm.has(key)) return Promise.resolve(true);
-      if (failed.has(key)) return Promise.resolve(false);
-      const existing = inflight.get(key);
-      if (existing) return existing;
-      const myEpoch = epoch;
-      const p = enqueue(async () => {
-        if (myEpoch !== epoch) return false;
-        if (warm.has(key)) return true;
-        let ok = false;
-        try { ok = !!(await deps.initSpeaker(id)); } catch { ok = false; }
-        if (myEpoch === epoch) (ok ? warm : failed).add(key);
-        return ok;
-      }).then((ok) => { if (myEpoch === epoch) settle(key, ok); return ok; })
-        .finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
-      inflight.set(key, p);
-      return p;
+      return ensureInternal(styleId, false);
     },
     /**
      * 読み上げ ON の直後に1回だけ、捨てる audio_query でエンジンを起こす(待たない呼び方でよい)。
@@ -240,6 +266,7 @@ export function createVoiceWarmup(deps) {
      */
     beforeSynth() {
       active += 1;
+      lastActivityAt = now();
       const gate = streamGate;
       if (!gate) return null;
       return waitGate(gate);
@@ -261,6 +288,14 @@ export function createVoiceWarmup(deps) {
       };
     },
 
+    /**
+     * 再生側の様子と計器をつなぐ(v0.1.1777)。isIdle: 再生も順番待ちも無い時 true。
+     *   onInit: 声を読み込んだ時間(ms)と、裏の読み込みだったか。
+     * @param {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void }} h
+     */
+    setHooks(h) {
+      hooks = h && typeof h === 'object' ? h : {};
+    },
     /** 走っている合成の数(少しずつ受け取り中も含む)。 */
     activeCount() {
       return active;
@@ -270,7 +305,7 @@ export function createVoiceWarmup(deps) {
      * @param {unknown} result
      */
     afterSynth(result) {
-      const done = () => { active = Math.max(0, active - 1); pump(); };
+      const done = () => { active = Math.max(0, active - 1); lastActivityAt = now(); pump(); };
       if (isStreamedVoice(result)) {
         void result.whenDone.then(done, done);
         return;
@@ -397,4 +432,25 @@ export function startVoiceWarmup(warmup, allStyleIds) {
   for (const id of VOICE_NARROW_STYLE_IDS) {
     if (id !== first && ids.includes(id)) void warmup.ensureWhenIdle(id);
   }
+}
+
+/**
+ * v0.1.1777: 再生の様子(読む順番待ち・再生中)と計器を warmup につなぐ(会場・コメビュ共通)。
+ * @param {ReturnType<typeof createVoiceWarmup>|null|undefined} warmup
+ * @param {() => boolean} isPlayerIdle 再生中でも順番待ちでもない時 true
+ * @param {() => Record<string, any>} getDiag
+ */
+export function wireVoiceWarmupHooks(warmup, isPlayerIdle, getDiag) {
+  if (!warmup) return;
+  warmup.setHooks({
+    isIdle: isPlayerIdle,
+    onInit: (ms, background) => {
+      if (!background) return;
+      const d = getDiag();
+      if (!d || typeof d !== 'object') return;
+      // 裏で声を読み込んだ件数と最長(この間エンジンは他の合成ができない=次のコメントが待つ)。
+      d.bgInitTotal = (Number(d.bgInitTotal) || 0) + 1;
+      d.bgInitMaxMs = Math.max(Number(d.bgInitMaxMs) || 0, Math.round(ms));
+    }
+  });
 }
