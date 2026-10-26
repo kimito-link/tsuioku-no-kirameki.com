@@ -3703,6 +3703,17 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
+// v0.1.1781: 会場とコメビュで VOICEVOX の使用中を分け合う(src/lib/voiceEngineActivity.js)。
+//   裏の声読み込みは「どちらのページも静か」な時だけ始める。SW が落ちて値が消えても「静か」扱いで止まらない。
+let voiceEngineLastActivityAt = 0;
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== 'NLS_VOICE_ENGINE_ACTIVITY' && msg.type !== 'NLS_VOICE_ENGINE_QUIET')) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  if (msg.type === 'NLS_VOICE_ENGINE_ACTIVITY') voiceEngineLastActivityAt = Date.now();
+  sendResponse({ quietMs: voiceEngineLastActivityAt > 0 ? Date.now() - voiceEngineLastActivityAt : 1e9 });
+  return false;
+});
+
 // v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== 'NLS_FETCH_PROXY') return undefined;
