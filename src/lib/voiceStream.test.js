@@ -153,6 +153,14 @@ describe('createStreamGain', () => {
     g.process(Int16Array.from([9000, -9000]));
     expect(g.gain).toBeCloseTo((g.targetPeak * 0.25) / 0.3, 3);
   });
+  it('v0.1.1780: 初めての声でも、最初に届いた分の RMS が大きければ下げる(短すぎる出だしでは判断しない)', () => {
+    const g = createStreamGain(100);
+    g.process(Int16Array.from({ length: 2400 }, (_, i) => (i % 2 ? 9830 : -9830)));
+    expect(g.gain).toBeCloseTo((g.targetPeak * 0.25) / 0.3, 2);
+    const g2 = createStreamGain(100);
+    g2.process(Int16Array.from([9830, -9830]));
+    expect(g2.gain).toBeGreaterThan((g2.targetPeak * 0.25) / 0.3 + 0.1);
+  });
   it('v0.1.1779: 声ごとの RMS も覚える。少しずつ届いた声は届いた分の RMS を測る', () => {
     resetVoiceStylePeaksForTest();
     expect(knownVoiceStyleRms(8)).toBe(-1);

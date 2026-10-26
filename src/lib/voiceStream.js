@@ -41,6 +41,9 @@ export const VOICE_STREAM_STALL_MS = 5000;
 /** 少しずつ流すときに仮定する、素の声の最大振幅(満振幅比)。長文の実測 43〜48%。 */
 export const VOICE_STREAM_ASSUMED_PEAK = 0.45;
 
+/** 初めての声の聞こえの大きさを、最初に届いた分から見積もるのに要る有音サンプル数(24kHz で約0.08秒・v0.1.1780)。 */
+export const VOICE_STREAM_MIN_RMS_SAMPLES = 2000;
+
 /** 最初に届いた分の最大振幅に掛ける余裕(文の後半の方が大きくなりがち・v0.1.1774)。 */
 export const VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
 
@@ -364,7 +367,18 @@ export function createStreamGain(volumePercent, opts = {}) {
         const est = knownPeak > 0 ? Math.max(knownPeak, first) : Math.max(first, VOICE_STREAM_MIN_EST_PEAK);
         gain = Math.min(VOICE_MAX_BOOST, target / est);
         // v0.1.1779: 前に鳴らした声の聞こえの大きさが分かれば、詰まった声を狙いの RMS まで下げる(voiceVolume.js)。
-        if (knownRms > 0) gain = Math.min(gain, (target * VOICE_TARGET_RMS_RATIO) / knownRms);
+        //   初めての声は、最初に届いた分の RMS で見積もる(出だしは文全体より静かなことが多い=下げすぎにはなりにくい)。
+        let firstRms = -1;
+        if (knownRms <= 0) {
+          let sq = 0;
+          let n = 0;
+          for (let i = 0; i < samples.length; i++) {
+            if (Math.abs(samples[i]) >= 328) { const x = samples[i] / 32768; sq += x * x; n++; }
+          }
+          if (n >= VOICE_STREAM_MIN_RMS_SAMPLES) firstRms = Math.sqrt(sq / n);
+        }
+        const estRms = knownRms > 0 ? knownRms : firstRms;
+        if (estRms > 0) gain = Math.min(gain, (target * VOICE_TARGET_RMS_RATIO) / estRms);
       }
       if (peak > 0 && (peak / 32768) * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
       if (firstGain < 0) firstGain = gain;
