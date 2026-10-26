@@ -149,6 +149,8 @@ export async function runVoiceTest(o) {
     // v0.1.1774: この回だけの「声が出るまで」の平均・最大(e2eAvgMs は過去の回を引きずる)。
     e2eRunAvgMs: e2eN > 0 ? Math.round((Number(delta.e2eSumMsTotal) || 0) / e2eN) : -1,
     e2eRunMaxMs: e2eN > 0 ? Number(delta.e2eMaxMs) || 0 : -1,
+    // v0.1.1776: 試験の間に混ざった本物のコメントの件数(声の差・遅れの見え方に効く)。計器が無ければ -1。
+    otherItems: Number.isFinite(Number(delta.voiceEnqueuedTotal)) ? Math.max(0, Number(delta.voiceEnqueuedTotal) - plan.length) : -1,
     delta
   };
   if (typeof o.write === 'function') {

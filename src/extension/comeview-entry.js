@@ -1015,6 +1015,7 @@ function enqueueVoiceTimelineItems(items) {
       enqueuedAt: Date.now(),
       priority: isHighPriority ? 'high' : 'normal'
     };
+    _voiceDiag.voiceEnqueuedTotal = (Number(_voiceDiag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
     _voiceQueue = merged.queue;
     if (merged.merged) continue;

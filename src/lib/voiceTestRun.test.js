@@ -90,4 +90,14 @@ describe('voiceTestRun', () => {
     expect(report.e2eRunAvgMs).toBe(300);
     expect(report.e2eRunMaxMs).toBe(300);
   });
+  it('v0.1.1776: 試験の間に混ざった本物のコメントの件数を出す', async () => {
+    let t = 0;
+    const diag = { voiceEnqueuedTotal: 40 };
+    const report = await runVoiceTest({
+      kind: 'short', count: 2, mode: 'comeview',
+      enqueue: () => { diag.voiceEnqueuedTotal += 2; },
+      getDiag: () => diag, isIdle: () => true, now: () => t, sleep: async (ms) => { t += ms; }
+    });
+    expect(report.otherItems).toBe(2);
+  });
 });
