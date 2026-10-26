@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VoicePlayer, VOICE_ALIVE_RETRY_BACKOFF_MS } from './voicePlayer.js';
+import { StreamedVoice } from './voiceStream.js';
 
 describe('VoicePlayer', () => {
   let mockStorage;
@@ -356,6 +357,77 @@ describe('VoicePlayer', () => {
     // drain の setTimeout を待たずに、enqueue 内の即時 prefetch で合成が起動していること。
     expect(synth).toHaveBeenCalled();
     if (resolveSynth) resolveSynth(null);
+  });
+
+  describe('2026-10-26: 声を少しずつ受け取る(ストリーミング)', () => {
+    /** @param {{ supported?: boolean, weak?: boolean }} o */
+    async function setup(o = {}) {
+      mockStorage.get.mockResolvedValue(o.weak ? { nls_voice_weak_pc_v1: true } : {});
+      const streamedAudio = {
+        play: vi.fn().mockResolvedValue(),
+        pause: vi.fn(),
+        addEventListener: vi.fn((event, cb) => { if (event === 'ended') setTimeout(cb, 0); }),
+        removeEventListener: vi.fn()
+      };
+      const createStreamedAudio = vi.fn(() => streamedAudio);
+      player.probeVoiceStreaming = vi.fn().mockResolvedValue(o.supported !== false);
+      player.createStreamedAudio = createStreamedAudio;
+      await player.enable({ persist: false });
+      await new Promise((r) => setTimeout(r, 0));
+      return { createStreamedAudio, streamedAudio };
+    }
+
+    it('遅い PC と分かっていて待ちが無ければ、少しずつ受け取りを頼み、Web Audio 側で鳴らす', async () => {
+      const voice = new StreamedVoice(16000);
+      voice.append(new Int16Array(16000));
+      voice.finish();
+      const synth = vi.fn().mockResolvedValue(voice);
+      player.fetchSynthesizeVoice = synth;
+      const { createStreamedAudio, streamedAudio } = await setup({ weak: true });
+      player.enqueue([{ kind: 'comment', userId: 's1', nickname: 'S', text: 'みじかい' }]);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(synth.mock.calls[0][2].stream).toBe(true);
+      expect(createStreamedAudio).toHaveBeenCalledWith(voice, 100);
+      expect(streamedAudio.play).toHaveBeenCalled();
+      expect(mockAudio.play).not.toHaveBeenCalled();
+    });
+
+    it('速い PC の短いコメント・エンジンが非対応なら頼まない', async () => {
+      const synth = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+      player.fetchSynthesizeVoice = synth;
+      await setup({ weak: false });
+      player.enqueue([{ kind: 'comment', userId: 's2', nickname: 'S', text: 'みじかい' }]);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(synth.mock.calls[0][2].stream).toBeUndefined();
+
+      const synth2 = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+      player.fetchSynthesizeVoice = synth2;
+      await setup({ weak: true, supported: false });
+      player.enqueue([{ kind: 'comment', userId: 's3', nickname: 'S', text: 'みじかい' }]);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(synth2.mock.calls[0][2].stream).toBeUndefined();
+    });
+
+    it('鳴っている間に来たコメントは丸ごと受け取る(先読みが合成を隠す・速さの補正を残す)', async () => {
+      const synth = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+      player.fetchSynthesizeVoice = synth;
+      await setup({ weak: true });
+      player.stopCurrent = () => {}; // 何か鳴っている
+      player.enqueue([{ kind: 'comment', userId: 's4', nickname: 'S', text: 'あとから' }]);
+      expect(synth.mock.calls[0][2].stream).toBeUndefined();
+    });
+
+    it('Web Audio の部品が無い会場でも、少しずつ届いた声は丸ごと再生で鳴らす', async () => {
+      const voice = new StreamedVoice(16000);
+      voice.append(new Int16Array(8));
+      voice.finish();
+      player.fetchSynthesizeVoice = vi.fn().mockResolvedValue(voice);
+      await setup({ weak: true });
+      player.createStreamedAudio = vi.fn(() => null);
+      player.enqueue([{ kind: 'comment', userId: 's5', nickname: 'S', text: 'まるごと' }]);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mockAudio.play).toHaveBeenCalled();
+    });
   });
 
   it('v0.1.800: kickPrefetch は読み上げOFFなら何もしない(暴走/無駄合成しない)', async () => {

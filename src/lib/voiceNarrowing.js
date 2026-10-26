@@ -24,14 +24,51 @@ export const VOICE_WEAK_PC_WARM_SYNTH_MS = 500;
 export const VOICE_WEAK_PC_COLD_SYNTH_MS = 3000;
 
 /**
+ * 2回目以降の合成を、これだけの件数測ってから判定する(2026-10-26)。
+ *   PC 実測で、速い PC が最初の数件(声の準備と重なった回)だけで「弱い」と記録された。
+ */
+export const VOICE_WEAK_PC_MIN_WARM_SAMPLES = 5;
+
+/** 速い PC と分かったら、誤って残った「弱い」の記録を消す件数。 */
+export const VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
+
+/**
+ * (合成時間−決まった 250ms)÷声の長さ(×1000)がこれ以上なら「弱い」(2026-10-26 PC 実測: グラボ有り約100〜230・無し約650以上)。
+ *   ms だけで見ると、長いコメントの多い配信で速い PC が「弱い」と記録された(v0.1.1768 実測)。
+ */
+export const VOICE_WEAK_PC_RTF_PERMILLE = 400;
+
+/**
+ * 2回目以降の合成が遅いか。声の長さで割った比が十分そろっていれば比で、
+ *   比が1件も無ければ(古い計器・短い声ばかり)今までどおり ms で見る。まだ測れていなければ null。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, warmSynthRtfPermille?: number, warmRtfSamples?: number }} diag
+ * @param {number} minSamples
+ * @returns {boolean|null}
+ */
+function isWarmSynthSlow(diag, minSamples) {
+  const rtf = Number(diag?.warmSynthRtfPermille);
+  const rtfSamples = Number(diag?.warmRtfSamples) || 0;
+  if (rtfSamples > 0) {
+    // 比が1件でも測れていれば比だけで見る(ms に戻ると長文の多い配信で速い PC を見誤る)。
+    if (rtfSamples < minSamples || !Number.isFinite(rtf) || rtf < 0) return null;
+    return rtf >= VOICE_WEAK_PC_RTF_PERMILLE;
+  }
+  const warm = Number(diag?.warmSynthEmaMs);
+  const samples = Number(diag?.warmSynthSamples) || 0;
+  if (samples >= minSamples && Number.isFinite(warm) && warm >= 0) return warm >= VOICE_WEAK_PC_WARM_SYNTH_MS;
+  return null;
+}
+
+/**
  * P1 の計器から「弱いPC」かを決める。まだ測れていなければ false(=絞らない・今のまま)。
- * @param {{ warmSynthEmaMs?: number, coldSynthMaxMs?: number }} diag
+ *   2回目以降の合成は VOICE_WEAK_PC_MIN_WARM_SAMPLES 件そろってから見る。
+ *   計器(voiceStageTiming)は、声の準備と重なった回を warm/cold に入れない。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
  * @returns {boolean}
  */
 export function isWeakVoicePc(diag) {
-  const warm = Number(diag?.warmSynthEmaMs);
   const cold = Number(diag?.coldSynthMaxMs);
-  if (Number.isFinite(warm) && warm >= VOICE_WEAK_PC_WARM_SYNTH_MS) return true;
+  if (isWarmSynthSlow(diag, VOICE_WEAK_PC_MIN_WARM_SAMPLES) === true) return true;
   if (Number.isFinite(cold) && cold >= VOICE_WEAK_PC_COLD_SYNTH_MS) return true;
   return false;
 }
@@ -53,7 +90,11 @@ export function narrowVoiceStyleIds(availableStyleIds, weak) {
 
 export { KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC } from './voiceKeys.js';
 
-/** 絞り込みの設定。既定は 'off'(=今までどおり全部の声)。 */
+/**
+ * 絞り込みの設定。既定は 'auto'(v0.1.1768・りんく判断: 遅い PC と分かった時だけ絞る)。
+ *   PC 実測でグラボ無しは新しい人の声の準備が最大13.6秒かかり、32件飛ばした。速い PC は変わらない。
+ *   自分で「しない」を選んだ人('off' が保存されている)はそのまま。
+ */
 export const VOICE_NARROW_MODES = Object.freeze(['off', 'auto', 'on']);
 
 /**
@@ -61,7 +102,7 @@ export const VOICE_NARROW_MODES = Object.freeze(['off', 'auto', 'on']);
  * @returns {'off'|'auto'|'on'}
  */
 export function normalizeVoiceNarrowMode(raw) {
-  return raw === 'auto' || raw === 'on' ? raw : 'off';
+  return raw === 'off' || raw === 'on' ? raw : 'auto';
 }
 
 /**
@@ -120,4 +161,28 @@ export function rememberWeakVoicePc(diag, state, write) {
   if (state.saved || !isWeakVoicePc(diag)) return;
   state.saved = true;
   Promise.resolve().then(() => write(true)).catch(() => { /* 記録の失敗は読み上げに影響させない */ });
+}
+
+/**
+ * 速い PC と十分に分かったか(2回目以降の合成が十分な件数そろって速く、初めての声も遅くない)。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
+ * @returns {boolean}
+ */
+export function isFastVoicePc(diag) {
+  const cold = Number(diag?.coldSynthMaxMs) || 0;
+  return isWarmSynthSlow(diag, VOICE_FAST_PC_MIN_WARM_SAMPLES) === false
+    && cold < VOICE_WEAK_PC_COLD_SYNTH_MS;
+}
+
+/**
+ * 2026-10-26: 「弱い」と誤って記録された速い PC の記録を一度だけ消す(PC 実測で起きた)。
+ *   消さないと、短いコメントまで少しずつ受け取り、かえって遅くなる(0.3秒→0.7秒)。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
+ * @param {{ cleared?: boolean }} state
+ * @param {() => unknown} clear
+ */
+export function forgetWeakVoicePcIfFast(diag, state, clear) {
+  if (state.cleared || !isFastVoicePc(diag)) return;
+  state.cleared = true;
+  Promise.resolve().then(() => clear()).catch(() => { /* 記録の失敗は読み上げに影響させない */ });
 }

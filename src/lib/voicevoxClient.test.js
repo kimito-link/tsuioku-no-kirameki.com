@@ -9,7 +9,8 @@ import {
   probeVoicevoxAlive,
   isWhisperStyleName,
   listVoicevoxStyleIds,
-  synthesizeVoice
+  synthesizeVoice,
+  warmupVoicevoxQuery
 } from './voicevoxClient.js';
 
 afterEach(() => {
@@ -242,6 +243,40 @@ describe('synthesizeVoice', () => {
     );
     await vi.advanceTimersByTimeAsync(10);
     await expect(pending).resolves.toBeNull();
+  });
+
+  it('audio_query の時間切れは stage:query で知らせる(2026-10-26・以前は synth と区別できなかった)', async () => {
+    vi.useFakeTimers();
+    const onFailure = vi.fn();
+    const fetchFn = vi.fn(() => new Promise(() => {}));
+    const pending = synthesizeVoice('本文', { styleId: 3 }, { fetchFn, audioQueryTimeoutMs: 10, onFailure });
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(pending).resolves.toBeNull();
+    expect(onFailure.mock.calls[0][0].stage).toBe('query');
+  });
+
+  it('synthesis の時間切れは stage:synth で知らせる', async () => {
+    vi.useFakeTimers();
+    const onFailure = vi.fn();
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pitchScale: 0, speedScale: 1 }) })
+      .mockImplementationOnce(() => new Promise(() => {}));
+    const pending = synthesizeVoice('本文', { styleId: 3 }, { fetchFn, synthesisTimeoutMs: 10, onFailure });
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(pending).resolves.toBeNull();
+    expect(onFailure.mock.calls[0][0].stage).toBe('synth');
+  });
+
+  it('warmupVoicevoxQuery は「あ」で audio_query を1回だけ投げる(結果は捨てる)', async () => {
+    const fetchFn = vi.fn(async () => ({ ok: true }));
+    await expect(warmupVoicevoxQuery(8, { fetchFn })).resolves.toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const url = String(fetchFn.mock.calls[0][0]);
+    expect(url).toContain('/audio_query?');
+    expect(url).toContain('speaker=8');
+    await expect(warmupVoicevoxQuery(-1, { fetchFn })).resolves.toBe(false);
+    await expect(warmupVoicevoxQuery(3, { fetchFn: async () => { throw new Error('down'); } })).resolves.toBe(false);
   });
 
   it('synthesis のタイムアウト時も null', async () => {

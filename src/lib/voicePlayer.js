@@ -9,6 +9,9 @@ import {
   KEY_VOICE_READING_ENABLED
 } from './voiceKeys.js';
 import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
+import { startVoiceWarmup } from './voiceWarmup.js';
+import { isStreamedVoice, shouldStreamVoice } from './voiceStream.js';
+import { isWeakVoicePc } from './voiceNarrowing.js';
 import {
   capVoiceMaxCharsByBoost,
   computeVoiceCongestion,
@@ -30,14 +33,14 @@ import {
   computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 import {
-  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, recordVoiceSynthStage
+  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceStreamDone, recordVoiceSynthStage
 } from './voiceStageTiming.js';
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT
 } from './voiceVolume.js';
 import { decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
-  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc
+  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, forgetWeakVoicePcIfFast
 } from './voiceNarrowing.js';
 
 /**
@@ -102,6 +105,17 @@ export class VoicePlayer {
     this.fetchVoiceStyleIds = deps.fetchVoiceStyleIds;
     /** P3: 声のモデルの先読み(/initialize_speaker)。無ければ先読みしない。 */
     this.initVoiceSpeaker = deps.initVoiceSpeaker || null;
+    /** 2026-10-26: 声を使う前に温める(voiceWarmup.js)。fetchSynthesizeVoice と同じものを渡す。無ければ何もしない。 */
+    this.voiceWarmup = deps.voiceWarmup || null;
+    /**
+     * 2026-10-26: 声を少しずつ受け取って鳴らす(voiceStream.js)。両方そろったときだけ使う。
+     *   probeVoiceStreaming: エンジンが対応しているか / createStreamedAudio: StreamedVoice を鳴らす Audio もどき
+     */
+    this.probeVoiceStreaming = deps.probeVoiceStreaming || null;
+    this.createStreamedAudio = deps.createStreamedAudio || null;
+    this._streamSupported = false;
+    /** 遅い PC と分かったら、この ON の間は覚えておく(少しずつ読むと合成の計器が速く見えるため)。 */
+    this._slowEngine = false;
     this._weakPcState = { saved: false };
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
@@ -179,6 +193,9 @@ export class VoicePlayer {
       upstreamEmaMs: -1, lastUpstreamMs: -1, queueWaitEmaMs: -1, engineWaitEmaMs: -1,
       audioQueryEmaMs: -1, synthesisEmaMs: -1, warmSynthEmaMs: -1,
       coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
+      speakerInitTotal: 0, speakerInitMaxMs: 0,
+      streamTotal: 0, streamFirstAudioEmaMs: -1, warmSynthSamples: 0, contendedSynthTotal: 0,
+      warmSynthRtfPermille: -1, warmRtfSamples: 0,
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
     // 2026-10-22計器(P1): 合成1件ごとのエンジン待ち・初めての声を測る(印字専用)。
@@ -414,9 +431,19 @@ export class VoicePlayer {
     }
 
     // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする。
-    const prepared = await prepareVoiceStyleIds(await this.fetchVoiceStyleIds(), {
+    const allStyleIds = await this.fetchVoiceStyleIds();
+    // 2026-10-26: 温まった記録を消し(エンジンが再起動していても困らないように)、エンジンを1回起こす。
+    startVoiceWarmup(this.voiceWarmup, allStyleIds);
+    this._streamSupported = false;
+    if (this.probeVoiceStreaming && this.createStreamedAudio) {
+      void Promise.resolve()
+        .then(() => this.probeVoiceStreaming())
+        .then((ok) => { this._streamSupported = ok === true; }, () => {});
+    }
+    const prepared = await prepareVoiceStyleIds(allStyleIds, {
       readSettings: async () => {
         const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
+        this._slowEngine = b[KEY_VOICE_WEAK_PC] === true;
         return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
       },
       initSpeaker: this.initVoiceSpeaker
@@ -453,13 +480,23 @@ export class VoicePlayer {
     //   pressure(需要/供給比)由来のブーストで埋める。上げるだけ・落ち着いていれば0。
     const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
     const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
+    const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) });
+    // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(合成の待ちがそのまま声の遅れになる時)。
+    if (!this._slowEngine && isWeakVoicePc(this.diag)) this._slowEngine = true;
+    const stream = shouldStreamVoice({
+      supported: this._streamSupported,
+      idle: this.queue[0] === item && !this.stopCurrent,
+      slowEngine: this._slowEngine,
+      textLength: text.length
+    });
     // v0.1.1224: 失敗理由を計器へ(_synthesizeTracked が onFailure を渡す)。
     const promise = this._synthesizeTracked(
-      buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) }),
+      text,
       {
         ...assigned,
         speedOffset: assigned.speedOffset + effBoost
-      }
+      },
+      { stream }
     ).catch(() => null);
     // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
@@ -477,8 +514,9 @@ export class VoicePlayer {
    * 戻り値・例外は fetchSynthesizeVoice と同じ(計器は読み上げの挙動を変えない)。
    * @param {string} text
    * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
+   * @param {{ stream?: boolean }} [extra]
    */
-  _synthesizeTracked(text, voice) {
+  _synthesizeTracked(text, voice, extra = {}) {
     const track = this._synthTracker.begin(voice?.styleId);
     /** @type {{ queryMs?: number, synthMs?: number }} */
     let timing = {};
@@ -487,7 +525,8 @@ export class VoicePlayer {
     try {
       started = this.fetchSynthesizeVoice(text, voice, {
         onFailure: (info) => this._recordSynthFailureReason(info),
-        onTiming: (t) => { timing = t || {}; }
+        onTiming: (t) => { timing = t || {}; },
+        ...(extra.stream === true ? { stream: true } : {})
       });
     } catch (err) {
       started = Promise.reject(err);
@@ -495,9 +534,23 @@ export class VoicePlayer {
     return Promise.resolve(started)
       .then(
         (wav) => {
-          try { recordVoiceSynthStage(this.diag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
-          // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
-          if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
+          /** @type {any} */
+          let r = null;
+          try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(this.diag, r); } catch { /* 計器は本体を止めない */ }
+          const judge = () => {
+            // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
+            if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
+            // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す。
+            if (this.storage) {
+              forgetWeakVoicePcIfFast(this.diag, this._weakPcState, () => {
+                this._slowEngine = false;
+                return this.storage.set({ [KEY_VOICE_WEAK_PC]: false });
+              });
+            }
+          };
+          judge();
+          // 少しずつ受け取った声は、届き終わった時に速さを数える。
+          if (r && isStreamedVoice(wav)) void recordVoiceStreamDone(this.diag, r, wav, () => Date.now(), judge);
           return wav;
         },
         (err) => {
@@ -672,6 +725,7 @@ export class VoicePlayer {
         this.diag.synthWaitEmaMs = this._synthWaitEmaMs;
 
         if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
+          if (isStreamedVoice(wav)) wav.cancel(); // 鳴らさないので受け取りもやめる
           // v0.1.1213: 合成が null で返った件を数える。ここは以前どのカウンタも増やさずに
           //   捨てており、実配信で「需要52.2/分・読めた6件・間引き12件」=約34件が
           //   どの計器にも乗らない穴になっていた(=なぜ読まれないか答えられない)。
@@ -692,10 +746,19 @@ export class VoicePlayer {
         let objectUrl = '';
         try {
           // 2026-10-22(P2): 文ごとに最大振幅を揃え、音量設定を掛ける(音割れしない範囲)。
-          const blob = new Blob([applyVoiceVolumeToWav(wav, this.volumePercent)], { type: 'audio/wav' });
-          objectUrl = this.createObjectURL(blob);
-          const AudioCtor = this.audioConstructor;
-          const audio = new AudioCtor(objectUrl);
+          // 2026-10-26: 少しずつ届く声は Web Audio で鳴らす(作れなければ届き終わるのを待って丸ごと)。
+          const streamedAudio = isStreamedVoice(wav) && this.createStreamedAudio
+            ? this.createStreamedAudio(wav, this.volumePercent)
+            : null;
+          /** @type {any} */
+          let audio = streamedAudio;
+          if (!audio) {
+            const whole = isStreamedVoice(wav) ? (await wav.whenDone, wav.toWav()) : wav;
+            const blob = new Blob([applyVoiceVolumeToWav(whole, this.volumePercent)], { type: 'audio/wav' });
+            objectUrl = this.createObjectURL(blob);
+            const AudioCtor = this.audioConstructor;
+            audio = new AudioCtor(objectUrl);
+          }
           // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 再生直前の「今」の混雑度と
           //   合成時点の混雑度を比べ、今の方が詰まっていれば playbackRate で追いつかせる
           //   (合成やり直しなし=ゼロコスト・上げるだけ=間延び退行なし)。
@@ -704,7 +767,8 @@ export class VoicePlayer {
           const boostNow = this._resolveEffectiveSpeedBoost(
             computeVoiceCongestion(this.queue.length).speedBoost
           );
-          const playbackRate = computeVoicePlaybackRate(boostAtSynth, boostNow);
+          // 少しずつ流す声は速さを変えない(声の高さも変わるため)。待ちが無い時だけ使うので補正はほぼ要らない。
+          const playbackRate = streamedAudio ? 1.0 : computeVoicePlaybackRate(boostAtSynth, boostNow);
           if (playbackRate !== 1.0) {
             audio.preservesPitch = true;
             audio.playbackRate = playbackRate;

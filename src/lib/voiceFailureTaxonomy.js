@@ -22,6 +22,7 @@ const ALIVE_FAILURES = Object.freeze({
 /** @type {Readonly<Record<string, VoiceFailure>>} */
 const SYNTH_FAILURES = Object.freeze({
   timeout: Object.freeze({ cause: 'timeout', stage: 'synth' }),
+  query_timeout: Object.freeze({ cause: 'timeout', stage: 'query' }),
   unreachable: Object.freeze({ cause: 'down', stage: 'synth' }),
   query_http: Object.freeze({ cause: 'http', stage: 'query' }),
   query_body: Object.freeze({ cause: 'payload', stage: 'query' }),

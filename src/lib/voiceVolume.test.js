@@ -84,8 +84,9 @@ describe('配線(会場・コメビュ・ポップアップ)', () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const read = (/** @type {string} */ p) => fs.readFileSync(path.join(root, p), 'utf8');
   it('会場とコメビュの両方が、再生直前に同じ純関数で音量を掛ける', () => {
-    expect(read('src/lib/voicePlayer.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(wav, this\.volumePercent\)\]/);
-    expect(read('src/extension/comeview-entry.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(wav, _voiceVolumePercent\)\]/);
+    // 2026-10-26: 少しずつ届いた声を丸ごと再生に戻すときも同じ関数を通す(whole = 丸ごとの WAV)。
+    expect(read('src/lib/voicePlayer.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(whole, this\.volumePercent\)\]/);
+    expect(read('src/extension/comeview-entry.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(whole, _voiceVolumePercent\)\]/);
     expect(read('src/extension/comeview-entry.js')).toMatch(/changes\[KEY_VOICE_VOLUME_PERCENT\]/);
     expect(read('src/extension/venueBar.js')).toMatch(/storageOnChanged: .*chrome\.storage\.onChanged/);
   });

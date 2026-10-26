@@ -87,11 +87,14 @@ import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
   buildVoiceReadingText,
-  initializeVoicevoxSpeaker,
   listVoicevoxStyleIds,
   probeVoicevoxAlive,
+  probeVoicevoxStreaming,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
+import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
+import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
+import { createVoicevoxWarmup, startVoiceWarmup, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
@@ -106,11 +109,14 @@ import {
   createVoiceSynthTracker,
   foldVoiceStageEma,
   measureVoiceGapMs,
+  measureWavAudioMs,
+  recordVoiceStreamDone,
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
 import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
 import {
-  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc
+  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, isWeakVoicePc,
+  forgetWeakVoicePcIfFast
 } from '../lib/voiceNarrowing.js';
 import {
   applyVoiceVolumeToWav,
@@ -251,6 +257,10 @@ const _voicePrefetches = new Map();
 let _voicePlaying = false;
 let _voiceGeneration = 0;
 let _voiceStopCurrent = null;
+/** 2026-10-26: エンジンが声の少しずつ受け取りに対応しているか(読み上げ ON のたびに調べる)。 */
+let _voiceStreamSupported = false;
+/** 遅い PC と分かったら、この ON の間は覚えておく(会場の VoicePlayer と同じ)。 */
+let _voiceSlowEngine = false;
 let _voiceSkipTimer = null;
 let _initialVoicesPrimed = false;
 
@@ -588,12 +598,18 @@ async function enableVoiceReading({ persist = true } = {}) {
   }
 
   // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする(会場と同じ)。
-  _voiceStyleIds = (await prepareVoiceStyleIds(await listVoicevoxStyleIds(), {
+  const allStyleIds = await listVoicevoxStyleIds();
+  // 起動直後のエンジンを捨てる audio_query で起こす(待たない・voiceWarmup.js)。
+  startVoiceWarmup(_voiceWarmup, allStyleIds);
+  _voiceStreamSupported = false;
+  void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
+  _voiceStyleIds = (await prepareVoiceStyleIds(allStyleIds, {
     readSettings: async () => {
       const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
+      _voiceSlowEngine = b[KEY_VOICE_WEAK_PC] === true;
       return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
     },
-    initSpeaker: (id) => initializeVoicevoxSpeaker(id)
+    initSpeaker: (id) => _voiceWarmup.ensure(id)
   })).styleIds;
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
@@ -625,6 +641,10 @@ let _voiceVolumePercent = VOICE_VOLUME_DEFAULT;
 /** 2026-10-22計器(P1・会場 VoicePlayer と同じ物差し): エンジン待ち・初めての声を測る。 */
 const _voiceSynthTracker = createVoiceSynthTracker();
 
+/** 2026-10-26: 初めての声を合成の前に読み込む(会場と同じ voiceWarmup.js)。 */
+const _voiceWarmup = createVoicevoxWarmup();
+const synthesizeVoiceWarm = withVoiceWarmup(_voiceWarmup, synthesizeVoice);
+
 /**
  * 合成を依頼し、段階計測を _voiceDiag へ記録する(戻り値・例外は synthesizeVoice と同じ)。
  * @param {string} text
@@ -632,18 +652,31 @@ const _voiceSynthTracker = createVoiceSynthTracker();
  */
 /** P3: 遅いPCの記録は1タブで1回だけ書く。 */
 const _voiceWeakPcState = { saved: false };
-function synthesizeVoiceTracked(text, voice) {
+function synthesizeVoiceTracked(text, voice, extra = {}) {
   const track = _voiceSynthTracker.begin(voice?.styleId);
   /** @type {{ queryMs?: number, synthMs?: number }} */
   let timing = {};
-  return synthesizeVoice(text, voice, {
+  return synthesizeVoiceWarm(text, voice, {
     onFailure: (info) => recordVoiceSynthFailureReason(info),
-    onTiming: (t) => { timing = t || {}; }
+    onTiming: (t) => { timing = t || {}; },
+    ...(extra.stream === true ? { stream: true } : {})
   }).then(
     (wav) => {
-      try { recordVoiceSynthStage(_voiceDiag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
-      // P3: 遅いPCと分かったら一度だけ記録(会場の VoicePlayer と同じ判定=voiceNarrowing.js)。
-      rememberWeakVoicePc(_voiceDiag, _voiceWeakPcState, () => chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: true }));
+      /** @type {any} */
+      let r = null;
+      try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(_voiceDiag, r); } catch { /* 計器は本体を止めない */ }
+      const judge = () => {
+        // P3: 遅いPCと分かったら一度だけ記録(会場の VoicePlayer と同じ判定=voiceNarrowing.js)。
+        rememberWeakVoicePc(_voiceDiag, _voiceWeakPcState, () => chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: true }));
+        // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す(会場と同じ)。
+        forgetWeakVoicePcIfFast(_voiceDiag, _voiceWeakPcState, () => {
+          _voiceSlowEngine = false;
+          return chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: false });
+        });
+      };
+      judge();
+      // 少しずつ受け取った声は、届き終わった時に速さを数える(会場と同じ)。
+      if (r && isStreamedVoice(wav)) void recordVoiceStreamDone(_voiceDiag, r, wav, () => Date.now(), judge);
       return wav;
     },
     (err) => {
@@ -664,12 +697,22 @@ function ensureVoicePrefetch(item, generation) {
     _voiceAssignments,
     _voiceStyleIds
   );
+  const text = buildMergedVoiceText(item, { maxChars: congestion.maxChars });
+  // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(会場の VoicePlayer と同じ判定)。
+  if (!_voiceSlowEngine && isWeakVoicePc(_voiceDiag)) _voiceSlowEngine = true;
+  const stream = shouldStreamVoice({
+    supported: _voiceStreamSupported,
+    idle: _voiceQueue[0] === item && !_voiceStopCurrent,
+    slowEngine: _voiceSlowEngine,
+    textLength: text.length
+  });
   const promise = synthesizeVoiceTracked(
-    buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+    text,
     {
       ...assigned,
       speedOffset: assigned.speedOffset + congestion.speedBoost
-    }
+    },
+    { stream }
   ).catch(() => null);
   _voicePrefetches.set(item, { generation, promise });
   return promise;
@@ -805,6 +848,7 @@ async function drainVoiceQueue() {
         isObsMode()
       ) {
         markVoicePhase('skip_after_synth'); // v0.1.895: 世代変更/無効化等で読まずにスキップした。
+        if (isStreamedVoice(wav)) wav.cancel(); // 鳴らさないので受け取りもやめる
         continue;
       }
 
@@ -813,10 +857,16 @@ async function drainVoiceQueue() {
       try {
         markVoicePhase('await_playback'); // v0.1.895: 再生待ちに入る(watchdog 付き)。
         // 2026-10-22(P2): 文ごとに最大振幅を揃え、音量設定を掛ける(会場と同じ純関数)。
-        objectUrl = URL.createObjectURL(
-          new Blob([applyVoiceVolumeToWav(wav, _voiceVolumePercent)], { type: 'audio/wav' })
-        );
-        const audio = new Audio(objectUrl);
+        // 2026-10-26: 少しずつ届く声は Web Audio で鳴らす(voiceStreamAudio.js・使えなければ丸ごと再生)。
+        /** @type {any} */
+        let audio = isStreamedVoice(wav) ? createBrowserStreamedAudio(wav, _voiceVolumePercent) : null;
+        if (!audio) {
+          const whole = wav;
+          objectUrl = URL.createObjectURL(
+            new Blob([applyVoiceVolumeToWav(whole, _voiceVolumePercent)], { type: 'audio/wav' })
+          );
+          audio = new Audio(objectUrl);
+        }
         await new Promise((resolve) => {
           let settled = false;
           // v0.1.883: 再生完了の安全網(watchdog)。'ended'/'error' が一度も来ないケース
