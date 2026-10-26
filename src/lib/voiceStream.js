@@ -40,6 +40,12 @@ export const VOICE_STREAM_STALL_MS = 5000;
 /** 少しずつ流すときに仮定する、素の声の最大振幅(満振幅比)。長文の実測 43〜48%。 */
 export const VOICE_STREAM_ASSUMED_PEAK = 0.45;
 
+/** 最初に届いた分の最大振幅に掛ける余裕(文の後半の方が大きくなりがち・v0.1.1774)。 */
+export const VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
+
+/** 最初の分から見積もる最大振幅の下限(ほぼ無音で始まる声を上げすぎない)。 */
+export const VOICE_STREAM_MIN_EST_PEAK = 0.1;
+
 /**
  * 少しずつ流すかを決める。
  * @param {{ supported?: boolean, idle?: boolean, slowEngine?: boolean, textLength?: number }} input
@@ -268,6 +274,13 @@ export function createStreamGain(volumePercent) {
       for (let i = 0; i < samples.length; i++) {
         const a = Math.abs(samples[i]);
         if (a > peak) peak = a;
+      }
+      if (firstGain < 0 && peak > 0) {
+        // v0.1.1774: 最初に届いた分(約0.3秒)の大きさから倍率を決め直す。仮定の大きさ(45%)のままだと、
+        //   もともと小さい声(ささやき系など)は狙いの14〜28%しか出ず「小さすぎ」になった(PC 試験)。
+        //   文の後半はもう少し大きくなりがちなので 1.25倍の余裕を見る。天井を超えそうなら下で下げる。
+        const est = Math.max((peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM, VOICE_STREAM_MIN_EST_PEAK);
+        gain = Math.min(VOICE_MAX_BOOST, target / est);
       }
       if (peak > 0 && (peak / 32768) * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
       if (firstGain < 0) firstGain = gain;

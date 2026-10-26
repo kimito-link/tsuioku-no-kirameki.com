@@ -116,7 +116,7 @@ export async function runVoiceTest(o) {
   while (!o.isIdle() && now() < settleBy) await sleep(250);
   // 声ごとの大きさの最小/最大は「その回の分」だけを見る(差分にできない値なので、始めに戻す)。
   const live = o.getDiag();
-  if (live && typeof live === 'object') { live.outRmsDbMin = 999; live.outRmsDbMax = -999; }
+  if (live && typeof live === 'object') { live.outRmsDbMin = 999; live.outRmsDbMax = -999; live.e2eMaxMs = 0; }
   const before = JSON.parse(JSON.stringify(o.getDiag() || {}));
   const startedAt = now();
   for (const { gapMs, item } of plan) {
@@ -135,6 +135,8 @@ export async function runVoiceTest(o) {
     idleStreak = o.isIdle() ? idleStreak + 1 : 0;
   }
   const after = JSON.parse(JSON.stringify(o.getDiag() || {}));
+  const delta = diffVoiceDiag(before, after);
+  const e2eN = Number(delta.e2eSampleTotal) || 0;
   const report = {
     mode: o.mode,
     label: typeof o.label === 'string' ? o.label : '',
@@ -144,7 +146,10 @@ export async function runVoiceTest(o) {
     startedAt,
     finishedAt: now(),
     timedOut,
-    delta: diffVoiceDiag(before, after)
+    // v0.1.1774: この回だけの「声が出るまで」の平均・最大(e2eAvgMs は過去の回を引きずる)。
+    e2eRunAvgMs: e2eN > 0 ? Math.round((Number(delta.e2eSumMsTotal) || 0) / e2eN) : -1,
+    e2eRunMaxMs: e2eN > 0 ? Number(delta.e2eMaxMs) || 0 : -1,
+    delta
   };
   if (typeof o.write === 'function') {
     try { await o.write(report); } catch { /* 保存できなくても試験は終わる */ }

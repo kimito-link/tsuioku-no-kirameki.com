@@ -110,6 +110,7 @@ import {
   foldVoiceStageEma,
   measureVoiceGapMs,
   measureWavAudioMs,
+  recordVoiceE2eSample,
   recordVoiceStreamDone,
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
@@ -934,6 +935,7 @@ async function drainVoiceQueue() {
             if (_e2eMs >= 0) {
               _voiceDiag.lastE2eMs = _e2eMs;
               _voiceDiag.e2eAvgMs = computeVoiceE2eAverage(_voiceDiag.e2eAvgMs, _e2eMs);
+              recordVoiceE2eSample(_voiceDiag, _e2eMs);
             }
             updateVoiceLagNotice();
             if (playResult && typeof playResult.catch === 'function') {

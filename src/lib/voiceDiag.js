@@ -72,6 +72,9 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   speakerInitTotal: number,    // 2026-10-26計器: 合成の前に声を読み込んだ件数(voiceWarmup)
  *   speakerInitMaxMs: number,    // 同上の最大所要ms(初めての声の読み込みにかかった時間)
  *   voiceBorrowTotal: number,    // v0.1.1772計器: 温まっていない声の代わりに温まった声で読んだ件数
+ *   e2eSampleTotal: number,      // v0.1.1774計器: 声が出るまでを測った件数(試験の回ごとの平均用)
+ *   e2eSumMsTotal: number,       // 同上の合計ms
+ *   e2eMaxMs: number,            // 同上の最大ms
  *   streamTotal: number,         // 2026-10-26計器: 少しずつ受け取って読んだ件数(voiceStream)
  *   warmSynthSamples: number,    // 2026-10-26計器: warmSynthEmaMs に入れた件数(弱い PC の判定はこれが5件から)
  *   contendedSynthTotal: number, // 2026-10-26計器: 別の声の準備と重なって速さの物差しから外した件数
@@ -164,6 +167,9 @@ export function makeInitialVoiceDiag() {
     speakerInitTotal: 0,
     speakerInitMaxMs: 0,
     voiceBorrowTotal: 0,
+    e2eSampleTotal: 0,
+    e2eSumMsTotal: 0,
+    e2eMaxMs: 0,
     streamTotal: 0,
     streamFirstAudioEmaMs: -1,
     warmSynthSamples: 0,
@@ -260,6 +266,9 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     speakerInitTotal: num(d.speakerInitTotal, base.speakerInitTotal),
     speakerInitMaxMs: num(d.speakerInitMaxMs, base.speakerInitMaxMs),
     voiceBorrowTotal: num(d.voiceBorrowTotal, base.voiceBorrowTotal),
+    e2eSampleTotal: num(d.e2eSampleTotal, base.e2eSampleTotal),
+    e2eSumMsTotal: num(d.e2eSumMsTotal, base.e2eSumMsTotal),
+    e2eMaxMs: num(d.e2eMaxMs, base.e2eMaxMs),
     streamTotal: num(d.streamTotal, base.streamTotal),
     warmSynthSamples: num(d.warmSynthSamples, base.warmSynthSamples),
     contendedSynthTotal: num(d.contendedSynthTotal, base.contendedSynthTotal),
