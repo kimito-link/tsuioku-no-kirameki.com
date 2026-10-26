@@ -7,7 +7,7 @@ import {
   VOICE_STREAM_GATE_MAX_MS,
   VOICE_WARMUP_QUERY_TIMEOUT_MS
 } from './voiceWarmup.js';
-import { StreamedVoice } from './voiceStream.js';
+import { knownVoiceStylePeak, resetVoiceStylePeaksForTest, StreamedVoice } from './voiceStream.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -345,5 +345,35 @@ describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本�
     await f('長文', { styleId: 3 }, { stream: true });
     await f('次', { styleId: 3 }, {});
     expect(synth).toHaveBeenCalledTimes(2);
+  });
+
+  it('v0.1.1775: 他の合成が走っている時は、少しずつではなく丸ごと作る', async () => {
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    w.markWarm(3);
+    const d = deferred();
+    const synth = vi.fn(async (text) => { if (text === '先') await d.promise; return new ArrayBuffer(4); });
+    const f = withVoiceWarmup(w, synth);
+    const p1 = f('先', { styleId: 3 }, {});
+    const p2 = f('長文', { styleId: 3 }, { stream: true });
+    await flush();
+    expect(synth.mock.calls[1][2].stream).toBeUndefined();
+    d.resolve(true);
+    await Promise.all([p1, p2]);
+    await f('長文', { styleId: 3 }, { stream: true });
+    expect(synth.mock.calls[2][2].stream).toBe(true);
+  });
+
+  it('v0.1.1775: 少しずつ届いた声に styleId を付け、届き終わったら声の大きさを覚える', async () => {
+    resetVoiceStylePeaksForTest();
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    w.markWarm(13);
+    const voice = new StreamedVoice(24000);
+    const f = withVoiceWarmup(w, async () => voice);
+    await f('長文', { styleId: 13 }, { stream: true });
+    expect(voice.styleId).toBe(13);
+    voice.append(Int16Array.from([16384, -100]));
+    voice.finish();
+    await flush();
+    expect(knownVoiceStylePeak(13)).toBeCloseTo(0.5);
   });
 });

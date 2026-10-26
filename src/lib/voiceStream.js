@@ -43,8 +43,46 @@ export const VOICE_STREAM_ASSUMED_PEAK = 0.45;
 /** 最初に届いた分の最大振幅に掛ける余裕(文の後半の方が大きくなりがち・v0.1.1774)。 */
 export const VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
 
-/** 最初の分から見積もる最大振幅の下限(ほぼ無音で始まる声を上げすぎない)。 */
-export const VOICE_STREAM_MIN_EST_PEAK = 0.1;
+/**
+ * 最初の分から見積もる最大振幅の下限(ほぼ無音で始まる声を上げすぎない)。
+ *   v0.1.1775: 0.1 だと静かな出だしで倍率を上げすぎ、文の途中で 44% まで下げ直していた(PC 試験)。
+ */
+export const VOICE_STREAM_MIN_EST_PEAK = 0.2;
+
+/** 声(styleId)ごとに、これまで鳴らした素の最大振幅(v0.1.1775)。少しずつ読む時の最初の倍率に使う。 */
+/** @type {Map<string, number>} */
+const stylePeaks = new Map();
+
+/**
+ * 1件読み終えた声の素の最大振幅を覚える(直近寄りの平均)。
+ * @param {unknown} styleId
+ * @param {unknown} peak 0〜1
+ */
+export function rememberVoiceStylePeak(styleId, peak) {
+  const id = Number(styleId);
+  const p = Number(peak);
+  if (!Number.isInteger(id) || id < 0 || !Number.isFinite(p) || p <= 0 || p > 1) return;
+  const key = String(id);
+  const prev = stylePeaks.get(key);
+  stylePeaks.set(key, prev === undefined ? p : prev + 0.5 * (p - prev));
+}
+
+/**
+ * 覚えている声の素の最大振幅。知らなければ -1。
+ * @param {unknown} styleId
+ * @returns {number}
+ */
+export function knownVoiceStylePeak(styleId) {
+  const id = Number(styleId);
+  if (!Number.isInteger(id) || id < 0) return -1;
+  const v = stylePeaks.get(String(id));
+  return v === undefined ? -1 : v;
+}
+
+/** テスト用: 覚えた大きさを消す。 */
+export function resetVoiceStylePeaksForTest() {
+  stylePeaks.clear();
+}
 
 /**
  * 少しずつ流すかを決める。
@@ -156,6 +194,10 @@ export class StreamedVoice {
     /** @type {Int16Array[]} */
     this.chunks = [];
     this.totalSamples = 0;
+    /** 届いた分の素の最大振幅(0〜1)。 */
+    this.peak = 0;
+    /** この声の styleId(分かれば・v0.1.1775)。 */
+    this.styleId = -1;
     this.done = false;
     this.failed = false;
     /** @type {Set<() => void>} */
@@ -178,6 +220,9 @@ export class StreamedVoice {
     if (this.done || !samples || samples.length === 0) return;
     this.chunks.push(samples);
     this.totalSamples += samples.length;
+    let m = 0;
+    for (let i = 0; i < samples.length; i++) { const a = Math.abs(samples[i]); if (a > m) m = a; }
+    if (m / 32768 > this.peak) this.peak = m / 32768;
     this._emit();
   }
 
@@ -245,8 +290,10 @@ export function isStreamedVoice(x) {
 /**
  * 少しずつ流すときの音量。仮定の大きさで始め、天井を超えそうな分が届いたら倍率を下げる(上げない)。
  * @param {unknown} volumePercent
+ * @param {{ knownPeak?: number }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)
  */
-export function createStreamGain(volumePercent) {
+export function createStreamGain(volumePercent, opts = {}) {
+  const knownPeak = Number(opts?.knownPeak) > 0 ? Number(opts.knownPeak) : -1;
   const pct = normalizeVoiceVolumePercent(volumePercent);
   const target = Math.min(VOICE_PEAK_CEILING, (VOICE_TARGET_PEAK_AT_100 * pct) / 100);
   let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
@@ -279,7 +326,9 @@ export function createStreamGain(volumePercent) {
         // v0.1.1774: 最初に届いた分(約0.3秒)の大きさから倍率を決め直す。仮定の大きさ(45%)のままだと、
         //   もともと小さい声(ささやき系など)は狙いの14〜28%しか出ず「小さすぎ」になった(PC 試験)。
         //   文の後半はもう少し大きくなりがちなので 1.25倍の余裕を見る。天井を超えそうなら下で下げる。
-        const est = Math.max((peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM, VOICE_STREAM_MIN_EST_PEAK);
+        //   v0.1.1775: 同じ声を前に鳴らしていれば、その大きさを基準にする(出だしだけでは分からないため)。
+        const first = (peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM;
+        const est = knownPeak > 0 ? Math.max(knownPeak, first) : Math.max(first, VOICE_STREAM_MIN_EST_PEAK);
         gain = Math.min(VOICE_MAX_BOOST, target / est);
       }
       if (peak > 0 && (peak / 32768) * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
@@ -326,7 +375,7 @@ export function createStreamedVoiceAudio(voice, deps) {
   let unsubscribe = null;
   /** @type {any} */
   let whole = null;
-  const gain = createStreamGain(deps.volumePercent);
+  const gain = createStreamGain(deps.volumePercent, { knownPeak: knownVoiceStylePeak(voice.styleId) });
   // 2026-10-26計器(voicePlaybackQuality.js): 次の分が間に合わず無音が挟まった回数と最長の無音。
   let underruns = 0;
   let underrunMaxMs = 0;

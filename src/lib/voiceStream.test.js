@@ -7,7 +7,10 @@ import {
   isStreamedVoice,
   shouldStreamVoice,
   VOICE_STREAM_LONG_TEXT_CHARS,
-  VOICE_STREAM_PREBUFFER_SEC
+  VOICE_STREAM_PREBUFFER_SEC,
+  knownVoiceStylePeak,
+  rememberVoiceStylePeak,
+  resetVoiceStylePeaksForTest
 } from './voiceStream.js';
 import { VOICE_PEAK_CEILING } from './voiceVolume.js';
 import {
@@ -123,13 +126,36 @@ describe('createStreamGain', () => {
     g.process(Int16Array.from([10, -10]));
     expect(g.gain).toBe(after);
   });
-  it('v0.1.1774: もともと小さい声は、最初に届いた分の大きさから倍率を上げて狙いに近づける', () => {
+  it('v0.1.1774: もともと小さい声は、最初に届いた分の大きさから倍率を上げる(知らない声は上げすぎない)', () => {
     const g = createStreamGain(100);
     // 素の最大振幅 7%(ささやき系)。仮定(45%)のままだと狙いの約15%しか出なかった。
     const out = g.process(Int16Array.from([2300, -2300]));
     const peak = Math.max(...Array.from(out, Math.abs));
-    expect(peak / g.targetPeak).toBeGreaterThan(0.5);
+    expect(peak / g.targetPeak).toBeGreaterThan(0.3);
     expect(g.outPeak).toBeLessThanOrEqual(VOICE_PEAK_CEILING);
+  });
+  it('v0.1.1775: 前に鳴らした同じ声の大きさを知っていれば、それを基準に狙いへ合わせる', () => {
+    const g = createStreamGain(100, { knownPeak: 0.08 });
+    const out = g.process(Int16Array.from([2300, -2300]));
+    const peak = Math.max(...Array.from(out, Math.abs));
+    // 倍率の上限(VOICE_MAX_BOOST=4)まで上げて狙いの約6割
+    expect(peak / g.targetPeak).toBeGreaterThan(0.55);
+  });
+  it('v0.1.1775: 静かな出だしでも、知っている声なら途中で倍率を下げ直さない', () => {
+    const g = createStreamGain(100, { knownPeak: 0.45 });
+    g.process(Int16Array.from([300, -300]));
+    g.process(Int16Array.from([14700, -14700]));
+    expect(g.dropRatio).toBe(1);
+  });
+  it('v0.1.1775: 声ごとの大きさを覚える(直近寄りの平均)', () => {
+    resetVoiceStylePeaksForTest();
+    expect(knownVoiceStylePeak(8)).toBe(-1);
+    rememberVoiceStylePeak(8, 0.4);
+    rememberVoiceStylePeak(8, 0.2);
+    expect(knownVoiceStylePeak(8)).toBeCloseTo(0.3);
+    rememberVoiceStylePeak(8, 5);
+    rememberVoiceStylePeak('x', 0.3);
+    expect(knownVoiceStylePeak(8)).toBeCloseTo(0.3);
   });
   it('v0.1.1774: 普段の大きさの声は、最初の分から決めても狙いの近く', () => {
     const g = createStreamGain(100);
