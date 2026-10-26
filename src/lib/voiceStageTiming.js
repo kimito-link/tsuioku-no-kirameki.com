@@ -58,7 +58,7 @@ export function createVoiceSynthTracker(deps = {}) {
   return {
     /**
      * @param {unknown} styleId
-     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number } }}
+     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number } }}
      */
     begin(styleId) {
       const startAt = now();
@@ -80,13 +80,16 @@ export function createVoiceSynthTracker(deps = {}) {
         }
         const q = Number(timing?.queryMs);
         const s = Number(timing?.synthMs);
+        const i = Number(timing?.initMs);
         return {
           cold,
           ok: ok === true,
           totalMs: Math.max(0, endAt - startAt),
           engineWaitMs: prevDoneAt > startAt ? Math.min(prevDoneAt, endAt) - startAt : 0,
           queryMs: Number.isFinite(q) && q >= 0 ? Math.round(q) : -1,
-          synthMs: Number.isFinite(s) && s >= 0 ? Math.round(s) : -1
+          synthMs: Number.isFinite(s) && s >= 0 ? Math.round(s) : -1,
+          // 2026-10-26: 合成の前に声を読み込んだ時間(voiceWarmup)。無ければ 0。
+          initMs: Number.isFinite(i) && i > 0 ? Math.round(i) : 0
         };
       };
       return { cold, end };
@@ -107,7 +110,14 @@ export function recordVoiceSynthStage(diag, r) {
   foldVoiceStageEma(diag, 'audioQueryEmaMs', r.queryMs);
   // synthesis の純時間 = 応答までの時間からエンジン待ちを引いたもの(待ちは synthesis 側で起きる前提)。
   if (r.synthMs >= 0) foldVoiceStageEma(diag, 'synthesisEmaMs', Math.max(0, r.synthMs - r.engineWaitMs));
-  const ownMs = Math.max(0, r.totalMs - r.engineWaitMs);
+  // 2026-10-26: 声の読み込み(initMs)は合成の速さではないので引く。引かないと速いPCでも
+  //   初めての声が 3.5秒台になり、isWeakVoicePc が「弱いPC」と記録してしまう(消すコードは無い)。
+  const initMs = Number(r.initMs) > 0 ? Number(r.initMs) : 0;
+  if (initMs > 0) {
+    diag.speakerInitTotal = (Number(diag.speakerInitTotal) || 0) + 1;
+    diag.speakerInitMaxMs = Math.max(Number(diag.speakerInitMaxMs) || 0, Math.round(initMs));
+  }
+  const ownMs = Math.max(0, r.totalMs - r.engineWaitMs - initMs);
   if (r.cold) {
     diag.coldSynthTotal = (Number(diag.coldSynthTotal) || 0) + 1;
     diag.coldSynthMaxMs = Math.max(Number(diag.coldSynthMaxMs) || 0, Math.round(ownMs));
@@ -140,6 +150,8 @@ export function formatVoiceStageBreakdown(snap) {
   }
   const cold = Number(snap.coldSynthTotal) || 0;
   if (cold > 0) parts.push(`初めての声${cold}件(最大${sec(snap.coldSynthMaxMs)})`);
+  const init = Number(snap.speakerInitTotal) || 0;
+  if (init > 0) parts.push(`声の読み込み${init}件(最大${sec(snap.speakerInitMaxMs)})`);
   if (!parts.length) return '';
   return `遅れの段階(${parts.join('・')})`;
 }

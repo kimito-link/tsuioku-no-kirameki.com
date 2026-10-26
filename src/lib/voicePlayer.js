@@ -9,6 +9,7 @@ import {
   KEY_VOICE_READING_ENABLED
 } from './voiceKeys.js';
 import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
+import { startVoiceWarmup } from './voiceWarmup.js';
 import {
   capVoiceMaxCharsByBoost,
   computeVoiceCongestion,
@@ -102,6 +103,8 @@ export class VoicePlayer {
     this.fetchVoiceStyleIds = deps.fetchVoiceStyleIds;
     /** P3: 声のモデルの先読み(/initialize_speaker)。無ければ先読みしない。 */
     this.initVoiceSpeaker = deps.initVoiceSpeaker || null;
+    /** 2026-10-26: 声を使う前に温める(voiceWarmup.js)。fetchSynthesizeVoice と同じものを渡す。無ければ何もしない。 */
+    this.voiceWarmup = deps.voiceWarmup || null;
     this._weakPcState = { saved: false };
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
@@ -179,6 +182,7 @@ export class VoicePlayer {
       upstreamEmaMs: -1, lastUpstreamMs: -1, queueWaitEmaMs: -1, engineWaitEmaMs: -1,
       audioQueryEmaMs: -1, synthesisEmaMs: -1, warmSynthEmaMs: -1,
       coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
+      speakerInitTotal: 0, speakerInitMaxMs: 0,
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
     // 2026-10-22計器(P1): 合成1件ごとのエンジン待ち・初めての声を測る(印字専用)。
@@ -414,7 +418,10 @@ export class VoicePlayer {
     }
 
     // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする。
-    const prepared = await prepareVoiceStyleIds(await this.fetchVoiceStyleIds(), {
+    const allStyleIds = await this.fetchVoiceStyleIds();
+    // 2026-10-26: 温まった記録を消し(エンジンが再起動していても困らないように)、エンジンを1回起こす。
+    startVoiceWarmup(this.voiceWarmup, allStyleIds);
+    const prepared = await prepareVoiceStyleIds(allStyleIds, {
       readSettings: async () => {
         const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
         return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };

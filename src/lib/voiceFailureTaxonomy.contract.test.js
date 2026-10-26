@@ -20,7 +20,8 @@ const ALIVE_LEGACY_CASES = [
 ];
 
 const SYNTH_LEGACY_CASES = [
-  { name: '時間切れ', input: { stage: 'query', error: new Error('AbortError') }, token: 'timeout' },
+  { name: '時間切れ', input: { stage: 'synth', error: new Error('AbortError') }, token: 'timeout' },
+  { name: '解析の時間切れ', input: { stage: 'query', error: new Error('AbortError') }, token: 'query_timeout' },
   { name: '接続不能', input: { stage: 'synth', error: new TypeError('Failed to fetch') }, token: 'unreachable' },
   { name: '解析HTTPエラー', input: { stage: 'query', httpStatus: 503 }, token: 'query_http' },
   { name: '解析body不正', input: { stage: 'query', bodyInvalid: true }, token: 'query_body' },
@@ -43,6 +44,7 @@ const ALIVE_TOKEN_CONTRACT = [
 
 const SYNTH_TOKEN_CONTRACT = [
   { token: 'timeout', normalized: { cause: 'timeout', stage: 'synth' }, label: '音声合成が時間切れ' },
+  { token: 'query_timeout', normalized: { cause: 'timeout', stage: 'query' }, label: '音声解析が時間切れ' },
   { token: 'unreachable', normalized: { cause: 'down', stage: 'synth' }, label: '音声合成時にVOICEVOXへ接続できない' },
   { token: 'query_http', normalized: { cause: 'http', stage: 'query' }, label: '音声解析がエラーを返した(過負荷の疑い)' },
   { token: 'query_body', normalized: { cause: 'payload', stage: 'query' }, label: '音声解析の応答が不正' },
@@ -57,9 +59,9 @@ describe('voiceFailureTaxonomy 旧分類器との契約', () => {
       .toEqual(['no-fetch', 'timeout', 'refused', 'http-error', '']);
   });
 
-  it('synth旧分類器の全値域7個を代表入力から固定する', () => {
+  it('synth旧分類器の全値域8個を代表入力から固定する', () => {
     expect(SYNTH_LEGACY_CASES.map(({ input }) => classifyVoiceSynthFailureReason(input)))
-      .toEqual(['timeout', 'unreachable', 'query_http', 'query_body', 'synth_http', 'synth_body', 'unknown']);
+      .toEqual(['timeout', 'query_timeout', 'unreachable', 'query_http', 'query_body', 'synth_http', 'synth_body', 'unknown']);
   });
 
   it.each(ALIVE_TOKEN_CONTRACT)('alive旧トークン "$token" を2軸へ変換する', ({ token, normalized, label }) => {

@@ -277,6 +277,34 @@ export async function initializeVoicevoxSpeaker(styleId, opts = {}) {
 }
 
 /**
+ * 2026-10-26(VOICEVOX 0.26 計測): エンジン起動直後の最初の audio_query は辞書の準備で約2.3秒かかった。
+ *   読み上げ ON の直後に1回だけ捨てる audio_query を投げ、最初のコメントでこの待ちを払わないようにする。
+ *   audio_query は声を指定するので、その声の読み込みも兼ねる。失敗しても読み上げは続ける(false を返すだけ)。
+ * @param {number} styleId
+ * @param {{ fetchFn?: FetchFn, baseUrl?: string, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function warmupVoicevoxQuery(styleId, opts = {}) {
+  const id = Number(styleId);
+  if (!Number.isInteger(id) || id < 0) return false;
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  if (typeof fetchFn !== 'function') return false;
+  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  const query = new URLSearchParams({ text: 'あ', speaker: String(id) });
+  try {
+    const response = await fetchWithTimeout(
+      fetchFn,
+      `${baseUrl}/audio_query?${query}`,
+      { method: 'POST' },
+      positiveTimeout(opts.timeoutMs, 15000)
+    );
+    return !!response && response.ok !== false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * VOICEVOX のスタイル名が「ささやき声」系か判定する純関数。
  * ユーザー方針(2026-06-13)「ささやくような声は入れない方がいい」: ささやき/ウィスパー系は
  *   小さく聞き取りにくいので読み上げの声候補から外す。
@@ -377,6 +405,8 @@ export async function synthesizeVoice(text, voice, opts = {}) {
   // 2026-10-22 計器(P1・印字専用): audio_query と synthesis の所要を分けて呼び出し側へ渡す。
   const nowMs = () => Date.now();
   const queryStartAt = nowMs();
+  /** どこまで進んだか。catch で失敗した段階を正しく伝える(2026-10-26: 以前は常に 'synth')。 */
+  let stage = 'query';
   try {
     const queryResponse = await fetchWithTimeout(
       fetchFn,
@@ -405,6 +435,7 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     audioQuery.outputStereo = false;
 
     const queryMs = nowMs() - queryStartAt;
+    stage = 'synth';
     const synthStartAt = nowMs();
     const synthesisRes = await fetchWithTimeout(
       fetchBufferFn,
@@ -436,7 +467,7 @@ export async function synthesizeVoice(text, voice, opts = {}) {
   } catch (err) {
     // v0.1.1224: ここは「接続不能(VOICEVOX未起動)」と「時間切れ」と「本文読み取り失敗」が
     //   全部落ちてくる。error をそのまま渡し、分類は純関数(voiceSynthFailureReason)に任せる。
-    notifyFailure({ stage: 'synth', error: err });
+    notifyFailure({ stage, error: err });
     return null;
   }
 }

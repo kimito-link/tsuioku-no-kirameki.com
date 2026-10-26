@@ -365,9 +365,9 @@ import {
   isVoicevoxAlive,
   probeVoicevoxAlive,
   listVoicevoxStyleIds,
-  initializeVoicevoxSpeaker,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
+import { createVoicevoxWarmup, withVoiceWarmup } from '../lib/voiceWarmup.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -3353,6 +3353,7 @@ export function mountVenueBarButton(options = {}) {
     void chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {});
   };
 
+  const venueVoiceWarmup = createVoicevoxWarmup(); // 初めての声を合成前に読み込む(voiceWarmup.js)
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
@@ -3387,8 +3388,9 @@ export function mountVenueBarButton(options = {}) {
     //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
     probeVoicevoxAlive,
     fetchVoiceStyleIds: listVoicevoxStyleIds,
-    initVoiceSpeaker: (/** @type {number} */ id) => initializeVoicevoxSpeaker(id), // P3: 絞った声の先読み(判定は lib の voiceNarrowing.js)
-    fetchSynthesizeVoice: synthesizeVoice,
+    initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensure(id), // P3 の先読みも温めと同じ1本の列
+    voiceWarmup: venueVoiceWarmup,
+    fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
     resolveVoice: resolveVoiceForUser
   });
   

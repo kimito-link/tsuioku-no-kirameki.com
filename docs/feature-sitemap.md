@@ -603,7 +603,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 28</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 29</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -632,6 +632,7 @@
 - `src/lib/voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
+- `src/lib/voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
 - `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 
 </details>
@@ -1287,6 +1288,7 @@
 - `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
 
 ### 🔊 読み上げ (10版)
+- `v0.1.1765` 2026-10-26 — 初めての声の読み上げを取りこぼさない
 - `v0.1.1763` 2026-10-25 — アプリは iPhone の声で読み上げ
 - `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
 - `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
@@ -1296,9 +1298,9 @@
 - `v0.1.1749` 2026-10-22 — 読み上げの音量をポップアップで変えられるように
 - `v0.1.1748` 2026-10-22 — 読み上げの遅れを段階ごとに測れるように
 - `v0.1.1746` 2026-10-22 — スマホ読み上げの取りこぼしを数える
-- `v0.1.1745` 2026-10-22 — スマホの最新コメント欄を読み上げに合わせた
 
-### 🩺 診断・状態速報 (1版)
+### 🩺 診断・状態速報 (2版)
+- `v0.1.1765` 2026-10-26 — 初めての声の読み上げを取りこぼさない
 - `v0.1.1748` 2026-10-22 — 読み上げの遅れを段階ごとに測れるように
 
 ### ⚡ 描画・性能 (2版)

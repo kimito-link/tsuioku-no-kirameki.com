@@ -8,6 +8,7 @@ import {
   VOICE_UPSTREAM_SANE_MAX_MS
 } from './voiceStageTiming.js';
 import { buildVoiceDiagLine, buildVoiceDiagSnapshot, makeInitialVoiceDiag } from './voiceDiag.js';
+import { isWeakVoicePc } from './voiceNarrowing.js';
 
 /** 手で進める時計。 */
 function clock(start = 1000) {
@@ -108,6 +109,24 @@ describe('recordVoiceSynthStage', () => {
     expect(d.coldSynthTotal).toBe(0);
     expect(d.warmSynthEmaMs).toBe(-1);
   });
+  it('声の読み込み(initMs)は合成の時間から引き、別に数える=速いPCを弱いPCと記録しない', () => {
+    const d = makeInitialVoiceDiag();
+    // 実測: 読み込み 3.5秒 + 合成 0.3秒。引かないと 3.8秒で isWeakVoicePc の 3秒を超える。
+    recordVoiceSynthStage(d, { cold: true, ok: true, totalMs: 3800, engineWaitMs: 0, queryMs: 100, synthMs: 200, initMs: 3500 });
+    expect(d.coldSynthMaxMs).toBe(300);
+    expect(isWeakVoicePc(d)).toBe(false);
+    expect(d.speakerInitTotal).toBe(1);
+    expect(d.speakerInitMaxMs).toBe(3500);
+  });
+  it('tracker は onTiming の initMs を返す(無ければ 0)', () => {
+    const c = clock(0);
+    const t = createVoiceSynthTracker({ now: c.now });
+    const a = t.begin(3);
+    c.set(100);
+    expect(a.end({ queryMs: 10, synthMs: 20, initMs: 40 }).initMs).toBe(40);
+    const b = t.begin(2);
+    expect(b.end({}).initMs).toBe(0);
+  });
 });
 
 describe('状態速報への表示', () => {
@@ -132,5 +151,12 @@ describe('状態速報への表示', () => {
     expect(snap.upstreamEmaMs).toBe(1200);
     expect(snap.coldSynthMaxMs).toBe(6000);
     expect(buildVoiceDiagLine(snap, now)).toContain('遅れの段階(受信→キュー1.2秒・初めての声2件(最大6.0秒))');
+  });
+  it('声の読み込みもスナップショットを通って表示される', () => {
+    const now = 10_000_000;
+    const diag = { ...makeInitialVoiceDiag(), enabled: true, spokenTotal: 1, speakerInitTotal: 2, speakerInitMaxMs: 3500 };
+    const snap = buildVoiceDiagSnapshot(diag, now, 'lv1');
+    expect(snap.speakerInitMaxMs).toBe(3500);
+    expect(formatVoiceStageBreakdown(snap)).toBe('遅れの段階(声の読み込み2件(最大3.5秒))');
   });
 });
