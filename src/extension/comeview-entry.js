@@ -121,9 +121,13 @@ import {
 import {
   applyVoiceVolumeToWav,
   KEY_VOICE_VOLUME_PERCENT,
+  measureVoiceWavLevel,
   normalizeVoiceVolumePercent,
-  VOICE_VOLUME_DEFAULT
+  VOICE_VOLUME_DEFAULT,
+  voiceTargetPeak
 } from '../lib/voiceVolume.js';
+import { observeVoicePlayback } from '../lib/voicePlaybackQuality.js';
+import { wireVoiceTestHook } from './voiceTestHook.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
@@ -860,13 +864,22 @@ async function drainVoiceQueue() {
         // 2026-10-26: 少しずつ届く声は Web Audio で鳴らす(voiceStreamAudio.js・使えなければ丸ごと再生)。
         /** @type {any} */
         let audio = isStreamedVoice(wav) ? createBrowserStreamedAudio(wav, _voiceVolumePercent) : null;
+        /** @type {{ peak: number, rms: number } | null} */
+        let wholeLevel = null;
         if (!audio) {
-          const whole = wav;
-          objectUrl = URL.createObjectURL(
-            new Blob([applyVoiceVolumeToWav(whole, _voiceVolumePercent)], { type: 'audio/wav' })
-          );
+          const loud = applyVoiceVolumeToWav(wav, _voiceVolumePercent);
+          wholeLevel = measureVoiceWavLevel(loud);
+          objectUrl = URL.createObjectURL(new Blob([loud], { type: 'audio/wav' }));
           audio = new Audio(objectUrl);
         }
+        // 2026-10-26計器: 聞こえ方(途切れ・つっかえ・音割れ・小さすぎ)を数える(会場と同じ・再生には触れない)。
+        observeVoicePlayback(audio, {
+          diag: _voiceDiag,
+          outPeak: wholeLevel ? wholeLevel.peak : -1,
+          outRms: wholeLevel ? wholeLevel.rms : -1,
+          targetPeak: voiceTargetPeak(_voiceVolumePercent),
+          onRecorded: () => publishVoiceDiag()
+        });
         await new Promise((resolve) => {
           let settled = false;
           // v0.1.883: 再生完了の安全網(watchdog)。'ended'/'error' が一度も来ないケース
@@ -1064,6 +1077,15 @@ async function initializeVoiceReading() {
   if (forceVoiceOn || bag[VOICE_READING_ENABLED_KEY] === true) {
     await enableVoiceReading({ persist: forceVoiceOn });
   }
+  // 2026-10-26: 決まった形のコメントで読み上げを試す入口(開発版だけ・voiceTestHook.js)。
+  wireVoiceTestHook({
+    target: 'comeview',
+    readUrl: true,
+    enqueue: (items) => enqueueVoiceTimelineItems(items),
+    getDiag: () => _voiceDiag,
+    isIdle: () => !_voicePlaying && _voiceQueue.length === 0,
+    ensureEnabled: async () => _voiceReadingEnabled
+  });
 }
 
 /**

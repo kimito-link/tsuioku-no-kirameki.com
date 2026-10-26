@@ -14,6 +14,7 @@
 graph LR
   n_comeview["コメビュ(別窓)"]
   n_comeview --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
+  n_comeview --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
   n_comeview --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_comeview --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_comeview --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_comeview --> n_src_lib_userCommentProfileCache_js["lib/userCommentProfileCache.js"]:::shared
   n_comeview --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
   n_comeview --> n_src_lib_voiceAgeGate_js["lib/voiceAgeGate.js"]:::shared
-  n_comeview --> n_src_lib_voiceAssignment_js["lib/voiceAssignment.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 19 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 22 ファイル省略（全件は storage-bus.md / metafile 参照）。

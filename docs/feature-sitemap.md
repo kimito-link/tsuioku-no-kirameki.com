@@ -603,7 +603,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 31</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 34</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -611,6 +611,7 @@
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
 - `src/extension/voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
+- `src/extension/voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
 - `src/lib/phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
 - `src/lib/phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
 - `src/lib/phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
@@ -627,11 +628,13 @@
 - `src/lib/voiceLagNotice.js` — 読み上げが大きく遅れているときの一言(会場・コメビュ共通)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
+- `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
 - `src/lib/voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
 - `src/lib/voiceStageTiming.js` — 読み上げの遅れを「段階ごと」に測る計器(印字専用・読み上げの挙動には一切介入しない)。
 - `src/lib/voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。
 - `src/lib/voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
 - `src/lib/voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
+- `src/lib/voiceTestRun.js` — 読み上げを「決まった形のコメント」で流して測る試験(開発版だけ・2026-10-26)。
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 - `src/lib/voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
@@ -1272,22 +1275,22 @@
 - `v0.1.1761` 2026-10-25 — 吹き出しが段の案内文に被るのを直す
 
 ### 🏟 会場・席 (6版)
+- `v0.1.1771` 2026-10-26 — 読み上げの聞こえ方を数字で確かめる
 - `v0.1.1761` 2026-10-25 — 吹き出しが段の案内文に被るのを直す
 - `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
 - `v0.1.1758` 2026-10-24 — スマホで新着をすぐ受け取る
 - `v0.1.1754` 2026-10-23 — 読み上げが遅れているときに秒数を出す
 - `v0.1.1753` 2026-10-22 — スマホ会場の席が急に0人になるのを直す
-- `v0.1.1751` 2026-10-22 — スマホで声が先に届いても画面を合わせる
 
-### 🎈 吹き出し (3版)
+### 🎈 吹き出し (2版)
 - `v0.1.1761` 2026-10-25 — 吹き出しが段の案内文に被るのを直す
 - `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
-- `v0.1.1751` 2026-10-22 — スマホで声が先に届いても画面を合わせる
 
 ### 🎁 ギフト (1版)
 - `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
 
-### 🔊 読み上げ (9版)
+### 🔊 読み上げ (10版)
+- `v0.1.1771` 2026-10-26 — 読み上げの聞こえ方を数字で確かめる
 - `v0.1.1768` 2026-10-26 — 遅いPCは声を6つに絞って先に準備
 - `v0.1.1767` 2026-10-26 — 速いPCを遅いと見誤らない
 - `v0.1.1766` 2026-10-26 — 遅いPCでも声が早く出始める
@@ -1298,7 +1301,8 @@
 - `v0.1.1759` 2026-10-24 — 読み上げの声を絞る設定を追加(既定オフ)
 - `v0.1.1754` 2026-10-23 — 読み上げが遅れているときに秒数を出す
 
-### 🩺 診断・状態速報 (2版)
+### 🩺 診断・状態速報 (3版)
+- `v0.1.1771` 2026-10-26 — 読み上げの聞こえ方を数字で確かめる
 - `v0.1.1766` 2026-10-26 — 遅いPCでも声が早く出始める
 - `v0.1.1765` 2026-10-26 — 初めての声の読み上げを取りこぼさない
 

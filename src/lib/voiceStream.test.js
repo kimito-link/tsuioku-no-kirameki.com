@@ -349,3 +349,32 @@ describe('synthesizeVoice({ stream: true })', () => {
     expect(onFailure.mock.calls[0][0].stage).toBe('synth');
   });
 });
+
+describe('2026-10-26 聞こえ方の計器(quality)', () => {
+  it('次の分が間に合わず無音が挟まったら underrun を数え、鳴らした大きさを残す', async () => {
+    const f = fakeContext();
+    const v = new StreamedVoice(1000);
+    const audio = createStreamedVoiceAudio(v, { audioContext: () => f.ctx, volumePercent: 100 });
+    v.append(Int16Array.from({ length: 400 }, () => 8000));
+    await audio.play();
+    expect(audio.quality.underruns).toBe(0);
+    f.ctx.currentTime = 1.0; // 0.4秒分しか並べていないのに1秒たった=0.6秒の無音
+    v.append(Int16Array.from({ length: 200 }, () => 8000));
+    expect(audio.quality.underruns).toBe(1);
+    expect(audio.quality.underrunMaxMs).toBeGreaterThan(500);
+    expect(audio.quality.outPeak).toBeGreaterThan(0);
+    expect(audio.quality.outRms).toBeGreaterThan(0);
+    expect(audio.quality.gainDropRatio).toBe(1);
+  });
+  it('途中で大きな音が来て倍率を下げたら gainDropRatio が1未満、途中で止まったら partial', async () => {
+    const f = fakeContext();
+    const v = new StreamedVoice(1000);
+    const audio = createStreamedVoiceAudio(v, { audioContext: () => f.ctx, volumePercent: 300 });
+    v.append(Int16Array.from({ length: 400 }, () => 3000));
+    await audio.play();
+    v.append(Int16Array.from({ length: 100 }, () => 30000));
+    expect(audio.quality.gainDropRatio).toBeLessThan(0.8);
+    v.fail();
+    expect(audio.quality.partial).toBe(true);
+  });
+});

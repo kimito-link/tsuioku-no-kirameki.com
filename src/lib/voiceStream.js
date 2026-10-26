@@ -244,8 +244,21 @@ export function createStreamGain(volumePercent) {
   const pct = normalizeVoiceVolumePercent(volumePercent);
   const target = Math.min(VOICE_PEAK_CEILING, (VOICE_TARGET_PEAK_AT_100 * pct) / 100);
   let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
+  const startGain = gain;
+  // 2026-10-26計器: 実際に鳴らした最大振幅(0〜1)と、最初に鳴らした時の倍率(途中で下げたかを見る)。
+  let outPeak = 0;
+  let firstGain = -1;
+  let sumSq = 0;
+  let voiced = 0;
   return {
     get gain() { return gain; },
+    get outPeak() { return outPeak; },
+    /** 鳴らした音の RMS(無音を除く・0〜1)。 */
+    get outRms() { return voiced > 0 ? Math.sqrt(sumSq / voiced) : 0; },
+    /** 鳴らし始めた倍率に対する今の倍率(1=下げていない)。まだ鳴らしていなければ 1。 */
+    get dropRatio() { return firstGain > 0 ? gain / firstGain : 1; },
+    targetPeak: target,
+    startGain,
     /**
      * @param {Int16Array} samples
      * @returns {Float32Array}
@@ -257,8 +270,13 @@ export function createStreamGain(volumePercent) {
         if (a > peak) peak = a;
       }
       if (peak > 0 && (peak / 32768) * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
+      if (firstGain < 0) firstGain = gain;
+      outPeak = Math.max(outPeak, (peak / 32768) * gain);
       const out = new Float32Array(samples.length);
-      for (let i = 0; i < samples.length; i++) out[i] = (samples[i] / 32768) * gain;
+      for (let i = 0; i < samples.length; i++) {
+        out[i] = (samples[i] / 32768) * gain;
+        if (Math.abs(samples[i]) >= 328) { sumSq += out[i] * out[i]; voiced++; }
+      }
       return out;
     }
   };
@@ -296,6 +314,9 @@ export function createStreamedVoiceAudio(voice, deps) {
   /** @type {any} */
   let whole = null;
   const gain = createStreamGain(deps.volumePercent);
+  // 2026-10-26計器(voicePlaybackQuality.js): 次の分が間に合わず無音が挟まった回数と最長の無音。
+  let underruns = 0;
+  let underrunMaxMs = 0;
 
   const finishEnded = () => {
     if (ended) return;
@@ -325,6 +346,10 @@ export function createStreamedVoiceAudio(voice, deps) {
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       src.connect(ctx.destination);
+      if (started && nextAt > 0 && nextAt < ctx.currentTime) {
+        underruns += 1;
+        underrunMaxMs = Math.max(underrunMaxMs, Math.round((ctx.currentTime + 0.02 - nextAt) * 1000));
+      }
       const at = Math.max(nextAt, ctx.currentTime + 0.02);
       nextAt = at + count / voice.sampleRate;
       scheduledSamples += count;
@@ -360,6 +385,17 @@ export function createStreamedVoiceAudio(voice, deps) {
     /** 少しずつ流すときは再生速度を変えない(変えると声の高さも変わるため)。 */
     playbackRate: 1,
     preservesPitch: true,
+    /** 聞こえ方の計器(voicePlaybackQuality.js の observeVoicePlayback が読む)。 */
+    get quality() {
+      return {
+        underruns,
+        underrunMaxMs,
+        outPeak: started && !whole ? gain.outPeak : -1,
+        outRms: started && !whole ? gain.outRms : -1,
+        gainDropRatio: started && !whole ? gain.dropRatio : 1,
+        partial: voice.failed === true && voice.totalSamples > 0
+      };
+    },
     get duration() {
       return voice.done && voice.sampleRate > 0 ? voice.totalSamples / voice.sampleRate : NaN;
     },

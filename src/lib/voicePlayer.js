@@ -12,6 +12,7 @@ import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import { startVoiceWarmup } from './voiceWarmup.js';
 import { isStreamedVoice, shouldStreamVoice } from './voiceStream.js';
 import { isWeakVoicePc } from './voiceNarrowing.js';
+import { observeVoicePlayback } from './voicePlaybackQuality.js';
 import {
   capVoiceMaxCharsByBoost,
   computeVoiceCongestion,
@@ -36,7 +37,7 @@ import {
   createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceStreamDone, recordVoiceSynthStage
 } from './voiceStageTiming.js';
 import {
-  applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT
+  applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, measureVoiceWavLevel, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT, voiceTargetPeak
 } from './voiceVolume.js';
 import { decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
@@ -196,6 +197,9 @@ export class VoicePlayer {
       speakerInitTotal: 0, speakerInitMaxMs: 0,
       streamTotal: 0, streamFirstAudioEmaMs: -1, warmSynthSamples: 0, contendedSynthTotal: 0,
       warmSynthRtfPermille: -1, warmRtfSamples: 0,
+      playCheckedTotal: 0, playCutShortTotal: 0, playStallTotal: 0, streamUnderrunTotal: 0, streamUnderrunMaxMs: 0,
+      playErrorAfterStartTotal: 0, clipItemTotal: 0, quietItemTotal: 0, streamGainDropTotal: 0,
+      outPeakEmaPermille: -1, outRmsDbMin: 999, outRmsDbMax: -999, lastOutRmsDb: 0, lastPlayIssue: '', venueGate: '',
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
     // 2026-10-22計器(P1): 合成1件ごとのエンジン待ち・初めての声を測る(印字専用)。
@@ -752,9 +756,13 @@ export class VoicePlayer {
             : null;
           /** @type {any} */
           let audio = streamedAudio;
+          /** @type {{ peak: number, rms: number } | null} */
+          let wholeLevel = null;
           if (!audio) {
             const whole = isStreamedVoice(wav) ? (await wav.whenDone, wav.toWav()) : wav;
-            const blob = new Blob([applyVoiceVolumeToWav(whole, this.volumePercent)], { type: 'audio/wav' });
+            const loud = applyVoiceVolumeToWav(whole, this.volumePercent);
+            wholeLevel = measureVoiceWavLevel(loud);
+            const blob = new Blob([loud], { type: 'audio/wav' });
             objectUrl = this.createObjectURL(blob);
             const AudioCtor = this.audioConstructor;
             audio = new AudioCtor(objectUrl);
@@ -773,6 +781,15 @@ export class VoicePlayer {
             audio.preservesPitch = true;
             audio.playbackRate = playbackRate;
           }
+          // 2026-10-26計器: 聞こえ方(途切れ・つっかえ・音割れ・小さすぎ)を数える(再生には触れない)。
+          observeVoicePlayback(audio, {
+            diag: this.diag,
+            playbackRate,
+            outPeak: wholeLevel ? wholeLevel.peak : -1,
+            outRms: wholeLevel ? wholeLevel.rms : -1,
+            targetPeak: voiceTargetPeak(this.volumePercent),
+            onRecorded: () => this._emitDiag()
+          });
           // 2026-07-24計器(段階0=shadow): playbackRateが上限で飽和=補正が追いつけていない兆候。
           if (playbackRate >= VOICE_PLAYBACK_RATE_MAX) this.diag.rateClampTotal += 1;
 
