@@ -71,6 +71,8 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   lastColdSynthMs: number,     // 同上の直近1件
  *   speakerInitTotal: number,    // 2026-10-26計器: 合成の前に声を読み込んだ件数(voiceWarmup)
  *   speakerInitMaxMs: number,    // 同上の最大所要ms(初めての声の読み込みにかかった時間)
+ *   streamTotal: number,         // 2026-10-26計器: 少しずつ受け取って読んだ件数(voiceStream)
+ *   streamFirstAudioEmaMs: number, // 同上の「最初の声が届くまで」のEMA
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
@@ -140,6 +142,8 @@ export function makeInitialVoiceDiag() {
     lastColdSynthMs: -1,
     speakerInitTotal: 0,
     speakerInitMaxMs: 0,
+    streamTotal: 0,
+    streamFirstAudioEmaMs: -1,
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -214,6 +218,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     lastColdSynthMs: num(d.lastColdSynthMs, base.lastColdSynthMs),
     speakerInitTotal: num(d.speakerInitTotal, base.speakerInitTotal),
     speakerInitMaxMs: num(d.speakerInitMaxMs, base.speakerInitMaxMs),
+    streamTotal: num(d.streamTotal, base.streamTotal),
+    streamFirstAudioEmaMs: num(d.streamFirstAudioEmaMs, base.streamFirstAudioEmaMs),
     lagVerdict: String(d.lagVerdict || base.lagVerdict),
     diagBornAt: num(d.diagBornAt, base.diagBornAt),
     capturedAt: now,

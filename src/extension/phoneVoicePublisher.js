@@ -18,7 +18,8 @@ export function createPcPhoneVoice(getTarget) {
       const bag = await chrome.storage.local.get([KEY_VOICE_ASSIGNMENTS, KEY_VOICE_READ_NAME_ENABLED]);
       return { assignments: bag?.[KEY_VOICE_ASSIGNMENTS], readName: bag?.[KEY_VOICE_READ_NAME_ENABLED] === true };
     },
-    synth: (text, voice) => synthesizeVoice(text, voice),
+    // stream を渡さないので必ず丸ごとの WAV(または null)が返る。
+    synth: async (text, voice) => /** @type {ArrayBuffer|null} */ (await synthesizeVoice(text, voice)),
     encode: (wav) => encodeWavToOggOpus(wav),
     post: async (clip) => {
       const t = getTarget();

@@ -58,7 +58,7 @@ export function createVoiceSynthTracker(deps = {}) {
   return {
     /**
      * @param {unknown} styleId
-     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number } }}
+     * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean } }}
      */
     begin(styleId) {
       const startAt = now();
@@ -89,7 +89,9 @@ export function createVoiceSynthTracker(deps = {}) {
           queryMs: Number.isFinite(q) && q >= 0 ? Math.round(q) : -1,
           synthMs: Number.isFinite(s) && s >= 0 ? Math.round(s) : -1,
           // 2026-10-26: 合成の前に声を読み込んだ時間(voiceWarmup)。無ければ 0。
-          initMs: Number.isFinite(i) && i > 0 ? Math.round(i) : 0
+          initMs: Number.isFinite(i) && i > 0 ? Math.round(i) : 0,
+          // 2026-10-26: 少しずつ受け取った(voiceStream)。時間は「最初の声が届くまで」。
+          streamed: timing?.streamed === true
         };
       };
       return { cold, end };
@@ -108,11 +110,18 @@ export function recordVoiceSynthStage(diag, r) {
   if (!r.ok) return;
   foldVoiceStageEma(diag, 'engineWaitEmaMs', r.engineWaitMs);
   foldVoiceStageEma(diag, 'audioQueryEmaMs', r.queryMs);
+  const initMs = Number(r.initMs) > 0 ? Number(r.initMs) : 0;
+  if (r.streamed) {
+    // 少しずつ受け取った声は「最初の声まで」の時間なので、丸ごと合成の物差し(warm/cold)に混ぜない
+    //   (混ぜると遅い PC が速く見え、弱い PC の判定が外れる)。
+    diag.streamTotal = (Number(diag.streamTotal) || 0) + 1;
+    foldVoiceStageEma(diag, 'streamFirstAudioEmaMs', Math.max(0, r.totalMs - r.engineWaitMs - initMs));
+    return;
+  }
   // synthesis の純時間 = 応答までの時間からエンジン待ちを引いたもの(待ちは synthesis 側で起きる前提)。
   if (r.synthMs >= 0) foldVoiceStageEma(diag, 'synthesisEmaMs', Math.max(0, r.synthMs - r.engineWaitMs));
   // 2026-10-26: 声の読み込み(initMs)は合成の速さではないので引く。引かないと速いPCでも
   //   初めての声が 3.5秒台になり、isWeakVoicePc が「弱いPC」と記録してしまう(消すコードは無い)。
-  const initMs = Number(r.initMs) > 0 ? Number(r.initMs) : 0;
   if (initMs > 0) {
     diag.speakerInitTotal = (Number(diag.speakerInitTotal) || 0) + 1;
     diag.speakerInitMaxMs = Math.max(Number(diag.speakerInitMaxMs) || 0, Math.round(initMs));
@@ -148,6 +157,8 @@ export function formatVoiceStageBreakdown(snap) {
     const split = q >= 0 && s >= 0 ? `(query${q}ms+synth${s}ms)` : '';
     parts.push(`合成${sec(snap.warmSynthEmaMs)}${split}`);
   }
+  const streamed = Number(snap.streamTotal) || 0;
+  if (streamed > 0 && ok(snap.streamFirstAudioEmaMs)) parts.push(`少しずつ${streamed}件(最初の声まで${sec(snap.streamFirstAudioEmaMs)})`);
   const cold = Number(snap.coldSynthTotal) || 0;
   if (cold > 0) parts.push(`初めての声${cold}件(最大${sec(snap.coldSynthMaxMs)})`);
   const init = Number(snap.speakerInitTotal) || 0;

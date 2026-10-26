@@ -118,6 +118,15 @@ describe('recordVoiceSynthStage', () => {
     expect(d.speakerInitTotal).toBe(1);
     expect(d.speakerInitMaxMs).toBe(3500);
   });
+  it('少しずつ受け取った声は別に数え、丸ごと合成の物差し(弱い PC の判定)に混ぜない', () => {
+    const d = makeInitialVoiceDiag();
+    recordVoiceSynthStage(d, { cold: false, ok: true, totalMs: 900, engineWaitMs: 0, queryMs: 300, synthMs: 600, initMs: 0, streamed: true });
+    expect(d.streamTotal).toBe(1);
+    expect(d.streamFirstAudioEmaMs).toBe(900);
+    expect(d.warmSynthEmaMs).toBe(-1);
+    expect(d.synthesisEmaMs).toBe(-1);
+    expect(formatVoiceStageBreakdown(d)).toContain('少しずつ1件(最初の声まで0.9秒)');
+  });
   it('tracker は onTiming の initMs を返す(無ければ 0)', () => {
     const c = clock(0);
     const t = createVoiceSynthTracker({ now: c.now });

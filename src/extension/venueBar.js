@@ -365,9 +365,11 @@ import {
   isVoicevoxAlive,
   probeVoicevoxAlive,
   listVoicevoxStyleIds,
-  synthesizeVoice
+  synthesizeVoice,
+  probeVoicevoxStreaming
 } from '../lib/voicevoxClient.js';
 import { createVoicevoxWarmup, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -3390,6 +3392,7 @@ export function mountVenueBarButton(options = {}) {
     fetchVoiceStyleIds: listVoicevoxStyleIds,
     initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensure(id), // P3 の先読みも温めと同じ1本の列
     voiceWarmup: venueVoiceWarmup,
+    probeVoiceStreaming: probeVoicevoxStreaming, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
     fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
     resolveVoice: resolveVoiceForUser
   });
