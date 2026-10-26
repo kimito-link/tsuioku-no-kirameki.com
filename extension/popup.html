@@ -11837,14 +11837,14 @@
             </label>
           </div>
           <!-- 2026-10-24(P3・ユーザー条件「絞るのは弱いPCだけ・絞り方は固定」): 読み上げの声の種類を絞るか。
-               既定はオフ(今までどおり全部の声)。配線は popup/wireVoiceNarrowSelect.js、判定は lib の voiceNarrowing.js。 -->
+               既定は「遅いPCと分かったら」(v0.1.1768・グラボ無しの実測で準備待ちの飛ばしが多かったため)。配線は popup/wireVoiceNarrowSelect.js、判定は lib の voiceNarrowing.js。 -->
           <div class="nl-record-sub">
             <label for="voiceNarrowSelect" class="nl-record-sub__label">
               <span>
                 読み上げの声を絞る
                 <select id="voiceNarrowSelect" aria-label="読み上げの声を絞る">
                   <option value="off">しない</option>
-                  <option value="auto">遅いPCと分かったら</option>
+                  <option value="auto">遅いPCと分かったら(おすすめ)</option>
                   <option value="on">いつも</option>
                 </select>
                 <span class="nl-record-sub__hint"

@@ -65,7 +65,11 @@ export function narrowVoiceStyleIds(availableStyleIds, weak) {
 
 export { KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC } from './voiceKeys.js';
 
-/** 絞り込みの設定。既定は 'off'(=今までどおり全部の声)。 */
+/**
+ * 絞り込みの設定。既定は 'auto'(v0.1.1768・りんく判断: 遅い PC と分かった時だけ絞る)。
+ *   PC 実測でグラボ無しは新しい人の声の準備が最大13.6秒かかり、32件飛ばした。速い PC は変わらない。
+ *   自分で「しない」を選んだ人('off' が保存されている)はそのまま。
+ */
 export const VOICE_NARROW_MODES = Object.freeze(['off', 'auto', 'on']);
 
 /**
@@ -73,7 +77,7 @@ export const VOICE_NARROW_MODES = Object.freeze(['off', 'auto', 'on']);
  * @returns {'off'|'auto'|'on'}
  */
 export function normalizeVoiceNarrowMode(raw) {
-  return raw === 'auto' || raw === 'on' ? raw : 'off';
+  return raw === 'off' || raw === 'on' ? raw : 'auto';
 }
 
 /**
