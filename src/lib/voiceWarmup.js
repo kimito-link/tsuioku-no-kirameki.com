@@ -451,13 +451,14 @@ export function withVoiceWarmup(warmup, synth) {
     if (wav) warmup.markWarm(useStyle);
     // v0.1.1775: 声ごとの素の大きさを覚える(次に少しずつ読む時の最初の倍率に使う)。
     try {
+      const textLength = String(text ?? '').length;
       if (isStreamedVoice(wav)) {
         wav.styleId = useStyle;
         const sv = wav;
-        void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms); }, () => {});
+        void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms, textLength); }, () => {});
       } else if (wav instanceof ArrayBuffer) {
         const level = measureVoiceWavLevel(wav);
-        if (level) rememberVoiceStylePeak(useStyle, level.peak, level.rms);
+        if (level) rememberVoiceStylePeak(useStyle, level.peak, level.rms, textLength);
       }
     } catch { /* 計器・補助は本体を止めない */ }
     return wav;

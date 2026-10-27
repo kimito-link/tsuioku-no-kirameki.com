@@ -73,8 +73,13 @@ const styleRms = new Map();
  * @param {unknown} styleId
  * @param {unknown} peak 0〜1
  * @param {unknown} [rms] 0〜1(無音を除く)。分かれば一緒に覚える
+ * @param {unknown} [textLength] 読んだ文の長さ。少しずつ読む長さ未満の短い文は覚えない(v0.1.1787)。
+ *   短い文は最大振幅÷RMS が 12〜13dB と長い文(16〜18dB)より小さく、覚えると次の長い文の倍率を
+ *   上げすぎて 4〜6dB 大きく出た(PC 実測: 短い文を続けた直後の長い文)。
  */
-export function rememberVoiceStylePeak(styleId, peak, rms) {
+export function rememberVoiceStylePeak(styleId, peak, rms, textLength) {
+  const len = Number(textLength);
+  if (Number.isFinite(len) && len >= 0 && len < VOICE_STREAM_LONG_TEXT_CHARS) return;
   const id = Number(styleId);
   const p = Number(peak);
   if (!Number.isInteger(id) || id < 0 || !Number.isFinite(p) || p <= 0 || p > 1) return;
