@@ -95,7 +95,8 @@ import {
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import {
   computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
-  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor,
+  predictVoiceQueueWaitMs, capVoiceMaxCharsByWait
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
@@ -105,6 +106,7 @@ import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voiceP
 import {
   computeVoiceCongestion,
   computeVoicePlaybackRate,
+  capVoiceMaxCharsByBoost,
   computeVoiceE2eAverage,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
@@ -743,7 +745,14 @@ function ensureVoicePrefetch(item, generation) {
     _voiceAssignments,
     _voiceStyleIds
   );
-  const text = buildMergedVoiceText(item, { maxChars: congestion.maxChars });
+  const boostAtSynth = comeviewSpeedBoost(congestion.speedBoost);
+  // v0.1.1799: この件が鳴るまでの見込み待ちが長ければ本文を短くする(会場と同じ)。
+  //   コメビュは速さに合わせた本文の上限(capVoiceMaxCharsByBoost)も無かったのでそろえる。
+  const ahead = Math.max(0, _voiceQueue.indexOf(item)) + (_voiceStopCurrent ? 1 : 0);
+  const boostChars = capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars);
+  const maxChars = capVoiceMaxCharsByWait(predictVoiceQueueWaitMs(ahead, _voicePaceState, boostAtSynth), boostChars);
+  if (maxChars < boostChars) _voiceDiag.trimByWaitTotal = (Number(_voiceDiag.trimByWaitTotal) || 0) + 1;
+  const text = buildMergedVoiceText(item, { maxChars });
   // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(会場の VoicePlayer と同じ判定)。
   if (!_voiceSlowEngine && isWeakVoicePc(_voiceDiag)) _voiceSlowEngine = true;
   const stream = shouldStreamVoice({
@@ -752,7 +761,6 @@ function ensureVoicePrefetch(item, generation) {
     slowEngine: _voiceSlowEngine,
     textLength: text.length
   });
-  const boostAtSynth = comeviewSpeedBoost(congestion.speedBoost);
   const promise = synthesizeVoiceTracked(
     text,
     {
@@ -879,7 +887,7 @@ async function drainVoiceQueue() {
       const wav = prefetch
         ? await prefetch.promise
         : await synthesizeVoiceTracked(
-            buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+            buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars) }),
             {
               ...assigned,
               speedOffset: assigned.speedOffset + boostAtSynth
