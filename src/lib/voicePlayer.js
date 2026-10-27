@@ -32,7 +32,8 @@ import {
   updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax,
   updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict,
   computeSustainedPressureBoost, mergeVoiceSpeedBoost, computeBacklogCatchUpBoost,
-  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor,
+  resolveVoiceQueueMaxByChars
 } from './voiceLagBudget.js';
 import {
   createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage
@@ -182,7 +183,7 @@ export class VoicePlayer {
       // v0.1.1222計器: 持続過負荷ブースト(pressure由来)。lastSustainedBoost=直近の上乗せ値、
       //   sustainedBoostTotal=キュー長では出せない速度を実際に足した累計。
       //   ★「速くしたのに読める数が増えたか」を後から検算するための計器(効果の裏取り用)。
-      lastSustainedBoost: 0, sustainedBoostTotal: 0, lastBacklogBoost: 0, lastPaceFloor: 0,
+      lastSustainedBoost: 0, sustainedBoostTotal: 0, lastBacklogBoost: 0, lastPaceFloor: 0, queueMaxByChars: 0,
       dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0,
       // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
       //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
@@ -477,6 +478,24 @@ export class VoicePlayer {
     return userId || key || name || 'anon';
   }
 
+  /**
+   * v0.1.1800: 待っている件+新しい件の文字数から件数の上限を見積もる(voiceLagBudget.resolveVoiceQueueMaxByChars)。
+   * @param {object} candidate
+   * @returns {number}
+   */
+  _resolveQueueMaxByChars(candidate) {
+    try {
+      const maxChars = computeVoiceCongestion(this.queue.length + 1).maxChars;
+      const counts = [...this.queue, candidate].map((it) => buildMergedVoiceText(it, { maxChars }).length);
+      const byChars = resolveVoiceQueueMaxByChars(counts, this._paceState);
+      if (byChars == null) return this._effectiveQueueMax;
+      this.diag.queueMaxByChars = byChars;
+      return byChars;
+    } catch {
+      return this._effectiveQueueMax;
+    }
+  }
+
   /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ）。 */
   _ensurePrefetch(item, generation) {
     if (!item || generation !== this.generation) return null;
@@ -508,7 +527,7 @@ export class VoicePlayer {
     // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
     //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
-    this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost });
+    this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length });
     return promise;
   }
 
@@ -720,11 +739,14 @@ export class VoicePlayer {
         // v0.1.1089(Phase 2): 先読み済みWAVは pf.boostAtSynth の速度で焼き固まっている。
         //   先読み無し(その場で合成)なら今の実効ブーストがそのまま合成速度=補正不要(等速)。
         const boostAtSynth = pf ? pf.boostAtSynth : effBoostNow;
+        const inlineText = pf ? '' : buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) });
+        // v0.1.1800: 読んだ文字数(1文字あたりの長さを覚えて、件数の上限を文字数から見積もるため)。
+        const spokenChars = pf ? Number(pf.textLength) || 0 : inlineText.length;
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const wav = pf
           ? await pf.promise
           : await this._synthesizeTracked(
-              buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) }),
+              inlineText,
               {
                 ...assigned,
                 speedOffset: assigned.speedOffset + effBoostNow
@@ -848,7 +870,7 @@ export class VoicePlayer {
                   const playbackMs = Math.max(0, Date.now() - _playbackStartAt);
                   this._playbackEmaMs = updateVoiceServiceTimeEma(this._playbackEmaMs, playbackMs);
                   this.diag.playbackEmaMs = this._playbackEmaMs;
-                  noteVoicePacePlayed(this._paceState, playbackMs, playbackRate, boostAtSynth);
+                  noteVoicePacePlayed(this._paceState, playbackMs, playbackRate, boostAtSynth, spokenChars);
                 } catch { /* 計測失敗は無視 */ }
               }
               // v0.1.771: 再生が終わった(ended/error/stop)→ 吹き出しに「読み上げ終了」を通知。
@@ -1035,7 +1057,10 @@ export class VoicePlayer {
       //   天井のみ(voiceLagBudget.VOICE_QUEUE_MAX_CEIL)。実際のmaxは処理時間EMAから動的算出した
       //   this._effectiveQueueMax(床2〜天井8)。実配信で処理時間が伸びた(1703ms/件)ときに8件固定だと
       //   ラグ上界が安全網(8000ms)を超えるのを、実効上限の動的縮小で構造的に防ぐ。
-      const pushed = pushVoiceQueue(this.queue, candidate, { max: this._effectiveQueueMax });
+      // v0.1.1800: 待っている件の文字数から上限を見積もる(長い声の直後に平均が膨らんで、続く短い
+      //   コメントまで飛ばしていた)。見積もれなければ従来の this._effectiveQueueMax。
+      const queueMax = this._resolveQueueMaxByChars(candidate);
+      const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax });
       this.queue = pushed.queue;
       noteVoicePaceArrival(this._paceState, candidate.enqueuedAt);
       
