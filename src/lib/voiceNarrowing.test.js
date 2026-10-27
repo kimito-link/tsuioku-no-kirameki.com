@@ -11,7 +11,8 @@ import {
   rememberWeakVoicePc,
   isFastVoicePc,
   forgetWeakVoicePcIfFast,
-  VOICE_NARROW_STYLE_IDS
+  VOICE_NARROW_STYLE_IDS,
+  VOICE_CAPPED_STYLE_IDS
 } from './voiceNarrowing.js';
 import { assignVoiceForUser } from './voiceAssignment.js';
 import { initializeVoicevoxSpeaker } from './voicevoxClient.js';
@@ -142,15 +143,49 @@ describe('prepareVoiceStyleIds', () => {
     expect(log).toEqual([3, 2, 8, 10, 13, 14]);
   });
 
-  it('設定が読めない・先読みが失敗しても、全部の声で続ける', async () => {
+  it('設定が読めない・先読みが失敗しても、読み上げは続ける(既定 auto の上限の表で)', async () => {
     const r = await prepareVoiceStyleIds(engine, { readSettings: async () => { throw new Error('x'); } });
-    expect(r.styleIds).toEqual(engine);
+    expect(r.styleIds).toEqual([3, 2, 8, 10, 13, 14, 20]);
+    expect(r.narrowed).toBe(false);
     const r2 = await prepareVoiceStyleIds(engine, {
       readSettings: async () => ({ mode: 'on' }),
       initSpeaker: async () => { throw new Error('down'); }
     });
     await flush();
     expect(r2.narrowed).toBe(true);
+  });
+});
+
+describe('v0.1.1795 声の種類の上限', () => {
+  const all = Array.from({ length: 127 }, (_, i) => i);
+  it('既定(auto)の速い PC は上限の表の声だけ(表の順番のまま)・先読みしない', async () => {
+    const init = [];
+    const r = await prepareVoiceStyleIds(all, {
+      readSettings: async () => ({ mode: 'auto', weak: false }),
+      initSpeaker: async (id) => { init.push(id); }
+    });
+    await new Promise((res) => setTimeout(res, 0));
+    expect(r.styleIds).toEqual([...VOICE_CAPPED_STYLE_IDS]);
+    expect(r.narrowed).toBe(false);
+    expect(init).toEqual([]);
+  });
+  it('「しない」を選んだ人は全部の声のまま', async () => {
+    const r = await prepareVoiceStyleIds(all, { readSettings: async () => ({ mode: 'off' }) });
+    expect(r.styleIds).toEqual(all);
+  });
+  it('遅い PC は今までどおり6つ', async () => {
+    const r = await prepareVoiceStyleIds(all, { readSettings: async () => ({ mode: 'auto', weak: true }) });
+    expect(r.styleIds).toEqual([...VOICE_NARROW_STYLE_IDS]);
+  });
+  it('表は20種類・重複なし・先頭6つは遅い PC の表と同じ・ささやき系を含まない', () => {
+    expect(VOICE_CAPPED_STYLE_IDS.length).toBe(20);
+    expect(new Set(VOICE_CAPPED_STYLE_IDS).size).toBe(20);
+    expect(VOICE_CAPPED_STYLE_IDS.slice(0, 6)).toEqual([...VOICE_NARROW_STYLE_IDS]);
+    for (const w of [19, 22, 36, 50, 86, 117]) expect(VOICE_CAPPED_STYLE_IDS).not.toContain(w);
+  });
+  it('表の声が2つ未満しか無いエンジンでは絞らない', async () => {
+    const r = await prepareVoiceStyleIds([3, 200, 201], { readSettings: async () => ({ mode: 'auto' }) });
+    expect(r.styleIds).toEqual([3, 200, 201]);
   });
 });
 
