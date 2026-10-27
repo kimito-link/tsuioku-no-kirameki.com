@@ -93,6 +93,7 @@ import {
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
+import { computeBacklogCatchUpBoost, mergeVoiceSpeedBoost } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
@@ -700,6 +701,17 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
   );
 }
 
+/**
+ * v0.1.1797: 混雑(キュー長)の上乗せに、順番待ちが伸びた分の上乗せを足す(会場の VoicePlayer と同じ)。
+ *   今までコメビュはキュー長しか見ず、1件ずつ少しだけ長い声が続くと遅れが際限なく積もった(PC 試験)。
+ * @param {number} congestionBoost
+ */
+function comeviewSpeedBoost(congestionBoost) {
+  const backlog = computeBacklogCatchUpBoost(_voiceDiag.queueWaitEmaMs);
+  _voiceDiag.lastBacklogBoost = backlog;
+  return mergeVoiceSpeedBoost(congestionBoost, backlog);
+}
+
 /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ)。 */
 function ensureVoicePrefetch(item, generation) {
   if (!item || generation !== _voiceGeneration) return null;
@@ -724,7 +736,7 @@ function ensureVoicePrefetch(item, generation) {
     text,
     {
       ...assigned,
-      speedOffset: assigned.speedOffset + congestion.speedBoost
+      speedOffset: assigned.speedOffset + comeviewSpeedBoost(congestion.speedBoost)
     },
     { stream }
   ).catch(() => null);
@@ -846,7 +858,7 @@ async function drainVoiceQueue() {
             buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
             {
               ...assigned,
-              speedOffset: assigned.speedOffset + congestion.speedBoost
+              speedOffset: assigned.speedOffset + comeviewSpeedBoost(congestion.speedBoost)
             }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);

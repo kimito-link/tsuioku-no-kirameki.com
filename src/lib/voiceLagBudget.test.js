@@ -434,3 +434,20 @@ describe('mergeVoiceSpeedBoost (v0.1.1222)', () => {
     expect(mergeVoiceSpeedBoost(undefined, 0.4)).toBeCloseTo(0.4, 5);
   });
 });
+
+describe('v0.1.1797 computeBacklogCatchUpBoost(順番待ちが伸びたら少し早口に)', async () => {
+  const { computeBacklogCatchUpBoost, VOICE_BACKLOG_BOOST_MAX, mergeVoiceSpeedBoost } = await import('./voiceLagBudget.js');
+  it('待ちが 1.5秒以下・未計測(-1)・壊れた値では上げない', () => {
+    for (const w of [-1, 0, 800, 1500, NaN, undefined, 'x']) expect(computeBacklogCatchUpBoost(w)).toBe(0);
+  });
+  it('待ちに比例して上がり、上限で止まる', () => {
+    expect(computeBacklogCatchUpBoost(2500)).toBeCloseTo(0.05);
+    expect(computeBacklogCatchUpBoost(4500)).toBeCloseTo(0.15);
+    expect(computeBacklogCatchUpBoost(7500)).toBeCloseTo(VOICE_BACKLOG_BOOST_MAX);
+    expect(computeBacklogCatchUpBoost(60000)).toBe(VOICE_BACKLOG_BOOST_MAX);
+  });
+  it('混雑の上乗せより小さければ、混雑の方を使う(下げない)', () => {
+    expect(mergeVoiceSpeedBoost(0.4, computeBacklogCatchUpBoost(4500))).toBe(0.4);
+    expect(mergeVoiceSpeedBoost(0, computeBacklogCatchUpBoost(4500))).toBeCloseTo(0.15);
+  });
+});

@@ -31,7 +31,7 @@ import {
 import {
   updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax,
   updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict,
-  computeSustainedPressureBoost, mergeVoiceSpeedBoost
+  computeSustainedPressureBoost, mergeVoiceSpeedBoost, computeBacklogCatchUpBoost
 } from './voiceLagBudget.js';
 import {
   createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage
@@ -179,7 +179,7 @@ export class VoicePlayer {
       // v0.1.1222計器: 持続過負荷ブースト(pressure由来)。lastSustainedBoost=直近の上乗せ値、
       //   sustainedBoostTotal=キュー長では出せない速度を実際に足した累計。
       //   ★「速くしたのに読める数が増えたか」を後から検算するための計器(効果の裏取り用)。
-      lastSustainedBoost: 0, sustainedBoostTotal: 0,
+      lastSustainedBoost: 0, sustainedBoostTotal: 0, lastBacklogBoost: 0,
       dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0,
       // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
       //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
@@ -591,7 +591,10 @@ export class VoicePlayer {
       serviceTimeEmaMs: this._serviceTimeEmaMs,
       sampleCount: this._spokenSampleCount
     });
-    const merged = mergeVoiceSpeedBoost(congestionBoost, sustained);
+    // v0.1.1797: 順番待ちが伸びていたら、それでも上げる(pressure が 1.2 未満の「少しだけ足りない」を拾う)。
+    const backlog = computeBacklogCatchUpBoost(this.diag?.queueWaitEmaMs);
+    this.diag.lastBacklogBoost = backlog;
+    const merged = mergeVoiceSpeedBoost(congestionBoost, Math.max(sustained, backlog));
     // 計器: 持続ブーストが実際に効いた累計(効果を後から検算できるようにする)。
     if (sustained > 0 && merged > congestionBoost) {
       this.diag.sustainedBoostTotal = (Number(this.diag.sustainedBoostTotal) || 0) + 1;
