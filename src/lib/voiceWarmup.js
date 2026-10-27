@@ -37,6 +37,17 @@ import { measureVoiceWavLevel } from './voiceVolume.js';
  */
 export const VOICE_IDLE_INIT_DELAY_MS = 1500;
 
+/**
+ * もう片方のページ(会場/コメビュ)が静かになってから、裏の読み込みを始めるまでの時間(ms・v0.1.1782)。
+ *   1.5秒だと、短いコメントが1.5秒おきに来る間の小さな切れ目で読み込みが始まった。グラボ無しでは
+ *   1つの読み込みにエンジンが数秒ふさがり、もう片方のページの次のコメントがその後ろで待つ
+ *   (PC 試験: 起動直後の会場の短文で audio_query 平均 1.1秒・声まで最長 6.5秒、温まった後は 0.1秒)。
+ */
+export const VOICE_REMOTE_QUIET_MS = 4000;
+
+/** 再生中・読む順番待ちの間、もう片方のページへ「使っている」と知らせる間隔(ms・v0.1.1782)。 */
+export const VOICE_BUSY_PING_INTERVAL_MS = 1000;
+
 /** 少しずつ受け取っている声を、次の合成が待つ上限(ms)。 */
 export const VOICE_STREAM_GATE_MAX_MS = 8000;
 
@@ -138,7 +149,7 @@ export function createVoiceWarmup(deps) {
       const ask = /** @type {() => Promise<number>} */ (hooks.engineQuietMs);
       void Promise.resolve().then(ask).then((q) => q, () => Infinity).then((q) => {
         remoteChecking = false;
-        if (!(Number(q) >= VOICE_IDLE_INIT_DELAY_MS)) {
+        if (!(Number(q) >= VOICE_REMOTE_QUIET_MS)) {
           try { if (typeof hooks.onRemoteBusy === 'function') hooks.onRemoteBusy(); } catch { /* 計器 */ }
           pump();
           return;
@@ -482,6 +493,17 @@ export function startVoiceWarmup(warmup, allStyleIds) {
  */
 export function wireVoiceWarmupHooks(warmup, isPlayerIdle, getDiag, engine) {
   if (!warmup) return;
+  // v0.1.1782: 合成の前後だけでなく、再生中・順番待ちの間も「使っている」と知らせる
+  //   (声を鳴らしている間や次のコメントを待つ短い間に、もう片方のページが読み込みを始めないように)。
+  const w = /** @type {any} */ (warmup);
+  if (w._busyPingTimer) { clearInterval(w._busyPingTimer); w._busyPingTimer = null; }
+  if (engine) {
+    w._busyPingTimer = setInterval(() => {
+      let idle = true;
+      try { idle = isPlayerIdle() !== false; } catch { idle = true; }
+      if (!idle) engine.ping();
+    }, VOICE_BUSY_PING_INTERVAL_MS);
+  }
   warmup.setHooks({
     isIdle: isPlayerIdle,
     onActivity: engine ? () => engine.ping() : undefined,
