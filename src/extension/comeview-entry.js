@@ -1090,6 +1090,7 @@ async function initializeVoiceReading() {
     getDiag: () => _voiceDiag,
     isIdle: () => !_voicePlaying && _voiceQueue.length === 0,
     prepare: () => { _voiceQueue = []; _voicePrefetches.clear(); }, // 開いた時のさかのぼり分を捨てる
+    isVoiceOn: () => _voiceReadingEnabled === true && !_voiceToggleBusy,
     ensureEnabled: async () => _voiceReadingEnabled
   });
 }

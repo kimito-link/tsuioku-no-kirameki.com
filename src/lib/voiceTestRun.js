@@ -6,6 +6,8 @@
 //   ★ストアに出す版では動かない(manifest に key がある開発版だけ=stage-submission.py が key を落とす)。
 //   ★ニコ生にコメントを送ることは無い(読み上げの列に入れるだけ)。
 
+import { voiceStyleLevelsSnapshot } from './voiceStream.js';
+
 /** 試験の結果を残す storage キー(直近 VOICE_TEST_REPORT_KEEP 件の配列)。 */
 export const VOICE_TEST_REPORT_KEY = 'nls_voice_test_report_v1';
 export const VOICE_TEST_REPORT_KEEP = 20;
@@ -151,6 +153,8 @@ export async function runVoiceTest(o) {
     e2eRunMaxMs: e2eN > 0 ? Number(delta.e2eMaxMs) || 0 : -1,
     // v0.1.1776: 試験の間に混ざった本物のコメントの件数(声の差・遅れの見え方に効く)。計器が無ければ -1。
     otherItems: Number.isFinite(Number(delta.voiceEnqueuedTotal)) ? Math.max(0, Number(delta.voiceEnqueuedTotal) - plan.length) : -1,
+    // v0.1.1783: 声ごとの素の最大振幅・RMS(このページで覚えている分)。声ごとの差の直し方を決める材料。
+    styleLevels: voiceStyleLevelsSnapshot(),
     delta
   };
   if (typeof o.write === 'function') {

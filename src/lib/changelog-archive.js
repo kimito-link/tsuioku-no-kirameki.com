@@ -24,6 +24,33 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1764',
+    date: '2026-10-25',
+    summary: 'アプリで応援ランキングを見られる',
+    items: Object.freeze([
+      'iPhone アプリ(とスマホ)で、PC が無くても「いま配信中の応援ランキング」を見られるようにしました。開始画面の 🏆 から開けます。中身はサイトの「追憶のきらめき ランキング」と同じです。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1763',
+    date: '2026-10-25',
+    summary: 'アプリは iPhone の声で読み上げ',
+    items: Object.freeze([
+      'iPhone アプリの中では、🗣 の読み上げを iPhone 本体の声にしました。画面を閉じても読み続け、PC の VOICEVOX が動いていなくても読めます。',
+      'Safari や PC のブラウザでは、今までどおり PC の VOICEVOX の声で読みます。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1762',
+    date: '2026-10-25',
+    summary: 'iPhone アプリの開始画面・デモ・通知',
+    items: Object.freeze([
+      'iPhone アプリ(追憶のきらめき ライブビュー)の準備を入れました。アプリが最初に開く開始画面(/phone)で、PC の拡張の「📱 スマホへ送信」のリンクを貼ると、次からは自動で開きます。',
+      'PC が無くても試せるデモ(/live-view?v=demo)を足しました。作り物の配信が端末の中だけで流れます(サーバーには取りに行きません)。',
+      'アプリの中だけで動く機能: ギフトが届いたら通知と振動(🔔)、画面を閉じても続く読み上げ、配信の共有(📤)、見たくない人を隠す・報告する(🚩)。Safari や PC のブラウザでは今までと同じです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1761',
     date: '2026-10-25',
     summary: '吹き出しが段の案内文に被るのを直す',
