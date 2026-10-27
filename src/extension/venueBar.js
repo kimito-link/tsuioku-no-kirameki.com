@@ -6744,18 +6744,14 @@ export function mountVenueBarButton(options = {}) {
       maybeThrowGiftFromSpeech(speech);
       // 2026-07-06: 来場システムメッセージならパチンコ入賞演出(保留玉が入る)として投げる。
       maybeThrowArrivalFromSpeech(speech);
-      if (voicePlayer.enabled && venueReaderLease && !venueReaderLease.mayRead(liveIdFromPathname())) {
-        // コメビュが同じ配信を読んでいる=ここでは鳴らさない。吹き出しは声なしの寿命へ。
-        if (bubble) markBubbleResolved(bubble);
-        voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1;
-      } else if (voicePlayer.enabled) {
+      if (voicePlayer.enabled) {
         // v0.1.771: 吹き出しを読み上げに連動。実際に鳴り始めたら speaking(消さない)、鳴り終えたら done。
         // v0.1.799「読み上げとコメントがずれる」根治: 床を鮮度ゲート(8秒)に合わせたので、鳴らずに
         //   捨てられた吹き出しが pending のまま8秒残らないよう、onDropped(再生では発火しない drop 専用
         //   シグナル)で resolved を通知し unvoiced(流速寿命)へ落とす。再生時は onAudioStart→speaking。
         //   onPlayStart(再生/破棄の両方で発火する曖昧信号)は配線しない(取りこぼし回避・従来どおり)。
         //   bubble が無い(空テキスト等で出なかった)場合は no-op で安全。
-        voicePlayer.enqueue([{
+        const voiceIt = () => voicePlayer.enqueue([{
           kind: 'comment',
           userId: speech.userId,
           nickname: speech.name,
@@ -6781,6 +6777,9 @@ export function mountVenueBarButton(options = {}) {
             charaLive.onCommentSpokenEnd();
           }
         }]);
+        // v0.1.1794: コメビュが同じ配信を読んでいれば鳴らさない(吹き出しは声なしの寿命へ)。届いた順に答える。
+        if (!venueReaderLease) voiceIt();
+        else venueReaderLease.whenMine(liveIdFromPathname(), voiceIt, () => { if (bubble) markBubbleResolved(bubble); voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1; });
       }
     }
   };
