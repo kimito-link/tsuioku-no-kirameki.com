@@ -17,6 +17,12 @@ describe('voiceTestRun', () => {
     const b = buildVoiceTestItems('burst', 10, 'r');
     expect(b.reduce((n, x) => n + x.gapMs, 0)).toBeLessThan(1000);
     expect(buildVoiceTestItems('weird', 999, 'r')).toHaveLength(30);
+    const m = buildVoiceTestItems('mixed', 99, 'r');
+    expect(m).toHaveLength(30);
+    expect(m[0].gapMs).toBe(0);
+    expect(m.some((x) => x.item.text.length >= 40)).toBe(true);
+    expect(m.some((x) => x.item.text.length < 10)).toBe(true);
+    expect(buildVoiceTestItems('mixed', 99, 'x').map((x) => x.gapMs)).toEqual(m.map((x) => x.gapMs)); // 毎回同じ並び
   });
   it('差分: 累計は引き算・それ以外は後の値', () => {
     expect(diffVoiceDiag({ spokenTotal: 3, e2eAvgMs: 500 }, { spokenTotal: 8, e2eAvgMs: 900, lastPlayIssue: 'cut' }))
