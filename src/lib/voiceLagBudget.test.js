@@ -527,3 +527,43 @@ describe('v0.1.1797 早口の床(追いついた後も釣り合う速さを保�
     expect(Math.max(...withFloor.slice(10))).toBeLessThan(Math.min(...without.slice(10))); // どこを取っても床ありの方が小さい
   });
 });
+
+describe('v0.1.1800 件数の上限を待ち件の文字数から見積もる', async () => {
+  const {
+    createVoicePaceState, noteVoicePacePlayed, resolveVoiceQueueMaxByChars,
+    VOICE_QUEUE_MAX_FLOOR, VOICE_QUEUE_MAX_CEIL, VOICE_CHAR_MS_DEFAULT
+  } = await import('./voiceLagBudget.js');
+
+  it('1文字あたりの長さを覚える(早口・再生速度は普通の速さに戻して数える)', () => {
+    const s = createVoicePaceState();
+    noteVoicePacePlayed(s, 1000, 1, 0, 10);
+    expect(s.charMsEma).toBeCloseTo(100);
+    const t = createVoicePaceState();
+    noteVoicePacePlayed(t, 1000, 1.2, 0.25, 10);
+    expect(t.charMsEma).toBeCloseTo(150);
+    const u = createVoicePaceState();
+    noteVoicePacePlayed(u, 1000); // 文字数不明なら覚えない
+    expect(u.charMsEma).toBe(-1);
+  });
+
+  it('PC 試験の再現: 長い声の直後でも、短いコメント10件はほぼ全部入る', () => {
+    const s = createVoicePaceState();
+    for (let i = 0; i < 5; i += 1) noteVoicePacePlayed(s, 7000, 1, 0, 50); // 長い声 140ms/字
+    const shorts = Array(10).fill(5); // 「こんばんは」級
+    expect(resolveVoiceQueueMaxByChars(shorts, s)).toBe(VOICE_QUEUE_MAX_CEIL);
+  });
+
+  it('長い件が待っていれば絞る(床まで)', () => {
+    const s = createVoicePaceState();
+    noteVoicePacePlayed(s, 7000, 1, 0, 50);
+    expect(resolveVoiceQueueMaxByChars(Array(8).fill(50), s)).toBe(VOICE_QUEUE_MAX_FLOOR);
+  });
+
+  it('まだ鳴らしていなければ見込み値で数える・配列でなければ null', () => {
+    const s = createVoicePaceState();
+    expect(VOICE_CHAR_MS_DEFAULT).toBeGreaterThan(0);
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(5), s)).toBe(VOICE_QUEUE_MAX_CEIL);
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(5), null)).toBe(VOICE_QUEUE_MAX_CEIL);
+    expect(resolveVoiceQueueMaxByChars(/** @type {any} */ (null), s)).toBeNull();
+  });
+});

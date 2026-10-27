@@ -498,22 +498,40 @@ describe('VoicePlayer', () => {
       if (resolveSynth) resolveSynth(null);
     });
 
-    it('_effectiveQueueMaxを縮めた状態でenqueueすると、実際にその件数で溢れがdropされる', async () => {
+    it('長いコメントが溜まると、文字数の見積もりで実際に溢れがdropされる(v0.1.1800)', async () => {
       let resolveSynth;
       player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
       await player.enable({ persist: false });
-      // 処理時間が伸びた状況を模して実効上限を3に縮める(voiceLagBudgetの計算結果を想定)。
-      player._effectiveQueueMax = 3;
+      player._paceState.charMsEma = 140; // 1文字0.14秒(PC 試験の長い声と同じくらい)
       const onDropped = vi.fn();
-      const items = Array.from({ length: 6 }, (_, i) => ({
-        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `msg${i}`, onDropped
+      const long = 'あ'.repeat(60);
+      const items = Array.from({ length: 10 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `${long}${i}`, onDropped
       }));
       player.enqueue(items);
       await new Promise((r) => setTimeout(r, 10));
-      // 先頭1件はdrainでshift済み・残りqueueは実効上限(3)でクランプされる(8固定なら5件残るはず)。
-      expect(player.queue.length).toBeLessThanOrEqual(3);
-      // 縮小で溢れた分は既存のdroppedループを通り、onDroppedが呼ばれている(地雷G-3: 通知漏れ防止)。
+      // 1件 7秒前後=予算6秒を超えるので床(5)まで絞られる。
+      expect(player.queue.length).toBeLessThanOrEqual(5);
+      expect(player.diag.queueMaxByChars).toBe(5);
+      // 溢れた分は既存のdroppedループを通り、onDroppedが呼ばれている(地雷G-3: 通知漏れ防止)。
       expect(onDropped).toHaveBeenCalled();
+      if (resolveSynth) resolveSynth(null);
+    });
+
+    it('長い声の直後(処理時間の平均が膨らんで上限5)でも、短いコメント10件は8件まで残る(v0.1.1800)', async () => {
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      player._effectiveQueueMax = 5; // 従来ならここで3件飛ばしていた
+      player._paceState.charMsEma = 140;
+      const onDropped = vi.fn();
+      const items = Array.from({ length: 10 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `草${i}`, onDropped
+      }));
+      player.enqueue(items);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(player.queue.length).toBeGreaterThanOrEqual(7);
+      expect(player.diag.queueMaxByChars).toBe(8);
       if (resolveSynth) resolveSynth(null);
     });
   });

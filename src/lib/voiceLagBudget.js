@@ -358,10 +358,10 @@ export const VOICE_PACE_FLOOR_MARGIN = 0.03;
  *   PC 試験: 待ちだけで早口を決めると、追いついた瞬間に 0 に戻り、また遅れて…を繰り返した
  *   (遅れ 0.6〜1秒 ↔ 4.5〜5.4秒)。声の長さが間隔をどれだけ上回るかを覚えておき、その分だけは
  *   追いついた後も早口のまま保つ(ちょうど釣り合う速さに落ち着く)。
- * @returns {{ lastArrivalAt: number, gapEmaMs: number, gapCount: number, naturalEmaMs: number, naturalCount: number }}
+ * @returns {{ lastArrivalAt: number, gapEmaMs: number, gapCount: number, naturalEmaMs: number, naturalCount: number, charMsEma: number }}
  */
 export function createVoicePaceState() {
-  return { lastArrivalAt: -1, gapEmaMs: -1, gapCount: 0, naturalEmaMs: -1, naturalCount: 0 };
+  return { lastArrivalAt: -1, gapEmaMs: -1, gapCount: 0, naturalEmaMs: -1, naturalCount: 0, charMsEma: -1 };
 }
 
 /** @param {number} prev @param {number} sample */
@@ -392,15 +392,50 @@ export function noteVoicePaceArrival(state, nowMs) {
  * @param {number} playedMs 再生開始〜終了の実時間
  * @param {number} [playbackRate] 再生速度(1 = そのまま)
  * @param {number} [boostAtSynth] 合成時に足した早口の量
+ * @param {number} [chars] 読んだ文字数(分かれば1文字あたりの長さも覚える・v0.1.1800)
  */
-export function noteVoicePacePlayed(state, playedMs, playbackRate = 1, boostAtSynth = 0) {
+export function noteVoicePacePlayed(state, playedMs, playbackRate = 1, boostAtSynth = 0, chars = 0) {
   if (!state) return;
   const ms = Number(playedMs);
   if (!Number.isFinite(ms) || ms <= 0) return;
   const rate = Number(playbackRate) > 0 ? Number(playbackRate) : 1;
   const boost = Number(boostAtSynth) > 0 ? Number(boostAtSynth) : 0;
-  state.naturalEmaMs = paceEma(state.naturalEmaMs, ms * rate * (1 + boost));
+  const natural = ms * rate * (1 + boost);
+  state.naturalEmaMs = paceEma(state.naturalEmaMs, natural);
   state.naturalCount += 1;
+  const n = Math.floor(Number(chars));
+  if (n > 0) state.charMsEma = paceEma(state.charMsEma, natural / n);
+}
+
+/** v0.1.1800: 1件の見込みの長さの下限(短い声にも合成・つなぎの時間がかかる)。 */
+export const VOICE_ITEM_MIN_MS = 600;
+/** v0.1.1800: まだ1件も鳴らしていない時の1文字あたりの見込み(普通の速さの VOICEVOX でおよそ)。 */
+export const VOICE_CHAR_MS_DEFAULT = 130;
+
+/**
+ * v0.1.1800: 待っている件それぞれの文字数から「新しい方から何件までなら遅れ予算(6秒)に収まるか」を数え、
+ *   件数の上限にする(床 VOICE_QUEUE_MAX_FLOOR・天井 VOICE_QUEUE_MAX_CEIL)。
+ *   PC 試験: 今までは直近の1件あたり処理時間の平均で上限を決めていたため、長いコメントを読んだ直後は
+ *   平均が4〜5秒に膨らみ上限が5件に縮んで、続けて来た短いコメント10件のうち3件を飛ばした(開いた直後なら1件)。
+ *   1文字あたりの長さをまだ覚えていなければ見込み値(VOICE_CHAR_MS_DEFAULT)で数える。
+ *   charCounts が配列でなければ null(呼び出し側が従来の上限を使う)。
+ * @param {number[]} charCounts 待っている件の文字数(古い順・新しく入れる件を含む)
+ * @param {ReturnType<typeof createVoicePaceState> | null | undefined} paceState
+ * @returns {number|null}
+ */
+export function resolveVoiceQueueMaxByChars(charCounts, paceState) {
+  if (!Array.isArray(charCounts)) return null;
+  const learned = Number(paceState?.charMsEma);
+  const perChar = learned > 0 ? learned : VOICE_CHAR_MS_DEFAULT;
+  let total = 0;
+  let fit = 0;
+  for (let i = charCounts.length - 1; i >= 0; i -= 1) {
+    const n = Math.max(0, Math.floor(Number(charCounts[i]) || 0));
+    total += Math.max(VOICE_ITEM_MIN_MS, n * perChar);
+    if (total > VOICE_LAG_BUDGET_MS) break;
+    fit += 1;
+  }
+  return Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, fit));
 }
 
 /**
