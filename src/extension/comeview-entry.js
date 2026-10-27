@@ -94,7 +94,7 @@ import {
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
-import { chromeVoiceReaderLeaseLink, VOICE_READER_LEASE_BEAT_MS } from '../lib/voiceReaderLease.js';
+import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
@@ -244,6 +244,9 @@ let _commentCount = 0;
 let _hoverBar = null;
 let _hoverRow = null;
 let _voiceReadingEnabled = false;
+// v0.1.1794: 同じ配信を会場でも読んでいる時は、先に読み始めた方だけが読む(声の二重・VOICEVOX の取り合いを防ぐ)。
+//   試験(voiceTestRun)は enqueueVoiceTimelineItems を直接呼ぶのでこの関門を通らない。
+const _voiceReaderLease = startVoiceReaderLease(() => _voiceReadingEnabled && !isObsMode() && !!_liveId, () => _liveId);
 let _voiceToggleBusy = false;
 /** v0.1.699: 名前読み(既定OFF=本文だけ)。 */
 let _voiceReadNameEnabled = false;
@@ -538,7 +541,6 @@ function updateVoiceLagNotice() {
 function disableVoiceReading({ persist = true } = {}) {
   _voiceReadingEnabled = false;
   _voiceToggleBusy = false;
-  _voiceReaderLease?.release();
   stopVoicePlayback();
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(false);
@@ -621,7 +623,7 @@ async function enableVoiceReading({ persist = true } = {}) {
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
   _voiceToggleBusy = false;
-  voiceReaderBeat();
+  if (_liveId) void _voiceReaderLease?.beat(_liveId);
   // ★v0.1.1333: 成功時は古い失敗理由を消し、次の状態速報で誤診させない。
   _voiceDiag.lastEnableFailReason = '';
   publishVoiceDiag();
@@ -986,14 +988,6 @@ async function drainVoiceQueue() {
   }
 }
 
-// v0.1.1794: 同じ配信を会場でも読んでいる時は、先に読み始めた方だけが読む(声の二重・VOICEVOX の取り合いを防ぐ)。
-//   試験(voiceTestRun)は enqueueVoiceTimelineItems を直接呼ぶのでこの関門を通らない。
-const _voiceReaderLease = chromeVoiceReaderLeaseLink();
-function voiceReaderBeat() {
-  if (_voiceReaderLease && _voiceReadingEnabled && !isObsMode() && _liveId) void _voiceReaderLease.beat(_liveId);
-}
-setInterval(voiceReaderBeat, VOICE_READER_LEASE_BEAT_MS);
-window.addEventListener('pagehide', () => { _voiceReaderLease?.release(); });
 
 /** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
 function enqueueLiveVoiceItems(items) {

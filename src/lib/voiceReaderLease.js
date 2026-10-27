@@ -126,3 +126,27 @@ export function chromeVoiceReaderLeaseLink() {
   if (!rt || typeof rt.sendMessage !== 'function') return null;
   return createVoiceReaderLeaseLink((msg) => rt.sendMessage(msg));
 }
+
+/**
+ * 合図を定期的に送り、読まなくなったら手放す(会場・コメビュの配線を1行にするため)。chrome が無ければ null。
+ * @param {() => boolean} isActive 読み上げ中か(会場なら「開いていて ON」)
+ * @param {() => unknown} liveId
+ * @param {{ link?: ReturnType<typeof createVoiceReaderLeaseLink> | null }} [opts]
+ * @returns {ReturnType<typeof createVoiceReaderLeaseLink> | null}
+ */
+export function startVoiceReaderLease(isActive, liveId, opts = {}) {
+  const link = opts.link !== undefined ? opts.link : chromeVoiceReaderLeaseLink();
+  if (!link) return null;
+  let beating = false;
+  setInterval(() => {
+    if (isActive()) {
+      void link.beat(liveId());
+      beating = true;
+    } else if (beating) {
+      link.release();
+      beating = false;
+    }
+  }, VOICE_READER_LEASE_BEAT_MS);
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', () => link.release());
+  return link;
+}

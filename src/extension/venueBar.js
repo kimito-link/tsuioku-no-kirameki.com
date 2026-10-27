@@ -370,7 +370,7 @@ import {
   probeVoicevoxStreaming
 } from '../lib/voicevoxClient.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
-import { chromeVoiceReaderLeaseLink, VOICE_READER_LEASE_BEAT_MS } from '../lib/voiceReaderLease.js';
+import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3400,21 +3400,8 @@ export function mountVenueBarButton(options = {}) {
   });
   wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
-  // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(src/lib/voiceReaderLease.js)。
-  //   会場を開いて読み上げが ON の間だけ名乗り、閉じる・OFF にしたら手放す。
-  const venueReaderLease = chromeVoiceReaderLeaseLink();
-  let venueReaderBeating = false;
-  setInterval(() => {
-    if (!venueReaderLease) return;
-    if (open && voicePlayer.enabled) {
-      void venueReaderLease.beat(liveIdFromPathname());
-      venueReaderBeating = true;
-    } else if (venueReaderBeating) {
-      venueReaderLease.release();
-      venueReaderBeating = false;
-    }
-  }, VOICE_READER_LEASE_BEAT_MS);
-  window.addEventListener('pagehide', () => { venueReaderLease?.release(); });
+  // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(開いて ON の間だけ名乗る・voiceReaderLease.js)。
+  const venueReaderLease = startVoiceReaderLease(() => open && voicePlayer.enabled, liveIdFromPathname);
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {
       voicePlayer.disable();
