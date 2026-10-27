@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1769',
+    date: '2026-10-26',
+    summary: '遅いPCの判定を文の長さで割って見る',
+    items: Object.freeze([
+      '長いコメントの多い配信で、グラフィックボードのある PC まで「遅い PC」と記録されることがあったのを直しました。声を作る時間を、できた声の長さで割って判定します。',
+      '誤って「遅い PC」と記録されていた場合は、速いと分かった時点で自動で消えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1768',
     date: '2026-10-26',
     summary: '遅いPCは声を6つに絞って先に準備',

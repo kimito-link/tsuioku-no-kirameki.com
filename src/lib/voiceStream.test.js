@@ -190,6 +190,18 @@ describe('createStreamGain', () => {
     loudStart.process(square(0.09));
     expect(loudStart.gain).toBeCloseTo(rmsTarget(loudStart) / 0.09, 2);
   });
+  it('v0.1.1789: 短い文は長文の表・覚えた値を使わず、出だしの大きさから決める', () => {
+    const g = createStreamGain(100, { knownRms: 0.05, tableRms: 0.05, tablePeak: 0.3, shortText: true });
+    g.process(Int16Array.from([14000, -14000]));
+    // 出だしの最大振幅 0.427×1.25 = 0.534 で見積もる(長文の RMS の狙いなら 0.0718/0.05 = 1.44倍だった)
+    expect(g.gain).toBeCloseTo(g.targetPeak / ((14000 / 32768) * 1.25), 3);
+    const quiet = createStreamGain(100, { shortText: true });
+    quiet.process(Int16Array.from([3000, -3000]));
+    expect(quiet.gain).toBeCloseTo(quiet.targetPeak / 0.4, 3);
+    const dense = createStreamGain(100, { shortText: true });
+    dense.process(square(0.09));
+    expect(dense.gain).toBeCloseTo(Math.min(dense.targetPeak / Math.max(0.09 * 1.25, 0.09 * 6.3), (dense.targetPeak * 0.25) / 0.09), 2);
+  });
   it('v0.1.1788: 見積もりは全127声の範囲に収める(外れ値で上げすぎ・下げすぎない)', () => {
     const low = createStreamGain(100, { knownRms: 0.02 });
     low.process(Int16Array.from([3000, -3000]));

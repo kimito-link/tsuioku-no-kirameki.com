@@ -23,7 +23,8 @@ import {
   normalizeVoiceVolumePercent,
   VOICE_MAX_BOOST,
   VOICE_PEAK_CEILING,
-  VOICE_TARGET_PEAK_AT_100
+  VOICE_TARGET_PEAK_AT_100,
+  VOICE_TARGET_RMS_RATIO
 } from './voiceVolume.js';
 import { voiceStyleTableLevel } from './voiceStyleLevelTable.js';
 
@@ -59,6 +60,12 @@ export const VOICE_STREAM_MEDIAN_RMS = 0.0708;
 /** RMS の見積もりの下限・上限(-26dB / -19dB)。1件だけの外れ値で倍率を振り回さない。 */
 export const VOICE_STREAM_MIN_EST_RMS = 0.05;
 export const VOICE_STREAM_MAX_EST_RMS = 0.112;
+/**
+ * 短い文の見積もり(v0.1.1789・v0.1.1786〜1787 と同じ値)。全127声の短文の最大振幅は中央値 0.43。
+ *   下限 0.4 なら上げすぎは 1.2倍まで。最大振幅÷RMS のふつうの値は小さめ(16dB)に置く=上げすぎない側。
+ */
+export const VOICE_STREAM_SHORT_MIN_EST_PEAK = 0.4;
+export const VOICE_STREAM_SHORT_CREST = 6.3;
 
 /** 声(styleId)ごとに、これまで鳴らした素の最大振幅(v0.1.1775)。少しずつ読む時の最初の倍率に使う。 */
 /** @type {Map<string, number>} */
@@ -274,6 +281,8 @@ export class StreamedVoice {
     this.styleId = -1;
     /** 人ごとの声の高さのずらし(分かれば・v0.1.1788)。 */
     this.pitchOffset = 0;
+    /** 読む文の長さ(分かれば・v0.1.1789)。-1 は不明(長文として扱う)。 */
+    this.textLength = -1;
     this.done = false;
     this.failed = false;
     /** @type {Set<() => void>} */
@@ -374,14 +383,15 @@ export function isStreamedVoice(x) {
 /**
  * 少しずつ流すときの音量。仮定の大きさで始め、天井を超えそうな分が届いたら倍率を下げる(上げない)。
  * @param {unknown} volumePercent
- * @param {{ knownPeak?: number, knownRms?: number, tableRms?: number, tablePeak?: number }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)と RMS(v0.1.1779)、
- *   全127声を測った表の長文の RMS・最大振幅(v0.1.1788)
+ * @param {{ knownPeak?: number, knownRms?: number, tableRms?: number, tablePeak?: number, shortText?: boolean }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)と RMS(v0.1.1779)、
+ *   全127声を測った表の長文の RMS・最大振幅(v0.1.1788)、短い文か(v0.1.1789)
  */
 export function createStreamGain(volumePercent, opts = {}) {
   const knownPeak = Number(opts?.knownPeak) > 0 ? Number(opts.knownPeak) : -1;
   const knownRms = Number(opts?.knownRms) > 0 ? Number(opts.knownRms) : -1;
   const tableRms = Number(opts?.tableRms) > 0 ? Number(opts.tableRms) : -1;
   const tablePeak = Number(opts?.tablePeak) > 0 ? Number(opts.tablePeak) : -1;
+  const shortText = opts?.shortText === true;
   const pct = normalizeVoiceVolumePercent(volumePercent);
   const target = Math.min(VOICE_PEAK_CEILING, (VOICE_TARGET_PEAK_AT_100 * pct) / 100);
   let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
@@ -418,7 +428,7 @@ export function createStreamGain(volumePercent, opts = {}) {
         const first = (peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM;
         // 最初に届いた分の RMS(有音が VOICE_STREAM_MIN_RMS_SAMPLES 以上ある時だけ・無ければ -1)。
         let firstRms = -1;
-        if (tableRms <= 0 && knownRms <= 0) {
+        if (shortText || (tableRms <= 0 && knownRms <= 0)) {
           let sq = 0;
           let n = 0;
           for (let i = 0; i < samples.length; i++) {
@@ -430,14 +440,24 @@ export function createStreamGain(volumePercent, opts = {}) {
         //   0.23〜0.64 と揺れ、それを覚えて倍率を決めると声が混ざった時に 7〜10dB ばらついた(PC 試験 v0.1.1787)。
         //   見積もりは 覚えた値((声, 高さのずらし)ごと・同じ声なら文による揺れは ±0.5dB) > 測った表(ずらし 0) > 出だし(全体より静かなので中央値より小さくはしない) の順。
         //   外れ値で上げすぎ・下げすぎないよう、全127声の範囲に収める。
-        let estRms = knownRms > 0 ? knownRms
-          : tableRms > 0 ? tableRms
-            : Math.max(firstRms, VOICE_STREAM_MEDIAN_RMS);
-        estRms = Math.min(VOICE_STREAM_MAX_EST_RMS, Math.max(VOICE_STREAM_MIN_EST_RMS, estRms));
-        gain = Math.min(VOICE_MAX_BOOST, (target / VOICE_STREAM_TYPICAL_LONG_CREST) / estRms);
-        // 天井の手前で止める(途中で倍率を下げ直す=音が段になるのを避ける)。
-        const peakEst = Math.max(first, tablePeak > 0 ? tablePeak : 0, knownPeak > 0 ? knownPeak : 0);
-        if (peakEst > 0) gain = Math.min(gain, (VOICE_PEAK_CEILING * 0.9) / peakEst);
+        if (shortText) {
+          // v0.1.1789: 短い文(遅い PC では短い文も少しずつ読む)は、長文の表・覚えた値を使わない。
+          //   短い文は無音の割合と最大振幅÷RMS(12〜13dB)が長文と違い、同じ声でも長文との差が -7〜+7dB ある
+          //   (全127声の実測)。長文の RMS の狙いを当てると短い文が 5.6〜7.1dB ばらついた(PC 試験 v0.1.1788)。
+          //   v0.1.1787 までと同じく、出だしの最大振幅・RMS×ふつうの比・下限 0.4 から最大振幅を見積もる。
+          const est = Math.max(first, firstRms > 0 ? Math.min(1, firstRms * VOICE_STREAM_SHORT_CREST) : 0, VOICE_STREAM_SHORT_MIN_EST_PEAK);
+          gain = Math.min(VOICE_MAX_BOOST, target / est);
+          if (firstRms > 0) gain = Math.min(gain, (target * VOICE_TARGET_RMS_RATIO) / firstRms);
+        } else {
+          let estRms = knownRms > 0 ? knownRms
+            : tableRms > 0 ? tableRms
+              : Math.max(firstRms, VOICE_STREAM_MEDIAN_RMS);
+          estRms = Math.min(VOICE_STREAM_MAX_EST_RMS, Math.max(VOICE_STREAM_MIN_EST_RMS, estRms));
+          gain = Math.min(VOICE_MAX_BOOST, (target / VOICE_STREAM_TYPICAL_LONG_CREST) / estRms);
+          // 天井の手前で止める(途中で倍率を下げ直す=音が段になるのを避ける)。
+          const peakEst = Math.max(first, tablePeak > 0 ? tablePeak : 0, knownPeak > 0 ? knownPeak : 0);
+          if (peakEst > 0) gain = Math.min(gain, (VOICE_PEAK_CEILING * 0.9) / peakEst);
+        }
       }
       if (peak > 0 && (peak / 32768) * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
       if (firstGain < 0) firstGain = gain;
@@ -488,7 +508,8 @@ export function createStreamedVoiceAudio(voice, deps) {
     knownPeak: knownVoiceStylePeak(voice.styleId, voice.pitchOffset),
     knownRms: knownVoiceStyleRms(voice.styleId, voice.pitchOffset),
     tableRms: tableLevel?.rms,
-    tablePeak: tableLevel?.peak
+    tablePeak: tableLevel?.peak,
+    shortText: voice.textLength >= 0 && voice.textLength < VOICE_STREAM_LONG_TEXT_CHARS
   });
   // 2026-10-26計器(voicePlaybackQuality.js): 次の分が間に合わず無音が挟まった回数と最長の無音。
   let underruns = 0;
