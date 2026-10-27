@@ -9,7 +9,7 @@
 //   - 小さすぎ: 鳴らした音の最大振幅が、音量設定の狙いより大きく下回った
 //   会場(VoicePlayer)とコメビュの両方が observeVoicePlayback を使う。
 
-import { VOICE_TARGET_RMS_RATIO } from './voiceVolume.js';
+import { voiceTargetRms } from './voiceVolume.js';
 import { updateVoiceServiceTimeEma } from './voiceLagBudget.js';
 
 /** 鳴った時間が声の長さのこれ未満なら「途切れ」。 */
@@ -83,8 +83,10 @@ export function recordVoicePlaybackQuality(diag, s) {
     if (peak >= VOICE_CLIP_LEVEL) { inc('clipItemTotal'); issues.push('clip'); }
     const target = Number(s.targetPeak);
     // v0.1.1779: 詰まった声は聞こえの大きさ(RMS)で下げるので最大振幅は狙いより低くなる。RMS が足りていれば小さすぎではない。
+    // v0.1.1792: 聞こえの大きさで揃えるようになったので、RMS の狙い(voiceTargetRms)の 6割以上なら足りている。
+    //   (以前の基準 狙いの最大振幅×0.25×0.6 は今の RMS の狙いとほぼ同じ値で、ちょうど狙いどおりの文も小さすぎ扱いになりえた)
     const rmsNow = Number(s.outRms);
-    const loudEnough = Number.isFinite(rmsNow) && rmsNow >= target * VOICE_TARGET_RMS_RATIO * VOICE_QUIET_RATIO;
+    const loudEnough = Number.isFinite(rmsNow) && rmsNow >= voiceTargetRms(target) * VOICE_QUIET_RATIO;
     if (Number.isFinite(target) && target > 0 && peak > 0 && peak < target * VOICE_QUIET_RATIO && !loudEnough) {
       inc('quietItemTotal');
       issues.push(`quiet${Math.round(peak * 100)}/${Math.round(target * 100)}%`);
