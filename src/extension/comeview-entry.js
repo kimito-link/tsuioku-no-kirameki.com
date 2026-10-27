@@ -93,7 +93,10 @@ import {
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
-import { computeBacklogCatchUpBoost, mergeVoiceSpeedBoost } from '../lib/voiceLagBudget.js';
+import {
+  computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
+} from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
@@ -263,7 +266,7 @@ let _voiceQueue = [];
  *   item オブジェクトをキーに in-flight WAV Promise を持つ Map にし、詰まり具合に応じて
  *   先頭から深さ分(最大3)を並行で先行合成する。再生は元々1本ずつ=不協和は起きない。
  *   同一 VOICEVOX サーバへの並行 audio_query/synthesis は可能。CPU 有界化のため上限3。
- * @type {Map<any, { generation: number, promise: Promise<ArrayBuffer|null> }>}
+ * @type {Map<any, { generation: number, promise: Promise<ArrayBuffer|null>, boostAtSynth?: number }>}
  */
 const _voicePrefetches = new Map();
 let _voicePlaying = false;
@@ -701,13 +704,19 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
   );
 }
 
+/** v0.1.1797: 届く間隔と声の長さ(追いついた後も保つ早口の床)。 */
+const _voicePaceState = createVoicePaceState();
+
 /**
  * v0.1.1797: 混雑(キュー長)の上乗せに、順番待ちが伸びた分の上乗せを足す(会場の VoicePlayer と同じ)。
  *   今までコメビュはキュー長しか見ず、1件ずつ少しだけ長い声が続くと遅れが際限なく積もった(PC 試験)。
  * @param {number} congestionBoost
  */
 function comeviewSpeedBoost(congestionBoost) {
-  const backlog = computeBacklogCatchUpBoost(_voiceDiag.queueWaitEmaMs);
+  // 追いついた後も、声の長さが間隔を上回る分(床)だけは早口を保つ(会場と同じ)。
+  const paceFloor = computeVoicePaceFloor(_voicePaceState);
+  const backlog = computeBacklogCatchUpBoost(_voiceDiag.queueWaitEmaMs, paceFloor);
+  _voiceDiag.lastPaceFloor = paceFloor;
   _voiceDiag.lastBacklogBoost = backlog;
   return mergeVoiceSpeedBoost(congestionBoost, backlog);
 }
@@ -732,15 +741,16 @@ function ensureVoicePrefetch(item, generation) {
     slowEngine: _voiceSlowEngine,
     textLength: text.length
   });
+  const boostAtSynth = comeviewSpeedBoost(congestion.speedBoost);
   const promise = synthesizeVoiceTracked(
     text,
     {
       ...assigned,
-      speedOffset: assigned.speedOffset + comeviewSpeedBoost(congestion.speedBoost)
+      speedOffset: assigned.speedOffset + boostAtSynth
     },
     { stream }
   ).catch(() => null);
-  _voicePrefetches.set(item, { generation, promise });
+  _voicePrefetches.set(item, { generation, promise, boostAtSynth });
   return promise;
 }
 
@@ -852,13 +862,14 @@ async function drainVoiceQueue() {
       _voicePrefetches.delete(item);
       const _synthStart = Date.now(); // v0.1.852 観測: 合成所要(先読み済なら待ち時間=ほぼ0)。
       markVoicePhase(prefetch ? 'await_prefetch' : 'await_synth'); // v0.1.895: 合成待ちで止まったか。
+      const boostAtSynth = prefetch ? (Number(prefetch.boostAtSynth) || 0) : comeviewSpeedBoost(congestion.speedBoost);
       const wav = prefetch
         ? await prefetch.promise
         : await synthesizeVoiceTracked(
             buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
             {
               ...assigned,
-              speedOffset: assigned.speedOffset + comeviewSpeedBoost(congestion.speedBoost)
+              speedOffset: assigned.speedOffset + boostAtSynth
             }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
@@ -902,6 +913,7 @@ async function drainVoiceQueue() {
           targetPeak: voiceTargetPeak(_voiceVolumePercent),
           onRecorded: () => publishVoiceDiag()
         });
+        let _playStartAt = -1;
         await new Promise((resolve) => {
           let settled = false;
           // v0.1.883: 再生完了の安全網(watchdog)。'ended'/'error' が一度も来ないケース
@@ -931,6 +943,8 @@ async function drainVoiceQueue() {
             if (objectUrl) URL.revokeObjectURL(objectUrl);
             objectUrl = '';
             _voiceStopCurrent = null;
+            // v0.1.1797: 鳴った長さを「早口なしの長さ」に戻して覚える(早口の床の材料)。
+            if (_playStartAt > 0) noteVoicePacePlayed(_voicePaceState, Date.now() - _playStartAt, 1, boostAtSynth);
             resolve();
           };
           const onMeta = () => {
@@ -951,6 +965,7 @@ async function drainVoiceQueue() {
           armWatchdog(VOICE_PLAYBACK_HARD_CAP_MS); // 先に固定上限で必ず張る(メタ未取得でも固着しない)。
           try {
             const playResult = audio.play();
+            _playStartAt = Date.now();
             // 2026-10-22計器(P1): 体感遅延(キュー投入→再生開始)。会場と同じ物差し(コメビュは未計測だった)。
             const _e2eMs = measureVoiceGapMs(item.enqueuedAt, Date.now());
             if (_e2eMs >= 0) {
@@ -1060,6 +1075,7 @@ function enqueueVoiceTimelineItems(items) {
       { max: 8 }
     );
     _voiceQueue = pushed.queue;
+    noteVoicePaceArrival(_voicePaceState, candidate.enqueuedAt);
     droppedCount += pushed.dropped.length;
   }
   if (droppedCount > 0) showVoiceSkipped(droppedCount);
