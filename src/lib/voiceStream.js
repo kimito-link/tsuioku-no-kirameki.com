@@ -57,8 +57,12 @@ export const VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
 export const VOICE_STREAM_TYPICAL_LONG_CREST = 6.68;
 /** 知らない声の RMS の見積もり(全127声の中央値 -23.0dB)。 */
 export const VOICE_STREAM_MEDIAN_RMS = 0.0708;
-/** RMS の見積もりの下限・上限(-26dB / -19dB)。1件だけの外れ値で倍率を振り回さない。 */
-export const VOICE_STREAM_MIN_EST_RMS = 0.05;
+/**
+ * RMS の見積もりの下限・上限(-28dB / -19dB)。1件だけの外れ値で倍率を振り回さない。
+ *   v0.1.1790: 下限 0.05 → 0.04。全127声の最小は 0.039(style 19)、声を低くずらした人(3@-6)は 0.043 で、
+ *   0.05 で止めると小さく鳴り「小さすぎ」が出た(PC 試験 v0.1.1789)。天井の手前で止める仕組みは別にある。
+ */
+export const VOICE_STREAM_MIN_EST_RMS = 0.04;
 export const VOICE_STREAM_MAX_EST_RMS = 0.112;
 /**
  * 短い文の見積もり(v0.1.1789・v0.1.1786〜1787 と同じ値)。全127声の短文の最大振幅は中央値 0.43。
