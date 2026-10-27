@@ -452,13 +452,16 @@ export function withVoiceWarmup(warmup, synth) {
     // v0.1.1775: 声ごとの素の大きさを覚える(次に少しずつ読む時の最初の倍率に使う)。
     try {
       const textLength = String(text ?? '').length;
+      const pitchOffset = /** @type {any} */ (voice)?.pitchOffset;
       if (isStreamedVoice(wav)) {
         wav.styleId = useStyle;
+        wav.pitchOffset = Number(pitchOffset) || 0;
+        wav.textLength = textLength;
         const sv = wav;
-        void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms, textLength); }, () => {});
+        void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms, textLength, pitchOffset); }, () => {});
       } else if (wav instanceof ArrayBuffer) {
         const level = measureVoiceWavLevel(wav);
-        if (level) rememberVoiceStylePeak(useStyle, level.peak, level.rms, textLength);
+        if (level) rememberVoiceStylePeak(useStyle, level.peak, level.rms, textLength, pitchOffset);
       }
     } catch { /* 計器・補助は本体を止めない */ }
     return wav;

@@ -8,7 +8,8 @@ import {
   normalizeVoiceVolumePercent,
   VOICE_PEAK_CEILING,
   VOICE_TARGET_PEAK_AT_100,
-  VOICE_TARGET_RMS_RATIO
+  voiceLevelGain,
+  voiceTargetRms
 } from './voiceVolume.js';
 
 /** 16bit PCM モノラルの WAV を作る。 */
@@ -49,16 +50,17 @@ describe('normalizeVoiceVolumePercent', () => {
 });
 
 describe('applyVoiceVolumeToWav', () => {
-  it('100%で長文(最大振幅48%)は今と同じ=元の buffer をそのまま返す', () => {
-    const wav = makeWav(speech(Math.round(FULL * VOICE_TARGET_PEAK_AT_100)));
+  it('v0.1.1792: 100%で聞こえの大きさ(RMS)が狙いと同じ文は、元の buffer をそのまま返す', () => {
+    const r = voiceTargetRms(VOICE_TARGET_PEAK_AT_100);
+    const wav = makeWav([0, ...Array.from({ length: 200 }, (_, i) => (i % 2 ? 1 : -1) * Math.round(FULL * r))]);
     expect(applyVoiceVolumeToWav(wav, 100)).toBe(wav);
   });
 
-  it('100%で短文(最大振幅19%)は長文と同じ大きさまで上がる', () => {
+  it('v0.1.1792: 小さい文は聞こえの大きさの狙いまで上がり、元は書き換えない', () => {
     const wav = makeWav(speech(Math.round(FULL * 0.19)));
     const out = applyVoiceVolumeToWav(wav, 100);
-    expect(peakOf(out) / FULL).toBeCloseTo(VOICE_TARGET_PEAK_AT_100, 2);
-    expect(peakOf(wav)).toBe(Math.round(FULL * 0.19)); // 元は書き換えない
+    expect(rmsOf(out)).toBeCloseTo(voiceTargetRms(VOICE_TARGET_PEAK_AT_100), 2);
+    expect(peakOf(wav)).toBe(Math.round(FULL * 0.19));
   });
 
   it('300%でも満振幅の98%を超えない(音割れしない)', () => {
@@ -67,25 +69,30 @@ describe('applyVoiceVolumeToWav', () => {
   });
 
   it('増幅は4倍まで(ほぼ無音の文の雑音を持ち上げない)', () => {
-    const wav = makeWav([0, 100, -50]);
-    expect(peakOf(applyVoiceVolumeToWav(wav, 300))).toBe(400);
+    const wav = makeWav([0, 1000, -500]);
+    expect(peakOf(applyVoiceVolumeToWav(wav, 300))).toBe(4000);
   });
 
   it('0%で無音、50%で半分', () => {
     const wav = makeWav(speech(Math.round(FULL * 0.48)));
+    const full = rmsOf(applyVoiceVolumeToWav(wav, 100));
     expect(peakOf(applyVoiceVolumeToWav(wav, 0))).toBe(0);
-    expect(peakOf(applyVoiceVolumeToWav(wav, 50)) / FULL).toBeCloseTo(0.24, 2);
+    expect(rmsOf(applyVoiceVolumeToWav(wav, 50)) / full).toBeCloseTo(0.5, 2);
   });
 
-  it('詰まった声(最大振幅に比べて RMS が大きい)は聞こえの大きさの狙いまで下げ、声ごとの差を縮める', () => {
-    const dense = makeWav([0, ...Array.from({ length: 60 }, (_, i) => (i % 2 ? 1 : -1) * Math.round(FULL * 0.3))]);
+  it('v0.1.1792: 最大振幅÷RMS が違う声・文でも、聞こえの大きさがそろう', () => {
+    // 詰まった声(最大振幅÷RMS = 1)と話し声らしい形(約 4.8)。最大振幅で揃えると差は 13.6dB あった。
+    const dense = makeWav([0, ...Array.from({ length: 60 }, (_, i) => (i % 2 ? 1 : -1) * Math.round(FULL * 0.05))]);
     const sparse = makeWav(speech(Math.round(FULL * 0.3)));
-    const target = VOICE_TARGET_PEAK_AT_100 * VOICE_TARGET_RMS_RATIO;
     const denseOut = rmsOf(applyVoiceVolumeToWav(dense, 100));
     const sparseOut = rmsOf(applyVoiceVolumeToWav(sparse, 100));
-    expect(denseOut).toBeCloseTo(target, 2);
-    // 最大振幅だけで揃えると差は 20log10(6)=15.6dB。RMS の天井で 15.6 → 4dB 未満に縮む。
-    expect(Math.abs(20 * Math.log10(denseOut / sparseOut))).toBeLessThan(4);
+    expect(Math.abs(20 * Math.log10(denseOut / sparseOut))).toBeLessThan(0.5);
+  });
+
+  it('v0.1.1792: 最大振幅が大きい声は、天井の手前(9割)で止める', () => {
+    expect(voiceLevelGain(0.9, 0.03, VOICE_TARGET_PEAK_AT_100)).toBeCloseTo((VOICE_PEAK_CEILING * 0.9) / 0.9, 6);
+    // RMS が分からなければ今までどおり最大振幅で揃える
+    expect(voiceLevelGain(0.24, 0, VOICE_TARGET_PEAK_AT_100)).toBeCloseTo(2, 6);
   });
 
   it('16bit PCM の WAV でなければ触らない(外部の形が変わっても壊れない)', () => {
