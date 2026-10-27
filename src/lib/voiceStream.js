@@ -24,7 +24,7 @@ import {
   VOICE_MAX_BOOST,
   VOICE_PEAK_CEILING,
   VOICE_TARGET_PEAK_AT_100,
-  VOICE_TARGET_RMS_RATIO
+  VOICE_TYPICAL_CREST
 } from './voiceVolume.js';
 import { voiceStyleTableLevel } from './voiceStyleLevelTable.js';
 
@@ -51,10 +51,8 @@ export const VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
 
 /**
  * v0.1.1788: 少しずつ読む長文は聞こえの大きさ(有音の RMS)で揃える。全127声の長文(PC 実測)の
- *   有音 RMS は中央値 -23.0dB・p10 -24.9・p90 -21.2。最大振幅÷RMS の中ほど 16.5dB で割った値を狙いにする
- *   (=丸ごと読む長文を最大振幅で揃えた時と平均で同じ大きさ)。
+ *   有音 RMS は中央値 -23.0dB・p10 -24.9・p90 -21.2。狙いは voiceVolume.js の voiceTargetRms と同じ。
  */
-export const VOICE_STREAM_TYPICAL_LONG_CREST = 6.68;
 /** 知らない声の RMS の見積もり(全127声の中央値 -23.0dB)。 */
 export const VOICE_STREAM_MEDIAN_RMS = 0.0708;
 /**
@@ -66,10 +64,9 @@ export const VOICE_STREAM_MIN_EST_RMS = 0.04;
 export const VOICE_STREAM_MAX_EST_RMS = 0.112;
 /**
  * 短い文の見積もり(v0.1.1789・v0.1.1786〜1787 と同じ値)。全127声の短文の最大振幅は中央値 0.43。
- *   下限 0.4 なら上げすぎは 1.2倍まで。最大振幅÷RMS のふつうの値は小さめ(16dB)に置く=上げすぎない側。
+ *   下限 0.4 なら上げすぎは 1.2倍まで。出だしの RMS が測れない時だけ使う。
  */
 export const VOICE_STREAM_SHORT_MIN_EST_PEAK = 0.4;
-export const VOICE_STREAM_SHORT_CREST = 6.3;
 
 /** 声(styleId)ごとに、これまで鳴らした素の最大振幅(v0.1.1775)。少しずつ読む時の最初の倍率に使う。 */
 /** @type {Map<string, number>} */
@@ -450,9 +447,14 @@ export function createStreamGain(volumePercent, opts = {}) {
           //   短い文は無音の割合と最大振幅÷RMS(12〜13dB)が長文と違い、同じ声でも長文との差が -7〜+7dB ある
           //   (全127声の実測)。長文の RMS の狙いを当てると短い文が 5.6〜7.1dB ばらついた(PC 試験 v0.1.1788)。
           //   v0.1.1787 までと同じく、出だしの最大振幅・RMS×ふつうの比・下限 0.4 から最大振幅を見積もる。
-          const est = Math.max(first, firstRms > 0 ? Math.min(1, firstRms * VOICE_STREAM_SHORT_CREST) : 0, VOICE_STREAM_SHORT_MIN_EST_PEAK);
-          gain = Math.min(VOICE_MAX_BOOST, target / est);
-          if (firstRms > 0) gain = Math.min(gain, (target * VOICE_TARGET_RMS_RATIO) / firstRms);
+          //   v0.1.1792: 出だし(短い文ならほぼ全体)の RMS が測れれば、丸ごと読む時と同じく聞こえの大きさで揃える。
+          if (firstRms > 0) {
+            gain = Math.min(VOICE_MAX_BOOST, (target / VOICE_TYPICAL_CREST) / Math.max(firstRms, VOICE_STREAM_MIN_EST_RMS),
+              (VOICE_PEAK_CEILING * 0.9) / Math.max(first, 1e-6));
+          } else {
+            const est = Math.max(first, VOICE_STREAM_SHORT_MIN_EST_PEAK);
+            gain = Math.min(VOICE_MAX_BOOST, target / est);
+          }
         } else {
           // v0.1.1791: 声の高さをずらした人の1件目は、表(ずらし 0 の値)と出だしの RMS の間(相乗平均)で見積もる。
           //   ずらしで RMS が最大 ±4dB 動くため、表だけだと低くずらした人の1件目が 3dB 小さく鳴り
@@ -461,7 +463,7 @@ export function createStreamGain(volumePercent, opts = {}) {
             : tableRms > 0 ? (pitchShifted && firstRms > 0 ? Math.sqrt(tableRms * firstRms) : tableRms)
               : Math.max(firstRms, VOICE_STREAM_MEDIAN_RMS);
           estRms = Math.min(VOICE_STREAM_MAX_EST_RMS, Math.max(VOICE_STREAM_MIN_EST_RMS, estRms));
-          gain = Math.min(VOICE_MAX_BOOST, (target / VOICE_STREAM_TYPICAL_LONG_CREST) / estRms);
+          gain = Math.min(VOICE_MAX_BOOST, (target / VOICE_TYPICAL_CREST) / estRms);
           // 天井の手前で止める(途中で倍率を下げ直す=音が段になるのを避ける)。
           const peakEst = Math.max(first, tablePeak > 0 ? tablePeak : 0, knownPeak > 0 ? knownPeak : 0);
           if (peakEst > 0) gain = Math.min(gain, (VOICE_PEAK_CEILING * 0.9) / peakEst);

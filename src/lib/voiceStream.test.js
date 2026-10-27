@@ -16,10 +16,9 @@ import {
   VOICE_STREAM_MAX_EST_RMS,
   VOICE_STREAM_MEDIAN_RMS,
   VOICE_STREAM_MIN_EST_RMS,
-  VOICE_STREAM_TYPICAL_LONG_CREST,
   voiceStyleLevelsSnapshot
 } from './voiceStream.js';
-import { VOICE_PEAK_CEILING } from './voiceVolume.js';
+import { VOICE_PEAK_CEILING, VOICE_TYPICAL_CREST } from './voiceVolume.js';
 import { voiceStyleTableLevel } from './voiceStyleLevelTable.js';
 import {
   probeVoicevoxStreaming,
@@ -137,7 +136,7 @@ describe('createStreamGain', () => {
   /** 有音の RMS が rms(0〜1)の、長さ n の矩形波。 */
   const square = (/** @type {number} */ rms, n = VOICE_STREAM_MIN_RMS_SAMPLES + 400) =>
     Int16Array.from({ length: n }, (_, i) => (i % 2 ? 1 : -1) * Math.round(rms * 32768));
-  const rmsTarget = (/** @type {any} */ g) => g.targetPeak / VOICE_STREAM_TYPICAL_LONG_CREST;
+  const rmsTarget = (/** @type {any} */ g) => g.targetPeak / VOICE_TYPICAL_CREST;
   it('v0.1.1788: 測った表の RMS があれば、その声を聞こえの大きさの狙いに合わせる', () => {
     const quiet = createStreamGain(100, { tableRms: 0.056, tablePeak: 0.3 });
     quiet.process(Int16Array.from([3000, -3000]));
@@ -174,7 +173,7 @@ describe('createStreamGain', () => {
     v.append(Int16Array.from({ length: 400 }, () => 3000));
     return audio.play().then(() => {
       const target = Math.min(VOICE_PEAK_CEILING, 0.48);
-      const want = Math.min((target / VOICE_STREAM_TYPICAL_LONG_CREST) / Math.max(VOICE_STREAM_MIN_EST_RMS, /** @type {any} */ (lv).rms),
+      const want = Math.min((target / VOICE_TYPICAL_CREST) / Math.max(VOICE_STREAM_MIN_EST_RMS, /** @type {any} */ (lv).rms),
         (VOICE_PEAK_CEILING * 0.9) / /** @type {any} */ (lv).peak);
       expect(audio.quality.outPeak).toBeCloseTo((3000 / 32768) * want, 3);
     });
@@ -190,7 +189,7 @@ describe('createStreamGain', () => {
     loudStart.process(square(0.09));
     expect(loudStart.gain).toBeCloseTo(rmsTarget(loudStart) / 0.09, 2);
   });
-  it('v0.1.1789: 短い文は長文の表・覚えた値を使わず、出だしの大きさから決める', () => {
+  it('v0.1.1789/1792: 短い文は長文の表・覚えた値を使わず、出だし(短い文ならほぼ全体)の大きさから決める', () => {
     const g = createStreamGain(100, { knownRms: 0.05, tableRms: 0.05, tablePeak: 0.3, shortText: true });
     g.process(Int16Array.from([14000, -14000]));
     // 出だしの最大振幅 0.427×1.25 = 0.534 で見積もる(長文の RMS の狙いなら 0.0718/0.05 = 1.44倍だった)
@@ -200,7 +199,8 @@ describe('createStreamGain', () => {
     expect(quiet.gain).toBeCloseTo(quiet.targetPeak / 0.4, 3);
     const dense = createStreamGain(100, { shortText: true });
     dense.process(square(0.09));
-    expect(dense.gain).toBeCloseTo(Math.min(dense.targetPeak / Math.max(0.09 * 1.25, 0.09 * 6.3), (dense.targetPeak * 0.25) / 0.09), 2);
+    // v0.1.1792: 出だしの RMS が測れれば、丸ごと読む時と同じく聞こえの大きさで揃える
+    expect(dense.gain).toBeCloseTo(rmsTarget(dense) / 0.09, 2);
   });
   it('v0.1.1791: 声の高さをずらした人の1件目は、表と出だしの RMS の間で見積もる(ずらし 0 は表のまま)', () => {
     const shifted = createStreamGain(100, { tableRms: 0.063, tablePeak: 0.53, pitchShifted: true });
