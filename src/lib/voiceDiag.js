@@ -49,6 +49,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   voicedRecentRatio: number,   // 2026-07-28計器: 直近voiced率EMA(累計voicedRatioの世代錯誤を補う)
  *   lastSustainedBoost: number,  // v0.1.1222計器: 持続過負荷(pressure由来)で上乗せした速度(0=未適用)
  *   lastBacklogBoost: number,    // v0.1.1797計器: 順番待ちが伸びて上乗せした速度(0=未適用)
+ *   lastPaceFloor: number,       // v0.1.1797計器: 追いついた後も保つ早口の床(声の長さ÷届く間隔−1)
  *   sustainedBoostTotal: number, // v0.1.1222計器: キュー長では出せない速度を実際に足した累計件数
  *   synthFailReasons: Record<string, number>, // v0.1.1224計器: 合成失敗の理由別内訳(原因を名指しする)
  *   dropCountGateTotal: number,  // 2026-07-28計器: 件数ゲート最古dropの累計(3分別のうちの1つ)
@@ -144,6 +145,7 @@ export function makeInitialVoiceDiag() {
     voicedRecentRatio: -1,
     lastSustainedBoost: 0,
     lastBacklogBoost: 0,
+    lastPaceFloor: 0,
     sustainedBoostTotal: 0,
     synthFailReasons: {},
     dropCountGateTotal: 0,
@@ -253,6 +255,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
         : base.synthFailReasons,
     lastSustainedBoost: num(d.lastSustainedBoost, base.lastSustainedBoost),
     lastBacklogBoost: num(d.lastBacklogBoost, base.lastBacklogBoost),
+    lastPaceFloor: num(d.lastPaceFloor, base.lastPaceFloor),
     sustainedBoostTotal: num(d.sustainedBoostTotal, base.sustainedBoostTotal),
     arrivalPerMin: num(d.arrivalPerMin, base.arrivalPerMin),
     voicedRecentRatio: num(d.voicedRecentRatio, base.voicedRecentRatio),
