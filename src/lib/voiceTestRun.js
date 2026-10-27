@@ -43,6 +43,7 @@ const LONG_TEXTS = Object.freeze([
  * v0.1.1799: 'mixed' = 本番の流れに近い、決まった並び(毎回同じ=前後の版を比べられる)。
  *   [前からの間隔ms, 長文か]。短文が続く所・長文が続く所・3件いっぺん・しばらく静か、を混ぜた約2分。
  */
+/** @type {ReadonlyArray<readonly [number, boolean]>} */
 const MIXED_PLAN = Object.freeze([
   [0, false], [1200, false], [2500, true], [800, false], [300, false],
   [300, false], [4000, true], [3000, true], [1500, false], [6000, false],
