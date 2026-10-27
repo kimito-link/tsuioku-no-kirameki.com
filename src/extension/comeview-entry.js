@@ -95,8 +95,7 @@ import {
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import {
   computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
-  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor,
-  predictVoiceQueueWaitMs, capVoiceMaxCharsByWait
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
@@ -746,13 +745,8 @@ function ensureVoicePrefetch(item, generation) {
     _voiceStyleIds
   );
   const boostAtSynth = comeviewSpeedBoost(congestion.speedBoost);
-  // v0.1.1799: この件が鳴るまでの見込み待ちが長ければ本文を短くする(会場と同じ)。
-  //   コメビュは速さに合わせた本文の上限(capVoiceMaxCharsByBoost)も無かったのでそろえる。
-  const ahead = Math.max(0, _voiceQueue.indexOf(item)) + (_voiceStopCurrent ? 1 : 0);
-  const boostChars = capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars);
-  const maxChars = capVoiceMaxCharsByWait(predictVoiceQueueWaitMs(ahead, _voicePaceState, boostAtSynth), boostChars);
-  if (maxChars < boostChars) _voiceDiag.trimByWaitTotal = (Number(_voiceDiag.trimByWaitTotal) || 0) + 1;
-  const text = buildMergedVoiceText(item, { maxChars });
+  // v0.1.1799: コメビュには速さに合わせた本文の上限(会場の capVoiceMaxCharsByBoost)が無かったのでそろえる。
+  const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars) });
   // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(会場の VoicePlayer と同じ判定)。
   if (!_voiceSlowEngine && isWeakVoicePc(_voiceDiag)) _voiceSlowEngine = true;
   const stream = shouldStreamVoice({

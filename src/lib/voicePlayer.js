@@ -32,8 +32,7 @@ import {
   updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax,
   updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict,
   computeSustainedPressureBoost, mergeVoiceSpeedBoost, computeBacklogCatchUpBoost,
-  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor,
-  predictVoiceQueueWaitMs, capVoiceMaxCharsByWait
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
 } from './voiceLagBudget.js';
 import {
   createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage
@@ -183,7 +182,7 @@ export class VoicePlayer {
       // v0.1.1222計器: 持続過負荷ブースト(pressure由来)。lastSustainedBoost=直近の上乗せ値、
       //   sustainedBoostTotal=キュー長では出せない速度を実際に足した累計。
       //   ★「速くしたのに読める数が増えたか」を後から検算するための計器(効果の裏取り用)。
-      lastSustainedBoost: 0, sustainedBoostTotal: 0, lastBacklogBoost: 0, lastPaceFloor: 0, trimByWaitTotal: 0,
+      lastSustainedBoost: 0, sustainedBoostTotal: 0, lastBacklogBoost: 0, lastPaceFloor: 0,
       dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0,
       // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
       //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
@@ -488,13 +487,7 @@ export class VoicePlayer {
     //   pressure(需要/供給比)由来のブーストで埋める。上げるだけ・落ち着いていれば0。
     const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
     const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
-    // v0.1.1799: この件が鳴るまでの見込み待ちが長ければ本文を短くする(長文1件が後ろを6〜8秒待たせていた)。
-    const ahead = Math.max(0, this.queue.indexOf(item)) + (this.stopCurrent ? 1 : 0);
-    const waitMs = predictVoiceQueueWaitMs(ahead, this._paceState, effBoost);
-    const boostChars = capVoiceMaxCharsByBoost(effBoost, congestion.maxChars);
-    const maxChars = capVoiceMaxCharsByWait(waitMs, boostChars);
-    if (maxChars < boostChars) this.diag.trimByWaitTotal = (Number(this.diag.trimByWaitTotal) || 0) + 1;
-    const text = buildMergedVoiceText(item, { maxChars });
+    const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) });
     // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(合成の待ちがそのまま声の遅れになる時)。
     if (!this._slowEngine && isWeakVoicePc(this.diag)) this._slowEngine = true;
     const stream = shouldStreamVoice({

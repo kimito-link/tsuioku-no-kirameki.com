@@ -527,24 +527,3 @@ describe('v0.1.1797 早口の床(追いついた後も釣り合う速さを保�
     expect(Math.max(...withFloor.slice(10))).toBeLessThan(Math.min(...without.slice(10))); // どこを取っても床ありの方が小さい
   });
 });
-
-describe('v0.1.1799 待ちが伸びている時だけ長文を短く読む', async () => {
-  const { predictVoiceQueueWaitMs, capVoiceMaxCharsByWait, createVoicePaceState, noteVoicePacePlayed } = await import('./voiceLagBudget.js');
-  it('前に並んだ件数×声の長さ(早口ぶん縮める)・覚えていなければ 0', () => {
-    const s = createVoicePaceState();
-    expect(predictVoiceQueueWaitMs(3, s, 0)).toBe(0);
-    noteVoicePacePlayed(s, 2000);
-    expect(predictVoiceQueueWaitMs(0, s, 0)).toBe(0);
-    expect(predictVoiceQueueWaitMs(3, s, 0)).toBe(6000);
-    expect(predictVoiceQueueWaitMs(3, s, 0.2)).toBeCloseTo(5000);
-    expect(predictVoiceQueueWaitMs('x', s, 0)).toBe(0);
-  });
-  it('3秒で40字・5秒で30字・下げるだけ', () => {
-    expect(capVoiceMaxCharsByWait(0, 60)).toBe(60);
-    expect(capVoiceMaxCharsByWait(2999, 60)).toBe(60);
-    expect(capVoiceMaxCharsByWait(3000, 60)).toBe(40);
-    expect(capVoiceMaxCharsByWait(5000, 60)).toBe(30);
-    expect(capVoiceMaxCharsByWait(5000, 20)).toBe(20);
-    expect(capVoiceMaxCharsByWait(NaN, 50)).toBe(50);
-  });
-});
