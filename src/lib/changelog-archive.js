@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1778',
+    date: '2026-10-26',
+    summary: '会場の声の裏読み込みが15秒止まるのを直す',
+    items: Object.freeze([
+      '会場(視聴ページ)で声を裏で読み込む時、VOICEVOX の「中身なし」の返事を受け取れず15秒の打ち切りまで止まっていたのを直しました。その間ほかの声の準備も待たされていました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1777',
     date: '2026-10-26',
     summary: '裏の声の準備で次のコメントを待たせない',
