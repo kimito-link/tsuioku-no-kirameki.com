@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1776',
+    date: '2026-10-26',
+    summary: '読み上げの列に来た件数を数える',
+    items: Object.freeze([
+      '読み上げの列に来たコメントの件数を数えるようにしました(開発版の試験で、本物のコメントがどれだけ混ざったかを分けて見るため)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1775',
     date: '2026-10-26',
     summary: '読み上げの途中で急に小さくならないように',

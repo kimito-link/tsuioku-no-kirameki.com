@@ -4,8 +4,9 @@
  */
 import { createPhoneVoiceSender } from '../lib/phoneVoiceSender.js';
 import { encodeWavToOggOpus } from '../lib/phoneVoiceEncode.js';
-import { listVoicevoxStyleIds, synthesizeVoice } from '../lib/voicevoxClient.js';
-import { KEY_VOICE_ASSIGNMENTS, KEY_VOICE_READ_NAME_ENABLED } from '../lib/voiceKeys.js';
+import { listVoicevoxStyleIds, probeVoicevoxStreaming, synthesizeVoice } from '../lib/voicevoxClient.js';
+import { KEY_VOICE_ASSIGNMENTS, KEY_VOICE_NARROW_MODE, KEY_VOICE_READ_NAME_ENABLED, KEY_VOICE_WEAK_PC } from '../lib/voiceKeys.js';
+import { prepareVoiceStyleIds } from '../lib/voiceNarrowing.js';
 
 /**
  * @param {() => { creds: { mode: string, viewToken: string, headers: Record<string, string> }, ingestUrl: string }|null} getTarget
@@ -13,7 +14,19 @@ import { KEY_VOICE_ASSIGNMENTS, KEY_VOICE_READ_NAME_ENABLED } from '../lib/voice
  */
 export function createPcPhoneVoice(getTarget) {
   return createPhoneVoiceSender({
-    listStyleIds: () => listVoicevoxStyleIds(),
+    // v0.1.1796: 会場・コメビュと同じ声の組から選ぶ(全部の声を使うと VOICEVOX のメモリが最大14GB に膨らみ、
+    //   スマホとPCで同じ人の声も変わっていた)。少しずつ受け取りに対応していればそれで受け取る(メモリ半分)。
+    listStyleIds: async () => {
+      const all = await listVoicevoxStyleIds();
+      if (!all.length) return all;
+      await probeVoicevoxStreaming().catch(() => false);
+      return (await prepareVoiceStyleIds(all, {
+        readSettings: async () => {
+          const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
+          return { mode: b?.[KEY_VOICE_NARROW_MODE], weak: b?.[KEY_VOICE_WEAK_PC] };
+        }
+      })).styleIds;
+    },
     loadSettings: async () => {
       const bag = await chrome.storage.local.get([KEY_VOICE_ASSIGNMENTS, KEY_VOICE_READ_NAME_ENABLED]);
       return { assignments: bag?.[KEY_VOICE_ASSIGNMENTS], readName: bag?.[KEY_VOICE_READ_NAME_ENABLED] === true };
