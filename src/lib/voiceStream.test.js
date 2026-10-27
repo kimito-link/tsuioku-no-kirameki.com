@@ -206,6 +206,16 @@ describe('createStreamGain', () => {
     rememberVoiceStylePeak('x', 0.3);
     expect(knownVoiceStylePeak(8)).toBeCloseTo(0.3);
   });
+  it('v0.1.1787: 短い文の大きさは覚えない(次の長い文を大きくしすぎない)', () => {
+    resetVoiceStylePeaksForTest();
+    rememberVoiceStylePeak(3, 0.48, 0.08, 40);
+    rememberVoiceStylePeak(3, 0.2, 0.05, 8);
+    rememberVoiceStylePeak(3, 0.2, 0.05, 29);
+    expect(knownVoiceStylePeak(3)).toBeCloseTo(0.48);
+    expect(knownVoiceStyleRms(3)).toBeCloseTo(0.08);
+    rememberVoiceStylePeak(3, 0.4, 0.08, 30);
+    expect(knownVoiceStylePeak(3)).toBeCloseTo(0.44);
+  });
   it('v0.1.1774: 普段の大きさの声は、最初の分から決めても狙いの近く', () => {
     const g = createStreamGain(100);
     const out = g.process(Int16Array.from([12000, -12000]));
