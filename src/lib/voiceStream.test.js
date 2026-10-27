@@ -202,6 +202,17 @@ describe('createStreamGain', () => {
     dense.process(square(0.09));
     expect(dense.gain).toBeCloseTo(Math.min(dense.targetPeak / Math.max(0.09 * 1.25, 0.09 * 6.3), (dense.targetPeak * 0.25) / 0.09), 2);
   });
+  it('v0.1.1791: 声の高さをずらした人の1件目は、表と出だしの RMS の間で見積もる(ずらし 0 は表のまま)', () => {
+    const shifted = createStreamGain(100, { tableRms: 0.063, tablePeak: 0.53, pitchShifted: true });
+    shifted.process(square(0.043));
+    expect(shifted.gain).toBeCloseTo(rmsTarget(shifted) / Math.sqrt(0.063 * 0.043), 3);
+    const plain = createStreamGain(100, { tableRms: 0.063, tablePeak: 0.53 });
+    plain.process(square(0.043));
+    expect(plain.gain).toBeCloseTo(rmsTarget(plain) / 0.063, 3);
+    const learned = createStreamGain(100, { knownRms: 0.043, tableRms: 0.063, pitchShifted: true });
+    learned.process(square(0.08));
+    expect(learned.gain).toBeCloseTo(rmsTarget(learned) / 0.043, 3);
+  });
   it('v0.1.1788: 見積もりは全127声の範囲に収める(外れ値で上げすぎ・下げすぎない)', () => {
     const low = createStreamGain(100, { knownRms: 0.02 });
     low.process(Int16Array.from([3000, -3000]));
