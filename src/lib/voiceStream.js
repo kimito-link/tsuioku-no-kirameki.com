@@ -384,8 +384,8 @@ export function isStreamedVoice(x) {
 /**
  * 少しずつ流すときの音量。仮定の大きさで始め、天井を超えそうな分が届いたら倍率を下げる(上げない)。
  * @param {unknown} volumePercent
- * @param {{ knownPeak?: number, knownRms?: number, tableRms?: number, tablePeak?: number, shortText?: boolean, pitchShifted?: boolean }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)と RMS(v0.1.1779)、
- *   全127声を測った表の長文の RMS・最大振幅(v0.1.1788)、短い文か(v0.1.1789)
+ * @param {{ knownPeak?: number, knownRms?: number, tableRms?: number, tablePeak?: number, shortText?: boolean }} [opts] 同じ声を前に鳴らした時の素の最大振幅(v0.1.1775)と RMS(v0.1.1779)、
+ *   全127声を測った表の長文の RMS・最大振幅(v0.1.1788・v0.1.1793 から声の高さのずらし込み)、短い文か(v0.1.1789)
  */
 export function createStreamGain(volumePercent, opts = {}) {
   const knownPeak = Number(opts?.knownPeak) > 0 ? Number(opts.knownPeak) : -1;
@@ -393,7 +393,6 @@ export function createStreamGain(volumePercent, opts = {}) {
   const tableRms = Number(opts?.tableRms) > 0 ? Number(opts.tableRms) : -1;
   const tablePeak = Number(opts?.tablePeak) > 0 ? Number(opts.tablePeak) : -1;
   const shortText = opts?.shortText === true;
-  const pitchShifted = opts?.pitchShifted === true;
   const pct = normalizeVoiceVolumePercent(volumePercent);
   const target = Math.min(VOICE_PEAK_CEILING, (VOICE_TARGET_PEAK_AT_100 * pct) / 100);
   let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
@@ -430,7 +429,7 @@ export function createStreamGain(volumePercent, opts = {}) {
         const first = (peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM;
         // 最初に届いた分の RMS(有音が VOICE_STREAM_MIN_RMS_SAMPLES 以上ある時だけ・無ければ -1)。
         let firstRms = -1;
-        if (shortText || (knownRms <= 0 && (tableRms <= 0 || pitchShifted))) {
+        if (shortText || (knownRms <= 0 && tableRms <= 0)) {
           let sq = 0;
           let n = 0;
           for (let i = 0; i < samples.length; i++) {
@@ -456,11 +455,11 @@ export function createStreamGain(volumePercent, opts = {}) {
             gain = Math.min(VOICE_MAX_BOOST, target / est);
           }
         } else {
-          // v0.1.1791: 声の高さをずらした人の1件目は、表(ずらし 0 の値)と出だしの RMS の間(相乗平均)で見積もる。
-          //   ずらしで RMS が最大 ±4dB 動くため、表だけだと低くずらした人の1件目が 3dB 小さく鳴り
-          //   「小さすぎ」が出た(PC 試験 v0.1.1790・3@-6 の素の RMS 0.043 / 表 0.063)。2件目からは覚えた値を使う。
+          // v0.1.1793: 声の高さをずらした人の1件目も表(ずらしごとの倍率込み)で見積もる。
+          //   v0.1.1791 は表(ずらし 0)と出だしの RMS の相乗平均だったが、出だしは全体より +2〜3dB 大きく出がちで
+          //   (全127声の実測・揺れ ±5〜7dB)、低くずらした人の1件目が 4dB 小さく鳴った(PC 試験 v0.1.1792)。
           let estRms = knownRms > 0 ? knownRms
-            : tableRms > 0 ? (pitchShifted && firstRms > 0 ? Math.sqrt(tableRms * firstRms) : tableRms)
+            : tableRms > 0 ? tableRms
               : Math.max(firstRms, VOICE_STREAM_MEDIAN_RMS);
           estRms = Math.min(VOICE_STREAM_MAX_EST_RMS, Math.max(VOICE_STREAM_MIN_EST_RMS, estRms));
           gain = Math.min(VOICE_MAX_BOOST, (target / VOICE_TYPICAL_CREST) / estRms);
@@ -513,14 +512,13 @@ export function createStreamedVoiceAudio(voice, deps) {
   let unsubscribe = null;
   /** @type {any} */
   let whole = null;
-  const tableLevel = voiceStyleTableLevel(voice.styleId);
+  const tableLevel = voiceStyleTableLevel(voice.styleId, voice.pitchOffset);
   const gain = createStreamGain(deps.volumePercent, {
     knownPeak: knownVoiceStylePeak(voice.styleId, voice.pitchOffset),
     knownRms: knownVoiceStyleRms(voice.styleId, voice.pitchOffset),
     tableRms: tableLevel?.rms,
     tablePeak: tableLevel?.peak,
-    shortText: voice.textLength >= 0 && voice.textLength < VOICE_STREAM_LONG_TEXT_CHARS,
-    pitchShifted: Math.round((Number(voice.pitchOffset) || 0) * 100) !== 0
+    shortText: voice.textLength >= 0 && voice.textLength < VOICE_STREAM_LONG_TEXT_CHARS
   });
   // 2026-10-26計器(voicePlaybackQuality.js): 次の分が間に合わず無音が挟まった回数と最長の無音。
   let underruns = 0;

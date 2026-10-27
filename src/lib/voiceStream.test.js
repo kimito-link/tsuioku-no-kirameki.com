@@ -202,16 +202,28 @@ describe('createStreamGain', () => {
     // v0.1.1792: 出だしの RMS が測れれば、丸ごと読む時と同じく聞こえの大きさで揃える
     expect(dense.gain).toBeCloseTo(rmsTarget(dense) / 0.09, 2);
   });
-  it('v0.1.1791: 声の高さをずらした人の1件目は、表と出だしの RMS の間で見積もる(ずらし 0 は表のまま)', () => {
-    const shifted = createStreamGain(100, { tableRms: 0.063, tablePeak: 0.53, pitchShifted: true });
-    shifted.process(square(0.043));
-    expect(shifted.gain).toBeCloseTo(rmsTarget(shifted) / Math.sqrt(0.063 * 0.043), 3);
-    const plain = createStreamGain(100, { tableRms: 0.063, tablePeak: 0.53 });
-    plain.process(square(0.043));
-    expect(plain.gain).toBeCloseTo(rmsTarget(plain) / 0.063, 3);
-    const learned = createStreamGain(100, { knownRms: 0.043, tableRms: 0.063, pitchShifted: true });
+  it('v0.1.1793: 声の高さをずらした人の1件目は、ずらしの倍率込みの表で見積もる(大きめの出だしに引っ張られない)', () => {
+    const g = createStreamGain(100, { tableRms: 0.04, tablePeak: 0.33 });
+    g.process(square(0.06));
+    expect(g.gain).toBeCloseTo(rmsTarget(g) / 0.04, 3);
+    const learned = createStreamGain(100, { knownRms: 0.043, tableRms: 0.063 });
     learned.process(square(0.08));
     expect(learned.gain).toBeCloseTo(rmsTarget(learned) / 0.043, 3);
+    resetVoiceStylePeaksForTest();
+    const lv = /** @type {any} */ (voiceStyleTableLevel(3, -0.06));
+    expect(lv.rms).toBeLessThan(/** @type {any} */ (voiceStyleTableLevel(3)).rms * 0.7);
+    const f = fakeContext();
+    const v = new StreamedVoice(1000);
+    v.styleId = 3;
+    v.pitchOffset = -0.06;
+    const audio = createStreamedVoiceAudio(v, { audioContext: () => f.ctx, volumePercent: 100 });
+    v.append(Int16Array.from({ length: 400 }, () => 3000));
+    return audio.play().then(() => {
+      const target = Math.min(VOICE_PEAK_CEILING, 0.48);
+      const want = Math.min((target / VOICE_TYPICAL_CREST) / Math.max(VOICE_STREAM_MIN_EST_RMS, lv.rms),
+        (VOICE_PEAK_CEILING * 0.9) / Math.max(lv.peak, (3000 / 32768) * 1.25));
+      expect(audio.quality.outPeak).toBeCloseTo((3000 / 32768) * want, 3);
+    });
   });
   it('v0.1.1788: 見積もりは全127声の範囲に収める(外れ値で上げすぎ・下げすぎない)', () => {
     const low = createStreamGain(100, { knownRms: 0.02 });
