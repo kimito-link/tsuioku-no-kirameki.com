@@ -13,10 +13,14 @@ import {
   rememberVoiceStylePeak,
   resetVoiceStylePeaksForTest,
   VOICE_STREAM_MIN_RMS_SAMPLES,
-  VOICE_STREAM_TYPICAL_CREST,
+  VOICE_STREAM_MAX_EST_RMS,
+  VOICE_STREAM_MEDIAN_RMS,
+  VOICE_STREAM_MIN_EST_RMS,
+  VOICE_STREAM_TYPICAL_LONG_CREST,
   voiceStyleLevelsSnapshot
 } from './voiceStream.js';
 import { VOICE_PEAK_CEILING } from './voiceVolume.js';
+import { voiceStyleTableLevel } from './voiceStyleLevelTable.js';
 import {
   probeVoicevoxStreaming,
   resetVoicevoxStreamingSupport,
@@ -130,52 +134,82 @@ describe('createStreamGain', () => {
     g.process(Int16Array.from([10, -10]));
     expect(g.gain).toBe(after);
   });
-  it('v0.1.1774: もともと小さい声は、最初に届いた分の大きさから倍率を上げる(知らない声は上げすぎない)', () => {
-    const g = createStreamGain(100);
-    // v0.1.1786: 素の最大振幅 27%(全127声の長文で最も小さい声・ささやき系は読み上げに使わない)。
-    //   知らない声は上げすぎない側(下限 0.4)に倒すので、1件目は狙いの約7割(2件目からは覚えた大きさで揃う)。
-    const out = g.process(Int16Array.from([8847, -8847]));
-    const peak = Math.max(...Array.from(out, Math.abs));
-    expect(peak / g.targetPeak).toBeGreaterThan(0.6);
-    expect(g.gain).toBeLessThanOrEqual(g.targetPeak / 0.4 + 1e-9);
-    expect(g.outPeak).toBeLessThanOrEqual(VOICE_PEAK_CEILING);
+  /** 有音の RMS が rms(0〜1)の、長さ n の矩形波。 */
+  const square = (/** @type {number} */ rms, n = VOICE_STREAM_MIN_RMS_SAMPLES + 400) =>
+    Int16Array.from({ length: n }, (_, i) => (i % 2 ? 1 : -1) * Math.round(rms * 32768));
+  const rmsTarget = (/** @type {any} */ g) => g.targetPeak / VOICE_STREAM_TYPICAL_LONG_CREST;
+  it('v0.1.1788: 測った表の RMS があれば、その声を聞こえの大きさの狙いに合わせる', () => {
+    const quiet = createStreamGain(100, { tableRms: 0.056, tablePeak: 0.3 });
+    quiet.process(Int16Array.from([3000, -3000]));
+    expect(quiet.gain).toBeCloseTo(rmsTarget(quiet) / 0.056, 3);
+    const loud = createStreamGain(100, { tableRms: 0.087, tablePeak: 0.5 });
+    loud.process(Int16Array.from([3000, -3000]));
+    // 表で -25dB と -21dB の声は、倍率が 4dB 違う=鳴らした大きさが揃う
+    expect(20 * Math.log10(quiet.gain / loud.gain)).toBeCloseTo(20 * Math.log10(0.087 / 0.056), 3);
   });
-  it('v0.1.1785: 初めての声で出だしの最大振幅が小さくても、RMS から見積もって上げすぎない', () => {
-    // 出だし: 最大振幅 12%・RMS 約 6%(実測の長文の出だしに近い)。最大振幅だけなら下限 0.2 で 2.4倍になっていた。
-    const n = VOICE_STREAM_MIN_RMS_SAMPLES + 400;
-    const chunk = Int16Array.from({ length: n }, (_, i) => (i === 0 ? 3932 : (i % 2 ? 1 : -1) * 1966));
-    const g = createStreamGain(100);
-    g.process(chunk);
-    const rms = 1966 / 32768;
-    const est = Math.max(0.4, rms * VOICE_STREAM_TYPICAL_CREST);
-    expect(g.gain).toBeCloseTo(Math.min(g.targetPeak / est, (g.targetPeak * 0.25) / rms), 2);
-    expect(g.gain).toBeLessThan(g.targetPeak / 0.2 - 0.5);
+  it('v0.1.1788: (声, 高さのずらし)ごとに覚えた値があれば、表より優先する', () => {
+    const g = createStreamGain(100, { knownRms: 0.09, tableRms: 0.07, tablePeak: 0.47 });
+    g.process(Int16Array.from([3000, -3000]));
+    expect(g.gain).toBeCloseTo(rmsTarget(g) / 0.09, 3);
   });
-  it('v0.1.1775: 前に鳴らした同じ声の大きさを知っていれば、それを基準に狙いへ合わせる', () => {
-    const g = createStreamGain(100, { knownPeak: 0.08 });
-    const out = g.process(Int16Array.from([2300, -2300]));
-    const peak = Math.max(...Array.from(out, Math.abs));
-    // 倍率の上限(VOICE_MAX_BOOST=4)まで上げて狙いの約6割
-    expect(peak / g.targetPeak).toBeGreaterThan(0.55);
+  it('v0.1.1788: 声の高さのずらしごとに分けて覚える(同じ声でも RMS が最大 ±4dB 動くため)', () => {
+    resetVoiceStylePeaksForTest();
+    rememberVoiceStylePeak(3, 0.5, 0.05, 40, -0.06);
+    rememberVoiceStylePeak(3, 0.5, 0.08, 40, 0.06);
+    rememberVoiceStylePeak(3, 0.5, 0.063, 40, 0);
+    expect(knownVoiceStyleRms(3, -0.06)).toBeCloseTo(0.05);
+    expect(knownVoiceStyleRms(3, 0.06)).toBeCloseTo(0.08);
+    expect(knownVoiceStyleRms(3)).toBeCloseTo(0.063);
+    expect(knownVoiceStyleRms(3, 0.03)).toBe(-1);
+    expect(Object.keys(voiceStyleLevelsSnapshot()).sort()).toEqual(['3', '3@-6', '3@6']);
+  });
+  it('v0.1.1788: 少しずつ読む声は、表の値と(声, ずらし)ごとに覚えた値で最初の倍率を決める', () => {
+    resetVoiceStylePeaksForTest();
+    const lv = voiceStyleTableLevel(19);
+    expect(lv).not.toBeNull();
+    const f = fakeContext();
+    const v = new StreamedVoice(1000);
+    v.styleId = 19;
+    const audio = createStreamedVoiceAudio(v, { audioContext: () => f.ctx, volumePercent: 100 });
+    v.append(Int16Array.from({ length: 400 }, () => 3000));
+    return audio.play().then(() => {
+      const target = Math.min(VOICE_PEAK_CEILING, 0.48);
+      const want = Math.min((target / VOICE_STREAM_TYPICAL_LONG_CREST) / Math.max(VOICE_STREAM_MIN_EST_RMS, /** @type {any} */ (lv).rms),
+        (VOICE_PEAK_CEILING * 0.9) / /** @type {any} */ (lv).peak);
+      expect(audio.quality.outPeak).toBeCloseTo((3000 / 32768) * want, 3);
+    });
+  });
+  it('v0.1.1788: 表に無い声は覚えた RMS、それも無ければ出だしと中央値の大きい方で見積もる', () => {
+    const known = createStreamGain(100, { knownRms: 0.08 });
+    known.process(Int16Array.from([3000, -3000]));
+    expect(known.gain).toBeCloseTo(rmsTarget(known) / 0.08, 3);
+    const quietStart = createStreamGain(100);
+    quietStart.process(square(0.03));
+    expect(quietStart.gain).toBeCloseTo(rmsTarget(quietStart) / VOICE_STREAM_MEDIAN_RMS, 3);
+    const loudStart = createStreamGain(100);
+    loudStart.process(square(0.09));
+    expect(loudStart.gain).toBeCloseTo(rmsTarget(loudStart) / 0.09, 2);
+  });
+  it('v0.1.1788: 見積もりは全127声の範囲に収める(外れ値で上げすぎ・下げすぎない)', () => {
+    const low = createStreamGain(100, { knownRms: 0.02 });
+    low.process(Int16Array.from([3000, -3000]));
+    expect(low.gain).toBeCloseTo(rmsTarget(low) / VOICE_STREAM_MIN_EST_RMS, 3);
+    const high = createStreamGain(100, { knownRms: 0.3 });
+    high.process(Int16Array.from([3000, -3000]));
+    expect(high.gain).toBeCloseTo(rmsTarget(high) / VOICE_STREAM_MAX_EST_RMS, 3);
+  });
+  it('v0.1.1788: 分かっている最大振幅が大きい声は、天井の手前に収まる倍率にする(途中で下げ直さない)', () => {
+    const g = createStreamGain(100, { tableRms: 0.05, tablePeak: 0.79 });
+    g.process(Int16Array.from([300, -300]));
+    expect(g.gain).toBeCloseTo((VOICE_PEAK_CEILING * 0.9) / 0.79, 3);
+    g.process(Int16Array.from([25800, -25800]));
+    expect(g.dropRatio).toBe(1);
   });
   it('v0.1.1775: 静かな出だしでも、知っている声なら途中で倍率を下げ直さない', () => {
     const g = createStreamGain(100, { knownPeak: 0.45 });
     g.process(Int16Array.from([300, -300]));
     g.process(Int16Array.from([14700, -14700]));
     expect(g.dropRatio).toBe(1);
-  });
-  it('v0.1.1779: 前に鳴らした声の RMS が大きければ、聞こえの大きさの狙いまで下げる', () => {
-    const g = createStreamGain(100, { knownPeak: 0.45, knownRms: 0.3 });
-    g.process(Int16Array.from([9000, -9000]));
-    expect(g.gain).toBeCloseTo((g.targetPeak * 0.25) / 0.3, 3);
-  });
-  it('v0.1.1780: 初めての声でも、最初に届いた分の RMS が大きければ下げる(短すぎる出だしでは判断しない)', () => {
-    const g = createStreamGain(100);
-    g.process(Int16Array.from({ length: 2400 }, (_, i) => (i % 2 ? 9830 : -9830)));
-    expect(g.gain).toBeCloseTo((g.targetPeak * 0.25) / 0.3, 2);
-    const g2 = createStreamGain(100);
-    g2.process(Int16Array.from([9830, -9830]));
-    expect(g2.gain).toBeGreaterThan((g2.targetPeak * 0.25) / 0.3 + 0.1);
   });
   it('v0.1.1779: 声ごとの RMS も覚える。少しずつ届いた声は届いた分の RMS を測る', () => {
     resetVoiceStylePeaksForTest();
