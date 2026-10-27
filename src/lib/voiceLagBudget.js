@@ -431,3 +431,40 @@ export function mergeVoiceSpeedBoost(congestionBoost, sustainedBoost) {
   // 下げない(max)。既存の挙動を悪化させないことを型で保証する。
   return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(base, extra));
 }
+
+/** v0.1.1799: この件が鳴るまでの見込み待ちがこれを超えたら、本文を短くして読む(ms)。 */
+export const VOICE_TRIM_WAIT_MS = 3000;
+/** 見込み待ちがこれを超えたら、さらに短く。 */
+export const VOICE_TRIM_HARD_WAIT_MS = 5000;
+
+/**
+ * v0.1.1799: この件の前に並んでいる件数(鳴っている1件を含む)と、1件あたりの声の長さから、
+ *   この件が鳴り始めるまでの見込み(ms)。声の長さをまだ覚えていなければ 0(短くしない)。
+ * @param {unknown} ahead
+ * @param {ReturnType<typeof createVoicePaceState> | null | undefined} paceState
+ * @param {unknown} boost 合成時に足す早口の量
+ */
+export function predictVoiceQueueWaitMs(ahead, paceState, boost) {
+  const n = Math.max(0, Math.floor(Number(ahead) || 0));
+  const natural = Number(paceState?.naturalEmaMs);
+  if (n === 0 || !(natural > 0)) return 0;
+  const b = Number(boost) > 0 ? Number(boost) : 0;
+  return (n * natural) / (1 + b);
+}
+
+/**
+ * v0.1.1799: 見込み待ちが長いほど本文の上限を下げる(下げるだけ)。
+ *   PC 試験(長短が混ざり読み切れない量): 長文1件が6〜8秒しゃべる間、後ろの短文が6〜8秒待たされ、
+ *   古くなって飛ばされた(30件中8件)。待ちが伸びている時だけ長文を途中までにして、後ろを待たせない。
+ * @param {unknown} waitMs predictVoiceQueueWaitMs の値
+ * @param {unknown} maxChars 今の上限
+ * @returns {number}
+ */
+export function capVoiceMaxCharsByWait(waitMs, maxChars) {
+  const base = Number(maxChars) >= 1 ? Math.floor(Number(maxChars)) : 60;
+  const w = Number(waitMs);
+  if (!Number.isFinite(w)) return base;
+  if (w >= VOICE_TRIM_HARD_WAIT_MS) return Math.min(base, 30);
+  if (w >= VOICE_TRIM_WAIT_MS) return Math.min(base, 40);
+  return base;
+}

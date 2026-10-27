@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1779',
+    date: '2026-10-26',
+    summary: '声ごとの聞こえの大きさをそろえる',
+    items: Object.freeze([
+      '読み上げの音量を「一番大きい瞬間」だけでなく「聞こえの大きさ」でもそろえるようにしました。声によって大きく聞こえたり小さく聞こえたりする差が縮みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1778',
     date: '2026-10-26',
     summary: '会場の声の裏読み込みが15秒止まるのを直す',
