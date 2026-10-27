@@ -30,23 +30,35 @@ export const VOICE_PEAK_CEILING = 0.98;
 export const VOICE_MAX_BOOST = 4;
 
 /**
- * v0.1.1779: 聞こえの大きさ(無音を除いた RMS)の狙い = 狙いの最大振幅 × この比(約 -12dB)。
- *   最大振幅だけで揃えると、詰まった声(最大振幅に比べて RMS が大きい声)ほど大きく聞こえ、
- *   声ごとの差が 6〜10dB 出た(PC 試験 v0.1.1778)。RMS がこれを超える声だけ下げる(上げはしない)。
+ * v0.1.1792: 聞こえの大きさ(無音を除いた RMS)の狙い = 狙いの最大振幅 ÷ この比(16.5dB)。
+ *   全127声の長文(PC 実測)の最大振幅÷RMS の中ほど。=長文を最大振幅で揃えていた頃と平均で同じ大きさ。
  */
-export const VOICE_TARGET_RMS_RATIO = 0.25;
+export const VOICE_TYPICAL_CREST = 6.68;
 
 /**
- * 最大振幅と RMS の両方の狙いから決めた倍率(上限つき)。rms が分からなければ最大振幅だけで決める。
+ * 音量設定での聞こえの大きさの狙い(RMS・0〜1)。
+ * @param {number} targetPeak
+ * @returns {number}
+ */
+export function voiceTargetRms(targetPeak) {
+  return targetPeak / VOICE_TYPICAL_CREST;
+}
+
+/**
+ * 倍率(上限つき)。v0.1.1792: RMS が分かれば聞こえの大きさ(RMS)の狙いに合わせ、最大振幅は天井の手前(9割)で止める。
+ *   最大振幅で揃えると、最大振幅÷RMS が声・文ごとに違う(短文 12〜13dB・長文 15〜18dB)ぶん聞こえの大きさがずれ、
+ *   短い文が声ごとに 6.4dB までばらついた(PC 試験 v0.1.1790)。丸ごと読む WAV は文全体の RMS が正確に分かる。
+ *   rms が分からなければ今までどおり最大振幅だけで決める。
  * @param {number} peak 素の最大振幅(0〜1)
  * @param {number} rms 素の RMS(0〜1・無音を除く)。不明なら 0 以下
  * @param {number} targetPeak
  * @returns {number}
  */
 export function voiceLevelGain(peak, rms, targetPeak) {
-  let gain = peak > 0 ? Math.min(VOICE_MAX_BOOST, targetPeak / peak) : VOICE_MAX_BOOST;
-  if (rms > 0) gain = Math.min(gain, (targetPeak * VOICE_TARGET_RMS_RATIO) / rms);
-  return gain;
+  if (rms > 0 && peak > 0) {
+    return Math.min(VOICE_MAX_BOOST, voiceTargetRms(targetPeak) / rms, (VOICE_PEAK_CEILING * 0.9) / peak);
+  }
+  return peak > 0 ? Math.min(VOICE_MAX_BOOST, targetPeak / peak) : VOICE_MAX_BOOST;
 }
 
 /**

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1059 件
+## ⚠️ 役割コメントが無いソース 9 / 1060 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -974,7 +974,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2182)
+- 📁 **src/** (2184)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1261,7 +1261,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1924)
+  - 📁 **lib/** (1926)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3132,6 +3132,8 @@
     - `voiceStageTiming.test.js`
     - `voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。
     - `voiceStream.test.js`
+    - `voiceStyleLevelTable.js` — VOICEVOX の声(styleId)ごとの素の大きさの表(v0.1.1788)。
+    - `voiceStyleLevelTable.test.js`
     - `voiceSustainedBoost.integration.test.js`
     - `voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
     - `voiceSynthFailure.test.js`
