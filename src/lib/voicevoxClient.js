@@ -583,6 +583,84 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
 }
 
 /**
+ * v0.1.1796: /streaming_synthesis を最後まで受け取り、丸ごとの WAV(ArrayBuffer)として返す。
+ *   VOICEVOX は /synthesis を使うと、声のファイルごとのメモリが少しずつ受け取りの約2倍になる
+ *   (PC 実測・26種類: グラボ有り 2.1GB→3.6GB / 無し 1.5GB→2.7GB。両方使うと両方ぶん取る)。
+ *   音(長さ・RMS・最大振幅)は /synthesis と同じ。短文はほぼ1回で届くので、グラボ無しは同じか速く、
+ *   グラボ有りは 0.1〜0.3秒遅いだけ(短文・中くらいは 0.6秒以内)。
+ *   断られたら STREAM_FALLBACK(呼び出し側が /synthesis で作り直す)。時間切れ・途中の失敗は null(この1件を捨てる)。
+ * @param {string} url
+ * @param {object} audioQuery
+ * @param {number} styleId
+ * @param {{ streamFetchFn?: Function, synthesisTimeoutMs?: number }} opts
+ * @param {(info: any) => void} notifyFailure
+ * @returns {Promise<ArrayBuffer|null|typeof STREAM_FALLBACK>}
+ */
+async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailure) {
+  const streamFetchFn = typeof opts.streamFetchFn === 'function' ? opts.streamFetchFn : proxyStreamFetchFn;
+  const totalMs = positiveTimeout(opts.synthesisTimeoutMs, 8000);
+  const controller = new AbortController();
+  /** @type {any} */
+  let reader = null;
+  let timer = /** @type {any} */ (0);
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      try { controller.abort(); void reader?.cancel?.().catch(() => {}); } catch { /* no-op */ }
+      reject(new Error('voicevox_timeout'));
+    }, totalMs);
+  });
+  try {
+    return await Promise.race([timeout, (async () => {
+      const res = await streamFetchFn(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'audio/wav' },
+        body: JSON.stringify(audioQuery),
+        signal: controller.signal
+      });
+      if (!res || res.ok === false) {
+        const status = Number(res?.status) || 0;
+        if (status === 404 || status === 405 || status === 501) { _streamSupport = 'no'; return STREAM_FALLBACK; }
+        if (status === 422) { _streamRejectedStyles.add(styleId); return STREAM_FALLBACK; }
+        notifyFailure({ stage: 'synth', httpStatus: status });
+        return null;
+      }
+      reader = res.body && typeof res.body.getReader === 'function' ? res.body.getReader() : null;
+      if (!reader) return STREAM_FALLBACK;
+      /** @type {Uint8Array[]} */
+      const parts = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const part = value instanceof Uint8Array ? value : new Uint8Array(value || []);
+        parts.push(part);
+        total += part.length;
+      }
+      const wav = new Uint8Array(total);
+      let off = 0;
+      for (const part of parts) { wav.set(part, off); off += part.length; }
+      const tag = (/** @type {number} */ o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);
+      if (total <= 44 || tag(0) !== 'RIFF' || tag(8) !== 'WAVE') {
+        notifyFailure({ stage: 'synth', bodyInvalid: true });
+        return null;
+      }
+      // 大きさ欄が「不明」で来ても丸ごと再生できるよう、標準の並び(data が 36)なら実際の長さで書き直す。
+      if (tag(36) === 'data') {
+        const dv = new DataView(wav.buffer);
+        dv.setUint32(4, total - 8, true);
+        dv.setUint32(40, total - 44, true);
+      }
+      return wav.buffer;
+    })()]);
+  } catch (err) {
+    notifyFailure({ stage: 'synth', error: err });
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * @param {unknown} text
  * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
  * @param {{
@@ -593,8 +671,11 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
  *   onFailure?: (info: { stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }) => void,
  *   onTiming?: (t: { queryMs: number, synthMs: number, streamed?: boolean }) => void,
  *   stream?: boolean,
+ *   wholeViaStream?: boolean,
  *   streamFetchFn?: Function
  * }} [opts]
+ *   v0.1.1796: stream が無くてもエンジンが少しずつ受け取りに対応していれば、それで最後まで受け取って丸ごと返す
+ *   (wholeViaStream: false で今までどおり /synthesis)。
  *   2026-10-26: stream が true でエンジンが対応していれば、少しずつ受け取って StreamedVoice を返す
  *   (synthMs は最初の声が届くまで)。断られたら今までどおり /synthesis で丸ごと返す。
  *   v0.1.1224: onFailure は「null を返す理由」を呼び出し側へ伝える任意コールバック。
@@ -678,6 +759,20 @@ export async function synthesizeVoice(text, voice, opts = {}) {
           } catch { /* 計器の失敗は読み上げを止めない */ }
         }
         return streamed;
+      }
+    } else if (opts.stream !== true && opts.wholeViaStream !== false && _streamSupport === 'yes' && !_streamRejectedStyles.has(styleId)) {
+      // v0.1.1796: 丸ごと欲しい時も /streaming_synthesis で受け取る(/synthesis を混ぜると VOICEVOX のメモリが倍になる)。
+      const whole = await streamSynthesisWhole(
+        `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
+        audioQuery, styleId, opts, notifyFailure
+      );
+      if (whole !== STREAM_FALLBACK) {
+        if (whole) {
+          try {
+            if (typeof opts.onTiming === 'function') opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
+          } catch { /* 計器の失敗は読み上げを止めない */ }
+        }
+        return whole;
       }
     }
     const synthesisRes = await fetchWithTimeout(

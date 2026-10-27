@@ -547,3 +547,75 @@ describe('2026-10-26 聞こえ方の計器(quality)', () => {
     expect(audio.quality.partial).toBe(true);
   });
 });
+
+describe('v0.1.1796 丸ごと欲しい時も /streaming_synthesis で受け取る(VOICEVOX のメモリを倍にしない)', () => {
+  const queryOk = () => ({ ok: true, json: async () => ({ pitchScale: 0, speedScale: 1 }) });
+  const enable = () => probeVoicevoxStreaming({
+    fetchFn: vi.fn().mockResolvedValue({ ok: true, json: async () => ({ supported_features: { streaming_synthesis: true } }) })
+  });
+
+  it('対応エンジンでは最後まで受け取り、/synthesis と同じ丸ごとの WAV を返す', async () => {
+    await enable();
+    const wav = makeWav(new Array(1600).fill(5));
+    const fetchFn = vi.fn().mockResolvedValueOnce(queryOk());
+    const streamFetchFn = vi.fn().mockResolvedValue(streamResponse([wav.subarray(0, 100), wav.subarray(100)]));
+    const onTiming = vi.fn();
+    const out = await synthesizeVoice('草', { styleId: 3 }, { fetchFn, streamFetchFn, onTiming });
+    expect(out).toBeInstanceOf(ArrayBuffer);
+    expect(new Uint8Array(/** @type {ArrayBuffer} */ (out))).toEqual(wav);
+    expect(fetchFn).toHaveBeenCalledTimes(1); // audio_query だけ・/synthesis は呼ばない
+    expect(streamFetchFn.mock.calls[0][0]).toMatch(/\/streaming_synthesis\?speaker=3&segment_length=0\.3$/);
+    expect(onTiming.mock.calls[0][0].streamed).toBeUndefined();
+  });
+
+  it('大きさ欄が「不明」で来ても実際の長さに書き直す', async () => {
+    await enable();
+    const wav = makeWav(new Array(800).fill(3));
+    const dv = new DataView(wav.buffer, wav.byteOffset);
+    dv.setUint32(4, 0xffffffff, true);
+    dv.setUint32(40, 0xffffffff, true);
+    const fetchFn = vi.fn().mockResolvedValueOnce(queryOk());
+    const out = await synthesizeVoice('草', { styleId: 3 }, { fetchFn, streamFetchFn: vi.fn().mockResolvedValue(streamResponse([wav])) });
+    const odv = new DataView(/** @type {ArrayBuffer} */ (out));
+    expect(odv.getUint32(4, true)).toBe(wav.length - 8);
+    expect(odv.getUint32(40, true)).toBe(wav.length - 44);
+  });
+
+  it('wholeViaStream: false なら今までどおり /synthesis', async () => {
+    await enable();
+    const whole = new Uint8Array([1]).buffer;
+    const fetchFn = vi.fn().mockResolvedValueOnce(queryOk()).mockResolvedValueOnce({ ok: true, arrayBuffer: async () => whole });
+    const streamFetchFn = vi.fn();
+    await expect(synthesizeVoice('あ', { styleId: 3 }, { fetchFn, streamFetchFn, wholeViaStream: false })).resolves.toBe(whole);
+    expect(streamFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('断られた(422)らその声は /synthesis に戻す', async () => {
+    await enable();
+    const whole = new Uint8Array([1]).buffer;
+    const fetchFn = vi.fn().mockResolvedValueOnce(queryOk()).mockResolvedValueOnce({ ok: true, arrayBuffer: async () => whole });
+    const streamFetchFn = vi.fn().mockResolvedValue({ ok: false, status: 422, body: null });
+    await expect(synthesizeVoice('あ', { styleId: 77 }, { fetchFn, streamFetchFn })).resolves.toBe(whole);
+    expect(fetchFn.mock.calls[1][0]).toMatch(/\/synthesis\?speaker=77$/);
+  });
+
+  it('WAV でない中身・途中で壊れたら、この1件は null(失敗を計器へ)', async () => {
+    await enable();
+    const onFailure = vi.fn();
+    const fetchFn = vi.fn().mockResolvedValueOnce(queryOk());
+    const bad = new Uint8Array(100).fill(9);
+    await expect(synthesizeVoice('あ', { styleId: 3 }, { fetchFn, streamFetchFn: vi.fn().mockResolvedValue(streamResponse([bad])), onFailure })).resolves.toBeNull();
+    expect(onFailure.mock.calls[0][0]).toMatchObject({ stage: 'synth', bodyInvalid: true });
+    const broken = new ReadableStream({ pull(c) { c.error(new Error('down')); } });
+    const fetchFn2 = vi.fn().mockResolvedValueOnce(queryOk());
+    await expect(synthesizeVoice('あ', { styleId: 3 }, { fetchFn: fetchFn2, streamFetchFn: vi.fn().mockResolvedValue({ ok: true, status: 200, body: broken }), onFailure })).resolves.toBeNull();
+  });
+
+  it('時間内に届かなければ null(固まらない)', async () => {
+    await enable();
+    const fetchFn = vi.fn().mockResolvedValueOnce(queryOk());
+    const never = new ReadableStream({ pull() { return new Promise(() => {}); } });
+    const out = await synthesizeVoice('あ', { styleId: 3 }, { fetchFn, streamFetchFn: vi.fn().mockResolvedValue({ ok: true, status: 200, body: never }), synthesisTimeoutMs: 30 });
+    expect(out).toBeNull();
+  });
+});
