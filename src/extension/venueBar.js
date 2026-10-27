@@ -3401,7 +3401,7 @@ export function mountVenueBarButton(options = {}) {
   wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
   // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(開いて ON の間だけ名乗る・voiceReaderLease.js)。
-  const venueReaderLease = startVoiceReaderLease(() => open && voicePlayer.enabled, liveIdFromPathname);
+  const venueReaderLease = startVoiceReaderLease(() => open && voicePlayer.enabled, liveIdFromPathname, { onPageHide: (fn) => window.addEventListener('pagehide', fn) });
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {
       voicePlayer.disable();

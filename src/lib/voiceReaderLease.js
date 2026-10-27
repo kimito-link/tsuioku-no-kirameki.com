@@ -131,7 +131,8 @@ export function chromeVoiceReaderLeaseLink() {
  * 合図を定期的に送り、読まなくなったら手放す(会場・コメビュの配線を1行にするため)。chrome が無ければ null。
  * @param {() => boolean} isActive 読み上げ中か(会場なら「開いていて ON」)
  * @param {() => unknown} liveId
- * @param {{ link?: ReturnType<typeof createVoiceReaderLeaseLink> | null }} [opts]
+ * @param {{ link?: ReturnType<typeof createVoiceReaderLeaseLink> | null, onPageHide?: (fn: () => void) => void }} [opts]
+ *   onPageHide: ページを閉じる時に呼ぶ口(呼び出し側が window の pagehide を渡す・lib は I/O を持たない)
  * @returns {ReturnType<typeof createVoiceReaderLeaseLink> | null}
  */
 export function startVoiceReaderLease(isActive, liveId, opts = {}) {
@@ -147,6 +148,6 @@ export function startVoiceReaderLease(isActive, liveId, opts = {}) {
       beating = false;
     }
   }, VOICE_READER_LEASE_BEAT_MS);
-  if (typeof window !== 'undefined') window.addEventListener('pagehide', () => link.release());
+  if (typeof opts.onPageHide === 'function') opts.onPageHide(() => link.release());
   return link;
 }

@@ -246,7 +246,9 @@ let _hoverRow = null;
 let _voiceReadingEnabled = false;
 // v0.1.1794: 同じ配信を会場でも読んでいる時は、先に読み始めた方だけが読む(声の二重・VOICEVOX の取り合いを防ぐ)。
 //   試験(voiceTestRun)は enqueueVoiceTimelineItems を直接呼ぶのでこの関門を通らない。
-const _voiceReaderLease = startVoiceReaderLease(() => _voiceReadingEnabled && !isObsMode() && !!_liveId, () => _liveId);
+const _voiceReaderLease = startVoiceReaderLease(() => _voiceReadingEnabled && !isObsMode() && !!_liveId, () => _liveId, {
+  onPageHide: (fn) => window.addEventListener('pagehide', fn)
+});
 let _voiceToggleBusy = false;
 /** v0.1.699: 名前読み(既定OFF=本文だけ)。 */
 let _voiceReadNameEnabled = false;
