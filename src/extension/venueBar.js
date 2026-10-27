@@ -370,6 +370,7 @@ import {
   probeVoicevoxStreaming
 } from '../lib/voicevoxClient.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3399,6 +3400,8 @@ export function mountVenueBarButton(options = {}) {
   });
   wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
+  // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(開いて ON の間だけ名乗る・voiceReaderLease.js)。
+  const venueReaderLease = startVoiceReaderLease(() => open && voicePlayer.enabled, liveIdFromPathname, { onPageHide: (fn) => window.addEventListener('pagehide', fn) });
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {
       voicePlayer.disable();
@@ -6748,7 +6751,7 @@ export function mountVenueBarButton(options = {}) {
         //   シグナル)で resolved を通知し unvoiced(流速寿命)へ落とす。再生時は onAudioStart→speaking。
         //   onPlayStart(再生/破棄の両方で発火する曖昧信号)は配線しない(取りこぼし回避・従来どおり)。
         //   bubble が無い(空テキスト等で出なかった)場合は no-op で安全。
-        voicePlayer.enqueue([{
+        const voiceIt = () => voicePlayer.enqueue([{
           kind: 'comment',
           userId: speech.userId,
           nickname: speech.name,
@@ -6774,6 +6777,9 @@ export function mountVenueBarButton(options = {}) {
             charaLive.onCommentSpokenEnd();
           }
         }]);
+        // v0.1.1794: コメビュが同じ配信を読んでいれば鳴らさない(吹き出しは声なしの寿命へ)。届いた順に答える。
+        if (!venueReaderLease) voiceIt();
+        else venueReaderLease.whenMine(liveIdFromPathname(), voiceIt, () => { if (bubble) markBubbleResolved(bubble); voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1; });
       }
     }
   };
