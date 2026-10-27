@@ -104,6 +104,7 @@ import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoic
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
   computeVoiceCongestion,
+  computeVoicePlaybackRate,
   computeVoiceE2eAverage,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
@@ -905,9 +906,21 @@ async function drainVoiceQueue() {
           objectUrl = URL.createObjectURL(new Blob([loud], { type: 'audio/wav' }));
           audio = new Audio(objectUrl);
         }
+        // v0.1.1798: 先読みした声は、合成した時の早口のまま焼き固まっている。今の方が詰まっていれば
+        //   再生速度で追いつく(会場 VoicePlayer v0.1.1089 と同じ・上げるだけ)。コメビュはこれが無く、
+        //   遅れがたまり始めても1〜2件前に決めた速さのまま読み、最初の遅れが会場の2倍(4.6秒)まで伸びた。
+        //   少しずつ流す声は速さを変えない(声の高さも変わるため)。
+        const playbackRate = isStreamedVoice(wav)
+          ? 1.0
+          : computeVoicePlaybackRate(boostAtSynth, comeviewSpeedBoost(computeVoiceCongestion(_voiceQueue.length).speedBoost));
+        if (playbackRate !== 1.0) {
+          audio.preservesPitch = true;
+          audio.playbackRate = playbackRate;
+        }
         // 2026-10-26計器: 聞こえ方(途切れ・つっかえ・音割れ・小さすぎ)を数える(会場と同じ・再生には触れない)。
         observeVoicePlayback(audio, {
           diag: _voiceDiag,
+          playbackRate,
           outPeak: wholeLevel ? wholeLevel.peak : -1,
           outRms: wholeLevel ? wholeLevel.rms : -1,
           targetPeak: voiceTargetPeak(_voiceVolumePercent),
@@ -944,12 +957,12 @@ async function drainVoiceQueue() {
             objectUrl = '';
             _voiceStopCurrent = null;
             // v0.1.1797: 鳴った長さを「早口なしの長さ」に戻して覚える(早口の床の材料)。
-            if (_playStartAt > 0) noteVoicePacePlayed(_voicePaceState, Date.now() - _playStartAt, 1, boostAtSynth);
+            if (_playStartAt > 0) noteVoicePacePlayed(_voicePaceState, Date.now() - _playStartAt, playbackRate, boostAtSynth);
             resolve();
           };
           const onMeta = () => {
             const dur = Number(audio.duration);
-            if (Number.isFinite(dur) && dur > 0) armWatchdog(dur * 1000 + 1500);
+            if (Number.isFinite(dur) && dur > 0) armWatchdog((dur * 1000) / playbackRate + 1500);
           };
           _voiceStopCurrent = () => {
             try {

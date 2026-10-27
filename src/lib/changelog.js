@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1798',
+    date: '2026-10-27',
+    summary: 'コメビュも読み上げの遅れに再生速度で追いつく',
+    items: Object.freeze([
+      'コメビュは、先に作っておいた声を作った時の速さのまま読んでいたため、遅れがたまり始めても追いつくのが1〜2件遅れ、最初の遅れが放送ページの2倍(約4.6秒)まで伸びていました。放送ページと同じく、読む直前に今の混み具合を見て、必要なら再生速度を少し上げて追いつくようにしました(声の高さは変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1797',
     date: '2026-10-27',
     summary: '読み上げの遅れがたまったら少し早口で追いつく',
@@ -171,14 +179,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '声ごとの聞こえの大きさをそろえる',
     items: Object.freeze([
       '読み上げの音量を「一番大きい瞬間」だけでなく「聞こえの大きさ」でもそろえるようにしました。声によって大きく聞こえたり小さく聞こえたりする差が縮みます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1778',
-    date: '2026-10-26',
-    summary: '会場の声の裏読み込みが15秒止まるのを直す',
-    items: Object.freeze([
-      '会場(視聴ページ)で声を裏で読み込む時、VOICEVOX の「中身なし」の返事を受け取れず15秒の打ち切りまで止まっていたのを直しました。その間ほかの声の準備も待たされていました。'
     ])
   })
 ]);
