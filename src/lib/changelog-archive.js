@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1763',
+    date: '2026-10-25',
+    summary: 'アプリは iPhone の声で読み上げ',
+    items: Object.freeze([
+      'iPhone アプリの中では、🗣 の読み上げを iPhone 本体の声にしました。画面を閉じても読み続け、PC の VOICEVOX が動いていなくても読めます。',
+      'Safari や PC のブラウザでは、今までどおり PC の VOICEVOX の声で読みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1762',
     date: '2026-10-25',
     summary: 'iPhone アプリの開始画面・デモ・通知',

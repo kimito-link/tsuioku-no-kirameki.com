@@ -11,7 +11,8 @@ import {
   knownVoiceStylePeak,
   knownVoiceStyleRms,
   rememberVoiceStylePeak,
-  resetVoiceStylePeaksForTest
+  resetVoiceStylePeaksForTest,
+  voiceStyleLevelsSnapshot
 } from './voiceStream.js';
 import { VOICE_PEAK_CEILING } from './voiceVolume.js';
 import {
@@ -170,6 +171,15 @@ describe('createStreamGain', () => {
     const v = new StreamedVoice(24000);
     v.append(Int16Array.from([16384, -16384, 0]));
     expect(v.rms).toBeCloseTo(0.5);
+  });
+  it('v0.1.1783: 声ごとの素の大きさを試験の記録用に取り出せる(RMS が分からない声は -1)', () => {
+    resetVoiceStylePeaksForTest();
+    rememberVoiceStylePeak(3, 0.48, 0.08);
+    rememberVoiceStylePeak(8, 0.3);
+    expect(voiceStyleLevelsSnapshot()).toEqual({
+      3: { peak: 0.48, rms: 0.08, crestDb: 15.6 },
+      8: { peak: 0.3, rms: -1, crestDb: -1 }
+    });
   });
   it('v0.1.1775: 声ごとの大きさを覚える(直近寄りの平均)', () => {
     resetVoiceStylePeaksForTest();
