@@ -1,7 +1,7 @@
 // voiceTestHook.js — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
 //   起動のしかた(どちらも開発版=manifest に key があるときだけ):
 //   - runtime メッセージ { type: 'NLS_VOICE_TEST', target: 'comeview'|'venue', kind, count, label }
-//   - コメビュの URL に ?voice=1&voicetest=short|long|burst(&voicetestn=10)
+//   - コメビュの URL に ?voice=1&voicetest=short|long|burst|mixed(&voicetestn=10)
 //   結果は chrome.storage.local の nls_voice_test_report_v1(配列)に残る。
 //   v0.1.1782: { ..., ping: true } を送ると、試験を始めずに { ok: true, ready: true, running, voiceOn } を返す。
 //   空の返事(=まだ入口がつながっていない)なら少し待って送り直す(開いた直後の最初の1通が消えていた)。

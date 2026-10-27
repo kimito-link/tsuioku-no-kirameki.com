@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1799',
+    date: '2026-10-28',
+    summary: 'コメビュも混雑時は本文を短めに(放送ページと同じ)',
+    items: Object.freeze([
+      'コメビュは、混んで早口にしている時に本文を短くする仕組みが無く、放送ページより長く読んでいました。放送ページと同じ上限にそろえました。',
+      '開発版の読み上げ試験に、短文と長文が混ざった本番に近い流れと、1件ごとの鳴り始め・長さ・飛ばしの記録を足しました(ストア版には入りません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1798',
     date: '2026-10-27',
     summary: 'コメビュも読み上げの遅れに再生速度で追いつく',
@@ -171,14 +180,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '初めての声も聞こえの大きさをそろえる',
     items: Object.freeze([
       '初めて読み上げる声も、最初に届いた分で聞こえの大きさを見積もり、大きすぎる声を下げるようにしました(これまでは一度鳴らした声だけでした)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1779',
-    date: '2026-10-26',
-    summary: '声ごとの聞こえの大きさをそろえる',
-    items: Object.freeze([
-      '読み上げの音量を「一番大きい瞬間」だけでなく「聞こえの大きさ」でもそろえるようにしました。声によって大きく聞こえたり小さく聞こえたりする差が縮みます。'
     ])
   })
 ]);
