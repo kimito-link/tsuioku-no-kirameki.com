@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1783',
+    date: '2026-10-27',
+    summary: '試験で声ごとの素の大きさを記録',
+    items: Object.freeze([
+      '開発版の読み上げ試験の記録に、声ごとの素の大きさ(最大振幅と聞こえの大きさ)を残すようにしました。声ごとの音量差を、実際の声の形を見てから直すための計器です(ふだんの動きは変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1782',
     date: '2026-10-27',
     summary: '読み上げ中は声の裏読み込みを待つ',
@@ -185,15 +193,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'アプリで応援ランキングを見られる',
     items: Object.freeze([
       'iPhone アプリ(とスマホ)で、PC が無くても「いま配信中の応援ランキング」を見られるようにしました。開始画面の 🏆 から開けます。中身はサイトの「追憶のきらめき ランキング」と同じです。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1763',
-    date: '2026-10-25',
-    summary: 'アプリは iPhone の声で読み上げ',
-    items: Object.freeze([
-      'iPhone アプリの中では、🗣 の読み上げを iPhone 本体の声にしました。画面を閉じても読み続け、PC の VOICEVOX が動いていなくても読めます。',
-      'Safari や PC のブラウザでは、今までどおり PC の VOICEVOX の声で読みます。'
     ])
   })
 ]);
