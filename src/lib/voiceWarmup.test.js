@@ -372,10 +372,18 @@ describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本�
     w.markWarm(13);
     const voice = new StreamedVoice(24000);
     const f = withVoiceWarmup(w, async () => voice);
-    await f('長文', { styleId: 13 }, { stream: true });
+    await f('あ'.repeat(30), { styleId: 13 }, { stream: true });
     expect(voice.styleId).toBe(13);
     voice.append(Int16Array.from([16384, -100]));
     voice.finish();
+    await flush();
+    expect(knownVoiceStylePeak(13)).toBeCloseTo(0.5);
+    // v0.1.1787: 短い文の大きさは覚えない
+    const shortVoice = new StreamedVoice(24000);
+    const g = withVoiceWarmup(w, async () => shortVoice);
+    await g('短い', { styleId: 13 }, { stream: true });
+    shortVoice.append(Int16Array.from([4000, -100]));
+    shortVoice.finish();
     await flush();
     expect(knownVoiceStylePeak(13)).toBeCloseTo(0.5);
   });

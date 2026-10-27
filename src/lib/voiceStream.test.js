@@ -12,6 +12,8 @@ import {
   knownVoiceStyleRms,
   rememberVoiceStylePeak,
   resetVoiceStylePeaksForTest,
+  VOICE_STREAM_MIN_RMS_SAMPLES,
+  VOICE_STREAM_TYPICAL_CREST,
   voiceStyleLevelsSnapshot
 } from './voiceStream.js';
 import { VOICE_PEAK_CEILING } from './voiceVolume.js';
@@ -130,11 +132,24 @@ describe('createStreamGain', () => {
   });
   it('v0.1.1774: もともと小さい声は、最初に届いた分の大きさから倍率を上げる(知らない声は上げすぎない)', () => {
     const g = createStreamGain(100);
-    // 素の最大振幅 7%(ささやき系)。仮定(45%)のままだと狙いの約15%しか出なかった。
-    const out = g.process(Int16Array.from([2300, -2300]));
+    // v0.1.1786: 素の最大振幅 27%(全127声の長文で最も小さい声・ささやき系は読み上げに使わない)。
+    //   知らない声は上げすぎない側(下限 0.4)に倒すので、1件目は狙いの約7割(2件目からは覚えた大きさで揃う)。
+    const out = g.process(Int16Array.from([8847, -8847]));
     const peak = Math.max(...Array.from(out, Math.abs));
-    expect(peak / g.targetPeak).toBeGreaterThan(0.3);
+    expect(peak / g.targetPeak).toBeGreaterThan(0.6);
+    expect(g.gain).toBeLessThanOrEqual(g.targetPeak / 0.4 + 1e-9);
     expect(g.outPeak).toBeLessThanOrEqual(VOICE_PEAK_CEILING);
+  });
+  it('v0.1.1785: 初めての声で出だしの最大振幅が小さくても、RMS から見積もって上げすぎない', () => {
+    // 出だし: 最大振幅 12%・RMS 約 6%(実測の長文の出だしに近い)。最大振幅だけなら下限 0.2 で 2.4倍になっていた。
+    const n = VOICE_STREAM_MIN_RMS_SAMPLES + 400;
+    const chunk = Int16Array.from({ length: n }, (_, i) => (i === 0 ? 3932 : (i % 2 ? 1 : -1) * 1966));
+    const g = createStreamGain(100);
+    g.process(chunk);
+    const rms = 1966 / 32768;
+    const est = Math.max(0.4, rms * VOICE_STREAM_TYPICAL_CREST);
+    expect(g.gain).toBeCloseTo(Math.min(g.targetPeak / est, (g.targetPeak * 0.25) / rms), 2);
+    expect(g.gain).toBeLessThan(g.targetPeak / 0.2 - 0.5);
   });
   it('v0.1.1775: 前に鳴らした同じ声の大きさを知っていれば、それを基準に狙いへ合わせる', () => {
     const g = createStreamGain(100, { knownPeak: 0.08 });
@@ -190,6 +205,16 @@ describe('createStreamGain', () => {
     rememberVoiceStylePeak(8, 5);
     rememberVoiceStylePeak('x', 0.3);
     expect(knownVoiceStylePeak(8)).toBeCloseTo(0.3);
+  });
+  it('v0.1.1787: 短い文の大きさは覚えない(次の長い文を大きくしすぎない)', () => {
+    resetVoiceStylePeaksForTest();
+    rememberVoiceStylePeak(3, 0.48, 0.08, 40);
+    rememberVoiceStylePeak(3, 0.2, 0.05, 8);
+    rememberVoiceStylePeak(3, 0.2, 0.05, 29);
+    expect(knownVoiceStylePeak(3)).toBeCloseTo(0.48);
+    expect(knownVoiceStyleRms(3)).toBeCloseTo(0.08);
+    rememberVoiceStylePeak(3, 0.4, 0.08, 30);
+    expect(knownVoiceStylePeak(3)).toBeCloseTo(0.44);
   });
   it('v0.1.1774: 普段の大きさの声は、最初の分から決めても狙いの近く', () => {
     const g = createStreamGain(100);
