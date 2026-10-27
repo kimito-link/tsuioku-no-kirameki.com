@@ -48,9 +48,10 @@ export function createVoiceReaderLeaseTable(opts = {}) {
 }
 
 /**
- * ページ側の口。mayRead(liveId) は同期で答える(コメントが届いた瞬間に決めるため)。
- *   答えは直近の名乗りの結果。名乗りは beat() で定期的に、mayRead() の時にも裏で送る。
- *   まだ答えが無い・古い(TTL 超え)・配信が変わった時は「読んでよい」。
+ * ページ側の口。check(liveId) で「読んでよいか」を答える。
+ *   直近の名乗りの答えが新しければそれを即座に返し、無い・古い時は名乗りの返事を待ってから答える
+ *   (v0.1.1794 の初版は答えが無い時に「読む」としていて、コメビュを開いた直後・会場を開き直した直後の
+ *   最初の数件が二重に読まれた=PC 試験)。返事が来ない・壊れている時は「読む」。
  * @param {(msg: Record<string, unknown>) => (Promise<unknown> | unknown)} sendMessage
  * @param {{ now?: () => number, holder?: string }} [opts]
  */
@@ -61,8 +62,15 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
   let lastGranted = true;
   let lastAnswerAt = -Infinity;
   let lastSentAt = -Infinity;
+  /** @type {Promise<void> | null} */
+  let inflight = null;
   /** @param {string} lv */
-  const claim = async (lv) => {
+  const claim = (lv) => {
+    if (!inflight) inflight = claimOnce(lv).finally(() => { inflight = null; });
+    return inflight;
+  };
+  /** @param {string} lv */
+  const claimOnce = async (lv) => {
     lastSentAt = now();
     /** @type {unknown} */
     let timer = null;
@@ -84,7 +92,9 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
   };
   /** @param {unknown} liveId */
   const norm = (liveId) => String(liveId || '').trim().toLowerCase();
-  return {
+  /** @type {Promise<unknown>} */
+  let chain = Promise.resolve();
+  const link = {
     holder,
     /** 読んでいる間の合図(定期的に呼ぶ)。 */
     beat(/** @type {unknown} */ liveId) {
@@ -94,16 +104,31 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
       return claim(lv);
     },
     /**
+     * 読んでよいか(届いた順に答える)。
      * @param {unknown} liveId
-     * @returns {boolean}
+     * @returns {Promise<boolean>}
      */
-    mayRead(liveId) {
+    async check(liveId) {
       const lv = norm(liveId);
       if (!lv) return true;
       if (lv !== lastLive) { lastLive = lv; lastGranted = true; lastAnswerAt = -Infinity; }
-      if (now() - lastSentAt >= VOICE_READER_LEASE_BEAT_MS / 2) void claim(lv);
-      const fresh = now() - lastAnswerAt <= VOICE_READER_LEASE_TTL_MS;
-      return !fresh || lastGranted;
+      const isFresh = () => now() - lastAnswerAt <= VOICE_READER_LEASE_TTL_MS;
+      if (!isFresh()) await claim(lv);
+      else if (now() - lastSentAt >= VOICE_READER_LEASE_BEAT_MS / 2) void claim(lv);
+      return !isFresh() || lastGranted;
+    },
+    /**
+     * 読んでよければ onMine、もう片方が読んでいれば onYield を呼ぶ(届いた順を崩さない)。
+     * @param {unknown} liveId
+     * @param {() => unknown} onMine
+     * @param {() => unknown} [onYield]
+     */
+    whenMine(liveId, onMine, onYield) {
+      chain = chain
+        .then(() => link.check(liveId))
+        .then((ok) => (ok ? onMine() : onYield?.()))
+        .catch(() => {});
+      return chain;
     },
     /** もう読まない(窓を閉じる・読み上げを切った)。 */
     release() {
@@ -115,6 +140,7 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
       } catch { /* no-op */ }
     }
   };
+  return link;
 }
 
 /**

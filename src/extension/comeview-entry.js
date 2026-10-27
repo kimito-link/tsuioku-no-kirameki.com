@@ -994,12 +994,11 @@ async function drainVoiceQueue() {
 /** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
 function enqueueLiveVoiceItems(items) {
   if (!_voiceReadingEnabled || !Array.isArray(items) || !items.length) return;
-  if (_voiceReaderLease && !_voiceReaderLease.mayRead(_liveId)) {
+  if (!_voiceReaderLease) { enqueueVoiceTimelineItems(items); return; }
+  void _voiceReaderLease.whenMine(_liveId, () => enqueueVoiceTimelineItems(items), () => {
     _voiceDiag.readerYieldTotal = (Number(_voiceDiag.readerYieldTotal) || 0) + items.length;
     publishVoiceDiag();
-    return;
-  }
-  enqueueVoiceTimelineItems(items);
+  });
 }
 
 function enqueueVoiceTimelineItems(items) {
