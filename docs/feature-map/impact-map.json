@@ -2242,6 +2242,20 @@
       ]
     },
     {
+      "file": "src/lib/voiceReaderLease.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceReadQueue.js",
       "featureCount": 3,
       "features": [

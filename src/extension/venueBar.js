@@ -370,6 +370,7 @@ import {
   probeVoicevoxStreaming
 } from '../lib/voicevoxClient.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { chromeVoiceReaderLeaseLink, VOICE_READER_LEASE_BEAT_MS } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3399,6 +3400,21 @@ export function mountVenueBarButton(options = {}) {
   });
   wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
+  // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(src/lib/voiceReaderLease.js)。
+  //   会場を開いて読み上げが ON の間だけ名乗り、閉じる・OFF にしたら手放す。
+  const venueReaderLease = chromeVoiceReaderLeaseLink();
+  let venueReaderBeating = false;
+  setInterval(() => {
+    if (!venueReaderLease) return;
+    if (open && voicePlayer.enabled) {
+      void venueReaderLease.beat(liveIdFromPathname());
+      venueReaderBeating = true;
+    } else if (venueReaderBeating) {
+      venueReaderLease.release();
+      venueReaderBeating = false;
+    }
+  }, VOICE_READER_LEASE_BEAT_MS);
+  window.addEventListener('pagehide', () => { venueReaderLease?.release(); });
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {
       voicePlayer.disable();
@@ -6741,7 +6757,11 @@ export function mountVenueBarButton(options = {}) {
       maybeThrowGiftFromSpeech(speech);
       // 2026-07-06: 来場システムメッセージならパチンコ入賞演出(保留玉が入る)として投げる。
       maybeThrowArrivalFromSpeech(speech);
-      if (voicePlayer.enabled) {
+      if (voicePlayer.enabled && venueReaderLease && !venueReaderLease.mayRead(liveIdFromPathname())) {
+        // コメビュが同じ配信を読んでいる=ここでは鳴らさない。吹き出しは声なしの寿命へ。
+        if (bubble) markBubbleResolved(bubble);
+        voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1;
+      } else if (voicePlayer.enabled) {
         // v0.1.771: 吹き出しを読み上げに連動。実際に鳴り始めたら speaking(消さない)、鳴り終えたら done。
         // v0.1.799「読み上げとコメントがずれる」根治: 床を鮮度ゲート(8秒)に合わせたので、鳴らずに
         //   捨てられた吹き出しが pending のまま8秒残らないよう、onDropped(再生では発火しない drop 専用
