@@ -12,6 +12,8 @@ import {
   knownVoiceStyleRms,
   rememberVoiceStylePeak,
   resetVoiceStylePeaksForTest,
+  VOICE_STREAM_MIN_RMS_SAMPLES,
+  VOICE_STREAM_TYPICAL_CREST,
   voiceStyleLevelsSnapshot
 } from './voiceStream.js';
 import { VOICE_PEAK_CEILING } from './voiceVolume.js';
@@ -135,6 +137,16 @@ describe('createStreamGain', () => {
     const peak = Math.max(...Array.from(out, Math.abs));
     expect(peak / g.targetPeak).toBeGreaterThan(0.3);
     expect(g.outPeak).toBeLessThanOrEqual(VOICE_PEAK_CEILING);
+  });
+  it('v0.1.1785: 初めての声で出だしの最大振幅が小さくても、RMS から見積もって上げすぎない', () => {
+    // 出だし: 最大振幅 12%・RMS 約 6%(実測の長文の出だしに近い)。最大振幅だけなら下限 0.2 で 2.4倍になっていた。
+    const n = VOICE_STREAM_MIN_RMS_SAMPLES + 400;
+    const chunk = Int16Array.from({ length: n }, (_, i) => (i === 0 ? 3932 : (i % 2 ? 1 : -1) * 1966));
+    const g = createStreamGain(100);
+    g.process(chunk);
+    const rms = 1966 / 32768;
+    expect(g.gain).toBeCloseTo(Math.min(g.targetPeak / (rms * VOICE_STREAM_TYPICAL_CREST), (g.targetPeak * 0.25) / rms), 2);
+    expect(g.gain).toBeLessThan(g.targetPeak / 0.2 - 0.5);
   });
   it('v0.1.1775: 前に鳴らした同じ声の大きさを知っていれば、それを基準に狙いへ合わせる', () => {
     const g = createStreamGain(100, { knownPeak: 0.08 });

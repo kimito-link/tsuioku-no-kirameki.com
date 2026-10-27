@@ -53,6 +53,12 @@ export const VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
  */
 export const VOICE_STREAM_MIN_EST_PEAK = 0.2;
 
+/**
+ * 素の声の「最大振幅÷RMS」のふつうの値(v0.1.1785)。PC 実測の長文で 15.8〜18.3dB(6.2〜8.2倍)。
+ *   小さめ(16dB)に置く=初めての声の最大振幅を小さく見積もりすぎない側(倍率を上げすぎない側)。
+ */
+export const VOICE_STREAM_TYPICAL_CREST = 6.3;
+
 /** 声(styleId)ごとに、これまで鳴らした素の最大振幅(v0.1.1775)。少しずつ読む時の最初の倍率に使う。 */
 /** @type {Map<string, number>} */
 const stylePeaks = new Map();
@@ -383,12 +389,9 @@ export function createStreamGain(volumePercent, opts = {}) {
         //   文の後半はもう少し大きくなりがちなので 1.25倍の余裕を見る。天井を超えそうなら下で下げる。
         //   v0.1.1775: 同じ声を前に鳴らしていれば、その大きさを基準にする(出だしだけでは分からないため)。
         const first = (peak / 32768) * VOICE_STREAM_FIRST_PEAK_HEADROOM;
-        const est = knownPeak > 0 ? Math.max(knownPeak, first) : Math.max(first, VOICE_STREAM_MIN_EST_PEAK);
-        gain = Math.min(VOICE_MAX_BOOST, target / est);
-        // v0.1.1779: 前に鳴らした声の聞こえの大きさが分かれば、詰まった声を狙いの RMS まで下げる(voiceVolume.js)。
-        //   初めての声は、最初に届いた分の RMS で見積もる(出だしは文全体より静かなことが多い=下げすぎにはなりにくい)。
+        // 最初に届いた分の RMS(有音が VOICE_STREAM_MIN_RMS_SAMPLES 以上ある時だけ・無ければ -1)。
         let firstRms = -1;
-        if (knownRms <= 0) {
+        if (knownRms <= 0 || knownPeak <= 0) {
           let sq = 0;
           let n = 0;
           for (let i = 0; i < samples.length; i++) {
@@ -396,6 +399,15 @@ export function createStreamGain(volumePercent, opts = {}) {
           }
           if (n >= VOICE_STREAM_MIN_RMS_SAMPLES) firstRms = Math.sqrt(sq / n);
         }
+        // v0.1.1785: 初めての声は、出だしの最大振幅だけでなく RMS×ふつうの比(VOICE_STREAM_TYPICAL_CREST)からも
+        //   最大振幅を見積もる。出だしの最大振幅が小さいと下限 0.2 で決まり倍率が 2.4倍になり、開いて最初の長文が
+        //   覚えた後より 6dB 大きく鳴った(PC 試験 v0.1.1784: 声ごとの差 9.4dB・覚えた後は 3.6〜5.3dB)。
+        const est = knownPeak > 0
+          ? Math.max(knownPeak, first)
+          : Math.max(first, firstRms > 0 ? Math.min(1, firstRms * VOICE_STREAM_TYPICAL_CREST) : 0, VOICE_STREAM_MIN_EST_PEAK);
+        gain = Math.min(VOICE_MAX_BOOST, target / est);
+        // v0.1.1779: 前に鳴らした声の聞こえの大きさが分かれば、詰まった声を狙いの RMS まで下げる(voiceVolume.js)。
+        //   初めての声は、最初に届いた分の RMS で見積もる(出だしは文全体より静かなことが多い=下げすぎにはなりにくい)。
         const estRms = knownRms > 0 ? knownRms : firstRms;
         if (estRms > 0) gain = Math.min(gain, (target * VOICE_TARGET_RMS_RATIO) / estRms);
       }
