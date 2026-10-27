@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   VOICE_READER_CLAIM,
   VOICE_READER_LEASE_TTL_MS,
   VOICE_READER_RELEASE,
   createVoiceReaderLeaseLink,
-  createVoiceReaderLeaseTable
+  createVoiceReaderLeaseTable,
+  startVoiceReaderLease,
+  VOICE_READER_LEASE_BEAT_MS
 } from './voiceReaderLease.js';
 
 /** 2つのページが1つの表(Background 役)を共有する。 */
@@ -69,4 +71,23 @@ describe('voiceReaderLease (v0.1.1794)', () => {
     expect(weird.mayRead('lv1')).toBe(true);
     expect(weird.mayRead('')).toBe(true);
   });
+  it('startVoiceReaderLease: 読み上げ中だけ名乗り、止めたら1回だけ手放す', () => {
+    vi.useFakeTimers();
+    try {
+      /** @type {string[]} */
+      const sent = [];
+      const link = createVoiceReaderLeaseLink((msg) => { sent.push(String(msg.type)); return Promise.resolve({ granted: true }); }, { holder: 'h' });
+      let active = true;
+      startVoiceReaderLease(() => active, () => 'lv1', { link });
+      vi.advanceTimersByTime(VOICE_READER_LEASE_BEAT_MS * 2);
+      expect(sent.filter((t) => t === VOICE_READER_CLAIM)).toHaveLength(2);
+      active = false;
+      vi.advanceTimersByTime(VOICE_READER_LEASE_BEAT_MS * 3);
+      expect(sent.filter((t) => t === VOICE_READER_RELEASE)).toHaveLength(1);
+      expect(startVoiceReaderLease(() => true, () => 'lv1', { link: null })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
+
