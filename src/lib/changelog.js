@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1784',
+    date: '2026-10-27',
+    summary: '読み上げ試験の開始待ちを直す',
+    items: Object.freeze([
+      '開発版の読み上げ試験で、読み上げを ON にしている途中に始めると「OFF です」と止まっていたのを、ON になり終わるまで待つようにしました(ふだんの動きは変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1783',
     date: '2026-10-27',
     summary: '試験で声ごとの素の大きさを記録',
@@ -185,14 +193,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       '読み上げで初めて使う声は、合成の前に VOICEVOX へ声を読み込んでから読むようにしました。これまでは読み込みに3秒以上かかると、その人の最初のコメントが黙って飛ばされることがありました。',
       '読み上げを ON にした直後に、VOICEVOX を一度だけ起こしておきます(起動直後の最初の1件が遅れないように)。',
       '状態速報の「合成失敗の理由」で、音声解析の時間切れと音声合成の時間切れを分けて出すようにしました。「遅れの段階」には声の読み込みにかかった時間も出ます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1764',
-    date: '2026-10-25',
-    summary: 'アプリで応援ランキングを見られる',
-    items: Object.freeze([
-      'iPhone アプリ(とスマホ)で、PC が無くても「いま配信中の応援ランキング」を見られるようにしました。開始画面の 🏆 から開けます。中身はサイトの「追憶のきらめき ランキング」と同じです。'
     ])
   })
 ]);

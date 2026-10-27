@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1764',
+    date: '2026-10-25',
+    summary: 'アプリで応援ランキングを見られる',
+    items: Object.freeze([
+      'iPhone アプリ(とスマホ)で、PC が無くても「いま配信中の応援ランキング」を見られるようにしました。開始画面の 🏆 から開けます。中身はサイトの「追憶のきらめき ランキング」と同じです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1763',
     date: '2026-10-25',
     summary: 'アプリは iPhone の声で読み上げ',
