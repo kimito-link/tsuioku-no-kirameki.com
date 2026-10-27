@@ -3,6 +3,8 @@
 //   - runtime メッセージ { type: 'NLS_VOICE_TEST', target: 'comeview'|'venue', kind, count, label }
 //   - コメビュの URL に ?voice=1&voicetest=short|long|burst(&voicetestn=10)
 //   結果は chrome.storage.local の nls_voice_test_report_v1(配列)に残る。
+//   v0.1.1782: { ..., ping: true } を送ると、試験を始めずに { ok: true, ready: true, running } を返す。
+//   空の返事(=まだ入口がつながっていない)なら少し待って送り直す(開いた直後の最初の1通が消えていた)。
 
 import {
   appendVoiceTestReport,
@@ -52,6 +54,10 @@ export function wireVoiceTestHook(o) {
   try {
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (!msg || msg.type !== VOICE_TEST_MESSAGE || msg.target !== o.target) return false;
+      if (msg.ping === true) {
+        sendResponse({ ok: true, ready: true, running });
+        return false;
+      }
       void start(msg).then(sendResponse, () => sendResponse({ ok: false, reason: 'error' }));
       return true;
     });

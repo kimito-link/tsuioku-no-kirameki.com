@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1782',
+    date: '2026-10-27',
+    summary: '読み上げ中は声の裏読み込みを待つ',
+    items: Object.freeze([
+      '会場かコメビュが声を鳴らしている間や、次のコメントを待つ短い間に、もう片方のページが声の読み込みを始めないようにしました。グラボの無い PC で、起動直後に声が出るまでの遅れが減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1781',
     date: '2026-10-27',
     summary: '会場とコメビュで声の準備を譲り合う',
@@ -186,16 +194,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'iPhone アプリの中では、🗣 の読み上げを iPhone 本体の声にしました。画面を閉じても読み続け、PC の VOICEVOX が動いていなくても読めます。',
       'Safari や PC のブラウザでは、今までどおり PC の VOICEVOX の声で読みます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1762',
-    date: '2026-10-25',
-    summary: 'iPhone アプリの開始画面・デモ・通知',
-    items: Object.freeze([
-      'iPhone アプリ(追憶のきらめき ライブビュー)の準備を入れました。アプリが最初に開く開始画面(/phone)で、PC の拡張の「📱 スマホへ送信」のリンクを貼ると、次からは自動で開きます。',
-      'PC が無くても試せるデモ(/live-view?v=demo)を足しました。作り物の配信が端末の中だけで流れます(サーバーには取りに行きません)。',
-      'アプリの中だけで動く機能: ギフトが届いたら通知と振動(🔔)、画面を閉じても続く読み上げ、配信の共有(📤)、見たくない人を隠す・報告する(🚩)。Safari や PC のブラウザでは今までと同じです。'
     ])
   })
 ]);

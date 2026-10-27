@@ -5,6 +5,8 @@ import {
   withVoiceWarmup,
   wireVoiceWarmupHooks,
   VOICE_IDLE_INIT_DELAY_MS,
+  VOICE_REMOTE_QUIET_MS,
+  VOICE_BUSY_PING_INTERVAL_MS,
   VOICE_STREAM_GATE_MAX_MS,
   VOICE_WARMUP_QUERY_TIMEOUT_MS
 } from './voiceWarmup.js';
@@ -415,7 +417,7 @@ describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本�
     for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
     expect(calls).toEqual([]);
     expect(diag.bgInitYieldTotal).toBeGreaterThanOrEqual(2);
-    remoteQuiet = VOICE_IDLE_INIT_DELAY_MS;
+    remoteQuiet = VOICE_REMOTE_QUIET_MS;
     await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
     expect(calls).toEqual([8]);
   });
@@ -429,5 +431,38 @@ describe('v0.1.1772: 温まっていない声は借りて今すぐ読み、本�
     const f = withVoiceWarmup(w, async () => new ArrayBuffer(4));
     await f('こんにちは', { styleId: 3 }, {});
     expect(ping).toHaveBeenCalledTimes(4);
+  });
+
+  it('v0.1.1782: もう片方のページが静かでも 4秒未満なら裏の読み込みを始めない', async () => {
+    vi.useFakeTimers();
+    const calls = [];
+    const w = createVoiceWarmup({ initSpeaker: async (id) => { calls.push(id); return true; } });
+    let remoteQuiet = VOICE_IDLE_INIT_DELAY_MS;
+    wireVoiceWarmupHooks(w, () => true, () => ({}), { ping: () => {}, quietMs: async () => remoteQuiet });
+    void w.ensureWhenIdle(8);
+    for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(calls).toEqual([]);
+    remoteQuiet = VOICE_REMOTE_QUIET_MS;
+    await vi.advanceTimersByTimeAsync(VOICE_IDLE_INIT_DELAY_MS);
+    expect(calls).toEqual([8]);
+  });
+
+  it('v0.1.1782: 再生中・順番待ちの間は、もう片方のページへ「使っている」と知らせ続ける', async () => {
+    vi.useFakeTimers();
+    const ping = vi.fn();
+    const w = createVoiceWarmup({ initSpeaker: async () => true });
+    let idle = false;
+    wireVoiceWarmupHooks(w, () => idle, () => ({}), { ping, quietMs: async () => Infinity });
+    await vi.advanceTimersByTimeAsync(VOICE_BUSY_PING_INTERVAL_MS * 3);
+    expect(ping).toHaveBeenCalledTimes(3);
+    idle = true;
+    await vi.advanceTimersByTimeAsync(VOICE_BUSY_PING_INTERVAL_MS * 3);
+    expect(ping).toHaveBeenCalledTimes(3);
+    // つなぎ直しても知らせが二重にならない
+    idle = false;
+    wireVoiceWarmupHooks(w, () => idle, () => ({}), { ping, quietMs: async () => Infinity });
+    await vi.advanceTimersByTimeAsync(VOICE_BUSY_PING_INTERVAL_MS);
+    expect(ping).toHaveBeenCalledTimes(4);
+    wireVoiceWarmupHooks(w, () => idle, () => ({}), null);
   });
 });
