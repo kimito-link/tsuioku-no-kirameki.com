@@ -322,7 +322,7 @@ export function computeSustainedPressureBoost(inputs) {
 
 /** v0.1.1797: 順番待ちがこれを超えたら少し早口にして追いつく(ms)。 */
 export const VOICE_BACKLOG_WAIT_START_MS = 1500;
-/** 順番待ち由来の上乗せの上限(待ち 7.5秒で到達)。 */
+/** 順番待ち由来の上乗せの上限(待ち 4.5秒で到達)。 */
 export const VOICE_BACKLOG_BOOST_MAX = 0.3;
 
 /**
@@ -337,7 +337,8 @@ export const VOICE_BACKLOG_BOOST_MAX = 0.3;
 export function computeBacklogCatchUpBoost(queueWaitMs) {
   const w = Number(queueWaitMs);
   if (!Number.isFinite(w) || w <= VOICE_BACKLOG_WAIT_START_MS) return 0;
-  return Math.min(VOICE_BACKLOG_BOOST_MAX, ((w - VOICE_BACKLOG_WAIT_START_MS) / 1000) * 0.05);
+  // 1秒あたり +0.1(PC 試験: +0.05 では10件目でも +0.12〜0.15 までしか上がらず、遅れは 5〜6秒で止まるだけだった)。
+  return Math.min(VOICE_BACKLOG_BOOST_MAX, ((w - VOICE_BACKLOG_WAIT_START_MS) / 1000) * 0.1);
 }
 
 /**
