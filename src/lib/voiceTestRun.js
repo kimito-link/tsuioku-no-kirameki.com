@@ -13,7 +13,7 @@ export const VOICE_TEST_REPORT_KEY = 'nls_voice_test_report_v1';
 export const VOICE_TEST_REPORT_KEEP = 20;
 /** 試験を始める runtime メッセージの type。target は 'comeview' か 'venue'。 */
 export const VOICE_TEST_MESSAGE = 'NLS_VOICE_TEST';
-export const VOICE_TEST_KINDS = Object.freeze(['short', 'long', 'burst']);
+export const VOICE_TEST_KINDS = Object.freeze(['short', 'long', 'burst', 'mixed']);
 
 /**
  * 開発版(manifest に key がある)だけ試験を許す。
@@ -40,8 +40,22 @@ const LONG_TEXTS = Object.freeze([
 ]);
 
 /**
+ * v0.1.1799: 'mixed' = 本番の流れに近い、決まった並び(毎回同じ=前後の版を比べられる)。
+ *   [前からの間隔ms, 長文か]。短文が続く所・長文が続く所・3件いっぺん・しばらく静か、を混ぜた約2分。
+ */
+const MIXED_PLAN = Object.freeze([
+  [0, false], [1200, false], [2500, true], [800, false], [300, false],
+  [300, false], [4000, true], [3000, true], [1500, false], [6000, false],
+  [500, true], [500, false], [2000, false], [7000, true], [2500, true],
+  [1000, false], [200, false], [200, false], [200, true], [9000, false],
+  [3500, true], [1800, false], [1200, false], [4500, true], [600, false],
+  [600, true], [5000, false], [2200, true], [1400, false], [3000, false]
+]);
+
+/**
  * 試験で流すコメントと、前のコメントからの間隔(ms)。userId は毎回新しい(=初めての声も試す)。
  * @param {unknown} kind 'short'(1.5秒おき)/ 'long'(40字以上・7秒おき=読み終わるより先に次が来ない間隔)/ 'burst'(1秒以内に全部)
+ *   / 'mixed'(短文と長文・間隔ばらばらの決まった並び・最大30件)
  * @param {unknown} count
  * @param {string} runId
  * @returns {{ gapMs: number, item: { kind: 'comment', userId: string, nickname: string, text: string } }[]}
@@ -49,6 +63,17 @@ const LONG_TEXTS = Object.freeze([
 export function buildVoiceTestItems(kind, count, runId) {
   const k = VOICE_TEST_KINDS.includes(/** @type {any} */ (kind)) ? /** @type {string} */ (kind) : 'short';
   const n = Math.max(1, Math.min(30, Math.floor(Number(count)) || 10));
+  if (k === 'mixed') {
+    return MIXED_PLAN.slice(0, n).map(([gapMs, isLong], i) => ({
+      gapMs,
+      item: {
+        kind: 'comment',
+        userId: `voicetest-${runId}-${i}`,
+        nickname: `試験${i + 1}`,
+        text: (isLong ? LONG_TEXTS : SHORT_TEXTS)[i % 10]
+      }
+    }));
+  }
   const texts = k === 'long' ? LONG_TEXTS : SHORT_TEXTS;
   // v0.1.1773: 長文は1件約5〜6秒の声なので、4秒おきだと読むより来る方が速く、どの PC でも遅れが積もった。
   const gap = k === 'long' ? 7000 : k === 'burst' ? 100 : 1500;
