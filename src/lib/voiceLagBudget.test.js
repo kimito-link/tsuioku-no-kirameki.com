@@ -434,3 +434,96 @@ describe('mergeVoiceSpeedBoost (v0.1.1222)', () => {
     expect(mergeVoiceSpeedBoost(undefined, 0.4)).toBeCloseTo(0.4, 5);
   });
 });
+
+describe('v0.1.1797 computeBacklogCatchUpBoost(順番待ちが伸びたら少し早口に)', async () => {
+  const { computeBacklogCatchUpBoost, VOICE_BACKLOG_BOOST_MAX, mergeVoiceSpeedBoost } = await import('./voiceLagBudget.js');
+  it('待ちが 1.5秒以下・未計測(-1)・壊れた値では上げない', () => {
+    for (const w of [-1, 0, 800, 1500, NaN, undefined, 'x']) expect(computeBacklogCatchUpBoost(w)).toBe(0);
+  });
+  it('待ちに比例して上がり、上限で止まる', () => {
+    expect(computeBacklogCatchUpBoost(2500)).toBeCloseTo(0.1);
+    expect(computeBacklogCatchUpBoost(3500)).toBeCloseTo(0.2);
+    expect(computeBacklogCatchUpBoost(4500)).toBeCloseTo(VOICE_BACKLOG_BOOST_MAX);
+    expect(computeBacklogCatchUpBoost(60000)).toBe(VOICE_BACKLOG_BOOST_MAX);
+  });
+  it('混雑の上乗せより小さければ、混雑の方を使う(下げない)', () => {
+    expect(mergeVoiceSpeedBoost(0.4, computeBacklogCatchUpBoost(3000))).toBe(0.4);
+    expect(mergeVoiceSpeedBoost(0, computeBacklogCatchUpBoost(3000))).toBeCloseTo(0.15);
+  });
+});
+
+describe('v0.1.1797 早口の床(追いついた後も釣り合う速さを保つ)', async () => {
+  const {
+    createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor,
+    computeBacklogCatchUpBoost, VOICE_BACKLOG_BOOST_MAX, VOICE_PACE_GAP_CAP_MS
+  } = await import('./voiceLagBudget.js');
+
+  it('見本が3件ずつ揃うまでは 0', () => {
+    const s = createVoicePaceState();
+    for (let i = 0; i < 3; i += 1) noteVoicePaceArrival(s, i * 7000); // 間隔は2件
+    for (let i = 0; i < 3; i += 1) noteVoicePacePlayed(s, 7640);
+    expect(computeVoicePaceFloor(s)).toBe(0);
+    noteVoicePaceArrival(s, 21000);
+    expect(computeVoicePaceFloor(s)).toBeCloseTo(7640 / 7000 - 1 + 0.03, 5);
+  });
+
+  it('声が間隔より短ければ 0・長すぎても上限まで', () => {
+    const s = createVoicePaceState();
+    for (let i = 0; i < 5; i += 1) { noteVoicePaceArrival(s, i * 7000); noteVoicePacePlayed(s, 3000); }
+    expect(computeVoicePaceFloor(s)).toBe(0);
+    const t = createVoicePaceState();
+    for (let i = 0; i < 5; i += 1) { noteVoicePaceArrival(t, i * 1000); noteVoicePacePlayed(t, 7000); }
+    expect(computeVoicePaceFloor(t)).toBe(VOICE_BACKLOG_BOOST_MAX);
+  });
+
+  it('早口・再生速度で鳴った長さは、ふつうの速さの長さに戻して覚える', () => {
+    const s = createVoicePaceState();
+    noteVoicePacePlayed(s, 5000, 1.2, 0.1);
+    expect(s.naturalEmaMs).toBeCloseTo(5000 * 1.2 * 1.1, 5);
+    noteVoicePacePlayed(s, NaN); noteVoicePacePlayed(s, 0); noteVoicePacePlayed(null, 1000);
+    expect(s.naturalCount).toBe(1);
+  });
+
+  it('長く静かだった間隔は上限で切る(過負荷ではない)', () => {
+    const s = createVoicePaceState();
+    noteVoicePaceArrival(s, 0);
+    noteVoicePaceArrival(s, 10 * 60 * 1000);
+    expect(s.gapEmaMs).toBe(VOICE_PACE_GAP_CAP_MS);
+  });
+
+  it('床は待ちの上乗せに足され、上限で止まる', () => {
+    expect(computeBacklogCatchUpBoost(0, 0.09)).toBeCloseTo(0.09);
+    expect(computeBacklogCatchUpBoost(2500, 0.09)).toBeCloseTo(0.19);
+    expect(computeBacklogCatchUpBoost(9000, 0.25)).toBe(VOICE_BACKLOG_BOOST_MAX);
+    expect(computeBacklogCatchUpBoost(0, -1)).toBe(0);
+    expect(computeBacklogCatchUpBoost(0, 'x')).toBe(0);
+  });
+
+  // PC 試験の再現: 1件7.64秒の声が7秒おきに20件。床が無いと遅れが 1秒前後 ↔ 4.5秒以上を往復した。
+  function simulate(/** @type {boolean} */ withFloor) {
+    const s = createVoicePaceState();
+    let waitEma = -1;
+    let prevEnd = 0;
+    const lags = [];
+    for (let i = 0; i < 20; i += 1) {
+      const arrival = i * 7000;
+      noteVoicePaceArrival(s, arrival);
+      const start = Math.max(arrival, prevEnd);
+      const wait = start - arrival;
+      waitEma = waitEma < 0 ? wait : waitEma + 0.3 * (wait - waitEma);
+      const boost = computeBacklogCatchUpBoost(waitEma, withFloor ? computeVoicePaceFloor(s) : 0);
+      const played = 7640 / (1 + boost);
+      noteVoicePacePlayed(s, played, 1, boost);
+      prevEnd = start + played;
+      lags.push(wait);
+    }
+    return lags;
+  }
+
+  it('床があると後半は遅れが消え、揺れない', () => {
+    const withFloor = simulate(true);
+    const without = simulate(false);
+    expect(Math.max(...withFloor.slice(-6))).toBeLessThan(100); // 最後の6件は遅れ 0.1秒未満
+    expect(Math.max(...withFloor.slice(10))).toBeLessThan(Math.min(...without.slice(10))); // どこを取っても床ありの方が小さい
+  });
+});

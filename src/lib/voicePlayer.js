@@ -31,7 +31,8 @@ import {
 import {
   updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax,
   updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict,
-  computeSustainedPressureBoost, mergeVoiceSpeedBoost
+  computeSustainedPressureBoost, mergeVoiceSpeedBoost, computeBacklogCatchUpBoost,
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
 } from './voiceLagBudget.js';
 import {
   createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage
@@ -143,6 +144,8 @@ export class VoicePlayer {
     //   serviceTimeEma=1件あたり処理時間のEMA、effectiveQueueMax=そこから計算した実効上限
     //   (pushVoiceQueueのmaxに実適用・床2〜天井8)、growStreak=復帰ヒステリシスの連続カウンタ。
     this._serviceTimeEmaMs = -1;
+    /** v0.1.1797: 届く間隔と声の長さ(追いついた後も保つ早口の床)。 */
+    this._paceState = createVoicePaceState();
     this._effectiveQueueMax = 8;
     this._growStreak = 0;
     // 2026-07-28(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md): 体感遅延
@@ -179,7 +182,7 @@ export class VoicePlayer {
       // v0.1.1222計器: 持続過負荷ブースト(pressure由来)。lastSustainedBoost=直近の上乗せ値、
       //   sustainedBoostTotal=キュー長では出せない速度を実際に足した累計。
       //   ★「速くしたのに読める数が増えたか」を後から検算するための計器(効果の裏取り用)。
-      lastSustainedBoost: 0, sustainedBoostTotal: 0,
+      lastSustainedBoost: 0, sustainedBoostTotal: 0, lastBacklogBoost: 0, lastPaceFloor: 0,
       dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0,
       // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
       //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
@@ -591,7 +594,13 @@ export class VoicePlayer {
       serviceTimeEmaMs: this._serviceTimeEmaMs,
       sampleCount: this._spokenSampleCount
     });
-    const merged = mergeVoiceSpeedBoost(congestionBoost, sustained);
+    // v0.1.1797: 順番待ちが伸びていたら、それでも上げる(pressure が 1.2 未満の「少しだけ足りない」を拾う)。
+    //   追いついた後も、声の長さが間隔を上回る分(床)だけは早口を保つ(0 に戻ると遅れが再び積もって揺れた)。
+    const paceFloor = computeVoicePaceFloor(this._paceState);
+    const backlog = computeBacklogCatchUpBoost(this.diag?.queueWaitEmaMs, paceFloor);
+    this.diag.lastPaceFloor = paceFloor;
+    this.diag.lastBacklogBoost = backlog;
+    const merged = mergeVoiceSpeedBoost(congestionBoost, Math.max(sustained, backlog));
     // 計器: 持続ブーストが実際に効いた累計(効果を後から検算できるようにする)。
     if (sustained > 0 && merged > congestionBoost) {
       this.diag.sustainedBoostTotal = (Number(this.diag.sustainedBoostTotal) || 0) + 1;
@@ -839,6 +848,7 @@ export class VoicePlayer {
                   const playbackMs = Math.max(0, Date.now() - _playbackStartAt);
                   this._playbackEmaMs = updateVoiceServiceTimeEma(this._playbackEmaMs, playbackMs);
                   this.diag.playbackEmaMs = this._playbackEmaMs;
+                  noteVoicePacePlayed(this._paceState, playbackMs, playbackRate, boostAtSynth);
                 } catch { /* 計測失敗は無視 */ }
               }
               // v0.1.771: 再生が終わった(ended/error/stop)→ 吹き出しに「読み上げ終了」を通知。
@@ -1027,6 +1037,7 @@ export class VoicePlayer {
       //   ラグ上界が安全網(8000ms)を超えるのを、実効上限の動的縮小で構造的に防ぐ。
       const pushed = pushVoiceQueue(this.queue, candidate, { max: this._effectiveQueueMax });
       this.queue = pushed.queue;
+      noteVoicePaceArrival(this._paceState, candidate.enqueuedAt);
       
       if (pushed.dropped && pushed.dropped.length > 0) {
         for (const dropped of pushed.dropped) {
