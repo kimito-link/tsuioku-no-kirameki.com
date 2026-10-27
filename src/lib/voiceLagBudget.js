@@ -320,6 +320,26 @@ export function computeSustainedPressureBoost(inputs) {
   return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(0, raw));
 }
 
+/** v0.1.1797: 順番待ちがこれを超えたら少し早口にして追いつく(ms)。 */
+export const VOICE_BACKLOG_WAIT_START_MS = 1500;
+/** 順番待ち由来の上乗せの上限(待ち 7.5秒で到達)。 */
+export const VOICE_BACKLOG_BOOST_MAX = 0.3;
+
+/**
+ * v0.1.1797: 順番待ち(キュー投入→取り出しの EMA)が伸びていたら、少し早口にして追いつく上乗せ値。
+ *   PC 試験: 1件約7.5秒の声が7秒おきに来ると、列は1件しか溜まらず(キュー長の混雑判定は 0)、
+ *   pressure も約1.07(しきい値 1.2 未満)で上がらないまま、遅れだけが1件ごとに 0.6〜1秒ずつ積もった
+ *   (10件目で 6〜7秒)。待ち時間そのものを見るので、この「少しだけ足りない」を拾える。
+ *   落ち着いていれば 0(普段の声の速さは変えない)。
+ * @param {unknown} queueWaitMs
+ * @returns {number} 0〜VOICE_BACKLOG_BOOST_MAX
+ */
+export function computeBacklogCatchUpBoost(queueWaitMs) {
+  const w = Number(queueWaitMs);
+  if (!Number.isFinite(w) || w <= VOICE_BACKLOG_WAIT_START_MS) return 0;
+  return Math.min(VOICE_BACKLOG_BOOST_MAX, ((w - VOICE_BACKLOG_WAIT_START_MS) / 1000) * 0.05);
+}
+
 /**
  * 既存の混雑ブーストと持続過負荷ブーストを合成する(上げるだけ・上限で clamp)。
  *
