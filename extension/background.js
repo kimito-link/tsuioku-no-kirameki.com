@@ -3714,6 +3714,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
+// v0.1.1794: 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけ(src/lib/voiceReaderLease.js と同じ規則)。
+//   配信ごとに「いま読んでいるページ」を1つ持つ。合図が 6秒途切れたら、もう片方が引き継ぐ。
+//   SW が落ちて表が消えても、次の名乗りから作り直す(どちらも読める状態から始まる)。
+const voiceReaderByLive = new Map();
+const VOICE_READER_LEASE_TTL_MS = 6000;
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== 'NLS_VOICE_READER_CLAIM' && msg.type !== 'NLS_VOICE_READER_RELEASE')) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  const holder = String(msg.holder || '');
+  if (msg.type === 'NLS_VOICE_READER_RELEASE') {
+    for (const [lv, cur] of voiceReaderByLive) if (cur.holder === holder) voiceReaderByLive.delete(lv);
+    sendResponse({ ok: true });
+    return false;
+  }
+  const lv = String(msg.liveId || '').trim().toLowerCase();
+  const now = Date.now();
+  const cur = voiceReaderByLive.get(lv);
+  let granted = true;
+  if (lv && holder) {
+    if (!cur || cur.holder === holder || now - cur.at > VOICE_READER_LEASE_TTL_MS) voiceReaderByLive.set(lv, { holder, at: now });
+    else granted = false;
+  }
+  sendResponse({ granted });
+  return false;
+});
+
 // v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== 'NLS_FETCH_PROXY') return undefined;

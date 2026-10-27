@@ -194,7 +194,7 @@ export class VoicePlayer {
       upstreamEmaMs: -1, lastUpstreamMs: -1, queueWaitEmaMs: -1, engineWaitEmaMs: -1,
       audioQueryEmaMs: -1, synthesisEmaMs: -1, warmSynthEmaMs: -1,
       coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
-      speakerInitTotal: 0, speakerInitMaxMs: 0, voiceBorrowTotal: 0, e2eSampleTotal: 0, e2eSumMsTotal: 0, e2eMaxMs: 0, bgInitTotal: 0, bgInitMaxMs: 0, bgInitYieldTotal: 0,
+      speakerInitTotal: 0, speakerInitMaxMs: 0, voiceBorrowTotal: 0, e2eSampleTotal: 0, e2eSumMsTotal: 0, e2eMaxMs: 0, bgInitTotal: 0, bgInitMaxMs: 0, bgInitYieldTotal: 0, readerYieldTotal: 0,
       streamTotal: 0, streamFirstAudioEmaMs: -1, warmSynthSamples: 0, contendedSynthTotal: 0,
       warmSynthRtfPermille: -1, warmRtfSamples: 0,
       playCheckedTotal: 0, playCutShortTotal: 0, playStallTotal: 0, streamUnderrunTotal: 0, streamUnderrunMaxMs: 0,

@@ -442,8 +442,9 @@ export default [
     // v0.1.1766: 声を少しずつ鳴らす(import 2行+VoicePlayer への1行)=+3。中身は lib の voiceStream.js。
     // v0.1.1771: 読み上げの聞こえ方の試験入口(import 1行+呼び出し1行)と、会場で鳴らない理由の計器
     //   (開閉と発言の2か所に1行ずつ)=+4。中身は voiceTestHook.js / lib の voicePlaybackQuality.js。
+    // v0.1.1794: 同じ配信をコメビュと二重に読まない(import 1行+名乗りの1行+発言ごとの分岐5行)=+7。中身は lib の voiceReaderLease.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7334, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7341, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
