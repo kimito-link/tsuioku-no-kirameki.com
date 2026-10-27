@@ -3,6 +3,9 @@
 //   - runtime メッセージ { type: 'NLS_VOICE_TEST', target: 'comeview'|'venue', kind, count, label }
 //   - コメビュの URL に ?voice=1&voicetest=short|long|burst(&voicetestn=10)
 //   結果は chrome.storage.local の nls_voice_test_report_v1(配列)に残る。
+//   v0.1.1782: { ..., ping: true } を送ると、試験を始めずに { ok: true, ready: true, running, voiceOn } を返す。
+//   空の返事(=まだ入口がつながっていない)なら少し待って送り直す(開いた直後の最初の1通が消えていた)。
+//   v0.1.1784: voiceOn = 読み上げが ON になり終わっているか(ON にしている途中は false)。
 
 import {
   appendVoiceTestReport,
@@ -19,6 +22,7 @@ import {
  *   isIdle: () => boolean,
  *   prepare?: () => void,
  *   ensureEnabled?: () => Promise<boolean>,
+ *   isVoiceOn?: () => boolean,
  *   readUrl?: boolean
  * }} o
  */
@@ -52,6 +56,12 @@ export function wireVoiceTestHook(o) {
   try {
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (!msg || msg.type !== VOICE_TEST_MESSAGE || msg.target !== o.target) return false;
+      if (msg.ping === true) {
+        let voiceOn = true;
+        try { voiceOn = typeof o.isVoiceOn === 'function' ? o.isVoiceOn() === true : true; } catch { voiceOn = false; }
+        sendResponse({ ok: true, ready: true, running, voiceOn });
+        return false;
+      }
       void start(msg).then(sendResponse, () => sendResponse({ ok: false, reason: 'error' }));
       return true;
     });
@@ -77,7 +87,10 @@ export function wireVenueVoiceTestHook(voicePlayer) {
     getDiag: () => voicePlayer.diag,
     isIdle: () => !voicePlayer.playing && voicePlayer.queue.length === 0,
     prepare: () => { voicePlayer.queue = []; voicePlayer.prefetches.clear(); }, // 試験の前の待ち行列を捨てる
+    isVoiceOn: () => voicePlayer.enabled === true && !voicePlayer.toggleBusy,
     ensureEnabled: async () => {
+      // v0.1.1784: 開いた直後の「ON にしている途中」に始めると enable() が何もせず戻り voice-off になった(PC 試験)。
+      for (let i = 0; i < 60 && voicePlayer.toggleBusy; i++) await new Promise((r) => setTimeout(r, 250));
       if (!voicePlayer.enabled) await voicePlayer.enable({ persist: false });
       return voicePlayer.enabled === true;
     }

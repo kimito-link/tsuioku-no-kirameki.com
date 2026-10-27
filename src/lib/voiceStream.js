@@ -103,6 +103,25 @@ export function knownVoiceStylePeak(styleId) {
   return v === undefined ? -1 : v;
 }
 
+/**
+ * 覚えている声ごとの素の大きさ(読み上げ試験の記録用・v0.1.1783)。crestDb = 最大振幅÷RMS の dB。
+ *   声ごとの差を縮める倍率の決め方を、推測でなく実際の声の形で決めるための材料。
+ * @returns {Record<string, { peak: number, rms: number, crestDb: number }>}
+ */
+export function voiceStyleLevelsSnapshot() {
+  /** @type {Record<string, { peak: number, rms: number, crestDb: number }>} */
+  const out = {};
+  for (const [key, peak] of stylePeaks) {
+    const rms = styleRms.get(key) ?? -1;
+    out[key] = {
+      peak: Math.round(peak * 1000) / 1000,
+      rms: rms > 0 ? Math.round(rms * 1000) / 1000 : -1,
+      crestDb: rms > 0 ? Math.round(20 * Math.log10(peak / rms) * 10) / 10 : -1
+    };
+  }
+  return out;
+}
+
 /** テスト用: 覚えた大きさを消す。 */
 export function resetVoiceStylePeaksForTest() {
   stylePeaks.clear();
