@@ -705,6 +705,16 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
   );
 }
 
+/**
+ * v0.1.1799: 鳴らさずに捨てた item に知らせる(試験の1件ごとの記録用)。
+ * @param {any} item
+ */
+function notifyVoiceItemDropped(item) {
+  if (item && typeof item.onDropped === 'function') {
+    try { item.onDropped(); } catch { /* no-op */ }
+  }
+}
+
 /** v0.1.1797: 届く間隔と声の長さ(追いついた後も保つ早口の床)。 */
 const _voicePaceState = createVoicePaceState();
 
@@ -819,6 +829,7 @@ async function drainVoiceQueue() {
       }
       if (allStale && _voiceQueue.length > 0) {
         const dropCount = _voiceQueue.length;
+        for (const d of _voiceQueue) notifyVoiceItemDropped(d);
         _voiceQueue = []; // 全て古い場合は一括で捨てる
         showVoiceSkipped(dropCount);
         _voiceDiag.staleDropTotal += dropCount; // v0.1.852 観測: 間引き累計=遅延の傍証。
@@ -846,6 +857,7 @@ async function drainVoiceQueue() {
       if (ageCheck.stale) {
         showVoiceSkipped(1);
         _voiceDiag.staleDropTotal += 1; // v0.1.852 観測。
+        notifyVoiceItemDropped(item);
         _voicePrefetches.delete(item); // prefetch が stale 向けなら破棄
         continue; // 読まずに捨てる
       }
@@ -886,6 +898,7 @@ async function drainVoiceQueue() {
         isObsMode()
       ) {
         markVoicePhase('skip_after_synth'); // v0.1.895: 世代変更/無効化等で読まずにスキップした。
+        notifyVoiceItemDropped(item);
         if (isStreamedVoice(wav)) wav.cancel(); // 鳴らさないので受け取りもやめる
         continue;
       }
@@ -956,6 +969,7 @@ async function drainVoiceQueue() {
             if (objectUrl) URL.revokeObjectURL(objectUrl);
             objectUrl = '';
             _voiceStopCurrent = null;
+            if (typeof item.onAudioEnd === 'function') { try { item.onAudioEnd(); } catch { /* no-op */ } }
             // v0.1.1797: 鳴った長さを「早口なしの長さ」に戻して覚える(早口の床の材料)。
             if (_playStartAt > 0) noteVoicePacePlayed(_voicePaceState, Date.now() - _playStartAt, playbackRate, boostAtSynth);
             resolve();
@@ -978,6 +992,7 @@ async function drainVoiceQueue() {
           armWatchdog(VOICE_PLAYBACK_HARD_CAP_MS); // 先に固定上限で必ず張る(メタ未取得でも固着しない)。
           try {
             const playResult = audio.play();
+            if (typeof item.onAudioStart === 'function') { try { item.onAudioStart(); } catch { /* no-op */ } }
             _playStartAt = Date.now();
             // 2026-10-22計器(P1): 体感遅延(キュー投入→再生開始)。会場と同じ物差し(コメビュは未計測だった)。
             const _e2eMs = measureVoiceGapMs(item.enqueuedAt, Date.now());
@@ -1073,12 +1088,16 @@ function enqueueVoiceTimelineItems(items) {
       body,
       count: 1,
       enqueuedAt: Date.now(),
-      priority: isHighPriority ? 'high' : 'normal'
+      priority: isHighPriority ? 'high' : 'normal',
+      // v0.1.1799: 鳴り始め・鳴り終わり・捨てた時の知らせ(試験の1件ごとの記録用・会場 VoicePlayer と同じ名前)。
+      onAudioStart: item.onAudioStart,
+      onAudioEnd: item.onAudioEnd,
+      onDropped: item.onDropped
     };
     _voiceDiag.voiceEnqueuedTotal = (Number(_voiceDiag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
     _voiceQueue = merged.queue;
-    if (merged.merged) continue;
+    if (merged.merged) { notifyVoiceItemDropped(candidate); continue; }
     // v0.1.782: わんコメ(OneComme limitQueue=10)式に、リアルタイム維持の主軸を件数ゲート
     //   (最古drop)に置く。上限 12→8 でラグを有界化(voicePlayer 会場/会話版と揃える)。
     //   時間ゲート(isVoiceItemStale)は安全網に格下げ済み(voiceAgeGate v0.1.782)。
@@ -1090,6 +1109,7 @@ function enqueueVoiceTimelineItems(items) {
     _voiceQueue = pushed.queue;
     noteVoicePaceArrival(_voicePaceState, candidate.enqueuedAt);
     droppedCount += pushed.dropped.length;
+    for (const d of pushed.dropped) notifyVoiceItemDropped(d);
   }
   if (droppedCount > 0) showVoiceSkipped(droppedCount);
   // v0.1.852 観測: 件数ゲート(max:8 最古drop)の drop も間引きに計上=「追いつけず捨てた」傍証。

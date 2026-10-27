@@ -107,3 +107,29 @@ describe('voiceTestRun', () => {
     expect(report.otherItems).toBe(2);
   });
 });
+
+describe('v0.1.1799 試験の1件ごとの記録', () => {
+  it('鳴り始め・長さ・捨てられたかを1件ごとに残す', async () => {
+    let t = 1000;
+    /** @type {any[]} */
+    const got = [];
+    const report = await runVoiceTest({
+      kind: 'short', count: 3, mode: 'venue',
+      enqueue: (items) => { got.push(...items); },
+      getDiag: () => ({}),
+      isIdle: () => true,
+      now: () => t,
+      sleep: async (ms) => {
+        // 1件目: 200ms 後に鳴り 800ms 鳴る / 2件目: 捨てる / 3件目: 鳴らない
+        if (got[0] && !got[0]._done) { got[0]._done = true; t += 200; got[0].onAudioStart(); t += 800; got[0].onAudioEnd(); }
+        if (got[1] && !got[1]._done) { got[1]._done = true; got[1].onDropped(); }
+        t += ms;
+      }
+    });
+    expect(report.items.map((r) => r.i)).toEqual([1, 2, 3]);
+    expect(report.items[0].startMs).toBe(200);
+    expect(report.items[0].durMs).toBe(800);
+    expect(report.items[1].dropped).toBe(true);
+    expect(report.items[2]).toMatchObject({ startMs: -1, durMs: -1, dropped: false, long: false });
+  });
+});

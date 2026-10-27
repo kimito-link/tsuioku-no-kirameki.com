@@ -147,10 +147,24 @@ export async function runVoiceTest(o) {
   if (live && typeof live === 'object') { live.outRmsDbMin = 999; live.outRmsDbMax = -999; live.e2eMaxMs = 0; live.bgInitMaxMs = 0; live.lastPlayIssue = ''; }
   const before = JSON.parse(JSON.stringify(o.getDiag() || {}));
   const startedAt = now();
-  for (const { gapMs, item } of plan) {
+  // v0.1.1799: 1件ごとの記録(入れた時刻・鳴り始め・鳴り終わり・捨てられたか)。平均と最大だけでは
+  //   「どの件が・なぜ遅れたか」が分からなかった(PC 試験 mixed)。
+  /** @type {{ i: number, long: boolean, at: number, startMs: number, durMs: number, dropped: boolean }[]} */
+  const items = [];
+  for (const [i, { gapMs, item }] of plan.entries()) {
     if (gapMs > 0) await sleep(gapMs);
     const at = now();
-    o.enqueue([{ ...item, at, receivedAt: at }]);
+    const rec = { i: i + 1, long: item.text.length >= 40, at: at - startedAt, startMs: -1, durMs: -1, dropped: false };
+    items.push(rec);
+    let startAt = -1;
+    o.enqueue([{
+      ...item,
+      at,
+      receivedAt: at,
+      onAudioStart: () => { if (startAt < 0) { startAt = now(); rec.startMs = startAt - at; } },
+      onAudioEnd: () => { if (startAt >= 0 && rec.durMs < 0) rec.durMs = now() - startAt; },
+      onDropped: () => { if (startAt < 0) rec.dropped = true; }
+    }]);
   }
   const lastEnqueuedAt = now();
   const deadline = startedAt + (Number(o.timeoutMs) > 0 ? Number(o.timeoutMs) : 180_000);
@@ -181,6 +195,7 @@ export async function runVoiceTest(o) {
     otherItems: Number.isFinite(Number(delta.voiceEnqueuedTotal)) ? Math.max(0, Number(delta.voiceEnqueuedTotal) - plan.length) : -1,
     // v0.1.1783: 声ごとの素の最大振幅・RMS(このページで覚えている分)。声ごとの差の直し方を決める材料。
     styleLevels: voiceStyleLevelsSnapshot(),
+    items,
     delta
   };
   if (typeof o.write === 'function') {
