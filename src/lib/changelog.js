@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1800',
+    date: '2026-10-28',
+    summary: '一気に来た短いコメントを飛ばしにくく',
+    items: Object.freeze([
+      '放送ページの読み上げ: 長いコメントを読んだ直後に短いコメントがまとめて来ると、3件ほど読まずに飛ばしていたのを直しました。',
+      '待っているコメントの文字数から「何件まで読めば遅れが6秒に収まるか」を見積もるようにしました(長い文が溜まった時は今まで通り絞ります)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1799',
     date: '2026-10-28',
     summary: 'コメビュも混雑時は本文を短めに(放送ページと同じ)',
@@ -172,14 +181,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場とコメビュで声の準備を譲り合う',
     items: Object.freeze([
       '会場とコメビュを同時に使っている時、片方が読み上げている間はもう片方が声の裏読み込みを始めないようにしました。グラボの無い PC で、読み上げを ON にした直後の遅れが減ります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1780',
-    date: '2026-10-26',
-    summary: '初めての声も聞こえの大きさをそろえる',
-    items: Object.freeze([
-      '初めて読み上げる声も、最初に届いた分で聞こえの大きさを見積もり、大きすぎる声を下げるようにしました(これまでは一度鳴らした声だけでした)。'
     ])
   })
 ]);
