@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1789',
+    date: '2026-10-27',
+    summary: '短いコメントの音量のばらつきを戻す',
+    items: Object.freeze([
+      '0.1.1788 で、遅い PC で読む短いコメントの音量がばらつくようになっていたのを直しました。長いコメントの揃え方はそのままです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1788',
     date: '2026-10-27',
     summary: '声ごとの音量を聞こえの大きさで揃える',
@@ -176,15 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '短いコメントが続く配信で、グラフィックボードのある PC が一時的に「遅い PC」と記録されることがあったのを直しました。どの PC でもかかる決まった時間を引き、短すぎる声は判定に使いません。',
       '少しずつ読んだ声も速さの判定に数えるので、誤って「遅い PC」と記録されても早く元に戻ります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1769',
-    date: '2026-10-26',
-    summary: '遅いPCの判定を文の長さで割って見る',
-    items: Object.freeze([
-      '長いコメントの多い配信で、グラフィックボードのある PC まで「遅い PC」と記録されることがあったのを直しました。声を作る時間を、できた声の長さで割って判定します。',
-      '誤って「遅い PC」と記録されていた場合は、速いと分かった時点で自動で消えます。'
     ])
   })
 ]);

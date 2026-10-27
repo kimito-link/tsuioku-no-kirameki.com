@@ -456,6 +456,7 @@ export function withVoiceWarmup(warmup, synth) {
       if (isStreamedVoice(wav)) {
         wav.styleId = useStyle;
         wav.pitchOffset = Number(pitchOffset) || 0;
+        wav.textLength = textLength;
         const sv = wav;
         void sv.whenDone.then((ok) => { if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms, textLength, pitchOffset); }, () => {});
       } else if (wav instanceof ArrayBuffer) {
