@@ -367,7 +367,7 @@ import {
   probeVoicevoxAlive,
   listVoicevoxStyleIds,
   synthesizeVoice,
-  probeVoicevoxStreaming
+  probeVoicevoxStreaming, probeVoicevoxGpuCapable
 } from '../lib/voicevoxClient.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
@@ -3394,7 +3394,7 @@ export function mountVenueBarButton(options = {}) {
     fetchVoiceStyleIds: listVoicevoxStyleIds,
     initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensureWhenIdle(id), // P3 の先読みは合成の合間に裏で
     voiceWarmup: venueVoiceWarmup,
-    probeVoiceStreaming: probeVoicevoxStreaming, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
+    probeVoiceStreaming: probeVoicevoxStreaming, probeVoiceGpu: probeVoicevoxGpuCapable, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
     fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
     resolveVoice: resolveVoiceForUser
   });

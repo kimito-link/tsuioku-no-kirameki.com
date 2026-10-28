@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   decideVoiceLagNotice,
+  shouldHintVoiceGpu,
+  VOICE_GPU_HINT_TEXT,
   VOICE_LAG_NOTICE_HIDE_MS,
   VOICE_LAG_NOTICE_SHOW_MS
 } from './voiceLagNotice.js';
@@ -74,5 +76,24 @@ describe('VoicePlayer の通知', () => {
     expect(calls.length).toBe(3); // 出す・出したまま(秒数更新)・消す。消えたあとは呼ばない。
     expect(calls[0]).toMatch(/約5秒遅れています/);
     expect(calls[2]).toBe('');
+  });
+});
+
+describe('GPU の案内(2026-10-28)', () => {
+  const slow = { warmSynthEmaMs: 1500, warmSynthSamples: 8, coldSynthMaxMs: 2000 };
+  const fast = { warmSynthEmaMs: 80, warmSynthSamples: 8, coldSynthMaxMs: 600 };
+  it('GPU を使えて声づくりが遅いときだけ添える', () => {
+    expect(shouldHintVoiceGpu(slow, true)).toBe(true);
+    expect(shouldHintVoiceGpu(slow, false)).toBe(false);
+    expect(shouldHintVoiceGpu(slow, null)).toBe(false);
+    expect(shouldHintVoiceGpu(fast, true)).toBe(false);
+    expect(shouldHintVoiceGpu({}, true)).toBe(false); // まだ測れていない
+  });
+  it('遅れの一言が出るときだけ後ろに付く', () => {
+    const r = decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 5000, queueNow: 3 }, { gpuCapable: true });
+    expect(r.shown).toBe(true);
+    expect(r.text.endsWith(`。${VOICE_GPU_HINT_TEXT}`)).toBe(true);
+    expect(decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 1000, queueNow: 3 }, { gpuCapable: true }).text).toBe('');
+    expect(decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 5000, queueNow: 3 }).text).not.toContain('GPU');
   });
 });
