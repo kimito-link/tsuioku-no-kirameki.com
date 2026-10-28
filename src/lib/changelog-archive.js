@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1785',
+    date: '2026-10-27',
+    summary: '最初の長文が大きすぎるのを抑える',
+    items: Object.freeze([
+      '読み上げを始めて最初に読む長いコメントが、ほかより大きく鳴ることがあったのを直しました。初めての声は、出だしの音の大きさから全体の大きさをより正しく見積もります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1784',
     date: '2026-10-27',
     summary: '読み上げ試験の開始待ちを直す',

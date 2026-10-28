@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1805',
+    date: '2026-10-28',
+    summary: 'コメビュで後から届く古いコメントを読まない',
+    items: Object.freeze([
+      'コメントの多い放送でコメビュを開くと、少し後に開く前の古いコメントが100件以上まとめて届き、読み上げ待ちに入ってから捨てられていました。最初から読み上げに入れず、届いた件数にも数えないようにしました(読み上げの声は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1804',
     date: '2026-10-28',
     summary: 'コメビュで読み上げが抜けるのを直す',
@@ -177,14 +185,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '初めての声の1件目を上げすぎない',
     items: Object.freeze([
       '初めて使う声の1件目が、2件目以降より大きく鳴ることがあったのを抑えました。VOICEVOX の全127の声を測った値をもとに、上げすぎない側に見積もります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1785',
-    date: '2026-10-27',
-    summary: '最初の長文が大きすぎるのを抑える',
-    items: Object.freeze([
-      '読み上げを始めて最初に読む長いコメントが、ほかより大きく鳴ることがあったのを直しました。初めての声は、出だしの音の大きさから全体の大きさをより正しく見積もります。'
     ])
   })
 ]);
