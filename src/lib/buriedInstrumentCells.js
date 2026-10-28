@@ -190,11 +190,13 @@ export function buildBuriedCells(data) {
   const host = fast?.hostMoveDiag;
   if (host && num(host.moveCount) != null) {
     const moves = num(host.moveCount) || 0;
+    // v0.1.1821: 実害は「中身の読み込み直し」(reloadCount)。moveBefore で保てた移動は数えても警告しない。
+    const reloads = num(host.reloadCount);
     if (moves > 0) {
       out.push(cell(
         'host-move', '記録役の引っ越し',
-        moves >= 3 ? 'warn' : 'ok',
-        `${moves}回 移動`
+        (reloads ?? moves) >= 3 ? 'warn' : 'ok',
+        reloads != null ? `${moves}回 移動・読み込み直し${reloads}回` : `${moves}回 移動`
       ));
     }
   }
