@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1794',
+    date: '2026-10-27',
+    summary: '会場とコメビュで同じコメントを二重に読まない',
+    items: Object.freeze([
+      '同じ配信を放送ページの会場とコメビュの両方で開いていると、同じコメントが2回読まれ、声も遅れていたのを直しました。先に読み始めた方だけが読み、そちらを閉じるか読み上げを切ると、数秒でもう片方が引き継ぎます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1793',
     date: '2026-10-27',
     summary: '低めの声の人の最初の長文も揃える',
