@@ -976,7 +976,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2197)
+- 📁 **src/** (2198)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1268,7 +1268,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1934)
+  - 📁 **lib/** (1935)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2940,6 +2940,7 @@
     - `userIdPreference.test.js`
     - `userLaneCandidatesFromStorage.js` — 応援ユーザーレーン用: nls_comments 相当の StoredComment 配列から userId 単位に集約した候補。
     - `userLaneCandidatesFromStorage.test.js`
+    - `userLaneCandidatesFromStorageEquivalence.test.js`
     - `userLaneDiagSnapshot.js` — Popup DevTools 用: lane pipeline の観測スナップショット（PII を含めない）。
     - `userLaneDiagSnapshot.test.js`
     - `userLaneMergeGiftThrowers.js` — ギフト／広告投げ主専用レーン用のエントリ一覧（りんく列とは別段）。
