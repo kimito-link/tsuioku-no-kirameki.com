@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1813',
+    date: '2026-10-28',
+    summary: '名前を読むときも www などを聞きやすく',
+    items: Object.freeze([
+      '「名前も読む」にしているとき、名前の「ｗｗｗ」や連打も本文と同じように読みます(たろうｗｗｗ →「たろうわらわら」)。絵文字だけの名前は名前を飛ばして本文だけ読みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1812',
     date: '2026-10-28',
     summary: 'NG にした人は読み上げでも読まない',
@@ -180,14 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場とコメビュで同じコメントを二重に読まない',
     items: Object.freeze([
       '同じ配信を放送ページの会場とコメビュの両方で開いていると、同じコメントが2回読まれ、声も遅れていたのを直しました。先に読み始めた方だけが読み、そちらを閉じるか読み上げを切ると、数秒でもう片方が引き継ぎます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1793',
-    date: '2026-10-27',
-    summary: '低めの声の人の最初の長文も揃える',
-    items: Object.freeze([
-      '声を低めにずらした人の最初の長いコメントが、まだ少し小さく鳴ることがあったのを直しました。声ごとに、高さを変えたときの音量の変わり方を全127の声で測った表を使います。'
     ])
   })
 ]);
