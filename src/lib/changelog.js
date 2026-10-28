@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1806',
+    date: '2026-10-28',
+    summary: '読み上げが遅いとき GPU の案内を出す',
+    items: Object.freeze([
+      '読み上げが大きく遅れているとき、VOICEVOX がグラフィックボード(GPU)を使えるのに声づくりが遅いと分かったら、「VOICEVOX の設定でエンジンモードを GPU にすると速くなることがあります」と一言添えるようにしました。設定は自動では変えません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1805',
     date: '2026-10-28',
     summary: 'コメビュで後から届く古いコメントを読まない',
@@ -177,14 +185,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '短い文の直後の長い文を大きくしない',
     items: Object.freeze([
       '短いコメントを続けて読んだ直後の長いコメントが、少し大きく鳴ることがあったのを直しました。声の大きさの覚え方を、長い文だけから覚えるようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1786',
-    date: '2026-10-27',
-    summary: '初めての声の1件目を上げすぎない',
-    items: Object.freeze([
-      '初めて使う声の1件目が、2件目以降より大きく鳴ることがあったのを抑えました。VOICEVOX の全127の声を測った値をもとに、上げすぎない側に見積もります。'
     ])
   })
 ]);
