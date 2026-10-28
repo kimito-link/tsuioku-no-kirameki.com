@@ -35,6 +35,7 @@ import {
   classifyPrompt, parseCategory, selectMembers, CATEGORIES, weightOf,
 } from './council-roles.mjs';
 import { LINEUP, ENV_NAMES } from './council-lineup.mjs';
+import { orderSynthChain, shouldWaitAndRetry } from './council-synth.mjs';
 
 const args = process.argv.slice(2);
 let question = '';
@@ -252,7 +253,9 @@ async function geminiChat(model, prompt, system = '', timeoutMs = 90000) {
       // ★2026-10-17: 2048 → 4096。Gemini 2.5 系は思考トークンが出力上限に含まれるため、2048だと
       //  回答が途中で切れる。実会議(COUNCIL_FULL)で gemini-2.5-flash(weight1)の本文が118字で途切れていた
       //  （同じ会議の gemini-3.7-flash は1220字）。上限を上げても短い回答は短いまま＝費用は増えない。
-      generationConfig: { maxOutputTokens: 4096, temperature: 0.6 },
+      // ★2026-10-28: 4096 → 8192。統合（入力1万字超）で gemini-2.5-flash が280字で途切れた。
+      //  入力が長く指示が複雑なほど思考トークンが増え、4096では本文に届かない。
+      generationConfig: { maxOutputTokens: 8192, temperature: 0.6 },
     };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${E}`, {
@@ -263,6 +266,11 @@ async function geminiChat(model, prompt, system = '', timeoutMs = 90000) {
     if (!r.ok || j.error) throw new Error('HTTP ' + r.status + ' ' + (j.error?.message || '').slice(0, 120));
     const t = j?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
     if (!t) throw new Error('empty');
+    // ★2026-10-28: 出力上限で途中切れした本文は成功として扱わない（openaiChat の reasoning-only と同じ考え方）。
+    //  途中で切れた統合を「会議の結論」として記録すると、読む人は欠けていることに気づけない。
+    //  失敗にすれば統合は次の候補へ進み、日報の成績にも出る。
+    const finish = j?.candidates?.[0]?.finishReason;
+    if (finish === 'MAX_TOKENS') throw new Error('truncated (finishReason=MAX_TOKENS): 出力上限で本文が途中切れ (len=' + t.length + ')');
     return t;
   } finally { clearTimeout(timer); }
 }
@@ -968,11 +976,10 @@ async function council(members, label, key) {
       //  fail-closed 違反（「全員の回答を読んだ統合」だと後から誤認される）。同一入力でのみ再試行する。
       //  全滅時は「統合なし」を明示ログし、素の回答だけを記録する（司令塔が手動統合する既存運用へ落ちる）。
       //  従来は失敗時に無言で握り潰しており、統合が消えたことに気づけなかった。
-      const chain = [];
+      const rawChain = [];
       for (const c of [synth, ...(SYNTH_STRONG ? priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).filter(Boolean) : [])]) {
-        if (c && !chain.some(x => x.label === c.label)) chain.push(c);
+        if (c && !rawChain.some(x => x.label === c.label)) rawChain.push(c);
       }
-      const isTpmError = (msg) => /tokens per minute|\bTPM\b/i.test(String(msg || ''));
       const tpmWaitMs = (msg) => {
         const m = String(msg || '').match(/try again in ([\d.]+)s/i);
         return Math.min(70000, m ? (Number(m[1]) + 5) * 1000 : 65000);
@@ -980,6 +987,13 @@ async function council(members, label, key) {
       const all = digestOf(shown, 900); // 重複を畳んだ後の回答で統合（ノイズ・重複を統括に見せない）
       // 1.3tok/字の見積もり仮説を実会議で校正するための材料（429の Requested 値と突き合わせる）。
       console.error(`[${label}] ②統合digest ${all.length}字`);
+      // 2026-10-28: 入力が大きいとき、物理的に受け取れない候補（groq無料枠=1回8000トークン）を後ろへ回す。
+      //  全員召集の会議で digest 11686字 → groq が65秒待った末に413で落ちていた。理由は council-synth.mjs 冒頭。
+      const { chain, moved, estimatedTokens } = orderSynthChain(rawChain, all.length);
+      if (moved.length) {
+        console.error(`[${label}] ②統合: 入力見積もり約${estimatedTokens}トークン → 上限の小さい ${moved.join(', ')} を後ろへ回す`);
+        noteEvent('synth-reordered', { round: label, moved, estimatedTokens });
+      }
       const synthPrompt = () =>
         `【会議メンバー全員の回答（批判・修正済み）】\n${all}\n\n` +
         `あなたは統括役。次の手順で統合すること:\n` +
@@ -993,7 +1007,7 @@ async function council(members, label, key) {
         const cand = chain[ci];
         console.error(`[${label}] ②統合: ${cand.label} が1案に束ねる${ci > 0 ? '（次点フォールバック）' : ''}`);
         let sres = await runRound([{ ...cand, role: 'lead' }], question, synthPrompt);
-        if (sres[0]?.error && ci === 0 && isTpmError(sres[0].error)) {
+        if (sres[0]?.error && ci === 0 && shouldWaitAndRetry(sres[0].error)) {
           const w = tpmWaitMs(sres[0].error);
           console.error(`[${label}] ②統合: 筆頭 ${cand.label} がTPM 429 → ${Math.round(w / 1000)}秒待って同一入力で1回だけ再試行`);
           await new Promise(r => setTimeout(r, w));
