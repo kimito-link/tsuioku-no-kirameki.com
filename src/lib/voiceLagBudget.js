@@ -409,6 +409,8 @@ export function noteVoicePacePlayed(state, playedMs, playbackRate = 1, boostAtSy
 
 /** v0.1.1800: 1件の見込みの長さの下限(短い声にも合成・つなぎの時間がかかる)。 */
 export const VOICE_ITEM_MIN_MS = 600;
+/** v0.1.1801: 1回の合成の固定費(voiceStageTiming.VOICE_RTF_FIXED_OVERHEAD_MS と同じ値)。 */
+export const VOICE_SYNTH_FIXED_MS = 250;
 /** v0.1.1800: まだ1件も鳴らしていない時の1文字あたりの見込み(普通の速さの VOICEVOX でおよそ)。 */
 export const VOICE_CHAR_MS_DEFAULT = 130;
 
@@ -419,19 +421,26 @@ export const VOICE_CHAR_MS_DEFAULT = 130;
  *   平均が4〜5秒に膨らみ上限が5件に縮んで、続けて来た短いコメント10件のうち3件を飛ばした(開いた直後なら1件)。
  *   1文字あたりの長さをまだ覚えていなければ見込み値(VOICE_CHAR_MS_DEFAULT)で数える。
  *   charCounts が配列でなければ null(呼び出し側が従来の上限を使う)。
+ *   v0.1.1801: 声を作る方が鳴らすより遅い PC(合成時間÷声の長さ synthRtf が大きい)では、1件にかかる時間は
+ *   「声の長さ」ではなく「作る時間」で決まる。PC 試験(グラフィックボードなし)で、作る時間を数えずに8件まで
+ *   ためた結果、待ちが10秒に達して古い件から12件が待ったあげく捨てられた(作った分も無駄になる)。
+ *   1件 = max(声の長さ, 固定費 + 声の長さ×synthRtf) で数える。速い PC(比0.1前後)では変わらない。
  * @param {number[]} charCounts 待っている件の文字数(古い順・新しく入れる件を含む)
  * @param {ReturnType<typeof createVoicePaceState> | null | undefined} paceState
+ * @param {number} [synthRtf] 合成時間÷声の長さ(分からなければ 0 = 数えない)
  * @returns {number|null}
  */
-export function resolveVoiceQueueMaxByChars(charCounts, paceState) {
+export function resolveVoiceQueueMaxByChars(charCounts, paceState, synthRtf = 0) {
   if (!Array.isArray(charCounts)) return null;
   const learned = Number(paceState?.charMsEma);
   const perChar = learned > 0 ? learned : VOICE_CHAR_MS_DEFAULT;
+  const rtf = Number(synthRtf) > 0 ? Number(synthRtf) : 0;
   let total = 0;
   let fit = 0;
   for (let i = charCounts.length - 1; i >= 0; i -= 1) {
     const n = Math.max(0, Math.floor(Number(charCounts[i]) || 0));
-    total += Math.max(VOICE_ITEM_MIN_MS, n * perChar);
+    const natural = Math.max(VOICE_ITEM_MIN_MS, n * perChar);
+    total += rtf > 0 ? Math.max(natural, VOICE_SYNTH_FIXED_MS + natural * rtf) : natural;
     if (total > VOICE_LAG_BUDGET_MS) break;
     fit += 1;
   }

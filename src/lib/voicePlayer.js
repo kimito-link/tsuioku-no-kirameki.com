@@ -487,7 +487,11 @@ export class VoicePlayer {
     try {
       const maxChars = computeVoiceCongestion(this.queue.length + 1).maxChars;
       const counts = [...this.queue, candidate].map((it) => buildMergedVoiceText(it, { maxChars }).length);
-      const byChars = resolveVoiceQueueMaxByChars(counts, this._paceState);
+      // v0.1.1801: 声を作る速さ(合成時間÷声の長さ)が3件以上測れていれば、作る時間も数える。
+      const rtfSamples = Number(this.diag.warmRtfSamples) || 0;
+      const rtfPermille = Number(this.diag.warmSynthRtfPermille);
+      const synthRtf = rtfSamples >= 3 && rtfPermille > 0 ? rtfPermille / 1000 : 0;
+      const byChars = resolveVoiceQueueMaxByChars(counts, this._paceState, synthRtf);
       if (byChars == null) return this._effectiveQueueMax;
       this.diag.queueMaxByChars = byChars;
       return byChars;
