@@ -28,20 +28,47 @@ import { yieldToBrowserPaint } from './yieldToBrowserPaint.js';
 /**
  * @param {() => void} callback 束ねられた末に1回だけ呼ばれる同期コールバック。
  *   実行時点の最新状態を自分で読みに行く関数であること(上記契約を参照)。
- * @param {{ yieldFn?: () => Promise<void> }} [opts]
+ * @param {{
+ *   yieldFn?: () => Promise<void>,
+ *   minIntervalMs?: () => number,
+ *   nowFn?: () => number,
+ *   setTimeoutFn?: (fn: () => void, ms: number) => unknown
+ * }} [opts]
  *   yieldFn: 待ち方の差し替え(テスト用)。既定は yieldToBrowserPaint。
+ *   minIntervalMs: ★v0.1.1816 前回の実行からこの ms は空ける(実行のたびに聞く・0 以下なら空けない)。
+ *     空けている間に来た予約は束ねられ、空いた時点で1回だけ実行する(最新状態を読む契約は同じ)。
+ *     視聴ページに隠れて入っている popup は新着ごとに記録全体から数え直すので、隠れている間だけ間隔を空ける。
+ *   nowFn / setTimeoutFn: テスト用の差し替え。
  * @returns {{ schedule: () => void, isPending: () => boolean }}
  */
 export function createCoalescedRepaintScheduler(callback, opts = {}) {
   const yieldFn = (opts && opts.yieldFn) || yieldToBrowserPaint;
+  const minIntervalMs = opts && typeof opts.minIntervalMs === 'function' ? opts.minIntervalMs : null;
+  const nowFn = (opts && opts.nowFn) || (() => Date.now());
+  const setTimeoutFn = (opts && opts.setTimeoutFn) || ((fn, ms) => setTimeout(fn, ms));
   let pending = false;
+  let lastRunAt = -Infinity;
+
+  function run() {
+    pending = false;
+    lastRunAt = nowFn();
+    callback();
+  }
 
   function schedule() {
     if (pending) return; // 既に予約済みなら何もしない(束ね本体)
     pending = true;
     yieldFn().then(() => {
-      pending = false;
-      callback();
+      let gap = 0;
+      if (minIntervalMs) {
+        try { gap = Number(minIntervalMs()) || 0; } catch { gap = 0; }
+      }
+      const waitMs = gap > 0 ? lastRunAt + gap - nowFn() : 0;
+      if (waitMs > 0) {
+        setTimeoutFn(run, waitMs);
+        return;
+      }
+      run();
     });
   }
 

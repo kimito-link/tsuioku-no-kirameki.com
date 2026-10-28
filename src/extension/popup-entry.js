@@ -5565,7 +5565,8 @@ const _instantPushSentAtByCommentNo = new Map();
  * (coalescedRepaintScheduler.js の JSDoc 参照。契約を破る変更をしない)。
  */
 const _instantPushRepaintScheduler = createCoalescedRepaintScheduler(
-  () => repaintStoryUserLaneWithInstantPushBuffer()
+  () => repaintStoryUserLaneWithInstantPushBuffer(),
+  { minIntervalMs: () => (_panelHidden() ? 1500 : 0) } // v0.1.1816: 隠れている間は1.5秒に1回まで(会場の席の鏡を書くので止めない・理由は scheduler の JSDoc)
 );
 /** パネルが「見えているか」(親 content が伝える+document.hidden)。★定期処理はすべてこの判定で止める。 */
 const _panelActivity = createPanelActivity({ isDocHidden: () => typeof document !== 'undefined' && document.hidden === true });
