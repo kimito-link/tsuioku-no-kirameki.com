@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1781',
+    date: '2026-10-27',
+    summary: '会場とコメビュで声の準備を譲り合う',
+    items: Object.freeze([
+      '会場とコメビュを同時に使っている時、片方が読み上げている間はもう片方が声の裏読み込みを始めないようにしました。グラボの無い PC で、読み上げを ON にした直後の遅れが減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1780',
     date: '2026-10-26',
     summary: '初めての声も聞こえの大きさをそろえる',
