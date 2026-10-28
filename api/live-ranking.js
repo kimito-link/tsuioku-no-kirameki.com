@@ -271,14 +271,15 @@ async function probeWatchPage(lv) {
 }
 
 /** 1配信ぶんの「支えた人」を集める。★rank はニコ生側が持っているので自前で計算しない。 */
-async function collectOne(lv, meta) {
+async function collectOne(lv, meta, allowEmpty = false) {
   const [gift, ad] = await Promise.all([
     fetchJsonSafe(`https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/${lv}/ranking?rank=10`),
     fetchJsonSafe(`https://api.nicoad.nicovideo.jp/v1/contents/live/${lv}/ranking/contribution?limit=10`)
   ]);
   const giftRankers = Array.isArray(gift?.data?.rankers) ? gift.data.rankers : [];
   const adRanking = Array.isArray(ad?.data?.ranking) ? ad.data.ranking : [];
-  if (!giftRankers.length && !adRanking.length) return null;
+  // ★1配信だけ取るとき(allowEmpty)は、まだ誰も応援していなくても番組情報を出す。
+  if (!allowEmpty && !giftRankers.length && !adRanking.length) return null;
   // ★ranking エンドポイントの data は【rankers だけ】(実測 2026-09-05)。
   //   totalPoint は histories 側にしかない。最初それを読んで「ギフト計=0 なのに支援者12人」
   //   という矛盾を出した。★無い項目を読まず、返ってきた行から足す。
@@ -302,6 +303,70 @@ async function collectOne(lv, meta) {
     gift: gift?.data ? { rankers: giftRankers } : null,
     ad: ad?.data ? { ranking: adRanking } : null
   };
+}
+
+/**
+ * ★v0.1.1819: 1配信だけその場で取る(PC の拡張が無い人が「放送の URL を貼る」とき)。
+ *   一覧(上位の個人配信 20 件)に無い配信でも、番組情報とギフト/広告の順位表を返す。
+ *   ★終わった配信・チャンネル番組も出す(本人が貼った配信なので、一覧の絞り込みは掛けない)。
+ *   取れる中身は collect() と同じ公開情報だけ(本文は取らない)。
+ * @param {string} lv 検疫済みの小文字 lvNNN
+ * @returns {Promise<{ ok: true, live: object } | { ok: false, code: number, error: string }>}
+ */
+export async function collectSingle(lv) {
+  const meta = await probeWatchPage(lv);
+  if (!meta.fetched) return { ok: false, code: 502, error: 'watch page unavailable' };
+  // ★HTML は取れたのに番組の形が読めない=番組が無い(か、仕様変更)。空の行は出さない。
+  if (!meta.title && !meta.streamer.id && !meta.beginTime) return { ok: false, code: 404, error: 'program not found' };
+  const live = await collectOne(lv, meta, true);
+  return { ok: true, live: { ...live, onAir: !!meta.onAir, isUserBroadcast: !!meta.isUserBroadcast } };
+}
+
+/** ★1配信ぶんの置き場(60秒だけ)。一覧の STORE_KEY とは別(性質の違うものを混ぜない)。 */
+const ONE_KEY_PREFIX = 'live:one:';
+const ONE_TTL_SECONDS = 60;
+/** ★同じ配信を同時に何人が開いても、ニコ生へ取りに行くのは 1 本だけ(収集は 1〜3 秒)。 */
+const ONE_LOCK_PREFIX = 'live:one-lock:';
+const ONE_LOCK_TTL_SECONDS = 15;
+
+/** GET /api/live-ranking?lv=lvNNN */
+async function handleOne(req, res) {
+  const lv = String(req.query?.lv || '').trim().toLowerCase();
+  if (!/^lv\d{6,15}$/.test(lv)) {
+    res.status(400).json({ ok: false, error: 'bad live id' });
+    return;
+  }
+  const key = ONE_KEY_PREFIX + lv;
+  const cachedRaw = await upstash(['GET', key]);
+  if (cachedRaw) {
+    let cached = null;
+    try { cached = JSON.parse(cachedRaw); } catch { cached = null; }
+    if (cached && cached.live) {
+      const withComment = await attachComments({ lives: [cached.live] });
+      res.status(200).json({ ok: true, capturedAt: cached.capturedAt, live: withComment.lives[0], cached: true });
+      return;
+    }
+  }
+  const locked = await upstash(['SET', ONE_LOCK_PREFIX + lv, String(Date.now()), 'NX', 'EX', String(ONE_LOCK_TTL_SECONDS)]);
+  if (locked !== 'OK') {
+    // ★他の人が取りに行っている最中。少し待ってもう一度呼べば置き場から返る。
+    res.setHeader('Retry-After', '2');
+    res.status(503).json({ ok: false, error: 'in flight', retryAfterSec: 2 });
+    return;
+  }
+  try {
+    const r = await collectSingle(lv);
+    if (!r.ok) {
+      res.status(r.code).json({ ok: false, error: r.error });
+      return;
+    }
+    const capturedAt = Date.now();
+    await upstash(['SET', key, JSON.stringify({ capturedAt, live: r.live }), 'EX', String(ONE_TTL_SECONDS)]);
+    const withComment = await attachComments({ lives: [r.live] });
+    res.status(200).json({ ok: true, capturedAt, live: withComment.lives[0], cached: false });
+  } finally {
+    try { await upstash(['DEL', ONE_LOCK_PREFIX + lv]); } catch { /* TTL で消える */ }
+  }
 }
 
 /** ★export はローカル検証用(node から実データを1回集めて画面に流す)。Vercel は default export しか見ない。 */
@@ -619,6 +684,12 @@ export default async function handler(req, res) {
 
     if (req.method !== 'GET') {
       res.status(405).json({ ok: false, error: 'method not allowed' });
+      return;
+    }
+
+    // ★v0.1.1819: 1配信だけ(PC の拡張が無い人が放送の URL を貼ったとき)。
+    if (req.query?.lv !== undefined) {
+      await handleOne(req, res);
       return;
     }
 

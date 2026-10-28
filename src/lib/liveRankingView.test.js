@@ -5,7 +5,7 @@ import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
   cacheBust, supporterRows, identifiedSupporters, identifiedSupportersByName, commentRows, isBlankIcon, uidFromUserPageUrl,
   createRowChangeTracker, rowKey, STALE_MIN,
-  pinLiveFirst, liveShareText, liveOgTitle, SHARE_NAME_MAX, SHARE_TITLE_MAX, SHARE_TEXT_MAX
+  pinLiveFirst, mergePinnedLive, liveShareText, liveOgTitle, SHARE_NAME_MAX, SHARE_TITLE_MAX, SHARE_TEXT_MAX
 } from './liveRankingView.js';
 
 describe('liveRankingView', () => {
@@ -169,6 +169,22 @@ describe('liveRankingView', () => {
 
   it('pinLiveFirst: 大文字・前後空白を許す', () => {
     expect(pinLiveFirst([a, b, c], ' LV100003 ')).toEqual({ lives: [c, a, b], found: true });
+  });
+
+  it('mergePinnedLive: 一覧に無い1配信を足す(元の応答は変えない)・v0.1.1819', () => {
+    const data = { ok: true, capturedAt: 5, lives: [a, b] };
+    const out = mergePinnedLive(data, c);
+    expect(out).toEqual({ ok: true, capturedAt: 5, lives: [a, b, c] });
+    expect(data.lives).toEqual([a, b]);
+    expect(pinLiveFirst(out.lives, 'lv100003').lives[0]).toBe(c);
+  });
+
+  it('mergePinnedLive: 既にあれば足さない・形が違えば元のまま・一覧が無くても1件で出す', () => {
+    const data = { ok: true, lives: [a, b] };
+    expect(mergePinnedLive(data, { liveId: 'LV100001' })).toBe(data);
+    expect(mergePinnedLive(data, { liveId: 'co123' })).toBe(data);
+    expect(mergePinnedLive(data, null)).toBe(data);
+    expect(mergePinnedLive(null, c).lives).toEqual([c]);
   });
 
   it('pinLiveFirst: 不在なら found=false・並び不変', () => {
