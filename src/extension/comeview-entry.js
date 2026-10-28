@@ -81,6 +81,7 @@ import {
   commentNoOfComeviewRow,
   filterUnseenComeviewComments,
   pickRefreshVoiceItems,
+  splitVoiceBacklogByCommentNo,
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
@@ -429,6 +430,7 @@ async function switchToLiveId(nextLiveId) {
   _renderedKeys.clear();
   _seenCommentNos.clear();
   _voiceBatchSeenNos.clear();
+  _voiceMaxCommentNo = 0;
   _seenGiftAtBySig.clear();
   _tailRows = [];
   _giftRows = [];
@@ -1079,11 +1081,19 @@ function noteVoiceBigBatch(items) {
 }
 /** noteVoiceBigBatch 用: 読む列へ来たことのある番号(同じコメントが2回来ていないかを見る)。 */
 const _voiceBatchSeenNos = new Set();
+/** v0.1.1805: 読みに回した最大のコメント番号(配信を切り替えたら 0)。 */
+let _voiceMaxCommentNo = 0;
 
 /** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
 function enqueueLiveVoiceItems(items) {
   if (!_voiceReadingEnabled || !Array.isArray(items) || !items.length) return;
   noteVoiceBigBatch(items);
+  // v0.1.1805: 開く前の古いコメントが後からまとめて届いた分は、読み上げ待ちにも届いた件数にも入れない。
+  const split = splitVoiceBacklogByCommentNo(items, _voiceMaxCommentNo);
+  _voiceMaxCommentNo = split.maxNo;
+  if (split.backlog) _voiceDiag.backlogSkipTotal = (Number(_voiceDiag.backlogSkipTotal) || 0) + split.backlog;
+  items = split.fresh;
+  if (!items.length) { publishVoiceDiag(); return; }
   if (!_voiceReaderLease) { enqueueVoiceTimelineItems(items); return; }
   void _voiceReaderLease.whenMine(_liveId, () => enqueueVoiceTimelineItems(items), () => {
     _voiceDiag.readerYieldTotal = (Number(_voiceDiag.readerYieldTotal) || 0) + items.length;
