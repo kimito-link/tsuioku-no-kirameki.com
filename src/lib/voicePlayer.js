@@ -13,6 +13,7 @@ import { startVoiceWarmup } from './voiceWarmup.js';
 import { isStreamedVoice, shouldStreamVoice } from './voiceStream.js';
 import { isWeakVoicePc } from './voiceNarrowing.js';
 import { observeVoicePlayback } from './voicePlaybackQuality.js';
+import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
   capVoiceMaxCharsByBoost,
   computeVoiceCongestion,
@@ -129,6 +130,8 @@ export class VoicePlayer {
 
     this.enabled = false;
     this.readNameEnabled = false;
+    /** v0.1.1812: コメビュで NG にした人(読まない)。 */
+    this.ngKeys = new Set();
     this.toggleBusy = false;
     this.styleIds = [];
     this.assignments = {};
@@ -246,7 +249,8 @@ export class VoicePlayer {
           this.VOICE_READING_ENABLED_KEY,
           this.VOICE_ASSIGNMENTS_KEY,
           this.VOICE_READ_NAME_KEY,
-          KEY_VOICE_VOLUME_PERCENT
+          KEY_VOICE_VOLUME_PERCENT,
+          COMEVIEW_NG_STORAGE_KEY
         ]);
       }
     } catch {
@@ -256,6 +260,7 @@ export class VoicePlayer {
     this.assignments = (!rawAssignments || typeof rawAssignments !== 'object' || Array.isArray(rawAssignments)) ? {} : rawAssignments;
     this.readNameEnabled = bag[this.VOICE_READ_NAME_KEY] === true;
     this.volumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
+    this.ngKeys = voiceNgKeySet(bag[COMEVIEW_NG_STORAGE_KEY]);
     this._watchVolumeSetting();
 
     this._emitToggle();
@@ -267,7 +272,7 @@ export class VoicePlayer {
     }
   }
 
-  /** ポップアップで音量が変わったら、次に鳴らす声から反映する(1回だけ購読)。 */
+  /** ポップアップで音量が変わったら、次に鳴らす声から反映する(1回だけ購読)。コメビュの NG の変更も同じ口で拾う。 */
   _watchVolumeSetting() {
     const ev = this.storageOnChanged;
     if (this._volumeWatched || !ev || typeof ev.addListener !== 'function') return;
@@ -277,6 +282,8 @@ export class VoicePlayer {
         if (areaName && areaName !== 'local') return;
         const c = changes && changes[KEY_VOICE_VOLUME_PERCENT];
         if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
+        const ng = changes && changes[COMEVIEW_NG_STORAGE_KEY];
+        if (ng) this.ngKeys = voiceNgKeySet(ng.newValue);
       });
     } catch { /* 購読できなくても起動時の値で鳴らす */ }
   }
@@ -1007,7 +1014,13 @@ export class VoicePlayer {
     let droppedCount = 0;
     for (const item of items) {
       if (!item || (item.kind !== 'comment' && item.kind !== 'gift')) continue;
-      
+      // v0.1.1812: コメビュで NG にした人は読まない(画面から消した人の声だけ聞こえる食い違いをなくす)。
+      if (isVoiceItemNgMuted(item, this.ngKeys)) {
+        this.diag.ngMutedTotal = (Number(this.diag.ngMutedTotal) || 0) + 1;
+        this._notifyDropped(item);
+        continue;
+      }
+
       const name = this.readNameEnabled ? String(item.nickname || '').trim() : '';
       let body = '';
       let isHighPriority = false;
@@ -1020,7 +1033,8 @@ export class VoicePlayer {
         body = String(item.text || '').trim();
       }
 
-      if (!buildVoiceReadingText({ name, text: body })) continue;
+      // v0.1.1811: 読む文字が無い(絵文字・記号だけ)ときも「鳴らない」と知らせる(吹き出しを合成待ちのまま8秒残さない)。
+      if (!buildVoiceReadingText({ name, text: body })) { this._notifyDropped(item); continue; }
 
       // 2026-10-22計器(P1): 受信→キュー投入。保存のまとめ書き(最大1.5秒)等の上流の遅れ。
       //   receivedAt は呼び出し側(会場)が渡す受信時刻(無ければ計測しない)。

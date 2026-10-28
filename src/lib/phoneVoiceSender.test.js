@@ -32,6 +32,14 @@ describe('createPhoneVoiceSender', () => {
     expect(d.synth.mock.calls[0][0]).toBe('c3');
     expect(s.state()).toBe('ok');
   });
+  it('コメビュで NG にした人は声にしない(v0.1.1812)', async () => {
+    const d = deps({ loadSettings: async () => ({ ngKeys: new Set(['u:u2']) }) });
+    const s = createPhoneVoiceSender(d);
+    await s.tick({ wanted: true, liveId: 'lv1', rows: rows(1) });
+    expect(await s.tick({ wanted: true, liveId: 'lv1', rows: rows(1, 2, 3) })).toBe(1);
+    expect(d.synth).toHaveBeenCalledTimes(1);
+    expect(d.synth.mock.calls[0][0]).toBe('c3');
+  });
   it('名前読みが ON なら名前も読む', async () => {
     const d = deps({ loadSettings: async () => ({ readName: true }) });
     const s = createPhoneVoiceSender(d);

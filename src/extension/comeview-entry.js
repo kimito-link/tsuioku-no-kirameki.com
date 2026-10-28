@@ -1135,7 +1135,8 @@ function enqueueVoiceTimelineItems(items) {
       body = String(item.text || '').trim();
     }
 
-    if (!buildVoiceReadingText({ name, text: body })) continue;
+    // v0.1.1811: 読む文字が無いときも「鳴らない」と知らせる(会場 VoicePlayer と同じ)。
+    if (!buildVoiceReadingText({ name, text: body })) { notifyVoiceItemDropped(item); continue; }
     // 2026-10-22計器(P1): 受信(item.at=capturedAt)→キュー投入。
     const _upstreamMs = measureVoiceGapMs(item.at, Date.now());
     if (_upstreamMs >= 0) {
