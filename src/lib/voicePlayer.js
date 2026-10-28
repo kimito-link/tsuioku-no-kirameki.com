@@ -1020,7 +1020,8 @@ export class VoicePlayer {
         body = String(item.text || '').trim();
       }
 
-      if (!buildVoiceReadingText({ name, text: body })) continue;
+      // v0.1.1811: 読む文字が無い(絵文字・記号だけ)ときも「鳴らない」と知らせる(吹き出しを合成待ちのまま8秒残さない)。
+      if (!buildVoiceReadingText({ name, text: body })) { this._notifyDropped(item); continue; }
 
       // 2026-10-22計器(P1): 受信→キュー投入。保存のまとめ書き(最大1.5秒)等の上流の遅れ。
       //   receivedAt は呼び出し側(会場)が渡す受信時刻(無ければ計測しない)。

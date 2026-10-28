@@ -319,6 +319,18 @@ describe('VoicePlayer', () => {
     expect(onDropped).toHaveBeenCalledTimes(1); // 鳴らなかった→drop 通知
   });
 
+  it('v0.1.1811: 読む文字が無い(絵文字だけ)コメントは合成せず onDropped を呼ぶ', async () => {
+    await player.enable({ persist: false });
+    player.fetchSynthesizeVoice.mockClear();
+    const onAudioStart = vi.fn();
+    const onDropped = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u5', nickname: 'E', text: '😂😂', onAudioStart, onDropped }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    expect(onAudioStart).not.toHaveBeenCalled();
+    expect(player.fetchSynthesizeVoice).not.toHaveBeenCalled();
+  });
+
   it('v0.1.799: 実再生時は onDropped を【呼ばない】(speaking を壊さない=ずれ再発防止)', async () => {
     await player.enable({ persist: false });
     const onAudioStart = vi.fn();
