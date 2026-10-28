@@ -1226,7 +1226,9 @@ const VENUE_CSS = `
     background:
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
     overscroll-behavior: contain;
-    contain: layout paint;
+    /* v0.1.1817: 客席を自分の層へ。毎フレーム変わる隣(群衆・ニコ生側)につられ481席を毎回描き直していた(実測 描画1,487→364ms/10秒) */
+    contain: layout paint style;
+    will-change: transform;
   }
   /* v0.1.1129: Chrome系のスクロールバー非表示(scrollbar-width:none の webkit 版)。 */
   .nlsb-seats::-webkit-scrollbar {
