@@ -80,6 +80,7 @@ import {
   selectAppendedComeviewTimelineItems,
   commentNoOfComeviewRow,
   filterUnseenComeviewComments,
+  pickRefreshVoiceItems,
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
@@ -95,7 +96,7 @@ import {
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import {
   computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
-  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor, foldVoiceArrivalWindow
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
@@ -142,7 +143,7 @@ import {
   upgradeAnonymousAvatarImage,
   upgradeAnonymousAvatarImages
 } from '../lib/avatarPartsComposer.js';
-import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
+import { isVoiceItemStale, VOICE_STALE_MS_NORMAL } from '../lib/voiceAgeGate.js';
 import { runStorageOpWithTimeout } from '../lib/storageOpTimeout.js';
 import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
@@ -427,6 +428,7 @@ async function switchToLiveId(nextLiveId) {
   // 前配信の表示・既読・読み上げキューをリセットして新配信を一から読む。
   _renderedKeys.clear();
   _seenCommentNos.clear();
+  _voiceBatchSeenNos.clear();
   _seenGiftAtBySig.clear();
   _tailRows = [];
   _giftRows = [];
@@ -718,6 +720,8 @@ function notifyVoiceItemDropped(item) {
 
 /** v0.1.1797: 届く間隔と声の長さ(追いついた後も保つ早口の床)。 */
 const _voicePaceState = createVoicePaceState();
+/** v0.1.1803計器: 届いたコメントの件/分(会場 VoicePlayer と同じ窓)。読めた件数の差が「届いた数」か「読み方」かを分ける。 */
+let _voiceArrivalWindow = null;
 
 /**
  * v0.1.1797: 混雑(キュー長)の上乗せに、順番待ちが伸びた分の上乗せを足す(会場の VoicePlayer と同じ)。
@@ -1048,9 +1052,38 @@ async function drainVoiceQueue() {
 }
 
 
+/**
+ * v0.1.1804計器: 一度に10件以上が読む列へ来た時の中身(開いて約30秒後に約100件まとめて来て全部
+ *   古いと捨てられた原因を、推測でなく数字で分けるため)。番号の無い行・届いてからの経過で
+ *   「同じ行の出し直し」か「本当にまとめて届いた」かが分かる。
+ * @param {ReadonlyArray<Record<string, any>>} items
+ */
+function noteVoiceBigBatch(items) {
+  const nos = items.map((it) => commentNoOfComeviewRow(it));
+  const seenBefore = nos.filter((no) => no && _voiceBatchSeenNos.has(no)).length;
+  for (const no of nos) if (no) _voiceBatchSeenNos.add(no);
+  if (_voiceBatchSeenNos.size > 2000) _voiceBatchSeenNos.clear();
+  if (items.length < 10) return;
+  const now = Date.now();
+  const ages = items.map((it) => now - Number(it?.at)).filter((a) => Number.isFinite(a));
+  _voiceDiag.bigBatchTotal = (Number(_voiceDiag.bigBatchTotal) || 0) + 1;
+  _voiceDiag.lastBigBatch = {
+    at: now,
+    size: items.length,
+    noLess: nos.filter((no) => !no).length,
+    seenBefore,
+    oldestAgeMs: ages.length ? Math.max(...ages) : -1,
+    newestAgeMs: ages.length ? Math.min(...ages) : -1
+  };
+  publishVoiceDiag();
+}
+/** noteVoiceBigBatch 用: 読む列へ来たことのある番号(同じコメントが2回来ていないかを見る)。 */
+const _voiceBatchSeenNos = new Set();
+
 /** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
 function enqueueLiveVoiceItems(items) {
   if (!_voiceReadingEnabled || !Array.isArray(items) || !items.length) return;
+  noteVoiceBigBatch(items);
   if (!_voiceReaderLease) { enqueueVoiceTimelineItems(items); return; }
   void _voiceReaderLease.whenMine(_liveId, () => enqueueVoiceTimelineItems(items), () => {
     _voiceDiag.readerYieldTotal = (Number(_voiceDiag.readerYieldTotal) || 0) + items.length;
@@ -1084,6 +1117,8 @@ function enqueueVoiceTimelineItems(items) {
       _voiceDiag.lastUpstreamMs = _upstreamMs;
       foldVoiceStageEma(_voiceDiag, 'upstreamEmaMs', _upstreamMs);
     }
+    _voiceArrivalWindow = foldVoiceArrivalWindow(_voiceArrivalWindow, Date.now(), 1);
+    _voiceDiag.arrivalPerMin = _voiceArrivalWindow.arrivalPerMin;
     const candidate = {
       userKey: voiceUserKeyForItem(item),
       name,
@@ -1914,6 +1949,10 @@ async function performFullRefresh(forceBottom) {
     TIMELINE_LIMIT
   );
   _commentCount = comments.length;
+  // v0.1.1804: 初回以外は、この全量描画で初めて出る新しいコメントも読む(下の既出登録より先に拾う)。
+  const refreshVoiceItems = _initialVoicesPrimed
+    ? pickRefreshVoiceItems(timeline, _seenCommentNos, Date.now(), VOICE_STALE_MS_NORMAL)
+    : [];
   renderFullTimeline(timeline, forceBottom);
   // v0.1.679: 全量描画した行の識別子を「既出」に登録(以後の hot append が二重に足さない)。
   for (const item of timeline) {
@@ -1921,6 +1960,10 @@ async function performFullRefresh(forceBottom) {
     rememberSeenCommentNo(commentNoOfComeviewRow(item));
   }
 
+  if (refreshVoiceItems.length) {
+    _voiceDiag.refreshVoicedTotal = (Number(_voiceDiag.refreshVoicedTotal) || 0) + refreshVoiceItems.length;
+    enqueueLiveVoiceItems(refreshVoiceItems);
+  }
   if (!_initialVoicesPrimed) {
     _initialVoicesPrimed = true;
     if (timeline.length > 0) {
