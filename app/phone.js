@@ -3,10 +3,11 @@
  *   PC の拡張の「📱 スマホへ送信」で出たリンクを貼ると、この端末で覚えて次から自動で開く。
  *   PC が無くても「デモを見る」で中身を試せる(/live-view?v=demo・作り物の配信)。
  *   v0.1.1764: PC が無くても「いま配信中の応援ランキング」(/live・app/live.html)を見られる。
+ *   v0.1.1819: PC が無い人はニコ生の放送の URL を貼れば、その配信の応援を見られる(/live?lv=)。
  *
  * @module phone-start
  */
-import { PHONE_START_LINK_KEY, parseViewerLink, savedViewerPath, viewerPathFor } from '../src/lib/phoneStartLink.js';
+import { PHONE_START_LINK_KEY, parseNicoliveWatchLink, parseViewerLink, savedViewerPath, viewerPathFor } from '../src/lib/phoneStartLink.js';
 
 /** 覚えたリンクを自動で開くまでの待ち(ms)。その間に「リンクを変える」を押せる。 */
 const AUTO_OPEN_MS = 1_500;
@@ -34,9 +35,15 @@ function boot() {
   /** @param {string} path */
   const go = (path) => location.assign(path);
   const openFrom = (/** @type {string} */ raw) => {
+    // ★ニコ生の放送の URL を先に見る(lv だけの文字列は拡張のトークンの形にも合ってしまうため)。
+    const lv = parseNicoliveWatchLink(raw);
+    if (lv) {
+      go(`/live?lv=${encodeURIComponent(lv)}`);
+      return;
+    }
     const link = parseViewerLink(raw);
     if (!link) {
-      msg.textContent = 'このリンクは開けません。PC の拡張の「📱 スマホへ送信」で出たリンク(app.tsuioku-no-kirameki.com/live-view?v=…)を貼ってください。';
+      msg.textContent = 'このリンクは開けません。ニコ生の放送の URL(live.nicovideo.jp/watch/lv…)か、PC の拡張の「📱 スマホへ送信」で出たリンクを貼ってください。';
       msg.dataset.kind = 'error';
       return;
     }

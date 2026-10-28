@@ -13,7 +13,7 @@ import { escapeHtml as esc, safeHttpUrl, formatNumberJa as num } from '../lib/ht
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
   cacheBust, supporterRows, commentRows, isBlankIcon, createRowChangeTracker, rowKey,
-  LIVE_ID_RE, pinLiveFirst, liveShareText
+  LIVE_ID_RE, pinLiveFirst, mergePinnedLive, liveShareText
 } from '../lib/liveRankingView.js';
 import { buildXIntentUrl } from '../lib/xIntentUrl.js';
 import { buildRecentCardHtml } from '../lib/liveRecentHoverCard.js';
@@ -281,14 +281,18 @@ function render(data) {
   // ★合成順序は「賑わい順を作ってから 1 件を先頭へ」(逆だと sort が pin を壊す)。
   const { lives: ordered, found } = pinLiveFirst(sortByEstimatedConcurrent(lives, nowMs), PINNED_LV);
   const missing = !!PINNED_LV && !found;
+  // ★v0.1.1819: 貼られた配信は終わっていても出す(onAir:false)。放送中の数には入れない。
+  const pinnedEnded = found && ordered[0] && ordered[0].onAir === false;
+  const onAirCount = lives.filter((/** @type {any} */ l) => !(l && l.onAir === false)).length;
   // ★コメントの集計は別ジョブ(約 10 分ごと)。ギフト/広告の鮮度とは別に、いつ数えた値かを添える。
   const cf = freshness(data.commentsCapturedAt, nowMs);
   const cMin = cf.text ? cf.text.replace(/^⚠ /, '').replace(/ 更新$/, '').replace(/の情報です.*$/, '') : '';
   elMeta.innerHTML = `<img class="face" src="${esc(f.stale ? FACE.tanuNormal : (missing ? FACE.tanuHalf : FACE.kontaSmile))}" alt="">`
-    + `放送中 <b>${lives.length}</b> 配信`
+    + `放送中 <b>${onAirCount}</b> 配信`
     + (f.text ? `・<span${f.stale ? ' class="stale"' : ''}>${esc(f.text)}</span>` : '')
     + (cMin ? `・<span${cf.stale ? ' class="stale"' : ''}>コメント集計 ${esc(cMin)}</span>` : '')
-    + (missing ? '・<span class="pin-missing">その配信はもう放送が終わったみたい。いま支えている人の一覧は、そのまま見られるわ</span>' : '');
+    + (pinnedEnded ? '・<span class="pin-missing">貼った配信は放送が終わっています。最後の順位表を出しているわ</span>' : '')
+    + (missing ? '・<span class="pin-missing">その配信の情報は取れなかったわ。URL を確かめてね。いま支えている人の一覧は、そのまま見られるわ</span>' : '');
 
   tracker.begin();
   giftPulse.begin();
@@ -390,6 +394,34 @@ function setBusy(busy) {
   }
 }
 
+const PINNED_RETRY_MS = 2000;
+const PINNED_TRIES = 3;
+/**
+ * v0.1.1819: ?lv= の配信が一覧(放送中の上位)に無いとき、その1配信だけ取って足す。
+ *   PC の拡張が無い人が開始画面で「放送の URL を貼る」とここへ来る。
+ *   取れなければ一覧だけを出す(貼った配信が見つからない旨は render が出す)。
+ * @param {any} data /api/live-ranking の応答(一覧がまだ無ければ null)
+ * @returns {Promise<any>}
+ */
+async function withPinnedLive(data) {
+  if (!PINNED_LV) return data;
+  if (pinLiveFirst((data && data.lives) || [], PINNED_LV).found) return data;
+  for (let i = 0; i < PINNED_TRIES; i++) {
+    try {
+      const r = await fetch(`/api/live-ranking?lv=${encodeURIComponent(PINNED_LV)}`, { cache: 'no-store' });
+      // ★他の人が取りに行っている最中(503)。少し待てば置き場から返る。
+      if (r.status === 503) { await new Promise((ok) => setTimeout(ok, PINNED_RETRY_MS)); continue; }
+      if (!r.ok) break;
+      const one = await r.json();
+      return mergePinnedLive(data, one && one.live);
+    } catch {
+      break;
+    }
+  }
+  if (!data) throw new Error('この配信の情報を取れませんでした。URL を確かめて、少し待ってから「いま更新」を押してください。');
+  return data;
+}
+
 /**
  * @param {{ refresh?: boolean }} [opts]
  * @returns {Promise<void>}
@@ -400,10 +432,13 @@ function load(opts) {
   setBusy(true);
   return fetch(refresh ? '/api/live-ranking?refresh=1' : '/api/live-ranking', { cache: 'no-store' })
     .then((r) => {
+      // ★v0.1.1819: 貼られた配信(?lv=)だけは、一覧がまだ無くても出す。
+      if (r.status === 404 && PINNED_LV) return null;
       if (r.status === 404) throw new Error('まだ集計されていません。しばらくお待ちください。');
       if (!r.ok) throw new Error(`読み込みに失敗しました (${r.status})`);
       return r.json();
     })
+    .then(withPinnedLive)
     .then((data) => { _lastCapturedAt = Number(data && data.capturedAt) || _lastCapturedAt; render(data); prewarmRecent(data); })
     .catch((e) => showState(String(e && e.message ? e.message : e)))
     .finally(() => { setBusy(false); _nextAutoAt = Date.now() + AUTO_REFRESH_MS; });
