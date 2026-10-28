@@ -338,6 +338,7 @@ import {
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
 import { moveNodePreservingState, moveNodeAfterPreservingState } from '../lib/moveNodePreservingState.js'; // v0.1.1820: host を動かしてもパネル(iframe)を読み込み直させない
+import { decideBesideOverflow, createBesideOverflowMemory, besideOverflowFor, rememberBesideOverflow } from '../lib/besideOverflowGuard.js'; // v0.1.1825: 横付きが右へはみ出したら縮める/下へ
 // ★v0.1.1454: メモリ/DOM の逼迫判定(凍結の予兆を数字で出す)。
 import { judgeMemoryPressure } from '../lib/memoryPressureProbe.js';
 /*
@@ -2827,6 +2828,7 @@ const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
  * 真犯人候補。どの経路が・何回・会場open中に動かしているかを実測してから直す(推測patch禁止)。
  * @type {{ count:number, reloadCount:number, venueOpenMoves:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }}
  */
+const _besideOverflowMem = createBesideOverflowMemory();
 const _inlineHostMoveState = { count: 0, reloadCount: 0, venueOpenMoves: 0, byReason: {}, samples: [], lastAtMs: 0 };
 
 /** 拡張の <style> を貼り直した回数(0 は「消されていない」の証拠になる)。 */
@@ -5430,8 +5432,10 @@ function renderInlineHostAnchoredToVideo(video) {
    */
   let besideLayout = null;
 
+  // v0.1.1825: この幅で一度「縮めても収まらない」と実測したら、行に入れず below へ（besideOverflowGuard）
+  const besideOverflow = besideOverflowFor(_besideOverflowMem, nlsLayoutViewportSize().innerWidth);
   if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
-    const col = findBesideFlexRowColumnInsertion(video);
+    const col = besideOverflow?.below ? null : findBesideFlexRowColumnInsertion(video);
     if (col?.hostParent && col.insertAfter) {
       // beside 用の幅・高さを純粋関数で再計算
       const layoutVp = nlsLayoutViewportSize();
@@ -5514,8 +5518,8 @@ function renderInlineHostAnchoredToVideo(video) {
       }
     } else {
       const r = resolveInlinePanelInsertAnchor(
-        insertResolveAnchor,
-        placement
+        besideOverflow?.below ? domAnchor : insertResolveAnchor,
+        besideOverflow?.below ? INLINE_PANEL_PLACEMENT_BELOW : placement
       );
       insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
       hostParent = r.hostParent;
@@ -5662,8 +5666,22 @@ function renderInlineHostAnchoredToVideo(video) {
   applyInlineHostPanelWidthWithViewportWide(host, iframe, {
     baselineWidthPx: finalPanelWidthPx,
     hostAttachFallbackBody,
-    maxAppliedWidthPx: besideViewportWideCap
+    maxAppliedWidthPx: besideFlexRowColumn && besideOverflow?.capPx != null ? Math.min(besideOverflow.capPx, besideViewportWideCap ?? Infinity) : besideViewportWideCap
   });
+  if (placement === INLINE_PANEL_PLACEMENT_BESIDE && besideFlexRowColumn) {
+    // 置いた後の実測: パネルか、行内でその右に押し出された列(公式コメ列)がタブ右端を越えたか
+    try {
+      const vwNow = nlsLayoutViewportSize().innerWidth;
+      const trailingRights = [];
+      for (let s = host.nextElementSibling; s; s = s.nextElementSibling) {
+        if (s instanceof HTMLElement) trailingRights.push(s.getBoundingClientRect().right);
+      }
+      const d = decideBesideOverflow({ viewportWidth: vwNow, hostRect: host.getBoundingClientRect(), trailingRights, scrollX: window.scrollX });
+      if (rememberBesideOverflow(_besideOverflowMem, vwNow, d)) {
+        requestAnimationFrame(() => { try { if (video.isConnected) renderInlineHostAnchoredToVideo(video); } catch { /* 次の tick で描き直る */ } });
+      }
+    } catch { /* 測れなければ従来どおり */ }
+  }
   // beside の高さを動画行の自然高さに揃える（縦間延びの解消）
   if (besideLayout) {
     host.style.maxHeight = `${besideLayout.panelHeight}px`;

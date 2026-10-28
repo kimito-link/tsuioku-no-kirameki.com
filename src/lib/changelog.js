@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1825',
+    date: '2026-10-28',
+    summary: '横付きパネルが右へはみ出さないように',
+    items: Object.freeze([
+      '狭めの窓で横付きパネルを挟むと公式コメント欄が画面の外へ押し出され横スクロールが出ていたのを直しました。置いた後に実際の位置を測り、縮めて収まるなら幅を詰め、収まらなければ動画の下へ出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1824',
     date: '2026-10-28',
     summary: 'アプリだけでコメントを流す',
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '読み上げが遅いとき GPU の案内を出す',
     items: Object.freeze([
       '読み上げが大きく遅れているとき、VOICEVOX がグラフィックボード(GPU)を使えるのに声づくりが遅いと分かったら、「VOICEVOX の設定でエンジンモードを GPU にすると速くなることがあります」と一言添えるようにしました。設定は自動では変えません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1805',
-    date: '2026-10-28',
-    summary: 'コメビュで後から届く古いコメントを読まない',
-    items: Object.freeze([
-      'コメントの多い放送でコメビュを開くと、少し後に開く前の古いコメントが100件以上まとめて届き、読み上げ待ちに入ってから捨てられていました。最初から読み上げに入れず、届いた件数にも数えないようにしました(読み上げの声は変わりません)。'
     ])
   })
 ]);

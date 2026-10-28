@@ -4760,6 +4760,16 @@
       ]
     },
     {
+      "file": "src/lib/besideOverflowGuard.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/blackScreenOwnerCells.js",
       "featureCount": 1,
       "features": [

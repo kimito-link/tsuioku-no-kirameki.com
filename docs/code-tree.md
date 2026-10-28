@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1076 件
+## ⚠️ 役割コメントが無いソース 9 / 1077 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -977,7 +977,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2210)
+- 📁 **src/** (2212)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1272,7 +1272,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1941)
+  - 📁 **lib/** (1943)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1407,6 +1407,8 @@
     - `bandScale.test.js`
     - `bandScale.wiring.test.js`
     - `bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
+    - `besideOverflowGuard.js` — 横付き(beside)パネルが視聴行の中に入った結果、ページが横にはみ出したかを判定する純粋関数。
+    - `besideOverflowGuard.test.js`
     - `blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
     - `blackCurtainLedger.test.js`
     - `blackCurtainLedgerWiring.wiring.test.js`

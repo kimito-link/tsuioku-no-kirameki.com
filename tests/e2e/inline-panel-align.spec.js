@@ -105,6 +105,30 @@ function injectTwoColumnPlayerRowLargeBesideGap() {
 }
 
 /**
+ * 実配信 1252px の再現（v0.1.1825）: 動画列は縮まず(680px)・公式コメ列 377px が右に並ぶ流体の視聴行。
+ * パネル(640px)を間に挟むとパネル右端もコメ列もタブ右端を越える＝横スクロールが出ていた。
+ */
+function injectFluidPlayerRowWideVideo() {
+  const doc = globalThis.document;
+  const win = globalThis.window;
+  for (const sel of ['#mock-player-row', '#e2e-mock-video', '.ga-ns-comment-panel']) doc.querySelector(sel)?.remove();
+  const row = doc.createElement('section');
+  row.id = 'mock-player-row';
+  row.style.cssText = 'display:flex;flex-direction:row;align-items:flex-start;gap:10px;margin:12px 0;padding:8px;background:#1a1a1a;';
+  const v = doc.createElement('video');
+  v.setAttribute('playsinline', '');
+  v.style.cssText = 'display:block;width:680px;height:383px;flex-shrink:0;background:#000;';
+  const side = doc.createElement('div');
+  side.className = 'ga-ns-comment-panel comment-panel';
+  side.style.cssText = 'width:377px;min-height:383px;flex-shrink:0;background:#2a2a2a;';
+  row.appendChild(v);
+  row.appendChild(side);
+  doc.body.prepend(row);
+  win.scrollTo(0, 0);
+  win.dispatchEvent(new Event('resize'));
+}
+
+/**
  * 本家 watch で多い `display:inline-flex` の視聴行（横付きアンカーが `flex` のみ判定だと見逃す）。
  */
 function injectTwoColumnPlayerRowInlineFlex() {
@@ -446,6 +470,19 @@ test.describe('inline panel alignment', () => {
         prevElementId: 'mock-player-row',
         floatingClass: false
       });
+  });
+
+  test('beside で挟むとタブ右端を越える幅なら、横スクロールを出さず下へ逃がす', async ({ context }) => {
+    await setInlinePanelModes(context, { widthMode: 'video', placement: 'beside' });
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 1252, height: 900 });
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(injectFluidPlayerRowWideVideo);
+    await expect
+      .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+      .toMatchObject({ display: 'block', parentTag: 'BODY', prevElementId: 'mock-player-row' });
+    const sw = await page.evaluate(() => globalThis.document.documentElement.scrollWidth - globalThis.window.innerWidth);
+    expect(sw).toBeLessThanOrEqual(1);
   });
 
   test('beside では 空白 Text ノードが間にあっても毎tick再挿入しない', async ({
@@ -886,7 +923,10 @@ test.describe('inline panel viewport size matrix', () => {
       });
   });
 
-  for (const vw of [1280, 1440, 1920, 2560]) {
+  // 1280/1440 は外した(v0.1.1825): この mock は gap:300 なのでパネルを挟むと余白が2つになり
+  // 行が 8+400+300+292+300+220=1520px＝公式コメ列がタブの外へ押し出されていた(=はみ出しそのもの)。
+  // 今はその幅では下へ逃がすのが正しい挙動(上の「横スクロールを出さず下へ逃がす」が守る)。
+  for (const vw of [1600, 1920, 2560]) {
     test(`beside+幅拡大(常に)+列間ギャップ大: ${vw}px で行内かつ幅がタブ幅を超えない`, async ({
       context
     }) => {
