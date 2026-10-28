@@ -957,7 +957,10 @@ async function council(members, label, key) {
       // 2026-08-18: 'groq/llama-3.3-70b' を撤去。同日GroqのLlama一斉廃止で404になった死にラベルで、
       // 上のcloudflare/glm-5.2撤去(2026-08-13)と同じ「findが永久に外れる死に要素」。挙動は
       // 変わらないが、統合はリトライ無しの一発工程であり、絶対に当たらない選択肢を候補列に残さない。
-      priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'gemini-2.5-flash'];
+      // 2026-10-28: 2番手を cloudflare/nemotron-120b → gemini-2.5-flash に入れ替え。全員召集(digest 11510字)で
+      //  groq が後ろへ回ると nemotron が先頭になるが、max_tokens 3000 でも推論9145字で上限を使い切り本文なしだった。
+      //  gemini-2.5-flash は同じ入力で2770字・24秒・4見出しを書き切った（実測・りんくのPC）。nemotron は最後の砦として残す。
+      priority = ['groq/gpt-oss-120b', 'gemini-2.5-flash', 'cloudflare/nemotron-120b'];
       synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
         || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
       if (synth) console.error(`[${label}] ②統合役(能力優先): ${synth.label}`);

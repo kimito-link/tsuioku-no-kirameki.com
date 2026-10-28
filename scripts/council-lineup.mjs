@@ -183,9 +183,9 @@ export const LINEUP = [
   //  CFの/ai/models/searchは実測で毎日安定取得できており、素通しにする理由が既に消えている。
   //  liveProbe:true も付与（下記glm-5.2/kimi-k2.7-codeの有料化発覚を受け、カタログ照合だけでは
   //  検知できない「一覧に存在するが無料枠では呼べない」劣化を実疎通で毎日確認する）。
-  // ★2026-10-28 opts に max_tokens: 3000 を追加: 統合の次点として呼ばれたとき（入力1万字超）、
-  //   推論だけで既定の1600を使い切り本文なし(finish=length)で落ちた。qwen3-30b-a3b と同じ対処。
-  { label: 'cloudflare/nemotron-120b', provider: 'cloudflare', rawId: '@cf/nvidia/nemotron-3-120b-a12b', apiModel: '@cf/nvidia/nemotron-3-120b-a12b', opts: { max_tokens: 3000 }, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+  // ★2026-10-28 記録: 統合(入力1万字超)で推論が上限を使い切り本文なし(finish=length)。max_tokens 3000 も試したが
+  //   推論が3304字→9145字に伸びただけで答えに届かず、効果なしのため戻した。統合の順番を gemini-2.5-flash の後ろへ回して対処（meeting.mjs）。
+  { label: 'cloudflare/nemotron-120b', provider: 'cloudflare', rawId: '@cf/nvidia/nemotron-3-120b-a12b', apiModel: '@cf/nvidia/nemotron-3-120b-a12b', opts: {}, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
   // 2026-06-27 追加 → 2026-07-31 撤去（cloudflare/glm-5.2, cloudflare/kimi-k2.7-code）:
   //   実機でCloudflare Workers AI /ai/v1/chat/completions を叩いたところ両モデルとも
