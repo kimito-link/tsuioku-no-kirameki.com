@@ -221,6 +221,43 @@ export function makeInitialVoiceDiag() {
 }
 
 /**
+ * 配信が変わっても引き継ぐ計器(このPC・このエンジンの性質)。これ以外は配信ごとに数え直す。
+ *   声づくりの速さ(warm/cold/RTF)は isWeakVoicePc・件数上限・GPU 案内が使うので捨てない。
+ */
+export const VOICE_DIAG_KEEP_ACROSS_LIVES = Object.freeze([
+  'enabled', 'lastEnableFailReason', 'enableFailTotal',
+  'serviceTimeEmaMs', 'effectiveQueueMax', 'synthWaitEmaMs', 'playPrepEmaMs', 'playbackEmaMs', 'expectedPlayEmaMs',
+  'engineWaitEmaMs', 'audioQueryEmaMs', 'synthesisEmaMs', 'warmSynthEmaMs', 'warmSynthSamples',
+  'warmSynthRtfPermille', 'warmRtfSamples', 'coldSynthTotal', 'coldSynthMaxMs', 'lastColdSynthMs',
+  'speakerInitTotal', 'speakerInitMaxMs', 'voiceBorrowTotal', 'bgInitTotal', 'bgInitMaxMs', 'bgInitYieldTotal',
+  'streamTotal', 'streamFirstAudioEmaMs', 'contendedSynthTotal',
+  'outPeakEmaPermille', 'outRmsDbMin', 'outRmsDbMax', 'lastOutRmsDb', 'venueGate'
+]);
+
+/**
+ * 2026-10-28: 配信が変わったら、配信ごとの計器(読めた数・飛ばした数・遅れ・届いた件/分 など)を数え直す。
+ *   コメビュは1つの窓で配信を追いかけるため、前の配信の分が新しい配信の liveId 付きで書かれていた(§12.7 の嘘)。
+ *   その場で書き換える(呼び出し側が同じオブジェクトを持ち続けるため)。
+ * @param {Record<string, any>} diag
+ * @param {number} nowMs
+ */
+export function resetVoiceDiagForNewLive(diag, nowMs) {
+  if (!diag || typeof diag !== 'object') return;
+  const base = /** @type {Record<string, any>} */ (makeInitialVoiceDiag());
+  const keep = new Set(VOICE_DIAG_KEEP_ACROSS_LIVES);
+  for (const key of Object.keys(diag)) {
+    if (keep.has(key)) continue;
+    if (Object.prototype.hasOwnProperty.call(base, key)) {
+      const v = base[key];
+      diag[key] = v && typeof v === 'object' ? { ...v } : v;
+    } else if (typeof diag[key] === 'number') {
+      diag[key] = 0; // 初期 state に無い数え(voiceEnqueuedTotal 等)も数え直す
+    }
+  }
+  diag.diagBornAt = Number(nowMs) || 0;
+}
+
+/**
  * storage 書き込み用の軽量スナップショット(ago は読み手側で算出するため base を渡す)。
  * @param {Partial<VoiceDiagState>|null|undefined} diag
  * @param {number} [nowMs]
