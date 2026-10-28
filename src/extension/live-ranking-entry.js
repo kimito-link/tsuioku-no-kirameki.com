@@ -25,6 +25,7 @@ import {
 } from '../lib/liveMotion.js';
 import { toEpochMs } from '../lib/timeAuthority.js';
 import { buildPlatformSectionHtml, platformsErrorHtml } from '../lib/livePlatformsHtml.js';
+import { mountDirectComments } from './liveDirectComments.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -70,6 +71,8 @@ function liveIdFromQuery() {
   }
 }
 const PINNED_LV = liveIdFromQuery();
+// iPhone アプリの中だけ: その配信のコメントを端末が直接受け取って流す欄(アプリの外では何も出さない)。
+mountDirectComments({ lv: PINNED_LV, mountBefore: document.getElementById('list') });
 
 /**
  * 1 配信ぶんの「X でシェア」リンクの href。空なら呼び出し側はリンクを描かない。

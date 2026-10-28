@@ -875,7 +875,7 @@
   - `src/extension/statusSmartphoneCard.js`
   - `src/extension/popup-entry.js`
   - `src/lib/statusPublisherPlan.js`
-- **拡張なしでスマホから見る(放送URL・ファンにも公開)** — ①開始画面(/phone)に放送URLを貼る→/live?lv= で1配信だけその場で取る(api/live-ranking.js の ?lv=・60秒置き場・SET NX で1本)・一覧に無ければ mergePinnedLive で足す(v0.1.1819)。②配信者の「👥 ファンにも公開」で読むだけの fan_… リンク(api/status.js ?action=fan・GET ?v=fan_ は配信者の最新を読むだけ・目印を置かない・CDN 5秒・リアルタイムは1時間の人数と月の総数で止める)(v0.1.1820)
+- **拡張なしでスマホから見る(放送URL・ファンにも公開)** — ①開始画面(/phone)に放送URLを貼る→/live?lv= で1配信だけその場で取る(api/live-ranking.js の ?lv=・60秒置き場・SET NX で1本)・一覧に無ければ mergePinnedLive で足す(v0.1.1819)。②配信者の「👥 ファンにも公開」で読むだけの fan_… リンク(api/status.js ?action=fan・GET ?v=fan_ は配信者の最新を読むだけ・目印を置かない・CDN 5秒・リアルタイムは1時間の人数と月の総数で止める)(v0.1.1820)。③iPhone アプリだけの「💬 コメントを流す」=端末がニコニコから直接受け取る(watch/view/segment は CapacitorHttp・握手は WebView の WebSocket・読み方は公開の型どおりの ndgrLiveFollow・サーバーへ送らない)(v0.1.1821)
   - `api/live-ranking.js`
   - `src/lib/phoneStartLink.js`
   - `app/phone.js`
@@ -883,6 +883,8 @@
   - `src/server/fanLinkApi.js`
   - `src/extension/fanLinkClient.js`
   - `src/extension/statusSmartphoneCard.js`
+  - `src/extension/liveDirectComments.js`
+  - `src/lib/ndgrLiveFollow.js`
 - **スマホから生放送にコメント(PC中継)** — スマホのWEB版の本物の入力欄(popup-entry.js の submitComment)が、受動ビューで globalThis.__nlsWebCommentRelay があるときだけ /api/post に預ける(拡張の中では常に null=PCの送信経路は不変)。サーバー(api/post.js)は投稿用の鍵(#pk=・ハッシュだけ保存)で照合し待ち行列に最長60秒・20秒8件まで。PCの送信担当(status.html?publisher=1)の phonePostRelay.js がふだん10秒/入力中2秒で取りに行き、NLS_POST_COMMENT で放送タブのコメント欄から投稿して結果を返す。スマホは接続の帯と ⏱→✓→✓✓(放送のコメントに流れたのを鏡で確認)の印を app/live-view-post.js で出す。PC の「✍️ スマホからコメントする」スイッチ・自分専用URL・QR は statusSmartphoneCard.js。判定は phonePost.js(v0.1.1734)
   - `api/post.js`
   - `src/lib/phonePost.js`
@@ -986,7 +988,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 287</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 288</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1057,6 +1059,7 @@
 - `scripts/lib/today-jst.mjs` — 運用日（JST）を返す唯一の正本。
 - `scripts/lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
+- `scripts/measure-phone-direct.mjs` — 「iPhone アプリが自分でニコ生のコメントを取る」(拡張なし 第3段)の前に測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
 - `scripts/perf-ab/boot-profile.mjs` — パネル(popup)の【起動の瞬間】のメインスレッド CPU プロファイル。「押した瞬間の黒い幕」の原因探し用。
@@ -1298,6 +1301,7 @@
 - `v0.1.1819` 2026-10-28 — PC が無くても放送 URL で応援を見る
 
 ### 🔊 読み上げ (11版)
+- `v0.1.1821` 2026-10-28 — アプリだけでコメントを流す
 - `v0.1.1812` 2026-10-28 — NG にした人は読み上げでも読まない
 - `v0.1.1811` 2026-10-28 — 読み上げない吹き出しが残らないように
 - `v0.1.1810` 2026-10-28 — 絵文字や記号だけのコメントは読み上げない
@@ -1308,7 +1312,6 @@
 - `v0.1.1805` 2026-10-28 — コメビュで後から届く古いコメントを読まない
 - `v0.1.1804` 2026-10-28 — コメビュで読み上げが抜けるのを直す
 - `v0.1.1803` 2026-10-28 — 読み上げの遅れの計器を正しく
-- `v0.1.1801` 2026-10-28 — 遅いPCで混んだ時の読み上げの遅れを短く
 
 ### 🪟 応援レーン・タイル (2版)
 - `v0.1.1816` 2026-10-28 — 隠れた画面の数え直しを間引く

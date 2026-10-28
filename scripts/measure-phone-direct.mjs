@@ -9,8 +9,7 @@
  *      (Access-Control-Allow-Origin)。読ませないものはネイティブ通信(CapacitorHttp)で取る。
  *   3. 遅れ: view を next.at で辿り、segment を「届きしだい読む」(ネイティブ部品)と
  *      「最後まで読む」(CapacitorHttp)の両方で、コメントの時刻(meta.at)から手元に届くまでの秒数(p50 / p90)。
- *      ★src/lib/ndgrForwardCrawl.js は使わない。1回目の計測で segment をほぼ取れなかった(view 91回・segment 4本・12バイト)ため、
- *        公開の型どおりに番号で読む小さな版をここに置いた(結果しだいで lib 側を直す)。
+ *      ★view の読み方は src/lib/ndgrLiveFollow.js(公開の型どおり)。ndgrForwardCrawl.js は実データを読み違える。
  *   4. 続けて取ったときに 429 / 403 が出ないか(回数制限)。
  *
  * ■ 秘密を出さない
@@ -24,7 +23,8 @@
 import { fetchWatchHtml, fetchViewUri } from '../src/server/nicoliveGuest.js';
 import { extractEmbeddedData } from '../src/lib/nicoliveRankingPick.js';
 import { pickWsUrlFromEmbeddedData } from '../src/lib/embeddedDataExtract.js';
-import { pbForEach, decodeChunkedMessage } from '../src/lib/ndgrDecode.js';
+import { decodeChunkedMessage } from '../src/lib/ndgrDecode.js';
+import { readNdgrViewEntry, ndgrMessageAtMs } from '../src/lib/ndgrLiveFollow.js';
 import { splitLengthDelimitedMessagesWithTail } from '../src/lib/lengthDelimitedStream.js';
 
 const APP_ORIGIN = 'https://app.tsuioku-no-kirameki.com';
@@ -124,65 +124,6 @@ async function main() {
 }
 
 /**
- * Timestamp { seconds=1, nanos=2 } を ms に。
- * @param {Uint8Array} b @param {number} s @param {number} e
- */
-function tsMs(b, s, e) {
-  let sec = 0;
-  let ns = 0;
-  pbForEach(b, s, e, (fn, wt, val) => {
-    if (wt !== 0) return;
-    if (fn === 1) sec = Number(val) || 0;
-    if (fn === 2) ns = Number(val) || 0;
-  });
-  return sec * 1000 + Math.floor(ns / 1e6);
-}
-
-/**
- * view の1区切り(ChunkedEntry: segment=1 / backward=2 / previous=3 / next=4)を読む。
- * 公開の型(n-air-app/nicolive-comment-protobuf)どおりに番号で読む。
- * @param {Uint8Array} f
- */
-function readEntry(f) {
-  /** @type {{ kind: string, uri?: string, untilMs?: number, at?: number }} */
-  const out = { kind: '' };
-  pbForEach(f, 0, f.length, (fn, wt, _v, s, e) => {
-    if (wt !== 2) return;
-    if (fn === 1 || fn === 3) {
-      out.kind = fn === 1 ? 'segment' : 'previous';
-      pbForEach(f, s, e, (gn, gw, _gv, gs, ge) => {
-        if (gw !== 2) return;
-        if (gn === 2) out.untilMs = tsMs(f, gs, ge);
-        if (gn === 3) out.uri = new TextDecoder().decode(f.subarray(gs, ge));
-      });
-    } else if (fn === 2) {
-      out.kind = 'backward';
-    } else if (fn === 4) {
-      out.kind = 'next';
-      pbForEach(f, s, e, (gn, gw, gv) => {
-        if (gn === 1 && gw === 0) out.at = Number(gv);
-      });
-    }
-  });
-  return out;
-}
-
-/**
- * ChunkedMessage の meta.at(コメントが付いた時刻・ms)。meta=1 { at=2 }。
- * @param {Uint8Array} f
- */
-function messageAtMs(f) {
-  let at = 0;
-  pbForEach(f, 0, f.length, (fn, wt, _v, s, e) => {
-    if (fn !== 1 || wt !== 2) return;
-    pbForEach(f, s, e, (gn, gw, _gv, gs, ge) => {
-      if (gn === 2 && gw === 2) at = tsMs(f, gs, ge);
-    });
-  });
-  return at;
-}
-
-/**
  * view を next.at で辿り、新しい segment をすぐ読み始める。segment は流れてくるそばから
  * 読み(=ネイティブ部品の届き方)、読み終わった時刻も控える(=CapacitorHttp の届き方)。
  * @param {string} viewUri
@@ -232,7 +173,7 @@ export async function followLive(viewUri, minutes) {
           const n = decodeChunkedMessage(fr).chats.length;
           if (!n) continue;
           chats += n;
-          const at = messageAtMs(fr);
+          const at = ndgrMessageAtMs(fr);
           if (at > 0) {
             lagsStream.push((now - at) / 1000);
             pending.push(at);
@@ -267,7 +208,7 @@ export async function followLive(viewUri, minutes) {
     const bytes = new Uint8Array(await res.arrayBuffer());
     let nextAt = null;
     for (const fr of splitLengthDelimitedMessagesWithTail(bytes).frames) {
-      const ent = readEntry(fr);
+      const ent = readNdgrViewEntry(fr);
       kinds[ent.kind || '?'] = (kinds[ent.kind || '?'] || 0) + 1;
       if (ent.kind === 'segment' && ent.uri && !seen.has(ent.uri)) {
         seen.add(ent.uri);

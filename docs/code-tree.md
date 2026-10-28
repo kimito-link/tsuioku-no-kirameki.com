@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1072 件
+## ⚠️ 役割コメントが無いソース 9 / 1075 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -844,7 +844,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (102)
+- 📁 **scripts/** (103)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -929,6 +929,7 @@
   - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
+  - `measure-phone-direct.mjs` — 「iPhone アプリが自分でニコ生のコメントを取る」(拡張なし 第3段)の前に測る。
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
   - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
   - `migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
@@ -976,7 +977,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2204)
+- 📁 **src/** (2208)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1013,7 +1014,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (98)
+  - 📁 **extension/** (100)
     - 📁 **popup/** (14)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1055,6 +1056,8 @@
     - `laneMirrorRecordsLastTiled.wiring.test.js`
     - `live-ranking-entry.js` — `/live/`「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)の描画。
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
+    - `liveDirectComments.js` — iPhone アプリの中だけで、ニコ生のコメントを端末が直接受け取って流す(拡張なし 第3段)。
+    - `liveDirectComments.test.js`
     - `liveEvents.wiring.test.js`
     - `liveEventsPhone.test.js`
     - `liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
@@ -1269,7 +1272,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1937)
+  - 📁 **lib/** (1939)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2284,6 +2287,8 @@
     - `ndgrForwardCrawl.test.js`
     - `ndgrHiddenFlushThreshold.js` — 裏タブで「コメントが数十秒遅れて出る」のを止める純関数。
     - `ndgrHiddenFlushThreshold.test.js`
+    - `ndgrLiveFollow.js` — NDGR(ニコ生の新しいコメント配信)を「いま」から前へ追う純粋部品。
+    - `ndgrLiveFollow.test.js`
     - `ndgrMessageDedupe.js` — v0.1.238: NDGR Message ID dedupe
     - `ndgrMessageDedupe.test.js`
     - `ndgrUnknownSamplesBudget.js` — 【層】L0 判定層(純粋関数・I/O禁止)

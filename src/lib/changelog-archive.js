@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1801',
+    date: '2026-10-28',
+    summary: '遅いPCで混んだ時の読み上げの遅れを短く',
+    items: Object.freeze([
+      '声を作るのに時間がかかるPCで、コメントがとても多い時に、ためすぎて最大10秒遅れ、待たせた後で捨てていたのを直しました。',
+      '声を作る速さも数えて、何件まで待たせるかを決めます(速いPCは今まで通り)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1800',
     date: '2026-10-28',
     summary: '一気に来た短いコメントを飛ばしにくく',
