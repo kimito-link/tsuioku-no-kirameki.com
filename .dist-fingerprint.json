@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "d35ef72f5166115e09ab2279a8b7f7bd8dbbe6f10673291a709e56cb9c233885",
+  "fingerprint": "2d5d0ecdaea4ebe8bac1b53da1010a8ea39e857483abb0fbe2870d21126b2aff",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -898,7 +898,7 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
-    "extension/dist/self-update-sw.js": "905f8e80385e923dda31b018bb00940260220111f93c8c59707e3cb9d5d8f906",
+    "extension/dist/self-update-sw.js": "dea5ff6a1a74ddd763e44766de0a78f9dcb68d6fbe37edde3f9bc6b931a5f74e",
     "extension/dist/content.js": "de46886d199f5d8b51d064419f4135a303e056124ed68a13bf726fd1cf664498",
     "extension/dist/popup.js": "8ed69b54a5a8851445cdad3e9ab3410e0e00ca1e819896d6f522fa6392fbfbd0",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
