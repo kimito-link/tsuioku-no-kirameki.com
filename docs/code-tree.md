@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1061 件
+## ⚠️ 役割コメントが無いソース 9 / 1065 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -974,7 +974,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2186)
+- 📁 **src/** (2191)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1011,7 +1011,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (92)
+  - 📁 **extension/** (97)
     - 📁 **popup/** (14)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1080,6 +1080,11 @@
     - `popupBackfillCompleteState.wiring.test.js`
     - `popupUserLaneAvatarObservedFlow.test.js`
     - `repaintLoopGuard.wiring.test.js`
+    - `self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
+    - `self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
+    - `self-update.js` — 開発中（展開して読み込んだ）拡張が、作業フォルダの新しい版に自分で入れ替わる。
+    - `self-update.kit-test.mjs` — self-update.test.mjs — self-update.js の試験。拡張へ写すときは import 先のパスだけ直す。
+    - `self-update.test.js`
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
     - `smartphoneFreshness.wiring.test.js`

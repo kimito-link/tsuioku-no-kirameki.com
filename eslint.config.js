@@ -25,6 +25,8 @@ export default [
       // mobile/scripts/** は web-ios-android キットからコピーした App Store 提出の道具(キット側で検査済み・
       //   書き換えずに保つ=キットとの差分を小さく)。mobile/node_modules・mobile/ios は CI が作る。
       'mobile/**',
+      // キット(templates/extension-self-update)の試験の無改変の写し(キット側で検査済み・node で chrome の代役を置く)。
+      'src/extension/self-update.kit-test.mjs',
       'node_modules/**',
       '.claude/**',
       // .artifacts/** は verify ログ・調査用展開物（asar 展開した第三者 minified
