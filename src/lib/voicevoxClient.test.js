@@ -399,6 +399,11 @@ describe('buildVoiceReadingText', () => {
     ).toBe(`${'長い名前'.repeat(20)}、${kana(40)}`);
   });
 
+  it('v0.1.1813: 名前も本文と同じく整える(www・絵文字だけの名前)', () => {
+    expect(buildVoiceReadingText({ name: 'たろうｗｗｗ', text: 'こんにちは' })).toBe('たろうわらわら、こんにちは');
+    expect(buildVoiceReadingText({ name: '🌸🌸', text: 'こんにちは' })).toBe('こんにちは');
+  });
+
   it('空本文は名前があっても空文字', () => {
     expect(buildVoiceReadingText({ name: 'りすなー', text: '  ' })).toBe('');
   });
