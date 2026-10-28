@@ -8531,6 +8531,17 @@
             <p><strong>名前読みの切り替え（v0.1.699）</strong> — ハンドルネームを読むかどうかを選べます（既定は本文だけ）。</p>
             <p><strong>ご利用には</strong> — VOICEVOX（無料）を別途インストールして起動しておくだけ。音声を配信に乗せる場合は、使用キャラクターのクレジット表記ルールに従ってください。</p>
           </div>
+          <div class="board fade d2" id="voice-reading-speed" aria-labelledby="voice-reading-speed-heading" style="margin-top:var(--space-md)">
+            <h3 id="voice-reading-speed-heading">読み上げについて（声が出るまでの待ち時間）</h3>
+            <p><strong>声はあなたのパソコンの中で作られます</strong> — 拡張は、パソコンで起動している VOICEVOX に「この文を読んで」と頼んでいるだけです。なので、声が出るまでの速さは<strong>パソコンの力によって変わります</strong>。</p>
+            <p><strong>VOICEVOX には2つの動かし方があります</strong> — どのパソコンでも動く「CPU モード」と、グラフィックボード（GPU）を使う速い「GPU モード」です。グラフィックボードが付いていないパソコンも多く、その場合は CPU モードで動きます。</p>
+            <!-- 出典: 2026-10-28 開発者PC（RTX 4070 Ti・Core i7-13700F）での VOICEVOX 実測（GPUモード短文≈0.3秒／CPUモード≈2秒／長文はほぼ同等）。他のPCは未測定。 -->
+            <p><strong>開発者のパソコンで測った目安</strong> — 短いひとことは、GPU モードで約 0.3 秒、CPU モードで約 2 秒でした。長めの文では、どちらもほとんど同じ速さでした。ほかのパソコンでは測っていないので、<strong>これより待つこともあります</strong>。</p>
+            <p><strong>少し遅れて聞こえても、こわれていません</strong> — CPU モードだと、コメントから声が出るまで少し間があくことがあります。コメントが多いときは、古いものを飛ばして「今」のコメントに追いつくようにしています。</p>
+            <!-- 出典: VOICEVOX 公式 howtouse.md「オプション」節・qAndA.md「GPU 版」（Windows は DirectML 対応 GPU・Mac は GPU モード非対応・CPU 版では GPU モード不可）。 -->
+            <p><strong>速くしたいとき（Windows）</strong> — 対応するグラフィックボードがあれば、VOICEVOX の「設定」→「オプション」→「エンジン」にある<strong>エンジンモード</strong>を「GPU」にすると速くなります。CPU 版の VOICEVOX を入れている場合は、GPU 版が必要です（インストーラー版は「エンジン」→「エンジンの管理」から切り替えられます）。Mac 版は GPU モードに対応していません。</p>
+            <p><strong>GPU モードの注意</strong> — グラフィックボードのメモリを多めに使います。重いゲームを配信しながら使うときは、様子を見ながら選んでください。</p>
+          </div>
         </div>
       </section>
 
