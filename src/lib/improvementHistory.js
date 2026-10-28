@@ -4034,5 +4034,33 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1762', metric: 'cross-checked-claims', value: 40,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '前版から増えた分は、スマホのデモ・通知・隠す機能の単体テスト(作り物の見本に実在の画像サーバーや実在の桁の ID が無いことも確かめる)。'
+  }),
+  Object.freeze({
+    version: '0.1.1803', metric: 'bundle-kb', value: 1435,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1762 以降この台帳への記録が止まっていた間(スマホ版・読み上げ・音量・自己更新)の機能追加で増えた分。この版の差分は計器2か所だけで popup.js は増やしていない。'
+  }),
+  Object.freeze({
+    version: '0.1.1803', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1803', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '直近30日の窓で数える値なので、古いコミットが窓から抜けると減る。この間の確かめは PC の実機試験(RC)の数字で行い、コミット本文にその言い回しを書かなかった分は数えられていない。'
+  }),
+  Object.freeze({
+    version: '0.1.1804', metric: 'bundle-kb', value: 1435,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1803 と同じ(この版はコメビュだけの変更で popup.js は変わらない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1804', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1804', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '0.1.1803 と同じ(30日の窓で数える値)。'
   })
 ]);
