@@ -536,6 +536,24 @@ describe('VoicePlayer', () => {
     });
   });
 
+  describe('v0.1.1801 声を作るのが遅い PC', () => {
+    it('合成の比が測れていれば、作る時間も数えて上限を絞る', async () => {
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      player._paceState.charMsEma = 125;
+      player.diag.warmRtfSamples = 5;
+      player.diag.warmSynthRtfPermille = 2000;
+      const items = Array.from({ length: 10 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `草${i}`
+      }));
+      player.enqueue(items);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(player.diag.queueMaxByChars).toBe(5); // 比を数えなければ 8(前のテスト)
+      if (resolveSynth) resolveSynth(null);
+    });
+  });
+
   describe('v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): E2E/統合', () => {
     it('実再生時にlastE2eMs/e2eAvgMsを計測する(到着→発声)', async () => {
       await player.enable({ persist: false });
