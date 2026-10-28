@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1065 件
+## ⚠️ 役割コメントが無いソース 9 / 1068 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -844,7 +844,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (100)
+- 📁 **scripts/** (102)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -905,6 +905,8 @@
   - `council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
   - `council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
   - `council-roles.stance.test.js`
+  - `council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
+  - `council-synth.test.js`
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
   - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
   - `dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
@@ -974,7 +976,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2191)
+- 📁 **src/** (2195)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1266,7 +1268,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1928)
+  - 📁 **lib/** (1932)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2923,6 +2925,8 @@
     - `topSupportersMirrorProvisional.wiring.test.js`
     - `trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
     - `trackedImports.test.js`
+    - `trailingPublisher.js` — 「先に1回・間引いた分は最後に1回」書く小さな仕組み(DOM も chrome API も触らない)。
+    - `trailingPublisher.test.js`
     - `trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
     - `trimMap.test.js`
     - `uiUxRoadmapTdd.test.js`
@@ -3135,6 +3139,8 @@
     - `voiceReadQueue.test.js`
     - `voiceReaderLease.js` — 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけにする(v0.1.1794)。
     - `voiceReaderLease.test.js`
+    - `voiceReadingNormalize.js` — 読み上げる本文を「耳で聞いて自然」に整える純関数(会場・コメビュ・スマホ共通)。
+    - `voiceReadingNormalize.test.js`
     - `voiceStageTiming.js` — 読み上げの遅れを「段階ごと」に測る計器(印字専用・読み上げの挙動には一切介入しない)。
     - `voiceStageTiming.test.js`
     - `voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。

@@ -16,6 +16,9 @@ import {
   warmupVoicevoxQuery
 } from './voicevoxClient.js';
 
+/** 同じ文字の連打は読み上げで縮めるので、長さを試すときは違う文字を並べる。 */
+const kana = (n) => Array.from({ length: n }, (_, i) => 'あいうえおかきくけこ'[i % 10]).join('');
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -351,7 +354,7 @@ describe('buildVoiceReadingText', () => {
   });
 
   it('本文を最大60文字へ切り詰める', () => {
-    const result = buildVoiceReadingText({ name: '', text: 'あ'.repeat(80) });
+    const result = buildVoiceReadingText({ name: '', text: kana(80) });
     expect(Array.from(result)).toHaveLength(60);
   });
 
@@ -359,41 +362,41 @@ describe('buildVoiceReadingText', () => {
     expect(
       buildVoiceReadingText({
         name: 'りすなー',
-        text: 'あ'.repeat(61)
+        text: kana(61)
       })
-    ).toBe(`りすなー、${'あ'.repeat(60)}`);
+    ).toBe(`りすなー、${kana(60)}`);
   });
 
   it('最大文字数40では本文を40文字にする', () => {
     const result = buildVoiceReadingText(
-      { name: '', text: 'あ'.repeat(60) },
+      { name: '', text: kana(60) },
       { maxChars: 40 }
     );
-    expect(result).toBe('あ'.repeat(40));
+    expect(result).toBe(kana(40));
   });
 
   it('不正な最大文字数は60へ戻す', () => {
     expect(
       buildVoiceReadingText(
-        { name: '', text: 'あ'.repeat(70) },
+        { name: '', text: kana(70) },
         { maxChars: 'invalid' }
       )
-    ).toBe('あ'.repeat(60));
+    ).toBe(kana(60));
     expect(
       buildVoiceReadingText(
-        { name: '', text: 'あ'.repeat(70) },
+        { name: '', text: kana(70) },
         { maxChars: -1 }
       )
-    ).toBe('あ'.repeat(60));
+    ).toBe(kana(60));
   });
 
   it('名前は本文の最大文字数に含めない', () => {
     expect(
       buildVoiceReadingText(
-        { name: '長い名前'.repeat(20), text: 'あ'.repeat(50) },
+        { name: '長い名前'.repeat(20), text: kana(50) },
         { maxChars: 40 }
       )
-    ).toBe(`${'長い名前'.repeat(20)}、${'あ'.repeat(40)}`);
+    ).toBe(`${'長い名前'.repeat(20)}、${kana(40)}`);
   });
 
   it('空本文は名前があっても空文字', () => {
@@ -409,7 +412,7 @@ describe('buildMergedVoiceText', () => {
         body: '8888',
         count: 4
       })
-    ).toBe('8888、ほか3件');
+    ).toBe('パチパチ、ほか3件'); // 2026-10-28: 拍手の 8 は「パチパチ」と読む
   });
 
   it('1件なら残り件数を付けない', () => {
@@ -427,12 +430,12 @@ describe('buildMergedVoiceText', () => {
       buildMergedVoiceText(
         {
           name: 'りすなー',
-          body: 'あ'.repeat(50),
+          body: kana(50),
           count: 3
         },
         { maxChars: 40 }
       )
-    ).toBe(`りすなー、${'あ'.repeat(40)}、ほか2件`);
+    ).toBe(`りすなー、${kana(40)}、ほか2件`);
   });
 });
 

@@ -504,7 +504,7 @@ describe('VoicePlayer', () => {
       await player.enable({ persist: false });
       player._paceState.charMsEma = 140; // 1文字0.14秒(PC 試験の長い声と同じくらい)
       const onDropped = vi.fn();
-      const long = 'あ'.repeat(60);
+      const long = Array.from({ length: 60 }, (_, i) => 'あいうえおかきくけこ'[i % 10]).join(''); // 連打は縮めるので違う文字で
       const items = Array.from({ length: 10 }, (_, i) => ({
         kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `${long}${i}`, onDropped
       }));

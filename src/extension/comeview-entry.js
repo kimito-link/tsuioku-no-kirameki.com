@@ -115,6 +115,7 @@ import {
   resolveVoiceSynthDepth
 } from '../lib/voiceReadQueue.js';
 import { makeInitialVoiceDiag, buildVoiceDiagSnapshot, resetVoiceDiagForNewLive } from '../lib/voiceDiag.js';
+import { createTrailingPublisher } from '../lib/trailingPublisher.js';
 import {
   createVoiceSynthTracker,
   foldVoiceStageEma,
@@ -293,7 +294,6 @@ let _initialVoicesPrimed = false;
  */
 const _voiceDiag = makeInitialVoiceDiag(); // プロパティのみ更新(再代入しない)。
 _voiceDiag.diagBornAt = Date.now();
-let _voiceDiagLastWriteAt = 0;
 
 /**
  * v0.1.895: drainVoiceQueue が今どのフェーズに居るかを記録する(固着位置の計器)。
@@ -319,10 +319,14 @@ let _voiceDrainStuckTimer = null;
 
 /** _voiceDiag を storage へ(min-gap で間引き)。失敗は握る=発話を止めない。 */
 function publishVoiceDiag() {
+  _voiceDiagPublisher.request();
+}
+
+/** 3秒 min-gap=書き過ぎない。v0.1.1809: 間引いた分は最後に1回書く(止まった後に古い数を残さない)。 */
+const _voiceDiagPublisher = createTrailingPublisher(writeVoiceDiagNow, 3000);
+function writeVoiceDiagNow() {
   try {
     const now = Date.now();
-    if (now - _voiceDiagLastWriteAt < 3000) return; // 3秒 min-gap=書き過ぎない。
-    _voiceDiagLastWriteAt = now;
     // ★v0.1.1328: どの面が書いたかを残す(会場は 'venue' を書いている)。
     //   化石値を見たとき「どちらの実装のものか」が分からないと調査が始められない。
     const snap = { ...buildVoiceDiagSnapshot(_voiceDiag, now, _liveId), source: 'comeview' };
