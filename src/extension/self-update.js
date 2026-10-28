@@ -16,6 +16,7 @@
  *   出典: 君斗りんくのAI返信サジェスト 7.8.121（kimito-link-reply-suggest PR #110 の sw/self-update.js）。
  *   キットで変えた点: 前面判定を chrome.runtime.getContexts（Chrome 116+）優先にした。tabs 権限が無いと
  *   tab.url が見えない場合があり、元の「url で見分ける」は普段の Chrome で未確認だったため。
+ *   追憶で足した差分: 前面判定でサイトに埋め込んだ拡張の iframe(frameId≠0)を数えない(下の extensionPageInFront)。
  *   ★配布境界をまたぐ意図的な複製（拡張は自分のフォルダの外を import できない）。直すときはキットの正本を先に直す。
  */
 export const SELF_UPDATE_ALARM = 'self-update-check';
@@ -41,7 +42,10 @@ export async function extensionPageInFront() {
       const ctx = await chrome.runtime.getContexts({ contextTypes: ['TAB', 'POPUP'] });
       if (ctx.some((c) => c.contextType === 'POPUP')) return true;
       const ids = new Set(active.map((t) => t.id));
-      return ctx.some((c) => ids.has(c.tabId));
+      // 追憶の差分(キットへ戻す予定): サイトのページに埋め込んだ拡張の iframe(frameId≠0)は数えない。
+      //   数えると、拡張の iframe を埋め込んだタブが前面にある間ずっと「使っている」になり入れ替わらない
+      //   (PC 試験で実際に止まった: watch ページの popup.html?inline=1)。
+      return ctx.some((c) => ids.has(c.tabId) && !(Number(c.frameId) > 0));
     }
     const origin = chrome.runtime.getURL('');
     return active.some((t) => String(t.url || t.pendingUrl || '').startsWith(origin));
