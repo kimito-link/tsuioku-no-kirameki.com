@@ -177,6 +177,8 @@ graph LR
   f22 --> f22_4["server/fanLinkApi.js"]
   f22 --> f22_5["extension/fanLinkClient.js"]
   f22 --> f22_6["extension/statusSmartphoneCard.js"]
+  f22 --> f22_7["extension/liveDirectComments.js"]
+  f22 --> f22_8["lib/ndgrLiveFollow.js"]
   HUB --> f23["スマホから生放送にコメント(PC中継)"]
   f23 --> f23_0["post.js"]
   f23 --> f23_1["lib/phonePost.js"]
@@ -384,7 +386,7 @@ graph LR
 - `store-assets/`（8 件） — App Store の掲載文・アイコン・撮影計画・審査メモの正本  〔iOS / ストア〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 102 件</sub>
+<sub>ファイル 103 件</sub>
 
 - `audit/`（4 件） — 「面(popup/会場/別窓/・live)の間でCSSとDOMがずれていないか」を機械で洗う監査(静的=一度も効かないCSSの検出+基準値のラチェット / 実ブラウザ=hidden・押せない・はみ出し・クリック透過)  〔監査 / CSS / 会場〕
 - `lib/`（4 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
@@ -397,14 +399,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2204 件</sub>
+<sub>ファイル 2208 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（98 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（100 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（117 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1937 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1939 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（14 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -581,7 +583,7 @@ POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッ
 - [`src/lib/statusPublisherPlan.js`](../src/lib/statusPublisherPlan.js)
 
 ### 拡張なしでスマホから見る(放送URL・ファンにも公開)  〔スマホ / サーバー〕
-①開始画面(/phone)に放送URLを貼る→/live?lv= で1配信だけその場で取る(api/live-ranking.js の ?lv=・60秒置き場・SET NX で1本)・一覧に無ければ mergePinnedLive で足す(v0.1.1819)。②配信者の「👥 ファンにも公開」で読むだけの fan_… リンク(api/status.js ?action=fan・GET ?v=fan_ は配信者の最新を読むだけ・目印を置かない・CDN 5秒・リアルタイムは1時間の人数と月の総数で止める)(v0.1.1820)
+①開始画面(/phone)に放送URLを貼る→/live?lv= で1配信だけその場で取る(api/live-ranking.js の ?lv=・60秒置き場・SET NX で1本)・一覧に無ければ mergePinnedLive で足す(v0.1.1819)。②配信者の「👥 ファンにも公開」で読むだけの fan_… リンク(api/status.js ?action=fan・GET ?v=fan_ は配信者の最新を読むだけ・目印を置かない・CDN 5秒・リアルタイムは1時間の人数と月の総数で止める)(v0.1.1820)。③iPhone アプリだけの「💬 コメントを流す」=端末がニコニコから直接受け取る(watch/view/segment は CapacitorHttp・握手は WebView の WebSocket・読み方は公開の型どおりの ndgrLiveFollow・サーバーへ送らない)(v0.1.1821)
 
 - [`api/live-ranking.js`](../api/live-ranking.js)
 - [`src/lib/phoneStartLink.js`](../src/lib/phoneStartLink.js)
@@ -590,6 +592,8 @@ POST /api/device で利用者ごとに deviceId・writeKey(サーバーはハッ
 - [`src/server/fanLinkApi.js`](../src/server/fanLinkApi.js)
 - [`src/extension/fanLinkClient.js`](../src/extension/fanLinkClient.js)
 - [`src/extension/statusSmartphoneCard.js`](../src/extension/statusSmartphoneCard.js)
+- [`src/extension/liveDirectComments.js`](../src/extension/liveDirectComments.js)
+- [`src/lib/ndgrLiveFollow.js`](../src/lib/ndgrLiveFollow.js)
 
 ### スマホから生放送にコメント(PC中継)  〔スマホ / コメント送信 / サーバー〕
 スマホのWEB版の本物の入力欄(popup-entry.js の submitComment)が、受動ビューで globalThis.__nlsWebCommentRelay があるときだけ /api/post に預ける(拡張の中では常に null=PCの送信経路は不変)。サーバー(api/post.js)は投稿用の鍵(#pk=・ハッシュだけ保存)で照合し待ち行列に最長60秒・20秒8件まで。PCの送信担当(status.html?publisher=1)の phonePostRelay.js がふだん10秒/入力中2秒で取りに行き、NLS_POST_COMMENT で放送タブのコメント欄から投稿して結果を返す。スマホは接続の帯と ⏱→✓→✓✓(放送のコメントに流れたのを鏡で確認)の印を app/live-view-post.js で出す。PC の「✍️ スマホからコメントする」スイッチ・自分専用URL・QR は statusSmartphoneCard.js。判定は phonePost.js(v0.1.1734)
