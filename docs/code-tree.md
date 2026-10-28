@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1069 件
+## ⚠️ 役割コメントが無いソース 9 / 1070 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -976,7 +976,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2198)
+- 📁 **src/** (2200)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1268,7 +1268,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1935)
+  - 📁 **lib/** (1937)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2264,6 +2264,8 @@
     - `mirrorSanitize.test.js`
     - `monotonicCommentCount.js` — v0.1.645: コメント記録件数の「数値ズレ」根治。
     - `monotonicCommentCount.test.js`
+    - `moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
+    - `moveNodePreservingState.test.js`
     - `nameplateToggle.wiring.test.js`
     - `nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
     - `nameplateToggleFinder.js` — ニコ生公式の「なふだを表示」トグルを見つける(純関数)。
