@@ -390,6 +390,7 @@ export function weightOf(label) {
     // ★2026-10-17 追加: cloudflare/deepseek-v4-pro は nvidia の deepseek-v4 と名前が同じで、下の
     //  "deepseek-v4"→3 に先に当たってしまう。新規は予備の最下位(weight4)から入れる規約（CF勢と同じ）なので、
     //  この1行を "deepseek-v4"→3 より【前】に置く（ifは先勝ち）。他のCF勢の重みは変えない（"cloudflare" 全体ではなく狭く指定）。
+    //  2026-10-28: 後継 cloudflare/deepseek-v4.1-flash（1017）に入れ替え。この判定は前方一致なので v4.1 にもそのまま効く。
     if (n.includes("cloudflare/deepseek-v4")) return 4;
     if (n.includes("deepseek-v4")) return 3;
     // ★2026-09-02 昇格(3→1): magistral-medium を lead 主力にする。

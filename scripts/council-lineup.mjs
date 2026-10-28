@@ -229,7 +229,26 @@ export const LINEUP = [
   //   いずれも推論で1600を使い切り finish=length・本文0字（max_tokens 3000でも実会議で上限に当たる回があった）。
   //   chat_template_kwargs.enable_thinking=false だけが finish=stop・1045トークン・本文1624字・推論0字・20310ms。
   //   ★推論を切って直接答えさせる設定（深い推論は捨てる）。max_tokens は余裕を見て2400。
-  { label: 'cloudflare/deepseek-v4-pro', provider: 'cloudflare', rawId: '@cf/deepseek-ai/deepseek-v4-pro-0813', apiModel: '@cf/deepseek-ai/deepseek-v4-pro-0813', opts: { chat_template_kwargs: { enable_thinking: false }, max_tokens: 2400 }, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+  // ★2026-10-28 世代交代（cloudflare/deepseek-v4-pro-0813 → cloudflare/deepseek-v4.1-flash-1017・同プロバイダ/同役割critic/同weight4）:
+  //  本人指示「会議に使うLLMモデルのメンバーを最新のものにして」。足さずに【入れ替え】（恒久ルール5）。
+  //  1017 は 2026-10-19 に Workers AI へ追加（developers.cloudflare.com/changelog/post/2026-10-19-deepseek-v4.1-flash-workers-ai/）。
+  //  実測（りんくのPC・本番と同じ /ai/v1/chat/completions・buildSystem の critic system・日本語の設計お題・
+  //   temperature 0.6・2並列×2回・2026-10-28 10:28〜10:46 JST）:
+  //   v4.1-flash-1017 + enable_thinking:false + max_tokens 2400 → 200×4・5.5〜8.4秒・finish=stop×4・本文581〜818字・推論0字・日本語84〜88%・(0)〜(3)の型どおり
+  //   v4-pro-0813（旧・同設定）                                  → 200×4・9.8〜15.9秒・finish=stop×4・本文579〜879字
+  //   ＝中身は同等で約2倍速い。usage.neurons も 50〜89 と軽い（v4-pro 既定は654〜714）。
+  //   ★enable_thinking:false は必須: 既定（推論あり）だと max_tokens 1600 を推論で使い切り本文0字（finish=length×4）。
+  //  ★同日に試して不採用にした新顔（同条件。"新しい＝使える"ではない）:
+  //   - @cf/qwen/qwen3.8-27b（low+3000）: 内容は今の qwen3-30b より良いが 36〜58秒、60秒で1本時間切れ。
+  //     08-25 の「2本目だけ76秒」と同じ傾向が続いている。今の qwen3-30b は同条件で 8.9〜10.9秒・stop×4 で健全なので据え置き。
+  //   - @cf/openai/gpt-oss-120b: 2並列の2本目が「!!!!…」を1600字出して壊れる回が2回、お題の誤読が1回。
+  //   - @cf/moonshotai/kimi-k2.7-code: 403 は出なくなった（無料で呼べる）が、1600では推論で上限を使い切り本文0字×4。neurons 594〜687/回と重い。
+  //   - @cf/zai-org/glm-5.3・nvidia minimax-m3.1-flash・nvidia step-5-preview: 1600では本文0字（finish=length）。step-5 は1本150秒で時間切れ。
+  //   - gemini-3.8-flash: 3回・計6本とも 503「high demand」か時間切れ（採用中の 3.7-flash も同時刻に全滅＝今日は判定不能）。
+  //   - nvidia/nemotron-3.5-bolt-e4b: 短い疎通 200/441ms のみ（4B の小型。本番条件は未試験）。
+  //  昇格基準は新規予備と同じ: 7日以上空けた実会議2回でFAILEDゼロなら正規化。
+  //  旧: { label: 'cloudflare/deepseek-v4-pro', rawId/apiModel: '@cf/deepseek-ai/deepseek-v4-pro-0813', opts: { chat_template_kwargs: { enable_thinking: false }, max_tokens: 2400 } }（2026-10-17採用）
+  { label: 'cloudflare/deepseek-v4.1-flash', provider: 'cloudflare', rawId: '@cf/deepseek-ai/deepseek-v4.1-flash-1017', apiModel: '@cf/deepseek-ai/deepseek-v4.1-flash-1017', opts: { chat_template_kwargs: { enable_thinking: false }, max_tokens: 2400 }, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
   // 2026-06-?? 追加 → 2026-07-31 撤去（nvidia/qwen3.5-122b）:
   //   本改修でrawIdを空('')からapiModelと同値('qwen/qwen3.5-122b-a10b')に埋め、
