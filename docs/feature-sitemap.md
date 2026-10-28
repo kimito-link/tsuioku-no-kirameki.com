@@ -978,7 +978,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 290</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 291</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1086,6 +1086,7 @@
 - `src/lib/backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
 - `src/lib/bandScale.js` — 「大きく見せる枠(PICK UP 帯)」の倍率(純関数)。
 - `src/lib/bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
+- `src/lib/besideOverflowGuard.js` — 横付き(beside)パネルが視聴行の中に入った結果、ページが横にはみ出したかを判定する純粋関数。
 - `src/lib/blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
 - `src/lib/bootTimelineBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
 - `src/lib/buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
@@ -1309,10 +1310,12 @@
 - `v0.1.1821` 2026-10-28 — 診断の読み込み直し回数を正しく数える
 - `v0.1.1809` 2026-10-28 — 読み上げの記録が古い数のまま残るのを直す
 
-### その他 (6版)
+### ⚡ 描画・性能 (1版)
+- `v0.1.1822` 2026-10-28 — 横付きパネルが右へはみ出さないように
+
+### その他 (5版)
 - `v0.1.1820` 2026-10-28 — 視聴ページでパネルの二重起動を解消
 - `v0.1.1819` 2026-10-28 — パネル初回表示の自動テストを安定化
 - `v0.1.1818` 2026-10-28 — コメント欄の見張りを間引く
 - `v0.1.1814` 2026-10-28 — 視聴ページの動きを軽く(コメントの読み直し)
 - `v0.1.1813` 2026-10-28 — 名前を読むときも www などを聞きやすく
-- `v0.1.1802` 2026-10-28 — 開発版は新しい版に自分で入れ替わる

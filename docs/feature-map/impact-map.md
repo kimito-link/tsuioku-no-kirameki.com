@@ -521,6 +521,7 @@
 | `src/lib/backgroundWatchTab.js` | 1 | 状態速報ページ |
 | `src/lib/bandScale.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/bandScaleBoot.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/besideOverflowGuard.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/blackScreenOwnerCells.js` | 1 | 状態速報ページ |
 | `src/lib/blobDownload.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/bootTimeline.js` | 1 | ポップアップ(応援レーン) |
