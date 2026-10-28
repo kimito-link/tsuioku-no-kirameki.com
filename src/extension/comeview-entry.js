@@ -428,6 +428,7 @@ async function switchToLiveId(nextLiveId) {
   // 前配信の表示・既読・読み上げキューをリセットして新配信を一から読む。
   _renderedKeys.clear();
   _seenCommentNos.clear();
+  _voiceBatchSeenNos.clear();
   _seenGiftAtBySig.clear();
   _tailRows = [];
   _giftRows = [];
@@ -1051,9 +1052,38 @@ async function drainVoiceQueue() {
 }
 
 
+/**
+ * v0.1.1804計器: 一度に10件以上が読む列へ来た時の中身(開いて約30秒後に約100件まとめて来て全部
+ *   古いと捨てられた原因を、推測でなく数字で分けるため)。番号の無い行・届いてからの経過で
+ *   「同じ行の出し直し」か「本当にまとめて届いた」かが分かる。
+ * @param {ReadonlyArray<Record<string, any>>} items
+ */
+function noteVoiceBigBatch(items) {
+  const nos = items.map((it) => commentNoOfComeviewRow(it));
+  const seenBefore = nos.filter((no) => no && _voiceBatchSeenNos.has(no)).length;
+  for (const no of nos) if (no) _voiceBatchSeenNos.add(no);
+  if (_voiceBatchSeenNos.size > 2000) _voiceBatchSeenNos.clear();
+  if (items.length < 10) return;
+  const now = Date.now();
+  const ages = items.map((it) => now - Number(it?.at)).filter((a) => Number.isFinite(a));
+  _voiceDiag.bigBatchTotal = (Number(_voiceDiag.bigBatchTotal) || 0) + 1;
+  _voiceDiag.lastBigBatch = {
+    at: now,
+    size: items.length,
+    noLess: nos.filter((no) => !no).length,
+    seenBefore,
+    oldestAgeMs: ages.length ? Math.max(...ages) : -1,
+    newestAgeMs: ages.length ? Math.min(...ages) : -1
+  };
+  publishVoiceDiag();
+}
+/** noteVoiceBigBatch 用: 読む列へ来たことのある番号(同じコメントが2回来ていないかを見る)。 */
+const _voiceBatchSeenNos = new Set();
+
 /** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
 function enqueueLiveVoiceItems(items) {
   if (!_voiceReadingEnabled || !Array.isArray(items) || !items.length) return;
+  noteVoiceBigBatch(items);
   if (!_voiceReaderLease) { enqueueVoiceTimelineItems(items); return; }
   void _voiceReaderLease.whenMine(_liveId, () => enqueueVoiceTimelineItems(items), () => {
     _voiceDiag.readerYieldTotal = (Number(_voiceDiag.readerYieldTotal) || 0) + items.length;
