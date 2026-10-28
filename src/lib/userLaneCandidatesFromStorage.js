@@ -53,24 +53,46 @@ function rowLiveId(row) {
 
 /**
  * @param {unknown} row
- * @param {string} targetNorm normalizeLv 済みの比較キー
- * @returns {boolean}
- */
-function rowMatchesLiveFilter(row, targetNorm) {
-  if (!targetNorm) return true;
-  const o = /** @type {{ liveId?: unknown, lvId?: unknown }} */ (row);
-  const a = normalizeLv(o?.liveId);
-  const b = normalizeLv(o?.lvId);
-  return (Boolean(a) && a === targetNorm) || (Boolean(b) && b === targetNorm);
-}
-
-/**
- * @param {unknown} row
  * @returns {number}
  */
 function rowCapturedAt(row) {
   const n = Number(/** @type {{ capturedAt?: unknown }} */ (row)?.capturedAt);
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** String.prototype.trim と同じ空白の定義(WhiteSpace+LineTerminator)で「空白以外が1文字でもあるか」。 */
+const NON_SPACE_RE = /\S/;
+
+/**
+ * 時刻の昇順(同時刻は元の順)に既に並んでいるか。並んでいれば安定ソートしても同じ並び。
+ * @param {readonly unknown[]} group
+ * @returns {boolean}
+ */
+function isSortedByCapturedAt(group) {
+  for (let i = 1; i < group.length; i++) {
+    if (rowCapturedAt(group[i - 1]) > rowCapturedAt(group[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * 昇順の配列から「時刻の降順・同時刻は元の順」(= 降順の安定ソートと同じ並び)を作る。
+ *   後ろから同時刻のかたまりごとに、かたまりの中は前から順に積む。
+ * @param {readonly unknown[]} chronological
+ * @returns {unknown[]}
+ */
+function newestFirstFromChronological(chronological) {
+  /** @type {unknown[]} */
+  const out = [];
+  let end = chronological.length;
+  while (end > 0) {
+    const t = rowCapturedAt(chronological[end - 1]);
+    let start = end - 1;
+    while (start > 0 && rowCapturedAt(chronological[start - 1]) === t) start -= 1;
+    for (let i = start; i < end; i++) out.push(chronological[i]);
+    end = start;
+  }
+  return out;
 }
 
 /**
@@ -100,13 +122,30 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
   const requireText = opts?.requireText === true;
 
   const allRows = Array.isArray(storedComments) ? storedComments : [];
-  let rows = filterByLive
-    ? allRows.filter((e) => rowMatchesLiveFilter(e, targetNorm))
-    : allRows;
-  if (requireText) {
-    rows = rows.filter((e) =>
-      Boolean(String(/** @type {{ text?: unknown }} */ (e)?.text ?? '').trim())
-    );
+  // ★v0.1.1815: 視聴ページに隠れて入っている popup が、新着1件ごとに全件(3万行級)でこの関数を回していた。
+  //   出力は1文字も変えずに、1行ごとの文字列の作り直しを減らす(結果の同一性は Equivalence テストが固定)。
+  //   - 配信IDの正規化は「同じ生の値なら同じ結果」なので値ごとに1回だけ
+  //   - 本文の空判定は trim() の新しい文字列を作らず /\S/ で見る(trim と同じ空白の定義)
+  /** @type {Map<unknown, string>} */
+  const lvNormMemo = new Map();
+  const normLvMemo = (/** @type {unknown} */ v) => {
+    let n = lvNormMemo.get(v);
+    if (n === undefined) {
+      n = normalizeLv(v);
+      lvNormMemo.set(v, n);
+    }
+    return n;
+  };
+  const rows = [];
+  for (const e of allRows) {
+    if (filterByLive) {
+      const o = /** @type {{ liveId?: unknown, lvId?: unknown }} */ (e);
+      const a = normLvMemo(o?.liveId);
+      const b = a && a === targetNorm ? a : normLvMemo(o?.lvId);
+      if (!((Boolean(a) && a === targetNorm) || (Boolean(b) && b === targetNorm))) continue;
+    }
+    if (requireText && !NON_SPACE_RE.test(String(/** @type {{ text?: unknown }} */ (e)?.text ?? ''))) continue;
+    rows.push(e);
   }
   // v0.1.373: 当ライブ一致 0 件のときに「全ライブ混在フォールバック」すると、
   //   別放送やおすすめ列由来で蓄積した別ユーザが「この配信の応援」と誤認されやすい。
@@ -134,9 +173,10 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
     if (broadcasterUid && userId === broadcasterUid) {
       continue;
     }
-    const chronological = [...group].sort(
-      (a, b) => rowCapturedAt(a) - rowCapturedAt(b)
-    );
+    // 保存順=時刻順のことがほとんどなので、既に並んでいれば並べ替えを省く(安定ソートの結果と同じ並び)。
+    const chronological = isSortedByCapturedAt(group)
+      ? group
+      : [...group].sort((a, b) => rowCapturedAt(a) - rowCapturedAt(b));
     let observed = false;
     /** @type {string[]} */
     const urls = [];
@@ -144,12 +184,18 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
     // 一致する URL は除外する（ギフト演出 DOM 観測の取り違え後方互換補正）。
     const isBroadcasterHere =
       broadcasterGuardEnabled && userId === broadcasterUid;
+    // 同じ URL の2回目以降は判定も候補追加も省く。pickStrongestAvatarUrlForUser は「最初に最高点だった URL」を
+    //   選ぶので、重複を落としても選ばれる URL は同じ(判定はこの人・この配信者情報について URL だけで決まる)。
+    /** @type {Set<string>} */
+    const seenUrls = new Set();
     for (const g of chronological) {
       if (/** @type {{ avatarObserved?: boolean }} */ (g).avatarObserved === true) {
         observed = true;
       }
       const u = String(/** @type {{ avatarUrl?: unknown }} */ (g).avatarUrl ?? '').trim();
       if (!u) continue;
+      if (seenUrls.has(u)) continue;
+      seenUrls.add(u);
       // 0.1.83: 普遍ルール — URL の埋め込み uid とエントリ uid の不一致は弾く
       //   broadcaster 情報が無くても効く最強のガード（過去の汚染データも全て掃除）
       if (!isAvatarUrlForUserId(u, userId)) continue;
@@ -164,9 +210,7 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
     }
     const avatarUrl = pickStrongestAvatarUrlForUser(userId, urls);
 
-    const newestFirst = [...chronological].sort(
-      (a, b) => rowCapturedAt(b) - rowCapturedAt(a)
-    );
+    const newestFirst = newestFirstFromChronological(chronological);
     let nickname = '';
     for (const g of chronological) {
       const n = String(/** @type {{ nickname?: unknown }} */ (g).nickname ?? '').trim();
@@ -174,7 +218,11 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       nickname = pickBetterInterceptNickname(userId, nickname, n);
     }
 
-    const lastCapturedAt = Math.max(0, ...chronological.map(rowCapturedAt));
+    // 時刻の昇順に並んでいるので最大は末尾(rowCapturedAt は 0 以上=Math.max(0, ...全件) と同じ値)。
+    //   全件の spread は大量コメントの人で引数上限に近づくのも避けられる。
+    const lastCapturedAt = chronological.length
+      ? rowCapturedAt(chronological[chronological.length - 1])
+      : 0;
 
     // 会場 VIP常連光らせ(v0.1.734)用: このユーザーの実発言数とギフト回数を持たせる。
     //   これが無いと venue 側で全員 count=1 扱いになりスコアが閾値に届かず誰も光らない。
