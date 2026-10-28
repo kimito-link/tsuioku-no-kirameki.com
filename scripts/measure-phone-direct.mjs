@@ -31,7 +31,10 @@ async function pickLv(arg) {
   if (LV_RE.test(String(arg || ''))) return String(arg);
   const r = await fetch(`${APP_ORIGIN}/api/live-ranking`);
   const j = await r.json();
-  const lv = j?.lives?.[0]?.liveId;
+  // コメントが0件だと遅れを測れないので、放送中でコメントの一番多い配信を選ぶ。
+  const lives = (Array.isArray(j?.lives) ? j.lives : []).filter((/** @type {any} */ l) => l?.onAir !== false);
+  lives.sort((/** @type {any} */ a, /** @type {any} */ b) => (Number(b?.commentCount) || 0) - (Number(a?.commentCount) || 0));
+  const lv = lives[0]?.liveId;
   if (!LV_RE.test(String(lv || ''))) throw new Error('放送中の配信が見つかりません。lv を渡してください。');
   return lv;
 }
@@ -110,13 +113,20 @@ async function main() {
   const statuses = new Map();
   const lags = [];
   let chats = 0;
+  let viewGets = 0;
+  let segGets = 0;
+  let segBytes = 0;
   const ac = new AbortController();
   const stopAt = Date.now() + minutes * 60_000;
   const fetchBinary = async (url, o) => {
     try {
       const r = await fetch(url, { signal: o?.signal });
       statuses.set(r.status, (statuses.get(r.status) || 0) + 1);
-      return { ok: r.ok, status: r.status, bytes: r.ok ? new Uint8Array(await r.arrayBuffer()) : new Uint8Array() };
+      const bytes = r.ok ? new Uint8Array(await r.arrayBuffer()) : new Uint8Array();
+      // view(?at=)と segment を分けて数える(0件のとき「来ていない」のか「読めていない」のかを切り分ける)。
+      if (/[?&]at=/.test(url)) viewGets += 1;
+      else { segGets += 1; segBytes += bytes.length; }
+      return { ok: r.ok, status: r.status, bytes };
     } catch {
       statuses.set(0, (statuses.get(0) || 0) + 1);
       return { ok: false, status: 0, bytes: new Uint8Array() };
@@ -142,6 +152,7 @@ async function main() {
   clearTimeout(timer);
   ac.abort();
   console.log(`- 受け取ったコメント: ${chats} 件・終わり方: ${stopReason || '時間切れ'}`);
+  console.log(`- 取得: view ${viewGets} 回・segment ${segGets} 回(${segBytes} バイト)`);
   console.log(`- 遅れ(秒): p50=${pct(lags, 50)?.toFixed(1) ?? '—'} p90=${pct(lags, 90)?.toFixed(1) ?? '—'}(${lags.length} 件で計算)`);
   console.log(`- HTTP の状態: ${[...statuses].map(([s, n]) => `${s}×${n}`).join(' ') || '—'}`);
   const limited = (statuses.get(429) || 0) + (statuses.get(403) || 0);
