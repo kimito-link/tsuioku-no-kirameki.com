@@ -773,7 +773,7 @@ export const KEY_STATUS_DEVICE_CRED = 'nls_status_device_cred_v1';
 export const KEY_PHONE_POST = 'nls_phone_post_v1';
 
 /**
- * ★v0.1.1820: 「👥 ファンにも公開」(配信者中継)。api/status.js?action=fan が出したファン用リンク。値: { fanToken, enabledAt }。
+ * ★v0.1.1823: 「👥 ファンにも公開」(配信者中継)。api/status.js?action=fan が出したファン用リンク。値: { fanToken, enabledAt }。
  *   あれば状態画面にファン用の URL を出す(押すたびにサーバーで寿命が延びる)。OFF・同意を外すと消す。
  */
 export const KEY_FAN_LINK = 'nls_fan_link_v1';

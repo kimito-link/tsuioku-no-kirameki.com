@@ -246,7 +246,7 @@ async function handleEventsPost(req, res) {
 }
 
 /**
- * v0.1.1820: 配信者中継。配信者の PC が「👥 ファンにも公開」を ON/OFF する。鍵の照合は概要の送信と同じ。
+ * v0.1.1823: 配信者中継。配信者の PC が「👥 ファンにも公開」を ON/OFF する。鍵の照合は概要の送信と同じ。
  *   { on: true } → ファン用リンク(読むだけ)を返す / { on: false } → 取り消す。
  */
 async function handleFanPost(req, res) {
@@ -329,7 +329,7 @@ export default async function handler(req, res) {
         res.status(400).json({ ok: false, error: 'bad view token' });
         return;
       }
-      // ★v0.1.1820: ファン用リンク(fan_…)は配信者の閲覧トークンに読み替えて【読むだけ】で返す。
+      // ★v0.1.1823: ファン用リンク(fan_…)は配信者の閲覧トークンに読み替えて【読むだけ】で返す。
       //   ファンが見ても、配信者の PC の動き(声づくり・送る間隔)を変える目印は置かない。
       const fan = isFanToken(token);
       if (fan) {

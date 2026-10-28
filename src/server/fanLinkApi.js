@@ -1,7 +1,7 @@
 // @ts-nocheck
 /* global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む */
 /**
- * v0.1.1820: 配信者中継(ファン用の読むだけのリンク)の Redis 係。api/status.js・api/device.js から呼ぶ。
+ * v0.1.1823: 配信者中継(ファン用の読むだけのリンク)の Redis 係。api/status.js・api/device.js から呼ぶ。
  *   POST /api/status?action=fan  { on: true }  → ファン用リンクを返す(あれば同じものを延ばして返す)
  *   POST /api/status?action=fan  { on: false } → 取り消す(古いリンクは 404)
  *   GET  /api/status?v=fan_…                    → 配信者の最新を【読むだけ】で返す(api/status.js)

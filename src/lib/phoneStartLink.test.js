@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseNicoliveWatchLink, parseViewerLink } from './phoneStartLink.js';
 
-describe('parseNicoliveWatchLink(PC が無い人が貼るニコ生の放送 URL・v0.1.1819)', () => {
+describe('parseNicoliveWatchLink(PC が無い人が貼るニコ生の放送 URL・v0.1.1822)', () => {
   it('PC の放送ページ・スマホの放送ページ・短縮 URL・lv だけを読める', () => {
     expect(parseNicoliveWatchLink('https://live.nicovideo.jp/watch/lv349123456')).toBe('lv349123456');
     expect(parseNicoliveWatchLink('https://sp.live.nicovideo.jp/watch/lv349123456?ref=share')).toBe('lv349123456');

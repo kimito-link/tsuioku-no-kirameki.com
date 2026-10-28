@@ -83,6 +83,7 @@
 | `data-nls-fiber-rows` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-fiber-scans` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-fiber-step` | extension/page-intercept-entry.js | extension/content-entry.js |
+| `data-nls-first-paint-gate` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-heat` | extension/venueBar.js | — |
 | `data-nls-hidden` | extension/content-entry.js | extension/content-entry.js<br>lib/inlineHostVisibilityIntent.js |
 | `data-nls-hidden-injected` | extension/content-entry.js | — |

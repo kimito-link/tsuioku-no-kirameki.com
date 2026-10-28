@@ -37,7 +37,7 @@ const mkRes = () => {
 };
 const get = async (lv) => { const res = mkRes(); await handler({ method: 'GET', headers: {}, query: { lv } }, res); return res; };
 
-describe('/api/live-ranking?lv= (PC の拡張が無い人が放送の URL を貼る・v0.1.1819)', () => {
+describe('/api/live-ranking?lv= (PC の拡張が無い人が放送の URL を貼る・v0.1.1822)', () => {
   let store; let nico;
   beforeEach(() => {
     store = new Map();

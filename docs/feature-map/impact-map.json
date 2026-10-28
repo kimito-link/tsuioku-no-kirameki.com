@@ -7340,6 +7340,16 @@
       ]
     },
     {
+      "file": "src/lib/moveNodePreservingState.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/nameplateToggleBoot.js",
       "featureCount": 1,
       "features": [

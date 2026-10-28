@@ -37,7 +37,7 @@ describe('PC 無しで見られる応援ランキング(app.tsuioku-no-kirameki.
   });
 });
 
-describe('PC が無くても放送の URL を貼れば見られる(v0.1.1819)', () => {
+describe('PC が無くても放送の URL を貼れば見られる(v0.1.1822)', () => {
   const entry = read('src/extension/live-ranking-entry.js');
   it('★開始画面はニコ生の放送 URL を拡張のリンクより先に見る(lv だけの文字列はトークンの形にも合うため)', () => {
     const lvAt = phoneJs.indexOf('parseNicoliveWatchLink(raw)');

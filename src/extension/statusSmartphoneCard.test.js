@@ -127,7 +127,7 @@ describe('✍️ スマホからコメントする(v0.1.1734)', () => {
   });
 });
 
-describe('👥 ファンにも公開(v0.1.1820・配信者中継)', () => {
+describe('👥 ファンにも公開(v0.1.1823・配信者中継)', () => {
   const F = 'fan_' + 'f'.repeat(22);
   const fan = (stored = '') => {
     let cur = stored;
