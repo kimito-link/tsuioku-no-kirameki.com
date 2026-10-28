@@ -20,8 +20,8 @@ export const INLINE_HOST_MOVE_SAMPLE_CAP = 8;
  *   reloadCount は「prevConnected && hadIframe」のときだけ増える=接続済み host に iframe が居る状態で
  *   動かした(=iframe リロード実害あり)移設のみ。初回 attach や iframe 生成前の移設はノイズとして
  *   moveCount にだけ入る。
- * @param {{ count:number, reloadCount:number, venueOpenMoves:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }} state
- * @param {{ reason:string, atMs:number, prevConnected:boolean, hadIframe:boolean, venueOpen:boolean }} move
+ * @param {{ count:number, reloadCount:number, preservedMoves?:number, venueOpenMoves:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }} state
+ * @param {{ reason:string, atMs:number, prevConnected:boolean, hadIframe:boolean, venueOpen:boolean, preserved?:boolean }} move
  * @returns {object} 更新後の同じ state
  */
 export function recordInlineHostMove(state, move) {
@@ -37,7 +37,11 @@ export function recordInlineHostMove(state, move) {
   const venueOpen = move?.venueOpen === true;
   state.count += 1;
   state.byReason[reason] = (Number(state.byReason[reason]) || 0) + 1;
-  if (prevConnected && hadIframe) state.reloadCount += 1;
+  // v0.1.1821: moveBefore で iframe を保ったまま動かせた移設は実害なし=reloadCount でなく preservedMoves。
+  if (prevConnected && hadIframe) {
+    if (move?.preserved === true) state.preservedMoves = (Number(state.preservedMoves) || 0) + 1;
+    else state.reloadCount += 1;
+  }
   if (venueOpen) state.venueOpenMoves += 1;
   state.lastAtMs = Number(move?.atMs) || 0;
   state.samples.push({
@@ -45,6 +49,7 @@ export function recordInlineHostMove(state, move) {
     prevConnected,
     hadIframe,
     venueOpen,
+    preserved: move?.preserved === true,
     atMs: state.lastAtMs
   });
   if (state.samples.length > INLINE_HOST_MOVE_SAMPLE_CAP) {
@@ -104,15 +109,16 @@ export function recordInlineHostMoveVenueSkip(state) {
 
 /**
  * fastDiag(content.hostMoveDiag)へ出す形に要約する純関数。
- * @param {{ count:number, reloadCount:number, venueOpenMoves:number, duplicateSeen?:number, venueSkipCount?:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }|null} state
+ * @param {{ count:number, reloadCount:number, preservedMoves?:number, venueOpenMoves:number, duplicateSeen?:number, venueSkipCount?:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }|null} state
  * @param {number} nowMs
- * @returns {{ moveCount:number, reloadCount:number, venueOpenMoves:number, duplicateSeen:number, venueSkipCount:number, lastMoveAgoMs:(number|null), byReason:Record<string,number>, samples:Array<object> }}
+ * @returns {{ moveCount:number, reloadCount:number, preservedMoves:number, venueOpenMoves:number, duplicateSeen:number, venueSkipCount:number, lastMoveAgoMs:(number|null), byReason:Record<string,number>, samples:Array<object> }}
  */
 export function summarizeInlineHostMoveDiag(state, nowMs) {
   const lastAtMs = Number(state?.lastAtMs) || 0;
   return {
     moveCount: Number(state?.count) || 0,
     reloadCount: Number(state?.reloadCount) || 0,
+    preservedMoves: Number(state?.preservedMoves) || 0,
     venueOpenMoves: Number(state?.venueOpenMoves) || 0,
     duplicateSeen: Number(state?.duplicateSeen) || 0,
     venueSkipCount: Number(state?.venueSkipCount) || 0,
