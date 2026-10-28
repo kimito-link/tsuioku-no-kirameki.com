@@ -1,4 +1,5 @@
 // voicevoxClient.js — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
+import { normalizeVoiceReadingBody } from './voiceReadingNormalize.js';
 import {
   StreamedVoice,
   createWavStreamParser,
@@ -846,12 +847,8 @@ export function buildVoiceReadingText(row, { maxChars = 60 } = {}) {
     Number.isFinite(rawMaxChars) && rawMaxChars >= 1
       ? Math.floor(rawMaxChars)
       : 60;
-  const body = Array.from(
-    rawText
-      .replace(/(?:https?:\/\/|www\.)[^\s]+/gi, 'URL省略')
-      .replace(/\s+/g, ' ')
-      .trim()
-  )
+  // 2026-10-28: 笑いの w・拍手の 8・同じ文字の連打も読みやすく(voiceReadingNormalize.js)。
+  const body = Array.from(normalizeVoiceReadingBody(rawText))
     .slice(0, limit)
     .join('');
   if (!body) return '';

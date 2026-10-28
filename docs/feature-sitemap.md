@@ -603,7 +603,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 37</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 38</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -632,6 +632,7 @@
 - `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
 - `src/lib/voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
 - `src/lib/voiceReaderLease.js` — 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけにする(v0.1.1794)。
+- `src/lib/voiceReadingNormalize.js` — 読み上げる本文を「耳で聞いて自然」に整える純関数(会場・コメビュ・スマホ共通)。
 - `src/lib/voiceStageTiming.js` — 読み上げの遅れを「段階ごと」に測る計器(印字専用・読み上げの挙動には一切介入しない)。
 - `src/lib/voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。
 - `src/lib/voiceStyleLevelTable.js` — VOICEVOX の声(styleId)ごとの素の大きさの表(v0.1.1788)。
@@ -976,7 +977,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 287</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 289</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1037,6 +1038,7 @@
 - `scripts/council-daily.mjs` — 会議ハーネスの日課を1本にまとめる（2026-09-16 新設）
 - `scripts/council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
 - `scripts/council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
+- `scripts/council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
 - `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
 - `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
@@ -1241,6 +1243,7 @@
 - `src/lib/tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。
 - `src/lib/topSupportRankAnonymousFold.js` — userKey: string,
 - `src/lib/trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
+- `src/lib/trailingPublisher.js` — 「先に1回・間引いた分は最後に1回」書く小さな仕組み(DOM も chrome API も触らない)。
 - `src/lib/trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
 - `src/lib/unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
@@ -1278,7 +1281,9 @@
 ### 🏟 会場・席 (1版)
 - `v0.1.1794` 2026-10-27 — 会場とコメビュで同じコメントを二重に読まない
 
-### 🔊 読み上げ (13版)
+### 🔊 読み上げ (15版)
+- `v0.1.1809` 2026-10-28 — 読み上げの記録が古い数のまま残るのを直す
+- `v0.1.1808` 2026-10-28 — 読み上げる文を聞きやすく(www・8888・連打)
 - `v0.1.1807` 2026-10-28 — コメビュの読み上げ計器を配信ごとに数え直す
 - `v0.1.1806` 2026-10-28 — 読み上げが遅いとき GPU の案内を出す
 - `v0.1.1805` 2026-10-28 — コメビュで後から届く古いコメントを読まない
@@ -1293,11 +1298,12 @@
 - `v0.1.1795` 2026-10-27 — 読み上げの声の組を変えてメモリを半分以下に
 - `v0.1.1794` 2026-10-27 — 会場とコメビュで同じコメントを二重に読まない
 
-### その他 (7版)
+### 🩺 診断・状態速報 (1版)
+- `v0.1.1809` 2026-10-28 — 読み上げの記録が古い数のまま残るのを直す
+
+### その他 (5版)
 - `v0.1.1802` 2026-10-28 — 開発版は新しい版に自分で入れ替わる
 - `v0.1.1793` 2026-10-27 — 低めの声の人の最初の長文も揃える
 - `v0.1.1792` 2026-10-27 — 短いコメントも聞こえの大きさで揃える
 - `v0.1.1791` 2026-10-27 — 低めの声の人の1件目を小さくしない
 - `v0.1.1790` 2026-10-27 — 低めの声の長いコメントを小さくしない
-- `v0.1.1789` 2026-10-27 — 短いコメントの音量のばらつきを戻す
-- `v0.1.1788` 2026-10-27 — 声ごとの音量を聞こえの大きさで揃える

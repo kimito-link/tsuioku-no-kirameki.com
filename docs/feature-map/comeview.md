@@ -50,10 +50,10 @@ graph LR
   n_comeview --> n_src_lib_supportGridDisplayTier_js["lib/supportGridDisplayTier.js"]:::shared
   n_comeview --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
   n_comeview --> n_src_lib_supportTimelineHtml_js["lib/supportTimelineHtml.js"]:::shared
+  n_comeview --> n_src_lib_trailingPublisher_js["lib/trailingPublisher.js"]:::shared
   n_comeview --> n_src_lib_userCommentProfileCache_js["lib/userCommentProfileCache.js"]:::shared
   n_comeview --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
-  n_comeview --> n_src_lib_voiceAgeGate_js["lib/voiceAgeGate.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 25 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 27 ファイル省略（全件は storage-bus.md / metafile 参照）。
