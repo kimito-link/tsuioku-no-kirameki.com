@@ -22,6 +22,16 @@ describe('createPhoneVoiceSender', () => {
     expect(d.synth.mock.calls[0][0]).toBe('c3');
     expect(s.state()).toBe('ok');
   });
+  it('絵文字だけのコメントは飛ばし、VOICEVOX 停止扱いにしない(v0.1.1810)', async () => {
+    const d = deps();
+    const s = createPhoneVoiceSender(d);
+    await s.tick({ wanted: true, liveId: 'lv1', rows: rows(1) });
+    const r = [...rows(1), { no: '2', text: '😂😂', userId: 'u2', name: 'N2' }, ...rows(3)];
+    expect(await s.tick({ wanted: true, liveId: 'lv1', rows: r })).toBe(1);
+    expect(d.synth).toHaveBeenCalledTimes(1);
+    expect(d.synth.mock.calls[0][0]).toBe('c3');
+    expect(s.state()).toBe('ok');
+  });
   it('名前読みが ON なら名前も読む', async () => {
     const d = deps({ loadSettings: async () => ({ readName: true }) });
     const s = createPhoneVoiceSender(d);
