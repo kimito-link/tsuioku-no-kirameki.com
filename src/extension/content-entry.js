@@ -337,6 +337,7 @@ import {
   shouldSkipInlineHostMoveForVenue,
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
+import { moveNodePreservingState, moveNodeAfterPreservingState } from '../lib/moveNodePreservingState.js'; // v0.1.1820: host を動かしてもパネル(iframe)を読み込み直させない
 // ★v0.1.1454: メモリ/DOM の逼迫判定(凍結の予兆を数字で出す)。
 import { judgeMemoryPressure } from '../lib/memoryPressureProbe.js';
 /*
@@ -4287,7 +4288,7 @@ function renderInlinePanelFloatingHost() {
 
   if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
     noteInlineHostMove('floating_body', host);
-    document.body.appendChild(host);
+    moveNodePreservingState(document.body, host);
   }
   host.classList.add('nls-inline-host--floating');
   host.style.position = 'fixed';
@@ -4436,7 +4437,7 @@ function renderInlinePanelDockBottomHost() {
 
   if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
     noteInlineHostMove('dock_body', host);
-    document.body.appendChild(host);
+    moveNodePreservingState(document.body, host);
   }
   host.style.position = 'fixed';
   host.style.left = '0';
@@ -5602,7 +5603,7 @@ function renderInlineHostAnchoredToVideo(video) {
   if (hostAttachFallbackBody) {
     if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
       noteInlineHostMove('anchored_video_fallback_body', host);
-      hostParent.appendChild(host);
+      moveNodePreservingState(hostParent, host);
     }
   } else {
     if (
@@ -5610,7 +5611,7 @@ function renderInlineHostAnchoredToVideo(video) {
       !shouldSkipHostMoveForVenueNow(host)
     ) {
       noteInlineHostMove('anchored_video', host);
-      insertAfter.insertAdjacentElement('afterend', host);
+      moveNodeAfterPreservingState(insertAfter, host);
     }
   }
   host.style.boxSizing = 'border-box';
@@ -5785,7 +5786,7 @@ function renderInlinePopupHost(target) {
   if (hostAttachFallbackBody) {
     if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
       noteInlineHostMove('nonvideo_fallback_body', host);
-      hostParent.appendChild(host);
+      moveNodePreservingState(hostParent, host);
     }
   } else {
     if (
@@ -5793,7 +5794,7 @@ function renderInlinePopupHost(target) {
       !shouldSkipHostMoveForVenueNow(host)
     ) {
       noteInlineHostMove('nonvideo_anchor', host);
-      insertAfter.insertAdjacentElement('afterend', host);
+      moveNodeAfterPreservingState(insertAfter, host);
     }
   }
   host.style.boxSizing = 'border-box';
@@ -8269,7 +8270,7 @@ function prewarmInlinePopupIframe() {
         await releasePrewarmLeaseIfMine();
         return;
       }
-      if (host.parentNode !== document.body) {
+      if (!host.isConnected) { // v0.1.1820: 旧条件(body 直下でない)は順番待ちの間に通常描画が置いた表示中のパネルを画面外へ引きはがし、直後に戻す=中身が読み込み直しになっていた
         // 画面に出さないままで body に挿入。iframe は display:none でも load する。
         setInlineHostDisplay(host, 'none', 'prewarm_offscreen');
         host.setAttribute('aria-hidden', 'true');
