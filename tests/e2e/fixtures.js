@@ -52,9 +52,25 @@ export async function enableInlinePanelAutoshow(context) {
     sw = pickExt();
   }
   if (!sw) throw new Error('extension service worker not found');
+  await waitExtensionStorageReady(sw);
   await sw.evaluate(async (key) => {
     await chrome.storage.local.set({ [key]: true });
   }, KEY_INLINE_PANEL_AUTOSHOW);
+}
+
+/**
+ * 起動直後の service worker は chrome.storage がまだ生えていないことがある
+ * (evaluate が "reading 'local'" で落ちる・高負荷時に数%)。生えるまで短く待つ。
+ * @param {import('@playwright/test').Worker} sw
+ */
+export async function waitExtensionStorageReady(sw) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const ready = await sw.evaluate(() => typeof chrome !== 'undefined' && !!chrome.storage?.local).catch(() => false);
+    if (ready) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('extension service worker storage not ready');
 }
 
 /**
