@@ -9,6 +9,7 @@ import {
   commentNoOfComeviewRow,
   filterUnseenComeviewComments,
   pickRefreshVoiceItems,
+  splitVoiceBacklogByCommentNo,
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from './comeviewInstantRender.js';
@@ -239,5 +240,26 @@ describe('pickRefreshVoiceItems(v0.1.1804: 整合リフレッシュで初めて�
     expect(pickRefreshVoiceItems([{ kind: 'comment', commentNo: '1' }], new Set(), now, 8000)).toEqual([]);
     expect(pickRefreshVoiceItems([{ kind: 'comment', commentNo: '1', at: now + 5000 }], new Set(), now, 8000)).toEqual([]);
     expect(pickRefreshVoiceItems(null, new Set(), now, 8000)).toEqual([]);
+  });
+});
+
+describe('splitVoiceBacklogByCommentNo(v0.1.1805: 開く前の古いコメントを読み上げに入れない)', () => {
+  const c = (no) => ({ kind: 'comment', commentNo: String(no) });
+  it('はじめ(最大番号0)は全部通し、最大番号を覚える', () => {
+    const r = splitVoiceBacklogByCommentNo([c(5619), c(5620)], 0);
+    expect(r.fresh).toHaveLength(2);
+    expect(r.backlog).toBe(0);
+    expect(r.maxNo).toBe(5620);
+  });
+  it('後からまとめて届いた古い番号(最大−30未満)は外して数える・少しの前後は通す', () => {
+    const r = splitVoiceBacklogByCommentNo([c(5447), c(5500), c(5600), c(5621), c(5676)], 5620);
+    expect(r.fresh.map((x) => x.commentNo)).toEqual(['5600', '5621', '5676']);
+    expect(r.backlog).toBe(2);
+    expect(r.maxNo).toBe(5676);
+  });
+  it('番号の無い行・ギフトは通す', () => {
+    const r = splitVoiceBacklogByCommentNo([{ kind: 'comment' }, { kind: 'gift', commentNo: '1' }], 5000);
+    expect(r.fresh).toHaveLength(2);
+    expect(r.backlog).toBe(0);
   });
 });
