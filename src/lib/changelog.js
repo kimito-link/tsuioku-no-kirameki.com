@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1809',
+    date: '2026-10-28',
+    summary: '読み上げの記録が古い数のまま残るのを直す',
+    items: Object.freeze([
+      '読み上げの記録(読めた数・遅れなど)は3秒に1回まとめて保存していますが、読み上げが止まると最後の数件の分が保存されず、状態速報に古い数が残っていました。止まった後にも最後の状態を1回保存するようにしました(放送ページとコメビュの両方)。読み上げの声は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1808',
     date: '2026-10-28',
     summary: '読み上げる文を聞きやすく(www・8888・連打)',
@@ -179,14 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '低めの声の長いコメントを小さくしない',
     items: Object.freeze([
       '声を低めにずらした人の長いコメントが、小さく鳴ることがあったのを直しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1789',
-    date: '2026-10-27',
-    summary: '短いコメントの音量のばらつきを戻す',
-    items: Object.freeze([
-      '0.1.1788 で、遅い PC で読む短いコメントの音量がばらつくようになっていたのを直しました。長いコメントの揃え方はそのままです。'
     ])
   })
 ]);

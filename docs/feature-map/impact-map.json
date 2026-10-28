@@ -2050,6 +2050,20 @@
       ]
     },
     {
+      "file": "src/lib/trailingPublisher.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/userCommentProfileCache.js",
       "featureCount": 3,
       "features": [

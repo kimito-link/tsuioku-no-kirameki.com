@@ -305,6 +305,7 @@ import {
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import { createTrailingPublisher } from '../lib/trailingPublisher.js';
 import { wireVenueVoiceTestHook } from './voiceTestHook.js';
 import {
   shouldRenderLoading,
@@ -3345,17 +3346,13 @@ export function mountVenueBarButton(options = {}) {
     renderVoiceLoading(state, reason);
   };
 
-  // v0.1.1065: 会場読み上げの計器を KEY_VOICE_DIAG へ書く(3秒min-gap・他診断と同型)。
-  //   これまで会場のVoicePlayerは無計器で、状態速報の「会場読み上げ」行は別経路(comeview)の
-  //   古いスナップショットを表示し続けていた(=読み上げ不調の切り分けが不可能だった)。
-  let _venueVoiceDiagLastWriteAt = 0;
-  const publishVenueVoiceDiag = (/** @type {import('../lib/voiceDiag.js').VoiceDiagState} */ diag) => {
-    const now = Date.now();
-    if (now - _venueVoiceDiagLastWriteAt < 3000) return;
-    _venueVoiceDiagLastWriteAt = now;
-    const snap = { ...buildVoiceDiagSnapshot(diag, now, liveIdFromPathname()), source: 'venue' };
-    void chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {});
-  };
+  // v0.1.1065: 会場読み上げの計器を KEY_VOICE_DIAG へ書く(3秒min-gap)。それまで状態速報は別経路(comeview)の古い値を表示し続けていた。
+  //   v0.1.1809: 間引いた分は最後に1回書く(読み上げが止まった後に古い数を残さない・trailingPublisher.js)。
+  let _venueVoiceDiagLatest = /** @type {import('../lib/voiceDiag.js').VoiceDiagState | null} */ (null);
+  const venueVoiceDiagPublisher = createTrailingPublisher(() => {
+    if (_venueVoiceDiagLatest) void chrome.storage.local.set({ [KEY_VOICE_DIAG]: { ...buildVoiceDiagSnapshot(_venueVoiceDiagLatest, Date.now(), liveIdFromPathname()), source: 'venue' } }).catch(() => {});
+  }, 3000);
+  const publishVenueVoiceDiag = (/** @type {import('../lib/voiceDiag.js').VoiceDiagState} */ diag) => { _venueVoiceDiagLatest = diag; venueVoiceDiagPublisher.request(); };
 
   const venueVoiceWarmup = createVoicevoxWarmup(); // 初めての声を合成前に読み込む(voiceWarmup.js)
   const voicePlayer = new VoicePlayer({
