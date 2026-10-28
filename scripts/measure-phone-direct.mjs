@@ -7,8 +7,10 @@
  *      握手できるか(できなければ WebView の WebSocket は使えない=ネイティブの部品が要る)。
  *   2. CORS: watch ページ・NDGR(mpn.live)・koken・nicoad が、アプリの Origin に読ませるか
  *      (Access-Control-Allow-Origin)。読ませないものはネイティブ通信(CapacitorHttp)で取る。
- *   3. 遅れ: NDGR の segment を「最後まで読む GET」(CapacitorHttp と同じ取り方)で前方向に追ったとき、
- *      コメントが流れてから手元に届くまでの秒数(p50 / p90)。
+ *   3. 遅れ: view を next.at で辿り、segment を「届きしだい読む」(ネイティブ部品)と
+ *      「最後まで読む」(CapacitorHttp)の両方で、コメントの時刻(meta.at)から手元に届くまでの秒数(p50 / p90)。
+ *      ★src/lib/ndgrForwardCrawl.js は使わない。1回目の計測で segment をほぼ取れなかった(view 91回・segment 4本・12バイト)ため、
+ *        公開の型どおりに番号で読む小さな版をここに置いた(結果しだいで lib 側を直す)。
  *   4. 続けて取ったときに 429 / 403 が出ないか(回数制限)。
  *
  * ■ 秘密を出さない
@@ -21,8 +23,9 @@
 
 import { fetchWatchHtml, fetchViewUri } from '../src/server/nicoliveGuest.js';
 import { extractEmbeddedData } from '../src/lib/nicoliveRankingPick.js';
-import { pickWsUrlFromEmbeddedData, pickProgramBeginAt } from '../src/lib/embeddedDataExtract.js';
-import { crawlNdgrForward } from '../src/lib/ndgrForwardCrawl.js';
+import { pickWsUrlFromEmbeddedData } from '../src/lib/embeddedDataExtract.js';
+import { pbForEach, decodeChunkedMessage } from '../src/lib/ndgrDecode.js';
+import { splitLengthDelimitedMessagesWithTail } from '../src/lib/lengthDelimitedStream.js';
 
 const APP_ORIGIN = 'https://app.tsuioku-no-kirameki.com';
 const LV_RE = /^lv\d{6,15}$/;
@@ -79,9 +82,6 @@ async function main() {
   const props = extractEmbeddedData(html);
   const wsUrl = props ? pickWsUrlFromEmbeddedData(props) : '';
   if (!wsUrl) throw new Error('watch ページから視聴の接続先を読めませんでした(放送が終わっているかも)。');
-  // vpos の基準は vposBaseTime(無ければ開始時刻)。秒でも ms でも来るので ms にそろえる。
-  const vb = Number(props?.program?.vposBaseTime) || 0;
-  const beginAtMs = vb > 0 ? (vb < 1e12 ? vb * 1000 : vb) : Number(pickProgramBeginAt(props)) || 0;
 
   console.log('\n## 1. WebSocket の握手(Origin ごと)');
   /** @type {string} */
@@ -109,57 +109,187 @@ async function main() {
     console.log(`- ${name}: ${r.status} ACAO=${r.acao} → ${r.readable ? 'WebView の fetch で読める' : 'ネイティブ通信が要る'}`);
   }
 
-  console.log(`\n## 3-4. 前方向に ${minutes} 分追う(最後まで読む GET)`);
+  console.log(`\n## 3-4. 前方向に ${minutes} 分追う(公開の型どおりに読む)`);
+  const r = await followLive(viewUri, minutes);
+  console.log(`- view: ${r.viewGets} 回(区切り ${r.entryKinds})・segment: ${r.segGets} 本(${r.segBytes} バイト)`);
+  console.log(`- 受け取ったコメント: ${r.chats} 件(時刻つき ${r.lagsStream.length} 件)`);
+  const fmt = (/** @type {number[]} */ a) =>
+    `p50=${pct(a, 50)?.toFixed(1) ?? '—'} p90=${pct(a, 90)?.toFixed(1) ?? '—'}`;
+  console.log(`- 遅れ(秒・届きしだい読む=ネイティブ部品): ${fmt(r.lagsStream)}`);
+  console.log(`- 遅れ(秒・最後まで読む=CapacitorHttp): ${fmt(r.lagsFull)}`);
+  console.log(`- HTTP の状態: ${[...r.statuses].map(([k, n]) => `${k}×${n}`).join(' ') || '—'}`);
+  const limited = (r.statuses.get(429) || 0) + (r.statuses.get(403) || 0);
+  console.log(`- 回数制限(429/403): ${limited ? `${limited} 回 → 間隔を広げる必要あり` : 'なし'}`);
+  if (r.note) console.log(`- メモ: ${r.note}`);
+}
+
+/**
+ * Timestamp { seconds=1, nanos=2 } を ms に。
+ * @param {Uint8Array} b @param {number} s @param {number} e
+ */
+function tsMs(b, s, e) {
+  let sec = 0;
+  let ns = 0;
+  pbForEach(b, s, e, (fn, wt, val) => {
+    if (wt !== 0) return;
+    if (fn === 1) sec = Number(val) || 0;
+    if (fn === 2) ns = Number(val) || 0;
+  });
+  return sec * 1000 + Math.floor(ns / 1e6);
+}
+
+/**
+ * view の1区切り(ChunkedEntry: segment=1 / backward=2 / previous=3 / next=4)を読む。
+ * 公開の型(n-air-app/nicolive-comment-protobuf)どおりに番号で読む。
+ * @param {Uint8Array} f
+ */
+function readEntry(f) {
+  /** @type {{ kind: string, uri?: string, untilMs?: number, at?: number }} */
+  const out = { kind: '' };
+  pbForEach(f, 0, f.length, (fn, wt, _v, s, e) => {
+    if (wt !== 2) return;
+    if (fn === 1 || fn === 3) {
+      out.kind = fn === 1 ? 'segment' : 'previous';
+      pbForEach(f, s, e, (gn, gw, _gv, gs, ge) => {
+        if (gw !== 2) return;
+        if (gn === 2) out.untilMs = tsMs(f, gs, ge);
+        if (gn === 3) out.uri = new TextDecoder().decode(f.subarray(gs, ge));
+      });
+    } else if (fn === 2) {
+      out.kind = 'backward';
+    } else if (fn === 4) {
+      out.kind = 'next';
+      pbForEach(f, s, e, (gn, gw, gv) => {
+        if (gn === 1 && gw === 0) out.at = Number(gv);
+      });
+    }
+  });
+  return out;
+}
+
+/**
+ * ChunkedMessage の meta.at(コメントが付いた時刻・ms)。meta=1 { at=2 }。
+ * @param {Uint8Array} f
+ */
+function messageAtMs(f) {
+  let at = 0;
+  pbForEach(f, 0, f.length, (fn, wt, _v, s, e) => {
+    if (fn !== 1 || wt !== 2) return;
+    pbForEach(f, s, e, (gn, gw, _gv, gs, ge) => {
+      if (gn === 2 && gw === 2) at = tsMs(f, gs, ge);
+    });
+  });
+  return at;
+}
+
+/**
+ * view を next.at で辿り、新しい segment をすぐ読み始める。segment は流れてくるそばから
+ * 読み(=ネイティブ部品の届き方)、読み終わった時刻も控える(=CapacitorHttp の届き方)。
+ * @param {string} viewUri
+ * @param {number} minutes
+ */
+export async function followLive(viewUri, minutes) {
+  const stopAt = Date.now() + minutes * 60_000;
   const statuses = new Map();
-  const lags = [];
-  let chats = 0;
+  const bump = (/** @type {number} */ k) => statuses.set(k, (statuses.get(k) || 0) + 1);
+  /** @type {Record<string, number>} */
+  const kinds = {};
+  const seen = new Set();
+  /** @type {Promise<void>[]} */
+  const tasks = [];
+  /** @type {number[]} */
+  const lagsStream = [];
+  /** @type {number[]} */
+  const lagsFull = [];
   let viewGets = 0;
   let segGets = 0;
   let segBytes = 0;
+  let chats = 0;
+  let note = '';
   const ac = new AbortController();
-  const stopAt = Date.now() + minutes * 60_000;
-  const fetchBinary = async (url, o) => {
+
+  const readSegment = async (/** @type {string} */ uri) => {
+    segGets += 1;
+    /** @type {number[]} */
+    const pending = [];
     try {
-      const r = await fetch(url, { signal: o?.signal });
-      statuses.set(r.status, (statuses.get(r.status) || 0) + 1);
-      const bytes = r.ok ? new Uint8Array(await r.arrayBuffer()) : new Uint8Array();
-      // view(?at=)と segment を分けて数える(0件のとき「来ていない」のか「読めていない」のかを切り分ける)。
-      if (/[?&]at=/.test(url)) viewGets += 1;
-      else { segGets += 1; segBytes += bytes.length; }
-      return { ok: r.ok, status: r.status, bytes };
+      const res = await fetch(uri, { signal: ac.signal });
+      bump(res.status);
+      if (!res.ok || !res.body) return;
+      let buf = new Uint8Array();
+      const reader = res.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        segBytes += value.length;
+        const merged = new Uint8Array(buf.length + value.length);
+        merged.set(buf);
+        merged.set(value, buf.length);
+        const { frames, tail } = splitLengthDelimitedMessagesWithTail(merged);
+        buf = tail;
+        const now = Date.now();
+        for (const fr of frames) {
+          const n = decodeChunkedMessage(fr).chats.length;
+          if (!n) continue;
+          chats += n;
+          const at = messageAtMs(fr);
+          if (at > 0) {
+            lagsStream.push((now - at) / 1000);
+            pending.push(at);
+          }
+        }
+      }
+      const end = Date.now();
+      for (const at of pending) lagsFull.push((end - at) / 1000);
     } catch {
-      statuses.set(0, (statuses.get(0) || 0) + 1);
-      return { ok: false, status: 0, bytes: new Uint8Array() };
+      if (!ac.signal.aborted) bump(0);
     }
   };
-  const timer = setTimeout(() => ac.abort(), minutes * 60_000);
-  const gen = crawlNdgrForward({ viewBase: viewUri, fetchBinary, signal: ac.signal });
-  let stopReason = '';
-  for (;;) {
-    const step = await gen.next();
-    if (step.done) { stopReason = step.value?.stopReason || ''; break; }
-    const got = Date.now();
-    for (const c of step.value.chats || []) {
-      chats += 1;
-      // vpos は放送開始からの 1/100 秒。始まりの時刻が取れたときだけ遅れを出す。
-      if (beginAtMs > 0 && Number.isFinite(c.vpos)) {
-        const lagSec = (got - (beginAtMs + Number(c.vpos) * 10)) / 1000;
-        if (lagSec > -5 && lagSec < 600) lags.push(lagSec);
-      }
+
+  /** @type {string|number} */
+  let at = 'now';
+  while (Date.now() < stopAt) {
+    viewGets += 1;
+    /** @type {Response} */
+    let res;
+    try {
+      res = await fetch(`${viewUri}${viewUri.includes('?') ? '&' : '?'}at=${at}`, { signal: ac.signal });
+    } catch {
+      bump(0);
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
     }
-    if (Date.now() > stopAt) break;
+    bump(res.status);
+    if (res.status === 429 || res.status === 403) {
+      await new Promise((r) => setTimeout(r, 5000));
+      continue;
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let nextAt = null;
+    for (const fr of splitLengthDelimitedMessagesWithTail(bytes).frames) {
+      const ent = readEntry(fr);
+      kinds[ent.kind || '?'] = (kinds[ent.kind || '?'] || 0) + 1;
+      if (ent.kind === 'segment' && ent.uri && !seen.has(ent.uri)) {
+        seen.add(ent.uri);
+        tasks.push(readSegment(ent.uri));
+      }
+      if (ent.kind === 'next' && ent.at) nextAt = ent.at;
+    }
+    if (nextAt == null) {
+      note = 'view に next が無い回があった';
+      await new Promise((r) => setTimeout(r, 1000));
+    } else {
+      at = nextAt;
+    }
   }
-  clearTimeout(timer);
+  // 読みかけの segment は最大30秒待って打ち切る(最後まで読む遅れを取りこぼさないため)。
+  await Promise.race([Promise.allSettled(tasks), new Promise((r) => setTimeout(r, 30_000))]);
   ac.abort();
-  console.log(`- 受け取ったコメント: ${chats} 件・終わり方: ${stopReason || '時間切れ'}`);
-  console.log(`- 取得: view ${viewGets} 回・segment ${segGets} 回(${segBytes} バイト)`);
-  console.log(`- 遅れ(秒): p50=${pct(lags, 50)?.toFixed(1) ?? '—'} p90=${pct(lags, 90)?.toFixed(1) ?? '—'}(${lags.length} 件で計算)`);
-  console.log(`- HTTP の状態: ${[...statuses].map(([s, n]) => `${s}×${n}`).join(' ') || '—'}`);
-  const limited = (statuses.get(429) || 0) + (statuses.get(403) || 0);
-  console.log(`- 回数制限(429/403): ${limited ? `${limited} 回 → 間隔を広げる必要あり` : 'なし'}`);
+  const entryKinds = Object.entries(kinds).map(([k, n]) => `${k}×${n}`).join(' ') || '—';
+  return { viewGets, segGets, segBytes, chats, lagsStream, lagsFull, statuses, entryKinds, note };
 }
 
-main().catch((e) => {
+if (!process.env.MEASURE_NO_MAIN) main().catch((e) => {
   console.error(`計測できませんでした: ${e?.message || e}`);
   process.exit(1);
 });
