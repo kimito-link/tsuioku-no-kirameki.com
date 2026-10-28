@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1804',
+    date: '2026-10-28',
+    summary: 'コメビュで読み上げが抜けるのを直す',
+    items: Object.freeze([
+      'コメビュが1分ごとに一覧を読み直している間に届いたコメントは、画面には出ても読み上げられていませんでした。届いてから8秒以内のものは読むようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1803',
     date: '2026-10-28',
     summary: '読み上げの遅れの計器を正しく',
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '最初の長文が大きすぎるのを抑える',
     items: Object.freeze([
       '読み上げを始めて最初に読む長いコメントが、ほかより大きく鳴ることがあったのを直しました。初めての声は、出だしの音の大きさから全体の大きさをより正しく見積もります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1784',
-    date: '2026-10-27',
-    summary: '読み上げ試験の開始待ちを直す',
-    items: Object.freeze([
-      '開発版の読み上げ試験で、読み上げを ON にしている途中に始めると「OFF です」と止まっていたのを、ON になり終わるまで待つようにしました(ふだんの動きは変わりません)。'
     ])
   })
 ]);

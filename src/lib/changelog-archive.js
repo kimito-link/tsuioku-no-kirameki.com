@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1784',
+    date: '2026-10-27',
+    summary: '読み上げ試験の開始待ちを直す',
+    items: Object.freeze([
+      '開発版の読み上げ試験で、読み上げを ON にしている途中に始めると「OFF です」と止まっていたのを、ON になり終わるまで待つようにしました(ふだんの動きは変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1783',
     date: '2026-10-27',
     summary: '試験で声ごとの素の大きさを記録',

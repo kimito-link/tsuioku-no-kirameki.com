@@ -207,6 +207,29 @@ export function filterUnseenComeviewComments(rows, seenNos) {
 }
 
 /**
+ * v0.1.1804: 整合リフレッシュ(全量描画)で初めて画面に出たコメントのうち、読み上げに回す分。
+ *   リフレッシュ中に届いたコメントは全量描画が先に出して「既出」に登録するため、後から来る
+ *   差分(hot append)では読み上げられず、声だけ抜けていた。番号があり未出で、届いてから
+ *   maxAgeMs 以内のものだけ返す(古い行をまとめて読まない)。
+ * @param {readonly Record<string, unknown>[]|unknown} timeline
+ * @param {Set<string>} seenNos
+ * @param {number} nowMs
+ * @param {number} maxAgeMs
+ * @returns {Record<string, unknown>[]}
+ */
+export function pickRefreshVoiceItems(timeline, seenNos, nowMs, maxAgeMs) {
+  if (!Array.isArray(timeline)) return [];
+  const seen = seenNos instanceof Set ? seenNos : new Set();
+  return timeline.filter((item) => {
+    if (!item || item.kind !== 'comment') return false;
+    const no = commentNoOfComeviewRow(item);
+    if (!no || seen.has(no)) return false;
+    const age = nowMs - Number(item.at);
+    return Number.isFinite(age) && age >= 0 && age <= maxAgeMs;
+  });
+}
+
+/**
  * ギフトの「再キャプチャ重複」を除く。同一内容(uid/アイテム/pt/メッセージ)のギフトが
  * windowMs 以内に再出現したら重複として捨てる(同じ人が本当に2回投げるのは通常分単位で離れる)。
  * seenAtBySig は呼び出し側が保持する Map(sig→最後に見た at)。本関数が更新する。
