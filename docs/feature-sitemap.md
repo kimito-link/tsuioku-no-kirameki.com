@@ -976,7 +976,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 283</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 287</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1068,6 +1068,10 @@
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/extension/popup/init/frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
+- `src/extension/self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
+- `src/extension/self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
+- `src/extension/self-update.js` — 開発中（展開して読み込んだ）拡張が、作業フォルダの新しい版に自分で入れ替わる。
+- `src/extension/self-update.kit-test.mjs` — self-update.test.mjs — self-update.js の試験。拡張へ写すときは import 先のパスだけ直す。
 - `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
 - `src/lib/adObservationLog.js` — 広告(ニコニ広告)の「いつ増えたか」を、拡張が【気づいた時刻】として残す(純関数)。v0.1.1665。
@@ -1268,11 +1272,10 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🏟 会場・席 (2版)
+### 🏟 会場・席 (1版)
 - `v0.1.1794` 2026-10-27 — 会場とコメビュで同じコメントを二重に読まない
-- `v0.1.1782` 2026-10-27 — 読み上げ中は声の裏読み込みを待つ
 
-### 🔊 読み上げ (13版)
+### 🔊 読み上げ (12版)
 - `v0.1.1801` 2026-10-28 — 遅いPCで混んだ時の読み上げの遅れを短く
 - `v0.1.1800` 2026-10-28 — 一気に来た短いコメントを飛ばしにくく
 - `v0.1.1799` 2026-10-28 — コメビュも混雑時は本文を短めに(放送ページと同じ)
@@ -1285,9 +1288,9 @@
 - `v0.1.1785` 2026-10-27 — 最初の長文が大きすぎるのを抑える
 - `v0.1.1784` 2026-10-27 — 読み上げ試験の開始待ちを直す
 - `v0.1.1783` 2026-10-27 — 試験で声ごとの素の大きさを記録
-- `v0.1.1782` 2026-10-27 — 読み上げ中は声の裏読み込みを待つ
 
-### その他 (7版)
+### その他 (8版)
+- `v0.1.1802` 2026-10-28 — 開発版は新しい版に自分で入れ替わる
 - `v0.1.1793` 2026-10-27 — 低めの声の人の最初の長文も揃える
 - `v0.1.1792` 2026-10-27 — 短いコメントも聞こえの大きさで揃える
 - `v0.1.1791` 2026-10-27 — 低めの声の人の1件目を小さくしない

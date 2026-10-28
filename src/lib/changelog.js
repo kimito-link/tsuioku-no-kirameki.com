@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1802',
+    date: '2026-10-28',
+    summary: '開発版は新しい版に自分で入れ替わる',
+    items: Object.freeze([
+      '開発版(フォルダから読み込んだ拡張)は、2分おきに新しい版が置かれていないか見て、あれば自分で読み込み直すようにしました。更新ボタンを押す必要がなくなります(この版を入れる時だけ最後の1回が必要です)。',
+      '拡張の画面を前で使っている間は待ちます。ストアから入れた拡張では何もしません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1801',
     date: '2026-10-28',
     summary: '遅いPCで混んだ時の読み上げの遅れを短く',
@@ -174,14 +183,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '試験で声ごとの素の大きさを記録',
     items: Object.freeze([
       '開発版の読み上げ試験の記録に、声ごとの素の大きさ(最大振幅と聞こえの大きさ)を残すようにしました。声ごとの音量差を、実際の声の形を見てから直すための計器です(ふだんの動きは変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1782',
-    date: '2026-10-27',
-    summary: '読み上げ中は声の裏読み込みを待つ',
-    items: Object.freeze([
-      '会場かコメビュが声を鳴らしている間や、次のコメントを待つ短い間に、もう片方のページが声の読み込みを始めないようにしました。グラボの無い PC で、起動直後に声が出るまでの遅れが減ります。'
     ])
   })
 ]);

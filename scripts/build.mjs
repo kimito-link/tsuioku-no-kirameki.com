@@ -114,6 +114,12 @@ const targets = [
     target: 'chrome111'
   },
   {
+    // v0.1.1802: 開発版が新しい版に自分で入れ替わる(キット extension-self-update)。background.js が importScripts で読む。
+    entryPoints: ['src/extension/self-update-sw-entry.js'],
+    outfile: 'extension/dist/self-update-sw.js',
+    target: 'chrome111'
+  },
+  {
     entryPoints: ['src/extension/content-entry.js'],
     outfile: 'extension/dist/content.js',
     target: 'chrome100'
