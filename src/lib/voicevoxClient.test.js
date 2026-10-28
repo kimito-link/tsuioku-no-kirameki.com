@@ -11,6 +11,7 @@ import {
   probeVoicevoxAlive,
   isWhisperStyleName,
   listVoicevoxStyleIds,
+  probeVoicevoxGpuCapable,
   synthesizeVoice,
   warmupVoicevoxQuery
 } from './voicevoxClient.js';
@@ -457,5 +458,27 @@ describe('proxyTextResponse(Background 経由の応答)', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('probeVoicevoxGpuCapable', () => {
+  const ok = (body) => async () => ({ ok: true, json: async () => body });
+  it('cuda か dml が true なら true(使えるだけ・今の状態ではない)', async () => {
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok({ cpu: true, cuda: false, dml: true }) })).toBe(true);
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok({ cpu: true, cuda: true, dml: false }) })).toBe(true);
+  });
+  it('どちらも無ければ false', async () => {
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok({ cpu: true, cuda: false, dml: false }) })).toBe(false);
+  });
+  it('読めない・失敗・形が違うときは null(案内を出さない)', async () => {
+    expect(await probeVoicevoxGpuCapable({ fetchFn: async () => ({ ok: false, status: 404 }) })).toBe(null);
+    expect(await probeVoicevoxGpuCapable({ fetchFn: async () => { throw new Error('down'); } })).toBe(null);
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok(null) })).toBe(null);
+  });
+  it('/supported_devices を GET で読む', async () => {
+    const fetchFn = vi.fn(ok({ cpu: true, dml: true }));
+    await probeVoicevoxGpuCapable({ fetchFn, baseUrl: 'http://x:1/' });
+    expect(fetchFn.mock.calls[0][0]).toBe('http://x:1/supported_devices');
+    expect(fetchFn.mock.calls[0][1]?.method).toBe('GET');
   });
 });

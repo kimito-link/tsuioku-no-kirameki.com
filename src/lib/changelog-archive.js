@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1786',
+    date: '2026-10-27',
+    summary: '初めての声の1件目を上げすぎない',
+    items: Object.freeze([
+      '初めて使う声の1件目が、2件目以降より大きく鳴ることがあったのを抑えました。VOICEVOX の全127の声を測った値をもとに、上げすぎない側に見積もります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1785',
     date: '2026-10-27',
     summary: '最初の長文が大きすぎるのを抑える',

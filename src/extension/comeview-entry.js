@@ -92,6 +92,7 @@ import {
   listVoicevoxStyleIds,
   probeVoicevoxAlive,
   probeVoicevoxStreaming,
+  probeVoicevoxGpuCapable,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
@@ -278,6 +279,8 @@ let _voiceGeneration = 0;
 let _voiceStopCurrent = null;
 /** 2026-10-26: エンジンが声の少しずつ受け取りに対応しているか(読み上げ ON のたびに調べる)。 */
 let _voiceStreamSupported = false;
+/** エンジンが GPU を使えるか(遅れの一言の GPU 案内用・null=分からない)。 */
+let _voiceGpuCapable = /** @type {boolean|null} */ (null);
 /** 遅い PC と分かったら、この ON の間は覚えておく(会場の VoicePlayer と同じ)。 */
 let _voiceSlowEngine = false;
 let _voiceSkipTimer = null;
@@ -543,7 +546,7 @@ function stopVoicePlayback() {
 /** P5: 読み上げが大きく遅れているときの一言(会場の VoicePlayer と同じ判定=voiceLagNotice.js)。 */
 let _voiceLagNoticeShown = false;
 function updateVoiceLagNotice() {
-  const r = decideVoiceLagNotice(_voiceLagNoticeShown, { ..._voiceDiag, queueNow: _voiceQueue.length });
+  const r = decideVoiceLagNotice(_voiceLagNoticeShown, { ..._voiceDiag, queueNow: _voiceQueue.length }, { gpuCapable: _voiceGpuCapable });
   if (r.shown === _voiceLagNoticeShown && !r.shown) return;
   _voiceLagNoticeShown = r.shown;
   const el = document.getElementById('cvVoiceLag');
@@ -624,6 +627,8 @@ async function enableVoiceReading({ persist = true } = {}) {
   startVoiceWarmup(_voiceWarmup, allStyleIds);
   _voiceStreamSupported = false;
   void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
+  _voiceGpuCapable = null;
+  void probeVoicevoxGpuCapable().then((ok) => { _voiceGpuCapable = typeof ok === 'boolean' ? ok : null; }, () => {});
   _voiceStyleIds = (await prepareVoiceStyleIds(allStyleIds, {
     readSettings: async () => {
       const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
