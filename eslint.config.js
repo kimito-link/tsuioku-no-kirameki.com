@@ -427,7 +427,8 @@ export default [
     // v0.1.1718: 較正リングの試行間隔 120s→300s と保持件数 2000→400(+2行・1回約830KB→約170KB)。読み手は開発モニタの書き出しだけ。
     // v0.1.1757: スマホのリアルタイム化の小さな TAIL を書く配線(+26行・大半は【なぜ】のコメント)。判定は lib(liveEvents.js の shouldWriteLiveEventsTail)。
     // v0.1.1818: コメント欄の見張りを位置を読む前に間引く(+4行: import・前回時刻・判定と記録)。判定は lib の commentPanelHealthProbe.js。
-    rules: { 'max-lines': ['error', { max: 19544, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1820: host の移動を iframe を読み込み直さない moveBefore 経由に(+1行: import)。手順は lib の moveNodePreservingState.js。
+    rules: { 'max-lines': ['error', { max: 19545, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
