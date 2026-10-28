@@ -428,7 +428,7 @@ export default [
     // v0.1.1757: スマホのリアルタイム化の小さな TAIL を書く配線(+26行・大半は【なぜ】のコメント)。判定は lib(liveEvents.js の shouldWriteLiveEventsTail)。
     // v0.1.1818: コメント欄の見張りを位置を読む前に間引く(+4行: import・前回時刻・判定と記録)。判定は lib の commentPanelHealthProbe.js。
     // v0.1.1820: host の移動を iframe を読み込み直さない moveBefore 経由に(+1行: import)。手順は lib の moveNodePreservingState.js。
-    // v0.1.1822: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
+    // v0.1.1825: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
     rules: { 'max-lines': ['error', { max: 19563, skipBlankLines: false, skipComments: false }] }
   },
   {
@@ -469,7 +469,8 @@ export default [
     // v0.1.1738: gzip は受け口の返事(gzipOk)を見てから・スマホの目印を150秒保持(+3行)。判定は lib(autoPublishDecision.js の readPublishAck)。
     // v0.1.1740: スマホの読み上げ(返事の voiceWanted で声を作って送る・+6行)。判定と順番は lib(phoneVoiceSender.js)、配線は phoneVoicePublisher.js。
     // v0.1.1757: スマホへ新着を3秒ごとに送る係の配線(+4行: import・生成・返事を渡す・統計)。本体は liveEventsPublisher.js / lib の liveEventSender.js。
-    rules: { 'max-lines': ['error', { max: 4604, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1823: 「👥 ファンにも公開」の配線(+3行: import・スイッチに渡す・同意 OFF で止める)。本体は fanLinkClient.js / statusSmartphoneCard.js。
+    rules: { 'max-lines': ['error', { max: 4607, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

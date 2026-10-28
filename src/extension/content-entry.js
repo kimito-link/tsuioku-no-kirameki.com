@@ -338,7 +338,7 @@ import {
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
 import { moveNodePreservingState, moveNodeAfterPreservingState } from '../lib/moveNodePreservingState.js'; // v0.1.1820: host を動かしてもパネル(iframe)を読み込み直させない
-import { decideBesideOverflow, createBesideOverflowMemory, besideOverflowFor, rememberBesideOverflow } from '../lib/besideOverflowGuard.js'; // v0.1.1822: 横付きが右へはみ出したら縮める/下へ
+import { decideBesideOverflow, createBesideOverflowMemory, besideOverflowFor, rememberBesideOverflow } from '../lib/besideOverflowGuard.js'; // v0.1.1825: 横付きが右へはみ出したら縮める/下へ
 // ★v0.1.1454: メモリ/DOM の逼迫判定(凍結の予兆を数字で出す)。
 import { judgeMemoryPressure } from '../lib/memoryPressureProbe.js';
 /*
@@ -5432,7 +5432,7 @@ function renderInlineHostAnchoredToVideo(video) {
    */
   let besideLayout = null;
 
-  // v0.1.1822: この幅で一度「縮めても収まらない」と実測したら、行に入れず below へ（besideOverflowGuard）
+  // v0.1.1825: この幅で一度「縮めても収まらない」と実測したら、行に入れず below へ（besideOverflowGuard）
   const besideOverflow = besideOverflowFor(_besideOverflowMem, nlsLayoutViewportSize().innerWidth);
   if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
     const col = besideOverflow?.below ? null : findBesideFlexRowColumnInsertion(video);

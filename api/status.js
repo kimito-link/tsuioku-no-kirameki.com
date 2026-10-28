@@ -42,6 +42,8 @@ import { authenticateDevice, incrWithExpiry, upstash } from '../src/server/devic
 import { MAX_VOICE_BODY_BYTES, isVoiceWanted, loadVoiceClips, markVoiceWanted, saveVoiceClip } from '../src/server/phoneVoiceApi.js';
 import { isRealtimeEnabled, issueRealtimeToken, publishLiveEvents } from '../src/server/liveEventsApi.js';
 import { LIVE_EVENTS_MAX_BODY_BYTES } from '../src/lib/liveEvents.js';
+import { FAN_SNAPSHOT_CDN_SECONDS, isFanToken } from '../src/lib/fanLink.js';
+import { allowFanRealtime, enableFanLink, resolveFanLink, revokeFanLink } from '../src/server/fanLinkApi.js';
 
 /** ★v0.1.1730: 保存期間 7日→24時間(2026-10-21 りんく了承)。共有キー経路も利用者経路も同じ。 */
 const TTL_SECONDS = STATUS_TTL_SECONDS;
@@ -243,6 +245,29 @@ async function handleEventsPost(req, res) {
   res.status(r.code).json(r.json);
 }
 
+/**
+ * v0.1.1823: 配信者中継。配信者の PC が「👥 ファンにも公開」を ON/OFF する。鍵の照合は概要の送信と同じ。
+ *   { on: true } → ファン用リンク(読むだけ)を返す / { on: false } → 取り消す。
+ */
+async function handleFanPost(req, res) {
+  const body = readBody(req) || {};
+  const w = await resolveSideWriter(req, body);
+  if (!w) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!VIEW_TOKEN_RE.test(w.token) || isFanToken(w.token)) {
+    res.status(400).json({ ok: false, error: 'bad view token' });
+    return;
+  }
+  if (body.on === false) {
+    await revokeFanLink(w.token);
+    res.status(200).json({ ok: true, fan: false });
+    return;
+  }
+  res.status(200).json({ ok: true, fan: true, fanToken: await enableFanLink(w.token) });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
@@ -252,6 +277,10 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST' && req.query?.action === 'events') {
       await handleEventsPost(req, res);
+      return;
+    }
+    if (req.method === 'POST' && req.query?.action === 'fan') {
+      await handleFanPost(req, res);
       return;
     }
     if (req.method === 'POST' && req.headers?.['x-device-id']) {
@@ -295,28 +324,48 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-      const token = String(req.query?.v || '');
+      let token = String(req.query?.v || '');
       if (!VIEW_TOKEN_RE.test(token)) {
         res.status(400).json({ ok: false, error: 'bad view token' });
         return;
+      }
+      // ★v0.1.1823: ファン用リンク(fan_…)は配信者の閲覧トークンに読み替えて【読むだけ】で返す。
+      //   ファンが見ても、配信者の PC の動き(声づくり・送る間隔)を変える目印は置かない。
+      const fan = isFanToken(token);
+      if (fan) {
+        token = await resolveFanLink(token);
+        if (!token) {
+          res.status(404).json({ ok: false, error: 'not found' });
+          return;
+        }
       }
       // ★v0.1.1740: スマホの読み上げ。声だけを返す(概要の目印・ETag とは別)。
       //   取りに来ること自体が「声がほしい」目印(30秒)=PC は送信の返事でそれを知り、その間だけ声を作る。
       // ★v0.1.1756: リアルタイム化の購読の許可(キーが無ければ realtime:false=ポーリングのまま)。
       if (req.query?.action === 'realtime') {
+        // ★ファンのリアルタイムは人数と月の総数で止める(超えたら realtime:false=15秒ごとの取得に落ちる)。
+        if (fan) {
+          const verdict = await allowFanRealtime(token, Date.now());
+          if (!verdict.allow) {
+            res.status(200).json({ ok: true, realtime: false, reason: verdict.reason });
+            return;
+          }
+        }
         const r = await issueRealtimeToken(token, Date.now());
         res.status(r.code).json(r.json);
         return;
       }
       if (req.query?.action === 'voice') {
-        await markVoiceWanted(token);
+        if (!fan) await markVoiceWanted(token);
         res.status(200).json({ ok: true, clips: await loadVoiceClips(token, req.query?.after) });
         return;
       }
       // ★v0.1.1736: 「いまスマホで開いている」目印を置く(30秒で消える・中身は '1' だけ)。
       //   拡張はこれを見て、開いている間だけ約5秒間隔で送る(誰も見ていないときは今までどおり)。最適化なので失敗は無視。
       //   ★await する(返事を返した後の通信は、関数が止められて届かないことがある)。
-      await upstash(['SET', deviceKeys.viewing(token), '1', 'EX', String(VIEWER_ACTIVE_TTL_SEC)]).catch(() => {});
+      if (!fan) await upstash(['SET', deviceKeys.viewing(token), '1', 'EX', String(VIEWER_ACTIVE_TTL_SEC)]).catch(() => {});
+      // ★ファンは同じ配信を大勢で見る=CDN で数秒まとめる(サーバーの読み取りは人数に比例しない)。
+      if (fan) res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${FAN_SNAPSHOT_CDN_SECONDS}`);
       // ★v0.1.1729: スマホが持っている版と同じなら本文なしの 304(本体は読まない=Redis も通信も軽い)。
       const ifNoneMatch = req.headers?.['if-none-match'];
       if (ifNoneMatch) {

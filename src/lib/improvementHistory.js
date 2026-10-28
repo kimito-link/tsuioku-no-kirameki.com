@@ -4302,9 +4302,9 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '0.1.1820 と同じ(30日の窓で数える値)。'
   }),
   Object.freeze({
-    version: '0.1.1822', metric: 'bundle-kb', value: 1436,
+    version: '0.1.1822', metric: 'bundle-kb', value: 1437,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: 'content.js に横付きのはみ出し判定(besideOverflowGuard)と配線を追加。popup.js は変更履歴の文字列だけ'
+    note: 'popup.js はコードの変更なし(更新履歴の入れ替わりのみ)。直したのはスマホの WEB 版と /api/live-ranking。'
   }),
   Object.freeze({
     version: '0.1.1822', metric: 'gate-selftest', value: 4,
@@ -4313,6 +4313,48 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1822', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: 'besideOverflowGuard の単体6件と E2E『横スクロールを出さず下へ逃がす』(旧コードで赤・新コードで緑を確認)'
+    note: '0.1.1821 と同じ(30日の窓で数える値)。'
+  }),
+  Object.freeze({
+    version: '0.1.1823', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'popup.js はコードの変更なし(更新履歴の入れ替わりのみ)。ファンにも公開は status.js 側。'
+  }),
+  Object.freeze({
+    version: '0.1.1823', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1823', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '0.1.1822 と同じ(30日の窓で数える値)。'
+  }),
+  Object.freeze({
+    version: '0.1.1824', metric: 'bundle-kb', value: 1438,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'popup.js はコードの変更なし(更新履歴の入れ替わりのみ)。コメントを流す欄は app/dist/live-ranking.js 側。'
+  }),
+  Object.freeze({
+    version: '0.1.1824', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1824', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '0.1.1823 と同じ(30日の窓で数える値)。'
+  }),
+  Object.freeze({
+    version: '0.1.1825', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'content.js に横付きのはみ出し判定(besideOverflowGuard)と配線を追加。popup.js は変更履歴の文字列だけ'
+  }),
+  Object.freeze({
+    version: '0.1.1825', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1825', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'besideOverflowGuard の単体6件・E2E『横スクロールを出さず下へ逃がす』(旧コードで赤)・実配信 1252px で はみ出し +469→−15 / 1920px は変化なし'
   })
 ]);
