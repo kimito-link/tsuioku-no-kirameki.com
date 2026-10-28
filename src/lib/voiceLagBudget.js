@@ -364,6 +364,17 @@ export function createVoicePaceState() {
   return { lastArrivalAt: -1, gapEmaMs: -1, gapCount: 0, naturalEmaMs: -1, naturalCount: 0, charMsEma: -1 };
 }
 
+/**
+ * 2026-10-28: 配信が変わったら「届く間隔」だけ忘れる(声の長さ・1文字の長さは声の性質なので残す)。
+ * @param {ReturnType<typeof createVoicePaceState>} state
+ */
+export function resetVoicePaceArrival(state) {
+  if (!state) return;
+  state.lastArrivalAt = -1;
+  state.gapEmaMs = -1;
+  state.gapCount = 0;
+}
+
 /** @param {number} prev @param {number} sample */
 function paceEma(prev, sample) {
   return prev < 0 ? sample : prev + VOICE_PACE_EMA_ALPHA * (sample - prev);

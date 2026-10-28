@@ -18,7 +18,11 @@ import {
   computeVoiceLagVerdict,
   computeSustainedPressureBoost,
   mergeVoiceSpeedBoost,
-  VOICE_SUSTAINED_PRESSURE_MIN
+  VOICE_SUSTAINED_PRESSURE_MIN,
+  createVoicePaceState,
+  noteVoicePaceArrival,
+  noteVoicePacePlayed,
+  resetVoicePaceArrival
 } from './voiceLagBudget.js';
 
 /**
@@ -586,5 +590,20 @@ describe('v0.1.1801 声を作る方が遅い PC は作る時間で数える', as
   it('短いコメントも、作るのが遅ければ1件0.97秒で数える(比1.2・PC 試験の値)', () => {
     expect(resolveVoiceQueueMaxByChars(Array(10).fill(2), s, 1.2)).toBe(6);
     expect(resolveVoiceQueueMaxByChars(Array(10).fill(2), s, 0.3)).toBe(VOICE_QUEUE_MAX_CEIL);
+  });
+});
+
+describe('resetVoicePaceArrival(2026-10-28)', () => {
+  it('届く間隔だけ忘れ、声の長さは残す', () => {
+    const st = createVoicePaceState();
+    noteVoicePaceArrival(st, 1000);
+    noteVoicePaceArrival(st, 2000);
+    noteVoicePacePlayed(st, 1500, 1, 0, 10);
+    resetVoicePaceArrival(st);
+    expect(st.lastArrivalAt).toBe(-1);
+    expect(st.gapEmaMs).toBe(-1);
+    expect(st.gapCount).toBe(0);
+    expect(st.naturalCount).toBe(1);
+    expect(st.charMsEma).toBe(150);
   });
 });
