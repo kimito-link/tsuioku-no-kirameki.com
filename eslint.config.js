@@ -403,7 +403,8 @@ export default [
     // v0.1.1734: スマホの WEB版だけの「PC に中継して投稿する」口(+30行: 口の取り出し・送信ボタンの可否・預ける分岐・Enter 送信の無効化・起動時の配線)。
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
-    rules: { 'max-lines': ['error', { max: 21745, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
+    rules: { 'max-lines': ['error', { max: 21746, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
