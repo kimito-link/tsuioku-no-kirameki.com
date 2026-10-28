@@ -115,6 +115,10 @@ export class VoicePlayer {
      *   probeVoiceStreaming: エンジンが対応しているか / createStreamedAudio: StreamedVoice を鳴らす Audio もどき
      */
     this.probeVoiceStreaming = deps.probeVoiceStreaming || null;
+    /** エンジンが GPU を使えるか(遅れの一言に GPU の案内を添えるため・voiceLagNotice.js)。 */
+    this.probeVoiceGpu = deps.probeVoiceGpu || null;
+    /** @type {boolean|null} */
+    this._gpuCapable = null;
     this.createStreamedAudio = deps.createStreamedAudio || null;
     this._streamSupported = false;
     /** 遅い PC と分かったら、この ON の間は覚えておく(少しずつ読むと合成の計器が速く見えるため)。 */
@@ -447,6 +451,12 @@ export class VoicePlayer {
       void Promise.resolve()
         .then(() => this.probeVoiceStreaming())
         .then((ok) => { this._streamSupported = ok === true; }, () => {});
+    }
+    this._gpuCapable = null;
+    if (this.probeVoiceGpu) {
+      void Promise.resolve()
+        .then(() => this.probeVoiceGpu())
+        .then((ok) => { this._gpuCapable = typeof ok === 'boolean' ? ok : null; }, () => {});
     }
     const prepared = await prepareVoiceStyleIds(allStyleIds, {
       readSettings: async () => {
@@ -986,7 +996,7 @@ export class VoicePlayer {
 
   /** P5: 遅れの一言を出す/消す(状態が変わったときだけ通知)。 */
   _updateLagNotice() {
-    const r = decideVoiceLagNotice(this._lagNoticeShown, { ...this.diag, queueNow: this.queue.length });
+    const r = decideVoiceLagNotice(this._lagNoticeShown, { ...this.diag, queueNow: this.queue.length }, { gpuCapable: this._gpuCapable });
     if (r.shown === this._lagNoticeShown && !r.shown) return;
     this._lagNoticeShown = r.shown;
     try { this.onLagNotice(r.text); } catch { /* no-op: 表示の失敗は読み上げに影響させない */ }

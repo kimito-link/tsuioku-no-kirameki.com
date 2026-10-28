@@ -479,6 +479,28 @@ export async function probeVoicevoxStreaming(opts = {}) {
   }
 }
 
+/**
+ * 2026-10-28: このエンジンが GPU を使えるか(/supported_devices の cuda か dml が true)。
+ *   ★「今 GPU で動いているか」ではない(それを返す API は無い)。使えるかどうかだけ。
+ *   読めないとき・古いエンジンは null(分からない=案内を出さない)。
+ * @param {{ fetchFn?: FetchFn, baseUrl?: string, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean|null>}
+ */
+export async function probeVoicevoxGpuCapable(opts = {}) {
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  if (typeof fetchFn !== 'function') return null;
+  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  try {
+    const res = await fetchWithTimeout(fetchFn, `${baseUrl}/supported_devices`, { method: 'GET' }, positiveTimeout(opts.timeoutMs, 5000));
+    if (!res || res.ok === false || typeof (/** @type {any} */ (res)).json !== 'function') return null;
+    const devices = await (/** @type {any} */ (res)).json();
+    if (!devices || typeof devices !== 'object') return null;
+    return devices.cuda === true || devices.dml === true;
+  } catch {
+    return null;
+  }
+}
+
 /** 少しずつ受け取りを諦めて /synthesis に戻す合図。 */
 const STREAM_FALLBACK = Symbol('stream_fallback');
 
