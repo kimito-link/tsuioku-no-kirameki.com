@@ -477,6 +477,7 @@
 | `src/extension/comeview-entry.js` | 1 | コメビュ(別窓) |
 | `src/extension/content-entry.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/ext-census-sw.js` | 1 | バックフィル SW |
+| `src/extension/fanLinkClient.js` | 1 | 状態速報ページ |
 | `src/extension/live-ranking-entry.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/extension/liveEventsPublisher.js` | 1 | 状態速報ページ |
 | `src/extension/offscreen-entry.js` | 1 | コメント IDB 書き手 |
@@ -641,6 +642,7 @@
 | `src/lib/exportWaitNarration.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/externalFetchCells.js` | 1 | 状態速報ページ |
 | `src/lib/externalLinksSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/fanLink.js` | 1 | 状態速報ページ |
 | `src/lib/fastDiagFullGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/finalDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/flickerMeter.js` | 1 | ポップアップ(応援レーン) |

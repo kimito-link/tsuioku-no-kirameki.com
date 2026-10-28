@@ -110,6 +110,7 @@
 | `KEY_DEEP_HARVEST_QUIET_UI` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_DIAGNOSTICS_ERROR_RING_V1` | lib/diagnosticRingStore.js | lib/diagnosticRingStore.js |
 | `KEY_EFFECT_SOUND_ENABLED` | — | extension/venueBar.js |
+| `KEY_FAN_LINK` | extension/fanLinkClient.js | extension/fanLinkClient.js |
 | `KEY_FOLD_ANONYMOUS_IN_RANK_STRIP` | — | extension/popup-entry.js |
 | `KEY_GIFT_EFFECT_DIAG` | extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_GIFT_RANKING_LANE_ENABLED` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1069 件
+## ⚠️ 役割コメントが無いソース 9 / 1072 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -976,7 +976,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2198)
+- 📁 **src/** (2204)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1013,7 +1013,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (97)
+  - 📁 **extension/** (98)
     - 📁 **popup/** (14)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1048,6 +1048,7 @@
     - `embeddedProgramElapsed.wiring.test.js`
     - `ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
     - `ext-census-sw.test.js`
+    - `fanLinkClient.js` — 【層】L2 拡張の配線(chrome.storage と fetch。形の判定は src/lib/fanLink.js)
     - `giftHistoryLaneStateWiring.test.js`
     - `heavyReuseNotDoubleGated.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`
@@ -1268,7 +1269,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1935)
+  - 📁 **lib/** (1937)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1794,6 +1795,7 @@
     - `externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
     - `externalLinksSectionHtml.test.js`
     - `failOpenGuardCensus.test.js`
+    - `fanLink.js` — 【層】L0 判定層(純粋関数)
     - `fastDiagFullGate.js` — AI共有用の診断(fastDiag)の【全文】を、storage へ書くかどうかの判定(純関数・I/O禁止)。v0.1.1694
     - `fastDiagFullGate.test.js`
     - `finalDetailCells.js` — 100個化の最終弾(識別・効果音・BGM・記録の質)。
@@ -2451,6 +2453,7 @@
     - `phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
     - `phoneSoundCues.test.js`
     - `phoneStartLink.js` — スマホの開始画面(app/phone.html)で貼られた「PC の拡張のスマホ用リンク」を読む(純関数)。
+    - `phoneStartLink.test.js`
     - `phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
     - `phoneVenueModel.test.js`
     - `phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
@@ -3206,13 +3209,16 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (11)
+  - 📁 **server/** (14)
     - `deviceApi.test.js`
     - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `fanLinkApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `fanLinkApi.test.js`
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
     - `kickApi.test.js`
     - `liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `liveEventsApi.test.js`
+    - `liveRankingOne.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
     - `phonePostApi.test.js`
