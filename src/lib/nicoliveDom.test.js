@@ -79,6 +79,19 @@ describe('parseCommentElement', () => {
     expect(p?.commentNo).toBe('88');
   });
 
+  it('v0.1.1814: コメント行でない要素では親の outerHTML を作らない(全体読み直しの重さ対策)', () => {
+    const parent = document.createElement('div');
+    const span = document.createElement('span');
+    span.className = 'comment-text';
+    span.textContent = 'ただの本文(番号なし)';
+    parent.appendChild(span);
+    const spy = vi.fn(() => '<div></div>');
+    Object.defineProperty(parent, 'outerHTML', { get: spy, configurable: true });
+    Object.defineProperty(span, 'outerHTML', { get: spy, configurable: true });
+    expect(parseCommentElement(span)).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   it('おすすめ program-card 内の li は null（二重ガード）', () => {
     document.body.innerHTML = `
       <article class="program-card ga-ns-program-card">

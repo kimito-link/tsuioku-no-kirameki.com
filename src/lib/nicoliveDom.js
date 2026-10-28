@@ -908,11 +908,6 @@ export function parseCommentElement(el) {
   const fromGrid = parseNicoLiveTableRow(el);
   if (fromGrid) return fromGrid;
 
-  const userId = resolveUserIdOnElement(el);
-  const base =
-    documentBaseHref(el.ownerDocument) || 'https://live.nicovideo.jp/';
-  const avatarUrl = extractUserIconUrlFromElement(el, base);
-
   const raw = (
     ('innerText' in el ? /** @type {HTMLElement} */ (el).innerText : '') ||
     el.textContent ||
@@ -922,11 +917,20 @@ export function parseCommentElement(el) {
     .trim();
   if (!raw) return null;
 
-  const withAv = (/** @type {{ commentNo: string, text: string }} */ o) => ({
-    ...o,
-    userId,
-    ...(avatarUrl ? { avatarUrl } : {})
-  });
+  // v0.1.1814: uid・アイコンは「コメント行だと分かってから」だけ探す(結果は同じ)。
+  //   以前は先に探していたため、550ms ごとの全体読み直しで行でない要素にも親10段の outerHTML を
+  //   作っていた(実測: 拡張ありで視聴ページの描画が30秒中2.5〜7.5秒止まる・大半がここ)。
+  const withAv = (/** @type {{ commentNo: string, text: string }} */ o) => {
+    const userId = resolveUserIdOnElement(el);
+    const base =
+      documentBaseHref(el.ownerDocument) || 'https://live.nicovideo.jp/';
+    const avatarUrl = extractUserIconUrlFromElement(el, base);
+    return {
+      ...o,
+      userId,
+      ...(avatarUrl ? { avatarUrl } : {})
+    };
+  };
 
   const lines = raw
     .split(/\n+/)
