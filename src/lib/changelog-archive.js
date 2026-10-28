@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1787',
+    date: '2026-10-27',
+    summary: '短い文の直後の長い文を大きくしない',
+    items: Object.freeze([
+      '短いコメントを続けて読んだ直後の長いコメントが、少し大きく鳴ることがあったのを直しました。声の大きさの覚え方を、長い文だけから覚えるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1786',
     date: '2026-10-27',
     summary: '初めての声の1件目を上げすぎない',

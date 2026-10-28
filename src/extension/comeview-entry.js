@@ -98,7 +98,7 @@ import {
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import {
   computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
-  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor, foldVoiceArrivalWindow
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor, foldVoiceArrivalWindow, resetVoicePaceArrival
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
@@ -114,7 +114,7 @@ import {
   pushVoiceQueue,
   resolveVoiceSynthDepth
 } from '../lib/voiceReadQueue.js';
-import { makeInitialVoiceDiag, buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import { makeInitialVoiceDiag, buildVoiceDiagSnapshot, resetVoiceDiagForNewLive } from '../lib/voiceDiag.js';
 import {
   createVoiceSynthTracker,
   foldVoiceStageEma,
@@ -292,6 +292,7 @@ let _initialVoicesPrimed = false;
  *   定期スナップショットを書く(popup 診断ブリッジと同思想)。記録/発話には一切触れない。
  */
 const _voiceDiag = makeInitialVoiceDiag(); // プロパティのみ更新(再代入しない)。
+_voiceDiag.diagBornAt = Date.now();
 let _voiceDiagLastWriteAt = 0;
 
 /**
@@ -440,6 +441,11 @@ async function switchToLiveId(nextLiveId) {
   _voiceQueue = [];
   _voiceGeneration += 1;
   _voicePrefetches.clear();
+  // 2026-10-28: 計器も配信ごとに数え直す(前の配信の数を新しい配信の名前で書かない)。声づくりの速さは残す。
+  resetVoiceDiagForNewLive(_voiceDiag, Date.now());
+  _voiceArrivalWindow = null;
+  resetVoicePaceArrival(_voicePaceState);
+  updateVoiceLagNotice(); // 待ちが空・遅れは未計測に戻ったので一言を消す
   await requestFullRefresh(true);
 }
 

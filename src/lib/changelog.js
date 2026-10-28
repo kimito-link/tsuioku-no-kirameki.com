@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1807',
+    date: '2026-10-28',
+    summary: 'コメビュの読み上げ計器を配信ごとに数え直す',
+    items: Object.freeze([
+      'コメビュの窓を開いたまま配信が切り替わると、読めた数・飛ばした数・遅れなどの計器が前の配信の分を引き継いでいました。配信が変わったら数え直すようにしました(声を作る速さの記録は PC の性質なので残します)。読み上げの声は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1806',
     date: '2026-10-28',
     summary: '読み上げが遅いとき GPU の案内を出す',
@@ -177,14 +185,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '声ごとの音量を聞こえの大きさで揃える',
     items: Object.freeze([
       '長いコメントを読むとき、声ごとの音量を「聞こえの大きさ」で揃えるようにしました。2種類の声が混ざると、途中の文が大きすぎたり小さすぎたりしていたのを抑えます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1787',
-    date: '2026-10-27',
-    summary: '短い文の直後の長い文を大きくしない',
-    items: Object.freeze([
-      '短いコメントを続けて読んだ直後の長いコメントが、少し大きく鳴ることがあったのを直しました。声の大きさの覚え方を、長い文だけから覚えるようにしました。'
     ])
   })
 ]);
