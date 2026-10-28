@@ -95,7 +95,7 @@ import {
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
 import {
   computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
-  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor, foldVoiceArrivalWindow
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
@@ -718,6 +718,8 @@ function notifyVoiceItemDropped(item) {
 
 /** v0.1.1797: 届く間隔と声の長さ(追いついた後も保つ早口の床)。 */
 const _voicePaceState = createVoicePaceState();
+/** v0.1.1803計器: 届いたコメントの件/分(会場 VoicePlayer と同じ窓)。読めた件数の差が「届いた数」か「読み方」かを分ける。 */
+let _voiceArrivalWindow = null;
 
 /**
  * v0.1.1797: 混雑(キュー長)の上乗せに、順番待ちが伸びた分の上乗せを足す(会場の VoicePlayer と同じ)。
@@ -1084,6 +1086,8 @@ function enqueueVoiceTimelineItems(items) {
       _voiceDiag.lastUpstreamMs = _upstreamMs;
       foldVoiceStageEma(_voiceDiag, 'upstreamEmaMs', _upstreamMs);
     }
+    _voiceArrivalWindow = foldVoiceArrivalWindow(_voiceArrivalWindow, Date.now(), 1);
+    _voiceDiag.arrivalPerMin = _voiceArrivalWindow.arrivalPerMin;
     const candidate = {
       userKey: voiceUserKeyForItem(item),
       name,

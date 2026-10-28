@@ -6678,6 +6678,7 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.755 リアルタイム完璧化: maxEmit 8→24。洪水時に「9件目以降の新着を取りこぼす」のを防ぐ
     //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
     //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
+    const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
     const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
     speechState = {
       seenKeys: result.seenKeys,
@@ -6758,7 +6759,7 @@ export function mountVenueBarButton(options = {}) {
           key: speech.key,
           text: speech.text,
           // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
-          receivedAt: speech.capturedAt,
+          receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
           // ★キャラライブの相槌はここに乗せる(2026-08-25)。
           //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
           //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で

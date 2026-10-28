@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1783',
+    date: '2026-10-27',
+    summary: '試験で声ごとの素の大きさを記録',
+    items: Object.freeze([
+      '開発版の読み上げ試験の記録に、声ごとの素の大きさ(最大振幅と聞こえの大きさ)を残すようにしました。声ごとの音量差を、実際の声の形を見てから直すための計器です(ふだんの動きは変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1782',
     date: '2026-10-27',
     summary: '読み上げ中は声の裏読み込みを待つ',
