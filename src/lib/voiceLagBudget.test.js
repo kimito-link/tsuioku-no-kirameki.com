@@ -567,3 +567,24 @@ describe('v0.1.1800 件数の上限を待ち件の文字数から見積もる', 
     expect(resolveVoiceQueueMaxByChars(/** @type {any} */ (null), s)).toBeNull();
   });
 });
+
+describe('v0.1.1801 声を作る方が遅い PC は作る時間で数える', async () => {
+  const { createVoicePaceState, noteVoicePacePlayed, resolveVoiceQueueMaxByChars, VOICE_QUEUE_MAX_CEIL, VOICE_QUEUE_MAX_FLOOR } = await import('./voiceLagBudget.js');
+  const s = createVoicePaceState();
+  noteVoicePacePlayed(s, 1000, 1, 0, 8); // 125ms/字
+  const mid = Array(10).fill(8); // 1件 1秒
+
+  it('速い PC(比0.1)は数えない時と同じ', () => {
+    expect(resolveVoiceQueueMaxByChars(mid, s, 0.1)).toBe(resolveVoiceQueueMaxByChars(mid, s));
+    expect(resolveVoiceQueueMaxByChars(mid, s)).toBe(6);
+  });
+
+  it('作るのが声より遅い(比2.0)と 1件 2.25秒で数えて床まで絞る', () => {
+    expect(resolveVoiceQueueMaxByChars(mid, s, 2.0)).toBe(VOICE_QUEUE_MAX_FLOOR);
+  });
+
+  it('短いコメントも、作るのが遅ければ1件0.97秒で数える(比1.2・PC 試験の値)', () => {
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(2), s, 1.2)).toBe(6);
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(2), s, 0.3)).toBe(VOICE_QUEUE_MAX_CEIL);
+  });
+});
