@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1821',
+    date: '2026-10-28',
+    summary: '診断の読み込み直し回数を正しく数える',
+    items: Object.freeze([
+      'パネルの置き場所の移動のうち、中身を読み込み直さずに済んだものは「読み込み直し」に数えないようにしました(状態速報の数字が実際と合うように)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1820',
     date: '2026-10-28',
     summary: '視聴ページでパネルの二重起動を解消',
@@ -176,15 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '開発版(フォルダから読み込んだ拡張)は、2分おきに新しい版が置かれていないか見て、あれば自分で読み込み直すようにしました。更新ボタンを押す必要がなくなります(この版を入れる時だけ最後の1回が必要です)。',
       '拡張の画面を前で使っている間は待ちます。ストアから入れた拡張では何もしません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1801',
-    date: '2026-10-28',
-    summary: '遅いPCで混んだ時の読み上げの遅れを短く',
-    items: Object.freeze([
-      '声を作るのに時間がかかるPCで、コメントがとても多い時に、ためすぎて最大10秒遅れ、待たせた後で捨てていたのを直しました。',
-      '声を作る速さも数えて、何件まで待たせるかを決めます(速いPCは今まで通り)。'
     ])
   })
 ]);
