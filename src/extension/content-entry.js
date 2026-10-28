@@ -2956,17 +2956,23 @@ function setInlineHostVisible(host, visible, cause) {
 }
 
 /**
- * host 移設の【直前】に呼ぶ(観測のみ・DOMは触らない)。isConnected/iframe有無/会場open を採取。
+ * host 移設の【直前】に呼ぶ。isConnected/iframe有無/会場open を採取してから move を実行する(move 省略=観測のみ)。
+ *   v0.1.1821: move が 'moved'(moveBefore で iframe を保った)なら reloadCount でなく preservedMoves に数える。
  * @param {string} reason 移設経路名(anchored_video / floating_body 等)
  * @param {HTMLElement|null} host
+ * @param {() => ('moved'|'inserted')} [move]
  */
-function noteInlineHostMove(reason, host) {
+function noteInlineHostMove(reason, host, move) {
+  const prevConnected = Boolean(host && host.isConnected);
+  const hadIframe = Boolean(host && host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`));
+  const preserved = move ? move() === 'moved' : false;
   try {
     recordInlineHostMove(_inlineHostMoveState, {
       reason,
       atMs: Date.now(),
-      prevConnected: Boolean(host && host.isConnected),
-      hadIframe: Boolean(host && host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)),
+      prevConnected,
+      hadIframe,
+      preserved,
       // venueBar.js(別バンドル)が open 中に立てる documentElement クラス(文字列契約・wiringテストで固定)。
       venueOpen: document.documentElement.classList.contains('nlsb-venue-open')
     });
@@ -4287,8 +4293,7 @@ function renderInlinePanelFloatingHost() {
   const iframeH = Math.min(580, Math.round(vh * 0.78));
 
   if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
-    noteInlineHostMove('floating_body', host);
-    moveNodePreservingState(document.body, host);
+    noteInlineHostMove('floating_body', host, () => moveNodePreservingState(document.body, host));
   }
   host.classList.add('nls-inline-host--floating');
   host.style.position = 'fixed';
@@ -4436,8 +4441,7 @@ function renderInlinePanelDockBottomHost() {
   const hostMaxH = iframeInnerH + 16; // 上下の余白
 
   if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
-    noteInlineHostMove('dock_body', host);
-    moveNodePreservingState(document.body, host);
+    noteInlineHostMove('dock_body', host, () => moveNodePreservingState(document.body, host));
   }
   host.style.position = 'fixed';
   host.style.left = '0';
@@ -5602,16 +5606,14 @@ function renderInlineHostAnchoredToVideo(video) {
   });
   if (hostAttachFallbackBody) {
     if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
-      noteInlineHostMove('anchored_video_fallback_body', host);
-      moveNodePreservingState(hostParent, host);
+      noteInlineHostMove('anchored_video_fallback_body', host, () => moveNodePreservingState(hostParent, host));
     }
   } else {
     if (
       !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter) &&
       !shouldSkipHostMoveForVenueNow(host)
     ) {
-      noteInlineHostMove('anchored_video', host);
-      moveNodeAfterPreservingState(insertAfter, host);
+      noteInlineHostMove('anchored_video', host, () => moveNodeAfterPreservingState(insertAfter, host));
     }
   }
   host.style.boxSizing = 'border-box';
@@ -5785,16 +5787,14 @@ function renderInlinePopupHost(target) {
 
   if (hostAttachFallbackBody) {
     if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
-      noteInlineHostMove('nonvideo_fallback_body', host);
-      moveNodePreservingState(hostParent, host);
+      noteInlineHostMove('nonvideo_fallback_body', host, () => moveNodePreservingState(hostParent, host));
     }
   } else {
     if (
       !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter) &&
       !shouldSkipHostMoveForVenueNow(host)
     ) {
-      noteInlineHostMove('nonvideo_anchor', host);
-      moveNodeAfterPreservingState(insertAfter, host);
+      noteInlineHostMove('nonvideo_anchor', host, () => moveNodeAfterPreservingState(insertAfter, host));
     }
   }
   host.style.boxSizing = 'border-box';
