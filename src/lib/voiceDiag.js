@@ -82,6 +82,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   bgInitMaxMs: number,         // 同上の最長ms
  *   bgInitYieldTotal: number,    // もう片方のページが使用中で裏の読み込みを見送った回数(v0.1.1781)
  *   readerYieldTotal: number,    // 同じ配信をもう片方のページが読んでいるので読まなかったコメント数(v0.1.1794)
+ *   ngMutedTotal: number,        // v0.1.1812: コメビュで NG にした人なので読まなかったコメント数(会場)
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
  *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数
@@ -190,6 +191,7 @@ export function makeInitialVoiceDiag() {
     bgInitMaxMs: 0,
     bgInitYieldTotal: 0,
     readerYieldTotal: 0,
+    ngMutedTotal: 0,
     refreshVoicedTotal: 0,
     backlogSkipTotal: 0,
     bigBatchTotal: 0,
@@ -337,6 +339,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     bgInitMaxMs: num(d.bgInitMaxMs, base.bgInitMaxMs),
     bgInitYieldTotal: num(d.bgInitYieldTotal, base.bgInitYieldTotal),
     readerYieldTotal: num(d.readerYieldTotal, base.readerYieldTotal),
+    ngMutedTotal: num(d.ngMutedTotal, base.ngMutedTotal),
     refreshVoicedTotal: num(d.refreshVoicedTotal, base.refreshVoicedTotal),
     backlogSkipTotal: num(d.backlogSkipTotal, base.backlogSkipTotal),
     bigBatchTotal: num(d.bigBatchTotal, base.bigBatchTotal),

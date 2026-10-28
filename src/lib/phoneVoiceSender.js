@@ -9,6 +9,7 @@ import { pickNewVoiceRows } from './phoneVoice.js';
 import { resolveVoiceForUser } from './voiceAssignment.js';
 import { buildVoiceReadingText } from './voicevoxClient.js';
 import { comeviewUserKeyForRow } from './comeviewActions.js';
+import { isVoiceItemNgMuted } from './voiceNgMute.js';
 
 /** 声の一覧(styleIds)を取り直す間隔。VOICEVOX を後から起動しても拾えるように。 */
 const STYLE_RETRY_MS = 30_000;
@@ -64,7 +65,7 @@ function countRowsWithoutNumber(rows) {
 /**
  * @param {{
  *   listStyleIds: () => Promise<number[]>,
- *   loadSettings: () => Promise<{ assignments?: unknown, readName?: boolean }>,
+ *   loadSettings: () => Promise<{ assignments?: unknown, readName?: boolean, ngKeys?: Set<string> }>,
  *   synth: (text: string, voice: { styleId: number, pitchOffset: number, speedOffset: number }) => Promise<ArrayBuffer|null>,
  *   encode: (wav: ArrayBuffer) => Promise<Uint8Array|null>,
  *   post: (clip: { no: string, ogg: string }) => Promise<boolean>,
@@ -137,6 +138,8 @@ export function createPhoneVoiceSender(deps) {
       // 合成している間に次の回が列へ足した分も、この回のうちに続けて読む。
       while (pending.length) {
         const p = /** @type {{ no: string, userId: string, name: string, text: string }} */ (pending.shift());
+        // v0.1.1812: コメビュで NG にした人は声にしない(PC の会場・コメビュと同じ)。
+        if (isVoiceItemNgMuted(p, settings.ngKeys)) continue;
         const voice = resolveVoiceForUser(comeviewUserKeyForRow(p) || 'anon', settings.assignments, styleIds);
         const text = buildVoiceReadingText({ name: settings.readName ? p.name : '', text: p.text });
         // v0.1.1810: 絵文字・記号だけのコメントは読む文字が無い('')。合成に失敗した扱い(=VOICEVOX 停止)にしない。
