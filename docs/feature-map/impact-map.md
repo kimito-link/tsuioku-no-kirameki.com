@@ -784,6 +784,7 @@
 | `src/lib/mirrorBundleFlushScheduler.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mirrorPayloadWrite.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mirrorSanitize.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/moveNodePreservingState.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/nameplateToggleBoot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/nameplateToggleFinder.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrBacklog.js` | 1 | 記録エンジン(watchページ常駐) |

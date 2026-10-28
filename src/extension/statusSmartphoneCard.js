@@ -31,7 +31,7 @@ export const PHONE_POST_CONSENT_TEXT =
   '(このPCのブラウザでログインしているアカウントで流れます)。本文はサーバーに最長1分だけ置き、PCが受け取ったら消します。';
 
 /**
- * v0.1.1820: 「👥 ファンにも公開」の説明(配信者中継)。privacy.html 4-3 と揃える(変えるときは両方)。
+ * v0.1.1823: 「👥 ファンにも公開」の説明(配信者中継)。privacy.html 4-3 と揃える(変えるときは両方)。
  *   ★誰が・何を見られ・何ができないか・止め方を、スイッチの横に書く。
  */
 export const FAN_LINK_CONSENT_TEXT =
@@ -159,7 +159,7 @@ export function buildSmartphoneCard(deps) {
   };
 
   /**
-   * v0.1.1820: 「👥 ファンにも公開」。ON のときはファン用の読むだけの URL と QR を出す(配信の告知に貼れる)。
+   * v0.1.1823: 「👥 ファンにも公開」。ON のときはファン用の読むだけの URL と QR を出す(配信の告知に貼れる)。
    * @param {string} appOrigin
    * @param {FanLinkDeps} fl
    */

@@ -171,7 +171,7 @@ describe('liveRankingView', () => {
     expect(pinLiveFirst([a, b, c], ' LV100003 ')).toEqual({ lives: [c, a, b], found: true });
   });
 
-  it('mergePinnedLive: 一覧に無い1配信を足す(元の応答は変えない)・v0.1.1819', () => {
+  it('mergePinnedLive: 一覧に無い1配信を足す(元の応答は変えない)・v0.1.1822', () => {
     const data = { ok: true, capturedAt: 5, lives: [a, b] };
     const out = mergePinnedLive(data, c);
     expect(out).toEqual({ ok: true, capturedAt: 5, lives: [a, b, c] });

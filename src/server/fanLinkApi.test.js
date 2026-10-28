@@ -31,7 +31,7 @@ const auth = (c) => ({ 'x-device-id': c.deviceId, 'x-write-key': c.writeKey });
 const fanPost = (headers, body) => call(statusHandler, { method: 'POST', query: { action: 'fan' }, headers, body });
 const view = (v, extra = {}) => call(statusHandler, { method: 'GET', query: { v, ...extra } });
 
-describe('配信者中継: ファン用の読むだけのリンク(v0.1.1820)', () => {
+describe('配信者中継: ファン用の読むだけのリンク(v0.1.1823)', () => {
   let store; let ably; let logSpy; let c;
   beforeEach(async () => {
     store = new Map(); ably = [];

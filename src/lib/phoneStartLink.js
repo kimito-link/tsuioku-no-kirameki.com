@@ -61,7 +61,7 @@ const NICOLIVE_LV_RE = /^lv\d{6,15}$/;
 const NICOLIVE_HOSTS = new Set(['live.nicovideo.jp', 'sp.live.nicovideo.jp', 'live2.nicovideo.jp', 'nico.ms']);
 
 /**
- * v0.1.1819: PC の拡張が無い人が貼る「ニコ生の放送の URL」から番組 ID(lvNNN)を取る。
+ * v0.1.1822: PC の拡張が無い人が貼る「ニコ生の放送の URL」から番組 ID(lvNNN)を取る。
  *   受け付ける形: https://live.nicovideo.jp/watch/lv… ・ sp.live… ・ https://nico.ms/lv… ・ lv… だけ。
  *   ほかのサイトや番組以外のページは '' (開かない)。
  * @param {unknown} input

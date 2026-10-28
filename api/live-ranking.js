@@ -306,7 +306,7 @@ async function collectOne(lv, meta, allowEmpty = false) {
 }
 
 /**
- * ★v0.1.1819: 1配信だけその場で取る(PC の拡張が無い人が「放送の URL を貼る」とき)。
+ * ★v0.1.1822: 1配信だけその場で取る(PC の拡張が無い人が「放送の URL を貼る」とき)。
  *   一覧(上位の個人配信 20 件)に無い配信でも、番組情報とギフト/広告の順位表を返す。
  *   ★終わった配信・チャンネル番組も出す(本人が貼った配信なので、一覧の絞り込みは掛けない)。
  *   取れる中身は collect() と同じ公開情報だけ(本文は取らない)。
@@ -687,7 +687,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ★v0.1.1819: 1配信だけ(PC の拡張が無い人が放送の URL を貼ったとき)。
+    // ★v0.1.1822: 1配信だけ(PC の拡張が無い人が放送の URL を貼ったとき)。
     if (req.query?.lv !== undefined) {
       await handleOne(req, res);
       return;

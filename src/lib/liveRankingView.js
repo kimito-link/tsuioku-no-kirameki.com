@@ -469,7 +469,7 @@ export function pinLiveFirst(lives, lv) {
 }
 
 /**
- * v0.1.1819: 一覧(放送中の上位)に無い配信を、1配信だけ取った結果(/api/live-ranking?lv=)で足す。
+ * v0.1.1822: 一覧(放送中の上位)に無い配信を、1配信だけ取った結果(/api/live-ranking?lv=)で足す。
  *   PC の拡張が無い人が「放送の URL を貼る」と、その配信が一覧に無くても先頭に出せる。
  *   ★一覧に既にあれば足さない(二重に出さない)。足す側の形が違えば元のまま返す。
  * @param {any} data /api/live-ranking の応答(null でもよい)

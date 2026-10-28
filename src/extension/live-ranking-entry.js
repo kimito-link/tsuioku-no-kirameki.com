@@ -284,7 +284,7 @@ function render(data) {
   // ★合成順序は「賑わい順を作ってから 1 件を先頭へ」(逆だと sort が pin を壊す)。
   const { lives: ordered, found } = pinLiveFirst(sortByEstimatedConcurrent(lives, nowMs), PINNED_LV);
   const missing = !!PINNED_LV && !found;
-  // ★v0.1.1819: 貼られた配信は終わっていても出す(onAir:false)。放送中の数には入れない。
+  // ★v0.1.1822: 貼られた配信は終わっていても出す(onAir:false)。放送中の数には入れない。
   const pinnedEnded = found && ordered[0] && ordered[0].onAir === false;
   const onAirCount = lives.filter((/** @type {any} */ l) => !(l && l.onAir === false)).length;
   // ★コメントの集計は別ジョブ(約 10 分ごと)。ギフト/広告の鮮度とは別に、いつ数えた値かを添える。
@@ -400,7 +400,7 @@ function setBusy(busy) {
 const PINNED_RETRY_MS = 2000;
 const PINNED_TRIES = 3;
 /**
- * v0.1.1819: ?lv= の配信が一覧(放送中の上位)に無いとき、その1配信だけ取って足す。
+ * v0.1.1822: ?lv= の配信が一覧(放送中の上位)に無いとき、その1配信だけ取って足す。
  *   PC の拡張が無い人が開始画面で「放送の URL を貼る」とここへ来る。
  *   取れなければ一覧だけを出す(貼った配信が見つからない旨は render が出す)。
  * @param {any} data /api/live-ranking の応答(一覧がまだ無ければ null)
@@ -435,7 +435,7 @@ function load(opts) {
   setBusy(true);
   return fetch(refresh ? '/api/live-ranking?refresh=1' : '/api/live-ranking', { cache: 'no-store' })
     .then((r) => {
-      // ★v0.1.1819: 貼られた配信(?lv=)だけは、一覧がまだ無くても出す。
+      // ★v0.1.1822: 貼られた配信(?lv=)だけは、一覧がまだ無くても出す。
       if (r.status === 404 && PINNED_LV) return null;
       if (r.status === 404) throw new Error('まだ集計されていません。しばらくお待ちください。');
       if (!r.ok) throw new Error(`読み込みに失敗しました (${r.status})`);
