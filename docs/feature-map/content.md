@@ -45,6 +45,7 @@ graph LR
   n_content --> n_src_lib_backfillSlotPool_js["lib/backfillSlotPool.js"]:::shared
   n_content --> n_src_lib_backfillTransientRetry_js["lib/backfillTransientRetry.js"]:::shared
   n_content --> n_src_lib_backfillVisibilityRearm_js["lib/backfillVisibilityRearm.js"]
+  n_content --> n_src_lib_besideOverflowGuard_js["lib/besideOverflowGuard.js"]
   n_content --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
   n_content --> n_src_lib_broadcastUrl_js["lib/broadcastUrl.js"]:::shared
   n_content --> n_src_lib_broadcasterProfileCard_js["lib/broadcasterProfileCard.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_content --> n_src_lib_bubblePlacement_js["lib/bubblePlacement.js"]:::shared
   n_content --> n_src_lib_captureAuditionRichviewEventScoreDiagProbe_js["lib/captureAuditionRichviewEventScoreDiagProbe.js"]
   n_content --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
-  n_content --> n_src_lib_celebrationFlyText_js["lib/celebrationFlyText.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 324 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 325 ファイル省略（全件は storage-bus.md / metafile 参照）。
