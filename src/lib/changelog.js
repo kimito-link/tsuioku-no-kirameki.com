@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1803',
+    date: '2026-10-28',
+    summary: '読み上げの遅れの計器を正しく',
+    items: Object.freeze([
+      '放送ページの読み上げで「コメントを受け取ってから読み上げ待ちに入るまで」の時間が、開いた直後の数件の値のまま止まっていたのを直し、ずっと測り続けるようにしました。',
+      'コメビュの読み上げでも、1分あたりに届いたコメントの数を記録するようにしました(読めた数の差の理由を調べるため)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1802',
     date: '2026-10-28',
     summary: '開発版は新しい版に自分で入れ替わる',
@@ -175,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '読み上げ試験の開始待ちを直す',
     items: Object.freeze([
       '開発版の読み上げ試験で、読み上げを ON にしている途中に始めると「OFF です」と止まっていたのを、ON になり終わるまで待つようにしました(ふだんの動きは変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1783',
-    date: '2026-10-27',
-    summary: '試験で声ごとの素の大きさを記録',
-    items: Object.freeze([
-      '開発版の読み上げ試験の記録に、声ごとの素の大きさ(最大振幅と聞こえの大きさ)を残すようにしました。声ごとの音量差を、実際の声の形を見てから直すための計器です(ふだんの動きは変わりません)。'
     ])
   })
 ]);
