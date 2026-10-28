@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1788',
+    date: '2026-10-27',
+    summary: '声ごとの音量を聞こえの大きさで揃える',
+    items: Object.freeze([
+      '長いコメントを読むとき、声ごとの音量を「聞こえの大きさ」で揃えるようにしました。2種類の声が混ざると、途中の文が大きすぎたり小さすぎたりしていたのを抑えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1787',
     date: '2026-10-27',
     summary: '短い文の直後の長い文を大きくしない',

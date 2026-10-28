@@ -51,7 +51,7 @@ describe('iPhone 内蔵の声の読み上げ(live-view-native-voice.js)', () => 
     f.finishOne();
     await flush();
     expect(f.TextToSpeech.speak).toHaveBeenCalledTimes(2);
-    expect(f.TextToSpeech.speak.mock.calls[1][0].text).toBe('888');
+    expect(f.TextToSpeech.speak.mock.calls[1][0].text).toBe('パチパチ'); // 2026-10-28: 拍手の 8 は「パチパチ」(PC と同じ整え方)
   });
 
   it('★ギフト・本文の無い行は読まない。OFF の間は読まない(見たことだけ覚える)', () => {
@@ -95,7 +95,9 @@ describe('iPhone 内蔵の声の読み上げ(live-view-native-voice.js)', () => 
     expect(speechTextForComment('見て https://example.com/x')).toBe('見て リンク');
     expect(speechTextForComment('それなwww')).toBe('それなわらわら');
     expect(speechTextForComment('草w')).toBe('草わら');
-    expect(speechTextForComment('あ'.repeat(80))).toBe(`${'あ'.repeat(60)} 以下略`);
+    const kana = (n) => Array.from({ length: n }, (_, i) => 'あいうえおかきくけこ'[i % 10]).join('');
+    expect(speechTextForComment(kana(80))).toBe(`${kana(60)} 以下略`);
+    expect(speechTextForComment('おめでとう88888')).toBe('おめでとうパチパチ');
     expect(speechTextForComment('   ')).toBe('');
   });
 
