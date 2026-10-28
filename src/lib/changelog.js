@@ -18,6 +18,22 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1812',
+    date: '2026-10-28',
+    summary: 'NG にした人は読み上げでも読まない',
+    items: Object.freeze([
+      'コメビュで NG にした人のコメントは画面から消えますが、放送ページの会場モードの読み上げと、スマホへ送る声では読まれていました。どちらでも読まないようにしました(NG を外せば次のコメントから読みます)。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1811',
+    date: '2026-10-28',
+    summary: '読み上げない吹き出しが残らないように',
+    items: Object.freeze([
+      '絵文字や記号だけで読み上げないコメントの吹き出しが、声を待つ印のまま最大8秒残っていました。読まないと分かった時点で、ふつうの吹き出しと同じ速さで消えるようにしました(会場モード)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1810',
     date: '2026-10-28',
     summary: '絵文字や記号だけのコメントは読み上げない',
@@ -172,22 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '低めの声の人の最初の長文も揃える',
     items: Object.freeze([
       '声を低めにずらした人の最初の長いコメントが、まだ少し小さく鳴ることがあったのを直しました。声ごとに、高さを変えたときの音量の変わり方を全127の声で測った表を使います。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1792',
-    date: '2026-10-27',
-    summary: '短いコメントも聞こえの大きさで揃える',
-    items: Object.freeze([
-      '短いコメントも、長いコメントと同じく「聞こえの大きさ」で音量を揃えるようにしました。声やコメントの長さが変わっても、音量がそろいやすくなります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1791',
-    date: '2026-10-27',
-    summary: '低めの声の人の1件目を小さくしない',
-    items: Object.freeze([
-      '声を低めにずらした人の、最初の長いコメントが小さく鳴ることがあったのを直しました。'
     ])
   })
 ]);

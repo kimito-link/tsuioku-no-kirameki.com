@@ -7,6 +7,7 @@ import { encodeWavToOggOpus } from '../lib/phoneVoiceEncode.js';
 import { listVoicevoxStyleIds, probeVoicevoxStreaming, synthesizeVoice } from '../lib/voicevoxClient.js';
 import { KEY_VOICE_ASSIGNMENTS, KEY_VOICE_NARROW_MODE, KEY_VOICE_READ_NAME_ENABLED, KEY_VOICE_WEAK_PC } from '../lib/voiceKeys.js';
 import { prepareVoiceStyleIds } from '../lib/voiceNarrowing.js';
+import { COMEVIEW_NG_STORAGE_KEY, voiceNgKeySet } from '../lib/voiceNgMute.js';
 
 /**
  * @param {() => { creds: { mode: string, viewToken: string, headers: Record<string, string> }, ingestUrl: string }|null} getTarget
@@ -28,8 +29,12 @@ export function createPcPhoneVoice(getTarget) {
       })).styleIds;
     },
     loadSettings: async () => {
-      const bag = await chrome.storage.local.get([KEY_VOICE_ASSIGNMENTS, KEY_VOICE_READ_NAME_ENABLED]);
-      return { assignments: bag?.[KEY_VOICE_ASSIGNMENTS], readName: bag?.[KEY_VOICE_READ_NAME_ENABLED] === true };
+      const bag = await chrome.storage.local.get([KEY_VOICE_ASSIGNMENTS, KEY_VOICE_READ_NAME_ENABLED, COMEVIEW_NG_STORAGE_KEY]);
+      return {
+        assignments: bag?.[KEY_VOICE_ASSIGNMENTS],
+        readName: bag?.[KEY_VOICE_READ_NAME_ENABLED] === true,
+        ngKeys: voiceNgKeySet(bag?.[COMEVIEW_NG_STORAGE_KEY])
+      };
     },
     // stream を渡さないので必ず丸ごとの WAV(または null)が返る。
     synth: async (text, voice) => /** @type {ArrayBuffer|null} */ (await synthesizeVoice(text, voice)),
