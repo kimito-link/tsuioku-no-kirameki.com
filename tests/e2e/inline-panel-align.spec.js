@@ -1,4 +1,4 @@
-import { test, expect, enableInlinePanelAutoshow } from './fixtures.js';
+import { test, expect, enableInlinePanelAutoshow, waitExtensionStorageReady } from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
 const KEY_INLINE_PANEL_WIDTH_MODE = 'nls_inline_panel_width_mode';
@@ -29,7 +29,7 @@ async function extensionServiceWorker(context) {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     const ext = pickExt();
-    if (ext) return ext;
+    if (ext) { await waitExtensionStorageReady(ext); return ext; }
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error('extension service worker not found');
@@ -913,6 +913,11 @@ test.describe('inline panel viewport size matrix', () => {
           floatingClass: false
         });
 
+      // 行の差し替え直後は前回の幅(below の全幅)が一瞬残ることがある=行内に入った後の幅が落ち着くのを待つ
+      //   (配置が合った瞬間に1回だけ読むと、高負荷時に 1256px を掴んで赤くなっていた・v0.1.1819)。
+      await expect
+        .poll(async () => Number.parseFloat(String((await hostPlacementMetrics(page))?.width || '0')), { timeout: 10_000 })
+        .toBeLessThanOrEqual(360);
       const m = await hostPlacementMetrics(page);
       const w = Number.parseFloat(String(m?.width || '0'));
       expect(w).toBeGreaterThan(260);
@@ -952,9 +957,11 @@ test.describe('inline panel 初回表示ゲート', () => {
         const hb = host.getBoundingClientRect();
         const vb = v ? v.getBoundingClientRect() : null;
         const below = vb ? hb.top >= vb.bottom - 8 : false;
-        return { present: true, visible, below };
+        return { present: true, visible, below, gate: host.dataset.nlsFirstPaintGate || '' };
       }, INLINE_HOST_ID);
-      if (s.present && s.visible && s.below) sawBelowVisible.push(i);
+      // ゲートの安全網(800ms 経っても行が無い=deadline)を過ぎた後の below は仕様どおり。
+      //   負荷の高い CI ではサンプル12回が 800ms を超えて毎回赤くなっていた(v0.1.1819)。
+      if (s.present && s.visible && s.below && s.gate !== 'deadline') sawBelowVisible.push(i);
       await page.waitForTimeout(50);
     }
 
@@ -1024,11 +1031,12 @@ test.describe('inline panel 初回表示ゲート', () => {
             const hb = host.getBoundingClientRect();
             const vb = v ? v.getBoundingClientRect() : null;
             const atDefault = vb ? hb.top >= vb.bottom - 8 : false;
-            return { present: true, visible: true, atDefault };
+            return { present: true, visible: true, atDefault, gate: host.dataset.nlsFirstPaintGate || '' };
           },
           { hostId: INLINE_HOST_ID, mode: startPlacement }
         );
-        if (s.present && s.visible && s.atDefault) sawDefaultPlacementVisible.push(i);
+        // ゲートの安全網(deadline)後は仕様どおり既定配置で出てよい(行の注入より先に 800ms 経つ高負荷 CI・v0.1.1819)。
+        if (s.present && s.visible && s.atDefault && s.gate !== 'deadline') sawDefaultPlacementVisible.push(`${i}:${s.gate || '-'}`);
         await page.waitForTimeout(40);
       }
 
