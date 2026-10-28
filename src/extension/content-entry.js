@@ -648,6 +648,7 @@ import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
   decideCommentPanelRestoreAction,
+  shouldProbeCommentPanelHealthNow,
   normalizeCommentPanelAutoRestoreEnabled
 } from '../lib/commentPanelHealthProbe.js';
 
@@ -13742,6 +13743,7 @@ let commentPanelAutoRestoreEnabled = true;
  * @type {number}
  */
 let lastCommentPanelRestoreActionAt = 0;
+let lastCommentPanelProbeAt = 0;
 
 /**
  * ユーザが能動的にスクロール操作した最後の epoch ms。
@@ -13857,6 +13859,8 @@ async function probeAndRestoreCommentPanelHealth() {
   if (!commentPanelAutoRestoreEnabled) return;
   if (!hasExtensionContext()) return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  if (!shouldProbeCommentPanelHealthNow({ now: Date.now(), lastProbeAt: lastCommentPanelProbeAt, lastActionAt: lastCommentPanelRestoreActionAt, lastUserScrollAt: lastUserInitiatedScrollAt })) return; // v0.1.1818: 位置を読む前に間引く(強制レイアウト対策)
+  lastCommentPanelProbeAt = Date.now();
 
   const panel = findNicoCommentPanel(document);
   /** @type {{ top: number, height: number } | null} */

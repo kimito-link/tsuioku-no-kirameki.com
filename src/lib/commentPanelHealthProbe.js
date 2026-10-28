@@ -81,6 +81,32 @@ export function normalizeCommentPanelAutoRestoreEnabled(raw) {
  */
 
 /**
+ * v0.1.1818: 見張り(位置の読み取り)を回す最短間隔。記録の定期スキャン(550ms)ごとに読んでいたが、
+ *   ニコ生側が直前に DOM を書き換えているため毎回レイアウトの強制計算になっていた
+ *   (試験用 Chrome の実測で、拡張の強制レイアウトの最大の出どころ・10秒あたり約400ms)。
+ *   復旧は前回から10秒空ける設計なので、気づくのが最大2秒遅れても実害はない。
+ */
+export const COMMENT_PANEL_PROBE_MIN_INTERVAL_MS = 2 * 1000;
+
+/**
+ * 位置を読む前に、今回は見張りを回すかを決める(読む前に決められるものだけで判断する)。
+ *   - 前回の見張りから最短間隔が経っていない → 回さない
+ *   - 前回の復旧から cooldown 以内 / 手動スクロール直後 → 読んでも 'none' になるので回さない
+ * @param {{ now: number, lastProbeAt?: number, lastActionAt?: number, lastUserScrollAt?: number }} input
+ * @returns {boolean}
+ */
+export function shouldProbeCommentPanelHealthNow(input) {
+  const now = Number(input?.now) || 0;
+  const lastProbeAt = Number(input?.lastProbeAt) || 0;
+  if (lastProbeAt > 0 && now - lastProbeAt < COMMENT_PANEL_PROBE_MIN_INTERVAL_MS) return false;
+  const lastActionAt = Number(input?.lastActionAt) || 0;
+  if (lastActionAt > 0 && now - lastActionAt < COMMENT_PANEL_RESTORE_COOLDOWN_MS) return false;
+  const userScrollAt = Number(input?.lastUserScrollAt) || 0;
+  if (userScrollAt > 0 && now - userScrollAt < COMMENT_PANEL_USER_SCROLL_LOCKOUT_MS) return false;
+  return true;
+}
+
+/**
  * @param {CommentPanelHealthInput} input
  * @returns {CommentPanelHealthDecision}
  */
