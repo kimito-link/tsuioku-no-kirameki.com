@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "6b88af885dfcb6f2beaa6a0e8edceabaf3ce8fd8fecb5901837b67e98946be25",
+  "fingerprint": "4049c3aa1b8c0bfa9b22d63c3ebcec33afb839a89618eb47868189d924580fc4",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -904,7 +904,7 @@
     "extension/dist/content.js": "d4f59096a454b90994dc385e04990b43cfa2e0c7f802cade529a08bb79234828",
     "extension/dist/popup.js": "a2a160e862e69627dd3aee71f7b56aa27c4a00da480b28c9050845d913235815",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "1deb1d3376e0f68be08354acc10859ba6e57d9cee0882e2f68f45b58591b8e46",
+    "extension/dist/status.js": "214560dd0b08656d546a9da6caf27144eaaed0461eba347e45fbff026ac062f5",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "082c3efa4faca84e47537d9e3d010bb11cfb5a4111364c9527caf430229b5d6a",
     "extension/dist/comeview.js": "b143d09554fc659b696e5717b7a564533c69a8c2791eeeea51cd775e3a970ec5",
