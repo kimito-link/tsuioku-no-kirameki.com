@@ -8,6 +8,14 @@
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
 try { importScripts('dist/backfill-sw.js'); } catch (e) { console.warn('[NLS] backfill-sw load failed', e); } // eslint-disable-line no-undef
+// v0.1.1802: 開発版(展開して読み込み)が、拡張のフォルダの新しい版に自分で入れ替わる(キット extension-self-update)。
+//   ストア版(manifest に update_url)では何もしない。
+try { importScripts('dist/self-update-sw.js'); } catch (e) { console.warn('[NLS] self-update load failed', e); } // eslint-disable-line no-undef
+
+/** 2分おきの見回りを予約する(self-update-sw.js が読めなかった時は何もしない)。 */
+function ensureSelfUpdateAlarm() {
+  try { globalThis.__nlsSelfUpdate?.scheduleSelfUpdateCheck(); } catch { /* no-op */ }
+}
 
 const MATCH_PATTERNS = [
   'https://*.nicovideo.jp/*',
@@ -993,6 +1001,7 @@ async function migrateClearStaleSelfPostedOnce(previousVersion) {
 
 chrome.runtime.onInstalled.addListener((details) => {
   ensureToolbarOpensPopupNotSidePanel();
+  ensureSelfUpdateAlarm();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
@@ -1054,6 +1063,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onStartup.addListener(() => {
   ensureToolbarOpensPopupNotSidePanel();
+  ensureSelfUpdateAlarm();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
@@ -1092,6 +1102,11 @@ chrome.runtime.onStartup.addListener(() => {
 const __swBootAt = Date.now();
 
 chrome.alarms.onAlarm.addListener((alarm) => {
+  const selfUpdate = globalThis.__nlsSelfUpdate;
+  if (selfUpdate && alarm?.name === selfUpdate.SELF_UPDATE_ALARM) {
+    void selfUpdate.checkForNewVersion().catch((e) => console.warn('[self-update]', String(e?.message || e)));
+    return;
+  }
   if (alarm?.name === AUTO_BACKUP_ALARM) {
     void runAutoBackupCycle();
     return;

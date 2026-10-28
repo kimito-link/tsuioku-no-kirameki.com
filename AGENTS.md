@@ -389,6 +389,12 @@ Claude Code main → 複数の `.claude/agents/judge-*.md` を並列起動
 - `src/lib/changelog.js` 先頭エントリ(`version` 一致・`summary` は **35字以内**・`items` は配布物の
   ユーザー向け説明)
 
+**★v0.1.1802 から開発版は自分で入れ替わる(キット `templates/extension-self-update`)。** service worker が2分おきに
+読み込み元フォルダの manifest.json の version を見て、新しければ `chrome.runtime.reload()` する(拡張の画面を前面で
+使っている間は待つ・ストア版は何もしない)。update 扱いなので `reloadExistingWatchTabs` で watch タブも読み込み直る。
+→ copy:ext した後に**ユーザーへ更新ボタンを頼まない**(version を上げ忘れると入れ替わらない)。下の3手順は旧来の記録。
+写しは `src/extension/self-update.js`(キット無改変・直すときはキットを先に)。
+
 **⚠️ push しただけではユーザーの Chrome に届かない(最重要・§10 の「1セット」)。**
 司令塔(Claude Code)が build+commit+push した後、**ユーザー側で次の3手順を踏んで初めて反映**される:
 1. ローカルリポを **git pull**(最新 `extension/dist/` を取得)

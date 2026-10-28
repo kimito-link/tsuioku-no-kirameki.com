@@ -17,6 +17,7 @@
     "**/node_modules",
     "extension/dist",
     "**/*.test.js",
-    "src/lib/changelog-archive.js"
+    "src/lib/changelog-archive.js",
+    "src/extension/self-update.js"
   ]
 }
