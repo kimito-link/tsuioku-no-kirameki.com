@@ -4780,7 +4780,7 @@ let inlineFirstPaintGateRafId = null;
  * 横付き初回ゲートをリセット（liveId 切替・再初期化時）。次の beside 描画で再武装。
  */
 function resetInlineFirstPaintGate() {
-  inlineFirstPaintGateState = null;
+  inlineFirstPaintGateState = null; try { delete document.getElementById(INLINE_POPUP_HOST_ID)?.dataset.nlsFirstPaintGate; } catch { /* no-op */ }
   if (inlineFirstPaintGateRafId != null) {
     try {
       cancelAnimationFrame(inlineFirstPaintGateRafId);
@@ -5350,7 +5350,7 @@ function maybePassFirstPaintGateForBeside(video) {
     stableFrames: INLINE_FIRST_PAINT.geomStableFrames,
     tolerancePx: INLINE_FIRST_PAINT.geomStableTolerancePx
   });
-  if (res.shouldPaint) {
+  if (res.shouldPaint) { if (res.reason !== 'already') try { ensureInlinePopupHost().dataset.nlsFirstPaintGate = res.reason; } catch { /* no-op */ } // v0.1.1819: stable か deadline(安全網)かを E2E/診断が読む
     if (inlineFirstPaintGateRafId != null) {
       try {
         cancelAnimationFrame(inlineFirstPaintGateRafId);
