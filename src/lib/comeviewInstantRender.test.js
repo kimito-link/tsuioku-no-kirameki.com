@@ -8,6 +8,7 @@ import {
   selectAppendedComeviewTimelineItems,
   commentNoOfComeviewRow,
   filterUnseenComeviewComments,
+  pickRefreshVoiceItems,
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from './comeviewInstantRender.js';
@@ -218,5 +219,25 @@ describe('pickUnseenComeviewGifts(再キャプチャ重複の遮断)', () => {
     expect(
       pickUnseenComeviewGifts([{ userId: 'u2', itemName: '花', point: 100, message: '', capturedAt: 2000 }], seen)
     ).toHaveLength(1);
+  });
+});
+
+describe('pickRefreshVoiceItems(v0.1.1804: 整合リフレッシュで初めて出たコメントも読む)', () => {
+  const now = 1_000_000;
+  it('番号があり未出で、届いて8秒以内のコメントだけ返す', () => {
+    const timeline = [
+      { kind: 'comment', commentNo: '1', at: now - 1000 },
+      { kind: 'comment', commentNo: '2', at: now - 2000 },
+      { kind: 'comment', commentNo: '3', at: now - 9000 },
+      { kind: 'comment', at: now - 500 },
+      { kind: 'gift', commentNo: '5', at: now - 500 }
+    ];
+    const got = pickRefreshVoiceItems(timeline, new Set(['2']), now, 8000);
+    expect(got.map((x) => x.commentNo)).toEqual(['1']);
+  });
+  it('時刻が無い・未来・壊れた入力は読まない', () => {
+    expect(pickRefreshVoiceItems([{ kind: 'comment', commentNo: '1' }], new Set(), now, 8000)).toEqual([]);
+    expect(pickRefreshVoiceItems([{ kind: 'comment', commentNo: '1', at: now + 5000 }], new Set(), now, 8000)).toEqual([]);
+    expect(pickRefreshVoiceItems(null, new Set(), now, 8000)).toEqual([]);
   });
 });

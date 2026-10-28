@@ -80,6 +80,7 @@ import {
   selectAppendedComeviewTimelineItems,
   commentNoOfComeviewRow,
   filterUnseenComeviewComments,
+  pickRefreshVoiceItems,
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
@@ -142,7 +143,7 @@ import {
   upgradeAnonymousAvatarImage,
   upgradeAnonymousAvatarImages
 } from '../lib/avatarPartsComposer.js';
-import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
+import { isVoiceItemStale, VOICE_STALE_MS_NORMAL } from '../lib/voiceAgeGate.js';
 import { runStorageOpWithTimeout } from '../lib/storageOpTimeout.js';
 import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
@@ -1918,6 +1919,10 @@ async function performFullRefresh(forceBottom) {
     TIMELINE_LIMIT
   );
   _commentCount = comments.length;
+  // v0.1.1804: 初回以外は、この全量描画で初めて出る新しいコメントも読む(下の既出登録より先に拾う)。
+  const refreshVoiceItems = _initialVoicesPrimed
+    ? pickRefreshVoiceItems(timeline, _seenCommentNos, Date.now(), VOICE_STALE_MS_NORMAL)
+    : [];
   renderFullTimeline(timeline, forceBottom);
   // v0.1.679: 全量描画した行の識別子を「既出」に登録(以後の hot append が二重に足さない)。
   for (const item of timeline) {
@@ -1925,6 +1930,10 @@ async function performFullRefresh(forceBottom) {
     rememberSeenCommentNo(commentNoOfComeviewRow(item));
   }
 
+  if (refreshVoiceItems.length) {
+    _voiceDiag.refreshVoicedTotal = (Number(_voiceDiag.refreshVoicedTotal) || 0) + refreshVoiceItems.length;
+    enqueueLiveVoiceItems(refreshVoiceItems);
+  }
   if (!_initialVoicesPrimed) {
     _initialVoicesPrimed = true;
     if (timeline.length > 0) {
