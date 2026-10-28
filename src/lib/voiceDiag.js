@@ -83,6 +83,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   bgInitYieldTotal: number,    // もう片方のページが使用中で裏の読み込みを見送った回数(v0.1.1781)
  *   readerYieldTotal: number,    // 同じ配信をもう片方のページが読んでいるので読まなかったコメント数(v0.1.1794)
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
+ *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数
  *   lastBigBatch: ({ at: number, size: number, noLess: number, seenBefore: number, oldestAgeMs: number, newestAgeMs: number } | null), // 同上の直近1回の中身
  *   streamTotal: number,         // 2026-10-26計器: 少しずつ受け取って読んだ件数(voiceStream)
@@ -190,6 +191,7 @@ export function makeInitialVoiceDiag() {
     bgInitYieldTotal: 0,
     readerYieldTotal: 0,
     refreshVoicedTotal: 0,
+    backlogSkipTotal: 0,
     bigBatchTotal: 0,
     lastBigBatch: /** @type {VoiceBigBatch | null} */ (null),
     streamTotal: 0,
@@ -299,6 +301,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     bgInitYieldTotal: num(d.bgInitYieldTotal, base.bgInitYieldTotal),
     readerYieldTotal: num(d.readerYieldTotal, base.readerYieldTotal),
     refreshVoicedTotal: num(d.refreshVoicedTotal, base.refreshVoicedTotal),
+    backlogSkipTotal: num(d.backlogSkipTotal, base.backlogSkipTotal),
     bigBatchTotal: num(d.bigBatchTotal, base.bigBatchTotal),
     lastBigBatch: d.lastBigBatch && typeof d.lastBigBatch === 'object' ? d.lastBigBatch : null,
     streamTotal: num(d.streamTotal, base.streamTotal),
