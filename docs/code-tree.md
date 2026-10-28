@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1068 件
+## ⚠️ 役割コメントが無いソース 9 / 1069 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -976,7 +976,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2195)
+- 📁 **src/** (2197)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1268,7 +1268,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1932)
+  - 📁 **lib/** (1934)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3126,6 +3126,8 @@
     - `voiceLoadingState.test.js`
     - `voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
     - `voiceNarrowing.test.js`
+    - `voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
+    - `voiceNgMute.test.js`
     - `voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
     - `voicePlaybackQuality.test.js`
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
