@@ -7,7 +7,7 @@
 //   - 「ああああああああ」「ーーーーーー」「！！！！！！」→ 長く続いて、その間ほかのコメントが待たされる。
 //   画面の表示は変えない(読み上げる文だけ)。本家の表示を置き換える話ではない(AGENTS.md §3.5)。
 //
-// 方針: 確実に「笑い/拍手/連打」と言える形だけを直す。英単語(wow・www.〜)や金額・数(8888円)には触らない。
+// 方針: 確実に「笑い/拍手/連打」と言える形だけを直す。読める文字が無いコメントは '' にする(呼び出し側が読まずに飛ばす)。英単語(wow・www.〜)や金額・数(8888円)には触らない。
 
 /** 同じ文字がこれより多く続いたら、ここまでに縮める。 */
 export const VOICE_REPEAT_KEEP = 4;
@@ -32,8 +32,13 @@ export function normalizeVoiceReadingBody(text, opts = {}) {
   if (!s) return '';
   s = s.replace(/(?:https?:\/\/|www\.)[^\s]+/gi, typeof opts.urlWord === 'string' ? opts.urlWord : 'URL省略');
   s = s.replace(LAUGH_W_RE, laughWord).replace(LAUGH_W_TAIL_RE, 'わら');
+  // 2026-10-28: コメント全体が w 1文字なら笑い(VOICEVOX は全角「ｗ」を「ダブリュウ」と読む・PC 実測)。
+  if (/^\s*[wWｗＷ]\s*$/.test(s)) s = 'わら';
   s = s.replace(CLAP_8_RE, 'パチパチ');
   // 同じ文字の連打を縮める(サロゲートペア・絵文字も1文字として数える)。
   s = s.replace(/(.)\1{4,}/gsu, (_m, ch) => ch.repeat(VOICE_REPEAT_KEEP));
-  return s.replace(/\s+/g, ' ').trim();
+  s = s.replace(/\s+/g, ' ').trim();
+  // 2026-10-28: 文字も数字も無い(絵文字・記号・顔文字だけ)なら読まない。VOICEVOX は 0 モーラ=無音を返すだけで、
+  //   その間ほかのコメントを待たせていた(PC 実測: 😂😂・👏・！？・…・♪♪・(^^) はすべて 0 モーラ)。
+  return /[\p{L}\p{N}]/u.test(s) ? s : '';
 }

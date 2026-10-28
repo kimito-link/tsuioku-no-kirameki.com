@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1810',
+    date: '2026-10-28',
+    summary: '絵文字や記号だけのコメントは読み上げない',
+    items: Object.freeze([
+      '絵文字・記号・顔文字だけのコメント(😂👏・！？・…・♪・(^^) など)は、VOICEVOX では音が出ないのに順番待ちに入って、ほかのコメントを待たせていました。読み上げずに飛ばすようにしました(画面には今までどおり出ます)。',
+      'コメント全体が「ｗ」1文字のときも「わら」と読みます(今までは「ダブリュー」と読まれていました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1809',
     date: '2026-10-28',
     summary: '読み上げの記録が古い数のまま残るのを直す',
@@ -179,14 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '低めの声の人の1件目を小さくしない',
     items: Object.freeze([
       '声を低めにずらした人の、最初の長いコメントが小さく鳴ることがあったのを直しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1790',
-    date: '2026-10-27',
-    summary: '低めの声の長いコメントを小さくしない',
-    items: Object.freeze([
-      '声を低めにずらした人の長いコメントが、小さく鳴ることがあったのを直しました。'
     ])
   })
 ]);

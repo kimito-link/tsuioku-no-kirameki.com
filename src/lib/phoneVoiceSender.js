@@ -139,6 +139,8 @@ export function createPhoneVoiceSender(deps) {
         const p = /** @type {{ no: string, userId: string, name: string, text: string }} */ (pending.shift());
         const voice = resolveVoiceForUser(comeviewUserKeyForRow(p) || 'anon', settings.assignments, styleIds);
         const text = buildVoiceReadingText({ name: settings.readName ? p.name : '', text: p.text });
+        // v0.1.1810: 絵文字・記号だけのコメントは読む文字が無い('')。合成に失敗した扱い(=VOICEVOX 停止)にしない。
+        if (!text) continue;
         const wav = await safe(() => deps.synth(text, voice), null);
         if (!wav) {
           // 合成できない=VOICEVOX が止まった可能性。次の回に声の一覧から確かめ直す。
