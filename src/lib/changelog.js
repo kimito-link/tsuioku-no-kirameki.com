@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1820',
+    date: '2026-10-28',
+    summary: 'ファンにも公開(拡張なしで見られる)',
+    items: Object.freeze([
+      '状態画面の「📱 スマホで見る」に「👥 ファンにも公開」を足しました(既定はOFF)。ONにすると読むだけのファン用URLとQRが出て、拡張を持っていない人も、その配信のコメントと応援をスマホで見られます。',
+      'ファン用URLからはコメントの投稿や、このPCの動きを変える操作はできません。OFFにする・「スマホで見る」をOFFにするとURLは使えなくなります。URLを作り直してもファン用URLはそのまま使えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1819',
     date: '2026-10-28',
     summary: 'PC が無くても放送 URL で応援を見る',
@@ -176,15 +185,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '声を作るのに時間がかかるPCで、コメントがとても多い時に、ためすぎて最大10秒遅れ、待たせた後で捨てていたのを直しました。',
       '声を作る速さも数えて、何件まで待たせるかを決めます(速いPCは今まで通り)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1800',
-    date: '2026-10-28',
-    summary: '一気に来た短いコメントを飛ばしにくく',
-    items: Object.freeze([
-      '放送ページの読み上げ: 長いコメントを読んだ直後に短いコメントがまとめて来ると、3件ほど読まずに飛ばしていたのを直しました。',
-      '待っているコメントの文字数から「何件まで読めば遅れが6秒に収まるか」を見積もるようにしました(長い文が溜まった時は今まで通り絞ります)。'
     ])
   })
 ]);

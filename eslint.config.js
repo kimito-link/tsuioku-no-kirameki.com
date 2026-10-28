@@ -467,7 +467,8 @@ export default [
     // v0.1.1738: gzip は受け口の返事(gzipOk)を見てから・スマホの目印を150秒保持(+3行)。判定は lib(autoPublishDecision.js の readPublishAck)。
     // v0.1.1740: スマホの読み上げ(返事の voiceWanted で声を作って送る・+6行)。判定と順番は lib(phoneVoiceSender.js)、配線は phoneVoicePublisher.js。
     // v0.1.1757: スマホへ新着を3秒ごとに送る係の配線(+4行: import・生成・返事を渡す・統計)。本体は liveEventsPublisher.js / lib の liveEventSender.js。
-    rules: { 'max-lines': ['error', { max: 4604, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1820: 「👥 ファンにも公開」の配線(+3行: import・スイッチに渡す・同意 OFF で止める)。本体は fanLinkClient.js / statusSmartphoneCard.js。
+    rules: { 'max-lines': ['error', { max: 4607, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

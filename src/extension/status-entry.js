@@ -225,6 +225,7 @@ import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpT
 import { disablePhonePost, enablePhonePost, forgetPhonePostKey, readPhonePostKey, startPhonePostRelay } from './phonePostRelay.js';
 import { buildPublishBody, deleteDeviceOnServer, forgetDeviceCred, getPublishCredentials, maybeRegisterDevice, refreshDeviceCredCache, rotateDeviceViewToken, shouldForgetDeviceCred } from './statusDeviceCred.js';
 import { buildSmartphoneCard } from './statusSmartphoneCard.js';
+import { disableFanLink, enableFanLink, readFanToken } from './fanLinkClient.js';
 /*
  * ★v0.1.1371: boot(init)で await する storage read の上限[ms]。
  *   ここが無界だと storage stall のとき init が止まり、refresh にも到達せず【画面が白紙】になる
@@ -348,6 +349,7 @@ async function setWebPublishOptIn(next) {
   try {
     await chrome.storage.local.set({ [KEY_WEB_PUBLISH_OPT_IN]: value });
     if (!value) await disablePhonePost(getPublishCredentials(getUploadConfig())); // v0.1.1734: スマホからのコメントも止める
+    if (!value) await disableFanLink(getPublishCredentials(getUploadConfig())); // v0.1.1820: ファンへの公開も止める
     if (!value) await deleteDeviceOnServer(getUploadConfig().appOrigin); // v0.1.1731: 同意 OFF=サーバーの利用者データも消す(v0.1.1732: 消し終わってから画面に出す)
   } catch {
     /* best-effort: 保存に失敗してもキャッシュは反映済み(次回起動で既定OFFに戻る=安全側) */
@@ -3289,6 +3291,7 @@ function buildAutoPublishConsentToggle() {
     registerNow: () => maybeRegisterDevice({ optedIn: _webPublishOptIn === true, uploadCfg: getUploadConfig() }),
     rotate: rotateDeviceViewToken,
     phonePost: { readKey: readPhonePostKey, enable: () => enablePhonePost(getPublishCredentials(getUploadConfig())), disable: () => disablePhonePost(getPublishCredentials(getUploadConfig())), forget: forgetPhonePostKey }, // v0.1.1734
+    fanLink: { readToken: readFanToken, enable: () => enableFanLink(getPublishCredentials(getUploadConfig())), disable: () => disableFanLink(getPublishCredentials(getUploadConfig())) }, // v0.1.1820
     openUrl: (url) => { try { chrome.tabs.create({ url }); } catch { window.open(url, '_blank', 'noopener'); } }
   });
 }

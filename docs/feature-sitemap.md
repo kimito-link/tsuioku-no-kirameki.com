@@ -875,6 +875,14 @@
   - `src/extension/statusSmartphoneCard.js`
   - `src/extension/popup-entry.js`
   - `src/lib/statusPublisherPlan.js`
+- **拡張なしでスマホから見る(放送URL・ファンにも公開)** — ①開始画面(/phone)に放送URLを貼る→/live?lv= で1配信だけその場で取る(api/live-ranking.js の ?lv=・60秒置き場・SET NX で1本)・一覧に無ければ mergePinnedLive で足す(v0.1.1819)。②配信者の「👥 ファンにも公開」で読むだけの fan_… リンク(api/status.js ?action=fan・GET ?v=fan_ は配信者の最新を読むだけ・目印を置かない・CDN 5秒・リアルタイムは1時間の人数と月の総数で止める)(v0.1.1820)
+  - `api/live-ranking.js`
+  - `src/lib/phoneStartLink.js`
+  - `app/phone.js`
+  - `src/lib/fanLink.js`
+  - `src/server/fanLinkApi.js`
+  - `src/extension/fanLinkClient.js`
+  - `src/extension/statusSmartphoneCard.js`
 - **スマホから生放送にコメント(PC中継)** — スマホのWEB版の本物の入力欄(popup-entry.js の submitComment)が、受動ビューで globalThis.__nlsWebCommentRelay があるときだけ /api/post に預ける(拡張の中では常に null=PCの送信経路は不変)。サーバー(api/post.js)は投稿用の鍵(#pk=・ハッシュだけ保存)で照合し待ち行列に最長60秒・20秒8件まで。PCの送信担当(status.html?publisher=1)の phonePostRelay.js がふだん10秒/入力中2秒で取りに行き、NLS_POST_COMMENT で放送タブのコメント欄から投稿して結果を返す。スマホは接続の帯と ⏱→✓→✓✓(放送のコメントに流れたのを鏡で確認)の印を app/live-view-post.js で出す。PC の「✍️ スマホからコメントする」スイッチ・自分専用URL・QR は statusSmartphoneCard.js。判定は phonePost.js(v0.1.1734)
   - `api/post.js`
   - `src/lib/phonePost.js`
@@ -978,7 +986,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 289</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 287</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -988,7 +996,6 @@
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
 - `app/live-view.js` — global NL_BUILD_ID
-- `app/phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
 - `extension/background.js` — MV3 Service Worker
 - `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
 - `mobile/scripts/appstore-submit.mjs` — 移植元: partnership_program_website/scripts/appstore-submit.mjs
@@ -1187,7 +1194,6 @@
 - `src/lib/phoneBlocklist.js` — スマホで「この人を隠す」(純関数)。iPhone アプリの審査(ほかの人の書き込みを見せるアプリは、
 - `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
-- `src/lib/phoneStartLink.js` — スマホの開始画面(app/phone.html)で貼られた「PC の拡張のスマホ用リンク」を読む(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -1291,7 +1297,7 @@
 ### 🎁 ギフト (1版)
 - `v0.1.1819` 2026-10-28 — PC が無くても放送 URL で応援を見る
 
-### 🔊 読み上げ (12版)
+### 🔊 読み上げ (11版)
 - `v0.1.1812` 2026-10-28 — NG にした人は読み上げでも読まない
 - `v0.1.1811` 2026-10-28 — 読み上げない吹き出しが残らないように
 - `v0.1.1810` 2026-10-28 — 絵文字や記号だけのコメントは読み上げない
@@ -1303,7 +1309,6 @@
 - `v0.1.1804` 2026-10-28 — コメビュで読み上げが抜けるのを直す
 - `v0.1.1803` 2026-10-28 — 読み上げの遅れの計器を正しく
 - `v0.1.1801` 2026-10-28 — 遅いPCで混んだ時の読み上げの遅れを短く
-- `v0.1.1800` 2026-10-28 — 一気に来た短いコメントを飛ばしにくく
 
 ### 🪟 応援レーン・タイル (2版)
 - `v0.1.1816` 2026-10-28 — 隠れた画面の数え直しを間引く
@@ -1312,7 +1317,8 @@
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1809` 2026-10-28 — 読み上げの記録が古い数のまま残るのを直す
 
-### その他 (4版)
+### その他 (5版)
+- `v0.1.1820` 2026-10-28 — ファンにも公開(拡張なしで見られる)
 - `v0.1.1818` 2026-10-28 — コメント欄の見張りを間引く
 - `v0.1.1814` 2026-10-28 — 視聴ページの動きを軽く(コメントの読み直し)
 - `v0.1.1813` 2026-10-28 — 名前を読むときも www などを聞きやすく
