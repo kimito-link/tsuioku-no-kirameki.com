@@ -26,6 +26,7 @@ import {
   saveDeviceRecord,
   upstash
 } from '../src/server/deviceStore.js';
+import { moveFanLink, revokeFanLink } from '../src/server/fanLinkApi.js';
 
 /** 鍵・閲覧トークンは書かない。結果だけ。 */
 export function logDevice(outcome) {
@@ -51,6 +52,8 @@ export default async function handler(req, res) {
       const viewToken = randomToken(24);
       // v0.1.1734: スマホからコメントする鍵も古いURLに紐づく=一緒に無効にする(PC で ON にし直すと新しいURLが出る)。
       await revokePhonePost(auth.record.v);
+      // v0.1.1823: ファン用リンクは新しい閲覧トークンへ付け替える(ファンに配ったリンクは切らない)。
+      await moveFanLink(auth.record.v, viewToken);
       // 古い閲覧URLの中身を先に消す(作り直した瞬間から古いURLは 404)。
       await upstash(['DEL', deviceKeys.latest(auth.record.v), deviceKeys.etag(auth.record.v)]);
       // writeKey は変えない(ハッシュはそのまま)=記録を直接書き換える。
@@ -89,6 +92,7 @@ export default async function handler(req, res) {
         return;
       }
       await revokePhonePost(auth.record.v);
+      await revokeFanLink(auth.record.v); // v0.1.1823: スマホで見るを止めたら、ファン用リンクも消す
       await upstash([
         'DEL',
         deviceKeys.latest(auth.record.v),

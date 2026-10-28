@@ -45,6 +45,7 @@ export function silentWavDataUrl(seconds = 0.5) {
 function readOn() {
   try { return globalThis.localStorage?.getItem(STORE_KEY) === 'on'; } catch { return false; }
 }
+/** @param {boolean} on */
 function writeOn(on) {
   try { globalThis.localStorage?.setItem(STORE_KEY, on ? 'on' : 'off'); } catch { /* 覚えられなくても読める */ }
 }
@@ -70,6 +71,7 @@ export function speechTextForComment(text) {
  */
 export function createNativeSpeechVoice(a = {}) {
   const cap = a.cap !== undefined ? a.cap : /** @type {any} */ (globalThis).Capacitor;
+  /** @type {any} */
   let tts = null;
   try {
     if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) {
