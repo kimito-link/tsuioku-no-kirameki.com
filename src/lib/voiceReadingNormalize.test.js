@@ -25,11 +25,21 @@ describe('normalizeVoiceReadingBody', () => {
   it('同じ文字の連打を4文字に縮める', () => {
     expect(normalizeVoiceReadingBody('ああああああああ')).toBe('ああああ');
     expect(normalizeVoiceReadingBody('すごーーーーーーい！！！！！！')).toBe('すごーーーーい！！！！');
-    expect(normalizeVoiceReadingBody('😂😂😂😂😂😂')).toBe('😂😂😂😂');
+    expect(normalizeVoiceReadingBody('すごい😂😂😂😂😂😂')).toBe('すごい😂😂😂😂');
     expect(normalizeVoiceReadingBody('ああああ')).toBe('ああああ');
   });
   it('URL の読み方を変えられる(スマホは「リンク」)', () => {
     expect(normalizeVoiceReadingBody('見て https://example.com/x', { urlWord: 'リンク' })).toBe('見て リンク');
+  });
+  it('コメント全体が w 1文字なら「わら」(全角ｗは「ダブリュウ」と読まれる)', () => {
+    expect(normalizeVoiceReadingBody('ｗ')).toBe('わら');
+    expect(normalizeVoiceReadingBody(' w ')).toBe('わら');
+  });
+  it('絵文字・記号・顔文字だけなら読まない(VOICEVOX は無音を返すだけ)', () => {
+    for (const t of ['😂😂', '👏', '！？', '…', '♪♪', '(^^)', '✨✨']) expect(normalizeVoiceReadingBody(t)).toBe('');
+    expect(normalizeVoiceReadingBody('✨おめでとう✨')).toBe('✨おめでとう✨');
+    expect(normalizeVoiceReadingBody('ﾜﾛﾀ')).toBe('ﾜﾛﾀ');
+    expect(normalizeVoiceReadingBody('100')).toBe('100');
   });
   it('空・空白・null', () => {
     expect(normalizeVoiceReadingBody('')).toBe('');
