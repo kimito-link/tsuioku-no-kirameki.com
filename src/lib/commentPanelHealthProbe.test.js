@@ -7,7 +7,8 @@ import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
   decideCommentPanelRestoreAction,
-  normalizeCommentPanelAutoRestoreEnabled
+  normalizeCommentPanelAutoRestoreEnabled,
+  shouldProbeCommentPanelHealthNow
 } from './commentPanelHealthProbe.js';
 
 /**
@@ -349,5 +350,26 @@ describe('decideCommentPanelRestoreAction: 入力ロバスト性', () => {
       })
     );
     expect(r.action).toBe('click_latest_button');
+  });
+});
+
+describe('shouldProbeCommentPanelHealthNow(v0.1.1818: 位置を読む前に間引く)', () => {
+  it('初回と、前回の見張りから2秒経てば回す', () => {
+    expect(shouldProbeCommentPanelHealthNow({ now: 10_000 })).toBe(true);
+    expect(shouldProbeCommentPanelHealthNow({ now: 10_000, lastProbeAt: 8_000 })).toBe(true);
+    expect(shouldProbeCommentPanelHealthNow({ now: 10_000, lastProbeAt: 8_001 })).toBe(false);
+  });
+
+  it('前回の復旧から10秒以内・手動スクロールから5秒以内は回さない(読んでも none になる場面)', () => {
+    expect(shouldProbeCommentPanelHealthNow({ now: 20_000, lastActionAt: 10_001 })).toBe(false);
+    expect(shouldProbeCommentPanelHealthNow({ now: 20_000, lastActionAt: 10_000 })).toBe(true);
+    expect(shouldProbeCommentPanelHealthNow({ now: 20_000, lastUserScrollAt: 15_001 })).toBe(false);
+    expect(shouldProbeCommentPanelHealthNow({ now: 20_000, lastUserScrollAt: 15_000 })).toBe(true);
+  });
+
+  it('回さないと判定する場面では decideCommentPanelRestoreAction も none を返す(結果を変えない)', () => {
+    const base = { enabled: true, panelPresent: true, hasLatestButton: true, viewportHeight: 800, panelRect: { top: 100, height: 400 } };
+    expect(decideCommentPanelRestoreAction({ ...base, now: 20_000, lastActionAt: 10_001 }).action).toBe('none');
+    expect(decideCommentPanelRestoreAction({ ...base, now: 20_000, lastUserScrollAt: 15_001 }).action).toBe('none');
   });
 });
