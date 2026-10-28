@@ -25,7 +25,7 @@
  *     (c) 行データは既存の isValidChatRow(nlsInterceptAuth.js と同じ shape 検証)を通す
  *   最悪ケースは「自分のパネルに偽コメントが一瞬表示される」に限定される。
  *
- * 副作用なし、純関数のみ。
+ * 副作用なし、純関数のみ(★v0.1.1815: 確定済み一覧ごとのキー集合を WeakMap に覚える。結果は変えない)。
  */
 
 import { isValidChatRow, sanitizeIncomingArray } from './nlsInterceptAuth.js';
@@ -118,6 +118,34 @@ function dedupeKeyForEntry(entry) {
 }
 
 /**
+ * ★v0.1.1815: 確定済み一覧の「commentNo キー集合」を配列ごとに覚えておく。
+ *   視聴ページに隠れて入っている popup では、新着1件ごとに同じ確定済み一覧(3万行級)から
+ *   この集合を3〜4回作り直していた(1件ごとに全行で正規表現と文字列づくり)。
+ *   覚えるのは「同じ配列・同じ長さ」のときだけ。確定済み一覧は作り直しで差し替える運用
+ *   (popup-entry.js は配列の中身をその場で書き換えない)なので、同じ配列なら集合も同じ。
+ *   長さも見るのは、万一 push で伸ばされたときに古い集合を使わないための保険。
+ * @type {WeakMap<object, { length: number, keys: Set<string> }>}
+ */
+const _confirmedKeySetCache = new WeakMap();
+
+/**
+ * @param {ReadonlyArray<Record<string, unknown>>} arr
+ * @returns {Set<string>}
+ */
+function confirmedKeySetOf(arr) {
+  const hit = _confirmedKeySetCache.get(arr);
+  if (hit && hit.length === arr.length) return hit.keys;
+  /** @type {Set<string>} */
+  const keys = new Set();
+  for (const e of arr) {
+    const k = dedupeKeyForEntry(e);
+    if (k) keys.add(k);
+  }
+  _confirmedKeySetCache.set(arr, { length: arr.length, keys });
+  return keys;
+}
+
+/**
  * 「表示の先出し」バッファへ新規プッシュ行を合流する純関数。
  *   - 既に同じ commentNo が確定済み(storage 由来)一覧に存在するなら追加しない(正規到着で既に置換済み)。
  *   - 既存プッシュバッファに同じ commentNo があれば上書きしない(先着優先・多重送信の再エンキュー防止)。
@@ -135,18 +163,18 @@ export function mergeInstantPushBuffer(
   opts = {}
 ) {
   const maxBuffered = Math.max(1, Number(opts.maxBuffered) || 300);
-  const confirmedKeys = new Set(
-    (Array.isArray(confirmedEntries) ? confirmedEntries : [])
-      .map(dedupeKeyForEntry)
-      .filter(Boolean)
-  );
-  const out = (Array.isArray(existingPushBuffer) ? existingPushBuffer : []).filter((e) => {
+  const existing = Array.isArray(existingPushBuffer) ? existingPushBuffer : [];
+  const incomingList = Array.isArray(incomingDisplayEntries) ? incomingDisplayEntries : [];
+  // 先出し中の行も新着も無ければ、確定済み一覧を見るまでもなく空(結果は従来と同じ新しい空配列)。
+  if (!existing.length && !incomingList.length) return [];
+  const confirmedKeys = Array.isArray(confirmedEntries) ? confirmedKeySetOf(confirmedEntries) : new Set();
+  const out = existing.filter((e) => {
     const key = dedupeKeyForEntry(e);
     // 正規到着済みなら先出し行は用済み(置換済み)なので落とす。
     return !(key && confirmedKeys.has(key));
   });
   const seenKeys = new Set(out.map(dedupeKeyForEntry).filter(Boolean));
-  for (const incoming of Array.isArray(incomingDisplayEntries) ? incomingDisplayEntries : []) {
+  for (const incoming of incomingList) {
     const key = dedupeKeyForEntry(incoming);
     if (key) {
       if (seenKeys.has(key) || confirmedKeys.has(key)) continue;
@@ -172,13 +200,21 @@ export function composeDisplayEntriesWithInstantPush(confirmedEntries, pushBuffe
   const confirmed = Array.isArray(confirmedEntries) ? confirmedEntries : [];
   const buffer = Array.isArray(pushBuffer) ? pushBuffer : [];
   if (!buffer.length) return confirmed;
-  const confirmedKeys = new Set(confirmed.map(dedupeKeyForEntry).filter(Boolean));
+  const confirmedKeys = confirmedKeySetOf(confirmed);
   const extra = buffer.filter((e) => {
     const key = dedupeKeyForEntry(e);
     return !(key && confirmedKeys.has(key));
   });
   if (!extra.length) return confirmed;
-  return [...confirmed, ...extra];
+  const merged = [...confirmed, ...extra];
+  // 合成結果は次の新着で「確定済み一覧」として渡ってくるので、集合も足し算で先に作っておく(全行の作り直しを省く)。
+  const mergedKeys = new Set(confirmedKeys);
+  for (const e of extra) {
+    const k = dedupeKeyForEntry(e);
+    if (k) mergedKeys.add(k);
+  }
+  _confirmedKeySetCache.set(merged, { length: merged.length, keys: mergedKeys });
+  return merged;
 }
 
 /**
