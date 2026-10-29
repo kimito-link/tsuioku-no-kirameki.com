@@ -46,6 +46,7 @@ const rel = (r, o) => ({ left: r.left - o.left, top: r.top - o.top, right: r.rig
  * @param {HTMLElement|null} p.anchorEl 話した人のアバター(無ければ fallback を使う)
  * @param {{x:number,y:number}|null} [p.fallback] 席が無い人の決定座標(レイヤー基準)
  * @param {HTMLElement|null} p.seating 会場の席の帯(ここから外=配信映像は軽く避ける)
+ * @param {HTMLElement|null} [p.viewport] 席の一覧のスクロール枠。席が無い人の吹き出しはこの中(下の縁)に出す
  * @param {Array<{ el: Element|null, weight: number, clipTo?: Element|null }>} p.obstacleEls clipTo=その枠(一覧のスクロール)で見えている部分だけを避ける
  * @param {Array<{left:number,top:number,right:number,bottom:number}>} p.otherBubbles 他の吹き出しの箱(レイヤー基準)
  * @param {import('../lib/bubblePlacement.js').BubbleSide|null} [p.prefer]
@@ -66,12 +67,21 @@ export function placeVenueBubble(p) {
     anchor = v.anchor;
     away = !v.visible;
     edge = v.edge;
+  } else if (p.fallback && p.viewport) {
+    // ★v0.1.1828: 席が無い人(会場が満席・会場に居ない人)の吹き出し。以前は会場の下端から決めた座標に出し、
+    //   診断の行に被ったり PICK UP より下(会場の外)に出たりしていた(実機)。一覧の見えている下の縁に、名前付きで出す。
+    const v = rel(p.viewport.getBoundingClientRect(), L);
+    const x = Math.min(Math.max(p.fallback.x, v.left + 24), v.right - 24);
+    anchor = { left: x - 1, top: v.bottom - 2, right: x + 1, bottom: v.bottom - 2 };
+    away = true;
+    edge = 'bottom';
   } else if (p.fallback) {
     anchor = { left: p.fallback.x - 1, top: p.fallback.y, right: p.fallback.x + 1, bottom: p.fallback.y };
   } else {
     return null;
   }
   bubbleEl.classList.toggle('nlsb-bubble--away', away);
+  bubbleEl.classList.toggle('nlsb-bubble--seatless', !anchorEl && !!p.viewport);
   const w = bubbleEl.offsetWidth || 160;
   const h = bubbleEl.offsetHeight || 40;
   const obstacles = [];
