@@ -16,6 +16,7 @@
  * @module live-view-native-voice
  */
 import { PHONE_VOICE_QUEUE_MAX, pickNewVoiceRows } from '../src/lib/phoneVoice.js';
+import { normalizeVoiceReadingBody } from '../src/lib/voiceReadingNormalize.js';
 
 const STORE_KEY = 'nls_phone_voice_v1';
 /** 1件で読む最大の文字数(長文で次のコメントが何十秒も待たされないように)。 */
@@ -44,21 +45,18 @@ export function silentWavDataUrl(seconds = 0.5) {
 function readOn() {
   try { return globalThis.localStorage?.getItem(STORE_KEY) === 'on'; } catch { return false; }
 }
+/** @param {boolean} on */
 function writeOn(on) {
   try { globalThis.localStorage?.setItem(STORE_KEY, on ? 'on' : 'off'); } catch { /* 覚えられなくても読める */ }
 }
 
 /**
- * 読み上げる文字にする。URL は「リンク」、w の連続は「わら」、長すぎる文は切る。読むものが無ければ ''。
+ * 読み上げる文字にする。URL は「リンク」、w の連続は「わら」、8 の連続は「パチパチ」、長すぎる文は切る。読むものが無ければ ''。
  * @param {string} text
  */
 export function speechTextForComment(text) {
-  let t = String(text ?? '')
-    .replace(/https?:\/\/\S+/g, 'リンク')
-    .replace(/[wｗ]{3,}$/u, 'わらわら')
-    .replace(/[wｗ]{1,2}$/u, 'わら')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // 2026-10-28: PC の読み上げと同じ整え方(拍手の 8・同じ文字の連打も)を共有する(voiceReadingNormalize.js)。
+  let t = normalizeVoiceReadingBody(text, { urlWord: 'リンク' });
   if (t.length > NATIVE_SPEECH_MAX_CHARS) t = `${t.slice(0, NATIVE_SPEECH_MAX_CHARS)} 以下略`;
   return t;
 }
@@ -73,6 +71,7 @@ export function speechTextForComment(text) {
  */
 export function createNativeSpeechVoice(a = {}) {
   const cap = a.cap !== undefined ? a.cap : /** @type {any} */ (globalThis).Capacitor;
+  /** @type {any} */
   let tts = null;
   try {
     if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) {

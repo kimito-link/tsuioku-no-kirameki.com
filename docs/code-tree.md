@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1052 件
+## ⚠️ 役割コメントが無いソース 9 / 1083 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -844,7 +844,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (100)
+- 📁 **scripts/** (103)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -905,6 +905,8 @@
   - `council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
   - `council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
   - `council-roles.stance.test.js`
+  - `council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
+  - `council-synth.test.js`
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
   - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
   - `dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
@@ -927,6 +929,7 @@
   - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
+  - `measure-phone-direct.mjs` — 「iPhone アプリが自分でニコ生のコメントを取る」(拡張なし 第3段)の前に測る。
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
   - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
   - `migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
@@ -974,7 +977,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2169)
+- 📁 **src/** (2220)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1011,8 +1014,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (89)
-    - 📁 **popup/** (14)
+  - 📁 **extension/** (104)
+    - 📁 **popup/** (15)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1028,6 +1031,7 @@
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
+      - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
     - 📁 **story/** (6)
       - `laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
@@ -1040,18 +1044,23 @@
     - `backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
     - `cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
+    - `comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
+    - `comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
     - `commentTickerStarvation.wiring.test.js`
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
     - `embeddedProgramElapsed.wiring.test.js`
     - `ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
     - `ext-census-sw.test.js`
+    - `fanLinkClient.js` — 【層】L2 拡張の配線(chrome.storage と fetch。形の判定は src/lib/fanLink.js)
     - `giftHistoryLaneStateWiring.test.js`
     - `heavyReuseNotDoubleGated.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`
     - `laneMirrorRecordsLastTiled.wiring.test.js`
     - `live-ranking-entry.js` — `/live/`「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)の描画。
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
+    - `liveDirectComments.js` — iPhone アプリの中だけで、ニコ生のコメントを端末が直接受け取って流す(拡張なし 第3段)。
+    - `liveDirectComments.test.js`
     - `liveEvents.wiring.test.js`
     - `liveEventsPhone.test.js`
     - `liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
@@ -1080,6 +1089,11 @@
     - `popupBackfillCompleteState.wiring.test.js`
     - `popupUserLaneAvatarObservedFlow.test.js`
     - `repaintLoopGuard.wiring.test.js`
+    - `self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
+    - `self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
+    - `self-update.js` — 開発中（展開して読み込んだ）拡張が、作業フォルダの新しい版に自分で入れ替わる。
+    - `self-update.kit-test.mjs` — self-update.test.mjs — self-update.js の試験。拡張へ写すときは import 先のパスだけ直す。
+    - `self-update.test.js`
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
     - `smartphoneFreshness.wiring.test.js`
@@ -1105,6 +1119,10 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
+    - `voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
+    - `voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
+    - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
+    - `voiceTestHook.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
   - 📁 **images/** (117)
@@ -1258,7 +1276,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1914)
+  - 📁 **lib/** (1947)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1393,6 +1411,8 @@
     - `bandScale.test.js`
     - `bandScale.wiring.test.js`
     - `bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
+    - `besideOverflowGuard.js` — 横付き(beside)パネルが視聴行の中に入った結果、ページが横にはみ出したかを判定する純粋関数。
+    - `besideOverflowGuard.test.js`
     - `blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
     - `blackCurtainLedger.test.js`
     - `blackCurtainLedgerWiring.wiring.test.js`
@@ -1527,6 +1547,8 @@
     - `comeviewBootNotBlocked.wiring.test.js`
     - `comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
     - `comeviewInstantRender.test.js`
+    - `comeviewLivePush.js` — コメビュ(別窓)の読み上げへ、届いたコメントを storage を待たずに渡す(P5b・2026-10-29)。
+    - `comeviewLivePush.test.js`
     - `comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
     - `comeviewRows.test.js`
     - `comeviewTimelineDiff.js` — コメビュの「整合(reconcile)」を差分で描くための純関数。
@@ -1784,6 +1806,7 @@
     - `externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
     - `externalLinksSectionHtml.test.js`
     - `failOpenGuardCensus.test.js`
+    - `fanLink.js` — 【層】L0 判定層(純粋関数)
     - `fastDiagFullGate.js` — AI共有用の診断(fastDiag)の【全文】を、storage へ書くかどうかの判定(純関数・I/O禁止)。v0.1.1694
     - `fastDiagFullGate.test.js`
     - `finalDetailCells.js` — 100個化の最終弾(識別・効果音・BGM・記録の質)。
@@ -2254,6 +2277,8 @@
     - `mirrorSanitize.test.js`
     - `monotonicCommentCount.js` — v0.1.645: コメント記録件数の「数値ズレ」根治。
     - `monotonicCommentCount.test.js`
+    - `moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
+    - `moveNodePreservingState.test.js`
     - `nameplateToggle.wiring.test.js`
     - `nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
     - `nameplateToggleFinder.js` — ニコ生公式の「なふだを表示」トグルを見つける(純関数)。
@@ -2272,6 +2297,8 @@
     - `ndgrForwardCrawl.test.js`
     - `ndgrHiddenFlushThreshold.js` — 裏タブで「コメントが数十秒遅れて出る」のを止める純関数。
     - `ndgrHiddenFlushThreshold.test.js`
+    - `ndgrLiveFollow.js` — NDGR(ニコ生の新しいコメント配信)を「いま」から前へ追う純粋部品。
+    - `ndgrLiveFollow.test.js`
     - `ndgrMessageDedupe.js` — v0.1.238: NDGR Message ID dedupe
     - `ndgrMessageDedupe.test.js`
     - `ndgrUnknownSamplesBudget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -2441,6 +2468,7 @@
     - `phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
     - `phoneSoundCues.test.js`
     - `phoneStartLink.js` — スマホの開始画面(app/phone.html)で貼られた「PC の拡張のスマホ用リンク」を読む(純関数)。
+    - `phoneStartLink.test.js`
     - `phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
     - `phoneVenueModel.test.js`
     - `phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
@@ -2915,6 +2943,8 @@
     - `topSupportersMirrorProvisional.wiring.test.js`
     - `trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
     - `trackedImports.test.js`
+    - `trailingPublisher.js` — 「先に1回・間引いた分は最後に1回」書く小さな仕組み(DOM も chrome API も触らない)。
+    - `trailingPublisher.test.js`
     - `trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
     - `trimMap.test.js`
     - `uiUxRoadmapTdd.test.js`
@@ -2928,6 +2958,7 @@
     - `userIdPreference.test.js`
     - `userLaneCandidatesFromStorage.js` — 応援ユーザーレーン用: nls_comments 相当の StoredComment 配列から userId 単位に集約した候補。
     - `userLaneCandidatesFromStorage.test.js`
+    - `userLaneCandidatesFromStorageEquivalence.test.js`
     - `userLaneDiagSnapshot.js` — Popup DevTools 用: lane pipeline の観測スナップショット（PII を含めない）。
     - `userLaneDiagSnapshot.test.js`
     - `userLaneMergeGiftThrowers.js` — ギフト／広告投げ主専用レーン用のエントリ一覧（りんく列とは別段）。
@@ -3099,6 +3130,8 @@
     - `voiceDiag.js` — ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
     - `voiceDiag.test.js`
     - `voiceDiagKey.js` — 会場モード(comeview)の読み上げ診断 storage キーの正本(producer=comeview / consumer=status で共有)。
+    - `voiceEngineActivity.js` — 会場とコメビュで「VOICEVOX がいま使われているか」を分け合う(v0.1.1781)。
+    - `voiceEngineActivity.test.js`
     - `voiceFailureTaxonomy.contract.test.js`
     - `voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
     - `voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
@@ -3112,17 +3145,31 @@
     - `voiceLoadingState.test.js`
     - `voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
     - `voiceNarrowing.test.js`
+    - `voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
+    - `voiceNgMute.test.js`
+    - `voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
+    - `voicePlaybackQuality.test.js`
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
+    - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
+    - `voiceQuality.test.js`
     - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
     - `voiceReachabilityProbe.test.js`
     - `voiceReachabilityWiring.test.js`
     - `voiceReadQueue.js` — 読み上げキュー末尾へ追加し、上限超過分を古い順に返す。
     - `voiceReadQueue.test.js`
+    - `voiceReaderLease.js` — 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけにする(v0.1.1794)。
+    - `voiceReaderLease.test.js`
+    - `voiceReadingNormalize.js` — 読み上げる本文を「耳で聞いて自然」に整える純関数(会場・コメビュ・スマホ共通)。
+    - `voiceReadingNormalize.test.js`
     - `voiceStageTiming.js` — 読み上げの遅れを「段階ごと」に測る計器(印字専用・読み上げの挙動には一切介入しない)。
     - `voiceStageTiming.test.js`
+    - `voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。
+    - `voiceStream.test.js`
+    - `voiceStyleLevelTable.js` — VOICEVOX の声(styleId)ごとの素の大きさの表(v0.1.1788)。
+    - `voiceStyleLevelTable.test.js`
     - `voiceSustainedBoost.integration.test.js`
     - `voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
     - `voiceSynthFailure.test.js`
@@ -3130,8 +3177,12 @@
     - `voiceSynthFailureReason.integration.test.js`
     - `voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
     - `voiceSynthFailureReason.test.js`
+    - `voiceTestRun.js` — 読み上げを「決まった形のコメント」で流して測る試験(開発版だけ・2026-10-26)。
+    - `voiceTestRun.test.js`
     - `voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
     - `voiceVolume.test.js`
+    - `voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
+    - `voiceWarmup.test.js`
     - `voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
     - `voicevoxClient.test.js`
     - `watchAudienceCopy.js` — watch パネル「観客メモ」用の短文・ツールチップ文言（DOM 非依存）。
@@ -3175,13 +3226,16 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (11)
+  - 📁 **server/** (14)
     - `deviceApi.test.js`
     - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `fanLinkApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `fanLinkApi.test.js`
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
     - `kickApi.test.js`
     - `liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `liveEventsApi.test.js`
+    - `liveRankingOne.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
     - `phonePostApi.test.js`

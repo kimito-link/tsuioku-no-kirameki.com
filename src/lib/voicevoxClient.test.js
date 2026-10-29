@@ -5,12 +5,19 @@ import {
   buildVoiceReadingText,
   classifyVoicevoxAliveFailure,
   defaultVoicevoxAliveTimeoutMs,
+  initializeVoicevoxSpeaker,
   isVoicevoxAlive,
+  proxyTextResponse,
   probeVoicevoxAlive,
   isWhisperStyleName,
   listVoicevoxStyleIds,
-  synthesizeVoice
+  probeVoicevoxGpuCapable,
+  synthesizeVoice,
+  warmupVoicevoxQuery
 } from './voicevoxClient.js';
+
+/** 同じ文字の連打は読み上げで縮めるので、長さを試すときは違う文字を並べる。 */
+const kana = (n) => Array.from({ length: n }, (_, i) => 'あいうえおかきくけこ'[i % 10]).join('');
 
 afterEach(() => {
   vi.useRealTimers();
@@ -244,6 +251,40 @@ describe('synthesizeVoice', () => {
     await expect(pending).resolves.toBeNull();
   });
 
+  it('audio_query の時間切れは stage:query で知らせる(2026-10-26・以前は synth と区別できなかった)', async () => {
+    vi.useFakeTimers();
+    const onFailure = vi.fn();
+    const fetchFn = vi.fn(() => new Promise(() => {}));
+    const pending = synthesizeVoice('本文', { styleId: 3 }, { fetchFn, audioQueryTimeoutMs: 10, onFailure });
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(pending).resolves.toBeNull();
+    expect(onFailure.mock.calls[0][0].stage).toBe('query');
+  });
+
+  it('synthesis の時間切れは stage:synth で知らせる', async () => {
+    vi.useFakeTimers();
+    const onFailure = vi.fn();
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pitchScale: 0, speedScale: 1 }) })
+      .mockImplementationOnce(() => new Promise(() => {}));
+    const pending = synthesizeVoice('本文', { styleId: 3 }, { fetchFn, synthesisTimeoutMs: 10, onFailure });
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(pending).resolves.toBeNull();
+    expect(onFailure.mock.calls[0][0].stage).toBe('synth');
+  });
+
+  it('warmupVoicevoxQuery は「あ」で audio_query を1回だけ投げる(結果は捨てる)', async () => {
+    const fetchFn = vi.fn(async () => ({ ok: true }));
+    await expect(warmupVoicevoxQuery(8, { fetchFn })).resolves.toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const url = String(fetchFn.mock.calls[0][0]);
+    expect(url).toContain('/audio_query?');
+    expect(url).toContain('speaker=8');
+    await expect(warmupVoicevoxQuery(-1, { fetchFn })).resolves.toBe(false);
+    await expect(warmupVoicevoxQuery(3, { fetchFn: async () => { throw new Error('down'); } })).resolves.toBe(false);
+  });
+
   it('synthesis のタイムアウト時も null', async () => {
     vi.useFakeTimers();
     const fetchFn = vi
@@ -313,7 +354,7 @@ describe('buildVoiceReadingText', () => {
   });
 
   it('本文を最大60文字へ切り詰める', () => {
-    const result = buildVoiceReadingText({ name: '', text: 'あ'.repeat(80) });
+    const result = buildVoiceReadingText({ name: '', text: kana(80) });
     expect(Array.from(result)).toHaveLength(60);
   });
 
@@ -321,41 +362,46 @@ describe('buildVoiceReadingText', () => {
     expect(
       buildVoiceReadingText({
         name: 'りすなー',
-        text: 'あ'.repeat(61)
+        text: kana(61)
       })
-    ).toBe(`りすなー、${'あ'.repeat(60)}`);
+    ).toBe(`りすなー、${kana(60)}`);
   });
 
   it('最大文字数40では本文を40文字にする', () => {
     const result = buildVoiceReadingText(
-      { name: '', text: 'あ'.repeat(60) },
+      { name: '', text: kana(60) },
       { maxChars: 40 }
     );
-    expect(result).toBe('あ'.repeat(40));
+    expect(result).toBe(kana(40));
   });
 
   it('不正な最大文字数は60へ戻す', () => {
     expect(
       buildVoiceReadingText(
-        { name: '', text: 'あ'.repeat(70) },
+        { name: '', text: kana(70) },
         { maxChars: 'invalid' }
       )
-    ).toBe('あ'.repeat(60));
+    ).toBe(kana(60));
     expect(
       buildVoiceReadingText(
-        { name: '', text: 'あ'.repeat(70) },
+        { name: '', text: kana(70) },
         { maxChars: -1 }
       )
-    ).toBe('あ'.repeat(60));
+    ).toBe(kana(60));
   });
 
   it('名前は本文の最大文字数に含めない', () => {
     expect(
       buildVoiceReadingText(
-        { name: '長い名前'.repeat(20), text: 'あ'.repeat(50) },
+        { name: '長い名前'.repeat(20), text: kana(50) },
         { maxChars: 40 }
       )
-    ).toBe(`${'長い名前'.repeat(20)}、${'あ'.repeat(40)}`);
+    ).toBe(`${'長い名前'.repeat(20)}、${kana(40)}`);
+  });
+
+  it('v0.1.1813: 名前も本文と同じく整える(www・絵文字だけの名前)', () => {
+    expect(buildVoiceReadingText({ name: 'たろうｗｗｗ', text: 'こんにちは' })).toBe('たろうわらわら、こんにちは');
+    expect(buildVoiceReadingText({ name: '🌸🌸', text: 'こんにちは' })).toBe('こんにちは');
   });
 
   it('空本文は名前があっても空文字', () => {
@@ -371,7 +417,7 @@ describe('buildMergedVoiceText', () => {
         body: '8888',
         count: 4
       })
-    ).toBe('8888、ほか3件');
+    ).toBe('パチパチ、ほか3件'); // 2026-10-28: 拍手の 8 は「パチパチ」と読む
   });
 
   it('1件なら残り件数を付けない', () => {
@@ -389,11 +435,58 @@ describe('buildMergedVoiceText', () => {
       buildMergedVoiceText(
         {
           name: 'りすなー',
-          body: 'あ'.repeat(50),
+          body: kana(50),
           count: 3
         },
         { maxChars: 40 }
       )
-    ).toBe(`りすなー、${'あ'.repeat(40)}、ほか2件`);
+    ).toBe(`りすなー、${kana(40)}、ほか2件`);
+  });
+});
+
+describe('proxyTextResponse(Background 経由の応答)', () => {
+  it('204(中身なし)でも例外にならず ok の Response になる', () => {
+    const r = proxyTextResponse({ text: '', status: 204 });
+    expect(r.ok).toBe(true);
+    expect(r.status).toBe(204);
+  });
+  it('本文つきの 200 はそのまま読める', async () => {
+    const r = proxyTextResponse({ text: '{"a":1}', status: 200 });
+    expect(await r.text()).toBe('{"a":1}');
+  });
+  it('状態が壊れていたら 502(失敗扱い)', () => {
+    expect(proxyTextResponse({ text: 'x', status: 0 }).ok).toBe(false);
+  });
+  it('content script から initialize_speaker(204)を頼んでも打ち切りを待たずに true', async () => {
+    const sendMessage = vi.fn((_msg, cb) => cb({ text: '', status: 204, ok: true }));
+    vi.stubGlobal('chrome', { runtime: { sendMessage, lastError: undefined } });
+    try {
+      expect(await initializeVoicevoxSpeaker(8, { timeoutMs: 1000 })).toBe(true);
+      expect(sendMessage.mock.calls[0][0].url).toContain('/initialize_speaker?speaker=8');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('probeVoicevoxGpuCapable', () => {
+  const ok = (body) => async () => ({ ok: true, json: async () => body });
+  it('cuda か dml が true なら true(使えるだけ・今の状態ではない)', async () => {
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok({ cpu: true, cuda: false, dml: true }) })).toBe(true);
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok({ cpu: true, cuda: true, dml: false }) })).toBe(true);
+  });
+  it('どちらも無ければ false', async () => {
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok({ cpu: true, cuda: false, dml: false }) })).toBe(false);
+  });
+  it('読めない・失敗・形が違うときは null(案内を出さない)', async () => {
+    expect(await probeVoicevoxGpuCapable({ fetchFn: async () => ({ ok: false, status: 404 }) })).toBe(null);
+    expect(await probeVoicevoxGpuCapable({ fetchFn: async () => { throw new Error('down'); } })).toBe(null);
+    expect(await probeVoicevoxGpuCapable({ fetchFn: ok(null) })).toBe(null);
+  });
+  it('/supported_devices を GET で読む', async () => {
+    const fetchFn = vi.fn(ok({ cpu: true, dml: true }));
+    await probeVoicevoxGpuCapable({ fetchFn, baseUrl: 'http://x:1/' });
+    expect(fetchFn.mock.calls[0][0]).toBe('http://x:1/supported_devices');
+    expect(fetchFn.mock.calls[0][1]?.method).toBe('GET');
   });
 });

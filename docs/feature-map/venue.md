@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_GIFT_EFFECT_DIAG`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`
-- 読むキー: `KEY_EFFECT_SOUND_ENABLED`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
+- 読むキー: `KEY_EFFECT_SOUND_ENABLED`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VOICE_QUALITY`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -23,6 +23,9 @@ graph LR
   n_venue --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_venue --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_venue --> n_src_extension_venueBubblePlacer_js["extension/venueBubblePlacer.js"]:::shared
+  n_venue --> n_src_extension_voiceQualitySetting_js["extension/voiceQualitySetting.js"]:::shared
+  n_venue --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
+  n_venue --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
   n_venue --> n_src_lib_adObservationLog_js["lib/adObservationLog.js"]:::shared
   n_venue --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_venue --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
@@ -50,10 +53,7 @@ graph LR
   n_venue --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
   n_venue --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_venue --> n_src_lib_displayRecordedCount_js["lib/displayRecordedCount.js"]:::shared
-  n_venue --> n_src_lib_effectDirector_js["lib/effectDirector.js"]:::shared
-  n_venue --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
-  n_venue --> n_src_lib_extDocBusyCensus_js["lib/extDocBusyCensus.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 126 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 140 ファイル省略（全件は storage-bus.md / metafile 参照）。

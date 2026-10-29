@@ -11837,18 +11837,33 @@
             </label>
           </div>
           <!-- 2026-10-24(P3・ユーザー条件「絞るのは弱いPCだけ・絞り方は固定」): 読み上げの声の種類を絞るか。
-               既定はオフ(今までどおり全部の声)。配線は popup/wireVoiceNarrowSelect.js、判定は lib の voiceNarrowing.js。 -->
+               既定は「遅いPCと分かったら」(v0.1.1768・グラボ無しの実測で準備待ちの飛ばしが多かったため)。配線は popup/wireVoiceNarrowSelect.js、判定は lib の voiceNarrowing.js。 -->
           <div class="nl-record-sub">
             <label for="voiceNarrowSelect" class="nl-record-sub__label">
               <span>
                 読み上げの声を絞る
                 <select id="voiceNarrowSelect" aria-label="読み上げの声を絞る">
                   <option value="off">しない</option>
-                  <option value="auto">遅いPCと分かったら</option>
+                  <option value="auto">遅いPCと分かったら(おすすめ)</option>
                   <option value="on">いつも</option>
                 </select>
                 <span class="nl-record-sub__hint"
                   >ノートPCで読み上げが遅れるときに。声を6種類に絞り、読み上げを始めたときに先に読み込んでおきます。同じ人はいつも同じ声のままです。次に読み上げを ON にしたときから効きます。</span>
+              </span>
+            </label>
+          </div>
+          <!-- 2026-10-29: 読み上げの声の音質(出力サンプリングレート)。既定は今までどおり標準(16kHz・v0.1.1063 で合成が約30%速いため)。
+               高音質(24kHz)は自分で選んだ人だけ。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceQualitySelect" class="nl-record-sub__label">
+              <span>
+                読み上げの音質
+                <select id="voiceQualitySelect" aria-label="読み上げの音質">
+                  <option value="standard">標準(おすすめ)</option>
+                  <option value="high">高音質(速いPC向け)</option>
+                </select>
+                <span class="nl-record-sub__hint"
+                  >高音質は声が少しくっきりしますが、作るのに時間がかかります。グラボのある速いPCで、こもって聞こえるときに。次の声から効きます。</span>
               </span>
             </label>
           </div>

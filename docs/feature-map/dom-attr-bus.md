@@ -67,7 +67,7 @@
 | `data-nl-uname` | lib/supportTimelineHtml.js | extension/comeview-entry.js<br>extension/popup-entry.js |
 | `data-nl-usage-terms-ack` | extension/popup-entry.js<br>lib/cloakNotForSidePanel.js | — |
 | `data-nl-user-detail-wired` | extension/popup-entry.js | extension/popup-entry.js |
-| `data-nl-wired` | extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceVolumeSlider.js |
+| `data-nl-wired` | extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js |
 | `data-nls-active` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-audition-fetch` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-auto-open` | extension/content-entry.js | extension/content-entry.js |
@@ -83,6 +83,7 @@
 | `data-nls-fiber-rows` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-fiber-scans` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-fiber-step` | extension/page-intercept-entry.js | extension/content-entry.js |
+| `data-nls-first-paint-gate` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-heat` | extension/venueBar.js | — |
 | `data-nls-hidden` | extension/content-entry.js | extension/content-entry.js<br>lib/inlineHostVisibilityIntent.js |
 | `data-nls-hidden-injected` | extension/content-entry.js | — |

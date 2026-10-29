@@ -206,6 +206,61 @@ export function filterUnseenComeviewComments(rows, seenNos) {
   });
 }
 
+/** v0.1.1805: 読み上げ済みの最大コメント番号からこれ以上小さい番号は「開く前の古いコメント」とみなす。 */
+export const VOICE_BACKLOG_NO_MARGIN = 30;
+
+/**
+ * v0.1.1805: 読み上げに回す前に、開く前の古いコメント(後からまとめて届く分)を外す。
+ *   PC 実測(NHK BS 実況): コメビュを開いて約26秒後に、開く前のコメント100件以上が番号付き・
+ *   ユーザー無し・時刻=受け取った時刻でまとめて届き、読み上げ待ちに入ってから全部「古い」で捨てられ、
+ *   届いた件数・飛ばした件数を膨らませていた。時刻では見分けられないので、番号で見分ける:
+ *   これまでに読みに回した最大の番号より margin 以上小さい番号は古い(番号の無い行・ギフトは通す)。
+ * @param {readonly Record<string, unknown>[]} items
+ * @param {number} maxNo これまでに読みに回した最大の番号(0=まだ)
+ * @param {number} [margin]
+ * @returns {{ fresh: Record<string, unknown>[], backlog: number, maxNo: number }}
+ */
+export function splitVoiceBacklogByCommentNo(items, maxNo, margin = VOICE_BACKLOG_NO_MARGIN) {
+  const list = Array.isArray(items) ? items : [];
+  const floor = Number(maxNo) > 0 ? Number(maxNo) - margin : -Infinity;
+  /** @type {Record<string, unknown>[]} */
+  const fresh = [];
+  let backlog = 0;
+  let next = Number(maxNo) > 0 ? Number(maxNo) : 0;
+  for (const item of list) {
+    const no = Number(commentNoOfComeviewRow(item));
+    if (item?.kind === 'comment' && Number.isFinite(no) && no > 0) {
+      if (no < floor) { backlog += 1; continue; }
+      if (no > next) next = no;
+    }
+    fresh.push(item);
+  }
+  return { fresh, backlog, maxNo: next };
+}
+
+/**
+ * v0.1.1804: 整合リフレッシュ(全量描画)で初めて画面に出たコメントのうち、読み上げに回す分。
+ *   リフレッシュ中に届いたコメントは全量描画が先に出して「既出」に登録するため、後から来る
+ *   差分(hot append)では読み上げられず、声だけ抜けていた。番号があり未出で、届いてから
+ *   maxAgeMs 以内のものだけ返す(古い行をまとめて読まない)。
+ * @param {readonly Record<string, unknown>[]|unknown} timeline
+ * @param {Set<string>} seenNos
+ * @param {number} nowMs
+ * @param {number} maxAgeMs
+ * @returns {Record<string, unknown>[]}
+ */
+export function pickRefreshVoiceItems(timeline, seenNos, nowMs, maxAgeMs) {
+  if (!Array.isArray(timeline)) return [];
+  const seen = seenNos instanceof Set ? seenNos : new Set();
+  return timeline.filter((item) => {
+    if (!item || item.kind !== 'comment') return false;
+    const no = commentNoOfComeviewRow(item);
+    if (!no || seen.has(no)) return false;
+    const age = nowMs - Number(item.at);
+    return Number.isFinite(age) && age >= 0 && age <= maxAgeMs;
+  });
+}
+
 /**
  * ギフトの「再キャプチャ重複」を除く。同一内容(uid/アイテム/pt/メッセージ)のギフトが
  * windowMs 以内に再出現したら重複として捨てる(同じ人が本当に2回投げるのは通常分単位で離れる)。

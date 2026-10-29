@@ -36,3 +36,20 @@ describe('PC 無しで見られる応援ランキング(app.tsuioku-no-kirameki.
     expect(phoneJs).toContain("$('resumeRanking').addEventListener('click', () => { clearTimeout(autoTimer); go('/live'); });");
   });
 });
+
+describe('PC が無くても放送の URL を貼れば見られる(v0.1.1822)', () => {
+  const entry = read('src/extension/live-ranking-entry.js');
+  it('★開始画面はニコ生の放送 URL を拡張のリンクより先に見る(lv だけの文字列はトークンの形にも合うため)', () => {
+    const lvAt = phoneJs.indexOf('parseNicoliveWatchLink(raw)');
+    const viewerAt = phoneJs.indexOf('parseViewerLink(raw)');
+    expect(lvAt).toBeGreaterThan(0);
+    expect(lvAt).toBeLessThan(viewerAt);
+    expect(phoneJs).toContain('go(`/live?lv=${encodeURIComponent(lv)}`)');
+    expect(phoneHtml).toContain('placeholder="https://live.nicovideo.jp/watch/lv…"');
+  });
+  it('★一覧に無い配信は ?lv= の API で1配信だけ足す(一覧がまだ無くても出す)', () => {
+    expect(entry).toContain('.then(withPinnedLive)');
+    expect(entry).toContain('/api/live-ranking?lv=${encodeURIComponent(PINNED_LV)}');
+    expect(entry).toContain('if (r.status === 404 && PINNED_LV) return null;');
+  });
+});

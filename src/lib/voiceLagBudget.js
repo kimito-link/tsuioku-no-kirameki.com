@@ -320,6 +320,157 @@ export function computeSustainedPressureBoost(inputs) {
   return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(0, raw));
 }
 
+/** v0.1.1797: 順番待ちがこれを超えたら少し早口にして追いつく(ms)。 */
+export const VOICE_BACKLOG_WAIT_START_MS = 1500;
+/** 順番待ち由来の上乗せの上限(待ち 4.5秒で到達)。 */
+export const VOICE_BACKLOG_BOOST_MAX = 0.3;
+
+/**
+ * v0.1.1797: 順番待ち(キュー投入→取り出しの EMA)が伸びていたら、少し早口にして追いつく上乗せ値。
+ *   PC 試験: 1件約7.5秒の声が7秒おきに来ると、列は1件しか溜まらず(キュー長の混雑判定は 0)、
+ *   pressure も約1.07(しきい値 1.2 未満)で上がらないまま、遅れだけが1件ごとに 0.6〜1秒ずつ積もった
+ *   (10件目で 6〜7秒)。待ち時間そのものを見るので、この「少しだけ足りない」を拾える。
+ *   落ち着いていれば 0(普段の声の速さは変えない)。
+ * @param {unknown} queueWaitMs
+ * @param {unknown} [paceFloor] computeVoicePaceFloor の値(追いついた後も保つ分)
+ * @returns {number} 0〜VOICE_BACKLOG_BOOST_MAX
+ */
+export function computeBacklogCatchUpBoost(queueWaitMs, paceFloor = 0) {
+  const w = Number(queueWaitMs);
+  const floor = Number.isFinite(Number(paceFloor)) ? Math.max(0, Number(paceFloor)) : 0;
+  // 1秒あたり +0.1(PC 試験: +0.05 では10件目でも +0.12〜0.15 までしか上がらず、遅れは 5〜6秒で止まるだけだった)。
+  const byWait = Number.isFinite(w) && w > VOICE_BACKLOG_WAIT_START_MS
+    ? ((w - VOICE_BACKLOG_WAIT_START_MS) / 1000) * 0.1
+    : 0;
+  return Math.min(VOICE_BACKLOG_BOOST_MAX, floor + byWait);
+}
+
+/** 読み上げの「ふつうの速さでの長さ」と「届く間隔」をそれぞれ何件見てから床を出すか。 */
+export const VOICE_PACE_MIN_SAMPLES = 3;
+/** これより長い間隔は同じ扱い(しばらく静かだった=過負荷ではない)。 */
+export const VOICE_PACE_GAP_CAP_MS = 20000;
+const VOICE_PACE_EMA_ALPHA = 0.3;
+/** 床に足す少しの余り(溜まった遅れを消し切るため)。 */
+export const VOICE_PACE_FLOOR_MARGIN = 0.03;
+
+/**
+ * v0.1.1797: 「届く間隔」と「ふつうの速さで読んだ長さ」の移動平均。
+ *   PC 試験: 待ちだけで早口を決めると、追いついた瞬間に 0 に戻り、また遅れて…を繰り返した
+ *   (遅れ 0.6〜1秒 ↔ 4.5〜5.4秒)。声の長さが間隔をどれだけ上回るかを覚えておき、その分だけは
+ *   追いついた後も早口のまま保つ(ちょうど釣り合う速さに落ち着く)。
+ * @returns {{ lastArrivalAt: number, gapEmaMs: number, gapCount: number, naturalEmaMs: number, naturalCount: number, charMsEma: number }}
+ */
+export function createVoicePaceState() {
+  return { lastArrivalAt: -1, gapEmaMs: -1, gapCount: 0, naturalEmaMs: -1, naturalCount: 0, charMsEma: -1 };
+}
+
+/**
+ * 2026-10-28: 配信が変わったら「届く間隔」だけ忘れる(声の長さ・1文字の長さは声の性質なので残す)。
+ * @param {ReturnType<typeof createVoicePaceState>} state
+ */
+export function resetVoicePaceArrival(state) {
+  if (!state) return;
+  state.lastArrivalAt = -1;
+  state.gapEmaMs = -1;
+  state.gapCount = 0;
+}
+
+/** @param {number} prev @param {number} sample */
+function paceEma(prev, sample) {
+  return prev < 0 ? sample : prev + VOICE_PACE_EMA_ALPHA * (sample - prev);
+}
+
+/**
+ * 読む列に1件入った(まとめられた分・読まない分は呼ばない)。
+ * @param {ReturnType<typeof createVoicePaceState>} state
+ * @param {number} nowMs
+ */
+export function noteVoicePaceArrival(state, nowMs) {
+  if (!state) return;
+  const now = Number(nowMs);
+  if (!Number.isFinite(now)) return;
+  if (state.lastArrivalAt >= 0 && now >= state.lastArrivalAt) {
+    const gap = Math.min(VOICE_PACE_GAP_CAP_MS, now - state.lastArrivalAt);
+    state.gapEmaMs = paceEma(state.gapEmaMs, gap);
+    state.gapCount += 1;
+  }
+  state.lastArrivalAt = now;
+}
+
+/**
+ * 1件読み終えた。実際に鳴った時間から「早口なしで読んだらの長さ」に戻して覚える。
+ * @param {ReturnType<typeof createVoicePaceState>} state
+ * @param {number} playedMs 再生開始〜終了の実時間
+ * @param {number} [playbackRate] 再生速度(1 = そのまま)
+ * @param {number} [boostAtSynth] 合成時に足した早口の量
+ * @param {number} [chars] 読んだ文字数(分かれば1文字あたりの長さも覚える・v0.1.1800)
+ */
+export function noteVoicePacePlayed(state, playedMs, playbackRate = 1, boostAtSynth = 0, chars = 0) {
+  if (!state) return;
+  const ms = Number(playedMs);
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  const rate = Number(playbackRate) > 0 ? Number(playbackRate) : 1;
+  const boost = Number(boostAtSynth) > 0 ? Number(boostAtSynth) : 0;
+  const natural = ms * rate * (1 + boost);
+  state.naturalEmaMs = paceEma(state.naturalEmaMs, natural);
+  state.naturalCount += 1;
+  const n = Math.floor(Number(chars));
+  if (n > 0) state.charMsEma = paceEma(state.charMsEma, natural / n);
+}
+
+/** v0.1.1800: 1件の見込みの長さの下限(短い声にも合成・つなぎの時間がかかる)。 */
+export const VOICE_ITEM_MIN_MS = 600;
+/** v0.1.1801: 1回の合成の固定費(voiceStageTiming.VOICE_RTF_FIXED_OVERHEAD_MS と同じ値)。 */
+export const VOICE_SYNTH_FIXED_MS = 250;
+/** v0.1.1800: まだ1件も鳴らしていない時の1文字あたりの見込み(普通の速さの VOICEVOX でおよそ)。 */
+export const VOICE_CHAR_MS_DEFAULT = 130;
+
+/**
+ * v0.1.1800: 待っている件それぞれの文字数から「新しい方から何件までなら遅れ予算(6秒)に収まるか」を数え、
+ *   件数の上限にする(床 VOICE_QUEUE_MAX_FLOOR・天井 VOICE_QUEUE_MAX_CEIL)。
+ *   PC 試験: 今までは直近の1件あたり処理時間の平均で上限を決めていたため、長いコメントを読んだ直後は
+ *   平均が4〜5秒に膨らみ上限が5件に縮んで、続けて来た短いコメント10件のうち3件を飛ばした(開いた直後なら1件)。
+ *   1文字あたりの長さをまだ覚えていなければ見込み値(VOICE_CHAR_MS_DEFAULT)で数える。
+ *   charCounts が配列でなければ null(呼び出し側が従来の上限を使う)。
+ *   v0.1.1801: 声を作る方が鳴らすより遅い PC(合成時間÷声の長さ synthRtf が大きい)では、1件にかかる時間は
+ *   「声の長さ」ではなく「作る時間」で決まる。PC 試験(グラフィックボードなし)で、作る時間を数えずに8件まで
+ *   ためた結果、待ちが10秒に達して古い件から12件が待ったあげく捨てられた(作った分も無駄になる)。
+ *   1件 = max(声の長さ, 固定費 + 声の長さ×synthRtf) で数える。速い PC(比0.1前後)では変わらない。
+ * @param {number[]} charCounts 待っている件の文字数(古い順・新しく入れる件を含む)
+ * @param {ReturnType<typeof createVoicePaceState> | null | undefined} paceState
+ * @param {number} [synthRtf] 合成時間÷声の長さ(分からなければ 0 = 数えない)
+ * @returns {number|null}
+ */
+export function resolveVoiceQueueMaxByChars(charCounts, paceState, synthRtf = 0) {
+  if (!Array.isArray(charCounts)) return null;
+  const learned = Number(paceState?.charMsEma);
+  const perChar = learned > 0 ? learned : VOICE_CHAR_MS_DEFAULT;
+  const rtf = Number(synthRtf) > 0 ? Number(synthRtf) : 0;
+  let total = 0;
+  let fit = 0;
+  for (let i = charCounts.length - 1; i >= 0; i -= 1) {
+    const n = Math.max(0, Math.floor(Number(charCounts[i]) || 0));
+    const natural = Math.max(VOICE_ITEM_MIN_MS, n * perChar);
+    total += rtf > 0 ? Math.max(natural, VOICE_SYNTH_FIXED_MS + natural * rtf) : natural;
+    if (total > VOICE_LAG_BUDGET_MS) break;
+    fit += 1;
+  }
+  return Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, fit));
+}
+
+/**
+ * 床 = 声の長さが届く間隔を上回る割合+少し(1件7.6秒・7秒おきなら約0.12)。見本が少ないうちは 0。
+ * @param {ReturnType<typeof createVoicePaceState> | null | undefined} state
+ * @returns {number} 0〜VOICE_BACKLOG_BOOST_MAX
+ */
+export function computeVoicePaceFloor(state) {
+  if (!state || state.gapCount < VOICE_PACE_MIN_SAMPLES || state.naturalCount < VOICE_PACE_MIN_SAMPLES) return 0;
+  if (!(state.gapEmaMs > 0) || !(state.naturalEmaMs > 0)) return 0;
+  const over = state.naturalEmaMs / state.gapEmaMs - 1;
+  // 釣り合うちょうどの速さだと、溜まった遅れ(1.5秒未満)が消えずに残るので、少しだけ余計に早口にする。
+  return over > 0 ? Math.min(VOICE_BACKLOG_BOOST_MAX, over + VOICE_PACE_FLOOR_MARGIN) : 0;
+}
+
 /**
  * 既存の混雑ブーストと持続過負荷ブーストを合成する(上げるだけ・上限で clamp)。
  *

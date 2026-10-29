@@ -3,7 +3,9 @@ import {
   makeInitialVoiceDiag,
   buildVoiceDiagSnapshot,
   buildVoiceDiagLine,
-  VOICE_DIAG_FRESH_MS
+  VOICE_DIAG_FRESH_MS,
+  VOICE_DIAG_KEEP_ACROSS_LIVES,
+  resetVoiceDiagForNewLive
 } from './voiceDiag.js';
 
 /*
@@ -527,5 +529,47 @@ describe('2026-07-28計器(段階0=shadow・council-fable設計voice-lag-decompo
       enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, diagBornAt: 0
     }, 0);
     expect(line).not.toContain('計測');
+  });
+});
+
+describe('resetVoiceDiagForNewLive(2026-10-28・コメビュの配信切替)', () => {
+  it('配信ごとの数は初期値へ・声づくりの速さは残す・同じオブジェクトのまま', () => {
+    const d = /** @type {any} */ (makeInitialVoiceDiag());
+    Object.assign(d, {
+      enabled: true, spokenTotal: 40, staleDropTotal: 9, e2eAvgMs: 5200, upstreamEmaMs: 300, arrivalPerMin: 120,
+      backlogSkipTotal: 100, lastBigBatch: { at: 1, size: 100, noLess: 100, seenBefore: 0, oldestAgeMs: 1, newestAgeMs: 1 },
+      synthFailReasons: { timeout: 3 }, voiceEnqueuedTotal: 55,
+      warmSynthEmaMs: 1400, warmSynthSamples: 8, warmSynthRtfPermille: 900, coldSynthMaxMs: 3200
+    });
+    const same = d;
+    resetVoiceDiagForNewLive(d, 1234);
+    expect(d).toBe(same);
+    expect(d.spokenTotal).toBe(0);
+    expect(d.staleDropTotal).toBe(0);
+    expect(d.e2eAvgMs).toBe(-1);
+    expect(d.upstreamEmaMs).toBe(-1);
+    expect(d.arrivalPerMin).toBe(-1);
+    expect(d.backlogSkipTotal).toBe(0);
+    expect(d.lastBigBatch).toBe(null);
+    expect(d.synthFailReasons).toEqual({});
+    expect(d.voiceEnqueuedTotal).toBe(0);
+    expect(d.diagBornAt).toBe(1234);
+    expect(d.enabled).toBe(true);
+    expect(d.warmSynthEmaMs).toBe(1400);
+    expect(d.warmSynthSamples).toBe(8);
+    expect(d.warmSynthRtfPermille).toBe(900);
+    expect(d.coldSynthMaxMs).toBe(3200);
+  });
+  it('残す鍵はすべて初期 state にある(書き間違いで黙って全部消さない)', () => {
+    const base = makeInitialVoiceDiag();
+    for (const k of VOICE_DIAG_KEEP_ACROSS_LIVES) expect(Object.prototype.hasOwnProperty.call(base, k)).toBe(true);
+  });
+  it('初期 state の synthFailReasons を共有しない', () => {
+    const a = /** @type {any} */ (makeInitialVoiceDiag());
+    resetVoiceDiagForNewLive(a, 1);
+    a.synthFailReasons.x = 1;
+    const b = /** @type {any} */ (makeInitialVoiceDiag());
+    resetVoiceDiagForNewLive(b, 1);
+    expect(b.synthFailReasons).toEqual({});
   });
 });

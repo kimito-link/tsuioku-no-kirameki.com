@@ -63,4 +63,72 @@ describe('createCoalescedRepaintScheduler', () => {
     const scheduler = createCoalescedRepaintScheduler(callback);
     expect(() => scheduler.schedule()).not.toThrow();
   });
+
+  describe('v0.1.1816: minIntervalMs(隠れている間は間隔を空ける)', () => {
+    function harness(gapRef) {
+      let now = 1000;
+      const timers = [];
+      const callback = vi.fn();
+      const scheduler = createCoalescedRepaintScheduler(callback, {
+        yieldFn: makeImmediateYieldFn(),
+        minIntervalMs: () => gapRef.value,
+        nowFn: () => now,
+        setTimeoutFn: (fn, ms) => timers.push({ fn, at: now + ms })
+      });
+      const flush = async () => { await Promise.resolve(); await Promise.resolve(); };
+      const advance = (ms) => {
+        now += ms;
+        for (const t of timers.splice(0)) {
+          if (t.at <= now) t.fn();
+          else timers.push(t);
+        }
+      };
+      return { callback, scheduler, flush, advance, timers };
+    }
+
+    it('間隔 0 なら従来どおり毎回すぐ実行', async () => {
+      const h = harness({ value: 0 });
+      h.scheduler.schedule(); await h.flush();
+      h.scheduler.schedule(); await h.flush();
+      expect(h.callback).toHaveBeenCalledTimes(2);
+      expect(h.timers).toHaveLength(0);
+    });
+
+    it('間隔中の予約は束ねて、空いた時点で1回だけ実行する', async () => {
+      const h = harness({ value: 1500 });
+      h.scheduler.schedule(); await h.flush();
+      expect(h.callback).toHaveBeenCalledTimes(1);
+      h.advance(200);
+      h.scheduler.schedule(); await h.flush();
+      h.scheduler.schedule(); await h.flush();
+      expect(h.callback).toHaveBeenCalledTimes(1);
+      expect(h.scheduler.isPending()).toBe(true);
+      h.advance(1000);
+      expect(h.callback).toHaveBeenCalledTimes(1);
+      h.advance(300);
+      expect(h.callback).toHaveBeenCalledTimes(2);
+      expect(h.scheduler.isPending()).toBe(false);
+    });
+
+    it('間隔は実行のたびに聞く(見えるようになったら次からすぐ)', async () => {
+      const gap = { value: 1500 };
+      const h = harness(gap);
+      h.scheduler.schedule(); await h.flush();
+      gap.value = 0;
+      h.advance(10);
+      h.scheduler.schedule(); await h.flush();
+      expect(h.callback).toHaveBeenCalledTimes(2);
+    });
+
+    it('間隔の関数が投げても止まらず、すぐ実行する', async () => {
+      const callback = vi.fn();
+      const scheduler = createCoalescedRepaintScheduler(callback, {
+        yieldFn: makeImmediateYieldFn(),
+        minIntervalMs: () => { throw new Error('x'); }
+      });
+      scheduler.schedule();
+      await Promise.resolve(); await Promise.resolve();
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+  });
 });

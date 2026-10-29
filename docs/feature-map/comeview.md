@@ -6,13 +6,17 @@
 ## storage の出入り
 
 - 書くキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_VOICE_DIAG`, `KEY_VOICE_WEAK_PC`, `fn:comeviewPinStorageKey`
-- 読むキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VOICE_NARROW_MODE`, `KEY_VOICE_VOLUME_PERCENT`, `KEY_VOICE_WEAK_PC`
+- 読むキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VOICE_NARROW_MODE`, `KEY_VOICE_QUALITY`, `KEY_VOICE_VOLUME_PERCENT`, `KEY_VOICE_WEAK_PC`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
 ```mermaid
 graph LR
   n_comeview["コメビュ(別窓)"]
+  n_comeview --> n_src_extension_comeviewLivePushClient_js["extension/comeviewLivePushClient.js"]
+  n_comeview --> n_src_extension_voiceQualitySetting_js["extension/voiceQualitySetting.js"]:::shared
+  n_comeview --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
+  n_comeview --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
   n_comeview --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_comeview --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_comeview --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
@@ -23,6 +27,7 @@ graph LR
   n_comeview --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_comeview --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
   n_comeview --> n_src_lib_comeviewInstantRender_js["lib/comeviewInstantRender.js"]
+  n_comeview --> n_src_lib_comeviewLivePush_js["lib/comeviewLivePush.js"]:::shared
   n_comeview --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_comeview --> n_src_lib_comeviewTimelineDiff_js["lib/comeviewTimelineDiff.js"]
   n_comeview --> n_src_lib_comeviewUserDetailLink_js["lib/comeviewUserDetailLink.js"]:::shared
@@ -48,12 +53,7 @@ graph LR
   n_comeview --> n_src_lib_supportGridDisplayTier_js["lib/supportGridDisplayTier.js"]:::shared
   n_comeview --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
   n_comeview --> n_src_lib_supportTimelineHtml_js["lib/supportTimelineHtml.js"]:::shared
-  n_comeview --> n_src_lib_userCommentProfileCache_js["lib/userCommentProfileCache.js"]:::shared
-  n_comeview --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
-  n_comeview --> n_src_lib_voiceAgeGate_js["lib/voiceAgeGate.js"]:::shared
-  n_comeview --> n_src_lib_voiceAssignment_js["lib/voiceAssignment.js"]:::shared
-  n_comeview --> n_src_lib_voiceDiag_js["lib/voiceDiag.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 16 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 32 ファイル省略（全件は storage-bus.md / metafile 参照）。

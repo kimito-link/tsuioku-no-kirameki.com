@@ -1,4 +1,4 @@
-import { test, expect, enableInlinePanelAutoshow } from './fixtures.js';
+import { test, expect, enableInlinePanelAutoshow, waitExtensionStorageReady } from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
 const KEY_INLINE_PANEL_WIDTH_MODE = 'nls_inline_panel_width_mode';
@@ -29,7 +29,7 @@ async function extensionServiceWorker(context) {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     const ext = pickExt();
-    if (ext) return ext;
+    if (ext) { await waitExtensionStorageReady(ext); return ext; }
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error('extension service worker not found');
@@ -97,6 +97,30 @@ function injectTwoColumnPlayerRowLargeBesideGap() {
   side.style.cssText =
     'width:220px;min-height:280px;flex-shrink:0;background:#2a2a2a;';
 
+  row.appendChild(v);
+  row.appendChild(side);
+  doc.body.prepend(row);
+  win.scrollTo(0, 0);
+  win.dispatchEvent(new Event('resize'));
+}
+
+/**
+ * 実配信 1252px の再現（v0.1.1825）: 動画列は縮まず(680px)・公式コメ列 377px が右に並ぶ流体の視聴行。
+ * パネル(640px)を間に挟むとパネル右端もコメ列もタブ右端を越える＝横スクロールが出ていた。
+ */
+function injectFluidPlayerRowWideVideo() {
+  const doc = globalThis.document;
+  const win = globalThis.window;
+  for (const sel of ['#mock-player-row', '#e2e-mock-video', '.ga-ns-comment-panel']) doc.querySelector(sel)?.remove();
+  const row = doc.createElement('section');
+  row.id = 'mock-player-row';
+  row.style.cssText = 'display:flex;flex-direction:row;align-items:flex-start;gap:10px;margin:12px 0;padding:8px;background:#1a1a1a;';
+  const v = doc.createElement('video');
+  v.setAttribute('playsinline', '');
+  v.style.cssText = 'display:block;width:680px;height:383px;flex-shrink:0;background:#000;';
+  const side = doc.createElement('div');
+  side.className = 'ga-ns-comment-panel comment-panel';
+  side.style.cssText = 'width:377px;min-height:383px;flex-shrink:0;background:#2a2a2a;';
   row.appendChild(v);
   row.appendChild(side);
   doc.body.prepend(row);
@@ -446,6 +470,19 @@ test.describe('inline panel alignment', () => {
         prevElementId: 'mock-player-row',
         floatingClass: false
       });
+  });
+
+  test('beside で挟むとタブ右端を越える幅なら、横スクロールを出さず下へ逃がす', async ({ context }) => {
+    await setInlinePanelModes(context, { widthMode: 'video', placement: 'beside' });
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 1252, height: 900 });
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(injectFluidPlayerRowWideVideo);
+    await expect
+      .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+      .toMatchObject({ display: 'block', parentTag: 'BODY', prevElementId: 'mock-player-row' });
+    const sw = await page.evaluate(() => globalThis.document.documentElement.scrollWidth - globalThis.window.innerWidth);
+    expect(sw).toBeLessThanOrEqual(1);
   });
 
   test('beside では 空白 Text ノードが間にあっても毎tick再挿入しない', async ({
@@ -886,7 +923,10 @@ test.describe('inline panel viewport size matrix', () => {
       });
   });
 
-  for (const vw of [1280, 1440, 1920, 2560]) {
+  // 1280/1440 は外した(v0.1.1825): この mock は gap:300 なのでパネルを挟むと余白が2つになり
+  // 行が 8+400+300+292+300+220=1520px＝公式コメ列がタブの外へ押し出されていた(=はみ出しそのもの)。
+  // 今はその幅では下へ逃がすのが正しい挙動(上の「横スクロールを出さず下へ逃がす」が守る)。
+  for (const vw of [1600, 1920, 2560]) {
     test(`beside+幅拡大(常に)+列間ギャップ大: ${vw}px で行内かつ幅がタブ幅を超えない`, async ({
       context
     }) => {
@@ -913,6 +953,11 @@ test.describe('inline panel viewport size matrix', () => {
           floatingClass: false
         });
 
+      // 行の差し替え直後は前回の幅(below の全幅)が一瞬残ることがある=行内に入った後の幅が落ち着くのを待つ
+      //   (配置が合った瞬間に1回だけ読むと、高負荷時に 1256px を掴んで赤くなっていた・v0.1.1819)。
+      await expect
+        .poll(async () => Number.parseFloat(String((await hostPlacementMetrics(page))?.width || '0')), { timeout: 10_000 })
+        .toBeLessThanOrEqual(360);
       const m = await hostPlacementMetrics(page);
       const w = Number.parseFloat(String(m?.width || '0'));
       expect(w).toBeGreaterThan(260);
@@ -952,9 +997,11 @@ test.describe('inline panel 初回表示ゲート', () => {
         const hb = host.getBoundingClientRect();
         const vb = v ? v.getBoundingClientRect() : null;
         const below = vb ? hb.top >= vb.bottom - 8 : false;
-        return { present: true, visible, below };
+        return { present: true, visible, below, gate: host.dataset.nlsFirstPaintGate || '' };
       }, INLINE_HOST_ID);
-      if (s.present && s.visible && s.below) sawBelowVisible.push(i);
+      // ゲートの安全網(800ms 経っても行が無い=deadline)を過ぎた後の below は仕様どおり。
+      //   負荷の高い CI ではサンプル12回が 800ms を超えて毎回赤くなっていた(v0.1.1819)。
+      if (s.present && s.visible && s.below && s.gate !== 'deadline') sawBelowVisible.push(i);
       await page.waitForTimeout(50);
     }
 
@@ -1024,11 +1071,12 @@ test.describe('inline panel 初回表示ゲート', () => {
             const hb = host.getBoundingClientRect();
             const vb = v ? v.getBoundingClientRect() : null;
             const atDefault = vb ? hb.top >= vb.bottom - 8 : false;
-            return { present: true, visible: true, atDefault };
+            return { present: true, visible: true, atDefault, gate: host.dataset.nlsFirstPaintGate || '' };
           },
           { hostId: INLINE_HOST_ID, mode: startPlacement }
         );
-        if (s.present && s.visible && s.atDefault) sawDefaultPlacementVisible.push(i);
+        // ゲートの安全網(deadline)後は仕様どおり既定配置で出てよい(行の注入より先に 800ms 経つ高負荷 CI・v0.1.1819)。
+        if (s.present && s.visible && s.atDefault && s.gate !== 'deadline') sawDefaultPlacementVisible.push(`${i}:${s.gate || '-'}`);
         await page.waitForTimeout(40);
       }
 

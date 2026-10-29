@@ -36,3 +36,5 @@ export const KEY_VOICE_VOLUME_PERCENT = 'nls_voice_volume_percent_v1';
 export const KEY_VOICE_NARROW_MODE = 'nls_voice_narrow_mode_v1';
 /** P3: このPCで合成が遅いと一度でも測れたか(true のみ書く)。'auto' のときだけ使う。 */
 export const KEY_VOICE_WEAK_PC = 'nls_voice_weak_pc_v1';
+/** 声の音質('standard' 既定=16kHz | 'high'=24kHz)。2026-10-29。正規化は voiceQuality.js。 */
+export const KEY_VOICE_QUALITY = 'nls_voice_quality_v1';

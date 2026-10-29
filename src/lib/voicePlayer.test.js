@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VoicePlayer, VOICE_ALIVE_RETRY_BACKOFF_MS } from './voicePlayer.js';
+import { StreamedVoice } from './voiceStream.js';
 
 describe('VoicePlayer', () => {
   let mockStorage;
@@ -318,6 +319,38 @@ describe('VoicePlayer', () => {
     expect(onDropped).toHaveBeenCalledTimes(1); // 鳴らなかった→drop 通知
   });
 
+  it('v0.1.1811: 読む文字が無い(絵文字だけ)コメントは合成せず onDropped を呼ぶ', async () => {
+    await player.enable({ persist: false });
+    player.fetchSynthesizeVoice.mockClear();
+    const onAudioStart = vi.fn();
+    const onDropped = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u5', nickname: 'E', text: '😂😂', onAudioStart, onDropped }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    expect(onAudioStart).not.toHaveBeenCalled();
+    expect(player.fetchSynthesizeVoice).not.toHaveBeenCalled();
+  });
+
+  it('v0.1.1812: コメビュで NG にした人は読まず onDropped を呼ぶ(変更も追従する)', async () => {
+    let listener = null;
+    player.storageOnChanged = { addListener: (fn) => { listener = fn; } };
+    mockStorage.get.mockResolvedValue({ nls_comeview_ng_v1: [{ key: 'u:ng1', name: 'X' }] });
+    await player.initialize();
+    await player.enable({ persist: false });
+    player.fetchSynthesizeVoice.mockClear();
+    const onDropped = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'ng1', nickname: 'X', text: 'こんにちは', onDropped }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    expect(player.fetchSynthesizeVoice).not.toHaveBeenCalled();
+    expect(player.diag.ngMutedTotal).toBe(1);
+    // NG を外したら次から読む
+    listener({ nls_comeview_ng_v1: { newValue: [] } }, 'local');
+    player.enqueue([{ kind: 'comment', userId: 'ng1', nickname: 'X', text: 'こんにちは' }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(player.fetchSynthesizeVoice).toHaveBeenCalledTimes(1);
+  });
+
   it('v0.1.799: 実再生時は onDropped を【呼ばない】(speaking を壊さない=ずれ再発防止)', async () => {
     await player.enable({ persist: false });
     const onAudioStart = vi.fn();
@@ -356,6 +389,77 @@ describe('VoicePlayer', () => {
     // drain の setTimeout を待たずに、enqueue 内の即時 prefetch で合成が起動していること。
     expect(synth).toHaveBeenCalled();
     if (resolveSynth) resolveSynth(null);
+  });
+
+  describe('2026-10-26: 声を少しずつ受け取る(ストリーミング)', () => {
+    /** @param {{ supported?: boolean, weak?: boolean }} o */
+    async function setup(o = {}) {
+      mockStorage.get.mockResolvedValue(o.weak ? { nls_voice_weak_pc_v1: true } : {});
+      const streamedAudio = {
+        play: vi.fn().mockResolvedValue(),
+        pause: vi.fn(),
+        addEventListener: vi.fn((event, cb) => { if (event === 'ended') setTimeout(cb, 0); }),
+        removeEventListener: vi.fn()
+      };
+      const createStreamedAudio = vi.fn(() => streamedAudio);
+      player.probeVoiceStreaming = vi.fn().mockResolvedValue(o.supported !== false);
+      player.createStreamedAudio = createStreamedAudio;
+      await player.enable({ persist: false });
+      await new Promise((r) => setTimeout(r, 0));
+      return { createStreamedAudio, streamedAudio };
+    }
+
+    it('遅い PC と分かっていて待ちが無ければ、少しずつ受け取りを頼み、Web Audio 側で鳴らす', async () => {
+      const voice = new StreamedVoice(16000);
+      voice.append(new Int16Array(16000));
+      voice.finish();
+      const synth = vi.fn().mockResolvedValue(voice);
+      player.fetchSynthesizeVoice = synth;
+      const { createStreamedAudio, streamedAudio } = await setup({ weak: true });
+      player.enqueue([{ kind: 'comment', userId: 's1', nickname: 'S', text: 'みじかい' }]);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(synth.mock.calls[0][2].stream).toBe(true);
+      expect(createStreamedAudio).toHaveBeenCalledWith(voice, 100);
+      expect(streamedAudio.play).toHaveBeenCalled();
+      expect(mockAudio.play).not.toHaveBeenCalled();
+    });
+
+    it('速い PC の短いコメント・エンジンが非対応なら頼まない', async () => {
+      const synth = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+      player.fetchSynthesizeVoice = synth;
+      await setup({ weak: false });
+      player.enqueue([{ kind: 'comment', userId: 's2', nickname: 'S', text: 'みじかい' }]);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(synth.mock.calls[0][2].stream).toBeUndefined();
+
+      const synth2 = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+      player.fetchSynthesizeVoice = synth2;
+      await setup({ weak: true, supported: false });
+      player.enqueue([{ kind: 'comment', userId: 's3', nickname: 'S', text: 'みじかい' }]);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(synth2.mock.calls[0][2].stream).toBeUndefined();
+    });
+
+    it('鳴っている間に来たコメントは丸ごと受け取る(先読みが合成を隠す・速さの補正を残す)', async () => {
+      const synth = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+      player.fetchSynthesizeVoice = synth;
+      await setup({ weak: true });
+      player.stopCurrent = () => {}; // 何か鳴っている
+      player.enqueue([{ kind: 'comment', userId: 's4', nickname: 'S', text: 'あとから' }]);
+      expect(synth.mock.calls[0][2].stream).toBeUndefined();
+    });
+
+    it('Web Audio の部品が無い会場でも、少しずつ届いた声は丸ごと再生で鳴らす', async () => {
+      const voice = new StreamedVoice(16000);
+      voice.append(new Int16Array(8));
+      voice.finish();
+      player.fetchSynthesizeVoice = vi.fn().mockResolvedValue(voice);
+      await setup({ weak: true });
+      player.createStreamedAudio = vi.fn(() => null);
+      player.enqueue([{ kind: 'comment', userId: 's5', nickname: 'S', text: 'まるごと' }]);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mockAudio.play).toHaveBeenCalled();
+    });
   });
 
   it('v0.1.800: kickPrefetch は読み上げOFFなら何もしない(暴走/無駄合成しない)', async () => {
@@ -426,22 +530,58 @@ describe('VoicePlayer', () => {
       if (resolveSynth) resolveSynth(null);
     });
 
-    it('_effectiveQueueMaxを縮めた状態でenqueueすると、実際にその件数で溢れがdropされる', async () => {
+    it('長いコメントが溜まると、文字数の見積もりで実際に溢れがdropされる(v0.1.1800)', async () => {
       let resolveSynth;
       player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
       await player.enable({ persist: false });
-      // 処理時間が伸びた状況を模して実効上限を3に縮める(voiceLagBudgetの計算結果を想定)。
-      player._effectiveQueueMax = 3;
+      player._paceState.charMsEma = 140; // 1文字0.14秒(PC 試験の長い声と同じくらい)
       const onDropped = vi.fn();
-      const items = Array.from({ length: 6 }, (_, i) => ({
-        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `msg${i}`, onDropped
+      const long = Array.from({ length: 60 }, (_, i) => 'あいうえおかきくけこ'[i % 10]).join(''); // 連打は縮めるので違う文字で
+      const items = Array.from({ length: 10 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `${long}${i}`, onDropped
       }));
       player.enqueue(items);
       await new Promise((r) => setTimeout(r, 10));
-      // 先頭1件はdrainでshift済み・残りqueueは実効上限(3)でクランプされる(8固定なら5件残るはず)。
-      expect(player.queue.length).toBeLessThanOrEqual(3);
-      // 縮小で溢れた分は既存のdroppedループを通り、onDroppedが呼ばれている(地雷G-3: 通知漏れ防止)。
+      // 1件 7秒前後=予算6秒を超えるので床(5)まで絞られる。
+      expect(player.queue.length).toBeLessThanOrEqual(5);
+      expect(player.diag.queueMaxByChars).toBe(5);
+      // 溢れた分は既存のdroppedループを通り、onDroppedが呼ばれている(地雷G-3: 通知漏れ防止)。
       expect(onDropped).toHaveBeenCalled();
+      if (resolveSynth) resolveSynth(null);
+    });
+
+    it('長い声の直後(処理時間の平均が膨らんで上限5)でも、短いコメント10件は8件まで残る(v0.1.1800)', async () => {
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      player._effectiveQueueMax = 5; // 従来ならここで3件飛ばしていた
+      player._paceState.charMsEma = 140;
+      const onDropped = vi.fn();
+      const items = Array.from({ length: 10 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `草${i}`, onDropped
+      }));
+      player.enqueue(items);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(player.queue.length).toBeGreaterThanOrEqual(7);
+      expect(player.diag.queueMaxByChars).toBe(8);
+      if (resolveSynth) resolveSynth(null);
+    });
+  });
+
+  describe('v0.1.1801 声を作るのが遅い PC', () => {
+    it('合成の比が測れていれば、作る時間も数えて上限を絞る', async () => {
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      player._paceState.charMsEma = 125;
+      player.diag.warmRtfSamples = 5;
+      player.diag.warmSynthRtfPermille = 2000;
+      const items = Array.from({ length: 10 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `草${i}`
+      }));
+      player.enqueue(items);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(player.diag.queueMaxByChars).toBe(5); // 比を数えなければ 8(前のテスト)
       if (resolveSynth) resolveSynth(null);
     });
   });

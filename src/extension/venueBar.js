@@ -305,6 +305,8 @@ import {
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import { createTrailingPublisher } from '../lib/trailingPublisher.js';
+import { wireVenueVoiceTestHook } from './voiceTestHook.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
@@ -365,9 +367,13 @@ import {
   isVoicevoxAlive,
   probeVoicevoxAlive,
   listVoicevoxStyleIds,
-  initializeVoicevoxSpeaker,
-  synthesizeVoice
+  synthesizeVoice,
+  probeVoicevoxStreaming, probeVoicevoxGpuCapable
 } from '../lib/voicevoxClient.js';
+import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
+import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
+import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -1221,7 +1227,9 @@ const VENUE_CSS = `
     background:
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
     overscroll-behavior: contain;
-    contain: layout paint;
+    /* v0.1.1817: 客席を自分の層へ。毎フレーム変わる隣(群衆・ニコ生側)につられ481席を毎回描き直していた(実測 描画1,487→364ms/10秒) */
+    contain: layout paint style;
+    will-change: transform;
   }
   /* v0.1.1129: Chrome系のスクロールバー非表示(scrollbar-width:none の webkit 版)。 */
   .nlsb-seats::-webkit-scrollbar {
@@ -2241,6 +2249,10 @@ const VENUE_CSS = `
   .nlsb-bubble--away .nlsb-bubble-who { display: block; }
   .nlsb-bubble--away .nlsb-bubble-who::after { content: " ↓"; }
   .nlsb-bubble--away[data-side='bottom'] .nlsb-bubble-who::after { content: " ↑"; }
+  /* v0.1.1828: 席が無い人の吹き出しは指す席が無い=矢印も尻尾も出さない(名前だけ)。 */
+  .nlsb-bubble--seatless .nlsb-bubble-who::after,
+  .nlsb-bubble--seatless[data-side='bottom'] .nlsb-bubble-who::after { content: ""; }
+  .nlsb-bubble--seatless::after { display: none; }
   .nlsb-bubble.nlsb-is-leaving {
     opacity: 0;
   }
@@ -3341,18 +3353,16 @@ export function mountVenueBarButton(options = {}) {
     renderVoiceLoading(state, reason);
   };
 
-  // v0.1.1065: 会場読み上げの計器を KEY_VOICE_DIAG へ書く(3秒min-gap・他診断と同型)。
-  //   これまで会場のVoicePlayerは無計器で、状態速報の「会場読み上げ」行は別経路(comeview)の
-  //   古いスナップショットを表示し続けていた(=読み上げ不調の切り分けが不可能だった)。
-  let _venueVoiceDiagLastWriteAt = 0;
-  const publishVenueVoiceDiag = (/** @type {import('../lib/voiceDiag.js').VoiceDiagState} */ diag) => {
-    const now = Date.now();
-    if (now - _venueVoiceDiagLastWriteAt < 3000) return;
-    _venueVoiceDiagLastWriteAt = now;
-    const snap = { ...buildVoiceDiagSnapshot(diag, now, liveIdFromPathname()), source: 'venue' };
-    void chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {});
-  };
+  // v0.1.1065: 会場読み上げの計器を KEY_VOICE_DIAG へ書く(3秒min-gap)。それまで状態速報は別経路(comeview)の古い値を表示し続けていた。
+  //   v0.1.1809: 間引いた分は最後に1回書く(読み上げが止まった後に古い数を残さない・trailingPublisher.js)。
+  let _venueVoiceDiagLatest = /** @type {import('../lib/voiceDiag.js').VoiceDiagState | null} */ (null);
+  const venueVoiceDiagPublisher = createTrailingPublisher(() => {
+    if (_venueVoiceDiagLatest) void chrome.storage.local.set({ [KEY_VOICE_DIAG]: { ...buildVoiceDiagSnapshot(_venueVoiceDiagLatest, Date.now(), liveIdFromPathname()), source: 'venue' } }).catch(() => {});
+  }, 3000);
+  const publishVenueVoiceDiag = (/** @type {import('../lib/voiceDiag.js').VoiceDiagState} */ diag) => { _venueVoiceDiagLatest = diag; venueVoiceDiagPublisher.request(); };
 
+  const venueVoiceWarmup = createVoicevoxWarmup(); // 初めての声を合成前に読み込む(voiceWarmup.js)
+  wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
@@ -3387,11 +3397,16 @@ export function mountVenueBarButton(options = {}) {
     //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
     probeVoicevoxAlive,
     fetchVoiceStyleIds: listVoicevoxStyleIds,
-    initVoiceSpeaker: (/** @type {number} */ id) => initializeVoicevoxSpeaker(id), // P3: 絞った声の先読み(判定は lib の voiceNarrowing.js)
-    fetchSynthesizeVoice: synthesizeVoice,
+    initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensureWhenIdle(id), // P3 の先読みは合成の合間に裏で
+    voiceWarmup: venueVoiceWarmup,
+    probeVoiceStreaming: probeVoicevoxStreaming, probeVoiceGpu: probeVoicevoxGpuCapable, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
+    fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
     resolveVoice: resolveVoiceForUser
   });
-  
+  wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
+  wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
+  // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(開いて ON の間だけ名乗る・voiceReaderLease.js)。
+  const venueReaderLease = startVoiceReaderLease(() => open && voicePlayer.enabled, liveIdFromPathname, { onPageHide: (fn) => window.addEventListener('pagehide', fn) });
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.enabled) {
       voicePlayer.disable();
@@ -4404,7 +4419,7 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
-   * @param {{ speakerKey: string, text: string }} speech
+   * @param {{ speakerKey: string, text: string, userId?: string, name?: string }} speech
    */
   const showSpeechBubble = (speech) => {
     const seatIndex = seatByKey.get(speech.speakerKey);
@@ -4450,7 +4465,11 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1760: 席が一覧の外にいるとき(.nlsb-bubble--away)だけ見える発言者名(誰の吹き出しか分かるように)。
     const whoSpan = document.createElement('span');
     whoSpan.className = 'nlsb-bubble-who';
-    whoSpan.textContent = String(/** @type {any} */ (speech).name || '').trim() || 'コメント';
+    // ★v0.1.1832: 名前の無い人(匿名)は「コメント」でなく席と同じ「匿名NNN」で出す(実配信で15件全部「コメント」だった)。
+    const whoName = String(/** @type {any} */ (speech).name || '').trim();
+    const whoUid = String(/** @type {any} */ (speech).userId || '').trim();
+    whoSpan.textContent =
+      (whoName && !isGenericComeviewName(whoName) ? whoName : '') || anonymousDisplayLabel(whoUid || speech.speakerKey);
     const textSpan = document.createElement('span');
     textSpan.className = 'nlsb-bubble-text';
     textSpan.textContent = text;
@@ -5134,7 +5153,10 @@ export function mountVenueBarButton(options = {}) {
       anchorEl: anchorEl instanceof HTMLElement ? anchorEl : null,
       fallback: node ? null : bubble.fallbackAnchor,
       seating,
+      viewport: seatsHost,
+      viewportFloor: storyDiagHost,
       obstacleEls: [
+        { el: storyDiagHost, weight: W.guide, clipTo: seatsHost },
         { el: pickupEls.root, weight: W.pickup },
         { el: header, weight: W.header },
         ...Array.from(seatsHost.querySelectorAll('.nl-story-userlane-guide'), (el) => ({ el, weight: W.guide, clipTo: seatsHost }))
@@ -6668,12 +6690,14 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.755 リアルタイム完璧化: maxEmit 8→24。洪水時に「9件目以降の新着を取りこぼす」のを防ぐ
     //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
     //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
+    const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
     const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
     speechState = {
       seenKeys: result.seenKeys,
       primed: result.primed
     };
     // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
+    if (result.speeches.length > 0) voicePlayer.diag.venueGate = voicePlayer.enabled ? 'ok' : 'voice-off';
     if (result.speeches.length > 0) {
       pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now(), {
         // 発言者のサムネ・ハンドル名・ID・リンクをセットで(§3.5)。サムネは観測済みのプロフィール > uid から導出 > 匿名は identicon。
@@ -6740,14 +6764,14 @@ export function mountVenueBarButton(options = {}) {
         //   シグナル)で resolved を通知し unvoiced(流速寿命)へ落とす。再生時は onAudioStart→speaking。
         //   onPlayStart(再生/破棄の両方で発火する曖昧信号)は配線しない(取りこぼし回避・従来どおり)。
         //   bubble が無い(空テキスト等で出なかった)場合は no-op で安全。
-        voicePlayer.enqueue([{
+        const voiceIt = () => voicePlayer.enqueue([{
           kind: 'comment',
           userId: speech.userId,
           nickname: speech.name,
           key: speech.key,
           text: speech.text,
           // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
-          receivedAt: speech.capturedAt,
+          receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
           // ★キャラライブの相槌はここに乗せる(2026-08-25)。
           //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
           //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
@@ -6766,6 +6790,9 @@ export function mountVenueBarButton(options = {}) {
             charaLive.onCommentSpokenEnd();
           }
         }]);
+        // v0.1.1794: コメビュが同じ配信を読んでいれば鳴らさない(吹き出しは声なしの寿命へ)。届いた順に答える。
+        if (!venueReaderLease) voiceIt();
+        else venueReaderLease.whenMine(liveIdFromPathname(), voiceIt, () => { if (bubble) markBubbleResolved(bubble); voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1; });
       }
     }
   };
@@ -7162,6 +7189,7 @@ export function mountVenueBarButton(options = {}) {
    */
   const setOpen = (nextOpen, persist) => {
     open = nextOpen === true;
+    voicePlayer.diag.venueGate = open ? 'no-input' : 'panel-closed';
     root.classList.toggle('nlsb-is-open', open);
     // v0.1.1115 ①POP遮蔽: 会場open中だけ document ルートに印を付け、CSS(VENUE_CSS末尾)が
     //   ①POPホスト(#nls-inline-popup-host)を visibility:hidden にする。open→close 往復で

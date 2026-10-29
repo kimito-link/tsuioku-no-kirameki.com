@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { measureVoiceWavLevel, voiceTargetPeak } from './voiceVolume.js';
 import { fileURLToPath } from 'node:url';
 import {
   applyVoiceVolumeToWav,
   normalizeVoiceVolumePercent,
   VOICE_PEAK_CEILING,
-  VOICE_TARGET_PEAK_AT_100
+  VOICE_TARGET_PEAK_AT_100,
+  voiceLevelGain,
+  voiceTargetRms
 } from './voiceVolume.js';
 
 /** 16bit PCM モノラルの WAV を作る。 */
@@ -29,6 +32,12 @@ const peakOf = (/** @type {ArrayBuffer} */ buf) => {
   return p;
 };
 const FULL = 32767;
+/** 話し声らしい形: 最大振幅1か所 + その 1/6 くらいの小さな揺れ(最大振幅÷RMS ≈ 6)。 */
+const speech = (/** @type {number} */ peak) => [0, peak, ...Array.from({ length: 60 }, (_, i) => (i % 2 ? 1 : -1) * Math.round(peak / 6))];
+const rmsOf = (/** @type {ArrayBuffer} */ buf) => {
+  const lv = measureVoiceWavLevel(buf);
+  return lv ? lv.rms : 0;
+};
 
 describe('normalizeVoiceVolumePercent', () => {
   it('未設定・壊れた値は100、範囲外は0〜300に収める', () => {
@@ -41,16 +50,17 @@ describe('normalizeVoiceVolumePercent', () => {
 });
 
 describe('applyVoiceVolumeToWav', () => {
-  it('100%で長文(最大振幅48%)は今と同じ=元の buffer をそのまま返す', () => {
-    const wav = makeWav([0, Math.round(FULL * VOICE_TARGET_PEAK_AT_100), -1000]);
+  it('v0.1.1792: 100%で聞こえの大きさ(RMS)が狙いと同じ文は、元の buffer をそのまま返す', () => {
+    const r = voiceTargetRms(VOICE_TARGET_PEAK_AT_100);
+    const wav = makeWav([0, ...Array.from({ length: 200 }, (_, i) => (i % 2 ? 1 : -1) * Math.round(FULL * r))]);
     expect(applyVoiceVolumeToWav(wav, 100)).toBe(wav);
   });
 
-  it('100%で短文(最大振幅19%)は長文と同じ大きさまで上がる', () => {
-    const wav = makeWav([0, Math.round(FULL * 0.19), -3000]);
+  it('v0.1.1792: 小さい文は聞こえの大きさの狙いまで上がり、元は書き換えない', () => {
+    const wav = makeWav(speech(Math.round(FULL * 0.19)));
     const out = applyVoiceVolumeToWav(wav, 100);
-    expect(peakOf(out) / FULL).toBeCloseTo(VOICE_TARGET_PEAK_AT_100, 2);
-    expect(peakOf(wav)).toBe(Math.round(FULL * 0.19)); // 元は書き換えない
+    expect(rmsOf(out)).toBeCloseTo(voiceTargetRms(VOICE_TARGET_PEAK_AT_100), 2);
+    expect(peakOf(wav)).toBe(Math.round(FULL * 0.19));
   });
 
   it('300%でも満振幅の98%を超えない(音割れしない)', () => {
@@ -59,14 +69,30 @@ describe('applyVoiceVolumeToWav', () => {
   });
 
   it('増幅は4倍まで(ほぼ無音の文の雑音を持ち上げない)', () => {
-    const wav = makeWav([0, 100, -50]);
-    expect(peakOf(applyVoiceVolumeToWav(wav, 300))).toBe(400);
+    const wav = makeWav([0, 1000, -500]);
+    expect(peakOf(applyVoiceVolumeToWav(wav, 300))).toBe(4000);
   });
 
   it('0%で無音、50%で半分', () => {
-    const wav = makeWav([0, Math.round(FULL * 0.48)]);
+    const wav = makeWav(speech(Math.round(FULL * 0.48)));
+    const full = rmsOf(applyVoiceVolumeToWav(wav, 100));
     expect(peakOf(applyVoiceVolumeToWav(wav, 0))).toBe(0);
-    expect(peakOf(applyVoiceVolumeToWav(wav, 50)) / FULL).toBeCloseTo(0.24, 2);
+    expect(rmsOf(applyVoiceVolumeToWav(wav, 50)) / full).toBeCloseTo(0.5, 2);
+  });
+
+  it('v0.1.1792: 最大振幅÷RMS が違う声・文でも、聞こえの大きさがそろう', () => {
+    // 詰まった声(最大振幅÷RMS = 1)と話し声らしい形(約 4.8)。最大振幅で揃えると差は 13.6dB あった。
+    const dense = makeWav([0, ...Array.from({ length: 60 }, (_, i) => (i % 2 ? 1 : -1) * Math.round(FULL * 0.05))]);
+    const sparse = makeWav(speech(Math.round(FULL * 0.3)));
+    const denseOut = rmsOf(applyVoiceVolumeToWav(dense, 100));
+    const sparseOut = rmsOf(applyVoiceVolumeToWav(sparse, 100));
+    expect(Math.abs(20 * Math.log10(denseOut / sparseOut))).toBeLessThan(0.5);
+  });
+
+  it('v0.1.1792: 最大振幅が大きい声は、天井の手前(9割)で止める', () => {
+    expect(voiceLevelGain(0.9, 0.03, VOICE_TARGET_PEAK_AT_100)).toBeCloseTo((VOICE_PEAK_CEILING * 0.9) / 0.9, 6);
+    // RMS が分からなければ今までどおり最大振幅で揃える
+    expect(voiceLevelGain(0.24, 0, VOICE_TARGET_PEAK_AT_100)).toBeCloseTo(2, 6);
   });
 
   it('16bit PCM の WAV でなければ触らない(外部の形が変わっても壊れない)', () => {
@@ -84,8 +110,10 @@ describe('配線(会場・コメビュ・ポップアップ)', () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const read = (/** @type {string} */ p) => fs.readFileSync(path.join(root, p), 'utf8');
   it('会場とコメビュの両方が、再生直前に同じ純関数で音量を掛ける', () => {
-    expect(read('src/lib/voicePlayer.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(wav, this\.volumePercent\)\]/);
-    expect(read('src/extension/comeview-entry.js')).toMatch(/new Blob\(\[applyVoiceVolumeToWav\(wav, _voiceVolumePercent\)\]/);
+    // 2026-10-26: 少しずつ届いた声を丸ごと再生に戻すときも同じ関数を通す(whole = 丸ごとの WAV)。
+    // 2026-10-26: 鳴らす直前の大きさを計器(measureVoiceWavLevel)で測るため、一度 loud に受けてから Blob にする。
+    expect(read('src/lib/voicePlayer.js')).toMatch(/const loud = applyVoiceVolumeToWav\(whole, this\.volumePercent\);[\s\S]{0,120}new Blob\(\[loud\]/);
+    expect(read('src/extension/comeview-entry.js')).toMatch(/const loud = applyVoiceVolumeToWav\(wav, _voiceVolumePercent\);[\s\S]{0,160}new Blob\(\[loud\]/);
     expect(read('src/extension/comeview-entry.js')).toMatch(/changes\[KEY_VOICE_VOLUME_PERCENT\]/);
     expect(read('src/extension/venueBar.js')).toMatch(/storageOnChanged: .*chrome\.storage\.onChanged/);
   });
@@ -113,5 +141,29 @@ describe('VoicePlayer の音量設定', () => {
     expect(player.volumePercent).toBe(250);
     await player.initialize();
     expect(listeners.length).toBe(1); // 二重購読しない
+  });
+});
+
+describe('2026-10-26 聞こえ方の計器: measureVoiceWavLevel / voiceTargetPeak', () => {
+  function wav(samples) {
+    const buf = new ArrayBuffer(44 + samples.length * 2);
+    const v = new DataView(buf);
+    const tag = (o, s) => { for (let i = 0; i < 4; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    tag(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); tag(8, 'WAVE');
+    tag(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    tag(36, 'data'); v.setUint32(40, samples.length * 2, true);
+    samples.forEach((s, i) => v.setInt16(44 + i * 2, s, true));
+    return buf;
+  }
+  it('最大振幅と、無音を除いた RMS', () => {
+    const lv = measureVoiceWavLevel(wav([0, 0, 16384, -16384]));
+    expect(lv?.peak).toBeCloseTo(0.5, 2);
+    expect(lv?.rms).toBeCloseTo(0.5, 2);
+    expect(measureVoiceWavLevel(new ArrayBuffer(4))).toBeNull();
+  });
+  it('音量設定の狙い', () => {
+    expect(voiceTargetPeak(100)).toBeCloseTo(0.48);
+    expect(voiceTargetPeak(300)).toBeCloseTo(0.98);
   });
 });

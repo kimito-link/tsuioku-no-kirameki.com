@@ -3,7 +3,8 @@ import {
   expect,
   dismissExtensionUsageTermsGate,
   openNlPopupSettings,
-  enableInlinePanelAutoshow
+  enableInlinePanelAutoshow,
+  waitExtensionStorageReady
 } from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
@@ -23,6 +24,7 @@ test.describe('extension interaction', () => {
     if (!sw) {
       sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
     }
+    await waitExtensionStorageReady(sw);
     const extensionId = new URL(sw.url()).hostname;
 
     await sw.evaluate(async (key) => {
@@ -61,6 +63,7 @@ test.describe('extension interaction', () => {
     if (!sw) {
       sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
     }
+    await waitExtensionStorageReady(sw);
 
     await sw.evaluate(async (key) => {
       await chrome.storage.local.set({ [key]: false });
@@ -140,6 +143,7 @@ test.describe('extension interaction', () => {
     if (!sw) {
       sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
     }
+    await waitExtensionStorageReady(sw);
     await enableInlinePanelAutoshow(context);
 
     const page = await context.newPage();
@@ -164,5 +168,53 @@ test.describe('extension interaction', () => {
     const src = await iframe.getAttribute('src');
     expect(src).toContain('inline=1');
     expect(src).toContain('lv=lv888888888');
+  });
+
+  /*
+   * v0.1.1820 退行ガード: パネル(iframe)が開いて約1秒後に丸ごと読み込み直されていた。
+   *   先読み(prewarm)が順番待ちの間に通常描画が置いた表示中のパネルを画面外へ引きはがし、
+   *   直後に描画が元へ戻す=iframe の付け直しで popup が2回起動していた。視聴行が後から
+   *   出来てパネルの置き場所が変わっても、iframe の読み込みは1回だけであること。
+   */
+  test('パネルを開いても host は1回しか作られない', async ({ context }) => {
+    // v0.1.1830: 作りたて(未挿入)の host を「古い」と捨てて作り直し、開くたび4回作っていた(=毎回 display:none から始まる)。
+    await enableInlinePanelAutoshow(context);
+    const page = await context.newPage();
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    const sw = context.serviceWorkers().find((w) => w.url().startsWith('chrome-extension://'));
+    await expect
+      .poll(async () => sw.evaluate(async () => (await chrome.storage.local.get('nls_ai_share_fast_diag_v1')).nls_ai_share_fast_diag_v1?.content?.hostMoveDiag?.byReason?.host_created ?? null), { timeout: 25_000 })
+      .not.toBeNull();
+    await page.waitForTimeout(4000);
+    const created = await sw.evaluate(async () => (await chrome.storage.local.get('nls_ai_share_fast_diag_v1')).nls_ai_share_fast_diag_v1?.content?.hostMoveDiag?.byReason?.host_created);
+    expect(created).toBe(1);
+  });
+
+  test('視聴行が後から出来てもパネルは読み込み直されない', async ({ context }) => {
+    await enableInlinePanelAutoshow(context);
+    const page = await context.newPage();
+    let panelLoads = 0;
+    page.on('framenavigated', (f) => {
+      if (f !== page.mainFrame() && f.url().includes('popup.html')) panelLoads += 1;
+    });
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(() => {
+      const doc = globalThis.document;
+      const old = doc.getElementById('e2e-mock-video');
+      if (old) old.remove();
+      const wrap = doc.createElement('section');
+      wrap.id = 'mock-player-wrap';
+      wrap.style.cssText = 'width:500px;display:flex;flex-direction:column;';
+      const v = doc.createElement('video');
+      v.style.cssText = 'display:block;width:400px;height:225px;';
+      wrap.appendChild(v);
+      doc.body.prepend(wrap);
+      globalThis.window.dispatchEvent(new Event('resize'));
+    });
+    await expect
+      .poll(() => page.evaluate((id) => document.getElementById(id)?.parentElement?.id || '', INLINE_HOST_ID), { timeout: 25_000 })
+      .toBe('mock-player-wrap');
+    await page.waitForTimeout(3000);
+    expect(panelLoads).toBe(1);
   });
 });

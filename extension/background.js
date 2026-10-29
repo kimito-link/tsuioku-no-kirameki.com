@@ -8,6 +8,14 @@
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
 try { importScripts('dist/backfill-sw.js'); } catch (e) { console.warn('[NLS] backfill-sw load failed', e); } // eslint-disable-line no-undef
+// v0.1.1802: 開発版(展開して読み込み)が、拡張のフォルダの新しい版に自分で入れ替わる(キット extension-self-update)。
+//   ストア版(manifest に update_url)では何もしない。
+try { importScripts('dist/self-update-sw.js'); } catch (e) { console.warn('[NLS] self-update load failed', e); } // eslint-disable-line no-undef
+
+/** 2分おきの見回りを予約する(self-update-sw.js が読めなかった時は何もしない)。 */
+function ensureSelfUpdateAlarm() {
+  try { globalThis.__nlsSelfUpdate?.scheduleSelfUpdateCheck(); } catch { /* no-op */ }
+}
 
 const MATCH_PATTERNS = [
   'https://*.nicovideo.jp/*',
@@ -993,6 +1001,7 @@ async function migrateClearStaleSelfPostedOnce(previousVersion) {
 
 chrome.runtime.onInstalled.addListener((details) => {
   ensureToolbarOpensPopupNotSidePanel();
+  ensureSelfUpdateAlarm();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
@@ -1054,6 +1063,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onStartup.addListener(() => {
   ensureToolbarOpensPopupNotSidePanel();
+  ensureSelfUpdateAlarm();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
@@ -1092,6 +1102,11 @@ chrome.runtime.onStartup.addListener(() => {
 const __swBootAt = Date.now();
 
 chrome.alarms.onAlarm.addListener((alarm) => {
+  const selfUpdate = globalThis.__nlsSelfUpdate;
+  if (selfUpdate && alarm?.name === selfUpdate.SELF_UPDATE_ALARM) {
+    void selfUpdate.checkForNewVersion().catch((e) => console.warn('[self-update]', String(e?.message || e)));
+    return;
+  }
   if (alarm?.name === AUTO_BACKUP_ALARM) {
     void runAutoBackupCycle();
     return;
@@ -3661,6 +3676,83 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   void doDevReloadGo();
   return undefined;
+});
+
+// 2026-10-26: VOICEVOX の声を少しずつ中継する(会場モードの content script 用・/streaming_synthesis)。
+//   sendMessage は1往復で丸ごとしか返せないので、ポートで届いた分ずつ送る。宛先は VOICEVOX だけ。
+chrome.runtime.onConnect.addListener((port) => {
+  if (!port || port.name !== 'NLS_VOICEVOX_STREAM') return;
+  if (!port.sender || port.sender.id !== chrome.runtime.id) {
+    try { port.disconnect(); } catch { /* no-op */ }
+    return;
+  }
+  const controller = new AbortController();
+  let closed = false;
+  const send = (m) => {
+    if (closed) return;
+    try { port.postMessage(m); } catch { closed = true; controller.abort(); }
+  };
+  port.onDisconnect.addListener(() => { closed = true; controller.abort(); });
+  port.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'start') return;
+    let targetUrl;
+    try { targetUrl = new URL(String(msg.url || '')); } catch { send({ type: 'error', error: 'Invalid URL' }); return; }
+    if (!(targetUrl.hostname === '127.0.0.1' && targetUrl.port === '50021' && targetUrl.pathname === '/streaming_synthesis')) {
+      send({ type: 'error', error: 'URL not allowed' });
+      return;
+    }
+    const init = { ...(msg.init || {}), signal: controller.signal };
+    fetch(targetUrl.toString(), init)
+      .then(async (res) => {
+        send({ type: 'head', ok: res.ok, status: res.status });
+        if (!res.ok || !res.body) { send({ type: 'end' }); return; }
+        const reader = res.body.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done || closed) break;
+          send({ type: 'chunk', data: Array.from(value) });
+        }
+        send({ type: 'end' });
+      })
+      .catch((err) => send({ type: 'error', error: String(err && err.message || err) }));
+  });
+});
+
+// v0.1.1781: 会場とコメビュで VOICEVOX の使用中を分け合う(src/lib/voiceEngineActivity.js)。
+//   裏の声読み込みは「どちらのページも静か」な時だけ始める。SW が落ちて値が消えても「静か」扱いで止まらない。
+let voiceEngineLastActivityAt = 0;
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== 'NLS_VOICE_ENGINE_ACTIVITY' && msg.type !== 'NLS_VOICE_ENGINE_QUIET')) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  if (msg.type === 'NLS_VOICE_ENGINE_ACTIVITY') voiceEngineLastActivityAt = Date.now();
+  sendResponse({ quietMs: voiceEngineLastActivityAt > 0 ? Date.now() - voiceEngineLastActivityAt : 1e9 });
+  return false;
+});
+
+// v0.1.1794: 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけ(src/lib/voiceReaderLease.js と同じ規則)。
+//   配信ごとに「いま読んでいるページ」を1つ持つ。合図が 6秒途切れたら、もう片方が引き継ぐ。
+//   SW が落ちて表が消えても、次の名乗りから作り直す(どちらも読める状態から始まる)。
+const voiceReaderByLive = new Map();
+const VOICE_READER_LEASE_TTL_MS = 6000;
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== 'NLS_VOICE_READER_CLAIM' && msg.type !== 'NLS_VOICE_READER_RELEASE')) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  const holder = String(msg.holder || '');
+  if (msg.type === 'NLS_VOICE_READER_RELEASE') {
+    for (const [lv, cur] of voiceReaderByLive) if (cur.holder === holder) voiceReaderByLive.delete(lv);
+    sendResponse({ ok: true });
+    return false;
+  }
+  const lv = String(msg.liveId || '').trim().toLowerCase();
+  const now = Date.now();
+  const cur = voiceReaderByLive.get(lv);
+  let granted = true;
+  if (lv && holder) {
+    if (!cur || cur.holder === holder || now - cur.at > VOICE_READER_LEASE_TTL_MS) voiceReaderByLive.set(lv, { holder, at: now });
+    else granted = false;
+  }
+  sendResponse({ granted });
+  return false;
 });
 
 // v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
