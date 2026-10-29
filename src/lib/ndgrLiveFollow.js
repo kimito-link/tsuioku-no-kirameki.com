@@ -127,6 +127,34 @@ export function ndgrCommentsFromSegment(bytes) {
 }
 
 /**
+ * segment の中身からギフトだけを取り出す(Gift の型どおり。名前もアイテム名も無い壊れた1件は捨てる)。
+ * @param {Uint8Array} bytes
+ * @returns {{ name: string, itemName: string, point: number|null, atMs: number }[]}
+ */
+export function ndgrGiftsFromSegment(bytes) {
+  /** @type {{ name: string, itemName: string, point: number|null, atMs: number }[]} */
+  const rows = [];
+  for (const fr of splitLengthDelimitedMessagesWithTail(bytes).frames) {
+    let gifts;
+    try {
+      gifts = decodeChunkedMessage(fr).gifts;
+    } catch {
+      continue;
+    }
+    if (!gifts.length) continue;
+    const atMs = ndgrMessageAtMs(fr);
+    for (const g of gifts) {
+      const itemName = String(g.itemName || '').trim();
+      const name = String(g.advertiserName || '').trim();
+      if (!itemName && !name) continue;
+      const point = typeof g.point === 'number' && Number.isFinite(g.point) ? g.point : null;
+      rows.push({ name, itemName, point, atMs });
+    }
+  }
+  return rows;
+}
+
+/**
  * @param {string} viewUri
  * @param {string|number} at
  */
@@ -141,6 +169,7 @@ function viewAt(viewUri, at) {
  *   viewUri: string,
  *   fetchBytes: (url: string) => Promise<{ status: number, bytes: Uint8Array }>,
  *   onComments: (rows: { no: string, text: string, name: string, atMs: number }[]) => void,
+ *   onGifts?: (rows: { name: string, itemName: string, point: number|null, atMs: number }[]) => void,
  *   signal?: AbortSignal,
  *   sleep?: (ms: number) => Promise<void>
  * }} opts
@@ -164,6 +193,10 @@ export async function followNdgrLive(opts) {
       if (stopped() || r.status !== 200 || !r.bytes?.length) return;
       const rows = ndgrCommentsFromSegment(r.bytes);
       if (rows.length) opts.onComments(rows);
+      if (typeof opts.onGifts === 'function') {
+        const gifts = ndgrGiftsFromSegment(r.bytes);
+        if (gifts.length) opts.onGifts(gifts);
+      }
     } catch {
       /* 1本読めなくても追うのは止めない */
     }

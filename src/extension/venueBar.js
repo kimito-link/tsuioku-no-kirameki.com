@@ -2248,6 +2248,10 @@ const VENUE_CSS = `
   .nlsb-bubble--away .nlsb-bubble-who { display: block; }
   .nlsb-bubble--away .nlsb-bubble-who::after { content: " ↓"; }
   .nlsb-bubble--away[data-side='bottom'] .nlsb-bubble-who::after { content: " ↑"; }
+  /* v0.1.1828: 席が無い人の吹き出しは指す席が無い=矢印も尻尾も出さない(名前だけ)。 */
+  .nlsb-bubble--seatless .nlsb-bubble-who::after,
+  .nlsb-bubble--seatless[data-side='bottom'] .nlsb-bubble-who::after { content: ""; }
+  .nlsb-bubble--seatless::after { display: none; }
   .nlsb-bubble.nlsb-is-leaving {
     opacity: 0;
   }
@@ -5143,7 +5147,9 @@ export function mountVenueBarButton(options = {}) {
       anchorEl: anchorEl instanceof HTMLElement ? anchorEl : null,
       fallback: node ? null : bubble.fallbackAnchor,
       seating,
+      viewport: seatsHost,
       obstacleEls: [
+        { el: storyDiagHost, weight: W.guide, clipTo: seatsHost },
         { el: pickupEls.root, weight: W.pickup },
         { el: header, weight: W.header },
         ...Array.from(seatsHost.querySelectorAll('.nl-story-userlane-guide'), (el) => ({ el, weight: W.guide, clipTo: seatsHost }))
