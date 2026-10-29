@@ -68,7 +68,7 @@ export function placeVenueBubble(p) {
     away = !v.visible;
     edge = v.edge;
   } else if (p.fallback && p.viewport) {
-    // ★v0.1.1826: 席が無い人(会場が満席・会場に居ない人)の吹き出し。以前は会場の下端から決めた座標に出し、
+    // ★v0.1.1828: 席が無い人(会場が満席・会場に居ない人)の吹き出し。以前は会場の下端から決めた座標に出し、
     //   診断の行に被ったり PICK UP より下(会場の外)に出たりしていた(実機)。一覧の見えている下の縁に、名前付きで出す。
     const v = rel(p.viewport.getBoundingClientRect(), L);
     const x = Math.min(Math.max(p.fallback.x, v.left + 24), v.right - 24);

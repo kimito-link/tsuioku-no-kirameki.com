@@ -449,7 +449,7 @@ export default [
     // v0.1.1771: 読み上げの聞こえ方の試験入口(import 1行+呼び出し1行)と、会場で鳴らない理由の計器
     //   (開閉と発言の2か所に1行ずつ)=+4。中身は voiceTestHook.js / lib の voicePlaybackQuality.js。
     // v0.1.1794: 同じ配信をコメビュと二重に読まない(import 1行+名乗りの1行+発言ごとの分岐5行)=+7。中身は lib の voiceReaderLease.js。
-    // v0.1.1826: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
+    // v0.1.1828: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
     files: ['src/extension/venueBar.js'],
     rules: { 'max-lines': ['error', { max: 7346, skipBlankLines: false, skipComments: false }] }
   },

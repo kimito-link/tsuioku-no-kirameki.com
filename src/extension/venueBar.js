@@ -2248,7 +2248,7 @@ const VENUE_CSS = `
   .nlsb-bubble--away .nlsb-bubble-who { display: block; }
   .nlsb-bubble--away .nlsb-bubble-who::after { content: " ↓"; }
   .nlsb-bubble--away[data-side='bottom'] .nlsb-bubble-who::after { content: " ↑"; }
-  /* v0.1.1826: 席が無い人の吹き出しは指す席が無い=矢印も尻尾も出さない(名前だけ)。 */
+  /* v0.1.1828: 席が無い人の吹き出しは指す席が無い=矢印も尻尾も出さない(名前だけ)。 */
   .nlsb-bubble--seatless .nlsb-bubble-who::after,
   .nlsb-bubble--seatless[data-side='bottom'] .nlsb-bubble-who::after { content: ""; }
   .nlsb-bubble--seatless::after { display: none; }
