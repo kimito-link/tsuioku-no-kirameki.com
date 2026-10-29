@@ -13,6 +13,7 @@
 ```mermaid
 graph LR
   n_comeview["コメビュ(別窓)"]
+  n_comeview --> n_src_extension_comeviewLivePushClient_js["extension/comeviewLivePushClient.js"]
   n_comeview --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
   n_comeview --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
   n_comeview --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
@@ -25,6 +26,7 @@ graph LR
   n_comeview --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_comeview --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
   n_comeview --> n_src_lib_comeviewInstantRender_js["lib/comeviewInstantRender.js"]
+  n_comeview --> n_src_lib_comeviewLivePush_js["lib/comeviewLivePush.js"]:::shared
   n_comeview --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_comeview --> n_src_lib_comeviewTimelineDiff_js["lib/comeviewTimelineDiff.js"]
   n_comeview --> n_src_lib_comeviewUserDetailLink_js["lib/comeviewUserDetailLink.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_comeview --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
   n_comeview --> n_src_lib_supportTimelineHtml_js["lib/supportTimelineHtml.js"]:::shared
   n_comeview --> n_src_lib_trailingPublisher_js["lib/trailingPublisher.js"]:::shared
-  n_comeview --> n_src_lib_userCommentProfileCache_js["lib/userCommentProfileCache.js"]:::shared
-  n_comeview --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 28 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 30 ファイル省略（全件は storage-bus.md / metafile 参照）。

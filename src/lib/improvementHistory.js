@@ -4398,5 +4398,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1828', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '0.1.1827 と同じ(30日の窓で数える値)。席が無い人の吹き出しは配線テストと実寸ページでの測定で確かめた。'
+  }),
+  Object.freeze({
+    version: '0.1.1829', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版と同じ水準。今回の変更は content とコメビュの配線(popup は触っていない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1829', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1829', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '近道は単体テスト(行の選び方・メッセージの検証・二度読まない・タブの選び方)と、content/コメビュの配線テストの両方で固定。実機での速さは状態速報の「受信→キュー」で確かめる。'
   })
 ]);

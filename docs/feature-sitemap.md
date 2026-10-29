@@ -318,7 +318,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 270</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 273</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -340,6 +340,8 @@
 - `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
 - `src/extension/avatar-face-worker-entry.js` — 匿名の顔を合成する専用 Worker(v0.1.1681)。
+- `src/extension/comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
+- `src/extension/comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
 - `src/extension/sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
@@ -374,6 +376,7 @@
 - `src/lib/coalescedRepaintScheduler.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存。yieldToBrowserPaint のみ依存)
 - `src/lib/comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
 - `src/lib/comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
+- `src/lib/comeviewLivePush.js` — コメビュ(別窓)の読み上げへ、届いたコメントを storage を待たずに渡す(P5b・2026-10-29)。
 - `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
 - `src/lib/comeviewTimelineDiff.js` — コメビュの「整合(reconcile)」を差分で描くための純関数。
 - `src/lib/comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
@@ -1303,21 +1306,20 @@
 - `v0.1.1822` 2026-10-28 — PC が無くても放送 URL で応援を見る
 
 ### 🔊 読み上げ (6版)
+- `v0.1.1829` 2026-10-29 — コメビュの読み上げを少し早く
 - `v0.1.1827` 2026-10-29 — アプリのコメント欄にギフトも出す
 - `v0.1.1824` 2026-10-28 — アプリだけでコメントを流す
 - `v0.1.1812` 2026-10-28 — NG にした人は読み上げでも読まない
 - `v0.1.1811` 2026-10-28 — 読み上げない吹き出しが残らないように
 - `v0.1.1810` 2026-10-28 — 絵文字や記号だけのコメントは読み上げない
-- `v0.1.1809` 2026-10-28 — 読み上げの記録が古い数のまま残るのを直す
 
 ### 🪟 応援レーン・タイル (2版)
 - `v0.1.1816` 2026-10-28 — 隠れた画面の数え直しを間引く
 - `v0.1.1815` 2026-10-28 — 隠れた画面の計算を軽く
 
-### 🩺 診断・状態速報 (3版)
+### 🩺 診断・状態速報 (2版)
 - `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 - `v0.1.1821` 2026-10-28 — 診断の読み込み直し回数を正しく数える
-- `v0.1.1809` 2026-10-28 — 読み上げの記録が古い数のまま残るのを直す
 
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1825` 2026-10-28 — 横付きパネルが右へはみ出さないように

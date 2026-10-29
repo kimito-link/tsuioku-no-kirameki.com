@@ -85,6 +85,8 @@ import {
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
+import { takeUnreadVoiceItems } from '../lib/comeviewLivePush.js';
+import { createComeviewLivePushClient } from './comeviewLivePushClient.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
@@ -439,6 +441,8 @@ async function switchToLiveId(nextLiveId) {
   _seenCommentNos.clear();
   _voiceBatchSeenNos.clear();
   _voiceMaxCommentNo = 0;
+  _voiceReadNos.clear();
+  void _livePush.ensure(); // P5b: 新しい配信の watch タブへ繋ぎ直す
   _seenGiftAtBySig.clear();
   _tailRows = [];
   _giftRows = [];
@@ -566,6 +570,7 @@ function updateVoiceLagNotice() {
 function disableVoiceReading({ persist = true } = {}) {
   _voiceReadingEnabled = false;
   _voiceToggleBusy = false;
+  _livePush.close();
   stopVoicePlayback();
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(false);
@@ -657,6 +662,7 @@ async function enableVoiceReading({ persist = true } = {}) {
   driveCvVoiceLoading('ready');
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(true);
+  void _livePush.ensure();
 }
 
 function voiceUserKeyForItem(item) {
@@ -1098,10 +1104,29 @@ function noteVoiceBigBatch(items) {
 const _voiceBatchSeenNos = new Set();
 /** v0.1.1805: 読みに回した最大のコメント番号(配信を切り替えたら 0)。 */
 let _voiceMaxCommentNo = 0;
+/** P5b: 読み上げに回した commentNo(近道と storage 経由の両方から来るので1回だけ読む)。 */
+const _voiceReadNos = new Set();
+
+/**
+ * P5b(2026-10-29): watch タブから storage を待たずに届いた新着を読み上げへ(表示は今までどおり storage 経由)。
+ *   表示が隠れていても読む(隠れている間の storage 分は後で表示だけされ、読み上げは _voiceReadNos で重ならない)。
+ */
+const _livePush = createComeviewLivePushClient({
+  isActive: () => _voiceReadingEnabled && !isObsMode(),
+  getLiveId: () => _liveId,
+  onRows: (_lv, rows) => {
+    if (_paused || !rows.length) return;
+    const profiled = Object.keys(_profileCache).length ? applyUserCommentProfileMapToEntries(rows, _profileCache).next : rows;
+    const items = buildAllComeviewTimeline(profiled, []).filter((it) => it.kind === 'comment');
+    enqueueLiveVoiceItems(filterVisibleComeviewTimeline(items, _ngKeys, _hiddenSigs));
+  }
+});
 
 /** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
 function enqueueLiveVoiceItems(items) {
   if (!_voiceReadingEnabled || !Array.isArray(items) || !items.length) return;
+  items = takeUnreadVoiceItems(items, _voiceReadNos, commentNoOfComeviewRow); // P5b: 近道で読んだ分を storage 経由で二度読まない
+  if (!items.length) return;
   noteVoiceBigBatch(items);
   // v0.1.1805: 開く前の古いコメントが後からまとめて届いた分は、読み上げ待ちにも届いた件数にも入れない。
   const split = splitVoiceBacklogByCommentNo(items, _voiceMaxCommentNo);
