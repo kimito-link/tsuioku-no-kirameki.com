@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・152 ファイル）
+## ⚠️ 影響大（3機能以上に波及・154 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -33,9 +33,11 @@
 - `src/lib/voiceDiagKey.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceKeys.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceNarrowing.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/voiceQuality.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceReadingNormalize.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceVolume.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/domain/user/nickname.js` → **4 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/extension/voiceQualitySetting.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/adObservationLog.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/avatarBroadcasterGuard.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/backfillRemoveRecommendedLivePollution.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -190,9 +192,11 @@
 | `src/lib/voiceDiagKey.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceKeys.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceNarrowing.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/voiceQuality.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceReadingNormalize.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceVolume.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/domain/user/nickname.js` | 4 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/extension/voiceQualitySetting.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/adObservationLog.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/avatarBroadcasterGuard.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/backfillRemoveRecommendedLivePollution.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -499,6 +503,7 @@
 | `src/extension/popup/report/htmlReportDocument.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireLaneUserDetailOpen.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireVoiceNarrowSelect.js` | 1 | ポップアップ(応援レーン) |
+| `src/extension/popup/wireVoiceQualitySelect.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireVoiceVolumeSlider.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/status-entry.js` | 1 | 状態速報ページ |
 | `src/extension/statusDeviceCred.js` | 1 | 状態速報ページ |

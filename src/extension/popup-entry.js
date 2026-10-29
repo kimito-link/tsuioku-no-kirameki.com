@@ -914,6 +914,7 @@ import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js'
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
 import { wireVoiceVolumeSlider } from './popup/wireVoiceVolumeSlider.js';
 import { wireVoiceNarrowSelect } from './popup/wireVoiceNarrowSelect.js';
+import { wireVoiceQualitySelect } from './popup/wireVoiceQualitySelect.js';
 import {
   applyPopupFrameFallback,
   loadPopupFrameSettings,
@@ -19811,6 +19812,7 @@ async function initPopup() {
 
   wireVoiceVolumeSlider(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P2: 読み上げ音量
   wireVoiceNarrowSelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P3: 声の絞り込み
+  wireVoiceQualitySelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // 声の音質(既定16kHz)
   const effectSoundToggle = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));
   effectSoundToggle?.addEventListener('change', async () => {
     try {

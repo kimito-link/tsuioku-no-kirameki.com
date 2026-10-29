@@ -370,6 +370,7 @@ import {
   synthesizeVoice,
   probeVoicevoxStreaming, probeVoicevoxGpuCapable
 } from '../lib/voicevoxClient.js';
+import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
@@ -3361,6 +3362,7 @@ export function mountVenueBarButton(options = {}) {
   const publishVenueVoiceDiag = (/** @type {import('../lib/voiceDiag.js').VoiceDiagState} */ diag) => { _venueVoiceDiagLatest = diag; venueVoiceDiagPublisher.request(); };
 
   const venueVoiceWarmup = createVoicevoxWarmup(); // 初めての声を合成前に読み込む(voiceWarmup.js)
+  wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従

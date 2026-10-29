@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1080 件
+## ⚠️ 役割コメントが無いソース 9 / 1083 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -977,7 +977,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2216)
+- 📁 **src/** (2220)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1014,8 +1014,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (102)
-    - 📁 **popup/** (14)
+  - 📁 **extension/** (104)
+    - 📁 **popup/** (15)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1031,6 +1031,7 @@
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
+      - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
     - 📁 **story/** (6)
       - `laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
@@ -1118,6 +1119,7 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
+    - `voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
     - `voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
     - `voiceTestHook.test.js`
@@ -1274,7 +1276,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1945)
+  - 📁 **lib/** (1947)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3151,6 +3153,8 @@
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
+    - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
+    - `voiceQuality.test.js`
     - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
     - `voiceReachabilityProbe.test.js`
     - `voiceReachabilityWiring.test.js`

@@ -606,13 +606,15 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 39</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
+- `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
 - `src/extension/popup/wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
+- `src/extension/voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
 - `src/extension/voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
 - `src/extension/voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
 - `src/lib/phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
@@ -634,6 +636,7 @@
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
 - `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
+- `src/lib/voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
 - `src/lib/voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
 - `src/lib/voiceReaderLease.js` — 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけにする(v0.1.1794)。
 - `src/lib/voiceReadingNormalize.js` — 読み上げる本文を「耳で聞いて自然」に整える純関数(会場・コメビュ・スマホ共通)。
@@ -1290,7 +1293,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🏟 会場・席 (5版)
+### 🏟 会場・席 (6版)
+- `v0.1.1830` 2026-10-29 — 読み上げの音質を選べるように
 - `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 - `v0.1.1817` 2026-10-28 — 会場の客席の描き直しを軽く
 - `v0.1.1816` 2026-10-28 — 隠れた画面の数え直しを間引く
@@ -1306,12 +1310,12 @@
 - `v0.1.1822` 2026-10-28 — PC が無くても放送 URL で応援を見る
 
 ### 🔊 読み上げ (6版)
+- `v0.1.1830` 2026-10-29 — 読み上げの音質を選べるように
 - `v0.1.1829` 2026-10-29 — コメビュの読み上げを少し早く
 - `v0.1.1827` 2026-10-29 — アプリのコメント欄にギフトも出す
 - `v0.1.1824` 2026-10-28 — アプリだけでコメントを流す
 - `v0.1.1812` 2026-10-28 — NG にした人は読み上げでも読まない
 - `v0.1.1811` 2026-10-28 — 読み上げない吹き出しが残らないように
-- `v0.1.1810` 2026-10-28 — 絵文字や記号だけのコメントは読み上げない
 
 ### 🪟 応援レーン・タイル (2版)
 - `v0.1.1816` 2026-10-28 — 隠れた画面の数え直しを間引く
