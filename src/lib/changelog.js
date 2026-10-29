@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1830',
+    date: '2026-10-28',
+    summary: 'パネルを開くときの作り直しを1回に',
+    items: Object.freeze([
+      '視聴ページでパネルを開くたび、パネルの入れ物を4回作り直していました（作りたてを古いものと見なして捨てていた）。1回だけ作るようにしたので、開く瞬間の無駄な隠す・出すが減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1829',
     date: '2026-10-29',
     summary: 'コメビュの読み上げを少し早く',
@@ -175,15 +183,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '読み上げない吹き出しが残らないように',
     items: Object.freeze([
       '絵文字や記号だけで読み上げないコメントの吹き出しが、声を待つ印のまま最大8秒残っていました。読まないと分かった時点で、ふつうの吹き出しと同じ速さで消えるようにしました(会場モード)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1810',
-    date: '2026-10-28',
-    summary: '絵文字や記号だけのコメントは読み上げない',
-    items: Object.freeze([
-      '絵文字・記号・顔文字だけのコメント(😂👏・！？・…・♪・(^^) など)は、VOICEVOX では音が出ないのに順番待ちに入って、ほかのコメントを待たせていました。読み上げずに飛ばすようにしました(画面には今までどおり出ます)。',
-      'コメント全体が「ｗ」1文字のときも「わら」と読みます(今までは「ダブリュー」と読まれていました)。'
     ])
   })
 ]);
