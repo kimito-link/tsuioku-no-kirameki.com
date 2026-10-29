@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1831',
+    date: '2026-10-28',
+    summary: '視聴ページの確認用ログを毎回出さない',
+    items: Object.freeze([
+      'パネルの描画のたびに、確認用の大きな記録（約5KB）を視聴ページのコンソールへ自動で出し続けていました。必要なときだけ手で呼べるようにして、自動では出さないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1830',
     date: '2026-10-28',
     summary: 'パネルを開くときの作り直しを1回に',
@@ -175,14 +183,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'NG にした人は読み上げでも読まない',
     items: Object.freeze([
       'コメビュで NG にした人のコメントは画面から消えますが、放送ページの会場モードの読み上げと、スマホへ送る声では読まれていました。どちらでも読まないようにしました(NG を外せば次のコメントから読みます)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1811',
-    date: '2026-10-28',
-    summary: '読み上げない吹き出しが残らないように',
-    items: Object.freeze([
-      '絵文字や記号だけで読み上げないコメントの吹き出しが、声を待つ印のまま最大8秒残っていました。読まないと分かった時点で、ふつうの吹き出しと同じ速さで消えるようにしました(会場モード)。'
     ])
   })
 ]);
