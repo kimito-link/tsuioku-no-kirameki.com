@@ -4428,9 +4428,9 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: 'E2E『パネルを開いても host は1回しか作られない』(修正前の実測 host_created=4→1)'
   }),
   Object.freeze({
-    version: '0.1.1831', metric: 'bundle-kb', value: 1437,
+    version: '0.1.1831', metric: 'bundle-kb', value: 1436,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '前版と同じ水準。popup に音質の選択肢1つと配線(wireVoiceQualitySelect.js)を足しただけで、値の決め方は lib の voiceQuality.js。'
+    note: 'popup.js から描画ごとの自動ログ呼び出し(setTimeout)を削除'
   }),
   Object.freeze({
     version: '0.1.1831', metric: 'gate-selftest', value: 4,
@@ -4438,6 +4438,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   }),
   Object.freeze({
     version: '0.1.1831', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'grep で __NLS_LANE_DIAG__ の自動呼び出しが他に無いこと・関数自体は DevTools 用に残ることを確認'
+  }),
+  Object.freeze({
+    version: '0.1.1832', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版と同じ水準。popup に音質の選択肢1つと配線(wireVoiceQualitySelect.js)を足しただけで、値の決め方は lib の voiceQuality.js。'
+  }),
+  Object.freeze({
+    version: '0.1.1832', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1832', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '音質の切り替えは単体テスト(エンジンへ渡す outputSamplingRate が 16k/24k/変な値→16k)と、3か所の配線・popup の既定のテストの両方で固定。音の違いは自宅PCで聞き比べてもらう。'
   })

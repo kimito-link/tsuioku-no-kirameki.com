@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1812',
+    date: '2026-10-28',
+    summary: 'NG にした人は読み上げでも読まない',
+    items: Object.freeze([
+      'コメビュで NG にした人のコメントは画面から消えますが、放送ページの会場モードの読み上げと、スマホへ送る声では読まれていました。どちらでも読まないようにしました(NG を外せば次のコメントから読みます)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1811',
     date: '2026-10-28',
     summary: '読み上げない吹き出しが残らないように',
