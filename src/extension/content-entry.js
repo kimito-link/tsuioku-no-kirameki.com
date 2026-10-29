@@ -653,6 +653,7 @@ import {
   shouldProbeCommentPanelHealthNow,
   normalizeCommentPanelAutoRestoreEnabled
 } from '../lib/commentPanelHealthProbe.js';
+import { pushLiveCommentsToComeview } from './comeviewLivePushHost.js';
 
 /**
  * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string, avatarObserved?: boolean }} ParsedCommentRow
@@ -12224,6 +12225,8 @@ function persistCommentRows(rows, opts = {}) {
   } catch {
     /* no-op: 即時プッシュの失敗はコメント記録に影響させない(storage 経路が後で届く) */
   }
+  // P5b(2026-10-29): コメビュの読み上げへも storage を待たずに流す(コメビュが port を開いている時だけ・費用ゼロ)。
+  try { pushLiveCommentsToComeview(liveId || '', filtered); } catch { /* no-op: 記録に影響させない */ }
 }
 
 /** v0.1.795: SW staging 畳み込みの最終チェック時刻(過剰な storage 読みを抑制)。 */

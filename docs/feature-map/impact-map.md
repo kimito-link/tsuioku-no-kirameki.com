@@ -339,6 +339,7 @@
 | `src/lib/charaLiveController.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/charaLiveStage.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/charaLiveState.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/comeviewLivePush.js` | 2 | コメビュ(別窓) / 記録エンジン(watchページ常駐) |
 | `src/lib/comeviewUserDetailLink.js` | 2 | コメビュ(別窓) / ポップアップ(応援レーン) |
 | `src/lib/comeviewUserNotes.js` | 2 | コメビュ(別窓) / ポップアップ(応援レーン) |
 | `src/lib/commentDeltaTier.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
@@ -478,6 +479,8 @@
 | `src/domain/user/avatar.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/backfill-sw-entry.js` | 1 | バックフィル SW |
 | `src/extension/comeview-entry.js` | 1 | コメビュ(別窓) |
+| `src/extension/comeviewLivePushClient.js` | 1 | コメビュ(別窓) |
+| `src/extension/comeviewLivePushHost.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/content-entry.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/ext-census-sw.js` | 1 | バックフィル SW |
 | `src/extension/fanLinkClient.js` | 1 | 状態速報ページ |
