@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1806',
+    date: '2026-10-28',
+    summary: '読み上げが遅いとき GPU の案内を出す',
+    items: Object.freeze([
+      '読み上げが大きく遅れているとき、VOICEVOX がグラフィックボード(GPU)を使えるのに声づくりが遅いと分かったら、「VOICEVOX の設定でエンジンモードを GPU にすると速くなることがあります」と一言添えるようにしました。設定は自動では変えません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1805',
     date: '2026-10-28',
     summary: 'コメビュで後から届く古いコメントを読まない',

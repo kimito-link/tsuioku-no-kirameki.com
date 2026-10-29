@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1826',
+    date: '2026-10-29',
+    summary: '席が無い人の吹き出しも会場の中に出す',
+    items: Object.freeze([
+      '会場で、席が無い人(会場が満席・会場に居ない人)の吹き出しが、「①の診断」の行に被ったり、PICK UP 枠より下(会場の外)に出たりしていたのを直しました。一覧の見えている下の端に、名前を付けて出します(指す席が無いので矢印と尻尾は付けません)。',
+      '吹き出しが避ける物に「①の診断」の行も加えました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1825',
     date: '2026-10-28',
     summary: '横付きパネルが右へはみ出さないように',
@@ -176,14 +185,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'コメビュの読み上げ計器を配信ごとに数え直す',
     items: Object.freeze([
       'コメビュの窓を開いたまま配信が切り替わると、読めた数・飛ばした数・遅れなどの計器が前の配信の分を引き継いでいました。配信が変わったら数え直すようにしました(声を作る速さの記録は PC の性質なので残します)。読み上げの声は変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1806',
-    date: '2026-10-28',
-    summary: '読み上げが遅いとき GPU の案内を出す',
-    items: Object.freeze([
-      '読み上げが大きく遅れているとき、VOICEVOX がグラフィックボード(GPU)を使えるのに声づくりが遅いと分かったら、「VOICEVOX の設定でエンジンモードを GPU にすると速くなることがあります」と一言添えるようにしました。設定は自動では変えません。'
     ])
   })
 ]);
