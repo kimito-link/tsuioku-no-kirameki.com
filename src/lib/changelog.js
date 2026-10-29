@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1826',
+    date: '2026-10-29',
+    summary: 'アプリのコメントを自動でつなぎ直す',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」は、通信が切れても自動でつなぎ直すようにしました(3秒・10秒・30秒・60秒あけて最大4回)。長い配信の途中で電波が途切れても、押し直さずに続きを受け取れます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1825',
     date: '2026-10-28',
     summary: '横付きパネルが右へはみ出さないように',
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'コメビュの読み上げ計器を配信ごとに数え直す',
     items: Object.freeze([
       'コメビュの窓を開いたまま配信が切り替わると、読めた数・飛ばした数・遅れなどの計器が前の配信の分を引き継いでいました。配信が変わったら数え直すようにしました(声を作る速さの記録は PC の性質なので残します)。読み上げの声は変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1806',
-    date: '2026-10-28',
-    summary: '読み上げが遅いとき GPU の案内を出す',
-    items: Object.freeze([
-      '読み上げが大きく遅れているとき、VOICEVOX がグラフィックボード(GPU)を使えるのに声づくりが遅いと分かったら、「VOICEVOX の設定でエンジンモードを GPU にすると速くなることがあります」と一言添えるようにしました。設定は自動では変えません。'
     ])
   })
 ]);
