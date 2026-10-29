@@ -4417,7 +4417,7 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
-   * @param {{ speakerKey: string, text: string }} speech
+   * @param {{ speakerKey: string, text: string, userId?: string, name?: string }} speech
    */
   const showSpeechBubble = (speech) => {
     const seatIndex = seatByKey.get(speech.speakerKey);
@@ -4463,7 +4463,11 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1760: 席が一覧の外にいるとき(.nlsb-bubble--away)だけ見える発言者名(誰の吹き出しか分かるように)。
     const whoSpan = document.createElement('span');
     whoSpan.className = 'nlsb-bubble-who';
-    whoSpan.textContent = String(/** @type {any} */ (speech).name || '').trim() || 'コメント';
+    // ★v0.1.1832: 名前の無い人(匿名)は「コメント」でなく席と同じ「匿名NNN」で出す(実配信で15件全部「コメント」だった)。
+    const whoName = String(/** @type {any} */ (speech).name || '').trim();
+    const whoUid = String(/** @type {any} */ (speech).userId || '').trim();
+    whoSpan.textContent =
+      (whoName && !isGenericComeviewName(whoName) ? whoName : '') || anonymousDisplayLabel(whoUid || speech.speakerKey);
     const textSpan = document.createElement('span');
     textSpan.className = 'nlsb-bubble-text';
     textSpan.textContent = text;
@@ -5148,6 +5152,7 @@ export function mountVenueBarButton(options = {}) {
       fallback: node ? null : bubble.fallbackAnchor,
       seating,
       viewport: seatsHost,
+      viewportFloor: storyDiagHost,
       obstacleEls: [
         { el: storyDiagHost, weight: W.guide, clipTo: seatsHost },
         { el: pickupEls.root, weight: W.pickup },

@@ -452,8 +452,9 @@ export default [
     //   (開閉と発言の2か所に1行ずつ)=+4。中身は voiceTestHook.js / lib の voicePlaybackQuality.js。
     // v0.1.1794: 同じ配信をコメビュと二重に読まない(import 1行+名乗りの1行+発言ごとの分岐5行)=+7。中身は lib の voiceReaderLease.js。
     // v0.1.1828: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
+    // v0.1.1832: 席が無い人の吹き出しを診断の行の上に出す配線(viewportFloor 1行)と、名前の無い人を「匿名NNN」で出す4行=+5。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7346, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7351, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
