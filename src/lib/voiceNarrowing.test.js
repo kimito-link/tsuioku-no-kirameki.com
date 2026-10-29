@@ -9,7 +9,10 @@ import {
   normalizeVoiceNarrowMode,
   prepareVoiceStyleIds,
   rememberWeakVoicePc,
-  VOICE_NARROW_STYLE_IDS
+  isFastVoicePc,
+  forgetWeakVoicePcIfFast,
+  VOICE_NARROW_STYLE_IDS,
+  VOICE_CAPPED_STYLE_IDS
 } from './voiceNarrowing.js';
 import { assignVoiceForUser } from './voiceAssignment.js';
 import { initializeVoicevoxSpeaker } from './voicevoxClient.js';
@@ -20,9 +23,29 @@ describe('isWeakVoicePc', () => {
     expect(isWeakVoicePc({})).toBe(false);
   });
   it('自宅PC(150ms)は弱くない・ノートPC(700ms/初回7.7秒)は弱い', () => {
-    expect(isWeakVoicePc({ warmSynthEmaMs: 150, coldSynthMaxMs: 900 })).toBe(false);
-    expect(isWeakVoicePc({ warmSynthEmaMs: 700 })).toBe(true);
+    expect(isWeakVoicePc({ warmSynthEmaMs: 150, warmSynthSamples: 9, coldSynthMaxMs: 900 })).toBe(false);
+    expect(isWeakVoicePc({ warmSynthEmaMs: 700, warmSynthSamples: 5 })).toBe(true);
     expect(isWeakVoicePc({ warmSynthEmaMs: 300, coldSynthMaxMs: 7700 })).toBe(true);
+  });
+  it('2026-10-26: 2回目以降の合成は5件そろうまで判定に使わない(速い PC が最初の数件で弱いと記録された)', () => {
+    expect(isWeakVoicePc({ warmSynthEmaMs: 700, warmSynthSamples: 4 })).toBe(false);
+    expect(isWeakVoicePc({ warmSynthEmaMs: 700 })).toBe(false);
+  });
+  it('isFastVoicePc は10件そろって速く、初めての声も遅くないときだけ', () => {
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 10, coldSynthMaxMs: 2300 })).toBe(true);
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 9 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 600, warmSynthSamples: 20 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 20, coldSynthMaxMs: 8000 })).toBe(false);
+  });
+  it('2026-10-26 PC実測: 声の長さで割った比があれば比で見る(長文の多いグラボ有りPCを弱いとしない)', () => {
+    // グラボ有り: 長文で合成 900ms でも、声が 7秒なら比は約130
+    expect(isWeakVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 8, warmSynthRtfPermille: 130, warmRtfSamples: 8 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 12, warmSynthRtfPermille: 130, warmRtfSamples: 12 })).toBe(true);
+    // グラボ無し: 比は約800
+    expect(isWeakVoicePc({ warmSynthEmaMs: 1400, warmSynthSamples: 6, warmSynthRtfPermille: 800, warmRtfSamples: 5 })).toBe(true);
+    // 比が測れ始めたら、そろうまで ms には戻らない
+    expect(isWeakVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 8, warmSynthRtfPermille: 130, warmRtfSamples: 4 })).toBe(false);
+    expect(isFastVoicePc({ warmSynthEmaMs: 300, warmSynthSamples: 12, warmSynthRtfPermille: 900, warmRtfSamples: 3 })).toBe(false);
   });
 });
 
@@ -69,9 +92,14 @@ describe('initializeVoicevoxSpeaker', () => {
 });
 
 describe('設定(しない/遅いPCと分かったら/いつも)', () => {
-  it('既定と壊れた値は「しない」', () => {
-    expect(normalizeVoiceNarrowMode(undefined)).toBe('off');
-    expect(normalizeVoiceNarrowMode('weird')).toBe('off');
+  it('既定と壊れた値は「遅いPCと分かったら」・自分で選んだ「しない」はそのまま', () => {
+    expect(normalizeVoiceNarrowMode(undefined)).toBe('auto');
+    expect(normalizeVoiceNarrowMode('weird')).toBe('auto');
+    expect(normalizeVoiceNarrowMode('off')).toBe('off');
+  });
+  it('既定のままでも、遅いPCと記録されたら絞る', () => {
+    expect(isVoiceNarrowActive(undefined, true)).toBe(true);
+    expect(isVoiceNarrowActive(undefined, false)).toBe(false);
   });
   it('auto は「遅いPC」と記録されたときだけ絞る', () => {
     expect(isVoiceNarrowActive('off', true)).toBe(false);
@@ -115,9 +143,10 @@ describe('prepareVoiceStyleIds', () => {
     expect(log).toEqual([3, 2, 8, 10, 13, 14]);
   });
 
-  it('設定が読めない・先読みが失敗しても、全部の声で続ける', async () => {
+  it('設定が読めない・先読みが失敗しても、読み上げは続ける(既定 auto の上限の表で)', async () => {
     const r = await prepareVoiceStyleIds(engine, { readSettings: async () => { throw new Error('x'); } });
-    expect(r.styleIds).toEqual(engine);
+    expect(r.styleIds).toEqual([3, 2, 8, 10, 13, 14, 20, 0, 1]);
+    expect(r.narrowed).toBe(false);
     const r2 = await prepareVoiceStyleIds(engine, {
       readSettings: async () => ({ mode: 'on' }),
       initSpeaker: async () => { throw new Error('down'); }
@@ -127,15 +156,62 @@ describe('prepareVoiceStyleIds', () => {
   });
 });
 
+describe('v0.1.1795 声の種類の上限', () => {
+  const all = Array.from({ length: 127 }, (_, i) => i);
+  it('既定(auto)の速い PC は上限の表の声だけ(表の順番のまま)・先読みしない', async () => {
+    const init = [];
+    const r = await prepareVoiceStyleIds(all, {
+      readSettings: async () => ({ mode: 'auto', weak: false }),
+      initSpeaker: async (id) => { init.push(id); }
+    });
+    await new Promise((res) => setTimeout(res, 0));
+    expect(r.styleIds).toEqual([...VOICE_CAPPED_STYLE_IDS]);
+    expect(r.narrowed).toBe(false);
+    expect(init).toEqual([]);
+  });
+  it('「しない」を選んだ人は全部の声のまま', async () => {
+    const r = await prepareVoiceStyleIds(all, { readSettings: async () => ({ mode: 'off' }) });
+    expect(r.styleIds).toEqual(all);
+  });
+  it('遅い PC は今までどおり6つ', async () => {
+    const r = await prepareVoiceStyleIds(all, { readSettings: async () => ({ mode: 'auto', weak: true }) });
+    expect(r.styleIds).toEqual([...VOICE_NARROW_STYLE_IDS]);
+  });
+  it('表は26種類・重複なし・先頭6つは遅い PC の表と同じ・ささやき系と小さい声を含まない', () => {
+    expect(VOICE_CAPPED_STYLE_IDS.length).toBe(26);
+    expect(new Set(VOICE_CAPPED_STYLE_IDS).size).toBe(26);
+    expect(VOICE_CAPPED_STYLE_IDS.slice(0, 6)).toEqual([...VOICE_NARROW_STYLE_IDS]);
+    for (const w of [19, 22, 36, 50, 75, 76, 86, 117]) expect(VOICE_CAPPED_STYLE_IDS).not.toContain(w);
+  });
+  it('表の声は VOICEVOX 0.26 のモデルファイル 0/1/4/15.vvm だけに収まる(メモリの上限の根拠)', () => {
+    const vvm = { 0: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 1: [14], 4: [11, 21], 15: [13, 20, 46, 66, 77, 78, 79, 80, 81, 82, 83, 84, 85] };
+    const allowed = new Set(Object.values(vvm).flat());
+    for (const id of VOICE_CAPPED_STYLE_IDS) expect(allowed.has(id)).toBe(true);
+  });
+  it('表の声が2つ未満しか無いエンジンでは絞らない', async () => {
+    const r = await prepareVoiceStyleIds([3, 200, 201], { readSettings: async () => ({ mode: 'auto' }) });
+    expect(r.styleIds).toEqual([3, 200, 201]);
+  });
+});
+
 describe('rememberWeakVoicePc', () => {
   it('遅いと分かったら1回だけ書く・速いPCでは書かない', async () => {
     const writes = [];
     const state = { saved: false };
-    rememberWeakVoicePc({ warmSynthEmaMs: 150 }, state, () => writes.push(1));
-    rememberWeakVoicePc({ warmSynthEmaMs: 700 }, state, () => writes.push(2));
-    rememberWeakVoicePc({ warmSynthEmaMs: 900 }, state, () => writes.push(3));
+    rememberWeakVoicePc({ warmSynthEmaMs: 150, warmSynthSamples: 5 }, state, () => writes.push(1));
+    rememberWeakVoicePc({ warmSynthEmaMs: 700, warmSynthSamples: 5 }, state, () => writes.push(2));
+    rememberWeakVoicePc({ warmSynthEmaMs: 900, warmSynthSamples: 6 }, state, () => writes.push(3));
     await new Promise((r) => setTimeout(r, 0));
     expect(writes).toEqual([2]);
+  });
+  it('forgetWeakVoicePcIfFast は速いと分かったら1回だけ消す', async () => {
+    const clears = [];
+    const state = { cleared: false };
+    forgetWeakVoicePcIfFast({ warmSynthEmaMs: 300, warmSynthSamples: 3 }, state, () => clears.push(1));
+    forgetWeakVoicePcIfFast({ warmSynthEmaMs: 300, warmSynthSamples: 10 }, state, () => clears.push(2));
+    forgetWeakVoicePcIfFast({ warmSynthEmaMs: 300, warmSynthSamples: 11 }, state, () => clears.push(3));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(clears).toEqual([2]);
   });
   it('書き込みが失敗しても投げない', async () => {
     expect(() => rememberWeakVoicePc({ coldSynthMaxMs: 8000 }, { saved: false }, async () => { throw new Error('x'); })).not.toThrow();
@@ -158,7 +234,16 @@ describe('配線(会場・コメビュ・ポップアップ)', () => {
       expect(src).toMatch(/rememberWeakVoicePc\(/);
     }
     expect(vb).toMatch(/initVoiceSpeaker:\s*\(/);
-    expect(cv).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*initializeVoicevoxSpeaker\(id\)/);
+    // 2026-10-26: 先読みは voiceWarmup の1本の列を通す(合成前の読み込みと重ならないように)。
+    expect(cv).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*_voiceWarmup\.ensureWhenIdle\(id\)/);
+    expect(vb).toMatch(/initVoiceSpeaker:[^\n]*venueVoiceWarmup\.ensureWhenIdle\(id\)/);
+    for (const src of [vb, cv]) {
+      expect(src).toMatch(/createVoicevoxWarmup\(\)/);
+      expect(src).toMatch(/withVoiceWarmup\(/);
+    }
+    expect(read('voiceWarmup.js')).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*initializeVoicevoxSpeaker\(id/);
+    expect(cv).toMatch(/startVoiceWarmup\(_voiceWarmup,/);
+    expect(vp).toMatch(/startVoiceWarmup\(this\.voiceWarmup,/);
   });
 
   it('ポップアップの設定は既定「しない」で、詳細設定の中にある(スマホでは隠れる)', () => {

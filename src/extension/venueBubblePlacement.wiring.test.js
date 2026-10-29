@@ -30,4 +30,16 @@ describe('配線: 吹き出しを大事な表示に被せない(v0.1.1760)', () 
     expect(phone).toMatch(/seatsEl\.replaceChildren\(\.\.\.nodes\);\s*relayoutBubbles\(\);/);
     expect(phone).toContain('chooseBubblePlacement({');
   });
+  it('★席が無い人の吹き出しは一覧の中(下の縁)に名前付きで出し、診断の行も避ける(v0.1.1828 実機で会場の外・診断の上に出た)', () => {
+    expect(venueBar).toContain('viewport: seatsHost,');
+    expect(venueBar).toContain('{ el: storyDiagHost, weight: W.guide, clipTo: seatsHost },');
+    expect(placer).toMatch(/else if \(p\.fallback && p\.viewport\)[\s\S]*away = true;\s*edge = 'bottom';/);
+    expect(venueBar).toContain('.nlsb-bubble--seatless::after { display: none; }');
+  });
+  it('★席が無い人の吹き出しは診断の行の上に出し、名前の無い人は「匿名NNN」で出す(v0.1.1832 実配信で診断に15件中14件被り・名前が全部「コメント」)', () => {
+    expect(venueBar).toContain('viewportFloor: storyDiagHost,');
+    expect(placer).toContain('if (f.bottom > f.top && f.top > v.top + 40 && f.top < floor) floor = f.top;');
+    expect(venueBar).toContain('anonymousDisplayLabel(whoUid || speech.speakerKey)');
+    expect(venueBar).not.toContain(".trim() || 'コメント';");
+  });
 });

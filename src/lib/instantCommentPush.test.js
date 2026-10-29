@@ -220,3 +220,74 @@ describe('computeInstantPushGapAverage', () => {
     expect(computeInstantPushGapAverage(-1, NaN)).toBe(-1);
   });
 });
+
+describe('v0.1.1815: 確定済み一覧のキー集合の使い回しは結果を変えない', () => {
+  // 変更前の実装(毎回作り直す)をそのまま写した基準。
+  const key = (e) => {
+    const no = String(e?.commentNo || '').trim();
+    return /^\d+$/.test(no) ? `no:${no}` : '';
+  };
+  function refMerge(existing, confirmed, incoming, max = 300) {
+    const ck = new Set((Array.isArray(confirmed) ? confirmed : []).map(key).filter(Boolean));
+    const out = (Array.isArray(existing) ? existing : []).filter((e) => !(key(e) && ck.has(key(e))));
+    const seen = new Set(out.map(key).filter(Boolean));
+    for (const inc of Array.isArray(incoming) ? incoming : []) {
+      const k = key(inc);
+      if (k) {
+        if (seen.has(k) || ck.has(k)) continue;
+        seen.add(k);
+      }
+      out.push(inc);
+    }
+    return out.length > max ? out.slice(out.length - max) : out;
+  }
+  function refCompose(confirmed, buffer) {
+    const c = Array.isArray(confirmed) ? confirmed : [];
+    const b = Array.isArray(buffer) ? buffer : [];
+    if (!b.length) return c;
+    const ck = new Set(c.map(key).filter(Boolean));
+    const extra = b.filter((e) => !(key(e) && ck.has(key(e))));
+    return extra.length ? [...c, ...extra] : c;
+  }
+
+  it('新着ごとの流れ(合成結果が次の確定済み一覧になる)を何周回しても基準と同じ', () => {
+    let confirmed = [{ commentNo: '1' }, { commentNo: 'x' }, { commentNo: '2' }];
+    let buf = [];
+    let refConfirmed = confirmed;
+    let refBuf = [];
+    for (let i = 3; i < 60; i++) {
+      const incoming = [{ commentNo: String(i) }, { commentNo: String(i - 2) }, { commentNo: '' }];
+      buf = mergeInstantPushBuffer(buf, confirmed, incoming, { maxBuffered: 5 });
+      refBuf = refMerge(refBuf, refConfirmed, incoming, 5);
+      expect(buf).toEqual(refBuf);
+      buf = mergeInstantPushBuffer(buf, confirmed, []);
+      refBuf = refMerge(refBuf, refConfirmed, []);
+      expect(buf).toEqual(refBuf);
+      const next = composeDisplayEntriesWithInstantPush(confirmed, buf);
+      const refNext = refCompose(refConfirmed, refBuf);
+      expect(next).toEqual(refNext);
+      confirmed = next;
+      refConfirmed = refNext;
+      if (i % 7 === 0) {
+        // storage 経由の正規到着=新しい配列で差し替え
+        confirmed = [...confirmed.filter((e) => !e.instantPush), { commentNo: String(i + 1) }];
+        refConfirmed = [...refConfirmed.filter((e) => !e.instantPush), { commentNo: String(i + 1) }];
+      }
+    }
+  });
+
+  it('同じ配列が後から伸ばされても古いキー集合を使わない', () => {
+    const confirmed = [{ commentNo: '1' }];
+    expect(mergeInstantPushBuffer([], confirmed, [{ commentNo: '2' }])).toEqual([{ commentNo: '2' }]);
+    confirmed.push({ commentNo: '2' });
+    expect(mergeInstantPushBuffer([], confirmed, [{ commentNo: '2' }])).toEqual([]);
+    expect(composeDisplayEntriesWithInstantPush(confirmed, [{ commentNo: '2' }])).toBe(confirmed);
+  });
+
+  it('先出しも新着も無ければ新しい空配列を返す', () => {
+    const empty = [];
+    const out = mergeInstantPushBuffer(empty, [{ commentNo: '1' }], []);
+    expect(out).toEqual([]);
+    expect(out).not.toBe(empty);
+  });
+});

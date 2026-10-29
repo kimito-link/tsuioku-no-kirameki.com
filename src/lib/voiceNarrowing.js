@@ -17,6 +17,16 @@
  */
 export const VOICE_NARROW_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14]);
 
+/**
+ * v0.1.1795: 速い PC でも使う声の組(固定・順番も意味を持つ)。VOICEVOX は声のモデルファイル(vvm)ごとにメモリを取り、
+ *   返さない。1ファイル(数キャラ入り)で約0.7GB、全部で約14GB(PC 実測・VOICEVOX 0.26)。声の数ではなくファイルの数で増えるので、
+ *   別々のキャラ20人にすると13ファイルにまたがり 7.7GB だった。この組は 4ファイル(0/1/4/15.vvm)に収まる26種類で約3.7GB。
+ *   0.vvm=めたん・ずんだもん・つむぎ・はう / 1.vvm=ひまり / 4.vvm=玄野・剣崎 / 15.vvm=龍星・もち子・小夜。
+ *   先頭6つは弱い PC の表と同じ。ささやき系(86 など)と小さい声(75/76)は入れない。
+ *   ★順番と中身を変えると常連の声が変わるので、変えるときは版を分けて changelog に書く。
+ */
+export const VOICE_CAPPED_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14, 11, 21, 20, 46, 0, 4, 6, 1, 7, 5, 81, 82, 83, 84, 85, 66, 77, 78, 79, 80]);
+
 /** 2回目以降の合成がこれ以上かかるPCを「弱い」とみなす(ms)。自宅PC 120〜160ms、ノートPC 700ms。 */
 export const VOICE_WEAK_PC_WARM_SYNTH_MS = 500;
 
@@ -24,14 +34,51 @@ export const VOICE_WEAK_PC_WARM_SYNTH_MS = 500;
 export const VOICE_WEAK_PC_COLD_SYNTH_MS = 3000;
 
 /**
+ * 2回目以降の合成を、これだけの件数測ってから判定する(2026-10-26)。
+ *   PC 実測で、速い PC が最初の数件(声の準備と重なった回)だけで「弱い」と記録された。
+ */
+export const VOICE_WEAK_PC_MIN_WARM_SAMPLES = 5;
+
+/** 速い PC と分かったら、誤って残った「弱い」の記録を消す件数。 */
+export const VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
+
+/**
+ * (合成時間−決まった 250ms)÷声の長さ(×1000)がこれ以上なら「弱い」(2026-10-26 PC 実測: グラボ有り約100〜230・無し約650以上)。
+ *   ms だけで見ると、長いコメントの多い配信で速い PC が「弱い」と記録された(v0.1.1768 実測)。
+ */
+export const VOICE_WEAK_PC_RTF_PERMILLE = 400;
+
+/**
+ * 2回目以降の合成が遅いか。声の長さで割った比が十分そろっていれば比で、
+ *   比が1件も無ければ(古い計器・短い声ばかり)今までどおり ms で見る。まだ測れていなければ null。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, warmSynthRtfPermille?: number, warmRtfSamples?: number }} diag
+ * @param {number} minSamples
+ * @returns {boolean|null}
+ */
+function isWarmSynthSlow(diag, minSamples) {
+  const rtf = Number(diag?.warmSynthRtfPermille);
+  const rtfSamples = Number(diag?.warmRtfSamples) || 0;
+  if (rtfSamples > 0) {
+    // 比が1件でも測れていれば比だけで見る(ms に戻ると長文の多い配信で速い PC を見誤る)。
+    if (rtfSamples < minSamples || !Number.isFinite(rtf) || rtf < 0) return null;
+    return rtf >= VOICE_WEAK_PC_RTF_PERMILLE;
+  }
+  const warm = Number(diag?.warmSynthEmaMs);
+  const samples = Number(diag?.warmSynthSamples) || 0;
+  if (samples >= minSamples && Number.isFinite(warm) && warm >= 0) return warm >= VOICE_WEAK_PC_WARM_SYNTH_MS;
+  return null;
+}
+
+/**
  * P1 の計器から「弱いPC」かを決める。まだ測れていなければ false(=絞らない・今のまま)。
- * @param {{ warmSynthEmaMs?: number, coldSynthMaxMs?: number }} diag
+ *   2回目以降の合成は VOICE_WEAK_PC_MIN_WARM_SAMPLES 件そろってから見る。
+ *   計器(voiceStageTiming)は、声の準備と重なった回を warm/cold に入れない。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
  * @returns {boolean}
  */
 export function isWeakVoicePc(diag) {
-  const warm = Number(diag?.warmSynthEmaMs);
   const cold = Number(diag?.coldSynthMaxMs);
-  if (Number.isFinite(warm) && warm >= VOICE_WEAK_PC_WARM_SYNTH_MS) return true;
+  if (isWarmSynthSlow(diag, VOICE_WEAK_PC_MIN_WARM_SAMPLES) === true) return true;
   if (Number.isFinite(cold) && cold >= VOICE_WEAK_PC_COLD_SYNTH_MS) return true;
   return false;
 }
@@ -44,16 +91,30 @@ export function isWeakVoicePc(diag) {
  * @returns {number[]}
  */
 export function narrowVoiceStyleIds(availableStyleIds, weak) {
+  return pickFromTable(availableStyleIds, weak ? VOICE_NARROW_STYLE_IDS : null);
+}
+
+/**
+ * 表のうちエンジンにある声だけ(表の順番のまま)。表が null か、2つ未満しか無ければエンジンの声そのまま。
+ * @param {readonly number[]} availableStyleIds
+ * @param {readonly number[] | null} table
+ * @returns {number[]}
+ */
+function pickFromTable(availableStyleIds, table) {
   const available = Array.isArray(availableStyleIds) ? availableStyleIds.map(Number) : [];
-  if (!weak) return available;
+  if (!table) return available;
   const have = new Set(available);
-  const narrowed = VOICE_NARROW_STYLE_IDS.filter((id) => have.has(id));
-  return narrowed.length >= 2 ? narrowed : available;
+  const picked = table.filter((id) => have.has(id));
+  return picked.length >= 2 ? picked : available;
 }
 
 export { KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC } from './voiceKeys.js';
 
-/** 絞り込みの設定。既定は 'off'(=今までどおり全部の声)。 */
+/**
+ * 絞り込みの設定。既定は 'auto'(v0.1.1768・りんく判断: 遅い PC と分かった時だけ絞る)。
+ *   PC 実測でグラボ無しは新しい人の声の準備が最大13.6秒かかり、32件飛ばした。速い PC は変わらない。
+ *   自分で「しない」を選んだ人('off' が保存されている)はそのまま。
+ */
 export const VOICE_NARROW_MODES = Object.freeze(['off', 'auto', 'on']);
 
 /**
@@ -61,7 +122,7 @@ export const VOICE_NARROW_MODES = Object.freeze(['off', 'auto', 'on']);
  * @returns {'off'|'auto'|'on'}
  */
 export function normalizeVoiceNarrowMode(raw) {
-  return raw === 'auto' || raw === 'on' ? raw : 'off';
+  return raw === 'off' || raw === 'on' ? raw : 'auto';
 }
 
 /**
@@ -95,7 +156,9 @@ export async function prepareVoiceStyleIds(allStyleIds, deps) {
     settings = {};
   }
   const active = isVoiceNarrowActive(settings.mode, settings.weak);
-  const styleIds = narrowVoiceStyleIds(all, active);
+  // v0.1.1795: 絞らない時も、既定('auto')なら上限の表から選ぶ。自分で「しない」('off')を選んだ人は全部のまま。
+  const capped = !active && normalizeVoiceNarrowMode(settings.mode) === 'auto';
+  const styleIds = active ? narrowVoiceStyleIds(all, true) : pickFromTable(all, capped ? VOICE_CAPPED_STYLE_IDS : null);
   const narrowed = active && styleIds.length < all.length;
   if (narrowed && typeof deps.initSpeaker === 'function') {
     const init = deps.initSpeaker;
@@ -120,4 +183,28 @@ export function rememberWeakVoicePc(diag, state, write) {
   if (state.saved || !isWeakVoicePc(diag)) return;
   state.saved = true;
   Promise.resolve().then(() => write(true)).catch(() => { /* 記録の失敗は読み上げに影響させない */ });
+}
+
+/**
+ * 速い PC と十分に分かったか(2回目以降の合成が十分な件数そろって速く、初めての声も遅くない)。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
+ * @returns {boolean}
+ */
+export function isFastVoicePc(diag) {
+  const cold = Number(diag?.coldSynthMaxMs) || 0;
+  return isWarmSynthSlow(diag, VOICE_FAST_PC_MIN_WARM_SAMPLES) === false
+    && cold < VOICE_WEAK_PC_COLD_SYNTH_MS;
+}
+
+/**
+ * 2026-10-26: 「弱い」と誤って記録された速い PC の記録を一度だけ消す(PC 実測で起きた)。
+ *   消さないと、短いコメントまで少しずつ受け取り、かえって遅くなる(0.3秒→0.7秒)。
+ * @param {{ warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
+ * @param {{ cleared?: boolean }} state
+ * @param {() => unknown} clear
+ */
+export function forgetWeakVoicePcIfFast(diag, state, clear) {
+  if (state.cleared || !isFastVoicePc(diag)) return;
+  state.cleared = true;
+  Promise.resolve().then(() => clear()).catch(() => { /* 記録の失敗は読み上げに影響させない */ });
 }

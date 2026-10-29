@@ -469,6 +469,23 @@ export function pinLiveFirst(lives, lv) {
 }
 
 /**
+ * v0.1.1822: 一覧(放送中の上位)に無い配信を、1配信だけ取った結果(/api/live-ranking?lv=)で足す。
+ *   PC の拡張が無い人が「放送の URL を貼る」と、その配信が一覧に無くても先頭に出せる。
+ *   ★一覧に既にあれば足さない(二重に出さない)。足す側の形が違えば元のまま返す。
+ * @param {any} data /api/live-ranking の応答(null でもよい)
+ * @param {any} one  /api/live-ranking?lv= の応答の live
+ * @returns {any} lives に1件足した応答(元の data は変えない)
+ */
+export function mergePinnedLive(data, one) {
+  const base = data && typeof data === 'object' ? data : { ok: true, lives: [] };
+  const lives = Array.isArray(base.lives) ? base.lives : [];
+  const id = String((one && one.liveId) ?? '').trim().toLowerCase();
+  if (!LIVE_ID_RE.test(id)) return base;
+  if (lives.some((/** @type {any} */ l) => String((l && l.liveId) ?? '').trim().toLowerCase() === id)) return base;
+  return { ...base, lives: [...lives, one] };
+}
+
+/**
  * 文字列を 1 行に正規化して、コードポイント単位で切り詰める(サロゲートペアを割らない)。
  * @param {unknown} v
  * @param {number} max

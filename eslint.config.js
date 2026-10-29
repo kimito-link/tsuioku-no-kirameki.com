@@ -25,6 +25,8 @@ export default [
       // mobile/scripts/** は web-ios-android キットからコピーした App Store 提出の道具(キット側で検査済み・
       //   書き換えずに保つ=キットとの差分を小さく)。mobile/node_modules・mobile/ios は CI が作る。
       'mobile/**',
+      // キット(templates/extension-self-update)の試験の無改変の写し(キット側で検査済み・node で chrome の代役を置く)。
+      'src/extension/self-update.kit-test.mjs',
       'node_modules/**',
       '.claude/**',
       // .artifacts/** は verify ログ・調査用展開物（asar 展開した第三者 minified
@@ -401,7 +403,8 @@ export default [
     // v0.1.1734: スマホの WEB版だけの「PC に中継して投稿する」口(+30行: 口の取り出し・送信ボタンの可否・預ける分岐・Enter 送信の無効化・起動時の配線)。
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
-    rules: { 'max-lines': ['error', { max: 21745, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
+    rules: { 'max-lines': ['error', { max: 21746, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -423,7 +426,12 @@ export default [
     // v0.1.1699: フォロー先一覧の読み先を本体キーの直読みから readChunkedComments へ(+4行・すべて【なぜ】のコメント)。本体キーの書き戻し停止(次版)で直読みだけが黙って死ぬのを先に防ぐ。ロジックは既存の readChunkedComments。
     // v0.1.1718: 較正リングの試行間隔 120s→300s と保持件数 2000→400(+2行・1回約830KB→約170KB)。読み手は開発モニタの書き出しだけ。
     // v0.1.1757: スマホのリアルタイム化の小さな TAIL を書く配線(+26行・大半は【なぜ】のコメント)。判定は lib(liveEvents.js の shouldWriteLiveEventsTail)。
-    rules: { 'max-lines': ['error', { max: 19540, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1818: コメント欄の見張りを位置を読む前に間引く(+4行: import・前回時刻・判定と記録)。判定は lib の commentPanelHealthProbe.js。
+    // v0.1.1820: host の移動を iframe を読み込み直さない moveBefore 経由に(+1行: import)。手順は lib の moveNodePreservingState.js。
+    // v0.1.1825: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
+    // v0.1.1829: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
+    // v0.1.1830: 作りたて host を古いと捨てて開くたび4回作り直していたのを止める(+5行: 一度でも DOM に入った host の WeakSet と記録2か所)。
+    rules: { 'max-lines': ['error', { max: 19571, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -438,8 +446,16 @@ export default [
     // v0.1.1754: 読み上げの遅れの一言(span 1つと onLagNotice の配線)=+3行。判定と文言は lib の voiceLagNotice.js。
     // v0.1.1759: 声の絞り込みの先読み(initVoiceSpeaker を VoicePlayer へ渡す import 1行+配線1行)。判定は lib の voiceNarrowing.js。
     // v0.1.1760: 吹き出しの置き場所の判定を venueBubblePlacer.js / lib の bubblePlacement.js へ出した=7339→7325(下げた)。
+    // v0.1.1765: 声の温め(warmup の生成1行+import 1行+VoicePlayer への1行)=+2。中身は lib の voiceWarmup.js。
+    // v0.1.1766: 声を少しずつ鳴らす(import 2行+VoicePlayer への1行)=+3。中身は lib の voiceStream.js。
+    // v0.1.1771: 読み上げの聞こえ方の試験入口(import 1行+呼び出し1行)と、会場で鳴らない理由の計器
+    //   (開閉と発言の2か所に1行ずつ)=+4。中身は voiceTestHook.js / lib の voicePlaybackQuality.js。
+    // v0.1.1794: 同じ配信をコメビュと二重に読まない(import 1行+名乗りの1行+発言ごとの分岐5行)=+7。中身は lib の voiceReaderLease.js。
+    // v0.1.1828: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
+    // v0.1.1832: 席が無い人の吹き出しを診断の行の上に出す配線(viewportFloor 1行)と、名前の無い人を「匿名NNN」で出す4行=+5。
+    // v0.1.1833: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7325, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7353, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -458,7 +474,8 @@ export default [
     // v0.1.1738: gzip は受け口の返事(gzipOk)を見てから・スマホの目印を150秒保持(+3行)。判定は lib(autoPublishDecision.js の readPublishAck)。
     // v0.1.1740: スマホの読み上げ(返事の voiceWanted で声を作って送る・+6行)。判定と順番は lib(phoneVoiceSender.js)、配線は phoneVoicePublisher.js。
     // v0.1.1757: スマホへ新着を3秒ごとに送る係の配線(+4行: import・生成・返事を渡す・統計)。本体は liveEventsPublisher.js / lib の liveEventSender.js。
-    rules: { 'max-lines': ['error', { max: 4604, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1823: 「👥 ファンにも公開」の配線(+3行: import・スイッチに渡す・同意 OFF で止める)。本体は fanLinkClient.js / statusSmartphoneCard.js。
+    rules: { 'max-lines': ['error', { max: 4607, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

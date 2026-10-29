@@ -318,7 +318,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 270</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 273</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -340,6 +340,8 @@
 - `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
 - `src/extension/avatar-face-worker-entry.js` — 匿名の顔を合成する専用 Worker(v0.1.1681)。
+- `src/extension/comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
+- `src/extension/comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
 - `src/extension/sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
@@ -374,6 +376,7 @@
 - `src/lib/coalescedRepaintScheduler.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存。yieldToBrowserPaint のみ依存)
 - `src/lib/comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
 - `src/lib/comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
+- `src/lib/comeviewLivePush.js` — コメビュ(別窓)の読み上げへ、届いたコメントを storage を待たずに渡す(P5b・2026-10-29)。
 - `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
 - `src/lib/comeviewTimelineDiff.js` — コメビュの「整合(reconcile)」を差分で描くための純関数。
 - `src/lib/comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
@@ -603,13 +606,17 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 28</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
+- `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
 - `src/extension/popup/wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
+- `src/extension/voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
+- `src/extension/voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
+- `src/extension/voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
 - `src/lib/phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
 - `src/lib/phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
 - `src/lib/phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
@@ -619,6 +626,7 @@
 - `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
 - `src/lib/voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
+- `src/lib/voiceEngineActivity.js` — 会場とコメビュで「VOICEVOX がいま使われているか」を分け合う(v0.1.1781)。
 - `src/lib/voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
 - `src/lib/voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
 - `src/lib/voiceKeys.js` — 読み上げ設定の storage キーの【正本】。
@@ -626,12 +634,21 @@
 - `src/lib/voiceLagNotice.js` — 読み上げが大きく遅れているときの一言(会場・コメビュ共通)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
+- `src/lib/voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
+- `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
+- `src/lib/voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
 - `src/lib/voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
+- `src/lib/voiceReaderLease.js` — 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけにする(v0.1.1794)。
+- `src/lib/voiceReadingNormalize.js` — 読み上げる本文を「耳で聞いて自然」に整える純関数(会場・コメビュ・スマホ共通)。
 - `src/lib/voiceStageTiming.js` — 読み上げの遅れを「段階ごと」に測る計器(印字専用・読み上げの挙動には一切介入しない)。
+- `src/lib/voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。
+- `src/lib/voiceStyleLevelTable.js` — VOICEVOX の声(styleId)ごとの素の大きさの表(v0.1.1788)。
 - `src/lib/voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
 - `src/lib/voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
+- `src/lib/voiceTestRun.js` — 読み上げを「決まった形のコメント」で流して測る試験(開発版だけ・2026-10-26)。
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
+- `src/lib/voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
 - `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 
 </details>
@@ -864,6 +881,16 @@
   - `src/extension/statusSmartphoneCard.js`
   - `src/extension/popup-entry.js`
   - `src/lib/statusPublisherPlan.js`
+- **拡張なしでスマホから見る(放送URL・ファンにも公開)** — ①開始画面(/phone)に放送URLを貼る→/live?lv= で1配信だけその場で取る(api/live-ranking.js の ?lv=・60秒置き場・SET NX で1本)・一覧に無ければ mergePinnedLive で足す(v0.1.1822)。②配信者の「👥 ファンにも公開」で読むだけの fan_… リンク(api/status.js ?action=fan・GET ?v=fan_ は配信者の最新を読むだけ・目印を置かない・CDN 5秒・リアルタイムは1時間の人数と月の総数で止める)(v0.1.1823)。③iPhone アプリだけの「💬 コメントを流す」=端末がニコニコから直接受け取る(watch/view/segment は CapacitorHttp・握手は WebView の WebSocket・読み方は公開の型どおりの ndgrLiveFollow・サーバーへ送らない)(v0.1.1824)
+  - `api/live-ranking.js`
+  - `src/lib/phoneStartLink.js`
+  - `app/phone.js`
+  - `src/lib/fanLink.js`
+  - `src/server/fanLinkApi.js`
+  - `src/extension/fanLinkClient.js`
+  - `src/extension/statusSmartphoneCard.js`
+  - `src/extension/liveDirectComments.js`
+  - `src/lib/ndgrLiveFollow.js`
 - **スマホから生放送にコメント(PC中継)** — スマホのWEB版の本物の入力欄(popup-entry.js の submitComment)が、受動ビューで globalThis.__nlsWebCommentRelay があるときだけ /api/post に預ける(拡張の中では常に null=PCの送信経路は不変)。サーバー(api/post.js)は投稿用の鍵(#pk=・ハッシュだけ保存)で照合し待ち行列に最長60秒・20秒8件まで。PCの送信担当(status.html?publisher=1)の phonePostRelay.js がふだん10秒/入力中2秒で取りに行き、NLS_POST_COMMENT で放送タブのコメント欄から投稿して結果を返す。スマホは接続の帯と ⏱→✓→✓✓(放送のコメントに流れたのを鏡で確認)の印を app/live-view-post.js で出す。PC の「✍️ スマホからコメントする」スイッチ・自分専用URL・QR は statusSmartphoneCard.js。判定は phonePost.js(v0.1.1734)
   - `api/post.js`
   - `src/lib/phonePost.js`
@@ -967,7 +994,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 283</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 290</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -977,7 +1004,6 @@
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
 - `app/live-view.js` — global NL_BUILD_ID
-- `app/phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
 - `extension/background.js` — MV3 Service Worker
 - `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
 - `mobile/scripts/appstore-submit.mjs` — 移植元: partnership_program_website/scripts/appstore-submit.mjs
@@ -1028,6 +1054,7 @@
 - `scripts/council-daily.mjs` — 会議ハーネスの日課を1本にまとめる（2026-09-16 新設）
 - `scripts/council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
 - `scripts/council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
+- `scripts/council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
 - `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
 - `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
@@ -1038,6 +1065,7 @@
 - `scripts/lib/today-jst.mjs` — 運用日（JST）を返す唯一の正本。
 - `scripts/lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
+- `scripts/measure-phone-direct.mjs` — 「iPhone アプリが自分でニコ生のコメントを取る」(拡張なし 第3段)の前に測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
 - `scripts/perf-ab/boot-profile.mjs` — パネル(popup)の【起動の瞬間】のメインスレッド CPU プロファイル。「押した瞬間の黒い幕」の原因探し用。
@@ -1059,6 +1087,10 @@
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/extension/popup/init/frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
+- `src/extension/self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
+- `src/extension/self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
+- `src/extension/self-update.js` — 開発中（展開して読み込んだ）拡張が、作業フォルダの新しい版に自分で入れ替わる。
+- `src/extension/self-update.kit-test.mjs` — self-update.test.mjs — self-update.js の試験。拡張へ写すときは import 先のパスだけ直す。
 - `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
 - `src/lib/adObservationLog.js` — 広告(ニコニ広告)の「いつ増えたか」を、拡張が【気づいた時刻】として残す(純関数)。v0.1.1665。
@@ -1070,6 +1102,7 @@
 - `src/lib/backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
 - `src/lib/bandScale.js` — 「大きく見せる枠(PICK UP 帯)」の倍率(純関数)。
 - `src/lib/bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
+- `src/lib/besideOverflowGuard.js` — 横付き(beside)パネルが視聴行の中に入った結果、ページが横にはみ出したかを判定する純粋関数。
 - `src/lib/blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
 - `src/lib/bootTimelineBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
 - `src/lib/buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
@@ -1140,6 +1173,7 @@
 - `src/lib/mirrorBundle.js` — 5種類の「鏡」を同一 tick の 1 バンドルとして扱うための合流バッファ純関数。
 - `src/lib/mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
 - `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
+- `src/lib/moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
 - `src/lib/nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
 - `src/lib/noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
@@ -1171,7 +1205,6 @@
 - `src/lib/phoneBlocklist.js` — スマホで「この人を隠す」(純関数)。iPhone アプリの審査(ほかの人の書き込みを見せるアプリは、
 - `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
-- `src/lib/phoneStartLink.js` — スマホの開始画面(app/phone.html)で貼られた「PC の拡張のスマホ用リンク」を読む(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -1228,6 +1261,7 @@
 - `src/lib/tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。
 - `src/lib/topSupportRankAnonymousFold.js` — userKey: string,
 - `src/lib/trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
+- `src/lib/trailingPublisher.js` — 「先に1回・間引いた分は最後に1回」書く小さな仕組み(DOM も chrome API も触らない)。
 - `src/lib/trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
 - `src/lib/unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
@@ -1259,54 +1293,48 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 📥 コメント取得 (2版)
-- `v0.1.1758` 2026-10-24 — スマホで新着をすぐ受け取る
-- `v0.1.1746` 2026-10-22 — スマホ読み上げの取りこぼしを数える
-
 ### 🙂 匿名(184) (1版)
-- `v0.1.1761` 2026-10-25 — 吹き出しが段の案内文に被るのを直す
+- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
 
-### 🏟 会場・席 (10版)
-- `v0.1.1761` 2026-10-25 — 吹き出しが段の案内文に被るのを直す
-- `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
-- `v0.1.1758` 2026-10-24 — スマホで新着をすぐ受け取る
-- `v0.1.1754` 2026-10-23 — 読み上げが遅れているときに秒数を出す
-- `v0.1.1753` 2026-10-22 — スマホ会場の席が急に0人になるのを直す
-- `v0.1.1751` 2026-10-22 — スマホで声が先に届いても画面を合わせる
-- `v0.1.1750` 2026-10-22 — コメビュの読み上げを届いた瞬間に準備
-- `v0.1.1749` 2026-10-22 — 読み上げの音量をポップアップで変えられるように
-- `v0.1.1748` 2026-10-22 — 読み上げの遅れを段階ごとに測れるように
-- `v0.1.1747` 2026-10-22 — スマホ会場の顔なしの人をその人の顔に
+### 🏟 会場・席 (5版)
+- `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
+- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
+- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
+- `v0.1.1817` 2026-10-28 — 会場の客席の描き直しを軽く
+- `v0.1.1816` 2026-10-28 — 隠れた画面の数え直しを間引く
 
-### 🎈 吹き出し (3版)
-- `v0.1.1761` 2026-10-25 — 吹き出しが段の案内文に被るのを直す
-- `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
-- `v0.1.1751` 2026-10-22 — スマホで声が先に届いても画面を合わせる
+### 🎈 吹き出し (2版)
+- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
+- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
-### 🎁 ギフト (1版)
-- `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
+### 🎁 ギフト (2版)
+- `v0.1.1827` 2026-10-29 — アプリのコメント欄にギフトも出す
+- `v0.1.1822` 2026-10-28 — PC が無くても放送 URL で応援を見る
 
-### 🔊 読み上げ (10版)
-- `v0.1.1763` 2026-10-25 — アプリは iPhone の声で読み上げ
-- `v0.1.1762` 2026-10-25 — iPhone アプリの開始画面・デモ・通知
-- `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
-- `v0.1.1759` 2026-10-24 — 読み上げの声を絞る設定を追加(既定オフ)
-- `v0.1.1754` 2026-10-23 — 読み上げが遅れているときに秒数を出す
-- `v0.1.1750` 2026-10-22 — コメビュの読み上げを届いた瞬間に準備
-- `v0.1.1749` 2026-10-22 — 読み上げの音量をポップアップで変えられるように
-- `v0.1.1748` 2026-10-22 — 読み上げの遅れを段階ごとに測れるように
-- `v0.1.1746` 2026-10-22 — スマホ読み上げの取りこぼしを数える
-- `v0.1.1745` 2026-10-22 — スマホの最新コメント欄を読み上げに合わせた
+### 🔊 読み上げ (4版)
+- `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
+- `v0.1.1829` 2026-10-29 — コメビュの読み上げを少し早く
+- `v0.1.1827` 2026-10-29 — アプリのコメント欄にギフトも出す
+- `v0.1.1824` 2026-10-28 — アプリだけでコメントを流す
 
-### 🩺 診断・状態速報 (1版)
-- `v0.1.1748` 2026-10-22 — 読み上げの遅れを段階ごとに測れるように
+### 🪟 応援レーン・タイル (2版)
+- `v0.1.1816` 2026-10-28 — 隠れた画面の数え直しを間引く
+- `v0.1.1815` 2026-10-28 — 隠れた画面の計算を軽く
+
+### 🩺 診断・状態速報 (3版)
+- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
+- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
+- `v0.1.1821` 2026-10-28 — 診断の読み込み直し回数を正しく数える
 
 ### ⚡ 描画・性能 (2版)
-- `v0.1.1760` 2026-10-24 — 吹き出しが PICK UP や案内に被らない
-- `v0.1.1757` 2026-10-24 — スマホへ新着を3秒ごとに送る係(PC)
+- `v0.1.1831` 2026-10-28 — 視聴ページの確認用ログを毎回出さない
+- `v0.1.1825` 2026-10-28 — 横付きパネルが右へはみ出さないように
 
-### その他 (4版)
-- `v0.1.1764` 2026-10-25 — アプリで応援ランキングを見られる
-- `v0.1.1756` 2026-10-24 — スマホへすぐ届けるサーバーの受け口
-- `v0.1.1755` 2026-10-22 — スマホ版のサーバーに月の上限を足す
-- `v0.1.1752` 2026-10-22 — スマホ用の送信は映している配信だけに
+### その他 (7版)
+- `v0.1.1830` 2026-10-28 — パネルを開くときの作り直しを1回に
+- `v0.1.1826` 2026-10-29 — アプリのコメントを自動でつなぎ直す
+- `v0.1.1823` 2026-10-28 — ファンにも公開(拡張なしで見られる)
+- `v0.1.1820` 2026-10-28 — 視聴ページでパネルの二重起動を解消
+- `v0.1.1819` 2026-10-28 — パネル初回表示の自動テストを安定化
+- `v0.1.1818` 2026-10-28 — コメント欄の見張りを間引く
+- `v0.1.1814` 2026-10-28 — 視聴ページの動きを軽く(コメントの読み直し)

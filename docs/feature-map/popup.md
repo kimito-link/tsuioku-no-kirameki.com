@@ -32,6 +32,7 @@ graph LR
   n_popup --> n_src_extension_popup_report_htmlReportDocument_js["extension/popup/report/htmlReportDocument.js"]
   n_popup --> n_src_extension_popup_wireLaneUserDetailOpen_js["extension/popup/wireLaneUserDetailOpen.js"]
   n_popup --> n_src_extension_popup_wireVoiceNarrowSelect_js["extension/popup/wireVoiceNarrowSelect.js"]
+  n_popup --> n_src_extension_popup_wireVoiceQualitySelect_js["extension/popup/wireVoiceQualitySelect.js"]
   n_popup --> n_src_extension_popup_wireVoiceVolumeSlider_js["extension/popup/wireVoiceVolumeSlider.js"]
   n_popup --> n_src_extension_statusPublisherHost_js["extension/statusPublisherHost.js"]
   n_popup --> n_src_extension_story_laneContentLod_js["extension/story/laneContentLod.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
   n_popup --> n_src_lib_avatarComposeDiagLine_js["lib/avatarComposeDiagLine.js"]:::shared
   n_popup --> n_src_lib_avatarEntryCounts_js["lib/avatarEntryCounts.js"]
-  n_popup --> n_src_lib_avatarFaceStore_js["lib/avatarFaceStore.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 468 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 470 ファイル省略（全件は storage-bus.md / metafile 参照）。

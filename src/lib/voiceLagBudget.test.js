@@ -18,7 +18,11 @@ import {
   computeVoiceLagVerdict,
   computeSustainedPressureBoost,
   mergeVoiceSpeedBoost,
-  VOICE_SUSTAINED_PRESSURE_MIN
+  VOICE_SUSTAINED_PRESSURE_MIN,
+  createVoicePaceState,
+  noteVoicePaceArrival,
+  noteVoicePacePlayed,
+  resetVoicePaceArrival
 } from './voiceLagBudget.js';
 
 /**
@@ -432,5 +436,174 @@ describe('mergeVoiceSpeedBoost (v0.1.1222)', () => {
   it('不正値は0扱いで壊れない', () => {
     expect(mergeVoiceSpeedBoost(NaN, NaN)).toBe(0);
     expect(mergeVoiceSpeedBoost(undefined, 0.4)).toBeCloseTo(0.4, 5);
+  });
+});
+
+describe('v0.1.1797 computeBacklogCatchUpBoost(順番待ちが伸びたら少し早口に)', async () => {
+  const { computeBacklogCatchUpBoost, VOICE_BACKLOG_BOOST_MAX, mergeVoiceSpeedBoost } = await import('./voiceLagBudget.js');
+  it('待ちが 1.5秒以下・未計測(-1)・壊れた値では上げない', () => {
+    for (const w of [-1, 0, 800, 1500, NaN, undefined, 'x']) expect(computeBacklogCatchUpBoost(w)).toBe(0);
+  });
+  it('待ちに比例して上がり、上限で止まる', () => {
+    expect(computeBacklogCatchUpBoost(2500)).toBeCloseTo(0.1);
+    expect(computeBacklogCatchUpBoost(3500)).toBeCloseTo(0.2);
+    expect(computeBacklogCatchUpBoost(4500)).toBeCloseTo(VOICE_BACKLOG_BOOST_MAX);
+    expect(computeBacklogCatchUpBoost(60000)).toBe(VOICE_BACKLOG_BOOST_MAX);
+  });
+  it('混雑の上乗せより小さければ、混雑の方を使う(下げない)', () => {
+    expect(mergeVoiceSpeedBoost(0.4, computeBacklogCatchUpBoost(3000))).toBe(0.4);
+    expect(mergeVoiceSpeedBoost(0, computeBacklogCatchUpBoost(3000))).toBeCloseTo(0.15);
+  });
+});
+
+describe('v0.1.1797 早口の床(追いついた後も釣り合う速さを保つ)', async () => {
+  const {
+    createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor,
+    computeBacklogCatchUpBoost, VOICE_BACKLOG_BOOST_MAX, VOICE_PACE_GAP_CAP_MS
+  } = await import('./voiceLagBudget.js');
+
+  it('見本が3件ずつ揃うまでは 0', () => {
+    const s = createVoicePaceState();
+    for (let i = 0; i < 3; i += 1) noteVoicePaceArrival(s, i * 7000); // 間隔は2件
+    for (let i = 0; i < 3; i += 1) noteVoicePacePlayed(s, 7640);
+    expect(computeVoicePaceFloor(s)).toBe(0);
+    noteVoicePaceArrival(s, 21000);
+    expect(computeVoicePaceFloor(s)).toBeCloseTo(7640 / 7000 - 1 + 0.03, 5);
+  });
+
+  it('声が間隔より短ければ 0・長すぎても上限まで', () => {
+    const s = createVoicePaceState();
+    for (let i = 0; i < 5; i += 1) { noteVoicePaceArrival(s, i * 7000); noteVoicePacePlayed(s, 3000); }
+    expect(computeVoicePaceFloor(s)).toBe(0);
+    const t = createVoicePaceState();
+    for (let i = 0; i < 5; i += 1) { noteVoicePaceArrival(t, i * 1000); noteVoicePacePlayed(t, 7000); }
+    expect(computeVoicePaceFloor(t)).toBe(VOICE_BACKLOG_BOOST_MAX);
+  });
+
+  it('早口・再生速度で鳴った長さは、ふつうの速さの長さに戻して覚える', () => {
+    const s = createVoicePaceState();
+    noteVoicePacePlayed(s, 5000, 1.2, 0.1);
+    expect(s.naturalEmaMs).toBeCloseTo(5000 * 1.2 * 1.1, 5);
+    noteVoicePacePlayed(s, NaN); noteVoicePacePlayed(s, 0); noteVoicePacePlayed(null, 1000);
+    expect(s.naturalCount).toBe(1);
+  });
+
+  it('長く静かだった間隔は上限で切る(過負荷ではない)', () => {
+    const s = createVoicePaceState();
+    noteVoicePaceArrival(s, 0);
+    noteVoicePaceArrival(s, 10 * 60 * 1000);
+    expect(s.gapEmaMs).toBe(VOICE_PACE_GAP_CAP_MS);
+  });
+
+  it('床は待ちの上乗せに足され、上限で止まる', () => {
+    expect(computeBacklogCatchUpBoost(0, 0.09)).toBeCloseTo(0.09);
+    expect(computeBacklogCatchUpBoost(2500, 0.09)).toBeCloseTo(0.19);
+    expect(computeBacklogCatchUpBoost(9000, 0.25)).toBe(VOICE_BACKLOG_BOOST_MAX);
+    expect(computeBacklogCatchUpBoost(0, -1)).toBe(0);
+    expect(computeBacklogCatchUpBoost(0, 'x')).toBe(0);
+  });
+
+  // PC 試験の再現: 1件7.64秒の声が7秒おきに20件。床が無いと遅れが 1秒前後 ↔ 4.5秒以上を往復した。
+  function simulate(/** @type {boolean} */ withFloor) {
+    const s = createVoicePaceState();
+    let waitEma = -1;
+    let prevEnd = 0;
+    const lags = [];
+    for (let i = 0; i < 20; i += 1) {
+      const arrival = i * 7000;
+      noteVoicePaceArrival(s, arrival);
+      const start = Math.max(arrival, prevEnd);
+      const wait = start - arrival;
+      waitEma = waitEma < 0 ? wait : waitEma + 0.3 * (wait - waitEma);
+      const boost = computeBacklogCatchUpBoost(waitEma, withFloor ? computeVoicePaceFloor(s) : 0);
+      const played = 7640 / (1 + boost);
+      noteVoicePacePlayed(s, played, 1, boost);
+      prevEnd = start + played;
+      lags.push(wait);
+    }
+    return lags;
+  }
+
+  it('床があると後半は遅れが消え、揺れない', () => {
+    const withFloor = simulate(true);
+    const without = simulate(false);
+    expect(Math.max(...withFloor.slice(-6))).toBeLessThan(100); // 最後の6件は遅れ 0.1秒未満
+    expect(Math.max(...withFloor.slice(10))).toBeLessThan(Math.min(...without.slice(10))); // どこを取っても床ありの方が小さい
+  });
+});
+
+describe('v0.1.1800 件数の上限を待ち件の文字数から見積もる', async () => {
+  const {
+    createVoicePaceState, noteVoicePacePlayed, resolveVoiceQueueMaxByChars,
+    VOICE_QUEUE_MAX_FLOOR, VOICE_QUEUE_MAX_CEIL, VOICE_CHAR_MS_DEFAULT
+  } = await import('./voiceLagBudget.js');
+
+  it('1文字あたりの長さを覚える(早口・再生速度は普通の速さに戻して数える)', () => {
+    const s = createVoicePaceState();
+    noteVoicePacePlayed(s, 1000, 1, 0, 10);
+    expect(s.charMsEma).toBeCloseTo(100);
+    const t = createVoicePaceState();
+    noteVoicePacePlayed(t, 1000, 1.2, 0.25, 10);
+    expect(t.charMsEma).toBeCloseTo(150);
+    const u = createVoicePaceState();
+    noteVoicePacePlayed(u, 1000); // 文字数不明なら覚えない
+    expect(u.charMsEma).toBe(-1);
+  });
+
+  it('PC 試験の再現: 長い声の直後でも、短いコメント10件はほぼ全部入る', () => {
+    const s = createVoicePaceState();
+    for (let i = 0; i < 5; i += 1) noteVoicePacePlayed(s, 7000, 1, 0, 50); // 長い声 140ms/字
+    const shorts = Array(10).fill(5); // 「こんばんは」級
+    expect(resolveVoiceQueueMaxByChars(shorts, s)).toBe(VOICE_QUEUE_MAX_CEIL);
+  });
+
+  it('長い件が待っていれば絞る(床まで)', () => {
+    const s = createVoicePaceState();
+    noteVoicePacePlayed(s, 7000, 1, 0, 50);
+    expect(resolveVoiceQueueMaxByChars(Array(8).fill(50), s)).toBe(VOICE_QUEUE_MAX_FLOOR);
+  });
+
+  it('まだ鳴らしていなければ見込み値で数える・配列でなければ null', () => {
+    const s = createVoicePaceState();
+    expect(VOICE_CHAR_MS_DEFAULT).toBeGreaterThan(0);
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(5), s)).toBe(VOICE_QUEUE_MAX_CEIL);
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(5), null)).toBe(VOICE_QUEUE_MAX_CEIL);
+    expect(resolveVoiceQueueMaxByChars(/** @type {any} */ (null), s)).toBeNull();
+  });
+});
+
+describe('v0.1.1801 声を作る方が遅い PC は作る時間で数える', async () => {
+  const { createVoicePaceState, noteVoicePacePlayed, resolveVoiceQueueMaxByChars, VOICE_QUEUE_MAX_CEIL, VOICE_QUEUE_MAX_FLOOR } = await import('./voiceLagBudget.js');
+  const s = createVoicePaceState();
+  noteVoicePacePlayed(s, 1000, 1, 0, 8); // 125ms/字
+  const mid = Array(10).fill(8); // 1件 1秒
+
+  it('速い PC(比0.1)は数えない時と同じ', () => {
+    expect(resolveVoiceQueueMaxByChars(mid, s, 0.1)).toBe(resolveVoiceQueueMaxByChars(mid, s));
+    expect(resolveVoiceQueueMaxByChars(mid, s)).toBe(6);
+  });
+
+  it('作るのが声より遅い(比2.0)と 1件 2.25秒で数えて床まで絞る', () => {
+    expect(resolveVoiceQueueMaxByChars(mid, s, 2.0)).toBe(VOICE_QUEUE_MAX_FLOOR);
+  });
+
+  it('短いコメントも、作るのが遅ければ1件0.97秒で数える(比1.2・PC 試験の値)', () => {
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(2), s, 1.2)).toBe(6);
+    expect(resolveVoiceQueueMaxByChars(Array(10).fill(2), s, 0.3)).toBe(VOICE_QUEUE_MAX_CEIL);
+  });
+});
+
+describe('resetVoicePaceArrival(2026-10-28)', () => {
+  it('届く間隔だけ忘れ、声の長さは残す', () => {
+    const st = createVoicePaceState();
+    noteVoicePaceArrival(st, 1000);
+    noteVoicePaceArrival(st, 2000);
+    noteVoicePacePlayed(st, 1500, 1, 0, 10);
+    resetVoicePaceArrival(st);
+    expect(st.lastArrivalAt).toBe(-1);
+    expect(st.gapEmaMs).toBe(-1);
+    expect(st.gapCount).toBe(0);
+    expect(st.naturalCount).toBe(1);
+    expect(st.charMsEma).toBe(150);
   });
 });

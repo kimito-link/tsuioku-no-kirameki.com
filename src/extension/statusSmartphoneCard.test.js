@@ -126,3 +126,47 @@ describe('✍️ スマホからコメントする(v0.1.1734)', () => {
     expect(el.textContent).toContain('もう送れません');
   });
 });
+
+describe('👥 ファンにも公開(v0.1.1823・配信者中継)', () => {
+  const F = 'fan_' + 'f'.repeat(22);
+  const fan = (stored = '') => {
+    let cur = stored;
+    return {
+      readToken: vi.fn(async () => cur),
+      enable: vi.fn(async () => { cur = F; return F; }),
+      disable: vi.fn(async () => { cur = ''; })
+    };
+  };
+  it('★説明に「誰が・何を見られ・何ができないか・止め方」を書く(privacy.html 4-3 と揃える)', async () => {
+    const { FAN_LINK_CONSENT_TEXT } = await import('./statusSmartphoneCard.js');
+    for (const w of ['読むだけ', '拡張が無くても', '視聴者のID・表示名・コメント本文', 'コメントの投稿', 'OFFにするとそのURLは使えなくなります']) {
+      expect(FAN_LINK_CONSENT_TEXT).toContain(w);
+    }
+  });
+  it('★既定は OFF。ON にするとファン用の URL(fan_…)と QR を出す。配信者の閲覧 URL とは別', async () => {
+    const fl = fan();
+    const { el } = mk({ creds: DEVICE, deps: { optedIn: true, fanLink: fl } });
+    await flush(); await flush();
+    const cb = [...el.querySelectorAll('input[type=checkbox]')].at(-1);
+    expect(cb.checked).toBe(false);
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change'));
+    await flush(); await flush();
+    expect(fl.enable).toHaveBeenCalled();
+    expect(el.textContent).toContain(`https://app.example/live-view?v=${F}`);
+    expect(el.textContent).toContain(`https://app.example/live-view?v=${DEVICE.viewToken}`);
+  });
+  it('★ON のままなら開くたびに寿命を延ばして同じ URL を出す・OFF で取り消す', async () => {
+    const fl = fan(F);
+    const { el } = mk({ creds: DEVICE, deps: { optedIn: true, fanLink: fl } });
+    await flush(); await flush(); await flush();
+    expect(fl.enable).toHaveBeenCalledTimes(1);
+    const cb = [...el.querySelectorAll('input[type=checkbox]')].at(-1);
+    expect(cb.checked).toBe(true);
+    cb.checked = false;
+    cb.dispatchEvent(new Event('change'));
+    await flush(); await flush();
+    expect(fl.disable).toHaveBeenCalled();
+    expect(el.textContent).toContain('もう見られません');
+  });
+});

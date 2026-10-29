@@ -22,6 +22,16 @@ describe('inlineHostMoveProbe(v0.1.1124 D-1計器)', () => {
     expect(d.lastMoveAgoMs).toBe(1_000);
   });
 
+  it('moveBefore で iframe を保てた移設(preserved)は reloadCount でなく preservedMoves に入る(v0.1.1821)', () => {
+    const s = {};
+    recordInlineHostMove(s, { reason: 'anchored_video', atMs: 1, prevConnected: true, hadIframe: true, venueOpen: false, preserved: true });
+    recordInlineHostMove(s, { reason: 'prewarm_offscreen', atMs: 2, prevConnected: true, hadIframe: true, venueOpen: false });
+    const d = summarizeInlineHostMoveDiag(s, 3);
+    expect(d.reloadCount).toBe(1);
+    expect(d.preservedMoves).toBe(1);
+    expect(d.samples[0].preserved).toBe(true);
+  });
+
   it('iframe未生成の移設は reloadCount に入らない(初回attachをノイズにしない)', () => {
     const s = {};
     recordInlineHostMove(s, { reason: 'dock_body', atMs: 1, prevConnected: true, hadIframe: false, venueOpen: false });

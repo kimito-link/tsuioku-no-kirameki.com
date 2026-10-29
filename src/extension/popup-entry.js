@@ -914,6 +914,7 @@ import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js'
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
 import { wireVoiceVolumeSlider } from './popup/wireVoiceVolumeSlider.js';
 import { wireVoiceNarrowSelect } from './popup/wireVoiceNarrowSelect.js';
+import { wireVoiceQualitySelect } from './popup/wireVoiceQualitySelect.js';
 import {
   applyPopupFrameFallback,
   loadPopupFrameSettings,
@@ -5565,7 +5566,8 @@ const _instantPushSentAtByCommentNo = new Map();
  * (coalescedRepaintScheduler.js の JSDoc 参照。契約を破る変更をしない)。
  */
 const _instantPushRepaintScheduler = createCoalescedRepaintScheduler(
-  () => repaintStoryUserLaneWithInstantPushBuffer()
+  () => repaintStoryUserLaneWithInstantPushBuffer(),
+  { minIntervalMs: () => (_panelHidden() ? 1500 : 0) } // v0.1.1816: 隠れている間は1.5秒に1回まで(会場の席の鏡を書くので止めない・理由は scheduler の JSDoc)
 );
 /** パネルが「見えているか」(親 content が伝える+document.hidden)。★定期処理はすべてこの判定で止める。 */
 const _panelActivity = createPanelActivity({ isDocHidden: () => typeof document !== 'undefined' && document.hidden === true });
@@ -6744,11 +6746,8 @@ function renderStoryUserLane() {
     fingerprint: laneDomFingerprint(perTierKeysOf(laneDomSelf)),
     fingerprintFor: _lastPublishedLaneMirrorHash
   };
-  setTimeout(() => {
-    if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
-      window.__NLS_LANE_DIAG__();
-    }
-  }, 3000);
+  // v0.1.1831: ここで描画のたび3秒後に __NLS_LANE_DIAG__() を自動で呼び、約5KBの JSON を視聴ページの
+  //   コンソールへ出し続けていた(DevTools が中身を抱え続ける)。必要なときに DevTools から手で呼ぶ。
 }
 
 /** passive 鏡描画の再描画 skip 用 signature(変化が無ければ paint しない)。 */
@@ -19810,6 +19809,7 @@ async function initPopup() {
 
   wireVoiceVolumeSlider(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P2: 読み上げ音量
   wireVoiceNarrowSelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P3: 声の絞り込み
+  wireVoiceQualitySelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // 声の音質(既定16kHz)
   const effectSoundToggle = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));
   effectSoundToggle?.addEventListener('change', async () => {
     try {

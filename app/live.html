@@ -33,6 +33,15 @@
       .app-note { margin-top: 20px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-soft); font-size: .8rem; color: var(--ink-sub); }
       .app-note p { margin: 0 0 6px; }
       .app-note p:last-child { margin-bottom: 0; }
+      /* iPhone アプリの中だけに出る「💬 コメントを流す」(src/extension/liveDirectComments.js) */
+      .direct-comments { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-soft); }
+      .direct-head { display: flex; gap: 8px; flex-wrap: wrap; }
+      .direct-head .btn { min-height: 44px; }
+      .direct-state { margin: 8px 0 6px; font-size: .8rem; color: var(--ink-sub); }
+      .direct-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; font-size: .9rem; }
+      .direct-list li { padding: 6px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+      .direct-name { font-weight: 700; color: var(--navy); margin-right: 4px; }
+      .direct-list li.direct-gift { background: rgba(255, 196, 0, .14); border-radius: 8px; padding: 6px 8px; }
     </style>
   </head>
   <body>

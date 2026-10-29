@@ -139,7 +139,9 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     // 合成経路は先読みとその場合成の2つだけ。両方が同じ計測つき合成(synthesizeVoiceTracked)を通り、
     //   その中で失敗理由計器を1か所だけ配線する(2026-10-22 P1 で集約)。
     expect((synthBranch.match(/(?<!function )synthesizeVoiceTracked\(/g) || []).length).toBe(2);
-    expect((synthBranch.match(/(?<!function )synthesizeVoice\(/g) || []).length).toBe(1);
+    // 2026-10-26: 素の synthesizeVoice は声の温め(withVoiceWarmup)で包んだ1つだけを呼ぶ。
+    expect((synthBranch.match(/(?<!function )synthesizeVoiceWarm\(/g) || []).length).toBe(1);
+    expect(cv).toMatch(/const synthesizeVoiceWarm = withVoiceWarmup\(_voiceWarmup, synthesizeVoice\);/);
     expect((synthBranch.match(/onFailure:\s*\(info\)\s*=>\s*recordVoiceSynthFailureReason\(info\)/g) || []).length).toBe(1);
     // 理由bagは初期化を含む2参照、null累計は1つの失敗分岐だけに限定する。
     expect((synthBranch.match(/_voiceDiag\.synthFailReasons/g) || []).length).toBe(2);

@@ -14,6 +14,7 @@ import qrcode from 'qrcode-generator';
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 import { copyTextWithFallback } from '../lib/copyTextWithFallback.js';
 import { buildPhonePostUrl } from '../lib/phonePost.js';
+import { fanViewUrl } from '../lib/fanLink.js';
 
 /** 同意の説明文。privacy.html 4-3 と揃える(変えるときは両方)。 */
 export const SMARTPHONE_CONSENT_TEXT =
@@ -28,6 +29,15 @@ export const SMARTPHONE_CONSENT_TEXT =
 export const PHONE_POST_CONSENT_TEXT =
   '✍️ スマホからコメントする：スマホで書いたコメントを、このPCで開いている放送タブのコメント欄から投稿します' +
   '(このPCのブラウザでログインしているアカウントで流れます)。本文はサーバーに最長1分だけ置き、PCが受け取ったら消します。';
+
+/**
+ * v0.1.1823: 「👥 ファンにも公開」の説明(配信者中継)。privacy.html 4-3 と揃える(変えるときは両方)。
+ *   ★誰が・何を見られ・何ができないか・止め方を、スイッチの横に書く。
+ */
+export const FAN_LINK_CONSENT_TEXT =
+  '👥 ファンにも公開：配信を見に来た人に配れる、読むだけのURLを作ります。このURLを開いた人は、拡張が無くても、' +
+  '上の「スマホで見る」と同じ内容(視聴者のID・表示名・コメント本文を含みます)をスマホで見られます。' +
+  'コメントの投稿や、このPCの動きを変える操作はできません。OFFにするとそのURLは使えなくなります。';
 
 /**
  * PC の画面の QR(スマホのカメラで読むだけで開ける=URL を手で送らなくてよい)。
@@ -63,8 +73,14 @@ export function buildUrlQrImage(url) {
  *   registerNow: () => (Promise<unknown> | undefined),
  *   rotate: () => Promise<string | null>,
  *   openUrl: (url: string) => void,
- *   phonePost?: PhonePostDeps
+ *   phonePost?: PhonePostDeps,
+ *   fanLink?: FanLinkDeps
  * }} SmartphoneCardDeps
+ * @typedef {{
+ *   readToken: () => Promise<string>,
+ *   enable: () => Promise<string>,
+ *   disable: () => Promise<void>
+ * }} FanLinkDeps
  */
 
 /**
@@ -139,6 +155,70 @@ export function buildSmartphoneCard(deps) {
     }
     if (note) urlArea.appendChild(document.createTextNode(' ' + note));
     if (deps.phonePost) void renderPhonePost(liveViewUrl, deps.phonePost);
+    if (deps.fanLink) void renderFanLink(creds.appOrigin, deps.fanLink);
+  };
+
+  /**
+   * v0.1.1823: 「👥 ファンにも公開」。ON のときはファン用の読むだけの URL と QR を出す(配信の告知に貼れる)。
+   * @param {string} appOrigin
+   * @param {FanLinkDeps} fl
+   */
+  const renderFanLink = async (appOrigin, fl) => {
+    const box = document.createElement('div');
+    box.style.cssText = 'margin-top:8px;padding-top:6px;border-top:1px dashed var(--nl-border);';
+    urlArea.appendChild(box);
+    const lab = document.createElement('label');
+    lab.style.cssText = 'display:flex;align-items:flex-start;gap:6px;cursor:pointer;';
+    const fcb = document.createElement('input');
+    fcb.type = 'checkbox';
+    fcb.style.cssText = 'margin-top:2px;flex:0 0 auto;cursor:pointer;';
+    const ftxt = document.createElement('span');
+    ftxt.textContent = FAN_LINK_CONSENT_TEXT;
+    lab.appendChild(fcb);
+    lab.appendChild(ftxt);
+    box.appendChild(lab);
+    const out = document.createElement('div');
+    box.appendChild(out);
+    const show = (/** @type {string} */ f) => {
+      out.replaceChildren();
+      if (!f) return;
+      const url = fanViewUrl(appOrigin, f);
+      const head = document.createElement('div');
+      head.textContent = '👥 ファン用のURL(読むだけ。配信の告知やコメントで配ってOK):';
+      head.style.cssText = 'margin-top:6px;font-weight:600;';
+      out.appendChild(head);
+      const urlBox = document.createElement('div');
+      urlBox.textContent = url;
+      urlBox.style.cssText = 'padding:6px 8px;border:1px solid var(--nl-border);border-radius:6px;background:var(--nl-bg);word-break:break-all;user-select:all;font-family:monospace;';
+      out.appendChild(urlBox);
+      const qr = buildUrlQrImage(url);
+      if (qr) out.appendChild(qr);
+      const cp = mkBtn('📋 URLをコピー', async () => {
+        const r = await copyTextWithFallback(url);
+        cp.textContent = r === 'clipboard' || r === 'execCommand' ? '✓ コピーしました' : '× コピー不可';
+        setTimeout(() => { cp.textContent = '📋 URLをコピー'; }, 1800);
+      });
+      out.appendChild(cp);
+    };
+    // ON のままなら、開くたびにサーバーで寿命を延ばして(=同じ URL)出す。
+    const stored = await fl.readToken();
+    fcb.checked = Boolean(stored);
+    if (stored) show((await fl.enable()) || stored);
+    fcb.addEventListener('change', async () => {
+      fcb.disabled = true;
+      if (fcb.checked) {
+        out.textContent = 'ファン用のURLを作っています…';
+        const f = await fl.enable();
+        if (!f) {
+          fcb.checked = false;
+          out.textContent = 'URLを作れませんでした。時間をおいてもう一度ONにしてください。';
+        } else show(f);
+      } else {
+        await fl.disable();
+        out.textContent = 'ファンへの公開を止めました(さっきのURLではもう見られません)。';
+      }
+      fcb.disabled = false;
+    });
   };
 
   /**

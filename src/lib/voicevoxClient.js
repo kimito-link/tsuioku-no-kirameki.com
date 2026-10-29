@@ -1,8 +1,35 @@
 // voicevoxClient.js — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
+import { normalizeVoiceReadingBody } from './voiceReadingNormalize.js';
+import {
+  StreamedVoice,
+  createWavStreamParser,
+  VOICE_STREAM_PREBUFFER_SEC,
+  VOICE_STREAM_SEGMENT_SEC,
+  VOICE_STREAM_STALL_MS
+} from './voiceStream.js';
+
 export const VOICEVOX_BASE_URL = 'http://127.0.0.1:50021';
 
 /** v0.1.1063: 読み上げWAVの出力サンプリングレート(Hz)。16kで合成約30%高速・それ以下は速くならない(実測)。 */
 export const VOICEVOX_OUTPUT_SAMPLING_RATE = 16000;
+
+/**
+ * 2026-10-29: 合成の出力サンプリングレート(Hz)。既定は上の 16k。利用者が「高音質」を選んだときだけ 24k
+ *   (配線は src/extension/voiceQualitySetting.js・値の決め方は voiceQuality.js)。
+ *   受け付けるのは 16000 / 24000 だけ。それ以外は 16000 に戻す(エンジンへ変な値を渡さない)。
+ */
+let _outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
+
+/** @param {unknown} hz */
+export function setVoicevoxOutputSamplingRate(hz) {
+  const n = Number(hz);
+  _outputSamplingRate = n === 24000 ? 24000 : VOICEVOX_OUTPUT_SAMPLING_RATE;
+}
+
+/** @returns {number} */
+export function getVoicevoxOutputSamplingRate() {
+  return _outputSamplingRate;
+}
 
 /**
  * fetch 互換関数。プロキシ経由の buffer 取得は Response 風オブジェクト
@@ -41,6 +68,20 @@ function isExtensionPage() {
 }
 
 /**
+ * Background から届いた {text, status} を Response にする(v0.1.1778)。
+ *   204 などの「中身なし」の状態で本文つき Response を作ると例外になり、約束が決着せず打ち切りまで待っていた
+ *   (/initialize_speaker は 204 を返す=会場の裏読み込みが毎回15秒止まっていた・PC 実測)。
+ * @param {{ text?: unknown, status?: unknown }} res
+ * @returns {Response}
+ */
+export function proxyTextResponse(res) {
+  const raw = Number(res && res.status);
+  const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
+  const noBody = status === 204 || status === 205 || status === 304;
+  return new Response(noBody ? null : String(res && res.text != null ? res.text : ''), { status });
+}
+
+/**
  * Chrome 拡張の Background 経由で fetch を行い CSP / Mixed Content を回避する。
  * 拡張ページ(comeview.html 等)では直接 fetch を使う(プロキシ不要・タイムアウトが効く)。
  * @param {string|URL} url
@@ -61,7 +102,7 @@ async function proxyFetchFn(url, init) {
         (res) => {
           if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
           if (!res || res.error) return reject(new Error(res?.error || 'Proxy fetch failed'));
-          resolve(new Response(res.text, { status: res.status }));
+          try { resolve(proxyTextResponse(res)); } catch (e) { reject(e); }
         }
       );
     });
@@ -98,6 +139,64 @@ async function proxyFetchBufferFn(url, init) {
   }
   return globalThis.fetch(url, init);
 }
+
+/**
+ * 2026-10-26: 声を少しずつ受け取るための fetch。返り値は { ok, status, body: ReadableStream }。
+ *   拡張ページは直接 fetch。content script は Background とポートでつなぎ、届いた分ずつ受け取る
+ *   (sendMessage は1往復で丸ごとしか返せないため)。
+ * @param {string|URL} url
+ * @param {RequestInit} [init]
+ * @returns {Promise<{ ok: boolean, status: number, body: ReadableStream<Uint8Array> | null }>}
+ */
+async function proxyStreamFetchFn(url, init) {
+  if (isExtensionPage() || typeof chrome === 'undefined' || !chrome.runtime?.connect) {
+    return globalThis.fetch(url, init);
+  }
+  const port = chrome.runtime.connect({ name: VOICEVOX_STREAM_PORT });
+  const safeInit = { ...init };
+  const signal = safeInit.signal;
+  delete safeInit.signal;
+  return new Promise((resolve, reject) => {
+    /** @type {ReadableStreamDefaultController<Uint8Array> | null} */
+    let ctl = null;
+    let headed = false;
+    const body = new ReadableStream({
+      start(c) { ctl = c; },
+      cancel() { try { port.disconnect(); } catch { /* no-op */ } }
+    });
+    const close = (/** @type {Error|null} */ err) => {
+      try { if (err) ctl?.error(err); else ctl?.close(); } catch { /* 既に閉じている */ }
+    };
+    signal?.addEventListener?.('abort', () => {
+      try { port.disconnect(); } catch { /* no-op */ }
+      if (!headed) reject(new Error('voicevox_stream_abort'));
+      close(new Error('voicevox_stream_abort'));
+    });
+    port.onMessage.addListener((/** @type {any} */ m) => {
+      if (!m || typeof m !== 'object') return;
+      if (m.type === 'head') {
+        headed = true;
+        resolve({ ok: m.ok === true, status: Number(m.status) || 0, body });
+      } else if (m.type === 'chunk' && Array.isArray(m.data)) {
+        try { ctl?.enqueue(Uint8Array.from(m.data)); } catch { /* 閉じた後 */ }
+      } else if (m.type === 'end') {
+        close(null);
+        try { port.disconnect(); } catch { /* no-op */ }
+      } else if (m.type === 'error') {
+        if (!headed) reject(new Error(String(m.error || 'Proxy stream failed')));
+        close(new Error(String(m.error || 'Proxy stream failed')));
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      if (!headed) reject(new Error('Proxy stream disconnected'));
+      close(new Error('Proxy stream disconnected'));
+    });
+    port.postMessage({ type: 'start', url: url.toString(), init: safeInit });
+  });
+}
+
+/** Background の中継ポートの名前(background.js と同じ文字列)。 */
+export const VOICEVOX_STREAM_PORT = 'NLS_VOICEVOX_STREAM';
 
 /**
  * fetch 自体が AbortSignal を無視しても呼び出し元を解放する。
@@ -277,6 +376,34 @@ export async function initializeVoicevoxSpeaker(styleId, opts = {}) {
 }
 
 /**
+ * 2026-10-26(VOICEVOX 0.26 計測): エンジン起動直後の最初の audio_query は辞書の準備で約2.3秒かかった。
+ *   読み上げ ON の直後に1回だけ捨てる audio_query を投げ、最初のコメントでこの待ちを払わないようにする。
+ *   audio_query は声を指定するので、その声の読み込みも兼ねる。失敗しても読み上げは続ける(false を返すだけ)。
+ * @param {number} styleId
+ * @param {{ fetchFn?: FetchFn, baseUrl?: string, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function warmupVoicevoxQuery(styleId, opts = {}) {
+  const id = Number(styleId);
+  if (!Number.isInteger(id) || id < 0) return false;
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  if (typeof fetchFn !== 'function') return false;
+  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  const query = new URLSearchParams({ text: 'あ', speaker: String(id) });
+  try {
+    const response = await fetchWithTimeout(
+      fetchFn,
+      `${baseUrl}/audio_query?${query}`,
+      { method: 'POST' },
+      positiveTimeout(opts.timeoutMs, 15000)
+    );
+    return !!response && response.ok !== false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * VOICEVOX のスタイル名が「ささやき声」系か判定する純関数。
  * ユーザー方針(2026-06-13)「ささやくような声は入れない方がいい」: ささやき/ウィスパー系は
  *   小さく聞き取りにくいので読み上げの声候補から外す。
@@ -329,6 +456,251 @@ export async function listVoicevoxStyleIds(opts = {}) {
   }
 }
 
+/** 2026-10-26: このエンジンが少しずつ受け取りに対応しているか。'unknown' の間は使わない。 */
+let _streamSupport = /** @type {'unknown'|'yes'|'no'} */ ('unknown');
+/** 少しずつ受け取りを断られた声(422)。 */
+const _streamRejectedStyles = new Set();
+
+/** 少しずつ受け取りを使えるか(エンジンが対応していると分かっている)。 */
+export function isVoicevoxStreamingSupported() {
+  return _streamSupport === 'yes';
+}
+
+/** テストと読み上げ ON のやり直し用。 */
+export function resetVoicevoxStreamingSupport() {
+  _streamSupport = 'unknown';
+  _streamRejectedStyles.clear();
+}
+
+/**
+ * エンジンが少しずつ受け取り(/streaming_synthesis)に対応しているかを /engine_manifest で調べる。
+ *   0.26 から supported_features.streaming_synthesis が true。古い版・読めないときは false(今までどおり)。
+ * @param {{ fetchFn?: FetchFn, baseUrl?: string, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function probeVoicevoxStreaming(opts = {}) {
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  if (typeof fetchFn !== 'function') return false;
+  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  try {
+    const res = await fetchWithTimeout(fetchFn, `${baseUrl}/engine_manifest`, { method: 'GET' }, positiveTimeout(opts.timeoutMs, 5000));
+    if (!res || res.ok === false || typeof (/** @type {any} */ (res)).json !== 'function') {
+      _streamSupport = 'no';
+      return false;
+    }
+    const manifest = await (/** @type {any} */ (res)).json();
+    const ok = manifest?.supported_features?.streaming_synthesis === true;
+    _streamSupport = ok ? 'yes' : 'no';
+    return ok;
+  } catch {
+    // 調べられなかった(混雑・一時的な失敗)。次の ON でまた調べる。
+    return false;
+  }
+}
+
+/**
+ * 2026-10-28: このエンジンが GPU を使えるか(/supported_devices の cuda か dml が true)。
+ *   ★「今 GPU で動いているか」ではない(それを返す API は無い)。使えるかどうかだけ。
+ *   読めないとき・古いエンジンは null(分からない=案内を出さない)。
+ * @param {{ fetchFn?: FetchFn, baseUrl?: string, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean|null>}
+ */
+export async function probeVoicevoxGpuCapable(opts = {}) {
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  if (typeof fetchFn !== 'function') return null;
+  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  try {
+    const res = await fetchWithTimeout(fetchFn, `${baseUrl}/supported_devices`, { method: 'GET' }, positiveTimeout(opts.timeoutMs, 5000));
+    if (!res || res.ok === false || typeof (/** @type {any} */ (res)).json !== 'function') return null;
+    const devices = await (/** @type {any} */ (res)).json();
+    if (!devices || typeof devices !== 'object') return null;
+    return devices.cuda === true || devices.dml === true;
+  } catch {
+    return null;
+  }
+}
+
+/** 少しずつ受け取りを諦めて /synthesis に戻す合図。 */
+const STREAM_FALLBACK = Symbol('stream_fallback');
+
+/**
+ * /streaming_synthesis で声を少しずつ受け取る。少したまった時点(0.3秒)で StreamedVoice を返し、
+ *   残りは裏で受け取り続ける。エンジンが断ったら STREAM_FALLBACK(呼び出し側が /synthesis で作り直す)。
+ * @param {string} url
+ * @param {object} audioQuery
+ * @param {number} styleId
+ * @param {{ streamFetchFn?: Function, synthesisTimeoutMs?: number }} opts
+ * @param {(info: any) => void} notifyFailure
+ * @returns {Promise<StreamedVoice|null|typeof STREAM_FALLBACK>}
+ */
+async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
+  const streamFetchFn = typeof opts.streamFetchFn === 'function' ? opts.streamFetchFn : proxyStreamFetchFn;
+  const firstAudioMs = positiveTimeout(opts.synthesisTimeoutMs, 8000);
+  const controller = new AbortController();
+  /** @type {any} */
+  let res;
+  let timer = /** @type {any} */ (0);
+  try {
+    res = await Promise.race([
+      Promise.resolve().then(() => streamFetchFn(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'audio/wav' },
+        body: JSON.stringify(audioQuery),
+        signal: controller.signal
+      })),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => { controller.abort(); reject(new Error('voicevox_timeout')); }, firstAudioMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res || res.ok === false) {
+    const status = Number(res?.status) || 0;
+    // 古いエンジン(無い)/この声は少しずつに対応していない → 今までのやり方で作り直す。
+    if (status === 404 || status === 405 || status === 501) { _streamSupport = 'no'; return STREAM_FALLBACK; }
+    if (status === 422) { _streamRejectedStyles.add(styleId); return STREAM_FALLBACK; }
+    notifyFailure({ stage: 'synth', httpStatus: status });
+    return null;
+  }
+  const reader = res.body && typeof res.body.getReader === 'function' ? res.body.getReader() : null;
+  if (!reader) return STREAM_FALLBACK;
+  const parser = createWavStreamParser();
+  /** @type {StreamedVoice|null} */
+  let voice = null;
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (/** @type {StreamedVoice|null} */ v) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(firstTimer);
+      resolve(v);
+    };
+    const firstTimer = setTimeout(() => {
+      try { controller.abort(); void reader.cancel().catch(() => {}); } catch { /* no-op */ }
+      voice?.fail();
+      notifyFailure({ stage: 'synth', error: new Error('voicevox_timeout') });
+      settle(null);
+    }, firstAudioMs);
+    void (async () => {
+      try {
+        for (;;) {
+          let stall = /** @type {any} */ (0);
+          const next = await Promise.race([
+            reader.read(),
+            new Promise((_, reject) => { stall = setTimeout(() => reject(new Error('voicevox_stream_stall')), VOICE_STREAM_STALL_MS); })
+          ]).finally(() => clearTimeout(stall));
+          const { done, value } = /** @type {{ done: boolean, value?: Uint8Array }} */ (next);
+          if (done) break;
+          const samples = parser.push(value instanceof Uint8Array ? value : new Uint8Array(value || []));
+          if (parser.error) throw new Error(`voicevox_stream_${parser.error}`);
+          if (samples && samples.length) {
+            if (!voice) {
+              voice = new StreamedVoice(parser.sampleRate);
+              voice._cancel = () => { try { controller.abort(); void reader.cancel().catch(() => {}); } catch { /* no-op */ } };
+            }
+            voice.append(samples);
+            if (voice.bufferedSec >= VOICE_STREAM_PREBUFFER_SEC) settle(voice);
+          }
+          if (voice?.done) return; // 鳴らす側が受け取りをやめた
+        }
+        if (voice) { voice.finish(); settle(voice); } else {
+          notifyFailure({ stage: 'synth', bodyInvalid: true });
+          settle(null);
+        }
+      } catch (err) {
+        try { void reader.cancel().catch(() => {}); } catch { /* no-op */ }
+        if (voice && voice.totalSamples > 0) {
+          // 途中で途切れた: 届いた分だけ読んで終える。
+          voice.fail();
+          settle(voice);
+        } else {
+          notifyFailure({ stage: 'synth', error: err });
+          settle(null);
+        }
+      }
+    })();
+  });
+}
+
+/**
+ * v0.1.1796: /streaming_synthesis を最後まで受け取り、丸ごとの WAV(ArrayBuffer)として返す。
+ *   VOICEVOX は /synthesis を使うと、声のファイルごとのメモリが少しずつ受け取りの約2倍になる
+ *   (PC 実測・26種類: グラボ有り 2.1GB→3.6GB / 無し 1.5GB→2.7GB。両方使うと両方ぶん取る)。
+ *   音(長さ・RMS・最大振幅)は /synthesis と同じ。短文はほぼ1回で届くので、グラボ無しは同じか速く、
+ *   グラボ有りは 0.1〜0.3秒遅いだけ(短文・中くらいは 0.6秒以内)。
+ *   断られたら STREAM_FALLBACK(呼び出し側が /synthesis で作り直す)。時間切れ・途中の失敗は null(この1件を捨てる)。
+ * @param {string} url
+ * @param {object} audioQuery
+ * @param {number} styleId
+ * @param {{ streamFetchFn?: Function, synthesisTimeoutMs?: number }} opts
+ * @param {(info: any) => void} notifyFailure
+ * @returns {Promise<ArrayBuffer|null|typeof STREAM_FALLBACK>}
+ */
+async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailure) {
+  const streamFetchFn = typeof opts.streamFetchFn === 'function' ? opts.streamFetchFn : proxyStreamFetchFn;
+  const totalMs = positiveTimeout(opts.synthesisTimeoutMs, 8000);
+  const controller = new AbortController();
+  /** @type {any} */
+  let reader = null;
+  let timer = /** @type {any} */ (0);
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      try { controller.abort(); void reader?.cancel?.().catch(() => {}); } catch { /* no-op */ }
+      reject(new Error('voicevox_timeout'));
+    }, totalMs);
+  });
+  try {
+    return await Promise.race([timeout, (async () => {
+      const res = await streamFetchFn(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'audio/wav' },
+        body: JSON.stringify(audioQuery),
+        signal: controller.signal
+      });
+      if (!res || res.ok === false) {
+        const status = Number(res?.status) || 0;
+        if (status === 404 || status === 405 || status === 501) { _streamSupport = 'no'; return STREAM_FALLBACK; }
+        if (status === 422) { _streamRejectedStyles.add(styleId); return STREAM_FALLBACK; }
+        notifyFailure({ stage: 'synth', httpStatus: status });
+        return null;
+      }
+      reader = res.body && typeof res.body.getReader === 'function' ? res.body.getReader() : null;
+      if (!reader) return STREAM_FALLBACK;
+      /** @type {Uint8Array[]} */
+      const parts = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const part = value instanceof Uint8Array ? value : new Uint8Array(value || []);
+        parts.push(part);
+        total += part.length;
+      }
+      const wav = new Uint8Array(total);
+      let off = 0;
+      for (const part of parts) { wav.set(part, off); off += part.length; }
+      const tag = (/** @type {number} */ o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);
+      if (total <= 44 || tag(0) !== 'RIFF' || tag(8) !== 'WAVE') {
+        notifyFailure({ stage: 'synth', bodyInvalid: true });
+        return null;
+      }
+      // 大きさ欄が「不明」で来ても丸ごと再生できるよう、標準の並び(data が 36)なら実際の長さで書き直す。
+      if (tag(36) === 'data') {
+        const dv = new DataView(wav.buffer);
+        dv.setUint32(4, total - 8, true);
+        dv.setUint32(40, total - 44, true);
+      }
+      return wav.buffer;
+    })()]);
+  } catch (err) {
+    notifyFailure({ stage: 'synth', error: err });
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * @param {unknown} text
  * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
@@ -338,13 +710,20 @@ export async function listVoicevoxStyleIds(opts = {}) {
  *   synthesisTimeoutMs?: number,
  *   baseUrl?: string,
  *   onFailure?: (info: { stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }) => void,
- *   onTiming?: (t: { queryMs: number, synthMs: number }) => void
+ *   onTiming?: (t: { queryMs: number, synthMs: number, streamed?: boolean }) => void,
+ *   stream?: boolean,
+ *   wholeViaStream?: boolean,
+ *   streamFetchFn?: Function
  * }} [opts]
+ *   v0.1.1796: stream が無くてもエンジンが少しずつ受け取りに対応していれば、それで最後まで受け取って丸ごと返す
+ *   (wholeViaStream: false で今までどおり /synthesis)。
+ *   2026-10-26: stream が true でエンジンが対応していれば、少しずつ受け取って StreamedVoice を返す
+ *   (synthMs は最初の声が届くまで)。断られたら今までどおり /synthesis で丸ごと返す。
  *   v0.1.1224: onFailure は「null を返す理由」を呼び出し側へ伝える任意コールバック。
  *   戻り値の型(ArrayBuffer|null)は変えないので既存の呼び出しは無改修で動く。
  *   ★従来は6通りの失敗が全部 null に畳まれ、実配信の「合成失敗17件(その他16)」の
  *     正体を誰も答えられなかった([[instrument-must-name-the-cause-2026-08-01]])。
- * @returns {Promise<ArrayBuffer|null>}
+ * @returns {Promise<ArrayBuffer|StreamedVoice|null>}
  */
 export async function synthesizeVoice(text, voice, opts = {}) {
   const readingText = String(text || '').trim();
@@ -377,6 +756,8 @@ export async function synthesizeVoice(text, voice, opts = {}) {
   // 2026-10-22 計器(P1・印字専用): audio_query と synthesis の所要を分けて呼び出し側へ渡す。
   const nowMs = () => Date.now();
   const queryStartAt = nowMs();
+  /** どこまで進んだか。catch で失敗した段階を正しく伝える(2026-10-26: 以前は常に 'synth')。 */
+  let stage = 'query';
   try {
     const queryResponse = await fetchWithTimeout(
       fetchFn,
@@ -401,11 +782,41 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     // v0.1.1063: 出力を16kHzモノラルに固定。実測(2026-07-04)で合成が約30%速くなり
     //   (1465→1025ms)WAVも約33%小さくなる=読み上げのテンポ改善(12kHzはこれ以上速くならず
     //   音質だけ落ちるので16kが最適点)。コメント読み上げ用途では音質差は実用上分からない。
-    audioQuery.outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
+    //   2026-10-29: 「高音質」を選んだ人だけ 24kHz(合成は遅くなる・速い PC 向け)。
+    audioQuery.outputSamplingRate = _outputSamplingRate;
     audioQuery.outputStereo = false;
 
     const queryMs = nowMs() - queryStartAt;
+    stage = 'synth';
     const synthStartAt = nowMs();
+    if (opts.stream === true && _streamSupport === 'yes' && !_streamRejectedStyles.has(styleId)) {
+      const streamed = await streamSynthesis(
+        `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
+        audioQuery, styleId, opts, notifyFailure
+      );
+      if (streamed !== STREAM_FALLBACK) {
+        if (streamed) {
+          try {
+            if (typeof opts.onTiming === 'function') opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt, streamed: true });
+          } catch { /* 計器の失敗は読み上げを止めない */ }
+        }
+        return streamed;
+      }
+    } else if (opts.stream !== true && opts.wholeViaStream !== false && _streamSupport === 'yes' && !_streamRejectedStyles.has(styleId)) {
+      // v0.1.1796: 丸ごと欲しい時も /streaming_synthesis で受け取る(/synthesis を混ぜると VOICEVOX のメモリが倍になる)。
+      const whole = await streamSynthesisWhole(
+        `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
+        audioQuery, styleId, opts, notifyFailure
+      );
+      if (whole !== STREAM_FALLBACK) {
+        if (whole) {
+          try {
+            if (typeof opts.onTiming === 'function') opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
+          } catch { /* 計器の失敗は読み上げを止めない */ }
+        }
+        return whole;
+      }
+    }
     const synthesisRes = await fetchWithTimeout(
       fetchBufferFn,
       `${baseUrl}/synthesis?speaker=${styleId}`,
@@ -436,7 +847,7 @@ export async function synthesizeVoice(text, voice, opts = {}) {
   } catch (err) {
     // v0.1.1224: ここは「接続不能(VOICEVOX未起動)」と「時間切れ」と「本文読み取り失敗」が
     //   全部落ちてくる。error をそのまま渡し、分類は純関数(voiceSynthFailureReason)に任せる。
-    notifyFailure({ stage: 'synth', error: err });
+    notifyFailure({ stage, error: err });
     return null;
   }
 }
@@ -455,16 +866,13 @@ export function buildVoiceReadingText(row, { maxChars = 60 } = {}) {
     Number.isFinite(rawMaxChars) && rawMaxChars >= 1
       ? Math.floor(rawMaxChars)
       : 60;
-  const body = Array.from(
-    rawText
-      .replace(/(?:https?:\/\/|www\.)[^\s]+/gi, 'URL省略')
-      .replace(/\s+/g, ' ')
-      .trim()
-  )
+  // 2026-10-28: 笑いの w・拍手の 8・同じ文字の連打も読みやすく(voiceReadingNormalize.js)。
+  const body = Array.from(normalizeVoiceReadingBody(rawText))
     .slice(0, limit)
     .join('');
   if (!body) return '';
-  const name = String(row?.name || '').trim();
+  // v0.1.1813: 名前も本文と同じ整え方で読む(「たろうｗｗｗ」を「ダブリュー…」と読まない・絵文字だけの名前は読まない)。
+  const name = normalizeVoiceReadingBody(String(row?.name || ''));
   return name ? `${name}、${body}` : body;
 }
 

@@ -80,51 +80,76 @@ import {
   selectAppendedComeviewTimelineItems,
   commentNoOfComeviewRow,
   filterUnseenComeviewComments,
+  pickRefreshVoiceItems,
+  splitVoiceBacklogByCommentNo,
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
+import { takeUnreadVoiceItems } from '../lib/comeviewLivePush.js';
+import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
+import { createComeviewLivePushClient } from './comeviewLivePushClient.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
   buildVoiceReadingText,
-  initializeVoicevoxSpeaker,
   listVoicevoxStyleIds,
   probeVoicevoxAlive,
+  probeVoicevoxStreaming,
+  probeVoicevoxGpuCapable,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
+import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
+import {
+  computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
+  createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor, foldVoiceArrivalWindow, resetVoicePaceArrival
+} from '../lib/voiceLagBudget.js';
+import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
+import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
+import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
   computeVoiceCongestion,
+  computeVoicePlaybackRate,
+  capVoiceMaxCharsByBoost,
   computeVoiceE2eAverage,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
   resolveVoiceSynthDepth
 } from '../lib/voiceReadQueue.js';
-import { makeInitialVoiceDiag, buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import { makeInitialVoiceDiag, buildVoiceDiagSnapshot, resetVoiceDiagForNewLive } from '../lib/voiceDiag.js';
+import { createTrailingPublisher } from '../lib/trailingPublisher.js';
 import {
   createVoiceSynthTracker,
   foldVoiceStageEma,
   measureVoiceGapMs,
+  measureWavAudioMs,
+  recordVoiceE2eSample,
+  recordVoiceStreamDone,
   recordVoiceSynthStage
 } from '../lib/voiceStageTiming.js';
 import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
 import {
-  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc
+  KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, isWeakVoicePc,
+  forgetWeakVoicePcIfFast
 } from '../lib/voiceNarrowing.js';
 import {
   applyVoiceVolumeToWav,
   KEY_VOICE_VOLUME_PERCENT,
+  measureVoiceWavLevel,
   normalizeVoiceVolumePercent,
-  VOICE_VOLUME_DEFAULT
+  VOICE_VOLUME_DEFAULT,
+  voiceTargetPeak
 } from '../lib/voiceVolume.js';
+import { observeVoicePlayback } from '../lib/voicePlaybackQuality.js';
+import { wireVoiceTestHook } from './voiceTestHook.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
   upgradeAnonymousAvatarImage,
   upgradeAnonymousAvatarImages
 } from '../lib/avatarPartsComposer.js';
-import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
+import { isVoiceItemStale, VOICE_STALE_MS_NORMAL } from '../lib/voiceAgeGate.js';
 import { runStorageOpWithTimeout } from '../lib/storageOpTimeout.js';
 import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
@@ -232,6 +257,11 @@ let _commentCount = 0;
 let _hoverBar = null;
 let _hoverRow = null;
 let _voiceReadingEnabled = false;
+// v0.1.1794: 同じ配信を会場でも読んでいる時は、先に読み始めた方だけが読む(声の二重・VOICEVOX の取り合いを防ぐ)。
+//   試験(voiceTestRun)は enqueueVoiceTimelineItems を直接呼ぶのでこの関門を通らない。
+const _voiceReaderLease = startVoiceReaderLease(() => _voiceReadingEnabled && !isObsMode() && !!_liveId, () => _liveId, {
+  onPageHide: (fn) => window.addEventListener('pagehide', fn)
+});
 let _voiceToggleBusy = false;
 /** v0.1.699: 名前読み(既定OFF=本文だけ)。 */
 let _voiceReadNameEnabled = false;
@@ -245,12 +275,18 @@ let _voiceQueue = [];
  *   item オブジェクトをキーに in-flight WAV Promise を持つ Map にし、詰まり具合に応じて
  *   先頭から深さ分(最大3)を並行で先行合成する。再生は元々1本ずつ=不協和は起きない。
  *   同一 VOICEVOX サーバへの並行 audio_query/synthesis は可能。CPU 有界化のため上限3。
- * @type {Map<any, { generation: number, promise: Promise<ArrayBuffer|null> }>}
+ * @type {Map<any, { generation: number, promise: Promise<ArrayBuffer|null>, boostAtSynth?: number }>}
  */
 const _voicePrefetches = new Map();
 let _voicePlaying = false;
 let _voiceGeneration = 0;
 let _voiceStopCurrent = null;
+/** 2026-10-26: エンジンが声の少しずつ受け取りに対応しているか(読み上げ ON のたびに調べる)。 */
+let _voiceStreamSupported = false;
+/** エンジンが GPU を使えるか(遅れの一言の GPU 案内用・null=分からない)。 */
+let _voiceGpuCapable = /** @type {boolean|null} */ (null);
+/** 遅い PC と分かったら、この ON の間は覚えておく(会場の VoicePlayer と同じ)。 */
+let _voiceSlowEngine = false;
 let _voiceSkipTimer = null;
 let _initialVoicesPrimed = false;
 
@@ -260,7 +296,7 @@ let _initialVoicesPrimed = false;
  *   定期スナップショットを書く(popup 診断ブリッジと同思想)。記録/発話には一切触れない。
  */
 const _voiceDiag = makeInitialVoiceDiag(); // プロパティのみ更新(再代入しない)。
-let _voiceDiagLastWriteAt = 0;
+_voiceDiag.diagBornAt = Date.now();
 
 /**
  * v0.1.895: drainVoiceQueue が今どのフェーズに居るかを記録する(固着位置の計器)。
@@ -286,10 +322,14 @@ let _voiceDrainStuckTimer = null;
 
 /** _voiceDiag を storage へ(min-gap で間引き)。失敗は握る=発話を止めない。 */
 function publishVoiceDiag() {
+  _voiceDiagPublisher.request();
+}
+
+/** 3秒 min-gap=書き過ぎない。v0.1.1809: 間引いた分は最後に1回書く(止まった後に古い数を残さない)。 */
+const _voiceDiagPublisher = createTrailingPublisher(writeVoiceDiagNow, 3000);
+function writeVoiceDiagNow() {
   try {
     const now = Date.now();
-    if (now - _voiceDiagLastWriteAt < 3000) return; // 3秒 min-gap=書き過ぎない。
-    _voiceDiagLastWriteAt = now;
     // ★v0.1.1328: どの面が書いたかを残す(会場は 'venue' を書いている)。
     //   化石値を見たとき「どちらの実装のものか」が分からないと調査が始められない。
     const snap = { ...buildVoiceDiagSnapshot(_voiceDiag, now, _liveId), source: 'comeview' };
@@ -400,12 +440,21 @@ async function switchToLiveId(nextLiveId) {
   // 前配信の表示・既読・読み上げキューをリセットして新配信を一から読む。
   _renderedKeys.clear();
   _seenCommentNos.clear();
+  _voiceBatchSeenNos.clear();
+  _voiceMaxCommentNo = 0;
+  _voiceReadNos.clear();
+  void _livePush.ensure(); // P5b: 新しい配信の watch タブへ繋ぎ直す
   _seenGiftAtBySig.clear();
   _tailRows = [];
   _giftRows = [];
   _voiceQueue = [];
   _voiceGeneration += 1;
   _voicePrefetches.clear();
+  // 2026-10-28: 計器も配信ごとに数え直す(前の配信の数を新しい配信の名前で書かない)。声づくりの速さは残す。
+  resetVoiceDiagForNewLive(_voiceDiag, Date.now());
+  _voiceArrivalWindow = null;
+  resetVoicePaceArrival(_voicePaceState);
+  updateVoiceLagNotice(); // 待ちが空・遅れは未計測に戻ったので一言を消す
   await requestFullRefresh(true);
 }
 
@@ -512,7 +561,7 @@ function stopVoicePlayback() {
 /** P5: 読み上げが大きく遅れているときの一言(会場の VoicePlayer と同じ判定=voiceLagNotice.js)。 */
 let _voiceLagNoticeShown = false;
 function updateVoiceLagNotice() {
-  const r = decideVoiceLagNotice(_voiceLagNoticeShown, { ..._voiceDiag, queueNow: _voiceQueue.length });
+  const r = decideVoiceLagNotice(_voiceLagNoticeShown, { ..._voiceDiag, queueNow: _voiceQueue.length }, { gpuCapable: _voiceGpuCapable });
   if (r.shown === _voiceLagNoticeShown && !r.shown) return;
   _voiceLagNoticeShown = r.shown;
   const el = document.getElementById('cvVoiceLag');
@@ -522,6 +571,7 @@ function updateVoiceLagNotice() {
 function disableVoiceReading({ persist = true } = {}) {
   _voiceReadingEnabled = false;
   _voiceToggleBusy = false;
+  _livePush.close();
   stopVoicePlayback();
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(false);
@@ -588,22 +638,32 @@ async function enableVoiceReading({ persist = true } = {}) {
   }
 
   // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする(会場と同じ)。
-  _voiceStyleIds = (await prepareVoiceStyleIds(await listVoicevoxStyleIds(), {
+  const allStyleIds = await listVoicevoxStyleIds();
+  // 起動直後のエンジンを捨てる audio_query で起こす(待たない・voiceWarmup.js)。
+  startVoiceWarmup(_voiceWarmup, allStyleIds);
+  _voiceStreamSupported = false;
+  void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
+  _voiceGpuCapable = null;
+  void probeVoicevoxGpuCapable().then((ok) => { _voiceGpuCapable = typeof ok === 'boolean' ? ok : null; }, () => {});
+  _voiceStyleIds = (await prepareVoiceStyleIds(allStyleIds, {
     readSettings: async () => {
       const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
+      _voiceSlowEngine = b[KEY_VOICE_WEAK_PC] === true;
       return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
     },
-    initSpeaker: (id) => initializeVoicevoxSpeaker(id)
+    initSpeaker: (id) => _voiceWarmup.ensureWhenIdle(id) // 合成が走っていない時に裏で(v0.1.1772)
   })).styleIds;
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
   _voiceToggleBusy = false;
+  if (_liveId) void _voiceReaderLease?.beat(_liveId);
   // ★v0.1.1333: 成功時は古い失敗理由を消し、次の状態速報で誤診させない。
   _voiceDiag.lastEnableFailReason = '';
   publishVoiceDiag();
   driveCvVoiceLoading('ready');
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(true);
+  void _livePush.ensure();
 }
 
 function voiceUserKeyForItem(item) {
@@ -625,6 +685,13 @@ let _voiceVolumePercent = VOICE_VOLUME_DEFAULT;
 /** 2026-10-22計器(P1・会場 VoicePlayer と同じ物差し): エンジン待ち・初めての声を測る。 */
 const _voiceSynthTracker = createVoiceSynthTracker();
 
+/** 2026-10-26: 初めての声を合成の前に読み込む(会場と同じ voiceWarmup.js)。 */
+const _voiceWarmup = createVoicevoxWarmup();
+const synthesizeVoiceWarm = withVoiceWarmup(_voiceWarmup, synthesizeVoice);
+wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
+// v0.1.1777: 裏の声の読み込みは、鳴らしても待たせてもいない時だけ(次のコメントを待たせない)。
+wireVoiceWarmupHooks(_voiceWarmup, () => !_voicePlaying && _voiceQueue.length === 0, () => _voiceDiag, chromeVoiceEngineLink());
+
 /**
  * 合成を依頼し、段階計測を _voiceDiag へ記録する(戻り値・例外は synthesizeVoice と同じ)。
  * @param {string} text
@@ -632,18 +699,31 @@ const _voiceSynthTracker = createVoiceSynthTracker();
  */
 /** P3: 遅いPCの記録は1タブで1回だけ書く。 */
 const _voiceWeakPcState = { saved: false };
-function synthesizeVoiceTracked(text, voice) {
+function synthesizeVoiceTracked(text, voice, extra = {}) {
   const track = _voiceSynthTracker.begin(voice?.styleId);
   /** @type {{ queryMs?: number, synthMs?: number }} */
   let timing = {};
-  return synthesizeVoice(text, voice, {
+  return synthesizeVoiceWarm(text, voice, {
     onFailure: (info) => recordVoiceSynthFailureReason(info),
-    onTiming: (t) => { timing = t || {}; }
+    onTiming: (t) => { timing = t || {}; },
+    ...(extra.stream === true ? { stream: true } : {})
   }).then(
     (wav) => {
-      try { recordVoiceSynthStage(_voiceDiag, track.end(timing, !!wav)); } catch { /* 計器は本体を止めない */ }
-      // P3: 遅いPCと分かったら一度だけ記録(会場の VoicePlayer と同じ判定=voiceNarrowing.js)。
-      rememberWeakVoicePc(_voiceDiag, _voiceWeakPcState, () => chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: true }));
+      /** @type {any} */
+      let r = null;
+      try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(_voiceDiag, r); } catch { /* 計器は本体を止めない */ }
+      const judge = () => {
+        // P3: 遅いPCと分かったら一度だけ記録(会場の VoicePlayer と同じ判定=voiceNarrowing.js)。
+        rememberWeakVoicePc(_voiceDiag, _voiceWeakPcState, () => chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: true }));
+        // 2026-10-26: 速い PC と十分に分かったら、誤って残った「弱い」の記録を消す(会場と同じ)。
+        forgetWeakVoicePcIfFast(_voiceDiag, _voiceWeakPcState, () => {
+          _voiceSlowEngine = false;
+          return chrome.storage.local.set({ [KEY_VOICE_WEAK_PC]: false });
+        });
+      };
+      judge();
+      // 少しずつ受け取った声は、届き終わった時に速さを数える(会場と同じ)。
+      if (r && isStreamedVoice(wav)) void recordVoiceStreamDone(_voiceDiag, r, wav, () => Date.now(), judge);
       return wav;
     },
     (err) => {
@@ -651,6 +731,35 @@ function synthesizeVoiceTracked(text, voice) {
       throw err;
     }
   );
+}
+
+/**
+ * v0.1.1799: 鳴らさずに捨てた item に知らせる(試験の1件ごとの記録用)。
+ * @param {any} item
+ */
+function notifyVoiceItemDropped(item) {
+  if (item && typeof item.onDropped === 'function') {
+    try { item.onDropped(); } catch { /* no-op */ }
+  }
+}
+
+/** v0.1.1797: 届く間隔と声の長さ(追いついた後も保つ早口の床)。 */
+const _voicePaceState = createVoicePaceState();
+/** v0.1.1803計器: 届いたコメントの件/分(会場 VoicePlayer と同じ窓)。読めた件数の差が「届いた数」か「読み方」かを分ける。 */
+let _voiceArrivalWindow = null;
+
+/**
+ * v0.1.1797: 混雑(キュー長)の上乗せに、順番待ちが伸びた分の上乗せを足す(会場の VoicePlayer と同じ)。
+ *   今までコメビュはキュー長しか見ず、1件ずつ少しだけ長い声が続くと遅れが際限なく積もった(PC 試験)。
+ * @param {number} congestionBoost
+ */
+function comeviewSpeedBoost(congestionBoost) {
+  // 追いついた後も、声の長さが間隔を上回る分(床)だけは早口を保つ(会場と同じ)。
+  const paceFloor = computeVoicePaceFloor(_voicePaceState);
+  const backlog = computeBacklogCatchUpBoost(_voiceDiag.queueWaitEmaMs, paceFloor);
+  _voiceDiag.lastPaceFloor = paceFloor;
+  _voiceDiag.lastBacklogBoost = backlog;
+  return mergeVoiceSpeedBoost(congestionBoost, backlog);
 }
 
 /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ)。 */
@@ -664,14 +773,26 @@ function ensureVoicePrefetch(item, generation) {
     _voiceAssignments,
     _voiceStyleIds
   );
+  const boostAtSynth = comeviewSpeedBoost(congestion.speedBoost);
+  // v0.1.1799: コメビュには速さに合わせた本文の上限(会場の capVoiceMaxCharsByBoost)が無かったのでそろえる。
+  const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars) });
+  // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(会場の VoicePlayer と同じ判定)。
+  if (!_voiceSlowEngine && isWeakVoicePc(_voiceDiag)) _voiceSlowEngine = true;
+  const stream = shouldStreamVoice({
+    supported: _voiceStreamSupported,
+    idle: _voiceQueue[0] === item && !_voiceStopCurrent,
+    slowEngine: _voiceSlowEngine,
+    textLength: text.length
+  });
   const promise = synthesizeVoiceTracked(
-    buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+    text,
     {
       ...assigned,
-      speedOffset: assigned.speedOffset + congestion.speedBoost
-    }
+      speedOffset: assigned.speedOffset + boostAtSynth
+    },
+    { stream }
   ).catch(() => null);
-  _voicePrefetches.set(item, { generation, promise });
+  _voicePrefetches.set(item, { generation, promise, boostAtSynth });
   return promise;
 }
 
@@ -739,6 +860,7 @@ async function drainVoiceQueue() {
       }
       if (allStale && _voiceQueue.length > 0) {
         const dropCount = _voiceQueue.length;
+        for (const d of _voiceQueue) notifyVoiceItemDropped(d);
         _voiceQueue = []; // 全て古い場合は一括で捨てる
         showVoiceSkipped(dropCount);
         _voiceDiag.staleDropTotal += dropCount; // v0.1.852 観測: 間引き累計=遅延の傍証。
@@ -766,6 +888,7 @@ async function drainVoiceQueue() {
       if (ageCheck.stale) {
         showVoiceSkipped(1);
         _voiceDiag.staleDropTotal += 1; // v0.1.852 観測。
+        notifyVoiceItemDropped(item);
         _voicePrefetches.delete(item); // prefetch が stale 向けなら破棄
         continue; // 読まずに捨てる
       }
@@ -783,13 +906,14 @@ async function drainVoiceQueue() {
       _voicePrefetches.delete(item);
       const _synthStart = Date.now(); // v0.1.852 観測: 合成所要(先読み済なら待ち時間=ほぼ0)。
       markVoicePhase(prefetch ? 'await_prefetch' : 'await_synth'); // v0.1.895: 合成待ちで止まったか。
+      const boostAtSynth = prefetch ? (Number(prefetch.boostAtSynth) || 0) : comeviewSpeedBoost(congestion.speedBoost);
       const wav = prefetch
         ? await prefetch.promise
         : await synthesizeVoiceTracked(
-            buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+            buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars) }),
             {
               ...assigned,
-              speedOffset: assigned.speedOffset + congestion.speedBoost
+              speedOffset: assigned.speedOffset + boostAtSynth
             }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
@@ -805,6 +929,8 @@ async function drainVoiceQueue() {
         isObsMode()
       ) {
         markVoicePhase('skip_after_synth'); // v0.1.895: 世代変更/無効化等で読まずにスキップした。
+        notifyVoiceItemDropped(item);
+        if (isStreamedVoice(wav)) wav.cancel(); // 鳴らさないので受け取りもやめる
         continue;
       }
 
@@ -813,10 +939,38 @@ async function drainVoiceQueue() {
       try {
         markVoicePhase('await_playback'); // v0.1.895: 再生待ちに入る(watchdog 付き)。
         // 2026-10-22(P2): 文ごとに最大振幅を揃え、音量設定を掛ける(会場と同じ純関数)。
-        objectUrl = URL.createObjectURL(
-          new Blob([applyVoiceVolumeToWav(wav, _voiceVolumePercent)], { type: 'audio/wav' })
-        );
-        const audio = new Audio(objectUrl);
+        // 2026-10-26: 少しずつ届く声は Web Audio で鳴らす(voiceStreamAudio.js・使えなければ丸ごと再生)。
+        /** @type {any} */
+        let audio = isStreamedVoice(wav) ? createBrowserStreamedAudio(wav, _voiceVolumePercent) : null;
+        /** @type {{ peak: number, rms: number } | null} */
+        let wholeLevel = null;
+        if (!audio) {
+          const loud = applyVoiceVolumeToWav(wav, _voiceVolumePercent);
+          wholeLevel = measureVoiceWavLevel(loud);
+          objectUrl = URL.createObjectURL(new Blob([loud], { type: 'audio/wav' }));
+          audio = new Audio(objectUrl);
+        }
+        // v0.1.1798: 先読みした声は、合成した時の早口のまま焼き固まっている。今の方が詰まっていれば
+        //   再生速度で追いつく(会場 VoicePlayer v0.1.1089 と同じ・上げるだけ)。コメビュはこれが無く、
+        //   遅れがたまり始めても1〜2件前に決めた速さのまま読み、最初の遅れが会場の2倍(4.6秒)まで伸びた。
+        //   少しずつ流す声は速さを変えない(声の高さも変わるため)。
+        const playbackRate = isStreamedVoice(wav)
+          ? 1.0
+          : computeVoicePlaybackRate(boostAtSynth, comeviewSpeedBoost(computeVoiceCongestion(_voiceQueue.length).speedBoost));
+        if (playbackRate !== 1.0) {
+          audio.preservesPitch = true;
+          audio.playbackRate = playbackRate;
+        }
+        // 2026-10-26計器: 聞こえ方(途切れ・つっかえ・音割れ・小さすぎ)を数える(会場と同じ・再生には触れない)。
+        observeVoicePlayback(audio, {
+          diag: _voiceDiag,
+          playbackRate,
+          outPeak: wholeLevel ? wholeLevel.peak : -1,
+          outRms: wholeLevel ? wholeLevel.rms : -1,
+          targetPeak: voiceTargetPeak(_voiceVolumePercent),
+          onRecorded: () => publishVoiceDiag()
+        });
+        let _playStartAt = -1;
         await new Promise((resolve) => {
           let settled = false;
           // v0.1.883: 再生完了の安全網(watchdog)。'ended'/'error' が一度も来ないケース
@@ -846,11 +1000,14 @@ async function drainVoiceQueue() {
             if (objectUrl) URL.revokeObjectURL(objectUrl);
             objectUrl = '';
             _voiceStopCurrent = null;
+            if (typeof item.onAudioEnd === 'function') { try { item.onAudioEnd(); } catch { /* no-op */ } }
+            // v0.1.1797: 鳴った長さを「早口なしの長さ」に戻して覚える(早口の床の材料)。
+            if (_playStartAt > 0) noteVoicePacePlayed(_voicePaceState, Date.now() - _playStartAt, playbackRate, boostAtSynth);
             resolve();
           };
           const onMeta = () => {
             const dur = Number(audio.duration);
-            if (Number.isFinite(dur) && dur > 0) armWatchdog(dur * 1000 + 1500);
+            if (Number.isFinite(dur) && dur > 0) armWatchdog((dur * 1000) / playbackRate + 1500);
           };
           _voiceStopCurrent = () => {
             try {
@@ -866,11 +1023,14 @@ async function drainVoiceQueue() {
           armWatchdog(VOICE_PLAYBACK_HARD_CAP_MS); // 先に固定上限で必ず張る(メタ未取得でも固着しない)。
           try {
             const playResult = audio.play();
+            if (typeof item.onAudioStart === 'function') { try { item.onAudioStart(); } catch { /* no-op */ } }
+            _playStartAt = Date.now();
             // 2026-10-22計器(P1): 体感遅延(キュー投入→再生開始)。会場と同じ物差し(コメビュは未計測だった)。
             const _e2eMs = measureVoiceGapMs(item.enqueuedAt, Date.now());
             if (_e2eMs >= 0) {
               _voiceDiag.lastE2eMs = _e2eMs;
               _voiceDiag.e2eAvgMs = computeVoiceE2eAverage(_voiceDiag.e2eAvgMs, _e2eMs);
+              recordVoiceE2eSample(_voiceDiag, _e2eMs);
             }
             updateVoiceLagNotice();
             if (playResult && typeof playResult.catch === 'function') {
@@ -916,6 +1076,73 @@ async function drainVoiceQueue() {
   }
 }
 
+
+/**
+ * v0.1.1804計器: 一度に10件以上が読む列へ来た時の中身(開いて約30秒後に約100件まとめて来て全部
+ *   古いと捨てられた原因を、推測でなく数字で分けるため)。番号の無い行・届いてからの経過で
+ *   「同じ行の出し直し」か「本当にまとめて届いた」かが分かる。
+ * @param {ReadonlyArray<Record<string, any>>} items
+ */
+function noteVoiceBigBatch(items) {
+  const nos = items.map((it) => commentNoOfComeviewRow(it));
+  const seenBefore = nos.filter((no) => no && _voiceBatchSeenNos.has(no)).length;
+  for (const no of nos) if (no) _voiceBatchSeenNos.add(no);
+  if (_voiceBatchSeenNos.size > 2000) _voiceBatchSeenNos.clear();
+  if (items.length < 10) return;
+  const now = Date.now();
+  const ages = items.map((it) => now - Number(it?.at)).filter((a) => Number.isFinite(a));
+  _voiceDiag.bigBatchTotal = (Number(_voiceDiag.bigBatchTotal) || 0) + 1;
+  _voiceDiag.lastBigBatch = {
+    at: now,
+    size: items.length,
+    noLess: nos.filter((no) => !no).length,
+    seenBefore,
+    oldestAgeMs: ages.length ? Math.max(...ages) : -1,
+    newestAgeMs: ages.length ? Math.min(...ages) : -1
+  };
+  publishVoiceDiag();
+}
+/** noteVoiceBigBatch 用: 読む列へ来たことのある番号(同じコメントが2回来ていないかを見る)。 */
+const _voiceBatchSeenNos = new Set();
+/** v0.1.1805: 読みに回した最大のコメント番号(配信を切り替えたら 0)。 */
+let _voiceMaxCommentNo = 0;
+/** P5b: 読み上げに回した commentNo(近道と storage 経由の両方から来るので1回だけ読む)。 */
+const _voiceReadNos = new Set();
+
+/**
+ * P5b(2026-10-29): watch タブから storage を待たずに届いた新着を読み上げへ(表示は今までどおり storage 経由)。
+ *   表示が隠れていても読む(隠れている間の storage 分は後で表示だけされ、読み上げは _voiceReadNos で重ならない)。
+ */
+const _livePush = createComeviewLivePushClient({
+  isActive: () => _voiceReadingEnabled && !isObsMode(),
+  getLiveId: () => _liveId,
+  onRows: (_lv, rows) => {
+    if (_paused || !rows.length) return;
+    const profiled = Object.keys(_profileCache).length ? applyUserCommentProfileMapToEntries(rows, _profileCache).next : rows;
+    const items = buildAllComeviewTimeline(profiled, []).filter((it) => it.kind === 'comment');
+    enqueueLiveVoiceItems(filterVisibleComeviewTimeline(items, _ngKeys, _hiddenSigs));
+  }
+});
+
+/** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
+function enqueueLiveVoiceItems(items) {
+  if (!_voiceReadingEnabled || !Array.isArray(items) || !items.length) return;
+  items = takeUnreadVoiceItems(items, _voiceReadNos, commentNoOfComeviewRow); // P5b: 近道で読んだ分を storage 経由で二度読まない
+  if (!items.length) return;
+  noteVoiceBigBatch(items);
+  // v0.1.1805: 開く前の古いコメントが後からまとめて届いた分は、読み上げ待ちにも届いた件数にも入れない。
+  const split = splitVoiceBacklogByCommentNo(items, _voiceMaxCommentNo);
+  _voiceMaxCommentNo = split.maxNo;
+  if (split.backlog) _voiceDiag.backlogSkipTotal = (Number(_voiceDiag.backlogSkipTotal) || 0) + split.backlog;
+  items = split.fresh;
+  if (!items.length) { publishVoiceDiag(); return; }
+  if (!_voiceReaderLease) { enqueueVoiceTimelineItems(items); return; }
+  void _voiceReaderLease.whenMine(_liveId, () => enqueueVoiceTimelineItems(items), () => {
+    _voiceDiag.readerYieldTotal = (Number(_voiceDiag.readerYieldTotal) || 0) + items.length;
+    publishVoiceDiag();
+  });
+}
+
 function enqueueVoiceTimelineItems(items) {
   if (!_voiceReadingEnabled || isObsMode() || !Array.isArray(items)) return;
   let droppedCount = 0;
@@ -935,24 +1162,32 @@ function enqueueVoiceTimelineItems(items) {
       body = String(item.text || '').trim();
     }
 
-    if (!buildVoiceReadingText({ name, text: body })) continue;
+    // v0.1.1811: 読む文字が無いときも「鳴らない」と知らせる(会場 VoicePlayer と同じ)。
+    if (!buildVoiceReadingText({ name, text: body })) { notifyVoiceItemDropped(item); continue; }
     // 2026-10-22計器(P1): 受信(item.at=capturedAt)→キュー投入。
     const _upstreamMs = measureVoiceGapMs(item.at, Date.now());
     if (_upstreamMs >= 0) {
       _voiceDiag.lastUpstreamMs = _upstreamMs;
       foldVoiceStageEma(_voiceDiag, 'upstreamEmaMs', _upstreamMs);
     }
+    _voiceArrivalWindow = foldVoiceArrivalWindow(_voiceArrivalWindow, Date.now(), 1);
+    _voiceDiag.arrivalPerMin = _voiceArrivalWindow.arrivalPerMin;
     const candidate = {
       userKey: voiceUserKeyForItem(item),
       name,
       body,
       count: 1,
       enqueuedAt: Date.now(),
-      priority: isHighPriority ? 'high' : 'normal'
+      priority: isHighPriority ? 'high' : 'normal',
+      // v0.1.1799: 鳴り始め・鳴り終わり・捨てた時の知らせ(試験の1件ごとの記録用・会場 VoicePlayer と同じ名前)。
+      onAudioStart: item.onAudioStart,
+      onAudioEnd: item.onAudioEnd,
+      onDropped: item.onDropped
     };
+    _voiceDiag.voiceEnqueuedTotal = (Number(_voiceDiag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
     _voiceQueue = merged.queue;
-    if (merged.merged) continue;
+    if (merged.merged) { notifyVoiceItemDropped(candidate); continue; }
     // v0.1.782: わんコメ(OneComme limitQueue=10)式に、リアルタイム維持の主軸を件数ゲート
     //   (最古drop)に置く。上限 12→8 でラグを有界化(voicePlayer 会場/会話版と揃える)。
     //   時間ゲート(isVoiceItemStale)は安全網に格下げ済み(voiceAgeGate v0.1.782)。
@@ -962,7 +1197,9 @@ function enqueueVoiceTimelineItems(items) {
       { max: 8 }
     );
     _voiceQueue = pushed.queue;
+    noteVoicePaceArrival(_voicePaceState, candidate.enqueuedAt);
     droppedCount += pushed.dropped.length;
+    for (const d of pushed.dropped) notifyVoiceItemDropped(d);
   }
   if (droppedCount > 0) showVoiceSkipped(droppedCount);
   // v0.1.852 観測: 件数ゲート(max:8 最古drop)の drop も間引きに計上=「追いつけず捨てた」傍証。
@@ -1014,6 +1251,17 @@ async function initializeVoiceReading() {
   if (forceVoiceOn || bag[VOICE_READING_ENABLED_KEY] === true) {
     await enableVoiceReading({ persist: forceVoiceOn });
   }
+  // 2026-10-26: 決まった形のコメントで読み上げを試す入口(開発版だけ・voiceTestHook.js)。
+  wireVoiceTestHook({
+    target: 'comeview',
+    readUrl: true,
+    enqueue: (items) => enqueueVoiceTimelineItems(items),
+    getDiag: () => _voiceDiag,
+    isIdle: () => !_voicePlaying && _voiceQueue.length === 0,
+    prepare: () => { _voiceQueue = []; _voicePrefetches.clear(); }, // 開いた時のさかのぼり分を捨てる
+    isVoiceOn: () => _voiceReadingEnabled === true && !_voiceToggleBusy,
+    ensureEnabled: async () => _voiceReadingEnabled
+  });
 }
 
 /**
@@ -1599,7 +1847,7 @@ function appendTimelineItems(items) {
   }
   listEl.appendChild(fragment);
   upgradeAnonymousAvatarImages(listEl);
-  enqueueVoiceTimelineItems(items);
+  enqueueLiveVoiceItems(items);
 
   let rows = listEl.querySelectorAll('[data-cv-key]');
   while (rows.length > TIMELINE_LIMIT) {
@@ -1754,6 +2002,10 @@ async function performFullRefresh(forceBottom) {
     TIMELINE_LIMIT
   );
   _commentCount = comments.length;
+  // v0.1.1804: 初回以外は、この全量描画で初めて出る新しいコメントも読む(下の既出登録より先に拾う)。
+  const refreshVoiceItems = _initialVoicesPrimed
+    ? pickRefreshVoiceItems(timeline, _seenCommentNos, Date.now(), VOICE_STALE_MS_NORMAL)
+    : [];
   renderFullTimeline(timeline, forceBottom);
   // v0.1.679: 全量描画した行の識別子を「既出」に登録(以後の hot append が二重に足さない)。
   for (const item of timeline) {
@@ -1761,12 +2013,16 @@ async function performFullRefresh(forceBottom) {
     rememberSeenCommentNo(commentNoOfComeviewRow(item));
   }
 
+  if (refreshVoiceItems.length) {
+    _voiceDiag.refreshVoicedTotal = (Number(_voiceDiag.refreshVoicedTotal) || 0) + refreshVoiceItems.length;
+    enqueueLiveVoiceItems(refreshVoiceItems);
+  }
   if (!_initialVoicesPrimed) {
     _initialVoicesPrimed = true;
     if (timeline.length > 0) {
       // コメビュ起動直後に無音にならないよう、直近3件を読み上げる（primeEmit）
       const primes = timeline.slice(Math.max(0, timeline.length - 3));
-      enqueueVoiceTimelineItems(primes);
+      enqueueLiveVoiceItems(primes);
     }
   }
 
