@@ -18,12 +18,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1831',
+    version: '0.1.1832',
     date: '2026-10-29',
     summary: '席が無い人の吹き出しを診断の上に出し名前も',
     items: Object.freeze([
       '会場で、席が無い人の吹き出しがほとんど「①の診断」の行の上に重なって出ていたのを直しました。診断の行が見えているときは、その上に出します。',
       '席が無い人や一覧の外にいる人の吹き出しの名前が「コメント」とだけ出ていたのを、席と同じ「匿名NNN」(名前がある人は名前)で出すようにしました。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1831',
+    date: '2026-10-28',
+    summary: '視聴ページの確認用ログを毎回出さない',
+    items: Object.freeze([
+      'パネルの描画のたびに、確認用の大きな記録（約5KB）を視聴ページのコンソールへ自動で出し続けていました。必要なときだけ手で呼べるようにして、自動では出さないようにしました。'
     ])
   }),
   Object.freeze({
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '名前を読むときも www などを聞きやすく',
     items: Object.freeze([
       '「名前も読む」にしているとき、名前の「ｗｗｗ」や連打も本文と同じように読みます(たろうｗｗｗ →「たろうわらわら」)。絵文字だけの名前は名前を飛ばして本文だけ読みます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1812',
-    date: '2026-10-28',
-    summary: 'NG にした人は読み上げでも読まない',
-    items: Object.freeze([
-      'コメビュで NG にした人のコメントは画面から消えますが、放送ページの会場モードの読み上げと、スマホへ送る声では読まれていました。どちらでも読まないようにしました(NG を外せば次のコメントから読みます)。'
     ])
   })
 ]);
