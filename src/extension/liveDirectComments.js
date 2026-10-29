@@ -82,7 +82,8 @@ export function nativeFetchBytes(http) {
  * @param {{
  *   lv: string, http: any, signal: AbortSignal,
  *   onComments: (rows: { no: string, text: string, name: string, atMs: number }[]) => void,
- *   onState: (state: 'connecting'|'live'|'ended'|'failed') => void,
+ *   onGifts?: (rows: { name: string, itemName: string, point: number|null, atMs: number }[]) => void,
+ *   onState: (state: 'connecting'|'live'|'ended'|'failed'|'retrying') => void,
  *   WebSocketImpl?: any
  * }} a
  */
@@ -104,20 +105,75 @@ export async function startDirectComments(a) {
       return;
     }
     a.onState('live');
-    const end = await followNdgrLive({ viewUri, fetchBytes: nativeFetchBytes(a.http), onComments: a.onComments, signal: a.signal });
+    const end = await followNdgrLive({ viewUri, fetchBytes: nativeFetchBytes(a.http), onComments: a.onComments, onGifts: a.onGifts, signal: a.signal });
     if (end !== 'aborted') a.onState('failed');
   } catch {
     if (!a.signal.aborted) a.onState('failed');
   }
 }
 
+/** 切れたときにつなぎ直すまでの待ち(つながったら最初に戻る)。使い切ったらあきらめて「もう一度押して」。 */
+export const DIRECT_RETRY_DELAYS_MS = Object.freeze([3_000, 10_000, 30_000, 60_000]);
+
+/**
+ * startDirectComments を、切れたら自動でつなぎ直しながら回す(長い配信の途中で通信が切れても止めない)。
+ * 配信が終わった(ended)・止めた(abort)ときは、つなぎ直さない。
+ * @param {Parameters<typeof startDirectComments>[0] & { sleep?: (ms: number, signal: AbortSignal) => Promise<void> }} a
+ *   onState には 'retrying' も来る。
+ */
+export async function runDirectComments(a) {
+  const sleep = a.sleep || abortableSleep;
+  let tries = 0;
+  for (;;) {
+    let last = '';
+    await startDirectComments({
+      ...a,
+      onState: (s) => {
+        last = s;
+        if (s === 'live') tries = 0;
+        if (s !== 'failed') a.onState(s);
+      }
+    });
+    if (a.signal.aborted || last !== 'failed') return;
+    if (tries >= DIRECT_RETRY_DELAYS_MS.length) {
+      a.onState('failed');
+      return;
+    }
+    a.onState(/** @type {any} */ ('retrying'));
+    await sleep(DIRECT_RETRY_DELAYS_MS[tries], a.signal);
+    tries += 1;
+    if (a.signal.aborted) return;
+  }
+}
+
+/** @param {number} ms @param {AbortSignal} signal */
+function abortableSleep(ms, signal) {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => { clearTimeout(t); resolve(undefined); }, { once: true });
+  });
+}
+
 const STATE_TEXT = {
   idle: 'PC が無くても、このアプリがニコニコから直接コメントを受け取って流します(受け取ったコメントは iPhone の中だけ)。',
   connecting: 'つないでいます…',
   live: '受け取り中(数秒遅れで届きます)',
+  retrying: '通信が切れました。つなぎ直しています…',
   ended: 'この配信は終わっているか、見られない配信です。',
   failed: 'うまく受け取れませんでした。もう一度押してください。'
 };
+
+/**
+ * ギフト1件の行(「🎁 名前 さんが アイテム(100pt)」)。名前が無い匿名のギフトは「匿名」。
+ * @param {{ name: string, itemName: string, point: number|null }} row
+ */
+export function giftItem(row) {
+  const li = document.createElement('li');
+  li.className = 'direct-gift';
+  const pt = row.point != null && row.point > 0 ? `(${row.point}pt)` : '';
+  li.innerHTML = `🎁 <span class="direct-name">${esc(row.name || '匿名')}</span> さんが ${esc(row.itemName || 'ギフト')}${esc(pt)}`;
+  return li;
+}
 
 /**
  * /live?lv= の上に「💬 コメントを流す」の欄を出す。アプリの外では何もしない。
@@ -159,7 +215,7 @@ export function mountDirectComments(a) {
   /** @param {keyof typeof STATE_TEXT} s */
   const setState = (s) => {
     stateEl.textContent = STATE_TEXT[s];
-    const running = s === 'connecting' || s === 'live';
+    const running = s === 'connecting' || s === 'live' || s === 'retrying';
     toggleBtn.textContent = running ? '⏹ 止める' : '💬 コメントを流す';
     if (!running) ac = null;
   };
@@ -176,6 +232,13 @@ export function mountDirectComments(a) {
     if (voice) voice.onRows(rows);
   };
 
+  // ギフトは目立つ色で並べるだけ(読み上げは PC と同じくコメントだけ=phoneVoice.js はギフトを読まない)。
+  /** @param {{ name: string, itemName: string, point: number|null }[]} rows */
+  const onGifts = (rows) => {
+    for (const row of rows) listEl.insertBefore(giftItem(row), listEl.firstChild);
+    while (listEl.children.length > DIRECT_COMMENTS_MAX) listEl.lastChild?.remove();
+  };
+
   toggleBtn.addEventListener('click', () => {
     if (voice) voice.wake();
     if (ac) {
@@ -185,7 +248,7 @@ export function mountDirectComments(a) {
     }
     const mine = new AbortController();
     ac = mine;
-    void startDirectComments({ lv: a.lv, http, signal: mine.signal, onComments, onState: (s) => { if (ac === mine) setState(s); } });
+    void runDirectComments({ lv: a.lv, http, signal: mine.signal, onComments, onGifts, onState: (s) => { if (ac === mine) setState(/** @type {any} */ (s)); } });
   });
   paintVoice();
   return true;
