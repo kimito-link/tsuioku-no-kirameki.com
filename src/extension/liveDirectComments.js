@@ -82,6 +82,7 @@ export function nativeFetchBytes(http) {
  * @param {{
  *   lv: string, http: any, signal: AbortSignal,
  *   onComments: (rows: { no: string, text: string, name: string, atMs: number }[]) => void,
+ *   onGifts?: (rows: { name: string, itemName: string, point: number|null, atMs: number }[]) => void,
  *   onState: (state: 'connecting'|'live'|'ended'|'failed'|'retrying') => void,
  *   WebSocketImpl?: any
  * }} a
@@ -104,7 +105,7 @@ export async function startDirectComments(a) {
       return;
     }
     a.onState('live');
-    const end = await followNdgrLive({ viewUri, fetchBytes: nativeFetchBytes(a.http), onComments: a.onComments, signal: a.signal });
+    const end = await followNdgrLive({ viewUri, fetchBytes: nativeFetchBytes(a.http), onComments: a.onComments, onGifts: a.onGifts, signal: a.signal });
     if (end !== 'aborted') a.onState('failed');
   } catch {
     if (!a.signal.aborted) a.onState('failed');
@@ -163,6 +164,18 @@ const STATE_TEXT = {
 };
 
 /**
+ * ギフト1件の行(「🎁 名前 さんが アイテム(100pt)」)。名前が無い匿名のギフトは「匿名」。
+ * @param {{ name: string, itemName: string, point: number|null }} row
+ */
+export function giftItem(row) {
+  const li = document.createElement('li');
+  li.className = 'direct-gift';
+  const pt = row.point != null && row.point > 0 ? `(${row.point}pt)` : '';
+  li.innerHTML = `🎁 <span class="direct-name">${esc(row.name || '匿名')}</span> さんが ${esc(row.itemName || 'ギフト')}${esc(pt)}`;
+  return li;
+}
+
+/**
  * /live?lv= の上に「💬 コメントを流す」の欄を出す。アプリの外では何もしない。
  * @param {{ lv: string, mountBefore: Element|null, cap?: any }} a
  * @returns {boolean} 欄を出したら true
@@ -219,6 +232,13 @@ export function mountDirectComments(a) {
     if (voice) voice.onRows(rows);
   };
 
+  // ギフトは目立つ色で並べるだけ(読み上げは PC と同じくコメントだけ=phoneVoice.js はギフトを読まない)。
+  /** @param {{ name: string, itemName: string, point: number|null }[]} rows */
+  const onGifts = (rows) => {
+    for (const row of rows) listEl.insertBefore(giftItem(row), listEl.firstChild);
+    while (listEl.children.length > DIRECT_COMMENTS_MAX) listEl.lastChild?.remove();
+  };
+
   toggleBtn.addEventListener('click', () => {
     if (voice) voice.wake();
     if (ac) {
@@ -228,7 +248,7 @@ export function mountDirectComments(a) {
     }
     const mine = new AbortController();
     ac = mine;
-    void runDirectComments({ lv: a.lv, http, signal: mine.signal, onComments, onState: (s) => { if (ac === mine) setState(/** @type {any} */ (s)); } });
+    void runDirectComments({ lv: a.lv, http, signal: mine.signal, onComments, onGifts, onState: (s) => { if (ac === mine) setState(/** @type {any} */ (s)); } });
   });
   paintVoice();
   return true;

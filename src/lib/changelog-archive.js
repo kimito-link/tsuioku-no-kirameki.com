@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1807',
+    date: '2026-10-28',
+    summary: 'コメビュの読み上げ計器を配信ごとに数え直す',
+    items: Object.freeze([
+      'コメビュの窓を開いたまま配信が切り替わると、読めた数・飛ばした数・遅れなどの計器が前の配信の分を引き継いでいました。配信が変わったら数え直すようにしました(声を作る速さの記録は PC の性質なので残します)。読み上げの声は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1806',
     date: '2026-10-28',
     summary: '読み上げが遅いとき GPU の案内を出す',

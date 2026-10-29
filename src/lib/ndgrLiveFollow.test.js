@@ -3,6 +3,7 @@ import {
   readNdgrViewEntry,
   ndgrMessageAtMs,
   ndgrCommentsFromSegment,
+  ndgrGiftsFromSegment,
   followNdgrLive,
   NDGR_FOLLOW_MAX_FAILS
 } from './ndgrLiveFollow.js';
@@ -145,5 +146,43 @@ describe('followNdgrLive', () => {
     const r = await followNdgrLive({ viewUri: '', fetchBytes: async () => { n += 1; return { status: 200, bytes: new Uint8Array() }; }, onComments: () => {} });
     expect(r).toBe('no_view');
     expect(n).toBe(0);
+  });
+});
+
+const giftMessage = ({ name, itemName, point, atMs }) =>
+  frame([
+    ...ld(1, [...st(1, 'g1'), ...ld(2, ts(atMs))]),
+    ...ld(2, ld(8, [...st(1, 'item-1'), ...vi(2, 123), ...st(3, name), ...vi(4, point), ...st(6, itemName)]))
+  ]);
+
+describe('ndgrGiftsFromSegment', () => {
+  it('ギフトの送り主・アイテム名・ポイントを取り出し、コメントとは混ぜない', () => {
+    const bytes = new Uint8Array([
+      ...chatMessage({ no: 1, text: 'こんばんは', atMs: 1000 }),
+      ...giftMessage({ name: 'こん太', itemName: 'きらきら', point: 500, atMs: 2000 })
+    ]);
+    expect(ndgrGiftsFromSegment(bytes)).toEqual([{ name: 'こん太', itemName: 'きらきら', point: 500, atMs: 2000 }]);
+    expect(ndgrCommentsFromSegment(bytes).map((r) => r.text)).toEqual(['こんばんは']);
+  });
+
+  it('followNdgrLive は onGifts があるときだけギフトを渡す', async () => {
+    const ac = new AbortController();
+    const gifts = [];
+    const seg = new Uint8Array(giftMessage({ name: 'たぬ姉', itemName: 'はなまる', point: 100, atMs: 101_000 }));
+    await followNdgrLive({
+      viewUri: 'https://mpn.live.nicovideo.jp/api/view/v4/abc',
+      fetchBytes: async (u) => {
+        if (u.includes('/data/segment/')) return { status: 200, bytes: seg };
+        if (u.endsWith('at=now')) return { status: 200, bytes: viewBytes(segmentEntry(1, 100), nextEntry(116)) };
+        await new Promise((res) => setTimeout(res, 0));
+        ac.abort();
+        return { status: 200, bytes: new Uint8Array() };
+      },
+      onComments: () => {},
+      onGifts: (rows) => gifts.push(...rows),
+      signal: ac.signal,
+      sleep: async () => {}
+    });
+    expect(gifts.map((g) => g.itemName)).toEqual(['はなまる']);
   });
 });
