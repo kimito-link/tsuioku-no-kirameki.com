@@ -86,6 +86,7 @@ import {
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
 import { takeUnreadVoiceItems } from '../lib/comeviewLivePush.js';
+import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { createComeviewLivePushClient } from './comeviewLivePushClient.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
@@ -687,6 +688,7 @@ const _voiceSynthTracker = createVoiceSynthTracker();
 /** 2026-10-26: 初めての声を合成の前に読み込む(会場と同じ voiceWarmup.js)。 */
 const _voiceWarmup = createVoicevoxWarmup();
 const synthesizeVoiceWarm = withVoiceWarmup(_voiceWarmup, synthesizeVoice);
+wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
 // v0.1.1777: 裏の声の読み込みは、鳴らしても待たせてもいない時だけ(次のコメントを待たせない)。
 wireVoiceWarmupHooks(_voiceWarmup, () => !_voicePlaying && _voiceQueue.length === 0, () => _voiceDiag, chromeVoiceEngineLink());
 

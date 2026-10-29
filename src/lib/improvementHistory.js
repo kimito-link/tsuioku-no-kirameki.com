@@ -4454,5 +4454,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1832', metric: 'cross-checked-claims', value: 42,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '前版と同等(30日の窓)。診断の行との重なりは、実配信の測定(15件中14件被り)と同じ形のページで直す前 100%→直した後 0% を確かめた。'
+  }),
+  Object.freeze({
+    version: '0.1.1833', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版と同じ水準。popup に音質の選択肢1つと配線(wireVoiceQualitySelect.js)を足しただけで、値の決め方は lib の voiceQuality.js。'
+  }),
+  Object.freeze({
+    version: '0.1.1833', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1833', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '音質の切り替えは単体テスト(エンジンへ渡す outputSamplingRate が 16k/24k/変な値→16k)と、3か所の配線・popup の既定のテストの両方で固定。音の違いは自宅PCで聞き比べてもらう。'
   })
 ]);

@@ -68,6 +68,7 @@
 - 🔵 **KEY_VENUE_BUTTON_VISIBLE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_VOICE_ASSIGNMENTS** — 読む人だけ（書く経路が無い疑い）: src/extension/phoneVoicePublisher.js
 - 🔵 **KEY_VOICE_NARROW_MODE** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/phoneVoicePublisher.js
+- 🔵 **KEY_VOICE_QUALITY** — 読む人だけ（書く経路が無い疑い）: src/extension/voiceQualitySetting.js
 - 🔵 **KEY_VOICE_READ_NAME_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/phoneVoicePublisher.js
 - 🔵 **KEY_VOICE_VOLUME_PERCENT** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -171,6 +172,7 @@
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_VOICE_NARROW_MODE` | — | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
+| `KEY_VOICE_QUALITY` | — | extension/voiceQualitySetting.js |
 | `KEY_VOICE_READ_NAME_ENABLED` | — | extension/phoneVoicePublisher.js |
 | `KEY_VOICE_VOLUME_PERCENT` | — | extension/comeview-entry.js |
 | `KEY_VOICE_WEAK_PC` | extension/comeview-entry.js | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
