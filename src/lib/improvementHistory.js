@@ -4412,5 +4412,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1829', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '近道は単体テスト(行の選び方・メッセージの検証・二度読まない・タブの選び方)と、content/コメビュの配線テストの両方で固定。実機での速さは状態速報の「受信→キュー」で確かめる。'
+  }),
+  Object.freeze({
+    version: '0.1.1830', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1829 と同じ(popup は変更履歴の文字列だけ)。'
+  }),
+  Object.freeze({
+    version: '0.1.1830', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1830', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '0.1.1829 と同じ(30日の窓で数える値)。診断の行との重なりは、実配信の測定(15件中14件被り)と同じ形のページで直す前 100%→直した後 0% を確かめた。'
   })
 ]);

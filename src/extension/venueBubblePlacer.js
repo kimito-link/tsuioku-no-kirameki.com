@@ -47,6 +47,7 @@ const rel = (r, o) => ({ left: r.left - o.left, top: r.top - o.top, right: r.rig
  * @param {{x:number,y:number}|null} [p.fallback] 席が無い人の決定座標(レイヤー基準)
  * @param {HTMLElement|null} p.seating 会場の席の帯(ここから外=配信映像は軽く避ける)
  * @param {HTMLElement|null} [p.viewport] 席の一覧のスクロール枠。席が無い人の吹き出しはこの中(下の縁)に出す
+ * @param {Element|null} [p.viewportFloor] 一覧の最後にある行(診断)。見えていれば、席が無い人の吹き出しはその上に出す
  * @param {Array<{ el: Element|null, weight: number, clipTo?: Element|null }>} p.obstacleEls clipTo=その枠(一覧のスクロール)で見えている部分だけを避ける
  * @param {Array<{left:number,top:number,right:number,bottom:number}>} p.otherBubbles 他の吹き出しの箱(レイヤー基準)
  * @param {import('../lib/bubblePlacement.js').BubbleSide|null} [p.prefer]
@@ -72,7 +73,14 @@ export function placeVenueBubble(p) {
     //   診断の行に被ったり PICK UP より下(会場の外)に出たりしていた(実機)。一覧の見えている下の縁に、名前付きで出す。
     const v = rel(p.viewport.getBoundingClientRect(), L);
     const x = Math.min(Math.max(p.fallback.x, v.left + 24), v.right - 24);
-    anchor = { left: x - 1, top: v.bottom - 2, right: x + 1, bottom: v.bottom - 2 };
+    // ★v0.1.1830: 一覧の最後に「①の診断」の行がある。縁をそのまま使うと、席が無い人の吹き出しが
+    //   ほぼ全部その行の上に出ていた(実配信 15件中14件が 78〜100% 重なり)。見えている診断の行の上端を縁にする。
+    let floor = v.bottom;
+    if (p.viewportFloor && p.viewportFloor.isConnected) {
+      const f = rel(p.viewportFloor.getBoundingClientRect(), L);
+      if (f.bottom > f.top && f.top > v.top + 40 && f.top < floor) floor = f.top;
+    }
+    anchor = { left: x - 1, top: floor - 2, right: x + 1, bottom: floor - 2 };
     away = true;
     edge = 'bottom';
   } else if (p.fallback) {
