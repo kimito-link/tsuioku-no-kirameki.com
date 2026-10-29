@@ -2634,6 +2634,18 @@
       ]
     },
     {
+      "file": "src/lib/comeviewLivePush.js",
+      "featureCount": 2,
+      "features": [
+        "comeview",
+        "content"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewUserDetailLink.js",
       "featureCount": 2,
       "features": [
@@ -4277,6 +4289,26 @@
       ],
       "labels": [
         "コメビュ(別窓)"
+      ]
+    },
+    {
+      "file": "src/extension/comeviewLivePushClient.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
+      "file": "src/extension/comeviewLivePushHost.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
       ]
     },
     {
