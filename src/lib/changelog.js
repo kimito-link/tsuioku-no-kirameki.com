@@ -18,12 +18,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1831',
+    version: '0.1.1832',
     date: '2026-10-29',
     summary: '読み上げの音質を選べるように',
     items: Object.freeze([
       '設定に「読み上げの音質」を足しました。標準(今までどおり)と高音質から選べます。高音質は声が少しくっきりしますが、作るのに時間がかかるので、グラボのある速いPC向けです。',
       '既定は標準のままです。変えると、会場・コメビュ・スマホへ送る声のどれも次の声から切り替わります。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1831',
+    date: '2026-10-28',
+    summary: '視聴ページの確認用ログを毎回出さない',
+    items: Object.freeze([
+      'パネルの描画のたびに、確認用の大きな記録（約5KB）を視聴ページのコンソールへ自動で出し続けていました。必要なときだけ手で呼べるようにして、自動では出さないようにしました。'
     ])
   }),
   Object.freeze({
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '名前を読むときも www などを聞きやすく',
     items: Object.freeze([
       '「名前も読む」にしているとき、名前の「ｗｗｗ」や連打も本文と同じように読みます(たろうｗｗｗ →「たろうわらわら」)。絵文字だけの名前は名前を飛ばして本文だけ読みます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1812',
-    date: '2026-10-28',
-    summary: 'NG にした人は読み上げでも読まない',
-    items: Object.freeze([
-      'コメビュで NG にした人のコメントは画面から消えますが、放送ページの会場モードの読み上げと、スマホへ送る声では読まれていました。どちらでも読まないようにしました(NG を外せば次のコメントから読みます)。'
     ])
   })
 ]);

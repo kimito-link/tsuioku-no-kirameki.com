@@ -404,7 +404,7 @@ export default [
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
-    // v0.1.1831: 読み上げの音質の選択肢の配線(+2行: import と呼び出し)。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。
+    // v0.1.1832: 読み上げの音質の選択肢の配線(+2行: import と呼び出し)。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。
     rules: { 'max-lines': ['error', { max: 21748, skipBlankLines: false, skipComments: false }] }
   },
   {
@@ -453,7 +453,7 @@ export default [
     //   (開閉と発言の2か所に1行ずつ)=+4。中身は voiceTestHook.js / lib の voicePlaybackQuality.js。
     // v0.1.1794: 同じ配信をコメビュと二重に読まない(import 1行+名乗りの1行+発言ごとの分岐5行)=+7。中身は lib の voiceReaderLease.js。
     // v0.1.1828: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
-    // v0.1.1831: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
+    // v0.1.1832: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
     files: ['src/extension/venueBar.js'],
     rules: { 'max-lines': ['error', { max: 7348, skipBlankLines: false, skipComments: false }] }
   },
