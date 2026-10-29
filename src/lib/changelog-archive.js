@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1813',
+    date: '2026-10-28',
+    summary: '名前を読むときも www などを聞きやすく',
+    items: Object.freeze([
+      '「名前も読む」にしているとき、名前の「ｗｗｗ」や連打も本文と同じように読みます(たろうｗｗｗ →「たろうわらわら」)。絵文字だけの名前は名前を飛ばして本文だけ読みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1812',
     date: '2026-10-28',
     summary: 'NG にした人は読み上げでも読まない',
