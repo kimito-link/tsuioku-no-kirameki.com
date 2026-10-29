@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1811',
+    date: '2026-10-28',
+    summary: '読み上げない吹き出しが残らないように',
+    items: Object.freeze([
+      '絵文字や記号だけで読み上げないコメントの吹き出しが、声を待つ印のまま最大8秒残っていました。読まないと分かった時点で、ふつうの吹き出しと同じ速さで消えるようにしました(会場モード)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1810',
     date: '2026-10-28',
     summary: '絵文字や記号だけのコメントは読み上げない',
