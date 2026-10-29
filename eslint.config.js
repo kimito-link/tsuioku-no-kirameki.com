@@ -429,7 +429,7 @@ export default [
     // v0.1.1818: コメント欄の見張りを位置を読む前に間引く(+4行: import・前回時刻・判定と記録)。判定は lib の commentPanelHealthProbe.js。
     // v0.1.1820: host の移動を iframe を読み込み直さない moveBefore 経由に(+1行: import)。手順は lib の moveNodePreservingState.js。
     // v0.1.1825: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
-    // v0.1.1826: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
+    // v0.1.1829: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
     rules: { 'max-lines': ['error', { max: 19566, skipBlankLines: false, skipComments: false }] }
   },
   {
@@ -450,8 +450,9 @@ export default [
     // v0.1.1771: 読み上げの聞こえ方の試験入口(import 1行+呼び出し1行)と、会場で鳴らない理由の計器
     //   (開閉と発言の2か所に1行ずつ)=+4。中身は voiceTestHook.js / lib の voicePlaybackQuality.js。
     // v0.1.1794: 同じ配信をコメビュと二重に読まない(import 1行+名乗りの1行+発言ごとの分岐5行)=+7。中身は lib の voiceReaderLease.js。
+    // v0.1.1828: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7341, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7346, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

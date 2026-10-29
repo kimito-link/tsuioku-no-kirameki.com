@@ -30,4 +30,10 @@ describe('配線: 吹き出しを大事な表示に被せない(v0.1.1760)', () 
     expect(phone).toMatch(/seatsEl\.replaceChildren\(\.\.\.nodes\);\s*relayoutBubbles\(\);/);
     expect(phone).toContain('chooseBubblePlacement({');
   });
+  it('★席が無い人の吹き出しは一覧の中(下の縁)に名前付きで出し、診断の行も避ける(v0.1.1828 実機で会場の外・診断の上に出た)', () => {
+    expect(venueBar).toContain('viewport: seatsHost,');
+    expect(venueBar).toContain('{ el: storyDiagHost, weight: W.guide, clipTo: seatsHost },');
+    expect(placer).toMatch(/else if \(p\.fallback && p\.viewport\)[\s\S]*away = true;\s*edge = 'bottom';/);
+    expect(venueBar).toContain('.nlsb-bubble--seatless::after { display: none; }');
+  });
 });
