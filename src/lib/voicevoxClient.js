@@ -14,6 +14,24 @@ export const VOICEVOX_BASE_URL = 'http://127.0.0.1:50021';
 export const VOICEVOX_OUTPUT_SAMPLING_RATE = 16000;
 
 /**
+ * 2026-10-29: 合成の出力サンプリングレート(Hz)。既定は上の 16k。利用者が「高音質」を選んだときだけ 24k
+ *   (配線は src/extension/voiceQualitySetting.js・値の決め方は voiceQuality.js)。
+ *   受け付けるのは 16000 / 24000 だけ。それ以外は 16000 に戻す(エンジンへ変な値を渡さない)。
+ */
+let _outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
+
+/** @param {unknown} hz */
+export function setVoicevoxOutputSamplingRate(hz) {
+  const n = Number(hz);
+  _outputSamplingRate = n === 24000 ? 24000 : VOICEVOX_OUTPUT_SAMPLING_RATE;
+}
+
+/** @returns {number} */
+export function getVoicevoxOutputSamplingRate() {
+  return _outputSamplingRate;
+}
+
+/**
  * fetch 互換関数。プロキシ経由の buffer 取得は Response 風オブジェクト
  * ({ ok, status, arrayBuffer }) を返すため、戻り値はそれも許容する。
  * @typedef {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response | { ok: boolean, status: number, arrayBuffer: () => Promise<ArrayBuffer> }>} FetchFn
@@ -764,7 +782,8 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     // v0.1.1063: 出力を16kHzモノラルに固定。実測(2026-07-04)で合成が約30%速くなり
     //   (1465→1025ms)WAVも約33%小さくなる=読み上げのテンポ改善(12kHzはこれ以上速くならず
     //   音質だけ落ちるので16kが最適点)。コメント読み上げ用途では音質差は実用上分からない。
-    audioQuery.outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
+    //   2026-10-29: 「高音質」を選んだ人だけ 24kHz(合成は遅くなる・速い PC 向け)。
+    audioQuery.outputSamplingRate = _outputSamplingRate;
     audioQuery.outputStereo = false;
 
     const queryMs = nowMs() - queryStartAt;

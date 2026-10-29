@@ -11852,6 +11852,21 @@
               </span>
             </label>
           </div>
+          <!-- 2026-10-29: 読み上げの声の音質(出力サンプリングレート)。既定は今までどおり標準(16kHz・v0.1.1063 で合成が約30%速いため)。
+               高音質(24kHz)は自分で選んだ人だけ。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceQualitySelect" class="nl-record-sub__label">
+              <span>
+                読み上げの音質
+                <select id="voiceQualitySelect" aria-label="読み上げの音質">
+                  <option value="standard">標準(おすすめ)</option>
+                  <option value="high">高音質(速いPC向け)</option>
+                </select>
+                <span class="nl-record-sub__hint"
+                  >高音質は声が少しくっきりしますが、作るのに時間がかかります。グラボのある速いPCで、こもって聞こえるときに。次の声から効きます。</span>
+              </span>
+            </label>
+          </div>
           <!-- v0.1.1271(ユーザー要望): 視聴ページに「🏟 会場モード」ボタンを出すか（既定 ON＝出す）。
                「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、会場の画面ではなく
                ボタンが常時表示されていることだった。会場を使わない人は隠せるようにする。 -->

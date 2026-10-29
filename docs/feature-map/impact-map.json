@@ -482,6 +482,24 @@
       ]
     },
     {
+      "file": "src/lib/voiceQuality.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceReadingNormalize.js",
       "featureCount": 5,
       "features": [
@@ -530,6 +548,22 @@
         "記録エンジン(watchページ常駐)",
         "Web版 追憶のきらめき ランキング(/live/)",
         "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/extension/voiceQualitySetting.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
@@ -4483,6 +4517,16 @@
     },
     {
       "file": "src/extension/popup/wireVoiceNarrowSelect.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/wireVoiceQualitySelect.js",
       "featureCount": 1,
       "features": [
         "popup"
