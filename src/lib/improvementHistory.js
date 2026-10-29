@@ -4412,5 +4412,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1829', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '近道は単体テスト(行の選び方・メッセージの検証・二度読まない・タブの選び方)と、content/コメビュの配線テストの両方で固定。実機での速さは状態速報の「受信→キュー」で確かめる。'
+  }),
+  Object.freeze({
+    version: '0.1.1830', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'content.js に一度でも DOM に入った host の WeakSet を追加。popup.js は変更履歴の文字列だけ'
+  }),
+  Object.freeze({
+    version: '0.1.1830', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1830', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'E2E『パネルを開いても host は1回しか作られない』(修正前の実測 host_created=4→1)'
   })
 ]);

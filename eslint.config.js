@@ -430,7 +430,8 @@ export default [
     // v0.1.1820: host の移動を iframe を読み込み直さない moveBefore 経由に(+1行: import)。手順は lib の moveNodePreservingState.js。
     // v0.1.1825: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
     // v0.1.1829: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
-    rules: { 'max-lines': ['error', { max: 19566, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1830: 作りたて host を古いと捨てて開くたび4回作り直していたのを止める(+5行: 一度でも DOM に入った host の WeakSet と記録2か所)。
+    rules: { 'max-lines': ['error', { max: 19571, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
