@@ -5,7 +5,10 @@ import {
   bytesFromNativeData,
   nativeFetchBytes,
   startDirectComments,
-  mountDirectComments
+  runDirectComments,
+  mountDirectComments,
+  giftItem,
+  DIRECT_RETRY_DELAYS_MS
 } from './liveDirectComments.js';
 
 const nativeCap = (http, { native = true, available = true } = {}) => ({
@@ -97,6 +100,48 @@ describe('startDirectComments', () => {
   });
 });
 
+describe('runDirectComments(切れたらつなぎ直す)', () => {
+  it('握手に失敗したら間を空けてつなぎ直し、使い切ったら failed で止まる', async () => {
+    const states = [];
+    const waits = [];
+    let watches = 0;
+    const http = { get: async () => { watches += 1; return { status: 200, data: watchHtml('wss://secret/ws') }; } };
+    const failingWs = class {
+      constructor() { this.l = { open: [], message: [], error: [], close: [] }; queueMicrotask(() => this.l.error.forEach((f) => f())); }
+      addEventListener(t, f) { this.l[t].push(f); }
+      send() {}
+      close() {}
+    };
+    await runDirectComments({
+      lv: 'lv1234567', http, signal: new AbortController().signal, onComments: () => {},
+      onState: (s) => states.push(s), WebSocketImpl: failingWs,
+      sleep: async (ms) => { waits.push(ms); }
+    });
+    expect(waits).toEqual([...DIRECT_RETRY_DELAYS_MS]);
+    expect(watches).toBe(DIRECT_RETRY_DELAYS_MS.length + 1);
+    expect(states.filter((s) => s === 'retrying')).toHaveLength(DIRECT_RETRY_DELAYS_MS.length);
+    expect(states.at(-1)).toBe('failed');
+  });
+
+  it('配信が終わっていたら(ended)つなぎ直さない', async () => {
+    const states = [];
+    const http = { get: async () => ({ status: 200, data: '<html></html>' }) };
+    await runDirectComments({ lv: 'lv1234567', http, signal: new AbortController().signal, onComments: () => {}, onState: (s) => states.push(s), sleep: async () => { throw new Error('待たない'); } });
+    expect(states).toEqual(['connecting', 'ended']);
+  });
+
+  it('止めたら(abort)待っている途中でも終わる', async () => {
+    const ac = new AbortController();
+    const states = [];
+    const http = { get: async () => { throw new Error('圏外'); } };
+    await runDirectComments({
+      lv: 'lv1234567', http, signal: ac.signal, onComments: () => {}, onState: (s) => states.push(s),
+      sleep: async () => { ac.abort(); }
+    });
+    expect(states).toEqual(['connecting', 'retrying']);
+  });
+});
+
 describe('mountDirectComments', () => {
   it('アプリの外(LP の /live/・ブラウザ)では何も出さない', () => {
     document.body.innerHTML = '<main id="list"></main>';
@@ -111,5 +156,15 @@ describe('mountDirectComments', () => {
     expect(mountDirectComments({ lv: '', mountBefore: document.getElementById('list'), cap })).toBe(false);
     expect(mountDirectComments({ lv: 'lv1234567', mountBefore: document.getElementById('list'), cap })).toBe(true);
     expect(document.querySelector('[data-direct-toggle]')?.textContent).toContain('コメントを流す');
+  });
+});
+
+describe('giftItem', () => {
+  it('名前・アイテム・ポイントを出し、名前は文字として扱う(タグにしない)', () => {
+    const li = giftItem({ name: '<b>x</b>', itemName: 'きらきら', point: 500 });
+    expect(li.className).toBe('direct-gift');
+    expect(li.textContent).toBe('🎁 <b>x</b> さんが きらきら(500pt)');
+    expect(li.querySelector('b')).toBeNull();
+    expect(giftItem({ name: '', itemName: '', point: null }).textContent).toBe('🎁 匿名 さんが ギフト');
   });
 });
