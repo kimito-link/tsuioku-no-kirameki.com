@@ -4416,7 +4416,7 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1830', metric: 'bundle-kb', value: 1436,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '0.1.1829 と同じ(popup は変更履歴の文字列だけ)。'
+    note: 'content.js に一度でも DOM に入った host の WeakSet を追加。popup.js は変更履歴の文字列だけ'
   }),
   Object.freeze({
     version: '0.1.1830', metric: 'gate-selftest', value: 4,
@@ -4425,6 +4425,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1830', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: '0.1.1829 と同じ(30日の窓で数える値)。診断の行との重なりは、実配信の測定(15件中14件被り)と同じ形のページで直す前 100%→直した後 0% を確かめた。'
+    note: 'E2E『パネルを開いても host は1回しか作られない』(修正前の実測 host_created=4→1)'
+  }),
+  Object.freeze({
+    version: '0.1.1831', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1830 と同じ(popup は変更履歴の文字列だけ)。'
+  }),
+  Object.freeze({
+    version: '0.1.1831', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1831', metric: 'cross-checked-claims', value: 42,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '前版より増。診断の行との重なりは、実配信の測定(15件中14件被り)と同じ形のページで直す前 100%→直した後 0% を確かめた。'
   })
 ]);

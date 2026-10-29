@@ -176,6 +176,20 @@ test.describe('extension interaction', () => {
    *   直後に描画が元へ戻す=iframe の付け直しで popup が2回起動していた。視聴行が後から
    *   出来てパネルの置き場所が変わっても、iframe の読み込みは1回だけであること。
    */
+  test('パネルを開いても host は1回しか作られない', async ({ context }) => {
+    // v0.1.1830: 作りたて(未挿入)の host を「古い」と捨てて作り直し、開くたび4回作っていた(=毎回 display:none から始まる)。
+    await enableInlinePanelAutoshow(context);
+    const page = await context.newPage();
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    const sw = context.serviceWorkers().find((w) => w.url().startsWith('chrome-extension://'));
+    await expect
+      .poll(async () => sw.evaluate(async () => (await chrome.storage.local.get('nls_ai_share_fast_diag_v1')).nls_ai_share_fast_diag_v1?.content?.hostMoveDiag?.byReason?.host_created ?? null), { timeout: 25_000 })
+      .not.toBeNull();
+    await page.waitForTimeout(4000);
+    const created = await sw.evaluate(async () => (await chrome.storage.local.get('nls_ai_share_fast_diag_v1')).nls_ai_share_fast_diag_v1?.content?.hostMoveDiag?.byReason?.host_created);
+    expect(created).toBe(1);
+  });
+
   test('視聴行が後から出来てもパネルは読み込み直されない', async ({ context }) => {
     await enableInlinePanelAutoshow(context);
     const page = await context.newPage();
