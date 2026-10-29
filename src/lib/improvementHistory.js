@@ -4426,5 +4426,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1830', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'E2E『パネルを開いても host は1回しか作られない』(修正前の実測 host_created=4→1)'
+  }),
+  Object.freeze({
+    version: '0.1.1831', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'popup.js から描画ごとの自動ログ呼び出し(setTimeout)を削除'
+  }),
+  Object.freeze({
+    version: '0.1.1831', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1831', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'grep で __NLS_LANE_DIAG__ の自動呼び出しが他に無いこと・関数自体は DevTools 用に残ることを確認'
   })
 ]);
