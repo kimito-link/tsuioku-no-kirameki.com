@@ -4356,5 +4356,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1825', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'besideOverflowGuard の単体6件・E2E『横スクロールを出さず下へ逃がす』(旧コードで赤)・実配信 1252px で はみ出し +469→−15 / 1920px は変化なし'
+  }),
+  Object.freeze({
+    version: '0.1.1826', metric: 'bundle-kb', value: 1437,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版と同じ(popup は触っていない)。過去最良より大きいのは 0.1.1454 以降の機能追加の累積。'
+  }),
+  Object.freeze({
+    version: '0.1.1826', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1826', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '前版より増。席が無い人の吹き出しの置き場所は、配線テストに加えて、実寸のページで置き場所を測って確かめた(一覧の中・診断と PICK UP に被らない)。'
   })
 ]);
