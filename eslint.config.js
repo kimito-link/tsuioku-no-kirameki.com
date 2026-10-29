@@ -404,7 +404,7 @@ export default [
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
-    // v0.1.1830: 読み上げの音質の選択肢の配線(+2行: import と呼び出し)。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。
+    // v0.1.1831: 読み上げの音質の選択肢の配線(+2行: import と呼び出し)。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。
     rules: { 'max-lines': ['error', { max: 21748, skipBlankLines: false, skipComments: false }] }
   },
   {
@@ -431,7 +431,8 @@ export default [
     // v0.1.1820: host の移動を iframe を読み込み直さない moveBefore 経由に(+1行: import)。手順は lib の moveNodePreservingState.js。
     // v0.1.1825: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
     // v0.1.1829: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
-    rules: { 'max-lines': ['error', { max: 19566, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1830: 作りたて host を古いと捨てて開くたび4回作り直していたのを止める(+5行: 一度でも DOM に入った host の WeakSet と記録2か所)。
+    rules: { 'max-lines': ['error', { max: 19571, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -452,7 +453,7 @@ export default [
     //   (開閉と発言の2か所に1行ずつ)=+4。中身は voiceTestHook.js / lib の voicePlaybackQuality.js。
     // v0.1.1794: 同じ配信をコメビュと二重に読まない(import 1行+名乗りの1行+発言ごとの分岐5行)=+7。中身は lib の voiceReaderLease.js。
     // v0.1.1828: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
-    // v0.1.1830: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
+    // v0.1.1831: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
     files: ['src/extension/venueBar.js'],
     rules: { 'max-lines': ['error', { max: 7348, skipBlankLines: false, skipComments: false }] }
   },

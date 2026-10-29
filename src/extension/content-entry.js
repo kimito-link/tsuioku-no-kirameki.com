@@ -2969,6 +2969,7 @@ function noteInlineHostMove(reason, host, move) {
   const prevConnected = Boolean(host && host.isConnected);
   const hadIframe = Boolean(host && host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`));
   const preserved = move ? move() === 'moved' : false;
+  if (host && host.isConnected) nlsInlineHostsEverConnected.add(host);
   try {
     recordInlineHostMove(_inlineHostMoveState, {
       reason,
@@ -3008,6 +3009,8 @@ function shouldSkipHostMoveForVenueNow(host) {
 /** getElementById はツリー未接続ノードに効かないため、ホストは参照を保持する */
 /** @type {HTMLDivElement|null} */
 let nlsInlinePopupHostSingleton = null;
+/** v0.1.1830: 一度でも DOM に入った host。作りたて(まだ未挿入)の singleton を「古い」と誤って捨てない=開くたび host を4回作り直していた */
+const nlsInlineHostsEverConnected = new WeakSet();
 /**
  * v0.1.1092: コメント即時プッシュレーン(storage迂回)。iframe src の `pn=` に焼き込む
  * nonce をタブごとに1つ保持し、popup 側(inline iframe)の照合値と一致させる。
@@ -3525,7 +3528,8 @@ function pickPrimaryInlinePopupHostFromDom() {
     // 古い host を返す」 race が起きる。DOM に 1 件も無いなら singleton も破棄。
     if (
       nlsInlinePopupHostSingleton &&
-      !nlsInlinePopupHostSingleton.isConnected
+      !nlsInlinePopupHostSingleton.isConnected &&
+      nlsInlineHostsEverConnected.has(nlsInlinePopupHostSingleton)
     ) {
       nlsInlinePopupHostSingleton = null;
     }
@@ -3541,6 +3545,7 @@ function pickPrimaryInlinePopupHostFromDom() {
     }
   }
   const connected = hosts.filter((h) => h.isConnected);
+  for (const h of connected) nlsInlineHostsEverConnected.add(h);
   /** @type {HTMLDivElement} */
   let primary;
   if (connected.length > 1) {
