@@ -6745,11 +6745,8 @@ function renderStoryUserLane() {
     fingerprint: laneDomFingerprint(perTierKeysOf(laneDomSelf)),
     fingerprintFor: _lastPublishedLaneMirrorHash
   };
-  setTimeout(() => {
-    if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
-      window.__NLS_LANE_DIAG__();
-    }
-  }, 3000);
+  // v0.1.1831: ここで描画のたび3秒後に __NLS_LANE_DIAG__() を自動で呼び、約5KBの JSON を視聴ページの
+  //   コンソールへ出し続けていた(DevTools が中身を抱え続ける)。必要なときに DevTools から手で呼ぶ。
 }
 
 /** passive 鏡描画の再描画 skip 用 signature(変化が無ければ paint しない)。 */

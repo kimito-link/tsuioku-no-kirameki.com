@@ -73,7 +73,7 @@ export function placeVenueBubble(p) {
     //   診断の行に被ったり PICK UP より下(会場の外)に出たりしていた(実機)。一覧の見えている下の縁に、名前付きで出す。
     const v = rel(p.viewport.getBoundingClientRect(), L);
     const x = Math.min(Math.max(p.fallback.x, v.left + 24), v.right - 24);
-    // ★v0.1.1831: 一覧の最後に「①の診断」の行がある。縁をそのまま使うと、席が無い人の吹き出しが
+    // ★v0.1.1832: 一覧の最後に「①の診断」の行がある。縁をそのまま使うと、席が無い人の吹き出しが
     //   ほぼ全部その行の上に出ていた(実配信 15件中14件が 78〜100% 重なり)。見えている診断の行の上端を縁にする。
     let floor = v.bottom;
     if (p.viewportFloor && p.viewportFloor.isConnected) {

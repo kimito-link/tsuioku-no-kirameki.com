@@ -4463,7 +4463,7 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1760: 席が一覧の外にいるとき(.nlsb-bubble--away)だけ見える発言者名(誰の吹き出しか分かるように)。
     const whoSpan = document.createElement('span');
     whoSpan.className = 'nlsb-bubble-who';
-    // ★v0.1.1831: 名前の無い人(匿名)は「コメント」でなく席と同じ「匿名NNN」で出す(実配信で15件全部「コメント」だった)。
+    // ★v0.1.1832: 名前の無い人(匿名)は「コメント」でなく席と同じ「匿名NNN」で出す(実配信で15件全部「コメント」だった)。
     const whoName = String(/** @type {any} */ (speech).name || '').trim();
     const whoUid = String(/** @type {any} */ (speech).userId || '').trim();
     whoSpan.textContent =
