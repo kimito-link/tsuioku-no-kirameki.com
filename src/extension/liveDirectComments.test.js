@@ -7,6 +7,7 @@ import {
   startDirectComments,
   runDirectComments,
   mountDirectComments,
+  giftItem,
   DIRECT_RETRY_DELAYS_MS
 } from './liveDirectComments.js';
 
@@ -155,5 +156,15 @@ describe('mountDirectComments', () => {
     expect(mountDirectComments({ lv: '', mountBefore: document.getElementById('list'), cap })).toBe(false);
     expect(mountDirectComments({ lv: 'lv1234567', mountBefore: document.getElementById('list'), cap })).toBe(true);
     expect(document.querySelector('[data-direct-toggle]')?.textContent).toContain('コメントを流す');
+  });
+});
+
+describe('giftItem', () => {
+  it('名前・アイテム・ポイントを出し、名前は文字として扱う(タグにしない)', () => {
+    const li = giftItem({ name: '<b>x</b>', itemName: 'きらきら', point: 500 });
+    expect(li.className).toBe('direct-gift');
+    expect(li.textContent).toBe('🎁 <b>x</b> さんが きらきら(500pt)');
+    expect(li.querySelector('b')).toBeNull();
+    expect(giftItem({ name: '', itemName: '', point: null }).textContent).toBe('🎁 匿名 さんが ギフト');
   });
 });

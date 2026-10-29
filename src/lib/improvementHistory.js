@@ -4370,5 +4370,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1826', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '0.1.1825 と同じ(30日の窓で数える値)。'
+  }),
+  Object.freeze({
+    version: '0.1.1827', metric: 'bundle-kb', value: 1436,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1826 と同じ。popup.js は変更履歴の文字列だけ(ギフト表示はアプリ側 live-ranking の束)'
+  }),
+  Object.freeze({
+    version: '0.1.1827', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1827', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '0.1.1826 と同じ(30日の窓で数える値)。'
   })
 ]);
