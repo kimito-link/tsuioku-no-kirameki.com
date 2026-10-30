@@ -4,6 +4,7 @@ import {
   ndgrMessageAtMs,
   ndgrCommentsFromSegment,
   ndgrGiftsFromSegment,
+  chatUserId,
   followNdgrLive,
   NDGR_FOLLOW_MAX_FAILS
 } from './ndgrLiveFollow.js';
@@ -65,8 +66,8 @@ describe('ndgrCommentsFromSegment / ndgrMessageAtMs', () => {
       ...chatMessage({ no: 2, text: '8888', atMs: 1_761_000_001_000 })
     ]);
     expect(ndgrCommentsFromSegment(bytes)).toEqual([
-      { no: '1', text: 'こんばんは', name: 'りんく', atMs: 1_761_000_000_250 },
-      { no: '2', text: '8888', name: '', atMs: 1_761_000_001_000 }
+      { no: '1', text: 'こんばんは', name: 'りんく', userId: '', atMs: 1_761_000_000_250 },
+      { no: '2', text: '8888', name: '', userId: '', atMs: 1_761_000_001_000 }
     ]);
   });
 
@@ -184,5 +185,13 @@ describe('ndgrGiftsFromSegment', () => {
       sleep: async () => {}
     });
     expect(gifts.map((g) => g.itemName)).toEqual(['はなまる']);
+  });
+});
+
+describe('chatUserId', () => {
+  it('数値 ID を先に、無ければ ID の形をした匿名 ID、どちらも無ければ空', () => {
+    expect(chatUserId({ rawUserId: 143172392, hashedUserId: 'a:abcdefgh' })).toBe('143172392');
+    expect(chatUserId({ rawUserId: null, hashedUserId: 'a:abcdefgh' })).toBe('a:abcdefgh');
+    expect(chatUserId({ rawUserId: 0, hashedUserId: 'バスケットボール' })).toBe('');
   });
 });

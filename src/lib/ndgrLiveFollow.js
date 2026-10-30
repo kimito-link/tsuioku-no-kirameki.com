@@ -101,12 +101,23 @@ export function ndgrMessageAtMs(f) {
 }
 
 /**
+ * コメントした人の ID。数値 ID(rawUserId)を先に、無ければ匿名の ID(hashedUserId・ID の形のものだけ)。
+ * @param {{ rawUserId: number|null, hashedUserId: string }} c
+ * @returns {string} 分からなければ ''
+ */
+export function chatUserId(c) {
+  if (typeof c.rawUserId === 'number' && c.rawUserId > 0) return String(c.rawUserId);
+  const h = String(c.hashedUserId || '').trim();
+  return /^[a-zA-Z0-9_:-]{8,}$/.test(h) ? h : '';
+}
+
+/**
  * segment の中身からコメントを取り出す(壊れた区切りは捨てて残りを読む)。
  * @param {Uint8Array} bytes
- * @returns {{ no: string, text: string, name: string, atMs: number }[]}
+ * @returns {{ no: string, text: string, name: string, userId: string, atMs: number }[]}
  */
 export function ndgrCommentsFromSegment(bytes) {
-  /** @type {{ no: string, text: string, name: string, atMs: number }[]} */
+  /** @type {{ no: string, text: string, name: string, userId: string, atMs: number }[]} */
   const rows = [];
   for (const fr of splitLengthDelimitedMessagesWithTail(bytes).frames) {
     let chats;
@@ -120,7 +131,7 @@ export function ndgrCommentsFromSegment(bytes) {
     for (const c of chats) {
       const text = String(c.content || '').trim();
       if (!text) continue;
-      rows.push({ no: c.no == null ? '' : String(c.no), text, name: String(c.name || ''), atMs });
+      rows.push({ no: c.no == null ? '' : String(c.no), text, name: String(c.name || ''), userId: chatUserId(c), atMs });
     }
   }
   return rows;
@@ -168,7 +179,7 @@ function viewAt(viewUri, at) {
  * @param {{
  *   viewUri: string,
  *   fetchBytes: (url: string) => Promise<{ status: number, bytes: Uint8Array }>,
- *   onComments: (rows: { no: string, text: string, name: string, atMs: number }[]) => void,
+ *   onComments: (rows: { no: string, text: string, name: string, userId: string, atMs: number }[]) => void,
  *   onGifts?: (rows: { name: string, itemName: string, point: number|null, atMs: number }[]) => void,
  *   signal?: AbortSignal,
  *   sleep?: (ms: number) => Promise<void>
