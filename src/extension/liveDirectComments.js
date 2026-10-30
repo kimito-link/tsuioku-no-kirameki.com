@@ -26,6 +26,8 @@ import { pickWsUrlFromEmbeddedData } from '../lib/embeddedDataExtract.js';
 import { followNdgrLive } from '../lib/ndgrLiveFollow.js';
 import { fetchViewUri } from '../server/nicoliveGuest.js';
 import { createNativeSpeechVoice } from '../../app/live-view-native-voice.js';
+import { deriveAvatarUrlFromUid } from '../lib/deriveAvatarUrlFromUid.js';
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 
 /** 画面に並べる最大件数(古い方から消す)。 */
 export const DIRECT_COMMENTS_MAX = 40;
@@ -81,7 +83,7 @@ export function nativeFetchBytes(http) {
  * 1配信のコメントを受け取り始める。止めるまで(または取れなくなるまで)続く。
  * @param {{
  *   lv: string, http: any, signal: AbortSignal,
- *   onComments: (rows: { no: string, text: string, name: string, atMs: number }[]) => void,
+ *   onComments: (rows: { no: string, text: string, name: string, userId: string, atMs: number }[]) => void,
  *   onGifts?: (rows: { name: string, itemName: string, point: number|null, atMs: number }[]) => void,
  *   onState: (state: 'connecting'|'live'|'ended'|'failed'|'retrying') => void,
  *   WebSocketImpl?: any
@@ -164,6 +166,31 @@ const STATE_TEXT = {
 };
 
 /**
+ * コメント1件の行。人が出る場所は「サムネ・ID・名前・リンク」をそろえる(AGENTS.md §3.5)。
+ *   数値 ID … CDN のアイコン(404 ならその人のゆっくり顔)+名前は本人のページへのリンク
+ *   匿名 ID … その人ごとのゆっくり顔(一律の灰色にしない)
+ * @param {{ text: string, name: string, userId?: string }} row
+ */
+export function commentItem(row) {
+  const li = document.createElement('li');
+  const uid = String(row.userId || '');
+  const numeric = /^[0-9]+$/.test(uid);
+  const face = anonymousIdenticonDataUrl(uid, 64);
+  const src = (numeric && deriveAvatarUrlFromUid(uid)) || face;
+  const label = row.name || (uid && !numeric ? '匿名' : uid) || '匿名';
+  const nameHtml = numeric
+    ? `<a class="direct-name" href="https://www.nicovideo.jp/user/${uid}" target="_blank" rel="noopener">${esc(label)}</a>`
+    : `<span class="direct-name">${esc(label)}</span>`;
+  li.innerHTML = `${src ? `<img class="direct-icon" alt="" width="24" height="24" loading="lazy" src="${esc(src)}">` : ''}${nameHtml} ${esc(row.text)}`;
+  const img = li.querySelector('img');
+  if (img && numeric && face) {
+    // アイコン未設定・退会は CDN が 404(AGENTS.md §3.6)。白丸や壊れ画像の代わりにゆっくり顔。
+    img.addEventListener('error', () => { if (img.src !== face) img.src = face; }, { once: true });
+  }
+  return li;
+}
+
+/**
  * ギフト1件の行(「🎁 名前 さんが アイテム(100pt)」)。名前が無い匿名のギフトは「匿名」。
  * @param {{ name: string, itemName: string, point: number|null }} row
  */
@@ -221,12 +248,10 @@ export function mountDirectComments(a) {
   };
   setState('idle');
 
-  /** @param {{ no: string, text: string, name: string }[]} rows */
+  /** @param {{ no: string, text: string, name: string, userId: string }[]} rows */
   const onComments = (rows) => {
     for (const row of rows) {
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="direct-name">${esc(row.name || '匿名')}</span> ${esc(row.text)}`;
-      listEl.insertBefore(li, listEl.firstChild);
+      listEl.insertBefore(commentItem(row), listEl.firstChild);
     }
     while (listEl.children.length > DIRECT_COMMENTS_MAX) listEl.lastChild?.remove();
     if (voice) voice.onRows(rows);

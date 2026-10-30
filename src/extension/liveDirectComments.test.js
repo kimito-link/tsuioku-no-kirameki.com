@@ -8,6 +8,7 @@ import {
   runDirectComments,
   mountDirectComments,
   giftItem,
+  commentItem,
   DIRECT_RETRY_DELAYS_MS
 } from './liveDirectComments.js';
 
@@ -166,5 +167,26 @@ describe('giftItem', () => {
     expect(li.textContent).toBe('🎁 <b>x</b> さんが きらきら(500pt)');
     expect(li.querySelector('b')).toBeNull();
     expect(giftItem({ name: '', itemName: '', point: null }).textContent).toBe('🎁 匿名 さんが ギフト');
+  });
+});
+
+describe('commentItem(サムネ・ID・名前・リンクをそろえる)', () => {
+  it('数値 ID は CDN のアイコンと本人ページへのリンク。404 ならゆっくり顔に替える', () => {
+    const li = commentItem({ text: '<i>こん</i>', name: 'りんく', userId: '143172392' });
+    const img = li.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14317/143172392.jpg');
+    expect(li.querySelector('a')?.getAttribute('href')).toBe('https://www.nicovideo.jp/user/143172392');
+    expect(li.querySelector('i')).toBeNull();
+    img?.dispatchEvent(new Event('error'));
+    expect(img?.getAttribute('src')).toMatch(/^data:image\/svg/);
+  });
+
+  it('匿名はその人ごとのゆっくり顔で、リンクは付けない', () => {
+    const a = commentItem({ text: 'x', name: '', userId: 'a:abcdefgh' });
+    const b = commentItem({ text: 'x', name: '', userId: 'a:zzzzzzzz' });
+    expect(a.querySelector('img')?.getAttribute('src')).toMatch(/^data:image\/svg/);
+    expect(a.querySelector('img')?.getAttribute('src')).not.toBe(b.querySelector('img')?.getAttribute('src'));
+    expect(a.querySelector('a')).toBeNull();
+    expect(a.querySelector('.direct-name')?.textContent).toBe('匿名');
   });
 });
