@@ -55,6 +55,20 @@ jobs:
       - name: Build extension bundles
         run: npm run build
 
+      # 全拡張共通の物差し(web-ios-android/templates/extension-verify): 拡張を読み込み、
+      # service worker・全画面・watch ページへの注入を確かめる。設定は extension-verify.json。
+      - name: Checkout shared kit (web-ios-android)
+        uses: actions/checkout@v4
+        with:
+          repository: kimito-link/web-ios-android
+          path: .kit
+
+      - name: Extension verify (all pages + injection)
+        run: node .kit/templates/extension-verify/run.mjs .
+
+      - name: Extension verify wiring (shared rule)
+        run: node .kit/templates/diagnostics/check-extension-verify-wired.mjs .
+
       - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb
 

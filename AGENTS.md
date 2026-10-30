@@ -243,6 +243,12 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 
 ## 10. エージェントへのお願い
 
+- **★拡張を変えたら、報告の前に `npm run verify:extension` を自分で走らせる。人に「拡張を再読み込みして開き直して」と頼んで確認を代わりにさせない**
+  （全拡張共通ルール・2026-10-25。正本は `../web-ios-android/CLAUDE.md`「Chrome拡張は AI が読み込んで自分で確かめる」）。
+  拡張を Chromium に読み込み、service worker・全画面（sidepanel/popup/status/venue/comeview/live-view/marketing-export/offscreen）・
+  watch ページへの注入（MAIN と ISOLATED の両方）を確かめる。設定は `extension-verify.json`、証拠は `.artifacts/extension-verify/`。
+  新しい画面（HTML）を足したら `pages` に足す（足さないと「未検証の画面」で赤）。`verify:cc` の末尾でも「報」として走り、CI の e2e ジョブでは門として走る。
+  個々の機能の深い確認は従来どおり `tests/e2e/`。
 - **まず [`docs/MAP.md`](docs/MAP.md) を開く＝全部の地図・診断・検証への唯一の入口**。
   「どこを直す／何が壊れる／今の状態／壊れてないか／公開記事」を1枚から辿れる。迷ったらここ起点。
 - **担当ファイル・場所に迷ったら、まず [`docs/repo-tree-map.md`](docs/repo-tree-map.md) を引く**。
