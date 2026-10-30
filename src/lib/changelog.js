@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1836',
+    date: '2026-10-31',
+    summary: 'つなぎ直しで同じコメントが二重に出ないように',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」で、通信が切れて自動でつなぎ直したとき、直前のコメントがもう一度並ぶことがありました。一度並べたコメントとギフトは二度並べないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1835',
     date: '2026-10-31',
     summary: 'アプリのコメントに顔アイコンを出す',
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場の客席の描き直しを軽く',
     items: Object.freeze([
       '会場モードの客席を別の層で描くようにしました。ほかの動くものにつられて客席を毎回まるごと描き直していたのをやめ、試験では描き直しの時間が約4分の1になりました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1816',
-    date: '2026-10-28',
-    summary: '隠れた画面の数え直しを間引く',
-    items: Object.freeze([
-      '視聴ページに隠れて入っている小さな画面は、新しいコメントが来るたびに応援レーンを数え直していました。隠れている間は1.5秒に1回までにまとめます(会場の席への反映は最大1.5秒遅れるだけで、表示中は今までどおりすぐ)。'
     ])
   })
 ]);

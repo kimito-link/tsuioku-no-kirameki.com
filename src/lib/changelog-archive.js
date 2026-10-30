@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1816',
+    date: '2026-10-28',
+    summary: '隠れた画面の数え直しを間引く',
+    items: Object.freeze([
+      '視聴ページに隠れて入っている小さな画面は、新しいコメントが来るたびに応援レーンを数え直していました。隠れている間は1.5秒に1回までにまとめます(会場の席への反映は最大1.5秒遅れるだけで、表示中は今までどおりすぐ)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1815',
     date: '2026-10-28',
     summary: '隠れた画面の計算を軽く',
