@@ -17,7 +17,7 @@ jobs:
     #   verify(test+lint+typecheck+build) の実測は数分なので 20分あれば足りる。
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -39,7 +39,7 @@ jobs:
     # workers=1 + CI retries=1 で spec 数分は 20 分に届きやすい。ギリギリの打ち切りを避ける。
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -58,7 +58,7 @@ jobs:
       # 全拡張共通の物差し(web-ios-android/templates/extension-verify): 拡張を読み込み、
       # service worker・全画面・watch ページへの注入を確かめる。設定は extension-verify.json。
       - name: Checkout shared kit (web-ios-android)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: kimito-link/web-ios-android
           path: .kit
