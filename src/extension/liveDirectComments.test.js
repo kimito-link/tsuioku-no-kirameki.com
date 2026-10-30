@@ -9,6 +9,7 @@ import {
   mountDirectComments,
   giftItem,
   commentItem,
+  freshDirectRows,
   DIRECT_RETRY_DELAYS_MS
 } from './liveDirectComments.js';
 
@@ -188,5 +189,20 @@ describe('commentItem(サムネ・ID・名前・リンクをそろえる)', () =
     expect(a.querySelector('img')?.getAttribute('src')).not.toBe(b.querySelector('img')?.getAttribute('src'));
     expect(a.querySelector('a')).toBeNull();
     expect(a.querySelector('.direct-name')?.textContent).toBe('匿名');
+  });
+});
+
+describe('freshDirectRows(つなぎ直しで同じコメントを二重に並べない)', () => {
+  it('一度通した番号は次から落とし、番号が空の行は通す', () => {
+    const seen = new Set();
+    const key = (r) => r.no;
+    expect(freshDirectRows([{ no: '1' }, { no: '2' }], seen, key).map((r) => r.no)).toEqual(['1', '2']);
+    expect(freshDirectRows([{ no: '2' }, { no: '3' }, { no: '' }], seen, key).map((r) => r.no)).toEqual(['3', '']);
+  });
+
+  it('覚える件数には上限がある', () => {
+    const seen = new Set();
+    freshDirectRows(Array.from({ length: 700 }, (_, i) => ({ no: String(i) })), seen, (r) => r.no);
+    expect(seen.size).toBe(600);
   });
 });
