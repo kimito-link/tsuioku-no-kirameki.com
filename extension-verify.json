@@ -1,0 +1,48 @@
+{
+  "$comment": "拡張を本物のブラウザに読み込んで全画面・全差し込み先を自動確認する設定(全拡張共通の物差し)。実体は web-ios-android/templates/extension-verify/run.mjs(npm run verify:extension)。個々の機能の深い確認は tests/e2e/ が受け持つ。新しい画面を足したら pages に足す(足さないと「未検証の画面」で赤)。",
+  "extensionDir": "extension",
+  "pages": [
+    {
+      "path": "popup.html"
+    },
+    {
+      "path": "status.html"
+    },
+    {
+      "path": "venue.html?lv=lv888888888"
+    },
+    {
+      "path": "comeview.html"
+    },
+    {
+      "path": "live-view.html"
+    },
+    {
+      "path": "marketing-export.html"
+    },
+    {
+      "path": "offscreen.html"
+    }
+  ],
+  "sites": [
+    {
+      "url": "https://live.nicovideo.jp/watch/lv888888888",
+      "fixture": "tests/e2e/fixtures/watch/lv888888888/index.html",
+      "expect": "(() => document.documentElement.hasAttribute('data-nls-page-token') || 'page-intercept(MAIN) が動いていない')()"
+    }
+  ],
+  "allowErrors": [
+    {
+      "pattern": "nicolive-share-keys\\.json",
+      "reason": "開発用の共有キーファイル。PC にだけ置く任意ファイル(gitに無い)。無ければ取り込まないだけ(status-entry.js SHARE_KEYS_LOCAL_FILE)"
+    },
+    {
+      "pattern": "sound/custom/manifest\\.json",
+      "reason": "マイ効果音の同梱一覧。scripts/install-local-sounds.mjs が PC で作る任意ファイル。無ければ0本として扱う"
+    },
+    {
+      "pattern": "127\\.0\\.0\\.1:50021/",
+      "reason": "VOICEVOX(ローカルの読み上げエンジン)が起動していないだけ。検証環境には無い"
+    }
+  ]
+}
