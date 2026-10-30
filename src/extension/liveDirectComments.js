@@ -165,6 +165,31 @@ const STATE_TEXT = {
   failed: 'うまく受け取れませんでした。もう一度押してください。'
 };
 
+/** 同じ行を2回並べないために覚えておく件数(古い方から忘れる)。 */
+const DIRECT_SEEN_MAX = 600;
+
+/**
+ * まだ並べていない行だけを返す。つなぎ直すと view は「いま」から読み直すので、
+ * 直前の区切り(segment)をもう一度受け取ることがある(同じコメントが二重に並ばないように)。
+ * 番号(key)が空の行は見分けられないので、そのまま通す。
+ * @template T
+ * @param {T[]} rows
+ * @param {Set<string>} seen 呼び出し側が持ち続ける(この関数が足して、古い方を捨てる)
+ * @param {(row: T) => string} keyOf
+ * @returns {T[]}
+ */
+export function freshDirectRows(rows, seen, keyOf) {
+  const out = [];
+  for (const row of rows) {
+    const key = String(keyOf(row) ?? '');
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    out.push(row);
+  }
+  while (seen.size > DIRECT_SEEN_MAX) seen.delete(/** @type {string} */ (seen.values().next().value));
+  return out;
+}
+
 /**
  * コメント1件の行。人が出る場所は「サムネ・ID・名前・リンク」をそろえる(AGENTS.md §3.5)。
  *   数値 ID … CDN のアイコン(404 ならその人のゆっくり顔)+名前は本人のページへのリンク
@@ -248,8 +273,14 @@ export function mountDirectComments(a) {
   };
   setState('idle');
 
-  /** @param {{ no: string, text: string, name: string, userId: string }[]} rows */
-  const onComments = (rows) => {
+  /** @type {Set<string>} */
+  const seenComments = new Set();
+  /** @type {Set<string>} */
+  const seenGifts = new Set();
+  /** @param {{ no: string, text: string, name: string, userId: string }[]} all */
+  const onComments = (all) => {
+    const rows = freshDirectRows(all, seenComments, (r) => r.no);
+    if (!rows.length) return;
     for (const row of rows) {
       listEl.insertBefore(commentItem(row), listEl.firstChild);
     }
@@ -258,8 +289,9 @@ export function mountDirectComments(a) {
   };
 
   // ギフトは目立つ色で並べるだけ(読み上げは PC と同じくコメントだけ=phoneVoice.js はギフトを読まない)。
-  /** @param {{ name: string, itemName: string, point: number|null }[]} rows */
-  const onGifts = (rows) => {
+  /** @param {{ name: string, itemName: string, point: number|null, atMs: number }[]} all */
+  const onGifts = (all) => {
+    const rows = freshDirectRows(all, seenGifts, (r) => `${r.atMs}|${r.name}|${r.itemName}|${r.point}`);
     for (const row of rows) listEl.insertBefore(giftItem(row), listEl.firstChild);
     while (listEl.children.length > DIRECT_COMMENTS_MAX) listEl.lastChild?.remove();
   };
