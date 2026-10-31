@@ -41,6 +41,7 @@ graph LR
   n_live_ranking --> n_src_lib_phoneVoice_js["lib/phoneVoice.js"]:::shared
   n_live_ranking --> n_src_lib_protobufVarint_js["lib/protobufVarint.js"]:::shared
   n_live_ranking --> n_src_lib_timeAuthority_js["lib/timeAuthority.js"]:::shared
+  n_live_ranking --> n_src_lib_voiceAssignment_js["lib/voiceAssignment.js"]:::shared
   n_live_ranking --> n_src_lib_voiceReadingNormalize_js["lib/voiceReadingNormalize.js"]:::shared
   n_live_ranking --> n_src_lib_xIntentUrl_js["lib/xIntentUrl.js"]
   n_live_ranking --> n_src_server_nicoliveGuest_js["server/nicoliveGuest.js"]

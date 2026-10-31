@@ -44,6 +44,12 @@ const config: CapacitorConfig = {
     LocalNotifications: {
       iconColor: '#F06AA0',
     },
+    // 時計・電池・戻るボタンの色。画面は明るいクリーム地なので濃い色で描く。
+    //   既定(DEFAULT)は端末のダークモードに従い、ダークモードの Android では白い文字がクリーム地に溶けて
+    //   見えなくなった(2026-10-31 moto g64y 実機で確認)。
+    SystemBars: {
+      style: 'LIGHT',
+    },
   },
   server: {
     url: 'https://app.tsuioku-no-kirameki.com/phone',
