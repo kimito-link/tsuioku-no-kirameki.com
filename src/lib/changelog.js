@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1843',
+    date: '2026-10-31',
+    summary: '過去コメントの埋め直しの読み違いを直す',
+    items: Object.freeze([
+      '途中から開いた配信で過去のコメントを埋める仕組みが、ニコ生の応答から「次に読む位置」を取り違えることがありました。正しい位置をたどるようにしたので、埋め直しが途中で止まりにくくなります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1842',
     date: '2026-10-31',
     summary: '止まった取り込みの立て直しを直す',
@@ -172,15 +180,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'iPhone アプリで放送の URL を貼った画面に「💬 コメントを流す」を足しました。PC も配信者の協力も無しに、アプリがニコニコから直接その配信のコメントを受け取って並べ、🗣 で iPhone の声で読み上げます(数秒遅れ)。',
       '受け取ったコメントは iPhone の中だけで使い、当サイトのサーバーへは送りません。ブラウザでは出ません(ニコニコがブラウザからの読み取りを許していないため)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1823',
-    date: '2026-10-28',
-    summary: 'ファンにも公開(拡張なしで見られる)',
-    items: Object.freeze([
-      '状態画面の「📱 スマホで見る」に「👥 ファンにも公開」を足しました(既定はOFF)。ONにすると読むだけのファン用URLとQRが出て、拡張を持っていない人も、その配信のコメントと応援をスマホで見られます。',
-      'ファン用URLからはコメントの投稿や、このPCの動きを変える操作はできません。OFFにする・「スマホで見る」をOFFにするとURLは使えなくなります。URLを作り直してもファン用URLはそのまま使えます。'
     ])
   })
 ]);

@@ -1377,3 +1377,29 @@ describe('isPlausibleEventTitleText (v0.1.359)', () => {
     expect(isPlausibleEventTitleText(123)).toBe(false);
   });
 });
+
+describe('decodeChunkedEntry の next.at(実機の長さつき応答・2026-10-31)', () => {
+  const framed = (entry) => [...encodeVarint(entry.length), ...entry];
+  const SEG = (n) => `https://mpn.live.nicovideo.jp/data/segment/v4/s${n}`;
+  const ts = (sec) => varintField(1, sec);
+  const seg = (field, n, from) =>
+    framed(lenDelimited(field, [...lenDelimited(1, ts(from)), ...lenDelimited(2, ts(from + 16)), ...strField(3, SEG(n))]));
+  const next = (at) => framed(lenDelimited(4, varintField(1, at)));
+  const bwd = () => framed(lenDelimited(2, [...lenDelimited(1, ts(1_761_799_900)), ...strField(2, 'https://mpn.live.nicovideo.jp/data/backward/v4/b')]));
+
+  it('segment の from 秒数や長さの数値ではなく、next の unixtime を返す', () => {
+    const nav = decodeChunkedEntry(new Uint8Array([...bwd(), ...seg(3, 0, 1_761_799_984), ...seg(1, 1, 1_761_800_000), ...next(1_761_800_016)]));
+    expect(nav.nextAt).toBe(1_761_800_016);
+    expect(nav.backwardUri).toContain('/data/backward/v4/');
+    expect(nav.segmentUris).toEqual([SEG(1)]);
+    expect(nav.previousUris).toEqual([SEG(0)]);
+  });
+
+  it('next だけの応答(?at=now)でも長さの数値を拾わない', () => {
+    expect(decodeChunkedEntry(new Uint8Array(next(1_761_800_016))).nextAt).toBe(1_761_800_016);
+  });
+
+  it('next の無い応答は null(segment の from を next にしない)', () => {
+    expect(decodeChunkedEntry(new Uint8Array(seg(1, 1, 1_761_800_000))).nextAt).toBeNull();
+  });
+});

@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1823',
+    date: '2026-10-28',
+    summary: 'ファンにも公開(拡張なしで見られる)',
+    items: Object.freeze([
+      '状態画面の「📱 スマホで見る」に「👥 ファンにも公開」を足しました(既定はOFF)。ONにすると読むだけのファン用URLとQRが出て、拡張を持っていない人も、その配信のコメントと応援をスマホで見られます。',
+      'ファン用URLからはコメントの投稿や、このPCの動きを変える操作はできません。OFFにする・「スマホで見る」をOFFにするとURLは使えなくなります。URLを作り直してもファン用URLはそのまま使えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1822',
     date: '2026-10-28',
     summary: 'PC が無くても放送 URL で応援を見る',
