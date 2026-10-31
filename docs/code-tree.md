@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1085 件
+## ⚠️ 役割コメントが無いソース 9 / 1086 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -951,7 +951,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2237)
+- 📁 **src/** (2239)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1275,7 +1275,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1947)
+  - 📁 **lib/** (1949)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3131,6 +3131,8 @@
     - `voiceDiagKey.js` — 会場モード(comeview)の読み上げ診断 storage キーの正本(producer=comeview / consumer=status で共有)。
     - `voiceEngineActivity.js` — 会場とコメビュで「VOICEVOX がいま使われているか」を分け合う(v0.1.1781)。
     - `voiceEngineActivity.test.js`
+    - `voiceEngineOverload.js` — VOICEVOX が混みすぎて合成が時間切れを続けるときの切り替え(純関数)。
+    - `voiceEngineOverload.test.js`
     - `voiceFailureTaxonomy.contract.test.js`
     - `voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
     - `voiceInputDevices.js` — マイク確認でサンプルする時間（ms）

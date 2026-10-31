@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1825',
+    date: '2026-10-28',
+    summary: '横付きパネルが右へはみ出さないように',
+    items: Object.freeze([
+      '狭めの窓で横付きパネルを挟むと公式コメント欄が画面の外へ押し出され横スクロールが出ていたのを直しました。置いた後に実際の位置を測り、縮めて収まるなら幅を詰め、収まらなければ動画の下へ出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1824',
     date: '2026-10-28',
     summary: 'アプリだけでコメントを流す',

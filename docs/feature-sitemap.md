@@ -607,7 +607,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -628,6 +628,7 @@
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
 - `src/lib/voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/voiceEngineActivity.js` — 会場とコメビュで「VOICEVOX がいま使われているか」を分け合う(v0.1.1781)。
+- `src/lib/voiceEngineOverload.js` — VOICEVOX が混みすぎて合成が時間切れを続けるときの切り替え(純関数)。
 - `src/lib/voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
 - `src/lib/voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
 - `src/lib/voiceKeys.js` — 読み上げ設定の storage キーの【正本】。
@@ -1314,7 +1315,8 @@
 - `v0.1.1836` 2026-10-31 — つなぎ直しで同じコメントが二重に出ないように
 - `v0.1.1827` 2026-10-29 — アプリのコメント欄にギフトも出す
 
-### 🔊 読み上げ (6版)
+### 🔊 読み上げ (7版)
+- `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
 - `v0.1.1841` 2026-10-31 — VOICEVOX再起動後も準備中と正しく出す
 - `v0.1.1840` 2026-10-31 — 読み上げの遅れの理由を画面で分かるように
 - `v0.1.1837` 2026-10-31 — コメントを流す間は画面を消さない
@@ -1327,8 +1329,8 @@
 - `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
 ### ⚡ 描画・性能 (2版)
+- `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
 - `v0.1.1831` 2026-10-28 — 視聴ページの確認用ログを毎回出さない
-- `v0.1.1825` 2026-10-28 — 横付きパネルが右へはみ出さないように
 
 ### その他 (6版)
 - `v0.1.1844` 2026-10-31 — Android アプリでもコメントを流せるように

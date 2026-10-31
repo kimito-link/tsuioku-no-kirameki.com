@@ -12,6 +12,12 @@ import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import { startVoiceWarmup } from './voiceWarmup.js';
 import { isStreamedVoice, shouldStreamVoice } from './voiceStream.js';
 import { isWeakVoicePc } from './voiceNarrowing.js';
+import {
+  createVoiceOverloadState,
+  noteVoiceSynthOutcome,
+  resolveVoiceOverloadTimeouts,
+  capVoiceSynthDepthForOverload
+} from './voiceEngineOverload.js';
 import { observeVoicePlayback } from './voicePlaybackQuality.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
@@ -126,6 +132,8 @@ export class VoicePlayer {
     /** 遅い PC と分かったら、この ON の間は覚えておく(少しずつ読むと合成の計器が速く見えるため)。 */
     this._slowEngine = false;
     this._weakPcState = { saved: false };
+    /** 2026-10-31: 合成の時間切れが続いたら「混雑中」=1件ずつ・長めに待つ(voiceEngineOverload.js)。 */
+    this._overload = createVoiceOverloadState();
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
 
@@ -571,11 +579,19 @@ export class VoicePlayer {
     const track = this._synthTracker.begin(voice?.styleId);
     /** @type {{ queryMs?: number, synthMs?: number }} */
     let timing = {};
+    /** この1件が時間切れで終わったか(混雑の判定に使う)。 */
+    let timedOut = false;
+    const startedAt = Date.now();
+    const overloadTimeouts = resolveVoiceOverloadTimeouts(this._overload.overloaded);
     // 同期で呼ぶ(enqueue 直後に合成が起動していることを既存テストが固定している=v0.1.800)。
     let started;
     try {
       started = this.fetchSynthesizeVoice(text, voice, {
-        onFailure: (info) => this._recordSynthFailureReason(info),
+        ...overloadTimeouts,
+        onFailure: (info) => {
+          const reason = this._recordSynthFailureReason(info);
+          if (reason === 'timeout' || reason === 'query_timeout') timedOut = true;
+        },
         onTiming: (t) => { timing = t || {}; },
         ...(extra.stream === true ? { stream: true } : {})
       });
@@ -588,6 +604,7 @@ export class VoicePlayer {
           /** @type {any} */
           let r = null;
           try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(this.diag, r); } catch { /* 計器は本体を止めない */ }
+          this._noteOverload({ timedOut, ok: !!wav, totalMs: Date.now() - startedAt });
           const judge = () => {
             // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
             if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
@@ -606,6 +623,7 @@ export class VoicePlayer {
         },
         (err) => {
           try { track.end(timing, false); } catch { /* no-op */ }
+          this._noteOverload({ timedOut, ok: false });
           throw err;
         }
       );
@@ -616,6 +634,21 @@ export class VoicePlayer {
       const reason = classifyVoiceSynthFailureReason(info);
       const bag = this.diag.synthFailReasons || (this.diag.synthFailReasons = {});
       bag[reason] = (Number(bag[reason]) || 0) + 1;
+      return reason;
+    } catch { /* 計器の失敗は読み上げを止めない */ }
+    return '';
+  }
+
+  /**
+   * 2026-10-31: 合成1件の結果から「エンジン混雑中」を更新し、計器に出す(状態速報で見える)。
+   * @param {{ timedOut?: boolean, ok?: boolean, totalMs?: number }} outcome
+   */
+  _noteOverload(outcome) {
+    try {
+      const was = this._overload.overloaded;
+      const now = noteVoiceSynthOutcome(this._overload, outcome);
+      this.diag.voiceOverloaded = now;
+      if (now && !was) this.diag.voiceOverloadTotal = (Number(this.diag.voiceOverloadTotal) || 0) + 1;
     } catch { /* 計器の失敗は読み上げを止めない */ }
   }
 
@@ -664,9 +697,10 @@ export class VoicePlayer {
       this.prefetches.clear();
       return;
     }
-    const depth = resolveVoiceSynthDepth(this.queue.length, {
+    // 2026-10-31: エンジンが混雑中(時間切れが続いた)なら、同時に頼むのは今読む1件だけ。
+    const depth = capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
       pending: this.queue.length
-    });
+    }), this._overload.overloaded);
     // v0.1.1088計器(設計書§2): diag.lastDepth は宣言のみでどこからも代入されていなかった
     //   化石計器。ここで実値を代入して修理する(先読み深さの実測)。
     this.diag.lastDepth = depth;
