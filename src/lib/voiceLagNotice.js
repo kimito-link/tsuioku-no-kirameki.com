@@ -47,17 +47,19 @@ export function isVoiceWarmingUp(diag) {
 
 /**
  * GPU の案内を添えるか。エンジンが GPU を使えると分かっていて、声づくりが遅いと測れたときだけ。
- * @param {Parameters<typeof isWeakVoicePc>[0]} diag
+ * @param {Parameters<typeof isWeakVoicePc>[0] & { voiceOverloaded?: boolean }} diag
  * @param {boolean|null|undefined} gpuCapable probeVoicevoxGpuCapable の結果
  * @returns {boolean}
  */
 export function shouldHintVoiceGpu(diag, gpuCapable) {
-  return gpuCapable === true && isWeakVoicePc(diag);
+  // 2026-10-31: 時間切れが続いた「混雑中」(voiceEngineOverload.js)も遅い証拠。成功した合成が無いと
+  //   isWeakVoicePc は測れないため、ここを見ないと一番遅いときに案内が出なかった。
+  return gpuCapable === true && (isWeakVoicePc(diag) || diag?.voiceOverloaded === true);
 }
 
 /**
  * @param {boolean} prevShown 直前に出していたか
- * @param {{ e2eAvgMs?: number, upstreamEmaMs?: number, queueNow?: number, warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number }} diag
+ * @param {{ e2eAvgMs?: number, upstreamEmaMs?: number, queueNow?: number, warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number, voiceOverloaded?: boolean }} diag
  * @param {{ gpuCapable?: boolean|null }} [opts]
  * @returns {{ shown: boolean, lagMs: number, text: string }}
  */
@@ -77,7 +79,7 @@ export function decideVoiceLagNotice(prevShown, diag, opts = {}) {
     shown: true,
     lagMs,
     text: `読み上げが約${sec}秒遅れています。追いつくまで、${staleSec}秒より前のコメントは読まずに飛ばします`
-      + (isVoiceWarmingUp(diag)
+      + (isVoiceWarmingUp(diag) && diag?.voiceOverloaded !== true
         ? `。${VOICE_WARMING_TEXT}`
         : shouldHintVoiceGpu(diag, opts?.gpuCapable) ? `。${VOICE_GPU_HINT_TEXT}` : '')
   };
