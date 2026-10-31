@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1841',
+    date: '2026-10-31',
+    summary: 'VOICEVOX再起動後も準備中と正しく出す',
+    items: Object.freeze([
+      '読み上げを ON にするたびに、声の「初めて」と速さを数え直すようにしました。VOICEVOX を途中で再起動したり GPU に切り替えたりした後も、起動直後の遅れに「準備中」の案内が出て、古い速さで遅い PC と決めつけません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1840',
     date: '2026-10-31',
     summary: '読み上げの遅れの理由を画面で分かるように',
@@ -174,14 +182,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'スマホの開始画面に、ニコ生の放送の URL を貼れるようにしました。PC の拡張が無くても、その配信をギフト・広告で応援している人と番組の情報を見られます(終わった配信は最後の順位表)。',
       '応援ランキングで、上位に入っていない配信を ?lv= で開いたときも、その配信だけ取ってきて先頭に出すようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1821',
-    date: '2026-10-28',
-    summary: '診断の読み込み直し回数を正しく数える',
-    items: Object.freeze([
-      'パネルの置き場所の移動のうち、中身を読み込み直さずに済んだものは「読み込み直し」に数えないようにしました(状態速報の数字が実際と合うように)'
     ])
   })
 ]);

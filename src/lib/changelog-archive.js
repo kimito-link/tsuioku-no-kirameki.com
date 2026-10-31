@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1821',
+    date: '2026-10-28',
+    summary: '診断の読み込み直し回数を正しく数える',
+    items: Object.freeze([
+      'パネルの置き場所の移動のうち、中身を読み込み直さずに済んだものは「読み込み直し」に数えないようにしました(状態速報の数字が実際と合うように)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1820',
     date: '2026-10-28',
     summary: '視聴ページでパネルの二重起動を解消',

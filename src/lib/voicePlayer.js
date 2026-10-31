@@ -37,7 +37,8 @@ import {
   resolveVoiceQueueMaxByChars
 } from './voiceLagBudget.js';
 import {
-  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage
+  createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage,
+  resetVoiceWarmMeasure
 } from './voiceStageTiming.js';
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, measureVoiceWavLevel, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT, voiceTargetPeak
@@ -453,6 +454,9 @@ export class VoicePlayer {
     const allStyleIds = await this.fetchVoiceStyleIds();
     // 2026-10-26: 温まった記録を消し(エンジンが再起動していても困らないように)、エンジンを1回起こす。
     startVoiceWarmup(this.voiceWarmup, allStyleIds);
+    // 2026-10-31: 声の「初めて」と温まった速さもこの ON から数え直す(VOICEVOX を再起動していても正しく)。
+    this._synthTracker.reset();
+    resetVoiceWarmMeasure(this.diag);
     this._streamSupported = false;
     if (this.probeVoiceStreaming && this.createStreamedAudio) {
       void Promise.resolve()
