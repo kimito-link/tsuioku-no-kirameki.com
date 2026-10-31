@@ -44,8 +44,9 @@
   - `src/lib/ndgrViewBasePick.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
 
+- `scripts/measure-ndgr-crawls.mjs` — 拡張の NDGR 巡回(前方向の立て直し・過去埋め)を本物の配信に当てて数える。
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
 - `src/extension/backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
@@ -994,7 +995,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 290</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 291</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1011,6 +1012,7 @@
 - `mobile/scripts/asc-create-profile.mjs` — App Store 用 Provisioning Profile を App Store Connect API で作成する。
 - `mobile/scripts/asc-review-check.mjs` — 移植元: partnership_program_website/scripts/asc-review-check.mjs
 - `mobile/scripts/asc-set-content-rights.mjs` — App Store Connect の app リソースに contentRightsDeclaration を設定する。
+- `mobile/scripts/build-android-debug.mjs` — Android アプリ(テスト用 APK)を PC で作り、つないだ Android 端末に入れる。
 - `mobile/scripts/capture-appstore-screenshots.mjs` — 移植元: partnership_program_website/scripts/capture-appstore-screenshots.mjs
 - `mobile/scripts/check-splash-config.mjs` — scripts/check-splash-config.mjs
 - `mobile/scripts/check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」を機械検出する出荷事故ゲート。
@@ -1312,14 +1314,13 @@
 - `v0.1.1836` 2026-10-31 — つなぎ直しで同じコメントが二重に出ないように
 - `v0.1.1827` 2026-10-29 — アプリのコメント欄にギフトも出す
 
-### 🔊 読み上げ (7版)
+### 🔊 読み上げ (6版)
 - `v0.1.1841` 2026-10-31 — VOICEVOX再起動後も準備中と正しく出す
 - `v0.1.1840` 2026-10-31 — 読み上げの遅れの理由を画面で分かるように
 - `v0.1.1837` 2026-10-31 — コメントを流す間は画面を消さない
 - `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
 - `v0.1.1829` 2026-10-29 — コメビュの読み上げを少し早く
 - `v0.1.1827` 2026-10-29 — アプリのコメント欄にギフトも出す
-- `v0.1.1824` 2026-10-28 — アプリだけでコメントを流す
 
 ### 🩺 診断・状態速報 (2版)
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
@@ -1329,7 +1330,8 @@
 - `v0.1.1831` 2026-10-28 — 視聴ページの確認用ログを毎回出さない
 - `v0.1.1825` 2026-10-28 — 横付きパネルが右へはみ出さないように
 
-### その他 (5版)
+### その他 (6版)
+- `v0.1.1844` 2026-10-31 — Android アプリでもコメントを流せるように
 - `v0.1.1843` 2026-10-31 — 過去コメントの埋め直しの読み違いを直す
 - `v0.1.1842` 2026-10-31 — 止まった取り込みの立て直しを直す
 - `v0.1.1834` 2026-10-31 — アプリでコメントの接続が止められていたのを直す
