@@ -34,7 +34,7 @@ graph LR
   n_live_ranking --> n_src_lib_liveRankingView_js["lib/liveRankingView.js"]:::shared
   n_live_ranking --> n_src_lib_liveRecentHoverCard_js["lib/liveRecentHoverCard.js"]
   n_live_ranking --> n_src_lib_ndgrDecode_js["lib/ndgrDecode.js"]:::shared
-  n_live_ranking --> n_src_lib_ndgrLiveFollow_js["lib/ndgrLiveFollow.js"]
+  n_live_ranking --> n_src_lib_ndgrLiveFollow_js["lib/ndgrLiveFollow.js"]:::shared
   n_live_ranking --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_live_ranking --> n_src_lib_nicoadContributionRankingApi_js["lib/nicoadContributionRankingApi.js"]:::shared
   n_live_ranking --> n_src_lib_nicoliveRankingPick_js["lib/nicoliveRankingPick.js"]

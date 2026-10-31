@@ -389,6 +389,7 @@
 | `src/lib/milestoneEffectDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/monotonicCommentCount.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/ndgrBackfillCrawl.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
+| `src/lib/ndgrLiveFollow.js` | 2 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/ndgrViewBasePick.js` | 2 | 記録エンジン(watchページ常駐) / ページ傍受 |
 | `src/lib/nicoUserFollowingApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/nicoUserProfileApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -800,7 +801,6 @@
 | `src/lib/ndgrFlushDedupKey.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrForwardCrawl.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrHiddenFlushThreshold.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/ndgrLiveFollow.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/ndgrMessageDedupe.js` | 1 | ページ傍受 |
 | `src/lib/ndgrUnknownSamplesBudget.js` | 1 | ページ傍受 |
 | `src/lib/networkErrorProbe.js` | 1 | 記録エンジン(watchページ常駐) |

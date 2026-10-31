@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   readNdgrViewEntry,
+  readNdgrViewNav,
   ndgrMessageAtMs,
   ndgrCommentsFromSegment,
   ndgrGiftsFromSegment,
@@ -38,6 +39,22 @@ const chatMessage = ({ no, text, name = '', atMs }) =>
     ...ld(1, [...st(1, `id${no}`), ...ld(2, ts(atMs))]),
     ...ld(2, ld(1, [...st(1, text), ...(name ? st(2, name) : []), ...vi(3, 100), ...vi(8, no)]))
   ]);
+
+describe('readNdgrViewNav(ndgrForwardCrawl 用・2026-10-31)', () => {
+  it('view の応答を丸ごと読み、segment / previous / next を分ける', () => {
+    const nav = readNdgrViewNav(viewBytes(backwardEntry(), previousEntry(1), segmentEntry(2, 1000), segmentEntry(3, 1016), nextEntry(1_761_000_032)));
+    expect(nav).toEqual({ segmentUris: [SEG(2), SEG(3)], previousUris: [SEG(1)], nextAt: 1_761_000_032 });
+  });
+
+  it('★segment の from の秒数を next にしない(next が無ければ null)', () => {
+    expect(readNdgrViewNav(viewBytes(segmentEntry(2, 1234))).nextAt).toBeNull();
+  });
+
+  it('空や壊れた応答でも投げない', () => {
+    expect(readNdgrViewNav(new Uint8Array())).toEqual({ segmentUris: [], previousUris: [], nextAt: null });
+    expect(() => readNdgrViewNav(new Uint8Array([0xff, 0xff, 0x01]))).not.toThrow();
+  });
+});
 
 describe('readNdgrViewEntry', () => {
   it('segment / previous / next / backward を番号どおりに読み分ける', () => {
