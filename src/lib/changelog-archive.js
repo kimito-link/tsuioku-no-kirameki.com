@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1827',
+    date: '2026-10-29',
+    summary: 'アプリのコメント欄にギフトも出す',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」に、ギフトも「🎁 名前 さんが アイテム(ポイント)」として色付きで並ぶようにしました。読み上げはこれまでどおりコメントだけです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1826',
     date: '2026-10-29',
     summary: 'アプリのコメントを自動でつなぎ直す',

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1086 件
+## ⚠️ 役割コメントが無いソース 9 / 1090 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -230,7 +230,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (364)
+- 📁 **docs/** (368)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -568,6 +568,10 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
+  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
@@ -951,7 +955,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2239)
+- 📁 **src/** (2243)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1275,7 +1279,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1949)
+  - 📁 **lib/** (1953)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1495,6 +1499,8 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -1943,6 +1949,8 @@
     - `identityAcquisitionCensus.test.js`
     - `iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の
     - `iframeOfficialDomFromRelay.test.js`
+    - `improvementHistory.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `improvementHistory.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `improvementHistory.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `improvementLedger.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `improvementLedger.test.js`

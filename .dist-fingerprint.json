@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "98d8f00945546b70bb040980f34843bd96fc848c3db50b578c841538dc77326e",
+  "fingerprint": "de79dad5a56d2415d1b59206a45cd8535f4b6fbf24af3ec024b0ab5b79c3ea3b",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -918,9 +918,9 @@
     "extension/dist/backfill-sw.js": "aead0e5add7a0dbe68c7bbe6cc6d2c38d03dddb46a1a5a6969284c6ff1cac39c",
     "extension/dist/self-update-sw.js": "dea5ff6a1a74ddd763e44766de0a78f9dcb68d6fbe37edde3f9bc6b931a5f74e",
     "extension/dist/content.js": "33667e0423281bed22004751a6b692036d8c5029e559ba84c8d8b0fc8e51bb66",
-    "extension/dist/popup.js": "a5030b2bedcf6e01e0e782f00bd822073466f985664c0c6def4f3c7c2913f88b",
+    "extension/dist/popup.js": "770199cd8ddf3fafa762a19ccb225540ea9452557e3aa4b23f828802c6b13767",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "ebaf916d544b19466fc1e4da7291f79ca84110ee617c05a28c58359e00c315f4",
+    "extension/dist/status.js": "40624632d0546e8a66792dd25113ad8f390ecda76eb53d80fe12c62881a99d0d",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "082c3efa4faca84e47537d9e3d010bb11cfb5a4111364c9527caf430229b5d6a",
     "extension/dist/comeview.js": "88258e456232c715daa4cd6494cc256c2ca2e114a9065d64a7d43448f6c491f8",
@@ -930,8 +930,8 @@
     "extension/dist/avatar-face-worker.js": "7d17a9a9d2f53cf8c90373ccb940ee2e458b0b9f04ed5bb83b349ab394945af9",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "92625ae889f4bae9de70b2f3d8a8acd9d144eb1a5f92c71807f6eb6d496e8b41",
-    "app/dist/live-view.js": "bef916c456e5fc53ef9cd43b530c9b0b2e887bd3e43cadb66d7a67e1a12e15d7",
+    "app/dist/live-view.js": "7836c5492dbce82f562da992f46ad328111c7c7a0742d9646ad868f9f2a577a2",
     "app/dist/phone.js": "b8584722ba772174b0b0e344546de1692c1f8022a6a87105986247a07665b684",
-    "app/dist/live-ranking.js": "4888425c45bc003029498261c4c9447cfcdc70ffe7b32851a28bf4977b619c70"
+    "app/dist/live-ranking.js": "f5adc57882a7cbae8d03d1aadf14cbb86b7d5cb6ea142f079d976329f27e2a20"
   }
 }
