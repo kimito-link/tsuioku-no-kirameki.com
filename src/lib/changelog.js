@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1842',
+    date: '2026-10-31',
+    summary: '止まった取り込みの立て直しを直す',
+    items: Object.freeze([
+      'コメントの取り込みが止まったときに自動で立て直す仕組みが、ニコ生の応答を読み違えて空振りしていました。スマホ版で確かめた読み方に揃え、次の位置を正しくたどれるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1841',
     date: '2026-10-31',
     summary: 'VOICEVOX再起動後も準備中と正しく出す',
@@ -173,15 +181,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '状態画面の「📱 スマホで見る」に「👥 ファンにも公開」を足しました(既定はOFF)。ONにすると読むだけのファン用URLとQRが出て、拡張を持っていない人も、その配信のコメントと応援をスマホで見られます。',
       'ファン用URLからはコメントの投稿や、このPCの動きを変える操作はできません。OFFにする・「スマホで見る」をOFFにするとURLは使えなくなります。URLを作り直してもファン用URLはそのまま使えます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1822',
-    date: '2026-10-28',
-    summary: 'PC が無くても放送 URL で応援を見る',
-    items: Object.freeze([
-      'スマホの開始画面に、ニコ生の放送の URL を貼れるようにしました。PC の拡張が無くても、その配信をギフト・広告で応援している人と番組の情報を見られます(終わった配信は最後の順位表)。',
-      '応援ランキングで、上位に入っていない配信を ?lv= で開いたときも、その配信だけ取ってきて先頭に出すようにしました。'
     ])
   })
 ]);
