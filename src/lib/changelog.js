@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1845',
+    date: '2026-10-31',
+    summary: 'アプリの読み上げを人ごとに違う声に',
+    items: Object.freeze([
+      'スマホアプリだけで「💬 コメントを流す」を読み上げるとき、全員が同じ声でした。人ごとに声の高さと速さを変えたので、誰のコメントか聞き分けやすくなります(同じ人はいつも同じ声)。',
+      'Android アプリで、ダークモードの端末だと画面の上の時計や電池が背景に溶けて見えなかったのを直しました(次にアプリを入れ直したときから)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1844',
     date: '2026-10-31',
     summary: 'Android アプリでもコメントを流せるように',
@@ -171,14 +180,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'アプリのコメントを自動でつなぎ直す',
     items: Object.freeze([
       'iPhone アプリの「💬 コメントを流す」は、通信が切れても自動でつなぎ直すようにしました(3秒・10秒・30秒・60秒あけて最大4回)。長い配信の途中で電波が途切れても、押し直さずに続きを受け取れます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1825',
-    date: '2026-10-28',
-    summary: '横付きパネルが右へはみ出さないように',
-    items: Object.freeze([
-      '狭めの窓で横付きパネルを挟むと公式コメント欄が画面の外へ押し出され横スクロールが出ていたのを直しました。置いた後に実際の位置を測り、縮めて収まるなら幅を詰め、収まらなければ動画の下へ出します。'
     ])
   })
 ]);
