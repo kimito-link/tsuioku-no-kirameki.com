@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1817',
+    date: '2026-10-28',
+    summary: '会場の客席の描き直しを軽く',
+    items: Object.freeze([
+      '会場モードの客席を別の層で描くようにしました。ほかの動くものにつられて客席を毎回まるごと描き直していたのをやめ、試験では描き直しの時間が約4分の1になりました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1816',
     date: '2026-10-28',
     summary: '隠れた画面の数え直しを間引く',

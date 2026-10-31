@@ -10,6 +10,7 @@ import {
   giftItem,
   commentItem,
   freshDirectRows,
+  createScreenHold,
   DIRECT_RETRY_DELAYS_MS
 } from './liveDirectComments.js';
 
@@ -204,5 +205,46 @@ describe('freshDirectRows(つなぎ直しで同じコメントを二重に並べ
     const seen = new Set();
     freshDirectRows(Array.from({ length: 700 }, (_, i) => ({ no: String(i) })), seen, (r) => r.no);
     expect(seen.size).toBe(600);
+  });
+});
+
+describe('createScreenHold(流している間は画面を消さない)', () => {
+  const fakeNav = () => {
+    const locks = [];
+    return {
+      locks,
+      nav: {
+        wakeLock: {
+          request: async () => {
+            const l = { released: false, on: [], addEventListener(t, f) { this.on.push(f); }, async release() { this.released = true; } };
+            locks.push(l);
+            return l;
+          }
+        }
+      }
+    };
+  };
+
+  it('つけたら取り、止めたら手放す。OS が手放したら見える状態に戻ったとき取り直す', async () => {
+    const { nav, locks } = fakeNav();
+    const doc = { visibilityState: 'visible', l: [], addEventListener(t, f) { this.l.push(f); } };
+    const h = createScreenHold({ nav, doc });
+    await h.set(true);
+    expect(h.held()).toBe(true);
+    locks[0].on.forEach((f) => f()); // 画面ロックで OS が手放した
+    expect(h.held()).toBe(false);
+    doc.l.forEach((f) => f());
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(locks).toHaveLength(2);
+    await h.set(false);
+    expect(locks[1].released).toBe(true);
+    expect(h.held()).toBe(false);
+  });
+
+  it('使えない端末では何もしない', async () => {
+    const h = createScreenHold({ nav: {}, doc: undefined });
+    await h.set(true);
+    expect(h.held()).toBe(false);
   });
 });

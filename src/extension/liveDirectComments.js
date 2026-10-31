@@ -165,6 +165,43 @@ const STATE_TEXT = {
   failed: 'うまく受け取れませんでした。もう一度押してください。'
 };
 
+/**
+ * コメントを流している間だけ画面を消さない(消えるとアプリが止まり、コメントも読み上げも止まる)。
+ * 画面ロックの解除や別アプリから戻ったときは OS が手放すので、見える状態に戻ったら取り直す。
+ * 使えない端末・電池節約中は何もしない(静かにあきらめる)。
+ * @param {{ nav?: any, doc?: Document }} [a]
+ * @returns {{ set: (on: boolean) => Promise<void>, held: () => boolean }}
+ */
+export function createScreenHold(a = {}) {
+  const nav = a.nav !== undefined ? a.nav : globalThis.navigator;
+  const doc = a.doc !== undefined ? a.doc : globalThis.document;
+  let want = false;
+  /** @type {any} */
+  let lock = null;
+  const take = async () => {
+    if (!want || lock || !nav || !nav.wakeLock || (doc && doc.visibilityState === 'hidden')) return;
+    try {
+      const l = await nav.wakeLock.request('screen');
+      if (!want) { await l.release(); return; }
+      lock = l;
+      l.addEventListener?.('release', () => { if (lock === l) lock = null; });
+    } catch {
+      lock = null;
+    }
+  };
+  doc?.addEventListener?.('visibilitychange', () => { if (doc.visibilityState === 'visible') void take(); });
+  return {
+    set: async (on) => {
+      want = on;
+      if (on) return take();
+      const l = lock;
+      lock = null;
+      try { await l?.release(); } catch { /* 手放し済み */ }
+    },
+    held: () => Boolean(lock)
+  };
+}
+
 /** 同じ行を2回並べないために覚えておく件数(古い方から忘れる)。 */
 const DIRECT_SEEN_MAX = 600;
 
@@ -264,10 +301,12 @@ export function mountDirectComments(a) {
 
   /** @type {AbortController|null} */
   let ac = null;
+  const screen = createScreenHold();
   /** @param {keyof typeof STATE_TEXT} s */
   const setState = (s) => {
     stateEl.textContent = STATE_TEXT[s];
     const running = s === 'connecting' || s === 'live' || s === 'retrying';
+    void screen.set(running);
     toggleBtn.textContent = running ? '⏹ 止める' : '💬 コメントを流す';
     if (!running) ac = null;
   };
