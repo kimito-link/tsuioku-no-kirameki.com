@@ -17,8 +17,27 @@
  */
 import { PHONE_VOICE_QUEUE_MAX, pickNewVoiceRows } from '../src/lib/phoneVoice.js';
 import { normalizeVoiceReadingBody } from '../src/lib/voiceReadingNormalize.js';
+import { assignVoiceForUser } from '../src/lib/voiceAssignment.js';
 
 const STORE_KEY = 'nls_phone_voice_v1';
+/**
+ * 端末の声は1種類なので、人ごとに声の高さを変えて聞き分けられるようにする(2026-10-31 りんく「声がぜんぶおなじかも」)。
+ * 割り当ては PC の VOICEVOX と同じ voiceAssignment.js(同じ人はいつも同じ高さ)。styleId をこの表の番号として使う。
+ */
+export const NATIVE_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
+/** ふだんの速さ(人ごとの速さはここに voiceAssignment の speedOffset を足す)。 */
+const NATIVE_VOICE_RATE = 1.1;
+
+/**
+ * その人の声の高さと速さ。名前の無いコメント(userId 無し)はふだんの声。
+ * @param {string} userId
+ * @returns {{ pitch: number, rate: number }}
+ */
+export function nativeVoiceToneFor(userId) {
+  if (!userId) return { pitch: 1.0, rate: NATIVE_VOICE_RATE };
+  const v = assignVoiceForUser(userId, NATIVE_VOICE_PITCHES.map((_, i) => i));
+  return { pitch: NATIVE_VOICE_PITCHES[v.styleId], rate: Math.round((NATIVE_VOICE_RATE + v.speedOffset) * 100) / 100 };
+}
 /** 1件で読む最大の文字数(長文で次のコメントが何十秒も待たされないように)。 */
 export const NATIVE_SPEECH_MAX_CHARS = 60;
 /** 声の長さの見積もり(1文字あたり ms)。吹き出しを声に合わせる目安にだけ使う。 */
@@ -85,7 +104,7 @@ export function createNativeSpeechVoice(a = {}) {
   let on = readOn();
   /** @type {Set<string>|null} null = まだ1回も見ていない(最初の1回は覚えるだけ)。 */
   let seen = null;
-  /** @type {{ no: string, text: string }[]} */
+  /** @type {{ no: string, text: string, pitch: number, rate: number }[]} */
   let queue = [];
   let speaking = false;
   /** @type {any} */
@@ -134,7 +153,7 @@ export function createNativeSpeechVoice(a = {}) {
     const done = () => { speaking = false; speakNext(); };
     try {
       // queueStrategy 1 = 前の声を切らずに後ろへ足す。category は iOS では使われない(Android 用)。
-      Promise.resolve(tts.speak({ text: item.text, lang: 'ja-JP', rate: 1.1, pitch: 1.0, volume: 1.0, category: 'playback', queueStrategy: 1 }))
+      Promise.resolve(tts.speak({ text: item.text, lang: 'ja-JP', rate: item.rate, pitch: item.pitch, volume: 1.0, category: 'playback', queueStrategy: 1 }))
         .then(done, done);
     } catch { done(); }
   }
@@ -175,7 +194,7 @@ export function createNativeSpeechVoice(a = {}) {
       for (const p of r.picks) {
         const text = speechTextForComment(p.text);
         if (!text) continue;
-        queue.push({ no: p.no, text });
+        queue.push({ no: p.no, text, ...nativeVoiceToneFor(p.userId) });
         added += 1;
       }
       // 追いつけないときは古い方から捨てる(遅れて読むより、いまのコメントを読む)。

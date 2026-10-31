@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1847',
+    date: '2026-10-31',
+    summary: 'アプリの読み上げを人ごとに違う声に',
+    items: Object.freeze([
+      'スマホアプリだけで「💬 コメントを流す」を読み上げるとき、全員が同じ声でした。人ごとに声の高さと速さを変えたので、誰のコメントか聞き分けやすくなります(同じ人はいつも同じ声)。',
+      'Android アプリで、ダークモードの端末だと画面の上の時計や電池が背景に溶けて見えなかったのを直しました(次にアプリを入れ直したときから)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1846',
     date: '2026-10-31',
     summary: '重い配信でも読み上げが無音にならないように',
@@ -172,14 +181,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'アプリのコメント欄にギフトも出す',
     items: Object.freeze([
       'iPhone アプリの「💬 コメントを流す」に、ギフトも「🎁 名前 さんが アイテム(ポイント)」として色付きで並ぶようにしました。読み上げはこれまでどおりコメントだけです。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1826',
-    date: '2026-10-29',
-    summary: 'アプリのコメントを自動でつなぎ直す',
-    items: Object.freeze([
-      'iPhone アプリの「💬 コメントを流す」は、通信が切れても自動でつなぎ直すようにしました(3秒・10秒・30秒・60秒あけて最大4回)。長い配信の途中で電波が途切れても、押し直さずに続きを受け取れます。'
     ])
   })
 ]);
