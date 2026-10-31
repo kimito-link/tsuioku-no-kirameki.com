@@ -639,6 +639,10 @@ function paintGiftHistoryMirror(snap) {
           shownCount: m.ledgerRows.length,
           payloadSource: m.payloadSource
         });
+        // 読めないアイコンは公式の既定アイコンへ(インラインの onerror は使わない=CSP)。
+        for (const img of throws.querySelectorAll('img[data-on-error-fallback="blank"]')) {
+          img.addEventListener('error', () => { img.src = NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS; }, { once: true });
+        }
       }
     }
   } catch {
