@@ -32,6 +32,9 @@ describe('giftThrowLedgerTableHtml', () => {
     expect(html).toContain('12345');
     expect(html).toContain('乾杯');
     expect(html).toContain('koken API');
+    // ★拡張画面の CSP はインラインのイベント属性を止める(毎回エラーが積もる)=印だけ付ける
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+    expect(html).toContain('data-on-error-fallback="blank"');
   });
 
   it('空行は空文字', () => {
