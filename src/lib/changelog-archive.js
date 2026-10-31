@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1820',
+    date: '2026-10-28',
+    summary: '視聴ページでパネルの二重起動を解消',
+    items: Object.freeze([
+      '視聴ページを開いた直後、パネルの中身が2〜3回起動し直していたのを1回にしました(先読みが表示中のパネルを一瞬画面外へ動かしていたのが原因)',
+      'パネルの置き場所が変わっても、中身を読み込み直さずに動かすようにしました(対応している Chrome のみ)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1819',
     date: '2026-10-28',
     summary: 'パネル初回表示の自動テストを安定化',

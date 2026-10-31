@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1840',
+    date: '2026-10-31',
+    summary: '読み上げの遅れの理由を画面で分かるように',
+    items: Object.freeze([
+      '読み上げが遅れたときの案内に、VOICEVOX を起動した直後は初めて使う声の準備で遅れること・続けて読むうちに速くなることを書くようにしました。準備が済んでも遅いときだけ GPU の案内を出します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1839',
     date: '2026-10-31',
     summary: 'イベント欄の拡張のエラーも止める',
@@ -174,15 +182,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '診断の読み込み直し回数を正しく数える',
     items: Object.freeze([
       'パネルの置き場所の移動のうち、中身を読み込み直さずに済んだものは「読み込み直し」に数えないようにしました(状態速報の数字が実際と合うように)'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1820',
-    date: '2026-10-28',
-    summary: '視聴ページでパネルの二重起動を解消',
-    items: Object.freeze([
-      '視聴ページを開いた直後、パネルの中身が2〜3回起動し直していたのを1回にしました(先読みが表示中のパネルを一瞬画面外へ動かしていたのが原因)',
-      'パネルの置き場所が変わっても、中身を読み込み直さずに動かすようにしました(対応している Chrome のみ)'
     ])
   })
 ]);
