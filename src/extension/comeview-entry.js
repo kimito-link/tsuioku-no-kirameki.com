@@ -126,7 +126,8 @@ import {
   measureWavAudioMs,
   recordVoiceE2eSample,
   recordVoiceStreamDone,
-  recordVoiceSynthStage
+  recordVoiceSynthStage,
+  resetVoiceWarmMeasure
 } from '../lib/voiceStageTiming.js';
 import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
 import {
@@ -641,6 +642,9 @@ async function enableVoiceReading({ persist = true } = {}) {
   const allStyleIds = await listVoicevoxStyleIds();
   // 起動直後のエンジンを捨てる audio_query で起こす(待たない・voiceWarmup.js)。
   startVoiceWarmup(_voiceWarmup, allStyleIds);
+  // 2026-10-31: 声の「初めて」と温まった速さもこの ON から数え直す(会場と同じ)。
+  _voiceSynthTracker.reset();
+  resetVoiceWarmMeasure(_voiceDiag);
   _voiceStreamSupported = false;
   void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
   _voiceGpuCapable = null;
