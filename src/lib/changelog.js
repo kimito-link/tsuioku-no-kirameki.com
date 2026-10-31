@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1837',
+    date: '2026-10-31',
+    summary: 'コメントを流す間は画面を消さない',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1836',
     date: '2026-10-31',
     summary: 'つなぎ直しで同じコメントが二重に出ないように',
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'コメント欄の見張りを間引く',
     items: Object.freeze([
       'コメント欄が最新から外れていないかの見張りを、0.5秒ごとから2秒ごとにしました。直前にニコ生が画面を書き換えているため、毎回レイアウトの計算をやり直させていました(戻す動きは今までどおり)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1817',
-    date: '2026-10-28',
-    summary: '会場の客席の描き直しを軽く',
-    items: Object.freeze([
-      '会場モードの客席を別の層で描くようにしました。ほかの動くものにつられて客席を毎回まるごと描き直していたのをやめ、試験では描き直しの時間が約4分の1になりました。'
     ])
   })
 ]);
