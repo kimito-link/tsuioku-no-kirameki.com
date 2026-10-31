@@ -81,6 +81,13 @@ export function createVoiceSynthTracker(deps = {}) {
 
   return {
     /**
+     * 読み上げ ON のたびに呼ぶ(2026-10-31)。VOICEVOX を再起動すると声はまた冷えているので、
+     *   覚えていると初めての声を「温まった声」として数え、起動直後の遅れを弱い PC と取り違える。
+     */
+    reset() {
+      seenStyles.clear();
+    },
+    /**
      * @param {unknown} styleId
      * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number, borrowed?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, startAt: number, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number, borrowed: boolean } }}
      */
@@ -178,6 +185,20 @@ export function recordVoiceSynthStage(diag, r) {
     //   速い PC が「弱い」と記録された。声の長さで割った比(グラボ有り約0.12・無し約0.8)も残す。
     foldWarmSynthRtf(diag, ownMs, Number(r.audioMs));
   }
+}
+
+/**
+ * 読み上げ ON のたびに、温まった声の物差しを測り直す(2026-10-31)。
+ *   VOICEVOX を再起動・GPU に切り替えた後も前の数が残っていると、起動直後の遅れに
+ *   「準備中」の案内が出ず(voiceLagNotice の isVoiceWarmingUp)、古い速さで弱い PC を判定してしまう。
+ * @param {Record<string, any>} diag
+ */
+export function resetVoiceWarmMeasure(diag) {
+  if (!diag || typeof diag !== 'object') return;
+  diag.warmSynthEmaMs = -1;
+  diag.warmSynthSamples = 0;
+  diag.warmSynthRtfPermille = -1;
+  diag.warmRtfSamples = 0;
 }
 
 /**
