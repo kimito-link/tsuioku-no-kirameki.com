@@ -11,6 +11,9 @@ importers:
       '@capacitor-community/text-to-speech':
         specifier: 8.0.2
         version: 8.0.2(@capacitor/core@8.5.3)
+      '@capacitor/android':
+        specifier: 8.5.3
+        version: 8.5.3(@capacitor/core@8.5.3)
       '@capacitor/core':
         specifier: 8.5.3
         version: 8.5.3
@@ -49,6 +52,11 @@ packages:
     resolution: {integrity: sha512-SbpBMzcmzdTiN8jQDme/yUYHEJISZA+IiaRn5zT14k3UKpjaA7eYBnSm9h76rJHRV/y6DVZVhT1J0SaK5JTKtA==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/android@8.5.3':
+    resolution: {integrity: sha512-ilH4gSSz3DrketMkzDVAvY9JsWJ//rCQnECLTdcFRO7xXDogwAbUvQAnIAbiqefwV/D1xfjEL4Gw1MJXEcaA9g==}
+    peerDependencies:
+      '@capacitor/core': ^8.5.0
 
   '@capacitor/assets@3.0.5':
     resolution: {integrity: sha512-ohz/OUq61Y1Fc6aVSt0uDrUdeOA7oTH4pkWDbv/8I3UrPjH7oPkzYhShuDRUjekNp9RBi198VSFdt0CetpEOzw==}
@@ -912,6 +920,10 @@ packages:
 snapshots:
 
   '@capacitor-community/text-to-speech@8.0.2(@capacitor/core@8.5.3)':
+    dependencies:
+      '@capacitor/core': 8.5.3
+
+  '@capacitor/android@8.5.3(@capacitor/core@8.5.3)':
     dependencies:
       '@capacitor/core': 8.5.3
 
