@@ -85,6 +85,30 @@ export function readNdgrViewEntry(f) {
 }
 
 /**
+ * view の応答(長さつき ChunkedEntry の並び)を丸ごと読む(2026-10-31・ndgrForwardCrawl 用)。
+ *   ndgrForwardCrawl は decodeChunkedEntry で「URI らしい文字列」と「最初の数値」を推測していて、
+ *   実データでは next を取り違えコメントが0件だった。公開の型どおりに読んだものを同じ形で返す。
+ * @param {Uint8Array} bytes
+ * @returns {{ segmentUris: string[], previousUris: string[], nextAt: number|null }}
+ */
+export function readNdgrViewNav(bytes) {
+  /** @type {{ segmentUris: string[], previousUris: string[], nextAt: number|null }} */
+  const nav = { segmentUris: [], previousUris: [], nextAt: null };
+  for (const fr of splitLengthDelimitedMessagesWithTail(bytes).frames) {
+    let ent;
+    try {
+      ent = readNdgrViewEntry(fr);
+    } catch {
+      continue;
+    }
+    if (ent.kind === 'next' && ent.at > 0) nav.nextAt = ent.at;
+    else if (ent.kind === 'segment' && ent.uri) nav.segmentUris.push(ent.uri);
+    else if (ent.kind === 'previous' && ent.uri) nav.previousUris.push(ent.uri);
+  }
+  return nav;
+}
+
+/**
  * ChunkedMessage の meta.at(コメントが付いた時刻・ms)。無ければ 0。
  * @param {Uint8Array} f
  * @returns {number}

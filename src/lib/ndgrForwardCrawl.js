@@ -22,7 +22,8 @@
  * @module ndgrForwardCrawl
  */
 
-import { decodeChunkedEntry, decodeChunkedMessage } from './ndgrDecode.js';
+import { decodeChunkedMessage } from './ndgrDecode.js';
+import { readNdgrViewNav } from './ndgrLiveFollow.js';
 import { splitLengthDelimitedMessages } from './lengthDelimitedStream.js';
 import {
   NDGR_BACKFILL_BACKOFF_MS,
@@ -227,7 +228,7 @@ function trimVisited(visited) {
  * async generator。配信中ずっと回す前提（終了は通常 abort / cap）。
  *
  * フロー:
- *   1. `?at=now` → decodeChunkedEntry(bytes).nextAt で初期カーソル取得。
+ *   1. `?at=now` → readNdgrViewNav(bytes).nextAt で初期カーソル取得(2026-10-31: 公開の型どおりに読む)。
  *   2. `?at={cursorAt}` → ChunkedEntry → segmentUris（ライブ edge）＋ previousUris（直近過去）を fetch。
  *   3. 各 segment URI → ChunkedMessage stream → decodeChunkedMessage で chats 抽出 → yield。
  *   4. cursorAt = nextAt。`wait = clamp(nextAt*1000 - now(), minGapMs, maxGapMs)` で sleep。
@@ -278,7 +279,7 @@ export async function* crawlNdgrForward(opts) {
   if (nowRes.rateLimited) return done('rate_limited');
   if (!nowRes.bytes) return done('no_cursor');
   bytesFetched += nowRes.bytes.length;
-  let cursorAt = decodeChunkedEntry(nowRes.bytes).nextAt;
+  let cursorAt = readNdgrViewNav(nowRes.bytes).nextAt;
   if (cursorAt == null) return done('no_cursor');
 
   // 2) 前方向 long-poll ループ。
@@ -300,7 +301,7 @@ export async function* crawlNdgrForward(opts) {
     }
     consecutiveErrors = 0;
     bytesFetched += entryRes.bytes.length;
-    const nav = decodeChunkedEntry(entryRes.bytes);
+    const nav = readNdgrViewNav(entryRes.bytes);
 
     // ライブ edge（segmentUris）を集める。previousUris（直近過去）は初回 hop のみ・件数上限つき
     //   （v0.1.512: 毎 hop の過去再取得＝巨大放送フリーズの原因を回避。過去埋めは backfill 担当）。

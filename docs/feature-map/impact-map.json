@@ -3220,6 +3220,18 @@
       ]
     },
     {
+      "file": "src/lib/ndgrLiveFollow.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "live-ranking"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)"
+      ]
+    },
+    {
       "file": "src/lib/ndgrViewBasePick.js",
       "featureCount": 2,
       "features": [
@@ -7493,16 +7505,6 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/ndgrLiveFollow.js",
-      "featureCount": 1,
-      "features": [
-        "live-ranking"
-      ],
-      "labels": [
-        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {
