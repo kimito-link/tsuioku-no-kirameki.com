@@ -1176,6 +1176,10 @@ export function decodeChunkedEntry(buf, start, end) {
   //     （subarray の byteOffset 計算を避けるため絶対オフセットで処理）。
   let o = s0;
   let guard = 0;
+  let frames = 0;
+  let framedUris = false;
+  /** @type {number|null} */
+  let framedNextAt = null;
   while (o < e0 && guard < 100_000) {
     guard += 1;
     const lv = pbVarint(buf, o);
@@ -1184,8 +1188,56 @@ export function decodeChunkedEntry(buf, start, end) {
     const fEnd = fStart + lv[0];
     if (lv[0] <= 0 || fEnd > e0) break; // 長さ0 / バッファ超過 = フレーミングでない
     walk(fStart, fEnd, 1, null); // 各フレーム＝1 ChunkedEntry。entryField は直下で確定。
+    frames += 1;
+    const scan = scanNdgrFrameForNext(buf, fStart, fEnd);
+    if (scan.hasUri) framedUris = true;
+    else if (framedNextAt == null && scan.unixSec != null) framedNextAt = scan.unixSec;
     o = fEnd;
   }
 
+  // (3) 2026-10-31: 長さつきの並びとして最後まで読めた(=実機の応答)ときは、next.at を
+  //   「URI を持たない区切り(ReadyForNext)の中の unixtime」だけから取る。(1) の「最初に見つけた数値」は
+  //   実データでは長さの varint や segment の from 秒数を拾い、`?at=18` のような過去を叩いていた
+  //   (ndgrForwardCrawl で実測 0件・v0.1.1842)。field 番号には依存しない(上の防御方針のまま)。
+  if (frames > 0 && o === e0 && (framedUris || framedNextAt != null)) {
+    nav.nextAt = framedNextAt;
+  }
+
   return nav;
+}
+
+/** next.at とみなす unixtime(秒)の範囲。2001年〜2286年。 */
+const NDGR_NEXT_AT_MIN_SEC = 1_000_000_000;
+const NDGR_NEXT_AT_MAX_SEC = 10_000_000_000;
+
+/**
+ * 1区切り(ChunkedEntry)が NDGR の URI を含むか、含まないなら中の最初の unixtime(秒)を返す。
+ * @param {Uint8Array} buf
+ * @param {number} s
+ * @param {number} e
+ * @returns {{ hasUri: boolean, unixSec: number|null }}
+ */
+function scanNdgrFrameForNext(buf, s, e) {
+  let hasUri = false;
+  /** @type {number|null} */
+  let unixSec = null;
+  /** @type {(s: number, e: number, depth: number) => void} */
+  const walk = (ws, we, depth) => {
+    if (depth > 4 || hasUri) return;
+    pbForEach(buf, ws, we, (_fn, wt, val, fs, fe) => {
+      if (hasUri) return;
+      if (wt === 0) {
+        if (unixSec == null && typeof val === 'number' && val >= NDGR_NEXT_AT_MIN_SEC && val < NDGR_NEXT_AT_MAX_SEC) unixSec = val;
+        return;
+      }
+      if (wt !== 2) return;
+      if (/^https?:\/\//.test(decodeStr(buf, fs, fe))) {
+        hasUri = true;
+        return;
+      }
+      walk(fs, fe, depth + 1);
+    });
+  };
+  walk(s, e, 0);
+  return { hasUri, unixSec: hasUri ? null : unixSec };
 }
