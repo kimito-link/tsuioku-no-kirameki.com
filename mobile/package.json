@@ -6,10 +6,13 @@
   "type": "module",
   "packageManager": "pnpm@10.28.2",
   "scripts": {
-    "lint:submission": "node scripts/lint-pre-submission.mjs"
+    "lint:submission": "node scripts/lint-pre-submission.mjs",
+    "android:apk": "node scripts/build-android-debug.mjs",
+    "android:install": "node scripts/build-android-debug.mjs --install"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "8.0.2",
+    "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/ios": "8.5.3",

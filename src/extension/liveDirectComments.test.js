@@ -82,6 +82,14 @@ describe('startDirectComments', () => {
     expect(urls).toEqual(['https://live.nicovideo.jp/watch/lv1234567']);
   });
 
+  it('watch ページは PC の名乗りで取る(Android の名乗りだとスマホ版へ飛ばされ接続先が無い)', async () => {
+    const seen = [];
+    const http = { get: async (o) => { seen.push(o); return { status: 200, data: '<html></html>' }; } };
+    await startDirectComments({ lv: 'lv1234567', http, signal: new AbortController().signal, onComments: () => {}, onState: () => {} });
+    expect(seen[0].headers['User-Agent']).toMatch(/Windows NT/);
+    expect(seen[0].headers['User-Agent']).not.toMatch(/Mobile|Android|iPhone/);
+  });
+
   it('握手できたら live になり、止めると view を叩くのをやめる', async () => {
     const ac = new AbortController();
     const states = [];

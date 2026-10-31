@@ -29,6 +29,16 @@ import { createNativeSpeechVoice } from '../../app/live-view-native-voice.js';
 import { deriveAvatarUrlFromUid } from '../lib/deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 
+/**
+ * watch ページを取るときの見出し。
+ * Android の WebView の名乗り(…Mobile Safari)のままだと sp.live.nicovideo.jp(スマホ版)へ飛ばされ、
+ * そこには視聴の接続先(embedded-data)が無いので「終わった配信」と誤判定する(2026-10-31 エミュレータで実測)。
+ * PC の Chrome を名乗って、PC と同じページ(拡張・計測スクリプトと同じ形)を受け取る。
+ */
+export const WATCH_PAGE_HEADERS = Object.freeze({
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+});
+
 /** 画面に並べる最大件数(古い方から消す)。 */
 export const DIRECT_COMMENTS_MAX = 40;
 
@@ -92,7 +102,7 @@ export function nativeFetchBytes(http) {
 export async function startDirectComments(a) {
   a.onState('connecting');
   try {
-    const r = await a.http.get({ url: `https://live.nicovideo.jp/watch/${a.lv}`, responseType: 'text', connectTimeout: 10_000, readTimeout: 15_000 });
+    const r = await a.http.get({ url: `https://live.nicovideo.jp/watch/${a.lv}`, headers: WATCH_PAGE_HEADERS, responseType: 'text', connectTimeout: 10_000, readTimeout: 15_000 });
     const html = typeof r?.data === 'string' ? r.data : '';
     const props = html ? extractEmbeddedData(html) : null;
     const wsUrl = props ? pickWsUrlFromEmbeddedData(props) : '';
