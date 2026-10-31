@@ -38,25 +38,40 @@ function atUrl(at) {
   return `${VIEW_BASE}?at=${encodeURIComponent(String(at))}`;
 }
 
-/** `?at=now` 応答 = next ポインタ varint（field1）。decodeChunkedEntry が nextAt として拾う。 */
-function nowEntryBytes(nextAt) {
-  return new Uint8Array(varintField(1, nextAt));
+/** 長さつきの1区切り(view の応答は ChunkedEntry をこれで並べたもの)。 */
+function framed(entry) {
+  return [...encodeVarint(entry.length), ...entry];
 }
 
 /**
- * 前方向 View ChunkedEntry。segmentUris（field1=ライブ edge）/ previousUris（field3=直近過去）/
- * nextAt（field4 varint）を埋める。decodeChunkedEntry が path と field 番号で振り分ける。
+ * 公開の型(n-air-app/nicolive-comment-protobuf)どおりの ChunkedEntry。
+ *   segment=1 / previous=3 は MessageSegment { uri=3 }、next=4 は ReadyForNext { at=1 }。
  */
+function segmentEntry(field, uri) {
+  // 実データどおり from=1 / until=2 の Timestamp を先に置く(from の秒数を next と取り違えないか)。
+  const tsField = (n, sec) => lenDelimited(n, varintField(1, sec));
+  return framed(lenDelimited(field, [...tsField(1, 1_700_000_000), ...tsField(2, 1_700_000_016), ...strField(3, uri)]));
+}
+function nextEntry(at) {
+  return framed(lenDelimited(4, varintField(1, at)));
+}
+
+/** `?at=now` 応答 = next の1区切りだけ。 */
+function nowEntryBytes(nextAt) {
+  return new Uint8Array(nextEntry(nextAt));
+}
+
+/** 前方向 view 応答。segmentUris(ライブ edge)/ previousUris(直近過去)/ nextAt を並べる。 */
 function viewEntryBytesFwd({ segmentUris, previousUris, nextAt } = {}) {
   const out = [];
-  if (nextAt != null) out.push(...varintField(4, nextAt));
-  if (Array.isArray(segmentUris)) {
-    for (const u of segmentUris) out.push(...lenDelimited(1, strField(1, u)));
-  }
   if (Array.isArray(previousUris)) {
-    for (const u of previousUris) out.push(...lenDelimited(3, strField(1, u)));
+    for (const u of previousUris) out.push(...segmentEntry(3, u));
   }
-  if (out.length === 0) out.push(...strField(15, 'pad')); // 非空 padding（nextAt も URI も生まない）
+  if (Array.isArray(segmentUris)) {
+    for (const u of segmentUris) out.push(...segmentEntry(1, u));
+  }
+  if (nextAt != null) out.push(...nextEntry(nextAt));
+  if (out.length === 0) out.push(...framed(lenDelimited(2, strField(3, 'pad')))); // backward だけ(nextAt も segment も生まない)
   return new Uint8Array(out);
 }
 

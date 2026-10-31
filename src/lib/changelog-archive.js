@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1822',
+    date: '2026-10-28',
+    summary: 'PC が無くても放送 URL で応援を見る',
+    items: Object.freeze([
+      'スマホの開始画面に、ニコ生の放送の URL を貼れるようにしました。PC の拡張が無くても、その配信をギフト・広告で応援している人と番組の情報を見られます(終わった配信は最後の順位表)。',
+      '応援ランキングで、上位に入っていない配信を ?lv= で開いたときも、その配信だけ取ってきて先頭に出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1821',
     date: '2026-10-28',
     summary: '診断の読み込み直し回数を正しく数える',
