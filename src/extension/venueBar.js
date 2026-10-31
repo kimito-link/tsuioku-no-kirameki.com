@@ -2795,6 +2795,9 @@ export function mountVenueBarButton(options = {}) {
   voiceStatus.style.color = '#7a828e';
   const voiceLag = /** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()); // P5: 読み上げの遅れの一言(文言と判定は lib の voiceLagNotice.js)
   voiceLag.className = 'nlsb-voice-lag';
+  // 2026-11-01: GPU の案内(遅れの一言とは別の行・文言と判定は voiceLagNotice.decideVoiceGpuTip)。出すときだけ見える。
+  const voiceGpuTip = Object.assign(/** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()), { className: 'nlsb-voice-gpu-tip', hidden: true });
+  voiceGpuTip.style.cssText += 'color:#b45309;font-weight:600;';
 
   let venueWindowBtn = null;
   if (!isStandalone) {
@@ -2835,9 +2838,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, venueWindowBtn, note, close);
+    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
   } else {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, note, close);
+    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
   header.append(title, headerRight);
 
@@ -3386,6 +3389,7 @@ export function mountVenueBarButton(options = {}) {
     ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
     onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; },
+    onGpuTip: (/** @type {string} */ text) => { voiceGpuTip.textContent = text; voiceGpuTip.title = text; voiceGpuTip.hidden = !text; },
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
     },

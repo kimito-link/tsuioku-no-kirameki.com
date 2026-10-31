@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1826',
+    date: '2026-10-29',
+    summary: 'アプリのコメントを自動でつなぎ直す',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」は、通信が切れても自動でつなぎ直すようにしました(3秒・10秒・30秒・60秒あけて最大4回)。長い配信の途中で電波が途切れても、押し直さずに続きを受け取れます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1825',
     date: '2026-10-28',
     summary: '横付きパネルが右へはみ出さないように',

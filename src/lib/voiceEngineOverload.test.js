@@ -9,7 +9,7 @@ import {
   VOICE_OVERLOAD_SYNTH_TIMEOUT_MS
 } from './voiceEngineOverload.js';
 import { VoicePlayer } from './voicePlayer.js';
-import { decideVoiceLagNotice, VOICE_GPU_HINT_TEXT, VOICE_WARMING_TEXT } from './voiceLagNotice.js';
+import { decideVoiceLagNotice, decideVoiceGpuTip, VOICE_GPU_TIP_TEXT, VOICE_WARMING_TEXT } from './voiceLagNotice.js';
 
 describe('voiceEngineOverload(純関数)', () => {
   it('時間切れが1回だけなら混雑中にしない・2回続いたら混雑中', () => {
@@ -97,7 +97,41 @@ describe('遅れの一言(混雑中)', () => {
   it('混雑中は「起動直後の準備」と言わず、GPU の案内を出す', () => {
     const r = decideVoiceLagNotice(false, { e2eAvgMs: 14000, queueNow: 5, voiceOverloaded: true }, { gpuCapable: true });
     expect(r.shown).toBe(true);
-    expect(r.text).toContain(VOICE_GPU_HINT_TEXT);
     expect(r.text).not.toContain(VOICE_WARMING_TEXT);
+    expect(decideVoiceGpuTip({ voiceOverloaded: true }, true)).toBe(VOICE_GPU_TIP_TEXT);
+  });
+});
+
+describe('★GPU の案内の実配線(2026-11-01 りんく「UIUX に入れておいてほしい」)', () => {
+  it('VoicePlayer は混雑中になると onGpuTip で案内を出し、止めると消す', async () => {
+    /** @type {string[]} */
+    const tips = [];
+    const player = new VoicePlayer({
+      fetchSynthesizeVoice: async (_t, _v, opts) => {
+        opts?.onFailure?.({ stage: 'synth', error: new Error('voicevox_timeout') });
+        return null;
+      },
+      resolveVoice: () => ({ styleId: 3, pitchOffset: 0, speedOffset: 0 }),
+      onGpuTip: (text) => tips.push(text)
+    });
+    player.enabled = true;
+    player._gpuCapable = true;
+    await player._synthesizeTracked('a', { styleId: 3 });
+    await player._synthesizeTracked('b', { styleId: 3 });
+    player._updateLagNotice();
+    expect(tips.at(-1)).toBe(VOICE_GPU_TIP_TEXT);
+    player.disable({ persist: false });
+    expect(tips.at(-1)).toBe('');
+  });
+
+  it('会場とコメビュの両方に案内の置き場がある', async () => {
+    const fs = await import('node:fs');
+    const venue = fs.readFileSync('src/extension/venueBar.js', 'utf8');
+    const cv = fs.readFileSync('src/extension/comeview-entry.js', 'utf8');
+    const html = fs.readFileSync('extension/comeview.html', 'utf8');
+    expect(venue).toMatch(/onGpuTip:/);
+    expect(venue).toMatch(/voiceLag, voiceGpuTip/);
+    expect(html).toMatch(/id="cvVoiceGpuTip"/);
+    expect(cv).toMatch(/decideVoiceGpuTip\(_voiceDiag, _voiceGpuCapable\)/);
   });
 });
