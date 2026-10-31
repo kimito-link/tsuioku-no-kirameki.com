@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1838',
+    date: '2026-10-31',
+    summary: 'ギフト一覧で出ていた拡張のエラーを止める',
+    items: Object.freeze([
+      'ギフトの投げ一覧を描くたびに、拡張機能の管理画面へ「Content Security Policy」のエラーが積もっていました。アイコンが読めないときの差し替えを安全設定に沿った書き方に直し、エラーが出ないようにしました。読めないアイコンは公式の既定アイコンになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1837',
     date: '2026-10-31',
     summary: 'コメントを流す間は画面を消さない',
@@ -176,14 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '横付きパネルの初回表示で、待ちの安全網が働いたかを記録するようにしました(見た目は変わりません)',
       '混み合った試験環境でときどき失敗していた自動テストを直しました'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1818',
-    date: '2026-10-28',
-    summary: 'コメント欄の見張りを間引く',
-    items: Object.freeze([
-      'コメント欄が最新から外れていないかの見張りを、0.5秒ごとから2秒ごとにしました。直前にニコ生が画面を書き換えているため、毎回レイアウトの計算をやり直させていました(戻す動きは今までどおり)。'
     ])
   })
 ]);

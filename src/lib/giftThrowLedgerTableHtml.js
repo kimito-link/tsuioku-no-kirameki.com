@@ -7,10 +7,12 @@ import { escapeHtml } from './htmlEscape.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel } from './userRooms.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
-import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
 import { safeHttpUrl as sanitizeHttpUrl } from './htmlText.js';
 
-const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${escapeHtml(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
+// ★インラインの onerror は拡張画面の CSP(script-src 'self')で止められ、毎回エラーが積もっていた
+//   (2026-10-31 りんくの chrome://extensions のエラー画面・paintNorthStarGiftThrowsPanel)。
+//   印だけ付け、差し替えは描いた側が addEventListener で行う(popup の bindOnErrorHandlersWithin と同じ印)。
+const DEFAULT_USERICON_ONERROR_ATTR = 'data-on-error-fallback="blank"';
 
 /** @param {unknown} v */
 function formatLedgerNumber(v) {

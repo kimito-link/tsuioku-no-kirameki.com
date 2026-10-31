@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1818',
+    date: '2026-10-28',
+    summary: 'コメント欄の見張りを間引く',
+    items: Object.freeze([
+      'コメント欄が最新から外れていないかの見張りを、0.5秒ごとから2秒ごとにしました。直前にニコ生が画面を書き換えているため、毎回レイアウトの計算をやり直させていました(戻す動きは今までどおり)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1817',
     date: '2026-10-28',
     summary: '会場の客席の描き直しを軽く',
