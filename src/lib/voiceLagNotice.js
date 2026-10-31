@@ -16,7 +16,7 @@
 // 方針: 4秒以上で出し、2.5秒未満に戻るか読み上げ待ちが空になったら消す(出たり消えたりを繰り返さない)。
 
 import { VOICE_STALE_MS_NORMAL } from './voiceAgeGate.js';
-import { isWeakVoicePc } from './voiceNarrowing.js';
+import { isWeakVoicePc, VOICE_WEAK_PC_MIN_WARM_SAMPLES } from './voiceNarrowing.js';
 
 /** これ以上遅れたら一言を出す(ms)。 */
 export const VOICE_LAG_NOTICE_SHOW_MS = 4000;
@@ -24,8 +24,26 @@ export const VOICE_LAG_NOTICE_SHOW_MS = 4000;
 /** 出したあと、これ未満に戻ったら消す(ms)。 */
 export const VOICE_LAG_NOTICE_HIDE_MS = 2500;
 
-/** 遅れの一言に添える GPU の案内。 */
-export const VOICE_GPU_HINT_TEXT = 'VOICEVOX の設定でエンジンモードを GPU にすると速くなることがあります';
+/** 遅れの一言に添える GPU の案内(準備中を過ぎても遅いときだけ)。 */
+export const VOICE_GPU_HINT_TEXT = 'ずっと遅いときは、VOICEVOX の「設定」→「エンジンモード」を GPU にすると速くなることがあります';
+
+/**
+ * 起動直後(声の準備中)の一言。2026-10-31 りんく「ユーザーが理解できるようにするべき」:
+ *   VOICEVOX を起動した直後に「約4秒遅れています」とだけ出ても、壊れたのか一時的なのか分からない。
+ *   裏取り: 初めて使う声は 1 回目の合成が遅い(レッツノート実測 初回7.7秒→2回目以降0.7秒・coldSynthMaxMs の計器)。
+ *   2回目以降の合成(warmSynthSamples)が VOICE_WEAK_PC_MIN_WARM_SAMPLES 件そろうまでを「準備中」とみなす。
+ *   何分で終わるかは声の数と PC で変わるので、時間は書かない。
+ */
+export const VOICE_WARMING_TEXT = 'VOICEVOX を起動した直後は、初めて使う声の準備で遅れます。続けて読むうちに速くなります';
+
+/**
+ * まだ声の準備中か(2回目以降の合成が十分に測れていない)。
+ * @param {{ warmSynthSamples?: number, warmRtfSamples?: number }} diag
+ */
+export function isVoiceWarmingUp(diag) {
+  const samples = Math.max(Number(diag?.warmSynthSamples) || 0, Number(diag?.warmRtfSamples) || 0);
+  return samples < VOICE_WEAK_PC_MIN_WARM_SAMPLES;
+}
 
 /**
  * GPU の案内を添えるか。エンジンが GPU を使えると分かっていて、声づくりが遅いと測れたときだけ。
@@ -58,7 +76,9 @@ export function decideVoiceLagNotice(prevShown, diag, opts = {}) {
   return {
     shown: true,
     lagMs,
-    text: `読み上げが約${sec}秒遅れています(${staleSec}秒以上待ったコメントは読まずに飛ばして追いつきます)`
-      + (shouldHintVoiceGpu(diag, opts?.gpuCapable) ? `。${VOICE_GPU_HINT_TEXT}` : '')
+    text: `読み上げが約${sec}秒遅れています。追いつくまで、${staleSec}秒より前のコメントは読まずに飛ばします`
+      + (isVoiceWarmingUp(diag)
+        ? `。${VOICE_WARMING_TEXT}`
+        : shouldHintVoiceGpu(diag, opts?.gpuCapable) ? `。${VOICE_GPU_HINT_TEXT}` : '')
   };
 }
