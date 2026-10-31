@@ -6,6 +6,7 @@ import {
   decideVoiceLagNotice,
   shouldHintVoiceGpu,
   VOICE_GPU_HINT_TEXT,
+  VOICE_WARMING_TEXT,
   VOICE_LAG_NOTICE_HIDE_MS,
   VOICE_LAG_NOTICE_SHOW_MS
 } from './voiceLagNotice.js';
@@ -23,7 +24,7 @@ describe('decideVoiceLagNotice', () => {
     const r = decideVoiceLagNotice(false, { e2eAvgMs: 3000, upstreamEmaMs: 1200, queueNow: 2 });
     expect(r.shown).toBe(true);
     expect(r.lagMs).toBe(4200);
-    expect(r.text).toBe('読み上げが約4秒遅れています(8秒以上待ったコメントは読まずに飛ばして追いつきます)');
+    expect(r.text).toBe(`読み上げが約4秒遅れています。追いつくまで、8秒より前のコメントは読まずに飛ばします。${VOICE_WARMING_TEXT}`);
   });
 
   it('一度出したら2.5秒未満に戻るまで消さない(出たり消えたりしない)', () => {
@@ -95,5 +96,19 @@ describe('GPU の案内(2026-10-28)', () => {
     expect(r.text.endsWith(`。${VOICE_GPU_HINT_TEXT}`)).toBe(true);
     expect(decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 1000, queueNow: 3 }, { gpuCapable: true }).text).toBe('');
     expect(decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 5000, queueNow: 3 }).text).not.toContain('GPU');
+  });
+});
+
+describe('起動直後の一言(2026-10-31 りんく「ユーザーが理解できるようにするべき」)', () => {
+  it('2回目以降の合成がまだ少ないうちは「準備中」と書き、GPU の案内は出さない', () => {
+    const r = decideVoiceLagNotice(false, { e2eAvgMs: 4000, queueNow: 3, warmSynthSamples: 1, coldSynthMaxMs: 8000 }, { gpuCapable: true });
+    expect(r.text).toContain('約4秒遅れています');
+    expect(r.text.endsWith(`。${VOICE_WARMING_TEXT}`)).toBe(true);
+    expect(r.text).not.toContain('GPU');
+  });
+  it('準備が済んでも遅ければ GPU の案内に替わる', () => {
+    const r = decideVoiceLagNotice(false, { e2eAvgMs: 5000, queueNow: 3, warmSynthEmaMs: 1500, warmSynthSamples: 8 }, { gpuCapable: true });
+    expect(r.text).not.toContain(VOICE_WARMING_TEXT);
+    expect(r.text.endsWith(`。${VOICE_GPU_HINT_TEXT}`)).toBe(true);
   });
 });
