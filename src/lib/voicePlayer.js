@@ -49,7 +49,7 @@ import {
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, measureVoiceWavLevel, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT, voiceTargetPeak
 } from './voiceVolume.js';
-import { decideVoiceLagNotice } from './voiceLagNotice.js';
+import { decideVoiceGpuTip, decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
   KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, forgetWeakVoicePcIfFast
 } from './voiceNarrowing.js';
@@ -85,6 +85,9 @@ export class VoicePlayer {
     this.onSkip = deps.onSkip || (() => {});
     /** P5: 遅れが大きいときの一言(空文字=消す)。判定は voiceLagNotice.js。 */
     this.onLagNotice = deps.onLagNotice || (() => {});
+    /** 2026-11-01: GPU の案内(遅れの一言とは別の行・voiceLagNotice.decideVoiceGpuTip)。 */
+    this.onGpuTip = deps.onGpuTip || (() => {});
+    this._gpuTipText = '';
     this._lagNoticeShown = false;
     this.isObsMode = deps.isObsMode || (() => false);
     this.audioConstructor = deps.audioConstructor;
@@ -1041,10 +1044,19 @@ export class VoicePlayer {
 
   /** P5: 遅れの一言を出す/消す(状態が変わったときだけ通知)。 */
   _updateLagNotice() {
+    this._updateGpuTip();
     const r = decideVoiceLagNotice(this._lagNoticeShown, { ...this.diag, queueNow: this.queue.length }, { gpuCapable: this._gpuCapable });
     if (r.shown === this._lagNoticeShown && !r.shown) return;
     this._lagNoticeShown = r.shown;
     try { this.onLagNotice(r.text); } catch { /* no-op: 表示の失敗は読み上げに影響させない */ }
+  }
+
+  /** 2026-11-01: GPU の案内を出す/消す(文言が変わったときだけ通知)。 */
+  _updateGpuTip() {
+    const text = this.enabled ? decideVoiceGpuTip(this.diag, this._gpuCapable) : '';
+    if (text === this._gpuTipText) return;
+    this._gpuTipText = text;
+    try { this.onGpuTip(text); } catch { /* no-op: 表示の失敗は読み上げに影響させない */ }
   }
 
   enqueue(items) {

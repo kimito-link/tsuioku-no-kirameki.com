@@ -454,8 +454,9 @@ export default [
     // v0.1.1828: 席が無い人の吹き出しを一覧の中に出す配線(viewport 1行)と、診断の行を避ける1行・矢印/尻尾を消すCSS3行。判定は venueBubblePlacer.js。
     // v0.1.1832: 席が無い人の吹き出しを診断の行の上に出す配線(viewportFloor 1行)と、名前の無い人を「匿名NNN」で出す4行=+5。
     // v0.1.1833: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
+    // v0.1.1847: GPU の案内を遅れの一言とは別の行に出す(span 生成と色2行+コメント1行+onGpuTip の配線1行)=+4。文言と判定は lib の voiceLagNotice.decideVoiceGpuTip。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7353, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7357, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1847',
+    date: '2026-11-01',
+    summary: 'VOICEVOX を GPU にする案内を見やすく',
+    items: Object.freeze([
+      '読み上げが遅い PC では、会場モードとコメビュの読み上げボタンの横に「⚡ 読み上げを速くするには: VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に」と、遅いと分かっている間ずっと出すようにしました。以前は「遅れています」の長い一文の最後に付いていて見落としやすく、VOICEVOX の画面の場所も「オプション」が抜けていました。GPU を使える PC だけに出し、VOICEVOX を起動した直後の準備中は出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1846',
     date: '2026-10-31',
     summary: '重い配信でも読み上げが無音にならないように',
@@ -172,14 +180,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'アプリのコメント欄にギフトも出す',
     items: Object.freeze([
       'iPhone アプリの「💬 コメントを流す」に、ギフトも「🎁 名前 さんが アイテム(ポイント)」として色付きで並ぶようにしました。読み上げはこれまでどおりコメントだけです。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1826',
-    date: '2026-10-29',
-    summary: 'アプリのコメントを自動でつなぎ直す',
-    items: Object.freeze([
-      'iPhone アプリの「💬 コメントを流す」は、通信が切れても自動でつなぎ直すようにしました(3秒・10秒・30秒・60秒あけて最大4回)。長い配信の途中で電波が途切れても、押し直さずに続きを受け取れます。'
     ])
   })
 ]);

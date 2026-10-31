@@ -129,7 +129,7 @@ import {
   recordVoiceSynthStage,
   resetVoiceWarmMeasure
 } from '../lib/voiceStageTiming.js';
-import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
+import { decideVoiceGpuTip, decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
 import {
   KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, isWeakVoicePc,
   forgetWeakVoicePcIfFast
@@ -567,6 +567,18 @@ function updateVoiceLagNotice() {
   _voiceLagNoticeShown = r.shown;
   const el = document.getElementById('cvVoiceLag');
   if (el) el.textContent = r.text;
+  updateVoiceGpuTip();
+}
+
+/** 2026-11-01: GPU の案内(遅れの一言とは別の行・会場と同じ判定=voiceLagNotice.decideVoiceGpuTip)。 */
+function updateVoiceGpuTip() {
+  const el = document.getElementById('cvVoiceGpuTip');
+  if (!el) return;
+  const text = _voiceReadingEnabled ? decideVoiceGpuTip(_voiceDiag, _voiceGpuCapable) : '';
+  if (el.textContent === text) return;
+  el.textContent = text;
+  el.title = text;
+  el.hidden = !text;
 }
 
 function disableVoiceReading({ persist = true } = {}) {
