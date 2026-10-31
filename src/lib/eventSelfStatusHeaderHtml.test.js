@@ -26,6 +26,9 @@ describe('buildEventSelfStatusHeaderHtml', () => {
     expect(html).toContain('🏆 ゴリアテ杯');
     expect(html).toContain('のどかさんは現在 <strong>1位</strong>');
     expect(html).toContain('（💎5,000）');
+    // ★拡張画面の CSP はインラインのイベント属性を止める=印だけ付ける(bindOnErrorHandlersWithin が拾う)
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+    expect(html).toContain('data-on-error-hide="1"');
   });
 
   it('2-3位もメダル', () => {

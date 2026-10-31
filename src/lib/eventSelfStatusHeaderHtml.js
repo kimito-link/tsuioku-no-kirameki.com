@@ -71,7 +71,7 @@ export function buildEventSelfStatusHeaderHtml(self, broadcasterName) {
       `<div class="nl-event-self__body">` +
         eventLine +
         `<p class="nl-event-self__talk">` +
-          `<img class="nl-event-self__rinku" src="${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.png" alt="ゆっくりりんく" onerror="this.style.display='none'" />` +
+          `<img class="nl-event-self__rinku" src="${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.png" alt="ゆっくりりんく" data-on-error-hide="1" />` +
           `<span class="nl-event-self__talk-text">${talkMain} ${talkPush}</span>` +
         `</p>` +
       `</div>` +

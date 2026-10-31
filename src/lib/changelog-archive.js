@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1819',
+    date: '2026-10-28',
+    summary: 'パネル初回表示の自動テストを安定化',
+    items: Object.freeze([
+      '横付きパネルの初回表示で、待ちの安全網が働いたかを記録するようにしました(見た目は変わりません)',
+      '混み合った試験環境でときどき失敗していた自動テストを直しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1818',
     date: '2026-10-28',
     summary: 'コメント欄の見張りを間引く',

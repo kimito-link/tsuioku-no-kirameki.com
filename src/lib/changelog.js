@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1839',
+    date: '2026-10-31',
+    summary: 'イベント欄の拡張のエラーも止める',
+    items: Object.freeze([
+      'イベントに参加している配信で、順位の欄にあるりんくの絵の書き方が安全設定に止められ、拡張機能の管理画面にエラーが積もっていました。ギフト一覧と同じ直し方で、エラーが出ないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1838',
     date: '2026-10-31',
     summary: 'ギフト一覧で出ていた拡張のエラーを止める',
@@ -175,15 +183,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '視聴ページを開いた直後、パネルの中身が2〜3回起動し直していたのを1回にしました(先読みが表示中のパネルを一瞬画面外へ動かしていたのが原因)',
       'パネルの置き場所が変わっても、中身を読み込み直さずに動かすようにしました(対応している Chrome のみ)'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1819',
-    date: '2026-10-28',
-    summary: 'パネル初回表示の自動テストを安定化',
-    items: Object.freeze([
-      '横付きパネルの初回表示で、待ちの安全網が働いたかを記録するようにしました(見た目は変わりません)',
-      '混み合った試験環境でときどき失敗していた自動テストを直しました'
     ])
   })
 ]);
