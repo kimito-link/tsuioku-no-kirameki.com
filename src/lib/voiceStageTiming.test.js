@@ -8,6 +8,7 @@ import {
   recordVoiceE2eSample,
   recordVoiceStreamDone,
   recordVoiceSynthStage,
+  resetVoiceWarmMeasure,
   VOICE_UPSTREAM_SANE_MAX_MS
 } from './voiceStageTiming.js';
 import { buildVoiceDiagLine, buildVoiceDiagSnapshot, makeInitialVoiceDiag } from './voiceDiag.js';
@@ -274,5 +275,22 @@ describe('v0.1.1774: recordVoiceE2eSample', () => {
     expect(d.e2eSampleTotal).toBe(2);
     expect(d.e2eSumMsTotal).toBe(1100);
     expect(d.e2eMaxMs).toBe(900);
+  });
+});
+
+describe('2026-10-31 読み上げ ON のたびに数え直す(VOICEVOX 再起動後の起動直後の遅れ)', () => {
+  it('reset 後は同じ声でも「初めての声」に戻る', () => {
+    const t = createVoiceSynthTracker({ now: () => 0 });
+    expect(t.begin(3).cold).toBe(true);
+    expect(t.begin(3).cold).toBe(false);
+    t.reset();
+    expect(t.begin(3).cold).toBe(true);
+  });
+
+  it('温まった速さと件数を空に戻す(他の計器は残す)', () => {
+    const diag = { warmSynthEmaMs: 1500, warmSynthSamples: 9, warmSynthRtfPermille: 800, warmRtfSamples: 7, coldSynthTotal: 4 };
+    resetVoiceWarmMeasure(diag);
+    expect(diag).toEqual({ warmSynthEmaMs: -1, warmSynthSamples: 0, warmSynthRtfPermille: -1, warmRtfSamples: 0, coldSynthTotal: 4 });
+    expect(isWeakVoicePc(diag)).toBe(false);
   });
 });
