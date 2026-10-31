@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1824',
+    date: '2026-10-28',
+    summary: 'アプリだけでコメントを流す',
+    items: Object.freeze([
+      'iPhone アプリで放送の URL を貼った画面に「💬 コメントを流す」を足しました。PC も配信者の協力も無しに、アプリがニコニコから直接その配信のコメントを受け取って並べ、🗣 で iPhone の声で読み上げます(数秒遅れ)。',
+      '受け取ったコメントは iPhone の中だけで使い、当サイトのサーバーへは送りません。ブラウザでは出ません(ニコニコがブラウザからの読み取りを許していないため)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1823',
     date: '2026-10-28',
     summary: 'ファンにも公開(拡張なしで見られる)',

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1844',
+    date: '2026-10-31',
+    summary: 'Android アプリでもコメントを流せるように',
+    items: Object.freeze([
+      'Android アプリで「💬 コメントを流す」を押すと「この配信は終わっているか、見られない配信です」と出て、放送中でもコメントが受け取れませんでした。Android だとニコニコがスマホ向けのページを返し、そこに接続先が載っていなかったためです。PC と同じページを受け取るようにしたので、Android でもコメントが流れます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1843',
     date: '2026-10-31',
     summary: '過去コメントの埋め直しの読み違いを直す',
@@ -171,15 +179,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '横付きパネルが右へはみ出さないように',
     items: Object.freeze([
       '狭めの窓で横付きパネルを挟むと公式コメント欄が画面の外へ押し出され横スクロールが出ていたのを直しました。置いた後に実際の位置を測り、縮めて収まるなら幅を詰め、収まらなければ動画の下へ出します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1824',
-    date: '2026-10-28',
-    summary: 'アプリだけでコメントを流す',
-    items: Object.freeze([
-      'iPhone アプリで放送の URL を貼った画面に「💬 コメントを流す」を足しました。PC も配信者の協力も無しに、アプリがニコニコから直接その配信のコメントを受け取って並べ、🗣 で iPhone の声で読み上げます(数秒遅れ)。',
-      '受け取ったコメントは iPhone の中だけで使い、当サイトのサーバーへは送りません。ブラウザでは出ません(ニコニコがブラウザからの読み取りを許していないため)。'
     ])
   })
 ]);
