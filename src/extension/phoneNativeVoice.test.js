@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNativeSpeechVoice, silentWavDataUrl, speechTextForComment } from '../../app/live-view-native-voice.js';
+import { createNativeSpeechVoice, NATIVE_VOICE_PITCHES, nativeVoiceToneFor, silentWavDataUrl, speechTextForComment } from '../../app/live-view-native-voice.js';
 import { phoneVoiceLabel } from '../../app/live-view-voice.js';
 
 const liveView = readFileSync(new URL('../../app/live-view.js', import.meta.url), 'utf8');
@@ -52,6 +52,26 @@ describe('iPhone 内蔵の声の読み上げ(live-view-native-voice.js)', () => 
     await flush();
     expect(f.TextToSpeech.speak).toHaveBeenCalledTimes(2);
     expect(f.TextToSpeech.speak.mock.calls[1][0].text).toBe('パチパチ'); // 2026-10-28: 拍手の 8 は「パチパチ」(PC と同じ整え方)
+  });
+
+  it('★人ごとに声の高さ・速さを変える(同じ人はいつも同じ)。名前の無いコメントはふだんの声', () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `a:user${i}`);
+    const tones = ids.map((id) => nativeVoiceToneFor(id));
+    expect(new Set(tones.map((t) => t.pitch)).size).toBeGreaterThanOrEqual(4);
+    for (const t of tones) {
+      expect(NATIVE_VOICE_PITCHES).toContain(t.pitch);
+      expect(t.rate).toBeGreaterThanOrEqual(1.1);
+      expect(t.rate).toBeLessThanOrEqual(1.2);
+    }
+    expect(nativeVoiceToneFor('a:user3')).toEqual(nativeVoiceToneFor('a:user3'));
+    expect(nativeVoiceToneFor('')).toEqual({ pitch: 1.0, rate: 1.1 });
+
+    const f = fakeCap();
+    const v = createNativeSpeechVoice({ cap: f.cap, Audio: FakeAudio });
+    v.toggle();
+    v.onRows([]);
+    v.onRows([row(1, 'わこつ', { userId: 'a:user7' })]);
+    expect(f.TextToSpeech.speak.mock.calls[0][0]).toMatchObject(nativeVoiceToneFor('a:user7'));
   });
 
   it('★ギフト・本文の無い行は読まない。OFF の間は読まない(見たことだけ覚える)', () => {
