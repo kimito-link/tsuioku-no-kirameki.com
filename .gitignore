@@ -37,6 +37,10 @@ keys.txt
 secrets.json
 credentials.json
 .webui_secret_key
+# Android のアップロード鍵(失うとアプリを更新できない・絶対にコミットしない)
+.secrets-local/
+*.jks
+keystore.properties
 
 # CWS Publish API 認証情報(絶対にコミットしない)
 .cws-credentials.json

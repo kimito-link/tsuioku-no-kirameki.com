@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1086 件
+## ⚠️ 役割コメントが無いソース 9 / 1093 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -763,13 +763,13 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **mobile/** (47)
+- 📁 **mobile/** (54)
   - 📁 **assets/** (1)
     - `splash.png`
   - 📁 **release-notes/** (1)
     - `CURRENT-ja.txt`
-  - 📁 **scripts/** (32)
-    - 📁 **lib/** (16)
+  - 📁 **scripts/** (39)
+    - 📁 **lib/** (17)
       - `app-config.mjs` — 移植元: partnership_program_website/scripts/lib/app-config.mjs
       - `apple-guideline-checks.mjs` — lint-pre-submission CHECK 31・32 の判定（純関数）。
       - `asc-api.mjs` — 移植元: partnership_program_website/scripts/lib/asc-api.mjs
@@ -785,7 +785,9 @@
       - `former-names-check.mjs` — 役割: 改名したアプリで、旧名称が「宣言した面」に残っていないかを調べる純関数(lint-pre-submission の CHECK 33)。
       - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
       - `listing-source-files.mjs` — 役割: 審査提出で ASC に送る掲載文の「正本ファイル」がリポに揃っているかを調べる純関数(lint-pre-submission の CHECK 34)。
+      - `play-api.mjs` — 移植元: partnership_program_website/scripts/lib/play-api.mjs
       - `team-distinction-core.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」の判定（純関数）。
+    - `android-patch-signing.mjs` — Patch <target>/app/build.gradle so `bundleRelease` produces a signed AAB.
     - `appstore-submit.mjs` — 移植元: partnership_program_website/scripts/appstore-submit.mjs
     - `asc-create-app.mjs` — 移植元: partnership_program_website/scripts/asc-create-app.mjs
     - `asc-create-profile.mjs` — App Store 用 Provisioning Profile を App Store Connect API で作成する。
@@ -799,7 +801,12 @@
     - `generate-release-notes.mjs` — Generate release-notes/CURRENT-ja.txt from conventional-style commit
     - `lint-pre-submission.mjs` — 移植元: partnership_program_website/scripts/lint-pre-submission.mjs
     - `patch-ios-launch-dark.mjs` — iOS 起動時の白フラッシュ対策（最小・必要十分）。
+    - `play-publish.mjs` — 移植元: partnership_program_website/scripts/play-publish.mjs
+    - `prepare-android-assets.mjs` — Android のアイコンとスプラッシュを、iPhone と同じ原版から作る(cap add android / cap sync のあとに呼ぶ)。
+    - `verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
+    - `verify-android-splash-not-default.mjs` — Android スプラッシュ「Capacitor デフォルト出荷事故」防止ゲート（直接証拠方式）。
     - `verify-ios-splash-not-default.mjs` — iOS スプラッシュ「Capacitor デフォルト出荷事故」防止ゲート（直接証拠方式）。
+    - `verify-signing-material-path.mjs` — 「CIが書き込む署名鍵の場所」と「build.gradleが実際に読む場所」の不一致を防ぐゲート
     - `verify-team-distinction.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」を、姉妹リポを横断して点検する（4.3(a) の自己点検）。
     - `verify-webdir-consistency.mjs` — 「capacitor.config.ts の webDir」と「CI の Prepare webDir が実際に作る場所」の
   - 📁 **store-assets/** (8)
