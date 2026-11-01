@@ -12,15 +12,12 @@
  *   android/ はコミットしない(iOS の ios/ と同じ・毎回 cap add で作る)。
  *
  * ■ アイコン
- *   Android の丸いアイコン(adaptive icon)は前景と背景の2枚が要る。iPhone と同じ 1024 の原版
- *   (store-assets/appstore/app-icon-1024.png)から、背景=原版そのまま・前景=透明、を作る。
- *   原版1枚(icon-only)だけ渡すと前景が Capacitor の既定ロゴのまま残る(2026-10-31 エミュレータで実測)。
+ *   作り方は scripts/prepare-android-assets.mjs(Google Play 用の CI と共用)。
  *
- * ■ これは「テスト用」。Google Play 用の署名つき AAB は作らない(配布はまだ決めていない)。
+ * ■ これは「テスト用」。Google Play 用の署名つき AAB は .github/workflows/android-play-release.yml が作る。
  */
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -63,21 +60,8 @@ if (!existsSync(index)) writeFileSync(index, '<!doctype html><html><head><meta c
 if (!existsSync(path.join(OUT, 'android', 'app'))) run('npx cap add android');
 run('npx cap sync android');
 
-// 4. アイコンとスプラッシュ
-// pnpm は依存を実体フォルダの隣に置くので、リンクを実体へたどってから探す。
-const sharp = createRequire(realpathSync(path.join(OUT, 'node_modules', '@capacitor', 'assets', 'package.json')))('sharp');
-const master = path.join(OUT, 'store-assets', 'appstore', 'app-icon-1024.png');
-const assets = path.join(OUT, 'assets');
-await sharp(master).png().toFile(path.join(assets, 'icon-only.png'));
-// 背景=原版そのまま(端まで絵がある)・前景=透明。丸く切られて見えるのは中央(りんくの顔)になる。
-//   前景に縮めた原版を重ねると、背景の原版と二重に見える(2026-10-31 エミュレータで実測)。
-await sharp(master).png().toFile(path.join(assets, 'icon-background.png'));
-await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-  .png()
-  .toFile(path.join(assets, 'icon-foreground.png'));
-const brand = JSON.parse(readFileSync(path.join(OUT, 'app.config.json'), 'utf8')).brand || {};
-const bg = brand.splashBackgroundColor || '#FFF7EC';
-run(`npx @capacitor/assets generate --android --assetPath assets --splashBackgroundColor "${bg}" --splashBackgroundColorDark "${brand.splashBackgroundColorDark || bg}"`);
+// 4. アイコンとスプラッシュ(Google Play 用の CI と同じ作り方・prepare-android-assets.mjs)
+run(`node "${path.join(OUT, 'scripts', 'prepare-android-assets.mjs')}" "${OUT}"`);
 
 // 5. テスト用 APK
 run(`"${path.join(OUT, 'android', 'gradlew.bat')}" assembleDebug --no-daemon -q`, path.join(OUT, 'android'));

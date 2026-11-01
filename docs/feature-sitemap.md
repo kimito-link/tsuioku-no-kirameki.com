@@ -740,10 +740,13 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 88</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 91</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
+- `mobile/scripts/verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
+- `mobile/scripts/verify-android-splash-not-default.mjs` — Android スプラッシュ「Capacitor デフォルト出荷事故」防止ゲート（直接証拠方式）。
 - `mobile/scripts/verify-ios-splash-not-default.mjs` — iOS スプラッシュ「Capacitor デフォルト出荷事故」防止ゲート（直接証拠方式）。
+- `mobile/scripts/verify-signing-material-path.mjs` — 「CIが書き込む署名鍵の場所」と「build.gradleが実際に読む場所」の不一致を防ぐゲート
 - `mobile/scripts/verify-team-distinction.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」を、姉妹リポを横断して点検する（4.3(a) の自己点検）。
 - `mobile/scripts/verify-webdir-consistency.mjs` — 「capacitor.config.ts の webDir」と「CI の Prepare webDir が実際に作る場所」の
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
@@ -996,7 +999,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 291</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 295</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1008,6 +1011,7 @@
 - `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
 - `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
+- `mobile/scripts/android-patch-signing.mjs` — Patch <target>/app/build.gradle so `bundleRelease` produces a signed AAB.
 - `mobile/scripts/appstore-submit.mjs` — 移植元: partnership_program_website/scripts/appstore-submit.mjs
 - `mobile/scripts/asc-create-app.mjs` — 移植元: partnership_program_website/scripts/asc-create-app.mjs
 - `mobile/scripts/asc-create-profile.mjs` — App Store 用 Provisioning Profile を App Store Connect API で作成する。
@@ -1033,9 +1037,12 @@
 - `mobile/scripts/lib/former-names-check.mjs` — 役割: 改名したアプリで、旧名称が「宣言した面」に残っていないかを調べる純関数(lint-pre-submission の CHECK 33)。
 - `mobile/scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
 - `mobile/scripts/lib/listing-source-files.mjs` — 役割: 審査提出で ASC に送る掲載文の「正本ファイル」がリポに揃っているかを調べる純関数(lint-pre-submission の CHECK 34)。
+- `mobile/scripts/lib/play-api.mjs` — 移植元: partnership_program_website/scripts/lib/play-api.mjs
 - `mobile/scripts/lib/team-distinction-core.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」の判定（純関数）。
 - `mobile/scripts/lint-pre-submission.mjs` — 移植元: partnership_program_website/scripts/lint-pre-submission.mjs
 - `mobile/scripts/patch-ios-launch-dark.mjs` — iOS 起動時の白フラッシュ対策（最小・必要十分）。
+- `mobile/scripts/play-publish.mjs` — 移植元: partnership_program_website/scripts/play-publish.mjs
+- `mobile/scripts/prepare-android-assets.mjs` — Android のアイコンとスプラッシュを、iPhone と同じ原版から作る(cap add android / cap sync のあとに呼ぶ)。
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
 - `scripts/audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
 - `scripts/audit/make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
