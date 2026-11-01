@@ -7,7 +7,8 @@
     "iosScheme": "tsuioku",
     "appleSiwaServiceId": null,
     "productionDomain": "app.tsuioku-no-kirameki.com",
-    "stagingDomain": null
+    "stagingDomain": null,
+    "shortDescription": "PC の拡張が記録した応援コメントとギフトを、スマホで一緒に。ギフトは通知と振動で、コメントは画面を閉じても読み上げで。"
   },
   "stores": {
     "ascAppId": "6826728669",
