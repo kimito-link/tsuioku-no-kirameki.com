@@ -25,7 +25,15 @@ export const VOICE_LAG_NOTICE_SHOW_MS = 4000;
 export const VOICE_LAG_NOTICE_HIDE_MS = 2500;
 
 /** 遅れの一言に添える GPU の案内(準備中を過ぎても遅いときだけ)。 */
-export const VOICE_GPU_HINT_TEXT = 'ずっと遅いときは、VOICEVOX の「設定」→「エンジンモード」を GPU にすると速くなることがあります';
+export const VOICE_GPU_HINT_TEXT = 'ずっと遅いときは、VOICEVOX の「設定」→「オプション」→「エンジンモード」を GPU にすると速くなることがあります';
+
+/**
+ * GPU の案内(遅れの一言とは別に、遅いと分かっている間ずっと出す)。2026-11-01 りんく「UIUX に入れておいてほしい」:
+ *   以前は遅れの一言(4秒以上遅れたときだけ)の末尾に付けていたので、長い一文に埋もれて見落とされた。
+ *   場所は VOICEVOX 0.26 の画面で確認(メニュー「設定」→「オプション」→ 項目「エンジンモード」で CPU/GPU を選ぶ)。
+ *   切り替えると VOICEVOX のエンジンが再起動する(その間は読み上げが止まる)ので、それも書く。
+ */
+export const VOICE_GPU_TIP_TEXT = '⚡ 読み上げを速くするには: VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に(切り替えると VOICEVOX が再起動します)';
 
 /**
  * 起動直後(声の準備中)の一言。2026-10-31 りんく「ユーザーが理解できるようにするべき」:
@@ -58,12 +66,24 @@ export function shouldHintVoiceGpu(diag, gpuCapable) {
 }
 
 /**
+ * GPU の案内を出すか(出すなら文言・出さないなら空文字)。遅れの大きさには関係なく、遅いと測れている間ずっと出す。
+ * @param {Parameters<typeof shouldHintVoiceGpu>[0]} diag
+ * @param {boolean|null|undefined} gpuCapable
+ * @returns {string}
+ */
+export function decideVoiceGpuTip(diag, gpuCapable) {
+  // 起動直後(初めての声の準備)はどの PC でも遅いので出さない。ただし時間切れが続く混雑中は準備中でも出す。
+  if (isVoiceWarmingUp(diag) && diag?.voiceOverloaded !== true) return '';
+  return shouldHintVoiceGpu(diag, gpuCapable) ? VOICE_GPU_TIP_TEXT : '';
+}
+
+/**
  * @param {boolean} prevShown 直前に出していたか
  * @param {{ e2eAvgMs?: number, upstreamEmaMs?: number, queueNow?: number, warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number, voiceOverloaded?: boolean }} diag
- * @param {{ gpuCapable?: boolean|null }} [opts]
+ * @param {{ gpuCapable?: boolean|null }} [_opts] 2026-11-01 から GPU の案内は decideVoiceGpuTip へ移した(呼び出し側の互換のため受け取るだけ)
  * @returns {{ shown: boolean, lagMs: number, text: string }}
  */
-export function decideVoiceLagNotice(prevShown, diag, opts = {}) {
+export function decideVoiceLagNotice(prevShown, diag, _opts = {}) {
   const e2e = Number(diag?.e2eAvgMs);
   const up = Number(diag?.upstreamEmaMs);
   const queueNow = Number(diag?.queueNow);
@@ -79,8 +99,9 @@ export function decideVoiceLagNotice(prevShown, diag, opts = {}) {
     shown: true,
     lagMs,
     text: `読み上げが約${sec}秒遅れています。追いつくまで、${staleSec}秒より前のコメントは読まずに飛ばします`
+      // GPU の案内は decideVoiceGpuTip で別の行に出す(2026-11-01)。ここに足すと二重になる。
       + (isVoiceWarmingUp(diag) && diag?.voiceOverloaded !== true
         ? `。${VOICE_WARMING_TEXT}`
-        : shouldHintVoiceGpu(diag, opts?.gpuCapable) ? `。${VOICE_GPU_HINT_TEXT}` : '')
+        : '')
   };
 }

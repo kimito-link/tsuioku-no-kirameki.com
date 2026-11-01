@@ -143,6 +143,13 @@
         color: var(--cv-sub);
         white-space: nowrap;
       }
+      /* 2026-11-01: GPU の案内(遅いと分かっている間ずっと出す)。見落とされないよう色を付け、長いので折り返す。 */
+      .cv-voice-gpu-tip {
+        color: #b45309;
+        font-weight: 600;
+        white-space: normal;
+      }
+      .cv-voice-gpu-tip[hidden] { display: none; }
       body.is-obs .cv-voice-controls { display: none !important; }
 
       .cv-list {
@@ -678,6 +685,7 @@
         <span class="cv-voice-status" id="cvVoiceStatus" role="status"></span>
         <span class="cv-voice-skip" id="cvVoiceSkip" aria-live="polite"></span>
         <span class="cv-voice-skip" id="cvVoiceLag" aria-live="polite"></span>
+        <span class="cv-voice-gpu-tip" id="cvVoiceGpuTip" role="note" hidden></span>
       </span>
       <button id="cvBtnNg" type="button" title="非表示にした人を管理" style="display: none;">NG 0</button>
       <button id="cvBtnWindow" type="button" title="別ウィンドウで開く">⧉ 別窓</button>

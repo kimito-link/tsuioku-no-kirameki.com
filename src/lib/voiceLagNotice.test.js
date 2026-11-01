@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path';
 import {
   decideVoiceLagNotice,
   shouldHintVoiceGpu,
+  decideVoiceGpuTip,
+  VOICE_GPU_TIP_TEXT,
   VOICE_GPU_HINT_TEXT,
   VOICE_WARMING_TEXT,
   VOICE_LAG_NOTICE_HIDE_MS,
@@ -90,12 +92,23 @@ describe('GPU の案内(2026-10-28)', () => {
     expect(shouldHintVoiceGpu(fast, true)).toBe(false);
     expect(shouldHintVoiceGpu({}, true)).toBe(false); // まだ測れていない
   });
-  it('遅れの一言が出るときだけ後ろに付く', () => {
+  it('★2026-11-01: 遅れの一言には付けず、別の行(decideVoiceGpuTip)で遅れの大きさに関係なく出す', () => {
     const r = decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 5000, queueNow: 3 }, { gpuCapable: true });
     expect(r.shown).toBe(true);
-    expect(r.text.endsWith(`。${VOICE_GPU_HINT_TEXT}`)).toBe(true);
-    expect(decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 1000, queueNow: 3 }, { gpuCapable: true }).text).toBe('');
-    expect(decideVoiceLagNotice(false, { ...slow, e2eAvgMs: 5000, queueNow: 3 }).text).not.toContain('GPU');
+    expect(r.text).not.toContain('GPU');
+    expect(decideVoiceGpuTip({ ...slow, e2eAvgMs: 1000 }, true)).toBe(VOICE_GPU_TIP_TEXT);
+    expect(decideVoiceGpuTip(slow, false)).toBe('');
+    expect(decideVoiceGpuTip(fast, true)).toBe('');
+  });
+  it('案内は VOICEVOX の実際の画面の場所(設定→オプション→エンジンモード)と再起動を書く', () => {
+    expect(VOICE_GPU_TIP_TEXT).toContain('「設定」→「オプション」→「エンジンモード」');
+    expect(VOICE_GPU_TIP_TEXT).toContain('再起動');
+    expect(VOICE_GPU_HINT_TEXT).toContain('「設定」→「オプション」→「エンジンモード」');
+  });
+  it('起動直後(声の準備中)は出さない・時間切れが続く混雑中は準備中でも出す', () => {
+    const warming = { warmSynthSamples: 1, coldSynthMaxMs: 8000 };
+    expect(decideVoiceGpuTip(warming, true)).toBe('');
+    expect(decideVoiceGpuTip({ ...warming, voiceOverloaded: true }, true)).toBe(VOICE_GPU_TIP_TEXT);
   });
 });
 
@@ -106,9 +119,10 @@ describe('起動直後の一言(2026-10-31 りんく「ユーザーが理解で�
     expect(r.text.endsWith(`。${VOICE_WARMING_TEXT}`)).toBe(true);
     expect(r.text).not.toContain('GPU');
   });
-  it('準備が済んでも遅ければ GPU の案内に替わる', () => {
-    const r = decideVoiceLagNotice(false, { e2eAvgMs: 5000, queueNow: 3, warmSynthEmaMs: 1500, warmSynthSamples: 8 }, { gpuCapable: true });
+  it('準備が済んだら「準備中」とは書かない(GPU の案内は別の行に出る)', () => {
+    const diag = { e2eAvgMs: 5000, queueNow: 3, warmSynthEmaMs: 1500, warmSynthSamples: 8 };
+    const r = decideVoiceLagNotice(false, diag, { gpuCapable: true });
     expect(r.text).not.toContain(VOICE_WARMING_TEXT);
-    expect(r.text.endsWith(`。${VOICE_GPU_HINT_TEXT}`)).toBe(true);
+    expect(decideVoiceGpuTip(diag, true)).toBe(VOICE_GPU_TIP_TEXT);
   });
 });
