@@ -32,6 +32,7 @@
   // ★LP のナビと【同じ順・同じ文言】。1 か所だけ直せば全ページに効く。
   var NAV = [
     ['#worldview', 'はじめに'],
+    ['#smartphone', 'スマホアプリ'],
     ['#record-foundation', '記録安定'],
     ['#record-results', '改善実績'],
     ['#record-transparency', '透明性'],
