@@ -91,7 +91,7 @@ describe('デモの配線(live-view-demo.js)', () => {
     const next = await (await d.voiceFetch()).json();
     expect(next.clips).toEqual([{ no: '1', ogg: 'AQID' }]);
     expect(urls.every((u) => u.startsWith('/app/demo/'))).toBe(true);
-    expect(liveView).toContain('if (_demo) return applyPhoneBlocklist(await _demo.snapshot(), readBlocklist());');
+    expect(liveView).toContain('if (_demo) return rememberAuthorsAndBlock(await _demo.snapshot());');
     expect(liveView).toContain('if (!_demo) createPhoneRealtime(');
   });
 });

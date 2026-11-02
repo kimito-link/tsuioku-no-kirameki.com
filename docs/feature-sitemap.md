@@ -999,7 +999,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 295</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 298</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1041,6 +1041,9 @@
 - `mobile/scripts/lib/team-distinction-core.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」の判定（純関数）。
 - `mobile/scripts/lint-pre-submission.mjs` — 移植元: partnership_program_website/scripts/lint-pre-submission.mjs
 - `mobile/scripts/patch-ios-launch-dark.mjs` — iOS 起動時の白フラッシュ対策（最小・必要十分）。
+- `mobile/scripts/play-fill-data-safety.mjs` — Submit Google Play Data Safety answers through Android Publisher API.
+- `mobile/scripts/play-fill-listing.mjs` — Push every edit-scoped Play Console field that the Android Publisher API exposes:
+- `mobile/scripts/play-generate-data-safety-csv.mjs` — Generate the Google Play Data Safety CSV deterministically from a
 - `mobile/scripts/play-publish.mjs` — 移植元: partnership_program_website/scripts/play-publish.mjs
 - `mobile/scripts/prepare-android-assets.mjs` — Android のアイコンとスプラッシュを、iPhone と同じ原版から作る(cap add android / cap sync のあとに呼ぶ)。
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
@@ -1307,22 +1310,21 @@
 - `v0.1.1835` 2026-10-31 — アプリのコメントに顔アイコンを出す
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
 - `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
 - `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
-### 🎈 吹き出し (2版)
+### 🎈 吹き出し (1版)
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
 ### 🎁 ギフト (3版)
 - `v0.1.1839` 2026-10-31 — イベント欄の拡張のエラーも止める
 - `v0.1.1838` 2026-10-31 — ギフト一覧で出ていた拡張のエラーを止める
 - `v0.1.1836` 2026-10-31 — つなぎ直しで同じコメントが二重に出ないように
 
-### 🔊 読み上げ (8版)
+### 🔊 読み上げ (9版)
+- `v0.1.1849` 2026-11-02 — スマホで隠した人を読み上げでも出さない
 - `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
 - `v0.1.1847` 2026-10-31 — アプリの読み上げを人ごとに違う声に
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
@@ -1332,9 +1334,8 @@
 - `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
 - `v0.1.1829` 2026-10-29 — コメビュの読み上げを少し早く
 
-### 🩺 診断・状態速報 (2版)
+### 🩺 診断・状態速報 (1版)
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
 ### ⚡ 描画・性能 (2版)
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように

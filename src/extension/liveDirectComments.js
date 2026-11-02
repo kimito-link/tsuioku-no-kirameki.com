@@ -28,6 +28,8 @@ import { fetchViewUri } from '../server/nicoliveGuest.js';
 import { createNativeSpeechVoice } from '../../app/live-view-native-voice.js';
 import { deriveAvatarUrlFromUid } from '../lib/deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { dropBlockedRows } from '../lib/phoneBlocklist.js';
+import { openPhoneBlockSheet, readBlocklist } from '../../app/live-view-block.js';
 
 /**
  * watch ページを取るときの見出し。
@@ -289,11 +291,13 @@ export function mountDirectComments(a) {
   box.setAttribute('aria-label', 'コメント(このアプリが直接受け取ります)');
   box.innerHTML =
     '<div class="direct-head"><button type="button" class="btn" data-direct-toggle>💬 コメントを流す</button>' +
-    '<button type="button" class="btn" data-direct-voice hidden>🗣 読み上げ</button></div>' +
+    '<button type="button" class="btn" data-direct-voice hidden>🗣 読み上げ</button>' +
+    '<button type="button" class="btn" data-direct-block aria-label="見たくない人を隠す・報告する">🚩</button></div>' +
     '<p class="direct-state" aria-live="polite"></p><ol class="direct-list"></ol>';
   a.mountBefore.parentNode.insertBefore(box, a.mountBefore);
   const toggleBtn = /** @type {HTMLButtonElement} */ (box.querySelector('[data-direct-toggle]'));
   const voiceBtn = /** @type {HTMLButtonElement} */ (box.querySelector('[data-direct-voice]'));
+  const blockBtn = /** @type {HTMLButtonElement} */ (box.querySelector('[data-direct-block]'));
   const stateEl = /** @type {HTMLElement} */ (box.querySelector('.direct-state'));
   const listEl = /** @type {HTMLElement} */ (box.querySelector('.direct-list'));
 
@@ -326,12 +330,21 @@ export function mountDirectComments(a) {
   const seenComments = new Set();
   /** @type {Set<string>} */
   const seenGifts = new Set();
+  /**
+   * v0.1.1844: 🚩 の「隠す」候補にする最近のコメント(古→新)。並べた行の data-uid と組で、隠したら画面からも消す。
+   * @type {{ no: string, text: string, name: string, userId: string }[]}
+   */
+  let recent = [];
   /** @param {{ no: string, text: string, name: string, userId: string }[]} all */
   const onComments = (all) => {
-    const rows = freshDirectRows(all, seenComments, (r) => r.no);
+    // v0.1.1844: 🚩 で隠した人は並べないし読まない(PC とつなぐ形と同じ・この端末の中だけ)。
+    const rows = dropBlockedRows(freshDirectRows(all, seenComments, (r) => r.no), readBlocklist());
     if (!rows.length) return;
+    recent = recent.concat(rows).slice(-DIRECT_COMMENTS_MAX);
     for (const row of rows) {
-      listEl.insertBefore(commentItem(row), listEl.firstChild);
+      const li = commentItem(row);
+      li.dataset.uid = String(row.userId || '');
+      listEl.insertBefore(li, listEl.firstChild);
     }
     while (listEl.children.length > DIRECT_COMMENTS_MAX) listEl.lastChild?.remove();
     if (voice) voice.onRows(rows);
@@ -344,6 +357,19 @@ export function mountDirectComments(a) {
     for (const row of rows) listEl.insertBefore(giftItem(row), listEl.firstChild);
     while (listEl.children.length > DIRECT_COMMENTS_MAX) listEl.lastChild?.remove();
   };
+
+  blockBtn.addEventListener('click', () => {
+    openPhoneBlockSheet({
+      getRows: () => recent,
+      onChange: () => {
+        const blocked = new Set(readBlocklist());
+        recent = recent.filter((r) => !blocked.has(String(r.userId || '')));
+        for (const li of Array.from(listEl.querySelectorAll('li[data-uid]'))) {
+          if (blocked.has(/** @type {HTMLElement} */ (li).dataset.uid || '')) li.remove();
+        }
+      }
+    });
+  });
 
   toggleBtn.addEventListener('click', () => {
     if (voice) voice.wake();
