@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1093 件
+## ⚠️ 役割コメントが無いソース 9 / 1096 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -40,6 +40,34 @@
 
 ## 全ファイルツリー
 
+- 📁 **"src/** (17)
+  - 📁 **images/** (17)
+    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png"`
+          - `logo_funlink_black_RGB_link_black.png"`
+          - `logo_funlink_black_RGB_maru_black.png"`
+      - 📁 **color/** (8)
+        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
+          - `logo_funlink_RGB_color.png"`
+          - `logo_funlink_RGB_ginga_color.png"`
+          - `logo_funlink_RGB_hoshi.png"`
+          - `logo_funlink_RGB_link_hoshi.png"`
+          - `logo_funlink_RGB_link_orange.png"`
+          - `logo_funlink_RGB_maru_blue.png"`
+          - `logo_funlink_RGB_maru_ginga.png"`
+          - `logo_funlink_RGB_maru_orange.png"`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png"`
+        - `logo_funlink_white_RGB_link_black.png"`
+        - `logo_funlink_white_RGB_maru_black.png"`
+    - 📁 **logo/** (3)
+      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg"`
+        - `251016_logo_guide_kimitolink_ol.ai"`
+        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -763,13 +791,13 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **mobile/** (54)
+- 📁 **mobile/** (65)
   - 📁 **assets/** (1)
     - `splash.png`
   - 📁 **release-notes/** (1)
     - `CURRENT-ja.txt`
-  - 📁 **scripts/** (39)
-    - 📁 **lib/** (17)
+  - 📁 **scripts/** (43)
+    - 📁 **lib/** (18)
       - `app-config.mjs` — 移植元: partnership_program_website/scripts/lib/app-config.mjs
       - `apple-guideline-checks.mjs` — lint-pre-submission CHECK 31・32 の判定（純関数）。
       - `asc-api.mjs` — 移植元: partnership_program_website/scripts/lib/asc-api.mjs
@@ -786,6 +814,7 @@
       - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
       - `listing-source-files.mjs` — 役割: 審査提出で ASC に送る掲載文の「正本ファイル」がリポに揃っているかを調べる純関数(lint-pre-submission の CHECK 34)。
       - `play-api.mjs` — 移植元: partnership_program_website/scripts/lib/play-api.mjs
+      - `play-data-safety-template.json`
       - `team-distinction-core.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」の判定（純関数）。
     - `android-patch-signing.mjs` — Patch <target>/app/build.gradle so `bundleRelease` produces a signed AAB.
     - `appstore-submit.mjs` — 移植元: partnership_program_website/scripts/appstore-submit.mjs
@@ -801,6 +830,9 @@
     - `generate-release-notes.mjs` — Generate release-notes/CURRENT-ja.txt from conventional-style commit
     - `lint-pre-submission.mjs` — 移植元: partnership_program_website/scripts/lint-pre-submission.mjs
     - `patch-ios-launch-dark.mjs` — iOS 起動時の白フラッシュ対策（最小・必要十分）。
+    - `play-fill-data-safety.mjs` — Submit Google Play Data Safety answers through Android Publisher API.
+    - `play-fill-listing.mjs` — Push every edit-scoped Play Console field that the Android Publisher API exposes:
+    - `play-generate-data-safety-csv.mjs` — Generate the Google Play Data Safety CSV deterministically from a
     - `play-publish.mjs` — 移植元: partnership_program_website/scripts/play-publish.mjs
     - `prepare-android-assets.mjs` — Android のアイコンとスプラッシュを、iPhone と同じ原版から作る(cap add android / cap sync のあとに呼ぶ)。
     - `verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
@@ -809,7 +841,7 @@
     - `verify-signing-material-path.mjs` — 「CIが書き込む署名鍵の場所」と「build.gradleが実際に読む場所」の不一致を防ぐゲート
     - `verify-team-distinction.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」を、姉妹リポを横断して点検する（4.3(a) の自己点検）。
     - `verify-webdir-consistency.mjs` — 「capacitor.config.ts の webDir」と「CI の Prepare webDir が実際に作る場所」の
-  - 📁 **store-assets/** (8)
+  - 📁 **store-assets/** (15)
     - 📁 **appstore/** (6)
       - `app-icon-1024.png`
       - `description-ja.txt`
@@ -817,6 +849,15 @@
       - `promotional-text-ja.txt`
       - `review-notes.txt`
       - `subtitle-ja.txt`
+    - 📁 **play/** (7)
+      - 📁 **screenshots/** (3)
+        - `01-comments.png`
+        - `02-supporters.png`
+        - `03-start.png`
+      - `data-safety.csv`
+      - `feature-graphic.png`
+      - `icon-512.png`
+      - `listing-copy.md`
     - `screenshot-plan.json`
     - `team-apps.json`
   - `.gitignore`
@@ -958,7 +999,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2239)
+- 📁 **src/** (2222)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1106,7 +1147,7 @@
     - `voiceTestHook.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (134)
+  - 📁 **images/** (117)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1206,7 +1247,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (13)
+    - 📁 **logo/** (10)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1216,11 +1257,6 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
-      - 📁 **データ一式/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg`
-        - `251016_logo_guide_kimitolink_ol.ai`
-        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1261,26 +1297,6 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
-    - 📁 **データ出力/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png`
-          - `logo_funlink_black_RGB_link_black.png`
-          - `logo_funlink_black_RGB_maru_black.png`
-      - 📁 **color/** (8)
-        - 📁 **RGB_データ用/** (8)
-          - `logo_funlink_RGB_color.png`
-          - `logo_funlink_RGB_ginga_color.png`
-          - `logo_funlink_RGB_hoshi.png`
-          - `logo_funlink_RGB_link_hoshi.png`
-          - `logo_funlink_RGB_link_orange.png`
-          - `logo_funlink_RGB_maru_blue.png`
-          - `logo_funlink_RGB_maru_ginga.png`
-          - `logo_funlink_RGB_maru_orange.png`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png`
-        - `logo_funlink_white_RGB_link_black.png`
-        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
   - 📁 **lib/** (1949)
     - 📁 **fixtures/** (2)
@@ -3363,7 +3379,7 @@
   - `gen-og-live-ranking.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (66)
+- 📁 **tsuioku-no-kirameki/** (68)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -3388,8 +3404,11 @@
       - `yukkuri-thread.css`
     - 📁 **js/** (1)
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (38)
-    - 📁 **lp/** (5)
+  - 📁 **images/** (40)
+    - 📁 **lp/** (7)
+      - 📁 **phone/** (2)
+        - `phone-start.webp`
+        - `phone-supporters.webp`
       - `kimito-link-color.webp`
       - `kimito-link-ginga-color.webp`
       - `kimito-maru-black.webp`

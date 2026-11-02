@@ -999,7 +999,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 295</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 298</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1041,6 +1041,9 @@
 - `mobile/scripts/lib/team-distinction-core.mjs` — 同一 Team のアプリ同士が「別アプリに見えるか」の判定（純関数）。
 - `mobile/scripts/lint-pre-submission.mjs` — 移植元: partnership_program_website/scripts/lint-pre-submission.mjs
 - `mobile/scripts/patch-ios-launch-dark.mjs` — iOS 起動時の白フラッシュ対策（最小・必要十分）。
+- `mobile/scripts/play-fill-data-safety.mjs` — Submit Google Play Data Safety answers through Android Publisher API.
+- `mobile/scripts/play-fill-listing.mjs` — Push every edit-scoped Play Console field that the Android Publisher API exposes:
+- `mobile/scripts/play-generate-data-safety-csv.mjs` — Generate the Google Play Data Safety CSV deterministically from a
 - `mobile/scripts/play-publish.mjs` — 移植元: partnership_program_website/scripts/play-publish.mjs
 - `mobile/scripts/prepare-android-assets.mjs` — Android のアイコンとスプラッシュを、iPhone と同じ原版から作る(cap add android / cap sync のあとに呼ぶ)。
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
