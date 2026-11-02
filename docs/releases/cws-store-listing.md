@@ -5,8 +5,8 @@ Chrome Web Store の「ストアの掲載情報 → 詳細な説明」に貼り�
 
 - **対象拡張**: 君斗りんくの追憶のきらめき（ID: `cjbabignmmodaickpeckiojjabnlogdb`）
 - **連動更新**: `extension/manifest.json` の version、`src/lib/changelog.js` の先頭エントリ
-- **次回提出予定**: master の最新版（2026-10-22 時点 0.1.1747・まだ提出していない。差分と審査の注意点は [cws-next-submission.md](cws-next-submission.md)）
-- **最後の提出版**: 0.1.1728（★2026-10-21 提出→同日通過・公開済 / ZIP 16,443,746 bytes）
+- **審査中（最後の提出版）**: 0.1.1848（★2026-11-03 提出・`status:["OK"]` / ZIP 16,564,413 bytes。差分と審査の注意点は [cws-next-submission.md](cws-next-submission.md)。★「詳細な説明」欄は今回は貼り直していない）
+- **公開中**: 0.1.1728（2026-10-21 提出→同日通過・公開済 / ZIP 16,443,746 bytes）
 - 前回公開: 0.1.1473（2026-08-22 01:24 一般公開・審査送信から約1時間で通過 / ZIP: build/tsuioku-no-kirameki-0.1.1473.zip・16,317,410 bytes・134ファイル）
 - 前々回: 0.1.1244（2026-08-03 ZIP: build/tsuioku-no-kirameki-0.1.1244.zip）
 
