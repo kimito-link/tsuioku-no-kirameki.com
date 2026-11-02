@@ -33,21 +33,37 @@ const STYLE = `
 #lvWebBlockSheet .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 `;
 
+function ensureStyle() {
+  if (document.getElementById('lvWebBlockStyle')) return;
+  const style = document.createElement('style');
+  style.id = 'lvWebBlockStyle';
+  style.textContent = STYLE;
+  document.head.appendChild(style);
+}
+
 /**
+ * 画面右下に 🚩 を付ける(PC とつなぐ形のライブビュー)。
  * @param {{ getRows: () => any[], onChange: () => void }} a
  */
 export function mountPhoneBlockUi(a) {
   if (document.getElementById('lvWebBlockBtn')) return;
-  const style = document.createElement('style');
-  style.textContent = STYLE;
-  document.head.appendChild(style);
+  ensureStyle();
   const btn = document.createElement('button');
   btn.id = 'lvWebBlockBtn';
   btn.type = 'button';
   btn.textContent = '🚩';
   btn.setAttribute('aria-label', '見たくない人を隠す・報告する');
-  btn.addEventListener('click', (ev) => { ev.stopPropagation(); open(); });
+  btn.addEventListener('click', (ev) => { ev.stopPropagation(); openPhoneBlockSheet(a); });
   document.body.appendChild(btn);
+}
+
+/**
+ * 「見たくない人を隠す・報告する」の板を開く。v0.1.1844: 拡張なしの形(💬 コメントを流す)からも使う。
+ * @param {{ getRows: () => any[], onChange: () => void }} a
+ */
+export function openPhoneBlockSheet(a) {
+  ensureStyle();
+  open();
 
   function open() {
     close();
@@ -59,7 +75,7 @@ export function mountPhoneBlockUi(a) {
     const h = document.createElement('h2');
     h.textContent = '見たくない人を隠す・報告する';
     const note = document.createElement('p');
-    note.textContent = '隠した人のコメントと顔は、この端末の画面に出なくなります(PC の記録は変わりません)。';
+    note.textContent = '隠した人のコメントと顔は、この端末の画面に出なくなり、読み上げもしません(PC の記録は変わりません)。';
     const ul = document.createElement('ul');
     const set = new Set(blocked);
     const people = recentPeopleForBlock(a.getRows()).filter((x) => !set.has(x.userId));
