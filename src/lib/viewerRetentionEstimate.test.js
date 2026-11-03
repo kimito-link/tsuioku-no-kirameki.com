@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { estimateViewerRetention } from './viewerRetentionEstimate.js';
-import { buildViewerRetentionSectionHtml } from './viewerRetentionSectionHtml.js';
+import { buildViewerRetentionSectionHtml, VIEWER_RETENTION_OPEN_ROWS } from './viewerRetentionSectionHtml.js';
 
 const T0 = Date.parse('2026-11-03T12:00:00.000Z');
 const MIN = 60_000;
@@ -83,5 +83,14 @@ describe('buildViewerRetentionSectionHtml', () => {
   });
   it('誰もいなければ章ごと出さない', () => {
     expect(buildViewerRetentionSectionHtml(estimateViewerRetention([]))).toBe('');
+  });
+  it('v0.1.1856: 人が多いと上位だけ開き、残りは「残り N 人」に畳む(スクロールを軽くする)', () => {
+    const many = [];
+    for (let u = 0; u < VIEWER_RETENTION_OPEN_ROWS + 7; u++) many.push(c(String(1000 + u), u % 60), c(String(1000 + u), 59));
+    const html = buildViewerRetentionSectionHtml(estimateViewerRetention(many));
+    expect(html).toContain('<details class="mkt-vr__rest"><summary>残り 7人を見る</summary>');
+    const [openPart, restPart] = html.split('<details class="mkt-vr__rest"');
+    expect((openPart.match(/<tr>\n<td>/g) || []).length).toBe(VIEWER_RETENTION_OPEN_ROWS);
+    expect((restPart.match(/<tr>\n<td>/g) || []).length).toBe(7);
   });
 });

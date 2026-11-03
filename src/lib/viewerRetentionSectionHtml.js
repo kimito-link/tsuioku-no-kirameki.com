@@ -13,6 +13,8 @@ import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc
 export const VIEWER_RETENTION_SECTION_ID = 'mkt-viewer-retention';
 /** 表に出す人数の上限（重い配信で HTML が膨らみすぎないように）。超えた分は件数だけ書く。 */
 export const VIEWER_RETENTION_TABLE_CAP = 500;
+/** 最初から開いて見せる行数。残りは畳む(畳んだ中のサムネは開くまで描かれない=長い配信でもスクロールが重くならない)。 */
+export const VIEWER_RETENTION_OPEN_ROWS = 50;
 
 /** @param {number} ms */
 function minLabel(ms) {
@@ -73,7 +75,7 @@ export function buildViewerRetentionSectionHtml(est, opts = {}) {
     .join('');
 
   const shown = est.users.slice(0, VIEWER_RETENTION_TABLE_CAP);
-  const rows = shown
+  const rowHtml = shown
     .map((u, i) => {
       const rawLabel = displayUserLabel(u.userId, u.nickname || '');
       const nameHtml = maskShare
@@ -97,8 +99,14 @@ export function buildViewerRetentionSectionHtml(est, opts = {}) {
 <td class="mkt-vr__bar"><div class="mkt-vr__fill" style="width:${u.retentionPct}%"></div><span>${u.retentionPct}%</span></td>
 <td>${escapeHtml(join)}</td><td>${escapeHtml(last)}</td><td>${u.count}</td>
 </tr>`;
-    })
-    .join('');
+    });
+  const thead =
+    '<thead><tr><th>#</th><th>サムネ</th><th>ユーザー</th><th>判定</th><th>視聴維持率</th><th>見始め</th><th>最後のコメント</th><th>コメント数</th></tr></thead>';
+  const openRows = rowHtml.slice(0, VIEWER_RETENTION_OPEN_ROWS).join('');
+  const restRows = rowHtml.slice(VIEWER_RETENTION_OPEN_ROWS);
+  const restHtml = restRows.length
+    ? `<details class="mkt-vr__rest"><summary>残り ${restRows.length}人を見る</summary><div class="mkt-vr__table-wrap"><table>${thead}<tbody>${restRows.join('')}</tbody></table></div></details>`
+    : '';
   const more =
     est.users.length > shown.length
       ? `<p class="mkt-note">ほか ${est.users.length - shown.length}人は表を軽くするため省略しています（全体の数字には入っています）。</p>`
@@ -123,15 +131,18 @@ export function buildViewerRetentionSectionHtml(est, opts = {}) {
 #${VIEWER_RETENTION_SECTION_ID} .mkt-vr__bar{position:relative;min-width:120px}
 #${VIEWER_RETENTION_SECTION_ID} .mkt-vr__fill{position:absolute;left:0;top:25%;height:50%;background:#7c3aed55;border-radius:4px}
 #${VIEWER_RETENTION_SECTION_ID} .mkt-vr__bar span{position:relative}
+#${VIEWER_RETENTION_SECTION_ID} .mkt-vr__rest{margin:.5rem 0}
+#${VIEWER_RETENTION_SECTION_ID} .mkt-vr__rest>summary{cursor:pointer;color:#93c5fd;padding:.35rem 0}
 </style>
 <p class="mkt-note">コメントした人ひとりずつについて、配信の最後まで見ていたかを<strong>コメントの時刻から推定</strong>しました。</p>
 <div class="mkt-vr__cards">${cards}</div>
 ${viewerRetentionBasisHtml(est)}
 ${maskNote}
 <div class="mkt-vr__table-wrap"><table>
-<thead><tr><th>#</th><th>サムネ</th><th>ユーザー</th><th>判定</th><th>視聴維持率</th><th>見始め</th><th>最後のコメント</th><th>コメント数</th></tr></thead>
-<tbody>${rows}</tbody>
+${thead}
+<tbody>${openRows}</tbody>
 </table></div>
+${restHtml}
 ${more}
 </section>`;
 }
