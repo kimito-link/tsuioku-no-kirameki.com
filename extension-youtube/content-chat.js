@@ -444,6 +444,49 @@
     }
     return pickYtBroadcasterIconUrl(candidates);
   }
+  function visibleTextOf(root) {
+    try {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      let out = "";
+      const clipCache = /* @__PURE__ */ new Map();
+      const rootRect = root.getBoundingClientRect();
+      const clipRectOf = (start) => {
+        for (let e = start; e && e !== root.parentElement; e = e.parentElement) {
+          if (clipCache.has(e)) return clipCache.get(e) || null;
+          const st = window.getComputedStyle(e);
+          if (st.overflow !== "visible" || st.overflowY !== "visible") {
+            const r = e.getBoundingClientRect();
+            clipCache.set(e, r);
+            return r;
+          }
+        }
+        return null;
+      };
+      let node;
+      while (node = walker.nextNode()) {
+        const text = String(node.nodeValue || "");
+        if (!text.trim()) {
+          out += text;
+          continue;
+        }
+        const parent = node.parentElement;
+        if (parent && window.getComputedStyle(parent).visibility === "hidden") continue;
+        range.selectNodeContents(node);
+        const r = range.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue;
+        const clip = clipRectOf(parent) || rootRect;
+        if (clip && clip.height > 0) {
+          const overlap = Math.min(r.bottom, clip.bottom) - Math.max(r.top, clip.top);
+          if (overlap < r.height / 2) continue;
+        }
+        out += text;
+      }
+      return out.replace(/\s+/g, " ").replace(/([0-9,.])\s+(?=[0-9,.])/g, "$1").trim();
+    } catch {
+      return "";
+    }
+  }
   function readConcurrentViewers() {
     const selectors = [
       "ytd-watch-metadata #description #info",
@@ -464,7 +507,7 @@
       }
       for (let i = 0; i < nodes.length; i += 1) {
         const el = nodes[i];
-        const texts = [String(el.getAttribute("aria-label") || "")];
+        const texts = [visibleTextOf(el), String(el.getAttribute("aria-label") || "")];
         el.querySelectorAll("[aria-label]").forEach((x) => texts.push(String(x.getAttribute("aria-label") || "")));
         texts.push(String(
           /** @type {HTMLElement} */
