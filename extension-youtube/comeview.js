@@ -992,6 +992,9 @@
     else a.removeAttribute("href");
   }
   function fixTextNode(node) {
+    const parentTag = node.parentNode && /** @type {Element} */
+    node.parentNode.tagName;
+    if (parentTag === "SCRIPT" || parentTag === "STYLE") return;
     const v = String(node.nodeValue || "");
     let next = ytWording(v);
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
@@ -1021,10 +1024,13 @@
   var EMPTY_THUMB_SEL = '[class*="thumb--empty"]';
   var SC_BUBBLE_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E") center/70% no-repeat`;
   function fixEmptyThumb(el) {
-    const row = el.closest("tr, li") || el.parentElement;
-    const sc = ytSuperChatFromRowText(row ? row.textContent : "");
+    const tr = el.closest("tr");
+    const row = tr || el.parentElement;
+    let sc = ytSuperChatFromRowText(row ? row.textContent : "");
     if (!sc) return;
-    const color = ytSuperChatTierColor(sc.yen);
+    const ptCell = tr && tr.querySelector('td[data-label="pt"]');
+    if (ptCell) sc = ytSuperChatFromRowText(`スーパーチャット ${ptCell.textContent}`) || sc;
+    const color = tr ? ytSuperChatTierColor(sc.yen) : "#e62117";
     if (el.getAttribute("data-yt-sc") === color) return;
     el.setAttribute("data-yt-sc", color);
     const h = (
@@ -1064,6 +1070,29 @@
       /** @type {Text} */
       n
     );
+  }
+  function ytFixHtmlString(html) {
+    try {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      fixSubtree(doc.documentElement);
+      const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
+      return (doctype ? doctype[0] + "\n" : "") + doc.documentElement.outerHTML;
+    } catch {
+      return html;
+    }
+  }
+  if (typeof Blob === "function" && typeof DOMParser === "function" && typeof document !== "undefined") {
+    const RealBlob = Blob;
+    class YtFixingBlob extends RealBlob {
+      /** @param {any[]} [parts] @param {BlobPropertyBag} [opts] */
+      constructor(parts, opts) {
+        if (opts && /^text\/html/i.test(String(opts.type || "")) && Array.isArray(parts) && parts.length === 1 && typeof parts[0] === "string") {
+          parts = [ytFixHtmlString(parts[0])];
+        }
+        super(parts, opts);
+      }
+    }
+    globalThis.Blob = YtFixingBlob;
   }
   function startDomFixer() {
     if (!document.body) return;
