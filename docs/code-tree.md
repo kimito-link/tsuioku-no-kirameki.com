@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1096 件
+## ⚠️ 役割コメントが無いソース 9 / 1099 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -865,7 +865,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (104)
+- 📁 **scripts/** (105)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -928,6 +928,7 @@
   - `council-roles.stance.test.js`
   - `council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
   - `council-synth.test.js`
+  - `council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
   - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
   - `dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
@@ -999,7 +1000,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2222)
+- 📁 **src/** (2225)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1036,7 +1037,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (104)
+  - 📁 **extension/** (105)
     - 📁 **popup/** (15)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1092,6 +1093,7 @@
     - `ndgrViewBasePick.wiring.test.js`
     - `noSpeechNote.wiring.test.js`
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+    - `orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
     - `phoneDemoFeed.test.js`
@@ -1298,7 +1300,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1949)
+  - 📁 **lib/** (1951)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2426,6 +2428,8 @@
     - `opaqueCanvasNoBlack.wiring.test.js`
     - `openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
     - `openingFiveMinuteCorrelation.test.js`
+    - `orphanTabAutoReload.js` — 拡張が入れ替わった後、開いたままの放送ページが古い版のまま止まるのを、ページ自身が見つけて読み込み直す。
+    - `orphanTabAutoReload.test.js`
     - `ouenBanner.js` — 応援動画バナーの表示判断（純粋関数）。
     - `ouenBanner.test.js`
     - `ouenBannerDom.js` — 応援動画バナーを DOM に反映する。

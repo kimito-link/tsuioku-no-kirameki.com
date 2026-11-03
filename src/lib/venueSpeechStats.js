@@ -55,11 +55,62 @@ export function speechSupportLine(text) {
 
 /**
  * 発言が 0 件のときの本文。ギフト・広告の記録がある人には「発言なし」だけを見せない。
+ *
+ * ★v0.1.1851(2026-11-03 実機): 「ギフト・広告のみ」と出た人のタイルには 💬1 があり、ホバーには「発言 2」と本文まで出ていた。
+ *   原因はタブの拡張が更新で切れていて(画面上部に「拡張が更新されました…F5」)、保存した記録が読めなかったこと。
+ *   読めなかったのに「記録はありません」と言い切るのは診断の嘘(AGENTS.md §12.7)なので、
+ *   ・読めなかった(拡張が切れた/時間切れ)ときはそう言う
+ *   ・タイルに 💬 がある人には「ギフト・広告のみ」と言わない
  * @param {unknown} text タイルの data-stats
+ * @param {{ contextLost?: boolean, readFailed?: boolean }} [read] 保存した記録を読めたか
  * @returns {string}
  */
-export function speechEmptyMessage(text) {
+export function speechEmptyMessage(text, read = {}) {
+  if (read && read.contextLost) {
+    return '拡張が更新されたため、このタブからは保存した記録を読めません。ページを再読み込み(F5)すると出ます';
+  }
+  if (read && read.readFailed) {
+    return '記録の読み込みが間に合いませんでした。少し待ってもう一度押してください';
+  }
+  const p = parseTileStatsText(text);
+  if (p.comments != null) {
+    return `発言 ${ja(p.comments)} 回の本文が、保存した記録の中に見つかりませんでした`;
+  }
   return speechSupportLine(text)
     ? 'この配信のコメントの記録はありません(応援はギフト・広告のみ)'
     : 'この配信の記録にはまだ発言がありません';
+}
+
+/**
+ * 保存した記録から本文が1件も取れなかったときに、会場が手元に持っている直近の発言(ホバーと同じ値)で代わりに出すための注記。
+ *   読めなかった理由があればそれを添える。代わりに出す本文が無ければ ''(呼び出し側は speechEmptyMessage を出す)。
+ * @param {number} shown 代わりに出す件数
+ * @param {{ contextLost?: boolean, readFailed?: boolean }} [read]
+ * @returns {string}
+ */
+export function speechFallbackNote(shown, read = {}) {
+  const n = Number(shown);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const head = `会場が覚えている直近の発言 ${ja(n)} 件だけを出しています`;
+  if (read && read.contextLost) return `${head}(拡張が更新されたため。ページを再読み込み(F5)すると全部出ます)`;
+  if (read && read.readFailed) return `${head}(記録の読み込みが間に合わなかったため。もう一度押すと全部出ることがあります)`;
+  return head;
+}
+
+/**
+ * 保存した記録から本文が1件も取れなかったときの代わりの一覧の HTML(手元の直近の発言・新しい順のまま)。無ければ ''。
+ *   件数(全 N 件)は言わない(手元の数は記録の数ではない)=注記で「直近だけ」と明示する。
+ * @param {unknown} texts ホバーカードと同じ recentTexts(新しい順・recentTextRing.js)
+ * @param {{ contextLost?: boolean, readFailed?: boolean }} read
+ * @param {(s: string) => string} esc
+ * @param {number} [max]
+ * @returns {string}
+ */
+export function speechFallbackListHtml(texts, read, esc, max = 1000) {
+  const rows = (Array.isArray(texts) ? texts : []).map((t) => String(t ?? '').trim()).filter(Boolean).slice(0, max);
+  if (!rows.length) return '';
+  return (
+    `<div class="nlsb-speech-support">${esc(speechFallbackNote(rows.length, read))}</div>` +
+    rows.map((t) => `<div class="nlsb-roster-row"><span class="nlsb-roster-who">${esc(t)}</span></div>`).join('')
+  );
 }
