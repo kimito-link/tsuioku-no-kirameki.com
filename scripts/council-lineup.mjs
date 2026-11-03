@@ -396,7 +396,10 @@ export const LINEUP = [
   //  - Mistral Large 4（Mistral 直・NIM 両方）: 本文空 / 240秒 timeout。mistral-medium-3.5・small-2603・magistral は30秒間隔でも 429。
   //  - Kimi K2.6 / K2.7-code・GLM 5.3（CF・NIM）・MiniMax M3.1・Step 5・Nemotron 3.5 Lightning: 推論で上限を使い切り EMPTY/CUT（推論オフでも直らない or 未対応）。
   //  - cloudflare glm-5.2: 推論オフなら4/4 OK・7秒台と良いが、7/31 に「Workers Paid が必要」で撤去した経緯があり、
-  //    今日通った理由（無料化か契約が Paid になったか）を確認できていない（会議の鍵には請求を読む権限が無い）。お金の確認が取れるまで採らない。
+  //    今日通った理由は「アカウントが Workers Paid（月$5・2026-11-24 更新）を契約中」だから（りんくが請求画面で確認）。
+  //    Paid では1日 10,000 Neurons の無料枠を超えても止まらず従量課金が続く。glm-5.2 は Paid 専用モデルなので、
+  //    足すと会議のたびにお金がかかり得る＝無料前提の会議（恒久ルール1）に反するため採らない。
+  //    ★同じ理由で、CF の既存メンバー6体も無料枠を超えた日は課金される（Free なら止まっていた）。会議でCF勢を増やすときは使用量を見ること。
   //  - SambaNova DeepSeek-V3.2: 2日連続 timeout / high demand。
 
   // 2026-07-31 追加: NVIDIA lead正規(nemotron-3-ultra-550b)の別経路予備。OpenRouterの無料
