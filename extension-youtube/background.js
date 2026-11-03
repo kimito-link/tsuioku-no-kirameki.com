@@ -943,6 +943,7 @@
     VOICE_QUEUE: "yt_voice_queue",
     VOICE_STATE: "yt_voice_state"
   });
+  var BACKGROUND_READER_ENABLED = false;
   var DEFAULT_VOICE_SETTINGS = Object.freeze({
     enabled: true,
     mode: YT_VOICE_MODES.ALL,
@@ -1315,7 +1316,7 @@
           });
         }
         let enqueuedAny = false;
-        if (settings.enabled) {
+        if (BACKGROUND_READER_ENABLED && settings.enabled) {
           for (const newItem of idbResult.newlyAdded) {
             const prevLen = voiceQueue.length;
             const enq = enqueueYtVoiceItem(voiceQueue, newItem, {
@@ -1356,7 +1357,7 @@
           updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
         }
         await chrome.storage.local.set(updates);
-        if (settings.enabled && (enqueuedAny || voiceQueue.length > 0)) {
+        if (BACKGROUND_READER_ENABLED && settings.enabled && (enqueuedAny || voiceQueue.length > 0)) {
           nudgeOffscreenDrain();
         }
         return {
@@ -1379,8 +1380,8 @@
           ...data[STORAGE_KEYS.VOICE_SETTINGS] || {}
         };
         const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
-        if (!settings.enabled || queue.length === 0) {
-          return { ok: true, entry: null, remaining: queue.length, enabled: Boolean(settings.enabled) };
+        if (!BACKGROUND_READER_ENABLED || !settings.enabled || queue.length === 0) {
+          return { ok: true, entry: null, remaining: queue.length, enabled: BACKGROUND_READER_ENABLED && Boolean(settings.enabled) };
         }
         const [entry, ...rest] = queue;
         await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_QUEUE]: rest });

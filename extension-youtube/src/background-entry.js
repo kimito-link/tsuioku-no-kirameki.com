@@ -33,6 +33,11 @@ const STORAGE_KEYS = Object.freeze({
   VOICE_STATE: 'yt_voice_state',
 });
 
+// ★読み上げはニコ生版と同じくコメビュ(comeview.html の「読み上げ」)が担う。YouTube 版に元からあった
+//   この裏方の読み上げ(offscreen)も動くと、同じコメントが二重に読まれる(2026-11-04 りんくの実機で確認)。
+//   なので裏方は止めておく(仕組みは残す)。
+const BACKGROUND_READER_ENABLED = false;
+
 const DEFAULT_VOICE_SETTINGS = Object.freeze({
   enabled: true,
   mode: YT_VOICE_MODES.ALL,
@@ -516,7 +521,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // 新規追加されたコメントだけを読み上げキューへ投入
       let enqueuedAny = false;
-      if (settings.enabled) {
+      if (BACKGROUND_READER_ENABLED && settings.enabled) {
         for (const newItem of idbResult.newlyAdded) {
           const prevLen = voiceQueue.length;
           const enq = enqueueYtVoiceItem(voiceQueue, newItem, {
@@ -561,7 +566,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       await chrome.storage.local.set(updates);
-      if (settings.enabled && (enqueuedAny || voiceQueue.length > 0)) {
+      if (BACKGROUND_READER_ENABLED && settings.enabled && (enqueuedAny || voiceQueue.length > 0)) {
         nudgeOffscreenDrain();
       }
       return {
@@ -589,8 +594,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
         ? data[STORAGE_KEYS.VOICE_QUEUE]
         : [];
-      if (!settings.enabled || queue.length === 0) {
-        return { ok: true, entry: null, remaining: queue.length, enabled: Boolean(settings.enabled) };
+      if (!BACKGROUND_READER_ENABLED || !settings.enabled || queue.length === 0) {
+        return { ok: true, entry: null, remaining: queue.length, enabled: BACKGROUND_READER_ENABLED && Boolean(settings.enabled) };
       }
       const [entry, ...rest] = queue;
       await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_QUEUE]: rest });
