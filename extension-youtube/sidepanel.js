@@ -519,6 +519,7 @@
   } catch {
   }
   var videoIdByLv = /* @__PURE__ */ new Map();
+  var IS_MARKETING_PAGE = typeof location !== "undefined" && /marketing-export\.html$/.test(String(location.pathname || ""));
   var replayVideoIds = /* @__PURE__ */ new Set();
   var lvByVideoId = /* @__PURE__ */ new Map();
   function pseudoLvForVideoId(videoId) {
@@ -594,6 +595,8 @@
     const name = String(r?.name || "").trim();
     const key = personKey || channelId || (name ? `name:${name}` : "");
     const at = Number(r?.recordedAt || 0) || Date.now();
+    const postedAt = r?.replay ? ytReplayPostedAt(String(r?.ts || ""), Number(r?._streamStartedAt || 0), at) : ytPostedAtFromClock(String(r?.ts || ""), at);
+    const capturedAt = r?.replay && IS_MARKETING_PAGE && postedAt > 0 ? postedAt : at;
     return {
       id: String(r?.id || r?.pk || `yt${i}`),
       liveId: lv,
@@ -603,10 +606,10 @@
       ytChannelId: /^UC/.test(key) ? key : channelId,
       nickname: name,
       avatarUrl: String(r?.iconUrl || ""),
-      capturedAt: at,
+      capturedAt,
       // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)
       // リプレイ(アーカイブ)は時刻表示が経過時間なので、配信の開始時刻 + 経過時間にする
-      ytPostedAt: r?.replay ? ytReplayPostedAt(String(r?.ts || ""), Number(r?._streamStartedAt || 0), at) : ytPostedAtFromClock(String(r?.ts || ""), at),
+      ytPostedAt: postedAt,
       ytKind: String(r?.kind || "text"),
       ...r?.giftName ? { ytGiftName: String(r.giftName) } : {},
       ...r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {},
@@ -45432,7 +45435,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T23:21" ? String("yt-2026-11-03T23:21") : "dev";
+      const buildId = "yt-2026-11-03T23:23" ? String("yt-2026-11-03T23:23") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45450,7 +45453,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.31") : "";
+    const bundledVersion = true ? String("0.1.32") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45495,7 +45498,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T23:21" ? String("yt-2026-11-03T23:21") : "dev";
+            return "yt-2026-11-03T23:23" ? String("yt-2026-11-03T23:23") : "dev";
           } catch {
             return "dev";
           }
