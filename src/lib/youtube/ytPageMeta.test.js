@@ -1,0 +1,43 @@
+import { describe, it, expect } from 'vitest';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, pickYtBroadcasterIconUrl } from './ytPageMeta.js';
+
+describe('parseYtVideoIdFromUrl', () => {
+  it('watch / live / live_chat / youtu.be を読める', () => {
+    expect(parseYtVideoIdFromUrl('https://www.youtube.com/watch?v=abcdefghijk&t=1')).toBe('abcdefghijk');
+    expect(parseYtVideoIdFromUrl('https://www.youtube.com/live/abcdefghijk?si=x')).toBe('abcdefghijk');
+    expect(parseYtVideoIdFromUrl('https://www.youtube.com/live_chat?is_popout=1&v=abcdefghijk')).toBe('abcdefghijk');
+    expect(parseYtVideoIdFromUrl('https://youtu.be/abcdefghijk')).toBe('abcdefghijk');
+  });
+  it('取れないものは空', () => {
+    expect(parseYtVideoIdFromUrl('https://www.youtube.com/')).toBe('');
+    expect(parseYtVideoIdFromUrl('https://www.youtube.com/live/short')).toBe('');
+    expect(parseYtVideoIdFromUrl('')).toBe('');
+    expect(parseYtVideoIdFromUrl(/** @type {any} */ (null))).toBe('');
+  });
+});
+
+describe('isYtWatchLikeUrl', () => {
+  it('watch と live は真・live_chat とトップは偽', () => {
+    expect(isYtWatchLikeUrl('https://www.youtube.com/watch?v=abcdefghijk')).toBe(true);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/live/abcdefghijk')).toBe(true);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/live_chat?v=abcdefghijk')).toBe(false);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/')).toBe(false);
+  });
+});
+
+describe('pickYtBroadcasterIconUrl', () => {
+  it('空・data: を飛ばして大きいサイズに上げる', () => {
+    expect(
+      pickYtBroadcasterIconUrl(['', 'data:image/gif;base64,xx', 'https://yt3.ggpht.com/abc=s48-c-k-c0x00ffffff-no-rj']),
+    ).toBe('https://yt3.ggpht.com/abc=s176-c-k-c0x00ffffff-no-rj');
+  });
+  it('// 始まりを https にする・知らないホストは捨てる', () => {
+    expect(pickYtBroadcasterIconUrl(['https://evil.example/a.png', '//yt3.googleusercontent.com/x=s240-c'])).toBe(
+      'https://yt3.googleusercontent.com/x=s240-c',
+    );
+  });
+  it('候補なしは空', () => {
+    expect(pickYtBroadcasterIconUrl([])).toBe('');
+    expect(pickYtBroadcasterIconUrl(/** @type {any} */ (null))).toBe('');
+  });
+});

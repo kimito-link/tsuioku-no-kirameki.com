@@ -1,10 +1,18 @@
 // content-chat-entry.js — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
-/* global chrome, window, document, MutationObserver, URL, URLSearchParams, setTimeout, setInterval */
+/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, setInterval */
 
 import {
   parseYtChatElement,
   extractYtWatchConcurrentViewersFromText,
 } from '../../src/lib/youtube/ytChatParse.js';
+import {
+  parseYtVideoIdFromUrl,
+  isYtWatchLikeUrl,
+  pickYtBroadcasterIconUrl,
+} from '../../src/lib/youtube/ytPageMeta.js';
+
+/** チャットを自動で「すべて」に切り替えるか（サイドパネルの設定・既定オン） */
+const AUTO_ALL_CHAT_KEY = 'yt_auto_all_chat_v1';
 
 const CHAT_ITEM_SELECTOR = [
   'yt-live-chat-text-message-renderer',
@@ -23,33 +31,17 @@ const MAX_SEEN_IDS = 5000;
  * @returns {string}
  */
 function resolveCurrentVideoId() {
-  try {
-    const ownV = new URLSearchParams(window.location.search).get('v');
-    if (ownV) return ownV.trim();
-  } catch {
-    // ignore
-  }
-
+  const own = parseYtVideoIdFromUrl(String(window.location.href || ''));
+  if (own) return own;
   try {
     if (window.top && window.top !== window) {
-      const topV = new URLSearchParams(window.top.location.search).get('v');
-      if (topV) return topV.trim();
+      const top = parseYtVideoIdFromUrl(String(window.top.location.href || ''));
+      if (top) return top;
     }
   } catch {
     // cross-origin 時は参照不可
   }
-
-  try {
-    if (document.referrer) {
-      const refUrl = new URL(document.referrer);
-      const refV = refUrl.searchParams.get('v');
-      if (refV) return refV.trim();
-    }
-  } catch {
-    // ignore
-  }
-
-  return '';
+  return parseYtVideoIdFromUrl(String(document.referrer || ''));
 }
 
 /**
@@ -83,52 +75,130 @@ function safeSendMessage(msg) {
 }
 
 /**
- * 視聴ページ（/watch）で配信タイトル・配信者名を拾って SW へ通知する。
+ * 要素から画像 URL 候補を集める（遅延読み込みで src が空のときは srcset / data 属性も見る）。
+ * @param {Element | null} img
+ * @returns {string[]}
+ */
+function collectImgUrlCandidates(img) {
+  if (!img) return [];
+  const out = [];
+  const anyImg = /** @type {any} */ (img);
+  out.push(String(anyImg.currentSrc || ''));
+  out.push(String(anyImg.src || ''));
+  out.push(String(img.getAttribute('src') || ''));
+  const srcset = String(img.getAttribute('srcset') || '');
+  if (srcset) out.push(srcset.split(',').pop()?.trim().split(/\s+/)[0] || '');
+  out.push(String(img.getAttribute('data-src') || ''));
+  out.push(String(img.getAttribute('data-thumb') || ''));
+  return out;
+}
+
+/** 配信者アイコン（チャンネル画像）を探す。YouTube は画面構成が何度も変わるので候補を広く見る。 */
+function readBroadcasterIconUrl() {
+  const selectors = [
+    'ytd-watch-metadata ytd-video-owner-renderer #avatar img',
+    'ytd-watch-metadata #owner yt-img-shadow img',
+    'ytd-watch-metadata #owner img',
+    '#owner #avatar img',
+    'ytd-video-owner-renderer #avatar img',
+    'ytd-video-owner-renderer img',
+    '#upload-info #avatar img',
+    'ytd-channel-name ~ * img',
+  ];
+  const candidates = [];
+  for (const sel of selectors) {
+    try {
+      document.querySelectorAll(sel).forEach((img) => {
+        candidates.push(...collectImgUrlCandidates(img));
+      });
+    } catch {
+      // ignore
+    }
+  }
+  // 最後の手段: ページ内 JSON-LD / meta（チャンネル画像は含まれないことが多いが無害）
+  try {
+    const metaImg = document.querySelector('link[itemprop="thumbnailUrl"][href*="ggpht"], meta[itemprop="image"][content*="ggpht"]');
+    if (metaImg) candidates.push(String(metaImg.getAttribute('href') || metaImg.getAttribute('content') || ''));
+  } catch {
+    // ignore
+  }
+  return pickYtBroadcasterIconUrl(candidates);
+}
+
+/** 同時視聴数（「◯人が視聴中」「◯ watching now」）を探す。 */
+function readConcurrentViewers() {
+  const selectors = [
+    'ytd-watch-metadata #description #info',
+    'ytd-watch-metadata #info-container',
+    'ytd-watch-info-text',
+    'ytd-watch-metadata #view-count',
+    '#view-count',
+    'ytd-video-primary-info-renderer #count',
+    'ytd-video-view-count-renderer',
+    '#info',
+  ];
+  for (const sel of selectors) {
+    /** @type {NodeListOf<Element>} */
+    let nodes;
+    try {
+      nodes = document.querySelectorAll(sel);
+    } catch {
+      continue;
+    }
+    for (let i = 0; i < nodes.length; i += 1) {
+      const el = nodes[i];
+      const texts = [
+        String(el.textContent || ''),
+        String(el.getAttribute('aria-label') || ''),
+      ];
+      el.querySelectorAll('[aria-label]').forEach((x) => texts.push(String(x.getAttribute('aria-label') || '')));
+      for (const t of texts) {
+        const parsed = extractYtWatchConcurrentViewersFromText(t);
+        if (parsed !== null) return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 視聴ページ（/watch・/live/ID）で配信タイトル・配信者名・アイコン・同時視聴数を拾って SW へ通知する。
+ * YouTube はページ遷移しない（SPA）ので、どのページで読み込まれても動き、URL が視聴ページの時だけ送る。
  */
 function setupWatchPageMetaObserver() {
   const sendMeta = () => {
+    if (!isYtWatchLikeUrl(String(window.location.href || ''))) return;
     const videoId = resolveCurrentVideoId();
     if (!videoId) return;
 
     const titleEl = document.querySelector(
-      'h1.ytd-watch-metadata yt-formatted-string, h1.title yt-formatted-string',
+      'ytd-watch-metadata h1 yt-formatted-string, h1.ytd-watch-metadata yt-formatted-string, h1.title yt-formatted-string',
     );
     const rawTitle =
       String(titleEl?.textContent || '').replace(/\s+/g, ' ').trim() ||
-      String(document.title || '').replace(/\s*-\s*YouTube$/i, '').trim();
+      String(document.title || '').replace(/\s*-\s*YouTube$/i, '').replace(/^\(\d+\)\s*/, '').trim();
 
     const ownerNameEl = document.querySelector(
-      '#owner #channel-name a, ytd-video-owner-renderer #channel-name a, #upload-info #channel-name a',
+      'ytd-watch-metadata #owner #channel-name a, #owner #channel-name a, ytd-video-owner-renderer #channel-name a, #upload-info #channel-name a',
     );
     const broadcasterName = String(ownerNameEl?.textContent || '').replace(/\s+/g, ' ').trim();
 
-    const ownerLinkEl = document.querySelector(
-      '#owner a[href*="/channel/UC"], ytd-video-owner-renderer a[href*="/channel/UC"]',
-    );
-    const href = String(ownerLinkEl?.getAttribute('href') || '');
-    const ucMatch = href.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
-    const broadcasterChannelId = ucMatch ? ucMatch[1] : '';
-
-    const ownerImgEl = document.querySelector(
-      '#owner #avatar img, ytd-video-owner-renderer #avatar img, #upload-info #avatar img',
-    );
-    const broadcasterIconUrl = String(
-      ownerImgEl?.getAttribute('src') || (ownerImgEl && 'src' in ownerImgEl ? ownerImgEl.src : '') || '',
-    ).trim();
-
-    /** @type {number | null} */
-    let concurrentViewers = null;
-    const infoCandidates = document.querySelectorAll(
-      'ytd-watch-info-text, #info-container, #view-count, ytd-video-primary-info-renderer #count, #info',
-    );
-    for (let i = 0; i < infoCandidates.length; i += 1) {
-      const parsed = extractYtWatchConcurrentViewersFromText(
-        String(infoCandidates[i]?.textContent || ''),
+    let broadcasterChannelId = '';
+    try {
+      const links = document.querySelectorAll(
+        'ytd-watch-metadata #owner a[href], #owner a[href], ytd-video-owner-renderer a[href]',
       );
-      if (parsed !== null) {
-        concurrentViewers = parsed;
-        break;
+      for (let i = 0; i < links.length && !broadcasterChannelId; i += 1) {
+        const m = String(links[i].getAttribute('href') || '').match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
+        if (m) broadcasterChannelId = m[1];
       }
+      if (!broadcasterChannelId) {
+        const metaCh = document.querySelector('meta[itemprop="channelId"], meta[itemprop="identifier"][content^="UC"]');
+        const c = String(metaCh?.getAttribute('content') || '');
+        if (/^UC[A-Za-z0-9_-]{22}$/.test(c)) broadcasterChannelId = c;
+      }
+    } catch {
+      // ignore
     }
 
     safeSendMessage({
@@ -138,8 +208,8 @@ function setupWatchPageMetaObserver() {
         title: rawTitle,
         broadcasterName,
         broadcasterChannelId,
-        broadcasterIconUrl,
-        concurrentViewers,
+        broadcasterIconUrl: readBroadcasterIconUrl(),
+        concurrentViewers: readConcurrentViewers(),
       },
     });
   };
@@ -150,7 +220,71 @@ function setupWatchPageMetaObserver() {
   setInterval(sendMeta, 5000);
   window.addEventListener('yt-navigate-finish', () => {
     setTimeout(sendMeta, 800);
+    setTimeout(sendMeta, 2500);
   });
+}
+
+/**
+ * チャット欄を「上位のチャット（トップチャット）」から「すべてのチャット」へ切り替える。
+ * YouTube の上位チャットは一部のコメントを隠すので、記録・読み上げの取りこぼしになる。
+ * メニューの並びは [上位, すべて] の順。2番目が選ばれていなければ押す。設定でオフにできる。
+ */
+function setupAutoAllChat() {
+  let attempts = 0;
+  let done = false;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const tryOnce = async () => {
+    if (done || attempts >= 6) return;
+    attempts += 1;
+    let enabled = true;
+    try {
+      const got = await chrome.storage.local.get(AUTO_ALL_CHAT_KEY);
+      enabled = got?.[AUTO_ALL_CHAT_KEY] !== false;
+    } catch {
+      // ignore
+    }
+    if (!enabled) {
+      done = true;
+      return;
+    }
+    const trigger = /** @type {HTMLElement | null} */ (
+      document.querySelector(
+        'yt-live-chat-header-renderer yt-sort-filter-sub-menu-renderer #trigger, yt-live-chat-header-renderer #trigger',
+      )
+    );
+    if (!trigger) return;
+    trigger.click();
+    await sleep(350);
+    const items = Array.from(
+      document.querySelectorAll(
+        'tp-yt-iron-dropdown tp-yt-paper-listbox a, tp-yt-iron-dropdown tp-yt-paper-listbox tp-yt-paper-item, yt-sort-filter-sub-menu-renderer tp-yt-paper-listbox a',
+      ),
+    ).filter((el) => /** @type {HTMLElement} */ (el).offsetParent !== null || el.closest('tp-yt-iron-dropdown'));
+    // 同じ項目が a と paper-item の二重で拾われるのを除く
+    const uniq = items.filter((el) => !items.some((o) => o !== el && o.contains(el)));
+    if (uniq.length < 2) {
+      trigger.click();
+      return;
+    }
+    const allItem = /** @type {HTMLElement} */ (uniq[1]);
+    const selected =
+      allItem.classList.contains('iron-selected') ||
+      allItem.getAttribute('aria-selected') === 'true' ||
+      !!allItem.querySelector('.iron-selected, [aria-selected="true"]');
+    if (selected) {
+      trigger.click();
+      done = true;
+      return;
+    }
+    allItem.click();
+    done = true;
+  };
+
+  setTimeout(tryOnce, 1500);
+  setTimeout(tryOnce, 4000);
+  setTimeout(tryOnce, 8000);
+  setTimeout(tryOnce, 15000);
 }
 
 /**
@@ -285,12 +419,114 @@ function setupLiveChatObserver() {
   }, 2000);
 }
 
+/**
+ * サイドパネルからのコメント送信を受けて、YouTube 本体のチャット入力欄に書いて送信ボタンを押す。
+ * ログイン・送信の可否は YouTube 本体の判断に任せる（拡張は代わりに打つだけ）。
+ */
+function setupCommentSendBridge() {
+  if (String(window.location.pathname || '').startsWith('/live_chat_replay')) return;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (!msg || msg.type !== 'YT_SEND_COMMENT_TO_FRAME') return undefined;
+      const want = String(msg.videoId || '');
+      const mine = resolveCurrentVideoId();
+      if (want && mine && want !== mine) return undefined;
+      (async () => {
+        const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!text) return { ok: false, reason: 'empty' };
+        const input = /** @type {HTMLElement | null} */ (
+          document.querySelector(
+            'yt-live-chat-text-input-field-renderer #input[contenteditable], #input.yt-live-chat-text-input-field-renderer, yt-live-chat-message-input-renderer #input[contenteditable]',
+          )
+        );
+        if (!input) {
+          const signIn = document.querySelector(
+            'yt-live-chat-message-input-renderer #sign-in, yt-live-chat-restricted-participation-renderer, yt-live-chat-message-input-renderer yt-button-renderer a[href*="ServiceLogin"]',
+          );
+          return { ok: false, reason: signIn ? 'not-signed-in' : 'no-input' };
+        }
+        input.focus();
+        try {
+          document.execCommand('selectAll', false);
+          document.execCommand('delete', false);
+          document.execCommand('insertText', false, text);
+        } catch {
+          // ignore
+        }
+        if (String(input.textContent || '').trim() !== text) {
+          input.textContent = text;
+          input.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }));
+        }
+        await sleep(120);
+        const btn = /** @type {HTMLButtonElement | null} */ (
+          document.querySelector(
+            'yt-live-chat-message-input-renderer #send-button button, #send-button yt-button-renderer button, #send-button button',
+          )
+        );
+        if (!btn) return { ok: false, reason: 'no-send-button' };
+        if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+          return { ok: false, reason: 'send-disabled' };
+        }
+        btn.click();
+        await sleep(400);
+        const left = String(input.textContent || '').trim();
+        return { ok: left === '' || left !== text, reason: left === text ? 'still-in-box' : '' };
+      })()
+        .then((r) => sendResponse(r))
+        .catch((e) => sendResponse({ ok: false, reason: String(e) }));
+      return true;
+    });
+  } catch {
+    // context invalidated
+  }
+}
+
+/**
+ * 視聴ページの動画を1枚の PNG にする（📷 スクショ）。広告中や DRM 動画では失敗することがある。
+ */
+function setupVideoFrameCapture() {
+  try {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (!msg || msg.type !== 'YT_CAPTURE_FRAME_IN_PAGE') return undefined;
+      try {
+        const video = /** @type {HTMLVideoElement | null} */ (
+          document.querySelector('#movie_player video.html5-main-video, video.html5-main-video, #movie_player video')
+        );
+        if (!video || !video.videoWidth) {
+          sendResponse({ ok: false, reason: 'no-video' });
+          return undefined;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          sendResponse({ ok: false, reason: 'no-canvas' });
+          return undefined;
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        sendResponse({ ok: true, dataUrl: canvas.toDataURL('image/png'), currentTime: video.currentTime });
+      } catch (e) {
+        sendResponse({ ok: false, reason: String(e) });
+      }
+      return undefined;
+    });
+  } catch {
+    // context invalidated
+  }
+}
+
 function init() {
   const path = String(window.location.pathname || '');
   if (path.startsWith('/live_chat')) {
     setupLiveChatObserver();
-  } else if (path.startsWith('/watch')) {
+    if (!path.startsWith('/live_chat_replay')) setupAutoAllChat();
+    setupCommentSendBridge();
+  } else if (window.top === window) {
+    // 最上位の YouTube ページ（トップから視聴ページへ遷移しても動くよう、どのページでも待機）
     setupWatchPageMetaObserver();
+    setupVideoFrameCapture();
   }
 }
 

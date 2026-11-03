@@ -1,5 +1,5 @@
 // background-entry.js — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
-/* global chrome, URL */
+/* global chrome */
 
 import {
   VOICEVOX_BASE_URL,
@@ -15,6 +15,7 @@ import {
 } from '../../src/lib/youtube/ytVoiceQueue.js';
 import { mergeYtStreamSummary } from '../../src/lib/youtube/ytStreamStorePolicy.js';
 import { appendYtStreamCommentsIdb } from './ytIdbStore.js';
+import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
 
 const STORAGE_KEYS = Object.freeze({
   STREAM_SUMMARIES: 'yt_stream_summaries',
@@ -117,14 +118,40 @@ async function nudgeOffscreenDrain() {
  * @returns {string}
  */
 function extractVideoIdFromSender(sender) {
-  try {
-    const tabUrl = sender?.tab?.url || '';
-    if (!tabUrl) return '';
-    const u = new URL(tabUrl);
-    return (u.searchParams.get('v') || '').trim();
-  } catch {
-    return '';
+  return parseYtVideoIdFromUrl(String(sender?.url || '')) || parseYtVideoIdFromUrl(String(sender?.tab?.url || ''));
+}
+
+/**
+ * サイドパネルのコメントを、その配信を開いているタブのチャット欄へ渡して送信させる。
+ * @param {string} videoId
+ * @param {string} text
+ */
+async function relayCommentToChatFrame(videoId, text) {
+  const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
+  const scored = tabs
+    .map((t) => {
+      const vid = parseYtVideoIdFromUrl(String(t.url || ''));
+      let score = 0;
+      if (videoId && vid === videoId) score += 10;
+      if (String(t.url || '').includes('/live_chat')) score += 2;
+      if (t.active) score += 1;
+      return { t, score };
+    })
+    .filter((x) => x.score >= (videoId ? 10 : 1))
+    .sort((a, b) => b.score - a.score);
+  if (scored.length === 0) return { ok: false, reason: 'no-tab' };
+  let last = { ok: false, reason: 'no-chat-frame' };
+  for (const { t } of scored) {
+    if (typeof t.id !== 'number') continue;
+    try {
+      const res = await chrome.tabs.sendMessage(t.id, { type: 'YT_SEND_COMMENT_TO_FRAME', videoId, text });
+      if (res && res.ok) return res;
+      if (res) last = res;
+    } catch {
+      // そのタブにチャット欄が無い
+    }
   }
+  return last;
 }
 
 function setupSidePanelBehavior() {
@@ -149,6 +176,40 @@ chrome.runtime.onStartup?.addListener(() => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
+
+  if (message.type === 'YT_CAPTURE_FRAME') {
+    (async () => {
+      const want = String(message.videoId || '');
+      const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
+      const sorted = tabs
+        .filter((t) => !String(t.url || '').includes('/live_chat'))
+        .sort((a, b) => {
+          const sa = (parseYtVideoIdFromUrl(String(a.url || '')) === want ? 10 : 0) + (a.active ? 1 : 0);
+          const sb = (parseYtVideoIdFromUrl(String(b.url || '')) === want ? 10 : 0) + (b.active ? 1 : 0);
+          return sb - sa;
+        });
+      for (const t of sorted) {
+        if (typeof t.id !== 'number') continue;
+        try {
+          const res = await chrome.tabs.sendMessage(t.id, { type: 'YT_CAPTURE_FRAME_IN_PAGE' }, { frameId: 0 });
+          if (res) return res;
+        } catch {
+          // そのタブに content script が無い
+        }
+      }
+      return { ok: false, reason: 'no-tab' };
+    })()
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, reason: String(err) }));
+    return true;
+  }
+
+  if (message.type === 'YT_SEND_COMMENT') {
+    relayCommentToChatFrame(String(message.videoId || ''), String(message.text || ''))
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, reason: String(err) }));
+    return true;
+  }
 
   if (message.type === 'YT_STREAM_META') {
     runSerialized(async () => {

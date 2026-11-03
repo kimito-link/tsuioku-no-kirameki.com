@@ -1,5 +1,5 @@
 // sidepanel-entry.js — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
-/* global window, chrome, document, performance */
+/* global window, chrome, document, performance, URL, Blob, fetch, setTimeout */
 
 import { formatNumberJa, safeHttpUrl } from '../../src/lib/htmlText.js';
 import { anonymousIdenticonDataUrl } from '../../src/lib/anonymousIdenticon.js';
@@ -14,6 +14,13 @@ import {
   createYtStreamIncrementalState,
   applyYtStreamIncrementalItems,
 } from '../../src/lib/youtube/ytStreamStorePolicy.js';
+import { buildYtUserLaneTiers, YT_USER_LANE_TIER_KEYS } from '../../src/lib/youtube/ytUserLaneTiers.js';
+import {
+  buildYtMarketingReportHtml,
+  buildYtCommentLogReportHtml,
+  buildYtReportFilename,
+} from '../../src/lib/youtube/ytReportHtml.js';
+import { formatRelativeTimeJa } from '../../src/lib/supportActivityTimeline.js';
 import { getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 
 const STORAGE_KEYS = Object.freeze({
@@ -52,8 +59,21 @@ const BROADCASTER_FALLBACK_ICON =
 
 /** 応援ユーザーの順位カードに表示する最大人数 */
 const TOP_SUPPORT_STRIP_LIMIT = 10;
-/** アイコン列の各ティアに表示する最大人数 */
-const STORY_USERLANE_LIMIT = 36;
+/** アイコン列の各段に表示する最大人数（超えた分は「ほか N人」と正直に出す） */
+const STORY_USERLANE_LIMIT = 60;
+/** 応援タイムラインに並べる最大行数 */
+const SUPPORT_TIMELINE_LIMIT = 80;
+/** チャットを自動で「すべてのチャット」に切り替える設定（content script と同じキー） */
+const AUTO_ALL_CHAT_KEY = 'yt_auto_all_chat_v1';
+
+/** ニコ生版の段の案内文（src/lib/storyUserLaneGuideHtml.js の言い回しを YouTube 用に写したもの） */
+const STORY_TIER_GUIDE = Object.freeze({
+  link: 'りんく: チャンネルID・表示名・アイコンがそろった人を、直近に話した順に並べるよ。',
+  gift: 'ギフト列: スーパーチャット・スーパーステッカーで応援してくれた人を、金額の大きい順に並べるよ。',
+  member: 'メンバー列: メンバー加入・メンバーシップギフト・メンバーバッジの人を並べるよ（ニコ生版の広告列の位置）。',
+  konta: 'こん太: 表示名かアイコンのどちらかまで取れた人は、この段に並ぶよ。',
+  tanu: 'たぬ姉: チャンネルIDが取れない人や情報が薄い人は、ぜんぶこの段に集めるよ。',
+});
 /** 全員グリッドに表示する最大人数 */
 const STORY_GROWTH_GRID_LIMIT = 240;
 
@@ -806,134 +826,96 @@ function createStoryUserlaneCell(opts) {
 }
 
 /**
- * 6. 「アイコン列・グリッド・診断を表示」（`#supportVisualDetails`）内の
- * 3つの列（スパチャ列・メンバー/ギフト列・コメントした人（件数順））と
- * 全員丸アイコン敷き詰めグリッド（`#sceneStoryGrowth` + `いま N 人を表示中`）を描画する。
+ * タイル（アイコン列・グリッド）を押したときの動き。
+ * 普通に押す → 下の詳細欄にその人の発言一覧（ニコ生版の #sceneStoryDetail と同じ）。
+ * Ctrl / ⌘ / 中クリック → チャンネルページを開く（リンク本来の動き）。
+ * @param {HTMLElement} cell
+ * @param {any} user
+ */
+function bindStoryTileClick(cell, user) {
+  cell.addEventListener('click', (ev) => {
+    const e = /** @type {MouseEvent} */ (ev);
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault();
+    void showStoryUserDetail(user);
+  });
+}
+
+/**
+ * 6. 「アイコン列・グリッド・診断を表示」（`#supportVisualDetails`）を
+ * ニコ生版と同じ段（りんく・ギフト・メンバー・こん太・たぬ姉）で描き、
+ * 下に全員の丸アイコンのグリッド（`#sceneStoryGrowth`）を並べる。
  *
  * @param {any} ranking
  */
 function renderSupportVisualDetails(ranking) {
   const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
+  const built = buildYtUserLaneTiers(commenters, { limitPerTier: STORY_USERLANE_LIMIT });
 
-  // 1) スパチャ列
-  const superchatLaneEl = document.getElementById('storyUserLaneSuperchat');
-  const superchatCountEl = document.getElementById('storyLaneSuperchatCount');
-  const superchatUsers = commenters
-    .filter((c) => c.superchatCount + c.stickerCount > 0)
-    .sort((a, b) => {
-      if (b.superchatTotalAmount !== a.superchatTotalAmount) {
-        return b.superchatTotalAmount - a.superchatTotalAmount;
-      }
-      return b.commentCount - a.commentCount;
-    });
-  if (superchatCountEl) {
-    superchatCountEl.textContent = `${formatNumberJa(superchatUsers.length)}人`;
-  }
-  if (superchatLaneEl) {
-    clearChildren(superchatLaneEl);
-    if (superchatUsers.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'nl-story-userlane__empty-note';
-      empty.textContent = 'Super Chat / Sticker の応援者が届くとここに丸アイコンが並びます。';
-      superchatLaneEl.appendChild(empty);
-    } else {
-      const frag = document.createDocumentFragment();
-      for (const u of superchatUsers.slice(0, STORY_USERLANE_LIMIT)) {
-        const amtText = u.primaryFormattedAmount || `${u.superchatCount + u.stickerCount}回`;
-        frag.appendChild(
-          createStoryUserlaneCell({
-            name: u.name,
-            channelId: u.channelId,
-            iconUrl: u.iconUrl,
-            channelUrl: u.channelUrl,
-            pulseBadge: amtText,
-            statsBadge: `💬${u.commentCount}件 💰${amtText}`,
-          }),
-        );
-      }
-      superchatLaneEl.appendChild(frag);
+  for (const key of YT_USER_LANE_TIER_KEYS) {
+    const laneEl = document.getElementById(`storyTierLane-${key}`);
+    const countEl = document.getElementById(`storyTierCount-${key}`);
+    const guideEl = document.getElementById(`storyTierGuide-${key}`);
+    const wrapEl = document.getElementById(`storyTierWrap-${key}`);
+    const users = built.tiers[key];
+    const total = built.totals[key];
+    if (guideEl && !guideEl.textContent) guideEl.textContent = STORY_TIER_GUIDE[key];
+    if (countEl) {
+      countEl.textContent =
+        total > users.length
+          ? `${formatNumberJa(users.length)}人（ほか${formatNumberJa(total - users.length)}人）`
+          : `${formatNumberJa(total)}人`;
     }
-  }
-
-  // 2) メンバー・ギフト列
-  const memberLaneEl = document.getElementById('storyUserLaneMemberGift');
-  const memberCountEl = document.getElementById('storyLaneMemberGiftCount');
-  const memberUsers = commenters
-    .filter((c) => c.giftCount > 0 || c.membershipCount > 0 || c.isMember)
-    .sort((a, b) => {
-      if (b.giftCount !== a.giftCount) return b.giftCount - a.giftCount;
-      if (b.membershipCount !== a.membershipCount) return b.membershipCount - a.membershipCount;
-      return b.commentCount - a.commentCount;
-    });
-  if (memberCountEl) {
-    memberCountEl.textContent = `${formatNumberJa(memberUsers.length)}人`;
-  }
-  if (memberLaneEl) {
-    clearChildren(memberLaneEl);
-    if (memberUsers.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'nl-story-userlane__empty-note';
-      empty.textContent = 'メンバー加入・ギフト・メンバー発言者が届くとここに丸アイコンが並びます。';
-      memberLaneEl.appendChild(empty);
-    } else {
-      const frag = document.createDocumentFragment();
-      for (const u of memberUsers.slice(0, STORY_USERLANE_LIMIT)) {
-        const pulse =
-          u.giftCount > 0
-            ? `🎁${u.giftCount}回`
-            : u.membershipCount > 0
-              ? `加入${u.membershipCount}回`
-              : '⭐メンバー';
-        frag.appendChild(
-          createStoryUserlaneCell({
-            name: u.name,
-            channelId: u.channelId,
-            iconUrl: u.iconUrl,
-            channelUrl: u.channelUrl,
-            pulseBadge: pulse,
-            statsBadge: `💬${u.commentCount}件 ${pulse}`,
-          }),
-        );
+    // ギフト・メンバーの段は、該当者がいないときは段ごと畳む（ニコ生版も空の段は hidden）
+    if (wrapEl) wrapEl.hidden = total === 0 && (key === 'gift' || key === 'member');
+    if (!laneEl) continue;
+    clearChildren(laneEl);
+    if (users.length === 0) {
+      if (key === 'link' || key === 'tanu' || key === 'konta') {
+        const empty = document.createElement('p');
+        empty.className = 'nl-story-userlane__empty-note';
+        empty.textContent =
+          key === 'link'
+            ? 'コメントが届くと、ここに丸アイコンが並びます。'
+            : 'この段に当てはまる人はまだいません。';
+        laneEl.appendChild(empty);
       }
-      memberLaneEl.appendChild(frag);
+      continue;
     }
-  }
-
-  // 3) コメントした人（件数順）
-  const commentersLaneEl = document.getElementById('storyUserLaneCommenters');
-  const commentersCountEl = document.getElementById('storyLaneCommentersCount');
-  if (commentersCountEl) {
-    commentersCountEl.textContent = `${formatNumberJa(commenters.length)}人`;
-  }
-  if (commentersLaneEl) {
-    clearChildren(commentersLaneEl);
-    if (commenters.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'nl-story-userlane__empty-note';
-      empty.textContent = 'コメントした人が届くと件数順に丸アイコンが並びます。';
-      commentersLaneEl.appendChild(empty);
-    } else {
-      const frag = document.createDocumentFragment();
-      for (const u of commenters.slice(0, STORY_USERLANE_LIMIT)) {
-        const stats = u.primaryFormattedAmount
-          ? `💬${u.commentCount}件 · ${u.primaryFormattedAmount}`
-          : `💬${u.commentCount}件`;
-        frag.appendChild(
-          createStoryUserlaneCell({
-            name: u.name,
-            channelId: u.channelId,
-            iconUrl: u.iconUrl,
-            channelUrl: u.channelUrl,
-            pulseBadge: `${u.commentCount}件`,
-            statsBadge: stats,
-          }),
-        );
+    const frag = document.createDocumentFragment();
+    for (const u of users) {
+      let pulse = `${u.commentCount}件`;
+      if (key === 'gift') pulse = u.primaryFormattedAmount || `${u.superchatCount + u.stickerCount}回`;
+      else if (key === 'member') {
+        pulse = u.giftCount > 0 ? `🎁${u.giftCount}回` : u.membershipCount > 0 ? `加入${u.membershipCount}回` : '⭐メンバー';
       }
-      commentersLaneEl.appendChild(frag);
+      const stats = u.primaryFormattedAmount
+        ? `💬${u.commentCount}件 · ${u.primaryFormattedAmount}`
+        : `💬${u.commentCount}件`;
+      const cell = createStoryUserlaneCell({
+        name: u.name,
+        channelId: u.channelId,
+        iconUrl: u.iconUrl,
+        channelUrl: u.channelUrl,
+        pulseBadge: pulse,
+        statsBadge: stats,
+      });
+      bindStoryTileClick(cell, u);
+      frag.appendChild(cell);
     }
+    laneEl.appendChild(frag);
   }
 
-  // 4) コメントした全員の顔を小さな丸で敷き詰めるグリッド（件数バッジ付き・「いま N 人を表示中」）
+  const footEl = document.getElementById('storyUserLaneFoot');
+  if (footEl) {
+    const others = built.total - built.displayed;
+    footEl.textContent =
+      others > 0
+        ? `いま ${formatNumberJa(built.displayed)} 件を表示中（ほか ${formatNumberJa(others)}人・直近アクティブ順）`
+        : `いま ${formatNumberJa(built.displayed)} 件を表示中`;
+  }
+
+  // コメントした全員の顔を小さな丸で敷き詰めるグリッド（件数バッジ付き）
   const growthGridEl = document.getElementById('sceneStoryGrowth');
   const gaugeLabelEl = document.getElementById('sceneStoryGaugeLabel');
   const gridSlice = commenters.slice(0, STORY_GROWTH_GRID_LIMIT);
@@ -952,7 +934,6 @@ function renderSupportVisualDetails(ranking) {
         /** @type {HTMLAnchorElement} */ (cell).target = '_blank';
         /** @type {HTMLAnchorElement} */ (cell).rel = 'noopener noreferrer';
       }
-
       const media = document.createElement('span');
       media.className = 'nl-story-growth-cell__media';
       media.appendChild(
@@ -964,14 +945,199 @@ function renderSupportVisualDetails(ranking) {
         ),
       );
       cell.appendChild(media);
+      bindStoryTileClick(cell, u);
       frag.appendChild(cell);
     }
     growthGridEl.appendChild(frag);
   }
   if (gaugeLabelEl) {
-    gaugeLabelEl.textContent = `いま ${formatNumberJa(commenters.length)} 人を表示中`;
+    gaugeLabelEl.textContent =
+      commenters.length > gridSlice.length
+        ? `いま ${formatNumberJa(gridSlice.length)} 人を表示中（ほか ${formatNumberJa(commenters.length - gridSlice.length)}人）`
+        : `いま ${formatNumberJa(commenters.length)} 人を表示中`;
   }
   visualDetailsNeedsRefresh = false;
+}
+
+/**
+ * タイルを押した人の詳細（サムネ・名前・ID・リンク・発言一覧）を `#sceneStoryDetail` に出す。
+ * @param {any} user
+ */
+async function showStoryUserDetail(user) {
+  const box = document.getElementById('sceneStoryDetail');
+  if (!box || !user) return;
+  const img = /** @type {HTMLImageElement | null} */ (document.getElementById('sceneStoryDetailImg'));
+  const nameEl = document.getElementById('sceneStoryDetailUser');
+  const metaEl = document.getElementById('sceneStoryDetailUserMeta');
+  const textEl = document.getElementById('sceneStoryDetailText');
+  const subEl = document.getElementById('sceneStoryDetailMeta');
+  const listEl = document.getElementById('sceneStoryDetailList');
+  const channelId = String(user.channelId || '');
+  const name = String(user.name || channelId || 'リスナー');
+
+  if (img) {
+    const fallback = getDeterministicIdenticonUrl(channelId || name);
+    const safe = safeHttpUrl(user.iconUrl || '');
+    img.src = safe || fallback;
+    img.referrerPolicy = 'no-referrer';
+    img.onerror = () => {
+      if (img.src !== fallback) img.src = fallback;
+    };
+  }
+  if (nameEl) {
+    clearChildren(nameEl);
+    const url = safeHttpUrl(user.channelUrl || buildYtChannelUrl(channelId));
+    if (url) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = name;
+      nameEl.appendChild(a);
+    } else {
+      nameEl.textContent = name;
+    }
+  }
+  if (metaEl) {
+    const parts = [];
+    if (channelId) parts.push(channelId);
+    parts.push(`コメント ${formatNumberJa(user.commentCount || 0)}件`);
+    if (user.primaryFormattedAmount) parts.push(`スパチャ ${user.primaryFormattedAmount}`);
+    if (user.isMember) parts.push('メンバー');
+    metaEl.textContent = parts.join(' · ');
+  }
+  if (textEl) textEl.textContent = '発言を読み込んでいます…';
+  if (subEl) subEl.textContent = '';
+  if (listEl) clearChildren(listEl);
+  box.hidden = false;
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  let rows = [];
+  try {
+    const all = selectedVideoId ? await getYtStreamCommentsByVideoId(selectedVideoId) : [];
+    rows = all.filter((r) => (channelId ? r.channelId === channelId : r.name === name));
+  } catch {
+    rows = [];
+  }
+  rows.sort((a, b) => Number(b.recordedAt || 0) - Number(a.recordedAt || 0));
+  if (textEl) textEl.textContent = rows.length ? `この配信での発言 ${formatNumberJa(rows.length)}件（新しい順）` : 'この配信での発言はまだ記録されていません。';
+  if (listEl) {
+    const frag = document.createDocumentFragment();
+    for (const r of rows.slice(0, 200)) {
+      const li = document.createElement('li');
+      const when = formatRelativeTimeJa(Number(r.recordedAt || 0), Date.now());
+      const amount = Number(r.amount || 0) > 0 ? `【${r.currency || ''} ${formatNumberJa(r.amount)}】` : '';
+      li.textContent = `${when ? `${when} ` : ''}${amount}${String(r.text || (r.kind === 'membership' ? '（メンバー加入）' : ''))}`;
+      frag.appendChild(li);
+    }
+    listEl.appendChild(frag);
+  }
+  if (subEl && rows.length > 200) subEl.textContent = `ほか ${formatNumberJa(rows.length - 200)}件は HTML 書き出しで見られます。`;
+}
+
+/** 応援タイムライン用に、直近の記録を新しい順で持っておく */
+/** @type {any[]} */
+let supportTimelineBuffer = [];
+
+/**
+ * @param {any[]} records
+ * @param {boolean} reset
+ */
+function pushSupportTimeline(records, reset) {
+  if (reset) supportTimelineBuffer = [];
+  const sorted = (Array.isArray(records) ? records : [])
+    .slice()
+    .sort((a, b) => Number(b.recordedAt || 0) - Number(a.recordedAt || 0));
+  supportTimelineBuffer = sorted.concat(supportTimelineBuffer).slice(0, SUPPORT_TIMELINE_LIMIT);
+}
+
+/** 応援タイムライン（コメント＋スパチャ・メンバーを時刻順に1本で）を描く。開いているときだけ。 */
+function renderSupportTimeline() {
+  const details = /** @type {HTMLDetailsElement | null} */ (document.getElementById('supportTimelineDetails'));
+  const body = document.getElementById('supportTimelineBody');
+  const giftMeta = document.getElementById('supportTimelineGiftMeta');
+  const paidCount = supportTimelineBuffer.filter((r) => r.kind && r.kind !== 'text').length;
+  if (giftMeta) {
+    giftMeta.hidden = paidCount === 0;
+    giftMeta.textContent = paidCount > 0 ? `応援 ${paidCount}件` : '';
+  }
+  if (!details?.open || !body) return;
+  clearChildren(body);
+  if (supportTimelineBuffer.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'nl-support-timeline__empty';
+    p.textContent = 'コメントやスパチャが届くと、ここに時刻順で並びます。';
+    body.appendChild(p);
+    return;
+  }
+  const now = Date.now();
+  const frag = document.createDocumentFragment();
+  for (const r of supportTimelineBuffer) {
+    const isSupport = r.kind && r.kind !== 'text';
+    const url = safeHttpUrl(buildYtChannelUrl(r.channelId || ''));
+    const row = url ? document.createElement('a') : document.createElement('div');
+    if (url) {
+      /** @type {HTMLAnchorElement} */ (row).href = url;
+      /** @type {HTMLAnchorElement} */ (row).target = '_blank';
+      /** @type {HTMLAnchorElement} */ (row).rel = 'noopener noreferrer';
+    }
+    const name = String(r.name || r.channelId || 'リスナー');
+    const ago = formatRelativeTimeJa(Number(r.recordedAt || 0), now);
+    if (isSupport) {
+      row.className = 'nl-tl-gift';
+      const wrap = document.createElement('span');
+      wrap.className = 'nl-tl-gift__avatar-wrap';
+      wrap.appendChild(createAvatarImgWithFallback(r.iconUrl || '', name, r.channelId || name, 'nl-tl-gift__avatar'));
+      const badge = document.createElement('span');
+      badge.className = 'nl-tl-gift__badge';
+      badge.setAttribute('aria-hidden', 'true');
+      badge.textContent = r.kind === 'superchat' || r.kind === 'sticker' ? '💰' : '⭐';
+      wrap.appendChild(badge);
+      row.appendChild(wrap);
+      const n = document.createElement('span');
+      n.className = 'nl-tl-gift__name';
+      n.textContent = name;
+      row.appendChild(n);
+      const item = document.createElement('span');
+      item.className = 'nl-tl-gift__item';
+      item.textContent =
+        r.kind === 'superchat'
+          ? `スーパーチャット${r.text ? `「${r.text}」` : ''}`
+          : r.kind === 'sticker'
+            ? 'スーパーステッカー'
+            : r.kind === 'membership_gift'
+              ? 'メンバーシップギフト'
+              : 'メンバー加入';
+      row.appendChild(item);
+      if (Number(r.amount || 0) > 0) {
+        const pt = document.createElement('span');
+        pt.className = 'nl-tl-gift__pt';
+        pt.textContent = formatYtCurrencyAmount(Number(r.amount), String(r.currency || ''));
+        row.appendChild(pt);
+      }
+    } else {
+      row.className = 'nl-tl-row';
+      row.appendChild(createAvatarImgWithFallback(r.iconUrl || '', name, r.channelId || name, 'nl-tl-row__avatar'));
+      const n = document.createElement('span');
+      n.className = 'nl-tl-row__name';
+      n.textContent = name;
+      row.appendChild(n);
+      const t = document.createElement('span');
+      t.className = 'nl-tl-row__text';
+      t.textContent = String(r.text || '');
+      row.appendChild(t);
+    }
+    if (ago) {
+      const tm = document.createElement('span');
+      tm.className = 'nl-tl-time';
+      tm.setAttribute('aria-hidden', 'true');
+      tm.textContent = ago;
+      row.appendChild(tm);
+    }
+    row.title = `${name}：${String(r.text || '')}${ago ? `（${ago}）` : ''}`;
+    frag.appendChild(row);
+  }
+  body.appendChild(frag);
 }
 
 /**
@@ -1184,6 +1350,9 @@ async function renderStreamFullLoad() {
   renderLaneFull('rinku', applied.laneDisplay.rinku, applied.laneCounts.rinku);
   renderLaneFull('konta', applied.laneDisplay.konta, applied.laneCounts.konta);
   renderLaneFull('tanunee', applied.laneDisplay.tanunee, applied.laneCounts.tanunee);
+  pushSupportTimeline(items.slice(-SUPPORT_TIMELINE_LIMIT), true);
+  renderSupportTimeline();
+  updateExportButtonsState(applied.totalCount);
 
   metrics.lastFullLoadDurationMs = Math.round((performance.now() - t0) * 100) / 100;
 }
@@ -1238,6 +1407,9 @@ async function renderStreamIncrementalUpdate() {
   await renderVoiceUiFromStorage(data);
 
   if (applied.addedCount > 0) {
+    pushSupportTimeline(newRecords, false);
+    renderSupportTimeline();
+    updateExportButtonsState(applied.totalCount);
     patchLaneIncremental('rinku', applied.addedByLane.rinku, applied.laneCounts.rinku);
     patchLaneIncremental('konta', applied.addedByLane.konta, applied.laneCounts.konta);
     patchLaneIncremental('tanunee', applied.addedByLane.tanunee, applied.laneCounts.tanunee);
@@ -1294,8 +1466,11 @@ async function restoreCollapsibleUiState() {
       comeviewDetails.open = uiState.comeviewOpen === true;
     }
     if (supportVisualDetails) {
-      supportVisualDetails.open = uiState.supportVisualOpen === true;
+      // ニコ生版と同じく、アイコン列は最初から開いておく（閉じたことがある人だけ閉じたまま）
+      supportVisualDetails.open = uiState.supportVisualOpen !== false;
     }
+    const growthCollapsed = uiState.storyGrowthCollapsed === true;
+    applyStoryGrowthCollapsed(growthCollapsed);
   } catch {
     // ignore
   }
@@ -1317,10 +1492,204 @@ function saveCollapsibleUiState() {
         settingsOpen: Boolean(settingsDetails?.open),
         comeviewOpen: Boolean(comeviewDetails?.open),
         supportVisualOpen: Boolean(supportVisualDetails?.open),
+        storyGrowthCollapsed: document.getElementById('storyGrowthCollapsible')?.hidden === true,
       },
     });
   } catch {
     // ignore
+  }
+}
+
+/**
+ * 全員グリッドの「アイコン列を隠す／表示」。
+ * @param {boolean} collapsed
+ */
+function applyStoryGrowthCollapsed(collapsed) {
+  const box = document.getElementById('storyGrowthCollapsible');
+  const btn = document.getElementById('storyGrowthCollapseBtn');
+  if (box) box.hidden = collapsed;
+  if (btn) {
+    btn.textContent = collapsed ? 'アイコン列を表示' : 'アイコン列を隠す';
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+}
+
+/** 記録が1件以上あるときだけ HTML・マーケを押せるようにする。 @param {number} total */
+function updateExportButtonsState(total) {
+  const has = Number(total) > 0;
+  for (const id of ['exportJson', 'exportMarketingQuickBtn']) {
+    const b = /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
+    if (b) b.disabled = !has;
+  }
+}
+
+/**
+ * 投稿・書き出しの結果を1行で出す。
+ * @param {string} text
+ * @param {'ok'|'error'|''} tone
+ */
+function setComposeStatus(text, tone) {
+  const el = document.getElementById('commentPostStatus');
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text;
+  el.classList.toggle('is-ok', tone === 'ok');
+  el.classList.toggle('is-error', tone === 'error');
+}
+
+/**
+ * 保存（ダウンロード）。拡張ページの a[download] で落とす（downloads 権限は使わない）。
+ * @param {Blob} blob
+ * @param {string} filename
+ */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** 選んでいる配信の要約と全記録を読む。 */
+async function loadSelectedStreamForExport() {
+  const data = await chrome.storage.local.get([STORAGE_KEYS.STREAM_SUMMARIES]);
+  const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+  const summary = selectedVideoId ? summaries[selectedVideoId] || null : null;
+  const items = selectedVideoId ? await getYtStreamCommentsByVideoId(selectedVideoId) : [];
+  return { summary, items };
+}
+
+const COMMENT_SEND_REASON_JA = Object.freeze({
+  'no-tab': 'この配信の YouTube タブが見つかりません。視聴ページを開いてください。',
+  'no-chat-frame': 'チャット欄が見つかりません。視聴ページでチャットを表示してください。',
+  'no-input': 'チャットの入力欄がありません（チャットが閉じている・アーカイブ・コメント制限中かもしれません）。',
+  'not-signed-in': 'YouTube にログインしていないので送れません。YouTube 側でログインしてください。',
+  'no-send-button': '送信ボタンが見つかりません。YouTube の画面が変わったかもしれません。',
+  'send-disabled': 'YouTube 側で送信できない状態です（低速モード・メンバー限定など）。',
+  'still-in-box': '送信ボタンを押しましたが、文字が入力欄に残っています。YouTube 側の画面を確認してください。',
+  empty: 'コメントが空です。',
+});
+
+function bindComposeAndExportEvents() {
+  const input = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('commentInput'));
+  const postBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('postCommentBtn'));
+  const syncPostBtn = () => {
+    if (postBtn && input) postBtn.disabled = !input.value.trim() || postBtn.getAttribute('aria-busy') === 'true';
+  };
+  const send = async () => {
+    if (!input || !postBtn) return;
+    const text = input.value.replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    postBtn.setAttribute('aria-busy', 'true');
+    postBtn.disabled = true;
+    setComposeStatus('送信しています…', '');
+    /** @type {any} */
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: selectedVideoId, text });
+    } catch (e) {
+      res = { ok: false, reason: String(e) };
+    }
+    postBtn.setAttribute('aria-busy', 'false');
+    if (res && res.ok) {
+      input.value = '';
+      setComposeStatus('送信しました（YouTube のチャット欄から送っています）', 'ok');
+    } else {
+      const reason = String(res?.reason || '');
+      setComposeStatus(
+        /** @type {Record<string,string>} */ (COMMENT_SEND_REASON_JA)[reason] || `送信できませんでした（${reason || '理由不明'}）`,
+        'error',
+      );
+    }
+    syncPostBtn();
+  };
+  input?.addEventListener('input', syncPostBtn);
+  input?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) {
+      ev.preventDefault();
+      void send();
+    }
+  });
+  postBtn?.addEventListener('click', () => void send());
+
+  document.getElementById('exportJson')?.addEventListener('click', async () => {
+    setComposeStatus('HTML レポートを作っています…', '');
+    try {
+      const { summary, items } = await loadSelectedStreamForExport();
+      const now = Date.now();
+      const html = buildYtCommentLogReportHtml({ summary, items, nowMs: now });
+      downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), buildYtReportFilename('html', summary, now));
+      setComposeStatus(`HTML レポートを保存しました（${formatNumberJa(items.length)}件）`, 'ok');
+    } catch (e) {
+      setComposeStatus(`HTML レポートを作れませんでした（${String(e)}）`, 'error');
+    }
+  });
+
+  document.getElementById('exportMarketingQuickBtn')?.addEventListener('click', async () => {
+    setComposeStatus('マーケ分析を作っています…', '');
+    try {
+      const { summary, items } = await loadSelectedStreamForExport();
+      const now = Date.now();
+      const html = buildYtMarketingReportHtml({ summary, items, nowMs: now });
+      downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), buildYtReportFilename('marketing', summary, now));
+      setComposeStatus('マーケ分析を保存しました', 'ok');
+    } catch (e) {
+      setComposeStatus(`マーケ分析を作れませんでした（${String(e)}）`, 'error');
+    }
+  });
+
+  document.getElementById('captureScreenshot')?.addEventListener('click', async () => {
+    setComposeStatus('動画の画面を保存しています…', '');
+    /** @type {any} */
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ type: 'YT_CAPTURE_FRAME', videoId: selectedVideoId });
+    } catch (e) {
+      res = { ok: false, reason: String(e) };
+    }
+    if (!res?.ok || typeof res.dataUrl !== 'string' || !res.dataUrl.startsWith('data:image/png')) {
+      setComposeStatus(
+        res?.reason === 'no-video' || res?.reason === 'no-tab'
+          ? '視聴ページの動画が見つかりません。配信を開いて再生してください。'
+          : `スクショを保存できませんでした（${String(res?.reason || '理由不明')}）`,
+        'error',
+      );
+      return;
+    }
+    const blob = await (await fetch(res.dataUrl)).blob();
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    downloadBlob(blob, `yt-screenshot-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`);
+    setComposeStatus('スクショを保存しました', 'ok');
+  });
+
+  document.getElementById('storyGrowthCollapseBtn')?.addEventListener('click', () => {
+    const box = document.getElementById('storyGrowthCollapsible');
+    applyStoryGrowthCollapsed(box?.hidden !== true);
+    saveCollapsibleUiState();
+  });
+
+  document.getElementById('sceneStoryDetailClose')?.addEventListener('click', () => {
+    const box = document.getElementById('sceneStoryDetail');
+    if (box) box.hidden = true;
+  });
+
+  document.getElementById('supportTimelineDetails')?.addEventListener('toggle', () => {
+    renderSupportTimeline();
+  });
+
+  const autoAll = /** @type {HTMLInputElement | null} */ (document.getElementById('yt-auto-all-chat'));
+  if (autoAll) {
+    chrome.storage.local.get(AUTO_ALL_CHAT_KEY).then((got) => {
+      autoAll.checked = got?.[AUTO_ALL_CHAT_KEY] !== false;
+    });
+    autoAll.addEventListener('change', () => {
+      chrome.storage.local.set({ [AUTO_ALL_CHAT_KEY]: autoAll.checked });
+    });
   }
 }
 
@@ -1332,7 +1701,7 @@ function bindUiEvents() {
       chrome.tabs?.query({ active: true, currentWindow: true }, (tabs) => {
         void chrome.runtime.lastError;
         const activeTab = tabs && tabs[0];
-        if (activeTab?.id && activeTab.url && /youtube\.com\/watch/i.test(activeTab.url)) {
+        if (activeTab?.id && activeTab.url && /youtube\.com\/(watch|live\/)/i.test(activeTab.url)) {
           chrome.tabs.reload(activeTab.id);
         }
       });
@@ -1381,6 +1750,8 @@ function bindUiEvents() {
     }
     saveCollapsibleUiState();
   });
+
+  bindComposeAndExportEvents();
 
   const comeviewDetails = document.getElementById('yt-comeview-details');
   comeviewDetails?.addEventListener('toggle', () => {

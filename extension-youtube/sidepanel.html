@@ -1258,42 +1258,869 @@
         background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
         border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
       }
+
+      /* ===== ここから: extension/popup.html から写したニコ生版の見た目（コメント欄・書き出しボタン・応援タイムライン・タイル詳細） ===== */
+      :root {
+        --nl-accent-hover: color-mix(in srgb, var(--nl-accent) 82%, #000 18%);
+        --nl-base-font: 15.25px;
+        --nl-placeholder: #9a8a80;
+        --nl-radius: 14px;
+        --nl-shadow: 0 8px 18px rgb(74 59 52 / 10%);
+      }
+.nl-story-growth-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-bottom: 4px;
+      }
+.nl-story-growth-collapse-btn {
+        flex: 0 0 auto;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.68), 12px);
+        font-weight: 600;
+        color: var(--nl-accent);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-bg-soft) 12%);
+        border: 1px solid var(--nl-border);
+        border-radius: 8px;
+        padding: 4px 10px;
+        cursor: pointer;
+        line-height: 1.25;
+        max-width: 100%;
+      }
+.nl-story-growth-collapse-btn:hover {
+        background: var(--nl-bg-soft);
+      }
+.nl-story-growth-collapse-btn:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+      }
+.nl-story-userlane-guide__foot {
+        margin: 2px 0 0;
+        padding: 0 2px;
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--nl-muted);
+        line-height: 1.35;
+      }
+.nl-story-detail {
+        position: relative;
+        margin-top: 6px;
+        padding: 6px;
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 24%, var(--nl-border) 76%);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 90%, #e9f9ff 10%);
+        overflow: visible;
+      }
+.nl-story-detail.is-preview {
+        border-style: dashed;
+        opacity: 0.94;
+        background: color-mix(in srgb, var(--nl-surface) 88%, #dbeafe 12%);
+      }
+.nl-story-detail.is-hover-bubble {
+        position: fixed;
+        margin-top: 0;
+        width: min(280px, calc(100vw - 16px));
+        max-width: min(280px, calc(100vw - 16px));
+        padding: 7px 8px;
+        opacity: 0.98;
+        z-index: 999;
+        box-shadow:
+          0 10px 24px rgb(2 17 31 / 24%),
+          0 2px 8px rgb(2 17 31 / 12%);
+      }
+.nl-story-detail.is-hover-bubble::after {
+        content: '';
+        position: absolute;
+        left: var(--nl-story-detail-arrow-left, 18px);
+        bottom: -8px;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
+        border-top: 8px solid color-mix(in srgb, var(--nl-surface) 88%, #dbeafe 12%);
+      }
+.nl-story-detail.is-hover-bubble.is-hover-below::after {
+        top: -8px;
+        bottom: auto;
+        border-top: 0;
+        border-bottom: 8px solid color-mix(in srgb, var(--nl-surface) 88%, #dbeafe 12%);
+      }
+.nl-story-detail.is-pinned-detail {
+        border-color: color-mix(in srgb, var(--nl-accent) 42%, var(--nl-border) 58%);
+      }
+.nl-story-detail-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+.nl-story-detail-img {
+        width: var(--nl-story-icon-size);
+        height: var(--nl-story-icon-size);
+        min-width: var(--nl-story-icon-size);
+        min-height: var(--nl-story-icon-size);
+        object-fit: contain;
+        object-position: center;
+        border-radius: 4px;
+        border: 1px solid var(--nl-border);
+        background: #fff;
+        flex-shrink: 0;
+      }
+.nl-story-detail-img.nl-story-detail-img--remote {
+        object-fit: cover;
+      }
+.nl-story-detail-img.nl-story-detail-img--tv-fallback {
+        object-fit: contain;
+        padding: 2px;
+        background: linear-gradient(180deg, #efebe9, #d7ccc8);
+        border-color: color-mix(in srgb, #6d4c41 45%, var(--nl-border) 55%);
+      }
+.nl-story-detail-user {
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 800;
+        color: var(--nl-text);
+      }
+.nl-story-detail-user-meta {
+        margin-top: 1px;
+        font-size: 9px;
+        line-height: 1.2;
+        color: var(--nl-muted);
+      }
+.nl-story-detail-user-link {
+        color: var(--nl-muted);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+.nl-story-detail-user-link:hover {
+        color: var(--nl-text);
+      }
+.nl-story-detail-text {
+        margin-top: 5px;
+        font-size: 10.4px;
+        line-height: 1.32;
+        color: var(--nl-text);
+        word-break: break-word;
+      }
+.nl-story-detail-meta {
+        margin-top: 3px;
+        font-size: 8.7px;
+        line-height: 1.2;
+        color: var(--nl-muted);
+      }
+.nl-story-detail-list {
+        margin: 4px 0 0;
+        padding: 0;
+        list-style: none;
+        border-top: 1px dashed color-mix(in srgb, var(--nl-border) 78%, #ffffff 22%);
+      }
+.nl-story-detail-list li {
+        padding-top: 3px;
+        font-size: 9px;
+        line-height: 1.25;
+        color: var(--nl-muted);
+        word-break: break-word;
+      }
+.nl-live-stat-cards ~ .nl-comment-compose--primary {
+        margin-top: 5px;
+        margin-bottom: 5px;
+        padding: 6px 8px;
+      }
+.nl-live-stat-cards ~ .nl-comment-compose--primary textarea {
+        min-height: clamp(36px, 2.8em, 52px);
+        max-height: clamp(44px, 3.8em, 64px);
+      }
+.nl-support-timeline {
+        margin: 6px 0 0;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        background: var(--nl-surface);
+        box-sizing: border-box;
+        max-width: 100%;
+      }
+.nl-support-timeline__summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 7px 10px;
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--nl-text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+.nl-support-timeline__summary::-webkit-details-marker {
+        display: none;
+      }
+.nl-support-timeline__summary::before {
+        content: '▸';
+        color: var(--nl-muted);
+        font-size: 10px;
+      }
+.nl-support-timeline[open] .nl-support-timeline__summary::before {
+        content: '▾';
+      }
+.nl-support-timeline__gift-meta {
+        font-size: 10px;
+        font-weight: 700;
+        color: #b06f00;
+        background: color-mix(in srgb, #ffb020 18%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, #ffb020 40%, var(--nl-border));
+        border-radius: 999px;
+        padding: 1px 8px;
+      }
+.nl-support-timeline__body {
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 4px 6px 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+.nl-support-timeline__empty {
+        font-size: 10.5px;
+        color: var(--nl-muted);
+        padding: 10px 6px;
+        text-align: center;
+      }
+.nl-comment-compose {
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius);
+        padding: 7px 9px;
+        margin-bottom: 6px;
+        box-shadow: var(--nl-shadow);
+      }
+.nl-comment-compose textarea {
+        width: 100%;
+        min-height: clamp(48px, 3.6em, 72px);
+        max-height: clamp(56px, 5em, 88px);
+        resize: none;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font: inherit;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.95), 17px);
+        line-height: 1.4;
+        color: var(--nl-text);
+        background: var(--nl-surface);
+      }
+.nl-comment-compose textarea::placeholder {
+        color: var(--nl-placeholder, var(--nl-muted));
+        opacity: 1;
+      }
+.nl-comment-compose textarea:focus-visible {
+        outline: 2px solid #7dd3fc;
+        outline-offset: 1px;
+      }
+.nl-comment-kindness {
+        margin-top: 8px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+.nl-comment-kindness[hidden] {
+        display: none;
+      }
+.nl-comment-kindness__face {
+        width: 52px;
+        height: 52px;
+        flex-shrink: 0;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 10px rgb(15 23 42 / 14%));
+      }
+.nl-comment-kindness__face.is-hop {
+        animation: nl-yukkuri-hop 0.5s cubic-bezier(0.34, 1.55, 0.64, 1);
+        animation-fill-mode: both;
+      }
+.nl-comment-kindness__bubble {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+        border-radius: 14px;
+        border: 1px solid #f5d08c;
+        border-left: 4px solid #f59e0b;
+        background: linear-gradient(180deg, #fffaf0 0%, #fffdf8 100%);
+        padding: 10px 12px;
+        box-shadow: 0 8px 18px rgb(148 163 184 / 14%);
+        overflow-wrap: anywhere;
+      }
+.nl-comment-kindness__bubble::before {
+        content: '';
+        position: absolute;
+        left: -7px;
+        top: 18px;
+        width: 12px;
+        height: 12px;
+        background: #fffaf0;
+        border-left: 1px solid #f5d08c;
+        border-bottom: 1px solid #f5d08c;
+        transform: rotate(45deg);
+      }
+.nl-comment-kindness[data-level='strong'] .nl-comment-kindness__bubble {
+        border-color: #f2b3b3;
+        border-left-color: #ef4444;
+        background: linear-gradient(180deg, #fff7f7 0%, #fffdfc 100%);
+      }
+.nl-comment-kindness[data-level='strong'] .nl-comment-kindness__bubble::before {
+        background: #fff7f7;
+        border-left-color: #f2b3b3;
+        border-bottom-color: #f2b3b3;
+      }
+.nl-comment-kindness__title {
+        display: block;
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.82), 13px);
+        font-weight: 800;
+        color: #9a3412;
+        line-height: 1.25;
+      }
+.nl-comment-kindness[data-level='strong'] .nl-comment-kindness__title {
+        color: #b91c1c;
+      }
+.nl-comment-kindness__body {
+        margin: 4px 0 0;
+        font-size: clamp(11.5px, calc(var(--nl-base-font) * 0.86), 14px);
+        color: var(--nl-text);
+        line-height: 1.45;
+      }
+.nl-comment-kindness__confirm {
+        margin: 6px 0 0;
+        font-size: clamp(10.5px, calc(var(--nl-base-font) * 0.78), 12.5px);
+        color: var(--nl-muted);
+        line-height: 1.4;
+      }
+.nl-compose-send-row {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+      }
+.nl-compose-send-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 8px;
+      }
+.nl-compose-send-row #postCommentBtn {
+        flex: 1 1 132px;
+        min-width: min(100%, 132px);
+      }
+.nl-cheer-palette-wrapper {
+        position: relative;
+        flex: 0 0 36px;
+        display: flex;
+        align-items: stretch;
+      }
+.nl-cheer-toggle {
+        width: 36px;
+        min-height: 36px;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        background: var(--nl-surface);
+        color: var(--nl-text);
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.12s ease, border-color 0.12s ease;
+      }
+.nl-cheer-toggle:hover {
+        background: var(--nl-bg-soft);
+      }
+.nl-cheer-toggle:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 1px;
+      }
+.nl-cheer-toggle[aria-expanded='true'] {
+        background: var(--nl-bg-soft);
+        border-color: var(--nl-accent);
+      }
+.nl-cheer-palette {
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 0;
+        z-index: 50;
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: 12px;
+        padding: 8px;
+        box-shadow: 0 8px 24px rgb(15 23 42 / 18%);
+        display: grid;
+        grid-template-columns: repeat(4, minmax(56px, 1fr));
+        gap: 5px;
+        width: max-content;
+        max-width: min(320px, calc(100vw - 24px));
+      }
+.nl-cheer-palette[hidden] {
+        display: none;
+      }
+.nl-cheer-palette__head {
+        grid-column: 1 / -1;
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--nl-muted);
+        margin: 0 2px 2px;
+        letter-spacing: 0.02em;
+      }
+.nl-cheer-chip {
+        border: 1px solid var(--nl-border);
+        background: var(--nl-bg);
+        color: var(--nl-text);
+        border-radius: 8px;
+        padding: 6px 4px;
+        font-size: 11.5px;
+        line-height: 1.15;
+        text-align: center;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font: inherit;
+        font-size: 11.5px;
+        font-weight: 600;
+      }
+.nl-cheer-chip:hover {
+        background: var(--nl-bg-soft);
+        border-color: var(--nl-accent);
+      }
+.nl-cheer-chip:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 1px;
+      }
+.nl-cheer-chip:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+.nl-compose-send-row #postStatus {
+        min-width: 0;
+      }
+.nl-compose-send-actions .nl-compose-quick-toolbar {
+        flex: 1 1 220px;
+        min-width: min(100%, 200px);
+        margin-top: 0;
+      }
+.nl-compose-quick-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 8px;
+        margin-top: 6px;
+      }
+.nl-compose-quick-toolbar[data-nl-hoisted='top'] {
+        margin: 2px 0 8px;
+        padding: 6px 0 8px;
+        border-bottom: 1px solid var(--nl-border, rgba(255, 255, 255, 0.12));
+      }
+.nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
+      .nl-comment-compose--primary .nl-compose-quick-toolbar #reloadWatchTabBtn {
+        width: auto;
+        flex: 1 1 92px;
+        min-width: min(100%, 84px);
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+.nl-compose-qbtn__row {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        flex-wrap: wrap;
+        text-align: center;
+      }
+.nl-compose-qbtn__emoji {
+        flex-shrink: 0;
+        font-size: 1.15em;
+        line-height: 1;
+      }
+.nl-compose-qbtn__word {
+        font-weight: 700;
+        line-height: 1.2;
+      }
+#postCommentBtn {
+        border: none;
+        border-radius: 10px;
+        background: #0f9f6f;
+        color: #fff;
+        padding: 10px 16px;
+        min-height: 44px;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.92), 16px);
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+#postCommentBtn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+      }
+#postCommentBtn[aria-busy='true'] {
+        opacity: 0.88;
+      }
+#captureScreenshot {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 44px;
+        font: inherit;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.92), 15px);
+        font-weight: 700;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 2px solid var(--nl-accent);
+        background: var(--nl-surface);
+        color: var(--nl-accent);
+        cursor: pointer;
+      }
+#captureScreenshot:disabled {
+        border-color: #cbd5e1;
+        color: #9ca3af;
+        cursor: not-allowed;
+      }
+#captureScreenshot:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+      }
+#exportJson {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 44px;
+        font: inherit;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.92), 15px);
+        font-weight: 700;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(124deg, var(--nl-accent), #19a7d8);
+        color: #fff;
+        cursor: pointer;
+        box-shadow: 0 5px 12px rgb(15 143 216 / 34%);
+        transition: background 0.15s ease, transform 0.1s ease;
+      }
+#exportJson:hover:not(:disabled) {
+        background: var(--nl-accent-hover);
+      }
+#exportJson:active:not(:disabled) {
+        transform: scale(0.98);
+      }
+@media (prefers-reduced-motion: reduce) {
+#exportJson:active:not(:disabled) {
+          transform: none;
+        }
+}
+#exportJson:disabled {
+        background: #cbd5e1;
+        color: #64748b;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+#exportJson:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgb(15 143 216 / 45%);
+      }
+body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
+      body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
+      body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #reloadWatchTabBtn,
+      body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #reloadWatchTabBtn {
+        min-height: 40px;
+        padding: 8px 10px;
+      }
+body.nl-tight
+        .nl-comment-compose--primary
+        .nl-compose-quick-toolbar
+        #exportJson
+        .nl-compose-qbtn__emoji,
+      body.nl-compact
+        .nl-comment-compose--primary
+        .nl-compose-quick-toolbar
+        #exportJson
+        .nl-compose-qbtn__emoji,
+      body.nl-tight
+        .nl-comment-compose--primary
+        .nl-compose-quick-toolbar
+        #captureScreenshot
+        .nl-compose-qbtn__emoji,
+      body.nl-compact
+        .nl-comment-compose--primary
+        .nl-compose-quick-toolbar
+        #captureScreenshot
+        .nl-compose-qbtn__emoji {
+        font-size: 1.35em;
+      }
+.room-heat {
+        padding: 6px 7px;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        background: linear-gradient(145deg, var(--nl-surface), var(--nl-bg-soft));
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
+      }
+#userRoomList .room-heat {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+.room-heat-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+.room-heat-title {
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--nl-text);
+      }
+.room-heat-meta {
+        font-size: 9px;
+        color: var(--nl-muted);
+      }
+.room-heat-track {
+        min-height: 10px;
+        height: 10px;
+        border-radius: 999px;
+        border: 1px solid var(--nl-border);
+        background: linear-gradient(90deg, var(--nl-bg-soft), var(--nl-surface));
+        overflow: hidden;
+        box-shadow: inset 0 1px 2px rgb(2 17 31 / 14%);
+      }
+.room-heat-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #0f8fd8, #14b8a6);
+        transition: width 420ms cubic-bezier(0.33, 1, 0.68, 1);
+      }
+.room-heat-note {
+        margin-top: 3px;
+        font-size: 8.8px;
+        color: var(--nl-muted);
+      }
+.room-heat-velocity {
+        margin-top: 4px;
+        font-size: 9px;
+        color: var(--nl-muted);
+      }
+body.nl-tight .nl-comment-compose textarea {
+        min-height: 36px;
+      }
+      .nl-comment-post-status {
+        margin: 4px 2px 0;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--nl-text-sub);
+      }
+      .nl-comment-post-status.is-error { color: #c2410c; }
+      .nl-comment-post-status.is-ok { color: #15803d; }
+      .nl-story-detail-head { position: relative; }
+      .nl-story-detail-close {
+        margin-left: auto;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-surface);
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 800;
+        line-height: 1;
+        padding: 3px 7px;
+        color: var(--nl-text-sub);
+      }
+.nl-tl-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        padding: 3px 6px;
+        border-radius: 7px;
+        font-size: 11px;
+        line-height: 1.3;
+        color: var(--nl-text);
+        text-decoration: none;
+      }
+a.nl-tl-row:hover {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
+      }
+.nl-tl-row__avatar {
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+        object-fit: cover;
+        background: #fff;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 60%, transparent);
+      }
+.nl-tl-row__name {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 9em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+.nl-tl-row__text {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+.nl-tl-row--self .nl-tl-row__name {
+        color: var(--nl-accent, #0f8fd8);
+      }
+.nl-tl-gift {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        font-size: 11px;
+        line-height: 1.3;
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, #ffb020 16%, var(--nl-surface)),
+          color-mix(in srgb, #ff7eb6 12%, var(--nl-surface))
+        );
+        border: 1px solid color-mix(in srgb, #ffb020 38%, var(--nl-border));
+        text-decoration: none;
+        color: var(--nl-text);
+      }
+a.nl-tl-gift:hover {
+        border-color: color-mix(in srgb, #ffb020 60%, var(--nl-border));
+      }
+.nl-tl-gift__icon {
+        flex: 0 0 auto;
+        font-size: 13px;
+      }
+.nl-tl-gift__avatar-wrap {
+        position: relative;
+        flex: 0 0 auto;
+        width: 22px;
+        height: 22px;
+      }
+.nl-tl-gift__avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        object-fit: cover;
+        background: #fff;
+        border: 1px solid color-mix(in srgb, #ffb020 50%, var(--nl-border));
+      }
+.nl-tl-gift__badge {
+        position: absolute;
+        right: -3px;
+        bottom: -3px;
+        font-size: 9px;
+        line-height: 1;
+        filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
+      }
+.nl-tl-gift__name {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 8em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 800;
+      }
+.nl-tl-gift__item {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--nl-muted);
+      }
+.nl-tl-gift__pt {
+        flex: 0 0 auto;
+        font-weight: 800;
+        color: #b06f00;
+        font-variant-numeric: tabular-nums;
+      }
+.nl-tl-time {
+        flex: 0 0 auto;
+        margin-left: auto;
+        padding-left: 6px;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--nl-muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ===== ここまで ===== */
     </style>
   </head>
   <body>
-    <!-- 1. 上部ボタン列: 再読み込み・コメビュ・読み上げ（HTML/マーケ/スクショは置かない） -->
-    <div
-      id="nlTopQuickToolbar"
-      class="nl-compose-quick-toolbar"
-      data-nl-hoisted="top"
-      role="group"
-      aria-label="視聴タブ・コメビュ・読み上げのクイック操作"
-    >
-      <button
-        type="button"
-        id="reloadWatchTabBtn"
-        class="nl-compose-quick-btn nl-compose-quick-btn--reload-watch"
-        title="開いているYouTube視聴タブを再読み込みし、サイドパネル表示も更新します"
-      >
-        ↻ 再読み込み
-      </button>
-      <button
-        type="button"
-        id="openComeviewBtn"
-        class="nl-compose-quick-btn nl-compose-quick-btn--comeview"
-        title="3レーンのコメント一覧（コメビュ）を開閉します"
-      >
-        💬 コメビュ
-      </button>
-      <button
-        type="button"
-        id="openComeviewVoiceBtn"
-        class="nl-compose-quick-btn nl-compose-quick-btn--comeview-voice"
-        title="VOICEVOX 読み上げ設定を開閉します"
-      >
-        🔊 読み上げ
-      </button>
-    </div>
+    <!-- 1. コメント投稿（extension/popup.html の section.nl-comment-compose--primary と同じ並び） -->
+    <section class="nl-comment-compose nl-comment-compose--primary" aria-label="コメント投稿">
+      <textarea id="commentInput" maxlength="200" placeholder="ここにコメントを書いて送信（YouTube にログインしたまま送れます）" aria-label="コメント本文（200文字まで）"></textarea>
+      <div class="nl-compose-send-row">
+        <div class="nl-compose-send-actions">
+          <button type="button" id="postCommentBtn" disabled aria-busy="false">コメント送信</button>
+          <div class="nl-compose-quick-toolbar" role="toolbar" aria-label="書き出しと視聴タブの再読み込み">
+          <button type="button" id="exportJson" disabled title="HTMLレポートを保存（この配信の記録コメントをまとめた検索用HTML）" aria-label="HTMLレポートを保存（この配信の記録コメントをまとめた検索用HTML）">
+            <span class="nl-compose-qbtn__row">
+              <span class="nl-compose-qbtn__emoji" aria-hidden="true">💾</span>
+              <span class="nl-compose-qbtn__word">HTML</span>
+            </span>
+          </button>
+          <button type="button" id="exportMarketingQuickBtn" disabled title="マーケ分析を1つのHTMLで保存（グラフと指標・応援者・スパチャ）" aria-label="マーケ分析を1つのHTMLで保存（グラフと指標・応援者・スパチャ）">
+            <span class="nl-compose-qbtn__row">
+              <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
+              <span class="nl-compose-qbtn__word">マーケ</span>
+            </span>
+          </button>
+          <button type="button" id="captureScreenshot" title="YouTube の視聴画面を PNG 画像で保存" aria-label="YouTube の視聴画面を PNG 画像で保存">
+            <span class="nl-compose-qbtn__row">
+              <span class="nl-compose-qbtn__emoji" aria-hidden="true">📷</span>
+              <span class="nl-compose-qbtn__word">スクショ</span>
+            </span>
+          </button>
+          <button type="button" id="reloadWatchTabBtn" title="開いている YouTube 視聴タブを再読み込み（F5 と同じ）" aria-label="開いている YouTube 視聴タブを再読み込み（F5 と同じ）">
+            <span class="nl-compose-qbtn__row">
+              <span class="nl-compose-qbtn__emoji" aria-hidden="true">↻</span>
+              <span class="nl-compose-qbtn__word">再読み込み</span>
+            </span>
+          </button>
+          <button type="button" id="openComeviewBtn" title="3レーンのコメント一覧（コメビュ）を開閉" aria-label="3レーンのコメント一覧（コメビュ）を開閉">
+            <span class="nl-compose-qbtn__row">
+              <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
+              <span class="nl-compose-qbtn__word">コメビュ</span>
+            </span>
+          </button>
+          <button type="button" id="openComeviewVoiceBtn" title="VOICEVOX 読み上げ設定を開閉" aria-label="VOICEVOX 読み上げ設定を開閉">
+            <span class="nl-compose-qbtn__row">
+              <span class="nl-compose-qbtn__emoji" aria-hidden="true">🔊</span>
+              <span class="nl-compose-qbtn__word">読み上げ</span>
+            </span>
+          </button>
+          </div>
+        </div>
+      </div>
+      <p id="commentPostStatus" class="nl-comment-post-status" role="status" aria-live="polite" hidden></p>
+      <details id="supportTimelineDetails" class="nl-support-timeline">
+        <summary class="nl-support-timeline__summary">
+          <span class="nl-support-timeline__summary-label">応援タイムライン（コメント＋スパチャ・メンバー）</span>
+          <span id="supportTimelineGiftMeta" class="nl-support-timeline__gift-meta" hidden></span>
+        </summary>
+        <div id="supportTimelineBody" class="nl-support-timeline__body" role="log" aria-label="コメントと応援の時系列" aria-live="off"></div>
+      </details>
+    </section>
 
     <!-- 配信選択バー -->
     <div class="nl-yt-stream-bar" aria-label="記録中の配信">
@@ -1444,109 +2271,107 @@
       </div>
     </section>
 
-    <!-- 6. アイコン列・グリッド・診断を表示（extension/popup.html の #supportVisualDetails と同じ構造） -->
-    <details id="supportVisualDetails" class="nl-support-visual-details">
+    <!-- 6. アイコン列・グリッド・診断を表示（extension/popup.html の #supportVisualDetails と同じ段構成・最初から開く） -->
+    <details id="supportVisualDetails" class="nl-support-visual-details" open>
       <summary id="supportVisualDetailsSummary" class="nl-support-visual-details__summary">
         アイコン列・グリッド・診断を表示
       </summary>
       <div class="nl-support-visual-details__body">
         <div class="nl-story-meter-wrap">
-          <div class="nl-story-userlane-stack">
-            <!-- 列1: スパチャ列 -->
-            <div class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift">
-              <div class="nl-story-userlane-guide">
+          <div class="nl-story-growth-head">
+            <button type="button" id="storyGrowthCollapseBtn" class="nl-story-growth-collapse-btn" aria-expanded="true" aria-controls="storyGrowthCollapsible">
+              アイコン列を隠す
+            </button>
+          </div>
+          <div id="sceneStoryUserLaneStack" class="nl-story-userlane-stack" aria-label="応援ユーザーのサムネイル（りんく・ギフト・メンバー・こん太・たぬ姉の段）" title="タイルを押すとその人の発言一覧（Ctrl+クリックでチャンネルを開く）">
+            <div id="storyTierWrap-link" class="nl-story-userlane-tier-wrap">
+              <div class="nl-story-userlane-guide nl-story-userlane-guide--mid">
                 <div class="nl-story-userlane-guide__lines">
                   <div class="nl-story-userlane-guide__line">
-                    <img
-                      class="nl-story-userlane-guide__face"
-                      src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
-                      alt="りんく"
-                      width="26"
-                      height="26"
-                      decoding="async"
-                    />
-                    <span class="nl-story-userlane-guide__text">
-                      スパチャ列 — Super Chat / Sticker で応援してくれた方
-                    </span>
-                    <span class="nl-story-userlane-guide__count" id="storyLaneSuperchatCount">0人</span>
+                    <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" alt="りんく" width="24" height="24" decoding="async" />
+                    <span class="nl-story-userlane-guide__text" id="storyTierGuide-link"></span>
+                    <span class="nl-story-userlane-guide__count" id="storyTierCount-link">0人</span>
                   </div>
                 </div>
               </div>
-              <div
-                id="storyUserLaneSuperchat"
-                class="nl-story-userlane nl-story-userlane--gift"
-                role="list"
-                aria-label="スパチャ列"
-              ></div>
+              <div id="storyTierLane-link" class="nl-story-userlane nl-story-userlane--link" role="list" aria-label="りんく段・ID と名前とサムネがそろった人"></div>
             </div>
-
-            <!-- 列2: メンバー・ギフト列 -->
-            <div class="nl-story-userlane-tier-wrap">
-              <div class="nl-story-userlane-guide">
+            <div id="storyTierWrap-gift" class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift">
+              <div class="nl-story-userlane-guide nl-story-userlane-guide--mid">
                 <div class="nl-story-userlane-guide__lines">
                   <div class="nl-story-userlane-guide__line">
-                    <img
-                      class="nl-story-userlane-guide__face"
-                      src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
-                      alt="こん太"
-                      width="26"
-                      height="26"
-                      decoding="async"
-                    />
-                    <span class="nl-story-userlane-guide__text">
-                      メンバー・ギフト列 — メンバー加入・ギフト・メンバーバッジの方
-                    </span>
-                    <span class="nl-story-userlane-guide__count" id="storyLaneMemberGiftCount">0人</span>
+                    <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" alt="りんく" width="24" height="24" decoding="async" />
+                    <span class="nl-story-userlane-guide__text" id="storyTierGuide-gift"></span>
+                    <span class="nl-story-userlane-guide__count" id="storyTierCount-gift">0人</span>
                   </div>
                 </div>
               </div>
-              <div
-                id="storyUserLaneMemberGift"
-                class="nl-story-userlane nl-story-userlane--konta"
-                role="list"
-                aria-label="メンバー・ギフト列"
-              ></div>
+              <div id="storyTierLane-gift" class="nl-story-userlane nl-story-userlane--gift" role="list" aria-label="ギフト段・スーパーチャット／ステッカー"></div>
             </div>
-
-            <!-- 列3: コメントした人（件数順） -->
-            <div class="nl-story-userlane-tier-wrap">
-              <div class="nl-story-userlane-guide">
+            <div id="storyTierWrap-member" class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--ad">
+              <div class="nl-story-userlane-guide nl-story-userlane-guide--mid">
                 <div class="nl-story-userlane-guide__lines">
                   <div class="nl-story-userlane-guide__line">
-                    <img
-                      class="nl-story-userlane-guide__face"
-                      src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
-                      alt="たぬ姉"
-                      width="26"
-                      height="26"
-                      decoding="async"
-                    />
-                    <span class="nl-story-userlane-guide__text">
-                      コメントした人（件数順） — 発言件数が多い順の丸アイコン一覧
-                    </span>
-                    <span class="nl-story-userlane-guide__count" id="storyLaneCommentersCount">0人</span>
+                    <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" alt="こん太" width="24" height="24" decoding="async" />
+                    <span class="nl-story-userlane-guide__text" id="storyTierGuide-member"></span>
+                    <span class="nl-story-userlane-guide__count" id="storyTierCount-member">0人</span>
                   </div>
                 </div>
               </div>
-              <div
-                id="storyUserLaneCommenters"
-                class="nl-story-userlane nl-story-userlane--tanu"
-                role="list"
-                aria-label="コメントした人（件数順）"
-              ></div>
+              <div id="storyTierLane-member" class="nl-story-userlane nl-story-userlane--ad" role="list" aria-label="メンバー段・メンバー加入／ギフト／バッジ"></div>
+            </div>
+            <div id="storyTierWrap-konta" class="nl-story-userlane-tier-wrap">
+              <div class="nl-story-userlane-guide nl-story-userlane-guide--mid">
+                <div class="nl-story-userlane-guide__lines">
+                  <div class="nl-story-userlane-guide__line">
+                    <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" alt="こん太" width="24" height="24" decoding="async" />
+                    <span class="nl-story-userlane-guide__text" id="storyTierGuide-konta"></span>
+                    <span class="nl-story-userlane-guide__count" id="storyTierCount-konta">0人</span>
+                  </div>
+                </div>
+              </div>
+              <div id="storyTierLane-konta" class="nl-story-userlane nl-story-userlane--konta" role="list" aria-label="こん太段・名前かサムネのどちらかが取れた人"></div>
+            </div>
+            <div id="storyTierWrap-tanu" class="nl-story-userlane-tier-wrap">
+              <div class="nl-story-userlane-guide nl-story-userlane-guide--mid">
+                <div class="nl-story-userlane-guide__lines">
+                  <div class="nl-story-userlane-guide__line">
+                    <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" alt="たぬ姉" width="24" height="24" decoding="async" />
+                    <span class="nl-story-userlane-guide__text" id="storyTierGuide-tanu"></span>
+                    <span class="nl-story-userlane-guide__count" id="storyTierCount-tanu">0人</span>
+                  </div>
+                </div>
+              </div>
+              <div id="storyTierLane-tanu" class="nl-story-userlane nl-story-userlane--tanu" role="list" aria-label="たぬ姉段・情報が薄い人"></div>
             </div>
           </div>
-
-          <!-- 全員の顔を小さな丸で敷き詰めるグリッド（件数バッジ付き・「いま N 人を表示中」） -->
+          <div class="nl-story-userlane-guide">
+            <div class="nl-story-userlane-guide__lines">
+              <p class="nl-story-userlane-guide__foot" id="storyUserLaneFoot" aria-live="polite">いま 0 件を表示中</p>
+            </div>
+          </div>
           <div id="storyGrowthCollapsible" class="nl-story-growth-collapsible">
             <div id="sceneStoryGauge" class="nl-story-meter" aria-label="応援コメントアイコン表示">
               <div id="sceneStoryGrowth" class="nl-story-growth" aria-live="polite"></div>
             </div>
-            <div id="sceneStoryGaugeLabel" class="nl-story-meter-label">いま 0 人を表示中</div>
+            <div id="sceneStoryGaugeLabel" class="nl-story-meter-label">1コメントごとに、りんくが左→右へ増えるよ</div>
           </div>
         </div>
       </div>
     </details>
+    <div id="sceneStoryDetail" class="nl-story-detail" hidden>
+      <div class="nl-story-detail-head">
+        <img id="sceneStoryDetailImg" class="nl-story-detail-img" src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" alt="" aria-hidden="true" />
+        <div>
+          <div id="sceneStoryDetailUser" class="nl-story-detail-user">-</div>
+          <div id="sceneStoryDetailUserMeta" class="nl-story-detail-user-meta">-</div>
+        </div>
+        <button type="button" id="sceneStoryDetailClose" class="nl-story-detail-close" aria-label="閉じる">×</button>
+      </div>
+      <div id="sceneStoryDetailText" class="nl-story-detail-text"></div>
+      <div id="sceneStoryDetailMeta" class="nl-story-detail-meta"></div>
+      <ul id="sceneStoryDetailList" class="nl-story-detail-list"></ul>
+    </div>
 
     <!-- 7a. ボタンから開く折りたたみ欄1: 3レーンのコメント一覧（コメビュ・初期は閉じる） -->
     <details class="nl-frame-theme-details" id="yt-comeview-details">
@@ -1679,7 +2504,11 @@
         </div>
 
         <div class="notice-banner" id="yt-all-chat-notice">
-          <strong>全件記録のヒント</strong>: YouTube チャット欄の左上メニューが「トップチャット」だと一部コメントが間引かれます。<strong>「すべてのチャット」表示でないと全件は拾えない</strong>ため、切替をおすすめします。
+          <strong>全件記録のヒント</strong>: YouTube チャット欄が「上位のチャット（トップチャット）」だと一部コメントが隠れます。拡張が開いたときに自動で「すべてのチャット」へ切り替えます。
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; margin-top: 4px">
+            <input type="checkbox" id="yt-auto-all-chat" checked />
+            <span>チャットを自動で「すべてのチャット」にする</span>
+          </label>
         </div>
       </div>
     </details>

@@ -40,6 +40,7 @@ describe('mergeYtStreamSummary', () => {
       broadcasterChannelId: 'UCOwner123456789012345678',
       broadcasterIconUrl: '',
       concurrentViewers: null,
+      peakConcurrentViewers: null,
       chatFilterLabel: 'すべてのチャット',
       itemCount: 120,
       createdAt: t0,
@@ -61,6 +62,11 @@ describe('mergeYtStreamSummary', () => {
     expect(updated.title).toBe('テスト配信');
     expect(updated.broadcasterIconUrl).toBe('https://yt3.ggpht.com/owner=s88');
     expect(updated.concurrentViewers).toBe(1234);
+    expect(updated.peakConcurrentViewers).toBe(1234);
+    // 同時視聴が減っても最大の記録は残る
+    const later = mergeYtStreamSummary(updated, { videoId: 'vid-1', concurrentViewers: 900 }, t1 + 1);
+    expect(later.concurrentViewers).toBe(900);
+    expect(later.peakConcurrentViewers).toBe(1234);
     expect(updated.itemCount).toBe(5000);
     expect(updated.createdAt).toBe(t0);
     expect(updated.updatedAt).toBe(t1);
