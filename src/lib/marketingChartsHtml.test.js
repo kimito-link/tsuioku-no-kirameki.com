@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMarketingDashboardHtml,
   buildAudienceParticipationLeadSectionHtml,
-  MKT_SECTION_REVEAL_ENABLED
+  MKT_SECTION_REVEAL_ENABLED,
+  eagerInlineImages
 } from './marketingChartsHtml.js';
 import { aggregateMarketingReport } from './marketingAggregate.js';
 import { analyzeAudienceEngagementGap } from './audienceEngagementGap.js';
@@ -789,6 +790,11 @@ describe('buildMarketingDashboardHtml', () => {
     const html = buildMarketingDashboardHtml(r);
     expect(html).not.toContain('<script>alert');
     expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('v0.1.1856: 埋め込み画像(data:)は遅延読み込みをやめ、ネットの画像は遅延読み込みのまま', () => {
+    const out = eagerInlineImages('<img src="data:image/svg+xml,x" loading="lazy" alt=""><img src="https://a/b.jpg" loading="lazy">');
+    expect(out).toBe('<img src="data:image/svg+xml,x" alt=""><img src="https://a/b.jpg" loading="lazy">');
   });
 
   it('v0.1.1854: キャラの案内・機能一覧・作戦会議などの定型文は出さない(数字だけを出す)', () => {

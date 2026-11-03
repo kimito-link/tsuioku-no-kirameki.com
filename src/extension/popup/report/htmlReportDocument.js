@@ -1690,8 +1690,14 @@ export async function buildHtmlReportDocument(
           <h2>ユーザー別（しおり集計）</h2>
           <table>
             <thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>累計字数</th><th>最新コメント</th></tr></thead>
-            <tbody>${roomRows.join('') || '<tr><td colspan="5">データなし</td></tr>'}</tbody>
+            <tbody>${(embed ? roomRows.slice(0, 50) : roomRows).join('') || '<tr><td colspan="5">データなし</td></tr>'}</tbody>
           </table>
+          ${
+            // v0.1.1856: マーケに埋め込むときは51人目以降を畳む(畳んだ中のサムネは開くまで描かれない=スクロールが重くならない)
+            embed && roomRows.length > 50
+              ? `<details class="report-room-rest"><summary>残り ${roomRows.length - 50}人を見る</summary><table><thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>累計字数</th><th>最新コメント</th></tr></thead><tbody>${roomRows.slice(50).join('')}</tbody></table></details>`
+              : ''
+          }
         </section>
         <section class="card" id="sec-id-breakdown">
           <h2>内訳統計（無料）</h2>

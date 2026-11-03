@@ -3,7 +3,8 @@ import {
   buildSupportersGiftsRows,
   sectionSupportersGiftsHtml,
   SUPPORTERS_GIFTS_MAX_COMMENTS_PER_USER,
-  SUPPORTERS_GIFTS_MAX_COMMENT_ONLY_USERS
+  SUPPORTERS_GIFTS_MAX_COMMENT_ONLY_USERS,
+  SUPPORTERS_GIFTS_VISIBLE
 } from './supportersGiftsSection.js';
 
 const c = (userId, text, at, nickname = '') => ({ userId, text, capturedAt: at, nickname });
@@ -86,6 +87,16 @@ describe('sectionSupportersGiftsHtml: 畳める章の HTML', () => {
     expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
     expect(html).toContain('星&lt;i&gt;');
     expect(html).not.toContain('<b>x</b>');
+  });
+
+  it('v0.1.1856: 人が多いと上位だけ並べ、残りは閉じた「残り N 人」に畳む。検索するとそこも開く', () => {
+    const crowd = Array.from({ length: SUPPORTERS_GIFTS_VISIBLE + 3 }, (_, i) => c(String(5000 + i), 'こんにちは', 1_700_000_000_000 + i));
+    const html = sectionSupportersGiftsHtml(buildSupportersGiftsRows({ comments: crowd, giftRows: [] }), { maskShare: false, renderIdentity: identity });
+    expect(html).toContain('<details class="mkt-sg-rest"><summary>残り 3人を見る</summary>');
+    const [visible, rest] = html.split('<details class="mkt-sg-rest"');
+    expect((visible.match(/<details class="mkt-sg"/g) || []).length).toBe(SUPPORTERS_GIFTS_VISIBLE);
+    expect((rest.match(/<details class="mkt-sg"/g) || []).length).toBe(3);
+    expect(html).toContain("if (rest) rest.open = q ? true : restWasOpen;");
   });
 
   it('上位の人は開いた状態(open)・それ以外は閉じる', () => {

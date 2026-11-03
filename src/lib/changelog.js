@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1856',
+    date: '2026-11-03',
+    summary: 'マーケHTMLのスクロールを軽く',
+    items: Object.freeze([
+      'マーケHTMLのスクロールが重かったのを軽くしました。ページに埋め込んだ顔の絵(900枚以上)をスクロールのたびに読み直していたので、最初に1回だけ読むようにしました。',
+      '人の一覧(視聴維持率・応援者・ユーザー別)は上位50人だけ最初に出し、残りは「残り N人を見る」を押すと開くようにしました。応援者の検索は残りの人も探します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1855',
     date: '2026-11-03',
     summary: '拡張の更新後に F5 しなくても動くように',
@@ -175,15 +184,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'アプリでコメントの接続が止められていたのを直す',
     items: Object.freeze([
       'iPhone アプリの「💬 コメントを流す」で、ページの安全設定がニコニコへの接続(WebSocket)まで止めてしまい、つながらない状態でした。ニコニコの接続先だけを許可して、受け取れるようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1833',
-    date: '2026-10-29',
-    summary: '読み上げの音質を選べるように',
-    items: Object.freeze([
-      '設定に「読み上げの音質」を足しました。標準(今までどおり)と高音質から選べます。高音質は声が少しくっきりしますが、作るのに時間がかかるので、グラボのある速いPC向けです。',
-      '既定は標準のままです。変えると、会場・コメビュ・スマホへ送る声のどれも次の声から切り替わります。'
     ])
   })
 ]);
