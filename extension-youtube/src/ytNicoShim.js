@@ -67,6 +67,8 @@ try {
 // ---- 2. videoId ⇔ 疑似 lv ----
 /** @type {Map<string, string>} lv → videoId */
 const videoIdByLv = new Map();
+/** @type {Set<string>} チャットのリプレイ(アーカイブ)で記録した動画 */
+const replayVideoIds = new Set();
 /** @type {Map<string, string>} videoId → lv */
 const lvByVideoId = new Map();
 
@@ -262,7 +264,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
     viewerCountSource: 'dom',
     officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
-    streamAgeMin: startedAt > 0 ? Math.max(0, Math.round((Date.now() - startedAt) / 60000)) : null,
+    // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
+    streamAgeMin: startedAt > 0 && !replayVideoIds.has(videoId) ? Math.max(0, Math.round((Date.now() - startedAt) / 60000)) : null,
   };
 }
 
@@ -383,6 +386,7 @@ async function buildCommentsForLvUncached(lv) {
   const who = buildYtPersonResolver(list);
   let streamStartedAt = 0;
   if (list.some((r) => r?.replay)) {
+    replayVideoIds.add(vid);
     try {
       const bag = await real.storage.local.get(KEY_YT_SUMMARIES);
       const sum = bag?.[KEY_YT_SUMMARIES]?.[vid];
@@ -407,6 +411,8 @@ async function buildCommentsForLvUncached(lv) {
 // 配信者の数字ID → YouTube の対応が分からないまま(ニコニコのリンク・ID のまま)になる。記録のある配信の配信者を先に登録する。
 /** @type {Record<string, any>} */
 let knownSummaries = {};
+// 「ギフト貢献度」の欄に入れたのが YouTube のトップファン(XP)か、スパチャの合計の順位(pt)か。言葉の直しを切り替える。
+let kokenIsTopFans = true;
 function registerBroadcastersFromSummaries() {
   for (const [vid, sum] of Object.entries(knownSummaries)) {
     try {
@@ -481,6 +487,7 @@ if (real && real.storage && real.storage.local && real.tabs) {
           const lb = /** @type {Record<string, any>} */ (await realGet(lbKey))?.[lbKey];
           const fromBoard = lb ? ytLeaderboardToKoken(lb, (await buildCommentsForLv(lv)) || [], lv) : null;
           if (fromBoard) v = fromBoard;
+          if (v != null) kokenIsTopFans = !!fromBoard;
         }
         if (v != null) bag[k] = v;
       }
@@ -532,9 +539,10 @@ if (real && real.storage && real.storage.local && real.tabs) {
         if (!vid) return { ok: false, error: 'not_youtube' };
         const bag = await realGet(KEY_YT_SUMMARIES);
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
+        // 先に記録を読む(アーカイブかどうか・配信者の UC… が記録から分かるため)
+        const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
         const snapshot = /** @type {Record<string, any>} */ (ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || '')));
         // 「ギフトpt」= YouTube の有料の応援の合計(円にしたおよその額)
-        const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
         if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
         return { ok: true, snapshot };
       });
@@ -764,7 +772,7 @@ function fixTextNode(node) {
   const parentTag = node.parentNode && /** @type {Element} */ (node.parentNode).tagName;
   if (parentTag === 'SCRIPT' || parentTag === 'STYLE') return; // 動く中身・見た目の指定は書き換えない
   const v = String(node.nodeValue || '');
-  let next = ytWording(v); // ニコニコの言葉 → YouTube の言葉(決まった文言だけ)
+  let next = ytWording(v, { topFans: kokenIsTopFans }); // ニコニコの言葉 → YouTube の言葉(決まった文言だけ)
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
   if (next !== v) node.nodeValue = next;
@@ -785,7 +793,7 @@ function fixUidLabelAttr(el) {
 function fixTitleAttr(el) {
   const t = el.getAttribute('title');
   if (!t) return;
-  let next = ytWording(t);
+  let next = ytWording(t, { topFans: kokenIsTopFans });
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
   if (next !== t) el.setAttribute('title', next);
 }

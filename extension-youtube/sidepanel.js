@@ -188,7 +188,7 @@
   }
 
   // src/lib/youtube/ytWording.js
-  var RULES = [
+  var TOP_FAN_RULES = [
     [
       "ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。",
       "YouTube のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。"
@@ -196,7 +196,18 @@
     ["公式の貢献度ランキング（niconico の表示に準拠）", "YouTube 公式のトップファン（XP の順位）"],
     ["ギフト貢献度", "トップファン"],
     // 数字のあとの単位「貢」→ XP(例: 410貢 → 410 XP)
-    [/(\d[\d,]*)\s*貢(?![献])/g, "$1 XP"],
+    [/(\d[\d,]*)\s*貢(?![献])/g, "$1 XP"]
+  ];
+  var SUPERCHAT_RANK_RULES = [
+    [
+      "ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。",
+      "スーパーチャット・ギフトの合計の順位（上位）を表示します。トップファンの順位が出ていない配信（アーカイブなど）で使います。"
+    ],
+    ["公式の貢献度ランキング（niconico の表示に準拠）", "スーパーチャット・ギフトの合計の順位"],
+    ["ギフト貢献度", "スパチャの合計順"],
+    [/(\d[\d,]*)\s*貢(?![献])/g, "$1 pt"]
+  ];
+  var RULES = [
     ["ニコ生の応援コメントを、このPCで見える化", "YouTube の応援コメントを、このPCで見える化"],
     ["ニコニコ生放送 トップ", "YouTube トップ"],
     ["ニコ生の視聴ページの右下に", "YouTube の視聴ページの右下に"],
@@ -215,11 +226,12 @@
     ["ニコ広告", "広告"]
   ];
   var QUICK = /貢|ニコ/;
-  function ytWording(text) {
+  function ytWording(text, opts = {}) {
     const v = String(text ?? "");
     if (!QUICK.test(v)) return v;
     let out = v;
-    for (const [from, to] of RULES) {
+    const rules = [...opts.topFans === false ? SUPERCHAT_RANK_RULES : TOP_FAN_RULES, ...RULES];
+    for (const [from, to] of rules) {
       out = typeof from === "string" ? out.split(from).join(to) : out.replace(from, to);
     }
     return out;
@@ -492,6 +504,7 @@
   } catch {
   }
   var videoIdByLv = /* @__PURE__ */ new Map();
+  var replayVideoIds = /* @__PURE__ */ new Set();
   var lvByVideoId = /* @__PURE__ */ new Map();
   function pseudoLvForVideoId(videoId) {
     const id = String(videoId || "");
@@ -620,7 +633,8 @@
       viewerCountSource: "dom",
       officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
       officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
-      streamAgeMin: startedAt > 0 ? Math.max(0, Math.round((Date.now() - startedAt) / 6e4)) : null
+      // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
+      streamAgeMin: startedAt > 0 && !replayVideoIds.has(videoId) ? Math.max(0, Math.round((Date.now() - startedAt) / 6e4)) : null
     };
   }
   var normName = (name) => String(name || "").trim().replace(/^@/, "").toLowerCase();
@@ -709,6 +723,7 @@
     const who = buildYtPersonResolver(list);
     let streamStartedAt = 0;
     if (list.some((r) => r?.replay)) {
+      replayVideoIds.add(vid);
       try {
         const bag = await real.storage.local.get(KEY_YT_SUMMARIES);
         const sum = bag?.[KEY_YT_SUMMARIES]?.[vid];
@@ -727,6 +742,7 @@
     return out;
   }
   var knownSummaries = {};
+  var kokenIsTopFans = true;
   function registerBroadcastersFromSummaries() {
     for (const [vid, sum] of Object.entries(knownSummaries)) {
       try {
@@ -804,6 +820,7 @@
             );
             const fromBoard = lb ? ytLeaderboardToKoken(lb, await buildCommentsForLv(lv) || [], lv) : null;
             if (fromBoard) v = fromBoard;
+            if (v != null) kokenIsTopFans = !!fromBoard;
           }
           if (v != null) bag[k] = v;
         }
@@ -845,11 +862,11 @@
           if (!vid) return { ok: false, error: "not_youtube" };
           const bag = await realGet(KEY_YT_SUMMARIES);
           const sum = bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid] || {};
+          const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => void 0);
           const snapshot = (
             /** @type {Record<string, any>} */
             ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ""))
           );
-          const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => void 0);
           if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
           return { ok: true, snapshot };
         });
@@ -1041,7 +1058,7 @@
     node.parentNode.tagName;
     if (parentTag === "SCRIPT" || parentTag === "STYLE") return;
     const v = String(node.nodeValue || "");
-    let next = ytWording(v);
+    let next = ytWording(v, { topFans: kokenIsTopFans });
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
     if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
     if (next !== v) node.nodeValue = next;
@@ -1055,7 +1072,7 @@
   function fixTitleAttr(el) {
     const t = el.getAttribute("title");
     if (!t) return;
-    let next = ytWording(t);
+    let next = ytWording(t, { topFans: kokenIsTopFans });
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || "" : uid);
     if (next !== t) el.setAttribute("title", next);
   }
@@ -45370,7 +45387,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T23:02" ? String("yt-2026-11-03T23:02") : "dev";
+      const buildId = "yt-2026-11-03T23:04" ? String("yt-2026-11-03T23:04") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45388,7 +45405,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.27") : "";
+    const bundledVersion = true ? String("0.1.28") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45433,7 +45450,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T23:02" ? String("yt-2026-11-03T23:02") : "dev";
+            return "yt-2026-11-03T23:04" ? String("yt-2026-11-03T23:04") : "dev";
           } catch {
             return "dev";
           }

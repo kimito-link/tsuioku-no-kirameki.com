@@ -6,8 +6,8 @@
  * コメント本文を誤って書き換えないよう、決まった文言だけを置き換える(「ニコ生」を一律に置き換えない)。
  */
 
-/** @type {Array<[string | RegExp, string]>} 上から順に置き換える */
-const RULES = [
+// 「ギフト貢献度」欄の言葉。YouTube のトップファン(XP の順位表)を入れているときだけ使う。
+const TOP_FAN_RULES = [
   [
     'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。',
     'YouTube のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。',
@@ -16,6 +16,20 @@ const RULES = [
   ['ギフト貢献度', 'トップファン'],
   // 数字のあとの単位「貢」→ XP(例: 410貢 → 410 XP)
   [/(\d[\d,]*)\s*貢(?![献])/g, '$1 XP'],
+];
+
+// トップファンの順位表が無い配信(アーカイブなど)は、入口がスパチャの合計の順位を入れている。XP ではないので pt にする。
+const SUPERCHAT_RANK_RULES = [
+  [
+    'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。',
+    'スーパーチャット・ギフトの合計の順位（上位）を表示します。トップファンの順位が出ていない配信（アーカイブなど）で使います。',
+  ],
+  ['公式の貢献度ランキング（niconico の表示に準拠）', 'スーパーチャット・ギフトの合計の順位'],
+  ['ギフト貢献度', 'スパチャの合計順'],
+  [/(\d[\d,]*)\s*貢(?![献])/g, '$1 pt'],
+];
+
+const RULES = [
   ['ニコ生の応援コメントを、このPCで見える化', 'YouTube の応援コメントを、このPCで見える化'],
   ['ニコニコ生放送 トップ', 'YouTube トップ'],
   ['ニコ生の視聴ページの右下に', 'YouTube の視聴ページの右下に'],
@@ -39,13 +53,15 @@ const QUICK = /貢|ニコ/;
 
 /**
  * @param {string} text
+ * @param {{ topFans?: boolean }} [opts] topFans=false: ギフト貢献度の欄がスパチャの合計の順位のとき
  * @returns {string}
  */
-export function ytWording(text) {
+export function ytWording(text, opts = {}) {
   const v = String(text ?? '');
   if (!QUICK.test(v)) return v;
   let out = v;
-  for (const [from, to] of RULES) {
+  const rules = [...(opts.topFans === false ? SUPERCHAT_RANK_RULES : TOP_FAN_RULES), ...RULES];
+  for (const [from, to] of rules) {
     out = typeof from === 'string' ? out.split(from).join(to) : out.replace(from, to);
   }
   return out;
