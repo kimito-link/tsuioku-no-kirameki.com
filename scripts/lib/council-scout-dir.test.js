@@ -58,6 +58,17 @@ describe('resolveCouncilScoutDir', () => {
   it('git が使えない場所では、従来のスクリプト位置基準へ fail-open する', () => {
     // 監視が「動かなくなる」より「worktree 内に書いてでも動く」方を選ぶ設計。
     const outside = mkdtempSync(join(tmpdir(), 'scoutdir-'));
-    expect(resolveCouncilScoutDir(outside)).toBe(join(outside, 'council-scout'));
+    // git の pre-push フックの中では GIT_DIR 等が設定され、どこでも git が「使えて」しまう
+    //   (2026-11-03: push のたびにこのテストだけ赤になった)。フックの外と同じ条件にして測る。
+    const saved = {};
+    for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR']) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+    try {
+      expect(resolveCouncilScoutDir(outside)).toBe(join(outside, 'council-scout'));
+    } finally {
+      for (const [k, v] of Object.entries(saved)) if (v !== undefined) process.env[k] = v;
+    }
   });
 });
