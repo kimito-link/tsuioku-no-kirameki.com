@@ -37,7 +37,7 @@ describe('ytAmountLabel (元の金額)', () => {
       'lv900000000001',
     );
     expect(bags.subApp.history[0].itemName).toMatch(/^スーパーチャット \$5\.00/);
-    expect(bags.subApp.totalCounts[0].itemName).toBe('スーパーチャット');
+    expect(bags.subApp.totalCounts[0].itemName).toMatch(/^スーパーチャット \$5\.00/); // 投げ一覧と同じ名前でまとめる(0pt のまとめ行を出さない)
   });
 });
 
