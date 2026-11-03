@@ -657,6 +657,10 @@
     const broadcasterChannelId = String(
       patch?.broadcasterChannelId || prev.broadcasterChannelId || ""
     ).trim();
+    const broadcasterIconUrl = String(
+      patch?.broadcasterIconUrl || prev.broadcasterIconUrl || ""
+    ).trim();
+    const concurrentViewers = typeof patch?.concurrentViewers === "number" && Number.isFinite(patch.concurrentViewers) && patch.concurrentViewers >= 0 ? Math.floor(patch.concurrentViewers) : typeof prev.concurrentViewers === "number" && Number.isFinite(prev.concurrentViewers) && prev.concurrentViewers >= 0 ? Math.floor(prev.concurrentViewers) : null;
     const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || "").trim();
     const itemCount = typeof patch?.itemCount === "number" && Number.isFinite(patch.itemCount) && patch.itemCount >= 0 ? Math.floor(patch.itemCount) : typeof prev.itemCount === "number" && Number.isFinite(prev.itemCount) ? Math.floor(prev.itemCount) : 0;
     const createdAt = typeof prev.createdAt === "number" && Number.isFinite(prev.createdAt) && prev.createdAt > 0 ? prev.createdAt : nowMs;
@@ -665,6 +669,8 @@
       title,
       broadcasterName,
       broadcasterChannelId,
+      broadcasterIconUrl,
+      concurrentViewers,
       chatFilterLabel,
       itemCount,
       createdAt,
@@ -760,9 +766,15 @@
         idx += 1;
         const getReq = store.get(rec.pk);
         getReq.onsuccess = () => {
-          if (!getReq.result) {
+          const existing = getReq.result;
+          if (!existing) {
             store.put(rec);
             newlyAdded.push(rec);
+          } else if (rec.iconUrl && !existing.iconUrl) {
+            store.put({
+              ...existing,
+              iconUrl: rec.iconUrl
+            });
           }
           processNext();
         };
@@ -895,7 +907,9 @@
             videoId,
             title: payload.title ? String(payload.title) : void 0,
             broadcasterName: payload.broadcasterName ? String(payload.broadcasterName) : void 0,
-            broadcasterChannelId: payload.broadcasterChannelId ? String(payload.broadcasterChannelId) : void 0
+            broadcasterChannelId: payload.broadcasterChannelId ? String(payload.broadcasterChannelId) : void 0,
+            broadcasterIconUrl: payload.broadcasterIconUrl ? String(payload.broadcasterIconUrl) : void 0,
+            concurrentViewers: typeof payload.concurrentViewers === "number" ? payload.concurrentViewers : void 0
           },
           Date.now()
         );

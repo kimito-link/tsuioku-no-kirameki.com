@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest';
 import {
   parseYtChatElement,
   parsePurchaseAmount,
-  extractChannelIdFromContextMenuParams
+  extractChannelIdFromContextMenuParams,
+  extractYtWatchConcurrentViewersFromText
 } from './ytChatParse.js';
 
 /**
@@ -277,5 +278,35 @@ describe('ytChatParse', () => {
     expect(parsePurchaseAmount('£20.00')).toEqual({ amount: 20, currency: 'GBP' });
     expect(parsePurchaseAmount('₩5,000')).toEqual({ amount: 5000, currency: 'KRW' });
     expect(parsePurchaseAmount('')).toEqual({ amount: 0, currency: '' });
+  });
+
+  it('parses yt-gift-message-view-model and extracts author avatar instead of gift box illustration', () => {
+    const giftVmEl = htmlToElement(`
+      <yt-gift-message-view-model id="ChwKGkNGiftViewModelSample999">
+        <div class="yt-spec-avatar-shape" id="author-photo">
+          <img class="yt-core-image" src="//yt4.ggpht.com/gift-vm-author-avatar=s64-c-k-c0x00ffffff-no-rj" alt="">
+        </div>
+        <div id="content">
+          <span id="author-name-v2">@gift_vm_sender</span>
+          <span id="message-v2">10 件の「りんくちゃんねる」のメンバーシップ ギフトを贈りました</span>
+          <img src="https://www.gstatic.com/youtube/img/pdg/gift/gift_box_v2.png" alt="">
+        </div>
+      </yt-gift-message-view-model>
+    `);
+    const parsed = parseYtChatElement(giftVmEl);
+    expect(parsed).not.toBeNull();
+    expect(parsed.kind).toBe('membership_gift');
+    expect(parsed.name).toBe('@gift_vm_sender');
+    expect(parsed.iconUrl).toBe('https://yt4.ggpht.com/gift-vm-author-avatar=s64-c-k-c0x00ffffff-no-rj');
+  });
+
+  it('extracts concurrent viewer count from watch page strings', () => {
+    expect(extractYtWatchConcurrentViewersFromText('1,234 人が視聴中')).toBe(1234);
+    expect(extractYtWatchConcurrentViewersFromText('現在 5.2万 人が視聴中')).toBe(52000);
+    expect(extractYtWatchConcurrentViewersFromText('48人が視聴中')).toBe(48);
+    expect(extractYtWatchConcurrentViewersFromText('3,456 watching now')).toBe(3456);
+    expect(extractYtWatchConcurrentViewersFromText('12.5K watching now')).toBe(12500);
+    expect(extractYtWatchConcurrentViewersFromText('1,234 回視聴')).toBeNull();
+    expect(extractYtWatchConcurrentViewersFromText('')).toBeNull();
   });
 });

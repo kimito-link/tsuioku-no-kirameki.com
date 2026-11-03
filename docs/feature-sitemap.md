@@ -614,7 +614,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 50</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 49</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -623,7 +623,6 @@
 - `extension-youtube/sidepanel.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示バンドル
 - `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 - `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
-- `extension-youtube/src/sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示専用 UI（差分更新対応）
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
@@ -1013,7 +1012,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 301</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1023,6 +1022,7 @@
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
 - `app/live-view.js` — global NL_BUILD_ID
+- `extension-youtube/src/sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
 - `extension/background.js` — MV3 Service Worker
 - `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
 - `mobile/scripts/android-patch-signing.mjs` — Patch <target>/app/build.gradle so `bundleRelease` produces a signed AAB.

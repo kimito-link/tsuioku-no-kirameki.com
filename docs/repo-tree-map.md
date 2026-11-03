@@ -368,9 +368,9 @@ graph LR
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
 ## `extension-youtube/` — YouTube Live 版の試作拡張(単一用途分離)。manifest/content-chat/background/sidepanel/offscreen  〔YouTube / 試作 / 記録 / 読み上げ〕
-<sub>ファイル 24 件</sub>
+<sub>ファイル 27 件</sub>
 
-- `images/`（12 件） — YouTube Live 版試作拡張のアイコン・キャラ画像(ニコ生版と共通の3キャラ)  〔YouTube / 画像〕
+- `images/`（15 件） — YouTube Live 版試作拡張のアイコン・キャラ画像(ニコ生版と共通の3キャラ)  〔YouTube / 画像〕
 - `src/`（5 件） — YouTube Live 版試作拡張のバンドル entry(content-chat/background/sidepanel/offscreen)  〔YouTube / entry / 記録〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕

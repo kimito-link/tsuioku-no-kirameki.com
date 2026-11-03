@@ -197,7 +197,113 @@ function extractBadges(el) {
 }
 
 /**
- * 要素から投稿者チャンネル ID を抽出する。
+ * 要素から投稿者アイコン画像の URL を抽出する。
+ * `yt-gift-message-view-model` 等の新旧コンポーネント構造に対応し、
+ * ギフト箱イラスト（`#gift-image`）やバッジ画像・絵文字は除外する。
+ *
+ * @param {any} el
+ * @returns {string}
+ */
+export function extractAuthorIconUrl(el) {
+  if (!el || typeof el.querySelectorAll !== 'function') return '';
+
+  /** @param {any} raw */
+  const normalizeCandidateUrl = (raw) => {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return '';
+    const withProtocol = trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
+    return safeHttpUrl(withProtocol);
+  };
+
+  // 1) 投稿者アイコン専用コンテナを優先探索
+  const prioritySelectors = [
+    '#author-photo img',
+    'yt-img-shadow#author-photo img',
+    '#avatar img',
+    'yt-avatar-shape img',
+    '.yt-spec-avatar-shape img',
+    'img.yt-spec-avatar-shape__image',
+  ];
+  for (const sel of prioritySelectors) {
+    const imgs = el.querySelectorAll(sel) || [];
+    for (let i = 0; i < imgs.length; i += 1) {
+      const img = imgs[i];
+      const rawSrc =
+        img?.getAttribute?.('src') || (typeof img?.src === 'string' ? img.src : '');
+      const valid = normalizeCandidateUrl(rawSrc);
+      if (valid) return valid;
+    }
+  }
+
+  // 2) フォールバック: 要素内の img からギフト絵柄・絵文字・バッジ・通貨アイコンを除いて探索
+  const allImgs = el.querySelectorAll('#img, yt-img-shadow img, img') || [];
+  for (let i = 0; i < allImgs.length; i += 1) {
+    const img = allImgs[i];
+    if (!img) continue;
+    if (
+      typeof img.closest === 'function' &&
+      img.closest(
+        '#gift-image, #sticker, #sticker-bumper, #currency-img, #chat-badges, #chip-badges, #prepend-chat-badges, yt-live-chat-author-badge-renderer, #message, #message-v2',
+      )
+    ) {
+      continue;
+    }
+    const cls = String(img.getAttribute?.('class') || '');
+    if (cls.includes('emoji')) continue;
+
+    const rawSrc =
+      img.getAttribute?.('src') || (typeof img.src === 'string' ? img.src : '');
+    const valid = normalizeCandidateUrl(rawSrc);
+    if (!valid) continue;
+    if (valid.includes('/youtube/img/pdg/gift/') || valid.includes('/notoemoji/')) {
+      continue;
+    }
+    return valid;
+  }
+
+  return '';
+}
+
+/**
+ * YouTube 視聴ページ（`/watch`）の視聴人数テキスト（例: `"1,234 人が視聴中"`, `"1.2万 人が視聴中"`, `"3,456 watching now"`）から
+ * 同時接続数（整数）を抽出する。該当しない文字列や異常値の場合は `null` を返す（AGENTS.md §3.6 fail-soft）。
+ *
+ * @param {string} rawText
+ * @returns {number | null}
+ */
+export function extractYtWatchConcurrentViewersFromText(rawText) {
+  if (typeof rawText !== 'string' || !rawText.trim()) return null;
+  const normalized = rawText
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/，/g, ',')
+    .replace(/．/g, '.')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const jaMatch = normalized.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(万|億)?\s*人(?:が)?\s*視聴中/);
+  if (jaMatch) {
+    const base = Number.parseFloat(jaMatch[1].replace(/,/g, ''));
+    if (!Number.isFinite(base) || base < 0) return null;
+    const unit = jaMatch[2] || '';
+    const mult = unit === '億' ? 100_000_000 : unit === '万' ? 10_000 : 1;
+    return Math.round(base * mult);
+  }
+
+  const enMatch = normalized.match(
+    /([0-9][0-9,]*(?:\.[0-9]+)?)\s*([KkMm])?\s*watching(?:\s+now)?\b/i,
+  );
+  if (enMatch) {
+    const base = Number.parseFloat(enMatch[1].replace(/,/g, ''));
+    if (!Number.isFinite(base) || base < 0) return null;
+    const unit = (enMatch[2] || '').toUpperCase();
+    const mult = unit === 'M' ? 1_000_000 : unit === 'K' ? 1_000 : 1;
+    return Math.round(base * mult);
+  }
+
+  return null;
+}
+
+/**
  * @param {any} el
  * @param {string} name
  * @returns {string}
@@ -283,8 +389,7 @@ export function parseYtChatElement(el) {
 
     const channelId = extractChannelId(el, name);
 
-    const imgEl = el.querySelector?.('#img, #author-photo img, yt-img-shadow img');
-    const iconUrl = safeHttpUrl(imgEl?.getAttribute?.('src') || '');
+    const iconUrl = extractAuthorIconUrl(el);
 
     const badges = extractBadges(el);
 

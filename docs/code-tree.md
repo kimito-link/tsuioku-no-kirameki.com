@@ -764,30 +764,33 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **extension-youtube/** (24)
-  - 📁 **images/** (12)
+- 📁 **extension-youtube/** (27)
+  - 📁 **images/** (15)
     - 📁 **logo/** (4)
       - `konta-yukkuri-icon-128.png`
       - `konta-yukkuri-icon-16.png`
       - `konta-yukkuri-icon-32.png`
       - `konta-yukkuri-icon-48.png`
-    - 📁 **yukkuri-charactore-english/** (8)
-      - 📁 **konta/** (2)
+    - 📁 **yukkuri-charactore-english/** (11)
+      - 📁 **konta/** (3)
         - `kitsune-yukkuri-normal.png`
         - `kitsune-yukkuri-normal.thumb128.png`
-      - 📁 **link/** (3)
+        - `kitsune-yukkuri-smile-mouth-open.png`
+      - 📁 **link/** (4)
         - `link-yukkuri-half-eyes-mouth-closed.png`
         - `link-yukkuri-normal-mouth-closed.png`
         - `link-yukkuri-normal-mouth-closed.thumb128.png`
-      - 📁 **tanunee/** (3)
+        - `link-yukkuri-smile-mouth-open.png`
+      - 📁 **tanunee/** (4)
         - `tanuki-yukkuri-half-eyes-mouth-closed.png`
         - `tanuki-yukkuri-normal-mouth-closed.png`
         - `tanuki-yukkuri-normal-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-smile-mouth-open.png`
   - 📁 **src/** (5)
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
-    - `sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示専用 UI（差分更新対応）
+    - `sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
     - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
   - `background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
   - `content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル

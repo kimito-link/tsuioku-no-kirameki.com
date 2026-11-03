@@ -269,5 +269,41 @@ describe('applyYtSupportRankingDelta（差分更新）', () => {
     expect(Array.from(step3.snapshot.supporterChannelIds)).toEqual(
       Array.from(fullExpected.supporterChannelIds),
     );
+    expect(step3.snapshot.uniqueCommenterCount).toBe(fullExpected.uniqueCommenterCount);
+    expect(step3.snapshot.commenters).toEqual(fullExpected.commenters);
+    expect(step3.snapshot.primaryCurrencySummary).toEqual(fullExpected.primaryCurrencySummary);
+  });
+
+  it('全発言者ランキング（commenters）はコメント件数順・同数ならスパチャ額順で並ぶ', () => {
+    const items = [
+      { id: '1', kind: 'text', channelId: 'UCUser111111111111111111', name: 'Alice', ts: 10 },
+      { id: '2', kind: 'text', channelId: 'UCUser111111111111111111', name: 'Alice', ts: 20 },
+      {
+        id: '3',
+        kind: 'superchat',
+        channelId: 'UCUser222222222222222222',
+        name: 'Bob',
+        amount: 1000,
+        currency: 'JPY',
+        ts: 15,
+      },
+      { id: '4', kind: 'text', channelId: 'UCUser222222222222222222', name: 'Bob', ts: 25 },
+      { id: '5', kind: 'text', channelId: 'UCUser333333333333333333', name: 'Carol', ts: 30 },
+      { id: '6', kind: 'text', channelId: 'UCUser333333333333333333', name: 'Carol', ts: 40 },
+      { id: '7', kind: 'text', channelId: 'UCUser333333333333333333', name: 'Carol', ts: 50 },
+    ];
+    const res = aggregateYtSupportRanking(items);
+    expect(res.uniqueCommenterCount).toBe(3);
+    // Carol (3件) -> Bob (2件 + ¥1000) -> Alice (2件 + ¥0)
+    expect(res.commenters.map((c) => c.name)).toEqual(['Carol', 'Bob', 'Alice']);
+    expect(res.commenters[0].commentCount).toBe(3);
+    expect(res.commenters[1].commentCount).toBe(2);
+    expect(res.commenters[1].superchatTotalAmount).toBe(1000);
+    expect(res.primaryCurrencySummary).toEqual({
+      currency: 'JPY',
+      amount: 1000,
+      itemCount: 1,
+      formatted: '¥1,000',
+    });
   });
 });

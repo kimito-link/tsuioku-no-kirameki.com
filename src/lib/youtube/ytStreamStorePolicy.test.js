@@ -38,6 +38,8 @@ describe('mergeYtStreamSummary', () => {
       title: 'テスト配信',
       broadcasterName: 'りんく',
       broadcasterChannelId: 'UCOwner123456789012345678',
+      broadcasterIconUrl: '',
+      concurrentViewers: null,
       chatFilterLabel: 'すべてのチャット',
       itemCount: 120,
       createdAt: t0,
@@ -50,11 +52,15 @@ describe('mergeYtStreamSummary', () => {
       first,
       {
         videoId: 'vid-1',
+        broadcasterIconUrl: 'https://yt3.ggpht.com/owner=s88',
+        concurrentViewers: 1234,
         itemCount: 5000, // 1500件上限なしで全件数を保持
       },
       t1,
     );
     expect(updated.title).toBe('テスト配信');
+    expect(updated.broadcasterIconUrl).toBe('https://yt3.ggpht.com/owner=s88');
+    expect(updated.concurrentViewers).toBe(1234);
     expect(updated.itemCount).toBe(5000);
     expect(updated.createdAt).toBe(t0);
     expect(updated.updatedAt).toBe(t1);

@@ -143,6 +143,75 @@
     }
     return Array.from(badgeSet);
   }
+  function extractAuthorIconUrl(el) {
+    if (!el || typeof el.querySelectorAll !== "function") return "";
+    const normalizeCandidateUrl = (raw) => {
+      const trimmed = String(raw || "").trim();
+      if (!trimmed) return "";
+      const withProtocol = trimmed.startsWith("//") ? `https:${trimmed}` : trimmed;
+      return safeHttpUrl(withProtocol);
+    };
+    const prioritySelectors = [
+      "#author-photo img",
+      "yt-img-shadow#author-photo img",
+      "#avatar img",
+      "yt-avatar-shape img",
+      ".yt-spec-avatar-shape img",
+      "img.yt-spec-avatar-shape__image"
+    ];
+    for (const sel of prioritySelectors) {
+      const imgs = el.querySelectorAll(sel) || [];
+      for (let i = 0; i < imgs.length; i += 1) {
+        const img = imgs[i];
+        const rawSrc = img?.getAttribute?.("src") || (typeof img?.src === "string" ? img.src : "");
+        const valid = normalizeCandidateUrl(rawSrc);
+        if (valid) return valid;
+      }
+    }
+    const allImgs = el.querySelectorAll("#img, yt-img-shadow img, img") || [];
+    for (let i = 0; i < allImgs.length; i += 1) {
+      const img = allImgs[i];
+      if (!img) continue;
+      if (typeof img.closest === "function" && img.closest(
+        "#gift-image, #sticker, #sticker-bumper, #currency-img, #chat-badges, #chip-badges, #prepend-chat-badges, yt-live-chat-author-badge-renderer, #message, #message-v2"
+      )) {
+        continue;
+      }
+      const cls = String(img.getAttribute?.("class") || "");
+      if (cls.includes("emoji")) continue;
+      const rawSrc = img.getAttribute?.("src") || (typeof img.src === "string" ? img.src : "");
+      const valid = normalizeCandidateUrl(rawSrc);
+      if (!valid) continue;
+      if (valid.includes("/youtube/img/pdg/gift/") || valid.includes("/notoemoji/")) {
+        continue;
+      }
+      return valid;
+    }
+    return "";
+  }
+  function extractYtWatchConcurrentViewersFromText(rawText) {
+    if (typeof rawText !== "string" || !rawText.trim()) return null;
+    const normalized = rawText.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 65248)).replace(/，/g, ",").replace(/．/g, ".").replace(/\s+/g, " ").trim();
+    const jaMatch = normalized.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(万|億)?\s*人(?:が)?\s*視聴中/);
+    if (jaMatch) {
+      const base = Number.parseFloat(jaMatch[1].replace(/,/g, ""));
+      if (!Number.isFinite(base) || base < 0) return null;
+      const unit = jaMatch[2] || "";
+      const mult = unit === "億" ? 1e8 : unit === "万" ? 1e4 : 1;
+      return Math.round(base * mult);
+    }
+    const enMatch = normalized.match(
+      /([0-9][0-9,]*(?:\.[0-9]+)?)\s*([KkMm])?\s*watching(?:\s+now)?\b/i
+    );
+    if (enMatch) {
+      const base = Number.parseFloat(enMatch[1].replace(/,/g, ""));
+      if (!Number.isFinite(base) || base < 0) return null;
+      const unit = (enMatch[2] || "").toUpperCase();
+      const mult = unit === "M" ? 1e6 : unit === "K" ? 1e3 : 1;
+      return Math.round(base * mult);
+    }
+    return null;
+  }
   function extractChannelId(el, name) {
     const direct = el.getAttribute?.("data-author-external-channel-id") || el.getAttribute?.("author-external-channel-id") || "";
     if (direct && direct.trim()) return direct.trim();
@@ -188,8 +257,7 @@
       const name = String(authorEl?.textContent || "").replace(/\s+/g, " ").trim();
       if (!rawId && !name) return null;
       const channelId = extractChannelId(el, name);
-      const imgEl = el.querySelector?.("#img, #author-photo img, yt-img-shadow img");
-      const iconUrl = safeHttpUrl(imgEl?.getAttribute?.("src") || "");
+      const iconUrl = extractAuthorIconUrl(el);
       const badges = extractBadges(el);
       let text = "";
       const msgEl = el.querySelector?.("#message, #message-v2");
@@ -309,25 +377,48 @@
       const href = String(ownerLinkEl?.getAttribute("href") || "");
       const ucMatch = href.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
       const broadcasterChannelId = ucMatch ? ucMatch[1] : "";
+      const ownerImgEl = document.querySelector(
+        "#owner #avatar img, ytd-video-owner-renderer #avatar img, #upload-info #avatar img"
+      );
+      const broadcasterIconUrl = String(
+        ownerImgEl?.getAttribute("src") || (ownerImgEl && "src" in ownerImgEl ? ownerImgEl.src : "") || ""
+      ).trim();
+      let concurrentViewers = null;
+      const infoCandidates = document.querySelectorAll(
+        "ytd-watch-info-text, #info-container, #view-count, ytd-video-primary-info-renderer #count, #info"
+      );
+      for (let i = 0; i < infoCandidates.length; i += 1) {
+        const parsed = extractYtWatchConcurrentViewersFromText(
+          String(infoCandidates[i]?.textContent || "")
+        );
+        if (parsed !== null) {
+          concurrentViewers = parsed;
+          break;
+        }
+      }
       safeSendMessage({
         type: "YT_STREAM_META",
         payload: {
           videoId,
           title: rawTitle,
           broadcasterName,
-          broadcasterChannelId
+          broadcasterChannelId,
+          broadcasterIconUrl,
+          concurrentViewers
         }
       });
     };
     sendMeta();
     setTimeout(sendMeta, 1500);
     setTimeout(sendMeta, 4e3);
+    setInterval(sendMeta, 5e3);
     window.addEventListener("yt-navigate-finish", () => {
       setTimeout(sendMeta, 800);
     });
   }
   function setupLiveChatObserver() {
     const seenIds = /* @__PURE__ */ new Set();
+    const seenWithIconIds = /* @__PURE__ */ new Set();
     let pendingBatch = [];
     let flushTimer = null;
     let lastFilterLabel = "";
@@ -336,6 +427,13 @@
       if (seenIds.size > MAX_SEEN_IDS) {
         const first = seenIds.values().next().value;
         if (first) seenIds.delete(first);
+      }
+    };
+    const rememberIconId = (id) => {
+      seenWithIconIds.add(id);
+      if (seenWithIconIds.size > MAX_SEEN_IDS) {
+        const first = seenWithIconIds.values().next().value;
+        if (first) seenWithIconIds.delete(first);
       }
     };
     const flushBatch = () => {
@@ -358,27 +456,41 @@
       if (flushTimer !== null) return;
       flushTimer = setTimeout(flushBatch, 150);
     };
-    const inspectElement = (el, allowRetry = true) => {
+    const inspectElement = (el, retryCount = 0) => {
       if (!el || typeof el.tagName !== "string") return;
       const rawId = String(el.getAttribute?.("id") || "").trim();
-      if (rawId && seenIds.has(rawId)) return;
+      if (rawId && seenWithIconIds.has(rawId)) return;
       const parsed = parseYtChatElement(el);
       if (!parsed) {
-        if (allowRetry) {
-          setTimeout(() => inspectElement(el, false), 120);
+        if (retryCount < 2) {
+          setTimeout(() => inspectElement(el, retryCount + 1), 150);
         }
         return;
       }
-      if (seenIds.has(parsed.id)) return;
-      rememberId(parsed.id);
-      pendingBatch.push(parsed);
-      queueFlush();
+      if (!seenIds.has(parsed.id)) {
+        rememberId(parsed.id);
+        if (parsed.iconUrl) {
+          rememberIconId(parsed.id);
+        } else if (retryCount < 3) {
+          setTimeout(() => inspectElement(el, retryCount + 1), 200 * (retryCount + 1));
+        }
+        pendingBatch.push(parsed);
+        queueFlush();
+        return;
+      }
+      if (parsed.iconUrl && !seenWithIconIds.has(parsed.id)) {
+        rememberIconId(parsed.id);
+        pendingBatch.push(parsed);
+        queueFlush();
+      } else if (!parsed.iconUrl && retryCount < 3) {
+        setTimeout(() => inspectElement(el, retryCount + 1), 250 * (retryCount + 1));
+      }
     };
     const scanAllExisting = (root = document) => {
       try {
         const nodes = root.querySelectorAll(CHAT_ITEM_SELECTOR);
         for (let i = 0; i < nodes.length; i += 1) {
-          inspectElement(nodes[i], true);
+          inspectElement(nodes[i], 0);
         }
         queueFlush();
       } catch {
@@ -396,12 +508,12 @@
           );
           if (!node || node.nodeType !== 1) continue;
           if (typeof node.matches === "function" && node.matches(CHAT_ITEM_SELECTOR)) {
-            inspectElement(node, true);
+            inspectElement(node, 0);
           }
           if (typeof node.querySelectorAll === "function") {
             const children = node.querySelectorAll(CHAT_ITEM_SELECTOR);
             for (let k = 0; k < children.length; k += 1) {
-              inspectElement(children[k], true);
+              inspectElement(children[k], 0);
             }
           }
         }

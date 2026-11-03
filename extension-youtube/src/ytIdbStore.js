@@ -91,9 +91,15 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems) {
       idx += 1;
       const getReq = store.get(rec.pk);
       getReq.onsuccess = () => {
-        if (!getReq.result) {
+        const existing = getReq.result;
+        if (!existing) {
           store.put(rec);
           newlyAdded.push(rec);
+        } else if (rec.iconUrl && !existing.iconUrl) {
+          store.put({
+            ...existing,
+            iconUrl: rec.iconUrl,
+          });
         }
         processNext();
       };
