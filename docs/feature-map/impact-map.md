@@ -499,6 +499,7 @@
 | `src/extension/liveDirectComments.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/extension/liveEventsPublisher.js` | 1 | 状態速報ページ |
 | `src/extension/offscreen-entry.js` | 1 | コメント IDB 書き手 |
+| `src/extension/orphanTabAutoReloadHost.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/page-intercept-entry.js` | 1 | ページ傍受 |
 | `src/extension/phonePostRelay.js` | 1 | 状態速報ページ |
 | `src/extension/phoneVoicePublisher.js` | 1 | 状態速報ページ |
@@ -839,6 +840,7 @@
 | `src/lib/oggOpusMux.js` | 1 | 状態速報ページ |
 | `src/lib/openingFiveMinuteCorrelation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/opSoundDirector.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/orphanTabAutoReload.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ouenBanner.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/ouenBannerDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/overlayShown.js` | 1 | ポップアップ(応援レーン) |
