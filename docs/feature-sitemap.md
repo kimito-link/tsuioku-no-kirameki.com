@@ -200,8 +200,9 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 100</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 101</summary>
 
+- `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -325,7 +326,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 274</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 275</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -596,6 +597,7 @@
 - `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
 - `src/lib/yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
+- `src/lib/youtube/ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
 - `tests/helpers/laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
@@ -676,7 +678,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 44</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 45</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
@@ -721,6 +723,7 @@
 - `src/lib/roomCardInnerHtml.js` — 応援ルームカード（renderUserRooms の各 <li class="room-card">）の inner HTML を組む純関数。
 - `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
+- `src/lib/youtube/ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
 - `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
 
 </details>
@@ -1012,7 +1015,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 301</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 302</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1304,6 +1307,7 @@
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
+- `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
 - `src/server/liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
 - `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
@@ -1326,22 +1330,21 @@
 - `v0.1.1835` 2026-10-31 — アプリのコメントに顔アイコンを出す
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
 - `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
 - `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
-### 🎈 吹き出し (2版)
+### 🎈 吹き出し (1版)
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
 ### 🎁 ギフト (3版)
 - `v0.1.1839` 2026-10-31 — イベント欄の拡張のエラーも止める
 - `v0.1.1838` 2026-10-31 — ギフト一覧で出ていた拡張のエラーを止める
 - `v0.1.1836` 2026-10-31 — つなぎ直しで同じコメントが二重に出ないように
 
-### 🔊 読み上げ (8版)
+### 🔊 読み上げ (9版)
+- `v0.1.1850` 2026-11-03 — 混んだ配信で読み上げが全く鳴らないのを修正
 - `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
 - `v0.1.1847` 2026-10-31 — アプリの読み上げを人ごとに違う声に
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
@@ -1351,9 +1354,8 @@
 - `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
 - `v0.1.1829` 2026-10-29 — コメビュの読み上げを少し早く
 
-### 🩺 診断・状態速報 (2版)
+### 🩺 診断・状態速報 (1版)
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-- `v0.1.1828` 2026-10-29 — 席が無い人の吹き出しも会場の中に出す
 
 ### ⚡ 描画・性能 (2版)
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
