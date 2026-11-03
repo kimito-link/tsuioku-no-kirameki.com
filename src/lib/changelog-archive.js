@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1830',
+    date: '2026-10-28',
+    summary: 'パネルを開くときの作り直しを1回に',
+    items: Object.freeze([
+      '視聴ページでパネルを開くたび、パネルの入れ物を4回作り直していました（作りたてを古いものと見なして捨てていた）。1回だけ作るようにしたので、開く瞬間の無駄な隠す・出すが減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1829',
     date: '2026-10-29',
     summary: 'コメビュの読み上げを少し早く',
