@@ -50,6 +50,7 @@ const ITEM_NAME = /** @type {Record<string, string>} */ ({
   sticker: 'スーパーステッカー',
   membership: 'メンバー加入',
   membership_gift: 'メンバーシップギフト',
+  yt_gift: 'ギフト',
 });
 
 /**
@@ -81,7 +82,7 @@ export function isYtPaidKind(kind) {
 /**
  * @param {Array<{
  *   id?: string, userId?: string, nickname?: string, avatarUrl?: string, text?: string,
- *   capturedAt?: number, ytPostedAt?: number, ytKind?: string, ytAmount?: number, ytCurrency?: string
+ *   capturedAt?: number, ytPostedAt?: number, ytKind?: string, ytGiftName?: string, ytGiftImageUrl?: string, ytAmount?: number, ytCurrency?: string
  * }>} entries ytNicoShim が作ったニコ生形のコメント行
  * @param {string} lv 疑似 lv
  * @param {{ startedAt?: number, now?: number }} [opts]
@@ -108,7 +109,10 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     const baseItemName = ITEM_NAME[kind];
     const amountLabel = ytAmountLabel(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
     // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
-    const itemName = amountLabel ? `${baseItemName} ${amountLabel}` : baseItemName;
+    // YouTube の新しい「ギフト」(ジュエルのスタンプ)はギフトの名前と絵がある(例: ハイ)。金額は出ないので pt は 0
+    const giftName = kind === 'yt_gift' ? String(e.ytGiftName || '').trim() : '';
+    const giftThumb = kind === 'yt_gift' ? String(e.ytGiftImageUrl || '') : '';
+    const itemName = giftName || (amountLabel ? `${baseItemName} ${amountLabel}` : baseItemName);
     const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
     const at = Number(e.ytPostedAt) || Number(e.capturedAt) || now;
     const pubSec = Math.floor(at / 1000);
@@ -135,7 +139,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
       points: point,
       time: beginSec > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : '—',
       sortKey: beginSec > 0 ? offsetSec : pubSec,
-      thumbnailUrl: '',
+      thumbnailUrl: giftThumb,
       senderAvatarUrl: String(e.avatarUrl || ''),
       userId: uid,
       kokenHistoryId: `yt:${String(e.id || '')}`,
@@ -144,9 +148,9 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
       capturedAt: at,
     });
 
-    const item = byItem.get(baseItemName) || { itemName: baseItemName, count: 0, thumbnailUrl: '' };
+    const item = byItem.get(giftName || baseItemName) || { itemName: giftName || baseItemName, count: 0, thumbnailUrl: giftThumb };
     item.count += 1;
-    byItem.set(baseItemName, item);
+    byItem.set(giftName || baseItemName, item);
 
     if (!uid) continue;
     const u = byUser.get(uid) || {

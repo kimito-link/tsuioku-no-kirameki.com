@@ -277,6 +277,23 @@
         const alt = String(stickerImg?.getAttribute?.("alt") || "").trim();
         text = alt || "スーパーステッカー";
       }
+      let giftName = "";
+      let giftImageUrl = "";
+      if (tag === "yt-gift-message-view-model") {
+        const imgs = el.querySelectorAll?.("img") || [];
+        for (let i = 0; i < imgs.length; i += 1) {
+          const src = String(imgs[i].getAttribute?.("src") || "");
+          if (/\/pdg\/gift\/assets\//.test(src)) {
+            giftImageUrl = src.startsWith("//") ? `https:${src}` : src;
+            break;
+          }
+        }
+        const sent = text.match(/^(.+?)\s*を送信しました/) || text.match(/^sent\s+(.+?)\s*$/i);
+        if (giftImageUrl || sent && !/メンバーシップ|membership/i.test(text)) {
+          kind = "yt_gift";
+          giftName = sent ? sent[1].trim() : "";
+        }
+      }
       let amount = 0;
       let currency = "";
       if (kind === "superchat" || kind === "sticker") {
@@ -301,7 +318,8 @@
         amount,
         currency,
         badges,
-        ts
+        ts,
+        ...kind === "yt_gift" ? { giftName, giftImageUrl } : {}
       };
     } catch {
       return null;

@@ -40,3 +40,18 @@ describe('ytAmountLabel (元の金額)', () => {
     expect(bags.subApp.totalCounts[0].itemName).toBe('スーパーチャット');
   });
 });
+
+describe('YouTube のギフト(ジュエル)', () => {
+  it('uses the gift name and image as the item', async () => {
+    const { buildYtGiftBags } = await import('../../../extension-youtube/src/ytGiftToNico.js');
+    const img = 'https://www.gstatic.com/youtube/img/pdg/gift/assets/yes_jp.png';
+    const bags = buildYtGiftBags(
+      [{ id: 'g', userId: '8000000002', nickname: '@ゆき', ytKind: 'yt_gift', ytGiftName: 'ハイ', ytGiftImageUrl: img, capturedAt: 1 }],
+      'lv900000000002',
+    );
+    expect(bags.count).toBe(1);
+    expect(bags.subApp.history[0].itemName).toBe('ハイ');
+    expect(bags.subApp.history[0].thumbnailUrl).toBe(img);
+    expect(bags.subApp.history[0].points).toBe(0);
+  });
+});

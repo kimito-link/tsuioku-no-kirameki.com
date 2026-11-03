@@ -354,7 +354,7 @@ function extractChannelId(el, name) {
  *   name: string,
  *   iconUrl: string,
  *   text: string,
- *   kind: 'text' | 'superchat' | 'sticker' | 'membership' | 'membership_gift',
+ *   kind: 'text' | 'superchat' | 'sticker' | 'membership' | 'membership_gift' | 'yt_gift',
  *   amount: number,
  *   currency: string,
  *   badges: string[],
@@ -366,7 +366,7 @@ export function parseYtChatElement(el) {
     if (!el || typeof el.tagName !== 'string') return null;
     const tag = el.tagName.toLowerCase();
 
-    /** @type {'text' | 'superchat' | 'sticker' | 'membership' | 'membership_gift' | ''} */
+    /** @type {'text' | 'superchat' | 'sticker' | 'membership' | 'membership_gift' | 'yt_gift' | ''} */
     let kind = '';
     if (tag === 'yt-live-chat-text-message-renderer') {
       kind = 'text';
@@ -416,6 +416,27 @@ export function parseYtChatElement(el) {
       text = alt || 'スーパーステッカー';
     }
 
+    // ★yt-gift-message-view-model は2種類ある: メンバーシップのギフトと、YouTube の新しい「ギフト」
+    //   (ジュエルで送るスタンプ。例「ハイ を送信しました」・絵は gstatic の /pdg/gift/assets/)。
+    //   後者をメンバーシップギフトとして数えると取り違える(2026-11-04 MasuoTV の配信で実物を確認)。
+    let giftName = '';
+    let giftImageUrl = '';
+    if (tag === 'yt-gift-message-view-model') {
+      const imgs = el.querySelectorAll?.('img') || [];
+      for (let i = 0; i < imgs.length; i += 1) {
+        const src = String(imgs[i].getAttribute?.('src') || '');
+        if (/\/pdg\/gift\/assets\//.test(src)) {
+          giftImageUrl = src.startsWith('//') ? `https:${src}` : src;
+          break;
+        }
+      }
+      const sent = text.match(/^(.+?)\s*を送信しました/) || text.match(/^sent\s+(.+?)\s*$/i);
+      if (giftImageUrl || (sent && !/メンバーシップ|membership/i.test(text))) {
+        kind = 'yt_gift';
+        giftName = sent ? sent[1].trim() : '';
+      }
+    }
+
     let amount = 0;
     let currency = '';
     if (kind === 'superchat' || kind === 'sticker') {
@@ -445,6 +466,7 @@ export function parseYtChatElement(el) {
       currency,
       badges,
       ts,
+      ...(kind === 'yt_gift' ? { giftName, giftImageUrl } : {}),
     };
   } catch {
     return null;

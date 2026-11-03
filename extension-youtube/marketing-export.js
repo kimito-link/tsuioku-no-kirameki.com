@@ -24,7 +24,7 @@
       roleLabel: "ファン視点",
       description: "スパチャ・ステッカー・メンバー・メンバーシップギフトの人",
       badges: Object.freeze(["member"]),
-      kinds: Object.freeze(["superchat", "sticker", "membership", "membership_gift"]),
+      kinds: Object.freeze(["superchat", "sticker", "membership", "membership_gift", "yt_gift"]),
       includeSupporterChannels: true,
       isDefault: false
     },
@@ -263,7 +263,8 @@
       superchat: "スーパーチャット",
       sticker: "スーパーステッカー",
       membership: "メンバー加入",
-      membership_gift: "メンバーシップギフト"
+      membership_gift: "メンバーシップギフト",
+      yt_gift: "ギフト"
     }
   );
   function ytAmountLabel(amount, currency) {
@@ -296,7 +297,9 @@
       const kind = String(e.ytKind || "");
       const baseItemName = ITEM_NAME[kind];
       const amountLabel = ytAmountLabel(Number(e.ytAmount || 0), String(e.ytCurrency || ""));
-      const itemName = amountLabel ? `${baseItemName} ${amountLabel}` : baseItemName;
+      const giftName = kind === "yt_gift" ? String(e.ytGiftName || "").trim() : "";
+      const giftThumb = kind === "yt_gift" ? String(e.ytGiftImageUrl || "") : "";
+      const itemName = giftName || (amountLabel ? `${baseItemName} ${amountLabel}` : baseItemName);
       const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ""));
       const at = Number(e.ytPostedAt) || Number(e.capturedAt) || now;
       const pubSec = Math.floor(at / 1e3);
@@ -321,7 +324,7 @@
         points: point,
         time: beginSec > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : "—",
         sortKey: beginSec > 0 ? offsetSec : pubSec,
-        thumbnailUrl: "",
+        thumbnailUrl: giftThumb,
         senderAvatarUrl: String(e.avatarUrl || ""),
         userId: uid,
         kokenHistoryId: `yt:${String(e.id || "")}`,
@@ -329,9 +332,9 @@
         contribution: point,
         capturedAt: at
       });
-      const item = byItem.get(baseItemName) || { itemName: baseItemName, count: 0, thumbnailUrl: "" };
+      const item = byItem.get(giftName || baseItemName) || { itemName: giftName || baseItemName, count: 0, thumbnailUrl: giftThumb };
       item.count += 1;
-      byItem.set(baseItemName, item);
+      byItem.set(giftName || baseItemName, item);
       if (!uid) continue;
       const u = byUser.get(uid) || {
         userId: uid,
@@ -520,6 +523,8 @@
       // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)
       ytPostedAt: ytPostedAtFromClock(String(r?.ts || ""), at),
       ytKind: String(r?.kind || "text"),
+      ...r?.giftName ? { ytGiftName: String(r.giftName) } : {},
+      ...r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {},
       ytAmount: Number(r?.amount || 0),
       ytCurrency: String(r?.currency || "")
     };

@@ -28,7 +28,7 @@ export const YT_LANE_RULES = Object.freeze([
     roleLabel: 'ファン視点',
     description: 'スパチャ・ステッカー・メンバー・メンバーシップギフトの人',
     badges: Object.freeze(['member']),
-    kinds: Object.freeze(['superchat', 'sticker', 'membership', 'membership_gift']),
+    kinds: Object.freeze(['superchat', 'sticker', 'membership', 'membership_gift', 'yt_gift']),
     includeSupporterChannels: true,
     isDefault: false,
   },
