@@ -1064,9 +1064,123 @@
   });
   var YT_DEFAULT_STYLE_IDS = VOICE_CAPPED_STYLE_IDS;
 
+  // src/lib/voiceEngineOverload.js
+  var VOICE_OVERLOAD_TIMEOUT_STREAK = 2;
+  var VOICE_OVERLOAD_RECOVER_STREAK = 5;
+  var VOICE_OVERLOAD_FAST_MS = 3e3;
+  var VOICE_OVERLOAD_QUERY_TIMEOUT_MS = 3e4;
+  var VOICE_OVERLOAD_SYNTH_TIMEOUT_MS = 45e3;
+  function createVoiceOverloadState() {
+    return { overloaded: false, timeoutStreak: 0, fastStreak: 0 };
+  }
+  function noteVoiceSynthOutcome(state, outcome) {
+    if (!state) return false;
+    if (outcome?.timedOut === true) {
+      state.timeoutStreak += 1;
+      state.fastStreak = 0;
+      if (state.timeoutStreak >= VOICE_OVERLOAD_TIMEOUT_STREAK) state.overloaded = true;
+      return state.overloaded;
+    }
+    if (outcome?.ok !== true) return state.overloaded;
+    state.timeoutStreak = 0;
+    const ms = Number(outcome?.totalMs);
+    if (Number.isFinite(ms) && ms >= 0 && ms < VOICE_OVERLOAD_FAST_MS) {
+      state.fastStreak += 1;
+      if (state.overloaded && state.fastStreak >= VOICE_OVERLOAD_RECOVER_STREAK) state.overloaded = false;
+    } else {
+      state.fastStreak = 0;
+    }
+    return state.overloaded;
+  }
+  function resolveVoiceOverloadTimeouts(overloaded) {
+    if (!overloaded) return {};
+    return {
+      audioQueryTimeoutMs: VOICE_OVERLOAD_QUERY_TIMEOUT_MS,
+      synthesisTimeoutMs: VOICE_OVERLOAD_SYNTH_TIMEOUT_MS
+    };
+  }
+
+  // src/lib/voiceLightFallback.js
+  var LIGHT_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
+  var LIGHT_VOICE_MAX_CHARS = 60;
+  var LIGHT_VOICE_PROBE_INTERVAL_MS = 3e4;
+  var LIGHT_VOICE_PROBE_TEXT = "てすと";
+  function shouldUseLightVoice(s) {
+    return !!s && s.setting !== "off" && s.available === true && s.overloaded === true;
+  }
+  function shouldProbeVoicevox(s) {
+    if (!s || s.inFlight > 0) return false;
+    return !(s.lastProbeAt > 0) || s.nowMs - s.lastProbeAt >= LIGHT_VOICE_PROBE_INTERVAL_MS;
+  }
+
   // extension-youtube/src/offscreen-entry.js
   var isVoicevoxOnline = false;
   var isDrainingQueue = false;
+  var overload = createVoiceOverloadState();
+  var synthInFlight = 0;
+  var lastProbeAt = 0;
+  var lightFailStreak = 0;
+  var lastReportedEngineKey = "";
+  async function synthesizeTracked(text, voice) {
+    let timedOut = false;
+    const startedAt = Date.now();
+    synthInFlight += 1;
+    let wav = null;
+    try {
+      wav = await synthesizeVoice(text, voice, {
+        baseUrl: VOICEVOX_BASE_URL,
+        ...resolveVoiceOverloadTimeouts(overload.overloaded),
+        onFailure: (info) => {
+          if (/timeout/i.test(String(
+            /** @type {any} */
+            info?.error?.message || info?.error || ""
+          ))) timedOut = true;
+        }
+      });
+    } catch (err) {
+      if (/timeout/i.test(String(
+        /** @type {any} */
+        err?.message || err
+      ))) timedOut = true;
+      wav = null;
+    } finally {
+      synthInFlight = Math.max(0, synthInFlight - 1);
+    }
+    const ok = !!wav && wav instanceof ArrayBuffer;
+    noteVoiceSynthOutcome(overload, { timedOut, ok, totalMs: Date.now() - startedAt });
+    reportEngineState(false);
+    return { wav: ok ? wav : null, timedOut };
+  }
+  function maybeProbeVoicevox() {
+    const nowMs = Date.now();
+    if (!shouldProbeVoicevox({ nowMs, lastProbeAt, inFlight: synthInFlight })) return;
+    lastProbeAt = nowMs;
+    void synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, { styleId: YT_DEFAULT_STYLE_IDS[0], pitchOffset: 0, speedOffset: 0 }).catch(() => null);
+  }
+  function reportEngineState(lightActive) {
+    const key = `${overload.overloaded}|${lightActive}`;
+    if (key === lastReportedEngineKey) return;
+    lastReportedEngineKey = key;
+    chrome.runtime.sendMessage(
+      { type: "YT_REPORT_VOICE_ENGINE", payload: { overloaded: overload.overloaded, lightActive } },
+      () => {
+        void chrome.runtime.lastError;
+      }
+    );
+  }
+  function speakLight(entry) {
+    const text = String(entry.text || "").slice(0, LIGHT_VOICE_MAX_CHARS);
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: "YT_SPEAK_LIGHT", payload: { text, userKey: String(entry.userKey || "") } },
+        (reply) => {
+          void chrome.runtime.lastError;
+          if (reply?.reason === "no-voice") lightFailStreak = 3;
+          resolve(!!reply?.ok);
+        }
+      );
+    });
+  }
   function playWavBuffer(wavBuffer) {
     return new Promise((resolve) => {
       try {
@@ -1162,18 +1276,25 @@
             void chrome.runtime.lastError;
           }
         );
-        const wav = await synthesizeVoice(
-          entry.text,
-          {
-            styleId: entry.styleId,
-            pitchOffset: Number(entry.pitchOffset || 0),
-            speedOffset: Number(entry.speedOffset || 0)
-          },
-          {
-            baseUrl: VOICEVOX_BASE_URL
-          }
-        );
-        if (!wav || !(wav instanceof ArrayBuffer)) {
+        const useLight = shouldUseLightVoice({
+          overloaded: overload.overloaded,
+          available: lightFailStreak < 3,
+          setting: String(res?.lightVoice || "auto")
+        });
+        reportEngineState(useLight);
+        if (useLight) {
+          maybeProbeVoicevox();
+          const spoken = await speakLight(entry);
+          lightFailStreak = spoken ? 0 : lightFailStreak + 1;
+          continue;
+        }
+        const { wav, timedOut } = await synthesizeTracked(entry.text, {
+          styleId: entry.styleId,
+          pitchOffset: Number(entry.pitchOffset || 0),
+          speedOffset: Number(entry.speedOffset || 0)
+        });
+        if (!wav) {
+          if (timedOut) continue;
           await checkVoicevoxStatus();
           break;
         }

@@ -1,5 +1,5 @@
 // background-entry.js — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
-/* global chrome */
+/* global chrome, setTimeout, clearTimeout */
 
 import {
   VOICEVOX_BASE_URL,
@@ -16,6 +16,7 @@ import {
 import { mergeYtStreamSummary } from '../../src/lib/youtube/ytStreamStorePolicy.js';
 import { appendYtStreamCommentsIdb } from './ytIdbStore.js';
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 
 const STORAGE_KEYS = Object.freeze({
   STREAM_SUMMARIES: 'yt_stream_summaries',
@@ -30,6 +31,8 @@ const DEFAULT_VOICE_SETTINGS = Object.freeze({
   enabled: true,
   mode: YT_VOICE_MODES.ALL,
   broadcasterNameOverride: '',
+  /** VOICEVOX が追いつかない間 PC の声で読むか: 'auto'(既定) / 'off'(VOICEVOX だけで読む) */
+  lightVoice: 'auto',
   availableStyleIds: Array.from(YT_DEFAULT_STYLE_IDS),
 });
 
@@ -122,6 +125,86 @@ function extractVideoIdFromSender(sender) {
 }
 
 /**
+ * PC に入っている日本語の声(chrome.tts・Windows では Haruka / Ayumi / Ichiro など)。
+ * @returns {Promise<{ name: string, lang: string }[]>}
+ */
+async function getJapaneseTtsVoices() {
+  if (!chrome?.tts?.getVoices) return [];
+  const raw = await new Promise((resolve) => {
+    try {
+      chrome.tts.getVoices((vs) => resolve(Array.isArray(vs) ? vs : []));
+    } catch {
+      resolve([]);
+    }
+  });
+  return pickJapaneseVoices(
+    /** @type {any[]} */ (raw).map((v) => ({
+      name: String(v.voiceName || ''),
+      voiceURI: String(v.voiceName || ''),
+      lang: String(v.lang || ''),
+      localService: v.remote !== true,
+    })),
+  );
+}
+
+/**
+ * 1件を PC の声で読み、読み終わる(か打ち切る)まで待つ。人ごとの声・高さ・速さは lightVoiceToneFor。
+ * @param {string} text
+ * @param {string} userKey
+ * @returns {Promise<{ ok: boolean, reason?: string }>}
+ */
+async function speakLightTts(text, userKey) {
+  const t = String(text || '').trim();
+  if (!t) return { ok: false, reason: 'empty' };
+  const voices = await getJapaneseTtsVoices();
+  if (!voices.length) return { ok: false, reason: 'no-voice' };
+  const tone = lightVoiceToneFor(userKey, voices.length);
+  const voice = voices[tone.voiceIndex % voices.length];
+  return new Promise((resolve) => {
+    let started = false;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve({ ok: started, reason: started ? '' : 'not-started' });
+    };
+    const timer = setTimeout(() => {
+      try {
+        chrome.tts.stop();
+      } catch {
+        // no-op
+      }
+      finish();
+    }, t.length * 400 + 5000);
+    try {
+      chrome.tts.speak(
+        t,
+        {
+          voiceName: voice.name,
+          lang: voice.lang || 'ja-JP',
+          pitch: tone.pitch,
+          rate: tone.rate,
+          enqueue: false,
+          onEvent: (ev) => {
+            if (ev.type === 'start') started = true;
+            else if (['end', 'interrupted', 'cancelled', 'error'].includes(ev.type)) {
+              if (ev.type === 'end') started = true;
+              finish();
+            }
+          },
+        },
+        () => {
+          if (chrome.runtime.lastError) finish();
+        },
+      );
+    } catch {
+      finish();
+    }
+  });
+}
+
+/**
  * サイドパネルのコメントを、その配信を開いているタブのチャット欄へ渡して送信させる。
  * @param {string} videoId
  * @param {string} text
@@ -201,6 +284,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })()
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, reason: String(err) }));
+    return true;
+  }
+
+  if (message.type === 'YT_SPEAK_LIGHT') {
+    const payload = message.payload || {};
+    speakLightTts(String(payload.text || ''), String(payload.userKey || ''))
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, reason: String(err) }));
+    return true;
+  }
+
+  if (message.type === 'YT_REPORT_VOICE_ENGINE') {
+    runSerialized(async () => {
+      const payload = message.payload || {};
+      const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_STATE]);
+      const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+      const overloaded = payload.overloaded === true;
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.VOICE_STATE]: {
+          ...prevState,
+          engineOverloaded: overloaded,
+          lightVoiceActive: payload.lightActive === true,
+          // 一度でも混雑したら「読み上げが遅い PC」として GPU の案内を出し続ける(ニコ生版 KEY_VOICE_WEAK_PC と同じ考え)
+          weakPcSeen: prevState.weakPcSeen === true || overloaded,
+          updatedAt: Date.now(),
+        },
+      });
+      return { ok: true };
+    })
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }
 
@@ -394,7 +508,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       const [entry, ...rest] = queue;
       await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_QUEUE]: rest });
-      return { ok: true, entry, remaining: rest.length, enabled: true };
+      return {
+        ok: true,
+        entry,
+        remaining: rest.length,
+        enabled: true,
+        lightVoice: settings.lightVoice === 'off' ? 'off' : 'auto',
+      };
     })
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));

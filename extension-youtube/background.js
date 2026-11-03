@@ -816,6 +816,29 @@
     return "";
   }
 
+  // src/lib/voiceLightFallback.js
+  var LIGHT_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
+  var LIGHT_VOICE_RATE = 1.2;
+  function pickJapaneseVoices(voices) {
+    if (!Array.isArray(voices)) return [];
+    const ja = voices.filter((v) => v && /^ja([-_]|$)/i.test(String(v.lang || "")));
+    const local = ja.filter((v) => v.localService === true);
+    const use = local.length ? local : ja;
+    return [...use].sort((a, b) => String(a.name || a.voiceURI || "").localeCompare(String(b.name || b.voiceURI || "")));
+  }
+  function lightVoiceToneFor(userKey, voiceCount) {
+    const n = Math.max(1, Math.floor(Number(voiceCount) || 0));
+    if (!userKey) return { voiceIndex: 0, pitch: 1, rate: LIGHT_VOICE_RATE };
+    const combos = n * LIGHT_VOICE_PITCHES.length;
+    const v = assignVoiceForUser(userKey, Array.from({ length: combos }, (_, i) => i));
+    const combo = Number(v.styleId) || 0;
+    return {
+      voiceIndex: combo % n,
+      pitch: LIGHT_VOICE_PITCHES[Math.floor(combo / n) % LIGHT_VOICE_PITCHES.length],
+      rate: Math.round((LIGHT_VOICE_RATE + (Number(v.speedOffset) || 0)) * 100) / 100
+    };
+  }
+
   // extension-youtube/src/background-entry.js
   var STORAGE_KEYS = Object.freeze({
     STREAM_SUMMARIES: "yt_stream_summaries",
@@ -829,6 +852,8 @@
     enabled: true,
     mode: YT_VOICE_MODES.ALL,
     broadcasterNameOverride: "",
+    /** VOICEVOX が追いつかない間 PC の声で読むか: 'auto'(既定) / 'off'(VOICEVOX だけで読む) */
+    lightVoice: "auto",
     availableStyleIds: Array.from(YT_DEFAULT_STYLE_IDS)
   });
   var storageJobChain = Promise.resolve();
@@ -887,6 +912,74 @@
   }
   function extractVideoIdFromSender(sender) {
     return parseYtVideoIdFromUrl(String(sender?.url || "")) || parseYtVideoIdFromUrl(String(sender?.tab?.url || ""));
+  }
+  async function getJapaneseTtsVoices() {
+    if (!chrome?.tts?.getVoices) return [];
+    const raw = await new Promise((resolve) => {
+      try {
+        chrome.tts.getVoices((vs) => resolve(Array.isArray(vs) ? vs : []));
+      } catch {
+        resolve([]);
+      }
+    });
+    return pickJapaneseVoices(
+      /** @type {any[]} */
+      raw.map((v) => ({
+        name: String(v.voiceName || ""),
+        voiceURI: String(v.voiceName || ""),
+        lang: String(v.lang || ""),
+        localService: v.remote !== true
+      }))
+    );
+  }
+  async function speakLightTts(text, userKey) {
+    const t = String(text || "").trim();
+    if (!t) return { ok: false, reason: "empty" };
+    const voices = await getJapaneseTtsVoices();
+    if (!voices.length) return { ok: false, reason: "no-voice" };
+    const tone = lightVoiceToneFor(userKey, voices.length);
+    const voice = voices[tone.voiceIndex % voices.length];
+    return new Promise((resolve) => {
+      let started = false;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve({ ok: started, reason: started ? "" : "not-started" });
+      };
+      const timer = setTimeout(() => {
+        try {
+          chrome.tts.stop();
+        } catch {
+        }
+        finish();
+      }, t.length * 400 + 5e3);
+      try {
+        chrome.tts.speak(
+          t,
+          {
+            voiceName: voice.name,
+            lang: voice.lang || "ja-JP",
+            pitch: tone.pitch,
+            rate: tone.rate,
+            enqueue: false,
+            onEvent: (ev) => {
+              if (ev.type === "start") started = true;
+              else if (["end", "interrupted", "cancelled", "error"].includes(ev.type)) {
+                if (ev.type === "end") started = true;
+                finish();
+              }
+            }
+          },
+          () => {
+            if (chrome.runtime.lastError) finish();
+          }
+        );
+      } catch {
+        finish();
+      }
+    });
   }
   async function relayCommentToChatFrame(videoId, text) {
     const tabs = await chrome.tabs.query({ url: ["https://www.youtube.com/*"] });
@@ -950,6 +1043,31 @@
         }
         return { ok: false, reason: "no-tab" };
       })().then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, reason: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_SPEAK_LIGHT") {
+      const payload = message.payload || {};
+      speakLightTts(String(payload.text || ""), String(payload.userKey || "")).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, reason: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_REPORT_VOICE_ENGINE") {
+      runSerialized(async () => {
+        const payload = message.payload || {};
+        const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_STATE]);
+        const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+        const overloaded = payload.overloaded === true;
+        await chrome.storage.local.set({
+          [STORAGE_KEYS.VOICE_STATE]: {
+            ...prevState,
+            engineOverloaded: overloaded,
+            lightVoiceActive: payload.lightActive === true,
+            // 一度でも混雑したら「読み上げが遅い PC」として GPU の案内を出し続ける(ニコ生版 KEY_VOICE_WEAK_PC と同じ考え)
+            weakPcSeen: prevState.weakPcSeen === true || overloaded,
+            updatedAt: Date.now()
+          }
+        });
+        return { ok: true };
+      }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }
     if (message.type === "YT_SEND_COMMENT") {
@@ -1104,7 +1222,13 @@
         }
         const [entry, ...rest] = queue;
         await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_QUEUE]: rest });
-        return { ok: true, entry, remaining: rest.length, enabled: true };
+        return {
+          ok: true,
+          entry,
+          remaining: rest.length,
+          enabled: true,
+          lightVoice: settings.lightVoice === "off" ? "off" : "auto"
+        };
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }

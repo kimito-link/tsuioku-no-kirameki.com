@@ -2062,6 +2062,17 @@ a.nl-tl-gift:hover {
         font-variant-numeric: tabular-nums;
       }
 
+      .nl-voice-engine-note {
+        white-space: pre-line;
+        margin: 4px 0 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: #fff7e6;
+        color: #b45309;
+        font-size: 11.5px;
+        font-weight: 600;
+        line-height: 1.45;
+      }
       /* ===== ここまで ===== */
     </style>
   </head>
@@ -2121,6 +2132,8 @@ a.nl-tl-gift:hover {
         <div id="supportTimelineBody" class="nl-support-timeline__body" role="log" aria-label="コメントと応援の時系列" aria-live="off"></div>
       </details>
     </section>
+
+    <p id="yt-voice-engine-banner" class="nl-voice-engine-note" role="status" aria-live="polite" hidden></p>
 
     <!-- 配信選択バー -->
     <div class="nl-yt-stream-bar" aria-label="記録中の配信">
@@ -2487,6 +2500,10 @@ a.nl-tl-gift:hover {
               style="width: 105px"
             />
           </label>
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap" title="VOICEVOX の合成が時間切れになり続ける間だけ、PC に入っている声（Windows の声）で人ごとに声・高さ・速さを変えて読みます。速くなったら自動で VOICEVOX に戻ります。">
+            <input type="checkbox" id="yt-voice-light" checked />
+            <span>追いつかない間は PC の声で読む</span>
+          </label>
           <button type="button" id="yt-voice-recheck-btn">VOICEVOX 再確認</button>
           <button type="button" id="yt-voice-clear-btn">キュー消去</button>
         </div>
@@ -2495,6 +2512,7 @@ a.nl-tl-gift:hover {
           キューが一定数（8件以上）たまったため、自動で「選んで読む」モードに切り替えています。
         </div>
 
+        <p id="yt-voice-engine-note" class="nl-voice-engine-note" role="status" hidden></p>
         <div id="yt-voice-status-box" class="voice-status-box is-offline" role="status">
           VOICEVOX の接続状態を確認しています…
         </div>

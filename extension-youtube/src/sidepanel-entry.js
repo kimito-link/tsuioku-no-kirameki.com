@@ -21,6 +21,7 @@ import {
   buildYtReportFilename,
 } from '../../src/lib/youtube/ytReportHtml.js';
 import { formatRelativeTimeJa } from '../../src/lib/supportActivityTimeline.js';
+import { VOICE_GPU_TIP_TEXT, VOICE_LIGHT_ACTIVE_TEXT } from '../../src/lib/voiceLagNotice.js';
 import { getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 
 const STORAGE_KEYS = Object.freeze({
@@ -1169,6 +1170,23 @@ async function renderVoiceUiFromStorage(prefetchedData) {
     ? data[STORAGE_KEYS.VOICE_QUEUE]
     : [];
 
+  // ニコ生版 #558 と同じ: PC の声で読んでいる間はそう伝え、遅い PC なら GPU の案内を出す
+  const lightActive = voiceState.lightVoiceActive === true && settings.enabled !== false;
+  const gpuTip = voiceState.weakPcSeen === true;
+  for (const id of ['yt-voice-engine-banner', 'yt-voice-engine-note']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const lines = [];
+    if (lightActive) lines.push(VOICE_LIGHT_ACTIVE_TEXT);
+    if (gpuTip) lines.push(VOICE_GPU_TIP_TEXT);
+    el.textContent = lines.join('\n');
+    el.hidden = lines.length === 0;
+  }
+  const lightEl = /** @type {HTMLInputElement | null} */ (document.getElementById('yt-voice-light'));
+  if (lightEl && document.activeElement !== lightEl) {
+    lightEl.checked = settings.lightVoice !== 'off';
+  }
+
   const enabledEl = /** @type {HTMLInputElement | null} */ (
     document.getElementById('yt-voice-enabled')
   );
@@ -1812,6 +1830,17 @@ function bindUiEvents() {
         type: 'YT_UPDATE_VOICE_SETTINGS',
         payload: { broadcasterNameOverride: bNameInput.value.trim() },
       },
+      () => {
+        void chrome.runtime.lastError;
+        runRenderSerialized(() => renderVoiceUiFromStorage());
+      },
+    );
+  });
+
+  const lightEl = /** @type {HTMLInputElement | null} */ (document.getElementById('yt-voice-light'));
+  lightEl?.addEventListener('change', () => {
+    chrome.runtime.sendMessage(
+      { type: 'YT_UPDATE_VOICE_SETTINGS', payload: { lightVoice: lightEl.checked ? 'auto' : 'off' } },
       () => {
         void chrome.runtime.lastError;
         runRenderSerialized(() => renderVoiceUiFromStorage());

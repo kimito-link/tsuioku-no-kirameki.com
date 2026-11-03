@@ -8,9 +8,109 @@ import {
   synthesizeVoice,
 } from '../../src/lib/voicevoxClient.js';
 import { YT_DEFAULT_STYLE_IDS } from '../../src/lib/youtube/ytVoiceQueue.js';
+import {
+  createVoiceOverloadState,
+  noteVoiceSynthOutcome,
+  resolveVoiceOverloadTimeouts,
+} from '../../src/lib/voiceEngineOverload.js';
+import {
+  LIGHT_VOICE_MAX_CHARS,
+  LIGHT_VOICE_PROBE_TEXT,
+  shouldUseLightVoice,
+  shouldProbeVoicevox,
+} from '../../src/lib/voiceLightFallback.js';
 
 let isVoicevoxOnline = false;
 let isDrainingQueue = false;
+
+/**
+ * ニコ生版 voicePlayer.js と同じ「混雑」の扱い(2026-11-03・PR #557/#558 の移植)。
+ * - 時間切れが続いたら混雑中: 打ち切りを長くし(問い合わせ30秒・合成45秒)、VOICEVOX には1件ずつしか頼まない
+ *   (このプレイヤーはもともと1件ずつ取り出して読むので、読んでいる件が捨てられることはない)。
+ * - 時間切れは「VOICEVOX が落ちた」ではないので、止めずに次の件へ進む。
+ * - 混雑中は PC の声(Windows の声)で読む。人ごとの声・高さ・速さは voiceLightFallback.lightVoiceToneFor。
+ *   ときどき短い文を VOICEVOX に頼んで速さを確かめ、速い合成が続いたら VOICEVOX に戻る。
+ */
+const overload = createVoiceOverloadState();
+let synthInFlight = 0;
+let lastProbeAt = 0;
+/** PC の声で続けて読めなかった回数。3回続いたら使わない(無音のまま切り替え続けないため)。 */
+let lightFailStreak = 0;
+let lastReportedEngineKey = '';
+
+/**
+ * VOICEVOX で1件合成する(時間切れかどうかと所要時間を混雑の判定に足す)。
+ * @param {string} text
+ * @param {{ styleId: number, pitchOffset: number, speedOffset: number }} voice
+ */
+async function synthesizeTracked(text, voice) {
+  let timedOut = false;
+  const startedAt = Date.now();
+  synthInFlight += 1;
+  /** @type {ArrayBuffer | null} */
+  let wav = null;
+  try {
+    wav = await synthesizeVoice(text, voice, {
+      baseUrl: VOICEVOX_BASE_URL,
+      ...resolveVoiceOverloadTimeouts(overload.overloaded),
+      onFailure: (info) => {
+        if (/timeout/i.test(String(/** @type {any} */ (info?.error)?.message || info?.error || ''))) timedOut = true;
+      },
+    });
+  } catch (err) {
+    if (/timeout/i.test(String(/** @type {any} */ (err)?.message || err))) timedOut = true;
+    wav = null;
+  } finally {
+    synthInFlight = Math.max(0, synthInFlight - 1);
+  }
+  const ok = !!wav && wav instanceof ArrayBuffer;
+  noteVoiceSynthOutcome(overload, { timedOut, ok, totalMs: Date.now() - startedAt });
+  reportEngineState(false);
+  return { wav: ok ? wav : null, timedOut };
+}
+
+/** PC の声で読んでいる間、ときどき VOICEVOX に短い文を頼んで速さを確かめる(結果を待たない)。 */
+function maybeProbeVoicevox() {
+  const nowMs = Date.now();
+  if (!shouldProbeVoicevox({ nowMs, lastProbeAt, inFlight: synthInFlight })) return;
+  lastProbeAt = nowMs;
+  void synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, { styleId: YT_DEFAULT_STYLE_IDS[0], pitchOffset: 0, speedOffset: 0 }).catch(() => null);
+}
+
+/**
+ * 混雑・PC の声の状態をサイドパネル用に知らせる(変わったときだけ)。
+ * @param {boolean} lightActive
+ */
+function reportEngineState(lightActive) {
+  const key = `${overload.overloaded}|${lightActive}`;
+  if (key === lastReportedEngineKey) return;
+  lastReportedEngineKey = key;
+  chrome.runtime.sendMessage(
+    { type: 'YT_REPORT_VOICE_ENGINE', payload: { overloaded: overload.overloaded, lightActive } },
+    () => {
+      void chrome.runtime.lastError;
+    },
+  );
+}
+
+/**
+ * 1件を PC の声で読む(実際の発声は service worker の chrome.tts。Offscreen は無音が30秒続くと閉じられるため)。
+ * @param {any} entry
+ * @returns {Promise<boolean>}
+ */
+function speakLight(entry) {
+  const text = String(entry.text || '').slice(0, LIGHT_VOICE_MAX_CHARS);
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: 'YT_SPEAK_LIGHT', payload: { text, userKey: String(entry.userKey || '') } },
+      (reply) => {
+        void chrome.runtime.lastError;
+        if (reply?.reason === 'no-voice') lightFailStreak = 3;
+        resolve(!!reply?.ok);
+      },
+    );
+  });
+}
 
 /**
  * WAV ArrayBuffer を Audio 要素で再生する。
@@ -129,19 +229,28 @@ async function drainVoiceQueueLoop() {
         },
       );
 
-      const wav = await synthesizeVoice(
-        entry.text,
-        {
-          styleId: entry.styleId,
-          pitchOffset: Number(entry.pitchOffset || 0),
-          speedOffset: Number(entry.speedOffset || 0),
-        },
-        {
-          baseUrl: VOICEVOX_BASE_URL,
-        },
-      );
+      const useLight = shouldUseLightVoice({
+        overloaded: overload.overloaded,
+        available: lightFailStreak < 3,
+        setting: String(res?.lightVoice || 'auto'),
+      });
+      reportEngineState(useLight);
+      if (useLight) {
+        maybeProbeVoicevox();
+        const spoken = await speakLight(entry);
+        lightFailStreak = spoken ? 0 : lightFailStreak + 1;
+        continue;
+      }
 
-      if (!wav || !(wav instanceof ArrayBuffer)) {
+      const { wav, timedOut } = await synthesizeTracked(entry.text, {
+        styleId: entry.styleId,
+        pitchOffset: Number(entry.pitchOffset || 0),
+        speedOffset: Number(entry.speedOffset || 0),
+      });
+
+      if (!wav) {
+        // 時間切れ=VOICEVOX が混んでいるだけ。止めずに次へ(混雑中なら次から PC の声に切り替わる)。
+        if (timedOut) continue;
         await checkVoicevoxStatus();
         break;
       }

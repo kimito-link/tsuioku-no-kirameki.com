@@ -12,7 +12,8 @@
   "permissions": [
     "storage",
     "sidePanel",
-    "offscreen"
+    "offscreen",
+    "tts"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
