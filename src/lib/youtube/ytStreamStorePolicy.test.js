@@ -67,6 +67,10 @@ describe('mergeYtStreamSummary', () => {
     const later = mergeYtStreamSummary(updated, { videoId: 'vid-1', concurrentViewers: 900 }, t1 + 1);
     expect(later.concurrentViewers).toBe(900);
     expect(later.peakConcurrentViewers).toBe(1234);
+    // 読み違いの巨大な数は保存しない・前に入ってしまった分も捨てる
+    const broken = mergeYtStreamSummary({ ...later, concurrentViewers: 1.2e28, peakConcurrentViewers: 1.2e28 }, { videoId: 'vid-1', concurrentViewers: 1.2e28 }, t1 + 2);
+    expect(broken.concurrentViewers).toBe(null);
+    expect(broken.peakConcurrentViewers).toBe(null);
     expect(updated.itemCount).toBe(5000);
     expect(updated.createdAt).toBe(t0);
     expect(updated.updatedAt).toBe(t1);

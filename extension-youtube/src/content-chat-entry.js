@@ -147,11 +147,12 @@ function readConcurrentViewers() {
     }
     for (let i = 0; i < nodes.length; i += 1) {
       const el = nodes[i];
-      const texts = [
-        String(el.textContent || ''),
-        String(el.getAttribute('aria-label') || ''),
-      ];
+      // 数字が回るアニメーション(yt-animated-rolling-number)は textContent に 0〜9 が全部並ぶので、
+      // 読み上げ用の aria-label を先に見る。textContent は最後(桁の連なりは parser 側で捨てる)。
+      const texts = [String(el.getAttribute('aria-label') || '')];
       el.querySelectorAll('[aria-label]').forEach((x) => texts.push(String(x.getAttribute('aria-label') || '')));
+      texts.push(String(/** @type {HTMLElement} */ (el).innerText || ''));
+      texts.push(String(el.textContent || ''));
       for (const t of texts) {
         const parsed = extractYtWatchConcurrentViewersFromText(t);
         if (parsed !== null) return parsed;
