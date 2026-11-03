@@ -215,9 +215,17 @@
     ["ニコ生上で公開されている応援(コメント・ギフト)", "YouTube 上で公開されている応援(コメント・スーパーチャット)"],
     ["ニコ生上で公開されているコメント・ギフト情報", "YouTube 上で公開されているコメント・スーパーチャット情報"],
     ["ニコニコの公開プロフィールから", "YouTube の公開ページから"],
-    ["ニコ広告", "広告"]
+    ["ニコ広告", "広告"],
+    // YouTube には来場者数(延べの入場数)がない。「取れていない」と書くと故障に見えるので、無いものとして書く
+    ["来場者数が取れていないため「来場 X 人中 Y 人がコメント」は表示できません。視聴ページを開いた状態で配信を記録し、再出力してください。", "YouTube には来場者数（延べの入場数）がないため、「来場 X 人中 Y 人がコメント」は出しません。"],
+    ["（来場者数は未取得）", ""],
+    ["来場データ不足", "YouTube に来場者数なし"],
+    ["配信ページを開いたまま記録すると取得できます", "YouTube には来場者数がありません"],
+    ["手元記録の発言者数（来場者数が未取得のため参加率は出せません）", "手元記録の発言者数"],
+    ["広告ランキング未取得（配信ページで記録）", "YouTube に広告ランキングなし"],
+    ["来場者数が未取得のため、来場とコメントの変換率は判定できません。", "YouTube には来場者数がないため、来場とコメントの変換率は出しません。"]
   ];
-  var QUICK = /貢|ニコ|niconico/;
+  var QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング/;
   function ytWording(text, opts = {}) {
     const v = String(text ?? "");
     if (!QUICK.test(v)) return v;
@@ -1162,12 +1170,32 @@
       n
     );
   }
+  function ytTrimMarketingDoc(doc) {
+    for (const id of ["mkt-commenter-follow", "mkt-commenter-follow-analytics"]) {
+      doc.getElementById(id)?.remove();
+      doc.querySelectorAll(`a[href="#${id}"]`).forEach((a) => (a.closest("li") || a).remove());
+    }
+    doc.querySelectorAll("#mkt-participation-lead *").forEach((el) => {
+      if (el.children.length === 0 && String(el.textContent || "").trim() === "未取得") el.textContent = "—";
+    });
+    const KEEP = 8;
+    doc.querySelectorAll("ul.mkt-gm-gifts").forEach((ul) => {
+      const items = Array.from(ul.children);
+      if (items.length <= KEEP + 1) return;
+      for (const li of items.slice(KEEP)) li.remove();
+      const more = doc.createElement("li");
+      more.className = "mkt-gm-gift";
+      more.textContent = `ほか ${items.length - KEEP} 件（全部はギフト投げ履歴の表にあります）`;
+      ul.appendChild(more);
+    });
+  }
   function ytFixHtmlString(html) {
     try {
       const OFF = "data-ytoff-on";
       const parked = html.replace(/(\s)on([a-z]+=)/gi, `$1${OFF}$2`);
       const doc = new DOMParser().parseFromString(parked, "text/html");
       fixSubtree(doc.documentElement);
+      if (doc.getElementById("mkt-kpi")) ytTrimMarketingDoc(doc);
       doc.querySelectorAll("[data-search]").forEach((el) => {
         const v = String(el.getAttribute("data-search") || "");
         let next = /lv9\d{11}/.test(v) ? ytFixPseudoLvText(v) : v;
