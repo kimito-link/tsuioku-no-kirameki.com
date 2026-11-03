@@ -26,6 +26,20 @@ const COMMENTS_PREFIX = 'nls_comments_';
 // テールにも全件を渡す(popup が既存の重複畳み込み=mergeTailRowsIntoDisplay で控えと重ねて、増えた分だけが足される)。
 // これが無いと、控えのまま件数も最新コメントも止まる(0.1.11 までの「リアルタイムで反映されない」)。
 const TAIL_PREFIX = 'nls_ctail_';
+const LAST_WATCH_URL_KEY = 'nls_last_watch_url';
+/** @param {Record<string, any> | undefined} sums yt_stream_summaries */
+function newestVideoIdOf(sums) {
+  let best = '';
+  let bestAt = -1;
+  for (const [vid, sum] of Object.entries(sums || {})) {
+    const at = Number(sum?.updatedAt || 0);
+    if (at > bestAt) {
+      bestAt = at;
+      best = vid;
+    }
+  }
+  return best;
+}
 // ニコ生版がギフトを読むキー(ytGiftToNico.js の説明を参照)。prefix → buildYtGiftBags の結果のどれを返すか
 const GIFT_KEY_PREFIXES = /** @type {Array<[string, string]>} */ ([
   ['nls_gift_users_', 'giftUsers'],
@@ -382,6 +396,12 @@ if (real && real.storage && real.storage.local && real.tabs) {
     })
     .catch(() => {});
 
+  const lastWatchUrlFromSummaries = async () => {
+    const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
+    const vid = newestVideoIdOf(sums);
+    return vid ? `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(vid)}` : '';
+  };
+
   /**
    * @param {any} keys
    * @returns {Promise<Record<string, any>>}
@@ -394,6 +414,13 @@ if (real && real.storage && real.storage.local && real.tabs) {
     if (list) for (const k of list) if (/^nls_/.test(k) && !shimDiag.keysAsked.includes(k.replace(/lv\d+/, 'LV'))) shimDiag.keysAsked.push(k.replace(/lv\d+/, 'LV'));
     if (list) {
       for (const k of list) {
+        if (k === LAST_WATCH_URL_KEY) {
+          // ニコ生版のコメビュ等は「最後に見ていた配信」をこのキーから決める。YouTube 版では、
+          // 記録がいちばん新しく更新された配信(=いま見ている配信)の疑似 watch URL を渡す。
+          const url = await lastWatchUrlFromSummaries();
+          if (url) bag[k] = url;
+          continue;
+        }
         if (k.startsWith(COMMENTS_PREFIX) || k.startsWith(TAIL_PREFIX)) {
           const lv = k.slice((k.startsWith(TAIL_PREFIX) ? TAIL_PREFIX : COMMENTS_PREFIX).length).toLowerCase();
           if (!videoIdForPseudoLv(lv)) continue;
@@ -604,6 +631,18 @@ if (real && real.storage && real.storage.local && real.tabs) {
       if (!changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};
       const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
+      // 見ている配信が変わったら「最後に見ていた配信」も変わったと知らせる(コメビュが新しい配信へ追従する)
+      const newestNext = newestVideoIdOf(next);
+      if (newestNext && newestNext !== newestVideoIdOf(prev)) {
+        const synthUrl = { [LAST_WATCH_URL_KEY]: { newValue: `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(newestNext)}` } };
+        for (const fn of listeners) {
+          try {
+            fn(synthUrl, 'local');
+          } catch {
+            /* no-op */
+          }
+        }
+      }
       for (const vid of Object.keys(next)) {
         if (prev[vid] && Number(prev[vid].updatedAt || 0) === Number(next[vid]?.updatedAt || 0)) continue;
         void notifyLv(pseudoLvForVideoId(vid), next[vid]);

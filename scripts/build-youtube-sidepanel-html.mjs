@@ -54,6 +54,21 @@ copyFileSync(resolve(root, 'extension/dist/cloak-failsafe.js'), resolve(root, 'e
   copyFileSync(resolve(root, 'extension/marketing-export-guard.js'), resolve(root, 'extension-youtube/marketing-export-guard.js'));
   copyReferencedImagesLater.push(mkOut);
 }
+// コメビュもニコ生版 comeview.html の完全コピー(プログラムは comeview-nico-entry.js)
+{
+  const cv = readFileSync(resolve(root, 'extension/comeview.html'), 'utf8');
+  const from = '<script src="dist/comeview.js"></script>';
+  if (!cv.includes(from)) throw new Error(`comeview.html に ${from} がありません（ニコ生版の形が変わった?）`);
+  const cvOut = cv
+    .replace(from, '<script src="comeview.js"></script>')
+    .replace(
+      '</html>',
+      '<!-- このファイルは scripts/build-youtube-sidepanel-html.mjs の生成物です（ニコ生版 extension/comeview.html の完全コピー）。直接直さないでください。 -->\n</html>',
+    );
+  if (/src="dist\//.test(cvOut)) throw new Error('comeview.html に知らない dist/ の読み込みがあります');
+  writeFileSync(resolve(root, 'extension-youtube/comeview.html'), cvOut, 'utf8');
+  copyReferencedImagesLater.push(cvOut);
+}
 // popup-entry.js が名前を組み立てて読むもの(文字列からは拾えない)は、置き場ごと写す
 for (const rel of ['images/avatar-parts', 'images/yukkuri-charactore-english', 'data', 'dist/avatar-face-worker.js']) {
   cpSync(resolve(root, 'extension', rel), resolve(root, 'extension-youtube', rel), { recursive: true });
