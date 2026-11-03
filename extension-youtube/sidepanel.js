@@ -201,6 +201,37 @@
     const lv = pseudoLvForVideoId(vid);
     return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: void 0, __ytUrl: url };
   }
+  var ytKeyByNumericUid = /* @__PURE__ */ new Map();
+  var numericUidByYtKey = /* @__PURE__ */ new Map();
+  function numericUidForYtKey(ytKey) {
+    const key = String(ytKey || "");
+    if (!key) return "";
+    const known = numericUidByYtKey.get(key);
+    if (known) return known;
+    let h1 = 2654435761;
+    let h2 = 2246822519;
+    for (let i = 0; i < key.length; i += 1) {
+      const c = key.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+      h2 = Math.imul(h2 ^ c, 3266489917) >>> 0;
+    }
+    let n2 = (h1 % 1e5 * 1e4 + h2 % 1e4) % 1e9;
+    let uid = String(8e9 + n2);
+    while (ytKeyByNumericUid.has(uid) && ytKeyByNumericUid.get(uid) !== key) {
+      n2 = (n2 + 1) % 1e9;
+      uid = String(8e9 + n2);
+    }
+    numericUidByYtKey.set(key, uid);
+    ytKeyByNumericUid.set(uid, key);
+    return uid;
+  }
+  function ytKeyForNumericUid(uid) {
+    return ytKeyByNumericUid.get(String(uid || "")) || "";
+  }
+  function ytChannelUrlForNumericUid(uid) {
+    const key = ytKeyForNumericUid(uid);
+    return /^UC[A-Za-z0-9_-]{22}$/.test(key) ? `https://www.youtube.com/channel/${key}` : "";
+  }
   function ytRecordToNicoEntry(r, i, lv) {
     const channelId = String(r?.channelId || "").trim();
     const name = String(r?.name || "").trim();
@@ -210,7 +241,8 @@
       liveId: lv,
       commentNo: String(i + 1),
       text: String(r?.text || ""),
-      userId: channelId || (name ? `name:${name}` : ""),
+      userId: numericUidForYtKey(channelId || (name ? `name:${name}` : "")),
+      ytChannelId: channelId,
       nickname: name,
       avatarUrl: String(r?.iconUrl || ""),
       capturedAt: at,
@@ -237,7 +269,7 @@
       metas: [],
       scripts: [],
       noopenerLinks: [],
-      broadcasterUserId: chId,
+      broadcasterUserId: chId ? numericUidForYtKey(chId) : "",
       broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : "",
       broadcasterIconUrl: String(sum?.broadcasterIconUrl || ""),
       // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
@@ -378,6 +410,112 @@
         }
       });
     }
+  }
+  var NICO_USER_LINK_RE = /^https?:\/\/(?:www\.)?nicovideo\.jp\/user\/(\d+)/;
+  var PSEUDO_UID_RE = /8\d{9}/g;
+  function ytLabelForUid(uid) {
+    const key = ytKeyForNumericUid(uid);
+    if (!key) return "";
+    if (key.startsWith("name:")) return "";
+    return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
+  }
+  function fixAnchor(a) {
+    const href = String(a.getAttribute("href") || "");
+    const m = href.match(NICO_USER_LINK_RE);
+    if (!m || !ytKeyForNumericUid(m[1])) return;
+    const yt = ytChannelUrlForNumericUid(m[1]);
+    if (yt) a.setAttribute("href", yt);
+    else a.removeAttribute("href");
+  }
+  function fixTextNode(node) {
+    const v = String(node.nodeValue || "");
+    if (!/8\d{9}/.test(v)) return;
+    const next = v.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
+    if (next !== v) node.nodeValue = next;
+  }
+  function fixTitleAttr(el) {
+    const t = el.getAttribute("title");
+    if (!t || !/8\d{9}/.test(t)) return;
+    const next = t.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || "" : uid);
+    if (next !== t) el.setAttribute("title", next);
+  }
+  function fixSubtree(root) {
+    if (root.nodeType === 3) {
+      fixTextNode(
+        /** @type {Text} */
+        root
+      );
+      return;
+    }
+    if (root.nodeType !== 1) return;
+    const el = (
+      /** @type {Element} */
+      root
+    );
+    if (el.tagName === "A") fixAnchor(el);
+    fixTitleAttr(el);
+    el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
+    el.querySelectorAll("[title]").forEach(fixTitleAttr);
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let n2;
+    while (n2 = walker.nextNode()) fixTextNode(
+      /** @type {Text} */
+      n2
+    );
+  }
+  function startDomFixer() {
+    if (!document.body) return;
+    fixSubtree(document.body);
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (m.type === "characterData") fixTextNode(
+          /** @type {Text} */
+          m.target
+        );
+        else if (m.type === "attributes") {
+          const el = (
+            /** @type {Element} */
+            m.target
+          );
+          if (m.attributeName === "href" && el.tagName === "A") fixAnchor(el);
+          else if (m.attributeName === "title") fixTitleAttr(el);
+        } else m.addedNodes.forEach(fixSubtree);
+      }
+    }).observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["href", "title"]
+    });
+  }
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startDomFixer, { once: true });
+    else startDomFixer();
+  }
+  if (real && real.tabs && typeof real.tabs.create === "function") {
+    const realCreate = real.tabs.create.bind(real.tabs);
+    real.tabs.create = (props, cb) => {
+      const m = String(props?.url || "").match(NICO_USER_LINK_RE);
+      if (m && ytKeyForNumericUid(m[1])) {
+        const yt = ytChannelUrlForNumericUid(m[1]);
+        if (!yt) return cb ? cb(void 0) : Promise.resolve(void 0);
+        props = { ...props, url: yt };
+      }
+      return realCreate(props, cb);
+    };
+  }
+  if (typeof window !== "undefined" && typeof window.open === "function") {
+    const realOpen = window.open.bind(window);
+    window.open = (url, ...rest) => {
+      const m = String(url || "").match(NICO_USER_LINK_RE);
+      if (m && ytKeyForNumericUid(m[1])) {
+        const yt = ytChannelUrlForNumericUid(m[1]);
+        if (!yt) return null;
+        return realOpen(yt, ...rest);
+      }
+      return realOpen(url, ...rest);
+    };
   }
 
   // src/lib/storageRefreshTriggerKey.js
@@ -45105,7 +45243,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T10:29" ? String("yt-2026-11-03T10:29") : "dev";
+      const buildId = "yt-2026-11-03T10:34" ? String("yt-2026-11-03T10:34") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45123,7 +45261,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.2") : "";
+    const bundledVersion = true ? String("0.1.3") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45168,7 +45306,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T10:29" ? String("yt-2026-11-03T10:29") : "dev";
+            return "yt-2026-11-03T10:34" ? String("yt-2026-11-03T10:34") : "dev";
           } catch {
             return "dev";
           }

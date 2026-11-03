@@ -218,6 +218,59 @@ function readConcurrentViewers() {
       }
     }
   }
+  return readViewersFromSameLine();
+}
+
+/**
+ * 最後の手: 「視聴中 / watching」の文字そのものを探し、それと【同じ行の高さ】にある文字だけをつなげて読む。
+ * 数字が回る表示は 0〜9 が縦に積まれていて、切り取りの親が分からなくても、
+ * 見えている桁だけが「視聴中」と同じ高さに並ぶ(他の桁は上下にずれている)。
+ * @returns {number | null}
+ */
+function readViewersFromSameLine() {
+  try {
+    const roots = document.querySelectorAll('ytd-watch-metadata, #above-the-fold, ytd-watch-flexy #primary');
+    const range = document.createRange();
+    /** @param {Node} n */
+    const rectOf = (n) => {
+      range.selectNodeContents(n);
+      return range.getBoundingClientRect();
+    };
+    for (let ri = 0; ri < roots.length; ri += 1) {
+      const walker = document.createTreeWalker(roots[ri], NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const v = String(node.nodeValue || '');
+        if (!/視聴中|watching/i.test(v)) continue;
+        const ref = rectOf(node);
+        if (ref.height <= 0) continue;
+        // 同じ行の文字を集める範囲: 4 つ上の親まで
+        let box = node.parentElement;
+        for (let k = 0; k < 4 && box && box.parentElement; k += 1) box = box.parentElement;
+        if (!box) continue;
+        const w2 = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+        let t;
+        let line = '';
+        while ((t = w2.nextNode())) {
+          const tv = String(t.nodeValue || '');
+          if (!tv.trim()) {
+            line += tv;
+            continue;
+          }
+          const r = rectOf(t);
+          const overlap = Math.min(r.bottom, ref.bottom) - Math.max(r.top, ref.top);
+          if (r.height > 0 && overlap >= Math.min(r.height, ref.height) / 2) line += tv;
+        }
+        const text = line
+          .replace(/\s+/g, ' ')
+          .replace(/([0-9,.])\s+(?=[0-9,.])/g, '$1');
+        const parsed = extractYtWatchConcurrentViewersFromText(text);
+        if (parsed !== null) return parsed;
+      }
+    }
+  } catch {
+    // 読めなければ null(人数は「—」のまま)
+  }
   return null;
 }
 

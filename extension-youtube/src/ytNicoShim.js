@@ -1,5 +1,5 @@
 // ytNicoShim.js — ニコ生版のサイドパネル(本物の popup-entry.js)を、YouTube の記録で動かすための「入口の差し替え」。
-/* global window, history, URL */
+/* global window, history, URL, document, NodeFilter, MutationObserver */
 //
 // ★りんく「一旦ソースをごっそり写してから変えて」「完全コピーしてから変える約束かえないで」(2026-11-03)。
 //   画面(popup.html)もプログラム(popup-entry.js)もニコ生版そのものを使う。違うのは「どこからコメントを読むか」だけ。
@@ -83,6 +83,57 @@ function mapTab(tab) {
   return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: undefined, __ytUrl: url };
 }
 
+// ---- 2b. YouTube の人 ⇔ ニコ生版が「本人のID」として扱える数字のID ----
+// ニコ生版は「数字のユーザーID」の人だけを本人として上の段(りんく・こん太)へ並べる(匿名 a: はたぬ姉)。
+// YouTube のチャンネルID(UC…)は数字でないので、そのままだと全員たぬ姉に落ちる。
+// → 同じ人にはいつも同じ 10 桁の数字を割り当てて渡す(ニコ生版のルールはそのまま・入口で形だけ合わせる)。
+/** @type {Map<string, string>} 数字ID → YouTube の人の鍵(UC… か name:表示名) */
+const ytKeyByNumericUid = new Map();
+/** @type {Map<string, string>} YouTube の人の鍵 → 数字ID */
+const numericUidByYtKey = new Map();
+
+/**
+ * @param {string} ytKey UC… か name:表示名
+ * @returns {string} 10 桁の数字(先頭は 8)
+ */
+export function numericUidForYtKey(ytKey) {
+  const key = String(ytKey || '');
+  if (!key) return '';
+  const known = numericUidByYtKey.get(key);
+  if (known) return known;
+  let h1 = 0x9e3779b1;
+  let h2 = 0x85ebca77;
+  for (let i = 0; i < key.length; i += 1) {
+    const c = key.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0xc2b2ae3d) >>> 0;
+  }
+  let n = ((h1 % 100000) * 10000 + (h2 % 10000)) % 1000000000;
+  let uid = String(8000000000 + n);
+  // まれに別の人と同じ数字になったら、ずらして空いている数字にする
+  while (ytKeyByNumericUid.has(uid) && ytKeyByNumericUid.get(uid) !== key) {
+    n = (n + 1) % 1000000000;
+    uid = String(8000000000 + n);
+  }
+  numericUidByYtKey.set(key, uid);
+  ytKeyByNumericUid.set(uid, key);
+  return uid;
+}
+
+/** @param {string} uid */
+export function ytKeyForNumericUid(uid) {
+  return ytKeyByNumericUid.get(String(uid || '')) || '';
+}
+
+/**
+ * 数字ID → その人の YouTube のページ(チャンネルが分かる人だけ)
+ * @param {string} uid
+ */
+export function ytChannelUrlForNumericUid(uid) {
+  const key = ytKeyForNumericUid(uid);
+  return /^UC[A-Za-z0-9_-]{22}$/.test(key) ? `https://www.youtube.com/channel/${key}` : '';
+}
+
 // ---- 3. YouTube の記録 → ニコ生のコメント行 ----
 /**
  * @param {any} r YouTube の記録 1 件(ytIdbStore)
@@ -98,7 +149,8 @@ export function ytRecordToNicoEntry(r, i, lv) {
     liveId: lv,
     commentNo: String(i + 1),
     text: String(r?.text || ''),
-    userId: channelId || (name ? `name:${name}` : ''),
+    userId: numericUidForYtKey(channelId || (name ? `name:${name}` : '')),
+    ytChannelId: channelId,
     nickname: name,
     avatarUrl: String(r?.iconUrl || ''),
     capturedAt: at,
@@ -133,7 +185,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
     metas: [],
     scripts: [],
     noopenerLinks: [],
-    broadcasterUserId: chId,
+    broadcasterUserId: chId ? numericUidForYtKey(chId) : '',
     broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : '',
     broadcasterIconUrl: String(sum?.broadcasterIconUrl || ''),
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
@@ -300,4 +352,112 @@ if (real && real.storage && real.storage.local && real.tabs) {
       }
     });
   }
+}
+
+// ---- 5. 画面に出た「数字ID」と「ニコニコのユーザーページへのリンク」を、YouTube の人に戻す ----
+// ニコ生版は数字IDから https://www.nicovideo.jp/user/<数字> を作るので、そのままだとニコニコへ飛んでしまう。
+// 描画はニコ生版のまま、出来上がった画面の上で「誰か」だけを YouTube に戻す。
+const NICO_USER_LINK_RE = /^https?:\/\/(?:www\.)?nicovideo\.jp\/user\/(\d+)/;
+const PSEUDO_UID_RE = /8\d{9}/g;
+
+/** @param {string} uid */
+function ytLabelForUid(uid) {
+  const key = ytKeyForNumericUid(uid);
+  if (!key) return '';
+  if (key.startsWith('name:')) return '';
+  return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
+}
+
+/** @param {Element} a */
+function fixAnchor(a) {
+  const href = String(a.getAttribute('href') || '');
+  const m = href.match(NICO_USER_LINK_RE);
+  if (!m || !ytKeyForNumericUid(m[1])) return;
+  const yt = ytChannelUrlForNumericUid(m[1]);
+  if (yt) a.setAttribute('href', yt);
+  else a.removeAttribute('href');
+}
+
+/** @param {Text} node */
+function fixTextNode(node) {
+  const v = String(node.nodeValue || '');
+  if (!/8\d{9}/.test(v)) return;
+  const next = v.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
+  if (next !== v) node.nodeValue = next;
+}
+
+/** @param {Element} el */
+function fixTitleAttr(el) {
+  const t = el.getAttribute('title');
+  if (!t || !/8\d{9}/.test(t)) return;
+  const next = t.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
+  if (next !== t) el.setAttribute('title', next);
+}
+
+/** @param {Node} root */
+function fixSubtree(root) {
+  if (root.nodeType === 3) {
+    fixTextNode(/** @type {Text} */ (root));
+    return;
+  }
+  if (root.nodeType !== 1) return;
+  const el = /** @type {Element} */ (root);
+  if (el.tagName === 'A') fixAnchor(el);
+  fixTitleAttr(el);
+  el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
+  el.querySelectorAll('[title]').forEach(fixTitleAttr);
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode())) fixTextNode(/** @type {Text} */ (n));
+}
+
+function startDomFixer() {
+  if (!document.body) return;
+  fixSubtree(document.body);
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      if (m.type === 'characterData') fixTextNode(/** @type {Text} */ (m.target));
+      else if (m.type === 'attributes') {
+        const el = /** @type {Element} */ (m.target);
+        if (m.attributeName === 'href' && el.tagName === 'A') fixAnchor(el);
+        else if (m.attributeName === 'title') fixTitleAttr(el);
+      } else m.addedNodes.forEach(fixSubtree);
+    }
+  }).observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['href', 'title'],
+  });
+}
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startDomFixer, { once: true });
+  else startDomFixer();
+}
+
+// ニコ生版がプログラムからタブを開くとき(chrome.tabs.create / window.open)も、ニコニコのユーザーページなら YouTube へ
+if (real && real.tabs && typeof real.tabs.create === 'function') {
+  const realCreate = real.tabs.create.bind(real.tabs);
+  real.tabs.create = (/** @type {any} */ props, /** @type {any} */ cb) => {
+    const m = String(props?.url || '').match(NICO_USER_LINK_RE);
+    if (m && ytKeyForNumericUid(m[1])) {
+      const yt = ytChannelUrlForNumericUid(m[1]);
+      if (!yt) return cb ? cb(undefined) : Promise.resolve(undefined);
+      props = { ...props, url: yt };
+    }
+    return realCreate(props, cb);
+  };
+}
+if (typeof window !== 'undefined' && typeof window.open === 'function') {
+  const realOpen = window.open.bind(window);
+  window.open = (/** @type {any} */ url, /** @type {any[]} */ ...rest) => {
+    const m = String(url || '').match(NICO_USER_LINK_RE);
+    if (m && ytKeyForNumericUid(m[1])) {
+      const yt = ytChannelUrlForNumericUid(m[1]);
+      if (!yt) return null;
+      return realOpen(yt, ...rest);
+    }
+    return realOpen(url, ...rest);
+  };
 }
