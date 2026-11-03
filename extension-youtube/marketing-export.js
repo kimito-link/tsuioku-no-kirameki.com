@@ -901,13 +901,29 @@
           void notifyLv(pseudoLvForVideoId(vid), next[vid]);
         }
       });
-      setInterval(() => {
-        const lv = lastAskedLv;
-        if (!lv) return;
-        const vid = videoIdForPseudoLv(lv);
-        if (!vid) return;
-        void Promise.resolve(realGet(KEY_YT_SUMMARIES)).then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid])).catch(() => {
-        });
+      const pollTimer = setInterval(() => {
+        try {
+          if (!real.runtime?.id) {
+            clearInterval(pollTimer);
+            try {
+              const last = Number(sessionStorage.getItem("nl_yt_page_orphan_reload_at") || 0);
+              if (Date.now() - last > 6e4) {
+                sessionStorage.setItem("nl_yt_page_orphan_reload_at", String(Date.now()));
+                setTimeout(() => location.reload(), 1500);
+              }
+            } catch {
+            }
+            return;
+          }
+          const lv = lastAskedLv;
+          if (!lv) return;
+          const vid = videoIdForPseudoLv(lv);
+          if (!vid) return;
+          void Promise.resolve(realGet(KEY_YT_SUMMARIES)).then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid])).catch(() => {
+          });
+        } catch {
+          clearInterval(pollTimer);
+        }
       }, 3e3);
     }
   }
