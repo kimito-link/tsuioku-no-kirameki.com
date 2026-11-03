@@ -135,6 +135,38 @@
     });
   }
 
+  // src/lib/youtube/ytPostedAt.js
+  function parseYtChatClock(ts) {
+    const s = String(ts || "").replace(/\s+/g, " ").trim();
+    if (!s) return null;
+    const m = s.match(/(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    let h = Number(m[1]);
+    const min = Number(m[2]);
+    if (!(h >= 0 && h <= 23 && min >= 0 && min <= 59)) return null;
+    const pm = /PM|午後/i.test(s);
+    const am = /AM|午前/i.test(s);
+    if (pm || am) {
+      if (h > 12) return null;
+      if (h === 12) h = 0;
+      if (pm) h += 12;
+    }
+    return { h, m: min };
+  }
+  function ytPostedAtFromClock(ts, recordedAt) {
+    const rec = Number(recordedAt);
+    if (!Number.isFinite(rec) || rec <= 0) return rec;
+    const c = parseYtChatClock(ts);
+    if (!c) return rec;
+    const d = new Date(rec);
+    d.setHours(c.h, c.m, 0, 0);
+    let t = d.getTime();
+    if (t > rec + 6e4) t -= 24 * 36e5;
+    if (rec - t <= 9e4) return rec;
+    if (rec - t > 12 * 36e5) return rec;
+    return t;
+  }
+
   // src/lib/youtube/ytPageMeta.js
   var VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   function parseYtVideoIdFromUrl(rawUrl) {
@@ -225,7 +257,7 @@
       const kind = String(e.ytKind || "");
       const itemName = ITEM_NAME[kind];
       const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ""));
-      const at = Number(e.capturedAt) || now;
+      const at = Number(e.ytPostedAt) || Number(e.capturedAt) || now;
       const pubSec = Math.floor(at / 1e3);
       totalPoints += point;
       events.push({
@@ -431,6 +463,8 @@
       nickname: name,
       avatarUrl: String(r?.iconUrl || ""),
       capturedAt: at,
+      // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)
+      ytPostedAt: ytPostedAtFromClock(String(r?.ts || ""), at),
       ytKind: String(r?.kind || "text"),
       ytAmount: Number(r?.amount || 0),
       ytCurrency: String(r?.currency || "")

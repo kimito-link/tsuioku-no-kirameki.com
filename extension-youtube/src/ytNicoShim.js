@@ -14,6 +14,7 @@
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
+import { ytPostedAtFromClock } from '../../src/lib/youtube/ytPostedAt.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 
@@ -184,6 +185,8 @@ export function ytRecordToNicoEntry(r, i, lv, personKey) {
     nickname: name,
     avatarUrl: String(r?.iconUrl || ''),
     capturedAt: at,
+    // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)
+    ytPostedAt: ytPostedAtFromClock(String(r?.ts || ''), at),
     ytKind: String(r?.kind || 'text'),
     ytAmount: Number(r?.amount || 0),
     ytCurrency: String(r?.currency || ''),

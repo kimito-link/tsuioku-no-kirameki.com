@@ -774,6 +774,10 @@
     let pendingBatch = [];
     let flushTimer = null;
     let lastFilterLabel = "";
+    let boundVideoId = resolveCurrentVideoId();
+    const staleEls = /* @__PURE__ */ new WeakSet();
+    let switchGraceUntil = 0;
+    const SWITCH_GRACE_MS = 4e3;
     const rememberId = (id) => {
       seenIds.add(id);
       if (seenIds.size > MAX_SEEN_IDS) {
@@ -795,10 +799,11 @@
       lastFilterLabel = filterLabel;
       const items = pendingBatch;
       pendingBatch = [];
+      if (!boundVideoId) return;
       safeSendMessage({
         type: "YT_CHAT_ITEMS",
         payload: {
-          videoId: resolveCurrentVideoId(),
+          videoId: boundVideoId,
           chatFilterLabel: filterLabel,
           items
         }
@@ -808,8 +813,32 @@
       if (flushTimer !== null) return;
       flushTimer = setTimeout(flushBatch, 150);
     };
+    const checkVideoSwitch = () => {
+      const vid = resolveCurrentVideoId();
+      if (!vid || vid === boundVideoId) return;
+      if (flushTimer !== null) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+      if (pendingBatch.length) flushBatch();
+      try {
+        const nodes = document.querySelectorAll(CHAT_ITEM_SELECTOR);
+        for (let i = 0; i < nodes.length; i += 1) staleEls.add(nodes[i]);
+      } catch {
+      }
+      boundVideoId = vid;
+      switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
+    };
     const inspectElement = (el, retryCount = 0) => {
       if (!el || typeof el.tagName !== "string") return;
+      checkVideoSwitch();
+      if (staleEls.has(el)) return;
+      if (el.isConnected === false) return;
+      const waitMs = switchGraceUntil - Date.now();
+      if (waitMs > 0) {
+        setTimeout(() => inspectElement(el, retryCount), waitMs + 50);
+        return;
+      }
       const rawId = String(el.getAttribute?.("id") || "").trim();
       if (rawId && seenWithIconIds.has(rawId)) return;
       const parsed = parseYtChatElement(el);
