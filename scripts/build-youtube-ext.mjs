@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 
+// サイドパネルの HTML はニコ生版 popup.html から丸ごと写して作る(先に作っておく)
+await import('./build-youtube-sidepanel-html.mjs');
+
 const common = {
   bundle: true,
   format: 'iife',

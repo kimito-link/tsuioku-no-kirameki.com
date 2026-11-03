@@ -660,8 +660,12 @@
     const broadcasterIconUrl = String(
       patch?.broadcasterIconUrl || prev.broadcasterIconUrl || ""
     ).trim();
-    const concurrentViewers = typeof patch?.concurrentViewers === "number" && Number.isFinite(patch.concurrentViewers) && patch.concurrentViewers >= 0 ? Math.floor(patch.concurrentViewers) : typeof prev.concurrentViewers === "number" && Number.isFinite(prev.concurrentViewers) && prev.concurrentViewers >= 0 ? Math.floor(prev.concurrentViewers) : null;
-    const prevPeak = typeof prev.peakConcurrentViewers === "number" && Number.isFinite(prev.peakConcurrentViewers) ? Math.floor(prev.peakConcurrentViewers) : null;
+    const plausible = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 5e7;
+    const concurrentViewers = plausible(patch?.concurrentViewers) ? Math.floor(
+      /** @type {number} */
+      patch.concurrentViewers
+    ) : plausible(prev.concurrentViewers) ? Math.floor(prev.concurrentViewers) : null;
+    const prevPeak = plausible(prev.peakConcurrentViewers) ? Math.floor(prev.peakConcurrentViewers) : null;
     const peakConcurrentViewers = concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
     const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || "").trim();
     const itemCount = typeof patch?.itemCount === "number" && Number.isFinite(patch.itemCount) && patch.itemCount >= 0 ? Math.floor(patch.itemCount) : typeof prev.itemCount === "number" && Number.isFinite(prev.itemCount) ? Math.floor(prev.itemCount) : 0;

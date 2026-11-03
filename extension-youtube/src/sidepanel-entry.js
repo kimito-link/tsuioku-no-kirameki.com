@@ -14,7 +14,6 @@ import {
   createYtStreamIncrementalState,
   applyYtStreamIncrementalItems,
 } from '../../src/lib/youtube/ytStreamStorePolicy.js';
-import { buildYtUserLaneTiers, YT_USER_LANE_TIER_KEYS } from '../../src/lib/youtube/ytUserLaneTiers.js';
 import {
   buildYtMarketingReportHtml,
   buildYtCommentLogReportHtml,
@@ -23,6 +22,18 @@ import {
 import { formatRelativeTimeJa } from '../../src/lib/supportActivityTimeline.js';
 import { VOICE_GPU_TIP_TEXT, VOICE_LIGHT_ACTIVE_TEXT } from '../../src/lib/voiceLagNotice.js';
 import { getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
+import {
+  paintStatCards,
+  paintTopSupportRankStrip,
+  paintNorthStarLanes,
+  paintStoryUserLanes,
+  bindStoryUserLaneClicks,
+  pushRecentActivity,
+  paintStoryHeader,
+  dismissInitialLoadShade,
+  paintVersionBadge,
+  applyInlineLayout,
+} from './sidepanelNicoView.js';
 
 const STORAGE_KEYS = Object.freeze({
   STREAM_SUMMARIES: 'yt_stream_summaries',
@@ -55,26 +66,11 @@ const LANE_CONFIG = Object.freeze({
   },
 });
 
-const BROADCASTER_FALLBACK_ICON =
-  'images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png';
-
-/** 応援ユーザーの順位カードに表示する最大人数 */
-const TOP_SUPPORT_STRIP_LIMIT = 10;
-/** アイコン列の各段に表示する最大人数（超えた分は「ほか N人」と正直に出す） */
-const STORY_USERLANE_LIMIT = 60;
 /** 応援タイムラインに並べる最大行数 */
 const SUPPORT_TIMELINE_LIMIT = 80;
 /** チャットを自動で「すべてのチャット」に切り替える設定（content script と同じキー） */
 const AUTO_ALL_CHAT_KEY = 'yt_auto_all_chat_v1';
 
-/** ニコ生版の段の案内文（src/lib/storyUserLaneGuideHtml.js の言い回しを YouTube 用に写したもの） */
-const STORY_TIER_GUIDE = Object.freeze({
-  link: 'りんく: チャンネルID・表示名・アイコンがそろった人を、直近に話した順に並べるよ。',
-  gift: 'ギフト列: スーパーチャット・スーパーステッカーで応援してくれた人を、金額の大きい順に並べるよ。',
-  member: 'メンバー列: メンバー加入・メンバーシップギフト・メンバーバッジの人を並べるよ（ニコ生版の広告列の位置）。',
-  konta: 'こん太: 表示名かアイコンのどちらかまで取れた人は、この段に並ぶよ。',
-  tanu: 'たぬ姉: チャンネルIDが取れない人や情報が薄い人は、ぜんぶこの段に集めるよ。',
-});
 /** 全員グリッドに表示する最大人数 */
 const STORY_GROWTH_GRID_LIMIT = 240;
 
@@ -157,22 +153,6 @@ function formatShortChannelId(channelId) {
   if (!raw) return '';
   const cleaned = raw.startsWith('handle:') ? raw.slice('handle:'.length) : raw;
   return cleaned.length > 14 ? `${cleaned.slice(0, 14)}…` : cleaned;
-}
-
-/**
- * 経過ミリ秒を「12分」「1時間05分」等の日本語表記に整形する。
- * @param {number} elapsedMs
- * @returns {string}
- */
-function formatElapsedDurationJa(elapsedMs) {
-  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return '—';
-  const totalSec = Math.floor(elapsedMs / 1000);
-  if (totalSec < 60) return '1分未満';
-  const totalMin = Math.floor(totalSec / 60);
-  if (totalMin < 60) return `${totalMin}分`;
-  const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
-  return `${hours}時間${String(mins).padStart(2, '0')}分`;
 }
 
 /**
@@ -422,8 +402,7 @@ function patchLaneIncremental(lane, newlyAddedChronological, totalLaneCount) {
 }
 
 /**
- * 2. 3キャラの数字カード（りんく=記録 / こん太=同時接続 / たぬ姉=来場者数）と
- * 3. 数字の行（来場・コメント・経過・スパチャ合計・メンバー/ギフト件数）を更新する。
+ * 数字カード・数字の行（ニコ生版と同じ id に入れる・sidepanelNicoView.js）。
  *
  * @param {any} currentSummary
  * @param {number} totalComments
@@ -431,72 +410,7 @@ function patchLaneIncremental(lane, newlyAddedChronological, totalLaneCount) {
  * @param {ReturnType<typeof createYtStreamIncrementalState> | null} incState
  */
 function renderLiveStatsAndOfficialRow(currentSummary, totalComments, ranking, incState) {
-  const uniqueVisitors = Number(ranking?.uniqueCommenterCount || 0);
-  const concurrent =
-    typeof currentSummary?.concurrentViewers === 'number' &&
-    Number.isFinite(currentSummary.concurrentViewers) &&
-    currentSummary.concurrentViewers >= 0
-      ? currentSummary.concurrentViewers
-      : null;
-
-  // 2. 3キャラの数字カード
-  const commentsCardVal = document.getElementById('liveStatComments');
-  if (commentsCardVal) {
-    commentsCardVal.textContent = formatNumberJa(totalComments);
-  }
-
-  const concurrentEstEl = document.getElementById('watchConcurrentEst');
-  if (concurrentEstEl) {
-    concurrentEstEl.textContent = concurrent !== null ? formatNumberJa(concurrent) : '—';
-  }
-
-  const visitorsCardVal = document.getElementById('watchViewerDom');
-  if (visitorsCardVal) {
-    visitorsCardVal.textContent = formatNumberJa(uniqueVisitors);
-  }
-
-  // 3. 数字の行（nl-official-nico-stats）
-  const offVisitors = document.getElementById('officialStatVisitors');
-  if (offVisitors) {
-    offVisitors.textContent = formatNumberJa(uniqueVisitors);
-  }
-
-  const offComments = document.getElementById('officialStatComments');
-  if (offComments) {
-    offComments.textContent = formatNumberJa(totalComments);
-  }
-
-  const offElapsed = document.getElementById('officialStatElapsed');
-  if (offElapsed) {
-    const startMs =
-      (incState && incState.firstRecordedAt > 0 ? incState.firstRecordedAt : 0) ||
-      Number(currentSummary?.createdAt || 0);
-    const endMs =
-      Math.max(
-        incState && incState.lastRecordedAt > 0 ? incState.lastRecordedAt : 0,
-        Number(currentSummary?.updatedAt || 0),
-      ) || Date.now();
-    if (startMs > 0 && endMs >= startMs && (totalComments > 0 || currentSummary)) {
-      offElapsed.textContent = formatElapsedDurationJa(endMs - startMs);
-    } else {
-      offElapsed.textContent = '—';
-    }
-  }
-
-  const offSuperchat = document.getElementById('officialStatSuperchat');
-  if (offSuperchat) {
-    const primary = ranking?.primaryCurrencySummary;
-    offSuperchat.textContent = primary?.formatted || '—';
-  }
-
-  const offMemGift = document.getElementById('officialStatMemberGift');
-  if (offMemGift) {
-    const memGiftCount =
-      Number(ranking?.counts?.membership || 0) + Number(ranking?.counts?.membershipGift || 0);
-    offMemGift.textContent = `${formatNumberJa(memGiftCount)}件`;
-  }
-
-  // コメビュ折りたたみのメタ件数
+  paintStatCards(currentSummary, totalComments, ranking, incState);
   const comeviewMeta = document.getElementById('yt-comeview-summary-meta');
   if (comeviewMeta) {
     comeviewMeta.textContent = `合計 ${formatNumberJa(totalComments)}件`;
@@ -504,326 +418,20 @@ function renderLiveStatsAndOfficialRow(currentSummary, totalComments, ranking, i
 }
 
 /**
- * 順位カード1枚（`.nl-top-support-rank__line`）を組み立てる。
- * @param {{
- *   placeText: string,
- *   countText: string,
- *   name: string,
- *   channelId: string,
- *   iconUrl: string,
- *   channelUrl?: string
- * }} opts
- * @returns {HTMLElement}
- */
-function createSupportRankLineCard(opts) {
-  const channelUrl = safeHttpUrl(opts.channelUrl || buildYtChannelUrl(opts.channelId));
-  const card = channelUrl ? document.createElement('a') : document.createElement('div');
-  card.className = channelUrl
-    ? 'nl-top-support-rank__line nl-top-support-rank__line--linkable supporter-row'
-    : 'nl-top-support-rank__line supporter-row';
-  card.setAttribute('role', 'listitem');
-  if (channelUrl) {
-    /** @type {HTMLAnchorElement} */ (card).href = channelUrl;
-    /** @type {HTMLAnchorElement} */ (card).target = '_blank';
-    /** @type {HTMLAnchorElement} */ (card).rel = 'noopener noreferrer';
-  }
-  const displayName = String(opts.name || opts.channelId || 'リスナー').trim();
-  const shortId = formatShortChannelId(opts.channelId);
-  card.title = opts.channelId
-    ? `${displayName} (${opts.channelId}) — ${opts.countText}`
-    : `${displayName} — ${opts.countText}`;
-
-  const placeSpan = document.createElement('span');
-  placeSpan.className = 'nl-top-support-rank__place';
-  placeSpan.textContent = opts.placeText;
-  card.appendChild(placeSpan);
-
-  const countSpan = document.createElement('span');
-  countSpan.className = 'nl-top-support-rank__count';
-  countSpan.textContent = opts.countText;
-  card.appendChild(countSpan);
-
-  const thumbWrap = document.createElement('span');
-  thumbWrap.className = 'nl-top-support-rank__thumb-wrap';
-  thumbWrap.appendChild(
-    createAvatarImgWithFallback(
-      opts.iconUrl || '',
-      displayName,
-      opts.channelId || displayName,
-      'nl-top-support-rank__thumb',
-    ),
-  );
-  card.appendChild(thumbWrap);
-
-  if (shortId) {
-    const idSpan = document.createElement('span');
-    idSpan.className = 'nl-top-support-rank__id';
-    idSpan.textContent = shortId;
-    idSpan.title = opts.channelId;
-    card.appendChild(idSpan);
-  }
-
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'nl-top-support-rank__name';
-  nameSpan.textContent = displayName;
-  card.appendChild(nameSpan);
-
-  return card;
-}
-
-/**
- * 4. 応援ユーザーの順位カード（`#topSupportRankStrip`）を描画する。
- * 左上に配信者カード、その後に 1位〜の人カード（コメント件数順・同数ならスパチャ額順）。
- *
+ * 応援ユーザーの順位カード（ニコ生版 #topSupportRankStrip と同じ描き方）。
  * @param {any} currentSummary
  * @param {any} ranking
  */
 function renderTopSupportRankStrip(currentSummary, ranking) {
-  const listEl = document.getElementById('topSupportRankList');
-  if (!listEl) return;
-
-  clearChildren(listEl);
-  const frag = document.createDocumentFragment();
-
-  // 左上: 配信者カード（.nl-top-support-rank__caster）
-  const casterTile = document.createElement('div');
-  casterTile.className = 'nl-top-support-rank__caster';
-  casterTile.setAttribute('role', 'listitem');
-
-  const casterLabel = document.createElement('span');
-  casterLabel.className = 'nl-top-support-rank__caster-label';
-  casterLabel.textContent = '配信者';
-  casterTile.appendChild(casterLabel);
-
-  const bName = String(
-    currentSummary?.broadcasterName || currentSummary?.title || 'YouTube 配信者',
-  ).trim();
-  const bChannelId = String(currentSummary?.broadcasterChannelId || '').trim();
-  const bChannelUrl =
-    safeHttpUrl(buildYtChannelUrl(bChannelId)) ||
-    (selectedVideoId
-      ? `https://www.youtube.com/watch?v=${encodeURIComponent(selectedVideoId)}`
-      : '');
-
-  const casterThumb = createAvatarImgWithFallback(
-    currentSummary?.broadcasterIconUrl || '',
-    bName,
-    bChannelId || bName,
-    'nl-top-support-rank__caster-thumb',
-    BROADCASTER_FALLBACK_ICON,
-  );
-  casterTile.appendChild(casterThumb);
-
-  const casterNameSpan = document.createElement('span');
-  casterNameSpan.className = 'nl-top-support-rank__caster-name';
-  casterNameSpan.textContent = bName;
-  casterNameSpan.title = bChannelId ? `${bName} (${bChannelId})` : bName;
-  casterTile.appendChild(casterNameSpan);
-
-  if (bChannelUrl) {
-    const followLink = document.createElement('a');
-    followLink.className = 'nl-top-support-rank__caster-follow';
-    followLink.href = bChannelUrl;
-    followLink.target = '_blank';
-    followLink.rel = 'noopener noreferrer';
-    followLink.textContent = bChannelId ? 'チャンネル' : '視聴ページ';
-    casterTile.appendChild(followLink);
-  }
-  frag.appendChild(casterTile);
-
-  // 1位〜の人カード（コメント件数順、同数ならスパチャ額順。左上の配信者カードと重複しないよう配信者本人は除く）
-  const commenters = (Array.isArray(ranking?.commenters) ? ranking.commenters : []).filter(
-    (c) => !bChannelId || c.channelId !== bChannelId,
-  );
-  const topSlice = commenters.slice(0, TOP_SUPPORT_STRIP_LIMIT);
-  for (let i = 0; i < topSlice.length; i += 1) {
-    const c = topSlice[i];
-    const countLabel = c.primaryFormattedAmount
-      ? `${c.commentCount}件 · ${c.primaryFormattedAmount}`
-      : `${c.commentCount}件`;
-    frag.appendChild(
-      createSupportRankLineCard({
-        placeText: String(i + 1),
-        countText: countLabel,
-        name: c.name,
-        channelId: c.channelId,
-        iconUrl: c.iconUrl,
-        channelUrl: c.channelUrl,
-      }),
-    );
-  }
-
-  listEl.appendChild(frag);
+  paintTopSupportRankStrip(currentSummary, ranking, selectedVideoId);
 }
 
 /**
- * 5. North Star レーン（「スパチャランキング（通貨別）」・「メンバー・ギフト」）を描画する。
+ * 応援レーン（ニコ生版の公式値レーンの位置）。
  * @param {any} ranking
  */
 function renderNorthStarSupportLanes(ranking) {
-  const summaryEl = document.getElementById('yt-support-summary');
-  const currencyContainer = document.getElementById('yt-currency-ranking-container');
-  const memberSummaryEl = document.getElementById('yt-member-gift-summary');
-  const memberListEl = document.getElementById('yt-member-gift-list');
-
-  const paidTotalCount =
-    Number(ranking?.counts?.superchat || 0) + Number(ranking?.counts?.sticker || 0);
-
-  if (summaryEl) {
-    summaryEl.textContent = `スパチャ・ステッカー ${formatNumberJa(paidTotalCount)}件（通貨別集計・換算なし）`;
-  }
-  if (memberSummaryEl) {
-    memberSummaryEl.textContent = `メンバー加入 ${formatNumberJa(ranking?.counts?.membership || 0)}件 / ギフト ${formatNumberJa(ranking?.counts?.membershipGift || 0)}件`;
-  }
-
-  // レーン1: スパチャランキング（通貨別）
-  if (currencyContainer) {
-    clearChildren(currencyContainer);
-    const currencies = Object.keys(ranking?.byCurrency || {});
-    if (currencies.length === 0) {
-      const hint = document.createElement('div');
-      hint.className = 'empty-hint';
-      hint.textContent = 'スーパーチャット・ステッカーが届くと通貨ごとに集計されます。';
-      currencyContainer.appendChild(hint);
-    } else {
-      for (const currency of currencies) {
-        const box = document.createElement('div');
-        box.className = 'currency-box';
-        box.dataset.currency = currency;
-
-        const header = document.createElement('div');
-        header.className = 'currency-header';
-        const titleSpan = document.createElement('span');
-        titleSpan.textContent = `${currency} ランキング`;
-        const totalSpan = document.createElement('span');
-        totalSpan.textContent = `合計 ${formatYtCurrencyAmount(
-          ranking.totalsByCurrency[currency],
-          currency,
-        )}`;
-        header.appendChild(titleSpan);
-        header.appendChild(totalSpan);
-        box.appendChild(header);
-
-        const listWrap = document.createElement('div');
-        listWrap.className = 'nl-top-support-rank__list';
-        listWrap.setAttribute('role', 'list');
-
-        const rows = ranking.byCurrency[currency].slice(0, 12);
-        for (const row of rows) {
-          listWrap.appendChild(
-            createSupportRankLineCard({
-              placeText: `${row.rank}位`,
-              countText: `${row.formattedAmount} (${row.count}回)`,
-              name: row.name,
-              channelId: row.channelId,
-              iconUrl: row.iconUrl,
-              channelUrl: row.channelUrl,
-            }),
-          );
-        }
-
-        box.appendChild(listWrap);
-        currencyContainer.appendChild(box);
-      }
-    }
-  }
-
-  // レーン2: メンバー・ギフト
-  if (memberListEl) {
-    clearChildren(memberListEl);
-    const memberSupporters = (ranking?.supporters || []).filter(
-      (/** @type {any} */ s) => s.membershipCount > 0 || s.giftCount > 0,
-    );
-    if (memberSupporters.length === 0) {
-      const hint = document.createElement('div');
-      hint.className = 'empty-hint';
-      hint.textContent = 'メンバー加入・メンバーシップギフトが届くとここに表示されます。';
-      memberListEl.appendChild(hint);
-    } else {
-      const frag = document.createDocumentFragment();
-      for (let i = 0; i < Math.min(memberSupporters.length, 16); i += 1) {
-        const sup = memberSupporters[i];
-        const badgeText =
-          sup.giftCount > 0
-            ? `ギフト ${sup.giftCount}回`
-            : `メンバー加入 ${sup.membershipCount}回`;
-        frag.appendChild(
-          createSupportRankLineCard({
-            placeText: `${i + 1}`,
-            countText: badgeText,
-            name: sup.name,
-            channelId: sup.channelId,
-            iconUrl: sup.iconUrl,
-            channelUrl: sup.channelUrl,
-          }),
-        );
-      }
-      memberListEl.appendChild(frag);
-    }
-  }
-}
-
-/**
- * `.nl-story-userlane` 内の丸アイコン人物セル（名前・件数・金額バッジ付き）を生成する。
- * @param {{
- *   name: string,
- *   channelId: string,
- *   iconUrl: string,
- *   channelUrl?: string,
- *   pulseBadge?: string,
- *   statsBadge?: string
- * }} opts
- * @returns {HTMLElement}
- */
-function createStoryUserlaneCell(opts) {
-  const channelUrl = safeHttpUrl(opts.channelUrl || buildYtChannelUrl(opts.channelId));
-  const cell = channelUrl ? document.createElement('a') : document.createElement('span');
-  cell.className = channelUrl
-    ? 'nl-story-userlane-cell nl-story-userlane-cell--linkable'
-    : 'nl-story-userlane-cell';
-  cell.setAttribute('role', 'listitem');
-  if (channelUrl) {
-    /** @type {HTMLAnchorElement} */ (cell).href = channelUrl;
-    /** @type {HTMLAnchorElement} */ (cell).target = '_blank';
-    /** @type {HTMLAnchorElement} */ (cell).rel = 'noopener noreferrer';
-  }
-  if (opts.pulseBadge) {
-    cell.setAttribute('data-pulse', opts.pulseBadge);
-  }
-
-  const displayName = String(opts.name || opts.channelId || 'リスナー').trim();
-  const shortId = formatShortChannelId(opts.channelId);
-  cell.title = opts.channelId ? `${displayName} (${opts.channelId})` : displayName;
-
-  cell.appendChild(
-    createAvatarImgWithFallback(
-      opts.iconUrl || '',
-      displayName,
-      opts.channelId || displayName,
-      'nl-story-userlane-avatar',
-    ),
-  );
-
-  const meta = document.createElement('span');
-  meta.className = 'nl-story-userlane-meta';
-  if (opts.statsBadge) {
-    meta.setAttribute('data-stats', opts.statsBadge);
-  }
-
-  if (shortId) {
-    const idSpan = document.createElement('span');
-    idSpan.className = 'nl-story-userlane-meta__id';
-    idSpan.textContent = shortId;
-    meta.appendChild(idSpan);
-  }
-
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'nl-story-userlane-meta__name';
-  nameSpan.textContent = displayName;
-  meta.appendChild(nameSpan);
-
-  cell.appendChild(meta);
-  return cell;
+  paintNorthStarLanes(ranking);
 }
 
 /**
@@ -851,70 +459,7 @@ function bindStoryTileClick(cell, user) {
  */
 function renderSupportVisualDetails(ranking) {
   const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
-  const built = buildYtUserLaneTiers(commenters, { limitPerTier: STORY_USERLANE_LIMIT });
-
-  for (const key of YT_USER_LANE_TIER_KEYS) {
-    const laneEl = document.getElementById(`storyTierLane-${key}`);
-    const countEl = document.getElementById(`storyTierCount-${key}`);
-    const guideEl = document.getElementById(`storyTierGuide-${key}`);
-    const wrapEl = document.getElementById(`storyTierWrap-${key}`);
-    const users = built.tiers[key];
-    const total = built.totals[key];
-    if (guideEl && !guideEl.textContent) guideEl.textContent = STORY_TIER_GUIDE[key];
-    if (countEl) {
-      countEl.textContent =
-        total > users.length
-          ? `${formatNumberJa(users.length)}人（ほか${formatNumberJa(total - users.length)}人）`
-          : `${formatNumberJa(total)}人`;
-    }
-    // ギフト・メンバーの段は、該当者がいないときは段ごと畳む（ニコ生版も空の段は hidden）
-    if (wrapEl) wrapEl.hidden = total === 0 && (key === 'gift' || key === 'member');
-    if (!laneEl) continue;
-    clearChildren(laneEl);
-    if (users.length === 0) {
-      if (key === 'link' || key === 'tanu' || key === 'konta') {
-        const empty = document.createElement('p');
-        empty.className = 'nl-story-userlane__empty-note';
-        empty.textContent =
-          key === 'link'
-            ? 'コメントが届くと、ここに丸アイコンが並びます。'
-            : 'この段に当てはまる人はまだいません。';
-        laneEl.appendChild(empty);
-      }
-      continue;
-    }
-    const frag = document.createDocumentFragment();
-    for (const u of users) {
-      let pulse = `${u.commentCount}件`;
-      if (key === 'gift') pulse = u.primaryFormattedAmount || `${u.superchatCount + u.stickerCount}回`;
-      else if (key === 'member') {
-        pulse = u.giftCount > 0 ? `🎁${u.giftCount}回` : u.membershipCount > 0 ? `加入${u.membershipCount}回` : '⭐メンバー';
-      }
-      const stats = u.primaryFormattedAmount
-        ? `💬${u.commentCount}件 · ${u.primaryFormattedAmount}`
-        : `💬${u.commentCount}件`;
-      const cell = createStoryUserlaneCell({
-        name: u.name,
-        channelId: u.channelId,
-        iconUrl: u.iconUrl,
-        channelUrl: u.channelUrl,
-        pulseBadge: pulse,
-        statsBadge: stats,
-      });
-      bindStoryTileClick(cell, u);
-      frag.appendChild(cell);
-    }
-    laneEl.appendChild(frag);
-  }
-
-  const footEl = document.getElementById('storyUserLaneFoot');
-  if (footEl) {
-    const others = built.total - built.displayed;
-    footEl.textContent =
-      others > 0
-        ? `いま ${formatNumberJa(built.displayed)} 件を表示中（ほか ${formatNumberJa(others)}人・直近アクティブ順）`
-        : `いま ${formatNumberJa(built.displayed)} 件を表示中`;
-  }
+  paintStoryUserLanes(ranking, currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0);
 
   // コメントした全員の顔を小さな丸で敷き詰めるグリッド（件数バッジ付き）
   const growthGridEl = document.getElementById('sceneStoryGrowth');
@@ -1319,6 +864,18 @@ function updateStreamHeaderUi(summaries, activeId, totalItemsCount) {
 }
 
 /**
+ * いちばん新しい記録(ティッカー用)。
+ * @param {any[]} records
+ */
+function latestRecordOf(records) {
+  let best = null;
+  for (const r of Array.isArray(records) ? records : []) {
+    if (!best || Number(r?.recordedAt || 0) >= Number(best.recordedAt || 0)) best = r;
+  }
+  return best;
+}
+
+/**
  * 初回オープン時または配信切替時に、選択中の配信を1回だけ IndexedDB から読み込んで初期状態を作る。
  */
 async function renderStreamFullLoad() {
@@ -1370,7 +927,10 @@ async function renderStreamFullLoad() {
   renderLaneFull('tanunee', applied.laneDisplay.tanunee, applied.laneCounts.tanunee);
   pushSupportTimeline(items.slice(-SUPPORT_TIMELINE_LIMIT), true);
   renderSupportTimeline();
+  pushRecentActivity(items, true);
+  paintStoryHeader(applied.totalCount, latestRecordOf(items));
   updateExportButtonsState(applied.totalCount);
+  dismissInitialLoadShade();
 
   metrics.lastFullLoadDurationMs = Math.round((performance.now() - t0) * 100) / 100;
 }
@@ -1427,6 +987,8 @@ async function renderStreamIncrementalUpdate() {
   if (applied.addedCount > 0) {
     pushSupportTimeline(newRecords, false);
     renderSupportTimeline();
+    pushRecentActivity(newRecords, false);
+    paintStoryHeader(applied.totalCount, latestRecordOf(newRecords));
     updateExportButtonsState(applied.totalCount);
     patchLaneIncremental('rinku', applied.addedByLane.rinku, applied.laneCounts.rinku);
     patchLaneIncremental('konta', applied.addedByLane.konta, applied.laneCounts.konta);
@@ -1547,7 +1109,7 @@ function updateExportButtonsState(total) {
  * @param {'ok'|'error'|''} tone
  */
 function setComposeStatus(text, tone) {
-  const el = document.getElementById('commentPostStatus');
+  const el = document.getElementById('postStatus');
   if (!el) return;
   el.hidden = !text;
   el.textContent = text;
@@ -1879,8 +1441,16 @@ function bindUiEvents() {
 }
 
 async function initSidepanel() {
+  applyInlineLayout();
+  window.addEventListener('resize', applyInlineLayout);
+  paintVersionBadge();
+  // 何かで止まっても、幕(りんく・こん太・たぬ姉)が出たままにならないように
+  setTimeout(dismissInitialLoadShade, 4000);
   await restoreCollapsibleUiState();
   bindUiEvents();
+  bindStoryUserLaneClicks((user) => {
+    void showStoryUserDetail(user);
+  });
   await runRenderSerialized(() => renderStreamFullLoad());
   requestVoicevoxRecheck();
 }
