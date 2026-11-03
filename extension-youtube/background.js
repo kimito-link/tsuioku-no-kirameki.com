@@ -657,6 +657,7 @@
     const broadcasterChannelId = String(
       patch?.broadcasterChannelId || prev.broadcasterChannelId || ""
     ).trim();
+    const broadcasterHandle = String(patch?.broadcasterHandle || prev.broadcasterHandle || "").trim();
     const broadcasterIconUrl = String(
       patch?.broadcasterIconUrl || prev.broadcasterIconUrl || ""
     ).trim();
@@ -680,6 +681,7 @@
       title,
       broadcasterName,
       broadcasterChannelId,
+      broadcasterHandle,
       broadcasterIconUrl,
       concurrentViewers,
       peakConcurrentViewers,
@@ -1164,6 +1166,7 @@
             broadcasterName: payload.broadcasterName ? String(payload.broadcasterName) : void 0,
             broadcasterChannelId: payload.broadcasterChannelId ? String(payload.broadcasterChannelId) : void 0,
             broadcasterIconUrl: payload.broadcasterIconUrl ? String(payload.broadcasterIconUrl) : void 0,
+            broadcasterHandle: payload.broadcasterHandle ? String(payload.broadcasterHandle) : void 0,
             concurrentViewers: typeof payload.concurrentViewers === "number" ? payload.concurrentViewers : void 0,
             startedAt: typeof payload.startedAt === "number" ? payload.startedAt : void 0
           },

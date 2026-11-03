@@ -388,6 +388,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           broadcasterIconUrl: payload.broadcasterIconUrl
             ? String(payload.broadcasterIconUrl)
             : undefined,
+          broadcasterHandle: payload.broadcasterHandle ? String(payload.broadcasterHandle) : undefined,
           concurrentViewers:
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
           startedAt: typeof payload.startedAt === 'number' ? payload.startedAt : undefined,

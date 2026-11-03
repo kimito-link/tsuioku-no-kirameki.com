@@ -668,6 +668,7 @@
       );
       const broadcasterName = String(ownerNameEl?.textContent || "").replace(/\s+/g, " ").trim();
       let broadcasterChannelId = "";
+      let broadcasterHandle = "";
       try {
         const links = document.querySelectorAll(
           "ytd-watch-metadata #owner a[href], #owner a[href], ytd-video-owner-renderer a[href]"
@@ -675,6 +676,8 @@
         for (let i = 0; i < links.length && !broadcasterChannelId; i += 1) {
           const m = String(links[i].getAttribute("href") || "").match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
           if (m) broadcasterChannelId = m[1];
+          const h = String(links[i].getAttribute("href") || "").match(/^\/(@[^/?#]+)/);
+          if (h && !broadcasterHandle) broadcasterHandle = decodeURIComponent(h[1]);
         }
         if (!broadcasterChannelId) {
           const metaCh = document.querySelector('meta[itemprop="channelId"], meta[itemprop="identifier"][content^="UC"]');
@@ -691,6 +694,7 @@
           title: rawTitle,
           broadcasterName,
           broadcasterChannelId,
+          broadcasterHandle,
           broadcasterIconUrl: readBroadcasterIconUrl(),
           concurrentViewers: viewers,
           startedAt: readStreamStartedAt(videoId)

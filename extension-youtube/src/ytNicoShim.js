@@ -149,6 +149,8 @@ export function ytChannelUrlForNumericUid(uid) {
 
 /** @type {Map<string, string>} 数字ID → その人の YouTube のアイコン(分かっている人だけ) */
 const ytIconByNumericUid = new Map();
+/** @type {Map<string, string>} 記録で見えた「名前 → UC…」(配信者のチャンネルを名前から引くため) */
+const ucByNameHint = new Map();
 
 /** @param {string} uid */
 export function ytIconForNumericUid(uid) {
@@ -195,8 +197,13 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。分からないときだけ、記録を始めた時刻で代わりにする。
   const startedAt = Number(sum?.startedAt || 0) || Number(sum?.createdAt || 0);
-  const chId = String(sum?.broadcasterChannelId || '');
-  const bUid = chId ? numericUidForYtKey(chId) : '';
+  const ucId = String(sum?.broadcasterChannelId || '');
+  const handle = String(sum?.broadcasterHandle || '');
+  // UC… が分からない配信は、記録の中の同じ名前の人(配信者がチャットに書いていれば UC… が分かる)→ @名前 の順で決める
+  const ucFromRecords = !ucId && handle ? ucByNameHint.get(normName(handle)) || '' : '';
+  const chId = ucId || ucFromRecords;
+  const bKey = chId || (handle ? `handle:${handle}` : '');
+  const bUid = bKey ? numericUidForYtKey(bKey) : '';
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
   const bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
   if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
@@ -214,7 +221,11 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
     scripts: [],
     noopenerLinks: [],
     broadcasterUserId: bUid,
-    broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : '',
+    broadcasterPageUrl: chId
+      ? `https://www.youtube.com/channel/${chId}`
+      : handle
+        ? `https://www.youtube.com/${encodeURI(handle)}`
+        : '',
     broadcasterIconUrl: bIcon,
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
@@ -245,6 +256,7 @@ export function buildYtPersonResolver(items) {
     if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
     const n = normName(r?.name);
     if (n && !ucByName.has(n)) ucByName.set(n, ch);
+    if (n) ucByNameHint.set(n, ch);
   }
   /** @param {any} r */
   const keyOf = (r) => {

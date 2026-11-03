@@ -411,6 +411,7 @@
     return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : "";
   }
   var ytIconByNumericUid = /* @__PURE__ */ new Map();
+  var ucByNameHint = /* @__PURE__ */ new Map();
   function ytIconForNumericUid(uid) {
     return ytIconByNumericUid.get(String(uid || "")) || "";
   }
@@ -438,8 +439,12 @@
     const lv = pseudoLvForVideoId(videoId);
     const viewers = typeof sum?.concurrentViewers === "number" ? sum.concurrentViewers : NaN;
     const startedAt = Number(sum?.startedAt || 0) || Number(sum?.createdAt || 0);
-    const chId = String(sum?.broadcasterChannelId || "");
-    const bUid = chId ? numericUidForYtKey(chId) : "";
+    const ucId = String(sum?.broadcasterChannelId || "");
+    const handle = String(sum?.broadcasterHandle || "");
+    const ucFromRecords = !ucId && handle ? ucByNameHint.get(normName(handle)) || "" : "";
+    const chId = ucId || ucFromRecords;
+    const bKey = chId || (handle ? `handle:${handle}` : "");
+    const bUid = bKey ? numericUidForYtKey(bKey) : "";
     const bIcon = String(sum?.broadcasterIconUrl || "") || ytIconForNumericUid(bUid);
     if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
     return {
@@ -456,7 +461,7 @@
       scripts: [],
       noopenerLinks: [],
       broadcasterUserId: bUid,
-      broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : "",
+      broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : handle ? `https://www.youtube.com/${encodeURI(handle)}` : "",
       broadcasterIconUrl: bIcon,
       // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
       // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
@@ -475,6 +480,7 @@
       if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
       const n = normName(r?.name);
       if (n && !ucByName.has(n)) ucByName.set(n, ch);
+      if (n) ucByNameHint.set(n, ch);
     }
     const keyOf = (r) => {
       const ch = String(r?.channelId || "").trim();
