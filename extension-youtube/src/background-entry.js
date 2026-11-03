@@ -14,7 +14,10 @@ import {
   enqueueYtVoiceItem,
 } from '../../src/lib/youtube/ytVoiceQueue.js';
 import { mergeYtStreamSummary } from '../../src/lib/youtube/ytStreamStorePolicy.js';
-import { appendYtStreamCommentsIdb } from './ytIdbStore.js';
+import { appendYtStreamCommentsIdb, resetYtCommentsDb } from './ytIdbStore.js';
+
+/** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
+let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 
@@ -48,7 +51,13 @@ let creatingOffscreenPromise = null;
  * @returns {Promise<T>}
  */
 function runSerialized(fn) {
-  const next = storageJobChain.then(fn, fn);
+  // 1つの仕事が返ってこなくても(保存の待ちが固まる等)、後ろの仕事を止めない。20秒で次へ進む。
+  const guarded = () =>
+    Promise.race([
+      Promise.resolve().then(fn),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('job_timeout')), 20000)),
+    ]);
+  const next = /** @type {Promise<any>} */ (storageJobChain.then(guarded, guarded));
   storageJobChain = next.then(
     () => undefined,
     () => undefined,
@@ -458,7 +467,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       // IndexedDB へ全件保存（間引きなし・重複 pk のみスキップ）
-      const idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+      // 失敗したら、つながりを開き直して1回だけやり直す(切れたつながりで黙って保存できなくなるのを防ぐ)
+      let idbResult;
+      try {
+        idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+      } catch (err) {
+        resetYtCommentsDb();
+        try {
+          idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+        } catch (err2) {
+          void chrome.storage.local.set({
+            yt_ingest_diag: { at: Date.now(), ok: false, videoId, error: String(err2 || err).slice(0, 200) },
+          });
+          throw err2;
+        }
+      }
+      if (Date.now() - lastIngestDiagAt > 30000) {
+        lastIngestDiagAt = Date.now();
+        void chrome.storage.local.set({
+          yt_ingest_diag: { at: Date.now(), ok: true, videoId, received: incoming.length, added: idbResult.newlyAdded.length },
+        });
+      }
 
       // 新規追加されたコメントだけを読み上げキューへ投入
       let enqueuedAny = false;

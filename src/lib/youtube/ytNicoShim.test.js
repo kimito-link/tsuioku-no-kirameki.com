@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildYtPersonResolver, ytRecordToNicoEntry } from './ytNicoShim.js';
+import { buildYtPersonResolver, ytRecordToNicoEntry } from '../../../extension-youtube/src/ytNicoShim.js';
 
 const UC = 'UCz6LkxZaaaaaaaaaaximANA';
 

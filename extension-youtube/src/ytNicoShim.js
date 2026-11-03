@@ -1,5 +1,5 @@
 // ytNicoShim.js — ニコ生版のサイドパネル(本物の popup-entry.js)を、YouTube の記録で動かすための「入口の差し替え」。
-/* global window, history, URL, document, NodeFilter, MutationObserver */
+/* global window, history, URL, document, NodeFilter, MutationObserver, setInterval */
 //
 // ★りんく「一旦ソースをごっそり写してから変えて」「完全コピーしてから変える約束かえないで」(2026-11-03)。
 //   画面(popup.html)もプログラム(popup-entry.js)もニコ生版そのものを使う。違うのは「どこからコメントを読むか」だけ。
@@ -15,9 +15,18 @@
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { buildYtGiftBags } from './ytGiftToNico.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 const COMMENTS_PREFIX = 'nls_comments_';
+// ニコ生版がギフトを読むキー(ytGiftToNico.js の説明を参照)。prefix → buildYtGiftBags の結果のどれを返すか
+const GIFT_KEY_PREFIXES = /** @type {Array<[string, string]>} */ ([
+  ['nls_gift_users_', 'giftUsers'],
+  ['nls_gift_events_', 'giftEvents'],
+  ['nls_gift_subapp_history_', 'subApp'],
+  ['nls_gift_history_throws_', 'throws'],
+  ['nls_koken_api_contrib_', 'koken'],
+]);
 
 // ---- 1. 起動モード(popup-entry が読み込み時に location.search を読むので、先に書いておく) ----
 try {
@@ -256,8 +265,34 @@ export function buildYtPersonResolver(items) {
   return { keyOf, iconOf: (key) => iconByKey.get(key) || '' };
 }
 
+/** @type {Map<string, { at: number, p: Promise<any[] | undefined> }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む */
+const commentsCache = new Map();
+/** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
+const shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0 };
+/** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
+/** popup が最後にコメントを聞いてきた配信(=いま画面に出ている配信) */
+let lastAskedLv = '';
 /** @param {string} lv */
-async function buildCommentsForLv(lv) {
+function buildCommentsForLv(lv) {
+  const hit = commentsCache.get(lv);
+  if (hit && Date.now() - hit.at < 1500) return hit.p;
+  const p = buildCommentsForLvUncached(lv);
+  commentsCache.set(lv, { at: Date.now(), p });
+  return p;
+}
+
+/**
+ * @param {string} lv
+ * @param {any} [summary] yt_stream_summaries の1件(配信の開始時刻に使う)
+ */
+async function buildGiftBagsForLv(lv, summary) {
+  const entries = await buildCommentsForLv(lv);
+  if (!entries) return undefined;
+  return buildYtGiftBags(entries, lv, { startedAt: Number(summary?.startedAt || 0) });
+}
+
+/** @param {string} lv */
+async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
   const items = await getYtStreamCommentsByVideoId(vid);
@@ -295,11 +330,25 @@ if (real && real.storage && real.storage.local && real.tabs) {
     const bag = /** @type {Record<string, any>} */ (await realGet(keys));
     if (list) {
       for (const k of list) {
-        if (!k.startsWith(COMMENTS_PREFIX)) continue;
-        const lv = k.slice(COMMENTS_PREFIX.length).toLowerCase();
-        if (!videoIdForPseudoLv(lv)) continue;
-        const arr = await buildCommentsForLv(lv);
-        if (arr) bag[k] = arr;
+        if (k.startsWith(COMMENTS_PREFIX)) {
+          const lv = k.slice(COMMENTS_PREFIX.length).toLowerCase();
+          if (!videoIdForPseudoLv(lv)) continue;
+          lastAskedLv = lv;
+          const arr = await buildCommentsForLv(lv);
+          if (arr) bag[k] = arr;
+          continue;
+        }
+        const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));
+        if (!g) continue;
+        const lv = k.slice(g[0].length).toLowerCase();
+        const vid = videoIdForPseudoLv(lv);
+        if (!vid) continue;
+        const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES));
+        const gifts = /** @type {Record<string, any> | undefined} */ (
+          await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
+        );
+        const v = gifts ? gifts[g[1]] : null;
+        if (v != null) bag[k] = v;
       }
     }
     return bag;
@@ -349,7 +398,11 @@ if (real && real.storage && real.storage.local && real.tabs) {
         if (!vid) return { ok: false, error: 'not_youtube' };
         const bag = await realGet(KEY_YT_SUMMARIES);
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
-        return { ok: true, snapshot: ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || '')) };
+        const snapshot = /** @type {Record<string, any>} */ (ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || '')));
+        // 「ギフトpt」= YouTube の有料の応援の合計(円にしたおよその額)
+        const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
+        if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
+        return { ok: true, snapshot };
       });
     }
     if (type === 'NLS_CAPTURE_SCREENSHOT') {
@@ -408,26 +461,65 @@ if (real && real.storage && real.storage.local && real.tabs) {
       listeners.push(fn);
       add(fn);
     };
+    /** @type {Map<string, string>} lv → 最後に知らせた記録の「件数:最後のid」 */
+    const lastNotified = new Map();
+    /**
+     * その配信の記録を読み直し、変わっていれば popup に「コメント(とギフト)のキーが変わった」と知らせる。
+     * 失敗しても次の回で必ずやり直す(1回の失敗で画面の更新を止めない)。
+     * @param {string} lv
+     * @param {any} summary
+     */
+    const notifyLv = async (lv, summary) => {
+      commentsCache.delete(lv);
+      const arr = await buildCommentsForLv(lv).catch(() => undefined);
+      if (!arr) return;
+      const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ''}`;
+      if (lastNotified.get(lv) === sig) return;
+      lastNotified.set(lv, sig);
+      /** @type {Record<string, { newValue: any }>} */
+      const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr } };
+      try {
+        const gifts = /** @type {Record<string, any>} */ (buildYtGiftBags(arr, lv, { startedAt: Number(summary?.startedAt || 0) }));
+        if (gifts && gifts.count > 0) {
+          for (const [pre, field] of GIFT_KEY_PREFIXES) {
+            const v = gifts[field];
+            if (v != null) synth[`${pre}${lv}`] = { newValue: v };
+          }
+        }
+      } catch {
+        /* ギフトが作れなくてもコメントは知らせる */
+      }
+      shimDiag.notified += 1;
+      shimDiag.listeners = listeners.length;
+      shimDiag.lastNotifiedAt = Date.now();
+      shimDiag.lastCount = arr.length;
+      for (const fn of listeners) {
+        try {
+          fn(synth, 'local');
+        } catch {
+          /* 1 つの受け手の失敗で他を止めない */
+        }
+      }
+    };
     add((/** @type {Record<string, any>} */ changes, /** @type {string} */ area) => {
       if (area !== 'local' || !changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};
       const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
       for (const vid of Object.keys(next)) {
         if (prev[vid] && Number(prev[vid].updatedAt || 0) === Number(next[vid]?.updatedAt || 0)) continue;
-        const lv = pseudoLvForVideoId(vid);
-        void buildCommentsForLv(lv).then((arr) => {
-          if (!arr) return;
-          const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr } };
-          for (const fn of listeners) {
-            try {
-              fn(synth, 'local');
-            } catch {
-              /* 1 つの受け手の失敗で他を止めない */
-            }
-          }
-        });
+        void notifyLv(pseudoLvForVideoId(vid), next[vid]);
       }
     });
+    // 知らせが来なくても(まとめの書き込みが遅れる・落ちる)、開いている配信は3秒ごとに記録を見直す
+    setInterval(() => {
+      const lv = lastAskedLv;
+      if (!lv) return;
+      const vid = videoIdForPseudoLv(lv);
+      if (!vid) return;
+      void Promise.resolve(realGet(KEY_YT_SUMMARIES))
+        .then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid]))
+        .catch(() => {});
+    }, 3000);
   }
 }
 

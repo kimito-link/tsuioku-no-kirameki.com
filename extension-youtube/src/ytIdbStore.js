@@ -18,6 +18,24 @@ let dbPromise = null;
  * サイドパネルの差分取得（`afterRecordedAt` 以降の新着のみ取得）に対応する。
  * @returns {Promise<any>}
  */
+/** 持っているつながりを捨てる(次に使うとき開き直す)。保存に失敗したときに呼ぶ。 */
+export function resetYtCommentsDb() {
+  const p = dbPromise;
+  dbPromise = null;
+  if (p) {
+    p.then(
+      (db) => {
+        try {
+          db.close();
+        } catch {
+          /* no-op */
+        }
+      },
+      () => {},
+    );
+  }
+}
+
 export function openYtCommentsDb() {
   if (dbPromise) return dbPromise;
 
@@ -41,7 +59,27 @@ export function openYtCommentsDb() {
           });
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // つながりが切れたら(ブラウザが閉じた・別の版が開こうとした)、次は開き直す。
+        // 切れたつながりを持ち続けると、以後の保存が全部失敗して記録が黙って止まる。
+        db.onclose = () => {
+          dbPromise = null;
+        };
+        db.onversionchange = () => {
+          dbPromise = null;
+          try {
+            db.close();
+          } catch {
+            /* no-op */
+          }
+        };
+        resolve(db);
+      };
+      // 他のつながりのせいで開けないまま待ち続けないよう、待ちは知らせて開き直せるようにする
+      req.onblocked = () => {
+        dbPromise = null;
+      };
       req.onerror = () => {
         dbPromise = null;
         reject(req.error || new Error('idb_open_failed'));

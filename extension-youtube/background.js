@@ -722,6 +722,22 @@
   var INDEX_BY_VIDEO_ID = "by_videoId";
   var INDEX_BY_VIDEO_ID_RECORDED_AT = "by_videoId_recordedAt";
   var dbPromise = null;
+  function resetYtCommentsDb() {
+    const p = dbPromise;
+    dbPromise = null;
+    if (p) {
+      p.then(
+        (db) => {
+          try {
+            db.close();
+          } catch {
+          }
+        },
+        () => {
+        }
+      );
+    }
+  }
   function openYtCommentsDb() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
@@ -744,7 +760,23 @@
             });
           }
         };
-        req.onsuccess = () => resolve(req.result);
+        req.onsuccess = () => {
+          const db = req.result;
+          db.onclose = () => {
+            dbPromise = null;
+          };
+          db.onversionchange = () => {
+            dbPromise = null;
+            try {
+              db.close();
+            } catch {
+            }
+          };
+          resolve(db);
+        };
+        req.onblocked = () => {
+          dbPromise = null;
+        };
         req.onerror = () => {
           dbPromise = null;
           reject(req.error || new Error("idb_open_failed"));
@@ -850,6 +882,7 @@
   }
 
   // extension-youtube/src/background-entry.js
+  var lastIngestDiagAt = 0;
   var STORAGE_KEYS = Object.freeze({
     STREAM_SUMMARIES: "yt_stream_summaries",
     ACTIVE_VIDEO_ID: "yt_active_video_id",
@@ -869,7 +902,14 @@
   var storageJobChain = Promise.resolve();
   var creatingOffscreenPromise = null;
   function runSerialized(fn) {
-    const next = storageJobChain.then(fn, fn);
+    const guarded = () => Promise.race([
+      Promise.resolve().then(fn),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("job_timeout")), 2e4))
+    ]);
+    const next = (
+      /** @type {Promise<any>} */
+      storageJobChain.then(guarded, guarded)
+    );
     storageJobChain = next.then(
       () => void 0,
       () => void 0
@@ -1184,7 +1224,26 @@
             recordedAt: Date.now()
           });
         }
-        const idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+        let idbResult;
+        try {
+          idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+        } catch (err) {
+          resetYtCommentsDb();
+          try {
+            idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+          } catch (err2) {
+            void chrome.storage.local.set({
+              yt_ingest_diag: { at: Date.now(), ok: false, videoId, error: String(err2 || err).slice(0, 200) }
+            });
+            throw err2;
+          }
+        }
+        if (Date.now() - lastIngestDiagAt > 3e4) {
+          lastIngestDiagAt = Date.now();
+          void chrome.storage.local.set({
+            yt_ingest_diag: { at: Date.now(), ok: true, videoId, received: incoming.length, added: idbResult.newlyAdded.length }
+          });
+        }
         let enqueuedAny = false;
         if (settings.enabled) {
           for (const newItem of idbResult.newlyAdded) {
