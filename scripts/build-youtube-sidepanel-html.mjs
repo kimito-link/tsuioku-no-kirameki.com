@@ -18,6 +18,8 @@ const root = resolve(__dirname, '..');
 const NICO_POPUP = resolve(root, 'extension/popup.html');
 const OUT = resolve(root, 'extension-youtube/sidepanel.html');
 
+/** @type {string[]} あとで画像を写す本文 */
+const copyReferencedImagesLater = [];
 const src = readFileSync(NICO_POPUP, 'utf8');
 const swaps = [
   ['<script src="dist/cloak-failsafe.js"></script>', '<script src="cloak-failsafe.js"></script>'],
@@ -35,6 +37,23 @@ out = out.replace(
 );
 writeFileSync(OUT, out, 'utf8');
 copyFileSync(resolve(root, 'extension/dist/cloak-failsafe.js'), resolve(root, 'extension-youtube/cloak-failsafe.js'));
+
+// マーケ画面もニコ生版 marketing-export.html の完全コピー(プログラムは marketing-export-nico-entry.js)
+{
+  const mk = readFileSync(resolve(root, 'extension/marketing-export.html'), 'utf8');
+  const from = '<script src="dist/marketing-export.js"></script>';
+  if (!mk.includes(from)) throw new Error(`marketing-export.html に ${from} がありません（ニコ生版の形が変わった?）`);
+  const mkOut = mk
+    .replace(from, '<script src="marketing-export.js"></script>')
+    .replace(
+      '</html>',
+      '<!-- このファイルは scripts/build-youtube-sidepanel-html.mjs の生成物です（ニコ生版 extension/marketing-export.html の完全コピー）。直接直さないでください。 -->\n</html>',
+    );
+  if (/src="dist\//.test(mkOut)) throw new Error('marketing-export.html に知らない dist/ の読み込みがあります');
+  writeFileSync(resolve(root, 'extension-youtube/marketing-export.html'), mkOut, 'utf8');
+  copyFileSync(resolve(root, 'extension/marketing-export-guard.js'), resolve(root, 'extension-youtube/marketing-export-guard.js'));
+  copyReferencedImagesLater.push(mkOut);
+}
 // popup-entry.js が名前を組み立てて読むもの(文字列からは拾えない)は、置き場ごと写す
 for (const rel of ['images/avatar-parts', 'images/yukkuri-charactore-english', 'data', 'dist/avatar-face-worker.js']) {
   cpSync(resolve(root, 'extension', rel), resolve(root, 'extension-youtube', rel), { recursive: true });
@@ -60,5 +79,5 @@ export function copyReferencedImages(text) {
   return copied;
 }
 
-const copied = copyReferencedImages(out);
+const copied = copyReferencedImages(out) + copyReferencedImagesLater.reduce((n, t) => n + copyReferencedImages(t), 0);
 console.log(`sidepanel.html を作りました（ニコ生版 popup.html の完全コピー・${out.length.toLocaleString()} 文字・画像 ${copied} 枚を写した）`);

@@ -344,6 +344,7 @@
   );
   try {
     const u = new URL(window.location.href);
+    if (!/\/sidepanel\.html$/.test(u.pathname)) throw new Error("not_sidepanel");
     if (u.searchParams.get("inline") !== "1" || u.searchParams.get("dock") !== "sidepanel") {
       u.searchParams.set("inline", "1");
       u.searchParams.set("dock", "sidepanel");
@@ -4212,6 +4213,27 @@
     return Number.isFinite(t) && t > 0 ? t : 0;
   }
 
+  // src/lib/parseInterestArrivalComment.js
+  var INTEREST_ARRIVAL_RE = new RegExp(
+    "^[\\u3000\\s]*「(.+?)」が好きな(\\d+)人が来場しました[\\u3000\\s]*$"
+  );
+  function parseInterestArrivalComment(text) {
+    if (typeof text !== "string") return null;
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    const m = trimmed.match(INTEREST_ARRIVAL_RE);
+    if (!m) return null;
+    const tag = m[1].trim();
+    const count = parseInt(m[2], 10);
+    if (!tag || !Number.isFinite(count) || count < 1) return null;
+    return { tag, count };
+  }
+
+  // src/lib/viewerRetentionEstimate.js
+  var VIEWER_RETENTION_MIN_DURATION_MS = 6 * 6e4;
+  var EDGE_WINDOW_MIN_MS = 3 * 6e4;
+  var EDGE_WINDOW_MAX_MS = 10 * 6e4;
+
   // src/lib/supporterRanking.js
   function num3(v) {
     const n2 = Number(v);
@@ -4549,1003 +4571,6 @@
       }
     }
     return { buckets, totals };
-  }
-
-  // src/lib/marketingDynamicAdvice.js
-  var HIGH = 100;
-  var KPI_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "kpi-link-very-active",
-        character: "link",
-        priority: HIGH,
-        test: (m) => m.r.commentsPerMinute >= 50,
-        lines: ["すごい盛り上がりだったのだ！", "次回もこのテンポを維持するため、開始 5 分で同じ密度を再現する弾を仕込んでおきたいのだ。"]
-      },
-      {
-        id: "kpi-link-active",
-        character: "link",
-        priority: 80,
-        test: (m) => m.r.commentsPerMinute >= 20,
-        lines: ["しっかりリアクションが回った枠なのだ。", "配信内容の柱がコメに乗っている証拠で、自信持って次回も走っていいのだ。"]
-      },
-      {
-        id: "kpi-link-modest",
-        character: "link",
-        priority: 60,
-        test: (m) => m.r.commentsPerMinute >= 5,
-        lines: ["程よくコメが付いた枠なのだ。", "濃い対話型の配信ならこのテンポが心地いいから、無理にテンポを上げる必要はないのだ。"]
-      },
-      {
-        id: "kpi-link-quiet",
-        character: "link",
-        priority: 40,
-        test: (m) => m.r.commentsPerMinute < 5 && m.r.totalComments > 0,
-        lines: ["今日は静かめだったのだ。", "長文派が多い時間帯か、聴く側の枠だった可能性なのだ。コメ密度だけが配信価値じゃないのだ。"]
-      },
-      {
-        id: "kpi-konta-many-people",
-        character: "konta",
-        priority: HIGH,
-        test: (m) => m.r.uniqueUsers >= 100,
-        lines: ["いっぱいの人が来てくれたのだ。", "ユニーク 100 人超えは「次回また来たい」と思ってもらう導線が効いた証拠なのだ。"]
-      },
-      {
-        id: "kpi-konta-some-people",
-        character: "konta",
-        priority: 60,
-        test: (m) => m.r.uniqueUsers >= 30,
-        lines: ["しっかり常連層がついてる枠なのだ。", "名前が見える人が増えるとコミュニティとして安定してくるのだ。"]
-      },
-      {
-        id: "kpi-konta-tight-circle",
-        character: "konta",
-        priority: 40,
-        test: (m) => m.r.uniqueUsers > 0 && m.r.uniqueUsers < 30,
-        lines: ["少人数だけど深く話せる枠なのだ。", "人数より「常連が何人いるか」を大事にする配信スタイルなら理想形なのだ。"]
-      },
-      {
-        id: "kpi-tanu-balanced",
-        character: "tanu",
-        priority: HIGH,
-        test: (m) => m.r.commentsPerMinute >= 10 && m.r.uniqueUsers >= 30,
-        lines: ["コメ密度・人数のバランスが取れた、健康的な枠なのだ。", "安定運営の指標としては優秀なのだ。"]
-      },
-      {
-        id: "kpi-tanu-deep",
-        character: "tanu",
-        priority: 80,
-        test: (m) => m.r.medianCommentsPerUser >= 3,
-        lines: ["コメンター 1 人あたりの中央値が 3 件以上で、深く対話してくれた人が多い枠なのだ。", "濃いコミュニティができている兆しなのだ。"]
-      },
-      {
-        id: "kpi-tanu-glance",
-        character: "tanu",
-        priority: 50,
-        test: (m) => m.r.uniqueUsers > 0 && m.r.medianCommentsPerUser <= 1,
-        lines: ["1 人 1 コメで通り過ぎる「一見」率が高い枠なのだ。", "集客力は高いけど定着の伸びしろがあるパターンなのだ。"]
-      }
-    ]
-  );
-  var CONCURRENT_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "cc-link-strong-retention",
-        character: "link",
-        priority: HIGH,
-        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio >= 0.8,
-        lines: ["終了時保持率 80% 超で、最後まで残ってもらえた枠なのだ。", "ファン層がしっかりついてる証拠で、リピーター比率も高くなりやすいのだ。"]
-      },
-      {
-        id: "cc-link-mid-retention",
-        character: "link",
-        priority: 70,
-        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio >= 0.5,
-        lines: ["終了時保持率 50%＋で、中盤までしっかり持ったのだ。", "半減点が出ている場合はその瞬間に何があったか振り返ると次の改善ポイントが見えるのだ。"]
-      },
-      {
-        id: "cc-link-weak-retention",
-        character: "link",
-        priority: 50,
-        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio < 0.5,
-        lines: ["終了時保持率が 50% を切っている枠なのだ。", "中盤でテンポが落ちた可能性。コメ伝染や話芸ピークの位置とつき合わせて中だるみを潰すのだ。"]
-      },
-      {
-        id: "cc-konta-early-peak",
-        character: "konta",
-        priority: 80,
-        test: (m) => m.peak?.peakMinute != null && m.r.durationMinutes > 10 && m.peak.peakMinute < m.r.durationMinutes * 0.25,
-        lines: ["ピークが冒頭側にあって「掴みは強い」枠なのだ。", "配信告知やオープニング演出が効いている可能性大なのだ。"]
-      },
-      {
-        id: "cc-konta-late-peak",
-        character: "konta",
-        priority: 70,
-        test: (m) => m.peak?.peakMinute != null && m.r.durationMinutes > 10 && m.peak.peakMinute > m.r.durationMinutes * 0.75,
-        lines: ["ピークが終盤に来てる、後半勝負型の枠なのだ。", "最後まで観てもらえる構成になっているから、エンディング演出を大切にしたいのだ。"]
-      },
-      {
-        id: "cc-konta-mid-peak",
-        character: "konta",
-        priority: 60,
-        test: (m) => m.peak?.peakMinute != null,
-        lines: ["ピークが中盤に来てる、王道の山型なのだ。", "冒頭・中盤・終盤のメリハリが綺麗に出ている配信構成なのだ。"]
-      },
-      {
-        id: "cc-tanu-no-half",
-        character: "tanu",
-        priority: 80,
-        test: (m) => m.peak?.halfDecayMinute == null && m.peak?.peakValue != null && m.peak.peakValue > 0,
-        lines: ["ピーク後に「ピークの半分を割った」分が出ていない＝ずっと盛り上がってる枠なのだ。", "視聴維持の理想形なのだ。"]
-      },
-      {
-        id: "cc-tanu-half-fast",
-        character: "tanu",
-        priority: 60,
-        test: (m) => m.peak?.peakMinute != null && m.peak?.halfDecayMinute != null && m.peak.halfDecayMinute - m.peak.peakMinute <= 5,
-        lines: ["ピーク後 5 分で半減してる急降下パターンなのだ。", "盛り上がりの瞬間性が高い反面、リピート視聴の動機を作る工夫があるとさらに良いのだ。"]
-      },
-      {
-        id: "cc-tanu-no-data",
-        character: "tanu",
-        priority: 30,
-        test: (m) => m.peak == null || m.peak.peakValue === 0,
-        lines: ["同接サンプルが取れていない枠なのだ。", "視聴ページで拡張が動いていた時間が短かった可能性。次回は最初から開いておくと記録が残るのだ。"]
-      }
-    ]
-  );
-  var LAUGHTER_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "la-konta-very-funny",
-        character: "konta",
-        priority: HIGH,
-        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.3,
-        lines: ["笑いコメが全体の 30% 超えで、抱腹絶倒系の枠なのだ。", "切り抜き映えする瞬間が多いから、ハイライトクリップを作るベース素材として最強なのだ。"]
-      },
-      {
-        id: "la-konta-funny",
-        character: "konta",
-        priority: 70,
-        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.15,
-        lines: ["笑いの瞬間が定期的に出ている枠なのだ。", "ピークの前後 30 秒に注目すると、ウケた言葉やボケのパターンが見えてくるのだ。"]
-      },
-      {
-        id: "la-konta-low",
-        character: "konta",
-        priority: 40,
-        test: (m) => (m.laughter?.overallRatio ?? 0) < 0.05 && m.r.totalComments > 0,
-        lines: ["笑いコメが 5% 未満の真面目めの枠なのだ。", "感情曲線で「驚き」「ポジ」の比率が高ければ、笑い以外の感動軸でファンが集まっているということなのだ。"]
-      },
-      {
-        id: "la-link-funny-bias",
-        character: "link",
-        priority: 70,
-        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.2,
-        lines: ["笑い反応の瞬発力がある配信スタイルなのだ。", "次回もこの空気感を維持できるよう「笑い起点」のトピックを 1 〜 2 個用意しておくのだ。"]
-      },
-      {
-        id: "la-link-serious",
-        character: "link",
-        priority: 50,
-        test: (m) => (m.laughter?.overallRatio ?? 0) < 0.05 && (m.sentimentTotals?.positive ?? 0) > 0,
-        lines: ["笑いより共感・感心ベースで動いてる枠なのだ。", "「ホロッとした」「すごい」みたいな感情コメを大切にする方向性が合ってるのだ。"]
-      },
-      {
-        id: "la-tanu-clipping",
-        character: "tanu",
-        priority: 60,
-        test: (m) => m.laughter?.peakBucket != null && (m.laughter?.peakValue ?? 0) >= 5,
-        lines: ["笑いピークの 30 秒バケットがハッキリ立ってる枠なのだ。", "切り抜きクリエイター向けの素材としてピーク時刻をメモしておくと活用できるのだ。"]
-      }
-    ]
-  );
-  var NEW_VS_REPEAT_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "nr-link-new-rush",
-        character: "link",
-        priority: HIGH,
-        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.7,
-        lines: ["新規率 70% 超で、新しい人がたくさん来た回なのだ。", "タイトル・サムネ・告知が効いた枠なので、その要素を次回にも引き継ぐのだ。"]
-      },
-      {
-        id: "nr-link-balanced",
-        character: "link",
-        priority: 70,
-        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.3 && (m.newVsRepeat?.repeatRatio ?? 0) >= 0.3,
-        lines: ["新規・常連が両方いるバランス型なのだ。", "コミュニティとして健康な状態で、長く続く配信スタイルなのだ。"]
-      },
-      {
-        id: "nr-link-mostly-repeat",
-        character: "link",
-        priority: 60,
-        test: (m) => (m.newVsRepeat?.repeatRatio ?? 0) >= 0.7,
-        lines: ["常連層に支えられた回なのだ。", "安心感はあるけど、新規流入を増やすには TikTok 切り抜きや SNS 告知の見直しが効くかもしれないのだ。"]
-      },
-      {
-        id: "nr-konta-heavy-fans",
-        character: "konta",
-        priority: HIGH,
-        test: (m) => (m.newVsRepeat?.heavyRatio ?? 0) >= 0.3,
-        lines: ["ヘビー常連（過去 5+ コメ実績）が 30% 超え、コアファンが厚い枠なのだ。", "こういう枠は配信者としても精神的に楽なはずなのだ。"]
-      },
-      {
-        id: "nr-konta-discovery",
-        character: "konta",
-        priority: 60,
-        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.5,
-        lines: ["半数以上が新規で、新しい出会いがいっぱいあった枠なのだ。", "次回また来てもらうために配信冒頭で軽い自己紹介を入れるのも有効なのだ。"]
-      },
-      {
-        id: "nr-tanu-tracking",
-        character: "tanu",
-        priority: 80,
-        test: (m) => (m.newVsRepeat?.totalCurrent ?? 0) >= 30,
-        lines: ["過去配信との突き合わせができる規模感なのだ。", "常連カレンダーと併せて「いつもいる人」を意識すると、次回の挨拶や反応に厚みが出るのだ。"]
-      },
-      {
-        id: "nr-tanu-small-sample",
-        character: "tanu",
-        priority: 30,
-        test: (m) => (m.newVsRepeat?.totalCurrent ?? 0) < 10,
-        lines: ["サンプル数が少なめなので、新規率 / 常連率の数字は揺れやすいのだ。", "何回かまとめて見るのがいいのだ。"]
-      }
-    ]
-  );
-  var SILENCE_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "sl-link-engaged",
-        character: "link",
-        priority: HIGH,
-        test: (m) => m.silenceQualityCounts.engaged >= 3,
-        lines: ["沈黙明けに反応が爆発する「ガン見系」が複数回あった枠なのだ。", "配信者の話芸 / 演出が効いた瞬間なので、その時の話題は再利用できる強い弾なのだ。"]
-      },
-      {
-        id: "sl-link-departed",
-        character: "link",
-        priority: 70,
-        test: (m) => m.silenceQualityCounts.departed >= 3,
-        lines: ["沈黙明けに反応が出ない「離脱系」が複数あった枠なのだ。", "中盤で視聴者が去ってる瞬間。話題の切り替えタイミングを見直したいのだ。"]
-      },
-      {
-        id: "sl-konta-rare",
-        character: "konta",
-        priority: 60,
-        test: (m) => m.silenceCount === 0,
-        lines: ["60 秒以上の沈黙が一度もない、ずっと賑やかだった枠なのだ。", "視聴者が常に何かに反応してた証拠で、雑談力が高い配信なのだ。"]
-      },
-      {
-        id: "sl-konta-many",
-        character: "konta",
-        priority: 50,
-        test: (m) => m.silenceCount >= 10,
-        lines: ["沈黙ゾーンが 10 個以上あった、メリハリの強い枠なのだ。", "考え込ませる場面 → どっと反応、のリズムがあれば「ガン見系」が多いはずなのだ。"]
-      },
-      {
-        id: "sl-tanu-explainer",
-        character: "tanu",
-        priority: 40,
-        test: (m) => m.silenceCount > 0,
-        lines: ["沈黙ゾーンの「質」を見ると、その配信の盛り上がり方の特徴が掴めるのだ。", "ガン見系が多い＝静と動のメリハリ、離脱系が多い＝改善余地あり、の目安なのだ。"]
-      }
-    ]
-  );
-  var SENTIMENT_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "st-konta-positive",
-        character: "konta",
-        priority: HIGH,
-        test: (m) => (m.sentimentTotals?.positive ?? 0) > (m.sentimentTotals?.negative ?? 0) * 3 && (m.sentimentTotals?.positive ?? 0) >= 10,
-        lines: ["ポジティブ系の言葉が圧倒的に多い、温かい枠なのだ。", "「楽しい」「すごい」「ありがとう」が回ってる配信は心理的に安全な空間なのだ。"]
-      },
-      {
-        id: "st-konta-surprise",
-        character: "konta",
-        priority: 80,
-        test: (m) => (m.sentimentTotals?.surprise ?? 0) >= 10,
-        lines: ["「マジ」「えっ」「うそ」みたいな驚き系が多めの枠なのだ。", "サプライズ展開・予想外のオチが効いている証拠で、エンタメ性の高い配信なのだ。"]
-      },
-      {
-        id: "st-konta-negative",
-        character: "konta",
-        priority: 60,
-        test: (m) => (m.sentimentTotals?.negative ?? 0) > (m.sentimentTotals?.positive ?? 0) && (m.sentimentTotals?.negative ?? 0) >= 5,
-        lines: ["ネガ系コメが目立つ枠なのだ。", "辞書ベースで皮肉や冗談を読めないので、文脈次第では「ヤバい」がポジでも拾われるのだ。鵜呑みにせず数値の傾向だけ見るのだ。"]
-      },
-      {
-        id: "st-link-confused",
-        character: "link",
-        priority: 50,
-        test: (m) => (m.sentimentTotals?.confusion ?? 0) >= 5,
-        lines: ["「うーん」「謎」みたいな困惑系が出てる枠なのだ。", "ゲーム実況や情報配信なら「考えさせる場面」の証拠で、必ずしも悪くないのだ。"]
-      },
-      {
-        id: "st-tanu-balanced-tone",
-        character: "tanu",
-        priority: 40,
-        test: (m) => (m.sentimentTotals?.positive ?? 0) > 0 && (m.sentimentTotals?.surprise ?? 0) > 0,
-        lines: ["ポジ・驚きが両方乗ってる、感情の起伏がある枠なのだ。", "一本調子じゃない構成は飽きにくくて、リピート視聴に効くのだ。"]
-      }
-    ]
-  );
-  var REACH_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "rc-konta-silent-many",
-        character: "konta",
-        priority: HIGH,
-        test: (m) => (m.reach?.coefficient ?? 0) >= 10,
-        lines: ["リーチ係数 10+ で、コメンター 1 人につき 10 人以上が観てるサイレント観戦層が厚い枠なのだ。", "コメ少なめでも観てる人は多いから、自信を持っていいのだ。"]
-      },
-      {
-        id: "rc-konta-balanced",
-        character: "konta",
-        priority: 70,
-        test: (m) => (m.reach?.coefficient ?? 0) >= 3 && (m.reach?.coefficient ?? 0) < 10,
-        lines: ["リーチ係数 3〜10 のバランス型なのだ。", "コメする側と観る側の比率が健康的で、コミュニティの規模感がほどよいのだ。"]
-      },
-      {
-        id: "rc-konta-active",
-        character: "konta",
-        priority: 50,
-        test: (m) => (m.reach?.coefficient ?? 0) > 0 && (m.reach?.coefficient ?? 0) < 3,
-        lines: ["リーチ係数 1〜3 で、観てる人ほぼ全員がコメする能動的な枠なのだ。", "少人数でも濃い時間が流れているのだ。"]
-      },
-      {
-        id: "rc-link-grow-silent",
-        character: "link",
-        priority: 60,
-        test: (m) => (m.reach?.coefficient ?? 0) >= 8,
-        lines: ["サイレント観戦層が厚い場合、ROM 専を引き出す「コメしやすい雑談コーナー」とかを作ると体感盛り上がりが上がるのだ。"]
-      }
-    ]
-  );
-  var GROWTH_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "gr-link-booming",
-        character: "link",
-        priority: HIGH,
-        test: (m) => (m.growth?.zScore ?? -99) >= 1.5,
-        lines: ["過去配信の平均から +1.5σ 以上で、絶好調の回なのだ！", "何が効いたかメモしておくと次回再現しやすいのだ。"]
-      },
-      {
-        id: "gr-link-up",
-        character: "link",
-        priority: 70,
-        test: (m) => (m.growth?.deltaPct ?? -1) >= 0.2,
-        lines: ["過去平均より +20% 以上のプラスなのだ。", "いい流れに乗っているから、配信フォーマットを変えずにこのまま続けたいのだ。"]
-      },
-      {
-        id: "gr-link-flat",
-        character: "link",
-        priority: 50,
-        test: (m) => Math.abs(m.growth?.deltaPct ?? 0) < 0.1 && (m.growth?.deltaPct ?? null) !== null,
-        lines: ["過去平均と±10% 以内の安定枠なのだ。", "良くも悪くも揺れがない、固定客向けの安心感がある回なのだ。"]
-      },
-      {
-        id: "gr-link-down",
-        character: "link",
-        priority: 60,
-        test: (m) => (m.growth?.deltaPct ?? 99) <= -0.2,
-        lines: ["過去平均より -20% 以下なのだ。", "ジャンル違い・短時間枠・配信時間が変則的だった可能性。下がっただけで配信の価値が下がるわけじゃないのだ。"]
-      },
-      {
-        id: "gr-tanu-sample",
-        character: "tanu",
-        priority: 30,
-        test: (m) => m.growth?.average == null,
-        lines: ["過去配信のサンプルがまだ少ないので、成長メーターが表示できない枠なのだ。", "5 配信ぐらい記録が貯まると相対比較ができるようになるのだ。"]
-      }
-    ]
-  );
-  var FIRST_SECOND_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "fs-konta-eager",
-        character: "konta",
-        priority: HIGH,
-        test: (m) => m.firstSecondTotal >= 10,
-        lines: ["10 人以上が「初コメ → 続けてコメ」を打ってる、乗ってきた派が多い枠なのだ。", "初コメで終わらず会話に入る人が多いコミュニティは健康的なのだ。"]
-      },
-      {
-        id: "fs-konta-watcher",
-        character: "konta",
-        priority: 50,
-        test: (m) => m.firstSecondTotal > 0 && m.firstSecondTotal < 5,
-        lines: ["多くの人が 1 コメで様子見、もしくは継続コメまでは流れない枠なのだ。", "コメ歓迎の声をかけたり、テーマトークで巻き込むと 2 コメ目を引き出せるかもしれないのだ。"]
-      }
-    ]
-  );
-  var SURVIVAL_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "sv-link-strong",
-        character: "link",
-        priority: HIGH,
-        test: (m) => (m.survivalEndPct ?? -1) >= 50,
-        lines: ["最初の区間にコメくれた人の半分以上が、終盤までコメし続けてた枠なのだ。", "視聴維持＋コメ参加の二重で強い、理想型の配信なのだ。"]
-      },
-      {
-        id: "sv-link-fade",
-        character: "link",
-        priority: 60,
-        test: (m) => (m.survivalEndPct ?? -1) >= 0 && (m.survivalEndPct ?? -1) < 25,
-        lines: ["初期コメ参加者の 25% 以下しか終盤に残ってない枠なのだ。", "半減点と突き合わせて、どの瞬間に離脱が始まったか調べるのが次の改善ポイントなのだ。"]
-      }
-    ]
-  );
-  var KEYBOARD_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "kb-tanu-emoji-heavy",
-        character: "tanu",
-        priority: 80,
-        test: (m) => (m.keyboardCounts?.emoji ?? 0) > 0 && (m.keyboardCounts?.emoji ?? 0) >= (m.keyboardCounts?.short ?? 0) + (m.keyboardCounts?.long ?? 0) + (m.keyboardCounts?.balanced ?? 0),
-        lines: ["絵文字派が他の型と比べて多い枠なのだ。", "視覚的なテンションが高い文化のコミュニティで、配信者側も絵文字や顔文字を返すと馴染みやすいのだ。"]
-      },
-      {
-        id: "kb-tanu-short-dominant",
-        character: "tanu",
-        priority: 70,
-        test: (m) => (m.keyboardCounts?.short ?? 0) > 0 && (m.keyboardCounts?.short ?? 0) >= (m.keyboardCounts?.long ?? 0) + (m.keyboardCounts?.balanced ?? 0),
-        lines: ["短文派が多い反応速度型コミュニティなのだ。", "会話のテンポが速いから配信者側もテンポに合わせると盛り上がるのだ。"]
-      },
-      {
-        id: "kb-tanu-long-dominant",
-        character: "tanu",
-        priority: 70,
-        test: (m) => (m.keyboardCounts?.long ?? 0) > 0 && (m.keyboardCounts?.long ?? 0) >= (m.keyboardCounts?.short ?? 0) + (m.keyboardCounts?.balanced ?? 0),
-        lines: ["ロング派が多い熟読型コミュニティなのだ。", "丁寧に答えると満足度が上がる層なので、配信者側のレスもじっくりめが合うのだ。"]
-      },
-      {
-        id: "kb-tanu-quiet",
-        character: "tanu",
-        priority: 50,
-        test: (m) => (m.keyboardCounts?.quiet ?? 0) >= 5,
-        lines: ["無口観戦派（1 コメ以下）が 5 人以上いる枠なのだ。", "見てるだけのファンも大事な客層で、コメ歓迎の声かけで参加に誘えるかもしれないのだ。"]
-      }
-    ]
-  );
-  var ECHO_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "ec-konta-many",
-        character: "konta",
-        priority: HIGH,
-        test: (m) => m.echoBurstCount >= 5,
-        lines: ["コメ伝染／被り瞬間が 5 件以上あった、コミュニティの一体感が高い枠なのだ。", '同じ語が瞬間的に複数人から出る現象は、その配信の "象徴ワード" になりやすいのだ。']
-      },
-      {
-        id: "ec-konta-few",
-        character: "konta",
-        priority: 60,
-        test: (m) => m.echoBurstCount > 0 && m.echoBurstCount < 3,
-        lines: ["コメ伝染が 1〜2 件と控えめだった枠なのだ。", "個別反応が中心の落ち着いた空気で、これも配信スタイルの一つなのだ。"]
-      }
-    ]
-  );
-  var RECENT_CMP_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "rc-link-trend",
-        character: "link",
-        priority: 70,
-        test: (m) => m.recentCmpCount >= 5,
-        lines: ["直近 5 配信の比較バーが揃って表示できる規模感なのだ。", "上昇トレンドなら自信に、平らなら安定運営の指標として活用するのだ。"]
-      }
-    ]
-  );
-  var WAVEFORM_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "wf-tanu-similar",
-        character: "tanu",
-        priority: 60,
-        test: (m) => m.waveformSimilarCount >= 3,
-        lines: ["過去配信と形が似ている回が複数見つかった枠なのだ。", '"あの神回ぽい流れ" を発見できる機能で、配信ルーチンの再現性が見えるのだ。']
-      }
-    ]
-  );
-  var UNIQUE_WORDS_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "uw-konta-many",
-        character: "konta",
-        priority: 70,
-        test: (m) => m.uniqueWordsCount >= 5,
-        lines: ["視聴者側から自然に出ていた人気語が 5 つ以上ある枠なのだ。", "次回の話題振りや返しに少し混ぜると、場の言葉に寄せやすいのだ。"]
-      }
-    ]
-  );
-  var TALENT_PEAK_RULES = (
-    /** @type {AdviceRule[]} */
-    [
-      {
-        id: "tp-link-many",
-        character: "link",
-        priority: HIGH,
-        test: (m) => m.talentPeakCount >= 5,
-        lines: ['沈黙→即反応の "話芸ピーク" が 5 回以上検出されたのだ。', "トーク力が爆発した回で、その瞬間の話題はメモして次回再現したい弾なのだ。"]
-      },
-      {
-        id: "tp-link-few",
-        character: "link",
-        priority: 50,
-        test: (m) => m.talentPeakCount >= 1 && m.talentPeakCount < 3,
-        lines: ["話芸ピークが 1〜2 回検出されたのだ。", "少なめだけど確実に「効いた瞬間」があった証拠なのだ。"]
-      }
-    ]
-  );
-  var RULES = Object.freeze({
-    kpi: KPI_RULES,
-    concurrent: CONCURRENT_RULES,
-    laughter: LAUGHTER_RULES,
-    newVsRepeat: NEW_VS_REPEAT_RULES,
-    silence: SILENCE_RULES,
-    sentiment: SENTIMENT_RULES,
-    reach: REACH_RULES,
-    growth: GROWTH_RULES,
-    firstSecond: FIRST_SECOND_RULES,
-    survival: SURVIVAL_RULES,
-    keyboard: KEYBOARD_RULES,
-    echo: ECHO_RULES,
-    recentCmp: RECENT_CMP_RULES,
-    waveform: WAVEFORM_RULES,
-    uniqueWords: UNIQUE_WORDS_RULES,
-    talentPeak: TALENT_PEAK_RULES
-  });
-  var MARKETING_DYNAMIC_ADVICE_TOTAL_RULES = (() => {
-    let n2 = 0;
-    for (const k of Object.keys(RULES)) n2 += RULES[k].length;
-    return n2;
-  })();
-
-  // src/lib/supportGrowthInsights.js
-  function filterBroadcaster(comments, broadcasterUserId) {
-    const uid = String(broadcasterUserId || "").trim();
-    if (!uid) return Array.isArray(comments) ? comments.slice() : [];
-    return (Array.isArray(comments) ? comments : []).filter(
-      (c) => String(c?.userId || "").trim() !== uid
-    );
-  }
-  function formatOffsetClock(ms, streamStart) {
-    if (typeof ms !== "number" || !Number.isFinite(ms) || typeof streamStart !== "number") return "—";
-    const rel = Math.max(0, ms - streamStart);
-    const m = Math.floor(rel / 6e4);
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
-    if (h > 0) return `開始から約 ${h}時間${mm}分`;
-    return `開始から約 ${m}分`;
-  }
-  function roughTokens(text) {
-    const t = String(text || "").replace(/https?:\/\/\S+/g, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-    if (!t) return [];
-    const parts = t.split(/\s+/).filter((w) => w.length >= 2 && w.length <= 24);
-    return parts.slice(0, 40);
-  }
-  function topKeys(counts, n2) {
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, n2).map(([k]) => k);
-  }
-  function safeNick(nick, mask) {
-    const s5 = String(nick || "").trim();
-    if (!s5) return "ギフト参加者";
-    return mask ? maskLabelForShare(s5) : s5;
-  }
-  function safeCommentSnippet(text, mask) {
-    const t = String(text || "").replace(/\s+/g, " ").trim();
-    if (!t) return "";
-    const slice = t.length > 48 ? `${t.slice(0, 47)}…` : t;
-    if (!mask) return slice;
-    return maskLabelForShare(slice.length > 12 ? slice : `${slice}••`);
-  }
-  function buildSupportGrowthInsights(opts) {
-    const report = opts.report;
-    const mask = opts.maskShareLabels === true;
-    const broadcasterUserId = String(opts.broadcasterUserId || "").trim();
-    const comments = filterBroadcaster(opts.comments || [], broadcasterUserId);
-    const giftUsers = Array.isArray(opts.giftUsers) ? opts.giftUsers.slice() : [];
-    const sessionSummaryRows = Array.isArray(opts.sessionSummaryRows) ? opts.sessionSummaryRows : [];
-    const pastBroadcasts = Array.isArray(opts.pastBroadcasts) ? opts.pastBroadcasts : [];
-    const streamStart = (() => {
-      let min = 0;
-      for (const c of comments) {
-        const at = c?.capturedAt;
-        if (typeof at !== "number" || !Number.isFinite(at)) continue;
-        if (!min || at < min) min = at;
-      }
-      return min;
-    })();
-    const total = comments.length;
-    const lowData = total < 8;
-    const velocity = buildCommentVelocityTimeline(comments, { bucketMs: 6e4, rollingWindowMin: 5 });
-    const laughter = buildLaughterDensityTimeline(comments, { bucketMs: 3e4 });
-    const silenceZones = detectCommentSilenceZones(comments, {
-      thresholdMs: 6e4,
-      quality: { windowMs: 3e4 }
-    });
-    const sentimentCurve = scoreSentimentTimeline(comments, { bucketMs: 6e4 });
-    const newVsRepeat = classifyCommentersAgainstHistory({
-      currentLiveId: report.liveId,
-      currentComments: comments,
-      pastBroadcasts: pastBroadcasts.map((b) => ({
-        liveId: String(b?.liveId || ""),
-        comments: filterBroadcaster(b?.comments || [], broadcasterUserId)
-      })),
-      heavyThreshold: 5
-    });
-    const firstSecondLatency = buildCommenterFirstSecondLatency(comments);
-    const talentPeaks = detectTalentPeakMoments(comments);
-    const echoPropagation = detectCommentPropagation(comments, { windowMs: 3e4, minDistinctUsers: 3 });
-    const echoSync = detectCommentSyncBursts(comments, { windowMs: 5e3, minDistinctUsers: 3 });
-    const concurrentSeries = buildConcurrentTimelineSeries(sessionSummaryRows);
-    const concurrentPeak = analyzeConcurrentPeak(concurrentSeries);
-    const departedHeavySilence = silenceZones.filter((z) => String(z?.quality) === "departed").length;
-    const sentimentTotals = sentimentCurve.totals;
-    const pos = sentimentTotals.positive + sentimentTotals.surprise;
-    const neg = sentimentTotals.negative + sentimentTotals.confusion;
-    const positiveLean = pos >= neg * 1.2;
-    const endRetentionOk = concurrentPeak?.endRetentionRatio != null && concurrentPeak.endRetentionRatio >= 0.45;
-    const newVisitorLean = newVsRepeat.totalCurrent > 0 && newVsRepeat.newCount / newVsRepeat.totalCurrent >= 0.35;
-    const nextActions = [];
-    if (lowData) {
-      nextActions.push({
-        phase: "全体",
-        line: "短い枠でも OK。「今日来てくれてありがとう」と一言だけ入れる",
-        because: "記録がまだ少なくて細かい傾向が読みにくい時間帯",
-        effect: "コメントが増えやすい（安心の合図）"
-      });
-    } else {
-      if (velocity.peakMinute != null && velocity.peakMinute <= 4) {
-        nextActions.push({
-          phase: "冒頭",
-          line: "「初見さんも、一言だけでも挨拶だけ置いてってね」と軽く呼ぶ",
-          because: "開始直後にコメントの山があり、流れが早い",
-          effect: "参加の入口を広げる"
-        });
-      } else {
-        nextActions.push({
-          phase: "冒頭",
-          line: "今日の目的を 10 秒で言い切ってから雑談に入る",
-          because: "はじめの分かりやすさが後半の会話量に効きやすい",
-          effect: "コメントが増えやすい"
-        });
-      }
-      if (echoPropagation.length || echoSync.length) {
-        nextActions.push({
-          phase: "盛り上がり直後",
-          line: "さっき盛り上がったワードを次回の冒頭で一回だけ振る",
-          because: "同じ言葉が短時間に続いた「みんなで乗った」時間がある",
-          effect: "再訪・合言葉化しやすい"
-        });
-      }
-      if (giftUsers.length) {
-        nextActions.push({
-          phase: "ギフト直後",
-          line: "『（名前）さん、ありがとう』＋今日のできたことひと言",
-          because: "ギフト参加が記録に残っている",
-          effect: "ギフト・投げのお礼が伝わる（催し付けに見えにくい）"
-        });
-      } else {
-        nextActions.push({
-          phase: "中盤",
-          line: "「ここだけ答えて」で二択クイズを一問だけ挟む",
-          because: "ギフトが少ない回でも、会話のきっかけを作れる",
-          effect: "コメントが増えやすい"
-        });
-      }
-      if (departedHeavySilence >= 1) {
-        nextActions.push({
-          phase: "沈黙が長く感じたら",
-          line: "答えやすい二択（A か B）を出してから話を続ける",
-          because: "「静かになったあと」が離脱向きに読める区間がある",
-          effect: "離脱防止（空気が重くなりにくい）"
-        });
-      } else if (talentPeaks.length) {
-        nextActions.push({
-          phase: "盛り上がり直後",
-          line: "「ここ良かったね」と自分でも一言だけまとめる",
-          because: "間が空いたあと反応が返ってきた時間がある",
-          effect: "リスナーの気持ちが続きやすい"
-        });
-      }
-      nextActions.push({
-        phase: "終盤",
-        line: "終わり 5 分前に「次回いつ／なにするか」を一言だけ予告",
-        because: endRetentionOk ? "終盤まで反応が残りやすかった" : "次回につなげると残りやすい",
-        effect: "再訪しやすい"
-      });
-    }
-    while (nextActions.length > 5) nextActions.pop();
-    while (nextActions.length < 3 && !lowData) {
-      nextActions.push({
-        phase: "全体",
-        line: "『コメントは読むけど打つのが苦手な人もいいねだけで OK』と伝える",
-        because: "参加のハードルを下げると後から増えやすい",
-        effect: "コメントが増えやすい"
-      });
-      if (nextActions.length >= 3) break;
-    }
-    const supportWindows = [];
-    const vb = velocity.buckets || [];
-    let bestV = -1;
-    let bestVm = -1;
-    for (const b of vb) {
-      if (b.count > bestV) {
-        bestV = b.count;
-        bestVm = b.minute;
-      }
-    }
-    if (bestVm >= 0 && bestV > 0) {
-      const at = streamStart ? streamStart + bestVm * 6e4 : 0;
-      supportWindows.push({
-        label: "みんなが乗っていた時間",
-        timeHint: streamStart ? formatOffsetClock(at, streamStart) : "記録の前半〜中盤",
-        because: "このあたりでコメントの勢いが強かった"
-      });
-    }
-    const lb = laughter.buckets || [];
-    let bestL = -1;
-    let bestLm = -1;
-    for (const b of lb) {
-      const c = b.count ?? 0;
-      if (c > bestL) {
-        bestL = c;
-        bestLm = b.minute;
-      }
-    }
-    if (bestLm >= 0 && bestL > 0) {
-      const at = streamStart ? streamStart + bestLm * 3e4 : 0;
-      supportWindows.push({
-        label: "笑いやリアクションが集まった時間",
-        timeHint: streamStart ? formatOffsetClock(at, streamStart) : "中盤付近",
-        because: "笑い系の反応がここでまとまって見える"
-      });
-    }
-    if (positiveLean && sentimentCurve.buckets.length >= 2) {
-      let bestIdx = 0;
-      let bestScore = -1;
-      sentimentCurve.buckets.forEach((bu2, i) => {
-        const s5 = bu2.positive + bu2.surprise - (bu2.negative + bu2.confusion) * 0.5;
-        if (s5 > bestScore) {
-          bestScore = s5;
-          bestIdx = i;
-        }
-      });
-      const bu = sentimentCurve.buckets[bestIdx];
-      if (bu && bestScore > 0) {
-        supportWindows.push({
-          label: "お願いしても空気が重くなりにくい時間",
-          timeHint: streamStart ? formatOffsetClock(bu.atStart, streamStart) : "中盤",
-          because: "この付近は前向きな言い回しが目立ちやすかった"
-        });
-      }
-    }
-    if (echoSync.length) {
-      const b0 = echoSync[0];
-      const at = (b0.firstAt + b0.lastAt) / 2;
-      if (Number.isFinite(at)) {
-        supportWindows.push({
-          label: "みんなが同じ言葉で盛り上がった瞬間",
-          timeHint: streamStart ? formatOffsetClock(at, streamStart) : "—",
-          because: "短時間に同じ反応が重なった"
-        });
-      }
-    }
-    const giftFlow = [];
-    const WIN = 3 * 6e4;
-    for (const g of giftUsers.slice(0, 8)) {
-      const uid = String(g.userId || "").trim();
-      const at = g.capturedAt;
-      if (!uid || typeof at !== "number" || !Number.isFinite(at)) continue;
-      const beforeCounts = /* @__PURE__ */ new Map();
-      const afterCounts = /* @__PURE__ */ new Map();
-      let beforeN = 0;
-      let afterN = 0;
-      for (const c of comments) {
-        const ca = c?.capturedAt;
-        if (typeof ca !== "number" || !Number.isFinite(ca)) continue;
-        const text = String(c.text || "");
-        if (ca < at && ca >= at - WIN) {
-          beforeN += 1;
-          for (const w of roughTokens(text)) {
-            beforeCounts.set(w, (beforeCounts.get(w) || 0) + 1);
-          }
-        }
-        if (ca > at && ca <= at + WIN) {
-          afterN += 1;
-          for (const w of roughTokens(text)) {
-            afterCounts.set(w, (afterCounts.get(w) || 0) + 1);
-          }
-        }
-      }
-      const beforeWords = topKeys(beforeCounts, 4).join("、") || "（目立つ単語は少なめ）";
-      const afterWords = topKeys(afterCounts, 4).join("、") || "（目立つ単語は少なめ）";
-      const nick = safeNick(g.nickname, mask);
-      giftFlow.push({
-        headline: `${nick} さんのギフト前後（記録は初回検知時刻ベース）`,
-        beforeHint: `その前後 3 分のコメント数: 前 ${beforeN} / 後 ${afterN}。前に出やすかった言葉: ${beforeWords}`,
-        afterHint: `後に出やすかった言葉: ${afterWords}`,
-        thankTimingHint: afterN >= beforeN ? "お礼の一言はギフト直後が自然（反応が続きやすい）" : "短くお礼を挟んでから、話題を戻すと流れが滑らか"
-      });
-    }
-    const onboarding = {
-      summaryLine: "",
-      voiceExamples: [
-        "「初見さんも、好きな食べ物だけ置いてってね」",
-        "「今来た人向けに 10 秒で説明すると…」",
-        "「打つのが苦手な人は 888 だけでも大丈夫」"
-      ]
-    };
-    if (newVsRepeat.totalCurrent > 0) {
-      const ratio = newVsRepeat.newCount / newVsRepeat.totalCurrent;
-      if (ratio >= 0.4) {
-        onboarding.summaryLine = "初めての反応が目立つ回に見える（「初見さんが入りやすい回」になりやすい）";
-      } else if (ratio <= 0.15) {
-        onboarding.summaryLine = "いつものメンバーが中心になりやすい回に見える（深い会話向き）";
-      } else {
-        onboarding.summaryLine = "初見さんと常連さんが混ざりやすいバランスに見える";
-      }
-    } else {
-      onboarding.summaryLine = "ユーザー層の比率は十分な記録がないため省略";
-    }
-    const fsTotal = firstSecondLatency.totalUsers || 0;
-    const fsQuick = (firstSecondLatency.distribution?.["<10s"] || 0) + (firstSecondLatency.distribution?.["10-30s"] || 0);
-    if (fsTotal > 0 && fsQuick / fsTotal >= 0.35) {
-      onboarding.voiceExamples.push(
-        "「2 コメ目までが早い人が多いので、短く拾ってあげると続きやすいかも」"
-      );
-    }
-    const clippingMoments = [];
-    for (const tp of talentPeaks.slice(0, 2)) {
-      const mid = (tp.silenceEndAt + tp.silenceStartAt) / 2;
-      let sample = "";
-      for (const c of comments) {
-        const ca = c?.capturedAt;
-        if (typeof ca !== "number") continue;
-        if (ca >= tp.silenceEndAt && ca <= tp.silenceEndAt + 25e3) {
-          sample = safeCommentSnippet(String(c.text || ""), mask);
-          break;
-        }
-      }
-      clippingMoments.push({
-        atLabel: streamStart ? formatOffsetClock(mid, streamStart) : "—",
-        reason: "間が空いたあと反応が返ってきた時間（話の転換点になりやすい）",
-        sampleLine: sample || "（代表コメントはこの近くを見る）",
-        promoHint: "短く切り抜くなら「間→盛り上がり」の流れが伝わるカット",
-        kind: "talk"
-      });
-    }
-    for (const b of laughter.buckets || []) {
-      if ((b.count || 0) < 2) continue;
-      const at = b.atStart;
-      let sample = "";
-      for (const c of comments) {
-        const ca = c?.capturedAt;
-        if (typeof ca !== "number") continue;
-        if (ca >= at && ca < at + 3e4) {
-          const tx = String(c.text || "");
-          if (/[wｗ草笑ワロタ8888]/i.test(tx)) {
-            sample = safeCommentSnippet(tx, mask);
-            break;
-          }
-        }
-      }
-      clippingMoments.push({
-        atLabel: streamStart ? formatOffsetClock(at + 15e3, streamStart) : "—",
-        reason: "ここは笑いやリアクションが集中",
-        sampleLine: sample || "（笑い系のコメントがまとまって見える）",
-        promoHint: "SNS なら「この瞬間だけでも見てほしい」系の一言が合いやすい",
-        kind: "laugh"
-      });
-      if (clippingMoments.length >= 5) break;
-    }
-    for (const eb of echoSync.slice(0, 2)) {
-      const at = (eb.firstAt + eb.lastAt) / 2;
-      if (!Number.isFinite(at)) continue;
-      clippingMoments.push({
-        atLabel: streamStart ? formatOffsetClock(at, streamStart) : "—",
-        reason: "みんなが同じ言葉で重なった瞬間（内輪っぽさが強いことも）",
-        sampleLine: eb.text ? safeCommentSnippet(eb.text, mask) : "（被りワード周辺）",
-        promoHint: "常連向けの「その日の合言葉」として使えることがある",
-        kind: "echo"
-      });
-    }
-    const listenerRewards = [];
-    listenerRewards.push({ line: "よく書いてくれた人の話題を、次回の最初に軽く触れる" });
-    if (giftUsers.length) {
-      listenerRewards.push({ line: "ギフトが出たら短く名前を呼んで一言お礼（長く説明しない）" });
-    }
-    listenerRewards.push({ line: "初コメっぽい短文には「ありがとう」だけでも返すと続きやすい" });
-    listenerRewards.push({
-      line: "よく出た言葉を「次回の合言葉」として一回だけ使うと参加しやすい"
-    });
-    const askTiming = { good: [], bad: [] };
-    if (positiveLean) {
-      askTiming.good.push("前向きなコメントが目立つ時間は、お礼や軽い案内が自然");
-    }
-    if (bestV > 2) {
-      askTiming.good.push("コメントの勢いがある時間は、短いお願いも空気が軽い");
-    }
-    if (giftUsers.length && endRetentionOk) {
-      askTiming.good.push("終盤まで反応が残りやすい回は、締めのお礼が効きやすい");
-    }
-    if (departedHeavySilence >= 2) {
-      askTiming.bad.push("静かな時間が「離脱向き」と読める区間では、お願いより雑談に戻す");
-    }
-    if (!positiveLean && neg > pos) {
-      askTiming.bad.push("不安や迷いの言い回しが目立つときは、支援の話より安心の話を先に");
-    }
-    if (newVisitorLean && fsTotal > 0 && fsQuick / fsTotal < 0.2) {
-      askTiming.bad.push("初見さんが多いのに 2 コメ目が伸びにくいときは、長いお願いより短い呼びかけを先に");
-    }
-    const caution = [];
-    if (!giftUsers.length && total > 30) {
-      caution.push("ギフト記録が無い回でも失敗ではないのだ。コメントの山や笑いの時間をまず探すのだ。");
-    }
-    if (giftUsers.length && total < 5) {
-      caution.push("ギフト記録はあるがコメント記録が少ない。結合の精度は参考程度に留めるのだ。");
-    }
-    const adviceSlice = {
-      hasGiftSignals: giftUsers.length > 0,
-      lowData,
-      departedSilenceHeavy: departedHeavySilence >= 2,
-      positiveLean,
-      giftFlowRows: giftFlow.length,
-      newVisitorLean,
-      endRetentionOk: Boolean(endRetentionOk)
-    };
-    return {
-      nextActions: nextActions.slice(0, 5),
-      supportWindows: supportWindows.slice(0, 6),
-      giftFlow,
-      onboarding,
-      clippingMoments: clippingMoments.slice(0, 8),
-      listenerRewards,
-      askTiming,
-      caution,
-      adviceSlice,
-      meta: {
-        streamStartAt: streamStart || null,
-        giftNote: "ギフトはストレージ上 userId ごとに 1 行で、時刻は初回検知に近い場合があるのだ。"
-      }
-    };
-  }
-  function buildReportMemoPayload(opts) {
-    const full = buildSupportGrowthInsights(opts);
-    return {
-      nextMemos: full.nextActions.slice(0, 3).map((a) => `${a.phase}: ${a.line}`),
-      highlights: full.clippingMoments.slice(0, 3).map((c) => ({
-        atLabel: c.atLabel,
-        reason: c.reason,
-        sampleLine: c.sampleLine
-      })),
-      thanksPoints: [
-        full.adviceSlice.hasGiftSignals ? "ギフト・投げに反応があった" : null,
-        full.supportWindows.length ? "盛り上がりの時間帯が読み取れた" : null,
-        full.onboarding.summaryLine ? "初見さんの入り方の傾向メモ" : null
-      ].filter(Boolean),
-      templates: full.onboarding.voiceExamples.slice(0, 4),
-      caution: full.caution
-    };
   }
 
   // src/lib/giftMomentumAnalytics.js
@@ -6412,20 +5437,17 @@ ${sampleNote}`;
       analytics.segments.localEnthusiasts,
       analytics.segments.quietSupporters
     ];
-    return segments.map((seg) => {
-      const examples = seg.representatives.length ? `<ul class="mkt-cfa-examples">${seg.representatives.map((row) => {
+    const head = segments.map(
+      (seg) => `<li><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span><strong>${escapeHtml2(seg.label)}</strong> ${formatEventRankingNumber(seg.count)}名 <small>${escapeHtml2(formatCommenterFollowPct(seg.pctOfFollowed))}</small> — ${escapeHtml2(seg.description)}</li>`
+    ).join("");
+    const rows = segments.flatMap(
+      (seg) => seg.representatives.map((row) => {
         const rawLabel = displayUserLabel(row.userId, row.nickname || "");
-        const label = buildUserProfileLinkedLabelHtml(row.userId, rawLabel);
-        const stats = `コメ ${formatEventRankingNumber(row.commentCount)} / フォロワー ${formatEventRankingNumber(row.followerCount)}`;
-        return `<li>${label}<span>${escapeHtml2(stats)}</span></li>`;
-      }).join("")}</ul>` : '<p class="mkt-note">該当者はまだいません。</p>';
-      return `<article class="mkt-cfa-card mkt-cfa-card--${escapeAttr(seg.id)}">
-<div class="mkt-cfa-card__head"><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span><h3>${escapeHtml2(seg.label)}</h3></div>
-<strong class="mkt-cfa-card__count">${formatEventRankingNumber(seg.count)}名 <small>${escapeHtml2(formatCommenterFollowPct(seg.pctOfFollowed))}</small></strong>
-<p>${escapeHtml2(seg.description)}</p>
-${examples}
-</article>`;
-    }).join("");
+        return `<tr><td><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span> ${escapeHtml2(seg.label)}</td><td>${buildUserProfileLinkedLabelHtml(row.userId, rawLabel)}</td><td class="mkt-num">${formatEventRankingNumber(row.commentCount)}</td><td class="mkt-num">${formatEventRankingNumber(row.followerCount)}</td></tr>`;
+      })
+    ).join("");
+    const table = rows ? `<div class="mkt-table-scroll"><table class="mkt-rank mkt-cfa-seg-table"><thead><tr><th>層</th><th>ユーザー</th><th>コメ</th><th>フォロワー</th></tr></thead><tbody>${rows}</tbody></table></div>` : "";
+    return `<ul class="mkt-cfa-seg-legend">${head}</ul>${table}`;
   }
   function commenterFollowCsvDownloadScriptHtml(buttonId) {
     return `<script>
@@ -6526,20 +5548,24 @@ ${examples}
 </tr>`
     ).join("");
     const insights = deltas.insightLines.length ? `<ul class="mkt-insight-list">${deltas.insightLines.map((line) => `<li>${escapeHtml2(line)}</li>`).join("")}</ul>` : "";
+    const incRows = deltaRows(deltas.increased, "+");
+    const decRows = deltaRows(deltas.decreased, "-");
+    const timingHasData = timing.buckets.some((b) => b.increasedCount > 0 || b.decreasedCount > 0);
+    if (!incRows && !decRows && !timingHasData) return "";
     const timingInsights = timing.insightLines.length ? `<ul class="mkt-insight-list">${timing.insightLines.map((line) => `<li>${escapeHtml2(line)}</li>`).join("")}</ul>` : "";
     return `<div class="mkt-cfa-delta">
 <h3 class="mkt-subhead">フォロー増減（前回キャッシュ比較）</h3>
 <p class="mkt-note">配信前後の差分は横断キャッシュと今回スナップショットの比較です。配信内のリアルタイム増減ではありません。</p>
 ${insights}
-<div class="mkt-cfa-delta-grid">
-<div><h4 class="mkt-cfa-delta__title">増えた人 TOP</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${deltaRows(deltas.increased, "+") || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div></div>
-<div><h4 class="mkt-cfa-delta__title">減った人 TOP</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${deltaRows(deltas.decreased, "-") || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div></div>
-</div>
-<h3 class="mkt-subhead">初コメ時刻帯 × 増減</h3>
+${incRows || decRows ? `<div class="mkt-cfa-delta-grid">
+${incRows ? `<div><h4 class="mkt-cfa-delta__title">増えた人 TOP</h4>
+<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${incRows}</tbody></table></div></div>` : ""}
+${decRows ? `<div><h4 class="mkt-cfa-delta__title">減った人 TOP</h4>
+<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${decRows}</tbody></table></div></div>` : ""}
+</div>` : ""}
+${timingHasData ? `<h3 class="mkt-subhead">初コメ時刻帯 × 増減</h3>
 ${timingInsights}
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-cfa-timing-table"><thead><tr><th>時間帯</th><th>コメンター</th><th>増</th><th>減</th><th>純増</th></tr></thead><tbody>${timingRows}</tbody></table></div>
+<div class="mkt-table-scroll"><table class="mkt-rank mkt-cfa-timing-table"><thead><tr><th>時間帯</th><th>コメンター</th><th>増</th><th>減</th><th>純増</th></tr></thead><tbody>${timingRows}</tbody></table></div>` : ""}
 </div>`;
   }
   function commenterFolloweeProfilePanelHtml(profile) {
@@ -6548,16 +5574,19 @@ ${timingInsights}
       (b) => `<tr><td data-label="区分">${escapeHtml2(b.label)}</td><td data-label="人数" class="mkt-num">${formatEventRankingNumber(b.count)}</td><td data-label="比率" class="mkt-num">${b.pct}%</td></tr>`
     ).join("");
     const insights = profile.insightLines.length ? `<ul class="mkt-insight-list">${profile.insightLines.map((line) => `<li>${escapeHtml2(line)}</li>`).join("")}</ul>` : "";
+    const followeeRows = bucketRows(profile.followeeBuckets);
+    const levelRows = bucketRows(profile.levelBuckets);
+    const distTable = (title, rowsHtml) => rowsHtml ? `<div><h4 class="mkt-cfa-delta__title">${title}</h4>
+<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>区分</th><th>人数</th><th>比率</th></tr></thead><tbody>${rowsHtml}</tbody></table></div></div>` : "";
+    const distGrid = followeeRows || levelRows ? `<div class="mkt-cfa-profile-grid">
+${distTable("フォロー数分布", followeeRows)}
+${distTable("LV 分布", levelRows)}
+</div>` : "";
     return `<div class="mkt-cfa-profile">
 <h3 class="mkt-subhead">コメンターのフォロー先・属性傾向</h3>
 <p class="mkt-note">フォロー先リスト自体は取得していません。各コメンターの「フォロー数（followee）」・LV・プレミアム率から、視聴者層の広がりを推定します。</p>
 ${insights}
-<div class="mkt-cfa-profile-grid">
-<div><h4 class="mkt-cfa-delta__title">フォロー数分布</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>区分</th><th>人数</th><th>比率</th></tr></thead><tbody>${bucketRows(profile.followeeBuckets) || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div></div>
-<div><h4 class="mkt-cfa-delta__title">LV 分布</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>区分</th><th>人数</th><th>比率</th></tr></thead><tbody>${bucketRows(profile.levelBuckets) || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div></div>
-</div>
+${distGrid}
 </div>`;
   }
   function commenterFollowingListPanelHtml(analytics, r) {
@@ -6588,7 +5617,10 @@ ${insights}
     const commonTable = commonRows ? `<h3 class="mkt-subhead">共通フォロー先 TOP</h3>
 <p class="mkt-note">複数の上位コメンターが共通してフォローしている userId です。</p>
 <div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>userId</th><th>重複人数</th></tr></thead><tbody>${commonRows}</tbody></table></div>` : "";
-    const insights = analytics.followingListInsights?.length ? `<ul class="mkt-insight-list">${analytics.followingListInsights.map((line) => `<li>${escapeHtml2(line)}</li>`).join("")}</ul>` : "";
+    const followingInsightLines = (analytics.followingListInsights || []).filter(
+      (line) => !(noteHtml && /取得に失敗|ログイン/.test(String(line)))
+    );
+    const insights = followingInsightLines.length ? `<ul class="mkt-insight-list">${followingInsightLines.map((line) => `<li>${escapeHtml2(line)}</li>`).join("")}</ul>` : "";
     if (!noteHtml && !bfCard && !commonTable && !insights) return "";
     return `<div class="mkt-cfa-following-list">
 <h3 class="mkt-subhead">フォロー先一覧分析</h3>
@@ -6600,12 +5632,7 @@ ${commonTable}
   }
   function sectionInterestArrival(r) {
     const summary = r.interestArrivalSummary;
-    if (!summary || summary.messageCount <= 0) {
-      return `<section class="mkt-section mkt-section--interest-arrival mkt-section--empty" id="mkt-interest-arrival" aria-label="興味タグ別来場（検出 0件）">
-      <h2>興味タグ別来場</h2>
-      <p class="mkt-section__note">この配信では「○○が好きなN人が来場しました」の通知が検出されませんでした(0件)。配信ジャンルやニコ生側のシステムメッセージ配信状況により出ない配信もあります。</p>
-    </section>`;
-    }
+    if (!summary || summary.messageCount <= 0) return "";
     const stats = [
       {
         label: "来場人数（合算）",
@@ -6691,7 +5718,7 @@ ${commonTable}
 <div class="mkt-cfa-toolbar">${csvButton}</div>
 <div class="mkt-cfa-stats">${stats}</div>
 ${commenterFollowScatterSvg(analytics)}
-<div class="mkt-cfa-segments">${commenterFollowSegmentCardsHtml(analytics)}</div>
+<div class="mkt-cfa-segtable">${commenterFollowSegmentCardsHtml(analytics)}</div>
 ${commenterFollowDeltaPanelHtml(analytics.followDeltas, analytics.followTiming)}
 ${commenterFolloweeProfilePanelHtml(analytics.followeeProfile)}
 ${commenterFollowingListPanelHtml(analytics, r)}
@@ -6921,6 +5948,435 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       eventRankingSectionHtml = "";
     }
     return eventRankingSectionHtml;
+  }
+
+  // src/lib/supportGrowthInsights.js
+  function filterBroadcaster(comments, broadcasterUserId) {
+    const uid = String(broadcasterUserId || "").trim();
+    if (!uid) return Array.isArray(comments) ? comments.slice() : [];
+    return (Array.isArray(comments) ? comments : []).filter(
+      (c) => String(c?.userId || "").trim() !== uid
+    );
+  }
+  function formatOffsetClock(ms, streamStart) {
+    if (typeof ms !== "number" || !Number.isFinite(ms) || typeof streamStart !== "number") return "—";
+    const rel = Math.max(0, ms - streamStart);
+    const m = Math.floor(rel / 6e4);
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    if (h > 0) return `開始から約 ${h}時間${mm}分`;
+    return `開始から約 ${m}分`;
+  }
+  function roughTokens(text) {
+    const t = String(text || "").replace(/https?:\/\/\S+/g, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    if (!t) return [];
+    const parts = t.split(/\s+/).filter((w) => w.length >= 2 && w.length <= 24);
+    return parts.slice(0, 40);
+  }
+  function topKeys(counts, n2) {
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, n2).map(([k]) => k);
+  }
+  function safeNick(nick, mask) {
+    const s5 = String(nick || "").trim();
+    if (!s5) return "ギフト参加者";
+    return mask ? maskLabelForShare(s5) : s5;
+  }
+  function safeCommentSnippet(text, mask) {
+    const t = String(text || "").replace(/\s+/g, " ").trim();
+    if (!t) return "";
+    const slice = t.length > 48 ? `${t.slice(0, 47)}…` : t;
+    if (!mask) return slice;
+    return maskLabelForShare(slice.length > 12 ? slice : `${slice}••`);
+  }
+  function buildSupportGrowthInsights(opts) {
+    const report = opts.report;
+    const mask = opts.maskShareLabels === true;
+    const broadcasterUserId = String(opts.broadcasterUserId || "").trim();
+    const comments = filterBroadcaster(opts.comments || [], broadcasterUserId);
+    const giftUsers = Array.isArray(opts.giftUsers) ? opts.giftUsers.slice() : [];
+    const sessionSummaryRows = Array.isArray(opts.sessionSummaryRows) ? opts.sessionSummaryRows : [];
+    const pastBroadcasts = Array.isArray(opts.pastBroadcasts) ? opts.pastBroadcasts : [];
+    const streamStart = (() => {
+      let min = 0;
+      for (const c of comments) {
+        const at = c?.capturedAt;
+        if (typeof at !== "number" || !Number.isFinite(at)) continue;
+        if (!min || at < min) min = at;
+      }
+      return min;
+    })();
+    const total = comments.length;
+    const lowData = total < 8;
+    const velocity = buildCommentVelocityTimeline(comments, { bucketMs: 6e4, rollingWindowMin: 5 });
+    const laughter = buildLaughterDensityTimeline(comments, { bucketMs: 3e4 });
+    const silenceZones = detectCommentSilenceZones(comments, {
+      thresholdMs: 6e4,
+      quality: { windowMs: 3e4 }
+    });
+    const sentimentCurve = scoreSentimentTimeline(comments, { bucketMs: 6e4 });
+    const newVsRepeat = classifyCommentersAgainstHistory({
+      currentLiveId: report.liveId,
+      currentComments: comments,
+      pastBroadcasts: pastBroadcasts.map((b) => ({
+        liveId: String(b?.liveId || ""),
+        comments: filterBroadcaster(b?.comments || [], broadcasterUserId)
+      })),
+      heavyThreshold: 5
+    });
+    const firstSecondLatency = buildCommenterFirstSecondLatency(comments);
+    const talentPeaks = detectTalentPeakMoments(comments);
+    const echoPropagation = detectCommentPropagation(comments, { windowMs: 3e4, minDistinctUsers: 3 });
+    const echoSync = detectCommentSyncBursts(comments, { windowMs: 5e3, minDistinctUsers: 3 });
+    const concurrentSeries = buildConcurrentTimelineSeries(sessionSummaryRows);
+    const concurrentPeak = analyzeConcurrentPeak(concurrentSeries);
+    const departedHeavySilence = silenceZones.filter((z) => String(z?.quality) === "departed").length;
+    const sentimentTotals = sentimentCurve.totals;
+    const pos = sentimentTotals.positive + sentimentTotals.surprise;
+    const neg = sentimentTotals.negative + sentimentTotals.confusion;
+    const positiveLean = pos >= neg * 1.2;
+    const endRetentionOk = concurrentPeak?.endRetentionRatio != null && concurrentPeak.endRetentionRatio >= 0.45;
+    const newVisitorLean = newVsRepeat.totalCurrent > 0 && newVsRepeat.newCount / newVsRepeat.totalCurrent >= 0.35;
+    const nextActions = [];
+    if (lowData) {
+      nextActions.push({
+        phase: "全体",
+        line: "短い枠でも OK。「今日来てくれてありがとう」と一言だけ入れる",
+        because: "記録がまだ少なくて細かい傾向が読みにくい時間帯",
+        effect: "コメントが増えやすい（安心の合図）"
+      });
+    } else {
+      if (velocity.peakMinute != null && velocity.peakMinute <= 4) {
+        nextActions.push({
+          phase: "冒頭",
+          line: "「初見さんも、一言だけでも挨拶だけ置いてってね」と軽く呼ぶ",
+          because: "開始直後にコメントの山があり、流れが早い",
+          effect: "参加の入口を広げる"
+        });
+      } else {
+        nextActions.push({
+          phase: "冒頭",
+          line: "今日の目的を 10 秒で言い切ってから雑談に入る",
+          because: "はじめの分かりやすさが後半の会話量に効きやすい",
+          effect: "コメントが増えやすい"
+        });
+      }
+      if (echoPropagation.length || echoSync.length) {
+        nextActions.push({
+          phase: "盛り上がり直後",
+          line: "さっき盛り上がったワードを次回の冒頭で一回だけ振る",
+          because: "同じ言葉が短時間に続いた「みんなで乗った」時間がある",
+          effect: "再訪・合言葉化しやすい"
+        });
+      }
+      if (giftUsers.length) {
+        nextActions.push({
+          phase: "ギフト直後",
+          line: "『（名前）さん、ありがとう』＋今日のできたことひと言",
+          because: "ギフト参加が記録に残っている",
+          effect: "ギフト・投げのお礼が伝わる（催し付けに見えにくい）"
+        });
+      } else {
+        nextActions.push({
+          phase: "中盤",
+          line: "「ここだけ答えて」で二択クイズを一問だけ挟む",
+          because: "ギフトが少ない回でも、会話のきっかけを作れる",
+          effect: "コメントが増えやすい"
+        });
+      }
+      if (departedHeavySilence >= 1) {
+        nextActions.push({
+          phase: "沈黙が長く感じたら",
+          line: "答えやすい二択（A か B）を出してから話を続ける",
+          because: "「静かになったあと」が離脱向きに読める区間がある",
+          effect: "離脱防止（空気が重くなりにくい）"
+        });
+      } else if (talentPeaks.length) {
+        nextActions.push({
+          phase: "盛り上がり直後",
+          line: "「ここ良かったね」と自分でも一言だけまとめる",
+          because: "間が空いたあと反応が返ってきた時間がある",
+          effect: "リスナーの気持ちが続きやすい"
+        });
+      }
+      nextActions.push({
+        phase: "終盤",
+        line: "終わり 5 分前に「次回いつ／なにするか」を一言だけ予告",
+        because: endRetentionOk ? "終盤まで反応が残りやすかった" : "次回につなげると残りやすい",
+        effect: "再訪しやすい"
+      });
+    }
+    while (nextActions.length > 5) nextActions.pop();
+    while (nextActions.length < 3 && !lowData) {
+      nextActions.push({
+        phase: "全体",
+        line: "『コメントは読むけど打つのが苦手な人もいいねだけで OK』と伝える",
+        because: "参加のハードルを下げると後から増えやすい",
+        effect: "コメントが増えやすい"
+      });
+      if (nextActions.length >= 3) break;
+    }
+    const supportWindows = [];
+    const vb = velocity.buckets || [];
+    let bestV = -1;
+    let bestVm = -1;
+    for (const b of vb) {
+      if (b.count > bestV) {
+        bestV = b.count;
+        bestVm = b.minute;
+      }
+    }
+    if (bestVm >= 0 && bestV > 0) {
+      const at = streamStart ? streamStart + bestVm * 6e4 : 0;
+      supportWindows.push({
+        label: "みんなが乗っていた時間",
+        timeHint: streamStart ? formatOffsetClock(at, streamStart) : "記録の前半〜中盤",
+        because: "このあたりでコメントの勢いが強かった"
+      });
+    }
+    const lb = laughter.buckets || [];
+    let bestL = -1;
+    let bestLm = -1;
+    for (const b of lb) {
+      const c = b.count ?? 0;
+      if (c > bestL) {
+        bestL = c;
+        bestLm = b.minute;
+      }
+    }
+    if (bestLm >= 0 && bestL > 0) {
+      const at = streamStart ? streamStart + bestLm * 3e4 : 0;
+      supportWindows.push({
+        label: "笑いやリアクションが集まった時間",
+        timeHint: streamStart ? formatOffsetClock(at, streamStart) : "中盤付近",
+        because: "笑い系の反応がここでまとまって見える"
+      });
+    }
+    if (positiveLean && sentimentCurve.buckets.length >= 2) {
+      let bestIdx = 0;
+      let bestScore = -1;
+      sentimentCurve.buckets.forEach((bu2, i) => {
+        const s5 = bu2.positive + bu2.surprise - (bu2.negative + bu2.confusion) * 0.5;
+        if (s5 > bestScore) {
+          bestScore = s5;
+          bestIdx = i;
+        }
+      });
+      const bu = sentimentCurve.buckets[bestIdx];
+      if (bu && bestScore > 0) {
+        supportWindows.push({
+          label: "お願いしても空気が重くなりにくい時間",
+          timeHint: streamStart ? formatOffsetClock(bu.atStart, streamStart) : "中盤",
+          because: "この付近は前向きな言い回しが目立ちやすかった"
+        });
+      }
+    }
+    if (echoSync.length) {
+      const b0 = echoSync[0];
+      const at = (b0.firstAt + b0.lastAt) / 2;
+      if (Number.isFinite(at)) {
+        supportWindows.push({
+          label: "みんなが同じ言葉で盛り上がった瞬間",
+          timeHint: streamStart ? formatOffsetClock(at, streamStart) : "—",
+          because: "短時間に同じ反応が重なった"
+        });
+      }
+    }
+    const giftFlow = [];
+    const WIN = 3 * 6e4;
+    for (const g of giftUsers.slice(0, 8)) {
+      const uid = String(g.userId || "").trim();
+      const at = g.capturedAt;
+      if (!uid || typeof at !== "number" || !Number.isFinite(at)) continue;
+      const beforeCounts = /* @__PURE__ */ new Map();
+      const afterCounts = /* @__PURE__ */ new Map();
+      let beforeN = 0;
+      let afterN = 0;
+      for (const c of comments) {
+        const ca = c?.capturedAt;
+        if (typeof ca !== "number" || !Number.isFinite(ca)) continue;
+        const text = String(c.text || "");
+        if (ca < at && ca >= at - WIN) {
+          beforeN += 1;
+          for (const w of roughTokens(text)) {
+            beforeCounts.set(w, (beforeCounts.get(w) || 0) + 1);
+          }
+        }
+        if (ca > at && ca <= at + WIN) {
+          afterN += 1;
+          for (const w of roughTokens(text)) {
+            afterCounts.set(w, (afterCounts.get(w) || 0) + 1);
+          }
+        }
+      }
+      const beforeWords = topKeys(beforeCounts, 4).join("、") || "（目立つ単語は少なめ）";
+      const afterWords = topKeys(afterCounts, 4).join("、") || "（目立つ単語は少なめ）";
+      const nick = safeNick(g.nickname, mask);
+      giftFlow.push({
+        headline: `${nick} さんのギフト前後（記録は初回検知時刻ベース）`,
+        beforeHint: `その前後 3 分のコメント数: 前 ${beforeN} / 後 ${afterN}。前に出やすかった言葉: ${beforeWords}`,
+        afterHint: `後に出やすかった言葉: ${afterWords}`,
+        thankTimingHint: afterN >= beforeN ? "お礼の一言はギフト直後が自然（反応が続きやすい）" : "短くお礼を挟んでから、話題を戻すと流れが滑らか"
+      });
+    }
+    const onboarding = {
+      summaryLine: "",
+      voiceExamples: [
+        "「初見さんも、好きな食べ物だけ置いてってね」",
+        "「今来た人向けに 10 秒で説明すると…」",
+        "「打つのが苦手な人は 888 だけでも大丈夫」"
+      ]
+    };
+    if (newVsRepeat.totalCurrent > 0) {
+      const ratio = newVsRepeat.newCount / newVsRepeat.totalCurrent;
+      if (ratio >= 0.4) {
+        onboarding.summaryLine = "初めての反応が目立つ回に見える（「初見さんが入りやすい回」になりやすい）";
+      } else if (ratio <= 0.15) {
+        onboarding.summaryLine = "いつものメンバーが中心になりやすい回に見える（深い会話向き）";
+      } else {
+        onboarding.summaryLine = "初見さんと常連さんが混ざりやすいバランスに見える";
+      }
+    } else {
+      onboarding.summaryLine = "ユーザー層の比率は十分な記録がないため省略";
+    }
+    const fsTotal = firstSecondLatency.totalUsers || 0;
+    const fsQuick = (firstSecondLatency.distribution?.["<10s"] || 0) + (firstSecondLatency.distribution?.["10-30s"] || 0);
+    if (fsTotal > 0 && fsQuick / fsTotal >= 0.35) {
+      onboarding.voiceExamples.push(
+        "「2 コメ目までが早い人が多いので、短く拾ってあげると続きやすいかも」"
+      );
+    }
+    const clippingMoments = [];
+    for (const tp of talentPeaks.slice(0, 2)) {
+      const mid = (tp.silenceEndAt + tp.silenceStartAt) / 2;
+      let sample = "";
+      for (const c of comments) {
+        const ca = c?.capturedAt;
+        if (typeof ca !== "number") continue;
+        if (ca >= tp.silenceEndAt && ca <= tp.silenceEndAt + 25e3) {
+          sample = safeCommentSnippet(String(c.text || ""), mask);
+          break;
+        }
+      }
+      clippingMoments.push({
+        atLabel: streamStart ? formatOffsetClock(mid, streamStart) : "—",
+        reason: "間が空いたあと反応が返ってきた時間（話の転換点になりやすい）",
+        sampleLine: sample || "（代表コメントはこの近くを見る）",
+        promoHint: "短く切り抜くなら「間→盛り上がり」の流れが伝わるカット",
+        kind: "talk"
+      });
+    }
+    for (const b of laughter.buckets || []) {
+      if ((b.count || 0) < 2) continue;
+      const at = b.atStart;
+      let sample = "";
+      for (const c of comments) {
+        const ca = c?.capturedAt;
+        if (typeof ca !== "number") continue;
+        if (ca >= at && ca < at + 3e4) {
+          const tx = String(c.text || "");
+          if (/[wｗ草笑ワロタ8888]/i.test(tx)) {
+            sample = safeCommentSnippet(tx, mask);
+            break;
+          }
+        }
+      }
+      clippingMoments.push({
+        atLabel: streamStart ? formatOffsetClock(at + 15e3, streamStart) : "—",
+        reason: "ここは笑いやリアクションが集中",
+        sampleLine: sample || "（笑い系のコメントがまとまって見える）",
+        promoHint: "SNS なら「この瞬間だけでも見てほしい」系の一言が合いやすい",
+        kind: "laugh"
+      });
+      if (clippingMoments.length >= 5) break;
+    }
+    for (const eb of echoSync.slice(0, 2)) {
+      const at = (eb.firstAt + eb.lastAt) / 2;
+      if (!Number.isFinite(at)) continue;
+      clippingMoments.push({
+        atLabel: streamStart ? formatOffsetClock(at, streamStart) : "—",
+        reason: "みんなが同じ言葉で重なった瞬間（内輪っぽさが強いことも）",
+        sampleLine: eb.text ? safeCommentSnippet(eb.text, mask) : "（被りワード周辺）",
+        promoHint: "常連向けの「その日の合言葉」として使えることがある",
+        kind: "echo"
+      });
+    }
+    const listenerRewards = [];
+    listenerRewards.push({ line: "よく書いてくれた人の話題を、次回の最初に軽く触れる" });
+    if (giftUsers.length) {
+      listenerRewards.push({ line: "ギフトが出たら短く名前を呼んで一言お礼（長く説明しない）" });
+    }
+    listenerRewards.push({ line: "初コメっぽい短文には「ありがとう」だけでも返すと続きやすい" });
+    listenerRewards.push({
+      line: "よく出た言葉を「次回の合言葉」として一回だけ使うと参加しやすい"
+    });
+    const askTiming = { good: [], bad: [] };
+    if (positiveLean) {
+      askTiming.good.push("前向きなコメントが目立つ時間は、お礼や軽い案内が自然");
+    }
+    if (bestV > 2) {
+      askTiming.good.push("コメントの勢いがある時間は、短いお願いも空気が軽い");
+    }
+    if (giftUsers.length && endRetentionOk) {
+      askTiming.good.push("終盤まで反応が残りやすい回は、締めのお礼が効きやすい");
+    }
+    if (departedHeavySilence >= 2) {
+      askTiming.bad.push("静かな時間が「離脱向き」と読める区間では、お願いより雑談に戻す");
+    }
+    if (!positiveLean && neg > pos) {
+      askTiming.bad.push("不安や迷いの言い回しが目立つときは、支援の話より安心の話を先に");
+    }
+    if (newVisitorLean && fsTotal > 0 && fsQuick / fsTotal < 0.2) {
+      askTiming.bad.push("初見さんが多いのに 2 コメ目が伸びにくいときは、長いお願いより短い呼びかけを先に");
+    }
+    const caution = [];
+    if (!giftUsers.length && total > 30) {
+      caution.push("ギフト記録が無い回でも失敗ではないのだ。コメントの山や笑いの時間をまず探すのだ。");
+    }
+    if (giftUsers.length && total < 5) {
+      caution.push("ギフト記録はあるがコメント記録が少ない。結合の精度は参考程度に留めるのだ。");
+    }
+    const adviceSlice = {
+      hasGiftSignals: giftUsers.length > 0,
+      lowData,
+      departedSilenceHeavy: departedHeavySilence >= 2,
+      positiveLean,
+      giftFlowRows: giftFlow.length,
+      newVisitorLean,
+      endRetentionOk: Boolean(endRetentionOk)
+    };
+    return {
+      nextActions: nextActions.slice(0, 5),
+      supportWindows: supportWindows.slice(0, 6),
+      giftFlow,
+      onboarding,
+      clippingMoments: clippingMoments.slice(0, 8),
+      listenerRewards,
+      askTiming,
+      caution,
+      adviceSlice,
+      meta: {
+        streamStartAt: streamStart || null,
+        giftNote: "ギフトはストレージ上 userId ごとに 1 行で、時刻は初回検知に近い場合があるのだ。"
+      }
+    };
+  }
+  function buildReportMemoPayload(opts) {
+    const full = buildSupportGrowthInsights(opts);
+    return {
+      nextMemos: full.nextActions.slice(0, 3).map((a) => `${a.phase}: ${a.line}`),
+      highlights: full.clippingMoments.slice(0, 3).map((c) => ({
+        atLabel: c.atLabel,
+        reason: c.reason,
+        sampleLine: c.sampleLine
+      })),
+      thanksPoints: [
+        full.adviceSlice.hasGiftSignals ? "ギフト・投げに反応があった" : null,
+        full.supportWindows.length ? "盛り上がりの時間帯が読み取れた" : null,
+        full.onboarding.summaryLine ? "初見さんの入り方の傾向メモ" : null
+      ].filter(Boolean),
+      templates: full.onboarding.voiceExamples.slice(0, 4),
+      caution: full.caution
+    };
   }
 
   // src/lib/reportNextMemoSectionHtml.js
@@ -7589,11 +7045,11 @@ ${commenterFollowingListPanelHtml(analytics, r)}
 
   // src/lib/kiramekiAwardsSectionHtml.js
   var KIRAMEKI_AWARDS_CSS = `
-.kirameki-awards { margin: 2rem 0; }
-.kirameki-awards__heading { font-size: 1.4rem; margin-bottom: 0.4rem; color: #14171a; }
-.kirameki-awards__lead { color: #3a4046; font-size: 0.92rem; margin-bottom: 1.5rem; line-height: 1.6; }
-.kirameki-awards__group { margin-bottom: 1.5rem; }
-.kirameki-awards__group-label { font-size: 1.05rem; font-weight: 700; color: #1f2429; border-bottom: 2px solid #d4d8dd; padding-bottom: 0.3rem; margin-bottom: 0.8rem; }
+.kirameki-awards { margin: 2rem 0; grid-column: 1 / -1; }
+.kirameki-awards__heading { font-size: 1.4rem; margin-bottom: 0.4rem; color: #e2e8f0; }
+.kirameki-awards__lead { color: #94a3b8; font-size: 0.92rem; margin-bottom: 1.5rem; line-height: 1.6; }
+.kirameki-awards__group { margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 0 0.8rem; }
+.kirameki-awards__group-label { font-size: 1.05rem; font-weight: 700; color: #e2e8f0; border-bottom: 2px solid #334155; padding-bottom: 0.3rem; margin-bottom: 0.8rem; grid-column: 1 / -1; }
 .kirameki-award { background: #fafafa; border: 1px solid #d8dadd; border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; }
 .kirameki-award--all { background: linear-gradient(135deg, #fff4cc, #fff0e0); border-color: #f0b400; }
 .kirameki-award--daily { background: #eaf3ff; border-color: #5aa7e8; }
@@ -7801,22 +7257,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
     if (!s5) return "";
     if (s5.startsWith("ch")) return s5;
     return s5.startsWith("lv") ? s5 : `lv${s5}`;
-  }
-
-  // src/lib/parseInterestArrivalComment.js
-  var INTEREST_ARRIVAL_RE = new RegExp(
-    "^[\\u3000\\s]*「(.+?)」が好きな(\\d+)人が来場しました[\\u3000\\s]*$"
-  );
-  function parseInterestArrivalComment(text) {
-    if (typeof text !== "string") return null;
-    const trimmed = text.trim();
-    if (!trimmed) return null;
-    const m = trimmed.match(INTEREST_ARRIVAL_RE);
-    if (!m) return null;
-    const tag = m[1].trim();
-    const count = parseInt(m[2], 10);
-    if (!tag || !Number.isFinite(count) || count < 1) return null;
-    return { tag, count };
   }
 
   // src/lib/marketingAggregate.js
@@ -9364,6 +8804,7 @@ ${commenterFollowingListPanelHtml(analytics, r)}
     }
   }
   async function buildHtmlReportDocument(comments, snapshot, snapshotError, liveId, watchUrl, eventRankingModel, deps) {
+    const embed = deps.embedForMarketing === true;
     const exportedAtIso = (/* @__PURE__ */ new Date()).toISOString();
     const exportedAtJst = formatDateTime(Date.now());
     const safeLiveId = escapeHtml2(liveId);
@@ -10319,19 +9760,19 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   </head>
   <body>
     <div class="wrap">
-      <header class="hero">
+      ${embed ? "" : `<header class="hero">
         <h1>君斗りんくの追憶のきらめき HTMLレポート <span class="pill">${safeLiveId}</span></h1>
         <p>出力日時: ${escapeHtml2(exportedAtJst)} / ISO: ${escapeHtml2(exportedAtIso)}</p>
         <p class="mono">watch URL: ${safeWatchUrl}</p>
-      </header>
+      </header>`}
 
-      ${participationLeadHtml}
+      ${embed ? "" : participationLeadHtml}
 
-      ${sectionInterestArrival(participationSummaryReport)}
+      ${embed ? "" : sectionInterestArrival(participationSummaryReport)}
 
-      ${yukkuriReportHtml}
+      ${embed ? "" : yukkuriReportHtml}
 
-      ${eventRankingSectionHtml}
+      ${embed ? "" : eventRankingSectionHtml}
 
       <div class="search-box">
         <input id="q" type="search" placeholder="タイトル・配信者・タグ・メタ・script・コメントを横断検索（例: 珈琲 / まめ。２ / コーヒー / og:title）">
@@ -10341,24 +9782,24 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       <nav class="toc" aria-label="目次">
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
-          <li><a href="#sec-participation-lead">来場とコメント参加</a></li>
-          <li><a href="#mkt-interest-arrival">興味タグ別来場${participationSummaryReport?.interestArrivalSummary?.messageCount > 0 ? "" : "（検出 0件）"}</a></li>
-          <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
-          ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ""}
+          ${embed ? "" : `<li><a href="#sec-participation-lead">来場とコメント参加</a></li>
+          <li><a href="#mkt-interest-arrival">興味タグ別来場${participationSummaryReport?.interestArrivalSummary?.messageCount > 0 ? "" : "（検出 0件）"}</a></li>`}
+          ${embed ? "" : '<li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>'}
+          ${eventRankingSectionHtml && !embed ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ""}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
-          ${thumbedUsersSectionHtml ? '<li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>' : ""}
-          ${commenterFollowBlock.hasDirectory ? '<li><a href="#sec-commenter-follow">数値IDコメンター（フォロー情報）</a></li>' : ""}
-          ${commenterFollowBlock.hasAnalytics ? '<li><a href="#sec-commenter-follow-analytics">フォロー×コメント分析</a></li>' : ""}
+          ${thumbedUsersSectionHtml && !embed ? '<li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>' : ""}
+          ${commenterFollowBlock.hasDirectory && !embed ? '<li><a href="#sec-commenter-follow">数値IDコメンター（フォロー情報）</a></li>' : ""}
+          ${commenterFollowBlock.hasAnalytics && !embed ? '<li><a href="#sec-commenter-follow-analytics">フォロー×コメント分析</a></li>' : ""}
           <li><a href="#sec-self-comments">自分のコメント抜粋</a></li>
           <li><a href="#sec-all-comments">保存コメント一覧（CSV ダウンロードあり）</a></li>
-          <li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
-          <li><a href="#sec-tech-dump">ページの裏側データ（上級者向け）</a></li>
+          ${embed ? "" : `<li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
+          <li><a href="#sec-tech-dump">ページの裏側データ（上級者向け）</a></li>`}
         </ol>
       </nav>
 
-      ${nextMemoSectionHtml}
+      ${embed ? "" : nextMemoSectionHtml}
 
       <div class="grid">
         <section class="card" id="sec-overview">
@@ -10400,8 +9841,10 @@ ${commenterFollowingListPanelHtml(analytics, r)}
           <h2>ユーザー別（しおり集計）</h2>
           <table>
             <thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>累計字数</th><th>最新コメント</th></tr></thead>
-            <tbody>${roomRows.join("") || '<tr><td colspan="5">データなし</td></tr>'}</tbody>
+            <tbody>${(embed ? roomRows.slice(0, 50) : roomRows).join("") || '<tr><td colspan="5">データなし</td></tr>'}</tbody>
           </table>
+          ${// v0.1.1856: マーケに埋め込むときは51人目以降を畳む(畳んだ中のサムネは開くまで描かれない=スクロールが重くならない)
+    embed && roomRows.length > 50 ? `<details class="report-room-rest"><summary>残り ${roomRows.length - 50}人を見る</summary><table><thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>累計字数</th><th>最新コメント</th></tr></thead><tbody>${roomRows.slice(50).join("")}</tbody></table></details>` : ""}
         </section>
         <section class="card" id="sec-id-breakdown">
           <h2>内訳統計（無料）</h2>
@@ -10418,14 +9861,14 @@ ${commenterFollowingListPanelHtml(analytics, r)}
           </table>
         </section>
         ${kiramekiAwardsSectionHtml}
-        ${thumbedUsersSectionHtml}
-        ${commenterFollowBlock.directoryHtml}
-        ${commenterFollowBlock.analyticsHtml}
+        ${embed ? "" : thumbedUsersSectionHtml}
+        ${embed ? "" : commenterFollowBlock.directoryHtml}
+        ${embed ? "" : commenterFollowBlock.analyticsHtml}
       </div>
-      ${htmlReportConceptGuideCardHtml}
-      ${htmlReportSaveGuideCardHtml}
+      ${embed ? "" : htmlReportConceptGuideCardHtml}
+      ${embed ? "" : htmlReportSaveGuideCardHtml}
 
-      <section class="card" id="sec-share-meta" style="margin-top:12px;">
+      ${embed ? "" : `      <section class="card" id="sec-share-meta" style="margin-top:12px;">
         <h2>シェア・プレビュー向けの情報</h2>
         <p class="guide-lead">SNSやブラウザのプレビューに使われることが多い項目だけ、日本語の見出しに直して載せているのだ。</p>
         <table>
@@ -10459,7 +9902,7 @@ ${commenterFollowingListPanelHtml(analytics, r)}
             <tbody>${headNoopenerRows.join("") || '<tr><td colspan="2">取得なし</td></tr>'}</tbody>
           </table>
         </div>
-      </details>
+      </details>`}
 
       <section class="card" id="sec-self-comments" style="margin-top:12px;">
         <h2>自分のコメント抜粋（${selfPostedComments.length}件）</h2>
@@ -10522,7 +9965,7 @@ ${commenterFollowingListPanelHtml(analytics, r)}
         }
       })();
     <\/script>
-    ${commenterFollowBlock.embedScriptHtml}
+    ${embed ? "" : commenterFollowBlock.embedScriptHtml}
   </body>
 </html>`;
   }
@@ -19386,6 +18829,46 @@ ${sourceCol}
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.1857",
+      date: "2026-11-03",
+      summary: "メディアキットを配信者ごとに・さらに軽く",
+      items: Object.freeze([
+        "マーケHTMLのメディアキットが、このPCで記録した配信を配信者に関係なく全部まとめていたので、ほかの配信者の数字(フォロワーの増減・配信頻度・応援者)が混ざっていました。今の配信の配信者の配信だけで集計するようにしました。",
+        "メディアキットで30日・60日・90日の数字が同じになるときは、同じ列を並べずに1列だけ出すようにしました。「この配信を支えた応援者たち」の見出しが白い字で見えなかったのも直しました。",
+        "マーケHTMLを開いたあと、手が空いたときに章を1つずつ描いておくようにしました。スクロールで章が画面に入るたびに描き直していたのがなくなり、さらに軽くなります。"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.1856",
+      date: "2026-11-03",
+      summary: "マーケHTMLのスクロールを軽く",
+      items: Object.freeze([
+        "マーケHTMLのスクロールが重かったのを軽くしました。ページに埋め込んだ顔の絵(900枚以上)をスクロールのたびに読み直していたので、最初に1回だけ読むようにしました。",
+        "人の一覧(視聴維持率・応援者・ユーザー別)は上位50人だけ最初に出し、残りは「残り N人を見る」を押すと開くようにしました。応援者の検索は残りの人も探します。"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.1855",
+      date: "2026-11-03",
+      summary: "拡張の更新後に F5 しなくても動くように",
+      items: Object.freeze([
+        "拡張が新しい版に入れ替わった後、開いたままの放送ページが古い版のまま止まり(会場に「拡張が更新されました。ページを再読み込み(F5)してください」)、読み上げや人のカードの発言一覧が動かなくなることがありました。止まったことにページ自身が気づいて、自動で読み込み直すようにしました。コメントを打ちかけている間は待ちます。",
+        "拡張が入れ替わったときの放送タブの読み込み直しを、ほかの準備が長引いても待たずに行うようにしました。",
+        "人のカードを押したときの発言一覧で、記録を読めなかったのに「この配信のコメントの記録はありません」と言い切っていたのを直しました。読めなかった理由を出し、マウスを乗せたときと同じ直近の発言を代わりに出します。"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.1854",
+      date: "2026-11-03",
+      summary: "マーケを1つに・視聴維持率を追加",
+      items: Object.freeze([
+        "「HTML」ボタンの中身(コメント全文の検索・CSV・ユーザー別・自分のコメントなど)をマーケのレポートの1章に入れ、保存のボタンを「マーケHTML」1つにまとめました。マーケ分析・メディアキット・コメント記録が全部1つのHTMLに入ります(「共有用に伏せる」のときはコメント記録の章は入れません)。",
+        "マーケのレポートに「視聴維持率(最後まで見たか・推定)」を足しました。コメントした人ひとりずつ、最後まで見ていたか・配信の何%を見ていたかを出し、全体では「最後まで見た人の割合」「始まりから最後まで見た人の割合」を出します。ニコ生は入退室を公開していないので、コメントの時刻からの推定です(推定の根拠もレポートに書いてあります)。",
+        "マーケのレポートから定型文を外し、数字だけにしました。キャラの案内・作戦会議・声かけ例・お返し・お願いの出しどころ・次枠メモ・機能一覧・この拡張について・キャラガイドは出しません。データが無い表(「—」だけの表や全部0の表)と同接が取れていないときの同接の章も出しません。",
+        "マーケのレポートを画面の幅いっぱいに広げ、フォロー層は名前が1行で読める表に、トップコメンターは名前とバーが崩れない並びにしました。コメント記録の章も全幅になり、きらめきの賞は横に並ぶようにしました。"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.1852",
       date: "2026-11-03",
       summary: "GPU の案内をポップアップにも・会場で読みやすく",
@@ -19514,40 +18997,6 @@ ${sourceCol}
       summary: "アプリのコメントに顔アイコンを出す",
       items: Object.freeze([
         "iPhone アプリの「💬 コメントを流す」で、コメントの横にその人のアイコンを出すようにしました。アイコン未設定の人と匿名の人は、その人ごとのゆっくり顔になります。名前を押すとニコニコのユーザーページが開きます。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1834",
-      date: "2026-10-31",
-      summary: "アプリでコメントの接続が止められていたのを直す",
-      items: Object.freeze([
-        "iPhone アプリの「💬 コメントを流す」で、ページの安全設定がニコニコへの接続(WebSocket)まで止めてしまい、つながらない状態でした。ニコニコの接続先だけを許可して、受け取れるようにしました。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1833",
-      date: "2026-10-29",
-      summary: "読み上げの音質を選べるように",
-      items: Object.freeze([
-        "設定に「読み上げの音質」を足しました。標準(今までどおり)と高音質から選べます。高音質は声が少しくっきりしますが、作るのに時間がかかるので、グラボのある速いPC向けです。",
-        "既定は標準のままです。変えると、会場・コメビュ・スマホへ送る声のどれも次の声から切り替わります。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1832",
-      date: "2026-10-29",
-      summary: "席が無い人の吹き出しを診断の上に出し名前も",
-      items: Object.freeze([
-        "会場で、席が無い人の吹き出しがほとんど「①の診断」の行の上に重なって出ていたのを直しました。診断の行が見えているときは、その上に出します。",
-        "席が無い人や一覧の外にいる人の吹き出しの名前が「コメント」とだけ出ていたのを、席と同じ「匿名NNN」(名前がある人は名前)で出すようにしました。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1831",
-      date: "2026-10-28",
-      summary: "視聴ページの確認用ログを毎回出さない",
-      items: Object.freeze([
-        "パネルの描画のたびに、確認用の大きな記録（約5KB）を視聴ページのコンソールへ自動で出し続けていました。必要なときだけ手で呼べるようにして、自動では出さないようにしました。"
       ])
     })
   ]);
@@ -45631,7 +45080,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T13:54" ? String("yt-2026-11-03T13:54") : "dev";
+      const buildId = "yt-2026-11-03T13:57" ? String("yt-2026-11-03T13:57") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45649,7 +45098,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.8") : "";
+    const bundledVersion = true ? String("0.1.9") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45694,7 +45143,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T13:54" ? String("yt-2026-11-03T13:54") : "dev";
+            return "yt-2026-11-03T13:57" ? String("yt-2026-11-03T13:57") : "dev";
           } catch {
             return "dev";
           }

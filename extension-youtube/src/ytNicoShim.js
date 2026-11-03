@@ -31,6 +31,8 @@ const GIFT_KEY_PREFIXES = /** @type {Array<[string, string]>} */ ([
 // ---- 1. 起動モード(popup-entry が読み込み時に location.search を読むので、先に書いておく) ----
 try {
   const u = new URL(window.location.href);
+  // サイドパネル(sidepanel.html)だけ。マーケ等の別ページは自分の URL のまま動かす
+  if (!/\/sidepanel\.html$/.test(u.pathname)) throw new Error('not_sidepanel');
   if (u.searchParams.get('inline') !== '1' || u.searchParams.get('dock') !== 'sidepanel') {
     u.searchParams.set('inline', '1');
     u.searchParams.set('dock', 'sidepanel');
