@@ -43,6 +43,7 @@ describe('mergeYtStreamSummary', () => {
       peakConcurrentViewers: null,
       chatFilterLabel: 'すべてのチャット',
       itemCount: 120,
+      startedAt: null,
       createdAt: t0,
       updatedAt: t0,
     });
@@ -219,5 +220,16 @@ describe('applyYtStreamIncrementalItems（1万件配信対応の差分更新）'
     expect(resDelta.addedByLane.rinku.map((x) => x.id)).toEqual(['msg-10003']);
     expect(state.laneDisplay.tanunee[0].id).toBe('msg-10001');
     expect(state.laneDisplay.tanunee).toHaveLength(YT_SIDE_PANEL_DISPLAY_LIMIT);
+  });
+});
+
+describe('mergeYtStreamSummary の配信開始時刻', () => {
+  it('ページの開始時刻を覚え、次に来なくても前の値を残す', async () => {
+    const { mergeYtStreamSummary } = await import('./ytStreamStorePolicy.js');
+    const a = mergeYtStreamSummary(undefined, { videoId: 'v', startedAt: 1781434926000 }, 1793000000000);
+    expect(a.startedAt).toBe(1781434926000);
+    const b = mergeYtStreamSummary(a, { videoId: 'v' }, 1793000005000);
+    expect(b.startedAt).toBe(1781434926000);
+    expect(b.createdAt).toBe(1793000000000);
   });
 });
