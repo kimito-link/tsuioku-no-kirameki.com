@@ -264,6 +264,9 @@ export function extractAuthorIconUrl(el) {
   return '';
 }
 
+/** 同時視聴としてあり得る上限(これを超える数は読み違いとして捨てる) */
+const YT_MAX_PLAUSIBLE_VIEWERS = 50_000_000;
+
 /**
  * YouTube 視聴ページ（`/watch`）の視聴人数テキスト（例: `"1,234 人が視聴中"`, `"1.2万 人が視聴中"`, `"3,456 watching now"`）から
  * 同時接続数（整数）を抽出する。該当しない文字列や異常値の場合は `null` を返す（AGENTS.md §3.6 fail-soft）。
@@ -271,9 +274,6 @@ export function extractAuthorIconUrl(el) {
  * @param {string} rawText
  * @returns {number | null}
  */
-/** 同時視聴としてあり得る上限(これを超える数は読み違いとして捨てる) */
-const YT_MAX_PLAUSIBLE_VIEWERS = 50_000_000;
-
 export function extractYtWatchConcurrentViewersFromText(rawText) {
   if (typeof rawText !== 'string' || !rawText.trim()) return null;
   const normalized = rawText

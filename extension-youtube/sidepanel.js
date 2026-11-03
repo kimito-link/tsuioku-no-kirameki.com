@@ -911,68 +911,6 @@
     };
   }
 
-  // src/lib/youtube/ytUserLaneTiers.js
-  var YT_USER_LANE_TIER_KEYS = Object.freeze(["link", "gift", "member", "konta", "tanu"]);
-  var UC_RE = /^UC[A-Za-z0-9_-]{22}$/;
-  function hasRealIcon(u) {
-    const s = String(u?.iconUrl || "").trim();
-    return /^https:\/\//i.test(s);
-  }
-  function hasRealName(u) {
-    const n = String(u?.name || "").trim();
-    return n !== "" && n !== String(u?.channelId || "").trim();
-  }
-  function classifyYtUserLaneTier(u) {
-    if (!u || typeof u !== "object") return "tanu";
-    const paid = Number(u.superchatCount || 0) + Number(u.stickerCount || 0);
-    if (paid > 0) return "gift";
-    if (Number(u.giftCount || 0) > 0 || Number(u.membershipCount || 0) > 0 || u.isMember === true) {
-      return "member";
-    }
-    const hasId = UC_RE.test(String(u.channelId || ""));
-    const icon = hasRealIcon(u);
-    const name = hasRealName(u);
-    if (hasId && icon && name) return "link";
-    if (hasId && (icon || name)) return "konta";
-    return "tanu";
-  }
-  function buildYtUserLaneTiers(commenters, opts = {}) {
-    const limit = Math.max(1, Math.floor(Number(opts.limitPerTier) || 60));
-    const all = { link: [], gift: [], member: [], konta: [], tanu: [] };
-    const seen = /* @__PURE__ */ new Set();
-    const list = Array.isArray(commenters) ? commenters : [];
-    for (const u of list) {
-      if (!u || typeof u !== "object") continue;
-      const key = String(u.channelId || u.name || "").trim();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      all[classifyYtUserLaneTier(u)].push(u);
-    }
-    const byRecent = (a, b) => Number(b.lastTs || 0) - Number(a.lastTs || 0);
-    all.gift.sort((a, b) => {
-      const d = Number(b.superchatTotalAmount || 0) - Number(a.superchatTotalAmount || 0);
-      return d !== 0 ? d : byRecent(a, b);
-    });
-    all.member.sort((a, b) => {
-      const d = Number(b.giftCount || 0) + Number(b.membershipCount || 0) - (Number(a.giftCount || 0) + Number(a.membershipCount || 0));
-      return d !== 0 ? d : byRecent(a, b);
-    });
-    all.link.sort(byRecent);
-    all.konta.sort(byRecent);
-    all.tanu.sort(byRecent);
-    const tiers = {};
-    const totals = {};
-    let displayed = 0;
-    let total = 0;
-    for (const k of YT_USER_LANE_TIER_KEYS) {
-      totals[k] = all[k].length;
-      tiers[k] = all[k].slice(0, limit);
-      displayed += tiers[k].length;
-      total += all[k].length;
-    }
-    return { tiers, totals, displayed, total };
-  }
-
   // src/lib/commentVelocityTimeline.js
   function collectValidSorted(comments) {
     const list = Array.isArray(comments) ? comments : [];
@@ -1508,6 +1446,1847 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     });
   }
 
+  // src/shared/html/escape.js
+  function escapeHtml2(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function escapeAttr(s) {
+    return escapeHtml2(s);
+  }
+
+  // src/lib/deriveAvatarUrlFromUid.js
+  var AVATAR_HOST = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
+  function deriveAvatarUrlFromUid(uid, size = "s") {
+    const numUid = normalizeUid(uid);
+    if (numUid == null) return "";
+    const dirNum = Math.floor(numUid / 1e4);
+    const sz = size === "m" ? "m" : "s";
+    return `${AVATAR_HOST}/${sz}/${dirNum}/${numUid}.jpg`;
+  }
+  function normalizeUid(uid) {
+    if (uid == null) return null;
+    if (typeof uid === "number") {
+      if (!Number.isFinite(uid) || uid < 0 || !Number.isInteger(uid)) return null;
+      return uid;
+    }
+    if (typeof uid === "string") {
+      const t = uid.trim();
+      if (!/^[0-9]+$/.test(t)) return null;
+      const n = Number(t);
+      if (!Number.isFinite(n) || n < 0) return null;
+      return n;
+    }
+    return null;
+  }
+
+  // src/lib/supportGrowthTileSrc.js
+  function isHttpOrHttpsUrl(url) {
+    const s = String(url || "").trim();
+    return /^https?:\/\//i.test(s);
+  }
+  function niconicoDefaultUserIconUrl(userId) {
+    const s = String(userId || "").trim();
+    if (!/^\d{5,14}$/.test(s)) return "";
+    const n = Number(s);
+    if (!Number.isFinite(n) || n < 1) return "";
+    return deriveAvatarUrlFromUid(s);
+  }
+  function isAnonymousStyleNicoUserId(userId) {
+    const s = String(userId || "").trim();
+    if (!s) return true;
+    if (/^\d{5,14}$/.test(s)) return false;
+    if (/^a:/i.test(s)) return true;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
+    return true;
+  }
+  function pickSupportGrowthFallbackTileSrc(userId, httpCandidate, yukkuriSrc, tvSrc) {
+    if (isHttpOrHttpsUrl(httpCandidate)) {
+      return String(httpCandidate).trim();
+    }
+    const y = String(yukkuriSrc || "").trim();
+    const t = String(tvSrc || "").trim();
+    if (isAnonymousStyleNicoUserId(userId)) {
+      return t || y;
+    }
+    const syn = niconicoDefaultUserIconUrl(userId);
+    if (isHttpOrHttpsUrl(syn)) return syn;
+    return y || t;
+  }
+
+  // src/lib/nicoAnonymousDisplay.js
+  var NICO_HASHED_ANON_USER_ID_RE = /^[A-Za-z0-9_-]{16,40}$/;
+  function isNiconicoHashedAnonymousUserId(userId) {
+    const s = String(userId ?? "").trim();
+    if (!s) return false;
+    if (s.startsWith("__")) return false;
+    if (/^\d+$/.test(s)) return false;
+    return NICO_HASHED_ANON_USER_ID_RE.test(s);
+  }
+  function isNiconicoAnonymousUserId(userId) {
+    const s = String(userId ?? "").trim();
+    if (/^a:/i.test(s)) {
+      const rest = s.slice(2).trim();
+      return rest.length >= 2;
+    }
+    return isNiconicoHashedAnonymousUserId(s);
+  }
+  function isNiconicoAutoUserPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return /^user\s+[A-Za-z0-9]+$/i.test(n);
+  }
+  function isNiconicoGuestPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return n === "ゲスト";
+  }
+  function anonymousNicknameFallback(userId, nickname) {
+    const nick = String(nickname ?? "").trim();
+    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
+    if (nick && !isPlaceholder) return nick;
+    return isNiconicoAnonymousUserId(userId) ? "匿名" : "";
+  }
+
+  // src/lib/userRooms.js
+  var UNKNOWN_USER_KEY = "__unknown__";
+  function shortUserKeyDisplay(userKey) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) return "";
+    const s = String(userKey);
+    return s.length <= 18 ? s : `${s.slice(0, 8)}…${s.slice(-6)}`;
+  }
+  function displayUserLabel(userKey, nickname) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) {
+      return "ID未取得（DOMに投稿者情報なし）";
+    }
+    const name = anonymousNicknameFallback(userKey, nickname);
+    const shortId = shortUserKeyDisplay(userKey);
+    if (name) return `${name}（${shortId}）`;
+    return shortId;
+  }
+
+  // src/lib/userSupportGridAccent.js
+  var ACCENT_OKLCH_LIGHT = Object.freeze([
+    "oklch(0.52 0.13 264)",
+    "oklch(0.58 0.12 230)",
+    "oklch(0.52 0.12 150)",
+    "oklch(0.62 0.14 85)",
+    "oklch(0.54 0.16 25)",
+    "oklch(0.52 0.14 310)",
+    "oklch(0.62 0.14 50)",
+    "oklch(0.56 0.02 264)"
+  ]);
+  var ACCENT_OKLCH_DARK = Object.freeze([
+    "oklch(0.78 0.09 264)",
+    "oklch(0.82 0.08 230)",
+    "oklch(0.78 0.09 150)",
+    "oklch(0.84 0.10 85)",
+    "oklch(0.79 0.11 25)",
+    "oklch(0.78 0.09 310)",
+    "oklch(0.84 0.10 50)",
+    "oklch(0.78 0.03 264)"
+  ]);
+  var ACCENT_HEX_LIGHT = Object.freeze([
+    "#375ca8",
+    "#0f8ab8",
+    "#217a4a",
+    "#c9a227",
+    "#c43c4f",
+    "#8f3d8c",
+    "#d9781a",
+    "#6b6f7a"
+  ]);
+  var ACCENT_HEX_DARK = Object.freeze([
+    "#8eb7ff",
+    "#6fd4f5",
+    "#5ecd8f",
+    "#e8cf5a",
+    "#ff8a9d",
+    "#d896ff",
+    "#ffb366",
+    "#b4b8c4"
+  ]);
+  function fnv1a32(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+  function accentSlotFromUserKey(userKey) {
+    const k = String(userKey || "").trim();
+    if (!k || k === UNKNOWN_USER_KEY) return null;
+    return fnv1a32(k) % 8;
+  }
+  function accentColorForSlot(slot, colorScheme) {
+    if (!Number.isInteger(slot) || slot < 0 || slot > 7) return null;
+    const pal = colorScheme === "dark" ? ACCENT_HEX_DARK : ACCENT_HEX_LIGHT;
+    return pal[slot] ?? null;
+  }
+
+  // src/lib/giftDisplayNickname.js
+  function isLikelyInternalNdgGiftOrCampaignLabel(s) {
+    const t = String(s || "").trim();
+    if (!t) return false;
+    if (/^nicolive_/i.test(t)) return true;
+    if (/^stamp_[a-z0-9_]{2,}$/i.test(t)) return true;
+    let hasNonAscii = false;
+    for (let i = 0; i < t.length; i += 1) {
+      if (t.charCodeAt(i) > 127) {
+        hasNonAscii = true;
+        break;
+      }
+    }
+    if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
+    if (/unei_niconico/i.test(t)) return true;
+    if (/^\d{4,}[_a-z][a-z0-9_]{8,}$/i.test(t) && !hasNonAscii) return true;
+    return false;
+  }
+  function stripNicknameC0ControlsExceptTabLfCr(s) {
+    let out = "";
+    for (const ch of s) {
+      const cp = (
+        /** @type {number} */
+        ch.codePointAt(0)
+      );
+      if (cp <= 31 && cp !== 9 && cp !== 10 && cp !== 13) continue;
+      out += ch;
+    }
+    return out;
+  }
+  function scrubGiftRankingNickname(raw) {
+    const trimmed = stripNicknameC0ControlsExceptTabLfCr(String(raw ?? "")).replace(/\u200B|\uFEFF/g, "").trim();
+    if (!trimmed) return "";
+    if (isLikelyInternalNdgGiftOrCampaignLabel(trimmed)) return "";
+    if (/^[.\u2026\u2022\u22EF\u30FB\u3000⋯‥・\s]{1,32}$/u.test(trimmed)) {
+      return "";
+    }
+    const fffdMatches = trimmed.match(/\uFFFD/gu);
+    const ffdc = fffdMatches ? fffdMatches.length : 0;
+    if (ffdc > 0 && ffdc / trimmed.length > 0.2) return "";
+    let bad = 0;
+    for (const ch of trimmed) {
+      const cp = (
+        /** @type {number} */
+        ch.codePointAt(0)
+      );
+      if (cp === 65533 || cp < 32 || cp >= 55296 && cp <= 57343) bad += 1;
+      else if (cp >= 57344 && cp <= 63743) bad += 1;
+    }
+    if (bad / trimmed.length > 0.35) return "";
+    return trimmed;
+  }
+  function formatNicknameWithUidFallback(userId, resolvedNickname) {
+    const nick = String(resolvedNickname || "").trim();
+    if (nick) return nick;
+    const uid = String(userId || "").trim();
+    if (!uid) return "";
+    if (isNiconicoAnonymousUserId(uid)) return "";
+    if (/^\d+$/.test(uid)) return `u/${uid}`;
+    return `u/${uid.slice(0, 20)}`;
+  }
+
+  // src/lib/topSupportRankStripLines.js
+  function isOfficialDomRankUserKey(userKey) {
+    return /^__(?:anon_)?(?:ad|contrib)_\d+/.test(String(userKey || ""));
+  }
+  function isAnonymousOfficialDomRankUserKey(userKey) {
+    return /^__anon_(?:ad|contrib)_\d+/.test(String(userKey || ""));
+  }
+  function isSyntheticGiftSenderKey(userKey) {
+    return /^__(?:anon_gift|gift)_/.test(String(userKey || ""));
+  }
+  var OFFICIAL_RANK_ANON_LABEL = "名無し";
+  function shortDeterministicHash(s) {
+    let h = 5381;
+    const str = String(s || "");
+    for (let i = 0; i < str.length; i += 1) {
+      h = (h << 5) + h + str.charCodeAt(i) >>> 0;
+    }
+    return h.toString(36);
+  }
+  function officialDomRankBadgeThumb(placeNumber, userKey) {
+    const n = typeof placeNumber === "number" && Number.isFinite(placeNumber) && placeNumber > 0 ? String(Math.floor(placeNumber)) : "—";
+    const uniq = shortDeterministicHash(userKey);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" role="img"><title>順位${n} 未取得 ${uniq}</title><rect width="48" height="48" rx="11" fill="#e7e9ec"/><text x="24" y="25" font-family="sans-serif" font-size="17" font-weight="700" fill="#8b95a1" text-anchor="middle">${n}</text><text x="24" y="38" font-family="sans-serif" font-size="8" fill="#aab2bc" text-anchor="middle">未取得</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }
+  function topSupportRankLineModels(stripRooms, opts) {
+    const defaultThumb = String(opts?.defaultThumbSrc || "").trim();
+    const anonThumb = String(opts?.anonymousFallbackThumbSrc || "").trim();
+    const colorScheme = opts?.colorScheme === "dark" ? "dark" : "light";
+    const placeMode = opts?.placeNumberMode === "dense" ? "dense" : "row";
+    const idnResolver = typeof opts?.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : null;
+    const rooms = Array.isArray(stripRooms) ? stripRooms : [];
+    const officialRankUrlFreq = /* @__PURE__ */ new Map();
+    for (const rr of rooms) {
+      if (!isOfficialDomRankUserKey(String(rr?.userKey ?? ""))) continue;
+      const u = String(rr?.avatarUrl || "").trim();
+      if (!u || !isHttpOrHttpsUrl(u)) continue;
+      officialRankUrlFreq.set(u, (officialRankUrlFreq.get(u) || 0) + 1);
+    }
+    let knownRank = 0;
+    let denseRank = 0;
+    let denseLastCount = null;
+    return rooms.map((r) => {
+      const userKey = String(r?.userKey ?? "");
+      const isUnknown = userKey === UNKNOWN_USER_KEY;
+      const count = Math.max(0, Number(r?.count) || 0);
+      const rankHintRaw = r?.rankHint;
+      const rankHint = typeof rankHintRaw === "number" && Number.isFinite(rankHintRaw) && rankHintRaw > 0 ? Math.floor(rankHintRaw) : null;
+      let placeNumber;
+      if (isUnknown) {
+        placeNumber = null;
+      } else if (rankHint != null) {
+        placeNumber = rankHint;
+      } else if (placeMode === "dense") {
+        if (denseLastCount === null || count < denseLastCount) {
+          denseRank += 1;
+          denseLastCount = count;
+        }
+        placeNumber = denseRank;
+      } else {
+        knownRank += 1;
+        placeNumber = knownRank;
+      }
+      const rawAv = String(r?.avatarUrl || "").trim();
+      const uidForThumb = isUnknown ? "" : userKey;
+      const isOfficialRank = isOfficialDomRankUserKey(userKey);
+      const rawAvDuplicatedOfficial = isOfficialRank && isHttpOrHttpsUrl(rawAv) && (officialRankUrlFreq.get(rawAv) || 0) >= 2;
+      let thumbSrc = "";
+      if (isHttpOrHttpsUrl(rawAv) && !rawAvDuplicatedOfficial) {
+        thumbSrc = String(rawAv).trim();
+      } else if (isOfficialRank) {
+        thumbSrc = officialDomRankBadgeThumb(placeNumber, userKey);
+      } else if (idnResolver && uidForThumb && isAnonymousStyleNicoUserId(uidForThumb)) {
+        const idn = String(idnResolver(uidForThumb) || "").trim();
+        thumbSrc = idn ? idn : pickSupportGrowthFallbackTileSrc(
+          uidForThumb,
+          rawAv,
+          defaultThumb,
+          anonThumb || defaultThumb
+        );
+      } else {
+        thumbSrc = pickSupportGrowthFallbackTileSrc(
+          uidForThumb,
+          rawAv,
+          defaultThumb,
+          anonThumb || defaultThumb
+        );
+      }
+      const thumbNeedsNoReferrer = isHttpOrHttpsUrl(thumbSrc);
+      const nickRaw = scrubGiftRankingNickname(String(r?.nickname ?? ""));
+      const hideIdLine = Boolean(r?.hideIdLine);
+      const useOfficialDomNick = /^__(ad|contrib)_\d+_/i.test(userKey) && Boolean(nickRaw);
+      const isAnonOfficialDomRank = isAnonymousOfficialDomRankUserKey(userKey) || isOfficialRank && !useOfficialDomNick;
+      const resolvedNickForLine = useOfficialDomNick ? nickRaw : isAnonOfficialDomRank ? OFFICIAL_RANK_ANON_LABEL : anonymousNicknameFallback(userKey, nickRaw);
+      const isSyntheticGift = isSyntheticGiftSenderKey(userKey);
+      const idTitle = isUnknown || isAnonOfficialDomRank || useOfficialDomNick || isSyntheticGift || hideIdLine ? "" : String(r.userKey);
+      let idShort = isUnknown ? "—" : useOfficialDomNick || isAnonOfficialDomRank || isSyntheticGift || hideIdLine ? "" : shortUserKeyDisplay(userKey) || String(userKey);
+      const nameLine = isUnknown ? "—" : isAnonOfficialDomRank ? OFFICIAL_RANK_ANON_LABEL : formatNicknameWithUidFallback(userKey, resolvedNickForLine) || "（未取得）";
+      if (!isUnknown && !useOfficialDomNick && idShort) {
+        const m = /^__anon_(.+)$/i.exec(String(userKey));
+        if (m && String(nameLine).trim() === String(m[1]).trim()) {
+          idShort = "";
+        }
+      }
+      const fullLabelForTitle = isAnonOfficialDomRank ? OFFICIAL_RANK_ANON_LABEL : useOfficialDomNick ? nickRaw : isSyntheticGift ? (
+        // ギフト合成キーは title にも内部キーを出さず nickname のみ（空なら「名無し」）
+        String(r?.nickname || "").trim() || "名無し"
+      ) : displayUserLabel(userKey, r?.nickname);
+      let hasAccent = false;
+      let accentColorCss = null;
+      if (!isUnknown) {
+        const slot = accentSlotFromUserKey(userKey);
+        const col = slot != null ? accentColorForSlot(slot, colorScheme) : null;
+        if (col) {
+          hasAccent = true;
+          accentColorCss = col;
+        }
+      }
+      return {
+        count,
+        userKey,
+        isUnknown,
+        placeNumber,
+        hasAccent,
+        accentColorCss,
+        thumbSrc,
+        thumbNeedsNoReferrer,
+        idTitle,
+        idShort,
+        nameLine,
+        fullLabelForTitle
+      };
+    });
+  }
+
+  // src/lib/storyTileTvStyle.js
+  function storyTileUsesYukkuriTvStyle(requestedSrc, displaySrc) {
+    const r = String(requestedSrc == null ? "" : requestedSrc);
+    const d = String(displaySrc == null ? "" : displaySrc);
+    return r.includes("yukkuri-charactore-english") || d.includes("yukkuri-charactore-english");
+  }
+
+  // src/lib/commentTickerLatestHtml.js
+  function buildCommentTickerLatestHtml(input) {
+    const label = String(input?.label ?? "");
+    const avatarSrc = String(input?.avatarSrc ?? "");
+    const textShown = String(input?.textShown ?? "");
+    const userPageHref = String(input?.userPageHref ?? "");
+    const labelHtml = label ? `<span class="nl-ticker-latest__name">${escapeHtml2(label)}</span><span class="nl-ticker-latest__colon">：</span>` : "";
+    const rowInnerHtml = `<span class="nl-ticker-latest__row"><img class="nl-ticker-latest__avatar" alt="" src="${escapeHtml2(avatarSrc)}" data-on-error-fallback="blank">` + labelHtml + `<span class="nl-ticker-latest__text">${escapeHtml2(textShown)}</span></span>`;
+    return userPageHref ? `<a class="nl-ticker-item nl-ticker-latest nl-ticker-latest--linkable" aria-live="polite" href="${escapeAttr(userPageHref)}" target="_blank" rel="noopener noreferrer">${rowInnerHtml}</a>` : `<span class="nl-ticker-item nl-ticker-latest" aria-live="polite">${rowInnerHtml}</span>`;
+  }
+
+  // src/lib/supportVisualStoryCopy.js
+  var SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL = "詳しい状況（開発・切り分け用）";
+  function buildStoryUserLaneStackAriaLabel(laneDisplayedSlots) {
+    const n = Math.max(0, Math.floor(Number(laneDisplayedSlots) || 0));
+    return `最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）合計${n}件`;
+  }
+
+  // src/lib/timeAuthority.js
+  var VALUE_FRESH_MS = 3 * 60 * 1e3;
+
+  // src/lib/giftDeltaFallback.js
+  var GIFT_DELTA_TIER_THRESHOLDS = Object.freeze({
+    medium: 50,
+    large: 500,
+    mega: 5e3
+  });
+
+  // src/lib/liveGiftPulse.js
+  var PULSE_MAX_GAP_MS = 15 * 6e4;
+  var EMPTY_PULSE = Object.freeze({ byKey: /* @__PURE__ */ new Map(), sum: 0, spanMs: 0, top: null, tier: null });
+  function formatPtDelta(d) {
+    const n = Math.floor(Number(d) || 0);
+    return n > 0 ? `+${n.toLocaleString("ja-JP")}pt` : "";
+  }
+  function formatCountDelta(d) {
+    const n = Math.floor(Number(d) || 0);
+    return n > 0 ? `+${n.toLocaleString("ja-JP")}件` : "";
+  }
+
+  // src/lib/laneTileStats.js
+  function positiveOrNull(n) {
+    const v = Math.floor(Number(n));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }
+  var STATS_TEXT_CACHE_MAX = 5e3;
+  var statsTextCache = /* @__PURE__ */ new Map();
+  function formatLaneTileStats(stats) {
+    if (!stats || typeof stats !== "object") return "";
+    const g = positiveOrNull(stats.giftPt);
+    const a = positiveOrNull(stats.adPt);
+    const c = positiveOrNull(stats.commentCount);
+    if (g == null && a == null && c == null) return "";
+    const key = `${g ?? ""}|${a ?? ""}|${c ?? ""}`;
+    const hit = statsTextCache.get(key);
+    if (hit !== void 0) return hit;
+    const parts = [];
+    if (g != null) parts.push(`🎁${formatNumberJa(g)}`);
+    if (a != null) parts.push(`📣${formatNumberJa(a)}`);
+    if (c != null) parts.push(`💬${formatNumberJa(c)}`);
+    const out = parts.join(" ");
+    if (statsTextCache.size >= STATS_TEXT_CACHE_MAX) statsTextCache.clear();
+    statsTextCache.set(key, out);
+    return out;
+  }
+  function laneTileStatsLegendText() {
+    return "🎁📣は公式の公開pt・💬は拡張が記録した件数";
+  }
+  function formatLaneTilePulse(pulse) {
+    const gift = formatPtDelta(pulse && pulse.giftDelta);
+    if (gift) return { text: gift, kind: "gift", tier: String(pulse && pulse.giftTier || "") };
+    const hot = formatCountDelta(pulse && pulse.heat);
+    if (hot) return { text: hot, kind: "hot", tier: String(pulse && pulse.heatTier || "") };
+    return { text: "", kind: "", tier: "" };
+  }
+
+  // src/lib/storyUserLaneGuideHtml.js
+  function guideCountSpan(count) {
+    if (typeof count !== "number" || !Number.isFinite(count) || count < 0) return "";
+    return `<span class="nl-story-userlane-guide__count">${Math.floor(count)}人</span>`;
+  }
+  function storyUserLaneGuideLine(src, textEscaped, count) {
+    return `<div class="nl-story-userlane-guide__line"><img class="nl-story-userlane-guide__face" src="${escapeAttr(src)}" alt="" width="24" height="24" decoding="async" /><span class="nl-story-userlane-guide__text">${textEscaped}${guideCountSpan(count)}</span></div>`;
+  }
+  function buildStoryUserLaneGuideTopHtml(faceLink, count) {
+    return storyUserLaneGuideLine(
+      faceLink,
+      escapeHtml2(
+        "りんく: 数値ユーザーID＋個人サムネが揃った応援だけ、この列に載せるよ。匿名（a:）はカスタム表示名やサムネが見えていても上には出さず、下の段に流す設計だよ。"
+      ),
+      count
+    );
+  }
+  function buildStoryUserLaneGuideGiftHtml(faceGift, count) {
+    return storyUserLaneGuideLine(
+      faceGift,
+      escapeHtml2(
+        "ギフト列: この放送でギフトを投げた人を、数値ユーザーIDで記録できた順に並べるよ。個人サムネが取れている人はその画像、まだの人はゆっくり画像で表示するよ。"
+      ),
+      count
+    );
+  }
+  function buildStoryUserLaneGuideAdHtml(faceAd, count) {
+    return storyUserLaneGuideLine(
+      faceAd,
+      escapeHtml2(
+        "広告列: 公式のニコニ広告ランキング（この放送の貢献度順）から広告主を並べるよ。数値ユーザーIDが取れた人は個人サムネ（無ければゆっくり画像）で、ID無しの匿名広告も広告主名で表示するよ。"
+      ),
+      count
+    );
+  }
+  function buildStoryUserLaneGuideKontaHtml(faceKonta, count) {
+    return storyUserLaneGuideLine(
+      faceKonta,
+      escapeHtml2(
+        "こん太: 2番目の優先として、数値IDのアカウントで表示名か個人サムネのどちらかまで取れた人は、その次の段として並びやすいよ。ニコの匿名ID（a: 形式）はここには載せず、りんく条件を満たすときだけりんく、それ以外はたぬ姉側だよ。"
+      ),
+      count
+    );
+  }
+  function buildStoryUserLaneGuideTanuHtml(faceTanu, count) {
+    return storyUserLaneGuideLine(
+      faceTanu,
+      escapeHtml2(
+        `たぬ姉: 匿名（a:）の応援、表示名やサムネが揃わない応援、ID 不明はぜんぶこの段に集めるよ。下の「${SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL}」を開くと、どこの情報が欠けているか確認してね。`
+      ),
+      count
+    );
+  }
+  function buildStoryUserLaneGuideFootHtml(displayCount, totalCandidates) {
+    const n = Math.max(0, Math.floor(Number(displayCount) || 0));
+    const total = Math.max(0, Math.floor(Number(totalCandidates) || 0));
+    const others = total > n ? total - n : 0;
+    const text = others > 0 ? `いま ${n} 件を表示中（ほか ${others}人・直近アクティブ順）` : `いま ${n} 件を表示中`;
+    return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml2(text)}</p>`;
+  }
+  function buildStoryUserLaneStatsLegendHtml() {
+    return `<p class="nl-story-userlane-guide__legend">${escapeHtml2(laneTileStatsLegendText())}</p>`;
+  }
+  function buildStoryUserLaneGuideFootAndRecordedHtml(laneDisplayedSlots, recordedCommentRowsTotal, totalCandidates, withStatsLegend) {
+    let foot = buildStoryUserLaneGuideFootHtml(laneDisplayedSlots, totalCandidates);
+    if (withStatsLegend === true && Math.floor(Number(laneDisplayedSlots) || 0) > 0) {
+      foot += buildStoryUserLaneStatsLegendHtml();
+    }
+    if (recordedCommentRowsTotal == null || !Number.isFinite(Number(recordedCommentRowsTotal))) {
+      return foot;
+    }
+    const total = Math.max(0, Math.floor(Number(recordedCommentRowsTotal)));
+    if (total <= 0) {
+      return foot;
+    }
+    return foot + `<p class="nl-story-userlane-guide__recorded" aria-live="polite">この放送で記録している応援コメントは <strong>${total}</strong> 件です。上の件数はレーンに並べた人数の合計であり、コメント件数とは数え方が異なります。</p>`;
+  }
+  function storyUserLaneEmptyNoteTwoLines(line1, line2) {
+    return `<p class="nl-story-userlane__empty-note-p">${escapeHtml2(line1)}</p><p class="nl-story-userlane__empty-note-p">${escapeHtml2(line2)}</p>`;
+  }
+  function buildStoryUserLaneEmptyNoteLinkHtml() {
+    return storyUserLaneEmptyNoteTwoLines(
+      "この段は「数値ユーザーID＋個人サムネがそろった応援」だけが並ぶよ。いまの記録では該当者がいません。",
+      "条件を満たす応援が届くと自動で増えます。"
+    );
+  }
+  function buildStoryUserLaneEmptyNoteGiftHtml() {
+    return storyUserLaneEmptyNoteTwoLines(
+      "この段は「ギフトを投げた人」だけが並ぶよ。いまの記録では該当者がいません。",
+      "ギフトが届くと、送り主の数値IDが取れた人から自動で増えます。"
+    );
+  }
+  function buildStoryUserLaneEmptyNoteKontaHtml() {
+    return storyUserLaneEmptyNoteTwoLines(
+      "この段は「数値IDで、表示名か個人サムネのどちらかまで取れた応援」だけが並ぶよ。いまの記録では該当者がいません。",
+      "条件を満たす応援が届くと自動で増えます。"
+    );
+  }
+  function buildStoryUserLaneEmptyNoteTanuHtml() {
+    return storyUserLaneEmptyNoteTwoLines(
+      "この段は「匿名（a:）や表示名・サムネが揃わない応援、ID 不明」だけが並ぶよ。いまの記録では該当者がいません。",
+      "条件を満たす応援が届くと自動で増えます。"
+    );
+  }
+
+  // src/domain/user/identity.js
+  function isAnonymousStyleNicoUserId2(userId) {
+    const s = String(userId || "").trim();
+    if (!s) return true;
+    if (/^\d{5,14}$/.test(s)) return false;
+    if (/^a:/i.test(s)) return true;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
+    return true;
+  }
+  function isNumericNicoUserId(userId) {
+    return !isAnonymousStyleNicoUserId2(userId);
+  }
+
+  // src/lib/nicoUserPage.js
+  function nicoUserPageUrl(userId) {
+    const uid = String(userId == null ? "" : userId).trim();
+    if (!/^\d{1,18}$/.test(uid)) return "";
+    return `https://www.nicovideo.jp/user/${uid}`;
+  }
+
+  // src/lib/personTileDom.js
+  function buildPersonTileEl(p, io) {
+    const fullUid = String(p.entry?.userId || "").trim();
+    const pageUrl = nicoUserPageUrl(fullUid);
+    const isLinkable = isNumericNicoUserId(fullUid) && pageUrl !== "";
+    const cell = isLinkable ? document.createElement("a") : document.createElement("span");
+    cell.className = "nl-story-userlane-cell";
+    if (isLinkable) {
+      cell.href = pageUrl;
+      cell.target = "_blank";
+      cell.rel = "noopener noreferrer";
+      cell.classList.add("nl-story-userlane-cell--linkable");
+    }
+    const img = document.createElement("img");
+    img.className = "nl-story-userlane-avatar";
+    const requestedLane = p.displaySrc;
+    const displayLane = io.storyAvatarLoadGuard.pickDisplaySrc(requestedLane);
+    const cachedFace = fullUid && requestedLane.startsWith("data:image/svg+xml") && typeof io.cachedAnonymousFace === "function" ? io.cachedAnonymousFace(fullUid) : "";
+    img.src = cachedFace || displayLane;
+    io.storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
+    img.classList.toggle(
+      "nl-avatar--tv-fallback",
+      io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
+    );
+    img.alt = "";
+    const tip = fullUid && fullUid !== p.meta.idLine ? `${p.title} | ${fullUid}` : p.title;
+    img.title = tip;
+    cell.title = tip;
+    img.decoding = "async";
+    if (io.isHttpOrHttpsUrl(img.src)) {
+      img.referrerPolicy = "no-referrer";
+    }
+    if (fullUid && requestedLane.startsWith("data:image/svg+xml") && typeof io.upgradeAnonymousAvatarImage === "function") {
+      io.upgradeAnonymousAvatarImage(img, fullUid, 64);
+    }
+    const metaEl = document.createElement("span");
+    metaEl.className = "nl-story-userlane-meta";
+    const idRow = document.createElement("span");
+    idRow.className = "nl-story-userlane-meta__id";
+    idRow.textContent = p.meta.idLine;
+    const nameRow = document.createElement("span");
+    nameRow.className = "nl-story-userlane-meta__name";
+    nameRow.textContent = p.meta.nameLine;
+    metaEl.appendChild(idRow);
+    metaEl.appendChild(nameRow);
+    cell.appendChild(img);
+    cell.appendChild(metaEl);
+    return cell;
+  }
+
+  // src/lib/laneWindowVerdict.js
+  var LANE_WINDOW_MIN_TILES = 49;
+  function judgeLaneWindow(input) {
+    const isVenue = input?.isVenue === true;
+    if (isVenue) {
+      return { windowed: false, reason: "venue-has-own-scroll" };
+    }
+    const raw = input?.tileCount;
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) {
+      return { windowed: false, reason: "count-unknown" };
+    }
+    const n = raw;
+    if (n < LANE_WINDOW_MIN_TILES) {
+      return { windowed: false, reason: "fits-without-window" };
+    }
+    return { windowed: true, reason: "many-tiles" };
+  }
+
+  // src/lib/venueDomCensus.js
+  var VENUE_CENSUS_SECTIONS = Object.freeze(["link", "gift", "ad", "konta", "tanu"]);
+
+  // src/lib/venueLaneParity.js
+  function venueLaneParityKey(cellOrItem) {
+    const c = (
+      /** @type {any} */
+      cellOrItem && typeof cellOrItem === "object" ? cellOrItem : {}
+    );
+    const uid = String(c.userId ?? c.entry?.userId ?? "").trim();
+    if (uid) return `u:${uid}`;
+    const idLine = String(c.idLine ?? c.meta?.idLine ?? "").trim();
+    const title = String(c.title ?? "").trim();
+    const composite = `${idLine}|${title}`;
+    return composite === "|" ? "" : `c:${composite}`;
+  }
+
+  // src/lib/storyUserLaneClickAffordanceParity.js
+  function createStoryUserLaneClickAffordanceParityState() {
+    return { checked: 0, mismatched: 0, lastSample: null };
+  }
+  function observeStoryUserLaneClickAffordance(state, obs) {
+    if (!state || typeof state !== "object" || !obs || typeof obs !== "object") return;
+    const el = obs.tileEl;
+    if (!el || typeof el !== "object" || typeof el.tagName !== "string") return;
+    const tag = el.tagName.toUpperCase();
+    if (tag !== "SPAN" && tag !== "TD") return;
+    let cursor = "";
+    try {
+      const view = el.ownerDocument && el.ownerDocument.defaultView;
+      if (view && typeof view.getComputedStyle === "function") {
+        cursor = String(view.getComputedStyle(el).cursor || "").trim();
+      }
+    } catch {
+      return;
+    }
+    if (!cursor) return;
+    state.checked += 1;
+    if (cursor !== "pointer") return;
+    state.mismatched += 1;
+    state.lastSample = { tag, cursor, title: String(obs.title || "").trim().slice(0, 40) };
+  }
+
+  // src/lib/venueYukkuriNamedCensus.js
+  var IDENTICON_SRC_PREFIX = "data:image/svg+xml";
+  var NUMERIC_UID_RE = /^\d+$/;
+  var IN_RANGE_NUMERIC_UID_RE = /^\d{5,14}$/;
+  function createVenueYukkuriNamedCensusState() {
+    return {
+      checked: 0,
+      yukkuriNamed: 0,
+      outOfRangeDigits: 0,
+      checkedAnonymousStyle: 0,
+      yukkuriNamedAnonymousStyle: 0,
+      lastSample: null,
+      lastSampleAnonymousStyle: null,
+      /*
+       * ★v0.1.1358: uid を持たない「名前ありゆっくり顔」(広告主・ゲスト等)。
+       *
+       * ■ なぜ足すか(2026-08-12 ユーザー実機・指摘「計器が機能してない証拠」)
+       *   スクショには広告列に「無職にまっしぐら」「そろおじさん」「ノエル」等、
+       *   **名前があるのにゆっくり顔**のタイルが並んでいた。
+       *   ところが速報は `名前ありゆっくり顔 ✅ 検18(匿名系検0)` = 実害0 と報告していた。
+       *   真因: 数値ID系でも a:系でもない(uid が空の)タイルは `if (!uid) return` で
+       *   **checked にすら入らず**、完全に計器の外だった。
+       *   ★「0件」は「異常なし」ではなく「測っていない」だった
+       *     ([[zero-count-may-mean-unmeasured]] の典型)。
+       */
+      checkedNoUid: 0,
+      yukkuriNamedNoUid: 0,
+      lastSampleNoUid: (
+        /** @type {null | { name: string }} */
+        null
+      )
+    };
+  }
+  function observeVenueYukkuriNamedTile(state, obs) {
+    if (!state || typeof state !== "object" || !obs || typeof obs !== "object") return;
+    const uid = String(obs.uid || "").trim();
+    const rawName = String(obs.rawName || "").trim();
+    const displaySrc = String(obs.displaySrc || "").trim();
+    if (!rawName) return;
+    if (rawName.startsWith("匿名")) return;
+    if (isNiconicoGuestPlaceholderNickname(rawName) || isNiconicoAutoUserPlaceholderNickname(rawName)) {
+      return;
+    }
+    if (!NUMERIC_UID_RE.test(uid)) {
+      if (!uid) {
+        state.checkedNoUid += 1;
+        if (!displaySrc.startsWith(IDENTICON_SRC_PREFIX)) return;
+        state.yukkuriNamedNoUid += 1;
+        state.lastSampleNoUid = { name: rawName };
+        return;
+      }
+      state.checkedAnonymousStyle += 1;
+      if (!displaySrc.startsWith(IDENTICON_SRC_PREFIX)) return;
+      state.yukkuriNamedAnonymousStyle += 1;
+      state.lastSampleAnonymousStyle = { uid, name: rawName };
+      return;
+    }
+    state.checked += 1;
+    if (!displaySrc.startsWith(IDENTICON_SRC_PREFIX)) return;
+    state.yukkuriNamed += 1;
+    if (!IN_RANGE_NUMERIC_UID_RE.test(uid)) state.outOfRangeDigits += 1;
+    state.lastSample = { uid, name: rawName, digits: uid.length };
+  }
+
+  // src/extension/story/laneContentLod.js
+  var LANE_CONTENT_LOD_ENABLED = false;
+  var LANE_CONTENT_LOD_EAGER_HEAD = 24;
+  var LANE_CONTENT_LOD_HOLLOW_CLASS = "nl-story-userlane-cell--hollow";
+  var LANE_CONTENT_LOD_ROOT_MARGIN = "600px 0px";
+  var _laneLodState = /* @__PURE__ */ new WeakMap();
+  function shouldRenderHollow(ctx, enabled = LANE_CONTENT_LOD_ENABLED) {
+    if (!enabled) return false;
+    if (!ctx || typeof ctx !== "object") return false;
+    if (ctx.hasWrap === true) return false;
+    if (ctx.laneName !== "tanu") return false;
+    if (ctx.hasRealThumb === true) return false;
+    if (ctx.alreadyFilled === true) return false;
+    return Math.floor(Number(ctx.index) || 0) >= LANE_CONTENT_LOD_EAGER_HEAD;
+  }
+  function buildHollowTileEl(p) {
+    const cell = document.createElement("span");
+    cell.className = `nl-story-userlane-cell ${LANE_CONTENT_LOD_HOLLOW_CLASS}`;
+    const tip = String(p && p.title || "");
+    if (tip) cell.title = tip;
+    return cell;
+  }
+  function stateFor(laneEl) {
+    let st = _laneLodState.get(laneEl);
+    if (!st) {
+      st = { observer: null, filledKeys: /* @__PURE__ */ new Set(), pending: /* @__PURE__ */ new WeakMap() };
+      _laneLodState.set(laneEl, st);
+    }
+    return st;
+  }
+  function isAlreadyFilled(laneEl, userKey) {
+    if (!laneEl || !userKey) return false;
+    const st = _laneLodState.get(laneEl);
+    return st ? st.filledKeys.has(userKey) : false;
+  }
+  function forgetLaneContentLod(laneEl) {
+    if (!laneEl) return;
+    const st = _laneLodState.get(laneEl);
+    if (!st) return;
+    if (st.observer) {
+      try {
+        st.observer.disconnect();
+      } catch {
+      }
+      st.observer = null;
+    }
+    st.pending = /* @__PURE__ */ new WeakMap();
+  }
+  function observeHollowTile(laneEl, hollowEl, userKey, fill, enabled = LANE_CONTENT_LOD_ENABLED) {
+    if (!enabled) return;
+    if (!laneEl || !hollowEl || typeof fill !== "function") return;
+    if (typeof IntersectionObserver !== "function") {
+      try {
+        fill();
+      } catch {
+      }
+      return;
+    }
+    const st = stateFor(laneEl);
+    if (!st.observer) {
+      const root = typeof laneEl.closest === "function" ? laneEl.closest(".nl-main") : null;
+      st.observer = new IntersectionObserver(
+        (entries, obs) => {
+          for (const ent of entries) {
+            if (!ent.isIntersecting) continue;
+            const target = ent.target;
+            const run = st.pending.get(target);
+            st.pending.delete(target);
+            try {
+              obs.unobserve(target);
+            } catch {
+            }
+            if (typeof run === "function") {
+              try {
+                run();
+              } catch {
+              }
+            }
+          }
+        },
+        { root: root || null, rootMargin: LANE_CONTENT_LOD_ROOT_MARGIN }
+      );
+    }
+    const key = String(userKey || "");
+    st.pending.set(hollowEl, () => {
+      if (key) st.filledKeys.add(key);
+      fill();
+    });
+    try {
+      st.observer.observe(hollowEl);
+    } catch {
+    }
+  }
+
+  // src/extension/story/renderStoryUserLaneDom.js
+  var _laneTierLastKey = /* @__PURE__ */ new WeakMap();
+  var _laneTileNodes = /* @__PURE__ */ new WeakMap();
+  var _laneTierTileKeys = /* @__PURE__ */ new WeakMap();
+  function applyLaneTileStatsAttr(tileEl, p) {
+    const metaEl = tileEl && tileEl.lastElementChild;
+    if (!metaEl || !metaEl.classList || !metaEl.classList.contains("nl-story-userlane-meta")) return;
+    const text = formatLaneTileStats(p && /** @type {any} */
+    p.stats);
+    const cur = metaEl.getAttribute("data-stats");
+    if (text) {
+      if (cur !== text) metaEl.setAttribute("data-stats", text);
+    } else if (cur !== null) {
+      metaEl.removeAttribute("data-stats");
+    }
+    applyLaneTilePulseAttr(tileEl, p);
+  }
+  function setAttrIfChanged(el, name, value) {
+    const cur = el.getAttribute(name);
+    if (value) {
+      if (cur !== value) el.setAttribute(name, value);
+    } else if (cur !== null) {
+      el.removeAttribute(name);
+    }
+  }
+  function applyLaneTilePulseAttr(tileEl, p) {
+    const { text, kind, tier } = formatLaneTilePulse(p && /** @type {any} */
+    p.pulse);
+    setAttrIfChanged(tileEl, "data-pulse", text);
+    setAttrIfChanged(tileEl, "data-pulse-tier", text ? tier : "");
+    const gifted = kind === "gift";
+    if (tileEl.classList.contains("is-gifted") !== gifted) tileEl.classList.toggle("is-gifted", gifted);
+    const hot = kind === "hot";
+    if (tileEl.classList.contains("is-hot") !== hot) tileEl.classList.toggle("is-hot", hot);
+  }
+  function syncLaneTierStatsInPlace(laneEl, items) {
+    const nodes = laneEl ? _laneTileNodes.get(laneEl) : null;
+    if (!nodes || !Array.isArray(items) || nodes.length !== items.length) return;
+    for (let i = 0; i < nodes.length; i += 1) {
+      const node = nodes[i];
+      const sameWho = !node || !node.dataset || node.dataset.userKey === venueLaneParityKey(items[i]);
+      if (sameWho) applyLaneTileStatsAttr(node, items[i]);
+    }
+  }
+  function bucketsHaveTileStats(buckets) {
+    for (const tier of ["link", "gift", "ad", "konta", "tanu"]) {
+      const arr = buckets && Array.isArray(buckets[tier]) ? buckets[tier] : [];
+      for (const p of arr) if (p && p.stats && formatLaneTileStats(p.stats)) return true;
+    }
+    return false;
+  }
+  var _laneTierRepaintCount = { link: 0, gift: 0, ad: 0, konta: 0, tanu: 0, unknown: 0 };
+  function laneNameOfEl(el) {
+    const id = String(el && el.id || "");
+    const m = /sceneStoryUserLane(Link|Gift|Ad|Konta|Tanu)/.exec(id);
+    if (m) return m[1].toLowerCase();
+    const dataLaneName = String(el && el.dataset && el.dataset.laneName || "").trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(_laneTierRepaintCount, dataLaneName) ? dataLaneName : "unknown";
+  }
+  var _clickAffordanceParity = createStoryUserLaneClickAffordanceParityState();
+  var _yukkuriNamedCensus = createVenueYukkuriNamedCensusState();
+  var STORY_USER_LANE_SHRINK_KEEP_MAX_MS = 10 * 60 * 1e3;
+  function storyLaneTierBodyKey(items) {
+    return items.map(storyLaneTileKey).join("");
+  }
+  function storyLaneTileKey(p) {
+    const it = p && typeof p === "object" ? p : {};
+    return [
+      String(it.entry?.userId || ""),
+      String(it.displaySrc || ""),
+      String(it.meta?.idLine || ""),
+      String(it.meta?.nameLine || ""),
+      String(it.title || "")
+    ].join("");
+  }
+  function applyStoryUserLaneWindow(laneEl, tileCount, wrapTileEl) {
+    if (!laneEl || !laneEl.classList) return;
+    const { windowed } = judgeLaneWindow({ tileCount, isVenue: !!wrapTileEl });
+    laneEl.classList.toggle("nl-story-userlane--windowed", windowed);
+  }
+  var _guideHtmlLast = /* @__PURE__ */ new WeakMap();
+  var _emptyNoteHtml = /* @__PURE__ */ new WeakMap();
+  function setGuideHtmlIfChanged(el, html) {
+    const next = String(html);
+    const hasChild = !!el.firstChild;
+    if (_guideHtmlLast.get(el) === next && (next === "" ? !hasChild : hasChild)) return;
+    el.innerHTML = next;
+    _guideHtmlLast.set(el, next);
+  }
+  function syncStoryUserLaneTierEmptyNote(laneEl, show, innerHtml) {
+    const next = laneEl.nextElementSibling;
+    const isNote = !!(next && next.classList.contains("nl-story-userlane__empty-note"));
+    if (isNote && show && innerHtml && _emptyNoteHtml.get(next) === innerHtml) return;
+    if (isNote) next.remove();
+    if (!show || !innerHtml) return;
+    const box = document.createElement("div");
+    box.className = "nl-story-userlane__empty-note";
+    box.innerHTML = innerHtml;
+    _emptyNoteHtml.set(box, innerHtml);
+    laneEl.insertAdjacentElement("afterend", box);
+  }
+  function fillLaneTier(el, items, io, wrapTileEl) {
+    if (!items.length) {
+      if (_laneTierLastKey.get(el) === "" && !el.firstChild) {
+        el.hidden = true;
+        return;
+      }
+      el.innerHTML = "";
+      el.hidden = true;
+      _laneTierLastKey.set(el, "");
+      _laneTileNodes.delete(el);
+      _laneTierTileKeys.delete(el);
+      return;
+    }
+    const key = storyLaneTierBodyKey(items);
+    if (_laneTierLastKey.get(el) === key && el.firstChild) {
+      el.hidden = false;
+      syncLaneTierStatsInPlace(el, items);
+      return;
+    }
+    forgetLaneContentLod(el);
+    const laneNameForLod = laneNameOfEl(el);
+    const frag = document.createDocumentFragment();
+    const tileNodes = new Array(items.length).fill(null);
+    const tileKeys = items.map(storyLaneTileKey);
+    let reusePool = null;
+    if (typeof wrapTileEl !== "function") {
+      const prevNodes = _laneTileNodes.get(el);
+      const prevKeys = _laneTierTileKeys.get(el);
+      if (prevNodes && prevKeys && prevNodes.length === prevKeys.length) {
+        reusePool = /* @__PURE__ */ new Map();
+        for (let j = 0; j < prevNodes.length; j += 1) {
+          const n = prevNodes[j];
+          if (!n || n.parentNode !== el) continue;
+          const list = reusePool.get(prevKeys[j]);
+          if (list) list.push(n);
+          else reusePool.set(prevKeys[j], [n]);
+        }
+      }
+    }
+    for (let i = 0; i < items.length; i += 1) {
+      const p = items[i];
+      const lodUserKey = String(p && p.entry && p.entry.userId || "");
+      if (shouldRenderHollow({
+        laneName: laneNameForLod,
+        index: i,
+        hasRealThumb: io.isHttpOrHttpsUrl(String(p && p.displaySrc || "")),
+        hasWrap: typeof wrapTileEl === "function",
+        alreadyFilled: isAlreadyFilled(el, lodUserKey)
+      })) {
+        const hollowEl = buildHollowTileEl(p);
+        try {
+          hollowEl.dataset.thumb = "0";
+          hollowEl.dataset.userKey = venueLaneParityKey(p);
+        } catch {
+        }
+        observeHollowTile(el, hollowEl, lodUserKey, () => {
+          if (!hollowEl.parentNode) return;
+          const realEl = buildPersonTileEl(p, io);
+          try {
+            realEl.dataset.thumb = io.isHttpOrHttpsUrl(String(p && p.displaySrc || "")) ? "1" : "0";
+            realEl.dataset.userKey = venueLaneParityKey(p);
+          } catch {
+          }
+          applyLaneTileStatsAttr(realEl, p);
+          tileNodes[i] = realEl;
+          hollowEl.replaceWith(realEl);
+        });
+        frag.appendChild(hollowEl);
+        continue;
+      }
+      const reuseList = reusePool ? reusePool.get(tileKeys[i]) : void 0;
+      const reused = reuseList && reuseList.length ? reuseList.shift() : null;
+      if (reused) {
+        applyLaneTileStatsAttr(reused, p);
+        tileNodes[i] = reused;
+        frag.appendChild(reused);
+        continue;
+      }
+      const tileEl = buildPersonTileEl(p, io);
+      try {
+        observeStoryUserLaneClickAffordance(_clickAffordanceParity, { tileEl, title: p && p.title });
+      } catch {
+      }
+      try {
+        observeVenueYukkuriNamedTile(_yukkuriNamedCensus, {
+          uid: p && p.entry && p.entry.userId,
+          rawName: p && p.title,
+          displaySrc: p && p.displaySrc
+        });
+      } catch {
+      }
+      try {
+        tileEl.dataset.thumb = io.isHttpOrHttpsUrl(String(p && p.displaySrc || "")) ? "1" : "0";
+        tileEl.dataset.userKey = venueLaneParityKey(p);
+      } catch {
+      }
+      applyLaneTileStatsAttr(tileEl, p);
+      tileNodes[i] = tileEl;
+      frag.appendChild(typeof wrapTileEl === "function" ? wrapTileEl(tileEl, p, i) : tileEl);
+    }
+    el.replaceChildren(frag);
+    el.hidden = false;
+    _laneTierLastKey.set(el, key);
+    _laneTileNodes.set(el, tileNodes);
+    _laneTierTileKeys.set(el, tileKeys);
+    const laneName = laneNameOfEl(el);
+    _laneTierRepaintCount[laneName] = (_laneTierRepaintCount[laneName] || 0) + 1;
+  }
+  function paintStoryUserLaneDomFilled(els, faces, buckets, pickedLength, io, opts) {
+    const {
+      stack,
+      laneLink,
+      laneGift,
+      laneAd,
+      laneKonta,
+      laneTanu,
+      hintLink,
+      linkWrap,
+      giftWrap,
+      adWrap,
+      guideTop,
+      guideLinesTop,
+      guideMidGift,
+      guideLinesMidGift,
+      guideMidAd,
+      guideLinesMidAd,
+      guideMidKonta,
+      guideLinesMidKonta,
+      guideMidTanu,
+      guideLinesMidTanu,
+      guideBottom,
+      guideLinesBottom
+    } = els;
+    const wrapTileEl = opts && typeof opts.wrapTileEl === "function" ? opts.wrapTileEl : void 0;
+    const showGuides = !(opts && opts.guides === false);
+    fillLaneTier(laneLink, buckets.link, io, wrapTileEl);
+    fillLaneTier(laneGift, buckets.gift, io, wrapTileEl);
+    if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io, wrapTileEl);
+    fillLaneTier(laneKonta, buckets.konta, io, wrapTileEl);
+    fillLaneTier(laneTanu, buckets.tanu, io, wrapTileEl);
+    applyStoryUserLaneWindow(laneTanu, buckets.tanu.length, wrapTileEl);
+    syncStoryUserLaneTierEmptyNote(
+      laneLink,
+      showGuides && buckets.link.length === 0,
+      buildStoryUserLaneEmptyNoteLinkHtml()
+    );
+    const emptyOverrides = opts && opts.emptyTextOverrides && typeof opts.emptyTextOverrides === "object" ? opts.emptyTextOverrides : null;
+    syncStoryUserLaneTierEmptyNote(
+      laneGift,
+      showGuides && buckets.gift.length === 0,
+      emptyOverrides && typeof emptyOverrides.gift === "string" ? emptyOverrides.gift : buildStoryUserLaneEmptyNoteGiftHtml()
+    );
+    syncStoryUserLaneTierEmptyNote(
+      laneKonta,
+      showGuides && buckets.konta.length === 0,
+      buildStoryUserLaneEmptyNoteKontaHtml()
+    );
+    syncStoryUserLaneTierEmptyNote(
+      laneTanu,
+      showGuides && buckets.tanu.length === 0,
+      buildStoryUserLaneEmptyNoteTanuHtml()
+    );
+    if (hintLink) {
+      const showLinkHint = showGuides && buckets.link.length === 0 && (buckets.konta.length > 0 || buckets.tanu.length > 0);
+      hintLink.hidden = !showLinkHint;
+    }
+    if (linkWrap) {
+      const showLinkWrap = !laneLink.hidden || hintLink && !hintLink.hidden;
+      linkWrap.hidden = !showLinkWrap;
+    }
+    if (giftWrap) {
+      const showGiftWrap = !laneGift.hidden || guideMidGift && !guideMidGift.hidden || Boolean(
+        laneGift.nextElementSibling?.classList?.contains("nl-story-userlane__empty-note")
+      );
+      giftWrap.hidden = !showGiftWrap;
+    }
+    if (laneAd && adWrap) {
+      const hasAd = (buckets.ad || []).length > 0;
+      if (hasAd) laneAd.hidden = false;
+      adWrap.hidden = !hasAd;
+      if (guideMidAd) guideMidAd.hidden = !(showGuides && hasAd);
+      if (guideLinesMidAd) {
+        setGuideHtmlIfChanged(
+          guideLinesMidAd,
+          showGuides && hasAd ? buildStoryUserLaneGuideAdHtml(faces.faceAd, buckets.ad.length) : ""
+        );
+      }
+    }
+    stack.setAttribute("aria-label", buildStoryUserLaneStackAriaLabel(pickedLength));
+    stack.hidden = false;
+    if (guideLinesTop) {
+      setGuideHtmlIfChanged(
+        guideLinesTop,
+        showGuides ? buildStoryUserLaneGuideTopHtml(faces.faceLink, buckets.link.length) : ""
+      );
+    }
+    if (guideTop) guideTop.hidden = !showGuides;
+    if (guideLinesMidGift) {
+      setGuideHtmlIfChanged(
+        guideLinesMidGift,
+        showGuides ? buildStoryUserLaneGuideGiftHtml(faces.faceGift, buckets.gift.length) : ""
+      );
+    }
+    if (guideMidGift) guideMidGift.hidden = !showGuides;
+    if (guideLinesMidKonta) {
+      setGuideHtmlIfChanged(
+        guideLinesMidKonta,
+        showGuides ? buildStoryUserLaneGuideKontaHtml(faces.faceKonta, buckets.konta.length) : ""
+      );
+    }
+    if (guideMidKonta) guideMidKonta.hidden = !showGuides;
+    if (guideLinesMidTanu) {
+      setGuideHtmlIfChanged(
+        guideLinesMidTanu,
+        showGuides ? buildStoryUserLaneGuideTanuHtml(faces.faceTanu, buckets.tanu.length) : ""
+      );
+    }
+    if (guideMidTanu) guideMidTanu.hidden = !showGuides;
+    if (guideLinesBottom) {
+      setGuideHtmlIfChanged(
+        guideLinesBottom,
+        showGuides ? buildStoryUserLaneGuideFootAndRecordedHtml(
+          pickedLength,
+          opts && typeof opts.recordedCommentRowsTotal === "number" ? opts.recordedCommentRowsTotal : void 0,
+          opts && typeof opts.totalCandidates === "number" ? opts.totalCandidates : void 0,
+          bucketsHaveTileStats(buckets)
+        ) : ""
+      );
+    }
+    if (guideBottom) guideBottom.hidden = !showGuides;
+  }
+
+  // src/lib/youtube/ytUserLaneTiers.js
+  var YT_USER_LANE_TIER_KEYS = Object.freeze(["link", "gift", "member", "konta", "tanu"]);
+  var UC_RE = /^UC[A-Za-z0-9_-]{22}$/;
+  function hasRealIcon(u) {
+    const s = String(u?.iconUrl || "").trim();
+    return /^https:\/\//i.test(s);
+  }
+  function hasRealName(u) {
+    const n = String(u?.name || "").trim();
+    return n !== "" && n !== String(u?.channelId || "").trim();
+  }
+  function classifyYtUserLaneTier(u) {
+    if (!u || typeof u !== "object") return "tanu";
+    const paid = Number(u.superchatCount || 0) + Number(u.stickerCount || 0);
+    if (paid > 0) return "gift";
+    if (Number(u.giftCount || 0) > 0 || Number(u.membershipCount || 0) > 0 || u.isMember === true) {
+      return "member";
+    }
+    const hasId = UC_RE.test(String(u.channelId || ""));
+    const icon = hasRealIcon(u);
+    const name = hasRealName(u);
+    if (hasId && icon && name) return "link";
+    if (hasId && (icon || name)) return "konta";
+    return "tanu";
+  }
+  function buildYtUserLaneTiers(commenters, opts = {}) {
+    const limit = Math.max(1, Math.floor(Number(opts.limitPerTier) || 60));
+    const all = { link: [], gift: [], member: [], konta: [], tanu: [] };
+    const seen = /* @__PURE__ */ new Set();
+    const list = Array.isArray(commenters) ? commenters : [];
+    for (const u of list) {
+      if (!u || typeof u !== "object") continue;
+      const key = String(u.channelId || u.name || "").trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      all[classifyYtUserLaneTier(u)].push(u);
+    }
+    const byRecent = (a, b) => Number(b.lastTs || 0) - Number(a.lastTs || 0);
+    all.gift.sort((a, b) => {
+      const d = Number(b.superchatTotalAmount || 0) - Number(a.superchatTotalAmount || 0);
+      return d !== 0 ? d : byRecent(a, b);
+    });
+    all.member.sort((a, b) => {
+      const d = Number(b.giftCount || 0) + Number(b.membershipCount || 0) - (Number(a.giftCount || 0) + Number(a.membershipCount || 0));
+      return d !== 0 ? d : byRecent(a, b);
+    });
+    all.link.sort(byRecent);
+    all.konta.sort(byRecent);
+    all.tanu.sort(byRecent);
+    const tiers = {};
+    const totals = {};
+    let displayed = 0;
+    let total = 0;
+    for (const k of YT_USER_LANE_TIER_KEYS) {
+      totals[k] = all[k].length;
+      tiers[k] = all[k].slice(0, limit);
+      displayed += tiers[k].length;
+      total += all[k].length;
+    }
+    return { tiers, totals, displayed, total };
+  }
+
+  // src/lib/youtube/ytRankLinesHtml.js
+  function ytRankUserKey(channelId, name) {
+    const id = String(channelId || "").trim();
+    if (id) return id;
+    const n = String(name || "").trim();
+    return n ? `name:${n}` : "";
+  }
+  function safeYtChannelHref(url) {
+    const s = String(url || "").trim();
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      if (u.protocol !== "https:") return "";
+      if (!/(^|\.)youtube\.com$/i.test(u.hostname)) return "";
+      return u.toString();
+    } catch {
+      return "";
+    }
+  }
+  function buildYtRankLinesHtml(models, opts) {
+    const list = Array.isArray(models) ? models : [];
+    const countTextAt = typeof opts?.countTextAt === "function" ? opts.countTextAt : () => "";
+    const hrefFor = typeof opts?.hrefFor === "function" ? opts.hrefFor : () => "";
+    const resolveDisplayThumb = typeof opts?.resolveDisplayThumb === "function" ? opts.resolveDisplayThumb : (s) => s;
+    return list.map((m, i) => {
+      const placeHtml = m.placeNumber != null ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>` : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
+      const full = escapeAttr(m.fullLabelForTitle);
+      const displayThumb = resolveDisplayThumb(m.thumbSrc);
+      const thumbRp = isHttpOrHttpsUrl(displayThumb) ? ' referrerpolicy="no-referrer"' : "";
+      const nameText = escapeHtml2(m.nameLine);
+      const idTitle = m.isUnknown ? "" : escapeAttr(m.idTitle);
+      const idBlock = String(m.idShort || "").trim() === "" ? "" : `<span class="nl-top-support-rank__id" title="${idTitle}">${escapeHtml2(m.idShort)}</span>`;
+      let lineClass = `nl-top-support-rank__line${m.isUnknown ? " nl-top-support-rank__line--unknown" : ""}`;
+      let lineStyle = "";
+      if (m.hasAccent && m.accentColorCss) {
+        lineClass += " nl-top-support-rank__line--has-accent";
+        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
+      }
+      const href = m.isUnknown ? "" : safeYtChannelHref(hrefFor(m.userKey, i));
+      const innerHtml = `${placeHtml}
+        <span class="nl-top-support-rank__count">${escapeHtml2(countTextAt(i))}</span>
+        <span class="nl-top-support-rank__thumb-wrap">
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="${nameText}" decoding="async"${thumbRp} />
+        </span>
+        ${idBlock}
+        <span class="nl-top-support-rank__name">${nameText}</span>`;
+      return href ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>` : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${innerHtml}</div>`;
+    }).join("");
+  }
+  function buildYtCasterTileHtml(input) {
+    const name = String(input?.name || "").trim();
+    if (!name) return "";
+    const pageUrl = safeYtChannelHref(input?.pageUrl);
+    const iconUrl = String(input?.iconUrl || "").trim();
+    const followLabel = String(input?.followLabel || "チャンネル");
+    const iconHtml = iconUrl && /^https:\/\//i.test(iconUrl) ? `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />` : `<span class="nl-top-support-rank__caster-thumb" aria-hidden="true"></span>`;
+    const title = pageUrl ? `配信者 ${name}（クリックでチャンネルページ）` : `配信者 ${name}`;
+    const nameBlock = pageUrl ? `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(pageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` + iconHtml + `<span class="nl-top-support-rank__caster-name">${escapeHtml2(name)}</span></a><a class="nl-top-support-rank__caster-follow" href="${escapeAttr(pageUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml2(followLabel)}</a>` : iconHtml + `<span class="nl-top-support-rank__caster-name">${escapeHtml2(name)}</span>`;
+    return `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(title)}"><span class="nl-top-support-rank__caster-label">配信者</span>` + nameBlock + `</div>`;
+  }
+
+  // extension-youtube/src/sidepanelNicoView.js
+  var IMG = Object.freeze({
+    linkFace: "images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png",
+    kontaFace: "images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png",
+    tanuFace: "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png",
+    linkSmile: "images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png",
+    linkHalf: "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png",
+    kontaSmile: "images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png",
+    tanuSmile: "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+  });
+  var RANK_STRIP_LIMIT = 10;
+  var LANE_RANK_LIMIT = 10;
+  var STORY_USERLANE_LIMIT = 60;
+  var ROOM_HEAT_WINDOW_MS = 5 * 60 * 1e3;
+  var identiconCache2 = /* @__PURE__ */ new Map();
+  function identiconFor(key) {
+    const k = String(key || "anon").trim() || "anon";
+    const hit = identiconCache2.get(k);
+    if (hit) return hit;
+    const url = anonymousIdenticonDataUrl(k, 64);
+    if (identiconCache2.size > 2e3) {
+      const first = identiconCache2.keys().next().value;
+      if (first) identiconCache2.delete(first);
+    }
+    identiconCache2.set(k, url);
+    return url;
+  }
+  function $(id) {
+    return document.getElementById(id);
+  }
+  function setText(id, text) {
+    const el = $(id);
+    if (el && el.textContent !== text) el.textContent = text;
+  }
+  function setStatValue(id, text) {
+    const el = $(id);
+    if (!el) return;
+    if (el.textContent !== text) el.textContent = text;
+    el.classList.toggle("is-placeholder", text === "—" || text === "");
+  }
+  function bindImageFallbacks(root) {
+    if (!root) return;
+    root.querySelectorAll("img").forEach((node) => {
+      if (!(node instanceof HTMLImageElement)) return;
+      if (node.dataset.ytOnErrorBound === "1") return;
+      node.dataset.ytOnErrorBound = "1";
+      node.addEventListener(
+        "error",
+        () => {
+          if (node.dataset.onErrorHide === "1") {
+            node.style.visibility = "hidden";
+            return;
+          }
+          const keyEl = node.closest("[data-yt-user-key],[data-user-key]");
+          const key = keyEl && (keyEl.getAttribute("data-yt-user-key") || keyEl.getAttribute("data-user-key")) || node.alt || "anon";
+          const fb = identiconFor(String(key).replace(/^u:/, ""));
+          if (node.src !== fb) node.src = fb;
+        },
+        { once: true }
+      );
+    });
+  }
+  function dismissInitialLoadShade() {
+    const shade2 = $("nlInitialLoadShade");
+    const primary = $("nlPopupPrimary");
+    if (primary) primary.setAttribute("aria-busy", "false");
+    if (!shade2 || shade2.classList.contains("nl-init-shade--done")) return;
+    shade2.classList.add("nl-init-shade--done");
+    setTimeout(() => {
+      shade2.setAttribute("hidden", "");
+    }, 400);
+  }
+  function applyInlineLayout() {
+    const root = document.documentElement;
+    const body = document.body;
+    if (!root || !body) return;
+    root.classList.add("nl-inline");
+    body.classList.add("nl-inline");
+    const width = Math.max(260, Math.round(window.innerWidth || 360));
+    const height = Math.max(180, Math.round(window.innerHeight || 400));
+    const baseFont = width >= 900 ? 15.5 : width >= 720 ? 15.25 : width >= 520 ? 15 : 14.5;
+    root.style.setProperty("--nl-pop-width", `${width}px`);
+    root.style.setProperty("--nl-pop-height", `${height}px`);
+    root.style.setProperty("--nl-base-font", `${baseFont}px`);
+    body.classList.remove("nl-tight", "nl-compact");
+  }
+  function paintVersionBadge() {
+    let version = "";
+    try {
+      version = String(chrome.runtime.getManifest().version || "");
+    } catch {
+      version = "";
+    }
+    setText("nlVersionBadgeValue", version ? `v${version} · YouTube` : "YouTube");
+  }
+  function formatElapsedJa(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "—";
+    const totalMin = Math.floor(ms / 6e4);
+    if (totalMin < 1) return "1分未満";
+    if (totalMin < 60) return `${totalMin}分`;
+    return `${Math.floor(totalMin / 60)}時間${String(totalMin % 60).padStart(2, "0")}分`;
+  }
+  function paintStatCards(summary, total, ranking, incState) {
+    const uniq = Number(ranking?.uniqueCommenterCount || 0);
+    const cv = Number(summary?.concurrentViewers);
+    const concurrent = Number.isFinite(cv) && cv >= 0 && summary?.concurrentViewers != null ? cv : null;
+    const peak = Number(summary?.peakConcurrentViewers);
+    setStatValue("liveStatComments", total > 0 || summary ? formatNumberJa(total) : "—");
+    setStatValue("watchConcurrentEst", concurrent !== null ? formatNumberJa(concurrent) : "—");
+    setStatValue("watchViewerDom", uniq > 0 || summary ? formatNumberJa(uniq) : "—");
+    const breakdown = $("liveStatCommentsBreakdown");
+    if (breakdown) {
+      const c = ranking?.counts || {};
+      const paid = Number(c.superchat || 0) + Number(c.sticker || 0);
+      const mem = Number(c.membership || 0) + Number(c.membershipGift || 0);
+      const text = total > 0 ? `うち スパチャ ${formatNumberJa(paid)} · メンバー ${formatNumberJa(mem)}` : "";
+      breakdown.textContent = text;
+      breakdown.hidden = !text;
+    }
+    setStatValue("officialStatNicoViewers", Number.isFinite(peak) && peak > 0 ? formatNumberJa(peak) : "—");
+    setStatValue("officialStatNicoComments", total > 0 ? formatNumberJa(total) : "—");
+    const rate = $("officialStatNicoCommentsRate");
+    const startMs = (incState && Number(incState.firstRecordedAt) > 0 ? Number(incState.firstRecordedAt) : 0) || Number(summary?.createdAt || 0);
+    const endMs = Math.max(
+      incState && Number(incState.lastRecordedAt) > 0 ? Number(incState.lastRecordedAt) : 0,
+      Number(summary?.updatedAt || 0)
+    ) || Date.now();
+    const elapsed = startMs > 0 && endMs >= startMs ? endMs - startMs : -1;
+    setStatValue("officialStatNicoStreamAge", elapsed >= 0 && (total > 0 || summary) ? formatElapsedJa(elapsed) : "—");
+    if (rate) {
+      const perMin = elapsed >= 6e4 && total > 0 ? Math.round(total / (elapsed / 6e4) * 10) / 10 : 0;
+      const t = perMin > 0 ? `${perMin}/分` : "";
+      if (rate.textContent !== t) rate.textContent = t;
+      rate.classList.toggle("is-placeholder", !t);
+    }
+    const primary = ranking?.primaryCurrencySummary;
+    setStatValue("officialStatNicoAdPts", primary && primary.amount > 0 ? String(primary.formatted) : "—");
+    const memCount = Number(ranking?.counts?.membership || 0) + Number(ranking?.counts?.membershipGift || 0);
+    setStatValue("officialStatNicoGiftPts", memCount > 0 ? `${formatNumberJa(memCount)}件` : "—");
+  }
+  function rankModels(rooms) {
+    return topSupportRankLineModels(rooms, {
+      defaultThumbSrc: IMG.linkFace,
+      anonymousFallbackThumbSrc: IMG.linkFace,
+      colorScheme: "light",
+      anonymousIdenticonResolver: (uid) => identiconFor(uid)
+    });
+  }
+  function channelHrefOf(person) {
+    return safeHttpUrl(person?.channelUrl || buildYtChannelUrl(person?.channelId || ""));
+  }
+  function paintTopSupportRankStrip(summary, ranking, videoId) {
+    const strip = $("topSupportRankStrip");
+    if (!strip) return;
+    const bChannelId = String(summary?.broadcasterChannelId || "").trim();
+    const casterHtml = buildYtCasterTileHtml({
+      name: String(summary?.broadcasterName || "").trim(),
+      iconUrl: String(summary?.broadcasterIconUrl || ""),
+      pageUrl: safeHttpUrl(buildYtChannelUrl(bChannelId)) || (videoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}` : ""),
+      followLabel: bChannelId ? "チャンネル" : "視聴ページ"
+    });
+    const commenters = (Array.isArray(ranking?.commenters) ? ranking.commenters : []).filter((c) => !bChannelId || c.channelId !== bChannelId).slice(0, RANK_STRIP_LIMIT);
+    let html;
+    if (!commenters.length) {
+      if (!casterHtml) {
+        strip.hidden = true;
+        strip.setAttribute("aria-hidden", "true");
+        strip.innerHTML = "";
+        return;
+      }
+      strip.setAttribute("aria-label", "配信者情報");
+      html = `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のチャンネル登録から。</p><div class="nl-top-support-rank__list" role="list">${casterHtml}</div>`;
+    } else {
+      strip.setAttribute("aria-label", "記録した応援コメントをユーザー別に数えた件数の多い順");
+      const rooms = commenters.map((c) => ({
+        userKey: ytRankUserKey(c.channelId, c.name),
+        nickname: String(c.name || ""),
+        count: Number(c.commentCount || 0),
+        avatarUrl: String(c.iconUrl || "")
+      }));
+      const lines = buildYtRankLinesHtml(rankModels(rooms), {
+        countTextAt: (i) => {
+          const c = commenters[i];
+          return c.primaryFormattedAmount ? `${c.commentCount}件 · ${c.primaryFormattedAmount}` : `${c.commentCount}件`;
+        },
+        hrefFor: (_k, i) => channelHrefOf(commenters[i])
+      });
+      html = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${casterHtml}${lines}</div>`;
+    }
+    if (strip.dataset.ytLastHtml === html && strip.firstChild) {
+      strip.hidden = false;
+      return;
+    }
+    strip.innerHTML = html;
+    strip.dataset.ytLastHtml = html;
+    strip.hidden = false;
+    strip.removeAttribute("aria-hidden");
+    bindImageFallbacks(strip);
+  }
+  function syncLaneGadget(laneId, hasRows) {
+    const lane = document.querySelector(`.nl-north-star-lane[data-lane="${laneId}"]`);
+    if (!(lane instanceof HTMLElement)) return;
+    lane.hidden = false;
+    const gadget = lane.querySelector(".nl-north-star-lane__gadget:not(.nl-north-star-lane__gadget--summary)");
+    if (gadget instanceof HTMLElement) {
+      gadget.setAttribute("data-nl-acq-mode", "determinate");
+      const fill = gadget.querySelector(".nl-north-star-lane__acq-fill");
+      if (fill instanceof HTMLElement) fill.style.width = hasRows ? "100%" : "0%";
+      const pct = gadget.querySelector(".nl-north-star-lane__acq-pct-num");
+      if (pct) pct.textContent = hasRows ? "100%" : "—";
+      const chara = gadget.querySelector(".nl-north-star-lane__chara-wrap");
+      if (chara) chara.setAttribute("data-nl-acq-tier", hasRows ? "ok" : "wait");
+    }
+  }
+  function paintLaneRanking(laneId, people, countOf, countTextOf, noteText, emptyText) {
+    const body = $(`northStarLaneBody-${laneId}`);
+    if (!body) return;
+    syncLaneGadget(laneId, people.length > 0);
+    body.classList.add("nl-top-support-rank", "nl-top-support-rank--below-cards");
+    if (laneId === "giftHistory") body.classList.add("nl-gift-rank-strip");
+    let html;
+    if (!people.length) {
+      body.setAttribute("data-lane-state", "not_yet");
+      html = `<p class="nl-top-support-rank__note">${escapeHtml2(emptyText)}</p>`;
+    } else {
+      body.setAttribute("data-lane-state", "ok");
+      const rooms = people.map((p) => ({
+        userKey: ytRankUserKey(p.channelId, p.name),
+        nickname: String(p.name || ""),
+        count: countOf(p),
+        avatarUrl: String(p.iconUrl || "")
+      }));
+      html = `<p class="nl-top-support-rank__note">${escapeHtml2(noteText)}</p><div class="nl-top-support-rank__list" role="list">${buildYtRankLinesHtml(rankModels(rooms), {
+        countTextAt: (i) => countTextOf(people[i], i),
+        hrefFor: (_k, i) => channelHrefOf(people[i])
+      })}</div>`;
+    }
+    if (body.dataset.ytLastHtml === html && body.firstChild) return;
+    body.innerHTML = html;
+    body.dataset.ytLastHtml = html;
+    bindImageFallbacks(body);
+  }
+  function paintNorthStarLanes(ranking) {
+    const primary = ranking?.primaryCurrencySummary;
+    const cur = String(primary?.currency || "");
+    const scRows = cur && ranking?.byCurrency?.[cur] ? ranking.byCurrency[cur].slice(0, LANE_RANK_LIMIT) : [];
+    paintLaneRanking(
+      "contributionRanking",
+      scRows,
+      (p) => Number(p.amount || 0),
+      (p) => `${p.formattedAmount}`,
+      `${cur} の金額が多い順（${formatNumberJa(scRows.length)}人）`,
+      "スーパーチャット・スーパーステッカーが届くと、ここに金額の多い順で並びます。"
+    );
+    const members = (Array.isArray(ranking?.supporters) ? ranking.supporters : []).filter((s) => s.membershipCount > 0 || s.giftCount > 0).sort(
+      (a, b) => b.giftCount + b.membershipCount - (a.giftCount + a.membershipCount) || b.lastTs - a.lastTs
+    ).slice(0, LANE_RANK_LIMIT);
+    paintLaneRanking(
+      "giftHistory",
+      members,
+      (p) => p.giftCount + p.membershipCount,
+      (p) => p.giftCount > 0 ? `🎁${p.giftCount}回` : `加入${p.membershipCount}回`,
+      "ユーザー別（多い順・最大10）",
+      "メンバー加入・メンバーシップギフトが届くと、ここに並びます。"
+    );
+    {
+      const memTotal = Number(ranking?.counts?.membership || 0) + Number(ranking?.counts?.membershipGift || 0);
+      const ptWrap = $("giftHistoryProgramPt");
+      if (ptWrap) {
+        const num = ptWrap.querySelector(".nl-north-star-lane__program-pt-num");
+        if (num) num.textContent = memTotal > 0 ? formatNumberJa(memTotal) : "—";
+        const unit = ptWrap.querySelector("small");
+        if (unit) unit.textContent = "件";
+        ptWrap.classList.toggle("is-placeholder", memTotal === 0);
+      }
+    }
+    {
+      const body = $("northStarLaneBody-programPoints");
+      const codes = Object.keys(ranking?.totalsByCurrency || {}).sort(
+        (a, b) => (ranking.currencyItemCounts?.[b] || 0) - (ranking.currencyItemCounts?.[a] || 0)
+      );
+      syncLaneGadget("programPoints", codes.length > 0);
+      if (body) {
+        body.classList.add("nl-top-support-rank", "nl-top-support-rank--below-cards");
+        body.setAttribute("data-lane-state", codes.length ? "ok" : "not_yet");
+        const html = codes.length ? `<p class="nl-top-support-rank__note">通貨ごとの合計（換算なし）</p><div class="nl-top-support-rank__list" role="list">${codes.map(
+          (code, i) => `<div class="nl-top-support-rank__line" role="listitem" title="${escapeAttr(code)}"><span class="nl-top-support-rank__place" aria-hidden="true">${i + 1}</span><span class="nl-top-support-rank__count">${escapeHtml2(formatYtCurrencyAmount(ranking.totalsByCurrency[code], code))}</span><span class="nl-top-support-rank__id">${escapeHtml2(code)}</span><span class="nl-top-support-rank__name">${formatNumberJa(ranking.currencyItemCounts?.[code] || 0)}件</span></div>`
+        ).join("")}</div>` : `<p class="nl-top-support-rank__note">スーパーチャットが届くと、通貨ごとの合計が出ます。</p>`;
+        if (body.dataset.ytLastHtml !== html) {
+          body.innerHTML = html;
+          body.dataset.ytLastHtml = html;
+        }
+      }
+    }
+    const trio = [
+      ["rink", scRows.length, "人"],
+      ["konta", members.length, "人"],
+      ["tanu", Object.keys(ranking?.totalsByCurrency || {}).length, "通貨"]
+    ];
+    for (const [slot, n, unit] of trio) {
+      const el = document.querySelector(`[data-nl-trio-slot="${slot}"]`);
+      if (!el) continue;
+      el.setAttribute("data-nl-acq-tier", n > 0 ? "ok" : "wait");
+      const num = el.querySelector(".nl-north-star-chara-trio__pct-num");
+      if (num) num.textContent = n > 0 ? `${formatNumberJa(n)}${unit}` : "—";
+    }
+  }
+  var LANE_GUIDE = Object.freeze({
+    top: [IMG.linkFace, "りんく: チャンネルID・表示名・アイコンがそろった人を、直近に話した順に並べるよ。"],
+    gift: [
+      IMG.linkSmile,
+      "ギフト列: スーパーチャット・スーパーステッカーで応援してくれた人を、金額の大きい順に並べるよ。"
+    ],
+    ad: [IMG.kontaSmile, "メンバー列: メンバー加入・メンバーシップギフト・メンバーバッジの人を並べるよ。"],
+    konta: [IMG.kontaFace, "こん太: 表示名かアイコンのどちらかまで取れた人は、この段に並ぶよ。"],
+    tanu: [IMG.tanuFace, "たぬ姉: チャンネルIDが取れない人や情報が薄い人は、ぜんぶこの段に集めるよ。"]
+  });
+  function guideLineHtml(face, text, count) {
+    return `<div class="nl-story-userlane-guide__line"><img class="nl-story-userlane-guide__face" src="${escapeAttr(face)}" alt="" width="24" height="24" decoding="async" /><span class="nl-story-userlane-guide__text">${escapeHtml2(text)}<span class="nl-story-userlane-guide__count">${Math.floor(count)}人</span></span></div>`;
+  }
+  function setGuide(wrapId, linesId, html) {
+    const wrap = $(wrapId);
+    const lines = $(linesId);
+    if (lines && lines.innerHTML !== html) lines.innerHTML = html;
+    if (wrap) wrap.hidden = !html;
+  }
+  var laneIo = {
+    storyAvatarLoadGuard: {
+      /** @param {string} s */
+      pickDisplaySrc: (s) => s,
+      /** @param {HTMLImageElement} img @param {string} requested */
+      noteRemoteAttempt: (img, requested) => {
+        if (!isHttpOrHttpsUrl(requested)) return;
+        img.addEventListener(
+          "error",
+          () => {
+            const cell = img.closest("[data-user-key]");
+            const key = String(cell?.getAttribute("data-user-key") || img.title || "anon").replace(/^u:/, "");
+            const fb = identiconFor(key);
+            if (img.src !== fb) img.src = fb;
+          },
+          { once: true }
+        );
+      }
+    },
+    isHttpOrHttpsUrl,
+    storyTileUsesYukkuriTvStyle
+  };
+  var laneUserByKey = /* @__PURE__ */ new Map();
+  function laneItemOf(u, tier) {
+    const key = ytRankUserKey(u.channelId, u.name);
+    const name = String(u.name || u.channelId || "リスナー").trim();
+    const iconOk = /^https:\/\//i.test(String(u.iconUrl || ""));
+    const shortId = (() => {
+      const raw = String(u.channelId || "").replace(/^handle:/, "");
+      return raw.length > 12 ? `${raw.slice(0, 12)}…` : raw;
+    })();
+    let nameLine = name;
+    if (tier === "gift" && u.primaryFormattedAmount) nameLine = `${name} ${u.primaryFormattedAmount}`;
+    return {
+      displaySrc: iconOk ? String(u.iconUrl) : identiconFor(key || name),
+      title: name,
+      meta: { idLine: shortId, nameLine },
+      entry: { userId: key },
+      stats: { commentCount: Number(u.commentCount || 0) }
+    };
+  }
+  function paintStoryUserLanes(ranking, total) {
+    const stack = $("sceneStoryUserLaneStack");
+    if (!stack) return;
+    const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
+    const built = buildYtUserLaneTiers(commenters, { limitPerTier: STORY_USERLANE_LIMIT });
+    laneUserByKey.clear();
+    for (const c of commenters) laneUserByKey.set(ytRankUserKey(c.channelId, c.name), c);
+    const buckets = {
+      link: built.tiers.link.map((u) => laneItemOf(u, "link")),
+      gift: built.tiers.gift.map((u) => laneItemOf(u, "gift")),
+      ad: built.tiers.member.map((u) => laneItemOf(u, "member")),
+      konta: built.tiers.konta.map((u) => laneItemOf(u, "konta")),
+      tanu: built.tiers.tanu.map((u) => laneItemOf(u, "tanu"))
+    };
+    const els = {
+      stack,
+      laneLink: $("sceneStoryUserLaneLink"),
+      laneGift: $("sceneStoryUserLaneGift"),
+      laneAd: $("sceneStoryUserLaneAd"),
+      laneKonta: $("sceneStoryUserLaneKonta"),
+      laneTanu: $("sceneStoryUserLaneTanu"),
+      hintLink: $("sceneStoryUserLaneLinkHint"),
+      linkWrap: $("sceneStoryUserLaneLinkWrap"),
+      giftWrap: $("sceneStoryUserLaneGiftWrap"),
+      adWrap: $("sceneStoryUserLaneAdWrap"),
+      guideTop: null,
+      guideLinesTop: null,
+      guideMidGift: null,
+      guideLinesMidGift: null,
+      guideMidAd: null,
+      guideLinesMidAd: null,
+      guideMidKonta: null,
+      guideLinesMidKonta: null,
+      guideMidTanu: null,
+      guideLinesMidTanu: null,
+      guideBottom: null,
+      guideLinesBottom: null
+    };
+    if (!els.laneLink || !els.laneGift || !els.laneKonta || !els.laneTanu) return;
+    paintStoryUserLaneDomFilled(
+      els,
+      { faceLink: IMG.linkFace, faceGift: IMG.linkSmile, faceKonta: IMG.kontaFace, faceTanu: IMG.tanuFace },
+      buckets,
+      built.displayed,
+      laneIo,
+      { guides: false, recordedCommentRowsTotal: total, totalCandidates: built.total }
+    );
+    const hasAny = built.total > 0;
+    if (els.hintLink) els.hintLink.hidden = !(buckets.link.length === 0 && hasAny);
+    if (els.linkWrap) els.linkWrap.hidden = !(buckets.link.length > 0 || els.hintLink && !els.hintLink.hidden);
+    if (els.giftWrap) els.giftWrap.hidden = buckets.gift.length === 0;
+    setGuide("sceneStoryUserLaneGuideTop", "sceneStoryUserLaneGuideLinesTop", hasAny ? guideLineHtml(LANE_GUIDE.top[0], LANE_GUIDE.top[1], buckets.link.length) : "");
+    setGuide(
+      "sceneStoryUserLaneGuideMidGift",
+      "sceneStoryUserLaneGuideLinesMidGift",
+      buckets.gift.length ? guideLineHtml(LANE_GUIDE.gift[0], LANE_GUIDE.gift[1], buckets.gift.length) : ""
+    );
+    setGuide(
+      "sceneStoryUserLaneGuideMidAd",
+      "sceneStoryUserLaneGuideLinesMidAd",
+      buckets.ad.length ? guideLineHtml(LANE_GUIDE.ad[0], LANE_GUIDE.ad[1], buckets.ad.length) : ""
+    );
+    setGuide(
+      "sceneStoryUserLaneGuideMidKonta",
+      "sceneStoryUserLaneGuideLinesMidKonta",
+      hasAny ? guideLineHtml(LANE_GUIDE.konta[0], LANE_GUIDE.konta[1], buckets.konta.length) : ""
+    );
+    setGuide(
+      "sceneStoryUserLaneGuideMidTanu",
+      "sceneStoryUserLaneGuideLinesMidTanu",
+      hasAny ? guideLineHtml(LANE_GUIDE.tanu[0], LANE_GUIDE.tanu[1], buckets.tanu.length) : ""
+    );
+    const others = built.total - built.displayed;
+    setGuide(
+      "sceneStoryUserLaneGuideBottom",
+      "sceneStoryUserLaneGuideLinesBottom",
+      hasAny ? `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml2(
+        others > 0 ? `いま ${built.displayed} 件を表示中（ほか ${others}人・直近アクティブ順）` : `いま ${built.displayed} 件を表示中`
+      )}</p><p class="nl-story-userlane-guide__foot">${escapeHtml2(`記録 ${formatNumberJa(total)} 件・💬はこのPCに記録した件数`)}</p>` : ""
+    );
+    if (!hasAny) stack.hidden = true;
+  }
+  function bindStoryUserLaneClicks(onPick) {
+    const stack = $("sceneStoryUserLaneStack");
+    if (!stack || stack.dataset.ytClickBound === "1") return;
+    stack.dataset.ytClickBound = "1";
+    stack.addEventListener("click", (ev) => {
+      const e = (
+        /** @type {MouseEvent} */
+        ev
+      );
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+      const target = (
+        /** @type {HTMLElement|null} */
+        e.target instanceof HTMLElement ? e.target : null
+      );
+      const cell = target?.closest(".nl-story-userlane-cell");
+      if (!(cell instanceof HTMLElement)) return;
+      const key = String(cell.getAttribute("data-user-key") || "").replace(/^u:/, "");
+      const user = laneUserByKey.get(key);
+      if (!user) return;
+      e.preventDefault();
+      onPick(user);
+    });
+  }
+  var recentActivity = [];
+  function pushRecentActivity(records, reset) {
+    if (reset) recentActivity = [];
+    for (const r of Array.isArray(records) ? records : []) {
+      const at = Number(r?.recordedAt || 0);
+      if (at > 0) recentActivity.push({ at, key: ytRankUserKey(r.channelId, r.name) || "unknown" });
+    }
+    const latest = recentActivity.reduce((m, x) => Math.max(m, x.at), 0);
+    const threshold = latest - ROOM_HEAT_WINDOW_MS;
+    recentActivity = recentActivity.filter((x) => x.at >= threshold);
+  }
+  function paintStoryHeader(total, latest) {
+    const countEl = $("count");
+    if (countEl) {
+      const t = total > 0 ? formatNumberJa(total) : "-";
+      if (countEl.textContent !== t) countEl.textContent = t;
+      countEl.classList.toggle("is-placeholder", total <= 0);
+    }
+    const segA = $("commentTickerSegA");
+    const viewport = $("commentTickerViewport");
+    if (segA && latest) {
+      const name = String(latest.name || latest.channelId || "リスナー");
+      const text = String(latest.text || "") || (latest.kind === "membership" ? "（メンバー加入）" : latest.kind === "membership_gift" ? "（メンバーシップギフト）" : "");
+      const sig = `${latest.pk || ""}|${latest.recordedAt || ""}|${text}`;
+      if (segA.dataset.ytSig !== sig) {
+        segA.dataset.ytSig = sig;
+        const key = ytRankUserKey(latest.channelId, latest.name);
+        segA.innerHTML = buildCommentTickerLatestHtml({
+          label: name,
+          avatarSrc: /^https:\/\//i.test(String(latest.iconUrl || "")) ? String(latest.iconUrl) : identiconFor(key || name),
+          textShown: text,
+          userPageHref: channelHrefOf(latest)
+        });
+        segA.setAttribute("data-yt-user-key", key);
+        bindImageFallbacks(segA);
+      }
+      if (viewport) viewport.classList.remove("is-empty");
+    }
+    const users = new Set(recentActivity.map((x) => x.key));
+    const recent = recentActivity.length;
+    const heatPercent = recent > 0 ? Math.min(100, Math.log10(recent + 1) * 38) : 0;
+    const heatText = recent >= 50 ? "増加がとても大きい" : recent >= 20 ? "増加が大きい" : recent >= 5 ? "増加あり" : "増加は少なめ";
+    setText("roomHeatMeta", `直近5分 +${recent}件 / ${users.size}人`);
+    const fill = $("roomHeatFill");
+    if (fill) fill.style.width = `${heatPercent.toFixed(2)}%`;
+    setText("roomHeatNote", `${heatText}（この5分で増えた件数）`);
+    const lead = total <= 0 ? "りんくがみんなの応援コメントを集めているよ！" : recent >= 20 ? "いま応援がどんどん増えているよ！" : recent > 0 ? "みんなの応援コメントが届いているよ！" : "りんくがみんなの応援コメントを集めているよ！";
+    setText("sceneStoryLead", lead);
+    setText(
+      "sceneStorySub",
+      total > 0 ? `この配信で ${formatNumberJa(total)} 件の応援を記録したよ。` : "応援コメントの増え方をここで見守るよ。"
+    );
+    const img = (
+      /** @type {HTMLImageElement|null} */
+      $("sceneStoryImg")
+    );
+    const want = recent > 0 ? IMG.linkSmile : IMG.linkHalf;
+    if (img && img.getAttribute("src") !== want) img.setAttribute("src", want);
+  }
+  if (typeof window !== "undefined") {
+    window.__ytNicoView = { identiconFor };
+  }
+
   // extension-youtube/src/sidepanel-entry.js
   var STORAGE_KEYS = Object.freeze({
     STREAM_SUMMARIES: "yt_stream_summaries",
@@ -1538,24 +3317,14 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
       fallbackIcon: "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
     }
   });
-  var BROADCASTER_FALLBACK_ICON = "images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png";
-  var TOP_SUPPORT_STRIP_LIMIT = 10;
-  var STORY_USERLANE_LIMIT = 60;
   var SUPPORT_TIMELINE_LIMIT = 80;
   var AUTO_ALL_CHAT_KEY = "yt_auto_all_chat_v1";
-  var STORY_TIER_GUIDE = Object.freeze({
-    link: "りんく: チャンネルID・表示名・アイコンがそろった人を、直近に話した順に並べるよ。",
-    gift: "ギフト列: スーパーチャット・スーパーステッカーで応援してくれた人を、金額の大きい順に並べるよ。",
-    member: "メンバー列: メンバー加入・メンバーシップギフト・メンバーバッジの人を並べるよ（ニコ生版の広告列の位置）。",
-    konta: "こん太: 表示名かアイコンのどちらかまで取れた人は、この段に並ぶよ。",
-    tanu: "たぬ姉: チャンネルIDが取れない人や情報が薄い人は、ぜんぶこの段に集めるよ。"
-  });
   var STORY_GROWTH_GRID_LIMIT = 240;
   var selectedVideoId = "";
   var currentIncrementalState = null;
   var renderJobChain = Promise.resolve();
   var visualDetailsNeedsRefresh = false;
-  var identiconCache2 = /* @__PURE__ */ new Map();
+  var identiconCache3 = /* @__PURE__ */ new Map();
   var metrics = {
     fullGetAllCount: 0,
     incrementalFetchCount: 0,
@@ -1584,14 +3353,14 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
   }
   function getDeterministicIdenticonUrl(key) {
     const k = String(key || "anon").trim() || "anon";
-    const cached = identiconCache2.get(k);
+    const cached = identiconCache3.get(k);
     if (cached) return cached;
     const url = anonymousIdenticonDataUrl(k, 64);
-    if (identiconCache2.size > 2e3) {
-      const first = identiconCache2.keys().next().value;
-      if (first) identiconCache2.delete(first);
+    if (identiconCache3.size > 2e3) {
+      const first = identiconCache3.keys().next().value;
+      if (first) identiconCache3.delete(first);
     }
-    identiconCache2.set(k, url);
+    identiconCache3.set(k, url);
     return url;
   }
   function formatShortChannelId(channelId) {
@@ -1599,16 +3368,6 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     if (!raw) return "";
     const cleaned = raw.startsWith("handle:") ? raw.slice("handle:".length) : raw;
     return cleaned.length > 14 ? `${cleaned.slice(0, 14)}…` : cleaned;
-  }
-  function formatElapsedDurationJa(elapsedMs) {
-    if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return "—";
-    const totalSec = Math.floor(elapsedMs / 1e3);
-    if (totalSec < 60) return "1分未満";
-    const totalMin = Math.floor(totalSec / 60);
-    if (totalMin < 60) return `${totalMin}分`;
-    const hours = Math.floor(totalMin / 60);
-    const mins = totalMin % 60;
-    return `${hours}時間${String(mins).padStart(2, "0")}分`;
   }
   function createAvatarImgWithFallback(iconUrl, name, channelKey, className, explicitFallbackSrc = "") {
     const safeUrl = safeHttpUrl(iconUrl || "");
@@ -1783,290 +3542,17 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     }
   }
   function renderLiveStatsAndOfficialRow(currentSummary, totalComments, ranking, incState) {
-    const uniqueVisitors = Number(ranking?.uniqueCommenterCount || 0);
-    const concurrent = typeof currentSummary?.concurrentViewers === "number" && Number.isFinite(currentSummary.concurrentViewers) && currentSummary.concurrentViewers >= 0 ? currentSummary.concurrentViewers : null;
-    const commentsCardVal = document.getElementById("liveStatComments");
-    if (commentsCardVal) {
-      commentsCardVal.textContent = formatNumberJa(totalComments);
-    }
-    const concurrentEstEl = document.getElementById("watchConcurrentEst");
-    if (concurrentEstEl) {
-      concurrentEstEl.textContent = concurrent !== null ? formatNumberJa(concurrent) : "—";
-    }
-    const visitorsCardVal = document.getElementById("watchViewerDom");
-    if (visitorsCardVal) {
-      visitorsCardVal.textContent = formatNumberJa(uniqueVisitors);
-    }
-    const offVisitors = document.getElementById("officialStatVisitors");
-    if (offVisitors) {
-      offVisitors.textContent = formatNumberJa(uniqueVisitors);
-    }
-    const offComments = document.getElementById("officialStatComments");
-    if (offComments) {
-      offComments.textContent = formatNumberJa(totalComments);
-    }
-    const offElapsed = document.getElementById("officialStatElapsed");
-    if (offElapsed) {
-      const startMs = (incState && incState.firstRecordedAt > 0 ? incState.firstRecordedAt : 0) || Number(currentSummary?.createdAt || 0);
-      const endMs = Math.max(
-        incState && incState.lastRecordedAt > 0 ? incState.lastRecordedAt : 0,
-        Number(currentSummary?.updatedAt || 0)
-      ) || Date.now();
-      if (startMs > 0 && endMs >= startMs && (totalComments > 0 || currentSummary)) {
-        offElapsed.textContent = formatElapsedDurationJa(endMs - startMs);
-      } else {
-        offElapsed.textContent = "—";
-      }
-    }
-    const offSuperchat = document.getElementById("officialStatSuperchat");
-    if (offSuperchat) {
-      const primary = ranking?.primaryCurrencySummary;
-      offSuperchat.textContent = primary?.formatted || "—";
-    }
-    const offMemGift = document.getElementById("officialStatMemberGift");
-    if (offMemGift) {
-      const memGiftCount = Number(ranking?.counts?.membership || 0) + Number(ranking?.counts?.membershipGift || 0);
-      offMemGift.textContent = `${formatNumberJa(memGiftCount)}件`;
-    }
+    paintStatCards(currentSummary, totalComments, ranking, incState);
     const comeviewMeta = document.getElementById("yt-comeview-summary-meta");
     if (comeviewMeta) {
       comeviewMeta.textContent = `合計 ${formatNumberJa(totalComments)}件`;
     }
   }
-  function createSupportRankLineCard(opts) {
-    const channelUrl = safeHttpUrl(opts.channelUrl || buildYtChannelUrl(opts.channelId));
-    const card = channelUrl ? document.createElement("a") : document.createElement("div");
-    card.className = channelUrl ? "nl-top-support-rank__line nl-top-support-rank__line--linkable supporter-row" : "nl-top-support-rank__line supporter-row";
-    card.setAttribute("role", "listitem");
-    if (channelUrl) {
-      card.href = channelUrl;
-      card.target = "_blank";
-      card.rel = "noopener noreferrer";
-    }
-    const displayName = String(opts.name || opts.channelId || "リスナー").trim();
-    const shortId = formatShortChannelId(opts.channelId);
-    card.title = opts.channelId ? `${displayName} (${opts.channelId}) — ${opts.countText}` : `${displayName} — ${opts.countText}`;
-    const placeSpan = document.createElement("span");
-    placeSpan.className = "nl-top-support-rank__place";
-    placeSpan.textContent = opts.placeText;
-    card.appendChild(placeSpan);
-    const countSpan = document.createElement("span");
-    countSpan.className = "nl-top-support-rank__count";
-    countSpan.textContent = opts.countText;
-    card.appendChild(countSpan);
-    const thumbWrap = document.createElement("span");
-    thumbWrap.className = "nl-top-support-rank__thumb-wrap";
-    thumbWrap.appendChild(
-      createAvatarImgWithFallback(
-        opts.iconUrl || "",
-        displayName,
-        opts.channelId || displayName,
-        "nl-top-support-rank__thumb"
-      )
-    );
-    card.appendChild(thumbWrap);
-    if (shortId) {
-      const idSpan = document.createElement("span");
-      idSpan.className = "nl-top-support-rank__id";
-      idSpan.textContent = shortId;
-      idSpan.title = opts.channelId;
-      card.appendChild(idSpan);
-    }
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "nl-top-support-rank__name";
-    nameSpan.textContent = displayName;
-    card.appendChild(nameSpan);
-    return card;
-  }
   function renderTopSupportRankStrip(currentSummary, ranking) {
-    const listEl = document.getElementById("topSupportRankList");
-    if (!listEl) return;
-    clearChildren(listEl);
-    const frag = document.createDocumentFragment();
-    const casterTile = document.createElement("div");
-    casterTile.className = "nl-top-support-rank__caster";
-    casterTile.setAttribute("role", "listitem");
-    const casterLabel = document.createElement("span");
-    casterLabel.className = "nl-top-support-rank__caster-label";
-    casterLabel.textContent = "配信者";
-    casterTile.appendChild(casterLabel);
-    const bName = String(
-      currentSummary?.broadcasterName || currentSummary?.title || "YouTube 配信者"
-    ).trim();
-    const bChannelId = String(currentSummary?.broadcasterChannelId || "").trim();
-    const bChannelUrl = safeHttpUrl(buildYtChannelUrl(bChannelId)) || (selectedVideoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(selectedVideoId)}` : "");
-    const casterThumb = createAvatarImgWithFallback(
-      currentSummary?.broadcasterIconUrl || "",
-      bName,
-      bChannelId || bName,
-      "nl-top-support-rank__caster-thumb",
-      BROADCASTER_FALLBACK_ICON
-    );
-    casterTile.appendChild(casterThumb);
-    const casterNameSpan = document.createElement("span");
-    casterNameSpan.className = "nl-top-support-rank__caster-name";
-    casterNameSpan.textContent = bName;
-    casterNameSpan.title = bChannelId ? `${bName} (${bChannelId})` : bName;
-    casterTile.appendChild(casterNameSpan);
-    if (bChannelUrl) {
-      const followLink = document.createElement("a");
-      followLink.className = "nl-top-support-rank__caster-follow";
-      followLink.href = bChannelUrl;
-      followLink.target = "_blank";
-      followLink.rel = "noopener noreferrer";
-      followLink.textContent = bChannelId ? "チャンネル" : "視聴ページ";
-      casterTile.appendChild(followLink);
-    }
-    frag.appendChild(casterTile);
-    const commenters = (Array.isArray(ranking?.commenters) ? ranking.commenters : []).filter(
-      (c) => !bChannelId || c.channelId !== bChannelId
-    );
-    const topSlice = commenters.slice(0, TOP_SUPPORT_STRIP_LIMIT);
-    for (let i = 0; i < topSlice.length; i += 1) {
-      const c = topSlice[i];
-      const countLabel = c.primaryFormattedAmount ? `${c.commentCount}件 · ${c.primaryFormattedAmount}` : `${c.commentCount}件`;
-      frag.appendChild(
-        createSupportRankLineCard({
-          placeText: String(i + 1),
-          countText: countLabel,
-          name: c.name,
-          channelId: c.channelId,
-          iconUrl: c.iconUrl,
-          channelUrl: c.channelUrl
-        })
-      );
-    }
-    listEl.appendChild(frag);
+    paintTopSupportRankStrip(currentSummary, ranking, selectedVideoId);
   }
   function renderNorthStarSupportLanes(ranking) {
-    const summaryEl = document.getElementById("yt-support-summary");
-    const currencyContainer = document.getElementById("yt-currency-ranking-container");
-    const memberSummaryEl = document.getElementById("yt-member-gift-summary");
-    const memberListEl = document.getElementById("yt-member-gift-list");
-    const paidTotalCount = Number(ranking?.counts?.superchat || 0) + Number(ranking?.counts?.sticker || 0);
-    if (summaryEl) {
-      summaryEl.textContent = `スパチャ・ステッカー ${formatNumberJa(paidTotalCount)}件（通貨別集計・換算なし）`;
-    }
-    if (memberSummaryEl) {
-      memberSummaryEl.textContent = `メンバー加入 ${formatNumberJa(ranking?.counts?.membership || 0)}件 / ギフト ${formatNumberJa(ranking?.counts?.membershipGift || 0)}件`;
-    }
-    if (currencyContainer) {
-      clearChildren(currencyContainer);
-      const currencies = Object.keys(ranking?.byCurrency || {});
-      if (currencies.length === 0) {
-        const hint = document.createElement("div");
-        hint.className = "empty-hint";
-        hint.textContent = "スーパーチャット・ステッカーが届くと通貨ごとに集計されます。";
-        currencyContainer.appendChild(hint);
-      } else {
-        for (const currency of currencies) {
-          const box = document.createElement("div");
-          box.className = "currency-box";
-          box.dataset.currency = currency;
-          const header = document.createElement("div");
-          header.className = "currency-header";
-          const titleSpan = document.createElement("span");
-          titleSpan.textContent = `${currency} ランキング`;
-          const totalSpan = document.createElement("span");
-          totalSpan.textContent = `合計 ${formatYtCurrencyAmount(
-            ranking.totalsByCurrency[currency],
-            currency
-          )}`;
-          header.appendChild(titleSpan);
-          header.appendChild(totalSpan);
-          box.appendChild(header);
-          const listWrap = document.createElement("div");
-          listWrap.className = "nl-top-support-rank__list";
-          listWrap.setAttribute("role", "list");
-          const rows = ranking.byCurrency[currency].slice(0, 12);
-          for (const row of rows) {
-            listWrap.appendChild(
-              createSupportRankLineCard({
-                placeText: `${row.rank}位`,
-                countText: `${row.formattedAmount} (${row.count}回)`,
-                name: row.name,
-                channelId: row.channelId,
-                iconUrl: row.iconUrl,
-                channelUrl: row.channelUrl
-              })
-            );
-          }
-          box.appendChild(listWrap);
-          currencyContainer.appendChild(box);
-        }
-      }
-    }
-    if (memberListEl) {
-      clearChildren(memberListEl);
-      const memberSupporters = (ranking?.supporters || []).filter(
-        (s) => s.membershipCount > 0 || s.giftCount > 0
-      );
-      if (memberSupporters.length === 0) {
-        const hint = document.createElement("div");
-        hint.className = "empty-hint";
-        hint.textContent = "メンバー加入・メンバーシップギフトが届くとここに表示されます。";
-        memberListEl.appendChild(hint);
-      } else {
-        const frag = document.createDocumentFragment();
-        for (let i = 0; i < Math.min(memberSupporters.length, 16); i += 1) {
-          const sup = memberSupporters[i];
-          const badgeText = sup.giftCount > 0 ? `ギフト ${sup.giftCount}回` : `メンバー加入 ${sup.membershipCount}回`;
-          frag.appendChild(
-            createSupportRankLineCard({
-              placeText: `${i + 1}`,
-              countText: badgeText,
-              name: sup.name,
-              channelId: sup.channelId,
-              iconUrl: sup.iconUrl,
-              channelUrl: sup.channelUrl
-            })
-          );
-        }
-        memberListEl.appendChild(frag);
-      }
-    }
-  }
-  function createStoryUserlaneCell(opts) {
-    const channelUrl = safeHttpUrl(opts.channelUrl || buildYtChannelUrl(opts.channelId));
-    const cell = channelUrl ? document.createElement("a") : document.createElement("span");
-    cell.className = channelUrl ? "nl-story-userlane-cell nl-story-userlane-cell--linkable" : "nl-story-userlane-cell";
-    cell.setAttribute("role", "listitem");
-    if (channelUrl) {
-      cell.href = channelUrl;
-      cell.target = "_blank";
-      cell.rel = "noopener noreferrer";
-    }
-    if (opts.pulseBadge) {
-      cell.setAttribute("data-pulse", opts.pulseBadge);
-    }
-    const displayName = String(opts.name || opts.channelId || "リスナー").trim();
-    const shortId = formatShortChannelId(opts.channelId);
-    cell.title = opts.channelId ? `${displayName} (${opts.channelId})` : displayName;
-    cell.appendChild(
-      createAvatarImgWithFallback(
-        opts.iconUrl || "",
-        displayName,
-        opts.channelId || displayName,
-        "nl-story-userlane-avatar"
-      )
-    );
-    const meta = document.createElement("span");
-    meta.className = "nl-story-userlane-meta";
-    if (opts.statsBadge) {
-      meta.setAttribute("data-stats", opts.statsBadge);
-    }
-    if (shortId) {
-      const idSpan = document.createElement("span");
-      idSpan.className = "nl-story-userlane-meta__id";
-      idSpan.textContent = shortId;
-      meta.appendChild(idSpan);
-    }
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "nl-story-userlane-meta__name";
-    nameSpan.textContent = displayName;
-    meta.appendChild(nameSpan);
-    cell.appendChild(meta);
-    return cell;
+    paintNorthStarLanes(ranking);
   }
   function bindStoryTileClick(cell, user) {
     cell.addEventListener("click", (ev) => {
@@ -2081,56 +3567,7 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
   }
   function renderSupportVisualDetails(ranking) {
     const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
-    const built = buildYtUserLaneTiers(commenters, { limitPerTier: STORY_USERLANE_LIMIT });
-    for (const key of YT_USER_LANE_TIER_KEYS) {
-      const laneEl = document.getElementById(`storyTierLane-${key}`);
-      const countEl = document.getElementById(`storyTierCount-${key}`);
-      const guideEl = document.getElementById(`storyTierGuide-${key}`);
-      const wrapEl = document.getElementById(`storyTierWrap-${key}`);
-      const users = built.tiers[key];
-      const total = built.totals[key];
-      if (guideEl && !guideEl.textContent) guideEl.textContent = STORY_TIER_GUIDE[key];
-      if (countEl) {
-        countEl.textContent = total > users.length ? `${formatNumberJa(users.length)}人（ほか${formatNumberJa(total - users.length)}人）` : `${formatNumberJa(total)}人`;
-      }
-      if (wrapEl) wrapEl.hidden = total === 0 && (key === "gift" || key === "member");
-      if (!laneEl) continue;
-      clearChildren(laneEl);
-      if (users.length === 0) {
-        if (key === "link" || key === "tanu" || key === "konta") {
-          const empty = document.createElement("p");
-          empty.className = "nl-story-userlane__empty-note";
-          empty.textContent = key === "link" ? "コメントが届くと、ここに丸アイコンが並びます。" : "この段に当てはまる人はまだいません。";
-          laneEl.appendChild(empty);
-        }
-        continue;
-      }
-      const frag = document.createDocumentFragment();
-      for (const u of users) {
-        let pulse = `${u.commentCount}件`;
-        if (key === "gift") pulse = u.primaryFormattedAmount || `${u.superchatCount + u.stickerCount}回`;
-        else if (key === "member") {
-          pulse = u.giftCount > 0 ? `🎁${u.giftCount}回` : u.membershipCount > 0 ? `加入${u.membershipCount}回` : "⭐メンバー";
-        }
-        const stats = u.primaryFormattedAmount ? `💬${u.commentCount}件 · ${u.primaryFormattedAmount}` : `💬${u.commentCount}件`;
-        const cell = createStoryUserlaneCell({
-          name: u.name,
-          channelId: u.channelId,
-          iconUrl: u.iconUrl,
-          channelUrl: u.channelUrl,
-          pulseBadge: pulse,
-          statsBadge: stats
-        });
-        bindStoryTileClick(cell, u);
-        frag.appendChild(cell);
-      }
-      laneEl.appendChild(frag);
-    }
-    const footEl = document.getElementById("storyUserLaneFoot");
-    if (footEl) {
-      const others = built.total - built.displayed;
-      footEl.textContent = others > 0 ? `いま ${formatNumberJa(built.displayed)} 件を表示中（ほか ${formatNumberJa(others)}人・直近アクティブ順）` : `いま ${formatNumberJa(built.displayed)} 件を表示中`;
-    }
+    paintStoryUserLanes(ranking, currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0);
     const growthGridEl = document.getElementById("sceneStoryGrowth");
     const gaugeLabelEl = document.getElementById("sceneStoryGaugeLabel");
     const gridSlice = commenters.slice(0, STORY_GROWTH_GRID_LIMIT);
@@ -2475,6 +3912,13 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
       }
     }
   }
+  function latestRecordOf(records) {
+    let best = null;
+    for (const r of Array.isArray(records) ? records : []) {
+      if (!best || Number(r?.recordedAt || 0) >= Number(best.recordedAt || 0)) best = r;
+    }
+    return best;
+  }
   async function renderStreamFullLoad() {
     const t0 = performance.now();
     const data = await chrome.storage.local.get([
@@ -2518,7 +3962,10 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     renderLaneFull("tanunee", applied.laneDisplay.tanunee, applied.laneCounts.tanunee);
     pushSupportTimeline(items.slice(-SUPPORT_TIMELINE_LIMIT), true);
     renderSupportTimeline();
+    pushRecentActivity(items, true);
+    paintStoryHeader(applied.totalCount, latestRecordOf(items));
     updateExportButtonsState(applied.totalCount);
+    dismissInitialLoadShade();
     metrics.lastFullLoadDurationMs = Math.round((performance.now() - t0) * 100) / 100;
   }
   async function renderStreamIncrementalUpdate() {
@@ -2561,6 +4008,8 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     if (applied.addedCount > 0) {
       pushSupportTimeline(newRecords, false);
       renderSupportTimeline();
+      pushRecentActivity(newRecords, false);
+      paintStoryHeader(applied.totalCount, latestRecordOf(newRecords));
       updateExportButtonsState(applied.totalCount);
       patchLaneIncremental("rinku", applied.addedByLane.rinku, applied.laneCounts.rinku);
       patchLaneIncremental("konta", applied.addedByLane.konta, applied.laneCounts.konta);
@@ -2662,7 +4111,7 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     }
   }
   function setComposeStatus(text, tone) {
-    const el = document.getElementById("commentPostStatus");
+    const el = document.getElementById("postStatus");
     if (!el) return;
     el.hidden = !text;
     el.textContent = text;
@@ -2971,8 +4420,15 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     });
   }
   async function initSidepanel() {
+    applyInlineLayout();
+    window.addEventListener("resize", applyInlineLayout);
+    paintVersionBadge();
+    setTimeout(dismissInitialLoadShade, 4e3);
     await restoreCollapsibleUiState();
     bindUiEvents();
+    bindStoryUserLaneClicks((user) => {
+      void showStoryUserDetail(user);
+    });
     await runRenderSerialized(() => renderStreamFullLoad());
     requestVoicevoxRecheck();
   }
