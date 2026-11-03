@@ -58,6 +58,17 @@ await Promise.all([
   }),
   build({
     ...common,
+    // ★ニコ生版の本物 marketing-export-entry.js(マーケ画面)を、同じ入口(ytNicoShim)つきで束ねる
+    entryPoints: [resolve(root, 'extension-youtube/src/marketing-export-nico-entry.js')],
+    outfile: resolve(root, 'extension-youtube/marketing-export.js'),
+    target: ['chrome100'],
+    define: popupDefine,
+    banner: {
+      js: '// marketing-export.js — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル\n/* eslint-disable */',
+    },
+  }),
+  build({
+    ...common,
     entryPoints: [resolve(root, 'extension-youtube/src/offscreen-entry.js')],
     outfile: resolve(root, 'extension-youtube/offscreen.js'),
     banner: {
@@ -67,4 +78,6 @@ await Promise.all([
 ]);
 
 // popup-entry.js の中で使っている画像も写す
-console.log(`画像を ${copyReferencedImages(readFileSync(resolve(root, 'extension-youtube/sidepanel.js'), 'utf8'))} 枚写しました`);
+console.log(
+  `画像を ${['sidepanel.js', 'marketing-export.js'].reduce((n, f) => n + copyReferencedImages(readFileSync(resolve(root, 'extension-youtube', f), 'utf8')), 0)} 枚写しました`,
+);
