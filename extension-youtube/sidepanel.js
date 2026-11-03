@@ -1409,6 +1409,13 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     return `${day}日前`;
   }
 
+  // src/lib/voiceAgeGate.js
+  var VOICE_STALE_BACKLOG_QUEUE = Number.POSITIVE_INFINITY;
+
+  // src/lib/voiceLagNotice.js
+  var VOICE_GPU_TIP_TEXT = "⚡ 読み上げを速くするには: VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に(切り替えると VOICEVOX が再起動します)";
+  var VOICE_LIGHT_ACTIVE_TEXT = "VOICEVOX が追いつかないので、いまは PC の声で読んでいます。VOICEVOX が速くなったら自動で戻ります";
+
   // extension-youtube/src/ytIdbStore.js
   var DB_NAME = "yt_kirameki_db";
   var DB_VERSION = 2;
@@ -2343,6 +2350,24 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
       autoSwitched: false
     };
     const voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
+    const lightActive = voiceState.lightVoiceActive === true && settings.enabled !== false;
+    const gpuTip = voiceState.weakPcSeen === true;
+    for (const id of ["yt-voice-engine-banner", "yt-voice-engine-note"]) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const lines = [];
+      if (lightActive) lines.push(VOICE_LIGHT_ACTIVE_TEXT);
+      if (gpuTip) lines.push(VOICE_GPU_TIP_TEXT);
+      el.textContent = lines.join("\n");
+      el.hidden = lines.length === 0;
+    }
+    const lightEl = (
+      /** @type {HTMLInputElement | null} */
+      document.getElementById("yt-voice-light")
+    );
+    if (lightEl && document.activeElement !== lightEl) {
+      lightEl.checked = settings.lightVoice !== "off";
+    }
     const enabledEl = (
       /** @type {HTMLInputElement | null} */
       document.getElementById("yt-voice-enabled")
@@ -2899,6 +2924,19 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
           type: "YT_UPDATE_VOICE_SETTINGS",
           payload: { broadcasterNameOverride: bNameInput.value.trim() }
         },
+        () => {
+          void chrome.runtime.lastError;
+          runRenderSerialized(() => renderVoiceUiFromStorage());
+        }
+      );
+    });
+    const lightEl = (
+      /** @type {HTMLInputElement | null} */
+      document.getElementById("yt-voice-light")
+    );
+    lightEl?.addEventListener("change", () => {
+      chrome.runtime.sendMessage(
+        { type: "YT_UPDATE_VOICE_SETTINGS", payload: { lightVoice: lightEl.checked ? "auto" : "off" } },
         () => {
           void chrome.runtime.lastError;
           runRenderSerialized(() => renderVoiceUiFromStorage());
