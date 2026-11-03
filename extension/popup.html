@@ -8560,6 +8560,7 @@
       }
 
       .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      .nl-comment-compose--primary .nl-compose-quick-toolbar #exportMarketingQuickBtn,
       .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
       .nl-comment-compose--primary .nl-compose-quick-toolbar #reloadWatchTabBtn {
         width: auto;
@@ -9344,7 +9345,9 @@
         outline-offset: 2px;
       }
 
-      #exportJson {
+      /* v0.1.1854: 保存はマーケHTML 1つに。旧「HTML」と同じ押しやすい主ボタンの見た目にする。 */
+      #exportJson,
+      #exportMarketingQuickBtn {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -9363,28 +9366,33 @@
         transition: background 0.15s ease, transform 0.1s ease;
       }
 
-      #exportJson:hover:not(:disabled) {
+      #exportJson:hover:not(:disabled),
+      #exportMarketingQuickBtn:hover:not(:disabled) {
         background: var(--nl-accent-hover);
       }
 
-      #exportJson:active:not(:disabled) {
+      #exportJson:active:not(:disabled),
+      #exportMarketingQuickBtn:active:not(:disabled) {
         transform: scale(0.98);
       }
 
       @media (prefers-reduced-motion: reduce) {
-        #exportJson:active:not(:disabled) {
+        #exportJson:active:not(:disabled),
+        #exportMarketingQuickBtn:active:not(:disabled) {
           transform: none;
         }
       }
 
-      #exportJson:disabled {
+      #exportJson:disabled,
+      #exportMarketingQuickBtn:disabled {
         background: #cbd5e1;
         color: #64748b;
         cursor: not-allowed;
         box-shadow: none;
       }
 
-      #exportJson:focus-visible {
+      #exportJson:focus-visible,
+      #exportMarketingQuickBtn:focus-visible {
         outline: 2px solid #fff;
         outline-offset: 2px;
         box-shadow: 0 0 0 4px rgb(15 143 216 / 45%);
@@ -9399,6 +9407,8 @@
       }
 
       body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #exportMarketingQuickBtn,
+      body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #exportMarketingQuickBtn,
       body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
       body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
       body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
