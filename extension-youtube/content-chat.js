@@ -847,6 +847,7 @@
       boundVideoId = vid;
       switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
     };
+    const isReplay = String(window.location.pathname || "").startsWith("/live_chat_replay");
     const inspectElement = (el, retryCount = 0) => {
       if (!el || typeof el.tagName !== "string") return;
       checkVideoSwitch();
@@ -873,13 +874,13 @@
         } else if (retryCount < 3) {
           setTimeout(() => inspectElement(el, retryCount + 1), 200 * (retryCount + 1));
         }
-        pendingBatch.push(parsed);
+        pendingBatch.push(isReplay ? { ...parsed, replay: true } : parsed);
         queueFlush();
         return;
       }
       if (parsed.iconUrl && !seenWithIconIds.has(parsed.id)) {
         rememberIconId(parsed.id);
-        pendingBatch.push(parsed);
+        pendingBatch.push(isReplay ? { ...parsed, replay: true } : parsed);
         queueFlush();
       } else if (!parsed.iconUrl && retryCount < 3) {
         setTimeout(() => inspectElement(el, retryCount + 1), 250 * (retryCount + 1));

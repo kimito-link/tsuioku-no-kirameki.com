@@ -606,6 +606,10 @@ function setupLiveChatObserver() {
     switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
   };
 
+  // アーカイブのチャットのリプレイでは、コメントの時刻表示は「動画の中の経過時間」(例 1:23:45)で時計ではない。
+  //   記録に印を付け、入口(ytNicoShim)が時計として読まないようにする。
+  const isReplay = String(window.location.pathname || '').startsWith('/live_chat_replay');
+
   const inspectElement = (el, retryCount = 0) => {
     if (!el || typeof el.tagName !== 'string') return;
     checkVideoSwitch();
@@ -634,7 +638,7 @@ function setupLiveChatObserver() {
       } else if (retryCount < 3) {
         setTimeout(() => inspectElement(el, retryCount + 1), 200 * (retryCount + 1));
       }
-      pendingBatch.push(parsed);
+      pendingBatch.push(isReplay ? { ...parsed, replay: true } : parsed);
       queueFlush();
       return;
     }
@@ -642,7 +646,7 @@ function setupLiveChatObserver() {
     // 初回取得時に遅延ロードで空だったアイコン URL が後から入った場合は補完送信する
     if (parsed.iconUrl && !seenWithIconIds.has(parsed.id)) {
       rememberIconId(parsed.id);
-      pendingBatch.push(parsed);
+      pendingBatch.push(isReplay ? { ...parsed, replay: true } : parsed);
       queueFlush();
     } else if (!parsed.iconUrl && retryCount < 3) {
       setTimeout(() => inspectElement(el, retryCount + 1), 250 * (retryCount + 1));
