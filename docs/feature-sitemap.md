@@ -44,8 +44,10 @@
   - `src/lib/ndgrViewBasePick.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 65</summary>
 
+- `extension-youtube/content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
+- `extension-youtube/src/content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
 - `scripts/measure-ndgr-crawls.mjs` — 拡張の NDGR 巡回(前方向の立て直し・過去埋め)を本物の配信に当てて数える。
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
@@ -107,6 +109,7 @@
 - `src/lib/swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
 - `src/lib/swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
 - `src/lib/userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
+- `src/lib/youtube/ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
 - `tests/helpers/wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
 
 </details>
@@ -195,7 +198,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 99</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 100</summary>
 
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
@@ -295,6 +298,7 @@
 - `src/lib/watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
 - `src/lib/watchTabPrioritize.js` — watch タブ候補リストを「対象 watch URL に最も近い」順に並べ替える純粋関数。
+- `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
 
 </details>
@@ -319,7 +323,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 273</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 274</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -589,6 +593,7 @@
 - `src/lib/watchPageViewerProfile.js` — watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
 - `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
 - `src/lib/yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
+- `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
 - `tests/helpers/laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
@@ -607,10 +612,14 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 48</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
+- `extension-youtube/background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
+- `extension-youtube/sidepanel.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示バンドル
+- `extension-youtube/src/background-entry.js` — YouTube Live コメントのローカル記録・読み上げキュー管理 Service Worker
+- `extension-youtube/src/sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示 UI
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
@@ -651,6 +660,7 @@
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 - `src/lib/voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
+- `src/lib/youtube/ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
 - `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 
 </details>
@@ -999,7 +1009,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 298</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 299</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1053,6 +1063,7 @@
 - `scripts/build-phone-demo-snapshot.mjs` — スマホ版のデモ(/live-view?v=demo)の土台 app/demo/snapshot.json を作る。
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
+- `scripts/build-youtube-ext.mjs` — YouTube Live 試作拡張（extension-youtube/）の esbuild バンドルスクリプト
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
 - `scripts/census-watch.mjs` — 配置後の「更新→F5→溜まるまで待つ→速報を読む→基準線と比べる」を機械にする(2026-10-20)。
 - `scripts/check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。

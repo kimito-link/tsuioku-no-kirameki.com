@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1096 件
+## ⚠️ 役割コメントが無いソース 9 / 1107 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -40,34 +40,6 @@
 
 ## 全ファイルツリー
 
-- 📁 **"src/** (17)
-  - 📁 **images/** (17)
-    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png"`
-          - `logo_funlink_black_RGB_link_black.png"`
-          - `logo_funlink_black_RGB_maru_black.png"`
-      - 📁 **color/** (8)
-        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
-          - `logo_funlink_RGB_color.png"`
-          - `logo_funlink_RGB_ginga_color.png"`
-          - `logo_funlink_RGB_hoshi.png"`
-          - `logo_funlink_RGB_link_hoshi.png"`
-          - `logo_funlink_RGB_link_orange.png"`
-          - `logo_funlink_RGB_maru_blue.png"`
-          - `logo_funlink_RGB_maru_ginga.png"`
-          - `logo_funlink_RGB_maru_orange.png"`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png"`
-        - `logo_funlink_white_RGB_link_black.png"`
-        - `logo_funlink_white_RGB_maru_black.png"`
-    - 📁 **logo/** (3)
-      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg"`
-        - `251016_logo_guide_kimitolink_ol.ai"`
-        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -258,7 +230,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (364)
+- 📁 **docs/** (365)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -370,7 +342,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (178)
+  - 📁 **handoff/** (179)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -550,6 +522,7 @@
     - `venue-transport-effect-SPEC-2026-08-08.md`
     - `voicevox-any-pc-DESIGN.md`
     - `winv-clipboard-freeze-synthesis.md`
+    - `youtube-ext-prototype-HANDOFF.md`
   - 📁 **marketing/** (1)
     - `x-article-live-ranking-2026-09-14.md`
   - 📁 **patent-unique-voice-reading-filing-final/** (1)
@@ -791,6 +764,16 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
+- 📁 **extension-youtube/** (8)
+  - 📁 **src/** (3)
+    - `background-entry.js` — YouTube Live コメントのローカル記録・読み上げキュー管理 Service Worker
+    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
+    - `sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示 UI
+  - `background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
+  - `content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
+  - `manifest.json`
+  - `sidepanel.html`
+  - `sidepanel.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示バンドル
 - 📁 **mobile/** (65)
   - 📁 **assets/** (1)
     - `splash.png`
@@ -865,7 +848,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (104)
+- 📁 **scripts/** (105)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -908,6 +891,7 @@
   - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
+  - `build-youtube-ext.mjs` — YouTube Live 試作拡張（extension-youtube/）の esbuild バンドルスクリプト
   - `build.mjs` — ⚠️ 役割コメント無し
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
   - `census-watch.mjs` — 配置後の「更新→F5→溜まるまで待つ→速報を読む→基準線と比べる」を機械にする(2026-10-20)。
@@ -999,7 +983,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2222)
+- 📁 **src/** (2247)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1147,7 +1131,7 @@
     - `voiceTestHook.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (117)
+  - 📁 **images/** (134)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1247,7 +1231,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (10)
+    - 📁 **logo/** (13)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1257,6 +1241,11 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
+      - 📁 **データ一式/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg`
+        - `251016_logo_guide_kimitolink_ol.ai`
+        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1297,8 +1286,28 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
+    - 📁 **データ出力/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png`
+          - `logo_funlink_black_RGB_link_black.png`
+          - `logo_funlink_black_RGB_maru_black.png`
+      - 📁 **color/** (8)
+        - 📁 **RGB_データ用/** (8)
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_hoshi.png`
+          - `logo_funlink_RGB_link_hoshi.png`
+          - `logo_funlink_RGB_link_orange.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_ginga.png`
+          - `logo_funlink_RGB_maru_orange.png`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png`
+        - `logo_funlink_white_RGB_link_black.png`
+        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1949)
+  - 📁 **lib/** (1957)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1314,6 +1323,15 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
+    - 📁 **youtube/** (8)
+      - `ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
+      - `ytChatParse.test.js`
+      - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
+      - `ytLaneAssign.test.js`
+      - `ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計（通貨別・純関数）
+      - `ytSupportRanking.test.js`
+      - `ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
+      - `ytVoiceQueue.test.js`
     - `AGENTS.md`
     - `aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
     - `aboutBlankGapVerdict.test.js`

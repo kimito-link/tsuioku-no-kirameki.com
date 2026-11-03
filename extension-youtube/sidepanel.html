@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>追憶のきらめき for YouTube（試作）</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #1e293b;
+        --panel-soft: #263449;
+        --border: #334155;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --rinku: #f43f5e;
+        --konta: #f59e0b;
+        --tanunee: #10b981;
+        --accent: #38bdf8;
+        --warn-bg: #451a03;
+        --warn-border: #f59e0b;
+        --warn-text: #fde68a;
+        --ok-bg: #064e3b;
+        --ok-border: #10b981;
+        --ok-text: #a7f3d0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 10px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      header.app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 8px;
+      }
+
+      .app-title {
+        font-weight: 700;
+        font-size: 14px;
+        color: #f8fafc;
+      }
+
+      .app-subtitle {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .notice-banner {
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #172554;
+        border: 1px solid #3b82f6;
+        color: #dbeafe;
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+
+      .notice-banner.is-warning {
+        background: var(--warn-bg);
+        border-color: var(--warn-border);
+        color: var(--warn-text);
+      }
+
+      .filter-pill {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      .card-title {
+        font-weight: 700;
+        font-size: 13px;
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .control-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      select,
+      input[type='text'],
+      button {
+        background: var(--panel-soft);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: var(--accent);
+      }
+
+      .voice-status-box {
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-top: 6px;
+        border: 1px solid var(--border);
+      }
+
+      .voice-status-box.is-offline {
+        background: var(--warn-bg);
+        border-color: var(--warn-border);
+        color: var(--warn-text);
+      }
+
+      .voice-status-box.is-online {
+        background: var(--ok-bg);
+        border-color: var(--ok-border);
+        color: var(--ok-text);
+      }
+
+      .autoswitch-badge {
+        display: none;
+        margin-top: 6px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: #7c2d12;
+        border: 1px solid #fb923c;
+        color: #ffedd5;
+        font-size: 11px;
+      }
+
+      .autoswitch-badge.is-active {
+        display: block;
+      }
+
+      .voice-last-spoken {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .currency-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 8px;
+      }
+
+      .currency-box {
+        background: var(--panel-soft);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+      }
+
+      .currency-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-weight: 700;
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 4px;
+      }
+
+      .supporter-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 0;
+        border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+        font-size: 12px;
+      }
+
+      .supporter-row:last-child {
+        border-bottom: none;
+      }
+
+      .rank-badge {
+        font-weight: 700;
+        color: #fbbf24;
+        min-width: 26px;
+      }
+
+      .lanes-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      @media (max-width: 640px) {
+        .lanes-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .lane-col {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        max-height: 460px;
+      }
+
+      .lane-header {
+        padding: 8px 10px;
+        font-weight: 700;
+        font-size: 12px;
+        border-bottom: 2px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .lane-rinku .lane-header {
+        border-bottom-color: var(--rinku);
+      }
+      .lane-konta .lane-header {
+        border-bottom-color: var(--konta);
+      }
+      .lane-tanunee .lane-header {
+        border-bottom-color: var(--tanunee);
+      }
+
+      .lane-role {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--muted);
+        display: block;
+      }
+
+      .lane-list {
+        padding: 6px;
+        overflow-y: auto;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .chat-item {
+        background: var(--panel-soft);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+
+      .chat-item.kind-superchat,
+      .chat-item.kind-sticker {
+        border-color: #f59e0b;
+        background: rgba(245, 158, 11, 0.12);
+      }
+
+      .chat-item.kind-membership,
+      .chat-item.kind-membership_gift {
+        border-color: #10b981;
+        background: rgba(16, 185, 129, 0.12);
+      }
+
+      .chat-item-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+      }
+
+      .avatar-img {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #334155;
+        flex-shrink: 0;
+      }
+
+      .avatar-fallback {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #475569;
+        color: #f8fafc;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+
+      .author-link {
+        color: #38bdf8;
+        text-decoration: none;
+        font-weight: 600;
+        word-break: break-all;
+      }
+
+      .author-link:hover {
+        text-decoration: underline;
+      }
+
+      .channel-id-tag {
+        font-size: 10px;
+        color: var(--muted);
+        font-family: monospace;
+      }
+
+      .voice-pill {
+        font-size: 10px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: rgba(56, 189, 248, 0.18);
+        color: #bae6fd;
+      }
+
+      .amount-pill {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #f59e0b;
+        color: #0f172a;
+      }
+
+      .member-pill {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: #10b981;
+        color: #052e16;
+      }
+
+      .chat-text {
+        word-break: break-word;
+        color: #f1f5f9;
+      }
+
+      .empty-hint {
+        color: var(--muted);
+        font-size: 11px;
+        text-align: center;
+        padding: 14px 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <div class="app-title">追憶のきらめき for YouTube（試作）</div>
+        <div class="app-subtitle" id="yt-stream-summary">YouTube Live のチャット待機中…</div>
+      </div>
+      <div>
+        <select id="yt-stream-select" aria-label="記録済み配信の選択">
+          <option value="">配信を選択…</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="notice-banner" id="yt-all-chat-notice">
+      <div>
+        💡 <strong>全件記録のヒント</strong>: YouTube チャット欄の左上メニューが「トップチャット」だと一部コメントが間引かれます。<strong>「すべてのチャット」表示でないと全件は拾えない</strong>ため、切替をおすすめします。
+      </div>
+      <span class="filter-pill" id="yt-detected-filter-badge">現在のチャット表示: 検出待ち</span>
+    </div>
+
+    <section class="card" aria-label="VOICEVOX 読み上げ設定">
+      <h2 class="card-title">
+        <span>🔊 人ごとに違う声で読み上げ（VOICEVOX）</span>
+        <span id="yt-voice-queue-info" style="font-size: 11px; color: var(--muted)">待機キュー: 0件</span>
+      </h2>
+      <div class="control-row">
+        <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer">
+          <input type="checkbox" id="yt-voice-enabled" checked />
+          <span>読み上げ ON</span>
+        </label>
+        <label style="display: inline-flex; align-items: center; gap: 4px">
+          <span>モード:</span>
+          <select id="yt-voice-mode">
+            <option value="all">全部読む</option>
+            <option value="select">選んで読む（スパチャ・メンバー・配信者名入り）</option>
+          </select>
+        </label>
+        <label style="display: inline-flex; align-items: center; gap: 4px">
+          <span>配信者名キーワード:</span>
+          <input
+            type="text"
+            id="yt-broadcaster-name-input"
+            placeholder="例: りんく"
+            style="width: 110px"
+          />
+        </label>
+        <button type="button" id="yt-voice-recheck-btn">VOICEVOX 再確認</button>
+        <button type="button" id="yt-voice-clear-btn">キュー消去</button>
+      </div>
+
+      <div id="yt-voice-autoswitch-badge" class="autoswitch-badge">
+        ⚡ キューが一定数（8件以上）たまったため、自動で「選んで読む」モードに切り替えています。
+      </div>
+
+      <div id="yt-voice-status-box" class="voice-status-box is-offline" role="status">
+        VOICEVOX の接続状態を確認しています…
+      </div>
+
+      <div id="yt-voice-last-spoken" class="voice-last-spoken">
+        読み上げ履歴: まだ再生されたコメントはありません（同じチャンネルIDの投稿者は毎回同じ声で読まれます）
+      </div>
+    </section>
+
+    <section class="card" id="yt-support-ranking-section" aria-label="応援者ランキング（通貨別）">
+      <h2 class="card-title">
+        <span>👑 応援者ランキング（通貨別集計・換算なし）</span>
+        <span id="yt-support-summary" style="font-size: 11px; color: var(--muted)">スパチャ 0件 / メンバー 0件</span>
+      </h2>
+      <div id="yt-currency-ranking-container" class="currency-grid">
+        <div class="empty-hint">スーパーチャット・ステッカー・メンバー加入が届くと通貨ごとに集計されます。</div>
+      </div>
+    </section>
+
+    <section class="lanes-grid" aria-label="3レーン振り返り">
+      <div class="lane-col lane-rinku" id="lane-rinku">
+        <div class="lane-header">
+          <div>
+            🌸 りんくレーン
+            <span class="lane-role">配信者視点（配信者本人・モデレーター）</span>
+          </div>
+          <span id="lane-rinku-count">0</span>
+        </div>
+        <div class="lane-list" id="lane-rinku-list">
+          <div class="empty-hint">配信者・モデレーターのコメントがここに表示されます</div>
+        </div>
+      </div>
+
+      <div class="lane-col lane-konta" id="lane-konta">
+        <div class="lane-header">
+          <div>
+            🦊 こん太レーン
+            <span class="lane-role">ファン視点（スパチャ・メンバー・ギフト）</span>
+          </div>
+          <span id="lane-konta-count">0</span>
+        </div>
+        <div class="lane-list" id="lane-konta-list">
+          <div class="empty-hint">スパチャ・メンバー・ギフトの応援がここに表示されます</div>
+        </div>
+      </div>
+
+      <div class="lane-col lane-tanunee" id="lane-tanunee">
+        <div class="lane-header">
+          <div>
+            🍃 たぬ姉レーン
+            <span class="lane-role">案内役（一般コメント）</span>
+          </div>
+          <span id="lane-tanunee-count">0</span>
+        </div>
+        <div class="lane-list" id="lane-tanunee-list">
+          <div class="empty-hint">一般リスナーのコメントがここに表示されます</div>
+        </div>
+      </div>
+    </section>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
