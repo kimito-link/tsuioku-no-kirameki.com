@@ -36,7 +36,8 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   broadcasterIconUrl?: string,
  *   concurrentViewers?: number | null,
  *   chatFilterLabel?: string,
- *   itemCount?: number
+ *   itemCount?: number,
+ *   startedAt?: number | null
  * }} patch
  * @param {number} [nowMs]
  * @returns {{
@@ -49,6 +50,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   peakConcurrentViewers: number | null,
  *   chatFilterLabel: string,
  *   itemCount: number,
+ *   startedAt: number | null,
  *   createdAt: number,
  *   updatedAt: number
  * }}
@@ -83,6 +85,14 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
         ? Math.floor(prev.itemCount)
         : 0;
 
+  // 配信が本当に始まった時刻(ページの「ライブ配信開始日」・ms)。分からなければ前の値のまま。
+  const okTime = (/** @type {unknown} */ v) => typeof v === 'number' && Number.isFinite(v) && v > 0;
+  const startedAt = okTime(patch?.startedAt)
+    ? Math.floor(/** @type {number} */ (patch.startedAt))
+    : okTime(prev.startedAt)
+      ? Math.floor(prev.startedAt)
+      : null;
+
   const createdAt =
     typeof prev.createdAt === 'number' && Number.isFinite(prev.createdAt) && prev.createdAt > 0
       ? prev.createdAt
@@ -98,6 +108,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     peakConcurrentViewers,
     chatFilterLabel,
     itemCount,
+    startedAt,
     createdAt,
     updatedAt: nowMs,
   };

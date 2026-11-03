@@ -589,6 +589,21 @@
     }
     return null;
   }
+  function readStreamStartedAt(videoId) {
+    try {
+      const metas = document.querySelectorAll('meta[itemprop="startDate"]');
+      for (let i = 0; i < metas.length; i += 1) {
+        const scope = metas[i].closest("[itemscope]") || document;
+        const idMeta = scope.querySelector('meta[itemprop="identifier"], meta[itemprop="videoId"]');
+        const id = String(idMeta?.getAttribute("content") || "");
+        if (id && id !== videoId) continue;
+        const ms = Date.parse(String(metas[i].getAttribute("content") || ""));
+        if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) return ms;
+      }
+    } catch {
+    }
+    return null;
+  }
   var lastProbeAt = 0;
   function saveViewerProbe() {
     const now = Date.now();
@@ -663,7 +678,8 @@
           broadcasterName,
           broadcasterChannelId,
           broadcasterIconUrl: readBroadcasterIconUrl(),
-          concurrentViewers: viewers
+          concurrentViewers: viewers,
+          startedAt: readStreamStartedAt(videoId)
         }
       });
       if (viewers === null) saveViewerProbe();

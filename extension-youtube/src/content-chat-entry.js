@@ -305,6 +305,29 @@ function readViewersFromSameLine() {
 }
 
 /**
+ * 配信が本当に始まった時刻(ms)。ページの埋め込み情報 <meta itemprop="startDate"> を読む。
+ * YouTube は画面遷移してもページを読み直さないので、同じページの videoId と一致するときだけ使う。
+ * @param {string} videoId
+ * @returns {number | null}
+ */
+function readStreamStartedAt(videoId) {
+  try {
+    const metas = document.querySelectorAll('meta[itemprop="startDate"]');
+    for (let i = 0; i < metas.length; i += 1) {
+      const scope = metas[i].closest('[itemscope]') || document;
+      const idMeta = scope.querySelector('meta[itemprop="identifier"], meta[itemprop="videoId"]');
+      const id = String(idMeta?.getAttribute('content') || '');
+      if (id && id !== videoId) continue;
+      const ms = Date.parse(String(metas[i].getAttribute('content') || ''));
+      if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) return ms;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/**
  * 同時接続が読めなかったとき、「視聴中」の近くに何が書いてあったかを控える(次に直すための手がかり)。
  * chrome.storage.local の yt_viewer_probe に最後の1回分だけ置く。
  */
@@ -396,6 +419,7 @@ function setupWatchPageMetaObserver() {
         broadcasterChannelId,
         broadcasterIconUrl: readBroadcasterIconUrl(),
         concurrentViewers: viewers,
+        startedAt: readStreamStartedAt(videoId),
       },
     });
     if (viewers === null) saveViewerProbe();
