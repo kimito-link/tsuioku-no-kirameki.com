@@ -887,6 +887,33 @@ function fixSubtree(root) {
 
 // マーケHTML などの保存ファイルは、画面の直し(上の fixSubtree)が届かない文字列として作られる。
 // HTML の Blob を作る瞬間に、同じ直しをその文字列にもかける(失敗したら元のまま)。
+/**
+ * マーケHTML のうち、YouTube では中身が無い・大きすぎて見にくい所を整える(保存するファイルだけ)。
+ * - フォロー情報の2章: ニコニコにしか無い情報で、YouTube では全員「—」。ファイルの半分近く(数MB)を占めて重い→外す
+ * - ギフトの瞬間: YouTube はスパチャが数秒おきに飛ぶので1枚に数百件並ぶ→各カード 8 件まで+「ほか N 件」
+ * @param {Document} doc
+ */
+function ytTrimMarketingDoc(doc) {
+  for (const id of ['mkt-commenter-follow', 'mkt-commenter-follow-analytics']) {
+    doc.getElementById(id)?.remove();
+    doc.querySelectorAll(`a[href="#${id}"]`).forEach((a) => (a.closest('li') || a).remove());
+  }
+  // 来場者数のカードの「未取得」は故障に見えるので「—」(YouTube には来場者数がない)
+  doc.querySelectorAll('#mkt-participation-lead *').forEach((el) => {
+    if (el.children.length === 0 && String(el.textContent || '').trim() === '未取得') el.textContent = '—';
+  });
+  const KEEP = 8;
+  doc.querySelectorAll('ul.mkt-gm-gifts').forEach((ul) => {
+    const items = Array.from(ul.children);
+    if (items.length <= KEEP + 1) return;
+    for (const li of items.slice(KEEP)) li.remove();
+    const more = doc.createElement('li');
+    more.className = 'mkt-gm-gift';
+    more.textContent = `ほか ${items.length - KEEP} 件（全部はギフト投げ履歴の表にあります）`;
+    ul.appendChild(more);
+  });
+}
+
 /** @param {string} html */
 function ytFixHtmlString(html) {
   try {
@@ -897,6 +924,7 @@ function ytFixHtmlString(html) {
     const parked = html.replace(/(\s)on([a-z]+=)/gi, `$1${OFF}$2`);
     const doc = new DOMParser().parseFromString(parked, 'text/html');
     fixSubtree(doc.documentElement);
+    if (doc.getElementById('mkt-kpi')) ytTrimMarketingDoc(doc);
     // 全文検索の索引(data-search)にも疑似 lv・数字ID が入っているので、同じく YouTube に戻す
     doc.querySelectorAll('[data-search]').forEach((el) => {
       const v = String(el.getAttribute('data-search') || '');
