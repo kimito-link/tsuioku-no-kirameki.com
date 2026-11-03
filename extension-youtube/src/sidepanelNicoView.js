@@ -169,6 +169,13 @@ export function formatElapsedJa(ms) {
   return `${Math.floor(totalMin / 60)}時間${String(totalMin % 60).padStart(2, '0')}分`;
 }
 
+/** 同時視聴としてあり得る上限(ytChatParse と同じ 5,000万) */
+const MAX_PLAUSIBLE_VIEWERS = 50_000_000;
+/** @param {number} v */
+function isPlausibleViewers(v) {
+  return Number.isFinite(v) && v >= 0 && v <= MAX_PLAUSIBLE_VIEWERS;
+}
+
 /**
  * 1. 数字カード(記録・同時視聴・コメントした人)と数字の行。
  * @param {any} summary
@@ -179,8 +186,10 @@ export function formatElapsedJa(ms) {
 export function paintStatCards(summary, total, ranking, incState) {
   const uniq = Number(ranking?.uniqueCommenterCount || 0);
   const cv = Number(summary?.concurrentViewers);
-  const concurrent = Number.isFinite(cv) && cv >= 0 && summary?.concurrentViewers != null ? cv : null;
-  const peak = Number(summary?.peakConcurrentViewers);
+  // 前の版が保存した壊れた値(数字が回るアニメの 0〜9 を全部つなげた巨大な数)は表示でも捨てる
+  const concurrent = summary?.concurrentViewers != null && isPlausibleViewers(cv) ? cv : null;
+  const peakRaw = Number(summary?.peakConcurrentViewers);
+  const peak = isPlausibleViewers(peakRaw) ? peakRaw : NaN;
 
   setStatValue('liveStatComments', total > 0 || summary ? formatNumberJa(total) : '—');
   setStatValue('watchConcurrentEst', concurrent !== null ? formatNumberJa(concurrent) : '—');
@@ -313,7 +322,8 @@ export function paintTopSupportRankStrip(summary, ranking, videoId) {
 function syncLaneGadget(laneId, hasRows) {
   const lane = document.querySelector(`.nl-north-star-lane[data-lane="${laneId}"]`);
   if (!(lane instanceof HTMLElement)) return;
-  lane.hidden = false;
+  // ニコ生版と同じく、まだ何も無いレーンは畳む(空の大きな箱を並べない)
+  lane.hidden = !hasRows;
   const gadget = lane.querySelector('.nl-north-star-lane__gadget:not(.nl-north-star-lane__gadget--summary)');
   if (gadget instanceof HTMLElement) {
     gadget.setAttribute('data-nl-acq-mode', 'determinate');
