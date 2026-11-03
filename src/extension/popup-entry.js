@@ -931,6 +931,7 @@ import {
 } from '../lib/watchSnapshotAlignment.js';
 import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
 import { createBroadcasterUidTracker } from '../lib/broadcasterUidTracker.js';
+import { isMarketingExportTabFinished } from '../lib/marketingExportTabState.js';
 
 /**
  * @typedef {{
@@ -17526,7 +17527,7 @@ async function openOrFocusMarketingExportTab(lv) {
       }
     });
     if (match && match.id != null) {
-      await chrome.tabs.update(match.id, { active: true });
+      await chrome.tabs.update(match.id, isMarketingExportTabFinished(match.url || '') ? { url, active: true } : { active: true }); // v0.1.1858: 終わったタブは作り直す
       if (match.windowId != null) await chrome.windows.update(match.windowId, { focused: true });
       return;
     }
