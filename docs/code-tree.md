@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1099 件
+## ⚠️ 役割コメントが無いソース 9 / 1105 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -1000,7 +1000,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2225)
+- 📁 **src/** (2236)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1037,8 +1037,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (105)
-    - 📁 **popup/** (15)
+  - 📁 **extension/** (107)
+    - 📁 **popup/** (17)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1053,6 +1053,8 @@
       - `renderAcquisitionDashboard.test.js`
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
+      - `wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
+      - `wireVoiceGpuTip.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
       - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
@@ -1300,7 +1302,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1951)
+  - 📁 **lib/** (1960)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1960,6 +1962,8 @@
     - `htmlReportCommenterFollowSection.test.js`
     - `htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
     - `htmlReportConceptGuide.test.js`
+    - `htmlReportEmbed.js` — v0.1.1854: 旧「HTMLレポート」(コメント全文・検索・CSV・ユーザー別・自分のコメント等)を、
+    - `htmlReportEmbed.test.js`
     - `htmlReportFullCount.wiring.test.js`
     - `htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
     - `htmlText.test.js`
@@ -3141,6 +3145,9 @@
     - `viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
     - `viewerCelebrationMatch.test.js`
     - `viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `viewerRetentionEstimate.js` — 視聴維持率（推定）: 「最後まで配信を見ていたか」を、コメントした人ひとりずつ推定する。
+    - `viewerRetentionEstimate.test.js`
+    - `viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
     - `viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
     - `viewerSelfLaneAggregate.test.js`
     - `voiceAgeGate.js` — 読み上げアイテムが鮮度切れかどうか判定する純関数。
@@ -3169,6 +3176,9 @@
     - `voiceLagBudget.test.js`
     - `voiceLagNotice.js` — 読み上げが大きく遅れているときの一言(会場・コメビュ共通)。DOM も chrome API も触らない純関数。
     - `voiceLagNotice.test.js`
+    - `voiceLightFallback.js` — VOICEVOX が追いつかないときだけ、PC に入っている軽い声(Windows の声)で読む(純関数)。
+    - `voiceLightFallback.test.js`
+    - `voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
     - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
     - `voiceLoadingState.test.js`
     - `voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
@@ -3181,6 +3191,7 @@
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
+    - `voicePlayerOverloadKeep.test.js`
     - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
     - `voiceQuality.test.js`
     - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。

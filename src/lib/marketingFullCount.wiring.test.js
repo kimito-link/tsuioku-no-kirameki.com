@@ -28,7 +28,7 @@ describe('★マーケレポート: 全件で分析し、過去配信を読ん�
     expect(mch).toMatch(/import \{ judgeNewVsRepeatBasis \} from '\.\/newVsRepeatBasis\.js';/);
     expect(mch).toContain('const newVsRepeatBasis = judgeNewVsRepeatBasis(pastBroadcastsForLayer.length);');
     expect(mch).toContain('newVsRepeatBasis.ok ? sectionNewVsRepeat(newVsRepeat) : sectionNewVsRepeatUnavailable(newVsRepeatBasis.note)');
-    // 次のアドバイスも、出せる(ok)ときだけ
-    expect(mch).toContain('newVsRepeatBasis.ok && newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat()');
+    // v0.1.1854: 章の後ろの定型アドバイスは撤去した(数字だけを出す)
+    expect(mch).not.toContain('adviceAfterNewVsRepeat');
   });
 });

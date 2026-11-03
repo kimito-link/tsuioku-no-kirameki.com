@@ -14305,7 +14305,7 @@ function createDevMonitorOverlay() {
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
-  // v0.1.1853: 拡張が新しい版に入れ替わってこのページが古い版のまま止まったら、自分で読み込み直す(F5 不要・入力中は待つ)。
+  // v0.1.1855: 拡張が新しい版に入れ替わってこのページが古い版のまま止まったら、自分で読み込み直す(F5 不要・入力中は待つ)。
   if (isWatchInlinePanelTopFrame()) startOrphanTabAutoReloadInPage(() => hasExtensionContext());
   /*
    * ★v0.1.1271(ユーザー要望): 会場モードのボタンを出すかを設定で選べるようにした。

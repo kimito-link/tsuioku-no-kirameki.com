@@ -30,7 +30,11 @@ import '../lib/extDocBusyCensusBoot.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
 import { buildMediaKitDocument } from '../lib/mediaKitExport.js';
-import { attachCommenterFollowToReport, buildYukkuriImageDataUrlMap } from './popup/report/htmlReportDocument.js';
+import {
+  attachCommenterFollowToReport,
+  buildHtmlReportDocument,
+  buildYukkuriImageDataUrlMap
+} from './popup/report/htmlReportDocument.js';
 import {
   giftUsersStorageKey,
   eventDomStorageKey,
@@ -71,7 +75,7 @@ import { readStorageBagWithRetry, normalizeUserCommentProfileMap } from '../lib/
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
-import { exportWaitLinesForKind } from '../lib/exportWaitNarration.js';
+import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 
 /**
@@ -642,8 +646,35 @@ async function runExport(lid) {
       mediaKitHtml = '';
     }
     mktProf.mark('media_kit');
+    // v0.1.1854: 旧「HTML」ボタンの中身(コメント全文・検索・CSV・ユーザー別など)も同じ HTML の1章に入れる(ボタンをマーケ1つにまとめる)。
+    //   マーケ側にある章(来場・興味タグ・イベント順位・サムネ一覧・フォロー情報)は二重に出さない。失敗・打ち切りでも分析レポートは必ず出す(fail-soft)。
+    //   「共有用に伏せる」のときは名前入りのコメント一覧になるので章ごと入れない。
+    let htmlReportHtml = '';
+    if (!maskShareLabels) {
+      setWaitStageText('コメント記録をまとめています…', 90);
+      try {
+        htmlReportHtml = await withTimeout(
+          buildHtmlReportDocument(
+            comments,
+            snapshot,
+            '',
+            lid,
+            `https://live.nicovideo.jp/watch/${lid}`,
+            null,
+            { ...buildHtmlReportDeps(snapshot), watchSnapshotStorageKey, embedForMarketing: true }
+          ),
+          resolveHtmlReportBuildTimeoutMs(comments.length),
+          'html_report_build_timeout'
+        );
+      } catch {
+        htmlReportHtml = '';
+      }
+    }
+    mktProf.mark('html_report');
     const html = buildMarketingDashboardHtml(report, {
       mediaKitHtml,
+      htmlReportHtml,
+      programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
       maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
