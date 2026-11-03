@@ -4678,5 +4678,33 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1850', metric: 'cross-checked-claims', value: 43,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日の窓で数える値。0.1.1848 の42から+1(過去最良55より低いのは窓から古い回が抜けたため)'
+  }),
+  Object.freeze({
+    version: '0.1.1851', metric: 'bundle-kb', value: 1438,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1850 と同じ。軽い声への切り替えは会場の読み上げ側だけで popup には入らない'
+  }),
+  Object.freeze({
+    version: '0.1.1851', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1851', metric: 'cross-checked-claims', value: 43,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値。0.1.1850 と同じ'
+  }),
+  Object.freeze({
+    version: '0.1.1852', metric: 'bundle-kb', value: 1438,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1851 と同じ(GPU の案内の配線は数百バイトで KB の繰り上がりに届かない)'
+  }),
+  Object.freeze({
+    version: '0.1.1852', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1852', metric: 'cross-checked-claims', value: 43,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値。0.1.1851 と同じ'
   })
 ]);

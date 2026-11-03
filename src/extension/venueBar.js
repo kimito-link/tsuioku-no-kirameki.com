@@ -2798,6 +2798,13 @@ export function mountVenueBarButton(options = {}) {
   // 2026-11-01: GPU の案内(遅れの一言とは別の行・文言と判定は voiceLagNotice.decideVoiceGpuTip)。出すときだけ見える。
   const voiceGpuTip = Object.assign(/** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()), { className: 'nlsb-voice-gpu-tip', hidden: true });
   voiceGpuTip.style.cssText += 'color:#b45309;font-weight:600;';
+  // 2026-11-03 りんく: 会場の帯は半透明で、後ろのニコ生のコメント入力欄と文字が重なって読めなかった。
+  //   遅れの一言と GPU の案内だけ、不透明な下地を敷いて何の上でも読めるようにする。
+  voiceLag.hidden = true;
+  for (const el of [voiceLag, voiceGpuTip]) {
+    el.style.cssText += 'background:rgba(255,255,255,0.96);padding:2px 8px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.18);';
+  }
+  voiceGpuTip.style.background = '#fff7e6';
 
   let venueWindowBtn = null;
   if (!isStandalone) {
@@ -3388,7 +3395,7 @@ export function mountVenueBarButton(options = {}) {
       /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
     ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
-    onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; },
+    onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; voiceLag.hidden = !text; },
     onGpuTip: (/** @type {string} */ text) => { voiceGpuTip.textContent = text; voiceGpuTip.title = text; voiceGpuTip.hidden = !text; },
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');

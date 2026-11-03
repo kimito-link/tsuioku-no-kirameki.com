@@ -56,6 +56,8 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   dropCountGateTotal: number,  // 2026-07-28計器: 件数ゲート最古dropの累計(3分別のうちの1つ)
  *   dropHeadStaleTotal: number,  // 2026-07-28計器: 先頭itemの単体stale破棄の累計
  *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
+ *   lightSpokenTotal: number,  // 2026-11-03計器: VOICEVOX が追いつかず軽い声(Windows の声)で読んだ件数
+ *   lightVoiceActive: boolean, // 2026-11-03計器: 今、軽い声で読んでいるか
  *   synthNullTotal: number,      // 2026-08-01計器: 合成がnullで返り読まれずに消えた累計
  *   synthNullNearTimeout: number,// 同上のうち時間切れ(8000ms上限付近)由来の件数
  *   audioBlockedTotal: number,   // v0.1.1327計器: ブラウザの自動再生ブロック(NotAllowedError)で鳴らせなかった累計
@@ -160,6 +162,8 @@ export function makeInitialVoiceDiag() {
     dropCountGateTotal: 0,
     dropHeadStaleTotal: 0,
     dropSweepStaleTotal: 0,
+    lightSpokenTotal: 0,
+    lightVoiceActive: false,
     // v0.1.1213: 合成が null で返って消えた件(時間切れ内訳つき)。
     synthNullTotal: 0,
     synthNullNearTimeout: 0,
@@ -319,6 +323,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
     dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
+    lightSpokenTotal: num(d.lightSpokenTotal, base.lightSpokenTotal),
+    lightVoiceActive: d.lightVoiceActive === true,
     upstreamEmaMs: num(d.upstreamEmaMs, base.upstreamEmaMs),
     lastUpstreamMs: num(d.lastUpstreamMs, base.lastUpstreamMs),
     queueWaitEmaMs: num(d.queueWaitEmaMs, base.queueWaitEmaMs),
