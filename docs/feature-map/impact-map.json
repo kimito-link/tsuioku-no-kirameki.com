@@ -2320,6 +2320,34 @@
       ]
     },
     {
+      "file": "src/lib/voiceLightFallback.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceLightSpeaker.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceLoadingState.js",
       "featureCount": 3,
       "features": [
