@@ -2854,11 +2854,16 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     if (totalMin < 60) return `${totalMin}分`;
     return `${Math.floor(totalMin / 60)}時間${String(totalMin % 60).padStart(2, "0")}分`;
   }
+  var MAX_PLAUSIBLE_VIEWERS = 5e7;
+  function isPlausibleViewers(v) {
+    return Number.isFinite(v) && v >= 0 && v <= MAX_PLAUSIBLE_VIEWERS;
+  }
   function paintStatCards(summary, total, ranking, incState) {
     const uniq = Number(ranking?.uniqueCommenterCount || 0);
     const cv = Number(summary?.concurrentViewers);
-    const concurrent = Number.isFinite(cv) && cv >= 0 && summary?.concurrentViewers != null ? cv : null;
-    const peak = Number(summary?.peakConcurrentViewers);
+    const concurrent = summary?.concurrentViewers != null && isPlausibleViewers(cv) ? cv : null;
+    const peakRaw = Number(summary?.peakConcurrentViewers);
+    const peak = isPlausibleViewers(peakRaw) ? peakRaw : NaN;
     setStatValue("liveStatComments", total > 0 || summary ? formatNumberJa(total) : "—");
     setStatValue("watchConcurrentEst", concurrent !== null ? formatNumberJa(concurrent) : "—");
     setStatValue("watchViewerDom", uniq > 0 || summary ? formatNumberJa(uniq) : "—");
@@ -2954,7 +2959,7 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
   function syncLaneGadget(laneId, hasRows) {
     const lane = document.querySelector(`.nl-north-star-lane[data-lane="${laneId}"]`);
     if (!(lane instanceof HTMLElement)) return;
-    lane.hidden = false;
+    lane.hidden = !hasRows;
     const gadget = lane.querySelector(".nl-north-star-lane__gadget:not(.nl-north-star-lane__gadget--summary)");
     if (gadget instanceof HTMLElement) {
       gadget.setAttribute("data-nl-acq-mode", "determinate");
