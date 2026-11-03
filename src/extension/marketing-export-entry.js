@@ -77,6 +77,7 @@ import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
+import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 
 /**
  * @typedef {{
@@ -431,9 +432,32 @@ function setWaitStageText(text, progressPct) {
   }
 }
 
+/** 処理を始めるときは「終わった」印を消す(処理中のタブを popup が作り直さないように)。 */
+function clearTabFinished() {
+  try {
+    const u = new URL(location.href);
+    if (!u.searchParams.has(MARKETING_EXPORT_STATE_PARAM)) return;
+    u.searchParams.delete(MARKETING_EXPORT_STATE_PARAM);
+    history.replaceState(null, '', u.toString());
+  } catch {
+    /* no-op */
+  }
+}
+
+/** @param {'done'|'error'} state */
+function markTabFinished(state) {
+  // v0.1.1858: 終わったことを URL に残す。popup はこれを見て、もう一度押されたら作り直す(前に出すだけにしない)。
+  try {
+    history.replaceState(null, '', withMarketingExportState(location.href, state));
+  } catch {
+    /* no-op */
+  }
+}
+
 /** @param {string} text */
 function showDoneStage(text) {
   stopWaitCharCycle();
+  markTabFinished('done');
   const wait = document.getElementById('mktWaitStage');
   const done = document.getElementById('mktDoneStage');
   const doneText = document.getElementById('mktDoneText');
@@ -445,6 +469,7 @@ function showDoneStage(text) {
 /** @param {string} text @param {boolean} [showRetry] */
 function showErrorStage(text, showRetry) {
   stopWaitCharCycle();
+  markTabFinished('error');
   const wait = document.getElementById('mktWaitStage');
   const err = document.getElementById('mktErrorStage');
   const errText = document.getElementById('mktErrorText');
@@ -456,6 +481,7 @@ function showErrorStage(text, showRetry) {
     retryBtn.onclick = () => {
       err?.classList.remove('is-visible');
       if (wait) wait.style.display = 'flex';
+      clearTabFinished();
       void runExport(liveIdFromUrl());
     };
   }
@@ -751,6 +777,7 @@ async function runExport(lid) {
 
 function bootstrap() {
   /** @type {any} */ (window).__NL_MKTEXPORT_BOOTED = true;
+  clearTabFinished();
   startWaitCharCycle();
   const skipBtn = document.getElementById('mktSkipBtn');
   if (skipBtn) skipBtn.hidden = true; // MVP: セクション演出はPR3で追加、今は待機演出のみのため非表示
