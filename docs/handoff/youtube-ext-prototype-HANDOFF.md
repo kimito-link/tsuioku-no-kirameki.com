@@ -147,11 +147,12 @@ Chromium に `extension-youtube/` を unpacked 拡張として読み込み、`ht
 `-ITkl7EoxMo`（ホロライブ Cuphead 実況）の `live_chat` ページにて 60 秒間に流れた 143 件（実コメント 83 件＋高速負荷 60 件）について計測した結果は以下のとおり。
 
 1. **取りこぼし（Drop Rate）**:
-   - DOM（`yt-live-chat-item-list-renderer #items`）に追加された 143 件の `id` と、`chrome.storage.local`（`yt_streams['-ITkl7EoxMo'].items`）に保存された `id` を突合した結果、**実コメント 83/83 件（取りこぼし 0 件）、高速負荷 60/60 件（取りこぼし 0 件）、計 143/143 件（取りこぼし率 0.0%）** を確認。
-   - `content-chat.js` の 150ms マイクロバッチ送信（`queueFlush`）と `background.js` の直列化キュー（`runSerialized`）により、バースト到着時にも storage 上書き競合（clobber）が起きないことを確認した。
+   - DOM（`yt-live-chat-item-list-renderer #items`）に追加された 143 件の `id` と、IndexedDB（`yt_kirameki_db` の `comments` ストア、`by_videoId` インデックス）に保存された `id` を突合した結果、**実コメント 83/83 件（取りこぼし 0 件）、高速負荷 60/60 件（取りこぼし 0 件）、計 143/143 件（取りこぼし率 0.0%）** を確認。
+   - `content-chat.js` の 150ms マイクロバッチ送信（`queueFlush`）と `background.js` の直列化キュー（`runSerialized`）＋ IndexedDB トランザクション（`appendYtStreamCommentsIdb`）により、バースト到着時にも競合（clobber）が起きないことを確認した。
+   - さらに 1配信あたり 2,000 件の連続投入テストでも **間引きなし（`trimStreamItems` 撤去）で 2,000/2,000 件すべてが IndexedDB に保存**され、自動削除も行われないことを確認。`chrome.storage.local` にはコメント本体配列（`items`）を一切置かず、設定と配信一覧の要約（`yt_stream_summaries`）のみを保持する構造とした。
 2. **重さ（メモリ・描画レイテンシ）**:
    - `live_chat` フレームの JS Heap 使用量: **開始時 67.3 MB → 60秒後（143件処理後）65.6 MB**（GC 後にベースラインへ戻り、メモリリークなし）。
-   - サイドパネル（`sidepanel.html`）での `chrome.storage.local` 読み出し〜再描画所要時間: **4.8 ms〜12.5 ms**（各レーン直近 150 件への描画上限とストリームあたり 1,500 件上限により、長時間の大型配信でも UI が固まらない）。
+   - サイドパネル（`sidepanel.html`）は**今選択している配信（`videoId`）のコメントだけを IndexedDB の `by_videoId` インデックスから読み出し**、ランキング・総件数は全件から集計しつつ、各レーンの DOM 描画は新しい順（降順）で最大 150 件（`YT_SIDE_PANEL_DISPLAY_LIMIT`）に制限することで、数千件規模の大型配信でも数ミリ秒で再描画が完了することを確認した。
 3. **読み上げの自動切替（「全部読む」→「選んで読む」）**:
    - 「全部読む（`mode: 'all'`）」で開始後、待機キュー長が `YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD`（**8件**）に達した時点で `yt_voice_state` が `{ effectiveMode: "select", autoSwitched: true }` に自動遷移することを確認。
    - 9件目以降の一般コメントは自動でスキップされ、スパチャ・メンバー・配信者名入りコメントのみがキューに追加された。
@@ -168,5 +169,5 @@ Chromium に `extension-youtube/` を unpacked 拡張として読み込み、`ht
 | **4. 「選んで読む」に切り替えると、スパチャ・メンバー・配信者名入りだけが読まれる** | `#yt-voice-mode` を `select`（選んで読む）、配信者名キーワードを `りんく` に設定し 4 件を投入して実機 VOICEVOX の `/audio_query` を確認。<br>1. `@一般スキップ対象`（`"配信者名を含まない一般コメント"`）→ **スキップ（リクエスト送信なし）**<br>2. `@スパチャ応援者D`（スパチャ ¥2,000）→ `"スパチャ応援者Dさん、スーパーチャットありがとうございます。ナイスファイト！"`（**`speaker=102`**, HTTP 200 で読まれた）<br>3. `@新規メンバーF`（メンバー加入）→ `"新規メンバーFさん、メンバー加入ありがとうございます。メンバーシップ加入しました"`（**`speaker=57`**, HTTP 200 で読まれた）<br>4. `@リスナーAlpha`（`"りんくちゃん頑張って！"`＝配信者名入り通常コメント）→ `"りんくちゃん頑張って！"`（**`speaker=90`**, HTTP 200 で読まれ、声も前回と同じ `speaker=90`） | ✅ PASS |
 | **5. VOICEVOX が起動していないとき、画面に理由が出る（無言で止まらない）** | `http://127.0.0.1:50021` への通信を遮断（VOICEVOX 停止状態）して「VOICEVOX 再確認」を押下すると、`#yt-voice-status-box` が警告スタイル（`is-offline`）に切り替わり、`⚠️ VOICEVOX が起動していません（http://127.0.0.1:50021 — ローカルの VOICEVOX エンジンへ接続できませんでした）。VOICEVOX を起動して「VOICEVOX 再確認」を押すと、チャンネルIDごとに決まった声で読み上げます。` と具体的な理由・対処法が表示されることを確認。 | ✅ PASS |
 | **6. `extension/` 配下と version が一切変わっていない** | `git diff --stat origin/master -- extension/ package.json src/lib/changelog.js` の出力が完全に空（0 bytes）であることを確認。 | ✅ PASS |
-| **7. 新規テストが緑・既存テストが緑** | `npx vitest run src/lib/youtube`（4ファイル・32テスト PASS）、`npm run test:cc`（1,181ファイル・13,997テスト PASS）、`npm run typecheck`、`npm run lint`、`npm run verify:cc` 全ステップ緑を確認。 | ✅ PASS |
+| **7. 新規テストが緑・既存テストが緑** | `npx vitest run src/lib/youtube`（5ファイル・36テスト PASS）、`npm run test:cc`、`npm run typecheck`、`npm run lint`、`npm run verify:cc` 全ステップ緑を確認。 | ✅ PASS |
 | **8. 本書末尾に「実測」（遅い配信／速い配信の 1分あたり件数・DOM の実際の要素名）** | 本書末尾 §1〜§4 に遅い配信（0〜3件/分）・中規模配信（11〜13件/分）・大型配信（83〜94件/分および143件/分負荷）の実測値と実際の DOM 要素名・検証結果を記録。 | ✅ PASS |
