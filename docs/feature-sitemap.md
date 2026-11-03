@@ -668,7 +668,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 46</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 47</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
@@ -693,6 +693,7 @@
 - `src/lib/htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
 - `src/lib/liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
 - `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
+- `src/lib/marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
 - `src/lib/marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
 - `src/lib/marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
 - `src/lib/mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
@@ -1315,9 +1316,6 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🙂 匿名(184) (1版)
-- `v0.1.1835` 2026-10-31 — アプリのコメントに顔アイコンを出す
-
 ### 🏟 会場・席 (3版)
 - `v0.1.1855` 2026-11-03 — 拡張の更新後に F5 しなくても動くように
 - `v0.1.1852` 2026-11-03 — GPU の案内をポップアップにも・会場で読みやすく
@@ -1345,7 +1343,8 @@
 - `v0.1.1856` 2026-11-03 — マーケHTMLのスクロールを軽く
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
 
-### その他 (4版)
+### その他 (5版)
+- `v0.1.1858` 2026-11-04 — マーケHTMLを撮り直せないのを直す
 - `v0.1.1854` 2026-11-03 — マーケを1つに・視聴維持率を追加
 - `v0.1.1844` 2026-10-31 — Android アプリでもコメントを流せるように
 - `v0.1.1843` 2026-10-31 — 過去コメントの埋め直しの読み違いを直す

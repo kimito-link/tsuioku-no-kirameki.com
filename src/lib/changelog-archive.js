@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1835',
+    date: '2026-10-31',
+    summary: 'アプリのコメントに顔アイコンを出す',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」で、コメントの横にその人のアイコンを出すようにしました。アイコン未設定の人と匿名の人は、その人ごとのゆっくり顔になります。名前を押すとニコニコのユーザーページが開きます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1834',
     date: '2026-10-31',
     summary: 'アプリでコメントの接続が止められていたのを直す',

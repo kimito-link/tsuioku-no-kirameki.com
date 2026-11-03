@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1858',
+    date: '2026-11-04',
+    summary: 'マーケHTMLを撮り直せないのを直す',
+    items: Object.freeze([
+      '同じ配信のマーケHTMLをもう一度撮ろうとすると、前回の「ダウンロードを開始しました」のタブが前に出るだけで、分析もダウンロードも始まりませんでした(タイムシフトで撮り直したときなど)。終わったタブは作り直して、毎回ちゃんと分析とダウンロードが始まるようにしました。処理中のタブは今までどおり前に出すだけです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1857',
     date: '2026-11-03',
     summary: 'メディアキットを配信者ごとに・さらに軽く',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'つなぎ直しで同じコメントが二重に出ないように',
     items: Object.freeze([
       'iPhone アプリの「💬 コメントを流す」で、通信が切れて自動でつなぎ直したとき、直前のコメントがもう一度並ぶことがありました。一度並べたコメントとギフトは二度並べないようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1835',
-    date: '2026-10-31',
-    summary: 'アプリのコメントに顔アイコンを出す',
-    items: Object.freeze([
-      'iPhone アプリの「💬 コメントを流す」で、コメントの横にその人のアイコンを出すようにしました。アイコン未設定の人と匿名の人は、その人ごとのゆっくり顔になります。名前を押すとニコニコのユーザーページが開きます。'
     ])
   })
 ]);
