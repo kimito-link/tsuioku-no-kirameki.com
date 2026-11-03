@@ -12296,9 +12296,11 @@
               aria-label="書き出しと watch の再読み込み"
               aria-describedby="exportToolbarHint"
             >
+              <!-- v0.1.1854: 「HTML」の中身はマーケの1章に入った(ボタンはマーケ1つ)。要素は保存先の情報(dataset)を持つので残して隠す。 -->
               <button
                 type="button"
                 id="exportJson"
+                hidden
                 disabled
                 title="HTMLレポートを保存"
                 aria-label="HTMLレポートを保存。メタ情報・保存コメントをまとめた検索用HTMLをダウンロードします。"
@@ -12312,8 +12314,8 @@
                 type="button"
                 id="exportMarketingQuickBtn"
                 disabled
-                title="マーケ分析+メディアキットを1つのHTMLで保存"
-                aria-label="マーケ分析とメディアキットを1つのHTMLで保存。グラフと指標、共有用の実績サマリがまとまっています。"
+                title="マーケ分析・視聴維持率・メディアキット・コメント記録を全部1つのHTMLで保存"
+                aria-label="マーケ分析・視聴維持率・メディアキット・コメント記録を全部1つのHTMLで保存。グラフと指標、最後まで見た人の割合、共有用の実績サマリ、コメント全文の検索とCSVがまとまっています。"
               >
                 <span class="nl-compose-qbtn__row">
                   <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
@@ -12435,7 +12437,7 @@
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
           id="exportToolbarHint"
         >
-          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（なふだ・取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
+          マーケ（分析・コメント記録をまとめて1つのHTML）・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（なふだ・取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
         </p>
         <details
           class="nl-export-toolbar__details nl-compose-primary-more"

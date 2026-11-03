@@ -485,6 +485,7 @@ export async function attachCommenterFollowToReport(report, liveId, opts = {}, d
  *   getCachedAnonymousIdenticonDataUrl: (userId: string) => string,
  *   watchMetaSnapshot: any,
  *   inlinePassive: boolean,
+ *   embedForMarketing?: boolean,
  *   watchSnapshotStorageKey: (liveId: string) => string
  * }} deps
  * @returns {Promise<string>}
@@ -498,6 +499,8 @@ export async function buildHtmlReportDocument(
   eventRankingModel,
   deps
 ) {
+  // v0.1.1854: マーケ分析の1章として埋め込むとき(マーケ側にある章=来場・興味タグ・イベント順位・サムネ一覧・フォロー情報・保存の案内は出さない)。
+  const embed = deps.embedForMarketing === true;
   const exportedAtIso = new Date().toISOString();
   const exportedAtJst = formatDateTime(Date.now());
   const safeLiveId = escapeHtml(liveId);
@@ -1591,19 +1594,19 @@ export async function buildHtmlReportDocument(
   </head>
   <body>
     <div class="wrap">
-      <header class="hero">
+      ${embed ? '' : `<header class="hero">
         <h1>君斗りんくの追憶のきらめき HTMLレポート <span class="pill">${safeLiveId}</span></h1>
         <p>出力日時: ${escapeHtml(exportedAtJst)} / ISO: ${escapeHtml(exportedAtIso)}</p>
         <p class="mono">watch URL: ${safeWatchUrl}</p>
-      </header>
+      </header>`}
 
-      ${participationLeadHtml}
+      ${embed ? '' : participationLeadHtml}
 
-      ${sectionInterestArrival(participationSummaryReport)}
+      ${embed ? '' : sectionInterestArrival(participationSummaryReport)}
 
       ${yukkuriReportHtml}
 
-      ${eventRankingSectionHtml}
+      ${embed ? '' : eventRankingSectionHtml}
 
       <div class="search-box">
         <input id="q" type="search" placeholder="タイトル・配信者・タグ・メタ・script・コメントを横断検索（例: 珈琲 / まめ。２ / コーヒー / og:title）">
@@ -1613,16 +1616,16 @@ export async function buildHtmlReportDocument(
       <nav class="toc" aria-label="目次">
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
-          <li><a href="#sec-participation-lead">来場とコメント参加</a></li>
-          <li><a href="#mkt-interest-arrival">興味タグ別来場${participationSummaryReport?.interestArrivalSummary?.messageCount > 0 ? '' : '（検出 0件）'}</a></li>
+          ${embed ? '' : `<li><a href="#sec-participation-lead">来場とコメント参加</a></li>
+          <li><a href="#mkt-interest-arrival">興味タグ別来場${participationSummaryReport?.interestArrivalSummary?.messageCount > 0 ? '' : '（検出 0件）'}</a></li>`}
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
-          ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
+          ${eventRankingSectionHtml && !embed ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
-          ${thumbedUsersSectionHtml ? '<li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>' : ''}
-          ${commenterFollowBlock.hasDirectory ? '<li><a href="#sec-commenter-follow">数値IDコメンター（フォロー情報）</a></li>' : ''}
-          ${commenterFollowBlock.hasAnalytics ? '<li><a href="#sec-commenter-follow-analytics">フォロー×コメント分析</a></li>' : ''}
+          ${thumbedUsersSectionHtml && !embed ? '<li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>' : ''}
+          ${commenterFollowBlock.hasDirectory && !embed ? '<li><a href="#sec-commenter-follow">数値IDコメンター（フォロー情報）</a></li>' : ''}
+          ${commenterFollowBlock.hasAnalytics && !embed ? '<li><a href="#sec-commenter-follow-analytics">フォロー×コメント分析</a></li>' : ''}
           <li><a href="#sec-self-comments">自分のコメント抜粋</a></li>
           <li><a href="#sec-all-comments">保存コメント一覧（CSV ダウンロードあり）</a></li>
           <li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
@@ -1705,12 +1708,12 @@ export async function buildHtmlReportDocument(
           </table>
         </section>
         ${kiramekiAwardsSectionHtml}
-        ${thumbedUsersSectionHtml}
-        ${commenterFollowBlock.directoryHtml}
-        ${commenterFollowBlock.analyticsHtml}
+        ${embed ? '' : thumbedUsersSectionHtml}
+        ${embed ? '' : commenterFollowBlock.directoryHtml}
+        ${embed ? '' : commenterFollowBlock.analyticsHtml}
       </div>
-      ${htmlReportConceptGuideCardHtml}
-      ${htmlReportSaveGuideCardHtml}
+      ${embed ? '' : htmlReportConceptGuideCardHtml}
+      ${embed ? '' : htmlReportSaveGuideCardHtml}
 
       <section class="card" id="sec-share-meta" style="margin-top:12px;">
         <h2>シェア・プレビュー向けの情報</h2>
@@ -1815,7 +1818,7 @@ export async function buildHtmlReportDocument(
         }
       })();
     </script>
-    ${commenterFollowBlock.embedScriptHtml}
+    ${embed ? '' : commenterFollowBlock.embedScriptHtml}
   </body>
 </html>`;
 }

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1100 件
+## ⚠️ 役割コメントが無いソース 9 / 1103 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -40,6 +40,34 @@
 
 ## 全ファイルツリー
 
+- 📁 **"src/** (17)
+  - 📁 **images/** (17)
+    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png"`
+          - `logo_funlink_black_RGB_link_black.png"`
+          - `logo_funlink_black_RGB_maru_black.png"`
+      - 📁 **color/** (8)
+        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
+          - `logo_funlink_RGB_color.png"`
+          - `logo_funlink_RGB_ginga_color.png"`
+          - `logo_funlink_RGB_hoshi.png"`
+          - `logo_funlink_RGB_link_hoshi.png"`
+          - `logo_funlink_RGB_link_orange.png"`
+          - `logo_funlink_RGB_maru_blue.png"`
+          - `logo_funlink_RGB_maru_ginga.png"`
+          - `logo_funlink_RGB_maru_orange.png"`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png"`
+        - `logo_funlink_white_RGB_link_black.png"`
+        - `logo_funlink_white_RGB_maru_black.png"`
+    - 📁 **logo/** (3)
+      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg"`
+        - `251016_logo_guide_kimitolink_ol.ai"`
+        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -972,7 +1000,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2245)
+- 📁 **src/** (2233)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1122,7 +1150,7 @@
     - `voiceTestHook.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (134)
+  - 📁 **images/** (117)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1222,7 +1250,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (13)
+    - 📁 **logo/** (10)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1232,11 +1260,6 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
-      - 📁 **データ一式/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg`
-        - `251016_logo_guide_kimitolink_ol.ai`
-        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1277,28 +1300,8 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
-    - 📁 **データ出力/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png`
-          - `logo_funlink_black_RGB_link_black.png`
-          - `logo_funlink_black_RGB_maru_black.png`
-      - 📁 **color/** (8)
-        - 📁 **RGB_データ用/** (8)
-          - `logo_funlink_RGB_color.png`
-          - `logo_funlink_RGB_ginga_color.png`
-          - `logo_funlink_RGB_hoshi.png`
-          - `logo_funlink_RGB_link_hoshi.png`
-          - `logo_funlink_RGB_link_orange.png`
-          - `logo_funlink_RGB_maru_blue.png`
-          - `logo_funlink_RGB_maru_ginga.png`
-          - `logo_funlink_RGB_maru_orange.png`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png`
-        - `logo_funlink_white_RGB_link_black.png`
-        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1953)
+  - 📁 **lib/** (1958)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1958,6 +1961,8 @@
     - `htmlReportCommenterFollowSection.test.js`
     - `htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
     - `htmlReportConceptGuide.test.js`
+    - `htmlReportEmbed.js` — v0.1.1854: 旧「HTMLレポート」(コメント全文・検索・CSV・ユーザー別・自分のコメント等)を、
+    - `htmlReportEmbed.test.js`
     - `htmlReportFullCount.wiring.test.js`
     - `htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
     - `htmlText.test.js`
@@ -3137,6 +3142,9 @@
     - `viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
     - `viewerCelebrationMatch.test.js`
     - `viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `viewerRetentionEstimate.js` — 視聴維持率（推定）: 「最後まで配信を見ていたか」を、コメントした人ひとりずつ推定する。
+    - `viewerRetentionEstimate.test.js`
+    - `viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
     - `viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
     - `viewerSelfLaneAggregate.test.js`
     - `voiceAgeGate.js` — 読み上げアイテムが鮮度切れかどうか判定する純関数。

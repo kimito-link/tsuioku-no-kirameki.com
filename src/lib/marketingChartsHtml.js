@@ -46,6 +46,9 @@ import {
   SUPPORTERS_GIFTS_CSS
 } from './supportersGiftsSection.js';
 import { sectionMediaKitHtml } from './mediaKitEmbed.js';
+import { estimateViewerRetention } from './viewerRetentionEstimate.js';
+import { buildViewerRetentionSectionHtml } from './viewerRetentionSectionHtml.js';
+import { sectionHtmlReportChapter } from './htmlReportEmbed.js';
 import { buildCrossSupporterRanking } from './crossSupporterRanking.js';
 import { diagnoseKeyboardTypes } from './keyboardTypeDiagnostic.js';
 import {
@@ -4406,6 +4409,8 @@ function buildSectionRevealScriptHtml() {
  *   yukkuriImageDataUrlMap?: Record<string, string>,
  *   eventRanking?: EventRankingReportModel | null,
  *   mediaKitHtml?: string,
+ *   htmlReportHtml?: string,
+ *   programStartAtMs?: number,
  *   slimForHeavyExport?: boolean
  * }} [opts]
  * @returns {string}
@@ -4493,6 +4498,11 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     currentComments: currentCommentsForLayer,
     pastBroadcasts: pastBroadcastsForLayer,
     heavyThreshold: 5
+  });
+  // v0.1.1854: 視聴維持率(最後まで見たか・コメント時刻からの推定)。一人ずつ＋全体。
+  const viewerRetention = estimateViewerRetention(currentCommentsForLayer, {
+    broadcasterUserId,
+    programStartAtMs: typeof opts.programStartAtMs === 'number' ? opts.programStartAtMs : undefined
   });
   const survivalCurve = buildCommenterSurvivalCurve(currentCommentsForLayer, {
     segmentCount: 5
@@ -4819,6 +4829,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // 何も起こらない／謎のスクロール挙動になる問題を解消する。
   const allTocItems = [
     { id: 'mkt-participation-lead', label: '来場とコメント参加' },
+    { id: 'mkt-viewer-retention', label: '視聴維持率（最後まで見たか）' },
     { id: 'mkt-gift-moments', label: 'ギフトの瞬間' },
     { id: 'mkt-ad-observed', label: '広告の気づいた時刻' },
     { id: 'mkt-analysis-skills', label: '分析スキルボード' },
@@ -4836,6 +4847,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-gift-ledger', label: 'ギフト投げ履歴' },
     { id: 'mkt-supporters-gifts', label: '応援者とギフト' },
     { id: 'mkt-media-kit-section', label: 'メディアキット' },
+    { id: 'mkt-html-report-section', label: 'コメント記録（全文検索・CSV）' },
     { id: 'mkt-onboarding', label: '初見さんの手がかり' },
     { id: 'mkt-clip-promo', label: '切り抜き・告知候補' },
     { id: 'mkt-listener-care', label: 'リスナーお返し' },
@@ -4905,6 +4917,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const bodyHtml = `${sectionFeaturesOverview()}
 __NL_TOC_PLACEHOLDER__
 ${sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
+${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver })}
 ${idWrap('mkt-gift-moments', sectionGiftMoments(giftMomentsAnalysis, giftMomentNextLines, maskShare, identiconResolver))}
 ${idWrap('mkt-ad-observed', adObservedHtml)}
 ${sectionAdviceIntro()}
@@ -4924,6 +4937,7 @@ ${sectionSupportersGiftsHtml(supportersGiftsRows, {
   renderIdentity: (row) => giftLedgerUserIdentityCells({ userId: row.userId, senderLabel: row.label, senderAvatarUrl: row.avatarUrl }, maskShare, identiconResolver)
 })}
 ${typeof opts.mediaKitHtml === 'string' ? sectionMediaKitHtml(opts.mediaKitHtml) : ''}
+${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlReportHtml) : ''}
 ${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
 ${idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
 ${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, audienceGap)}
