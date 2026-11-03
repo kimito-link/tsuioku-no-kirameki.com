@@ -21,6 +21,10 @@ const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const REPO = path.resolve(arg('--repo', '.'));
 const OUT = path.resolve(arg('--out', 'council-trial.json'));
 const ONLY = arg('--only', ''); // 例: --only groq,gemini
+const MODELS = arg('--models', ''); // 例: --models mistral:mistral-large-4,gemini:gemini-3.8-flash（指定時はカタログ探索をせずこれだけ試す）
+const DELAY = Number(arg('--delay', '1500')); // 同じプロバイダへ続けて投げる間隔(ms)。Mistral は 429 を踏むので 20000 以上
+const TIMEOUT = Number(arg('--timeout', '120000'));
+const REPEAT = Number(arg('--repeat', '1')); // 安定性を見るなら 2〜3
 
 const { LINEUP } = await import(pathToFileURL(path.join(REPO, 'scripts/council-lineup.mjs')).href);
 
@@ -101,7 +105,7 @@ async function probe(provider, model, extra = {}) {
   try {
     if (provider === 'gemini') {
       const r = await j(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${K.gemini}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, timeoutMs: 120000,
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, timeoutMs: TIMEOUT,
         body: JSON.stringify({ contents: [{ parts: [{ text: PROMPT }] }], systemInstruction: { parts: [{ text: SYSTEM }] }, generationConfig: { maxOutputTokens: 8192, temperature: 0.6 } }),
       });
       const c = r.body?.candidates?.[0];
@@ -110,7 +114,7 @@ async function probe(provider, model, extra = {}) {
     }
     const url = typeof ENDPOINT[provider] === 'function' ? ENDPOINT[provider]() : ENDPOINT[provider];
     const r = await j(url, {
-      method: 'POST', timeoutMs: 120000,
+      method: 'POST', timeoutMs: TIMEOUT,
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + K[KEYOF[provider]] },
       body: JSON.stringify({ model, messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: PROMPT }], max_tokens: 1600, temperature: 0.6, ...extra }),
     });
@@ -118,7 +122,8 @@ async function probe(provider, model, extra = {}) {
     const msg = ch?.message || {};
     const reasoning = msg.reasoning_content || msg.reasoning || '';
     const err = r.status !== 200 ? (r.body?.error?.message || r.body?.errors?.[0]?.message || r.body?.message || r.body?.detail || JSON.stringify(r.body).slice(0, 200)) : '';
-    return fin(provider, model, t0, r.status, msg.content || '', ch?.finish_reason || '', String(reasoning).length, err, r.body?.usage?.cost);
+    const content = Array.isArray(msg.content) ? msg.content.map((p) => (typeof p === 'string' ? p : p?.text || '')).join('') : String(msg.content || '');
+    return fin(provider, model, t0, r.status, content, ch?.finish_reason || '', String(reasoning).length, err, r.body?.usage?.cost);
   } catch (e) {
     return fin(provider, model, t0, 0, '', '', 0, e.message || String(e));
   }
@@ -132,7 +137,7 @@ function fin(provider, model, t0, status, text, finish, reasoningLen, err, cost)
   return rec;
 }
 
-const { out: cat, notes } = await catalog();
+const { out: cat, notes } = MODELS ? { out: {}, notes: {} } : await catalog();
 const want = (p) => !ONLY || ONLY.split(',').includes(p);
 
 // 新顔（名簿に無いもの）
@@ -144,11 +149,18 @@ for (const [p, ids] of Object.entries(cat)) {
   fresh[p] = list;
 }
 // 今の名簿メンバー（比較の基準）
-const current = LINEUP.map((e) => ({ provider: e.provider, model: e.apiModel, extra: Object.fromEntries(Object.entries(e.opts || {}).filter(([k]) => k !== 'max_tokens')), label: e.label }));
+const current = LINEUP.map((e) => ({ provider: e.provider, model: e.apiModel, extra: { ...(e.opts || {}) }, label: e.label }));
 
 const jobs = {};
-for (const c of current) if (want(c.provider) && c.provider !== 'anthropic') (jobs[c.provider] ||= []).push({ ...c, kind: 'current' });
-for (const [p, ids] of Object.entries(fresh)) if (want(p)) for (const id of ids) {
+if (MODELS) for (const spec of MODELS.split(',')) {
+  const [p, ...rest] = spec.split(':'); const id = rest.join(':');
+  const cur = current.find((c) => c.provider === p && c.model === id);
+  (jobs[p] ||= []).push(cur ? { ...cur, kind: 'current' } : { provider: p, model: id, extra: {}, kind: 'new' });
+  if (!cur && /deepseek|qwen3|glm|kimi|nemotron|step|minimax|magistral|reason|think/i.test(id) && p !== 'gemini') jobs[p].push({ provider: p, model: id, extra: { chat_template_kwargs: { enable_thinking: false } }, kind: 'new(推論オフ)' });
+  if (!cur && /gpt-oss/i.test(id)) jobs[p].push({ provider: p, model: id, extra: { reasoning_effort: 'low' }, kind: 'new(effort=low)' });
+}
+if (!MODELS) for (const c of current) if (want(c.provider) && c.provider !== 'anthropic') (jobs[c.provider] ||= []).push({ ...c, kind: 'current' });
+if (!MODELS) for (const [p, ids] of Object.entries(fresh)) if (want(p)) for (const id of ids) {
   // 推論モデルは「推論オフ」と「既定」の両方を試す（v4.1-flash は enable_thinking=false 必須だった）
   (jobs[p] ||= []).push({ provider: p, model: id, extra: {}, kind: 'new' });
   if (/deepseek|qwen3|glm|kimi|nemotron|step|minimax|magistral|reason|think/i.test(id) && p !== 'gemini')
@@ -162,10 +174,10 @@ console.log('新顔の数:', JSON.stringify(Object.fromEntries(Object.entries(fr
 // プロバイダごとに直列、プロバイダ同士は並列（レート制限を踏まない）
 const results = (await Promise.all(Object.entries(jobs).map(async ([p, list]) => {
   const rs = [];
-  for (const job of list) {
+  for (const job of list) for (let i = 0; i < REPEAT; i++) {
     const r = await probe(p, job.model, job.extra);
-    rs.push({ ...r, kind: job.kind, label: job.label || null, extra: job.extra });
-    await new Promise((s) => setTimeout(s, 1500));
+    rs.push({ ...r, kind: job.kind, label: job.label || null, extra: job.extra, try: i + 1 });
+    await new Promise((s) => setTimeout(s, DELAY));
   }
   return rs;
 }))).flat();
