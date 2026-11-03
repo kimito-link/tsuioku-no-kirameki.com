@@ -661,6 +661,8 @@
       patch?.broadcasterIconUrl || prev.broadcasterIconUrl || ""
     ).trim();
     const concurrentViewers = typeof patch?.concurrentViewers === "number" && Number.isFinite(patch.concurrentViewers) && patch.concurrentViewers >= 0 ? Math.floor(patch.concurrentViewers) : typeof prev.concurrentViewers === "number" && Number.isFinite(prev.concurrentViewers) && prev.concurrentViewers >= 0 ? Math.floor(prev.concurrentViewers) : null;
+    const prevPeak = typeof prev.peakConcurrentViewers === "number" && Number.isFinite(prev.peakConcurrentViewers) ? Math.floor(prev.peakConcurrentViewers) : null;
+    const peakConcurrentViewers = concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
     const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || "").trim();
     const itemCount = typeof patch?.itemCount === "number" && Number.isFinite(patch.itemCount) && patch.itemCount >= 0 ? Math.floor(patch.itemCount) : typeof prev.itemCount === "number" && Number.isFinite(prev.itemCount) ? Math.floor(prev.itemCount) : 0;
     const createdAt = typeof prev.createdAt === "number" && Number.isFinite(prev.createdAt) && prev.createdAt > 0 ? prev.createdAt : nowMs;
@@ -671,6 +673,7 @@
       broadcasterChannelId,
       broadcasterIconUrl,
       concurrentViewers,
+      peakConcurrentViewers,
       chatFilterLabel,
       itemCount,
       createdAt,
@@ -792,6 +795,27 @@
     });
   }
 
+  // src/lib/youtube/ytPageMeta.js
+  var VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+  function parseYtVideoIdFromUrl(rawUrl) {
+    if (typeof rawUrl !== "string" || !rawUrl.trim()) return "";
+    let u;
+    try {
+      u = new URL(rawUrl, "https://www.youtube.com");
+    } catch {
+      return "";
+    }
+    const v = String(u.searchParams.get("v") || "").trim();
+    if (VIDEO_ID_RE.test(v)) return v;
+    const host = u.hostname.toLowerCase();
+    const segs = u.pathname.split("/").filter(Boolean);
+    if (host === "youtu.be" && segs[0] && VIDEO_ID_RE.test(segs[0])) return segs[0];
+    if ((segs[0] === "live" || segs[0] === "shorts") && segs[1] && VIDEO_ID_RE.test(segs[1])) {
+      return segs[1];
+    }
+    return "";
+  }
+
   // extension-youtube/src/background-entry.js
   var STORAGE_KEYS = Object.freeze({
     STREAM_SUMMARIES: "yt_stream_summaries",
@@ -862,14 +886,30 @@
     }
   }
   function extractVideoIdFromSender(sender) {
-    try {
-      const tabUrl = sender?.tab?.url || "";
-      if (!tabUrl) return "";
-      const u = new URL(tabUrl);
-      return (u.searchParams.get("v") || "").trim();
-    } catch {
-      return "";
+    return parseYtVideoIdFromUrl(String(sender?.url || "")) || parseYtVideoIdFromUrl(String(sender?.tab?.url || ""));
+  }
+  async function relayCommentToChatFrame(videoId, text) {
+    const tabs = await chrome.tabs.query({ url: ["https://www.youtube.com/*"] });
+    const scored = tabs.map((t) => {
+      const vid = parseYtVideoIdFromUrl(String(t.url || ""));
+      let score = 0;
+      if (videoId && vid === videoId) score += 10;
+      if (String(t.url || "").includes("/live_chat")) score += 2;
+      if (t.active) score += 1;
+      return { t, score };
+    }).filter((x) => x.score >= (videoId ? 10 : 1)).sort((a, b) => b.score - a.score);
+    if (scored.length === 0) return { ok: false, reason: "no-tab" };
+    let last = { ok: false, reason: "no-chat-frame" };
+    for (const { t } of scored) {
+      if (typeof t.id !== "number") continue;
+      try {
+        const res = await chrome.tabs.sendMessage(t.id, { type: "YT_SEND_COMMENT_TO_FRAME", videoId, text });
+        if (res && res.ok) return res;
+        if (res) last = res;
+      } catch {
+      }
     }
+    return last;
   }
   function setupSidePanelBehavior() {
     try {
@@ -891,6 +931,31 @@
   });
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message.type !== "string") return false;
+    if (message.type === "YT_CAPTURE_FRAME") {
+      (async () => {
+        const want = String(message.videoId || "");
+        const tabs = await chrome.tabs.query({ url: ["https://www.youtube.com/*"] });
+        const sorted = tabs.filter((t) => !String(t.url || "").includes("/live_chat")).sort((a, b) => {
+          const sa = (parseYtVideoIdFromUrl(String(a.url || "")) === want ? 10 : 0) + (a.active ? 1 : 0);
+          const sb = (parseYtVideoIdFromUrl(String(b.url || "")) === want ? 10 : 0) + (b.active ? 1 : 0);
+          return sb - sa;
+        });
+        for (const t of sorted) {
+          if (typeof t.id !== "number") continue;
+          try {
+            const res = await chrome.tabs.sendMessage(t.id, { type: "YT_CAPTURE_FRAME_IN_PAGE" }, { frameId: 0 });
+            if (res) return res;
+          } catch {
+          }
+        }
+        return { ok: false, reason: "no-tab" };
+      })().then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, reason: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_SEND_COMMENT") {
+      relayCommentToChatFrame(String(message.videoId || ""), String(message.text || "")).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, reason: String(err) }));
+      return true;
+    }
     if (message.type === "YT_STREAM_META") {
       runSerialized(async () => {
         const payload = message.payload || {};

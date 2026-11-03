@@ -46,6 +46,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   broadcasterChannelId: string,
  *   broadcasterIconUrl: string,
  *   concurrentViewers: number | null,
+ *   peakConcurrentViewers: number | null,
  *   chatFilterLabel: string,
  *   itemCount: number,
  *   createdAt: number,
@@ -73,6 +74,12 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
           prev.concurrentViewers >= 0
         ? Math.floor(prev.concurrentViewers)
         : null;
+  const prevPeak =
+    typeof prev.peakConcurrentViewers === 'number' && Number.isFinite(prev.peakConcurrentViewers)
+      ? Math.floor(prev.peakConcurrentViewers)
+      : null;
+  const peakConcurrentViewers =
+    concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
   const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || '').trim();
   const itemCount =
     typeof patch?.itemCount === 'number' && Number.isFinite(patch.itemCount) && patch.itemCount >= 0
@@ -93,6 +100,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     broadcasterChannelId,
     broadcasterIconUrl,
     concurrentViewers,
+    peakConcurrentViewers,
     chatFilterLabel,
     itemCount,
     createdAt,
