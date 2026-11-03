@@ -487,6 +487,18 @@
       return "";
     }
   }
+  var OTHER_VIDEOS_SEL = "#secondary, #related, ytd-watch-next-secondary-results-renderer, ytd-compact-video-renderer, yt-lockup-view-model, ytd-rich-item-renderer, ytd-video-renderer, ytd-miniplayer";
+  function isInOtherVideos(n) {
+    const el = n && n.nodeType === 1 ? (
+      /** @type {Element} */
+      n
+    ) : n?.parentElement || null;
+    try {
+      return Boolean(el && el.closest(OTHER_VIDEOS_SEL));
+    } catch {
+      return false;
+    }
+  }
   function readConcurrentViewers() {
     const selectors = [
       "ytd-watch-metadata #description #info",
@@ -507,6 +519,7 @@
       }
       for (let i = 0; i < nodes.length; i += 1) {
         const el = nodes[i];
+        if (isInOtherVideos(el)) continue;
         const texts = [visibleTextOf(el), String(el.getAttribute("aria-label") || "")];
         el.querySelectorAll("[aria-label]").forEach((x) => texts.push(String(x.getAttribute("aria-label") || "")));
         texts.push(String(
@@ -520,11 +533,23 @@
         }
       }
     }
+    try {
+      const labeled = document.querySelectorAll('[aria-label*="視聴中"], [aria-label*="watching"]');
+      for (let i = 0; i < labeled.length; i += 1) {
+        if (isInOtherVideos(labeled[i])) continue;
+        const parsed = extractYtWatchConcurrentViewersFromText(String(labeled[i].getAttribute("aria-label") || ""));
+        if (parsed !== null) return parsed;
+      }
+    } catch {
+    }
     return readViewersFromSameLine();
   }
   function readViewersFromSameLine() {
     try {
-      const roots = document.querySelectorAll("ytd-watch-metadata, #above-the-fold, ytd-watch-flexy #primary");
+      const roots = [
+        ...Array.from(document.querySelectorAll("ytd-watch-metadata, #above-the-fold, ytd-watch-flexy #primary")),
+        document.body
+      ].filter(Boolean);
       const range = document.createRange();
       const rectOf = (n) => {
         range.selectNodeContents(n);
@@ -536,6 +561,7 @@
         while (node = walker.nextNode()) {
           const v = String(node.nodeValue || "");
           if (!/視聴中|watching/i.test(v)) continue;
+          if (isInOtherVideos(node)) continue;
           const ref = rectOf(node);
           if (ref.height <= 0) continue;
           let box = node.parentElement;
@@ -562,6 +588,42 @@
     } catch {
     }
     return null;
+  }
+  var lastProbeAt = 0;
+  function saveViewerProbe() {
+    const now = Date.now();
+    if (now - lastProbeAt < 3e4) return;
+    lastProbeAt = now;
+    try {
+      const found = [];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode()) && found.length < 8) {
+        const v = String(node.nodeValue || "");
+        if (!/視聴中|watching/i.test(v)) continue;
+        if (isInOtherVideos(node)) continue;
+        let box = node.parentElement;
+        const path = [];
+        for (let k = 0; k < 5 && box; k += 1) {
+          path.push(`${box.tagName.toLowerCase()}${box.id ? `#${box.id}` : ""}`);
+          if (k < 4 && box.parentElement) box = box.parentElement;
+        }
+        found.push(
+          JSON.stringify({
+            text: v.slice(0, 80),
+            path: path.join("<"),
+            visible: box ? visibleTextOf(box).slice(0, 200) : "",
+            inner: box ? String(
+              /** @type {HTMLElement} */
+              box.innerText || ""
+            ).slice(0, 200) : ""
+          })
+        );
+      }
+      const labels = Array.from(document.querySelectorAll('[aria-label*="視聴"], [aria-label*="watching"]')).slice(0, 8).map((x) => String(x.getAttribute("aria-label") || "").slice(0, 80));
+      void chrome.storage.local.set({ yt_viewer_probe: { at: now, url: String(window.location.href), found, labels } });
+    } catch {
+    }
   }
   function setupWatchPageMetaObserver() {
     const sendMeta = () => {
@@ -592,6 +654,7 @@
         }
       } catch {
       }
+      const viewers = readConcurrentViewers();
       safeSendMessage({
         type: "YT_STREAM_META",
         payload: {
@@ -600,9 +663,10 @@
           broadcasterName,
           broadcasterChannelId,
           broadcasterIconUrl: readBroadcasterIconUrl(),
-          concurrentViewers: readConcurrentViewers()
+          concurrentViewers: viewers
         }
       });
+      if (viewers === null) saveViewerProbe();
     };
     sendMeta();
     setTimeout(sendMeta, 1500);

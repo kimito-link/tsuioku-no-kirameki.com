@@ -230,19 +230,26 @@
   }
   function ytChannelUrlForNumericUid(uid) {
     const key = ytKeyForNumericUid(uid);
-    return /^UC[A-Za-z0-9_-]{22}$/.test(key) ? `https://www.youtube.com/channel/${key}` : "";
+    if (/^UC[A-Za-z0-9_-]{22}$/.test(key)) return `https://www.youtube.com/channel/${key}`;
+    const h = key.startsWith("handle:@") ? key.slice("handle:@".length) : "";
+    return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : "";
   }
-  function ytRecordToNicoEntry(r, i, lv) {
+  var ytIconByNumericUid = /* @__PURE__ */ new Map();
+  function ytIconForNumericUid(uid) {
+    return ytIconByNumericUid.get(String(uid || "")) || "";
+  }
+  function ytRecordToNicoEntry(r, i, lv, personKey) {
     const channelId = String(r?.channelId || "").trim();
     const name = String(r?.name || "").trim();
+    const key = personKey || channelId || (name ? `name:${name}` : "");
     const at = Number(r?.recordedAt || 0) || Date.now();
     return {
       id: String(r?.id || r?.pk || `yt${i}`),
       liveId: lv,
       commentNo: String(i + 1),
       text: String(r?.text || ""),
-      userId: numericUidForYtKey(channelId || (name ? `name:${name}` : "")),
-      ytChannelId: channelId,
+      userId: numericUidForYtKey(key),
+      ytChannelId: /^UC/.test(key) ? key : channelId,
       nickname: name,
       avatarUrl: String(r?.iconUrl || ""),
       capturedAt: at,
@@ -256,6 +263,9 @@
     const viewers = typeof sum?.concurrentViewers === "number" ? sum.concurrentViewers : NaN;
     const startedAt = Number(sum?.createdAt || 0);
     const chId = String(sum?.broadcasterChannelId || "");
+    const bUid = chId ? numericUidForYtKey(chId) : "";
+    const bIcon = String(sum?.broadcasterIconUrl || "") || ytIconForNumericUid(bUid);
+    if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
     return {
       title: tabTitle || String(sum?.title || ""),
       url: `https://live.nicovideo.jp/watch/${lv}`,
@@ -269,9 +279,9 @@
       metas: [],
       scripts: [],
       noopenerLinks: [],
-      broadcasterUserId: chId ? numericUidForYtKey(chId) : "",
+      broadcasterUserId: bUid,
       broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : "",
-      broadcasterIconUrl: String(sum?.broadcasterIconUrl || ""),
+      broadcasterIconUrl: bIcon,
       // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
       // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
       viewerCountFromDom: null,
@@ -281,11 +291,46 @@
       streamAgeMin: startedAt > 0 ? Math.max(0, Math.round((Date.now() - startedAt) / 6e4)) : null
     };
   }
+  var normName = (name) => String(name || "").trim().replace(/^@/, "").toLowerCase();
+  function buildYtPersonResolver(items) {
+    const ucByName = /* @__PURE__ */ new Map();
+    for (const r of items) {
+      const ch = String(r?.channelId || "").trim();
+      if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
+      const n2 = normName(r?.name);
+      if (n2 && !ucByName.has(n2)) ucByName.set(n2, ch);
+    }
+    const keyOf2 = (r) => {
+      const ch = String(r?.channelId || "").trim();
+      if (/^UC[A-Za-z0-9_-]{22}$/.test(ch)) return ch;
+      const n2 = normName(r?.name || (ch.startsWith("handle:") ? ch.slice("handle:".length) : ""));
+      const uc = n2 ? ucByName.get(n2) : "";
+      if (uc) return uc;
+      if (ch) return ch;
+      return n2 ? `name:${n2}` : "";
+    };
+    const iconByKey = /* @__PURE__ */ new Map();
+    for (const r of items) {
+      const icon = String(r?.iconUrl || "").trim();
+      if (!icon) continue;
+      const k = keyOf2(r);
+      if (k) iconByKey.set(k, icon);
+    }
+    return { keyOf: keyOf2, iconOf: (key) => iconByKey.get(key) || "" };
+  }
   async function buildCommentsForLv(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
     const items = await getYtStreamCommentsByVideoId(vid);
-    return (Array.isArray(items) ? items : []).map((r, i) => ytRecordToNicoEntry(r, i, lv));
+    const list = Array.isArray(items) ? items : [];
+    const who = buildYtPersonResolver(list);
+    return list.map((r, i) => {
+      const key = who.keyOf(r);
+      const icon = String(r?.iconUrl || "").trim() || who.iconOf(key);
+      const e = ytRecordToNicoEntry({ ...r, iconUrl: icon }, i, lv, key);
+      if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
+      return e;
+    });
   }
   var real = (
     /** @type {any} */
@@ -417,6 +462,7 @@
     const key = ytKeyForNumericUid(uid);
     if (!key) return "";
     if (key.startsWith("name:")) return "";
+    if (key.startsWith("handle:")) return key.slice("handle:".length);
     return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
   }
   function fixAnchor(a) {
@@ -439,6 +485,14 @@
     const next = t.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || "" : uid);
     if (next !== t) el.setAttribute("title", next);
   }
+  var NICO_USERICON_RE = /nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg/;
+  function fixImg(img) {
+    const src = String(img.getAttribute("src") || "");
+    const m = src.match(NICO_USERICON_RE);
+    if (!m) return;
+    const icon = ytIconForNumericUid(m[1]);
+    if (icon && icon !== src) img.setAttribute("src", icon);
+  }
   function fixSubtree(root) {
     if (root.nodeType === 3) {
       fixTextNode(
@@ -453,7 +507,9 @@
       root
     );
     if (el.tagName === "A") fixAnchor(el);
+    if (el.tagName === "IMG") fixImg(el);
     fixTitleAttr(el);
+    el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
     el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
     el.querySelectorAll("[title]").forEach(fixTitleAttr);
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -479,6 +535,7 @@
           );
           if (m.attributeName === "href" && el.tagName === "A") fixAnchor(el);
           else if (m.attributeName === "title") fixTitleAttr(el);
+          else if (m.attributeName === "src" && el.tagName === "IMG") fixImg(el);
         } else m.addedNodes.forEach(fixSubtree);
       }
     }).observe(document.body, {
@@ -486,7 +543,7 @@
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ["href", "title"]
+      attributeFilter: ["href", "title", "src"]
     });
   }
   if (typeof document !== "undefined") {
@@ -45243,7 +45300,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T10:34" ? String("yt-2026-11-03T10:34") : "dev";
+      const buildId = "yt-2026-11-03T12:44" ? String("yt-2026-11-03T12:44") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45261,7 +45318,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.3") : "";
+    const bundledVersion = true ? String("0.1.4") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45306,7 +45363,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T10:34" ? String("yt-2026-11-03T10:34") : "dev";
+            return "yt-2026-11-03T12:44" ? String("yt-2026-11-03T12:44") : "dev";
           } catch {
             return "dev";
           }
