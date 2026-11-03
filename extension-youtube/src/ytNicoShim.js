@@ -890,17 +890,13 @@ function fixSubtree(root) {
 /** @param {string} html */
 function ytFixHtmlString(html) {
   try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    // 画像の src を書き換えると、拡張の画面の中では onerror="…" の書き込みが CSP で止められたと毎回エラーが出る。
-    // 直す間だけ onerror を外し、終わったら戻す(保存ファイルを開いたときは onerror が効く)。
-    /** @type {Array<[Element, string]>} */
-    const held = [];
-    doc.querySelectorAll('[onerror]').forEach((el) => {
-      held.push([el, String(el.getAttribute('onerror') || '')]);
-      el.removeAttribute('onerror');
-    });
+    // 拡張の画面の中では on…="…" の書き込みは CSP で止められ、画像の読み込み失敗などのたびにエラーが積もる
+    // (外して戻す方式は、読み込み失敗が後から来るので効かなかった)。読み込む前に文字列のまま別の名前にしておき、
+    // 書き出したあとで元に戻す。拡張の画面の中では一度もプログラムとして存在しない。保存ファイルには元のまま入る。
+    const OFF = 'data-ytoff-on';
+    const parked = html.replace(/(\s)on([a-z]+=)/gi, `$1${OFF}$2`);
+    const doc = new DOMParser().parseFromString(parked, 'text/html');
     fixSubtree(doc.documentElement);
-    for (const [el, v] of held) el.setAttribute('onerror', v);
     // 全文検索の索引(data-search)にも疑似 lv・数字ID が入っているので、同じく YouTube に戻す
     doc.querySelectorAll('[data-search]').forEach((el) => {
       const v = String(el.getAttribute('data-search') || '');
@@ -909,7 +905,8 @@ function ytFixHtmlString(html) {
       if (next !== v) el.setAttribute('data-search', next);
     });
     const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
-    return (doctype ? doctype[0] + '\n' : '') + doc.documentElement.outerHTML;
+    const out = (doctype ? doctype[0] + '\n' : '') + doc.documentElement.outerHTML;
+    return out.split(OFF).join('on');
   } catch {
     return html;
   }

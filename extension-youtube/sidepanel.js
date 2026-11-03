@@ -1172,14 +1172,10 @@
   }
   function ytFixHtmlString(html) {
     try {
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const held = [];
-      doc.querySelectorAll("[onerror]").forEach((el) => {
-        held.push([el, String(el.getAttribute("onerror") || "")]);
-        el.removeAttribute("onerror");
-      });
+      const OFF = "data-ytoff-on";
+      const parked = html.replace(/(\s)on([a-z]+=)/gi, `$1${OFF}$2`);
+      const doc = new DOMParser().parseFromString(parked, "text/html");
       fixSubtree(doc.documentElement);
-      for (const [el, v] of held) el.setAttribute("onerror", v);
       doc.querySelectorAll("[data-search]").forEach((el) => {
         const v = String(el.getAttribute("data-search") || "");
         let next = /lv9\d{11}/.test(v) ? ytFixPseudoLvText(v) : v;
@@ -1187,7 +1183,8 @@
         if (next !== v) el.setAttribute("data-search", next);
       });
       const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
-      return (doctype ? doctype[0] + "\n" : "") + doc.documentElement.outerHTML;
+      const out = (doctype ? doctype[0] + "\n" : "") + doc.documentElement.outerHTML;
+      return out.split(OFF).join("on");
     } catch {
       return html;
     }
@@ -45435,7 +45432,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T23:23" ? String("yt-2026-11-03T23:23") : "dev";
+      const buildId = "yt-2026-11-03T23:30" ? String("yt-2026-11-03T23:30") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45453,7 +45450,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.32") : "";
+    const bundledVersion = true ? String("0.1.33") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45498,7 +45495,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T23:23" ? String("yt-2026-11-03T23:23") : "dev";
+            return "yt-2026-11-03T23:30" ? String("yt-2026-11-03T23:30") : "dev";
           } catch {
             return "dev";
           }
