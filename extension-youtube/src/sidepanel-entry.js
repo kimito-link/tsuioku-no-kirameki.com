@@ -446,7 +446,11 @@ function renderNorthStarSupportLanes(ranking) {
  * @param {any} ranking
  */
 function renderSupportVisualDetails(ranking) {
-  paintStoryUserLanes(ranking, currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0);
+  paintStoryUserLanes(
+    ranking,
+    currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0,
+    selectedVideoId,
+  );
 
   // 応援グリッド: コメント1件=顔1つ(ニコ生版と同じ並べ方)
   paintStoryGrowthGrid(

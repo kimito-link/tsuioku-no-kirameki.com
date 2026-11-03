@@ -17,6 +17,8 @@ import { buildCommentTickerLatestHtml } from '../../src/lib/commentTickerLatestH
 import { paintStoryUserLaneDomFilled } from '../../src/extension/story/renderStoryUserLaneDom.js';
 import { buildYtChannelUrl, formatYtCurrencyAmount } from '../../src/lib/youtube/ytSupportRanking.js';
 import { buildYtUserLaneTiers } from '../../src/lib/youtube/ytUserLaneTiers.js';
+import { createLaneHeatTracker } from '../../src/lib/laneHeatTracker.js';
+import { heatPulseByUid, attachLaneTilePulse } from '../../src/lib/laneTileStats.js';
 import { buildSupportAccentIndex } from '../../src/lib/userSupportGridAccent.js';
 import { STORY_GROWTH_MAX_CELLS, buildStoryGrowthGaugeLabel } from '../../src/lib/storyGrowthLimits.js';
 import { buildStoryAvatarDiagHtml } from '../../src/lib/storyAvatarDiagLine.js';
@@ -534,6 +536,7 @@ const laneIo = {
 /** タイルを押したときに出す人を引くための表(userKey → 人) */
 /** @type {Map<string, any>} */
 const laneUserByKey = new Map();
+const laneHeat = createLaneHeatTracker();
 
 /**
  * @param {any} u
@@ -563,21 +566,29 @@ function laneItemOf(u, tier) {
  * YouTube の段: りんく / ギフト列=スーパーチャット / 広告列の位置=メンバー / こん太 / たぬ姉。
  * @param {any} ranking
  * @param {number} total
+ * @param {string} [videoId] 熱い人(+N件)の数え直しを配信ごとに分ける
  */
-export function paintStoryUserLanes(ranking, total) {
+export function paintStoryUserLanes(ranking, total, videoId = '') {
   const stack = $('sceneStoryUserLaneStack');
   if (!stack) return;
   const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
   const built = buildYtUserLaneTiers(commenters, { limitPerTier: STORY_USERLANE_LIMIT });
   laneUserByKey.clear();
   for (const c of commenters) laneUserByKey.set(ytRankUserKey(c.channelId, c.name), c);
-  const buckets = {
+  const rawBuckets = {
     link: built.tiers.link.map((u) => laneItemOf(u, 'link')),
     gift: built.tiers.gift.map((u) => laneItemOf(u, 'gift')),
     ad: built.tiers.member.map((u) => laneItemOf(u, 'member')),
     konta: built.tiers.konta.map((u) => laneItemOf(u, 'konta')),
     tanu: built.tiers.tanu.map((u) => laneItemOf(u, 'tanu')),
   };
+  // 熱い人の「+N件」(直近60秒に増えたコメント)。ニコ生版と同じ laneHeatTracker → attachLaneTilePulse。
+  const heat = laneHeat.observe(
+    String(videoId || ''),
+    commenters.map((c) => ({ uid: ytRankUserKey(c.channelId, c.name), commentCount: Number(c.commentCount || 0) })),
+    Date.now(),
+  );
+  const buckets = attachLaneTilePulse(rawBuckets, heatPulseByUid(heat));
   const els = {
     stack,
     laneLink: $('sceneStoryUserLaneLink'),

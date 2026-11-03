@@ -1919,6 +1919,7 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
   }
 
   // src/lib/laneTileStats.js
+  var TIER_KEYS = ["link", "gift", "ad", "konta", "tanu"];
   function positiveOrNull(n) {
     const v = Math.floor(Number(n));
     return Number.isFinite(v) && v > 0 ? v : null;
@@ -1945,6 +1946,30 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
   }
   function laneTileStatsLegendText() {
     return "🎁📣は公式の公開pt・💬は拡張が記録した件数";
+  }
+  function heatPulseByUid(heatMap) {
+    const out = /* @__PURE__ */ new Map();
+    if (!heatMap || typeof heatMap.forEach !== "function") return out;
+    heatMap.forEach((v, uid) => {
+      if (uid && v && v.heat > 0) out.set(uid, { heat: v.heat, heatTier: String(v.tier || "") });
+    });
+    return out;
+  }
+  function attachLaneTilePulse(buckets, pulseByUid) {
+    if (!pulseByUid || pulseByUid.size === 0) return buckets;
+    const out = (
+      /** @type {any} */
+      { ...buckets }
+    );
+    for (const tier of TIER_KEYS) {
+      const arr = Array.isArray(buckets?.[tier]) ? buckets[tier] : [];
+      out[tier] = arr.map((item) => {
+        const uid = String(item?.entry?.userId || "").trim();
+        const p = uid ? pulseByUid.get(uid) : void 0;
+        return p ? { ...item, pulse: { ...item.pulse || {}, ...p } } : item;
+      });
+    }
+    return out;
   }
   function formatLaneTilePulse(pulse) {
     const gift = formatPtDelta(pulse && pulse.giftDelta);
@@ -2743,6 +2768,99 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     return { tiers, totals, displayed, total };
   }
 
+  // src/lib/commentDeltaTier.js
+  function tierForCommentDelta(d) {
+    return d >= 10 ? "mega" : d >= 5 ? "large" : d >= 2 ? "medium" : "small";
+  }
+
+  // src/lib/laneHeatTracker.js
+  var LANE_HEAT_WINDOW_MS = 6e4;
+  function createLaneHeatTracker(opts = {}) {
+    const windowMs = Number(opts.windowMs) > 0 ? Number(opts.windowMs) : LANE_HEAT_WINDOW_MS;
+    const maxEvents = Number(opts.maxEventsPerUid) > 0 ? Math.floor(Number(opts.maxEventsPerUid)) : 8;
+    const rebaseGapMs = Number(opts.rebaseGapMs) > 0 ? Number(opts.rebaseGapMs) : windowMs * 3;
+    let liveId = "";
+    let lastAt = 0;
+    let users = /* @__PURE__ */ new Map();
+    const collect = (now, entries) => {
+      const out = /* @__PURE__ */ new Map();
+      for (const [uid, u] of entries) {
+        let heat = 0;
+        let at = 0;
+        for (const e of u.events) {
+          if (now - e.at >= windowMs) continue;
+          heat += e.d;
+          at = Math.max(at, e.at);
+        }
+        if (heat > 0) out.set(uid, { heat, tier: tierForCommentDelta(heat), lastAt: at });
+      }
+      return out;
+    };
+    return {
+      /**
+       * @param {string} lid
+       * @param {ReadonlyArray<{ uid: string, commentCount: number }>|null|undefined} rows
+       * @param {number} nowMs
+       * @returns {Map<string, { heat: number, tier: 'small'|'medium'|'large'|'mega', lastAt: number }>} heat>0 のみ
+       */
+      observe(lid, rows, nowMs) {
+        const id = String(lid || "");
+        const now = Number(nowMs) || 0;
+        if (id !== liveId || lastAt && (now < lastAt || now - lastAt > rebaseGapMs)) users = /* @__PURE__ */ new Map();
+        liveId = id;
+        lastAt = now;
+        const seen = /* @__PURE__ */ new Set();
+        for (const r of Array.isArray(rows) ? rows : []) {
+          const uid = r && typeof r.uid === "string" ? r.uid.trim() : "";
+          const n = Number(r && r.commentCount);
+          if (!uid || !Number.isFinite(n)) continue;
+          const c = Math.max(0, Math.floor(n));
+          seen.add(uid);
+          const u = users.get(uid);
+          if (!u) {
+            users.set(uid, { prev: c, events: [], seenAt: now, dipAt: 0 });
+            continue;
+          }
+          if (c > u.prev) {
+            u.events.push({ at: now, d: c - u.prev });
+            if (u.events.length > maxEvents) u.events.splice(0, u.events.length - maxEvents);
+            u.prev = c;
+            u.dipAt = 0;
+          } else if (c < u.prev) {
+            if (!u.dipAt) u.dipAt = now;
+            else if (now - u.dipAt >= windowMs) {
+              u.prev = c;
+              u.dipAt = 0;
+            }
+          } else {
+            u.dipAt = 0;
+          }
+          u.seenAt = now;
+        }
+        for (const [uid, u] of Array.from(users)) {
+          if (!seen.has(uid) && now - u.seenAt >= windowMs) {
+            users.delete(uid);
+            continue;
+          }
+          u.events = u.events.filter((e) => now - e.at < windowMs);
+        }
+        return collect(now, users);
+      },
+      /**
+       * 状態を進めずに、いま窓内にある増分だけを返す(暫定供給の間に使う)。
+       *   基準・観測時刻・liveId は触らない。rebaseGapMs を超えて観測が止まっていたら溜まった増分は出さない。
+       * @param {string} lid 別の配信なら空(配信切替直後に旧配信の増分を出さない)
+       * @param {number} nowMs
+       */
+      peek(lid, nowMs) {
+        const now = Number(nowMs) || 0;
+        if (String(lid || "") !== liveId) return /* @__PURE__ */ new Map();
+        if (!lastAt || now < lastAt || now - lastAt > rebaseGapMs) return /* @__PURE__ */ new Map();
+        return collect(now, users);
+      }
+    };
+  }
+
   // src/lib/storyAvatarDiagLine.js
   function formatStoryAvatarDiagLine(s) {
     const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
@@ -3205,6 +3323,7 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     storyTileUsesYukkuriTvStyle
   };
   var laneUserByKey = /* @__PURE__ */ new Map();
+  var laneHeat = createLaneHeatTracker();
   function laneItemOf(u, tier) {
     const key = ytRankUserKey(u.channelId, u.name);
     const name = String(u.name || u.channelId || "リスナー").trim();
@@ -3223,20 +3342,26 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
       stats: { commentCount: Number(u.commentCount || 0) }
     };
   }
-  function paintStoryUserLanes(ranking, total) {
+  function paintStoryUserLanes(ranking, total, videoId = "") {
     const stack = $("sceneStoryUserLaneStack");
     if (!stack) return;
     const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
     const built = buildYtUserLaneTiers(commenters, { limitPerTier: STORY_USERLANE_LIMIT });
     laneUserByKey.clear();
     for (const c of commenters) laneUserByKey.set(ytRankUserKey(c.channelId, c.name), c);
-    const buckets = {
+    const rawBuckets = {
       link: built.tiers.link.map((u) => laneItemOf(u, "link")),
       gift: built.tiers.gift.map((u) => laneItemOf(u, "gift")),
       ad: built.tiers.member.map((u) => laneItemOf(u, "member")),
       konta: built.tiers.konta.map((u) => laneItemOf(u, "konta")),
       tanu: built.tiers.tanu.map((u) => laneItemOf(u, "tanu"))
     };
+    const heat = laneHeat.observe(
+      String(videoId || ""),
+      commenters.map((c) => ({ uid: ytRankUserKey(c.channelId, c.name), commentCount: Number(c.commentCount || 0) })),
+      Date.now()
+    );
+    const buckets = attachLaneTilePulse(rawBuckets, heatPulseByUid(heat));
     const els = {
       stack,
       laneLink: $("sceneStoryUserLaneLink"),
@@ -3750,7 +3875,11 @@ ${text}`;
     paintNorthStarLanes(ranking);
   }
   function renderSupportVisualDetails(ranking) {
-    paintStoryUserLanes(ranking, currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0);
+    paintStoryUserLanes(
+      ranking,
+      currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0,
+      selectedVideoId
+    );
     paintStoryGrowthGrid(
       growthRecords,
       currentIncrementalState ? currentIncrementalState.totalCount || 0 : growthRecords.length,
