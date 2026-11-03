@@ -4696,7 +4696,7 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1852', metric: 'bundle-kb', value: 1438,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: 'popup に GPU の案内の配線と変更履歴の一文が増えた分'
+    note: '0.1.1851 と同じ(GPU の案内の配線は数百バイトで KB の繰り上がりに届かない)'
   }),
   Object.freeze({
     version: '0.1.1852', metric: 'gate-selftest', value: 4,
