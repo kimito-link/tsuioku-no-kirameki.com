@@ -381,6 +381,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             : undefined,
           concurrentViewers:
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
+          startedAt: typeof payload.startedAt === 'number' ? payload.startedAt : undefined,
         },
         Date.now(),
       );

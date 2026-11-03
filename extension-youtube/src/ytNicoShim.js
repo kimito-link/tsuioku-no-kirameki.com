@@ -182,7 +182,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
   const lv = pseudoLvForVideoId(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
-  const startedAt = Number(sum?.createdAt || 0);
+  // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。分からないときだけ、記録を始めた時刻で代わりにする。
+  const startedAt = Number(sum?.startedAt || 0) || Number(sum?.createdAt || 0);
   const chId = String(sum?.broadcasterChannelId || '');
   const bUid = chId ? numericUidForYtKey(chId) : '';
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
@@ -349,6 +350,17 @@ if (real && real.storage && real.storage.local && real.tabs) {
         const bag = await realGet(KEY_YT_SUMMARIES);
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
         return { ok: true, snapshot: ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || '')) };
+      });
+    }
+    if (type === 'NLS_CAPTURE_SCREENSHOT') {
+      // ニコ生版の「スクショ」= 動画の今のコマを画像にする。YouTube 版はもともと持っている YT_CAPTURE_FRAME で撮る。
+      return realTabsGet(tabId).then(async (tab) => {
+        const vid = parseYtVideoIdFromUrl(String(tab?.url || ''));
+        const res = await real.runtime.sendMessage({ type: 'YT_CAPTURE_FRAME', videoId: vid });
+        if (res && res.ok && typeof res.dataUrl === 'string') {
+          return { ok: true, dataUrl: res.dataUrl, liveId: pseudoLvForVideoId(vid) };
+        }
+        return { ok: false, errorCode: String(res?.reason || 'capture_failed') };
       });
     }
     if (type === 'NLS_POST_COMMENT') {

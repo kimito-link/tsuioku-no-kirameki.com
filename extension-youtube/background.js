@@ -669,6 +669,11 @@
     const peakConcurrentViewers = concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
     const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || "").trim();
     const itemCount = typeof patch?.itemCount === "number" && Number.isFinite(patch.itemCount) && patch.itemCount >= 0 ? Math.floor(patch.itemCount) : typeof prev.itemCount === "number" && Number.isFinite(prev.itemCount) ? Math.floor(prev.itemCount) : 0;
+    const okTime = (v) => typeof v === "number" && Number.isFinite(v) && v > 0;
+    const startedAt = okTime(patch?.startedAt) ? Math.floor(
+      /** @type {number} */
+      patch.startedAt
+    ) : okTime(prev.startedAt) ? Math.floor(prev.startedAt) : null;
     const createdAt = typeof prev.createdAt === "number" && Number.isFinite(prev.createdAt) && prev.createdAt > 0 ? prev.createdAt : nowMs;
     return {
       videoId,
@@ -680,6 +685,7 @@
       peakConcurrentViewers,
       chatFilterLabel,
       itemCount,
+      startedAt,
       createdAt,
       updatedAt: nowMs
     };
@@ -1118,7 +1124,8 @@
             broadcasterName: payload.broadcasterName ? String(payload.broadcasterName) : void 0,
             broadcasterChannelId: payload.broadcasterChannelId ? String(payload.broadcasterChannelId) : void 0,
             broadcasterIconUrl: payload.broadcasterIconUrl ? String(payload.broadcasterIconUrl) : void 0,
-            concurrentViewers: typeof payload.concurrentViewers === "number" ? payload.concurrentViewers : void 0
+            concurrentViewers: typeof payload.concurrentViewers === "number" ? payload.concurrentViewers : void 0,
+            startedAt: typeof payload.startedAt === "number" ? payload.startedAt : void 0
           },
           Date.now()
         );

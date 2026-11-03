@@ -261,7 +261,7 @@
   function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
     const lv = pseudoLvForVideoId(videoId);
     const viewers = typeof sum?.concurrentViewers === "number" ? sum.concurrentViewers : NaN;
-    const startedAt = Number(sum?.createdAt || 0);
+    const startedAt = Number(sum?.startedAt || 0) || Number(sum?.createdAt || 0);
     const chId = String(sum?.broadcasterChannelId || "");
     const bUid = chId ? numericUidForYtKey(chId) : "";
     const bIcon = String(sum?.broadcasterIconUrl || "") || ytIconForNumericUid(bUid);
@@ -397,6 +397,16 @@
           const bag = await realGet(KEY_YT_SUMMARIES);
           const sum = bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid] || {};
           return { ok: true, snapshot: ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || "")) };
+        });
+      }
+      if (type === "NLS_CAPTURE_SCREENSHOT") {
+        return realTabsGet(tabId).then(async (tab) => {
+          const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
+          const res = await real.runtime.sendMessage({ type: "YT_CAPTURE_FRAME", videoId: vid });
+          if (res && res.ok && typeof res.dataUrl === "string") {
+            return { ok: true, dataUrl: res.dataUrl, liveId: pseudoLvForVideoId(vid) };
+          }
+          return { ok: false, errorCode: String(res?.reason || "capture_failed") };
         });
       }
       if (type === "NLS_POST_COMMENT") {
@@ -45300,7 +45310,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T13:16" ? String("yt-2026-11-03T13:16") : "dev";
+      const buildId = "yt-2026-11-03T13:28" ? String("yt-2026-11-03T13:28") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45318,7 +45328,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.5") : "";
+    const bundledVersion = true ? String("0.1.6") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45363,7 +45373,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T13:16" ? String("yt-2026-11-03T13:16") : "dev";
+            return "yt-2026-11-03T13:28" ? String("yt-2026-11-03T13:28") : "dev";
           } catch {
             return "dev";
           }
