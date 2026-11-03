@@ -379,6 +379,26 @@ export const LINEUP = [
   //   1体の遅さが会議全体を止める（会議は並列で、律速は最も遅いメンバー）。scout の実疎通と同じ90秒で諦めて失敗として数える（採用基準: 遅さで会議を止める枠は置かない）。
   { label: 'nvidia/deepseek-v4.1-flash', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4.1-flash', apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
 
+  // ★2026-11-03 追加（会議メンバーを11/3時点の最新へ・generalist の予備 weight3）:
+  //  NVIDIA Nemotron 3.5 Super（2026-10-15 公開・120B/12B有効）。名簿の nemotron 系（3-ultra-550b・CF の 3-120b）より新しい世代。
+  //  実測（scripts/council-trial.mjs・本番と同じ max_tokens 1600 / temperature 0.6・りんくのPC・11/3 に2回測定）:
+  //   推論オフ(enable_thinking=false): 5553ms / 17466ms / 33190ms で3/3 OK（本文569〜895字）。
+  //   既定(推論オン): 14823ms EMPTY / 112216ms CUT / 111425ms EMPTY ＝推論で上限を使い切る型。推論オフ必須。
+  //  中身: お題（無料枠をログイン済みに1日5回）に「使い捨てアカウント量産でAPI費が膨らむ」を挙げ、
+  //   電話番号認証・端末指紋の手順まで書けた（同時に測った名簿メンバーと同等以上）。
+  //  ★CF の nemotron-120b は同じ条件で5回中3回 CUT（途中切れ）。その代わりの新しい頭脳として足す。CF 版は統合の最後の砦（meeting.mjs priority）なので今回は撤去しない。
+  //  恒久ルール3: 新顔は予備から。label に "nvidia" を含むと weightOf が 2 にするため、council-roles.mjs に "nemotron-3.5"→3 の行を足した。
+  //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。timeoutMs は NIM の遅さ（33秒実績）を見て90秒。
+  { label: 'nvidia/nemotron-3.5-super', provider: 'nvidia', rawId: 'nvidia/nemotron-3.5-super-vl-120b-a12b', apiModel: 'nvidia/nemotron-3.5-super-vl-120b-a12b', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
+  // ★2026-11-03 試して見送った新顔（同じ council-trial で実測。再挑戦するときの出発点）:
+  //  - Gemini 4 Argon / 3.1 Pro: 429 quota（無料枠では呼べない。有料プラン専用）。
+  //  - gemini-3.8-flash: 4回とも 503 high demand（名簿の 3.7-flash も同日4回 503）。混雑が引いたら再測定して 3.7 と入れ替える候補。
+  //  - Mistral Large 4（Mistral 直・NIM 両方）: 本文空 / 240秒 timeout。mistral-medium-3.5・small-2603・magistral は30秒間隔でも 429。
+  //  - Kimi K2.6 / K2.7-code・GLM 5.3（CF・NIM）・MiniMax M3.1・Step 5・Nemotron 3.5 Lightning: 推論で上限を使い切り EMPTY/CUT（推論オフでも直らない or 未対応）。
+  //  - cloudflare glm-5.2: 推論オフなら4/4 OK・7秒台と良いが、7/31 に「Workers Paid が必要」で撤去した経緯があり、
+  //    今日通った理由（無料化か契約が Paid になったか）を確認できていない（会議の鍵には請求を読む権限が無い）。お金の確認が取れるまで採らない。
+  //  - SambaNova DeepSeek-V3.2: 2日連続 timeout / high demand。
+
   // 2026-07-31 追加: NVIDIA lead正規(nemotron-3-ultra-550b)の別経路予備。OpenRouterの無料
   // モデル一覧(:freeサフィックス)に同一モデルが存在することを発見し、3並列200 OK(360/402/2140ms)
   // で裏取り済み。roleOfはlabelに"nemotron-3-ultra"を含むため自動でlead判定される。
