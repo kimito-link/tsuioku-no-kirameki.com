@@ -961,12 +961,49 @@
     } catch {
     }
   }
+  function setupLeaderboardReader() {
+    let lastSig = "";
+    const read = () => {
+      const videoId = resolveCurrentVideoId();
+      if (!videoId) return;
+      const rows = [];
+      try {
+        const items = document.querySelectorAll("ytvl-live-leaderboard-item-view-model");
+        for (let i = 0; i < items.length; i += 1) {
+          const el = items[i];
+          const texts = Array.from(el.querySelectorAll("span.ytAttributedStringHost, span")).map((x) => String(x.textContent || "").replace(/\s+/g, " ").trim()).filter(Boolean);
+          const rankText = texts.find((t) => /^\d{1,3}$/.test(t));
+          const name = texts.find((t) => /^@\S+$/.test(t)) || "";
+          const xpText = texts.find((t) => /^[0-9,]+\s*XP$/i.test(t));
+          if (!rankText || !name || !xpText) continue;
+          const img = el.querySelector("img");
+          const iconUrl = String(img?.getAttribute("src") || "");
+          rows.push({
+            rank: Number(rankText),
+            name,
+            xp: Number(xpText.replace(/[^0-9]/g, "")) || 0,
+            iconUrl: /^https:\/\//.test(iconUrl) ? iconUrl : ""
+          });
+        }
+      } catch {
+        return;
+      }
+      if (!rows.length) return;
+      const sig = rows.map((r) => `${r.rank}:${r.name}:${r.xp}`).join("|");
+      if (sig === lastSig) return;
+      lastSig = sig;
+      safeSendMessage({ type: "YT_LEADERBOARD", payload: { videoId, rows } });
+    };
+    setInterval(read, 5e3);
+    setTimeout(read, 1500);
+  }
   function init() {
     const path = String(window.location.pathname || "");
     if (path.startsWith("/live_chat")) {
       setupLiveChatObserver();
       if (!path.startsWith("/live_chat_replay")) setupAutoAllChat();
       setupCommentSendBridge();
+      setupLeaderboardReader();
     } else if (window.top === window) {
       setupWatchPageMetaObserver();
       setupVideoFrameCapture();

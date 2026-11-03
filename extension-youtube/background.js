@@ -1177,6 +1177,15 @@
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }
+    if (message.type === "YT_LEADERBOARD") {
+      const payload = message.payload || {};
+      const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || "").trim();
+      const rows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
+      if (!videoId || !rows.length) return false;
+      void chrome.storage.local.set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows } }).catch(() => {
+      });
+      return false;
+    }
     if (message.type === "YT_CHAT_ITEMS") {
       runSerialized(async () => {
         const payload = message.payload || {};

@@ -25,3 +25,19 @@ describe('buildYtPersonResolver', () => {
     expect(who.keyOf(items[0])).not.toBe(who.keyOf(items[1]));
   });
 });
+
+describe('ytLeaderboardToKoken', () => {
+  it('トップファンの @handle を記録の同じ名前の人に結びつけ、XP を貢献度にする', async () => {
+    const { ytLeaderboardToKoken } = await import('../../../extension-youtube/src/ytNicoShim.js');
+    const entries = [{ userId: '8123456789', nickname: '@yk-ve8dk', avatarUrl: 'https://yt3.ggpht.com/x' }];
+    const k = ytLeaderboardToKoken(
+      { capturedAt: 1, rows: [{ rank: 1, name: '@yk-ve8dk', xp: 84480, iconUrl: '' }, { rank: 2, name: '@ねる茶', xp: 81605, iconUrl: '' }] },
+      entries,
+      'lv900000000001',
+    );
+    expect(k?.rows[0].userPageUrl).toBe('https://www.nicovideo.jp/user/8123456789');
+    expect(k?.rows[0].contribution).toBe(84480);
+    expect(k?.rows[0].thumbnailUrl).toBe('https://yt3.ggpht.com/x');
+    expect(k?.rows[1].userPageUrl).toMatch(/user\/8\d{9}$/);
+  });
+});
