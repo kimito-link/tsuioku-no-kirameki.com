@@ -3,10 +3,13 @@
  * @template T
  * @param {readonly T[]|unknown} queue
  * @param {T} item
- * @param {{ max?: number }} [opts]
+ * 2026-11-03: keep(x) が true の件(VOICEVOX が合成している最中の件)は捨てず、その次に古い件から捨てる。
+ *   合成に十数秒かかる PC では、毎回いちばん古い=合成中の件を捨てて新しい件の合成を頼み直し、
+ *   1件も鳴らないうえに VOICEVOX 側に捨てた依頼が積み上がっていた(実配信: 毎分156件・読めた2件)。
+ * @param {{ max?: number, keep?: (x: T) => boolean }} [opts]
  * @returns {{ queue: T[], dropped: T[] }}
  */
-export function pushVoiceQueue(queue, item, { max = 5 } = {}) {
+export function pushVoiceQueue(queue, item, { max = 5, keep } = {}) {
   const current = Array.isArray(queue) ? [...queue] : [];
   if (item && typeof item === 'object' && /** @type {{priority?: string}} */ (item).priority === 'high') {
     // PR-V3: ギフト等優先アイテムは通常アイテムの前に割り込む
@@ -22,10 +25,20 @@ export function pushVoiceQueue(queue, item, { max = 5 } = {}) {
   const rawMax = Number(max);
   const limit = Number.isFinite(rawMax) ? Math.max(0, Math.floor(rawMax)) : 5;
   const dropCount = Math.max(0, current.length - limit);
-  return {
-    queue: current.slice(dropCount),
-    dropped: current.slice(0, dropCount)
-  };
+  if (typeof keep !== 'function' || dropCount === 0) {
+    return {
+      queue: current.slice(dropCount),
+      dropped: current.slice(0, dropCount)
+    };
+  }
+  // 古い順に、守る件を飛ばして dropCount 件まで捨てる(守る件が多ければ上限を少し超えて残る)。
+  const dropped = [];
+  const kept = [];
+  for (const x of current) {
+    if (dropped.length < dropCount && x !== item && !keep(x)) dropped.push(x);
+    else kept.push(x);
+  }
+  return { queue: kept, dropped };
 }
 
 /**
