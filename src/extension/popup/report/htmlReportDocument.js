@@ -1604,7 +1604,7 @@ export async function buildHtmlReportDocument(
 
       ${embed ? '' : sectionInterestArrival(participationSummaryReport)}
 
-      ${yukkuriReportHtml}
+      ${embed ? '' : yukkuriReportHtml}
 
       ${embed ? '' : eventRankingSectionHtml}
 
@@ -1618,7 +1618,7 @@ export async function buildHtmlReportDocument(
         <ol class="toc__list">
           ${embed ? '' : `<li><a href="#sec-participation-lead">来場とコメント参加</a></li>
           <li><a href="#mkt-interest-arrival">興味タグ別来場${participationSummaryReport?.interestArrivalSummary?.messageCount > 0 ? '' : '（検出 0件）'}</a></li>`}
-          <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
+          ${embed ? '' : '<li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>'}
           ${eventRankingSectionHtml && !embed ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
@@ -1628,12 +1628,12 @@ export async function buildHtmlReportDocument(
           ${commenterFollowBlock.hasAnalytics && !embed ? '<li><a href="#sec-commenter-follow-analytics">フォロー×コメント分析</a></li>' : ''}
           <li><a href="#sec-self-comments">自分のコメント抜粋</a></li>
           <li><a href="#sec-all-comments">保存コメント一覧（CSV ダウンロードあり）</a></li>
-          <li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
-          <li><a href="#sec-tech-dump">ページの裏側データ（上級者向け）</a></li>
+          ${embed ? '' : `<li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
+          <li><a href="#sec-tech-dump">ページの裏側データ（上級者向け）</a></li>`}
         </ol>
       </nav>
 
-      ${nextMemoSectionHtml}
+      ${embed ? '' : nextMemoSectionHtml}
 
       <div class="grid">
         <section class="card" id="sec-overview">
@@ -1715,7 +1715,7 @@ export async function buildHtmlReportDocument(
       ${embed ? '' : htmlReportConceptGuideCardHtml}
       ${embed ? '' : htmlReportSaveGuideCardHtml}
 
-      <section class="card" id="sec-share-meta" style="margin-top:12px;">
+      ${embed ? '' : `      <section class="card" id="sec-share-meta" style="margin-top:12px;">
         <h2>シェア・プレビュー向けの情報</h2>
         <p class="guide-lead">SNSやブラウザのプレビューに使われることが多い項目だけ、日本語の見出しに直して載せているのだ。</p>
         <table>
@@ -1752,7 +1752,7 @@ export async function buildHtmlReportDocument(
             <tbody>${headNoopenerRows.join('') || '<tr><td colspan="2">取得なし</td></tr>'}</tbody>
           </table>
         </div>
-      </details>
+      </details>`}
 
       <section class="card" id="sec-self-comments" style="margin-top:12px;">
         <h2>自分のコメント抜粋（${selfPostedComments.length}件）</h2>
