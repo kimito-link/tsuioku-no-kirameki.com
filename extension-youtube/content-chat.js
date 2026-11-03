@@ -1074,7 +1074,7 @@
     const path = String(window.location.pathname || "");
     if (path.startsWith("/live_chat")) {
       setupLiveChatObserver();
-      if (!path.startsWith("/live_chat_replay")) setupAutoAllChat();
+      setupAutoAllChat();
       setupCommentSendBridge();
       setupLeaderboardReader();
     } else if (window.top === window) {
