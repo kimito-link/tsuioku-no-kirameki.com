@@ -266,6 +266,18 @@
       membership_gift: "メンバーシップギフト"
     }
   );
+  function ytAmountLabel(amount, currency) {
+    const a = Number(amount);
+    if (!Number.isFinite(a) || a <= 0) return "";
+    const cur = String(currency || "").toUpperCase();
+    if (/^[A-Z]{3}$/.test(cur)) {
+      try {
+        return new Intl.NumberFormat("ja-JP", { style: "currency", currency: cur }).format(a);
+      } catch {
+      }
+    }
+    return `${a.toLocaleString("ja-JP")}${cur ? ` ${cur}` : ""}`;
+  }
   function isYtPaidKind(kind) {
     return Object.prototype.hasOwnProperty.call(ITEM_NAME, String(kind || ""));
   }
@@ -282,7 +294,9 @@
       const uid = String(e.userId || "").trim();
       const nickname = String(e.nickname || "").trim();
       const kind = String(e.ytKind || "");
-      const itemName = ITEM_NAME[kind];
+      const baseItemName = ITEM_NAME[kind];
+      const amountLabel = ytAmountLabel(Number(e.ytAmount || 0), String(e.ytCurrency || ""));
+      const itemName = amountLabel ? `${baseItemName} ${amountLabel}` : baseItemName;
       const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ""));
       const at = Number(e.ytPostedAt) || Number(e.capturedAt) || now;
       const pubSec = Math.floor(at / 1e3);
@@ -315,9 +329,9 @@
         contribution: point,
         capturedAt: at
       });
-      const item = byItem.get(itemName) || { itemName, count: 0, thumbnailUrl: "" };
+      const item = byItem.get(baseItemName) || { itemName: baseItemName, count: 0, thumbnailUrl: "" };
       item.count += 1;
-      byItem.set(itemName, item);
+      byItem.set(baseItemName, item);
       if (!uid) continue;
       const u = byUser.get(uid) || {
         userId: uid,
