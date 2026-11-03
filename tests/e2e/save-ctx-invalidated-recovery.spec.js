@@ -123,7 +123,8 @@ test.skip('保存が context-invalidated のとき、ワンクリック再読み
     },
     { lv: 'lv888888888', key: STORAGE_COMMENTS, watchUrl: MOCK_WATCH }
   );
-  await exportBtn.click();
+  // v0.1.1854: HTML ボタンは隠した(中身はマーケの1章)。保存処理そのものはこの要素の click で動く。
+  await exportBtn.evaluate((el) => /** @type {HTMLButtonElement} */ (el).click());
 
   // ワンクリック復帰バナーが出る（これが復帰手段の本体）。
   await expect(popup.locator('#extensionContextBanner')).toBeVisible({ timeout: 10_000 });
