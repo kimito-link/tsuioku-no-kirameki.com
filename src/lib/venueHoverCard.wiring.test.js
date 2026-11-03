@@ -257,7 +257,7 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     it('表示上限があり、全件数を併記する(黙って切らない)', () => {
       expect(venueBarSrc).toMatch(/VENUE_SPEECH_PANEL_MAX\s*=\s*\d+/);
       const openAt = venueBarSrc.indexOf('const openSpeechPanelFor');
-      // v0.1.1853: 記録が読めないときの代わりの一覧を足したので、関数の終わり(toggleRosterPanel の手前)までを見る。
+      // v0.1.1855: 記録が読めないときの代わりの一覧を足したので、関数の終わり(toggleRosterPanel の手前)までを見る。
       const block = venueBarSrc.slice(openAt, venueBarSrc.indexOf('const toggleRosterPanel', openAt));
       expect(block).toMatch(/全 \$\{total\} 件/);
     });

@@ -404,7 +404,8 @@ export default [
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
-    rules: { 'max-lines': ['error', { max: 21746, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1852: 遅い PC なら GPU の案内を出す配線(import 1行+呼び出し4行=+5)。中身は popup/wireVoiceGpuTip.js。
+    rules: { 'max-lines': ['error', { max: 21751, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -431,7 +432,7 @@ export default [
     // v0.1.1825: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
     // v0.1.1829: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
     // v0.1.1830: 作りたて host を古いと捨てて開くたび4回作り直していたのを止める(+5行: 一度でも DOM に入った host の WeakSet と記録2か所)。
-    // v0.1.1853: 拡張の入れ替え後に古い版のまま止まったページが自分で読み込み直す(import 1行+呼び出しとコメント2行)=+3。中身は lib の orphanTabAutoReload.js。
+    // v0.1.1855: 拡張の入れ替え後に古い版のまま止まったページが自分で読み込み直す(import 1行+呼び出しとコメント2行)=+3。中身は lib の orphanTabAutoReload.js。
     rules: { 'max-lines': ['error', { max: 19574, skipBlankLines: false, skipComments: false }] }
   },
   {
@@ -456,9 +457,10 @@ export default [
     // v0.1.1832: 席が無い人の吹き出しを診断の行の上に出す配線(viewportFloor 1行)と、名前の無い人を「匿名NNN」で出す4行=+5。
     // v0.1.1833: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
     // v0.1.1848: GPU の案内を遅れの一言とは別の行に出す(span 生成と色2行+コメント1行+onGpuTip の配線1行)=+4。文言と判定は lib の voiceLagNotice.decideVoiceGpuTip。
-    // v0.1.1853: 発言パネルが記録を読めなかったとき(拡張が切れた/時間切れ)に理由を返し、ホバーと同じ手元の発言を代わりに出す配線=+15。文言と HTML は lib の venueSpeechStats.js。
+    // v0.1.1852: 遅れの一言と GPU の案内に不透明な下地(後ろのコメント欄と重なって読めなかった・コメント2行+下地4行+隠す1行)=+7。
+    // v0.1.1855: 発言パネルが記録を読めなかったとき(拡張が切れた/時間切れ)に理由を返し、ホバーと同じ手元の発言を代わりに出す配線=+15。文言と HTML は lib の venueSpeechStats.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7372, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7379, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

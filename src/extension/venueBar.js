@@ -2798,6 +2798,13 @@ export function mountVenueBarButton(options = {}) {
   // 2026-11-01: GPU の案内(遅れの一言とは別の行・文言と判定は voiceLagNotice.decideVoiceGpuTip)。出すときだけ見える。
   const voiceGpuTip = Object.assign(/** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()), { className: 'nlsb-voice-gpu-tip', hidden: true });
   voiceGpuTip.style.cssText += 'color:#b45309;font-weight:600;';
+  // 2026-11-03 りんく: 会場の帯は半透明で、後ろのニコ生のコメント入力欄と文字が重なって読めなかった。
+  //   遅れの一言と GPU の案内だけ、不透明な下地を敷いて何の上でも読めるようにする。
+  voiceLag.hidden = true;
+  for (const el of [voiceLag, voiceGpuTip]) {
+    el.style.cssText += 'background:rgba(255,255,255,0.96);padding:2px 8px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.18);';
+  }
+  voiceGpuTip.style.background = '#fff7e6';
 
   let venueWindowBtn = null;
   if (!isStandalone) {
@@ -3304,7 +3311,7 @@ export function mountVenueBarButton(options = {}) {
       try {
         statsText = String(anchorEl.querySelector('[data-stats]')?.getAttribute('data-stats') || '');
       } catch { /* 取れなくてもパネルは開く */ }
-      // v0.1.1853: ホバーと同じ手元の発言も渡す(保存した記録が読めないときの代わり・新しい取得ゼロ)。
+      // v0.1.1855: ホバーと同じ手元の発言も渡す(保存した記録が読めないときの代わり・新しい取得ゼロ)。
       const fallbackTexts = Array.isArray(data?.recentTexts) && data.recentTexts.length
         ? data.recentTexts
         : (data?.lastText ? [data.lastText] : []);
@@ -3392,7 +3399,7 @@ export function mountVenueBarButton(options = {}) {
       /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
     ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
-    onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; },
+    onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; voiceLag.hidden = !text; },
     onGpuTip: (/** @type {string} */ text) => { voiceGpuTip.textContent = text; voiceGpuTip.title = text; voiceGpuTip.hidden = !text; },
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
@@ -4011,7 +4018,7 @@ export function mountVenueBarButton(options = {}) {
    * ★呼ばれるのはクリックの瞬間だけ(常時のstorage readは1件も増やさない)。
    *   大配信では read が browser process を詰まらせる既知の地雷があるため、
    *   タイムアウト付きで走らせ、失敗しても会場の描画は止めない。
-   * v0.1.1853: 読めなかった(拡張が切れた/時間切れ)ことも返す。以前は失敗も [] で「記録はありません」と言い切っていた。
+   * v0.1.1855: 読めなかった(拡張が切れた/時間切れ)ことも返す。以前は失敗も [] で「記録はありません」と言い切っていた。
    * @param {string} liveId
    * @returns {Promise<{ rows: any[], readFailed: boolean, contextLost: boolean }>}
    */
@@ -4222,7 +4229,7 @@ export function mountVenueBarButton(options = {}) {
             );
           })
           .join('')
-      // v0.1.1853: 記録から1件も取れなければ、ホバーと同じ手元の直近の発言で代わりに出す(2026-11-03 実機: ホバーは発言2・パネルは「記録なし」)。
+      // v0.1.1855: 記録から1件も取れなければ、ホバーと同じ手元の直近の発言で代わりに出す(2026-11-03 実機: ホバーは発言2・パネルは「記録なし」)。
       : speechFallbackListHtml(total ? [] : who?.fallbackTexts, readState, escapeHtml, VENUE_SPEECH_PANEL_MAX);
     const note = total > rows.length ? `（新しい ${rows.length} 件を表示 / 全 ${total} 件）` : `（全 ${total} 件）`;
     /*
@@ -7082,7 +7089,7 @@ export function mountVenueBarButton(options = {}) {
     // キャラライブも止める(rAF を回したまま放置すると拡張更新後も裏で描き続ける)。
     try { charaLive.destroy(); } catch { /* no-op */ }
     try {
-      // v0.1.1853: ページが自分で読み込み直す(content-entry.js の startOrphanTabAutoReload)。打ちかけのコメントがある間は待つ。
+      // v0.1.1855: ページが自分で読み込み直す(content-entry.js の startOrphanTabAutoReload)。打ちかけのコメントがある間は待つ。
       title.textContent = '⚠ 拡張が新しい版になりました。このページを自動で読み込み直します(コメント入力中は待ちます)';
       title.style.color = '#ffcf66';
     } catch { /* no-op */ }

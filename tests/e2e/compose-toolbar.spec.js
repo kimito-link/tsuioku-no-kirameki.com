@@ -71,7 +71,7 @@ test.describe('compose quick toolbar (UD + compact)', () => {
       toolbar.locator('xpath=ancestor::*[contains(@class,"nl-main")]')
     ).toHaveCount(1);
 
-    for (const id of ['exportJson', 'captureScreenshot', 'reloadWatchTabBtn']) {
+    for (const id of ['exportMarketingQuickBtn', 'captureScreenshot', 'reloadWatchTabBtn']) {
       const btn = popup.locator(`#${id}`);
       await expect(btn).toBeVisible();
       await expect(
@@ -83,7 +83,7 @@ test.describe('compose quick toolbar (UD + compact)', () => {
 
     const audit = await popup.evaluate(() => {
       const composeEl = document.querySelector('.nl-comment-compose--primary');
-      const ids = ['exportJson', 'captureScreenshot', 'reloadWatchTabBtn'];
+      const ids = ['exportMarketingQuickBtn', 'captureScreenshot', 'reloadWatchTabBtn'];
       const detailsCount = composeEl
         ? composeEl.querySelectorAll('details').length
         : -1;

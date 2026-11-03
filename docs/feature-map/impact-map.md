@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・155 ファイル）
+## ⚠️ 影響大（3機能以上に波及・157 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -74,9 +74,11 @@
 - `src/lib/supportVisualStoryCopy.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/timingConstants.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ)
 - `src/lib/userRooms.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/voiceAgeGate.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/voiceDiag.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceFailureTaxonomy.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceLagBudget.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/voiceLagNotice.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/voiceNgMute.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voicePlaybackQuality.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceStageTiming.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
@@ -152,10 +154,10 @@
 - `src/lib/venueMirrorIntakeDiag.js` → **3 機能**: 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/venueSeatsDiagKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/venueYukkuriNamedCensus.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
-- `src/lib/voiceAgeGate.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/lib/voiceEngineActivity.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/lib/voiceEngineOverload.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
-- `src/lib/voiceLagNotice.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
+- `src/lib/voiceLightFallback.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
+- `src/lib/voiceLightSpeaker.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/lib/voiceLoadingState.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/lib/voicePlayer.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/lib/voiceReaderLease.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
@@ -234,9 +236,11 @@
 | `src/lib/supportVisualStoryCopy.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/timingConstants.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ) |
 | `src/lib/userRooms.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/voiceAgeGate.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/voiceDiag.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceFailureTaxonomy.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceLagBudget.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/voiceLagNotice.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/voiceNgMute.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voicePlaybackQuality.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceStageTiming.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
@@ -312,10 +316,10 @@
 | `src/lib/venueMirrorIntakeDiag.js` | 3 | 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/venueSeatsDiagKey.js` | 3 | 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/venueYukkuriNamedCensus.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
-| `src/lib/voiceAgeGate.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/voiceEngineActivity.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/voiceEngineOverload.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
-| `src/lib/voiceLagNotice.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/voiceLightFallback.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/voiceLightSpeaker.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/voiceLoadingState.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/voicePlayer.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/voiceReaderLease.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -506,6 +510,7 @@
 | `src/extension/popup/renderAcquisitionDashboard.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/report/htmlReportDocument.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireLaneUserDetailOpen.js` | 1 | ポップアップ(応援レーン) |
+| `src/extension/popup/wireVoiceGpuTip.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireVoiceNarrowSelect.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireVoiceQualitySelect.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireVoiceVolumeSlider.js` | 1 | ポップアップ(応援レーン) |
@@ -702,6 +707,7 @@
 | `src/lib/hiddenTabExternalFetchGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/htmlReportCommenterFollowSection.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/htmlReportConceptGuide.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/htmlReportEmbed.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/identityAcquisitionCensus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/iframeOfficialDomFromRelay.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inferBroadcasterUserIdFromComments.js` | 1 | ポップアップ(応援レーン) |
@@ -776,9 +782,7 @@
 | `src/lib/mangaBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingChartsHtml.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/marketingDynamicAdvice.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingGiftThrowLedger.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/marketingHtmlAdvisorAvatars.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingReportEmbed.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingSupportParticipationCounts.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mcpBridge/buildLiveMcpSnapshot.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -1007,6 +1011,8 @@
 | `src/lib/venueOpenCache.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/verifiedAvatarRegistry.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerCountProbeMerge.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/viewerRetentionEstimate.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/viewerRetentionSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerSelfLaneAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/voiceBubbleRealtimeParity.js` | 1 | 状態速報ページ |
 | `src/lib/voiceComment.js` | 1 | 記録エンジン(watchページ常駐) |
