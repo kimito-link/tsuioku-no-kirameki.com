@@ -19,6 +19,11 @@ import { buildYtGiftBags } from './ytGiftToNico.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 const COMMENTS_PREFIX = 'nls_comments_';
+// ニコ生版の「テール」(まだ本体に畳み込んでいない新着)。ニコ生版の popup は、本体の全件を一度読んだら
+// 同じ配信のあいだはその控えを使い回し、新着はテールから足す。YouTube 版は本体とテールを分けて持たないので、
+// テールにも全件を渡す(popup が既存の重複畳み込み=mergeTailRowsIntoDisplay で控えと重ねて、増えた分だけが足される)。
+// これが無いと、控えのまま件数も最新コメントも止まる(0.1.11 までの「リアルタイムで反映されない」)。
+const TAIL_PREFIX = 'nls_ctail_';
 // ニコ生版がギフトを読むキー(ytGiftToNico.js の説明を参照)。prefix → buildYtGiftBags の結果のどれを返すか
 const GIFT_KEY_PREFIXES = /** @type {Array<[string, string]>} */ ([
   ['nls_gift_users_', 'giftUsers'],
@@ -282,7 +287,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined> }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0 };
+const shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 /** popup が最後にコメントを聞いてきた配信(=いま画面に出ている配信) */
 let lastAskedLv = '';
@@ -382,12 +387,14 @@ if (real && real.storage && real.storage.local && real.tabs) {
     const list =
       keys == null ? null : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
     const bag = /** @type {Record<string, any>} */ (await realGet(keys));
+    if (list) for (const k of list) if (/^nls_/.test(k) && !shimDiag.keysAsked.includes(k.replace(/lv\d+/, 'LV'))) shimDiag.keysAsked.push(k.replace(/lv\d+/, 'LV'));
     if (list) {
       for (const k of list) {
-        if (k.startsWith(COMMENTS_PREFIX)) {
-          const lv = k.slice(COMMENTS_PREFIX.length).toLowerCase();
+        if (k.startsWith(COMMENTS_PREFIX) || k.startsWith(TAIL_PREFIX)) {
+          const lv = k.slice((k.startsWith(TAIL_PREFIX) ? TAIL_PREFIX : COMMENTS_PREFIX).length).toLowerCase();
           if (!videoIdForPseudoLv(lv)) continue;
           lastAskedLv = lv;
+          shimDiag.commentGets += 1;
           const arr = await buildCommentsForLv(lv);
           if (arr) bag[k] = arr;
           continue;
@@ -538,7 +545,7 @@ if (real && real.storage && real.storage.local && real.tabs) {
       if (lastNotified.get(lv) === sig) return;
       lastNotified.set(lv, sig);
       /** @type {Record<string, { newValue: any }>} */
-      const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr } };
+      const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: arr } };
       try {
         const gifts = /** @type {Record<string, any>} */ (buildYtGiftBags(arr, lv, { startedAt: Number(summary?.startedAt || 0) }));
         if (gifts && gifts.count > 0) {
