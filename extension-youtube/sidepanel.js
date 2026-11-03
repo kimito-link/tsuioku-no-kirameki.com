@@ -221,7 +221,7 @@
   }
   function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
     const lv = pseudoLvForVideoId(videoId);
-    const viewers = Number(sum?.concurrentViewers);
+    const viewers = typeof sum?.concurrentViewers === "number" ? sum.concurrentViewers : NaN;
     const startedAt = Number(sum?.createdAt || 0);
     const chId = String(sum?.broadcasterChannelId || "");
     return {
@@ -45105,7 +45105,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T10:26" ? String("yt-2026-11-03T10:26") : "dev";
+      const buildId = "yt-2026-11-03T10:29" ? String("yt-2026-11-03T10:29") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45123,7 +45123,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.1") : "";
+    const bundledVersion = true ? String("0.1.2") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45168,7 +45168,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T10:26" ? String("yt-2026-11-03T10:26") : "dev";
+            return "yt-2026-11-03T10:29" ? String("yt-2026-11-03T10:29") : "dev";
           } catch {
             return "dev";
           }
