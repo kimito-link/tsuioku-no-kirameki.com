@@ -5,6 +5,8 @@ import {
   mergeYtStreamSummary,
   prepareYtCommentsForIdb,
   selectYtNewestCommentsForDisplay,
+  createYtStreamIncrementalState,
+  applyYtStreamIncrementalItems,
 } from './ytStreamStorePolicy.js';
 
 describe('buildYtCommentPrimaryKey', () => {
@@ -99,5 +101,107 @@ describe('selectYtNewestCommentsForDisplay', () => {
     expect(displayed.map((x) => x.id)).toEqual(['c5', 'c4', 'c3']);
     // 元の配列（全件データ）は破壊しない
     expect(items).toHaveLength(5);
+  });
+});
+
+describe('applyYtStreamIncrementalItems（1万件配信対応の差分更新）', () => {
+  it('1万件の既存コメント状態に対して新着バッチだけを O(ΔN) で追記・ランキング差分更新し、既読 pk は重複加算しない', () => {
+    const state = createYtStreamIncrementalState('stream-10k', {
+      broadcasterChannelId: 'UCOwner111111111111111111',
+    });
+
+    const initial10k = Array.from({ length: 10_000 }, (_, i) => {
+      const n = i + 1;
+      const isSuperchat = n % 1000 === 0;
+      const isOwner = n % 2500 === 0 && !isSuperchat;
+      return {
+        id: `msg-${n}`,
+        pk: `stream-10k::msg-${n}`,
+        videoId: 'stream-10k',
+        channelId: isOwner
+          ? 'UCOwner111111111111111111'
+          : isSuperchat
+            ? `UCSupporter${n}`
+            : `UCViewer${n % 500}`,
+        name: isOwner ? '@Owner' : isSuperchat ? `@Supporter${n}` : `@Viewer${n % 500}`,
+        text: `コメント #${n}`,
+        kind: isSuperchat ? 'superchat' : 'text',
+        amount: isSuperchat ? 1000 : 0,
+        currency: isSuperchat ? 'JPY' : '',
+        badges: isOwner ? ['owner'] : [],
+        ts: n,
+        recordedAt: 1_700_000_000_000 + n,
+      };
+    });
+
+    const resInitial = applyYtStreamIncrementalItems(state, initial10k);
+    expect(resInitial.addedCount).toBe(10_000);
+    expect(state.totalCount).toBe(10_000);
+    expect(state.laneCounts.rinku).toBe(2); // 2500, 7500
+    expect(state.laneCounts.konta).toBe(10); // 1000, 2000, ..., 10000
+    expect(state.laneCounts.rinku + state.laneCounts.konta + state.laneCounts.tanunee).toBe(10_000);
+    expect(state.laneDisplay.tanunee).toHaveLength(YT_SIDE_PANEL_DISPLAY_LIMIT);
+    expect(state.laneDisplay.tanunee[0].id).toBe('msg-9999');
+    expect(resInitial.ranking.totalsByCurrency.JPY).toBe(10_000);
+
+    // 境界の既読1件(msg-10000)＋新着3件を差分適用
+    const deltaBatch = [
+      initial10k[9999], // 既読（スキップされるべき）
+      {
+        id: 'msg-10001',
+        pk: 'stream-10k::msg-10001',
+        videoId: 'stream-10k',
+        channelId: 'UCNewViewer1',
+        name: '@NewViewer1',
+        text: '10001件目の一般コメント',
+        kind: 'text',
+        amount: 0,
+        currency: '',
+        badges: [],
+        ts: 10001,
+        recordedAt: 1_700_000_010_001,
+      },
+      {
+        id: 'msg-10002',
+        pk: 'stream-10k::msg-10002',
+        videoId: 'stream-10k',
+        channelId: 'UCSupporter1000',
+        name: '@Supporter1000',
+        text: '追加スパチャ！',
+        kind: 'superchat',
+        amount: 5000,
+        currency: 'JPY',
+        badges: [],
+        ts: 10002,
+        recordedAt: 1_700_000_010_002,
+      },
+      {
+        id: 'msg-10003',
+        pk: 'stream-10k::msg-10003',
+        videoId: 'stream-10k',
+        channelId: 'UCOwner111111111111111111',
+        name: '@Owner',
+        text: 'ありがとう！',
+        kind: 'text',
+        amount: 0,
+        currency: '',
+        badges: ['owner'],
+        ts: 10003,
+        recordedAt: 1_700_000_010_003,
+      },
+    ];
+
+    const resDelta = applyYtStreamIncrementalItems(state, deltaBatch);
+    expect(resDelta.addedCount).toBe(3); // 既読1件は除外され新着3件のみ
+    expect(state.totalCount).toBe(10_003);
+    expect(resDelta.rankingChanged).toBe(true);
+    expect(resDelta.ranking.totalsByCurrency.JPY).toBe(15_000);
+    expect(resDelta.ranking.byCurrency.JPY[0].channelId).toBe('UCSupporter1000');
+    expect(resDelta.ranking.byCurrency.JPY[0].amount).toBe(6000);
+    expect(resDelta.addedByLane.tanunee.map((x) => x.id)).toEqual(['msg-10001']);
+    expect(resDelta.addedByLane.konta.map((x) => x.id)).toEqual(['msg-10002']);
+    expect(resDelta.addedByLane.rinku.map((x) => x.id)).toEqual(['msg-10003']);
+    expect(state.laneDisplay.tanunee[0].id).toBe('msg-10001');
+    expect(state.laneDisplay.tanunee).toHaveLength(YT_SIDE_PANEL_DISPLAY_LIMIT);
   });
 });

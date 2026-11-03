@@ -1,6 +1,11 @@
-// background-entry.js — YouTube Live コメントの IndexedDB 全件記録・配信要約・読み上げキュー管理 Service Worker
+// background-entry.js — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 /* global chrome, URL */
 
+import {
+  VOICEVOX_BASE_URL,
+  probeVoicevoxAlive,
+  listVoicevoxStyleIds,
+} from '../../src/lib/voicevoxClient.js';
 import {
   YT_VOICE_MODES,
   YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD,
@@ -30,6 +35,9 @@ const DEFAULT_VOICE_SETTINGS = Object.freeze({
 /** 並列メッセージによる storage / IndexedDB 競合を防ぐ直列化キュー */
 let storageJobChain = Promise.resolve();
 
+/** @type {Promise<void> | null} */
+let creatingOffscreenPromise = null;
+
 /**
  * @template T
  * @param {() => Promise<T>} fn
@@ -42,6 +50,65 @@ function runSerialized(fn) {
     () => undefined,
   );
   return next;
+}
+
+/**
+ * サイドパネルを閉じていても VOICEVOX 再生を継続するための Offscreen Document を起動・維持する。
+ * @returns {Promise<boolean>}
+ */
+async function ensureOffscreenDocument() {
+  try {
+    if (!chrome?.offscreen?.createDocument) return false;
+    if (chrome.runtime?.getContexts) {
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT'],
+      });
+      if (Array.isArray(contexts) && contexts.length > 0) {
+        return true;
+      }
+    } else if (typeof chrome.offscreen.hasDocument === 'function') {
+      const has = await chrome.offscreen.hasDocument();
+      if (has) return true;
+    }
+
+    if (!creatingOffscreenPromise) {
+      creatingOffscreenPromise = chrome.offscreen
+        .createDocument({
+          url: 'offscreen.html',
+          reasons: ['AUDIO_PLAYBACK'],
+          justification:
+            'サイドパネルを閉じていても VOICEVOX によるチャット読み上げ音声を再生し続けるため',
+        })
+        .catch((err) => {
+          const msg = String(err?.message || err || '');
+          if (!msg.includes('Only a single offscreen')) {
+            throw err;
+          }
+        })
+        .finally(() => {
+          creatingOffscreenPromise = null;
+        });
+    }
+    await creatingOffscreenPromise;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Offscreen Document へ読み上げキュー消化の合図を送る。
+ */
+async function nudgeOffscreenDrain() {
+  const ready = await ensureOffscreenDocument();
+  if (!ready) return;
+  try {
+    chrome.runtime.sendMessage({ type: 'YT_OFFSCREEN_DRAIN' }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -71,8 +138,13 @@ function setupSidePanelBehavior() {
 }
 
 setupSidePanelBehavior();
+ensureOffscreenDocument();
 chrome.runtime.onInstalled.addListener(() => {
   setupSidePanelBehavior();
+  ensureOffscreenDocument();
+});
+chrome.runtime.onStartup?.addListener(() => {
+  ensureOffscreenDocument();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -141,9 +213,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       let voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
         ? data[STORAGE_KEYS.VOICE_QUEUE]
         : [];
-      let voiceState = data[STORAGE_KEYS.VOICE_STATE] || {
-        effectiveMode: settings.mode,
-        autoSwitched: false,
+      const prevVoiceState = data[STORAGE_KEYS.VOICE_STATE] || {};
+      let voiceState = {
+        ...prevVoiceState,
+        effectiveMode: prevVoiceState.effectiveMode || settings.mode,
+        autoSwitched: Boolean(prevVoiceState.autoSwitched),
         updatedAt: Date.now(),
       };
 
@@ -175,8 +249,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
 
       // 新規追加されたコメントだけを読み上げキューへ投入
+      let enqueuedAny = false;
       if (settings.enabled) {
         for (const newItem of idbResult.newlyAdded) {
+          const prevLen = voiceQueue.length;
           const enq = enqueueYtVoiceItem(voiceQueue, newItem, {
             mode: settings.mode,
             broadcasterName,
@@ -184,8 +260,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             assignments,
           });
           voiceQueue = enq.queue;
+          if (voiceQueue.length > prevLen) {
+            enqueuedAny = true;
+          }
           assignments = enq.assignments;
           voiceState = {
+            ...voiceState,
             effectiveMode: enq.effectiveMode,
             autoSwitched: enq.autoSwitched,
             updatedAt: Date.now(),
@@ -215,6 +295,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       await chrome.storage.local.set(updates);
+      if (settings.enabled && (enqueuedAny || voiceQueue.length > 0)) {
+        nudgeOffscreenDrain();
+      }
       return {
         ok: true,
         addedCount: idbResult.newlyAdded.length,
@@ -229,16 +312,152 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'YT_SHIFT_VOICE_QUEUE') {
     runSerialized(async () => {
-      const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_QUEUE]);
+      const data = await chrome.storage.local.get([
+        STORAGE_KEYS.VOICE_SETTINGS,
+        STORAGE_KEYS.VOICE_QUEUE,
+      ]);
+      const settings = {
+        ...DEFAULT_VOICE_SETTINGS,
+        ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
+      };
       const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
         ? data[STORAGE_KEYS.VOICE_QUEUE]
         : [];
-      if (queue.length === 0) {
-        return { ok: true, entry: null, remaining: 0 };
+      if (!settings.enabled || queue.length === 0) {
+        return { ok: true, entry: null, remaining: queue.length, enabled: Boolean(settings.enabled) };
       }
       const [entry, ...rest] = queue;
       await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_QUEUE]: rest });
-      return { ok: true, entry, remaining: rest.length };
+      return { ok: true, entry, remaining: rest.length, enabled: true };
+    })
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+
+  if (message.type === 'YT_REPORT_VOICEVOX_STATUS') {
+    runSerialized(async () => {
+      const payload = message.payload || {};
+      const online = Boolean(payload.online);
+      const reason = String(payload.reason || (online ? 'ok' : 'unreachable'));
+      const availableStyleIds =
+        Array.isArray(payload.availableStyleIds) && payload.availableStyleIds.length > 0
+          ? payload.availableStyleIds
+          : null;
+
+      const data = await chrome.storage.local.get([
+        STORAGE_KEYS.VOICE_SETTINGS,
+        STORAGE_KEYS.VOICE_STATE,
+        STORAGE_KEYS.VOICE_QUEUE,
+      ]);
+      const currentSettings = {
+        ...DEFAULT_VOICE_SETTINGS,
+        ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
+      };
+      if (availableStyleIds) {
+        currentSettings.availableStyleIds = availableStyleIds;
+      }
+      const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
+        ? data[STORAGE_KEYS.VOICE_QUEUE]
+        : [];
+      const isOverThreshold =
+        currentSettings.enabled !== false &&
+        currentSettings.mode === YT_VOICE_MODES.ALL &&
+        queue.length >= YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD;
+
+      const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+      const nextState = {
+        ...prevState,
+        effectiveMode: isOverThreshold ? YT_VOICE_MODES.SELECT : currentSettings.mode,
+        autoSwitched: isOverThreshold,
+        voicevoxOnline: online,
+        voicevoxReason: reason,
+        availableStyleCount: currentSettings.availableStyleIds.length,
+        voicevoxCheckedAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.VOICE_SETTINGS]: currentSettings,
+        [STORAGE_KEYS.VOICE_STATE]: nextState,
+      });
+      return { ok: true, state: nextState };
+    })
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+
+  if (message.type === 'YT_REPORT_VOICE_SPOKEN') {
+    runSerialized(async () => {
+      const payload = message.payload || {};
+      const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_STATE]);
+      const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+      const nextState = {
+        ...prevState,
+        lastSpokenSummary: String(payload.lastSpokenSummary || ''),
+        lastSpokenAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.VOICE_STATE]: nextState,
+      });
+      return { ok: true };
+    })
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+
+  if (message.type === 'YT_RECHECK_VOICEVOX') {
+    runSerialized(async () => {
+      await ensureOffscreenDocument();
+      const probe = await probeVoicevoxAlive({ baseUrl: VOICEVOX_BASE_URL });
+      const online = Boolean(probe.ok);
+      const reason = probe.ok ? 'ok' : probe.reason === 'timeout' ? 'timeout' : 'unreachable';
+      let styles = [];
+      if (online) {
+        styles = await listVoicevoxStyleIds({ baseUrl: VOICEVOX_BASE_URL });
+      }
+      const data = await chrome.storage.local.get([
+        STORAGE_KEYS.VOICE_SETTINGS,
+        STORAGE_KEYS.VOICE_STATE,
+        STORAGE_KEYS.VOICE_QUEUE,
+      ]);
+      const currentSettings = {
+        ...DEFAULT_VOICE_SETTINGS,
+        ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
+      };
+      if (styles.length > 0) {
+        currentSettings.availableStyleIds = styles;
+      }
+      const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
+        ? data[STORAGE_KEYS.VOICE_QUEUE]
+        : [];
+      const isOverThreshold =
+        currentSettings.enabled !== false &&
+        currentSettings.mode === YT_VOICE_MODES.ALL &&
+        queue.length >= YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD;
+
+      const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+      const nextState = {
+        ...prevState,
+        effectiveMode: isOverThreshold ? YT_VOICE_MODES.SELECT : currentSettings.mode,
+        autoSwitched: isOverThreshold,
+        voicevoxOnline: online,
+        voicevoxReason: reason,
+        availableStyleCount: currentSettings.availableStyleIds.length,
+        voicevoxCheckedAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.VOICE_SETTINGS]: currentSettings,
+        [STORAGE_KEYS.VOICE_STATE]: nextState,
+      });
+      if (online && currentSettings.enabled && queue.length > 0) {
+        nudgeOffscreenDrain();
+      }
+      return { ok: true, online, reason, state: nextState };
     })
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
@@ -251,6 +470,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const data = await chrome.storage.local.get([
         STORAGE_KEYS.VOICE_SETTINGS,
         STORAGE_KEYS.VOICE_QUEUE,
+        STORAGE_KEYS.VOICE_STATE,
       ]);
       const current = {
         ...DEFAULT_VOICE_SETTINGS,
@@ -269,11 +489,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         next.mode === YT_VOICE_MODES.ALL &&
         nextQueue.length >= YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD;
 
+      const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
       const updates = {
         [STORAGE_KEYS.VOICE_SETTINGS]: next,
         [STORAGE_KEYS.VOICE_STATE]: {
+          ...prevState,
           effectiveMode: isOverThreshold ? YT_VOICE_MODES.SELECT : next.mode,
           autoSwitched: isOverThreshold,
+          availableStyleCount: Array.isArray(next.availableStyleIds)
+            ? next.availableStyleIds.length
+            : prevState.availableStyleCount || YT_DEFAULT_STYLE_IDS.length,
           updatedAt: Date.now(),
         },
       };
@@ -281,6 +506,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         updates[STORAGE_KEYS.VOICE_QUEUE] = [];
       }
       await chrome.storage.local.set(updates);
+      if (next.enabled && nextQueue.length > 0) {
+        nudgeOffscreenDrain();
+      }
       return { ok: true, settings: next };
     })
       .then((res) => sendResponse(res))
@@ -290,14 +518,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'YT_CLEAR_VOICE_QUEUE') {
     runSerialized(async () => {
-      const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_SETTINGS]);
+      const data = await chrome.storage.local.get([
+        STORAGE_KEYS.VOICE_SETTINGS,
+        STORAGE_KEYS.VOICE_STATE,
+      ]);
       const settings = {
         ...DEFAULT_VOICE_SETTINGS,
         ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
       };
+      const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
       await chrome.storage.local.set({
         [STORAGE_KEYS.VOICE_QUEUE]: [],
         [STORAGE_KEYS.VOICE_STATE]: {
+          ...prevState,
           effectiveMode: settings.mode,
           autoSwitched: false,
           updatedAt: Date.now(),

@@ -1,18 +1,21 @@
-// ytIdbStore.js — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・取得するストア
+// ytIdbStore.js — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
 /* global indexedDB, IDBKeyRange */
 
 import { prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
 
 const DB_NAME = 'yt_kirameki_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_COMMENTS = 'comments';
 const INDEX_BY_VIDEO_ID = 'by_videoId';
+const INDEX_BY_VIDEO_ID_RECORDED_AT = 'by_videoId_recordedAt';
 
 /** @type {Promise<any> | null} */
 let dbPromise = null;
 
 /**
  * IndexedDB (`yt_kirameki_db`) を開く。
+ * DB Version 2 で `by_videoId_recordedAt`（複合インデックス `['videoId', 'recordedAt']`）を作成し、
+ * サイドパネルの差分取得（`afterRecordedAt` 以降の新着のみ取得）に対応する。
  * @returns {Promise<any>}
  */
 export function openYtCommentsDb() {
@@ -23,9 +26,19 @@ export function openYtCommentsDb() {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
+        let store;
         if (!db.objectStoreNames.contains(STORE_COMMENTS)) {
-          const store = db.createObjectStore(STORE_COMMENTS, { keyPath: 'pk' });
+          store = db.createObjectStore(STORE_COMMENTS, { keyPath: 'pk' });
+        } else {
+          store = req.transaction.objectStore(STORE_COMMENTS);
+        }
+        if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID)) {
           store.createIndex(INDEX_BY_VIDEO_ID, 'videoId', { unique: false });
+        }
+        if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
+          store.createIndex(INDEX_BY_VIDEO_ID_RECORDED_AT, ['videoId', 'recordedAt'], {
+            unique: false,
+          });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -101,7 +114,7 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems) {
 }
 
 /**
- * 指定された配信（`videoId`）の保存済みコメントだけを IndexedDB から全件取得する。
+ * 指定された配信（`videoId`）の保存済みコメントを IndexedDB から全件取得する（初回オープン・配信切替時のみ使用）。
  *
  * @param {string} videoId
  * @returns {Promise<any[]>}
@@ -114,9 +127,21 @@ export async function getYtStreamCommentsByVideoId(videoId) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_COMMENTS], 'readonly');
     const store = tx.objectStore(STORE_COMMENTS);
+    if (store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
+      const index = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
+      const range = IDBKeyRange.bound([vid, 0], [vid, Number.MAX_SAFE_INTEGER]);
+      const req = index.getAll(range);
+      req.onsuccess = () => {
+        resolve(Array.isArray(req.result) ? req.result : []);
+      };
+      req.onerror = () => {
+        reject(req.error || new Error('idb_get_failed'));
+      };
+      return;
+    }
+
     const index = store.index(INDEX_BY_VIDEO_ID);
     const req = index.getAll(IDBKeyRange.only(vid));
-
     req.onsuccess = () => {
       const list = Array.isArray(req.result) ? req.result : [];
       list.sort((a, b) => Number(a.recordedAt || 0) - Number(b.recordedAt || 0));
@@ -124,6 +149,39 @@ export async function getYtStreamCommentsByVideoId(videoId) {
     };
     req.onerror = () => {
       reject(req.error || new Error('idb_get_failed'));
+    };
+  });
+}
+
+/**
+ * 指定された配信（`videoId`）について、`afterRecordedAt` 以降に記録された新着コメントだけを
+ * 複合インデックス `by_videoId_recordedAt` で差分取得する（storage 変化のたびに全件 getAll しない）。
+ *
+ * @param {string} videoId
+ * @param {number} afterRecordedAt
+ * @returns {Promise<any[]>}
+ */
+export async function getYtStreamCommentsSince(videoId, afterRecordedAt = 0) {
+  const vid = String(videoId || '').trim();
+  if (!vid) return [];
+  const lower =
+    typeof afterRecordedAt === 'number' && Number.isFinite(afterRecordedAt) && afterRecordedAt > 0
+      ? afterRecordedAt
+      : 0;
+
+  const db = await openYtCommentsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_COMMENTS], 'readonly');
+    const store = tx.objectStore(STORE_COMMENTS);
+    const index = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
+    const range = IDBKeyRange.bound([vid, lower], [vid, Number.MAX_SAFE_INTEGER]);
+    const req = index.getAll(range);
+
+    req.onsuccess = () => {
+      resolve(Array.isArray(req.result) ? req.result : []);
+    };
+    req.onerror = () => {
+      reject(req.error || new Error('idb_get_since_failed'));
     };
   });
 }

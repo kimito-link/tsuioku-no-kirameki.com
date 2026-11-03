@@ -272,786 +272,214 @@
     "126": [0.5, 0.68, 1.08, 0.94]
   });
 
-  // src/lib/voiceStream.js
-  var VOICE_STREAM_SEGMENT_SEC = 0.3;
-  var VOICE_STREAM_PREBUFFER_SEC = 0.3;
-  var VOICE_STREAM_STALL_MS = 5e3;
-  function createWavStreamParser() {
-    let head = new Uint8Array(0);
-    let headerDone = false;
-    let sampleRate = 0;
-    let error = "";
-    let remaining = Infinity;
-    let carry = -1;
-    function parseHeader(buf) {
-      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-      const tag = (o) => String.fromCharCode(buf[o], buf[o + 1], buf[o + 2], buf[o + 3]);
-      if (buf.length < 12) return -1;
-      if (tag(0) !== "RIFF" || tag(8) !== "WAVE") {
-        error = "not_wav";
-        return -2;
-      }
-      let off = 12;
-      let pcm16 = false;
-      while (off + 8 <= buf.length) {
-        const id = tag(off);
-        const size = dv.getUint32(off + 4, true);
-        const body = off + 8;
-        if (id === "fmt ") {
-          if (body + 16 > buf.length) return -1;
-          const format = dv.getUint16(body, true);
-          const channels = dv.getUint16(body + 2, true);
-          sampleRate = dv.getUint32(body + 4, true);
-          const bits = dv.getUint16(body + 14, true);
-          pcm16 = format === 1 && bits === 16 && channels === 1 && sampleRate > 0;
-          if (!pcm16) {
-            error = "not_pcm16_mono";
-            return -2;
-          }
-        } else if (id === "data") {
-          if (!pcm16) {
-            error = "no_fmt";
-            return -2;
-          }
-          remaining = size > 0 && size < 4294967295 ? size : Infinity;
-          return body;
-        }
-        off = body + size + (size & 1);
-      }
-      return -1;
-    }
-    return {
-      push(bytes) {
-        if (error || !(bytes instanceof Uint8Array) || bytes.length === 0) return null;
-        let data = bytes;
-        if (!headerDone) {
-          const merged = new Uint8Array(head.length + bytes.length);
-          merged.set(head, 0);
-          merged.set(bytes, head.length);
-          const at = parseHeader(merged);
-          if (at === -2) return null;
-          if (at === -1) {
-            if (merged.length > 4096) error = "header_too_long";
-            head = merged;
-            return null;
-          }
-          headerDone = true;
-          head = new Uint8Array(0);
-          data = merged.subarray(at);
-        }
-        if (remaining !== Infinity) {
-          if (remaining <= 0) return null;
-          if (data.length > remaining) data = data.subarray(0, remaining);
-          remaining -= data.length;
-        }
-        let buf = data;
-        if (carry >= 0) {
-          buf = new Uint8Array(data.length + 1);
-          buf[0] = carry;
-          buf.set(data, 1);
-          carry = -1;
-        }
-        const n = buf.length >> 1;
-        if (buf.length & 1) carry = buf[buf.length - 1];
-        if (n === 0) return null;
-        const out = new Int16Array(n);
-        for (let i = 0; i < n; i++) out[i] = (buf[2 * i + 1] << 8 | buf[2 * i]) << 16 >> 16;
-        return out;
-      },
-      get sampleRate() {
-        return sampleRate;
-      },
-      get error() {
-        return error;
-      }
-    };
-  }
-  var StreamedVoice = class {
-    /** @param {number} sampleRate */
-    constructor(sampleRate) {
-      this.sampleRate = sampleRate;
-      this.chunks = [];
-      this.totalSamples = 0;
-      this.peak = 0;
-      this._sumSq = 0;
-      this._voiced = 0;
-      this.styleId = -1;
-      this.pitchOffset = 0;
-      this.textLength = -1;
-      this.done = false;
-      this.failed = false;
-      this._listeners = /* @__PURE__ */ new Set();
-      this._cancel = null;
-      this._resolveDone = () => {
-      };
-      this.whenDone = new Promise((r) => {
-        this._resolveDone = r;
-      });
-    }
-    /** 届いた分の素の RMS(0〜1・無音を除く)。 */
-    get rms() {
-      return this._voiced > 0 ? Math.sqrt(this._sumSq / this._voiced) : 0;
-    }
-    /** ためた長さ(秒)。 */
-    get bufferedSec() {
-      return this.sampleRate > 0 ? this.totalSamples / this.sampleRate : 0;
-    }
-    /** @param {Int16Array} samples */
-    append(samples) {
-      if (this.done || !samples || samples.length === 0) return;
-      this.chunks.push(samples);
-      this.totalSamples += samples.length;
-      let m = 0;
-      for (let i = 0; i < samples.length; i++) {
-        const a = Math.abs(samples[i]);
-        if (a > m) m = a;
-      }
-      if (m / 32768 > this.peak) this.peak = m / 32768;
-      for (let i = 0; i < samples.length; i++) {
-        if (Math.abs(samples[i]) >= 328) {
-          const x = samples[i] / 32768;
-          this._sumSq += x * x;
-          this._voiced++;
-        }
-      }
-      this._emit();
-    }
-    finish() {
-      if (this.done) return;
-      this.done = true;
-      this._resolveDone(true);
-      this._emit();
-    }
-    fail() {
-      if (this.done) return;
-      this.done = true;
-      this.failed = true;
-      this._resolveDone(false);
-      this._emit();
-    }
-    /** 受け取りをやめる(鳴らすのをやめた・読み上げを止めた)。 */
-    cancel() {
-      const c = this._cancel;
-      this._cancel = null;
-      if (c) {
-        try {
-          c();
-        } catch {
-        }
-      }
-      this.fail();
-    }
-    /** @param {() => void} fn @returns {() => void} */
-    onUpdate(fn) {
-      this._listeners.add(fn);
-      return () => {
-        this._listeners.delete(fn);
-      };
-    }
-    _emit() {
-      for (const fn of [...this._listeners]) {
-        try {
-          fn();
-        } catch {
-        }
-      }
-    }
-    /** ためた分を普通の WAV(16bit モノラル)にする。丸ごと再生への切り替え用。 */
-    toWav() {
-      const dataBytes = this.totalSamples * 2;
-      const buf = new ArrayBuffer(44 + dataBytes);
-      const dv = new DataView(buf);
-      const w = (o, s) => {
-        for (let i = 0; i < 4; i++) dv.setUint8(o + i, s.charCodeAt(i));
-      };
-      w(0, "RIFF");
-      dv.setUint32(4, 36 + dataBytes, true);
-      w(8, "WAVE");
-      w(12, "fmt ");
-      dv.setUint32(16, 16, true);
-      dv.setUint16(20, 1, true);
-      dv.setUint16(22, 1, true);
-      dv.setUint32(24, this.sampleRate, true);
-      dv.setUint32(28, this.sampleRate * 2, true);
-      dv.setUint16(32, 2, true);
-      dv.setUint16(34, 16, true);
-      w(36, "data");
-      dv.setUint32(40, dataBytes, true);
-      let off = 44;
-      for (const c of this.chunks) {
-        for (let i = 0; i < c.length; i++, off += 2) dv.setInt16(off, c[i], true);
-      }
-      return buf;
-    }
-  };
-
   // src/lib/voicevoxClient.js
   var VOICEVOX_BASE_URL = "http://127.0.0.1:50021";
-  var VOICEVOX_OUTPUT_SAMPLING_RATE = 16e3;
-  var _outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
-  function positiveTimeout(value, fallback) {
-    const timeout = Number(value);
-    return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
-  }
-  function isExtensionPage() {
-    try {
-      return typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getURL === "function" && typeof location !== "undefined" && location.protocol === "chrome-extension:";
-    } catch {
-      return false;
+
+  // src/lib/youtube/ytSupportRanking.js
+  var ZERO_DECIMAL_CURRENCIES = /* @__PURE__ */ new Set(["JPY", "KRW", "TWD", "VND"]);
+  function buildYtChannelUrl(channelId) {
+    const id = String(channelId || "").trim();
+    if (/^UC[A-Za-z0-9_-]{16,32}$/.test(id)) {
+      return `https://www.youtube.com/channel/${id}`;
     }
-  }
-  function proxyTextResponse(res) {
-    const raw = Number(res && res.status);
-    const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
-    const noBody = status === 204 || status === 205 || status === 304;
-    return new Response(noBody ? null : String(res && res.text != null ? res.text : ""), { status });
-  }
-  async function proxyFetchFn(url, init) {
-    if (isExtensionPage()) {
-      return globalThis.fetch(url, init);
+    if (id.startsWith("handle:@")) {
+      const handle = id.slice("handle:".length);
+      if (/^@[A-Za-z0-9_.-]+$/.test(handle)) {
+        return `https://www.youtube.com/${handle}`;
+      }
     }
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      return new Promise((resolve, reject) => {
-        const safeInit = { ...init };
-        if ("signal" in safeInit) delete safeInit.signal;
-        chrome.runtime.sendMessage(
-          { type: "NLS_FETCH_PROXY", url: url.toString(), init: safeInit, wantBuffer: false },
-          (res) => {
-            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-            if (!res || res.error) return reject(new Error(res?.error || "Proxy fetch failed"));
-            try {
-              resolve(proxyTextResponse(res));
-            } catch (e) {
-              reject(e);
-            }
-          }
-        );
-      });
+    if (/^@[A-Za-z0-9_.-]+$/.test(id)) {
+      return `https://www.youtube.com/${id}`;
     }
-    return globalThis.fetch(url, init);
-  }
-  async function proxyFetchBufferFn(url, init) {
-    if (isExtensionPage()) {
-      return globalThis.fetch(url, init);
-    }
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      return new Promise((resolve, reject) => {
-        const safeInit = { ...init };
-        if ("signal" in safeInit) delete safeInit.signal;
-        chrome.runtime.sendMessage(
-          { type: "NLS_FETCH_PROXY", url: url.toString(), init: safeInit, wantBuffer: true },
-          (res) => {
-            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-            if (!res || res.error) return reject(new Error(res?.error || "Proxy fetch failed"));
-            const uint8 = new Uint8Array(res.buffer);
-            resolve({ ok: res.ok, status: res.status, arrayBuffer: async () => uint8.buffer });
-          }
-        );
-      });
-    }
-    return globalThis.fetch(url, init);
-  }
-  async function proxyStreamFetchFn(url, init) {
-    if (isExtensionPage() || typeof chrome === "undefined" || !chrome.runtime?.connect) {
-      return globalThis.fetch(url, init);
-    }
-    const port = chrome.runtime.connect({ name: VOICEVOX_STREAM_PORT });
-    const safeInit = { ...init };
-    const signal = safeInit.signal;
-    delete safeInit.signal;
-    return new Promise((resolve, reject) => {
-      let ctl = null;
-      let headed = false;
-      const body = new ReadableStream({
-        start(c) {
-          ctl = c;
-        },
-        cancel() {
-          try {
-            port.disconnect();
-          } catch {
-          }
-        }
-      });
-      const close = (err) => {
-        try {
-          if (err) ctl?.error(err);
-          else ctl?.close();
-        } catch {
-        }
-      };
-      signal?.addEventListener?.("abort", () => {
-        try {
-          port.disconnect();
-        } catch {
-        }
-        if (!headed) reject(new Error("voicevox_stream_abort"));
-        close(new Error("voicevox_stream_abort"));
-      });
-      port.onMessage.addListener((m) => {
-        if (!m || typeof m !== "object") return;
-        if (m.type === "head") {
-          headed = true;
-          resolve({ ok: m.ok === true, status: Number(m.status) || 0, body });
-        } else if (m.type === "chunk" && Array.isArray(m.data)) {
-          try {
-            ctl?.enqueue(Uint8Array.from(m.data));
-          } catch {
-          }
-        } else if (m.type === "end") {
-          close(null);
-          try {
-            port.disconnect();
-          } catch {
-          }
-        } else if (m.type === "error") {
-          if (!headed) reject(new Error(String(m.error || "Proxy stream failed")));
-          close(new Error(String(m.error || "Proxy stream failed")));
-        }
-      });
-      port.onDisconnect.addListener(() => {
-        if (!headed) reject(new Error("Proxy stream disconnected"));
-        close(new Error("Proxy stream disconnected"));
-      });
-      port.postMessage({ type: "start", url: url.toString(), init: safeInit });
-    });
-  }
-  var VOICEVOX_STREAM_PORT = "NLS_VOICEVOX_STREAM";
-  async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
-    const controller = new AbortController();
-    let timer = 0;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort();
-        reject(new Error("voicevox_timeout"));
-      }, timeoutMs);
-    });
-    try {
-      return (
-        /** @type {Response} */
-        await Promise.race([
-          Promise.resolve().then(
-            () => fetchFn(url, { ...init, signal: controller.signal })
-          ),
-          timeout
-        ])
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  async function arrayBufferWithTimeout(res, timeoutMs) {
-    let timer = 0;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("voicevox_body_timeout")), timeoutMs);
-    });
-    try {
-      return (
-        /** @type {ArrayBuffer} */
-        await Promise.race([res.arrayBuffer(), timeout])
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  function defaultVoicevoxAliveTimeoutMs(viaProxy) {
-    return viaProxy ? 5e3 : 1500;
-  }
-  function classifyVoicevoxAliveFailure(input) {
-    if (input?.hasFetch === false) return "no-fetch";
-    const err = input?.error;
-    if (err) {
-      const msg = String(
-        /** @type {any} */
-        err?.message || err || ""
-      );
-      if (msg.includes("voicevox_timeout")) return "timeout";
-      if (/abort/i.test(msg) || /** @type {any} */
-      err?.name === "AbortError") return "timeout";
-      return "refused";
-    }
-    const res = input?.response;
-    if (res && res.ok === false) return "http-error";
     return "";
   }
-  async function probeVoicevoxAlive(opts = {}) {
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") {
-      return { ok: false, reason: classifyVoicevoxAliveFailure({ hasFetch: false }) };
+  function formatYtCurrencyAmount(amount, currency) {
+    const code = String(currency || "").trim().toUpperCase();
+    const n = Number(amount);
+    if (!Number.isFinite(n)) return "—";
+    if (code === "JPY") {
+      return `¥${formatNumberJa(Math.round(n))}`;
     }
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    const viaProxy = !opts.fetchFn && !isExtensionPage();
-    const fallbackTimeout = defaultVoicevoxAliveTimeoutMs(viaProxy);
-    try {
-      const response = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/version`,
-        { method: "GET" },
-        positiveTimeout(opts.timeoutMs, fallbackTimeout)
-      );
-      if (response?.ok !== false) return { ok: true, reason: "" };
-      return { ok: false, reason: classifyVoicevoxAliveFailure({ response }) };
-    } catch (err) {
-      return { ok: false, reason: classifyVoicevoxAliveFailure({ error: err }) };
+    if (code === "KRW") {
+      return `₩${formatNumberJa(Math.round(n))}`;
     }
+    if (ZERO_DECIMAL_CURRENCIES.has(code)) {
+      return `${code} ${formatNumberJa(Math.round(n))}`;
+    }
+    const fixed = (Math.round(n * 100) / 100).toFixed(2);
+    return code ? `${code} ${fixed}` : fixed;
   }
-  function isWhisperStyleName(styleName) {
-    const name = String(styleName || "");
-    return /ささやき|囁き|ウィスパ|whisper/i.test(name);
-  }
-  async function listVoicevoxStyleIds(opts = {}) {
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") return [];
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    try {
-      const response = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/speakers`,
-        { method: "GET" },
-        positiveTimeout(opts.timeoutMs, 3e3)
-      );
-      if (!response || response.ok === false) return [];
-      const speakers = await response.json();
-      if (!Array.isArray(speakers)) return [];
-      const ids = [];
-      const seen = /* @__PURE__ */ new Set();
-      for (const speaker of speakers) {
-        if (!speaker || typeof speaker !== "object" || !Array.isArray(speaker.styles)) {
-          continue;
-        }
-        for (const style of speaker.styles) {
-          const id = Number(style?.id);
-          if (!Number.isInteger(id) || id < 0 || seen.has(id)) continue;
-          if (isWhisperStyleName(style?.name)) continue;
-          seen.add(id);
-          ids.push(id);
-        }
-      }
-      return ids;
-    } catch {
-      return [];
-    }
-  }
-  var _streamSupport = (
-    /** @type {'unknown'|'yes'|'no'} */
-    "unknown"
-  );
-  var _streamRejectedStyles = /* @__PURE__ */ new Set();
-  var STREAM_FALLBACK = /* @__PURE__ */ Symbol("stream_fallback");
-  async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
-    const streamFetchFn = typeof opts.streamFetchFn === "function" ? opts.streamFetchFn : proxyStreamFetchFn;
-    const firstAudioMs = positiveTimeout(opts.synthesisTimeoutMs, 8e3);
-    const controller = new AbortController();
-    let res;
-    let timer = (
-      /** @type {any} */
-      0
-    );
-    try {
-      res = await Promise.race([
-        Promise.resolve().then(() => streamFetchFn(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "audio/wav" },
-          body: JSON.stringify(audioQuery),
-          signal: controller.signal
-        })),
-        new Promise((_, reject) => {
-          timer = setTimeout(() => {
-            controller.abort();
-            reject(new Error("voicevox_timeout"));
-          }, firstAudioMs);
-        })
-      ]);
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res || res.ok === false) {
-      const status = Number(res?.status) || 0;
-      if (status === 404 || status === 405 || status === 501) {
-        _streamSupport = "no";
-        return STREAM_FALLBACK;
-      }
-      if (status === 422) {
-        _streamRejectedStyles.add(styleId);
-        return STREAM_FALLBACK;
-      }
-      notifyFailure({ stage: "synth", httpStatus: status });
-      return null;
-    }
-    const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
-    if (!reader) return STREAM_FALLBACK;
-    const parser = createWavStreamParser();
-    let voice = null;
-    return new Promise((resolve) => {
-      let settled = false;
-      const settle = (v) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(firstTimer);
-        resolve(v);
-      };
-      const firstTimer = setTimeout(() => {
-        try {
-          controller.abort();
-          void reader.cancel().catch(() => {
-          });
-        } catch {
-        }
-        voice?.fail();
-        notifyFailure({ stage: "synth", error: new Error("voicevox_timeout") });
-        settle(null);
-      }, firstAudioMs);
-      void (async () => {
-        try {
-          for (; ; ) {
-            let stall = (
-              /** @type {any} */
-              0
-            );
-            const next = await Promise.race([
-              reader.read(),
-              new Promise((_, reject) => {
-                stall = setTimeout(() => reject(new Error("voicevox_stream_stall")), VOICE_STREAM_STALL_MS);
-              })
-            ]).finally(() => clearTimeout(stall));
-            const { done, value } = (
-              /** @type {{ done: boolean, value?: Uint8Array }} */
-              next
-            );
-            if (done) break;
-            const samples = parser.push(value instanceof Uint8Array ? value : new Uint8Array(value || []));
-            if (parser.error) throw new Error(`voicevox_stream_${parser.error}`);
-            if (samples && samples.length) {
-              if (!voice) {
-                voice = new StreamedVoice(parser.sampleRate);
-                voice._cancel = () => {
-                  try {
-                    controller.abort();
-                    void reader.cancel().catch(() => {
-                    });
-                  } catch {
-                  }
-                };
-              }
-              voice.append(samples);
-              if (voice.bufferedSec >= VOICE_STREAM_PREBUFFER_SEC) settle(voice);
-            }
-            if (voice?.done) return;
-          }
-          if (voice) {
-            voice.finish();
-            settle(voice);
-          } else {
-            notifyFailure({ stage: "synth", bodyInvalid: true });
-            settle(null);
-          }
-        } catch (err) {
-          try {
-            void reader.cancel().catch(() => {
-            });
-          } catch {
-          }
-          if (voice && voice.totalSamples > 0) {
-            voice.fail();
-            settle(voice);
-          } else {
-            notifyFailure({ stage: "synth", error: err });
-            settle(null);
-          }
-        }
-      })();
-    });
-  }
-  async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailure) {
-    const streamFetchFn = typeof opts.streamFetchFn === "function" ? opts.streamFetchFn : proxyStreamFetchFn;
-    const totalMs = positiveTimeout(opts.synthesisTimeoutMs, 8e3);
-    const controller = new AbortController();
-    let reader = null;
-    let timer = (
-      /** @type {any} */
-      0
-    );
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        try {
-          controller.abort();
-          void reader?.cancel?.().catch(() => {
-          });
-        } catch {
-        }
-        reject(new Error("voicevox_timeout"));
-      }, totalMs);
-    });
-    try {
-      return await Promise.race([timeout, (async () => {
-        const res = await streamFetchFn(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "audio/wav" },
-          body: JSON.stringify(audioQuery),
-          signal: controller.signal
-        });
-        if (!res || res.ok === false) {
-          const status = Number(res?.status) || 0;
-          if (status === 404 || status === 405 || status === 501) {
-            _streamSupport = "no";
-            return STREAM_FALLBACK;
-          }
-          if (status === 422) {
-            _streamRejectedStyles.add(styleId);
-            return STREAM_FALLBACK;
-          }
-          notifyFailure({ stage: "synth", httpStatus: status });
-          return null;
-        }
-        reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
-        if (!reader) return STREAM_FALLBACK;
-        const parts = [];
-        let total = 0;
-        for (; ; ) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const part = value instanceof Uint8Array ? value : new Uint8Array(value || []);
-          parts.push(part);
-          total += part.length;
-        }
-        const wav = new Uint8Array(total);
-        let off = 0;
-        for (const part of parts) {
-          wav.set(part, off);
-          off += part.length;
-        }
-        const tag = (o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);
-        if (total <= 44 || tag(0) !== "RIFF" || tag(8) !== "WAVE") {
-          notifyFailure({ stage: "synth", bodyInvalid: true });
-          return null;
-        }
-        if (tag(36) === "data") {
-          const dv = new DataView(wav.buffer);
-          dv.setUint32(4, total - 8, true);
-          dv.setUint32(40, total - 44, true);
-        }
-        return wav.buffer;
-      })()]);
-    } catch (err) {
-      notifyFailure({ stage: "synth", error: err });
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  async function synthesizeVoice(text, voice, opts = {}) {
-    const readingText = String(text || "").trim();
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    const fetchBufferFn = opts.fetchFn ? opts.fetchFn : proxyFetchBufferFn;
-    const notifyFailure = (info) => {
-      try {
-        if (typeof opts.onFailure === "function") opts.onFailure(info);
-      } catch {
+  function createYtSupportRankingAccumulator() {
+    const totalsByCurrency = {};
+    const currencyUserMap = {};
+    const supporterMap = /* @__PURE__ */ new Map();
+    const supporterChannelIds = /* @__PURE__ */ new Set();
+    const counts = {
+      superchat: 0,
+      sticker: 0,
+      membership: 0,
+      membershipGift: 0
+    };
+    const byCurrency = {};
+    const supporters = [];
+    return {
+      totalsByCurrency,
+      currencyUserMap,
+      supporterMap,
+      supporterChannelIds,
+      counts,
+      snapshot: {
+        totalsByCurrency,
+        byCurrency,
+        counts,
+        supporters,
+        supporterChannelIds
       }
     };
-    if (!readingText || typeof fetchFn !== "function") return null;
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    const styleId = Number.isFinite(Number(voice?.styleId)) ? Number(voice.styleId) : 3;
-    const pitchOffset = Number.isFinite(Number(voice?.pitchOffset)) ? Number(voice.pitchOffset) : 0;
-    const speedOffset = Number.isFinite(Number(voice?.speedOffset)) ? Number(voice.speedOffset) : 0;
-    const query = new URLSearchParams({
-      text: readingText,
-      speaker: String(styleId)
-    });
-    const nowMs = () => Date.now();
-    const queryStartAt = nowMs();
-    let stage = "query";
-    try {
-      const queryResponse = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/audio_query?${query}`,
-        { method: "POST" },
-        positiveTimeout(opts.audioQueryTimeoutMs, 3e3)
-      );
-      if (!queryResponse || queryResponse.ok === false) {
-        notifyFailure({ stage: "query", httpStatus: Number(queryResponse?.status) || 0 });
-        return null;
-      }
-      const audioQuery = await queryResponse.json();
-      if (!audioQuery || typeof audioQuery !== "object") {
-        notifyFailure({ stage: "query", bodyInvalid: true });
-        return null;
-      }
-      const pitchScale = Number(audioQuery.pitchScale);
-      const speedScale = Number(audioQuery.speedScale);
-      audioQuery.pitchScale = (Number.isFinite(pitchScale) ? pitchScale : 0) + pitchOffset;
-      audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
-      audioQuery.outputSamplingRate = _outputSamplingRate;
-      audioQuery.outputStereo = false;
-      const queryMs = nowMs() - queryStartAt;
-      stage = "synth";
-      const synthStartAt = nowMs();
-      if (opts.stream === true && _streamSupport === "yes" && !_streamRejectedStyles.has(styleId)) {
-        const streamed = await streamSynthesis(
-          `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
-          audioQuery,
-          styleId,
-          opts,
-          notifyFailure
-        );
-        if (streamed !== STREAM_FALLBACK) {
-          if (streamed) {
-            try {
-              if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt, streamed: true });
-            } catch {
-            }
-          }
-          return streamed;
-        }
-      } else if (opts.stream !== true && opts.wholeViaStream !== false && _streamSupport === "yes" && !_streamRejectedStyles.has(styleId)) {
-        const whole = await streamSynthesisWhole(
-          `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
-          audioQuery,
-          styleId,
-          opts,
-          notifyFailure
-        );
-        if (whole !== STREAM_FALLBACK) {
-          if (whole) {
-            try {
-              if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
-            } catch {
-            }
-          }
-          return whole;
-        }
-      }
-      const synthesisRes = await fetchWithTimeout(
-        fetchBufferFn,
-        `${baseUrl}/synthesis?speaker=${styleId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "audio/wav"
-          },
-          body: JSON.stringify(audioQuery)
-        },
-        positiveTimeout(opts.synthesisTimeoutMs, 8e3)
-      );
-      if (!synthesisRes || synthesisRes.ok === false) {
-        notifyFailure({ stage: "synth", httpStatus: Number(synthesisRes?.status) || 0 });
-        return null;
-      }
-      const wav = await arrayBufferWithTimeout(
-        synthesisRes,
-        positiveTimeout(opts.synthesisTimeoutMs, 8e3)
-      );
-      try {
-        if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
-      } catch {
-      }
-      return wav;
-    } catch (err) {
-      notifyFailure({ stage, error: err });
-      return null;
-    }
   }
+  function applyYtSupportRankingDelta(accumulator, newItems) {
+    const acc = accumulator || createYtSupportRankingAccumulator();
+    let rankingChanged = false;
+    let supporterSetChanged = false;
+    const touchedCurrencies = /* @__PURE__ */ new Set();
+    if (!Array.isArray(newItems) || newItems.length === 0) {
+      return {
+        accumulator: acc,
+        snapshot: acc.snapshot,
+        rankingChanged: false,
+        supporterSetChanged: false
+      };
+    }
+    for (const item of newItems) {
+      if (!item || typeof item !== "object") continue;
+      const kind = String(item.kind || "");
+      const isSupportKind = kind === "superchat" || kind === "sticker" || kind === "membership" || kind === "membership_gift";
+      const badges = Array.isArray(item.badges) ? item.badges : [];
+      const isMemberBadge = badges.includes("member");
+      const channelId = String(item.channelId || item.name || "").trim();
+      if (channelId && (isSupportKind || isMemberBadge)) {
+        if (!acc.supporterChannelIds.has(channelId)) {
+          acc.supporterChannelIds.add(channelId);
+          supporterSetChanged = true;
+        }
+      }
+      if (!isSupportKind || !channelId) continue;
+      rankingChanged = true;
+      if (kind === "superchat") acc.counts.superchat += 1;
+      else if (kind === "sticker") acc.counts.sticker += 1;
+      else if (kind === "membership") acc.counts.membership += 1;
+      else if (kind === "membership_gift") acc.counts.membershipGift += 1;
+      const name = String(item.name || channelId).trim();
+      const iconUrl = safeHttpUrl(item.iconUrl || "");
+      const channelUrl = buildYtChannelUrl(channelId);
+      const ts = Number.isFinite(Number(item.ts)) ? Number(item.ts) : 0;
+      let sup = acc.supporterMap.get(channelId);
+      if (!sup) {
+        sup = {
+          channelId,
+          name,
+          iconUrl,
+          channelUrl,
+          amountsByCurrency: {},
+          superchatCount: 0,
+          stickerCount: 0,
+          membershipCount: 0,
+          giftCount: 0,
+          lastTs: ts
+        };
+        acc.supporterMap.set(channelId, sup);
+      } else {
+        if (name && (!sup.name || sup.name === sup.channelId)) sup.name = name;
+        if (iconUrl && !sup.iconUrl) sup.iconUrl = iconUrl;
+        if (ts > sup.lastTs) sup.lastTs = ts;
+      }
+      if (kind === "superchat") sup.superchatCount += 1;
+      else if (kind === "sticker") sup.stickerCount += 1;
+      else if (kind === "membership") sup.membershipCount += 1;
+      else if (kind === "membership_gift") sup.giftCount += 1;
+      const amount = Number(item.amount || 0);
+      const currency = String(item.currency || "").trim().toUpperCase();
+      if ((kind === "superchat" || kind === "sticker") && Number.isFinite(amount) && amount > 0 && currency) {
+        acc.totalsByCurrency[currency] = Math.round(((acc.totalsByCurrency[currency] || 0) + amount) * 100) / 100;
+        sup.amountsByCurrency[currency] = Math.round(((sup.amountsByCurrency[currency] || 0) + amount) * 100) / 100;
+        if (!acc.currencyUserMap[currency]) {
+          acc.currencyUserMap[currency] = /* @__PURE__ */ new Map();
+        }
+        const cMap = acc.currencyUserMap[currency];
+        let cEntry = cMap.get(channelId);
+        if (!cEntry) {
+          cEntry = {
+            channelId,
+            name,
+            iconUrl,
+            channelUrl,
+            amount: 0,
+            currency,
+            count: 0,
+            lastTs: ts
+          };
+          cMap.set(channelId, cEntry);
+        }
+        cEntry.amount = Math.round((cEntry.amount + amount) * 100) / 100;
+        cEntry.count += 1;
+        if (name && (!cEntry.name || cEntry.name === cEntry.channelId)) cEntry.name = name;
+        if (iconUrl && !cEntry.iconUrl) cEntry.iconUrl = iconUrl;
+        if (ts > cEntry.lastTs) cEntry.lastTs = ts;
+        touchedCurrencies.add(currency);
+      }
+    }
+    if (rankingChanged) {
+      for (const currency of touchedCurrencies) {
+        const cMap = acc.currencyUserMap[currency];
+        if (!cMap) continue;
+        const sorted = Array.from(cMap.values()).sort((a, b) => {
+          if (b.amount !== a.amount) return b.amount - a.amount;
+          if (b.count !== a.count) return b.count - a.count;
+          return b.lastTs - a.lastTs;
+        });
+        acc.snapshot.byCurrency[currency] = sorted.map((entry, idx) => ({
+          rank: idx + 1,
+          ...entry,
+          formattedAmount: formatYtCurrencyAmount(entry.amount, currency)
+        }));
+      }
+      acc.snapshot.supporters = Array.from(acc.supporterMap.values()).sort((a, b) => {
+        const aPaid = a.superchatCount + a.stickerCount;
+        const bPaid = b.superchatCount + b.stickerCount;
+        if (bPaid !== aPaid) return bPaid - aPaid;
+        if (b.giftCount !== a.giftCount) return b.giftCount - a.giftCount;
+        if (b.membershipCount !== a.membershipCount) return b.membershipCount - a.membershipCount;
+        return b.lastTs - a.lastTs;
+      });
+    }
+    return {
+      accumulator: acc,
+      snapshot: acc.snapshot,
+      rankingChanged,
+      supporterSetChanged
+    };
+  }
+
+  // src/lib/voiceAssignment.js
+  var DEFAULT_VOICE = Object.freeze({
+    styleId: 3,
+    pitchOffset: 0,
+    speedOffset: 0
+  });
+  var PITCH_OFFSETS = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
+  var SPEED_OFFSETS = Object.freeze([0, 0.05, 0.1]);
+
+  // src/lib/voiceNarrowing.js
+  var VOICE_NARROW_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14]);
+  var VOICE_CAPPED_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14, 11, 21, 20, 46, 0, 4, 6, 1, 7, 5, 81, 82, 83, 84, 85, 66, 77, 78, 79, 80]);
+  var VOICE_NARROW_MODES = Object.freeze(["off", "auto", "on"]);
+
+  // src/lib/youtube/ytVoiceQueue.js
+  var YT_VOICE_MODES = Object.freeze({
+    ALL: "all",
+    SELECT: "select"
+  });
+  var YT_DEFAULT_STYLE_IDS = VOICE_CAPPED_STYLE_IDS;
 
   // src/lib/youtube/ytLaneAssign.js
   var YT_LANES = Object.freeze({
@@ -1131,210 +559,133 @@
     }
     return YT_LANES.TANUNEE;
   }
-  function groupYtCommentsByLane(items, opts = {}) {
-    const grouped = {
+
+  // src/lib/youtube/ytStreamStorePolicy.js
+  var YT_SIDE_PANEL_DISPLAY_LIMIT = 150;
+  function buildYtCommentPrimaryKey(videoId, commentId) {
+    const v = String(videoId || "").trim();
+    const c = String(commentId || "").trim();
+    if (!v || !c) return "";
+    return `${v}::${c}`;
+  }
+  function createYtStreamIncrementalState(videoId, opts = {}) {
+    const displayLimit = typeof opts.displayLimit === "number" && opts.displayLimit > 0 ? Math.floor(opts.displayLimit) : YT_SIDE_PANEL_DISPLAY_LIMIT;
+    return {
+      videoId: String(videoId || "").trim(),
+      broadcasterChannelId: String(opts.broadcasterChannelId || "").trim(),
+      displayLimit,
+      totalCount: 0,
+      lastRecordedAt: 0,
+      /** @type {Set<string>} */
+      seenPks: /* @__PURE__ */ new Set(),
+      laneCounts: {
+        rinku: 0,
+        konta: 0,
+        tanunee: 0
+      },
+      /** @type {{ rinku: any[], konta: any[], tanunee: any[] }} */
+      laneDisplay: {
+        rinku: [],
+        konta: [],
+        tanunee: []
+      },
+      rankingAcc: createYtSupportRankingAccumulator()
+    };
+  }
+  function applyYtStreamIncrementalItems(state, incomingItems, opts = {}) {
+    if (opts.broadcasterChannelId) {
+      state.broadcasterChannelId = String(opts.broadcasterChannelId).trim();
+    }
+    const addedByLane = {
       rinku: [],
       konta: [],
       tanunee: []
     };
-    if (!Array.isArray(items)) return grouped;
-    for (const item of items) {
-      if (!item || typeof item !== "object") continue;
-      const lane = assignYtCommentLane(item, opts);
-      grouped[lane].push(item);
-    }
-    return grouped;
-  }
-
-  // src/lib/youtube/ytSupportRanking.js
-  var ZERO_DECIMAL_CURRENCIES = /* @__PURE__ */ new Set(["JPY", "KRW", "TWD", "VND"]);
-  function buildYtChannelUrl(channelId) {
-    const id = String(channelId || "").trim();
-    if (/^UC[A-Za-z0-9_-]{16,32}$/.test(id)) {
-      return `https://www.youtube.com/channel/${id}`;
-    }
-    if (id.startsWith("handle:@")) {
-      const handle = id.slice("handle:".length);
-      if (/^@[A-Za-z0-9_.-]+$/.test(handle)) {
-        return `https://www.youtube.com/${handle}`;
-      }
-    }
-    return "";
-  }
-  function formatYtCurrencyAmount(amount, currency) {
-    const code = String(currency || "").trim().toUpperCase();
-    const n = Number(amount);
-    if (!Number.isFinite(n)) return "—";
-    if (code === "JPY") {
-      return `¥${formatNumberJa(Math.round(n))}`;
-    }
-    if (code === "KRW") {
-      return `₩${formatNumberJa(Math.round(n))}`;
-    }
-    if (ZERO_DECIMAL_CURRENCIES.has(code)) {
-      return `${code} ${formatNumberJa(Math.round(n))}`;
-    }
-    const fixed = (Math.round(n * 100) / 100).toFixed(2);
-    return code ? `${code} ${fixed}` : fixed;
-  }
-  function aggregateYtSupportRanking(items) {
-    const totalsByCurrency = {};
-    const currencyUserMap = {};
-    const supporterMap = /* @__PURE__ */ new Map();
-    const supporterChannelIds = /* @__PURE__ */ new Set();
-    const counts = {
-      superchat: 0,
-      sticker: 0,
-      membership: 0,
-      membershipGift: 0
-    };
-    if (!Array.isArray(items)) {
+    if (!Array.isArray(incomingItems) || incomingItems.length === 0) {
       return {
-        totalsByCurrency,
-        byCurrency: {},
-        counts,
-        supporters: [],
-        supporterChannelIds
+        addedCount: 0,
+        addedByLane,
+        rankingChanged: false,
+        supporterSetChanged: false,
+        ranking: state.rankingAcc.snapshot,
+        laneCounts: state.laneCounts,
+        laneDisplay: state.laneDisplay,
+        totalCount: state.totalCount
       };
     }
-    for (const item of items) {
+    const unseen = [];
+    for (let i = 0; i < incomingItems.length; i += 1) {
+      const item = incomingItems[i];
       if (!item || typeof item !== "object") continue;
-      const kind = String(item.kind || "");
-      const isSupportKind = kind === "superchat" || kind === "sticker" || kind === "membership" || kind === "membership_gift";
-      const badges = Array.isArray(item.badges) ? item.badges : [];
-      const isMemberBadge = badges.includes("member");
-      const channelId = String(item.channelId || item.name || "").trim();
-      if (channelId && (isSupportKind || isMemberBadge)) {
-        supporterChannelIds.add(channelId);
-      }
-      if (!isSupportKind || !channelId) continue;
-      if (kind === "superchat") counts.superchat += 1;
-      else if (kind === "sticker") counts.sticker += 1;
-      else if (kind === "membership") counts.membership += 1;
-      else if (kind === "membership_gift") counts.membershipGift += 1;
-      const name = String(item.name || channelId).trim();
-      const iconUrl = safeHttpUrl(item.iconUrl || "");
-      const channelUrl = buildYtChannelUrl(channelId);
-      const ts = Number.isFinite(Number(item.ts)) ? Number(item.ts) : 0;
-      let sup = supporterMap.get(channelId);
-      if (!sup) {
-        sup = {
-          channelId,
-          name,
-          iconUrl,
-          channelUrl,
-          amountsByCurrency: {},
-          superchatCount: 0,
-          stickerCount: 0,
-          membershipCount: 0,
-          giftCount: 0,
-          lastTs: ts
-        };
-        supporterMap.set(channelId, sup);
-      } else {
-        if (name && (!sup.name || sup.name === sup.channelId)) sup.name = name;
-        if (iconUrl && !sup.iconUrl) sup.iconUrl = iconUrl;
-        if (ts > sup.lastTs) sup.lastTs = ts;
-      }
-      if (kind === "superchat") sup.superchatCount += 1;
-      else if (kind === "sticker") sup.stickerCount += 1;
-      else if (kind === "membership") sup.membershipCount += 1;
-      else if (kind === "membership_gift") sup.giftCount += 1;
-      const amount = Number(item.amount || 0);
-      const currency = String(item.currency || "").trim().toUpperCase();
-      if ((kind === "superchat" || kind === "sticker") && Number.isFinite(amount) && amount > 0 && currency) {
-        totalsByCurrency[currency] = Math.round(((totalsByCurrency[currency] || 0) + amount) * 100) / 100;
-        sup.amountsByCurrency[currency] = Math.round(((sup.amountsByCurrency[currency] || 0) + amount) * 100) / 100;
-        if (!currencyUserMap[currency]) {
-          currencyUserMap[currency] = /* @__PURE__ */ new Map();
-        }
-        const cMap = currencyUserMap[currency];
-        let cEntry = cMap.get(channelId);
-        if (!cEntry) {
-          cEntry = {
-            channelId,
-            name,
-            iconUrl,
-            channelUrl,
-            amount: 0,
-            currency,
-            count: 0,
-            lastTs: ts
-          };
-          cMap.set(channelId, cEntry);
-        }
-        cEntry.amount = Math.round((cEntry.amount + amount) * 100) / 100;
-        cEntry.count += 1;
-        if (name && (!cEntry.name || cEntry.name === cEntry.channelId)) cEntry.name = name;
-        if (iconUrl && !cEntry.iconUrl) cEntry.iconUrl = iconUrl;
-        if (ts > cEntry.lastTs) cEntry.lastTs = ts;
+      const pk = String(item.pk || "").trim() || buildYtCommentPrimaryKey(state.videoId || item.videoId, item.id);
+      if (!pk || state.seenPks.has(pk)) continue;
+      state.seenPks.add(pk);
+      unseen.push(item);
+      const recAt = Number(item.recordedAt || 0);
+      if (Number.isFinite(recAt) && recAt > state.lastRecordedAt) {
+        state.lastRecordedAt = recAt;
       }
     }
-    const byCurrency = {};
-    for (const [currency, cMap] of Object.entries(currencyUserMap)) {
-      const sorted = Array.from(cMap.values()).sort((a, b) => {
-        if (b.amount !== a.amount) return b.amount - a.amount;
-        if (b.count !== a.count) return b.count - a.count;
-        return b.lastTs - a.lastTs;
+    if (unseen.length === 0) {
+      return {
+        addedCount: 0,
+        addedByLane,
+        rankingChanged: false,
+        supporterSetChanged: false,
+        ranking: state.rankingAcc.snapshot,
+        laneCounts: state.laneCounts,
+        laneDisplay: state.laneDisplay,
+        totalCount: state.totalCount
+      };
+    }
+    state.totalCount += unseen.length;
+    const rankRes = applyYtSupportRankingDelta(state.rankingAcc, unseen);
+    for (let i = 0; i < unseen.length; i += 1) {
+      const item = unseen[i];
+      const lane = assignYtCommentLane(item, {
+        broadcasterChannelId: state.broadcasterChannelId,
+        supporterChannelIds: state.rankingAcc.supporterChannelIds
       });
-      byCurrency[currency] = sorted.map((entry, idx) => ({
-        rank: idx + 1,
-        ...entry,
-        formattedAmount: formatYtCurrencyAmount(entry.amount, currency)
-      }));
+      state.laneCounts[lane] += 1;
+      addedByLane[lane].push(item);
     }
-    const supporters = Array.from(supporterMap.values()).sort((a, b) => {
-      const aPaid = a.superchatCount + a.stickerCount;
-      const bPaid = b.superchatCount + b.stickerCount;
-      if (bPaid !== aPaid) return bPaid - aPaid;
-      if (b.giftCount !== a.giftCount) return b.giftCount - a.giftCount;
-      if (b.membershipCount !== a.membershipCount) return b.membershipCount - a.membershipCount;
-      return b.lastTs - a.lastTs;
-    });
+    const limit = state.displayLimit || YT_SIDE_PANEL_DISPLAY_LIMIT;
+    for (
+      const lane of
+      /** @type {const} */
+      ["rinku", "konta", "tanunee"]
+    ) {
+      const added = addedByLane[lane];
+      if (added.length === 0) continue;
+      const addedNewestFirst = added.slice().reverse();
+      if (addedNewestFirst.length >= limit) {
+        state.laneDisplay[lane] = addedNewestFirst.slice(0, limit);
+      } else {
+        const merged = addedNewestFirst.concat(state.laneDisplay[lane]);
+        if (merged.length > limit) {
+          merged.length = limit;
+        }
+        state.laneDisplay[lane] = merged;
+      }
+    }
     return {
-      totalsByCurrency,
-      byCurrency,
-      counts,
-      supporters,
-      supporterChannelIds
+      addedCount: unseen.length,
+      addedByLane,
+      rankingChanged: rankRes.rankingChanged,
+      supporterSetChanged: rankRes.supporterSetChanged,
+      ranking: rankRes.snapshot,
+      laneCounts: state.laneCounts,
+      laneDisplay: state.laneDisplay,
+      totalCount: state.totalCount
     };
-  }
-
-  // src/lib/voiceAssignment.js
-  var DEFAULT_VOICE = Object.freeze({
-    styleId: 3,
-    pitchOffset: 0,
-    speedOffset: 0
-  });
-  var PITCH_OFFSETS = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
-  var SPEED_OFFSETS = Object.freeze([0, 0.05, 0.1]);
-
-  // src/lib/voiceNarrowing.js
-  var VOICE_NARROW_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14]);
-  var VOICE_CAPPED_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14, 11, 21, 20, 46, 0, 4, 6, 1, 7, 5, 81, 82, 83, 84, 85, 66, 77, 78, 79, 80]);
-  var VOICE_NARROW_MODES = Object.freeze(["off", "auto", "on"]);
-
-  // src/lib/youtube/ytVoiceQueue.js
-  var YT_VOICE_MODES = Object.freeze({
-    ALL: "all",
-    SELECT: "select"
-  });
-  var YT_DEFAULT_STYLE_IDS = VOICE_CAPPED_STYLE_IDS;
-
-  // src/lib/youtube/ytStreamStorePolicy.js
-  var YT_SIDE_PANEL_DISPLAY_LIMIT = 150;
-  function selectYtNewestCommentsForDisplay(items, limit = YT_SIDE_PANEL_DISPLAY_LIMIT) {
-    if (!Array.isArray(items) || items.length === 0) return [];
-    const maxCount = typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : YT_SIDE_PANEL_DISPLAY_LIMIT;
-    const startIdx = Math.max(0, items.length - maxCount);
-    return items.slice(startIdx).reverse();
   }
 
   // extension-youtube/src/ytIdbStore.js
   var DB_NAME = "yt_kirameki_db";
-  var DB_VERSION = 1;
+  var DB_VERSION = 2;
   var STORE_COMMENTS = "comments";
   var INDEX_BY_VIDEO_ID = "by_videoId";
+  var INDEX_BY_VIDEO_ID_RECORDED_AT = "by_videoId_recordedAt";
   var dbPromise = null;
   function openYtCommentsDb() {
     if (dbPromise) return dbPromise;
@@ -1343,9 +694,19 @@
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = () => {
           const db = req.result;
+          let store;
           if (!db.objectStoreNames.contains(STORE_COMMENTS)) {
-            const store = db.createObjectStore(STORE_COMMENTS, { keyPath: "pk" });
+            store = db.createObjectStore(STORE_COMMENTS, { keyPath: "pk" });
+          } else {
+            store = req.transaction.objectStore(STORE_COMMENTS);
+          }
+          if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID)) {
             store.createIndex(INDEX_BY_VIDEO_ID, "videoId", { unique: false });
+          }
+          if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
+            store.createIndex(INDEX_BY_VIDEO_ID_RECORDED_AT, ["videoId", "recordedAt"], {
+              unique: false
+            });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -1367,6 +728,18 @@
     return new Promise((resolve, reject) => {
       const tx = db.transaction([STORE_COMMENTS], "readonly");
       const store = tx.objectStore(STORE_COMMENTS);
+      if (store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
+        const index2 = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
+        const range = IDBKeyRange.bound([vid, 0], [vid, Number.MAX_SAFE_INTEGER]);
+        const req2 = index2.getAll(range);
+        req2.onsuccess = () => {
+          resolve(Array.isArray(req2.result) ? req2.result : []);
+        };
+        req2.onerror = () => {
+          reject(req2.error || new Error("idb_get_failed"));
+        };
+        return;
+      }
       const index = store.index(INDEX_BY_VIDEO_ID);
       const req = index.getAll(IDBKeyRange.only(vid));
       req.onsuccess = () => {
@@ -1376,6 +749,25 @@
       };
       req.onerror = () => {
         reject(req.error || new Error("idb_get_failed"));
+      };
+    });
+  }
+  async function getYtStreamCommentsSince(videoId, afterRecordedAt = 0) {
+    const vid = String(videoId || "").trim();
+    if (!vid) return [];
+    const lower = typeof afterRecordedAt === "number" && Number.isFinite(afterRecordedAt) && afterRecordedAt > 0 ? afterRecordedAt : 0;
+    const db = await openYtCommentsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_COMMENTS], "readonly");
+      const store = tx.objectStore(STORE_COMMENTS);
+      const index = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
+      const range = IDBKeyRange.bound([vid, lower], [vid, Number.MAX_SAFE_INTEGER]);
+      const req = index.getAll(range);
+      req.onsuccess = () => {
+        resolve(Array.isArray(req.result) ? req.result : []);
+      };
+      req.onerror = () => {
+        reject(req.error || new Error("idb_get_since_failed"));
       };
     });
   }
@@ -1389,20 +781,67 @@
     VOICE_QUEUE: "yt_voice_queue",
     VOICE_STATE: "yt_voice_state"
   });
+  var LANE_CONFIG = Object.freeze({
+    rinku: {
+      listId: "lane-rinku-list",
+      countId: "lane-rinku-count",
+      emptyMessage: "配信者本人・モデレーターのコメントがここに表示されます",
+      fallbackIcon: "images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+    },
+    konta: {
+      listId: "lane-konta-list",
+      countId: "lane-konta-count",
+      emptyMessage: "スパチャ・ステッカー・メンバー・ギフトの応援がここに表示されます",
+      fallbackIcon: "images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+    },
+    tanunee: {
+      listId: "lane-tanunee-list",
+      countId: "lane-tanunee-count",
+      emptyMessage: "一般リスナーのコメントがここに表示されます",
+      fallbackIcon: "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+    }
+  });
   var selectedVideoId = "";
-  var isVoicevoxOnline = false;
-  var isDrainingQueue = false;
-  var lastSpokenSummary = "";
+  var currentIncrementalState = null;
+  var renderJobChain = Promise.resolve();
+  var metrics = {
+    fullGetAllCount: 0,
+    incrementalFetchCount: 0,
+    lastIncrementalFetchedItems: 0,
+    lastIncrementalAddedItems: 0,
+    lastIncrementalDurationMs: 0,
+    lastFullLoadDurationMs: 0,
+    voiceOnlyUpdateCount: 0
+  };
+  if (typeof window !== "undefined") {
+    window.__ytSidepanelMetrics = metrics;
+  }
+  function runRenderSerialized(fn) {
+    const next = renderJobChain.then(fn, fn);
+    renderJobChain = next.then(
+      () => void 0,
+      () => void 0
+    );
+    return next;
+  }
   function clearChildren(el) {
     if (!el) return;
     while (el.firstChild) {
       el.removeChild(el.firstChild);
     }
   }
-  function createAvatarNode(iconUrl, name) {
+  function createAvatarNode(iconUrl, name, fallbackIconPath) {
     const safeUrl = safeHttpUrl(iconUrl || "");
-    const initial = String(name || "?").replace(/^@/, "").trim().slice(0, 1).toUpperCase() || "?";
     const makeFallback = () => {
+      if (fallbackIconPath) {
+        const fImg = document.createElement("img");
+        fImg.className = "nl-story-userlane-avatar avatar-img";
+        fImg.src = fallbackIconPath;
+        fImg.alt = name || "icon";
+        fImg.decoding = "async";
+        return fImg;
+      }
+      const initial = String(name || "?").replace(/^@/, "").trim().slice(0, 1).toUpperCase() || "?";
       const span = document.createElement("span");
       span.className = "avatar-fallback";
       span.textContent = initial;
@@ -1412,10 +851,12 @@
       return makeFallback();
     }
     const img = document.createElement("img");
-    img.className = "avatar-img";
+    img.className = "nl-story-userlane-avatar avatar-img";
     img.src = safeUrl;
     img.alt = name || "icon";
     img.loading = "lazy";
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
     img.addEventListener("error", () => {
       const fallback = makeFallback();
       if (img.parentNode) {
@@ -1424,54 +865,59 @@
     });
     return img;
   }
-  function createAuthorHeaderFragment(user) {
+  function createAuthorHeaderFragment(user, fallbackIconPath) {
     const frag = document.createDocumentFragment();
     const displayName = String(user.name || user.channelId || "匿名リスナー").trim();
     const channelId = String(user.channelId || "").trim();
     const channelUrl = safeHttpUrl(buildYtChannelUrl(channelId));
-    frag.appendChild(createAvatarNode(user.iconUrl || "", displayName));
+    const shortId = channelId ? `${channelId.slice(0, 14)}${channelId.length > 14 ? "…" : ""}` : "";
+    const cell = channelUrl ? document.createElement("a") : document.createElement("span");
+    cell.className = channelUrl ? "nl-story-userlane-cell nl-story-userlane-cell--linkable author-link" : "nl-story-userlane-cell author-link";
     if (channelUrl) {
-      const link = document.createElement("a");
-      link.className = "author-link";
-      link.href = channelUrl;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = displayName;
-      frag.appendChild(link);
-    } else {
-      const span = document.createElement("span");
-      span.className = "author-link";
-      span.textContent = displayName;
-      frag.appendChild(span);
+      cell.href = channelUrl;
+      cell.target = "_blank";
+      cell.rel = "noopener noreferrer";
     }
-    if (channelId) {
+    cell.title = channelId ? `${displayName} (${channelId})` : displayName;
+    cell.appendChild(createAvatarNode(user.iconUrl || "", displayName, fallbackIconPath));
+    const meta = document.createElement("span");
+    meta.className = "nl-story-userlane-meta";
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "nl-story-userlane-meta__name";
+    nameSpan.textContent = displayName;
+    meta.appendChild(nameSpan);
+    if (shortId) {
       const idTag = document.createElement("span");
-      idTag.className = "channel-id-tag";
-      idTag.textContent = `(${channelId.slice(0, 14)}${channelId.length > 14 ? "…" : ""})`;
+      idTag.className = "nl-story-userlane-meta__id channel-id-tag";
+      idTag.textContent = `(${shortId})`;
       idTag.title = channelId;
-      frag.appendChild(idTag);
+      meta.appendChild(idTag);
     }
+    cell.appendChild(meta);
+    frag.appendChild(cell);
     if (Number.isFinite(Number(user.voiceStyleId))) {
       const voicePill = document.createElement("span");
       voicePill.className = "voice-pill";
       voicePill.dataset.voiceStyleId = String(user.voiceStyleId);
-      voicePill.textContent = `🔊 声 #${user.voiceStyleId}`;
+      voicePill.textContent = `声 #${user.voiceStyleId}`;
       frag.appendChild(voicePill);
     }
     return frag;
   }
-  function createChatItemElement(item) {
+  function createChatItemElement(item, lane = "tanunee") {
     const card = document.createElement("div");
     const kind = String(item.kind || "text");
-    card.className = `chat-item kind-${kind}`;
+    const isGiftLike = kind === "superchat" || kind === "sticker" || kind === "membership" || kind === "membership_gift";
+    card.className = `chat-item ${isGiftLike ? "nl-tl-gift" : "nl-tl-row"} kind-${kind}`;
     card.dataset.itemId = String(item.id || "");
     card.dataset.channelId = String(item.channelId || "");
     if (Number.isFinite(Number(item.voiceStyleId))) {
       card.dataset.voiceStyleId = String(item.voiceStyleId);
     }
+    const fallbackIcon = LANE_CONFIG[lane]?.fallbackIcon || LANE_CONFIG.tanunee.fallbackIcon;
     const head = document.createElement("div");
     head.className = "chat-item-head";
-    head.appendChild(createAuthorHeaderFragment(item));
+    head.appendChild(createAuthorHeaderFragment(item, fallbackIcon));
     if ((kind === "superchat" || kind === "sticker") && Number(item.amount) > 0) {
       const pill = document.createElement("span");
       pill.className = "amount-pill";
@@ -1491,6 +937,7 @@
     if (item.ts) {
       const tsSpan = document.createElement("span");
       tsSpan.className = "channel-id-tag";
+      tsSpan.style.marginLeft = "auto";
       tsSpan.textContent = String(item.ts);
       head.appendChild(tsSpan);
     }
@@ -1503,27 +950,63 @@
     }
     return card;
   }
-  function renderLaneColumn(listId, countId, items, emptyMessage) {
-    const listEl = document.getElementById(listId);
-    const countEl = document.getElementById(countId);
+  function renderLaneFull(lane, displayItems, totalLaneCount) {
+    const cfg = LANE_CONFIG[lane];
+    const listEl = document.getElementById(cfg.listId);
+    const countEl = document.getElementById(cfg.countId);
     if (countEl) {
-      countEl.textContent = `${items.length}件`;
+      countEl.textContent = `${totalLaneCount}件`;
     }
     if (!listEl) return;
     clearChildren(listEl);
-    if (items.length === 0) {
+    if (displayItems.length === 0) {
       const hint = document.createElement("div");
       hint.className = "empty-hint";
-      hint.textContent = emptyMessage;
+      hint.textContent = cfg.emptyMessage;
       listEl.appendChild(hint);
       return;
     }
-    const newestSlice = selectYtNewestCommentsForDisplay(items, YT_SIDE_PANEL_DISPLAY_LIMIT);
     const frag = document.createDocumentFragment();
-    for (let i = 0; i < newestSlice.length; i += 1) {
-      frag.appendChild(createChatItemElement(newestSlice[i]));
+    for (let i = 0; i < displayItems.length; i += 1) {
+      frag.appendChild(createChatItemElement(displayItems[i], lane));
     }
     listEl.appendChild(frag);
+  }
+  function patchLaneIncremental(lane, newlyAddedChronological, totalLaneCount) {
+    const cfg = LANE_CONFIG[lane];
+    const countEl = document.getElementById(cfg.countId);
+    if (countEl) {
+      countEl.textContent = `${totalLaneCount}件`;
+    }
+    if (!newlyAddedChronological || newlyAddedChronological.length === 0) return;
+    const listEl = document.getElementById(cfg.listId);
+    if (!listEl) return;
+    const emptyHint = listEl.querySelector(".empty-hint");
+    if (emptyHint) {
+      emptyHint.remove();
+    }
+    if (newlyAddedChronological.length >= YT_SIDE_PANEL_DISPLAY_LIMIT) {
+      clearChildren(listEl);
+      const newest = newlyAddedChronological.slice(-YT_SIDE_PANEL_DISPLAY_LIMIT).reverse();
+      const frag2 = document.createDocumentFragment();
+      for (let i = 0; i < newest.length; i += 1) {
+        frag2.appendChild(createChatItemElement(newest[i], lane));
+      }
+      listEl.appendChild(frag2);
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    for (let i = newlyAddedChronological.length - 1; i >= 0; i -= 1) {
+      frag.appendChild(createChatItemElement(newlyAddedChronological[i], lane));
+    }
+    listEl.insertBefore(frag, listEl.firstChild);
+    while (listEl.children.length > YT_SIDE_PANEL_DISPLAY_LIMIT) {
+      if (listEl.lastElementChild) {
+        listEl.removeChild(listEl.lastElementChild);
+      } else {
+        break;
+      }
+    }
   }
   function renderSupportRanking(ranking) {
     const summaryEl = document.getElementById("yt-support-summary");
@@ -1543,6 +1026,7 @@
       containerEl.appendChild(hint);
       return;
     }
+    const kontaFallback = LANE_CONFIG.konta.fallbackIcon;
     for (const currency of currencies) {
       const box = document.createElement("div");
       box.className = "currency-box";
@@ -1559,28 +1043,36 @@
       header.appendChild(titleSpan);
       header.appendChild(totalSpan);
       box.appendChild(header);
+      const listWrap = document.createElement("div");
+      listWrap.className = "nl-top-support-rank__list";
+      listWrap.setAttribute("role", "list");
       const rows = ranking.byCurrency[currency].slice(0, 10);
       for (const row of rows) {
         const rowEl = document.createElement("div");
-        rowEl.className = "supporter-row";
+        rowEl.className = "nl-top-support-rank__line supporter-row";
+        rowEl.setAttribute("role", "listitem");
         const rankSpan = document.createElement("span");
-        rankSpan.className = "rank-badge";
+        rankSpan.className = "nl-top-support-rank__place rank-badge";
         rankSpan.textContent = `${row.rank}位`;
         rowEl.appendChild(rankSpan);
         rowEl.appendChild(
-          createAuthorHeaderFragment({
-            name: row.name,
-            channelId: row.channelId,
-            iconUrl: row.iconUrl
-          })
+          createAuthorHeaderFragment(
+            {
+              name: row.name,
+              channelId: row.channelId,
+              iconUrl: row.iconUrl
+            },
+            kontaFallback
+          )
         );
         const amountSpan = document.createElement("span");
-        amountSpan.className = "amount-pill";
+        amountSpan.className = "nl-top-support-rank__count amount-pill";
         amountSpan.style.marginLeft = "auto";
         amountSpan.textContent = `${row.formattedAmount} (${row.count}回)`;
         rowEl.appendChild(amountSpan);
-        box.appendChild(rowEl);
+        listWrap.appendChild(rowEl);
       }
+      box.appendChild(listWrap);
       containerEl.appendChild(box);
     }
     const memberSupporters = ranking.supporters.filter(
@@ -1599,263 +1091,248 @@
       header.appendChild(titleSpan);
       header.appendChild(totalSpan);
       box.appendChild(header);
+      const listWrap = document.createElement("div");
+      listWrap.className = "nl-top-support-rank__list";
+      listWrap.setAttribute("role", "list");
       for (const sup of memberSupporters.slice(0, 10)) {
         const rowEl = document.createElement("div");
-        rowEl.className = "supporter-row";
+        rowEl.className = "nl-top-support-rank__line supporter-row";
+        rowEl.setAttribute("role", "listitem");
         rowEl.appendChild(
-          createAuthorHeaderFragment({
-            name: sup.name,
-            channelId: sup.channelId,
-            iconUrl: sup.iconUrl
-          })
+          createAuthorHeaderFragment(
+            {
+              name: sup.name,
+              channelId: sup.channelId,
+              iconUrl: sup.iconUrl
+            },
+            kontaFallback
+          )
         );
         const badge = document.createElement("span");
         badge.className = "member-pill";
         badge.style.marginLeft = "auto";
         badge.textContent = sup.giftCount > 0 ? `ギフト ${sup.giftCount}回` : `メンバー加入 ${sup.membershipCount}回`;
         rowEl.appendChild(badge);
-        box.appendChild(rowEl);
+        listWrap.appendChild(rowEl);
       }
+      box.appendChild(listWrap);
       containerEl.appendChild(box);
     }
   }
-  async function renderFromStorage() {
-    try {
-      const data = await chrome.storage.local.get([
-        STORAGE_KEYS.STREAM_SUMMARIES,
-        STORAGE_KEYS.ACTIVE_VIDEO_ID,
-        STORAGE_KEYS.VOICE_SETTINGS,
-        STORAGE_KEYS.VOICE_QUEUE,
-        STORAGE_KEYS.VOICE_STATE
-      ]);
-      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
-      const videoIds = Object.keys(summaries).sort(
-        (a, b) => Number(summaries[b]?.updatedAt || 0) - Number(summaries[a]?.updatedAt || 0)
-      );
-      const activeId = String(data[STORAGE_KEYS.ACTIVE_VIDEO_ID] || "");
-      if (!selectedVideoId || !summaries[selectedVideoId]) {
-        selectedVideoId = activeId && summaries[activeId] ? activeId : videoIds[0] || "";
-      }
-      const selectEl = (
-        /** @type {HTMLSelectElement | null} */
-        document.getElementById("yt-stream-select")
-      );
-      if (selectEl) {
-        clearChildren(selectEl);
-        if (videoIds.length === 0) {
-          const opt = document.createElement("option");
-          opt.value = "";
-          opt.textContent = "記録済みの配信はまだありません";
-          selectEl.appendChild(opt);
-        } else {
-          for (const vid of videoIds) {
-            const s = summaries[vid];
-            const opt = document.createElement("option");
-            opt.value = vid;
-            const labelTitle = s.title || vid;
-            opt.textContent = `${labelTitle} (${Number(s.itemCount || 0)}件)`;
-            if (vid === selectedVideoId) opt.selected = true;
-            selectEl.appendChild(opt);
-          }
-        }
-      }
-      const currentSummary = selectedVideoId ? summaries[selectedVideoId] : null;
-      const items = selectedVideoId ? await getYtStreamCommentsByVideoId(selectedVideoId) : [];
-      const summaryEl = document.getElementById("yt-stream-summary");
-      if (summaryEl) {
-        if (currentSummary) {
-          const bName = currentSummary.broadcasterName ? ` / 配信者: ${currentSummary.broadcasterName}` : "";
-          summaryEl.textContent = `記録中: ${currentSummary.title || currentSummary.videoId}${bName}（合計 ${items.length}件・全件 IndexedDB 保存）`;
-        } else {
-          summaryEl.textContent = "YouTube Live の視聴ページを開くと自動でチャットを記録します";
-        }
-      }
-      const filterBadge = document.getElementById("yt-detected-filter-badge");
-      const noticeBanner = document.getElementById("yt-all-chat-notice");
-      const filterLabel = String(currentSummary?.chatFilterLabel || "").trim();
-      if (filterBadge && noticeBanner) {
-        if (!filterLabel) {
-          filterBadge.textContent = "現在のチャット表示: 検出待ち（「すべてのチャット」を選択してください）";
-          noticeBanner.classList.remove("is-warning");
-        } else if (/トップチャット|top chat/i.test(filterLabel)) {
-          filterBadge.textContent = `⚠️ 現在「${filterLabel}」表示です — 「すべてのチャット」へ切り替えると全件取得できます`;
-          noticeBanner.classList.add("is-warning");
-        } else {
-          filterBadge.textContent = `✅ 現在のチャット表示: ${filterLabel}`;
-          noticeBanner.classList.remove("is-warning");
-        }
-      }
-      const settings = data[STORAGE_KEYS.VOICE_SETTINGS] || {
-        enabled: true,
-        mode: YT_VOICE_MODES.ALL,
-        broadcasterNameOverride: ""
-      };
-      const voiceState = data[STORAGE_KEYS.VOICE_STATE] || {
-        effectiveMode: settings.mode,
-        autoSwitched: false
-      };
-      const voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
-      const enabledEl = (
-        /** @type {HTMLInputElement | null} */
-        document.getElementById("yt-voice-enabled")
-      );
-      if (enabledEl && document.activeElement !== enabledEl) {
-        enabledEl.checked = Boolean(settings.enabled);
-      }
-      const modeEl = (
-        /** @type {HTMLSelectElement | null} */
-        document.getElementById("yt-voice-mode")
-      );
-      if (modeEl && document.activeElement !== modeEl) {
-        modeEl.value = settings.mode === YT_VOICE_MODES.SELECT ? "select" : "all";
-      }
-      const bNameInput = (
-        /** @type {HTMLInputElement | null} */
-        document.getElementById("yt-broadcaster-name-input")
-      );
-      if (bNameInput && document.activeElement !== bNameInput) {
-        bNameInput.value = settings.broadcasterNameOverride || currentSummary?.broadcasterName || "";
-      }
-      const queueInfoEl = document.getElementById("yt-voice-queue-info");
-      if (queueInfoEl) {
-        const modeLabel = voiceState.effectiveMode === YT_VOICE_MODES.SELECT ? "選んで読む" : "全部読む";
-        queueInfoEl.textContent = `待機キュー: ${voiceQueue.length}件（実効モード: ${modeLabel}）`;
-      }
-      const autoSwitchBadge = document.getElementById("yt-voice-autoswitch-badge");
-      if (autoSwitchBadge) {
-        if (voiceState.autoSwitched) {
-          autoSwitchBadge.classList.add("is-active");
-        } else {
-          autoSwitchBadge.classList.remove("is-active");
-        }
-      }
-      const ranking = aggregateYtSupportRanking(items);
-      renderSupportRanking(ranking);
-      const grouped = groupYtCommentsByLane(items, {
-        broadcasterChannelId: currentSummary?.broadcasterChannelId || "",
-        supporterChannelIds: ranking.supporterChannelIds
-      });
-      renderLaneColumn(
-        "lane-rinku-list",
-        "lane-rinku-count",
-        grouped.rinku,
-        "配信者本人・モデレーターのコメントがここに表示されます"
-      );
-      renderLaneColumn(
-        "lane-konta-list",
-        "lane-konta-count",
-        grouped.konta,
-        "スパチャ・ステッカー・メンバー・ギフトの応援がここに表示されます"
-      );
-      renderLaneColumn(
-        "lane-tanunee-list",
-        "lane-tanunee-count",
-        grouped.tanunee,
-        "一般リスナーのコメントがここに表示されます"
-      );
-    } catch {
-    }
-  }
-  async function checkVoicevoxStatus() {
-    const statusBox = document.getElementById("yt-voice-status-box");
-    const probe = await probeVoicevoxAlive({ baseUrl: VOICEVOX_BASE_URL });
-    if (!probe.ok) {
-      isVoicevoxOnline = false;
-      if (statusBox) {
-        statusBox.className = "voice-status-box is-offline";
-        const detail = probe.reason === "timeout" ? "応答がタイムアウトしました" : "ローカルの VOICEVOX エンジンへ接続できませんでした";
-        statusBox.textContent = `⚠️ VOICEVOX が起動していません（${VOICEVOX_BASE_URL} — ${detail}）。VOICEVOX を起動して「VOICEVOX 再確認」を押すと、チャンネルIDごとに決まった声で読み上げます。`;
-      }
-      return false;
-    }
-    isVoicevoxOnline = true;
-    const styles = await listVoicevoxStyleIds({ baseUrl: VOICEVOX_BASE_URL });
-    const availableStyleIds = styles.length > 0 ? styles : Array.from(YT_DEFAULT_STYLE_IDS);
-    if (statusBox) {
-      statusBox.className = "voice-status-box is-online";
-      statusBox.textContent = `🟢 VOICEVOX 接続中（${VOICEVOX_BASE_URL} / 利用可能スタイル: ${availableStyleIds.length}種）`;
-    }
-    chrome.runtime.sendMessage(
-      {
-        type: "YT_UPDATE_VOICE_SETTINGS",
-        payload: { availableStyleIds }
-      },
-      () => {
-        void chrome.runtime.lastError;
-      }
+  async function renderVoiceUiFromStorage(prefetchedData) {
+    const data = prefetchedData || await chrome.storage.local.get([
+      STORAGE_KEYS.STREAM_SUMMARIES,
+      STORAGE_KEYS.VOICE_SETTINGS,
+      STORAGE_KEYS.VOICE_QUEUE,
+      STORAGE_KEYS.VOICE_STATE
+    ]);
+    const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+    const currentSummary = selectedVideoId ? summaries[selectedVideoId] : null;
+    const settings = data[STORAGE_KEYS.VOICE_SETTINGS] || {
+      enabled: true,
+      mode: YT_VOICE_MODES.ALL,
+      broadcasterNameOverride: ""
+    };
+    const voiceState = data[STORAGE_KEYS.VOICE_STATE] || {
+      effectiveMode: settings.mode,
+      autoSwitched: false
+    };
+    const voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
+    const enabledEl = (
+      /** @type {HTMLInputElement | null} */
+      document.getElementById("yt-voice-enabled")
     );
-    return true;
-  }
-  function playWavBuffer(wavBuffer) {
-    return new Promise((resolve) => {
-      try {
-        const blob = new Blob([wavBuffer], { type: "audio/wav" });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        const cleanup = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        audio.addEventListener("ended", cleanup, { once: true });
-        audio.addEventListener("error", cleanup, { once: true });
-        const playPromise = audio.play();
-        if (playPromise && typeof playPromise.catch === "function") {
-          playPromise.catch(cleanup);
-        }
-      } catch {
-        resolve();
-      }
-    });
-  }
-  async function drainVoiceQueueLoop() {
-    if (isDrainingQueue) return;
-    isDrainingQueue = true;
-    try {
-      const data = await chrome.storage.local.get([
-        STORAGE_KEYS.VOICE_SETTINGS,
-        STORAGE_KEYS.VOICE_QUEUE
-      ]);
-      const settings = data[STORAGE_KEYS.VOICE_SETTINGS] || { enabled: true };
-      const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
-      if (!settings.enabled || queue.length === 0) {
-        return;
-      }
-      if (!isVoicevoxOnline) {
-        const alive = await checkVoicevoxStatus();
-        if (!alive) return;
-      }
-      const res = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "YT_SHIFT_VOICE_QUEUE" }, (reply) => {
-          void chrome.runtime.lastError;
-          resolve(reply || { ok: false, entry: null });
-        });
-      });
-      const entry = res?.entry;
-      if (!entry) return;
-      const lastSpokenEl = document.getElementById("yt-voice-last-spoken");
-      lastSpokenSummary = `🔊 読み上げ: ${entry.name || entry.channelId || "リスナー"} (${entry.userKey} → 声 #${entry.styleId}) 「${entry.text}」`;
-      if (lastSpokenEl) {
-        lastSpokenEl.textContent = lastSpokenSummary;
-      }
-      const wav = await synthesizeVoice(
-        entry.text,
-        {
-          styleId: entry.styleId,
-          pitchOffset: Number(entry.pitchOffset || 0),
-          speedOffset: Number(entry.speedOffset || 0)
-        },
-        {
-          baseUrl: VOICEVOX_BASE_URL
-        }
-      );
-      if (!wav || !(wav instanceof ArrayBuffer)) {
-        await checkVoicevoxStatus();
-        return;
-      }
-      await playWavBuffer(wav);
-    } finally {
-      isDrainingQueue = false;
+    if (enabledEl && document.activeElement !== enabledEl) {
+      enabledEl.checked = Boolean(settings.enabled);
     }
+    const modeEl = (
+      /** @type {HTMLSelectElement | null} */
+      document.getElementById("yt-voice-mode")
+    );
+    if (modeEl && document.activeElement !== modeEl) {
+      modeEl.value = settings.mode === YT_VOICE_MODES.SELECT ? "select" : "all";
+    }
+    const bNameInput = (
+      /** @type {HTMLInputElement | null} */
+      document.getElementById("yt-broadcaster-name-input")
+    );
+    if (bNameInput && document.activeElement !== bNameInput) {
+      bNameInput.value = settings.broadcasterNameOverride || currentSummary?.broadcasterName || "";
+    }
+    const queueInfoEl = document.getElementById("yt-voice-queue-info");
+    if (queueInfoEl) {
+      const modeLabel = voiceState.effectiveMode === YT_VOICE_MODES.SELECT ? "選んで読む" : "全部読む";
+      queueInfoEl.textContent = `待機キュー: ${voiceQueue.length}件（実効モード: ${modeLabel}）`;
+    }
+    const autoSwitchBadge = document.getElementById("yt-voice-autoswitch-badge");
+    if (autoSwitchBadge) {
+      if (voiceState.autoSwitched) {
+        autoSwitchBadge.classList.add("is-active");
+      } else {
+        autoSwitchBadge.classList.remove("is-active");
+      }
+    }
+    const statusBox = document.getElementById("yt-voice-status-box");
+    if (statusBox) {
+      if (voiceState.voicevoxOnline === true) {
+        const styleCount = Number(voiceState.availableStyleCount) || (Array.isArray(settings.availableStyleIds) ? settings.availableStyleIds.length : YT_DEFAULT_STYLE_IDS.length);
+        statusBox.className = "voice-status-box is-online";
+        statusBox.textContent = `VOICEVOX 接続中（${VOICEVOX_BASE_URL} / 利用可能スタイル: ${styleCount}種・サイドパネルを閉じていても再生継続）`;
+      } else if (voiceState.voicevoxOnline === false) {
+        const detail = voiceState.voicevoxReason === "timeout" ? "応答がタイムアウトしました" : "ローカルの VOICEVOX エンジンへ接続できませんでした";
+        statusBox.className = "voice-status-box is-offline";
+        statusBox.textContent = `VOICEVOX が起動していません（${VOICEVOX_BASE_URL} — ${detail}）。VOICEVOX を起動して「VOICEVOX 再確認」を押すと、チャンネルIDごとに決まった声で読み上げます。`;
+      }
+    }
+    const lastSpokenEl = document.getElementById("yt-voice-last-spoken");
+    if (lastSpokenEl && voiceState.lastSpokenSummary) {
+      lastSpokenEl.textContent = String(voiceState.lastSpokenSummary);
+    }
+  }
+  function updateStreamHeaderUi(summaries, activeId, totalItemsCount) {
+    const videoIds = Object.keys(summaries).sort(
+      (a, b) => Number(summaries[b]?.updatedAt || 0) - Number(summaries[a]?.updatedAt || 0)
+    );
+    if (!selectedVideoId || !summaries[selectedVideoId]) {
+      selectedVideoId = activeId && summaries[activeId] ? activeId : videoIds[0] || "";
+    }
+    const selectEl = (
+      /** @type {HTMLSelectElement | null} */
+      document.getElementById("yt-stream-select")
+    );
+    if (selectEl && document.activeElement !== selectEl) {
+      clearChildren(selectEl);
+      if (videoIds.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "記録済みの配信はまだありません";
+        selectEl.appendChild(opt);
+      } else {
+        for (const vid of videoIds) {
+          const s = summaries[vid];
+          const opt = document.createElement("option");
+          opt.value = vid;
+          const labelTitle = s.title || vid;
+          opt.textContent = `${labelTitle} (${Number(s.itemCount || 0)}件)`;
+          if (vid === selectedVideoId) opt.selected = true;
+          selectEl.appendChild(opt);
+        }
+      }
+    }
+    const currentSummary = selectedVideoId ? summaries[selectedVideoId] : null;
+    const summaryEl = document.getElementById("yt-stream-summary");
+    if (summaryEl) {
+      if (currentSummary) {
+        const bName = currentSummary.broadcasterName ? ` / 配信者: ${currentSummary.broadcasterName}` : "";
+        summaryEl.textContent = `記録中: ${currentSummary.title || currentSummary.videoId}${bName}（合計 ${totalItemsCount}件・全件 IndexedDB 保存）`;
+      } else {
+        summaryEl.textContent = "YouTube Live の視聴ページを開くと自動でチャットを記録します";
+      }
+    }
+    const filterBadge = document.getElementById("yt-detected-filter-badge");
+    const noticeBanner = document.getElementById("yt-all-chat-notice");
+    const filterLabel = String(currentSummary?.chatFilterLabel || "").trim();
+    if (filterBadge && noticeBanner) {
+      if (!filterLabel) {
+        filterBadge.textContent = "現在のチャット表示: 検出待ち（「すべてのチャット」を選択してください）";
+        noticeBanner.classList.remove("is-warning");
+      } else if (/トップチャット|top chat/i.test(filterLabel)) {
+        filterBadge.textContent = `現在「${filterLabel}」表示です — 「すべてのチャット」へ切り替えると全件取得できます`;
+        noticeBanner.classList.add("is-warning");
+        const detailsEl = (
+          /** @type {HTMLDetailsElement | null} */
+          document.getElementById("yt-settings-details")
+        );
+        if (detailsEl && !detailsEl.open) {
+          detailsEl.open = true;
+        }
+      } else {
+        filterBadge.textContent = `現在のチャット表示: ${filterLabel}`;
+        noticeBanner.classList.remove("is-warning");
+      }
+    }
+  }
+  async function renderStreamFullLoad() {
+    const t0 = performance.now();
+    const data = await chrome.storage.local.get([
+      STORAGE_KEYS.STREAM_SUMMARIES,
+      STORAGE_KEYS.ACTIVE_VIDEO_ID,
+      STORAGE_KEYS.VOICE_SETTINGS,
+      STORAGE_KEYS.VOICE_QUEUE,
+      STORAGE_KEYS.VOICE_STATE
+    ]);
+    const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+    const activeId = String(data[STORAGE_KEYS.ACTIVE_VIDEO_ID] || "");
+    const videoIds = Object.keys(summaries).sort(
+      (a, b) => Number(summaries[b]?.updatedAt || 0) - Number(summaries[a]?.updatedAt || 0)
+    );
+    if (!selectedVideoId || !summaries[selectedVideoId]) {
+      selectedVideoId = activeId && summaries[activeId] ? activeId : videoIds[0] || "";
+    }
+    const currentSummary = selectedVideoId ? summaries[selectedVideoId] : null;
+    const items = selectedVideoId ? await getYtStreamCommentsByVideoId(selectedVideoId) : [];
+    metrics.fullGetAllCount += 1;
+    currentIncrementalState = createYtStreamIncrementalState(selectedVideoId, {
+      broadcasterChannelId: currentSummary?.broadcasterChannelId || "",
+      displayLimit: YT_SIDE_PANEL_DISPLAY_LIMIT
+    });
+    const applied = applyYtStreamIncrementalItems(currentIncrementalState, items, {
+      broadcasterChannelId: currentSummary?.broadcasterChannelId || ""
+    });
+    updateStreamHeaderUi(summaries, activeId, applied.totalCount);
+    await renderVoiceUiFromStorage(data);
+    renderSupportRanking(applied.ranking);
+    renderLaneFull("rinku", applied.laneDisplay.rinku, applied.laneCounts.rinku);
+    renderLaneFull("konta", applied.laneDisplay.konta, applied.laneCounts.konta);
+    renderLaneFull("tanunee", applied.laneDisplay.tanunee, applied.laneCounts.tanunee);
+    metrics.lastFullLoadDurationMs = Math.round((performance.now() - t0) * 100) / 100;
+  }
+  async function renderStreamIncrementalUpdate() {
+    const t0 = performance.now();
+    const data = await chrome.storage.local.get([
+      STORAGE_KEYS.STREAM_SUMMARIES,
+      STORAGE_KEYS.ACTIVE_VIDEO_ID,
+      STORAGE_KEYS.VOICE_SETTINGS,
+      STORAGE_KEYS.VOICE_QUEUE,
+      STORAGE_KEYS.VOICE_STATE
+    ]);
+    const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+    const activeId = String(data[STORAGE_KEYS.ACTIVE_VIDEO_ID] || "");
+    const videoIds = Object.keys(summaries).sort(
+      (a, b) => Number(summaries[b]?.updatedAt || 0) - Number(summaries[a]?.updatedAt || 0)
+    );
+    if (!selectedVideoId || !summaries[selectedVideoId]) {
+      selectedVideoId = activeId && summaries[activeId] ? activeId : videoIds[0] || "";
+    }
+    if (!currentIncrementalState || currentIncrementalState.videoId !== selectedVideoId) {
+      await renderStreamFullLoad();
+      return;
+    }
+    const currentSummary = selectedVideoId ? summaries[selectedVideoId] : null;
+    const newRecords = selectedVideoId ? await getYtStreamCommentsSince(selectedVideoId, currentIncrementalState.lastRecordedAt) : [];
+    metrics.incrementalFetchCount += 1;
+    metrics.lastIncrementalFetchedItems = newRecords.length;
+    const applied = applyYtStreamIncrementalItems(currentIncrementalState, newRecords, {
+      broadcasterChannelId: currentSummary?.broadcasterChannelId || ""
+    });
+    metrics.lastIncrementalAddedItems = applied.addedCount;
+    updateStreamHeaderUi(summaries, activeId, applied.totalCount);
+    await renderVoiceUiFromStorage(data);
+    if (applied.addedCount > 0) {
+      patchLaneIncremental("rinku", applied.addedByLane.rinku, applied.laneCounts.rinku);
+      patchLaneIncremental("konta", applied.addedByLane.konta, applied.laneCounts.konta);
+      patchLaneIncremental("tanunee", applied.addedByLane.tanunee, applied.laneCounts.tanunee);
+    }
+    if (applied.rankingChanged) {
+      renderSupportRanking(applied.ranking);
+    }
+    metrics.lastIncrementalDurationMs = Math.round((performance.now() - t0) * 100) / 100;
+  }
+  function requestVoicevoxRecheck() {
+    chrome.runtime.sendMessage({ type: "YT_RECHECK_VOICEVOX" }, () => {
+      void chrome.runtime.lastError;
+      runRenderSerialized(() => renderVoiceUiFromStorage());
+    });
   }
   function bindUiEvents() {
     const selectEl = (
@@ -1864,7 +1341,7 @@
     );
     selectEl?.addEventListener("change", () => {
       selectedVideoId = selectEl.value;
-      renderFromStorage();
+      runRenderSerialized(() => renderStreamFullLoad());
     });
     const enabledEl = (
       /** @type {HTMLInputElement | null} */
@@ -1876,7 +1353,10 @@
           type: "YT_UPDATE_VOICE_SETTINGS",
           payload: { enabled: enabledEl.checked }
         },
-        () => renderFromStorage()
+        () => {
+          void chrome.runtime.lastError;
+          runRenderSerialized(() => renderVoiceUiFromStorage());
+        }
       );
     });
     const modeEl = (
@@ -1889,7 +1369,10 @@
           type: "YT_UPDATE_VOICE_SETTINGS",
           payload: { mode: modeEl.value === "select" ? YT_VOICE_MODES.SELECT : YT_VOICE_MODES.ALL }
         },
-        () => renderFromStorage()
+        () => {
+          void chrome.runtime.lastError;
+          runRenderSerialized(() => renderVoiceUiFromStorage());
+        }
       );
     });
     const bNameInput = (
@@ -1902,28 +1385,40 @@
           type: "YT_UPDATE_VOICE_SETTINGS",
           payload: { broadcasterNameOverride: bNameInput.value.trim() }
         },
-        () => renderFromStorage()
+        () => {
+          void chrome.runtime.lastError;
+          runRenderSerialized(() => renderVoiceUiFromStorage());
+        }
       );
     });
     const recheckBtn = document.getElementById("yt-voice-recheck-btn");
     recheckBtn?.addEventListener("click", () => {
-      checkVoicevoxStatus();
+      requestVoicevoxRecheck();
     });
     const clearBtn = document.getElementById("yt-voice-clear-btn");
     clearBtn?.addEventListener("click", () => {
-      chrome.runtime.sendMessage({ type: "YT_CLEAR_VOICE_QUEUE" }, () => renderFromStorage());
+      chrome.runtime.sendMessage({ type: "YT_CLEAR_VOICE_QUEUE" }, () => {
+        void chrome.runtime.lastError;
+        runRenderSerialized(() => renderVoiceUiFromStorage());
+      });
     });
-    chrome.storage.onChanged.addListener(() => {
-      renderFromStorage();
-      setTimeout(drainVoiceQueueLoop, 50);
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local") return;
+      const streamChanged = Boolean(
+        changes[STORAGE_KEYS.STREAM_SUMMARIES] || changes[STORAGE_KEYS.ACTIVE_VIDEO_ID]
+      );
+      if (streamChanged) {
+        runRenderSerialized(() => renderStreamIncrementalUpdate());
+      } else {
+        metrics.voiceOnlyUpdateCount += 1;
+        runRenderSerialized(() => renderVoiceUiFromStorage());
+      }
     });
   }
   async function initSidepanel() {
     bindUiEvents();
-    await renderFromStorage();
-    await checkVoicevoxStatus();
-    setInterval(drainVoiceQueueLoop, 700);
-    setInterval(checkVoicevoxStatus, 1e4);
+    await runRenderSerialized(() => renderStreamFullLoad());
+    requestVoicevoxRecheck();
   }
   initSidepanel();
 })();

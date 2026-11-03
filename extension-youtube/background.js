@@ -1,6 +1,412 @@
 // background.js — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
 /* eslint-disable */
 (() => {
+  // src/lib/voiceStyleLevelTable.js
+  var VOICE_STYLE_LEVEL_TABLE = Object.freeze({
+    "0": [0.084, 0.456],
+    "1": [0.064, 0.432],
+    "2": [0.075, 0.447],
+    "3": [0.063, 0.53],
+    "4": [0.086, 0.558],
+    "5": [0.066, 0.469],
+    "6": [0.066, 0.411],
+    "7": [0.067, 0.466],
+    "8": [0.08, 0.419],
+    "9": [0.085, 0.375],
+    "10": [0.071, 0.405],
+    "11": [0.07, 0.584],
+    "12": [0.074, 0.469],
+    "13": [0.078, 0.456],
+    "14": [0.078, 0.258],
+    "15": [0.069, 0.458],
+    "16": [0.082, 0.364],
+    "17": [0.073, 0.437],
+    "18": [0.073, 0.46],
+    "19": [0.039, 0.546],
+    "20": [0.08, 0.514],
+    "21": [0.075, 0.677],
+    "22": [0.053, 0.457],
+    "23": [0.086, 0.417],
+    "24": [0.074, 0.408],
+    "25": [0.097, 0.363],
+    "26": [0.067, 0.465],
+    "27": [0.085, 0.327],
+    "28": [0.065, 0.367],
+    "29": [0.098, 0.645],
+    "30": [0.1, 0.598],
+    "31": [0.101, 0.409],
+    "32": [0.074, 0.437],
+    "33": [0.076, 0.422],
+    "34": [0.072, 0.472],
+    "35": [0.056, 0.252],
+    "36": [0.06, 0.551],
+    "37": [0.087, 0.37],
+    "38": [0.1, 0.364],
+    "39": [0.08, 0.542],
+    "40": [0.073, 0.641],
+    "41": [0.09, 0.578],
+    "42": [0.081, 0.783],
+    "43": [0.091, 0.41],
+    "44": [0.088, 0.441],
+    "45": [0.081, 0.294],
+    "46": [0.084, 0.393],
+    "47": [0.073, 0.387],
+    "48": [0.089, 0.374],
+    "49": [0.089, 0.361],
+    "50": [0.07, 0.641],
+    "51": [0.082, 0.489],
+    "52": [0.089, 0.538],
+    "53": [0.091, 0.497],
+    "54": [0.067, 0.438],
+    "55": [0.098, 0.508],
+    "56": [0.098, 0.443],
+    "57": [0.099, 0.472],
+    "58": [0.084, 0.531],
+    "59": [0.101, 0.46],
+    "60": [0.114, 0.423],
+    "61": [0.072, 0.354],
+    "62": [0.092, 0.377],
+    "63": [0.096, 0.375],
+    "64": [0.094, 0.323],
+    "65": [0.084, 0.381],
+    "66": [0.085, 0.56],
+    "67": [0.097, 0.396],
+    "68": [0.077, 0.446],
+    "69": [0.081, 0.592],
+    "70": [0.072, 0.429],
+    "71": [0.055, 0.569],
+    "72": [0.073, 0.388],
+    "73": [0.091, 0.488],
+    "74": [0.086, 0.521],
+    "75": [0.059, 0.321],
+    "76": [0.055, 0.358],
+    "77": [0.083, 0.465],
+    "78": [0.075, 0.406],
+    "79": [0.08, 0.341],
+    "80": [0.093, 0.4],
+    "81": [0.082, 0.338],
+    "82": [0.084, 0.353],
+    "83": [0.082, 0.372],
+    "84": [0.095, 0.353],
+    "85": [0.083, 0.442],
+    "86": [0.058, 0.489],
+    "87": [0.074, 0.416],
+    "88": [0.09, 0.381],
+    "89": [0.101, 0.46],
+    "90": [0.074, 0.492],
+    "91": [0.08, 0.391],
+    "92": [0.071, 0.505],
+    "93": [0.074, 0.546],
+    "94": [0.084, 0.408],
+    "95": [0.072, 0.472],
+    "96": [0.091, 0.345],
+    "97": [0.062, 0.42],
+    "98": [0.052, 0.391],
+    "99": [0.1, 0.538],
+    "100": [0.077, 0.5],
+    "101": [0.093, 0.594],
+    "102": [0.09, 0.323],
+    "103": [0.076, 0.316],
+    "104": [0.095, 0.369],
+    "105": [0.106, 0.46],
+    "106": [0.088, 0.355],
+    "107": [0.081, 0.395],
+    "108": [0.081, 0.383],
+    "109": [0.075, 0.394],
+    "110": [0.078, 0.52],
+    "111": [0.079, 0.457],
+    "112": [0.059, 0.41],
+    "113": [0.079, 0.419],
+    "114": [0.071, 0.443],
+    "115": [0.081, 0.413],
+    "116": [0.073, 0.357],
+    "117": [0.054, 0.509],
+    "118": [0.102, 0.337],
+    "119": [0.098, 0.453],
+    "120": [0.101, 0.372],
+    "121": [0.106, 0.402],
+    "122": [0.088, 0.327],
+    "123": [0.082, 0.404],
+    "124": [0.089, 0.377],
+    "125": [0.077, 0.424],
+    "126": [0.061, 0.314]
+  });
+  var VOICE_PITCH_OFFSET_GRID = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
+  var VOICE_STYLE_PITCH_RMS_FACTOR = Object.freeze({
+    "0": [0.95, 1, 1.13, 1.16],
+    "1": [0.63, 0.82, 1.08, 1.03],
+    "2": [0.82, 0.93, 1.09, 1.18],
+    "3": [0.63, 0.83, 1.28, 1.32],
+    "4": [0.98, 1.01, 0.97, 0.95],
+    "5": [0.63, 0.83, 0.99, 0.97],
+    "6": [0.74, 0.85, 1.01, 1.15],
+    "7": [0.67, 0.87, 1.1, 0.93],
+    "8": [0.74, 0.87, 0.95, 0.91],
+    "9": [0.69, 0.82, 1.18, 1.27],
+    "10": [0.71, 0.88, 1.01, 1.04],
+    "11": [0.81, 0.93, 1.14, 1.33],
+    "12": [0.81, 0.91, 1.09, 1.26],
+    "13": [0.8, 0.89, 1.05, 1.09],
+    "14": [0.83, 0.94, 0.97, 1.06],
+    "15": [0.98, 1.08, 1, 1.08],
+    "16": [0.75, 0.88, 1.12, 1.19],
+    "17": [0.81, 0.9, 0.99, 0.93],
+    "18": [0.77, 0.87, 1.03, 1],
+    "19": [1, 1, 1, 1],
+    "20": [0.84, 0.91, 1.01, 1.01],
+    "21": [0.83, 0.86, 1.18, 1.32],
+    "22": [1, 1, 1, 1],
+    "23": [1.01, 1.01, 1.02, 1.12],
+    "24": [0.72, 0.88, 1.03, 1.06],
+    "25": [0.52, 0.77, 1.17, 1.4],
+    "26": [0.82, 0.88, 1.1, 1.12],
+    "27": [0.75, 0.85, 1.21, 1.33],
+    "28": [0.85, 0.94, 1.03, 1.09],
+    "29": [0.78, 0.92, 1.05, 1.12],
+    "30": [0.72, 0.87, 1.04, 1.07],
+    "31": [0.8, 0.92, 1.01, 0.99],
+    "32": [0.85, 0.92, 1.19, 1.19],
+    "33": [0.84, 0.84, 1.07, 1.16],
+    "34": [0.74, 0.88, 1.1, 1.15],
+    "35": [0.85, 0.97, 1.1, 0.74],
+    "36": [1, 1, 1, 1],
+    "37": [0.69, 0.88, 1.19, 1.23],
+    "38": [0.72, 0.79, 0.97, 0.7],
+    "39": [0.88, 0.93, 1.09, 1.26],
+    "40": [0.8, 0.91, 1.09, 1.19],
+    "41": [0.89, 0.92, 1.05, 1.05],
+    "42": [1.01, 0.99, 1.15, 1.3],
+    "43": [0.69, 0.82, 1, 0.98],
+    "44": [0.59, 0.74, 1.28, 1.64],
+    "45": [0.59, 0.77, 1.19, 1.19],
+    "46": [0.86, 0.92, 0.99, 0.87],
+    "47": [0.76, 0.91, 1.24, 1.38],
+    "48": [0.95, 0.98, 1, 0.99],
+    "49": [1.14, 0.98, 1.01, 0.9],
+    "50": [1, 1, 1, 1],
+    "51": [0.95, 1.01, 1.06, 1.07],
+    "52": [0.72, 0.87, 1.09, 1.13],
+    "53": [0.94, 0.98, 1.05, 1.08],
+    "54": [0.69, 0.88, 1.08, 1.02],
+    "55": [0.96, 1.02, 1.01, 1.04],
+    "56": [0.78, 0.93, 1.07, 1.2],
+    "57": [0.91, 0.98, 1.04, 0.94],
+    "58": [0.79, 0.88, 1, 0.95],
+    "59": [0.74, 0.85, 1.16, 0.92],
+    "60": [0.69, 0.89, 0.94, 0.91],
+    "61": [0.55, 0.7, 1.4, 1.6],
+    "62": [0.58, 0.78, 1.02, 0.87],
+    "63": [0.75, 1.03, 0.73, 0.84],
+    "64": [0.57, 0.8, 0.88, 0.62],
+    "65": [0.74, 0.9, 1.07, 1.07],
+    "66": [0.74, 0.91, 1, 1.02],
+    "67": [0.91, 0.96, 1.02, 1.02],
+    "68": [0.77, 0.89, 1.05, 1.18],
+    "69": [0.9, 0.95, 1.05, 1.13],
+    "70": [0.73, 0.87, 1.04, 0.87],
+    "71": [1.02, 1.02, 1, 0.98],
+    "72": [0.73, 0.83, 1.14, 1.27],
+    "73": [0.69, 0.88, 1.11, 1.25],
+    "74": [0.8, 0.9, 0.98, 0.87],
+    "75": [0.7, 0.85, 1.15, 1.27],
+    "76": [1.02, 0.96, 0.88, 0.79],
+    "77": [0.88, 0.93, 1.04, 1],
+    "78": [0.88, 0.95, 1, 1],
+    "79": [0.99, 0.96, 1.09, 1.1],
+    "80": [0.78, 0.9, 1.01, 0.92],
+    "81": [0.96, 1, 1.02, 1.04],
+    "82": [0.85, 0.92, 1.04, 1.06],
+    "83": [0.94, 0.96, 1.01, 1.01],
+    "84": [0.93, 0.98, 1.01, 1.01],
+    "85": [0.86, 0.93, 1.07, 1.12],
+    "86": [1, 1, 1, 1],
+    "87": [0.99, 1.03, 1.01, 1.07],
+    "88": [0.86, 0.99, 0.8, 0.92],
+    "89": [1.17, 1.2, 0.92, 0.88],
+    "90": [0.72, 0.82, 1.15, 1.16],
+    "91": [0.68, 0.85, 1.14, 1.17],
+    "92": [0.69, 0.79, 1.1, 1.21],
+    "93": [0.84, 0.9, 1.11, 1.19],
+    "94": [0.63, 0.87, 1.11, 1.12],
+    "95": [0.56, 0.8, 1.08, 1.01],
+    "96": [0.54, 0.76, 1.16, 1.32],
+    "97": [0.84, 0.93, 1.07, 1.2],
+    "98": [0.8, 0.86, 1.22, 1.36],
+    "99": [0.79, 0.89, 1.04, 1.09],
+    "100": [0.97, 1, 1.05, 1.12],
+    "101": [0.72, 0.85, 1.18, 1.31],
+    "102": [0.98, 0.99, 0.99, 1.06],
+    "103": [0.88, 1.01, 1, 1.08],
+    "104": [0.88, 0.89, 0.96, 1.09],
+    "105": [0.93, 0.94, 0.93, 0.79],
+    "106": [0.74, 0.88, 1.06, 1.17],
+    "107": [1.27, 1.09, 0.84, 0.78],
+    "108": [0.82, 0.97, 1.07, 0.99],
+    "109": [0.77, 0.91, 1.05, 0.99],
+    "110": [0.88, 0.97, 0.92, 1.01],
+    "111": [0.74, 0.93, 0.98, 0.87],
+    "112": [0.77, 0.87, 1.05, 1.13],
+    "113": [0.67, 0.85, 1.05, 1.04],
+    "114": [0.8, 0.91, 1.04, 1.25],
+    "115": [0.94, 0.96, 1.05, 1.08],
+    "116": [0.59, 0.8, 1.16, 1.37],
+    "117": [1, 1, 1, 1],
+    "118": [0.69, 0.83, 1.05, 1.04],
+    "119": [0.87, 0.97, 1.01, 0.94],
+    "120": [0.77, 0.93, 1.01, 0.93],
+    "121": [0.77, 0.88, 1.03, 0.97],
+    "122": [0.55, 0.73, 1.22, 1.31],
+    "123": [0.57, 0.77, 1.19, 1.36],
+    "124": [0.63, 0.8, 1.18, 1.2],
+    "125": [0.67, 0.81, 1.24, 1.38],
+    "126": [0.5, 0.68, 1.08, 0.94]
+  });
+
+  // src/lib/voicevoxClient.js
+  var VOICEVOX_BASE_URL = "http://127.0.0.1:50021";
+  function positiveTimeout(value, fallback) {
+    const timeout = Number(value);
+    return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
+  }
+  function isExtensionPage() {
+    try {
+      return typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getURL === "function" && typeof location !== "undefined" && location.protocol === "chrome-extension:";
+    } catch {
+      return false;
+    }
+  }
+  function proxyTextResponse(res) {
+    const raw = Number(res && res.status);
+    const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
+    const noBody = status === 204 || status === 205 || status === 304;
+    return new Response(noBody ? null : String(res && res.text != null ? res.text : ""), { status });
+  }
+  async function proxyFetchFn(url, init) {
+    if (isExtensionPage()) {
+      return globalThis.fetch(url, init);
+    }
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      return new Promise((resolve, reject) => {
+        const safeInit = { ...init };
+        if ("signal" in safeInit) delete safeInit.signal;
+        chrome.runtime.sendMessage(
+          { type: "NLS_FETCH_PROXY", url: url.toString(), init: safeInit, wantBuffer: false },
+          (res) => {
+            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+            if (!res || res.error) return reject(new Error(res?.error || "Proxy fetch failed"));
+            try {
+              resolve(proxyTextResponse(res));
+            } catch (e) {
+              reject(e);
+            }
+          }
+        );
+      });
+    }
+    return globalThis.fetch(url, init);
+  }
+  async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
+    const controller = new AbortController();
+    let timer = 0;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error("voicevox_timeout"));
+      }, timeoutMs);
+    });
+    try {
+      return (
+        /** @type {Response} */
+        await Promise.race([
+          Promise.resolve().then(
+            () => fetchFn(url, { ...init, signal: controller.signal })
+          ),
+          timeout
+        ])
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  function defaultVoicevoxAliveTimeoutMs(viaProxy) {
+    return viaProxy ? 5e3 : 1500;
+  }
+  function classifyVoicevoxAliveFailure(input) {
+    if (input?.hasFetch === false) return "no-fetch";
+    const err = input?.error;
+    if (err) {
+      const msg = String(
+        /** @type {any} */
+        err?.message || err || ""
+      );
+      if (msg.includes("voicevox_timeout")) return "timeout";
+      if (/abort/i.test(msg) || /** @type {any} */
+      err?.name === "AbortError") return "timeout";
+      return "refused";
+    }
+    const res = input?.response;
+    if (res && res.ok === false) return "http-error";
+    return "";
+  }
+  async function probeVoicevoxAlive(opts = {}) {
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") {
+      return { ok: false, reason: classifyVoicevoxAliveFailure({ hasFetch: false }) };
+    }
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    const viaProxy = !opts.fetchFn && !isExtensionPage();
+    const fallbackTimeout = defaultVoicevoxAliveTimeoutMs(viaProxy);
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        `${baseUrl}/version`,
+        { method: "GET" },
+        positiveTimeout(opts.timeoutMs, fallbackTimeout)
+      );
+      if (response?.ok !== false) return { ok: true, reason: "" };
+      return { ok: false, reason: classifyVoicevoxAliveFailure({ response }) };
+    } catch (err) {
+      return { ok: false, reason: classifyVoicevoxAliveFailure({ error: err }) };
+    }
+  }
+  function isWhisperStyleName(styleName) {
+    const name = String(styleName || "");
+    return /ささやき|囁き|ウィスパ|whisper/i.test(name);
+  }
+  async function listVoicevoxStyleIds(opts = {}) {
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") return [];
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        `${baseUrl}/speakers`,
+        { method: "GET" },
+        positiveTimeout(opts.timeoutMs, 3e3)
+      );
+      if (!response || response.ok === false) return [];
+      const speakers = await response.json();
+      if (!Array.isArray(speakers)) return [];
+      const ids = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const speaker of speakers) {
+        if (!speaker || typeof speaker !== "object" || !Array.isArray(speaker.styles)) {
+          continue;
+        }
+        for (const style of speaker.styles) {
+          const id = Number(style?.id);
+          if (!Number.isInteger(id) || id < 0 || seen.has(id)) continue;
+          if (isWhisperStyleName(style?.name)) continue;
+          seen.add(id);
+          ids.push(id);
+        }
+      }
+      return ids;
+    } catch {
+      return [];
+    }
+  }
+
   // src/lib/voiceAssignment.js
   var DEFAULT_VOICE = Object.freeze({
     styleId: 3,
@@ -197,6 +603,45 @@
     };
   }
 
+  // src/lib/youtube/ytLaneAssign.js
+  var YT_LANES = Object.freeze({
+    RINKU: "rinku",
+    KONTA: "konta",
+    TANUNEE: "tanunee"
+  });
+  var YT_LANE_RULES = Object.freeze([
+    {
+      lane: YT_LANES.RINKU,
+      characterName: "りんく",
+      roleLabel: "配信者視点",
+      description: "配信者本人・モデレーター",
+      badges: Object.freeze(["owner", "moderator"]),
+      kinds: Object.freeze([]),
+      includeSupporterChannels: false,
+      isDefault: false
+    },
+    {
+      lane: YT_LANES.KONTA,
+      characterName: "こん太",
+      roleLabel: "ファン視点",
+      description: "スパチャ・ステッカー・メンバー・メンバーシップギフトの人",
+      badges: Object.freeze(["member"]),
+      kinds: Object.freeze(["superchat", "sticker", "membership", "membership_gift"]),
+      includeSupporterChannels: true,
+      isDefault: false
+    },
+    {
+      lane: YT_LANES.TANUNEE,
+      characterName: "たぬ姉",
+      roleLabel: "案内役",
+      description: "それ以外の一般コメント",
+      badges: Object.freeze([]),
+      kinds: Object.freeze([]),
+      includeSupporterChannels: false,
+      isDefault: true
+    }
+  ]);
+
   // src/lib/youtube/ytStreamStorePolicy.js
   function buildYtCommentPrimaryKey(videoId, commentId) {
     const v = String(videoId || "").trim();
@@ -253,9 +698,10 @@
 
   // extension-youtube/src/ytIdbStore.js
   var DB_NAME = "yt_kirameki_db";
-  var DB_VERSION = 1;
+  var DB_VERSION = 2;
   var STORE_COMMENTS = "comments";
   var INDEX_BY_VIDEO_ID = "by_videoId";
+  var INDEX_BY_VIDEO_ID_RECORDED_AT = "by_videoId_recordedAt";
   var dbPromise = null;
   function openYtCommentsDb() {
     if (dbPromise) return dbPromise;
@@ -264,9 +710,19 @@
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = () => {
           const db = req.result;
+          let store;
           if (!db.objectStoreNames.contains(STORE_COMMENTS)) {
-            const store = db.createObjectStore(STORE_COMMENTS, { keyPath: "pk" });
+            store = db.createObjectStore(STORE_COMMENTS, { keyPath: "pk" });
+          } else {
+            store = req.transaction.objectStore(STORE_COMMENTS);
+          }
+          if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID)) {
             store.createIndex(INDEX_BY_VIDEO_ID, "videoId", { unique: false });
+          }
+          if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
+            store.createIndex(INDEX_BY_VIDEO_ID_RECORDED_AT, ["videoId", "recordedAt"], {
+              unique: false
+            });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -340,6 +796,7 @@
     availableStyleIds: Array.from(YT_DEFAULT_STYLE_IDS)
   });
   var storageJobChain = Promise.resolve();
+  var creatingOffscreenPromise = null;
   function runSerialized(fn) {
     const next = storageJobChain.then(fn, fn);
     storageJobChain = next.then(
@@ -347,6 +804,50 @@
       () => void 0
     );
     return next;
+  }
+  async function ensureOffscreenDocument() {
+    try {
+      if (!chrome?.offscreen?.createDocument) return false;
+      if (chrome.runtime?.getContexts) {
+        const contexts = await chrome.runtime.getContexts({
+          contextTypes: ["OFFSCREEN_DOCUMENT"]
+        });
+        if (Array.isArray(contexts) && contexts.length > 0) {
+          return true;
+        }
+      } else if (typeof chrome.offscreen.hasDocument === "function") {
+        const has = await chrome.offscreen.hasDocument();
+        if (has) return true;
+      }
+      if (!creatingOffscreenPromise) {
+        creatingOffscreenPromise = chrome.offscreen.createDocument({
+          url: "offscreen.html",
+          reasons: ["AUDIO_PLAYBACK"],
+          justification: "サイドパネルを閉じていても VOICEVOX によるチャット読み上げ音声を再生し続けるため"
+        }).catch((err) => {
+          const msg = String(err?.message || err || "");
+          if (!msg.includes("Only a single offscreen")) {
+            throw err;
+          }
+        }).finally(() => {
+          creatingOffscreenPromise = null;
+        });
+      }
+      await creatingOffscreenPromise;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async function nudgeOffscreenDrain() {
+    const ready = await ensureOffscreenDocument();
+    if (!ready) return;
+    try {
+      chrome.runtime.sendMessage({ type: "YT_OFFSCREEN_DRAIN" }, () => {
+        void chrome.runtime.lastError;
+      });
+    } catch {
+    }
   }
   function extractVideoIdFromSender(sender) {
     try {
@@ -368,8 +869,13 @@
     }
   }
   setupSidePanelBehavior();
+  ensureOffscreenDocument();
   chrome.runtime.onInstalled.addListener(() => {
     setupSidePanelBehavior();
+    ensureOffscreenDocument();
+  });
+  chrome.runtime.onStartup?.addListener(() => {
+    ensureOffscreenDocument();
   });
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message.type !== "string") return false;
@@ -423,9 +929,11 @@
         };
         let assignments = data[STORAGE_KEYS.VOICE_ASSIGNMENTS] || {};
         let voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
-        let voiceState = data[STORAGE_KEYS.VOICE_STATE] || {
-          effectiveMode: settings.mode,
-          autoSwitched: false,
+        const prevVoiceState = data[STORAGE_KEYS.VOICE_STATE] || {};
+        let voiceState = {
+          ...prevVoiceState,
+          effectiveMode: prevVoiceState.effectiveMode || settings.mode,
+          autoSwitched: Boolean(prevVoiceState.autoSwitched),
           updatedAt: Date.now()
         };
         const broadcasterName = String(settings.broadcasterNameOverride || "").trim() || String(prevSummary?.broadcasterName || "").trim();
@@ -447,8 +955,10 @@
           });
         }
         const idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+        let enqueuedAny = false;
         if (settings.enabled) {
           for (const newItem of idbResult.newlyAdded) {
+            const prevLen = voiceQueue.length;
             const enq = enqueueYtVoiceItem(voiceQueue, newItem, {
               mode: settings.mode,
               broadcasterName,
@@ -456,8 +966,12 @@
               assignments
             });
             voiceQueue = enq.queue;
+            if (voiceQueue.length > prevLen) {
+              enqueuedAny = true;
+            }
             assignments = enq.assignments;
             voiceState = {
+              ...voiceState,
               effectiveMode: enq.effectiveMode,
               autoSwitched: enq.autoSwitched,
               updatedAt: Date.now()
@@ -483,6 +997,9 @@
           updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
         }
         await chrome.storage.local.set(updates);
+        if (settings.enabled && (enqueuedAny || voiceQueue.length > 0)) {
+          nudgeOffscreenDrain();
+        }
         return {
           ok: true,
           addedCount: idbResult.newlyAdded.length,
@@ -494,14 +1011,124 @@
     }
     if (message.type === "YT_SHIFT_VOICE_QUEUE") {
       runSerialized(async () => {
-        const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_QUEUE]);
+        const data = await chrome.storage.local.get([
+          STORAGE_KEYS.VOICE_SETTINGS,
+          STORAGE_KEYS.VOICE_QUEUE
+        ]);
+        const settings = {
+          ...DEFAULT_VOICE_SETTINGS,
+          ...data[STORAGE_KEYS.VOICE_SETTINGS] || {}
+        };
         const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
-        if (queue.length === 0) {
-          return { ok: true, entry: null, remaining: 0 };
+        if (!settings.enabled || queue.length === 0) {
+          return { ok: true, entry: null, remaining: queue.length, enabled: Boolean(settings.enabled) };
         }
         const [entry, ...rest] = queue;
         await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_QUEUE]: rest });
-        return { ok: true, entry, remaining: rest.length };
+        return { ok: true, entry, remaining: rest.length, enabled: true };
+      }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_REPORT_VOICEVOX_STATUS") {
+      runSerialized(async () => {
+        const payload = message.payload || {};
+        const online = Boolean(payload.online);
+        const reason = String(payload.reason || (online ? "ok" : "unreachable"));
+        const availableStyleIds = Array.isArray(payload.availableStyleIds) && payload.availableStyleIds.length > 0 ? payload.availableStyleIds : null;
+        const data = await chrome.storage.local.get([
+          STORAGE_KEYS.VOICE_SETTINGS,
+          STORAGE_KEYS.VOICE_STATE,
+          STORAGE_KEYS.VOICE_QUEUE
+        ]);
+        const currentSettings = {
+          ...DEFAULT_VOICE_SETTINGS,
+          ...data[STORAGE_KEYS.VOICE_SETTINGS] || {}
+        };
+        if (availableStyleIds) {
+          currentSettings.availableStyleIds = availableStyleIds;
+        }
+        const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
+        const isOverThreshold = currentSettings.enabled !== false && currentSettings.mode === YT_VOICE_MODES.ALL && queue.length >= YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD;
+        const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+        const nextState = {
+          ...prevState,
+          effectiveMode: isOverThreshold ? YT_VOICE_MODES.SELECT : currentSettings.mode,
+          autoSwitched: isOverThreshold,
+          voicevoxOnline: online,
+          voicevoxReason: reason,
+          availableStyleCount: currentSettings.availableStyleIds.length,
+          voicevoxCheckedAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        await chrome.storage.local.set({
+          [STORAGE_KEYS.VOICE_SETTINGS]: currentSettings,
+          [STORAGE_KEYS.VOICE_STATE]: nextState
+        });
+        return { ok: true, state: nextState };
+      }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_REPORT_VOICE_SPOKEN") {
+      runSerialized(async () => {
+        const payload = message.payload || {};
+        const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_STATE]);
+        const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+        const nextState = {
+          ...prevState,
+          lastSpokenSummary: String(payload.lastSpokenSummary || ""),
+          lastSpokenAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        await chrome.storage.local.set({
+          [STORAGE_KEYS.VOICE_STATE]: nextState
+        });
+        return { ok: true };
+      }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_RECHECK_VOICEVOX") {
+      runSerialized(async () => {
+        await ensureOffscreenDocument();
+        const probe = await probeVoicevoxAlive({ baseUrl: VOICEVOX_BASE_URL });
+        const online = Boolean(probe.ok);
+        const reason = probe.ok ? "ok" : probe.reason === "timeout" ? "timeout" : "unreachable";
+        let styles = [];
+        if (online) {
+          styles = await listVoicevoxStyleIds({ baseUrl: VOICEVOX_BASE_URL });
+        }
+        const data = await chrome.storage.local.get([
+          STORAGE_KEYS.VOICE_SETTINGS,
+          STORAGE_KEYS.VOICE_STATE,
+          STORAGE_KEYS.VOICE_QUEUE
+        ]);
+        const currentSettings = {
+          ...DEFAULT_VOICE_SETTINGS,
+          ...data[STORAGE_KEYS.VOICE_SETTINGS] || {}
+        };
+        if (styles.length > 0) {
+          currentSettings.availableStyleIds = styles;
+        }
+        const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
+        const isOverThreshold = currentSettings.enabled !== false && currentSettings.mode === YT_VOICE_MODES.ALL && queue.length >= YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD;
+        const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
+        const nextState = {
+          ...prevState,
+          effectiveMode: isOverThreshold ? YT_VOICE_MODES.SELECT : currentSettings.mode,
+          autoSwitched: isOverThreshold,
+          voicevoxOnline: online,
+          voicevoxReason: reason,
+          availableStyleCount: currentSettings.availableStyleIds.length,
+          voicevoxCheckedAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        await chrome.storage.local.set({
+          [STORAGE_KEYS.VOICE_SETTINGS]: currentSettings,
+          [STORAGE_KEYS.VOICE_STATE]: nextState
+        });
+        if (online && currentSettings.enabled && queue.length > 0) {
+          nudgeOffscreenDrain();
+        }
+        return { ok: true, online, reason, state: nextState };
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }
@@ -510,7 +1137,8 @@
         const patch = message.payload || {};
         const data = await chrome.storage.local.get([
           STORAGE_KEYS.VOICE_SETTINGS,
-          STORAGE_KEYS.VOICE_QUEUE
+          STORAGE_KEYS.VOICE_QUEUE,
+          STORAGE_KEYS.VOICE_STATE
         ]);
         const current = {
           ...DEFAULT_VOICE_SETTINGS,
@@ -523,11 +1151,14 @@
         const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE]) ? data[STORAGE_KEYS.VOICE_QUEUE] : [];
         const nextQueue = next.enabled === false ? [] : queue;
         const isOverThreshold = next.enabled !== false && next.mode === YT_VOICE_MODES.ALL && nextQueue.length >= YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD;
+        const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
         const updates = {
           [STORAGE_KEYS.VOICE_SETTINGS]: next,
           [STORAGE_KEYS.VOICE_STATE]: {
+            ...prevState,
             effectiveMode: isOverThreshold ? YT_VOICE_MODES.SELECT : next.mode,
             autoSwitched: isOverThreshold,
+            availableStyleCount: Array.isArray(next.availableStyleIds) ? next.availableStyleIds.length : prevState.availableStyleCount || YT_DEFAULT_STYLE_IDS.length,
             updatedAt: Date.now()
           }
         };
@@ -535,20 +1166,28 @@
           updates[STORAGE_KEYS.VOICE_QUEUE] = [];
         }
         await chrome.storage.local.set(updates);
+        if (next.enabled && nextQueue.length > 0) {
+          nudgeOffscreenDrain();
+        }
         return { ok: true, settings: next };
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }
     if (message.type === "YT_CLEAR_VOICE_QUEUE") {
       runSerialized(async () => {
-        const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_SETTINGS]);
+        const data = await chrome.storage.local.get([
+          STORAGE_KEYS.VOICE_SETTINGS,
+          STORAGE_KEYS.VOICE_STATE
+        ]);
         const settings = {
           ...DEFAULT_VOICE_SETTINGS,
           ...data[STORAGE_KEYS.VOICE_SETTINGS] || {}
         };
+        const prevState = data[STORAGE_KEYS.VOICE_STATE] || {};
         await chrome.storage.local.set({
           [STORAGE_KEYS.VOICE_QUEUE]: [],
           [STORAGE_KEYS.VOICE_STATE]: {
+            ...prevState,
             effectiveMode: settings.mode,
             autoSwitched: false,
             updatedAt: Date.now()
