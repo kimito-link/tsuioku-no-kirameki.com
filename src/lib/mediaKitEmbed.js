@@ -75,7 +75,7 @@ export function sectionMediaKitHtml(kitHtml) {
   const css = scopeCss(parts.css, MEDIA_KIT_EMBED_SCOPE);
   return `<section class="mkt-section" id="mkt-media-kit-section">
 <h2>${escapeHtml('メディアキット（共有用の実績サマリ）')}</h2>
-<p class="mkt-note">スポンサーや仲間への共有用に、過去30日・60日・90日の配信実績をまとめた章です。</p>
+<p class="mkt-note">スポンサーや仲間への共有用に、この配信者の最近の配信実績をまとめた章です(この PC で記録した配信だけ)。</p>
 <div id="mkt-media-kit"><style>${css}</style>${parts.bodyHtml}</div>
 </section>`;
 }

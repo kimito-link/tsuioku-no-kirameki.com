@@ -14,6 +14,37 @@ import { broadcasterProfileStorageKey } from './storageKeys.js';
 /** メディアキットが遡る配信数の上限。 */
 export const MEDIA_KIT_LIVE_LIMIT = 60;
 
+/**
+ * v0.1.1857: 配信者で絞るときに遡って調べる配信数の上限。
+ * 記録は「見た配信」全部なので、他の配信者の配信も混ざっている。ここから同じ配信者の配信だけを拾う。
+ */
+export const MEDIA_KIT_SCAN_LIVE_LIMIT = 300;
+
+/**
+ * v0.1.1857: 配信者で絞る。summary の行(どれか1行でも)の broadcasterUserId が一致する配信だけ残す。
+ * 配信者が分からない(broadcasterUserId が空)ときは、今の配信(currentLiveId)だけにする
+ * (他の配信者の数字を1人の実績として混ぜて出さない)。
+ * @param {string[]} liveIds 新しい順
+ * @param {Map<string, unknown[]>} rowsByLiveId
+ * @param {{ broadcasterUserId?: string, currentLiveId?: string, limit: number }} opts
+ * @returns {string[]}
+ */
+export function pickLivesForBroadcaster(liveIds, rowsByLiveId, opts) {
+  const uid = String(opts.broadcasterUserId || '').trim();
+  const current = String(opts.currentLiveId || '').trim().toLowerCase();
+  /** @type {string[]} */
+  const out = [];
+  for (const lid of liveIds) {
+    if (out.length >= opts.limit) break;
+    const rows = rowsByLiveId.get(lid) || [];
+    const match = uid
+      ? rows.some((row) => String(/** @type {any} */ (row)?.broadcasterUserId ?? '').trim() === uid)
+      : lid === current;
+    if (match || (current && lid === current)) out.push(lid);
+  }
+  return out;
+}
+
 /** 応援者表彰のためのコメント全件読みを打ち切るまでの時間(取れた配信ぶんだけで出す)。 */
 export const MEDIA_KIT_SUPPORTER_SCAN_TIMEOUT_MS = 15_000;
 
@@ -29,6 +60,8 @@ export const MEDIA_KIT_SUPPORTER_SCAN_TIMEOUT_MS = 15_000;
  *   withTimeout: <T>(p: Promise<T>, ms: number, code: string) => Promise<T>,
  *   resolveProfileMap: () => Promise<Record<string, any>>,
  *   maskSupporters?: boolean,
+ *   broadcasterUserId?: string,
+ *   currentLiveId?: string,
  *   openDb?: () => Promise<IDBDatabase>,
  *   listLiveIds?: (db: IDBDatabase, opts: { limit: number }) => Promise<string[]>,
  *   listSummaryForLive?: (db: IDBDatabase, liveId: string, limit: number) => Promise<unknown[]>
@@ -49,12 +82,31 @@ export async function buildMediaKitDocument(deps) {
   let summaryRows = [];
   try {
     db = await openDb();
-    liveIds = await listLiveIds(db, { limit: MEDIA_KIT_LIVE_LIMIT });
+    const filterByBroadcaster = deps.broadcasterUserId !== undefined || deps.currentLiveId !== undefined;
+    const candidateIds = await listLiveIds(db, {
+      limit: filterByBroadcaster ? MEDIA_KIT_SCAN_LIVE_LIMIT : MEDIA_KIT_LIVE_LIMIT
+    });
     const openedDb = db;
-    const rowsByLive = await Promise.all(
-      liveIds.map((liveId) => listSummaryForLive(openedDb, liveId, 200).catch(() => /** @type {unknown[]} */ ([])))
-    );
-    summaryRows = rowsByLive.flat();
+    /** @param {string[]} ids @param {number} rowLimit */
+    const readRows = async (ids, rowLimit) => {
+      const arrays = await Promise.all(
+        ids.map((liveId) => listSummaryForLive(openedDb, liveId, rowLimit).catch(() => /** @type {unknown[]} */ ([])))
+      );
+      return new Map(ids.map((lid, index) => [lid, arrays[index] || []]));
+    };
+    if (filterByBroadcaster) {
+      // 配信者の判定は数行で足りる(全行読みは残した配信だけ=遡る枠が増えても重くしない)。
+      const probe = await readRows(candidateIds, 5);
+      liveIds = pickLivesForBroadcaster(candidateIds, probe, {
+        broadcasterUserId: deps.broadcasterUserId,
+        currentLiveId: deps.currentLiveId,
+        limit: MEDIA_KIT_LIVE_LIMIT
+      });
+    } else {
+      liveIds = candidateIds;
+    }
+    const rowsByLiveId = await readRows(liveIds, 200);
+    summaryRows = liveIds.flatMap((lid) => rowsByLiveId.get(lid) || []);
   } finally {
     try {
       db?.close();
