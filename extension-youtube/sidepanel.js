@@ -214,6 +214,31 @@
     return out;
   }
 
+  // src/lib/youtube/ytSuperChatTier.js
+  var TIERS = [
+    { min: 1e4, bg: "#e62117" },
+    { min: 5e3, bg: "#e91e63" },
+    { min: 2e3, bg: "#f57c00" },
+    { min: 1e3, bg: "#ffca28" },
+    { min: 500, bg: "#1de9b6" },
+    { min: 200, bg: "#00e5ff" },
+    { min: 0, bg: "#1e88e5" }
+  ];
+  function ytSuperChatTierColor(yen) {
+    const n2 = Number(yen);
+    const v = Number.isFinite(n2) && n2 > 0 ? n2 : 0;
+    for (const t of TIERS) if (v >= t.min) return t.bg;
+    return TIERS[TIERS.length - 1].bg;
+  }
+  function ytSuperChatFromRowText(rowText) {
+    const s5 = String(rowText || "");
+    if (!/スーパーチャット|スーパーステッカー/.test(s5)) return null;
+    const pt = s5.match(/([\d,]+)\s*pt/);
+    if (pt) return { yen: Number(pt[1].replace(/,/g, "")) || 0 };
+    const yen = s5.match(/[¥￥]\s*([\d,]+)/);
+    return { yen: yen ? Number(yen[1].replace(/,/g, "")) || 0 : 0 };
+  }
+
   // src/lib/youtube/ytPageMeta.js
   var VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   function parseYtVideoIdFromUrl(rawUrl) {
@@ -1001,6 +1026,23 @@
     const icon = ytIconForNumericUid(m[1]);
     if (icon && icon !== src) img.setAttribute("src", icon);
   }
+  var EMPTY_THUMB_SEL = '[class*="thumb--empty"]';
+  var SC_BUBBLE_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E") center/70% no-repeat`;
+  function fixEmptyThumb(el) {
+    const row = el.closest("tr, li") || el.parentElement;
+    const sc = ytSuperChatFromRowText(row ? row.textContent : "");
+    if (!sc) return;
+    const color = ytSuperChatTierColor(sc.yen);
+    if (el.getAttribute("data-yt-sc") === color) return;
+    el.setAttribute("data-yt-sc", color);
+    const h = (
+      /** @type {HTMLElement} */
+      el
+    );
+    h.style.background = `${SC_BUBBLE_BG}, ${color}`;
+    h.style.borderColor = color;
+    h.style.borderRadius = "6px";
+  }
   function fixSubtree(root) {
     if (root.nodeType === 3) {
       fixTextNode(
@@ -1022,6 +1064,8 @@
     el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
     el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
     el.querySelectorAll("[title]").forEach(fixTitleAttr);
+    if (el.matches(EMPTY_THUMB_SEL)) fixEmptyThumb(el);
+    el.querySelectorAll(EMPTY_THUMB_SEL).forEach(fixEmptyThumb);
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let n2;
     while (n2 = walker.nextNode()) fixTextNode(
@@ -27227,7 +27271,7 @@ ${body}`;
   }
 
   // src/lib/laneSceneEnvelope.js
-  var TIERS = (
+  var TIERS2 = (
     /** @type {const} */
     ["link", "gift", "ad", "konta", "tanu"]
   );
@@ -27241,7 +27285,7 @@ ${body}`;
   function laneSceneContentHash(buckets) {
     const b = buckets && typeof buckets === "object" ? buckets : {};
     const parts = [];
-    for (const tier of TIERS) {
+    for (const tier of TIERS2) {
       const arr = Array.isArray(
         /** @type {any} */
         b[tier]
@@ -27269,7 +27313,7 @@ ${body}`;
       perTierKeys
     ) : {};
     const parts = [];
-    for (const tier of TIERS) {
+    for (const tier of TIERS2) {
       const arr = Array.isArray(src[tier]) ? src[tier] : [];
       const keys = arr.map((k) => String(k ?? "").trim()).filter(Boolean);
       parts.push(`${tier}:${keys.join(",")}`);
@@ -27889,7 +27933,7 @@ ${body}`;
   }
 
   // src/lib/laneDomSelfMeasure.js
-  var TIERS2 = (
+  var TIERS3 = (
     /** @type {const} */
     ["link", "gift", "ad", "konta", "tanu"]
   );
@@ -27945,7 +27989,7 @@ ${body}`;
     const source = els && typeof els === "object" ? els : {};
     const perTier = {};
     let measured = false;
-    for (const tier of TIERS2) {
+    for (const tier of TIERS3) {
       const lane = source[LANE_KEYS[tier]] || null;
       if (lane) measured = true;
       perTier[tier] = measureLane(lane);
@@ -27960,7 +28004,7 @@ ${body}`;
   function perTierKeysOf(domSelf) {
     const perTier = domSelf && typeof domSelf === "object" && domSelf.perTier && typeof domSelf.perTier === "object" ? domSelf.perTier : {};
     const out = {};
-    for (const tier of TIERS2) {
+    for (const tier of TIERS3) {
       out[tier] = Array.isArray(perTier[tier]?.keys) ? perTier[tier].keys : [];
     }
     return out;
@@ -45259,7 +45303,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T22:41" ? String("yt-2026-11-03T22:41") : "dev";
+      const buildId = "yt-2026-11-03T22:48" ? String("yt-2026-11-03T22:48") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45277,7 +45321,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.24") : "";
+    const bundledVersion = true ? String("0.1.25") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45322,7 +45366,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T22:41" ? String("yt-2026-11-03T22:41") : "dev";
+            return "yt-2026-11-03T22:48" ? String("yt-2026-11-03T22:48") : "dev";
           } catch {
             return "dev";
           }

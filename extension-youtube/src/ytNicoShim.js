@@ -16,6 +16,7 @@
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { ytWording } from '../../src/lib/youtube/ytWording.js';
+import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 
@@ -761,6 +762,24 @@ function fixImg(img) {
   if (icon && icon !== src) img.setAttribute('src', icon);
 }
 
+// スーパーチャットには絵が無いので、ニコ生版は灰色の四角を出す。YouTube と同じ金額の色で塗り、吹き出しの印を載せる。
+const EMPTY_THUMB_SEL = '[class*="thumb--empty"]';
+const SC_BUBBLE_BG =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E\") center/70% no-repeat";
+/** @param {Element} el */
+function fixEmptyThumb(el) {
+  const row = el.closest('tr, li') || el.parentElement;
+  const sc = ytSuperChatFromRowText(row ? row.textContent : '');
+  if (!sc) return;
+  const color = ytSuperChatTierColor(sc.yen);
+  if (el.getAttribute('data-yt-sc') === color) return;
+  el.setAttribute('data-yt-sc', color);
+  const h = /** @type {HTMLElement} */ (el);
+  h.style.background = `${SC_BUBBLE_BG}, ${color}`;
+  h.style.borderColor = color;
+  h.style.borderRadius = '6px';
+}
+
 /** @param {Node} root */
 function fixSubtree(root) {
   if (root.nodeType === 3) {
@@ -777,6 +796,8 @@ function fixSubtree(root) {
   el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
   el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
   el.querySelectorAll('[title]').forEach(fixTitleAttr);
+  if (el.matches(EMPTY_THUMB_SEL)) fixEmptyThumb(el);
+  el.querySelectorAll(EMPTY_THUMB_SEL).forEach(fixEmptyThumb);
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = walker.nextNode())) fixTextNode(/** @type {Text} */ (n));
