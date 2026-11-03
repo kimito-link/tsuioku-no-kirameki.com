@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja" class="nl-inline" data-nl-usage-terms-ack="1" data-nl-recording="on" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
+<!DOCTYPE html><html lang="ja" data-nl-usage-terms-ack="1" data-nl-recording="on" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
 <!--
   ★v0.1.1299(6度目): <html> を【1行目・DOCTYPE の直後】へ移した。
   従来はこの下に約1,233バイトのコメントがあり、ブラウザがそれを読み終わるまで
@@ -33,7 +33,7 @@
     -->
     <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>君斗りんくの追憶のきらめき（YouTube Live）</title>
+    <title>君斗りんくの追憶のきらめき</title>
     <!-- ローディング幕で最初に出る3キャラ（通常顔）のサムネだけ最優先で先読み（空丸を防ぐ）。
          笑顔は喋る瞬間に差し替えるので preload しない（preload 未使用警告を避けるため）。 -->
     <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" />
@@ -10704,368 +10704,9 @@
       ★インラインで書くと拡張のCSP(script-src 'self')違反でブロックされる(v1353の実機エラー)。
         必ず別ファイル(=self)にすること。中身は src/extension/cloak-failsafe-entry.js。
     -->
-      <!-- ↓ YouTube 版だけの部品の見た目（extension-youtube/src/sidepanel-yt-parts.html から） -->
-    <style>
-      :root {
-        --nl-text-soft: #8a7568;
-        --nl-ok: #3fa66a;
-        --nl-warn: #d99a2b;
-        --nl-bad: #e15a76;
-        --nl-radius-sm: 8px;
-        --nl-radius-md: 12px;
-        --nl-radius-pill: 999px;
-        --nl-shadow-card: 0 1px 6px rgba(120, 80, 50, 0.08);
-        --nl-border-strong: #d8b89f;
-        --nl-accent-soft: #ffd9e6;
-      }
-            .nl-yt-stream-bar {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 6px;
-              flex-wrap: wrap;
-              padding: 4px 8px;
-              margin: 0 0 6px;
-              border-radius: 9px;
-              background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
-              border: 1px solid color-mix(in srgb, var(--nl-border) 75%, transparent);
-              font-size: 10.5px;
-            }
-      
-            .nl-yt-stream-bar__summary {
-              color: var(--nl-text-sub);
-              font-weight: 700;
-              min-width: 0;
-              flex: 1 1 160px;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-            }
-      
-            .nl-yt-stream-bar select {
-              font-size: 10.5px;
-              padding: 2px 6px;
-              max-width: 100%;
-            }
-      
-            .currency-grid {
-              display: flex;
-              flex-direction: column;
-              gap: 6px;
-            }
-      
-            .currency-box {
-              background: var(--nl-surface);
-              border: 1px solid var(--nl-border);
-              border-radius: var(--nl-radius-sm);
-              padding: 6px 7px;
-            }
-      
-            .currency-header {
-              display: flex;
-              justify-content: space-between;
-              align-items: baseline;
-              font-weight: 800;
-              font-size: 10.5px;
-              color: var(--nl-text);
-              margin-bottom: 5px;
-              border-bottom: 1px solid var(--nl-border);
-              padding-bottom: 3px;
-            }
-      
-            .control-row {
-              display: flex;
-              flex-wrap: wrap;
-              align-items: center;
-              gap: 8px;
-            }
-      
-            .voice-mode-field {
-              display: inline-flex;
-              align-items: center;
-              gap: 4px;
-              flex: 1 1 210px;
-              min-width: 0;
-            }
-      
-            .voice-mode-label {
-              white-space: nowrap;
-              flex-shrink: 0;
-              font-weight: 700;
-            }
-      
-            .voice-mode-field select {
-              flex: 1 1 auto;
-              min-width: 0;
-              max-width: 100%;
-            }
-      
-            .filter-pill {
-              display: inline-flex;
-              align-items: center;
-              padding: 1px 7px;
-              border-radius: var(--nl-radius-pill);
-              font-size: 10px;
-              font-weight: 700;
-              background: var(--nl-bg);
-              border: 1px solid var(--nl-border);
-              color: var(--nl-text-sub);
-            }
-      
-            .notice-banner {
-              padding: 6px 9px;
-              border-radius: var(--nl-radius-sm);
-              background: linear-gradient(180deg, #fffaf0, #fff4db);
-              border: 1px solid #f5d28d;
-              color: #6b4f18;
-              font-size: 11px;
-              line-height: 1.4;
-            }
-      
-            .notice-banner.is-warning {
-              background: #fff3e0;
-              border-color: var(--nl-warn);
-              color: #7c4a03;
-            }
-      
-            .voice-status-box {
-              padding: 6px 9px;
-              border-radius: var(--nl-radius-sm);
-              font-size: 11px;
-              border: 1px solid var(--nl-border);
-              background: var(--nl-bg);
-              color: var(--nl-text);
-            }
-      
-            .voice-status-box.is-offline {
-              background: #fff5f5;
-              border-color: color-mix(in srgb, var(--nl-bad) 55%, var(--nl-border));
-              color: #7a2436;
-            }
-      
-            .voice-status-box.is-online {
-              background: #f2fbf6;
-              border-color: color-mix(in srgb, var(--nl-ok) 55%, var(--nl-border));
-              color: #1e5c3a;
-            }
-      
-            .autoswitch-badge {
-              display: none;
-              padding: 5px 8px;
-              border-radius: var(--nl-radius-sm);
-              background: #fff4e5;
-              border: 1px solid var(--nl-warn);
-              color: #7c4a03;
-              font-size: 11px;
-              font-weight: 700;
-            }
-      
-            .autoswitch-badge.is-active {
-              display: block;
-            }
-      
-            .voice-last-spoken {
-              font-size: 11px;
-              color: var(--nl-text-soft);
-            }
-      
-            /* コメビュ3レーン（折りたたみ内） */
-            .lanes-grid {
-              display: grid;
-              grid-template-columns: repeat(3, minmax(0, 1fr));
-              gap: 8px;
-            }
-      
-            .lane-col {
-              background: var(--nl-surface);
-              border: 1px solid var(--nl-border);
-              border-radius: var(--nl-radius-md);
-              box-shadow: var(--nl-shadow-card);
-              display: flex;
-              flex-direction: column;
-              min-width: 0;
-              max-height: 380px;
-              padding: 6px;
-            }
-      
-            .lane-rinku {
-              border-top: 3px solid var(--nl-accent);
-            }
-      
-            .lane-konta {
-              border-top: 3px solid var(--nl-warn);
-            }
-      
-            .lane-tanunee {
-              border-top: 3px solid var(--nl-ok);
-            }
-      
-            .lane-list {
-              overflow-y: auto;
-              flex: 1 1 auto;
-              display: flex;
-              flex-direction: column;
-              gap: 5px;
-              padding: 2px;
-            }
-      
-            /* コメント行内のユーザー表示 */
-            .chat-item .nl-story-userlane-cell {
-              display: inline-flex;
-              flex-direction: row;
-              align-items: center;
-              justify-content: flex-start;
-              gap: 6px;
-              min-width: 0;
-              max-width: 100%;
-              border-radius: 999px;
-              padding-right: 4px;
-            }
-      
-            a.nl-story-userlane-cell--linkable,
-            a.author-link {
-              text-decoration: none;
-              color: var(--nl-text);
-              cursor: pointer;
-              font-weight: 700;
-            }
-      
-            a.nl-story-userlane-cell--linkable:hover,
-            a.author-link:hover {
-              color: var(--nl-accent);
-              text-decoration: underline;
-            }
-      
-            .chat-item {
-              background: var(--nl-bg);
-              border: 1px solid var(--nl-border);
-              border-radius: var(--nl-radius-sm);
-              padding: 5px 7px;
-              font-size: 11.5px;
-              color: var(--nl-text);
-            }
-      
-            .chat-item.kind-superchat,
-            .chat-item.kind-sticker {
-              background: linear-gradient(
-                90deg,
-                color-mix(in srgb, #ffb020 16%, var(--nl-surface)),
-                color-mix(in srgb, #ff7eb6 12%, var(--nl-surface))
-              );
-              border: 1px solid color-mix(in srgb, #ffb020 45%, var(--nl-border));
-            }
-      
-            .chat-item.kind-membership,
-            .chat-item.kind-membership_gift {
-              background: linear-gradient(
-                90deg,
-                color-mix(in srgb, var(--nl-ok) 12%, var(--nl-surface)),
-                color-mix(in srgb, var(--nl-accent) 10%, var(--nl-surface))
-              );
-              border: 1px solid color-mix(in srgb, var(--nl-ok) 40%, var(--nl-border));
-            }
-      
-            .chat-item-head {
-              display: flex;
-              align-items: center;
-              gap: 5px;
-              flex-wrap: wrap;
-              margin-bottom: 3px;
-            }
-      
-            .chat-text {
-              word-break: break-word;
-              color: var(--nl-text);
-              line-height: 1.38;
-              padding-left: 2px;
-            }
-      
-            .empty-hint,
-            .nl-story-userlane__empty-note {
-              grid-column: 1 / -1;
-              margin: 2px 0;
-              padding: 8px;
-              font-size: 10.5px;
-              line-height: 1.4;
-              font-weight: 600;
-              color: var(--nl-text-sub);
-              text-align: center;
-              border-radius: 8px;
-              background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
-              border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
-            }
-      
-            .nl-voice-engine-note {
-              white-space: pre-line;
-              margin: 4px 0 6px;
-              padding: 6px 8px;
-              border-radius: 8px;
-              background: #fff7e6;
-              color: #b45309;
-              font-size: 11.5px;
-              font-weight: 600;
-              line-height: 1.45;
-            }
-      .avatar-img {
-        width: var(--nl-lane-avatar);
-        height: var(--nl-lane-avatar);
-        border-radius: 999px;
-        object-fit: cover;
-        object-position: center;
-        border: 1.5px solid color-mix(in srgb, var(--nl-border-strong) 82%, #fff 18%);
-        box-shadow: 0 1px 3px rgba(120, 80, 50, 0.14);
-        background: var(--nl-bg);
-        flex-shrink: 0;
-      }
-
-      .channel-id-tag {
-        color: var(--nl-text-sub);
-        font-weight: 600;
-        font-size: 9.5px;
-        font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 100%;
-      }
-
-      .voice-pill {
-        font-size: 9.5px;
-        font-weight: 700;
-        padding: 1px 6px;
-        border-radius: var(--nl-radius-pill);
-        background: var(--nl-accent-soft);
-        color: var(--nl-text);
-        border: 1px solid color-mix(in srgb, var(--nl-accent) 35%, var(--nl-border));
-      }
-
-      .amount-pill {
-        font-size: 10px;
-        font-weight: 800;
-        padding: 1px 7px;
-        border-radius: var(--nl-radius-pill);
-        background: #fff0c2;
-        border: 1px solid #e6a817;
-        color: #7c4a03;
-      }
-
-      .member-pill {
-        font-size: 9.5px;
-        font-weight: 800;
-        padding: 1px 6px;
-        border-radius: var(--nl-radius-pill);
-        background: #e6f7ed;
-        border: 1px solid color-mix(in srgb, var(--nl-ok) 45%, var(--nl-border));
-        color: #1e5c3a;
-      }
-      /* 応援タイムラインは段ごと全幅に(見出しの「応援 N件」で1列目が広がり、最新コメントの欄が潰れるのを防ぐ) */
-      .nl-stats-bar > .nl-support-timeline {
-        grid-column: 1 / -1;
-      }
-    </style>
-    <!-- このファイルは scripts/build-youtube-sidepanel-html.mjs の生成物です。直接直さないでください。 -->
+    <script src="cloak-failsafe.js"></script>
   </head>
-  <body class="nl-inline">
+  <body>
     <!--
       初回ロード中のシェード。Chrome が popup.html を開いた瞬間に、
       hidden 要素の混じった raw な popup がチラ見えしないよう全画面を覆う。
@@ -11074,9 +10715,30 @@
     -->
     <div id="nlInitialLoadShade" class="nl-init-shade" aria-hidden="true">
       <div class="nl-init-shade__chars">
-        <img class="nl-init-shade__char" data-who="link" src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" alt="" decoding="async" fetchpriority="high">
-        <img class="nl-init-shade__char" data-who="konta" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" alt="" decoding="async" fetchpriority="high">
-        <img class="nl-init-shade__char" data-who="tanunee" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" alt="" decoding="async" fetchpriority="high">
+        <img
+          class="nl-init-shade__char"
+          data-who="link"
+          src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+          alt=""
+          decoding="async"
+          fetchpriority="high"
+        />
+        <img
+          class="nl-init-shade__char"
+          data-who="konta"
+          src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+          alt=""
+          decoding="async"
+          fetchpriority="high"
+        />
+        <img
+          class="nl-init-shade__char"
+          data-who="tanunee"
+          src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+          alt=""
+          decoding="async"
+          fetchpriority="high"
+        />
       </div>
       <div class="nl-init-shade__msg">
         <span class="nl-init-shade__speaker" id="nlInitShadeSpeaker"></span><span id="nlInitShadeSerif">りんく こん太 たぬ姉が いまからよみこむよー</span>
@@ -11085,53 +10747,31 @@
     </div>
     <header class="nl-header">
       <div class="nl-header-brand">
-        <img class="nl-header-mark" src="images/logo/kimito-maru-black.png" alt="" width="32" height="32" decoding="async">
+        <img
+          class="nl-header-mark"
+          src="images/logo/kimito-maru-black.png"
+          alt=""
+          width="32"
+          height="32"
+          decoding="async"
+        />
         <div class="nl-header-titles">
           <div class="nl-logo">君斗りんくの追憶のきらめき</div>
-          <p class="nl-sub">YouTube Live の応援コメントを、このPCで見える化（視聴ページを開くと自動で記録）</p>
+          <p class="nl-sub">
+            ニコ生の応援コメントを、このPCで見える化（記録は自分でON）
+          </p>
         </div>
       </div>
     </header>
 
     <div class="nl-main">
-      <div class="nl-compose-quick-toolbar" role="toolbar" aria-label="書き出しと視聴タブの再読み込み" aria-describedby="exportToolbarHint" data-nl-hoisted="top">
-              <button type="button" id="exportJson" disabled="" title="HTMLレポートを保存" aria-label="HTMLレポートを保存。メタ情報・保存コメントをまとめた検索用HTMLをダウンロードします。">
-                <span class="nl-compose-qbtn__row">
-                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">💾</span>
-                  <span class="nl-compose-qbtn__word">HTML</span>
-                </span>
-              </button>
-              <button type="button" id="exportMarketingQuickBtn" disabled="" title="マーケ分析+メディアキットを1つのHTMLで保存" aria-label="マーケ分析とメディアキットを1つのHTMLで保存。グラフと指標、共有用の実績サマリがまとまっています。">
-                <span class="nl-compose-qbtn__row">
-                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
-                  <span class="nl-compose-qbtn__word">マーケ</span>
-                </span>
-              </button>
-              <button type="button" id="captureScreenshot" disabled="" title="画面を1枚保存" aria-label="画面を1枚保存。動画の画面を PNG 画像として保存します。">
-                <span class="nl-compose-qbtn__row">
-                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">📷</span>
-                  <span class="nl-compose-qbtn__word">スクショ</span>
-                </span>
-              </button>
-              <button type="button" id="reloadWatchTabBtn" disabled="" title="視聴ページのタブを再読み込みします（F5 と同じ）" aria-label="視聴ページのタブを再読み込みします（F5 と同じ）">
-                <span class="nl-compose-qbtn__row">
-                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">↻</span>
-                  <span class="nl-compose-qbtn__word">再読み込み</span>
-                </span>
-              </button>
-              <button type="button" id="openComeviewBtn" title="コメビュ（3レーンのコメント一覧）を開く" aria-label="コメビュ（3レーンのコメント一覧）を開きます。">
-                <span class="nl-compose-qbtn__row">
-                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
-                  <span class="nl-compose-qbtn__word">コメビュ</span>
-                </span>
-              </button>
-              <button type="button" id="openComeviewVoiceBtn" title="読み上げ設定を開く（VOICEVOX が必要）" aria-label="読み上げ設定を開きます。読み上げには VOICEVOX が必要です。">
-                <span class="nl-compose-qbtn__row">
-                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">🔊</span>
-                  <span class="nl-compose-qbtn__word">読み上げ</span>
-                </span>
-              </button>
-            </div><div id="usageTermsGate" class="nl-usage-terms-gate" role="dialog" aria-modal="true" aria-labelledby="usageTermsGateTitle">
+      <div
+        id="usageTermsGate"
+        class="nl-usage-terms-gate"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="usageTermsGateTitle"
+      >
         <div class="nl-usage-terms-gate__panel">
           <h2 id="usageTermsGateTitle" class="nl-usage-terms-gate__title">
             利用の前に（ご確認ください）
@@ -11163,7 +10803,11 @@
                 <th scope="row">公式の案内</th>
                 <td>
                   サービス利用については、ニコニコのお知らせ等もあわせてご確認ください（例:
-                  <a href="https://www.nicovideo.jp/topic/notice/" target="_blank" rel="noopener noreferrer">https://www.nicovideo.jp/topic/notice/</a>）。
+                  <a
+                    href="https://www.nicovideo.jp/topic/notice/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >https://www.nicovideo.jp/topic/notice/</a>）。
                 </td>
               </tr>
             </tbody>
@@ -11172,17 +10816,27 @@
             内容は拡張の説明用です。特定のライセンスや利用規約の全文の代替にはなりません。
           </p>
           <label class="nl-usage-terms-gate__ack" for="usageTermsAckCheckbox">
-            <input type="checkbox" id="usageTermsAckCheckbox" autocomplete="off">
+            <input type="checkbox" id="usageTermsAckCheckbox" autocomplete="off" />
             <span>上記を読み、自分の利用として同意します</span>
           </label>
-          <button type="button" id="usageTermsContinueBtn" class="nl-usage-terms-gate__continue" disabled="">
+          <button type="button" id="usageTermsContinueBtn" class="nl-usage-terms-gate__continue" disabled>
             同意してポップアップを使う
           </button>
         </div>
       </div>
 
-      <div class="nl-popup-primary" id="nlPopupPrimary" aria-busy="true">
-      <div id="nlVersionBadge" class="nl-version-badge" role="status" aria-label="拡張バージョン（新ビルド反映の確認用）" title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。npm run build のあと chrome://extensions で「更新」し、watch ページも再読み込みしてください。">
+      <div
+        class="nl-popup-primary"
+        id="nlPopupPrimary"
+        aria-busy="true"
+      >
+      <div
+        id="nlVersionBadge"
+        class="nl-version-badge"
+        role="status"
+        aria-label="拡張バージョン（新ビルド反映の確認用）"
+        title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。npm run build のあと chrome://extensions で「更新」し、watch ページも再読み込みしてください。"
+      >
         <span class="nl-version-badge__label">ビルド</span>
         <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
       </div>
@@ -11192,18 +10846,46 @@
         既定 hidden。JS が「watch を扱える文脈」と判定したら外す。
         保存は既存 saveInlinePanelPlacement を呼ぶだけ＝storage キーを増やさず二重管理しない。
       -->
-      <div id="nlPlacementQuickbar" class="nl-placement-quickbar" role="group" aria-label="ページ内パネルの位置" hidden="">
+      <div
+        id="nlPlacementQuickbar"
+        class="nl-placement-quickbar"
+        role="group"
+        aria-label="ページ内パネルの位置"
+        hidden
+      >
         <span class="nl-placement-quickbar__label">パネル位置</span>
-        <span id="nlPlacementQuickValue" class="nl-placement-quickbar__value" title="ページ内パネルを視聴ページのどこに出すか。実際の位置は視聴中タブの幅でも変わります（広いと横付きになりやすい）。">—</span>
+        <span
+          id="nlPlacementQuickValue"
+          class="nl-placement-quickbar__value"
+          title="ページ内パネルを視聴ページのどこに出すか。実際の位置は視聴中タブの幅でも変わります（広いと横付きになりやすい）。"
+          >—</span
+        >
         <span class="nl-placement-quickbar__toggles">
-          <button type="button" id="nlPlacementQuickBeside" class="nl-placement-quickbar__chip" aria-pressed="false" title="プレイヤーの横に並べます（視聴中タブが十分広いとき）">
+          <button
+            type="button"
+            id="nlPlacementQuickBeside"
+            class="nl-placement-quickbar__chip"
+            aria-pressed="false"
+            title="プレイヤーの横に並べます（視聴中タブが十分広いとき）"
+          >
             横付き
           </button>
-          <button type="button" id="nlPlacementQuickBelow" class="nl-placement-quickbar__chip" aria-pressed="false" title="プレイヤー行の下に出します">
+          <button
+            type="button"
+            id="nlPlacementQuickBelow"
+            class="nl-placement-quickbar__chip"
+            aria-pressed="false"
+            title="プレイヤー行の下に出します"
+          >
             下
           </button>
         </span>
-        <button type="button" id="nlPlacementQuickMore" class="nl-placement-quickbar__more" title="画面下いっぱい・ポップアップ風など、他の位置や幅の設定を開きます">
+        <button
+          type="button"
+          id="nlPlacementQuickMore"
+          class="nl-placement-quickbar__more"
+          title="画面下いっぱい・ポップアップ風など、他の位置や幅の設定を開きます"
+        >
           詳細
         </button>
       </div>
@@ -11212,13 +10894,19 @@
         降格して見た目が変わらない件の説明行。降格時だけ JS が文言を入れて hidden を外す。
         「押しても何も変わらない」誤解の直接の解（実機 lv350592761: 幅1065px で降格）。
       -->
-      <p id="nlPlacementQuickHint" class="nl-placement-quickbar__hint" role="status" aria-live="polite" hidden=""></p>
+      <p
+        id="nlPlacementQuickHint"
+        class="nl-placement-quickbar__hint"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></p>
       <!--
         0.1.55 (AK) → 0.1.106: 既定は hidden。refresh が「非 watch」のときだけ外す。
         FOUC（ランキングだけ先に見える）防止。
       -->
       <!-- 既定 hidden: JS が走る・またはモジュール読込が遅い間にランキング枠だけが先に見える FOUC を防ぐ -->
-      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング" hidden="">
+      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング" hidden>
         <p class="nl-no-watch-hint__lead">
           🔎 watch ページが見つかりません。気になる放送を探してみますか？
         </p>
@@ -11256,7 +10944,13 @@
         ユーザーが「現在の配信」と誤認しないようにする。
         履歴があるときだけ JS が hidden を外す。標準は hidden。
       -->
-      <div id="lastBroadcastIndicator" class="nl-last-broadcast-indicator" role="note" aria-label="前回の配信" hidden="">
+      <div
+        id="lastBroadcastIndicator"
+        class="nl-last-broadcast-indicator"
+        role="note"
+        aria-label="前回の配信"
+        hidden
+      >
         <span id="lastBroadcastIndicatorLead" class="nl-last-broadcast-indicator__lead">前回の配信</span>
         <span id="lastBroadcastIndicatorTitle" class="nl-last-broadcast-indicator__title"></span>
       </div>
@@ -11264,26 +10958,53 @@
         0.1.69 (AY): 「もう一度開く」ボタン。前回の watchUrl を新タブで開く。
         履歴があるときだけ JS が hidden を外す。watchUrl が空なら disabled。
       -->
-      <div id="lastBroadcastActions" class="nl-last-broadcast-actions" role="group" aria-label="前回の配信のアクション" hidden="">
-        <button type="button" id="lastBroadcastReopenBtn" class="nl-last-broadcast-actions__reopen" title="前回の watch ページを新しいタブで開きます">
+      <div
+        id="lastBroadcastActions"
+        class="nl-last-broadcast-actions"
+        role="group"
+        aria-label="前回の配信のアクション"
+        hidden
+      >
+        <button
+          type="button"
+          id="lastBroadcastReopenBtn"
+          class="nl-last-broadcast-actions__reopen"
+          title="前回の watch ページを新しいタブで開きます"
+        >
           🔄 もう一度この配信を開く
         </button>
       </div>
-      <div id="offlineBanner" class="nl-extension-context-banner nl-offline-banner" role="status" aria-live="polite" hidden="">
+      <div
+        id="offlineBanner"
+        class="nl-extension-context-banner nl-offline-banner"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
         <strong>オフラインです</strong>
         <p class="nl-extension-context-banner__body">
           ネットワークに接続できないため、コメントの取得やスナップショットが失敗します。
           接続が戻ると自動的にバナーは消えます。
         </p>
       </div>
-      <div id="extensionContextBanner" class="nl-extension-context-banner" role="alert" aria-live="assertive" hidden="">
+      <div
+        id="extensionContextBanner"
+        class="nl-extension-context-banner"
+        role="alert"
+        aria-live="assertive"
+        hidden
+      >
         <strong>拡張の接続が切れました</strong>
         <p class="nl-extension-context-banner__body">
           <code>chrome://extensions</code>
           を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。ページの再読み込みだけでは直らないことがあります。
         </p>
         <p class="nl-extension-context-banner__body">
-          <button type="button" id="extensionContextBannerReload" class="nl-extension-context-banner__reload">このパネルを再読み込み</button>
+          <button
+            type="button"
+            id="extensionContextBannerReload"
+            class="nl-extension-context-banner__reload"
+          >このパネルを再読み込み</button>
         </p>
       </div>
       <!--
@@ -11292,7 +11013,13 @@
         差し替えると新旧混在ランタイムになる(実測: 本体1077+ページ1080でコメント送信不可)。
         DOM は一度作ったら remove せず hidden 切替(status-guard.js の流儀に倣う)。
       -->
-      <div id="nlVersionMismatchBanner" class="nl-extension-context-banner" role="alert" aria-live="assertive" hidden=""></div>
+      <div
+        id="nlVersionMismatchBanner"
+        class="nl-extension-context-banner"
+        role="alert"
+        aria-live="assertive"
+        hidden
+      ></div>
 
       <!--
         旧配置: stat card 群の上に full-width 帯として配信者情報（icon + name + フォロー）を出していた。
@@ -11300,75 +11027,145 @@
         データ同期用の隠し要素として casterBannerIcon / Name / Link / Follow は残すが、
         画面には出さず、renderTopSupportRankStrip がストリップ内に新しいタイルを作って表示する。
       -->
-      <div id="casterBanner" class="nl-caster-banner" hidden="" style="display:none !important">
+      <div id="casterBanner" class="nl-caster-banner" hidden style="display:none !important">
         <a id="casterBannerLink" target="_blank" rel="noopener noreferrer" title="配信者ページを開く">
-          <img id="casterBannerIcon" alt="" width="36" height="36" decoding="async">
+          <img id="casterBannerIcon" alt="" width="36" height="36" decoding="async" />
           <span id="casterBannerName"></span>
         </a>
         <a id="casterBannerFollow" target="_blank" rel="noopener noreferrer">フォロー</a>
       </div>
 
-      
-    <p id="yt-voice-engine-banner" class="nl-voice-engine-note" role="status" aria-live="polite" hidden=""></p>
-
-    <!-- 配信選択バー -->
-    <div class="nl-yt-stream-bar" aria-label="記録中の配信">
-      <span class="nl-yt-stream-bar__summary" id="yt-stream-summary">
-        YouTube Live の視聴ページを開くと自動でチャットを記録します
-      </span>
-      <select id="yt-stream-select" aria-label="記録済み配信の選択">
-        <option value="">配信を選択…</option>
-      </select>
-    </div>
-
-<div class="nl-live-stat-cards" id="liveStatCards">
-        <div class="nl-live-stat-card nl-live-stat-card--comments nl-live-stat-card--support-visual" id="supportVisualLiveCard" title="この数字は、このPCに記録したチャットの件数です（スーパーチャット・メンバー加入も含みます）。">
-          <img class="nl-live-stat-icon" src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" decoding="async">
+      <div class="nl-live-stat-cards" id="liveStatCards">
+        <div
+          class="nl-live-stat-card nl-live-stat-card--comments nl-live-stat-card--support-visual"
+          id="supportVisualLiveCard"
+          title="この数字は、このPCに記録した応援コメントの件数です（配信者ぶんも含む「記録した全件」なので、下の『公式』と同じ基準でほぼ一致します）。配信者ぶんは内訳の「うち配信者」で示します。画面に出ていない古いコメントは取り込めません。記録をオフにしていた時間やページを閉じていた間は増えません。記録OFF・非表示タブ・途中入室・サイト改修のときだけ公式と差が出ることがあります。"
+        >
+          <img
+            class="nl-live-stat-icon"
+            src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+            alt=""
+            decoding="async"
+          />
           <div class="nl-live-stat-label">記録</div>
           <div class="nl-live-stat-value" id="liveStatComments">—</div>
           <div class="nl-live-stat-unit">応援コメント</div>
-          <div class="nl-live-stat-sub nl-live-stat-sub--official" id="liveStatCommentsOfficial" hidden=""></div>
-          <div class="nl-live-stat-sub nl-live-stat-sub--ingest" id="liveStatCommentsIngest" hidden="" aria-live="polite"></div>
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--official"
+            id="liveStatCommentsOfficial"
+            hidden
+          ></div>
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--ingest"
+            id="liveStatCommentsIngest"
+            hidden
+            aria-live="polite"
+          ></div>
           <!-- v0.1.627: 記録の内訳(通常コメ/興味来場/システム)を併記。
                「公式 N / 記録 M」の M の出所が見えるようにユーザー納得性向上。
                ギフト・広告は persistable で保存時点で除外済=ここには含まれない。 -->
-          <div class="nl-live-stat-sub nl-live-stat-sub--breakdown" id="liveStatCommentsBreakdown" hidden="" title="ギフト・広告は別カウント(下のカード参照)"></div>
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--breakdown"
+            id="liveStatCommentsBreakdown"
+            hidden
+            title="ギフト・広告は別カウント(下のカード参照)"
+          ></div>
           <!-- v0.1.432: 過去ログ取り込みの状況（入口なし/途中/混雑）を記録カードの位置にも出す。
                v0.1.438: ボタン下と同じ「こん太(キャラ)+ピンク吹き出し」UI に統一（ユーザー指摘・統合性原則）。
                既存ボタン下の #backfillRinku は無変更。ここはもう一つのインスタンス（class 共有 / id は別）。
                外側 nl-live-stat-sub--backfill-hint はレイアウト位置の維持・内側は .nl-backfill-rinku の再利用。 -->
-          <div class="nl-live-stat-sub nl-live-stat-sub--backfill-hint" id="liveStatCommentsBackfillHint" hidden="" aria-live="polite">
-            <div id="recordCardBackfillRinku" class="nl-backfill-rinku nl-backfill-rinku--record-card" aria-hidden="true">
-              <img id="recordCardBackfillRinkuImg" class="nl-backfill-rinku__img" src="images/logo/konta-yukkuri-icon-48.png" width="32" height="32" alt="">
-              <p id="recordCardBackfillRinkuLead" class="nl-backfill-rinku__lead" aria-live="polite"></p>
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--backfill-hint"
+            id="liveStatCommentsBackfillHint"
+            hidden
+            aria-live="polite"
+          >
+            <div
+              id="recordCardBackfillRinku"
+              class="nl-backfill-rinku nl-backfill-rinku--record-card"
+              aria-hidden="true"
+            >
+              <img
+                id="recordCardBackfillRinkuImg"
+                class="nl-backfill-rinku__img"
+                src="images/logo/konta-yukkuri-icon-48.png"
+                width="32"
+                height="32"
+                alt=""
+              />
+              <p
+                id="recordCardBackfillRinkuLead"
+                class="nl-backfill-rinku__lead"
+                aria-live="polite"
+              ></p>
             </div>
             <!-- v0.1.450 PR2: ボタン受け入れ用の actions 行（空・JS が後で埋める）。
                  後続 PR3 で #recordCardBackfillRetryBtn を追加してコメント入力直下の
                  #backfillFetchPrompt を廃止し、上集約する設計（会議 2026-05-29 確定）。
                  この PR では空のままなので見た目変化なし（:empty で margin 0 にしておく）。 -->
-            <div id="recordCardBackfillActions" class="nl-backfill-rinku__actions"></div>
+            <div
+              id="recordCardBackfillActions"
+              class="nl-backfill-rinku__actions"
+            ></div>
           </div>
           <!-- 記録停止の自己回復ステータス（本番でも表示）。普段は hidden。
                「公式は増えてるのに記録が止まった」を検知して自動復旧した直後だけ
                短時間表示する。値の出所は chrome.storage.local の nls_recording_watchdog_v1。 -->
-          <div class="nl-live-stat-sub nl-live-stat-sub--recovery" id="liveStatCommentsRecovery" hidden="" aria-live="polite"></div>
-          <div id="liveStatCardCommentsLoad" class="nl-live-stat-card__char-load" hidden="" aria-hidden="true">
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--recovery"
+            id="liveStatCommentsRecovery"
+            hidden
+            aria-live="polite"
+          ></div>
+          <div
+            id="liveStatCardCommentsLoad"
+            class="nl-live-stat-card__char-load"
+            hidden
+            aria-hidden="true"
+          >
             <div class="nl-live-stat-card__char-load-box" role="status" aria-live="polite">
-              <img class="nl-live-stat-card__char-load-img" src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" decoding="async">
+              <img
+                class="nl-live-stat-card__char-load-img"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+                alt=""
+                decoding="async"
+              />
               <span class="nl-live-stat-card__char-load-msg">よみこんでいるよ…</span>
             </div>
           </div>
         </div>
-        <div class="nl-live-stat-card nl-live-stat-card--concurrent" id="watchConcurrentCard" aria-live="polite">
-          <img class="nl-live-stat-icon" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" decoding="async">
-          <div class="nl-live-stat-label">同時視聴</div>
+        <div
+          class="nl-live-stat-card nl-live-stat-card--concurrent"
+          id="watchConcurrentCard"
+          aria-live="polite"
+        >
+          <img
+            class="nl-live-stat-icon"
+            src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+            alt=""
+            decoding="async"
+            title="広告ランキングのレーンへ移動（非表示のときは貢献度またはギフト履歴へスクロールします）"
+            aria-label="広告ランキングへスクロール（表示がないときはコア情報へ）"
+          />
+          <div class="nl-live-stat-label">推定同時接続</div>
           <div class="nl-concurrent-body">
             <div id="watchConcurrentReady" class="nl-concurrent-ready">
               <div class="nl-live-stat-value" id="watchConcurrentEst">—</div>
               <div class="nl-live-stat-unit" id="watchConcurrentSub">人</div>
             </div>
-            <div id="watchConcurrentLoading" class="nl-concurrent-loading" role="status" hidden="" aria-label="推定同時接続を読み込み中">
-              <img class="nl-concurrent-loading__link" src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" decoding="async">
+            <div
+              id="watchConcurrentLoading"
+              class="nl-concurrent-loading"
+              role="status"
+              hidden
+              aria-label="推定同時接続を読み込み中"
+            >
+              <img
+                class="nl-concurrent-loading__link"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+                alt=""
+                decoding="async"
+              />
               <div class="nl-concurrent-loading__title">
                 ローディング
                 <span class="nl-concurrent-loading__title-dots" aria-hidden="true">
@@ -11380,32 +11177,57 @@
               <div class="nl-concurrent-loading__hint">データがそろうまで待っています</div>
             </div>
           </div>
-          <div id="liveStatCardConcurrentLoad" class="nl-live-stat-card__char-load" hidden="" aria-hidden="true">
+          <div
+            id="liveStatCardConcurrentLoad"
+            class="nl-live-stat-card__char-load"
+            hidden
+            aria-hidden="true"
+          >
             <div class="nl-live-stat-card__char-load-box" role="status" aria-live="polite">
-              <img class="nl-live-stat-card__char-load-img" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" decoding="async">
+              <img
+                class="nl-live-stat-card__char-load-img"
+                src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+                alt=""
+                decoding="async"
+              />
               <span class="nl-live-stat-card__char-load-msg">よみこんでいるよ…</span>
             </div>
           </div>
         </div>
         <div class="nl-live-stat-card nl-live-stat-card--visitors">
-          <img class="nl-live-stat-icon" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="" decoding="async">
-          <div class="nl-live-stat-label">コメントした人</div>
+          <img
+            class="nl-live-stat-icon"
+            src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+            alt=""
+            decoding="async"
+          />
+          <div class="nl-live-stat-label">来場者数</div>
           <div class="nl-live-stat-value" id="watchViewerDom">—</div>
           <div class="nl-live-stat-unit">人</div>
-          <div id="liveStatCardVisitorsLoad" class="nl-live-stat-card__char-load" hidden="" aria-hidden="true">
+          <div
+            id="liveStatCardVisitorsLoad"
+            class="nl-live-stat-card__char-load"
+            hidden
+            aria-hidden="true"
+          >
             <div class="nl-live-stat-card__char-load-box" role="status" aria-live="polite">
-              <img class="nl-live-stat-card__char-load-img" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="" decoding="async">
+              <img
+                class="nl-live-stat-card__char-load-img"
+                src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+                alt=""
+                decoding="async"
+              />
               <span class="nl-live-stat-card__char-load-msg">よみこんでいるよ…</span>
             </div>
           </div>
         </div>
-        <div class="nl-official-nico-stats__row" role="group" aria-label="この配信の数字の一覧">
+        <div class="nl-official-nico-stats__row" role="group" aria-label="公式視聴統計の一覧">
           <div class="nl-official-nico-stats__chip">
-            <span class="nl-official-nico-stats__label">最大同接</span>
+            <span class="nl-official-nico-stats__label">来場</span>
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoViewers">—</span>
           </div>
           <div class="nl-official-nico-stats__chip">
-            <span class="nl-official-nico-stats__label">記録コメ</span>
+            <span class="nl-official-nico-stats__label">本家コメ</span>
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
             <span class="nl-official-nico-stats__rate is-placeholder" id="officialStatNicoCommentsRate" aria-live="off"></span>
           </div>
@@ -11414,18 +11236,33 @@
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoStreamAge">—</span>
           </div>
           <div class="nl-official-nico-stats__chip">
-            <span class="nl-official-nico-stats__label">スパチャ</span>
+            <span class="nl-official-nico-stats__label">広告pt</span>
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoAdPts">—</span>
           </div>
           <div class="nl-official-nico-stats__chip">
-            <span class="nl-official-nico-stats__label">メンバー</span>
+            <span class="nl-official-nico-stats__label">ギフトpt</span>
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
           </div>
         </div>
-        <a id="watchOfficialEventBannerCard" class="nl-official-event-banner-card" target="_blank" rel="noopener" hidden="" aria-hidden="true">
+        <a
+          id="watchOfficialEventBannerCard"
+          class="nl-official-event-banner-card"
+          target="_blank"
+          rel="noopener"
+          hidden
+          aria-hidden="true"
+        >
           <div class="nl-official-event-banner-card__owner" id="watchOfficialEventBannerOwner"></div>
           <div class="nl-official-event-banner-card__body">
-            <img class="nl-official-event-banner-card__thumb" id="watchOfficialEventBannerThumb" alt="" decoding="async" referrerpolicy="no-referrer" loading="lazy" hidden="">
+            <img
+              class="nl-official-event-banner-card__thumb"
+              id="watchOfficialEventBannerThumb"
+              alt=""
+              decoding="async"
+              referrerpolicy="no-referrer"
+              loading="lazy"
+              hidden
+            />
             <div class="nl-official-event-banner-card__text">
               <div class="nl-official-event-banner-card__title" id="watchOfficialEventBannerTitle"></div>
               <div class="nl-official-event-banner-card__status">
@@ -11435,39 +11272,94 @@
             </div>
           </div>
         </a>
-        <div id="topSupportRankStrip" class="nl-top-support-rank nl-top-support-rank--below-cards nl-top-support-rank--span-cards" hidden="" aria-hidden="true"></div>
-        <div id="topGiftRankStrip" class="nl-top-support-rank nl-gift-rank-strip nl-top-support-rank--below-cards nl-top-support-rank--span-cards" hidden="" aria-hidden="true"></div>
+        <div
+          id="topSupportRankStrip"
+          class="nl-top-support-rank nl-top-support-rank--below-cards nl-top-support-rank--span-cards"
+          hidden
+          aria-hidden="true"
+        ></div>
+        <div
+          id="topGiftRankStrip"
+          class="nl-top-support-rank nl-gift-rank-strip nl-top-support-rank--below-cards nl-top-support-rank--span-cards"
+          hidden
+          aria-hidden="true"
+        ></div>
         <!-- v0.1.236: 北極星 6 レーン常設枠。
              kimito さん明示（2026-05-09）: 取得できる/出来ないに関わらず枠を popup に残す。
              鏡のように貼り付け原則: 取得できたら niconico DOM の outerHTML を body に流し込む。
              未取得時は placeholder のみで枠は維持。
              (1) 貢献度ランキング (2) ギフト履歴 (3) イベント累計スコア
              (4) 番組累計ポイント (5) イベント現在順位 (+α) 広告ランキング -->
-        <section id="northStarLanes" class="nl-north-star-lanes" aria-label="応援レーン（このPCの記録から集計）">
-          <h3 class="nl-north-star-lanes__title">応援レーン（スーパーチャット・メンバー）</h3>
+        <section
+          id="northStarLanes"
+          class="nl-north-star-lanes"
+          aria-label="公式値レーン（北極星 6 項目、常設）"
+        >
+          <h3 class="nl-north-star-lanes__title">公式値レーン（取得可否に関わらず常設）</h3>
           <!-- Antigravity §6.4 (v0.1.291): 北極星 3 キャラ trio パネル。
                rink/konta/tanu の 3 体を並列表示し、それぞれ担当レーンの取得率と
                tier 表情を反映。slot ↔ laneId 対応は
                src/lib/northStarCharaTrioConfig.js（純関数 + test ガード済）。
                sync は syncNorthStarCharaTrioSlotFromState() がレーン更新ごとに呼ぶ。 -->
-          <div id="northStarCharaTrio" class="nl-north-star-chara-trio" role="status" aria-label="3 キャラの取得率（りんく・こん太・たぬ姉）">
-            <div class="nl-north-star-chara-trio__slot" data-nl-trio-slot="rink" data-nl-acq-tier="wait" title="りんく（スーパーチャット）">
-              <img class="nl-north-star-chara-trio__chara" src="images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png" alt="" width="36" height="36" decoding="async">
+          <div
+            id="northStarCharaTrio"
+            class="nl-north-star-chara-trio"
+            role="status"
+            aria-label="3 キャラの取得率（りんく・こん太・たぬ姉）"
+          >
+            <div
+              class="nl-north-star-chara-trio__slot"
+              data-nl-trio-slot="rink"
+              data-nl-acq-tier="wait"
+              title="りんく（貢献度ランキング）"
+            >
+              <img
+                class="nl-north-star-chara-trio__chara"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png"
+                alt=""
+                width="36"
+                height="36"
+                decoding="async"
+              />
               <p class="nl-north-star-chara-trio__name">りんく</p>
               <p class="nl-north-star-chara-trio__pct" aria-live="polite"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
             </div>
-            <div class="nl-north-star-chara-trio__slot" data-nl-trio-slot="konta" data-nl-acq-tier="wait" title="こん太（メンバー）">
-              <img class="nl-north-star-chara-trio__chara" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-closed.png" alt="" width="36" height="36" decoding="async">
+            <div
+              class="nl-north-star-chara-trio__slot"
+              data-nl-trio-slot="konta"
+              data-nl-acq-tier="wait"
+              title="こん太（広告ランキング）"
+            >
+              <img
+                class="nl-north-star-chara-trio__chara"
+                src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-closed.png"
+                alt=""
+                width="36"
+                height="36"
+                decoding="async"
+              />
               <p class="nl-north-star-chara-trio__name">こん太</p>
               <p class="nl-north-star-chara-trio__pct" aria-live="polite"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
             </div>
-            <div class="nl-north-star-chara-trio__slot" data-nl-trio-slot="tanu" data-nl-acq-tier="wait" title="たぬ姉（通貨別の内訳）">
-              <img class="nl-north-star-chara-trio__chara" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-blink-mouth-closed.png" alt="" width="36" height="36" decoding="async">
+            <div
+              class="nl-north-star-chara-trio__slot"
+              data-nl-trio-slot="tanu"
+              data-nl-acq-tier="wait"
+              title="たぬ姉（この番組のギフト履歴）"
+            >
+              <img
+                class="nl-north-star-chara-trio__chara"
+                src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-blink-mouth-closed.png"
+                alt=""
+                width="36"
+                height="36"
+                decoding="async"
+              />
               <p class="nl-north-star-chara-trio__name">たぬ姉</p>
               <p class="nl-north-star-chara-trio__pct" aria-live="polite"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
             </div>
           </div>
-          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventBroadcasters" hidden="">
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventBroadcasters" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">イベントランキング</p>
               <p class="nl-north-star-lane__sublabel">このイベントの💎スコア順（公式ランキングに準拠）。</p>
@@ -11482,14 +11374,30 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-eventBroadcasters" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <aside id="northStarLaneAside-eventBroadcasters" class="nl-north-star-lane__rail" aria-label="（この項目はイベントランキングのみ）" hidden=""></aside>
+              <div
+                id="northStarLaneBody-eventBroadcasters"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventBroadcasters"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目はイベントランキングのみ）"
+                hidden
+              ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventVotingSupporters" hidden="">
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventVotingSupporters" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">応援者ランキング</p>
               <p class="nl-north-star-lane__sublabel">この配信者へのイベント投票（ギフト＋ニコニ広告）スコア順。イベント参加中のみ表示。</p>
@@ -11504,17 +11412,33 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-eventVotingSupporters" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <aside id="northStarLaneAside-eventVotingSupporters" class="nl-north-star-lane__rail" aria-label="（この項目は応援者ランキングのみ）" hidden=""></aside>
+              <div
+                id="northStarLaneBody-eventVotingSupporters"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventVotingSupporters"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目は応援者ランキングのみ）"
+                hidden
+              ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="contributionRanking" hidden="">
+          <div class="nl-north-star-lane" data-lane="contributionRanking" hidden>
             <div class="nl-north-star-lane__heading">
-              <p class="nl-north-star-lane__label">スーパーチャット貢献度</p>
-              <p class="nl-north-star-lane__sublabel">この配信でスーパーチャット・スーパーステッカーを送った人（いちばん多い通貨の金額順・最大10）。</p>
+              <p class="nl-north-star-lane__label">ギフト貢献度</p>
+              <p class="nl-north-star-lane__sublabel">ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。</p>
             </div>
             <div class="nl-north-star-lane__shell">
               <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
@@ -11526,18 +11450,40 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-contributionRanking" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <aside id="northStarLaneAside-contributionRanking" class="nl-north-star-lane__rail" aria-label="1位から10位" hidden=""></aside>
+              <div
+                id="northStarLaneBody-contributionRanking"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-contributionRanking"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
             </div>
           </div>
           <div class="nl-north-star-gift-stack" aria-label="ギフト指標">
-            <div class="nl-north-star-lane" data-lane="giftHistory" hidden="">
+            <div class="nl-north-star-lane" data-lane="giftHistory" hidden>
             <div class="nl-north-star-lane__heading nl-north-star-lane__heading--with-pt">
-              <p class="nl-north-star-lane__label">メンバー加入・メンバーシップギフト<span class="nl-north-star-lane__program-pt is-placeholder" id="giftHistoryProgramPt" title="この配信で記録したメンバー加入とメンバーシップギフトの件数"><span class="nl-north-star-lane__program-pt-label">合計</span> <b class="nl-north-star-lane__program-pt-num">—</b><small class="nl-north-star-lane__program-pt-unit">pt</small></span></p>
-              <p class="nl-north-star-lane__sublabel">メンバーに入った人・メンバーシップを贈った人（回数の多い順・最大10）。</p>
+              <p class="nl-north-star-lane__label">この番組へのギフト履歴<span
+                  class="nl-north-star-lane__program-pt is-placeholder"
+                  id="giftHistoryProgramPt"
+                  title="ニコ生プレイヤー表示の番組ギフト累計pt。下の一覧合計（履歴API）とは別指標です"
+                ><span class="nl-north-star-lane__program-pt-label">公式累計</span> <b class="nl-north-star-lane__program-pt-num">—</b><small class="nl-north-star-lane__program-pt-unit">pt</small></span></p>
+              <p class="nl-north-star-lane__sublabel">
+                ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。
+              </p>
             </div>
             <div class="nl-north-star-lane__shell">
               <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
@@ -11549,28 +11495,65 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/tanu-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/tanu-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-giftHistory" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <div id="northStarLaneGadgetSummary-giftHistory" class="nl-north-star-lane__gadget nl-north-star-lane__gadget--summary" hidden="" aria-hidden="true">
+              <div
+                id="northStarLaneBody-giftHistory"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <div
+                id="northStarLaneGadgetSummary-giftHistory"
+                class="nl-north-star-lane__gadget nl-north-star-lane__gadget--summary"
+                hidden
+                aria-hidden="true"
+              >
                 <p class="nl-north-star-lane__summary-title">表示の合計</p>
                 <p class="nl-north-star-lane__summary-note">公式番組累計（プレイヤー表示と同じ）</p>
                 <p class="nl-north-star-lane__summary-pt">
-                  <span class="nl-north-star-lane__summary-pt-num">—</span><span class="nl-north-star-lane__summary-pt-unit"></span>
+                  <span class="nl-north-star-lane__summary-pt-num">—</span><span
+                    class="nl-north-star-lane__summary-pt-unit"
+                  ></span>
                 </p>
                 <div class="nl-north-star-lane__chara-wrap nl-north-star-lane__chara-wrap--summary" data-nl-acq-tier="ok">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <aside id="northStarLaneAside-giftHistory" class="nl-north-star-lane__rail" aria-label="1位から10位" hidden=""></aside>
+              <aside
+                id="northStarLaneAside-giftHistory"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
             </div>
-            <div id="northStarLaneThrows-giftHistory" class="nl-north-star-lane__throws-panel" hidden="" aria-label="個別ギフト投げ一覧"></div>
+            <div
+              id="northStarLaneThrows-giftHistory"
+              class="nl-north-star-lane__throws-panel"
+              hidden
+              aria-label="個別ギフト投げ一覧"
+            ></div>
           </div>
-            <div class="nl-north-star-lane" data-lane="programPoints" hidden="">
+            <div class="nl-north-star-lane" data-lane="programPoints" hidden>
             <div class="nl-north-star-lane__heading">
-              <p class="nl-north-star-lane__label">通貨別の内訳</p>
-              <p class="nl-north-star-lane__sublabel">スーパーチャット・ステッカーの合計を通貨ごとに出します（換算なし）。</p>
+              <p class="nl-north-star-lane__label">番組累計ポイント</p>
+              <p class="nl-north-star-lane__sublabel">
+                番組ギフト累計pt（ティッカー等）。上段のユーザー別表示の内訳ではありません。
+              </p>
             </div>
             <div class="nl-north-star-lane__shell">
               <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
@@ -11582,15 +11565,31 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-programPoints" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <aside id="northStarLaneAside-programPoints" class="nl-north-star-lane__rail" aria-label="（この項目は数値のみ）" hidden=""></aside>
+              <div
+                id="northStarLaneBody-programPoints"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-programPoints"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目は数値のみ）"
+                hidden
+              ></aside>
             </div>
           </div>
           </div>
-          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking" hidden="">
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">広告ランキング</p>
               <p class="nl-north-star-lane__sublabel">ニコニ広告の貢献度ランキングです（ギフト貢献度とは別系統）。</p>
@@ -11605,14 +11604,30 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/konta-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/konta-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-adRanking" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <aside id="northStarLaneAside-adRanking" class="nl-north-star-lane__rail" aria-label="1位から10位" hidden=""></aside>
+              <div
+                id="northStarLaneBody-adRanking"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-adRanking"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="eventRank" hidden="">
+          <div class="nl-north-star-lane" data-lane="eventRank" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">イベント現在順位</p>
               <p class="nl-north-star-lane__sublabel">配信者本人がイベントで何位かを表示します（公式表示が取れないときは NDGR 推定で「目安」表示）。ギフト貢献者一覧は上のレーンを参照。</p>
@@ -11627,14 +11642,30 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-eventRank" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <aside id="northStarLaneAside-eventRank" class="nl-north-star-lane__rail" aria-label="1位から10位" hidden=""></aside>
+              <div
+                id="northStarLaneBody-eventRank"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventRank"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="eventScore" hidden="">
+          <div class="nl-north-star-lane" data-lane="eventScore" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">イベント累計スコア</p>
               <p class="nl-north-star-lane__sublabel">イベント参加中のときだけ意味を持つ累計です。</p>
@@ -11649,22 +11680,49 @@
                 </div>
                 <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
                 <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
                 </div>
               </div>
-              <div id="northStarLaneBody-eventScore" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
-              <aside id="northStarLaneAside-eventScore" class="nl-north-star-lane__rail" aria-label="（この項目はスコア表示のみ）" hidden=""></aside>
+              <div
+                id="northStarLaneBody-eventScore"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventScore"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目はスコア表示のみ）"
+                hidden
+              ></aside>
             </div>
           </div>
-          <p class="nl-north-star-lanes__note">このPCに記録したチャットから集計しています（YouTube の公式ランキングではありません）。違う通貨は換算しません。</p>
+          <p class="nl-north-star-lanes__note">
+            公式ページで見えている値を、できる範囲でこの欄に写します。取得できない項目は空欄のままにすることがあります。
+          </p>
         </section>
         <!-- v0.1.228: ギフトランキング opt-in prompt。flag OFF（default）のとき表示。
              ボタン押下で content 側の autoOpen / hidden iframe inject が動き出す。 -->
-        <div id="giftRankingFetchPrompt" class="nl-gift-ranking-prompt" hidden="" aria-hidden="true">
+        <div
+          id="giftRankingFetchPrompt"
+          class="nl-gift-ranking-prompt"
+          hidden
+          aria-hidden="true"
+        >
           <p class="nl-gift-ranking-prompt__text">
             ギフトランキング・累計・履歴は、配信者によっては取得に失敗してサイドバーが一瞬開く副作用が出るため、初期状態では取得しません。
           </p>
-          <button type="button" id="enableGiftRankingFetchBtn" class="nl-gift-ranking-prompt__btn">
+          <button
+            type="button"
+            id="enableGiftRankingFetchBtn"
+            class="nl-gift-ranking-prompt__btn"
+          >
             ギフトランキング取得を開始（β）
           </button>
         </div>
@@ -11683,70 +11741,25 @@
               理由＝この details が閉じていて、★見出しに その語が無いので中にあると分からない。
             ★「入れたのに届いていない」型。中身を増やすのではなく【名前を出す】ことで直す。
         -->
-        <summary class="nl-popup-settings__summary">詳細設定（読み上げ・チャットの表示）</summary>
+        <summary class="nl-popup-settings__summary">
+          詳細設定（記録のON/OFF・なふだ・取り込み・パネル位置・動き・表示トラブル）
+        </summary>
         <div class="nl-popup-settings__body">
-    <details class="nl-frame-theme-details" id="yt-settings-details">
-      <summary class="nl-frame-theme-details__summary">
-        <span class="nl-frame-theme-details__summary-left">
-          🔊 読み上げ設定（VOICEVOX）・全件取得のヒント
-        </span>
-        <span class="nl-frame-theme-details__summary-meta">
-          <span id="yt-voice-queue-info">待機キュー: 0件</span>
-          <span class="filter-pill" id="yt-detected-filter-badge">チャット表示: 検出待ち</span>
-        </span>
-      </summary>
-      <div class="nl-frame-theme-details__body">
-        <div class="control-row">
-          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; white-space: nowrap">
-            <input type="checkbox" id="yt-voice-enabled" checked="">
-            <span>読み上げ ON（パネル閉鎖中も継続）</span>
-          </label>
-          <label class="voice-mode-field">
-            <span class="voice-mode-label">モード:</span>
-            <select id="yt-voice-mode">
-              <option value="all">全部読む</option>
-              <option value="select">選んで読む（スパチャ・メンバー・配信者名入り）</option>
-            </select>
-          </label>
-          <label style="display: inline-flex; align-items: center; gap: 4px; white-space: nowrap">
-            <span>配信者名キーワード:</span>
-            <input type="text" id="yt-broadcaster-name-input" placeholder="例: りんく" style="width: 105px">
-          </label>
-          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap" title="VOICEVOX の合成が時間切れになり続ける間だけ、PC に入っている声（Windows の声）で人ごとに声・高さ・速さを変えて読みます。速くなったら自動で VOICEVOX に戻ります。">
-            <input type="checkbox" id="yt-voice-light" checked="">
-            <span>追いつかない間は PC の声で読む</span>
-          </label>
-          <button type="button" id="yt-voice-recheck-btn">VOICEVOX 再確認</button>
-          <button type="button" id="yt-voice-clear-btn">キュー消去</button>
-        </div>
-
-        <div id="yt-voice-autoswitch-badge" class="autoswitch-badge">
-          キューが一定数（8件以上）たまったため、自動で「選んで読む」モードに切り替えています。
-        </div>
-
-        <p id="yt-voice-engine-note" class="nl-voice-engine-note" role="status" hidden=""></p>
-        <div id="yt-voice-status-box" class="voice-status-box is-offline" role="status">
-          VOICEVOX の接続状態を確認しています…
-        </div>
-
-        <div id="yt-voice-last-spoken" class="voice-last-spoken">
-          読み上げ履歴: まだ再生されたコメントはありません（同じチャンネルIDの投稿者は毎回同じ声で読まれます）
-        </div>
-
-        <div class="notice-banner" id="yt-all-chat-notice">
-          <strong>全件記録のヒント</strong>: YouTube チャット欄が「上位のチャット（トップチャット）」だと一部コメントが隠れます。拡張が開いたときに自動で「すべてのチャット」へ切り替えます。
-          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; margin-top: 4px">
-            <input type="checkbox" id="yt-auto-all-chat" checked="">
-            <span>チャットを自動で「すべてのチャット」にする</span>
-          </label>
-        </div>
-      </div>
-    </details>
-
-
           <div class="nl-record nl-record--in-settings">
-            <div class="nl-record-hero" role="group" aria-labelledby="nlRecordHeroTitle" data-nl-recording="on">
-              <img class="nl-record-hero__link" src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="56" height="56" decoding="async">
+            <div
+              class="nl-record-hero"
+              role="group"
+              aria-labelledby="nlRecordHeroTitle"
+              data-nl-recording="on"
+            >
+              <img
+                class="nl-record-hero__link"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+                alt=""
+                width="56"
+                height="56"
+                decoding="async"
+              />
               <div class="nl-record-hero__main">
                 <span class="nl-record-hero__eyebrow">りんくより</span>
                 <div id="nlRecordHeroTitle" class="nl-record-hero__title">応援コメントの記録</div>
@@ -11754,11 +11767,17 @@
                   チェックを付けると、この放送の応援コメントがこのPCにたまります。外すと<strong>OFF</strong>で増えません。
                 </p>
                 <label class="nl-record-hero__toggle" for="recordToggle">
-                  <input type="checkbox" id="recordToggle" checked="" aria-label="応援コメントをこのPCに記録する（ONで記録、OFFで停止）">
+                  <input
+                    type="checkbox"
+                    id="recordToggle"
+                    checked
+                    aria-label="応援コメントをこのPCに記録する（ONで記録、OFFで停止）"
+                  />
                   <span class="nl-record-hero__pill" aria-hidden="true"></span>
                   <span class="nl-record-hero__toggle-text">
                     <span class="nl-record-hero__toggle-line">記録を ON / OFF</span>
-                    <span class="nl-record-hero__toggle-sub">ON＝件数が増える · OFF＝見るだけ（保存されない）</span>
+                    <span class="nl-record-hero__toggle-sub"
+                      >ON＝件数が増える · OFF＝見るだけ（保存されない）</span>
                   </span>
                 </label>
               </div>
@@ -11767,10 +11786,16 @@
 
           <div class="nl-record-sub">
             <label for="deepHarvestQuietUiToggle" class="nl-record-sub__label">
-              <input type="checkbox" id="deepHarvestQuietUiToggle" checked="" aria-label="コメント一覧の取り込み開始を遅らせ、読み込み中を表示する">
+              <input
+                type="checkbox"
+                id="deepHarvestQuietUiToggle"
+                checked
+                aria-label="コメント一覧の取り込み開始を遅らせ、読み込み中を表示する"
+              />
               <span>
                 一覧の取り込みをゆっくり始める（読み込み表示・滝を抑える）
-                <span class="nl-record-sub__hint">OFF にすると早く記録されやすいが、右のコメント欄が動きやすくなります。</span>
+                <span class="nl-record-sub__hint"
+                  >OFF にすると早く記録されやすいが、右のコメント欄が動きやすくなります。</span>
               </span>
             </label>
           </div>
@@ -11778,10 +11803,16 @@
                popup 側は鳴らさない(会場優先・二重再生防止)。 -->
           <div class="nl-record-sub">
             <label for="effectSoundToggle" class="nl-record-sub__label">
-              <input type="checkbox" id="effectSoundToggle" checked="" aria-label="ギフト・広告・イベント順位変動の効果音を鳴らす">
+              <input
+                type="checkbox"
+                id="effectSoundToggle"
+                checked
+                aria-label="ギフト・広告・イベント順位変動の効果音を鳴らす"
+              />
               <span>
                 ギフト・広告・順位変動の効果音を鳴らす
-                <span class="nl-record-sub__hint">ギフトやニコニ広告、参加中イベントの順位が上下したときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。</span>
+                <span class="nl-record-sub__hint"
+                  >ギフトやニコニ広告、参加中イベントの順位が上下したときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。</span>
               </span>
             </label>
           </div>
@@ -11791,8 +11822,17 @@
             <label for="voiceVolumeRange" class="nl-record-sub__label">
               <span>
                 読み上げの音量 <strong id="voiceVolumeValue">100%</strong>
-                <input type="range" id="voiceVolumeRange" min="0" max="300" step="10" value="100" aria-label="読み上げの音量(0〜300%)">
-                <span class="nl-record-sub__hint">VOICEVOX の読み上げの大きさです。ノートPCで小さく聞こえるときは上げてください。音が割れない範囲で大きくします。</span>
+                <input
+                  type="range"
+                  id="voiceVolumeRange"
+                  min="0"
+                  max="300"
+                  step="10"
+                  value="100"
+                  aria-label="読み上げの音量(0〜300%)"
+                />
+                <span class="nl-record-sub__hint"
+                  >VOICEVOX の読み上げの大きさです。ノートPCで小さく聞こえるときは上げてください。音が割れない範囲で大きくします。</span>
               </span>
             </label>
           </div>
@@ -11807,13 +11847,15 @@
                   <option value="auto">遅いPCと分かったら(おすすめ)</option>
                   <option value="on">いつも</option>
                 </select>
-                <span class="nl-record-sub__hint">ノートPCで読み上げが遅れるときに。声を6種類に絞り、読み上げを始めたときに先に読み込んでおきます。同じ人はいつも同じ声のままです。次に読み上げを ON にしたときから効きます。</span>
+                <span class="nl-record-sub__hint"
+                  >ノートPCで読み上げが遅れるときに。声を6種類に絞り、読み上げを始めたときに先に読み込んでおきます。同じ人はいつも同じ声のままです。次に読み上げを ON にしたときから効きます。</span>
               </span>
             </label>
           </div>
           <!-- 2026-11-03(りんく「POP とか会場モードに記載すべき」): 読み上げが遅い PC だと記録されているときだけ、
                VOICEVOX を GPU にする案内を出す。配線は popup/wireVoiceGpuTip.js、文言は lib の voiceLagNotice.js。 -->
-          <p id="voiceGpuTip" class="nl-record-sub__hint" hidden="" style="color:#b45309;font-weight:600;background:#fff7e6;border-radius:8px;padding:6px 8px;margin:4px 0;"></p>
+          <p id="voiceGpuTip" class="nl-record-sub__hint" hidden
+            style="color:#b45309;font-weight:600;background:#fff7e6;border-radius:8px;padding:6px 8px;margin:4px 0;"></p>
           <!-- 2026-10-29: 読み上げの声の音質(出力サンプリングレート)。既定は今までどおり標準(16kHz・v0.1.1063 で合成が約30%速いため)。
                高音質(24kHz)は自分で選んだ人だけ。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。 -->
           <div class="nl-record-sub">
@@ -11824,7 +11866,8 @@
                   <option value="standard">標準(おすすめ)</option>
                   <option value="high">高音質(速いPC向け)</option>
                 </select>
-                <span class="nl-record-sub__hint">高音質は声が少しくっきりしますが、作るのに時間がかかります。グラボのある速いPCで、こもって聞こえるときに。次の声から効きます。</span>
+                <span class="nl-record-sub__hint"
+                  >高音質は声が少しくっきりしますが、作るのに時間がかかります。グラボのある速いPCで、こもって聞こえるときに。次の声から効きます。</span>
               </span>
             </label>
           </div>
@@ -11833,10 +11876,16 @@
                ボタンが常時表示されていることだった。会場を使わない人は隠せるようにする。 -->
           <div class="nl-record-sub">
             <label for="venueButtonVisibleToggle" class="nl-record-sub__label">
-              <input type="checkbox" id="venueButtonVisibleToggle" checked="" aria-label="視聴ページに会場モードのボタンを表示する">
+              <input
+                type="checkbox"
+                id="venueButtonVisibleToggle"
+                checked
+                aria-label="視聴ページに会場モードのボタンを表示する"
+              />
               <span>
                 視聴ページに「会場モード」ボタンを出す
-                <span class="nl-record-sub__hint">ニコ生の視聴ページの右下に出る「🏟 会場モード」ボタンです。会場モードを使わない場合はオフにすると表示されなくなります（反映には視聴ページの再読み込みが必要です）。</span>
+                <span class="nl-record-sub__hint"
+                  >ニコ生の視聴ページの右下に出る「🏟 会場モード」ボタンです。会場モードを使わない場合はオフにすると表示されなくなります（反映には視聴ページの再読み込みが必要です）。</span>
               </span>
             </label>
           </div>
@@ -11861,10 +11910,16 @@
                確認音を兼ねるため既定ONが妥当。 -->
           <div class="nl-record-sub">
             <label for="opSoundEnabledToggle" class="nl-record-sub__label">
-              <input type="checkbox" id="opSoundEnabledToggle" checked="" aria-label="コメント送信などの操作音を鳴らす">
+              <input
+                type="checkbox"
+                id="opSoundEnabledToggle"
+                checked
+                aria-label="コメント送信などの操作音を鳴らす"
+              />
               <span>
                 操作音（コメント送信の打ち出し音など）を鳴らす
-                <span class="nl-record-sub__hint">コメント送信ボタンを押したときや送信できたときに、パチンコの打ち出しのような短い操作音を鳴らします。送信を重ねるほど音が育ちます。</span>
+                <span class="nl-record-sub__hint"
+                  >コメント送信ボタンを押したときや送信できたときに、パチンコの打ち出しのような短い操作音を鳴らします。送信を重ねるほど音が育ちます。</span>
               </span>
             </label>
           </div>
@@ -11875,72 +11930,153 @@
                「もう一度ためす」ボタンは記録カード内（記録件数の下・上集約）に移動。 -->
           <div class="nl-record-sub">
             <label for="backfillAutoStartToggle" class="nl-record-sub__label">
-              <input type="checkbox" id="backfillAutoStartToggle" checked="" aria-label="途中から開いた配信でも、過去のコメントを自動で取り込む">
+              <input
+                type="checkbox"
+                id="backfillAutoStartToggle"
+                checked
+                aria-label="途中から開いた配信でも、過去のコメントを自動で取り込む"
+              />
               <span>
                 途中から開いても、過去のコメントを自動で取り込む
-                <span class="nl-record-sub__hint">既定 ON。配信を開いて記録 ON なら、配信の最初までさかのぼって自動で取り込みます（こん太が取り込み中を教えてくれます）。途中で止まったり、もう一度やり直したいときは、記録カード内に出る「↻ もう一度ためす」ボタンを押してください。OFF にすると自動取り込みは走らず、このボタン押下時だけ取り込みます。</span>
+                <span class="nl-record-sub__hint"
+                  >既定 ON。配信を開いて記録 ON なら、配信の最初までさかのぼって自動で取り込みます（こん太が取り込み中を教えてくれます）。途中で止まったり、もう一度やり直したいときは、記録カード内に出る「↻ もう一度ためす」ボタンを押してください。OFF にすると自動取り込みは走らず、このボタン押下時だけ取り込みます。</span>
               </span>
             </label>
           </div>
           <div class="nl-record-sub">
             <label for="inlinePanelAutoshowToggle" class="nl-record-sub__label">
-              <input type="checkbox" id="inlinePanelAutoshowToggle" aria-label="次回の視聴ページでパネルを自動表示する（1回だけ）">
+              <input
+                type="checkbox"
+                id="inlinePanelAutoshowToggle"
+                aria-label="次回の視聴ページでパネルを自動表示する（1回だけ）"
+              />
               <span>
                 次回の視聴ページでパネルを自動表示する
-                <span class="nl-record-sub__hint">既定 OFF。ON にすると、次回の視聴ページで1回だけ自動表示し、その後はOFFに戻ります。</span>
+                <span class="nl-record-sub__hint"
+                  >既定 OFF。ON にすると、次回の視聴ページで1回だけ自動表示し、その後はOFFに戻ります。</span>
               </span>
             </label>
           </div>
           <div class="nl-record-sub">
             <label for="autopatrolEnabled" class="nl-record-sub__label">
-              <input type="checkbox" id="autopatrolEnabled" checked="" aria-label="配信を見ていない間も放送中の配信を自動巡回して同接推定の較正データを貯める">
+              <input
+                type="checkbox"
+                id="autopatrolEnabled"
+                checked
+                aria-label="配信を見ていない間も放送中の配信を自動巡回して同接推定の較正データを貯める"
+              />
               <span>
                 配信を見ていなくても自動巡回して較正データを貯める
-                <span class="nl-record-sub__hint">既定 ON。拡張を開いていなくても、放送中の配信を背景タブで1つずつ短時間ひらき、同接推定の較正データを少しずつ貯めます（PCを起動している間だけ・コメント本文は保存しません）。止めたいときはOFFにしてください。</span>
-                <span id="autopatrolStatus" class="nl-record-sub__hint" aria-live="polite">ON で巡回準備中…</span>
+                <span class="nl-record-sub__hint"
+                  >既定 ON。拡張を開いていなくても、放送中の配信を背景タブで1つずつ短時間ひらき、同接推定の較正データを少しずつ貯めます（PCを起動している間だけ・コメント本文は保存しません）。止めたいときはOFFにしてください。</span>
+                <span
+                  id="autopatrolStatus"
+                  class="nl-record-sub__hint"
+                  aria-live="polite"
+                  >ON で巡回準備中…</span>
               </span>
             </label>
             <div class="nl-calib-actions">
-              <button type="button" id="calibrationExportJsonBtn" class="nl-calib-actions__btn">較正データ JSON</button>
-              <button type="button" id="calibrationExportCsvBtn" class="nl-calib-actions__btn">較正データ CSV</button>
-              <button type="button" id="calibrationClearBtn" class="nl-calib-actions__btn nl-calib-actions__btn--danger">較正データを消去</button>
+              <button
+                type="button"
+                id="calibrationExportJsonBtn"
+                class="nl-calib-actions__btn"
+              >較正データ JSON</button>
+              <button
+                type="button"
+                id="calibrationExportCsvBtn"
+                class="nl-calib-actions__btn"
+              >較正データ CSV</button>
+              <button
+                type="button"
+                id="calibrationClearBtn"
+                class="nl-calib-actions__btn nl-calib-actions__btn--danger"
+              >較正データを消去</button>
             </div>
           </div>
-          <div class="nl-record nl-panel-width nl-settings-panel-layout" role="group" aria-labelledby="inlinePanelWidthLegend">
+          <div
+            class="nl-record nl-panel-width nl-settings-panel-layout"
+            role="group"
+            aria-labelledby="inlinePanelWidthLegend"
+          >
             <div id="inlinePanelWidthLegend" class="nl-panel-width-legend">
               ページ内パネルの位置・幅（watch）
             </div>
             <div class="nl-panel-width-radios" role="group" aria-label="パネルの位置">
               <span class="nl-panel-width-sublegend">位置</span>
               <label>
-                <input type="radio" name="inlinePanelPlacement" value="dock_bottom" id="inlinePanelPlacementDockBottom" checked="">
+                <input
+                  type="radio"
+                  name="inlinePanelPlacement"
+                  value="dock_bottom"
+                  id="inlinePanelPlacementDockBottom"
+                  checked
+                />
                 画面下いっぱい（既定・視聴ページに固定。ポップアップ風より見つけやすい）
               </label>
               <label>
-                <input type="radio" name="inlinePanelPlacement" value="below" id="inlinePanelPlacementBelow">
+                <input
+                  type="radio"
+                  name="inlinePanelPlacement"
+                  value="below"
+                  id="inlinePanelPlacementBelow"
+                />
                 プレイヤー行の下
-                <span class="nl-panel-placement-hint">選択どおりプレイヤー行の<strong>下</strong>に出します。広い画面で自動的に横付きにしたいときは、下の「幅の広げ方」を「広げない」以外にしてください（次に手前のタブで watch を開いたとき横付きへ切り替わります。自分で「下」を選んだ場合はその選択が優先され、自動では変わりません）。パネルが動画とコメントの<strong>あいだまで広く</strong>見えるのは、下の「幅」で視聴画面いっぱいや「タブ幅いっぱいまで広げる」を選んでいる場合などです。常に画面下端に固定したい場合は「画面下いっぱい」を選んでください。</span>
+                <span class="nl-panel-placement-hint"
+                  >選択どおりプレイヤー行の<strong>下</strong>に出します。広い画面で自動的に横付きにしたいときは、下の「幅の広げ方」を「広げない」以外にしてください（次に手前のタブで watch を開いたとき横付きへ切り替わります。自分で「下」を選んだ場合はその選択が優先され、自動では変わりません）。パネルが動画とコメントの<strong>あいだまで広く</strong>見えるのは、下の「幅」で視聴画面いっぱいや「タブ幅いっぱいまで広げる」を選んでいる場合などです。常に画面下端に固定したい場合は「画面下いっぱい」を選んでください。</span>
               </label>
               <label>
-                <input type="radio" name="inlinePanelPlacement" value="beside" id="inlinePanelPlacementBeside">
+                <input
+                  type="radio"
+                  name="inlinePanelPlacement"
+                  value="beside"
+                  id="inlinePanelPlacementBeside"
+                />
                 横付き（親のレイアウトに合わせる・従来に近い）
-                <span class="nl-panel-placement-hint nl-panel-placement-hint--warning">⚠️ 実際の位置は<strong>視聴中のブラウザタブの幅</strong>（このパネル内の幅ではありません）で決まります。タブ幅が約1100px未満のときは公式UIとの競合回避のため、自動で「プレイヤー行の下」になります。列の横に十分な隙間が無いときも同様です。</span>
+                <span class="nl-panel-placement-hint nl-panel-placement-hint--warning"
+                  >⚠️ 実際の位置は<strong>視聴中のブラウザタブの幅</strong>（このパネル内の幅ではありません）で決まります。タブ幅が約1100px未満のときは公式UIとの競合回避のため、自動で「プレイヤー行の下」になります。列の横に十分な隙間が無いときも同様です。</span>
               </label>
               <label>
-                <input type="radio" name="inlinePanelPlacement" value="floating" id="inlinePanelPlacementFloating">
+                <input
+                  type="radio"
+                  name="inlinePanelPlacement"
+                  value="floating"
+                  id="inlinePanelPlacementFloating"
+                />
                 ポップアップ風（ページから分離して固定・角は下で選べます）
-                <span class="nl-panel-placement-hint">公式の右パネルや動画と重なりやすいです。通常は上の「画面下いっぱい」を推奨します。</span>
+                <span class="nl-panel-placement-hint"
+                  >公式の右パネルや動画と重なりやすいです。通常は上の「画面下いっぱい」を推奨します。</span>
               </label>
             </div>
-            <div id="nlFloatingAnchorWrap" class="nl-floating-anchor-wrap" hidden="" aria-hidden="true">
+            <div
+              id="nlFloatingAnchorWrap"
+              class="nl-floating-anchor-wrap"
+              hidden
+              aria-hidden="true"
+            >
               <span class="nl-panel-width-sublegend">ポップアップ風の角</span>
-              <div class="nl-panel-width-radios nl-floating-anchor-radios" role="group" aria-label="浮遊パネルを置く画面の角">
+              <div
+                class="nl-panel-width-radios nl-floating-anchor-radios"
+                role="group"
+                aria-label="浮遊パネルを置く画面の角"
+              >
                 <label>
-                  <input type="radio" name="inlineFloatingAnchor" value="top_right" id="inlineFloatingAnchorTopRight" checked="">
+                  <input
+                    type="radio"
+                    name="inlineFloatingAnchor"
+                    value="top_right"
+                    id="inlineFloatingAnchorTopRight"
+                    checked
+                  />
                   右上（既定）
                 </label>
                 <label>
-                  <input type="radio" name="inlineFloatingAnchor" value="bottom_left" id="inlineFloatingAnchorBottomLeft">
+                  <input
+                    type="radio"
+                    name="inlineFloatingAnchor"
+                    value="bottom_left"
+                    id="inlineFloatingAnchorBottomLeft"
+                  />
                   左下
                 </label>
               </div>
@@ -11948,42 +12084,75 @@
             <div class="nl-panel-width-radios nl-panel-width-radios--width" role="group" aria-label="パネルの幅">
               <span class="nl-panel-width-sublegend">幅</span>
               <label>
-                <input type="radio" name="inlinePanelWidth" value="player_row" id="inlinePanelWidthPlayerRow">
+                <input
+                  type="radio"
+                  name="inlinePanelWidth"
+                  value="player_row"
+                  id="inlinePanelWidthPlayerRow"
+                />
                 視聴画面いっぱい（動画＋コメント列の下）
               </label>
               <span class="nl-muted nl-panel-width-hint nl-panel-width-hint--beside-cap" style="display:block;margin-top:4px;line-height:1.45;font-size:12px;">
                 配置が<strong>横付き</strong>で公式の<strong>列のあいだ</strong>に入っているときは、列からはみ出して折り返さないよう幅が<strong>動画列基準</strong>に抑えられます（ここで「視聴画面いっぱい」を選んでも幅が伸びないことがあります）。
               </span>
               <label>
-                <input type="radio" name="inlinePanelWidth" value="video" id="inlinePanelWidthVideo">
+                <input
+                  type="radio"
+                  name="inlinePanelWidth"
+                  value="video"
+                  id="inlinePanelWidthVideo"
+                />
                 動画の幅だけ
               </label>
             </div>
-            <div class="nl-panel-width-radios nl-panel-width-radios--viewport-wide" role="group" aria-labelledby="inlinePanelViewportWideLegend">
+            <div
+              class="nl-panel-width-radios nl-panel-width-radios--viewport-wide"
+              role="group"
+              aria-labelledby="inlinePanelViewportWideLegend"
+            >
               <div id="inlinePanelViewportWideLegend" class="nl-panel-width-sublegend">
                 下／横付きのときの幅の広げ方
               </div>
               <label>
-                <input type="radio" name="inlinePanelViewportWide" value="off" id="inlinePanelViewportWideOff">
+                <input
+                  type="radio"
+                  name="inlinePanelViewportWide"
+                  value="off"
+                  id="inlinePanelViewportWideOff"
+                />
                 広げない（従来どおり）
               </label>
               <label>
-                <input type="radio" name="inlinePanelViewportWide" value="always" id="inlinePanelViewportWideAlways">
+                <input
+                  type="radio"
+                  name="inlinePanelViewportWide"
+                  value="always"
+                  id="inlinePanelViewportWideAlways"
+                />
                 タブ幅いっぱいまで常に広げる（超ワイドは上限あり）
               </label>
               <label>
-                <input type="radio" name="inlinePanelViewportWide" value="once" id="inlinePanelViewportWideOnce">
+                <input
+                  type="radio"
+                  name="inlinePanelViewportWide"
+                  value="once"
+                  id="inlinePanelViewportWideOnce"
+                />
                 初めての1回だけ広げて試す
               </label>
-              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。位置が<strong>横付き</strong>のときは、公式の動画列とコメント列のあいだに収まる幅までに抑え、レイアウトが折り返して下に落ちないようにします。<br>なお、<strong>配置を自分で選んでいない</strong>状態でこれを「広げない」以外にすると、タブ幅が広い（約1100px以上）ときに watch を手前のタブで開いた<strong>1回</strong>、配置が自動で<strong>横付き</strong>に切り替わります（「常に」のときは毎回判定）。自分で「下」や「画面下いっぱい」を選んだ場合は、その選択が優先され自動では変わりません。</span>
+              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。位置が<strong>横付き</strong>のときは、公式の動画列とコメント列のあいだに収まる幅までに抑え、レイアウトが折り返して下に落ちないようにします。<br />なお、<strong>配置を自分で選んでいない</strong>状態でこれを「広げない」以外にすると、タブ幅が広い（約1100px以上）ときに watch を手前のタブで開いた<strong>1回</strong>、配置が自動で<strong>横付き</strong>に切り替わります（「常に」のときは毎回判定）。自分で「下」や「画面下いっぱい」を選んだ場合は、その選択が優先され自動では変わりません。</span>
             </div>
             <div class="nl-panel-calm-motion">
               <label for="calmPanelMotion">
-                <input type="checkbox" id="calmPanelMotion">
+                <input type="checkbox" id="calmPanelMotion" />
                 <span>パネル内の動きを抑える（ループアニメ・帯など。広告／ギフトの豪雨演出は出ます）</span>
               </label>
             </div>
-            <div class="nl-display-help" role="region" aria-labelledby="nlDisplayHelpTitle">
+            <div
+              class="nl-display-help"
+              role="region"
+              aria-labelledby="nlDisplayHelpTitle"
+            >
               <div id="nlDisplayHelpTitle" class="nl-display-help__title">
                 表示がおかしいとき
               </div>
@@ -11992,14 +12161,29 @@
                 <strong>表示キャッシュを消す</strong>（このPCが覚えた表示名・アイコンURLを忘れる。記録した応援コメントや設定は消えません）。
               </p>
               <div class="nl-display-help__actions">
-                <button type="button" id="reloadWatchTabPanelBtn" class="nl-panel-reload-btn" aria-describedby="nlDisplayHelpDesc">
+                <button
+                  type="button"
+                  id="reloadWatchTabPanelBtn"
+                  class="nl-panel-reload-btn"
+                  aria-describedby="nlDisplayHelpDesc"
+                >
                   watch を再読み込み
                 </button>
-                <button type="button" id="extensionCacheClearBtn" class="nl-extension-cache-clear-btn" aria-describedby="nlDisplayHelpDesc" title="記録したコメントや設定は消しません。表示名・アイコンURLの覚えだけ消します。">
+                <button
+                  type="button"
+                  id="extensionCacheClearBtn"
+                  class="nl-extension-cache-clear-btn"
+                  aria-describedby="nlDisplayHelpDesc"
+                  title="記録したコメントや設定は消しません。表示名・アイコンURLの覚えだけ消します。"
+                >
                   表示キャッシュを消す
                 </button>
               </div>
-              <span id="extensionCacheClearStatus" class="nl-extension-cache-clear-status nl-display-help__status" aria-live="polite"></span>
+              <span
+                id="extensionCacheClearStatus"
+                class="nl-extension-cache-clear-status nl-display-help__status"
+                aria-live="polite"
+              ></span>
             </div>
           </div>
         </div>
@@ -12023,7 +12207,14 @@
       -->
       <div class="nl-nameplate-inline">
         <div class="nl-nameplate-inline__guide">
-          <img class="nl-nameplate-inline__face" src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png" alt="" width="24" height="24" decoding="async">
+          <img
+            class="nl-nameplate-inline__face"
+            src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png"
+            alt=""
+            width="24"
+            height="24"
+            decoding="async"
+          />
           <span class="nl-nameplate-inline__text">
             りんく: 「表示する」にすると、キミがコメントしたとき<b>放送者さんのコメント欄にキミのアイコンと名前が出る</b>のだ。
             見えるのは<b>放送者さんだけ</b>で、ほかの視聴者さんには見えないから安心してね。
@@ -12038,12 +12229,33 @@
         </div>
       </div>
 
-      <section class="nl-comment-compose nl-comment-compose--primary" aria-label="コメント投稿">
-        <textarea id="commentInput" maxlength="200" placeholder="ここにコメントを書いて送信（YouTube のチャットに送ります）" aria-label="コメント本文（200文字まで）"></textarea>
-        <div id="commentKindnessPopover" class="nl-comment-kindness" data-level="mild" role="status" aria-live="polite" aria-atomic="true" hidden="">
-          <img id="commentKindnessFace" class="nl-comment-kindness__face" src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="52" height="52" decoding="async">
+      <section
+        class="nl-comment-compose nl-comment-compose--primary"
+        aria-label="コメント投稿"
+      >
+        <textarea id="commentInput" maxlength="250" placeholder="ここにコメントを書いて送信" aria-label="コメント本文（250文字まで）"></textarea>
+        <div
+          id="commentKindnessPopover"
+          class="nl-comment-kindness"
+          data-level="mild"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          hidden
+        >
+          <img
+            id="commentKindnessFace"
+            class="nl-comment-kindness__face"
+            src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+            alt=""
+            width="52"
+            height="52"
+            decoding="async"
+          />
           <div class="nl-comment-kindness__bubble">
-            <strong id="commentKindnessTitle" class="nl-comment-kindness__title">りんくから、ひとこと</strong>
+            <strong id="commentKindnessTitle" class="nl-comment-kindness__title"
+              >りんくから、ひとこと</strong
+            >
             <p id="commentKindnessBody" class="nl-comment-kindness__body"></p>
             <p id="commentKindnessConfirm" class="nl-comment-kindness__confirm"></p>
           </div>
@@ -12055,35 +12267,150 @@
                  chip ポップオーバーは position:absolute で上方向に開く（textarea を押し下げない）。
                  aria-haspopup/aria-expanded で SR ユーザーにも開閉が伝わる。 -->
             <div class="nl-cheer-palette-wrapper">
-              <button type="button" id="cheerToggleBtn" class="nl-cheer-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="cheerPalette" aria-label="盛り上げワードを挿入（8888・拍手・顔文字など）" title="盛り上げワード（8888 / wwww / 拍手 / 顔文字）を挿入">
+              <button
+                type="button"
+                id="cheerToggleBtn"
+                class="nl-cheer-toggle"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="cheerPalette"
+                aria-label="盛り上げワードを挿入（8888・拍手・顔文字など）"
+                title="盛り上げワード（8888 / wwww / 拍手 / 顔文字）を挿入"
+              >
                 <span aria-hidden="true">✨</span>
               </button>
-              <div id="cheerPalette" class="nl-cheer-palette" role="menu" aria-label="盛り上げワード一覧" hidden=""></div>
+              <div
+                id="cheerPalette"
+                class="nl-cheer-palette"
+                role="menu"
+                aria-label="盛り上げワード一覧"
+                hidden
+              ></div>
             </div>
-            <button type="button" id="postCommentBtn" disabled="" aria-busy="false">
+            <button type="button" id="postCommentBtn" disabled aria-busy="false">
               コメント送信
             </button>
-            
+            <div
+              class="nl-compose-quick-toolbar"
+              role="toolbar"
+              aria-label="書き出しと watch の再読み込み"
+              aria-describedby="exportToolbarHint"
+            >
+              <button
+                type="button"
+                id="exportJson"
+                disabled
+                title="HTMLレポートを保存"
+                aria-label="HTMLレポートを保存。メタ情報・保存コメントをまとめた検索用HTMLをダウンロードします。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">💾</span>
+                  <span class="nl-compose-qbtn__word">HTML</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="exportMarketingQuickBtn"
+                disabled
+                title="マーケ分析+メディアキットを1つのHTMLで保存"
+                aria-label="マーケ分析とメディアキットを1つのHTMLで保存。グラフと指標、共有用の実績サマリがまとまっています。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
+                  <span class="nl-compose-qbtn__word">マーケ</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="captureScreenshot"
+                disabled
+                title="画面を1枚保存"
+                aria-label="画面を1枚保存。watch の表示を PNG 画像として保存します。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">📷</span>
+                  <span class="nl-compose-qbtn__word">スクショ</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="reloadWatchTabBtn"
+                disabled
+                title="対象の watch タブを再読み込みします（F5 と同じ）"
+                aria-label="対象の watch タブを再読み込みします（F5 と同じ）"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">↻</span>
+                  <span class="nl-compose-qbtn__word">再読み込み</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="openComeviewBtn"
+                title="コメビュを別ウィンドウで開く（コピー・ピン留め・非表示・名前付けはこちら）"
+                aria-label="コメビュを別ウィンドウで開く。コメントのコピー・ピン留め・非表示・匿名さんへの名前付けができる専用ウィンドウです。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
+                  <span class="nl-compose-qbtn__word">コメビュ</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="openComeviewVoiceBtn"
+                title="読み上げONでコメビュを開く（VOICEVOX が必要）"
+                aria-label="コメントの読み上げをONにした状態でコメビュを別ウィンドウで開きます。読み上げには VOICEVOX が必要です。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">🔊</span>
+                  <span class="nl-compose-qbtn__word">読み上げ</span>
+                </span>
+              </button>
+            </div>
           </div>
-          <div id="nlExportWaitPanel" class="nl-export-wait" hidden="" aria-live="polite" aria-busy="true">
+          <div
+            id="nlExportWaitPanel"
+            class="nl-export-wait"
+            hidden
+            aria-live="polite"
+            aria-busy="true"
+          >
             <p class="nl-export-wait__title" id="nlExportWaitTitle">レポートを組み立て中…</p>
             <div class="nl-export-wait__grid">
               <div class="nl-export-wait__row nl-export-wait__row--link" data-who="link">
-                <img class="nl-export-wait__char" data-who="link" src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" alt="" decoding="async">
+                <img
+                  class="nl-export-wait__char"
+                  data-who="link"
+                  src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+                  alt=""
+                  decoding="async"
+                />
                 <div class="nl-export-wait__bubble">
                   <span class="nl-export-wait__name">りんく</span>
                   <p class="nl-export-wait__text" data-export-wait-text="link">準備中…</p>
                 </div>
               </div>
               <div class="nl-export-wait__row nl-export-wait__row--konta" data-who="konta">
-                <img class="nl-export-wait__char" data-who="konta" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" alt="" decoding="async">
+                <img
+                  class="nl-export-wait__char"
+                  data-who="konta"
+                  src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+                  alt=""
+                  decoding="async"
+                />
                 <div class="nl-export-wait__bubble">
                   <span class="nl-export-wait__name">こん太</span>
                   <p class="nl-export-wait__text" data-export-wait-text="konta">準備中…</p>
                 </div>
               </div>
               <div class="nl-export-wait__row nl-export-wait__row--tanunee" data-who="tanunee">
-                <img class="nl-export-wait__char" data-who="tanunee" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" alt="" decoding="async">
+                <img
+                  class="nl-export-wait__char"
+                  data-who="tanunee"
+                  src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+                  alt=""
+                  decoding="async"
+                />
                 <div class="nl-export-wait__bubble">
                   <span class="nl-export-wait__name">たぬ姉</span>
                   <p class="nl-export-wait__text" data-export-wait-text="tanunee">準備中…</p>
@@ -12104,8 +12431,16 @@
                * りんくの語り: #recordCardBackfillRinku (A 内・進捗 onChanged listener が更新)
                * 押下直後トースト: PR1 純関数 backfillRecordCardHintDomState の retry_started フェーズ
                * 動機説明 (なぜ取り込むか): #backfillAutoStartToggle 説明文に統合 (本 PR で更新済) -->
-        <p class="nl-export-toolbar__hint nl-compose-toolbar-hint" id="exportToolbarHint">HTML保存・マーケ・スクショ（動画の画面）・再読み込みは、いちばん上のボタンからもできます。</p>
-        <details class="nl-export-toolbar__details nl-compose-primary-more" data-nl-toolbar-only="">
+        <p
+          class="nl-export-toolbar__hint nl-compose-toolbar-hint"
+          id="exportToolbarHint"
+        >
+          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（なふだ・取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
+        </p>
+        <details
+          class="nl-export-toolbar__details nl-compose-primary-more"
+          data-nl-toolbar-only
+        >
           <summary class="nl-export-toolbar__summary">
             書き出しの詳細・定期サムネ・ページ表示
           </summary>
@@ -12125,7 +12460,9 @@
                 <option value="60000">1分</option>
                 <option value="300000">5分</option>
               </select>
-              <span class="nl-thumb-count">サムネ <span id="thumbCount">-</span> 件（このPC内）</span>
+              <span class="nl-thumb-count"
+                >サムネ <span id="thumbCount">-</span> 件（このPC内）</span
+              >
             </div>
             <p class="nl-export-toolbar__status" id="captureStatus" aria-live="polite"></p>
             <div class="nl-compose-troubleshoot" role="note" aria-label="送信トラブル時の案内">
@@ -12144,15 +12481,25 @@
       </div>
 
       <section class="nl-stats" aria-label="応援コメント数">
-        <span id="liveId" hidden="">-</span>
+        <span id="liveId" hidden>-</span>
         <div class="nl-count-wrap">
           <div class="nl-stats-bar">
-            <button type="button" id="supportVisualCountToggle" class="nl-count-hero nl-count-hero--toggle" title="応援コメント数（アイコン列・グリッド・診断は下の「アイコン列・グリッド・診断を表示」から開きます）" aria-label="応援コメント数">
+            <button
+              type="button"
+              id="supportVisualCountToggle"
+              class="nl-count-hero nl-count-hero--toggle"
+              title="応援コメント数（アイコン列・グリッド・診断は下の「アイコン列・グリッド・診断を表示」から開きます）"
+              aria-label="応援コメント数"
+            >
               <span class="nl-count-hero__label">応援</span>
               <span id="count" class="nl-count-hero__num is-placeholder" aria-live="polite">-</span>
               <span id="countUnit" class="nl-count-unit nl-count-hero__unit">コメント</span>
             </button>
-            <div class="nl-comment-ticker" role="region" aria-label="最新の応援コメント">
+            <div
+              class="nl-comment-ticker"
+              role="region"
+              aria-label="最新の応援コメント"
+            >
               <div class="nl-comment-ticker__viewport is-empty" id="commentTickerViewport">
                 <div class="nl-comment-ticker__scroll is-paused is-latest-only" id="commentTickerScroll">
                   <div class="nl-comment-ticker__seg" id="commentTickerSegA"></div>
@@ -12167,10 +12514,16 @@
             -->
             <details id="supportTimelineDetails" class="nl-support-timeline">
               <summary class="nl-support-timeline__summary">
-                <span class="nl-support-timeline__summary-label">応援タイムライン（コメント＋スパチャ・メンバー）</span>
-                <span id="supportTimelineGiftMeta" class="nl-support-timeline__gift-meta" hidden=""></span>
+                <span class="nl-support-timeline__summary-label">応援タイムライン（コメント＋ギフト）</span>
+                <span id="supportTimelineGiftMeta" class="nl-support-timeline__gift-meta" hidden></span>
               </summary>
-              <div id="supportTimelineBody" class="nl-support-timeline__body" role="log" aria-label="コメントとギフトの時系列" aria-live="off"></div>
+              <div
+                id="supportTimelineBody"
+                class="nl-support-timeline__body"
+                role="log"
+                aria-label="コメントとギフトの時系列"
+                aria-live="off"
+              ></div>
             </details>
           </div>
           <div id="roomHeatSummary" class="room-heat nl-heat-summary" role="status" aria-live="polite">
@@ -12182,62 +12535,168 @@
               <div id="roomHeatFill" class="room-heat-fill" style="width: 0%"></div>
             </div>
             <div id="roomHeatNote" class="room-heat-note">増加は少なめ（この5分で増えた件数）</div>
-            <div id="commentVelocityLine" class="room-heat-velocity" role="status" aria-live="polite" hidden=""></div>
+            <div
+              id="commentVelocityLine"
+              class="room-heat-velocity"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></div>
           </div>
           <div class="nl-story" aria-live="polite">
             <div class="nl-story-avatars" aria-hidden="true">
-              <img id="sceneStoryImg" class="nl-story-img nl-story-face" src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png" alt="">
+              <img
+                id="sceneStoryImg"
+                class="nl-story-img nl-story-face"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png"
+                alt=""
+              />
             </div>
             <div class="nl-story-body">
               <div class="nl-story-head">
                 <div id="sceneStoryLead" class="nl-story-lead">りんくがみんなの応援コメントを集めているよ！</div>
-                <span id="sceneStoryDelta" class="nl-story-delta" hidden=""></span>
+                <span id="sceneStoryDelta" class="nl-story-delta" hidden></span>
               </div>
               <div id="sceneStorySub" class="nl-story-sub">応援コメントの増え方をここで見守るよ。</div>
               <details id="supportVisualDetails" class="nl-support-visual-details">
-                <summary id="supportVisualDetailsSummary" class="nl-support-visual-details__summary">
+                <summary
+                  id="supportVisualDetailsSummary"
+                  class="nl-support-visual-details__summary"
+                >
                   アイコン列・グリッド・診断を表示
                 </summary>
                 <div class="nl-support-visual-details__body">
                   <div class="nl-story-meter-wrap">
                     <div class="nl-story-growth-head">
-                      <button type="button" id="storyGrowthCollapseBtn" class="nl-story-growth-collapse-btn" aria-expanded="true" aria-controls="storyGrowthCollapsible">
+                      <button
+                        type="button"
+                        id="storyGrowthCollapseBtn"
+                        class="nl-story-growth-collapse-btn"
+                        aria-expanded="true"
+                        aria-controls="storyGrowthCollapsible"
+                      >
                         アイコン列を隠す
                       </button>
                     </div>
-                    <div id="sceneStoryUserLaneGuideTop" class="nl-story-userlane-guide" hidden="">
-                      <div id="sceneStoryUserLaneGuideLinesTop" class="nl-story-userlane-guide__lines" aria-label="応援ユーザーレーンの説明（りんく）"></div>
+                    <div id="sceneStoryUserLaneGuideTop" class="nl-story-userlane-guide" hidden>
+                      <div
+                        id="sceneStoryUserLaneGuideLinesTop"
+                        class="nl-story-userlane-guide__lines"
+                        aria-label="応援ユーザーレーンの説明（りんく）"
+                      ></div>
                     </div>
-                    <div id="sceneStoryUserLaneStack" class="nl-story-userlane-stack" aria-label="最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）" title="応援してくれた人を、スーパーチャット・メンバー・プロフィールの揃い具合の段に分けて並べています。タイルを押すとその人の発言一覧が出ます。" hidden="">
-                      <div id="sceneStoryUserLaneLinkWrap" class="nl-story-userlane-tier-wrap">
-                        <div id="sceneStoryUserLaneLink" class="nl-story-userlane nl-story-userlane--link" aria-label="優先1・チャンネルID・表示名・アイコンがそろった人" hidden=""></div>
-                        <p id="sceneStoryUserLaneLinkHint" class="nl-story-userlane-tier-hint" hidden="">この段は「チャンネルID・表示名・アイコンがそろった人」だけ。いまの記録では該当者がいないので、下の段に並んでいます。</p>
+                    <div
+                      id="sceneStoryUserLaneStack"
+                      class="nl-story-userlane-stack"
+                      aria-label="最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）"
+                      title="応援ユーザーを、プロフィールの揃い具合の三段に分けて並べています。タイルを押すとその人の発言一覧（Ctrl+クリックでプロフィール）"
+                      hidden
+                    >
+                      <div
+                        id="sceneStoryUserLaneLinkWrap"
+                        class="nl-story-userlane-tier-wrap"
+                      >
+                        <div
+                          id="sceneStoryUserLaneLink"
+                          class="nl-story-userlane nl-story-userlane--link"
+                          aria-label="優先1・個人サムネと表示名がそろったユーザー"
+                          hidden
+                        ></div>
+                        <p
+                          id="sceneStoryUserLaneLinkHint"
+                          class="nl-story-userlane-tier-hint"
+                          hidden
+                        >
+                          この段は「表示名と個人サムネがそろった人」だけ。いまの記録では該当者がいないので、下の段に並んでいます。
+                        </p>
                       </div>
-                      <div id="sceneStoryUserLaneGiftWrap" class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift">
-                        <div id="sceneStoryUserLaneGuideMidGift" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden="">
-                          <div id="sceneStoryUserLaneGuideLinesMidGift" class="nl-story-userlane-guide__lines" aria-label="応援ユーザーレーンの説明（ギフト・広告投げ主）"></div>
+                      <div
+                        id="sceneStoryUserLaneGiftWrap"
+                        class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift"
+                      >
+                        <div
+                          id="sceneStoryUserLaneGuideMidGift"
+                          class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+                          hidden
+                        >
+                          <div
+                            id="sceneStoryUserLaneGuideLinesMidGift"
+                            class="nl-story-userlane-guide__lines"
+                            aria-label="応援ユーザーレーンの説明（ギフト・広告投げ主）"
+                          ></div>
                         </div>
-                        <div id="sceneStoryUserLaneGift" class="nl-story-userlane nl-story-userlane--gift" aria-label="スーパーチャット・スーパーステッカーを送った人" hidden=""></div>
+                        <div
+                          id="sceneStoryUserLaneGift"
+                          class="nl-story-userlane nl-story-userlane--gift"
+                          aria-label="ギフトを投げたユーザー"
+                          hidden
+                        ></div>
                       </div>
-                      <div id="sceneStoryUserLaneAdWrap" class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--ad">
-                        <div id="sceneStoryUserLaneGuideMidAd" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden="">
-                          <div id="sceneStoryUserLaneGuideLinesMidAd" class="nl-story-userlane-guide__lines" aria-label="応援ユーザーレーンの説明（広告投稿者）"></div>
+                      <div
+                        id="sceneStoryUserLaneAdWrap"
+                        class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--ad"
+                      >
+                        <div
+                          id="sceneStoryUserLaneGuideMidAd"
+                          class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+                          hidden
+                        >
+                          <div
+                            id="sceneStoryUserLaneGuideLinesMidAd"
+                            class="nl-story-userlane-guide__lines"
+                            aria-label="応援ユーザーレーンの説明（広告投稿者）"
+                          ></div>
                         </div>
-                        <div id="sceneStoryUserLaneAd" class="nl-story-userlane nl-story-userlane--ad" aria-label="メンバー（加入・ギフト・バッジ）" hidden=""></div>
+                        <div
+                          id="sceneStoryUserLaneAd"
+                          class="nl-story-userlane nl-story-userlane--ad"
+                          aria-label="広告を投げた広告主"
+                          hidden
+                        ></div>
                       </div>
-                      <div id="sceneStoryUserLaneGuideMidKonta" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden="">
-                        <div id="sceneStoryUserLaneGuideLinesMidKonta" class="nl-story-userlane-guide__lines" aria-label="応援ユーザーレーンの説明（こん太・この段の前）"></div>
+                      <div
+                        id="sceneStoryUserLaneGuideMidKonta"
+                        class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+                        hidden
+                      >
+                        <div
+                          id="sceneStoryUserLaneGuideLinesMidKonta"
+                          class="nl-story-userlane-guide__lines"
+                          aria-label="応援ユーザーレーンの説明（こん太・この段の前）"
+                        ></div>
                       </div>
-                      <div id="sceneStoryUserLaneKonta" class="nl-story-userlane nl-story-userlane--konta" aria-label="優先2・表示名かアイコンのどちらかが取れている人" hidden=""></div>
-                      <div id="sceneStoryUserLaneGuideMidTanu" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden="">
-                        <div id="sceneStoryUserLaneGuideLinesMidTanu" class="nl-story-userlane-guide__lines" aria-label="応援ユーザーレーンの説明（たぬ姉・この段の前）"></div>
+                      <div
+                        id="sceneStoryUserLaneKonta"
+                        class="nl-story-userlane nl-story-userlane--konta"
+                        aria-label="優先2・表示名かサムネのどちらかが取れているユーザー"
+                        hidden
+                      ></div>
+                      <div
+                        id="sceneStoryUserLaneGuideMidTanu"
+                        class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+                        hidden
+                      >
+                        <div
+                          id="sceneStoryUserLaneGuideLinesMidTanu"
+                          class="nl-story-userlane-guide__lines"
+                          aria-label="応援ユーザーレーンの説明（たぬ姉・この段の前）"
+                        ></div>
                       </div>
-                      <div id="sceneStoryUserLaneTanu" class="nl-story-userlane nl-story-userlane--tanu" aria-label="優先3・情報が薄い人" hidden=""></div>
+                      <div
+                        id="sceneStoryUserLaneTanu"
+                        class="nl-story-userlane nl-story-userlane--tanu"
+                        aria-label="優先3・取得が薄いユーザー"
+                        hidden
+                      ></div>
                     </div>
-                    <div id="sceneStoryUserLaneGuideBottom" class="nl-story-userlane-guide" hidden="">
-                      <div id="sceneStoryUserLaneGuideLinesBottom" class="nl-story-userlane-guide__lines" aria-label="応援ユーザーレーンの表示件数"></div>
+                    <div id="sceneStoryUserLaneGuideBottom" class="nl-story-userlane-guide" hidden>
+                      <div
+                        id="sceneStoryUserLaneGuideLinesBottom"
+                        class="nl-story-userlane-guide__lines"
+                        aria-label="応援ユーザーレーンの表示件数"
+                      ></div>
                     </div>
-                    <div id="storyAvatarDiag" class="nl-story-avatar-diag" hidden=""></div>
+                    <div id="storyAvatarDiag" class="nl-story-avatar-diag" hidden></div>
                     <div id="storyGrowthCollapsible" class="nl-story-growth-collapsible">
                       <div id="sceneStoryGauge" class="nl-story-meter" aria-label="応援コメントアイコン表示">
                         <div id="sceneStoryGrowth" class="nl-story-growth" aria-live="polite"></div>
@@ -12249,9 +12708,15 @@
                   </div>
                 </div>
               </details>
-              <div id="sceneStoryDetail" class="nl-story-detail" hidden="">
+              <div id="sceneStoryDetail" class="nl-story-detail" hidden>
                 <div class="nl-story-detail-head">
-                  <img id="sceneStoryDetailImg" class="nl-story-detail-img" src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png" alt="" aria-hidden="true">
+                  <img
+                    id="sceneStoryDetailImg"
+                    class="nl-story-detail-img"
+                    src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png"
+                    alt=""
+                    aria-hidden="true"
+                  />
                   <div>
                     <div id="sceneStoryDetailUser" class="nl-story-detail-user">-</div>
                     <div id="sceneStoryDetailUserMeta" class="nl-story-detail-user-meta">-</div>
@@ -12265,91 +12730,41 @@
           </div>
         </div>
       </section>
-    <details class="nl-frame-theme-details" id="yt-comeview-details">
-      <summary class="nl-frame-theme-details__summary">
-        <span class="nl-frame-theme-details__summary-left">
-          💬 コメビュ（3レーンのコメント一覧: りんく・こん太・たぬ姉）
-        </span>
-        <span class="nl-frame-theme-details__summary-meta" id="yt-comeview-summary-meta">
-          合計 0件
-        </span>
-      </summary>
-      <div class="nl-frame-theme-details__body">
-        <div class="lanes-grid">
-          <div class="lane-col lane-rinku" id="lane-rinku">
-            <div class="nl-story-userlane-guide">
-              <div class="nl-story-userlane-guide__lines">
-                <div class="nl-story-userlane-guide__line">
-                  <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" alt="りんく" width="26" height="26" decoding="async">
-                  <span class="nl-story-userlane-guide__text">りんくレーン（配信者・モデレーター）</span>
-                  <span class="nl-story-userlane-guide__count" id="lane-rinku-count">0件</span>
-                </div>
-              </div>
-            </div>
-            <div class="lane-list" id="lane-rinku-list">
-              <div class="empty-hint">配信者本人・モデレーターのコメントがここに表示されます</div>
-            </div>
-          </div>
 
-          <div class="lane-col lane-konta" id="lane-konta">
-            <div class="nl-story-userlane-guide">
-              <div class="nl-story-userlane-guide__lines">
-                <div class="nl-story-userlane-guide__line">
-                  <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" alt="こん太" width="26" height="26" decoding="async">
-                  <span class="nl-story-userlane-guide__text">こん太レーン（スパチャ・メンバー・ギフト）</span>
-                  <span class="nl-story-userlane-guide__count" id="lane-konta-count">0件</span>
-                </div>
-              </div>
-            </div>
-            <div class="lane-list" id="lane-konta-list">
-              <div class="empty-hint">スパチャ・ステッカー・メンバー・ギフトの応援がここに表示されます</div>
-            </div>
-          </div>
-
-          <div class="lane-col lane-tanunee" id="lane-tanunee">
-            <div class="nl-story-userlane-guide">
-              <div class="nl-story-userlane-guide__lines">
-                <div class="nl-story-userlane-guide__line">
-                  <img class="nl-story-userlane-guide__face" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" alt="たぬ姉" width="26" height="26" decoding="async">
-                  <span class="nl-story-userlane-guide__text">たぬ姉レーン（一般リスナー）</span>
-                  <span class="nl-story-userlane-guide__count" id="lane-tanunee-count">0件</span>
-                </div>
-              </div>
-            </div>
-            <div class="lane-list" id="lane-tanunee-list">
-              <div class="empty-hint">一般リスナーのコメントがここに表示されます</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </details>
-
-
-
-      <section id="watchMeta" class="nl-watch-meta" hidden="" data-nl-toolbar-only="">
+      <section id="watchMeta" class="nl-watch-meta" hidden data-nl-toolbar-only>
         <div class="nl-watch-meta-top">
-          <img id="watchThumb" alt="放送サムネイル" hidden="">
+          <img id="watchThumb" alt="放送サムネイル" hidden />
           <div>
             <div id="watchTitle" class="nl-watch-title">-</div>
             <div class="nl-watch-broadcaster">配信者: <span id="watchBroadcaster">-</span></div>
           </div>
         </div>
         <div id="watchTags" class="nl-watch-tags"></div>
-        <div id="watchAudience" class="nl-watch-audience" hidden="">
+        <div id="watchAudience" class="nl-watch-audience" hidden>
           <div class="nl-watch-audience-row">
             <span class="nl-watch-audience-label">ユニーク利用者（記録コメント・推定）</span>
             <strong id="watchUniqueUsers" class="nl-watch-audience-val">—</strong>
-            <span class="nl-watch-audience-sub">（ID未取得コメント <span id="watchCommentsNoId">—</span> 件）</span>
+            <span class="nl-watch-audience-sub"
+              >（ID未取得コメント <span id="watchCommentsNoId">—</span> 件）</span
+            >
           </div>
           <p id="watchAudienceNote" class="nl-watch-audience-note"></p>
         </div>
       </section>
 
-      <div id="commentHarvestBanner" class="nl-comment-harvest-banner" role="status" aria-live="polite" hidden="">
+      <div
+        id="commentHarvestBanner"
+        class="nl-comment-harvest-banner"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
         <strong>コメント欄を検出できていません</strong>
         <span id="commentHarvestBannerDetail"></span>
         <div class="nl-comment-harvest-banner__actions">
-          <span class="nl-comment-harvest-hint">ニコ生の画面改修でパネルが見つからない可能性があります。watch を再読み込みするか、しばらくお待ちください。</span>
+          <span class="nl-comment-harvest-hint"
+            >ニコ生の画面改修でパネルが見つからない可能性があります。watch を再読み込みするか、しばらくお待ちください。</span
+          >
           <button type="button" id="dismissCommentHarvestBanner">閉じる</button>
         </div>
       </div>
@@ -12357,7 +12772,12 @@
       <details class="nl-dev-monitor-details" id="devMonitorDetails">
         <summary>詳しい状況（開発・切り分け用・折りたたみ）</summary>
         <div class="nl-dev-monitor-details__body">
-          <div id="storyAvatarDiagDevMonitor" class="nl-story-diag-dev" aria-live="polite" hidden=""></div>
+          <div
+            id="storyAvatarDiagDevMonitor"
+            class="nl-story-diag-dev"
+            aria-live="polite"
+            hidden
+          ></div>
           <p class="nl-dev-monitor__hint">
             普段は開かなくて大丈夫です。記録と公式表示の差や、アイコン・名前がどれだけ取れているかを、グラフと表で見る欄です（上から順に
             取得率チャート → 件数の比較・種類の内訳 → 表 → 技術用JSON）。コメント本文は出しません。
@@ -12367,17 +12787,43 @@
             </span>
           </p>
           <div id="devMonitorAcquisition" class="nl-acquisition-wrap"></div>
-          <div id="devMonitorViz" class="nl-dev-monitor-viz-wrap" aria-live="polite"></div>
-          <div id="devMonitorDlCharts" class="nl-dev-monitor-dl-charts-wrap" aria-live="polite"></div>
+          <div
+            id="devMonitorViz"
+            class="nl-dev-monitor-viz-wrap"
+            aria-live="polite"
+          ></div>
+          <div
+            id="devMonitorDlCharts"
+            class="nl-dev-monitor-dl-charts-wrap"
+            aria-live="polite"
+          ></div>
           <dl class="nl-dev-monitor__stats" id="devMonitorStats"></dl>
           <!-- v0.1.202 A-0: AI 共有診断と同じ raw data から生成する取得状況サマリ -->
-          <dl class="nl-dev-monitor__stats" id="devMonitorGiftRankingExtras" aria-live="polite"></dl>
-          <pre class="nl-dev-monitor__json" id="devMonitorJson" aria-label="開発者向け・技術用の要約JSON（任意）"></pre>
+          <dl
+            class="nl-dev-monitor__stats"
+            id="devMonitorGiftRankingExtras"
+            aria-live="polite"
+          ></dl>
+          <pre
+            class="nl-dev-monitor__json"
+            id="devMonitorJson"
+            aria-label="開発者向け・技術用の要約JSON（任意）"
+          ></pre>
           <div class="nl-dev-monitor__actions">
-            <button type="button" class="nl-dev-monitor__btn nl-dev-monitor__btn--accent" id="devMonitorCopyAiBundleBtn" title="ページ内の診断（パネル・プレイヤー検出・挿入先）をまとめてコピー。開発者ツールは不要です。">
+            <button
+              type="button"
+              class="nl-dev-monitor__btn nl-dev-monitor__btn--accent"
+              id="devMonitorCopyAiBundleBtn"
+              title="ページ内の診断（パネル・プレイヤー検出・挿入先）をまとめてコピー。開発者ツールは不要です。"
+            >
               AI 共有用にコピー（診断まとめ）
             </button>
-            <button type="button" class="nl-dev-monitor__btn" id="devMonitorDownloadAiBundleBtn" title="診断 JSON だけをファイルに保存（マークダウンなし）。別名保存で共有できます。">
+            <button
+              type="button"
+              class="nl-dev-monitor__btn"
+              id="devMonitorDownloadAiBundleBtn"
+              title="診断 JSON だけをファイルに保存（マークダウンなし）。別名保存で共有できます。"
+            >
               AI 診断を JSON で保存
             </button>
             <button type="button" class="nl-dev-monitor__btn" id="devMonitorRefresh">
@@ -12394,37 +12840,63 @@
             </button>
             <div class="nl-dev-monitor__mask-row" role="group" aria-label="マーケ分析DLのプライバシー">
               <label>
-                <input type="checkbox" id="devMonitorExportMarketingMaskLabels">
+                <input type="checkbox" id="devMonitorExportMarketingMaskLabels" />
                 <span>
                   共有・掲載用に、DLするHTMLの<strong>トップコメンター表示名を伏せ字</strong>にし、<strong>サムネ画像を出さない</strong>（URLにユーザーIDが含まれることがあるため）。他枠での行為までは制限できません。
                 </span>
               </label>
             </div>
-            <button type="button" class="nl-dev-monitor__btn nl-dev-monitor__btn--accent" id="devMonitorExportMarketingBtn" disabled="">
+            <button type="button" class="nl-dev-monitor__btn nl-dev-monitor__btn--accent" id="devMonitorExportMarketingBtn" disabled>
               📊 マーケ分析DL
             </button>
             <!-- v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視) -->
-            <button type="button" class="nl-dev-monitor__btn" id="devMonitorForceRefetchCommenterFollowBtn" title="コメンターのフォロワー数・フォロー先など niconico プロフィール情報を、キャッシュを無視して取り直します。マーケ分析の散布図やセグメントに最新値を反映させたい時に。">
+            <button
+              type="button"
+              class="nl-dev-monitor__btn"
+              id="devMonitorForceRefetchCommenterFollowBtn"
+              title="コメンターのフォロワー数・フォロー先など niconico プロフィール情報を、キャッシュを無視して取り直します。マーケ分析の散布図やセグメントに最新値を反映させたい時に。"
+            >
               🔄 フォロー情報を強制再取得
             </button>
-            <span id="devMonitorForceRefetchCommenterFollowStatus" class="nl-dev-monitor__export-status" aria-live="polite"></span>
-            <span id="devMonitorExportTrendStatus" class="nl-dev-monitor__export-status" aria-live="polite"></span>
+            <span
+              id="devMonitorForceRefetchCommenterFollowStatus"
+              class="nl-dev-monitor__export-status"
+              aria-live="polite"
+            ></span>
+            <span
+              id="devMonitorExportTrendStatus"
+              class="nl-dev-monitor__export-status"
+              aria-live="polite"
+            ></span>
           </div>
         </div>
       </details>
 
-      <section class="nl-comment-compose" aria-label="コメント補助機能" data-nl-toolbar-only="">
+      <section class="nl-comment-compose" aria-label="コメント補助機能" data-nl-toolbar-only>
         <details class="nl-voice-guide-details" id="voiceOsGuideDetails">
           <summary class="nl-voice-guide-summary">
             <span class="nl-voice-guide-summary__avatar" aria-hidden="true">
-              <img class="nl-voice-guide-summary__img" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png" alt="" width="44" height="44" decoding="async">
+              <img
+                class="nl-voice-guide-summary__img"
+                src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png"
+                alt=""
+                width="44"
+                height="44"
+                decoding="async"
+              />
             </span>
             <span class="nl-voice-guide-summary__main">
-              <span class="nl-voice-guide-summary__title">たぬ姉より：OS の音声入力（Windows / Mac）</span>
-              <span class="nl-voice-guide-summary__context nl-voice-guide-summary__context--popup-only">
+              <span class="nl-voice-guide-summary__title"
+                >たぬ姉より：OS の音声入力（Windows / Mac）</span
+              >
+              <span
+                class="nl-voice-guide-summary__context nl-voice-guide-summary__context--popup-only"
+              >
                 ツールバーのポップアップではマイク行は出ません。watch の<strong>ページ内パネル</strong>でマイク設定と「音声入力」が使えます。詳細は開いてね。
               </span>
-              <span class="nl-voice-guide-summary__context nl-voice-guide-summary__context--inline-only">
+              <span
+                class="nl-voice-guide-summary__context nl-voice-guide-summary__context--inline-only"
+              >
                 下のマイク設定と「音声入力」とあわせて使えます。手順の詳細は開いてね。
               </span>
             </span>
@@ -12456,7 +12928,12 @@
         </details>
         <div class="nl-voice-device-row">
           <span class="nl-voice-device-label" id="voiceInputDeviceLabel">マイク</span>
-          <select id="voiceInputDevice" class="nl-voice-device-select" aria-labelledby="voiceInputDeviceLabel" aria-label="音声入力で使うマイク">
+          <select
+            id="voiceInputDevice"
+            class="nl-voice-device-select"
+            aria-labelledby="voiceInputDeviceLabel"
+            aria-label="音声入力で使うマイク"
+          >
             <option value="">既定（システムデフォルト）</option>
           </select>
           <button type="button" id="voiceDeviceRefresh" class="nl-voice-device-btn">
@@ -12472,20 +12949,31 @@
         <p id="voiceDeviceCheckStatus" class="nl-voice-device-status" aria-live="polite"></p>
         <div class="nl-voice-level-row" id="voiceLevelRow">
           <span class="nl-voice-level-label" id="voiceLevelLabel">入力レベル（音声入力中）</span>
-          <div class="nl-voice-level-track" id="voiceLevelTrack" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="voiceLevelLabel">
+          <div
+            class="nl-voice-level-track"
+            id="voiceLevelTrack"
+            role="meter"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            aria-labelledby="voiceLevelLabel"
+          >
             <div class="nl-voice-level-fill" id="voiceLevelFill"></div>
           </div>
         </div>
         <div class="nl-compose-actions">
-          <button type="button" id="voiceCommentBtn" disabled="" aria-pressed="false">
+          <button type="button" id="voiceCommentBtn" disabled aria-pressed="false">
             音声入力
           </button>
           <label class="nl-voice-autosend">
-            <input type="checkbox" id="voiceAutoSend" checked="">
+            <input type="checkbox" id="voiceAutoSend" checked />
             認識後に送信
           </label>
-          <label class="nl-voice-autosend" title="IME 変換中の Enter は送信しません。Ctrl+Enter / Cmd+Enter は常に送信できます。">
-            <input type="checkbox" id="commentEnterSend" checked="">
+          <label
+            class="nl-voice-autosend"
+            title="IME 変換中の Enter は送信しません。Ctrl+Enter / Cmd+Enter は常に送信できます。"
+          >
+            <input type="checkbox" id="commentEnterSend" checked />
             Enter でも送信
           </label>
         </div>
@@ -12495,41 +12983,89 @@
         <strong>保存に失敗しました</strong>
         <span id="storageErrorDetail"></span>
         <div class="storage-error-actions">
-          <span class="nl-storage-hint">古いデータを HTML レポートで保存してから、不要な放送の記録を削除すると改善することがあります。</span>
+          <span class="nl-storage-hint"
+            >古いデータを HTML レポートで保存してから、不要な放送の記録を削除すると改善することがあります。</span
+          >
           <button type="button" id="dismissStorageError">閉じる</button>
         </div>
       </div>
 
-      <h2 data-nl-toolbar-only="">応援可視化（ユーザー別）</h2>
-      <label class="nl-anonymous-identicon-opt" data-nl-toolbar-only="" title="ニコ生公式の表示は変わりません。拡張の一覧・グリッド・ユーザーレーンなど手元の区別用です。既定はオン。オフにすると従来のフォールバック画像に戻ります。">
-        <input type="checkbox" id="anonymousIdenticonEnabled" autocomplete="off" checked="" aria-describedby="anonymousIdenticonHint">
-        <span>匿名コメントに Identicon を付ける（視聴ページでは同一シルエットになり得る ID
-          を、この拡張内で区別しやすくします）</span>
+      <h2 data-nl-toolbar-only>応援可視化（ユーザー別）</h2>
+      <label
+        class="nl-anonymous-identicon-opt"
+        data-nl-toolbar-only
+        title="ニコ生公式の表示は変わりません。拡張の一覧・グリッド・ユーザーレーンなど手元の区別用です。既定はオン。オフにすると従来のフォールバック画像に戻ります。"
+      >
+        <input
+          type="checkbox"
+          id="anonymousIdenticonEnabled"
+          autocomplete="off"
+          checked
+          aria-describedby="anonymousIdenticonHint"
+        />
+        <span
+          >匿名コメントに Identicon を付ける（視聴ページでは同一シルエットになり得る ID
+          を、この拡張内で区別しやすくします）</span
+        >
       </label>
-      <p id="anonymousIdenticonHint" class="nl-anonymous-identicon-hint" data-nl-popup-copy="anonymous-identicon" data-nl-toolbar-only="">
+      <p
+        id="anonymousIdenticonHint"
+        class="nl-anonymous-identicon-hint"
+        data-nl-popup-copy="anonymous-identicon"
+        data-nl-toolbar-only
+      >
         公式ページそのものは変わりません。一覧のタイルだけ、匿名 ID ごとに模様を付けます（<strong>既定オン</strong>）。詳しくはサイトの
-        <a href="https://tsuioku-no-kirameki.com/#lp-anonymous-identicon" target="_blank" rel="noopener noreferrer">LP「匿名 Identicon」</a>
+        <a
+          href="https://tsuioku-no-kirameki.com/#lp-anonymous-identicon"
+          target="_blank"
+          rel="noopener noreferrer"
+          >LP「匿名 Identicon」</a
+        >
         もどうぞ。
       </p>
-      <label class="nl-anonymous-identicon-opt" data-nl-toolbar-only="" title="応援ランクストリップ（上部の小さなサムネ行）で、匿名（a:xxxxx やハッシュ系）ユーザーを件数上位でも後ろに回し、数値IDのユーザーを先に並べます。既定オン。">
-        <input type="checkbox" id="foldAnonymousInRankStrip" autocomplete="off" checked="" aria-describedby="foldAnonymousInRankStripHint">
-        <span>応援ランク上位を固定ファン優先にする（匿名大量のときでも数値 ID のユーザーを前に出します）</span>
+      <label
+        class="nl-anonymous-identicon-opt"
+        data-nl-toolbar-only
+        title="応援ランクストリップ（上部の小さなサムネ行）で、匿名（a:xxxxx やハッシュ系）ユーザーを件数上位でも後ろに回し、数値IDのユーザーを先に並べます。既定オン。"
+      >
+        <input
+          type="checkbox"
+          id="foldAnonymousInRankStrip"
+          autocomplete="off"
+          checked
+          aria-describedby="foldAnonymousInRankStripHint"
+        />
+        <span
+          >応援ランク上位を固定ファン優先にする（匿名大量のときでも数値 ID のユーザーを前に出します）</span
+        >
       </label>
-      <p id="foldAnonymousInRankStripHint" class="nl-anonymous-identicon-hint" data-nl-toolbar-only="">
+      <p
+        id="foldAnonymousInRankStripHint"
+        class="nl-anonymous-identicon-hint"
+        data-nl-toolbar-only
+      >
         匿名コメント（アイコンが取れない <code>a:xxxxx</code> 等）が件数トップに並ぶと、顔の見える固定ファンが折り畳まれて見えなくなるのを防ぎます（<strong>既定オン</strong>）。
       </p>
-      <ul id="userRoomList" aria-live="polite" data-nl-toolbar-only=""></ul>
+      <ul id="userRoomList" aria-live="polite" data-nl-toolbar-only></ul>
 
       <!-- 0.1.12 (D): 更新履歴。<details> 既定折り畳みで UIUX 阻害ゼロ。
            中身は popup-entry.js が EXTENSION_CHANGELOG から動的生成（HTML
            直書きにすると version bump の度に 2 箇所更新が必要になり drift する）。
            toolbar-only セクション群と同じ位置（拡張情報のすぐ近く）に配置。 -->
-      <section class="nl-frame-switch nl-changelog-section" aria-label="更新履歴（バージョンごとの変更点）" data-nl-toolbar-only="">
+      <section
+        class="nl-frame-switch nl-changelog-section"
+        aria-label="更新履歴（バージョンごとの変更点）"
+        data-nl-toolbar-only
+      >
         <details class="nl-frame-theme-details" id="changelogDetails">
           <summary class="nl-frame-theme-details__summary">
             <span class="nl-frame-theme-details__summary-text">
-              <span class="nl-frame-theme-details__summary-label">更新履歴（クリックで開く）</span>
-              <span class="nl-frame-current" aria-live="polite">最新: <span id="changelogLatestLabel">-</span></span>
+              <span class="nl-frame-theme-details__summary-label"
+                >更新履歴（クリックで開く）</span
+              >
+              <span class="nl-frame-current" aria-live="polite"
+                >最新: <span id="changelogLatestLabel">-</span></span
+              >
             </span>
           </summary>
           <div class="nl-frame-theme-details__body">
@@ -12538,11 +13074,17 @@
         </details>
       </section>
 
-      <section class="nl-frame-switch nl-project-concept" aria-label="この拡張について（君斗りんくの追憶のきらめき）" data-nl-toolbar-only="">
+      <section
+        class="nl-frame-switch nl-project-concept"
+        aria-label="この拡張について（君斗りんくの追憶のきらめき）"
+        data-nl-toolbar-only
+      >
         <details class="nl-frame-theme-details" id="projectConceptDetails">
           <summary class="nl-frame-theme-details__summary">
             <span class="nl-frame-theme-details__summary-text">
-              <span class="nl-frame-theme-details__summary-label">この拡張について（君斗りんくの追憶のきらめき）</span>
+              <span class="nl-frame-theme-details__summary-label"
+                >この拡張について（君斗りんくの追憶のきらめき）</span
+              >
               <span class="nl-project-concept-hint">応援の可視化</span>
             </span>
           </summary>
@@ -12556,41 +13098,83 @@
             </p>
             <p>
               この取り組みは<strong>動員ちゃれんじ</strong>と文脈でリンクしています。詳しくは
-              <a href="https://doin-challenge.com/" target="_blank" rel="noopener noreferrer">doin-challenge.com</a>
+              <a
+                href="https://doin-challenge.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >doin-challenge.com</a
+              >
               を参照してください。
             </p>
             <p>
               Kimito-Link 全体の情報は
-              <a href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer">kimito-link.com</a>
+              <a
+                href="https://kimito-link.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >kimito-link.com</a
+              >
               、または下の Powered by からどうぞ。
             </p>
           </div>
         </details>
       </section>
 
-      <section class="nl-frame-switch" aria-label="ポップアップの見た目（配色）" data-nl-toolbar-only="">
+      <section class="nl-frame-switch" aria-label="ポップアップの見た目（配色）" data-nl-toolbar-only>
         <details class="nl-frame-theme-details" id="frameThemeDetails">
           <summary class="nl-frame-theme-details__summary">
             <span class="nl-frame-theme-details__summary-text">
               <span class="nl-frame-theme-details__summary-label">ポップアップの配色</span>
-              <span class="nl-frame-current" aria-live="polite">現在: <span id="frameCurrentLabel">ライト</span></span>
+              <span class="nl-frame-current" aria-live="polite"
+                >現在: <span id="frameCurrentLabel">ライト</span></span
+              >
             </span>
           </summary>
           <div class="nl-frame-theme-details__body">
             <div class="nl-frame-grid" role="listbox" aria-label="配色プリセット">
-              <button type="button" class="nl-frame-chip" data-frame-id="light" role="option" aria-selected="true">
+              <button
+                type="button"
+                class="nl-frame-chip"
+                data-frame-id="light"
+                role="option"
+                aria-selected="true"
+              >
                 ライト<small>明るめ</small>
               </button>
-              <button type="button" class="nl-frame-chip" data-frame-id="dark" role="option" aria-selected="false">
+              <button
+                type="button"
+                class="nl-frame-chip"
+                data-frame-id="dark"
+                role="option"
+                aria-selected="false"
+              >
                 ダーク<small>落ち着いた暗さ</small>
               </button>
-              <button type="button" class="nl-frame-chip" data-frame-id="midnight" role="option" aria-selected="false">
+              <button
+                type="button"
+                class="nl-frame-chip"
+                data-frame-id="midnight"
+                role="option"
+                aria-selected="false"
+              >
                 ミッドナイト<small>夜向け</small>
               </button>
-              <button type="button" class="nl-frame-chip" data-frame-id="sunset" role="option" aria-selected="false">
+              <button
+                type="button"
+                class="nl-frame-chip"
+                data-frame-id="sunset"
+                role="option"
+                aria-selected="false"
+              >
                 サンセット<small>暖色</small>
               </button>
-              <button type="button" class="nl-frame-chip" data-frame-id="custom" role="option" aria-selected="false">
+              <button
+                type="button"
+                class="nl-frame-chip"
+                data-frame-id="custom"
+                role="option"
+                aria-selected="false"
+              >
                 カスタム<small>色を調整</small>
               </button>
             </div>
@@ -12599,15 +13183,15 @@
               <div class="nl-frame-color-grid">
                 <label class="nl-frame-color">
                   ヘッダー左（開始色）
-                  <input type="color" id="frameHeaderStart">
+                  <input type="color" id="frameHeaderStart" />
                 </label>
                 <label class="nl-frame-color">
                   ヘッダー右（終了色）
-                  <input type="color" id="frameHeaderEnd">
+                  <input type="color" id="frameHeaderEnd" />
                 </label>
                 <label class="nl-frame-color">
                   アクセント
-                  <input type="color" id="frameAccent">
+                  <input type="color" id="frameAccent" />
                 </label>
               </div>
               <div class="nl-frame-custom-actions">
@@ -12618,8 +13202,13 @@
                 <button type="button" id="copyFrameCode">配色コードをコピー</button>
                 <button type="button" id="toggleFrameCodeInput">コードを入力</button>
               </div>
-              <div class="nl-frame-share" id="frameShareBox" hidden="">
-                <textarea id="frameShareCode" spellcheck="false" autocomplete="off" aria-label="配色の共有コード"></textarea>
+              <div class="nl-frame-share" id="frameShareBox" hidden>
+                <textarea
+                  id="frameShareCode"
+                  spellcheck="false"
+                  autocomplete="off"
+                  aria-label="配色の共有コード"
+                ></textarea>
                 <div class="nl-frame-share-actions">
                   <button type="button" id="applyFrameCode">適用</button>
                 </div>
@@ -12632,7 +13221,7 @@
 
       <!-- v0.1.1726: 配信採点パネル(カラオケ採点風)はユーザー判断で画面から外した(採点の純lib・テストは残置)。 -->
 
-      <details class="nl-session-summary-panel" data-nl-toolbar-only="">
+      <details class="nl-session-summary-panel" data-nl-toolbar-only>
         <summary>記録サマリの推移（この放送）</summary>
         <p class="nl-sub">
           IndexedDB に約1分ごとにサンプルを残します（件数上限で古い順に削除されます）。
@@ -12642,18 +13231,22 @@
           <button type="button" id="exportSessionSummaryJsonBtn">
             サマリをJSONで保存
           </button>
-          <button type="button" id="exportMcpSnapshotJsonBtn" title="AI 連携用の正準スナップショットを Downloads/nicolivelog-mcp/ に保存します（MCP Phase1a）">
+          <button
+            type="button"
+            id="exportMcpSnapshotJsonBtn"
+            title="AI 連携用の正準スナップショットを Downloads/nicolivelog-mcp/ に保存します（MCP Phase1a）"
+          >
             MCP用JSONを保存
           </button>
         </div>
       </details>
 
-      <details class="nl-gift-quick-panel" data-nl-toolbar-only="">
+      <details class="nl-gift-quick-panel" data-nl-toolbar-only>
         <summary>ギフト・広告ユーザー（簡易）</summary>
         <div id="giftQuickStatsMount" class="nl-gift-quick-mount"></div>
       </details>
 
-      <details class="nl-gift-quick-panel" data-nl-toolbar-only="">
+      <details class="nl-gift-quick-panel" data-nl-toolbar-only>
         <summary id="giftSubAppHistorySummary">ギフトサイドバー履歴（未取得）</summary>
         <div id="giftSubAppHistoryMount" class="nl-gift-quick-mount"></div>
       </details>
@@ -12663,7 +13256,14 @@
         中身は extension/data/ouen-banner.json から読む。
         JSON が無い / show=false のときは表示しない（既定は非表示＝fail-closed）。
       -->
-      <a id="ouenBanner" class="nl-ouen-banner" hidden="" target="_blank" rel="noopener noreferrer" data-nl-toolbar-only="">
+      <a
+        id="ouenBanner"
+        class="nl-ouen-banner"
+        hidden
+        target="_blank"
+        rel="noopener noreferrer"
+        data-nl-toolbar-only
+      >
         <span class="nl-ouen-banner__tag">応援動画</span>
         <span class="nl-ouen-banner__text">
           <span class="nl-ouen-banner__title" id="ouenBannerTitle"></span>
@@ -12672,10 +13272,28 @@
         <span class="nl-ouen-banner__when" id="ouenBannerWhen"></span>
       </a>
 
-      <footer class="nl-powered-by" role="contentinfo" aria-label="ブランド表記" data-nl-toolbar-only="">
+      <footer
+        class="nl-powered-by"
+        role="contentinfo"
+        aria-label="ブランド表記"
+        data-nl-toolbar-only
+      >
         <span class="nl-powered-by-label">Powered by</span>
-        <a class="nl-powered-by-link" href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer" title="Kimito-Link Project 公式サイト（新しいタブで開きます）">
-          <img class="nl-powered-by-logo" src="images/logo/kimito-link-color.png" alt="Kimito-Link Project（kimito-link.com を新しいタブで開く）" width="300" height="52" decoding="async">
+        <a
+          class="nl-powered-by-link"
+          href="https://kimito-link.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Kimito-Link Project 公式サイト（新しいタブで開きます）"
+        >
+          <img
+            class="nl-powered-by-logo"
+            src="images/logo/kimito-link-color.png"
+            alt="Kimito-Link Project（kimito-link.com を新しいタブで開く）"
+            width="300"
+            height="52"
+            decoding="async"
+          />
         </a>
       </footer>
 
@@ -12683,8 +13301,7 @@
 
     </div>
 
-    
-  
     <script src="sidepanel.js"></script>
   </body>
+<!-- このファイルは scripts/build-youtube-sidepanel-html.mjs の生成物です（ニコ生版 extension/popup.html の完全コピー）。直接直さないでください。 -->
 </html>

@@ -1,5 +1,6 @@
 // build-youtube-ext.mjs — YouTube Live 試作拡張（extension-youtube/）の esbuild バンドルスクリプト
 import { build } from 'esbuild';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,7 +8,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 
 // サイドパネルの HTML はニコ生版 popup.html から丸ごと写して作る(先に作っておく)
-await import('./build-youtube-sidepanel-html.mjs');
+const { copyReferencedImages } = await import('./build-youtube-sidepanel-html.mjs');
+
+// ニコ生版 popup-entry.js が使う定数(scripts/build.mjs の popupDefine と同じ名前)。
+// 版は YouTube 版の manifest の版にする(ニコ生版の「読み込み中の版とファイルの版がズレています」の比べ先)。
+const PKG_VERSION = JSON.parse(readFileSync(resolve(root, 'extension-youtube/manifest.json'), 'utf8')).version;
+const popupDefine = {
+  NL_BUILD_ID: JSON.stringify(`yt-${new Date().toISOString().slice(0, 16)}`),
+  NL_DEV_HOTRELOAD: 'false',
+  NL_RELEASE: 'false',
+  NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION),
+};
 
 const common = {
   bundle: true,
@@ -36,10 +47,13 @@ await Promise.all([
   }),
   build({
     ...common,
-    entryPoints: [resolve(root, 'extension-youtube/src/sidepanel-entry.js')],
+    // ★ニコ生版の本物 popup-entry.js を、YouTube の記録を読む入口(ytNicoShim)つきで束ねる
+    entryPoints: [resolve(root, 'extension-youtube/src/sidepanel-nico-entry.js')],
     outfile: resolve(root, 'extension-youtube/sidepanel.js'),
+    target: ['chrome100'],
+    define: popupDefine,
     banner: {
-      js: '// sidepanel.js — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示バンドル\n/* eslint-disable */',
+      js: '// sidepanel.js — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル\n/* eslint-disable */',
     },
   }),
   build({
@@ -51,3 +65,6 @@ await Promise.all([
     },
   }),
 ]);
+
+// popup-entry.js の中で使っている画像も写す
+console.log(`画像を ${copyReferencedImages(readFileSync(resolve(root, 'extension-youtube/sidepanel.js'), 'utf8'))} 枚写しました`);
