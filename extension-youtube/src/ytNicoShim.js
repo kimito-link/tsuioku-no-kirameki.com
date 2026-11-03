@@ -116,7 +116,8 @@ export function ytRecordToNicoEntry(r, i, lv) {
  */
 export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
   const lv = pseudoLvForVideoId(videoId);
-  const viewers = Number(sum?.concurrentViewers);
+  // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
+  const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   const startedAt = Number(sum?.createdAt || 0);
   const chId = String(sum?.broadcasterChannelId || '');
   return {
