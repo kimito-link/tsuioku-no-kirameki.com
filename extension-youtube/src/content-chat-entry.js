@@ -1,5 +1,5 @@
 // content-chat-entry.js — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
-/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, setInterval */
+/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, setInterval, NodeFilter */
 
 import {
   parseYtChatElement,
@@ -126,6 +126,65 @@ function readBroadcasterIconUrl() {
 }
 
 /** 同時視聴数（「◯人が視聴中」「◯ watching now」）を探す。 */
+/**
+ * 画面に【見えている】文字だけをつないで返す。
+ * YouTube の同時視聴数は数字が回るアニメ(yt-animated-rolling-number)で、各桁に 0〜9 が縦に全部並び、
+ * 1つだけが枠の中に見えている。textContent / innerText だと 0〜9 が全部つながってしまうので、
+ * 文字ごとに位置を測り、はみ出しを隠している親の枠の中にある文字だけを残す。
+ * @param {Element} root
+ * @returns {string}
+ */
+function visibleTextOf(root) {
+  try {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    let out = '';
+    /** @type {Map<Element, DOMRect | null>} */
+    const clipCache = new Map();
+    const rootRect = root.getBoundingClientRect();
+    /** @param {Element | null} start */
+    const clipRectOf = (start) => {
+      for (let e = start; e && e !== root.parentElement; e = e.parentElement) {
+        if (clipCache.has(e)) return clipCache.get(e) || null;
+        const st = window.getComputedStyle(e);
+        if (st.overflow !== 'visible' || st.overflowY !== 'visible') {
+          const r = e.getBoundingClientRect();
+          clipCache.set(e, r);
+          return r;
+        }
+      }
+      return null;
+    };
+    let node;
+    while ((node = walker.nextNode())) {
+      const text = String(node.nodeValue || '');
+      if (!text.trim()) {
+        out += text;
+        continue;
+      }
+      const parent = node.parentElement;
+      if (parent && window.getComputedStyle(parent).visibility === 'hidden') continue;
+      range.selectNodeContents(node);
+      const r = range.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
+      // 切り取る親が見つからないときは読み取り元の箱そのもので切る(縦に並んだ 0〜9 のうち箱の中の1つだけ残す)
+      const clip = clipRectOf(parent) || rootRect;
+      if (clip && clip.height > 0) {
+        const overlap = Math.min(r.bottom, clip.bottom) - Math.max(r.top, clip.top);
+        if (overlap < r.height / 2) continue;
+      }
+      out += text;
+    }
+    // 桁ごとに別の要素なので「1 9 , 3 4 9」のように空白が挟まる。数字どうしの間の空白は詰める。
+    return out
+      .replace(/\s+/g, ' ')
+      .replace(/([0-9,.])\s+(?=[0-9,.])/g, '$1')
+      .trim();
+  } catch {
+    return '';
+  }
+}
+
 function readConcurrentViewers() {
   const selectors = [
     'ytd-watch-metadata #description #info',
@@ -149,7 +208,7 @@ function readConcurrentViewers() {
       const el = nodes[i];
       // 数字が回るアニメーション(yt-animated-rolling-number)は textContent に 0〜9 が全部並ぶので、
       // 読み上げ用の aria-label を先に見る。textContent は最後(桁の連なりは parser 側で捨てる)。
-      const texts = [String(el.getAttribute('aria-label') || '')];
+      const texts = [visibleTextOf(el), String(el.getAttribute('aria-label') || '')];
       el.querySelectorAll('[aria-label]').forEach((x) => texts.push(String(x.getAttribute('aria-label') || '')));
       texts.push(String(/** @type {HTMLElement} */ (el).innerText || ''));
       texts.push(String(el.textContent || ''));
