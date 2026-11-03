@@ -137,6 +137,8 @@ export class VoicePlayer {
     this._weakPcState = { saved: false };
     /** 2026-10-31: 合成の時間切れが続いたら「混雑中」=1件ずつ・長めに待つ(voiceEngineOverload.js)。 */
     this._overload = createVoiceOverloadState();
+    /** 2026-11-03: VOICEVOX に頼んでまだ返ってきていない合成の数(混雑中は1件ずつ頼むため)。 */
+    this._synthInFlight = 0;
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
 
@@ -586,6 +588,9 @@ export class VoicePlayer {
     let timedOut = false;
     const startedAt = Date.now();
     const overloadTimeouts = resolveVoiceOverloadTimeouts(this._overload.overloaded);
+    this._synthInFlight += 1;
+    let settled = false;
+    const settle = () => { if (!settled) { settled = true; this._synthInFlight = Math.max(0, this._synthInFlight - 1); } };
     // 同期で呼ぶ(enqueue 直後に合成が起動していることを既存テストが固定している=v0.1.800)。
     let started;
     try {
@@ -604,6 +609,7 @@ export class VoicePlayer {
     return Promise.resolve(started)
       .then(
         (wav) => {
+          settle();
           /** @type {any} */
           let r = null;
           try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(this.diag, r); } catch { /* 計器は本体を止めない */ }
@@ -625,6 +631,7 @@ export class VoicePlayer {
           return wav;
         },
         (err) => {
+          settle();
           try { track.end(timing, false); } catch { /* no-op */ }
           this._noteOverload({ timedOut, ok: false });
           throw err;
@@ -711,6 +718,10 @@ export class VoicePlayer {
     for (let i = 0; i < depth && i < this.queue.length; i++) {
       const item = this.queue[i];
       if (!item) continue;
+      // 2026-11-03: 混雑中は、VOICEVOX がまだ前の合成をしている間は次を頼まない。
+      //   拡張が諦めた依頼も VOICEVOX は最後まで計算するので、重ねて頼むほど全部が遅れる
+      //   (実測: CPU 100%・時間切れ1,940件)。頼まなかった件は順番が来たときに頼む。
+      if (this._overload.overloaded && this._synthInFlight > 0 && !this.prefetches.has(item)) continue;
       wanted.add(item);
       this._ensurePrefetch(item, generation);
     }
@@ -718,6 +729,16 @@ export class VoicePlayer {
     for (const key of this.prefetches.keys()) {
       if (!wanted.has(key)) this.prefetches.delete(key);
     }
+  }
+
+  /**
+   * 2026-11-03: VOICEVOX が混雑中(時間切れが続いた)なら、合成を頼み済みの件を守る判定を返す。
+   *   混雑していなければ null(=従来どおり件数・鮮度で捨てる)。
+   * @returns {((x: any) => boolean) | null}
+   */
+  _inflightKeeper() {
+    if (!this._overload.overloaded) return null;
+    return (x) => this.prefetches.has(x);
   }
 
   async _drainQueue() {
@@ -738,12 +759,15 @@ export class VoicePlayer {
           //   コメントが流れている限り「今のコメント」は必ず1つ読む方が体感が良い(無音より新着優先)。
           //   古い分だけ捨て、最新(末尾)を残してそのまま再生フローへ進める。
           const newest = this.queue[this.queue.length - 1];
-          const dropped = this.queue.slice(0, this.queue.length - 1);
+          // 2026-11-03: 混雑中は合成中の件も残す(捨てても VOICEVOX は止まらず、作業だけ無駄になる)。
+          const keepInflight = this._inflightKeeper();
+          const survivors = this.queue.filter((q) => q === newest || (keepInflight ? keepInflight(q) : false));
+          const dropped = this.queue.filter((q) => !survivors.includes(q));
           for (const d of dropped) {
             if (typeof d.onPlayStart === 'function') d.onPlayStart();
             this._notifyDropped(d); // v0.1.799: 鳴らず破棄→吹き出しを unvoiced へ
           }
-          this.queue = [newest];
+          this.queue = survivors;
           if (dropped.length > 0) {
             this._showSkipped(dropped.length);
             this.diag.staleDropTotal += dropped.length;
@@ -775,7 +799,11 @@ export class VoicePlayer {
         foldVoiceStageEma(this.diag, 'queueWaitEmaMs', measureVoiceGapMs(item.enqueuedAt, _serviceStart));
 
         const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
-        if (ageCheck.stale) {
+        // 2026-11-03: 混雑中は、合成を頼み済みの件と、後ろにもう新しい件が無い件は古くても読む
+        //   (遅い PC ではどの件も8秒を超えるので、ここで捨てると1件も鳴らない)。
+        const keepInflight = this._inflightKeeper();
+        const keepAnyway = !!keepInflight && (keepInflight(item) || this.queue.length === 0);
+        if (ageCheck.stale && !keepAnyway) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
           this._notifyDropped(item); // v0.1.799: stale で鳴らず破棄→吹き出しを unvoiced へ
           this._showSkipped(1);
@@ -1138,7 +1166,7 @@ export class VoicePlayer {
       // v0.1.1800: 待っている件の文字数から上限を見積もる(長い声の直後に平均が膨らんで、続く短い
       //   コメントまで飛ばしていた)。見積もれなければ従来の this._effectiveQueueMax。
       const queueMax = this._resolveQueueMaxByChars(candidate);
-      const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax });
+      const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax, keep: this._inflightKeeper() });
       this.queue = pushed.queue;
       noteVoicePaceArrival(this._paceState, candidate.enqueuedAt);
       
