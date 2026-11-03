@@ -59,7 +59,14 @@ copyFileSync(resolve(root, 'extension/dist/cloak-failsafe.js'), resolve(root, 'e
   const cv = readFileSync(resolve(root, 'extension/comeview.html'), 'utf8');
   const from = '<script src="dist/comeview.js"></script>';
   if (!cv.includes(from)) throw new Error(`comeview.html に ${from} がありません（ニコ生版の形が変わった?）`);
+  // YouTube 版だけの差し替え1つ: 名前の横の「(数字ID)」を YouTube の人の見分け(UC… / @handle)にする
+  //   (入口 ytNicoShim が data-yt-uid-label を置く。ニコ生版の CSS はそのまま残し、後ろで上書きするだけ)
+  const ytUidCss =
+    '<style>/* YouTube 版: 疑似の数字IDではなく YouTube の見分けを出す */' +
+    '.nl-tl-row[data-nl-uid][data-yt-uid-label]::after{content:"(" attr(data-yt-uid-label) ")"}' +
+    '.nl-tl-row[data-nl-uid][data-yt-uid-label=""]::after{content:""}</style>\n';
   const cvOut = cv
+    .replace('</head>', `${ytUidCss}</head>`)
     .replace(from, '<script src="comeview.js"></script>')
     .replace(
       '</html>',
