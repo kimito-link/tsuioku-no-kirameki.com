@@ -135,8 +135,12 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
     broadcasterUserId: chId,
     broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : '',
     broadcasterIconUrl: String(sum?.broadcasterIconUrl || ''),
-    viewerCountFromDom: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
+    // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
+    // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
+    viewerCountFromDom: null,
     viewerCountSource: 'dom',
+    officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
+    officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     streamAgeMin: startedAt > 0 ? Math.max(0, Math.round((Date.now() - startedAt) / 60000)) : null,
   };
 }

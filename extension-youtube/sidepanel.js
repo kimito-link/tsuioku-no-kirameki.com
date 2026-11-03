@@ -240,8 +240,12 @@
       broadcasterUserId: chId,
       broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : "",
       broadcasterIconUrl: String(sum?.broadcasterIconUrl || ""),
-      viewerCountFromDom: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
+      // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
+      // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
+      viewerCountFromDom: null,
       viewerCountSource: "dom",
+      officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
+      officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
       streamAgeMin: startedAt > 0 ? Math.max(0, Math.round((Date.now() - startedAt) / 6e4)) : null
     };
   }
@@ -45101,7 +45105,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T10:22" ? String("yt-2026-11-03T10:22") : "dev";
+      const buildId = "yt-2026-11-03T10:24" ? String("yt-2026-11-03T10:24") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45164,7 +45168,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T10:22" ? String("yt-2026-11-03T10:22") : "dev";
+            return "yt-2026-11-03T10:24" ? String("yt-2026-11-03T10:24") : "dev";
           } catch {
             return "dev";
           }
