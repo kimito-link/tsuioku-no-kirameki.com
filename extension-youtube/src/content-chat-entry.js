@@ -873,7 +873,8 @@ function init() {
   const path = String(window.location.pathname || '');
   if (path.startsWith('/live_chat')) {
     setupLiveChatObserver();
-    if (!path.startsWith('/live_chat_replay')) setupAutoAllChat();
+    // アーカイブのリプレイも「上位のチャットのリプレイ」⇄「チャットのリプレイ」の2択で、2つ目が全部(生配信と同じ並び)
+    setupAutoAllChat();
     setupCommentSendBridge();
     setupLeaderboardReader();
   } else if (window.top === window) {
