@@ -197,10 +197,136 @@
     };
   }
 
+  // src/lib/youtube/ytStreamStorePolicy.js
+  function buildYtCommentPrimaryKey(videoId, commentId) {
+    const v = String(videoId || "").trim();
+    const c = String(commentId || "").trim();
+    if (!v || !c) return "";
+    return `${v}::${c}`;
+  }
+  function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
+    const prev = existing && typeof existing === "object" ? existing : {};
+    const videoId = String(patch?.videoId || prev.videoId || "").trim();
+    const title = String(patch?.title || prev.title || "").trim();
+    const broadcasterName = String(patch?.broadcasterName || prev.broadcasterName || "").trim();
+    const broadcasterChannelId = String(
+      patch?.broadcasterChannelId || prev.broadcasterChannelId || ""
+    ).trim();
+    const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || "").trim();
+    const itemCount = typeof patch?.itemCount === "number" && Number.isFinite(patch.itemCount) && patch.itemCount >= 0 ? Math.floor(patch.itemCount) : typeof prev.itemCount === "number" && Number.isFinite(prev.itemCount) ? Math.floor(prev.itemCount) : 0;
+    const createdAt = typeof prev.createdAt === "number" && Number.isFinite(prev.createdAt) && prev.createdAt > 0 ? prev.createdAt : nowMs;
+    return {
+      videoId,
+      title,
+      broadcasterName,
+      broadcasterChannelId,
+      chatFilterLabel,
+      itemCount,
+      createdAt,
+      updatedAt: nowMs
+    };
+  }
+  function prepareYtCommentsForIdb(videoId, incomingItems, nowMs = Date.now()) {
+    const vid = String(videoId || "").trim();
+    if (!vid || !Array.isArray(incomingItems) || incomingItems.length === 0) {
+      return [];
+    }
+    const seenPks = /* @__PURE__ */ new Set();
+    const records = [];
+    for (let i = 0; i < incomingItems.length; i += 1) {
+      const item = incomingItems[i];
+      if (!item || typeof item !== "object") continue;
+      const commentId = String(item.id || "").trim();
+      const pk = buildYtCommentPrimaryKey(vid, commentId);
+      if (!pk || seenPks.has(pk)) continue;
+      seenPks.add(pk);
+      records.push({
+        ...item,
+        id: commentId,
+        videoId: vid,
+        pk,
+        recordedAt: typeof item.recordedAt === "number" && Number.isFinite(item.recordedAt) ? item.recordedAt : nowMs + i * 1e-3
+      });
+    }
+    return records;
+  }
+
+  // extension-youtube/src/ytIdbStore.js
+  var DB_NAME = "yt_kirameki_db";
+  var DB_VERSION = 1;
+  var STORE_COMMENTS = "comments";
+  var INDEX_BY_VIDEO_ID = "by_videoId";
+  var dbPromise = null;
+  function openYtCommentsDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      try {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE_COMMENTS)) {
+            const store = db.createObjectStore(STORE_COMMENTS, { keyPath: "pk" });
+            store.createIndex(INDEX_BY_VIDEO_ID, "videoId", { unique: false });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => {
+          dbPromise = null;
+          reject(req.error || new Error("idb_open_failed"));
+        };
+      } catch (err) {
+        dbPromise = null;
+        reject(err);
+      }
+    });
+    return dbPromise;
+  }
+  async function appendYtStreamCommentsIdb(videoId, incomingItems) {
+    const vid = String(videoId || "").trim();
+    const records = prepareYtCommentsForIdb(vid, incomingItems);
+    const db = await openYtCommentsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_COMMENTS], "readwrite");
+      const store = tx.objectStore(STORE_COMMENTS);
+      const index = store.index(INDEX_BY_VIDEO_ID);
+      const newlyAdded = [];
+      let totalCount = 0;
+      let idx = 0;
+      const processNext = () => {
+        if (idx >= records.length) {
+          const countReq = index.count(IDBKeyRange.only(vid));
+          countReq.onsuccess = () => {
+            totalCount = Number(countReq.result || 0);
+          };
+          return;
+        }
+        const rec = records[idx];
+        idx += 1;
+        const getReq = store.get(rec.pk);
+        getReq.onsuccess = () => {
+          if (!getReq.result) {
+            store.put(rec);
+            newlyAdded.push(rec);
+          }
+          processNext();
+        };
+        getReq.onerror = () => {
+          processNext();
+        };
+      };
+      processNext();
+      tx.oncomplete = () => {
+        resolve({ newlyAdded, totalCount });
+      };
+      tx.onerror = () => {
+        reject(tx.error || new Error("idb_append_failed"));
+      };
+    });
+  }
+
   // extension-youtube/src/background-entry.js
-  var MAX_ITEMS_PER_STREAM = 1500;
   var STORAGE_KEYS = Object.freeze({
-    STREAMS: "yt_streams",
+    STREAM_SUMMARIES: "yt_stream_summaries",
     ACTIVE_VIDEO_ID: "yt_active_video_id",
     VOICE_SETTINGS: "yt_voice_settings",
     VOICE_ASSIGNMENTS: "yt_voice_assignments",
@@ -232,20 +358,6 @@
       return "";
     }
   }
-  function trimStreamItems(items) {
-    if (!Array.isArray(items) || items.length <= MAX_ITEMS_PER_STREAM) {
-      return items || [];
-    }
-    const excess = items.length - MAX_ITEMS_PER_STREAM;
-    let removed = 0;
-    return items.filter((item) => {
-      if (removed >= excess) return true;
-      const isSupport = item.kind === "superchat" || item.kind === "sticker" || item.kind === "membership" || item.kind === "membership_gift";
-      if (isSupport) return true;
-      removed += 1;
-      return false;
-    });
-  }
   function setupSidePanelBehavior() {
     try {
       if (chrome?.sidePanel?.setPanelBehavior) {
@@ -267,28 +379,22 @@
         const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || "").trim();
         if (!videoId) return { ok: false };
         const data = await chrome.storage.local.get([
-          STORAGE_KEYS.STREAMS,
+          STORAGE_KEYS.STREAM_SUMMARIES,
           STORAGE_KEYS.ACTIVE_VIDEO_ID
         ]);
-        const streams = data[STORAGE_KEYS.STREAMS] || {};
-        const current = streams[videoId] || {
-          videoId,
-          title: "",
-          broadcasterName: "",
-          broadcasterChannelId: "",
-          chatFilterLabel: "",
-          items: [],
-          updatedAt: Date.now()
-        };
-        if (payload.title) current.title = String(payload.title);
-        if (payload.broadcasterName) current.broadcasterName = String(payload.broadcasterName);
-        if (payload.broadcasterChannelId) {
-          current.broadcasterChannelId = String(payload.broadcasterChannelId);
-        }
-        current.updatedAt = Date.now();
-        streams[videoId] = current;
+        const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+        summaries[videoId] = mergeYtStreamSummary(
+          summaries[videoId],
+          {
+            videoId,
+            title: payload.title ? String(payload.title) : void 0,
+            broadcasterName: payload.broadcasterName ? String(payload.broadcasterName) : void 0,
+            broadcasterChannelId: payload.broadcasterChannelId ? String(payload.broadcasterChannelId) : void 0
+          },
+          Date.now()
+        );
         await chrome.storage.local.set({
-          [STORAGE_KEYS.STREAMS]: streams,
+          [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
           [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId
         });
         return { ok: true, videoId };
@@ -302,26 +408,15 @@
         const incoming = Array.isArray(payload.items) ? payload.items : [];
         const chatFilterLabel = String(payload.chatFilterLabel || "").trim();
         const data = await chrome.storage.local.get([
-          STORAGE_KEYS.STREAMS,
+          STORAGE_KEYS.STREAM_SUMMARIES,
           STORAGE_KEYS.ACTIVE_VIDEO_ID,
           STORAGE_KEYS.VOICE_SETTINGS,
           STORAGE_KEYS.VOICE_ASSIGNMENTS,
           STORAGE_KEYS.VOICE_QUEUE,
           STORAGE_KEYS.VOICE_STATE
         ]);
-        const streams = data[STORAGE_KEYS.STREAMS] || {};
-        const stream = streams[videoId] || {
-          videoId,
-          title: "",
-          broadcasterName: "",
-          broadcasterChannelId: "",
-          chatFilterLabel: "",
-          items: [],
-          updatedAt: Date.now()
-        };
-        if (chatFilterLabel) {
-          stream.chatFilterLabel = chatFilterLabel;
-        }
+        const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+        const prevSummary = summaries[videoId] || null;
         const settings = {
           ...DEFAULT_VOICE_SETTINGS,
           ...data[STORAGE_KEYS.VOICE_SETTINGS] || {}
@@ -333,29 +428,28 @@
           autoSwitched: false,
           updatedAt: Date.now()
         };
-        const existingIds = new Set(stream.items.map((x) => x.id));
-        const broadcasterName = String(settings.broadcasterNameOverride || "").trim() || String(stream.broadcasterName || "").trim();
-        let addedCount = 0;
+        const broadcasterName = String(settings.broadcasterNameOverride || "").trim() || String(prevSummary?.broadcasterName || "").trim();
+        const enrichedIncoming = [];
         for (const rawItem of incoming) {
-          if (!rawItem || !rawItem.id || existingIds.has(rawItem.id)) continue;
-          existingIds.add(rawItem.id);
+          if (!rawItem || !rawItem.id) continue;
           const voice = resolveYtVoiceForChannel(rawItem.channelId || rawItem.name || "anonymous", {
             availableStyleIds: settings.availableStyleIds,
             assignments
           });
           assignments = voice.assignments;
-          const enrichedItem = {
+          enrichedIncoming.push({
             ...rawItem,
             voiceUserKey: voice.userKey,
             voiceStyleId: voice.styleId,
             pitchOffset: voice.pitchOffset,
             speedOffset: voice.speedOffset,
             recordedAt: Date.now()
-          };
-          stream.items.push(enrichedItem);
-          addedCount += 1;
-          if (settings.enabled) {
-            const enq = enqueueYtVoiceItem(voiceQueue, enrichedItem, {
+          });
+        }
+        const idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+        if (settings.enabled) {
+          for (const newItem of idbResult.newlyAdded) {
+            const enq = enqueueYtVoiceItem(voiceQueue, newItem, {
               mode: settings.mode,
               broadcasterName,
               availableStyleIds: settings.availableStyleIds,
@@ -370,11 +464,17 @@
             };
           }
         }
-        stream.items = trimStreamItems(stream.items);
-        stream.updatedAt = Date.now();
-        streams[videoId] = stream;
+        summaries[videoId] = mergeYtStreamSummary(
+          prevSummary,
+          {
+            videoId,
+            chatFilterLabel: chatFilterLabel || void 0,
+            itemCount: idbResult.totalCount
+          },
+          Date.now()
+        );
         const updates = {
-          [STORAGE_KEYS.STREAMS]: streams,
+          [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
           [STORAGE_KEYS.VOICE_ASSIGNMENTS]: assignments,
           [STORAGE_KEYS.VOICE_QUEUE]: voiceQueue,
           [STORAGE_KEYS.VOICE_STATE]: voiceState
@@ -383,7 +483,12 @@
           updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
         }
         await chrome.storage.local.set(updates);
-        return { ok: true, addedCount, totalCount: stream.items.length, videoId };
+        return {
+          ok: true,
+          addedCount: idbResult.newlyAdded.length,
+          totalCount: idbResult.totalCount,
+          videoId
+        };
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }

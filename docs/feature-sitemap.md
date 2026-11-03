@@ -124,8 +124,9 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
 
+- `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・取得するストア
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
@@ -323,7 +324,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 274</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 275</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -594,6 +595,7 @@
 - `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
 - `src/lib/yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
+- `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・表示スライス計算（純関数）
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
 - `tests/helpers/laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
@@ -618,7 +620,7 @@
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
 - `extension-youtube/background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
 - `extension-youtube/sidepanel.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示バンドル
-- `extension-youtube/src/background-entry.js` — YouTube Live コメントのローカル記録・読み上げキュー管理 Service Worker
+- `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・読み上げキュー管理 Service Worker
 - `extension-youtube/src/sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示 UI
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。

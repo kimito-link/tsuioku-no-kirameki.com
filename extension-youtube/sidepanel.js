@@ -1321,9 +1321,68 @@
   });
   var YT_DEFAULT_STYLE_IDS = VOICE_CAPPED_STYLE_IDS;
 
+  // src/lib/youtube/ytStreamStorePolicy.js
+  var YT_SIDE_PANEL_DISPLAY_LIMIT = 150;
+  function selectYtNewestCommentsForDisplay(items, limit = YT_SIDE_PANEL_DISPLAY_LIMIT) {
+    if (!Array.isArray(items) || items.length === 0) return [];
+    const maxCount = typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : YT_SIDE_PANEL_DISPLAY_LIMIT;
+    const startIdx = Math.max(0, items.length - maxCount);
+    return items.slice(startIdx).reverse();
+  }
+
+  // extension-youtube/src/ytIdbStore.js
+  var DB_NAME = "yt_kirameki_db";
+  var DB_VERSION = 1;
+  var STORE_COMMENTS = "comments";
+  var INDEX_BY_VIDEO_ID = "by_videoId";
+  var dbPromise = null;
+  function openYtCommentsDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      try {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE_COMMENTS)) {
+            const store = db.createObjectStore(STORE_COMMENTS, { keyPath: "pk" });
+            store.createIndex(INDEX_BY_VIDEO_ID, "videoId", { unique: false });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => {
+          dbPromise = null;
+          reject(req.error || new Error("idb_open_failed"));
+        };
+      } catch (err) {
+        dbPromise = null;
+        reject(err);
+      }
+    });
+    return dbPromise;
+  }
+  async function getYtStreamCommentsByVideoId(videoId) {
+    const vid = String(videoId || "").trim();
+    if (!vid) return [];
+    const db = await openYtCommentsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_COMMENTS], "readonly");
+      const store = tx.objectStore(STORE_COMMENTS);
+      const index = store.index(INDEX_BY_VIDEO_ID);
+      const req = index.getAll(IDBKeyRange.only(vid));
+      req.onsuccess = () => {
+        const list = Array.isArray(req.result) ? req.result : [];
+        list.sort((a, b) => Number(a.recordedAt || 0) - Number(b.recordedAt || 0));
+        resolve(list);
+      };
+      req.onerror = () => {
+        reject(req.error || new Error("idb_get_failed"));
+      };
+    });
+  }
+
   // extension-youtube/src/sidepanel-entry.js
   var STORAGE_KEYS = Object.freeze({
-    STREAMS: "yt_streams",
+    STREAM_SUMMARIES: "yt_stream_summaries",
     ACTIVE_VIDEO_ID: "yt_active_video_id",
     VOICE_SETTINGS: "yt_voice_settings",
     VOICE_ASSIGNMENTS: "yt_voice_assignments",
@@ -1459,10 +1518,10 @@
       listEl.appendChild(hint);
       return;
     }
-    const recent = items.slice(-150);
+    const newestSlice = selectYtNewestCommentsForDisplay(items, YT_SIDE_PANEL_DISPLAY_LIMIT);
     const frag = document.createDocumentFragment();
-    for (let i = 0; i < recent.length; i += 1) {
-      frag.appendChild(createChatItemElement(recent[i]));
+    for (let i = 0; i < newestSlice.length; i += 1) {
+      frag.appendChild(createChatItemElement(newestSlice[i]));
     }
     listEl.appendChild(frag);
   }
@@ -1563,19 +1622,19 @@
   async function renderFromStorage() {
     try {
       const data = await chrome.storage.local.get([
-        STORAGE_KEYS.STREAMS,
+        STORAGE_KEYS.STREAM_SUMMARIES,
         STORAGE_KEYS.ACTIVE_VIDEO_ID,
         STORAGE_KEYS.VOICE_SETTINGS,
         STORAGE_KEYS.VOICE_QUEUE,
         STORAGE_KEYS.VOICE_STATE
       ]);
-      const streams = data[STORAGE_KEYS.STREAMS] || {};
-      const videoIds = Object.keys(streams).sort(
-        (a, b) => Number(streams[b]?.updatedAt || 0) - Number(streams[a]?.updatedAt || 0)
+      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      const videoIds = Object.keys(summaries).sort(
+        (a, b) => Number(summaries[b]?.updatedAt || 0) - Number(summaries[a]?.updatedAt || 0)
       );
       const activeId = String(data[STORAGE_KEYS.ACTIVE_VIDEO_ID] || "");
-      if (!selectedVideoId || !streams[selectedVideoId]) {
-        selectedVideoId = activeId && streams[activeId] ? activeId : videoIds[0] || "";
+      if (!selectedVideoId || !summaries[selectedVideoId]) {
+        selectedVideoId = activeId && summaries[activeId] ? activeId : videoIds[0] || "";
       }
       const selectEl = (
         /** @type {HTMLSelectElement | null} */
@@ -1590,30 +1649,30 @@
           selectEl.appendChild(opt);
         } else {
           for (const vid of videoIds) {
-            const s = streams[vid];
+            const s = summaries[vid];
             const opt = document.createElement("option");
             opt.value = vid;
             const labelTitle = s.title || vid;
-            opt.textContent = `${labelTitle} (${(s.items || []).length}件)`;
+            opt.textContent = `${labelTitle} (${Number(s.itemCount || 0)}件)`;
             if (vid === selectedVideoId) opt.selected = true;
             selectEl.appendChild(opt);
           }
         }
       }
-      const currentStream = selectedVideoId ? streams[selectedVideoId] : null;
-      const items = Array.isArray(currentStream?.items) ? currentStream.items : [];
+      const currentSummary = selectedVideoId ? summaries[selectedVideoId] : null;
+      const items = selectedVideoId ? await getYtStreamCommentsByVideoId(selectedVideoId) : [];
       const summaryEl = document.getElementById("yt-stream-summary");
       if (summaryEl) {
-        if (currentStream) {
-          const bName = currentStream.broadcasterName ? ` / 配信者: ${currentStream.broadcasterName}` : "";
-          summaryEl.textContent = `記録中: ${currentStream.title || currentStream.videoId}${bName}（合計 ${items.length}件）`;
+        if (currentSummary) {
+          const bName = currentSummary.broadcasterName ? ` / 配信者: ${currentSummary.broadcasterName}` : "";
+          summaryEl.textContent = `記録中: ${currentSummary.title || currentSummary.videoId}${bName}（合計 ${items.length}件・全件 IndexedDB 保存）`;
         } else {
           summaryEl.textContent = "YouTube Live の視聴ページを開くと自動でチャットを記録します";
         }
       }
       const filterBadge = document.getElementById("yt-detected-filter-badge");
       const noticeBanner = document.getElementById("yt-all-chat-notice");
-      const filterLabel = String(currentStream?.chatFilterLabel || "").trim();
+      const filterLabel = String(currentSummary?.chatFilterLabel || "").trim();
       if (filterBadge && noticeBanner) {
         if (!filterLabel) {
           filterBadge.textContent = "現在のチャット表示: 検出待ち（「すべてのチャット」を選択してください）";
@@ -1655,7 +1714,7 @@
         document.getElementById("yt-broadcaster-name-input")
       );
       if (bNameInput && document.activeElement !== bNameInput) {
-        bNameInput.value = settings.broadcasterNameOverride || currentStream?.broadcasterName || "";
+        bNameInput.value = settings.broadcasterNameOverride || currentSummary?.broadcasterName || "";
       }
       const queueInfoEl = document.getElementById("yt-voice-queue-info");
       if (queueInfoEl) {
@@ -1673,7 +1732,7 @@
       const ranking = aggregateYtSupportRanking(items);
       renderSupportRanking(ranking);
       const grouped = groupYtCommentsByLane(items, {
-        broadcasterChannelId: currentStream?.broadcasterChannelId || "",
+        broadcasterChannelId: currentSummary?.broadcasterChannelId || "",
         supporterChannelIds: ranking.supporterChannelIds
       });
       renderLaneColumn(

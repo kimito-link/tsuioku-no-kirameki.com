@@ -15,9 +15,14 @@ import {
   buildYtChannelUrl,
 } from '../../src/lib/youtube/ytSupportRanking.js';
 import { YT_VOICE_MODES, YT_DEFAULT_STYLE_IDS } from '../../src/lib/youtube/ytVoiceQueue.js';
+import {
+  YT_SIDE_PANEL_DISPLAY_LIMIT,
+  selectYtNewestCommentsForDisplay,
+} from '../../src/lib/youtube/ytStreamStorePolicy.js';
+import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 
 const STORAGE_KEYS = Object.freeze({
-  STREAMS: 'yt_streams',
+  STREAM_SUMMARIES: 'yt_stream_summaries',
   ACTIVE_VIDEO_ID: 'yt_active_video_id',
   VOICE_SETTINGS: 'yt_voice_settings',
   VOICE_ASSIGNMENTS: 'yt_voice_assignments',
@@ -183,7 +188,7 @@ function createChatItemElement(item) {
 }
 
 /**
- * レーン1列を描画する。
+ * レーン1列を描画する（件数は全件数を表示し、DOM 描画は新しい順に上限件数を描画する）。
  * @param {string} listId
  * @param {string} countId
  * @param {any[]} items
@@ -206,11 +211,10 @@ function renderLaneColumn(listId, countId, items, emptyMessage) {
     return;
   }
 
-  // 最新コメントが上または下に追いやすいよう直近150件を描画
-  const recent = items.slice(-150);
+  const newestSlice = selectYtNewestCommentsForDisplay(items, YT_SIDE_PANEL_DISPLAY_LIMIT);
   const frag = document.createDocumentFragment();
-  for (let i = 0; i < recent.length; i += 1) {
-    frag.appendChild(createChatItemElement(recent[i]));
+  for (let i = 0; i < newestSlice.length; i += 1) {
+    frag.appendChild(createChatItemElement(newestSlice[i]));
   }
   listEl.appendChild(frag);
 }
@@ -289,7 +293,6 @@ function renderSupportRanking(ranking) {
     containerEl.appendChild(box);
   }
 
-  // メンバー加入・ギフトの応援者ボックス
   const memberSupporters = ranking.supporters.filter(
     (s) => s.membershipCount > 0 || s.giftCount > 0,
   );
@@ -332,28 +335,29 @@ function renderSupportRanking(ranking) {
 }
 
 /**
- * 画面全体（ストリーム選択・注意書き・3レーン・応援者ランキング・読み上げ状態）を再描画する。
+ * `chrome.storage.local` から配信一覧の要約と設定を読み、
+ * 今見ている配信（`selectedVideoId`）のコメントだけを IndexedDB から読んで描画する。
  */
 async function renderFromStorage() {
   try {
     const data = await chrome.storage.local.get([
-      STORAGE_KEYS.STREAMS,
+      STORAGE_KEYS.STREAM_SUMMARIES,
       STORAGE_KEYS.ACTIVE_VIDEO_ID,
       STORAGE_KEYS.VOICE_SETTINGS,
       STORAGE_KEYS.VOICE_QUEUE,
       STORAGE_KEYS.VOICE_STATE,
     ]);
 
-    const streams = data[STORAGE_KEYS.STREAMS] || {};
-    const videoIds = Object.keys(streams).sort(
-      (a, b) => Number(streams[b]?.updatedAt || 0) - Number(streams[a]?.updatedAt || 0),
+    const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+    const videoIds = Object.keys(summaries).sort(
+      (a, b) => Number(summaries[b]?.updatedAt || 0) - Number(summaries[a]?.updatedAt || 0),
     );
     const activeId = String(data[STORAGE_KEYS.ACTIVE_VIDEO_ID] || '');
-    if (!selectedVideoId || !streams[selectedVideoId]) {
-      selectedVideoId = activeId && streams[activeId] ? activeId : videoIds[0] || '';
+    if (!selectedVideoId || !summaries[selectedVideoId]) {
+      selectedVideoId = activeId && summaries[activeId] ? activeId : videoIds[0] || '';
     }
 
-    // 配信セレクタ更新
+    // 配信セレクタ更新（要約のみ参照）
     const selectEl = /** @type {HTMLSelectElement | null} */ (
       document.getElementById('yt-stream-select')
     );
@@ -366,26 +370,29 @@ async function renderFromStorage() {
         selectEl.appendChild(opt);
       } else {
         for (const vid of videoIds) {
-          const s = streams[vid];
+          const s = summaries[vid];
           const opt = document.createElement('option');
           opt.value = vid;
           const labelTitle = s.title || vid;
-          opt.textContent = `${labelTitle} (${(s.items || []).length}件)`;
+          opt.textContent = `${labelTitle} (${Number(s.itemCount || 0)}件)`;
           if (vid === selectedVideoId) opt.selected = true;
           selectEl.appendChild(opt);
         }
       }
     }
 
-    const currentStream = selectedVideoId ? streams[selectedVideoId] : null;
-    const items = Array.isArray(currentStream?.items) ? currentStream.items : [];
+    const currentSummary = selectedVideoId ? summaries[selectedVideoId] : null;
+    // 今見ている配信のコメントだけを IndexedDB から取得する
+    const items = selectedVideoId ? await getYtStreamCommentsByVideoId(selectedVideoId) : [];
 
     // ヘッダー要約
     const summaryEl = document.getElementById('yt-stream-summary');
     if (summaryEl) {
-      if (currentStream) {
-        const bName = currentStream.broadcasterName ? ` / 配信者: ${currentStream.broadcasterName}` : '';
-        summaryEl.textContent = `記録中: ${currentStream.title || currentStream.videoId}${bName}（合計 ${items.length}件）`;
+      if (currentSummary) {
+        const bName = currentSummary.broadcasterName
+          ? ` / 配信者: ${currentSummary.broadcasterName}`
+          : '';
+        summaryEl.textContent = `記録中: ${currentSummary.title || currentSummary.videoId}${bName}（合計 ${items.length}件・全件 IndexedDB 保存）`;
       } else {
         summaryEl.textContent = 'YouTube Live の視聴ページを開くと自動でチャットを記録します';
       }
@@ -394,7 +401,7 @@ async function renderFromStorage() {
     // 「トップチャット」vs「すべてのチャット」検出表示
     const filterBadge = document.getElementById('yt-detected-filter-badge');
     const noticeBanner = document.getElementById('yt-all-chat-notice');
-    const filterLabel = String(currentStream?.chatFilterLabel || '').trim();
+    const filterLabel = String(currentSummary?.chatFilterLabel || '').trim();
     if (filterBadge && noticeBanner) {
       if (!filterLabel) {
         filterBadge.textContent = '現在のチャット表示: 検出待ち（「すべてのチャット」を選択してください）';
@@ -441,7 +448,7 @@ async function renderFromStorage() {
     );
     if (bNameInput && document.activeElement !== bNameInput) {
       bNameInput.value =
-        settings.broadcasterNameOverride || currentStream?.broadcasterName || '';
+        settings.broadcasterNameOverride || currentSummary?.broadcasterName || '';
     }
 
     const queueInfoEl = document.getElementById('yt-voice-queue-info');
@@ -460,13 +467,13 @@ async function renderFromStorage() {
       }
     }
 
-    // 応援者ランキング集計
+    // 応援者ランキング集計（この配信の IndexedDB 全件から算出）
     const ranking = aggregateYtSupportRanking(items);
     renderSupportRanking(ranking);
 
     // 3レーン振り分け＆描画
     const grouped = groupYtCommentsByLane(items, {
-      broadcasterChannelId: currentStream?.broadcasterChannelId || '',
+      broadcasterChannelId: currentSummary?.broadcasterChannelId || '',
       supporterChannelIds: ranking.supporterChannelIds,
     });
 

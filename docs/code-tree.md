@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1107 件
+## ⚠️ 役割コメントが無いソース 9 / 1109 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -764,11 +764,12 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **extension-youtube/** (8)
-  - 📁 **src/** (3)
-    - `background-entry.js` — YouTube Live コメントのローカル記録・読み上げキュー管理 Service Worker
+- 📁 **extension-youtube/** (9)
+  - 📁 **src/** (4)
+    - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・読み上げキュー管理 Service Worker
     - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示 UI
+    - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・取得するストア
   - `background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
   - `content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
   - `manifest.json`
@@ -983,7 +984,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2247)
+- 📁 **src/** (2249)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1307,7 +1308,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1957)
+  - 📁 **lib/** (1959)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1323,11 +1324,13 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
-    - 📁 **youtube/** (8)
+    - 📁 **youtube/** (10)
       - `ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
       - `ytChatParse.test.js`
       - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
       - `ytLaneAssign.test.js`
+      - `ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・表示スライス計算（純関数）
+      - `ytStreamStorePolicy.test.js`
       - `ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計（通貨別・純関数）
       - `ytSupportRanking.test.js`
       - `ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
