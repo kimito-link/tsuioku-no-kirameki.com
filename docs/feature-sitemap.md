@@ -608,7 +608,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 45</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -635,6 +635,8 @@
 - `src/lib/voiceKeys.js` — 読み上げ設定の storage キーの【正本】。
 - `src/lib/voiceLagBudget.js` — 会場読み上げの件数ゲート実効上限を、処理時間EMA(実測)から動的に
 - `src/lib/voiceLagNotice.js` — 読み上げが大きく遅れているときの一言(会場・コメビュ共通)。DOM も chrome API も触らない純関数。
+- `src/lib/voiceLightFallback.js` — VOICEVOX が追いつかないときだけ、PC に入っている軽い声(Windows の声)で読む(純関数)。
+- `src/lib/voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
@@ -1325,6 +1327,7 @@
 - `v0.1.1836` 2026-10-31 — つなぎ直しで同じコメントが二重に出ないように
 
 ### 🔊 読み上げ (9版)
+- `v0.1.1851` 2026-11-03 — VOICEVOX が追いつかない間は PC の声で読む
 - `v0.1.1850` 2026-11-03 — 混んだ配信で読み上げが全く鳴らないのを修正
 - `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
 - `v0.1.1847` 2026-10-31 — アプリの読み上げを人ごとに違う声に
@@ -1333,7 +1336,6 @@
 - `v0.1.1840` 2026-10-31 — 読み上げの遅れの理由を画面で分かるように
 - `v0.1.1837` 2026-10-31 — コメントを流す間は画面を消さない
 - `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
-- `v0.1.1829` 2026-10-29 — コメビュの読み上げを少し早く
 
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も

@@ -19,6 +19,14 @@ import {
   capVoiceSynthDepthForOverload
 } from './voiceEngineOverload.js';
 import { observeVoicePlayback } from './voicePlaybackQuality.js';
+import {
+  LIGHT_VOICE_MAX_CHARS,
+  LIGHT_VOICE_PROBE_TEXT,
+  lightVoiceToneFor,
+  shouldProbeVoicevox,
+  shouldUseLightVoice
+} from './voiceLightFallback.js';
+import { createLightSpeaker } from './voiceLightSpeaker.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
   capVoiceMaxCharsByBoost,
@@ -139,6 +147,16 @@ export class VoicePlayer {
     this._overload = createVoiceOverloadState();
     /** 2026-11-03: VOICEVOX に頼んでまだ返ってきていない合成の数(混雑中は1件ずつ頼むため)。 */
     this._synthInFlight = 0;
+    /**
+     * 2026-11-03: VOICEVOX が追いつかない間だけ使う軽い声(voiceLightFallback.js)。
+     *   既定はブラウザの読み上げ(Windows の声)。無い環境では null=VOICEVOX だけで読む。
+     */
+    this.lightSpeaker = deps.lightSpeaker === undefined ? createLightSpeaker() : deps.lightSpeaker;
+    /** 'auto'(既定)か 'off'(VOICEVOX だけで読む)。 */
+    this.lightVoiceSetting = 'auto';
+    this._lightProbeAt = 0;
+    /** 軽い声で続けて読めなかった回数。3回続いたらこの ON の間は使わない(無音のまま切り替え続けないため)。 */
+    this._lightFailStreak = 0;
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
 
@@ -707,6 +725,11 @@ export class VoicePlayer {
       this.prefetches.clear();
       return;
     }
+    // 2026-11-03: 軽い声で読んでいる間は VOICEVOX に読み上げを頼まない(速さの確かめだけ)。
+    if (this._useLightVoice()) {
+      this._maybeProbeVoicevox();
+      return;
+    }
     // 2026-10-31: エンジンが混雑中(時間切れが続いた)なら、同時に頼むのは今読む1件だけ。
     const depth = capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
       pending: this.queue.length
@@ -739,6 +762,64 @@ export class VoicePlayer {
   _inflightKeeper() {
     if (!this._overload.overloaded) return null;
     return (x) => this.prefetches.has(x);
+  }
+
+  /** 2026-11-03: 今、軽い声で読むか(VOICEVOX が混雑中で、軽い声が使えるときだけ)。 */
+  _useLightVoice() {
+    let available = false;
+    try { available = !!this.lightSpeaker && this._lightFailStreak < 3 && this.lightSpeaker.available(); } catch { available = false; }
+    const on = shouldUseLightVoice({ overloaded: this._overload.overloaded, available, setting: this.lightVoiceSetting });
+    this.diag.lightVoiceActive = on;
+    return on;
+  }
+
+  /** 軽い声で読んでいる間、ときどき VOICEVOX に短い文を頼んで速さを確かめる(速ければ混雑が解けて戻る)。 */
+  _maybeProbeVoicevox() {
+    const nowMs = Date.now();
+    if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) return;
+    this._lightProbeAt = nowMs;
+    try {
+      const voice = this.resolveVoice('', this.assignments, this.styleIds);
+      void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).catch(() => null);
+    } catch { /* 確かめられなくても軽い声で読み続ける */ }
+  }
+
+  /**
+   * 2026-11-03: 1件を軽い声で読む。人ごとの声(どの声・高さ・速さ)は voiceLightFallback.lightVoiceToneFor。
+   * @param {any} item
+   * @param {number} generation
+   */
+  async _playLight(item, generation) {
+    this._maybeProbeVoicevox();
+    const text = buildMergedVoiceText(item, { maxChars: LIGHT_VOICE_MAX_CHARS });
+    const speaker = this.lightSpeaker;
+    let started = false;
+    if (text && speaker) {
+      const tone = lightVoiceToneFor(String(item.userKey || ''), speaker.voices().length);
+      this.stopCurrent = () => speaker.cancel();
+      try {
+        started = await speaker.speak(text, tone, {
+          onStart: () => { if (typeof item.onAudioStart === 'function') item.onAudioStart(); }
+        });
+      } catch { started = false; }
+      this.stopCurrent = null;
+    }
+    if (started && typeof item.onAudioEnd === 'function') item.onAudioEnd();
+    if (typeof item.onPlayStart === 'function') item.onPlayStart();
+    if (text && speaker) this._lightFailStreak = started ? 0 : this._lightFailStreak + 1;
+    if (!started || generation !== this.generation) {
+      this._notifyDropped(item);
+      return;
+    }
+    this.diag.spokenTotal += 1;
+    this.diag.lightSpokenTotal = (Number(this.diag.lightSpokenTotal) || 0) + 1;
+    this.diag.lastSpokenBase = Date.now();
+    const denom = this.diag.spokenTotal + this.diag.staleDropTotal;
+    this.diag.voicedRatio = denom > 0 ? this.diag.spokenTotal / denom : -1;
+    this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
+    this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+    this._emitDiag();
+    this._updateLagNotice(); // 「PC の声で読んでいます」を出す
   }
 
   async _drainQueue() {
@@ -815,6 +896,12 @@ export class VoicePlayer {
           this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
           this._emitDiag();
           this.prefetches.delete(item);
+          continue;
+        }
+
+        // 2026-11-03: VOICEVOX が追いつかない間は軽い声で読む(すでに合成を頼んだ件はそれを待つ)。
+        if (this._useLightVoice() && !this.prefetches.has(item)) {
+          await this._playLight(item, generation);
           continue;
         }
 

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1851',
+    date: '2026-11-03',
+    summary: 'VOICEVOX が追いつかない間は PC の声で読む',
+    items: Object.freeze([
+      'VOICEVOX が混んで追いつかない間だけ、PC に入っている声(Windows の Haruka・Ayumi・Ichiro・Sayaka など)に自動で切り替えて読むようにしました。人ごとに声の種類・高さ・速さを変えるので、誰のコメントか聞き分けられます(同じ人はいつも同じ声)。切り替えている間は「いまは PC の声で読んでいます」と出ます。VOICEVOX が速くなったら自動で戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1850',
     date: '2026-11-03',
     summary: '混んだ配信で読み上げが全く鳴らないのを修正',
@@ -171,15 +179,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'パネルを開くときの作り直しを1回に',
     items: Object.freeze([
       '視聴ページでパネルを開くたび、パネルの入れ物を4回作り直していました（作りたてを古いものと見なして捨てていた）。1回だけ作るようにしたので、開く瞬間の無駄な隠す・出すが減ります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1829',
-    date: '2026-10-29',
-    summary: 'コメビュの読み上げを少し早く',
-    items: Object.freeze([
-      'コメビュで読み上げを ON にしている間は、放送タブから新しいコメントを直接受け取って読むようにしました。これまでは保存のまとめ書き(最大1.5秒)を待ってから読んでいました。',
-      '同じコメントを二度読むことはありません。表示は今までどおりです。コメビュの画面が隠れているときも、読み上げは遅れずに続きます。'
     ])
   })
 ]);
