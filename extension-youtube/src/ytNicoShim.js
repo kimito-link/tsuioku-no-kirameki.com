@@ -391,13 +391,30 @@ async function buildCommentsForLvUncached(lv) {
       /* 分からなければ受け取った時刻 */
     }
   }
-  return list.map((r, i) => {
+  const out = list.map((r, i) => {
     const key = who.keyOf(r);
     const icon = String(r?.iconUrl || '').trim() || who.iconOf(key);
     const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
     return e;
   });
+  // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
+  registerBroadcastersFromSummaries();
+  return out;
+}
+
+// マーケ画面などは配信者の情報を保存済みの控えから読むので、ytSummaryToNicoSnapshot が呼ばれず
+// 配信者の数字ID → YouTube の対応が分からないまま(ニコニコのリンク・ID のまま)になる。記録のある配信の配信者を先に登録する。
+/** @type {Record<string, any>} */
+let knownSummaries = {};
+function registerBroadcastersFromSummaries() {
+  for (const [vid, sum] of Object.entries(knownSummaries)) {
+    try {
+      ytSummaryToNicoSnapshot(sum, vid, '');
+    } catch {
+      /* 1件壊れていても残りは登録する */
+    }
+  }
 }
 
 // ---- chrome の差し替え(本物の上に薄くかぶせる) ----
@@ -408,7 +425,9 @@ if (real && real.storage && real.storage.local && real.tabs) {
   // 前に開いた配信の疑似 lv(nls_last_watch_url 等に残る)も引けるよう、記録のある配信を先に全部登録しておく
   const knownVideosReady = Promise.resolve(realGet(KEY_YT_SUMMARIES))
     .then((bag) => {
-      for (const vid of Object.keys((bag && bag[KEY_YT_SUMMARIES]) || {})) pseudoLvForVideoId(vid);
+      knownSummaries = (bag && bag[KEY_YT_SUMMARIES]) || {};
+      for (const vid of Object.keys(knownSummaries)) pseudoLvForVideoId(vid);
+      registerBroadcastersFromSummaries();
     })
     .catch(() => {});
 
@@ -712,9 +731,27 @@ function ytLabelForUid(uid) {
   return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
 }
 
+// 疑似 lv(lv9…)の放送 URL・番号は YouTube の動画に戻す(分かる配信だけ)。
+const PSEUDO_WATCH_URL_RE = /https?:\/\/live\.nicovideo\.jp\/watch\/(lv9\d{11})/g;
+const PSEUDO_LV_RE = /\blv9\d{11}\b/g;
+/** @param {string} text */
+function ytFixPseudoLvText(text) {
+  return String(text)
+    .replace(PSEUDO_WATCH_URL_RE, (all, lv) => {
+      const vid = videoIdForPseudoLv(lv);
+      return vid ? `https://www.youtube.com/watch?v=${vid}` : all;
+    })
+    .replace(PSEUDO_LV_RE, (lv) => videoIdForPseudoLv(lv) || lv);
+}
+
 /** @param {Element} a */
 function fixAnchor(a) {
   const href = String(a.getAttribute('href') || '');
+  if (/live\.nicovideo\.jp\/watch\/lv9\d{11}/.test(href)) {
+    const next = ytFixPseudoLvText(href);
+    if (next !== href) a.setAttribute('href', next);
+    return;
+  }
   const m = href.match(NICO_USER_LINK_RE);
   if (!m || !ytKeyForNumericUid(m[1])) return;
   const yt = ytChannelUrlForNumericUid(m[1]);
@@ -729,6 +766,7 @@ function fixTextNode(node) {
   const v = String(node.nodeValue || '');
   let next = ytWording(v); // ニコニコの言葉 → YouTube の言葉(決まった文言だけ)
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
+  if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
   if (next !== v) node.nodeValue = next;
 }
 
@@ -801,7 +839,7 @@ function fixSubtree(root) {
   if (el.hasAttribute('data-nl-uid')) fixUidLabelAttr(el);
   el.querySelectorAll('[data-nl-uid]').forEach(fixUidLabelAttr);
   el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
-  el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
+  el.querySelectorAll('a[href*="nicovideo.jp/user/"], a[href*="live.nicovideo.jp/watch/lv9"]').forEach(fixAnchor);
   el.querySelectorAll('[title]').forEach(fixTitleAttr);
   if (el.matches(EMPTY_THUMB_SEL)) fixEmptyThumb(el);
   el.querySelectorAll(EMPTY_THUMB_SEL).forEach(fixEmptyThumb);

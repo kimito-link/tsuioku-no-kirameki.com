@@ -148,9 +148,10 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
       capturedAt: at,
     });
 
-    const item = byItem.get(giftName || baseItemName) || { itemName: giftName || baseItemName, count: 0, thumbnailUrl: giftThumb };
+    // 投げ一覧の行と同じ名前(金額つき)でまとめる。ニコ生版はこの名前で pt を足すので、まとめだけの 0pt の行が出ないように。
+    const item = byItem.get(itemName) || { itemName, count: 0, thumbnailUrl: giftThumb };
     item.count += 1;
-    byItem.set(giftName || baseItemName, item);
+    byItem.set(itemName, item);
 
     if (!uid) continue;
     const u = byUser.get(uid) || {

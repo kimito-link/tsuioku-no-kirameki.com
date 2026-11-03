@@ -194,7 +194,18 @@
     ["ニコニコ生放送 トップ", "YouTube トップ"],
     ["ニコ生の視聴ページの右下に", "YouTube の視聴ページの右下に"],
     ["ニコ生の画面改修でパネルが", "YouTube の画面改修でパネルが"],
-    ["ニコ生公式の表示は変わりません", "YouTube 公式の表示は変わりません"]
+    ["ニコ生公式の表示は変わりません", "YouTube 公式の表示は変わりません"],
+    // マーケHTML の説明文(ニコ生版の文をそのまま使っている所)
+    ["ニコニコユーザーID: ", "YouTube チャンネル: "],
+    ["配信者がニコニコでハンドル名を変更した場合、ここの表示と niconico の最新表示が異なることがあります", "配信者が YouTube でハンドル名を変更した場合、ここの表示と YouTube の最新表示が異なることがあります"],
+    ["サムネ・名前は数値ID時のみ niconico ユーザーページへリンクします", "サムネ・名前は YouTube のチャンネルへリンクします"],
+    ["ニコ生は「誰がいつ入って、いつ出たか」を公開していません", "YouTube は「誰がいつ入って、いつ出たか」を公開していません"],
+    ["ニコ生の「この番組へのギフト履歴」に近い形で", "YouTube のスーパーチャット・ギフトを"],
+    ["ニコ生の匿名ギフトは「名無し」にまとまることがあります。", ""],
+    ["ニコ生上で公開されている応援(コメント・ギフト)", "YouTube 上で公開されている応援(コメント・スーパーチャット)"],
+    ["ニコ生上で公開されているコメント・ギフト情報", "YouTube 上で公開されているコメント・スーパーチャット情報"],
+    ["ニコニコの公開プロフィールから", "YouTube の公開ページから"],
+    ["ニコ広告", "広告"]
   ];
   var QUICK = /貢|ニコ/;
   function ytWording(text) {
@@ -370,9 +381,9 @@
         contribution: point,
         capturedAt: at
       });
-      const item = byItem.get(giftName || baseItemName) || { itemName: giftName || baseItemName, count: 0, thumbnailUrl: giftThumb };
+      const item = byItem.get(itemName) || { itemName, count: 0, thumbnailUrl: giftThumb };
       item.count += 1;
-      byItem.set(giftName || baseItemName, item);
+      byItem.set(itemName, item);
       if (!uid) continue;
       const u = byUser.get(uid) || {
         userId: uid,
@@ -698,13 +709,24 @@
       } catch {
       }
     }
-    return list.map((r, i) => {
+    const out = list.map((r, i) => {
       const key = who.keyOf(r);
       const icon = String(r?.iconUrl || "").trim() || who.iconOf(key);
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
       return e;
     });
+    registerBroadcastersFromSummaries();
+    return out;
+  }
+  var knownSummaries = {};
+  function registerBroadcastersFromSummaries() {
+    for (const [vid, sum] of Object.entries(knownSummaries)) {
+      try {
+        ytSummaryToNicoSnapshot(sum, vid, "");
+      } catch {
+      }
+    }
   }
   var real = (
     /** @type {any} */
@@ -714,7 +736,9 @@
     const realLocal = real.storage.local;
     const realGet = realLocal.get.bind(realLocal);
     const knownVideosReady = Promise.resolve(realGet(KEY_YT_SUMMARIES)).then((bag) => {
-      for (const vid of Object.keys(bag && bag[KEY_YT_SUMMARIES] || {})) pseudoLvForVideoId(vid);
+      knownSummaries = bag && bag[KEY_YT_SUMMARIES] || {};
+      for (const vid of Object.keys(knownSummaries)) pseudoLvForVideoId(vid);
+      registerBroadcastersFromSummaries();
     }).catch(() => {
     });
     const lastWatchUrlFromSummaries = async () => {
@@ -984,8 +1008,21 @@
     if (key.startsWith("handle:")) return key.slice("handle:".length);
     return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
   }
+  var PSEUDO_WATCH_URL_RE = /https?:\/\/live\.nicovideo\.jp\/watch\/(lv9\d{11})/g;
+  var PSEUDO_LV_RE = /\blv9\d{11}\b/g;
+  function ytFixPseudoLvText(text) {
+    return String(text).replace(PSEUDO_WATCH_URL_RE, (all, lv) => {
+      const vid = videoIdForPseudoLv(lv);
+      return vid ? `https://www.youtube.com/watch?v=${vid}` : all;
+    }).replace(PSEUDO_LV_RE, (lv) => videoIdForPseudoLv(lv) || lv);
+  }
   function fixAnchor(a) {
     const href = String(a.getAttribute("href") || "");
+    if (/live\.nicovideo\.jp\/watch\/lv9\d{11}/.test(href)) {
+      const next = ytFixPseudoLvText(href);
+      if (next !== href) a.setAttribute("href", next);
+      return;
+    }
     const m = href.match(NICO_USER_LINK_RE);
     if (!m || !ytKeyForNumericUid(m[1])) return;
     const yt = ytChannelUrlForNumericUid(m[1]);
@@ -999,6 +1036,7 @@
     const v = String(node.nodeValue || "");
     let next = ytWording(v);
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
+    if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
     if (next !== v) node.nodeValue = next;
   }
   function fixUidLabelAttr(el) {
@@ -1061,7 +1099,7 @@
     if (el.hasAttribute("data-nl-uid")) fixUidLabelAttr(el);
     el.querySelectorAll("[data-nl-uid]").forEach(fixUidLabelAttr);
     el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
-    el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
+    el.querySelectorAll('a[href*="nicovideo.jp/user/"], a[href*="live.nicovideo.jp/watch/lv9"]').forEach(fixAnchor);
     el.querySelectorAll("[title]").forEach(fixTitleAttr);
     if (el.matches(EMPTY_THUMB_SEL)) fixEmptyThumb(el);
     el.querySelectorAll(EMPTY_THUMB_SEL).forEach(fixEmptyThumb);
