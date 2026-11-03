@@ -383,3 +383,19 @@ describe('capVoiceMaxCharsByBoost(速度を上げる局面では本文も短く�
     expect(capVoiceMaxCharsByBoost(undefined, undefined)).toBe(60);
   });
 });
+
+describe('pushVoiceQueue keep(2026-11-03: 合成中の件は捨てない)', () => {
+  it('keep が true の件を飛ばして、次に古い件から捨てる', () => {
+    const r = pushVoiceQueue(['a', 'b', 'c'], 'd', { max: 3, keep: (x) => x === 'a' });
+    expect(r.queue).toEqual(['a', 'c', 'd']);
+    expect(r.dropped).toEqual(['b']);
+  });
+  it('守る件しか無ければ上限を超えて残す(新しい件は捨てない)', () => {
+    const r = pushVoiceQueue(['a'], 'b', { max: 1, keep: () => true });
+    expect(r.queue).toEqual(['a', 'b']);
+    expect(r.dropped).toEqual([]);
+  });
+  it('keep を渡さなければ従来どおり最古から捨てる', () => {
+    expect(pushVoiceQueue(['a', 'b'], 'c', { max: 2 }).dropped).toEqual(['a']);
+  });
+});

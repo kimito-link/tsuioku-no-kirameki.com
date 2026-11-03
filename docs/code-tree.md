@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1096 件
+## ⚠️ 役割コメントが無いソース 9 / 1097 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -40,34 +40,6 @@
 
 ## 全ファイルツリー
 
-- 📁 **"src/** (17)
-  - 📁 **images/** (17)
-    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png"`
-          - `logo_funlink_black_RGB_link_black.png"`
-          - `logo_funlink_black_RGB_maru_black.png"`
-      - 📁 **color/** (8)
-        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
-          - `logo_funlink_RGB_color.png"`
-          - `logo_funlink_RGB_ginga_color.png"`
-          - `logo_funlink_RGB_hoshi.png"`
-          - `logo_funlink_RGB_link_hoshi.png"`
-          - `logo_funlink_RGB_link_orange.png"`
-          - `logo_funlink_RGB_maru_blue.png"`
-          - `logo_funlink_RGB_maru_ginga.png"`
-          - `logo_funlink_RGB_maru_orange.png"`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png"`
-        - `logo_funlink_white_RGB_link_black.png"`
-        - `logo_funlink_white_RGB_maru_black.png"`
-    - 📁 **logo/** (3)
-      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg"`
-        - `251016_logo_guide_kimitolink_ol.ai"`
-        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -865,7 +837,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (104)
+- 📁 **scripts/** (105)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -928,6 +900,7 @@
   - `council-roles.stance.test.js`
   - `council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
   - `council-synth.test.js`
+  - `council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
   - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
   - `dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
@@ -999,7 +972,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2222)
+- 📁 **src/** (2240)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1147,7 +1120,7 @@
     - `voiceTestHook.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (117)
+  - 📁 **images/** (134)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1247,7 +1220,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (10)
+    - 📁 **logo/** (13)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1257,6 +1230,11 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
+      - 📁 **データ一式/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg`
+        - `251016_logo_guide_kimitolink_ol.ai`
+        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1297,8 +1275,28 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
+    - 📁 **データ出力/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png`
+          - `logo_funlink_black_RGB_link_black.png`
+          - `logo_funlink_black_RGB_maru_black.png`
+      - 📁 **color/** (8)
+        - 📁 **RGB_データ用/** (8)
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_hoshi.png`
+          - `logo_funlink_RGB_link_hoshi.png`
+          - `logo_funlink_RGB_link_orange.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_ginga.png`
+          - `logo_funlink_RGB_maru_orange.png`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png`
+        - `logo_funlink_white_RGB_link_black.png`
+        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1949)
+  - 📁 **lib/** (1950)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3177,6 +3175,7 @@
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
+    - `voicePlayerOverloadKeep.test.js`
     - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
     - `voiceQuality.test.js`
     - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
