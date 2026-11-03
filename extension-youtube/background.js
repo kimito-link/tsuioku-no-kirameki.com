@@ -1019,9 +1019,31 @@
   }
   setupSidePanelBehavior();
   ensureOffscreenDocument();
-  chrome.runtime.onInstalled.addListener(() => {
+  async function reloadExistingYtWatchTabs(reason) {
+    let tabs = [];
+    try {
+      tabs = await chrome.tabs.query({ url: ["https://www.youtube.com/watch*", "https://www.youtube.com/live/*"] });
+    } catch {
+      return;
+    }
+    let reloaded = 0;
+    for (const tab of tabs) {
+      if (typeof tab.id !== "number") continue;
+      try {
+        await chrome.tabs.reload(tab.id);
+        reloaded += 1;
+      } catch {
+      }
+    }
+    try {
+      await chrome.storage.local.set({ yt_last_auto_tab_reload: { at: Date.now(), reason, tabCount: tabs.length, reloaded } });
+    } catch {
+    }
+  }
+  chrome.runtime.onInstalled.addListener((details) => {
     setupSidePanelBehavior();
     ensureOffscreenDocument();
+    if (details && details.reason === "update") void reloadExistingYtWatchTabs("update");
   });
   chrome.runtime.onStartup?.addListener(() => {
     ensureOffscreenDocument();
