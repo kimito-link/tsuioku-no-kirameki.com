@@ -781,9 +781,7 @@
 | `src/lib/mangaBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingChartsHtml.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/marketingDynamicAdvice.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingGiftThrowLedger.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/marketingHtmlAdvisorAvatars.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingReportEmbed.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingSupportParticipationCounts.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mcpBridge/buildLiveMcpSnapshot.js` | 1 | 記録エンジン(watchページ常駐) |

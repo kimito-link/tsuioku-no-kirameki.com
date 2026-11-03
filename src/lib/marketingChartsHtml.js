@@ -7,13 +7,8 @@
 
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
-import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
 import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
-import {
-  buildMangaBroadcastPanels,
-  renderMangaBroadcastPanelsHtml,
-  mangaBroadcastSummaryEmbeddedCss
-} from './mangaBroadcastSummary.js';
+import { mangaBroadcastSummaryEmbeddedCss } from './mangaBroadcastSummary.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
@@ -73,11 +68,6 @@ import {
   suggestUniqueWords,
   computeReachCoefficient
 } from './commenterCulturalAnalytics.js';
-import { pickAdvicesFor } from './marketingDynamicAdvice.js';
-import {
-  buildSupportGrowthInsights,
-  supportGrowthMetricsForAdvice
-} from './supportGrowthInsights.js';
 import { analyzeGiftMomentum } from './giftMomentumAnalytics.js';
 import { analyzeGiftMoments, buildGiftMomentNextActions } from './giftMomentAnalytics.js';
 import { adRowUid } from './adObservationLog.js';
@@ -97,105 +87,9 @@ import { buildSupporterChikuranRows } from './supporterChikuranScore.js';
 
 const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${escapeHtml(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
 
-/**
- * @param {'tanu' | 'link' | 'konta'} role
- * @param {string} displayName 「たぬ姉」など（未エスケープ）
- * @param {string[]} lines 本文（未エスケープ・1行ずつ <p>）
- */
-function adviceCard(role, displayName, lines) {
-  const ps = lines
-    .filter((s) => s && String(s).trim())
-    .map((line) => `<p class="mkt-advice__p">${escapeHtml(line)}</p>`)
-    .join('');
-  const avatarSrc = MKT_ADVISOR_AVATAR_DATA_URI[role];
-  const alt =
-    role === 'link' ? 'りんく' : role === 'konta' ? 'こん太' : 'たぬ姉';
-  // アドバイスカードは <details> で折りたたみ表示。読みたい人だけ開ける。
-  return `<details class="mkt-advice-details mkt-advice--${role}">
-<summary class="mkt-advice-summary">
-<img class="mkt-advice__avatar mkt-advice__avatar--summary" src="${avatarSrc}" alt="${escapeHtml(alt)}" width="28" height="28" loading="lazy" decoding="async">
-<span class="mkt-advice__name">${escapeHtml(displayName)}のコメント</span>
-</summary>
-<article class="mkt-advice-row" role="note">
-<div class="mkt-advice__avatar-wrap">
-<img class="mkt-advice__avatar" src="${avatarSrc}" alt="${escapeHtml(alt)}" width="56" height="56" loading="lazy" decoding="async">
-</div>
-<div class="mkt-advice__bubble">
-<div class="mkt-advice__name">${escapeHtml(displayName)}</div>
-${ps}
-</div>
-</article>
-</details>`;
-}
 
-/** ページ冒頭：機能一覧とスタンス（配信スタイルを否定しない） */
-function sectionFeaturesOverview() {
-  return `<section class="mkt-section mkt-section--features" aria-label="この分析ページの機能">
-<h2>このページでできること</h2>
-<p class="mkt-lead">拡張が手元に残したコメントを集計し、次のような<strong>グラフと表</strong>が並びます。あわせて、各ブロックの<strong>前後にりんく・こん太・たぬ姉からの短い分析メモ</strong>（アドバイス）が挟まり、数字の読み方や注意点を補います。</p>
-<ul class="mkt-feature-list">
-<li><strong>KPI サマリ</strong> — 総コメント数、ユニーク人数、コメント/分、平均・中央値、配信時間、ピーク分などを一覧</li>
-<li><strong>コメントタイムライン</strong> — 分ごとの盛り上がりと、その分のユニーク人数の推移</li>
-<li><strong>ユーザーセグメント</strong> — コメント回数の層（ヘビー〜一見）の割合</li>
-<li><strong>トップコメンター</strong> — 多めに書いてくれた人の並び（順位＝価値の上下ではない旨もメモで触れます）</li>
-<li><strong>時間帯ヒートマップ</strong> — コメントが集中した時間帯の傾向</li>
-<li><strong>本文・属性の傾向</strong> — 文字数の平均・中央値、URL/絵文字の含有、自分投稿・184 の割合、コメント間の最長インターバル</li>
-<li><strong>累積と5分窓</strong> — 経過に沿った累積コメント数と、直近5分の件数の推移（盛り上がりの補助線）</li>
-<li><strong>再生位置の三分割（vpos）</strong> — 記録に vpos が十分あるときだけ、早・中・遅の件数比</li>
-<li><strong>冒頭・終盤の四分位</strong> — 時間幅の最初・最後の四分の一に現れた人数と、「両方にいた」人数の目安</li>
-<li><strong>ページ末尾の JSON 埋め込み</strong> — 同じ .html 内に集計のコピーを入れてあり、表計算やツール連携に使えます（共有伏せ字時は JSON もマスク）</li>
-</ul>
-<p class="mkt-values-note"><strong>どんな配信も否定しません。</strong>静かな雑談も、わいわい型も、ゲーム特化も、歌枠も、それぞれに合ったスタイルがあります。<strong>そのスタイルに数字やメモで縛られる必要もありません。</strong>気になったところだけ眺めて、ひとつの視点・振り返りの補助として使ってください。</p>
-</section>`;
-}
 
-/** ページ冒頭：この画面の限界と三人の登場（3人それぞれ吹き出し） */
-function sectionAdviceIntro() {
-  const cards = [
-    adviceCard('link', 'りんく', [
-      'このページは、配信している側から見ても「手元の記録で枠を振り返る」ためのメモに近いのだ。',
-      '下のグラフのあいだに、俺・こん太・たぬ姉から短いメモが挟まるのだ。数字ひとつで配信の価値が決まるわけじゃないから、肩の力は抜いて読んでほしいのだ。',
-    ]),
-    adviceCard('konta', 'こん太', [
-      'ファン側からすると、コメントの出方や層は「みんなの入り方の違い」が見えるだけのことが多いのだ。',
-      '順位や割合で誰かを責めたり、応援の熱さを上下しないでほしいのだ。気持ちの補助として使ってくれればいいのだ。',
-    ]),
-    adviceCard('tanu', 'たぬ姉', [
-      '集計の正体はシンプルで、このページは拡張が記録した応援コメントだけを数にしているのだ。公式の同接数や売上とは一致しないから、あくまで手元の振り返り用として読んでほしいのだ。',
-    ])
-  ].join('');
-  const hint = `<p class="mkt-advice__roles-hint">${escapeHtml('役割の目安：りんく＝配信する側の目線 / こん太＝ファン側の肌感 / たぬ姉＝指標の整理と注意書き、なのだ。')}</p>`;
-  return `<section class="mkt-section mkt-section--advice" aria-label="キャラクターからの案内">
-<h2>りんく・こん太・たぬ姉から</h2>
-<div class="mkt-advice-stack mkt-advice-stack--intro">${cards}${hint}</div>
-</section>`;
-}
 
-/** KPI の直後
- * @param {MarketingReport} r */
-function sectionAdviceAfterKpi(r) {
-  const linkLines = [
-    'ピークの分やコメント／分は、枠のどこで盛り上がったかの目安になるのだ。全部のコメントに返せない日でも、波を知っておくと心の置きどころにはなるのだ。',
-  ];
-  if (r.peakMinuteCount >= 3 && r.durationMinutes >= 5) {
-    linkLines.push(
-      'ピークがはっきりしていれば、次の枠で企画を畳むタイミングの参考にするくらいの軽さで十分なのだ。'
-    );
-  }
-  const cards = [adviceCard('link', 'りんく', linkLines)];
-
-  const med = r.medianCommentsPerUser;
-  const avg = r.avgCommentsPerUser;
-  if (r.uniqueUsers >= 5 && med > 0 && avg > med * 1.75) {
-    cards.push(
-      adviceCard('tanu', 'たぬ姉', [
-        '平均コメント数と中央値が離れているのだ。少数のヘビーさんが平均を押し上げている可能性があるのだ。「ふつうの1人」の姿には中央値の方が近いことが多いのだ。',
-      ])
-    );
-  }
-
-  return `<div class="mkt-advice-after">${cards.join('')}</div>`;
-}
 
 /** @param {number} ms */
 function formatSilenceMs(ms) {
@@ -304,9 +198,6 @@ ${samples}
 </article>`;
     })
     .join('');
-  const hints = narrative.improvementHints.length
-    ? `<ul class="mkt-narrative-hints">${narrative.improvementHints.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>`
-    : '';
   const sampleNote = maskShare
     ? '<p class="mkt-note">共有向け出力では話題語と代表コメント本文を省略しています。</p>'
     : '';
@@ -318,7 +209,6 @@ ${samples}
 <p class="mkt-lead">${escapeHtml(summaryLine)}</p>
 ${sampleNote}
 <div class="mkt-narrative-grid">${segmentHtml}</div>
-${hints ? `<h3 class="mkt-narrative-subhead">次回に活かすなら</h3>${hints}` : ''}
 </section>`;
 }
 
@@ -328,17 +218,6 @@ function formatSilenceGapLabel(ms) {
   return `${formatSilenceMs(ms)}（連続する2コメント間の最大）`;
 }
 
-/** @param {MarketingReport} r */
-function sectionAdviceAfterContentShape(r) {
-  if (r.totalComments <= 0) return '';
-  const lines = [
-    '文字数や URL の多さは「話題がリンクを伴いやすい」「短文連打」などの雑なヒントになることがあるのだ。数字だけで良し悪しは決めないでほしいのだ。',
-  ];
-  if (r.textStats.pctWithEmoji >= 25 && r.uniqueUsers >= 8) {
-    lines.push('絵文字の比率が目立つときは、空気が柔らかい・リアクション中心の時間帯だった可能性があるのだ。');
-  }
-  return `<div class="mkt-advice-after">${adviceCard('tanu', 'たぬ姉', lines)}</div>`;
-}
 
 /** @param {MarketingReport} r */
 function sectionQuarterEngagement(r) {
@@ -376,16 +255,6 @@ function sectionQuarterEngagement(r) {
 <div class="mkt-kpi-grid">${inner}</div></section>`;
 }
 
-/** @param {MarketingReport} r */
-function sectionAdviceAfterQuarterEngagement(r) {
-  if (r.totalComments <= 0 || !r.quarterEngagement || r.quarterEngagement.skippedShortSpan) {
-    return '';
-  }
-  return `<div class="mkt-advice-after">${adviceCard('konta', 'こん太', [
-    '「冒頭にも終盤にもいる」は、長く居てくれた可能性のヒントに過ぎないのだ。タブを開いたまま放置、など別の理由もありうるのだ。',
-    '数字でファンの熱さを上下しないでほしいのだ。あくまで記録の出方を眺める補助だと思ってほしいのだ。',
-  ])}</div>`;
-}
 
 /** @param {MarketingReport} r */
 function sectionDerivedTimeline(r) {
@@ -451,13 +320,6 @@ ${yLabelsL}${yLabelsR}${xLabels}
 </section>`;
 }
 
-/** @param {MarketingReport} r */
-function sectionAdviceAfterDerivedTimeline(r) {
-  if (r.timeline.length < 2) return '';
-  return `<div class="mkt-advice-after">${adviceCard('link', 'りんく', [
-    '紫の5分窓は「直近で一気に増えたか」の目安になるのだ。累積（緑）は単調に増えるから、波を読むなら紫の方が分かりやすいことが多いのだ。',
-  ])}</div>`;
-}
 
 /** @param {MarketingReport} r */
 function sectionVposThirds(r) {
@@ -495,341 +357,33 @@ function sectionVposThirds(r) {
 </section>`;
 }
 
-/** タイムライン直後（チャートがあるときだけ）
- * @param {MarketingReport} r */
-function sectionAdviceAfterTimeline(r) {
-  if (r.timeline.length < 2) return '';
-  return `<div class="mkt-advice-after">${adviceCard('link', 'りんく', [
-    '青（コメント数）とオレンジ（その分のユニーク人数）のズレは、「同じ人が続けて話していた」「新しい顔が増えた」などの肌感のヒントになることがあるのだ。断定はできないから、眺めの補助として使ってほしいのだ。',
-  ])}</div>`;
-}
 
-/** セグメント直後
- * @param {MarketingReport} r */
-function sectionAdviceAfterSegment(r) {
-  const u = r.uniqueUsers;
-  const once = r.segmentPcts.once;
-  const heavyMid = r.segmentPcts.heavy + r.segmentPcts.mid;
-  /** @type {string[]} */
-  const konta = [];
-  /** @type {string[]} */
-  const tanu = [];
 
-  if (u >= 10 && once > 45) {
-    konta.push(
-      '一見さんの割合が多い枠も、悪いことばかりじゃないのだ。ちらっと顔を出してくれた人も、空気を一段明るくしてくれているのだ。'
-    );
-    tanu.push(
-      '層の厚みは配信の雰囲気や話題で変わるのだ。この円グラフを、誰かを責める材料にしないでほしいのだ。'
-    );
-  } else if (u >= 8 && heavyMid > 55) {
-    konta.push(
-      '何度も声をかけてくれる人が土台になっている感じ、に見えるのだ。推しのりんくにとっても支えになりやすいのだ。'
-    );
-    tanu.push(
-      'ヘビーやミドルが目立っても、ライトや一見さんの応援が薄いわけじゃないのだ。入り方は人それぞれなのだ。'
-    );
-  } else {
-    konta.push(
-      'ヘビーから一見まで、応援の入り方は人それぞれなのだ。「回数が少ない＝冷たい」にはならないのだ。'
-    );
-    tanu.push(
-      'ここでの分類は、良いファン・悪いファンを決めるラベルじゃないのだ。並びや割合を整理するための目安に近いのだ。'
-    );
-  }
-
-  const cards = [adviceCard('konta', 'こん太', konta), adviceCard('tanu', 'たぬ姉', tanu)];
-  return `<div class="mkt-advice-after">${cards.join('')}</div>`;
-}
-
-/** ランキング直後
- * @param {MarketingReport} r */
-function sectionAdviceAfterRank(r) {
-  if (r.topUsers.length === 0) return '';
-  return `<div class="mkt-advice-after">${adviceCard('tanu', 'たぬ姉', [
-    'ランキングは表示順のためで、下の人ほど価値が低いという話にはならないのだ。拾えた記録の範囲での並びなのだ。',
-  ])}</div>`;
-}
 
 /* ═══ 0.1.27 (AB): PRO 各セクションのキャラ解説（このデータで何がわかるか） ═══ */
 
-/** @param {string} html */
-function adviceWrap(html) {
-  return html ? `<div class="mkt-advice-after">${html}</div>` : '';
-}
 
-/**
- * 0.1.49 (AE): marketingDynamicAdvice.js の rule registry に対し metrics を
- *   渡して「内容に応じて変わる」アドバイスを動的に描画する。固定アドバイス
- *   （adviceAfter*）の後ろに追加して、より具体的な助言を出す。
- *
- *   ルールが何もマッチしない場合は空文字を返すので、固定アドバイスだけが
- *   表示される（後方互換）。
- *
- * @param {string} section
- * @param {import('./marketingDynamicAdvice.js').AdviceMetrics} metrics
- * @returns {string}
- */
-function dynamicAdviceCardsHtml(section, metrics) {
-  /** @type {{character: 'link'|'konta'|'tanu', lines: string[]}[]} */
-  let advices = [];
-  try {
-    advices = pickAdvicesFor(section, metrics);
-  } catch {
-    return '';
-  }
-  if (!advices.length) return '';
-  const cards = advices
-    .map((a) => {
-      const displayName =
-        a.character === 'link' ? 'りんく' : a.character === 'konta' ? 'こん太' : 'たぬ姉';
-      return adviceCard(a.character, displayName, a.lines);
-    })
-    .join('');
-  return adviceWrap(cards);
-}
 
-/**
- * 動的アドバイス用 metrics を集約データから組み立てる。
- * @param {{
- *   r: import('./marketingAggregate.js').MarketingReport,
- *   concurrentPeak: any,
- *   laughterDensity: any,
- *   silenceZones: any[],
- *   newVsRepeat: any,
- *   sentimentCurve: any,
- *   reach: any,
- *   growth: any,
- *   firstSecondLatency: any,
- *   survivalCurve: any,
- *   talentPeaks: any[],
- *   echoPropagation: any,
- *   echoSync: any,
- *   recentComparison: any,
- *   uniqueWords: any,
- *   similarBroadcasts: any[],
- *   keyboardTypes: any
- * }} opts
- * @returns {import('./marketingDynamicAdvice.js').AdviceMetrics}
- */
-function buildDynamicAdviceMetrics(opts) {
-  return {
-    r: opts.r,
-    peak: opts.concurrentPeak,
-    laughter: opts.laughterDensity,
-    silenceCount: Array.isArray(opts.silenceZones) ? opts.silenceZones.length : 0,
-    silenceQualityCounts: (() => {
-      /** @type {{engaged:number,departed:number,neutral:number,unknown:number}} */
-      const counts = { engaged: 0, departed: 0, neutral: 0, unknown: 0 };
-      const list = Array.isArray(opts.silenceZones) ? opts.silenceZones : [];
-      for (const z of list) {
-        const q = String(z?.quality || 'unknown');
-        if (q === 'engaged') counts.engaged += 1;
-        else if (q === 'departed') counts.departed += 1;
-        else if (q === 'neutral') counts.neutral += 1;
-        else counts.unknown += 1;
-      }
-      return counts;
-    })(),
-    newVsRepeat: opts.newVsRepeat
-      ? {
-          newRatio: Number(opts.newVsRepeat.newRatio) || 0,
-          repeatRatio: Number(opts.newVsRepeat.repeatRatio) || 0,
-          heavyRatio: Number(opts.newVsRepeat.heavyRatio) || 0,
-          totalCurrent: Number(opts.newVsRepeat.totalCurrent) || 0
-        }
-      : null,
-    sentimentTotals: opts.sentimentCurve?.totals
-      ? {
-          positive: Number(opts.sentimentCurve.totals.positive) || 0,
-          negative: Number(opts.sentimentCurve.totals.negative) || 0,
-          surprise: Number(opts.sentimentCurve.totals.surprise) || 0,
-          confusion: Number(opts.sentimentCurve.totals.confusion) || 0
-        }
-      : null,
-    reach: opts.reach
-      ? { coefficient: Number(opts.reach.coefficient) || null }
-      : null,
-    growth: opts.growth
-      ? {
-          deltaPct: Number.isFinite(opts.growth.deltaPct) ? opts.growth.deltaPct : null,
-          zScore: Number.isFinite(opts.growth.zScore) ? opts.growth.zScore : null,
-          average: Number.isFinite(opts.growth.average) ? opts.growth.average : null
-        }
-      : null,
-    firstSecondTotal:
-      Number(opts.firstSecondLatency?.totalUsers) ||
-      Number(opts.firstSecondLatency?.users?.length) ||
-      0,
-    survivalEndPct: (() => {
-      const segs = opts.survivalCurve?.segments;
-      if (!Array.isArray(segs) || segs.length === 0) return null;
-      const last = segs[segs.length - 1];
-      const v = Number(last?.survivalPct);
-      return Number.isFinite(v) ? v : null;
-    })(),
-    talentPeakCount: Array.isArray(opts.talentPeaks) ? opts.talentPeaks.length : 0,
-    echoBurstCount: (() => {
-      const ep = opts.echoPropagation;
-      const es = opts.echoSync;
-      const a = Array.isArray(ep) ? ep.length : Array.isArray(ep?.bursts) ? ep.bursts.length : 0;
-      const b = Array.isArray(es) ? es.length : Array.isArray(es?.bursts) ? es.bursts.length : 0;
-      return a + b;
-    })(),
-    recentCmpCount: Array.isArray(opts.recentComparison?.bars) ? opts.recentComparison.bars.length : 0,
-    uniqueWordsCount: Array.isArray(opts.uniqueWords?.suggestions) ? opts.uniqueWords.suggestions.length : 0,
-    waveformSimilarCount: Array.isArray(opts.similarBroadcasts) ? opts.similarBroadcasts.length : 0,
-    keyboardCounts: opts.keyboardTypes?.counts
-      ? {
-          emoji: Number(opts.keyboardTypes.counts.emoji) || 0,
-          short: Number(opts.keyboardTypes.counts.short) || 0,
-          long: Number(opts.keyboardTypes.counts.long) || 0,
-          quiet: Number(opts.keyboardTypes.counts.quiet) || 0,
-          balanced: Number(opts.keyboardTypes.counts.balanced) || 0
-        }
-      : null
-  };
-}
 
-function adviceAfterCommentVelocity() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    'コメ速度カーブは「1分ごとに何コメ来たか」と「直近5分の平均」を重ねて見るカーブなのだ。',
-    'ピークが出た分の前後を見直すと、「何のトピックで盛り上がったか」が手繰れるのだ。',
-  ]));
-}
 
-function adviceAfterConcurrent() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    '同接推移カーブは、視聴維持の代わりになる指標なのだ。ピーク到達分・半減点・終了時保持率の 3 つを見るのだ。',
-    '終了時保持率が高い枠は「最後まで残ってもらえた」枠で、半減点が早い枠は「序盤で抜けられた」可能性なのだ。',
-  ]));
-}
 
-function adviceAfterSilence() {
-  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
-    '沈黙＝悪ではないのだ。沈黙の質が "ガン見系" なら集中、"離脱系" なら盛り下がりの可能性なのだ。',
-    '長い沈黙の前後コメを見直すと、配信の「曲がり角」が分かるのだ。',
-  ]));
-}
 
-function adviceAfterLaughter() {
-  return adviceWrap(adviceCard('konta', 'こん太', [
-    '「笑い密度」は w / 草 / 8888 / 笑 等の出現を 30 秒粒度で見たやつなのだ。',
-    '笑いが集中した瞬間がそのまま「ハイライト候補」になるから、配信の切り抜きヒントに使えるのだ。',
-  ]));
-}
 
-function adviceAfterNewVsRepeat() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    '新規が多い枠＝集客がうまく回った枠、リピーターが多い枠＝コミュニティが厚い枠、なのだ。',
-    '両方ある枠が理想だけど、どちらかに偏っても配信スタイルとして全然 OK なのだ。',
-  ]));
-}
 
-function adviceAfterSurvival() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    'コメ参加維持率は「最初の区間にコメくれた人が、後半もコメしていたか」の割合なのだ。',
-    '50% を切ったタイミングで何があったか、コメタイムラインと突き合わせると気づきがあるのだ。',
-  ]));
-}
 
-function adviceAfterDeparted() {
-  return adviceWrap(adviceCard('konta', 'こん太', [
-    'ヘビーだった人が今回いない＝「離反」とは限らないのだ。タイミングが合わなかっただけかもしれないのだ。',
-    '同じ人が 2 〜 3 回連続で出てきたら、X とかで一言挨拶してもいいタイミングなのだ。',
-  ]));
-}
 
-function adviceAfterAttendance() {
-  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
-    '出席カレンダーは「常連層が枠を選んでいるか／毎回いるか」が見えるのだ。',
-    '横一列で●が並ぶ常連は、コミュニティの背骨なのだ。大事にしてほしいのだ。',
-  ]));
-}
 
-function adviceAfterKeyboard() {
-  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
-    'キーボード型は「ファン層の語り方」のざっくり傾向なのだ。短文派が多い枠は反応速度型、ロング派が多い枠は熟読型なのだ。',
-    '無口観戦派は配信を見てるけどコメは控えめな層で、これも貴重なファンなのだ。',
-  ]));
-}
 
-function adviceAfterRecentCmp() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    '直近 5 配信の比較バーは、自分の "調子のグラデーション" を一目で見るやつなのだ。',
-    '高い／低いに一喜一憂しなくていいのだ。配信ジャンル・曜日・時間で振れるのが普通なのだ。',
-  ]));
-}
 
-function adviceAfterWeekdayHeat() {
-  return adviceWrap(adviceCard('konta', 'こん太', [
-    '曜日 × 時間帯ヒートは「ファン層の活動時間」を浮き彫りにするのだ。濃い時間帯に配信を寄せると拾われやすいのだ。',
-    '逆に「自分の生活リズムに合う時間」を優先するのも全然アリなのだ。',
-  ]));
-}
 
-function adviceAfterGrowthMeter() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    '成長メーターは「過去平均との偏差」なのだ。±10% くらいは普通の揺らぎ、+50% 超えなら何かが効いた枠なのだ。',
-    '低い回も、悪いわけじゃないのだ。ジャンル違い・短時間枠なら下がるのが自然なのだ。',
-  ]));
-}
 
-function adviceAfterOpeningFive() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    '冒頭 5 分の CPM が「全体ピーク」と相関するなら、開始の掴みが効いている証拠なのだ。',
-    '相関が弱い枠は「中盤・終盤の伸びる仕掛け」が機能している、というポジティブな解釈もあるのだ。',
-  ]));
-}
 
-function adviceAfterWaveform() {
-  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
-    '"似てる配信" は CPM カーブの形だけで類似度を測るのだ。コメ件数の多い少ないは関係ないのだ。',
-    '形が同じ過去枠を見れば、「あの神回ぽい流れ」「あの落ち着いた回ぽい流れ」が言語化できるのだ。',
-  ]));
-}
 
-function adviceAfterEcho() {
-  return adviceWrap(adviceCard('konta', 'こん太', [
-    'コメ伝染と被り瞬間は、ファン同士の "歓声同期" を見るやつなのだ。ニコ生独特のコメ文化の数値化なのだ。',
-    'リスト上位の語が、その配信を象徴するキャッチフレーズになりやすいのだ。',
-  ]));
-}
 
-function adviceAfterFirstSecond() {
-  return adviceWrap(adviceCard('konta', 'こん太', [
-    '初コメ→2コメ目までが速い人は「乗ってきた派」、長い人は「様子見派」、というファンの肌感の数値化なのだ。',
-    '配信スタイルによって理想分布は変わるから、絶対的な良い悪いはないのだ。',
-  ]));
-}
 
-function adviceAfterTalentPeak() {
-  return adviceWrap(adviceCard('link', 'りんく', [
-    '話芸ピーク＝沈黙が続いた直後にどっと反応が来た瞬間、なのだ。配信者のリアクションやトークが効いた可能性大なのだ。',
-    'その瞬間のトーク内容を後で見返すと、自分の「効く弾」が見つかるのだ。',
-  ]));
-}
 
-function adviceAfterSentiment() {
-  return adviceWrap(adviceCard('konta', 'こん太', [
-    '感情曲線は語彙辞書ベースの「ざっくり感情」なのだ。皮肉や文脈は読まないので、傾向だけ参考に見るのだ。',
-    'ポジ・ネガが入れ替わった瞬間が、配信の起伏ポイントなのだ。',
-  ]));
-}
 
-function adviceAfterUniqueWords() {
-  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
-    '「視聴者発の人気語」は、配信中に視聴者側から自然に出ていた言葉なのだ。',
-    '次回のタイトル・話題振り・返しに少し混ぜると、場の言葉に寄せやすいのだ。',
-  ]));
-}
 
-function adviceAfterReach() {
-  return adviceWrap(adviceCard('konta', 'こん太', [
-    'リーチ係数は "1 コメンターあたり何人が観てるか" の目安なのだ。係数が大きいほどサイレント観戦層が厚い枠なのだ。',
-    'コメ少なめでも、係数が高いなら「観てる人は多い」枠だから自信を持っていいのだ。',
-  ]));
-}
 
 /**
  * 0.1.22 (W): TOC（目次）。各セクションの id に飛ぶアンカーリンク。
@@ -859,12 +413,8 @@ function sectionToc(items) {
  * @param {import('./concurrentPeakAnalysis.js').ConcurrentPeakAnalysis} peak
  */
 function sectionConcurrentTimeline(series, peak) {
-  if (!series || series.points.length < 2) {
-    return `<section class="mkt-section" id="mkt-concurrent">
-<h2>同接推移カーブ <span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">配信中の同接サンプル（来場者数の時系列）が <strong>2 サンプル以上</strong> 取れていれば描画されます。今回は ${series ? series.points.length : 0} サンプルのみです。</p>
-</section>`;
-  }
+  // v0.1.1854: 線を引けない（同接サンプル2点未満）ときは章ごと出さない（空の章を並べない）。
+  if (!series || series.points.length < 2) return '';
   const W = 900;
   const H = 220;
   const pad = 40;
@@ -1744,149 +1294,6 @@ function sectionReachCoefficient(reach) {
 </section>`;
 }
 
-/**
- * 次回行動メモ・応援チャンス等（KPI より前に出すブロック）
- * @param {ReturnType<typeof buildSupportGrowthInsights>} insights
- * @param {import('./marketingDynamicAdvice.js').AdviceMetrics} metricsFull
- */
-function renderSupportGrowthSections(insights, metricsFull) {
-  if (!insights) return '';
-  const parts = [];
-  const noteMeta = insights.meta?.giftNote
-    ? `<p class="mkt-note">${escapeHtml(String(insights.meta.giftNote))}</p>`
-    : '';
-
-  if (insights.nextActions?.length) {
-    const lis = insights.nextActions
-      .map(
-        (a) => `<li class="mkt-sg-next-item">
-<span class="mkt-sg-phase">${escapeHtml(a.phase)}</span>
-<p class="mkt-sg-line">${escapeHtml(a.line)}</p>
-<p class="mkt-sg-meta">根拠: ${escapeHtml(a.because)}</p>
-<p class="mkt-sg-meta">期待: ${escapeHtml(a.effect)}</p>
-</li>`
-      )
-      .join('');
-    const liveNote = 'この内容は今回の配信データから自動で組み立てています。配信内容によって毎回変わります。';
-    const trioCards =
-      `<div class="mkt-advice-stack mkt-advice-stack--next">` +
-      adviceCard('link', 'りんく', [
-        '次の配信で試しやすい順に並べたよ。気になる1つだけでも、まずはやってみよう。'
-      ]) +
-      adviceCard('konta', 'こん太', [
-        'リスナー目線で「言いやすい・参加しやすい」流れを拾ってるよ。楽しい空気づくりに使ってね。'
-      ]) +
-      adviceCard('tanu', 'たぬ姉', [
-        '数字は正解ではなく目安です。毎回の配信内容で変わるので、その回の色として読んでください。'
-      ]) +
-      `</div>`;
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-next-actions">
-<h2>りんく・こん太・たぬ姉の作戦会議（最大5つ）</h2>
-<p class="mkt-lead">まずは楽しく試せるアクションから。次の枠で使えるメモを先に置いたのだ。</p>
-<p class="mkt-sg-live-note">${escapeHtml(liveNote)}</p>
-${trioCards}
-${noteMeta}
-<ol class="mkt-sg-next-list">${lis}</ol>
-${dynamicAdviceCardsHtml('nextActions', metricsFull)}
-</section>`);
-  }
-
-  if (insights.supportWindows?.length) {
-    const rows = insights.supportWindows
-      .map(
-        (w) =>
-          `<li><strong>${escapeHtml(w.label)}</strong> <span class="mkt-sg-time">（${escapeHtml(w.timeHint)}）</span><br><span class="mkt-sg-meta">${escapeHtml(w.because)}</span></li>`
-      )
-      .join('');
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-support-chance">
-<h2>応援が増えそうな時間</h2>
-<ul class="mkt-sg-simple-list">${rows}</ul>
-${dynamicAdviceCardsHtml('supportGrowth', metricsFull)}
-</section>`);
-  }
-
-  if (insights.giftFlow?.length) {
-    const blocks = insights.giftFlow
-      .map(
-        (g) => `<article class="mkt-sg-gift-block"><h3>${escapeHtml(g.headline)}</h3>
-<p>${escapeHtml(g.beforeHint)}</p>
-<p>${escapeHtml(g.afterHint)}</p>
-<p class="mkt-sg-meta">${escapeHtml(g.thankTimingHint)}</p></article>`
-      )
-      .join('');
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-gift-flow">
-<p class="mkt-sg-note">番組・イベントの<strong>ギフト累計</strong>は、ニコ生公式のギフト指標です（広告ptやコメント数とは別枠です）。</p>
-<h2>ギフト・アイテムが飛びやすかった流れ</h2>
-${blocks}
-${dynamicAdviceCardsHtml('giftFlow', metricsFull)}
-</section>`);
-  }
-
-  const sumLine = String(insights.onboarding?.summaryLine || '').trim();
-  const voiceEx = Array.isArray(insights.onboarding?.voiceExamples)
-    ? insights.onboarding.voiceExamples
-    : [];
-  if (sumLine || voiceEx.length) {
-    const ex = voiceEx.map((v) => `<li>${escapeHtml(v)}</li>`).join('');
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-onboarding">
-<h2>初見さんを迎え入れる手がかり</h2>
-${sumLine ? `<p>${escapeHtml(sumLine)}</p>` : ''}
-<p class="mkt-lead">そのまま使える声かけ例</p>
-<ul class="mkt-sg-simple-list">${ex}</ul>
-${dynamicAdviceCardsHtml('listenerOnboarding', metricsFull)}
-</section>`);
-  }
-
-  if (insights.clippingMoments?.length) {
-    const cm = insights.clippingMoments
-      .map(
-        (c) =>
-          `<article class="mkt-sg-clip"><p class="mkt-sg-time">${escapeHtml(c.atLabel)} — ${escapeHtml(c.reason)}</p>
-<p class="mkt-sg-sample">代表: ${escapeHtml(c.sampleLine)}</p>
-<p class="mkt-sg-meta">${escapeHtml(c.promoHint)}</p></article>`
-      )
-      .join('');
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-clip-promo">
-<h2>切り抜き・告知に使えそうな場面</h2>
-${cm}
-</section>`);
-  }
-
-  if (insights.listenerRewards?.length) {
-    const lr = insights.listenerRewards.map((x) => `<li>${escapeHtml(x.line)}</li>`).join('');
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-listener-care">
-<h2>リスナーが喜ぶお返し</h2>
-<ul class="mkt-sg-simple-list">${lr}</ul>
-${dynamicAdviceCardsHtml('listenerCare', metricsFull)}
-</section>`);
-  }
-
-  const g = insights.askTiming?.good || [];
-  const b = insights.askTiming?.bad || [];
-  if (g.length || b.length) {
-    const gHtml = g.length
-      ? `<h3>お願いしても空気が軽くなりやすいとき</h3><ul class="mkt-sg-simple-list">${g.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
-      : '';
-    const bHtml = b.length
-      ? `<h3>お願いは控えめがよさそうなとき</h3><ul class="mkt-sg-simple-list">${b.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
-      : '';
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-ask-timing">
-<h2>お願いの出しどころ（やさしめの目安）</h2>
-${gHtml}${bHtml}
-${dynamicAdviceCardsHtml('askTiming', metricsFull)}
-</section>`);
-  }
-
-  if (insights.caution?.length) {
-    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-sg-caution">
-<h2>読み取りの注意</h2>
-<ul class="mkt-sg-simple-list">${insights.caution.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-</section>`);
-  }
-
-  if (!parts.length) return '';
-  return `<div class="mkt-sg-pack">${parts.join('\n')}</div>`;
-}
 
 /**
  * サムネ img をユーザーページへのリンクで包む（数値 uid のときだけ）。
@@ -3071,863 +2478,19 @@ ${giftItems}
 </section>`;
 }
 
-/**
- * @param {number} numerator
- * @param {number} denominator
- */
-function marketingPercentOf(numerator, denominator) {
-  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
-    return null;
-  }
-  return Math.round((numerator / denominator) * 1000) / 10;
-}
 
-/**
- * @param {number|null} value
- * @param {string} suffix
- */
-function marketingRatioDisplay(value, suffix = '%') {
-  return value == null ? '未取得' : `${value}${suffix}`;
-}
 
-/** @param {number} n */
-function marketingSignedDelta(n) {
-  if (!Number.isFinite(n) || n === 0) return '±0';
-  return n > 0 ? `+${formatEventRankingNumber(n)}` : `-${formatEventRankingNumber(Math.abs(n))}`;
-}
 
-/**
- * @param {import('./giftMomentumAnalytics.js').GiftMomentumTimingWindow[]} windows
- */
-function pickBestGiftReactionWindow(windows) {
-  let best = null;
-  for (const w of Array.isArray(windows) ? windows : []) {
-    if (!best || w.delta > best.delta || (w.delta === best.delta && w.giftCount > best.giftCount)) {
-      best = w;
-    }
-  }
-  return best;
-}
 
-/**
- * @param {{
- *   report: MarketingReport,
- *   audienceGap: import('./audienceEngagementGap.js').AudienceEngagementGap,
- *   giftMomentum: import('./giftMomentumAnalytics.js').GiftMomentumAnalysis,
- *   supporterChikuran: ReturnType<typeof buildSupporterChikuranRows>,
- *   sessionSummaryRows: readonly unknown[],
- *   pastBroadcasts: readonly unknown[],
- *   giftUsers: readonly unknown[],
- *   giftEvents: readonly unknown[],
- *   giftHistoryThrows: readonly unknown[],
- *   officialGiftHistory: readonly unknown[],
- *   giftContributionRanking: readonly unknown[],
- *   adContributionRanking: readonly unknown[],
- *   programStats: Record<string, unknown> | null,
- *   eventRanking: EventRankingReportModel | null | undefined
- * }} input
- */
-function buildMarketingFunnelBoard(input) {
-  const r = input.report;
-  const programStats = input.programStats || {};
-  const visitors =
-    input.audienceGap.totalVisitors ||
-    positiveMarketingNumber(programStats.watchCount) ||
-    positiveMarketingNumber(programStats.viewerCount) ||
-    maxMarketingField(input.sessionSummaryRows, [
-      'viewerCountFromDom',
-      'totalVisitors',
-      'watchCount',
-      'visitorCount'
-    ]);
-  const comments = Math.max(
-    input.audienceGap.effectiveCommentCount,
-    r.totalComments,
-    positiveMarketingNumber(programStats.commentCount)
-  );
-  const uniqueCommenters = Math.max(input.audienceGap.uniqueCommenters, resolveParticipantPeople(r).people);
-  const supporterCount = input.supporterChikuran.totals.supporterCount;
-  const giftSenderCount = input.giftMomentum.totals.senderCount;
-  const adRowCount = input.adContributionRanking.length;
-  const giftContributionRows = input.giftContributionRanking.length;
-  const supportSignalRows = giftSenderCount + adRowCount + giftContributionRows;
-  const commentsPerVisitor = marketingPercentOf(comments, visitors);
-  const uniquePerVisitor = marketingPercentOf(uniqueCommenters, visitors);
-  const supporterPerCommenter = marketingPercentOf(supporterCount, uniqueCommenters);
-  const giftSenderPerSupporter = marketingPercentOf(giftSenderCount, supporterCount);
-  const supportSignalPerSupporter = marketingPercentOf(supportSignalRows, supporterCount);
-  const bestGiftWindow = pickBestGiftReactionWindow(input.giftMomentum.timingWindows);
-  const giftReactionDelta = bestGiftWindow ? bestGiftWindow.delta : 0;
-  const sourceCoverage = [
-    r.totalComments > 0,
-    visitors > 0,
-    input.sessionSummaryRows.length > 0,
-    Object.keys(programStats).length > 0,
-    input.giftUsers.length > 0,
-    input.giftEvents.length > 0,
-    input.giftMomentum.hasSignals,
-    input.adContributionRanking.length > 0,
-    Boolean(input.eventRanking),
-    input.pastBroadcasts.length > 0
-  ].filter(Boolean).length;
 
-  const funnelRows = [
-    {
-      stage: '来場',
-      value: visitors > 0 ? `${formatEventRankingNumber(visitors)}人` : '未取得',
-      fromPrevious: '起点',
-      fromAudience: '100%',
-      reading: '見に来た人の入口。公式値か時系列サンプル最大値を使います。'
-    },
-    {
-      stage: 'コメント',
-      value: `${formatEventRankingNumber(comments)}件`,
-      fromPrevious: marketingRatioDisplay(commentsPerVisitor),
-      fromAudience: marketingRatioDisplay(commentsPerVisitor),
-      reading: '来場が発言に変わった量。多い来場に対して静かかどうかを見ます。'
-    },
-    {
-      stage: '発言者',
-      value: `${formatEventRankingNumber(uniqueCommenters)}人`,
-      fromPrevious: marketingRatioDisplay(marketingPercentOf(uniqueCommenters, comments)),
-      fromAudience: marketingRatioDisplay(uniquePerVisitor),
-      reading: '何人が会話に入ったか。コメント件数だけでなく人数を分けます。'
-    },
-    {
-      stage: '応援者候補',
-      value: `${formatEventRankingNumber(supporterCount)}名`,
-      fromPrevious: marketingRatioDisplay(supporterPerCommenter),
-      fromAudience: marketingRatioDisplay(marketingPercentOf(supporterCount, visitors)),
-      reading: 'コメント・ギフト・広告をまとめた、応援してくれた人の候補です。'
-    },
-    {
-      stage: 'ギフト送り主',
-      value: `${formatEventRankingNumber(giftSenderCount)}名`,
-      fromPrevious: marketingRatioDisplay(giftSenderPerSupporter),
-      fromAudience: marketingRatioDisplay(marketingPercentOf(giftSenderCount, visitors)),
-      reading: '応援者候補のうち、ギフト行動まで見えた人です。'
-    },
-    {
-      stage: '広告/貢献行',
-      value: `${formatEventRankingNumber(supportSignalRows)}行`,
-      fromPrevious: marketingRatioDisplay(supportSignalPerSupporter),
-      fromAudience: marketingRatioDisplay(marketingPercentOf(supportSignalRows, visitors)),
-      reading: 'ニコニ広告・貢献度ランキングなど、コメント以外の支援シグナルです。'
-    }
-  ];
 
-  const cards = [
-    {
-      label: 'コメントした人',
-      value:
-        visitors > 0
-          ? `${formatEventRankingNumber(uniqueCommenters)}人 / ${formatEventRankingNumber(visitors)}来場（${computeCommentParticipationPct(uniqueCommenters, visitors)}%）`
-          : `${formatEventRankingNumber(uniqueCommenters)}人`,
-      hint: '来場者のうち発言した人数（必須）'
-    },
-    {
-      label: '来場→発言',
-      value: marketingRatioDisplay(commentsPerVisitor),
-      hint: `${formatEventRankingNumber(visitors)}人中 ${formatEventRankingNumber(comments)}件`
-    },
-    {
-      label: '発言者→応援者',
-      value: marketingRatioDisplay(supporterPerCommenter),
-      hint: `${formatEventRankingNumber(uniqueCommenters)}人中 ${formatEventRankingNumber(supporterCount)}名`
-    },
-    {
-      label: '応援者→ギフト',
-      value: marketingRatioDisplay(giftSenderPerSupporter),
-      hint: `${formatEventRankingNumber(supporterCount)}名中 ${formatEventRankingNumber(giftSenderCount)}名`
-    },
-    {
-      label: 'ギフト後の反応',
-      value: bestGiftWindow ? marketingSignedDelta(giftReactionDelta) : '未取得',
-      hint: bestGiftWindow ? `${bestGiftWindow.label} の前後コメント差` : '時刻つきギフト待ち'
-    },
-    {
-      label: '支援シグナル',
-      value: `${formatEventRankingNumber(supportSignalRows)}行`,
-      hint: `ギフト送り主 ${giftSenderCount} / 広告 ${adRowCount} / 貢献 ${giftContributionRows}`
-    },
-    {
-      label: 'データ厚み',
-      value: `${sourceCoverage}/10`,
-      hint: '判断に使えるデータ種類'
-    }
-  ];
 
-  /** @type {{ area: string, priority: '高' | '中' | '低', basis: string, next: string }[]} */
-  const priorityRows = [];
-  if (visitors > 0 && commentsPerVisitor != null && commentsPerVisitor < 20) {
-    priorityRows.push({
-      area: '来場から発言',
-      priority: commentsPerVisitor < 8 ? '高' : '中',
-      basis: `来場に対するコメント率 ${commentsPerVisitor}%`,
-      next: '来場が増えた直後の問いかけ・選択肢・初見向け一言を増やす'
-    });
-  }
-  if (uniqueCommenters > 0 && r.segmentCounts.once >= Math.max(3, uniqueCommenters * 0.45)) {
-    priorityRows.push({
-      area: '初見・一見の定着',
-      priority: '中',
-      basis: `一見コメント ${r.segmentCounts.once}人 / 発言者 ${uniqueCommenters}人`,
-      next: '一度だけ発言した人が2回目を言いやすい返し方を探す'
-    });
-  }
-  if (supporterCount > 0 && giftSenderPerSupporter != null && giftSenderPerSupporter < 12) {
-    priorityRows.push({
-      area: '応援からギフト',
-      priority: input.giftMomentum.totals.totalPoints > 0 ? '中' : '低',
-      basis: `応援者候補に対するギフト送り主 ${giftSenderPerSupporter}%`,
-      next: 'ギフトが飛んだ場面の直前の会話・企画・お礼の流れを見る'
-    });
-  }
-  if (input.giftMomentum.totals.topSenderSharePct >= 60) {
-    priorityRows.push({
-      area: '支援の偏り',
-      priority: '中',
-      basis: `トップ送り主の代表pt比率 ${input.giftMomentum.totals.topSenderSharePct}%`,
-      next: '特定の人だけに寄せず、複数人が軽く参加できる応援導線にする'
-    });
-  }
-  if (bestGiftWindow) {
-    priorityRows.push({
-      area: 'ギフト後の会話',
-      priority: giftReactionDelta >= 0 ? '低' : '中',
-      basis: `${bestGiftWindow.label} 前後コメント差 ${marketingSignedDelta(giftReactionDelta)}`,
-      next: giftReactionDelta >= 0
-        ? '反応が続いた言葉や企画を次回も使える形でメモする'
-        : 'ギフト後に会話が止まった理由を、お礼の長さや話題転換から見る'
-    });
-  }
-  if (input.pastBroadcasts.length < 3) {
-    priorityRows.push({
-      area: '過去比較',
-      priority: '低',
-      basis: `比較できる過去配信 ${input.pastBroadcasts.length}枠`,
-      next: '数枠ためて、曜日・時間・企画ごとの違いを見る'
-    });
-  }
-  if (input.sessionSummaryRows.length < 3) {
-    priorityRows.push({
-      area: '時系列サンプル',
-      priority: '低',
-      basis: `来場/コメントの時系列サンプル ${input.sessionSummaryRows.length}点`,
-      next: '配信中のサンプルが増えるほど、静かな来場時間を細かく見られる'
-    });
-  }
-  if (input.eventRanking?.self?.rank) {
-    priorityRows.push({
-      area: 'イベント順位',
-      priority: '中',
-      basis: `${input.eventRanking.self.rank}位 / 差分 ${marketingMetricLabel(input.eventRanking.self.diffToNext, 'pt')}`,
-      next: '順位だけでなく、コメント・ギフト・広告のどれが動いた時間かを見る'
-    });
-  }
 
-  const dataGapRows = [
-    { label: '来場者数', ok: visitors > 0, effect: '来場→発言の変換率が出せる' },
-    { label: '時系列サンプル', ok: input.sessionSummaryRows.length >= 2, effect: '静かな来場時間を見つけられる' },
-    { label: '公式番組統計', ok: Object.keys(programStats).length > 0, effect: 'watch/comment/gift を公式値で補える' },
-    { label: 'ギフト時刻', ok: input.giftMomentum.totals.exactEventCount > 0, effect: 'ギフト前後のコメント変化が読める' },
-    { label: '広告ランキング', ok: adRowCount > 0, effect: '広告勢を応援者分析に足せる' },
-    { label: '過去配信', ok: input.pastBroadcasts.length >= 3, effect: '常連化・成長比較が強くなる' }
-  ];
 
-  return { cards, funnelRows, priorityRows: priorityRows.slice(0, 8), dataGapRows };
-}
 
-/** @param {ReturnType<typeof buildMarketingFunnelBoard>} board */
-function sectionMarketingFunnelBoard(board) {
-  const cardHtml = board.cards
-    .map(
-      (c) => `<div class="mkt-funnel-card">
-<span class="mkt-funnel-card__label">${escapeHtml(c.label)}</span>
-<strong class="mkt-funnel-card__value">${escapeHtml(c.value)}</strong>
-<span class="mkt-funnel-card__hint">${escapeHtml(c.hint)}</span>
-</div>`
-    )
-    .join('');
-  const funnelHtml = board.funnelRows
-    .map(
-      (row) => `<tr>
-<td data-label="段階">${escapeHtml(row.stage)}</td>
-<td data-label="数値" class="mkt-num">${escapeHtml(row.value)}</td>
-<td data-label="前段比">${escapeHtml(row.fromPrevious)}</td>
-<td data-label="来場比">${escapeHtml(row.fromAudience)}</td>
-<td data-label="読み方">${escapeHtml(row.reading)}</td>
-</tr>`
-    )
-    .join('');
-  const priorityHtml = board.priorityRows.length
-    ? board.priorityRows
-        .map(
-          (row) => `<tr>
-<td data-label="見る場所">${escapeHtml(row.area)}</td>
-<td data-label="優先度"><span class="mkt-funnel-priority mkt-funnel-priority--${escapeAttr(row.priority)}">${escapeHtml(row.priority)}</span></td>
-<td data-label="根拠">${escapeHtml(row.basis)}</td>
-<td data-label="次に見ること">${escapeHtml(row.next)}</td>
-</tr>`
-        )
-        .join('')
-    : `<tr><td data-label="見る場所" colspan="4">大きな優先課題は出ていません。気になる指標だけ見てください。</td></tr>`;
-  const gapHtml = board.dataGapRows
-    .map(
-      (row) => `<span class="mkt-funnel-gap ${row.ok ? 'mkt-funnel-gap--ok' : 'mkt-funnel-gap--missing'}">
-${escapeHtml(row.ok ? 'OK' : '未取得')} ${escapeHtml(row.label)}<small>${escapeHtml(row.effect)}</small>
-</span>`
-    )
-    .join('');
-  return `<section class="mkt-section mkt-section--funnel" id="mkt-marketing-funnel">
-<h2>マーケファネル & 優先度ボード</h2>
-<p class="mkt-note">来場からコメント、応援者候補、ギフト・広告までを段階で見ます。どこで細くなっているかを先に把握するための表です。</p>
-<div class="mkt-funnel-card-grid">${cardHtml}</div>
-<h3 class="mkt-subhead">来場から支援までの流れ</h3>
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-funnel-table">
-<thead><tr><th>段階</th><th>数値</th><th>前段比</th><th>来場比</th><th>読み方</th></tr></thead>
-<tbody>${funnelHtml}</tbody>
-</table></div>
-<h3 class="mkt-subhead">優先度ボード</h3>
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-priority-table">
-<thead><tr><th>見る場所</th><th>優先度</th><th>根拠</th><th>次に見ること</th></tr></thead>
-<tbody>${priorityHtml}</tbody>
-</table></div>
-<h3 class="mkt-subhead">データ診断</h3>
-<div class="mkt-funnel-gap-list">${gapHtml}</div>
-</section>`;
-}
 
-/** @param {number} count */
-function marketingCommentSegmentKey(count) {
-  if (count >= 10) return 'heavy';
-  if (count >= 4) return 'mid';
-  if (count >= 2) return 'light';
-  return 'once';
-}
 
-/**
- * @param {{
- *   report: MarketingReport,
- *   giftMomentum: import('./giftMomentumAnalytics.js').GiftMomentumAnalysis,
- *   supporterChikuran: ReturnType<typeof buildSupporterChikuranRows>
- * }} input
- */
-function buildMarketingSegmentActionBoard(input) {
-  const r = input.report;
-  const segmentTotal = Math.max(1, r.uniqueUsers);
-  const giftSenderRows = input.giftMomentum.senderRows.filter((row) =>
-    row.sources.some((source) => source.includes('gift') || source === 'official-history')
-  );
-  const giftCommenters = giftSenderRows.filter((row) => row.commentCount > 0).length;
-  const giftSilentSenders = Math.max(0, giftSenderRows.length - giftCommenters);
-  const supporterRows = input.supporterChikuran.rows || [];
-  const multiSourceRows = supporterRows.filter((row) => Array.isArray(row.sources) && row.sources.length >= 2).length;
-  const commentLedRows = supporterRows.filter(
-    (row) => row.commentCount > 0 && row.giftPointTotal <= 0 && row.adPointTotal <= 0
-  ).length;
-  const giftLedRows = supporterRows.filter((row) => row.giftPointTotal > 0).length;
-  const adLedRows = supporterRows.filter((row) => row.adPointTotal > 0).length;
-  const segmentGiftCounts = { heavy: 0, mid: 0, light: 0, once: 0 };
-  for (const row of giftSenderRows) {
-    segmentGiftCounts[marketingCommentSegmentKey(row.commentCount)] += 1;
-  }
 
-  const cards = [
-    {
-      label: 'ヘビー・中間',
-      value: `${r.segmentCounts.heavy + r.segmentCounts.mid}人`,
-      hint: `発言者の ${marketingPctLabel(((r.segmentCounts.heavy + r.segmentCounts.mid) / segmentTotal) * 100)}`
-    },
-    {
-      label: '一見・ライト',
-      value: `${r.segmentCounts.once + r.segmentCounts.light}人`,
-      hint: '入口と2回目の声かけを見る層'
-    },
-    {
-      label: '匿名コメント',
-      value: `${r.is184.count184}件`,
-      hint: `既知コメントの ${marketingPctLabel(r.is184.pctOfKnown)}`
-    },
-    {
-      label: 'ギフト行コメント率',
-      value: giftSenderRows.length > 0
-        ? marketingRatioDisplay(marketingPercentOf(giftCommenters, giftSenderRows.length))
-        : '未取得',
-      hint: `${giftCommenters}行がコメントあり / ${giftSilentSenders}行はコメント薄め`
-    },
-    {
-      label: '複合応援',
-      value: `${multiSourceRows}名`,
-      hint: 'コメント・ギフト・広告が重なった候補'
-    },
-    {
-      label: 'コメント主導',
-      value: `${commentLedRows}名`,
-      hint: '支援行動より会話で支える候補'
-    }
-  ];
-
-  const segmentRows = [
-    {
-      layer: 'ヘビー',
-      count: `${r.segmentCounts.heavy}人`,
-      share: `${r.segmentPcts.heavy}%`,
-      signal: `10件以上。ギフト行 ${segmentGiftCounts.heavy}行`,
-      action: '常連ノリや内輪感が強くなりすぎないよう、初見にも見える形で話題を開く'
-    },
-    {
-      layer: '中間',
-      count: `${r.segmentCounts.mid}人`,
-      share: `${r.segmentPcts.mid}%`,
-      signal: `4〜9件。ギフト行 ${segmentGiftCounts.mid}行`,
-      action: '企画参加・次枠告知・軽いお願いを受け取りやすい中心層として見る'
-    },
-    {
-      layer: 'ライト',
-      count: `${r.segmentCounts.light}人`,
-      share: `${r.segmentPcts.light}%`,
-      signal: `2〜3件。ギフト行 ${segmentGiftCounts.light}行`,
-      action: '2回目のコメントが出た話題を拾い、次回も入りやすい入口にする'
-    },
-    {
-      layer: '一見',
-      count: `${r.segmentCounts.once}人`,
-      share: `${r.segmentPcts.once}%`,
-      signal: `1件だけ。ギフト行 ${segmentGiftCounts.once}行`,
-      action: 'あいさつ、選択肢、短いリアクションなど、低負荷で参加できる導線を見る'
-    },
-    {
-      layer: '184・匿名',
-      count: `${r.is184.count184}件`,
-      share: marketingPctLabel(r.is184.pctOfKnown),
-      signal: `${r.is184.knownCount}件中の匿名コメント`,
-      action: '名前を出さなくても参加しやすい空気があるか、匿名の反応語を素材として見る'
-    }
-  ];
-
-  const overlapRows = [
-    {
-      type: 'コメント主導',
-      count: `${commentLedRows}名`,
-      basis: 'コメントはあるがギフト/広告ptは薄い',
-      action: '会話の中心・拾いやすい話題・初見導線の参考にする'
-    },
-    {
-      type: 'ギフト主導',
-      count: `${giftLedRows}名`,
-      basis: `ギフトptあり。うちコメントあり ${giftCommenters}行`,
-      action: 'ギフト前後の会話、お礼後の反応、投げやすいタイミングを見る'
-    },
-    {
-      type: '広告主導',
-      count: `${adLedRows}名`,
-      basis: 'ニコニ広告ptが見えた応援者候補',
-      action: '広告とコメントの波が重なるか、告知やイベント順位と合わせて見る'
-    },
-    {
-      type: '複合応援',
-      count: `${multiSourceRows}名`,
-      basis: '複数ソースに現れた応援者候補',
-      action: '濃い支援者として扱いながら、順位で価値づけしない表現にする'
-    }
-  ];
-
-  return { cards, segmentRows, overlapRows };
-}
-
-/** @param {ReturnType<typeof buildMarketingSegmentActionBoard>} board */
-function sectionMarketingSegmentActionBoard(board) {
-  const cardHtml = board.cards
-    .map(
-      (c) => `<div class="mkt-segment-action-card">
-<span class="mkt-segment-action-card__label">${escapeHtml(c.label)}</span>
-<strong class="mkt-segment-action-card__value">${escapeHtml(c.value)}</strong>
-<span class="mkt-segment-action-card__hint">${escapeHtml(c.hint)}</span>
-</div>`
-    )
-    .join('');
-  const segmentHtml = board.segmentRows
-    .map(
-      (row) => `<tr>
-<td data-label="層">${escapeHtml(row.layer)}</td>
-<td data-label="人数/件数" class="mkt-num">${escapeHtml(row.count)}</td>
-<td data-label="割合">${escapeHtml(row.share)}</td>
-<td data-label="シグナル">${escapeHtml(row.signal)}</td>
-<td data-label="使い方">${escapeHtml(row.action)}</td>
-</tr>`
-    )
-    .join('');
-  const overlapHtml = board.overlapRows
-    .map(
-      (row) => `<tr>
-<td data-label="タイプ">${escapeHtml(row.type)}</td>
-<td data-label="人数" class="mkt-num">${escapeHtml(row.count)}</td>
-<td data-label="根拠">${escapeHtml(row.basis)}</td>
-<td data-label="使い方">${escapeHtml(row.action)}</td>
-</tr>`
-    )
-    .join('');
-  return `<section class="mkt-section mkt-section--segment-action" id="mkt-segment-action">
-<h2>層別マーケ診断</h2>
-<p class="mkt-note">コメント量の層とギフト・広告の重なりを、個人名ではなく人数ベースで見ます。誰が上かではなく、どの入口が効いているかを見るための表です。</p>
-<div class="mkt-segment-action-card-grid">${cardHtml}</div>
-<h3 class="mkt-subhead">コメント層ごとの見方</h3>
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-segment-action-table">
-<thead><tr><th>層</th><th>人数/件数</th><th>割合</th><th>シグナル</th><th>使い方</th></tr></thead>
-<tbody>${segmentHtml}</tbody>
-</table></div>
-<h3 class="mkt-subhead">応援の重なり</h3>
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-support-overlap-table">
-<thead><tr><th>タイプ</th><th>人数</th><th>根拠</th><th>使い方</th></tr></thead>
-<tbody>${overlapHtml}</tbody>
-</table></div>
-</section>`;
-}
-
-/**
- * @param {boolean} ready
- * @param {boolean} partial
- */
-function marketingSkillStatus(ready, partial = false) {
-  if (ready) return { label: 'ON', className: 'on' };
-  if (partial) return { label: '一部', className: 'partial' };
-  return { label: '待機', className: 'off' };
-}
-
-/**
- * @param {{
- *   report: MarketingReport,
- *   audienceGap: import('./audienceEngagementGap.js').AudienceEngagementGap,
- *   giftMomentum: import('./giftMomentumAnalytics.js').GiftMomentumAnalysis,
- *   supporterChikuran: ReturnType<typeof buildSupporterChikuranRows>,
- *   sessionSummaryRows: readonly unknown[],
- *   pastBroadcasts: readonly unknown[],
- *   adContributionRanking: readonly unknown[],
- *   eventRanking: EventRankingReportModel | null | undefined,
- *   uniqueWords: readonly unknown[],
- *   talentPeaks: readonly unknown[],
- *   silenceZones: readonly unknown[],
- *   recentComparison: { bars?: readonly unknown[] },
- *   maskShareLabels: boolean
- * }} input
- */
-function buildAnalysisSkillBoard(input) {
-  const r = input.report;
-  const skills = [
-    {
-      name: 'コメントKPI',
-      status: marketingSkillStatus(r.totalComments > 0),
-      input: `${formatEventRankingNumber(r.totalComments)}件 / ${formatEventRankingNumber(resolveParticipantPeople(r).people)}人`,
-      output: 'KPI、速度、セグメント、本文傾向',
-      next: '配信全体の温度を最初に読む'
-    },
-    {
-      name: '来場→発言変換',
-      status: marketingSkillStatus(input.audienceGap.totalVisitors > 0, input.sessionSummaryRows.length > 0),
-      input: `${marketingMetricLabel(input.audienceGap.totalVisitors, '人')} / サンプル ${input.sessionSummaryRows.length}点`,
-      output: '静かな観客、来場100人あたりコメント',
-      next: '人は来たのに発言が少ない時間を探す'
-    },
-    {
-      name: '応援者ちくらんβ',
-      status: marketingSkillStatus(input.supporterChikuran.rows.length > 0),
-      input: `${input.supporterChikuran.totals.supporterCount}名候補`,
-      output: 'コメント・ギフト・広告を合算したローカル応援者',
-      next: '応援する人を主役に見る'
-    },
-    {
-      name: 'ギフト深掘り',
-      status: marketingSkillStatus(input.giftMomentum.hasSignals, input.giftMomentum.totals.officialGiftPoints > 0),
-      input: `${input.giftMomentum.totals.senderCount}名 / ${input.giftMomentum.totals.exactEventCount}時刻つき`,
-      output: '送り主タイプ、ギフト前後の反応',
-      next: 'ギフトが飛んだ理由とお礼後の流れを見る'
-    },
-    {
-      name: '広告・イベント',
-      status: marketingSkillStatus(input.adContributionRanking.length > 0 || Boolean(input.eventRanking)),
-      input: `広告 ${input.adContributionRanking.length}行 / イベント ${input.eventRanking ? 'あり' : 'なし'}`,
-      output: '広告勢、イベント順位、差分',
-      next: '支援行動と順位変動を同じ時間軸で見る'
-    },
-    {
-      name: '層別マーケ',
-      status: marketingSkillStatus(r.uniqueUsers > 0),
-      input: `ヘビー ${r.segmentCounts.heavy} / 中間 ${r.segmentCounts.mid} / 一見 ${r.segmentCounts.once}`,
-      output: 'コメント層ごとの入口と打ち手',
-      next: '初見・常連・匿名の入口を分ける'
-    },
-    {
-      name: '過去比較',
-      status: marketingSkillStatus(input.pastBroadcasts.length >= 2, input.pastBroadcasts.length > 0),
-      input: `${input.pastBroadcasts.length}枠`,
-      output: '常連化、成長、似てる配信、曜日時間',
-      next: '今回だけのブレと継続傾向を分ける'
-    },
-    {
-      name: '言葉・切り抜き',
-      status: marketingSkillStatus(input.uniqueWords.length > 0 || input.talentPeaks.length > 0),
-      input: `人気語 ${input.uniqueWords.length} / ピーク ${input.talentPeaks.length}`,
-      output: '切り抜き候補、告知素材、視聴者発の言葉',
-      next: '告知や次回タイトルに使える素材を探す'
-    },
-    {
-      name: '沈黙・速度診断',
-      status: marketingSkillStatus(input.silenceZones.length > 0 || r.timeline.length > 1),
-      input: `沈黙 ${input.silenceZones.length} / timeline ${r.timeline.length}点`,
-      output: 'コメント速度、沈黙の質、盛り上がりの山',
-      next: '間が空いた理由と再点火のきっかけを見る'
-    },
-    {
-      name: '共有/AI準備',
-      status: marketingSkillStatus(true),
-      input: input.maskShareLabels ? '共有伏せ字ON' : 'ローカル詳細',
-      output: 'HTML内JSON、表計算、必要時だけAI共有',
-      next: '外部AIや共有は明示操作した時だけ使う'
-    }
-  ];
-  const activeCount = skills.filter((s) => s.status.className === 'on').length;
-  const partialCount = skills.filter((s) => s.status.className === 'partial').length;
-  const cards = [
-    {
-      label: 'オーケストレーター',
-      value: 'Build→Run→Diagnose',
-      hint: '記録を集め、分析を走らせ、次に見る場所を出す'
-    },
-    {
-      label: 'ONスキル',
-      value: `${activeCount}/${skills.length}`,
-      hint: partialCount > 0 ? `一部 ${partialCount}件も利用` : '取得済みデータで起動'
-    },
-    {
-      label: '必要時だけ',
-      value: 'Opt-in',
-      hint: '共有・AI連携は明示操作時だけ'
-    },
-    {
-      label: '要点化',
-      value: `${formatEventRankingNumber(r.totalComments)}件→${skills.length}系統`,
-      hint: '大きなログを読める粒度に圧縮'
-    }
-  ];
-  const loopRows = [
-    { step: 'Build', label: '記録を束ねる', detail: 'コメント、来場、ギフト、広告、過去配信を同じHTMLに集める' },
-    { step: 'Run', label: '必要なスキルだけ走る', detail: 'データがある分析はON、足りない分析は一部/待機で表示する' },
-    { step: 'Diagnose', label: '詰まりを見つける', detail: '来場から発言、応援からギフト、ギフト後の反応を診断する' },
-    { step: 'Render', label: '見える形にする', detail: 'PCでは表、スマホではカード、JSONでは再利用できる形に出す' }
-  ];
-  return { cards, skills, loopRows };
-}
-
-/** @param {ReturnType<typeof buildAnalysisSkillBoard>} board */
-function sectionAnalysisSkillBoard(board) {
-  const cardHtml = board.cards
-    .map(
-      (c) => `<div class="mkt-skill-card">
-<span class="mkt-skill-card__label">${escapeHtml(c.label)}</span>
-<strong class="mkt-skill-card__value">${escapeHtml(c.value)}</strong>
-<span class="mkt-skill-card__hint">${escapeHtml(c.hint)}</span>
-</div>`
-    )
-    .join('');
-  const loopHtml = board.loopRows
-    .map(
-      (row) => `<article class="mkt-skill-loop-step">
-<span class="mkt-skill-loop-step__step">${escapeHtml(row.step)}</span>
-<strong>${escapeHtml(row.label)}</strong>
-<p>${escapeHtml(row.detail)}</p>
-</article>`
-    )
-    .join('');
-  const skillHtml = board.skills
-    .map(
-      (row) => `<tr>
-<td data-label="スキル">${escapeHtml(row.name)}</td>
-<td data-label="状態"><span class="mkt-skill-status mkt-skill-status--${escapeAttr(row.status.className)}">${escapeHtml(row.status.label)}</span></td>
-<td data-label="入力">${escapeHtml(row.input)}</td>
-<td data-label="出力">${escapeHtml(row.output)}</td>
-<td data-label="次に読む">${escapeHtml(row.next)}</td>
-</tr>`
-    )
-    .join('');
-  return `<section class="mkt-section mkt-section--analysis-skills" id="mkt-analysis-skills">
-<h2>分析スキルボード</h2>
-<p class="mkt-note">このHTML全体を、小さな分析スキルの集まりとして見ます。取得できたデータだけを使い、足りない部分は待機として見える化します。</p>
-<div class="mkt-skill-card-grid">${cardHtml}</div>
-<div class="mkt-skill-loop">${loopHtml}</div>
-<h3 class="mkt-subhead">起動した分析スキル</h3>
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-skill-table">
-<thead><tr><th>スキル</th><th>状態</th><th>入力</th><th>出力</th><th>次に読む</th></tr></thead>
-<tbody>${skillHtml}</tbody>
-</table></div>
-</section>`;
-}
-
-/**
- * @param {{
- *   report: MarketingReport,
- *   audienceGap: import('./audienceEngagementGap.js').AudienceEngagementGap,
- *   giftMomentum: import('./giftMomentumAnalytics.js').GiftMomentumAnalysis,
- *   supporterChikuran: ReturnType<typeof buildSupporterChikuranRows>,
- *   analysisSkillBoard: ReturnType<typeof buildAnalysisSkillBoard>,
- *   sessionSummaryRows: readonly unknown[],
- *   pastBroadcasts: readonly unknown[],
- *   adContributionRanking: readonly unknown[],
- *   eventRanking: EventRankingReportModel | null | undefined,
- *   programStats: unknown,
- *   maskShareLabels: boolean
- * }} input
- */
-function buildHarnessScalingBoard(input) {
-  const r = input.report;
-  const skillOn = input.analysisSkillBoard.skills.filter((s) => s.status.className === 'on').length;
-  const skillPartial = input.analysisSkillBoard.skills.filter((s) => s.status.className === 'partial').length;
-  const skillOff = input.analysisSkillBoard.skills.length - skillOn - skillPartial;
-  const memorySignals = [
-    r.totalComments > 0,
-    input.audienceGap.totalVisitors > 0 || input.sessionSummaryRows.length > 0 || Boolean(input.programStats),
-    input.giftMomentum.hasSignals,
-    input.adContributionRanking.length > 0 || Boolean(input.eventRanking),
-    input.pastBroadcasts.length > 0,
-    input.supporterChikuran.rows.length > 0
-  ].filter(Boolean).length;
-  const contextUnits = skillOn + skillPartial;
-  const cards = [
-    {
-      label: 'System scaling',
-      value: 'Harness',
-      hint: '記憶・文脈・スキル・検証を分析対象にする'
-    },
-    {
-      label: '記憶基盤',
-      value: `${memorySignals}/6系統`,
-      hint: 'コメント、来場、ギフト、広告、過去配信'
-    },
-    {
-      label: '動的コンテキスト',
-      value: `${formatEventRankingNumber(r.totalComments)}件→${contextUnits}系統`,
-      hint: '取得済み素材だけで読む順番を組む'
-    },
-    {
-      label: '検証ゲート',
-      value: input.maskShareLabels ? '伏せ字ON' : 'Local first',
-      hint: '共有・AI連携は明示操作時だけ'
-    }
-  ];
-  const layerRows = [
-    {
-      layer: '記憶基盤',
-      current: `コメント ${formatEventRankingNumber(r.totalComments)}件 / 過去 ${input.pastBroadcasts.length}枠`,
-      role: 'HTML内JSONと各セクションの共通材料を残す',
-      scale: '保存対象を増やすほど、比較・継続・常連化を読みやすくする'
-    },
-    {
-      layer: '動的コンテキスト',
-      current: `来場 ${marketingMetricLabel(input.audienceGap.totalVisitors, '人')} / サンプル ${input.sessionSummaryRows.length}点`,
-      role: '来場→発言→応援→支援へ、配信ごとに読む順番を組み替える',
-      scale: '時間窓と番組統計を足して、盛り上がりの前後関係を強くする'
-    },
-    {
-      layer: 'スキルルーティング',
-      current: `ON ${skillOn} / 一部 ${skillPartial} / 待機 ${skillOff}`,
-      role: '必要な分析だけ起動し、足りない入力は待機として見せる',
-      scale: '新しい分析スキルを足しても入口と読み順を崩さない'
-    },
-    {
-      layer: 'オーケストレーション',
-      current: 'Build → Run → Diagnose → Render',
-      role: '集計、診断、打ち手、HTML表示を同じ流れで接続する',
-      scale: 'ギフト・広告・イベントのタイミングを同じ時間軸へ寄せる'
-    },
-    {
-      layer: '検証・ガバナンス',
-      current: input.maskShareLabels ? '共有伏せ字ON' : 'ローカル詳細',
-      role: 'ローカル優先、共有/AIは明示操作、スマホ表示はカード化する',
-      scale: '将来のクラウド同期やAI共有を、同意と検証の別ゲートで扱う'
-    }
-  ];
-  const gateRows = [
-    {
-      gate: 'ローカル優先',
-      status: 'ON',
-      check: 'HTML生成時点で外部送信なし',
-      meaning: '利用者のPCに残った材料だけでまず読む'
-    },
-    {
-      gate: '文脈効率',
-      status: `${contextUnits}/${input.analysisSkillBoard.skills.length}`,
-      check: 'スキルの ON / 一部 / 待機',
-      meaning: '全部を読む前に、見るべき分析へ進める'
-    },
-    {
-      gate: '記憶衛生',
-      status: `${memorySignals}/6`,
-      check: 'データソース表と欠損診断',
-      meaning: 'あるデータと足りないデータを分けて表示する'
-    },
-    {
-      gate: '信頼性',
-      status: '検証対象',
-      check: 'unit / lint / build / visual',
-      meaning: '表、カード、スマホ表示の崩れを検査しやすくする'
-    },
-    {
-      gate: '安全な進化',
-      status: 'Opt-in',
-      check: '共有伏せ字とAI準備',
-      meaning: 'クラウド・AI連携は同意を別ゲートにする'
-    }
-  ];
-  return { cards, layerRows, gateRows };
-}
-
-/** @param {ReturnType<typeof buildHarnessScalingBoard>} board */
-function sectionHarnessScalingBoard(board) {
-  const cardHtml = board.cards
-    .map(
-      (c) => `<div class="mkt-harness-card">
-<span class="mkt-harness-card__label">${escapeHtml(c.label)}</span>
-<strong class="mkt-harness-card__value">${escapeHtml(c.value)}</strong>
-<span class="mkt-harness-card__hint">${escapeHtml(c.hint)}</span>
-</div>`
-    )
-    .join('');
-  const layerHtml = board.layerRows
-    .map(
-      (row) => `<tr>
-<td data-label="層">${escapeHtml(row.layer)}</td>
-<td data-label="今の入力">${escapeHtml(row.current)}</td>
-<td data-label="HTMLでの役割">${escapeHtml(row.role)}</td>
-<td data-label="伸ばし方">${escapeHtml(row.scale)}</td>
-</tr>`
-    )
-    .join('');
-  const gateHtml = board.gateRows
-    .map(
-      (row) => `<tr>
-<td data-label="ゲート">${escapeHtml(row.gate)}</td>
-<td data-label="状態"><span class="mkt-harness-gate-status">${escapeHtml(row.status)}</span></td>
-<td data-label="見ているもの">${escapeHtml(row.check)}</td>
-<td data-label="意味">${escapeHtml(row.meaning)}</td>
-</tr>`
-    )
-    .join('');
-  return `<section class="mkt-section mkt-section--harness" id="mkt-harness-scaling">
-<h2>分析ハーネス設計</h2>
-<p class="mkt-note">モデルだけでなく、記憶・文脈構築・スキル選択・実行ループ・検証を束ねる仕組みを育てる考え方を、このローカルHTML分析の全体設計に入れます。外部AIや共有は明示操作時だけです。</p>
-<div class="mkt-harness-card-grid">${cardHtml}</div>
-<h3 class="mkt-subhead">ハーネス層</h3>
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-harness-layer-table">
-<thead><tr><th>層</th><th>今の入力</th><th>HTMLでの役割</th><th>伸ばし方</th></tr></thead>
-<tbody>${layerHtml}</tbody>
-</table></div>
-<h3 class="mkt-subhead">信頼性ゲート</h3>
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-harness-gate-table">
-<thead><tr><th>ゲート</th><th>状態</th><th>見ているもの</th><th>意味</th></tr></thead>
-<tbody>${gateHtml}</tbody>
-</table></div>
-</section>`;
-}
 
 /** @param {string} source */
 function supporterChikuranSourceLabel(source) {
@@ -4620,31 +3183,6 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     uniqueCommentersInWindow: recentActiveCommenters
   });
 
-  /*
-   * 0.1.49 (AE): marketingDynamicAdvice.js の rule registry に渡す metrics を
-   *   集約データから組み立てる。各セクションの advice 配置位置で
-   *   `dynamicAdviceCardsHtml(section, metricsForAdvice)` を呼ぶと、データに応じた
-   *   キャラ別アドバイス（最大 3 件）が静的アドバイスの後ろに出力される。
-   */
-  const dynMetrics = buildDynamicAdviceMetrics({
-    r,
-    concurrentPeak,
-    laughterDensity,
-    silenceZones,
-    newVsRepeat,
-    sentimentCurve,
-    reach,
-    growth,
-    firstSecondLatency,
-    survivalCurve,
-    talentPeaks,
-    echoPropagation,
-    echoSync,
-    recentComparison,
-    uniqueWords,
-    similarBroadcasts,
-    keyboardTypes
-  });
 
   const giftUsersForSg = Array.isArray(opts.giftUsers) ? opts.giftUsers : [];
   const giftEventsForAnalytics = Array.isArray(opts.giftEvents) ? opts.giftEvents : [];
@@ -4664,15 +3202,6 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   )
     ? opts.officialEventDomBundle.adContributionRanking
     : [];
-  const sgInsights = buildSupportGrowthInsights({
-    report: r,
-    comments: currentCommentsForLayer,
-    giftUsers: giftUsersForSg,
-    sessionSummaryRows,
-    pastBroadcasts: pastBroadcastsForLayer,
-    broadcasterUserId,
-    maskShareLabels: maskShare
-  });
   const giftMomentum = analyzeGiftMomentum({
     comments: currentCommentsForLayer,
     giftUsers: giftUsersForSg,
@@ -4770,59 +3299,6 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     programStats: opts.officialEventDomBundle?.programStats || null,
     eventRanking: opts.eventRanking || null
   });
-  const marketingFunnelBoard = buildMarketingFunnelBoard({
-    report: r,
-    audienceGap,
-    giftMomentum,
-    supporterChikuran,
-    sessionSummaryRows,
-    pastBroadcasts: pastBroadcastsForLayer,
-    giftUsers: giftUsersForSg,
-    giftEvents: giftEventsForAnalytics,
-    giftHistoryThrows: giftHistoryThrowsForAnalytics,
-    officialGiftHistory: officialGiftHistoryForAnalytics,
-    giftContributionRanking: giftContributionRankingForAnalytics,
-    adContributionRanking: adContributionRankingForAnalytics,
-    programStats: opts.officialEventDomBundle?.programStats || null,
-    eventRanking: opts.eventRanking || null
-  });
-  const marketingSegmentActionBoard = buildMarketingSegmentActionBoard({
-    report: r,
-    giftMomentum,
-    supporterChikuran
-  });
-  const analysisSkillBoard = buildAnalysisSkillBoard({
-    report: r,
-    audienceGap,
-    giftMomentum,
-    supporterChikuran,
-    sessionSummaryRows,
-    pastBroadcasts: pastBroadcastsForLayer,
-    adContributionRanking: adContributionRankingForAnalytics,
-    eventRanking: opts.eventRanking || null,
-    uniqueWords,
-    talentPeaks,
-    silenceZones,
-    recentComparison,
-    maskShareLabels: maskShare
-  });
-  const harnessScalingBoard = buildHarnessScalingBoard({
-    report: r,
-    audienceGap,
-    giftMomentum,
-    supporterChikuran,
-    analysisSkillBoard,
-    sessionSummaryRows,
-    pastBroadcasts: pastBroadcastsForLayer,
-    adContributionRanking: adContributionRankingForAnalytics,
-    eventRanking: opts.eventRanking || null,
-    programStats: opts.officialEventDomBundle?.programStats || null,
-    maskShareLabels: maskShare
-  });
-  const metricsForAdvice = {
-    ...dynMetrics,
-    ...supportGrowthMetricsForAdvice(sgInsights.adviceSlice)
-  };
 
   // 0.1.26 (AA): TOC は「実際に描画されたセクション」だけ表示する。
   // 沈黙ゾーンやコメ伝染など、データ不足で空文字を返すセクションをクリックしても
@@ -4832,27 +3308,15 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-viewer-retention', label: '視聴維持率（最後まで見たか）' },
     { id: 'mkt-gift-moments', label: 'ギフトの瞬間' },
     { id: 'mkt-ad-observed', label: '広告の気づいた時刻' },
-    { id: 'mkt-analysis-skills', label: '分析スキルボード' },
-    { id: 'mkt-harness-scaling', label: '分析ハーネス設計' },
-    { id: 'mkt-next-actions', label: 'りんく達の作戦会議' },
     { id: 'mkt-data-summary', label: 'マーケ総合サマリ' },
-    { id: 'mkt-marketing-funnel', label: 'マーケファネル' },
-    { id: 'mkt-segment-action', label: '層別マーケ診断' },
     { id: 'mkt-audience-gap', label: '来場→コメント変換率' },
     { id: 'mkt-supporter-chikuran', label: '応援者ちくらんβ' },
     { id: 'mkt-cross-supporter-ranking', label: '横断応援者ランキングβ' },
-    { id: 'mkt-support-chance', label: '応援が増えそうな時間' },
-    { id: 'mkt-gift-flow', label: 'ギフトの流れ' },
     { id: 'mkt-gift-deep', label: 'ギフト深掘り' },
     { id: 'mkt-gift-ledger', label: 'ギフト投げ履歴' },
     { id: 'mkt-supporters-gifts', label: '応援者とギフト' },
     { id: 'mkt-media-kit-section', label: 'メディアキット' },
     { id: 'mkt-html-report-section', label: 'コメント記録（全文検索・CSV）' },
-    { id: 'mkt-onboarding', label: '初見さんの手がかり' },
-    { id: 'mkt-clip-promo', label: '切り抜き・告知候補' },
-    { id: 'mkt-listener-care', label: 'リスナーお返し' },
-    { id: 'mkt-ask-timing', label: 'お願いの出しどころ' },
-    { id: 'mkt-sg-caution', label: '読み取りの注意' },
     { id: 'mkt-event-ranking', label: 'イベント順位' },
     { id: 'mkt-ext-links', label: '支援物資・外部リンク' },
     { id: 'mkt-kpi', label: 'KPI サマリ' },
@@ -4914,133 +3378,68 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     });
   })();
 
-  const bodyHtml = `${sectionFeaturesOverview()}
-__NL_TOC_PLACEHOLDER__
-${sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
-${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver })}
-${idWrap('mkt-gift-moments', sectionGiftMoments(giftMomentsAnalysis, giftMomentNextLines, maskShare, identiconResolver))}
-${idWrap('mkt-ad-observed', adObservedHtml)}
-${sectionAdviceIntro()}
-${sectionAnalysisSkillBoard(analysisSkillBoard)}
-${sectionHarnessScalingBoard(harnessScalingBoard)}
-${renderSupportGrowthSections(sgInsights, metricsForAdvice)}
+  // v0.1.1854: りんく「作戦会議とか定型文はいらない・もっと有益なデータに」。どの配信でも同じになる案内・助言・声かけ例の章
+  //   (このページでできること/りんく達から/分析スキル/ハーネス/作戦会議・応援が増えそうな時間・初見さん・切り抜き・お返し・お願い・注意/
+  //   ファネル優先度・層別の使い方/各グラフ後の助言カード)は出さない。数字の章を「要点→視聴維持→流れ→応援者→ギフト→過去比較→記録」の順に並べる。
+  const bodyHtml = `__NL_TOC_PLACEHOLDER__
+${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, audienceGap)}
+${idWrap('mkt-kpi', sectionKpi(r, audienceGap))}
 ${sectionMarketingDataSummary(marketingDataSummary)}
-${sectionMarketingFunnelBoard(marketingFunnelBoard)}
-${sectionMarketingSegmentActionBoard(marketingSegmentActionBoard)}
+${sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
 ${sectionAudienceEngagementGap(audienceGap, r)}
+${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver })}
+${sectionSurvivalCurve(survivalCurve)}
+${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
+${newVsRepeatBasis.ok ? sectionNewVsRepeat(newVsRepeat) : sectionNewVsRepeatUnavailable(newVsRepeatBasis.note)}
+${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
+${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
+${idWrap('mkt-narrative', sectionBroadcastNarrative(broadcastNarrative, maskShare))}
+${idWrap('mkt-timeline', sectionTimeline(r))}
+${sectionCommentVelocityCurve(velocityTimeline)}
+${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
+${sectionSilenceZones(silenceZones)}
+${sectionLaughterDensity(laughterDensity)}
+${sectionSentimentCurve(sentimentCurve)}
+${sectionCommentFatigue(commentFatigue)}
+${idWrap('mkt-derived', sectionDerivedTimeline(r))}
+${idWrap('mkt-content', sectionContentShape(r))}
+${sectionUniqueWordSuggestions(uniqueWords)}
+${sectionEchoBursts(echoPropagation, echoSync)}
+${sectionTalentPeak(talentPeaks)}
+${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
+${idWrap('mkt-segment', sectionSegment(r))}
 ${sectionSupporterChikuranBeta(supporterChikuran, maskShare, identiconResolver)}
 ${sectionCrossSupporterRanking(crossSupporterRanking, pastBroadcastsForLayer.length)}
+${sectionFirstSecondLatency(firstSecondLatency)}
+${sectionKeyboardTypes(keyboardTypes)}
+${idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
+${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared })}
+${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared }, identiconResolver)}
+${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
+${idWrap('mkt-gift-moments', sectionGiftMoments(giftMomentsAnalysis, giftMomentNextLines, maskShare, identiconResolver))}
 ${sectionGiftMomentum(giftMomentum, maskShare, identiconResolver)}
 ${sectionGiftThrowLedger(giftThrowLedger, maskShare, identiconResolver)}
 ${sectionSupportersGiftsHtml(supportersGiftsRows, {
   maskShare,
   renderIdentity: (row) => giftLedgerUserIdentityCells({ userId: row.userId, senderLabel: row.label, senderAvatarUrl: row.avatarUrl }, maskShare, identiconResolver)
 })}
-${typeof opts.mediaKitHtml === 'string' ? sectionMediaKitHtml(opts.mediaKitHtml) : ''}
-${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlReportHtml) : ''}
+${idWrap('mkt-ad-observed', adObservedHtml)}
 ${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
-${idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
-${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, audienceGap)}
-${idWrap('mkt-kpi', sectionKpi(r, audienceGap))}
-${sectionAdviceAfterKpi(r)}
-${dynamicAdviceCardsHtml('kpi', metricsForAdvice)}
-${idWrap('mkt-content', sectionContentShape(r))}
-${sectionAdviceAfterContentShape(r)}
-${idWrap('mkt-narrative', sectionBroadcastNarrative(broadcastNarrative, maskShare))}
-${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
-${sectionAdviceAfterQuarterEngagement(r)}
-${idWrap('mkt-timeline', sectionTimeline(r))}
-${sectionAdviceAfterTimeline(r)}
-${sectionCommentVelocityCurve(velocityTimeline)}
-${adviceAfterCommentVelocity()}
-${sectionCommentFatigue(commentFatigue)}
-${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
-${adviceAfterConcurrent()}
-${dynamicAdviceCardsHtml('concurrent', metricsForAdvice)}
-${sectionSilenceZones(silenceZones)}
-${silenceZones.length ? adviceAfterSilence() : ''}
-${silenceZones.length ? dynamicAdviceCardsHtml('silence', metricsForAdvice) : ''}
-${sectionLaughterDensity(laughterDensity)}
-${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ''}
-${laughterDensity.buckets.length >= 2 ? dynamicAdviceCardsHtml('laughter', metricsForAdvice) : ''}
-${newVsRepeatBasis.ok ? sectionNewVsRepeat(newVsRepeat) : sectionNewVsRepeatUnavailable(newVsRepeatBasis.note)}
-${newVsRepeatBasis.ok && newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ''}
-${newVsRepeat.totalCurrent > 0 ? dynamicAdviceCardsHtml('newVsRepeat', metricsForAdvice) : ''}
-${sectionSurvivalCurve(survivalCurve)}
-${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ''}
-${survivalCurve.segments.length >= 2 ? dynamicAdviceCardsHtml('survival', metricsForAdvice) : ''}
-${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
-${(!maskShare && departedHeavy.length > 0) ? adviceAfterDeparted() : ''}
-${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
-${(!maskShare && attendanceMatrix.users.length > 0 && attendanceMatrix.broadcasts.length >= 2) ? adviceAfterAttendance() : ''}
-${sectionKeyboardTypes(keyboardTypes)}
-${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? adviceAfterKeyboard() : ''}
-${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? dynamicAdviceCardsHtml('keyboard', metricsForAdvice) : ''}
 ${sectionRecentComparison(recentComparison)}
-${recentComparison.bars.length >= 2 ? adviceAfterRecentCmp() : ''}
-${recentComparison.bars.length >= 2 ? dynamicAdviceCardsHtml('recentCmp', metricsForAdvice) : ''}
-${sectionWeekdayHourHeatmap(weekdayHourHeat)}
-${weekdayHourHeat.maxValue > 0 ? adviceAfterWeekdayHeat() : ''}
 ${sectionGrowthMeter(growth, '今回の総コメ数')}
-${growth.average != null ? adviceAfterGrowthMeter() : ''}
-${growth.average != null ? dynamicAdviceCardsHtml('growth', metricsForAdvice) : ''}
 ${sectionOpeningFivePrediction(openingFivePts)}
-${openingFivePts.points.length >= 2 ? adviceAfterOpeningFive() : ''}
 ${sectionWaveformSimilarity(similarBroadcasts)}
-${similarBroadcasts.length > 0 ? adviceAfterWaveform() : ''}
-${similarBroadcasts.length > 0 ? dynamicAdviceCardsHtml('waveform', metricsForAdvice) : ''}
-${sectionEchoBursts(echoPropagation, echoSync)}
-${(echoPropagation.length > 0 || echoSync.length > 0) ? adviceAfterEcho() : ''}
-${(echoPropagation.length > 0 || echoSync.length > 0) ? dynamicAdviceCardsHtml('echo', metricsForAdvice) : ''}
-${sectionFirstSecondLatency(firstSecondLatency)}
-${firstSecondLatency.totalUsers > 0 ? adviceAfterFirstSecond() : ''}
-${firstSecondLatency.totalUsers > 0 ? dynamicAdviceCardsHtml('firstSecond', metricsForAdvice) : ''}
-${sectionTalentPeak(talentPeaks)}
-${talentPeaks.length > 0 ? adviceAfterTalentPeak() : ''}
-${talentPeaks.length > 0 ? dynamicAdviceCardsHtml('talentPeak', metricsForAdvice) : ''}
-${sectionSentimentCurve(sentimentCurve)}
-${sentimentCurve.buckets.length >= 2 ? adviceAfterSentiment() : ''}
-${sentimentCurve.buckets.length >= 2 ? dynamicAdviceCardsHtml('sentiment', metricsForAdvice) : ''}
-${sectionUniqueWordSuggestions(uniqueWords)}
-${uniqueWords.length > 0 ? adviceAfterUniqueWords() : ''}
-${uniqueWords.length > 0 ? dynamicAdviceCardsHtml('uniqueWords', metricsForAdvice) : ''}
 ${sectionReachCoefficient(reach)}
-${reach.coefficient != null ? adviceAfterReach() : ''}
-${reach.coefficient != null ? dynamicAdviceCardsHtml('reach', metricsForAdvice) : ''}
-${idWrap('mkt-derived', sectionDerivedTimeline(r))}
-${sectionAdviceAfterDerivedTimeline(r)}
-${idWrap('mkt-segment', sectionSegment(r))}
-${sectionAdviceAfterSegment(r)}
-${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
-${sectionAdviceAfterRank(r)}
-${idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
-${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared })}
-${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared }, identiconResolver)}
+${sectionWeekdayHourHeatmap(weekdayHourHeat)}
 ${sectionInterestArrival(r)}
-${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap('mkt-vpos', sectionVposThirds(r))}
-${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
+${idWrap('mkt-hour', sectionHourHeatmap(r))}
+${idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
+${typeof opts.mediaKitHtml === 'string' ? sectionMediaKitHtml(opts.mediaKitHtml) : ''}
+${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlReportHtml) : ''}`;
   const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
   const finalBody = bodyHtml.replace('__NL_TOC_PLACEHOLDER__', sectionToc(tocItems));
 
-  // 漫画コマ風の「番組のおさらい」セクション。bundle が無い場合も opening / closing
-  // の最低 2 コマは出る設計。レスポンシブ：clamp + container query で全幅に追従。
-  const mangaPanels = buildMangaBroadcastPanels({
-    bundle: opts?.officialEventDomBundle ?? null,
-    broadcastTitle: typeof opts?.broadcastTitle === 'string' ? opts.broadcastTitle : '',
-    broadcasterName: typeof opts?.broadcasterName === 'string' ? opts.broadcasterName : '',
-    broadcasterUserId: String(broadcasterUserId || opts?.broadcasterProfile?.userId || ''),
-    recordedCommentCount:
-      typeof opts?.recordedCommentCount === 'number' ? opts.recordedCommentCount : undefined,
-    streamAgeMin: typeof opts?.streamAgeMin === 'number' ? opts.streamAgeMin : undefined
-  });
-  const yukkuriHtml = renderMangaBroadcastPanelsHtml(mangaPanels, {
-    heading: '今回の放送のおさらい・漫画版',
-    imageDataUrlMap:
-      opts?.yukkuriImageDataUrlMap && typeof opts.yukkuriImageDataUrlMap === 'object'
-        ? opts.yukkuriImageDataUrlMap
-        : undefined
-  });
 
   // 配信者プロフィールカード（名前リンク＋アイコン＋LV＋プロフィール/欲しいものリスト等）。
   // 取得できた項目だけ表示。未取得なら空＝カードごと省略。
@@ -5063,7 +3462,6 @@ ${buildSectionRevealBootScriptHtml()}
 <p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
 ${broadcasterProfileCardHtml}
-${yukkuriHtml}
 <main class="mkt-main">
 ${finalBody}
 </main>
@@ -5830,31 +4228,30 @@ ${sampleNote}`;
  * @returns {string}
  */
 function commenterFollowSegmentCardsHtml(analytics) {
+  // v0.1.1854: 細い3列カード(名前とIDが1文字ずつ縦に並んだ)をやめ、名前・コメ・フォロワーが1行で読める表にする。
   const segments = [
     analytics.segments.highFollowerRegulars,
     analytics.segments.localEnthusiasts,
     analytics.segments.quietSupporters
   ];
-  return segments
-    .map((seg) => {
-      const examples = seg.representatives.length
-        ? `<ul class="mkt-cfa-examples">${seg.representatives
-            .map((row) => {
-              const rawLabel = displayUserLabel(row.userId, row.nickname || '');
-              const label = buildUserProfileLinkedLabelHtml(row.userId, rawLabel);
-              const stats = `コメ ${formatEventRankingNumber(row.commentCount)} / フォロワー ${formatEventRankingNumber(row.followerCount)}`;
-              return `<li>${label}<span>${escapeHtml(stats)}</span></li>`;
-            })
-            .join('')}</ul>`
-        : '<p class="mkt-note">該当者はまだいません。</p>';
-      return `<article class="mkt-cfa-card mkt-cfa-card--${escapeAttr(seg.id)}">
-<div class="mkt-cfa-card__head"><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span><h3>${escapeHtml(seg.label)}</h3></div>
-<strong class="mkt-cfa-card__count">${formatEventRankingNumber(seg.count)}名 <small>${escapeHtml(formatCommenterFollowPct(seg.pctOfFollowed))}</small></strong>
-<p>${escapeHtml(seg.description)}</p>
-${examples}
-</article>`;
-    })
+  const head = segments
+    .map(
+      (seg) =>
+        `<li><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span><strong>${escapeHtml(seg.label)}</strong> ${formatEventRankingNumber(seg.count)}名 <small>${escapeHtml(formatCommenterFollowPct(seg.pctOfFollowed))}</small> — ${escapeHtml(seg.description)}</li>`
+    )
     .join('');
+  const rows = segments
+    .flatMap((seg) =>
+      seg.representatives.map((row) => {
+        const rawLabel = displayUserLabel(row.userId, row.nickname || '');
+        return `<tr><td><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span> ${escapeHtml(seg.label)}</td><td>${buildUserProfileLinkedLabelHtml(row.userId, rawLabel)}</td><td class="mkt-num">${formatEventRankingNumber(row.commentCount)}</td><td class="mkt-num">${formatEventRankingNumber(row.followerCount)}</td></tr>`;
+      })
+    )
+    .join('');
+  const table = rows
+    ? `<div class="mkt-table-scroll"><table class="mkt-rank mkt-cfa-seg-table"><thead><tr><th>層</th><th>ユーザー</th><th>コメ</th><th>フォロワー</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : '';
+  return `<ul class="mkt-cfa-seg-legend">${head}</ul>${table}`;
 }
 
 /**
@@ -5979,6 +4376,11 @@ function commenterFollowDeltaPanelHtml(deltas, timing) {
   const insights = deltas.insightLines.length
     ? `<ul class="mkt-insight-list">${deltas.insightLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
     : '';
+  // v0.1.1854: 空(—だけ)の表・増減が全部0の表は出さない(意味のないデータを並べない)。
+  const incRows = deltaRows(deltas.increased, '+');
+  const decRows = deltaRows(deltas.decreased, '-');
+  const timingHasData = timing.buckets.some((b) => b.increasedCount > 0 || b.decreasedCount > 0);
+  if (!incRows && !decRows && !timingHasData) return '';
   const timingInsights = timing.insightLines.length
     ? `<ul class="mkt-insight-list">${timing.insightLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
     : '';
@@ -5987,15 +4389,15 @@ function commenterFollowDeltaPanelHtml(deltas, timing) {
 <h3 class="mkt-subhead">フォロー増減（前回キャッシュ比較）</h3>
 <p class="mkt-note">配信前後の差分は横断キャッシュと今回スナップショットの比較です。配信内のリアルタイム増減ではありません。</p>
 ${insights}
-<div class="mkt-cfa-delta-grid">
-<div><h4 class="mkt-cfa-delta__title">増えた人 TOP</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${deltaRows(deltas.increased, '+') || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div></div>
-<div><h4 class="mkt-cfa-delta__title">減った人 TOP</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${deltaRows(deltas.decreased, '-') || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div></div>
-</div>
-<h3 class="mkt-subhead">初コメ時刻帯 × 増減</h3>
+${incRows || decRows ? `<div class="mkt-cfa-delta-grid">
+${incRows ? `<div><h4 class="mkt-cfa-delta__title">増えた人 TOP</h4>
+<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${incRows}</tbody></table></div></div>` : ''}
+${decRows ? `<div><h4 class="mkt-cfa-delta__title">減った人 TOP</h4>
+<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>ユーザー</th><th>フォロワー差</th><th>フォロー差</th><th>コメント</th></tr></thead><tbody>${decRows}</tbody></table></div></div>` : ''}
+</div>` : ''}
+${timingHasData ? `<h3 class="mkt-subhead">初コメ時刻帯 × 増減</h3>
 ${timingInsights}
-<div class="mkt-table-scroll"><table class="mkt-rank mkt-cfa-timing-table"><thead><tr><th>時間帯</th><th>コメンター</th><th>増</th><th>減</th><th>純増</th></tr></thead><tbody>${timingRows}</tbody></table></div>
+<div class="mkt-table-scroll"><table class="mkt-rank mkt-cfa-timing-table"><thead><tr><th>時間帯</th><th>コメンター</th><th>増</th><th>減</th><th>純増</th></tr></thead><tbody>${timingRows}</tbody></table></div>` : ''}
 </div>`;
 }
 
@@ -6017,16 +4419,27 @@ function commenterFolloweeProfilePanelHtml(profile) {
   const insights = profile.insightLines.length
     ? `<ul class="mkt-insight-list">${profile.insightLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
     : '';
+  // v0.1.1854: 中身の無い分布表（「—」だけ）は出さない。
+  const followeeRows = bucketRows(profile.followeeBuckets);
+  const levelRows = bucketRows(profile.levelBuckets);
+  /** @param {string} title @param {string} rowsHtml */
+  const distTable = (title, rowsHtml) =>
+    rowsHtml
+      ? `<div><h4 class="mkt-cfa-delta__title">${title}</h4>
+<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>区分</th><th>人数</th><th>比率</th></tr></thead><tbody>${rowsHtml}</tbody></table></div></div>`
+      : '';
+  const distGrid =
+    followeeRows || levelRows
+      ? `<div class="mkt-cfa-profile-grid">
+${distTable('フォロー数分布', followeeRows)}
+${distTable('LV 分布', levelRows)}
+</div>`
+      : '';
   return `<div class="mkt-cfa-profile">
 <h3 class="mkt-subhead">コメンターのフォロー先・属性傾向</h3>
 <p class="mkt-note">フォロー先リスト自体は取得していません。各コメンターの「フォロー数（followee）」・LV・プレミアム率から、視聴者層の広がりを推定します。</p>
 ${insights}
-<div class="mkt-cfa-profile-grid">
-<div><h4 class="mkt-cfa-delta__title">フォロー数分布</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>区分</th><th>人数</th><th>比率</th></tr></thead><tbody>${bucketRows(profile.followeeBuckets) || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div></div>
-<div><h4 class="mkt-cfa-delta__title">LV 分布</h4>
-<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>区分</th><th>人数</th><th>比率</th></tr></thead><tbody>${bucketRows(profile.levelBuckets) || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div></div>
-</div>
+${distGrid}
 </div>`;
 }
 
@@ -6076,8 +4489,12 @@ function commenterFollowingListPanelHtml(analytics, r) {
 <div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>userId</th><th>重複人数</th></tr></thead><tbody>${commonRows}</tbody></table></div>`
     : '';
 
-  const insights = analytics.followingListInsights?.length
-    ? `<ul class="mkt-insight-list">${analytics.followingListInsights.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
+  // v0.1.1854: 取得失敗の案内は上の注記と同じ内容が二重に出ていた=注記があるときは失敗系の行を出さない。
+  const followingInsightLines = (analytics.followingListInsights || []).filter(
+    (line) => !(noteHtml && /取得に失敗|ログイン/.test(String(line)))
+  );
+  const insights = followingInsightLines.length
+    ? `<ul class="mkt-insight-list">${followingInsightLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
     : '';
 
   if (!noteHtml && !bfCard && !commonTable && !insights) return '';
@@ -6101,12 +4518,8 @@ ${commonTable}
  */
 export function sectionInterestArrival(r) {
   const summary = r.interestArrivalSummary;
-  if (!summary || summary.messageCount <= 0) {
-    return `<section class="mkt-section mkt-section--interest-arrival mkt-section--empty" id="mkt-interest-arrival" aria-label="興味タグ別来場（検出 0件）">
-      <h2>興味タグ別来場</h2>
-      <p class="mkt-section__note">この配信では「○○が好きなN人が来場しました」の通知が検出されませんでした(0件)。配信ジャンルやニコ生側のシステムメッセージ配信状況により出ない配信もあります。</p>
-    </section>`;
-  }
+  // v0.1.1854: 0件のときは章ごと出さない(データの無い章を並べない)。
+  if (!summary || summary.messageCount <= 0) return '';
 
   const stats = [
     {
@@ -6224,7 +4637,7 @@ function sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId = '', s
 <div class="mkt-cfa-toolbar">${csvButton}</div>
 <div class="mkt-cfa-stats">${stats}</div>
 ${commenterFollowScatterSvg(analytics)}
-<div class="mkt-cfa-segments">${commenterFollowSegmentCardsHtml(analytics)}</div>
+<div class="mkt-cfa-segtable">${commenterFollowSegmentCardsHtml(analytics)}</div>
 ${commenterFollowDeltaPanelHtml(analytics.followDeltas, analytics.followTiming)}
 ${commenterFolloweeProfilePanelHtml(analytics.followeeProfile)}
 ${commenterFollowingListPanelHtml(analytics, r)}
@@ -6516,7 +4929,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-header{padding:2rem 1.5rem 1rem;background:linear-gradient(135deg,#1e293b,#0f172a);border-bottom:1px solid #334155}
 .mkt-header__title{margin:0;font-size:1.6rem;font-weight:700}
 .mkt-header__sub{margin:.3rem 0 0;font-size:.85rem;color:#94a3b8}
-.mkt-main{max-width:1080px;margin:0 auto;padding:1.5rem 1rem}
+.mkt-main{max-width:1440px;margin:0 auto;padding:1.5rem clamp(1rem,2.5vw,2.5rem)}
 .mkt-cf-row--hidden{display:none}
 .mkt-cf-more-wrap{margin:.75rem 0 0;text-align:center}
 .mkt-cf-more-btn{cursor:pointer;border:1px solid #475569;background:#0f172a;color:#cbd5e1;border-radius:999px;padding:.45rem 1rem;font-size:.82rem}
@@ -6615,7 +5028,8 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-seg-legend{display:flex;flex-direction:column;gap:.5rem}
 .mkt-leg{display:flex;align-items:center;gap:.4rem;font-size:.85rem}
 .mkt-leg__dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
-.mkt-rank-table{width:100%;border-collapse:collapse}
+.mkt-rank-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.mkt-rank-table td:nth-child(1){width:2.5rem}.mkt-rank-table td:nth-child(2){width:40px}.mkt-rank-table td:nth-child(3){width:clamp(9rem,32%,22rem)}
 .mkt-rank-table td{padding:.35rem .4rem;border-bottom:1px solid #1e293b}
 .mkt-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .mkt-rank{width:100%;border-collapse:collapse;font-size:.83rem}
@@ -6626,8 +5040,8 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-rank-n{width:2rem;color:#94a3b8;text-align:right;font-size:.8rem}
 .mkt-rank-av{width:28px;height:28px;border-radius:50%;object-fit:cover;display:block}
 .mkt-rank-av--empty{background:#334155}
-.mkt-rank-name{font-size:.85rem;max-width:220px}
-.mkt-rank-name>.nl-user-profile-link,.mkt-rank-name>span:not(.mkt-acct-badge):not(.mkt-follow-chip){display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.mkt-rank-name{font-size:.85rem;overflow:hidden}
+.mkt-rank-name>.nl-user-profile-link,.mkt-rank-name>span:not(.mkt-acct-badge):not(.mkt-follow-chip){display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
 .mkt-follow-chip{display:block;margin-top:2px;font-size:.7rem;color:#94a3b8;white-space:normal}
 .mkt-section--commenter-follow h2{border-left-color:#22d3ee}
 .mkt-cf-thumb{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#0f172a;vertical-align:middle}
@@ -6688,6 +5102,9 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-cfa-legend-item{display:inline-flex;align-items:center;gap:.28rem}
 .mkt-cfa-legend-item i{display:inline-block;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.16)}
 .mkt-cfa-segments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;margin:.8rem 0 0}
+.mkt-cfa-seg-legend{list-style:none;margin:.8rem 0 .4rem;padding:0;display:flex;flex-direction:column;gap:.3rem;font-size:.82rem;color:#cbd5e1}
+.mkt-cfa-seg-legend small{color:#94a3b8}
+.mkt-cfa-seg-table td{white-space:nowrap}
 .mkt-cfa-delta{margin-top:1rem;padding-top:.5rem;border-top:1px solid #334155}
 .mkt-cfa-delta-grid,.mkt-cfa-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:.65rem 0}
 .mkt-cfa-delta__title{margin:0 0 .35rem;font-size:.84rem;color:#e2e8f0}
@@ -6758,40 +5175,12 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-footer{text-align:center;padding:1.5rem;font-size:.72rem;color:#8b97a8}
 .mkt-section--embed h2{border-left-color:#22d3ee}
 .mkt-section--embed script{display:none}
-.mkt-section--features h2{border-left-color:#34d399}
 .mkt-lead{margin:0 0 .85rem;font-size:.88rem;color:#e2e8f0;line-height:1.65}
 .mkt-feature-list{margin:.4rem 0 0;padding-left:1.15rem;color:#cbd5e1;font-size:.82rem;line-height:1.65}
 .mkt-feature-list li{margin:.45rem 0 0}
 .mkt-feature-list li:first-child{margin-top:0}
 .mkt-values-note{margin:.95rem 0 0;padding-top:.85rem;border-top:1px solid #334155;font-size:.82rem;color:#94a3b8;line-height:1.65}
 .mkt-section--advice h2{border-left-color:#a78bfa}
-.mkt-advice-stack{display:flex;flex-direction:column;gap:clamp(.85rem,3vw,1.35rem)}
-.mkt-advice-stack--intro{gap:clamp(1rem,3.5vw,1.5rem)}
-.mkt-advice-stack--next{gap:clamp(.65rem,2.4vw,.9rem);margin:.65rem 0 .85rem}
-.mkt-advice-after{display:flex;flex-direction:column;gap:clamp(.75rem,2.5vw,1rem);margin:.85rem 0 0}
-.mkt-advice-details{border-radius:10px;background:#0a0f1a;border:1px solid #1e293b;margin:.5rem 0}
-.mkt-advice-summary{display:flex;align-items:center;gap:.5rem;padding:.45rem .75rem;cursor:pointer;list-style:none;user-select:none;border-radius:10px;transition:background .15s}
-.mkt-advice-summary::-webkit-details-marker{display:none}
-.mkt-advice-summary::before{content:"▶";font-size:.65rem;color:#64748b;transition:transform .15s;flex-shrink:0}
-.mkt-advice-details[open]>.mkt-advice-summary::before{transform:rotate(90deg)}
-.mkt-advice-summary:hover{background:#0f172a}
-.mkt-advice__avatar--summary{width:28px;height:28px;border-radius:6px;object-fit:contain;background:#0f172a;border:1px solid #334155;flex-shrink:0}
-.mkt-advice-details>.mkt-advice-row{margin:.25rem .75rem .75rem;max-width:calc(100% - 1.5rem)}
-.mkt-advice-row{display:flex;flex-direction:row;align-items:flex-start;gap:clamp(.65rem,2.5vw,.95rem);max-width:100%}
-.mkt-advice__avatar-wrap{flex-shrink:0;width:clamp(48px,12vw,56px)}
-.mkt-advice__avatar{width:clamp(48px,12vw,56px);height:clamp(48px,12vw,56px);object-fit:contain;display:block;border-radius:12px;background:#0f172a;border:1px solid #334155;box-shadow:0 4px 12px rgba(0,0,0,.2)}
-.mkt-advice__bubble{flex:1;min-width:0;position:relative;background:#0f172a;border:1px solid #334155;border-radius:14px;padding:clamp(.8rem,2.8vw,1.05rem) clamp(.85rem,3vw,1.15rem);box-shadow:0 2px 10px rgba(0,0,0,.12);overflow-wrap:break-word;word-wrap:break-word}
-.mkt-advice__bubble::before{content:"";position:absolute;left:-7px;top:18px;width:12px;height:12px;background:#0f172a;border-left:1px solid #334155;border-bottom:1px solid #334155;transform:rotate(45deg)}
-.mkt-advice--tanu .mkt-advice__bubble{border-top:1px solid rgba(196,181,253,.35)}
-.mkt-advice--link .mkt-advice__bubble{border-top:1px solid rgba(56,189,248,.35)}
-.mkt-advice--konta .mkt-advice__bubble{border-top:1px solid rgba(251,146,60,.35)}
-.mkt-advice--tanu .mkt-advice__bubble{border-left:3px solid #c4b5fd}
-.mkt-advice--link .mkt-advice__bubble{border-left:3px solid #38bdf8}
-.mkt-advice--konta .mkt-advice__bubble{border-left:3px solid #fb923c}
-.mkt-advice__name{font-size:clamp(.78rem,2.2vw,.85rem);font-weight:700;color:#f8fafc;margin:0 0 .5rem;letter-spacing:.02em;line-height:1.45}
-.mkt-advice__p{margin:.55rem 0 0;font-size:clamp(.8rem,2.3vw,.875rem);color:#cbd5e1;line-height:1.8}
-.mkt-advice__p:first-of-type{margin-top:0}
-.mkt-advice__roles-hint{margin:clamp(.35rem,2vw,.25rem) 0 0;padding:clamp(.65rem,2.5vw,.85rem) clamp(.75rem,3vw,1rem);font-size:clamp(.74rem,2.1vw,.8rem);color:#94a3b8;line-height:1.75;background:#0f172a;border-radius:10px;border:1px dashed #475569}
 @media(max-width:640px){
   .mkt-participation-lead-grid{grid-template-columns:1fr}
   .mkt-participation-headline{font-size:1rem}
@@ -6810,15 +5199,8 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
   .mkt-cfa-delta-grid,.mkt-cfa-profile-grid{grid-template-columns:1fr}
   .mkt-cfa-examples li{display:block}
   .mkt-cfa-examples li span{display:block;text-align:left;white-space:normal;margin-top:.08rem}
-  .mkt-advice-row{gap:.7rem}
-  .mkt-advice__bubble::before{top:14px}
 }
 @media(max-width:480px){
-  .mkt-advice-row{flex-direction:column;align-items:stretch;gap:.5rem}
-  .mkt-advice__bubble::before{display:none}
-  .mkt-advice__avatar-wrap{align-self:flex-start;width:52px}
-  .mkt-advice__avatar{width:52px;height:52px}
-  .mkt-advice__bubble{padding:.85rem 1rem}
 }
 @media(max-width:640px){
   .mkt-kpi-grid{grid-template-columns:repeat(2,1fr)}
@@ -6832,14 +5214,9 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-section--sg{border-left:4px solid #22c55e}
 .mkt-sg-live-note{margin:.25rem 0 .7rem;padding:.55rem .7rem;border:1px dashed #4ade80;border-radius:10px;background:#0b2a1b;color:#dcfce7;font-size:.82rem;line-height:1.55}
 .mkt-sg-note{margin:.35rem 0 .55rem;font-size:.85rem;color:#94a3b8;line-height:1.45}
-.mkt-sg-next-list{margin:.4rem 0 0;padding-left:1.2rem}
-.mkt-sg-next-item{margin-bottom:1rem;padding:.62rem .68rem;border:1px solid #334155;border-radius:10px;background:#0f172a}
-.mkt-sg-phase{display:inline-block;font-size:.72rem;font-weight:700;color:#bbf7d0;background:#14532d;border-radius:6px;padding:2px 8px;margin-bottom:.25rem}
 .mkt-sg-line{margin:.25rem 0;font-weight:600;color:#f8fafc}
 .mkt-sg-meta{margin:.15rem 0;font-size:.82rem;color:#94a3b8}
 .mkt-sg-time{font-size:.82rem;color:#cbd5e1}
-.mkt-sg-simple-list{margin:.4rem 0;padding-left:1.2rem}
-.mkt-sg-simple-list li{margin-bottom:.45rem}
 .mkt-section--narrative h2{border-left-color:#38bdf8}
 .mkt-narrative-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;margin:.8rem 0}
 .mkt-narrative-card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.8rem;min-width:0}
@@ -6853,9 +5230,6 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-narrative-subhead{font-size:.9rem;margin:.9rem 0 .35rem;color:#f8fafc}
 .mkt-narrative-hints{margin:.3rem 0 0;padding-left:1.2rem;color:#cbd5e1;font-size:.84rem}
 .mkt-narrative-hints li{margin-bottom:.35rem}
-.mkt-sg-gift-block{margin-bottom:1rem;padding:.6rem .4rem;border-top:1px solid #334155}
-.mkt-sg-gift-block h3{margin:.2rem 0 .4rem;font-size:.95rem;color:#e2e8f0}
-.mkt-sg-clip{margin-bottom:.85rem;padding-bottom:.6rem;border-bottom:1px dashed #334155}
 .mkt-sg-sample{font-size:.88rem;color:#e2e8f0}
 .mkt-section--data-summary h2{border-left-color:#14b8a6}
 .mkt-data-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin:.7rem 0 .9rem}
@@ -6872,52 +5246,11 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-data-gift-chip{display:inline-block;border:1px solid rgba(20,184,166,.5);background:rgba(20,184,166,.1);color:#ccfbf1;border-radius:999px;padding:.14rem .55rem;font-size:.76rem;line-height:1.35}
 .mkt-data-gift-chip b{color:#f8fafc}
 .mkt-section--funnel h2{border-left-color:#38bdf8}
-.mkt-funnel-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin:.7rem 0 .9rem}
-.mkt-funnel-card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.75rem;min-width:0}
-.mkt-funnel-card__label{display:block;font-size:.72rem;color:#93c5fd;margin-bottom:.18rem}
-.mkt-funnel-card__value{display:block;font-size:1.1rem;line-height:1.3;color:#f8fafc;overflow-wrap:anywhere}
-.mkt-funnel-card__hint{display:block;margin-top:.25rem;font-size:.72rem;color:#94a3b8;line-height:1.45}
 .mkt-funnel-table td:nth-child(1),.mkt-priority-table td:nth-child(1){font-weight:700;color:#e2e8f0;white-space:nowrap}
-.mkt-funnel-priority{display:inline-block;border-radius:999px;padding:.08rem .5rem;font-size:.72rem;font-weight:700;border:1px solid #334155;background:#111827;color:#cbd5e1;white-space:nowrap}
-.mkt-funnel-priority--高{border-color:rgba(248,113,113,.55);background:rgba(248,113,113,.13);color:#fecaca}
-.mkt-funnel-priority--中{border-color:rgba(251,191,36,.5);background:rgba(251,191,36,.12);color:#fde68a}
-.mkt-funnel-priority--低{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.11);color:#bbf7d0}
-.mkt-funnel-gap-list{display:flex;flex-wrap:wrap;gap:.45rem;margin:.35rem 0 0}
-.mkt-funnel-gap{display:inline-flex;flex-direction:column;gap:.1rem;max-width:220px;border:1px solid #334155;background:#111827;color:#cbd5e1;border-radius:10px;padding:.42rem .55rem;font-size:.76rem;line-height:1.35}
-.mkt-funnel-gap small{color:#94a3b8;font-size:.68rem;line-height:1.35}
-.mkt-funnel-gap--ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.08);color:#bbf7d0}
-.mkt-funnel-gap--missing{border-color:rgba(148,163,184,.38);background:#0f172a;color:#cbd5e1}
 .mkt-section--segment-action h2{border-left-color:#a3e635}
-.mkt-segment-action-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin:.7rem 0 .9rem}
-.mkt-segment-action-card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.75rem;min-width:0}
-.mkt-segment-action-card__label{display:block;font-size:.72rem;color:#bef264;margin-bottom:.18rem}
-.mkt-segment-action-card__value{display:block;font-size:1.1rem;line-height:1.3;color:#f8fafc;overflow-wrap:anywhere}
-.mkt-segment-action-card__hint{display:block;margin-top:.25rem;font-size:.72rem;color:#94a3b8;line-height:1.45}
 .mkt-segment-action-table td:nth-child(1),.mkt-support-overlap-table td:nth-child(1){font-weight:700;color:#e2e8f0;white-space:nowrap}
 .mkt-section--analysis-skills h2{border-left-color:#60a5fa}
-.mkt-skill-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.7rem;margin:.7rem 0 .9rem}
-.mkt-skill-card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.75rem;min-width:0}
-.mkt-skill-card__label{display:block;font-size:.72rem;color:#bfdbfe;margin-bottom:.18rem}
-.mkt-skill-card__value{display:block;font-size:1.05rem;line-height:1.35;color:#f8fafc;overflow-wrap:anywhere}
-.mkt-skill-card__hint{display:block;margin-top:.25rem;font-size:.72rem;color:#94a3b8;line-height:1.45}
-.mkt-skill-loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.55rem;margin:.75rem 0 1rem}
-.mkt-skill-loop-step{position:relative;background:#111827;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
-.mkt-skill-loop-step__step{display:inline-block;margin-bottom:.22rem;border:1px solid rgba(96,165,250,.45);border-radius:999px;padding:.06rem .45rem;color:#bfdbfe;font-size:.68rem;font-weight:700}
-.mkt-skill-loop-step strong{display:block;color:#f8fafc;font-size:.86rem;line-height:1.35}
-.mkt-skill-loop-step p{margin:.22rem 0 0;color:#94a3b8;font-size:.72rem;line-height:1.45}
-.mkt-skill-table td:nth-child(1){font-weight:700;color:#e2e8f0;white-space:nowrap}
-.mkt-skill-status{display:inline-block;border-radius:999px;padding:.08rem .48rem;font-size:.7rem;font-weight:700;border:1px solid #334155;background:#111827;color:#cbd5e1;white-space:nowrap}
-.mkt-skill-status--on{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12);color:#bbf7d0}
-.mkt-skill-status--partial{border-color:rgba(251,191,36,.5);background:rgba(251,191,36,.12);color:#fde68a}
-.mkt-skill-status--off{border-color:#475569;background:#0f172a;color:#94a3b8}
 .mkt-section--harness h2{border-left-color:#f472b6}
-.mkt-harness-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.7rem;margin:.7rem 0 .9rem}
-.mkt-harness-card{background:#111827;border:1px solid #374151;border-radius:10px;padding:.75rem;min-width:0}
-.mkt-harness-card__label{display:block;font-size:.72rem;color:#f9a8d4;margin-bottom:.18rem}
-.mkt-harness-card__value{display:block;font-size:1.05rem;line-height:1.35;color:#f8fafc;overflow-wrap:anywhere}
-.mkt-harness-card__hint{display:block;margin-top:.25rem;font-size:.72rem;color:#94a3b8;line-height:1.45}
-.mkt-harness-layer-table td:nth-child(1),.mkt-harness-gate-table td:nth-child(1){font-weight:700;color:#e2e8f0;white-space:nowrap}
-.mkt-harness-gate-status{display:inline-block;border-radius:999px;padding:.08rem .5rem;font-size:.72rem;font-weight:700;border:1px solid rgba(244,114,182,.45);background:rgba(244,114,182,.12);color:#fbcfe8;white-space:nowrap}
 .mkt-section--audience-gap h2{border-left-color:#22d3ee}
 .mkt-audience-level{display:inline-block;margin:0 0 .75rem;border-radius:999px;padding:.18rem .62rem;font-size:.76rem;font-weight:700}
 .mkt-audience-level--healthy{background:rgba(34,197,94,.14);color:#bbf7d0;border:1px solid rgba(34,197,94,.45)}
@@ -7076,7 +5409,6 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 @media print{
   body{background:#fff;color:#0f172a}
   .mkt-header,.mkt-section{background:#f1f5f9;border-color:#cbd5e1;box-shadow:none}
-  .mkt-advice-row{break-inside:avoid}
   .mkt-section{break-inside:avoid-page}
   .mkt-chart-wrap{overflow:visible}
 }

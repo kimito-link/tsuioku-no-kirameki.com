@@ -37,7 +37,10 @@ export function extractHtmlReportParts(reportHtml) {
 export function sectionHtmlReportChapter(reportHtml) {
   const parts = extractHtmlReportParts(reportHtml);
   if (!parts) return '';
-  const css = scopeCss(stripCssComments(parts.css), HTML_REPORT_EMBED_SCOPE);
+  // 章の中では旧レポートの「幅1200pxで中央寄せ」をやめ、マーケと同じ全幅で使う。広い画面ではユーザー別の表を2列ぶんの幅にする。
+  const embedCss = `.wrap{max-width:none;padding:0}
+@media (min-width:1100px){#sec-user-summary{grid-column:span 2}}`;
+  const css = scopeCss(stripCssComments(`${parts.css}\n${embedCss}`), HTML_REPORT_EMBED_SCOPE);
   return `<section class="mkt-section" id="mkt-html-report-section">
 <h2>${escapeHtml('コメント記録（全文検索・CSV・ユーザー別）')}</h2>
 <p class="mkt-note">以前の「HTML」ボタンで保存していた内容です。記録したコメントの全文を検索でき、CSV でも取り出せます。</p>
