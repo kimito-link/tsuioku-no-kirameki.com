@@ -249,9 +249,40 @@ function setupSidePanelBehavior() {
 
 setupSidePanelBehavior();
 ensureOffscreenDocument();
-chrome.runtime.onInstalled.addListener(() => {
+/**
+ * 拡張を更新すると、開いている YouTube のタブの中の古いプログラム(content script)は切れて、
+ * 記録も人数も黙って止まる(2026-11-03 実機: 記録 975 のまま30分止まった)。
+ * ニコ生版の reloadExistingWatchTabs と同じく、更新のときに視聴タブを読み込み直す。
+ * @param {string} reason
+ */
+async function reloadExistingYtWatchTabs(reason) {
+  let tabs = [];
+  try {
+    tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/watch*', 'https://www.youtube.com/live/*'] });
+  } catch {
+    return;
+  }
+  let reloaded = 0;
+  for (const tab of tabs) {
+    if (typeof tab.id !== 'number') continue;
+    try {
+      await chrome.tabs.reload(tab.id);
+      reloaded += 1;
+    } catch {
+      // no-op
+    }
+  }
+  try {
+    await chrome.storage.local.set({ yt_last_auto_tab_reload: { at: Date.now(), reason, tabCount: tabs.length, reloaded } });
+  } catch {
+    // no-op
+  }
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
   setupSidePanelBehavior();
   ensureOffscreenDocument();
+  if (details && details.reason === 'update') void reloadExistingYtWatchTabs('update');
 });
 chrome.runtime.onStartup?.addListener(() => {
   ensureOffscreenDocument();
