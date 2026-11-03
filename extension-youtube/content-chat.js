@@ -996,6 +996,27 @@
     };
     setInterval(read, 5e3);
     setTimeout(read, 1500);
+    setTimeout(() => void openLeaderboardOnce(read), 6e3);
+  }
+  async function openLeaderboardOnce(read) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      if (document.querySelector("ytvl-live-leaderboard-item-view-model")) return;
+      const btn = document.querySelector("ytvl-live-viewer-leaderboard-chat-entry-point-view-model button");
+      if (!(btn instanceof HTMLElement)) return;
+      btn.click();
+      await sleep(1500);
+      const panel = document.querySelector('ytd-engagement-panel-section-list-renderer[target-id="PAlive_viewer_leaderboard"]');
+      const box = panel?.querySelector("#content");
+      for (let i = 0; i < 6 && box instanceof HTMLElement; i += 1) {
+        box.scrollTop = box.scrollHeight;
+        await sleep(400);
+      }
+      read();
+      const back = panel?.querySelector('button[aria-label="戻る"], button[aria-label="Back"]');
+      if (back instanceof HTMLElement) back.click();
+    } catch {
+    }
   }
   function init() {
     const path = String(window.location.pathname || "");

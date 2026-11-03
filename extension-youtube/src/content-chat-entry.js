@@ -1,5 +1,5 @@
 // content-chat-entry.js — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
-/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, setInterval, NodeFilter */
+/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, setInterval, NodeFilter, HTMLElement */
 
 import {
   parseYtChatElement,
@@ -792,6 +792,35 @@ function setupLeaderboardReader() {
   };
   setInterval(read, 5000);
   setTimeout(read, 1500);
+  // 一度だけ、拡張がトップファンを開いて50位まで読み込ませ、すぐ閉じる(毎回手で開かなくて済むように)
+  setTimeout(() => void openLeaderboardOnce(read), 6000);
+}
+
+/**
+ * トップファンの入口(チャット上の「◯XP」ボタン)を押して順位表を読み込ませ、下まで送ってから「戻る」で閉じる。
+ * 順位表は閉じても中身が残るので、ページを開いて1回だけでよい。行が既にあるときは何もしない。
+ * @param {() => void} read
+ */
+async function openLeaderboardOnce(read) {
+  const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    if (document.querySelector('ytvl-live-leaderboard-item-view-model')) return;
+    const btn = document.querySelector('ytvl-live-viewer-leaderboard-chat-entry-point-view-model button');
+    if (!(btn instanceof HTMLElement)) return;
+    btn.click();
+    await sleep(1500);
+    const panel = document.querySelector('ytd-engagement-panel-section-list-renderer[target-id="PAlive_viewer_leaderboard"]');
+    const box = panel?.querySelector('#content');
+    for (let i = 0; i < 6 && box instanceof HTMLElement; i += 1) {
+      box.scrollTop = box.scrollHeight;
+      await sleep(400);
+    }
+    read();
+    const back = panel?.querySelector('button[aria-label="戻る"], button[aria-label="Back"]');
+    if (back instanceof HTMLElement) back.click();
+  } catch {
+    // 開けなくても記録には関係ない
+  }
 }
 
 function init() {
