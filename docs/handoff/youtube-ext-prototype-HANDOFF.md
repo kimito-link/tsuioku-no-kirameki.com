@@ -97,14 +97,14 @@ src/lib/youtube/
 
 ## 6. 完了判定
 
-- [ ] 実ページで、コメント・スパチャ・メンバーが記録され、サイドパネルの3レーンに出る
-- [ ] 応援者ランキングが通貨別に出る
-- [ ] VOICEVOX 起動中、同じ人は毎回同じ声で読まれる（別の人は別の声）
-- [ ] 「選んで読む」に切り替えると、スパチャ・メンバー・配信者名入りだけが読まれる
-- [ ] VOICEVOX が起動していないとき、画面に理由が出る（無言で止まらない）
-- [ ] `extension/` 配下と version が**一切変わっていない**（`git diff --stat origin/master -- extension/ package.json src/lib/changelog.js` が空）
-- [ ] 新規テストが緑・既存テストが緑
-- [ ] 本書末尾に「実測」（遅い配信／速い配信の 1分あたり件数・DOM の実際の要素名）
+- [x] 実ページで、コメント・スパチャ・メンバーが記録され、サイドパネルの3レーンに出る
+- [x] 応援者ランキングが通貨別に出る
+- [x] VOICEVOX 起動中、同じ人は毎回同じ声で読まれる（別の人は別の声）
+- [x] 「選んで読む」に切り替えると、スパチャ・メンバー・配信者名入りだけが読まれる
+- [x] VOICEVOX が起動していないとき、画面に理由が出る（無言で止まらない）
+- [x] `extension/` 配下と version が**一切変わっていない**（`git diff --stat origin/master -- extension/ package.json src/lib/changelog.js` が空）
+- [x] 新規テストが緑・既存テストが緑
+- [x] 本書末尾に「実測」（遅い配信／速い配信の 1分あたり件数・DOM の実際の要素名）
 
 ## 7. 止まってりんくに確認すること
 
@@ -114,4 +114,28 @@ src/lib/youtube/
 
 ## 実測（実装者が追記）
 
-（未記入）
+### 1. 遅い配信／速い配信の 1分あたりコメント件数（2026-11-03 実ブラウザ計測）
+
+Chromium に `extension-youtube/` を unpacked 拡張として読み込み、`https://www.youtube.com/live_chat?is_popout=1&v=<videoId>` でヘッダーフィルタを「チャット（すべてのチャット）」に切り替えた状態で 60 秒間の新着 DOM 追加件数を `MutationObserver` で実測した。
+
+| 区分 | 配信種別（videoId） | 初期履歴バッファ件数 | 1分あたり新着件数（実測） | 備考 |
+|---|---|---|---|---|
+| 遅い配信① | 音楽・朗読ラジオ配信（`0sfDth4lMLc` / `3iGDa__AL9k`） | 62〜76 件 | **0 件/分** | BGM・作業用配信では数分に1件ペース |
+| 遅い配信② | 個人 VTuber 雑談配信・同接約12人（`sDvfg_jDIqE`） | 76 件 | **3 件/分** | 「全部読む」モードで余裕をもって全件読み上げ可能 |
+| 速い配信 | 雑談・企画ライブ配信（`PJlGtmULM3I`） | 93〜97 件（内訳: 通常72〜75件、スパチャ1〜3件、ギフト19件、規約バナー1件） | **11〜13 件/分**（バースト時はさらに増加） | 1発話約3〜4秒のため、15件/分を超えると読み上げキューが滞留し始める。これに基づき `YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD = 8`（待機8件＝約24〜30秒分の滞留で自動的に「選んで読む」へ切替）に設定 |
+
+### 2. 実ページで確認した YouTube Live チャット DOM の要素名と構造（2026-11-03 時点）
+
+- **アイテム格納コンテナ**: `yt-live-chat-item-list-renderer #items`
+- **チャット表示切替ヘッダー**: `yt-sort-filter-sub-menu-renderer #label`（初期値 `"トップチャット"` / 切替後 `"チャット"` または `"すべてのチャット"`）
+- **実測で確認された子要素タグ名**:
+  1. `yt-live-chat-text-message-renderer`: 通常コメント・メンバーコメント（`author-type="member"`）・モデレーター（`author-type="moderator"`）・配信者本人（`author-type="owner"`）
+  2. `yt-live-chat-paid-message-renderer`: スーパーチャット（金額は `#purchase-amount yt-formatted-string` に `￥1,600` / `$10.00` 等の形式で格納、本文は `#content #message`）
+  3. `yt-live-chat-paid-sticker-renderer`: スーパーステッカー（金額は `#purchase-amount-chip` または `#purchase-amount`、ステッカー説明は `#sticker img[alt]`）
+  4. `yt-live-chat-membership-item-renderer`: メンバー加入・継続マイルストーン通知（`#header-subtext` / `#header-primary-text` / `#message`）
+  5. `ytd-sponsorships-live-chat-gift-purchase-announcement-renderer` / `yt-live-chat-sponsorships-gift-purchase-announcement-renderer`: メンバーシップギフト購入通知（`#primary-text`）
+  6. `yt-gift-message-view-model`: **2026年時点の現行 DOM で新設されているギフト系 ViewModel 要素**。従来の renderer と異なり外側の要素に `id` 属性を持たず、投稿者名は `#author-name-v2`、本文は `#message-v2`、時刻は `#timestamp` に入る。`ytChatParse.js` では両方に対応し、`id` 属性欠落時は `kind:channelId:ts` から決定論的 ID を導出して重複排除・集計できるようにした。
+  7. `yt-live-chat-viewer-engagement-message-renderer`: コミュニティガイドライン等のシステム案内バナー（`parseYtChatElement` で `null` を返して破棄）。
+- **投稿者チャンネル ID (`UC...`) の格納場所**:
+  - 2026年時点の YouTube Live チャット DOM（ShadyDOM）では `data-author-external-channel-id` 属性が省略されるケースが多く、代わりに要素の `whole-message-clickable` 属性（JSON）内の `liveChatItemContextMenuEndpoint.params`（二重 Base64 エンコードされた protobuf）に配信者チャンネルID（先頭 `UC[A-Za-z0-9_-]{22}`）と投稿者チャンネルID（末尾 `UC[A-Za-z0-9_-]{22}`）が格納されていることを実データで確認した。
+  - `extractChannelIdFromContextMenuParams()` でこの `params` から投稿者の `UC...` チャンネルIDを抽出し、万一取得できない要素（`yt-gift-message-view-model` 等）でも `handle:@ハンドル名` にフォールバックすることで、常に同じ投稿者が同じ `yt:<channelId>` キーで同じ VOICEVOX 声・応援者ランキングに紐づくよう実装した。

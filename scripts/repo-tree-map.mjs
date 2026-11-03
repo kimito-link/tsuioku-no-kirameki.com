@@ -45,6 +45,8 @@ const ROLES = {
   'extension/images': { role: 'アイコン・ロゴのマスター画像', tags: ['画像'] },
   'extension/dist': { role: 'ビルド成果物(content/popup/status 等の bundle)。build が生成', tags: ['ビルド成果物'] },
   'extension/sound': { role: '読み上げ・完了音などの音声素材', tags: ['音声'] },
+  'extension-youtube': { role: 'YouTube Live 版の試作拡張(単一用途分離)。manifest/content-chat/background/sidepanel', tags: ['YouTube', '試作', '記録', '読み上げ'] },
+  'extension-youtube/src': { role: 'YouTube Live 版試作拡張のバンドル entry(content-chat/background/sidepanel)', tags: ['YouTube', 'entry', '記録'] },
 
   'src': { role: 'LP 側 + 純粋関数ライブラリの源', tags: ['ソース'] },
   'src/lib': { role: '純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半', tags: ['色', '速度', 'コメント', 'レポート', '純粋関数'] },
