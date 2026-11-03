@@ -24,3 +24,19 @@ describe('ytWording のスパチャ合計順', () => {
     expect(ytWording('15800貢')).toBe('15800 XP');
   });
 });
+
+describe('ytWordingTopFanToSuperChatRank', () => {
+  it('トップファンの言葉をスパチャの合計順に戻す', async () => {
+    const { ytWordingTopFanToSuperChatRank } = await import('./ytWording.js');
+    expect(ytWordingTopFanToSuperChatRank('トップファン')).toBe('スパチャの合計順');
+    expect(ytWordingTopFanToSuperChatRank('15800 XP')).toBe('15800 pt');
+    expect(ytWordingTopFanToSuperChatRank('こんにちは')).toBe('こんにちは');
+  });
+});
+
+describe('niconico だけの文', () => {
+  it('ニコ を含まなくても直す', async () => {
+    const { ytWording } = await import('./ytWording.js');
+    expect(ytWording('サムネ・名前は数値ID時のみ niconico ユーザーページへリンクします(共有モードでは非表示)。')).toBe('サムネ・名前は YouTube のチャンネルへリンクします(共有モードでは非表示)。');
+  });
+});

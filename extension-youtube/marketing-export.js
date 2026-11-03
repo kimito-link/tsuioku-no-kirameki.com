@@ -218,7 +218,7 @@
     ["ニコニコの公開プロフィールから", "YouTube の公開ページから"],
     ["ニコ広告", "広告"]
   ];
-  var QUICK = /貢|ニコ/;
+  var QUICK = /貢|ニコ|niconico/;
   function ytWording(text, opts = {}) {
     const v = String(text ?? "");
     if (!QUICK.test(v)) return v;
@@ -228,6 +228,21 @@
       out = typeof from === "string" ? out.split(from).join(to) : out.replace(from, to);
     }
     return out;
+  }
+  function ytWordingTopFanToSuperChatRank(text) {
+    let out = String(text ?? "");
+    if (!/トップファン|XP/.test(out)) return out;
+    for (let i = 0; i < 3; i += 1) {
+      const from = (
+        /** @type {string} */
+        TOP_FAN_RULES[i][1]
+      );
+      out = out.split(from).join(
+        /** @type {string} */
+        SUPERCHAT_RANK_RULES[i][1]
+      );
+    }
+    return out.replace(/(\d[\d,]*) XP\b/g, "$1 pt");
   }
 
   // src/lib/youtube/ytSuperChatTier.js
@@ -631,6 +646,10 @@
     };
   }
   var normName = (name) => String(name || "").trim().replace(/^@/, "").toLowerCase();
+  function ytUsableIcon(url) {
+    const u = String(url || "").trim();
+    return /^https:\/\//i.test(u) ? u : "";
+  }
   function buildYtPersonResolver(items) {
     const ucByName = /* @__PURE__ */ new Map();
     for (const r of items) {
@@ -651,7 +670,7 @@
     };
     const iconByKey = /* @__PURE__ */ new Map();
     for (const r of items) {
-      const icon = String(r?.iconUrl || "").trim();
+      const icon = ytUsableIcon(r?.iconUrl);
       if (!icon) continue;
       const k = keyOf(r);
       if (k) iconByKey.set(k, icon);
@@ -726,7 +745,7 @@
     }
     const out = list.map((r, i) => {
       const key = who.keyOf(r);
-      const icon = String(r?.iconUrl || "").trim() || who.iconOf(key);
+      const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key);
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
       return e;
@@ -813,7 +832,11 @@
             );
             const fromBoard = lb ? ytLeaderboardToKoken(lb, await buildCommentsForLv(lv) || [], lv) : null;
             if (fromBoard) v = fromBoard;
-            if (v != null) kokenIsTopFans = !!fromBoard;
+            if (v != null) {
+              const wasTopFans = kokenIsTopFans;
+              kokenIsTopFans = !!fromBoard;
+              if (wasTopFans && !kokenIsTopFans) rewordTopFansAsSuperChatRank();
+            }
           }
           if (v != null) bag[k] = v;
         }
@@ -1079,6 +1102,16 @@
   }
   var EMPTY_THUMB_SEL = '[class*="thumb--empty"]';
   var SC_BUBBLE_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E") center/70% no-repeat`;
+  function rewordTopFansAsSuperChatRank() {
+    if (typeof document === "undefined" || !document.body) return;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while (n = walker.nextNode()) {
+      const v = String(n.nodeValue || "");
+      const next = ytWordingTopFanToSuperChatRank(v);
+      if (next !== v) n.nodeValue = next;
+    }
+  }
   function fixEmptyThumb(el) {
     const tr = el.closest("tr");
     const row = tr || el.parentElement;
@@ -1137,6 +1170,12 @@
       });
       fixSubtree(doc.documentElement);
       for (const [el, v] of held) el.setAttribute("onerror", v);
+      doc.querySelectorAll("[data-search]").forEach((el) => {
+        const v = String(el.getAttribute("data-search") || "");
+        let next = /lv9\d{11}/.test(v) ? ytFixPseudoLvText(v) : v;
+        if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || uid : uid);
+        if (next !== v) el.setAttribute("data-search", next);
+      });
       const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
       return (doctype ? doctype[0] + "\n" : "") + doc.documentElement.outerHTML;
     } catch {
