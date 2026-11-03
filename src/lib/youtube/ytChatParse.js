@@ -271,6 +271,9 @@ export function extractAuthorIconUrl(el) {
  * @param {string} rawText
  * @returns {number | null}
  */
+/** 同時視聴としてあり得る上限(これを超える数は読み違いとして捨てる) */
+const YT_MAX_PLAUSIBLE_VIEWERS = 50_000_000;
+
 export function extractYtWatchConcurrentViewersFromText(rawText) {
   if (typeof rawText !== 'string' || !rawText.trim()) return null;
   const normalized = rawText
@@ -280,24 +283,26 @@ export function extractYtWatchConcurrentViewersFromText(rawText) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  const jaMatch = normalized.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(万|億)?\s*人(?:が)?\s*視聴中/);
+  // 数字は「3桁区切り」か「9桁まで」だけ(長い数字の連なりを1つの数と読み違えない・2026-11-03 実機で 12,345,678,901,234… と出た)
+  const NUM = '(?<![0-9,.])((?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,9})(?:\\.[0-9]+)?)';
+  const jaMatch = normalized.match(new RegExp(`${NUM}\\s*(万|億)?\\s*人(?:が)?\\s*視聴中`));
   if (jaMatch) {
     const base = Number.parseFloat(jaMatch[1].replace(/,/g, ''));
     if (!Number.isFinite(base) || base < 0) return null;
     const unit = jaMatch[2] || '';
     const mult = unit === '億' ? 100_000_000 : unit === '万' ? 10_000 : 1;
-    return Math.round(base * mult);
+    const v = Math.round(base * mult);
+    return v <= YT_MAX_PLAUSIBLE_VIEWERS ? v : null;
   }
 
-  const enMatch = normalized.match(
-    /([0-9][0-9,]*(?:\.[0-9]+)?)\s*([KkMm])?\s*watching(?:\s+now)?\b/i,
-  );
+  const enMatch = normalized.match(new RegExp(`${NUM}\\s*([KkMm])?\\s*watching(?:\\s+now)?\\b`, 'i'));
   if (enMatch) {
     const base = Number.parseFloat(enMatch[1].replace(/,/g, ''));
     if (!Number.isFinite(base) || base < 0) return null;
     const unit = (enMatch[2] || '').toUpperCase();
     const mult = unit === 'M' ? 1_000_000 : unit === 'K' ? 1_000 : 1;
-    return Math.round(base * mult);
+    const v = Math.round(base * mult);
+    return v <= YT_MAX_PLAUSIBLE_VIEWERS ? v : null;
   }
 
   return null;

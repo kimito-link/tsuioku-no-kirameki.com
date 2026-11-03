@@ -2073,65 +2073,1059 @@ a.nl-tl-gift:hover {
         font-weight: 600;
         line-height: 1.45;
       }
+      /* ===== ニコ生版 extension/popup.html の同じ class/id の規則をそのまま写したもの（2026-11-03 りんく「完コピ」）。色は上の :root のトークンで温かいパステルになる ===== */
+      :root {
+        --nl-lane-accent-ad: #7fd49a;
+        --nl-lane-accent-contrib: #ffd35c;
+        --nl-lane-accent-gift: #ff8aa7;
+        --nl-lane-accent-program: #6cc4ff;
+        --nl-lane-accent-event-rank: #b69cff;
+        --nl-lane-accent-event-score: #b69cff;
+        --nl-lane-accent-event-broadcasters: #b69cff;
+      }
+@keyframes nl-init-shade-bob-speaking {
+        0%, 100% { transform: scale(1.16) translateY(-2px); }
+        50% { transform: scale(1.16) translateY(-9px); }
+      }
+@keyframes nl-init-shade-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+      }
+@keyframes nl-init-shade-css-failsafe {
+        0%, 18% { opacity: 1; visibility: visible; pointer-events: auto; }
+        99% { opacity: 0.04; visibility: visible; pointer-events: none; }
+        100% { opacity: 0; visibility: hidden; pointer-events: none; }
+      }
+@keyframes nl-yukkuri-hop {
+        0%,
+        100% {
+          transform: translateY(0) scale(1, 1);
+        }
+        22% {
+          transform: translateY(var(--nl-hop-y)) scale(1.04, 0.96);
+        }
+        45% {
+          transform: translateY(0) scale(0.98, 1.04);
+        }
+        62% {
+          transform: translateY(calc(var(--nl-hop-y) * 0.35)) scale(1.02, 0.99);
+        }
+        80% {
+          transform: translateY(0) scale(1, 1);
+        }
+      }
+@keyframes nl-story-pop {
+        0% { transform: scale(1); }
+        48% { transform: scale(1.045); }
+        100% { transform: scale(1); }
+      }
+@keyframes nl-story-burst {
+        0% { transform: scale(1); box-shadow: 0 2px 7px rgb(2 17 31 / 14%); }
+        40% { transform: scale(1.065); box-shadow: 0 5px 14px rgb(14 116 144 / 32%); }
+        100% { transform: scale(1); box-shadow: 0 2px 7px rgb(2 17 31 / 14%); }
+      }
+@keyframes nl-story-sparkle {
+        0% { opacity: 0; }
+        25% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+.nl-story-growth-collapse-btn:hover {
+        background: var(--nl-bg-soft);
+      }
+.nl-story-growth-collapse-btn:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+      }
+.nl-story-userlane-stack > .nl-story-userlane,
+      .nl-story-userlane-stack .nl-story-userlane-tier-wrap .nl-story-userlane {
+        max-height: none;
+        overflow-y: visible;
+      }
+.nl-story-userlane-meta__id,
+      .nl-story-userlane-meta__name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+@keyframes nl-lane-pulse-pop {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.045); }
+        100% { transform: scale(1); }
+      }
+.nl-story-userlane-meta[data-stats]::after {
+        content: attr(data-stats);
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--nl-lane-stats);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+.nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0'] {
+        gap: 0;
+        padding-right: 0;
+      }
+.nlsb-venue-lane-stack
+        .nl-story-userlane--tanu
+        > :nth-child(n + 25)
+        .nl-story-userlane-cell[data-thumb='0']
+        .nl-story-userlane-meta {
+        display: none;
+      }
+.nlsb-venue-lane-stack
+        .nl-story-userlane--tanu
+        > :nth-child(n + 25)
+        .nl-story-userlane-cell[data-thumb='0']
+        .nl-story-userlane-avatar {
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
+      }
+html:not(.nl-inline) .nl-support-visual-details[open] .nl-story-growth {
+        /* 内側スクロールは .nl-main と二重になるためやめ、メイン列の1本スクロールに任せる */
+        height: auto;
+        max-height: none;
+        min-height: 0;
+        overflow: visible;
+      }
+.nl-story-growth-cell.nl-story-growth-cell--repeat::after {
+        content: '×' attr(data-support-ordinal);
+        position: absolute;
+        bottom: 1px;
+        right: 0;
+        padding: 0 1px;
+        font-size: 7px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        color: var(--nl-text);
+        text-shadow:
+          0 0 2px var(--nl-surface),
+          0 0 2px var(--nl-surface);
+        pointer-events: none;
+      }
+.nl-story-growth-cell--selected,
+      .nl-story-growth-cell:focus-within {
+        box-shadow:
+          0 0 0 2px #ffffff,
+          0 0 0 4px #0284c7;
+        z-index: 2;
+        position: relative;
+      }
+.nl-story-detail.is-preview {
+        border-style: dashed;
+        opacity: 0.94;
+        background: color-mix(in srgb, var(--nl-surface) 88%, #dbeafe 12%);
+      }
+.nl-story-detail.is-hover-bubble {
+        position: fixed;
+        margin-top: 0;
+        width: min(280px, calc(100vw - 16px));
+        max-width: min(280px, calc(100vw - 16px));
+        padding: 7px 8px;
+        opacity: 0.98;
+        z-index: 999;
+        box-shadow:
+          0 10px 24px rgb(2 17 31 / 24%),
+          0 2px 8px rgb(2 17 31 / 12%);
+      }
+.nl-story-detail.is-hover-bubble::after {
+        content: '';
+        position: absolute;
+        left: var(--nl-story-detail-arrow-left, 18px);
+        bottom: -8px;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
+        border-top: 8px solid color-mix(in srgb, var(--nl-surface) 88%, #dbeafe 12%);
+      }
+.nl-story-detail.is-hover-bubble.is-hover-below::after {
+        top: -8px;
+        bottom: auto;
+        border-top: 0;
+        border-bottom: 8px solid color-mix(in srgb, var(--nl-surface) 88%, #dbeafe 12%);
+      }
+.nl-story-detail.is-pinned-detail {
+        border-color: color-mix(in srgb, var(--nl-accent) 42%, var(--nl-border) 58%);
+      }
+.nl-story-detail-img.nl-story-detail-img--remote {
+        object-fit: cover;
+      }
+.nl-story-detail-img.nl-story-detail-img--tv-fallback {
+        object-fit: contain;
+        padding: 2px;
+        background: linear-gradient(180deg, #efebe9, #d7ccc8);
+        border-color: color-mix(in srgb, #6d4c41 45%, var(--nl-border) 55%);
+      }
+.nl-story-detail-list li {
+        padding-top: 3px;
+        font-size: 9px;
+        line-height: 1.25;
+        color: var(--nl-muted);
+        word-break: break-word;
+      }
+@keyframes nl-story-icon-pop {
+        0% { transform: scale(0.92); }
+        62% { transform: scale(1.12); }
+        100% { transform: scale(1); }
+      }
+@keyframes nl-popup-primary-cloak-auto-reveal {
+        to {
+          opacity: 1;
+          pointer-events: auto;
+        }
+      }
+.nl-frame-theme-details__summary::-webkit-details-marker {
+        display: none;
+      }
+.nl-frame-theme-details__summary::before {
+        content: '';
+        width: 0.45em;
+        height: 0.45em;
+        border-right: 2px solid var(--nl-accent);
+        border-bottom: 2px solid var(--nl-accent);
+        transform: rotate(-45deg);
+        flex-shrink: 0;
+        margin-top: -0.1em;
+        transition: transform 0.15s ease;
+      }
+.nl-frame-theme-details[open] .nl-frame-theme-details__summary::before {
+        transform: rotate(45deg);
+        margin-top: 0.15em;
+      }
+.nl-frame-theme-details__summary:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+        border-radius: 9px;
+      }
+@media (prefers-reduced-motion: reduce) {
+.nl-frame-theme-details__summary::before {
+          transition: none;
+        }
+}
+.nl-official-nico-stats__val.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 12px);
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+.nl-live-stat-icon.nl-chara-bounce-small {
+        animation: nl-chara-bounce-small 0.35s cubic-bezier(.34,1.56,.64,1) 1;
+      }
+.nl-live-stat-icon.nl-chara-bounce-medium {
+        animation: nl-chara-bounce-medium 0.45s cubic-bezier(.34,1.56,.64,1) 1;
+      }
+.nl-live-stat-icon.nl-chara-bounce-big {
+        animation: nl-chara-bounce-big 0.55s cubic-bezier(.34,1.56,.64,1) 1;
+      }
+@keyframes nl-char-load-gentle {
+        0%,
+        100% {
+          transform: translateY(0);
+          opacity: 1;
+        }
+        50% {
+          transform: translateY(-3px);
+          opacity: 0.86;
+        }
+      }
+@keyframes nl-chara-bounce-small {
+        0%   { transform: translateY(0); }
+        40%  { transform: translateY(-4px); }
+        70%  { transform: translateY(-1px); }
+        100% { transform: translateY(0); }
+      }
+@keyframes nl-chara-bounce-medium {
+        0%   { transform: translateY(0) rotate(0); }
+        20%  { transform: translateY(-6px) rotate(-4deg); }
+        40%  { transform: translateY(-2px) rotate(3deg); }
+        60%  { transform: translateY(-4px) rotate(-2deg); }
+        80%  { transform: translateY(-1px) rotate(1deg); }
+        100% { transform: translateY(0) rotate(0); }
+      }
+@keyframes nl-chara-bounce-big {
+        0%   { transform: translateY(0) rotate(0) scale(1); }
+        15%  { transform: translateY(-8px) rotate(-6deg) scale(1.08); }
+        30%  { transform: translateY(-3px) rotate(4deg) scale(1.04); }
+        50%  { transform: translateY(-6px) rotate(-3deg) scale(1.06); }
+        70%  { transform: translateY(-2px) rotate(2deg) scale(1.02); }
+        85%  { transform: translateY(-1px) rotate(-1deg) scale(1); }
+        100% { transform: translateY(0) rotate(0) scale(1); }
+      }
+.nl-concurrent-body:has(#watchConcurrentLoading:not([hidden]))
+        #watchConcurrentReady {
+        display: none !important;
+      }
+@keyframes nl-concurrent-loading-bob {
+        0%,
+        100% {
+          transform: translateY(0) rotate(-2deg) scale(1, 1);
+        }
+
+        22% {
+          transform: translateY(-5px) rotate(1.5deg) scale(1.04, 0.96);
+        }
+
+        48% {
+          transform: translateY(-1px) rotate(-0.5deg) scale(0.98, 1.03);
+        }
+
+        72% {
+          transform: translateY(-3px) rotate(1deg) scale(1.02, 0.99);
+        }
+      }
+@keyframes nl-concurrent-dot-hop {
+        0%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.35;
+        }
+
+        45% {
+          transform: translateY(-4px);
+          opacity: 1;
+        }
+      }
+@keyframes nl-concurrent-hint-breathe {
+        0%,
+        100% {
+          opacity: 0.62;
+        }
+
+        50% {
+          opacity: 1;
+        }
+      }
+.nl-live-stat-value.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 13px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        font-variant-numeric: normal;
+        line-height: 1.25;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+.nl-top-support-rank__id,
+      .nl-top-support-rank__name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+        font-size: 0.92em;
+      }
+@keyframes nlBackfillHop {
+        0% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+        18% { transform: translateY(-9px) scale(0.94, 1.08) rotate(-6deg); }
+        40% { transform: translateY(0) scale(1.08, 0.92) rotate(0deg); }
+        46% { transform: translateY(-2px) scale(1, 1) rotate(4deg); }
+        62% { transform: translateY(-7px) scale(0.96, 1.06) rotate(7deg); }
+        82% { transform: translateY(0) scale(1.06, 0.94) rotate(0deg); }
+        100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+      }
+@keyframes nlBackfillBob {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-2px); }
+        100% { transform: translateY(0); }
+      }
+@keyframes nlBackfillPop {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.18) rotate(4deg); }
+        70% { transform: scale(0.96); }
+        100% { transform: scale(1); }
+      }
+@keyframes nlBackfillSparkle {
+        0% { box-shadow: 0 0 0 0 rgba(244, 122, 178, 0.55); }
+        100% { box-shadow: 0 0 0 14px rgba(244, 122, 178, 0); }
+      }
+@keyframes nlLiveStatCelebratePulse {
+        0% { box-shadow: 0 0 0 0 rgba(244, 122, 178, 0.55); }
+        40% { box-shadow: 0 0 0 10px rgba(244, 122, 178, 0.25); }
+        100% { box-shadow: 0 0 0 0 rgba(244, 122, 178, 0); }
+      }
+.nl-live-stat-card.nl-live-stat-card--celebrate {
+        animation: nlLiveStatCelebratePulse 1.1s ease-out 2;
+      }
+@media (prefers-reduced-motion: reduce) {
+.nl-live-stat-card.nl-live-stat-card--celebrate {
+          animation: none;
+          outline: 2px solid rgba(244, 122, 178, 0.65);
+          outline-offset: 2px;
+        }
+}
+@keyframes nlCelebrationBannerPop {
+        0% { transform: translateX(-50%) scale(0.82); opacity: 0; }
+        100% { transform: translateX(-50%) scale(1); opacity: 1; }
+      }
+@keyframes nlCelebrationFall {
+        0% { transform: translateY(0) rotate(0deg); opacity: 0.95; }
+        85% { opacity: 0.75; }
+        100% { transform: translateY(calc(100vh + 72px)) rotate(420deg); opacity: 0.15; }
+      }
+@keyframes nlCelebrationFallDeluge {
+        0% {
+          transform: translateY(0) translateX(0) rotate(0deg) scale(0.85);
+          opacity: 0;
+        }
+        6% { opacity: 0.92; }
+        25% {
+          transform: translateY(25vh) translateX(calc(var(--nl-celebration-sway, 0px) * 0.35)) rotate(120deg) scale(1);
+        }
+        55% {
+          transform: translateY(55vh) translateX(calc(var(--nl-celebration-sway, 0px) * 0.75)) rotate(260deg) scale(1);
+          opacity: 0.82;
+        }
+        100% {
+          transform: translateY(calc(100vh + 56px)) translateX(var(--nl-celebration-sway, 0px)) rotate(480deg) scale(0.95);
+          opacity: 0.08;
+        }
+      }
+@keyframes nlCelebrationBannerGlow {
+        0%, 100% { box-shadow: 0 8px 28px rgba(180, 60, 120, 0.18); }
+        50% { box-shadow: 0 8px 36px rgba(244, 122, 178, 0.42); }
+      }
+@keyframes nlFlyTextScroll {
+        0% { transform: translateX(108vw); opacity: 0; }
+        4% { opacity: 0.95; }
+        92% { opacity: 0.88; }
+        100% { transform: translateX(-115%); opacity: 0; }
+      }
+@keyframes nlFlyTextBurst {
+        0% {
+          transform: translate(calc(-50% + var(--nl-fly-x0, 0vw)), 0) scale(0.35)
+            rotate(calc(var(--nl-fly-rot, 0deg) - 8deg));
+          opacity: 0;
+        }
+        12% {
+          transform: translate(calc(-50% + var(--nl-fly-x0, 0vw)), 0) scale(1.08)
+            rotate(var(--nl-fly-rot, 0deg));
+          opacity: 1;
+        }
+        100% {
+          transform: translate(
+              calc(-50% + var(--nl-fly-x0, 0vw) + var(--nl-fly-x1, 0px)),
+              var(--nl-fly-y1, -80px)
+            )
+            scale(0.92) rotate(calc(var(--nl-fly-rot, 0deg) + 10deg));
+          opacity: 0;
+        }
+      }
+@keyframes nlCelebrationPikaFlash {
+        0% { opacity: 0; }
+        18% { opacity: 0.88; }
+        100% { opacity: 0; }
+      }
+@keyframes nlCelebrationPikaRadial {
+        0% { transform: translate(-50%, -50%) scale(0.15); opacity: 0; }
+        20% { opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
+      }
+@keyframes nlCelebrationPikaStarsIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+@keyframes nlCelebrationPikaStarBurst {
+        0% {
+          transform: translate(0, 0) scale(0.2) rotate(0deg);
+          opacity: 0;
+        }
+        25% {
+          transform: translate(calc(var(--nl-pika-x, 0px) * 0.35), calc(var(--nl-pika-y, 0px) * 0.35))
+            scale(1.2) rotate(45deg);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(var(--nl-pika-x, 0px), var(--nl-pika-y, 0px)) scale(0.3) rotate(120deg);
+          opacity: 0;
+        }
+      }
+@keyframes nlGiftBahamutZoom {
+        0% {
+          transform: translate(-50%, 55%) scale(0.07);
+          opacity: 0.45;
+          filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2)) blur(1px);
+        }
+        14% {
+          opacity: 1;
+          filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35)) blur(0);
+        }
+        40% {
+          transform: translate(-50%, -6%) scale(var(--nl-bahamut-peak, 1.75));
+        }
+        52% {
+          transform: translate(-50%, -10%) scale(calc(var(--nl-bahamut-peak, 1.75) * 1.05));
+        }
+        62% {
+          transform: translate(-50%, -7%) scale(var(--nl-bahamut-peak, 1.75));
+        }
+        78% {
+          transform: translate(-50%, -9%) scale(var(--nl-bahamut-peak, 1.75));
+          opacity: 1;
+        }
+        100% {
+          transform: translate(-50%, -22%) scale(calc(var(--nl-bahamut-peak, 1.75) * 1.28));
+          opacity: 0;
+        }
+      }
+@keyframes nlGiftBahamutCharPop {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        38% { transform: translateY(-22px) rotate(-5deg); }
+        52% { transform: translateY(-10px) rotate(3deg); }
+        62% { transform: translateY(-14px) rotate(0deg); }
+      }
+@keyframes nlGiftBahamutFlash {
+        0% { opacity: 0; }
+        20% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+@keyframes nlGiftBahamutBanner {
+        0% { transform: translateX(-50%) scale(0.7); opacity: 0; }
+        100% { transform: translateX(-50%) scale(1); opacity: 1; }
+      }
+@keyframes nlGiftBahamutSparkBurst {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.35);
+        }
+        22% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1.1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(
+            calc(-50% + var(--nl-spark-x, 0px)),
+            calc(-50% + var(--nl-spark-y, -72px))
+          ) scale(0.25);
+        }
+      }
+#northStarLanes.nl-north-star-lanes {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+      }
+.nl-north-star-lane:has(.nl-north-star-lane__body[data-lane-state='ok']) {
+        background: var(--nl-surface);
+      }
+.nl-north-star-lane[hidden] {
+        display: none !important;
+      }
+.nl-north-star-lane[data-lane='contributionRanking'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-contrib) 75%, var(--nl-border) 25%);
+      }
+.nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-gift) 75%, var(--nl-border) 25%);
+      }
+.nl-north-star-lane[data-lane='programPoints'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-program) 75%, var(--nl-border) 25%);
+      }
+.nl-north-star-lane[data-lane='adRanking'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-ad) 75%, var(--nl-border) 25%);
+      }
+.nl-north-star-lane[data-lane='eventRank'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-event-rank) 75%, var(--nl-border) 25%);
+      }
+.nl-north-star-lane[data-lane='eventScore'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-event-score) 75%, var(--nl-border) 25%);
+      }
+.nl-north-star-lane[data-lane='eventBroadcasters'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters) 75%, var(--nl-border) 25%);
+      }
+#northStarLanes .nl-north-star-lane + .nl-north-star-lane {
+        position: relative;
+        /* margin-top は撤去（container gap が「あいだ」を担う）。padding-top は
+           separator(::before, top:0) の上に文字が貼り付かない最小余白だけ残す。 */
+        padding-top: 5px;
+      }
+#northStarLanes .nl-north-star-lane + .nl-north-star-lane::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 4px;
+        right: 4px;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent 0%,
+          color-mix(in srgb, var(--nl-border) 45%, transparent) 15%,
+          color-mix(in srgb, var(--nl-border) 70%, transparent) 50%,
+          color-mix(in srgb, var(--nl-border) 45%, transparent) 85%,
+          transparent 100%
+        );
+        pointer-events: none;
+      }
+.nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__shell {
+        min-height: 84px;
+      }
+.nl-north-star-lane[data-lane='programPoints'] {
+        display: none;
+      }
+.nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank--below-cards .nl-top-support-rank__list {
+        padding: 4px 2px 8px;
+      }
+.nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank--below-cards .nl-top-support-rank__line {
+        /* v0.1.304: grid 化に伴い固定幅 min/max-width を撤去（grid トラックが幅を決める。
+           max-width が残ると 1fr 全幅化・折返しを阻害）。padding だけ giftHistory 専用に残す。 */
+        padding: 7px 6px 8px;
+      }
+.nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank__note {
+        font-size: clamp(8px, 1.7vw, 9px);
+        line-height: 1.3;
+        margin: 1px 0 2px;
+      }
+.nl-north-star-lane[data-lane='giftHistory'] {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        min-width: 0;
+      }
+.nl-north-star-lane[data-lane='giftHistory'] .nl-north-star-lane__body {
+        max-height: none;
+      }
+@media (min-width: 360px) {
+.nl-north-star-lane__shell {
+          grid-template-columns: minmax(0, 1fr) minmax(76px, 92px);
+        }
+.nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__shell {
+          grid-template-columns: minmax(0, 1fr) 58px;
+        }
+/* 右列: 一覧OK時はサマリー、待機時は aside（同一列に重ねる。4 子で折り返さない） */
+        .nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__shell > .nl-north-star-lane__body {
+          grid-column: 1;
+        }
+.nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__shell > .nl-north-star-lane__gadget--summary {
+          grid-column: 2;
+        }
+.nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__shell > .nl-north-star-lane__rail {
+          grid-column: 2;
+        }
+/* 順位表は狭くてよいが、待機の3キャラ案内は 92px 上限だと日本語が読めない */
+        .nl-north-star-lane__shell:has(.nl-north-star-lane__rail [data-nl-rail-wait='1']) {
+          grid-template-columns:
+            minmax(0, 1fr)
+            minmax(168px, min(40%, 300px));
+        }
+}
+@keyframes nl-north-star-acq-pending-opacity {
+        0%,
+        100% {
+          opacity: 0.42;
+        }
+        50% {
+          opacity: 0.9;
+        }
+      }
+@keyframes nl-chara-trio-celebrate-fade {
+        from { opacity: 0; transform: translateY(-4px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+.nl-north-star-lane__body .nl-north-star-rank-bundle__head {
+        margin-bottom: 4px;
+        min-width: 0;
+        max-height: 30px;
+        overflow: auto;
+        flex-shrink: 0;
+      }
+.nl-north-star-lane__body .nl-north-star-rank-bundle__hint {
+        margin: 6px 0 0;
+        font-size: 10.5px;
+        line-height: 1.35;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 52%, transparent);
+      }
+.nl-north-star-lane__body:not(.nl-top-support-rank--below-cards) .nl-top-support-rank__list {
+        max-height: min(40vh, 240px);
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+.nl-north-star-lane__body[data-lane-state="missing"],
+      .nl-north-star-lane__body[data-lane-state="no_event"],
+      .nl-north-star-lane__body[data-lane-state="no_program_gift"],
+      .nl-north-star-lane__body[data-lane-state="iframe_unrendered"],
+      .nl-north-star-lane__body[data-lane-state="fetch_error"],
+      .nl-north-star-lane__body[data-lane-state="event_present_unscrapable"],
+      .nl-north-star-lane__body[data-lane-state="not_yet"] {
+        color: color-mix(in srgb, var(--nl-text) 40%, transparent);
+        font-style: italic;
+      }
+.nl-north-star-lane__body[data-lane-state="missing"]:empty::after {
+        content: "(未取得)";
+      }
+.nl-north-star-lane__body[data-lane-state="no_event"]:empty::after {
+        content: "(イベント不参加)";
+      }
+.nl-north-star-lane__body[data-lane-state="no_program_gift"]:empty::after {
+        content: "(ギフト 0 件)";
+      }
+.nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
+        content: "";
+      }
+.nl-north-star-lane__body[data-lane-state="event_present_unscrapable"]:empty::after {
+        content: "イベント参加中（公式の順位・スコアは取得できていません）";
+      }
+.nl-north-star-lane__body[data-lane-state="fetch_error"]:empty::after {
+        content: "";
+      }
+.nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after {
+        content: "";
+      }
+.nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after,
+      .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
+        animation: none;
+        opacity: 0.72;
+      }
+@media (prefers-reduced-motion: reduce) {
+.nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after,
+        .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
+          opacity: 0.88;
+        }
+}
+.nl-north-star-lane__body:has(.nl-north-star-lane-wait) {
+        font-style: normal;
+        color: var(--nl-text);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        max-width: 100%;
+        justify-self: stretch;
+      }
+@keyframes nl-north-star-wait-gauge-opacity {
+        0%,
+        100% {
+          opacity: 0.44;
+        }
+        50% {
+          opacity: 0.92;
+        }
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__note {
+        text-align: center;
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__list {
+        display: grid;
+        grid-template-columns: repeat(
+          auto-fit,
+          minmax(var(--nl-rank-card-min, 58px), 1fr)
+        );
+        gap: 6px;
+        padding: 4px 2px 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__line {
+        display: grid;
+        /* v0.1.333: count 列を minmax(0,auto) に（長い pt 数値「13349」等が auto で
+           カード幅 min58px を超えて右端からはみ出す実機症状を是正。0 まで縮めて
+           カード内に収め、count 側で ellipsis）。place/thumb は固定なので 3列目だけ可縮に。 */
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+          "place thumb"
+          "name name"
+          "count count"
+          "id id";
+        align-items: center;
+        justify-items: center;
+        gap: 3px 6px;
+        /* カード枠を絶対に超えない（はみ出した数値・名前はカード内でクリップ）。 */
+        overflow: hidden;
+        /* grid トラックが幅を決めるので flex 固定幅・min/max-width は付けない
+           （max-width を残すと 1fr で全幅に伸びず・折返しも阻害する死にコードになる）。 */
+        min-width: 0;
+        min-height: 84px;
+        padding: 7px 6px 8px;
+        box-sizing: border-box;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 55%, transparent);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-bg-soft) 12%);
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__line.nl-top-support-rank__line--has-accent {
+        border-color: color-mix(in srgb, var(--nl-rank-accent) 35%, var(--nl-border) 65%);
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__place {
+        grid-area: place;
+        justify-self: start;
+        align-self: start;
+        margin-top: 1px;
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__thumb-wrap {
+        grid-area: thumb;
+        width: 34px;
+        height: 34px;
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__count {
+        grid-area: count;
+        justify-self: end;
+        align-self: start;
+        font-size: clamp(9px, 2.4vw, 11px);
+        line-height: 1.2;
+        /* v0.1.335: 全幅行に下ろしたので ellipsis をやめ、数値全体を読めるようにする
+           （6 桁 410xxx も折り返さず収まる。frame は overflow:hidden が死守）。 */
+        justify-self: center;
+        max-width: 100%;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        font-weight: 800;
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__id {
+        grid-area: id;
+        font-size: 9px;
+        max-width: 100%;
+        text-align: center;
+        line-height: 1.2;
+      }
+.nl-top-support-rank--below-cards .nl-top-support-rank__name {
+        grid-area: name;
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--nl-text);
+        max-width: 100%;
+        text-align: center;
+        line-height: 1.25;
+      }
+.nl-top-support-rank__caster-follow:hover {
+        opacity: 0.85;
+      }
+.nl-live-stat-cards ~ .nl-comment-compose--primary {
+        margin-top: 5px;
+        margin-bottom: 5px;
+        padding: 6px 8px;
+      }
+.nl-live-stat-cards ~ .nl-comment-compose--primary textarea {
+        min-height: clamp(36px, 2.8em, 52px);
+        max-height: clamp(44px, 3.8em, 64px);
+      }
+@keyframes nl-comment-ticker-scroll {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(-50%);
+        }
+      }
+.nl-support-timeline__summary::-webkit-details-marker {
+        display: none;
+      }
+.nl-support-timeline__summary::before {
+        content: '▸';
+        color: var(--nl-muted);
+        font-size: 10px;
+      }
+.nl-support-timeline[open] .nl-support-timeline__summary::before {
+        content: '▾';
+      }
+a.nl-tl-row:hover {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
+      }
+#supportTimelineBody [data-nl-uid] {
+        cursor: pointer;
+      }
+#supportTimelineBody [data-nl-uid]:hover {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
+      }
+a.nl-tl-gift:hover {
+        border-color: color-mix(in srgb, #ffb020 60%, var(--nl-border));
+      }
+.nl-support-visual-details[open] {
+        border-color: color-mix(in srgb, var(--nl-accent) 26%, var(--nl-border));
+        box-shadow: 0 6px 22px rgb(0 0 0 / 8%);
+      }
+.nl-support-visual-details[open] .nl-support-visual-details__summary {
+        background: color-mix(in srgb, var(--nl-accent) 7%, transparent);
+        border-radius: 9px 9px 0 0;
+      }
+.nl-support-visual-details__summary::-webkit-details-marker {
+        display: none;
+      }
+.nl-support-visual-details__summary::before {
+        content: '';
+        width: 0.45em;
+        height: 0.45em;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(-45deg);
+        flex-shrink: 0;
+        margin-top: -0.15em;
+        transition: transform 0.15s ease;
+      }
+.nl-support-visual-details[open] .nl-support-visual-details__summary::before {
+        transform: rotate(45deg);
+        margin-top: 0.1em;
+      }
+.nl-support-visual-details__summary:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+        border-radius: 9px;
+      }
+.nl-support-visual-details[open] > .nl-support-visual-details__body {
+        animation: nl-support-visual-body-open 0.2s ease-out;
+      }
+@keyframes nl-support-visual-body-open {
+        from {
+          opacity: 1;
+          transform: translateY(-3px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+@media (prefers-reduced-motion: reduce) {
+.nl-support-visual-details__summary::before {
+          transition: none;
+        }
+.nl-support-visual-details[open] > .nl-support-visual-details__body {
+          animation: none;
+        }
+}
+.nl-comment-compose textarea {
+        width: 100%;
+        min-height: clamp(48px, 3.6em, 72px);
+        max-height: clamp(56px, 5em, 88px);
+        resize: none;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font: inherit;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.95), 17px);
+        line-height: 1.4;
+        color: var(--nl-text);
+        background: var(--nl-surface);
+      }
+.nl-comment-compose textarea::placeholder {
+        color: var(--nl-placeholder, var(--nl-muted));
+        opacity: 1;
+      }
+.nl-comment-compose textarea:focus-visible {
+        outline: 2px solid #7dd3fc;
+        outline-offset: 1px;
+      }
+.nl-compose-send-row #postCommentBtn {
+        flex: 1 1 132px;
+        min-width: min(100%, 132px);
+      }
+.nl-compose-send-row #postStatus {
+        min-width: 0;
+      }
+.nl-compose-send-actions .nl-compose-quick-toolbar {
+        flex: 1 1 220px;
+        min-width: min(100%, 200px);
+        margin-top: 0;
+      }
+.nl-compose-quick-toolbar[data-nl-hoisted='top'] {
+        margin: 2px 0 8px;
+        padding: 6px 0 8px;
+        border-bottom: 1px solid var(--nl-border, rgba(255, 255, 255, 0.12));
+      }
+.nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
+      .nl-comment-compose--primary .nl-compose-quick-toolbar #reloadWatchTabBtn {
+        width: auto;
+        flex: 1 1 92px;
+        min-width: min(100%, 84px);
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+#postCommentBtn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+      }
+#postCommentBtn[aria-busy='true'] {
+        opacity: 0.88;
+      }
+#reloadWatchTabBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+#captureScreenshot:disabled {
+        border-color: #cbd5e1;
+        color: #9ca3af;
+        cursor: not-allowed;
+      }
+#captureScreenshot:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+      }
+#exportJson:hover:not(:disabled) {
+        background: var(--nl-accent-hover);
+      }
+#exportJson:active:not(:disabled) {
+        transform: scale(0.98);
+      }
+@media (prefers-reduced-motion: reduce) {
+#exportJson:active:not(:disabled) {
+          transform: none;
+        }
+}
+#exportJson:disabled {
+        background: #cbd5e1;
+        color: #64748b;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+#exportJson:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgb(15 143 216 / 45%);
+      }
+@keyframes nl-score-announce-shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-1px); }
+        75% { transform: translateX(1px); }
+      }
+@keyframes nl-score-reveal-pop {
+        0% { transform: scale(0.85); opacity: 0.4; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+@keyframes nl-score-radar-fade {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      /* ===== 写しここまで ===== */
       /* ===== ここまで ===== */
     </style>
   </head>
   <body>
-    <!-- 1. コメント投稿（extension/popup.html の section.nl-comment-compose--primary と同じ並び） -->
-    <section class="nl-comment-compose nl-comment-compose--primary" aria-label="コメント投稿">
-      <textarea id="commentInput" maxlength="200" placeholder="ここにコメントを書いて送信（YouTube にログインしたまま送れます）" aria-label="コメント本文（200文字まで）"></textarea>
-      <div class="nl-compose-send-row">
-        <div class="nl-compose-send-actions">
-          <button type="button" id="postCommentBtn" disabled aria-busy="false">コメント送信</button>
-          <div class="nl-compose-quick-toolbar" role="toolbar" aria-label="書き出しと視聴タブの再読み込み">
-          <button type="button" id="exportJson" disabled title="HTMLレポートを保存（この配信の記録コメントをまとめた検索用HTML）" aria-label="HTMLレポートを保存（この配信の記録コメントをまとめた検索用HTML）">
-            <span class="nl-compose-qbtn__row">
-              <span class="nl-compose-qbtn__emoji" aria-hidden="true">💾</span>
-              <span class="nl-compose-qbtn__word">HTML</span>
-            </span>
-          </button>
-          <button type="button" id="exportMarketingQuickBtn" disabled title="マーケ分析を1つのHTMLで保存（グラフと指標・応援者・スパチャ）" aria-label="マーケ分析を1つのHTMLで保存（グラフと指標・応援者・スパチャ）">
-            <span class="nl-compose-qbtn__row">
-              <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
-              <span class="nl-compose-qbtn__word">マーケ</span>
-            </span>
-          </button>
-          <button type="button" id="captureScreenshot" title="YouTube の視聴画面を PNG 画像で保存" aria-label="YouTube の視聴画面を PNG 画像で保存">
-            <span class="nl-compose-qbtn__row">
-              <span class="nl-compose-qbtn__emoji" aria-hidden="true">📷</span>
-              <span class="nl-compose-qbtn__word">スクショ</span>
-            </span>
-          </button>
-          <button type="button" id="reloadWatchTabBtn" title="開いている YouTube 視聴タブを再読み込み（F5 と同じ）" aria-label="開いている YouTube 視聴タブを再読み込み（F5 と同じ）">
-            <span class="nl-compose-qbtn__row">
-              <span class="nl-compose-qbtn__emoji" aria-hidden="true">↻</span>
-              <span class="nl-compose-qbtn__word">再読み込み</span>
-            </span>
-          </button>
-          <button type="button" id="openComeviewBtn" title="3レーンのコメント一覧（コメビュ）を開閉" aria-label="3レーンのコメント一覧（コメビュ）を開閉">
-            <span class="nl-compose-qbtn__row">
-              <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
-              <span class="nl-compose-qbtn__word">コメビュ</span>
-            </span>
-          </button>
-          <button type="button" id="openComeviewVoiceBtn" title="VOICEVOX 読み上げ設定を開閉" aria-label="VOICEVOX 読み上げ設定を開閉">
-            <span class="nl-compose-qbtn__row">
-              <span class="nl-compose-qbtn__emoji" aria-hidden="true">🔊</span>
-              <span class="nl-compose-qbtn__word">読み上げ</span>
-            </span>
-          </button>
-          </div>
-        </div>
-      </div>
-      <p id="commentPostStatus" class="nl-comment-post-status" role="status" aria-live="polite" hidden></p>
-      <details id="supportTimelineDetails" class="nl-support-timeline">
-        <summary class="nl-support-timeline__summary">
-          <span class="nl-support-timeline__summary-label">応援タイムライン（コメント＋スパチャ・メンバー）</span>
-          <span id="supportTimelineGiftMeta" class="nl-support-timeline__gift-meta" hidden></span>
-        </summary>
-        <div id="supportTimelineBody" class="nl-support-timeline__body" role="log" aria-label="コメントと応援の時系列" aria-live="off"></div>
-      </details>
-    </section>
+    <!-- 1. 上部ボタン列（ニコ生版は compose 内のツールバーを上へ持ち上げる=hoistQuickToolbarToTop と同じ位置） -->
+    <div id="nlTopQuickToolbar" class="nl-compose-quick-toolbar" data-nl-hoisted="top" role="toolbar" aria-label="書き出しと視聴タブの再読み込み">
+    <button type="button" id="exportJson" disabled title="HTMLレポートを保存（この配信の記録コメントをまとめた検索用HTML）" aria-label="HTMLレポートを保存（この配信の記録コメントをまとめた検索用HTML）">
+      <span class="nl-compose-qbtn__row">
+        <span class="nl-compose-qbtn__emoji" aria-hidden="true">💾</span>
+        <span class="nl-compose-qbtn__word">HTML</span>
+      </span>
+    </button>
+    <button type="button" id="exportMarketingQuickBtn" disabled title="マーケ分析を1つのHTMLで保存（グラフと指標・応援者・スパチャ）" aria-label="マーケ分析を1つのHTMLで保存（グラフと指標・応援者・スパチャ）">
+      <span class="nl-compose-qbtn__row">
+        <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
+        <span class="nl-compose-qbtn__word">マーケ</span>
+      </span>
+    </button>
+    <button type="button" id="captureScreenshot" title="YouTube の視聴画面を PNG 画像で保存" aria-label="YouTube の視聴画面を PNG 画像で保存">
+      <span class="nl-compose-qbtn__row">
+        <span class="nl-compose-qbtn__emoji" aria-hidden="true">📷</span>
+        <span class="nl-compose-qbtn__word">スクショ</span>
+      </span>
+    </button>
+    <button type="button" id="reloadWatchTabBtn" title="開いている YouTube 視聴タブを再読み込み（F5 と同じ）" aria-label="開いている YouTube 視聴タブを再読み込み（F5 と同じ）">
+      <span class="nl-compose-qbtn__row">
+        <span class="nl-compose-qbtn__emoji" aria-hidden="true">↻</span>
+        <span class="nl-compose-qbtn__word">再読み込み</span>
+      </span>
+    </button>
+    <button type="button" id="openComeviewBtn" title="3レーンのコメント一覧（コメビュ）を開閉" aria-label="3レーンのコメント一覧（コメビュ）を開閉">
+      <span class="nl-compose-qbtn__row">
+        <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
+        <span class="nl-compose-qbtn__word">コメビュ</span>
+      </span>
+    </button>
+    <button type="button" id="openComeviewVoiceBtn" title="VOICEVOX 読み上げ設定を開閉" aria-label="VOICEVOX 読み上げ設定を開閉">
+      <span class="nl-compose-qbtn__row">
+        <span class="nl-compose-qbtn__emoji" aria-hidden="true">🔊</span>
+        <span class="nl-compose-qbtn__word">読み上げ</span>
+      </span>
+    </button>
+    </div>
 
     <p id="yt-voice-engine-banner" class="nl-voice-engine-note" role="status" aria-live="polite" hidden></p>
 
@@ -2200,26 +3194,26 @@ a.nl-tl-gift:hover {
         role="group"
         aria-label="配信の主要指標（来場・コメント・経過・スパチャ合計・メンバー/ギフト）"
       >
-        <span class="nl-official-nico-stats__chip">
+        <div class="nl-official-nico-stats__chip">
           <span class="nl-official-nico-stats__label">来場</span>
           <span class="nl-official-nico-stats__val" id="officialStatVisitors">0</span>
-        </span>
-        <span class="nl-official-nico-stats__chip">
+        </div>
+        <div class="nl-official-nico-stats__chip">
           <span class="nl-official-nico-stats__label">コメント</span>
           <span class="nl-official-nico-stats__val" id="officialStatComments">0</span>
-        </span>
-        <span class="nl-official-nico-stats__chip">
+        </div>
+        <div class="nl-official-nico-stats__chip">
           <span class="nl-official-nico-stats__label">経過</span>
           <span class="nl-official-nico-stats__val" id="officialStatElapsed">—</span>
-        </span>
-        <span class="nl-official-nico-stats__chip">
+        </div>
+        <div class="nl-official-nico-stats__chip">
           <span class="nl-official-nico-stats__label">スパチャ合計</span>
           <span class="nl-official-nico-stats__val" id="officialStatSuperchat">—</span>
-        </span>
-        <span class="nl-official-nico-stats__chip">
+        </div>
+        <div class="nl-official-nico-stats__chip">
           <span class="nl-official-nico-stats__label">メンバー/ギフト</span>
           <span class="nl-official-nico-stats__val" id="officialStatMemberGift">0件</span>
-        </span>
+        </div>
       </div>
 
       <!-- 4. 応援ユーザーの順位カード（左上: 配信者カード、その後: 1位〜 コメント件数順・同数ならスパチャ額順） -->
@@ -2282,6 +3276,24 @@ a.nl-tl-gift:hover {
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- 5. コメント投稿（extension/popup.html の section.nl-comment-compose--primary と同じ並び） -->
+    <section class="nl-comment-compose nl-comment-compose--primary" aria-label="コメント投稿">
+      <textarea id="commentInput" maxlength="200" placeholder="ここにコメントを書いて送信（YouTube にログインしたまま送れます）" aria-label="コメント本文（200文字まで）"></textarea>
+      <div class="nl-compose-send-row">
+        <div class="nl-compose-send-actions">
+          <button type="button" id="postCommentBtn" disabled aria-busy="false">コメント送信</button>
+        </div>
+      </div>
+      <p id="commentPostStatus" class="nl-comment-post-status" role="status" aria-live="polite" hidden></p>
+      <details id="supportTimelineDetails" class="nl-support-timeline">
+        <summary class="nl-support-timeline__summary">
+          <span class="nl-support-timeline__summary-label">応援タイムライン（コメント＋スパチャ・メンバー）</span>
+          <span id="supportTimelineGiftMeta" class="nl-support-timeline__gift-meta" hidden></span>
+        </summary>
+        <div id="supportTimelineBody" class="nl-support-timeline__body" role="log" aria-label="コメントと応援の時系列" aria-live="off"></div>
+      </details>
     </section>
 
     <!-- 6. アイコン列・グリッド・診断を表示（extension/popup.html の #supportVisualDetails と同じ段構成・最初から開く） -->

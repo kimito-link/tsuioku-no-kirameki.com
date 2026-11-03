@@ -189,26 +189,28 @@
     }
     return "";
   }
+  var YT_MAX_PLAUSIBLE_VIEWERS = 5e7;
   function extractYtWatchConcurrentViewersFromText(rawText) {
     if (typeof rawText !== "string" || !rawText.trim()) return null;
     const normalized = rawText.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 65248)).replace(/，/g, ",").replace(/．/g, ".").replace(/\s+/g, " ").trim();
-    const jaMatch = normalized.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(万|億)?\s*人(?:が)?\s*視聴中/);
+    const NUM = "(?<![0-9,.])((?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,9})(?:\\.[0-9]+)?)";
+    const jaMatch = normalized.match(new RegExp(`${NUM}\\s*(万|億)?\\s*人(?:が)?\\s*視聴中`));
     if (jaMatch) {
       const base = Number.parseFloat(jaMatch[1].replace(/,/g, ""));
       if (!Number.isFinite(base) || base < 0) return null;
       const unit = jaMatch[2] || "";
       const mult = unit === "億" ? 1e8 : unit === "万" ? 1e4 : 1;
-      return Math.round(base * mult);
+      const v = Math.round(base * mult);
+      return v <= YT_MAX_PLAUSIBLE_VIEWERS ? v : null;
     }
-    const enMatch = normalized.match(
-      /([0-9][0-9,]*(?:\.[0-9]+)?)\s*([KkMm])?\s*watching(?:\s+now)?\b/i
-    );
+    const enMatch = normalized.match(new RegExp(`${NUM}\\s*([KkMm])?\\s*watching(?:\\s+now)?\\b`, "i"));
     if (enMatch) {
       const base = Number.parseFloat(enMatch[1].replace(/,/g, ""));
       if (!Number.isFinite(base) || base < 0) return null;
       const unit = (enMatch[2] || "").toUpperCase();
       const mult = unit === "M" ? 1e6 : unit === "K" ? 1e3 : 1;
-      return Math.round(base * mult);
+      const v = Math.round(base * mult);
+      return v <= YT_MAX_PLAUSIBLE_VIEWERS ? v : null;
     }
     return null;
   }
@@ -462,11 +464,13 @@
       }
       for (let i = 0; i < nodes.length; i += 1) {
         const el = nodes[i];
-        const texts = [
-          String(el.textContent || ""),
-          String(el.getAttribute("aria-label") || "")
-        ];
+        const texts = [String(el.getAttribute("aria-label") || "")];
         el.querySelectorAll("[aria-label]").forEach((x) => texts.push(String(x.getAttribute("aria-label") || "")));
+        texts.push(String(
+          /** @type {HTMLElement} */
+          el.innerText || ""
+        ));
+        texts.push(String(el.textContent || ""));
         for (const t of texts) {
           const parsed = extractYtWatchConcurrentViewersFromText(t);
           if (parsed !== null) return parsed;

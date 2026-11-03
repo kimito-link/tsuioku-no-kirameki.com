@@ -302,6 +302,10 @@ describe('ytChatParse', () => {
 
   it('extracts concurrent viewer count from watch page strings', () => {
     expect(extractYtWatchConcurrentViewersFromText('1,234 人が視聴中')).toBe(1234);
+    // 数字の連なり・あり得ない桁は読まない(2026-11-03 実機)
+    expect(extractYtWatchConcurrentViewersFromText('12345678901234567890 人が視聴中')).toBe(null);
+    expect(extractYtWatchConcurrentViewersFromText('12,345,678,901,234 人が視聴中')).toBe(null);
+    expect(extractYtWatchConcurrentViewersFromText('SEKAI NO OWARI「ラフレシア」22,932 人が視聴中 ライブ配信開始')).toBe(22932);
     expect(extractYtWatchConcurrentViewersFromText('現在 5.2万 人が視聴中')).toBe(52000);
     expect(extractYtWatchConcurrentViewersFromText('48人が視聴中')).toBe(48);
     expect(extractYtWatchConcurrentViewersFromText('3,456 watching now')).toBe(3456);
