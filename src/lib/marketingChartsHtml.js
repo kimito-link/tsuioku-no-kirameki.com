@@ -3447,7 +3447,7 @@ ${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlRe
     opts?.broadcasterProfile ?? null
   );
 
-  return `<!DOCTYPE html>
+  return eagerInlineImages(`<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -3468,7 +3468,20 @@ ${finalBody}
 <footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
 ${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}
 ${buildSectionRevealScriptHtml()}
-</body></html>`;
+</body></html>`);
+}
+
+/**
+ * v0.1.1856: HTML の中に埋め込んだ画像(data: の identicon 等)は遅延読み込みをやめる。
+ *   実測(lv351735139・画像1203枚): loading="lazy" のままだと、スクロールするたびに数百枚の SVG を
+ *   その場で読み込み・描き直し、スクロールが重かった。手元のデータなので最初に読んでおけば済む。
+ *   ネットの画像(ニコニコのサムネ)は遅延読み込みのまま(全部を一度に取りに行かない)。
+ * @param {string} html
+ */
+export function eagerInlineImages(html) {
+  return String(html).replace(/<img\b[^>]*>/g, (tag) =>
+    /\ssrc="data:/.test(tag) ? tag.replace(/\sloading="lazy"/, '') : tag
+  );
 }
 
 /**
