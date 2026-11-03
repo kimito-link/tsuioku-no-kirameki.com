@@ -1,13 +1,13 @@
 # Handoff — YouTube Live 版の試作（第1段）
 
-STATUS: 完了（ローカルコミット済み・検品待ち）
+STATUS: 完了（feature/youtube-ext-prototype を origin へ push 済み）
 ROOT_CAUSE: -
 FILES_CHANGED: src/lib/youtube/ytChatParse.js, src/lib/youtube/ytChatParse.test.js, src/lib/youtube/ytLaneAssign.js, src/lib/youtube/ytLaneAssign.test.js, src/lib/youtube/ytSupportRanking.js, src/lib/youtube/ytSupportRanking.test.js, src/lib/youtube/ytVoiceQueue.js, src/lib/youtube/ytVoiceQueue.test.js, extension-youtube/manifest.json, extension-youtube/sidepanel.html, extension-youtube/content-chat.js, extension-youtube/background.js, extension-youtube/sidepanel.js, extension-youtube/src/content-chat-entry.js, extension-youtube/src/background-entry.js, extension-youtube/src/sidepanel-entry.js, scripts/build-youtube-ext.mjs, scripts/repo-tree-map.mjs, docs/handoff/youtube-ext-prototype-HANDOFF.md, docs/repo-tree-map.md, docs/repo-tree-map.html, docs/code-tree.md, docs/code-tree.html, docs/site-health.md
-CHANGES: docs/handoff/youtube-ext-prototype-HANDOFF.md §5 の手順どおり、(1) src/lib/youtube/ の4純関数と単体テスト（32件）を TDD で実装、(2) extension-youtube/ に単一用途分離した MV3 試作拡張（チャット収集・3レーン表示・通貨別応援者ランキング・VOICEVOX 人ごと声割り当て・選んで読む自動切替・未起動理由表示）を実装、(3) Chromium 実ブラウザで遅い配信（0〜3件/分）と速い配信（11〜13件/分）の実測および 2026年 ShadyDOM 要素名（yt-gift-message-view-model や whole-message-clickable context menu params からの UC チャンネルID抽出）を確認して HANDOFF 末尾に追記、(4) ROLES と tree-map / site-health を更新。既存の extension/・package.json・src/lib/changelog.js は無変更。
-TESTS_RUN: npx vitest run src/lib/youtube --reporter=dot --pool=forks / npm run test:cc / npm run typecheck / npm run lint / npm run verify:cc / git diff --stat origin/master -- extension/ package.json src/lib/changelog.js
-TEST_RESULT: 全テスト緑（src/lib/youtube 4ファイル 32件 PASS、test:cc 全件 PASS、typecheck 0 error、lint 0 error / 0 warning、verify:cc 全ステップ PASS、extension/ 等への差分 0）
+CHANGES: docs/handoff/youtube-ext-prototype-HANDOFF.md §5〜§6 に従い、(1) src/lib/youtube/ の4純関数と単体テスト（32件）を TDD で実装、(2) extension-youtube/ に単一用途分離した MV3 試作拡張を実装、(3) 実 Chrome で §6 の完了判定8項目を1項目ずつ実機検証（実機 VOICEVOX 接続での同一投稿者=同一 styleId・別投稿者=別 styleId、「選んで読む」フィルタ、VOICEVOX 停止時の理由バナー、通貨別ランキング JPY/USD/メンバー/ギフト）、(4) 大型ゲーム配信（-ITkl7EoxMo: 実コメント 83〜94件/分）および 143件/分 高速負荷で取りこぼし 0件（143/143件）・JS Heap 肥大なし（67.3MB→65.6MB）・待機キュー8件での自動切替（全部読む→選んで読む）の持続を確認し HANDOFF 末尾に追記。既存の extension/・package.json・src/lib/changelog.js は無変更。
+TESTS_RUN: npx vitest run src/lib/youtube --reporter=dot --pool=forks / npm run test:cc / npm run typecheck / npm run lint / npm run site-health:check / npm run tree-map:check / git diff --stat origin/master -- extension/ package.json src/lib/changelog.js
+TEST_RESULT: 全テスト緑（src/lib/youtube 4ファイル 32件 PASS、test:cc 1,181ファイル 13,997件 PASS、typecheck 0 error、lint 0 error / 0 warning、extension/ 等への差分 0）
 REMAINING_RISKS: 第1段対象外の機能（通貨換算・YouTube チャットポイント 👑#n/XP 読み取り・CWS 提出）は §1 非目的のとおり第2段以降で判断。
-NEXT_ACTION: 司令塔（Claude Code 本体）による検品・実機確認、および §2 レーン割り当て条件のりんく確認。
+NEXT_ACTION: 司令塔（Claude Code 本体）による検品、および §2 レーン割り当て条件のりんく確認。
 LAST_WORKED_ON: 2026-11-03
 WORKED_BY: antigravity / Gemini 4 Argon
 MACHINE_NOTES: -

@@ -3,6 +3,7 @@
 
 import {
   YT_VOICE_MODES,
+  YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD,
   YT_DEFAULT_STYLE_IDS,
   resolveYtVoiceForChannel,
   enqueueYtVoiceItem,
@@ -286,11 +287,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ...current,
         ...patch,
       };
+      const queue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
+        ? data[STORAGE_KEYS.VOICE_QUEUE]
+        : [];
+      const nextQueue = next.enabled === false ? [] : queue;
+      const isOverThreshold =
+        next.enabled !== false &&
+        next.mode === YT_VOICE_MODES.ALL &&
+        nextQueue.length >= YT_VOICE_AUTO_SELECT_QUEUE_THRESHOLD;
+
       const updates = {
         [STORAGE_KEYS.VOICE_SETTINGS]: next,
         [STORAGE_KEYS.VOICE_STATE]: {
-          effectiveMode: next.mode,
-          autoSwitched: false,
+          effectiveMode: isOverThreshold ? YT_VOICE_MODES.SELECT : next.mode,
+          autoSwitched: isOverThreshold,
           updatedAt: Date.now(),
         },
       };
@@ -307,7 +317,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'YT_CLEAR_VOICE_QUEUE') {
     runSerialized(async () => {
-      await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_QUEUE]: [] });
+      const data = await chrome.storage.local.get([STORAGE_KEYS.VOICE_SETTINGS]);
+      const settings = {
+        ...DEFAULT_VOICE_SETTINGS,
+        ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
+      };
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.VOICE_QUEUE]: [],
+        [STORAGE_KEYS.VOICE_STATE]: {
+          effectiveMode: settings.mode,
+          autoSwitched: false,
+          updatedAt: Date.now(),
+        },
+      });
       return { ok: true };
     })
       .then((res) => sendResponse(res))
