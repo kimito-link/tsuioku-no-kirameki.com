@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1852',
+    date: '2026-11-03',
+    summary: 'GPU の案内をポップアップにも・会場で読みやすく',
+    items: Object.freeze([
+      '読み上げが遅い PC では、ポップアップの読み上げ欄にも「VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に」の案内を出すようにしました。',
+      '会場モードの「読み上げが遅れています」と GPU の案内が、後ろのニコ生のコメント欄と重なって読みにくかったので、白い下地を付けて何の上でも読めるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1851',
     date: '2026-11-03',
     summary: 'VOICEVOX が追いつかない間は PC の声で読む',
@@ -171,14 +180,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '視聴ページの確認用ログを毎回出さない',
     items: Object.freeze([
       'パネルの描画のたびに、確認用の大きな記録（約5KB）を視聴ページのコンソールへ自動で出し続けていました。必要なときだけ手で呼べるようにして、自動では出さないようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1830',
-    date: '2026-10-28',
-    summary: 'パネルを開くときの作り直しを1回に',
-    items: Object.freeze([
-      '視聴ページでパネルを開くたび、パネルの入れ物を4回作り直していました（作りたてを古いものと見なして捨てていた）。1回だけ作るようにしたので、開く瞬間の無駄な隠す・出すが減ります。'
     ])
   })
 ]);

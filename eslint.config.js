@@ -404,7 +404,8 @@ export default [
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
-    rules: { 'max-lines': ['error', { max: 21746, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1852: 遅い PC なら GPU の案内を出す配線(import 1行+呼び出し4行=+5)。中身は popup/wireVoiceGpuTip.js。
+    rules: { 'max-lines': ['error', { max: 21751, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -455,8 +456,9 @@ export default [
     // v0.1.1832: 席が無い人の吹き出しを診断の行の上に出す配線(viewportFloor 1行)と、名前の無い人を「匿名NNN」で出す4行=+5。
     // v0.1.1833: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
     // v0.1.1848: GPU の案内を遅れの一言とは別の行に出す(span 生成と色2行+コメント1行+onGpuTip の配線1行)=+4。文言と判定は lib の voiceLagNotice.decideVoiceGpuTip。
+    // v0.1.1852: 遅れの一言と GPU の案内に不透明な下地(後ろのコメント欄と重なって読めなかった・コメント2行+下地4行+隠す1行)=+7。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7357, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7364, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
