@@ -6546,6 +6546,16 @@
       ]
     },
     {
+      "file": "src/lib/htmlReportEmbed.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/identityAcquisitionCensus.js",
       "featureCount": 1,
       "features": [
@@ -7286,27 +7296,7 @@
       ]
     },
     {
-      "file": "src/lib/marketingDynamicAdvice.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/marketingGiftThrowLedger.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/marketingHtmlAdvisorAvatars.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -9577,6 +9567,26 @@
     },
     {
       "file": "src/lib/viewerCountProbeMerge.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/viewerRetentionEstimate.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/viewerRetentionSectionHtml.js",
       "featureCount": 1,
       "features": [
         "popup"

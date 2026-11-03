@@ -195,7 +195,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 100</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 101</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -292,6 +292,7 @@
 - `src/lib/topSupportRankStripConfig.js` — ポップアップ「応援ランキング」ストリップに並べる行数の上限（aggregateCommentsByUser の1行＝1カード）。
 - `src/lib/topSupportRankStripStableKey.js` — 応援ランキングストリップの DOM を組み直す必要があるか判定するキー。
 - `src/lib/venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
+- `src/lib/viewerRetentionEstimate.js` — 視聴維持率（推定）: 「最後まで配信を見ていたか」を、コメントした人ひとりずつ推定する。
 - `src/lib/viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
 - `src/lib/watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
@@ -667,7 +668,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 44</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 46</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
@@ -688,6 +689,7 @@
 - `src/lib/exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
 - `src/lib/htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
 - `src/lib/htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
+- `src/lib/htmlReportEmbed.js` — v0.1.1854: 旧「HTMLレポート」(コメント全文・検索・CSV・ユーザー別・自分のコメント等)を、
 - `src/lib/htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
 - `src/lib/liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
 - `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
@@ -712,6 +714,7 @@
 - `src/lib/roomCardInnerHtml.js` — 応援ルームカード（renderUserRooms の各 <li class="room-card">）の inner HTML を組む純関数。
 - `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
+- `src/lib/viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
 - `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
 
 </details>
@@ -1343,11 +1346,11 @@
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
 
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (1版)
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
-- `v0.1.1831` 2026-10-28 — 視聴ページの確認用ログを毎回出さない
 
-### その他 (4版)
+### その他 (5版)
+- `v0.1.1854` 2026-11-03 — マーケを1つに・視聴維持率を追加
 - `v0.1.1844` 2026-10-31 — Android アプリでもコメントを流せるように
 - `v0.1.1843` 2026-10-31 — 過去コメントの埋め直しの読み違いを直す
 - `v0.1.1842` 2026-10-31 — 止まった取り込みの立て直しを直す

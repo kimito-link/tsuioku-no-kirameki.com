@@ -5,7 +5,7 @@ export const MEDIA_KIT_EMBED_SCOPE = '#mkt-media-kit';
 
 /**
  * CSS の全セレクタの前に scope を付ける(マーケ側の CSS・要素セレクタと混ざらないように)。
- * :root と body は scope 自身、`*` は scope 配下の全要素に読み替える。@media は中身を再帰で処理する。
+ * :root と body は scope 自身、`*` は scope 配下の全要素に読み替える。@media/@supports/@container/@layer は中身を再帰で処理する。
  * メディアキットの CSS は単純(文字列内に波括弧を含まない)を前提にした最小実装。
  * @param {string} css
  * @param {string} scope
@@ -29,7 +29,7 @@ export function scopeCss(css, scope) {
       j++;
     }
     const inner = css.slice(open + 1, j - 1);
-    if (head.startsWith('@media') || head.startsWith('@supports')) {
+    if (/^@(media|supports|container|layer)\b/.test(head)) {
       out += `${head}{${scopeCss(inner, scope)}}`;
     } else if (head.startsWith('@')) {
       out += `${head}{${inner}}`;
