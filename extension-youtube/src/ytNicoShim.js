@@ -862,7 +862,16 @@ function fixSubtree(root) {
 function ytFixHtmlString(html) {
   try {
     const doc = new DOMParser().parseFromString(html, 'text/html');
+    // 画像の src を書き換えると、拡張の画面の中では onerror="…" の書き込みが CSP で止められたと毎回エラーが出る。
+    // 直す間だけ onerror を外し、終わったら戻す(保存ファイルを開いたときは onerror が効く)。
+    /** @type {Array<[Element, string]>} */
+    const held = [];
+    doc.querySelectorAll('[onerror]').forEach((el) => {
+      held.push([el, String(el.getAttribute('onerror') || '')]);
+      el.removeAttribute('onerror');
+    });
     fixSubtree(doc.documentElement);
+    for (const [el, v] of held) el.setAttribute('onerror', v);
     const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
     return (doctype ? doctype[0] + '\n' : '') + doc.documentElement.outerHTML;
   } catch {

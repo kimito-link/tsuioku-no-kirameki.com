@@ -1130,7 +1130,13 @@
   function ytFixHtmlString(html) {
     try {
       const doc = new DOMParser().parseFromString(html, "text/html");
+      const held = [];
+      doc.querySelectorAll("[onerror]").forEach((el) => {
+        held.push([el, String(el.getAttribute("onerror") || "")]);
+        el.removeAttribute("onerror");
+      });
       fixSubtree(doc.documentElement);
+      for (const [el, v] of held) el.setAttribute("onerror", v);
       const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
       return (doctype ? doctype[0] + "\n" : "") + doc.documentElement.outerHTML;
     } catch {
