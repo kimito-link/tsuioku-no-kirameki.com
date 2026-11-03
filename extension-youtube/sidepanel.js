@@ -406,6 +406,19 @@
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var COMMENTS_PREFIX = "nls_comments_";
   var TAIL_PREFIX = "nls_ctail_";
+  var LAST_WATCH_URL_KEY = "nls_last_watch_url";
+  function newestVideoIdOf(sums) {
+    let best = "";
+    let bestAt = -1;
+    for (const [vid, sum] of Object.entries(sums || {})) {
+      const at = Number(sum?.updatedAt || 0);
+      if (at > bestAt) {
+        bestAt = at;
+        best = vid;
+      }
+    }
+    return best;
+  }
   var GIFT_KEY_PREFIXES = (
     /** @type {Array<[string, string]>} */
     [
@@ -658,6 +671,14 @@
       for (const vid of Object.keys(bag && bag[KEY_YT_SUMMARIES] || {})) pseudoLvForVideoId(vid);
     }).catch(() => {
     });
+    const lastWatchUrlFromSummaries = async () => {
+      const sums = (
+        /** @type {Record<string, any>} */
+        (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES]
+      );
+      const vid = newestVideoIdOf(sums);
+      return vid ? `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(vid)}` : "";
+    };
     const shimGet = async (keys) => {
       await knownVideosReady;
       const list = keys == null ? null : Array.isArray(keys) ? keys.map(String) : typeof keys === "string" ? [keys] : Object.keys(keys);
@@ -670,6 +691,11 @@
       }
       if (list) {
         for (const k of list) {
+          if (k === LAST_WATCH_URL_KEY) {
+            const url = await lastWatchUrlFromSummaries();
+            if (url) bag[k] = url;
+            continue;
+          }
           if (k.startsWith(COMMENTS_PREFIX) || k.startsWith(TAIL_PREFIX)) {
             const lv2 = k.slice((k.startsWith(TAIL_PREFIX) ? TAIL_PREFIX : COMMENTS_PREFIX).length).toLowerCase();
             if (!videoIdForPseudoLv(lv2)) continue;
@@ -862,6 +888,16 @@
         if (!changes[KEY_YT_SUMMARIES]) return;
         const next = changes[KEY_YT_SUMMARIES].newValue || {};
         const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
+        const newestNext = newestVideoIdOf(next);
+        if (newestNext && newestNext !== newestVideoIdOf(prev)) {
+          const synthUrl = { [LAST_WATCH_URL_KEY]: { newValue: `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(newestNext)}` } };
+          for (const fn of listeners) {
+            try {
+              fn(synthUrl, "local");
+            } catch {
+            }
+          }
+        }
         for (const vid of Object.keys(next)) {
           if (prev[vid] && Number(prev[vid].updatedAt || 0) === Number(next[vid]?.updatedAt || 0)) continue;
           void notifyLv(pseudoLvForVideoId(vid), next[vid]);
@@ -45188,7 +45224,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.16") : "";
+    const bundledVersion = true ? String("0.1.17") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
