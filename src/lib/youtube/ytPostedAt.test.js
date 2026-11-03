@@ -29,3 +29,15 @@ describe('ytPostedAtFromClock', () => {
     expect(ytPostedAtFromClock('', rec)).toBe(rec);
   });
 });
+
+import { parseYtReplayOffsetSec, ytReplayPostedAt } from './ytPostedAt.js';
+describe('replay offset', () => {
+  it('reads elapsed time', () => {
+    expect(parseYtReplayOffsetSec('1:29')).toBe(89);
+    expect(parseYtReplayOffsetSec('1:02:03')).toBe(3723);
+    expect(parseYtReplayOffsetSec('-0:05')).toBe(-5);
+    expect(parseYtReplayOffsetSec('12:25 AM')).toBeNull();
+    expect(ytReplayPostedAt('1:29', 1000000, 5)).toBe(1000000 + 89000);
+    expect(ytReplayPostedAt('1:29', 0, 5)).toBe(5);
+  });
+});

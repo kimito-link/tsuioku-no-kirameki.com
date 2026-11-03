@@ -50,3 +50,29 @@ export function ytPostedAtFromClock(ts, recordedAt) {
   if (rec - t > 12 * 3600_000) return rec;
   return t;
 }
+
+/**
+ * アーカイブのチャットのリプレイの時刻表示(動画の中の経過時間 "1:29" / "1:02:03" / "-0:05")を秒にする。
+ * @param {string} ts
+ * @returns {number | null}
+ */
+export function parseYtReplayOffsetSec(ts) {
+  const s = String(ts || '').trim();
+  const m = s.match(/^(-)?(?:(\d+):)?(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const sec = Number(m[2] || 0) * 3600 + Number(m[3]) * 60 + Number(m[4]);
+  return m[1] ? -sec : sec;
+}
+
+/**
+ * リプレイの1件の「書かれた時刻」= 配信の開始時刻 + 経過時間。開始時刻が分からなければ受け取った時刻。
+ * @param {string} ts
+ * @param {number} streamStartedAt ms
+ * @param {number} recordedAt ms
+ */
+export function ytReplayPostedAt(ts, streamStartedAt, recordedAt) {
+  const start = Number(streamStartedAt);
+  const off = parseYtReplayOffsetSec(ts);
+  if (!(start > 0) || off == null) return Number(recordedAt);
+  return start + Math.max(0, off) * 1000;
+}
