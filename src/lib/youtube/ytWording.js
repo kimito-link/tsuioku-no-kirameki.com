@@ -49,7 +49,7 @@ const RULES = [
 ];
 
 /** 置き換えが起こりうる文字か(速く素通しするため) */
-const QUICK = /貢|ニコ/;
+const QUICK = /貢|ニコ|niconico/;
 
 /**
  * @param {string} text
@@ -65,4 +65,20 @@ export function ytWording(text, opts = {}) {
     out = typeof from === 'string' ? out.split(from).join(to) : out.replace(from, to);
   }
   return out;
+}
+
+/**
+ * 先に「トップファン」の言葉で直してしまった画面を、スパチャの合計の順位の言葉に戻す
+ * (どちらを入れたかは、ギフト貢献度の欄を読んだときに初めて分かるため)。
+ * @param {string} text
+ * @returns {string}
+ */
+export function ytWordingTopFanToSuperChatRank(text) {
+  let out = String(text ?? '');
+  if (!/トップファン|XP/.test(out)) return out;
+  for (let i = 0; i < 3; i += 1) {
+    const from = /** @type {string} */ (TOP_FAN_RULES[i][1]);
+    out = out.split(from).join(/** @type {string} */ (SUPERCHAT_RANK_RULES[i][1]));
+  }
+  return out.replace(/(\d[\d,]*) XP\b/g, '$1 pt');
 }

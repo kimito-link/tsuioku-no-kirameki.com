@@ -15,7 +15,7 @@
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
-import { ytWording } from '../../src/lib/youtube/ytWording.js';
+import { ytWording, ytWordingTopFanToSuperChatRank } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
@@ -272,6 +272,12 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
 /** @param {string} name */
 const normName = (name) => String(name || '').trim().replace(/^@/, '').toLowerCase();
 
+/** @param {unknown} url @returns {string} https の顔の画像だけ(仮の絵・空は '') */
+function ytUsableIcon(url) {
+  const u = String(url || '').trim();
+  return /^https:\/\//i.test(u) ? u : '';
+}
+
 /**
  * 同じ人の記録をそろえる。YouTube は同じ人でも、チャンネルID(UC…)が取れた記録と、
  * 名前(handle:@…)しか取れなかった記録が混ざる。そのまま渡すと同じ人が2人に分かれて並ぶ(2026-11-03 実機)。
@@ -303,7 +309,7 @@ export function buildYtPersonResolver(items) {
   /** @type {Map<string, string>} 人の鍵 → 最後に見えたアイコン */
   const iconByKey = new Map();
   for (const r of items) {
-    const icon = String(r?.iconUrl || '').trim();
+    const icon = ytUsableIcon(r?.iconUrl);
     if (!icon) continue;
     const k = keyOf(r);
     if (k) iconByKey.set(k, icon);
@@ -397,7 +403,8 @@ async function buildCommentsForLvUncached(lv) {
   }
   const out = list.map((r, i) => {
     const key = who.keyOf(r);
-    const icon = String(r?.iconUrl || '').trim() || who.iconOf(key);
+    // スパチャの欄の顔は読み込み前の仮の絵(data: など)のことがある。https の顔だけ使い、無ければ同じ人の別の記録の顔を使う。
+    const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key);
     const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
     return e;
@@ -487,7 +494,11 @@ if (real && real.storage && real.storage.local && real.tabs) {
           const lb = /** @type {Record<string, any>} */ (await realGet(lbKey))?.[lbKey];
           const fromBoard = lb ? ytLeaderboardToKoken(lb, (await buildCommentsForLv(lv)) || [], lv) : null;
           if (fromBoard) v = fromBoard;
-          if (v != null) kokenIsTopFans = !!fromBoard;
+          if (v != null) {
+            const wasTopFans = kokenIsTopFans;
+            kokenIsTopFans = !!fromBoard;
+            if (wasTopFans && !kokenIsTopFans) rewordTopFansAsSuperChatRank();
+          }
         }
         if (v != null) bag[k] = v;
       }
@@ -814,6 +825,18 @@ function fixImg(img) {
 const EMPTY_THUMB_SEL = '[class*="thumb--empty"]';
 const SC_BUBBLE_BG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E\") center/70% no-repeat";
+// ギフト貢献度の欄がスパチャの合計の順位だと分かった時点で、もう「トップファン」と直して出した文字を戻す
+function rewordTopFansAsSuperChatRank() {
+  if (typeof document === 'undefined' || !document.body) return;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode())) {
+    const v = String(n.nodeValue || '');
+    const next = ytWordingTopFanToSuperChatRank(v);
+    if (next !== v) n.nodeValue = next;
+  }
+}
+
 /** @param {Element} el */
 function fixEmptyThumb(el) {
   const tr = el.closest('tr');
@@ -872,6 +895,13 @@ function ytFixHtmlString(html) {
     });
     fixSubtree(doc.documentElement);
     for (const [el, v] of held) el.setAttribute('onerror', v);
+    // 全文検索の索引(data-search)にも疑似 lv・数字ID が入っているので、同じく YouTube に戻す
+    doc.querySelectorAll('[data-search]').forEach((el) => {
+      const v = String(el.getAttribute('data-search') || '');
+      let next = /lv9\d{11}/.test(v) ? ytFixPseudoLvText(v) : v;
+      if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || uid : uid));
+      if (next !== v) el.setAttribute('data-search', next);
+    });
     const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
     return (doctype ? doctype[0] + '\n' : '') + doc.documentElement.outerHTML;
   } catch {
