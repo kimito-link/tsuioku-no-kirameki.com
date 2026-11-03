@@ -1,5 +1,5 @@
 // ytNicoShim.js — ニコ生版のサイドパネル(本物の popup-entry.js)を、YouTube の記録で動かすための「入口の差し替え」。
-/* global window, history, URL, document, NodeFilter, MutationObserver, setInterval */
+/* global window, history, URL, document, NodeFilter, MutationObserver, setInterval, clearInterval, setTimeout, sessionStorage, location */
 //
 // ★りんく「一旦ソースをごっそり写してから変えて」「完全コピーしてから変える約束かえないで」(2026-11-03)。
 //   画面(popup.html)もプログラム(popup-entry.js)もニコ生版そのものを使う。違うのは「どこからコメントを読むか」だけ。
@@ -651,14 +651,34 @@ if (real && real.storage && real.storage.local && real.tabs) {
       }
     });
     // 知らせが来なくても(まとめの書き込みが遅れる・落ちる)、開いている配信は3秒ごとに記録を見直す
-    setInterval(() => {
-      const lv = lastAskedLv;
-      if (!lv) return;
-      const vid = videoIdForPseudoLv(lv);
-      if (!vid) return;
-      void Promise.resolve(realGet(KEY_YT_SUMMARIES))
-        .then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid]))
-        .catch(() => {});
+    // ★拡張が入れ替わった(更新された)あと、開いたままのコメビュ等の窓では chrome.* が使えなくなり、
+    //   ここが毎回「Extension context invalidated」を投げてエラー一覧に積もる。切れていたら見回りをやめる。
+    const pollTimer = setInterval(() => {
+      try {
+        if (!real.runtime?.id) {
+          clearInterval(pollTimer);
+          // 開いたままの窓は新しい版で開き直す(1分に1回まで)
+          try {
+            const last = Number(sessionStorage.getItem('nl_yt_page_orphan_reload_at') || 0);
+            if (Date.now() - last > 60_000) {
+              sessionStorage.setItem('nl_yt_page_orphan_reload_at', String(Date.now()));
+              setTimeout(() => location.reload(), 1500);
+            }
+          } catch {
+            /* no-op */
+          }
+          return;
+        }
+        const lv = lastAskedLv;
+        if (!lv) return;
+        const vid = videoIdForPseudoLv(lv);
+        if (!vid) return;
+        void Promise.resolve(realGet(KEY_YT_SUMMARIES))
+          .then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid]))
+          .catch(() => {});
+      } catch {
+        clearInterval(pollTimer);
+      }
     }, 3000);
   }
 }
