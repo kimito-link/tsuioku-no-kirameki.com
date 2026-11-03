@@ -1006,7 +1006,13 @@ chrome.runtime.onInstalled.addListener((details) => {
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
   void runMcpDiagDumpTick(); // v0.1.802: 反映直後に1回書いて司令塔がすぐ読めるように(alarm の1分を待たない)
-  void (async () => {
+  /*
+   * ★v0.1.1855: 前処理(移行・孤児タブ掃除)を prep にまとめ、更新時のタブ読み込み直しは最大 3 秒しか待たない。
+   *   2026-11-03 実機: 自己更新の後に watch タブが読み込み直されず、古い版のまま止まった(前回の更新でも同じ)。
+   *   大配信中は storage の読み書きが詰まりやすく、前処理の await が長引くと reloadExistingWatchTabs に届くのが遅れる
+   *   (docs/handoff/sw-reload-toil-council-MATERIAL.md の仮説 a)。ページ側の自力復帰(orphanTabAutoReload.js)と二重の安全網。
+   */
+  const prep = (async () => {
     await migrateFloatingPanelToDockProfileOnce();
     await migrateBelowPanelToDockProfileOnce();
     if (details?.reason === 'install') {
@@ -1052,11 +1058,18 @@ chrome.runtime.onInstalled.addListener((details) => {
     // v0.1.921: 過去 autopatrol が開いた孤児裏タブ(マーカーを失って復活し続ける)を先に掃除。
     //   reload より前に消すことで「孤児を reload して延命」を避ける。前面/手動視聴タブは触らない。
     await sweepOrphanAutopatrolTabsOnce();
+  })().catch(() => {
+    /* 前処理の失敗でタブの読み込み直しを止めない */
+  });
+  void (async () => {
     if (details?.reason === 'update') {
+      await Promise.race([prep, new Promise((r) => setTimeout(r, 3000))]);
       await reloadExistingWatchTabs(String(details?.reason || ''));
     } else {
+      await prep;
       await injectIntoExistingTabs();
     }
+    await prep;
     await resumeAutopatrolIfEnabled();
   })();
 });

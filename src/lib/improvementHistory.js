@@ -4706,5 +4706,61 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1852', metric: 'cross-checked-claims', value: 43,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日の窓で数える値。0.1.1851 と同じ'
+  }),
+  Object.freeze({
+    version: '0.1.1854', metric: 'bundle-kb', value: 1441,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+3KB は HTML レポート組み立て(popup と共有)にマーケ埋め込み用の分岐を足した分と、更新履歴の1件'
+  }),
+  Object.freeze({
+    version: '0.1.1854', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1854', metric: 'cross-checked-claims', value: 43,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値。0.1.1852 と同じ'
+  }),
+  Object.freeze({
+    version: '0.1.1855', metric: 'bundle-kb', value: 1412,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1854 の1441から-29(書庫へ移した古い変更履歴の分)。今回の本体は content と会場で popup には入らない'
+  }),
+  Object.freeze({
+    version: '0.1.1855', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1855', metric: 'cross-checked-claims', value: 43,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値。0.1.1854 と同じ43'
+  }),
+  Object.freeze({
+    version: '0.1.1856', metric: 'bundle-kb', value: 1412,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1855 と同じ 1412。最良 1360 より上なのは以前からで今回の悪化ではない'
+  }),
+  Object.freeze({
+    version: '0.1.1856', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1856', metric: 'cross-checked-claims', value: 43,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値。0.1.1854 と同じ'
+  }),
+  Object.freeze({
+    version: '0.1.1857', metric: 'bundle-kb', value: 1413,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1856 の 1412 から +1。最良 1360 より上なのは以前から'
+  }),
+  Object.freeze({
+    version: '0.1.1857', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1857', metric: 'cross-checked-claims', value: 43,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値。0.1.1856 と同じ'
   })
 ]);

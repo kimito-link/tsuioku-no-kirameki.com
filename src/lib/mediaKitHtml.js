@@ -258,6 +258,22 @@ function metricCells(windows, formatter) {
 }
 
 /**
+ * v0.1.1857: 長い期間に入る配信が短い期間と同じ(=同じ数字が並ぶだけ)なら、その列は出さない。
+ * @param {Array<Record<string, unknown>>} windows days の小さい順
+ * @returns {Array<Record<string, unknown>>}
+ */
+export function dedupeSameWindows(windows) {
+  /** @type {Array<Record<string, unknown>>} */
+  const out = [];
+  for (const window of windows) {
+    const prev = out[out.length - 1];
+    if (prev && Number(prev.liveCount) === Number(window.liveCount)) continue;
+    out.push(window);
+  }
+  return out;
+}
+
+/**
  * @param {{
  *   windows?: Array<Record<string, unknown>>,
  *   broadcaster?: { name?: unknown, userId?: unknown, iconUrl?: unknown }
@@ -272,7 +288,7 @@ function metricCells(windows, formatter) {
  * @returns {string}
  */
 export function buildMediaKitHtml(stats, options = {}) {
-  const windows = Array.isArray(stats?.windows) ? stats.windows : [];
+  const windows = dedupeSameWindows(Array.isArray(stats?.windows) ? stats.windows : []);
   const broadcaster =
     stats?.broadcaster && typeof stats.broadcaster === 'object'
       ? stats.broadcaster
@@ -429,7 +445,7 @@ export function buildMediaKitHtml(stats, options = {}) {
     .sources ul { margin: 8px 0 0; padding-left: 1.4em; }
     .generated { margin: 18px 0 0; color: var(--nl-sub); font-size: 12px; text-align: right; }
     .supporters { margin-top: 28px; }
-    .supporters h2 { margin: 0 0 6px; font-size: 20px; }
+    .supporters h2 { margin: 0 0 6px; font-size: 20px; color: var(--nl-ink); }
     .s-lead { margin: 0 0 14px; color: var(--nl-sub); font-size: 13.5px; }
     .s-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
     .s-col { border: 1px solid var(--nl-line); border-radius: 14px; padding: 16px 18px; background: #fff; }
@@ -470,7 +486,11 @@ export function buildMediaKitHtml(stats, options = {}) {
       </div>
     </header>
     <section class="content">
-      <p class="lead">配信実績を30日・60日・90日の期間で比較できる、共有用の統計資料です。</p>
+      <p class="lead">${escapeHtml(
+        windows.length > 1
+          ? `配信実績を${windows.map((window) => `${formatInteger(window.days)}日`).join('・')}の期間で比較できる、共有用の統計資料です。`
+          : `過去${formatInteger(windows[0]?.days ?? 30)}日の配信実績をまとめた、共有用の統計資料です。`
+      )}</p>
       <div class="table-wrap">
         <table>
           <thead>

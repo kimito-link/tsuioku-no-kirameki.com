@@ -158,7 +158,8 @@ test.describe('HTML レポート イベント順位セクション（実拡張�
       },
       { lv: 'lv888888888', key: STORAGE_COMMENTS, watchUrl: MOCK_WATCH }
     );
-    await exportBtn.click();
+    // v0.1.1854: HTML ボタンは隠した(中身はマーケの1章)。保存処理そのものはこの要素の click で動く。
+    await exportBtn.evaluate((el) => /** @type {HTMLButtonElement} */ (el).click());
 
     // 捕捉した HTML を取り出す（Blob 本文が入るまで待ってから読む）。
     await expect
