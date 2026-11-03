@@ -291,6 +291,46 @@ async function buildGiftBagsForLv(lv, summary) {
   return buildYtGiftBags(entries, lv, { startedAt: Number(summary?.startedAt || 0) });
 }
 
+/**
+ * YouTube の「トップファン」(XP 順位)を、ニコ生版の「ギフト貢献度」(公式ランキング)の形にする。
+ * 順位表には @handle しか無いので、記録の中の同じ名前の人(=同じ数字ID)に結びつける。
+ * @param {any} board yt_leaderboard_<videoId>
+ * @param {any[]} entries ニコ生形のコメント行
+ * @param {string} lv
+ */
+export function ytLeaderboardToKoken(board, entries, lv) {
+  const rows = Array.isArray(board?.rows) ? board.rows : [];
+  if (!rows.length) return null;
+  /** @type {Map<string, { uid: string, icon: string }>} */
+  const byName = new Map();
+  for (const e of Array.isArray(entries) ? entries : []) {
+    const n = normName(e?.nickname);
+    if (n && e?.userId) byName.set(n, { uid: String(e.userId), icon: String(e.avatarUrl || '') || byName.get(n)?.icon || '' });
+  }
+  return {
+    liveId: lv,
+    capturedAt: Number(board.capturedAt) || Date.now(),
+    lastOk: true,
+    lastStatus: 200,
+    source: 'youtube-top-fans',
+    rows: rows.map((/** @type {any} */ r) => {
+      const name = String(r?.name || '');
+      const hit = byName.get(normName(name));
+      const uid = hit?.uid || numericUidForYtKey(`handle:${name.startsWith('@') ? name : `@${name}`}`);
+      const icon = String(r?.iconUrl || '') || hit?.icon || '';
+      if (icon) ytIconByNumericUid.set(uid, icon);
+      return {
+        rank: Number(r?.rank) || 0,
+        name,
+        contribution: Number(r?.xp) || 0,
+        isAnonymous: false,
+        thumbnailUrl: icon,
+        userPageUrl: `https://www.nicovideo.jp/user/${uid}`,
+      };
+    }),
+  };
+}
+
 /** @param {string} lv */
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
@@ -347,7 +387,14 @@ if (real && real.storage && real.storage.local && real.tabs) {
         const gifts = /** @type {Record<string, any> | undefined} */ (
           await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
         );
-        const v = gifts ? gifts[g[1]] : null;
+        let v = gifts ? gifts[g[1]] : null;
+        if (g[1] === 'koken') {
+          // トップファンの順位があれば、そちらを「ギフト貢献度」にする(YouTube 公式の応援ランキング)
+          const lbKey = `yt_leaderboard_${vid}`;
+          const lb = /** @type {Record<string, any>} */ (await realGet(lbKey))?.[lbKey];
+          const fromBoard = lb ? ytLeaderboardToKoken(lb, (await buildCommentsForLv(lv)) || [], lv) : null;
+          if (fromBoard) v = fromBoard;
+        }
         if (v != null) bag[k] = v;
       }
     }
@@ -489,6 +536,15 @@ if (real && real.storage && real.storage.local && real.tabs) {
       } catch {
         /* ギフトが作れなくてもコメントは知らせる */
       }
+      try {
+        const vid = videoIdForPseudoLv(lv);
+        const lbKey = `yt_leaderboard_${vid}`;
+        const lb = /** @type {Record<string, any>} */ (await realGet(lbKey))?.[lbKey];
+        const fromBoard = lb ? ytLeaderboardToKoken(lb, arr, lv) : null;
+        if (fromBoard) synth[`nls_koken_api_contrib_${lv}`] = { newValue: fromBoard };
+      } catch {
+        /* no-op */
+      }
       shimDiag.notified += 1;
       shimDiag.listeners = listeners.length;
       shimDiag.lastNotifiedAt = Date.now();
@@ -502,7 +558,25 @@ if (real && real.storage && real.storage.local && real.tabs) {
       }
     };
     add((/** @type {Record<string, any>} */ changes, /** @type {string} */ area) => {
-      if (area !== 'local' || !changes[KEY_YT_SUMMARIES]) return;
+      if (area !== 'local') return;
+      for (const ck of Object.keys(changes)) {
+        if (!ck.startsWith('yt_leaderboard_')) continue;
+        const vid = ck.slice('yt_leaderboard_'.length);
+        const lv = pseudoLvForVideoId(vid);
+        void buildCommentsForLv(lv).then((arr) => {
+          const koken = ytLeaderboardToKoken(changes[ck].newValue, arr || [], lv);
+          if (!koken) return;
+          const synth = { [`nls_koken_api_contrib_${lv}`]: { newValue: koken } };
+          for (const fn of listeners) {
+            try {
+              fn(synth, 'local');
+            } catch {
+              /* no-op */
+            }
+          }
+        });
+      }
+      if (!changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};
       const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
       for (const vid of Object.keys(next)) {

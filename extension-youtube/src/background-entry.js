@@ -406,6 +406,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'YT_LEADERBOARD') {
+    // YouTube の「トップファン」の順位。配信ごとに最新の1つだけ置く(ニコ生版の「ギフト貢献度」の欄に出す)
+    const payload = message.payload || {};
+    const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || '').trim();
+    const rows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
+    if (!videoId || !rows.length) return false;
+    void chrome.storage.local
+      .set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows } })
+      .catch(() => {});
+    return false;
+  }
+
   if (message.type === 'YT_CHAT_ITEMS') {
     runSerialized(async () => {
       const payload = message.payload || {};

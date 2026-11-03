@@ -516,6 +516,37 @@
     if (!entries) return void 0;
     return buildYtGiftBags(entries, lv, { startedAt: Number(summary?.startedAt || 0) });
   }
+  function ytLeaderboardToKoken(board, entries, lv) {
+    const rows = Array.isArray(board?.rows) ? board.rows : [];
+    if (!rows.length) return null;
+    const byName = /* @__PURE__ */ new Map();
+    for (const e of Array.isArray(entries) ? entries : []) {
+      const n2 = normName(e?.nickname);
+      if (n2 && e?.userId) byName.set(n2, { uid: String(e.userId), icon: String(e.avatarUrl || "") || byName.get(n2)?.icon || "" });
+    }
+    return {
+      liveId: lv,
+      capturedAt: Number(board.capturedAt) || Date.now(),
+      lastOk: true,
+      lastStatus: 200,
+      source: "youtube-top-fans",
+      rows: rows.map((r) => {
+        const name = String(r?.name || "");
+        const hit = byName.get(normName(name));
+        const uid = hit?.uid || numericUidForYtKey(`handle:${name.startsWith("@") ? name : `@${name}`}`);
+        const icon = String(r?.iconUrl || "") || hit?.icon || "";
+        if (icon) ytIconByNumericUid.set(uid, icon);
+        return {
+          rank: Number(r?.rank) || 0,
+          name,
+          contribution: Number(r?.xp) || 0,
+          isAnonymous: false,
+          thumbnailUrl: icon,
+          userPageUrl: `https://www.nicovideo.jp/user/${uid}`
+        };
+      })
+    };
+  }
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
@@ -571,7 +602,16 @@
             /** @type {Record<string, any> | undefined} */
             await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
           );
-          const v = gifts ? gifts[g[1]] : null;
+          let v = gifts ? gifts[g[1]] : null;
+          if (g[1] === "koken") {
+            const lbKey = `yt_leaderboard_${vid}`;
+            const lb = (
+              /** @type {Record<string, any>} */
+              (await realGet(lbKey))?.[lbKey]
+            );
+            const fromBoard = lb ? ytLeaderboardToKoken(lb, await buildCommentsForLv(lv) || [], lv) : null;
+            if (fromBoard) v = fromBoard;
+          }
           if (v != null) bag[k] = v;
         }
       }
@@ -689,6 +729,17 @@
           }
         } catch {
         }
+        try {
+          const vid = videoIdForPseudoLv(lv);
+          const lbKey = `yt_leaderboard_${vid}`;
+          const lb = (
+            /** @type {Record<string, any>} */
+            (await realGet(lbKey))?.[lbKey]
+          );
+          const fromBoard = lb ? ytLeaderboardToKoken(lb, arr, lv) : null;
+          if (fromBoard) synth[`nls_koken_api_contrib_${lv}`] = { newValue: fromBoard };
+        } catch {
+        }
         shimDiag.notified += 1;
         shimDiag.listeners = listeners.length;
         shimDiag.lastNotifiedAt = Date.now();
@@ -701,7 +752,24 @@
         }
       };
       add((changes, area) => {
-        if (area !== "local" || !changes[KEY_YT_SUMMARIES]) return;
+        if (area !== "local") return;
+        for (const ck of Object.keys(changes)) {
+          if (!ck.startsWith("yt_leaderboard_")) continue;
+          const vid = ck.slice("yt_leaderboard_".length);
+          const lv = pseudoLvForVideoId(vid);
+          void buildCommentsForLv(lv).then((arr) => {
+            const koken = ytLeaderboardToKoken(changes[ck].newValue, arr || [], lv);
+            if (!koken) return;
+            const synth = { [`nls_koken_api_contrib_${lv}`]: { newValue: koken } };
+            for (const fn of listeners) {
+              try {
+                fn(synth, "local");
+              } catch {
+              }
+            }
+          });
+        }
+        if (!changes[KEY_YT_SUMMARIES]) return;
         const next = changes[KEY_YT_SUMMARIES].newValue || {};
         const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
         for (const vid of Object.keys(next)) {
@@ -45563,7 +45631,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T13:52" ? String("yt-2026-11-03T13:52") : "dev";
+      const buildId = "yt-2026-11-03T13:54" ? String("yt-2026-11-03T13:54") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45581,7 +45649,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.7") : "";
+    const bundledVersion = true ? String("0.1.8") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45626,7 +45694,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T13:52" ? String("yt-2026-11-03T13:52") : "dev";
+            return "yt-2026-11-03T13:54" ? String("yt-2026-11-03T13:54") : "dev";
           } catch {
             return "dev";
           }
