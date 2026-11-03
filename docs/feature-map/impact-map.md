@@ -499,6 +499,7 @@
 | `src/extension/liveDirectComments.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/extension/liveEventsPublisher.js` | 1 | 状態速報ページ |
 | `src/extension/offscreen-entry.js` | 1 | コメント IDB 書き手 |
+| `src/extension/orphanTabAutoReloadHost.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/page-intercept-entry.js` | 1 | ページ傍受 |
 | `src/extension/phonePostRelay.js` | 1 | 状態速報ページ |
 | `src/extension/phoneVoicePublisher.js` | 1 | 状態速報ページ |
@@ -706,6 +707,7 @@
 | `src/lib/hiddenTabExternalFetchGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/htmlReportCommenterFollowSection.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/htmlReportConceptGuide.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/htmlReportEmbed.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/identityAcquisitionCensus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/iframeOfficialDomFromRelay.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inferBroadcasterUserIdFromComments.js` | 1 | ポップアップ(応援レーン) |
@@ -780,9 +782,7 @@
 | `src/lib/mangaBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingChartsHtml.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/marketingDynamicAdvice.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingGiftThrowLedger.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/marketingHtmlAdvisorAvatars.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingReportEmbed.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingSupportParticipationCounts.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mcpBridge/buildLiveMcpSnapshot.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -840,6 +840,7 @@
 | `src/lib/oggOpusMux.js` | 1 | 状態速報ページ |
 | `src/lib/openingFiveMinuteCorrelation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/opSoundDirector.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/orphanTabAutoReload.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ouenBanner.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/ouenBannerDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/overlayShown.js` | 1 | ポップアップ(応援レーン) |
@@ -1010,6 +1011,8 @@
 | `src/lib/venueOpenCache.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/verifiedAvatarRegistry.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerCountProbeMerge.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/viewerRetentionEstimate.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/viewerRetentionSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerSelfLaneAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/voiceBubbleRealtimeParity.js` | 1 | 状態速報ページ |
 | `src/lib/voiceComment.js` | 1 | 記録エンジン(watchページ常駐) |

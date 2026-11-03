@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMarketingDashboardHtml,
   buildAudienceParticipationLeadSectionHtml,
-  MKT_SECTION_REVEAL_ENABLED
+  MKT_SECTION_REVEAL_ENABLED,
+  eagerInlineImages,
+  MARKETING_RENDER_IDLE_SCRIPT_HTML
 } from './marketingChartsHtml.js';
 import { aggregateMarketingReport } from './marketingAggregate.js';
 import { analyzeAudienceEngagementGap } from './audienceEngagementGap.js';
@@ -99,10 +101,10 @@ describe('広告の「気づいた時刻」の章(v0.1.1673)', () => {
     expect(sec).toContain('約30秒');
     expect(html).toContain('href="#mkt-ad-observed"');
   });
-  it('★位置はギフトの瞬間の後・分析スキルボードの前(履歴が無くても広告の章は出る)', () => {
+  it('★位置は来場とコメント参加の後(ギフト・応援の並び)。履歴が無くても広告の章は出る', () => {
     const html = buildMarketingDashboardHtml(aggregateMarketingReport(cm, 'lv9'), opts());
     const i = html.indexOf('id="mkt-ad-observed"');
-    expect(i).toBeLessThan(html.indexOf('id="mkt-analysis-skills"'));
+    expect(html).not.toContain('id="mkt-analysis-skills"'); // v0.1.1854: 分析スキルボード(定型)は撤去
     expect(i).toBeGreaterThan(html.indexOf('id="mkt-participation-lead"'));
   });
   it('★記録が無い・空なら章も目次も出さない', () => {
@@ -144,13 +146,14 @@ describe('ギフトの瞬間の章(v0.1.1672)', () => {
     totalCounts: [],
     ...extra
   });
-  it('★履歴を渡すと章が出る。位置は来場とコメント参加の後・分析スキルボードの前。相関の注記を含む', () => {
+  it('★履歴を渡すと章が出る。位置は来場とコメント参加・視聴維持率の後。相関の注記を含む', () => {
     const report = aggregateMarketingReport(comments, 'lv9');
     const html = buildMarketingDashboardHtml(report, { giftSubAppHistory: hist(), commentsForAnalytics: comments });
     const i = html.indexOf('id="mkt-gift-moments"');
     expect(i).toBeGreaterThan(0);
     expect(i).toBeGreaterThan(html.indexOf('id="mkt-participation-lead"'));
-    expect(i).toBeLessThan(html.indexOf('id="mkt-analysis-skills"'));
+    expect(i).toBeGreaterThan(html.indexOf('id="mkt-viewer-retention"'));
+    expect(html).not.toContain('id="mkt-analysis-skills"');
     expect(html).toContain('ギフトの瞬間');
     expect(html).toContain('花子さん');
     expect(html).toContain('ギフトが原因とは限りません');
@@ -318,7 +321,7 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('Alice');
   });
 
-  it('giftUsers を渡すとギフトの流れセクション（mkt-gift-flow）が含まれる', () => {
+  it('v0.1.1854: giftUsers を渡しても定型文の「ギフトの流れ」章（mkt-gift-flow）は出さない', () => {
     const html = buildMarketingDashboardHtml(minimal(), {
       giftUsers: [
         {
@@ -329,9 +332,8 @@ describe('buildMarketingDashboardHtml', () => {
         }
       ]
     });
-    expect(html).toContain('id="mkt-gift-flow"');
-    expect(html).toContain('ギフター');
-    expect(html).toContain('ギフト前後');
+    expect(html).not.toContain('id="mkt-gift-flow"');
+    expect(html).not.toContain('href="#mkt-gift-flow"');
   });
 
   it('giftEvents と保存履歴を渡すとギフト深掘りセクションが含まれる', () => {
@@ -590,51 +592,11 @@ describe('buildMarketingDashboardHtml', () => {
     expect(section).toContain('data-label="データ"');
     expect(html).toContain('マーケ総合サマリ');
     expect(html).toContain('.mkt-data-matrix');
-    const funnel = html.match(/<section class="mkt-section mkt-section--funnel"[\s\S]*?<\/section>/)?.[0] || '';
-    expect(funnel).toContain('id="mkt-marketing-funnel"');
-    expect(funnel).toContain('マーケファネル');
-    expect(funnel).toContain('来場から支援までの流れ');
-    expect(funnel).toContain('優先度ボード');
-    expect(funnel).toContain('データ診断');
-    expect(funnel).toContain('来場→発言');
-    expect(funnel).toContain('応援者→ギフト');
-    expect(funnel).toContain('ギフト後の反応');
-    expect(funnel).toContain('data-label="前段比"');
-    expect(funnel).toContain('時系列サンプル');
-    expect(html).toContain('.mkt-funnel-table');
-    const segmentAction = html.match(/<section class="mkt-section mkt-section--segment-action"[\s\S]*?<\/section>/)?.[0] || '';
-    expect(segmentAction).toContain('id="mkt-segment-action"');
-    expect(segmentAction).toContain('層別マーケ診断');
-    expect(segmentAction).toContain('ヘビー・中間');
-    expect(segmentAction).toContain('一見・ライト');
-    expect(segmentAction).toContain('匿名コメント');
-    expect(segmentAction).toContain('応援の重なり');
-    expect(segmentAction).toContain('data-label="層"');
-    expect(segmentAction).toContain('ギフト主導');
-    expect(html).toContain('.mkt-segment-action-table');
-    const skills = html.match(/<section class="mkt-section mkt-section--analysis-skills"[\s\S]*?<\/section>/)?.[0] || '';
-    expect(skills).toContain('id="mkt-analysis-skills"');
-    expect(skills).toContain('分析スキルボード');
-    expect(skills).toContain('Build');
-    expect(skills).toContain('Run');
-    expect(skills).toContain('Diagnose');
-    expect(skills).toContain('必要時だけ');
-    expect(skills).toContain('応援者ちくらんβ');
-    expect(skills).toContain('ギフト深掘り');
-    expect(skills).toContain('data-label="スキル"');
-    expect(html).toContain('.mkt-skill-table');
-    const harness = html.match(/<section class="mkt-section mkt-section--harness"[\s\S]*?<\/section>/)?.[0] || '';
-    expect(harness).toContain('id="mkt-harness-scaling"');
-    expect(harness).toContain('分析ハーネス設計');
-    expect(harness).toContain('System scaling');
-    expect(harness).toContain('記憶基盤');
-    expect(harness).toContain('動的コンテキスト');
-    expect(harness).toContain('スキルルーティング');
-    expect(harness).toContain('検証・ガバナンス');
-    expect(harness).toContain('信頼性ゲート');
-    expect(harness).toContain('data-label="層"');
-    expect(harness).toContain('data-label="ゲート"');
-    expect(html).toContain('.mkt-harness-layer-table');
+    // v0.1.1854: ファネル・層別診断・分析スキルボード・ハーネス設計(定型の読み物)は撤去した
+    for (const gone of ['mkt-marketing-funnel', 'mkt-segment-action', 'mkt-analysis-skills', 'mkt-harness-scaling']) {
+      expect(html).not.toContain(`id="${gone}"`);
+      expect(html).not.toContain(`href="#${gone}"`);
+    }
   });
 
   it('目次直下に来場とコメント参加の先頭ブロックを出す', () => {
@@ -658,7 +620,7 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('来場 1,000 人');
     expect(html).toContain('アイテムを投げた人');
     expect(html).toContain('広告をした人');
-    expect(html.indexOf('mkt-participation-lead')).toBeLessThan(html.indexOf('mkt-analysis-skills'));
+    expect(html.indexOf('id="mkt-participation-lead"')).toBeLessThan(html.indexOf('id="mkt-timeline"') > 0 ? html.indexOf('id="mkt-timeline"') : Infinity);
   });
 
   it('buildAudienceParticipationLeadSectionHtml は HTML レポート向けに詳細リンクを省略できる', () => {
@@ -831,39 +793,25 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 
-  it('りんく・こん太・たぬ姉の案内ブロックが含まれる', () => {
-    const html = buildMarketingDashboardHtml(minimal());
-    expect(html).toContain('りんく・こん太・たぬ姉から');
-    expect(html).toContain('mkt-advice--tanu');
-    expect(html).toContain('mkt-advice--link');
-    expect(html).toContain('mkt-advice--konta');
-    expect(html).toContain('mkt-advice-row');
-    expect(html).toContain('mkt-advice__bubble');
-    expect(html).toContain('mkt-advice__avatar');
-    expect(html).toContain('data:image/png;base64,');
-    expect(html).toContain('追憶のきらめき');
+  it('v0.1.1856: 埋め込み画像(data:)は遅延読み込みをやめ、ネットの画像は遅延読み込みのまま', () => {
+    const out = eagerInlineImages('<img src="data:image/svg+xml,x" loading="lazy" alt=""><img src="https://a/b.jpg" loading="lazy">');
+    expect(out).toBe('<img src="data:image/svg+xml,x" alt=""><img src="https://a/b.jpg" loading="lazy">');
   });
 
-  it('冒頭案内にりんく・こん太・たぬ姉の吹き出しが各1つずつ', () => {
+  it('v0.1.1854: キャラの案内・機能一覧・作戦会議などの定型文は出さない(数字だけを出す)', () => {
     const html = buildMarketingDashboardHtml(minimal());
-    const sectionMatch = html.match(
-      /<section class="mkt-section mkt-section--advice"[\s\S]*?<\/section>/
-    );
-    expect(sectionMatch).toBeTruthy();
-    const introBlock = String(sectionMatch?.[0] || '');
-    // v0.1.475: adviceCard が <details> 構造になったため mkt-advice--role は details タグに付く
-    expect((introBlock.match(/mkt-advice-details mkt-advice--link/g) || []).length).toBe(1);
-    expect((introBlock.match(/mkt-advice-details mkt-advice--konta/g) || []).length).toBe(1);
-    expect((introBlock.match(/mkt-advice-details mkt-advice--tanu/g) || []).length).toBe(1);
-  });
-
-  it('機能一覧とスタイル否定しない文言・分析メモの案内が含まれる', () => {
-    const html = buildMarketingDashboardHtml(minimal());
-    expect(html).toContain('このページでできること');
-    expect(html).toContain('mkt-section--features');
-    expect(html).toContain('分析メモ');
-    expect(html).toContain('どんな配信も否定しません');
-    expect(html).toContain('縛られる必要もありません');
+    expect(html).not.toContain('りんく・こん太・たぬ姉から');
+    expect(html).not.toContain('mkt-section--advice"');
+    expect(html).not.toContain('このページでできること');
+    expect(html).not.toContain('mkt-section--features');
+    expect(html).not.toContain('作戦会議');
+    expect(html).not.toContain('声かけ例');
+    expect(html).not.toContain('リスナーが喜ぶお返し');
+    expect(html).not.toContain('お願いの出しどころ');
+    expect(html).not.toContain('次回に活かすなら');
+    // データの章は残る
+    expect(html).toContain('トップコメンター');
+    expect(html).toContain('KPI サマリ');
   });
 
   it('maskShareLabels でトップコメンター名が伏せ字になり example.com のサムネURLが出ない', () => {
@@ -1335,5 +1283,24 @@ describe('段B: 横断応援者ランキング(buildMarketingDashboardHtml統合
     const section = html.match(/<section class="mkt-section mkt-section--cross-supporter-ranking"[\s\S]*?<\/section>/)?.[0] || '';
     expect(section).toContain('>匿名<');
     expect(section).not.toContain('anonhash');
+  });
+});
+
+describe('手が空いたときに章を描いておく(v0.1.1857)', () => {
+  it('script は .mkt-section を1章ずつ visible にし、requestIdleCallback が無くても動く', () => {
+    expect(MARKETING_RENDER_IDLE_SCRIPT_HTML).toContain(".mkt-section");
+    expect(MARKETING_RENDER_IDLE_SCRIPT_HTML).toContain("contentVisibility='visible'");
+    expect(MARKETING_RENDER_IDLE_SCRIPT_HTML).toContain('requestIdleCallback||');
+  });
+  it('script を実行すると全章が visible になる', () => {
+    const secs = [{ style: {} }, { style: {} }];
+    const fakeDoc = { readyState: 'complete', querySelectorAll: () => secs };
+    /** @type {Function[]} */
+    const pending = [];
+    const fakeWin = { requestIdleCallback: (cb) => pending.push(cb) };
+    const code = MARKETING_RENDER_IDLE_SCRIPT_HTML.replace(/^<script>/, '').replace(/<\/script>$/, '');
+    new Function('document', 'window', code)(fakeDoc, fakeWin);
+    while (pending.length) pending.shift()({ timeRemaining: () => 10 });
+    expect(secs.every((el) => el.style.contentVisibility === 'visible')).toBe(true);
   });
 });

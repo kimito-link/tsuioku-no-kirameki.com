@@ -136,4 +136,22 @@ describe('buildHtmlReportDocument (characterization)', () => {
     expect(typeof html).toBe('string');
     expect(html).toContain('lv1');
   });
+
+  it('マーケに埋め込むとき(embedForMarketing)はマーケ側にある章を出さず、コメント一覧・検索は残す', async () => {
+    const html = await buildHtmlReportDocument(
+      makeComments(4),
+      snapshot,
+      '',
+      'lv1',
+      'https://live.nicovideo.jp/watch/lv1',
+      null,
+      { ...makeDeps(), embedForMarketing: true }
+    );
+    expect(html).not.toContain('<header class="hero">');
+    expect(html).not.toContain('id="sec-participation-lead"');
+    expect(html).not.toContain('href="#sec-participation-lead"');
+    expect(html).toContain('id="sec-all-comments"');
+    expect(html).toContain('id="q"');
+    expect(html).toContain('id="sec-user-summary"');
+  });
 });

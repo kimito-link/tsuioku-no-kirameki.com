@@ -135,7 +135,7 @@ import { highlightLedgerReadKeys, isHighlightWorthyKind, planHighlightAppend } f
 // anonymousIdenticonDataUrl は P3(v0.1.1117)で venueLaneBuckets(①正本委譲)側へ移動=venueBar 直参照なし。
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
-import { speechSupportLine, speechEmptyMessage, parseTileStatsText } from '../lib/venueSpeechStats.js';
+import { speechSupportLine, speechEmptyMessage, speechFallbackListHtml, parseTileStatsText } from '../lib/venueSpeechStats.js';
 import { giftThrowsForUser, giftThrowsSectionHtml } from '../lib/venueGiftThrowsForUser.js';
 import { adObservationNote, adObservationStorageKey } from '../lib/adObservationLog.js';
 import { isContextInvalidatedError } from '../lib/reportSilentError.js';
@@ -3311,7 +3311,11 @@ export function mountVenueBarButton(options = {}) {
       try {
         statsText = String(anchorEl.querySelector('[data-stats]')?.getAttribute('data-stats') || '');
       } catch { /* 取れなくてもパネルは開く */ }
-      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc, statsText });
+      // v0.1.1855: ホバーと同じ手元の発言も渡す(保存した記録が読めないときの代わり・新しい取得ゼロ)。
+      const fallbackTexts = Array.isArray(data?.recentTexts) && data.recentTexts.length
+        ? data.recentTexts
+        : (data?.lastText ? [data.lastText] : []);
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc, statsText, fallbackTexts });
     });
   };
   wireSpeechPanelDelegation(seatsHost);
@@ -4014,14 +4018,18 @@ export function mountVenueBarButton(options = {}) {
    * ★呼ばれるのはクリックの瞬間だけ(常時のstorage readは1件も増やさない)。
    *   大配信では read が browser process を詰まらせる既知の地雷があるため、
    *   タイムアウト付きで走らせ、失敗しても会場の描画は止めない。
+   * v0.1.1855: 読めなかった(拡張が切れた/時間切れ)ことも返す。以前は失敗も [] で「記録はありません」と言い切っていた。
    * @param {string} liveId
-   * @returns {Promise<any[]>}
+   * @returns {Promise<{ rows: any[], readFailed: boolean, contextLost: boolean }>}
    */
   const readVenueCommentRowsForSpeech = async (liveId) => {
     const lid = String(liveId || '').trim();
-    if (!lid) return [];
+    if (!lid) return { rows: [], readFailed: true, contextLost: false };
+    // 拡張が更新されたタブでは chrome.storage が全部失敗する=読む前に分かる(hasVenueExtensionContext と同じ判定)。
+    if (!hasVenueExtensionContext()) return { rows: [], readFailed: true, contextLost: true };
     /** @type {unknown[]} */
     let rows = [];
+    let readFailed = false;
     try {
       const result = await runStorageOpWithTimeout(
         () => readChunkedComments(lid, commentsStorageKey(lid), (keys) => chrome.storage.local.get(keys)),
@@ -4030,6 +4038,7 @@ export function mountVenueBarButton(options = {}) {
       rows = Array.isArray(result?.rows) ? result.rows : [];
     } catch {
       rows = [];
+      readFailed = true; // チャンクが読めなかった(テールだけでは古い発言が欠ける)
     }
     /*
      * ★v0.1.1287: テール(nls_ctail_<lv>)も読む。会場の発言パネルだけが読んでいなかった。
@@ -4058,7 +4067,7 @@ export function mountVenueBarButton(options = {}) {
     } catch {
       /* テールは任意=読めなくてもチャンク分で動く */
     }
-    return rows;
+    return { rows, readFailed, contextLost: !hasVenueExtensionContext() };
   };
 
   /*
@@ -4148,7 +4157,8 @@ export function mountVenueBarButton(options = {}) {
   /**
    * その人の全発言を読み込んでパネルに出す。
    * ★storage read はこの関数の中だけ=クリックした瞬間だけ(常時readを増やさない)。
-   * @param {{ uid: string, displayName: string, avatarSrc?: string, statsText?: string }} who
+   * @param {{ uid: string, displayName: string, avatarSrc?: string, statsText?: string, fallbackTexts?: unknown }} who
+   *   fallbackTexts: ホバーカードと同じ「会場が手元に持っている直近の発言」(新しい取得ゼロ)。保存した記録から1件も取れないときだけ使う。
    */
   const openSpeechPanelFor = async (who) => {
     const uid = String(who?.uid || '').trim();
@@ -4178,9 +4188,11 @@ export function mountVenueBarButton(options = {}) {
     /** @type {Array<{ text?: unknown, capturedAt?: unknown }>} */
     let rows = [];
     let total = 0;
+    let readState = { readFailed: false, contextLost: false };
     try {
       const lid = String(activeLiveId || liveIdFromPathname() || '');
-      const raw = await readVenueCommentRowsForSpeech(lid);
+      const { rows: raw, ...st } = await readVenueCommentRowsForSpeech(lid);
+      readState = st;
       // v0.1.1248(2026-08-04 真因確定): extractUserCommentRows が期待するのは
       //   comeviewUserKeyForRow が返す【接頭辞つきキー】('u:<userId>' / 'n:<name>')であり、
       //   生の uid ではない(comeviewActions.js:226 は完全一致で照合する)。
@@ -4196,6 +4208,7 @@ export function mountVenueBarButton(options = {}) {
     } catch {
       rows = [];
       total = 0;
+      readState = { readFailed: true, contextLost: !hasVenueExtensionContext() };
     }
     if (speechPanel.hidden || gen !== speechOpenGen) return; // 読み込み中に閉じられた/別の人のパネルに替わった
 
@@ -4216,7 +4229,8 @@ export function mountVenueBarButton(options = {}) {
             );
           })
           .join('')
-      : '';
+      // v0.1.1855: 記録から1件も取れなければ、ホバーと同じ手元の直近の発言で代わりに出す(2026-11-03 実機: ホバーは発言2・パネルは「記録なし」)。
+      : speechFallbackListHtml(total ? [] : who?.fallbackTexts, readState, escapeHtml, VENUE_SPEECH_PANEL_MAX);
     const note = total > rows.length ? `（新しい ${rows.length} 件を表示 / 全 ${total} 件）` : `（全 ${total} 件）`;
     /*
      * ★「この人がここでどうしていたか」の一言を見出しにも出す（2026-08-30）。
@@ -4248,7 +4262,7 @@ export function mountVenueBarButton(options = {}) {
       (speechSupportLine(statsText)
         ? `<div class="nlsb-speech-support">${escapeHtml(speechSupportLine(statsText))}</div>`
         : '') +
-      `<div class="nlsb-roster-list">${listHtml || `<div class="nlsb-roster-empty">${escapeHtml(speechEmptyMessage(statsText))}</div>`}</div>`;
+      `<div class="nlsb-roster-list">${listHtml || `<div class="nlsb-roster-empty">${escapeHtml(speechEmptyMessage(statsText, readState))}</div>`}</div>`;
     const closeBtn2 = speechPanel.querySelector('.nlsb-roster-close');
     if (closeBtn2) closeBtn2.addEventListener('click', () => closeSpeechPanel());
     // v0.1.1659: ギフトの明細は発言一覧とは別に後から差し込む(パネルを待たせない・取れなくても発言一覧はそのまま)。
@@ -7075,7 +7089,8 @@ export function mountVenueBarButton(options = {}) {
     // キャラライブも止める(rAF を回したまま放置すると拡張更新後も裏で描き続ける)。
     try { charaLive.destroy(); } catch { /* no-op */ }
     try {
-      title.textContent = '⚠ 拡張が更新されました。ページを再読み込み(F5)してください';
+      // v0.1.1855: ページが自分で読み込み直す(content-entry.js の startOrphanTabAutoReload)。打ちかけのコメントがある間は待つ。
+      title.textContent = '⚠ 拡張が新しい版になりました。このページを自動で読み込み直します(コメント入力中は待ちます)';
       title.style.color = '#ffcf66';
     } catch { /* no-op */ }
   };

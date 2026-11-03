@@ -195,7 +195,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 100</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 101</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -292,6 +292,7 @@
 - `src/lib/topSupportRankStripConfig.js` — ポップアップ「応援ランキング」ストリップに並べる行数の上限（aggregateCommentsByUser の1行＝1カード）。
 - `src/lib/topSupportRankStripStableKey.js` — 応援ランキングストリップの DOM を組み直す必要があるか判定するキー。
 - `src/lib/venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
+- `src/lib/viewerRetentionEstimate.js` — 視聴維持率（推定）: 「最後まで配信を見ていたか」を、コメントした人ひとりずつ推定する。
 - `src/lib/viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
 - `src/lib/watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
@@ -667,7 +668,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 44</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 46</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
@@ -688,6 +689,7 @@
 - `src/lib/exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
 - `src/lib/htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
 - `src/lib/htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
+- `src/lib/htmlReportEmbed.js` — v0.1.1854: 旧「HTMLレポート」(コメント全文・検索・CSV・ユーザー別・自分のコメント等)を、
 - `src/lib/htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
 - `src/lib/liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
 - `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
@@ -712,6 +714,7 @@
 - `src/lib/roomCardInnerHtml.js` — 応援ルームカード（renderUserRooms の各 <li class="room-card">）の inner HTML を組む純関数。
 - `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
+- `src/lib/viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
 - `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
 
 </details>
@@ -1003,7 +1006,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 298</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1103,6 +1106,7 @@
 - `src/build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+- `src/extension/orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
 - `src/extension/popup/init/frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
 - `src/extension/self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
 - `src/extension/self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
@@ -1207,6 +1211,7 @@
 - `src/lib/oggOpusMux.js` — v0.1.1740: Opus の音のかたまり(パケット)を Ogg に包む(純関数)。
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
+- `src/lib/orphanTabAutoReload.js` — 拡張が入れ替わった後、開いたままの放送ページが古い版のまま止まるのを、ページ自身が見つけて読み込み直す。
 - `src/lib/ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
 - `src/lib/panelActivity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/panelCoverCulprit.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1310,18 +1315,13 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🙂 匿名(184) (2版)
+### 🙂 匿名(184) (1版)
 - `v0.1.1835` 2026-10-31 — アプリのコメントに顔アイコンを出す
-- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
+- `v0.1.1855` 2026-11-03 — 拡張の更新後に F5 しなくても動くように
 - `v0.1.1852` 2026-11-03 — GPU の案内をポップアップにも・会場で読みやすく
 - `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
-- `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
-- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-
-### 🎈 吹き出し (1版)
-- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
 
 ### 🎁 ギフト (3版)
 - `v0.1.1839` 2026-10-31 — イベント欄の拡張のエラーも止める
@@ -1329,6 +1329,7 @@
 - `v0.1.1836` 2026-10-31 — つなぎ直しで同じコメントが二重に出ないように
 
 ### 🔊 読み上げ (10版)
+- `v0.1.1855` 2026-11-03 — 拡張の更新後に F5 しなくても動くように
 - `v0.1.1852` 2026-11-03 — GPU の案内をポップアップにも・会場で読みやすく
 - `v0.1.1851` 2026-11-03 — VOICEVOX が追いつかない間は PC の声で読む
 - `v0.1.1850` 2026-11-03 — 混んだ配信で読み上げが全く鳴らないのを修正
@@ -1338,17 +1339,14 @@
 - `v0.1.1841` 2026-10-31 — VOICEVOX再起動後も準備中と正しく出す
 - `v0.1.1840` 2026-10-31 — 読み上げの遅れの理由を画面で分かるように
 - `v0.1.1837` 2026-10-31 — コメントを流す間は画面を消さない
-- `v0.1.1833` 2026-10-29 — 読み上げの音質を選べるように
 
-### 🩺 診断・状態速報 (1版)
-- `v0.1.1832` 2026-10-29 — 席が無い人の吹き出しを診断の上に出し名前も
-
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (3版)
+- `v0.1.1857` 2026-11-03 — メディアキットを配信者ごとに・さらに軽く
+- `v0.1.1856` 2026-11-03 — マーケHTMLのスクロールを軽く
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
-- `v0.1.1831` 2026-10-28 — 視聴ページの確認用ログを毎回出さない
 
 ### その他 (4版)
+- `v0.1.1854` 2026-11-03 — マーケを1つに・視聴維持率を追加
 - `v0.1.1844` 2026-10-31 — Android アプリでもコメントを流せるように
 - `v0.1.1843` 2026-10-31 — 過去コメントの埋め直しの読み違いを直す
 - `v0.1.1842` 2026-10-31 — 止まった取り込みの立て直しを直す
-- `v0.1.1834` 2026-10-31 — アプリでコメントの接続が止められていたのを直す
