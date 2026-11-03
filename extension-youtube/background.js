@@ -1,6 +1,56 @@
 // background.js — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
 /* eslint-disable */
 (() => {
+  // src/extension/self-update.js
+  var SELF_UPDATE_ALARM = "self-update-check";
+  var SELF_UPDATE_PERIOD_MINUTES = 2;
+  function compareVersions(a, b) {
+    const pa = String(a || "").split(".").map((x) => parseInt(x, 10) || 0);
+    const pb = String(b || "").split(".").map((x) => parseInt(x, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const d = (pa[i] || 0) - (pb[i] || 0);
+      if (d) return d;
+    }
+    return 0;
+  }
+  async function extensionPageInFront() {
+    try {
+      const active = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (chrome.runtime.getContexts) {
+        const ctx = await chrome.runtime.getContexts({ contextTypes: ["TAB", "POPUP"] });
+        if (ctx.some((c) => c.contextType === "POPUP")) return true;
+        const ids = new Set(active.map((t) => t.id));
+        return ctx.some((c) => ids.has(c.tabId) && !(Number(c.frameId) > 0));
+      }
+      const origin = chrome.runtime.getURL("");
+      return active.some((t) => String(t.url || t.pendingUrl || "").startsWith(origin));
+    } catch (_) {
+      return false;
+    }
+  }
+  async function checkForNewVersion(deps = {}) {
+    const running = chrome.runtime.getManifest();
+    if (running.update_url) return { action: "store", running: running.version };
+    let onDisk = "";
+    try {
+      const read = deps.fetchManifest || (async () => {
+        const res = await fetch(chrome.runtime.getURL("manifest.json"), { cache: "no-store" });
+        return res.json();
+      });
+      onDisk = String((await read()).version || "");
+    } catch (e) {
+      return { action: "error", running: running.version, error: String(e?.message || e) };
+    }
+    if (!onDisk || compareVersions(onDisk, running.version) <= 0) return { action: "same", running: running.version, onDisk };
+    if (await (deps.inFront || extensionPageInFront)()) return { action: "busy", running: running.version, onDisk };
+    await chrome.storage.local.set({ selfUpdateLast: { at: Date.now(), from: running.version, to: onDisk } });
+    (deps.reload || (() => chrome.runtime.reload()))();
+    return { action: "reload", running: running.version, onDisk };
+  }
+  function scheduleSelfUpdateCheck() {
+    chrome.alarms.create(SELF_UPDATE_ALARM, { periodInMinutes: SELF_UPDATE_PERIOD_MINUTES });
+  }
+
   // src/lib/voiceStyleLevelTable.js
   var VOICE_STYLE_LEVEL_TABLE = Object.freeze({
     "0": [0.084, 0.456],
@@ -1096,6 +1146,14 @@
   chrome.runtime.onStartup?.addListener(() => {
     ensureOffscreenDocument();
   });
+  try {
+    scheduleSelfUpdateCheck();
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (alarm && alarm.name === SELF_UPDATE_ALARM) void checkForNewVersion().catch(() => {
+      });
+    });
+  } catch {
+  }
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message.type !== "string") return false;
     if (message.type === "YT_CAPTURE_FRAME") {

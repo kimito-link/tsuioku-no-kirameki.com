@@ -1,6 +1,9 @@
 // background-entry.js — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 /* global chrome, setTimeout, clearTimeout */
 
+// 開発版が、拡張のフォルダの新しい版に自分で入れ替わる(ニコ生版 v0.1.1802 と同じキットの写し)。
+//   git pull で manifest の版が上がれば、2分以内に 🔄 を押したのと同じになる。
+import { SELF_UPDATE_ALARM, checkForNewVersion, scheduleSelfUpdateCheck } from '../../src/extension/self-update.js';
 import {
   VOICEVOX_BASE_URL,
   probeVoicevoxAlive,
@@ -296,6 +299,15 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onStartup?.addListener(() => {
   ensureOffscreenDocument();
 });
+
+try {
+  scheduleSelfUpdateCheck();
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm && alarm.name === SELF_UPDATE_ALARM) void checkForNewVersion().catch(() => {});
+  });
+} catch {
+  // alarms が使えない環境では従来どおり手で 🔄
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
