@@ -1007,7 +1007,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   void ensureMcpDiagDumpAlarm();
   void runMcpDiagDumpTick(); // v0.1.802: 反映直後に1回書いて司令塔がすぐ読めるように(alarm の1分を待たない)
   /*
-   * ★v0.1.1851: 前処理(移行・孤児タブ掃除)を prep にまとめ、更新時のタブ読み込み直しは最大 3 秒しか待たない。
+   * ★v0.1.1853: 前処理(移行・孤児タブ掃除)を prep にまとめ、更新時のタブ読み込み直しは最大 3 秒しか待たない。
    *   2026-11-03 実機: 自己更新の後に watch タブが読み込み直されず、古い版のまま止まった(前回の更新でも同じ)。
    *   大配信中は storage の読み書きが詰まりやすく、前処理の await が長引くと reloadExistingWatchTabs に届くのが遅れる
    *   (docs/handoff/sw-reload-toil-council-MATERIAL.md の仮説 a)。ページ側の自力復帰(orphanTabAutoReload.js)と二重の安全網。

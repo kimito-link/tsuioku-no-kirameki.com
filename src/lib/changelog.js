@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1851',
+    version: '0.1.1853',
     date: '2026-11-03',
     summary: '拡張の更新後に F5 しなくても動くように',
     items: Object.freeze([
