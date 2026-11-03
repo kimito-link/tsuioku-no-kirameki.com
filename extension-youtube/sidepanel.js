@@ -174,6 +174,33 @@
     return t;
   }
 
+  // src/lib/youtube/ytWording.js
+  var RULES = [
+    [
+      "ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。",
+      "YouTube のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。"
+    ],
+    ["公式の貢献度ランキング（niconico の表示に準拠）", "YouTube 公式のトップファン（XP の順位）"],
+    ["ギフト貢献度", "トップファン"],
+    // 数字のあとの単位「貢」→ XP(例: 410貢 → 410 XP)
+    [/(\d[\d,]*)\s*貢(?![献])/g, "$1 XP"],
+    ["ニコ生の応援コメントを、このPCで見える化", "YouTube の応援コメントを、このPCで見える化"],
+    ["ニコニコ生放送 トップ", "YouTube トップ"],
+    ["ニコ生の視聴ページの右下に", "YouTube の視聴ページの右下に"],
+    ["ニコ生の画面改修でパネルが", "YouTube の画面改修でパネルが"],
+    ["ニコ生公式の表示は変わりません", "YouTube 公式の表示は変わりません"]
+  ];
+  var QUICK = /貢|ニコ/;
+  function ytWording(text) {
+    const v = String(text ?? "");
+    if (!QUICK.test(v)) return v;
+    let out = v;
+    for (const [from, to] of RULES) {
+      out = typeof from === "string" ? out.split(from).join(to) : out.replace(from, to);
+    }
+    return out;
+  }
+
   // src/lib/youtube/ytPageMeta.js
   var VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   function parseYtVideoIdFromUrl(rawUrl) {
@@ -855,14 +882,15 @@
   }
   function fixTextNode(node) {
     const v = String(node.nodeValue || "");
-    if (!/8\d{9}/.test(v)) return;
-    const next = v.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
+    let next = ytWording(v);
+    if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
     if (next !== v) node.nodeValue = next;
   }
   function fixTitleAttr(el) {
     const t = el.getAttribute("title");
-    if (!t || !/8\d{9}/.test(t)) return;
-    const next = t.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || "" : uid);
+    if (!t) return;
+    let next = ytWording(t);
+    if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || "" : uid);
     if (next !== t) el.setAttribute("title", next);
   }
   var NICO_USERICON_RE = /nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg/;
@@ -45128,7 +45156,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T15:34" ? String("yt-2026-11-03T15:34") : "dev";
+      const buildId = "yt-2026-11-03T16:21" ? String("yt-2026-11-03T16:21") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45146,7 +45174,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.14") : "";
+    const bundledVersion = true ? String("0.1.15") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45191,7 +45219,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T15:34" ? String("yt-2026-11-03T15:34") : "dev";
+            return "yt-2026-11-03T16:21" ? String("yt-2026-11-03T16:21") : "dev";
           } catch {
             return "dev";
           }

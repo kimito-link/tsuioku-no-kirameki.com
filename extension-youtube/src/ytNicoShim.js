@@ -15,6 +15,7 @@
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock } from '../../src/lib/youtube/ytPostedAt.js';
+import { ytWording } from '../../src/lib/youtube/ytWording.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 
@@ -649,16 +650,17 @@ function fixAnchor(a) {
 /** @param {Text} node */
 function fixTextNode(node) {
   const v = String(node.nodeValue || '');
-  if (!/8\d{9}/.test(v)) return;
-  const next = v.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
+  let next = ytWording(v); // ニコニコの言葉 → YouTube の言葉(決まった文言だけ)
+  if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (next !== v) node.nodeValue = next;
 }
 
 /** @param {Element} el */
 function fixTitleAttr(el) {
   const t = el.getAttribute('title');
-  if (!t || !/8\d{9}/.test(t)) return;
-  const next = t.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
+  if (!t) return;
+  let next = ytWording(t);
+  if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
   if (next !== t) el.setAttribute('title', next);
 }
 
