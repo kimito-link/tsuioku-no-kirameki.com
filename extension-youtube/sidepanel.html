@@ -11094,8 +11094,6 @@
     </header>
 
     <div class="nl-main">
-      
-
       <div class="nl-compose-quick-toolbar" role="toolbar" aria-label="書き出しと視聴タブの再読み込み" aria-describedby="exportToolbarHint" data-nl-hoisted="top">
               <button type="button" id="exportJson" disabled="" title="HTMLレポートを保存" aria-label="HTMLレポートを保存。メタ情報・保存コメントをまとめた検索用HTMLをダウンロードします。">
                 <span class="nl-compose-qbtn__row">
@@ -11133,7 +11131,57 @@
                   <span class="nl-compose-qbtn__word">読み上げ</span>
                 </span>
               </button>
-            </div><div class="nl-popup-primary" id="nlPopupPrimary" aria-busy="true">
+            </div><div id="usageTermsGate" class="nl-usage-terms-gate" role="dialog" aria-modal="true" aria-labelledby="usageTermsGateTitle">
+        <div class="nl-usage-terms-gate__panel">
+          <h2 id="usageTermsGateTitle" class="nl-usage-terms-gate__title">
+            利用の前に（ご確認ください）
+          </h2>
+          <p class="nl-usage-terms-gate__lead">
+            本拡張機能の利用にあたり、次の内容を読み、ご自身の責任でご判断ください（ニコニコの利用条件ページの写しではありません）。
+          </p>
+          <table class="nl-usage-terms-table">
+            <tbody>
+              <tr>
+                <th scope="row">記録・書き出し</th>
+                <td>
+                  コメントの記録、HTML・画像の保存などはこのPC上で行われます。保存データの管理・公開はご利用者の責任です。
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">外部表示</th>
+                <td>
+                  ユーザーアイコン等はニコニコのサーバーから読み込まれる場合があります。表示物の権利は各権利者に帰属します。
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">再配布</th>
+                <td>
+                  本拡張で得たデータを、権利者の許諾なく第三者へ再配布しないでください。
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">公式の案内</th>
+                <td>
+                  サービス利用については、ニコニコのお知らせ等もあわせてご確認ください（例:
+                  <a href="https://www.nicovideo.jp/topic/notice/" target="_blank" rel="noopener noreferrer">https://www.nicovideo.jp/topic/notice/</a>）。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="nl-usage-terms-gate__note">
+            内容は拡張の説明用です。特定のライセンスや利用規約の全文の代替にはなりません。
+          </p>
+          <label class="nl-usage-terms-gate__ack" for="usageTermsAckCheckbox">
+            <input type="checkbox" id="usageTermsAckCheckbox" autocomplete="off">
+            <span>上記を読み、自分の利用として同意します</span>
+          </label>
+          <button type="button" id="usageTermsContinueBtn" class="nl-usage-terms-gate__continue" disabled="">
+            同意してポップアップを使う
+          </button>
+        </div>
+      </div>
+
+      <div class="nl-popup-primary" id="nlPopupPrimary" aria-busy="true">
       <div id="nlVersionBadge" class="nl-version-badge" role="status" aria-label="拡張バージョン（新ビルド反映の確認用）" title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。npm run build のあと chrome://extensions で「更新」し、watch ページも再読み込みしてください。">
         <span class="nl-version-badge__label">ビルド</span>
         <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
@@ -11144,40 +11192,107 @@
         既定 hidden。JS が「watch を扱える文脈」と判定したら外す。
         保存は既存 saveInlinePanelPlacement を呼ぶだけ＝storage キーを増やさず二重管理しない。
       -->
-      
+      <div id="nlPlacementQuickbar" class="nl-placement-quickbar" role="group" aria-label="ページ内パネルの位置" hidden="">
+        <span class="nl-placement-quickbar__label">パネル位置</span>
+        <span id="nlPlacementQuickValue" class="nl-placement-quickbar__value" title="ページ内パネルを視聴ページのどこに出すか。実際の位置は視聴中タブの幅でも変わります（広いと横付きになりやすい）。">—</span>
+        <span class="nl-placement-quickbar__toggles">
+          <button type="button" id="nlPlacementQuickBeside" class="nl-placement-quickbar__chip" aria-pressed="false" title="プレイヤーの横に並べます（視聴中タブが十分広いとき）">
+            横付き
+          </button>
+          <button type="button" id="nlPlacementQuickBelow" class="nl-placement-quickbar__chip" aria-pressed="false" title="プレイヤー行の下に出します">
+            下
+          </button>
+        </span>
+        <button type="button" id="nlPlacementQuickMore" class="nl-placement-quickbar__more" title="画面下いっぱい・ポップアップ風など、他の位置や幅の設定を開きます">
+          詳細
+        </button>
+      </div>
       <!--
         v0.1.336: 横付きを選んでもウィンドウが狭い（約1100px未満）と実効が「下」に
         降格して見た目が変わらない件の説明行。降格時だけ JS が文言を入れて hidden を外す。
         「押しても何も変わらない」誤解の直接の解（実機 lv350592761: 幅1065px で降格）。
       -->
-      
+      <p id="nlPlacementQuickHint" class="nl-placement-quickbar__hint" role="status" aria-live="polite" hidden=""></p>
       <!--
         0.1.55 (AK) → 0.1.106: 既定は hidden。refresh が「非 watch」のときだけ外す。
         FOUC（ランキングだけ先に見える）防止。
       -->
       <!-- 既定 hidden: JS が走る・またはモジュール読込が遅い間にランキング枠だけが先に見える FOUC を防ぐ -->
-      
+      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング" hidden="">
+        <p class="nl-no-watch-hint__lead">
+          🔎 watch ページが見つかりません。気になる放送を探してみますか？
+        </p>
+        <ul class="nl-no-watch-hint__links">
+          <li>
+            <a href="https://live.nicovideo.jp/" target="_blank" rel="noopener noreferrer">
+              🏠 ニコニコ生放送 トップ
+            </a>
+          </li>
+          <li>
+            <a href="https://live.nicovideo.jp/ranking" target="_blank" rel="noopener noreferrer">
+              📊 生放送ランキング
+            </a>
+          </li>
+          <!--
+            0.1.91: ちくらんは com.nicovideo.jp/ranking/live から
+            chikuwachan.com/live/NCU/ に移行（旧 URL は news blog に redirect）。
+            外部サービスだが niconico community ranking の現行リンクとして掲載。
+          -->
+          <li>
+            <a href="https://www.chikuwachan.com/live/NCU/" target="_blank" rel="noopener noreferrer">
+              🎯 ちくらん（コミュニティ生放送ランキング）
+            </a>
+          </li>
+          <li>
+            <a href="https://live.nicovideo.jp/recent" target="_blank" rel="noopener noreferrer">
+              🆕 開始したばかりの放送（recent）
+            </a>
+          </li>
+        </ul>
+      </section>
       <!--
         0.1.69 (AY): empty state で「前回の配信」を再現する indicator バナー。
         stat cards の上に「前回（HH:mm〜）」とタイトルを小さく見せて、
         ユーザーが「現在の配信」と誤認しないようにする。
         履歴があるときだけ JS が hidden を外す。標準は hidden。
       -->
-      
+      <div id="lastBroadcastIndicator" class="nl-last-broadcast-indicator" role="note" aria-label="前回の配信" hidden="">
+        <span id="lastBroadcastIndicatorLead" class="nl-last-broadcast-indicator__lead">前回の配信</span>
+        <span id="lastBroadcastIndicatorTitle" class="nl-last-broadcast-indicator__title"></span>
+      </div>
       <!--
         0.1.69 (AY): 「もう一度開く」ボタン。前回の watchUrl を新タブで開く。
         履歴があるときだけ JS が hidden を外す。watchUrl が空なら disabled。
       -->
-      
-      
-      
+      <div id="lastBroadcastActions" class="nl-last-broadcast-actions" role="group" aria-label="前回の配信のアクション" hidden="">
+        <button type="button" id="lastBroadcastReopenBtn" class="nl-last-broadcast-actions__reopen" title="前回の watch ページを新しいタブで開きます">
+          🔄 もう一度この配信を開く
+        </button>
+      </div>
+      <div id="offlineBanner" class="nl-extension-context-banner nl-offline-banner" role="status" aria-live="polite" hidden="">
+        <strong>オフラインです</strong>
+        <p class="nl-extension-context-banner__body">
+          ネットワークに接続できないため、コメントの取得やスナップショットが失敗します。
+          接続が戻ると自動的にバナーは消えます。
+        </p>
+      </div>
+      <div id="extensionContextBanner" class="nl-extension-context-banner" role="alert" aria-live="assertive" hidden="">
+        <strong>拡張の接続が切れました</strong>
+        <p class="nl-extension-context-banner__body">
+          <code>chrome://extensions</code>
+          を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。ページの再読み込みだけでは直らないことがあります。
+        </p>
+        <p class="nl-extension-context-banner__body">
+          <button type="button" id="extensionContextBannerReload" class="nl-extension-context-banner__reload">このパネルを再読み込み</button>
+        </p>
+      </div>
       <!--
         版混在検知バナー(2026-07-06): 未パック拡張は「本体(manifest/SW)=リロード時のまま、
         このページ=ディスクの新ファイルを都度読む」ため、配信中に copy:ext でディスクを
         差し替えると新旧混在ランタイムになる(実測: 本体1077+ページ1080でコメント送信不可)。
         DOM は一度作ったら remove せず hidden 切替(status-guard.js の流儀に倣う)。
       -->
-      
+      <div id="nlVersionMismatchBanner" class="nl-extension-context-banner" role="alert" aria-live="assertive" hidden=""></div>
 
       <!--
         旧配置: stat card 群の上に full-width 帯として配信者情報（icon + name + フォロー）を出していた。
@@ -11185,7 +11300,13 @@
         データ同期用の隠し要素として casterBannerIcon / Name / Link / Follow は残すが、
         画面には出さず、renderTopSupportRankStrip がストリップ内に新しいタイルを作って表示する。
       -->
-      
+      <div id="casterBanner" class="nl-caster-banner" hidden="" style="display:none !important">
+        <a id="casterBannerLink" target="_blank" rel="noopener noreferrer" title="配信者ページを開く">
+          <img id="casterBannerIcon" alt="" width="36" height="36" decoding="async">
+          <span id="casterBannerName"></span>
+        </a>
+        <a id="casterBannerFollow" target="_blank" rel="noopener noreferrer">フォロー</a>
+      </div>
 
       
     <p id="yt-voice-engine-banner" class="nl-voice-engine-note" role="status" aria-live="polite" hidden=""></p>
@@ -11216,11 +11337,21 @@
                v0.1.438: ボタン下と同じ「こん太(キャラ)+ピンク吹き出し」UI に統一（ユーザー指摘・統合性原則）。
                既存ボタン下の #backfillRinku は無変更。ここはもう一つのインスタンス（class 共有 / id は別）。
                外側 nl-live-stat-sub--backfill-hint はレイアウト位置の維持・内側は .nl-backfill-rinku の再利用。 -->
-          
+          <div class="nl-live-stat-sub nl-live-stat-sub--backfill-hint" id="liveStatCommentsBackfillHint" hidden="" aria-live="polite">
+            <div id="recordCardBackfillRinku" class="nl-backfill-rinku nl-backfill-rinku--record-card" aria-hidden="true">
+              <img id="recordCardBackfillRinkuImg" class="nl-backfill-rinku__img" src="images/logo/konta-yukkuri-icon-48.png" width="32" height="32" alt="">
+              <p id="recordCardBackfillRinkuLead" class="nl-backfill-rinku__lead" aria-live="polite"></p>
+            </div>
+            <!-- v0.1.450 PR2: ボタン受け入れ用の actions 行（空・JS が後で埋める）。
+                 後続 PR3 で #recordCardBackfillRetryBtn を追加してコメント入力直下の
+                 #backfillFetchPrompt を廃止し、上集約する設計（会議 2026-05-29 確定）。
+                 この PR では空のままなので見た目変化なし（:empty で margin 0 にしておく）。 -->
+            <div id="recordCardBackfillActions" class="nl-backfill-rinku__actions"></div>
+          </div>
           <!-- 記録停止の自己回復ステータス（本番でも表示）。普段は hidden。
                「公式は増えてるのに記録が止まった」を検知して自動復旧した直後だけ
                短時間表示する。値の出所は chrome.storage.local の nls_recording_watchdog_v1。 -->
-          
+          <div class="nl-live-stat-sub nl-live-stat-sub--recovery" id="liveStatCommentsRecovery" hidden="" aria-live="polite"></div>
           <div id="liveStatCardCommentsLoad" class="nl-live-stat-card__char-load" hidden="" aria-hidden="true">
             <div class="nl-live-stat-card__char-load-box" role="status" aria-live="polite">
               <img class="nl-live-stat-card__char-load-img" src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" decoding="async">
@@ -11291,9 +11422,21 @@
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
           </div>
         </div>
-        
+        <a id="watchOfficialEventBannerCard" class="nl-official-event-banner-card" target="_blank" rel="noopener" hidden="" aria-hidden="true">
+          <div class="nl-official-event-banner-card__owner" id="watchOfficialEventBannerOwner"></div>
+          <div class="nl-official-event-banner-card__body">
+            <img class="nl-official-event-banner-card__thumb" id="watchOfficialEventBannerThumb" alt="" decoding="async" referrerpolicy="no-referrer" loading="lazy" hidden="">
+            <div class="nl-official-event-banner-card__text">
+              <div class="nl-official-event-banner-card__title" id="watchOfficialEventBannerTitle"></div>
+              <div class="nl-official-event-banner-card__status">
+                <span class="nl-official-event-banner-card__rank" id="watchOfficialEventBannerRank"></span>
+                <span class="nl-official-event-banner-card__score" id="watchOfficialEventBannerScore"></span>
+              </div>
+            </div>
+          </div>
+        </a>
         <div id="topSupportRankStrip" class="nl-top-support-rank nl-top-support-rank--below-cards nl-top-support-rank--span-cards" hidden="" aria-hidden="true"></div>
-        
+        <div id="topGiftRankStrip" class="nl-top-support-rank nl-gift-rank-strip nl-top-support-rank--below-cards nl-top-support-rank--span-cards" hidden="" aria-hidden="true"></div>
         <!-- v0.1.236: 北極星 6 レーン常設枠。
              kimito さん明示（2026-05-09）: 取得できる/出来ないに関わらず枠を popup に残す。
              鏡のように貼り付け原則: 取得できたら niconico DOM の outerHTML を body に流し込む。
@@ -11324,8 +11467,50 @@
               <p class="nl-north-star-chara-trio__pct" aria-live="polite"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
             </div>
           </div>
-          
-          
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventBroadcasters" hidden="">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">イベントランキング</p>
+              <p class="nl-north-star-lane__sublabel">このイベントの💎スコア順（公式ランキングに準拠）。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                </div>
+              </div>
+              <div id="northStarLaneBody-eventBroadcasters" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
+              <aside id="northStarLaneAside-eventBroadcasters" class="nl-north-star-lane__rail" aria-label="（この項目はイベントランキングのみ）" hidden=""></aside>
+            </div>
+          </div>
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventVotingSupporters" hidden="">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">応援者ランキング</p>
+              <p class="nl-north-star-lane__sublabel">この配信者へのイベント投票（ギフト＋ニコニ広告）スコア順。イベント参加中のみ表示。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                </div>
+              </div>
+              <div id="northStarLaneBody-eventVotingSupporters" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
+              <aside id="northStarLaneAside-eventVotingSupporters" class="nl-north-star-lane__rail" aria-label="（この項目は応援者ランキングのみ）" hidden=""></aside>
+            </div>
+          </div>
           <div class="nl-north-star-lane" data-lane="contributionRanking" hidden="">
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">スーパーチャット貢献度</p>
@@ -11405,19 +11590,91 @@
             </div>
           </div>
           </div>
-          
-          
-          
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking" hidden="">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">広告ランキング</p>
+              <p class="nl-north-star-lane__sublabel">ニコニ広告の貢献度ランキングです（ギフト貢献度とは別系統）。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/konta-72.png" alt="" width="38" height="38" decoding="async">
+                </div>
+              </div>
+              <div id="northStarLaneBody-adRanking" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
+              <aside id="northStarLaneAside-adRanking" class="nl-north-star-lane__rail" aria-label="1位から10位" hidden=""></aside>
+            </div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="eventRank" hidden="">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">イベント現在順位</p>
+              <p class="nl-north-star-lane__sublabel">配信者本人がイベントで何位かを表示します（公式表示が取れないときは NDGR 推定で「目安」表示）。ギフト貢献者一覧は上のレーンを参照。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                </div>
+              </div>
+              <div id="northStarLaneBody-eventRank" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
+              <aside id="northStarLaneAside-eventRank" class="nl-north-star-lane__rail" aria-label="1位から10位" hidden=""></aside>
+            </div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="eventScore" hidden="">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">イベント累計スコア</p>
+              <p class="nl-north-star-lane__sublabel">イベント参加中のときだけ意味を持つ累計です。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img class="nl-north-star-lane__chara" src="images/marketing-html-avatars/rink-72.png" alt="" width="38" height="38" decoding="async">
+                </div>
+              </div>
+              <div id="northStarLaneBody-eventScore" class="nl-north-star-lane__body" data-lane-state="not_yet"></div>
+              <aside id="northStarLaneAside-eventScore" class="nl-north-star-lane__rail" aria-label="（この項目はスコア表示のみ）" hidden=""></aside>
+            </div>
+          </div>
           <p class="nl-north-star-lanes__note">このPCに記録したチャットから集計しています（YouTube の公式ランキングではありません）。違う通貨は換算しません。</p>
         </section>
         <!-- v0.1.228: ギフトランキング opt-in prompt。flag OFF（default）のとき表示。
              ボタン押下で content 側の autoOpen / hidden iframe inject が動き出す。 -->
-        
+        <div id="giftRankingFetchPrompt" class="nl-gift-ranking-prompt" hidden="" aria-hidden="true">
+          <p class="nl-gift-ranking-prompt__text">
+            ギフトランキング・累計・履歴は、配信者によっては取得に失敗してサイドバーが一瞬開く副作用が出るため、初期状態では取得しません。
+          </p>
+          <button type="button" id="enableGiftRankingFetchBtn" class="nl-gift-ranking-prompt__btn">
+            ギフトランキング取得を開始（β）
+          </button>
+        </div>
         <!-- v0.1.415: 過去ログ取り込み prompt は「コメント入力の近く」へ移動した
              （コメント送信エリア直下・下記 nl-comment-compose 内）。ユーザー提案 2026-05-27。 -->
       </div>
 
-      
+      <p class="nl-record-nav-hint">
+        <strong>応援コメントの記録</strong>の ON/OFF は、下の「<strong>詳細設定</strong>」を開くと<strong>先頭</strong>にあります（ファーストビューを広く保つための配置です）。
+      </p>
 
       <details id="nlPopupSettings" class="nl-popup-settings">
         <!--
@@ -11486,7 +11743,266 @@
       </div>
     </details>
 
-</div>
+
+          <div class="nl-record nl-record--in-settings">
+            <div class="nl-record-hero" role="group" aria-labelledby="nlRecordHeroTitle" data-nl-recording="on">
+              <img class="nl-record-hero__link" src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="56" height="56" decoding="async">
+              <div class="nl-record-hero__main">
+                <span class="nl-record-hero__eyebrow">りんくより</span>
+                <div id="nlRecordHeroTitle" class="nl-record-hero__title">応援コメントの記録</div>
+                <p class="nl-record-hero__lead">
+                  チェックを付けると、この放送の応援コメントがこのPCにたまります。外すと<strong>OFF</strong>で増えません。
+                </p>
+                <label class="nl-record-hero__toggle" for="recordToggle">
+                  <input type="checkbox" id="recordToggle" checked="" aria-label="応援コメントをこのPCに記録する（ONで記録、OFFで停止）">
+                  <span class="nl-record-hero__pill" aria-hidden="true"></span>
+                  <span class="nl-record-hero__toggle-text">
+                    <span class="nl-record-hero__toggle-line">記録を ON / OFF</span>
+                    <span class="nl-record-hero__toggle-sub">ON＝件数が増える · OFF＝見るだけ（保存されない）</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="nl-record-sub">
+            <label for="deepHarvestQuietUiToggle" class="nl-record-sub__label">
+              <input type="checkbox" id="deepHarvestQuietUiToggle" checked="" aria-label="コメント一覧の取り込み開始を遅らせ、読み込み中を表示する">
+              <span>
+                一覧の取り込みをゆっくり始める（読み込み表示・滝を抑える）
+                <span class="nl-record-sub__hint">OFF にすると早く記録されやすいが、右のコメント欄が動きやすくなります。</span>
+              </span>
+            </label>
+          </div>
+          <!-- v0.1.1053: ギフト/広告/イベント順位変動の効果音（既定 ON）。会場windowが開いていれば
+               popup 側は鳴らさない(会場優先・二重再生防止)。 -->
+          <div class="nl-record-sub">
+            <label for="effectSoundToggle" class="nl-record-sub__label">
+              <input type="checkbox" id="effectSoundToggle" checked="" aria-label="ギフト・広告・イベント順位変動の効果音を鳴らす">
+              <span>
+                ギフト・広告・順位変動の効果音を鳴らす
+                <span class="nl-record-sub__hint">ギフトやニコニ広告、参加中イベントの順位が上下したときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。</span>
+              </span>
+            </label>
+          </div>
+          <!-- 2026-10-22(P2・ユーザー要望「ノートPCだと読み上げが小さい。POPから音量調整」):
+               読み上げ(VOICEVOX)の音量。100% で長い文が今までと同じ大きさ。配線は popup/wireVoiceVolumeSlider.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceVolumeRange" class="nl-record-sub__label">
+              <span>
+                読み上げの音量 <strong id="voiceVolumeValue">100%</strong>
+                <input type="range" id="voiceVolumeRange" min="0" max="300" step="10" value="100" aria-label="読み上げの音量(0〜300%)">
+                <span class="nl-record-sub__hint">VOICEVOX の読み上げの大きさです。ノートPCで小さく聞こえるときは上げてください。音が割れない範囲で大きくします。</span>
+              </span>
+            </label>
+          </div>
+          <!-- 2026-10-24(P3・ユーザー条件「絞るのは弱いPCだけ・絞り方は固定」): 読み上げの声の種類を絞るか。
+               既定は「遅いPCと分かったら」(v0.1.1768・グラボ無しの実測で準備待ちの飛ばしが多かったため)。配線は popup/wireVoiceNarrowSelect.js、判定は lib の voiceNarrowing.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceNarrowSelect" class="nl-record-sub__label">
+              <span>
+                読み上げの声を絞る
+                <select id="voiceNarrowSelect" aria-label="読み上げの声を絞る">
+                  <option value="off">しない</option>
+                  <option value="auto">遅いPCと分かったら(おすすめ)</option>
+                  <option value="on">いつも</option>
+                </select>
+                <span class="nl-record-sub__hint">ノートPCで読み上げが遅れるときに。声を6種類に絞り、読み上げを始めたときに先に読み込んでおきます。同じ人はいつも同じ声のままです。次に読み上げを ON にしたときから効きます。</span>
+              </span>
+            </label>
+          </div>
+          <!-- 2026-11-03(りんく「POP とか会場モードに記載すべき」): 読み上げが遅い PC だと記録されているときだけ、
+               VOICEVOX を GPU にする案内を出す。配線は popup/wireVoiceGpuTip.js、文言は lib の voiceLagNotice.js。 -->
+          <p id="voiceGpuTip" class="nl-record-sub__hint" hidden="" style="color:#b45309;font-weight:600;background:#fff7e6;border-radius:8px;padding:6px 8px;margin:4px 0;"></p>
+          <!-- 2026-10-29: 読み上げの声の音質(出力サンプリングレート)。既定は今までどおり標準(16kHz・v0.1.1063 で合成が約30%速いため)。
+               高音質(24kHz)は自分で選んだ人だけ。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceQualitySelect" class="nl-record-sub__label">
+              <span>
+                読み上げの音質
+                <select id="voiceQualitySelect" aria-label="読み上げの音質">
+                  <option value="standard">標準(おすすめ)</option>
+                  <option value="high">高音質(速いPC向け)</option>
+                </select>
+                <span class="nl-record-sub__hint">高音質は声が少しくっきりしますが、作るのに時間がかかります。グラボのある速いPCで、こもって聞こえるときに。次の声から効きます。</span>
+              </span>
+            </label>
+          </div>
+          <!-- v0.1.1271(ユーザー要望): 視聴ページに「🏟 会場モード」ボタンを出すか（既定 ON＝出す）。
+               「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、会場の画面ではなく
+               ボタンが常時表示されていることだった。会場を使わない人は隠せるようにする。 -->
+          <div class="nl-record-sub">
+            <label for="venueButtonVisibleToggle" class="nl-record-sub__label">
+              <input type="checkbox" id="venueButtonVisibleToggle" checked="" aria-label="視聴ページに会場モードのボタンを表示する">
+              <span>
+                視聴ページに「会場モード」ボタンを出す
+                <span class="nl-record-sub__hint">ニコ生の視聴ページの右下に出る「🏟 会場モード」ボタンです。会場モードを使わない場合はオフにすると表示されなくなります（反映には視聴ページの再読み込みが必要です）。</span>
+              </span>
+            </label>
+          </div>
+          <!-- ★v0.1.1393(ユーザー要望「公式のこれも POPで操作できるようにしたい」):
+               公式コメント欄の「なふだを表示」を①POPから切り替える。
+               ★これは公式側の設定なので、拡張が状態を保存しない(公式が正本)。
+                 押すたびに公式トグルを叩き、結果を下の #nameplateToggleNote に出す。 -->
+          <div class="nl-record-sub">
+            <div class="nl-record-sub__label" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span>なふだ（放送者にあなたのアイコン・名前を見せる）</span>
+              <button type="button" id="nameplateOnBtn" class="nl-mini-btn">表示する</button>
+              <button type="button" id="nameplateOffBtn" class="nl-mini-btn">隠す</button>
+              <span class="nl-record-sub__hint" id="nameplateToggleNote"></span>
+            </div>
+            <div class="nl-record-sub__hint">
+              公式の「なふだを表示」を切り替えます。ONにすると放送者だけにあなたのアイコンとニックネームが見えます（他の視聴者には見えません）。
+              ★公式の設定パネルを一度も開いていないと切り替えられません。
+            </div>
+          </div>
+          <!-- Phase D1(2026-07-05・council/operation-sound-SYNTHESIS.md §4.2): 操作音（コメント送信の
+               打ち出し音等・既定ON）。ユーザー自身のジェスチャ起点なのでautoplay制約が無く、
+               確認音を兼ねるため既定ONが妥当。 -->
+          <div class="nl-record-sub">
+            <label for="opSoundEnabledToggle" class="nl-record-sub__label">
+              <input type="checkbox" id="opSoundEnabledToggle" checked="" aria-label="コメント送信などの操作音を鳴らす">
+              <span>
+                操作音（コメント送信の打ち出し音など）を鳴らす
+                <span class="nl-record-sub__hint">コメント送信ボタンを押したときや送信できたときに、パチンコの打ち出しのような短い操作音を鳴らします。送信を重ねるほど音が育ちます。</span>
+              </span>
+            </label>
+          </div>
+          <!-- v0.1.418: 過去ログ自動取り込み（既定 ON）。OFF にすると手動ボタンのみ。
+               v0.1.450 (PR4): 動機説明（なぜ取り込むか）と手動 trigger の案内をここに統合。
+               以前は下の #backfillFetchPrompt（コメント入力直下）にあった説明文を、ボタン廃止に
+               合わせて自動取り込みトグル説明に吸収。
+               「もう一度ためす」ボタンは記録カード内（記録件数の下・上集約）に移動。 -->
+          <div class="nl-record-sub">
+            <label for="backfillAutoStartToggle" class="nl-record-sub__label">
+              <input type="checkbox" id="backfillAutoStartToggle" checked="" aria-label="途中から開いた配信でも、過去のコメントを自動で取り込む">
+              <span>
+                途中から開いても、過去のコメントを自動で取り込む
+                <span class="nl-record-sub__hint">既定 ON。配信を開いて記録 ON なら、配信の最初までさかのぼって自動で取り込みます（こん太が取り込み中を教えてくれます）。途中で止まったり、もう一度やり直したいときは、記録カード内に出る「↻ もう一度ためす」ボタンを押してください。OFF にすると自動取り込みは走らず、このボタン押下時だけ取り込みます。</span>
+              </span>
+            </label>
+          </div>
+          <div class="nl-record-sub">
+            <label for="inlinePanelAutoshowToggle" class="nl-record-sub__label">
+              <input type="checkbox" id="inlinePanelAutoshowToggle" aria-label="次回の視聴ページでパネルを自動表示する（1回だけ）">
+              <span>
+                次回の視聴ページでパネルを自動表示する
+                <span class="nl-record-sub__hint">既定 OFF。ON にすると、次回の視聴ページで1回だけ自動表示し、その後はOFFに戻ります。</span>
+              </span>
+            </label>
+          </div>
+          <div class="nl-record-sub">
+            <label for="autopatrolEnabled" class="nl-record-sub__label">
+              <input type="checkbox" id="autopatrolEnabled" checked="" aria-label="配信を見ていない間も放送中の配信を自動巡回して同接推定の較正データを貯める">
+              <span>
+                配信を見ていなくても自動巡回して較正データを貯める
+                <span class="nl-record-sub__hint">既定 ON。拡張を開いていなくても、放送中の配信を背景タブで1つずつ短時間ひらき、同接推定の較正データを少しずつ貯めます（PCを起動している間だけ・コメント本文は保存しません）。止めたいときはOFFにしてください。</span>
+                <span id="autopatrolStatus" class="nl-record-sub__hint" aria-live="polite">ON で巡回準備中…</span>
+              </span>
+            </label>
+            <div class="nl-calib-actions">
+              <button type="button" id="calibrationExportJsonBtn" class="nl-calib-actions__btn">較正データ JSON</button>
+              <button type="button" id="calibrationExportCsvBtn" class="nl-calib-actions__btn">較正データ CSV</button>
+              <button type="button" id="calibrationClearBtn" class="nl-calib-actions__btn nl-calib-actions__btn--danger">較正データを消去</button>
+            </div>
+          </div>
+          <div class="nl-record nl-panel-width nl-settings-panel-layout" role="group" aria-labelledby="inlinePanelWidthLegend">
+            <div id="inlinePanelWidthLegend" class="nl-panel-width-legend">
+              ページ内パネルの位置・幅（watch）
+            </div>
+            <div class="nl-panel-width-radios" role="group" aria-label="パネルの位置">
+              <span class="nl-panel-width-sublegend">位置</span>
+              <label>
+                <input type="radio" name="inlinePanelPlacement" value="dock_bottom" id="inlinePanelPlacementDockBottom" checked="">
+                画面下いっぱい（既定・視聴ページに固定。ポップアップ風より見つけやすい）
+              </label>
+              <label>
+                <input type="radio" name="inlinePanelPlacement" value="below" id="inlinePanelPlacementBelow">
+                プレイヤー行の下
+                <span class="nl-panel-placement-hint">選択どおりプレイヤー行の<strong>下</strong>に出します。広い画面で自動的に横付きにしたいときは、下の「幅の広げ方」を「広げない」以外にしてください（次に手前のタブで watch を開いたとき横付きへ切り替わります。自分で「下」を選んだ場合はその選択が優先され、自動では変わりません）。パネルが動画とコメントの<strong>あいだまで広く</strong>見えるのは、下の「幅」で視聴画面いっぱいや「タブ幅いっぱいまで広げる」を選んでいる場合などです。常に画面下端に固定したい場合は「画面下いっぱい」を選んでください。</span>
+              </label>
+              <label>
+                <input type="radio" name="inlinePanelPlacement" value="beside" id="inlinePanelPlacementBeside">
+                横付き（親のレイアウトに合わせる・従来に近い）
+                <span class="nl-panel-placement-hint nl-panel-placement-hint--warning">⚠️ 実際の位置は<strong>視聴中のブラウザタブの幅</strong>（このパネル内の幅ではありません）で決まります。タブ幅が約1100px未満のときは公式UIとの競合回避のため、自動で「プレイヤー行の下」になります。列の横に十分な隙間が無いときも同様です。</span>
+              </label>
+              <label>
+                <input type="radio" name="inlinePanelPlacement" value="floating" id="inlinePanelPlacementFloating">
+                ポップアップ風（ページから分離して固定・角は下で選べます）
+                <span class="nl-panel-placement-hint">公式の右パネルや動画と重なりやすいです。通常は上の「画面下いっぱい」を推奨します。</span>
+              </label>
+            </div>
+            <div id="nlFloatingAnchorWrap" class="nl-floating-anchor-wrap" hidden="" aria-hidden="true">
+              <span class="nl-panel-width-sublegend">ポップアップ風の角</span>
+              <div class="nl-panel-width-radios nl-floating-anchor-radios" role="group" aria-label="浮遊パネルを置く画面の角">
+                <label>
+                  <input type="radio" name="inlineFloatingAnchor" value="top_right" id="inlineFloatingAnchorTopRight" checked="">
+                  右上（既定）
+                </label>
+                <label>
+                  <input type="radio" name="inlineFloatingAnchor" value="bottom_left" id="inlineFloatingAnchorBottomLeft">
+                  左下
+                </label>
+              </div>
+            </div>
+            <div class="nl-panel-width-radios nl-panel-width-radios--width" role="group" aria-label="パネルの幅">
+              <span class="nl-panel-width-sublegend">幅</span>
+              <label>
+                <input type="radio" name="inlinePanelWidth" value="player_row" id="inlinePanelWidthPlayerRow">
+                視聴画面いっぱい（動画＋コメント列の下）
+              </label>
+              <span class="nl-muted nl-panel-width-hint nl-panel-width-hint--beside-cap" style="display:block;margin-top:4px;line-height:1.45;font-size:12px;">
+                配置が<strong>横付き</strong>で公式の<strong>列のあいだ</strong>に入っているときは、列からはみ出して折り返さないよう幅が<strong>動画列基準</strong>に抑えられます（ここで「視聴画面いっぱい」を選んでも幅が伸びないことがあります）。
+              </span>
+              <label>
+                <input type="radio" name="inlinePanelWidth" value="video" id="inlinePanelWidthVideo">
+                動画の幅だけ
+              </label>
+            </div>
+            <div class="nl-panel-width-radios nl-panel-width-radios--viewport-wide" role="group" aria-labelledby="inlinePanelViewportWideLegend">
+              <div id="inlinePanelViewportWideLegend" class="nl-panel-width-sublegend">
+                下／横付きのときの幅の広げ方
+              </div>
+              <label>
+                <input type="radio" name="inlinePanelViewportWide" value="off" id="inlinePanelViewportWideOff">
+                広げない（従来どおり）
+              </label>
+              <label>
+                <input type="radio" name="inlinePanelViewportWide" value="always" id="inlinePanelViewportWideAlways">
+                タブ幅いっぱいまで常に広げる（超ワイドは上限あり）
+              </label>
+              <label>
+                <input type="radio" name="inlinePanelViewportWide" value="once" id="inlinePanelViewportWideOnce">
+                初めての1回だけ広げて試す
+              </label>
+              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。位置が<strong>横付き</strong>のときは、公式の動画列とコメント列のあいだに収まる幅までに抑え、レイアウトが折り返して下に落ちないようにします。<br>なお、<strong>配置を自分で選んでいない</strong>状態でこれを「広げない」以外にすると、タブ幅が広い（約1100px以上）ときに watch を手前のタブで開いた<strong>1回</strong>、配置が自動で<strong>横付き</strong>に切り替わります（「常に」のときは毎回判定）。自分で「下」や「画面下いっぱい」を選んだ場合は、その選択が優先され自動では変わりません。</span>
+            </div>
+            <div class="nl-panel-calm-motion">
+              <label for="calmPanelMotion">
+                <input type="checkbox" id="calmPanelMotion">
+                <span>パネル内の動きを抑える（ループアニメ・帯など。広告／ギフトの豪雨演出は出ます）</span>
+              </label>
+            </div>
+            <div class="nl-display-help" role="region" aria-labelledby="nlDisplayHelpTitle">
+              <div id="nlDisplayHelpTitle" class="nl-display-help__title">
+                表示がおかしいとき
+              </div>
+              <p class="nl-display-help__text" id="nlDisplayHelpDesc">
+                まず<strong>watch を再読み込み</strong>（ページをやり直す）。それでも名前やアイコンだけ変なときだけ、
+                <strong>表示キャッシュを消す</strong>（このPCが覚えた表示名・アイコンURLを忘れる。記録した応援コメントや設定は消えません）。
+              </p>
+              <div class="nl-display-help__actions">
+                <button type="button" id="reloadWatchTabPanelBtn" class="nl-panel-reload-btn" aria-describedby="nlDisplayHelpDesc">
+                  watch を再読み込み
+                </button>
+                <button type="button" id="extensionCacheClearBtn" class="nl-extension-cache-clear-btn" aria-describedby="nlDisplayHelpDesc" title="記録したコメントや設定は消しません。表示名・アイコンURLの覚えだけ消します。">
+                  表示キャッシュを消す
+                </button>
+              </div>
+              <span id="extensionCacheClearStatus" class="nl-extension-cache-clear-status nl-display-help__status" aria-live="polite"></span>
+            </div>
+          </div>
+        </div>
       </details>
 
       <div class="nl-vdh-divider" role="presentation">
@@ -11505,7 +12021,22 @@
         ★詳細設定の中のボタン(#nameplateOnBtn / #nameplateOffBtn)は残す(既存の導線を壊さない)。
           こちらは同じ機能への2つ目の入口。
       -->
-      
+      <div class="nl-nameplate-inline">
+        <div class="nl-nameplate-inline__guide">
+          <img class="nl-nameplate-inline__face" src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png" alt="" width="24" height="24" decoding="async">
+          <span class="nl-nameplate-inline__text">
+            りんく: 「表示する」にすると、キミがコメントしたとき<b>放送者さんのコメント欄にキミのアイコンと名前が出る</b>のだ。
+            見えるのは<b>放送者さんだけ</b>で、ほかの視聴者さんには見えないから安心してね。
+            これはニコ生そのものの設定で、<b>追憶のきらめきの記録には出ない</b>のだ。
+          </span>
+        </div>
+        <div class="nl-nameplate-inline__row">
+          <span class="nl-nameplate-inline__label">なふだ</span>
+          <button type="button" id="nameplateOnBtnInline" class="nl-mini-btn">表示する</button>
+          <button type="button" id="nameplateOffBtnInline" class="nl-mini-btn">隠す</button>
+          <span class="nl-nameplate-inline__note" id="nameplateToggleNoteInline"></span>
+        </div>
+      </div>
 
       <section class="nl-comment-compose nl-comment-compose--primary" aria-label="コメント投稿">
         <textarea id="commentInput" maxlength="200" placeholder="ここにコメントを書いて送信（YouTube のチャットに送ります）" aria-label="コメント本文（200文字まで）"></textarea>
@@ -11523,7 +12054,12 @@
                  既存レイアウトを動かさないよう、wrapper は flex の 1 アイテムで 36px 固定、
                  chip ポップオーバーは position:absolute で上方向に開く（textarea を押し下げない）。
                  aria-haspopup/aria-expanded で SR ユーザーにも開閉が伝わる。 -->
-            
+            <div class="nl-cheer-palette-wrapper">
+              <button type="button" id="cheerToggleBtn" class="nl-cheer-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="cheerPalette" aria-label="盛り上げワードを挿入（8888・拍手・顔文字など）" title="盛り上げワード（8888 / wwww / 拍手 / 顔文字）を挿入">
+                <span aria-hidden="true">✨</span>
+              </button>
+              <div id="cheerPalette" class="nl-cheer-palette" role="menu" aria-label="盛り上げワード一覧" hidden=""></div>
+            </div>
             <button type="button" id="postCommentBtn" disabled="" aria-busy="false">
               コメント送信
             </button>
@@ -11569,7 +12105,38 @@
                * 押下直後トースト: PR1 純関数 backfillRecordCardHintDomState の retry_started フェーズ
                * 動機説明 (なぜ取り込むか): #backfillAutoStartToggle 説明文に統合 (本 PR で更新済) -->
         <p class="nl-export-toolbar__hint nl-compose-toolbar-hint" id="exportToolbarHint">HTML保存・マーケ・スクショ（動画の画面）・再読み込みは、いちばん上のボタンからもできます。</p>
-        
+        <details class="nl-export-toolbar__details nl-compose-primary-more" data-nl-toolbar-only="">
+          <summary class="nl-export-toolbar__summary">
+            書き出しの詳細・定期サムネ・ページ表示
+          </summary>
+          <div class="nl-export-toolbar__detail-body">
+            <p class="nl-export-note">
+              メタ情報・script・noopenerリンク・保存コメントをまとめて検索できるHTMLを出力します。
+            </p>
+            <p class="nl-export-note nl-export-note--sub">
+              定期サムネは watch
+              ページの表示を間隔で保存します（このPCの拡張ストレージ内のみ。閲覧ページの仕様に依存します）。
+            </p>
+            <div class="nl-thumb-row" role="group" aria-label="定期サムネの間隔">
+              <label for="thumbInterval">定期サムネ</label>
+              <select id="thumbInterval" aria-label="定期サムネの間隔">
+                <option value="0">オフ</option>
+                <option value="30000">30秒</option>
+                <option value="60000">1分</option>
+                <option value="300000">5分</option>
+              </select>
+              <span class="nl-thumb-count">サムネ <span id="thumbCount">-</span> 件（このPC内）</span>
+            </div>
+            <p class="nl-export-toolbar__status" id="captureStatus" aria-live="polite"></p>
+            <div class="nl-compose-troubleshoot" role="note" aria-label="送信トラブル時の案内">
+              <p class="nl-compose-troubleshoot-text">
+                コメントの取得や送信がうまくいかないときは、<strong>watchページを再読み込み</strong>（F5）してください。送信の横の「再読み込み」ボタンでも同じ操作ができます。拡張機能のファイルを差し替えたあとは、Chrome の
+                <strong>chrome://extensions</strong>
+                を開き、「君斗りんくの追憶のきらめき」の<strong>「更新」</strong>を押してから、必要なら watch ページも再読み込みしてください（拡張は自動では再読み込みされません）。<strong>タブを複数開いて別々の生放送を同時に見ても使えます</strong>（各タブで拡張が動きます。設定やストレージは同じ Chrome プロファイル内で共有されます）。
+              </p>
+            </div>
+          </div>
+        </details>
       </section>
 
       <div class="nl-vdh-divider" role="presentation">
@@ -11670,7 +12237,7 @@
                     <div id="sceneStoryUserLaneGuideBottom" class="nl-story-userlane-guide" hidden="">
                       <div id="sceneStoryUserLaneGuideLinesBottom" class="nl-story-userlane-guide__lines" aria-label="応援ユーザーレーンの表示件数"></div>
                     </div>
-                    
+                    <div id="storyAvatarDiag" class="nl-story-avatar-diag" hidden=""></div>
                     <div id="storyGrowthCollapsible" class="nl-story-growth-collapsible">
                       <div id="sceneStoryGauge" class="nl-story-meter" aria-label="応援コメントアイコン表示">
                         <div id="sceneStoryGrowth" class="nl-story-growth" aria-live="polite"></div>
@@ -11759,47 +12326,351 @@
 
 
 
-      
+      <section id="watchMeta" class="nl-watch-meta" hidden="" data-nl-toolbar-only="">
+        <div class="nl-watch-meta-top">
+          <img id="watchThumb" alt="放送サムネイル" hidden="">
+          <div>
+            <div id="watchTitle" class="nl-watch-title">-</div>
+            <div class="nl-watch-broadcaster">配信者: <span id="watchBroadcaster">-</span></div>
+          </div>
+        </div>
+        <div id="watchTags" class="nl-watch-tags"></div>
+        <div id="watchAudience" class="nl-watch-audience" hidden="">
+          <div class="nl-watch-audience-row">
+            <span class="nl-watch-audience-label">ユニーク利用者（記録コメント・推定）</span>
+            <strong id="watchUniqueUsers" class="nl-watch-audience-val">—</strong>
+            <span class="nl-watch-audience-sub">（ID未取得コメント <span id="watchCommentsNoId">—</span> 件）</span>
+          </div>
+          <p id="watchAudienceNote" class="nl-watch-audience-note"></p>
+        </div>
+      </section>
 
-      
+      <div id="commentHarvestBanner" class="nl-comment-harvest-banner" role="status" aria-live="polite" hidden="">
+        <strong>コメント欄を検出できていません</strong>
+        <span id="commentHarvestBannerDetail"></span>
+        <div class="nl-comment-harvest-banner__actions">
+          <span class="nl-comment-harvest-hint">ニコ生の画面改修でパネルが見つからない可能性があります。watch を再読み込みするか、しばらくお待ちください。</span>
+          <button type="button" id="dismissCommentHarvestBanner">閉じる</button>
+        </div>
+      </div>
 
-      
+      <details class="nl-dev-monitor-details" id="devMonitorDetails">
+        <summary>詳しい状況（開発・切り分け用・折りたたみ）</summary>
+        <div class="nl-dev-monitor-details__body">
+          <div id="storyAvatarDiagDevMonitor" class="nl-story-diag-dev" aria-live="polite" hidden=""></div>
+          <p class="nl-dev-monitor__hint">
+            普段は開かなくて大丈夫です。記録と公式表示の差や、アイコン・名前がどれだけ取れているかを、グラフと表で見る欄です（上から順に
+            取得率チャート → 件数の比較・種類の内訳 → 表 → 技術用JSON）。コメント本文は出しません。
+            <span class="nl-dev-monitor__hint-sub">
+              困ったときの目安: ライブかタイムシフトか／「このPCで記録」がONか／対象のwatchタブを開いたままか。下の「watchタブ内の一時対応表」と「取り込んだ行数」が長く0のままなら、ページの再読み込み（F5）や拡張の更新も試してください。
+              パネルが出ない・不具合の報告には「AI 共有用にコピー（診断まとめ）」1 回で、ページ側の状態を AI に渡せます（開発者ツールの手コピーは不要です）。
+            </span>
+          </p>
+          <div id="devMonitorAcquisition" class="nl-acquisition-wrap"></div>
+          <div id="devMonitorViz" class="nl-dev-monitor-viz-wrap" aria-live="polite"></div>
+          <div id="devMonitorDlCharts" class="nl-dev-monitor-dl-charts-wrap" aria-live="polite"></div>
+          <dl class="nl-dev-monitor__stats" id="devMonitorStats"></dl>
+          <!-- v0.1.202 A-0: AI 共有診断と同じ raw data から生成する取得状況サマリ -->
+          <dl class="nl-dev-monitor__stats" id="devMonitorGiftRankingExtras" aria-live="polite"></dl>
+          <pre class="nl-dev-monitor__json" id="devMonitorJson" aria-label="開発者向け・技術用の要約JSON（任意）"></pre>
+          <div class="nl-dev-monitor__actions">
+            <button type="button" class="nl-dev-monitor__btn nl-dev-monitor__btn--accent" id="devMonitorCopyAiBundleBtn" title="ページ内の診断（パネル・プレイヤー検出・挿入先）をまとめてコピー。開発者ツールは不要です。">
+              AI 共有用にコピー（診断まとめ）
+            </button>
+            <button type="button" class="nl-dev-monitor__btn" id="devMonitorDownloadAiBundleBtn" title="診断 JSON だけをファイルに保存（マークダウンなし）。別名保存で共有できます。">
+              AI 診断を JSON で保存
+            </button>
+            <button type="button" class="nl-dev-monitor__btn" id="devMonitorRefresh">
+              スナップショット再取得
+            </button>
+            <button type="button" class="nl-dev-monitor__btn" id="devMonitorExportTrendBtn">
+              推移JSONをコピー
+            </button>
+            <button type="button" class="nl-dev-monitor__btn" id="devMonitorExportIngestBtn" title="コメント保存のたびに溜まる監査ログ（経路・件数のみ）">
+              取り込みログをコピー
+            </button>
+            <button type="button" class="nl-dev-monitor__btn" id="devMonitorClearIngestBtn" title="取り込み監査ログを削除">
+              取り込みログ消去
+            </button>
+            <div class="nl-dev-monitor__mask-row" role="group" aria-label="マーケ分析DLのプライバシー">
+              <label>
+                <input type="checkbox" id="devMonitorExportMarketingMaskLabels">
+                <span>
+                  共有・掲載用に、DLするHTMLの<strong>トップコメンター表示名を伏せ字</strong>にし、<strong>サムネ画像を出さない</strong>（URLにユーザーIDが含まれることがあるため）。他枠での行為までは制限できません。
+                </span>
+              </label>
+            </div>
+            <button type="button" class="nl-dev-monitor__btn nl-dev-monitor__btn--accent" id="devMonitorExportMarketingBtn" disabled="">
+              📊 マーケ分析DL
+            </button>
+            <!-- v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視) -->
+            <button type="button" class="nl-dev-monitor__btn" id="devMonitorForceRefetchCommenterFollowBtn" title="コメンターのフォロワー数・フォロー先など niconico プロフィール情報を、キャッシュを無視して取り直します。マーケ分析の散布図やセグメントに最新値を反映させたい時に。">
+              🔄 フォロー情報を強制再取得
+            </button>
+            <span id="devMonitorForceRefetchCommenterFollowStatus" class="nl-dev-monitor__export-status" aria-live="polite"></span>
+            <span id="devMonitorExportTrendStatus" class="nl-dev-monitor__export-status" aria-live="polite"></span>
+          </div>
+        </div>
+      </details>
 
-      
+      <section class="nl-comment-compose" aria-label="コメント補助機能" data-nl-toolbar-only="">
+        <details class="nl-voice-guide-details" id="voiceOsGuideDetails">
+          <summary class="nl-voice-guide-summary">
+            <span class="nl-voice-guide-summary__avatar" aria-hidden="true">
+              <img class="nl-voice-guide-summary__img" src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png" alt="" width="44" height="44" decoding="async">
+            </span>
+            <span class="nl-voice-guide-summary__main">
+              <span class="nl-voice-guide-summary__title">たぬ姉より：OS の音声入力（Windows / Mac）</span>
+              <span class="nl-voice-guide-summary__context nl-voice-guide-summary__context--popup-only">
+                ツールバーのポップアップではマイク行は出ません。watch の<strong>ページ内パネル</strong>でマイク設定と「音声入力」が使えます。詳細は開いてね。
+              </span>
+              <span class="nl-voice-guide-summary__context nl-voice-guide-summary__context--inline-only">
+                下のマイク設定と「音声入力」とあわせて使えます。手順の詳細は開いてね。
+              </span>
+            </span>
+          </summary>
+          <div class="nl-voice-os-guide-body">
+            <p>
+              上のコメント欄をクリックしてフォーカスしてから話すと、OS
+              の音声入力で文字が入りやすいです。ブラウザの「音声入力」より安定することがあります。
+            </p>
+            <ul>
+              <li>
+                <strong>Windows</strong>：<kbd>Win</kbd> + <kbd>H</kbd>
+                で音声入力を開き、コメント欄に向かって話す（バージョンにより名称・設定が異なります）。
+              </li>
+              <li>
+                <strong>Mac</strong>：システム設定のキーボードで<strong>音声入力</strong>をオンにし、コメント欄にフォーカスした状態で話す。ショートカットは多くの環境で
+                <kbd>Fn</kbd> を2回、または <kbd>Control</kbd>
+                を2回（設定の「音声入力」パネルで変更・確認できます）。
+              </li>
+            </ul>
+            <p>
+              拡張の「音声入力」ボタンが画面に無いレイアウトでも、OS の音声入力だけで入力できます。
+            </p>
+            <p>
+              音声で送りたいときは「Enter でも送信」にチェック。キーボード中心なら
+              <kbd>Ctrl</kbd>+<kbd>Enter</kbd>（Mac は <kbd>Cmd</kbd>+<kbd>Enter</kbd>）が便利です。
+            </p>
+          </div>
+        </details>
+        <div class="nl-voice-device-row">
+          <span class="nl-voice-device-label" id="voiceInputDeviceLabel">マイク</span>
+          <select id="voiceInputDevice" class="nl-voice-device-select" aria-labelledby="voiceInputDeviceLabel" aria-label="音声入力で使うマイク">
+            <option value="">既定（システムデフォルト）</option>
+          </select>
+          <button type="button" id="voiceDeviceRefresh" class="nl-voice-device-btn">
+            一覧更新
+          </button>
+          <button type="button" id="voiceMicCheck" class="nl-voice-device-btn">
+            入力確認
+          </button>
+          <button type="button" id="voiceSrCheck" class="nl-voice-device-btn">
+            認識テスト
+          </button>
+        </div>
+        <p id="voiceDeviceCheckStatus" class="nl-voice-device-status" aria-live="polite"></p>
+        <div class="nl-voice-level-row" id="voiceLevelRow">
+          <span class="nl-voice-level-label" id="voiceLevelLabel">入力レベル（音声入力中）</span>
+          <div class="nl-voice-level-track" id="voiceLevelTrack" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="voiceLevelLabel">
+            <div class="nl-voice-level-fill" id="voiceLevelFill"></div>
+          </div>
+        </div>
+        <div class="nl-compose-actions">
+          <button type="button" id="voiceCommentBtn" disabled="" aria-pressed="false">
+            音声入力
+          </button>
+          <label class="nl-voice-autosend">
+            <input type="checkbox" id="voiceAutoSend" checked="">
+            認識後に送信
+          </label>
+          <label class="nl-voice-autosend" title="IME 変換中の Enter は送信しません。Ctrl+Enter / Cmd+Enter は常に送信できます。">
+            <input type="checkbox" id="commentEnterSend" checked="">
+            Enter でも送信
+          </label>
+        </div>
+      </section>
 
-      
+      <div id="storageErrorBanner" role="alert">
+        <strong>保存に失敗しました</strong>
+        <span id="storageErrorDetail"></span>
+        <div class="storage-error-actions">
+          <span class="nl-storage-hint">古いデータを HTML レポートで保存してから、不要な放送の記録を削除すると改善することがあります。</span>
+          <button type="button" id="dismissStorageError">閉じる</button>
+        </div>
+      </div>
 
-      
-      
-      
-      
-      
-      
+      <h2 data-nl-toolbar-only="">応援可視化（ユーザー別）</h2>
+      <label class="nl-anonymous-identicon-opt" data-nl-toolbar-only="" title="ニコ生公式の表示は変わりません。拡張の一覧・グリッド・ユーザーレーンなど手元の区別用です。既定はオン。オフにすると従来のフォールバック画像に戻ります。">
+        <input type="checkbox" id="anonymousIdenticonEnabled" autocomplete="off" checked="" aria-describedby="anonymousIdenticonHint">
+        <span>匿名コメントに Identicon を付ける（視聴ページでは同一シルエットになり得る ID
+          を、この拡張内で区別しやすくします）</span>
+      </label>
+      <p id="anonymousIdenticonHint" class="nl-anonymous-identicon-hint" data-nl-popup-copy="anonymous-identicon" data-nl-toolbar-only="">
+        公式ページそのものは変わりません。一覧のタイルだけ、匿名 ID ごとに模様を付けます（<strong>既定オン</strong>）。詳しくはサイトの
+        <a href="https://tsuioku-no-kirameki.com/#lp-anonymous-identicon" target="_blank" rel="noopener noreferrer">LP「匿名 Identicon」</a>
+        もどうぞ。
+      </p>
+      <label class="nl-anonymous-identicon-opt" data-nl-toolbar-only="" title="応援ランクストリップ（上部の小さなサムネ行）で、匿名（a:xxxxx やハッシュ系）ユーザーを件数上位でも後ろに回し、数値IDのユーザーを先に並べます。既定オン。">
+        <input type="checkbox" id="foldAnonymousInRankStrip" autocomplete="off" checked="" aria-describedby="foldAnonymousInRankStripHint">
+        <span>応援ランク上位を固定ファン優先にする（匿名大量のときでも数値 ID のユーザーを前に出します）</span>
+      </label>
+      <p id="foldAnonymousInRankStripHint" class="nl-anonymous-identicon-hint" data-nl-toolbar-only="">
+        匿名コメント（アイコンが取れない <code>a:xxxxx</code> 等）が件数トップに並ぶと、顔の見える固定ファンが折り畳まれて見えなくなるのを防ぎます（<strong>既定オン</strong>）。
+      </p>
+      <ul id="userRoomList" aria-live="polite" data-nl-toolbar-only=""></ul>
 
       <!-- 0.1.12 (D): 更新履歴。<details> 既定折り畳みで UIUX 阻害ゼロ。
            中身は popup-entry.js が EXTENSION_CHANGELOG から動的生成（HTML
            直書きにすると version bump の度に 2 箇所更新が必要になり drift する）。
            toolbar-only セクション群と同じ位置（拡張情報のすぐ近く）に配置。 -->
-      
+      <section class="nl-frame-switch nl-changelog-section" aria-label="更新履歴（バージョンごとの変更点）" data-nl-toolbar-only="">
+        <details class="nl-frame-theme-details" id="changelogDetails">
+          <summary class="nl-frame-theme-details__summary">
+            <span class="nl-frame-theme-details__summary-text">
+              <span class="nl-frame-theme-details__summary-label">更新履歴（クリックで開く）</span>
+              <span class="nl-frame-current" aria-live="polite">最新: <span id="changelogLatestLabel">-</span></span>
+            </span>
+          </summary>
+          <div class="nl-frame-theme-details__body">
+            <ol id="changelogList" class="nl-changelog-list" aria-live="polite"></ol>
+          </div>
+        </details>
+      </section>
 
-      
+      <section class="nl-frame-switch nl-project-concept" aria-label="この拡張について（君斗りんくの追憶のきらめき）" data-nl-toolbar-only="">
+        <details class="nl-frame-theme-details" id="projectConceptDetails">
+          <summary class="nl-frame-theme-details__summary">
+            <span class="nl-frame-theme-details__summary-text">
+              <span class="nl-frame-theme-details__summary-label">この拡張について（君斗りんくの追憶のきらめき）</span>
+              <span class="nl-project-concept-hint">応援の可視化</span>
+            </span>
+          </summary>
+          <div class="nl-frame-theme-details__body nl-project-concept-body">
+            <p>
+              この拡張の呼び名は<strong>君斗りんくの追憶のきらめき</strong>です。ダウンロードする
+              HTML のファイル名などには、開発識別子として <strong>nicolivelog</strong>
+              が含まれることがあります。ニコ生の<strong>応援コメントをこのPCに記録</strong>し、一覧や
+              HTML レポートで<strong>応援の可視化</strong>につなげます。保存した HTML
+              には「この拡張について」のゆっくり解説も入ります。
+            </p>
+            <p>
+              この取り組みは<strong>動員ちゃれんじ</strong>と文脈でリンクしています。詳しくは
+              <a href="https://doin-challenge.com/" target="_blank" rel="noopener noreferrer">doin-challenge.com</a>
+              を参照してください。
+            </p>
+            <p>
+              Kimito-Link 全体の情報は
+              <a href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer">kimito-link.com</a>
+              、または下の Powered by からどうぞ。
+            </p>
+          </div>
+        </details>
+      </section>
 
-      
+      <section class="nl-frame-switch" aria-label="ポップアップの見た目（配色）" data-nl-toolbar-only="">
+        <details class="nl-frame-theme-details" id="frameThemeDetails">
+          <summary class="nl-frame-theme-details__summary">
+            <span class="nl-frame-theme-details__summary-text">
+              <span class="nl-frame-theme-details__summary-label">ポップアップの配色</span>
+              <span class="nl-frame-current" aria-live="polite">現在: <span id="frameCurrentLabel">ライト</span></span>
+            </span>
+          </summary>
+          <div class="nl-frame-theme-details__body">
+            <div class="nl-frame-grid" role="listbox" aria-label="配色プリセット">
+              <button type="button" class="nl-frame-chip" data-frame-id="light" role="option" aria-selected="true">
+                ライト<small>明るめ</small>
+              </button>
+              <button type="button" class="nl-frame-chip" data-frame-id="dark" role="option" aria-selected="false">
+                ダーク<small>落ち着いた暗さ</small>
+              </button>
+              <button type="button" class="nl-frame-chip" data-frame-id="midnight" role="option" aria-selected="false">
+                ミッドナイト<small>夜向け</small>
+              </button>
+              <button type="button" class="nl-frame-chip" data-frame-id="sunset" role="option" aria-selected="false">
+                サンセット<small>暖色</small>
+              </button>
+              <button type="button" class="nl-frame-chip" data-frame-id="custom" role="option" aria-selected="false">
+                カスタム<small>色を調整</small>
+              </button>
+            </div>
+            <details class="nl-frame-custom" id="frameCustomEditor">
+              <summary>カスタム色・共有コード</summary>
+              <div class="nl-frame-color-grid">
+                <label class="nl-frame-color">
+                  ヘッダー左（開始色）
+                  <input type="color" id="frameHeaderStart">
+                </label>
+                <label class="nl-frame-color">
+                  ヘッダー右（終了色）
+                  <input type="color" id="frameHeaderEnd">
+                </label>
+                <label class="nl-frame-color">
+                  アクセント
+                  <input type="color" id="frameAccent">
+                </label>
+              </div>
+              <div class="nl-frame-custom-actions">
+                <button type="button" id="saveCustomFrame">カスタムを保存</button>
+                <button type="button" id="resetCustomFrame">色を初期化</button>
+              </div>
+              <div class="nl-frame-share-inline">
+                <button type="button" id="copyFrameCode">配色コードをコピー</button>
+                <button type="button" id="toggleFrameCodeInput">コードを入力</button>
+              </div>
+              <div class="nl-frame-share" id="frameShareBox" hidden="">
+                <textarea id="frameShareCode" spellcheck="false" autocomplete="off" aria-label="配色の共有コード"></textarea>
+                <div class="nl-frame-share-actions">
+                  <button type="button" id="applyFrameCode">適用</button>
+                </div>
+              </div>
+              <p id="frameShareStatus"></p>
+            </details>
+          </div>
+        </details>
+      </section>
 
       <!-- v0.1.1726: 配信採点パネル(カラオケ採点風)はユーザー判断で画面から外した(採点の純lib・テストは残置)。 -->
 
-      
+      <details class="nl-session-summary-panel" data-nl-toolbar-only="">
+        <summary>記録サマリの推移（この放送）</summary>
+        <p class="nl-sub">
+          IndexedDB に約1分ごとにサンプルを残します（件数上限で古い順に削除されます）。
+        </p>
+        <div id="sessionSummaryCompareMount" class="nl-session-summary-mount"></div>
+        <div class="nl-session-summary-actions">
+          <button type="button" id="exportSessionSummaryJsonBtn">
+            サマリをJSONで保存
+          </button>
+          <button type="button" id="exportMcpSnapshotJsonBtn" title="AI 連携用の正準スナップショットを Downloads/nicolivelog-mcp/ に保存します（MCP Phase1a）">
+            MCP用JSONを保存
+          </button>
+        </div>
+      </details>
 
-      
+      <details class="nl-gift-quick-panel" data-nl-toolbar-only="">
+        <summary>ギフト・広告ユーザー（簡易）</summary>
+        <div id="giftQuickStatsMount" class="nl-gift-quick-mount"></div>
+      </details>
 
-      
+      <details class="nl-gift-quick-panel" data-nl-toolbar-only="">
+        <summary id="giftSubAppHistorySummary">ギフトサイドバー履歴（未取得）</summary>
+        <div id="giftSubAppHistoryMount" class="nl-gift-quick-mount"></div>
+      </details>
 
       <!--
         ★応援動画バナー（2026-08-25 追加）
         中身は extension/data/ouen-banner.json から読む。
         JSON が無い / show=false のときは表示しない（既定は非表示＝fail-closed）。
       -->
-      
+      <a id="ouenBanner" class="nl-ouen-banner" hidden="" target="_blank" rel="noopener noreferrer" data-nl-toolbar-only="">
+        <span class="nl-ouen-banner__tag">応援動画</span>
+        <span class="nl-ouen-banner__text">
+          <span class="nl-ouen-banner__title" id="ouenBannerTitle"></span>
+          <span class="nl-ouen-banner__note" id="ouenBannerNote"></span>
+        </span>
+        <span class="nl-ouen-banner__when" id="ouenBannerWhen"></span>
+      </a>
 
       <footer class="nl-powered-by" role="contentinfo" aria-label="ブランド表記" data-nl-toolbar-only="">
         <span class="nl-powered-by-label">Powered by</span>

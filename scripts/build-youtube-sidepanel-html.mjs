@@ -93,50 +93,9 @@ function fragment(html) {
   return t.content;
 }
 
-// 1. ニコ生にしか無い部品を抜く(YouTube では何も入らない・押しても動かないもの)
-removeAll([
-  'script',
-  '#usageTermsGate',
-  '#nlPlacementQuickbar',
-  '#nlPlacementQuickHint',
-  '#noWatchRankingHint',
-  '#lastBroadcastIndicator',
-  '#lastBroadcastActions',
-  '#offlineBanner',
-  '#extensionContextBanner',
-  '#nlVersionMismatchBanner',
-  '#casterBanner',
-  '#watchOfficialEventBannerCard',
-  '#topGiftRankStrip',
-  '[data-lane="eventBroadcasters"]',
-  '[data-lane="eventVotingSupporters"]',
-  '[data-lane="adRanking"]',
-  '[data-lane="eventRank"]',
-  '[data-lane="eventScore"]',
-  '#giftRankingFetchPrompt',
-  '.nl-record-nav-hint',
-  '.nl-nameplate-inline',
-  '.nl-cheer-palette-wrapper',
-  '.nl-compose-primary-more',
-  '#watchMeta',
-  '#commentHarvestBanner',
-  '#devMonitorDetails',
-  'section.nl-comment-compose[aria-label="コメント補助機能"]',
-  '#storageErrorBanner',
-  'h2[data-nl-toolbar-only]',
-  '.nl-anonymous-identicon-opt',
-  '.nl-anonymous-identicon-hint',
-  '#userRoomList',
-  '.nl-changelog-section',
-  '.nl-project-concept',
-  'section.nl-frame-switch',
-  '#ouenBanner',
-  '#storyAvatarDiag',
-  '#liveStatCommentsBackfillHint',
-  '#liveStatCommentsRecovery',
-  'details.nl-session-summary-panel',
-  'details.nl-gift-quick-panel',
-]);
+// 1. ★部品は1つも抜かない(りんく「一旦完全コピーしてから変える約束かえないで」2026-11-03)。
+//    抜くのはニコ生版のスクリプトだけ(YouTube 版は sidepanel.js が動かす)。
+removeAll(['script']);
 
 // 2. 上のボタン列: ニコ生版は JS(hoistQuickToolbarToTop)で一番上へ動かしている。YouTube 版は最初からそこに置く
 const toolbar = mustGet('.nl-compose-quick-toolbar');
@@ -216,7 +175,8 @@ setText(
   const settings = mustGet('#nlPopupSettings');
   setText('#nlPopupSettings .nl-popup-settings__summary', '詳細設定（読み上げ・チャットの表示）');
   const settingsBody = mustGet('#nlPopupSettings .nl-popup-settings__body');
-  settingsBody.innerHTML = part('settings');
+  // ニコ生版の設定はそのまま残し、先頭に YouTube の読み上げ・チャット設定を足す
+  settingsBody.insertBefore(fragment(part('settings')), settingsBody.firstChild);
   settings.removeAttribute('open');
 }
 

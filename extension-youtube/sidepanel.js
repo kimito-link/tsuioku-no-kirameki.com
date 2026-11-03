@@ -375,6 +375,20 @@
   // src/lib/voicevoxClient.js
   var VOICEVOX_BASE_URL = "http://127.0.0.1:50021";
 
+  // src/lib/storyGrowthLimits.js
+  var STORY_GROWTH_MAX_CELLS = 360;
+  function buildStoryGrowthGaugeLabel(total, maxCells) {
+    const all = Math.max(0, Math.floor(Number(total) || 0));
+    if (all <= 0) return "応援 0 コメント";
+    const cap = Math.max(1, Math.floor(Number(maxCells) || STORY_GROWTH_MAX_CELLS));
+    const hint = "ホバーでプレビュー・クリックで詳細固定（Esc・外側クリックで閉じる）";
+    if (all <= cap) {
+      return `応援 ${all.toLocaleString("ja-JP")} コメント / ${hint}`;
+    }
+    const hidden = all - cap;
+    return `応援 ${all.toLocaleString("ja-JP")} コメント（グリッドははじめの ${cap.toLocaleString("ja-JP")} 件で固定・そのあとの ${hidden.toLocaleString("ja-JP")} 件は下の応援レーンに出ます） / ${hint}`;
+  }
+
   // src/lib/youtube/ytSupportRanking.js
   var ZERO_DECIMAL_CURRENCIES = /* @__PURE__ */ new Set(["JPY", "KRW", "TWD", "VND"]);
   function buildYtChannelUrl(channelId) {
@@ -1621,6 +1635,44 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     const pal = colorScheme === "dark" ? ACCENT_HEX_DARK : ACCENT_HEX_LIGHT;
     return pal[slot] ?? null;
   }
+  function supportUserKeyFromEntry(entry) {
+    if (!entry || typeof entry !== "object") return UNKNOWN_USER_KEY;
+    const uid = String(
+      /** @type {{ userId?: string }} */
+      entry.userId || ""
+    ).trim();
+    return uid || UNKNOWN_USER_KEY;
+  }
+  function buildSupportAccentIndex(entries, offset = 0, count) {
+    if (!Array.isArray(entries)) return { ordinals: [], totals: [] };
+    const start = Math.max(0, Math.floor(Number(offset) || 0));
+    const requested = count == null ? entries.length - start : Math.floor(Number(count) || 0);
+    const end = Math.min(entries.length, start + Math.max(0, requested));
+    const len = Math.max(0, end - start);
+    const ordinals = new Array(len);
+    const totals = new Array(len);
+    const keys = new Array(len);
+    const totalByKey = /* @__PURE__ */ new Map();
+    for (let i = 0; i < len; i += 1) {
+      const key = supportUserKeyFromEntry(entries[start + i]);
+      keys[i] = key;
+      totalByKey.set(key, (totalByKey.get(key) || 0) + 1);
+    }
+    const running = /* @__PURE__ */ new Map();
+    for (let i = 0; i < len; i += 1) {
+      const key = keys[i];
+      if (key === UNKNOWN_USER_KEY) {
+        ordinals[i] = 1;
+        totals[i] = 1;
+        continue;
+      }
+      const r = (running.get(key) || 0) + 1;
+      running.set(key, r);
+      ordinals[i] = r;
+      totals[i] = totalByKey.get(key) || 0;
+    }
+    return { ordinals, totals };
+  }
 
   // src/lib/giftDisplayNickname.js
   function isLikelyInternalNdgGiftOrCampaignLabel(s) {
@@ -2691,6 +2743,53 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     return { tiers, totals, displayed, total };
   }
 
+  // src/lib/storyAvatarDiagLine.js
+  function formatStoryAvatarDiagLine(s) {
+    const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+    if (totalNum <= 0) return null;
+    let line = `診断(技術): 保存アイコンURL ${s.withAvatar}/${totalNum}（種類 ${s.uniqueAvatar}） / 表示に使えたアイコン ${s.resolvedAvatar}/${totalNum}（種類 ${s.resolvedUniqueAvatar}） / ユーザーID ${s.withUid}/${totalNum} / 自分の投稿 表示${s.selfShown}件（保存済${s.selfSaved}, 待ち${s.selfPending}, 一致${s.selfPendingMatched}） / ページから拾った補助 ${s.interceptItems}件（ID${s.interceptWithUid}, アイコン${s.interceptWithAvatar}） / 後から補完 ${s.mergedPatched}件`;
+    if (s.mergedUidReplaced > 0) {
+      line += `（ID差し替え ${s.mergedUidReplaced}）`;
+    }
+    if (s.stripped > 0) {
+      line += ` / 不整合除去 ${s.stripped}件`;
+    }
+    const mapOn = typeof s.interceptMapOnPage === "number" && s.interceptMapOnPage >= 0 ? String(s.interceptMapOnPage) : "—";
+    const exportRows = typeof s.interceptExportRows === "number" && s.interceptExportRows >= 0 ? s.interceptExportRows : null;
+    const exCode = String(s.interceptExportCode || "").trim();
+    const exDetail = String(s.interceptExportDetail || "").trim().slice(0, 72);
+    if (mapOn !== "—" || exportRows != null || exCode) {
+      line += ` / ページ内の一時対応表 ${mapOn}件`;
+      if (exportRows != null) line += `・直近の取り込み ${exportRows}行`;
+      if (exCode) line += ` [${exCode}]`;
+      if (exDetail) line += ` (${exDetail})`;
+    }
+    const ulDed = Math.max(0, Math.floor(Number(s.userLaneDeduped) || 0));
+    if (ulDed > 0) {
+      const t3 = Math.max(0, Math.floor(Number(s.userLaneTier3) || 0));
+      const t2 = Math.max(0, Math.floor(Number(s.userLaneTier2) || 0));
+      const t1 = Math.max(0, Math.floor(Number(s.userLaneTier1) || 0));
+      const sn = Math.max(0, Math.floor(Number(s.userLaneStrongNick) || 0));
+      const th = Math.max(0, Math.floor(Number(s.userLanePersonalThumb) || 0));
+      line += ` / レーン候補${ulDed}（り${t3}/こ${t2}/た${t1}・強名${sn}/個サ${th}）`;
+    }
+    const regressions = Math.max(0, Math.floor(Number(s.diagRegressions) || 0));
+    if (regressions > 0) {
+      line += ` / 表示ゆらぎ補正${regressions}回`;
+    }
+    return line;
+  }
+  function buildStoryAvatarDiagHtml(s) {
+    const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+    if (totalNum <= 0) {
+      return '<div class="nl-story-diag nl-story-diag--compact"><p class="nl-story-diag__lead">記録している応援コメント <strong>0</strong> 件です。</p></div>';
+    }
+    const technical = formatStoryAvatarDiagLine(s);
+    const glossary = '<ul class="nl-story-diag__list"><li><strong>保存アイコン</strong>：このPCの記録に、アイコンのURLとして残っている件数です。</li><li><strong>表示アイコン</strong>：グリッドなどで実際に画像として使えている件数です。</li><li><strong>ページから拾った補助</strong>：ニコ生のページが読み取る通信から、拡張が利用者表示を補うために使う情報です（本文は保存しません）。</li><li><strong>一時対応表</strong>：開いている watch タブのメモリ上だけにある対応表で、キャッシュとは別です。</li><li><strong>ユーザーレーンの段</strong>：記録コメントの表示名・サムネURL・成長タイル用の解決結果から「強い名前」「個人サムネ」を判定しています。公式の仮名のままだとこん太・たぬ姉に寄りやすいです。</li></ul>';
+    const compactLead = `記録している応援コメント <strong>${totalNum}</strong> 件です。件数の内訳（アイコン・ユーザーID・レーン・取り込みなど）は、下の「${SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL}」を開くと読めます。`;
+    return `<div class="nl-story-diag nl-story-diag--compact"><p class="nl-story-diag__lead">${compactLead}</p><details class="nl-story-diag__more"><summary class="nl-story-diag__summary">内訳・用語（詳しく見る）</summary><div class="nl-story-diag__body">` + glossary + (technical ? `<p class="nl-story-diag__technical">${escapeHtml2(technical)}</p>` : "") + `</div></details></div>`;
+  }
+
   // src/lib/youtube/ytRankLinesHtml.js
   function ytRankUserKey(channelId, name) {
     const id = String(channelId || "").trim();
@@ -3288,6 +3387,97 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     const want = recent > 0 ? IMG.linkSmile : IMG.linkHalf;
     if (img && img.getAttribute("src") !== want) img.setAttribute("src", want);
   }
+  function paintStoryGrowthGrid(records, total, onPick) {
+    const root = $("sceneStoryGrowth");
+    if (!root) return;
+    const list = (Array.isArray(records) ? records : []).slice(0, STORY_GROWTH_MAX_CELLS);
+    const entries = list.map((r) => ({ userId: ytRankUserKey(r?.channelId, r?.name) }));
+    const accent = buildSupportAccentIndex(entries, 0, entries.length);
+    const have = root.querySelectorAll(".nl-story-growth-cell").length;
+    if (have > list.length) {
+      root.innerHTML = "";
+    }
+    const start = Math.min(have, list.length);
+    const frag = document.createDocumentFragment();
+    for (let i = start; i < list.length; i += 1) {
+      const r = list[i] || {};
+      const key = entries[i].userId;
+      const name = String(r.name || "リスナー");
+      const cell = document.createElement("span");
+      cell.className = "nl-story-growth-cell";
+      const media = document.createElement("span");
+      media.className = "nl-story-growth-cell__media";
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.decoding = "async";
+      const fallback = identiconFor(key || name);
+      const remote = isHttpOrHttpsUrl(r.iconUrl) ? String(r.iconUrl) : "";
+      img.src = remote || fallback;
+      img.className = `nl-story-growth-icon${remote ? " nl-story-growth-icon--remote" : ""}`;
+      if (remote) {
+        img.referrerPolicy = "no-referrer";
+        img.addEventListener("error", () => {
+          if (img.src !== fallback) {
+            img.src = fallback;
+            img.classList.remove("nl-story-growth-icon--remote");
+          }
+        });
+      }
+      img.alt = name;
+      img.setAttribute("role", "button");
+      img.setAttribute("tabindex", "0");
+      const text = String(r.text || "").slice(0, 26);
+      img.setAttribute("aria-label", `${name}: ${text}`);
+      img.title = `${name}
+${text}`;
+      const pick = () => {
+        const u = laneUserByKey.get(key);
+        onPick(u || { channelId: r.channelId || "", name, iconUrl: r.iconUrl || "", commentCount: 0 });
+      };
+      img.addEventListener("click", pick);
+      img.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          pick();
+        }
+      });
+      media.appendChild(img);
+      cell.appendChild(media);
+      frag.appendChild(cell);
+    }
+    root.appendChild(frag);
+    const cells = root.querySelectorAll(".nl-story-growth-cell");
+    for (let i = 0; i < cells.length; i += 1) {
+      const cell = (
+        /** @type {HTMLElement} */
+        cells[i]
+      );
+      const ord = accent.ordinals[i] || 0;
+      cell.classList.toggle("nl-story-growth-cell--repeat", ord > 1);
+      if (ord > 1) cell.setAttribute("data-support-ordinal", String(ord));
+      else cell.removeAttribute("data-support-ordinal");
+    }
+    {
+      const n = list.length;
+      const px = n <= 20 ? 40 : n <= 80 ? 34 : n <= 200 ? 30 : n <= 500 ? 26 : n <= 1200 ? 22 : n <= 3e3 ? 18 : n <= 6e3 ? 14 : 12;
+      const body = root.closest(".nl-story-body");
+      (body instanceof HTMLElement ? body : root).style.setProperty("--nl-story-icon-size", `${px}px`);
+    }
+    setText("sceneStoryGaugeLabel", buildStoryGrowthGaugeLabel(total, STORY_GROWTH_MAX_CELLS));
+    const gauge = $("sceneStoryGauge");
+    if (gauge) gauge.setAttribute("aria-label", `応援コメントアイコン: 累計 ${formatNumberJa(total)} コメント`);
+    const diag = $("storyAvatarDiag");
+    if (diag) {
+      const withIcon = list.filter((r) => isHttpOrHttpsUrl(r?.iconUrl)).length;
+      const withUid = list.filter((r) => String(r?.channelId || "").trim()).length;
+      const html = buildStoryAvatarDiagHtml(
+        /** @type {any} */
+        { total, withUid, withAvatar: withIcon, uniqueAvatar: withIcon, resolvedAvatar: withIcon }
+      );
+      diag.innerHTML = String(html || "").replace(/ニコ生のページ/g, "YouTube のページ");
+      diag.hidden = !html;
+    }
+  }
   if (typeof window !== "undefined") {
     window.__ytNicoView = { identiconFor };
   }
@@ -3324,7 +3514,7 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
   });
   var SUPPORT_TIMELINE_LIMIT = 80;
   var AUTO_ALL_CHAT_KEY = "yt_auto_all_chat_v1";
-  var STORY_GROWTH_GRID_LIMIT = 240;
+  var growthRecords = [];
   var selectedVideoId = "";
   var currentIncrementalState = null;
   var renderJobChain = Promise.resolve();
@@ -3559,57 +3749,13 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
   function renderNorthStarSupportLanes(ranking) {
     paintNorthStarLanes(ranking);
   }
-  function bindStoryTileClick(cell, user) {
-    cell.addEventListener("click", (ev) => {
-      const e = (
-        /** @type {MouseEvent} */
-        ev
-      );
-      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
-      e.preventDefault();
-      void showStoryUserDetail(user);
-    });
-  }
   function renderSupportVisualDetails(ranking) {
-    const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
     paintStoryUserLanes(ranking, currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0);
-    const growthGridEl = document.getElementById("sceneStoryGrowth");
-    const gaugeLabelEl = document.getElementById("sceneStoryGaugeLabel");
-    const gridSlice = commenters.slice(0, STORY_GROWTH_GRID_LIMIT);
-    if (growthGridEl) {
-      clearChildren(growthGridEl);
-      const frag = document.createDocumentFragment();
-      for (let i = 0; i < gridSlice.length; i += 1) {
-        const u = gridSlice[i];
-        const channelUrl = safeHttpUrl(u.channelUrl || buildYtChannelUrl(u.channelId));
-        const cell = channelUrl ? document.createElement("a") : document.createElement("span");
-        cell.className = "nl-story-growth-cell nl-story-growth-cell--repeat";
-        cell.setAttribute("data-support-ordinal", String(u.commentCount));
-        cell.title = `${u.name} (${u.commentCount}件)`;
-        if (channelUrl) {
-          cell.href = channelUrl;
-          cell.target = "_blank";
-          cell.rel = "noopener noreferrer";
-        }
-        const media = document.createElement("span");
-        media.className = "nl-story-growth-cell__media";
-        media.appendChild(
-          createAvatarImgWithFallback(
-            u.iconUrl || "",
-            u.name,
-            u.channelId || u.name,
-            "nl-story-growth-icon nl-story-growth-icon--remote"
-          )
-        );
-        cell.appendChild(media);
-        bindStoryTileClick(cell, u);
-        frag.appendChild(cell);
-      }
-      growthGridEl.appendChild(frag);
-    }
-    if (gaugeLabelEl) {
-      gaugeLabelEl.textContent = commenters.length > gridSlice.length ? `いま ${formatNumberJa(gridSlice.length)} 人を表示中（ほか ${formatNumberJa(commenters.length - gridSlice.length)}人）` : `いま ${formatNumberJa(commenters.length)} 人を表示中`;
-    }
+    paintStoryGrowthGrid(
+      growthRecords,
+      currentIncrementalState ? currentIncrementalState.totalCount || 0 : growthRecords.length,
+      (u) => void showStoryUserDetail(u)
+    );
     visualDetailsNeedsRefresh = false;
   }
   async function showStoryUserDetail(user) {
@@ -3951,6 +4097,11 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
     const applied = applyYtStreamIncrementalItems(currentIncrementalState, items, {
       broadcasterChannelId: currentSummary?.broadcasterChannelId || ""
     });
+    growthRecords = items.slice(0, STORY_GROWTH_MAX_CELLS);
+    {
+      const g = document.getElementById("sceneStoryGrowth");
+      if (g) g.innerHTML = "";
+    }
     updateStreamHeaderUi(summaries, activeId, applied.totalCount);
     renderLiveStatsAndOfficialRow(
       currentSummary,
@@ -4014,6 +4165,9 @@ input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--border);bo
       pushSupportTimeline(newRecords, false);
       renderSupportTimeline();
       pushRecentActivity(newRecords, false);
+      if (growthRecords.length < STORY_GROWTH_MAX_CELLS) {
+        growthRecords = growthRecords.concat(newRecords).slice(0, STORY_GROWTH_MAX_CELLS);
+      }
       paintStoryHeader(applied.totalCount, latestRecordOf(newRecords));
       updateExportButtonsState(applied.totalCount);
       patchLaneIncremental("rinku", applied.addedByLane.rinku, applied.laneCounts.rinku);
