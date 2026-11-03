@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTileStatsText, speechSupportLine, speechEmptyMessage } from './venueSpeechStats.js';
+import { parseTileStatsText, speechSupportLine, speechEmptyMessage, speechFallbackNote, speechFallbackListHtml } from './venueSpeechStats.js';
 import { formatLaneTileStats } from './laneTileStats.js';
 
 describe('parseTileStatsText', () => {
@@ -37,6 +37,42 @@ describe('speechEmptyMessage', () => {
   });
   it('記録が何も無い人は従来の文言', () => {
     expect(speechEmptyMessage('')).toBe('この配信の記録にはまだ発言がありません');
-    expect(speechEmptyMessage('💬6')).toBe('この配信の記録にはまだ発言がありません');
+  });
+  it('★タイルに 💬 がある人に「ギフト・広告のみ」「まだ発言がありません」と言わない(2026-11-03 実機)', () => {
+    expect(speechEmptyMessage('🎁500 💬1')).not.toContain('ギフト・広告のみ');
+    expect(speechEmptyMessage('💬6')).not.toContain('まだ発言がありません');
+    expect(speechEmptyMessage('💬6')).toContain('6 回');
+  });
+  it('★記録を読めなかったときは「無い」と言い切らず理由を言う', () => {
+    expect(speechEmptyMessage('🎁500', { contextLost: true })).toContain('F5');
+    expect(speechEmptyMessage('🎁500', { contextLost: true })).not.toContain('ギフト・広告のみ');
+    expect(speechEmptyMessage('', { readFailed: true })).toContain('間に合いませんでした');
+  });
+});
+
+describe('speechFallbackNote', () => {
+  it('代わりに出す本文が無ければ空', () => {
+    expect(speechFallbackNote(0)).toBe('');
+    expect(speechFallbackNote(NaN, { contextLost: true })).toBe('');
+  });
+  it('件数と理由を出す', () => {
+    expect(speechFallbackNote(2)).toContain('2 件');
+    expect(speechFallbackNote(2, { contextLost: true })).toContain('F5');
+    expect(speechFallbackNote(2, { readFailed: true })).toContain('間に合わなかった');
+  });
+});
+
+describe('speechFallbackListHtml', () => {
+  const esc = (s) => String(s).replace(/</g, '&lt;');
+  it('手元の発言が無ければ空', () => {
+    expect(speechFallbackListHtml([], {}, esc)).toBe('');
+    expect(speechFallbackListHtml(undefined, {}, esc)).toBe('');
+  });
+  it('新しい順のまま並べ、注記に理由を出し、本文はエスケープする', () => {
+    const html = speechFallbackListHtml(['ユキちゃん', '<b>ww</b>', ' '], { contextLost: true }, esc);
+    expect(html.indexOf('ユキちゃん')).toBeLessThan(html.indexOf('ww'));
+    expect(html).toContain('2 件');
+    expect(html).toContain('F5');
+    expect(html).not.toContain('<b>');
   });
 });

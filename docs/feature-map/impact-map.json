@@ -4444,6 +4444,16 @@
       ]
     },
     {
+      "file": "src/extension/orphanTabAutoReloadHost.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/extension/page-intercept-entry.js",
       "featureCount": 1,
       "features": [
@@ -7841,6 +7851,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/orphanTabAutoReload.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
       ]
     },
     {

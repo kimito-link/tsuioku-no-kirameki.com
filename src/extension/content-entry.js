@@ -654,6 +654,7 @@ import {
   normalizeCommentPanelAutoRestoreEnabled
 } from '../lib/commentPanelHealthProbe.js';
 import { pushLiveCommentsToComeview } from './comeviewLivePushHost.js';
+import { startOrphanTabAutoReloadInPage } from './orphanTabAutoReloadHost.js';
 
 /**
  * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string, avatarObserved?: boolean }} ParsedCommentRow
@@ -14304,6 +14305,8 @@ function createDevMonitorOverlay() {
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
+  // v0.1.1851: 拡張が新しい版に入れ替わってこのページが古い版のまま止まったら、自分で読み込み直す(F5 不要・入力中は待つ)。
+  if (isWatchInlinePanelTopFrame()) startOrphanTabAutoReloadInPage(() => hasExtensionContext());
   /*
    * ★v0.1.1271(ユーザー要望): 会場モードのボタンを出すかを設定で選べるようにした。
    *   「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、
