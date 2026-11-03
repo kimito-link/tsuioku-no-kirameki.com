@@ -170,6 +170,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           broadcasterChannelId: payload.broadcasterChannelId
             ? String(payload.broadcasterChannelId)
             : undefined,
+          broadcasterIconUrl: payload.broadcasterIconUrl
+            ? String(payload.broadcasterIconUrl)
+            : undefined,
+          concurrentViewers:
+            typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
         },
         Date.now(),
       );

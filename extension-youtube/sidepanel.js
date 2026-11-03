@@ -11,6 +11,103 @@
     return (Number.isFinite(v) ? v : 0).toLocaleString("ja-JP");
   }
 
+  // src/lib/anonymousIdenticon.js
+  function hashString(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i += 1) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  var LINE = "#332a26";
+  var SKIN_TONES = ["#ffeede", "#ffe6cf", "#fdf0e4", "#f8dfc8"];
+  var HAIR_COLORS = [
+    ["#f29b38", "#ffc97e"],
+    ["#3a3534", "#6b6360"],
+    ["#8a5a2b", "#c08c50"],
+    ["#e88bb1", "#ffc3da"],
+    ["#5b87c5", "#9cc0ea"],
+    ["#7aa45a", "#b4d59a"],
+    ["#e9c25a", "#ffe6a0"],
+    ["#d4543a", "#f59679"],
+    ["#8d6bb0", "#c4a8e0"],
+    ["#8f8f8f", "#c9c9c9"],
+    ["#4ba596", "#92d5c9"],
+    ["#a4683f", "#d49a6e"]
+  ];
+  var EYES = [
+    // ぱっちり（白目+2色虹彩+ハイライト2つ）
+    (iris, irisDark) => `<ellipse cx="23.5" cy="37" rx="5" ry="6.6" fill="#fff" stroke="${LINE}" stroke-width="2.2"/><ellipse cx="40.5" cy="37" rx="5" ry="6.6" fill="#fff" stroke="${LINE}" stroke-width="2.2"/><ellipse cx="23.5" cy="38" rx="3.2" ry="4.4" fill="${irisDark}"/><ellipse cx="40.5" cy="38" rx="3.2" ry="4.4" fill="${irisDark}"/><ellipse cx="23.5" cy="39.2" rx="2" ry="2.6" fill="${iris}"/><ellipse cx="40.5" cy="39.2" rx="2" ry="2.6" fill="${iris}"/><circle cx="22" cy="35.4" r="1.6" fill="#fff"/><circle cx="39" cy="35.4" r="1.6" fill="#fff"/><circle cx="25.2" cy="40.2" r="0.8" fill="#fff" opacity="0.9"/><circle cx="42.2" cy="40.2" r="0.8" fill="#fff" opacity="0.9"/>`,
+    // にこにこ閉じ目（∩・太線）
+    () => `<path d="M18.5 38 q5 -6.5 10 0" stroke="${LINE}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M35.5 38 q5 -6.5 10 0" stroke="${LINE}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    // ジト目（まぶた直線+下半分の虹彩）
+    (iris, irisDark) => `<path d="M18.5 35 l10 0" stroke="${LINE}" stroke-width="2.8" stroke-linecap="round"/><path d="M35.5 35 l10 0" stroke="${LINE}" stroke-width="2.8" stroke-linecap="round"/><path d="M20.5 35.8 a3.6 4 0 0 0 7.2 0 z" fill="${irisDark}"/><path d="M37.5 35.8 a3.6 4 0 0 0 7.2 0 z" fill="${irisDark}"/><path d="M22 35.8 a2 2.2 0 0 0 4 0 z" fill="${iris}"/><path d="M39 35.8 a2 2.2 0 0 0 4 0 z" fill="${iris}"/>`
+  ];
+  var MOUTHS = [
+    () => `<path d="M27.5 46.5 q2.3 2.6 4.5 0 q2.2 2.6 4.5 0" stroke="${LINE}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`,
+    () => `<path d="M27 46 a5 4.6 0 0 0 10 0 z" fill="#9e3a30" stroke="${LINE}" stroke-width="1.8"/><path d="M29.5 49.2 a2.6 1.8 0 0 1 5 0 z" fill="#e9756a"/>`,
+    () => `<path d="M27 46 q5 4.4 10 0" stroke="${LINE}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
+  ];
+  var HAIRS = [
+    // ボブ+ぱっつんギザ（りんく系）
+    (c, hi) => `<path d="M8 44 q-2 -26 24 -28 q26 2 24 28 l-5 3 q3 -8 1 -14 l-3 6 -3 -8 -4 6 -4 -8 -3 7 -4 -7 -4 8 -4 -6 -3 8 -3 -6 q-2 6 1 14 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 24 q8 -7 18 -7 q10 0 18 7 q-8 -3 -18 -3 q-10 0 -18 3 z" fill="${hi}" opacity="0.85"/>`,
+    // 外はねショート（こんた系）
+    (c, hi) => `<path d="M9 42 q-7 -4 -3 -10 q-6 -2 0 -8 q2 -12 26 -12 q24 0 26 12 q6 6 0 8 q4 6 -3 10 l-4 1 q2 -6 0 -10 l-4 5 -3 -9 -5 6 -5 -9 -4 8 -5 -7 -4 9 -4 -5 q-2 4 0 10 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15 22 q8 -6 17 -6 q9 0 17 6 q-8 -2.5 -17 -2.5 q-9 0 -17 2.5 z" fill="${hi}" opacity="0.85"/>`,
+    // ロング風（たぬ姉系・髪が顔の横を流れ落ちる）
+    (c, hi) => `<path d="M10 58 q-4 -18 -2 -30 q4 -14 24 -14 q20 0 24 14 q2 12 -2 30 l-6 -2 q3 -12 2 -22 l-4 6 -3 -9 -5 6 -4 -9 -4 8 -5 -7 -4 8 -4 -5 q-1 10 2 22 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15 23 q8 -6 17 -6 q9 0 17 6 q-8 -2.5 -17 -2.5 q-9 0 -17 2.5 z" fill="${hi}" opacity="0.85"/>`,
+    // ふんわりマッシュ
+    (c, hi) => `<path d="M8 40 q-2 -25 24 -25 q26 0 24 25 q-1 5 -5 6 q2 -5 1 -9 l-4 5 -3 -7 -5 5 -4 -7 -4 6 -4 -6 -4 7 -5 -5 -3 7 -4 -5 q-1 4 1 9 q-4 -1 -5 -6 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 24 q9 -6.5 18 -6.5 q9 0 18 6.5 q-9 -3 -18 -3 q-9 0 -18 3 z" fill="${hi}" opacity="0.85"/>`
+  ];
+  var ACCENTS = [
+    (c) => `<path d="M32 16 q-2 -8 4 -11 q-1 5 1 7 q3 -3 7 -2 q-5 2 -6 7 z" fill="${c}" stroke="${LINE}" stroke-width="2" stroke-linejoin="round"/>`,
+    (c) => `<path d="M13 26 q-3 -12 3 -16 q6 3 7 13 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M51 26 q3 -12 -3 -16 q-6 3 -7 13 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15.5 24 q-1.5 -7 1.5 -10 q3 2 4 8 z" fill="#fff" opacity="0.75"/><path d="M48.5 24 q1.5 -7 -1.5 -10 q-3 2 -4 8 z" fill="#fff" opacity="0.75"/>`,
+    () => ""
+  ];
+  function shade(hex, f) {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    if (!m) return "#5a4636";
+    const c = (x) => Math.max(0, Math.min(255, Math.floor(parseInt(x, 16) * f)));
+    return `rgb(${c(m[1])},${c(m[2])},${c(m[3])})`;
+  }
+  var IDENTICON_CACHE_MAX = 2e3;
+  var identiconCache = /* @__PURE__ */ new Map();
+  function anonymousIdenticonDataUrl(userId, sizePx = 64) {
+    const s = String(userId || "").trim();
+    if (!s) return "";
+    const n = Math.max(16, Math.min(128, Number(sizePx) || 64));
+    const cacheKey = `${n}|${s}`;
+    const hit = identiconCache.get(cacheKey);
+    if (hit !== void 0) {
+      identiconCache.delete(cacheKey);
+      identiconCache.set(cacheKey, hit);
+      return hit;
+    }
+    const h = hashString(s);
+    const hue = (h >>> 15) % 360;
+    const bg = `hsl(${hue},55%,90%)`;
+    const skin = SKIN_TONES[h % SKIN_TONES.length];
+    const [hairC, hairHi] = HAIR_COLORS[(h >>> 3) % HAIR_COLORS.length];
+    const iris = shade(hairC, 0.9);
+    const irisDark = shade(hairC, 0.45);
+    const eyes = EYES[(h >>> 7) % EYES.length];
+    const mouth = MOUTHS[(h >>> 10) % MOUTHS.length];
+    const hairShape = HAIRS[(h >>> 12) % HAIRS.length];
+    const accent = ACCENTS[(h >>> 21) % ACCENTS.length];
+    const blushStrong = (h >>> 20 & 1) === 1;
+    const blush = `<ellipse cx="17" cy="44" rx="4.4" ry="2.6" fill="#ff9d9d" opacity="${blushStrong ? 0.8 : 0.45}"/><ellipse cx="47" cy="44" rx="4.4" ry="2.6" fill="#ff9d9d" opacity="${blushStrong ? 0.8 : 0.45}"/>`;
+    const k = n / 64;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}"><rect width="100%" height="100%" fill="${bg}"/><g transform="scale(${k})">` + accent(hairC) + `<path d="M13 38 a19 19 0 1 0 38 0 a19 21 0 0 0 -38 0 z" fill="${skin}" stroke="${LINE}" stroke-width="2.2"/>` + hairShape(hairC, hairHi) + blush + eyes(iris, irisDark) + mouth() + `</g></svg>`;
+    const out = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    identiconCache.set(cacheKey, out);
+    while (identiconCache.size > IDENTICON_CACHE_MAX) {
+      const oldest = identiconCache.keys().next().value;
+      if (oldest === void 0) break;
+      identiconCache.delete(oldest);
+    }
+    return out;
+  }
+
   // src/lib/voiceStyleLevelTable.js
   var VOICE_STYLE_LEVEL_TABLE = Object.freeze({
     "0": [0.084, 0.456],
@@ -311,8 +408,10 @@
   }
   function createYtSupportRankingAccumulator() {
     const totalsByCurrency = {};
+    const currencyItemCounts = {};
     const currencyUserMap = {};
     const supporterMap = /* @__PURE__ */ new Map();
+    const commenterMap = /* @__PURE__ */ new Map();
     const supporterChannelIds = /* @__PURE__ */ new Set();
     const counts = {
       superchat: 0,
@@ -322,19 +421,71 @@
     };
     const byCurrency = {};
     const supporters = [];
+    let cachedCommenters = [];
+    const snapshot = {
+      totalsByCurrency,
+      currencyItemCounts,
+      byCurrency,
+      counts,
+      supporters,
+      supporterChannelIds,
+      get uniqueCommenterCount() {
+        return commenterMap.size;
+      },
+      get primaryCurrencySummary() {
+        const codes = Object.keys(totalsByCurrency);
+        if (codes.length === 0) {
+          return { currency: "", amount: 0, itemCount: 0, formatted: "—" };
+        }
+        codes.sort((a, b) => {
+          const countDiff = (currencyItemCounts[b] || 0) - (currencyItemCounts[a] || 0);
+          if (countDiff !== 0) return countDiff;
+          const amountDiff = (totalsByCurrency[b] || 0) - (totalsByCurrency[a] || 0);
+          if (amountDiff !== 0) return amountDiff;
+          return a.localeCompare(b);
+        });
+        const best = codes[0];
+        const amount = totalsByCurrency[best] || 0;
+        return {
+          currency: best,
+          amount,
+          itemCount: currencyItemCounts[best] || 0,
+          formatted: formatYtCurrencyAmount(amount, best)
+        };
+      },
+      get commenters() {
+        if (cachedCommenters !== null) return cachedCommenters;
+        const sorted = Array.from(commenterMap.values()).sort((a, b) => {
+          if (b.commentCount !== a.commentCount) return b.commentCount - a.commentCount;
+          if (b.superchatTotalAmount !== a.superchatTotalAmount) {
+            return b.superchatTotalAmount - a.superchatTotalAmount;
+          }
+          const aMemGift = a.giftCount + a.membershipCount;
+          const bMemGift = b.giftCount + b.membershipCount;
+          if (bMemGift !== aMemGift) return bMemGift - aMemGift;
+          if (b.lastTs !== a.lastTs) return b.lastTs - a.lastTs;
+          return a.firstOrder - b.firstOrder;
+        });
+        cachedCommenters = sorted.map((entry, idx) => ({
+          rank: idx + 1,
+          ...entry
+        }));
+        return cachedCommenters;
+      }
+    };
     return {
       totalsByCurrency,
+      currencyItemCounts,
       currencyUserMap,
       supporterMap,
+      commenterMap,
       supporterChannelIds,
       counts,
-      snapshot: {
-        totalsByCurrency,
-        byCurrency,
-        counts,
-        supporters,
-        supporterChannelIds
-      }
+      commenterSeq: 0,
+      invalidateCommentersCache() {
+        cachedCommenters = null;
+      },
+      snapshot
     };
   }
   function applyYtSupportRankingDelta(accumulator, newItems) {
@@ -357,28 +508,96 @@
       const badges = Array.isArray(item.badges) ? item.badges : [];
       const isMemberBadge = badges.includes("member");
       const channelId = String(item.channelId || item.name || "").trim();
-      if (channelId && (isSupportKind || isMemberBadge)) {
+      if (!channelId) continue;
+      const name = String(item.name || channelId).trim();
+      const iconUrl = safeHttpUrl(item.iconUrl || "");
+      const channelUrl = buildYtChannelUrl(channelId);
+      const ts = Number.isFinite(Number(item.ts)) ? Number(item.ts) : Number.isFinite(Number(item.recordedAt)) ? Number(item.recordedAt) : 0;
+      const amount = Number(item.amount || 0);
+      const currency = String(item.currency || "").trim().toUpperCase();
+      const isPaid = (kind === "superchat" || kind === "sticker") && Number.isFinite(amount) && amount > 0 && Boolean(currency);
+      let commenter = acc.commenterMap.get(channelId);
+      if (!commenter) {
+        acc.commenterSeq += 1;
+        commenter = {
+          channelId,
+          name,
+          iconUrl,
+          channelUrl,
+          commentCount: 0,
+          superchatCount: 0,
+          stickerCount: 0,
+          superchatTotalAmount: 0,
+          amountsByCurrency: {},
+          primaryFormattedAmount: "",
+          membershipCount: 0,
+          giftCount: 0,
+          isMember: false,
+          lastTs: ts,
+          firstOrder: acc.commenterSeq
+        };
+        acc.commenterMap.set(channelId, commenter);
+      } else {
+        if (name && (!commenter.name || commenter.name === commenter.channelId)) {
+          commenter.name = name;
+        }
+        if (iconUrl && !commenter.iconUrl) {
+          commenter.iconUrl = iconUrl;
+        }
+        if (ts > commenter.lastTs) {
+          commenter.lastTs = ts;
+        }
+      }
+      commenter.commentCount += 1;
+      if (isMemberBadge || kind === "membership" || kind === "membership_gift") {
+        commenter.isMember = true;
+      }
+      if (kind === "superchat") commenter.superchatCount += 1;
+      else if (kind === "sticker") commenter.stickerCount += 1;
+      else if (kind === "membership") commenter.membershipCount += 1;
+      else if (kind === "membership_gift") commenter.giftCount += 1;
+      if (isPaid) {
+        commenter.superchatTotalAmount = Math.round((commenter.superchatTotalAmount + amount) * 100) / 100;
+        commenter.amountsByCurrency[currency] = Math.round(((commenter.amountsByCurrency[currency] || 0) + amount) * 100) / 100;
+        commenter.primaryFormattedAmount = formatYtCurrencyAmount(
+          commenter.amountsByCurrency[currency],
+          currency
+        );
+      }
+      acc.invalidateCommentersCache();
+      if (iconUrl) {
+        const existingSup = acc.supporterMap.get(channelId);
+        if (existingSup && !existingSup.iconUrl) {
+          existingSup.iconUrl = iconUrl;
+          rankingChanged = true;
+        }
+        for (const cKey of Object.keys(acc.currencyUserMap)) {
+          const cEntry = acc.currencyUserMap[cKey]?.get(channelId);
+          if (cEntry && !cEntry.iconUrl) {
+            cEntry.iconUrl = iconUrl;
+            touchedCurrencies.add(cKey);
+            rankingChanged = true;
+          }
+        }
+      }
+      if (isSupportKind || isMemberBadge) {
         if (!acc.supporterChannelIds.has(channelId)) {
           acc.supporterChannelIds.add(channelId);
           supporterSetChanged = true;
         }
       }
-      if (!isSupportKind || !channelId) continue;
+      if (!isSupportKind) continue;
       rankingChanged = true;
       if (kind === "superchat") acc.counts.superchat += 1;
       else if (kind === "sticker") acc.counts.sticker += 1;
       else if (kind === "membership") acc.counts.membership += 1;
       else if (kind === "membership_gift") acc.counts.membershipGift += 1;
-      const name = String(item.name || channelId).trim();
-      const iconUrl = safeHttpUrl(item.iconUrl || "");
-      const channelUrl = buildYtChannelUrl(channelId);
-      const ts = Number.isFinite(Number(item.ts)) ? Number(item.ts) : 0;
       let sup = acc.supporterMap.get(channelId);
       if (!sup) {
         sup = {
           channelId,
           name,
-          iconUrl,
+          iconUrl: iconUrl || commenter.iconUrl || "",
           channelUrl,
           amountsByCurrency: {},
           superchatCount: 0,
@@ -397,10 +616,9 @@
       else if (kind === "sticker") sup.stickerCount += 1;
       else if (kind === "membership") sup.membershipCount += 1;
       else if (kind === "membership_gift") sup.giftCount += 1;
-      const amount = Number(item.amount || 0);
-      const currency = String(item.currency || "").trim().toUpperCase();
-      if ((kind === "superchat" || kind === "sticker") && Number.isFinite(amount) && amount > 0 && currency) {
+      if (isPaid) {
         acc.totalsByCurrency[currency] = Math.round(((acc.totalsByCurrency[currency] || 0) + amount) * 100) / 100;
+        acc.currencyItemCounts[currency] = (acc.currencyItemCounts[currency] || 0) + 1;
         sup.amountsByCurrency[currency] = Math.round(((sup.amountsByCurrency[currency] || 0) + amount) * 100) / 100;
         if (!acc.currencyUserMap[currency]) {
           acc.currencyUserMap[currency] = /* @__PURE__ */ new Map();
@@ -411,7 +629,7 @@
           cEntry = {
             channelId,
             name,
-            iconUrl,
+            iconUrl: iconUrl || commenter.iconUrl || "",
             channelUrl,
             amount: 0,
             currency,
@@ -575,6 +793,7 @@
       broadcasterChannelId: String(opts.broadcasterChannelId || "").trim(),
       displayLimit,
       totalCount: 0,
+      firstRecordedAt: 0,
       lastRecordedAt: 0,
       /** @type {Set<string>} */
       seenPks: /* @__PURE__ */ new Set(),
@@ -622,8 +841,13 @@
       state.seenPks.add(pk);
       unseen.push(item);
       const recAt = Number(item.recordedAt || 0);
-      if (Number.isFinite(recAt) && recAt > state.lastRecordedAt) {
-        state.lastRecordedAt = recAt;
+      if (Number.isFinite(recAt) && recAt > 0) {
+        if (state.firstRecordedAt === 0 || recAt < state.firstRecordedAt) {
+          state.firstRecordedAt = recAt;
+        }
+        if (recAt > state.lastRecordedAt) {
+          state.lastRecordedAt = recAt;
+        }
       }
     }
     if (unseen.length === 0) {
@@ -779,7 +1003,8 @@
     VOICE_SETTINGS: "yt_voice_settings",
     VOICE_ASSIGNMENTS: "yt_voice_assignments",
     VOICE_QUEUE: "yt_voice_queue",
-    VOICE_STATE: "yt_voice_state"
+    VOICE_STATE: "yt_voice_state",
+    UI_STATE: "yt_sidepanel_ui_state"
   });
   var LANE_CONFIG = Object.freeze({
     rinku: {
@@ -801,9 +1026,15 @@
       fallbackIcon: "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
     }
   });
+  var BROADCASTER_FALLBACK_ICON = "images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png";
+  var TOP_SUPPORT_STRIP_LIMIT = 10;
+  var STORY_USERLANE_LIMIT = 36;
+  var STORY_GROWTH_GRID_LIMIT = 240;
   var selectedVideoId = "";
   var currentIncrementalState = null;
   var renderJobChain = Promise.resolve();
+  var visualDetailsNeedsRefresh = false;
+  var identiconCache2 = /* @__PURE__ */ new Map();
   var metrics = {
     fullGetAllCount: 0,
     incrementalFetchCount: 0,
@@ -830,47 +1061,63 @@
       el.removeChild(el.firstChild);
     }
   }
-  function createAvatarNode(iconUrl, name, fallbackIconPath) {
-    const safeUrl = safeHttpUrl(iconUrl || "");
-    const makeFallback = () => {
-      if (fallbackIconPath) {
-        const fImg = document.createElement("img");
-        fImg.className = "nl-story-userlane-avatar avatar-img";
-        fImg.src = fallbackIconPath;
-        fImg.alt = name || "icon";
-        fImg.decoding = "async";
-        return fImg;
-      }
-      const initial = String(name || "?").replace(/^@/, "").trim().slice(0, 1).toUpperCase() || "?";
-      const span = document.createElement("span");
-      span.className = "avatar-fallback";
-      span.textContent = initial;
-      return span;
-    };
-    if (!safeUrl) {
-      return makeFallback();
+  function getDeterministicIdenticonUrl(key) {
+    const k = String(key || "anon").trim() || "anon";
+    const cached = identiconCache2.get(k);
+    if (cached) return cached;
+    const url = anonymousIdenticonDataUrl(k, 64);
+    if (identiconCache2.size > 2e3) {
+      const first = identiconCache2.keys().next().value;
+      if (first) identiconCache2.delete(first);
     }
+    identiconCache2.set(k, url);
+    return url;
+  }
+  function formatShortChannelId(channelId) {
+    const raw = String(channelId || "").trim();
+    if (!raw) return "";
+    const cleaned = raw.startsWith("handle:") ? raw.slice("handle:".length) : raw;
+    return cleaned.length > 14 ? `${cleaned.slice(0, 14)}…` : cleaned;
+  }
+  function formatElapsedDurationJa(elapsedMs) {
+    if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return "—";
+    const totalSec = Math.floor(elapsedMs / 1e3);
+    if (totalSec < 60) return "1分未満";
+    const totalMin = Math.floor(totalSec / 60);
+    if (totalMin < 60) return `${totalMin}分`;
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    return `${hours}時間${String(mins).padStart(2, "0")}分`;
+  }
+  function createAvatarImgWithFallback(iconUrl, name, channelKey, className, explicitFallbackSrc = "") {
+    const safeUrl = safeHttpUrl(iconUrl || "");
+    const fallbackSrc = explicitFallbackSrc || getDeterministicIdenticonUrl(channelKey || name || "anon");
     const img = document.createElement("img");
-    img.className = "nl-story-userlane-avatar avatar-img";
-    img.src = safeUrl;
+    img.className = className;
+    img.src = safeUrl || fallbackSrc;
     img.alt = name || "icon";
     img.loading = "lazy";
     img.decoding = "async";
     img.referrerPolicy = "no-referrer";
-    img.addEventListener("error", () => {
-      const fallback = makeFallback();
-      if (img.parentNode) {
-        img.parentNode.replaceChild(fallback, img);
-      }
-    });
+    if (safeUrl) {
+      img.addEventListener(
+        "error",
+        () => {
+          if (img.src !== fallbackSrc) {
+            img.src = fallbackSrc;
+          }
+        },
+        { once: true }
+      );
+    }
     return img;
   }
-  function createAuthorHeaderFragment(user, fallbackIconPath) {
+  function createAuthorHeaderFragment(user) {
     const frag = document.createDocumentFragment();
     const displayName = String(user.name || user.channelId || "匿名リスナー").trim();
     const channelId = String(user.channelId || "").trim();
     const channelUrl = safeHttpUrl(buildYtChannelUrl(channelId));
-    const shortId = channelId ? `${channelId.slice(0, 14)}${channelId.length > 14 ? "…" : ""}` : "";
+    const shortId = formatShortChannelId(channelId);
     const cell = channelUrl ? document.createElement("a") : document.createElement("span");
     cell.className = channelUrl ? "nl-story-userlane-cell nl-story-userlane-cell--linkable author-link" : "nl-story-userlane-cell author-link";
     if (channelUrl) {
@@ -879,7 +1126,14 @@
       cell.rel = "noopener noreferrer";
     }
     cell.title = channelId ? `${displayName} (${channelId})` : displayName;
-    cell.appendChild(createAvatarNode(user.iconUrl || "", displayName, fallbackIconPath));
+    cell.appendChild(
+      createAvatarImgWithFallback(
+        user.iconUrl || "",
+        displayName,
+        channelId || displayName,
+        "nl-story-userlane-avatar avatar-img"
+      )
+    );
     const meta = document.createElement("span");
     meta.className = "nl-story-userlane-meta";
     const nameSpan = document.createElement("span");
@@ -904,7 +1158,7 @@
     }
     return frag;
   }
-  function createChatItemElement(item, lane = "tanunee") {
+  function createChatItemElement(item) {
     const card = document.createElement("div");
     const kind = String(item.kind || "text");
     const isGiftLike = kind === "superchat" || kind === "sticker" || kind === "membership" || kind === "membership_gift";
@@ -914,10 +1168,9 @@
     if (Number.isFinite(Number(item.voiceStyleId))) {
       card.dataset.voiceStyleId = String(item.voiceStyleId);
     }
-    const fallbackIcon = LANE_CONFIG[lane]?.fallbackIcon || LANE_CONFIG.tanunee.fallbackIcon;
     const head = document.createElement("div");
     head.className = "chat-item-head";
-    head.appendChild(createAuthorHeaderFragment(item, fallbackIcon));
+    head.appendChild(createAuthorHeaderFragment(item));
     if ((kind === "superchat" || kind === "sticker") && Number(item.amount) > 0) {
       const pill = document.createElement("span");
       pill.className = "amount-pill";
@@ -955,7 +1208,7 @@
     const listEl = document.getElementById(cfg.listId);
     const countEl = document.getElementById(cfg.countId);
     if (countEl) {
-      countEl.textContent = `${totalLaneCount}件`;
+      countEl.textContent = `${formatNumberJa(totalLaneCount)}件`;
     }
     if (!listEl) return;
     clearChildren(listEl);
@@ -968,7 +1221,7 @@
     }
     const frag = document.createDocumentFragment();
     for (let i = 0; i < displayItems.length; i += 1) {
-      frag.appendChild(createChatItemElement(displayItems[i], lane));
+      frag.appendChild(createChatItemElement(displayItems[i]));
     }
     listEl.appendChild(frag);
   }
@@ -976,7 +1229,7 @@
     const cfg = LANE_CONFIG[lane];
     const countEl = document.getElementById(cfg.countId);
     if (countEl) {
-      countEl.textContent = `${totalLaneCount}件`;
+      countEl.textContent = `${formatNumberJa(totalLaneCount)}件`;
     }
     if (!newlyAddedChronological || newlyAddedChronological.length === 0) return;
     const listEl = document.getElementById(cfg.listId);
@@ -990,14 +1243,14 @@
       const newest = newlyAddedChronological.slice(-YT_SIDE_PANEL_DISPLAY_LIMIT).reverse();
       const frag2 = document.createDocumentFragment();
       for (let i = 0; i < newest.length; i += 1) {
-        frag2.appendChild(createChatItemElement(newest[i], lane));
+        frag2.appendChild(createChatItemElement(newest[i]));
       }
       listEl.appendChild(frag2);
       return;
     }
     const frag = document.createDocumentFragment();
     for (let i = newlyAddedChronological.length - 1; i >= 0; i -= 1) {
-      frag.appendChild(createChatItemElement(newlyAddedChronological[i], lane));
+      frag.appendChild(createChatItemElement(newlyAddedChronological[i]));
     }
     listEl.insertBefore(frag, listEl.firstChild);
     while (listEl.children.length > YT_SIDE_PANEL_DISPLAY_LIMIT) {
@@ -1008,116 +1261,432 @@
       }
     }
   }
-  function renderSupportRanking(ranking) {
-    const summaryEl = document.getElementById("yt-support-summary");
-    const containerEl = document.getElementById("yt-currency-ranking-container");
-    const paidTotalCount = ranking.counts.superchat + ranking.counts.sticker;
-    const memberTotalCount = ranking.counts.membership + ranking.counts.membershipGift;
-    if (summaryEl) {
-      summaryEl.textContent = `スパチャ・ステッカー ${paidTotalCount}件 / メンバー・ギフト ${memberTotalCount}件`;
+  function renderLiveStatsAndOfficialRow(currentSummary, totalComments, ranking, incState) {
+    const uniqueVisitors = Number(ranking?.uniqueCommenterCount || 0);
+    const concurrent = typeof currentSummary?.concurrentViewers === "number" && Number.isFinite(currentSummary.concurrentViewers) && currentSummary.concurrentViewers >= 0 ? currentSummary.concurrentViewers : null;
+    const commentsCardVal = document.getElementById("liveStatComments");
+    if (commentsCardVal) {
+      commentsCardVal.textContent = formatNumberJa(totalComments);
     }
-    if (!containerEl) return;
-    clearChildren(containerEl);
-    const currencies = Object.keys(ranking.byCurrency);
-    if (currencies.length === 0 && ranking.supporters.length === 0) {
-      const hint = document.createElement("div");
-      hint.className = "empty-hint";
-      hint.textContent = "スーパーチャット・ステッカー・メンバー加入が届くと通貨ごとに集計されます。";
-      containerEl.appendChild(hint);
-      return;
+    const concurrentEstEl = document.getElementById("watchConcurrentEst");
+    if (concurrentEstEl) {
+      concurrentEstEl.textContent = concurrent !== null ? formatNumberJa(concurrent) : "—";
     }
-    const kontaFallback = LANE_CONFIG.konta.fallbackIcon;
-    for (const currency of currencies) {
-      const box = document.createElement("div");
-      box.className = "currency-box";
-      box.dataset.currency = currency;
-      const header = document.createElement("div");
-      header.className = "currency-header";
-      const titleSpan = document.createElement("span");
-      titleSpan.textContent = `${currency} ランキング`;
-      const totalSpan = document.createElement("span");
-      totalSpan.textContent = `合計 ${formatYtCurrencyAmount(
-        ranking.totalsByCurrency[currency],
-        currency
-      )}`;
-      header.appendChild(titleSpan);
-      header.appendChild(totalSpan);
-      box.appendChild(header);
-      const listWrap = document.createElement("div");
-      listWrap.className = "nl-top-support-rank__list";
-      listWrap.setAttribute("role", "list");
-      const rows = ranking.byCurrency[currency].slice(0, 10);
-      for (const row of rows) {
-        const rowEl = document.createElement("div");
-        rowEl.className = "nl-top-support-rank__line supporter-row";
-        rowEl.setAttribute("role", "listitem");
-        const rankSpan = document.createElement("span");
-        rankSpan.className = "nl-top-support-rank__place rank-badge";
-        rankSpan.textContent = `${row.rank}位`;
-        rowEl.appendChild(rankSpan);
-        rowEl.appendChild(
-          createAuthorHeaderFragment(
-            {
-              name: row.name,
-              channelId: row.channelId,
-              iconUrl: row.iconUrl
-            },
-            kontaFallback
-          )
-        );
-        const amountSpan = document.createElement("span");
-        amountSpan.className = "nl-top-support-rank__count amount-pill";
-        amountSpan.style.marginLeft = "auto";
-        amountSpan.textContent = `${row.formattedAmount} (${row.count}回)`;
-        rowEl.appendChild(amountSpan);
-        listWrap.appendChild(rowEl);
+    const visitorsCardVal = document.getElementById("watchViewerDom");
+    if (visitorsCardVal) {
+      visitorsCardVal.textContent = formatNumberJa(uniqueVisitors);
+    }
+    const offVisitors = document.getElementById("officialStatVisitors");
+    if (offVisitors) {
+      offVisitors.textContent = formatNumberJa(uniqueVisitors);
+    }
+    const offComments = document.getElementById("officialStatComments");
+    if (offComments) {
+      offComments.textContent = formatNumberJa(totalComments);
+    }
+    const offElapsed = document.getElementById("officialStatElapsed");
+    if (offElapsed) {
+      const startMs = (incState && incState.firstRecordedAt > 0 ? incState.firstRecordedAt : 0) || Number(currentSummary?.createdAt || 0);
+      const endMs = Math.max(
+        incState && incState.lastRecordedAt > 0 ? incState.lastRecordedAt : 0,
+        Number(currentSummary?.updatedAt || 0)
+      ) || Date.now();
+      if (startMs > 0 && endMs >= startMs && (totalComments > 0 || currentSummary)) {
+        offElapsed.textContent = formatElapsedDurationJa(endMs - startMs);
+      } else {
+        offElapsed.textContent = "—";
       }
-      box.appendChild(listWrap);
-      containerEl.appendChild(box);
     }
-    const memberSupporters = ranking.supporters.filter(
-      (s) => s.membershipCount > 0 || s.giftCount > 0
+    const offSuperchat = document.getElementById("officialStatSuperchat");
+    if (offSuperchat) {
+      const primary = ranking?.primaryCurrencySummary;
+      offSuperchat.textContent = primary?.formatted || "—";
+    }
+    const offMemGift = document.getElementById("officialStatMemberGift");
+    if (offMemGift) {
+      const memGiftCount = Number(ranking?.counts?.membership || 0) + Number(ranking?.counts?.membershipGift || 0);
+      offMemGift.textContent = `${formatNumberJa(memGiftCount)}件`;
+    }
+    const comeviewMeta = document.getElementById("yt-comeview-summary-meta");
+    if (comeviewMeta) {
+      comeviewMeta.textContent = `合計 ${formatNumberJa(totalComments)}件`;
+    }
+  }
+  function createSupportRankLineCard(opts) {
+    const channelUrl = safeHttpUrl(opts.channelUrl || buildYtChannelUrl(opts.channelId));
+    const card = channelUrl ? document.createElement("a") : document.createElement("div");
+    card.className = channelUrl ? "nl-top-support-rank__line nl-top-support-rank__line--linkable supporter-row" : "nl-top-support-rank__line supporter-row";
+    card.setAttribute("role", "listitem");
+    if (channelUrl) {
+      card.href = channelUrl;
+      card.target = "_blank";
+      card.rel = "noopener noreferrer";
+    }
+    const displayName = String(opts.name || opts.channelId || "リスナー").trim();
+    const shortId = formatShortChannelId(opts.channelId);
+    card.title = opts.channelId ? `${displayName} (${opts.channelId}) — ${opts.countText}` : `${displayName} — ${opts.countText}`;
+    const placeSpan = document.createElement("span");
+    placeSpan.className = "nl-top-support-rank__place";
+    placeSpan.textContent = opts.placeText;
+    card.appendChild(placeSpan);
+    const countSpan = document.createElement("span");
+    countSpan.className = "nl-top-support-rank__count";
+    countSpan.textContent = opts.countText;
+    card.appendChild(countSpan);
+    const thumbWrap = document.createElement("span");
+    thumbWrap.className = "nl-top-support-rank__thumb-wrap";
+    thumbWrap.appendChild(
+      createAvatarImgWithFallback(
+        opts.iconUrl || "",
+        displayName,
+        opts.channelId || displayName,
+        "nl-top-support-rank__thumb"
+      )
     );
-    if (memberSupporters.length > 0) {
-      const box = document.createElement("div");
-      box.className = "currency-box";
-      box.dataset.currency = "MEMBERSHIP";
-      const header = document.createElement("div");
-      header.className = "currency-header";
-      const titleSpan = document.createElement("span");
-      titleSpan.textContent = "メンバー加入・ギフト応援者";
-      const totalSpan = document.createElement("span");
-      totalSpan.textContent = `加入 ${ranking.counts.membership} / ギフト ${ranking.counts.membershipGift}`;
-      header.appendChild(titleSpan);
-      header.appendChild(totalSpan);
-      box.appendChild(header);
-      const listWrap = document.createElement("div");
-      listWrap.className = "nl-top-support-rank__list";
-      listWrap.setAttribute("role", "list");
-      for (const sup of memberSupporters.slice(0, 10)) {
-        const rowEl = document.createElement("div");
-        rowEl.className = "nl-top-support-rank__line supporter-row";
-        rowEl.setAttribute("role", "listitem");
-        rowEl.appendChild(
-          createAuthorHeaderFragment(
-            {
+    card.appendChild(thumbWrap);
+    if (shortId) {
+      const idSpan = document.createElement("span");
+      idSpan.className = "nl-top-support-rank__id";
+      idSpan.textContent = shortId;
+      idSpan.title = opts.channelId;
+      card.appendChild(idSpan);
+    }
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "nl-top-support-rank__name";
+    nameSpan.textContent = displayName;
+    card.appendChild(nameSpan);
+    return card;
+  }
+  function renderTopSupportRankStrip(currentSummary, ranking) {
+    const listEl = document.getElementById("topSupportRankList");
+    if (!listEl) return;
+    clearChildren(listEl);
+    const frag = document.createDocumentFragment();
+    const casterTile = document.createElement("div");
+    casterTile.className = "nl-top-support-rank__caster";
+    casterTile.setAttribute("role", "listitem");
+    const casterLabel = document.createElement("span");
+    casterLabel.className = "nl-top-support-rank__caster-label";
+    casterLabel.textContent = "配信者";
+    casterTile.appendChild(casterLabel);
+    const bName = String(
+      currentSummary?.broadcasterName || currentSummary?.title || "YouTube 配信者"
+    ).trim();
+    const bChannelId = String(currentSummary?.broadcasterChannelId || "").trim();
+    const bChannelUrl = safeHttpUrl(buildYtChannelUrl(bChannelId)) || (selectedVideoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(selectedVideoId)}` : "");
+    const casterThumb = createAvatarImgWithFallback(
+      currentSummary?.broadcasterIconUrl || "",
+      bName,
+      bChannelId || bName,
+      "nl-top-support-rank__caster-thumb",
+      BROADCASTER_FALLBACK_ICON
+    );
+    casterTile.appendChild(casterThumb);
+    const casterNameSpan = document.createElement("span");
+    casterNameSpan.className = "nl-top-support-rank__caster-name";
+    casterNameSpan.textContent = bName;
+    casterNameSpan.title = bChannelId ? `${bName} (${bChannelId})` : bName;
+    casterTile.appendChild(casterNameSpan);
+    if (bChannelUrl) {
+      const followLink = document.createElement("a");
+      followLink.className = "nl-top-support-rank__caster-follow";
+      followLink.href = bChannelUrl;
+      followLink.target = "_blank";
+      followLink.rel = "noopener noreferrer";
+      followLink.textContent = bChannelId ? "チャンネル" : "視聴ページ";
+      casterTile.appendChild(followLink);
+    }
+    frag.appendChild(casterTile);
+    const commenters = (Array.isArray(ranking?.commenters) ? ranking.commenters : []).filter(
+      (c) => !bChannelId || c.channelId !== bChannelId
+    );
+    const topSlice = commenters.slice(0, TOP_SUPPORT_STRIP_LIMIT);
+    for (let i = 0; i < topSlice.length; i += 1) {
+      const c = topSlice[i];
+      const countLabel = c.primaryFormattedAmount ? `${c.commentCount}件 · ${c.primaryFormattedAmount}` : `${c.commentCount}件`;
+      frag.appendChild(
+        createSupportRankLineCard({
+          placeText: String(i + 1),
+          countText: countLabel,
+          name: c.name,
+          channelId: c.channelId,
+          iconUrl: c.iconUrl,
+          channelUrl: c.channelUrl
+        })
+      );
+    }
+    listEl.appendChild(frag);
+  }
+  function renderNorthStarSupportLanes(ranking) {
+    const summaryEl = document.getElementById("yt-support-summary");
+    const currencyContainer = document.getElementById("yt-currency-ranking-container");
+    const memberSummaryEl = document.getElementById("yt-member-gift-summary");
+    const memberListEl = document.getElementById("yt-member-gift-list");
+    const paidTotalCount = Number(ranking?.counts?.superchat || 0) + Number(ranking?.counts?.sticker || 0);
+    if (summaryEl) {
+      summaryEl.textContent = `スパチャ・ステッカー ${formatNumberJa(paidTotalCount)}件（通貨別集計・換算なし）`;
+    }
+    if (memberSummaryEl) {
+      memberSummaryEl.textContent = `メンバー加入 ${formatNumberJa(ranking?.counts?.membership || 0)}件 / ギフト ${formatNumberJa(ranking?.counts?.membershipGift || 0)}件`;
+    }
+    if (currencyContainer) {
+      clearChildren(currencyContainer);
+      const currencies = Object.keys(ranking?.byCurrency || {});
+      if (currencies.length === 0) {
+        const hint = document.createElement("div");
+        hint.className = "empty-hint";
+        hint.textContent = "スーパーチャット・ステッカーが届くと通貨ごとに集計されます。";
+        currencyContainer.appendChild(hint);
+      } else {
+        for (const currency of currencies) {
+          const box = document.createElement("div");
+          box.className = "currency-box";
+          box.dataset.currency = currency;
+          const header = document.createElement("div");
+          header.className = "currency-header";
+          const titleSpan = document.createElement("span");
+          titleSpan.textContent = `${currency} ランキング`;
+          const totalSpan = document.createElement("span");
+          totalSpan.textContent = `合計 ${formatYtCurrencyAmount(
+            ranking.totalsByCurrency[currency],
+            currency
+          )}`;
+          header.appendChild(titleSpan);
+          header.appendChild(totalSpan);
+          box.appendChild(header);
+          const listWrap = document.createElement("div");
+          listWrap.className = "nl-top-support-rank__list";
+          listWrap.setAttribute("role", "list");
+          const rows = ranking.byCurrency[currency].slice(0, 12);
+          for (const row of rows) {
+            listWrap.appendChild(
+              createSupportRankLineCard({
+                placeText: `${row.rank}位`,
+                countText: `${row.formattedAmount} (${row.count}回)`,
+                name: row.name,
+                channelId: row.channelId,
+                iconUrl: row.iconUrl,
+                channelUrl: row.channelUrl
+              })
+            );
+          }
+          box.appendChild(listWrap);
+          currencyContainer.appendChild(box);
+        }
+      }
+    }
+    if (memberListEl) {
+      clearChildren(memberListEl);
+      const memberSupporters = (ranking?.supporters || []).filter(
+        (s) => s.membershipCount > 0 || s.giftCount > 0
+      );
+      if (memberSupporters.length === 0) {
+        const hint = document.createElement("div");
+        hint.className = "empty-hint";
+        hint.textContent = "メンバー加入・メンバーシップギフトが届くとここに表示されます。";
+        memberListEl.appendChild(hint);
+      } else {
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < Math.min(memberSupporters.length, 16); i += 1) {
+          const sup = memberSupporters[i];
+          const badgeText = sup.giftCount > 0 ? `ギフト ${sup.giftCount}回` : `メンバー加入 ${sup.membershipCount}回`;
+          frag.appendChild(
+            createSupportRankLineCard({
+              placeText: `${i + 1}`,
+              countText: badgeText,
               name: sup.name,
               channelId: sup.channelId,
-              iconUrl: sup.iconUrl
-            },
-            kontaFallback
+              iconUrl: sup.iconUrl,
+              channelUrl: sup.channelUrl
+            })
+          );
+        }
+        memberListEl.appendChild(frag);
+      }
+    }
+  }
+  function createStoryUserlaneCell(opts) {
+    const channelUrl = safeHttpUrl(opts.channelUrl || buildYtChannelUrl(opts.channelId));
+    const cell = channelUrl ? document.createElement("a") : document.createElement("span");
+    cell.className = channelUrl ? "nl-story-userlane-cell nl-story-userlane-cell--linkable" : "nl-story-userlane-cell";
+    cell.setAttribute("role", "listitem");
+    if (channelUrl) {
+      cell.href = channelUrl;
+      cell.target = "_blank";
+      cell.rel = "noopener noreferrer";
+    }
+    if (opts.pulseBadge) {
+      cell.setAttribute("data-pulse", opts.pulseBadge);
+    }
+    const displayName = String(opts.name || opts.channelId || "リスナー").trim();
+    const shortId = formatShortChannelId(opts.channelId);
+    cell.title = opts.channelId ? `${displayName} (${opts.channelId})` : displayName;
+    cell.appendChild(
+      createAvatarImgWithFallback(
+        opts.iconUrl || "",
+        displayName,
+        opts.channelId || displayName,
+        "nl-story-userlane-avatar"
+      )
+    );
+    const meta = document.createElement("span");
+    meta.className = "nl-story-userlane-meta";
+    if (opts.statsBadge) {
+      meta.setAttribute("data-stats", opts.statsBadge);
+    }
+    if (shortId) {
+      const idSpan = document.createElement("span");
+      idSpan.className = "nl-story-userlane-meta__id";
+      idSpan.textContent = shortId;
+      meta.appendChild(idSpan);
+    }
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "nl-story-userlane-meta__name";
+    nameSpan.textContent = displayName;
+    meta.appendChild(nameSpan);
+    cell.appendChild(meta);
+    return cell;
+  }
+  function renderSupportVisualDetails(ranking) {
+    const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
+    const superchatLaneEl = document.getElementById("storyUserLaneSuperchat");
+    const superchatCountEl = document.getElementById("storyLaneSuperchatCount");
+    const superchatUsers = commenters.filter((c) => c.superchatCount + c.stickerCount > 0).sort((a, b) => {
+      if (b.superchatTotalAmount !== a.superchatTotalAmount) {
+        return b.superchatTotalAmount - a.superchatTotalAmount;
+      }
+      return b.commentCount - a.commentCount;
+    });
+    if (superchatCountEl) {
+      superchatCountEl.textContent = `${formatNumberJa(superchatUsers.length)}人`;
+    }
+    if (superchatLaneEl) {
+      clearChildren(superchatLaneEl);
+      if (superchatUsers.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "nl-story-userlane__empty-note";
+        empty.textContent = "Super Chat / Sticker の応援者が届くとここに丸アイコンが並びます。";
+        superchatLaneEl.appendChild(empty);
+      } else {
+        const frag = document.createDocumentFragment();
+        for (const u of superchatUsers.slice(0, STORY_USERLANE_LIMIT)) {
+          const amtText = u.primaryFormattedAmount || `${u.superchatCount + u.stickerCount}回`;
+          frag.appendChild(
+            createStoryUserlaneCell({
+              name: u.name,
+              channelId: u.channelId,
+              iconUrl: u.iconUrl,
+              channelUrl: u.channelUrl,
+              pulseBadge: amtText,
+              statsBadge: `💬${u.commentCount}件 💰${amtText}`
+            })
+          );
+        }
+        superchatLaneEl.appendChild(frag);
+      }
+    }
+    const memberLaneEl = document.getElementById("storyUserLaneMemberGift");
+    const memberCountEl = document.getElementById("storyLaneMemberGiftCount");
+    const memberUsers = commenters.filter((c) => c.giftCount > 0 || c.membershipCount > 0 || c.isMember).sort((a, b) => {
+      if (b.giftCount !== a.giftCount) return b.giftCount - a.giftCount;
+      if (b.membershipCount !== a.membershipCount) return b.membershipCount - a.membershipCount;
+      return b.commentCount - a.commentCount;
+    });
+    if (memberCountEl) {
+      memberCountEl.textContent = `${formatNumberJa(memberUsers.length)}人`;
+    }
+    if (memberLaneEl) {
+      clearChildren(memberLaneEl);
+      if (memberUsers.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "nl-story-userlane__empty-note";
+        empty.textContent = "メンバー加入・ギフト・メンバー発言者が届くとここに丸アイコンが並びます。";
+        memberLaneEl.appendChild(empty);
+      } else {
+        const frag = document.createDocumentFragment();
+        for (const u of memberUsers.slice(0, STORY_USERLANE_LIMIT)) {
+          const pulse = u.giftCount > 0 ? `🎁${u.giftCount}回` : u.membershipCount > 0 ? `加入${u.membershipCount}回` : "⭐メンバー";
+          frag.appendChild(
+            createStoryUserlaneCell({
+              name: u.name,
+              channelId: u.channelId,
+              iconUrl: u.iconUrl,
+              channelUrl: u.channelUrl,
+              pulseBadge: pulse,
+              statsBadge: `💬${u.commentCount}件 ${pulse}`
+            })
+          );
+        }
+        memberLaneEl.appendChild(frag);
+      }
+    }
+    const commentersLaneEl = document.getElementById("storyUserLaneCommenters");
+    const commentersCountEl = document.getElementById("storyLaneCommentersCount");
+    if (commentersCountEl) {
+      commentersCountEl.textContent = `${formatNumberJa(commenters.length)}人`;
+    }
+    if (commentersLaneEl) {
+      clearChildren(commentersLaneEl);
+      if (commenters.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "nl-story-userlane__empty-note";
+        empty.textContent = "コメントした人が届くと件数順に丸アイコンが並びます。";
+        commentersLaneEl.appendChild(empty);
+      } else {
+        const frag = document.createDocumentFragment();
+        for (const u of commenters.slice(0, STORY_USERLANE_LIMIT)) {
+          const stats = u.primaryFormattedAmount ? `💬${u.commentCount}件 · ${u.primaryFormattedAmount}` : `💬${u.commentCount}件`;
+          frag.appendChild(
+            createStoryUserlaneCell({
+              name: u.name,
+              channelId: u.channelId,
+              iconUrl: u.iconUrl,
+              channelUrl: u.channelUrl,
+              pulseBadge: `${u.commentCount}件`,
+              statsBadge: stats
+            })
+          );
+        }
+        commentersLaneEl.appendChild(frag);
+      }
+    }
+    const growthGridEl = document.getElementById("sceneStoryGrowth");
+    const gaugeLabelEl = document.getElementById("sceneStoryGaugeLabel");
+    const gridSlice = commenters.slice(0, STORY_GROWTH_GRID_LIMIT);
+    if (growthGridEl) {
+      clearChildren(growthGridEl);
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < gridSlice.length; i += 1) {
+        const u = gridSlice[i];
+        const channelUrl = safeHttpUrl(u.channelUrl || buildYtChannelUrl(u.channelId));
+        const cell = channelUrl ? document.createElement("a") : document.createElement("span");
+        cell.className = "nl-story-growth-cell nl-story-growth-cell--repeat";
+        cell.setAttribute("data-support-ordinal", String(u.commentCount));
+        cell.title = `${u.name} (${u.commentCount}件)`;
+        if (channelUrl) {
+          cell.href = channelUrl;
+          cell.target = "_blank";
+          cell.rel = "noopener noreferrer";
+        }
+        const media = document.createElement("span");
+        media.className = "nl-story-growth-cell__media";
+        media.appendChild(
+          createAvatarImgWithFallback(
+            u.iconUrl || "",
+            u.name,
+            u.channelId || u.name,
+            "nl-story-growth-icon nl-story-growth-icon--remote"
           )
         );
-        const badge = document.createElement("span");
-        badge.className = "member-pill";
-        badge.style.marginLeft = "auto";
-        badge.textContent = sup.giftCount > 0 ? `ギフト ${sup.giftCount}回` : `メンバー加入 ${sup.membershipCount}回`;
-        rowEl.appendChild(badge);
-        listWrap.appendChild(rowEl);
+        cell.appendChild(media);
+        frag.appendChild(cell);
       }
-      box.appendChild(listWrap);
-      containerEl.appendChild(box);
+      growthGridEl.appendChild(frag);
     }
+    if (gaugeLabelEl) {
+      gaugeLabelEl.textContent = `いま ${formatNumberJa(commenters.length)} 人を表示中`;
+    }
+    visualDetailsNeedsRefresh = false;
   }
   async function renderVoiceUiFromStorage(prefetchedData) {
     const data = prefetchedData || await chrome.storage.local.get([
@@ -1213,7 +1782,7 @@
           const opt = document.createElement("option");
           opt.value = vid;
           const labelTitle = s.title || vid;
-          opt.textContent = `${labelTitle} (${Number(s.itemCount || 0)}件)`;
+          opt.textContent = `${labelTitle} (${formatNumberJa(Number(s.itemCount || 0))}件)`;
           if (vid === selectedVideoId) opt.selected = true;
           selectEl.appendChild(opt);
         }
@@ -1224,7 +1793,7 @@
     if (summaryEl) {
       if (currentSummary) {
         const bName = currentSummary.broadcasterName ? ` / 配信者: ${currentSummary.broadcasterName}` : "";
-        summaryEl.textContent = `記録中: ${currentSummary.title || currentSummary.videoId}${bName}（合計 ${totalItemsCount}件・全件 IndexedDB 保存）`;
+        summaryEl.textContent = `記録中: ${currentSummary.title || currentSummary.videoId}${bName}（合計 ${formatNumberJa(totalItemsCount)}件）`;
       } else {
         summaryEl.textContent = "YouTube Live の視聴ページを開くと自動でチャットを記録します";
       }
@@ -1234,20 +1803,13 @@
     const filterLabel = String(currentSummary?.chatFilterLabel || "").trim();
     if (filterBadge && noticeBanner) {
       if (!filterLabel) {
-        filterBadge.textContent = "現在のチャット表示: 検出待ち（「すべてのチャット」を選択してください）";
+        filterBadge.textContent = "チャット表示: 検出待ち";
         noticeBanner.classList.remove("is-warning");
       } else if (/トップチャット|top chat/i.test(filterLabel)) {
-        filterBadge.textContent = `現在「${filterLabel}」表示です — 「すべてのチャット」へ切り替えると全件取得できます`;
+        filterBadge.textContent = `現在「${filterLabel}」— 「すべてのチャット」推奨`;
         noticeBanner.classList.add("is-warning");
-        const detailsEl = (
-          /** @type {HTMLDetailsElement | null} */
-          document.getElementById("yt-settings-details")
-        );
-        if (detailsEl && !detailsEl.open) {
-          detailsEl.open = true;
-        }
       } else {
-        filterBadge.textContent = `現在のチャット表示: ${filterLabel}`;
+        filterBadge.textContent = `チャット表示: ${filterLabel}`;
         noticeBanner.classList.remove("is-warning");
       }
     }
@@ -1280,8 +1842,16 @@
       broadcasterChannelId: currentSummary?.broadcasterChannelId || ""
     });
     updateStreamHeaderUi(summaries, activeId, applied.totalCount);
+    renderLiveStatsAndOfficialRow(
+      currentSummary,
+      applied.totalCount,
+      applied.ranking,
+      currentIncrementalState
+    );
+    renderTopSupportRankStrip(currentSummary, applied.ranking);
+    renderNorthStarSupportLanes(applied.ranking);
+    renderSupportVisualDetails(applied.ranking);
     await renderVoiceUiFromStorage(data);
-    renderSupportRanking(applied.ranking);
     renderLaneFull("rinku", applied.laneDisplay.rinku, applied.laneCounts.rinku);
     renderLaneFull("konta", applied.laneDisplay.konta, applied.laneCounts.konta);
     renderLaneFull("tanunee", applied.laneDisplay.tanunee, applied.laneCounts.tanunee);
@@ -1317,14 +1887,30 @@
     });
     metrics.lastIncrementalAddedItems = applied.addedCount;
     updateStreamHeaderUi(summaries, activeId, applied.totalCount);
+    renderLiveStatsAndOfficialRow(
+      currentSummary,
+      applied.totalCount,
+      applied.ranking,
+      currentIncrementalState
+    );
     await renderVoiceUiFromStorage(data);
     if (applied.addedCount > 0) {
       patchLaneIncremental("rinku", applied.addedByLane.rinku, applied.laneCounts.rinku);
       patchLaneIncremental("konta", applied.addedByLane.konta, applied.laneCounts.konta);
       patchLaneIncremental("tanunee", applied.addedByLane.tanunee, applied.laneCounts.tanunee);
+      renderTopSupportRankStrip(currentSummary, applied.ranking);
+      const visualDetailsEl = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("supportVisualDetails")
+      );
+      if (visualDetailsEl?.open) {
+        renderSupportVisualDetails(applied.ranking);
+      } else {
+        visualDetailsNeedsRefresh = true;
+      }
     }
     if (applied.rankingChanged) {
-      renderSupportRanking(applied.ranking);
+      renderNorthStarSupportLanes(applied.ranking);
     }
     metrics.lastIncrementalDurationMs = Math.round((performance.now() - t0) * 100) / 100;
   }
@@ -1334,7 +1920,117 @@
       runRenderSerialized(() => renderVoiceUiFromStorage());
     });
   }
+  async function restoreCollapsibleUiState() {
+    try {
+      const data = await chrome.storage.local.get([STORAGE_KEYS.UI_STATE]);
+      const uiState = data[STORAGE_KEYS.UI_STATE] || {};
+      const settingsDetails = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("yt-settings-details")
+      );
+      const comeviewDetails = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("yt-comeview-details")
+      );
+      const supportVisualDetails = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("supportVisualDetails")
+      );
+      if (settingsDetails) {
+        settingsDetails.open = uiState.settingsOpen === true;
+      }
+      if (comeviewDetails) {
+        comeviewDetails.open = uiState.comeviewOpen === true;
+      }
+      if (supportVisualDetails) {
+        supportVisualDetails.open = uiState.supportVisualOpen === true;
+      }
+    } catch {
+    }
+  }
+  function saveCollapsibleUiState() {
+    try {
+      const settingsDetails = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("yt-settings-details")
+      );
+      const comeviewDetails = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("yt-comeview-details")
+      );
+      const supportVisualDetails = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("supportVisualDetails")
+      );
+      chrome.storage.local.set({
+        [STORAGE_KEYS.UI_STATE]: {
+          settingsOpen: Boolean(settingsDetails?.open),
+          comeviewOpen: Boolean(comeviewDetails?.open),
+          supportVisualOpen: Boolean(supportVisualDetails?.open)
+        }
+      });
+    } catch {
+    }
+  }
   function bindUiEvents() {
+    const reloadBtn = document.getElementById("reloadWatchTabBtn");
+    reloadBtn?.addEventListener("click", () => {
+      try {
+        chrome.tabs?.query({ active: true, currentWindow: true }, (tabs) => {
+          void chrome.runtime.lastError;
+          const activeTab = tabs && tabs[0];
+          if (activeTab?.id && activeTab.url && /youtube\.com\/watch/i.test(activeTab.url)) {
+            chrome.tabs.reload(activeTab.id);
+          }
+        });
+      } catch {
+      }
+      runRenderSerialized(() => renderStreamFullLoad());
+    });
+    const openComeviewBtn = document.getElementById("openComeviewBtn");
+    openComeviewBtn?.addEventListener("click", () => {
+      const comeviewDetails2 = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("yt-comeview-details")
+      );
+      if (!comeviewDetails2) return;
+      comeviewDetails2.open = !comeviewDetails2.open;
+      saveCollapsibleUiState();
+      if (comeviewDetails2.open) {
+        comeviewDetails2.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    });
+    const openVoiceBtn = document.getElementById("openComeviewVoiceBtn");
+    openVoiceBtn?.addEventListener("click", () => {
+      const settingsDetails2 = (
+        /** @type {HTMLDetailsElement | null} */
+        document.getElementById("yt-settings-details")
+      );
+      if (!settingsDetails2) return;
+      settingsDetails2.open = !settingsDetails2.open;
+      saveCollapsibleUiState();
+      if (settingsDetails2.open) {
+        settingsDetails2.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    });
+    const supportVisualDetails = (
+      /** @type {HTMLDetailsElement | null} */
+      document.getElementById("supportVisualDetails")
+    );
+    supportVisualDetails?.addEventListener("toggle", () => {
+      if (supportVisualDetails.open && visualDetailsNeedsRefresh && currentIncrementalState?.rankingAcc?.snapshot) {
+        renderSupportVisualDetails(currentIncrementalState.rankingAcc.snapshot);
+      }
+      saveCollapsibleUiState();
+    });
+    const comeviewDetails = document.getElementById("yt-comeview-details");
+    comeviewDetails?.addEventListener("toggle", () => {
+      saveCollapsibleUiState();
+    });
+    const settingsDetails = document.getElementById("yt-settings-details");
+    settingsDetails?.addEventListener("toggle", () => {
+      saveCollapsibleUiState();
+    });
     const selectEl = (
       /** @type {HTMLSelectElement | null} */
       document.getElementById("yt-stream-select")
@@ -1404,6 +2100,9 @@
     });
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
+      if (changes[STORAGE_KEYS.UI_STATE] && Object.keys(changes).length === 1) {
+        return;
+      }
       const streamChanged = Boolean(
         changes[STORAGE_KEYS.STREAM_SUMMARIES] || changes[STORAGE_KEYS.ACTIVE_VIDEO_ID]
       );
@@ -1416,6 +2115,7 @@
     });
   }
   async function initSidepanel() {
+    await restoreCollapsibleUiState();
     bindUiEvents();
     await runRenderSerialized(() => renderStreamFullLoad());
     requestVoicevoxRecheck();

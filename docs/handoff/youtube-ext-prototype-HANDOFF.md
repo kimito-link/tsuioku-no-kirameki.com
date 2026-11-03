@@ -252,3 +252,13 @@ Chromium に `extension-youtube/` を unpacked 拡張として読み込み、`ht
    - 変更後（Tsuioku Warm Pastel・3キャラ画像見出し・設定折りたたみ・3レーン主役）: `.artifacts/yt-sidepanel-after.png`
 
 
+
+### 4. ニコ生版と同じ画面構成への組み替え（第3段）
+
+- **上から**: 上部ボタン列（↻再読み込み / 💬コメビュ / 🔊読み上げ。HTML・マーケ・スクショは置かない）→ 3キャラ数字カード（りんく=記録 / こん太=同時接続（YouTube「◯人が視聴中」を `/watch` DOM から5秒ごと取得）/ たぬ姉=来場者数（重複なしコメント者））→ 数字の行（来場・コメント・経過・スパチャ合計（最多の通貨）・メンバー/ギフト件数）→ 順位カード（左上に配信者カード、続けて1〜10位を2列。コメント件数順・同数ならスパチャ額）→ レーン（スパチャランキング通貨別 / メンバー・ギフト）→ 「アイコン列・グリッド・診断を表示」（スパチャ列・メンバー/ギフト列・コメントした人（件数順）＋全員の丸アイコングリッド「いま N 人を表示中」、アイコン無し・読込失敗時は `anonymousIdenticonDataUrl(channelId)` の顔）→ コメビュ（3レーン）・読み上げ設定（いずれも初期は閉、開閉は `yt_sidepanel_ui_state` に記憶）。
+- クラス名・CSS は `extension/popup.html` のものを流用。`extension/` 側は未変更（`extension/dist` と `app/dist` の差分はビルド副産物のため add していない）。
+- **ギフト（`yt-gift-message-view-model`）のアイコン**: `extractAuthorIconUrl`（`src/lib/youtube/ytChatParse.js`）で `#author-photo img` を取得し、ギフト箱イラスト・絵文字は除外。後からアイコンが入った場合は content script が再送し、IndexedDB の既存レコードへ `iconUrl` を補完。全 `<img>` に error フォールバック付き。
+- 純関数の追加とテスト: `extractYtWatchConcurrentViewersFromText`、ranking の `commenters` / `uniqueCommenterCount` / `primaryCurrencySummary`、`mergeYtStreamSummary` の `broadcasterIconUrl` / `concurrentViewers`。
+- **スクリーンショット**（`.artifacts/`）: `yt-sidepanel-after.png`（既定状態）、`yt-sidepanel-visual-details-open.png`（アイコン列・グリッド展開）、`yt-vs-nico-sidepanel.png`（ニコ生版と横並び）。
+- **実測（Playwright で拡張を読み込み、ダミー22件・12人）**: 初期状態は3つの `<details>` すべて閉、数字カード 22/1,482/12、スパチャ合計 ¥6,600、メンバー/ギフト 2件、列セル 3/4/12、グリッド 12人・identicon 12種、320px 幅で「モード:」ラベルとセレクトは同一行。
+- **注意（未確認）**: ニコ生版側スクショは配信中でないため初期の読み込み画面（ロード演出）のまま。実際の YouTube 配信ページでの同時接続・ギフトアイコン取得は DOM セレクタ推定のため、実配信での目視確認が未実施。

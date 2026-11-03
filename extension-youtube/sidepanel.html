@@ -4,6 +4,9 @@
     <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>君斗りんくの追憶のきらめき for YouTube — サイドパネル</title>
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" />
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" />
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" />
     <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" />
     <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" />
     <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" />
@@ -37,6 +40,7 @@
         --nl-lane-pulse-gift: #c8721c;
         --nl-lane-avatar: 28px;
         --nl-lane-avatar-anon: 20px;
+        --nl-story-icon-size: 24px;
         --nl-radius-sm: 8px;
         --nl-radius-md: 12px;
         --nl-radius-lg: 16px;
@@ -78,60 +82,7 @@
       }
 
       body {
-        padding: 8px 10px 14px;
-      }
-
-      /* 上部コンパクトヘッダー（配信タイトル・配信選択） */
-      header.nl-yt-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 7px 10px;
-        background: var(--nl-surface);
-        border: 1px solid var(--nl-border);
-        border-radius: var(--nl-radius-md);
-        box-shadow: var(--nl-shadow-card);
-        margin-bottom: 6px;
-      }
-
-      .nl-yt-header__brand {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-        flex: 1 1 200px;
-      }
-
-      .nl-yt-header__logo {
-        width: 28px;
-        height: 28px;
-        border-radius: var(--nl-radius-pill);
-        border: 1.5px solid var(--nl-border-strong);
-        background: var(--nl-bg);
-        object-fit: cover;
-        flex-shrink: 0;
-      }
-
-      .nl-yt-header__titles {
-        min-width: 0;
-        flex: 1 1 auto;
-      }
-
-      .nl-yt-header__title {
-        font-weight: 800;
-        font-size: 13px;
-        color: var(--nl-text);
-        line-height: 1.25;
-      }
-
-      .nl-yt-header__subtitle {
-        font-size: 11px;
-        color: var(--nl-text-soft);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        padding: 6px 8px 14px;
       }
 
       select,
@@ -158,7 +109,807 @@
         background: var(--nl-accent-soft);
       }
 
-      /* 折りたたみ設定バー（画面上部を占領せず、レーンを主役にする） */
+      /* 1. 上部ボタン列（extension/popup.html の .nl-compose-quick-toolbar[data-nl-hoisted="top"] と同一） */
+      .nl-compose-quick-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 0 0 6px;
+        padding: 6px 8px;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 42%, var(--nl-border));
+        background: color-mix(in srgb, var(--nl-accent) 9%, var(--nl-surface));
+      }
+
+      .nl-compose-quick-toolbar[data-nl-hoisted='top'] {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        margin: 0 0 6px;
+        padding: 5px 8px;
+        border-radius: 0 0 10px 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-accent) 8%);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 2px 10px rgb(0 0 0 / 10%);
+      }
+
+      .nl-compose-quick-btn {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        margin: 0;
+        padding: 5px 9px;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.25;
+        color: var(--nl-text);
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 52%, var(--nl-border));
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-accent) 8%);
+        cursor: pointer;
+        box-shadow: 0 1px 0 rgb(255 255 255 / 45%) inset;
+        white-space: nowrap;
+      }
+
+      .nl-compose-quick-btn:hover {
+        filter: brightness(1.04);
+        border-color: var(--nl-accent);
+        background: var(--nl-accent-soft);
+      }
+
+      .nl-compose-quick-btn--reload-watch {
+        border-color: color-mix(in srgb, #0891b2 55%, var(--nl-border));
+        background: color-mix(in srgb, #0891b2 13%, var(--nl-surface));
+      }
+
+      .nl-compose-quick-btn--comeview {
+        border-color: color-mix(in srgb, #ea580c 52%, var(--nl-border));
+        background: color-mix(in srgb, #ea580c 12%, var(--nl-surface));
+      }
+
+      .nl-compose-quick-btn--comeview-voice {
+        border-color: color-mix(in srgb, #16a34a 52%, var(--nl-border));
+        background: color-mix(in srgb, #16a34a 12%, var(--nl-surface));
+      }
+
+      .nl-yt-stream-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding: 4px 8px;
+        margin: 0 0 6px;
+        border-radius: 9px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 75%, transparent);
+        font-size: 10.5px;
+      }
+
+      .nl-yt-stream-bar__summary {
+        color: var(--nl-text-sub);
+        font-weight: 700;
+        min-width: 0;
+        flex: 1 1 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .nl-yt-stream-bar select {
+        font-size: 10.5px;
+        padding: 2px 6px;
+        max-width: 100%;
+      }
+
+      /* 2. 3キャラの数字カード（extension/popup.html の .nl-live-stat-cards と同一） */
+      .nl-live-stat-cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 4px;
+        margin: 0 0 8px;
+      }
+
+      .nl-live-stat-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 5px 4px 5px;
+        border-radius: 9px;
+        background: linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--nl-surface) 92%, var(--nl-accent) 8%),
+          var(--nl-surface)
+        );
+        border: 1px solid color-mix(in srgb, var(--nl-border) 75%, var(--nl-accent) 25%);
+        box-shadow: 0 1px 4px rgb(0 0 0 / 5%);
+        min-width: 0;
+      }
+
+      .nl-live-stat-card--comments {
+        border-color: color-mix(in srgb, var(--nl-accent) 42%, var(--nl-border));
+      }
+
+      .nl-live-stat-card--concurrent {
+        border-color: color-mix(in srgb, #f59e0b 48%, var(--nl-border));
+        background: linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--nl-surface) 90%, #fbbf24 10%),
+          var(--nl-surface)
+        );
+      }
+
+      .nl-live-stat-card--visitors {
+        border-color: color-mix(in srgb, var(--nl-ok) 45%, var(--nl-border));
+        background: linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--nl-surface) 90%, var(--nl-ok) 10%),
+          var(--nl-surface)
+        );
+      }
+
+      .nl-live-stat-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border) 70%, #fff 30%);
+        box-shadow: 0 1px 4px rgb(0 0 0 / 10%);
+        margin-bottom: 2px;
+        flex-shrink: 0;
+        background: var(--nl-bg);
+      }
+
+      .nl-live-stat-label {
+        font-size: 9px;
+        font-weight: 800;
+        color: var(--nl-text-sub);
+        letter-spacing: 0.02em;
+        line-height: 1.15;
+        margin-bottom: 1px;
+      }
+
+      .nl-live-stat-value {
+        font-size: 13px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        color: var(--nl-text);
+        line-height: 1.12;
+        word-break: break-all;
+      }
+
+      .nl-live-stat-unit {
+        margin-top: 1px;
+        font-size: 8px;
+        font-weight: 600;
+        color: var(--nl-muted);
+        line-height: 1.15;
+      }
+
+      .nl-concurrent-body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        width: 100%;
+      }
+
+      .nl-concurrent-ready {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* 3. 数字の行（extension/popup.html の .nl-official-nico-stats と同一） */
+      .nl-official-nico-stats__row {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px 8px;
+        margin: 1px 0 0;
+        padding: 4px 7px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-surface) 90%, var(--nl-border) 10%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 78%, transparent);
+        font-size: 9.5px;
+        line-height: 1.25;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .nl-official-nico-stats__chip {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .nl-official-nico-stats__label {
+        font-weight: 700;
+        color: var(--nl-muted);
+        font-size: 8.5px;
+      }
+
+      .nl-official-nico-stats__val {
+        font-weight: 800;
+        color: var(--nl-text);
+      }
+
+      /* 4. 応援ユーザーの順位カード（extension/popup.html の #topSupportRankStrip / .nl-top-support-rank と同一） */
+      .nl-top-support-rank {
+        width: 100%;
+        margin-top: 4px;
+        padding: 5px 6px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, var(--nl-border) 68%, var(--nl-accent) 32%);
+        text-align: left;
+      }
+
+      .nl-top-support-rank--below-cards {
+        margin: 0;
+        padding: 8px 10px;
+        border-radius: 10px;
+      }
+
+      .nl-live-stat-cards > .nl-top-support-rank--span-cards {
+        grid-column: 1 / -1;
+        min-width: 0;
+        margin-top: 2px;
+      }
+
+      .nl-top-support-rank__note {
+        margin: 0 0 6px;
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.35;
+        color: var(--nl-text-sub);
+      }
+
+      .nl-top-support-rank__list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+        gap: 6px;
+        width: 100%;
+        min-width: 0;
+      }
+
+      /* 順位カードは配信者カード＋1〜10位を2列で並べる */
+      #topSupportRankList {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .nl-top-support-rank__caster {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 3px;
+        padding: 5px 5px 6px;
+        border-radius: 10px;
+        background: linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--nl-accent) 18%, var(--nl-surface)) 0%,
+          color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%) 100%
+        );
+        border: 1.5px solid color-mix(in srgb, var(--nl-accent) 52%, var(--nl-border));
+        box-shadow: 0 2px 6px rgb(0 0 0 / 8%);
+        font-size: 9.5px;
+        line-height: 1.2;
+        color: var(--nl-text);
+        min-width: 0;
+        text-align: center;
+      }
+
+      .nl-top-support-rank__caster-label {
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--nl-accent) 22%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, var(--nl-border));
+        color: var(--nl-text);
+      }
+
+      .nl-top-support-rank__caster-thumb {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 2px solid color-mix(in srgb, var(--nl-accent) 55%, #fff 45%);
+        box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+        background: var(--nl-bg);
+      }
+
+      .nl-top-support-rank__caster-name {
+        font-weight: 800;
+        font-size: 9.5px;
+        color: var(--nl-text);
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .nl-top-support-rank__caster-follow {
+        display: inline-block;
+        margin-top: 1px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 8px;
+        font-weight: 800;
+        text-decoration: none;
+        color: var(--nl-text);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-accent) 12%);
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, var(--nl-border));
+      }
+
+      .nl-top-support-rank__caster-follow:hover {
+        background: var(--nl-accent-soft);
+      }
+
+      .nl-top-support-rank__line {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 2px;
+        padding: 5px 4px 6px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 78%, transparent);
+        box-shadow: 0 1px 4px rgb(0 0 0 / 5%);
+        font-size: 9.5px;
+        line-height: 1.2;
+        color: var(--nl-text);
+        min-width: 0;
+        text-align: center;
+      }
+
+      a.nl-top-support-rank__line--linkable {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+      }
+
+      a.nl-top-support-rank__line--linkable:hover {
+        border-color: var(--nl-accent);
+        background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-surface));
+      }
+
+      .nl-top-support-rank__place {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        height: 16px;
+        padding: 0 5px;
+        border-radius: 999px;
+        font-size: 9px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        color: #fff;
+        background: linear-gradient(145deg, var(--nl-accent), #e05288);
+      }
+
+      .nl-top-support-rank__count {
+        font-weight: 800;
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+        color: var(--nl-rank-count);
+        white-space: nowrap;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .nl-top-support-rank__thumb-wrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 1px 0;
+      }
+
+      .nl-top-support-rank__thumb {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border-strong) 82%, #fff 18%);
+        background: var(--nl-bg);
+      }
+
+      .nl-top-support-rank__id {
+        font-size: 8px;
+        font-weight: 600;
+        color: var(--nl-text-sub);
+        font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .nl-top-support-rank__name {
+        font-weight: 800;
+        font-size: 9.5px;
+        color: var(--nl-text);
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* 5. North Star レーン（extension/popup.html の #northStarLanes / .nl-north-star-lanes と同一） */
+      .nl-north-star-lanes {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0 0 8px;
+        padding: 7px 8px;
+        border-radius: 12px;
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 34%, var(--nl-border));
+        background: linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--nl-surface) 92%, var(--nl-accent) 8%) 0%,
+          var(--nl-surface) 100%
+        );
+        box-shadow: 0 2px 10px rgb(0 0 0 / 5%);
+      }
+
+      .nl-north-star-lanes__title {
+        margin: 0;
+        font-size: 10.5px;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        color: var(--nl-text);
+      }
+
+      .nl-north-star-lane {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .nl-north-star-lane__heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 4px 8px;
+      }
+
+      .nl-north-star-lane__label {
+        font-size: 10px;
+        font-weight: 900;
+        color: var(--nl-text);
+        letter-spacing: 0.02em;
+      }
+
+      .nl-north-star-lane__sublabel {
+        font-size: 8.5px;
+        font-weight: 600;
+        color: var(--nl-muted);
+      }
+
+      .nl-north-star-lane__shell {
+        min-width: 0;
+      }
+
+      .nl-north-star-lane__body.nl-top-support-rank {
+        margin: 0;
+        padding: 6px 7px;
+      }
+
+      .currency-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .currency-box {
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius-sm);
+        padding: 6px 7px;
+      }
+
+      .currency-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-weight: 800;
+        font-size: 10.5px;
+        color: var(--nl-text);
+        margin-bottom: 5px;
+        border-bottom: 1px solid var(--nl-border);
+        padding-bottom: 3px;
+      }
+
+      /* 6. アイコン列・グリッド・診断を表示（extension/popup.html の #supportVisualDetails と同一） */
+      .nl-support-visual-details {
+        margin: 0 0 8px;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, transparent);
+        background: color-mix(in srgb, var(--nl-surface) 95%, var(--nl-border) 5%);
+      }
+
+      .nl-support-visual-details__summary {
+        cursor: pointer;
+        padding: 6px 9px;
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--nl-text-sub);
+        user-select: none;
+        list-style: revert;
+      }
+
+      .nl-support-visual-details__body {
+        padding: 4px 6px 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 65%, transparent);
+      }
+
+      .nl-story-meter-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .nl-story-userlane-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .nl-story-userlane-tier-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        margin: 0 0 4px;
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide__lines {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide__line {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 1.35;
+        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide__face {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+        flex: 0 0 auto;
+      }
+
+      .nl-story-userlane-guide__text {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide__count {
+        color: #9a6f12;
+        font-weight: 800;
+        font-size: 10.5px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .nl-story-userlane {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+        gap: 6px;
+        padding: 6px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 75%, transparent);
+      }
+
+      .nl-story-userlane--gift {
+        border-color: color-mix(in srgb, #f59e0b 48%, var(--nl-border));
+        background: linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--nl-surface) 90%, #fbbf24 10%),
+          var(--nl-surface)
+        );
+      }
+
+      .nl-story-userlane--konta {
+        border-color: color-mix(in srgb, var(--nl-accent) 42%, var(--nl-border));
+      }
+
+      .nl-story-userlane--tanu {
+        border-color: color-mix(in srgb, var(--nl-ok) 42%, var(--nl-border));
+      }
+
+      /* .nl-story-userlane 内の丸アイコン＋名前・件数・金額バッジセル */
+      .nl-story-userlane .nl-story-userlane-cell {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 3px;
+        padding: 6px 4px 5px;
+        border-radius: 10px;
+        background: var(--nl-surface);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 80%, transparent);
+        box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
+        min-width: 0;
+        text-align: center;
+        text-decoration: none;
+        color: var(--nl-text);
+      }
+
+      .nl-story-userlane .nl-story-userlane-cell[data-pulse]::after {
+        content: attr(data-pulse);
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        padding: 1px 5px;
+        border-radius: 999px;
+        font-size: 8px;
+        font-weight: 800;
+        line-height: 1.2;
+        background: linear-gradient(135deg, #fff0c2, #fde68a);
+        color: #7c4a03;
+        border: 1px solid #e6a817;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
+      }
+
+      .nl-story-userlane .nl-story-userlane-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border-strong) 82%, #fff 18%);
+        box-shadow: 0 1px 3px rgba(120, 80, 50, 0.14);
+        background: var(--nl-bg);
+      }
+
+      .nl-story-userlane .nl-story-userlane-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        width: 100%;
+        min-width: 0;
+        font-size: 9px;
+        line-height: 1.2;
+      }
+
+      .nl-story-userlane .nl-story-userlane-meta[data-stats]::after {
+        content: attr(data-stats);
+        display: inline-block;
+        margin-top: 1px;
+        font-size: 8px;
+        font-weight: 800;
+        color: var(--nl-lane-stats);
+        white-space: nowrap;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* コメントした全員の顔を小さな丸で敷き詰めるグリッド（#sceneStoryGrowth.nl-story-growth） */
+      .nl-story-growth-collapsible {
+        margin-top: 6px;
+      }
+
+      .nl-story-meter {
+        position: relative;
+        width: 100%;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+        border: 1px solid var(--nl-border);
+        padding: 6px;
+      }
+
+      .nl-story-growth {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(var(--nl-story-icon-size, 24px), 1fr));
+        gap: 4px;
+        align-content: start;
+        justify-items: center;
+      }
+
+      .nl-story-growth-cell {
+        position: relative;
+        width: var(--nl-story-icon-size, 24px);
+        height: var(--nl-story-icon-size, 24px);
+        border-radius: 999px;
+        overflow: visible;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+      }
+
+      .nl-story-growth-cell__media {
+        width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        overflow: hidden;
+        display: block;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border-strong) 80%, #fff 20%);
+        box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+        background: var(--nl-bg);
+      }
+
+      .nl-story-growth-icon {
+        width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        object-fit: cover;
+        display: block;
+      }
+
+      .nl-story-growth-cell--repeat[data-support-ordinal]::after {
+        content: '×' attr(data-support-ordinal);
+        position: absolute;
+        right: -3px;
+        bottom: -2px;
+        z-index: 2;
+        padding: 0 3px;
+        border-radius: 999px;
+        font-size: 7.5px;
+        font-weight: 900;
+        line-height: 1.25;
+        font-variant-numeric: tabular-nums;
+        color: #fff;
+        background: linear-gradient(145deg, var(--nl-accent), #d946ef);
+        box-shadow: 0 1px 2px rgb(0 0 0 / 28%);
+        pointer-events: none;
+      }
+
+      .nl-story-meter-label {
+        margin-top: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--nl-text-sub);
+        text-align: right;
+      }
+
+      /* 7. 折りたたみ欄（コメビュ 3レーン / 読み上げ設定 — 初期状態は閉じる） */
       .nl-frame-theme-details {
         background: var(--nl-surface);
         border: 1px solid var(--nl-border);
@@ -171,7 +922,7 @@
         cursor: pointer;
         list-style: none;
         padding: 6px 10px;
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 800;
         color: var(--nl-text);
         display: flex;
@@ -206,7 +957,7 @@
         align-items: center;
         gap: 6px;
         flex-wrap: wrap;
-        font-size: 10.5px;
+        font-size: 10px;
         font-weight: 700;
         color: var(--nl-text-sub);
       }
@@ -226,12 +977,32 @@
         gap: 8px;
       }
 
+      .voice-mode-field {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex: 1 1 210px;
+        min-width: 0;
+      }
+
+      .voice-mode-label {
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-weight: 700;
+      }
+
+      .voice-mode-field select {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: 100%;
+      }
+
       .filter-pill {
         display: inline-flex;
         align-items: center;
         padding: 1px 7px;
         border-radius: var(--nl-radius-pill);
-        font-size: 10.5px;
+        font-size: 10px;
         font-weight: 700;
         background: var(--nl-bg);
         border: 1px solid var(--nl-border);
@@ -295,17 +1066,7 @@
         color: var(--nl-text-soft);
       }
 
-      /* 3レーン主役領域（extension/popup.html の .nl-story / .nl-story-userlane-guide 構造を踏襲） */
-      .nl-story {
-        display: block;
-        padding: 8px;
-        border-radius: var(--nl-radius-md);
-        border: 1px solid var(--nl-border);
-        background: linear-gradient(135deg, var(--nl-surface), var(--nl-bg-soft));
-        box-shadow: var(--nl-shadow-card);
-        margin-bottom: 8px;
-      }
-
+      /* コメビュ3レーン（折りたたみ内） */
       .lanes-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -326,7 +1087,7 @@
         display: flex;
         flex-direction: column;
         min-width: 0;
-        max-height: 460px;
+        max-height: 380px;
         padding: 6px;
       }
 
@@ -340,79 +1101,6 @@
         border-top: 3px solid var(--nl-ok);
       }
 
-      /* extension/popup.html の .nl-story-userlane-guide__line / __face / __text / __count と同一 */
-      .nl-story-userlane-guide {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 4px;
-        margin: 0 0 6px;
-        min-width: 0;
-      }
-
-      .nl-story-userlane-guide__lines {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        min-width: 0;
-      }
-
-      .nl-story-userlane-guide__line {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        padding: 5px 8px;
-        border-radius: 10px;
-        background: linear-gradient(180deg, #fffaf0, #fff4db);
-        border: 1px solid #f5d28d;
-        color: #6b4f18;
-        font-size: 11px;
-        font-weight: 700;
-        line-height: 1.35;
-        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
-        min-width: 0;
-      }
-
-      .nl-story-userlane-guide__face {
-        width: 28px;
-        height: 28px;
-        border-radius: 999px;
-        object-fit: cover;
-        object-position: center;
-        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
-        background: var(--nl-surface);
-        flex: 0 0 auto;
-      }
-
-      .nl-story-userlane-guide__text {
-        flex: 1 1 auto;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-      }
-
-      .nl-story-userlane-guide__title-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-      }
-
-      .nl-story-userlane-guide__role {
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--nl-text-sub);
-      }
-
-      .nl-story-userlane-guide__count {
-        color: #9a6f12;
-        font-weight: 800;
-        font-size: 11px;
-        font-variant-numeric: tabular-nums;
-      }
-
-      /* レーン内のコメントリスト（extension/popup.html の .nl-support-timeline__body / .nl-tl-row / .nl-tl-gift 構造） */
       .lane-list {
         overflow-y: auto;
         flex: 1 1 auto;
@@ -422,8 +1110,8 @@
         padding: 2px;
       }
 
-      /* 人物タイル・アバター・メタ（extension/popup.html の .nl-story-userlane-cell 構造） */
-      .nl-story-userlane-cell {
+      /* コメント行内のユーザー表示 */
+      .chat-item .nl-story-userlane-cell {
         display: inline-flex;
         flex-direction: row;
         align-items: center;
@@ -449,7 +1137,6 @@
         text-decoration: underline;
       }
 
-      .nl-story-userlane-avatar,
       .avatar-img {
         width: var(--nl-lane-avatar);
         height: var(--nl-lane-avatar);
@@ -462,40 +1149,16 @@
         flex-shrink: 0;
       }
 
-      .avatar-fallback {
-        width: var(--nl-lane-avatar);
-        height: var(--nl-lane-avatar);
-        border-radius: 999px;
-        background: var(--nl-accent-soft);
-        color: var(--nl-text);
-        border: 1.5px dashed var(--nl-border-strong);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 800;
-        flex-shrink: 0;
-      }
-
-      .nl-story-userlane-meta {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 1px;
-        min-width: 0;
-        font-size: 10.5px;
-        line-height: 1.22;
-      }
-
       .nl-story-userlane-meta__id,
       .channel-id-tag {
         color: var(--nl-text-sub);
         font-weight: 600;
-        font-size: 10px;
+        font-size: 9.5px;
         font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        max-width: 100%;
       }
 
       .nl-story-userlane-meta__name {
@@ -504,9 +1167,9 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        max-width: 100%;
       }
 
-      /* コメント行カード（.nl-tl-row / .nl-tl-gift 互換） */
       .chat-item {
         background: var(--nl-bg);
         border: 1px solid var(--nl-border);
@@ -555,7 +1218,7 @@
       }
 
       .amount-pill {
-        font-size: 10.5px;
+        font-size: 10px;
         font-weight: 800;
         padding: 1px 7px;
         border-radius: var(--nl-radius-pill);
@@ -565,7 +1228,7 @@
       }
 
       .member-pill {
-        font-size: 10px;
+        font-size: 9.5px;
         font-weight: 800;
         padding: 1px 6px;
         border-radius: var(--nl-radius-pill);
@@ -581,157 +1244,396 @@
         padding-left: 2px;
       }
 
-      /* 応援者ランキング（extension/popup.html の .nl-top-support-rank 構造） */
-      .nl-top-support-rank {
-        width: 100%;
-        padding: 8px 10px;
-        border-radius: var(--nl-radius-md);
-        background: color-mix(in srgb, var(--nl-accent) 6%, var(--nl-surface));
-        border: 1px solid color-mix(in srgb, var(--nl-border) 72%, var(--nl-accent) 28%);
-        box-shadow: var(--nl-shadow-card);
-      }
-
-      .nl-top-support-rank__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 6px;
-      }
-
-      .nl-top-support-rank__title {
-        font-size: 12px;
-        font-weight: 800;
-        color: var(--nl-text);
-      }
-
-      .nl-top-support-rank__note {
-        margin: 0;
-        font-size: 10.5px;
-        font-weight: 700;
-        color: var(--nl-text-sub);
-      }
-
-      .currency-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-        gap: 8px;
-      }
-
-      .currency-box {
-        background: var(--nl-surface);
-        border: 1px solid var(--nl-border);
-        border-radius: var(--nl-radius-sm);
-        padding: 7px 8px;
-      }
-
-      .currency-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        font-weight: 800;
-        font-size: 11.5px;
-        color: var(--nl-text);
-        margin-bottom: 5px;
-        border-bottom: 1px solid var(--nl-border);
-        padding-bottom: 3px;
-      }
-
-      .nl-top-support-rank__list {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        width: 100%;
-        min-width: 0;
-      }
-
-      .nl-top-support-rank__line,
-      .supporter-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 4px;
-        border-radius: 6px;
-        font-size: 11px;
-        line-height: 1.25;
-        color: var(--nl-text);
-        min-width: 0;
-        border-bottom: 1px dashed color-mix(in srgb, var(--nl-border) 60%, transparent);
-      }
-
-      .supporter-row:last-child {
-        border-bottom: none;
-      }
-
-      .nl-top-support-rank__place,
-      .rank-badge {
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 26px;
-        padding: 1px 5px;
-        font-size: 10px;
-        font-weight: 800;
-        color: #fff;
-        background: linear-gradient(145deg, var(--nl-accent), #e05288);
-        border-radius: var(--nl-radius-pill);
-      }
-
-      .nl-top-support-rank__count {
-        font-weight: 800;
-        font-variant-numeric: tabular-nums;
-        color: var(--nl-rank-count);
-        margin-left: auto;
-        flex-shrink: 0;
-      }
-
       .empty-hint,
       .nl-story-userlane__empty-note {
-        margin: 4px 0 2px;
-        padding: 10px 8px;
-        font-size: 11px;
-        line-height: 1.45;
+        grid-column: 1 / -1;
+        margin: 2px 0;
+        padding: 8px;
+        font-size: 10.5px;
+        line-height: 1.4;
         font-weight: 600;
         color: var(--nl-text-sub);
         text-align: center;
-        border-radius: 10px;
+        border-radius: 8px;
         background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
         border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
       }
     </style>
   </head>
   <body>
-    <header class="nl-yt-header">
-      <div class="nl-yt-header__brand">
+    <!-- 1. 上部ボタン列: 再読み込み・コメビュ・読み上げ（HTML/マーケ/スクショは置かない） -->
+    <div
+      id="nlTopQuickToolbar"
+      class="nl-compose-quick-toolbar"
+      data-nl-hoisted="top"
+      role="group"
+      aria-label="視聴タブ・コメビュ・読み上げのクイック操作"
+    >
+      <button
+        type="button"
+        id="reloadWatchTabBtn"
+        class="nl-compose-quick-btn nl-compose-quick-btn--reload-watch"
+        title="開いているYouTube視聴タブを再読み込みし、サイドパネル表示も更新します"
+      >
+        ↻ 再読み込み
+      </button>
+      <button
+        type="button"
+        id="openComeviewBtn"
+        class="nl-compose-quick-btn nl-compose-quick-btn--comeview"
+        title="3レーンのコメント一覧（コメビュ）を開閉します"
+      >
+        💬 コメビュ
+      </button>
+      <button
+        type="button"
+        id="openComeviewVoiceBtn"
+        class="nl-compose-quick-btn nl-compose-quick-btn--comeview-voice"
+        title="VOICEVOX 読み上げ設定を開閉します"
+      >
+        🔊 読み上げ
+      </button>
+    </div>
+
+    <!-- 配信選択バー -->
+    <div class="nl-yt-stream-bar" aria-label="記録中の配信">
+      <span class="nl-yt-stream-bar__summary" id="yt-stream-summary">
+        YouTube Live の視聴ページを開くと自動でチャットを記録します
+      </span>
+      <select id="yt-stream-select" aria-label="記録済み配信の選択">
+        <option value="">配信を選択…</option>
+      </select>
+    </div>
+
+    <!-- 2. 3キャラの数字カード + 3. 数字の行 + 4. 応援ユーザーの順位カード（extension/popup.html の #liveStatCards 構造と同一） -->
+    <div id="liveStatCards" class="nl-live-stat-cards" aria-label="この枠の規模（記録・同時接続・来場）">
+      <div class="nl-live-stat-card nl-live-stat-card--comments">
         <img
-          class="nl-yt-header__logo"
-          src="images/logo/konta-yukkuri-icon-48.png"
-          alt="追憶のきらめき"
-          width="28"
-          height="28"
+          class="nl-live-stat-icon"
+          src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+          alt=""
+          width="24"
+          height="24"
           decoding="async"
         />
-        <div class="nl-yt-header__titles">
-          <div class="nl-yt-header__title">君斗りんくの追憶のきらめき for YouTube</div>
-          <div class="nl-yt-header__subtitle" id="yt-stream-summary">
-            YouTube Live の視聴ページを開くと自動でチャットを記録します
+        <div class="nl-live-stat-label">記録</div>
+        <div class="nl-live-stat-value" id="liveStatComments">0</div>
+        <div class="nl-live-stat-unit">応援コメント</div>
+      </div>
+
+      <div class="nl-live-stat-card nl-live-stat-card--concurrent" id="watchConcurrentCard">
+        <img
+          class="nl-live-stat-icon"
+          src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+          alt=""
+          width="24"
+          height="24"
+          decoding="async"
+        />
+        <div class="nl-live-stat-label">同時接続</div>
+        <div class="nl-concurrent-body">
+          <div id="watchConcurrentReady" class="nl-concurrent-ready">
+            <div class="nl-live-stat-value" id="watchConcurrentEst">—</div>
+            <div class="nl-live-stat-unit" id="watchConcurrentSub">人</div>
           </div>
         </div>
       </div>
-      <div>
-        <select id="yt-stream-select" aria-label="記録済み配信の選択">
-          <option value="">配信を選択…</option>
-        </select>
-      </div>
-    </header>
 
-    <!-- 設定・VOICEVOX状態・注意書きは折りたたみ欄にまとめ、下の3レーンを主役にする -->
+      <div class="nl-live-stat-card nl-live-stat-card--visitors">
+        <img
+          class="nl-live-stat-icon"
+          src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+          alt=""
+          width="24"
+          height="24"
+          decoding="async"
+        />
+        <div class="nl-live-stat-label">来場者数</div>
+        <div class="nl-live-stat-value" id="watchViewerDom">0</div>
+        <div class="nl-live-stat-unit" id="watchViewerSub">人</div>
+      </div>
+
+      <!-- 3. 数字の行（来場・コメント・経過・スパチャ合計・メンバー/ギフト件数） -->
+      <div
+        id="officialNicoStatsStrip"
+        class="nl-official-nico-stats__row"
+        role="group"
+        aria-label="配信の主要指標（来場・コメント・経過・スパチャ合計・メンバー/ギフト）"
+      >
+        <span class="nl-official-nico-stats__chip">
+          <span class="nl-official-nico-stats__label">来場</span>
+          <span class="nl-official-nico-stats__val" id="officialStatVisitors">0</span>
+        </span>
+        <span class="nl-official-nico-stats__chip">
+          <span class="nl-official-nico-stats__label">コメント</span>
+          <span class="nl-official-nico-stats__val" id="officialStatComments">0</span>
+        </span>
+        <span class="nl-official-nico-stats__chip">
+          <span class="nl-official-nico-stats__label">経過</span>
+          <span class="nl-official-nico-stats__val" id="officialStatElapsed">—</span>
+        </span>
+        <span class="nl-official-nico-stats__chip">
+          <span class="nl-official-nico-stats__label">スパチャ合計</span>
+          <span class="nl-official-nico-stats__val" id="officialStatSuperchat">—</span>
+        </span>
+        <span class="nl-official-nico-stats__chip">
+          <span class="nl-official-nico-stats__label">メンバー/ギフト</span>
+          <span class="nl-official-nico-stats__val" id="officialStatMemberGift">0件</span>
+        </span>
+      </div>
+
+      <!-- 4. 応援ユーザーの順位カード（左上: 配信者カード、その後: 1位〜 コメント件数順・同数ならスパチャ額順） -->
+      <div
+        id="topSupportRankStrip"
+        class="nl-top-support-rank nl-top-support-rank--below-cards nl-top-support-rank--span-cards"
+        aria-live="polite"
+      >
+        <p class="nl-top-support-rank__note" id="topSupportRankNote">
+          記録内・ユーザー別の応援件数が多い順です（同数ならスパチャ額順）。
+        </p>
+        <div class="nl-top-support-rank__list" id="topSupportRankList" role="list"></div>
+      </div>
+    </div>
+
+    <!-- 5. レーン（northStarLanes と同じ見た目: スパチャランキング（通貨別） / メンバー・ギフト） -->
+    <section
+      id="northStarLanes"
+      class="nl-north-star-lanes"
+      aria-label="応援ランキング（スパチャ通貨別・メンバー・ギフト）"
+    >
+      <h3 class="nl-north-star-lanes__title">応援ランキング（スパチャ・メンバー・ギフト）</h3>
+
+      <div class="nl-north-star-lane" data-lane="contributionRanking">
+        <div class="nl-north-star-lane__heading">
+          <span class="nl-north-star-lane__label">スパチャランキング（通貨別）</span>
+          <span class="nl-north-star-lane__sublabel" id="yt-support-summary">
+            Super Chat / Super Sticker（通貨別集計・換算なし）
+          </span>
+        </div>
+        <div class="nl-north-star-lane__shell">
+          <div
+            id="northStarLaneBody-contributionRanking"
+            class="nl-north-star-lane__body nl-top-support-rank nl-top-support-rank--below-cards"
+            aria-live="polite"
+          >
+            <div id="yt-currency-ranking-container" class="currency-grid">
+              <div class="empty-hint">スーパーチャット・ステッカーが届くと通貨ごとに集計されます。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nl-north-star-lane" data-lane="giftHistory">
+        <div class="nl-north-star-lane__heading">
+          <span class="nl-north-star-lane__label">メンバー・ギフト</span>
+          <span class="nl-north-star-lane__sublabel" id="yt-member-gift-summary">
+            メンバーシップ加入・マイルストーン・ギフト応援者
+          </span>
+        </div>
+        <div class="nl-north-star-lane__shell">
+          <div
+            id="northStarLaneBody-giftHistory"
+            class="nl-north-star-lane__body nl-top-support-rank nl-top-support-rank--below-cards"
+            aria-live="polite"
+          >
+            <div id="yt-member-gift-list" class="nl-top-support-rank__list" role="list">
+              <div class="empty-hint">メンバー加入・メンバーシップギフトが届くとここに表示されます。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. アイコン列・グリッド・診断を表示（extension/popup.html の #supportVisualDetails と同じ構造） -->
+    <details id="supportVisualDetails" class="nl-support-visual-details">
+      <summary id="supportVisualDetailsSummary" class="nl-support-visual-details__summary">
+        アイコン列・グリッド・診断を表示
+      </summary>
+      <div class="nl-support-visual-details__body">
+        <div class="nl-story-meter-wrap">
+          <div class="nl-story-userlane-stack">
+            <!-- 列1: スパチャ列 -->
+            <div class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift">
+              <div class="nl-story-userlane-guide">
+                <div class="nl-story-userlane-guide__lines">
+                  <div class="nl-story-userlane-guide__line">
+                    <img
+                      class="nl-story-userlane-guide__face"
+                      src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+                      alt="りんく"
+                      width="26"
+                      height="26"
+                      decoding="async"
+                    />
+                    <span class="nl-story-userlane-guide__text">
+                      スパチャ列 — Super Chat / Sticker で応援してくれた方
+                    </span>
+                    <span class="nl-story-userlane-guide__count" id="storyLaneSuperchatCount">0人</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                id="storyUserLaneSuperchat"
+                class="nl-story-userlane nl-story-userlane--gift"
+                role="list"
+                aria-label="スパチャ列"
+              ></div>
+            </div>
+
+            <!-- 列2: メンバー・ギフト列 -->
+            <div class="nl-story-userlane-tier-wrap">
+              <div class="nl-story-userlane-guide">
+                <div class="nl-story-userlane-guide__lines">
+                  <div class="nl-story-userlane-guide__line">
+                    <img
+                      class="nl-story-userlane-guide__face"
+                      src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+                      alt="こん太"
+                      width="26"
+                      height="26"
+                      decoding="async"
+                    />
+                    <span class="nl-story-userlane-guide__text">
+                      メンバー・ギフト列 — メンバー加入・ギフト・メンバーバッジの方
+                    </span>
+                    <span class="nl-story-userlane-guide__count" id="storyLaneMemberGiftCount">0人</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                id="storyUserLaneMemberGift"
+                class="nl-story-userlane nl-story-userlane--konta"
+                role="list"
+                aria-label="メンバー・ギフト列"
+              ></div>
+            </div>
+
+            <!-- 列3: コメントした人（件数順） -->
+            <div class="nl-story-userlane-tier-wrap">
+              <div class="nl-story-userlane-guide">
+                <div class="nl-story-userlane-guide__lines">
+                  <div class="nl-story-userlane-guide__line">
+                    <img
+                      class="nl-story-userlane-guide__face"
+                      src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+                      alt="たぬ姉"
+                      width="26"
+                      height="26"
+                      decoding="async"
+                    />
+                    <span class="nl-story-userlane-guide__text">
+                      コメントした人（件数順） — 発言件数が多い順の丸アイコン一覧
+                    </span>
+                    <span class="nl-story-userlane-guide__count" id="storyLaneCommentersCount">0人</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                id="storyUserLaneCommenters"
+                class="nl-story-userlane nl-story-userlane--tanu"
+                role="list"
+                aria-label="コメントした人（件数順）"
+              ></div>
+            </div>
+          </div>
+
+          <!-- 全員の顔を小さな丸で敷き詰めるグリッド（件数バッジ付き・「いま N 人を表示中」） -->
+          <div id="storyGrowthCollapsible" class="nl-story-growth-collapsible">
+            <div id="sceneStoryGauge" class="nl-story-meter" aria-label="応援コメントアイコン表示">
+              <div id="sceneStoryGrowth" class="nl-story-growth" aria-live="polite"></div>
+            </div>
+            <div id="sceneStoryGaugeLabel" class="nl-story-meter-label">いま 0 人を表示中</div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- 7a. ボタンから開く折りたたみ欄1: 3レーンのコメント一覧（コメビュ・初期は閉じる） -->
+    <details class="nl-frame-theme-details" id="yt-comeview-details">
+      <summary class="nl-frame-theme-details__summary">
+        <span class="nl-frame-theme-details__summary-left">
+          💬 コメビュ（3レーンのコメント一覧: りんく・こん太・たぬ姉）
+        </span>
+        <span class="nl-frame-theme-details__summary-meta" id="yt-comeview-summary-meta">
+          合計 0件
+        </span>
+      </summary>
+      <div class="nl-frame-theme-details__body">
+        <div class="lanes-grid">
+          <div class="lane-col lane-rinku" id="lane-rinku">
+            <div class="nl-story-userlane-guide">
+              <div class="nl-story-userlane-guide__lines">
+                <div class="nl-story-userlane-guide__line">
+                  <img
+                    class="nl-story-userlane-guide__face"
+                    src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+                    alt="りんく"
+                    width="26"
+                    height="26"
+                    decoding="async"
+                  />
+                  <span class="nl-story-userlane-guide__text">りんくレーン（配信者・モデレーター）</span>
+                  <span class="nl-story-userlane-guide__count" id="lane-rinku-count">0件</span>
+                </div>
+              </div>
+            </div>
+            <div class="lane-list" id="lane-rinku-list">
+              <div class="empty-hint">配信者本人・モデレーターのコメントがここに表示されます</div>
+            </div>
+          </div>
+
+          <div class="lane-col lane-konta" id="lane-konta">
+            <div class="nl-story-userlane-guide">
+              <div class="nl-story-userlane-guide__lines">
+                <div class="nl-story-userlane-guide__line">
+                  <img
+                    class="nl-story-userlane-guide__face"
+                    src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+                    alt="こん太"
+                    width="26"
+                    height="26"
+                    decoding="async"
+                  />
+                  <span class="nl-story-userlane-guide__text">こん太レーン（スパチャ・メンバー・ギフト）</span>
+                  <span class="nl-story-userlane-guide__count" id="lane-konta-count">0件</span>
+                </div>
+              </div>
+            </div>
+            <div class="lane-list" id="lane-konta-list">
+              <div class="empty-hint">スパチャ・ステッカー・メンバー・ギフトの応援がここに表示されます</div>
+            </div>
+          </div>
+
+          <div class="lane-col lane-tanunee" id="lane-tanunee">
+            <div class="nl-story-userlane-guide">
+              <div class="nl-story-userlane-guide__lines">
+                <div class="nl-story-userlane-guide__line">
+                  <img
+                    class="nl-story-userlane-guide__face"
+                    src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+                    alt="たぬ姉"
+                    width="26"
+                    height="26"
+                    decoding="async"
+                  />
+                  <span class="nl-story-userlane-guide__text">たぬ姉レーン（一般リスナー）</span>
+                  <span class="nl-story-userlane-guide__count" id="lane-tanunee-count">0件</span>
+                </div>
+              </div>
+            </div>
+            <div class="lane-list" id="lane-tanunee-list">
+              <div class="empty-hint">一般リスナーのコメントがここに表示されます</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- 7b. ボタンから開く折りたたみ欄2: 読み上げ設定（VOICEVOX・初期は閉じる） -->
     <details class="nl-frame-theme-details" id="yt-settings-details">
       <summary class="nl-frame-theme-details__summary">
         <span class="nl-frame-theme-details__summary-left">
-          読み上げ設定（VOICEVOX）・全件取得のヒント
+          🔊 読み上げ設定（VOICEVOX）・全件取得のヒント
         </span>
         <span class="nl-frame-theme-details__summary-meta">
           <span id="yt-voice-queue-info">待機キュー: 0件</span>
@@ -740,18 +1642,18 @@
       </summary>
       <div class="nl-frame-theme-details__body">
         <div class="control-row">
-          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700">
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; white-space: nowrap">
             <input type="checkbox" id="yt-voice-enabled" checked />
             <span>読み上げ ON（パネル閉鎖中も継続）</span>
           </label>
-          <label style="display: inline-flex; align-items: center; gap: 4px">
-            <span>モード:</span>
+          <label class="voice-mode-field">
+            <span class="voice-mode-label">モード:</span>
             <select id="yt-voice-mode">
               <option value="all">全部読む</option>
               <option value="select">選んで読む（スパチャ・メンバー・配信者名入り）</option>
             </select>
           </label>
-          <label style="display: inline-flex; align-items: center; gap: 4px">
+          <label style="display: inline-flex; align-items: center; gap: 4px; white-space: nowrap">
             <span>配信者名キーワード:</span>
             <input
               type="text"
@@ -781,107 +1683,6 @@
         </div>
       </div>
     </details>
-
-    <!-- 主役: 3レーン振り返り（りんく・こん太・たぬ姉のキャラ画像見出し） -->
-    <section class="nl-story" aria-label="3レーン振り返り">
-      <div class="lanes-grid">
-        <div class="lane-col lane-rinku" id="lane-rinku">
-          <div class="nl-story-userlane-guide">
-            <div class="nl-story-userlane-guide__lines">
-              <div class="nl-story-userlane-guide__line">
-                <img
-                  class="nl-story-userlane-guide__face"
-                  src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
-                  alt="りんく"
-                  width="28"
-                  height="28"
-                  decoding="async"
-                />
-                <div class="nl-story-userlane-guide__text">
-                  <div class="nl-story-userlane-guide__title-row">
-                    <span>りんくレーン</span>
-                    <span class="nl-story-userlane-guide__count" id="lane-rinku-count">0件</span>
-                  </div>
-                  <span class="nl-story-userlane-guide__role">配信者視点（配信者本人・モデレーター）</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="lane-list" id="lane-rinku-list">
-            <div class="empty-hint">配信者本人・モデレーターのコメントがここに表示されます</div>
-          </div>
-        </div>
-
-        <div class="lane-col lane-konta" id="lane-konta">
-          <div class="nl-story-userlane-guide">
-            <div class="nl-story-userlane-guide__lines">
-              <div class="nl-story-userlane-guide__line">
-                <img
-                  class="nl-story-userlane-guide__face"
-                  src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
-                  alt="こん太"
-                  width="28"
-                  height="28"
-                  decoding="async"
-                />
-                <div class="nl-story-userlane-guide__text">
-                  <div class="nl-story-userlane-guide__title-row">
-                    <span>こん太レーン</span>
-                    <span class="nl-story-userlane-guide__count" id="lane-konta-count">0件</span>
-                  </div>
-                  <span class="nl-story-userlane-guide__role">ファン視点（スパチャ・メンバー・ギフト）</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="lane-list" id="lane-konta-list">
-            <div class="empty-hint">スパチャ・ステッカー・メンバー・ギフトの応援がここに表示されます</div>
-          </div>
-        </div>
-
-        <div class="lane-col lane-tanunee" id="lane-tanunee">
-          <div class="nl-story-userlane-guide">
-            <div class="nl-story-userlane-guide__lines">
-              <div class="nl-story-userlane-guide__line">
-                <img
-                  class="nl-story-userlane-guide__face"
-                  src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
-                  alt="たぬ姉"
-                  width="28"
-                  height="28"
-                  decoding="async"
-                />
-                <div class="nl-story-userlane-guide__text">
-                  <div class="nl-story-userlane-guide__title-row">
-                    <span>たぬ姉レーン</span>
-                    <span class="nl-story-userlane-guide__count" id="lane-tanunee-count">0件</span>
-                  </div>
-                  <span class="nl-story-userlane-guide__role">案内役（一般コメント）</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="lane-list" id="lane-tanunee-list">
-            <div class="empty-hint">一般リスナーのコメントがここに表示されます</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 通貨別応援者ランキング（extension/popup.html の .nl-top-support-rank 構造） -->
-    <section
-      class="nl-top-support-rank"
-      id="yt-support-ranking-section"
-      aria-label="応援者ランキング（通貨別）"
-    >
-      <div class="nl-top-support-rank__header">
-        <span class="nl-top-support-rank__title">応援者ランキング（通貨別集計・換算なし）</span>
-        <span id="yt-support-summary" class="nl-top-support-rank__note">スパチャ 0件 / メンバー 0件</span>
-      </div>
-      <div id="yt-currency-ranking-container" class="currency-grid">
-        <div class="empty-hint">スーパーチャット・ステッカー・メンバー加入が届くと通貨ごとに集計されます。</div>
-      </div>
-    </section>
 
     <script src="sidepanel.js"></script>
   </body>

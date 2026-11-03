@@ -1,7 +1,10 @@
 // content-chat-entry.js — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
 /* global chrome, window, document, MutationObserver, URL, URLSearchParams, setTimeout, setInterval */
 
-import { parseYtChatElement } from '../../src/lib/youtube/ytChatParse.js';
+import {
+  parseYtChatElement,
+  extractYtWatchConcurrentViewersFromText,
+} from '../../src/lib/youtube/ytChatParse.js';
 
 const CHAT_ITEM_SELECTOR = [
   'yt-live-chat-text-message-renderer',
@@ -106,6 +109,28 @@ function setupWatchPageMetaObserver() {
     const ucMatch = href.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
     const broadcasterChannelId = ucMatch ? ucMatch[1] : '';
 
+    const ownerImgEl = document.querySelector(
+      '#owner #avatar img, ytd-video-owner-renderer #avatar img, #upload-info #avatar img',
+    );
+    const broadcasterIconUrl = String(
+      ownerImgEl?.getAttribute('src') || (ownerImgEl && 'src' in ownerImgEl ? ownerImgEl.src : '') || '',
+    ).trim();
+
+    /** @type {number | null} */
+    let concurrentViewers = null;
+    const infoCandidates = document.querySelectorAll(
+      'ytd-watch-info-text, #info-container, #view-count, ytd-video-primary-info-renderer #count, #info',
+    );
+    for (let i = 0; i < infoCandidates.length; i += 1) {
+      const parsed = extractYtWatchConcurrentViewersFromText(
+        String(infoCandidates[i]?.textContent || ''),
+      );
+      if (parsed !== null) {
+        concurrentViewers = parsed;
+        break;
+      }
+    }
+
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -113,6 +138,8 @@ function setupWatchPageMetaObserver() {
         title: rawTitle,
         broadcasterName,
         broadcasterChannelId,
+        broadcasterIconUrl,
+        concurrentViewers,
       },
     });
   };
@@ -120,6 +147,7 @@ function setupWatchPageMetaObserver() {
   sendMeta();
   setTimeout(sendMeta, 1500);
   setTimeout(sendMeta, 4000);
+  setInterval(sendMeta, 5000);
   window.addEventListener('yt-navigate-finish', () => {
     setTimeout(sendMeta, 800);
   });
@@ -131,6 +159,8 @@ function setupWatchPageMetaObserver() {
 function setupLiveChatObserver() {
   /** @type {Set<string>} */
   const seenIds = new Set();
+  /** @type {Set<string>} */
+  const seenWithIconIds = new Set();
   /** @type {any[]} */
   let pendingBatch = [];
   /** @type {any} */
@@ -142,6 +172,14 @@ function setupLiveChatObserver() {
     if (seenIds.size > MAX_SEEN_IDS) {
       const first = seenIds.values().next().value;
       if (first) seenIds.delete(first);
+    }
+  };
+
+  const rememberIconId = (id) => {
+    seenWithIconIds.add(id);
+    if (seenWithIconIds.size > MAX_SEEN_IDS) {
+      const first = seenWithIconIds.values().next().value;
+      if (first) seenWithIconIds.delete(first);
     }
   };
 
@@ -168,29 +206,46 @@ function setupLiveChatObserver() {
     flushTimer = setTimeout(flushBatch, 150);
   };
 
-  const inspectElement = (el, allowRetry = true) => {
+  const inspectElement = (el, retryCount = 0) => {
     if (!el || typeof el.tagName !== 'string') return;
     const rawId = String(el.getAttribute?.('id') || '').trim();
-    if (rawId && seenIds.has(rawId)) return;
+    if (rawId && seenWithIconIds.has(rawId)) return;
 
     const parsed = parseYtChatElement(el);
     if (!parsed) {
-      if (allowRetry) {
-        setTimeout(() => inspectElement(el, false), 120);
+      if (retryCount < 2) {
+        setTimeout(() => inspectElement(el, retryCount + 1), 150);
       }
       return;
     }
-    if (seenIds.has(parsed.id)) return;
-    rememberId(parsed.id);
-    pendingBatch.push(parsed);
-    queueFlush();
+
+    if (!seenIds.has(parsed.id)) {
+      rememberId(parsed.id);
+      if (parsed.iconUrl) {
+        rememberIconId(parsed.id);
+      } else if (retryCount < 3) {
+        setTimeout(() => inspectElement(el, retryCount + 1), 200 * (retryCount + 1));
+      }
+      pendingBatch.push(parsed);
+      queueFlush();
+      return;
+    }
+
+    // 初回取得時に遅延ロードで空だったアイコン URL が後から入った場合は補完送信する
+    if (parsed.iconUrl && !seenWithIconIds.has(parsed.id)) {
+      rememberIconId(parsed.id);
+      pendingBatch.push(parsed);
+      queueFlush();
+    } else if (!parsed.iconUrl && retryCount < 3) {
+      setTimeout(() => inspectElement(el, retryCount + 1), 250 * (retryCount + 1));
+    }
   };
 
   const scanAllExisting = (root = document) => {
     try {
       const nodes = root.querySelectorAll(CHAT_ITEM_SELECTOR);
       for (let i = 0; i < nodes.length; i += 1) {
-        inspectElement(nodes[i], true);
+        inspectElement(nodes[i], 0);
       }
       queueFlush();
     } catch {
@@ -208,12 +263,12 @@ function setupLiveChatObserver() {
         const node = /** @type {any} */ (added[j]);
         if (!node || node.nodeType !== 1) continue;
         if (typeof node.matches === 'function' && node.matches(CHAT_ITEM_SELECTOR)) {
-          inspectElement(node, true);
+          inspectElement(node, 0);
         }
         if (typeof node.querySelectorAll === 'function') {
           const children = node.querySelectorAll(CHAT_ITEM_SELECTOR);
           for (let k = 0; k < children.length; k += 1) {
-            inspectElement(children[k], true);
+            inspectElement(children[k], 0);
           }
         }
       }

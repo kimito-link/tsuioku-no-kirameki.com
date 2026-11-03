@@ -33,6 +33,8 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   title?: string,
  *   broadcasterName?: string,
  *   broadcasterChannelId?: string,
+ *   broadcasterIconUrl?: string,
+ *   concurrentViewers?: number | null,
  *   chatFilterLabel?: string,
  *   itemCount?: number
  * }} patch
@@ -42,6 +44,8 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   title: string,
  *   broadcasterName: string,
  *   broadcasterChannelId: string,
+ *   broadcasterIconUrl: string,
+ *   concurrentViewers: number | null,
  *   chatFilterLabel: string,
  *   itemCount: number,
  *   createdAt: number,
@@ -56,6 +60,19 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   const broadcasterChannelId = String(
     patch?.broadcasterChannelId || prev.broadcasterChannelId || '',
   ).trim();
+  const broadcasterIconUrl = String(
+    patch?.broadcasterIconUrl || prev.broadcasterIconUrl || '',
+  ).trim();
+  const concurrentViewers =
+    typeof patch?.concurrentViewers === 'number' &&
+    Number.isFinite(patch.concurrentViewers) &&
+    patch.concurrentViewers >= 0
+      ? Math.floor(patch.concurrentViewers)
+      : typeof prev.concurrentViewers === 'number' &&
+          Number.isFinite(prev.concurrentViewers) &&
+          prev.concurrentViewers >= 0
+        ? Math.floor(prev.concurrentViewers)
+        : null;
   const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || '').trim();
   const itemCount =
     typeof patch?.itemCount === 'number' && Number.isFinite(patch.itemCount) && patch.itemCount >= 0
@@ -74,6 +91,8 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     title,
     broadcasterName,
     broadcasterChannelId,
+    broadcasterIconUrl,
+    concurrentViewers,
     chatFilterLabel,
     itemCount,
     createdAt,
@@ -158,6 +177,7 @@ export function createYtStreamIncrementalState(videoId, opts = {}) {
     broadcasterChannelId: String(opts.broadcasterChannelId || '').trim(),
     displayLimit,
     totalCount: 0,
+    firstRecordedAt: 0,
     lastRecordedAt: 0,
     /** @type {Set<string>} */
     seenPks: new Set(),
@@ -224,8 +244,13 @@ export function applyYtStreamIncrementalItems(state, incomingItems, opts = {}) {
     unseen.push(item);
 
     const recAt = Number(item.recordedAt || 0);
-    if (Number.isFinite(recAt) && recAt > state.lastRecordedAt) {
-      state.lastRecordedAt = recAt;
+    if (Number.isFinite(recAt) && recAt > 0) {
+      if (state.firstRecordedAt === 0 || recAt < state.firstRecordedAt) {
+        state.firstRecordedAt = recAt;
+      }
+      if (recAt > state.lastRecordedAt) {
+        state.lastRecordedAt = recAt;
+      }
     }
   }
 
