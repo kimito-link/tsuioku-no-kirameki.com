@@ -394,10 +394,24 @@
   }
   function safeSendMessage(msg) {
     try {
-      if (!chrome?.runtime?.id) return;
+      if (!chrome?.runtime?.id) {
+        reloadOrphanedPageOnce();
+        return;
+      }
       chrome.runtime.sendMessage(msg, () => {
         void chrome.runtime.lastError;
       });
+    } catch {
+    }
+  }
+  function reloadOrphanedPageOnce() {
+    try {
+      const KEY = "nl_yt_orphan_reload_at";
+      const last = Number(window.sessionStorage.getItem(KEY) || 0);
+      if (Date.now() - last < 10 * 60 * 1e3) return;
+      window.sessionStorage.setItem(KEY, String(Date.now()));
+      const target = window.top && window.top !== window ? window.top : window;
+      target.location.reload();
     } catch {
     }
   }

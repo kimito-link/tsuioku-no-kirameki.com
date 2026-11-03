@@ -82,7 +82,23 @@
             });
           }
         };
-        req.onsuccess = () => resolve(req.result);
+        req.onsuccess = () => {
+          const db = req.result;
+          db.onclose = () => {
+            dbPromise = null;
+          };
+          db.onversionchange = () => {
+            dbPromise = null;
+            try {
+              db.close();
+            } catch {
+            }
+          };
+          resolve(db);
+        };
+        req.onblocked = () => {
+          dbPromise = null;
+        };
         req.onerror = () => {
           dbPromise = null;
           reject(req.error || new Error("idb_open_failed"));
@@ -157,9 +173,175 @@
     }
   }
 
+  // extension-youtube/src/ytGiftToNico.js
+  var JPY_PER_UNIT = (
+    /** @type {Record<string, number>} */
+    {
+      JPY: 1,
+      USD: 150,
+      EUR: 165,
+      GBP: 195,
+      CAD: 110,
+      AUD: 100,
+      NZD: 90,
+      CHF: 175,
+      SGD: 115,
+      HKD: 19,
+      TWD: 4.7,
+      KRW: 0.11,
+      CNY: 21,
+      PHP: 2.6,
+      THB: 4.3,
+      IDR: 95e-4,
+      MYR: 33,
+      INR: 1.8,
+      BRL: 27,
+      MXN: 8
+    }
+  );
+  function ytAmountToPoints(amount, currency) {
+    const a = Number(amount);
+    if (!Number.isFinite(a) || a <= 0) return 0;
+    const rate = JPY_PER_UNIT[String(currency || "").toUpperCase()] ?? 1;
+    return Math.max(0, Math.round(a * rate));
+  }
+  var ITEM_NAME = (
+    /** @type {Record<string, string>} */
+    {
+      superchat: "スーパーチャット",
+      sticker: "スーパーステッカー",
+      membership: "メンバー加入",
+      membership_gift: "メンバーシップギフト"
+    }
+  );
+  function isYtPaidKind(kind) {
+    return Object.prototype.hasOwnProperty.call(ITEM_NAME, String(kind || ""));
+  }
+  function buildYtGiftBags(entries, lv, opts = {}) {
+    const now = Number(opts.now) || Date.now();
+    const beginSec = Number(opts.startedAt) > 0 ? Math.floor(Number(opts.startedAt) / 1e3) : 0;
+    const paid = (Array.isArray(entries) ? entries : []).filter((e) => isYtPaidKind(String(e?.ytKind || "")));
+    const events = [];
+    const history2 = [];
+    const byUser = /* @__PURE__ */ new Map();
+    const byItem = /* @__PURE__ */ new Map();
+    let totalPoints = 0;
+    for (const e of paid) {
+      const uid = String(e.userId || "").trim();
+      const nickname = String(e.nickname || "").trim();
+      const kind = String(e.ytKind || "");
+      const itemName = ITEM_NAME[kind];
+      const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ""));
+      const at = Number(e.capturedAt) || now;
+      const pubSec = Math.floor(at / 1e3);
+      totalPoints += point;
+      events.push({
+        userId: uid,
+        nickname,
+        itemId: kind,
+        itemName,
+        point,
+        message: String(e.text || ""),
+        contributionRank: null,
+        capturedAt: at
+      });
+      const offsetSec = beginSec > 0 ? Math.max(0, pubSec - beginSec) : 0;
+      const h = Math.floor(offsetSec / 3600);
+      const m = Math.floor(offsetSec % 3600 / 60);
+      const s5 = offsetSec % 60;
+      history2.push({
+        itemName,
+        senderName: nickname || "名無し",
+        points: point,
+        time: beginSec > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s5).padStart(2, "0")}` : "—",
+        sortKey: beginSec > 0 ? offsetSec : pubSec,
+        thumbnailUrl: "",
+        senderAvatarUrl: String(e.avatarUrl || ""),
+        userId: uid,
+        kokenHistoryId: `yt:${String(e.id || "")}`,
+        publishedAt: pubSec,
+        contribution: point,
+        capturedAt: at
+      });
+      const item = byItem.get(itemName) || { itemName, count: 0, thumbnailUrl: "" };
+      item.count += 1;
+      byItem.set(itemName, item);
+      if (!uid) continue;
+      const u = byUser.get(uid) || {
+        userId: uid,
+        nickname: nickname || uid,
+        avatarUrl: "",
+        throwCount: 0,
+        totalPoints: 0,
+        capturedAt: at
+      };
+      u.throwCount += 1;
+      u.totalPoints += point;
+      if (at > u.capturedAt) u.capturedAt = at;
+      if (e.avatarUrl) u.avatarUrl = String(e.avatarUrl);
+      if (nickname) u.nickname = nickname;
+      byUser.set(uid, u);
+    }
+    history2.sort((a, b) => b.sortKey - a.sortKey);
+    const users = [...byUser.values()];
+    const ranked = [...users].sort((a, b) => b.totalPoints - a.totalPoints || b.throwCount - a.throwCount);
+    return {
+      count: paid.length,
+      totalPoints,
+      giftUsers: users.map((u) => ({
+        userId: u.userId,
+        nickname: u.nickname,
+        capturedAt: u.capturedAt,
+        throwCount: u.throwCount
+      })),
+      giftEvents: events,
+      subApp: history2.length ? {
+        liveId: lv,
+        capturedAt: now,
+        source: "youtube",
+        history: history2,
+        totalCounts: [...byItem.values()].sort((a, b) => b.count - a.count),
+        officialTotalPoint: totalPoints,
+        officialRemaining: 0
+      } : null,
+      throws: users.length ? users.map((u) => ({
+        userId: u.userId,
+        nickname: u.nickname,
+        throwCount: u.throwCount,
+        totalPoints: u.totalPoints,
+        capturedAt: u.capturedAt,
+        ...u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}
+      })) : null,
+      koken: ranked.length ? {
+        liveId: lv,
+        capturedAt: now,
+        lastOk: true,
+        lastStatus: 200,
+        rows: ranked.map((u, i) => ({
+          rank: i + 1,
+          name: u.nickname,
+          contribution: u.totalPoints,
+          isAnonymous: false,
+          thumbnailUrl: u.avatarUrl,
+          userPageUrl: `https://www.nicovideo.jp/user/${u.userId}`
+        }))
+      } : null
+    };
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var COMMENTS_PREFIX = "nls_comments_";
+  var GIFT_KEY_PREFIXES = (
+    /** @type {Array<[string, string]>} */
+    [
+      ["nls_gift_users_", "giftUsers"],
+      ["nls_gift_events_", "giftEvents"],
+      ["nls_gift_subapp_history_", "subApp"],
+      ["nls_gift_history_throws_", "throws"],
+      ["nls_koken_api_contrib_", "koken"]
+    ]
+  );
   try {
     const u = new URL(window.location.href);
     if (u.searchParams.get("inline") !== "1" || u.searchParams.get("dock") !== "sidepanel") {
@@ -318,7 +500,23 @@
     }
     return { keyOf: keyOf2, iconOf: (key) => iconByKey.get(key) || "" };
   }
-  async function buildCommentsForLv(lv) {
+  var commentsCache = /* @__PURE__ */ new Map();
+  var shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0 };
+  globalThis.__ytNicoShimDiag = shimDiag;
+  var lastAskedLv = "";
+  function buildCommentsForLv(lv) {
+    const hit = commentsCache.get(lv);
+    if (hit && Date.now() - hit.at < 1500) return hit.p;
+    const p = buildCommentsForLvUncached(lv);
+    commentsCache.set(lv, { at: Date.now(), p });
+    return p;
+  }
+  async function buildGiftBagsForLv(lv, summary) {
+    const entries = await buildCommentsForLv(lv);
+    if (!entries) return void 0;
+    return buildYtGiftBags(entries, lv, { startedAt: Number(summary?.startedAt || 0) });
+  }
+  async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
     const items = await getYtStreamCommentsByVideoId(vid);
@@ -352,11 +550,29 @@
       );
       if (list) {
         for (const k of list) {
-          if (!k.startsWith(COMMENTS_PREFIX)) continue;
-          const lv = k.slice(COMMENTS_PREFIX.length).toLowerCase();
-          if (!videoIdForPseudoLv(lv)) continue;
-          const arr = await buildCommentsForLv(lv);
-          if (arr) bag[k] = arr;
+          if (k.startsWith(COMMENTS_PREFIX)) {
+            const lv2 = k.slice(COMMENTS_PREFIX.length).toLowerCase();
+            if (!videoIdForPseudoLv(lv2)) continue;
+            lastAskedLv = lv2;
+            const arr = await buildCommentsForLv(lv2);
+            if (arr) bag[k] = arr;
+            continue;
+          }
+          const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));
+          if (!g) continue;
+          const lv = k.slice(g[0].length).toLowerCase();
+          const vid = videoIdForPseudoLv(lv);
+          if (!vid) continue;
+          const sums = (
+            /** @type {Record<string, any>} */
+            await realGet(KEY_YT_SUMMARIES)
+          );
+          const gifts = (
+            /** @type {Record<string, any> | undefined} */
+            await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
+          );
+          const v = gifts ? gifts[g[1]] : null;
+          if (v != null) bag[k] = v;
         }
       }
       return bag;
@@ -396,7 +612,13 @@
           if (!vid) return { ok: false, error: "not_youtube" };
           const bag = await realGet(KEY_YT_SUMMARIES);
           const sum = bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid] || {};
-          return { ok: true, snapshot: ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || "")) };
+          const snapshot = (
+            /** @type {Record<string, any>} */
+            ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ""))
+          );
+          const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => void 0);
+          if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
+          return { ok: true, snapshot };
         });
       }
       if (type === "NLS_CAPTURE_SCREENSHOT") {
@@ -445,25 +667,56 @@
         listeners.push(fn);
         add(fn);
       };
+      const lastNotified = /* @__PURE__ */ new Map();
+      const notifyLv = async (lv, summary) => {
+        commentsCache.delete(lv);
+        const arr = await buildCommentsForLv(lv).catch(() => void 0);
+        if (!arr) return;
+        const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ""}`;
+        if (lastNotified.get(lv) === sig) return;
+        lastNotified.set(lv, sig);
+        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr } };
+        try {
+          const gifts = (
+            /** @type {Record<string, any>} */
+            buildYtGiftBags(arr, lv, { startedAt: Number(summary?.startedAt || 0) })
+          );
+          if (gifts && gifts.count > 0) {
+            for (const [pre, field] of GIFT_KEY_PREFIXES) {
+              const v = gifts[field];
+              if (v != null) synth[`${pre}${lv}`] = { newValue: v };
+            }
+          }
+        } catch {
+        }
+        shimDiag.notified += 1;
+        shimDiag.listeners = listeners.length;
+        shimDiag.lastNotifiedAt = Date.now();
+        shimDiag.lastCount = arr.length;
+        for (const fn of listeners) {
+          try {
+            fn(synth, "local");
+          } catch {
+          }
+        }
+      };
       add((changes, area) => {
         if (area !== "local" || !changes[KEY_YT_SUMMARIES]) return;
         const next = changes[KEY_YT_SUMMARIES].newValue || {};
         const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
         for (const vid of Object.keys(next)) {
           if (prev[vid] && Number(prev[vid].updatedAt || 0) === Number(next[vid]?.updatedAt || 0)) continue;
-          const lv = pseudoLvForVideoId(vid);
-          void buildCommentsForLv(lv).then((arr) => {
-            if (!arr) return;
-            const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr } };
-            for (const fn of listeners) {
-              try {
-                fn(synth, "local");
-              } catch {
-              }
-            }
-          });
+          void notifyLv(pseudoLvForVideoId(vid), next[vid]);
         }
       });
+      setInterval(() => {
+        const lv = lastAskedLv;
+        if (!lv) return;
+        const vid = videoIdForPseudoLv(lv);
+        if (!vid) return;
+        void Promise.resolve(realGet(KEY_YT_SUMMARIES)).then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid])).catch(() => {
+        });
+      }, 3e3);
     }
   }
   var NICO_USER_LINK_RE = /^https?:\/\/(?:www\.)?nicovideo\.jp\/user\/(\d+)/;
@@ -45310,7 +45563,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T13:28" ? String("yt-2026-11-03T13:28") : "dev";
+      const buildId = "yt-2026-11-03T13:52" ? String("yt-2026-11-03T13:52") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45328,7 +45581,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.6") : "";
+    const bundledVersion = true ? String("0.1.7") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45373,7 +45626,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T13:28" ? String("yt-2026-11-03T13:28") : "dev";
+            return "yt-2026-11-03T13:52" ? String("yt-2026-11-03T13:52") : "dev";
           } catch {
             return "dev";
           }

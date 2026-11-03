@@ -65,12 +65,33 @@ function readChatFilterLabel() {
  */
 function safeSendMessage(msg) {
   try {
-    if (!chrome?.runtime?.id) return;
+    if (!chrome?.runtime?.id) {
+      reloadOrphanedPageOnce();
+      return;
+    }
     chrome.runtime.sendMessage(msg, () => {
       void chrome.runtime.lastError;
     });
   } catch {
     // context invalidated
+  }
+}
+
+/**
+ * 拡張が更新・入れ直しされると、このページの中の古いプログラムは拡張と話せなくなり、記録が黙って止まる。
+ * ニコ生版(PR #559)と同じく、そうなったらページを1回だけ読み込み直して新しいプログラムに入れ替える。
+ * チャット欄(iframe)の中で気づいたときも、視聴ページごと読み込み直す。10分に1回まで。
+ */
+function reloadOrphanedPageOnce() {
+  try {
+    const KEY = 'nl_yt_orphan_reload_at';
+    const last = Number(window.sessionStorage.getItem(KEY) || 0);
+    if (Date.now() - last < 10 * 60 * 1000) return;
+    window.sessionStorage.setItem(KEY, String(Date.now()));
+    const target = window.top && window.top !== window ? window.top : window;
+    target.location.reload();
+  } catch {
+    // 読み込み直せないときは何もしない
   }
 }
 
