@@ -332,6 +332,7 @@
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var COMMENTS_PREFIX = "nls_comments_";
+  var TAIL_PREFIX = "nls_ctail_";
   var GIFT_KEY_PREFIXES = (
     /** @type {Array<[string, string]>} */
     [
@@ -508,7 +509,10 @@
     return { keyOf: keyOf2, iconOf: (key) => iconByKey.get(key) || "" };
   }
   var commentsCache = /* @__PURE__ */ new Map();
-  var shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0 };
+  var shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: (
+    /** @type {string[]} */
+    []
+  ) };
   globalThis.__ytNicoShimDiag = shimDiag;
   var lastAskedLv = "";
   function buildCommentsForLv(lv) {
@@ -587,11 +591,15 @@
         await realGet(keys)
       );
       if (list) {
+        for (const k of list) if (/^nls_/.test(k) && !shimDiag.keysAsked.includes(k.replace(/lv\d+/, "LV"))) shimDiag.keysAsked.push(k.replace(/lv\d+/, "LV"));
+      }
+      if (list) {
         for (const k of list) {
-          if (k.startsWith(COMMENTS_PREFIX)) {
-            const lv2 = k.slice(COMMENTS_PREFIX.length).toLowerCase();
+          if (k.startsWith(COMMENTS_PREFIX) || k.startsWith(TAIL_PREFIX)) {
+            const lv2 = k.slice((k.startsWith(TAIL_PREFIX) ? TAIL_PREFIX : COMMENTS_PREFIX).length).toLowerCase();
             if (!videoIdForPseudoLv(lv2)) continue;
             lastAskedLv = lv2;
+            shimDiag.commentGets += 1;
             const arr = await buildCommentsForLv(lv2);
             if (arr) bag[k] = arr;
             continue;
@@ -722,7 +730,7 @@
         const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ""}`;
         if (lastNotified.get(lv) === sig) return;
         lastNotified.set(lv, sig);
-        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr } };
+        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: arr } };
         try {
           const gifts = (
             /** @type {Record<string, any>} */
@@ -45086,7 +45094,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T14:53" ? String("yt-2026-11-03T14:53") : "dev";
+      const buildId = "yt-2026-11-03T15:02" ? String("yt-2026-11-03T15:02") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45104,7 +45112,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.11") : "";
+    const bundledVersion = true ? String("0.1.12") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45149,7 +45157,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T14:53" ? String("yt-2026-11-03T14:53") : "dev";
+            return "yt-2026-11-03T15:02" ? String("yt-2026-11-03T15:02") : "dev";
           } catch {
             return "dev";
           }
