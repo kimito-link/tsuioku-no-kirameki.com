@@ -933,6 +933,12 @@
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
     if (next !== v) node.nodeValue = next;
   }
+  function fixUidLabelAttr(el) {
+    const uid = String(el.getAttribute("data-nl-uid") || "");
+    if (!/^8\d{9}$/.test(uid) || !ytKeyForNumericUid(uid)) return;
+    const label = ytLabelForUid(uid) || "";
+    if (el.getAttribute("data-yt-uid-label") !== label) el.setAttribute("data-yt-uid-label", label);
+  }
   function fixTitleAttr(el) {
     const t = el.getAttribute("title");
     if (!t) return;
@@ -964,6 +970,8 @@
     if (el.tagName === "A") fixAnchor(el);
     if (el.tagName === "IMG") fixImg(el);
     fixTitleAttr(el);
+    if (el.hasAttribute("data-nl-uid")) fixUidLabelAttr(el);
+    el.querySelectorAll("[data-nl-uid]").forEach(fixUidLabelAttr);
     el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
     el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
     el.querySelectorAll("[title]").forEach(fixTitleAttr);
@@ -991,6 +999,7 @@
           if (m.attributeName === "href" && el.tagName === "A") fixAnchor(el);
           else if (m.attributeName === "title") fixTitleAttr(el);
           else if (m.attributeName === "src" && el.tagName === "IMG") fixImg(el);
+          else if (m.attributeName === "data-nl-uid") fixUidLabelAttr(el);
         } else m.addedNodes.forEach(fixSubtree);
       }
     }).observe(document.body, {
@@ -998,7 +1007,7 @@
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ["href", "title", "src"]
+      attributeFilter: ["href", "title", "src", "data-nl-uid"]
     });
   }
   if (typeof document !== "undefined") {
