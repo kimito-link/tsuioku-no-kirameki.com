@@ -27,7 +27,7 @@ describe('★メディアキット生成の共有化と統合', () => {
     expect(popup).not.toContain('exportMediaKitBtn');
     const html = read('extension/popup.html');
     expect(html).not.toContain('exportMediaKitBtn');
-    expect(html).toContain('マーケ分析+メディアキットを1つのHTMLで保存');
+    expect(html).toContain('マーケ分析・視聴維持率・メディアキット・コメント記録を全部1つのHTMLで保存');
   });
 
   it('マーケ生成は、メディアキットを依存注入で作り、分析レポートの1章として同じ HTML に入れる(タブ・iframe は使わない)', () => {

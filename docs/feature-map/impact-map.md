@@ -706,6 +706,7 @@
 | `src/lib/hiddenTabExternalFetchGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/htmlReportCommenterFollowSection.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/htmlReportConceptGuide.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/htmlReportEmbed.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/identityAcquisitionCensus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/iframeOfficialDomFromRelay.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inferBroadcasterUserIdFromComments.js` | 1 | ポップアップ(応援レーン) |
@@ -1010,6 +1011,8 @@
 | `src/lib/venueOpenCache.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/verifiedAvatarRegistry.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerCountProbeMerge.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/viewerRetentionEstimate.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/viewerRetentionSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerSelfLaneAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/voiceBubbleRealtimeParity.js` | 1 | 状態速報ページ |
 | `src/lib/voiceComment.js` | 1 | 記録エンジン(watchページ常駐) |

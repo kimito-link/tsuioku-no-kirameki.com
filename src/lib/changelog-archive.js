@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1831',
+    date: '2026-10-28',
+    summary: '視聴ページの確認用ログを毎回出さない',
+    items: Object.freeze([
+      'パネルの描画のたびに、確認用の大きな記録（約5KB）を視聴ページのコンソールへ自動で出し続けていました。必要なときだけ手で呼べるようにして、自動では出さないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1830',
     date: '2026-10-28',
     summary: 'パネルを開くときの作り直しを1回に',
