@@ -3,7 +3,8 @@ import {
   buildMarketingDashboardHtml,
   buildAudienceParticipationLeadSectionHtml,
   MKT_SECTION_REVEAL_ENABLED,
-  eagerInlineImages
+  eagerInlineImages,
+  MARKETING_RENDER_IDLE_SCRIPT_HTML
 } from './marketingChartsHtml.js';
 import { aggregateMarketingReport } from './marketingAggregate.js';
 import { analyzeAudienceEngagementGap } from './audienceEngagementGap.js';
@@ -1282,5 +1283,24 @@ describe('段B: 横断応援者ランキング(buildMarketingDashboardHtml統合
     const section = html.match(/<section class="mkt-section mkt-section--cross-supporter-ranking"[\s\S]*?<\/section>/)?.[0] || '';
     expect(section).toContain('>匿名<');
     expect(section).not.toContain('anonhash');
+  });
+});
+
+describe('手が空いたときに章を描いておく(v0.1.1857)', () => {
+  it('script は .mkt-section を1章ずつ visible にし、requestIdleCallback が無くても動く', () => {
+    expect(MARKETING_RENDER_IDLE_SCRIPT_HTML).toContain(".mkt-section");
+    expect(MARKETING_RENDER_IDLE_SCRIPT_HTML).toContain("contentVisibility='visible'");
+    expect(MARKETING_RENDER_IDLE_SCRIPT_HTML).toContain('requestIdleCallback||');
+  });
+  it('script を実行すると全章が visible になる', () => {
+    const secs = [{ style: {} }, { style: {} }];
+    const fakeDoc = { readyState: 'complete', querySelectorAll: () => secs };
+    /** @type {Function[]} */
+    const pending = [];
+    const fakeWin = { requestIdleCallback: (cb) => pending.push(cb) };
+    const code = MARKETING_RENDER_IDLE_SCRIPT_HTML.replace(/^<script>/, '').replace(/<\/script>$/, '');
+    new Function('document', 'window', code)(fakeDoc, fakeWin);
+    while (pending.length) pending.shift()({ timeRemaining: () => 10 });
+    expect(secs.every((el) => el.style.contentVisibility === 'visible')).toBe(true);
   });
 });

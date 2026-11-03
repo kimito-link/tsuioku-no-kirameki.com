@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1834',
+    date: '2026-10-31',
+    summary: 'アプリでコメントの接続が止められていたのを直す',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」で、ページの安全設定がニコニコへの接続(WebSocket)まで止めてしまい、つながらない状態でした。ニコニコの接続先だけを許可して、受け取れるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1833',
     date: '2026-10-29',
     summary: '読み上げの音質を選べるように',

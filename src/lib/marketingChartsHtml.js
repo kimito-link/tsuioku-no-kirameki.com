@@ -3468,8 +3468,17 @@ ${finalBody}
 <footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
 ${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}
 ${buildSectionRevealScriptHtml()}
+${MARKETING_RENDER_IDLE_SCRIPT_HTML}
 </body></html>`);
 }
+
+/**
+ * v0.1.1857: 開いた直後は .mkt-section の content-visibility:auto で速く出し、手が空いたときに1章ずつ
+ * visible に切り替える。auto のままだと、スクロールで章が画面に入るたびに配置と描画をやり直す
+ * (実ファイル lv351735139 で、スクロール中の配置 44回・183ms → 切替後 8回・10ms)。
+ * 一度に全部切り替えると約0.5秒固まるので、1章ずつ requestIdleCallback で進める。
+ */
+export const MARKETING_RENDER_IDLE_SCRIPT_HTML = `<script>(function(){var q=[].slice.call(document.querySelectorAll('.mkt-section'));var idle=window.requestIdleCallback||function(cb){return setTimeout(function(){cb({timeRemaining:function(){return 8}})},50)};function step(d){while(q.length&&d.timeRemaining()>4){q.shift().style.contentVisibility='visible'}if(q.length)idle(step)}function go(){idle(step)}if(document.readyState==='complete')go();else window.addEventListener('load',go)})();</script>`;
 
 /**
  * v0.1.1856: HTML の中に埋め込んだ画像(data: の identicon 等)は遅延読み込みをやめる。
