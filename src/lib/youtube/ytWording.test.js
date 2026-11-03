@@ -15,3 +15,12 @@ describe('ytWording', () => {
     expect(ytWording('')).toBe('');
   });
 });
+
+describe('ytWording のスパチャ合計順', () => {
+  it('トップファンが無いときは XP でなく pt にする', async () => {
+    const { ytWording } = await import('./ytWording.js');
+    expect(ytWording('15800貢', { topFans: false })).toBe('15800 pt');
+    expect(ytWording('ギフト貢献度', { topFans: false })).toBe('スパチャの合計順');
+    expect(ytWording('15800貢')).toBe('15800 XP');
+  });
+});
