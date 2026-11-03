@@ -60,7 +60,7 @@ export function isYtPaidKind(kind) {
 /**
  * @param {Array<{
  *   id?: string, userId?: string, nickname?: string, avatarUrl?: string, text?: string,
- *   capturedAt?: number, ytKind?: string, ytAmount?: number, ytCurrency?: string
+ *   capturedAt?: number, ytPostedAt?: number, ytKind?: string, ytAmount?: number, ytCurrency?: string
  * }>} entries ytNicoShim が作ったニコ生形のコメント行
  * @param {string} lv 疑似 lv
  * @param {{ startedAt?: number, now?: number }} [opts]
@@ -86,7 +86,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     const kind = String(e.ytKind || '');
     const itemName = ITEM_NAME[kind];
     const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
-    const at = Number(e.capturedAt) || now;
+    const at = Number(e.ytPostedAt) || Number(e.capturedAt) || now;
     const pubSec = Math.floor(at / 1000);
     totalPoints += point;
 

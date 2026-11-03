@@ -1,5 +1,5 @@
 // content-chat-entry.js — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
-/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, setInterval, NodeFilter, HTMLElement */
+/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, clearTimeout, setInterval, NodeFilter, HTMLElement */
 
 import {
   parseYtChatElement,
@@ -536,6 +536,16 @@ function setupLiveChatObserver() {
   /** @type {any} */
   let flushTimer = null;
   let lastFilterLabel = '';
+  // ★チャット欄の URL(/live_chat?continuation=…)には動画IDが無く、親のページの URL から決めている。
+  //   YouTube は別の配信へ移ってもページを読み直さず、チャット欄はしばらく前の配信の中身のまま残るので、
+  //   そのまま送ると前の配信のコメント(スパチャ)が新しい配信の記録に混ざる(0.1.12 までの実際の事故)。
+  //   → 動画IDが変わった瞬間に、それまでの送り待ちは前の動画IDで送り切り、その時点で画面にある要素は
+  //     前の配信のものとして二度と送らない。切り替え直後に増えた要素は少し待って、まだ画面にあれば送る。
+  let boundVideoId = resolveCurrentVideoId();
+  /** @type {WeakSet<Element>} */
+  const staleEls = new WeakSet();
+  let switchGraceUntil = 0;
+  const SWITCH_GRACE_MS = 4000;
 
   const rememberId = (id) => {
     seenIds.add(id);
@@ -561,10 +571,11 @@ function setupLiveChatObserver() {
 
     const items = pendingBatch;
     pendingBatch = [];
+    if (!boundVideoId) return;
     safeSendMessage({
       type: 'YT_CHAT_ITEMS',
       payload: {
-        videoId: resolveCurrentVideoId(),
+        videoId: boundVideoId,
         chatFilterLabel: filterLabel,
         items,
       },
@@ -576,8 +587,35 @@ function setupLiveChatObserver() {
     flushTimer = setTimeout(flushBatch, 150);
   };
 
+  /** 動画IDが変わったかを見て、変わっていたら区切る */
+  const checkVideoSwitch = () => {
+    const vid = resolveCurrentVideoId();
+    if (!vid || vid === boundVideoId) return;
+    if (flushTimer !== null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    if (pendingBatch.length) flushBatch(); // 前の動画IDで送り切る
+    try {
+      const nodes = document.querySelectorAll(CHAT_ITEM_SELECTOR);
+      for (let i = 0; i < nodes.length; i += 1) staleEls.add(nodes[i]);
+    } catch {
+      // fail-soft
+    }
+    boundVideoId = vid;
+    switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
+  };
+
   const inspectElement = (el, retryCount = 0) => {
     if (!el || typeof el.tagName !== 'string') return;
+    checkVideoSwitch();
+    if (staleEls.has(el)) return;
+    if (el.isConnected === false) return;
+    const waitMs = switchGraceUntil - Date.now();
+    if (waitMs > 0) {
+      setTimeout(() => inspectElement(el, retryCount), waitMs + 50);
+      return;
+    }
     const rawId = String(el.getAttribute?.('id') || '').trim();
     if (rawId && seenWithIconIds.has(rawId)) return;
 
