@@ -17,6 +17,9 @@ import { buildCommentTickerLatestHtml } from '../../src/lib/commentTickerLatestH
 import { paintStoryUserLaneDomFilled } from '../../src/extension/story/renderStoryUserLaneDom.js';
 import { buildYtChannelUrl, formatYtCurrencyAmount } from '../../src/lib/youtube/ytSupportRanking.js';
 import { buildYtUserLaneTiers } from '../../src/lib/youtube/ytUserLaneTiers.js';
+import { buildSupportAccentIndex } from '../../src/lib/userSupportGridAccent.js';
+import { STORY_GROWTH_MAX_CELLS, buildStoryGrowthGaugeLabel } from '../../src/lib/storyGrowthLimits.js';
+import { buildStoryAvatarDiagHtml } from '../../src/lib/storyAvatarDiagLine.js';
 import {
   buildYtRankLinesHtml,
   buildYtCasterTileHtml,
@@ -754,6 +757,105 @@ export function paintStoryHeader(total, latest) {
   const img = /** @type {HTMLImageElement|null} */ ($('sceneStoryImg'));
   const want = recent > 0 ? IMG.linkSmile : IMG.linkHalf;
   if (img && img.getAttribute('src') !== want) img.setAttribute('src', want);
+}
+
+/**
+ * 5. 応援グリッド(`#sceneStoryGrowth`)。ニコ生版 syncStoryGrowth と同じ並べ方:
+ *    コメント1件 = 顔1つ・記録した順・はじめの STORY_GROWTH_MAX_CELLS 件で固定(窓はずらさない)。
+ *    同じ人の2回目以降は右上に「何回目か」(data-support-ordinal) を出す。
+ * @param {any[]} records 記録の古い順(はじめの最大 STORY_GROWTH_MAX_CELLS 件)
+ * @param {number} total この配信で記録した件数
+ * @param {(user: any) => void} onPick 顔を押したとき
+ */
+export function paintStoryGrowthGrid(records, total, onPick) {
+  const root = $('sceneStoryGrowth');
+  if (!root) return;
+  const list = (Array.isArray(records) ? records : []).slice(0, STORY_GROWTH_MAX_CELLS);
+  const entries = list.map((r) => ({ userId: ytRankUserKey(r?.channelId, r?.name) }));
+  const accent = buildSupportAccentIndex(entries, 0, entries.length);
+  const have = root.querySelectorAll('.nl-story-growth-cell').length;
+  if (have > list.length) {
+    root.innerHTML = '';
+  }
+  const start = Math.min(have, list.length);
+  const frag = document.createDocumentFragment();
+  for (let i = start; i < list.length; i += 1) {
+    const r = list[i] || {};
+    const key = entries[i].userId;
+    const name = String(r.name || 'リスナー');
+    const cell = document.createElement('span');
+    cell.className = 'nl-story-growth-cell';
+    const media = document.createElement('span');
+    media.className = 'nl-story-growth-cell__media';
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    const fallback = identiconFor(key || name);
+    const remote = isHttpOrHttpsUrl(r.iconUrl) ? String(r.iconUrl) : '';
+    img.src = remote || fallback;
+    img.className = `nl-story-growth-icon${remote ? ' nl-story-growth-icon--remote' : ''}`;
+    if (remote) {
+      img.referrerPolicy = 'no-referrer';
+      img.addEventListener('error', () => {
+        if (img.src !== fallback) {
+          img.src = fallback;
+          img.classList.remove('nl-story-growth-icon--remote');
+        }
+      });
+    }
+    img.alt = name;
+    img.setAttribute('role', 'button');
+    img.setAttribute('tabindex', '0');
+    const text = String(r.text || '').slice(0, 26);
+    img.setAttribute('aria-label', `${name}: ${text}`);
+    img.title = `${name}\n${text}`;
+    const pick = () => {
+      const u = laneUserByKey.get(key);
+      onPick(u || { channelId: r.channelId || '', name, iconUrl: r.iconUrl || '', commentCount: 0 });
+    };
+    img.addEventListener('click', pick);
+    img.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        pick();
+      }
+    });
+    media.appendChild(img);
+    cell.appendChild(media);
+    frag.appendChild(cell);
+  }
+  root.appendChild(frag);
+  // 何回目か(同じ人の2回目以降)は全マスで付け直す(人の数え直しで変わるため)
+  const cells = root.querySelectorAll('.nl-story-growth-cell');
+  for (let i = 0; i < cells.length; i += 1) {
+    const cell = /** @type {HTMLElement} */ (cells[i]);
+    const ord = accent.ordinals[i] || 0;
+    cell.classList.toggle('nl-story-growth-cell--repeat', ord > 1);
+    if (ord > 1) cell.setAttribute('data-support-ordinal', String(ord));
+    else cell.removeAttribute('data-support-ordinal');
+  }
+  // 顔の大きさ(ニコ生版 resolveStoryIconSize の埋め込み表示と同じ段階・描いている枚数で決める)
+  {
+    const n = list.length;
+    const px = n <= 20 ? 40 : n <= 80 ? 34 : n <= 200 ? 30 : n <= 500 ? 26 : n <= 1200 ? 22 : n <= 3000 ? 18 : n <= 6000 ? 14 : 12;
+    const body = root.closest('.nl-story-body');
+    (body instanceof HTMLElement ? body : root).style.setProperty('--nl-story-icon-size', `${px}px`);
+  }
+  setText('sceneStoryGaugeLabel', buildStoryGrowthGaugeLabel(total, STORY_GROWTH_MAX_CELLS));
+  const gauge = $('sceneStoryGauge');
+  if (gauge) gauge.setAttribute('aria-label', `応援コメントアイコン: 累計 ${formatNumberJa(total)} コメント`);
+
+  // グリッドの上の一文(ニコ生版 buildStoryAvatarDiagHtml をそのまま使う)
+  const diag = $('storyAvatarDiag');
+  if (diag) {
+    const withIcon = list.filter((r) => isHttpOrHttpsUrl(r?.iconUrl)).length;
+    const withUid = list.filter((r) => String(r?.channelId || '').trim()).length;
+    const html = buildStoryAvatarDiagHtml(
+      /** @type {any} */ ({ total, withUid, withAvatar: withIcon, uniqueAvatar: withIcon, resolvedAvatar: withIcon }),
+    );
+    diag.innerHTML = String(html || '').replace(/ニコ生のページ/g, 'YouTube のページ');
+    diag.hidden = !html;
+  }
 }
 
 /** パフォーマンス計測用(実機の確認で使う) */

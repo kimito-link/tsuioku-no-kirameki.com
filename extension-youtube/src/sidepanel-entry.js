@@ -4,6 +4,7 @@
 import { formatNumberJa, safeHttpUrl } from '../../src/lib/htmlText.js';
 import { anonymousIdenticonDataUrl } from '../../src/lib/anonymousIdenticon.js';
 import { VOICEVOX_BASE_URL } from '../../src/lib/voicevoxClient.js';
+import { STORY_GROWTH_MAX_CELLS } from '../../src/lib/storyGrowthLimits.js';
 import {
   formatYtCurrencyAmount,
   buildYtChannelUrl,
@@ -29,6 +30,7 @@ import {
   paintStoryUserLanes,
   bindStoryUserLaneClicks,
   pushRecentActivity,
+  paintStoryGrowthGrid,
   paintStoryHeader,
   dismissInitialLoadShade,
   paintVersionBadge,
@@ -72,7 +74,9 @@ const SUPPORT_TIMELINE_LIMIT = 80;
 const AUTO_ALL_CHAT_KEY = 'yt_auto_all_chat_v1';
 
 /** 全員グリッドに表示する最大人数 */
-const STORY_GROWTH_GRID_LIMIT = 240;
+/** 応援グリッドに並べる記録(古い順・はじめの STORY_GROWTH_MAX_CELLS 件で固定) */
+/** @type {any[]} */
+let growthRecords = [];
 
 let selectedVideoId = '';
 /** @type {ReturnType<typeof createYtStreamIncrementalState> | null} */
@@ -435,22 +439,6 @@ function renderNorthStarSupportLanes(ranking) {
 }
 
 /**
- * タイル（アイコン列・グリッド）を押したときの動き。
- * 普通に押す → 下の詳細欄にその人の発言一覧（ニコ生版の #sceneStoryDetail と同じ）。
- * Ctrl / ⌘ / 中クリック → チャンネルページを開く（リンク本来の動き）。
- * @param {HTMLElement} cell
- * @param {any} user
- */
-function bindStoryTileClick(cell, user) {
-  cell.addEventListener('click', (ev) => {
-    const e = /** @type {MouseEvent} */ (ev);
-    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
-    e.preventDefault();
-    void showStoryUserDetail(user);
-  });
-}
-
-/**
  * 6. 「アイコン列・グリッド・診断を表示」（`#supportVisualDetails`）を
  * ニコ生版と同じ段（りんく・ギフト・メンバー・こん太・たぬ姉）で描き、
  * 下に全員の丸アイコンのグリッド（`#sceneStoryGrowth`）を並べる。
@@ -458,50 +446,14 @@ function bindStoryTileClick(cell, user) {
  * @param {any} ranking
  */
 function renderSupportVisualDetails(ranking) {
-  const commenters = Array.isArray(ranking?.commenters) ? ranking.commenters : [];
   paintStoryUserLanes(ranking, currentIncrementalState ? currentIncrementalState.totalCount || 0 : 0);
 
-  // コメントした全員の顔を小さな丸で敷き詰めるグリッド（件数バッジ付き）
-  const growthGridEl = document.getElementById('sceneStoryGrowth');
-  const gaugeLabelEl = document.getElementById('sceneStoryGaugeLabel');
-  const gridSlice = commenters.slice(0, STORY_GROWTH_GRID_LIMIT);
-  if (growthGridEl) {
-    clearChildren(growthGridEl);
-    const frag = document.createDocumentFragment();
-    for (let i = 0; i < gridSlice.length; i += 1) {
-      const u = gridSlice[i];
-      const channelUrl = safeHttpUrl(u.channelUrl || buildYtChannelUrl(u.channelId));
-      const cell = channelUrl ? document.createElement('a') : document.createElement('span');
-      cell.className = 'nl-story-growth-cell nl-story-growth-cell--repeat';
-      cell.setAttribute('data-support-ordinal', String(u.commentCount));
-      cell.title = `${u.name} (${u.commentCount}件)`;
-      if (channelUrl) {
-        /** @type {HTMLAnchorElement} */ (cell).href = channelUrl;
-        /** @type {HTMLAnchorElement} */ (cell).target = '_blank';
-        /** @type {HTMLAnchorElement} */ (cell).rel = 'noopener noreferrer';
-      }
-      const media = document.createElement('span');
-      media.className = 'nl-story-growth-cell__media';
-      media.appendChild(
-        createAvatarImgWithFallback(
-          u.iconUrl || '',
-          u.name,
-          u.channelId || u.name,
-          'nl-story-growth-icon nl-story-growth-icon--remote',
-        ),
-      );
-      cell.appendChild(media);
-      bindStoryTileClick(cell, u);
-      frag.appendChild(cell);
-    }
-    growthGridEl.appendChild(frag);
-  }
-  if (gaugeLabelEl) {
-    gaugeLabelEl.textContent =
-      commenters.length > gridSlice.length
-        ? `いま ${formatNumberJa(gridSlice.length)} 人を表示中（ほか ${formatNumberJa(commenters.length - gridSlice.length)}人）`
-        : `いま ${formatNumberJa(commenters.length)} 人を表示中`;
-  }
+  // 応援グリッド: コメント1件=顔1つ(ニコ生版と同じ並べ方)
+  paintStoryGrowthGrid(
+    growthRecords,
+    currentIncrementalState ? currentIncrementalState.totalCount || 0 : growthRecords.length,
+    (u) => void showStoryUserDetail(u),
+  );
   visualDetailsNeedsRefresh = false;
 }
 
@@ -910,6 +862,11 @@ async function renderStreamFullLoad() {
     broadcasterChannelId: currentSummary?.broadcasterChannelId || '',
   });
 
+  growthRecords = items.slice(0, STORY_GROWTH_MAX_CELLS);
+  {
+    const g = document.getElementById('sceneStoryGrowth');
+    if (g) g.innerHTML = '';
+  }
   updateStreamHeaderUi(summaries, activeId, applied.totalCount);
   renderLiveStatsAndOfficialRow(
     currentSummary,
@@ -988,6 +945,9 @@ async function renderStreamIncrementalUpdate() {
     pushSupportTimeline(newRecords, false);
     renderSupportTimeline();
     pushRecentActivity(newRecords, false);
+    if (growthRecords.length < STORY_GROWTH_MAX_CELLS) {
+      growthRecords = growthRecords.concat(newRecords).slice(0, STORY_GROWTH_MAX_CELLS);
+    }
     paintStoryHeader(applied.totalCount, latestRecordOf(newRecords));
     updateExportButtonsState(applied.totalCount);
     patchLaneIncremental('rinku', applied.addedByLane.rinku, applied.laneCounts.rinku);
