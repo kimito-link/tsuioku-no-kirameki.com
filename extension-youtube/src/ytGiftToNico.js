@@ -52,6 +52,27 @@ const ITEM_NAME = /** @type {Record<string, string>} */ ({
   membership_gift: 'メンバーシップギフト',
 });
 
+/**
+ * 元の金額を、その通貨の書き方で出す(例: ¥1,000 / $5.00 / €2.00)。pt は円にしたおよその額なので、
+ * 外国の通貨では元の金額を並べないと誤解される。
+ * @param {number} amount
+ * @param {string} currency
+ * @returns {string} 金額が無ければ ''
+ */
+export function ytAmountLabel(amount, currency) {
+  const a = Number(amount);
+  if (!Number.isFinite(a) || a <= 0) return '';
+  const cur = String(currency || '').toUpperCase();
+  if (/^[A-Z]{3}$/.test(cur)) {
+    try {
+      return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: cur }).format(a);
+    } catch {
+      /* 知らない通貨コード */
+    }
+  }
+  return `${a.toLocaleString('ja-JP')}${cur ? ` ${cur}` : ''}`;
+}
+
 /** @param {string} kind */
 export function isYtPaidKind(kind) {
   return Object.prototype.hasOwnProperty.call(ITEM_NAME, String(kind || ''));
@@ -84,7 +105,10 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     const uid = String(e.userId || '').trim();
     const nickname = String(e.nickname || '').trim();
     const kind = String(e.ytKind || '');
-    const itemName = ITEM_NAME[kind];
+    const baseItemName = ITEM_NAME[kind];
+    const amountLabel = ytAmountLabel(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
+    // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
+    const itemName = amountLabel ? `${baseItemName} ${amountLabel}` : baseItemName;
     const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
     const at = Number(e.ytPostedAt) || Number(e.capturedAt) || now;
     const pubSec = Math.floor(at / 1000);
@@ -120,9 +144,9 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
       capturedAt: at,
     });
 
-    const item = byItem.get(itemName) || { itemName, count: 0, thumbnailUrl: '' };
+    const item = byItem.get(baseItemName) || { itemName: baseItemName, count: 0, thumbnailUrl: '' };
     item.count += 1;
-    byItem.set(itemName, item);
+    byItem.set(baseItemName, item);
 
     if (!uid) continue;
     const u = byUser.get(uid) || {

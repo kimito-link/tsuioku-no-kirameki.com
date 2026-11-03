@@ -25,3 +25,18 @@ describe('buildYtGiftBags', () => {
     expect(ytAmountToPoints(3, 'XYZ')).toBe(3);
   });
 });
+
+describe('ytAmountLabel (元の金額)', () => {
+  it('formats by currency', async () => {
+    const { ytAmountLabel, buildYtGiftBags } = await import('../../../extension-youtube/src/ytGiftToNico.js');
+    expect(ytAmountLabel(5, 'USD')).toMatch(/\$5\.00/);
+    expect(ytAmountLabel(1000, 'JPY')).toMatch(/1,000/);
+    expect(ytAmountLabel(0, 'JPY')).toBe('');
+    const bags = buildYtGiftBags(
+      [{ id: 'a', userId: '8000000001', nickname: 'x', ytKind: 'superchat', ytAmount: 5, ytCurrency: 'USD', capturedAt: 1 }],
+      'lv900000000001',
+    );
+    expect(bags.subApp.history[0].itemName).toMatch(/^スーパーチャット \$5\.00/);
+    expect(bags.subApp.totalCounts[0].itemName).toBe('スーパーチャット');
+  });
+});
