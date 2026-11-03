@@ -131,7 +131,17 @@ export function ytKeyForNumericUid(uid) {
  */
 export function ytChannelUrlForNumericUid(uid) {
   const key = ytKeyForNumericUid(uid);
-  return /^UC[A-Za-z0-9_-]{22}$/.test(key) ? `https://www.youtube.com/channel/${key}` : '';
+  if (/^UC[A-Za-z0-9_-]{22}$/.test(key)) return `https://www.youtube.com/channel/${key}`;
+  const h = key.startsWith('handle:@') ? key.slice('handle:@'.length) : '';
+  return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : '';
+}
+
+/** @type {Map<string, string>} 数字ID → その人の YouTube のアイコン(分かっている人だけ) */
+const ytIconByNumericUid = new Map();
+
+/** @param {string} uid */
+export function ytIconForNumericUid(uid) {
+  return ytIconByNumericUid.get(String(uid || '')) || '';
 }
 
 // ---- 3. YouTube の記録 → ニコ生のコメント行 ----
@@ -139,18 +149,20 @@ export function ytChannelUrlForNumericUid(uid) {
  * @param {any} r YouTube の記録 1 件(ytIdbStore)
  * @param {number} i 記録順の番号(0 始まり)
  * @param {string} lv
+ * @param {string} [personKey] 同じ人をまとめた鍵(UC… / handle:@… / name:…)
  */
-export function ytRecordToNicoEntry(r, i, lv) {
+export function ytRecordToNicoEntry(r, i, lv, personKey) {
   const channelId = String(r?.channelId || '').trim();
   const name = String(r?.name || '').trim();
+  const key = personKey || channelId || (name ? `name:${name}` : '');
   const at = Number(r?.recordedAt || 0) || Date.now();
   return {
     id: String(r?.id || r?.pk || `yt${i}`),
     liveId: lv,
     commentNo: String(i + 1),
     text: String(r?.text || ''),
-    userId: numericUidForYtKey(channelId || (name ? `name:${name}` : '')),
-    ytChannelId: channelId,
+    userId: numericUidForYtKey(key),
+    ytChannelId: /^UC/.test(key) ? key : channelId,
     nickname: name,
     avatarUrl: String(r?.iconUrl || ''),
     capturedAt: at,
@@ -172,6 +184,10 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   const startedAt = Number(sum?.createdAt || 0);
   const chId = String(sum?.broadcasterChannelId || '');
+  const bUid = chId ? numericUidForYtKey(chId) : '';
+  // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
+  const bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
+  if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
   return {
     title: tabTitle || String(sum?.title || ''),
     url: `https://live.nicovideo.jp/watch/${lv}`,
@@ -185,9 +201,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
     metas: [],
     scripts: [],
     noopenerLinks: [],
-    broadcasterUserId: chId ? numericUidForYtKey(chId) : '',
+    broadcasterUserId: bUid,
     broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : '',
-    broadcasterIconUrl: String(sum?.broadcasterIconUrl || ''),
+    broadcasterIconUrl: bIcon,
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
     viewerCountFromDom: null,
@@ -198,12 +214,61 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
   };
 }
 
+/** @param {string} name */
+const normName = (name) => String(name || '').trim().replace(/^@/, '').toLowerCase();
+
+/**
+ * 同じ人の記録をそろえる。YouTube は同じ人でも、チャンネルID(UC…)が取れた記録と、
+ * 名前(handle:@…)しか取れなかった記録が混ざる。そのまま渡すと同じ人が2人に分かれて並ぶ(2026-11-03 実機)。
+ * → 名前が同じで UC… が分かっている人がいれば、その UC… にまとめる。
+ *    アイコンも、その人のどれかの記録に付いていれば全部の記録に付ける。
+ * @param {any[]} items
+ * @returns {{ keyOf: (r: any) => string, iconOf: (key: string) => string }}
+ */
+export function buildYtPersonResolver(items) {
+  /** @type {Map<string, string>} 名前 → UC… */
+  const ucByName = new Map();
+  for (const r of items) {
+    const ch = String(r?.channelId || '').trim();
+    if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
+    const n = normName(r?.name);
+    if (n && !ucByName.has(n)) ucByName.set(n, ch);
+  }
+  /** @param {any} r */
+  const keyOf = (r) => {
+    const ch = String(r?.channelId || '').trim();
+    if (/^UC[A-Za-z0-9_-]{22}$/.test(ch)) return ch;
+    const n = normName(r?.name || (ch.startsWith('handle:') ? ch.slice('handle:'.length) : ''));
+    const uc = n ? ucByName.get(n) : '';
+    if (uc) return uc;
+    if (ch) return ch;
+    return n ? `name:${n}` : '';
+  };
+  /** @type {Map<string, string>} 人の鍵 → 最後に見えたアイコン */
+  const iconByKey = new Map();
+  for (const r of items) {
+    const icon = String(r?.iconUrl || '').trim();
+    if (!icon) continue;
+    const k = keyOf(r);
+    if (k) iconByKey.set(k, icon);
+  }
+  return { keyOf, iconOf: (key) => iconByKey.get(key) || '' };
+}
+
 /** @param {string} lv */
 async function buildCommentsForLv(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
   const items = await getYtStreamCommentsByVideoId(vid);
-  return (Array.isArray(items) ? items : []).map((r, i) => ytRecordToNicoEntry(r, i, lv));
+  const list = Array.isArray(items) ? items : [];
+  const who = buildYtPersonResolver(list);
+  return list.map((r, i) => {
+    const key = who.keyOf(r);
+    const icon = String(r?.iconUrl || '').trim() || who.iconOf(key);
+    const e = ytRecordToNicoEntry({ ...r, iconUrl: icon }, i, lv, key);
+    if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
+    return e;
+  });
 }
 
 // ---- chrome の差し替え(本物の上に薄くかぶせる) ----
@@ -365,6 +430,7 @@ function ytLabelForUid(uid) {
   const key = ytKeyForNumericUid(uid);
   if (!key) return '';
   if (key.startsWith('name:')) return '';
+  if (key.startsWith('handle:')) return key.slice('handle:'.length);
   return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
 }
 
@@ -394,6 +460,18 @@ function fixTitleAttr(el) {
   if (next !== t) el.setAttribute('title', next);
 }
 
+// ニコ生版はアイコンが無い人の顔を数字IDから(ニコニコの置き場所に)作るが、疑似IDなのでそこには無い。
+// その人の YouTube のアイコンが分かっていれば、それに差し替える(分からなければニコ生版の代わりの顔のまま)。
+const NICO_USERICON_RE = /nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg/;
+/** @param {Element} img */
+function fixImg(img) {
+  const src = String(img.getAttribute('src') || '');
+  const m = src.match(NICO_USERICON_RE);
+  if (!m) return;
+  const icon = ytIconForNumericUid(m[1]);
+  if (icon && icon !== src) img.setAttribute('src', icon);
+}
+
 /** @param {Node} root */
 function fixSubtree(root) {
   if (root.nodeType === 3) {
@@ -403,7 +481,9 @@ function fixSubtree(root) {
   if (root.nodeType !== 1) return;
   const el = /** @type {Element} */ (root);
   if (el.tagName === 'A') fixAnchor(el);
+  if (el.tagName === 'IMG') fixImg(el);
   fixTitleAttr(el);
+  el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
   el.querySelectorAll('a[href*="nicovideo.jp/user/"]').forEach(fixAnchor);
   el.querySelectorAll('[title]').forEach(fixTitleAttr);
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -421,6 +501,7 @@ function startDomFixer() {
         const el = /** @type {Element} */ (m.target);
         if (m.attributeName === 'href' && el.tagName === 'A') fixAnchor(el);
         else if (m.attributeName === 'title') fixTitleAttr(el);
+        else if (m.attributeName === 'src' && el.tagName === 'IMG') fixImg(el);
       } else m.addedNodes.forEach(fixSubtree);
     }
   }).observe(document.body, {
@@ -428,7 +509,7 @@ function startDomFixer() {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['href', 'title'],
+    attributeFilter: ['href', 'title', 'src'],
   });
 }
 if (typeof document !== 'undefined') {

@@ -185,6 +185,19 @@ function visibleTextOf(root) {
   }
 }
 
+// 横の「関連動画」にも他の配信の「◯人が視聴中」が並ぶ。それを読まないよう、そこは見ない。
+const OTHER_VIDEOS_SEL =
+  '#secondary, #related, ytd-watch-next-secondary-results-renderer, ytd-compact-video-renderer, yt-lockup-view-model, ytd-rich-item-renderer, ytd-video-renderer, ytd-miniplayer';
+/** @param {Node | null} n */
+function isInOtherVideos(n) {
+  const el = n && n.nodeType === 1 ? /** @type {Element} */ (n) : n?.parentElement || null;
+  try {
+    return Boolean(el && el.closest(OTHER_VIDEOS_SEL));
+  } catch {
+    return false;
+  }
+}
+
 function readConcurrentViewers() {
   const selectors = [
     'ytd-watch-metadata #description #info',
@@ -206,6 +219,7 @@ function readConcurrentViewers() {
     }
     for (let i = 0; i < nodes.length; i += 1) {
       const el = nodes[i];
+      if (isInOtherVideos(el)) continue;
       // 数字が回るアニメーション(yt-animated-rolling-number)は textContent に 0〜9 が全部並ぶので、
       // 読み上げ用の aria-label を先に見る。textContent は最後(桁の連なりは parser 側で捨てる)。
       const texts = [visibleTextOf(el), String(el.getAttribute('aria-label') || '')];
@@ -218,6 +232,17 @@ function readConcurrentViewers() {
       }
     }
   }
+  // 読み上げ用の名札(aria-label)に「◯人が視聴中」と書いてある要素を、ページ全体から探す
+  try {
+    const labeled = document.querySelectorAll('[aria-label*="視聴中"], [aria-label*="watching"]');
+    for (let i = 0; i < labeled.length; i += 1) {
+      if (isInOtherVideos(labeled[i])) continue;
+      const parsed = extractYtWatchConcurrentViewersFromText(String(labeled[i].getAttribute('aria-label') || ''));
+      if (parsed !== null) return parsed;
+    }
+  } catch {
+    // ignore
+  }
   return readViewersFromSameLine();
 }
 
@@ -229,7 +254,11 @@ function readConcurrentViewers() {
  */
 function readViewersFromSameLine() {
   try {
-    const roots = document.querySelectorAll('ytd-watch-metadata, #above-the-fold, ytd-watch-flexy #primary');
+    // 見つからない場所に置かれていることがあるので、最後はページ全体を見る
+    const roots = [
+      ...Array.from(document.querySelectorAll('ytd-watch-metadata, #above-the-fold, ytd-watch-flexy #primary')),
+      document.body,
+    ].filter(Boolean);
     const range = document.createRange();
     /** @param {Node} n */
     const rectOf = (n) => {
@@ -242,6 +271,7 @@ function readViewersFromSameLine() {
       while ((node = walker.nextNode())) {
         const v = String(node.nodeValue || '');
         if (!/視聴中|watching/i.test(v)) continue;
+        if (isInOtherVideos(node)) continue;
         const ref = rectOf(node);
         if (ref.height <= 0) continue;
         // 同じ行の文字を集める範囲: 4 つ上の親まで
@@ -272,6 +302,48 @@ function readViewersFromSameLine() {
     // 読めなければ null(人数は「—」のまま)
   }
   return null;
+}
+
+/**
+ * 同時接続が読めなかったとき、「視聴中」の近くに何が書いてあったかを控える(次に直すための手がかり)。
+ * chrome.storage.local の yt_viewer_probe に最後の1回分だけ置く。
+ */
+let lastProbeAt = 0;
+function saveViewerProbe() {
+  const now = Date.now();
+  if (now - lastProbeAt < 30000) return;
+  lastProbeAt = now;
+  try {
+    /** @type {string[]} */
+    const found = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode()) && found.length < 8) {
+      const v = String(node.nodeValue || '');
+      if (!/視聴中|watching/i.test(v)) continue;
+      if (isInOtherVideos(node)) continue;
+      let box = node.parentElement;
+      const path = [];
+      for (let k = 0; k < 5 && box; k += 1) {
+        path.push(`${box.tagName.toLowerCase()}${box.id ? `#${box.id}` : ''}`);
+        if (k < 4 && box.parentElement) box = box.parentElement;
+      }
+      found.push(
+        JSON.stringify({
+          text: v.slice(0, 80),
+          path: path.join('<'),
+          visible: box ? visibleTextOf(box).slice(0, 200) : '',
+          inner: box ? String(/** @type {HTMLElement} */ (box).innerText || '').slice(0, 200) : '',
+        }),
+      );
+    }
+    const labels = Array.from(document.querySelectorAll('[aria-label*="視聴"], [aria-label*="watching"]'))
+      .slice(0, 8)
+      .map((x) => String(x.getAttribute('aria-label') || '').slice(0, 80));
+    void chrome.storage.local.set({ yt_viewer_probe: { at: now, url: String(window.location.href), found, labels } });
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -314,6 +386,7 @@ function setupWatchPageMetaObserver() {
       // ignore
     }
 
+    const viewers = readConcurrentViewers();
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -322,9 +395,10 @@ function setupWatchPageMetaObserver() {
         broadcasterName,
         broadcasterChannelId,
         broadcasterIconUrl: readBroadcasterIconUrl(),
-        concurrentViewers: readConcurrentViewers(),
+        concurrentViewers: viewers,
       },
     });
+    if (viewers === null) saveViewerProbe();
   };
 
   sendMeta();
