@@ -1,4 +1,4 @@
-// ytSupportRanking.js — YouTube Live 配信ごとの応援者ランキング集計（通貨別・純関数）
+// ytSupportRanking.js — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 // @layer L0 — 純粋計算（副作用・ブラウザ API なし）
 
 import { formatNumberJa, safeHttpUrl } from '../htmlText.js';
@@ -20,6 +20,9 @@ export function buildYtChannelUrl(channelId) {
     if (/^@[A-Za-z0-9_.-]+$/.test(handle)) {
       return `https://www.youtube.com/${handle}`;
     }
+  }
+  if (/^@[A-Za-z0-9_.-]+$/.test(id)) {
+    return `https://www.youtube.com/${id}`;
   }
   return '';
 }
@@ -49,45 +52,10 @@ export function formatYtCurrencyAmount(amount, currency) {
 }
 
 /**
- * 配信内のチャット項目配列から、応援者ランキング（通貨別の金額集計＋メンバー加入・ギフト集計）を算出する。
- *
- * @param {any[]} items
- * @returns {{
- *   totalsByCurrency: Record<string, number>,
- *   byCurrency: Record<string, Array<{
- *     rank: number,
- *     channelId: string,
- *     name: string,
- *     iconUrl: string,
- *     channelUrl: string,
- *     amount: number,
- *     formattedAmount: string,
- *     currency: string,
- *     count: number,
- *     lastTs: number
- *   }>>,
- *   counts: {
- *     superchat: number,
- *     sticker: number,
- *     membership: number,
- *     membershipGift: number
- *   },
- *   supporters: Array<{
- *     channelId: string,
- *     name: string,
- *     iconUrl: string,
- *     channelUrl: string,
- *     amountsByCurrency: Record<string, number>,
- *     superchatCount: number,
- *     stickerCount: number,
- *     membershipCount: number,
- *     giftCount: number,
- *     lastTs: number
- *   }>,
- *   supporterChannelIds: Set<string>
- * }}
+ * 差分更新用の応援者ランキング累積状態（accumulator）を生成する。
+ * 1万件超の配信でも storage 変化のたびに全件再走査せず、新着バッチだけを O(ΔN) で加算できるようにする。
  */
-export function aggregateYtSupportRanking(items) {
+export function createYtSupportRankingAccumulator() {
   /** @type {Record<string, number>} */
   const totalsByCurrency = {};
   /** @type {Record<string, Map<string, any>>} */
@@ -96,25 +64,57 @@ export function aggregateYtSupportRanking(items) {
   const supporterMap = new Map();
   /** @type {Set<string>} */
   const supporterChannelIds = new Set();
-
   const counts = {
     superchat: 0,
     sticker: 0,
     membership: 0,
     membershipGift: 0,
   };
+  /** @type {Record<string, any[]>} */
+  const byCurrency = {};
+  /** @type {any[]} */
+  const supporters = [];
 
-  if (!Array.isArray(items)) {
-    return {
+  return {
+    totalsByCurrency,
+    currencyUserMap,
+    supporterMap,
+    supporterChannelIds,
+    counts,
+    snapshot: {
       totalsByCurrency,
-      byCurrency: {},
+      byCurrency,
       counts,
-      supporters: [],
+      supporters,
       supporterChannelIds,
+    },
+  };
+}
+
+/**
+ * 累積状態（accumulator）に新着コメント配列（`newItems`）を差分で反映する。
+ * 通常コメントのみの場合はソート再計算も行わず `rankingChanged: false` を返す。
+ *
+ * @param {ReturnType<typeof createYtSupportRankingAccumulator>} accumulator
+ * @param {any[]} newItems
+ */
+export function applyYtSupportRankingDelta(accumulator, newItems) {
+  const acc = accumulator || createYtSupportRankingAccumulator();
+  let rankingChanged = false;
+  let supporterSetChanged = false;
+  /** @type {Set<string>} */
+  const touchedCurrencies = new Set();
+
+  if (!Array.isArray(newItems) || newItems.length === 0) {
+    return {
+      accumulator: acc,
+      snapshot: acc.snapshot,
+      rankingChanged: false,
+      supporterSetChanged: false,
     };
   }
 
-  for (const item of items) {
+  for (const item of newItems) {
     if (!item || typeof item !== 'object') continue;
     const kind = String(item.kind || '');
     const isSupportKind =
@@ -127,21 +127,25 @@ export function aggregateYtSupportRanking(items) {
 
     const channelId = String(item.channelId || item.name || '').trim();
     if (channelId && (isSupportKind || isMemberBadge)) {
-      supporterChannelIds.add(channelId);
+      if (!acc.supporterChannelIds.has(channelId)) {
+        acc.supporterChannelIds.add(channelId);
+        supporterSetChanged = true;
+      }
     }
     if (!isSupportKind || !channelId) continue;
 
-    if (kind === 'superchat') counts.superchat += 1;
-    else if (kind === 'sticker') counts.sticker += 1;
-    else if (kind === 'membership') counts.membership += 1;
-    else if (kind === 'membership_gift') counts.membershipGift += 1;
+    rankingChanged = true;
+    if (kind === 'superchat') acc.counts.superchat += 1;
+    else if (kind === 'sticker') acc.counts.sticker += 1;
+    else if (kind === 'membership') acc.counts.membership += 1;
+    else if (kind === 'membership_gift') acc.counts.membershipGift += 1;
 
     const name = String(item.name || channelId).trim();
     const iconUrl = safeHttpUrl(item.iconUrl || '');
     const channelUrl = buildYtChannelUrl(channelId);
     const ts = Number.isFinite(Number(item.ts)) ? Number(item.ts) : 0;
 
-    let sup = supporterMap.get(channelId);
+    let sup = acc.supporterMap.get(channelId);
     if (!sup) {
       sup = {
         channelId,
@@ -155,7 +159,7 @@ export function aggregateYtSupportRanking(items) {
         giftCount: 0,
         lastTs: ts,
       };
-      supporterMap.set(channelId, sup);
+      acc.supporterMap.set(channelId, sup);
     } else {
       if (name && (!sup.name || sup.name === sup.channelId)) sup.name = name;
       if (iconUrl && !sup.iconUrl) sup.iconUrl = iconUrl;
@@ -169,16 +173,21 @@ export function aggregateYtSupportRanking(items) {
 
     const amount = Number(item.amount || 0);
     const currency = String(item.currency || '').trim().toUpperCase();
-    if ((kind === 'superchat' || kind === 'sticker') && Number.isFinite(amount) && amount > 0 && currency) {
-      totalsByCurrency[currency] =
-        Math.round(((totalsByCurrency[currency] || 0) + amount) * 100) / 100;
+    if (
+      (kind === 'superchat' || kind === 'sticker') &&
+      Number.isFinite(amount) &&
+      amount > 0 &&
+      currency
+    ) {
+      acc.totalsByCurrency[currency] =
+        Math.round(((acc.totalsByCurrency[currency] || 0) + amount) * 100) / 100;
       sup.amountsByCurrency[currency] =
         Math.round(((sup.amountsByCurrency[currency] || 0) + amount) * 100) / 100;
 
-      if (!currencyUserMap[currency]) {
-        currencyUserMap[currency] = new Map();
+      if (!acc.currencyUserMap[currency]) {
+        acc.currencyUserMap[currency] = new Map();
       }
-      const cMap = currencyUserMap[currency];
+      const cMap = acc.currencyUserMap[currency];
       let cEntry = cMap.get(channelId);
       if (!cEntry) {
         cEntry = {
@@ -198,38 +207,50 @@ export function aggregateYtSupportRanking(items) {
       if (name && (!cEntry.name || cEntry.name === cEntry.channelId)) cEntry.name = name;
       if (iconUrl && !cEntry.iconUrl) cEntry.iconUrl = iconUrl;
       if (ts > cEntry.lastTs) cEntry.lastTs = ts;
+      touchedCurrencies.add(currency);
     }
   }
 
-  /** @type {Record<string, any[]>} */
-  const byCurrency = {};
-  for (const [currency, cMap] of Object.entries(currencyUserMap)) {
-    const sorted = Array.from(cMap.values()).sort((a, b) => {
-      if (b.amount !== a.amount) return b.amount - a.amount;
-      if (b.count !== a.count) return b.count - a.count;
+  if (rankingChanged) {
+    for (const currency of touchedCurrencies) {
+      const cMap = acc.currencyUserMap[currency];
+      if (!cMap) continue;
+      const sorted = Array.from(cMap.values()).sort((a, b) => {
+        if (b.amount !== a.amount) return b.amount - a.amount;
+        if (b.count !== a.count) return b.count - a.count;
+        return b.lastTs - a.lastTs;
+      });
+      acc.snapshot.byCurrency[currency] = sorted.map((entry, idx) => ({
+        rank: idx + 1,
+        ...entry,
+        formattedAmount: formatYtCurrencyAmount(entry.amount, currency),
+      }));
+    }
+
+    acc.snapshot.supporters = Array.from(acc.supporterMap.values()).sort((a, b) => {
+      const aPaid = a.superchatCount + a.stickerCount;
+      const bPaid = b.superchatCount + b.stickerCount;
+      if (bPaid !== aPaid) return bPaid - aPaid;
+      if (b.giftCount !== a.giftCount) return b.giftCount - a.giftCount;
+      if (b.membershipCount !== a.membershipCount) return b.membershipCount - a.membershipCount;
       return b.lastTs - a.lastTs;
     });
-    byCurrency[currency] = sorted.map((entry, idx) => ({
-      rank: idx + 1,
-      ...entry,
-      formattedAmount: formatYtCurrencyAmount(entry.amount, currency),
-    }));
   }
 
-  const supporters = Array.from(supporterMap.values()).sort((a, b) => {
-    const aPaid = a.superchatCount + a.stickerCount;
-    const bPaid = b.superchatCount + b.stickerCount;
-    if (bPaid !== aPaid) return bPaid - aPaid;
-    if (b.giftCount !== a.giftCount) return b.giftCount - a.giftCount;
-    if (b.membershipCount !== a.membershipCount) return b.membershipCount - a.membershipCount;
-    return b.lastTs - a.lastTs;
-  });
-
   return {
-    totalsByCurrency,
-    byCurrency,
-    counts,
-    supporters,
-    supporterChannelIds,
+    accumulator: acc,
+    snapshot: acc.snapshot,
+    rankingChanged,
+    supporterSetChanged,
   };
+}
+
+/**
+ * 配信内のチャット項目配列から、応援者ランキング（通貨別の金額集計＋メンバー加入・ギフト集計）を算出する。
+ *
+ * @param {any[]} items
+ */
+export function aggregateYtSupportRanking(items) {
+  const acc = createYtSupportRankingAccumulator();
+  return applyYtSupportRankingDelta(acc, items).snapshot;
 }

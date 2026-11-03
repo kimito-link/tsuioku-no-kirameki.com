@@ -171,3 +171,84 @@ Chromium に `extension-youtube/` を unpacked 拡張として読み込み、`ht
 | **6. `extension/` 配下と version が一切変わっていない** | `git diff --stat origin/master -- extension/ package.json src/lib/changelog.js` の出力が完全に空（0 bytes）であることを確認。 | ✅ PASS |
 | **7. 新規テストが緑・既存テストが緑** | `npx vitest run src/lib/youtube`（5ファイル・36テスト PASS）、`npm run test:cc`、`npm run typecheck`、`npm run lint`、`npm run verify:cc` 全ステップ緑を確認。 | ✅ PASS |
 | **8. 本書末尾に「実測」（遅い配信／速い配信の 1分あたり件数・DOM の実際の要素名）** | 本書末尾 §1〜§4 に遅い配信（0〜3件/分）・中規模配信（11〜13件/分）・大型配信（83〜94件/分および143件/分負荷）の実測値と実際の DOM 要素名・検証結果を記録。 | ✅ PASS |
+
+---
+
+## 第2段（Offscreen 読み上げ継続・サイドパネル差分更新・CWS 提出用 ZIP ステージング）
+
+### 1. 第2段の目的と設計
+
+1. **サイドパネルを閉じていても読み上げを継続（Offscreen Document 再生）**
+   - `extension-youtube/manifest.json` の `permissions` に `"offscreen"` を追加。
+   - `extension-youtube/offscreen.html` および `extension-youtube/src/offscreen-entry.js`（バンドル先: `extension-youtube/offscreen.js`）を新設。
+   - Service Worker（`background.js`）が `chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], ... })` で Offscreen Document を常駐起動し、VOICEVOX の生存確認・音声合成（`/audio_query`, `/synthesis`）・`Audio` 再生・キュー消化をすべて Offscreen Document 側で実行する。
+   - サイドパネル（`sidepanel.js`）からは音声合成・`Audio` 再生ループを完全撤去し、設定変更と状態表示（`yt_voice_state` の接続状態・理由・最終読み上げテキスト・待機キュー件数）のみを担当させる。
+
+2. **サイドパネルの再読込の差分化（1万件配信でも重くならない設計）**
+   - `chrome.storage.onChanged` のたびに IndexedDB の全件 `getAll` を行わない。
+   - `extension-youtube/src/ytIdbStore.js`（DB Version 2）に複合インデックス `by_videoId_recordedAt`（`['videoId', 'recordedAt']`）を追加し、`getYtStreamCommentsSince(videoId, afterRecordedAt)` でカーソル時刻以降の新着レコードのみを IndexedDB から取得する。
+   - `src/lib/youtube/ytSupportRanking.js` に差分集計器（`createYtSupportRankingAccumulator`, `applyYtSupportRankingDelta`）を追加し、新着コメント分だけを $O(\Delta N)$ でランキングへ反映する（スパチャ・メンバー等の応援イベントが含まれない通常コメント到着時はランキング DOM の再構築もスキップ）。
+   - `src/lib/youtube/ytStreamStorePolicy.js` にストリーム表示状態の差分更新器（`createYtStreamIncrementalState`, `applyYtStreamIncrementalItems`）を追加し、各レーンには新着ノードだけを先頭へ `insertBefore` して 150 件（`YT_SIDE_PANEL_DISPLAY_LIMIT`）を超える末尾ノードのみを除去する。
+   - 読み上げキューや読み上げ状態（`yt_voice_queue`, `yt_voice_state`, `yt_voice_settings`）のみが変化したときは、IndexedDB クエリやレーン・ランキング更新を一切走らせず読み上げ UI だけを軽量更新する。
+
+3. **Chrome ウェブストア提出用 ZIP 生成スクリプト `scripts/stage-youtube-submission.mjs`**
+   - `extension-youtube/` から実行時に必要なファイル（`manifest.json`, `background.js`, `content-chat.js`, `sidepanel.html`, `sidepanel.js`, `offscreen.html`, `offscreen.js` 等）のみを `build/youtube-submission-<version>/` へステージングし、`extension-youtube/src/` や開発用一時ファイルを除外してフォワードスラッシュ（`/`）エントリの `build/tsuioku-no-kirameki-youtube-<version>.zip` を生成・検証する（CWS への提出は行わない）。
+
+### 2. 第2段の進行・実測ログ（2026-11-03 実施）
+
+- [x] 第2段の設計・計画を本書に記録
+- [x] 純関数（ランキング差分集計・ストリーム差分状態更新）の単体テスト追加と実装（`src/lib/youtube/ytSupportRanking.test.js`, `src/lib/youtube/ytStreamStorePolicy.test.js`）
+- [x] Offscreen Document 再生（`extension-youtube/offscreen.html` + `offscreen.js`）・サイドパネル差分描画の実装とビルド
+- [x] `scripts/stage-youtube-submission.mjs` とその単体テスト（`src/lib/youtube/ytStageSubmission.test.js`）の実装・ZIP 検証
+- [x] 実 Chrome での検証（①サイドパネル閉鎖中の VOICEVOX 読み上げ継続、②1万件配信での差分更新レイテンシ・メモリ実測）
+- [x] ニコ生版（`DESIGN.md`: Tsuioku Warm Pastel）への UI 統一・3キャラ画像適用・変更前後スクリーンショット保存（`.artifacts/yt-sidepanel-before.png`, `.artifacts/yt-sidepanel-after.png`）
+
+#### (A) サイドパネル閉鎖中の Offscreen Document による VOICEVOX 読み上げ継続の実測
+
+- **検証条件**: `sidepanel.html` を1枚も開いていない状態（`openSidepanelsBefore: 0`）で、実機 VOICEVOX（`http://127.0.0.1:50021`, 利用可能スタイル 119 種）を起動したまま `YT_CHAT_ITEMS`（6件）を Service Worker へ投入。
+- **実測結果**:
+  - Service Worker が自動で `offscreen.html`（`OFFSCREEN_DOCUMENT` コンテキスト数 `1`）を起動・維持。
+  - ※実装・実機検証の過程で、Chrome MV3 の Offscreen Document には `chrome.storage` API が公開されておらず `chrome.runtime`（メッセージ通信）のみ利用可能であることを確認し、`offscreen-entry.js` から `chrome.storage` 直接参照を排除して `YT_SHIFT_VOICE_QUEUE` / `YT_REPORT_VOICEVOX_STATUS` / `YT_REPORT_VOICE_SPOKEN` メッセージ経由に統一した。
+  - サイドパネルが閉じた状態のまま `offscreen.html` が実機 VOICEVOX へ `/audio_query`・`/synthesis` を送り、音声再生とキュー消化を進めて `yt_voice_state` に以下を記録することを確認:
+    - `voicevoxOnline: true`
+    - `lastSpokenSummary: "読み上げ: 君斗りんく Ch. (yt:UC_kimito_link_000001 → 声 #10) 「みんな今日は来てくれてありがとう！ゆっくりしていってね！」"`
+    - 待機キューが 6 件 → 4 件へと順次消化され、後からサイドパネルを開いた際にも再生が途切れず状態表示のみが同期されることを確認。
+
+#### (B) 10,000件配信でのサイドパネル差分更新（Incremental Update）の実測
+
+- **検証条件**:
+  1. 1つの配信（`videoId: "v_perf_10000"`）に **10,000 件**（配信者コメント 20 件、メンバー・スパチャ 980 件、一般コメント 9,000 件）を IndexedDB（`yt_kirameki_db` v2）へ保存（10,000 件の IndexedDB 書き込み所要時間: **1,345ms〜1,463ms**）。
+  2. `sidepanel.html` を開いて初回ロード（`getYtStreamCommentsByVideoId` による初回全件取得 `fullGetAllCount: 1`）を計測。
+  3. その後、**50件ずつの新着コメントバッチを 5 回連続（計 +250件 → 合計 10,250件）** 投入し、各バッチでの IndexedDB 差分取得（`getYtStreamCommentsSince`）＋差分ランキング更新（`applyYtSupportRankingDelta`）＋差分 DOM パッチ（`patchLaneIncremental`）の所要時間とメモリ使用量を `window.__ytSidepanelMetrics` および `performance.memory` で実測。
+- **実測結果**:
+  - **初回 10,000 件ロード時**:
+    - `fullGetAllCount`: **`1`**（初回のみ）
+    - IndexedDB 10,000 件取得＋初期集計・描画時間（`lastFullLoadDurationMs`）: **`92.3ms〜129.7ms`**
+    - レーン表示件数: `りんく 20件` / `こん太 980件` / `たぬ姉 9000件`（合計 10,000 件）
+  - **50件×5回（計 +250件 → 10,250件）の差分更新時**:
+    - `fullGetAllCount`: **`1` のまま変化なし（全件 `getAll` は 0 回）**
+    - `incrementalFetchCount`: **`5`**（5回とも複合インデックス `by_videoId_recordedAt` による差分取得のみ）
+    - 各回の差分更新ハンドラ所要時間（`incrementalHandlerDurations`）: **`[5.6ms, 3.5ms, 3.8ms, 4.6ms, 4.7ms]`（平均 4.44ms / 50件バッチ）**
+    - 10,250 件時点のサイドパネル JS Heap 使用量（`usedJSHeapSize`）: **`3.85 MB〜4.03 MB`**
+    - DOM 上の `.chat-item` 総数: **`320` ノード**（りんく 20 件＋こん太上限 150 件＋たぬ姉上限 150 件で一定に保たれ、1万件超でも DOM 肥大化なし）
+
+#### (C) CWS 提出用 ZIP ステージングスクリプト（`scripts/stage-youtube-submission.mjs`）
+
+- `node scripts/stage-youtube-submission.mjs` により `build/submission-youtube-0.1.0/` および `build/tsuioku-no-kirameki-youtube-0.1.0.zip`（19ファイル・2,407,469 bytes）を生成（提出はしない）。
+- `extension-youtube/src/` 配下のソースや `.map` / `.test.js` 等が除外され、ZIP エントリ名がすべてフォワードスラッシュ（`/`）であること、`manifest.json`（`key` なし）・HTML・JS から参照される全ローカルアセット・アイコン・キャラ画像が欠落なく含まれていることを `verifyYoutubeSubmissionFileMap` および単体テスト（`src/lib/youtube/ytStageSubmission.test.js`）で検証。
+
+### 3. ニコ生版（`DESIGN.md`: Tsuioku Warm Pastel）への UI 統一と変更前後スクリーンショット
+
+1. **カラートークン・ライトモード固定**:
+   - `extension-youtube/sidepanel.html` の 1行目を `extension/sidepanel.html` と同じく `<!DOCTYPE html><html lang="ja" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">` に統一し、`DESIGN.md`（Tsuioku Warm Pastel: クリーム地 `#fff7ec` / `#fffdf8`、桜ピンク `#e66a8c`、温かみのある茶系文字 `#2b2320`）の CSS トークンを適用。暗い黒・青グレーの配色を全廃。
+2. **3キャラ画像の適用（絵文字 🌸🦊🍃 の廃止）**:
+   - `extension/images/yukkuri-charactore-english/` の `link`・`konta`・`tanunee` および `extension/images/logo/` を `extension-youtube/images/` にコピーし、レーン見出し（`.nl-story-userlane-guide__face`）およびアバター未取得時のフォールバックにニコ生版と同一のキャラ画像を使用。
+3. **レーン・コメント行・応援者ランキングの HTML 構造とクラス名の統一**:
+   - `extension/popup.html` および `src/extension/popup/` の `.nl-story-userlane-guide`、`.nl-story-userlane-cell`、`.nl-story-userlane-avatar`、`.nl-story-userlane-meta`（サムネ・ハンドルネーム・チャンネルID・チャンネルリンクの4点セット）、`.nl-top-support-rank` / `.nl-top-support-rank__line` の構造に統一。
+4. **設定欄のコンパクト折りたたみ化**:
+   - 読み上げモード・VOICEVOX 接続状態・注意書きを `<details class="nl-frame-theme-details" id="yt-settings-details">` に格納して既定で折りたたみ（`settingsDetailsOpen: false`）、3つのレーンが画面の主役になるレイアウトへ変更。
+5. **変更前後スクリーンショット（`.artifacts/` 保存済み）**:
+   - 変更前（暗い青グレー画面・絵文字見出し・上部設定占領）: `.artifacts/yt-sidepanel-before.png`
+   - 変更後（Tsuioku Warm Pastel・3キャラ画像見出し・設定折りたたみ・3レーン主役）: `.artifacts/yt-sidepanel-after.png`
+
+

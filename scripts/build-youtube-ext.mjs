@@ -39,4 +39,12 @@ await Promise.all([
       js: '// sidepanel.js — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示バンドル\n/* eslint-disable */',
     },
   }),
+  build({
+    ...common,
+    entryPoints: [resolve(root, 'extension-youtube/src/offscreen-entry.js')],
+    outfile: resolve(root, 'extension-youtube/offscreen.js'),
+    banner: {
+      js: '// offscreen.js — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル\n/* eslint-disable */',
+    },
+  }),
 ]);

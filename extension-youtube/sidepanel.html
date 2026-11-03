@@ -1,107 +1,221 @@
-<!doctype html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
   <head>
     <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>追憶のきらめき for YouTube（試作）</title>
+    <title>君斗りんくの追憶のきらめき for YouTube — サイドパネル</title>
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" />
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" />
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" />
     <style>
+      [hidden] {
+        display: none !important;
+      }
+
       :root {
-        --bg: #0f172a;
-        --panel: #1e293b;
-        --panel-soft: #263449;
-        --border: #334155;
-        --text: #f8fafc;
-        --muted: #94a3b8;
-        --rinku: #f43f5e;
-        --konta: #f59e0b;
-        --tanunee: #10b981;
-        --accent: #38bdf8;
-        --warn-bg: #451a03;
-        --warn-border: #f59e0b;
-        --warn-text: #fde68a;
-        --ok-bg: #064e3b;
-        --ok-border: #10b981;
-        --ok-text: #a7f3d0;
+        /* DESIGN.md (Tsuioku Warm Pastel) トークン正本 + extension/popup.html 互換変数 */
+        color-scheme: light;
+        --nl-bg: #fff7ec;
+        --nl-bg-soft: #fff1f4;
+        --nl-surface: #fffdf9;
+        --nl-card-bg: #fffdf9;
+        --nl-text: #4a3b34;
+        --nl-text-soft: #8a7568;
+        --nl-text-sub: #7a6458;
+        --nl-muted: #9c8678;
+        --nl-border: #e3c9b5;
+        --nl-border-strong: #d8b89f;
+        --nl-accent: #f06aa0;
+        --nl-accent-soft: #ffd9e6;
+        --nl-user-accent: #f06aa0;
+        --nl-ok: #3fa66a;
+        --nl-processing: #3a90c8;
+        --nl-warn: #d99a2b;
+        --nl-bad: #e15a76;
+        --nl-rank-count: #9a6f12;
+        --nl-lane-stats: #9a6f12;
+        --nl-lane-pulse-gift: #c8721c;
+        --nl-lane-avatar: 28px;
+        --nl-lane-avatar-anon: 20px;
+        --nl-radius-sm: 8px;
+        --nl-radius-md: 12px;
+        --nl-radius-lg: 16px;
+        --nl-radius-pill: 999px;
+        --nl-shadow-card: 0 1px 6px rgba(120, 80, 50, 0.08);
+        --nl-shadow-raised: 0 4px 16px rgba(120, 80, 50, 0.12);
       }
 
       * {
         box-sizing: border-box;
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(in srgb, var(--nl-text, #4a3b34) 20%, transparent) transparent;
       }
 
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: color-mix(in srgb, var(--nl-text, #4a3b34) 20%, transparent);
+        border-radius: 10px;
+      }
+
+      html,
       body {
         margin: 0;
-        padding: 10px;
-        background: var(--bg);
-        color: var(--text);
-        font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+        padding: 0;
+        min-height: 100%;
+        color-scheme: light;
+        background-color: var(--nl-bg);
+        background-image: linear-gradient(160deg, var(--nl-bg), var(--nl-bg-soft));
+        color: var(--nl-text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
         font-size: 13px;
         line-height: 1.45;
       }
 
-      header.app-header {
+      body {
+        padding: 8px 10px 14px;
+      }
+
+      /* 上部コンパクトヘッダー（配信タイトル・配信選択） */
+      header.nl-yt-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-wrap: wrap;
         gap: 8px;
-        padding: 8px 10px;
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        margin-bottom: 8px;
+        padding: 7px 10px;
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius-md);
+        box-shadow: var(--nl-shadow-card);
+        margin-bottom: 6px;
       }
 
-      .app-title {
-        font-weight: 700;
-        font-size: 14px;
-        color: #f8fafc;
+      .nl-yt-header__brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1 1 200px;
       }
 
-      .app-subtitle {
-        font-size: 11px;
-        color: var(--muted);
+      .nl-yt-header__logo {
+        width: 28px;
+        height: 28px;
+        border-radius: var(--nl-radius-pill);
+        border: 1.5px solid var(--nl-border-strong);
+        background: var(--nl-bg);
+        object-fit: cover;
+        flex-shrink: 0;
       }
 
-      .notice-banner {
-        padding: 8px 10px;
-        border-radius: 8px;
-        background: #172554;
-        border: 1px solid #3b82f6;
-        color: #dbeafe;
-        font-size: 12px;
-        margin-bottom: 8px;
+      .nl-yt-header__titles {
+        min-width: 0;
+        flex: 1 1 auto;
       }
 
-      .notice-banner.is-warning {
-        background: var(--warn-bg);
-        border-color: var(--warn-border);
-        color: var(--warn-text);
-      }
-
-      .filter-pill {
-        display: inline-block;
-        margin-top: 4px;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 600;
-        background: rgba(255, 255, 255, 0.12);
-      }
-
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 10px;
-        margin-bottom: 10px;
-      }
-
-      .card-title {
-        font-weight: 700;
+      .nl-yt-header__title {
+        font-weight: 800;
         font-size: 13px;
-        margin: 0 0 8px 0;
+        color: var(--nl-text);
+        line-height: 1.25;
+      }
+
+      .nl-yt-header__subtitle {
+        font-size: 11px;
+        color: var(--nl-text-soft);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      select,
+      input[type='text'],
+      button {
+        background: var(--nl-surface);
+        color: var(--nl-text);
+        border: 1px solid var(--nl-border-strong);
+        border-radius: var(--nl-radius-sm);
+        padding: 4px 8px;
+        font-size: 11.5px;
+        font-family: inherit;
+      }
+
+      button {
+        cursor: pointer;
+        font-weight: 700;
+        background: linear-gradient(180deg, var(--nl-surface), var(--nl-bg));
+        transition: background-color 0.12s, border-color 0.12s;
+      }
+
+      button:hover {
+        border-color: var(--nl-accent);
+        background: var(--nl-accent-soft);
+      }
+
+      /* 折りたたみ設定バー（画面上部を占領せず、レーンを主役にする） */
+      .nl-frame-theme-details {
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius-md);
+        box-shadow: var(--nl-shadow-card);
+        margin-bottom: 8px;
+      }
+
+      .nl-frame-theme-details__summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 6px 10px;
+        font-size: 11.5px;
+        font-weight: 800;
+        color: var(--nl-text);
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .nl-frame-theme-details__summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .nl-frame-theme-details__summary-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .nl-frame-theme-details__summary-left::before {
+        content: '▸';
+        color: var(--nl-accent);
+        font-size: 11px;
+      }
+
+      .nl-frame-theme-details[open] .nl-frame-theme-details__summary-left::before {
+        content: '▾';
+      }
+
+      .nl-frame-theme-details__summary-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--nl-text-sub);
+      }
+
+      .nl-frame-theme-details__body {
+        padding: 8px 10px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 65%, transparent);
+        display: flex;
+        flex-direction: column;
         gap: 6px;
       }
 
@@ -110,57 +224,66 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
-        margin-bottom: 6px;
       }
 
-      select,
-      input[type='text'],
-      button {
-        background: var(--panel-soft);
-        color: var(--text);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 4px 8px;
-        font-size: 12px;
+      .filter-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 7px;
+        border-radius: var(--nl-radius-pill);
+        font-size: 10.5px;
+        font-weight: 700;
+        background: var(--nl-bg);
+        border: 1px solid var(--nl-border);
+        color: var(--nl-text-sub);
       }
 
-      button {
-        cursor: pointer;
+      .notice-banner {
+        padding: 6px 9px;
+        border-radius: var(--nl-radius-sm);
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 11px;
+        line-height: 1.4;
       }
 
-      button:hover {
-        border-color: var(--accent);
+      .notice-banner.is-warning {
+        background: #fff3e0;
+        border-color: var(--nl-warn);
+        color: #7c4a03;
       }
 
       .voice-status-box {
-        padding: 8px 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        margin-top: 6px;
-        border: 1px solid var(--border);
+        padding: 6px 9px;
+        border-radius: var(--nl-radius-sm);
+        font-size: 11px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-bg);
+        color: var(--nl-text);
       }
 
       .voice-status-box.is-offline {
-        background: var(--warn-bg);
-        border-color: var(--warn-border);
-        color: var(--warn-text);
+        background: #fff5f5;
+        border-color: color-mix(in srgb, var(--nl-bad) 55%, var(--nl-border));
+        color: #7a2436;
       }
 
       .voice-status-box.is-online {
-        background: var(--ok-bg);
-        border-color: var(--ok-border);
-        color: var(--ok-text);
+        background: #f2fbf6;
+        border-color: color-mix(in srgb, var(--nl-ok) 55%, var(--nl-border));
+        color: #1e5c3a;
       }
 
       .autoswitch-badge {
         display: none;
-        margin-top: 6px;
-        padding: 4px 8px;
-        border-radius: 6px;
-        background: #7c2d12;
-        border: 1px solid #fb923c;
-        color: #ffedd5;
+        padding: 5px 8px;
+        border-radius: var(--nl-radius-sm);
+        background: #fff4e5;
+        border: 1px solid var(--nl-warn);
+        color: #7c4a03;
         font-size: 11px;
+        font-weight: 700;
       }
 
       .autoswitch-badge.is-active {
@@ -168,9 +291,326 @@
       }
 
       .voice-last-spoken {
-        margin-top: 6px;
         font-size: 11px;
-        color: var(--muted);
+        color: var(--nl-text-soft);
+      }
+
+      /* 3レーン主役領域（extension/popup.html の .nl-story / .nl-story-userlane-guide 構造を踏襲） */
+      .nl-story {
+        display: block;
+        padding: 8px;
+        border-radius: var(--nl-radius-md);
+        border: 1px solid var(--nl-border);
+        background: linear-gradient(135deg, var(--nl-surface), var(--nl-bg-soft));
+        box-shadow: var(--nl-shadow-card);
+        margin-bottom: 8px;
+      }
+
+      .lanes-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      @media (max-width: 680px) {
+        .lanes-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .lane-col {
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius-md);
+        box-shadow: var(--nl-shadow-card);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        max-height: 460px;
+        padding: 6px;
+      }
+
+      .lane-rinku {
+        border-top: 3px solid var(--nl-accent);
+      }
+      .lane-konta {
+        border-top: 3px solid var(--nl-warn);
+      }
+      .lane-tanunee {
+        border-top: 3px solid var(--nl-ok);
+      }
+
+      /* extension/popup.html の .nl-story-userlane-guide__line / __face / __text / __count と同一 */
+      .nl-story-userlane-guide {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        margin: 0 0 6px;
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide__lines {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide__line {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.35;
+        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+        min-width: 0;
+      }
+
+      .nl-story-userlane-guide__face {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+        flex: 0 0 auto;
+      }
+
+      .nl-story-userlane-guide__text {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+
+      .nl-story-userlane-guide__title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .nl-story-userlane-guide__role {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--nl-text-sub);
+      }
+
+      .nl-story-userlane-guide__count {
+        color: #9a6f12;
+        font-weight: 800;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* レーン内のコメントリスト（extension/popup.html の .nl-support-timeline__body / .nl-tl-row / .nl-tl-gift 構造） */
+      .lane-list {
+        overflow-y: auto;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 2px;
+      }
+
+      /* 人物タイル・アバター・メタ（extension/popup.html の .nl-story-userlane-cell 構造） */
+      .nl-story-userlane-cell {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        min-width: 0;
+        max-width: 100%;
+        border-radius: 999px;
+        padding-right: 4px;
+      }
+
+      a.nl-story-userlane-cell--linkable,
+      a.author-link {
+        text-decoration: none;
+        color: var(--nl-text);
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      a.nl-story-userlane-cell--linkable:hover,
+      a.author-link:hover {
+        color: var(--nl-accent);
+        text-decoration: underline;
+      }
+
+      .nl-story-userlane-avatar,
+      .avatar-img {
+        width: var(--nl-lane-avatar);
+        height: var(--nl-lane-avatar);
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border-strong) 82%, #fff 18%);
+        box-shadow: 0 1px 3px rgba(120, 80, 50, 0.14);
+        background: var(--nl-bg);
+        flex-shrink: 0;
+      }
+
+      .avatar-fallback {
+        width: var(--nl-lane-avatar);
+        height: var(--nl-lane-avatar);
+        border-radius: 999px;
+        background: var(--nl-accent-soft);
+        color: var(--nl-text);
+        border: 1.5px dashed var(--nl-border-strong);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+        flex-shrink: 0;
+      }
+
+      .nl-story-userlane-meta {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 1px;
+        min-width: 0;
+        font-size: 10.5px;
+        line-height: 1.22;
+      }
+
+      .nl-story-userlane-meta__id,
+      .channel-id-tag {
+        color: var(--nl-text-sub);
+        font-weight: 600;
+        font-size: 10px;
+        font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .nl-story-userlane-meta__name {
+        color: var(--nl-text);
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* コメント行カード（.nl-tl-row / .nl-tl-gift 互換） */
+      .chat-item {
+        background: var(--nl-bg);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius-sm);
+        padding: 5px 7px;
+        font-size: 11.5px;
+        color: var(--nl-text);
+      }
+
+      .chat-item.kind-superchat,
+      .chat-item.kind-sticker {
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, #ffb020 16%, var(--nl-surface)),
+          color-mix(in srgb, #ff7eb6 12%, var(--nl-surface))
+        );
+        border: 1px solid color-mix(in srgb, #ffb020 45%, var(--nl-border));
+      }
+
+      .chat-item.kind-membership,
+      .chat-item.kind-membership_gift {
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--nl-ok) 12%, var(--nl-surface)),
+          color-mix(in srgb, var(--nl-accent) 10%, var(--nl-surface))
+        );
+        border: 1px solid color-mix(in srgb, var(--nl-ok) 40%, var(--nl-border));
+      }
+
+      .chat-item-head {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-bottom: 3px;
+      }
+
+      .voice-pill {
+        font-size: 9.5px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: var(--nl-radius-pill);
+        background: var(--nl-accent-soft);
+        color: var(--nl-text);
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 35%, var(--nl-border));
+      }
+
+      .amount-pill {
+        font-size: 10.5px;
+        font-weight: 800;
+        padding: 1px 7px;
+        border-radius: var(--nl-radius-pill);
+        background: #fff0c2;
+        border: 1px solid #e6a817;
+        color: #7c4a03;
+      }
+
+      .member-pill {
+        font-size: 10px;
+        font-weight: 800;
+        padding: 1px 6px;
+        border-radius: var(--nl-radius-pill);
+        background: #e6f7ed;
+        border: 1px solid color-mix(in srgb, var(--nl-ok) 45%, var(--nl-border));
+        color: #1e5c3a;
+      }
+
+      .chat-text {
+        word-break: break-word;
+        color: var(--nl-text);
+        line-height: 1.38;
+        padding-left: 2px;
+      }
+
+      /* 応援者ランキング（extension/popup.html の .nl-top-support-rank 構造） */
+      .nl-top-support-rank {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: var(--nl-radius-md);
+        background: color-mix(in srgb, var(--nl-accent) 6%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, var(--nl-border) 72%, var(--nl-accent) 28%);
+        box-shadow: var(--nl-shadow-card);
+      }
+
+      .nl-top-support-rank__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+
+      .nl-top-support-rank__title {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--nl-text);
+      }
+
+      .nl-top-support-rank__note {
+        margin: 0;
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--nl-text-sub);
       }
 
       .currency-grid {
@@ -180,210 +620,105 @@
       }
 
       .currency-box {
-        background: var(--panel-soft);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 8px;
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius-sm);
+        padding: 7px 8px;
       }
 
       .currency-header {
         display: flex;
         justify-content: space-between;
         align-items: baseline;
-        font-weight: 700;
-        margin-bottom: 6px;
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 4px;
+        font-weight: 800;
+        font-size: 11.5px;
+        color: var(--nl-text);
+        margin-bottom: 5px;
+        border-bottom: 1px solid var(--nl-border);
+        padding-bottom: 3px;
       }
 
+      .nl-top-support-rank__list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        width: 100%;
+        min-width: 0;
+      }
+
+      .nl-top-support-rank__line,
       .supporter-row {
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 0;
-        border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
-        font-size: 12px;
+        padding: 3px 4px;
+        border-radius: 6px;
+        font-size: 11px;
+        line-height: 1.25;
+        color: var(--nl-text);
+        min-width: 0;
+        border-bottom: 1px dashed color-mix(in srgb, var(--nl-border) 60%, transparent);
       }
 
       .supporter-row:last-child {
         border-bottom: none;
       }
 
+      .nl-top-support-rank__place,
       .rank-badge {
-        font-weight: 700;
-        color: #fbbf24;
-        min-width: 26px;
-      }
-
-      .lanes-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
-      }
-
-      @media (max-width: 640px) {
-        .lanes-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .lane-col {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-        max-height: 460px;
-      }
-
-      .lane-header {
-        padding: 8px 10px;
-        font-weight: 700;
-        font-size: 12px;
-        border-bottom: 2px solid var(--border);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .lane-rinku .lane-header {
-        border-bottom-color: var(--rinku);
-      }
-      .lane-konta .lane-header {
-        border-bottom-color: var(--konta);
-      }
-      .lane-tanunee .lane-header {
-        border-bottom-color: var(--tanunee);
-      }
-
-      .lane-role {
-        font-size: 10px;
-        font-weight: 400;
-        color: var(--muted);
-        display: block;
-      }
-
-      .lane-list {
-        padding: 6px;
-        overflow-y: auto;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-
-      .chat-item {
-        background: var(--panel-soft);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 6px 8px;
-        font-size: 12px;
-      }
-
-      .chat-item.kind-superchat,
-      .chat-item.kind-sticker {
-        border-color: #f59e0b;
-        background: rgba(245, 158, 11, 0.12);
-      }
-
-      .chat-item.kind-membership,
-      .chat-item.kind-membership_gift {
-        border-color: #10b981;
-        background: rgba(16, 185, 129, 0.12);
-      }
-
-      .chat-item-head {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex-wrap: wrap;
-        margin-bottom: 4px;
-      }
-
-      .avatar-img {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        object-fit: cover;
-        background: #334155;
         flex-shrink: 0;
-      }
-
-      .avatar-fallback {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: #475569;
-        color: #f8fafc;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        min-width: 26px;
+        padding: 1px 5px;
         font-size: 10px;
-        font-weight: 700;
+        font-weight: 800;
+        color: #fff;
+        background: linear-gradient(145deg, var(--nl-accent), #e05288);
+        border-radius: var(--nl-radius-pill);
+      }
+
+      .nl-top-support-rank__count {
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: var(--nl-rank-count);
+        margin-left: auto;
         flex-shrink: 0;
       }
 
-      .author-link {
-        color: #38bdf8;
-        text-decoration: none;
+      .empty-hint,
+      .nl-story-userlane__empty-note {
+        margin: 4px 0 2px;
+        padding: 10px 8px;
+        font-size: 11px;
+        line-height: 1.45;
         font-weight: 600;
-        word-break: break-all;
-      }
-
-      .author-link:hover {
-        text-decoration: underline;
-      }
-
-      .channel-id-tag {
-        font-size: 10px;
-        color: var(--muted);
-        font-family: monospace;
-      }
-
-      .voice-pill {
-        font-size: 10px;
-        padding: 1px 5px;
-        border-radius: 4px;
-        background: rgba(56, 189, 248, 0.18);
-        color: #bae6fd;
-      }
-
-      .amount-pill {
-        font-size: 11px;
-        font-weight: 700;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #f59e0b;
-        color: #0f172a;
-      }
-
-      .member-pill {
-        font-size: 10px;
-        font-weight: 700;
-        padding: 1px 5px;
-        border-radius: 4px;
-        background: #10b981;
-        color: #052e16;
-      }
-
-      .chat-text {
-        word-break: break-word;
-        color: #f1f5f9;
-      }
-
-      .empty-hint {
-        color: var(--muted);
-        font-size: 11px;
+        color: var(--nl-text-sub);
         text-align: center;
-        padding: 14px 6px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
       }
     </style>
   </head>
   <body>
-    <header class="app-header">
-      <div>
-        <div class="app-title">追憶のきらめき for YouTube（試作）</div>
-        <div class="app-subtitle" id="yt-stream-summary">YouTube Live のチャット待機中…</div>
+    <header class="nl-yt-header">
+      <div class="nl-yt-header__brand">
+        <img
+          class="nl-yt-header__logo"
+          src="images/logo/konta-yukkuri-icon-48.png"
+          alt="追憶のきらめき"
+          width="28"
+          height="28"
+          decoding="async"
+        />
+        <div class="nl-yt-header__titles">
+          <div class="nl-yt-header__title">君斗りんくの追憶のきらめき for YouTube</div>
+          <div class="nl-yt-header__subtitle" id="yt-stream-summary">
+            YouTube Live の視聴ページを開くと自動でチャットを記録します
+          </div>
+        </div>
       </div>
       <div>
         <select id="yt-stream-select" aria-label="記録済み配信の選択">
@@ -392,104 +727,159 @@
       </div>
     </header>
 
-    <div class="notice-banner" id="yt-all-chat-notice">
-      <div>
-        💡 <strong>全件記録のヒント</strong>: YouTube チャット欄の左上メニューが「トップチャット」だと一部コメントが間引かれます。<strong>「すべてのチャット」表示でないと全件は拾えない</strong>ため、切替をおすすめします。
-      </div>
-      <span class="filter-pill" id="yt-detected-filter-badge">現在のチャット表示: 検出待ち</span>
-    </div>
+    <!-- 設定・VOICEVOX状態・注意書きは折りたたみ欄にまとめ、下の3レーンを主役にする -->
+    <details class="nl-frame-theme-details" id="yt-settings-details">
+      <summary class="nl-frame-theme-details__summary">
+        <span class="nl-frame-theme-details__summary-left">
+          読み上げ設定（VOICEVOX）・全件取得のヒント
+        </span>
+        <span class="nl-frame-theme-details__summary-meta">
+          <span id="yt-voice-queue-info">待機キュー: 0件</span>
+          <span class="filter-pill" id="yt-detected-filter-badge">チャット表示: 検出待ち</span>
+        </span>
+      </summary>
+      <div class="nl-frame-theme-details__body">
+        <div class="control-row">
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700">
+            <input type="checkbox" id="yt-voice-enabled" checked />
+            <span>読み上げ ON（パネル閉鎖中も継続）</span>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 4px">
+            <span>モード:</span>
+            <select id="yt-voice-mode">
+              <option value="all">全部読む</option>
+              <option value="select">選んで読む（スパチャ・メンバー・配信者名入り）</option>
+            </select>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 4px">
+            <span>配信者名キーワード:</span>
+            <input
+              type="text"
+              id="yt-broadcaster-name-input"
+              placeholder="例: りんく"
+              style="width: 105px"
+            />
+          </label>
+          <button type="button" id="yt-voice-recheck-btn">VOICEVOX 再確認</button>
+          <button type="button" id="yt-voice-clear-btn">キュー消去</button>
+        </div>
 
-    <section class="card" aria-label="VOICEVOX 読み上げ設定">
-      <h2 class="card-title">
-        <span>🔊 人ごとに違う声で読み上げ（VOICEVOX）</span>
-        <span id="yt-voice-queue-info" style="font-size: 11px; color: var(--muted)">待機キュー: 0件</span>
-      </h2>
-      <div class="control-row">
-        <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer">
-          <input type="checkbox" id="yt-voice-enabled" checked />
-          <span>読み上げ ON</span>
-        </label>
-        <label style="display: inline-flex; align-items: center; gap: 4px">
-          <span>モード:</span>
-          <select id="yt-voice-mode">
-            <option value="all">全部読む</option>
-            <option value="select">選んで読む（スパチャ・メンバー・配信者名入り）</option>
-          </select>
-        </label>
-        <label style="display: inline-flex; align-items: center; gap: 4px">
-          <span>配信者名キーワード:</span>
-          <input
-            type="text"
-            id="yt-broadcaster-name-input"
-            placeholder="例: りんく"
-            style="width: 110px"
-          />
-        </label>
-        <button type="button" id="yt-voice-recheck-btn">VOICEVOX 再確認</button>
-        <button type="button" id="yt-voice-clear-btn">キュー消去</button>
-      </div>
+        <div id="yt-voice-autoswitch-badge" class="autoswitch-badge">
+          キューが一定数（8件以上）たまったため、自動で「選んで読む」モードに切り替えています。
+        </div>
 
-      <div id="yt-voice-autoswitch-badge" class="autoswitch-badge">
-        ⚡ キューが一定数（8件以上）たまったため、自動で「選んで読む」モードに切り替えています。
-      </div>
+        <div id="yt-voice-status-box" class="voice-status-box is-offline" role="status">
+          VOICEVOX の接続状態を確認しています…
+        </div>
 
-      <div id="yt-voice-status-box" class="voice-status-box is-offline" role="status">
-        VOICEVOX の接続状態を確認しています…
-      </div>
+        <div id="yt-voice-last-spoken" class="voice-last-spoken">
+          読み上げ履歴: まだ再生されたコメントはありません（同じチャンネルIDの投稿者は毎回同じ声で読まれます）
+        </div>
 
-      <div id="yt-voice-last-spoken" class="voice-last-spoken">
-        読み上げ履歴: まだ再生されたコメントはありません（同じチャンネルIDの投稿者は毎回同じ声で読まれます）
+        <div class="notice-banner" id="yt-all-chat-notice">
+          <strong>全件記録のヒント</strong>: YouTube チャット欄の左上メニューが「トップチャット」だと一部コメントが間引かれます。<strong>「すべてのチャット」表示でないと全件は拾えない</strong>ため、切替をおすすめします。
+        </div>
+      </div>
+    </details>
+
+    <!-- 主役: 3レーン振り返り（りんく・こん太・たぬ姉のキャラ画像見出し） -->
+    <section class="nl-story" aria-label="3レーン振り返り">
+      <div class="lanes-grid">
+        <div class="lane-col lane-rinku" id="lane-rinku">
+          <div class="nl-story-userlane-guide">
+            <div class="nl-story-userlane-guide__lines">
+              <div class="nl-story-userlane-guide__line">
+                <img
+                  class="nl-story-userlane-guide__face"
+                  src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+                  alt="りんく"
+                  width="28"
+                  height="28"
+                  decoding="async"
+                />
+                <div class="nl-story-userlane-guide__text">
+                  <div class="nl-story-userlane-guide__title-row">
+                    <span>りんくレーン</span>
+                    <span class="nl-story-userlane-guide__count" id="lane-rinku-count">0件</span>
+                  </div>
+                  <span class="nl-story-userlane-guide__role">配信者視点（配信者本人・モデレーター）</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lane-list" id="lane-rinku-list">
+            <div class="empty-hint">配信者本人・モデレーターのコメントがここに表示されます</div>
+          </div>
+        </div>
+
+        <div class="lane-col lane-konta" id="lane-konta">
+          <div class="nl-story-userlane-guide">
+            <div class="nl-story-userlane-guide__lines">
+              <div class="nl-story-userlane-guide__line">
+                <img
+                  class="nl-story-userlane-guide__face"
+                  src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+                  alt="こん太"
+                  width="28"
+                  height="28"
+                  decoding="async"
+                />
+                <div class="nl-story-userlane-guide__text">
+                  <div class="nl-story-userlane-guide__title-row">
+                    <span>こん太レーン</span>
+                    <span class="nl-story-userlane-guide__count" id="lane-konta-count">0件</span>
+                  </div>
+                  <span class="nl-story-userlane-guide__role">ファン視点（スパチャ・メンバー・ギフト）</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lane-list" id="lane-konta-list">
+            <div class="empty-hint">スパチャ・ステッカー・メンバー・ギフトの応援がここに表示されます</div>
+          </div>
+        </div>
+
+        <div class="lane-col lane-tanunee" id="lane-tanunee">
+          <div class="nl-story-userlane-guide">
+            <div class="nl-story-userlane-guide__lines">
+              <div class="nl-story-userlane-guide__line">
+                <img
+                  class="nl-story-userlane-guide__face"
+                  src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+                  alt="たぬ姉"
+                  width="28"
+                  height="28"
+                  decoding="async"
+                />
+                <div class="nl-story-userlane-guide__text">
+                  <div class="nl-story-userlane-guide__title-row">
+                    <span>たぬ姉レーン</span>
+                    <span class="nl-story-userlane-guide__count" id="lane-tanunee-count">0件</span>
+                  </div>
+                  <span class="nl-story-userlane-guide__role">案内役（一般コメント）</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lane-list" id="lane-tanunee-list">
+            <div class="empty-hint">一般リスナーのコメントがここに表示されます</div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="card" id="yt-support-ranking-section" aria-label="応援者ランキング（通貨別）">
-      <h2 class="card-title">
-        <span>👑 応援者ランキング（通貨別集計・換算なし）</span>
-        <span id="yt-support-summary" style="font-size: 11px; color: var(--muted)">スパチャ 0件 / メンバー 0件</span>
-      </h2>
+    <!-- 通貨別応援者ランキング（extension/popup.html の .nl-top-support-rank 構造） -->
+    <section
+      class="nl-top-support-rank"
+      id="yt-support-ranking-section"
+      aria-label="応援者ランキング（通貨別）"
+    >
+      <div class="nl-top-support-rank__header">
+        <span class="nl-top-support-rank__title">応援者ランキング（通貨別集計・換算なし）</span>
+        <span id="yt-support-summary" class="nl-top-support-rank__note">スパチャ 0件 / メンバー 0件</span>
+      </div>
       <div id="yt-currency-ranking-container" class="currency-grid">
         <div class="empty-hint">スーパーチャット・ステッカー・メンバー加入が届くと通貨ごとに集計されます。</div>
-      </div>
-    </section>
-
-    <section class="lanes-grid" aria-label="3レーン振り返り">
-      <div class="lane-col lane-rinku" id="lane-rinku">
-        <div class="lane-header">
-          <div>
-            🌸 りんくレーン
-            <span class="lane-role">配信者視点（配信者本人・モデレーター）</span>
-          </div>
-          <span id="lane-rinku-count">0</span>
-        </div>
-        <div class="lane-list" id="lane-rinku-list">
-          <div class="empty-hint">配信者・モデレーターのコメントがここに表示されます</div>
-        </div>
-      </div>
-
-      <div class="lane-col lane-konta" id="lane-konta">
-        <div class="lane-header">
-          <div>
-            🦊 こん太レーン
-            <span class="lane-role">ファン視点（スパチャ・メンバー・ギフト）</span>
-          </div>
-          <span id="lane-konta-count">0</span>
-        </div>
-        <div class="lane-list" id="lane-konta-list">
-          <div class="empty-hint">スパチャ・メンバー・ギフトの応援がここに表示されます</div>
-        </div>
-      </div>
-
-      <div class="lane-col lane-tanunee" id="lane-tanunee">
-        <div class="lane-header">
-          <div>
-            🍃 たぬ姉レーン
-            <span class="lane-role">案内役（一般コメント）</span>
-          </div>
-          <span id="lane-tanunee-count">0</span>
-        </div>
-        <div class="lane-list" id="lane-tanunee-list">
-          <div class="empty-hint">一般リスナーのコメントがここに表示されます</div>
-        </div>
       </div>
     </section>
 

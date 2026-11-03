@@ -1,5 +1,11 @@
-// ytStreamStorePolicy.js — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・表示スライス計算（純関数）
+// ytStreamStorePolicy.js — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
 // @layer L0 — 純粋計算（副作用・ブラウザ API なし）
+
+import { assignYtCommentLane } from './ytLaneAssign.js';
+import {
+  createYtSupportRankingAccumulator,
+  applyYtSupportRankingDelta,
+} from './ytSupportRanking.js';
 
 /** サイドパネルの各レーンに表示する最新コメントの上限件数（保存自体は全件） */
 export const YT_SIDE_PANEL_DISPLAY_LIMIT = 150;
@@ -134,4 +140,149 @@ export function selectYtNewestCommentsForDisplay(items, limit = YT_SIDE_PANEL_DI
       : YT_SIDE_PANEL_DISPLAY_LIMIT;
   const startIdx = Math.max(0, items.length - maxCount);
   return items.slice(startIdx).reverse();
+}
+
+/**
+ * サイドパネルの差分描画状態を初期化する（1配信ごと）。
+ *
+ * @param {string} videoId
+ * @param {{ broadcasterChannelId?: string, displayLimit?: number }} [opts]
+ */
+export function createYtStreamIncrementalState(videoId, opts = {}) {
+  const displayLimit =
+    typeof opts.displayLimit === 'number' && opts.displayLimit > 0
+      ? Math.floor(opts.displayLimit)
+      : YT_SIDE_PANEL_DISPLAY_LIMIT;
+  return {
+    videoId: String(videoId || '').trim(),
+    broadcasterChannelId: String(opts.broadcasterChannelId || '').trim(),
+    displayLimit,
+    totalCount: 0,
+    lastRecordedAt: 0,
+    /** @type {Set<string>} */
+    seenPks: new Set(),
+    laneCounts: {
+      rinku: 0,
+      konta: 0,
+      tanunee: 0,
+    },
+    /** @type {{ rinku: any[], konta: any[], tanunee: any[] }} */
+    laneDisplay: {
+      rinku: [],
+      konta: [],
+      tanunee: [],
+    },
+    rankingAcc: createYtSupportRankingAccumulator(),
+  };
+}
+
+/**
+ * 差分描画状態に新着コメント配列（`incomingItems`）を適用する。
+ * - `seenPks` で既読レコードをスキップするため、IndexedDB の境界クエリ（`recordedAt >= cursor`）の結果をそのまま渡せる。
+ * - 応援者ランキングは `applyYtSupportRankingDelta` で新着分だけを O(ΔN) 更新する。
+ * - 各レーンには新着分（`addedByLane`）だけを返し、表示スライス（`laneDisplay`）は最新 `displayLimit` 件に保つ。
+ *
+ * @param {ReturnType<typeof createYtStreamIncrementalState>} state
+ * @param {any[]} incomingItems
+ * @param {{ broadcasterChannelId?: string }} [opts]
+ */
+export function applyYtStreamIncrementalItems(state, incomingItems, opts = {}) {
+  if (opts.broadcasterChannelId) {
+    state.broadcasterChannelId = String(opts.broadcasterChannelId).trim();
+  }
+
+  /** @type {{ rinku: any[], konta: any[], tanunee: any[] }} */
+  const addedByLane = {
+    rinku: [],
+    konta: [],
+    tanunee: [],
+  };
+
+  if (!Array.isArray(incomingItems) || incomingItems.length === 0) {
+    return {
+      addedCount: 0,
+      addedByLane,
+      rankingChanged: false,
+      supporterSetChanged: false,
+      ranking: state.rankingAcc.snapshot,
+      laneCounts: state.laneCounts,
+      laneDisplay: state.laneDisplay,
+      totalCount: state.totalCount,
+    };
+  }
+
+  /** @type {any[]} */
+  const unseen = [];
+  for (let i = 0; i < incomingItems.length; i += 1) {
+    const item = incomingItems[i];
+    if (!item || typeof item !== 'object') continue;
+    const pk =
+      String(item.pk || '').trim() ||
+      buildYtCommentPrimaryKey(state.videoId || item.videoId, item.id);
+    if (!pk || state.seenPks.has(pk)) continue;
+    state.seenPks.add(pk);
+    unseen.push(item);
+
+    const recAt = Number(item.recordedAt || 0);
+    if (Number.isFinite(recAt) && recAt > state.lastRecordedAt) {
+      state.lastRecordedAt = recAt;
+    }
+  }
+
+  if (unseen.length === 0) {
+    return {
+      addedCount: 0,
+      addedByLane,
+      rankingChanged: false,
+      supporterSetChanged: false,
+      ranking: state.rankingAcc.snapshot,
+      laneCounts: state.laneCounts,
+      laneDisplay: state.laneDisplay,
+      totalCount: state.totalCount,
+    };
+  }
+
+  state.totalCount += unseen.length;
+
+  // 応援者ランキングを差分で更新（supporterChannelIds も最新化される）
+  const rankRes = applyYtSupportRankingDelta(state.rankingAcc, unseen);
+
+  // 新着コメントだけを3レーンに振り分け
+  for (let i = 0; i < unseen.length; i += 1) {
+    const item = unseen[i];
+    const lane = assignYtCommentLane(item, {
+      broadcasterChannelId: state.broadcasterChannelId,
+      supporterChannelIds: state.rankingAcc.supporterChannelIds,
+    });
+    state.laneCounts[lane] += 1;
+    addedByLane[lane].push(item);
+  }
+
+  // 各レーンの表示配列（降順＝新しい順）を更新し、displayLimit 件に抑える
+  const limit = state.displayLimit || YT_SIDE_PANEL_DISPLAY_LIMIT;
+  for (const lane of /** @type {const} */ (['rinku', 'konta', 'tanunee'])) {
+    const added = addedByLane[lane];
+    if (added.length === 0) continue;
+    const addedNewestFirst = added.slice().reverse();
+    if (addedNewestFirst.length >= limit) {
+      state.laneDisplay[lane] = addedNewestFirst.slice(0, limit);
+    } else {
+      const merged = addedNewestFirst.concat(state.laneDisplay[lane]);
+      if (merged.length > limit) {
+        merged.length = limit;
+      }
+      state.laneDisplay[lane] = merged;
+    }
+  }
+
+  return {
+    addedCount: unseen.length,
+    addedByLane,
+    rankingChanged: rankRes.rankingChanged,
+    supporterSetChanged: rankRes.supporterSetChanged,
+    ranking: rankRes.snapshot,
+    laneCounts: state.laneCounts,
+    laneDisplay: state.laneDisplay,
+    totalCount: state.totalCount,
+  };
 }

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1109 件
+## ⚠️ 役割コメントが無いソース 9 / 1112 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -764,15 +764,36 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **extension-youtube/** (9)
-  - 📁 **src/** (4)
-    - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・読み上げキュー管理 Service Worker
+- 📁 **extension-youtube/** (24)
+  - 📁 **images/** (12)
+    - 📁 **logo/** (4)
+      - `konta-yukkuri-icon-128.png`
+      - `konta-yukkuri-icon-16.png`
+      - `konta-yukkuri-icon-32.png`
+      - `konta-yukkuri-icon-48.png`
+    - 📁 **yukkuri-charactore-english/** (8)
+      - 📁 **konta/** (2)
+        - `kitsune-yukkuri-normal.png`
+        - `kitsune-yukkuri-normal.thumb128.png`
+      - 📁 **link/** (3)
+        - `link-yukkuri-half-eyes-mouth-closed.png`
+        - `link-yukkuri-normal-mouth-closed.png`
+        - `link-yukkuri-normal-mouth-closed.thumb128.png`
+      - 📁 **tanunee/** (3)
+        - `tanuki-yukkuri-half-eyes-mouth-closed.png`
+        - `tanuki-yukkuri-normal-mouth-closed.png`
+        - `tanuki-yukkuri-normal-mouth-closed.thumb128.png`
+  - 📁 **src/** (5)
+    - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
-    - `sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示 UI
-    - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・取得するストア
+    - `offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
+    - `sidepanel-entry.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示専用 UI（差分更新対応）
+    - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
   - `background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
   - `content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
   - `manifest.json`
+  - `offscreen.html`
+  - `offscreen.js` — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル
   - `sidepanel.html`
   - `sidepanel.js` — YouTube Live 3レーン・通貨別応援者ランキング・読み上げ設定の表示バンドル
 - 📁 **mobile/** (65)
@@ -849,7 +870,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (105)
+- 📁 **scripts/** (106)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -953,6 +974,7 @@
   - `split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
   - `split-changelog.mjs` — scripts/split-changelog.mjs — changelog.js を直近20版(本体)と旧版(archive)に分割
   - `stage-submission.py`
+  - `stage-youtube-submission.mjs` — YouTube Live 版 Chrome ウェブストア提出用 ZIP ステージングスクリプト
   - `status-live.mjs` — 状態速報(status.html の「AI共有」全文)を、コピー&貼り付けせずにターミナルへ取得する CLI。
   - `sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
@@ -984,7 +1006,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2249)
+- 📁 **src/** (2250)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1308,7 +1330,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1959)
+  - 📁 **lib/** (1960)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1324,14 +1346,15 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
-    - 📁 **youtube/** (10)
+    - 📁 **youtube/** (11)
       - `ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
       - `ytChatParse.test.js`
       - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
       - `ytLaneAssign.test.js`
-      - `ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・表示スライス計算（純関数）
+      - `ytStageSubmission.test.js`
+      - `ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
       - `ytStreamStorePolicy.test.js`
-      - `ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計（通貨別・純関数）
+      - `ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
       - `ytSupportRanking.test.js`
       - `ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
       - `ytVoiceQueue.test.js`
