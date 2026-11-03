@@ -38,6 +38,7 @@ describe('mergeYtStreamSummary', () => {
       title: 'テスト配信',
       broadcasterName: 'りんく',
       broadcasterChannelId: 'UCOwner123456789012345678',
+      broadcasterHandle: '',
       broadcasterIconUrl: '',
       concurrentViewers: null,
       peakConcurrentViewers: null,

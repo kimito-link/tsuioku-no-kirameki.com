@@ -33,6 +33,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   title?: string,
  *   broadcasterName?: string,
  *   broadcasterChannelId?: string,
+ *   broadcasterHandle?: string,
  *   broadcasterIconUrl?: string,
  *   concurrentViewers?: number | null,
  *   chatFilterLabel?: string,
@@ -45,6 +46,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   title: string,
  *   broadcasterName: string,
  *   broadcasterChannelId: string,
+ *   broadcasterHandle: string,
  *   broadcasterIconUrl: string,
  *   concurrentViewers: number | null,
  *   peakConcurrentViewers: number | null,
@@ -63,6 +65,8 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   const broadcasterChannelId = String(
     patch?.broadcasterChannelId || prev.broadcasterChannelId || '',
   ).trim();
+  // チャンネルの @名前(UC… の ID がページに無い配信もある・2026-11-03 実機: ホロライブ)
+  const broadcasterHandle = String(patch?.broadcasterHandle || prev.broadcasterHandle || '').trim();
   const broadcasterIconUrl = String(
     patch?.broadcasterIconUrl || prev.broadcasterIconUrl || '',
   ).trim();
@@ -103,6 +107,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     title,
     broadcasterName,
     broadcasterChannelId,
+    broadcasterHandle,
     broadcasterIconUrl,
     concurrentViewers,
     peakConcurrentViewers,

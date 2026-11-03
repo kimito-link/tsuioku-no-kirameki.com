@@ -418,6 +418,7 @@
     return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : "";
   }
   var ytIconByNumericUid = /* @__PURE__ */ new Map();
+  var ucByNameHint = /* @__PURE__ */ new Map();
   function ytIconForNumericUid(uid) {
     return ytIconByNumericUid.get(String(uid || "")) || "";
   }
@@ -445,8 +446,12 @@
     const lv = pseudoLvForVideoId(videoId);
     const viewers = typeof sum?.concurrentViewers === "number" ? sum.concurrentViewers : NaN;
     const startedAt = Number(sum?.startedAt || 0) || Number(sum?.createdAt || 0);
-    const chId = String(sum?.broadcasterChannelId || "");
-    const bUid = chId ? numericUidForYtKey(chId) : "";
+    const ucId = String(sum?.broadcasterChannelId || "");
+    const handle = String(sum?.broadcasterHandle || "");
+    const ucFromRecords = !ucId && handle ? ucByNameHint.get(normName(handle)) || "" : "";
+    const chId = ucId || ucFromRecords;
+    const bKey = chId || (handle ? `handle:${handle}` : "");
+    const bUid = bKey ? numericUidForYtKey(bKey) : "";
     const bIcon = String(sum?.broadcasterIconUrl || "") || ytIconForNumericUid(bUid);
     if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
     return {
@@ -463,7 +468,7 @@
       scripts: [],
       noopenerLinks: [],
       broadcasterUserId: bUid,
-      broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : "",
+      broadcasterPageUrl: chId ? `https://www.youtube.com/channel/${chId}` : handle ? `https://www.youtube.com/${encodeURI(handle)}` : "",
       broadcasterIconUrl: bIcon,
       // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
       // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
@@ -482,6 +487,7 @@
       if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
       const n2 = normName(r?.name);
       if (n2 && !ucByName.has(n2)) ucByName.set(n2, ch);
+      if (n2) ucByNameHint.set(n2, ch);
     }
     const keyOf2 = (r) => {
       const ch = String(r?.channelId || "").trim();
@@ -45080,7 +45086,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-03T14:00" ? String("yt-2026-11-03T14:00") : "dev";
+      const buildId = "yt-2026-11-03T14:53" ? String("yt-2026-11-03T14:53") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45098,7 +45104,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.10") : "";
+    const bundledVersion = true ? String("0.1.11") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45143,7 +45149,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-03T14:00" ? String("yt-2026-11-03T14:00") : "dev";
+            return "yt-2026-11-03T14:53" ? String("yt-2026-11-03T14:53") : "dev";
           } catch {
             return "dev";
           }
