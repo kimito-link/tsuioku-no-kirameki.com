@@ -14,7 +14,7 @@
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
-import { ytPostedAtFromClock } from '../../src/lib/youtube/ytPostedAt.js';
+import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { ytWording } from '../../src/lib/youtube/ytWording.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
@@ -201,7 +201,10 @@ export function ytRecordToNicoEntry(r, i, lv, personKey) {
     avatarUrl: String(r?.iconUrl || ''),
     capturedAt: at,
     // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)
-    ytPostedAt: r?.replay ? at : ytPostedAtFromClock(String(r?.ts || ''), at),
+    // リプレイ(アーカイブ)は時刻表示が経過時間なので、配信の開始時刻 + 経過時間にする
+    ytPostedAt: r?.replay
+      ? ytReplayPostedAt(String(r?.ts || ''), Number(r?._streamStartedAt || 0), at)
+      : ytPostedAtFromClock(String(r?.ts || ''), at),
     ytKind: String(r?.kind || 'text'),
     ...(r?.giftName ? { ytGiftName: String(r.giftName) } : {}),
     ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
@@ -377,10 +380,20 @@ async function buildCommentsForLvUncached(lv) {
   const items = await getYtStreamCommentsByVideoId(vid);
   const list = Array.isArray(items) ? items : [];
   const who = buildYtPersonResolver(list);
+  let streamStartedAt = 0;
+  if (list.some((r) => r?.replay)) {
+    try {
+      const bag = await real.storage.local.get(KEY_YT_SUMMARIES);
+      const sum = bag?.[KEY_YT_SUMMARIES]?.[vid];
+      streamStartedAt = Number(sum?.startedAt || 0);
+    } catch {
+      /* 分からなければ受け取った時刻 */
+    }
+  }
   return list.map((r, i) => {
     const key = who.keyOf(r);
     const icon = String(r?.iconUrl || '').trim() || who.iconOf(key);
-    const e = ytRecordToNicoEntry({ ...r, iconUrl: icon }, i, lv, key);
+    const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
     return e;
   });
