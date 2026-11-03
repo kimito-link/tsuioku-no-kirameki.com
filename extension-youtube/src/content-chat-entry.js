@@ -869,6 +869,55 @@ async function openLeaderboardOnce(read) {
   }
 }
 
+/**
+ * 拡張が新しい版に入れ替わると、視聴タブは読み込み直される(古いプログラムが切れて記録が止まるのを防ぐため)。
+ * アーカイブは読み込み直すと URL の &t= の位置(または最初)に戻ってしまい、同じ所のチャットを流し直すので
+ * 記録が増えなくなる(2026-11-04 実機: 4,391 件のまま止まった)。読み込み直す前に見ていた位置へ戻す。
+ * 生配信(長さが決まっていない動画)は触らない。
+ */
+function setupResumeAfterReload() {
+  const KEY = 'nl_yt_resume_v1';
+  const MAX_AGE_MS = 3 * 60 * 1000;
+  const videoEl = () => {
+    const v = document.querySelector('video.html5-main-video') || document.querySelector('video');
+    return v instanceof HTMLVideoElement ? v : null;
+  };
+  const isArchive = (/** @type {HTMLVideoElement} */ v) => Number.isFinite(v.duration) && v.duration > 0;
+  let resumed = false;
+  /** @type {{ vid?: string, t?: number, at?: number } | null} */
+  let saved = null;
+  try {
+    saved = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+  } catch {
+    saved = null;
+  }
+  const tick = () => {
+    const vid = parseYtVideoIdFromUrl(String(location.href || ''));
+    const v = videoEl();
+    if (!vid || !v) return;
+    if (!resumed) {
+      resumed = true;
+      const t = Number(saved?.t || 0);
+      const fresh = saved && saved.vid === vid && Date.now() - Number(saved.at || 0) < MAX_AGE_MS;
+      if (fresh && t > 5 && isArchive(v) && t < v.duration - 5 && Math.abs(v.currentTime - t) > 5) {
+        try {
+          v.currentTime = t;
+        } catch {
+          // 戻せなくても再生は続く
+        }
+        return;
+      }
+    }
+    if (!isArchive(v) || v.currentTime < 1) return;
+    try {
+      sessionStorage.setItem(KEY, JSON.stringify({ vid, t: Math.floor(v.currentTime), at: Date.now() }));
+    } catch {
+      // 保存できなくても記録には関係ない
+    }
+  };
+  setInterval(tick, 3000);
+}
+
 function init() {
   const path = String(window.location.pathname || '');
   if (path.startsWith('/live_chat')) {
@@ -881,6 +930,7 @@ function init() {
     // 最上位の YouTube ページ（トップから視聴ページへ遷移しても動くよう、どのページでも待機）
     setupWatchPageMetaObserver();
     setupVideoFrameCapture();
+    setupResumeAfterReload();
   }
 }
 
