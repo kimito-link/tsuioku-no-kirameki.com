@@ -203,6 +203,8 @@ export function ytRecordToNicoEntry(r, i, lv, personKey) {
     // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)
     ytPostedAt: ytPostedAtFromClock(String(r?.ts || ''), at),
     ytKind: String(r?.kind || 'text'),
+    ...(r?.giftName ? { ytGiftName: String(r.giftName) } : {}),
+    ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
     ytAmount: Number(r?.amount || 0),
     ytCurrency: String(r?.currency || ''),
   };

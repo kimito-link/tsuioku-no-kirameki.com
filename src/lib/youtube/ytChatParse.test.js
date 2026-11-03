@@ -300,6 +300,23 @@ describe('ytChatParse', () => {
     expect(parsed.iconUrl).toBe('https://yt4.ggpht.com/gift-vm-author-avatar=s64-c-k-c0x00ffffff-no-rj');
   });
 
+  it('tells a YouTube jewel gift apart from a membership gift', () => {
+    const el = htmlToElement(`
+      <yt-gift-message-view-model id="ChwKGkNGiftJewel1">
+        <div id="author-photo"><img src="https://yt4.ggpht.com/sender=s64" alt=""></div>
+        <div id="content">
+          <span id="author-name-v2">@冬川雪音サブ垢</span>
+          <span id="message-v2">ハイ を送信しました</span>
+          <img src="https://www.gstatic.com/youtube/img/pdg/gift/assets/yes_jp.png" alt="">
+        </div>
+      </yt-gift-message-view-model>
+    `);
+    const parsed = parseYtChatElement(el);
+    expect(parsed.kind).toBe('yt_gift');
+    expect(parsed.giftName).toBe('ハイ');
+    expect(parsed.giftImageUrl).toBe('https://www.gstatic.com/youtube/img/pdg/gift/assets/yes_jp.png');
+  });
+
   it('extracts concurrent viewer count from watch page strings', () => {
     expect(extractYtWatchConcurrentViewersFromText('1,234 人が視聴中')).toBe(1234);
     // 数字の連なり・あり得ない桁は読まない(2026-11-03 実機)
