@@ -92,7 +92,7 @@ copyFileSync(resolve(root, 'extension/dist/cloak-failsafe.js'), resolve(root, 'e
   copyReferencedImagesLater.push(vnOut);
 }
 // popup-entry.js が名前を組み立てて読むもの(文字列からは拾えない)は、置き場ごと写す
-for (const rel of ['images/avatar-parts', 'images/yukkuri-charactore-english', 'data', 'dist/avatar-face-worker.js']) {
+for (const rel of ['images/avatar-parts', 'images/yukkuri-charactore-english', 'data', 'sound', 'dist/avatar-face-worker.js']) {
   cpSync(resolve(root, 'extension', rel), resolve(root, 'extension-youtube', rel), { recursive: true });
 }
 
