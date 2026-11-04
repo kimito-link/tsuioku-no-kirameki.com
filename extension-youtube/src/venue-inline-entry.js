@@ -123,6 +123,7 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
   if (proto.__ytCrowdWrapped) return;
   proto.__ytCrowdWrapped = true;
   const realEnqueue = proto.enqueue;
+  let lastCrowdDiagAt = 0;
   proto.enqueue = function (/** @type {any[]} */ items) {
     if (!Array.isArray(items)) return realEnqueue.call(this, items);
     /** @type {any[]} */
@@ -152,6 +153,20 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
       keep.push(it);
     }
     const r = realEnqueue.call(this, keep);
+    // 計器は別のキーに書く(ニコ生版の読み上げ計器の保存は決まった項目だけを写すので、ここで足した数は残らない)
+    const now = Date.now();
+    if (now - lastCrowdDiagAt > 3000) {
+      lastCrowdDiagAt = now;
+      try {
+        if (isExtensionContextAlive()) {
+          void chrome.storage.local.set({
+            yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0 },
+          }).catch(() => {});
+        }
+      } catch {
+        /* 計器は読み上げを止めない */
+      }
+    }
     // 大事なものは古くなっても飛ばさない(列の中の印をギフトと同じ high にする)
     if (importantItems.length && Array.isArray(this.queue)) {
       const drops = new Set(importantItems.map((x) => x.onDropped).filter(Boolean));
