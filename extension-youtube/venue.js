@@ -2019,6 +2019,10 @@ ${sourceCol}
       if (!(el instanceof HTMLIFrameElement)) return;
       const m = String(el.getAttribute("src") || "").match(/^https:\/\/live\.nicovideo\.jp\/embed\/(lv\d+)/i);
       if (!m) return;
+      if (/[?&]overlay=1\b/.test(String(location.search || ""))) {
+        el.remove();
+        return;
+      }
       const vid = videoIdForPseudoLv(m[1].toLowerCase());
       if (!vid) {
         if (tries < 20) setTimeout(() => swapEmbed(el, tries + 1), 300);
@@ -2271,6 +2275,50 @@ ${sourceCol}
     };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
     else start();
+  }
+
+  // extension-youtube/src/ytVenueOverlayPrep.js
+  var YT_VENUE_OVERLAY = (() => {
+    try {
+      return new URLSearchParams(location.search).get("overlay") === "1";
+    } catch {
+      return false;
+    }
+  })();
+  try {
+    const sp = new URLSearchParams(location.search);
+    const vid = sp.get("vid");
+    if (vid && !sp.get("lv")) {
+      sp.set("lv", pseudoLvForVideoId(vid));
+      history.replaceState(null, "", `${location.pathname}?${sp.toString()}`);
+    }
+  } catch {
+  }
+  if (YT_VENUE_OVERLAY && typeof window !== "undefined" && window.parent !== window) {
+    const post = (msg) => {
+      try {
+        window.parent.postMessage({ source: "yt-venue", ...msg }, "https://www.youtube.com");
+      } catch {
+      }
+    };
+    window.close = () => post({ type: "close" });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") post({ type: "close" });
+    });
+    let last = "";
+    setInterval(() => {
+      for (const b of document.querySelectorAll("button")) {
+        if (b.textContent === "✕ タブを閉じる") b.textContent = "✕ 閉じる";
+      }
+      const el = document.querySelector(".nlsb-safe-area");
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+      const sig = JSON.stringify(rect);
+      if (sig === last) return;
+      last = sig;
+      post({ type: "safe-rect", rect });
+    }, 300);
   }
 
   // src/lib/storageRefreshTriggerKey.js
@@ -19745,7 +19793,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T07:15") : ""
+          buildId: true ? String("yt-2026-11-04T07:18") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
