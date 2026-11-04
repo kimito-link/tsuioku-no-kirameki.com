@@ -76,6 +76,21 @@ copyFileSync(resolve(root, 'extension/dist/cloak-failsafe.js'), resolve(root, 'e
   writeFileSync(resolve(root, 'extension-youtube/comeview.html'), cvOut, 'utf8');
   copyReferencedImagesLater.push(cvOut);
 }
+// 会場モードもニコ生版 venue.html の完全コピー(プログラムは venue-nico-entry.js)
+{
+  const vn = readFileSync(resolve(root, 'extension/venue.html'), 'utf8');
+  const from = '<script src="dist/venue.js"></script>';
+  if (!vn.includes(from)) throw new Error(`venue.html に ${from} がありません（ニコ生版の形が変わった?）`);
+  const vnOut = vn
+    .replace(from, '<script src="venue.js"></script>')
+    .replace(
+      '</html>',
+      '<!-- このファイルは scripts/build-youtube-sidepanel-html.mjs の生成物です（ニコ生版 extension/venue.html の完全コピー）。直接直さないでください。 -->\n</html>',
+    );
+  if (/src="dist\//.test(vnOut)) throw new Error('venue.html に知らない dist/ の読み込みがあります');
+  writeFileSync(resolve(root, 'extension-youtube/venue.html'), vnOut, 'utf8');
+  copyReferencedImagesLater.push(vnOut);
+}
 // popup-entry.js が名前を組み立てて読むもの(文字列からは拾えない)は、置き場ごと写す
 for (const rel of ['images/avatar-parts', 'images/yukkuri-charactore-english', 'data', 'dist/avatar-face-worker.js']) {
   cpSync(resolve(root, 'extension', rel), resolve(root, 'extension-youtube', rel), { recursive: true });
