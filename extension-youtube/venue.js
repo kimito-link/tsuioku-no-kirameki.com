@@ -1107,11 +1107,18 @@ ${sourceCol}
       ord.get(keyOf2(r, i))
     ) })).sort((a, b) => a.n - b.n).map((x) => x.r);
   }
+  function ytOwnerRowsLast(list, sum) {
+    const ch = String(sum?.broadcasterChannelId || "");
+    const handle = normName(sum?.broadcasterHandle);
+    const isOwner = (r) => Array.isArray(r?.badges) && r.badges.includes("owner") || !!ch && String(r?.channelId || "") === ch || !!handle && normName(r?.name) === handle;
+    if (!list.some(isOwner)) return list;
+    return [...list.filter((r) => !isOwner(r)), ...list.filter(isOwner)];
+  }
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
     const items = await getYtStreamCommentsByVideoId(vid);
-    const list = ytStableOrder(lv, Array.isArray(items) ? items : []);
+    const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
     const boardIconByName = /* @__PURE__ */ new Map();
     try {
       const lbKey = `yt_leaderboard_${vid}`;
@@ -1298,6 +1305,12 @@ ${sourceCol}
             return { ok: true, dataUrl: res.dataUrl, liveId: pseudoLvForVideoId(vid) };
           }
           return { ok: false, errorCode: String(res?.reason || "capture_failed") };
+        });
+      }
+      if (type === "NLS_EXPORT_INTERCEPT_CACHE") {
+        return realTabsGet(tabId).then((tab) => {
+          const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
+          return { ok: true, items: [], liveId: vid ? pseudoLvForVideoId(vid) : "", frameHref: String(tab?.url || "") };
         });
       }
       if (type === "NLS_POST_COMMENT") {
@@ -19649,7 +19662,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T06:47") : ""
+          buildId: true ? String("yt-2026-11-04T06:55") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
