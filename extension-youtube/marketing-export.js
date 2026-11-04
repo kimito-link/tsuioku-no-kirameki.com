@@ -1751,15 +1751,23 @@ ${sourceCol}
   function startDomFixer() {
     if (!document.body) return;
     fixSubtree(document.body);
-    let fixedAtVersion = uidRegVersion;
-    setInterval(() => {
-      if (fixedAtVersion === uidRegVersion || document.hidden) return;
-      fixedAtVersion = uidRegVersion;
-      try {
-        fixSubtree(document.body);
-      } catch {
-      }
-    }, 2e3);
+    if (/\/venue\.html$/.test(String(location.pathname || ""))) {
+      let fixedAtVersion = uidRegVersion;
+      setInterval(() => {
+        if (fixedAtVersion === uidRegVersion || document.hidden) return;
+        fixedAtVersion = uidRegVersion;
+        try {
+          const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          for (let n = w.nextNode(); n; n = w.nextNode()) {
+            if (/8\d{9}/.test(String(n.nodeValue || ""))) fixTextNode(
+              /** @type {Text} */
+              n
+            );
+          }
+        } catch {
+        }
+      }, 2e3);
+    }
     new MutationObserver((muts) => {
       if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, [data-yt-all]")))) scheduleTopFanRest();
       for (const m of muts) {
