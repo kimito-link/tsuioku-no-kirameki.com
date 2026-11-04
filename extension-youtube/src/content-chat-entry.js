@@ -338,7 +338,15 @@ function readStreamStartedAt(videoId) {
       const scope = metas[i].closest('[itemscope]') || document;
       const idMeta = scope.querySelector('meta[itemprop="identifier"], meta[itemprop="videoId"]');
       const id = String(idMeta?.getAttribute('content') || '');
-      if (id && id !== videoId) continue;
+      // ページ内で別の動画へ移ると、この欄が前の動画のまま残ることがある(2026-11-04 実機: 前のアーカイブの
+      // 開始日が次の配信に移り「経過 376時間」)。どの動画の欄か確かめられないときは読まない。
+      if (id) {
+        if (id !== videoId) continue;
+      } else {
+        const urlEl = scope.querySelector('link[itemprop="url"], meta[itemprop="url"], link[itemprop="embedUrl"]');
+        const url = String(urlEl?.getAttribute('href') || urlEl?.getAttribute('content') || '');
+        if (!videoId || !url.includes(videoId)) continue;
+      }
       const ms = Date.parse(String(metas[i].getAttribute('content') || ''));
       if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) return ms;
     }

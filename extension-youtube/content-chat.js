@@ -628,7 +628,13 @@
         const scope = metas[i].closest("[itemscope]") || document;
         const idMeta = scope.querySelector('meta[itemprop="identifier"], meta[itemprop="videoId"]');
         const id = String(idMeta?.getAttribute("content") || "");
-        if (id && id !== videoId) continue;
+        if (id) {
+          if (id !== videoId) continue;
+        } else {
+          const urlEl = scope.querySelector('link[itemprop="url"], meta[itemprop="url"], link[itemprop="embedUrl"]');
+          const url = String(urlEl?.getAttribute("href") || urlEl?.getAttribute("content") || "");
+          if (!videoId || !url.includes(videoId)) continue;
+        }
         const ms = Date.parse(String(metas[i].getAttribute("content") || ""));
         if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) return ms;
       }
