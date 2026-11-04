@@ -990,6 +990,183 @@
     return out;
   }
 
+  // extension-youtube/src/background-nico-relay.js
+  var OPEN_COMEVIEW_MESSAGE_TYPE = "NLS_OPEN_COMEVIEW";
+  var COMEVIEW_LV_RE = /^lv\d{1,15}$/;
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || msg.type !== OPEN_COMEVIEW_MESSAGE_TYPE) return void 0;
+    if (!sender || sender.id !== chrome.runtime.id) {
+      try {
+        sendResponse({ ok: false });
+      } catch {
+      }
+      return false;
+    }
+    const reply = (v) => {
+      try {
+        sendResponse(v);
+      } catch {
+      }
+    };
+    const lv = COMEVIEW_LV_RE.test(String(msg.liveId || "")) ? String(msg.liveId) : "";
+    const base = chrome.runtime.getURL("comeview.html");
+    const url = lv ? `${base}?lv=${lv}` : base;
+    (async () => {
+      try {
+        await chrome.windows.create({ url, type: "popup", width: 400, height: 640 });
+        reply({ ok: true });
+      } catch (err) {
+        reply({ ok: false, error: String(err && err.message) });
+      }
+    })();
+    return true;
+  });
+  var OPEN_VENUE_MESSAGE_TYPE = "NLS_OPEN_VENUE";
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || msg.type !== OPEN_VENUE_MESSAGE_TYPE) return void 0;
+    if (!sender || sender.id !== chrome.runtime.id) {
+      try {
+        sendResponse({ ok: false });
+      } catch {
+      }
+      return false;
+    }
+    const reply = (v) => {
+      try {
+        sendResponse(v);
+      } catch {
+      }
+    };
+    const lv = COMEVIEW_LV_RE.test(String(msg.liveId || "")) ? String(msg.liveId) : "";
+    const base = chrome.runtime.getURL("venue.html");
+    const url = lv ? `${base}?lv=${lv}` : base;
+    (async () => {
+      try {
+        await chrome.windows.create({ url, type: "popup", width: 1e3, height: 720 });
+        reply({ ok: true });
+      } catch (err) {
+        reply({ ok: false, error: String(err && err.message) });
+      }
+    })();
+    return true;
+  });
+  chrome.runtime.onConnect.addListener((port) => {
+    if (!port || port.name !== "NLS_VOICEVOX_STREAM") return;
+    if (!port.sender || port.sender.id !== chrome.runtime.id) {
+      try {
+        port.disconnect();
+      } catch {
+      }
+      return;
+    }
+    const controller = new AbortController();
+    let closed = false;
+    const send = (m) => {
+      if (closed) return;
+      try {
+        port.postMessage(m);
+      } catch {
+        closed = true;
+        controller.abort();
+      }
+    };
+    port.onDisconnect.addListener(() => {
+      closed = true;
+      controller.abort();
+    });
+    port.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== "start") return;
+      let targetUrl;
+      try {
+        targetUrl = new URL(String(msg.url || ""));
+      } catch {
+        send({ type: "error", error: "Invalid URL" });
+        return;
+      }
+      if (!(targetUrl.hostname === "127.0.0.1" && targetUrl.port === "50021" && targetUrl.pathname === "/streaming_synthesis")) {
+        send({ type: "error", error: "URL not allowed" });
+        return;
+      }
+      const init = { ...msg.init || {}, signal: controller.signal };
+      fetch(targetUrl.toString(), init).then(async (res) => {
+        send({ type: "head", ok: res.ok, status: res.status });
+        if (!res.ok || !res.body) {
+          send({ type: "end" });
+          return;
+        }
+        const reader = res.body.getReader();
+        for (; ; ) {
+          const { done, value } = await reader.read();
+          if (done || closed) break;
+          send({ type: "chunk", data: Array.from(value) });
+        }
+        send({ type: "end" });
+      }).catch((err) => send({ type: "error", error: String(err && err.message || err) }));
+    });
+  });
+  var voiceEngineLastActivityAt = 0;
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || msg.type !== "NLS_VOICE_ENGINE_ACTIVITY" && msg.type !== "NLS_VOICE_ENGINE_QUIET") return void 0;
+    if (!sender || sender.id !== chrome.runtime.id) return void 0;
+    if (msg.type === "NLS_VOICE_ENGINE_ACTIVITY") voiceEngineLastActivityAt = Date.now();
+    sendResponse({ quietMs: voiceEngineLastActivityAt > 0 ? Date.now() - voiceEngineLastActivityAt : 1e9 });
+    return false;
+  });
+  var voiceReaderByLive = /* @__PURE__ */ new Map();
+  var VOICE_READER_LEASE_TTL_MS = 6e3;
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || msg.type !== "NLS_VOICE_READER_CLAIM" && msg.type !== "NLS_VOICE_READER_RELEASE") return void 0;
+    if (!sender || sender.id !== chrome.runtime.id) return void 0;
+    const holder = String(msg.holder || "");
+    if (msg.type === "NLS_VOICE_READER_RELEASE") {
+      for (const [lv2, cur2] of voiceReaderByLive) if (cur2.holder === holder) voiceReaderByLive.delete(lv2);
+      sendResponse({ ok: true });
+      return false;
+    }
+    const lv = String(msg.liveId || "").trim().toLowerCase();
+    const now = Date.now();
+    const cur = voiceReaderByLive.get(lv);
+    let granted = true;
+    if (lv && holder) {
+      if (!cur || cur.holder === holder || now - cur.at > VOICE_READER_LEASE_TTL_MS) voiceReaderByLive.set(lv, { holder, at: now });
+      else granted = false;
+    }
+    sendResponse({ granted });
+    return false;
+  });
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || msg.type !== "NLS_FETCH_PROXY") return void 0;
+    if (!sender || sender.id !== chrome.runtime.id) return void 0;
+    let targetUrl;
+    try {
+      targetUrl = new URL(String(msg.url || ""));
+    } catch {
+      sendResponse({ error: "Invalid URL" });
+      return true;
+    }
+    const allowed = targetUrl.hostname === "127.0.0.1" && targetUrl.port === "50021" || targetUrl.hostname === "127.0.0.1" && targetUrl.port === "3456" || targetUrl.hostname === "localhost" && targetUrl.port === "3456";
+    if (!allowed) {
+      sendResponse({ error: "URL not allowed" });
+      return true;
+    }
+    fetch(msg.url, msg.init).then((res) => {
+      if (msg.wantBuffer) {
+        return res.arrayBuffer().then((buf) => ({
+          ok: res.ok,
+          status: res.status,
+          buffer: Array.from(new Uint8Array(buf))
+        }));
+      } else {
+        return res.text().then((text) => ({
+          ok: res.ok,
+          status: res.status,
+          text
+        }));
+      }
+    }).then((data) => sendResponse(data)).catch((err) => sendResponse({ error: err.message }));
+    return true;
+  });
+
   // src/lib/youtube/ytPageMeta.js
   var VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   function parseYtVideoIdFromUrl(rawUrl) {
@@ -1360,6 +1537,12 @@
   }
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message.type !== "string") return false;
+    if (message.type === "YT_GET_STREAM_COMMENTS") {
+      if (!sender || sender.id !== chrome.runtime.id) return false;
+      const vid = String(message.videoId || "");
+      getYtStreamCommentsByVideoId(vid).then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] })).catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
+      return true;
+    }
     if (message.type === "YT_CAPTURE_FRAME") {
       (async () => {
         const want = String(message.videoId || "");

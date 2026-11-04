@@ -717,6 +717,7 @@ ${sourceCol}
 
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
+  var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
   var COMMENTS_PREFIX = "nls_comments_";
   var TAIL_PREFIX = "nls_ctail_";
   var LAST_WATCH_URL_KEY = "nls_last_watch_url";
@@ -1005,10 +1006,18 @@ ${sourceCol}
     if (!list.some(isOwner)) return list;
     return [...list.filter((r) => !isOwner(r)), ...list.filter(isOwner)];
   }
+  async function getCommentsViaBackground(vid) {
+    try {
+      const res = await real?.runtime?.sendMessage?.({ type: "YT_GET_STREAM_COMMENTS", videoId: vid });
+      return Array.isArray(res?.items) ? res.items : [];
+    } catch {
+      return [];
+    }
+  }
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
-    const items = await getYtStreamCommentsByVideoId(vid);
+    const items = YT_SHIM_IN_PAGE ? await getCommentsViaBackground(vid) : await getYtStreamCommentsByVideoId(vid);
     const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
     const boardIconByName = /* @__PURE__ */ new Map();
     try {
@@ -1074,7 +1083,7 @@ ${sourceCol}
     /** @type {any} */
     globalThis.chrome
   );
-  if (real && real.storage && real.storage.local && real.tabs) {
+  if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)) {
     const realLocal = real.storage.local;
     const realGet = realLocal.get.bind(realLocal);
     const knownVideosReady = Promise.resolve(realGet(KEY_YT_SUMMARIES)).then((bag) => {
@@ -1190,85 +1199,87 @@ ${sourceCol}
       }
       return p;
     };
-    const wrapTabsFn = (fn) => {
-      return (...args) => {
+    if (real.tabs) {
+      const wrapTabsFn = (fn) => {
+        return (...args) => {
+          const cb = typeof args[args.length - 1] === "function" ? args.pop() : null;
+          const p = Promise.resolve(fn.apply(real.tabs, args)).then(
+            (res) => Array.isArray(res) ? res.map(mapTab) : mapTab(res)
+          );
+          if (cb) {
+            p.then(cb, () => cb(void 0));
+            return void 0;
+          }
+          return p;
+        };
+      };
+      const realTabsGetFn = real.tabs.get.bind(real.tabs);
+      const realTabsGet = (id) => Promise.resolve(realTabsGetFn(id));
+      real.tabs.query = wrapTabsFn(real.tabs.query);
+      real.tabs.get = wrapTabsFn(real.tabs.get);
+      const realSendMessage = real.tabs.sendMessage.bind(real.tabs);
+      const answerForYtTab = (tabId, message) => {
+        const type = String(message?.type || "");
+        if (type === "NLS_EXPORT_WATCH_SNAPSHOT") {
+          return realTabsGet(tabId).then(async (tab) => {
+            const url = String(tab?.url || "");
+            const vid = parseYtVideoIdFromUrl(url);
+            if (!vid) return { ok: false, error: "not_youtube" };
+            const bag = await realGet(KEY_YT_SUMMARIES);
+            const sum = bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid] || {};
+            const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => void 0);
+            const snapshot = (
+              /** @type {Record<string, any>} */
+              ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ""), bag && bag[KEY_YT_SUMMARIES] || {})
+            );
+            if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
+            return { ok: true, snapshot };
+          });
+        }
+        if (type === "NLS_CAPTURE_SCREENSHOT") {
+          return realTabsGet(tabId).then(async (tab) => {
+            const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
+            const res = await real.runtime.sendMessage({ type: "YT_CAPTURE_FRAME", videoId: vid });
+            if (res && res.ok && typeof res.dataUrl === "string") {
+              return { ok: true, dataUrl: res.dataUrl, liveId: pseudoLvForVideoId(vid) };
+            }
+            return { ok: false, errorCode: String(res?.reason || "capture_failed") };
+          });
+        }
+        if (type === "NLS_EXPORT_INTERCEPT_CACHE") {
+          return realTabsGet(tabId).then((tab) => {
+            const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
+            return { ok: true, items: [], liveId: vid ? pseudoLvForVideoId(vid) : "", frameHref: String(tab?.url || "") };
+          });
+        }
+        if (type === "NLS_POST_COMMENT") {
+          return realTabsGet(tabId).then(async (tab) => {
+            const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
+            const res = await real.runtime.sendMessage({ type: "YT_SEND_COMMENT", videoId: vid, text: String(message?.text || "") });
+            return res && res.ok ? { ok: true } : { ok: false, error: String(res?.reason || res?.error || "send_failed") };
+          });
+        }
+        return null;
+      };
+      real.tabs.sendMessage = (...args) => {
         const cb = typeof args[args.length - 1] === "function" ? args.pop() : null;
-        const p = Promise.resolve(fn.apply(real.tabs, args)).then(
-          (res) => Array.isArray(res) ? res.map(mapTab) : mapTab(res)
-        );
+        const [tabId, message] = args;
+        const p = realTabsGet(tabId).then((tab) => isYtWatchLikeUrl(String(tab?.url || "")) ? answerForYtTab(tabId, message) : null).catch(() => null).then((answered) => answered ? answered : realSendMessage(...args));
         if (cb) {
           p.then(cb, () => cb(void 0));
           return void 0;
         }
         return p;
       };
-    };
-    const realTabsGetFn = real.tabs.get.bind(real.tabs);
-    const realTabsGet = (id) => Promise.resolve(realTabsGetFn(id));
-    real.tabs.query = wrapTabsFn(real.tabs.query);
-    real.tabs.get = wrapTabsFn(real.tabs.get);
-    const realSendMessage = real.tabs.sendMessage.bind(real.tabs);
-    const answerForYtTab = (tabId, message) => {
-      const type = String(message?.type || "");
-      if (type === "NLS_EXPORT_WATCH_SNAPSHOT") {
-        return realTabsGet(tabId).then(async (tab) => {
-          const url = String(tab?.url || "");
-          const vid = parseYtVideoIdFromUrl(url);
-          if (!vid) return { ok: false, error: "not_youtube" };
-          const bag = await realGet(KEY_YT_SUMMARIES);
-          const sum = bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid] || {};
-          const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => void 0);
-          const snapshot = (
-            /** @type {Record<string, any>} */
-            ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ""), bag && bag[KEY_YT_SUMMARIES] || {})
-          );
-          if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
-          return { ok: true, snapshot };
+      for (const evName of ["onUpdated", "onCreated"]) {
+        const ev = real.tabs[evName];
+        if (!ev || typeof ev.addListener !== "function") continue;
+        const add = ev.addListener.bind(ev);
+        ev.addListener = (fn) => add((...a) => {
+          const out = a.map((x) => x && typeof x === "object" && "url" in x ? mapTab(x) : x);
+          return fn(...out);
         });
       }
-      if (type === "NLS_CAPTURE_SCREENSHOT") {
-        return realTabsGet(tabId).then(async (tab) => {
-          const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
-          const res = await real.runtime.sendMessage({ type: "YT_CAPTURE_FRAME", videoId: vid });
-          if (res && res.ok && typeof res.dataUrl === "string") {
-            return { ok: true, dataUrl: res.dataUrl, liveId: pseudoLvForVideoId(vid) };
-          }
-          return { ok: false, errorCode: String(res?.reason || "capture_failed") };
-        });
-      }
-      if (type === "NLS_EXPORT_INTERCEPT_CACHE") {
-        return realTabsGet(tabId).then((tab) => {
-          const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
-          return { ok: true, items: [], liveId: vid ? pseudoLvForVideoId(vid) : "", frameHref: String(tab?.url || "") };
-        });
-      }
-      if (type === "NLS_POST_COMMENT") {
-        return realTabsGet(tabId).then(async (tab) => {
-          const vid = parseYtVideoIdFromUrl(String(tab?.url || ""));
-          const res = await real.runtime.sendMessage({ type: "YT_SEND_COMMENT", videoId: vid, text: String(message?.text || "") });
-          return res && res.ok ? { ok: true } : { ok: false, error: String(res?.reason || res?.error || "send_failed") };
-        });
-      }
-      return null;
-    };
-    real.tabs.sendMessage = (...args) => {
-      const cb = typeof args[args.length - 1] === "function" ? args.pop() : null;
-      const [tabId, message] = args;
-      const p = realTabsGet(tabId).then((tab) => isYtWatchLikeUrl(String(tab?.url || "")) ? answerForYtTab(tabId, message) : null).catch(() => null).then((answered) => answered ? answered : realSendMessage(...args));
-      if (cb) {
-        p.then(cb, () => cb(void 0));
-        return void 0;
-      }
-      return p;
-    };
-    for (const evName of ["onUpdated", "onCreated"]) {
-      const ev = real.tabs[evName];
-      if (!ev || typeof ev.addListener !== "function") continue;
-      const add = ev.addListener.bind(ev);
-      ev.addListener = (fn) => add((...a) => {
-        const out = a.map((x) => x && typeof x === "object" && "url" in x ? mapTab(x) : x);
-        return fn(...out);
-      });
     }
     const onChanged = real.storage.onChanged;
     if (onChanged && typeof onChanged.addListener === "function") {
@@ -1358,7 +1369,7 @@ ${sourceCol}
         try {
           if (!real.runtime?.id) {
             clearInterval(pollTimer);
-            try {
+            if (!YT_SHIM_IN_PAGE) try {
               const last = Number(sessionStorage.getItem("nl_yt_page_orphan_reload_at") || 0);
               if (Date.now() - last > 6e4) {
                 sessionStorage.setItem("nl_yt_page_orphan_reload_at", String(Date.now()));
@@ -1506,7 +1517,9 @@ ${sourceCol}
   var SC_BUBBLE_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E") center/70% no-repeat`;
   function rewordTopFanHeadings(reword) {
     if (typeof document === "undefined" || !document.body) return;
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const base = YT_SHIM_IN_PAGE ? document.getElementById("nlsb-venue-root") : document.body;
+    if (!base) return;
+    const walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT);
     let n;
     while (n = walker.nextNode()) {
       const v = String(n.nodeValue || "");
@@ -1794,15 +1807,27 @@ ${sourceCol}
     body.appendChild(det);
   }
   function startDomFixer() {
+    if (YT_SHIM_IN_PAGE) {
+      const root = document.getElementById("nlsb-venue-root");
+      if (!root) {
+        setTimeout(startDomFixer, 500);
+        return;
+      }
+      startDomFixerOn(root, true);
+      return;
+    }
     if (!document.body) return;
-    fixSubtree(document.body);
-    if (/\/venue\.html$/.test(String(location.pathname || ""))) {
+    startDomFixerOn(document.body, /\/venue\.html$/.test(String(location.pathname || "")));
+  }
+  function startDomFixerOn(target, isVenue) {
+    fixSubtree(target);
+    if (isVenue) {
       let fixedAtVersion = uidRegVersion;
       setInterval(() => {
         if (fixedAtVersion === uidRegVersion || document.hidden) return;
         fixedAtVersion = uidRegVersion;
         try {
-          const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          const w = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
           for (let n = w.nextNode(); n; n = w.nextNode()) {
             if (/8\d{9}/.test(String(n.nodeValue || ""))) fixTextNode(
               /** @type {Text} */
@@ -1831,7 +1856,7 @@ ${sourceCol}
           else if (m.attributeName === "data-nl-uid") fixUidLabelAttr(el);
         } else m.addedNodes.forEach(fixSubtree);
       }
-    }).observe(document.body, {
+    }).observe(target, {
       childList: true,
       subtree: true,
       characterData: true,
