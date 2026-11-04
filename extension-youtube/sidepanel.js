@@ -750,9 +750,11 @@ ${sourceCol}
     ["配信ページを開いたまま記録すると取得できます", "YouTube には来場者数がありません"],
     ["手元記録の発言者数（来場者数が未取得のため参加率は出せません）", "手元記録の発言者数"],
     ["広告ランキング未取得（配信ページで記録）", "YouTube に広告ランキングなし"],
-    ["来場者数が未取得のため、来場とコメントの変換率は判定できません。", "YouTube には来場者数がないため、来場とコメントの変換率は出しません。"]
+    ["来場者数が未取得のため、来場とコメントの変換率は判定できません。", "YouTube には来場者数がないため、来場とコメントの変換率は出しません。"],
+    // 「ページの通信から人の情報をもらう」取り込みは YouTube では使わない(記録に名前と顔が入っている)。0件は正常
+    ["取り込みは成功しましたが0件でした。watchを開いたままポップアップを更新するか、ページを再読み込みしてください。", "YouTube 版では使いません（記録に名前と顔が入っているため・正常）。"]
   ];
-  var QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング/;
+  var QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした/;
   function ytWording(text, opts = {}) {
     const v = String(text ?? "");
     if (!QUICK.test(v)) return v;
@@ -1458,6 +1460,25 @@ ${sourceCol}
         }
       }
       return bag;
+    };
+    const realSet = realLocal.set.bind(realLocal);
+    realLocal.set = (items, cb) => {
+      try {
+        const m = items && items.nls_stat_cards_mirror_v1;
+        if (m && typeof m === "object" && m.official && typeof m.official === "object") {
+          items = {
+            ...items,
+            nls_stat_cards_mirror_v1: {
+              ...m,
+              official: { ...m.official, viewers: { text: "—", isPlaceholder: true } }
+            }
+          };
+          const st = items.nls_stat_cards_mirror_v1.official;
+          if (typeof st.summaryText === "string") st.summaryText = st.summaryText.replace(/来[\d,]+\s*·\s*/, "");
+        }
+      } catch {
+      }
+      return realSet(items, cb);
     };
     realLocal.get = (keys, cb) => {
       const p = shimGet(keys);
@@ -46103,7 +46124,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T07:05" ? String("yt-2026-11-04T07:05") : "dev";
+      const buildId = "yt-2026-11-04T07:12" ? String("yt-2026-11-04T07:12") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46121,7 +46142,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.66") : "";
+    const bundledVersion = true ? String("0.1.67") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46166,7 +46187,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T07:05" ? String("yt-2026-11-04T07:05") : "dev";
+            return "yt-2026-11-04T07:12" ? String("yt-2026-11-04T07:12") : "dev";
           } catch {
             return "dev";
           }

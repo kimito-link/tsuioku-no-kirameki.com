@@ -649,6 +649,28 @@ if (real && real.storage && real.storage.local && real.tabs) {
     }
     return bag;
   };
+  // 数字カードの写し(状態速報・会場が読む)にも、来場は「—」で書く。YouTube に延べの来場者数は無く、
+  //   ニコ生版の部品が同接の数を来場として写していた(2026-11-04 計器: official.viewers が同接と同じ 1,065)。
+  const realSet = realLocal.set.bind(realLocal);
+  realLocal.set = (/** @type {any} */ items, /** @type {any} */ cb) => {
+    try {
+      const m = items && items.nls_stat_cards_mirror_v1;
+      if (m && typeof m === 'object' && m.official && typeof m.official === 'object') {
+        items = {
+          ...items,
+          nls_stat_cards_mirror_v1: {
+            ...m,
+            official: { ...m.official, viewers: { text: '—', isPlaceholder: true } },
+          },
+        };
+        const st = items.nls_stat_cards_mirror_v1.official;
+        if (typeof st.summaryText === 'string') st.summaryText = st.summaryText.replace(/来[\d,]+\s*·\s*/, '');
+      }
+    } catch {
+      /* 直せなくても書き込みは止めない */
+    }
+    return realSet(items, cb);
+  };
   realLocal.get = (/** @type {any} */ keys, /** @type {any} */ cb) => {
     const p = shimGet(keys);
     if (typeof cb === 'function') {
