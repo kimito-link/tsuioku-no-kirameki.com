@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1860',
+    date: '2026-11-04',
+    summary: '吹き出しの一気出しを数える計器',
+    items: Object.freeze([
+      '会場で吹き出しが一度にたくさん出たとき、それが「本当にコメントが一気に来た」のか、「過去ログの取り込みで昔のコメントがまとめて流れた」のか、「書き込み待ちで溜まった分がまとめて届いた」のかを数えて、状態速報に1行で出すようにしました。見た目や動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1858',
     date: '2026-11-04',
     summary: 'マーケHTMLを撮り直せないのを直す',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'コメントを流す間は画面を消さない',
     items: Object.freeze([
       'iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1836',
-    date: '2026-10-31',
-    summary: 'つなぎ直しで同じコメントが二重に出ないように',
-    items: Object.freeze([
-      'iPhone アプリの「💬 コメントを流す」で、通信が切れて自動でつなぎ直したとき、直前のコメントがもう一度並ぶことがありました。一度並べたコメントとギフトは二度並べないようにしました。'
     ])
   })
 ]);

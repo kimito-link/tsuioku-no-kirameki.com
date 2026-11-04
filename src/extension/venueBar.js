@@ -159,6 +159,8 @@ import {
   observeVenueBubbleRemoval,
   toVenueBubbleChurnDiag
 } from '../lib/venueBubbleChurn.js';
+// 2026-11-04 計器(観測のみ): 吹き出しが「一気に出る」束を経路・取り込み元・実際の流量と並べて数える。
+import { createVenueBubbleBurstState, observeVenueSpeechBatch, toVenueBubbleBurstDiag } from '../lib/venueBubbleBurst.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 // v0.1.1118 鏡enrich(P4): ①が解決済みの顔URL(鏡displaySrc)を追加のenrich源にする(新規readゼロ)。
 import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../lib/venueMirrorAvatarEnrich.js';
@@ -3717,6 +3719,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-21 応援TOP吹き出しchurn計器(診断先行アプローチ): 生成頻度・寿命分布・強制退去を
   //   累積で数える(観測のみ・修正はしない)。
   const _bubbleChurn = createVenueBubbleChurnState();
+  const _bubbleBurst = createVenueBubbleBurstState();
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
   let _topBarShownOnce = false;
@@ -6183,6 +6186,8 @@ export function mountVenueBarButton(options = {}) {
       tileCountCensus: toVenueTileCountDiag(_tileCountCensus, Date.now()),
       // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
       bubbleChurn: toVenueBubbleChurnDiag(_bubbleChurn),
+      // 2026-11-04 計器: 吹き出しが一気に出た束(過去ログ/まとめ届き/本当に一気)。★ここに載せないと状態速報に出ない。
+      bubbleBurst: toVenueBubbleBurstDiag(_bubbleBurst, Date.now()),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now()),
       // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。ユーザー報告
       //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため。
@@ -6704,8 +6709,12 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.752: storage poll とリアルタイム live feed の両方が通る共通処理。引数 rows から
   //   新着発言を抽出(pickNewVenueSpeech)→席へマージ→吹き出し+読み上げ。両経路が同じ
   //   speechState.seenKeys を共有するので、同じコメントが poll と live で来ても1回だけ吹く。
-  /** @param {Array<Record<string, any>>} rows */
-  const processSpeechRows = (rows) => {
+  /**
+   * @param {Array<Record<string, any>>} rows
+   * @param {string} [path] 計器用: live(同じタブの即時経路)/tail(テール書き込み)/poll(storage 再読込)
+   * @param {string} [source] 計器用: 取り込み元(ndgr/ndgr_forward/backfill/deep…・live 経路のみ)
+   */
+  const processSpeechRows = (rows, path = 'unknown', source = '') => {
     // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
     applyVenueHeat(rows);
     // 「会話の連鎖」: 発言が途切れた人のストリークを掃除(席のグローが自然に消える)。
@@ -6771,6 +6780,7 @@ export function mountVenueBarButton(options = {}) {
         commitDisplay(baseRows);
       }
     }
+    let _burstShown = 0;
     for (const speech of result.speeches) {
       // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
       //   旧実装は読み上げON時に onPlayStart(声の再生開始)で吹き出していたが、VOICEVOXが
@@ -6778,6 +6788,7 @@ export function mountVenueBarButton(options = {}) {
       //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
       //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
       const bubble = showSpeechBubble(speech);
+      if (bubble) _burstShown += 1;
       // v0.1.778: ギフト/広告コメントなら投げ主のサムネから中央映像へアイテムを投げる。
       maybeThrowGiftFromSpeech(speech);
       // 2026-07-06: 来場システムメッセージならパチンコ入賞演出(保留玉が入る)として投げる。
@@ -6820,6 +6831,13 @@ export function mountVenueBarButton(options = {}) {
         else venueReaderLease.whenMine(liveIdFromPathname(), voiceIt, () => { if (bubble) markBubbleResolved(bubble); voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1; });
       }
     }
+    // 2026-11-04 計器(観測のみ): この束で何件吹いたか・経路・取り込み元・その時の配信の流量。
+    try {
+      observeVenueSpeechBatch(_bubbleBurst, {
+        at: Date.now(), path, source, rows, speeches: result.speeches,
+          fresh: Number(result.freshCount) || 0, shown: _burstShown
+      });
+    } catch { /* 計器失敗は描画を止めない */ }
   };
 
   // v0.1.754 ストリーム駆動在席: 在席 Map の変更を rAF で集約して席へ反映。コメント怒涛でも
@@ -6851,15 +6869,16 @@ export function mountVenueBarButton(options = {}) {
   /**
    * @param {string} incomingLiveId
    * @param {ReadonlyArray<Record<string, unknown>>} rows
+   * @param {string} [source] 計器用: 取り込み元(persistCommentRows の source)
    */
-  const onLiveComments = (incomingLiveId, rows) => {
+  const onLiveComments = (incomingLiveId, rows, source = '') => {
     if (!open) return; // 閉じている間は何もしない(開いた時に pollSpeech が storage から再シード)
     const cur = liveIdFromPathname();
     if (!cur || cur !== incomingLiveId) return; // 配信切替中の遅延コールバックは捨てる
     if (speechLiveId !== cur) resetSpeechTracking(cur); // pollSpeech と同じ追従
     const feedRows = liveFeedSpeechRows(rows);
     if (feedRows.length === 0) return;
-    processSpeechRows(feedRows); // 吹き出し/読み上げ(従来どおり)
+    processSpeechRows(feedRows, 'live', String(source || '')); // 吹き出し/読み上げ(従来どおり)
     // v0.1.754: 在席は「通過した瞬間に touch」。storage 集計を待たない=3時間でも O(席数)。
     //   touchRoster が requireText/userId を内部で守る(匿名/本文空は席に入れない・v0.1.740)。
     if (!rosterDriven) return;
@@ -6906,7 +6925,7 @@ export function mountVenueBarButton(options = {}) {
       const summary = /** @type {{ recent?: unknown }|undefined} */ (bag?.[summaryKey]);
       const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
       const rows = tailRows.length > 0 ? tailRows : recentRows;
-      processSpeechRows(rows);
+      processSpeechRows(rows, 'poll');
       const aggregatePoints = bag?.[giftPointsAggregateKey];
       if (typeof aggregatePoints === 'number') handleGiftPointsAggregate(aggregatePoints);
       if (panelKey) {
@@ -6941,7 +6960,7 @@ export function mountVenueBarButton(options = {}) {
     //   storage.local.get 再取得=1往復の遅延)していた。tail が変わったら newValue を直接
     //   processSpeechRows へ渡し、再取得を省いて即座に吹き出し/読み上げする(コメビュと同経路)。
     if (changes[tailKey] && Array.isArray(changes[tailKey].newValue)) {
-      processSpeechRows(/** @type {Array<Record<string, any>>} */ (changes[tailKey].newValue));
+      processSpeechRows(/** @type {Array<Record<string, any>>} */ (changes[tailKey].newValue), 'tail');
     } else if (changes[tailKey] || changes[summaryKey]) {
       // tail が無い(summary だけ等)時は従来どおり storage から読む保険。
       void pollSpeech();

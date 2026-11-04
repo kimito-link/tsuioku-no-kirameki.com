@@ -82,7 +82,8 @@ export function liveFeedSpeechRows(rows) {
  * @returns {{
  *   speeches: Array<{ key: string, speakerKey: string, userId: string, name: string, text: string, capturedAt: number }>,
  *   seenKeys: Set<string>,
- *   primed: boolean
+ *   primed: boolean,
+ *   freshCount?: number
  * }}
  *   speeches=新着発言(初回や該当なしは空)。seenKeys/primed=次回呼び出しに渡す更新後の状態。
  */
@@ -121,7 +122,7 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
       seen.add(s.key);
     }
     if (primeEmit <= 0) {
-      return { speeches: [], seenKeys: seen, primed: true };
+      return { speeches: [], seenKeys: seen, primed: true, freshCount: 0 };
     }
   }
 
@@ -154,10 +155,12 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
     return {
       speeches,
       seenKeys: new Set(arr.slice(arr.length - SEEN_CAP)),
-      primed: true
+      primed: true,
+      freshCount: fresh.length
     };
   }
-  return { speeches, seenKeys: seen, primed: true };
+  // freshCount: maxEmit で切る前の新着数(計器 venueBubbleBurst 用・挙動には使わない)。
+  return { speeches, seenKeys: seen, primed: true, freshCount: fresh.length };
 }
 
 /**
