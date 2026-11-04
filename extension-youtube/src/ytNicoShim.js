@@ -20,6 +20,7 @@ import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopF
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
+import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -34,6 +35,13 @@ const COMMENTS_PREFIX = 'nls_comments_';
 // テールにも全件を渡す(popup が既存の重複畳み込み=mergeTailRowsIntoDisplay で控えと重ねて、増えた分だけが足される)。
 // これが無いと、控えのまま件数も最新コメントも止まる(0.1.11 までの「リアルタイムで反映されない」)。
 const TAIL_PREFIX = 'nls_ctail_';
+// ニコ生版のテールは最新 TAIL_MAX_ROWS(2,000)件まで(commentTailBuffer.js)。会場は読んだコメントを最新 4,000 件まで覚えて
+//   (venueSpeech.js SEEN_CAP)、それより古いものは忘れる。YouTube 版がテールに全件(例 7,451件)を渡すと、忘れた古いコメントを
+//   新しいと思って何度も吹き出し・読み上げていた(2026-11-04 りんく実機「同じ言葉を連呼」「吹き出しが出すぎ」・計器 1分2,051件)。
+//   会場(視聴ページの中・venue.html)には、ニコ生版と同じく最新 2,000 件だけをテールとして渡す。
+const IS_VENUE_CONTEXT = YT_SHIM_IN_PAGE || (typeof location !== 'undefined' && /\/venue\.html$/.test(String(location.pathname || '')));
+/** @param {any[]} arr */
+const tailForContext = (arr) => (IS_VENUE_CONTEXT && Array.isArray(arr) && arr.length > TAIL_MAX_ROWS ? arr.slice(arr.length - TAIL_MAX_ROWS) : arr);
 const LAST_WATCH_URL_KEY = 'nls_last_watch_url';
 /** @param {Record<string, any> | undefined} sums yt_stream_summaries */
 function newestVideoIdOf(sums) {
@@ -671,7 +679,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           lastAskedLv = lv;
           shimDiag.commentGets += 1;
           const arr = await buildCommentsForLv(lv);
-          if (arr) bag[k] = arr;
+          if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
           continue;
         }
         const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));
@@ -877,7 +885,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       if (lastNotified.get(lv) === sig) return;
       lastNotified.set(lv, sig);
       /** @type {Record<string, { newValue: any }>} */
-      const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: arr } };
+      const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: tailForContext(arr) } };
       try {
         const gifts = /** @type {Record<string, any>} */ (buildYtGiftBags(arr, lv, { startedAt: ytTrustedStartedAt(summary, videoIdForPseudoLv(lv)) }));
         if (gifts && gifts.count > 0) {
