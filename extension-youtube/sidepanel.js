@@ -2296,7 +2296,7 @@ ${sourceCol}
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
-  if (typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+  if (!YT_SHIM_IN_PAGE && typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
     const mapSrc = (v) => {
       const s5 = String(v ?? "");
       const m = s5.match(NICO_USERICON_RE);
@@ -46198,7 +46198,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T13:33" ? String("yt-2026-11-04T13:33") : "dev";
+      const buildId = "yt-2026-11-04T13:44" ? String("yt-2026-11-04T13:44") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46216,7 +46216,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.82") : "";
+    const bundledVersion = true ? String("0.1.83") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46261,7 +46261,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T13:33" ? String("yt-2026-11-04T13:33") : "dev";
+            return "yt-2026-11-04T13:44" ? String("yt-2026-11-04T13:44") : "dev";
           } catch {
             return "dev";
           }

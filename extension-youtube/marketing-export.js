@@ -2088,7 +2088,7 @@ ${sourceCol}
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
-  if (typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+  if (!YT_SHIM_IN_PAGE && typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
     const mapSrc = (v) => {
       const s = String(v ?? "");
       const m = s.match(NICO_USERICON_RE);

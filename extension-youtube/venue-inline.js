@@ -2109,7 +2109,7 @@ ${sourceCol}
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
-  if (typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+  if (!YT_SHIM_IN_PAGE && typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
     const mapSrc = (v) => {
       const s = String(v ?? "");
       const m = s.match(NICO_USERICON_RE);
@@ -19600,7 +19600,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T13:33") : ""
+          buildId: true ? String("yt-2026-11-04T13:44") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
