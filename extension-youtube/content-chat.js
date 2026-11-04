@@ -1323,7 +1323,7 @@
         const html = await (await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: "include" })).text();
         const clientVersion = (html.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/) || [])[1] || "";
         const apiKey = (html.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1] || "";
-        const at = html.indexOf('"liveChatRenderer"');
+        const at = html.indexOf('"liveChatRenderer":{');
         const tail = at >= 0 ? html.slice(at, at + 2e4) : "";
         let cont = (tail.match(/"reloadContinuationData":\{"continuation":"([^"]+)"/) || [])[1] || "";
         if (!cont || !/"isReplay":true/.test(tail) || !clientVersion) {
