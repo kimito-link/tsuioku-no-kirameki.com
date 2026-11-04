@@ -1266,17 +1266,13 @@ ${sourceCol}
       rows: rows.map((r) => {
         const name = String(r?.name || "");
         const hit = byName.get(normName(name));
-        const personKey = hit?.uid && ytKeyForNumericUid(hit.uid) || `handle:${name.startsWith("@") ? name : `@${name}`}`;
-        const uid = numericUidForYtKey(`topfan:${personKey}`);
         const icon = String(r?.iconUrl || "") || hit?.icon || "";
-        if (icon) ytIconByNumericUid.set(uid, icon);
         return {
           rank: Number(r?.rank) || 0,
           name,
           contribution: Number(r?.xp) || 0,
           isAnonymous: false,
-          thumbnailUrl: icon,
-          userPageUrl: `https://www.nicovideo.jp/user/${uid}`
+          thumbnailUrl: icon
         };
       })
     };
@@ -45869,7 +45865,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T06:05" ? String("yt-2026-11-04T06:05") : "dev";
+      const buildId = "yt-2026-11-04T06:13" ? String("yt-2026-11-04T06:13") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45887,7 +45883,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.57") : "";
+    const bundledVersion = true ? String("0.1.58") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45932,7 +45928,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T06:05" ? String("yt-2026-11-04T06:05") : "dev";
+            return "yt-2026-11-04T06:13" ? String("yt-2026-11-04T06:13") : "dev";
           } catch {
             return "dev";
           }

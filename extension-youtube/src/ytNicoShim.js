@@ -409,21 +409,17 @@ export function ytLeaderboardToKoken(board, entries, lv) {
     rows: rows.map((/** @type {any} */ r) => {
       const name = String(r?.name || '');
       const hit = byName.get(normName(name));
-      // ★トップファンの行には、応援レーンの人とは別の数字IDを付ける(頭に topfan:)。
-      //   同じ数字IDだと、ニコ生版はこの欄の数字(XP)を「その人が投げたギフトの pt」として
-      //   レーンの顔に 🎁 で付け、ギフトを投げた人としてりんく段に上げてしまう(XP はギフトではない・0.1.53 実機)。
-      //   リンク・名前・顔は topfan: を外して元の人のものを使う。
-      const personKey = (hit?.uid && ytKeyForNumericUid(hit.uid)) || `handle:${name.startsWith('@') ? name : `@${name}`}`;
-      const uid = numericUidForYtKey(`topfan:${personKey}`);
+      // ★トップファンの行には数字IDを付けない(userPageUrl なし)。
+      //   数字IDがあると、ニコ生版はこの欄の数字(XP)を「その人が投げたギフトの pt」としてレーンの顔に 🎁 で付け、
+      //   ギフトを投げた人としてりんく段に上げる(0.1.53 実機)。別の数字IDにすると、今度は同じ人がレーンに
+      //   もう1人増える(0.1.55 実機: @しお漬け が2人)。ID の無い公式の行として渡せば、名前と顔だけの欄になり、どこにも結びつかない。
       const icon = String(r?.iconUrl || '') || hit?.icon || '';
-      if (icon) ytIconByNumericUid.set(uid, icon);
       return {
         rank: Number(r?.rank) || 0,
         name,
         contribution: Number(r?.xp) || 0,
         isAnonymous: false,
         thumbnailUrl: icon,
-        userPageUrl: `https://www.nicovideo.jp/user/${uid}`,
       };
     }),
   };

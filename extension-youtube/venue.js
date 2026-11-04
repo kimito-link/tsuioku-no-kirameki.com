@@ -1079,17 +1079,13 @@ ${sourceCol}
       rows: rows.map((r) => {
         const name = String(r?.name || "");
         const hit = byName.get(normName(name));
-        const personKey = hit?.uid && ytKeyForNumericUid(hit.uid) || `handle:${name.startsWith("@") ? name : `@${name}`}`;
-        const uid = numericUidForYtKey(`topfan:${personKey}`);
         const icon = String(r?.iconUrl || "") || hit?.icon || "";
-        if (icon) ytIconByNumericUid.set(uid, icon);
         return {
           rank: Number(r?.rank) || 0,
           name,
           contribution: Number(r?.xp) || 0,
           isAnonymous: false,
-          thumbnailUrl: icon,
-          userPageUrl: `https://www.nicovideo.jp/user/${uid}`
+          thumbnailUrl: icon
         };
       })
     };
@@ -19489,7 +19485,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T06:05") : ""
+          buildId: true ? String("yt-2026-11-04T06:13") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

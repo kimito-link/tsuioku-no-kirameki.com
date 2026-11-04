@@ -1058,17 +1058,13 @@ ${sourceCol}
       rows: rows.map((r) => {
         const name = String(r?.name || "");
         const hit = byName.get(normName(name));
-        const personKey = hit?.uid && ytKeyForNumericUid(hit.uid) || `handle:${name.startsWith("@") ? name : `@${name}`}`;
-        const uid = numericUidForYtKey(`topfan:${personKey}`);
         const icon = String(r?.iconUrl || "") || hit?.icon || "";
-        if (icon) ytIconByNumericUid.set(uid, icon);
         return {
           rank: Number(r?.rank) || 0,
           name,
           contribution: Number(r?.xp) || 0,
           isAnonymous: false,
-          thumbnailUrl: icon,
-          userPageUrl: `https://www.nicovideo.jp/user/${uid}`
+          thumbnailUrl: icon
         };
       })
     };
