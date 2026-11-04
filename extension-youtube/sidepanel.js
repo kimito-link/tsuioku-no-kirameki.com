@@ -1844,7 +1844,7 @@ ${sourceCol}
     });
     next.querySelectorAll(".nl-gift-ledger-row__thumb--empty").forEach((box) => {
       const name = String(box.parentElement?.textContent || "");
-      box.textContent = /メンバー/.test(name) ? "★" : "🎁";
+      box.textContent = /メンバー/.test(name) ? "★" : /スーパーチャット/.test(name) ? "¥" : /ステッカー/.test(name) ? "✦" : "🎁";
       box.style.cssText += ";display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6";
     });
     next.querySelectorAll("img").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
@@ -45625,7 +45625,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T05:30" ? String("yt-2026-11-04T05:30") : "dev";
+      const buildId = "yt-2026-11-04T05:31" ? String("yt-2026-11-04T05:31") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45643,7 +45643,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.46") : "";
+    const bundledVersion = true ? String("0.1.47") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45688,7 +45688,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T05:30" ? String("yt-2026-11-04T05:30") : "dev";
+            return "yt-2026-11-04T05:31" ? String("yt-2026-11-04T05:31") : "dev";
           } catch {
             return "dev";
           }

@@ -1636,7 +1636,7 @@ ${sourceCol}
     });
     next.querySelectorAll(".nl-gift-ledger-row__thumb--empty").forEach((box) => {
       const name = String(box.parentElement?.textContent || "");
-      box.textContent = /メンバー/.test(name) ? "★" : "🎁";
+      box.textContent = /メンバー/.test(name) ? "★" : /スーパーチャット/.test(name) ? "¥" : /ステッカー/.test(name) ? "✦" : "🎁";
       box.style.cssText += ";display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6";
     });
     next.querySelectorAll("img").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
