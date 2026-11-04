@@ -1413,3 +1413,77 @@ if (typeof HTMLImageElement !== 'undefined' && typeof Element !== 'undefined') {
     /* 差し替えられなくても、上の fixImg がいままでどおり直す */
   }
 }
+
+// ---- 計器: ちらつき(顔の絵の差し替え・作り直し)を数える(サイドパネル・会場) ----
+// りんく「こちらに確認もとめないで計器で検知して」(2026-11-04)。10秒ごとに storage の yt_diag_flicker に書く。
+//   srcChanges: 画面にある img の src が変わった回数 / imgAdds: img が新しく作られた回数(描き直し)
+//   flips: 同じ img が10秒の間に2回以上 src を変えた数(=ちらつきの本体) / byTransition: 「前の絵の種類→次」の回数
+if (typeof document !== 'undefined' && /\/(sidepanel|venue)\.html$/.test(String(location.pathname || ''))) {
+  const kindOf = (/** @type {string} */ src) => {
+    const s = String(src || '');
+    if (!s) return 'empty';
+    if (s.startsWith('data:image/svg')) return 'data-svg';
+    if (s.startsWith('data:')) return 'data';
+    if (/nicoaccount\/usericon/.test(s)) return 'nico-usericon';
+    if (/yt\d?\.ggpht\.com|googleusercontent/.test(s)) return 'yt-face';
+    if (/gstatic\.com/.test(s)) return 'gstatic';
+    if (s.startsWith('chrome-extension:')) return 'ext-image';
+    return 'other';
+  };
+  /** @type {WeakMap<Element, number>} */
+  let perImg = new WeakMap();
+  let win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: /** @type {Record<string, number>} */ ({}), where: /** @type {Record<string, number>} */ ({}) };
+  const whereOf = (/** @type {Element} */ el) => {
+    const host = el.closest('[id]');
+    return host ? `#${host.id}`.slice(0, 60) : '?';
+  };
+  const start = () => {
+    if (!document.body) return;
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (m.type === 'attributes' && m.target instanceof HTMLImageElement && m.attributeName === 'src') {
+          const img = m.target;
+          const t = `${kindOf(m.oldValue || '')}→${kindOf(img.getAttribute('src') || '')}`;
+          if (t.split('→')[0] === t.split('→')[1] && m.oldValue === img.getAttribute('src')) continue;
+          win.srcChanges += 1;
+          win.byTransition[t] = (win.byTransition[t] || 0) + 1;
+          const n = (perImg.get(img) || 0) + 1;
+          perImg.set(img, n);
+          if (n === 2) {
+            win.flips += 1;
+            const w = whereOf(img);
+            win.where[w] = (win.where[w] || 0) + 1;
+          }
+        } else if (m.type === 'childList') {
+          for (const n of m.addedNodes) {
+            if (!(n instanceof Element)) continue;
+            const c = n instanceof HTMLImageElement ? 1 : n.getElementsByTagName('img').length;
+            if (c) {
+              win.imgAdds += c;
+              const w = `add:${whereOf(n)}`;
+              win.where[w] = (win.where[w] || 0) + c;
+            }
+          }
+        }
+      }
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'], attributeOldValue: true });
+    setInterval(() => {
+      const snap = { at: Date.now(), page: location.pathname.split('/').pop(), version: chrome.runtime.getManifest?.().version, ...win };
+      win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: {}, where: {} };
+      perImg = new WeakMap();
+      void (async () => {
+        try {
+          const key = 'yt_diag_flicker';
+          const prev = (await real.storage.local.get(key))?.[key];
+          const list = Array.isArray(prev) ? prev : [];
+          list.push(snap);
+          await real.storage.local.set({ [key]: list.slice(-60) });
+        } catch {
+          /* 計器が失敗しても画面は止めない */
+        }
+      })();
+    }, 10000);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
+}

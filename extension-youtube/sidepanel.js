@@ -2130,6 +2130,79 @@ ${sourceCol}
     } catch {
     }
   }
+  if (typeof document !== "undefined" && /\/(sidepanel|venue)\.html$/.test(String(location.pathname || ""))) {
+    const kindOf = (src) => {
+      const s5 = String(src || "");
+      if (!s5) return "empty";
+      if (s5.startsWith("data:image/svg")) return "data-svg";
+      if (s5.startsWith("data:")) return "data";
+      if (/nicoaccount\/usericon/.test(s5)) return "nico-usericon";
+      if (/yt\d?\.ggpht\.com|googleusercontent/.test(s5)) return "yt-face";
+      if (/gstatic\.com/.test(s5)) return "gstatic";
+      if (s5.startsWith("chrome-extension:")) return "ext-image";
+      return "other";
+    };
+    let perImg = /* @__PURE__ */ new WeakMap();
+    let win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: (
+      /** @type {Record<string, number>} */
+      {}
+    ), where: (
+      /** @type {Record<string, number>} */
+      {}
+    ) };
+    const whereOf = (el) => {
+      const host = el.closest("[id]");
+      return host ? `#${host.id}`.slice(0, 60) : "?";
+    };
+    const start = () => {
+      if (!document.body) return;
+      new MutationObserver((muts) => {
+        for (const m of muts) {
+          if (m.type === "attributes" && m.target instanceof HTMLImageElement && m.attributeName === "src") {
+            const img = m.target;
+            const t = `${kindOf(m.oldValue || "")}→${kindOf(img.getAttribute("src") || "")}`;
+            if (t.split("→")[0] === t.split("→")[1] && m.oldValue === img.getAttribute("src")) continue;
+            win.srcChanges += 1;
+            win.byTransition[t] = (win.byTransition[t] || 0) + 1;
+            const n2 = (perImg.get(img) || 0) + 1;
+            perImg.set(img, n2);
+            if (n2 === 2) {
+              win.flips += 1;
+              const w = whereOf(img);
+              win.where[w] = (win.where[w] || 0) + 1;
+            }
+          } else if (m.type === "childList") {
+            for (const n2 of m.addedNodes) {
+              if (!(n2 instanceof Element)) continue;
+              const c = n2 instanceof HTMLImageElement ? 1 : n2.getElementsByTagName("img").length;
+              if (c) {
+                win.imgAdds += c;
+                const w = `add:${whereOf(n2)}`;
+                win.where[w] = (win.where[w] || 0) + c;
+              }
+            }
+          }
+        }
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["src"], attributeOldValue: true });
+      setInterval(() => {
+        const snap = { at: Date.now(), page: location.pathname.split("/").pop(), version: chrome.runtime.getManifest?.().version, ...win };
+        win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: {}, where: {} };
+        perImg = /* @__PURE__ */ new WeakMap();
+        void (async () => {
+          try {
+            const key = "yt_diag_flicker";
+            const prev = (await real.storage.local.get(key))?.[key];
+            const list = Array.isArray(prev) ? prev : [];
+            list.push(snap);
+            await real.storage.local.set({ [key]: list.slice(-60) });
+          } catch {
+          }
+        })();
+      }, 1e4);
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+    else start();
+  }
 
   // src/lib/storageRefreshTriggerKey.js
   var TRIGGER_KEY_MAX = 3;
@@ -45814,7 +45887,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.56") : "";
+    const bundledVersion = true ? String("0.1.57") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
