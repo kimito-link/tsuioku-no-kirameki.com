@@ -735,7 +735,8 @@ ${sourceCol}
       events.push({
         userId: uid,
         nickname,
-        itemId: kind,
+        itemId: "",
+        // ニコ生版は itemId からニコニコのアイテム画像 URL を作る。YouTube の種類名を入れると無い画像を探す
         itemName,
         point,
         message: String(e.text || ""),
@@ -19793,7 +19794,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T07:23") : ""
+          buildId: true ? String("yt-2026-11-04T08:12") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

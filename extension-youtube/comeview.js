@@ -623,7 +623,8 @@ ${sourceCol}
       events.push({
         userId: uid,
         nickname,
-        itemId: kind,
+        itemId: "",
+        // ニコ生版は itemId からニコニコのアイテム画像 URL を作る。YouTube の種類名を入れると無い画像を探す
         itemName,
         point,
         message: String(e.text || ""),
