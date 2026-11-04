@@ -19634,7 +19634,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T15:33") : ""
+          buildId: true ? String("yt-2026-11-04T15:41") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22577,6 +22577,7 @@ ${sourceCol}
     if (proto.__ytCrowdWrapped) return;
     proto.__ytCrowdWrapped = true;
     const realEnqueue = proto.enqueue;
+    let lastCrowdDiagAt = 0;
     proto.enqueue = function(items) {
       if (!Array.isArray(items)) return realEnqueue.call(this, items);
       const keep = [];
@@ -22603,6 +22604,19 @@ ${sourceCol}
         keep.push(it);
       }
       const r = realEnqueue.call(this, keep);
+      const now = Date.now();
+      if (now - lastCrowdDiagAt > 3e3) {
+        lastCrowdDiagAt = now;
+        try {
+          if (isExtensionContextAlive()) {
+            void chrome.storage.local.set({
+              yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0 }
+            }).catch(() => {
+            });
+          }
+        } catch {
+        }
+      }
       if (importantItems.length && Array.isArray(this.queue)) {
         const drops = new Set(importantItems.map((x) => x.onDropped).filter(Boolean));
         for (const q of this.queue) if (q && drops.has(q.onDropped)) q.priority = "high";
