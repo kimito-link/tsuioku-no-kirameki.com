@@ -1068,6 +1068,26 @@ ${sourceCol}
     return `nls_ctail_${id}`;
   }
 
+  // src/lib/youtube/ytVoicePriority.js
+  var IMPORTANT_KINDS = /* @__PURE__ */ new Set(["superchat", "sticker", "membership", "membership_gift", "yt_gift"]);
+  var IMPORTANT_BADGES = /* @__PURE__ */ new Set(["owner", "moderator"]);
+  function ytIsImportantVoiceRow(row, firstOfUser) {
+    if (firstOfUser) return true;
+    if (!row || typeof row !== "object") return false;
+    if (IMPORTANT_KINDS.has(String(row.kind || ""))) return true;
+    const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || "").toLowerCase()) : [];
+    return badges.some((b) => IMPORTANT_BADGES.has(b));
+  }
+  function ytMarkImportantVoiceRows(rows, personKeyOf) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(rows) ? rows : []).map((r) => {
+      const k = String(personKeyOf(r) || "");
+      const first = !!k && !seen.has(k);
+      if (k) seen.add(k);
+      return ytIsImportantVoiceRow(r, first);
+    });
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
@@ -1410,6 +1430,7 @@ ${sourceCol}
     if (!c) return null;
     return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
   }
+  var ytVoiceImportantKeys = /* @__PURE__ */ new Set();
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
@@ -1433,6 +1454,7 @@ ${sourceCol}
     }
     const wantHandles = /* @__PURE__ */ new Set();
     const who = buildYtPersonResolver(list);
+    const important = IS_VENUE_CONTEXT ? ytMarkImportantVoiceRows(list, (r) => who.keyOf(r)) : null;
     let streamStartedAt = 0;
     if (list.some((r) => r?.replay)) {
       replayVideoIds.add(vid);
@@ -1454,6 +1476,7 @@ ${sourceCol}
       }
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
+      if (important?.[i]) ytVoiceImportantKeys.add(`no:${e.commentNo}`);
       return e;
     });
     registerBroadcastersFromSummaries();
@@ -46201,7 +46224,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T15:12" ? String("yt-2026-11-04T15:12") : "dev";
+      const buildId = "yt-2026-11-04T15:33" ? String("yt-2026-11-04T15:33") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46219,7 +46242,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.85") : "";
+    const bundledVersion = true ? String("0.1.86") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46264,7 +46287,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T15:12" ? String("yt-2026-11-04T15:12") : "dev";
+            return "yt-2026-11-04T15:33" ? String("yt-2026-11-04T15:33") : "dev";
           } catch {
             return "dev";
           }

@@ -834,6 +834,31 @@ ${sourceCol}
     return `nls_ctail_${id}`;
   }
 
+  // src/lib/youtube/ytVoicePriority.js
+  var IMPORTANT_KINDS = /* @__PURE__ */ new Set(["superchat", "sticker", "membership", "membership_gift", "yt_gift"]);
+  var IMPORTANT_BADGES = /* @__PURE__ */ new Set(["owner", "moderator"]);
+  var YT_VOICE_CROWD_QUEUE = 2;
+  function ytIsImportantVoiceRow(row, firstOfUser) {
+    if (firstOfUser) return true;
+    if (!row || typeof row !== "object") return false;
+    if (IMPORTANT_KINDS.has(String(row.kind || ""))) return true;
+    const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || "").toLowerCase()) : [];
+    return badges.some((b) => IMPORTANT_BADGES.has(b));
+  }
+  function ytMarkImportantVoiceRows(rows, personKeyOf) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(rows) ? rows : []).map((r) => {
+      const k = String(personKeyOf(r) || "");
+      const first = !!k && !seen.has(k);
+      if (k) seen.add(k);
+      return ytIsImportantVoiceRow(r, first);
+    });
+  }
+  function ytShouldVoiceWhenCrowded(s) {
+    if (s.important) return true;
+    return !(Number(s.queueLength) >= YT_VOICE_CROWD_QUEUE);
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
@@ -1176,6 +1201,10 @@ ${sourceCol}
     if (!c) return null;
     return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
   }
+  var ytVoiceImportantKeys = /* @__PURE__ */ new Set();
+  function ytIsImportantVoiceKey(key) {
+    return ytVoiceImportantKeys.has(String(key || ""));
+  }
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
@@ -1199,6 +1228,7 @@ ${sourceCol}
     }
     const wantHandles = /* @__PURE__ */ new Set();
     const who = buildYtPersonResolver(list);
+    const important = IS_VENUE_CONTEXT ? ytMarkImportantVoiceRows(list, (r) => who.keyOf(r)) : null;
     let streamStartedAt = 0;
     if (list.some((r) => r?.replay)) {
       replayVideoIds.add(vid);
@@ -1220,6 +1250,7 @@ ${sourceCol}
       }
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
+      if (important?.[i]) ytVoiceImportantKeys.add(`no:${e.commentNo}`);
       return e;
     });
     registerBroadcastersFromSummaries();
@@ -2355,6 +2386,2849 @@ ${sourceCol}
     else start();
   }
 
+  // src/lib/voiceReadingNormalize.js
+  var VOICE_REPEAT_KEEP = 4;
+  var LAUGH_W_RE = /(?<![A-Za-zＡ-Ｚａ-ｚ])[wWｗＷ]{2,}(?![A-Za-zＡ-Ｚａ-ｚ])/g;
+  var LAUGH_W_TAIL_RE = /(?<=[\u3040-\u30ff\u3400-\u9fff\uff01-\uff9f])[wWｗＷ](?=[\s!！?？。、…]*$)/;
+  var CLAP_8_RE = /(?<![0-9０-９.,，．])[8８]{3,}(?![0-9０-９.,，．円万億人位点個回件年月日時分秒%％ptPT])/g;
+  var laughWord = (m) => Array.from(m).length >= 3 ? "わらわら" : "わら";
+  function normalizeVoiceReadingBody(text, opts = {}) {
+    let s = String(text ?? "");
+    if (!s) return "";
+    s = s.replace(/(?:https?:\/\/|www\.)[^\s]+/gi, typeof opts.urlWord === "string" ? opts.urlWord : "URL省略");
+    s = s.replace(LAUGH_W_RE, laughWord).replace(LAUGH_W_TAIL_RE, "わら");
+    if (/^\s*[wWｗＷ]\s*$/.test(s)) s = "わら";
+    s = s.replace(CLAP_8_RE, "パチパチ");
+    s = s.replace(/(.)\1{4,}/gsu, (_m, ch) => ch.repeat(VOICE_REPEAT_KEEP));
+    s = s.replace(/\s+/g, " ").trim();
+    return /[\p{L}\p{N}]/u.test(s) ? s : "";
+  }
+
+  // src/lib/voiceKeys.js
+  var KEY_VOICE_READING_ENABLED = "nls_voice_reading_enabled_v1";
+  var KEY_VOICE_ASSIGNMENTS = "nls_voice_assignments_v1";
+  var KEY_VOICE_READ_NAME_ENABLED = "nls_voice_read_name_enabled_v1";
+  var KEY_VOICE_VOLUME_PERCENT = "nls_voice_volume_percent_v1";
+  var KEY_VOICE_NARROW_MODE = "nls_voice_narrow_mode_v1";
+  var KEY_VOICE_WEAK_PC = "nls_voice_weak_pc_v1";
+  var KEY_VOICE_QUALITY = "nls_voice_quality_v1";
+
+  // src/lib/voiceVolume.js
+  var VOICE_VOLUME_MIN = 0;
+  var VOICE_VOLUME_MAX = 300;
+  var VOICE_VOLUME_DEFAULT = 100;
+  var VOICE_TARGET_PEAK_AT_100 = 0.48;
+  var VOICE_PEAK_CEILING = 0.98;
+  var VOICE_MAX_BOOST = 4;
+  var VOICE_TYPICAL_CREST = 6.68;
+  function voiceTargetRms(targetPeak) {
+    return targetPeak / VOICE_TYPICAL_CREST;
+  }
+  function voiceLevelGain(peak, rms, targetPeak) {
+    if (rms > 0 && peak > 0) {
+      return Math.min(VOICE_MAX_BOOST, voiceTargetRms(targetPeak) / rms, VOICE_PEAK_CEILING * 0.9 / peak);
+    }
+    return peak > 0 ? Math.min(VOICE_MAX_BOOST, targetPeak / peak) : VOICE_MAX_BOOST;
+  }
+  function normalizeVoiceVolumePercent(raw) {
+    if (raw === null || raw === void 0 || raw === "") return VOICE_VOLUME_DEFAULT;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return VOICE_VOLUME_DEFAULT;
+    return Math.min(VOICE_VOLUME_MAX, Math.max(VOICE_VOLUME_MIN, Math.round(n)));
+  }
+  function findPcm16Data(dv) {
+    if (dv.byteLength < 12) return null;
+    const tag = (o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
+    if (tag(0) !== "RIFF" || tag(8) !== "WAVE") return null;
+    let off = 12;
+    let isPcm16 = false;
+    while (off + 8 <= dv.byteLength) {
+      const id = tag(off);
+      const size = dv.getUint32(off + 4, true);
+      const body = off + 8;
+      if (id === "fmt " && body + 16 <= dv.byteLength) {
+        const format = dv.getUint16(body, true);
+        const bits = dv.getUint16(body + 14, true);
+        isPcm16 = format === 1 && bits === 16;
+      } else if (id === "data") {
+        if (!isPcm16) return null;
+        const length = Math.min(size, dv.byteLength - body) & ~1;
+        return { offset: body, length };
+      }
+      off = body + size + (size & 1);
+    }
+    return null;
+  }
+  function applyVoiceVolumeToWav(wav, volumePercent) {
+    if (!(wav instanceof ArrayBuffer)) return wav;
+    const pct = normalizeVoiceVolumePercent(volumePercent);
+    let dv;
+    try {
+      dv = new DataView(wav);
+    } catch {
+      return wav;
+    }
+    const data = findPcm16Data(dv);
+    if (!data || data.length < 2) return wav;
+    let peak = 0;
+    let sumSq = 0;
+    let voiced = 0;
+    for (let i = data.offset; i < data.offset + data.length; i += 2) {
+      const v = dv.getInt16(i, true);
+      const a = Math.abs(v);
+      if (a > peak) peak = a;
+      if (a >= 328) {
+        sumSq += v / 32768 * (v / 32768);
+        voiced++;
+      }
+    }
+    if (peak === 0) return wav;
+    const targetPeak = Math.min(VOICE_PEAK_CEILING, VOICE_TARGET_PEAK_AT_100 * pct / 100);
+    const gain = voiceLevelGain(peak / 32767, voiced > 0 ? Math.sqrt(sumSq / voiced) : 0, targetPeak);
+    if (Math.abs(gain - 1) < 0.01) return wav;
+    const out = wav.slice(0);
+    const odv = new DataView(out);
+    for (let i = data.offset; i < data.offset + data.length; i += 2) {
+      const v = Math.round(dv.getInt16(i, true) * gain);
+      odv.setInt16(i, Math.max(-32768, Math.min(32767, v)), true);
+    }
+    return out;
+  }
+  function voiceTargetPeak(volumePercent) {
+    const pct = normalizeVoiceVolumePercent(volumePercent);
+    return Math.min(VOICE_PEAK_CEILING, VOICE_TARGET_PEAK_AT_100 * pct / 100);
+  }
+  function measureVoiceWavLevel(wav) {
+    if (!(wav instanceof ArrayBuffer)) return null;
+    let dv;
+    try {
+      dv = new DataView(wav);
+    } catch {
+      return null;
+    }
+    const data = findPcm16Data(dv);
+    if (!data || data.length < 2) return null;
+    let peak = 0;
+    let sumSq = 0;
+    let n = 0;
+    for (let i = data.offset; i < data.offset + data.length; i += 2) {
+      const v = dv.getInt16(i, true);
+      const a = Math.abs(v);
+      if (a > peak) peak = a;
+      if (a >= 328) {
+        sumSq += v / 32768 * (v / 32768);
+        n++;
+      }
+    }
+    return { peak: Math.min(1, peak / 32767), rms: n > 0 ? Math.sqrt(sumSq / n) : 0 };
+  }
+
+  // src/lib/voiceStyleLevelTable.js
+  var VOICE_STYLE_LEVEL_TABLE = Object.freeze({
+    "0": [0.084, 0.456],
+    "1": [0.064, 0.432],
+    "2": [0.075, 0.447],
+    "3": [0.063, 0.53],
+    "4": [0.086, 0.558],
+    "5": [0.066, 0.469],
+    "6": [0.066, 0.411],
+    "7": [0.067, 0.466],
+    "8": [0.08, 0.419],
+    "9": [0.085, 0.375],
+    "10": [0.071, 0.405],
+    "11": [0.07, 0.584],
+    "12": [0.074, 0.469],
+    "13": [0.078, 0.456],
+    "14": [0.078, 0.258],
+    "15": [0.069, 0.458],
+    "16": [0.082, 0.364],
+    "17": [0.073, 0.437],
+    "18": [0.073, 0.46],
+    "19": [0.039, 0.546],
+    "20": [0.08, 0.514],
+    "21": [0.075, 0.677],
+    "22": [0.053, 0.457],
+    "23": [0.086, 0.417],
+    "24": [0.074, 0.408],
+    "25": [0.097, 0.363],
+    "26": [0.067, 0.465],
+    "27": [0.085, 0.327],
+    "28": [0.065, 0.367],
+    "29": [0.098, 0.645],
+    "30": [0.1, 0.598],
+    "31": [0.101, 0.409],
+    "32": [0.074, 0.437],
+    "33": [0.076, 0.422],
+    "34": [0.072, 0.472],
+    "35": [0.056, 0.252],
+    "36": [0.06, 0.551],
+    "37": [0.087, 0.37],
+    "38": [0.1, 0.364],
+    "39": [0.08, 0.542],
+    "40": [0.073, 0.641],
+    "41": [0.09, 0.578],
+    "42": [0.081, 0.783],
+    "43": [0.091, 0.41],
+    "44": [0.088, 0.441],
+    "45": [0.081, 0.294],
+    "46": [0.084, 0.393],
+    "47": [0.073, 0.387],
+    "48": [0.089, 0.374],
+    "49": [0.089, 0.361],
+    "50": [0.07, 0.641],
+    "51": [0.082, 0.489],
+    "52": [0.089, 0.538],
+    "53": [0.091, 0.497],
+    "54": [0.067, 0.438],
+    "55": [0.098, 0.508],
+    "56": [0.098, 0.443],
+    "57": [0.099, 0.472],
+    "58": [0.084, 0.531],
+    "59": [0.101, 0.46],
+    "60": [0.114, 0.423],
+    "61": [0.072, 0.354],
+    "62": [0.092, 0.377],
+    "63": [0.096, 0.375],
+    "64": [0.094, 0.323],
+    "65": [0.084, 0.381],
+    "66": [0.085, 0.56],
+    "67": [0.097, 0.396],
+    "68": [0.077, 0.446],
+    "69": [0.081, 0.592],
+    "70": [0.072, 0.429],
+    "71": [0.055, 0.569],
+    "72": [0.073, 0.388],
+    "73": [0.091, 0.488],
+    "74": [0.086, 0.521],
+    "75": [0.059, 0.321],
+    "76": [0.055, 0.358],
+    "77": [0.083, 0.465],
+    "78": [0.075, 0.406],
+    "79": [0.08, 0.341],
+    "80": [0.093, 0.4],
+    "81": [0.082, 0.338],
+    "82": [0.084, 0.353],
+    "83": [0.082, 0.372],
+    "84": [0.095, 0.353],
+    "85": [0.083, 0.442],
+    "86": [0.058, 0.489],
+    "87": [0.074, 0.416],
+    "88": [0.09, 0.381],
+    "89": [0.101, 0.46],
+    "90": [0.074, 0.492],
+    "91": [0.08, 0.391],
+    "92": [0.071, 0.505],
+    "93": [0.074, 0.546],
+    "94": [0.084, 0.408],
+    "95": [0.072, 0.472],
+    "96": [0.091, 0.345],
+    "97": [0.062, 0.42],
+    "98": [0.052, 0.391],
+    "99": [0.1, 0.538],
+    "100": [0.077, 0.5],
+    "101": [0.093, 0.594],
+    "102": [0.09, 0.323],
+    "103": [0.076, 0.316],
+    "104": [0.095, 0.369],
+    "105": [0.106, 0.46],
+    "106": [0.088, 0.355],
+    "107": [0.081, 0.395],
+    "108": [0.081, 0.383],
+    "109": [0.075, 0.394],
+    "110": [0.078, 0.52],
+    "111": [0.079, 0.457],
+    "112": [0.059, 0.41],
+    "113": [0.079, 0.419],
+    "114": [0.071, 0.443],
+    "115": [0.081, 0.413],
+    "116": [0.073, 0.357],
+    "117": [0.054, 0.509],
+    "118": [0.102, 0.337],
+    "119": [0.098, 0.453],
+    "120": [0.101, 0.372],
+    "121": [0.106, 0.402],
+    "122": [0.088, 0.327],
+    "123": [0.082, 0.404],
+    "124": [0.089, 0.377],
+    "125": [0.077, 0.424],
+    "126": [0.061, 0.314]
+  });
+  var VOICE_PITCH_OFFSET_GRID = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
+  var VOICE_STYLE_PITCH_RMS_FACTOR = Object.freeze({
+    "0": [0.95, 1, 1.13, 1.16],
+    "1": [0.63, 0.82, 1.08, 1.03],
+    "2": [0.82, 0.93, 1.09, 1.18],
+    "3": [0.63, 0.83, 1.28, 1.32],
+    "4": [0.98, 1.01, 0.97, 0.95],
+    "5": [0.63, 0.83, 0.99, 0.97],
+    "6": [0.74, 0.85, 1.01, 1.15],
+    "7": [0.67, 0.87, 1.1, 0.93],
+    "8": [0.74, 0.87, 0.95, 0.91],
+    "9": [0.69, 0.82, 1.18, 1.27],
+    "10": [0.71, 0.88, 1.01, 1.04],
+    "11": [0.81, 0.93, 1.14, 1.33],
+    "12": [0.81, 0.91, 1.09, 1.26],
+    "13": [0.8, 0.89, 1.05, 1.09],
+    "14": [0.83, 0.94, 0.97, 1.06],
+    "15": [0.98, 1.08, 1, 1.08],
+    "16": [0.75, 0.88, 1.12, 1.19],
+    "17": [0.81, 0.9, 0.99, 0.93],
+    "18": [0.77, 0.87, 1.03, 1],
+    "19": [1, 1, 1, 1],
+    "20": [0.84, 0.91, 1.01, 1.01],
+    "21": [0.83, 0.86, 1.18, 1.32],
+    "22": [1, 1, 1, 1],
+    "23": [1.01, 1.01, 1.02, 1.12],
+    "24": [0.72, 0.88, 1.03, 1.06],
+    "25": [0.52, 0.77, 1.17, 1.4],
+    "26": [0.82, 0.88, 1.1, 1.12],
+    "27": [0.75, 0.85, 1.21, 1.33],
+    "28": [0.85, 0.94, 1.03, 1.09],
+    "29": [0.78, 0.92, 1.05, 1.12],
+    "30": [0.72, 0.87, 1.04, 1.07],
+    "31": [0.8, 0.92, 1.01, 0.99],
+    "32": [0.85, 0.92, 1.19, 1.19],
+    "33": [0.84, 0.84, 1.07, 1.16],
+    "34": [0.74, 0.88, 1.1, 1.15],
+    "35": [0.85, 0.97, 1.1, 0.74],
+    "36": [1, 1, 1, 1],
+    "37": [0.69, 0.88, 1.19, 1.23],
+    "38": [0.72, 0.79, 0.97, 0.7],
+    "39": [0.88, 0.93, 1.09, 1.26],
+    "40": [0.8, 0.91, 1.09, 1.19],
+    "41": [0.89, 0.92, 1.05, 1.05],
+    "42": [1.01, 0.99, 1.15, 1.3],
+    "43": [0.69, 0.82, 1, 0.98],
+    "44": [0.59, 0.74, 1.28, 1.64],
+    "45": [0.59, 0.77, 1.19, 1.19],
+    "46": [0.86, 0.92, 0.99, 0.87],
+    "47": [0.76, 0.91, 1.24, 1.38],
+    "48": [0.95, 0.98, 1, 0.99],
+    "49": [1.14, 0.98, 1.01, 0.9],
+    "50": [1, 1, 1, 1],
+    "51": [0.95, 1.01, 1.06, 1.07],
+    "52": [0.72, 0.87, 1.09, 1.13],
+    "53": [0.94, 0.98, 1.05, 1.08],
+    "54": [0.69, 0.88, 1.08, 1.02],
+    "55": [0.96, 1.02, 1.01, 1.04],
+    "56": [0.78, 0.93, 1.07, 1.2],
+    "57": [0.91, 0.98, 1.04, 0.94],
+    "58": [0.79, 0.88, 1, 0.95],
+    "59": [0.74, 0.85, 1.16, 0.92],
+    "60": [0.69, 0.89, 0.94, 0.91],
+    "61": [0.55, 0.7, 1.4, 1.6],
+    "62": [0.58, 0.78, 1.02, 0.87],
+    "63": [0.75, 1.03, 0.73, 0.84],
+    "64": [0.57, 0.8, 0.88, 0.62],
+    "65": [0.74, 0.9, 1.07, 1.07],
+    "66": [0.74, 0.91, 1, 1.02],
+    "67": [0.91, 0.96, 1.02, 1.02],
+    "68": [0.77, 0.89, 1.05, 1.18],
+    "69": [0.9, 0.95, 1.05, 1.13],
+    "70": [0.73, 0.87, 1.04, 0.87],
+    "71": [1.02, 1.02, 1, 0.98],
+    "72": [0.73, 0.83, 1.14, 1.27],
+    "73": [0.69, 0.88, 1.11, 1.25],
+    "74": [0.8, 0.9, 0.98, 0.87],
+    "75": [0.7, 0.85, 1.15, 1.27],
+    "76": [1.02, 0.96, 0.88, 0.79],
+    "77": [0.88, 0.93, 1.04, 1],
+    "78": [0.88, 0.95, 1, 1],
+    "79": [0.99, 0.96, 1.09, 1.1],
+    "80": [0.78, 0.9, 1.01, 0.92],
+    "81": [0.96, 1, 1.02, 1.04],
+    "82": [0.85, 0.92, 1.04, 1.06],
+    "83": [0.94, 0.96, 1.01, 1.01],
+    "84": [0.93, 0.98, 1.01, 1.01],
+    "85": [0.86, 0.93, 1.07, 1.12],
+    "86": [1, 1, 1, 1],
+    "87": [0.99, 1.03, 1.01, 1.07],
+    "88": [0.86, 0.99, 0.8, 0.92],
+    "89": [1.17, 1.2, 0.92, 0.88],
+    "90": [0.72, 0.82, 1.15, 1.16],
+    "91": [0.68, 0.85, 1.14, 1.17],
+    "92": [0.69, 0.79, 1.1, 1.21],
+    "93": [0.84, 0.9, 1.11, 1.19],
+    "94": [0.63, 0.87, 1.11, 1.12],
+    "95": [0.56, 0.8, 1.08, 1.01],
+    "96": [0.54, 0.76, 1.16, 1.32],
+    "97": [0.84, 0.93, 1.07, 1.2],
+    "98": [0.8, 0.86, 1.22, 1.36],
+    "99": [0.79, 0.89, 1.04, 1.09],
+    "100": [0.97, 1, 1.05, 1.12],
+    "101": [0.72, 0.85, 1.18, 1.31],
+    "102": [0.98, 0.99, 0.99, 1.06],
+    "103": [0.88, 1.01, 1, 1.08],
+    "104": [0.88, 0.89, 0.96, 1.09],
+    "105": [0.93, 0.94, 0.93, 0.79],
+    "106": [0.74, 0.88, 1.06, 1.17],
+    "107": [1.27, 1.09, 0.84, 0.78],
+    "108": [0.82, 0.97, 1.07, 0.99],
+    "109": [0.77, 0.91, 1.05, 0.99],
+    "110": [0.88, 0.97, 0.92, 1.01],
+    "111": [0.74, 0.93, 0.98, 0.87],
+    "112": [0.77, 0.87, 1.05, 1.13],
+    "113": [0.67, 0.85, 1.05, 1.04],
+    "114": [0.8, 0.91, 1.04, 1.25],
+    "115": [0.94, 0.96, 1.05, 1.08],
+    "116": [0.59, 0.8, 1.16, 1.37],
+    "117": [1, 1, 1, 1],
+    "118": [0.69, 0.83, 1.05, 1.04],
+    "119": [0.87, 0.97, 1.01, 0.94],
+    "120": [0.77, 0.93, 1.01, 0.93],
+    "121": [0.77, 0.88, 1.03, 0.97],
+    "122": [0.55, 0.73, 1.22, 1.31],
+    "123": [0.57, 0.77, 1.19, 1.36],
+    "124": [0.63, 0.8, 1.18, 1.2],
+    "125": [0.67, 0.81, 1.24, 1.38],
+    "126": [0.5, 0.68, 1.08, 0.94]
+  });
+  function voicePitchRmsFactor(styleId, pitchOffset) {
+    const p = Number(pitchOffset);
+    if (!Number.isFinite(p) || Math.abs(p) < 1e-6) return 1;
+    const row = VOICE_STYLE_PITCH_RMS_FACTOR[String(Number(styleId))];
+    if (!Array.isArray(row)) return 1;
+    const f = [Number(row[0]), Number(row[1]), 1, Number(row[2]), Number(row[3])];
+    if (!f.every((x) => x > 0 && x < 4)) return 1;
+    const g = VOICE_PITCH_OFFSET_GRID;
+    if (p <= g[0]) return f[0];
+    if (p >= g[g.length - 1]) return f[f.length - 1];
+    for (let i = 0; i < g.length - 1; i++) {
+      if (p <= g[i + 1]) return f[i] + (f[i + 1] - f[i]) * (p - g[i]) / (g[i + 1] - g[i]);
+    }
+    return 1;
+  }
+  function voiceStyleTableLevel(styleId, pitchOffset = 0) {
+    const id = Number(styleId);
+    if (!Number.isInteger(id) || id < 0) return null;
+    const row = VOICE_STYLE_LEVEL_TABLE[String(id)];
+    if (!Array.isArray(row)) return null;
+    const rms = Number(row[0]);
+    const peak = Number(row[1]);
+    if (!(rms > 0 && rms < 1) || !(peak > 0 && peak <= 1)) return null;
+    const k = voicePitchRmsFactor(id, pitchOffset);
+    return { rms: rms * k, peak: Math.min(1, peak * k) };
+  }
+
+  // src/lib/voiceStream.js
+  var VOICE_STREAM_SEGMENT_SEC = 0.3;
+  var VOICE_STREAM_PREBUFFER_SEC = 0.3;
+  var VOICE_STREAM_LONG_TEXT_CHARS = 30;
+  var VOICE_STREAM_STALL_MS = 5e3;
+  var VOICE_STREAM_ASSUMED_PEAK = 0.45;
+  var VOICE_STREAM_MIN_RMS_SAMPLES = 2e3;
+  var VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
+  var VOICE_STREAM_MEDIAN_RMS = 0.0708;
+  var VOICE_STREAM_MIN_EST_RMS = 0.04;
+  var VOICE_STREAM_MAX_EST_RMS = 0.112;
+  var VOICE_STREAM_SHORT_MIN_EST_PEAK = 0.4;
+  var stylePeaks = /* @__PURE__ */ new Map();
+  var styleRms = /* @__PURE__ */ new Map();
+  function rememberVoiceStylePeak(styleId, peak, rms, textLength, pitchOffset) {
+    const len = Number(textLength);
+    if (Number.isFinite(len) && len >= 0 && len < VOICE_STREAM_LONG_TEXT_CHARS) return;
+    const key = voiceLevelKey(styleId, pitchOffset);
+    const p = Number(peak);
+    if (key === null || !Number.isFinite(p) || p <= 0 || p > 1) return;
+    const prev = stylePeaks.get(key);
+    stylePeaks.set(key, prev === void 0 ? p : prev + 0.5 * (p - prev));
+    const r = Number(rms);
+    if (Number.isFinite(r) && r > 0 && r <= 1) {
+      const pr = styleRms.get(key);
+      styleRms.set(key, pr === void 0 ? r : pr + 0.5 * (r - pr));
+    }
+  }
+  function voiceLevelKey(styleId, pitchOffset) {
+    const id = Number(styleId);
+    if (!Number.isInteger(id) || id < 0) return null;
+    const pitch = Math.round((Number(pitchOffset) || 0) * 100);
+    return pitch === 0 ? String(id) : `${id}@${pitch}`;
+  }
+  function knownVoiceStyleRms(styleId, pitchOffset) {
+    const key = voiceLevelKey(styleId, pitchOffset);
+    if (key === null) return -1;
+    const v = styleRms.get(key);
+    return v === void 0 ? -1 : v;
+  }
+  function knownVoiceStylePeak(styleId, pitchOffset) {
+    const key = voiceLevelKey(styleId, pitchOffset);
+    if (key === null) return -1;
+    const v = stylePeaks.get(key);
+    return v === void 0 ? -1 : v;
+  }
+  function voiceStyleLevelsSnapshot() {
+    const out = {};
+    for (const [key, peak] of stylePeaks) {
+      const rms = styleRms.get(key) ?? -1;
+      out[key] = {
+        peak: Math.round(peak * 1e3) / 1e3,
+        rms: rms > 0 ? Math.round(rms * 1e3) / 1e3 : -1,
+        crestDb: rms > 0 ? Math.round(20 * Math.log10(peak / rms) * 10) / 10 : -1
+      };
+    }
+    return out;
+  }
+  function shouldStreamVoice(input) {
+    if (input?.supported !== true || input?.idle !== true) return false;
+    if (input.slowEngine === true) return true;
+    return Number(input.textLength) >= VOICE_STREAM_LONG_TEXT_CHARS;
+  }
+  function createWavStreamParser() {
+    let head = new Uint8Array(0);
+    let headerDone = false;
+    let sampleRate = 0;
+    let error = "";
+    let remaining = Infinity;
+    let carry = -1;
+    function parseHeader(buf) {
+      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+      const tag = (o) => String.fromCharCode(buf[o], buf[o + 1], buf[o + 2], buf[o + 3]);
+      if (buf.length < 12) return -1;
+      if (tag(0) !== "RIFF" || tag(8) !== "WAVE") {
+        error = "not_wav";
+        return -2;
+      }
+      let off = 12;
+      let pcm16 = false;
+      while (off + 8 <= buf.length) {
+        const id = tag(off);
+        const size = dv.getUint32(off + 4, true);
+        const body = off + 8;
+        if (id === "fmt ") {
+          if (body + 16 > buf.length) return -1;
+          const format = dv.getUint16(body, true);
+          const channels = dv.getUint16(body + 2, true);
+          sampleRate = dv.getUint32(body + 4, true);
+          const bits = dv.getUint16(body + 14, true);
+          pcm16 = format === 1 && bits === 16 && channels === 1 && sampleRate > 0;
+          if (!pcm16) {
+            error = "not_pcm16_mono";
+            return -2;
+          }
+        } else if (id === "data") {
+          if (!pcm16) {
+            error = "no_fmt";
+            return -2;
+          }
+          remaining = size > 0 && size < 4294967295 ? size : Infinity;
+          return body;
+        }
+        off = body + size + (size & 1);
+      }
+      return -1;
+    }
+    return {
+      push(bytes) {
+        if (error || !(bytes instanceof Uint8Array) || bytes.length === 0) return null;
+        let data = bytes;
+        if (!headerDone) {
+          const merged = new Uint8Array(head.length + bytes.length);
+          merged.set(head, 0);
+          merged.set(bytes, head.length);
+          const at = parseHeader(merged);
+          if (at === -2) return null;
+          if (at === -1) {
+            if (merged.length > 4096) error = "header_too_long";
+            head = merged;
+            return null;
+          }
+          headerDone = true;
+          head = new Uint8Array(0);
+          data = merged.subarray(at);
+        }
+        if (remaining !== Infinity) {
+          if (remaining <= 0) return null;
+          if (data.length > remaining) data = data.subarray(0, remaining);
+          remaining -= data.length;
+        }
+        let buf = data;
+        if (carry >= 0) {
+          buf = new Uint8Array(data.length + 1);
+          buf[0] = carry;
+          buf.set(data, 1);
+          carry = -1;
+        }
+        const n = buf.length >> 1;
+        if (buf.length & 1) carry = buf[buf.length - 1];
+        if (n === 0) return null;
+        const out = new Int16Array(n);
+        for (let i = 0; i < n; i++) out[i] = (buf[2 * i + 1] << 8 | buf[2 * i]) << 16 >> 16;
+        return out;
+      },
+      get sampleRate() {
+        return sampleRate;
+      },
+      get error() {
+        return error;
+      }
+    };
+  }
+  var StreamedVoice = class {
+    /** @param {number} sampleRate */
+    constructor(sampleRate) {
+      this.sampleRate = sampleRate;
+      this.chunks = [];
+      this.totalSamples = 0;
+      this.peak = 0;
+      this._sumSq = 0;
+      this._voiced = 0;
+      this.styleId = -1;
+      this.pitchOffset = 0;
+      this.textLength = -1;
+      this.done = false;
+      this.failed = false;
+      this._listeners = /* @__PURE__ */ new Set();
+      this._cancel = null;
+      this._resolveDone = () => {
+      };
+      this.whenDone = new Promise((r) => {
+        this._resolveDone = r;
+      });
+    }
+    /** 届いた分の素の RMS(0〜1・無音を除く)。 */
+    get rms() {
+      return this._voiced > 0 ? Math.sqrt(this._sumSq / this._voiced) : 0;
+    }
+    /** ためた長さ(秒)。 */
+    get bufferedSec() {
+      return this.sampleRate > 0 ? this.totalSamples / this.sampleRate : 0;
+    }
+    /** @param {Int16Array} samples */
+    append(samples) {
+      if (this.done || !samples || samples.length === 0) return;
+      this.chunks.push(samples);
+      this.totalSamples += samples.length;
+      let m = 0;
+      for (let i = 0; i < samples.length; i++) {
+        const a = Math.abs(samples[i]);
+        if (a > m) m = a;
+      }
+      if (m / 32768 > this.peak) this.peak = m / 32768;
+      for (let i = 0; i < samples.length; i++) {
+        if (Math.abs(samples[i]) >= 328) {
+          const x = samples[i] / 32768;
+          this._sumSq += x * x;
+          this._voiced++;
+        }
+      }
+      this._emit();
+    }
+    finish() {
+      if (this.done) return;
+      this.done = true;
+      this._resolveDone(true);
+      this._emit();
+    }
+    fail() {
+      if (this.done) return;
+      this.done = true;
+      this.failed = true;
+      this._resolveDone(false);
+      this._emit();
+    }
+    /** 受け取りをやめる(鳴らすのをやめた・読み上げを止めた)。 */
+    cancel() {
+      const c = this._cancel;
+      this._cancel = null;
+      if (c) {
+        try {
+          c();
+        } catch {
+        }
+      }
+      this.fail();
+    }
+    /** @param {() => void} fn @returns {() => void} */
+    onUpdate(fn) {
+      this._listeners.add(fn);
+      return () => {
+        this._listeners.delete(fn);
+      };
+    }
+    _emit() {
+      for (const fn of [...this._listeners]) {
+        try {
+          fn();
+        } catch {
+        }
+      }
+    }
+    /** ためた分を普通の WAV(16bit モノラル)にする。丸ごと再生への切り替え用。 */
+    toWav() {
+      const dataBytes = this.totalSamples * 2;
+      const buf = new ArrayBuffer(44 + dataBytes);
+      const dv = new DataView(buf);
+      const w = (o, s) => {
+        for (let i = 0; i < 4; i++) dv.setUint8(o + i, s.charCodeAt(i));
+      };
+      w(0, "RIFF");
+      dv.setUint32(4, 36 + dataBytes, true);
+      w(8, "WAVE");
+      w(12, "fmt ");
+      dv.setUint32(16, 16, true);
+      dv.setUint16(20, 1, true);
+      dv.setUint16(22, 1, true);
+      dv.setUint32(24, this.sampleRate, true);
+      dv.setUint32(28, this.sampleRate * 2, true);
+      dv.setUint16(32, 2, true);
+      dv.setUint16(34, 16, true);
+      w(36, "data");
+      dv.setUint32(40, dataBytes, true);
+      let off = 44;
+      for (const c of this.chunks) {
+        for (let i = 0; i < c.length; i++, off += 2) dv.setInt16(off, c[i], true);
+      }
+      return buf;
+    }
+  };
+  function isStreamedVoice(x) {
+    return x instanceof StreamedVoice;
+  }
+  function createStreamGain(volumePercent, opts = {}) {
+    const knownPeak = Number(opts?.knownPeak) > 0 ? Number(opts.knownPeak) : -1;
+    const knownRms = Number(opts?.knownRms) > 0 ? Number(opts.knownRms) : -1;
+    const tableRms = Number(opts?.tableRms) > 0 ? Number(opts.tableRms) : -1;
+    const tablePeak = Number(opts?.tablePeak) > 0 ? Number(opts.tablePeak) : -1;
+    const shortText = opts?.shortText === true;
+    const pct = normalizeVoiceVolumePercent(volumePercent);
+    const target = Math.min(VOICE_PEAK_CEILING, VOICE_TARGET_PEAK_AT_100 * pct / 100);
+    let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
+    const startGain = gain;
+    let outPeak = 0;
+    let firstGain = -1;
+    let sumSq = 0;
+    let voiced = 0;
+    return {
+      get gain() {
+        return gain;
+      },
+      get outPeak() {
+        return outPeak;
+      },
+      /** 鳴らした音の RMS(無音を除く・0〜1)。 */
+      get outRms() {
+        return voiced > 0 ? Math.sqrt(sumSq / voiced) : 0;
+      },
+      /** 鳴らし始めた倍率に対する今の倍率(1=下げていない)。まだ鳴らしていなければ 1。 */
+      get dropRatio() {
+        return firstGain > 0 ? gain / firstGain : 1;
+      },
+      targetPeak: target,
+      startGain,
+      /**
+       * @param {Int16Array} samples
+       * @returns {Float32Array}
+       */
+      process(samples) {
+        let peak = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const a = Math.abs(samples[i]);
+          if (a > peak) peak = a;
+        }
+        if (firstGain < 0 && peak > 0) {
+          const first = peak / 32768 * VOICE_STREAM_FIRST_PEAK_HEADROOM;
+          let firstRms = -1;
+          if (shortText || knownRms <= 0 && tableRms <= 0) {
+            let sq = 0;
+            let n = 0;
+            for (let i = 0; i < samples.length; i++) {
+              if (Math.abs(samples[i]) >= 328) {
+                const x = samples[i] / 32768;
+                sq += x * x;
+                n++;
+              }
+            }
+            if (n >= VOICE_STREAM_MIN_RMS_SAMPLES) firstRms = Math.sqrt(sq / n);
+          }
+          if (shortText) {
+            if (firstRms > 0) {
+              gain = Math.min(
+                VOICE_MAX_BOOST,
+                target / VOICE_TYPICAL_CREST / Math.max(firstRms, VOICE_STREAM_MIN_EST_RMS),
+                VOICE_PEAK_CEILING * 0.9 / Math.max(first, 1e-6)
+              );
+            } else {
+              const est = Math.max(first, VOICE_STREAM_SHORT_MIN_EST_PEAK);
+              gain = Math.min(VOICE_MAX_BOOST, target / est);
+            }
+          } else {
+            let estRms = knownRms > 0 ? knownRms : tableRms > 0 ? tableRms : Math.max(firstRms, VOICE_STREAM_MEDIAN_RMS);
+            estRms = Math.min(VOICE_STREAM_MAX_EST_RMS, Math.max(VOICE_STREAM_MIN_EST_RMS, estRms));
+            gain = Math.min(VOICE_MAX_BOOST, target / VOICE_TYPICAL_CREST / estRms);
+            const peakEst = Math.max(first, tablePeak > 0 ? tablePeak : 0, knownPeak > 0 ? knownPeak : 0);
+            if (peakEst > 0) gain = Math.min(gain, VOICE_PEAK_CEILING * 0.9 / peakEst);
+          }
+        }
+        if (peak > 0 && peak / 32768 * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
+        if (firstGain < 0) firstGain = gain;
+        outPeak = Math.max(outPeak, peak / 32768 * gain);
+        const out = new Float32Array(samples.length);
+        for (let i = 0; i < samples.length; i++) {
+          out[i] = samples[i] / 32768 * gain;
+          if (Math.abs(samples[i]) >= 328) {
+            sumSq += out[i] * out[i];
+            voiced++;
+          }
+        }
+        return out;
+      }
+    };
+  }
+  function createStreamedVoiceAudio(voice, deps) {
+    const listeners = /* @__PURE__ */ new Map();
+    const emit = (type) => {
+      for (const fn of [...listeners.get(type) || []]) {
+        try {
+          fn({ type });
+        } catch {
+        }
+      }
+    };
+    const sources = /* @__PURE__ */ new Set();
+    let scheduledSamples = 0;
+    let nextAt = 0;
+    let started = false;
+    let stopped = false;
+    let ended = false;
+    let unsubscribe = null;
+    let whole = null;
+    const tableLevel = voiceStyleTableLevel(voice.styleId, voice.pitchOffset);
+    const gain = createStreamGain(deps.volumePercent, {
+      knownPeak: knownVoiceStylePeak(voice.styleId, voice.pitchOffset),
+      knownRms: knownVoiceStyleRms(voice.styleId, voice.pitchOffset),
+      tableRms: tableLevel?.rms,
+      tablePeak: tableLevel?.peak,
+      shortText: voice.textLength >= 0 && voice.textLength < VOICE_STREAM_LONG_TEXT_CHARS
+    });
+    let underruns = 0;
+    let underrunMaxMs = 0;
+    const finishEnded = () => {
+      if (ended) return;
+      ended = true;
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+      emit("ended");
+    };
+    const schedule = (ctx) => {
+      if (stopped || ended) return;
+      let skip = scheduledSamples;
+      const pending = [];
+      for (const c of voice.chunks) {
+        if (skip >= c.length) {
+          skip -= c.length;
+          continue;
+        }
+        pending.push(skip > 0 ? c.subarray(skip) : c);
+        skip = 0;
+      }
+      const count = pending.reduce((n, c) => n + c.length, 0);
+      if (count > 0) {
+        const buffer = ctx.createBuffer(1, count, voice.sampleRate);
+        const ch = buffer.getChannelData(0);
+        let off = 0;
+        for (const c of pending) {
+          ch.set(gain.process(c), off);
+          off += c.length;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(ctx.destination);
+        if (started && nextAt > 0 && nextAt < ctx.currentTime) {
+          underruns += 1;
+          underrunMaxMs = Math.max(underrunMaxMs, Math.round((ctx.currentTime + 0.02 - nextAt) * 1e3));
+        }
+        const at = Math.max(nextAt, ctx.currentTime + 0.02);
+        nextAt = at + count / voice.sampleRate;
+        scheduledSamples += count;
+        sources.add(src);
+        src.onended = () => {
+          sources.delete(src);
+          if (voice.done && sources.size === 0 && scheduledSamples >= voice.totalSamples) finishEnded();
+        };
+        src.start(at);
+        if (!started) {
+          started = true;
+          emit("playing");
+        }
+      } else if (voice.done && sources.size === 0) {
+        if (!started) emit("error");
+        finishEnded();
+      }
+    };
+    const playWhole = async () => {
+      const ok = await voice.whenDone;
+      if (stopped) return;
+      if (!ok && voice.totalSamples === 0) {
+        emit("error");
+        finishEnded();
+        return;
+      }
+      if (typeof deps.playWholeWav !== "function") {
+        emit("error");
+        finishEnded();
+        return;
+      }
+      let wav = voice.toWav();
+      if (typeof deps.wholeWavVolume === "function") wav = deps.wholeWavVolume(wav, deps.volumePercent);
+      whole = deps.playWholeWav(wav);
+      whole.addEventListener("playing", () => emit("playing"), { once: true });
+      whole.addEventListener("ended", () => finishEnded(), { once: true });
+      whole.addEventListener("error", () => {
+        emit("error");
+        finishEnded();
+      }, { once: true });
+      await whole.play();
+    };
+    return {
+      /** 少しずつ流すときは再生速度を変えない(変えると声の高さも変わるため)。 */
+      playbackRate: 1,
+      preservesPitch: true,
+      /** 聞こえ方の計器(voicePlaybackQuality.js の observeVoicePlayback が読む)。 */
+      get quality() {
+        return {
+          underruns,
+          underrunMaxMs,
+          outPeak: started && !whole ? gain.outPeak : -1,
+          outRms: started && !whole ? gain.outRms : -1,
+          gainDropRatio: started && !whole ? gain.dropRatio : 1,
+          partial: voice.failed === true && voice.totalSamples > 0
+        };
+      },
+      get duration() {
+        return voice.done && voice.sampleRate > 0 ? voice.totalSamples / voice.sampleRate : NaN;
+      },
+      /** @param {string} type @param {Function} fn */
+      addEventListener(type, fn) {
+        if (!listeners.has(type)) listeners.set(type, /* @__PURE__ */ new Set());
+        listeners.get(type)?.add(fn);
+      },
+      /** @param {string} type @param {Function} fn */
+      removeEventListener(type, fn) {
+        listeners.get(type)?.delete(fn);
+      },
+      async play() {
+        let ctx = null;
+        try {
+          ctx = deps.audioContext();
+        } catch {
+          ctx = null;
+        }
+        if (ctx && ctx.state !== "running") {
+          try {
+            await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 300))]);
+          } catch {
+          }
+        }
+        if (stopped) return;
+        if (!ctx || ctx.state !== "running") return playWhole();
+        const live = (
+          /** @type {AudioContext} */
+          ctx
+        );
+        const tryStart = () => {
+          if (!started && !voice.done && voice.bufferedSec < VOICE_STREAM_PREBUFFER_SEC) return;
+          schedule(live);
+        };
+        unsubscribe = voice.onUpdate(tryStart);
+        tryStart();
+      },
+      pause() {
+        stopped = true;
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
+        }
+        for (const s of sources) {
+          try {
+            s.stop();
+          } catch {
+          }
+        }
+        sources.clear();
+        if (whole) {
+          try {
+            whole.pause();
+          } catch {
+          }
+        }
+        voice.cancel();
+      }
+    };
+  }
+
+  // src/lib/voicevoxClient.js
+  var VOICEVOX_BASE_URL = "http://127.0.0.1:50021";
+  var VOICEVOX_OUTPUT_SAMPLING_RATE = 16e3;
+  var _outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
+  function setVoicevoxOutputSamplingRate(hz) {
+    const n = Number(hz);
+    _outputSamplingRate = n === 24e3 ? 24e3 : VOICEVOX_OUTPUT_SAMPLING_RATE;
+  }
+  function positiveTimeout(value, fallback) {
+    const timeout = Number(value);
+    return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
+  }
+  function isExtensionPage() {
+    try {
+      return typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getURL === "function" && typeof location !== "undefined" && location.protocol === "chrome-extension:";
+    } catch {
+      return false;
+    }
+  }
+  function proxyTextResponse(res) {
+    const raw = Number(res && res.status);
+    const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
+    const noBody = status === 204 || status === 205 || status === 304;
+    return new Response(noBody ? null : String(res && res.text != null ? res.text : ""), { status });
+  }
+  async function proxyFetchFn(url, init) {
+    if (isExtensionPage()) {
+      return globalThis.fetch(url, init);
+    }
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      return new Promise((resolve, reject) => {
+        const safeInit = { ...init };
+        if ("signal" in safeInit) delete safeInit.signal;
+        chrome.runtime.sendMessage(
+          { type: "NLS_FETCH_PROXY", url: url.toString(), init: safeInit, wantBuffer: false },
+          (res) => {
+            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+            if (!res || res.error) return reject(new Error(res?.error || "Proxy fetch failed"));
+            try {
+              resolve(proxyTextResponse(res));
+            } catch (e) {
+              reject(e);
+            }
+          }
+        );
+      });
+    }
+    return globalThis.fetch(url, init);
+  }
+  async function proxyFetchBufferFn(url, init) {
+    if (isExtensionPage()) {
+      return globalThis.fetch(url, init);
+    }
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      return new Promise((resolve, reject) => {
+        const safeInit = { ...init };
+        if ("signal" in safeInit) delete safeInit.signal;
+        chrome.runtime.sendMessage(
+          { type: "NLS_FETCH_PROXY", url: url.toString(), init: safeInit, wantBuffer: true },
+          (res) => {
+            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+            if (!res || res.error) return reject(new Error(res?.error || "Proxy fetch failed"));
+            const uint8 = new Uint8Array(res.buffer);
+            resolve({ ok: res.ok, status: res.status, arrayBuffer: async () => uint8.buffer });
+          }
+        );
+      });
+    }
+    return globalThis.fetch(url, init);
+  }
+  async function proxyStreamFetchFn(url, init) {
+    if (isExtensionPage() || typeof chrome === "undefined" || !chrome.runtime?.connect) {
+      return globalThis.fetch(url, init);
+    }
+    const port = chrome.runtime.connect({ name: VOICEVOX_STREAM_PORT });
+    const safeInit = { ...init };
+    const signal = safeInit.signal;
+    delete safeInit.signal;
+    return new Promise((resolve, reject) => {
+      let ctl = null;
+      let headed = false;
+      const body = new ReadableStream({
+        start(c) {
+          ctl = c;
+        },
+        cancel() {
+          try {
+            port.disconnect();
+          } catch {
+          }
+        }
+      });
+      const close = (err) => {
+        try {
+          if (err) ctl?.error(err);
+          else ctl?.close();
+        } catch {
+        }
+      };
+      signal?.addEventListener?.("abort", () => {
+        try {
+          port.disconnect();
+        } catch {
+        }
+        if (!headed) reject(new Error("voicevox_stream_abort"));
+        close(new Error("voicevox_stream_abort"));
+      });
+      port.onMessage.addListener((m) => {
+        if (!m || typeof m !== "object") return;
+        if (m.type === "head") {
+          headed = true;
+          resolve({ ok: m.ok === true, status: Number(m.status) || 0, body });
+        } else if (m.type === "chunk" && Array.isArray(m.data)) {
+          try {
+            ctl?.enqueue(Uint8Array.from(m.data));
+          } catch {
+          }
+        } else if (m.type === "end") {
+          close(null);
+          try {
+            port.disconnect();
+          } catch {
+          }
+        } else if (m.type === "error") {
+          if (!headed) reject(new Error(String(m.error || "Proxy stream failed")));
+          close(new Error(String(m.error || "Proxy stream failed")));
+        }
+      });
+      port.onDisconnect.addListener(() => {
+        if (!headed) reject(new Error("Proxy stream disconnected"));
+        close(new Error("Proxy stream disconnected"));
+      });
+      port.postMessage({ type: "start", url: url.toString(), init: safeInit });
+    });
+  }
+  var VOICEVOX_STREAM_PORT = "NLS_VOICEVOX_STREAM";
+  async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
+    const controller = new AbortController();
+    let timer = 0;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error("voicevox_timeout"));
+      }, timeoutMs);
+    });
+    try {
+      return (
+        /** @type {Response} */
+        await Promise.race([
+          Promise.resolve().then(
+            () => fetchFn(url, { ...init, signal: controller.signal })
+          ),
+          timeout
+        ])
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  async function arrayBufferWithTimeout(res, timeoutMs) {
+    let timer = 0;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("voicevox_body_timeout")), timeoutMs);
+    });
+    try {
+      return (
+        /** @type {ArrayBuffer} */
+        await Promise.race([res.arrayBuffer(), timeout])
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  function defaultVoicevoxAliveTimeoutMs(viaProxy) {
+    return viaProxy ? 5e3 : 1500;
+  }
+  function classifyVoicevoxAliveFailure(input) {
+    if (input?.hasFetch === false) return "no-fetch";
+    const err = input?.error;
+    if (err) {
+      const msg = String(
+        /** @type {any} */
+        err?.message || err || ""
+      );
+      if (msg.includes("voicevox_timeout")) return "timeout";
+      if (/abort/i.test(msg) || /** @type {any} */
+      err?.name === "AbortError") return "timeout";
+      return "refused";
+    }
+    const res = input?.response;
+    if (res && res.ok === false) return "http-error";
+    return "";
+  }
+  async function probeVoicevoxAlive(opts = {}) {
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") {
+      return { ok: false, reason: classifyVoicevoxAliveFailure({ hasFetch: false }) };
+    }
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    const viaProxy = !opts.fetchFn && !isExtensionPage();
+    const fallbackTimeout = defaultVoicevoxAliveTimeoutMs(viaProxy);
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        `${baseUrl}/version`,
+        { method: "GET" },
+        positiveTimeout(opts.timeoutMs, fallbackTimeout)
+      );
+      if (response?.ok !== false) return { ok: true, reason: "" };
+      return { ok: false, reason: classifyVoicevoxAliveFailure({ response }) };
+    } catch (err) {
+      return { ok: false, reason: classifyVoicevoxAliveFailure({ error: err }) };
+    }
+  }
+  async function isVoicevoxAlive(opts = {}) {
+    const probe = await probeVoicevoxAlive(opts);
+    return probe.ok;
+  }
+  async function initializeVoicevoxSpeaker(styleId, opts = {}) {
+    const id = Number(styleId);
+    if (!Number.isInteger(id) || id < 0) return false;
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") return false;
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        `${baseUrl}/initialize_speaker?speaker=${id}&skip_reinit=true`,
+        { method: "POST" },
+        positiveTimeout(opts.timeoutMs, 3e4)
+      );
+      return !!response && response.ok !== false;
+    } catch {
+      return false;
+    }
+  }
+  async function warmupVoicevoxQuery(styleId, opts = {}) {
+    const id = Number(styleId);
+    if (!Number.isInteger(id) || id < 0) return false;
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") return false;
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    const query = new URLSearchParams({ text: "あ", speaker: String(id) });
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        `${baseUrl}/audio_query?${query}`,
+        { method: "POST" },
+        positiveTimeout(opts.timeoutMs, 15e3)
+      );
+      return !!response && response.ok !== false;
+    } catch {
+      return false;
+    }
+  }
+  function isWhisperStyleName(styleName) {
+    const name = String(styleName || "");
+    return /ささやき|囁き|ウィスパ|whisper/i.test(name);
+  }
+  async function listVoicevoxStyleIds(opts = {}) {
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") return [];
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        `${baseUrl}/speakers`,
+        { method: "GET" },
+        positiveTimeout(opts.timeoutMs, 3e3)
+      );
+      if (!response || response.ok === false) return [];
+      const speakers = await response.json();
+      if (!Array.isArray(speakers)) return [];
+      const ids = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const speaker of speakers) {
+        if (!speaker || typeof speaker !== "object" || !Array.isArray(speaker.styles)) {
+          continue;
+        }
+        for (const style of speaker.styles) {
+          const id = Number(style?.id);
+          if (!Number.isInteger(id) || id < 0 || seen.has(id)) continue;
+          if (isWhisperStyleName(style?.name)) continue;
+          seen.add(id);
+          ids.push(id);
+        }
+      }
+      return ids;
+    } catch {
+      return [];
+    }
+  }
+  var _streamSupport = (
+    /** @type {'unknown'|'yes'|'no'} */
+    "unknown"
+  );
+  var _streamRejectedStyles = /* @__PURE__ */ new Set();
+  async function probeVoicevoxStreaming(opts = {}) {
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") return false;
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    try {
+      const res = await fetchWithTimeout(fetchFn, `${baseUrl}/engine_manifest`, { method: "GET" }, positiveTimeout(opts.timeoutMs, 5e3));
+      if (!res || res.ok === false || typeof /** @type {any} */
+      res.json !== "function") {
+        _streamSupport = "no";
+        return false;
+      }
+      const manifest = await /** @type {any} */
+      res.json();
+      const ok = manifest?.supported_features?.streaming_synthesis === true;
+      _streamSupport = ok ? "yes" : "no";
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+  async function probeVoicevoxGpuCapable(opts = {}) {
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    if (typeof fetchFn !== "function") return null;
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    try {
+      const res = await fetchWithTimeout(fetchFn, `${baseUrl}/supported_devices`, { method: "GET" }, positiveTimeout(opts.timeoutMs, 5e3));
+      if (!res || res.ok === false || typeof /** @type {any} */
+      res.json !== "function") return null;
+      const devices = await /** @type {any} */
+      res.json();
+      if (!devices || typeof devices !== "object") return null;
+      return devices.cuda === true || devices.dml === true;
+    } catch {
+      return null;
+    }
+  }
+  var STREAM_FALLBACK = /* @__PURE__ */ Symbol("stream_fallback");
+  async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
+    const streamFetchFn = typeof opts.streamFetchFn === "function" ? opts.streamFetchFn : proxyStreamFetchFn;
+    const firstAudioMs = positiveTimeout(opts.synthesisTimeoutMs, 8e3);
+    const controller = new AbortController();
+    let res;
+    let timer = (
+      /** @type {any} */
+      0
+    );
+    try {
+      res = await Promise.race([
+        Promise.resolve().then(() => streamFetchFn(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "audio/wav" },
+          body: JSON.stringify(audioQuery),
+          signal: controller.signal
+        })),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error("voicevox_timeout"));
+          }, firstAudioMs);
+        })
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res || res.ok === false) {
+      const status = Number(res?.status) || 0;
+      if (status === 404 || status === 405 || status === 501) {
+        _streamSupport = "no";
+        return STREAM_FALLBACK;
+      }
+      if (status === 422) {
+        _streamRejectedStyles.add(styleId);
+        return STREAM_FALLBACK;
+      }
+      notifyFailure({ stage: "synth", httpStatus: status });
+      return null;
+    }
+    const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
+    if (!reader) return STREAM_FALLBACK;
+    const parser = createWavStreamParser();
+    let voice = null;
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (v) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(firstTimer);
+        resolve(v);
+      };
+      const firstTimer = setTimeout(() => {
+        try {
+          controller.abort();
+          void reader.cancel().catch(() => {
+          });
+        } catch {
+        }
+        voice?.fail();
+        notifyFailure({ stage: "synth", error: new Error("voicevox_timeout") });
+        settle(null);
+      }, firstAudioMs);
+      void (async () => {
+        try {
+          for (; ; ) {
+            let stall = (
+              /** @type {any} */
+              0
+            );
+            const next = await Promise.race([
+              reader.read(),
+              new Promise((_, reject) => {
+                stall = setTimeout(() => reject(new Error("voicevox_stream_stall")), VOICE_STREAM_STALL_MS);
+              })
+            ]).finally(() => clearTimeout(stall));
+            const { done, value } = (
+              /** @type {{ done: boolean, value?: Uint8Array }} */
+              next
+            );
+            if (done) break;
+            const samples = parser.push(value instanceof Uint8Array ? value : new Uint8Array(value || []));
+            if (parser.error) throw new Error(`voicevox_stream_${parser.error}`);
+            if (samples && samples.length) {
+              if (!voice) {
+                voice = new StreamedVoice(parser.sampleRate);
+                voice._cancel = () => {
+                  try {
+                    controller.abort();
+                    void reader.cancel().catch(() => {
+                    });
+                  } catch {
+                  }
+                };
+              }
+              voice.append(samples);
+              if (voice.bufferedSec >= VOICE_STREAM_PREBUFFER_SEC) settle(voice);
+            }
+            if (voice?.done) return;
+          }
+          if (voice) {
+            voice.finish();
+            settle(voice);
+          } else {
+            notifyFailure({ stage: "synth", bodyInvalid: true });
+            settle(null);
+          }
+        } catch (err) {
+          try {
+            void reader.cancel().catch(() => {
+            });
+          } catch {
+          }
+          if (voice && voice.totalSamples > 0) {
+            voice.fail();
+            settle(voice);
+          } else {
+            notifyFailure({ stage: "synth", error: err });
+            settle(null);
+          }
+        }
+      })();
+    });
+  }
+  async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailure) {
+    const streamFetchFn = typeof opts.streamFetchFn === "function" ? opts.streamFetchFn : proxyStreamFetchFn;
+    const totalMs = positiveTimeout(opts.synthesisTimeoutMs, 8e3);
+    const controller = new AbortController();
+    let reader = null;
+    let timer = (
+      /** @type {any} */
+      0
+    );
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        try {
+          controller.abort();
+          void reader?.cancel?.().catch(() => {
+          });
+        } catch {
+        }
+        reject(new Error("voicevox_timeout"));
+      }, totalMs);
+    });
+    try {
+      return await Promise.race([timeout, (async () => {
+        const res = await streamFetchFn(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "audio/wav" },
+          body: JSON.stringify(audioQuery),
+          signal: controller.signal
+        });
+        if (!res || res.ok === false) {
+          const status = Number(res?.status) || 0;
+          if (status === 404 || status === 405 || status === 501) {
+            _streamSupport = "no";
+            return STREAM_FALLBACK;
+          }
+          if (status === 422) {
+            _streamRejectedStyles.add(styleId);
+            return STREAM_FALLBACK;
+          }
+          notifyFailure({ stage: "synth", httpStatus: status });
+          return null;
+        }
+        reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
+        if (!reader) return STREAM_FALLBACK;
+        const parts = [];
+        let total = 0;
+        for (; ; ) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const part = value instanceof Uint8Array ? value : new Uint8Array(value || []);
+          parts.push(part);
+          total += part.length;
+        }
+        const wav = new Uint8Array(total);
+        let off = 0;
+        for (const part of parts) {
+          wav.set(part, off);
+          off += part.length;
+        }
+        const tag = (o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);
+        if (total <= 44 || tag(0) !== "RIFF" || tag(8) !== "WAVE") {
+          notifyFailure({ stage: "synth", bodyInvalid: true });
+          return null;
+        }
+        if (tag(36) === "data") {
+          const dv = new DataView(wav.buffer);
+          dv.setUint32(4, total - 8, true);
+          dv.setUint32(40, total - 44, true);
+        }
+        return wav.buffer;
+      })()]);
+    } catch (err) {
+      notifyFailure({ stage: "synth", error: err });
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  async function synthesizeVoice(text, voice, opts = {}) {
+    const readingText = String(text || "").trim();
+    const fetchFn = opts.fetchFn || proxyFetchFn;
+    const fetchBufferFn = opts.fetchFn ? opts.fetchFn : proxyFetchBufferFn;
+    const notifyFailure = (info) => {
+      try {
+        if (typeof opts.onFailure === "function") opts.onFailure(info);
+      } catch {
+      }
+    };
+    if (!readingText || typeof fetchFn !== "function") return null;
+    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
+    const styleId = Number.isFinite(Number(voice?.styleId)) ? Number(voice.styleId) : 3;
+    const pitchOffset = Number.isFinite(Number(voice?.pitchOffset)) ? Number(voice.pitchOffset) : 0;
+    const speedOffset = Number.isFinite(Number(voice?.speedOffset)) ? Number(voice.speedOffset) : 0;
+    const query = new URLSearchParams({
+      text: readingText,
+      speaker: String(styleId)
+    });
+    const nowMs = () => Date.now();
+    const queryStartAt = nowMs();
+    let stage = "query";
+    try {
+      const queryResponse = await fetchWithTimeout(
+        fetchFn,
+        `${baseUrl}/audio_query?${query}`,
+        { method: "POST" },
+        positiveTimeout(opts.audioQueryTimeoutMs, 3e3)
+      );
+      if (!queryResponse || queryResponse.ok === false) {
+        notifyFailure({ stage: "query", httpStatus: Number(queryResponse?.status) || 0 });
+        return null;
+      }
+      const audioQuery = await queryResponse.json();
+      if (!audioQuery || typeof audioQuery !== "object") {
+        notifyFailure({ stage: "query", bodyInvalid: true });
+        return null;
+      }
+      const pitchScale = Number(audioQuery.pitchScale);
+      const speedScale = Number(audioQuery.speedScale);
+      audioQuery.pitchScale = (Number.isFinite(pitchScale) ? pitchScale : 0) + pitchOffset;
+      audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
+      audioQuery.outputSamplingRate = _outputSamplingRate;
+      audioQuery.outputStereo = false;
+      const queryMs = nowMs() - queryStartAt;
+      stage = "synth";
+      const synthStartAt = nowMs();
+      if (opts.stream === true && _streamSupport === "yes" && !_streamRejectedStyles.has(styleId)) {
+        const streamed = await streamSynthesis(
+          `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
+          audioQuery,
+          styleId,
+          opts,
+          notifyFailure
+        );
+        if (streamed !== STREAM_FALLBACK) {
+          if (streamed) {
+            try {
+              if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt, streamed: true });
+            } catch {
+            }
+          }
+          return streamed;
+        }
+      } else if (opts.stream !== true && opts.wholeViaStream !== false && _streamSupport === "yes" && !_streamRejectedStyles.has(styleId)) {
+        const whole = await streamSynthesisWhole(
+          `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
+          audioQuery,
+          styleId,
+          opts,
+          notifyFailure
+        );
+        if (whole !== STREAM_FALLBACK) {
+          if (whole) {
+            try {
+              if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
+            } catch {
+            }
+          }
+          return whole;
+        }
+      }
+      const synthesisRes = await fetchWithTimeout(
+        fetchBufferFn,
+        `${baseUrl}/synthesis?speaker=${styleId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "audio/wav"
+          },
+          body: JSON.stringify(audioQuery)
+        },
+        positiveTimeout(opts.synthesisTimeoutMs, 8e3)
+      );
+      if (!synthesisRes || synthesisRes.ok === false) {
+        notifyFailure({ stage: "synth", httpStatus: Number(synthesisRes?.status) || 0 });
+        return null;
+      }
+      const wav = await arrayBufferWithTimeout(
+        synthesisRes,
+        positiveTimeout(opts.synthesisTimeoutMs, 8e3)
+      );
+      try {
+        if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
+      } catch {
+      }
+      return wav;
+    } catch (err) {
+      notifyFailure({ stage, error: err });
+      return null;
+    }
+  }
+  function buildVoiceReadingText(row, { maxChars = 60 } = {}) {
+    const rawText = String(row?.text || "").trim();
+    if (!rawText) return "";
+    const rawMaxChars = Number(maxChars);
+    const limit = Number.isFinite(rawMaxChars) && rawMaxChars >= 1 ? Math.floor(rawMaxChars) : 60;
+    const body = Array.from(normalizeVoiceReadingBody(rawText)).slice(0, limit).join("");
+    if (!body) return "";
+    const name = normalizeVoiceReadingBody(String(row?.name || ""));
+    return name ? `${name}、${body}` : body;
+  }
+  function buildMergedVoiceText(item, { maxChars } = {}) {
+    const text = buildVoiceReadingText(
+      { name: item?.name, text: item?.body },
+      { maxChars }
+    );
+    if (!text) return "";
+    const rawCount = Number(item?.count);
+    const count = Number.isFinite(rawCount) && rawCount >= 1 ? Math.floor(rawCount) : 1;
+    return count > 1 ? `${text}、ほか${count - 1}件` : text;
+  }
+
+  // src/lib/voiceAgeGate.js
+  var VOICE_STALE_MS_NORMAL = 8e3;
+  var VOICE_STALE_BACKLOG_QUEUE = Number.POSITIVE_INFINITY;
+  var VOICE_STALE_MS_HIGH_PRIORITY = 1e4;
+  function isVoiceItemStale(enqueuedAt, now, queueLength, isHighPriority = false) {
+    if (typeof enqueuedAt !== "number" || typeof now !== "number" || typeof queueLength !== "number") {
+      return { stale: false, reason: "" };
+    }
+    if (enqueuedAt > now || enqueuedAt <= 0) {
+      return { stale: false, reason: "" };
+    }
+    const ageMs = now - enqueuedAt;
+    if (isHighPriority) {
+      if (ageMs > VOICE_STALE_MS_HIGH_PRIORITY) {
+        return { stale: true, reason: `age ${ageMs}ms > ${VOICE_STALE_MS_HIGH_PRIORITY}ms (high priority)` };
+      }
+      return { stale: false, reason: "" };
+    }
+    const thresholdMs = VOICE_STALE_MS_NORMAL;
+    if (ageMs > thresholdMs) {
+      return { stale: true, reason: `age ${ageMs}ms > ${thresholdMs}ms (q: ${queueLength})` };
+    }
+    return { stale: false, reason: "" };
+  }
+
+  // src/lib/voiceSynthFailure.js
+  var VOICE_SYNTH_TIMEOUT_MS = 8e3;
+  var VOICE_SYNTH_NEAR_TIMEOUT_RATIO = 0.9;
+  function classifyVoiceSynthNull(ev) {
+    const timeoutMs = Number(ev?.timeoutMs);
+    const limit = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : VOICE_SYNTH_TIMEOUT_MS;
+    const ms = Number(ev?.synthMs);
+    if (!Number.isFinite(ms) || ms < 0) return { nearTimeout: false, ratio: -1 };
+    const ratio = ms / limit;
+    return { nearTimeout: ratio >= VOICE_SYNTH_NEAR_TIMEOUT_RATIO, ratio };
+  }
+
+  // src/lib/voiceFailureTaxonomy.js
+  var ALIVE_FAILURES = Object.freeze({
+    "no-fetch": Object.freeze({ cause: "not_wired", stage: "probe" }),
+    timeout: Object.freeze({ cause: "timeout", stage: "probe" }),
+    refused: Object.freeze({ cause: "down", stage: "probe" }),
+    "http-error": Object.freeze({ cause: "http", stage: "probe" }),
+    "": null
+  });
+  var SYNTH_FAILURES = Object.freeze({
+    timeout: Object.freeze({ cause: "timeout", stage: "synth" }),
+    query_timeout: Object.freeze({ cause: "timeout", stage: "query" }),
+    unreachable: Object.freeze({ cause: "down", stage: "synth" }),
+    query_http: Object.freeze({ cause: "http", stage: "query" }),
+    query_body: Object.freeze({ cause: "payload", stage: "query" }),
+    synth_http: Object.freeze({ cause: "http", stage: "synth" }),
+    synth_body: Object.freeze({ cause: "payload", stage: "synth" }),
+    unknown: Object.freeze({ cause: "unknown", stage: "synth" })
+  });
+
+  // src/lib/voiceSynthFailureReason.js
+  var VOICE_SYNTH_FAIL_REASONS = Object.freeze([
+    "timeout",
+    "query_timeout",
+    "unreachable",
+    "query_http",
+    "query_body",
+    "synth_http",
+    "synth_body",
+    "unknown"
+  ]);
+  function classifyVoiceSynthFailureReason(ev) {
+    const stage = String(ev?.stage || "");
+    const msg = String(
+      /** @type {any} */
+      ev?.error?.message ?? ev?.error ?? ""
+    ).toLowerCase();
+    if (msg.includes("timeout") || msg.includes("abort")) return stage === "query" ? "query_timeout" : "timeout";
+    if (msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("econnrefused") || msg.includes("connection refused") || msg.includes("load failed")) {
+      return "unreachable";
+    }
+    if (ev?.bodyInvalid === true) {
+      return stage === "synth" ? "synth_body" : "query_body";
+    }
+    const status = Number(ev?.httpStatus);
+    if (Number.isFinite(status) && status > 0) {
+      return stage === "synth" ? "synth_http" : "query_http";
+    }
+    if (stage === "synth") return "synth_http";
+    if (stage === "query") return "query_http";
+    return "unknown";
+  }
+
+  // src/lib/voiceNarrowing.js
+  var VOICE_NARROW_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14]);
+  var VOICE_CAPPED_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14, 11, 21, 20, 46, 0, 4, 6, 1, 7, 5, 81, 82, 83, 84, 85, 66, 77, 78, 79, 80]);
+  var VOICE_WEAK_PC_WARM_SYNTH_MS = 500;
+  var VOICE_WEAK_PC_COLD_SYNTH_MS = 3e3;
+  var VOICE_WEAK_PC_MIN_WARM_SAMPLES = 5;
+  var VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
+  var VOICE_WEAK_PC_RTF_PERMILLE = 400;
+  function isWarmSynthSlow(diag, minSamples) {
+    const rtf = Number(diag?.warmSynthRtfPermille);
+    const rtfSamples = Number(diag?.warmRtfSamples) || 0;
+    if (rtfSamples > 0) {
+      if (rtfSamples < minSamples || !Number.isFinite(rtf) || rtf < 0) return null;
+      return rtf >= VOICE_WEAK_PC_RTF_PERMILLE;
+    }
+    const warm = Number(diag?.warmSynthEmaMs);
+    const samples = Number(diag?.warmSynthSamples) || 0;
+    if (samples >= minSamples && Number.isFinite(warm) && warm >= 0) return warm >= VOICE_WEAK_PC_WARM_SYNTH_MS;
+    return null;
+  }
+  function isWeakVoicePc(diag) {
+    const cold = Number(diag?.coldSynthMaxMs);
+    if (isWarmSynthSlow(diag, VOICE_WEAK_PC_MIN_WARM_SAMPLES) === true) return true;
+    if (Number.isFinite(cold) && cold >= VOICE_WEAK_PC_COLD_SYNTH_MS) return true;
+    return false;
+  }
+  function narrowVoiceStyleIds(availableStyleIds, weak) {
+    return pickFromTable(availableStyleIds, weak ? VOICE_NARROW_STYLE_IDS : null);
+  }
+  function pickFromTable(availableStyleIds, table) {
+    const available = Array.isArray(availableStyleIds) ? availableStyleIds.map(Number) : [];
+    if (!table) return available;
+    const have = new Set(available);
+    const picked = table.filter((id) => have.has(id));
+    return picked.length >= 2 ? picked : available;
+  }
+  var VOICE_NARROW_MODES = Object.freeze(["off", "auto", "on"]);
+  function normalizeVoiceNarrowMode(raw) {
+    return raw === "off" || raw === "on" ? raw : "auto";
+  }
+  function isVoiceNarrowActive(mode, weakRemembered) {
+    const m = normalizeVoiceNarrowMode(mode);
+    return m === "on" || m === "auto" && weakRemembered === true;
+  }
+  async function prepareVoiceStyleIds(allStyleIds, deps) {
+    const all = Array.isArray(allStyleIds) ? allStyleIds.map(Number) : [];
+    let settings = {};
+    try {
+      settings = await deps.readSettings() || {};
+    } catch {
+      settings = {};
+    }
+    const active = isVoiceNarrowActive(settings.mode, settings.weak);
+    const capped = !active && normalizeVoiceNarrowMode(settings.mode) === "auto";
+    const styleIds = active ? narrowVoiceStyleIds(all, true) : pickFromTable(all, capped ? VOICE_CAPPED_STYLE_IDS : null);
+    const narrowed = active && styleIds.length < all.length;
+    if (narrowed && typeof deps.initSpeaker === "function") {
+      const init = deps.initSpeaker;
+      void (async () => {
+        for (const id of styleIds) {
+          try {
+            await init(id);
+          } catch {
+          }
+        }
+      })();
+    }
+    return { styleIds, narrowed };
+  }
+  function rememberWeakVoicePc(diag, state, write) {
+    if (state.saved || !isWeakVoicePc(diag)) return;
+    state.saved = true;
+    Promise.resolve().then(() => write(true)).catch(() => {
+    });
+  }
+  function isFastVoicePc(diag) {
+    const cold = Number(diag?.coldSynthMaxMs) || 0;
+    return isWarmSynthSlow(diag, VOICE_FAST_PC_MIN_WARM_SAMPLES) === false && cold < VOICE_WEAK_PC_COLD_SYNTH_MS;
+  }
+  function forgetWeakVoicePcIfFast(diag, state, clear) {
+    if (state.cleared || !isFastVoicePc(diag)) return;
+    state.cleared = true;
+    Promise.resolve().then(() => clear()).catch(() => {
+    });
+  }
+
+  // src/lib/voiceEngineActivity.js
+  var VOICE_ENGINE_PING_MIN_INTERVAL_MS = 500;
+  var VOICE_ENGINE_QUIET_QUERY_TIMEOUT_MS = 500;
+  function createVoiceEngineActivityLink(sendMessage, opts = {}) {
+    const now = opts.now || (() => Date.now());
+    let lastPingAt = -Infinity;
+    return {
+      /** 合成・読み込みを始めた/終えた合図(間引いて送る・失敗は無視)。 */
+      ping() {
+        const t = now();
+        if (t - lastPingAt < VOICE_ENGINE_PING_MIN_INTERVAL_MS) return;
+        lastPingAt = t;
+        try {
+          const r = sendMessage({ type: "NLS_VOICE_ENGINE_ACTIVITY" });
+          if (r && typeof /** @type {any} */
+          r.catch === "function") r.catch(() => {
+          });
+        } catch {
+        }
+      },
+      /**
+       * どちらかのページが最後に VOICEVOX を使ってから何 ms たったか。分からなければ Infinity。
+       * @returns {Promise<number>}
+       */
+      async quietMs() {
+        let timer = null;
+        try {
+          const res = await Promise.race([
+            Promise.resolve(sendMessage({ type: "NLS_VOICE_ENGINE_QUIET" })),
+            new Promise((r) => {
+              timer = setTimeout(() => r(null), VOICE_ENGINE_QUIET_QUERY_TIMEOUT_MS);
+            })
+          ]);
+          const raw = res && typeof res === "object" ? (
+            /** @type {any} */
+            res.quietMs
+          ) : void 0;
+          return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? raw : Infinity;
+        } catch {
+          return Infinity;
+        } finally {
+          if (timer !== null) clearTimeout(
+            /** @type {any} */
+            timer
+          );
+        }
+      }
+    };
+  }
+  function chromeVoiceEngineLink() {
+    const rt = typeof chrome !== "undefined" ? chrome.runtime : void 0;
+    if (!rt || typeof rt.sendMessage !== "function") return null;
+    return createVoiceEngineActivityLink((msg) => rt.sendMessage(msg));
+  }
+
+  // src/lib/voiceWarmup.js
+  var VOICE_IDLE_INIT_DELAY_MS = 1500;
+  var VOICE_REMOTE_QUIET_MS = 4e3;
+  var VOICE_BUSY_PING_INTERVAL_MS = 1e3;
+  var VOICE_STREAM_GATE_MAX_MS = 8e3;
+  var VOICE_WARMUP_QUERY_TIMEOUT_MS = 8e3;
+  function createVoiceWarmup(deps) {
+    const now = typeof deps?.now === "function" ? deps.now : () => Date.now();
+    const setT = typeof deps?.setTimeout === "function" ? deps.setTimeout : (fn, ms) => setTimeout(fn, ms);
+    const clearT = typeof deps?.clearTimeout === "function" ? deps.clearTimeout : (h) => clearTimeout(h);
+    const warm = /* @__PURE__ */ new Set();
+    const inflight = /* @__PURE__ */ new Map();
+    const failed = /* @__PURE__ */ new Set();
+    let chain = Promise.resolve();
+    let pending = 0;
+    let epoch = 0;
+    let engineWarmed = false;
+    let primePromise = null;
+    const later = /* @__PURE__ */ new Set();
+    const waiters = /* @__PURE__ */ new Map();
+    let active = 0;
+    let pumpTimer = null;
+    let lastActivityAt = -Infinity;
+    let hooks = {};
+    let remoteChecking = false;
+    function signalActivity() {
+      try {
+        if (typeof hooks.onActivity === "function") hooks.onActivity();
+      } catch {
+      }
+    }
+    let streamGate = null;
+    function settle(key, ok) {
+      later.delete(key);
+      const list = waiters.get(key);
+      if (!list) return;
+      waiters.delete(key);
+      for (const fn of list) fn(ok);
+    }
+    function waitGate(gate) {
+      let timer = null;
+      return Promise.race([
+        gate.then(() => {
+        }, () => {
+        }),
+        new Promise((r) => {
+          timer = setT(() => r(void 0), VOICE_STREAM_GATE_MAX_MS);
+        })
+      ]).then(() => {
+        if (timer !== null) clearT(timer);
+      });
+    }
+    function pump() {
+      if (pumpTimer !== null || remoteChecking || later.size === 0) return;
+      pumpTimer = setT(() => {
+        pumpTimer = null;
+        if (later.size === 0) return;
+        if (!locallyIdle()) {
+          pump();
+          return;
+        }
+        if (typeof hooks.engineQuietMs !== "function") {
+          startNext();
+          return;
+        }
+        remoteChecking = true;
+        const ask = (
+          /** @type {() => Promise<number>} */
+          hooks.engineQuietMs
+        );
+        void Promise.resolve().then(ask).then((q) => q, () => Infinity).then((q) => {
+          remoteChecking = false;
+          if (!(Number(q) >= VOICE_REMOTE_QUIET_MS)) {
+            try {
+              if (typeof hooks.onRemoteBusy === "function") hooks.onRemoteBusy();
+            } catch {
+            }
+            pump();
+            return;
+          }
+          if (!locallyIdle()) {
+            pump();
+            return;
+          }
+          startNext();
+        });
+      }, VOICE_IDLE_INIT_DELAY_MS);
+    }
+    function locallyIdle() {
+      let playerIdle = true;
+      try {
+        playerIdle = typeof hooks.isIdle === "function" ? hooks.isIdle() !== false : true;
+      } catch {
+        playerIdle = true;
+      }
+      return active === 0 && pending === 0 && playerIdle && now() - lastActivityAt >= VOICE_IDLE_INIT_DELAY_MS;
+    }
+    function startNext() {
+      if (later.size === 0) return;
+      const key = (
+        /** @type {string} */
+        later.values().next().value
+      );
+      later.delete(key);
+      void ensureInternal(Number(key), true).then(() => {
+      }, () => {
+      });
+    }
+    function enqueue(task) {
+      pending += 1;
+      const p = chain.then(task, task);
+      chain = p.then(() => {
+      }, () => {
+      });
+      return p.finally(() => {
+        pending -= 1;
+        pump();
+      });
+    }
+    const keyOf2 = (styleId) => String(Number(styleId));
+    function ensureInternal(styleId, background) {
+      const id = Number(styleId);
+      if (!Number.isInteger(id) || id < 0) return Promise.resolve(false);
+      const key = keyOf2(id);
+      if (warm.has(key)) return Promise.resolve(true);
+      if (failed.has(key)) return Promise.resolve(false);
+      const existing = inflight.get(key);
+      if (existing) return existing;
+      const myEpoch = epoch;
+      const p = enqueue(async () => {
+        if (myEpoch !== epoch) return false;
+        if (warm.has(key)) return true;
+        let ok = false;
+        const t0 = now();
+        signalActivity();
+        try {
+          ok = !!await deps.initSpeaker(id);
+        } catch {
+          ok = false;
+        }
+        signalActivity();
+        try {
+          if (typeof hooks.onInit === "function") hooks.onInit(Math.max(0, now() - t0), background);
+        } catch {
+        }
+        if (myEpoch === epoch) (ok ? warm : failed).add(key);
+        return ok;
+      }).then((ok) => {
+        if (myEpoch === epoch) settle(key, ok);
+        return ok;
+      }).finally(() => {
+        if (inflight.get(key) === p) inflight.delete(key);
+      });
+      inflight.set(key, p);
+      return p;
+    }
+    const api = {
+      /** @param {unknown} styleId */
+      isWarm(styleId) {
+        return warm.has(keyOf2(styleId));
+      },
+      /** 合成に成功した声は温まっている。 @param {unknown} styleId */
+      markWarm(styleId) {
+        const id = Number(styleId);
+        if (Number.isInteger(id) && id >= 0) warm.add(keyOf2(id));
+      },
+      /** 列で読み込みを待っている・実行中のものがあるか。 */
+      busy() {
+        return pending > 0;
+      },
+      /**
+       * まだ温まっていない声を読み込む(列で順番に)。同じ声を同時に頼まれたら1回にまとめる。
+       * @param {unknown} styleId
+       * @returns {Promise<boolean>} 読み込めたら true(すでに温まっていても true)
+       */
+      ensure(styleId) {
+        return ensureInternal(styleId, false);
+      },
+      /**
+       * 読み上げ ON の直後に1回だけ、捨てる audio_query でエンジンを起こす(待たない呼び方でよい)。
+       * @param {unknown} styleId
+       * @returns {Promise<boolean>}
+       */
+      primeEngine(styleId) {
+        const id = Number(styleId);
+        if (engineWarmed || typeof deps.warmQuery !== "function" || !Number.isInteger(id) || id < 0) {
+          return Promise.resolve(false);
+        }
+        engineWarmed = true;
+        const myEpoch = epoch;
+        const warmQuery = deps.warmQuery;
+        const p = enqueue(async () => {
+          if (myEpoch !== epoch) return false;
+          let ok = false;
+          try {
+            ok = !!await warmQuery(id);
+          } catch {
+            ok = false;
+          }
+          if (ok && myEpoch === epoch) warm.add(keyOf2(id));
+          return ok;
+        });
+        primePromise = p;
+        return p;
+      },
+      /** エンジンを起こしている最中なら、その約束(無ければ null)。 */
+      priming() {
+        return primePromise;
+      },
+      /**
+       * 合成が1件も走っていない時に、裏で1つずつ読み込む(待たせない読み込み)。
+       * @param {unknown} styleId
+       * @returns {Promise<boolean>} 読み込めたら true
+       */
+      ensureWhenIdle(styleId) {
+        const id = Number(styleId);
+        if (!Number.isInteger(id) || id < 0) return Promise.resolve(false);
+        const key = keyOf2(id);
+        if (warm.has(key)) return Promise.resolve(true);
+        if (failed.has(key)) return Promise.resolve(false);
+        const existing = inflight.get(key);
+        if (existing) return existing;
+        later.add(key);
+        const p = new Promise((resolve) => {
+          const list = waiters.get(key) || [];
+          list.push(resolve);
+          waiters.set(key, list);
+        });
+        pump();
+        return (
+          /** @type {Promise<boolean>} */
+          p
+        );
+      },
+      /**
+       * まだ温まっていない声の代わりに今すぐ読む声。温まった声が無ければ null。
+       *   決まった順(絞り込みの固定表→番号順)に並べ、頼まれた声の番号で選ぶ=同じ状態なら同じ声。
+       * @param {unknown} styleId
+       * @returns {number|null}
+       */
+      borrowFor(styleId) {
+        const ids = [...warm].map(Number);
+        if (!ids.length) return null;
+        const inPalette = VOICE_NARROW_STYLE_IDS.filter((x) => ids.includes(x));
+        const rest = ids.filter((x) => !VOICE_NARROW_STYLE_IDS.includes(x)).sort((a, b) => a - b);
+        const order = [...inPalette, ...rest];
+        const n = Math.abs(Math.floor(Number(styleId))) || 0;
+        return order[n % order.length];
+      },
+      /**
+       * 合成を始める前に呼ぶ。少しずつ受け取り中の声があれば、届き終わるまで(上限つきで)待つ約束を返す。
+       *   無ければ null(=待たずに同期で合成を始められる)。
+       * @returns {Promise<void>|null}
+       */
+      beforeSynth() {
+        active += 1;
+        lastActivityAt = now();
+        signalActivity();
+        const gate = streamGate;
+        if (!gate) return null;
+        return waitGate(gate);
+      },
+      /**
+       * 少しずつ受け取る合成を【頼む時点】で門を閉じる(v0.1.1773)。返事を待つ間に並んで始まった先読みが
+       *   エンジンを取り合い、鳴り始めた声の続きが間に合わなかった(グラボ無し・一気に10件で 1.1秒の無音)。
+       * @returns {(result: unknown) => void} 合成の結果を渡すと、届き終わった時に門を開ける
+       */
+      closeStreamGate() {
+        let open = () => {
+        };
+        const g = new Promise((r) => {
+          open = r;
+        });
+        streamGate = g;
+        return (result) => {
+          const release = () => {
+            if (streamGate === g) streamGate = null;
+            open();
+          };
+          if (isStreamedVoice(result)) void result.whenDone.then(release, release);
+          else release();
+        };
+      },
+      /**
+       * 再生側の様子と計器をつなぐ(v0.1.1777)。isIdle: 再生も順番待ちも無い時 true。
+       *   onInit: 声を読み込んだ時間(ms)と、裏の読み込みだったか。
+       *   v0.1.1781: onActivity(合成・読み込みの合図) / engineQuietMs(両ページ通して静かな時間) / onRemoteBusy(計器)。
+       * @param {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void, onActivity?: () => void, engineQuietMs?: () => Promise<number>, onRemoteBusy?: () => void }} h
+       */
+      setHooks(h) {
+        hooks = h && typeof h === "object" ? h : {};
+      },
+      /** 走っている合成の数(少しずつ受け取り中も含む)。 */
+      activeCount() {
+        return active;
+      },
+      /**
+       * 合成が終わったら呼ぶ。少しずつ受け取った声は、届き終わってから「終わった」にする。
+       * @param {unknown} result
+       */
+      afterSynth(result) {
+        const done = () => {
+          active = Math.max(0, active - 1);
+          lastActivityAt = now();
+          signalActivity();
+          pump();
+        };
+        if (isStreamedVoice(result)) {
+          void result.whenDone.then(done, done);
+          return;
+        }
+        done();
+      },
+      /** 読み上げ ON のたびに呼ぶ(エンジンが再起動していても温まった扱いにしない)。 */
+      reset() {
+        epoch += 1;
+        warm.clear();
+        failed.clear();
+        inflight.clear();
+        engineWarmed = false;
+        primePromise = null;
+        if (pumpTimer !== null) {
+          clearT(pumpTimer);
+          pumpTimer = null;
+        }
+        for (const key of [...waiters.keys()]) settle(key, false);
+        later.clear();
+      },
+      now
+    };
+    return api;
+  }
+  function createVoicevoxWarmup() {
+    return createVoiceWarmup({
+      initSpeaker: (id) => initializeVoicevoxSpeaker(id, { timeoutMs: 15e3 }),
+      warmQuery: (id) => warmupVoicevoxQuery(id)
+    });
+  }
+  function withVoiceWarmup(warmup, synth) {
+    if (!warmup) return synth;
+    return async (text, voice, opts = {}) => {
+      const raw = Number(voice?.styleId);
+      const styleId = Number.isFinite(raw) ? raw : 3;
+      const startAt = warmup.now();
+      let useStyle = styleId;
+      let borrowed = false;
+      if (!warmup.isWarm(styleId)) {
+        const priming = warmup.priming();
+        if (priming && warmup.borrowFor(styleId) === null) {
+          try {
+            await priming;
+          } catch {
+          }
+        }
+        const sub = warmup.borrowFor(styleId);
+        if (sub !== null && sub !== styleId) {
+          useStyle = sub;
+          borrowed = true;
+          void warmup.ensureWhenIdle(styleId);
+        } else if (sub === null) {
+          try {
+            await warmup.ensure(styleId);
+          } catch {
+          }
+        }
+      }
+      const initMs = Math.max(0, warmup.now() - startAt);
+      const streamOk = opts?.stream === true && warmup.activeCount() === 0 && !warmup.busy();
+      const callOpts = { ...opts };
+      if (!streamOk) delete callOpts.stream;
+      const gate = warmup.beforeSynth();
+      if (gate) await gate;
+      const releaseStream = streamOk ? warmup.closeStreamGate() : null;
+      const busyAtStart = warmup.busy();
+      const onTiming = opts?.onTiming;
+      let wav = null;
+      try {
+        wav = await synth(text, borrowed ? { ...voice, styleId: useStyle } : voice, {
+          ...callOpts,
+          audioQueryTimeoutMs: Math.max(Number(opts?.audioQueryTimeoutMs) || 0, VOICE_WARMUP_QUERY_TIMEOUT_MS),
+          onTiming: (t) => {
+            if (typeof onTiming === "function") onTiming({ ...t || {}, initMs, contended: busyAtStart || warmup.busy(), borrowed });
+          }
+        });
+      } finally {
+        warmup.afterSynth(wav);
+        if (releaseStream) releaseStream(wav);
+      }
+      if (wav) warmup.markWarm(useStyle);
+      try {
+        const textLength = String(text ?? "").length;
+        const pitchOffset = (
+          /** @type {any} */
+          voice?.pitchOffset
+        );
+        if (isStreamedVoice(wav)) {
+          wav.styleId = useStyle;
+          wav.pitchOffset = Number(pitchOffset) || 0;
+          wav.textLength = textLength;
+          const sv = wav;
+          void sv.whenDone.then((ok) => {
+            if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms, textLength, pitchOffset);
+          }, () => {
+          });
+        } else if (wav instanceof ArrayBuffer) {
+          const level = measureVoiceWavLevel(wav);
+          if (level) rememberVoiceStylePeak(useStyle, level.peak, level.rms, textLength, pitchOffset);
+        }
+      } catch {
+      }
+      return wav;
+    };
+  }
+  function startVoiceWarmup(warmup, allStyleIds) {
+    if (!warmup) return;
+    const ids = Array.isArray(allStyleIds) ? allStyleIds.map(Number) : [];
+    warmup.reset();
+    const first = ids.includes(3) ? 3 : ids[0];
+    if (first === void 0) return;
+    void warmup.primeEngine(first).catch(() => {
+    });
+    for (const id of VOICE_NARROW_STYLE_IDS) {
+      if (id !== first && ids.includes(id)) void warmup.ensureWhenIdle(id);
+    }
+  }
+  function wireVoiceWarmupHooks(warmup, isPlayerIdle, getDiag, engine) {
+    if (!warmup) return;
+    const w = (
+      /** @type {any} */
+      warmup
+    );
+    if (w._busyPingTimer) {
+      clearInterval(w._busyPingTimer);
+      w._busyPingTimer = null;
+    }
+    if (engine) {
+      w._busyPingTimer = setInterval(() => {
+        let idle = true;
+        try {
+          idle = isPlayerIdle() !== false;
+        } catch {
+          idle = true;
+        }
+        if (!idle) engine.ping();
+      }, VOICE_BUSY_PING_INTERVAL_MS);
+    }
+    warmup.setHooks({
+      isIdle: isPlayerIdle,
+      onActivity: engine ? () => engine.ping() : void 0,
+      engineQuietMs: engine ? () => engine.quietMs() : void 0,
+      onRemoteBusy: () => {
+        const d = getDiag();
+        if (d && typeof d === "object") d.bgInitYieldTotal = (Number(d.bgInitYieldTotal) || 0) + 1;
+      },
+      onInit: (ms, background) => {
+        if (!background) return;
+        const d = getDiag();
+        if (!d || typeof d !== "object") return;
+        d.bgInitTotal = (Number(d.bgInitTotal) || 0) + 1;
+        d.bgInitMaxMs = Math.max(Number(d.bgInitMaxMs) || 0, Math.round(ms));
+      }
+    });
+  }
+
+  // src/lib/voiceEngineOverload.js
+  var VOICE_OVERLOAD_TIMEOUT_STREAK = 2;
+  var VOICE_OVERLOAD_RECOVER_STREAK = 5;
+  var VOICE_OVERLOAD_FAST_MS = 3e3;
+  var VOICE_OVERLOAD_QUERY_TIMEOUT_MS = 3e4;
+  var VOICE_OVERLOAD_SYNTH_TIMEOUT_MS = 45e3;
+  function createVoiceOverloadState() {
+    return { overloaded: false, timeoutStreak: 0, fastStreak: 0 };
+  }
+  function noteVoiceSynthOutcome(state, outcome) {
+    if (!state) return false;
+    if (outcome?.timedOut === true) {
+      state.timeoutStreak += 1;
+      state.fastStreak = 0;
+      if (state.timeoutStreak >= VOICE_OVERLOAD_TIMEOUT_STREAK) state.overloaded = true;
+      return state.overloaded;
+    }
+    if (outcome?.ok !== true) return state.overloaded;
+    state.timeoutStreak = 0;
+    const ms = Number(outcome?.totalMs);
+    if (Number.isFinite(ms) && ms >= 0 && ms < VOICE_OVERLOAD_FAST_MS) {
+      state.fastStreak += 1;
+      if (state.overloaded && state.fastStreak >= VOICE_OVERLOAD_RECOVER_STREAK) state.overloaded = false;
+    } else {
+      state.fastStreak = 0;
+    }
+    return state.overloaded;
+  }
+  function resolveVoiceOverloadTimeouts(overloaded) {
+    if (!overloaded) return {};
+    return {
+      audioQueryTimeoutMs: VOICE_OVERLOAD_QUERY_TIMEOUT_MS,
+      synthesisTimeoutMs: VOICE_OVERLOAD_SYNTH_TIMEOUT_MS
+    };
+  }
+  function capVoiceSynthDepthForOverload(depth, overloaded) {
+    const d = Number(depth);
+    if (!Number.isFinite(d)) return overloaded ? 1 : 0;
+    return overloaded ? Math.min(d, 1) : d;
+  }
+
+  // src/lib/voiceLagBudget.js
+  var VOICE_LAG_BUDGET_MS = 6e3;
+  var VOICE_QUEUE_MAX_CEIL = 8;
+  var VOICE_QUEUE_MAX_FLOOR = 5;
+  var VOICE_GROW_STREAK_N = 5;
+  function updateVoiceServiceTimeEma(prevMs, sampleMs, alpha = 0.3) {
+    const sample = Math.max(0, Number(sampleMs) || 0);
+    const prev = Number(prevMs);
+    if (!Number.isFinite(prev) || prev < 0) return sample;
+    return prev + alpha * (sample - prev);
+  }
+  function resolveVoiceQueueMax(serviceTimeEmaMs) {
+    const ema = Number(serviceTimeEmaMs);
+    if (!Number.isFinite(ema) || ema <= 0) return VOICE_QUEUE_MAX_CEIL;
+    const raw = Math.floor(VOICE_LAG_BUDGET_MS / ema);
+    return Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, raw));
+  }
+  function stepVoiceQueueMax(currentMax, computedMax, growStreak) {
+    const current = Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, Math.floor(Number(currentMax) || VOICE_QUEUE_MAX_CEIL)));
+    const computed = Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, Math.floor(Number(computedMax) || VOICE_QUEUE_MAX_CEIL)));
+    const streak = Math.max(0, Math.floor(Number(growStreak) || 0));
+    if (computed < current) {
+      return { nextMax: computed, nextGrowStreak: 0 };
+    }
+    if (computed === current) {
+      return { nextMax: current, nextGrowStreak: 0 };
+    }
+    const nextStreak = streak + 1;
+    if (nextStreak >= VOICE_GROW_STREAK_N) {
+      return { nextMax: Math.min(VOICE_QUEUE_MAX_CEIL, current + 1), nextGrowStreak: 0 };
+    }
+    return { nextMax: current, nextGrowStreak: nextStreak };
+  }
+  var VOICE_PRESSURE_OK_MAX = 1.2;
+  var VOICE_SYNTH_WAIT_DOMINANT_RATIO = 0.35;
+  var VOICE_PLAYBACK_DOMINANT_RATIO = 0.6;
+  var VOICE_STALL_EXCESS_RATIO = 0.2;
+  function updateVoiceEventRatioEma(prevRatio, hit, alpha = 0.05) {
+    const h = Number(hit);
+    if (h !== 0 && h !== 1) {
+      const prev2 = Number(prevRatio);
+      return Number.isFinite(prev2) ? prev2 : -1;
+    }
+    const prev = Number(prevRatio);
+    if (!Number.isFinite(prev) || prev < 0) return h;
+    return prev + alpha * (h - prev);
+  }
+  function foldVoiceArrivalWindow(state, nowMs, count = 1, windowMs = 1e4, alpha = 0.3) {
+    const now = Number(nowMs);
+    const safeNow = Number.isFinite(now) ? now : 0;
+    const addCount = Math.max(0, Math.floor(Number(count) || 0));
+    const s = state && typeof state === "object" ? state : {};
+    const prevStart = Number(s.windowStartMs);
+    const prevCount = Math.max(0, Math.floor(Number(s.windowCount) || 0));
+    const prevRate = Number(s.arrivalPerMin);
+    if (!Number.isFinite(prevStart)) {
+      return { windowStartMs: safeNow, windowCount: addCount, arrivalPerMin: Number.isFinite(prevRate) && prevRate >= 0 ? prevRate : -1 };
+    }
+    const elapsed2 = safeNow - prevStart;
+    if (elapsed2 < windowMs) {
+      return { windowStartMs: prevStart, windowCount: prevCount + addCount, arrivalPerMin: Number.isFinite(prevRate) && prevRate >= 0 ? prevRate : -1 };
+    }
+    const closedCount = prevCount + addCount;
+    const safeElapsed = Math.max(1, elapsed2);
+    const sampleRate = closedCount * 6e4 / safeElapsed;
+    const nextRate = !Number.isFinite(prevRate) || prevRate < 0 ? sampleRate : prevRate + alpha * (sampleRate - prevRate);
+    return { windowStartMs: safeNow, windowCount: 0, arrivalPerMin: nextRate };
+  }
+  function computeVoiceLagVerdict(inputs) {
+    const i = inputs && typeof inputs === "object" ? inputs : {};
+    const S = Number(i.serviceTimeEmaMs);
+    const W = Number(i.synthWaitEmaMs);
+    const E = Number(i.expectedPlayEmaMs);
+    const P = Number(i.playbackEmaMs);
+    const L = Number(i.arrivalPerMin);
+    const cap = Number(i.effectiveQueueMax);
+    const capLagTicks = Math.max(0, Math.floor(Number(i.capLagTicks) || 0));
+    const sampleCount = Math.max(0, Math.floor(Number(i.sampleCount) || 0));
+    if (!Number.isFinite(S) || S <= 0 || !Number.isFinite(L) || L <= 0 || sampleCount < 5) {
+      return "insufficient";
+    }
+    const pressure = L * S / 6e4;
+    if (pressure <= VOICE_PRESSURE_OK_MAX) {
+      if (capLagTicks >= 10) return "hysteresis";
+      return "ok";
+    }
+    const synthDominant = Number.isFinite(W) && W >= 0 && W / S >= VOICE_SYNTH_WAIT_DOMINANT_RATIO;
+    if (synthDominant) {
+      const capIsSmall = Number.isFinite(cap) && cap <= 3;
+      return capIsSmall ? "coldsynth" : "synthslow";
+    }
+    if (Number.isFinite(P) && Number.isFinite(E) && (P - E) / S >= VOICE_STALL_EXCESS_RATIO) {
+      return "stall";
+    }
+    if (Number.isFinite(E) && E >= 0 && E / S >= VOICE_PLAYBACK_DOMINANT_RATIO) {
+      return "playback";
+    }
+    return "mixed";
+  }
+  var VOICE_SUSTAINED_PRESSURE_MIN = VOICE_PRESSURE_OK_MAX;
+  var VOICE_SUSTAINED_BOOST_MAX = 0.8;
+  function computeSustainedPressureBoost(inputs) {
+    const i = inputs && typeof inputs === "object" ? inputs : {};
+    const L = Number(i.arrivalPerMin);
+    const S = Number(i.serviceTimeEmaMs);
+    const sampleCount = Math.max(0, Math.floor(Number(i.sampleCount) || 0));
+    if (!Number.isFinite(L) || L <= 0 || !Number.isFinite(S) || S <= 0 || sampleCount < 5) {
+      return 0;
+    }
+    const pressure = L * S / 6e4;
+    if (pressure <= VOICE_SUSTAINED_PRESSURE_MIN) return 0;
+    const raw = (pressure - VOICE_SUSTAINED_PRESSURE_MIN) * 0.4;
+    return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(0, raw));
+  }
+  var VOICE_BACKLOG_WAIT_START_MS = 1500;
+  var VOICE_BACKLOG_BOOST_MAX = 0.3;
+  function computeBacklogCatchUpBoost(queueWaitMs, paceFloor = 0) {
+    const w = Number(queueWaitMs);
+    const floor = Number.isFinite(Number(paceFloor)) ? Math.max(0, Number(paceFloor)) : 0;
+    const byWait = Number.isFinite(w) && w > VOICE_BACKLOG_WAIT_START_MS ? (w - VOICE_BACKLOG_WAIT_START_MS) / 1e3 * 0.1 : 0;
+    return Math.min(VOICE_BACKLOG_BOOST_MAX, floor + byWait);
+  }
+  var VOICE_PACE_MIN_SAMPLES = 3;
+  var VOICE_PACE_GAP_CAP_MS = 2e4;
+  var VOICE_PACE_EMA_ALPHA = 0.3;
+  var VOICE_PACE_FLOOR_MARGIN = 0.03;
+  function createVoicePaceState() {
+    return { lastArrivalAt: -1, gapEmaMs: -1, gapCount: 0, naturalEmaMs: -1, naturalCount: 0, charMsEma: -1 };
+  }
+  function paceEma(prev, sample) {
+    return prev < 0 ? sample : prev + VOICE_PACE_EMA_ALPHA * (sample - prev);
+  }
+  function noteVoicePaceArrival(state, nowMs) {
+    if (!state) return;
+    const now = Number(nowMs);
+    if (!Number.isFinite(now)) return;
+    if (state.lastArrivalAt >= 0 && now >= state.lastArrivalAt) {
+      const gap = Math.min(VOICE_PACE_GAP_CAP_MS, now - state.lastArrivalAt);
+      state.gapEmaMs = paceEma(state.gapEmaMs, gap);
+      state.gapCount += 1;
+    }
+    state.lastArrivalAt = now;
+  }
+  function noteVoicePacePlayed(state, playedMs, playbackRate = 1, boostAtSynth = 0, chars = 0) {
+    if (!state) return;
+    const ms = Number(playedMs);
+    if (!Number.isFinite(ms) || ms <= 0) return;
+    const rate = Number(playbackRate) > 0 ? Number(playbackRate) : 1;
+    const boost = Number(boostAtSynth) > 0 ? Number(boostAtSynth) : 0;
+    const natural = ms * rate * (1 + boost);
+    state.naturalEmaMs = paceEma(state.naturalEmaMs, natural);
+    state.naturalCount += 1;
+    const n = Math.floor(Number(chars));
+    if (n > 0) state.charMsEma = paceEma(state.charMsEma, natural / n);
+  }
+  var VOICE_ITEM_MIN_MS = 600;
+  var VOICE_SYNTH_FIXED_MS = 250;
+  var VOICE_CHAR_MS_DEFAULT = 130;
+  function resolveVoiceQueueMaxByChars(charCounts, paceState, synthRtf = 0) {
+    if (!Array.isArray(charCounts)) return null;
+    const learned = Number(paceState?.charMsEma);
+    const perChar = learned > 0 ? learned : VOICE_CHAR_MS_DEFAULT;
+    const rtf = Number(synthRtf) > 0 ? Number(synthRtf) : 0;
+    let total = 0;
+    let fit = 0;
+    for (let i = charCounts.length - 1; i >= 0; i -= 1) {
+      const n = Math.max(0, Math.floor(Number(charCounts[i]) || 0));
+      const natural = Math.max(VOICE_ITEM_MIN_MS, n * perChar);
+      total += rtf > 0 ? Math.max(natural, VOICE_SYNTH_FIXED_MS + natural * rtf) : natural;
+      if (total > VOICE_LAG_BUDGET_MS) break;
+      fit += 1;
+    }
+    return Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, fit));
+  }
+  function computeVoicePaceFloor(state) {
+    if (!state || state.gapCount < VOICE_PACE_MIN_SAMPLES || state.naturalCount < VOICE_PACE_MIN_SAMPLES) return 0;
+    if (!(state.gapEmaMs > 0) || !(state.naturalEmaMs > 0)) return 0;
+    const over = state.naturalEmaMs / state.gapEmaMs - 1;
+    return over > 0 ? Math.min(VOICE_BACKLOG_BOOST_MAX, over + VOICE_PACE_FLOOR_MARGIN) : 0;
+  }
+  function mergeVoiceSpeedBoost(congestionBoost, sustainedBoost) {
+    const a = Number(congestionBoost);
+    const b = Number(sustainedBoost);
+    const base = Number.isFinite(a) && a > 0 ? a : 0;
+    const extra = Number.isFinite(b) && b > 0 ? b : 0;
+    return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(base, extra));
+  }
+
+  // src/lib/voicePlaybackQuality.js
+  var VOICE_CUT_SHORT_RATIO = 0.85;
+  var VOICE_CUT_SHORT_SLACK_MS = 150;
+  var VOICE_STALL_RATIO = 1.25;
+  var VOICE_STALL_SLACK_MS = 400;
+  var VOICE_CLIP_LEVEL = 0.995;
+  var VOICE_QUIET_RATIO = 0.6;
+  function recordVoicePlaybackQuality(diag, s) {
+    if (!diag || typeof diag !== "object" || !s) return;
+    const inc = (k) => {
+      diag[k] = (Number(diag[k]) || 0) + 1;
+    };
+    const issues = [];
+    if (s.outcome === "error") {
+      if (s.started) {
+        inc("playErrorAfterStartTotal");
+        issues.push("error");
+      }
+      if (issues.length) diag.lastPlayIssue = issues.join(",");
+      return;
+    }
+    inc("playCheckedTotal");
+    const exp = Number(s.expectedMs);
+    const played = Number(s.playedMs);
+    if (s.streamed && s.partial) {
+      inc("playCutShortTotal");
+      issues.push("partial");
+    } else if (s.started && exp > 0 && played >= 0) {
+      if (played < exp * VOICE_CUT_SHORT_RATIO - VOICE_CUT_SHORT_SLACK_MS) {
+        inc("playCutShortTotal");
+        issues.push(`cut${Math.round(played)}/${Math.round(exp)}ms`);
+      } else if (!s.streamed && played > exp * VOICE_STALL_RATIO + VOICE_STALL_SLACK_MS) {
+        inc("playStallTotal");
+        issues.push(`stall${Math.round(played)}/${Math.round(exp)}ms`);
+      }
+    }
+    if (s.streamed && Number(s.underruns) > 0) {
+      inc("streamUnderrunTotal");
+      diag.streamUnderrunMaxMs = Math.max(Number(diag.streamUnderrunMaxMs) || 0, Math.round(Number(s.underrunMaxMs) || 0));
+      issues.push(`gap${s.underruns}x${Math.round(Number(s.underrunMaxMs) || 0)}ms`);
+    }
+    const peak = Number(s.outPeak);
+    if (Number.isFinite(peak) && peak >= 0) {
+      diag.outPeakEmaPermille = Math.round(updateVoiceServiceTimeEma(diag.outPeakEmaPermille, peak * 1e3));
+      if (peak >= VOICE_CLIP_LEVEL) {
+        inc("clipItemTotal");
+        issues.push("clip");
+      }
+      const target = Number(s.targetPeak);
+      const rmsNow = Number(s.outRms);
+      const loudEnough = Number.isFinite(rmsNow) && rmsNow >= voiceTargetRms(target) * VOICE_QUIET_RATIO;
+      if (Number.isFinite(target) && target > 0 && peak > 0 && peak < target * VOICE_QUIET_RATIO && !loudEnough) {
+        inc("quietItemTotal");
+        issues.push(`quiet${Math.round(peak * 100)}/${Math.round(target * 100)}%`);
+      }
+    }
+    const rms = Number(s.outRms);
+    if (Number.isFinite(rms) && rms > 0) {
+      const db = Math.round(20 * Math.log10(rms) * 10) / 10;
+      const lo = Number(diag.outRmsDbMin);
+      const hi = Number(diag.outRmsDbMax);
+      diag.outRmsDbMin = Number.isFinite(lo) ? Math.min(lo, db) : db;
+      diag.outRmsDbMax = Number.isFinite(hi) ? Math.max(hi, db) : db;
+      diag.lastOutRmsDb = db;
+    }
+    if (s.streamed && Number(s.gainDropRatio) > 0 && Number(s.gainDropRatio) < 0.8) {
+      inc("streamGainDropTotal");
+      issues.push(`drop${Math.round(Number(s.gainDropRatio) * 100)}%`);
+    }
+    if (issues.length) diag.lastPlayIssue = issues.join(",");
+  }
+  function observeVoicePlayback(audio, opts) {
+    if (!audio || typeof audio.addEventListener !== "function" || !opts?.diag) return;
+    const now = typeof opts.now === "function" ? opts.now : () => Date.now();
+    const rate = Number(opts.playbackRate) > 0 ? Number(opts.playbackRate) : 1;
+    let playingAt = -1;
+    let done = false;
+    const finish = (outcome) => {
+      if (done) return;
+      done = true;
+      try {
+        const q = audio.quality && typeof audio.quality === "object" ? audio.quality : null;
+        const durSec = Number(audio.duration);
+        recordVoicePlaybackQuality(opts.diag, {
+          expectedMs: Number.isFinite(durSec) && durSec > 0 ? durSec * 1e3 / rate : -1,
+          playedMs: playingAt >= 0 ? now() - playingAt : -1,
+          outcome,
+          started: playingAt >= 0,
+          streamed: !!q,
+          underruns: q ? Number(q.underruns) || 0 : 0,
+          underrunMaxMs: q ? Number(q.underrunMaxMs) || 0 : 0,
+          outPeak: q && Number(q.outPeak) >= 0 ? Number(q.outPeak) : Number(opts.outPeak ?? -1),
+          outRms: q && Number(q.outRms) > 0 ? Number(q.outRms) : Number(opts.outRms ?? -1),
+          targetPeak: Number(opts.targetPeak ?? -1),
+          gainDropRatio: q ? Number(q.gainDropRatio) || 0 : 0,
+          partial: q ? q.partial === true : false
+        });
+        if (typeof opts.onRecorded === "function") opts.onRecorded();
+      } catch {
+      }
+    };
+    try {
+      audio.addEventListener("playing", () => {
+        if (playingAt < 0) playingAt = now();
+      }, { once: true });
+      audio.addEventListener("ended", () => finish("ended"), { once: true });
+      audio.addEventListener("error", () => finish("error"), { once: true });
+    } catch {
+    }
+  }
+
+  // src/lib/voiceAssignment.js
+  var DEFAULT_VOICE = Object.freeze({
+    styleId: 3,
+    pitchOffset: 0,
+    speedOffset: 0
+  });
+  var PITCH_OFFSETS = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
+  var SPEED_OFFSETS = Object.freeze([0, 0.05, 0.1]);
+  function fnv1a32(value) {
+    const bytes = new TextEncoder().encode(String(value ?? ""));
+    let hash = 2166136261;
+    for (const byte of bytes) {
+      hash ^= byte;
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+  function normalizeStyleIds(styleIds) {
+    if (!Array.isArray(styleIds)) return [];
+    return styleIds.map((styleId) => Number(styleId)).filter((styleId) => Number.isInteger(styleId) && styleId >= 0);
+  }
+  function assignVoiceForUser(userKey, styleIds) {
+    const styles = normalizeStyleIds(styleIds);
+    if (!styles.length) return { ...DEFAULT_VOICE };
+    const hash = fnv1a32(userKey);
+    const styleBits = hash & 65535;
+    const pitchBits = hash >>> 16 & 255;
+    const speedBits = hash >>> 24 & 255;
+    return {
+      styleId: styles[styleBits % styles.length],
+      pitchOffset: PITCH_OFFSETS[pitchBits % PITCH_OFFSETS.length],
+      speedOffset: SPEED_OFFSETS[speedBits % SPEED_OFFSETS.length]
+    };
+  }
+  function resolveVoiceForUser(userKey, overrides, styleIds) {
+    const key = String(userKey ?? "");
+    if (overrides && typeof overrides === "object" && Object.prototype.hasOwnProperty.call(overrides, key)) {
+      const raw = (
+        /** @type {Record<string, any>} */
+        overrides[key]
+      );
+      if (raw && typeof raw === "object") {
+        const fallback = assignVoiceForUser(key, styleIds);
+        const styleId = Number(raw.styleId);
+        const pitchOffset = Number(raw.pitchOffset);
+        const speedOffset = Number(raw.speedOffset);
+        return {
+          styleId: Number.isFinite(styleId) ? styleId : fallback.styleId,
+          pitchOffset: Number.isFinite(pitchOffset) ? pitchOffset : 0,
+          speedOffset: Number.isFinite(speedOffset) ? speedOffset : 0
+        };
+      }
+    }
+    return assignVoiceForUser(key, styleIds);
+  }
+
+  // src/lib/voiceLightFallback.js
+  var LIGHT_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
+  var LIGHT_VOICE_RATE = 1.2;
+  var LIGHT_VOICE_MAX_CHARS = 60;
+  var LIGHT_VOICE_PROBE_INTERVAL_MS = 3e4;
+  var LIGHT_VOICE_PROBE_TEXT = "てすと";
+  function pickJapaneseVoices(voices) {
+    if (!Array.isArray(voices)) return [];
+    const ja4 = voices.filter((v) => v && /^ja([-_]|$)/i.test(String(v.lang || "")));
+    const local = ja4.filter((v) => v.localService === true);
+    const use = local.length ? local : ja4;
+    return [...use].sort((a, b) => String(a.name || a.voiceURI || "").localeCompare(String(b.name || b.voiceURI || "")));
+  }
+  function lightVoiceToneFor(userKey, voiceCount) {
+    const n = Math.max(1, Math.floor(Number(voiceCount) || 0));
+    if (!userKey) return { voiceIndex: 0, pitch: 1, rate: LIGHT_VOICE_RATE };
+    const combos = n * LIGHT_VOICE_PITCHES.length;
+    const v = assignVoiceForUser(userKey, Array.from({ length: combos }, (_, i) => i));
+    const combo = Number(v.styleId) || 0;
+    return {
+      voiceIndex: combo % n,
+      pitch: LIGHT_VOICE_PITCHES[Math.floor(combo / n) % LIGHT_VOICE_PITCHES.length],
+      rate: Math.round((LIGHT_VOICE_RATE + (Number(v.speedOffset) || 0)) * 100) / 100
+    };
+  }
+  function shouldUseLightVoice(s) {
+    return !!s && s.setting !== "off" && s.available === true && s.overloaded === true;
+  }
+  function shouldProbeVoicevox(s) {
+    if (!s || s.inFlight > 0) return false;
+    return !(s.lastProbeAt > 0) || s.nowMs - s.lastProbeAt >= LIGHT_VOICE_PROBE_INTERVAL_MS;
+  }
+
+  // src/lib/voiceLightSpeaker.js
+  var MAX_MS_PER_CHAR = 400;
+  var WATCHDOG_EXTRA_MS = 5e3;
+  function createLightSpeaker(deps = {}) {
+    const synth = deps.synth ?? globalThis.speechSynthesis;
+    const Utterance = deps.Utterance ?? globalThis.SpeechSynthesisUtterance;
+    if (!synth || typeof synth.speak !== "function" || typeof Utterance !== "function") return null;
+    let cached = [];
+    const refresh = () => {
+      try {
+        cached = pickJapaneseVoices(synth.getVoices?.() || []);
+      } catch {
+        cached = [];
+      }
+    };
+    refresh();
+    try {
+      synth.addEventListener?.("voiceschanged", refresh);
+    } catch {
+    }
+    return {
+      available: () => {
+        if (!cached.length) refresh();
+        return cached.length > 0;
+      },
+      voices: () => cached,
+      cancel: () => {
+        try {
+          synth.cancel();
+        } catch {
+        }
+      },
+      speak(text, tone, hooks = {}) {
+        return new Promise((resolve) => {
+          if (!cached.length) refresh();
+          const t = String(text || "");
+          if (!t || !cached.length) {
+            resolve(false);
+            return;
+          }
+          let started = false;
+          let done = false;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve(started);
+          };
+          const u = new Utterance(t);
+          u.voice = cached[tone.voiceIndex % cached.length];
+          u.lang = u.voice?.lang || "ja-JP";
+          u.pitch = tone.pitch;
+          u.rate = tone.rate;
+          u.onstart = () => {
+            started = true;
+            try {
+              hooks.onStart?.();
+            } catch {
+            }
+          };
+          u.onend = finish;
+          u.onerror = finish;
+          const timer = setTimeout(() => {
+            try {
+              synth.cancel();
+            } catch {
+            }
+            finish();
+          }, t.length * MAX_MS_PER_CHAR + WATCHDOG_EXTRA_MS);
+          try {
+            synth.speak(u);
+          } catch {
+            finish();
+          }
+        });
+      }
+    };
+  }
+
   // src/lib/comeviewRows.js
   var GENERIC_ANON_NAMES = /* @__PURE__ */ new Set(["匿名", "名無し", "名無しさん", "匿名さん"]);
   function isGenericComeviewName(name) {
@@ -2410,6 +5284,1568 @@ ${sourceCol}
       capturedAt
     };
   }
+
+  // src/lib/anonymousIdenticon.js
+  function hashString(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i += 1) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  var LINE = "#332a26";
+  var SKIN_TONES = ["#ffeede", "#ffe6cf", "#fdf0e4", "#f8dfc8"];
+  var HAIR_COLORS = [
+    ["#f29b38", "#ffc97e"],
+    ["#3a3534", "#6b6360"],
+    ["#8a5a2b", "#c08c50"],
+    ["#e88bb1", "#ffc3da"],
+    ["#5b87c5", "#9cc0ea"],
+    ["#7aa45a", "#b4d59a"],
+    ["#e9c25a", "#ffe6a0"],
+    ["#d4543a", "#f59679"],
+    ["#8d6bb0", "#c4a8e0"],
+    ["#8f8f8f", "#c9c9c9"],
+    ["#4ba596", "#92d5c9"],
+    ["#a4683f", "#d49a6e"]
+  ];
+  var EYES = [
+    // ぱっちり（白目+2色虹彩+ハイライト2つ）
+    (iris, irisDark) => `<ellipse cx="23.5" cy="37" rx="5" ry="6.6" fill="#fff" stroke="${LINE}" stroke-width="2.2"/><ellipse cx="40.5" cy="37" rx="5" ry="6.6" fill="#fff" stroke="${LINE}" stroke-width="2.2"/><ellipse cx="23.5" cy="38" rx="3.2" ry="4.4" fill="${irisDark}"/><ellipse cx="40.5" cy="38" rx="3.2" ry="4.4" fill="${irisDark}"/><ellipse cx="23.5" cy="39.2" rx="2" ry="2.6" fill="${iris}"/><ellipse cx="40.5" cy="39.2" rx="2" ry="2.6" fill="${iris}"/><circle cx="22" cy="35.4" r="1.6" fill="#fff"/><circle cx="39" cy="35.4" r="1.6" fill="#fff"/><circle cx="25.2" cy="40.2" r="0.8" fill="#fff" opacity="0.9"/><circle cx="42.2" cy="40.2" r="0.8" fill="#fff" opacity="0.9"/>`,
+    // にこにこ閉じ目（∩・太線）
+    () => `<path d="M18.5 38 q5 -6.5 10 0" stroke="${LINE}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M35.5 38 q5 -6.5 10 0" stroke="${LINE}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    // ジト目（まぶた直線+下半分の虹彩）
+    (iris, irisDark) => `<path d="M18.5 35 l10 0" stroke="${LINE}" stroke-width="2.8" stroke-linecap="round"/><path d="M35.5 35 l10 0" stroke="${LINE}" stroke-width="2.8" stroke-linecap="round"/><path d="M20.5 35.8 a3.6 4 0 0 0 7.2 0 z" fill="${irisDark}"/><path d="M37.5 35.8 a3.6 4 0 0 0 7.2 0 z" fill="${irisDark}"/><path d="M22 35.8 a2 2.2 0 0 0 4 0 z" fill="${iris}"/><path d="M39 35.8 a2 2.2 0 0 0 4 0 z" fill="${iris}"/>`
+  ];
+  var MOUTHS = [
+    () => `<path d="M27.5 46.5 q2.3 2.6 4.5 0 q2.2 2.6 4.5 0" stroke="${LINE}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`,
+    () => `<path d="M27 46 a5 4.6 0 0 0 10 0 z" fill="#9e3a30" stroke="${LINE}" stroke-width="1.8"/><path d="M29.5 49.2 a2.6 1.8 0 0 1 5 0 z" fill="#e9756a"/>`,
+    () => `<path d="M27 46 q5 4.4 10 0" stroke="${LINE}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
+  ];
+  var HAIRS = [
+    // ボブ+ぱっつんギザ（りんく系）
+    (c, hi) => `<path d="M8 44 q-2 -26 24 -28 q26 2 24 28 l-5 3 q3 -8 1 -14 l-3 6 -3 -8 -4 6 -4 -8 -3 7 -4 -7 -4 8 -4 -6 -3 8 -3 -6 q-2 6 1 14 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 24 q8 -7 18 -7 q10 0 18 7 q-8 -3 -18 -3 q-10 0 -18 3 z" fill="${hi}" opacity="0.85"/>`,
+    // 外はねショート（こんた系）
+    (c, hi) => `<path d="M9 42 q-7 -4 -3 -10 q-6 -2 0 -8 q2 -12 26 -12 q24 0 26 12 q6 6 0 8 q4 6 -3 10 l-4 1 q2 -6 0 -10 l-4 5 -3 -9 -5 6 -5 -9 -4 8 -5 -7 -4 9 -4 -5 q-2 4 0 10 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15 22 q8 -6 17 -6 q9 0 17 6 q-8 -2.5 -17 -2.5 q-9 0 -17 2.5 z" fill="${hi}" opacity="0.85"/>`,
+    // ロング風（たぬ姉系・髪が顔の横を流れ落ちる）
+    (c, hi) => `<path d="M10 58 q-4 -18 -2 -30 q4 -14 24 -14 q20 0 24 14 q2 12 -2 30 l-6 -2 q3 -12 2 -22 l-4 6 -3 -9 -5 6 -4 -9 -4 8 -5 -7 -4 8 -4 -5 q-1 10 2 22 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15 23 q8 -6 17 -6 q9 0 17 6 q-8 -2.5 -17 -2.5 q-9 0 -17 2.5 z" fill="${hi}" opacity="0.85"/>`,
+    // ふんわりマッシュ
+    (c, hi) => `<path d="M8 40 q-2 -25 24 -25 q26 0 24 25 q-1 5 -5 6 q2 -5 1 -9 l-4 5 -3 -7 -5 5 -4 -7 -4 6 -4 -6 -4 7 -5 -5 -3 7 -4 -5 q-1 4 1 9 q-4 -1 -5 -6 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 24 q9 -6.5 18 -6.5 q9 0 18 6.5 q-9 -3 -18 -3 q-9 0 -18 3 z" fill="${hi}" opacity="0.85"/>`
+  ];
+  var ACCENTS = [
+    (c) => `<path d="M32 16 q-2 -8 4 -11 q-1 5 1 7 q3 -3 7 -2 q-5 2 -6 7 z" fill="${c}" stroke="${LINE}" stroke-width="2" stroke-linejoin="round"/>`,
+    (c) => `<path d="M13 26 q-3 -12 3 -16 q6 3 7 13 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M51 26 q3 -12 -3 -16 q-6 3 -7 13 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15.5 24 q-1.5 -7 1.5 -10 q3 2 4 8 z" fill="#fff" opacity="0.75"/><path d="M48.5 24 q1.5 -7 -1.5 -10 q-3 2 -4 8 z" fill="#fff" opacity="0.75"/>`,
+    () => ""
+  ];
+  function shade(hex, f) {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    if (!m) return "#5a4636";
+    const c = (x) => Math.max(0, Math.min(255, Math.floor(parseInt(x, 16) * f)));
+    return `rgb(${c(m[1])},${c(m[2])},${c(m[3])})`;
+  }
+  var IDENTICON_CACHE_MAX = 2e3;
+  var identiconCache = /* @__PURE__ */ new Map();
+  function anonymousIdenticonDataUrl(userId, sizePx = 64) {
+    const s = String(userId || "").trim();
+    if (!s) return "";
+    const n = Math.max(16, Math.min(128, Number(sizePx) || 64));
+    const cacheKey = `${n}|${s}`;
+    const hit = identiconCache.get(cacheKey);
+    if (hit !== void 0) {
+      identiconCache.delete(cacheKey);
+      identiconCache.set(cacheKey, hit);
+      return hit;
+    }
+    const h = hashString(s);
+    const hue = (h >>> 15) % 360;
+    const bg = `hsl(${hue},55%,90%)`;
+    const skin = SKIN_TONES[h % SKIN_TONES.length];
+    const [hairC, hairHi] = HAIR_COLORS[(h >>> 3) % HAIR_COLORS.length];
+    const iris = shade(hairC, 0.9);
+    const irisDark = shade(hairC, 0.45);
+    const eyes = EYES[(h >>> 7) % EYES.length];
+    const mouth = MOUTHS[(h >>> 10) % MOUTHS.length];
+    const hairShape = HAIRS[(h >>> 12) % HAIRS.length];
+    const accent = ACCENTS[(h >>> 21) % ACCENTS.length];
+    const blushStrong = (h >>> 20 & 1) === 1;
+    const blush = `<ellipse cx="17" cy="44" rx="4.4" ry="2.6" fill="#ff9d9d" opacity="${blushStrong ? 0.8 : 0.45}"/><ellipse cx="47" cy="44" rx="4.4" ry="2.6" fill="#ff9d9d" opacity="${blushStrong ? 0.8 : 0.45}"/>`;
+    const k = n / 64;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}"><rect width="100%" height="100%" fill="${bg}"/><g transform="scale(${k})">` + accent(hairC) + `<path d="M13 38 a19 19 0 1 0 38 0 a19 21 0 0 0 -38 0 z" fill="${skin}" stroke="${LINE}" stroke-width="2.2"/>` + hairShape(hairC, hairHi) + blush + eyes(iris, irisDark) + mouth() + `</g></svg>`;
+    const out = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    identiconCache.set(cacheKey, out);
+    while (identiconCache.size > IDENTICON_CACHE_MAX) {
+      const oldest = identiconCache.keys().next().value;
+      if (oldest === void 0) break;
+      identiconCache.delete(oldest);
+    }
+    return out;
+  }
+
+  // src/lib/nicoUserPage.js
+  function nicoUserPageUrl(userId) {
+    const uid = String(userId == null ? "" : userId).trim();
+    if (!/^\d{1,18}$/.test(uid)) return "";
+    return `https://www.nicovideo.jp/user/${uid}`;
+  }
+  function anonymousDisplayLabel(anonKey) {
+    const key = String(anonKey == null ? "" : anonKey).trim();
+    const digits = key.replace(/\D+/g, "");
+    if (digits.length > 0) {
+      const tail = digits.slice(-3);
+      const n = Number(tail);
+      if (Number.isFinite(n) && n > 0) return `匿名${n}`;
+    }
+    let h = 0;
+    for (let i = 0; i < key.length; i += 1) {
+      h = (h * 31 + key.charCodeAt(i)) % 1e5;
+    }
+    return `匿名${h % 999 + 1}`;
+  }
+
+  // src/lib/comeviewActions.js
+  var COMEVIEW_NG_STORAGE_KEY = "nls_comeview_ng_v1";
+  var COMEVIEW_NG_MAX = 300;
+  function comeviewUserKeyForRow(row) {
+    if (!row || typeof row !== "object") return "";
+    const uid = String(row.userId || "").trim();
+    if (uid) return `u:${uid}`;
+    const name = String(row.name || "").trim();
+    if (name && !isGenericComeviewName(name)) return `n:${name}`;
+    return "";
+  }
+  function normalizeComeviewNgList(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const e of raw) {
+      if (!e || typeof e !== "object") continue;
+      const key = String(
+        /** @type {any} */
+        e.key || ""
+      ).trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        key,
+        name: String(
+          /** @type {any} */
+          e.name || ""
+        ).trim(),
+        at: Number(
+          /** @type {any} */
+          e.at
+        ) || 0
+      });
+    }
+    return out.length > COMEVIEW_NG_MAX ? out.slice(out.length - COMEVIEW_NG_MAX) : out;
+  }
+  function extractUserCommentRows(rawRows, userKey, max = 200) {
+    const key = String(userKey || "").trim();
+    if (!Array.isArray(rawRows) || !key) return { rows: [], total: 0 };
+    const cap = Number.isFinite(max) && max > 0 ? Math.floor(max) : 200;
+    const hits = [];
+    for (const raw of rawRows) {
+      const n = normalizeComeviewRow(raw);
+      if (!n) continue;
+      if (comeviewUserKeyForRow(n) !== key) continue;
+      hits.push(n);
+    }
+    return {
+      rows: hits.length > cap ? hits.slice(hits.length - cap) : hits,
+      total: hits.length
+    };
+  }
+
+  // src/lib/voiceNgMute.js
+  function voiceNgKeySet(raw) {
+    return new Set(normalizeComeviewNgList(raw).map((e) => e.key));
+  }
+  function isVoiceItemNgMuted(item, ngKeys) {
+    if (!item || !(ngKeys instanceof Set) || ngKeys.size === 0) return false;
+    const key = comeviewUserKeyForRow({
+      userId: String(item.userId ?? ""),
+      name: String(item.nickname ?? item.name ?? "")
+    });
+    return !!key && ngKeys.has(key);
+  }
+
+  // src/lib/voiceReadQueue.js
+  function pushVoiceQueue(queue, item, { max = 5, keep } = {}) {
+    const current = Array.isArray(queue) ? [...queue] : [];
+    if (item && typeof item === "object" && /** @type {{priority?: string}} */
+    item.priority === "high") {
+      const insertIdx = current.findIndex((x) => !x || typeof x !== "object" || /** @type {{priority?: string}} */
+      x.priority !== "high");
+      if (insertIdx < 0) {
+        current.push(item);
+      } else {
+        current.splice(insertIdx, 0, item);
+      }
+    } else {
+      current.push(item);
+    }
+    const rawMax = Number(max);
+    const limit = Number.isFinite(rawMax) ? Math.max(0, Math.floor(rawMax)) : 5;
+    const dropCount = Math.max(0, current.length - limit);
+    if (typeof keep !== "function" || dropCount === 0) {
+      return {
+        queue: current.slice(dropCount),
+        dropped: current.slice(0, dropCount)
+      };
+    }
+    const dropped = [];
+    const kept = [];
+    for (const x of current) {
+      if (dropped.length < dropCount && x !== item && !keep(x)) dropped.push(x);
+      else kept.push(x);
+    }
+    return { queue: kept, dropped };
+  }
+  function mergeRepeatedVoiceItem(queue, candidate) {
+    const current = Array.isArray(queue) ? [...queue] : [];
+    if (!candidate || typeof candidate !== "object") {
+      return { queue: current, merged: false };
+    }
+    const index = current.findIndex(
+      (existing2) => existing2 && typeof existing2 === "object" && existing2.body === candidate.body
+    );
+    if (index < 0) return { queue: current, merged: false };
+    const existing = current[index];
+    const rawCount = Number(existing.count);
+    const count = Number.isFinite(rawCount) && rawCount >= 1 ? Math.floor(rawCount) : 1;
+    current[index] = { ...existing, count: count + 1 };
+    return { queue: current, merged: true };
+  }
+  function computeVoiceCongestion(queueLength) {
+    const rawLength = Number(queueLength);
+    const length = Number.isFinite(rawLength) && rawLength >= 0 ? Math.floor(rawLength) : 0;
+    if (length >= 8) return { speedBoost: 0.8, maxChars: 30 };
+    if (length >= 5) return { speedBoost: 0.5, maxChars: 40 };
+    if (length >= 3) return { speedBoost: 0.3, maxChars: 50 };
+    if (length >= 2) return { speedBoost: 0.15, maxChars: 60 };
+    return { speedBoost: 0, maxChars: 60 };
+  }
+  function capVoiceMaxCharsByBoost(effectiveBoost, queueMaxChars) {
+    const boost = Number(effectiveBoost);
+    const base = Number.isFinite(Number(queueMaxChars)) && Number(queueMaxChars) >= 1 ? Math.floor(Number(queueMaxChars)) : 60;
+    let cap = 60;
+    if (Number.isFinite(boost)) {
+      if (boost >= 0.8) cap = 30;
+      else if (boost >= 0.5) cap = 40;
+      else if (boost >= 0.3) cap = 50;
+    }
+    return Math.min(base, cap);
+  }
+  function computeVoiceE2eAverage(prevAvgMs, sampleMs, alpha = 0.3) {
+    const sample = Number(sampleMs);
+    if (!Number.isFinite(sample) || sample < 0) {
+      const prev2 = Number(prevAvgMs);
+      return Number.isFinite(prev2) ? prev2 : -1;
+    }
+    const prev = Number(prevAvgMs);
+    if (!Number.isFinite(prev) || prev < 0) return Math.round(sample);
+    return Math.round(prev + alpha * (sample - prev));
+  }
+  var VOICE_PLAYBACK_RATE_MAX = 1.35;
+  function computeVoicePlaybackRate(boostAtSynth, boostNow) {
+    const at = Number(boostAtSynth);
+    const now = Number(boostNow);
+    if (!Number.isFinite(at) || !Number.isFinite(now)) return 1;
+    const rate = (1 + now) / (1 + at);
+    return Math.min(VOICE_PLAYBACK_RATE_MAX, Math.max(1, rate));
+  }
+  function resolveVoiceSynthDepth(queueLength, opts = {}) {
+    const rawLength = Number(queueLength);
+    const length = Number.isFinite(rawLength) && rawLength >= 0 ? Math.floor(rawLength) : 0;
+    let depth;
+    if (length >= 5) depth = 3;
+    else if (length >= 3) depth = 2;
+    else depth = 1;
+    const rawPending = Number(opts?.pending);
+    if (Number.isFinite(rawPending) && rawPending >= 0) {
+      depth = Math.min(depth, Math.floor(rawPending));
+    }
+    return depth;
+  }
+
+  // src/lib/voiceStageTiming.js
+  var VOICE_UPSTREAM_SANE_MAX_MS = 6e4;
+  var VOICE_RTF_MIN_AUDIO_MS = 600;
+  var VOICE_RTF_FIXED_OVERHEAD_MS = 250;
+  function foldWarmSynthRtf(diag, ownMs, audioMs) {
+    if (!Number.isFinite(audioMs) || audioMs < VOICE_RTF_MIN_AUDIO_MS || !Number.isFinite(ownMs)) return;
+    foldVoiceStageEma(diag, "warmSynthRtfPermille", Math.max(0, ownMs - VOICE_RTF_FIXED_OVERHEAD_MS) / audioMs * 1e3);
+    diag.warmRtfSamples = (Number(diag.warmRtfSamples) || 0) + 1;
+  }
+  function measureVoiceGapMs(fromMs, toMs) {
+    const cap = Number(fromMs);
+    const enq = Number(toMs);
+    if (!Number.isFinite(cap) || cap <= 0 || !Number.isFinite(enq) || enq <= 0) return -1;
+    const ms = enq - cap;
+    if (ms < 0 || ms > VOICE_UPSTREAM_SANE_MAX_MS) return -1;
+    return Math.round(ms);
+  }
+  function foldVoiceStageEma(diag, field, sampleMs) {
+    const v = Number(sampleMs);
+    if (!diag || typeof diag !== "object" || !Number.isFinite(v) || v < 0) return;
+    diag[field] = Math.round(updateVoiceServiceTimeEma(diag[field], v));
+  }
+  function createVoiceSynthTracker(deps = {}) {
+    const now = typeof deps.now === "function" ? deps.now : () => Date.now();
+    const seenStyles = /* @__PURE__ */ new Set();
+    let prevDone = Promise.resolve(0);
+    return {
+      /**
+       * 読み上げ ON のたびに呼ぶ(2026-10-31)。VOICEVOX を再起動すると声はまた冷えているので、
+       *   覚えていると初めての声を「温まった声」として数え、起動直後の遅れを弱い PC と取り違える。
+       */
+      reset() {
+        seenStyles.clear();
+      },
+      /**
+       * @param {unknown} styleId
+       * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number, borrowed?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, startAt: number, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number, borrowed: boolean } }}
+       */
+      begin(styleId) {
+        const startAt = now();
+        const key = String(styleId ?? "");
+        const cold = !seenStyles.has(key);
+        seenStyles.add(key);
+        let prevDoneAt = -1;
+        prevDone.then((t) => {
+          prevDoneAt = t;
+        }, () => {
+        });
+        let resolveSelf = () => {
+        };
+        prevDone = new Promise((r) => {
+          resolveSelf = r;
+        });
+        let ended = false;
+        const end = (timing = {}, ok = true) => {
+          const endAt = now();
+          if (!ended) {
+            ended = true;
+            resolveSelf(endAt);
+          }
+          const q = Number(timing?.queryMs);
+          const s = Number(timing?.synthMs);
+          const i = Number(timing?.initMs);
+          const a = Number(timing?.audioMs);
+          const borrowed = timing?.borrowed === true;
+          return {
+            // 借りた声は温まっている声で読んだので「初めての声」に入れない(v0.1.1772)。
+            cold: cold && !borrowed,
+            ok: ok === true,
+            startAt,
+            totalMs: Math.max(0, endAt - startAt),
+            engineWaitMs: prevDoneAt > startAt ? Math.min(prevDoneAt, endAt) - startAt : 0,
+            queryMs: Number.isFinite(q) && q >= 0 ? Math.round(q) : -1,
+            synthMs: Number.isFinite(s) && s >= 0 ? Math.round(s) : -1,
+            // 2026-10-26: 合成の前に声を読み込んだ時間(voiceWarmup)。無ければ 0。
+            initMs: Number.isFinite(i) && i > 0 ? Math.round(i) : 0,
+            // 2026-10-26: 少しずつ受け取った(voiceStream)。時間は「最初の声が届くまで」。
+            streamed: timing?.streamed === true,
+            // 2026-10-26: 別の声の準備と重なった(voiceWarmup)。速さの物差しに入れない。
+            contended: timing?.contended === true,
+            // 2026-10-26: できた声の長さ(ms)。合成の速さを文の長さで割るのに使う。分からなければ -1。
+            audioMs: Number.isFinite(a) && a > 0 ? Math.round(a) : -1,
+            // v0.1.1772: まだ温まっていない声の代わりに、温まった声で読んだ(voiceWarmup)。
+            borrowed
+          };
+        };
+        return { cold, end };
+      }
+    };
+  }
+  function recordVoiceSynthStage(diag, r) {
+    if (!diag || typeof diag !== "object" || !r) return;
+    if (!r.ok) return;
+    if (r.borrowed) diag.voiceBorrowTotal = (Number(diag.voiceBorrowTotal) || 0) + 1;
+    foldVoiceStageEma(diag, "engineWaitEmaMs", r.engineWaitMs);
+    foldVoiceStageEma(diag, "audioQueryEmaMs", r.queryMs);
+    const initMs = Number(r.initMs) > 0 ? Number(r.initMs) : 0;
+    if (r.streamed) {
+      diag.streamTotal = (Number(diag.streamTotal) || 0) + 1;
+      foldVoiceStageEma(diag, "streamFirstAudioEmaMs", Math.max(0, r.totalMs - r.engineWaitMs - initMs));
+      return;
+    }
+    if (r.synthMs >= 0) foldVoiceStageEma(diag, "synthesisEmaMs", Math.max(0, r.synthMs - r.engineWaitMs));
+    if (initMs > 0) {
+      diag.speakerInitTotal = (Number(diag.speakerInitTotal) || 0) + 1;
+      diag.speakerInitMaxMs = Math.max(Number(diag.speakerInitMaxMs) || 0, Math.round(initMs));
+    }
+    const ownMs = Math.max(0, r.totalMs - r.engineWaitMs - initMs);
+    if (r.contended) {
+      diag.contendedSynthTotal = (Number(diag.contendedSynthTotal) || 0) + 1;
+      return;
+    }
+    if (r.cold) {
+      diag.coldSynthTotal = (Number(diag.coldSynthTotal) || 0) + 1;
+      diag.coldSynthMaxMs = Math.max(Number(diag.coldSynthMaxMs) || 0, Math.round(ownMs));
+      diag.lastColdSynthMs = Math.round(ownMs);
+    } else {
+      foldVoiceStageEma(diag, "warmSynthEmaMs", ownMs);
+      diag.warmSynthSamples = (Number(diag.warmSynthSamples) || 0) + 1;
+      foldWarmSynthRtf(diag, ownMs, Number(r.audioMs));
+    }
+  }
+  function resetVoiceWarmMeasure(diag) {
+    if (!diag || typeof diag !== "object") return;
+    diag.warmSynthEmaMs = -1;
+    diag.warmSynthSamples = 0;
+    diag.warmSynthRtfPermille = -1;
+    diag.warmRtfSamples = 0;
+  }
+  function recordVoiceStreamDone(diag, r, voice, now, after) {
+    if (!diag || !r || !r.ok || !r.streamed || !voice || typeof voice.whenDone?.then !== "function") return Promise.resolve();
+    return voice.whenDone.then((ok) => {
+      if (ok !== true || voice.failed || r.cold || r.contended) return;
+      const audioMs = voice.sampleRate > 0 ? voice.totalSamples / voice.sampleRate * 1e3 : -1;
+      const ownMs = now() - r.startAt - r.engineWaitMs - (Number(r.initMs) > 0 ? Number(r.initMs) : 0);
+      foldWarmSynthRtf(diag, ownMs, audioMs);
+      if (typeof after === "function") after();
+    }).catch(() => {
+    });
+  }
+  function measureWavAudioMs(wav) {
+    if (!(wav instanceof ArrayBuffer) || wav.byteLength < 44) return -1;
+    try {
+      const v = new DataView(wav);
+      if (v.getUint32(0, false) !== 1380533830 || v.getUint32(8, false) !== 1463899717) return -1;
+      let off = 12;
+      let bytesPerSec = 0;
+      while (off + 8 <= wav.byteLength) {
+        const id = v.getUint32(off, false);
+        const size = v.getUint32(off + 4, true);
+        if (id === 1718449184 && off + 16 <= wav.byteLength) bytesPerSec = v.getUint32(off + 16, true);
+        if (id === 1684108385) {
+          if (bytesPerSec <= 0) return -1;
+          const dataBytes = Math.min(size, wav.byteLength - off - 8);
+          return Math.round(dataBytes / bytesPerSec * 1e3);
+        }
+        off += 8 + size + size % 2;
+      }
+    } catch {
+    }
+    return -1;
+  }
+  function recordVoiceE2eSample(diag, ms) {
+    const v = Number(ms);
+    if (!diag || typeof diag !== "object" || !Number.isFinite(v) || v < 0) return;
+    diag.e2eSampleTotal = (Number(diag.e2eSampleTotal) || 0) + 1;
+    diag.e2eSumMsTotal = (Number(diag.e2eSumMsTotal) || 0) + Math.round(v);
+    diag.e2eMaxMs = Math.max(Number(diag.e2eMaxMs) || 0, Math.round(v));
+  }
+
+  // src/lib/voiceLagNotice.js
+  var VOICE_LAG_NOTICE_SHOW_MS = 4e3;
+  var VOICE_LAG_NOTICE_HIDE_MS = 2500;
+  var VOICE_GPU_TIP_TEXT = "⚡ 読み上げを速くするには: VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に(切り替えると VOICEVOX が再起動します)";
+  var VOICE_WARMING_TEXT = "VOICEVOX を起動した直後は、初めて使う声の準備で遅れます。続けて読むうちに速くなります";
+  var VOICE_LIGHT_ACTIVE_TEXT = "VOICEVOX が追いつかないので、いまは PC の声で読んでいます。VOICEVOX が速くなったら自動で戻ります";
+  function isVoiceWarmingUp(diag) {
+    const samples = Math.max(Number(diag?.warmSynthSamples) || 0, Number(diag?.warmRtfSamples) || 0);
+    return samples < VOICE_WEAK_PC_MIN_WARM_SAMPLES;
+  }
+  function shouldHintVoiceGpu(diag, gpuCapable) {
+    return gpuCapable === true && (isWeakVoicePc(diag) || diag?.voiceOverloaded === true);
+  }
+  function decideVoiceGpuTip(diag, gpuCapable) {
+    if (isVoiceWarmingUp(diag) && diag?.voiceOverloaded !== true) return "";
+    return shouldHintVoiceGpu(diag, gpuCapable) ? VOICE_GPU_TIP_TEXT : "";
+  }
+  function decideVoiceLagNotice(prevShown, diag, _opts = {}) {
+    if (diag?.lightVoiceActive === true) return { shown: true, lagMs: -1, text: VOICE_LIGHT_ACTIVE_TEXT };
+    const e2e = Number(diag?.e2eAvgMs);
+    const up = Number(diag?.upstreamEmaMs);
+    const queueNow = Number(diag?.queueNow);
+    if (!Number.isFinite(e2e) || e2e < 0) return { shown: false, lagMs: -1, text: "" };
+    const lagMs = Math.round(e2e + (Number.isFinite(up) && up > 0 ? up : 0));
+    if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: "" };
+    const shown = prevShown ? lagMs >= VOICE_LAG_NOTICE_HIDE_MS : lagMs >= VOICE_LAG_NOTICE_SHOW_MS;
+    if (!shown) return { shown: false, lagMs, text: "" };
+    const sec = Math.round(lagMs / 1e3);
+    const staleSec = Math.round(VOICE_STALE_MS_NORMAL / 1e3);
+    return {
+      shown: true,
+      lagMs,
+      text: `読み上げが約${sec}秒遅れています。追いつくまで、${staleSec}秒より前のコメントは読まずに飛ばします` + (isVoiceWarmingUp(diag) && diag?.voiceOverloaded !== true ? `。${VOICE_WARMING_TEXT}` : "")
+    };
+  }
+
+  // src/lib/voicePlayer.js
+  var VOICE_ALIVE_RETRY_BACKOFF_MS = Object.freeze([0, 500, 1500]);
+  var SILENT_WAV_DATA_URI = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
+  var VoicePlayer = class {
+    constructor(deps = {}) {
+      this.storage = deps.storage;
+      this.onToggle = deps.onToggle || (() => {
+      });
+      this.onStatus = deps.onStatus || (() => {
+      });
+      this.onLoadingState = deps.onLoadingState || (() => {
+      });
+      this.onSkip = deps.onSkip || (() => {
+      });
+      this.onLagNotice = deps.onLagNotice || (() => {
+      });
+      this.onGpuTip = deps.onGpuTip || (() => {
+      });
+      this._gpuTipText = "";
+      this._lagNoticeShown = false;
+      this.isObsMode = deps.isObsMode || (() => false);
+      this.audioConstructor = deps.audioConstructor;
+      this.unlockAudioConstructor = deps.unlockAudioConstructor || (typeof globalThis !== "undefined" && typeof globalThis.Audio === "function" ? globalThis.Audio : null);
+      this.createObjectURL = deps.createObjectURL;
+      this.revokeObjectURL = deps.revokeObjectURL;
+      this.fetchVoicevoxAlive = deps.fetchVoicevoxAlive;
+      this.probeVoicevoxAlive = deps.probeVoicevoxAlive || (async () => {
+        const ok = await this.fetchVoicevoxAlive();
+        return { ok: !!ok, reason: ok ? "" : "refused" };
+      });
+      this.fetchVoiceStyleIds = deps.fetchVoiceStyleIds;
+      this.initVoiceSpeaker = deps.initVoiceSpeaker || null;
+      this.voiceWarmup = deps.voiceWarmup || null;
+      this.probeVoiceStreaming = deps.probeVoiceStreaming || null;
+      this.probeVoiceGpu = deps.probeVoiceGpu || null;
+      this._gpuCapable = null;
+      this.createStreamedAudio = deps.createStreamedAudio || null;
+      this._streamSupported = false;
+      this._slowEngine = false;
+      this._weakPcState = { saved: false };
+      this._overload = createVoiceOverloadState();
+      this._synthInFlight = 0;
+      this.lightSpeaker = deps.lightSpeaker === void 0 ? createLightSpeaker() : deps.lightSpeaker;
+      this.lightVoiceSetting = "auto";
+      this._lightProbeAt = 0;
+      this._lightFailStreak = 0;
+      this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
+      this.resolveVoice = deps.resolveVoice;
+      this.enabled = false;
+      this.readNameEnabled = false;
+      this.ngKeys = /* @__PURE__ */ new Set();
+      this.toggleBusy = false;
+      this.styleIds = [];
+      this.assignments = {};
+      this.queue = [];
+      this.prefetches = /* @__PURE__ */ new Map();
+      this.playing = false;
+      this.generation = 0;
+      this.stopCurrent = null;
+      this.skipTimer = null;
+      this.onDiag = deps.onDiag || (() => {
+      });
+      this._serviceTimeEmaMs = -1;
+      this._paceState = createVoicePaceState();
+      this._effectiveQueueMax = 8;
+      this._growStreak = 0;
+      this._synthWaitEmaMs = -1;
+      this._playPrepEmaMs = -1;
+      this._playbackEmaMs = -1;
+      this._expectedPlayEmaMs = -1;
+      this._arrivalWindowState = null;
+      this._dropCountGateTotal = 0;
+      this._dropHeadStaleTotal = 0;
+      this._dropSweepStaleTotal = 0;
+      this._voicedRecentRatioEma = -1;
+      this._capLagTicks = 0;
+      this._diagBornAt = Date.now();
+      this._spokenSampleCount = 0;
+      this.diag = {
+        enabled: false,
+        queueNow: 0,
+        queueMax: 0,
+        spokenTotal: 0,
+        staleDropTotal: 0,
+        playbackTimeoutTotal: 0,
+        lastSpokenBase: 0,
+        lastSynthMs: -1,
+        lastDepth: 0,
+        lastSpeedBoost: 0,
+        lastPhase: "",
+        lastPhaseAt: 0,
+        // v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 「到着→発声」の体感遅延。
+        //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
+        //   mergeTotal=mergeRepeatedVoiceItem で吸収した累計(統合が効いているかの計器)。
+        lastE2eMs: -1,
+        e2eAvgMs: -1,
+        mergeTotal: 0,
+        // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
+        //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
+        //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
+        //   飽和した回数、voicedRatio=spokenTotal/(spokenTotal+staleDropTotal)(生存者バイアスの緑を潰す指標)。
+        serviceTimeEmaMs: -1,
+        effectiveQueueMax: 8,
+        rateClampTotal: 0,
+        voicedRatio: -1,
+        // 2026-07-28計器(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md):
+        //   serviceTimeの3分解(合成待ち/準備待ち/実再生/期待再生時間)+drop原因の分別+需要/供給+判定。
+        synthWaitEmaMs: -1,
+        playPrepEmaMs: -1,
+        playbackEmaMs: -1,
+        expectedPlayEmaMs: -1,
+        arrivalPerMin: -1,
+        voicedRecentRatio: -1,
+        // v0.1.1222計器: 持続過負荷ブースト(pressure由来)。lastSustainedBoost=直近の上乗せ値、
+        //   sustainedBoostTotal=キュー長では出せない速度を実際に足した累計。
+        //   ★「速くしたのに読める数が増えたか」を後から検算するための計器(効果の裏取り用)。
+        lastSustainedBoost: 0,
+        sustainedBoostTotal: 0,
+        lastBacklogBoost: 0,
+        lastPaceFloor: 0,
+        queueMaxByChars: 0,
+        dropCountGateTotal: 0,
+        dropHeadStaleTotal: 0,
+        dropSweepStaleTotal: 0,
+        // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
+        //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
+        //   乗っていない**帳尻の穴が見つかった。真犯人は下の !wav 分岐が spokenTotal も drop も
+        //   増やさずに continue していたこと(voicevoxClient は 8000ms タイムアウトで null を返す)。
+        //   これが無いと「なぜ読まれないか」が原理的に分からない。
+        synthNullTotal: 0,
+        synthNullNearTimeout: 0,
+        // v0.1.1224計器: 合成失敗の【理由別】内訳。従来は6通りの失敗が全部 null に畳まれ、
+        //   実配信の「合成失敗17件(その他16)」の正体を誰も答えられなかった。
+        //   原因ごとに打つ手が正反対(接続不能=拡張では直せない / HTTP拒否=絞れば直る)。
+        synthFailReasons: {},
+        upstreamEmaMs: -1,
+        lastUpstreamMs: -1,
+        queueWaitEmaMs: -1,
+        engineWaitEmaMs: -1,
+        audioQueryEmaMs: -1,
+        synthesisEmaMs: -1,
+        warmSynthEmaMs: -1,
+        coldSynthTotal: 0,
+        coldSynthMaxMs: 0,
+        lastColdSynthMs: -1,
+        speakerInitTotal: 0,
+        speakerInitMaxMs: 0,
+        voiceBorrowTotal: 0,
+        e2eSampleTotal: 0,
+        e2eSumMsTotal: 0,
+        e2eMaxMs: 0,
+        bgInitTotal: 0,
+        bgInitMaxMs: 0,
+        bgInitYieldTotal: 0,
+        readerYieldTotal: 0,
+        streamTotal: 0,
+        streamFirstAudioEmaMs: -1,
+        warmSynthSamples: 0,
+        contendedSynthTotal: 0,
+        warmSynthRtfPermille: -1,
+        warmRtfSamples: 0,
+        playCheckedTotal: 0,
+        playCutShortTotal: 0,
+        playStallTotal: 0,
+        streamUnderrunTotal: 0,
+        streamUnderrunMaxMs: 0,
+        playErrorAfterStartTotal: 0,
+        clipItemTotal: 0,
+        quietItemTotal: 0,
+        streamGainDropTotal: 0,
+        outPeakEmaPermille: -1,
+        outRmsDbMin: 999,
+        outRmsDbMax: -999,
+        lastOutRmsDb: 0,
+        lastPlayIssue: "",
+        venueGate: "",
+        lagVerdict: "",
+        diagBornAt: this._diagBornAt
+      };
+      this._synthTracker = createVoiceSynthTracker();
+      this.volumePercent = VOICE_VOLUME_DEFAULT;
+      this.storageOnChanged = deps.storageOnChanged || null;
+    }
+    _emitDiag() {
+      this.diag.enabled = this.enabled;
+      this.diag.queueNow = this.queue.length;
+      if (this.queue.length > this.diag.queueMax) this.diag.queueMax = this.queue.length;
+      try {
+        this.onDiag(this.diag);
+      } catch {
+      }
+    }
+    // ★v0.1.1506: キー文字列の正本は voiceKeys.js。getter の【形は残し】戻り値だけ委譲する
+    //   (comeview-entry.js と二重定義になっていた。片方だけ直す事故を構造的に無くす)。
+    get VOICE_READING_ENABLED_KEY() {
+      return KEY_VOICE_READING_ENABLED;
+    }
+    get VOICE_ASSIGNMENTS_KEY() {
+      return KEY_VOICE_ASSIGNMENTS;
+    }
+    get VOICE_READ_NAME_KEY() {
+      return KEY_VOICE_READ_NAME_ENABLED;
+    }
+    /**
+     * @param {{ forceOn?: boolean }} [opts]
+     *   forceOn=true なら保存状態に関わらず読み上げを自動 ON にする(会場モードを開いたら
+     *   「いきなり読み上げ上がる」ユーザー期待のため。comeview の ?voice=1 相当)。
+     *   このとき persist:true で storage にも ON を残し、以後も復元される。
+     */
+    async initialize(opts = {}) {
+      if (this.isObsMode()) return;
+      let bag = {};
+      try {
+        if (this.storage) {
+          bag = await this.storage.get([
+            this.VOICE_READING_ENABLED_KEY,
+            this.VOICE_ASSIGNMENTS_KEY,
+            this.VOICE_READ_NAME_KEY,
+            KEY_VOICE_VOLUME_PERCENT,
+            COMEVIEW_NG_STORAGE_KEY
+          ]);
+        }
+      } catch {
+        bag = {};
+      }
+      const rawAssignments = bag[this.VOICE_ASSIGNMENTS_KEY];
+      this.assignments = !rawAssignments || typeof rawAssignments !== "object" || Array.isArray(rawAssignments) ? {} : rawAssignments;
+      this.readNameEnabled = bag[this.VOICE_READ_NAME_KEY] === true;
+      this.volumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
+      this.ngKeys = voiceNgKeySet(bag[COMEVIEW_NG_STORAGE_KEY]);
+      this._watchVolumeSetting();
+      this._emitToggle();
+      const forceOn = opts.forceOn === true;
+      if (forceOn || bag[this.VOICE_READING_ENABLED_KEY] === true) {
+        await this.enable({ persist: forceOn });
+      }
+    }
+    /** ポップアップで音量が変わったら、次に鳴らす声から反映する(1回だけ購読)。コメビュの NG の変更も同じ口で拾う。 */
+    _watchVolumeSetting() {
+      const ev = this.storageOnChanged;
+      if (this._volumeWatched || !ev || typeof ev.addListener !== "function") return;
+      this._volumeWatched = true;
+      try {
+        ev.addListener((changes, areaName) => {
+          if (areaName && areaName !== "local") return;
+          const c = changes && changes[KEY_VOICE_VOLUME_PERCENT];
+          if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
+          const ng = changes && changes[COMEVIEW_NG_STORAGE_KEY];
+          if (ng) this.ngKeys = voiceNgKeySet(ng.newValue);
+        });
+      } catch {
+      }
+    }
+    _emitToggle() {
+      this.onToggle(this.enabled, this.readNameEnabled, this.toggleBusy);
+    }
+    _showSkipped(count) {
+      if (count <= 0) return;
+      this.onSkip(count);
+    }
+    /**
+     * v0.1.799: item が【鳴らずに捨てられた】(stale/件数drop/合成失敗/flush/stop/merge)ときだけ
+     *   呼ぶ drop 専用シグナル。再生パスでは絶対に呼ばない(=onAudioStart と排他)。吹き出し側は
+     *   これを resolved として受け、pending→unvoiced に落として流速寿命で消す(床いっぱい残さない)。
+     *   onPlayStart(再生・破棄の両方で発火する曖昧な「消費」信号)は後方互換でそのまま残す。
+     * @param {{ onDropped?: Function }} item
+     */
+    _notifyDropped(item) {
+      if (item && typeof item.onDropped === "function") {
+        try {
+          item.onDropped();
+        } catch {
+        }
+      }
+    }
+    stop() {
+      const dropped = this.queue;
+      this.queue = [];
+      this.generation += 1;
+      this.prefetches.clear();
+      for (const item of dropped) this._notifyDropped(item);
+      if (typeof this.stopCurrent === "function") this.stopCurrent();
+      this.stopCurrent = null;
+      this._updateLagNotice();
+    }
+    /**
+     * v0.1.773 長時間ラグ対策: 待機中のキューだけを破棄して「今」へリセットする。
+     *   再生中の1本は止めない(stop と違い不協和を出さない)。タブが裏に回って drain が
+     *   スロットリングされ溜まった backlog を、可視復帰時に一掃して定常ラグの蓄積を断つ。
+     *   破棄した item には onPlayStart(=消費=resolved)を通知し、吹き出し側の状態整合を保つ。
+     * @returns {number} 破棄した件数
+     */
+    flushPendingQueue() {
+      const dropped = this.queue;
+      this.queue = [];
+      this.prefetches.clear();
+      for (const item of dropped) {
+        if (item && typeof item.onPlayStart === "function") item.onPlayStart();
+        this._notifyDropped(item);
+      }
+      if (dropped.length > 0) this._showSkipped(dropped.length);
+      return dropped.length;
+    }
+    disable({ persist = true } = {}) {
+      this.enabled = false;
+      this.toggleBusy = false;
+      this.stop();
+      this.onLoadingState("idle");
+      this._emitToggle();
+      if (persist && this.storage) {
+        this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: false }).catch(() => {
+        });
+      }
+    }
+    /**
+     * ★v0.1.1327: クリックの「ユーザー操作」を【その場で】使って音声を解錠する。
+     *
+     * ■ なぜ要るか(ユーザー実機「一瞬ONになって戻ってしまう」)
+     *   Chrome は自動再生をブロックし、`audio.play()` は【ユーザー操作の延長】でしか
+     *   通らない。ところが enable() は
+     *     クリック → (生存確認 最大3回+バックオフ) → スタイル取得 → …数百ms〜数秒…
+     *     → 最初のコメント到着 → 合成 → ようやく audio.play()
+     *   という流れで、実際に鳴らす時点では**クリックから遠く離れている**。
+     *   すると NotAllowedError になり、再生パス(:612-617)が disable() を呼ぶため
+     *   「ONになった直後にOFFへ戻る」ように見えていた。
+     *   ★comeview(拡張ページ)は制約が緩く、会場(content script)だけで出る非対称の正体。
+     *
+     * ■ 何をするか
+     *   クリック直後の同期タイミングで、無音の短い音を1回 play() しておく。
+     *   これが通れば以後の play() は解錠済みとして扱われる(標準的な audio unlock 手法)。
+     *   失敗しても握りつぶす=従来どおり進む(悪化させない)。
+     *
+     * @returns {Promise<boolean>} 解錠できたか(できなくても enable は続行する)
+     */
+    async primeAudioUnlock() {
+      const Ctor = this.unlockAudioConstructor;
+      if (typeof Ctor !== "function") return false;
+      try {
+        const a = new Ctor();
+        a.src = SILENT_WAV_DATA_URI;
+        a.volume = 0;
+        const p = a.play();
+        if (p && typeof p.then === "function") await p;
+        try {
+          a.pause();
+        } catch {
+        }
+        this._audioUnlocked = true;
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    async enable({ persist = true } = {}) {
+      if (this.isObsMode() || this.toggleBusy) return;
+      this.toggleBusy = true;
+      this._emitToggle();
+      await this.primeAudioUnlock();
+      this.onLoadingState("checking");
+      let probe = await this.probeVoicevoxAlive();
+      if (!probe.ok) {
+        this.onLoadingState("connecting");
+        for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
+          if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+          probe = await this.probeVoicevoxAlive();
+          if (probe.ok) break;
+        }
+      }
+      if (!probe.ok) {
+        this.diag.lastEnableFailReason = String(probe.reason || "unknown");
+        this.diag.enableFailTotal = (Number(this.diag.enableFailTotal) || 0) + 1;
+        this._emitDiag();
+        this.disable({ persist: false });
+        this.onLoadingState("notfound", probe.reason);
+        this.toggleBusy = false;
+        this._emitToggle();
+        return;
+      }
+      const allStyleIds = await this.fetchVoiceStyleIds();
+      startVoiceWarmup(this.voiceWarmup, allStyleIds);
+      this._synthTracker.reset();
+      resetVoiceWarmMeasure(this.diag);
+      this._streamSupported = false;
+      if (this.probeVoiceStreaming && this.createStreamedAudio) {
+        void Promise.resolve().then(() => this.probeVoiceStreaming()).then((ok) => {
+          this._streamSupported = ok === true;
+        }, () => {
+        });
+      }
+      this._gpuCapable = null;
+      if (this.probeVoiceGpu) {
+        void Promise.resolve().then(() => this.probeVoiceGpu()).then((ok) => {
+          this._gpuCapable = typeof ok === "boolean" ? ok : null;
+        }, () => {
+        });
+      }
+      const prepared = await prepareVoiceStyleIds(allStyleIds, {
+        readSettings: async () => {
+          const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
+          this._slowEngine = b[KEY_VOICE_WEAK_PC] === true;
+          return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
+        },
+        initSpeaker: this.initVoiceSpeaker
+      });
+      this.styleIds = prepared.styleIds;
+      this.diag.voiceNarrowed = prepared.narrowed;
+      this.generation += 1;
+      this.enabled = true;
+      this.diag.lastEnableFailReason = "";
+      this._emitDiag();
+      this.toggleBusy = false;
+      this.onLoadingState("ready");
+      this._emitToggle();
+      if (persist && this.storage) {
+        this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: true }).catch(() => {
+        });
+      }
+    }
+    _voiceUserKeyForItem(item) {
+      const userId = String(item?.userId || "").trim();
+      const name = String(item?.nickname || "").trim();
+      const key = String(item?.userKey || item?.key || "").trim();
+      return userId || key || name || "anon";
+    }
+    /**
+     * v0.1.1800: 待っている件+新しい件の文字数から件数の上限を見積もる(voiceLagBudget.resolveVoiceQueueMaxByChars)。
+     * @param {object} candidate
+     * @returns {number}
+     */
+    _resolveQueueMaxByChars(candidate) {
+      try {
+        const maxChars = computeVoiceCongestion(this.queue.length + 1).maxChars;
+        const counts = [...this.queue, candidate].map((it) => buildMergedVoiceText(it, { maxChars }).length);
+        const rtfSamples = Number(this.diag.warmRtfSamples) || 0;
+        const rtfPermille = Number(this.diag.warmSynthRtfPermille);
+        const synthRtf = rtfSamples >= 3 && rtfPermille > 0 ? rtfPermille / 1e3 : 0;
+        const byChars = resolveVoiceQueueMaxByChars(counts, this._paceState, synthRtf);
+        if (byChars == null) return this._effectiveQueueMax;
+        this.diag.queueMaxByChars = byChars;
+        return byChars;
+      } catch {
+        return this._effectiveQueueMax;
+      }
+    }
+    /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ）。 */
+    _ensurePrefetch(item, generation) {
+      if (!item || generation !== this.generation) return null;
+      const existing = this.prefetches.get(item);
+      if (existing && existing.generation === generation) return existing.promise;
+      const congestion = computeVoiceCongestion(this.queue.length);
+      const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
+      const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
+      const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) });
+      if (!this._slowEngine && isWeakVoicePc(this.diag)) this._slowEngine = true;
+      const stream = shouldStreamVoice({
+        supported: this._streamSupported,
+        idle: this.queue[0] === item && !this.stopCurrent,
+        slowEngine: this._slowEngine,
+        textLength: text.length
+      });
+      const promise = this._synthesizeTracked(
+        text,
+        {
+          ...assigned,
+          speedOffset: assigned.speedOffset + effBoost
+        },
+        { stream }
+      ).catch(() => null);
+      this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length });
+      return promise;
+    }
+    /**
+     * v0.1.1224: 合成失敗の理由を1件記録する。voicevoxClient の onFailure から呼ばれる。
+     * @param {{ stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }} info
+     */
+    /**
+     * 合成を依頼し、段階計測(エンジン待ち・audio_query/synthesis・初めての声)を diag へ記録する。
+     * 戻り値・例外は fetchSynthesizeVoice と同じ(計器は読み上げの挙動を変えない)。
+     * @param {string} text
+     * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
+     * @param {{ stream?: boolean }} [extra]
+     */
+    _synthesizeTracked(text, voice, extra = {}) {
+      const track = this._synthTracker.begin(voice?.styleId);
+      let timing = {};
+      let timedOut = false;
+      const startedAt = Date.now();
+      const overloadTimeouts = resolveVoiceOverloadTimeouts(this._overload.overloaded);
+      this._synthInFlight += 1;
+      let settled = false;
+      const settle = () => {
+        if (!settled) {
+          settled = true;
+          this._synthInFlight = Math.max(0, this._synthInFlight - 1);
+        }
+      };
+      let started;
+      try {
+        started = this.fetchSynthesizeVoice(text, voice, {
+          ...overloadTimeouts,
+          onFailure: (info) => {
+            const reason = this._recordSynthFailureReason(info);
+            if (reason === "timeout" || reason === "query_timeout") timedOut = true;
+          },
+          onTiming: (t) => {
+            timing = t || {};
+          },
+          ...extra.stream === true ? { stream: true } : {}
+        });
+      } catch (err) {
+        started = Promise.reject(err);
+      }
+      return Promise.resolve(started).then(
+        (wav) => {
+          settle();
+          let r = null;
+          try {
+            r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav);
+            recordVoiceSynthStage(this.diag, r);
+          } catch {
+          }
+          this._noteOverload({ timedOut, ok: !!wav, totalMs: Date.now() - startedAt });
+          const judge = () => {
+            if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
+            if (this.storage) {
+              forgetWeakVoicePcIfFast(this.diag, this._weakPcState, () => {
+                this._slowEngine = false;
+                return this.storage.set({ [KEY_VOICE_WEAK_PC]: false });
+              });
+            }
+          };
+          judge();
+          if (r && isStreamedVoice(wav)) void recordVoiceStreamDone(this.diag, r, wav, () => Date.now(), judge);
+          return wav;
+        },
+        (err) => {
+          settle();
+          try {
+            track.end(timing, false);
+          } catch {
+          }
+          this._noteOverload({ timedOut, ok: false });
+          throw err;
+        }
+      );
+    }
+    _recordSynthFailureReason(info) {
+      try {
+        const reason = classifyVoiceSynthFailureReason(info);
+        const bag = this.diag.synthFailReasons || (this.diag.synthFailReasons = {});
+        bag[reason] = (Number(bag[reason]) || 0) + 1;
+        return reason;
+      } catch {
+      }
+      return "";
+    }
+    /**
+     * 2026-10-31: 合成1件の結果から「エンジン混雑中」を更新し、計器に出す(状態速報で見える)。
+     * @param {{ timedOut?: boolean, ok?: boolean, totalMs?: number }} outcome
+     */
+    _noteOverload(outcome) {
+      try {
+        const was = this._overload.overloaded;
+        const now = noteVoiceSynthOutcome(this._overload, outcome);
+        this.diag.voiceOverloaded = now;
+        if (now && !was) this.diag.voiceOverloadTotal = (Number(this.diag.voiceOverloadTotal) || 0) + 1;
+      } catch {
+      }
+    }
+    /**
+     * v0.1.1222: 実際に適用する speedBoost を決める(既存の混雑ブースト ∪ 持続過負荷ブースト)。
+     *
+     * 【なぜ要るか】混雑ブーストは【絶対キュー長】依存(5件で0.5・8件で0.8)だが、実効上限が
+     *   処理時間EMAから3まで絞られると**キューは構造的に5件へ到達できない**=上位2段が
+     *   永久に発火しない。結果「速く読んで消化する」より「入口で捨てる」に倒れていた
+     *   (2026-08-01 実測: 需要102.3/分 vs 供給39.6/分・間引き88件・判定=playback・実効上限3)。
+     *   pressure はキュー長に依らず過負荷を検出できるので、この穴だけを埋める。
+     *
+     * ★上げるだけ(mergeVoiceSpeedBoost が max を取る)なので、既存の速さを下回らせない。
+     * @param {number} congestionBoost 既存の混雑由来ブースト
+     * @returns {number}
+     */
+    _resolveEffectiveSpeedBoost(congestionBoost) {
+      const sustained = computeSustainedPressureBoost({
+        arrivalPerMin: this.diag?.arrivalPerMin,
+        serviceTimeEmaMs: this._serviceTimeEmaMs,
+        sampleCount: this._spokenSampleCount
+      });
+      const paceFloor = computeVoicePaceFloor(this._paceState);
+      const backlog = computeBacklogCatchUpBoost(this.diag?.queueWaitEmaMs, paceFloor);
+      this.diag.lastPaceFloor = paceFloor;
+      this.diag.lastBacklogBoost = backlog;
+      const merged = mergeVoiceSpeedBoost(congestionBoost, Math.max(sustained, backlog));
+      if (sustained > 0 && merged > congestionBoost) {
+        this.diag.sustainedBoostTotal = (Number(this.diag.sustainedBoostTotal) || 0) + 1;
+      }
+      this.diag.lastSustainedBoost = sustained;
+      return merged;
+    }
+    /**
+     * v0.1.768: 先頭から深さ分(最大3)の item を先行合成する。
+     *   再生中に N+1 だけでなく N+2/N+3 も貯めることで、フラッド時に合成を遊ばせない。
+     *   深さは詰まり具合(resolveVoiceSynthDepth)で動的=落ち着いていれば1=無駄打ちしない。
+     *   先読みした item が後で stale 破棄されても、再生直前に必ず age-gate を通すので無駄打ちは回収。
+     */
+    _startPrefetch(generation) {
+      if (generation !== this.generation) {
+        this.prefetches.clear();
+        return;
+      }
+      if (this._useLightVoice()) {
+        this._maybeProbeVoicevox();
+        return;
+      }
+      const depth = capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
+        pending: this.queue.length
+      }), this._overload.overloaded);
+      this.diag.lastDepth = depth;
+      const wanted = /* @__PURE__ */ new Set();
+      for (let i = 0; i < depth && i < this.queue.length; i++) {
+        const item = this.queue[i];
+        if (!item) continue;
+        if (this._overload.overloaded && this._synthInFlight > 0 && !this.prefetches.has(item)) continue;
+        wanted.add(item);
+        this._ensurePrefetch(item, generation);
+      }
+      for (const key of this.prefetches.keys()) {
+        if (!wanted.has(key)) this.prefetches.delete(key);
+      }
+    }
+    /**
+     * 2026-11-03: VOICEVOX が混雑中(時間切れが続いた)なら、合成を頼み済みの件を守る判定を返す。
+     *   混雑していなければ null(=従来どおり件数・鮮度で捨てる)。
+     * @returns {((x: any) => boolean) | null}
+     */
+    _inflightKeeper() {
+      if (!this._overload.overloaded) return null;
+      return (x) => this.prefetches.has(x);
+    }
+    /** 2026-11-03: 今、軽い声で読むか(VOICEVOX が混雑中で、軽い声が使えるときだけ)。 */
+    _useLightVoice() {
+      let available = false;
+      try {
+        available = !!this.lightSpeaker && this._lightFailStreak < 3 && this.lightSpeaker.available();
+      } catch {
+        available = false;
+      }
+      const on = shouldUseLightVoice({ overloaded: this._overload.overloaded, available, setting: this.lightVoiceSetting });
+      this.diag.lightVoiceActive = on;
+      return on;
+    }
+    /** 軽い声で読んでいる間、ときどき VOICEVOX に短い文を頼んで速さを確かめる(速ければ混雑が解けて戻る)。 */
+    _maybeProbeVoicevox() {
+      const nowMs = Date.now();
+      if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) return;
+      this._lightProbeAt = nowMs;
+      try {
+        const voice = this.resolveVoice("", this.assignments, this.styleIds);
+        void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).catch(() => null);
+      } catch {
+      }
+    }
+    /**
+     * 2026-11-03: 1件を軽い声で読む。人ごとの声(どの声・高さ・速さ)は voiceLightFallback.lightVoiceToneFor。
+     * @param {any} item
+     * @param {number} generation
+     */
+    async _playLight(item, generation) {
+      this._maybeProbeVoicevox();
+      const text = buildMergedVoiceText(item, { maxChars: LIGHT_VOICE_MAX_CHARS });
+      const speaker = this.lightSpeaker;
+      let started = false;
+      if (text && speaker) {
+        const tone = lightVoiceToneFor(String(item.userKey || ""), speaker.voices().length);
+        this.stopCurrent = () => speaker.cancel();
+        try {
+          started = await speaker.speak(text, tone, {
+            onStart: () => {
+              if (typeof item.onAudioStart === "function") item.onAudioStart();
+            }
+          });
+        } catch {
+          started = false;
+        }
+        this.stopCurrent = null;
+      }
+      if (started && typeof item.onAudioEnd === "function") item.onAudioEnd();
+      if (typeof item.onPlayStart === "function") item.onPlayStart();
+      if (text && speaker) this._lightFailStreak = started ? 0 : this._lightFailStreak + 1;
+      if (!started || generation !== this.generation) {
+        this._notifyDropped(item);
+        return;
+      }
+      this.diag.spokenTotal += 1;
+      this.diag.lightSpokenTotal = (Number(this.diag.lightSpokenTotal) || 0) + 1;
+      this.diag.lastSpokenBase = Date.now();
+      const denom = this.diag.spokenTotal + this.diag.staleDropTotal;
+      this.diag.voicedRatio = denom > 0 ? this.diag.spokenTotal / denom : -1;
+      this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
+      this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+      this._emitDiag();
+      this._updateLagNotice();
+    }
+    async _drainQueue() {
+      if (this.playing || !this.enabled || this.isObsMode()) return;
+      this.playing = true;
+      try {
+        while (this.enabled && this.queue.length) {
+          const now = Date.now();
+          let allStale = true;
+          for (const qItem of this.queue) {
+            if (!isVoiceItemStale(qItem.enqueuedAt, now, this.queue.length, qItem.priority === "high").stale) {
+              allStale = false;
+              break;
+            }
+          }
+          if (allStale && this.queue.length > 0) {
+            const newest = this.queue[this.queue.length - 1];
+            const keepInflight2 = this._inflightKeeper();
+            const survivors = this.queue.filter((q) => q === newest || (keepInflight2 ? keepInflight2(q) : false));
+            const dropped = this.queue.filter((q) => !survivors.includes(q));
+            for (const d of dropped) {
+              if (typeof d.onPlayStart === "function") d.onPlayStart();
+              this._notifyDropped(d);
+            }
+            this.queue = survivors;
+            if (dropped.length > 0) {
+              this._showSkipped(dropped.length);
+              this.diag.staleDropTotal += dropped.length;
+              this._dropSweepStaleTotal += dropped.length;
+              this.diag.dropSweepStaleTotal = this._dropSweepStaleTotal;
+              for (let _i = 0; _i < dropped.length; _i += 1) {
+                this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
+              }
+              this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+              this._emitDiag();
+            }
+          }
+          const queueLength = this.queue.length;
+          const generation = this.generation;
+          this._startPrefetch(generation);
+          const item = this.queue.shift();
+          if (!item) continue;
+          const _serviceStart = Date.now();
+          foldVoiceStageEma(this.diag, "queueWaitEmaMs", measureVoiceGapMs(item.enqueuedAt, _serviceStart));
+          const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === "high");
+          const keepInflight = this._inflightKeeper();
+          const keepAnyway = !!keepInflight && (keepInflight(item) || this.queue.length === 0);
+          if (ageCheck.stale && !keepAnyway) {
+            if (typeof item.onPlayStart === "function") item.onPlayStart();
+            this._notifyDropped(item);
+            this._showSkipped(1);
+            this.diag.staleDropTotal += 1;
+            this._dropHeadStaleTotal += 1;
+            this.diag.dropHeadStaleTotal = this._dropHeadStaleTotal;
+            this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
+            this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+            this._emitDiag();
+            this.prefetches.delete(item);
+            continue;
+          }
+          if (this._useLightVoice() && !this.prefetches.has(item)) {
+            await this._playLight(item, generation);
+            continue;
+          }
+          const congestion = computeVoiceCongestion(queueLength);
+          const effBoostNow = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
+          const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
+          const pf = this.prefetches.get(item);
+          this.prefetches.delete(item);
+          const boostAtSynth = pf ? pf.boostAtSynth : effBoostNow;
+          const inlineText = pf ? "" : buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) });
+          const spokenChars = pf ? Number(pf.textLength) || 0 : inlineText.length;
+          const _synthStart = Date.now();
+          const wav = pf ? await pf.promise : await this._synthesizeTracked(
+            inlineText,
+            {
+              ...assigned,
+              speedOffset: assigned.speedOffset + effBoostNow
+            }
+          );
+          this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
+          this.diag.lastSpeedBoost = effBoostNow;
+          this._synthWaitEmaMs = updateVoiceServiceTimeEma(this._synthWaitEmaMs, this.diag.lastSynthMs);
+          this.diag.synthWaitEmaMs = this._synthWaitEmaMs;
+          if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
+            if (isStreamedVoice(wav)) wav.cancel();
+            if (!wav) {
+              this.diag.synthNullTotal += 1;
+              const failure = classifyVoiceSynthNull({ synthMs: this.diag.lastSynthMs });
+              if (failure.nearTimeout) this.diag.synthNullNearTimeout += 1;
+            }
+            if (typeof item.onPlayStart === "function") item.onPlayStart();
+            this._notifyDropped(item);
+            continue;
+          }
+          this._startPrefetch(generation);
+          let objectUrl = "";
+          try {
+            const streamedAudio = isStreamedVoice(wav) && this.createStreamedAudio ? this.createStreamedAudio(wav, this.volumePercent) : null;
+            let audio = streamedAudio;
+            let wholeLevel = null;
+            if (!audio) {
+              const whole = isStreamedVoice(wav) ? (await wav.whenDone, wav.toWav()) : wav;
+              const loud = applyVoiceVolumeToWav(whole, this.volumePercent);
+              wholeLevel = measureVoiceWavLevel(loud);
+              const blob = new Blob([loud], { type: "audio/wav" });
+              objectUrl = this.createObjectURL(blob);
+              const AudioCtor = this.audioConstructor;
+              audio = new AudioCtor(objectUrl);
+            }
+            const boostNow = this._resolveEffectiveSpeedBoost(
+              computeVoiceCongestion(this.queue.length).speedBoost
+            );
+            const playbackRate = streamedAudio ? 1 : computeVoicePlaybackRate(boostAtSynth, boostNow);
+            if (playbackRate !== 1) {
+              audio.preservesPitch = true;
+              audio.playbackRate = playbackRate;
+            }
+            observeVoicePlayback(audio, {
+              diag: this.diag,
+              playbackRate,
+              outPeak: wholeLevel ? wholeLevel.peak : -1,
+              outRms: wholeLevel ? wholeLevel.rms : -1,
+              targetPeak: voiceTargetPeak(this.volumePercent),
+              onRecorded: () => this._emitDiag()
+            });
+            if (playbackRate >= VOICE_PLAYBACK_RATE_MAX) this.diag.rateClampTotal += 1;
+            const _prepStart = Date.now();
+            let _playbackStartAt = -1;
+            try {
+              audio.addEventListener("playing", () => {
+                try {
+                  const prepMs = Math.max(0, Date.now() - _prepStart);
+                  this._playPrepEmaMs = updateVoiceServiceTimeEma(this._playPrepEmaMs, prepMs);
+                  this.diag.playPrepEmaMs = this._playPrepEmaMs;
+                  _playbackStartAt = Date.now();
+                  const durationSec = Number(audio.duration);
+                  if (Number.isFinite(durationSec) && durationSec > 0) {
+                    const expectedMs = durationSec * 1e3 / (Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1);
+                    this._expectedPlayEmaMs = updateVoiceServiceTimeEma(this._expectedPlayEmaMs, expectedMs);
+                    this.diag.expectedPlayEmaMs = this._expectedPlayEmaMs;
+                  }
+                } catch {
+                }
+              }, { once: true });
+            } catch {
+            }
+            await new Promise((resolve) => {
+              let settled = false;
+              const _watchdog = setTimeout(() => {
+                this.diag.playbackTimeoutTotal += 1;
+                finish();
+              }, 2e4);
+              const finish = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(_watchdog);
+                audio.removeEventListener("ended", finish);
+                audio.removeEventListener("error", finish);
+                if (objectUrl) this.revokeObjectURL(objectUrl);
+                objectUrl = "";
+                this.stopCurrent = null;
+                if (_playbackStartAt > 0) {
+                  try {
+                    const playbackMs = Math.max(0, Date.now() - _playbackStartAt);
+                    this._playbackEmaMs = updateVoiceServiceTimeEma(this._playbackEmaMs, playbackMs);
+                    this.diag.playbackEmaMs = this._playbackEmaMs;
+                    noteVoicePacePlayed(this._paceState, playbackMs, playbackRate, boostAtSynth, spokenChars);
+                  } catch {
+                  }
+                }
+                if (typeof item.onAudioEnd === "function") item.onAudioEnd();
+                resolve();
+              };
+              this.stopCurrent = () => {
+                try {
+                  audio.pause();
+                } catch {
+                }
+                finish();
+              };
+              audio.addEventListener("ended", finish, { once: true });
+              audio.addEventListener("error", finish, { once: true });
+              try {
+                const playResult = audio.play();
+                if (typeof item.onPlayStart === "function") item.onPlayStart();
+                const _enqueuedAt = Number(item.enqueuedAt);
+                if (Number.isFinite(_enqueuedAt) && _enqueuedAt > 0) {
+                  const e2e = Math.max(0, Date.now() - _enqueuedAt);
+                  this.diag.lastE2eMs = e2e;
+                  this.diag.e2eAvgMs = computeVoiceE2eAverage(this.diag.e2eAvgMs, e2e);
+                  recordVoiceE2eSample(this.diag, e2e);
+                }
+                this._updateLagNotice();
+                if (typeof item.onAudioStart === "function") item.onAudioStart();
+                if (playResult && typeof playResult.catch === "function") {
+                  playResult.catch((err) => {
+                    if (err && err.name === "NotAllowedError") {
+                      this.diag.audioBlockedTotal = (Number(this.diag.audioBlockedTotal) || 0) + 1;
+                      this.onStatus("⚠️ブラウザが音声をブロックしています。ページのどこかを一度クリックすると鳴ります");
+                    }
+                    finish();
+                  });
+                }
+              } catch {
+                finish();
+              }
+            });
+          } catch {
+            if (typeof item.onPlayStart === "function") item.onPlayStart();
+            this._notifyDropped(item);
+            if (objectUrl) this.revokeObjectURL(objectUrl);
+          }
+          this.diag.spokenTotal += 1;
+          this.diag.lastSpokenBase = Date.now();
+          this._spokenSampleCount += 1;
+          this._serviceTimeEmaMs = updateVoiceServiceTimeEma(this._serviceTimeEmaMs, Date.now() - _serviceStart);
+          const _computedMax = resolveVoiceQueueMax(this._serviceTimeEmaMs);
+          const _step = stepVoiceQueueMax(this._effectiveQueueMax, _computedMax, this._growStreak);
+          this._effectiveQueueMax = _step.nextMax;
+          this._growStreak = _step.nextGrowStreak;
+          this.diag.serviceTimeEmaMs = this._serviceTimeEmaMs;
+          this.diag.effectiveQueueMax = this._effectiveQueueMax;
+          const _voicedDenom = this.diag.spokenTotal + this.diag.staleDropTotal;
+          this.diag.voicedRatio = _voicedDenom > 0 ? this.diag.spokenTotal / _voicedDenom : -1;
+          this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
+          this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+          {
+            const _pressure = this.diag.arrivalPerMin > 0 && this._serviceTimeEmaMs > 0 ? this.diag.arrivalPerMin * this._serviceTimeEmaMs / 6e4 : -1;
+            this._capLagTicks = _pressure >= 0 && _pressure <= 1.2 && _computedMax - this._effectiveQueueMax >= 2 ? this._capLagTicks + 1 : 0;
+            this.diag.lagVerdict = computeVoiceLagVerdict({
+              serviceTimeEmaMs: this._serviceTimeEmaMs,
+              synthWaitEmaMs: this._synthWaitEmaMs,
+              expectedPlayEmaMs: this._expectedPlayEmaMs,
+              playbackEmaMs: this._playbackEmaMs,
+              arrivalPerMin: this.diag.arrivalPerMin,
+              effectiveQueueMax: this._effectiveQueueMax,
+              computedMax: _computedMax,
+              capLagTicks: this._capLagTicks,
+              sampleCount: this._spokenSampleCount
+            });
+          }
+          this._emitDiag();
+        }
+      } finally {
+        this.playing = false;
+        this._updateLagNotice();
+        if (this.enabled && this.queue.length) void this._drainQueue();
+      }
+    }
+    /** P5: 遅れの一言を出す/消す(状態が変わったときだけ通知)。 */
+    _updateLagNotice() {
+      this._updateGpuTip();
+      const r = decideVoiceLagNotice(this._lagNoticeShown, { ...this.diag, queueNow: this.queue.length }, { gpuCapable: this._gpuCapable });
+      if (r.shown === this._lagNoticeShown && !r.shown) return;
+      this._lagNoticeShown = r.shown;
+      try {
+        this.onLagNotice(r.text);
+      } catch {
+      }
+    }
+    /** 2026-11-01: GPU の案内を出す/消す(文言が変わったときだけ通知)。 */
+    _updateGpuTip() {
+      const text = this.enabled ? decideVoiceGpuTip(this.diag, this._gpuCapable) : "";
+      if (text === this._gpuTipText) return;
+      this._gpuTipText = text;
+      try {
+        this.onGpuTip(text);
+      } catch {
+      }
+    }
+    enqueue(items) {
+      if (!this.enabled || this.isObsMode() || !Array.isArray(items)) return;
+      let droppedCount = 0;
+      for (const item of items) {
+        if (!item || item.kind !== "comment" && item.kind !== "gift") continue;
+        if (isVoiceItemNgMuted(item, this.ngKeys)) {
+          this.diag.ngMutedTotal = (Number(this.diag.ngMutedTotal) || 0) + 1;
+          this._notifyDropped(item);
+          continue;
+        }
+        const name = this.readNameEnabled ? String(item.nickname || "").trim() : "";
+        let body = "";
+        let isHighPriority = false;
+        if (item.kind === "gift") {
+          isHighPriority = true;
+          const count = item.gift?.count > 1 ? `を${item.gift.count}個` : "を";
+          body = `ギフト、${item.gift?.name || "アイテム"}${count}贈りました。${item.gift?.message || ""}`.trim();
+        } else {
+          body = String(item.text || "").trim();
+        }
+        if (!buildVoiceReadingText({ name, text: body })) {
+          this._notifyDropped(item);
+          continue;
+        }
+        const _upstreamMs = measureVoiceGapMs(item.receivedAt, Date.now());
+        if (_upstreamMs >= 0) {
+          this.diag.lastUpstreamMs = _upstreamMs;
+          foldVoiceStageEma(this.diag, "upstreamEmaMs", _upstreamMs);
+        }
+        this._arrivalWindowState = foldVoiceArrivalWindow(this._arrivalWindowState, Date.now(), 1);
+        this.diag.arrivalPerMin = this._arrivalWindowState.arrivalPerMin;
+        const candidate = {
+          userKey: this._voiceUserKeyForItem(item),
+          name,
+          body,
+          count: 1,
+          enqueuedAt: Date.now(),
+          priority: isHighPriority ? "high" : "normal",
+          // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
+          onPlayStart: item.onPlayStart,
+          // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。
+          //   onAudioStart は audio.play() が実際に走ったときだけ・onAudioEnd は再生終了(ended/error/stop)時。
+          onAudioStart: item.onAudioStart,
+          onAudioEnd: item.onAudioEnd,
+          // v0.1.799: 鳴らず破棄された時だけ発火する drop 専用シグナル(再生では呼ばれない)。
+          onDropped: item.onDropped
+        };
+        this.diag.voiceEnqueuedTotal = (Number(this.diag.voiceEnqueuedTotal) || 0) + 1;
+        const merged = mergeRepeatedVoiceItem(this.queue, candidate);
+        this.queue = merged.queue;
+        if (merged.merged) {
+          this.diag.mergeTotal += 1;
+          if (typeof candidate.onPlayStart === "function") candidate.onPlayStart();
+          this._notifyDropped(candidate);
+          continue;
+        }
+        const queueMax = this._resolveQueueMaxByChars(candidate);
+        const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax, keep: this._inflightKeeper() });
+        this.queue = pushed.queue;
+        noteVoicePaceArrival(this._paceState, candidate.enqueuedAt);
+        if (pushed.dropped && pushed.dropped.length > 0) {
+          for (const dropped of pushed.dropped) {
+            if (typeof dropped.onPlayStart === "function") dropped.onPlayStart();
+            this._notifyDropped(dropped);
+          }
+          droppedCount += pushed.dropped.length;
+        }
+      }
+      if (droppedCount > 0) {
+        this._showSkipped(droppedCount);
+        this.diag.staleDropTotal += droppedCount;
+        this._dropCountGateTotal += droppedCount;
+        this.diag.dropCountGateTotal = this._dropCountGateTotal;
+        for (let _i = 0; _i < droppedCount; _i += 1) {
+          this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
+        }
+        this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+      }
+      this._emitDiag();
+      if (this.enabled && !this.isObsMode() && this.queue.length) {
+        try {
+          this._startPrefetch(this.generation);
+        } catch {
+        }
+      }
+      if (this.queue.length) void this._drainQueue();
+    }
+    /**
+     * v0.1.800: 外部(会場)から「今キューにある先頭群の合成を即起動」するための公開フック。
+     *   吹き出しを出した直後に呼ぶと、再生開始までの待ち(Δ)が合成時間まで縮む。深さ有界・FIFO不変。
+     */
+    kickPrefetch() {
+      if (!this.enabled || this.isObsMode() || !this.queue.length) return;
+      try {
+        this._startPrefetch(this.generation);
+      } catch {
+      }
+    }
+  };
 
   // src/lib/venuePickupBanner.js
   var VENUE_PICKUP_CLASS = "nlsb-pickup";
@@ -2533,103 +6969,6 @@ ${sourceCol}
       best = pickNewer(list[i], best);
     }
     return best;
-  }
-
-  // src/lib/anonymousIdenticon.js
-  function hashString(str) {
-    let h = 2166136261;
-    for (let i = 0; i < str.length; i += 1) {
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
-  var LINE = "#332a26";
-  var SKIN_TONES = ["#ffeede", "#ffe6cf", "#fdf0e4", "#f8dfc8"];
-  var HAIR_COLORS = [
-    ["#f29b38", "#ffc97e"],
-    ["#3a3534", "#6b6360"],
-    ["#8a5a2b", "#c08c50"],
-    ["#e88bb1", "#ffc3da"],
-    ["#5b87c5", "#9cc0ea"],
-    ["#7aa45a", "#b4d59a"],
-    ["#e9c25a", "#ffe6a0"],
-    ["#d4543a", "#f59679"],
-    ["#8d6bb0", "#c4a8e0"],
-    ["#8f8f8f", "#c9c9c9"],
-    ["#4ba596", "#92d5c9"],
-    ["#a4683f", "#d49a6e"]
-  ];
-  var EYES = [
-    // ぱっちり（白目+2色虹彩+ハイライト2つ）
-    (iris, irisDark) => `<ellipse cx="23.5" cy="37" rx="5" ry="6.6" fill="#fff" stroke="${LINE}" stroke-width="2.2"/><ellipse cx="40.5" cy="37" rx="5" ry="6.6" fill="#fff" stroke="${LINE}" stroke-width="2.2"/><ellipse cx="23.5" cy="38" rx="3.2" ry="4.4" fill="${irisDark}"/><ellipse cx="40.5" cy="38" rx="3.2" ry="4.4" fill="${irisDark}"/><ellipse cx="23.5" cy="39.2" rx="2" ry="2.6" fill="${iris}"/><ellipse cx="40.5" cy="39.2" rx="2" ry="2.6" fill="${iris}"/><circle cx="22" cy="35.4" r="1.6" fill="#fff"/><circle cx="39" cy="35.4" r="1.6" fill="#fff"/><circle cx="25.2" cy="40.2" r="0.8" fill="#fff" opacity="0.9"/><circle cx="42.2" cy="40.2" r="0.8" fill="#fff" opacity="0.9"/>`,
-    // にこにこ閉じ目（∩・太線）
-    () => `<path d="M18.5 38 q5 -6.5 10 0" stroke="${LINE}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M35.5 38 q5 -6.5 10 0" stroke="${LINE}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
-    // ジト目（まぶた直線+下半分の虹彩）
-    (iris, irisDark) => `<path d="M18.5 35 l10 0" stroke="${LINE}" stroke-width="2.8" stroke-linecap="round"/><path d="M35.5 35 l10 0" stroke="${LINE}" stroke-width="2.8" stroke-linecap="round"/><path d="M20.5 35.8 a3.6 4 0 0 0 7.2 0 z" fill="${irisDark}"/><path d="M37.5 35.8 a3.6 4 0 0 0 7.2 0 z" fill="${irisDark}"/><path d="M22 35.8 a2 2.2 0 0 0 4 0 z" fill="${iris}"/><path d="M39 35.8 a2 2.2 0 0 0 4 0 z" fill="${iris}"/>`
-  ];
-  var MOUTHS = [
-    () => `<path d="M27.5 46.5 q2.3 2.6 4.5 0 q2.2 2.6 4.5 0" stroke="${LINE}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`,
-    () => `<path d="M27 46 a5 4.6 0 0 0 10 0 z" fill="#9e3a30" stroke="${LINE}" stroke-width="1.8"/><path d="M29.5 49.2 a2.6 1.8 0 0 1 5 0 z" fill="#e9756a"/>`,
-    () => `<path d="M27 46 q5 4.4 10 0" stroke="${LINE}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
-  ];
-  var HAIRS = [
-    // ボブ+ぱっつんギザ（りんく系）
-    (c, hi) => `<path d="M8 44 q-2 -26 24 -28 q26 2 24 28 l-5 3 q3 -8 1 -14 l-3 6 -3 -8 -4 6 -4 -8 -3 7 -4 -7 -4 8 -4 -6 -3 8 -3 -6 q-2 6 1 14 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 24 q8 -7 18 -7 q10 0 18 7 q-8 -3 -18 -3 q-10 0 -18 3 z" fill="${hi}" opacity="0.85"/>`,
-    // 外はねショート（こんた系）
-    (c, hi) => `<path d="M9 42 q-7 -4 -3 -10 q-6 -2 0 -8 q2 -12 26 -12 q24 0 26 12 q6 6 0 8 q4 6 -3 10 l-4 1 q2 -6 0 -10 l-4 5 -3 -9 -5 6 -5 -9 -4 8 -5 -7 -4 9 -4 -5 q-2 4 0 10 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15 22 q8 -6 17 -6 q9 0 17 6 q-8 -2.5 -17 -2.5 q-9 0 -17 2.5 z" fill="${hi}" opacity="0.85"/>`,
-    // ロング風（たぬ姉系・髪が顔の横を流れ落ちる）
-    (c, hi) => `<path d="M10 58 q-4 -18 -2 -30 q4 -14 24 -14 q20 0 24 14 q2 12 -2 30 l-6 -2 q3 -12 2 -22 l-4 6 -3 -9 -5 6 -4 -9 -4 8 -5 -7 -4 8 -4 -5 q-1 10 2 22 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15 23 q8 -6 17 -6 q9 0 17 6 q-8 -2.5 -17 -2.5 q-9 0 -17 2.5 z" fill="${hi}" opacity="0.85"/>`,
-    // ふんわりマッシュ
-    (c, hi) => `<path d="M8 40 q-2 -25 24 -25 q26 0 24 25 q-1 5 -5 6 q2 -5 1 -9 l-4 5 -3 -7 -5 5 -4 -7 -4 6 -4 -6 -4 7 -5 -5 -3 7 -4 -5 q-1 4 1 9 q-4 -1 -5 -6 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 24 q9 -6.5 18 -6.5 q9 0 18 6.5 q-9 -3 -18 -3 q-9 0 -18 3 z" fill="${hi}" opacity="0.85"/>`
-  ];
-  var ACCENTS = [
-    (c) => `<path d="M32 16 q-2 -8 4 -11 q-1 5 1 7 q3 -3 7 -2 q-5 2 -6 7 z" fill="${c}" stroke="${LINE}" stroke-width="2" stroke-linejoin="round"/>`,
-    (c) => `<path d="M13 26 q-3 -12 3 -16 q6 3 7 13 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M51 26 q3 -12 -3 -16 q-6 3 -7 13 z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M15.5 24 q-1.5 -7 1.5 -10 q3 2 4 8 z" fill="#fff" opacity="0.75"/><path d="M48.5 24 q1.5 -7 -1.5 -10 q-3 2 -4 8 z" fill="#fff" opacity="0.75"/>`,
-    () => ""
-  ];
-  function shade(hex, f) {
-    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-    if (!m) return "#5a4636";
-    const c = (x) => Math.max(0, Math.min(255, Math.floor(parseInt(x, 16) * f)));
-    return `rgb(${c(m[1])},${c(m[2])},${c(m[3])})`;
-  }
-  var IDENTICON_CACHE_MAX = 2e3;
-  var identiconCache = /* @__PURE__ */ new Map();
-  function anonymousIdenticonDataUrl(userId, sizePx = 64) {
-    const s = String(userId || "").trim();
-    if (!s) return "";
-    const n = Math.max(16, Math.min(128, Number(sizePx) || 64));
-    const cacheKey = `${n}|${s}`;
-    const hit = identiconCache.get(cacheKey);
-    if (hit !== void 0) {
-      identiconCache.delete(cacheKey);
-      identiconCache.set(cacheKey, hit);
-      return hit;
-    }
-    const h = hashString(s);
-    const hue = (h >>> 15) % 360;
-    const bg = `hsl(${hue},55%,90%)`;
-    const skin = SKIN_TONES[h % SKIN_TONES.length];
-    const [hairC, hairHi] = HAIR_COLORS[(h >>> 3) % HAIR_COLORS.length];
-    const iris = shade(hairC, 0.9);
-    const irisDark = shade(hairC, 0.45);
-    const eyes = EYES[(h >>> 7) % EYES.length];
-    const mouth = MOUTHS[(h >>> 10) % MOUTHS.length];
-    const hairShape = HAIRS[(h >>> 12) % HAIRS.length];
-    const accent = ACCENTS[(h >>> 21) % ACCENTS.length];
-    const blushStrong = (h >>> 20 & 1) === 1;
-    const blush = `<ellipse cx="17" cy="44" rx="4.4" ry="2.6" fill="#ff9d9d" opacity="${blushStrong ? 0.8 : 0.45}"/><ellipse cx="47" cy="44" rx="4.4" ry="2.6" fill="#ff9d9d" opacity="${blushStrong ? 0.8 : 0.45}"/>`;
-    const k = n / 64;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}"><rect width="100%" height="100%" fill="${bg}"/><g transform="scale(${k})">` + accent(hairC) + `<path d="M13 38 a19 19 0 1 0 38 0 a19 21 0 0 0 -38 0 z" fill="${skin}" stroke="${LINE}" stroke-width="2.2"/>` + hairShape(hairC, hairHi) + blush + eyes(iris, irisDark) + mouth() + `</g></svg>`;
-    const out = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-    identiconCache.set(cacheKey, out);
-    while (identiconCache.size > IDENTICON_CACHE_MAX) {
-      const oldest = identiconCache.keys().next().value;
-      if (oldest === void 0) break;
-      identiconCache.delete(oldest);
-    }
-    return out;
   }
 
   // src/lib/pickTickerHighlight.js
@@ -3813,81 +8152,6 @@ ${sourceCol}
       fromChunks: false,
       index: null,
       complete: Array.isArray(main) || main == null
-    };
-  }
-
-  // src/lib/nicoUserPage.js
-  function nicoUserPageUrl(userId) {
-    const uid = String(userId == null ? "" : userId).trim();
-    if (!/^\d{1,18}$/.test(uid)) return "";
-    return `https://www.nicovideo.jp/user/${uid}`;
-  }
-  function anonymousDisplayLabel(anonKey) {
-    const key = String(anonKey == null ? "" : anonKey).trim();
-    const digits = key.replace(/\D+/g, "");
-    if (digits.length > 0) {
-      const tail = digits.slice(-3);
-      const n = Number(tail);
-      if (Number.isFinite(n) && n > 0) return `匿名${n}`;
-    }
-    let h = 0;
-    for (let i = 0; i < key.length; i += 1) {
-      h = (h * 31 + key.charCodeAt(i)) % 1e5;
-    }
-    return `匿名${h % 999 + 1}`;
-  }
-
-  // src/lib/comeviewActions.js
-  var COMEVIEW_NG_STORAGE_KEY = "nls_comeview_ng_v1";
-  var COMEVIEW_NG_MAX = 300;
-  function comeviewUserKeyForRow(row) {
-    if (!row || typeof row !== "object") return "";
-    const uid = String(row.userId || "").trim();
-    if (uid) return `u:${uid}`;
-    const name = String(row.name || "").trim();
-    if (name && !isGenericComeviewName(name)) return `n:${name}`;
-    return "";
-  }
-  function normalizeComeviewNgList(raw) {
-    if (!Array.isArray(raw)) return [];
-    const out = [];
-    const seen = /* @__PURE__ */ new Set();
-    for (const e of raw) {
-      if (!e || typeof e !== "object") continue;
-      const key = String(
-        /** @type {any} */
-        e.key || ""
-      ).trim();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push({
-        key,
-        name: String(
-          /** @type {any} */
-          e.name || ""
-        ).trim(),
-        at: Number(
-          /** @type {any} */
-          e.at
-        ) || 0
-      });
-    }
-    return out.length > COMEVIEW_NG_MAX ? out.slice(out.length - COMEVIEW_NG_MAX) : out;
-  }
-  function extractUserCommentRows(rawRows, userKey, max = 200) {
-    const key = String(userKey || "").trim();
-    if (!Array.isArray(rawRows) || !key) return { rows: [], total: 0 };
-    const cap = Number.isFinite(max) && max > 0 ? Math.floor(max) : 200;
-    const hits = [];
-    for (const raw of rawRows) {
-      const n = normalizeComeviewRow(raw);
-      if (!n) continue;
-      if (comeviewUserKeyForRow(n) !== key) continue;
-      hits.push(n);
-    }
-    return {
-      rows: hits.length > cap ? hits.slice(hits.length - cap) : hits,
-      total: hits.length
     };
   }
 
@@ -10279,4239 +14543,6 @@ ${sourceCol}
     return "大盛況";
   }
 
-  // src/lib/voiceReadingNormalize.js
-  var VOICE_REPEAT_KEEP = 4;
-  var LAUGH_W_RE = /(?<![A-Za-zＡ-Ｚａ-ｚ])[wWｗＷ]{2,}(?![A-Za-zＡ-Ｚａ-ｚ])/g;
-  var LAUGH_W_TAIL_RE = /(?<=[\u3040-\u30ff\u3400-\u9fff\uff01-\uff9f])[wWｗＷ](?=[\s!！?？。、…]*$)/;
-  var CLAP_8_RE = /(?<![0-9０-９.,，．])[8８]{3,}(?![0-9０-９.,，．円万億人位点個回件年月日時分秒%％ptPT])/g;
-  var laughWord = (m) => Array.from(m).length >= 3 ? "わらわら" : "わら";
-  function normalizeVoiceReadingBody(text, opts = {}) {
-    let s = String(text ?? "");
-    if (!s) return "";
-    s = s.replace(/(?:https?:\/\/|www\.)[^\s]+/gi, typeof opts.urlWord === "string" ? opts.urlWord : "URL省略");
-    s = s.replace(LAUGH_W_RE, laughWord).replace(LAUGH_W_TAIL_RE, "わら");
-    if (/^\s*[wWｗＷ]\s*$/.test(s)) s = "わら";
-    s = s.replace(CLAP_8_RE, "パチパチ");
-    s = s.replace(/(.)\1{4,}/gsu, (_m, ch) => ch.repeat(VOICE_REPEAT_KEEP));
-    s = s.replace(/\s+/g, " ").trim();
-    return /[\p{L}\p{N}]/u.test(s) ? s : "";
-  }
-
-  // src/lib/voiceKeys.js
-  var KEY_VOICE_READING_ENABLED = "nls_voice_reading_enabled_v1";
-  var KEY_VOICE_ASSIGNMENTS = "nls_voice_assignments_v1";
-  var KEY_VOICE_READ_NAME_ENABLED = "nls_voice_read_name_enabled_v1";
-  var KEY_VOICE_VOLUME_PERCENT = "nls_voice_volume_percent_v1";
-  var KEY_VOICE_NARROW_MODE = "nls_voice_narrow_mode_v1";
-  var KEY_VOICE_WEAK_PC = "nls_voice_weak_pc_v1";
-  var KEY_VOICE_QUALITY = "nls_voice_quality_v1";
-
-  // src/lib/voiceVolume.js
-  var VOICE_VOLUME_MIN = 0;
-  var VOICE_VOLUME_MAX = 300;
-  var VOICE_VOLUME_DEFAULT = 100;
-  var VOICE_TARGET_PEAK_AT_100 = 0.48;
-  var VOICE_PEAK_CEILING = 0.98;
-  var VOICE_MAX_BOOST = 4;
-  var VOICE_TYPICAL_CREST = 6.68;
-  function voiceTargetRms(targetPeak) {
-    return targetPeak / VOICE_TYPICAL_CREST;
-  }
-  function voiceLevelGain(peak, rms, targetPeak) {
-    if (rms > 0 && peak > 0) {
-      return Math.min(VOICE_MAX_BOOST, voiceTargetRms(targetPeak) / rms, VOICE_PEAK_CEILING * 0.9 / peak);
-    }
-    return peak > 0 ? Math.min(VOICE_MAX_BOOST, targetPeak / peak) : VOICE_MAX_BOOST;
-  }
-  function normalizeVoiceVolumePercent(raw) {
-    if (raw === null || raw === void 0 || raw === "") return VOICE_VOLUME_DEFAULT;
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return VOICE_VOLUME_DEFAULT;
-    return Math.min(VOICE_VOLUME_MAX, Math.max(VOICE_VOLUME_MIN, Math.round(n)));
-  }
-  function findPcm16Data(dv) {
-    if (dv.byteLength < 12) return null;
-    const tag = (o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
-    if (tag(0) !== "RIFF" || tag(8) !== "WAVE") return null;
-    let off = 12;
-    let isPcm16 = false;
-    while (off + 8 <= dv.byteLength) {
-      const id = tag(off);
-      const size = dv.getUint32(off + 4, true);
-      const body = off + 8;
-      if (id === "fmt " && body + 16 <= dv.byteLength) {
-        const format = dv.getUint16(body, true);
-        const bits = dv.getUint16(body + 14, true);
-        isPcm16 = format === 1 && bits === 16;
-      } else if (id === "data") {
-        if (!isPcm16) return null;
-        const length = Math.min(size, dv.byteLength - body) & ~1;
-        return { offset: body, length };
-      }
-      off = body + size + (size & 1);
-    }
-    return null;
-  }
-  function applyVoiceVolumeToWav(wav, volumePercent) {
-    if (!(wav instanceof ArrayBuffer)) return wav;
-    const pct = normalizeVoiceVolumePercent(volumePercent);
-    let dv;
-    try {
-      dv = new DataView(wav);
-    } catch {
-      return wav;
-    }
-    const data = findPcm16Data(dv);
-    if (!data || data.length < 2) return wav;
-    let peak = 0;
-    let sumSq = 0;
-    let voiced = 0;
-    for (let i = data.offset; i < data.offset + data.length; i += 2) {
-      const v = dv.getInt16(i, true);
-      const a = Math.abs(v);
-      if (a > peak) peak = a;
-      if (a >= 328) {
-        sumSq += v / 32768 * (v / 32768);
-        voiced++;
-      }
-    }
-    if (peak === 0) return wav;
-    const targetPeak = Math.min(VOICE_PEAK_CEILING, VOICE_TARGET_PEAK_AT_100 * pct / 100);
-    const gain = voiceLevelGain(peak / 32767, voiced > 0 ? Math.sqrt(sumSq / voiced) : 0, targetPeak);
-    if (Math.abs(gain - 1) < 0.01) return wav;
-    const out = wav.slice(0);
-    const odv = new DataView(out);
-    for (let i = data.offset; i < data.offset + data.length; i += 2) {
-      const v = Math.round(dv.getInt16(i, true) * gain);
-      odv.setInt16(i, Math.max(-32768, Math.min(32767, v)), true);
-    }
-    return out;
-  }
-  function voiceTargetPeak(volumePercent) {
-    const pct = normalizeVoiceVolumePercent(volumePercent);
-    return Math.min(VOICE_PEAK_CEILING, VOICE_TARGET_PEAK_AT_100 * pct / 100);
-  }
-  function measureVoiceWavLevel(wav) {
-    if (!(wav instanceof ArrayBuffer)) return null;
-    let dv;
-    try {
-      dv = new DataView(wav);
-    } catch {
-      return null;
-    }
-    const data = findPcm16Data(dv);
-    if (!data || data.length < 2) return null;
-    let peak = 0;
-    let sumSq = 0;
-    let n = 0;
-    for (let i = data.offset; i < data.offset + data.length; i += 2) {
-      const v = dv.getInt16(i, true);
-      const a = Math.abs(v);
-      if (a > peak) peak = a;
-      if (a >= 328) {
-        sumSq += v / 32768 * (v / 32768);
-        n++;
-      }
-    }
-    return { peak: Math.min(1, peak / 32767), rms: n > 0 ? Math.sqrt(sumSq / n) : 0 };
-  }
-
-  // src/lib/voiceStyleLevelTable.js
-  var VOICE_STYLE_LEVEL_TABLE = Object.freeze({
-    "0": [0.084, 0.456],
-    "1": [0.064, 0.432],
-    "2": [0.075, 0.447],
-    "3": [0.063, 0.53],
-    "4": [0.086, 0.558],
-    "5": [0.066, 0.469],
-    "6": [0.066, 0.411],
-    "7": [0.067, 0.466],
-    "8": [0.08, 0.419],
-    "9": [0.085, 0.375],
-    "10": [0.071, 0.405],
-    "11": [0.07, 0.584],
-    "12": [0.074, 0.469],
-    "13": [0.078, 0.456],
-    "14": [0.078, 0.258],
-    "15": [0.069, 0.458],
-    "16": [0.082, 0.364],
-    "17": [0.073, 0.437],
-    "18": [0.073, 0.46],
-    "19": [0.039, 0.546],
-    "20": [0.08, 0.514],
-    "21": [0.075, 0.677],
-    "22": [0.053, 0.457],
-    "23": [0.086, 0.417],
-    "24": [0.074, 0.408],
-    "25": [0.097, 0.363],
-    "26": [0.067, 0.465],
-    "27": [0.085, 0.327],
-    "28": [0.065, 0.367],
-    "29": [0.098, 0.645],
-    "30": [0.1, 0.598],
-    "31": [0.101, 0.409],
-    "32": [0.074, 0.437],
-    "33": [0.076, 0.422],
-    "34": [0.072, 0.472],
-    "35": [0.056, 0.252],
-    "36": [0.06, 0.551],
-    "37": [0.087, 0.37],
-    "38": [0.1, 0.364],
-    "39": [0.08, 0.542],
-    "40": [0.073, 0.641],
-    "41": [0.09, 0.578],
-    "42": [0.081, 0.783],
-    "43": [0.091, 0.41],
-    "44": [0.088, 0.441],
-    "45": [0.081, 0.294],
-    "46": [0.084, 0.393],
-    "47": [0.073, 0.387],
-    "48": [0.089, 0.374],
-    "49": [0.089, 0.361],
-    "50": [0.07, 0.641],
-    "51": [0.082, 0.489],
-    "52": [0.089, 0.538],
-    "53": [0.091, 0.497],
-    "54": [0.067, 0.438],
-    "55": [0.098, 0.508],
-    "56": [0.098, 0.443],
-    "57": [0.099, 0.472],
-    "58": [0.084, 0.531],
-    "59": [0.101, 0.46],
-    "60": [0.114, 0.423],
-    "61": [0.072, 0.354],
-    "62": [0.092, 0.377],
-    "63": [0.096, 0.375],
-    "64": [0.094, 0.323],
-    "65": [0.084, 0.381],
-    "66": [0.085, 0.56],
-    "67": [0.097, 0.396],
-    "68": [0.077, 0.446],
-    "69": [0.081, 0.592],
-    "70": [0.072, 0.429],
-    "71": [0.055, 0.569],
-    "72": [0.073, 0.388],
-    "73": [0.091, 0.488],
-    "74": [0.086, 0.521],
-    "75": [0.059, 0.321],
-    "76": [0.055, 0.358],
-    "77": [0.083, 0.465],
-    "78": [0.075, 0.406],
-    "79": [0.08, 0.341],
-    "80": [0.093, 0.4],
-    "81": [0.082, 0.338],
-    "82": [0.084, 0.353],
-    "83": [0.082, 0.372],
-    "84": [0.095, 0.353],
-    "85": [0.083, 0.442],
-    "86": [0.058, 0.489],
-    "87": [0.074, 0.416],
-    "88": [0.09, 0.381],
-    "89": [0.101, 0.46],
-    "90": [0.074, 0.492],
-    "91": [0.08, 0.391],
-    "92": [0.071, 0.505],
-    "93": [0.074, 0.546],
-    "94": [0.084, 0.408],
-    "95": [0.072, 0.472],
-    "96": [0.091, 0.345],
-    "97": [0.062, 0.42],
-    "98": [0.052, 0.391],
-    "99": [0.1, 0.538],
-    "100": [0.077, 0.5],
-    "101": [0.093, 0.594],
-    "102": [0.09, 0.323],
-    "103": [0.076, 0.316],
-    "104": [0.095, 0.369],
-    "105": [0.106, 0.46],
-    "106": [0.088, 0.355],
-    "107": [0.081, 0.395],
-    "108": [0.081, 0.383],
-    "109": [0.075, 0.394],
-    "110": [0.078, 0.52],
-    "111": [0.079, 0.457],
-    "112": [0.059, 0.41],
-    "113": [0.079, 0.419],
-    "114": [0.071, 0.443],
-    "115": [0.081, 0.413],
-    "116": [0.073, 0.357],
-    "117": [0.054, 0.509],
-    "118": [0.102, 0.337],
-    "119": [0.098, 0.453],
-    "120": [0.101, 0.372],
-    "121": [0.106, 0.402],
-    "122": [0.088, 0.327],
-    "123": [0.082, 0.404],
-    "124": [0.089, 0.377],
-    "125": [0.077, 0.424],
-    "126": [0.061, 0.314]
-  });
-  var VOICE_PITCH_OFFSET_GRID = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
-  var VOICE_STYLE_PITCH_RMS_FACTOR = Object.freeze({
-    "0": [0.95, 1, 1.13, 1.16],
-    "1": [0.63, 0.82, 1.08, 1.03],
-    "2": [0.82, 0.93, 1.09, 1.18],
-    "3": [0.63, 0.83, 1.28, 1.32],
-    "4": [0.98, 1.01, 0.97, 0.95],
-    "5": [0.63, 0.83, 0.99, 0.97],
-    "6": [0.74, 0.85, 1.01, 1.15],
-    "7": [0.67, 0.87, 1.1, 0.93],
-    "8": [0.74, 0.87, 0.95, 0.91],
-    "9": [0.69, 0.82, 1.18, 1.27],
-    "10": [0.71, 0.88, 1.01, 1.04],
-    "11": [0.81, 0.93, 1.14, 1.33],
-    "12": [0.81, 0.91, 1.09, 1.26],
-    "13": [0.8, 0.89, 1.05, 1.09],
-    "14": [0.83, 0.94, 0.97, 1.06],
-    "15": [0.98, 1.08, 1, 1.08],
-    "16": [0.75, 0.88, 1.12, 1.19],
-    "17": [0.81, 0.9, 0.99, 0.93],
-    "18": [0.77, 0.87, 1.03, 1],
-    "19": [1, 1, 1, 1],
-    "20": [0.84, 0.91, 1.01, 1.01],
-    "21": [0.83, 0.86, 1.18, 1.32],
-    "22": [1, 1, 1, 1],
-    "23": [1.01, 1.01, 1.02, 1.12],
-    "24": [0.72, 0.88, 1.03, 1.06],
-    "25": [0.52, 0.77, 1.17, 1.4],
-    "26": [0.82, 0.88, 1.1, 1.12],
-    "27": [0.75, 0.85, 1.21, 1.33],
-    "28": [0.85, 0.94, 1.03, 1.09],
-    "29": [0.78, 0.92, 1.05, 1.12],
-    "30": [0.72, 0.87, 1.04, 1.07],
-    "31": [0.8, 0.92, 1.01, 0.99],
-    "32": [0.85, 0.92, 1.19, 1.19],
-    "33": [0.84, 0.84, 1.07, 1.16],
-    "34": [0.74, 0.88, 1.1, 1.15],
-    "35": [0.85, 0.97, 1.1, 0.74],
-    "36": [1, 1, 1, 1],
-    "37": [0.69, 0.88, 1.19, 1.23],
-    "38": [0.72, 0.79, 0.97, 0.7],
-    "39": [0.88, 0.93, 1.09, 1.26],
-    "40": [0.8, 0.91, 1.09, 1.19],
-    "41": [0.89, 0.92, 1.05, 1.05],
-    "42": [1.01, 0.99, 1.15, 1.3],
-    "43": [0.69, 0.82, 1, 0.98],
-    "44": [0.59, 0.74, 1.28, 1.64],
-    "45": [0.59, 0.77, 1.19, 1.19],
-    "46": [0.86, 0.92, 0.99, 0.87],
-    "47": [0.76, 0.91, 1.24, 1.38],
-    "48": [0.95, 0.98, 1, 0.99],
-    "49": [1.14, 0.98, 1.01, 0.9],
-    "50": [1, 1, 1, 1],
-    "51": [0.95, 1.01, 1.06, 1.07],
-    "52": [0.72, 0.87, 1.09, 1.13],
-    "53": [0.94, 0.98, 1.05, 1.08],
-    "54": [0.69, 0.88, 1.08, 1.02],
-    "55": [0.96, 1.02, 1.01, 1.04],
-    "56": [0.78, 0.93, 1.07, 1.2],
-    "57": [0.91, 0.98, 1.04, 0.94],
-    "58": [0.79, 0.88, 1, 0.95],
-    "59": [0.74, 0.85, 1.16, 0.92],
-    "60": [0.69, 0.89, 0.94, 0.91],
-    "61": [0.55, 0.7, 1.4, 1.6],
-    "62": [0.58, 0.78, 1.02, 0.87],
-    "63": [0.75, 1.03, 0.73, 0.84],
-    "64": [0.57, 0.8, 0.88, 0.62],
-    "65": [0.74, 0.9, 1.07, 1.07],
-    "66": [0.74, 0.91, 1, 1.02],
-    "67": [0.91, 0.96, 1.02, 1.02],
-    "68": [0.77, 0.89, 1.05, 1.18],
-    "69": [0.9, 0.95, 1.05, 1.13],
-    "70": [0.73, 0.87, 1.04, 0.87],
-    "71": [1.02, 1.02, 1, 0.98],
-    "72": [0.73, 0.83, 1.14, 1.27],
-    "73": [0.69, 0.88, 1.11, 1.25],
-    "74": [0.8, 0.9, 0.98, 0.87],
-    "75": [0.7, 0.85, 1.15, 1.27],
-    "76": [1.02, 0.96, 0.88, 0.79],
-    "77": [0.88, 0.93, 1.04, 1],
-    "78": [0.88, 0.95, 1, 1],
-    "79": [0.99, 0.96, 1.09, 1.1],
-    "80": [0.78, 0.9, 1.01, 0.92],
-    "81": [0.96, 1, 1.02, 1.04],
-    "82": [0.85, 0.92, 1.04, 1.06],
-    "83": [0.94, 0.96, 1.01, 1.01],
-    "84": [0.93, 0.98, 1.01, 1.01],
-    "85": [0.86, 0.93, 1.07, 1.12],
-    "86": [1, 1, 1, 1],
-    "87": [0.99, 1.03, 1.01, 1.07],
-    "88": [0.86, 0.99, 0.8, 0.92],
-    "89": [1.17, 1.2, 0.92, 0.88],
-    "90": [0.72, 0.82, 1.15, 1.16],
-    "91": [0.68, 0.85, 1.14, 1.17],
-    "92": [0.69, 0.79, 1.1, 1.21],
-    "93": [0.84, 0.9, 1.11, 1.19],
-    "94": [0.63, 0.87, 1.11, 1.12],
-    "95": [0.56, 0.8, 1.08, 1.01],
-    "96": [0.54, 0.76, 1.16, 1.32],
-    "97": [0.84, 0.93, 1.07, 1.2],
-    "98": [0.8, 0.86, 1.22, 1.36],
-    "99": [0.79, 0.89, 1.04, 1.09],
-    "100": [0.97, 1, 1.05, 1.12],
-    "101": [0.72, 0.85, 1.18, 1.31],
-    "102": [0.98, 0.99, 0.99, 1.06],
-    "103": [0.88, 1.01, 1, 1.08],
-    "104": [0.88, 0.89, 0.96, 1.09],
-    "105": [0.93, 0.94, 0.93, 0.79],
-    "106": [0.74, 0.88, 1.06, 1.17],
-    "107": [1.27, 1.09, 0.84, 0.78],
-    "108": [0.82, 0.97, 1.07, 0.99],
-    "109": [0.77, 0.91, 1.05, 0.99],
-    "110": [0.88, 0.97, 0.92, 1.01],
-    "111": [0.74, 0.93, 0.98, 0.87],
-    "112": [0.77, 0.87, 1.05, 1.13],
-    "113": [0.67, 0.85, 1.05, 1.04],
-    "114": [0.8, 0.91, 1.04, 1.25],
-    "115": [0.94, 0.96, 1.05, 1.08],
-    "116": [0.59, 0.8, 1.16, 1.37],
-    "117": [1, 1, 1, 1],
-    "118": [0.69, 0.83, 1.05, 1.04],
-    "119": [0.87, 0.97, 1.01, 0.94],
-    "120": [0.77, 0.93, 1.01, 0.93],
-    "121": [0.77, 0.88, 1.03, 0.97],
-    "122": [0.55, 0.73, 1.22, 1.31],
-    "123": [0.57, 0.77, 1.19, 1.36],
-    "124": [0.63, 0.8, 1.18, 1.2],
-    "125": [0.67, 0.81, 1.24, 1.38],
-    "126": [0.5, 0.68, 1.08, 0.94]
-  });
-  function voicePitchRmsFactor(styleId, pitchOffset) {
-    const p = Number(pitchOffset);
-    if (!Number.isFinite(p) || Math.abs(p) < 1e-6) return 1;
-    const row = VOICE_STYLE_PITCH_RMS_FACTOR[String(Number(styleId))];
-    if (!Array.isArray(row)) return 1;
-    const f = [Number(row[0]), Number(row[1]), 1, Number(row[2]), Number(row[3])];
-    if (!f.every((x) => x > 0 && x < 4)) return 1;
-    const g = VOICE_PITCH_OFFSET_GRID;
-    if (p <= g[0]) return f[0];
-    if (p >= g[g.length - 1]) return f[f.length - 1];
-    for (let i = 0; i < g.length - 1; i++) {
-      if (p <= g[i + 1]) return f[i] + (f[i + 1] - f[i]) * (p - g[i]) / (g[i + 1] - g[i]);
-    }
-    return 1;
-  }
-  function voiceStyleTableLevel(styleId, pitchOffset = 0) {
-    const id = Number(styleId);
-    if (!Number.isInteger(id) || id < 0) return null;
-    const row = VOICE_STYLE_LEVEL_TABLE[String(id)];
-    if (!Array.isArray(row)) return null;
-    const rms = Number(row[0]);
-    const peak = Number(row[1]);
-    if (!(rms > 0 && rms < 1) || !(peak > 0 && peak <= 1)) return null;
-    const k = voicePitchRmsFactor(id, pitchOffset);
-    return { rms: rms * k, peak: Math.min(1, peak * k) };
-  }
-
-  // src/lib/voiceStream.js
-  var VOICE_STREAM_SEGMENT_SEC = 0.3;
-  var VOICE_STREAM_PREBUFFER_SEC = 0.3;
-  var VOICE_STREAM_LONG_TEXT_CHARS = 30;
-  var VOICE_STREAM_STALL_MS = 5e3;
-  var VOICE_STREAM_ASSUMED_PEAK = 0.45;
-  var VOICE_STREAM_MIN_RMS_SAMPLES = 2e3;
-  var VOICE_STREAM_FIRST_PEAK_HEADROOM = 1.25;
-  var VOICE_STREAM_MEDIAN_RMS = 0.0708;
-  var VOICE_STREAM_MIN_EST_RMS = 0.04;
-  var VOICE_STREAM_MAX_EST_RMS = 0.112;
-  var VOICE_STREAM_SHORT_MIN_EST_PEAK = 0.4;
-  var stylePeaks = /* @__PURE__ */ new Map();
-  var styleRms = /* @__PURE__ */ new Map();
-  function rememberVoiceStylePeak(styleId, peak, rms, textLength, pitchOffset) {
-    const len = Number(textLength);
-    if (Number.isFinite(len) && len >= 0 && len < VOICE_STREAM_LONG_TEXT_CHARS) return;
-    const key = voiceLevelKey(styleId, pitchOffset);
-    const p = Number(peak);
-    if (key === null || !Number.isFinite(p) || p <= 0 || p > 1) return;
-    const prev = stylePeaks.get(key);
-    stylePeaks.set(key, prev === void 0 ? p : prev + 0.5 * (p - prev));
-    const r = Number(rms);
-    if (Number.isFinite(r) && r > 0 && r <= 1) {
-      const pr = styleRms.get(key);
-      styleRms.set(key, pr === void 0 ? r : pr + 0.5 * (r - pr));
-    }
-  }
-  function voiceLevelKey(styleId, pitchOffset) {
-    const id = Number(styleId);
-    if (!Number.isInteger(id) || id < 0) return null;
-    const pitch = Math.round((Number(pitchOffset) || 0) * 100);
-    return pitch === 0 ? String(id) : `${id}@${pitch}`;
-  }
-  function knownVoiceStyleRms(styleId, pitchOffset) {
-    const key = voiceLevelKey(styleId, pitchOffset);
-    if (key === null) return -1;
-    const v = styleRms.get(key);
-    return v === void 0 ? -1 : v;
-  }
-  function knownVoiceStylePeak(styleId, pitchOffset) {
-    const key = voiceLevelKey(styleId, pitchOffset);
-    if (key === null) return -1;
-    const v = stylePeaks.get(key);
-    return v === void 0 ? -1 : v;
-  }
-  function voiceStyleLevelsSnapshot() {
-    const out = {};
-    for (const [key, peak] of stylePeaks) {
-      const rms = styleRms.get(key) ?? -1;
-      out[key] = {
-        peak: Math.round(peak * 1e3) / 1e3,
-        rms: rms > 0 ? Math.round(rms * 1e3) / 1e3 : -1,
-        crestDb: rms > 0 ? Math.round(20 * Math.log10(peak / rms) * 10) / 10 : -1
-      };
-    }
-    return out;
-  }
-  function shouldStreamVoice(input) {
-    if (input?.supported !== true || input?.idle !== true) return false;
-    if (input.slowEngine === true) return true;
-    return Number(input.textLength) >= VOICE_STREAM_LONG_TEXT_CHARS;
-  }
-  function createWavStreamParser() {
-    let head = new Uint8Array(0);
-    let headerDone = false;
-    let sampleRate = 0;
-    let error = "";
-    let remaining = Infinity;
-    let carry = -1;
-    function parseHeader(buf) {
-      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-      const tag = (o) => String.fromCharCode(buf[o], buf[o + 1], buf[o + 2], buf[o + 3]);
-      if (buf.length < 12) return -1;
-      if (tag(0) !== "RIFF" || tag(8) !== "WAVE") {
-        error = "not_wav";
-        return -2;
-      }
-      let off = 12;
-      let pcm16 = false;
-      while (off + 8 <= buf.length) {
-        const id = tag(off);
-        const size = dv.getUint32(off + 4, true);
-        const body = off + 8;
-        if (id === "fmt ") {
-          if (body + 16 > buf.length) return -1;
-          const format = dv.getUint16(body, true);
-          const channels = dv.getUint16(body + 2, true);
-          sampleRate = dv.getUint32(body + 4, true);
-          const bits = dv.getUint16(body + 14, true);
-          pcm16 = format === 1 && bits === 16 && channels === 1 && sampleRate > 0;
-          if (!pcm16) {
-            error = "not_pcm16_mono";
-            return -2;
-          }
-        } else if (id === "data") {
-          if (!pcm16) {
-            error = "no_fmt";
-            return -2;
-          }
-          remaining = size > 0 && size < 4294967295 ? size : Infinity;
-          return body;
-        }
-        off = body + size + (size & 1);
-      }
-      return -1;
-    }
-    return {
-      push(bytes) {
-        if (error || !(bytes instanceof Uint8Array) || bytes.length === 0) return null;
-        let data = bytes;
-        if (!headerDone) {
-          const merged = new Uint8Array(head.length + bytes.length);
-          merged.set(head, 0);
-          merged.set(bytes, head.length);
-          const at = parseHeader(merged);
-          if (at === -2) return null;
-          if (at === -1) {
-            if (merged.length > 4096) error = "header_too_long";
-            head = merged;
-            return null;
-          }
-          headerDone = true;
-          head = new Uint8Array(0);
-          data = merged.subarray(at);
-        }
-        if (remaining !== Infinity) {
-          if (remaining <= 0) return null;
-          if (data.length > remaining) data = data.subarray(0, remaining);
-          remaining -= data.length;
-        }
-        let buf = data;
-        if (carry >= 0) {
-          buf = new Uint8Array(data.length + 1);
-          buf[0] = carry;
-          buf.set(data, 1);
-          carry = -1;
-        }
-        const n = buf.length >> 1;
-        if (buf.length & 1) carry = buf[buf.length - 1];
-        if (n === 0) return null;
-        const out = new Int16Array(n);
-        for (let i = 0; i < n; i++) out[i] = (buf[2 * i + 1] << 8 | buf[2 * i]) << 16 >> 16;
-        return out;
-      },
-      get sampleRate() {
-        return sampleRate;
-      },
-      get error() {
-        return error;
-      }
-    };
-  }
-  var StreamedVoice = class {
-    /** @param {number} sampleRate */
-    constructor(sampleRate) {
-      this.sampleRate = sampleRate;
-      this.chunks = [];
-      this.totalSamples = 0;
-      this.peak = 0;
-      this._sumSq = 0;
-      this._voiced = 0;
-      this.styleId = -1;
-      this.pitchOffset = 0;
-      this.textLength = -1;
-      this.done = false;
-      this.failed = false;
-      this._listeners = /* @__PURE__ */ new Set();
-      this._cancel = null;
-      this._resolveDone = () => {
-      };
-      this.whenDone = new Promise((r) => {
-        this._resolveDone = r;
-      });
-    }
-    /** 届いた分の素の RMS(0〜1・無音を除く)。 */
-    get rms() {
-      return this._voiced > 0 ? Math.sqrt(this._sumSq / this._voiced) : 0;
-    }
-    /** ためた長さ(秒)。 */
-    get bufferedSec() {
-      return this.sampleRate > 0 ? this.totalSamples / this.sampleRate : 0;
-    }
-    /** @param {Int16Array} samples */
-    append(samples) {
-      if (this.done || !samples || samples.length === 0) return;
-      this.chunks.push(samples);
-      this.totalSamples += samples.length;
-      let m = 0;
-      for (let i = 0; i < samples.length; i++) {
-        const a = Math.abs(samples[i]);
-        if (a > m) m = a;
-      }
-      if (m / 32768 > this.peak) this.peak = m / 32768;
-      for (let i = 0; i < samples.length; i++) {
-        if (Math.abs(samples[i]) >= 328) {
-          const x = samples[i] / 32768;
-          this._sumSq += x * x;
-          this._voiced++;
-        }
-      }
-      this._emit();
-    }
-    finish() {
-      if (this.done) return;
-      this.done = true;
-      this._resolveDone(true);
-      this._emit();
-    }
-    fail() {
-      if (this.done) return;
-      this.done = true;
-      this.failed = true;
-      this._resolveDone(false);
-      this._emit();
-    }
-    /** 受け取りをやめる(鳴らすのをやめた・読み上げを止めた)。 */
-    cancel() {
-      const c = this._cancel;
-      this._cancel = null;
-      if (c) {
-        try {
-          c();
-        } catch {
-        }
-      }
-      this.fail();
-    }
-    /** @param {() => void} fn @returns {() => void} */
-    onUpdate(fn) {
-      this._listeners.add(fn);
-      return () => {
-        this._listeners.delete(fn);
-      };
-    }
-    _emit() {
-      for (const fn of [...this._listeners]) {
-        try {
-          fn();
-        } catch {
-        }
-      }
-    }
-    /** ためた分を普通の WAV(16bit モノラル)にする。丸ごと再生への切り替え用。 */
-    toWav() {
-      const dataBytes = this.totalSamples * 2;
-      const buf = new ArrayBuffer(44 + dataBytes);
-      const dv = new DataView(buf);
-      const w = (o, s) => {
-        for (let i = 0; i < 4; i++) dv.setUint8(o + i, s.charCodeAt(i));
-      };
-      w(0, "RIFF");
-      dv.setUint32(4, 36 + dataBytes, true);
-      w(8, "WAVE");
-      w(12, "fmt ");
-      dv.setUint32(16, 16, true);
-      dv.setUint16(20, 1, true);
-      dv.setUint16(22, 1, true);
-      dv.setUint32(24, this.sampleRate, true);
-      dv.setUint32(28, this.sampleRate * 2, true);
-      dv.setUint16(32, 2, true);
-      dv.setUint16(34, 16, true);
-      w(36, "data");
-      dv.setUint32(40, dataBytes, true);
-      let off = 44;
-      for (const c of this.chunks) {
-        for (let i = 0; i < c.length; i++, off += 2) dv.setInt16(off, c[i], true);
-      }
-      return buf;
-    }
-  };
-  function isStreamedVoice(x) {
-    return x instanceof StreamedVoice;
-  }
-  function createStreamGain(volumePercent, opts = {}) {
-    const knownPeak = Number(opts?.knownPeak) > 0 ? Number(opts.knownPeak) : -1;
-    const knownRms = Number(opts?.knownRms) > 0 ? Number(opts.knownRms) : -1;
-    const tableRms = Number(opts?.tableRms) > 0 ? Number(opts.tableRms) : -1;
-    const tablePeak = Number(opts?.tablePeak) > 0 ? Number(opts.tablePeak) : -1;
-    const shortText = opts?.shortText === true;
-    const pct = normalizeVoiceVolumePercent(volumePercent);
-    const target = Math.min(VOICE_PEAK_CEILING, VOICE_TARGET_PEAK_AT_100 * pct / 100);
-    let gain = Math.min(VOICE_MAX_BOOST, target / VOICE_STREAM_ASSUMED_PEAK);
-    const startGain = gain;
-    let outPeak = 0;
-    let firstGain = -1;
-    let sumSq = 0;
-    let voiced = 0;
-    return {
-      get gain() {
-        return gain;
-      },
-      get outPeak() {
-        return outPeak;
-      },
-      /** 鳴らした音の RMS(無音を除く・0〜1)。 */
-      get outRms() {
-        return voiced > 0 ? Math.sqrt(sumSq / voiced) : 0;
-      },
-      /** 鳴らし始めた倍率に対する今の倍率(1=下げていない)。まだ鳴らしていなければ 1。 */
-      get dropRatio() {
-        return firstGain > 0 ? gain / firstGain : 1;
-      },
-      targetPeak: target,
-      startGain,
-      /**
-       * @param {Int16Array} samples
-       * @returns {Float32Array}
-       */
-      process(samples) {
-        let peak = 0;
-        for (let i = 0; i < samples.length; i++) {
-          const a = Math.abs(samples[i]);
-          if (a > peak) peak = a;
-        }
-        if (firstGain < 0 && peak > 0) {
-          const first = peak / 32768 * VOICE_STREAM_FIRST_PEAK_HEADROOM;
-          let firstRms = -1;
-          if (shortText || knownRms <= 0 && tableRms <= 0) {
-            let sq = 0;
-            let n = 0;
-            for (let i = 0; i < samples.length; i++) {
-              if (Math.abs(samples[i]) >= 328) {
-                const x = samples[i] / 32768;
-                sq += x * x;
-                n++;
-              }
-            }
-            if (n >= VOICE_STREAM_MIN_RMS_SAMPLES) firstRms = Math.sqrt(sq / n);
-          }
-          if (shortText) {
-            if (firstRms > 0) {
-              gain = Math.min(
-                VOICE_MAX_BOOST,
-                target / VOICE_TYPICAL_CREST / Math.max(firstRms, VOICE_STREAM_MIN_EST_RMS),
-                VOICE_PEAK_CEILING * 0.9 / Math.max(first, 1e-6)
-              );
-            } else {
-              const est = Math.max(first, VOICE_STREAM_SHORT_MIN_EST_PEAK);
-              gain = Math.min(VOICE_MAX_BOOST, target / est);
-            }
-          } else {
-            let estRms = knownRms > 0 ? knownRms : tableRms > 0 ? tableRms : Math.max(firstRms, VOICE_STREAM_MEDIAN_RMS);
-            estRms = Math.min(VOICE_STREAM_MAX_EST_RMS, Math.max(VOICE_STREAM_MIN_EST_RMS, estRms));
-            gain = Math.min(VOICE_MAX_BOOST, target / VOICE_TYPICAL_CREST / estRms);
-            const peakEst = Math.max(first, tablePeak > 0 ? tablePeak : 0, knownPeak > 0 ? knownPeak : 0);
-            if (peakEst > 0) gain = Math.min(gain, VOICE_PEAK_CEILING * 0.9 / peakEst);
-          }
-        }
-        if (peak > 0 && peak / 32768 * gain > VOICE_PEAK_CEILING) gain = VOICE_PEAK_CEILING / (peak / 32768);
-        if (firstGain < 0) firstGain = gain;
-        outPeak = Math.max(outPeak, peak / 32768 * gain);
-        const out = new Float32Array(samples.length);
-        for (let i = 0; i < samples.length; i++) {
-          out[i] = samples[i] / 32768 * gain;
-          if (Math.abs(samples[i]) >= 328) {
-            sumSq += out[i] * out[i];
-            voiced++;
-          }
-        }
-        return out;
-      }
-    };
-  }
-  function createStreamedVoiceAudio(voice, deps) {
-    const listeners = /* @__PURE__ */ new Map();
-    const emit = (type) => {
-      for (const fn of [...listeners.get(type) || []]) {
-        try {
-          fn({ type });
-        } catch {
-        }
-      }
-    };
-    const sources = /* @__PURE__ */ new Set();
-    let scheduledSamples = 0;
-    let nextAt = 0;
-    let started = false;
-    let stopped = false;
-    let ended = false;
-    let unsubscribe = null;
-    let whole = null;
-    const tableLevel = voiceStyleTableLevel(voice.styleId, voice.pitchOffset);
-    const gain = createStreamGain(deps.volumePercent, {
-      knownPeak: knownVoiceStylePeak(voice.styleId, voice.pitchOffset),
-      knownRms: knownVoiceStyleRms(voice.styleId, voice.pitchOffset),
-      tableRms: tableLevel?.rms,
-      tablePeak: tableLevel?.peak,
-      shortText: voice.textLength >= 0 && voice.textLength < VOICE_STREAM_LONG_TEXT_CHARS
-    });
-    let underruns = 0;
-    let underrunMaxMs = 0;
-    const finishEnded = () => {
-      if (ended) return;
-      ended = true;
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
-      }
-      emit("ended");
-    };
-    const schedule = (ctx) => {
-      if (stopped || ended) return;
-      let skip = scheduledSamples;
-      const pending = [];
-      for (const c of voice.chunks) {
-        if (skip >= c.length) {
-          skip -= c.length;
-          continue;
-        }
-        pending.push(skip > 0 ? c.subarray(skip) : c);
-        skip = 0;
-      }
-      const count = pending.reduce((n, c) => n + c.length, 0);
-      if (count > 0) {
-        const buffer = ctx.createBuffer(1, count, voice.sampleRate);
-        const ch = buffer.getChannelData(0);
-        let off = 0;
-        for (const c of pending) {
-          ch.set(gain.process(c), off);
-          off += c.length;
-        }
-        const src = ctx.createBufferSource();
-        src.buffer = buffer;
-        src.connect(ctx.destination);
-        if (started && nextAt > 0 && nextAt < ctx.currentTime) {
-          underruns += 1;
-          underrunMaxMs = Math.max(underrunMaxMs, Math.round((ctx.currentTime + 0.02 - nextAt) * 1e3));
-        }
-        const at = Math.max(nextAt, ctx.currentTime + 0.02);
-        nextAt = at + count / voice.sampleRate;
-        scheduledSamples += count;
-        sources.add(src);
-        src.onended = () => {
-          sources.delete(src);
-          if (voice.done && sources.size === 0 && scheduledSamples >= voice.totalSamples) finishEnded();
-        };
-        src.start(at);
-        if (!started) {
-          started = true;
-          emit("playing");
-        }
-      } else if (voice.done && sources.size === 0) {
-        if (!started) emit("error");
-        finishEnded();
-      }
-    };
-    const playWhole = async () => {
-      const ok = await voice.whenDone;
-      if (stopped) return;
-      if (!ok && voice.totalSamples === 0) {
-        emit("error");
-        finishEnded();
-        return;
-      }
-      if (typeof deps.playWholeWav !== "function") {
-        emit("error");
-        finishEnded();
-        return;
-      }
-      let wav = voice.toWav();
-      if (typeof deps.wholeWavVolume === "function") wav = deps.wholeWavVolume(wav, deps.volumePercent);
-      whole = deps.playWholeWav(wav);
-      whole.addEventListener("playing", () => emit("playing"), { once: true });
-      whole.addEventListener("ended", () => finishEnded(), { once: true });
-      whole.addEventListener("error", () => {
-        emit("error");
-        finishEnded();
-      }, { once: true });
-      await whole.play();
-    };
-    return {
-      /** 少しずつ流すときは再生速度を変えない(変えると声の高さも変わるため)。 */
-      playbackRate: 1,
-      preservesPitch: true,
-      /** 聞こえ方の計器(voicePlaybackQuality.js の observeVoicePlayback が読む)。 */
-      get quality() {
-        return {
-          underruns,
-          underrunMaxMs,
-          outPeak: started && !whole ? gain.outPeak : -1,
-          outRms: started && !whole ? gain.outRms : -1,
-          gainDropRatio: started && !whole ? gain.dropRatio : 1,
-          partial: voice.failed === true && voice.totalSamples > 0
-        };
-      },
-      get duration() {
-        return voice.done && voice.sampleRate > 0 ? voice.totalSamples / voice.sampleRate : NaN;
-      },
-      /** @param {string} type @param {Function} fn */
-      addEventListener(type, fn) {
-        if (!listeners.has(type)) listeners.set(type, /* @__PURE__ */ new Set());
-        listeners.get(type)?.add(fn);
-      },
-      /** @param {string} type @param {Function} fn */
-      removeEventListener(type, fn) {
-        listeners.get(type)?.delete(fn);
-      },
-      async play() {
-        let ctx = null;
-        try {
-          ctx = deps.audioContext();
-        } catch {
-          ctx = null;
-        }
-        if (ctx && ctx.state !== "running") {
-          try {
-            await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 300))]);
-          } catch {
-          }
-        }
-        if (stopped) return;
-        if (!ctx || ctx.state !== "running") return playWhole();
-        const live = (
-          /** @type {AudioContext} */
-          ctx
-        );
-        const tryStart = () => {
-          if (!started && !voice.done && voice.bufferedSec < VOICE_STREAM_PREBUFFER_SEC) return;
-          schedule(live);
-        };
-        unsubscribe = voice.onUpdate(tryStart);
-        tryStart();
-      },
-      pause() {
-        stopped = true;
-        if (unsubscribe) {
-          unsubscribe();
-          unsubscribe = null;
-        }
-        for (const s of sources) {
-          try {
-            s.stop();
-          } catch {
-          }
-        }
-        sources.clear();
-        if (whole) {
-          try {
-            whole.pause();
-          } catch {
-          }
-        }
-        voice.cancel();
-      }
-    };
-  }
-
-  // src/lib/voicevoxClient.js
-  var VOICEVOX_BASE_URL = "http://127.0.0.1:50021";
-  var VOICEVOX_OUTPUT_SAMPLING_RATE = 16e3;
-  var _outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
-  function setVoicevoxOutputSamplingRate(hz) {
-    const n = Number(hz);
-    _outputSamplingRate = n === 24e3 ? 24e3 : VOICEVOX_OUTPUT_SAMPLING_RATE;
-  }
-  function positiveTimeout(value, fallback) {
-    const timeout = Number(value);
-    return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
-  }
-  function isExtensionPage() {
-    try {
-      return typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getURL === "function" && typeof location !== "undefined" && location.protocol === "chrome-extension:";
-    } catch {
-      return false;
-    }
-  }
-  function proxyTextResponse(res) {
-    const raw = Number(res && res.status);
-    const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
-    const noBody = status === 204 || status === 205 || status === 304;
-    return new Response(noBody ? null : String(res && res.text != null ? res.text : ""), { status });
-  }
-  async function proxyFetchFn(url, init) {
-    if (isExtensionPage()) {
-      return globalThis.fetch(url, init);
-    }
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      return new Promise((resolve, reject) => {
-        const safeInit = { ...init };
-        if ("signal" in safeInit) delete safeInit.signal;
-        chrome.runtime.sendMessage(
-          { type: "NLS_FETCH_PROXY", url: url.toString(), init: safeInit, wantBuffer: false },
-          (res) => {
-            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-            if (!res || res.error) return reject(new Error(res?.error || "Proxy fetch failed"));
-            try {
-              resolve(proxyTextResponse(res));
-            } catch (e) {
-              reject(e);
-            }
-          }
-        );
-      });
-    }
-    return globalThis.fetch(url, init);
-  }
-  async function proxyFetchBufferFn(url, init) {
-    if (isExtensionPage()) {
-      return globalThis.fetch(url, init);
-    }
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      return new Promise((resolve, reject) => {
-        const safeInit = { ...init };
-        if ("signal" in safeInit) delete safeInit.signal;
-        chrome.runtime.sendMessage(
-          { type: "NLS_FETCH_PROXY", url: url.toString(), init: safeInit, wantBuffer: true },
-          (res) => {
-            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-            if (!res || res.error) return reject(new Error(res?.error || "Proxy fetch failed"));
-            const uint8 = new Uint8Array(res.buffer);
-            resolve({ ok: res.ok, status: res.status, arrayBuffer: async () => uint8.buffer });
-          }
-        );
-      });
-    }
-    return globalThis.fetch(url, init);
-  }
-  async function proxyStreamFetchFn(url, init) {
-    if (isExtensionPage() || typeof chrome === "undefined" || !chrome.runtime?.connect) {
-      return globalThis.fetch(url, init);
-    }
-    const port = chrome.runtime.connect({ name: VOICEVOX_STREAM_PORT });
-    const safeInit = { ...init };
-    const signal = safeInit.signal;
-    delete safeInit.signal;
-    return new Promise((resolve, reject) => {
-      let ctl = null;
-      let headed = false;
-      const body = new ReadableStream({
-        start(c) {
-          ctl = c;
-        },
-        cancel() {
-          try {
-            port.disconnect();
-          } catch {
-          }
-        }
-      });
-      const close = (err) => {
-        try {
-          if (err) ctl?.error(err);
-          else ctl?.close();
-        } catch {
-        }
-      };
-      signal?.addEventListener?.("abort", () => {
-        try {
-          port.disconnect();
-        } catch {
-        }
-        if (!headed) reject(new Error("voicevox_stream_abort"));
-        close(new Error("voicevox_stream_abort"));
-      });
-      port.onMessage.addListener((m) => {
-        if (!m || typeof m !== "object") return;
-        if (m.type === "head") {
-          headed = true;
-          resolve({ ok: m.ok === true, status: Number(m.status) || 0, body });
-        } else if (m.type === "chunk" && Array.isArray(m.data)) {
-          try {
-            ctl?.enqueue(Uint8Array.from(m.data));
-          } catch {
-          }
-        } else if (m.type === "end") {
-          close(null);
-          try {
-            port.disconnect();
-          } catch {
-          }
-        } else if (m.type === "error") {
-          if (!headed) reject(new Error(String(m.error || "Proxy stream failed")));
-          close(new Error(String(m.error || "Proxy stream failed")));
-        }
-      });
-      port.onDisconnect.addListener(() => {
-        if (!headed) reject(new Error("Proxy stream disconnected"));
-        close(new Error("Proxy stream disconnected"));
-      });
-      port.postMessage({ type: "start", url: url.toString(), init: safeInit });
-    });
-  }
-  var VOICEVOX_STREAM_PORT = "NLS_VOICEVOX_STREAM";
-  async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
-    const controller = new AbortController();
-    let timer = 0;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort();
-        reject(new Error("voicevox_timeout"));
-      }, timeoutMs);
-    });
-    try {
-      return (
-        /** @type {Response} */
-        await Promise.race([
-          Promise.resolve().then(
-            () => fetchFn(url, { ...init, signal: controller.signal })
-          ),
-          timeout
-        ])
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  async function arrayBufferWithTimeout(res, timeoutMs) {
-    let timer = 0;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("voicevox_body_timeout")), timeoutMs);
-    });
-    try {
-      return (
-        /** @type {ArrayBuffer} */
-        await Promise.race([res.arrayBuffer(), timeout])
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  function defaultVoicevoxAliveTimeoutMs(viaProxy) {
-    return viaProxy ? 5e3 : 1500;
-  }
-  function classifyVoicevoxAliveFailure(input) {
-    if (input?.hasFetch === false) return "no-fetch";
-    const err = input?.error;
-    if (err) {
-      const msg = String(
-        /** @type {any} */
-        err?.message || err || ""
-      );
-      if (msg.includes("voicevox_timeout")) return "timeout";
-      if (/abort/i.test(msg) || /** @type {any} */
-      err?.name === "AbortError") return "timeout";
-      return "refused";
-    }
-    const res = input?.response;
-    if (res && res.ok === false) return "http-error";
-    return "";
-  }
-  async function probeVoicevoxAlive(opts = {}) {
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") {
-      return { ok: false, reason: classifyVoicevoxAliveFailure({ hasFetch: false }) };
-    }
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    const viaProxy = !opts.fetchFn && !isExtensionPage();
-    const fallbackTimeout = defaultVoicevoxAliveTimeoutMs(viaProxy);
-    try {
-      const response = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/version`,
-        { method: "GET" },
-        positiveTimeout(opts.timeoutMs, fallbackTimeout)
-      );
-      if (response?.ok !== false) return { ok: true, reason: "" };
-      return { ok: false, reason: classifyVoicevoxAliveFailure({ response }) };
-    } catch (err) {
-      return { ok: false, reason: classifyVoicevoxAliveFailure({ error: err }) };
-    }
-  }
-  async function isVoicevoxAlive(opts = {}) {
-    const probe = await probeVoicevoxAlive(opts);
-    return probe.ok;
-  }
-  async function initializeVoicevoxSpeaker(styleId, opts = {}) {
-    const id = Number(styleId);
-    if (!Number.isInteger(id) || id < 0) return false;
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") return false;
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    try {
-      const response = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/initialize_speaker?speaker=${id}&skip_reinit=true`,
-        { method: "POST" },
-        positiveTimeout(opts.timeoutMs, 3e4)
-      );
-      return !!response && response.ok !== false;
-    } catch {
-      return false;
-    }
-  }
-  async function warmupVoicevoxQuery(styleId, opts = {}) {
-    const id = Number(styleId);
-    if (!Number.isInteger(id) || id < 0) return false;
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") return false;
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    const query = new URLSearchParams({ text: "あ", speaker: String(id) });
-    try {
-      const response = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/audio_query?${query}`,
-        { method: "POST" },
-        positiveTimeout(opts.timeoutMs, 15e3)
-      );
-      return !!response && response.ok !== false;
-    } catch {
-      return false;
-    }
-  }
-  function isWhisperStyleName(styleName) {
-    const name = String(styleName || "");
-    return /ささやき|囁き|ウィスパ|whisper/i.test(name);
-  }
-  async function listVoicevoxStyleIds(opts = {}) {
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") return [];
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    try {
-      const response = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/speakers`,
-        { method: "GET" },
-        positiveTimeout(opts.timeoutMs, 3e3)
-      );
-      if (!response || response.ok === false) return [];
-      const speakers = await response.json();
-      if (!Array.isArray(speakers)) return [];
-      const ids = [];
-      const seen = /* @__PURE__ */ new Set();
-      for (const speaker of speakers) {
-        if (!speaker || typeof speaker !== "object" || !Array.isArray(speaker.styles)) {
-          continue;
-        }
-        for (const style of speaker.styles) {
-          const id = Number(style?.id);
-          if (!Number.isInteger(id) || id < 0 || seen.has(id)) continue;
-          if (isWhisperStyleName(style?.name)) continue;
-          seen.add(id);
-          ids.push(id);
-        }
-      }
-      return ids;
-    } catch {
-      return [];
-    }
-  }
-  var _streamSupport = (
-    /** @type {'unknown'|'yes'|'no'} */
-    "unknown"
-  );
-  var _streamRejectedStyles = /* @__PURE__ */ new Set();
-  async function probeVoicevoxStreaming(opts = {}) {
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") return false;
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    try {
-      const res = await fetchWithTimeout(fetchFn, `${baseUrl}/engine_manifest`, { method: "GET" }, positiveTimeout(opts.timeoutMs, 5e3));
-      if (!res || res.ok === false || typeof /** @type {any} */
-      res.json !== "function") {
-        _streamSupport = "no";
-        return false;
-      }
-      const manifest = await /** @type {any} */
-      res.json();
-      const ok = manifest?.supported_features?.streaming_synthesis === true;
-      _streamSupport = ok ? "yes" : "no";
-      return ok;
-    } catch {
-      return false;
-    }
-  }
-  async function probeVoicevoxGpuCapable(opts = {}) {
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    if (typeof fetchFn !== "function") return null;
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    try {
-      const res = await fetchWithTimeout(fetchFn, `${baseUrl}/supported_devices`, { method: "GET" }, positiveTimeout(opts.timeoutMs, 5e3));
-      if (!res || res.ok === false || typeof /** @type {any} */
-      res.json !== "function") return null;
-      const devices = await /** @type {any} */
-      res.json();
-      if (!devices || typeof devices !== "object") return null;
-      return devices.cuda === true || devices.dml === true;
-    } catch {
-      return null;
-    }
-  }
-  var STREAM_FALLBACK = /* @__PURE__ */ Symbol("stream_fallback");
-  async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
-    const streamFetchFn = typeof opts.streamFetchFn === "function" ? opts.streamFetchFn : proxyStreamFetchFn;
-    const firstAudioMs = positiveTimeout(opts.synthesisTimeoutMs, 8e3);
-    const controller = new AbortController();
-    let res;
-    let timer = (
-      /** @type {any} */
-      0
-    );
-    try {
-      res = await Promise.race([
-        Promise.resolve().then(() => streamFetchFn(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "audio/wav" },
-          body: JSON.stringify(audioQuery),
-          signal: controller.signal
-        })),
-        new Promise((_, reject) => {
-          timer = setTimeout(() => {
-            controller.abort();
-            reject(new Error("voicevox_timeout"));
-          }, firstAudioMs);
-        })
-      ]);
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res || res.ok === false) {
-      const status = Number(res?.status) || 0;
-      if (status === 404 || status === 405 || status === 501) {
-        _streamSupport = "no";
-        return STREAM_FALLBACK;
-      }
-      if (status === 422) {
-        _streamRejectedStyles.add(styleId);
-        return STREAM_FALLBACK;
-      }
-      notifyFailure({ stage: "synth", httpStatus: status });
-      return null;
-    }
-    const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
-    if (!reader) return STREAM_FALLBACK;
-    const parser = createWavStreamParser();
-    let voice = null;
-    return new Promise((resolve) => {
-      let settled = false;
-      const settle = (v) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(firstTimer);
-        resolve(v);
-      };
-      const firstTimer = setTimeout(() => {
-        try {
-          controller.abort();
-          void reader.cancel().catch(() => {
-          });
-        } catch {
-        }
-        voice?.fail();
-        notifyFailure({ stage: "synth", error: new Error("voicevox_timeout") });
-        settle(null);
-      }, firstAudioMs);
-      void (async () => {
-        try {
-          for (; ; ) {
-            let stall = (
-              /** @type {any} */
-              0
-            );
-            const next = await Promise.race([
-              reader.read(),
-              new Promise((_, reject) => {
-                stall = setTimeout(() => reject(new Error("voicevox_stream_stall")), VOICE_STREAM_STALL_MS);
-              })
-            ]).finally(() => clearTimeout(stall));
-            const { done, value } = (
-              /** @type {{ done: boolean, value?: Uint8Array }} */
-              next
-            );
-            if (done) break;
-            const samples = parser.push(value instanceof Uint8Array ? value : new Uint8Array(value || []));
-            if (parser.error) throw new Error(`voicevox_stream_${parser.error}`);
-            if (samples && samples.length) {
-              if (!voice) {
-                voice = new StreamedVoice(parser.sampleRate);
-                voice._cancel = () => {
-                  try {
-                    controller.abort();
-                    void reader.cancel().catch(() => {
-                    });
-                  } catch {
-                  }
-                };
-              }
-              voice.append(samples);
-              if (voice.bufferedSec >= VOICE_STREAM_PREBUFFER_SEC) settle(voice);
-            }
-            if (voice?.done) return;
-          }
-          if (voice) {
-            voice.finish();
-            settle(voice);
-          } else {
-            notifyFailure({ stage: "synth", bodyInvalid: true });
-            settle(null);
-          }
-        } catch (err) {
-          try {
-            void reader.cancel().catch(() => {
-            });
-          } catch {
-          }
-          if (voice && voice.totalSamples > 0) {
-            voice.fail();
-            settle(voice);
-          } else {
-            notifyFailure({ stage: "synth", error: err });
-            settle(null);
-          }
-        }
-      })();
-    });
-  }
-  async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailure) {
-    const streamFetchFn = typeof opts.streamFetchFn === "function" ? opts.streamFetchFn : proxyStreamFetchFn;
-    const totalMs = positiveTimeout(opts.synthesisTimeoutMs, 8e3);
-    const controller = new AbortController();
-    let reader = null;
-    let timer = (
-      /** @type {any} */
-      0
-    );
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        try {
-          controller.abort();
-          void reader?.cancel?.().catch(() => {
-          });
-        } catch {
-        }
-        reject(new Error("voicevox_timeout"));
-      }, totalMs);
-    });
-    try {
-      return await Promise.race([timeout, (async () => {
-        const res = await streamFetchFn(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "audio/wav" },
-          body: JSON.stringify(audioQuery),
-          signal: controller.signal
-        });
-        if (!res || res.ok === false) {
-          const status = Number(res?.status) || 0;
-          if (status === 404 || status === 405 || status === 501) {
-            _streamSupport = "no";
-            return STREAM_FALLBACK;
-          }
-          if (status === 422) {
-            _streamRejectedStyles.add(styleId);
-            return STREAM_FALLBACK;
-          }
-          notifyFailure({ stage: "synth", httpStatus: status });
-          return null;
-        }
-        reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
-        if (!reader) return STREAM_FALLBACK;
-        const parts = [];
-        let total = 0;
-        for (; ; ) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const part = value instanceof Uint8Array ? value : new Uint8Array(value || []);
-          parts.push(part);
-          total += part.length;
-        }
-        const wav = new Uint8Array(total);
-        let off = 0;
-        for (const part of parts) {
-          wav.set(part, off);
-          off += part.length;
-        }
-        const tag = (o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);
-        if (total <= 44 || tag(0) !== "RIFF" || tag(8) !== "WAVE") {
-          notifyFailure({ stage: "synth", bodyInvalid: true });
-          return null;
-        }
-        if (tag(36) === "data") {
-          const dv = new DataView(wav.buffer);
-          dv.setUint32(4, total - 8, true);
-          dv.setUint32(40, total - 44, true);
-        }
-        return wav.buffer;
-      })()]);
-    } catch (err) {
-      notifyFailure({ stage: "synth", error: err });
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  async function synthesizeVoice(text, voice, opts = {}) {
-    const readingText = String(text || "").trim();
-    const fetchFn = opts.fetchFn || proxyFetchFn;
-    const fetchBufferFn = opts.fetchFn ? opts.fetchFn : proxyFetchBufferFn;
-    const notifyFailure = (info) => {
-      try {
-        if (typeof opts.onFailure === "function") opts.onFailure(info);
-      } catch {
-      }
-    };
-    if (!readingText || typeof fetchFn !== "function") return null;
-    const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, "");
-    const styleId = Number.isFinite(Number(voice?.styleId)) ? Number(voice.styleId) : 3;
-    const pitchOffset = Number.isFinite(Number(voice?.pitchOffset)) ? Number(voice.pitchOffset) : 0;
-    const speedOffset = Number.isFinite(Number(voice?.speedOffset)) ? Number(voice.speedOffset) : 0;
-    const query = new URLSearchParams({
-      text: readingText,
-      speaker: String(styleId)
-    });
-    const nowMs = () => Date.now();
-    const queryStartAt = nowMs();
-    let stage = "query";
-    try {
-      const queryResponse = await fetchWithTimeout(
-        fetchFn,
-        `${baseUrl}/audio_query?${query}`,
-        { method: "POST" },
-        positiveTimeout(opts.audioQueryTimeoutMs, 3e3)
-      );
-      if (!queryResponse || queryResponse.ok === false) {
-        notifyFailure({ stage: "query", httpStatus: Number(queryResponse?.status) || 0 });
-        return null;
-      }
-      const audioQuery = await queryResponse.json();
-      if (!audioQuery || typeof audioQuery !== "object") {
-        notifyFailure({ stage: "query", bodyInvalid: true });
-        return null;
-      }
-      const pitchScale = Number(audioQuery.pitchScale);
-      const speedScale = Number(audioQuery.speedScale);
-      audioQuery.pitchScale = (Number.isFinite(pitchScale) ? pitchScale : 0) + pitchOffset;
-      audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
-      audioQuery.outputSamplingRate = _outputSamplingRate;
-      audioQuery.outputStereo = false;
-      const queryMs = nowMs() - queryStartAt;
-      stage = "synth";
-      const synthStartAt = nowMs();
-      if (opts.stream === true && _streamSupport === "yes" && !_streamRejectedStyles.has(styleId)) {
-        const streamed = await streamSynthesis(
-          `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
-          audioQuery,
-          styleId,
-          opts,
-          notifyFailure
-        );
-        if (streamed !== STREAM_FALLBACK) {
-          if (streamed) {
-            try {
-              if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt, streamed: true });
-            } catch {
-            }
-          }
-          return streamed;
-        }
-      } else if (opts.stream !== true && opts.wholeViaStream !== false && _streamSupport === "yes" && !_streamRejectedStyles.has(styleId)) {
-        const whole = await streamSynthesisWhole(
-          `${baseUrl}/streaming_synthesis?speaker=${styleId}&segment_length=${VOICE_STREAM_SEGMENT_SEC}`,
-          audioQuery,
-          styleId,
-          opts,
-          notifyFailure
-        );
-        if (whole !== STREAM_FALLBACK) {
-          if (whole) {
-            try {
-              if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
-            } catch {
-            }
-          }
-          return whole;
-        }
-      }
-      const synthesisRes = await fetchWithTimeout(
-        fetchBufferFn,
-        `${baseUrl}/synthesis?speaker=${styleId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "audio/wav"
-          },
-          body: JSON.stringify(audioQuery)
-        },
-        positiveTimeout(opts.synthesisTimeoutMs, 8e3)
-      );
-      if (!synthesisRes || synthesisRes.ok === false) {
-        notifyFailure({ stage: "synth", httpStatus: Number(synthesisRes?.status) || 0 });
-        return null;
-      }
-      const wav = await arrayBufferWithTimeout(
-        synthesisRes,
-        positiveTimeout(opts.synthesisTimeoutMs, 8e3)
-      );
-      try {
-        if (typeof opts.onTiming === "function") opts.onTiming({ queryMs, synthMs: nowMs() - synthStartAt });
-      } catch {
-      }
-      return wav;
-    } catch (err) {
-      notifyFailure({ stage, error: err });
-      return null;
-    }
-  }
-  function buildVoiceReadingText(row, { maxChars = 60 } = {}) {
-    const rawText = String(row?.text || "").trim();
-    if (!rawText) return "";
-    const rawMaxChars = Number(maxChars);
-    const limit = Number.isFinite(rawMaxChars) && rawMaxChars >= 1 ? Math.floor(rawMaxChars) : 60;
-    const body = Array.from(normalizeVoiceReadingBody(rawText)).slice(0, limit).join("");
-    if (!body) return "";
-    const name = normalizeVoiceReadingBody(String(row?.name || ""));
-    return name ? `${name}、${body}` : body;
-  }
-  function buildMergedVoiceText(item, { maxChars } = {}) {
-    const text = buildVoiceReadingText(
-      { name: item?.name, text: item?.body },
-      { maxChars }
-    );
-    if (!text) return "";
-    const rawCount = Number(item?.count);
-    const count = Number.isFinite(rawCount) && rawCount >= 1 ? Math.floor(rawCount) : 1;
-    return count > 1 ? `${text}、ほか${count - 1}件` : text;
-  }
-
-  // src/lib/voiceAgeGate.js
-  var VOICE_STALE_MS_NORMAL = 8e3;
-  var VOICE_STALE_BACKLOG_QUEUE = Number.POSITIVE_INFINITY;
-  var VOICE_STALE_MS_HIGH_PRIORITY = 1e4;
-  function isVoiceItemStale(enqueuedAt, now, queueLength, isHighPriority = false) {
-    if (typeof enqueuedAt !== "number" || typeof now !== "number" || typeof queueLength !== "number") {
-      return { stale: false, reason: "" };
-    }
-    if (enqueuedAt > now || enqueuedAt <= 0) {
-      return { stale: false, reason: "" };
-    }
-    const ageMs = now - enqueuedAt;
-    if (isHighPriority) {
-      if (ageMs > VOICE_STALE_MS_HIGH_PRIORITY) {
-        return { stale: true, reason: `age ${ageMs}ms > ${VOICE_STALE_MS_HIGH_PRIORITY}ms (high priority)` };
-      }
-      return { stale: false, reason: "" };
-    }
-    const thresholdMs = VOICE_STALE_MS_NORMAL;
-    if (ageMs > thresholdMs) {
-      return { stale: true, reason: `age ${ageMs}ms > ${thresholdMs}ms (q: ${queueLength})` };
-    }
-    return { stale: false, reason: "" };
-  }
-
-  // src/lib/voiceSynthFailure.js
-  var VOICE_SYNTH_TIMEOUT_MS = 8e3;
-  var VOICE_SYNTH_NEAR_TIMEOUT_RATIO = 0.9;
-  function classifyVoiceSynthNull(ev) {
-    const timeoutMs = Number(ev?.timeoutMs);
-    const limit = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : VOICE_SYNTH_TIMEOUT_MS;
-    const ms = Number(ev?.synthMs);
-    if (!Number.isFinite(ms) || ms < 0) return { nearTimeout: false, ratio: -1 };
-    const ratio = ms / limit;
-    return { nearTimeout: ratio >= VOICE_SYNTH_NEAR_TIMEOUT_RATIO, ratio };
-  }
-
-  // src/lib/voiceFailureTaxonomy.js
-  var ALIVE_FAILURES = Object.freeze({
-    "no-fetch": Object.freeze({ cause: "not_wired", stage: "probe" }),
-    timeout: Object.freeze({ cause: "timeout", stage: "probe" }),
-    refused: Object.freeze({ cause: "down", stage: "probe" }),
-    "http-error": Object.freeze({ cause: "http", stage: "probe" }),
-    "": null
-  });
-  var SYNTH_FAILURES = Object.freeze({
-    timeout: Object.freeze({ cause: "timeout", stage: "synth" }),
-    query_timeout: Object.freeze({ cause: "timeout", stage: "query" }),
-    unreachable: Object.freeze({ cause: "down", stage: "synth" }),
-    query_http: Object.freeze({ cause: "http", stage: "query" }),
-    query_body: Object.freeze({ cause: "payload", stage: "query" }),
-    synth_http: Object.freeze({ cause: "http", stage: "synth" }),
-    synth_body: Object.freeze({ cause: "payload", stage: "synth" }),
-    unknown: Object.freeze({ cause: "unknown", stage: "synth" })
-  });
-
-  // src/lib/voiceSynthFailureReason.js
-  var VOICE_SYNTH_FAIL_REASONS = Object.freeze([
-    "timeout",
-    "query_timeout",
-    "unreachable",
-    "query_http",
-    "query_body",
-    "synth_http",
-    "synth_body",
-    "unknown"
-  ]);
-  function classifyVoiceSynthFailureReason(ev) {
-    const stage = String(ev?.stage || "");
-    const msg = String(
-      /** @type {any} */
-      ev?.error?.message ?? ev?.error ?? ""
-    ).toLowerCase();
-    if (msg.includes("timeout") || msg.includes("abort")) return stage === "query" ? "query_timeout" : "timeout";
-    if (msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("econnrefused") || msg.includes("connection refused") || msg.includes("load failed")) {
-      return "unreachable";
-    }
-    if (ev?.bodyInvalid === true) {
-      return stage === "synth" ? "synth_body" : "query_body";
-    }
-    const status = Number(ev?.httpStatus);
-    if (Number.isFinite(status) && status > 0) {
-      return stage === "synth" ? "synth_http" : "query_http";
-    }
-    if (stage === "synth") return "synth_http";
-    if (stage === "query") return "query_http";
-    return "unknown";
-  }
-
-  // src/lib/voiceNarrowing.js
-  var VOICE_NARROW_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14]);
-  var VOICE_CAPPED_STYLE_IDS = Object.freeze([3, 2, 8, 10, 13, 14, 11, 21, 20, 46, 0, 4, 6, 1, 7, 5, 81, 82, 83, 84, 85, 66, 77, 78, 79, 80]);
-  var VOICE_WEAK_PC_WARM_SYNTH_MS = 500;
-  var VOICE_WEAK_PC_COLD_SYNTH_MS = 3e3;
-  var VOICE_WEAK_PC_MIN_WARM_SAMPLES = 5;
-  var VOICE_FAST_PC_MIN_WARM_SAMPLES = 10;
-  var VOICE_WEAK_PC_RTF_PERMILLE = 400;
-  function isWarmSynthSlow(diag, minSamples) {
-    const rtf = Number(diag?.warmSynthRtfPermille);
-    const rtfSamples = Number(diag?.warmRtfSamples) || 0;
-    if (rtfSamples > 0) {
-      if (rtfSamples < minSamples || !Number.isFinite(rtf) || rtf < 0) return null;
-      return rtf >= VOICE_WEAK_PC_RTF_PERMILLE;
-    }
-    const warm = Number(diag?.warmSynthEmaMs);
-    const samples = Number(diag?.warmSynthSamples) || 0;
-    if (samples >= minSamples && Number.isFinite(warm) && warm >= 0) return warm >= VOICE_WEAK_PC_WARM_SYNTH_MS;
-    return null;
-  }
-  function isWeakVoicePc(diag) {
-    const cold = Number(diag?.coldSynthMaxMs);
-    if (isWarmSynthSlow(diag, VOICE_WEAK_PC_MIN_WARM_SAMPLES) === true) return true;
-    if (Number.isFinite(cold) && cold >= VOICE_WEAK_PC_COLD_SYNTH_MS) return true;
-    return false;
-  }
-  function narrowVoiceStyleIds(availableStyleIds, weak) {
-    return pickFromTable(availableStyleIds, weak ? VOICE_NARROW_STYLE_IDS : null);
-  }
-  function pickFromTable(availableStyleIds, table) {
-    const available = Array.isArray(availableStyleIds) ? availableStyleIds.map(Number) : [];
-    if (!table) return available;
-    const have = new Set(available);
-    const picked = table.filter((id) => have.has(id));
-    return picked.length >= 2 ? picked : available;
-  }
-  var VOICE_NARROW_MODES = Object.freeze(["off", "auto", "on"]);
-  function normalizeVoiceNarrowMode(raw) {
-    return raw === "off" || raw === "on" ? raw : "auto";
-  }
-  function isVoiceNarrowActive(mode, weakRemembered) {
-    const m = normalizeVoiceNarrowMode(mode);
-    return m === "on" || m === "auto" && weakRemembered === true;
-  }
-  async function prepareVoiceStyleIds(allStyleIds, deps) {
-    const all = Array.isArray(allStyleIds) ? allStyleIds.map(Number) : [];
-    let settings = {};
-    try {
-      settings = await deps.readSettings() || {};
-    } catch {
-      settings = {};
-    }
-    const active = isVoiceNarrowActive(settings.mode, settings.weak);
-    const capped = !active && normalizeVoiceNarrowMode(settings.mode) === "auto";
-    const styleIds = active ? narrowVoiceStyleIds(all, true) : pickFromTable(all, capped ? VOICE_CAPPED_STYLE_IDS : null);
-    const narrowed = active && styleIds.length < all.length;
-    if (narrowed && typeof deps.initSpeaker === "function") {
-      const init = deps.initSpeaker;
-      void (async () => {
-        for (const id of styleIds) {
-          try {
-            await init(id);
-          } catch {
-          }
-        }
-      })();
-    }
-    return { styleIds, narrowed };
-  }
-  function rememberWeakVoicePc(diag, state, write) {
-    if (state.saved || !isWeakVoicePc(diag)) return;
-    state.saved = true;
-    Promise.resolve().then(() => write(true)).catch(() => {
-    });
-  }
-  function isFastVoicePc(diag) {
-    const cold = Number(diag?.coldSynthMaxMs) || 0;
-    return isWarmSynthSlow(diag, VOICE_FAST_PC_MIN_WARM_SAMPLES) === false && cold < VOICE_WEAK_PC_COLD_SYNTH_MS;
-  }
-  function forgetWeakVoicePcIfFast(diag, state, clear) {
-    if (state.cleared || !isFastVoicePc(diag)) return;
-    state.cleared = true;
-    Promise.resolve().then(() => clear()).catch(() => {
-    });
-  }
-
-  // src/lib/voiceEngineActivity.js
-  var VOICE_ENGINE_PING_MIN_INTERVAL_MS = 500;
-  var VOICE_ENGINE_QUIET_QUERY_TIMEOUT_MS = 500;
-  function createVoiceEngineActivityLink(sendMessage, opts = {}) {
-    const now = opts.now || (() => Date.now());
-    let lastPingAt = -Infinity;
-    return {
-      /** 合成・読み込みを始めた/終えた合図(間引いて送る・失敗は無視)。 */
-      ping() {
-        const t = now();
-        if (t - lastPingAt < VOICE_ENGINE_PING_MIN_INTERVAL_MS) return;
-        lastPingAt = t;
-        try {
-          const r = sendMessage({ type: "NLS_VOICE_ENGINE_ACTIVITY" });
-          if (r && typeof /** @type {any} */
-          r.catch === "function") r.catch(() => {
-          });
-        } catch {
-        }
-      },
-      /**
-       * どちらかのページが最後に VOICEVOX を使ってから何 ms たったか。分からなければ Infinity。
-       * @returns {Promise<number>}
-       */
-      async quietMs() {
-        let timer = null;
-        try {
-          const res = await Promise.race([
-            Promise.resolve(sendMessage({ type: "NLS_VOICE_ENGINE_QUIET" })),
-            new Promise((r) => {
-              timer = setTimeout(() => r(null), VOICE_ENGINE_QUIET_QUERY_TIMEOUT_MS);
-            })
-          ]);
-          const raw = res && typeof res === "object" ? (
-            /** @type {any} */
-            res.quietMs
-          ) : void 0;
-          return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? raw : Infinity;
-        } catch {
-          return Infinity;
-        } finally {
-          if (timer !== null) clearTimeout(
-            /** @type {any} */
-            timer
-          );
-        }
-      }
-    };
-  }
-  function chromeVoiceEngineLink() {
-    const rt = typeof chrome !== "undefined" ? chrome.runtime : void 0;
-    if (!rt || typeof rt.sendMessage !== "function") return null;
-    return createVoiceEngineActivityLink((msg) => rt.sendMessage(msg));
-  }
-
-  // src/lib/voiceWarmup.js
-  var VOICE_IDLE_INIT_DELAY_MS = 1500;
-  var VOICE_REMOTE_QUIET_MS = 4e3;
-  var VOICE_BUSY_PING_INTERVAL_MS = 1e3;
-  var VOICE_STREAM_GATE_MAX_MS = 8e3;
-  var VOICE_WARMUP_QUERY_TIMEOUT_MS = 8e3;
-  function createVoiceWarmup(deps) {
-    const now = typeof deps?.now === "function" ? deps.now : () => Date.now();
-    const setT = typeof deps?.setTimeout === "function" ? deps.setTimeout : (fn, ms) => setTimeout(fn, ms);
-    const clearT = typeof deps?.clearTimeout === "function" ? deps.clearTimeout : (h) => clearTimeout(h);
-    const warm = /* @__PURE__ */ new Set();
-    const inflight = /* @__PURE__ */ new Map();
-    const failed = /* @__PURE__ */ new Set();
-    let chain = Promise.resolve();
-    let pending = 0;
-    let epoch = 0;
-    let engineWarmed = false;
-    let primePromise = null;
-    const later = /* @__PURE__ */ new Set();
-    const waiters = /* @__PURE__ */ new Map();
-    let active = 0;
-    let pumpTimer = null;
-    let lastActivityAt = -Infinity;
-    let hooks = {};
-    let remoteChecking = false;
-    function signalActivity() {
-      try {
-        if (typeof hooks.onActivity === "function") hooks.onActivity();
-      } catch {
-      }
-    }
-    let streamGate = null;
-    function settle(key, ok) {
-      later.delete(key);
-      const list = waiters.get(key);
-      if (!list) return;
-      waiters.delete(key);
-      for (const fn of list) fn(ok);
-    }
-    function waitGate(gate) {
-      let timer = null;
-      return Promise.race([
-        gate.then(() => {
-        }, () => {
-        }),
-        new Promise((r) => {
-          timer = setT(() => r(void 0), VOICE_STREAM_GATE_MAX_MS);
-        })
-      ]).then(() => {
-        if (timer !== null) clearT(timer);
-      });
-    }
-    function pump() {
-      if (pumpTimer !== null || remoteChecking || later.size === 0) return;
-      pumpTimer = setT(() => {
-        pumpTimer = null;
-        if (later.size === 0) return;
-        if (!locallyIdle()) {
-          pump();
-          return;
-        }
-        if (typeof hooks.engineQuietMs !== "function") {
-          startNext();
-          return;
-        }
-        remoteChecking = true;
-        const ask = (
-          /** @type {() => Promise<number>} */
-          hooks.engineQuietMs
-        );
-        void Promise.resolve().then(ask).then((q) => q, () => Infinity).then((q) => {
-          remoteChecking = false;
-          if (!(Number(q) >= VOICE_REMOTE_QUIET_MS)) {
-            try {
-              if (typeof hooks.onRemoteBusy === "function") hooks.onRemoteBusy();
-            } catch {
-            }
-            pump();
-            return;
-          }
-          if (!locallyIdle()) {
-            pump();
-            return;
-          }
-          startNext();
-        });
-      }, VOICE_IDLE_INIT_DELAY_MS);
-    }
-    function locallyIdle() {
-      let playerIdle = true;
-      try {
-        playerIdle = typeof hooks.isIdle === "function" ? hooks.isIdle() !== false : true;
-      } catch {
-        playerIdle = true;
-      }
-      return active === 0 && pending === 0 && playerIdle && now() - lastActivityAt >= VOICE_IDLE_INIT_DELAY_MS;
-    }
-    function startNext() {
-      if (later.size === 0) return;
-      const key = (
-        /** @type {string} */
-        later.values().next().value
-      );
-      later.delete(key);
-      void ensureInternal(Number(key), true).then(() => {
-      }, () => {
-      });
-    }
-    function enqueue(task) {
-      pending += 1;
-      const p = chain.then(task, task);
-      chain = p.then(() => {
-      }, () => {
-      });
-      return p.finally(() => {
-        pending -= 1;
-        pump();
-      });
-    }
-    const keyOf2 = (styleId) => String(Number(styleId));
-    function ensureInternal(styleId, background) {
-      const id = Number(styleId);
-      if (!Number.isInteger(id) || id < 0) return Promise.resolve(false);
-      const key = keyOf2(id);
-      if (warm.has(key)) return Promise.resolve(true);
-      if (failed.has(key)) return Promise.resolve(false);
-      const existing = inflight.get(key);
-      if (existing) return existing;
-      const myEpoch = epoch;
-      const p = enqueue(async () => {
-        if (myEpoch !== epoch) return false;
-        if (warm.has(key)) return true;
-        let ok = false;
-        const t0 = now();
-        signalActivity();
-        try {
-          ok = !!await deps.initSpeaker(id);
-        } catch {
-          ok = false;
-        }
-        signalActivity();
-        try {
-          if (typeof hooks.onInit === "function") hooks.onInit(Math.max(0, now() - t0), background);
-        } catch {
-        }
-        if (myEpoch === epoch) (ok ? warm : failed).add(key);
-        return ok;
-      }).then((ok) => {
-        if (myEpoch === epoch) settle(key, ok);
-        return ok;
-      }).finally(() => {
-        if (inflight.get(key) === p) inflight.delete(key);
-      });
-      inflight.set(key, p);
-      return p;
-    }
-    const api = {
-      /** @param {unknown} styleId */
-      isWarm(styleId) {
-        return warm.has(keyOf2(styleId));
-      },
-      /** 合成に成功した声は温まっている。 @param {unknown} styleId */
-      markWarm(styleId) {
-        const id = Number(styleId);
-        if (Number.isInteger(id) && id >= 0) warm.add(keyOf2(id));
-      },
-      /** 列で読み込みを待っている・実行中のものがあるか。 */
-      busy() {
-        return pending > 0;
-      },
-      /**
-       * まだ温まっていない声を読み込む(列で順番に)。同じ声を同時に頼まれたら1回にまとめる。
-       * @param {unknown} styleId
-       * @returns {Promise<boolean>} 読み込めたら true(すでに温まっていても true)
-       */
-      ensure(styleId) {
-        return ensureInternal(styleId, false);
-      },
-      /**
-       * 読み上げ ON の直後に1回だけ、捨てる audio_query でエンジンを起こす(待たない呼び方でよい)。
-       * @param {unknown} styleId
-       * @returns {Promise<boolean>}
-       */
-      primeEngine(styleId) {
-        const id = Number(styleId);
-        if (engineWarmed || typeof deps.warmQuery !== "function" || !Number.isInteger(id) || id < 0) {
-          return Promise.resolve(false);
-        }
-        engineWarmed = true;
-        const myEpoch = epoch;
-        const warmQuery = deps.warmQuery;
-        const p = enqueue(async () => {
-          if (myEpoch !== epoch) return false;
-          let ok = false;
-          try {
-            ok = !!await warmQuery(id);
-          } catch {
-            ok = false;
-          }
-          if (ok && myEpoch === epoch) warm.add(keyOf2(id));
-          return ok;
-        });
-        primePromise = p;
-        return p;
-      },
-      /** エンジンを起こしている最中なら、その約束(無ければ null)。 */
-      priming() {
-        return primePromise;
-      },
-      /**
-       * 合成が1件も走っていない時に、裏で1つずつ読み込む(待たせない読み込み)。
-       * @param {unknown} styleId
-       * @returns {Promise<boolean>} 読み込めたら true
-       */
-      ensureWhenIdle(styleId) {
-        const id = Number(styleId);
-        if (!Number.isInteger(id) || id < 0) return Promise.resolve(false);
-        const key = keyOf2(id);
-        if (warm.has(key)) return Promise.resolve(true);
-        if (failed.has(key)) return Promise.resolve(false);
-        const existing = inflight.get(key);
-        if (existing) return existing;
-        later.add(key);
-        const p = new Promise((resolve) => {
-          const list = waiters.get(key) || [];
-          list.push(resolve);
-          waiters.set(key, list);
-        });
-        pump();
-        return (
-          /** @type {Promise<boolean>} */
-          p
-        );
-      },
-      /**
-       * まだ温まっていない声の代わりに今すぐ読む声。温まった声が無ければ null。
-       *   決まった順(絞り込みの固定表→番号順)に並べ、頼まれた声の番号で選ぶ=同じ状態なら同じ声。
-       * @param {unknown} styleId
-       * @returns {number|null}
-       */
-      borrowFor(styleId) {
-        const ids = [...warm].map(Number);
-        if (!ids.length) return null;
-        const inPalette = VOICE_NARROW_STYLE_IDS.filter((x) => ids.includes(x));
-        const rest = ids.filter((x) => !VOICE_NARROW_STYLE_IDS.includes(x)).sort((a, b) => a - b);
-        const order = [...inPalette, ...rest];
-        const n = Math.abs(Math.floor(Number(styleId))) || 0;
-        return order[n % order.length];
-      },
-      /**
-       * 合成を始める前に呼ぶ。少しずつ受け取り中の声があれば、届き終わるまで(上限つきで)待つ約束を返す。
-       *   無ければ null(=待たずに同期で合成を始められる)。
-       * @returns {Promise<void>|null}
-       */
-      beforeSynth() {
-        active += 1;
-        lastActivityAt = now();
-        signalActivity();
-        const gate = streamGate;
-        if (!gate) return null;
-        return waitGate(gate);
-      },
-      /**
-       * 少しずつ受け取る合成を【頼む時点】で門を閉じる(v0.1.1773)。返事を待つ間に並んで始まった先読みが
-       *   エンジンを取り合い、鳴り始めた声の続きが間に合わなかった(グラボ無し・一気に10件で 1.1秒の無音)。
-       * @returns {(result: unknown) => void} 合成の結果を渡すと、届き終わった時に門を開ける
-       */
-      closeStreamGate() {
-        let open = () => {
-        };
-        const g = new Promise((r) => {
-          open = r;
-        });
-        streamGate = g;
-        return (result) => {
-          const release = () => {
-            if (streamGate === g) streamGate = null;
-            open();
-          };
-          if (isStreamedVoice(result)) void result.whenDone.then(release, release);
-          else release();
-        };
-      },
-      /**
-       * 再生側の様子と計器をつなぐ(v0.1.1777)。isIdle: 再生も順番待ちも無い時 true。
-       *   onInit: 声を読み込んだ時間(ms)と、裏の読み込みだったか。
-       *   v0.1.1781: onActivity(合成・読み込みの合図) / engineQuietMs(両ページ通して静かな時間) / onRemoteBusy(計器)。
-       * @param {{ isIdle?: () => boolean, onInit?: (ms: number, background: boolean) => void, onActivity?: () => void, engineQuietMs?: () => Promise<number>, onRemoteBusy?: () => void }} h
-       */
-      setHooks(h) {
-        hooks = h && typeof h === "object" ? h : {};
-      },
-      /** 走っている合成の数(少しずつ受け取り中も含む)。 */
-      activeCount() {
-        return active;
-      },
-      /**
-       * 合成が終わったら呼ぶ。少しずつ受け取った声は、届き終わってから「終わった」にする。
-       * @param {unknown} result
-       */
-      afterSynth(result) {
-        const done = () => {
-          active = Math.max(0, active - 1);
-          lastActivityAt = now();
-          signalActivity();
-          pump();
-        };
-        if (isStreamedVoice(result)) {
-          void result.whenDone.then(done, done);
-          return;
-        }
-        done();
-      },
-      /** 読み上げ ON のたびに呼ぶ(エンジンが再起動していても温まった扱いにしない)。 */
-      reset() {
-        epoch += 1;
-        warm.clear();
-        failed.clear();
-        inflight.clear();
-        engineWarmed = false;
-        primePromise = null;
-        if (pumpTimer !== null) {
-          clearT(pumpTimer);
-          pumpTimer = null;
-        }
-        for (const key of [...waiters.keys()]) settle(key, false);
-        later.clear();
-      },
-      now
-    };
-    return api;
-  }
-  function createVoicevoxWarmup() {
-    return createVoiceWarmup({
-      initSpeaker: (id) => initializeVoicevoxSpeaker(id, { timeoutMs: 15e3 }),
-      warmQuery: (id) => warmupVoicevoxQuery(id)
-    });
-  }
-  function withVoiceWarmup(warmup, synth) {
-    if (!warmup) return synth;
-    return async (text, voice, opts = {}) => {
-      const raw = Number(voice?.styleId);
-      const styleId = Number.isFinite(raw) ? raw : 3;
-      const startAt = warmup.now();
-      let useStyle = styleId;
-      let borrowed = false;
-      if (!warmup.isWarm(styleId)) {
-        const priming = warmup.priming();
-        if (priming && warmup.borrowFor(styleId) === null) {
-          try {
-            await priming;
-          } catch {
-          }
-        }
-        const sub = warmup.borrowFor(styleId);
-        if (sub !== null && sub !== styleId) {
-          useStyle = sub;
-          borrowed = true;
-          void warmup.ensureWhenIdle(styleId);
-        } else if (sub === null) {
-          try {
-            await warmup.ensure(styleId);
-          } catch {
-          }
-        }
-      }
-      const initMs = Math.max(0, warmup.now() - startAt);
-      const streamOk = opts?.stream === true && warmup.activeCount() === 0 && !warmup.busy();
-      const callOpts = { ...opts };
-      if (!streamOk) delete callOpts.stream;
-      const gate = warmup.beforeSynth();
-      if (gate) await gate;
-      const releaseStream = streamOk ? warmup.closeStreamGate() : null;
-      const busyAtStart = warmup.busy();
-      const onTiming = opts?.onTiming;
-      let wav = null;
-      try {
-        wav = await synth(text, borrowed ? { ...voice, styleId: useStyle } : voice, {
-          ...callOpts,
-          audioQueryTimeoutMs: Math.max(Number(opts?.audioQueryTimeoutMs) || 0, VOICE_WARMUP_QUERY_TIMEOUT_MS),
-          onTiming: (t) => {
-            if (typeof onTiming === "function") onTiming({ ...t || {}, initMs, contended: busyAtStart || warmup.busy(), borrowed });
-          }
-        });
-      } finally {
-        warmup.afterSynth(wav);
-        if (releaseStream) releaseStream(wav);
-      }
-      if (wav) warmup.markWarm(useStyle);
-      try {
-        const textLength = String(text ?? "").length;
-        const pitchOffset = (
-          /** @type {any} */
-          voice?.pitchOffset
-        );
-        if (isStreamedVoice(wav)) {
-          wav.styleId = useStyle;
-          wav.pitchOffset = Number(pitchOffset) || 0;
-          wav.textLength = textLength;
-          const sv = wav;
-          void sv.whenDone.then((ok) => {
-            if (ok) rememberVoiceStylePeak(useStyle, sv.peak, sv.rms, textLength, pitchOffset);
-          }, () => {
-          });
-        } else if (wav instanceof ArrayBuffer) {
-          const level = measureVoiceWavLevel(wav);
-          if (level) rememberVoiceStylePeak(useStyle, level.peak, level.rms, textLength, pitchOffset);
-        }
-      } catch {
-      }
-      return wav;
-    };
-  }
-  function startVoiceWarmup(warmup, allStyleIds) {
-    if (!warmup) return;
-    const ids = Array.isArray(allStyleIds) ? allStyleIds.map(Number) : [];
-    warmup.reset();
-    const first = ids.includes(3) ? 3 : ids[0];
-    if (first === void 0) return;
-    void warmup.primeEngine(first).catch(() => {
-    });
-    for (const id of VOICE_NARROW_STYLE_IDS) {
-      if (id !== first && ids.includes(id)) void warmup.ensureWhenIdle(id);
-    }
-  }
-  function wireVoiceWarmupHooks(warmup, isPlayerIdle, getDiag, engine) {
-    if (!warmup) return;
-    const w = (
-      /** @type {any} */
-      warmup
-    );
-    if (w._busyPingTimer) {
-      clearInterval(w._busyPingTimer);
-      w._busyPingTimer = null;
-    }
-    if (engine) {
-      w._busyPingTimer = setInterval(() => {
-        let idle = true;
-        try {
-          idle = isPlayerIdle() !== false;
-        } catch {
-          idle = true;
-        }
-        if (!idle) engine.ping();
-      }, VOICE_BUSY_PING_INTERVAL_MS);
-    }
-    warmup.setHooks({
-      isIdle: isPlayerIdle,
-      onActivity: engine ? () => engine.ping() : void 0,
-      engineQuietMs: engine ? () => engine.quietMs() : void 0,
-      onRemoteBusy: () => {
-        const d = getDiag();
-        if (d && typeof d === "object") d.bgInitYieldTotal = (Number(d.bgInitYieldTotal) || 0) + 1;
-      },
-      onInit: (ms, background) => {
-        if (!background) return;
-        const d = getDiag();
-        if (!d || typeof d !== "object") return;
-        d.bgInitTotal = (Number(d.bgInitTotal) || 0) + 1;
-        d.bgInitMaxMs = Math.max(Number(d.bgInitMaxMs) || 0, Math.round(ms));
-      }
-    });
-  }
-
-  // src/lib/voiceEngineOverload.js
-  var VOICE_OVERLOAD_TIMEOUT_STREAK = 2;
-  var VOICE_OVERLOAD_RECOVER_STREAK = 5;
-  var VOICE_OVERLOAD_FAST_MS = 3e3;
-  var VOICE_OVERLOAD_QUERY_TIMEOUT_MS = 3e4;
-  var VOICE_OVERLOAD_SYNTH_TIMEOUT_MS = 45e3;
-  function createVoiceOverloadState() {
-    return { overloaded: false, timeoutStreak: 0, fastStreak: 0 };
-  }
-  function noteVoiceSynthOutcome(state, outcome) {
-    if (!state) return false;
-    if (outcome?.timedOut === true) {
-      state.timeoutStreak += 1;
-      state.fastStreak = 0;
-      if (state.timeoutStreak >= VOICE_OVERLOAD_TIMEOUT_STREAK) state.overloaded = true;
-      return state.overloaded;
-    }
-    if (outcome?.ok !== true) return state.overloaded;
-    state.timeoutStreak = 0;
-    const ms = Number(outcome?.totalMs);
-    if (Number.isFinite(ms) && ms >= 0 && ms < VOICE_OVERLOAD_FAST_MS) {
-      state.fastStreak += 1;
-      if (state.overloaded && state.fastStreak >= VOICE_OVERLOAD_RECOVER_STREAK) state.overloaded = false;
-    } else {
-      state.fastStreak = 0;
-    }
-    return state.overloaded;
-  }
-  function resolveVoiceOverloadTimeouts(overloaded) {
-    if (!overloaded) return {};
-    return {
-      audioQueryTimeoutMs: VOICE_OVERLOAD_QUERY_TIMEOUT_MS,
-      synthesisTimeoutMs: VOICE_OVERLOAD_SYNTH_TIMEOUT_MS
-    };
-  }
-  function capVoiceSynthDepthForOverload(depth, overloaded) {
-    const d = Number(depth);
-    if (!Number.isFinite(d)) return overloaded ? 1 : 0;
-    return overloaded ? Math.min(d, 1) : d;
-  }
-
-  // src/lib/voiceLagBudget.js
-  var VOICE_LAG_BUDGET_MS = 6e3;
-  var VOICE_QUEUE_MAX_CEIL = 8;
-  var VOICE_QUEUE_MAX_FLOOR = 5;
-  var VOICE_GROW_STREAK_N = 5;
-  function updateVoiceServiceTimeEma(prevMs, sampleMs, alpha = 0.3) {
-    const sample = Math.max(0, Number(sampleMs) || 0);
-    const prev = Number(prevMs);
-    if (!Number.isFinite(prev) || prev < 0) return sample;
-    return prev + alpha * (sample - prev);
-  }
-  function resolveVoiceQueueMax(serviceTimeEmaMs) {
-    const ema = Number(serviceTimeEmaMs);
-    if (!Number.isFinite(ema) || ema <= 0) return VOICE_QUEUE_MAX_CEIL;
-    const raw = Math.floor(VOICE_LAG_BUDGET_MS / ema);
-    return Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, raw));
-  }
-  function stepVoiceQueueMax(currentMax, computedMax, growStreak) {
-    const current = Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, Math.floor(Number(currentMax) || VOICE_QUEUE_MAX_CEIL)));
-    const computed = Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, Math.floor(Number(computedMax) || VOICE_QUEUE_MAX_CEIL)));
-    const streak = Math.max(0, Math.floor(Number(growStreak) || 0));
-    if (computed < current) {
-      return { nextMax: computed, nextGrowStreak: 0 };
-    }
-    if (computed === current) {
-      return { nextMax: current, nextGrowStreak: 0 };
-    }
-    const nextStreak = streak + 1;
-    if (nextStreak >= VOICE_GROW_STREAK_N) {
-      return { nextMax: Math.min(VOICE_QUEUE_MAX_CEIL, current + 1), nextGrowStreak: 0 };
-    }
-    return { nextMax: current, nextGrowStreak: nextStreak };
-  }
-  var VOICE_PRESSURE_OK_MAX = 1.2;
-  var VOICE_SYNTH_WAIT_DOMINANT_RATIO = 0.35;
-  var VOICE_PLAYBACK_DOMINANT_RATIO = 0.6;
-  var VOICE_STALL_EXCESS_RATIO = 0.2;
-  function updateVoiceEventRatioEma(prevRatio, hit, alpha = 0.05) {
-    const h = Number(hit);
-    if (h !== 0 && h !== 1) {
-      const prev2 = Number(prevRatio);
-      return Number.isFinite(prev2) ? prev2 : -1;
-    }
-    const prev = Number(prevRatio);
-    if (!Number.isFinite(prev) || prev < 0) return h;
-    return prev + alpha * (h - prev);
-  }
-  function foldVoiceArrivalWindow(state, nowMs, count = 1, windowMs = 1e4, alpha = 0.3) {
-    const now = Number(nowMs);
-    const safeNow = Number.isFinite(now) ? now : 0;
-    const addCount = Math.max(0, Math.floor(Number(count) || 0));
-    const s = state && typeof state === "object" ? state : {};
-    const prevStart = Number(s.windowStartMs);
-    const prevCount = Math.max(0, Math.floor(Number(s.windowCount) || 0));
-    const prevRate = Number(s.arrivalPerMin);
-    if (!Number.isFinite(prevStart)) {
-      return { windowStartMs: safeNow, windowCount: addCount, arrivalPerMin: Number.isFinite(prevRate) && prevRate >= 0 ? prevRate : -1 };
-    }
-    const elapsed2 = safeNow - prevStart;
-    if (elapsed2 < windowMs) {
-      return { windowStartMs: prevStart, windowCount: prevCount + addCount, arrivalPerMin: Number.isFinite(prevRate) && prevRate >= 0 ? prevRate : -1 };
-    }
-    const closedCount = prevCount + addCount;
-    const safeElapsed = Math.max(1, elapsed2);
-    const sampleRate = closedCount * 6e4 / safeElapsed;
-    const nextRate = !Number.isFinite(prevRate) || prevRate < 0 ? sampleRate : prevRate + alpha * (sampleRate - prevRate);
-    return { windowStartMs: safeNow, windowCount: 0, arrivalPerMin: nextRate };
-  }
-  function computeVoiceLagVerdict(inputs) {
-    const i = inputs && typeof inputs === "object" ? inputs : {};
-    const S = Number(i.serviceTimeEmaMs);
-    const W = Number(i.synthWaitEmaMs);
-    const E = Number(i.expectedPlayEmaMs);
-    const P = Number(i.playbackEmaMs);
-    const L = Number(i.arrivalPerMin);
-    const cap = Number(i.effectiveQueueMax);
-    const capLagTicks = Math.max(0, Math.floor(Number(i.capLagTicks) || 0));
-    const sampleCount = Math.max(0, Math.floor(Number(i.sampleCount) || 0));
-    if (!Number.isFinite(S) || S <= 0 || !Number.isFinite(L) || L <= 0 || sampleCount < 5) {
-      return "insufficient";
-    }
-    const pressure = L * S / 6e4;
-    if (pressure <= VOICE_PRESSURE_OK_MAX) {
-      if (capLagTicks >= 10) return "hysteresis";
-      return "ok";
-    }
-    const synthDominant = Number.isFinite(W) && W >= 0 && W / S >= VOICE_SYNTH_WAIT_DOMINANT_RATIO;
-    if (synthDominant) {
-      const capIsSmall = Number.isFinite(cap) && cap <= 3;
-      return capIsSmall ? "coldsynth" : "synthslow";
-    }
-    if (Number.isFinite(P) && Number.isFinite(E) && (P - E) / S >= VOICE_STALL_EXCESS_RATIO) {
-      return "stall";
-    }
-    if (Number.isFinite(E) && E >= 0 && E / S >= VOICE_PLAYBACK_DOMINANT_RATIO) {
-      return "playback";
-    }
-    return "mixed";
-  }
-  var VOICE_SUSTAINED_PRESSURE_MIN = VOICE_PRESSURE_OK_MAX;
-  var VOICE_SUSTAINED_BOOST_MAX = 0.8;
-  function computeSustainedPressureBoost(inputs) {
-    const i = inputs && typeof inputs === "object" ? inputs : {};
-    const L = Number(i.arrivalPerMin);
-    const S = Number(i.serviceTimeEmaMs);
-    const sampleCount = Math.max(0, Math.floor(Number(i.sampleCount) || 0));
-    if (!Number.isFinite(L) || L <= 0 || !Number.isFinite(S) || S <= 0 || sampleCount < 5) {
-      return 0;
-    }
-    const pressure = L * S / 6e4;
-    if (pressure <= VOICE_SUSTAINED_PRESSURE_MIN) return 0;
-    const raw = (pressure - VOICE_SUSTAINED_PRESSURE_MIN) * 0.4;
-    return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(0, raw));
-  }
-  var VOICE_BACKLOG_WAIT_START_MS = 1500;
-  var VOICE_BACKLOG_BOOST_MAX = 0.3;
-  function computeBacklogCatchUpBoost(queueWaitMs, paceFloor = 0) {
-    const w = Number(queueWaitMs);
-    const floor = Number.isFinite(Number(paceFloor)) ? Math.max(0, Number(paceFloor)) : 0;
-    const byWait = Number.isFinite(w) && w > VOICE_BACKLOG_WAIT_START_MS ? (w - VOICE_BACKLOG_WAIT_START_MS) / 1e3 * 0.1 : 0;
-    return Math.min(VOICE_BACKLOG_BOOST_MAX, floor + byWait);
-  }
-  var VOICE_PACE_MIN_SAMPLES = 3;
-  var VOICE_PACE_GAP_CAP_MS = 2e4;
-  var VOICE_PACE_EMA_ALPHA = 0.3;
-  var VOICE_PACE_FLOOR_MARGIN = 0.03;
-  function createVoicePaceState() {
-    return { lastArrivalAt: -1, gapEmaMs: -1, gapCount: 0, naturalEmaMs: -1, naturalCount: 0, charMsEma: -1 };
-  }
-  function paceEma(prev, sample) {
-    return prev < 0 ? sample : prev + VOICE_PACE_EMA_ALPHA * (sample - prev);
-  }
-  function noteVoicePaceArrival(state, nowMs) {
-    if (!state) return;
-    const now = Number(nowMs);
-    if (!Number.isFinite(now)) return;
-    if (state.lastArrivalAt >= 0 && now >= state.lastArrivalAt) {
-      const gap = Math.min(VOICE_PACE_GAP_CAP_MS, now - state.lastArrivalAt);
-      state.gapEmaMs = paceEma(state.gapEmaMs, gap);
-      state.gapCount += 1;
-    }
-    state.lastArrivalAt = now;
-  }
-  function noteVoicePacePlayed(state, playedMs, playbackRate = 1, boostAtSynth = 0, chars = 0) {
-    if (!state) return;
-    const ms = Number(playedMs);
-    if (!Number.isFinite(ms) || ms <= 0) return;
-    const rate = Number(playbackRate) > 0 ? Number(playbackRate) : 1;
-    const boost = Number(boostAtSynth) > 0 ? Number(boostAtSynth) : 0;
-    const natural = ms * rate * (1 + boost);
-    state.naturalEmaMs = paceEma(state.naturalEmaMs, natural);
-    state.naturalCount += 1;
-    const n = Math.floor(Number(chars));
-    if (n > 0) state.charMsEma = paceEma(state.charMsEma, natural / n);
-  }
-  var VOICE_ITEM_MIN_MS = 600;
-  var VOICE_SYNTH_FIXED_MS = 250;
-  var VOICE_CHAR_MS_DEFAULT = 130;
-  function resolveVoiceQueueMaxByChars(charCounts, paceState, synthRtf = 0) {
-    if (!Array.isArray(charCounts)) return null;
-    const learned = Number(paceState?.charMsEma);
-    const perChar = learned > 0 ? learned : VOICE_CHAR_MS_DEFAULT;
-    const rtf = Number(synthRtf) > 0 ? Number(synthRtf) : 0;
-    let total = 0;
-    let fit = 0;
-    for (let i = charCounts.length - 1; i >= 0; i -= 1) {
-      const n = Math.max(0, Math.floor(Number(charCounts[i]) || 0));
-      const natural = Math.max(VOICE_ITEM_MIN_MS, n * perChar);
-      total += rtf > 0 ? Math.max(natural, VOICE_SYNTH_FIXED_MS + natural * rtf) : natural;
-      if (total > VOICE_LAG_BUDGET_MS) break;
-      fit += 1;
-    }
-    return Math.min(VOICE_QUEUE_MAX_CEIL, Math.max(VOICE_QUEUE_MAX_FLOOR, fit));
-  }
-  function computeVoicePaceFloor(state) {
-    if (!state || state.gapCount < VOICE_PACE_MIN_SAMPLES || state.naturalCount < VOICE_PACE_MIN_SAMPLES) return 0;
-    if (!(state.gapEmaMs > 0) || !(state.naturalEmaMs > 0)) return 0;
-    const over = state.naturalEmaMs / state.gapEmaMs - 1;
-    return over > 0 ? Math.min(VOICE_BACKLOG_BOOST_MAX, over + VOICE_PACE_FLOOR_MARGIN) : 0;
-  }
-  function mergeVoiceSpeedBoost(congestionBoost, sustainedBoost) {
-    const a = Number(congestionBoost);
-    const b = Number(sustainedBoost);
-    const base = Number.isFinite(a) && a > 0 ? a : 0;
-    const extra = Number.isFinite(b) && b > 0 ? b : 0;
-    return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(base, extra));
-  }
-
-  // src/lib/voicePlaybackQuality.js
-  var VOICE_CUT_SHORT_RATIO = 0.85;
-  var VOICE_CUT_SHORT_SLACK_MS = 150;
-  var VOICE_STALL_RATIO = 1.25;
-  var VOICE_STALL_SLACK_MS = 400;
-  var VOICE_CLIP_LEVEL = 0.995;
-  var VOICE_QUIET_RATIO = 0.6;
-  function recordVoicePlaybackQuality(diag, s) {
-    if (!diag || typeof diag !== "object" || !s) return;
-    const inc = (k) => {
-      diag[k] = (Number(diag[k]) || 0) + 1;
-    };
-    const issues = [];
-    if (s.outcome === "error") {
-      if (s.started) {
-        inc("playErrorAfterStartTotal");
-        issues.push("error");
-      }
-      if (issues.length) diag.lastPlayIssue = issues.join(",");
-      return;
-    }
-    inc("playCheckedTotal");
-    const exp = Number(s.expectedMs);
-    const played = Number(s.playedMs);
-    if (s.streamed && s.partial) {
-      inc("playCutShortTotal");
-      issues.push("partial");
-    } else if (s.started && exp > 0 && played >= 0) {
-      if (played < exp * VOICE_CUT_SHORT_RATIO - VOICE_CUT_SHORT_SLACK_MS) {
-        inc("playCutShortTotal");
-        issues.push(`cut${Math.round(played)}/${Math.round(exp)}ms`);
-      } else if (!s.streamed && played > exp * VOICE_STALL_RATIO + VOICE_STALL_SLACK_MS) {
-        inc("playStallTotal");
-        issues.push(`stall${Math.round(played)}/${Math.round(exp)}ms`);
-      }
-    }
-    if (s.streamed && Number(s.underruns) > 0) {
-      inc("streamUnderrunTotal");
-      diag.streamUnderrunMaxMs = Math.max(Number(diag.streamUnderrunMaxMs) || 0, Math.round(Number(s.underrunMaxMs) || 0));
-      issues.push(`gap${s.underruns}x${Math.round(Number(s.underrunMaxMs) || 0)}ms`);
-    }
-    const peak = Number(s.outPeak);
-    if (Number.isFinite(peak) && peak >= 0) {
-      diag.outPeakEmaPermille = Math.round(updateVoiceServiceTimeEma(diag.outPeakEmaPermille, peak * 1e3));
-      if (peak >= VOICE_CLIP_LEVEL) {
-        inc("clipItemTotal");
-        issues.push("clip");
-      }
-      const target = Number(s.targetPeak);
-      const rmsNow = Number(s.outRms);
-      const loudEnough = Number.isFinite(rmsNow) && rmsNow >= voiceTargetRms(target) * VOICE_QUIET_RATIO;
-      if (Number.isFinite(target) && target > 0 && peak > 0 && peak < target * VOICE_QUIET_RATIO && !loudEnough) {
-        inc("quietItemTotal");
-        issues.push(`quiet${Math.round(peak * 100)}/${Math.round(target * 100)}%`);
-      }
-    }
-    const rms = Number(s.outRms);
-    if (Number.isFinite(rms) && rms > 0) {
-      const db = Math.round(20 * Math.log10(rms) * 10) / 10;
-      const lo = Number(diag.outRmsDbMin);
-      const hi = Number(diag.outRmsDbMax);
-      diag.outRmsDbMin = Number.isFinite(lo) ? Math.min(lo, db) : db;
-      diag.outRmsDbMax = Number.isFinite(hi) ? Math.max(hi, db) : db;
-      diag.lastOutRmsDb = db;
-    }
-    if (s.streamed && Number(s.gainDropRatio) > 0 && Number(s.gainDropRatio) < 0.8) {
-      inc("streamGainDropTotal");
-      issues.push(`drop${Math.round(Number(s.gainDropRatio) * 100)}%`);
-    }
-    if (issues.length) diag.lastPlayIssue = issues.join(",");
-  }
-  function observeVoicePlayback(audio, opts) {
-    if (!audio || typeof audio.addEventListener !== "function" || !opts?.diag) return;
-    const now = typeof opts.now === "function" ? opts.now : () => Date.now();
-    const rate = Number(opts.playbackRate) > 0 ? Number(opts.playbackRate) : 1;
-    let playingAt = -1;
-    let done = false;
-    const finish = (outcome) => {
-      if (done) return;
-      done = true;
-      try {
-        const q = audio.quality && typeof audio.quality === "object" ? audio.quality : null;
-        const durSec = Number(audio.duration);
-        recordVoicePlaybackQuality(opts.diag, {
-          expectedMs: Number.isFinite(durSec) && durSec > 0 ? durSec * 1e3 / rate : -1,
-          playedMs: playingAt >= 0 ? now() - playingAt : -1,
-          outcome,
-          started: playingAt >= 0,
-          streamed: !!q,
-          underruns: q ? Number(q.underruns) || 0 : 0,
-          underrunMaxMs: q ? Number(q.underrunMaxMs) || 0 : 0,
-          outPeak: q && Number(q.outPeak) >= 0 ? Number(q.outPeak) : Number(opts.outPeak ?? -1),
-          outRms: q && Number(q.outRms) > 0 ? Number(q.outRms) : Number(opts.outRms ?? -1),
-          targetPeak: Number(opts.targetPeak ?? -1),
-          gainDropRatio: q ? Number(q.gainDropRatio) || 0 : 0,
-          partial: q ? q.partial === true : false
-        });
-        if (typeof opts.onRecorded === "function") opts.onRecorded();
-      } catch {
-      }
-    };
-    try {
-      audio.addEventListener("playing", () => {
-        if (playingAt < 0) playingAt = now();
-      }, { once: true });
-      audio.addEventListener("ended", () => finish("ended"), { once: true });
-      audio.addEventListener("error", () => finish("error"), { once: true });
-    } catch {
-    }
-  }
-
-  // src/lib/voiceAssignment.js
-  var DEFAULT_VOICE = Object.freeze({
-    styleId: 3,
-    pitchOffset: 0,
-    speedOffset: 0
-  });
-  var PITCH_OFFSETS = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
-  var SPEED_OFFSETS = Object.freeze([0, 0.05, 0.1]);
-  function fnv1a32(value) {
-    const bytes = new TextEncoder().encode(String(value ?? ""));
-    let hash = 2166136261;
-    for (const byte of bytes) {
-      hash ^= byte;
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  }
-  function normalizeStyleIds(styleIds) {
-    if (!Array.isArray(styleIds)) return [];
-    return styleIds.map((styleId) => Number(styleId)).filter((styleId) => Number.isInteger(styleId) && styleId >= 0);
-  }
-  function assignVoiceForUser(userKey, styleIds) {
-    const styles = normalizeStyleIds(styleIds);
-    if (!styles.length) return { ...DEFAULT_VOICE };
-    const hash = fnv1a32(userKey);
-    const styleBits = hash & 65535;
-    const pitchBits = hash >>> 16 & 255;
-    const speedBits = hash >>> 24 & 255;
-    return {
-      styleId: styles[styleBits % styles.length],
-      pitchOffset: PITCH_OFFSETS[pitchBits % PITCH_OFFSETS.length],
-      speedOffset: SPEED_OFFSETS[speedBits % SPEED_OFFSETS.length]
-    };
-  }
-  function resolveVoiceForUser(userKey, overrides, styleIds) {
-    const key = String(userKey ?? "");
-    if (overrides && typeof overrides === "object" && Object.prototype.hasOwnProperty.call(overrides, key)) {
-      const raw = (
-        /** @type {Record<string, any>} */
-        overrides[key]
-      );
-      if (raw && typeof raw === "object") {
-        const fallback = assignVoiceForUser(key, styleIds);
-        const styleId = Number(raw.styleId);
-        const pitchOffset = Number(raw.pitchOffset);
-        const speedOffset = Number(raw.speedOffset);
-        return {
-          styleId: Number.isFinite(styleId) ? styleId : fallback.styleId,
-          pitchOffset: Number.isFinite(pitchOffset) ? pitchOffset : 0,
-          speedOffset: Number.isFinite(speedOffset) ? speedOffset : 0
-        };
-      }
-    }
-    return assignVoiceForUser(key, styleIds);
-  }
-
-  // src/lib/voiceLightFallback.js
-  var LIGHT_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
-  var LIGHT_VOICE_RATE = 1.2;
-  var LIGHT_VOICE_MAX_CHARS = 60;
-  var LIGHT_VOICE_PROBE_INTERVAL_MS = 3e4;
-  var LIGHT_VOICE_PROBE_TEXT = "てすと";
-  function pickJapaneseVoices(voices) {
-    if (!Array.isArray(voices)) return [];
-    const ja4 = voices.filter((v) => v && /^ja([-_]|$)/i.test(String(v.lang || "")));
-    const local = ja4.filter((v) => v.localService === true);
-    const use = local.length ? local : ja4;
-    return [...use].sort((a, b) => String(a.name || a.voiceURI || "").localeCompare(String(b.name || b.voiceURI || "")));
-  }
-  function lightVoiceToneFor(userKey, voiceCount) {
-    const n = Math.max(1, Math.floor(Number(voiceCount) || 0));
-    if (!userKey) return { voiceIndex: 0, pitch: 1, rate: LIGHT_VOICE_RATE };
-    const combos = n * LIGHT_VOICE_PITCHES.length;
-    const v = assignVoiceForUser(userKey, Array.from({ length: combos }, (_, i) => i));
-    const combo = Number(v.styleId) || 0;
-    return {
-      voiceIndex: combo % n,
-      pitch: LIGHT_VOICE_PITCHES[Math.floor(combo / n) % LIGHT_VOICE_PITCHES.length],
-      rate: Math.round((LIGHT_VOICE_RATE + (Number(v.speedOffset) || 0)) * 100) / 100
-    };
-  }
-  function shouldUseLightVoice(s) {
-    return !!s && s.setting !== "off" && s.available === true && s.overloaded === true;
-  }
-  function shouldProbeVoicevox(s) {
-    if (!s || s.inFlight > 0) return false;
-    return !(s.lastProbeAt > 0) || s.nowMs - s.lastProbeAt >= LIGHT_VOICE_PROBE_INTERVAL_MS;
-  }
-
-  // src/lib/voiceLightSpeaker.js
-  var MAX_MS_PER_CHAR = 400;
-  var WATCHDOG_EXTRA_MS = 5e3;
-  function createLightSpeaker(deps = {}) {
-    const synth = deps.synth ?? globalThis.speechSynthesis;
-    const Utterance = deps.Utterance ?? globalThis.SpeechSynthesisUtterance;
-    if (!synth || typeof synth.speak !== "function" || typeof Utterance !== "function") return null;
-    let cached = [];
-    const refresh = () => {
-      try {
-        cached = pickJapaneseVoices(synth.getVoices?.() || []);
-      } catch {
-        cached = [];
-      }
-    };
-    refresh();
-    try {
-      synth.addEventListener?.("voiceschanged", refresh);
-    } catch {
-    }
-    return {
-      available: () => {
-        if (!cached.length) refresh();
-        return cached.length > 0;
-      },
-      voices: () => cached,
-      cancel: () => {
-        try {
-          synth.cancel();
-        } catch {
-        }
-      },
-      speak(text, tone, hooks = {}) {
-        return new Promise((resolve) => {
-          if (!cached.length) refresh();
-          const t = String(text || "");
-          if (!t || !cached.length) {
-            resolve(false);
-            return;
-          }
-          let started = false;
-          let done = false;
-          const finish = () => {
-            if (done) return;
-            done = true;
-            clearTimeout(timer);
-            resolve(started);
-          };
-          const u = new Utterance(t);
-          u.voice = cached[tone.voiceIndex % cached.length];
-          u.lang = u.voice?.lang || "ja-JP";
-          u.pitch = tone.pitch;
-          u.rate = tone.rate;
-          u.onstart = () => {
-            started = true;
-            try {
-              hooks.onStart?.();
-            } catch {
-            }
-          };
-          u.onend = finish;
-          u.onerror = finish;
-          const timer = setTimeout(() => {
-            try {
-              synth.cancel();
-            } catch {
-            }
-            finish();
-          }, t.length * MAX_MS_PER_CHAR + WATCHDOG_EXTRA_MS);
-          try {
-            synth.speak(u);
-          } catch {
-            finish();
-          }
-        });
-      }
-    };
-  }
-
-  // src/lib/voiceNgMute.js
-  function voiceNgKeySet(raw) {
-    return new Set(normalizeComeviewNgList(raw).map((e) => e.key));
-  }
-  function isVoiceItemNgMuted(item, ngKeys) {
-    if (!item || !(ngKeys instanceof Set) || ngKeys.size === 0) return false;
-    const key = comeviewUserKeyForRow({
-      userId: String(item.userId ?? ""),
-      name: String(item.nickname ?? item.name ?? "")
-    });
-    return !!key && ngKeys.has(key);
-  }
-
-  // src/lib/voiceReadQueue.js
-  function pushVoiceQueue(queue, item, { max = 5, keep } = {}) {
-    const current = Array.isArray(queue) ? [...queue] : [];
-    if (item && typeof item === "object" && /** @type {{priority?: string}} */
-    item.priority === "high") {
-      const insertIdx = current.findIndex((x) => !x || typeof x !== "object" || /** @type {{priority?: string}} */
-      x.priority !== "high");
-      if (insertIdx < 0) {
-        current.push(item);
-      } else {
-        current.splice(insertIdx, 0, item);
-      }
-    } else {
-      current.push(item);
-    }
-    const rawMax = Number(max);
-    const limit = Number.isFinite(rawMax) ? Math.max(0, Math.floor(rawMax)) : 5;
-    const dropCount = Math.max(0, current.length - limit);
-    if (typeof keep !== "function" || dropCount === 0) {
-      return {
-        queue: current.slice(dropCount),
-        dropped: current.slice(0, dropCount)
-      };
-    }
-    const dropped = [];
-    const kept = [];
-    for (const x of current) {
-      if (dropped.length < dropCount && x !== item && !keep(x)) dropped.push(x);
-      else kept.push(x);
-    }
-    return { queue: kept, dropped };
-  }
-  function mergeRepeatedVoiceItem(queue, candidate) {
-    const current = Array.isArray(queue) ? [...queue] : [];
-    if (!candidate || typeof candidate !== "object") {
-      return { queue: current, merged: false };
-    }
-    const index = current.findIndex(
-      (existing2) => existing2 && typeof existing2 === "object" && existing2.body === candidate.body
-    );
-    if (index < 0) return { queue: current, merged: false };
-    const existing = current[index];
-    const rawCount = Number(existing.count);
-    const count = Number.isFinite(rawCount) && rawCount >= 1 ? Math.floor(rawCount) : 1;
-    current[index] = { ...existing, count: count + 1 };
-    return { queue: current, merged: true };
-  }
-  function computeVoiceCongestion(queueLength) {
-    const rawLength = Number(queueLength);
-    const length = Number.isFinite(rawLength) && rawLength >= 0 ? Math.floor(rawLength) : 0;
-    if (length >= 8) return { speedBoost: 0.8, maxChars: 30 };
-    if (length >= 5) return { speedBoost: 0.5, maxChars: 40 };
-    if (length >= 3) return { speedBoost: 0.3, maxChars: 50 };
-    if (length >= 2) return { speedBoost: 0.15, maxChars: 60 };
-    return { speedBoost: 0, maxChars: 60 };
-  }
-  function capVoiceMaxCharsByBoost(effectiveBoost, queueMaxChars) {
-    const boost = Number(effectiveBoost);
-    const base = Number.isFinite(Number(queueMaxChars)) && Number(queueMaxChars) >= 1 ? Math.floor(Number(queueMaxChars)) : 60;
-    let cap = 60;
-    if (Number.isFinite(boost)) {
-      if (boost >= 0.8) cap = 30;
-      else if (boost >= 0.5) cap = 40;
-      else if (boost >= 0.3) cap = 50;
-    }
-    return Math.min(base, cap);
-  }
-  function computeVoiceE2eAverage(prevAvgMs, sampleMs, alpha = 0.3) {
-    const sample = Number(sampleMs);
-    if (!Number.isFinite(sample) || sample < 0) {
-      const prev2 = Number(prevAvgMs);
-      return Number.isFinite(prev2) ? prev2 : -1;
-    }
-    const prev = Number(prevAvgMs);
-    if (!Number.isFinite(prev) || prev < 0) return Math.round(sample);
-    return Math.round(prev + alpha * (sample - prev));
-  }
-  var VOICE_PLAYBACK_RATE_MAX = 1.35;
-  function computeVoicePlaybackRate(boostAtSynth, boostNow) {
-    const at = Number(boostAtSynth);
-    const now = Number(boostNow);
-    if (!Number.isFinite(at) || !Number.isFinite(now)) return 1;
-    const rate = (1 + now) / (1 + at);
-    return Math.min(VOICE_PLAYBACK_RATE_MAX, Math.max(1, rate));
-  }
-  function resolveVoiceSynthDepth(queueLength, opts = {}) {
-    const rawLength = Number(queueLength);
-    const length = Number.isFinite(rawLength) && rawLength >= 0 ? Math.floor(rawLength) : 0;
-    let depth;
-    if (length >= 5) depth = 3;
-    else if (length >= 3) depth = 2;
-    else depth = 1;
-    const rawPending = Number(opts?.pending);
-    if (Number.isFinite(rawPending) && rawPending >= 0) {
-      depth = Math.min(depth, Math.floor(rawPending));
-    }
-    return depth;
-  }
-
-  // src/lib/voiceStageTiming.js
-  var VOICE_UPSTREAM_SANE_MAX_MS = 6e4;
-  var VOICE_RTF_MIN_AUDIO_MS = 600;
-  var VOICE_RTF_FIXED_OVERHEAD_MS = 250;
-  function foldWarmSynthRtf(diag, ownMs, audioMs) {
-    if (!Number.isFinite(audioMs) || audioMs < VOICE_RTF_MIN_AUDIO_MS || !Number.isFinite(ownMs)) return;
-    foldVoiceStageEma(diag, "warmSynthRtfPermille", Math.max(0, ownMs - VOICE_RTF_FIXED_OVERHEAD_MS) / audioMs * 1e3);
-    diag.warmRtfSamples = (Number(diag.warmRtfSamples) || 0) + 1;
-  }
-  function measureVoiceGapMs(fromMs, toMs) {
-    const cap = Number(fromMs);
-    const enq = Number(toMs);
-    if (!Number.isFinite(cap) || cap <= 0 || !Number.isFinite(enq) || enq <= 0) return -1;
-    const ms = enq - cap;
-    if (ms < 0 || ms > VOICE_UPSTREAM_SANE_MAX_MS) return -1;
-    return Math.round(ms);
-  }
-  function foldVoiceStageEma(diag, field, sampleMs) {
-    const v = Number(sampleMs);
-    if (!diag || typeof diag !== "object" || !Number.isFinite(v) || v < 0) return;
-    diag[field] = Math.round(updateVoiceServiceTimeEma(diag[field], v));
-  }
-  function createVoiceSynthTracker(deps = {}) {
-    const now = typeof deps.now === "function" ? deps.now : () => Date.now();
-    const seenStyles = /* @__PURE__ */ new Set();
-    let prevDone = Promise.resolve(0);
-    return {
-      /**
-       * 読み上げ ON のたびに呼ぶ(2026-10-31)。VOICEVOX を再起動すると声はまた冷えているので、
-       *   覚えていると初めての声を「温まった声」として数え、起動直後の遅れを弱い PC と取り違える。
-       */
-      reset() {
-        seenStyles.clear();
-      },
-      /**
-       * @param {unknown} styleId
-       * @returns {{ cold: boolean, end: (timing?: { queryMs?: number, synthMs?: number, initMs?: number, streamed?: boolean, contended?: boolean, audioMs?: number, borrowed?: boolean }, ok?: boolean) => { cold: boolean, ok: boolean, startAt: number, totalMs: number, engineWaitMs: number, queryMs: number, synthMs: number, initMs: number, streamed: boolean, contended: boolean, audioMs: number, borrowed: boolean } }}
-       */
-      begin(styleId) {
-        const startAt = now();
-        const key = String(styleId ?? "");
-        const cold = !seenStyles.has(key);
-        seenStyles.add(key);
-        let prevDoneAt = -1;
-        prevDone.then((t) => {
-          prevDoneAt = t;
-        }, () => {
-        });
-        let resolveSelf = () => {
-        };
-        prevDone = new Promise((r) => {
-          resolveSelf = r;
-        });
-        let ended = false;
-        const end = (timing = {}, ok = true) => {
-          const endAt = now();
-          if (!ended) {
-            ended = true;
-            resolveSelf(endAt);
-          }
-          const q = Number(timing?.queryMs);
-          const s = Number(timing?.synthMs);
-          const i = Number(timing?.initMs);
-          const a = Number(timing?.audioMs);
-          const borrowed = timing?.borrowed === true;
-          return {
-            // 借りた声は温まっている声で読んだので「初めての声」に入れない(v0.1.1772)。
-            cold: cold && !borrowed,
-            ok: ok === true,
-            startAt,
-            totalMs: Math.max(0, endAt - startAt),
-            engineWaitMs: prevDoneAt > startAt ? Math.min(prevDoneAt, endAt) - startAt : 0,
-            queryMs: Number.isFinite(q) && q >= 0 ? Math.round(q) : -1,
-            synthMs: Number.isFinite(s) && s >= 0 ? Math.round(s) : -1,
-            // 2026-10-26: 合成の前に声を読み込んだ時間(voiceWarmup)。無ければ 0。
-            initMs: Number.isFinite(i) && i > 0 ? Math.round(i) : 0,
-            // 2026-10-26: 少しずつ受け取った(voiceStream)。時間は「最初の声が届くまで」。
-            streamed: timing?.streamed === true,
-            // 2026-10-26: 別の声の準備と重なった(voiceWarmup)。速さの物差しに入れない。
-            contended: timing?.contended === true,
-            // 2026-10-26: できた声の長さ(ms)。合成の速さを文の長さで割るのに使う。分からなければ -1。
-            audioMs: Number.isFinite(a) && a > 0 ? Math.round(a) : -1,
-            // v0.1.1772: まだ温まっていない声の代わりに、温まった声で読んだ(voiceWarmup)。
-            borrowed
-          };
-        };
-        return { cold, end };
-      }
-    };
-  }
-  function recordVoiceSynthStage(diag, r) {
-    if (!diag || typeof diag !== "object" || !r) return;
-    if (!r.ok) return;
-    if (r.borrowed) diag.voiceBorrowTotal = (Number(diag.voiceBorrowTotal) || 0) + 1;
-    foldVoiceStageEma(diag, "engineWaitEmaMs", r.engineWaitMs);
-    foldVoiceStageEma(diag, "audioQueryEmaMs", r.queryMs);
-    const initMs = Number(r.initMs) > 0 ? Number(r.initMs) : 0;
-    if (r.streamed) {
-      diag.streamTotal = (Number(diag.streamTotal) || 0) + 1;
-      foldVoiceStageEma(diag, "streamFirstAudioEmaMs", Math.max(0, r.totalMs - r.engineWaitMs - initMs));
-      return;
-    }
-    if (r.synthMs >= 0) foldVoiceStageEma(diag, "synthesisEmaMs", Math.max(0, r.synthMs - r.engineWaitMs));
-    if (initMs > 0) {
-      diag.speakerInitTotal = (Number(diag.speakerInitTotal) || 0) + 1;
-      diag.speakerInitMaxMs = Math.max(Number(diag.speakerInitMaxMs) || 0, Math.round(initMs));
-    }
-    const ownMs = Math.max(0, r.totalMs - r.engineWaitMs - initMs);
-    if (r.contended) {
-      diag.contendedSynthTotal = (Number(diag.contendedSynthTotal) || 0) + 1;
-      return;
-    }
-    if (r.cold) {
-      diag.coldSynthTotal = (Number(diag.coldSynthTotal) || 0) + 1;
-      diag.coldSynthMaxMs = Math.max(Number(diag.coldSynthMaxMs) || 0, Math.round(ownMs));
-      diag.lastColdSynthMs = Math.round(ownMs);
-    } else {
-      foldVoiceStageEma(diag, "warmSynthEmaMs", ownMs);
-      diag.warmSynthSamples = (Number(diag.warmSynthSamples) || 0) + 1;
-      foldWarmSynthRtf(diag, ownMs, Number(r.audioMs));
-    }
-  }
-  function resetVoiceWarmMeasure(diag) {
-    if (!diag || typeof diag !== "object") return;
-    diag.warmSynthEmaMs = -1;
-    diag.warmSynthSamples = 0;
-    diag.warmSynthRtfPermille = -1;
-    diag.warmRtfSamples = 0;
-  }
-  function recordVoiceStreamDone(diag, r, voice, now, after) {
-    if (!diag || !r || !r.ok || !r.streamed || !voice || typeof voice.whenDone?.then !== "function") return Promise.resolve();
-    return voice.whenDone.then((ok) => {
-      if (ok !== true || voice.failed || r.cold || r.contended) return;
-      const audioMs = voice.sampleRate > 0 ? voice.totalSamples / voice.sampleRate * 1e3 : -1;
-      const ownMs = now() - r.startAt - r.engineWaitMs - (Number(r.initMs) > 0 ? Number(r.initMs) : 0);
-      foldWarmSynthRtf(diag, ownMs, audioMs);
-      if (typeof after === "function") after();
-    }).catch(() => {
-    });
-  }
-  function measureWavAudioMs(wav) {
-    if (!(wav instanceof ArrayBuffer) || wav.byteLength < 44) return -1;
-    try {
-      const v = new DataView(wav);
-      if (v.getUint32(0, false) !== 1380533830 || v.getUint32(8, false) !== 1463899717) return -1;
-      let off = 12;
-      let bytesPerSec = 0;
-      while (off + 8 <= wav.byteLength) {
-        const id = v.getUint32(off, false);
-        const size = v.getUint32(off + 4, true);
-        if (id === 1718449184 && off + 16 <= wav.byteLength) bytesPerSec = v.getUint32(off + 16, true);
-        if (id === 1684108385) {
-          if (bytesPerSec <= 0) return -1;
-          const dataBytes = Math.min(size, wav.byteLength - off - 8);
-          return Math.round(dataBytes / bytesPerSec * 1e3);
-        }
-        off += 8 + size + size % 2;
-      }
-    } catch {
-    }
-    return -1;
-  }
-  function recordVoiceE2eSample(diag, ms) {
-    const v = Number(ms);
-    if (!diag || typeof diag !== "object" || !Number.isFinite(v) || v < 0) return;
-    diag.e2eSampleTotal = (Number(diag.e2eSampleTotal) || 0) + 1;
-    diag.e2eSumMsTotal = (Number(diag.e2eSumMsTotal) || 0) + Math.round(v);
-    diag.e2eMaxMs = Math.max(Number(diag.e2eMaxMs) || 0, Math.round(v));
-  }
-
-  // src/lib/voiceLagNotice.js
-  var VOICE_LAG_NOTICE_SHOW_MS = 4e3;
-  var VOICE_LAG_NOTICE_HIDE_MS = 2500;
-  var VOICE_GPU_TIP_TEXT = "⚡ 読み上げを速くするには: VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に(切り替えると VOICEVOX が再起動します)";
-  var VOICE_WARMING_TEXT = "VOICEVOX を起動した直後は、初めて使う声の準備で遅れます。続けて読むうちに速くなります";
-  var VOICE_LIGHT_ACTIVE_TEXT = "VOICEVOX が追いつかないので、いまは PC の声で読んでいます。VOICEVOX が速くなったら自動で戻ります";
-  function isVoiceWarmingUp(diag) {
-    const samples = Math.max(Number(diag?.warmSynthSamples) || 0, Number(diag?.warmRtfSamples) || 0);
-    return samples < VOICE_WEAK_PC_MIN_WARM_SAMPLES;
-  }
-  function shouldHintVoiceGpu(diag, gpuCapable) {
-    return gpuCapable === true && (isWeakVoicePc(diag) || diag?.voiceOverloaded === true);
-  }
-  function decideVoiceGpuTip(diag, gpuCapable) {
-    if (isVoiceWarmingUp(diag) && diag?.voiceOverloaded !== true) return "";
-    return shouldHintVoiceGpu(diag, gpuCapable) ? VOICE_GPU_TIP_TEXT : "";
-  }
-  function decideVoiceLagNotice(prevShown, diag, _opts = {}) {
-    if (diag?.lightVoiceActive === true) return { shown: true, lagMs: -1, text: VOICE_LIGHT_ACTIVE_TEXT };
-    const e2e = Number(diag?.e2eAvgMs);
-    const up = Number(diag?.upstreamEmaMs);
-    const queueNow = Number(diag?.queueNow);
-    if (!Number.isFinite(e2e) || e2e < 0) return { shown: false, lagMs: -1, text: "" };
-    const lagMs = Math.round(e2e + (Number.isFinite(up) && up > 0 ? up : 0));
-    if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: "" };
-    const shown = prevShown ? lagMs >= VOICE_LAG_NOTICE_HIDE_MS : lagMs >= VOICE_LAG_NOTICE_SHOW_MS;
-    if (!shown) return { shown: false, lagMs, text: "" };
-    const sec = Math.round(lagMs / 1e3);
-    const staleSec = Math.round(VOICE_STALE_MS_NORMAL / 1e3);
-    return {
-      shown: true,
-      lagMs,
-      text: `読み上げが約${sec}秒遅れています。追いつくまで、${staleSec}秒より前のコメントは読まずに飛ばします` + (isVoiceWarmingUp(diag) && diag?.voiceOverloaded !== true ? `。${VOICE_WARMING_TEXT}` : "")
-    };
-  }
-
-  // src/lib/voicePlayer.js
-  var VOICE_ALIVE_RETRY_BACKOFF_MS = Object.freeze([0, 500, 1500]);
-  var SILENT_WAV_DATA_URI = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
-  var VoicePlayer = class {
-    constructor(deps = {}) {
-      this.storage = deps.storage;
-      this.onToggle = deps.onToggle || (() => {
-      });
-      this.onStatus = deps.onStatus || (() => {
-      });
-      this.onLoadingState = deps.onLoadingState || (() => {
-      });
-      this.onSkip = deps.onSkip || (() => {
-      });
-      this.onLagNotice = deps.onLagNotice || (() => {
-      });
-      this.onGpuTip = deps.onGpuTip || (() => {
-      });
-      this._gpuTipText = "";
-      this._lagNoticeShown = false;
-      this.isObsMode = deps.isObsMode || (() => false);
-      this.audioConstructor = deps.audioConstructor;
-      this.unlockAudioConstructor = deps.unlockAudioConstructor || (typeof globalThis !== "undefined" && typeof globalThis.Audio === "function" ? globalThis.Audio : null);
-      this.createObjectURL = deps.createObjectURL;
-      this.revokeObjectURL = deps.revokeObjectURL;
-      this.fetchVoicevoxAlive = deps.fetchVoicevoxAlive;
-      this.probeVoicevoxAlive = deps.probeVoicevoxAlive || (async () => {
-        const ok = await this.fetchVoicevoxAlive();
-        return { ok: !!ok, reason: ok ? "" : "refused" };
-      });
-      this.fetchVoiceStyleIds = deps.fetchVoiceStyleIds;
-      this.initVoiceSpeaker = deps.initVoiceSpeaker || null;
-      this.voiceWarmup = deps.voiceWarmup || null;
-      this.probeVoiceStreaming = deps.probeVoiceStreaming || null;
-      this.probeVoiceGpu = deps.probeVoiceGpu || null;
-      this._gpuCapable = null;
-      this.createStreamedAudio = deps.createStreamedAudio || null;
-      this._streamSupported = false;
-      this._slowEngine = false;
-      this._weakPcState = { saved: false };
-      this._overload = createVoiceOverloadState();
-      this._synthInFlight = 0;
-      this.lightSpeaker = deps.lightSpeaker === void 0 ? createLightSpeaker() : deps.lightSpeaker;
-      this.lightVoiceSetting = "auto";
-      this._lightProbeAt = 0;
-      this._lightFailStreak = 0;
-      this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
-      this.resolveVoice = deps.resolveVoice;
-      this.enabled = false;
-      this.readNameEnabled = false;
-      this.ngKeys = /* @__PURE__ */ new Set();
-      this.toggleBusy = false;
-      this.styleIds = [];
-      this.assignments = {};
-      this.queue = [];
-      this.prefetches = /* @__PURE__ */ new Map();
-      this.playing = false;
-      this.generation = 0;
-      this.stopCurrent = null;
-      this.skipTimer = null;
-      this.onDiag = deps.onDiag || (() => {
-      });
-      this._serviceTimeEmaMs = -1;
-      this._paceState = createVoicePaceState();
-      this._effectiveQueueMax = 8;
-      this._growStreak = 0;
-      this._synthWaitEmaMs = -1;
-      this._playPrepEmaMs = -1;
-      this._playbackEmaMs = -1;
-      this._expectedPlayEmaMs = -1;
-      this._arrivalWindowState = null;
-      this._dropCountGateTotal = 0;
-      this._dropHeadStaleTotal = 0;
-      this._dropSweepStaleTotal = 0;
-      this._voicedRecentRatioEma = -1;
-      this._capLagTicks = 0;
-      this._diagBornAt = Date.now();
-      this._spokenSampleCount = 0;
-      this.diag = {
-        enabled: false,
-        queueNow: 0,
-        queueMax: 0,
-        spokenTotal: 0,
-        staleDropTotal: 0,
-        playbackTimeoutTotal: 0,
-        lastSpokenBase: 0,
-        lastSynthMs: -1,
-        lastDepth: 0,
-        lastSpeedBoost: 0,
-        lastPhase: "",
-        lastPhaseAt: 0,
-        // v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 「到着→発声」の体感遅延。
-        //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
-        //   mergeTotal=mergeRepeatedVoiceItem で吸収した累計(統合が効いているかの計器)。
-        lastE2eMs: -1,
-        e2eAvgMs: -1,
-        mergeTotal: 0,
-        // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
-        //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
-        //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
-        //   飽和した回数、voicedRatio=spokenTotal/(spokenTotal+staleDropTotal)(生存者バイアスの緑を潰す指標)。
-        serviceTimeEmaMs: -1,
-        effectiveQueueMax: 8,
-        rateClampTotal: 0,
-        voicedRatio: -1,
-        // 2026-07-28計器(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md):
-        //   serviceTimeの3分解(合成待ち/準備待ち/実再生/期待再生時間)+drop原因の分別+需要/供給+判定。
-        synthWaitEmaMs: -1,
-        playPrepEmaMs: -1,
-        playbackEmaMs: -1,
-        expectedPlayEmaMs: -1,
-        arrivalPerMin: -1,
-        voicedRecentRatio: -1,
-        // v0.1.1222計器: 持続過負荷ブースト(pressure由来)。lastSustainedBoost=直近の上乗せ値、
-        //   sustainedBoostTotal=キュー長では出せない速度を実際に足した累計。
-        //   ★「速くしたのに読める数が増えたか」を後から検算するための計器(効果の裏取り用)。
-        lastSustainedBoost: 0,
-        sustainedBoostTotal: 0,
-        lastBacklogBoost: 0,
-        lastPaceFloor: 0,
-        queueMaxByChars: 0,
-        dropCountGateTotal: 0,
-        dropHeadStaleTotal: 0,
-        dropSweepStaleTotal: 0,
-        // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
-        //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
-        //   乗っていない**帳尻の穴が見つかった。真犯人は下の !wav 分岐が spokenTotal も drop も
-        //   増やさずに continue していたこと(voicevoxClient は 8000ms タイムアウトで null を返す)。
-        //   これが無いと「なぜ読まれないか」が原理的に分からない。
-        synthNullTotal: 0,
-        synthNullNearTimeout: 0,
-        // v0.1.1224計器: 合成失敗の【理由別】内訳。従来は6通りの失敗が全部 null に畳まれ、
-        //   実配信の「合成失敗17件(その他16)」の正体を誰も答えられなかった。
-        //   原因ごとに打つ手が正反対(接続不能=拡張では直せない / HTTP拒否=絞れば直る)。
-        synthFailReasons: {},
-        upstreamEmaMs: -1,
-        lastUpstreamMs: -1,
-        queueWaitEmaMs: -1,
-        engineWaitEmaMs: -1,
-        audioQueryEmaMs: -1,
-        synthesisEmaMs: -1,
-        warmSynthEmaMs: -1,
-        coldSynthTotal: 0,
-        coldSynthMaxMs: 0,
-        lastColdSynthMs: -1,
-        speakerInitTotal: 0,
-        speakerInitMaxMs: 0,
-        voiceBorrowTotal: 0,
-        e2eSampleTotal: 0,
-        e2eSumMsTotal: 0,
-        e2eMaxMs: 0,
-        bgInitTotal: 0,
-        bgInitMaxMs: 0,
-        bgInitYieldTotal: 0,
-        readerYieldTotal: 0,
-        streamTotal: 0,
-        streamFirstAudioEmaMs: -1,
-        warmSynthSamples: 0,
-        contendedSynthTotal: 0,
-        warmSynthRtfPermille: -1,
-        warmRtfSamples: 0,
-        playCheckedTotal: 0,
-        playCutShortTotal: 0,
-        playStallTotal: 0,
-        streamUnderrunTotal: 0,
-        streamUnderrunMaxMs: 0,
-        playErrorAfterStartTotal: 0,
-        clipItemTotal: 0,
-        quietItemTotal: 0,
-        streamGainDropTotal: 0,
-        outPeakEmaPermille: -1,
-        outRmsDbMin: 999,
-        outRmsDbMax: -999,
-        lastOutRmsDb: 0,
-        lastPlayIssue: "",
-        venueGate: "",
-        lagVerdict: "",
-        diagBornAt: this._diagBornAt
-      };
-      this._synthTracker = createVoiceSynthTracker();
-      this.volumePercent = VOICE_VOLUME_DEFAULT;
-      this.storageOnChanged = deps.storageOnChanged || null;
-    }
-    _emitDiag() {
-      this.diag.enabled = this.enabled;
-      this.diag.queueNow = this.queue.length;
-      if (this.queue.length > this.diag.queueMax) this.diag.queueMax = this.queue.length;
-      try {
-        this.onDiag(this.diag);
-      } catch {
-      }
-    }
-    // ★v0.1.1506: キー文字列の正本は voiceKeys.js。getter の【形は残し】戻り値だけ委譲する
-    //   (comeview-entry.js と二重定義になっていた。片方だけ直す事故を構造的に無くす)。
-    get VOICE_READING_ENABLED_KEY() {
-      return KEY_VOICE_READING_ENABLED;
-    }
-    get VOICE_ASSIGNMENTS_KEY() {
-      return KEY_VOICE_ASSIGNMENTS;
-    }
-    get VOICE_READ_NAME_KEY() {
-      return KEY_VOICE_READ_NAME_ENABLED;
-    }
-    /**
-     * @param {{ forceOn?: boolean }} [opts]
-     *   forceOn=true なら保存状態に関わらず読み上げを自動 ON にする(会場モードを開いたら
-     *   「いきなり読み上げ上がる」ユーザー期待のため。comeview の ?voice=1 相当)。
-     *   このとき persist:true で storage にも ON を残し、以後も復元される。
-     */
-    async initialize(opts = {}) {
-      if (this.isObsMode()) return;
-      let bag = {};
-      try {
-        if (this.storage) {
-          bag = await this.storage.get([
-            this.VOICE_READING_ENABLED_KEY,
-            this.VOICE_ASSIGNMENTS_KEY,
-            this.VOICE_READ_NAME_KEY,
-            KEY_VOICE_VOLUME_PERCENT,
-            COMEVIEW_NG_STORAGE_KEY
-          ]);
-        }
-      } catch {
-        bag = {};
-      }
-      const rawAssignments = bag[this.VOICE_ASSIGNMENTS_KEY];
-      this.assignments = !rawAssignments || typeof rawAssignments !== "object" || Array.isArray(rawAssignments) ? {} : rawAssignments;
-      this.readNameEnabled = bag[this.VOICE_READ_NAME_KEY] === true;
-      this.volumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
-      this.ngKeys = voiceNgKeySet(bag[COMEVIEW_NG_STORAGE_KEY]);
-      this._watchVolumeSetting();
-      this._emitToggle();
-      const forceOn = opts.forceOn === true;
-      if (forceOn || bag[this.VOICE_READING_ENABLED_KEY] === true) {
-        await this.enable({ persist: forceOn });
-      }
-    }
-    /** ポップアップで音量が変わったら、次に鳴らす声から反映する(1回だけ購読)。コメビュの NG の変更も同じ口で拾う。 */
-    _watchVolumeSetting() {
-      const ev = this.storageOnChanged;
-      if (this._volumeWatched || !ev || typeof ev.addListener !== "function") return;
-      this._volumeWatched = true;
-      try {
-        ev.addListener((changes, areaName) => {
-          if (areaName && areaName !== "local") return;
-          const c = changes && changes[KEY_VOICE_VOLUME_PERCENT];
-          if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
-          const ng = changes && changes[COMEVIEW_NG_STORAGE_KEY];
-          if (ng) this.ngKeys = voiceNgKeySet(ng.newValue);
-        });
-      } catch {
-      }
-    }
-    _emitToggle() {
-      this.onToggle(this.enabled, this.readNameEnabled, this.toggleBusy);
-    }
-    _showSkipped(count) {
-      if (count <= 0) return;
-      this.onSkip(count);
-    }
-    /**
-     * v0.1.799: item が【鳴らずに捨てられた】(stale/件数drop/合成失敗/flush/stop/merge)ときだけ
-     *   呼ぶ drop 専用シグナル。再生パスでは絶対に呼ばない(=onAudioStart と排他)。吹き出し側は
-     *   これを resolved として受け、pending→unvoiced に落として流速寿命で消す(床いっぱい残さない)。
-     *   onPlayStart(再生・破棄の両方で発火する曖昧な「消費」信号)は後方互換でそのまま残す。
-     * @param {{ onDropped?: Function }} item
-     */
-    _notifyDropped(item) {
-      if (item && typeof item.onDropped === "function") {
-        try {
-          item.onDropped();
-        } catch {
-        }
-      }
-    }
-    stop() {
-      const dropped = this.queue;
-      this.queue = [];
-      this.generation += 1;
-      this.prefetches.clear();
-      for (const item of dropped) this._notifyDropped(item);
-      if (typeof this.stopCurrent === "function") this.stopCurrent();
-      this.stopCurrent = null;
-      this._updateLagNotice();
-    }
-    /**
-     * v0.1.773 長時間ラグ対策: 待機中のキューだけを破棄して「今」へリセットする。
-     *   再生中の1本は止めない(stop と違い不協和を出さない)。タブが裏に回って drain が
-     *   スロットリングされ溜まった backlog を、可視復帰時に一掃して定常ラグの蓄積を断つ。
-     *   破棄した item には onPlayStart(=消費=resolved)を通知し、吹き出し側の状態整合を保つ。
-     * @returns {number} 破棄した件数
-     */
-    flushPendingQueue() {
-      const dropped = this.queue;
-      this.queue = [];
-      this.prefetches.clear();
-      for (const item of dropped) {
-        if (item && typeof item.onPlayStart === "function") item.onPlayStart();
-        this._notifyDropped(item);
-      }
-      if (dropped.length > 0) this._showSkipped(dropped.length);
-      return dropped.length;
-    }
-    disable({ persist = true } = {}) {
-      this.enabled = false;
-      this.toggleBusy = false;
-      this.stop();
-      this.onLoadingState("idle");
-      this._emitToggle();
-      if (persist && this.storage) {
-        this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: false }).catch(() => {
-        });
-      }
-    }
-    /**
-     * ★v0.1.1327: クリックの「ユーザー操作」を【その場で】使って音声を解錠する。
-     *
-     * ■ なぜ要るか(ユーザー実機「一瞬ONになって戻ってしまう」)
-     *   Chrome は自動再生をブロックし、`audio.play()` は【ユーザー操作の延長】でしか
-     *   通らない。ところが enable() は
-     *     クリック → (生存確認 最大3回+バックオフ) → スタイル取得 → …数百ms〜数秒…
-     *     → 最初のコメント到着 → 合成 → ようやく audio.play()
-     *   という流れで、実際に鳴らす時点では**クリックから遠く離れている**。
-     *   すると NotAllowedError になり、再生パス(:612-617)が disable() を呼ぶため
-     *   「ONになった直後にOFFへ戻る」ように見えていた。
-     *   ★comeview(拡張ページ)は制約が緩く、会場(content script)だけで出る非対称の正体。
-     *
-     * ■ 何をするか
-     *   クリック直後の同期タイミングで、無音の短い音を1回 play() しておく。
-     *   これが通れば以後の play() は解錠済みとして扱われる(標準的な audio unlock 手法)。
-     *   失敗しても握りつぶす=従来どおり進む(悪化させない)。
-     *
-     * @returns {Promise<boolean>} 解錠できたか(できなくても enable は続行する)
-     */
-    async primeAudioUnlock() {
-      const Ctor = this.unlockAudioConstructor;
-      if (typeof Ctor !== "function") return false;
-      try {
-        const a = new Ctor();
-        a.src = SILENT_WAV_DATA_URI;
-        a.volume = 0;
-        const p = a.play();
-        if (p && typeof p.then === "function") await p;
-        try {
-          a.pause();
-        } catch {
-        }
-        this._audioUnlocked = true;
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    async enable({ persist = true } = {}) {
-      if (this.isObsMode() || this.toggleBusy) return;
-      this.toggleBusy = true;
-      this._emitToggle();
-      await this.primeAudioUnlock();
-      this.onLoadingState("checking");
-      let probe = await this.probeVoicevoxAlive();
-      if (!probe.ok) {
-        this.onLoadingState("connecting");
-        for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
-          if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
-          probe = await this.probeVoicevoxAlive();
-          if (probe.ok) break;
-        }
-      }
-      if (!probe.ok) {
-        this.diag.lastEnableFailReason = String(probe.reason || "unknown");
-        this.diag.enableFailTotal = (Number(this.diag.enableFailTotal) || 0) + 1;
-        this._emitDiag();
-        this.disable({ persist: false });
-        this.onLoadingState("notfound", probe.reason);
-        this.toggleBusy = false;
-        this._emitToggle();
-        return;
-      }
-      const allStyleIds = await this.fetchVoiceStyleIds();
-      startVoiceWarmup(this.voiceWarmup, allStyleIds);
-      this._synthTracker.reset();
-      resetVoiceWarmMeasure(this.diag);
-      this._streamSupported = false;
-      if (this.probeVoiceStreaming && this.createStreamedAudio) {
-        void Promise.resolve().then(() => this.probeVoiceStreaming()).then((ok) => {
-          this._streamSupported = ok === true;
-        }, () => {
-        });
-      }
-      this._gpuCapable = null;
-      if (this.probeVoiceGpu) {
-        void Promise.resolve().then(() => this.probeVoiceGpu()).then((ok) => {
-          this._gpuCapable = typeof ok === "boolean" ? ok : null;
-        }, () => {
-        });
-      }
-      const prepared = await prepareVoiceStyleIds(allStyleIds, {
-        readSettings: async () => {
-          const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
-          this._slowEngine = b[KEY_VOICE_WEAK_PC] === true;
-          return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
-        },
-        initSpeaker: this.initVoiceSpeaker
-      });
-      this.styleIds = prepared.styleIds;
-      this.diag.voiceNarrowed = prepared.narrowed;
-      this.generation += 1;
-      this.enabled = true;
-      this.diag.lastEnableFailReason = "";
-      this._emitDiag();
-      this.toggleBusy = false;
-      this.onLoadingState("ready");
-      this._emitToggle();
-      if (persist && this.storage) {
-        this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: true }).catch(() => {
-        });
-      }
-    }
-    _voiceUserKeyForItem(item) {
-      const userId = String(item?.userId || "").trim();
-      const name = String(item?.nickname || "").trim();
-      const key = String(item?.userKey || item?.key || "").trim();
-      return userId || key || name || "anon";
-    }
-    /**
-     * v0.1.1800: 待っている件+新しい件の文字数から件数の上限を見積もる(voiceLagBudget.resolveVoiceQueueMaxByChars)。
-     * @param {object} candidate
-     * @returns {number}
-     */
-    _resolveQueueMaxByChars(candidate) {
-      try {
-        const maxChars = computeVoiceCongestion(this.queue.length + 1).maxChars;
-        const counts = [...this.queue, candidate].map((it) => buildMergedVoiceText(it, { maxChars }).length);
-        const rtfSamples = Number(this.diag.warmRtfSamples) || 0;
-        const rtfPermille = Number(this.diag.warmSynthRtfPermille);
-        const synthRtf = rtfSamples >= 3 && rtfPermille > 0 ? rtfPermille / 1e3 : 0;
-        const byChars = resolveVoiceQueueMaxByChars(counts, this._paceState, synthRtf);
-        if (byChars == null) return this._effectiveQueueMax;
-        this.diag.queueMaxByChars = byChars;
-        return byChars;
-      } catch {
-        return this._effectiveQueueMax;
-      }
-    }
-    /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ）。 */
-    _ensurePrefetch(item, generation) {
-      if (!item || generation !== this.generation) return null;
-      const existing = this.prefetches.get(item);
-      if (existing && existing.generation === generation) return existing.promise;
-      const congestion = computeVoiceCongestion(this.queue.length);
-      const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
-      const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
-      const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) });
-      if (!this._slowEngine && isWeakVoicePc(this.diag)) this._slowEngine = true;
-      const stream = shouldStreamVoice({
-        supported: this._streamSupported,
-        idle: this.queue[0] === item && !this.stopCurrent,
-        slowEngine: this._slowEngine,
-        textLength: text.length
-      });
-      const promise = this._synthesizeTracked(
-        text,
-        {
-          ...assigned,
-          speedOffset: assigned.speedOffset + effBoost
-        },
-        { stream }
-      ).catch(() => null);
-      this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length });
-      return promise;
-    }
-    /**
-     * v0.1.1224: 合成失敗の理由を1件記録する。voicevoxClient の onFailure から呼ばれる。
-     * @param {{ stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }} info
-     */
-    /**
-     * 合成を依頼し、段階計測(エンジン待ち・audio_query/synthesis・初めての声)を diag へ記録する。
-     * 戻り値・例外は fetchSynthesizeVoice と同じ(計器は読み上げの挙動を変えない)。
-     * @param {string} text
-     * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
-     * @param {{ stream?: boolean }} [extra]
-     */
-    _synthesizeTracked(text, voice, extra = {}) {
-      const track = this._synthTracker.begin(voice?.styleId);
-      let timing = {};
-      let timedOut = false;
-      const startedAt = Date.now();
-      const overloadTimeouts = resolveVoiceOverloadTimeouts(this._overload.overloaded);
-      this._synthInFlight += 1;
-      let settled = false;
-      const settle = () => {
-        if (!settled) {
-          settled = true;
-          this._synthInFlight = Math.max(0, this._synthInFlight - 1);
-        }
-      };
-      let started;
-      try {
-        started = this.fetchSynthesizeVoice(text, voice, {
-          ...overloadTimeouts,
-          onFailure: (info) => {
-            const reason = this._recordSynthFailureReason(info);
-            if (reason === "timeout" || reason === "query_timeout") timedOut = true;
-          },
-          onTiming: (t) => {
-            timing = t || {};
-          },
-          ...extra.stream === true ? { stream: true } : {}
-        });
-      } catch (err) {
-        started = Promise.reject(err);
-      }
-      return Promise.resolve(started).then(
-        (wav) => {
-          settle();
-          let r = null;
-          try {
-            r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav);
-            recordVoiceSynthStage(this.diag, r);
-          } catch {
-          }
-          this._noteOverload({ timedOut, ok: !!wav, totalMs: Date.now() - startedAt });
-          const judge = () => {
-            if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
-            if (this.storage) {
-              forgetWeakVoicePcIfFast(this.diag, this._weakPcState, () => {
-                this._slowEngine = false;
-                return this.storage.set({ [KEY_VOICE_WEAK_PC]: false });
-              });
-            }
-          };
-          judge();
-          if (r && isStreamedVoice(wav)) void recordVoiceStreamDone(this.diag, r, wav, () => Date.now(), judge);
-          return wav;
-        },
-        (err) => {
-          settle();
-          try {
-            track.end(timing, false);
-          } catch {
-          }
-          this._noteOverload({ timedOut, ok: false });
-          throw err;
-        }
-      );
-    }
-    _recordSynthFailureReason(info) {
-      try {
-        const reason = classifyVoiceSynthFailureReason(info);
-        const bag = this.diag.synthFailReasons || (this.diag.synthFailReasons = {});
-        bag[reason] = (Number(bag[reason]) || 0) + 1;
-        return reason;
-      } catch {
-      }
-      return "";
-    }
-    /**
-     * 2026-10-31: 合成1件の結果から「エンジン混雑中」を更新し、計器に出す(状態速報で見える)。
-     * @param {{ timedOut?: boolean, ok?: boolean, totalMs?: number }} outcome
-     */
-    _noteOverload(outcome) {
-      try {
-        const was = this._overload.overloaded;
-        const now = noteVoiceSynthOutcome(this._overload, outcome);
-        this.diag.voiceOverloaded = now;
-        if (now && !was) this.diag.voiceOverloadTotal = (Number(this.diag.voiceOverloadTotal) || 0) + 1;
-      } catch {
-      }
-    }
-    /**
-     * v0.1.1222: 実際に適用する speedBoost を決める(既存の混雑ブースト ∪ 持続過負荷ブースト)。
-     *
-     * 【なぜ要るか】混雑ブーストは【絶対キュー長】依存(5件で0.5・8件で0.8)だが、実効上限が
-     *   処理時間EMAから3まで絞られると**キューは構造的に5件へ到達できない**=上位2段が
-     *   永久に発火しない。結果「速く読んで消化する」より「入口で捨てる」に倒れていた
-     *   (2026-08-01 実測: 需要102.3/分 vs 供給39.6/分・間引き88件・判定=playback・実効上限3)。
-     *   pressure はキュー長に依らず過負荷を検出できるので、この穴だけを埋める。
-     *
-     * ★上げるだけ(mergeVoiceSpeedBoost が max を取る)なので、既存の速さを下回らせない。
-     * @param {number} congestionBoost 既存の混雑由来ブースト
-     * @returns {number}
-     */
-    _resolveEffectiveSpeedBoost(congestionBoost) {
-      const sustained = computeSustainedPressureBoost({
-        arrivalPerMin: this.diag?.arrivalPerMin,
-        serviceTimeEmaMs: this._serviceTimeEmaMs,
-        sampleCount: this._spokenSampleCount
-      });
-      const paceFloor = computeVoicePaceFloor(this._paceState);
-      const backlog = computeBacklogCatchUpBoost(this.diag?.queueWaitEmaMs, paceFloor);
-      this.diag.lastPaceFloor = paceFloor;
-      this.diag.lastBacklogBoost = backlog;
-      const merged = mergeVoiceSpeedBoost(congestionBoost, Math.max(sustained, backlog));
-      if (sustained > 0 && merged > congestionBoost) {
-        this.diag.sustainedBoostTotal = (Number(this.diag.sustainedBoostTotal) || 0) + 1;
-      }
-      this.diag.lastSustainedBoost = sustained;
-      return merged;
-    }
-    /**
-     * v0.1.768: 先頭から深さ分(最大3)の item を先行合成する。
-     *   再生中に N+1 だけでなく N+2/N+3 も貯めることで、フラッド時に合成を遊ばせない。
-     *   深さは詰まり具合(resolveVoiceSynthDepth)で動的=落ち着いていれば1=無駄打ちしない。
-     *   先読みした item が後で stale 破棄されても、再生直前に必ず age-gate を通すので無駄打ちは回収。
-     */
-    _startPrefetch(generation) {
-      if (generation !== this.generation) {
-        this.prefetches.clear();
-        return;
-      }
-      if (this._useLightVoice()) {
-        this._maybeProbeVoicevox();
-        return;
-      }
-      const depth = capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
-        pending: this.queue.length
-      }), this._overload.overloaded);
-      this.diag.lastDepth = depth;
-      const wanted = /* @__PURE__ */ new Set();
-      for (let i = 0; i < depth && i < this.queue.length; i++) {
-        const item = this.queue[i];
-        if (!item) continue;
-        if (this._overload.overloaded && this._synthInFlight > 0 && !this.prefetches.has(item)) continue;
-        wanted.add(item);
-        this._ensurePrefetch(item, generation);
-      }
-      for (const key of this.prefetches.keys()) {
-        if (!wanted.has(key)) this.prefetches.delete(key);
-      }
-    }
-    /**
-     * 2026-11-03: VOICEVOX が混雑中(時間切れが続いた)なら、合成を頼み済みの件を守る判定を返す。
-     *   混雑していなければ null(=従来どおり件数・鮮度で捨てる)。
-     * @returns {((x: any) => boolean) | null}
-     */
-    _inflightKeeper() {
-      if (!this._overload.overloaded) return null;
-      return (x) => this.prefetches.has(x);
-    }
-    /** 2026-11-03: 今、軽い声で読むか(VOICEVOX が混雑中で、軽い声が使えるときだけ)。 */
-    _useLightVoice() {
-      let available = false;
-      try {
-        available = !!this.lightSpeaker && this._lightFailStreak < 3 && this.lightSpeaker.available();
-      } catch {
-        available = false;
-      }
-      const on = shouldUseLightVoice({ overloaded: this._overload.overloaded, available, setting: this.lightVoiceSetting });
-      this.diag.lightVoiceActive = on;
-      return on;
-    }
-    /** 軽い声で読んでいる間、ときどき VOICEVOX に短い文を頼んで速さを確かめる(速ければ混雑が解けて戻る)。 */
-    _maybeProbeVoicevox() {
-      const nowMs = Date.now();
-      if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) return;
-      this._lightProbeAt = nowMs;
-      try {
-        const voice = this.resolveVoice("", this.assignments, this.styleIds);
-        void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).catch(() => null);
-      } catch {
-      }
-    }
-    /**
-     * 2026-11-03: 1件を軽い声で読む。人ごとの声(どの声・高さ・速さ)は voiceLightFallback.lightVoiceToneFor。
-     * @param {any} item
-     * @param {number} generation
-     */
-    async _playLight(item, generation) {
-      this._maybeProbeVoicevox();
-      const text = buildMergedVoiceText(item, { maxChars: LIGHT_VOICE_MAX_CHARS });
-      const speaker = this.lightSpeaker;
-      let started = false;
-      if (text && speaker) {
-        const tone = lightVoiceToneFor(String(item.userKey || ""), speaker.voices().length);
-        this.stopCurrent = () => speaker.cancel();
-        try {
-          started = await speaker.speak(text, tone, {
-            onStart: () => {
-              if (typeof item.onAudioStart === "function") item.onAudioStart();
-            }
-          });
-        } catch {
-          started = false;
-        }
-        this.stopCurrent = null;
-      }
-      if (started && typeof item.onAudioEnd === "function") item.onAudioEnd();
-      if (typeof item.onPlayStart === "function") item.onPlayStart();
-      if (text && speaker) this._lightFailStreak = started ? 0 : this._lightFailStreak + 1;
-      if (!started || generation !== this.generation) {
-        this._notifyDropped(item);
-        return;
-      }
-      this.diag.spokenTotal += 1;
-      this.diag.lightSpokenTotal = (Number(this.diag.lightSpokenTotal) || 0) + 1;
-      this.diag.lastSpokenBase = Date.now();
-      const denom = this.diag.spokenTotal + this.diag.staleDropTotal;
-      this.diag.voicedRatio = denom > 0 ? this.diag.spokenTotal / denom : -1;
-      this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
-      this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
-      this._emitDiag();
-      this._updateLagNotice();
-    }
-    async _drainQueue() {
-      if (this.playing || !this.enabled || this.isObsMode()) return;
-      this.playing = true;
-      try {
-        while (this.enabled && this.queue.length) {
-          const now = Date.now();
-          let allStale = true;
-          for (const qItem of this.queue) {
-            if (!isVoiceItemStale(qItem.enqueuedAt, now, this.queue.length, qItem.priority === "high").stale) {
-              allStale = false;
-              break;
-            }
-          }
-          if (allStale && this.queue.length > 0) {
-            const newest = this.queue[this.queue.length - 1];
-            const keepInflight2 = this._inflightKeeper();
-            const survivors = this.queue.filter((q) => q === newest || (keepInflight2 ? keepInflight2(q) : false));
-            const dropped = this.queue.filter((q) => !survivors.includes(q));
-            for (const d of dropped) {
-              if (typeof d.onPlayStart === "function") d.onPlayStart();
-              this._notifyDropped(d);
-            }
-            this.queue = survivors;
-            if (dropped.length > 0) {
-              this._showSkipped(dropped.length);
-              this.diag.staleDropTotal += dropped.length;
-              this._dropSweepStaleTotal += dropped.length;
-              this.diag.dropSweepStaleTotal = this._dropSweepStaleTotal;
-              for (let _i = 0; _i < dropped.length; _i += 1) {
-                this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
-              }
-              this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
-              this._emitDiag();
-            }
-          }
-          const queueLength = this.queue.length;
-          const generation = this.generation;
-          this._startPrefetch(generation);
-          const item = this.queue.shift();
-          if (!item) continue;
-          const _serviceStart = Date.now();
-          foldVoiceStageEma(this.diag, "queueWaitEmaMs", measureVoiceGapMs(item.enqueuedAt, _serviceStart));
-          const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === "high");
-          const keepInflight = this._inflightKeeper();
-          const keepAnyway = !!keepInflight && (keepInflight(item) || this.queue.length === 0);
-          if (ageCheck.stale && !keepAnyway) {
-            if (typeof item.onPlayStart === "function") item.onPlayStart();
-            this._notifyDropped(item);
-            this._showSkipped(1);
-            this.diag.staleDropTotal += 1;
-            this._dropHeadStaleTotal += 1;
-            this.diag.dropHeadStaleTotal = this._dropHeadStaleTotal;
-            this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
-            this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
-            this._emitDiag();
-            this.prefetches.delete(item);
-            continue;
-          }
-          if (this._useLightVoice() && !this.prefetches.has(item)) {
-            await this._playLight(item, generation);
-            continue;
-          }
-          const congestion = computeVoiceCongestion(queueLength);
-          const effBoostNow = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
-          const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
-          const pf = this.prefetches.get(item);
-          this.prefetches.delete(item);
-          const boostAtSynth = pf ? pf.boostAtSynth : effBoostNow;
-          const inlineText = pf ? "" : buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) });
-          const spokenChars = pf ? Number(pf.textLength) || 0 : inlineText.length;
-          const _synthStart = Date.now();
-          const wav = pf ? await pf.promise : await this._synthesizeTracked(
-            inlineText,
-            {
-              ...assigned,
-              speedOffset: assigned.speedOffset + effBoostNow
-            }
-          );
-          this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
-          this.diag.lastSpeedBoost = effBoostNow;
-          this._synthWaitEmaMs = updateVoiceServiceTimeEma(this._synthWaitEmaMs, this.diag.lastSynthMs);
-          this.diag.synthWaitEmaMs = this._synthWaitEmaMs;
-          if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
-            if (isStreamedVoice(wav)) wav.cancel();
-            if (!wav) {
-              this.diag.synthNullTotal += 1;
-              const failure = classifyVoiceSynthNull({ synthMs: this.diag.lastSynthMs });
-              if (failure.nearTimeout) this.diag.synthNullNearTimeout += 1;
-            }
-            if (typeof item.onPlayStart === "function") item.onPlayStart();
-            this._notifyDropped(item);
-            continue;
-          }
-          this._startPrefetch(generation);
-          let objectUrl = "";
-          try {
-            const streamedAudio = isStreamedVoice(wav) && this.createStreamedAudio ? this.createStreamedAudio(wav, this.volumePercent) : null;
-            let audio = streamedAudio;
-            let wholeLevel = null;
-            if (!audio) {
-              const whole = isStreamedVoice(wav) ? (await wav.whenDone, wav.toWav()) : wav;
-              const loud = applyVoiceVolumeToWav(whole, this.volumePercent);
-              wholeLevel = measureVoiceWavLevel(loud);
-              const blob = new Blob([loud], { type: "audio/wav" });
-              objectUrl = this.createObjectURL(blob);
-              const AudioCtor = this.audioConstructor;
-              audio = new AudioCtor(objectUrl);
-            }
-            const boostNow = this._resolveEffectiveSpeedBoost(
-              computeVoiceCongestion(this.queue.length).speedBoost
-            );
-            const playbackRate = streamedAudio ? 1 : computeVoicePlaybackRate(boostAtSynth, boostNow);
-            if (playbackRate !== 1) {
-              audio.preservesPitch = true;
-              audio.playbackRate = playbackRate;
-            }
-            observeVoicePlayback(audio, {
-              diag: this.diag,
-              playbackRate,
-              outPeak: wholeLevel ? wholeLevel.peak : -1,
-              outRms: wholeLevel ? wholeLevel.rms : -1,
-              targetPeak: voiceTargetPeak(this.volumePercent),
-              onRecorded: () => this._emitDiag()
-            });
-            if (playbackRate >= VOICE_PLAYBACK_RATE_MAX) this.diag.rateClampTotal += 1;
-            const _prepStart = Date.now();
-            let _playbackStartAt = -1;
-            try {
-              audio.addEventListener("playing", () => {
-                try {
-                  const prepMs = Math.max(0, Date.now() - _prepStart);
-                  this._playPrepEmaMs = updateVoiceServiceTimeEma(this._playPrepEmaMs, prepMs);
-                  this.diag.playPrepEmaMs = this._playPrepEmaMs;
-                  _playbackStartAt = Date.now();
-                  const durationSec = Number(audio.duration);
-                  if (Number.isFinite(durationSec) && durationSec > 0) {
-                    const expectedMs = durationSec * 1e3 / (Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1);
-                    this._expectedPlayEmaMs = updateVoiceServiceTimeEma(this._expectedPlayEmaMs, expectedMs);
-                    this.diag.expectedPlayEmaMs = this._expectedPlayEmaMs;
-                  }
-                } catch {
-                }
-              }, { once: true });
-            } catch {
-            }
-            await new Promise((resolve) => {
-              let settled = false;
-              const _watchdog = setTimeout(() => {
-                this.diag.playbackTimeoutTotal += 1;
-                finish();
-              }, 2e4);
-              const finish = () => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(_watchdog);
-                audio.removeEventListener("ended", finish);
-                audio.removeEventListener("error", finish);
-                if (objectUrl) this.revokeObjectURL(objectUrl);
-                objectUrl = "";
-                this.stopCurrent = null;
-                if (_playbackStartAt > 0) {
-                  try {
-                    const playbackMs = Math.max(0, Date.now() - _playbackStartAt);
-                    this._playbackEmaMs = updateVoiceServiceTimeEma(this._playbackEmaMs, playbackMs);
-                    this.diag.playbackEmaMs = this._playbackEmaMs;
-                    noteVoicePacePlayed(this._paceState, playbackMs, playbackRate, boostAtSynth, spokenChars);
-                  } catch {
-                  }
-                }
-                if (typeof item.onAudioEnd === "function") item.onAudioEnd();
-                resolve();
-              };
-              this.stopCurrent = () => {
-                try {
-                  audio.pause();
-                } catch {
-                }
-                finish();
-              };
-              audio.addEventListener("ended", finish, { once: true });
-              audio.addEventListener("error", finish, { once: true });
-              try {
-                const playResult = audio.play();
-                if (typeof item.onPlayStart === "function") item.onPlayStart();
-                const _enqueuedAt = Number(item.enqueuedAt);
-                if (Number.isFinite(_enqueuedAt) && _enqueuedAt > 0) {
-                  const e2e = Math.max(0, Date.now() - _enqueuedAt);
-                  this.diag.lastE2eMs = e2e;
-                  this.diag.e2eAvgMs = computeVoiceE2eAverage(this.diag.e2eAvgMs, e2e);
-                  recordVoiceE2eSample(this.diag, e2e);
-                }
-                this._updateLagNotice();
-                if (typeof item.onAudioStart === "function") item.onAudioStart();
-                if (playResult && typeof playResult.catch === "function") {
-                  playResult.catch((err) => {
-                    if (err && err.name === "NotAllowedError") {
-                      this.diag.audioBlockedTotal = (Number(this.diag.audioBlockedTotal) || 0) + 1;
-                      this.onStatus("⚠️ブラウザが音声をブロックしています。ページのどこかを一度クリックすると鳴ります");
-                    }
-                    finish();
-                  });
-                }
-              } catch {
-                finish();
-              }
-            });
-          } catch {
-            if (typeof item.onPlayStart === "function") item.onPlayStart();
-            this._notifyDropped(item);
-            if (objectUrl) this.revokeObjectURL(objectUrl);
-          }
-          this.diag.spokenTotal += 1;
-          this.diag.lastSpokenBase = Date.now();
-          this._spokenSampleCount += 1;
-          this._serviceTimeEmaMs = updateVoiceServiceTimeEma(this._serviceTimeEmaMs, Date.now() - _serviceStart);
-          const _computedMax = resolveVoiceQueueMax(this._serviceTimeEmaMs);
-          const _step = stepVoiceQueueMax(this._effectiveQueueMax, _computedMax, this._growStreak);
-          this._effectiveQueueMax = _step.nextMax;
-          this._growStreak = _step.nextGrowStreak;
-          this.diag.serviceTimeEmaMs = this._serviceTimeEmaMs;
-          this.diag.effectiveQueueMax = this._effectiveQueueMax;
-          const _voicedDenom = this.diag.spokenTotal + this.diag.staleDropTotal;
-          this.diag.voicedRatio = _voicedDenom > 0 ? this.diag.spokenTotal / _voicedDenom : -1;
-          this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
-          this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
-          {
-            const _pressure = this.diag.arrivalPerMin > 0 && this._serviceTimeEmaMs > 0 ? this.diag.arrivalPerMin * this._serviceTimeEmaMs / 6e4 : -1;
-            this._capLagTicks = _pressure >= 0 && _pressure <= 1.2 && _computedMax - this._effectiveQueueMax >= 2 ? this._capLagTicks + 1 : 0;
-            this.diag.lagVerdict = computeVoiceLagVerdict({
-              serviceTimeEmaMs: this._serviceTimeEmaMs,
-              synthWaitEmaMs: this._synthWaitEmaMs,
-              expectedPlayEmaMs: this._expectedPlayEmaMs,
-              playbackEmaMs: this._playbackEmaMs,
-              arrivalPerMin: this.diag.arrivalPerMin,
-              effectiveQueueMax: this._effectiveQueueMax,
-              computedMax: _computedMax,
-              capLagTicks: this._capLagTicks,
-              sampleCount: this._spokenSampleCount
-            });
-          }
-          this._emitDiag();
-        }
-      } finally {
-        this.playing = false;
-        this._updateLagNotice();
-        if (this.enabled && this.queue.length) void this._drainQueue();
-      }
-    }
-    /** P5: 遅れの一言を出す/消す(状態が変わったときだけ通知)。 */
-    _updateLagNotice() {
-      this._updateGpuTip();
-      const r = decideVoiceLagNotice(this._lagNoticeShown, { ...this.diag, queueNow: this.queue.length }, { gpuCapable: this._gpuCapable });
-      if (r.shown === this._lagNoticeShown && !r.shown) return;
-      this._lagNoticeShown = r.shown;
-      try {
-        this.onLagNotice(r.text);
-      } catch {
-      }
-    }
-    /** 2026-11-01: GPU の案内を出す/消す(文言が変わったときだけ通知)。 */
-    _updateGpuTip() {
-      const text = this.enabled ? decideVoiceGpuTip(this.diag, this._gpuCapable) : "";
-      if (text === this._gpuTipText) return;
-      this._gpuTipText = text;
-      try {
-        this.onGpuTip(text);
-      } catch {
-      }
-    }
-    enqueue(items) {
-      if (!this.enabled || this.isObsMode() || !Array.isArray(items)) return;
-      let droppedCount = 0;
-      for (const item of items) {
-        if (!item || item.kind !== "comment" && item.kind !== "gift") continue;
-        if (isVoiceItemNgMuted(item, this.ngKeys)) {
-          this.diag.ngMutedTotal = (Number(this.diag.ngMutedTotal) || 0) + 1;
-          this._notifyDropped(item);
-          continue;
-        }
-        const name = this.readNameEnabled ? String(item.nickname || "").trim() : "";
-        let body = "";
-        let isHighPriority = false;
-        if (item.kind === "gift") {
-          isHighPriority = true;
-          const count = item.gift?.count > 1 ? `を${item.gift.count}個` : "を";
-          body = `ギフト、${item.gift?.name || "アイテム"}${count}贈りました。${item.gift?.message || ""}`.trim();
-        } else {
-          body = String(item.text || "").trim();
-        }
-        if (!buildVoiceReadingText({ name, text: body })) {
-          this._notifyDropped(item);
-          continue;
-        }
-        const _upstreamMs = measureVoiceGapMs(item.receivedAt, Date.now());
-        if (_upstreamMs >= 0) {
-          this.diag.lastUpstreamMs = _upstreamMs;
-          foldVoiceStageEma(this.diag, "upstreamEmaMs", _upstreamMs);
-        }
-        this._arrivalWindowState = foldVoiceArrivalWindow(this._arrivalWindowState, Date.now(), 1);
-        this.diag.arrivalPerMin = this._arrivalWindowState.arrivalPerMin;
-        const candidate = {
-          userKey: this._voiceUserKeyForItem(item),
-          name,
-          body,
-          count: 1,
-          enqueuedAt: Date.now(),
-          priority: isHighPriority ? "high" : "normal",
-          // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
-          onPlayStart: item.onPlayStart,
-          // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。
-          //   onAudioStart は audio.play() が実際に走ったときだけ・onAudioEnd は再生終了(ended/error/stop)時。
-          onAudioStart: item.onAudioStart,
-          onAudioEnd: item.onAudioEnd,
-          // v0.1.799: 鳴らず破棄された時だけ発火する drop 専用シグナル(再生では呼ばれない)。
-          onDropped: item.onDropped
-        };
-        this.diag.voiceEnqueuedTotal = (Number(this.diag.voiceEnqueuedTotal) || 0) + 1;
-        const merged = mergeRepeatedVoiceItem(this.queue, candidate);
-        this.queue = merged.queue;
-        if (merged.merged) {
-          this.diag.mergeTotal += 1;
-          if (typeof candidate.onPlayStart === "function") candidate.onPlayStart();
-          this._notifyDropped(candidate);
-          continue;
-        }
-        const queueMax = this._resolveQueueMaxByChars(candidate);
-        const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax, keep: this._inflightKeeper() });
-        this.queue = pushed.queue;
-        noteVoicePaceArrival(this._paceState, candidate.enqueuedAt);
-        if (pushed.dropped && pushed.dropped.length > 0) {
-          for (const dropped of pushed.dropped) {
-            if (typeof dropped.onPlayStart === "function") dropped.onPlayStart();
-            this._notifyDropped(dropped);
-          }
-          droppedCount += pushed.dropped.length;
-        }
-      }
-      if (droppedCount > 0) {
-        this._showSkipped(droppedCount);
-        this.diag.staleDropTotal += droppedCount;
-        this._dropCountGateTotal += droppedCount;
-        this.diag.dropCountGateTotal = this._dropCountGateTotal;
-        for (let _i = 0; _i < droppedCount; _i += 1) {
-          this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
-        }
-        this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
-      }
-      this._emitDiag();
-      if (this.enabled && !this.isObsMode() && this.queue.length) {
-        try {
-          this._startPrefetch(this.generation);
-        } catch {
-        }
-      }
-      if (this.queue.length) void this._drainQueue();
-    }
-    /**
-     * v0.1.800: 外部(会場)から「今キューにある先頭群の合成を即起動」するための公開フック。
-     *   吹き出しを出した直後に呼ぶと、再生開始までの待ち(Δ)が合成時間まで縮む。深さ有界・FIFO不変。
-     */
-    kickPrefetch() {
-      if (!this.enabled || this.isObsMode() || !this.queue.length) return;
-      try {
-        this._startPrefetch(this.generation);
-      } catch {
-      }
-    }
-  };
-
   // src/lib/voiceDiagKey.js
   var KEY_VOICE_DIAG = "nls_voice_diag_v1";
 
@@ -19603,7 +19634,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T15:12") : ""
+          buildId: true ? String("yt-2026-11-04T15:33") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22537,5 +22568,46 @@ ${sourceCol}
       },
       true
     );
+  })();
+  (() => {
+    const proto = (
+      /** @type {any} */
+      VoicePlayer.prototype
+    );
+    if (proto.__ytCrowdWrapped) return;
+    proto.__ytCrowdWrapped = true;
+    const realEnqueue = proto.enqueue;
+    proto.enqueue = function(items) {
+      if (!Array.isArray(items)) return realEnqueue.call(this, items);
+      const keep = [];
+      const importantItems = [];
+      for (const it of items) {
+        if (!it || it.kind !== "comment") {
+          keep.push(it);
+          continue;
+        }
+        const important = ytIsImportantVoiceKey(it.key);
+        const queueLength = (Array.isArray(this.queue) ? this.queue.length : 0) + keep.length;
+        if (!ytShouldVoiceWhenCrowded({ important, queueLength })) {
+          this.diag.ytCrowdSkipTotal = (Number(this.diag.ytCrowdSkipTotal) || 0) + 1;
+          try {
+            it.onDropped?.();
+          } catch {
+          }
+          continue;
+        }
+        if (important) {
+          this.diag.ytImportantTotal = (Number(this.diag.ytImportantTotal) || 0) + 1;
+          importantItems.push(it);
+        }
+        keep.push(it);
+      }
+      const r = realEnqueue.call(this, keep);
+      if (importantItems.length && Array.isArray(this.queue)) {
+        const drops = new Set(importantItems.map((x) => x.onDropped).filter(Boolean));
+        for (const q of this.queue) if (q && drops.has(q.onDropped)) q.priority = "high";
+      }
+      return r;
+    };
   })();
 })();

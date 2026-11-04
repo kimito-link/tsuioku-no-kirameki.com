@@ -21,6 +21,7 @@ import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/yout
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
+import { ytMarkImportantVoiceRows } from '../../src/lib/youtube/ytVoicePriority.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -551,6 +552,13 @@ async function getCommentsViaBackground(vid) {
   return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
 }
 
+/** 会場の読み上げで大事なコメントのキー(venueSpeech.js の venueSpeechKey と同じ形 no:<番号>) */
+const ytVoiceImportantKeys = new Set();
+/** @param {string} key */
+export function ytIsImportantVoiceKey(key) {
+  return ytVoiceImportantKeys.has(String(key || ''));
+}
+
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
@@ -581,6 +589,8 @@ async function buildCommentsForLvUncached(lv) {
   /** @type {Set<string>} 顔を引きに行く @名前 */
   const wantHandles = new Set();
   const who = buildYtPersonResolver(list);
+  // 会場の読み上げ: 混んでいるときは大事なコメントだけ読む(りんく決定 2026-11-04)。どれが大事かの印をここで付ける
+  const important = IS_VENUE_CONTEXT ? ytMarkImportantVoiceRows(list, (r) => who.keyOf(r)) : null;
   let streamStartedAt = 0;
   if (list.some((r) => r?.replay)) {
     replayVideoIds.add(vid);
@@ -604,6 +614,7 @@ async function buildCommentsForLvUncached(lv) {
     }
     const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
+    if (important?.[i]) ytVoiceImportantKeys.add(`no:${e.commentNo}`);
     return e;
   });
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
