@@ -1731,6 +1731,14 @@ ${sourceCol}
     doc.querySelectorAll("#mkt-participation-lead *").forEach((el) => {
       if (el.children.length === 0 && String(el.textContent || "").trim() === "未取得") el.textContent = "—";
     });
+    const ledger = doc.getElementById("mkt-gift-ledger");
+    if (ledger) {
+      const w = doc.createTreeWalker(ledger, NodeFilter.SHOW_TEXT);
+      for (let n2 = w.nextNode(); n2; n2 = w.nextNode()) {
+        const v = String(n2.nodeValue || "");
+        if (v.includes("（UC")) n2.nodeValue = v.replace(/（UC[^（）]*）/g, "");
+      }
+    }
     const KEEP = 8;
     doc.querySelectorAll("ul.mkt-gm-gifts").forEach((ul) => {
       const items = Array.from(ul.children);
@@ -45669,7 +45677,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T05:33" ? String("yt-2026-11-04T05:33") : "dev";
+      const buildId = "yt-2026-11-04T05:35" ? String("yt-2026-11-04T05:35") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45687,7 +45695,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.48") : "";
+    const bundledVersion = true ? String("0.1.49") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45732,7 +45740,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T05:33" ? String("yt-2026-11-04T05:33") : "dev";
+            return "yt-2026-11-04T05:35" ? String("yt-2026-11-04T05:35") : "dev";
           } catch {
             return "dev";
           }

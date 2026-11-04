@@ -1523,6 +1523,14 @@ ${sourceCol}
     doc.querySelectorAll("#mkt-participation-lead *").forEach((el) => {
       if (el.children.length === 0 && String(el.textContent || "").trim() === "未取得") el.textContent = "—";
     });
+    const ledger = doc.getElementById("mkt-gift-ledger");
+    if (ledger) {
+      const w = doc.createTreeWalker(ledger, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const v = String(n.nodeValue || "");
+        if (v.includes("（UC")) n.nodeValue = v.replace(/（UC[^（）]*）/g, "");
+      }
+    }
     const KEEP = 8;
     doc.querySelectorAll("ul.mkt-gm-gifts").forEach((ul) => {
       const items = Array.from(ul.children);
