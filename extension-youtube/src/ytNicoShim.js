@@ -226,6 +226,9 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     userId: numericUidForYtKey(key),
     ytChannelId: /^UC/.test(key) ? key : channelId,
     nickname: name,
+    // 会場の吹き出しの発言者名は row.name を読む(venueSpeech.js)。ニコ生版の行は nickname だけなので名前のある人も
+    //   「匿名NNN」と出ていた(ニコ生は匿名の人が多く目立たない)。YouTube は全員に名前があるので、同じ名前を name にも入れる。
+    name,
     avatarUrl: String(r?.iconUrl || ''),
     capturedAt,
     // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)

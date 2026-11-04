@@ -962,6 +962,9 @@ ${sourceCol}
       userId: numericUidForYtKey(key),
       ytChannelId: /^UC/.test(key) ? key : channelId,
       nickname: name,
+      // 会場の吹き出しの発言者名は row.name を読む(venueSpeech.js)。ニコ生版の行は nickname だけなので名前のある人も
+      //   「匿名NNN」と出ていた(ニコ生は匿名の人が多く目立たない)。YouTube は全員に名前があるので、同じ名前を name にも入れる。
+      name,
       avatarUrl: String(r?.iconUrl || ""),
       capturedAt,
       // チャット欄の時刻表示から求めた「書かれた時刻」(受け取った時刻とずれるのは開いたときに残っていた分)
@@ -19597,7 +19600,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T13:28") : ""
+          buildId: true ? String("yt-2026-11-04T13:33") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
