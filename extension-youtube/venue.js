@@ -2005,7 +2005,8 @@ ${sourceCol}
     });
     anchor.after(btn);
   }
-  if (typeof document !== "undefined" && /\/sidepanel\.html$/.test(String(location.pathname || ""))) {
+  var YT_VENUE_WINDOW_ENABLED = false;
+  if (YT_VENUE_WINDOW_ENABLED && typeof document !== "undefined" && /\/sidepanel\.html$/.test(String(location.pathname || ""))) {
     const tryVenue = () => {
       ensureVenueButton();
       if (!document.getElementById("ytOpenVenueBtn")) setTimeout(tryVenue, 1e3);
@@ -19744,7 +19745,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T07:12") : ""
+          buildId: true ? String("yt-2026-11-04T07:15") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

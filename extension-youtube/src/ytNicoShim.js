@@ -1511,7 +1511,10 @@ function ensureVenueButton() {
   });
   anchor.after(btn);
 }
-if (typeof document !== 'undefined' && /\/sidepanel\.html$/.test(String(location.pathname || ''))) {
+// ★2026-11-04 りんく「そもそもこのかたちをのぞんでいない いらない」: 別窓の会場は出さない(ボタンを付けない)。
+//   埋め込みは配信によって 152-4(外への埋め込み不可)で映らない。作るならニコ生と同じ視聴ページに重ねる形(未定)。
+const YT_VENUE_WINDOW_ENABLED = false;
+if (YT_VENUE_WINDOW_ENABLED && typeof document !== 'undefined' && /\/sidepanel\.html$/.test(String(location.pathname || ''))) {
   const tryVenue = () => {
     ensureVenueButton();
     if (!document.getElementById('ytOpenVenueBtn')) setTimeout(tryVenue, 1000);
