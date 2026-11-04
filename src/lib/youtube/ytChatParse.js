@@ -215,6 +215,11 @@ export function extractAuthorIconUrl(el) {
     return safeHttpUrl(withProtocol);
   };
 
+  // 0) ページの世界で行のデータから読んだ本物の顔(content-chat-main.js が置く)。
+  //    画面に出るまで img は 1×1 の透明な絵なので、これがいちばん確か。
+  const fromData = normalizeCandidateUrl(el.getAttribute?.('data-nl-author-photo'));
+  if (fromData) return fromData;
+
   // 1) 投稿者アイコン専用コンテナを優先探索
   const prioritySelectors = [
     '#author-photo img',

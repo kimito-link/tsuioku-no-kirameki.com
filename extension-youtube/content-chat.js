@@ -151,6 +151,8 @@
       const withProtocol = trimmed.startsWith("//") ? `https:${trimmed}` : trimmed;
       return safeHttpUrl(withProtocol);
     };
+    const fromData = normalizeCandidateUrl(el.getAttribute?.("data-nl-author-photo"));
+    if (fromData) return fromData;
     const prioritySelectors = [
       "#author-photo img",
       "yt-img-shadow#author-photo img",
@@ -1092,7 +1094,7 @@
           inspectElement(el, 3);
         }
       });
-      mo.observe(el, { attributes: true, subtree: true, attributeFilter: ["src"] });
+      mo.observe(el, { attributes: true, subtree: true, attributeFilter: ["src", "data-nl-author-photo"] });
       setTimeout(() => mo.disconnect(), 10 * 60 * 1e3);
     };
     const scanAllExisting = (root = document) => {

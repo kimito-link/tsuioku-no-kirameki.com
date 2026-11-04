@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "追憶のきらめき for YouTube（試作）",
-  "version": "0.1.58",
+  "version": "0.1.59",
   "description": "YouTube Live のチャット・スーパーチャット・メンバーをローカル記録し、3つのレーンと通貨別応援者ランキング、VOICEVOXによる人ごとの声で振り返る試作拡張機能。",
   "icons": {
     "16": "images/logo/konta-yukkuri-icon-16.png",
@@ -39,6 +39,17 @@
     "default_path": "sidepanel.html"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/live_chat*"
+      ],
+      "js": [
+        "content-chat-main.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
     {
       "matches": [
         "https://www.youtube.com/*"

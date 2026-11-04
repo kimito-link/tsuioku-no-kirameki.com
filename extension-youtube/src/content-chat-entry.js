@@ -794,7 +794,7 @@ function setupLiveChatObserver() {
         inspectElement(el, 3);
       }
     });
-    mo.observe(el, { attributes: true, subtree: true, attributeFilter: ['src'] });
+    mo.observe(el, { attributes: true, subtree: true, attributeFilter: ['src', 'data-nl-author-photo'] });
     setTimeout(() => mo.disconnect(), 10 * 60 * 1000);
   };
 
