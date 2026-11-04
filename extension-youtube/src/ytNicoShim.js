@@ -1276,3 +1276,62 @@ if (typeof window !== 'undefined' && typeof window.open === 'function') {
     return realOpen(url, ...rest);
   };
 }
+
+// ---- 会場モードの入口(YouTube 版だけ) ----
+// ニコ生版は視聴ページに「🏟 会場モード」ボタンを出すが、YouTube 版はサイドパネルのコメビュの隣に置く。
+//   開くのはニコ生版の会場(venue.html)の完全コピー。lv はいちばん新しく記録した配信の疑似 lv。
+function ensureVenueButton() {
+  if (!/\/sidepanel\.html$/.test(String(location.pathname || ''))) return;
+  const anchor = document.getElementById('openComeviewVoiceBtn') || document.getElementById('openComeviewBtn');
+  if (!anchor || document.getElementById('ytOpenVenueBtn')) return;
+  const btn = /** @type {HTMLButtonElement} */ (anchor.cloneNode(false));
+  btn.id = 'ytOpenVenueBtn';
+  btn.title = '会場モードを別ウィンドウで開く';
+  btn.setAttribute('aria-label', '会場モードを別ウィンドウで開きます。');
+  btn.innerHTML =
+    '<span class="nl-compose-qbtn__row"><span class="nl-compose-qbtn__emoji" aria-hidden="true">🏟</span><span class="nl-compose-qbtn__word">会場</span></span>';
+  btn.addEventListener('click', () => {
+    void (async () => {
+      const sums = (await chrome.storage.local.get(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
+      const vid = newestVideoIdOf(sums);
+      if (!vid) return;
+      const url = chrome.runtime.getURL('venue.html') + `?lv=${pseudoLvForVideoId(vid)}`;
+      try {
+        await chrome.windows.create({ url, type: 'popup', width: 1280, height: 760 });
+      } catch {
+        window.open(url, '_blank', 'width=1280,height=760');
+      }
+    })();
+  });
+  anchor.after(btn);
+}
+if (typeof document !== 'undefined' && /\/sidepanel\.html$/.test(String(location.pathname || ''))) {
+  const tryVenue = () => {
+    ensureVenueButton();
+    if (!document.getElementById('ytOpenVenueBtn')) setTimeout(tryVenue, 1000);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryVenue, { once: true });
+  else tryVenue();
+}
+
+// 会場モードの真ん中の映像は、ニコ生版ではニコ生の埋め込みプレイヤー。YouTube 版はその動画の YouTube の埋め込みにする。
+if (typeof document !== 'undefined' && /\/venue\.html$/.test(String(location.pathname || ''))) {
+  const swapEmbed = (/** @type {Element} */ el, tries = 0) => {
+    if (!(el instanceof HTMLIFrameElement)) return;
+    const m = String(el.getAttribute('src') || '').match(/^https:\/\/live\.nicovideo\.jp\/embed\/(lv\d+)/i);
+    if (!m) return;
+    const vid = videoIdForPseudoLv(m[1].toLowerCase());
+    // 疑似 lv と動画の対応は記録を読んでから決まる。まだなら少し待って試し直す
+    if (!vid) {
+      if (tries < 20) setTimeout(() => swapEmbed(el, tries + 1), 300);
+      return;
+    }
+    el.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
+    el.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    el.src = `https://www.youtube.com/embed/${encodeURIComponent(vid)}?autoplay=1&mute=1`;
+  };
+  const scan = (/** @type {ParentNode} */ root) => root.querySelectorAll?.('iframe').forEach((f) => swapEmbed(f));
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) if (n instanceof Element) { swapEmbed(n); scan(n); }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
