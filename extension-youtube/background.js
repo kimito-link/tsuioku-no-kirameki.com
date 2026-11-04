@@ -1240,6 +1240,32 @@
     } catch {
     }
   }
+  async function setupEmbedReferer() {
+    try {
+      const dnr = chrome.declarativeNetRequest;
+      if (!dnr?.updateSessionRules) return;
+      await dnr.updateSessionRules({
+        removeRuleIds: [7101],
+        addRules: [
+          {
+            id: 7101,
+            priority: 1,
+            action: {
+              type: "modifyHeaders",
+              requestHeaders: [{ header: "Referer", operation: "set", value: "https://www.youtube.com/" }]
+            },
+            condition: {
+              urlFilter: "||www.youtube.com/embed/",
+              resourceTypes: ["sub_frame"],
+              initiatorDomains: [chrome.runtime.id]
+            }
+          }
+        ]
+      });
+    } catch {
+    }
+  }
+  void setupEmbedReferer();
   chrome.runtime.onInstalled.addListener((details) => {
     setupSidePanelBehavior();
     ensureOffscreenDocument();

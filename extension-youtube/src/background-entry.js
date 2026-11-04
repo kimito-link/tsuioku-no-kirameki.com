@@ -302,6 +302,37 @@ async function reloadExistingYtWatchTabs(reason) {
   }
 }
 
+// 会場モード(拡張の画面 venue.html)の真ん中に YouTube を埋め込むと、どこから埋め込んだかが YouTube に届かず
+//   「エラー153(動画プレーヤーの設定エラー)」で断られる。この拡張の画面から開く埋め込みにだけ、
+//   YouTube 自身のページから開いたという Referer を付ける(ほかのサイトの埋め込みには触らない)。
+async function setupEmbedReferer() {
+  try {
+    const dnr = chrome.declarativeNetRequest;
+    if (!dnr?.updateSessionRules) return;
+    await dnr.updateSessionRules({
+      removeRuleIds: [7101],
+      addRules: [
+        {
+          id: 7101,
+          priority: 1,
+          action: {
+            type: 'modifyHeaders',
+            requestHeaders: [{ header: 'Referer', operation: 'set', value: 'https://www.youtube.com/' }],
+          },
+          condition: {
+            urlFilter: '||www.youtube.com/embed/',
+            resourceTypes: ['sub_frame'],
+            initiatorDomains: [chrome.runtime.id],
+          },
+        },
+      ],
+    });
+  } catch {
+    // 古い Chrome などで使えなくても他は止めない
+  }
+}
+void setupEmbedReferer();
+
 chrome.runtime.onInstalled.addListener((details) => {
   setupSidePanelBehavior();
   ensureOffscreenDocument();

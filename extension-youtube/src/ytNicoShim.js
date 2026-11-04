@@ -128,6 +128,8 @@ function mapTab(tab) {
 const ytKeyByNumericUid = new Map();
 /** @type {Map<string, string>} YouTube の人の鍵 → 数字ID */
 const numericUidByYtKey = new Map();
+/** 数字IDを新しく割り当てた回数(画面の直しを、知らなかった人の分だけやり直すため) */
+let uidRegVersion = 0;
 
 /**
  * @param {string} ytKey UC… か name:表示名
@@ -154,6 +156,7 @@ export function numericUidForYtKey(ytKey) {
   }
   numericUidByYtKey.set(key, uid);
   ytKeyByNumericUid.set(uid, key);
+  uidRegVersion += 1;
   return uid;
 }
 
@@ -1226,6 +1229,18 @@ function ensureTopFanRest() {
 function startDomFixer() {
   if (!document.body) return;
   fixSubtree(document.body);
+  // 画面に先に出た数字IDは、あとで誰か分かっても文字が変わらないので直しが届かない(会場の席で実例)。
+  //   新しく人を覚えたときだけ、画面全体を直し直す。
+  let fixedAtVersion = uidRegVersion;
+  setInterval(() => {
+    if (fixedAtVersion === uidRegVersion || document.hidden) return;
+    fixedAtVersion = uidRegVersion;
+    try {
+      fixSubtree(document.body);
+    } catch {
+      /* no-op */
+    }
+  }, 2000);
   new MutationObserver((muts) => {
     if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === 'childList' && !(m.target instanceof Element && m.target.closest('#yt-topfan-rest, [data-yt-all]')))) scheduleTopFanRest();
     for (const m of muts) {

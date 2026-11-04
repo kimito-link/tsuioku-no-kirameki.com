@@ -897,6 +897,7 @@ ${sourceCol}
   }
   var ytKeyByNumericUid = /* @__PURE__ */ new Map();
   var numericUidByYtKey = /* @__PURE__ */ new Map();
+  var uidRegVersion = 0;
   function numericUidForYtKey(ytKey) {
     const key = String(ytKey || "");
     if (!key) return "";
@@ -917,6 +918,7 @@ ${sourceCol}
     }
     numericUidByYtKey.set(key, uid);
     ytKeyByNumericUid.set(uid, key);
+    uidRegVersion += 1;
     return uid;
   }
   function ytKeyForNumericUid(uid) {
@@ -1770,6 +1772,15 @@ ${sourceCol}
   function startDomFixer() {
     if (!document.body) return;
     fixSubtree(document.body);
+    let fixedAtVersion = uidRegVersion;
+    setInterval(() => {
+      if (fixedAtVersion === uidRegVersion || document.hidden) return;
+      fixedAtVersion = uidRegVersion;
+      try {
+        fixSubtree(document.body);
+      } catch {
+      }
+    }, 2e3);
     new MutationObserver((muts) => {
       if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, [data-yt-all]")))) scheduleTopFanRest();
       for (const m of muts) {
@@ -19354,7 +19365,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T05:42") : ""
+          buildId: true ? String("yt-2026-11-04T05:45") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
