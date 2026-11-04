@@ -510,20 +510,49 @@ export function ytOwnerRowsLast(list, sum) {
   return [...list.filter((r) => !isOwner(r)), ...list.filter(isOwner)];
 }
 
-/** @param {string} vid */
+/**
+ * 視聴ページの中の会場の記録の控え(配信ごと)。初回と30秒ごとは全件、あいだは新しく記録された分だけを background にもらう
+ * (3秒ごとに全件を受け取り直すと、長い配信でメッセージが大きくなり、失敗すると空の会場になる・Grok の点検 2026-11-04)。
+ * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number }>}
+ */
+const inPageCommentCache = new Map();
+const IN_PAGE_FULL_REFRESH_MS = 30_000;
+/**
+ * @param {string} vid
+ * @returns {Promise<any[] | null>} null = 受け取れなかった(前の控えも無い)
+ */
 async function getCommentsViaBackground(vid) {
+  const cur = inPageCommentCache.get(vid);
+  const now = Date.now();
+  const full = !cur || now - cur.fullAt > IN_PAGE_FULL_REFRESH_MS;
   try {
-    const res = await real?.runtime?.sendMessage?.({ type: 'YT_GET_STREAM_COMMENTS', videoId: vid });
-    return Array.isArray(res?.items) ? res.items : [];
+    const res = await real?.runtime?.sendMessage?.(
+      full ? { type: 'YT_GET_STREAM_COMMENTS', videoId: vid } : { type: 'YT_GET_STREAM_COMMENTS', videoId: vid, afterRecordedAt: cur.lastRecordedAt },
+    );
+    if (!res || res.ok === false || !Array.isArray(res.items)) throw new Error('no_items');
+    const next = full ? { byPk: new Map(), lastRecordedAt: 0, fullAt: now } : /** @type {NonNullable<typeof cur>} */ (cur);
+    for (const r of res.items) {
+      const k = String(r?.pk || r?.id || '');
+      if (!k) continue;
+      next.byPk.set(k, r);
+      const at = Number(r?.recordedAt || 0);
+      if (at > next.lastRecordedAt) next.lastRecordedAt = at;
+    }
+    inPageCommentCache.set(vid, next);
   } catch {
-    return [];
+    // 受け取れなかったときは空にせず、前の控えをそのまま使う(誰もいない会場にしない)
+    if (!cur) return null;
   }
+  const c = inPageCommentCache.get(vid);
+  if (!c) return null;
+  return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
 }
 
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
   const items = YT_SHIM_IN_PAGE ? await getCommentsViaBackground(vid) : await getYtStreamCommentsByVideoId(vid);
+  if (items == null) return undefined;
   const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
   // 顔の分からない人(YouTube のギフトだけ送った人など)は、トップファンの順位表の顔を名前で引く
   /** @type {Map<string, string>} */

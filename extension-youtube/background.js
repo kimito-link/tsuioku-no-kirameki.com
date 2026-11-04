@@ -937,6 +937,25 @@
       };
     });
   }
+  async function getYtStreamCommentsSince(videoId, afterRecordedAt = 0) {
+    const vid = String(videoId || "").trim();
+    if (!vid) return [];
+    const lower = typeof afterRecordedAt === "number" && Number.isFinite(afterRecordedAt) && afterRecordedAt > 0 ? afterRecordedAt : 0;
+    const db = await openYtCommentsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_COMMENTS], "readonly");
+      const store = tx.objectStore(STORE_COMMENTS);
+      const index = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
+      const range = IDBKeyRange.bound([vid, lower], [vid, Number.MAX_SAFE_INTEGER]);
+      const req = index.getAll(range);
+      req.onsuccess = () => {
+        resolve(Array.isArray(req.result) ? req.result : []);
+      };
+      req.onerror = () => {
+        reject(req.error || new Error("idb_get_since_failed"));
+      };
+    });
+  }
   async function deleteYtCommentsByPks(videoId, pks) {
     const vid = String(videoId || "").trim();
     const db = await openYtCommentsDb();
@@ -1540,7 +1559,8 @@
     if (message.type === "YT_GET_STREAM_COMMENTS") {
       if (!sender || sender.id !== chrome.runtime.id) return false;
       const vid = String(message.videoId || "");
-      getYtStreamCommentsByVideoId(vid).then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] })).catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
+      const after = Number(message.afterRecordedAt || 0);
+      (after > 0 ? getYtStreamCommentsSince(vid, after) : getYtStreamCommentsByVideoId(vid)).then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] })).catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
       return true;
     }
     if (message.type === "YT_CAPTURE_FRAME") {

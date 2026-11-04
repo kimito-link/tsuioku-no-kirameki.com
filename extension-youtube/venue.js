@@ -1138,18 +1138,41 @@ ${sourceCol}
     if (!list.some(isOwner)) return list;
     return [...list.filter((r) => !isOwner(r)), ...list.filter(isOwner)];
   }
+  var inPageCommentCache = /* @__PURE__ */ new Map();
+  var IN_PAGE_FULL_REFRESH_MS = 3e4;
   async function getCommentsViaBackground(vid) {
+    const cur = inPageCommentCache.get(vid);
+    const now = Date.now();
+    const full = !cur || now - cur.fullAt > IN_PAGE_FULL_REFRESH_MS;
     try {
-      const res = await real?.runtime?.sendMessage?.({ type: "YT_GET_STREAM_COMMENTS", videoId: vid });
-      return Array.isArray(res?.items) ? res.items : [];
+      const res = await real?.runtime?.sendMessage?.(
+        full ? { type: "YT_GET_STREAM_COMMENTS", videoId: vid } : { type: "YT_GET_STREAM_COMMENTS", videoId: vid, afterRecordedAt: cur.lastRecordedAt }
+      );
+      if (!res || res.ok === false || !Array.isArray(res.items)) throw new Error("no_items");
+      const next = full ? { byPk: /* @__PURE__ */ new Map(), lastRecordedAt: 0, fullAt: now } : (
+        /** @type {NonNullable<typeof cur>} */
+        cur
+      );
+      for (const r of res.items) {
+        const k = String(r?.pk || r?.id || "");
+        if (!k) continue;
+        next.byPk.set(k, r);
+        const at = Number(r?.recordedAt || 0);
+        if (at > next.lastRecordedAt) next.lastRecordedAt = at;
+      }
+      inPageCommentCache.set(vid, next);
     } catch {
-      return [];
+      if (!cur) return null;
     }
+    const c = inPageCommentCache.get(vid);
+    if (!c) return null;
+    return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
   }
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
     const items = YT_SHIM_IN_PAGE ? await getCommentsViaBackground(vid) : await getYtStreamCommentsByVideoId(vid);
+    if (items == null) return void 0;
     const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
     const boardIconByName = /* @__PURE__ */ new Map();
     try {
@@ -19840,7 +19863,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T12:17") : ""
+          buildId: true ? String("yt-2026-11-04T12:20") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
