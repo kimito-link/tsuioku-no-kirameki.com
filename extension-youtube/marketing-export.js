@@ -1998,6 +1998,10 @@ ${sourceCol}
       if (!(el instanceof HTMLIFrameElement)) return;
       const m = String(el.getAttribute("src") || "").match(/^https:\/\/live\.nicovideo\.jp\/embed\/(lv\d+)/i);
       if (!m) return;
+      if (/[?&]overlay=1\b/.test(String(location.search || ""))) {
+        el.remove();
+        return;
+      }
       const vid = videoIdForPseudoLv(m[1].toLowerCase());
       if (!vid) {
         if (tries < 20) setTimeout(() => swapEmbed(el, tries + 1), 300);

@@ -91,6 +91,15 @@ await Promise.all([
   }),
   build({
     ...common,
+    // 視聴ページの「🏟 会場モード」ボタンと、ページの上に重ねる会場(ニコ生版と同じ形・2026-11-04)
+    entryPoints: [resolve(root, 'extension-youtube/src/venue-overlay-content.js')],
+    outfile: resolve(root, 'extension-youtube/venue-overlay.js'),
+    banner: {
+      js: '// venue-overlay.js — YouTube 視聴ページの会場モードボタンと、ページに重ねる会場\n/* eslint-disable */',
+    },
+  }),
+  build({
+    ...common,
     entryPoints: [resolve(root, 'extension-youtube/src/offscreen-entry.js')],
     outfile: resolve(root, 'extension-youtube/offscreen.js'),
     banner: {

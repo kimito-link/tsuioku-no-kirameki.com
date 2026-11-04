@@ -1529,6 +1529,11 @@ if (typeof document !== 'undefined' && /\/venue\.html$/.test(String(location.pat
     if (!(el instanceof HTMLIFrameElement)) return;
     const m = String(el.getAttribute('src') || '').match(/^https:\/\/live\.nicovideo\.jp\/embed\/(lv\d+)/i);
     if (!m) return;
+    // 視聴ページの上に重ねた会場では、真ん中はページの本物のプレーヤーが映る(埋め込みは使わない=152-4 が出ない)
+    if (/[?&]overlay=1\b/.test(String(location.search || ''))) {
+      el.remove();
+      return;
+    }
     const vid = videoIdForPseudoLv(m[1].toLowerCase());
     // 疑似 lv と動画の対応は記録を読んでから決まる。まだなら少し待って試し直す
     if (!vid) {
