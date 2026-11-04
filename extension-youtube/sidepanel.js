@@ -673,7 +673,8 @@
       officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
       officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
       // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
-      streamAgeMin: startedAt > 0 && !replayVideoIds.has(videoId) ? Math.max(0, Math.round((Date.now() - startedAt) / 6e4)) : null
+      //   配信が終わっていたら(endedAt)、終わった時刻までで止める
+      streamAgeMin: startedAt > 0 && !replayVideoIds.has(videoId) ? Math.max(0, Math.round(((Number(sum?.endedAt) > startedAt ? Number(sum.endedAt) : Date.now()) - startedAt) / 6e4)) : null
     };
   }
   var normName = (name) => String(name || "").trim().replace(/^@/, "").toLowerCase();
@@ -45629,7 +45630,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T03:29" ? String("yt-2026-11-04T03:29") : "dev";
+      const buildId = "yt-2026-11-04T03:50" ? String("yt-2026-11-04T03:50") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45647,7 +45648,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.39") : "";
+    const bundledVersion = true ? String("0.1.40") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45692,7 +45693,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T03:29" ? String("yt-2026-11-04T03:29") : "dev";
+            return "yt-2026-11-04T03:50" ? String("yt-2026-11-04T03:50") : "dev";
           } catch {
             return "dev";
           }

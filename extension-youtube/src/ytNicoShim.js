@@ -295,7 +295,11 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
-    streamAgeMin: startedAt > 0 && !replayVideoIds.has(videoId) ? Math.max(0, Math.round((Date.now() - startedAt) / 60000)) : null,
+    //   配信が終わっていたら(endedAt)、終わった時刻までで止める
+    streamAgeMin:
+      startedAt > 0 && !replayVideoIds.has(videoId)
+        ? Math.max(0, Math.round(((Number(sum?.endedAt) > startedAt ? Number(sum.endedAt) : Date.now()) - startedAt) / 60000))
+        : null,
   };
 }
 

@@ -711,6 +711,30 @@
     } catch {
     }
   }
+  var fetchedEndedAt = /* @__PURE__ */ new Map();
+  function pageSaysEnded() {
+    try {
+      const box = document.querySelector("ytd-watch-metadata #info-container, ytd-watch-info-text, ytd-watch-metadata #description");
+      const text = String(box?.textContent || "").replace(/\s+/g, " ");
+      return /\d+\s*(分|時間|日)前にライブ配信(?!開始)/.test(text) || /Streamed live/i.test(text);
+    } catch {
+      return false;
+    }
+  }
+  function endedAtFields(videoId) {
+    if (!videoId || !pageSaysEnded()) return {};
+    const got = fetchedEndedAt.get(videoId);
+    if (got) return { endedAt: got };
+    if (fetchedEndedAt.has(videoId)) return {};
+    fetchedEndedAt.set(videoId, null);
+    void fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: "include" }).then((r) => r.ok ? r.text() : "").then((html) => {
+      const m = String(html || "").match(/"endTimestamp":"([^"]+)"/);
+      const ms = m ? Date.parse(m[1]) : NaN;
+      if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) fetchedEndedAt.set(videoId, ms);
+      else fetchedEndedAt.delete(videoId);
+    }).catch(() => fetchedEndedAt.delete(videoId));
+    return {};
+  }
   function startedAtFields(videoId) {
     const exact = readStreamStartedAt(videoId);
     if (exact) return { startedAt: exact };
@@ -764,7 +788,8 @@
           broadcasterHandle,
           broadcasterIconUrl: readBroadcasterIconUrl(),
           concurrentViewers: viewers,
-          ...startedAtFields(videoId)
+          ...startedAtFields(videoId),
+          ...endedAtFields(videoId)
         }
       });
       if (viewers === null) saveViewerProbe();
