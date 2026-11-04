@@ -1871,6 +1871,56 @@ ${sourceCol}
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
+  if (typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+    const mapSrc = (v) => {
+      const s = String(v ?? "");
+      const m = s.match(NICO_USERICON_RE);
+      if (!m) return v;
+      return ytIconForNumericUid(m[1]) || v;
+    };
+    try {
+      const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+      if (desc && desc.set && desc.get) {
+        Object.defineProperty(HTMLImageElement.prototype, "src", {
+          configurable: true,
+          enumerable: desc.enumerable,
+          get() {
+            return desc.get.call(this);
+          },
+          set(v) {
+            desc.set.call(this, mapSrc(v));
+          }
+        });
+      }
+      const realSetAttr = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function(name, value) {
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") return realSetAttr.call(this, name, mapSrc(value));
+        return realSetAttr.call(this, name, value);
+      };
+      const ih = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+      if (ih && ih.set && ih.get) {
+        const GLOBAL_RE = /https?:\/\/[^"'\s<>]*?nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg[^"'\s<>]*/g;
+        Object.defineProperty(Element.prototype, "innerHTML", {
+          configurable: true,
+          enumerable: ih.enumerable,
+          get() {
+            return ih.get.call(this);
+          },
+          set(v) {
+            let s = v;
+            if (typeof s === "string" && s.includes("usericon")) {
+              s = s.replace(GLOBAL_RE, (all, uid) => {
+                const icon = ytIconForNumericUid(uid);
+                return icon ? icon.replace(/&/g, "&amp;").replace(/"/g, "&quot;") : all;
+              });
+            }
+            ih.set.call(this, s);
+          }
+        });
+      }
+    } catch {
+    }
+  }
 
   // src/lib/storageRefreshTriggerKey.js
   function normalizeStorageKeyForCensus(key) {

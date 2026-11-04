@@ -2079,6 +2079,56 @@ ${sourceCol}
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
+  if (typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+    const mapSrc = (v) => {
+      const s5 = String(v ?? "");
+      const m = s5.match(NICO_USERICON_RE);
+      if (!m) return v;
+      return ytIconForNumericUid(m[1]) || v;
+    };
+    try {
+      const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+      if (desc && desc.set && desc.get) {
+        Object.defineProperty(HTMLImageElement.prototype, "src", {
+          configurable: true,
+          enumerable: desc.enumerable,
+          get() {
+            return desc.get.call(this);
+          },
+          set(v) {
+            desc.set.call(this, mapSrc(v));
+          }
+        });
+      }
+      const realSetAttr = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function(name, value) {
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") return realSetAttr.call(this, name, mapSrc(value));
+        return realSetAttr.call(this, name, value);
+      };
+      const ih = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+      if (ih && ih.set && ih.get) {
+        const GLOBAL_RE = /https?:\/\/[^"'\s<>]*?nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg[^"'\s<>]*/g;
+        Object.defineProperty(Element.prototype, "innerHTML", {
+          configurable: true,
+          enumerable: ih.enumerable,
+          get() {
+            return ih.get.call(this);
+          },
+          set(v) {
+            let s5 = v;
+            if (typeof s5 === "string" && s5.includes("usericon")) {
+              s5 = s5.replace(GLOBAL_RE, (all, uid) => {
+                const icon = ytIconForNumericUid(uid);
+                return icon ? icon.replace(/&/g, "&amp;").replace(/"/g, "&quot;") : all;
+              });
+            }
+            ih.set.call(this, s5);
+          }
+        });
+      }
+    } catch {
+    }
+  }
 
   // src/lib/storageRefreshTriggerKey.js
   var TRIGGER_KEY_MAX = 3;
@@ -45745,7 +45795,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T05:49" ? String("yt-2026-11-04T05:49") : "dev";
+      const buildId = "yt-2026-11-04T05:51" ? String("yt-2026-11-04T05:51") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45763,7 +45813,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.53") : "";
+    const bundledVersion = true ? String("0.1.54") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45808,7 +45858,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T05:49" ? String("yt-2026-11-04T05:49") : "dev";
+            return "yt-2026-11-04T05:51" ? String("yt-2026-11-04T05:51") : "dev";
           } catch {
             return "dev";
           }

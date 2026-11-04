@@ -1351,3 +1351,60 @@ if (typeof document !== 'undefined' && /\/venue\.html$/.test(String(location.pat
     for (const m of muts) for (const n of m.addedNodes) if (n instanceof Element) { swapEmbed(n); scan(n); }
   }).observe(document.documentElement, { childList: true, subtree: true });
 }
+
+// ちらつき対策: ニコ生版は顔を描くたびに、数字IDから作ったニコニコの顔の場所(nicoaccount/usericon/…)を src に入れる。
+//   画面に出てから YouTube の顔に差し替える(上の fixImg)と、描き直しのたびに一瞬ニコニコ側の絵(無い→代わりの絵)が
+//   映ってちらつく。src を入れる瞬間に YouTube の顔へ置き換えて、最初から正しい絵を読ませる。
+//   (分からない人はそのまま=いままでどおり)
+if (typeof HTMLImageElement !== 'undefined' && typeof Element !== 'undefined') {
+  /** @param {any} v */
+  const mapSrc = (v) => {
+    const s = String(v ?? '');
+    const m = s.match(NICO_USERICON_RE);
+    if (!m) return v;
+    return ytIconForNumericUid(m[1]) || v;
+  };
+  try {
+    const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    if (desc && desc.set && desc.get) {
+      Object.defineProperty(HTMLImageElement.prototype, 'src', {
+        configurable: true,
+        enumerable: desc.enumerable,
+        get() {
+          return desc.get.call(this);
+        },
+        set(v) {
+          desc.set.call(this, mapSrc(v));
+        },
+      });
+    }
+    const realSetAttr = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (name, value) {
+      if (this instanceof HTMLImageElement && String(name).toLowerCase() === 'src') return realSetAttr.call(this, name, mapSrc(value));
+      return realSetAttr.call(this, name, value);
+    };
+    const ih = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    if (ih && ih.set && ih.get) {
+      const GLOBAL_RE = /https?:\/\/[^"'\s<>]*?nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg[^"'\s<>]*/g;
+      Object.defineProperty(Element.prototype, 'innerHTML', {
+        configurable: true,
+        enumerable: ih.enumerable,
+        get() {
+          return ih.get.call(this);
+        },
+        set(v) {
+          let s = v;
+          if (typeof s === 'string' && s.includes('usericon')) {
+            s = s.replace(GLOBAL_RE, (all, uid) => {
+              const icon = ytIconForNumericUid(uid);
+              return icon ? icon.replace(/&/g, '&amp;').replace(/"/g, '&quot;') : all;
+            });
+          }
+          ih.set.call(this, s);
+        },
+      });
+    }
+  } catch {
+    /* 差し替えられなくても、上の fixImg がいままでどおり直す */
+  }
+}
