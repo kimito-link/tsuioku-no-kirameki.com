@@ -1079,6 +1079,7 @@ ${sourceCol}
             const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
             zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
             allThrowHistory = hist;
+            rebuildLaneKindLabels(hist);
             scheduleTopFanRest();
           }
           const laneRead = !!list && list.some((x) => x.startsWith("nls_gift_users_"));
@@ -1324,11 +1325,44 @@ ${sourceCol}
     if (yt) a.setAttribute("href", yt);
     else a.removeAttribute("href");
   }
+  var laneKindLabelByUid = /* @__PURE__ */ new Map();
+  function rebuildLaneKindLabels(hist) {
+    const rank = { スパチャ: 4, ギフト: 3, メンバー: 2, ステッカー: 1 };
+    laneKindLabelByUid.clear();
+    for (const h of Array.isArray(hist) ? hist : []) {
+      const uid = String(h?.userId || "");
+      if (!uid) continue;
+      const name = String(h?.itemName || "");
+      const kind = /スーパーチャット/.test(name) ? "スパチャ" : /メンバー/.test(name) ? "メンバー" : /ステッカー/.test(name) ? "ステッカー" : "ギフト";
+      const cur = laneKindLabelByUid.get(uid);
+      if (!cur || rank[
+        /** @type {keyof typeof rank} */
+        kind
+      ] > rank[
+        /** @type {keyof typeof rank} */
+        cur
+      ]) laneKindLabelByUid.set(uid, kind);
+    }
+  }
+  var SUPPORT_LANE_SEL = "#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd";
   function fixTextNode(node) {
     const parentTag = node.parentNode && /** @type {Element} */
     node.parentNode.tagName;
     if (parentTag === "SCRIPT" || parentTag === "STYLE") return;
     const v = String(node.nodeValue || "");
+    if (node.parentElement?.id === "officialStatNicoViewers") {
+      if (v !== "—") node.nodeValue = "—";
+      node.parentElement.classList.add("is-placeholder");
+      return;
+    }
+    {
+      const uid = v.trim();
+      if (/^8\d{9}$/.test(uid) && laneKindLabelByUid.has(uid) && node.parentElement?.closest(SUPPORT_LANE_SEL)) {
+        node.nodeValue = /** @type {string} */
+        laneKindLabelByUid.get(uid);
+        return;
+      }
+    }
     let next = ytWording(v, { topFans: kokenIsTopFans });
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid);
     if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
