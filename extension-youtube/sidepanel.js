@@ -1747,6 +1747,7 @@ ${sourceCol}
       const OFF = "data-ytoff-on";
       const parked = html.replace(/(\s)on([a-z]+=)/gi, `$1${OFF}$2`);
       const doc = new DOMParser().parseFromString(parked, "text/html");
+      ytRebuildMarketingLedger(doc);
       fixSubtree(doc.documentElement);
       if (doc.getElementById("mkt-kpi")) ytTrimMarketingDoc(doc);
       doc.querySelectorAll("[data-search]").forEach((el) => {
@@ -1804,6 +1805,63 @@ ${sourceCol}
   }
   var zeroPtGifts = [];
   var allThrowHistory = [];
+  function ytDecorateLedger(root) {
+    const next = root;
+    next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
+      if (/^—/.test(String(td.textContent || "").trim())) td.textContent = "—";
+    });
+    next.querySelectorAll("td.nl-gift-ledger-sender, td.mkt-gift-sender").forEach((td) => {
+      const walker = (td.ownerDocument || document).createTreeWalker(td, NodeFilter.SHOW_TEXT);
+      for (let n2 = walker.nextNode(); n2; n2 = walker.nextNode()) {
+        n2.nodeValue = String(n2.nodeValue || "").replace(/（[^（）]*）\s*$/, "");
+      }
+    });
+    next.querySelectorAll(".nl-gift-ledger-row__thumb--empty, .mkt-gift-ledger-row__thumb--empty").forEach((box) => {
+      const name = String(box.parentElement?.textContent || "");
+      box.textContent = /メンバー/.test(name) ? "★" : /スーパーチャット/.test(name) ? "¥" : /ステッカー/.test(name) ? "✦" : "🎁";
+      box.style.cssText += ";display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6";
+    });
+    next.querySelectorAll("img").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
+  }
+  function ytRebuildMarketingLedger(doc) {
+    const section = doc.getElementById("mkt-gift-ledger");
+    if (!section || !allThrowHistory.length) return;
+    if (String(doc.body?.textContent || "").includes("共有向けに表示名を伏せた出力")) return;
+    const rows = allThrowHistory.slice(0, 200).map((h) => ({
+      timeLabel: String(h.time || "—"),
+      itemName: String(h.itemName || "ギフト"),
+      points: Number(h.points) > 0 ? Math.trunc(Number(h.points)) : NaN,
+      thumbnailUrl: String(h.thumbnailUrl || ""),
+      userId: String(h.userId || ""),
+      senderLabel: String(h.senderName || ""),
+      senderAvatarUrl: String(h.senderAvatarUrl || ""),
+      source: "youtube"
+    }));
+    const html = rows.map((r, i) => buildGiftThrowLedgerTableRowHtml(r, i)).join("").replace(/nl-gift-ledger-sender/g, "mkt-gift-sender").replace(/nl-gift-ledger-evidence/g, "mkt-gift-evidence").replace(/nl-gift-ledger-thumb/g, "mkt-gift-thumb").replace(/nl-gift-ledger-mono/g, "mkt-mono").replace(/nl-gift-ledger-/g, "mkt-gift-ledger-").replace(/\bnl-num\b/g, "mkt-num").replace(/nl-user-thumb-link/g, "mkt-user-thumb-link");
+    let table = section.querySelector("table.mkt-gift-ledger-table");
+    if (!table) {
+      const head = doc.createElement("h3");
+      head.className = "mkt-subhead";
+      head.textContent = "投げ一覧（新しい順）";
+      const wrap = doc.createElement("div");
+      wrap.className = "mkt-table-scroll";
+      wrap.innerHTML = '<table class="mkt-rank mkt-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th><th>出典</th></tr></thead><tbody></tbody></table>';
+      section.append(head, wrap);
+      table = wrap.querySelector("table");
+    }
+    const tbody = table?.querySelector("tbody");
+    if (!tbody) return;
+    tbody.innerHTML = html;
+    const note = table.closest(".mkt-table-scroll")?.previousElementSibling;
+    if (note && note.classList.contains("mkt-note") && /表示は新しい順に/.test(String(note.textContent))) note.remove();
+    if (allThrowHistory.length > rows.length) {
+      const p = doc.createElement("p");
+      p.className = "mkt-note";
+      p.textContent = `表示は新しい順に ${rows.length} 件まで（全 ${allThrowHistory.length} 件）。`;
+      table.closest(".mkt-table-scroll")?.before(p);
+    }
+    ytDecorateLedger(tbody);
+  }
   function ensureZeroPtGifts() {
     const panel = document.getElementById("northStarLaneThrows-giftHistory");
     if (!panel || panel.hidden || !zeroPtGifts.length) return;
@@ -1833,21 +1891,7 @@ ${sourceCol}
     const next = holder.firstElementChild;
     if (!next) return;
     next.setAttribute("data-yt-all", sig);
-    next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
-      if (/^—/.test(String(td.textContent || "").trim())) td.textContent = "—";
-    });
-    next.querySelectorAll("td.nl-gift-ledger-sender").forEach((td) => {
-      const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
-      for (let n2 = walker.nextNode(); n2; n2 = walker.nextNode()) {
-        n2.nodeValue = String(n2.nodeValue || "").replace(/（[^（）]*）\s*$/, "");
-      }
-    });
-    next.querySelectorAll(".nl-gift-ledger-row__thumb--empty").forEach((box) => {
-      const name = String(box.parentElement?.textContent || "");
-      box.textContent = /メンバー/.test(name) ? "★" : /スーパーチャット/.test(name) ? "¥" : /ステッカー/.test(name) ? "✦" : "🎁";
-      box.style.cssText += ";display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6";
-    });
-    next.querySelectorAll("img").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
+    ytDecorateLedger(next);
     section.replaceWith(next);
   }
   function ensureTopFanRest() {
@@ -45625,7 +45669,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T05:31" ? String("yt-2026-11-04T05:31") : "dev";
+      const buildId = "yt-2026-11-04T05:33" ? String("yt-2026-11-04T05:33") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45643,7 +45687,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.47") : "";
+    const bundledVersion = true ? String("0.1.48") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45688,7 +45732,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T05:31" ? String("yt-2026-11-04T05:31") : "dev";
+            return "yt-2026-11-04T05:33" ? String("yt-2026-11-04T05:33") : "dev";
           } catch {
             return "dev";
           }
