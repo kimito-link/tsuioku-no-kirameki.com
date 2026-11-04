@@ -5,17 +5,14 @@
 //   会場の作り・見た目・席・吹き出し・読み上げはニコ生版の venueBar.js のまま(手を加えない)。
 //   ★2026-11-04 りんく「このかたちがいい」(ニコ生版の視聴ページのボタン)・「画面をくろくおおわないで」(0.1.69 の重ね窓は撤去)。
 import { pseudoLvForVideoId } from './ytNicoShim.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
 
-/** @returns {string} */
+/** @returns {string} 視聴ページ(/watch?v= ・ /live/<id>)の動画 id。視聴ページでなければ '' */
 function currentVideoId() {
-  if (location.pathname !== '/watch') return '';
-  try {
-    return String(new URLSearchParams(location.search).get('v') || '');
-  } catch {
-    return '';
-  }
+  const href = String(location.href || '');
+  return isYtWatchLikeUrl(href) ? parseYtVideoIdFromUrl(href) : '';
 }
 
 // ニコ生版の会場は、ニコ生の視聴ページの文字の大きさ(16px)を受け継ぐ前提で作られている(例: 人の札の幅 26ch)。
@@ -30,10 +27,23 @@ function ensureBaseFontSize() {
 }
 
 let mountedVid = '';
+/** 視聴ページ以外(ホーム・検索など)へ移ったら、会場をしまって隠す。ニコ生の視聴ページは移るとページごと消えるのと同じに見せる */
+function setRootShown(/** @type {boolean} */ shown) {
+  const root = /** @type {HTMLElement|null} */ (document.getElementById('nlsb-venue-root'));
+  if (!root) return;
+  if (!shown && document.documentElement.classList.contains('nlsb-venue-open')) {
+    root.querySelector('.nlsb-close-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  }
+  root.style.display = shown ? '' : 'none';
+}
 function sync() {
   const vid = currentVideoId();
+  if (!vid) {
+    setRootShown(false);
+    return;
+  }
+  setRootShown(true);
   if (vid === mountedVid) return;
-  if (!vid) return; // 視聴ページ以外へ移っても、出した会場はそのまま(次の動画で lv を切り替える)
   __ytSetVenueLiveId(pseudoLvForVideoId(vid));
   mountedVid = vid;
   ensureBaseFontSize();

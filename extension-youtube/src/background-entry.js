@@ -21,6 +21,7 @@ import {
   appendYtStreamCommentsIdb,
   resetYtCommentsDb,
   getYtStreamCommentsByVideoId,
+  getYtStreamCommentsSince,
   deleteYtCommentsByPks,
 } from './ytIdbStore.js';
 import { pickSwitchLeakPks } from '../../src/lib/youtube/ytSwitchLeakCleanup.js';
@@ -455,7 +456,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'YT_GET_STREAM_COMMENTS') {
     if (!sender || sender.id !== chrome.runtime.id) return false;
     const vid = String(message.videoId || '');
-    getYtStreamCommentsByVideoId(vid)
+    const after = Number(message.afterRecordedAt || 0);
+    (after > 0 ? getYtStreamCommentsSince(vid, after) : getYtStreamCommentsByVideoId(vid))
       .then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] }))
       .catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
     return true;
