@@ -27,18 +27,7 @@ const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 //   ・記録(IndexedDB)は拡張のもので、ページからは読めないので background に読んでもらう
 //   ・画面の直しは会場の中だけ(YouTube のページ自体の文字は触らない)
 //   ・chrome.tabs は無い(タブの写しはしない)
-/**
- * 会場の画面か(視聴ページの中の会場・venue.html)。会場だけ、金額の出ない YouTube のギフトも一番小さいアイテムとして飛ばす。
- *   ニコ生版の会場は pt が 0 のギフトを飛ばさない(ニコ生のギフトは必ず pt がある)。YouTube のギフト(ジュエル)は金額が出ない
- *   (2026-11-04 りんく「飛ばす(一番小さい大きさ)」)。投げ一覧やマーケの pt は 0 のまま(「—」)。
- * @param {any} v nls_gift_events_ の中身
- */
-function ytVenueThrowableGiftEvents(v) {
-  if (!IS_VENUE_CONTEXT || !Array.isArray(v)) return v;
-  return v.map((e) => (e && !(Number(e.point) > 0) && String(e.itemName || '') ? { ...e, point: 1 } : e));
-}
 export const YT_SHIM_IN_PAGE = typeof location !== 'undefined' && location.protocol !== 'chrome-extension:';
-const IS_VENUE_CONTEXT = YT_SHIM_IN_PAGE || (typeof location !== 'undefined' && /\/venue\.html$/.test(String(location.pathname || '')));
 const COMMENTS_PREFIX = 'nls_comments_';
 // ニコ生版の「テール」(まだ本体に畳み込んでいない新着)。ニコ生版の popup は、本体の全件を一度読んだら
 // 同じ配信のあいだはその控えを使い回し、新着はテールから足す。YouTube 版は本体とテールを分けて持たないので、
@@ -542,6 +531,9 @@ async function getCommentsViaBackground(vid) {
   } catch {
     // 受け取れなかったときは空にせず、前の控えをそのまま使う(誰もいない会場にしない)
     if (!cur) return null;
+    // 全件の受け取りに失敗したら、次は新しい分だけを受け取る(全件は30秒後に試し直す)。
+    //   そうしないと3秒ごとに全件を頼み続けて、新しいコメントが会場に入らないまま止まる(Grok の点検 2026-11-04)。
+    if (full) cur.fullAt = now;
   }
   const c = inPageCommentCache.get(vid);
   if (!c) return null;
@@ -689,8 +681,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
         );
         let v = gifts ? gifts[g[1]] : null;
-        if (g[1] === 'giftEvents') v = ytVenueThrowableGiftEvents(v);
-        if (g[1] === 'subApp') {
+                if (g[1] === 'subApp') {
           const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
           zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
           allThrowHistory = hist;
@@ -888,7 +879,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const gifts = /** @type {Record<string, any>} */ (buildYtGiftBags(arr, lv, { startedAt: ytTrustedStartedAt(summary, videoIdForPseudoLv(lv)) }));
         if (gifts && gifts.count > 0) {
           for (const [pre, field] of GIFT_KEY_PREFIXES) {
-            const v = field === 'giftEvents' ? ytVenueThrowableGiftEvents(gifts[field]) : gifts[field];
+            const v = gifts[field];
             if (v != null) synth[`${pre}${lv}`] = { newValue: v };
           }
         }
@@ -1496,7 +1487,9 @@ function startDomFixer() {
     // 視聴ページの中では、会場(ニコ生版 venueBar.js の root)の中だけを直す。会場は開いたときに作られるので出るまで待つ
     const root = document.getElementById('nlsb-venue-root');
     if (!root) {
-      setTimeout(startDomFixer, 500);
+      // 視聴ページ以外(ホームなど)では会場は出ないので、見に行く間をあける
+      const onWatch = /^\/(watch|live\/)/.test(String(location.pathname || ''));
+      setTimeout(startDomFixer, onWatch ? 500 : 3000);
       return;
     }
     startDomFixerOn(root, true);
