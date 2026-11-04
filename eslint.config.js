@@ -459,8 +459,9 @@ export default [
     // v0.1.1848: GPU の案内を遅れの一言とは別の行に出す(span 生成と色2行+コメント1行+onGpuTip の配線1行)=+4。文言と判定は lib の voiceLagNotice.decideVoiceGpuTip。
     // v0.1.1852: 遅れの一言と GPU の案内に不透明な下地(後ろのコメント欄と重なって読めなかった・コメント2行+下地4行+隠す1行)=+7。
     // v0.1.1855: 発言パネルが記録を読めなかったとき(拡張が切れた/時間切れ)に理由を返し、ホバーと同じ手元の発言を代わりに出す配線=+15。文言と HTML は lib の venueSpeechStats.js。
+    // v0.1.1860: 読み上げに配信 id と配信者 uid を渡す(混雑時は大事なものだけ読む・判定は lib の voiceBusyPriority.js)=+1。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7379, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7380, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

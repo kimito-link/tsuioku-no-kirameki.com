@@ -128,7 +128,7 @@
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_OUTCOME` | — | extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | extension/status-entry.js | extension/live-view-entry.js |
-| `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
+| `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/comeview-entry.js<br>extension/venueBar.js |
 | `KEY_LIVE_EVENTS_TAIL` | extension/content-entry.js | — |
 | `KEY_LIVE_EVENTS_WANTED` | extension/liveEventsPublisher.js | extension/content-entry.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/marketing-export-entry.js<br>extension/popup-entry.js |
