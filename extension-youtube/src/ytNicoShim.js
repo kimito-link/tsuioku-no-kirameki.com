@@ -1514,6 +1514,36 @@ if (typeof document !== 'undefined' && /\/(sidepanel|venue)\.html$/.test(String(
           const list = Array.isArray(prev) ? prev : [];
           list.push(snap);
           await real.storage.local.set({ [key]: list.slice(-60) });
+          // 画面の写し(0.1.61): 応援レーン各段の人数・先頭5タイルの文字と顔の種類、上の数字カードの文字。
+          //   ニコ生版と並べて比べるため(りんくに見え方を聞かない)。最新1件だけ yt_diag_lanes に置く。
+          const tileOf = (/** @type {Element} */ t) => {
+            const img = t.querySelector('img');
+            return {
+              lines: String(/** @type {HTMLElement} */ (t).innerText || '').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 5),
+              img: img ? kindOf(img.getAttribute('src') || '') : 'none',
+            };
+          };
+          /** @type {Record<string, any>} */
+          const lanes = {};
+          for (const name of ['Link', 'Gift', 'Ad', 'Konta', 'Tanu']) {
+            const el = document.getElementById(`sceneStoryUserLane${name}`);
+            if (!el) continue;
+            const tiles = Array.from(el.children).filter((c) => c.querySelector('img'));
+            const guide = document.getElementById(name === 'Link' ? 'sceneStoryUserLaneGuideLinesTop' : `sceneStoryUserLaneGuideLinesMid${name}`);
+            lanes[name] = {
+              shown: /** @type {HTMLElement} */ (el).offsetParent !== null,
+              guide: String(/** @type {HTMLElement|null} */ (guide)?.innerText || '').slice(0, 80),
+              n: tiles.length,
+              first: tiles.slice(0, 5).map(tileOf),
+            };
+          }
+          /** @type {Record<string, string>} */
+          const cards = {};
+          for (const id of ['topSupportRankStrip', 'watchConcurrentCard', 'supportVisualLiveCard', 'northStarLaneBody-contributionRanking', 'northStarLaneBody-giftHistory', 'northStarLaneBody-adRanking', 'northStarLaneBody-programPoints', 'northStarLaneBody-eventRank']) {
+            const el = /** @type {HTMLElement|null} */ (document.getElementById(id));
+            if (el) cards[id] = String(el.innerText || '').replace(/\s+/g, ' ').slice(0, 300);
+          }
+          await real.storage.local.set({ yt_diag_lanes: { at: Date.now(), version: snap.version, lanes, cards } });
         } catch {
           /* 計器が失敗しても画面は止めない */
         }
