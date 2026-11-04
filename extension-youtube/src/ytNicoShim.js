@@ -534,6 +534,7 @@ if (real && real.storage && real.storage.local && real.tabs) {
           const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
           zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
           allThrowHistory = hist;
+          rebuildLaneKindLabels(hist);
           scheduleTopFanRest();
         }
         // 応援レーンの「ギフト列」は ギフトを投げた人(nls_gift_users_)と一緒にこのキーを読み、
@@ -832,11 +833,45 @@ function fixAnchor(a) {
   else a.removeAttribute('href');
 }
 
+/**
+ * 応援レーン(りんく段・ギフト列・広告列)のタイルの1行目に出す札。ニコ生版は投げた人に「ギフト」「広告」の札を出す。
+ * YouTube 版は数字ID(=UC…)が出て長い文字列になっていたので、その人が何で応援したかの札にする(2026-11-04 りんく「完コピじゃない」)。
+ * @type {Map<string, string>} 数字ID → スパチャ / ギフト / メンバー / ステッカー
+ */
+const laneKindLabelByUid = new Map();
+/** @param {any[]} hist */
+function rebuildLaneKindLabels(hist) {
+  const rank = { スパチャ: 4, ギフト: 3, メンバー: 2, ステッカー: 1 };
+  laneKindLabelByUid.clear();
+  for (const h of Array.isArray(hist) ? hist : []) {
+    const uid = String(h?.userId || '');
+    if (!uid) continue;
+    const name = String(h?.itemName || '');
+    const kind = /スーパーチャット/.test(name) ? 'スパチャ' : /メンバー/.test(name) ? 'メンバー' : /ステッカー/.test(name) ? 'ステッカー' : 'ギフト';
+    const cur = laneKindLabelByUid.get(uid);
+    if (!cur || rank[/** @type {keyof typeof rank} */ (kind)] > rank[/** @type {keyof typeof rank} */ (cur)]) laneKindLabelByUid.set(uid, kind);
+  }
+}
+const SUPPORT_LANE_SEL = '#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd';
 /** @param {Text} node */
 function fixTextNode(node) {
   const parentTag = node.parentNode && /** @type {Element} */ (node.parentNode).tagName;
   if (parentTag === 'SCRIPT' || parentTag === 'STYLE') return; // 動く中身・見た目の指定は書き換えない
   const v = String(node.nodeValue || '');
+  // 小さい数字カードの「来場」は、ニコ生版では延べの来場者数。YouTube には延べが無く、ニコ生版の部品が同接(視聴中の人数)を
+  //   代わりに入れて「同接と同じ数」が出ていた。取れない数なので、ニコ生版の取れないときと同じ「—」にする。
+  if (node.parentElement?.id === 'officialStatNicoViewers') {
+    if (v !== '—') node.nodeValue = '—';
+    node.parentElement.classList.add('is-placeholder');
+    return;
+  }
+  {
+    const uid = v.trim();
+    if (/^8\d{9}$/.test(uid) && laneKindLabelByUid.has(uid) && node.parentElement?.closest(SUPPORT_LANE_SEL)) {
+      node.nodeValue = /** @type {string} */ (laneKindLabelByUid.get(uid));
+      return;
+    }
+  }
   let next = ytWording(v, { topFans: kokenIsTopFans }); // ニコニコの言葉 → YouTube の言葉(決まった文言だけ)
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
