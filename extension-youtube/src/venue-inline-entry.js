@@ -8,6 +8,10 @@ import { pseudoLvForVideoId } from './ytNicoShim.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
+// ニコ生版の放送ページと同じ見回り: 拡張が入れ替わったあと古い版のまま止まったページを、自分で読み込み直す
+//   (content-entry.js の startOrphanTabAutoReloadInPage。2026-11-04 実機: 更新後も古い会場が動き続け、キャラ画像が読めない)。
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 
 /** @returns {string} 視聴ページ(/watch?v= ・ /live/<id>)の動画 id。視聴ページでなければ '' */
 function currentVideoId() {
@@ -53,3 +57,5 @@ function sync() {
 // YouTube はページを読み直さずに動画を移る。1秒ごとに見て、動画が変わったら会場の配信を切り替える。
 setInterval(sync, 1000);
 sync();
+
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

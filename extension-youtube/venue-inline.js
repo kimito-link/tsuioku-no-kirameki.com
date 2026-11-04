@@ -19597,7 +19597,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T13:25") : ""
+          buildId: true ? String("yt-2026-11-04T13:28") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22347,6 +22347,101 @@ ${sourceCol}
     _forcedLiveId = v ? String(v) : null;
   }
 
+  // src/lib/orphanTabAutoReload.js
+  var ORPHAN_RELOAD_POLL_MS = 5e3;
+  var ORPHAN_RELOAD_DEAD_STREAK = 2;
+  var ORPHAN_RELOAD_MIN_GAP_MS = 6e4;
+  var ORPHAN_RELOAD_SESSION_KEY = "nls_orphan_auto_reload_at";
+  function decideOrphanReload(s) {
+    if (s.alive) return { action: "alive", deadStreak: 0 };
+    const streak = Math.max(0, Number(s.deadStreak) || 0) + 1;
+    if (streak < ORPHAN_RELOAD_DEAD_STREAK) return { action: "wait", deadStreak: streak };
+    if (s.typing) return { action: "typing", deadStreak: streak };
+    const last = Number(s.lastReloadAt) || 0;
+    if (last > 0 && s.now - last >= 0 && s.now - last < ORPHAN_RELOAD_MIN_GAP_MS) {
+      return { action: "loop-guard", deadStreak: streak };
+    }
+    return { action: "reload", deadStreak: streak };
+  }
+  function isTypingInPage(doc) {
+    try {
+      const el = (
+        /** @type {any} */
+        doc.activeElement
+      );
+      if (!el || el === doc.body) return false;
+      if (el.isContentEditable) return String(el.textContent || "").trim().length > 0;
+      const tag = String(el.tagName || "").toUpperCase();
+      if (tag === "TEXTAREA" || tag === "INPUT") return String(el.value || "").trim().length > 0;
+      return false;
+    } catch {
+      return false;
+    }
+  }
+  function startOrphanTabAutoReload(deps) {
+    const now = deps.now || (() => Date.now());
+    const setI = deps.setIntervalFn || ((fn, ms) => setInterval(fn, ms));
+    const clearI = deps.clearIntervalFn || ((id) => clearInterval(
+      /** @type {any} */
+      id
+    ));
+    let deadStreak = 0;
+    let done = false;
+    let timer = null;
+    const tick = () => {
+      if (done) return;
+      let alive = true;
+      try {
+        alive = Boolean(deps.hasContext());
+      } catch {
+        alive = false;
+      }
+      const d = decideOrphanReload({
+        alive,
+        deadStreak,
+        typing: !alive && deps.isTyping ? Boolean(deps.isTyping()) : false,
+        lastReloadAt: !alive && deps.readLastReloadAt ? Number(deps.readLastReloadAt()) || 0 : 0,
+        now: now()
+      });
+      deadStreak = d.deadStreak;
+      if (d.action !== "reload") return;
+      done = true;
+      clearI(timer);
+      try {
+        deps.writeLastReloadAt?.(now());
+      } catch {
+      }
+      deps.reload();
+    };
+    timer = setI(tick, deps.pollMs || ORPHAN_RELOAD_POLL_MS);
+    return () => {
+      done = true;
+      clearI(timer);
+    };
+  }
+
+  // src/extension/orphanTabAutoReloadHost.js
+  function startOrphanTabAutoReloadInPage(hasContext) {
+    return startOrphanTabAutoReload({
+      hasContext,
+      isTyping: () => isTypingInPage(document),
+      reload: () => window.location.reload(),
+      readLastReloadAt: () => {
+        try {
+          return Number(window.sessionStorage.getItem(ORPHAN_RELOAD_SESSION_KEY)) || 0;
+        } catch {
+          return 0;
+        }
+      },
+      writeLastReloadAt: (at) => {
+        try {
+          window.sessionStorage.setItem(ORPHAN_RELOAD_SESSION_KEY, String(at));
+        } catch {
+        }
+      }
+    });
+  }
+
   // extension-youtube/src/venue-inline-entry.js
   function currentVideoId() {
     const href = String(location.href || "");
@@ -22386,4 +22481,5 @@ ${sourceCol}
   }
   setInterval(sync, 1e3);
   sync();
+  if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());
 })();
