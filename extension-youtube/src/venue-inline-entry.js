@@ -4,7 +4,9 @@
 //   動画の疑似 lv を venueBar に教えてから(ビルド時に足す __ytSetVenueLiveId)、ニコ生版と同じ呼び方で出す。
 //   会場の作り・見た目・席・吹き出し・読み上げはニコ生版の venueBar.js のまま(手を加えない)。
 //   ★2026-11-04 りんく「このかたちがいい」(ニコ生版の視聴ページのボタン)・「画面をくろくおおわないで」(0.1.69 の重ね窓は撤去)。
-import { pseudoLvForVideoId } from './ytNicoShim.js';
+import { pseudoLvForVideoId, ytIsImportantVoiceKey } from './ytNicoShim.js';
+import { VoicePlayer } from '../../src/lib/voicePlayer.js';
+import { ytShouldVoiceWhenCrowded } from '../../src/lib/youtube/ytVoicePriority.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
@@ -110,4 +112,51 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
     },
     true,
   );
+})();
+
+// 混んだら大事なものだけ読む(2026-11-04 りんく決定)。ニコ生版の会場の読み上げ(VoicePlayer)はそのままで、
+//   YouTube 版の中だけ、列に入れる手前で選ぶ: 読み上げの待ちが2件以上なら、スパチャ・メンバー・ギフト・配信者/モデレーター・
+//   その配信で初めてのコメント以外は読まない(吹き出しは出る)。大事なものは古くなっても飛ばさない(ニコ生のギフトと同じ扱い)。
+//   計器: diag.ytCrowdSkipTotal(読まずに吹き出しだけにした数)・diag.ytImportantTotal(大事なものとして列に入れた数)。
+(() => {
+  const proto = /** @type {any} */ (VoicePlayer.prototype);
+  if (proto.__ytCrowdWrapped) return;
+  proto.__ytCrowdWrapped = true;
+  const realEnqueue = proto.enqueue;
+  proto.enqueue = function (/** @type {any[]} */ items) {
+    if (!Array.isArray(items)) return realEnqueue.call(this, items);
+    /** @type {any[]} */
+    const keep = [];
+    /** @type {any[]} */
+    const importantItems = [];
+    for (const it of items) {
+      if (!it || it.kind !== 'comment') {
+        keep.push(it);
+        continue;
+      }
+      const important = ytIsImportantVoiceKey(it.key);
+      const queueLength = (Array.isArray(this.queue) ? this.queue.length : 0) + keep.length;
+      if (!ytShouldVoiceWhenCrowded({ important, queueLength })) {
+        this.diag.ytCrowdSkipTotal = (Number(this.diag.ytCrowdSkipTotal) || 0) + 1;
+        try {
+          it.onDropped?.();
+        } catch {
+          /* 吹き出しの後始末の失敗で読み上げを止めない */
+        }
+        continue;
+      }
+      if (important) {
+        this.diag.ytImportantTotal = (Number(this.diag.ytImportantTotal) || 0) + 1;
+        importantItems.push(it);
+      }
+      keep.push(it);
+    }
+    const r = realEnqueue.call(this, keep);
+    // 大事なものは古くなっても飛ばさない(列の中の印をギフトと同じ high にする)
+    if (importantItems.length && Array.isArray(this.queue)) {
+      const drops = new Set(importantItems.map((x) => x.onDropped).filter(Boolean));
+      for (const q of this.queue) if (q && drops.has(q.onDropped)) q.priority = 'high';
+    }
+    return r;
+  };
 })();
