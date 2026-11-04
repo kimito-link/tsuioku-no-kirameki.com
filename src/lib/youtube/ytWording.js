@@ -84,9 +84,34 @@ export function ytWording(text, opts = {}) {
 export function ytWordingTopFanToSuperChatRank(text) {
   let out = String(text ?? '');
   if (!/トップファン|XP/.test(out)) return out;
-  for (let i = 0; i < 3; i += 1) {
-    const from = /** @type {string} */ (TOP_FAN_RULES[i][1]);
-    out = out.split(from).join(/** @type {string} */ (SUPERCHAT_RANK_RULES[i][1]));
-  }
+  out = swapOnce(out, TOP_FAN_RULES, SUPERCHAT_RANK_RULES);
   return out.replace(/(\d[\d,]*) XP\b/g, '$1 pt');
+}
+
+/**
+ * 逆向き: 一度「スパチャの合計順」の言葉にした画面を、トップファンの言葉に戻す
+ * (アーカイブを見たあと、トップファンの順位表がある配信へ移ったとき)。数字の単位は描き直しで直るので触らない。
+ * @param {string} text
+ * @returns {string}
+ */
+export function ytWordingSuperChatRankToTopFan(text) {
+  let out = String(text ?? '');
+  if (!/スパチャの合計順|スーパーチャット・ギフトの合計の順位/.test(out)) return out;
+  return swapOnce(out, SUPERCHAT_RANK_RULES, TOP_FAN_RULES);
+}
+
+/**
+ * 言い換えの1〜3番目(文・見出し・語)を、1回の走査で置き換える。順に置き換えると、置き換えた後の文の中の
+ * 「トップファン」をもう一度置き換えて文を壊していた(「トップファンの順位が出ていない」→「スパチャの合計順の順位…」)。
+ * @param {string} text
+ * @param {any[]} fromRules
+ * @param {any[]} toRules
+ */
+function swapOnce(text, fromRules, toRules) {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  for (let i = 0; i < 3; i += 1) map.set(String(fromRules[i][1]), String(toRules[i][1]));
+  const keys = [...map.keys()].sort((a, b) => b.length - a.length);
+  const re = new RegExp(keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  return text.replace(re, (m) => map.get(m) ?? m);
 }

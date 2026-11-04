@@ -34,6 +34,17 @@ describe('ytWordingTopFanToSuperChatRank', () => {
   });
 });
 
+describe('ytWordingSuperChatRankToTopFan', () => {
+  it('スパチャの合計順の言葉をトップファンに戻す', async () => {
+    const { ytWordingSuperChatRankToTopFan, ytWordingTopFanToSuperChatRank } = await import('./ytWording.js');
+    expect(ytWordingSuperChatRankToTopFan('スパチャの合計順')).toBe('トップファン');
+    expect(ytWordingSuperChatRankToTopFan('スーパーチャット・ギフトの合計の順位')).toBe('YouTube 公式のトップファン（XP の順位）');
+    const long = 'YouTube のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。';
+    expect(ytWordingSuperChatRankToTopFan(ytWordingTopFanToSuperChatRank(long))).toBe(long);
+    expect(ytWordingSuperChatRankToTopFan('こんにちは')).toBe('こんにちは');
+  });
+});
+
 describe('niconico だけの文', () => {
   it('ニコ を含まなくても直す', async () => {
     const { ytWording } = await import('./ytWording.js');

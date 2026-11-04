@@ -353,7 +353,30 @@ function readStreamStartedAt(videoId) {
   } catch {
     // ignore
   }
-  return null;
+  return readRelativeStartedAt();
+}
+
+/**
+ * ページ内で別の配信へ移ったあとは上の欄が新しい配信に変わらないので、説明欄の
+ * 「3 時間前にライブ配信開始」を目安に使う(分・時間・日の単位まで。無いと「経過 1分」と出ていた)。
+ * @returns {number | null}
+ */
+function readRelativeStartedAt() {
+  try {
+    const box = document.querySelector('ytd-watch-metadata #info-container, ytd-watch-info-text, ytd-watch-metadata #description');
+    const text = String(box?.textContent || '').replace(/\s+/g, ' ');
+    const unitMs = { 分: 60000, 時間: 3600000, 日: 86400000, minute: 60000, hour: 3600000, day: 86400000 };
+    let m = text.match(/(\d+)\s*(分|時間|日)前にライブ配信開始/);
+    if (!m) m = text.match(/Started streaming (\d+) (minute|hour|day)s? ago/i);
+    if (!m) return null;
+    const n = Number(m[1]);
+    const unit = /** @type {number} */ (unitMs[/** @type {keyof typeof unitMs} */ (m[2].toLowerCase())] || 0);
+    if (!Number.isFinite(n) || n < 0 || !unit) return null;
+    // 分の単位にそろえる(5秒ごとに値が揺れないように)
+    return Math.floor((Date.now() - n * unit) / 60000) * 60000;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -579,7 +602,7 @@ function setupLiveChatObserver() {
 
     const items = pendingBatch;
     pendingBatch = [];
-    if (!boundVideoId) return;
+    if (!boundVideoId || retired) return;
     safeSendMessage({
       type: 'YT_CHAT_ITEMS',
       payload: {
@@ -595,23 +618,46 @@ function setupLiveChatObserver() {
     flushTimer = setTimeout(flushBatch, 150);
   };
 
-  /** 動画IDが変わったかを見て、変わっていたら区切る */
-  const checkVideoSwitch = () => {
-    const vid = resolveCurrentVideoId();
-    if (!vid || vid === boundVideoId) return;
-    if (flushTimer !== null) {
-      clearTimeout(flushTimer);
-      flushTimer = null;
-    }
-    if (pendingBatch.length) flushBatch(); // 前の動画IDで送り切る
+  // ★0.1.36: 4秒待つだけでは、前の配信のチャット欄(この文書)が4秒を過ぎても前の配信のコメントを流し続け、
+  //   それが新しい配信の記録に入っていた(初音ミクの配信の人が DaiGo さんの配信の記録に二十数件)。
+  //   → 親ページの動画IDが変わったら、このチャット欄の文書はもう送らない(引退)。新しい配信のチャットは
+  //     YouTube が新しいチャット欄の文書として読み込み、そちらの記録係が最初から送る。
+  //     例外: このチャット欄の文書自身の URL が変わった(同じ文書のまま新しい配信のチャットへ移った)ときだけ、
+  //     その時点の要素を前の配信のものとして外し、少し待ってから新しい動画IDで送り直す。
+  let retired = false;
+  let retiredHref = '';
+
+  const markAllStale = () => {
     try {
       const nodes = document.querySelectorAll(CHAT_ITEM_SELECTOR);
       for (let i = 0; i < nodes.length; i += 1) staleEls.add(nodes[i]);
     } catch {
       // fail-soft
     }
-    boundVideoId = vid;
-    switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
+  };
+
+  /** 動画IDが変わったかを見て、変わっていたら区切る */
+  const checkVideoSwitch = () => {
+    const vid = resolveCurrentVideoId();
+    if (retired) {
+      const href = String(window.location.href || '');
+      if (vid && vid !== boundVideoId && href !== retiredHref) {
+        markAllStale();
+        retired = false;
+        boundVideoId = vid;
+        switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
+      }
+      return;
+    }
+    if (!vid || vid === boundVideoId) return;
+    if (flushTimer !== null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    if (pendingBatch.length) flushBatch(); // 前の動画IDで送り切る
+    markAllStale();
+    retired = true;
+    retiredHref = String(window.location.href || '');
   };
 
   // アーカイブのチャットのリプレイでは、コメントの時刻表示は「動画の中の経過時間」(例 1:23:45)で時計ではない。
@@ -621,6 +667,7 @@ function setupLiveChatObserver() {
   const inspectElement = (el, retryCount = 0) => {
     if (!el || typeof el.tagName !== 'string') return;
     checkVideoSwitch();
+    if (retired) return;
     if (staleEls.has(el)) return;
     if (el.isConnected === false) return;
     const waitMs = switchGraceUntil - Date.now();

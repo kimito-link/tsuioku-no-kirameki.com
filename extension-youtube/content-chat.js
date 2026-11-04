@@ -640,7 +640,29 @@
       }
     } catch {
     }
-    return null;
+    return readRelativeStartedAt();
+  }
+  function readRelativeStartedAt() {
+    try {
+      const box = document.querySelector("ytd-watch-metadata #info-container, ytd-watch-info-text, ytd-watch-metadata #description");
+      const text = String(box?.textContent || "").replace(/\s+/g, " ");
+      const unitMs = { 分: 6e4, 時間: 36e5, 日: 864e5, minute: 6e4, hour: 36e5, day: 864e5 };
+      let m = text.match(/(\d+)\s*(分|時間|日)前にライブ配信開始/);
+      if (!m) m = text.match(/Started streaming (\d+) (minute|hour|day)s? ago/i);
+      if (!m) return null;
+      const n = Number(m[1]);
+      const unit = (
+        /** @type {number} */
+        unitMs[
+          /** @type {keyof typeof unitMs} */
+          m[2].toLowerCase()
+        ] || 0
+      );
+      if (!Number.isFinite(n) || n < 0 || !unit) return null;
+      return Math.floor((Date.now() - n * unit) / 6e4) * 6e4;
+    } catch {
+      return null;
+    }
   }
   var lastProbeAt = 0;
   function saveViewerProbe() {
@@ -823,7 +845,7 @@
       lastFilterLabel = filterLabel;
       const items = pendingBatch;
       pendingBatch = [];
-      if (!boundVideoId) return;
+      if (!boundVideoId || retired) return;
       safeSendMessage({
         type: "YT_CHAT_ITEMS",
         payload: {
@@ -837,26 +859,42 @@
       if (flushTimer !== null) return;
       flushTimer = setTimeout(flushBatch, 150);
     };
+    let retired = false;
+    let retiredHref = "";
+    const markAllStale = () => {
+      try {
+        const nodes = document.querySelectorAll(CHAT_ITEM_SELECTOR);
+        for (let i = 0; i < nodes.length; i += 1) staleEls.add(nodes[i]);
+      } catch {
+      }
+    };
     const checkVideoSwitch = () => {
       const vid = resolveCurrentVideoId();
+      if (retired) {
+        const href = String(window.location.href || "");
+        if (vid && vid !== boundVideoId && href !== retiredHref) {
+          markAllStale();
+          retired = false;
+          boundVideoId = vid;
+          switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
+        }
+        return;
+      }
       if (!vid || vid === boundVideoId) return;
       if (flushTimer !== null) {
         clearTimeout(flushTimer);
         flushTimer = null;
       }
       if (pendingBatch.length) flushBatch();
-      try {
-        const nodes = document.querySelectorAll(CHAT_ITEM_SELECTOR);
-        for (let i = 0; i < nodes.length; i += 1) staleEls.add(nodes[i]);
-      } catch {
-      }
-      boundVideoId = vid;
-      switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
+      markAllStale();
+      retired = true;
+      retiredHref = String(window.location.href || "");
     };
     const isReplay = String(window.location.pathname || "").startsWith("/live_chat_replay");
     const inspectElement = (el, retryCount = 0) => {
       if (!el || typeof el.tagName !== "string") return;
       checkVideoSwitch();
+      if (retired) return;
       if (staleEls.has(el)) return;
       if (el.isConnected === false) return;
       const waitMs = switchGraceUntil - Date.now();
