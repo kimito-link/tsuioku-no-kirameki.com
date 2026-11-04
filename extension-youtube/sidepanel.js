@@ -1088,6 +1088,62 @@ ${sourceCol}
     });
   }
 
+  // extension-youtube/src/ytLocalAssetUrls.js
+  var ASSET_RE = /^(?:images|sound)\/[\w\-./]+\.(?:png|jpe?g|gif|webp|svg|mp3|ogg|wav)$/i;
+  var ready = /* @__PURE__ */ new Map();
+  var loading = /* @__PURE__ */ new Map();
+  function mimeOf(rel) {
+    const ext = (rel.split(".").pop() || "").toLowerCase();
+    return { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav" }[ext] || "application/octet-stream";
+  }
+  function b64ToBlobUrl(b64, mime) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  }
+  function ytLoadLocalAsset(rel) {
+    const key = String(rel || "").replace(/^\/+/, "");
+    if (!ASSET_RE.test(key) || key.includes("..")) return Promise.resolve("");
+    const hit = ready.get(key);
+    if (hit) return Promise.resolve(hit);
+    const p = loading.get(key);
+    if (p) return p;
+    const job = (async () => {
+      try {
+        const res = await chrome.runtime.sendMessage({ type: "YT_GET_EXT_ASSET", path: key });
+        if (!res || !res.ok || typeof res.b64 !== "string" || !res.b64) return "";
+        const url = b64ToBlobUrl(res.b64, String(res.mime || mimeOf(key)));
+        ready.set(key, url);
+        return url;
+      } catch {
+        return "";
+      } finally {
+        loading.delete(key);
+      }
+    })();
+    loading.set(key, job);
+    return job;
+  }
+  function relOfExtUrl(url) {
+    try {
+      const base = realGetURL ? realGetURL("") : "";
+      const s5 = String(url || "");
+      return base && s5.startsWith(base) ? s5.slice(base.length).split(/[?#]/)[0] : "";
+    } catch {
+      return "";
+    }
+  }
+  var realGetURL = null;
+  function ytLocalAssetUrlFor(url) {
+    const rel = relOfExtUrl(url);
+    if (!rel) return url;
+    const hit = ready.get(rel);
+    if (hit) return hit;
+    void ytLoadLocalAsset(rel);
+    return url;
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
@@ -1928,7 +1984,7 @@ ${sourceCol}
   var NICO_USERICON_RE = /nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg/;
   function fixImg(img) {
     const src = String(img.getAttribute("src") || "");
-    const m = src.match(NICO_USERICON_RE);
+    const m = src.match(NICO_USERICON_RE) || String(img.getAttribute("data-yt-nico-src") || "").match(NICO_USERICON_RE);
     if (!m) return;
     const icon = ytIconForNumericUid(m[1]);
     if (icon && icon !== src) img.setAttribute("src", icon);
@@ -2436,6 +2492,91 @@ ${sourceCol}
               });
             }
             ih.set.call(this, s5);
+          }
+        });
+      }
+    } catch {
+    }
+  }
+  if (YT_SHIM_IN_PAGE && typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+    const NIMG_RE = /^https?:\/\/[^/]*\.nimg\.jp\//i;
+    const mapPageSrc = (v) => {
+      const s5 = String(v ?? "");
+      if (s5.startsWith("chrome-extension://")) return { src: ytLocalAssetUrlFor(s5), nico: "" };
+      if (!NIMG_RE.test(s5)) return { src: v, nico: "" };
+      const m = s5.match(NICO_USERICON_RE);
+      const icon = m ? ytIconForNumericUid(m[1]) : "";
+      return icon ? { src: icon, nico: "" } : { src: "data:,", nico: s5 };
+    };
+    try {
+      const realSetAttr = Element.prototype.setAttribute;
+      const realGetAttr = Element.prototype.getAttribute;
+      Element.prototype.getAttribute = function(name) {
+        const v = realGetAttr.call(this, name);
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") {
+          return realGetAttr.call(this, "data-yt-nico-src") || v;
+        }
+        return v;
+      };
+      const failLater = (img, fail) => {
+        const want = realGetAttr.call(img, "data-yt-nico-src");
+        setTimeout(() => {
+          if (realGetAttr.call(img, "data-yt-nico-src") === want) fail();
+        }, 150);
+      };
+      const keepNico = (img, nico) => {
+        if (nico) realSetAttr.call(img, "data-yt-nico-src", nico);
+        else if (img.hasAttribute("data-yt-nico-src")) img.removeAttribute("data-yt-nico-src");
+      };
+      const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+      if (desc && desc.set && desc.get) {
+        Object.defineProperty(HTMLImageElement.prototype, "src", {
+          configurable: true,
+          enumerable: desc.enumerable,
+          // ニコ生版の部品(顔の読み込み見張り)は src を読んで「誰の顔が失敗したか」を決めるので、元の場所を見せる
+          get() {
+            return realGetAttr.call(this, "data-yt-nico-src") || desc.get.call(this);
+          },
+          set(v) {
+            const r = mapPageSrc(v);
+            keepNico(this, r.nico);
+            if (r.nico) failLater(this, () => desc.set.call(this, "data:,"));
+            else desc.set.call(this, r.src);
+          }
+        });
+      }
+      Element.prototype.setAttribute = function(name, value) {
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") {
+          const r = mapPageSrc(value);
+          keepNico(this, r.nico);
+          if (r.nico) return failLater(this, () => realSetAttr.call(this, name, "data:,"));
+          return realSetAttr.call(this, name, r.src);
+        }
+        return realSetAttr.call(this, name, value);
+      };
+      const ih = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+      if (ih && ih.set && ih.get) {
+        const SRC_RE = /\bsrc="((?:https?:\/\/[^"/]*\.nimg\.jp\/|chrome-extension:\/\/)[^"]*)"/gi;
+        const unesc = (t) => t.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+        const esc2 = (t) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        Object.defineProperty(Element.prototype, "innerHTML", {
+          configurable: true,
+          enumerable: ih.enumerable,
+          get() {
+            return ih.get.call(this);
+          },
+          set(v) {
+            let html = v;
+            if (typeof html === "string" && (html.includes("nimg.jp") || html.includes("chrome-extension://"))) {
+              html = html.replace(SRC_RE, (all, raw) => {
+                const r = mapPageSrc(unesc(raw));
+                return r.nico ? `data-yt-nico-src="${esc2(r.nico)}"` : `src="${esc2(String(r.src))}"`;
+              });
+            }
+            ih.set.call(this, html);
+            if (html !== v) {
+              for (const img of this.querySelectorAll("img[data-yt-nico-src]:not([src])")) failLater(img, () => realSetAttr.call(img, "src", "data:,"));
+            }
           }
         });
       }
@@ -18782,22 +18923,22 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       );
     }
     notes.push("推奨値はあくまで目安です。PlatformProfile への自動適用はしません（人の確認後に反映）。");
-    const ready = basis !== "insufficient";
+    const ready2 = basis !== "insufficient";
     return {
       platform,
       sampleCount: all.length,
       withTruthCount,
       crossUsableCount,
       basis,
-      ready,
+      ready: ready2,
       current: {
         avgSessionMin: round(currentAvgSessionMin, 2),
         perPersonCommentsPerMin: round(currentPerPerson, 3)
       },
       suggested: {
-        avgSessionMin: ready && medAvgSession != null ? round(clampRange(medAvgSession, AVG_SESSION_MIN_RANGE), 1) : null,
-        perPersonCommentsPerMin: ready && medPerPerson != null ? round(clampRange(medPerPerson, PER_PERSON_RANGE), 3) : null,
-        multiplierScale: ready && medMultScale != null ? round(clampRange(medMultScale, MULTIPLIER_SCALE_RANGE), 2) : null
+        avgSessionMin: ready2 && medAvgSession != null ? round(clampRange(medAvgSession, AVG_SESSION_MIN_RANGE), 1) : null,
+        perPersonCommentsPerMin: ready2 && medPerPerson != null ? round(clampRange(medPerPerson, PER_PERSON_RANGE), 3) : null,
+        multiplierScale: ready2 && medMultScale != null ? round(clampRange(medMultScale, MULTIPLIER_SCALE_RANGE), 2) : null
       },
       quality: {
         medianAbsBlendErrorPct: absBlendErr.length ? round(
@@ -28673,13 +28814,13 @@ ${body}`;
   // src/lib/previewRenderAckKey.js
   var KEY_PREVIEW_RENDER_ACK = "nls_preview_render_ack_v1";
   function buildPreviewRenderAck(input = {}) {
-    const ready = input.ready === true;
+    const ready2 = input.ready === true;
     const ts = Number(input.nowMs) > 0 ? Math.floor(Number(input.nowMs)) : 0;
     const liveId = String(input.liveId || "").trim().toLowerCase();
     const laneTiles = Math.max(0, Math.floor(Number(input.laneTiles) || 0));
     const supporterRows2 = Math.max(0, Math.floor(Number(input.supporterRows) || 0));
     const gen = Math.max(0, Math.floor(Number(input.gen) || 0));
-    return { ready, ts, liveId, laneTiles, supporterRows: supporterRows2, gen };
+    return { ready: ready2, ts, liveId, laneTiles, supporterRows: supporterRows2, gen };
   }
 
   // src/lib/commentDeltaTier.js
@@ -46224,7 +46365,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T15:41" ? String("yt-2026-11-04T15:41") : "dev";
+      const buildId = "yt-2026-11-04T16:46" ? String("yt-2026-11-04T16:46") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46242,7 +46383,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.87") : "";
+    const bundledVersion = true ? String("0.1.88") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46287,7 +46428,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T15:41" ? String("yt-2026-11-04T15:41") : "dev";
+            return "yt-2026-11-04T16:46" ? String("yt-2026-11-04T16:46") : "dev";
           } catch {
             return "dev";
           }

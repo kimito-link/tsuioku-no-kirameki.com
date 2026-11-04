@@ -5,6 +5,8 @@
 //   会場の作り・見た目・席・吹き出し・読み上げはニコ生版の venueBar.js のまま(手を加えない)。
 //   ★2026-11-04 りんく「このかたちがいい」(ニコ生版の視聴ページのボタン)・「画面をくろくおおわないで」(0.1.69 の重ね窓は撤去)。
 import { pseudoLvForVideoId, ytIsImportantVoiceKey } from './ytNicoShim.js';
+import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets } from './ytLocalAssetUrls.js';
+import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
 import { ytShouldVoiceWhenCrowded } from '../../src/lib/youtube/ytVoicePriority.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
@@ -56,9 +58,22 @@ function sync() {
   if (!document.getElementById('nlsb-venue-root')) mountVenueBarButton();
 }
 
+// 会場の画像はネットワークを通さず blob: で読む(ytLocalAssetUrls.js・YouTube のページの見張りがエラー一覧に積もるため)。
+//   キャラの絵と案内の顔は先に読んでから会場を出す(最長2.5秒・読めた分から効く)。
+ytInstallLocalAssetUrls();
+const PREFETCH = [
+  ...listCharaLiveImagePaths(),
+  'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png',
+  'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png',
+  'images/toumeilink.png',
+];
+
 // YouTube はページを読み直さずに動画を移る。1秒ごとに見て、動画が変わったら会場の配信を切り替える。
-setInterval(sync, 1000);
-sync();
+void ytPrefetchLocalAssets(PREFETCH).then(() => {
+  setInterval(sync, 1000);
+  sync();
+});
 
 if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());
 

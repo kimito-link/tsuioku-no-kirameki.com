@@ -1563,6 +1563,23 @@
       (after > 0 ? getYtStreamCommentsSince(vid, after) : getYtStreamCommentsByVideoId(vid)).then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] })).catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
       return true;
     }
+    if (message.type === "YT_GET_EXT_ASSET") {
+      if (!sender || sender.id !== chrome.runtime.id) return false;
+      const rel = String(message.path || "");
+      if (!/^(?:images|sound)\/[\w\-./]+\.(?:png|jpe?g|gif|webp|svg|mp3|ogg|wav)$/i.test(rel) || rel.includes("..")) {
+        sendResponse({ ok: false });
+        return false;
+      }
+      (async () => {
+        const res = await fetch(chrome.runtime.getURL(rel));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf = new Uint8Array(await res.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < buf.length; i += 32768) bin += String.fromCharCode.apply(null, Array.from(buf.subarray(i, i + 32768)));
+        return { ok: true, b64: btoa(bin), mime: res.headers.get("content-type") || "" };
+      })().then(sendResponse).catch((err) => sendResponse({ ok: false, error: String(err && err.message || err) }));
+      return true;
+    }
     if (message.type === "YT_CAPTURE_FRAME") {
       (async () => {
         const want = String(message.videoId || "");

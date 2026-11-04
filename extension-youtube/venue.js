@@ -854,6 +854,62 @@ ${sourceCol}
     });
   }
 
+  // extension-youtube/src/ytLocalAssetUrls.js
+  var ASSET_RE = /^(?:images|sound)\/[\w\-./]+\.(?:png|jpe?g|gif|webp|svg|mp3|ogg|wav)$/i;
+  var ready = /* @__PURE__ */ new Map();
+  var loading = /* @__PURE__ */ new Map();
+  function mimeOf(rel3) {
+    const ext = (rel3.split(".").pop() || "").toLowerCase();
+    return { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav" }[ext] || "application/octet-stream";
+  }
+  function b64ToBlobUrl(b64, mime) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  }
+  function ytLoadLocalAsset(rel3) {
+    const key = String(rel3 || "").replace(/^\/+/, "");
+    if (!ASSET_RE.test(key) || key.includes("..")) return Promise.resolve("");
+    const hit = ready.get(key);
+    if (hit) return Promise.resolve(hit);
+    const p = loading.get(key);
+    if (p) return p;
+    const job = (async () => {
+      try {
+        const res = await chrome.runtime.sendMessage({ type: "YT_GET_EXT_ASSET", path: key });
+        if (!res || !res.ok || typeof res.b64 !== "string" || !res.b64) return "";
+        const url = b64ToBlobUrl(res.b64, String(res.mime || mimeOf(key)));
+        ready.set(key, url);
+        return url;
+      } catch {
+        return "";
+      } finally {
+        loading.delete(key);
+      }
+    })();
+    loading.set(key, job);
+    return job;
+  }
+  function relOfExtUrl(url) {
+    try {
+      const base = realGetURL ? realGetURL("") : "";
+      const s = String(url || "");
+      return base && s.startsWith(base) ? s.slice(base.length).split(/[?#]/)[0] : "";
+    } catch {
+      return "";
+    }
+  }
+  var realGetURL = null;
+  function ytLocalAssetUrlFor(url) {
+    const rel3 = relOfExtUrl(url);
+    if (!rel3) return url;
+    const hit = ready.get(rel3);
+    if (hit) return hit;
+    void ytLoadLocalAsset(rel3);
+    return url;
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
@@ -1694,7 +1750,7 @@ ${sourceCol}
   var NICO_USERICON_RE = /nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg/;
   function fixImg(img) {
     const src = String(img.getAttribute("src") || "");
-    const m = src.match(NICO_USERICON_RE);
+    const m = src.match(NICO_USERICON_RE) || String(img.getAttribute("data-yt-nico-src") || "").match(NICO_USERICON_RE);
     if (!m) return;
     const icon = ytIconForNumericUid(m[1]);
     if (icon && icon !== src) img.setAttribute("src", icon);
@@ -2202,6 +2258,91 @@ ${sourceCol}
               });
             }
             ih.set.call(this, s);
+          }
+        });
+      }
+    } catch {
+    }
+  }
+  if (YT_SHIM_IN_PAGE && typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+    const NIMG_RE = /^https?:\/\/[^/]*\.nimg\.jp\//i;
+    const mapPageSrc = (v) => {
+      const s = String(v ?? "");
+      if (s.startsWith("chrome-extension://")) return { src: ytLocalAssetUrlFor(s), nico: "" };
+      if (!NIMG_RE.test(s)) return { src: v, nico: "" };
+      const m = s.match(NICO_USERICON_RE);
+      const icon = m ? ytIconForNumericUid(m[1]) : "";
+      return icon ? { src: icon, nico: "" } : { src: "data:,", nico: s };
+    };
+    try {
+      const realSetAttr = Element.prototype.setAttribute;
+      const realGetAttr = Element.prototype.getAttribute;
+      Element.prototype.getAttribute = function(name) {
+        const v = realGetAttr.call(this, name);
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") {
+          return realGetAttr.call(this, "data-yt-nico-src") || v;
+        }
+        return v;
+      };
+      const failLater = (img, fail) => {
+        const want = realGetAttr.call(img, "data-yt-nico-src");
+        setTimeout(() => {
+          if (realGetAttr.call(img, "data-yt-nico-src") === want) fail();
+        }, 150);
+      };
+      const keepNico = (img, nico) => {
+        if (nico) realSetAttr.call(img, "data-yt-nico-src", nico);
+        else if (img.hasAttribute("data-yt-nico-src")) img.removeAttribute("data-yt-nico-src");
+      };
+      const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+      if (desc && desc.set && desc.get) {
+        Object.defineProperty(HTMLImageElement.prototype, "src", {
+          configurable: true,
+          enumerable: desc.enumerable,
+          // ニコ生版の部品(顔の読み込み見張り)は src を読んで「誰の顔が失敗したか」を決めるので、元の場所を見せる
+          get() {
+            return realGetAttr.call(this, "data-yt-nico-src") || desc.get.call(this);
+          },
+          set(v) {
+            const r = mapPageSrc(v);
+            keepNico(this, r.nico);
+            if (r.nico) failLater(this, () => desc.set.call(this, "data:,"));
+            else desc.set.call(this, r.src);
+          }
+        });
+      }
+      Element.prototype.setAttribute = function(name, value) {
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") {
+          const r = mapPageSrc(value);
+          keepNico(this, r.nico);
+          if (r.nico) return failLater(this, () => realSetAttr.call(this, name, "data:,"));
+          return realSetAttr.call(this, name, r.src);
+        }
+        return realSetAttr.call(this, name, value);
+      };
+      const ih = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+      if (ih && ih.set && ih.get) {
+        const SRC_RE = /\bsrc="((?:https?:\/\/[^"/]*\.nimg\.jp\/|chrome-extension:\/\/)[^"]*)"/gi;
+        const unesc = (t) => t.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+        const esc = (t) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        Object.defineProperty(Element.prototype, "innerHTML", {
+          configurable: true,
+          enumerable: ih.enumerable,
+          get() {
+            return ih.get.call(this);
+          },
+          set(v) {
+            let html = v;
+            if (typeof html === "string" && (html.includes("nimg.jp") || html.includes("chrome-extension://"))) {
+              html = html.replace(SRC_RE, (all, raw) => {
+                const r = mapPageSrc(unesc(raw));
+                return r.nico ? `data-yt-nico-src="${esc(r.nico)}"` : `src="${esc(String(r.src))}"`;
+              });
+            }
+            ih.set.call(this, html);
+            if (html !== v) {
+              for (const img of this.querySelectorAll("img[data-yt-nico-src]:not([src])")) failLater(img, () => realSetAttr.call(img, "src", "data:,"));
+            }
           }
         });
       }
@@ -19888,7 +20029,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T15:41") : ""
+          buildId: true ? String("yt-2026-11-04T16:46") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

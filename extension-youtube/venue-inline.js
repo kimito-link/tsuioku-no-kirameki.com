@@ -859,6 +859,93 @@ ${sourceCol}
     return !(Number(s.queueLength) >= YT_VOICE_CROWD_QUEUE);
   }
 
+  // extension-youtube/src/ytLocalAssetUrls.js
+  var ASSET_RE = /^(?:images|sound)\/[\w\-./]+\.(?:png|jpe?g|gif|webp|svg|mp3|ogg|wav)$/i;
+  var ready = /* @__PURE__ */ new Map();
+  var loading = /* @__PURE__ */ new Map();
+  function mimeOf(rel3) {
+    const ext = (rel3.split(".").pop() || "").toLowerCase();
+    return { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav" }[ext] || "application/octet-stream";
+  }
+  function b64ToBlobUrl(b64, mime) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  }
+  function ytLoadLocalAsset(rel3) {
+    const key = String(rel3 || "").replace(/^\/+/, "");
+    if (!ASSET_RE.test(key) || key.includes("..")) return Promise.resolve("");
+    const hit = ready.get(key);
+    if (hit) return Promise.resolve(hit);
+    const p = loading.get(key);
+    if (p) return p;
+    const job = (async () => {
+      try {
+        const res = await chrome.runtime.sendMessage({ type: "YT_GET_EXT_ASSET", path: key });
+        if (!res || !res.ok || typeof res.b64 !== "string" || !res.b64) return "";
+        const url = b64ToBlobUrl(res.b64, String(res.mime || mimeOf(key)));
+        ready.set(key, url);
+        return url;
+      } catch {
+        return "";
+      } finally {
+        loading.delete(key);
+      }
+    })();
+    loading.set(key, job);
+    return job;
+  }
+  function relOfExtUrl(url) {
+    try {
+      const base = realGetURL ? realGetURL("") : "";
+      const s = String(url || "");
+      return base && s.startsWith(base) ? s.slice(base.length).split(/[?#]/)[0] : "";
+    } catch {
+      return "";
+    }
+  }
+  var realGetURL = null;
+  function ytLocalAssetUrlFor(url) {
+    const rel3 = relOfExtUrl(url);
+    if (!rel3) return url;
+    const hit = ready.get(rel3);
+    if (hit) return hit;
+    void ytLoadLocalAsset(rel3);
+    return url;
+  }
+  function ytInstallLocalAssetUrls() {
+    try {
+      const rt = (
+        /** @type {any} */
+        globalThis.chrome?.runtime
+      );
+      if (!rt || typeof rt.getURL !== "function" || rt.getURL.__ytLocalAsset) return;
+      const orig = rt.getURL.bind(rt);
+      realGetURL = orig;
+      const wrapped = (p) => {
+        const url = orig(p);
+        const key = String(p || "").replace(/^\/+/, "");
+        if (!ASSET_RE.test(key)) return url;
+        const hit = ready.get(key);
+        if (hit) return hit;
+        void ytLoadLocalAsset(key);
+        return url;
+      };
+      wrapped.__ytLocalAsset = true;
+      try {
+        rt.getURL = wrapped;
+      } catch {
+        Object.defineProperty(rt, "getURL", { configurable: true, writable: true, value: wrapped });
+      }
+    } catch {
+    }
+  }
+  function ytPrefetchLocalAssets(rels, timeoutMs = 2500) {
+    const all = Promise.all(rels.map((r) => ytLoadLocalAsset(r)));
+    return Promise.race([all, new Promise((r) => setTimeout(r, timeoutMs))]);
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
@@ -1702,7 +1789,7 @@ ${sourceCol}
   var NICO_USERICON_RE = /nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg/;
   function fixImg(img) {
     const src = String(img.getAttribute("src") || "");
-    const m = src.match(NICO_USERICON_RE);
+    const m = src.match(NICO_USERICON_RE) || String(img.getAttribute("data-yt-nico-src") || "").match(NICO_USERICON_RE);
     if (!m) return;
     const icon = ytIconForNumericUid(m[1]);
     if (icon && icon !== src) img.setAttribute("src", icon);
@@ -2216,6 +2303,91 @@ ${sourceCol}
     } catch {
     }
   }
+  if (YT_SHIM_IN_PAGE && typeof HTMLImageElement !== "undefined" && typeof Element !== "undefined") {
+    const NIMG_RE = /^https?:\/\/[^/]*\.nimg\.jp\//i;
+    const mapPageSrc = (v) => {
+      const s = String(v ?? "");
+      if (s.startsWith("chrome-extension://")) return { src: ytLocalAssetUrlFor(s), nico: "" };
+      if (!NIMG_RE.test(s)) return { src: v, nico: "" };
+      const m = s.match(NICO_USERICON_RE);
+      const icon = m ? ytIconForNumericUid(m[1]) : "";
+      return icon ? { src: icon, nico: "" } : { src: "data:,", nico: s };
+    };
+    try {
+      const realSetAttr = Element.prototype.setAttribute;
+      const realGetAttr = Element.prototype.getAttribute;
+      Element.prototype.getAttribute = function(name) {
+        const v = realGetAttr.call(this, name);
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") {
+          return realGetAttr.call(this, "data-yt-nico-src") || v;
+        }
+        return v;
+      };
+      const failLater = (img, fail) => {
+        const want = realGetAttr.call(img, "data-yt-nico-src");
+        setTimeout(() => {
+          if (realGetAttr.call(img, "data-yt-nico-src") === want) fail();
+        }, 150);
+      };
+      const keepNico = (img, nico) => {
+        if (nico) realSetAttr.call(img, "data-yt-nico-src", nico);
+        else if (img.hasAttribute("data-yt-nico-src")) img.removeAttribute("data-yt-nico-src");
+      };
+      const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+      if (desc && desc.set && desc.get) {
+        Object.defineProperty(HTMLImageElement.prototype, "src", {
+          configurable: true,
+          enumerable: desc.enumerable,
+          // ニコ生版の部品(顔の読み込み見張り)は src を読んで「誰の顔が失敗したか」を決めるので、元の場所を見せる
+          get() {
+            return realGetAttr.call(this, "data-yt-nico-src") || desc.get.call(this);
+          },
+          set(v) {
+            const r = mapPageSrc(v);
+            keepNico(this, r.nico);
+            if (r.nico) failLater(this, () => desc.set.call(this, "data:,"));
+            else desc.set.call(this, r.src);
+          }
+        });
+      }
+      Element.prototype.setAttribute = function(name, value) {
+        if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") {
+          const r = mapPageSrc(value);
+          keepNico(this, r.nico);
+          if (r.nico) return failLater(this, () => realSetAttr.call(this, name, "data:,"));
+          return realSetAttr.call(this, name, r.src);
+        }
+        return realSetAttr.call(this, name, value);
+      };
+      const ih = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+      if (ih && ih.set && ih.get) {
+        const SRC_RE = /\bsrc="((?:https?:\/\/[^"/]*\.nimg\.jp\/|chrome-extension:\/\/)[^"]*)"/gi;
+        const unesc = (t) => t.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+        const esc = (t) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        Object.defineProperty(Element.prototype, "innerHTML", {
+          configurable: true,
+          enumerable: ih.enumerable,
+          get() {
+            return ih.get.call(this);
+          },
+          set(v) {
+            let html = v;
+            if (typeof html === "string" && (html.includes("nimg.jp") || html.includes("chrome-extension://"))) {
+              html = html.replace(SRC_RE, (all, raw) => {
+                const r = mapPageSrc(unesc(raw));
+                return r.nico ? `data-yt-nico-src="${esc(r.nico)}"` : `src="${esc(String(r.src))}"`;
+              });
+            }
+            ih.set.call(this, html);
+            if (html !== v) {
+              for (const img of this.querySelectorAll("img[data-yt-nico-src]:not([src])")) failLater(img, () => realSetAttr.call(img, "src", "data:,"));
+            }
+          }
+        });
+      }
+    } catch {
+    }
+  }
   if (typeof document !== "undefined" && /\/sidepanel\.html$/.test(String(location.pathname || ""))) {
     const paintGridNote = () => {
       const grid = document.getElementById("sceneStoryGrowth");
@@ -2384,6 +2556,672 @@ ${sourceCol}
     };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
     else start();
+  }
+
+  // src/lib/yukkuriBroadcastSummary.js
+  var CHAR_BASE = (
+    /** @type {const} */
+    {
+      rinku: "images/yukkuri-charactore-english/link/link-yukkuri",
+      konta: "images/yukkuri-charactore-english/konta/kitsune-yukkuri",
+      tanunee: "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri"
+    }
+  );
+  function yukkuriCharacterImagePath(character, expression, mouthOpen) {
+    const base = CHAR_BASE[character];
+    if (character === "konta" && expression === "normal") {
+      return `${base}-normal.png`;
+    }
+    return `${base}-${expression}-mouth-${mouthOpen ? "open" : "closed"}.png`;
+  }
+
+  // src/lib/charaLiveState.js
+  var CHARA_LIVE_MEMBERS = Object.freeze([
+    Object.freeze({ id: "rinku", displayName: "りんく", role: "配信者視点" }),
+    Object.freeze({ id: "konta", displayName: "こん太", role: "ファン視点" }),
+    Object.freeze({ id: "tanunee", displayName: "たぬ姉", role: "匿名ガイド / しっかり者解説" })
+  ]);
+  var CHARA_LIVE_IDS = Object.freeze(CHARA_LIVE_MEMBERS.map((m) => m.id));
+  function fnv1a32(value) {
+    const s = String(value ?? "");
+    let hash = 2166136261;
+    for (let i = 0; i < s.length; i += 1) {
+      hash ^= s.charCodeAt(i) & 255;
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+  function charaHashUnit(seed) {
+    return fnv1a32(seed) / 4294967296;
+  }
+  function clamp01(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    return n < 0 ? 0 : n > 1 ? 1 : n;
+  }
+  var FLOAT_BASE_PERIOD_MS = 5200;
+  function resolveCharaFloat(timeMs, charaId, opts = {}) {
+    if (opts.reducedMotion === true) {
+      return { x: 0, y: 0, rotateDeg: 0, scale: 1 };
+    }
+    const t = Number(timeMs) || 0;
+    const heat = clamp01(opts.heatLevel);
+    const idx = CHARA_LIVE_IDS.indexOf(
+      /** @type {any} */
+      charaId
+    );
+    const evenPhase = idx >= 0 ? idx / CHARA_LIVE_IDS.length : 0;
+    const phaseSeed = (evenPhase + charaHashUnit(`float:${charaId}`) * 0.08) % 1;
+    const period = Math.max(1200, FLOAT_BASE_PERIOD_MS - heat * 1600);
+    const base = t / period * Math.PI * 2 + phaseSeed * Math.PI * 2;
+    const y = Math.sin(base) * (5 + heat * 3);
+    const x = Math.sin(base * 0.63 + phaseSeed * 3.1) * (3 + heat * 2);
+    const rotateDeg = Math.sin(base * 0.41 + phaseSeed * 1.7) * (1.6 + heat * 1.2);
+    const scale = 1 + Math.sin(base * 0.77 + phaseSeed * 2.3) * 0.012;
+    return { x, y, rotateDeg, scale };
+  }
+  var BLINK_DURATION_MS = 130;
+  var BLINK_INTERVAL_MS = 4200;
+  function isCharaBlinking(timeMs, charaId) {
+    const t = Number(timeMs) || 0;
+    if (t < 0) return false;
+    const seed = charaHashUnit(`blink:${charaId}`);
+    const interval = BLINK_INTERVAL_MS * (0.8 + seed * 0.4);
+    const cycle = Math.floor(t / interval);
+    const jitter = charaHashUnit(`blink:${charaId}:${cycle}`) * interval * 0.5;
+    const startAt = cycle * interval + jitter;
+    return t >= startAt && t < startAt + BLINK_DURATION_MS;
+  }
+  var IDLE_EXPRESSION_PERIOD_MS = 7e3;
+  function resolveIdleExpression(timeMs, charaId, opts = {}) {
+    const t = Number(timeMs) || 0;
+    const heat = clamp01(opts.heatLevel);
+    const seed = charaHashUnit(`expr:${charaId}`);
+    const period = IDLE_EXPRESSION_PERIOD_MS * (0.75 + seed * 0.5);
+    const slot = Math.floor(t / period);
+    const roll = charaHashUnit(`expr:${charaId}:${slot}`);
+    const smileChance = 0.22 + heat * 0.38;
+    if (roll < smileChance) return "smile";
+    if (roll > 1 - 0.14 * (1 - heat)) return "half-eyes";
+    return "normal";
+  }
+  var LIPSYNC_PERIOD_MS = 180;
+  function isCharaMouthOpen(elapsedMs, charaId) {
+    const e = Number(elapsedMs);
+    if (!Number.isFinite(e) || e < 0) return false;
+    const cycle = Math.floor(e / LIPSYNC_PERIOD_MS);
+    const within = e % LIPSYNC_PERIOD_MS / LIPSYNC_PERIOD_MS;
+    const openRatio = 0.35 + charaHashUnit(`lip:${charaId}:${cycle}`) * 0.4;
+    return within < openRatio;
+  }
+  function pickReactingChara(commentKey, lastSpeaker = null) {
+    const pool = CHARA_LIVE_IDS.filter((id) => id !== lastSpeaker);
+    const list = pool.length ? pool : CHARA_LIVE_IDS;
+    const idx = fnv1a32(`react:${commentKey}`) % list.length;
+    return (
+      /** @type {CharaId} */
+      list[idx]
+    );
+  }
+  function detectAddressedChara(text) {
+    const raw = String(text ?? "").trim();
+    if (!raw) return null;
+    const s = raw.toLowerCase();
+    const hits = [];
+    const ALIASES = {
+      rinku: ["りんく", "リンク", "link", "rinku"],
+      konta: ["こん太", "コン太", "こんた", "コンタ", "konta"],
+      tanunee: ["たぬ姉", "たぬねえ", "タヌ姉", "たぬネエ", "tanunee", "tanu"]
+    };
+    for (const id of CHARA_LIVE_IDS) {
+      for (const alias of ALIASES[id]) {
+        const at = s.indexOf(alias.toLowerCase());
+        if (at >= 0) {
+          hits.push({ id, at });
+          break;
+        }
+      }
+    }
+    if (!hits.length) return null;
+    hits.sort((a, b) => a.at - b.at);
+    return hits[0].id;
+  }
+  var REACT_MIN_MS = 1400;
+  var ANSWER_MIN_MS = 1800;
+  function resolveThinkingLook(elapsedMs) {
+    const e = Number(elapsedMs) || 0;
+    const slot = Math.floor(e / 1500);
+    const roll = charaHashUnit(`think:${slot}`);
+    return {
+      expression: roll < 0.75 ? "half-eyes" : "normal",
+      mouthOpen: false
+    };
+  }
+  var THINKING_TILT_MAX_DEG = 9;
+  function resolveThinkingTilt(elapsedMs) {
+    const e = Number(elapsedMs) || 0;
+    const phase = e / 2400 * Math.PI;
+    return Math.sin(phase) * THINKING_TILT_MAX_DEG;
+  }
+  function resolveCharaLiveLook(input) {
+    const charaId = (
+      /** @type {CharaId} */
+      input?.charaId || "rinku"
+    );
+    const mode = (
+      /** @type {CharaMode} */
+      input?.mode || "idle"
+    );
+    const timeMs = Number(input?.timeMs) || 0;
+    const startedAt = Number(input?.modeStartedAtMs);
+    const elapsed2 = Number.isFinite(startedAt) ? Math.max(0, timeMs - startedAt) : timeMs;
+    const heatLevel = clamp01(input?.heatLevel);
+    const reducedMotion = input?.reducedMotion === true;
+    const float = resolveCharaFloat(timeMs, charaId, { heatLevel, reducedMotion });
+    let expression;
+    let mouthOpen = false;
+    let tiltDeg = 0;
+    let allowBlink = true;
+    if (mode === "thinking") {
+      const look = resolveThinkingLook(elapsed2);
+      expression = look.expression;
+      mouthOpen = look.mouthOpen;
+      tiltDeg = reducedMotion ? 0 : resolveThinkingTilt(elapsed2);
+      allowBlink = false;
+    } else if (mode === "answer") {
+      expression = "smile";
+      mouthOpen = isCharaMouthOpen(elapsed2, charaId);
+    } else if (mode === "react") {
+      expression = "smile";
+      mouthOpen = isCharaMouthOpen(elapsed2, charaId);
+    } else {
+      expression = resolveIdleExpression(timeMs, charaId, { heatLevel });
+      mouthOpen = false;
+    }
+    if (allowBlink && isCharaBlinking(timeMs, charaId)) {
+      expression = "blink";
+    }
+    return {
+      charaId,
+      mode,
+      expression,
+      mouthOpen,
+      // konta の normal 単独ファイル問題は yukkuriCharacterImagePath が吸収済み。
+      imagePath: yukkuriCharacterImagePath(charaId, expression, mouthOpen),
+      float,
+      tiltDeg
+    };
+  }
+  function makeInitialCharaLiveState() {
+    const slots = {};
+    for (const id of CHARA_LIVE_IDS) {
+      slots[id] = { mode: "idle", modeStartedAtMs: 0, untilMs: 0, text: "" };
+    }
+    return { slots, lastSpeaker: null };
+  }
+  function expireCharaModes(state, nowMs) {
+    const now = Number(nowMs) || 0;
+    for (const id of CHARA_LIVE_IDS) {
+      const slot = state?.slots?.[id];
+      if (!slot || slot.mode === "idle") continue;
+      if (Number.isFinite(slot.untilMs) && now >= slot.untilMs) {
+        slot.mode = "idle";
+        slot.modeStartedAtMs = now;
+        slot.untilMs = 0;
+        slot.text = "";
+      }
+    }
+    return state;
+  }
+  function triggerCharaReaction(state, input) {
+    const now = Number(input?.nowMs) || 0;
+    const commentKey = String(input?.commentKey ?? "");
+    const duration = Number.isFinite(input?.durationMs) ? Math.max(REACT_MIN_MS, Number(input.durationMs)) : REACT_MIN_MS;
+    const first = pickReactingChara(commentKey, state?.lastSpeaker ?? null);
+    const order = [first, ...CHARA_LIVE_IDS.filter((id) => id !== first)];
+    for (const id of order) {
+      const slot = state?.slots?.[id];
+      if (!slot) continue;
+      if (slot.mode !== "idle") continue;
+      slot.mode = "react";
+      slot.modeStartedAtMs = now;
+      slot.untilMs = now + duration;
+      slot.text = String(input?.text ?? "");
+      state.lastSpeaker = id;
+      return id;
+    }
+    return null;
+  }
+  function triggerCharaCheer(state, input) {
+    const now = Number(input?.nowMs) || 0;
+    const duration = Number.isFinite(input?.durationMs) ? Math.max(REACT_MIN_MS, Number(input.durationMs)) : 2400;
+    const out = [];
+    for (const id of CHARA_LIVE_IDS) {
+      const slot = state?.slots?.[id];
+      if (!slot) continue;
+      if (slot.mode !== "idle" && slot.mode !== "react") continue;
+      slot.mode = "react";
+      slot.modeStartedAtMs = now;
+      slot.untilMs = now + duration;
+      slot.text = "";
+      out.push(id);
+    }
+    return out;
+  }
+  function triggerCharaAnswer(state, input) {
+    const now = Number(input?.nowMs) || 0;
+    const prompt = String(input?.prompt ?? "");
+    const duration = Number.isFinite(input?.durationMs) ? Math.max(ANSWER_MIN_MS, Number(input.durationMs)) : ANSWER_MIN_MS;
+    const addressed = detectAddressedChara(prompt);
+    const id = addressed || pickReactingChara(`answer:${prompt}`, state?.lastSpeaker ?? null);
+    const slot = state?.slots?.[id];
+    if (slot) {
+      slot.mode = "answer";
+      slot.modeStartedAtMs = now;
+      slot.untilMs = now + duration;
+      slot.text = String(input?.answer ?? "");
+      state.lastSpeaker = id;
+    }
+    return id;
+  }
+  function startCharaThinking(state, input) {
+    const now = Number(input?.nowMs) || 0;
+    const explicit = input?.charaId && CHARA_LIVE_IDS.includes(input.charaId) ? input.charaId : null;
+    const id = explicit || detectAddressedChara(String(input?.prompt ?? "")) || "tanunee";
+    const slot = state?.slots?.[id];
+    if (slot) {
+      slot.mode = "thinking";
+      slot.modeStartedAtMs = now;
+      slot.untilMs = Infinity;
+      slot.text = "";
+    }
+    return (
+      /** @type {CharaId} */
+      id
+    );
+  }
+  function endCharaThinking(state, input) {
+    const now = Number(input?.nowMs) || 0;
+    const only = input?.charaId ?? null;
+    const cleared = [];
+    for (const id of CHARA_LIVE_IDS) {
+      if (only && id !== only) continue;
+      const slot = state?.slots?.[id];
+      if (!slot || slot.mode !== "thinking") continue;
+      slot.mode = "idle";
+      slot.modeStartedAtMs = now;
+      slot.untilMs = 0;
+      slot.text = "";
+      cleared.push(id);
+    }
+    return cleared;
+  }
+  function buildCharaLiveRenderModel(state, opts) {
+    const timeMs = Number(opts?.timeMs) || 0;
+    return CHARA_LIVE_MEMBERS.map((member) => {
+      const id = (
+        /** @type {CharaId} */
+        member.id
+      );
+      const slot = state?.slots?.[id] || {
+        mode: "idle",
+        modeStartedAtMs: 0,
+        untilMs: 0,
+        text: ""
+      };
+      const look = resolveCharaLiveLook({
+        charaId: id,
+        mode: (
+          /** @type {CharaMode} */
+          slot.mode
+        ),
+        timeMs,
+        modeStartedAtMs: slot.modeStartedAtMs,
+        heatLevel: opts?.heatLevel,
+        reducedMotion: opts?.reducedMotion
+      });
+      return { ...look, displayName: member.displayName, text: slot.text || "" };
+    });
+  }
+
+  // src/lib/charaLiveStage.js
+  var THUMB_FALLBACK = Object.freeze({
+    // smile-mouth-closed の thumb は存在しない → 口を閉じた normal で代用。
+    "link/link-yukkuri-smile-mouth-closed": "link/link-yukkuri-normal-mouth-closed",
+    "tanunee/tanuki-yukkuri-smile-mouth-closed": "tanunee/tanuki-yukkuri-normal-mouth-closed",
+    "konta/kitsune-yukkuri-smile-mouth-closed": "konta/kitsune-yukkuri-normal",
+    // blink-mouth-open / half-eyes-mouth-open の thumb は無い → 口を閉じた同表情へ。
+    "link/link-yukkuri-blink-mouth-open": "link/link-yukkuri-blink-mouth-closed",
+    "konta/kitsune-yukkuri-blink-mouth-open": "konta/kitsune-yukkuri-blink-mouth-closed",
+    "tanunee/tanuki-yukkuri-blink-mouth-open": "tanunee/tanuki-yukkuri-blink-mouth-closed",
+    "link/link-yukkuri-half-eyes-mouth-open": "link/link-yukkuri-half-eyes-mouth-closed",
+    "konta/kitsune-yukkuri-half-eyes-mouth-open": "konta/kitsune-yukkuri-half-eyes-mouth-closed",
+    "tanunee/tanuki-yukkuri-half-eyes-mouth-open": "tanunee/tanuki-yukkuri-half-eyes-mouth-closed",
+    // konta は normal-mouth-open の実体が無い(fullでも) → smile-mouth-open で口を開ける。
+    "konta/kitsune-yukkuri-normal-mouth-open": "konta/kitsune-yukkuri-smile-mouth-open"
+  });
+  var IMG_BASE = "images/yukkuri-charactore-english/";
+  function toThumbPath(fullPath) {
+    const rel3 = String(fullPath).startsWith(IMG_BASE) ? String(fullPath).slice(IMG_BASE.length) : String(fullPath);
+    const stem = rel3.replace(/\.png$/, "");
+    const mapped = THUMB_FALLBACK[stem] || stem;
+    return `${IMG_BASE}${mapped}.thumb128.png`;
+  }
+  var CHARA_LIVE_SIZE_PX = 116;
+  var CHARA_LIVE_COMPACT_SIZE_PX = 64;
+  var CHARA_LIVE_PLACEMENT = "top";
+  function listCharaLiveImagePaths() {
+    const out = /* @__PURE__ */ new Set();
+    for (const id of CHARA_LIVE_IDS) {
+      for (
+        const expression of
+        /** @type {const} */
+        ["normal", "smile", "blink", "half-eyes"]
+      ) {
+        for (const mouthOpen of [false, true]) {
+          out.add(toThumbPath(yukkuriCharacterImagePath(id, expression, mouthOpen)));
+        }
+      }
+    }
+    return [...out];
+  }
+  function charaLiveStageCss() {
+    return `
+.nlcl-stage {
+  /*
+   * ★会場ステージ(.nlsb-stage)の内側に入る前提の配置(2026-08-25 実機で踏んだ)。
+   *   当初 body 直下に fixed + z-index:2147483000 で置いたが、会場ルート(.nlsb-root)が
+   *   まったく同じ z-index の全画面要素で、かつ後から DOM に入るため【完全に覆われて
+   *   一度も見えなかった】。同値 z-index は DOM 順で後勝ちになる。
+   *   会場の既存階層(客席 z4 / 吹き出し z5 / 常駐・roster z6 / 投げ物 z7)。
+   *
+   * ★z6 も間違いだった(2回目の同じ失敗・2026-08-25):
+   *   stage.append(stageLayout, bubbleLayer, rosterPanel, ...) は startCharaLive より
+   *   先に実行されるので、【同じ z6 の rosterPanel より DOM順で前】に置かれてしまい、
+   *   また負けた(venueBar.js:2711 のコメントが「stage.appendの最後に置くことで同z-index(6)
+   *   の常駐レイヤーより手前に来る」と明言している＝先に入る側は負ける)。
+   *   実測: 会場内で使われている z-index の最大は 7(投げ物)。よって 8 で最前面を取る。
+   *   ★「最大値を名乗る」でも「既存に合わせる」でもなく【実測して1つ上】が正解。
+   */
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 8;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  /* 配信の操作を絶対に奪わない。吹き出しも含めて素通し。 */
+  pointer-events: none;
+  /* 親の文字設定に引きずられない(ニコ生ページに寄生するため)。 */
+  font: 13px/1.5 system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+}
+.nlcl-chara {
+  position: relative;
+  width: ${CHARA_LIVE_SIZE_PX}px;
+  height: ${CHARA_LIVE_SIZE_PX}px;
+  /* transform の原点を足元に。浮遊しても「立っている」感じが崩れない。 */
+  transform-origin: 50% 90%;
+  will-change: transform;
+}
+/*
+ * ★上端配置(2026-10-17): data-placement="top" のとき、会場の上端の余白に 64px で右寄せ横一列。
+ *   吹き出しと「…」は画面外に出ないよう下向きにする(しっぽの向きも反転)。従来の右下配置は data-placement 無し/bottom-right のまま変わらない。
+ */
+.nlcl-stage[data-placement="top"] {
+  top: 4px;
+  bottom: auto;
+  align-items: flex-start;
+}
+.nlcl-stage[data-placement="top"] .nlcl-chara {
+  width: ${CHARA_LIVE_COMPACT_SIZE_PX}px;
+  height: ${CHARA_LIVE_COMPACT_SIZE_PX}px;
+  transform-origin: 50% 50%;
+}
+.nlcl-stage[data-placement="top"] .nlcl-chara__bubble,
+.nlcl-stage[data-placement="top"] .nlcl-chara__think {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+.nlcl-stage[data-placement="top"] .nlcl-chara__bubble::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #2f3a46;
+}
+/*
+ * ★お祝い(2026-10-17・応援コメント100件など): 3人が弾んで「100件!」のバッジが出る。
+ *   CSS animation は inline transform(浮遊)より優先されるので競合しない。終わると浮遊に戻る(fill-mode なし)。
+ *   transform/opacity のみ・DOM 追加はバッジ1個だけ。prefers-reduced-motion では弾みを止め、バッジの fade だけ残す。
+ */
+.nlcl-stage.is-cheering .nlcl-chara {
+  animation: nlcl-cheer 2.4s ease-in-out;
+}
+.nlcl-cheer-badge {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: #ff9800;
+  color: #fff;
+  border: 3px solid #fff;
+  box-shadow: 0 3px 0 rgba(150, 70, 0, 0.9), 0 6px 14px rgba(0, 0, 0, 0.35);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transform-origin: 100% 100%;
+  animation: nlcl-cheer-badge 2.2s ease-out forwards;
+}
+.nlcl-stage[data-placement="top"] .nlcl-cheer-badge {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform-origin: 100% 0;
+}
+.nlcl-cheer-badge[hidden] { display: none; }
+@keyframes nlcl-cheer {
+  0%   { transform: scale(1) translateY(0); }
+  14%  { transform: scale(1.35) translateY(-10px); }
+  28%  { transform: scale(1) translateY(0); }
+  44%  { transform: scale(1.25) translateY(-7px); }
+  60%  { transform: scale(1) translateY(0); }
+  76%  { transform: scale(1.15) translateY(-4px); }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes nlcl-cheer-badge {
+  0%   { opacity: 0; transform: scale(0.4); }
+  12%  { opacity: 1; transform: scale(1.18); }
+  22%  { transform: scale(1); }
+  80%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+.nlcl-chara__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  /* 立ち絵を背景から浮かせる(配信映像の上でも輪郭が見える)。 */
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* 喋っている子を少し持ち上げて前に出す(誰が喋ったか一目で分かる)。 */
+.nlcl-chara.is-speaking { z-index: 2; }
+.nlcl-chara.is-speaking .nlcl-chara__img {
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+.nlcl-chara__bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  max-width: 190px;
+  width: max-content;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: #fffdf7;
+  color: #23303f;
+  border: 2px solid #2f3a46;
+  box-shadow: 2px 2px 0 rgba(47, 58, 70, 0.9);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  /* 長文でも会場を覆わない。3 行で切る。 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  animation: nlcl-pop 160ms ease-out;
+}
+/* 吹き出しのしっぽ。 */
+.nlcl-chara__bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top-color: #2f3a46;
+}
+.nlcl-chara__name {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.7;
+  margin-bottom: 1px;
+}
+/* シンキングの「…」。考えている間だけ出る。 */
+.nlcl-chara__think {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #fffdf7;
+  border: 2px solid #2f3a46;
+  box-shadow: 2px 2px 0 rgba(47, 58, 70, 0.9);
+}
+.nlcl-chara__think i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4b5b6b;
+  animation: nlcl-think 1.25s ease-in-out infinite;
+}
+.nlcl-chara__think i:nth-child(2) { animation-delay: 0.18s; }
+.nlcl-chara__think i:nth-child(3) { animation-delay: 0.36s; }
+/* ★hidden を必ず効かせる(2026-08-25 発見のバグ):
+   display:flex は hidden 属性の既定 display:none に勝ってしまうため、
+   setVisible(false) しても隠れない。明示的に打ち消す。 */
+.nlcl-stage[hidden] { display: none; }
+/* ★2026-10-12 同じ罠が吹き出しと「…」にも残っていた(実測: 3体とも hidden なのに画面に出ていた)。
+   display:flex / -webkit-box は hidden の既定 display:none に勝つ。JS が hidden で出し入れする部品は全部ここで打ち消す。 */
+.nlcl-chara__bubble[hidden] { display: none; }
+.nlcl-chara__think[hidden] { display: none; }
+@keyframes nlcl-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
+}
+@keyframes nlcl-cheer-badge-calm {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes nlcl-think {
+  0%, 100% { opacity: 0.28; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nlcl-stage.is-cheering .nlcl-chara { animation: none; }
+  .nlcl-cheer-badge { animation: nlcl-cheer-badge-calm 2.2s linear forwards; }
+  .nlcl-chara__bubble { animation: none; }
+  .nlcl-chara__think i { animation: none; opacity: 0.7; }
+}
+`.trim();
+  }
+  function buildCharaLiveStageDom(doc, resolveUrl) {
+    const root = doc.createElement("div");
+    root.className = "nlcl-stage";
+    root.dataset.placement = CHARA_LIVE_PLACEMENT;
+    root.setAttribute("aria-live", "polite");
+    const nodes = {};
+    for (const member of CHARA_LIVE_MEMBERS) {
+      const el = doc.createElement("div");
+      el.className = "nlcl-chara";
+      el.dataset.chara = member.id;
+      const img = doc.createElement("img");
+      img.className = "nlcl-chara__img";
+      img.alt = member.displayName;
+      img.decoding = "async";
+      img.src = resolveUrl(toThumbPath(yukkuriCharacterImagePath(member.id, "normal", false)));
+      const bubble = doc.createElement("div");
+      bubble.className = "nlcl-chara__bubble";
+      bubble.hidden = true;
+      const think = doc.createElement("div");
+      think.className = "nlcl-chara__think";
+      think.hidden = true;
+      think.setAttribute("aria-hidden", "true");
+      for (let i = 0; i < 3; i += 1) think.appendChild(doc.createElement("i"));
+      el.append(img, bubble, think);
+      root.appendChild(el);
+      nodes[member.id] = { el, img, bubble, think };
+    }
+    const badge = doc.createElement("div");
+    badge.className = "nlcl-cheer-badge";
+    badge.hidden = true;
+    badge.setAttribute("aria-hidden", "true");
+    root.appendChild(badge);
+    return { root, badge, nodes };
+  }
+  function applyCharaLiveFrame(nodes, model, resolveUrl) {
+    for (const item of model) {
+      const node = nodes?.[item.charaId];
+      if (!node) continue;
+      const nextSrc = resolveUrl(toThumbPath(item.imagePath));
+      if (node.img.getAttribute("src") !== nextSrc) {
+        node.img.setAttribute("src", nextSrc);
+      }
+      const { x, y, rotateDeg, scale } = item.float;
+      const speaking = item.mode === "react" || item.mode === "answer";
+      const emphasise = speaking ? 1.06 : 1;
+      const transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${(rotateDeg + item.tiltDeg).toFixed(2)}deg) scale(${(scale * emphasise).toFixed(4)})`;
+      if (node.el.style.transform !== transform) {
+        node.el.style.transform = transform;
+      }
+      if (node.el.classList.contains("is-speaking") !== speaking) {
+        node.el.classList.toggle("is-speaking", speaking);
+      }
+      const showBubble = speaking && !!item.text;
+      if (showBubble) {
+        if (node.bubble.dataset.text !== item.text) {
+          node.bubble.textContent = "";
+          const name = node.bubble.ownerDocument.createElement("b");
+          name.className = "nlcl-chara__name";
+          name.textContent = item.displayName;
+          node.bubble.append(name, node.bubble.ownerDocument.createTextNode(item.text));
+          node.bubble.dataset.text = item.text;
+        }
+        if (node.bubble.hidden) node.bubble.hidden = false;
+      } else if (!node.bubble.hidden) {
+        node.bubble.hidden = true;
+        delete node.bubble.dataset.text;
+      }
+      const showThink = item.mode === "thinking";
+      if (node.think.hidden === showThink) node.think.hidden = !showThink;
+    }
+  }
+  function preloadCharaLiveImages(doc, resolveUrl) {
+    return listCharaLiveImagePaths().map((path) => {
+      const img = doc.createElement("img");
+      img.decoding = "async";
+      img.src = resolveUrl(path);
+      return img;
+    });
   }
 
   // src/lib/voiceReadingNormalize.js
@@ -5069,7 +5907,7 @@ ${sourceCol}
   });
   var PITCH_OFFSETS = Object.freeze([-0.06, -0.03, 0, 0.03, 0.06]);
   var SPEED_OFFSETS = Object.freeze([0, 0.05, 0.1]);
-  function fnv1a32(value) {
+  function fnv1a322(value) {
     const bytes = new TextEncoder().encode(String(value ?? ""));
     let hash = 2166136261;
     for (const byte of bytes) {
@@ -5085,7 +5923,7 @@ ${sourceCol}
   function assignVoiceForUser(userKey, styleIds) {
     const styles = normalizeStyleIds(styleIds);
     if (!styles.length) return { ...DEFAULT_VOICE };
-    const hash = fnv1a32(userKey);
+    const hash = fnv1a322(userKey);
     const styleBits = hash & 65535;
     const pitchBits = hash >>> 16 & 255;
     const speedBits = hash >>> 24 & 255;
@@ -14340,13 +15178,13 @@ ${sourceCol}
 
   // src/lib/venueCrowdMotion.js
   var BASE_PERIOD_MS = 3600;
-  function clamp01(v) {
+  function clamp012(v) {
     const n = Number(v);
     if (!Number.isFinite(n)) return 0;
     return n < 0 ? 0 : n > 1 ? 1 : n;
   }
   function resolveCrowdMotionProfile(heatLevel) {
-    const h = clamp01(heatLevel);
+    const h = clamp012(heatLevel);
     const periodMs = BASE_PERIOD_MS - h * 2400;
     const swayDeg = 4 + h * 18;
     const breathePx = 0.018 + h * 0.022;
@@ -14356,7 +15194,7 @@ ${sourceCol}
   function resolveCrowdSpriteMotion(timeMs, unitPhase, profile) {
     const t = Number(timeMs) || 0;
     const period = Math.max(200, profile.periodMs || BASE_PERIOD_MS);
-    const u = clamp01(unitPhase);
+    const u = clamp012(unitPhase);
     const globalPhase = t / period * Math.PI * 2;
     const phase = globalPhase + u * Math.PI * 2 * profile.desync;
     const swayRad = Math.sin(phase) * ((profile.swayDeg || 0) * Math.PI / 180);
@@ -15288,332 +16126,6 @@ ${sourceCol}
     }));
   }
 
-  // src/lib/yukkuriBroadcastSummary.js
-  var CHAR_BASE = (
-    /** @type {const} */
-    {
-      rinku: "images/yukkuri-charactore-english/link/link-yukkuri",
-      konta: "images/yukkuri-charactore-english/konta/kitsune-yukkuri",
-      tanunee: "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri"
-    }
-  );
-  function yukkuriCharacterImagePath(character, expression, mouthOpen) {
-    const base = CHAR_BASE[character];
-    if (character === "konta" && expression === "normal") {
-      return `${base}-normal.png`;
-    }
-    return `${base}-${expression}-mouth-${mouthOpen ? "open" : "closed"}.png`;
-  }
-
-  // src/lib/charaLiveState.js
-  var CHARA_LIVE_MEMBERS = Object.freeze([
-    Object.freeze({ id: "rinku", displayName: "りんく", role: "配信者視点" }),
-    Object.freeze({ id: "konta", displayName: "こん太", role: "ファン視点" }),
-    Object.freeze({ id: "tanunee", displayName: "たぬ姉", role: "匿名ガイド / しっかり者解説" })
-  ]);
-  var CHARA_LIVE_IDS = Object.freeze(CHARA_LIVE_MEMBERS.map((m) => m.id));
-  function fnv1a322(value) {
-    const s = String(value ?? "");
-    let hash = 2166136261;
-    for (let i = 0; i < s.length; i += 1) {
-      hash ^= s.charCodeAt(i) & 255;
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  }
-  function charaHashUnit(seed) {
-    return fnv1a322(seed) / 4294967296;
-  }
-  function clamp012(v) {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return 0;
-    return n < 0 ? 0 : n > 1 ? 1 : n;
-  }
-  var FLOAT_BASE_PERIOD_MS = 5200;
-  function resolveCharaFloat(timeMs, charaId, opts = {}) {
-    if (opts.reducedMotion === true) {
-      return { x: 0, y: 0, rotateDeg: 0, scale: 1 };
-    }
-    const t = Number(timeMs) || 0;
-    const heat = clamp012(opts.heatLevel);
-    const idx = CHARA_LIVE_IDS.indexOf(
-      /** @type {any} */
-      charaId
-    );
-    const evenPhase = idx >= 0 ? idx / CHARA_LIVE_IDS.length : 0;
-    const phaseSeed = (evenPhase + charaHashUnit(`float:${charaId}`) * 0.08) % 1;
-    const period = Math.max(1200, FLOAT_BASE_PERIOD_MS - heat * 1600);
-    const base = t / period * Math.PI * 2 + phaseSeed * Math.PI * 2;
-    const y = Math.sin(base) * (5 + heat * 3);
-    const x = Math.sin(base * 0.63 + phaseSeed * 3.1) * (3 + heat * 2);
-    const rotateDeg = Math.sin(base * 0.41 + phaseSeed * 1.7) * (1.6 + heat * 1.2);
-    const scale = 1 + Math.sin(base * 0.77 + phaseSeed * 2.3) * 0.012;
-    return { x, y, rotateDeg, scale };
-  }
-  var BLINK_DURATION_MS = 130;
-  var BLINK_INTERVAL_MS = 4200;
-  function isCharaBlinking(timeMs, charaId) {
-    const t = Number(timeMs) || 0;
-    if (t < 0) return false;
-    const seed = charaHashUnit(`blink:${charaId}`);
-    const interval = BLINK_INTERVAL_MS * (0.8 + seed * 0.4);
-    const cycle = Math.floor(t / interval);
-    const jitter = charaHashUnit(`blink:${charaId}:${cycle}`) * interval * 0.5;
-    const startAt = cycle * interval + jitter;
-    return t >= startAt && t < startAt + BLINK_DURATION_MS;
-  }
-  var IDLE_EXPRESSION_PERIOD_MS = 7e3;
-  function resolveIdleExpression(timeMs, charaId, opts = {}) {
-    const t = Number(timeMs) || 0;
-    const heat = clamp012(opts.heatLevel);
-    const seed = charaHashUnit(`expr:${charaId}`);
-    const period = IDLE_EXPRESSION_PERIOD_MS * (0.75 + seed * 0.5);
-    const slot = Math.floor(t / period);
-    const roll = charaHashUnit(`expr:${charaId}:${slot}`);
-    const smileChance = 0.22 + heat * 0.38;
-    if (roll < smileChance) return "smile";
-    if (roll > 1 - 0.14 * (1 - heat)) return "half-eyes";
-    return "normal";
-  }
-  var LIPSYNC_PERIOD_MS = 180;
-  function isCharaMouthOpen(elapsedMs, charaId) {
-    const e = Number(elapsedMs);
-    if (!Number.isFinite(e) || e < 0) return false;
-    const cycle = Math.floor(e / LIPSYNC_PERIOD_MS);
-    const within = e % LIPSYNC_PERIOD_MS / LIPSYNC_PERIOD_MS;
-    const openRatio = 0.35 + charaHashUnit(`lip:${charaId}:${cycle}`) * 0.4;
-    return within < openRatio;
-  }
-  function pickReactingChara(commentKey, lastSpeaker = null) {
-    const pool = CHARA_LIVE_IDS.filter((id) => id !== lastSpeaker);
-    const list = pool.length ? pool : CHARA_LIVE_IDS;
-    const idx = fnv1a322(`react:${commentKey}`) % list.length;
-    return (
-      /** @type {CharaId} */
-      list[idx]
-    );
-  }
-  function detectAddressedChara(text) {
-    const raw = String(text ?? "").trim();
-    if (!raw) return null;
-    const s = raw.toLowerCase();
-    const hits = [];
-    const ALIASES = {
-      rinku: ["りんく", "リンク", "link", "rinku"],
-      konta: ["こん太", "コン太", "こんた", "コンタ", "konta"],
-      tanunee: ["たぬ姉", "たぬねえ", "タヌ姉", "たぬネエ", "tanunee", "tanu"]
-    };
-    for (const id of CHARA_LIVE_IDS) {
-      for (const alias of ALIASES[id]) {
-        const at = s.indexOf(alias.toLowerCase());
-        if (at >= 0) {
-          hits.push({ id, at });
-          break;
-        }
-      }
-    }
-    if (!hits.length) return null;
-    hits.sort((a, b) => a.at - b.at);
-    return hits[0].id;
-  }
-  var REACT_MIN_MS = 1400;
-  var ANSWER_MIN_MS = 1800;
-  function resolveThinkingLook(elapsedMs) {
-    const e = Number(elapsedMs) || 0;
-    const slot = Math.floor(e / 1500);
-    const roll = charaHashUnit(`think:${slot}`);
-    return {
-      expression: roll < 0.75 ? "half-eyes" : "normal",
-      mouthOpen: false
-    };
-  }
-  var THINKING_TILT_MAX_DEG = 9;
-  function resolveThinkingTilt(elapsedMs) {
-    const e = Number(elapsedMs) || 0;
-    const phase = e / 2400 * Math.PI;
-    return Math.sin(phase) * THINKING_TILT_MAX_DEG;
-  }
-  function resolveCharaLiveLook(input) {
-    const charaId = (
-      /** @type {CharaId} */
-      input?.charaId || "rinku"
-    );
-    const mode = (
-      /** @type {CharaMode} */
-      input?.mode || "idle"
-    );
-    const timeMs = Number(input?.timeMs) || 0;
-    const startedAt = Number(input?.modeStartedAtMs);
-    const elapsed2 = Number.isFinite(startedAt) ? Math.max(0, timeMs - startedAt) : timeMs;
-    const heatLevel = clamp012(input?.heatLevel);
-    const reducedMotion = input?.reducedMotion === true;
-    const float = resolveCharaFloat(timeMs, charaId, { heatLevel, reducedMotion });
-    let expression;
-    let mouthOpen = false;
-    let tiltDeg = 0;
-    let allowBlink = true;
-    if (mode === "thinking") {
-      const look = resolveThinkingLook(elapsed2);
-      expression = look.expression;
-      mouthOpen = look.mouthOpen;
-      tiltDeg = reducedMotion ? 0 : resolveThinkingTilt(elapsed2);
-      allowBlink = false;
-    } else if (mode === "answer") {
-      expression = "smile";
-      mouthOpen = isCharaMouthOpen(elapsed2, charaId);
-    } else if (mode === "react") {
-      expression = "smile";
-      mouthOpen = isCharaMouthOpen(elapsed2, charaId);
-    } else {
-      expression = resolveIdleExpression(timeMs, charaId, { heatLevel });
-      mouthOpen = false;
-    }
-    if (allowBlink && isCharaBlinking(timeMs, charaId)) {
-      expression = "blink";
-    }
-    return {
-      charaId,
-      mode,
-      expression,
-      mouthOpen,
-      // konta の normal 単独ファイル問題は yukkuriCharacterImagePath が吸収済み。
-      imagePath: yukkuriCharacterImagePath(charaId, expression, mouthOpen),
-      float,
-      tiltDeg
-    };
-  }
-  function makeInitialCharaLiveState() {
-    const slots = {};
-    for (const id of CHARA_LIVE_IDS) {
-      slots[id] = { mode: "idle", modeStartedAtMs: 0, untilMs: 0, text: "" };
-    }
-    return { slots, lastSpeaker: null };
-  }
-  function expireCharaModes(state, nowMs) {
-    const now = Number(nowMs) || 0;
-    for (const id of CHARA_LIVE_IDS) {
-      const slot = state?.slots?.[id];
-      if (!slot || slot.mode === "idle") continue;
-      if (Number.isFinite(slot.untilMs) && now >= slot.untilMs) {
-        slot.mode = "idle";
-        slot.modeStartedAtMs = now;
-        slot.untilMs = 0;
-        slot.text = "";
-      }
-    }
-    return state;
-  }
-  function triggerCharaReaction(state, input) {
-    const now = Number(input?.nowMs) || 0;
-    const commentKey = String(input?.commentKey ?? "");
-    const duration = Number.isFinite(input?.durationMs) ? Math.max(REACT_MIN_MS, Number(input.durationMs)) : REACT_MIN_MS;
-    const first = pickReactingChara(commentKey, state?.lastSpeaker ?? null);
-    const order = [first, ...CHARA_LIVE_IDS.filter((id) => id !== first)];
-    for (const id of order) {
-      const slot = state?.slots?.[id];
-      if (!slot) continue;
-      if (slot.mode !== "idle") continue;
-      slot.mode = "react";
-      slot.modeStartedAtMs = now;
-      slot.untilMs = now + duration;
-      slot.text = String(input?.text ?? "");
-      state.lastSpeaker = id;
-      return id;
-    }
-    return null;
-  }
-  function triggerCharaCheer(state, input) {
-    const now = Number(input?.nowMs) || 0;
-    const duration = Number.isFinite(input?.durationMs) ? Math.max(REACT_MIN_MS, Number(input.durationMs)) : 2400;
-    const out = [];
-    for (const id of CHARA_LIVE_IDS) {
-      const slot = state?.slots?.[id];
-      if (!slot) continue;
-      if (slot.mode !== "idle" && slot.mode !== "react") continue;
-      slot.mode = "react";
-      slot.modeStartedAtMs = now;
-      slot.untilMs = now + duration;
-      slot.text = "";
-      out.push(id);
-    }
-    return out;
-  }
-  function triggerCharaAnswer(state, input) {
-    const now = Number(input?.nowMs) || 0;
-    const prompt = String(input?.prompt ?? "");
-    const duration = Number.isFinite(input?.durationMs) ? Math.max(ANSWER_MIN_MS, Number(input.durationMs)) : ANSWER_MIN_MS;
-    const addressed = detectAddressedChara(prompt);
-    const id = addressed || pickReactingChara(`answer:${prompt}`, state?.lastSpeaker ?? null);
-    const slot = state?.slots?.[id];
-    if (slot) {
-      slot.mode = "answer";
-      slot.modeStartedAtMs = now;
-      slot.untilMs = now + duration;
-      slot.text = String(input?.answer ?? "");
-      state.lastSpeaker = id;
-    }
-    return id;
-  }
-  function startCharaThinking(state, input) {
-    const now = Number(input?.nowMs) || 0;
-    const explicit = input?.charaId && CHARA_LIVE_IDS.includes(input.charaId) ? input.charaId : null;
-    const id = explicit || detectAddressedChara(String(input?.prompt ?? "")) || "tanunee";
-    const slot = state?.slots?.[id];
-    if (slot) {
-      slot.mode = "thinking";
-      slot.modeStartedAtMs = now;
-      slot.untilMs = Infinity;
-      slot.text = "";
-    }
-    return (
-      /** @type {CharaId} */
-      id
-    );
-  }
-  function endCharaThinking(state, input) {
-    const now = Number(input?.nowMs) || 0;
-    const only = input?.charaId ?? null;
-    const cleared = [];
-    for (const id of CHARA_LIVE_IDS) {
-      if (only && id !== only) continue;
-      const slot = state?.slots?.[id];
-      if (!slot || slot.mode !== "thinking") continue;
-      slot.mode = "idle";
-      slot.modeStartedAtMs = now;
-      slot.untilMs = 0;
-      slot.text = "";
-      cleared.push(id);
-    }
-    return cleared;
-  }
-  function buildCharaLiveRenderModel(state, opts) {
-    const timeMs = Number(opts?.timeMs) || 0;
-    return CHARA_LIVE_MEMBERS.map((member) => {
-      const id = (
-        /** @type {CharaId} */
-        member.id
-      );
-      const slot = state?.slots?.[id] || {
-        mode: "idle",
-        modeStartedAtMs: 0,
-        untilMs: 0,
-        text: ""
-      };
-      const look = resolveCharaLiveLook({
-        charaId: id,
-        mode: (
-          /** @type {CharaMode} */
-          slot.mode
-        ),
-        timeMs,
-        modeStartedAtMs: slot.modeStartedAtMs,
-        heatLevel: opts?.heatLevel,
-        reducedMotion: opts?.reducedMotion
-      });
-      return { ...look, displayName: member.displayName, text: slot.text || "" };
-    });
-  }
-
   // src/lib/supportCelebration.js
   var COMMENT_MILESTONES = Object.freeze([10, 25, 50, 100, 200, 500, 1e3, 2e3, 3e3, 5e3, 1e4]);
   var GIFT_MILESTONES = Object.freeze([1, 5, 10, 25, 50, 100]);
@@ -15674,346 +16186,6 @@ ${sourceCol}
   function cheerLabel(milestone) {
     const n = Math.floor(Number(milestone));
     return Number.isFinite(n) && n > 0 ? `${n.toLocaleString("ja-JP")}件!` : "";
-  }
-
-  // src/lib/charaLiveStage.js
-  var THUMB_FALLBACK = Object.freeze({
-    // smile-mouth-closed の thumb は存在しない → 口を閉じた normal で代用。
-    "link/link-yukkuri-smile-mouth-closed": "link/link-yukkuri-normal-mouth-closed",
-    "tanunee/tanuki-yukkuri-smile-mouth-closed": "tanunee/tanuki-yukkuri-normal-mouth-closed",
-    "konta/kitsune-yukkuri-smile-mouth-closed": "konta/kitsune-yukkuri-normal",
-    // blink-mouth-open / half-eyes-mouth-open の thumb は無い → 口を閉じた同表情へ。
-    "link/link-yukkuri-blink-mouth-open": "link/link-yukkuri-blink-mouth-closed",
-    "konta/kitsune-yukkuri-blink-mouth-open": "konta/kitsune-yukkuri-blink-mouth-closed",
-    "tanunee/tanuki-yukkuri-blink-mouth-open": "tanunee/tanuki-yukkuri-blink-mouth-closed",
-    "link/link-yukkuri-half-eyes-mouth-open": "link/link-yukkuri-half-eyes-mouth-closed",
-    "konta/kitsune-yukkuri-half-eyes-mouth-open": "konta/kitsune-yukkuri-half-eyes-mouth-closed",
-    "tanunee/tanuki-yukkuri-half-eyes-mouth-open": "tanunee/tanuki-yukkuri-half-eyes-mouth-closed",
-    // konta は normal-mouth-open の実体が無い(fullでも) → smile-mouth-open で口を開ける。
-    "konta/kitsune-yukkuri-normal-mouth-open": "konta/kitsune-yukkuri-smile-mouth-open"
-  });
-  var IMG_BASE = "images/yukkuri-charactore-english/";
-  function toThumbPath(fullPath) {
-    const rel3 = String(fullPath).startsWith(IMG_BASE) ? String(fullPath).slice(IMG_BASE.length) : String(fullPath);
-    const stem = rel3.replace(/\.png$/, "");
-    const mapped = THUMB_FALLBACK[stem] || stem;
-    return `${IMG_BASE}${mapped}.thumb128.png`;
-  }
-  var CHARA_LIVE_SIZE_PX = 116;
-  var CHARA_LIVE_COMPACT_SIZE_PX = 64;
-  var CHARA_LIVE_PLACEMENT = "top";
-  function listCharaLiveImagePaths() {
-    const out = /* @__PURE__ */ new Set();
-    for (const id of CHARA_LIVE_IDS) {
-      for (
-        const expression of
-        /** @type {const} */
-        ["normal", "smile", "blink", "half-eyes"]
-      ) {
-        for (const mouthOpen of [false, true]) {
-          out.add(toThumbPath(yukkuriCharacterImagePath(id, expression, mouthOpen)));
-        }
-      }
-    }
-    return [...out];
-  }
-  function charaLiveStageCss() {
-    return `
-.nlcl-stage {
-  /*
-   * ★会場ステージ(.nlsb-stage)の内側に入る前提の配置(2026-08-25 実機で踏んだ)。
-   *   当初 body 直下に fixed + z-index:2147483000 で置いたが、会場ルート(.nlsb-root)が
-   *   まったく同じ z-index の全画面要素で、かつ後から DOM に入るため【完全に覆われて
-   *   一度も見えなかった】。同値 z-index は DOM 順で後勝ちになる。
-   *   会場の既存階層(客席 z4 / 吹き出し z5 / 常駐・roster z6 / 投げ物 z7)。
-   *
-   * ★z6 も間違いだった(2回目の同じ失敗・2026-08-25):
-   *   stage.append(stageLayout, bubbleLayer, rosterPanel, ...) は startCharaLive より
-   *   先に実行されるので、【同じ z6 の rosterPanel より DOM順で前】に置かれてしまい、
-   *   また負けた(venueBar.js:2711 のコメントが「stage.appendの最後に置くことで同z-index(6)
-   *   の常駐レイヤーより手前に来る」と明言している＝先に入る側は負ける)。
-   *   実測: 会場内で使われている z-index の最大は 7(投げ物)。よって 8 で最前面を取る。
-   *   ★「最大値を名乗る」でも「既存に合わせる」でもなく【実測して1つ上】が正解。
-   */
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 8;
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  /* 配信の操作を絶対に奪わない。吹き出しも含めて素通し。 */
-  pointer-events: none;
-  /* 親の文字設定に引きずられない(ニコ生ページに寄生するため)。 */
-  font: 13px/1.5 system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
-}
-.nlcl-chara {
-  position: relative;
-  width: ${CHARA_LIVE_SIZE_PX}px;
-  height: ${CHARA_LIVE_SIZE_PX}px;
-  /* transform の原点を足元に。浮遊しても「立っている」感じが崩れない。 */
-  transform-origin: 50% 90%;
-  will-change: transform;
-}
-/*
- * ★上端配置(2026-10-17): data-placement="top" のとき、会場の上端の余白に 64px で右寄せ横一列。
- *   吹き出しと「…」は画面外に出ないよう下向きにする(しっぽの向きも反転)。従来の右下配置は data-placement 無し/bottom-right のまま変わらない。
- */
-.nlcl-stage[data-placement="top"] {
-  top: 4px;
-  bottom: auto;
-  align-items: flex-start;
-}
-.nlcl-stage[data-placement="top"] .nlcl-chara {
-  width: ${CHARA_LIVE_COMPACT_SIZE_PX}px;
-  height: ${CHARA_LIVE_COMPACT_SIZE_PX}px;
-  transform-origin: 50% 50%;
-}
-.nlcl-stage[data-placement="top"] .nlcl-chara__bubble,
-.nlcl-stage[data-placement="top"] .nlcl-chara__think {
-  top: calc(100% + 6px);
-  bottom: auto;
-}
-.nlcl-stage[data-placement="top"] .nlcl-chara__bubble::after {
-  top: auto;
-  bottom: 100%;
-  border-top-color: transparent;
-  border-bottom-color: #2f3a46;
-}
-/*
- * ★お祝い(2026-10-17・応援コメント100件など): 3人が弾んで「100件!」のバッジが出る。
- *   CSS animation は inline transform(浮遊)より優先されるので競合しない。終わると浮遊に戻る(fill-mode なし)。
- *   transform/opacity のみ・DOM 追加はバッジ1個だけ。prefers-reduced-motion では弾みを止め、バッジの fade だけ残す。
- */
-.nlcl-stage.is-cheering .nlcl-chara {
-  animation: nlcl-cheer 2.4s ease-in-out;
-}
-.nlcl-cheer-badge {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: #ff9800;
-  color: #fff;
-  border: 3px solid #fff;
-  box-shadow: 0 3px 0 rgba(150, 70, 0, 0.9), 0 6px 14px rgba(0, 0, 0, 0.35);
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  transform-origin: 100% 100%;
-  animation: nlcl-cheer-badge 2.2s ease-out forwards;
-}
-.nlcl-stage[data-placement="top"] .nlcl-cheer-badge {
-  top: calc(100% + 8px);
-  bottom: auto;
-  transform-origin: 100% 0;
-}
-.nlcl-cheer-badge[hidden] { display: none; }
-@keyframes nlcl-cheer {
-  0%   { transform: scale(1) translateY(0); }
-  14%  { transform: scale(1.35) translateY(-10px); }
-  28%  { transform: scale(1) translateY(0); }
-  44%  { transform: scale(1.25) translateY(-7px); }
-  60%  { transform: scale(1) translateY(0); }
-  76%  { transform: scale(1.15) translateY(-4px); }
-  100% { transform: scale(1) translateY(0); }
-}
-@keyframes nlcl-cheer-badge {
-  0%   { opacity: 0; transform: scale(0.4); }
-  12%  { opacity: 1; transform: scale(1.18); }
-  22%  { transform: scale(1); }
-  80%  { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1); }
-}
-.nlcl-chara__img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-  /* 立ち絵を背景から浮かせる(配信映像の上でも輪郭が見える)。 */
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
-  -webkit-user-select: none;
-  user-select: none;
-}
-/* 喋っている子を少し持ち上げて前に出す(誰が喋ったか一目で分かる)。 */
-.nlcl-chara.is-speaking { z-index: 2; }
-.nlcl-chara.is-speaking .nlcl-chara__img {
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
-}
-.nlcl-chara__bubble {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%);
-  max-width: 190px;
-  width: max-content;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: #fffdf7;
-  color: #23303f;
-  border: 2px solid #2f3a46;
-  box-shadow: 2px 2px 0 rgba(47, 58, 70, 0.9);
-  font-size: 12px;
-  line-height: 1.45;
-  text-align: center;
-  /* 長文でも会場を覆わない。3 行で切る。 */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  animation: nlcl-pop 160ms ease-out;
-}
-/* 吹き出しのしっぽ。 */
-.nlcl-chara__bubble::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -6px;
-  border: 6px solid transparent;
-  border-top-color: #2f3a46;
-}
-.nlcl-chara__name {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  opacity: 0.7;
-  margin-bottom: 1px;
-}
-/* シンキングの「…」。考えている間だけ出る。 */
-.nlcl-chara__think {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%);
-  display: flex;
-  gap: 4px;
-  padding: 7px 11px;
-  border-radius: 999px;
-  background: #fffdf7;
-  border: 2px solid #2f3a46;
-  box-shadow: 2px 2px 0 rgba(47, 58, 70, 0.9);
-}
-.nlcl-chara__think i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #4b5b6b;
-  animation: nlcl-think 1.25s ease-in-out infinite;
-}
-.nlcl-chara__think i:nth-child(2) { animation-delay: 0.18s; }
-.nlcl-chara__think i:nth-child(3) { animation-delay: 0.36s; }
-/* ★hidden を必ず効かせる(2026-08-25 発見のバグ):
-   display:flex は hidden 属性の既定 display:none に勝ってしまうため、
-   setVisible(false) しても隠れない。明示的に打ち消す。 */
-.nlcl-stage[hidden] { display: none; }
-/* ★2026-10-12 同じ罠が吹き出しと「…」にも残っていた(実測: 3体とも hidden なのに画面に出ていた)。
-   display:flex / -webkit-box は hidden の既定 display:none に勝つ。JS が hidden で出し入れする部品は全部ここで打ち消す。 */
-.nlcl-chara__bubble[hidden] { display: none; }
-.nlcl-chara__think[hidden] { display: none; }
-@keyframes nlcl-pop {
-  from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
-}
-@keyframes nlcl-cheer-badge-calm {
-  0%   { opacity: 0; }
-  10%  { opacity: 1; }
-  80%  { opacity: 1; }
-  100% { opacity: 0; }
-}
-@keyframes nlcl-think {
-  0%, 100% { opacity: 0.28; transform: translateY(0); }
-  50%      { opacity: 1;    transform: translateY(-3px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .nlcl-stage.is-cheering .nlcl-chara { animation: none; }
-  .nlcl-cheer-badge { animation: nlcl-cheer-badge-calm 2.2s linear forwards; }
-  .nlcl-chara__bubble { animation: none; }
-  .nlcl-chara__think i { animation: none; opacity: 0.7; }
-}
-`.trim();
-  }
-  function buildCharaLiveStageDom(doc, resolveUrl) {
-    const root = doc.createElement("div");
-    root.className = "nlcl-stage";
-    root.dataset.placement = CHARA_LIVE_PLACEMENT;
-    root.setAttribute("aria-live", "polite");
-    const nodes = {};
-    for (const member of CHARA_LIVE_MEMBERS) {
-      const el = doc.createElement("div");
-      el.className = "nlcl-chara";
-      el.dataset.chara = member.id;
-      const img = doc.createElement("img");
-      img.className = "nlcl-chara__img";
-      img.alt = member.displayName;
-      img.decoding = "async";
-      img.src = resolveUrl(toThumbPath(yukkuriCharacterImagePath(member.id, "normal", false)));
-      const bubble = doc.createElement("div");
-      bubble.className = "nlcl-chara__bubble";
-      bubble.hidden = true;
-      const think = doc.createElement("div");
-      think.className = "nlcl-chara__think";
-      think.hidden = true;
-      think.setAttribute("aria-hidden", "true");
-      for (let i = 0; i < 3; i += 1) think.appendChild(doc.createElement("i"));
-      el.append(img, bubble, think);
-      root.appendChild(el);
-      nodes[member.id] = { el, img, bubble, think };
-    }
-    const badge = doc.createElement("div");
-    badge.className = "nlcl-cheer-badge";
-    badge.hidden = true;
-    badge.setAttribute("aria-hidden", "true");
-    root.appendChild(badge);
-    return { root, badge, nodes };
-  }
-  function applyCharaLiveFrame(nodes, model, resolveUrl) {
-    for (const item of model) {
-      const node = nodes?.[item.charaId];
-      if (!node) continue;
-      const nextSrc = resolveUrl(toThumbPath(item.imagePath));
-      if (node.img.getAttribute("src") !== nextSrc) {
-        node.img.setAttribute("src", nextSrc);
-      }
-      const { x, y, rotateDeg, scale } = item.float;
-      const speaking = item.mode === "react" || item.mode === "answer";
-      const emphasise = speaking ? 1.06 : 1;
-      const transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${(rotateDeg + item.tiltDeg).toFixed(2)}deg) scale(${(scale * emphasise).toFixed(4)})`;
-      if (node.el.style.transform !== transform) {
-        node.el.style.transform = transform;
-      }
-      if (node.el.classList.contains("is-speaking") !== speaking) {
-        node.el.classList.toggle("is-speaking", speaking);
-      }
-      const showBubble = speaking && !!item.text;
-      if (showBubble) {
-        if (node.bubble.dataset.text !== item.text) {
-          node.bubble.textContent = "";
-          const name = node.bubble.ownerDocument.createElement("b");
-          name.className = "nlcl-chara__name";
-          name.textContent = item.displayName;
-          node.bubble.append(name, node.bubble.ownerDocument.createTextNode(item.text));
-          node.bubble.dataset.text = item.text;
-        }
-        if (node.bubble.hidden) node.bubble.hidden = false;
-      } else if (!node.bubble.hidden) {
-        node.bubble.hidden = true;
-        delete node.bubble.dataset.text;
-      }
-      const showThink = item.mode === "thinking";
-      if (node.think.hidden === showThink) node.think.hidden = !showThink;
-    }
-  }
-  function preloadCharaLiveImages(doc, resolveUrl) {
-    return listCharaLiveImagePaths().map((path) => {
-      const img = doc.createElement("img");
-      img.decoding = "async";
-      img.src = resolveUrl(path);
-      return img;
-    });
   }
 
   // src/lib/charaLiveController.js
@@ -19634,7 +19806,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T15:41") : ""
+          buildId: true ? String("yt-2026-11-04T16:46") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22516,8 +22688,18 @@ ${sourceCol}
     ensureBaseFontSize();
     if (!document.getElementById("nlsb-venue-root")) mountVenueBarButton();
   }
-  setInterval(sync, 1e3);
-  sync();
+  ytInstallLocalAssetUrls();
+  var PREFETCH = [
+    ...listCharaLiveImagePaths(),
+    "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png",
+    "images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png",
+    "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png",
+    "images/toumeilink.png"
+  ];
+  void ytPrefetchLocalAssets(PREFETCH).then(() => {
+    setInterval(sync, 1e3);
+    sync();
+  });
   if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());
   (() => {
     let buf = [];
