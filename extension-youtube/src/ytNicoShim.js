@@ -22,6 +22,7 @@ import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/y
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 import { ytMarkImportantVoiceRows } from '../../src/lib/youtube/ytVoicePriority.js';
+import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -1148,7 +1149,7 @@ const NICO_USERICON_RE = /nicoaccount\/usericon\/(?:s\/)?\d+\/(8\d{9})\.jpg/;
 /** @param {Element} img */
 function fixImg(img) {
   const src = String(img.getAttribute('src') || '');
-  const m = src.match(NICO_USERICON_RE);
+  const m = src.match(NICO_USERICON_RE) || String(img.getAttribute('data-yt-nico-src') || '').match(NICO_USERICON_RE);
   if (!m) return;
   const icon = ytIconForNumericUid(m[1]);
   if (icon && icon !== src) img.setAttribute('src', icon);
@@ -1739,6 +1740,109 @@ if (!YT_SHIM_IN_PAGE && typeof HTMLImageElement !== 'undefined' && typeof Elemen
     }
   } catch {
     /* 差し替えられなくても、上の fixImg がいままでどおり直す */
+  }
+}
+
+// 視聴ページの中(content script)の会場: YouTube のページの見張り(connection-allowlist-report-only)は、Google/YouTube 以外への
+//   読み込みを全部エラー一覧に報告する(止めはしない)。会場のキャラの表情が変わるたび・顔を描くたびに積もり、
+//   「すべて削除しても無限に出る」(2026-11-04 りんく実機)。画像を入れる瞬間に、つなぎに行かない形へ置き換える:
+//   ・拡張の中の画像 → 同じ中身の blob:(ytLocalAssetUrls.js)
+//   ・ニコニコの顔(疑似ID) → その人の YouTube の顔(分かれば)。分からなければ読まずに失敗させる(data:,)=
+//     ニコ生版で顔が無いとき(404)と同じく、ニコ生版の代わりの顔が出る。元の場所は data-yt-nico-src に残し、
+//     あとで YouTube の顔が分かったら fixImg が差し替える。
+if (YT_SHIM_IN_PAGE && typeof HTMLImageElement !== 'undefined' && typeof Element !== 'undefined') {
+  const NIMG_RE = /^https?:\/\/[^/]*\.nimg\.jp\//i;
+  /** @param {any} v @returns {{ src: any, nico: string }} */
+  const mapPageSrc = (v) => {
+    const s = String(v ?? '');
+    if (s.startsWith('chrome-extension://')) return { src: ytLocalAssetUrlFor(s), nico: '' };
+    if (!NIMG_RE.test(s)) return { src: v, nico: '' };
+    const m = s.match(NICO_USERICON_RE);
+    const icon = m ? ytIconForNumericUid(m[1]) : '';
+    return icon ? { src: icon, nico: '' } : { src: 'data:,', nico: s };
+  };
+  try {
+    const realSetAttr = Element.prototype.setAttribute;
+    const realGetAttr = Element.prototype.getAttribute;
+    Element.prototype.getAttribute = function (name) {
+      const v = realGetAttr.call(this, name);
+      if (this instanceof HTMLImageElement && String(name).toLowerCase() === 'src') {
+        return realGetAttr.call(this, 'data-yt-nico-src') || v;
+      }
+      return v;
+    };
+    // 読まずに失敗させるのは、ニコニコの置き場所が「無い(404)」と答えるくらい間を置いてから。
+    //   すぐ失敗させると、ニコ生版の顔の見張りが同じ人の2つ目の顔を描く前に失敗を覚えてしまい、
+    //   代わりの顔の見た目(枠と背景)が1つ目と2つ目で変わる(試験ページで 12 人中 6 人)。
+    /** @param {Element} img @param {() => void} fail */
+    const failLater = (img, fail) => {
+      const want = realGetAttr.call(img, 'data-yt-nico-src');
+      setTimeout(() => {
+        if (realGetAttr.call(img, 'data-yt-nico-src') === want) fail();
+      }, 150);
+    };
+    /** @param {Element} img @param {string} nico */
+    const keepNico = (img, nico) => {
+      if (nico) realSetAttr.call(img, 'data-yt-nico-src', nico);
+      else if (img.hasAttribute('data-yt-nico-src')) img.removeAttribute('data-yt-nico-src');
+    };
+    const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    if (desc && desc.set && desc.get) {
+      Object.defineProperty(HTMLImageElement.prototype, 'src', {
+        configurable: true,
+        enumerable: desc.enumerable,
+        // ニコ生版の部品(顔の読み込み見張り)は src を読んで「誰の顔が失敗したか」を決めるので、元の場所を見せる
+        get() {
+          return realGetAttr.call(this, 'data-yt-nico-src') || desc.get.call(this);
+        },
+        set(v) {
+          const r = mapPageSrc(v);
+          keepNico(this, r.nico);
+          if (r.nico) failLater(this, () => desc.set.call(this, 'data:,'));
+          else desc.set.call(this, r.src);
+        },
+      });
+    }
+    Element.prototype.setAttribute = function (name, value) {
+      if (this instanceof HTMLImageElement && String(name).toLowerCase() === 'src') {
+        const r = mapPageSrc(value);
+        keepNico(this, r.nico);
+        if (r.nico) return failLater(this, () => realSetAttr.call(this, name, 'data:,'));
+        return realSetAttr.call(this, name, r.src);
+      }
+      return realSetAttr.call(this, name, value);
+    };
+    // 会場の席の顔は innerHTML の <img src="…"> で入る(venueBar.js の nlsb-roster-avatar)
+    const ih = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    if (ih && ih.set && ih.get) {
+      const SRC_RE = /\bsrc="((?:https?:\/\/[^"/]*\.nimg\.jp\/|chrome-extension:\/\/)[^"]*)"/gi;
+      /** @param {string} t */
+      const unesc = (t) => t.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+      /** @param {string} t */
+      const esc = (t) => t.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      Object.defineProperty(Element.prototype, 'innerHTML', {
+        configurable: true,
+        enumerable: ih.enumerable,
+        get() {
+          return ih.get.call(this);
+        },
+        set(v) {
+          let html = v;
+          if (typeof html === 'string' && (html.includes('nimg.jp') || html.includes('chrome-extension://'))) {
+            html = html.replace(SRC_RE, (all, raw) => {
+              const r = mapPageSrc(unesc(raw));
+              return r.nico ? `data-yt-nico-src="${esc(r.nico)}"` : `src="${esc(String(r.src))}"`;
+            });
+          }
+          ih.set.call(this, html);
+          if (html !== v) {
+            for (const img of this.querySelectorAll('img[data-yt-nico-src]:not([src])')) failLater(img, () => realSetAttr.call(img, 'src', 'data:,'));
+          }
+        },
+      });
+    }
+  } catch {
+    /* 包めなければ元のまま(画像は出る・報告が残るだけ) */
   }
 }
 
