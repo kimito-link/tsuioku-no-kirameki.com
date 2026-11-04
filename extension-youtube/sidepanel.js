@@ -1084,6 +1084,7 @@ ${sourceCol}
   }
   var ytKeyByNumericUid = /* @__PURE__ */ new Map();
   var numericUidByYtKey = /* @__PURE__ */ new Map();
+  var uidRegVersion = 0;
   function numericUidForYtKey(ytKey) {
     const key = String(ytKey || "");
     if (!key) return "";
@@ -1104,6 +1105,7 @@ ${sourceCol}
     }
     numericUidByYtKey.set(key, uid);
     ytKeyByNumericUid.set(uid, key);
+    uidRegVersion += 1;
     return uid;
   }
   function ytKeyForNumericUid(uid) {
@@ -1957,6 +1959,15 @@ ${sourceCol}
   function startDomFixer() {
     if (!document.body) return;
     fixSubtree(document.body);
+    let fixedAtVersion = uidRegVersion;
+    setInterval(() => {
+      if (fixedAtVersion === uidRegVersion || document.hidden) return;
+      fixedAtVersion = uidRegVersion;
+      try {
+        fixSubtree(document.body);
+      } catch {
+      }
+    }, 2e3);
     new MutationObserver((muts) => {
       if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, [data-yt-all]")))) scheduleTopFanRest();
       for (const m of muts) {
@@ -45734,7 +45745,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T05:42" ? String("yt-2026-11-04T05:42") : "dev";
+      const buildId = "yt-2026-11-04T05:45" ? String("yt-2026-11-04T05:45") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45752,7 +45763,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.50") : "";
+    const bundledVersion = true ? String("0.1.51") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45797,7 +45808,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T05:42" ? String("yt-2026-11-04T05:42") : "dev";
+            return "yt-2026-11-04T05:45" ? String("yt-2026-11-04T05:45") : "dev";
           } catch {
             return "dev";
           }
