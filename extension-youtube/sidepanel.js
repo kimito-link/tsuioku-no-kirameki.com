@@ -863,7 +863,11 @@
               (await realGet(lbKey))?.[lbKey]
             );
             const fromBoard = lb ? ytLeaderboardToKoken(lb, await buildCommentsForLv(lv) || [], lv) : null;
-            if (fromBoard) v = fromBoard;
+            if (fromBoard) {
+              v = fromBoard;
+              topFanRestRows = fromBoard.rows.slice(10);
+              scheduleTopFanRest();
+            } else topFanRestRows = [];
             if (v != null) {
               const wasTopFans = kokenIsTopFans;
               kokenIsTopFans = !!fromBoard;
@@ -1245,10 +1249,79 @@
     }
     globalThis.Blob = YtFixingBlob;
   }
+  var topFanRestRows = [];
+  var topFanRestQueued = false;
+  function scheduleTopFanRest() {
+    if (topFanRestQueued || typeof document === "undefined") return;
+    topFanRestQueued = true;
+    setTimeout(() => {
+      topFanRestQueued = false;
+      ensureTopFanRest();
+    }, 0);
+  }
+  function ensureTopFanRest() {
+    const body = document.getElementById("northStarLaneBody-contributionRanking");
+    const old = document.getElementById("yt-topfan-rest");
+    const rows = kokenIsTopFans ? topFanRestRows : [];
+    if (!body || !rows.length || !body.querySelector('img, [class*="thumb"]')) {
+      if (old) old.remove();
+      return;
+    }
+    const sig = rows.map((r) => `${r.rank}:${r.name}:${r.contribution}`).join("|");
+    if (old && old.parentElement === body && old.getAttribute("data-sig") === sig) return;
+    const wasOpen = !!(old && /** @type {HTMLDetailsElement} */
+    old.open);
+    if (old) old.remove();
+    const det = document.createElement("details");
+    det.id = "yt-topfan-rest";
+    det.setAttribute("data-sig", sig);
+    det.open = wasOpen;
+    det.style.cssText = "margin:8px 4px 2px;font-size:12px;";
+    const sum = document.createElement("summary");
+    sum.textContent = `11位から下（${rows.length}人）`;
+    sum.style.cssText = "cursor:pointer;color:#2563eb;";
+    det.appendChild(sum);
+    const ol = document.createElement("ol");
+    ol.style.cssText = "list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 10px;";
+    for (const r of rows) {
+      const li = document.createElement("li");
+      li.style.cssText = "display:flex;align-items:center;gap:6px;min-width:0;";
+      const rank = document.createElement("span");
+      rank.textContent = String(r.rank || "");
+      rank.style.cssText = "width:22px;text-align:right;color:#64748b;flex:none;";
+      li.appendChild(rank);
+      const img = document.createElement("img");
+      img.width = 22;
+      img.height = 22;
+      img.alt = "";
+      img.style.cssText = "border-radius:50%;flex:none;object-fit:cover;background:#e2e8f0;";
+      if (/^https:\/\//.test(String(r.thumbnailUrl || ""))) img.src = String(r.thumbnailUrl);
+      img.addEventListener("error", () => img.removeAttribute("src"), { once: true });
+      li.appendChild(img);
+      const name = String(r.name || "");
+      const a = document.createElement("a");
+      a.textContent = name;
+      if (/^@\S+$/.test(name)) {
+        a.href = `https://www.youtube.com/${encodeURIComponent(name).replace(/^%40/, "@")}`;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+      }
+      a.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;color:inherit;";
+      li.appendChild(a);
+      const xp = document.createElement("span");
+      xp.textContent = `${Number(r.contribution || 0).toLocaleString("ja-JP")} XP`;
+      xp.style.cssText = "color:#64748b;flex:none;";
+      li.appendChild(xp);
+      ol.appendChild(li);
+    }
+    det.appendChild(ol);
+    body.appendChild(det);
+  }
   function startDomFixer() {
     if (!document.body) return;
     fixSubtree(document.body);
     new MutationObserver((muts) => {
+      if (topFanRestRows.length && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest")))) scheduleTopFanRest();
       for (const m of muts) {
         if (m.type === "characterData") fixTextNode(
           /** @type {Text} */
@@ -45486,7 +45559,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T02:51" ? String("yt-2026-11-04T02:51") : "dev";
+      const buildId = "yt-2026-11-04T03:12" ? String("yt-2026-11-04T03:12") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45504,7 +45577,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.37") : "";
+    const bundledVersion = true ? String("0.1.38") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45549,7 +45622,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T02:51" ? String("yt-2026-11-04T02:51") : "dev";
+            return "yt-2026-11-04T03:12" ? String("yt-2026-11-04T03:12") : "dev";
           } catch {
             return "dev";
           }
