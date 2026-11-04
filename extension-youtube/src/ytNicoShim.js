@@ -1647,7 +1647,10 @@ if (typeof document !== 'undefined' && /\/venue\.html$/.test(String(location.pat
 //   画面に出てから YouTube の顔に差し替える(上の fixImg)と、描き直しのたびに一瞬ニコニコ側の絵(無い→代わりの絵)が
 //   映ってちらつく。src を入れる瞬間に YouTube の顔へ置き換えて、最初から正しい絵を読ませる。
 //   (分からない人はそのまま=いままでどおり)
-if (typeof HTMLImageElement !== 'undefined' && typeof Element !== 'undefined') {
+// ★視聴ページの中(content script)では入れない: 隔離された世界から包んだ src/setAttribute で画像を読ませると、Chrome が
+//   「Unsafe attempt to load URL … from frame」で弾き、会場のキャラ画像や顔が読めなかった(2026-11-04 りんく実機・エラー一覧の
+//   スタックが venue-inline.js の set / setAttribute)。会場の顔は startDomFixerOn(root) の差し替えで直す。
+if (!YT_SHIM_IN_PAGE && typeof HTMLImageElement !== 'undefined' && typeof Element !== 'undefined') {
   /** @param {any} v */
   const mapSrc = (v) => {
     const s = String(v ?? '');
