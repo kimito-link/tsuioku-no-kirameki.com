@@ -1944,6 +1944,44 @@ ${sourceCol}
             const list = Array.isArray(prev) ? prev : [];
             list.push(snap);
             await real.storage.local.set({ [key]: list.slice(-60) });
+            const tileOf = (t) => {
+              const img = t.querySelector("img");
+              return {
+                lines: String(
+                  /** @type {HTMLElement} */
+                  t.innerText || ""
+                ).split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 5),
+                img: img ? kindOf(img.getAttribute("src") || "") : "none"
+              };
+            };
+            const lanes = {};
+            for (const name of ["Link", "Gift", "Ad", "Konta", "Tanu"]) {
+              const el = document.getElementById(`sceneStoryUserLane${name}`);
+              if (!el) continue;
+              const tiles = Array.from(el.children).filter((c) => c.querySelector("img"));
+              const guide = document.getElementById(name === "Link" ? "sceneStoryUserLaneGuideLinesTop" : `sceneStoryUserLaneGuideLinesMid${name}`);
+              lanes[name] = {
+                shown: (
+                  /** @type {HTMLElement} */
+                  el.offsetParent !== null
+                ),
+                guide: String(
+                  /** @type {HTMLElement|null} */
+                  guide?.innerText || ""
+                ).slice(0, 80),
+                n: tiles.length,
+                first: tiles.slice(0, 5).map(tileOf)
+              };
+            }
+            const cards = {};
+            for (const id of ["topSupportRankStrip", "watchConcurrentCard", "supportVisualLiveCard", "northStarLaneBody-contributionRanking", "northStarLaneBody-giftHistory", "northStarLaneBody-adRanking", "northStarLaneBody-programPoints", "northStarLaneBody-eventRank"]) {
+              const el = (
+                /** @type {HTMLElement|null} */
+                document.getElementById(id)
+              );
+              if (el) cards[id] = String(el.innerText || "").replace(/\s+/g, " ").slice(0, 300);
+            }
+            await real.storage.local.set({ yt_diag_lanes: { at: Date.now(), version: snap.version, lanes, cards } });
           } catch {
           }
         })();
