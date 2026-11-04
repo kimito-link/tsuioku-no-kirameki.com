@@ -19600,7 +19600,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T13:44") : ""
+          buildId: true ? String("yt-2026-11-04T15:07") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22485,4 +22485,54 @@ ${sourceCol}
   setInterval(sync, 1e3);
   sync();
   if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());
+  (() => {
+    let buf = [];
+    let total = 0;
+    let timer = 0;
+    const flush = () => {
+      timer = 0;
+      try {
+        if (!isExtensionContextAlive()) return;
+        void chrome.storage.local.set({ yt_diag_img_errors: { at: Date.now(), total, items: buf.slice(-40) } }).catch(() => {
+        });
+      } catch {
+      }
+    };
+    document.addEventListener(
+      "error",
+      (ev) => {
+        const el = (
+          /** @type {any} */
+          ev.target
+        );
+        if (!(el instanceof HTMLImageElement)) return;
+        const root = document.getElementById("nlsb-venue-root");
+        if (!root || !root.contains(el)) return;
+        total += 1;
+        let dom = "";
+        try {
+          dom = String(document.domain);
+        } catch {
+          dom = "?";
+        }
+        buf.push({
+          at: Date.now(),
+          src: String(el.getAttribute("src") || "").slice(0, 160),
+          cur: String(el.currentSrc || "").slice(0, 160),
+          cls: String(el.className || "").slice(0, 60),
+          parentCls: String(el.parentElement?.className || "").slice(0, 60),
+          connected: el.isConnected,
+          ownerIsDoc: el.ownerDocument === document,
+          ready: document.readyState,
+          vis: document.visibilityState,
+          dom,
+          href: String(location.href).slice(0, 80),
+          open: document.documentElement.classList.contains("nlsb-venue-open")
+        });
+        if (buf.length > 80) buf = buf.slice(-40);
+        if (!timer) timer = window.setTimeout(flush, 2e3);
+      },
+      true
+    );
+  })();
 })();
