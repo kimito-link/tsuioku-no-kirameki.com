@@ -229,3 +229,26 @@ export async function getYtStreamCommentsSince(videoId, afterRecordedAt = 0) {
     };
   });
 }
+
+/**
+ * 指定した pk の記録を消し、その配信の残りの件数を返す(切り替えで混ざった分の片付け用)。
+ * @param {string} videoId
+ * @param {string[]} pks
+ * @returns {Promise<number>}
+ */
+export async function deleteYtCommentsByPks(videoId, pks) {
+  const vid = String(videoId || '').trim();
+  const db = await openYtCommentsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_COMMENTS], 'readwrite');
+    const store = tx.objectStore(STORE_COMMENTS);
+    for (const pk of pks) store.delete(pk);
+    let total = 0;
+    const countReq = store.index(INDEX_BY_VIDEO_ID).count(IDBKeyRange.only(vid));
+    countReq.onsuccess = () => {
+      total = Number(countReq.result || 0);
+    };
+    tx.oncomplete = () => resolve(total);
+    tx.onerror = () => reject(tx.error || new Error('idb_delete_failed'));
+  });
+}

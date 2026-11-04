@@ -888,6 +888,89 @@
       };
     });
   }
+  async function getYtStreamCommentsByVideoId(videoId) {
+    const vid = String(videoId || "").trim();
+    if (!vid) return [];
+    const db = await openYtCommentsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_COMMENTS], "readonly");
+      const store = tx.objectStore(STORE_COMMENTS);
+      if (store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
+        const index2 = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
+        const range = IDBKeyRange.bound([vid, 0], [vid, Number.MAX_SAFE_INTEGER]);
+        const req2 = index2.getAll(range);
+        req2.onsuccess = () => {
+          resolve(Array.isArray(req2.result) ? req2.result : []);
+        };
+        req2.onerror = () => {
+          reject(req2.error || new Error("idb_get_failed"));
+        };
+        return;
+      }
+      const index = store.index(INDEX_BY_VIDEO_ID);
+      const req = index.getAll(IDBKeyRange.only(vid));
+      req.onsuccess = () => {
+        const list = Array.isArray(req.result) ? req.result : [];
+        list.sort((a, b) => Number(a.recordedAt || 0) - Number(b.recordedAt || 0));
+        resolve(list);
+      };
+      req.onerror = () => {
+        reject(req.error || new Error("idb_get_failed"));
+      };
+    });
+  }
+  async function deleteYtCommentsByPks(videoId, pks) {
+    const vid = String(videoId || "").trim();
+    const db = await openYtCommentsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_COMMENTS], "readwrite");
+      const store = tx.objectStore(STORE_COMMENTS);
+      for (const pk of pks) store.delete(pk);
+      let total = 0;
+      const countReq = store.index(INDEX_BY_VIDEO_ID).count(IDBKeyRange.only(vid));
+      countReq.onsuccess = () => {
+        total = Number(countReq.result || 0);
+      };
+      tx.oncomplete = () => resolve(total);
+      tx.onerror = () => reject(tx.error || new Error("idb_delete_failed"));
+    });
+  }
+
+  // src/lib/youtube/ytSwitchLeakCleanup.js
+  function authorKey(it) {
+    const ch = String(it?.channelId || "").trim();
+    if (ch) return `ch:${ch}`;
+    const name = String(it?.name || it?.authorName || "").trim();
+    return name ? `name:${name}` : "";
+  }
+  function pickSwitchLeakPks(targetItems, prevItems, windowMs = 3e3) {
+    const target = Array.isArray(targetItems) ? targetItems : [];
+    const prev = Array.isArray(prevItems) ? prevItems : [];
+    if (!target.length || !prev.length) return [];
+    let first = Infinity;
+    for (const it of target) {
+      const t = Number(it?.recordedAt);
+      if (Number.isFinite(t) && t < first) first = t;
+    }
+    if (!Number.isFinite(first)) return [];
+    const edge = first + windowMs;
+    const prevAuthors = new Set(prev.map(authorKey).filter(Boolean));
+    const laterAuthors = /* @__PURE__ */ new Set();
+    for (const it of target) {
+      if (Number(it?.recordedAt) > edge) {
+        const k = authorKey(it);
+        if (k) laterAuthors.add(k);
+      }
+    }
+    const out = [];
+    for (const it of target) {
+      if (!(Number(it?.recordedAt) <= edge)) continue;
+      const k = authorKey(it);
+      if (!k || !prevAuthors.has(k) || laterAuthors.has(k)) continue;
+      if (it?.pk) out.push(String(it.pk));
+    }
+    return out;
+  }
 
   // src/lib/youtube/ytPageMeta.js
   var VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
@@ -1155,6 +1238,29 @@
     });
   } catch {
   }
+  var SWITCH_LEAK_CLEANUPS = [{ key: "yt_cleanup_switch_leak_GRvNsGECdtc", target: "GRvNsGECdtc", prev: "ZcCrxy_B4fg" }];
+  async function runSwitchLeakCleanups() {
+    for (const job of SWITCH_LEAK_CLEANUPS) {
+      try {
+        const done = await chrome.storage.local.get(job.key);
+        if (done && done[job.key]) continue;
+        const target = await getYtStreamCommentsByVideoId(job.target);
+        const prev = await getYtStreamCommentsByVideoId(job.prev);
+        if (!target.length || !prev.length) continue;
+        const pks = pickSwitchLeakPks(target, prev);
+        const total = pks.length ? await deleteYtCommentsByPks(job.target, pks) : target.length;
+        const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
+        const summaries = data && data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+        if (summaries[job.target]) {
+          summaries[job.target] = { ...summaries[job.target], itemCount: total };
+          await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
+        }
+        await chrome.storage.local.set({ [job.key]: { at: Date.now(), removed: pks.length, total } });
+      } catch {
+      }
+    }
+  }
+  void runSwitchLeakCleanups();
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message.type !== "string") return false;
     if (message.type === "YT_CAPTURE_FRAME") {
