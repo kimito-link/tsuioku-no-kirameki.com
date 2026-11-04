@@ -4,11 +4,11 @@
 //   動画の疑似 lv を venueBar に教えてから(ビルド時に足す __ytSetVenueLiveId)、ニコ生版と同じ呼び方で出す。
 //   会場の作り・見た目・席・吹き出し・読み上げはニコ生版の venueBar.js のまま(手を加えない)。
 //   ★2026-11-04 りんく「このかたちがいい」(ニコ生版の視聴ページのボタン)・「画面をくろくおおわないで」(0.1.69 の重ね窓は撤去)。
-import { pseudoLvForVideoId, ytIsImportantVoiceKey } from './ytNicoShim.js';
+import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey } from './ytNicoShim.js';
 import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets } from './ytLocalAssetUrls.js';
 import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
-import { ytShouldVoiceWhenCrowded } from '../../src/lib/youtube/ytVoicePriority.js';
+import { ytShouldVoiceWhenCrowded, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
@@ -150,8 +150,17 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
         keep.push(it);
         continue;
       }
-      const important = ytIsImportantVoiceKey(it.key);
+      const reason = ytImportantVoiceReasonOfKey(it.key);
+      const important = reason !== '';
       const queueLength = (Array.isArray(this.queue) ? this.queue.length : 0) + keep.length;
+      // 計器(0.1.90): 読み上げに来たコメントの数・混んでいた回数・大事な理由ごとの数(絞り込みが効いているかを見る)
+      const d = /** @type {any} */ (this.diag);
+      d.ytCommentTotal = (Number(d.ytCommentTotal) || 0) + 1;
+      if (queueLength >= YT_VOICE_CROWD_QUEUE) d.ytCrowdedTotal = (Number(d.ytCrowdedTotal) || 0) + 1;
+      if (important) {
+        d.ytReason = d.ytReason || {};
+        d.ytReason[reason] = (Number(d.ytReason[reason]) || 0) + 1;
+      }
       if (!ytShouldVoiceWhenCrowded({ important, queueLength })) {
         this.diag.ytCrowdSkipTotal = (Number(this.diag.ytCrowdSkipTotal) || 0) + 1;
         try {
@@ -175,7 +184,7 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
       try {
         if (isExtensionContextAlive()) {
           void chrome.storage.local.set({
-            yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0 },
+            yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0, commentTotal: Number(/** @type {any} */ (this.diag).ytCommentTotal) || 0, crowdedTotal: Number(/** @type {any} */ (this.diag).ytCrowdedTotal) || 0, reasons: { .../** @type {any} */ (this.diag).ytReason } },
           }).catch(() => {});
         }
       } catch {

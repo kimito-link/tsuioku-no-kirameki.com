@@ -833,20 +833,21 @@ ${sourceCol}
   // src/lib/youtube/ytVoicePriority.js
   var IMPORTANT_KINDS = /* @__PURE__ */ new Set(["superchat", "sticker", "membership", "membership_gift", "yt_gift"]);
   var IMPORTANT_BADGES = /* @__PURE__ */ new Set(["owner", "moderator"]);
-  function ytIsImportantVoiceRow(row, firstOfUser) {
-    if (firstOfUser) return true;
-    if (!row || typeof row !== "object") return false;
-    if (IMPORTANT_KINDS.has(String(row.kind || ""))) return true;
-    const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || "").toLowerCase()) : [];
-    return badges.some((b) => IMPORTANT_BADGES.has(b));
+  function ytImportantVoiceReason(row, firstOfUser) {
+    if (row && typeof row === "object") {
+      if (IMPORTANT_KINDS.has(String(row.kind || ""))) return "kind";
+      const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || "").toLowerCase()) : [];
+      if (badges.some((b) => IMPORTANT_BADGES.has(b))) return "badge";
+    }
+    return firstOfUser ? "first" : "";
   }
-  function ytMarkImportantVoiceRows(rows, personKeyOf) {
+  function ytImportantVoiceReasons(rows, personKeyOf) {
     const seen = /* @__PURE__ */ new Set();
     return (Array.isArray(rows) ? rows : []).map((r) => {
       const k = String(personKeyOf(r) || "");
       const first = !!k && !seen.has(k);
       if (k) seen.add(k);
-      return ytIsImportantVoiceRow(r, first);
+      return ytImportantVoiceReason(r, first);
     });
   }
 
@@ -1248,7 +1249,7 @@ ${sourceCol}
     if (!c) return null;
     return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
   }
-  var ytVoiceImportantKeys = /* @__PURE__ */ new Set();
+  var ytVoiceImportantKeys = /* @__PURE__ */ new Map();
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
@@ -1272,7 +1273,7 @@ ${sourceCol}
     }
     const wantHandles = /* @__PURE__ */ new Set();
     const who = buildYtPersonResolver(list);
-    const important = IS_VENUE_CONTEXT ? ytMarkImportantVoiceRows(list, (r) => who.keyOf(r)) : null;
+    const important = IS_VENUE_CONTEXT ? ytImportantVoiceReasons(list, (r) => who.keyOf(r)) : null;
     let streamStartedAt = 0;
     if (list.some((r) => r?.replay)) {
       replayVideoIds.add(vid);
@@ -1294,7 +1295,7 @@ ${sourceCol}
       }
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
-      if (important?.[i]) ytVoiceImportantKeys.add(`no:${e.commentNo}`);
+      if (important?.[i]) ytVoiceImportantKeys.set(`no:${e.commentNo}`, important[i]);
       return e;
     });
     registerBroadcastersFromSummaries();

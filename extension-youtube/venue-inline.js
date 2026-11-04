@@ -838,20 +838,21 @@ ${sourceCol}
   var IMPORTANT_KINDS = /* @__PURE__ */ new Set(["superchat", "sticker", "membership", "membership_gift", "yt_gift"]);
   var IMPORTANT_BADGES = /* @__PURE__ */ new Set(["owner", "moderator"]);
   var YT_VOICE_CROWD_QUEUE = 2;
-  function ytIsImportantVoiceRow(row, firstOfUser) {
-    if (firstOfUser) return true;
-    if (!row || typeof row !== "object") return false;
-    if (IMPORTANT_KINDS.has(String(row.kind || ""))) return true;
-    const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || "").toLowerCase()) : [];
-    return badges.some((b) => IMPORTANT_BADGES.has(b));
+  function ytImportantVoiceReason(row, firstOfUser) {
+    if (row && typeof row === "object") {
+      if (IMPORTANT_KINDS.has(String(row.kind || ""))) return "kind";
+      const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || "").toLowerCase()) : [];
+      if (badges.some((b) => IMPORTANT_BADGES.has(b))) return "badge";
+    }
+    return firstOfUser ? "first" : "";
   }
-  function ytMarkImportantVoiceRows(rows, personKeyOf) {
+  function ytImportantVoiceReasons(rows, personKeyOf) {
     const seen = /* @__PURE__ */ new Set();
     return (Array.isArray(rows) ? rows : []).map((r) => {
       const k = String(personKeyOf(r) || "");
       const first = !!k && !seen.has(k);
       if (k) seen.add(k);
-      return ytIsImportantVoiceRow(r, first);
+      return ytImportantVoiceReason(r, first);
     });
   }
   function ytShouldVoiceWhenCrowded(s) {
@@ -1288,9 +1289,9 @@ ${sourceCol}
     if (!c) return null;
     return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
   }
-  var ytVoiceImportantKeys = /* @__PURE__ */ new Set();
-  function ytIsImportantVoiceKey(key) {
-    return ytVoiceImportantKeys.has(String(key || ""));
+  var ytVoiceImportantKeys = /* @__PURE__ */ new Map();
+  function ytImportantVoiceReasonOfKey(key) {
+    return ytVoiceImportantKeys.get(String(key || "")) || "";
   }
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
@@ -1315,7 +1316,7 @@ ${sourceCol}
     }
     const wantHandles = /* @__PURE__ */ new Set();
     const who = buildYtPersonResolver(list);
-    const important = IS_VENUE_CONTEXT ? ytMarkImportantVoiceRows(list, (r) => who.keyOf(r)) : null;
+    const important = IS_VENUE_CONTEXT ? ytImportantVoiceReasons(list, (r) => who.keyOf(r)) : null;
     let streamStartedAt = 0;
     if (list.some((r) => r?.replay)) {
       replayVideoIds.add(vid);
@@ -1337,7 +1338,7 @@ ${sourceCol}
       }
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
-      if (important?.[i]) ytVoiceImportantKeys.add(`no:${e.commentNo}`);
+      if (important?.[i]) ytVoiceImportantKeys.set(`no:${e.commentNo}`, important[i]);
       return e;
     });
     registerBroadcastersFromSummaries();
@@ -19811,7 +19812,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T22:40") : ""
+          buildId: true ? String("yt-2026-11-04T23:53") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22779,8 +22780,19 @@ ${sourceCol}
           keep.push(it);
           continue;
         }
-        const important = ytIsImportantVoiceKey(it.key);
+        const reason = ytImportantVoiceReasonOfKey(it.key);
+        const important = reason !== "";
         const queueLength = (Array.isArray(this.queue) ? this.queue.length : 0) + keep.length;
+        const d = (
+          /** @type {any} */
+          this.diag
+        );
+        d.ytCommentTotal = (Number(d.ytCommentTotal) || 0) + 1;
+        if (queueLength >= YT_VOICE_CROWD_QUEUE) d.ytCrowdedTotal = (Number(d.ytCrowdedTotal) || 0) + 1;
+        if (important) {
+          d.ytReason = d.ytReason || {};
+          d.ytReason[reason] = (Number(d.ytReason[reason]) || 0) + 1;
+        }
         if (!ytShouldVoiceWhenCrowded({ important, queueLength })) {
           this.diag.ytCrowdSkipTotal = (Number(this.diag.ytCrowdSkipTotal) || 0) + 1;
           try {
@@ -22802,7 +22814,14 @@ ${sourceCol}
         try {
           if (isExtensionContextAlive()) {
             void chrome.storage.local.set({
-              yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0 }
+              yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0, commentTotal: Number(
+                /** @type {any} */
+                this.diag.ytCommentTotal
+              ) || 0, crowdedTotal: Number(
+                /** @type {any} */
+                this.diag.ytCrowdedTotal
+              ) || 0, reasons: { .../** @type {any} */
+              this.diag.ytReason } }
             }).catch(() => {
             });
           }
