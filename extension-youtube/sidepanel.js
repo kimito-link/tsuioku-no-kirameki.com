@@ -1836,6 +1836,17 @@ ${sourceCol}
     next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
       if (/^—/.test(String(td.textContent || "").trim())) td.textContent = "—";
     });
+    next.querySelectorAll("td.nl-gift-ledger-sender").forEach((td) => {
+      const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
+      for (let n2 = walker.nextNode(); n2; n2 = walker.nextNode()) {
+        n2.nodeValue = String(n2.nodeValue || "").replace(/（[^（）]*）\s*$/, "");
+      }
+    });
+    next.querySelectorAll(".nl-gift-ledger-row__thumb--empty").forEach((box) => {
+      const name = String(box.parentElement?.textContent || "");
+      box.textContent = /メンバー/.test(name) ? "★" : "🎁";
+      box.style.cssText += ";display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6";
+    });
     next.querySelectorAll("img").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
     section.replaceWith(next);
   }
@@ -45614,7 +45625,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T04:58" ? String("yt-2026-11-04T04:58") : "dev";
+      const buildId = "yt-2026-11-04T05:30" ? String("yt-2026-11-04T05:30") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45632,7 +45643,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.44") : "";
+    const bundledVersion = true ? String("0.1.46") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45677,7 +45688,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T04:58" ? String("yt-2026-11-04T04:58") : "dev";
+            return "yt-2026-11-04T05:30" ? String("yt-2026-11-04T05:30") : "dev";
           } catch {
             return "dev";
           }
