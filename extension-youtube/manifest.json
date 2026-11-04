@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "追憶のきらめき for YouTube（試作）",
-  "version": "0.1.62",
+  "version": "0.1.63",
   "description": "YouTube Live のチャット・スーパーチャット・メンバーをローカル記録し、3つのレーンと通貨別応援者ランキング、VOICEVOXによる人ごとの声で振り返る試作拡張機能。",
   "icons": {
     "16": "images/logo/konta-yukkuri-icon-16.png",

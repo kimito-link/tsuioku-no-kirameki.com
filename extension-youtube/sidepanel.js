@@ -1277,11 +1277,38 @@ ${sourceCol}
       })
     };
   }
+  var stableOrderByLv = /* @__PURE__ */ new Map();
+  function ytStableOrder(lv, list) {
+    let ord = stableOrderByLv.get(lv);
+    if (!ord) {
+      ord = /* @__PURE__ */ new Map();
+      stableOrderByLv.set(lv, ord);
+    }
+    const keyOf2 = (r, i) => String(r?.id || r?.pk || `#${i}`);
+    list.forEach((r, i) => {
+      const k = keyOf2(r, i);
+      if (!ord.has(k)) ord.set(k, ord.size);
+    });
+    return list.map((r, i) => ({ r, n: (
+      /** @type {number} */
+      ord.get(keyOf2(r, i))
+    ) })).sort((a, b) => a.n - b.n).map((x) => x.r);
+  }
   async function buildCommentsForLvUncached(lv) {
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return void 0;
     const items = await getYtStreamCommentsByVideoId(vid);
-    const list = Array.isArray(items) ? items : [];
+    const list = ytStableOrder(lv, Array.isArray(items) ? items : []);
+    const boardIconByName = /* @__PURE__ */ new Map();
+    try {
+      const lbKey = `yt_leaderboard_${vid}`;
+      const lb = (await real?.storage?.local?.get?.(lbKey))?.[lbKey];
+      for (const row of Array.isArray(lb?.rows) ? lb.rows : []) {
+        const icon = ytUsableIcon(row?.iconUrl);
+        if (icon && row?.name) boardIconByName.set(normName(row.name), icon);
+      }
+    } catch {
+    }
     const who = buildYtPersonResolver(list);
     let streamStartedAt = 0;
     if (list.some((r) => r?.replay)) {
@@ -1295,7 +1322,7 @@ ${sourceCol}
     }
     const out = list.map((r, i) => {
       const key = who.keyOf(r);
-      const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key);
+      const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key) || boardIconByName.get(normName(r?.name)) || "";
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
       return e;
@@ -1641,6 +1668,19 @@ ${sourceCol}
         /** @type {keyof typeof rank} */
         cur
       ]) laneKindLabelByUid.set(uid, kind);
+    }
+    if (typeof document === "undefined" || !laneKindLabelByUid.size) return;
+    const byShown = /* @__PURE__ */ new Map();
+    for (const [uid, kind] of laneKindLabelByUid) {
+      const shown = ytLabelForUid(uid);
+      if (shown && shown.startsWith("UC")) byShown.set(shown, kind);
+    }
+    for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
+      const w = document.createTreeWalker(lane, NodeFilter.SHOW_TEXT);
+      for (let n2 = w.nextNode(); n2; n2 = w.nextNode()) {
+        const k = byShown.get(String(n2.nodeValue || "").trim());
+        if (k) n2.nodeValue = k;
+      }
     }
   }
   var SUPPORT_LANE_SEL = "#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd";
@@ -45989,7 +46029,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T06:24" ? String("yt-2026-11-04T06:24") : "dev";
+      const buildId = "yt-2026-11-04T06:47" ? String("yt-2026-11-04T06:47") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46007,7 +46047,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.62") : "";
+    const bundledVersion = true ? String("0.1.63") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46052,7 +46092,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T06:24" ? String("yt-2026-11-04T06:24") : "dev";
+            return "yt-2026-11-04T06:47" ? String("yt-2026-11-04T06:47") : "dev";
           } catch {
             return "dev";
           }

@@ -42,3 +42,16 @@ describe('ytLeaderboardToKoken', () => {
     expect(k?.rows[1].name).toBe('@ねる茶');
   });
 });
+
+describe('ytStableOrder(一度並べたコメントの順を変えない・ちらつき対策)', () => {
+  it('途中に後から入った行は最後に回し、前に並べた行の位置を変えない', async () => {
+    const { ytStableOrder } = await import('../../../extension-youtube/src/ytNicoShim.js');
+    const lv = 'lv900000000777';
+    const a = { id: 'a' }, b = { id: 'b' }, c = { id: 'c' }, x = { id: 'x' };
+    expect(ytStableOrder(lv, [a, b, c]).map((r) => r.id)).toEqual(['a', 'b', 'c']);
+    // x が a と b の間に入ってきても、a,b,c の位置は変わらず x は最後
+    expect(ytStableOrder(lv, [a, x, b, c]).map((r) => r.id)).toEqual(['a', 'b', 'c', 'x']);
+    const d = { id: 'd' };
+    expect(ytStableOrder(lv, [a, x, b, c, d]).map((r) => r.id)).toEqual(['a', 'b', 'c', 'x', 'd']);
+  });
+});
