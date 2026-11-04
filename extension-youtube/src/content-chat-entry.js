@@ -1072,7 +1072,8 @@ function setupArchiveBackfillRunner() {
       const html = await (await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: 'include' })).text();
       const clientVersion = (html.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/) || [])[1] || '';
       const apiKey = (html.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1] || '';
-      const at = html.indexOf('"liveChatRenderer"');
+      // ★ページの初めの方に部品の名前だけが並ぶ一覧("liveChatRenderer","…")があるので、中身の付いた所を探す(0.1.43)
+      const at = html.indexOf('"liveChatRenderer":{');
       const tail = at >= 0 ? html.slice(at, at + 20000) : '';
       let cont = (tail.match(/"reloadContinuationData":\{"continuation":"([^"]+)"/) || [])[1] || '';
       if (!cont || !/"isReplay":true/.test(tail) || !clientVersion) {
