@@ -1925,6 +1925,23 @@ ${sourceCol}
             return ih.get.call(this);
           },
           set(v) {
+            if (v === "" && this.id === "sceneStoryGrowth") {
+              try {
+                const why = (
+                  /** @type {any} */
+                  globalThis.__ytFlickerWhy
+                );
+                if (why) {
+                  const names = String(new Error().stack || "").split("\n").slice(2, 8).map((l) => (/at (?:async )?([\w$.<>]+) \(/.exec(l) || [])[1] || "?").join("<");
+                  why.clears[names] = (why.clears[names] || 0) + 1;
+                  const imgs = this.querySelectorAll("img");
+                  const icons = this.querySelectorAll("img.nl-story-growth-icon");
+                  const k = `imgs${imgs.length}/icons${icons.length}/cells${this.childElementCount}`;
+                  why.before[k] = (why.before[k] || 0) + 1;
+                }
+              } catch {
+              }
+            }
             let s = v;
             if (typeof s === "string" && s.includes("usericon")) {
               s = s.replace(GLOBAL_RE, (all, uid) => {
@@ -1951,6 +1968,7 @@ ${sourceCol}
       if (s.startsWith("chrome-extension:")) return "ext-image";
       return "other";
     };
+    globalThis.__ytFlickerWhy = { clears: {}, before: {}, idChanges: 0, idSamples: [], srcSamples: [] };
     let perImg = /* @__PURE__ */ new WeakMap();
     let win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: (
       /** @type {Record<string, number>} */
@@ -1967,11 +1985,40 @@ ${sourceCol}
       if (!document.body) return;
       new MutationObserver((muts) => {
         for (const m of muts) {
+          if (m.type === "attributes" && m.attributeName === "data-comment-id") {
+            if (m.oldValue && m.oldValue !== /** @type {Element} */
+            m.target.getAttribute("data-comment-id")) {
+              const why = (
+                /** @type {any} */
+                globalThis.__ytFlickerWhy
+              );
+              why.idChanges += 1;
+              if (why.idSamples.length < 4) {
+                why.idSamples.push({ idx: (
+                  /** @type {Element} */
+                  m.target.getAttribute("data-comment-index")
+                ), from: String(m.oldValue).slice(0, 40), to: String(
+                  /** @type {Element} */
+                  m.target.getAttribute("data-comment-id")
+                ).slice(0, 40) });
+              }
+            }
+            continue;
+          }
           if (m.type === "attributes" && m.target instanceof HTMLImageElement && m.attributeName === "src") {
             const img = m.target;
             const t = `${kindOf(m.oldValue || "")}→${kindOf(img.getAttribute("src") || "")}`;
             if (t.split("→")[0] === t.split("→")[1] && m.oldValue === img.getAttribute("src")) continue;
             win.srcChanges += 1;
+            {
+              const why = (
+                /** @type {any} */
+                globalThis.__ytFlickerWhy
+              );
+              if (why.srcSamples.length < 3 && img.closest("#sceneStoryGrowth")) {
+                why.srcSamples.push({ idx: img.getAttribute("data-comment-index"), from: String(m.oldValue || "").slice(-60), to: String(img.getAttribute("src") || "").slice(-60) });
+              }
+            }
             win.byTransition[t] = (win.byTransition[t] || 0) + 1;
             const n = (perImg.get(img) || 0) + 1;
             perImg.set(img, n);
@@ -1992,9 +2039,14 @@ ${sourceCol}
             }
           }
         }
-      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["src"], attributeOldValue: true });
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["src", "data-comment-id"], attributeOldValue: true });
       setInterval(() => {
-        const snap = { at: Date.now(), page: location.pathname.split("/").pop(), version: chrome.runtime.getManifest?.().version, ...win };
+        const why = (
+          /** @type {any} */
+          globalThis.__ytFlickerWhy
+        );
+        const snap = { at: Date.now(), page: location.pathname.split("/").pop(), version: chrome.runtime.getManifest?.().version, ...win, why: { ...why } };
+        globalThis.__ytFlickerWhy = { clears: {}, before: {}, idChanges: 0, idSamples: [], srcSamples: [] };
         win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: {}, where: {} };
         perImg = /* @__PURE__ */ new WeakMap();
         void (async () => {
@@ -19485,7 +19537,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T06:15") : ""
+          buildId: true ? String("yt-2026-11-04T06:19") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
