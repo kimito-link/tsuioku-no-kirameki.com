@@ -1714,15 +1714,21 @@ ${sourceCol}
     rewriteLaneFirstLines(byShown);
   }
   var SUPPORT_LANE_SEL = "#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd";
+  var LANE_KIND_WORDS = /(^|\n)\s*(スパチャ|ギフト|メンバー|ステッカー)\s*(\n|$)/;
   function rewriteLaneFirstLines(byShown) {
     if (typeof document === "undefined" || !byShown.size) return;
     for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
       for (const tile of Array.from(lane.children)) {
+        if (tile.hasAttribute("data-yt-kind-done") || LANE_KIND_WORDS.test(String(
+          /** @type {HTMLElement} */
+          tile.innerText ?? ""
+        ))) continue;
         const w = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT);
         for (let n2 = w.nextNode(); n2; n2 = w.nextNode()) {
           const k = byShown.get(String(n2.nodeValue || "").trim());
           if (k) {
             n2.nodeValue = k;
+            tile.setAttribute("data-yt-kind-done", "1");
             break;
           }
         }
@@ -46097,7 +46103,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T07:00" ? String("yt-2026-11-04T07:00") : "dev";
+      const buildId = "yt-2026-11-04T07:05" ? String("yt-2026-11-04T07:05") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46115,7 +46121,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.65") : "";
+    const bundledVersion = true ? String("0.1.66") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46160,7 +46166,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T07:00" ? String("yt-2026-11-04T07:00") : "dev";
+            return "yt-2026-11-04T07:05" ? String("yt-2026-11-04T07:05") : "dev";
           } catch {
             return "dev";
           }
