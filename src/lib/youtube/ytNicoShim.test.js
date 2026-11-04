@@ -64,3 +64,22 @@ describe('ytOwnerRowsLast(配信者のコメントを最後に回す)', () => {
     expect(ytOwnerRowsLast([{ id: 'a' }], {}).map((r) => r.id)).toEqual(['a']);
   });
 });
+
+describe('コメントの番号(会場・コメビュの「もう読んだか」)', () => {
+  it('配信者の行を最後に回しても、新しいコメントが来ても、同じコメントの番号は変わらない', async () => {
+    const { ytStableOrder, ytOwnerRowsLast, ytStableNoOf, ytRecordToNicoEntry } = await import('../../../extension-youtube/src/ytNicoShim.js');
+    const lv = 'lv900000000777';
+    const sum = { broadcasterChannelId: 'UCowner' };
+    const mk = (id, ch) => ({ id, channelId: ch, name: id, text: id });
+    const nosOf = (list) => {
+      const ordered = ytOwnerRowsLast(ytStableOrder(lv, list), sum);
+      return Object.fromEntries(ordered.map((r, i) => [r.id, ytRecordToNicoEntry(r, i, lv, r.channelId, ytStableNoOf(lv, r)).commentNo]));
+    };
+    const first = nosOf([mk('a', 'UC1'), mk('own', 'UCowner'), mk('b', 'UC2')]);
+    const second = nosOf([mk('a', 'UC1'), mk('own', 'UCowner'), mk('b', 'UC2'), mk('c', 'UC3')]);
+    expect(second.a).toBe(first.a);
+    expect(second.own).toBe(first.own);
+    expect(second.b).toBe(first.b);
+    expect(new Set(Object.values(second)).size).toBe(4);
+  });
+});

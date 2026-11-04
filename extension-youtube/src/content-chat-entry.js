@@ -738,6 +738,9 @@ function setupLiveChatObserver() {
     if (retired) return;
     if (staleEls.has(el)) return;
     if (el.isConnected === false) return;
+    // チャット欄の上の「固定されたメッセージ」(バナー)は、チャットに出た元のコメントの写し。
+    //   開閉のたびに作り直されるので、記録すると同じコメントが何度も新しく入る(2026-11-04 りんく実機)。
+    if (typeof el.closest === 'function' && el.closest('yt-live-chat-banner-renderer, yt-live-chat-banner-manager')) return;
     const waitMs = switchGraceUntil - Date.now();
     if (waitMs > 0) {
       setTimeout(() => inspectElement(el, retryCount), waitMs + 50);
