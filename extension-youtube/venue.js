@@ -19640,7 +19640,12 @@ ${sourceCol}
     let pickupRing = [];
     const updatePickupBanner = (fallbackRows) => {
       try {
-        const rows = pickupRing.length ? pickupRing : Array.isArray(fallbackRows) ? fallbackRows : [];
+        let rows = pickupRing.length ? pickupRing : Array.isArray(fallbackRows) ? fallbackRows : [];
+        if (pickupRing.length) {
+          const onScreen = new Set(activeBubbles.filter((b) => !b.removed && b.speechKey && !(b.ytGoneAt && b.ytGoneAt - Date.now() < 1500)).map((b) => b.speechKey));
+          rows = rows.filter((r) => r && r.key && onScreen.has(String(r.key)));
+          if (!rows.length) return;
+        }
         applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
       } catch {
       }
@@ -20029,7 +20034,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T16:46") : ""
+          buildId: true ? String("yt-2026-11-04T22:40") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -20590,6 +20595,10 @@ ${sourceCol}
       const reducedMotion = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const bubble = {
         bubbleKey,
+        speechKey: String(
+          /** @type {any} */
+          speech.key || ""
+        ),
         seatIndex: seatUsable ? seatIndex : -1,
         // 席が無い発言者は観客領域の決定座標(speakerKey ハッシュで毎回同じ位置)へ。
         fallbackAnchor: seatUsable ? null : crowdBubbleAnchor(speech.speakerKey),
@@ -20626,6 +20635,7 @@ ${sourceCol}
         bubble.removeTimer = 0;
       }
       const ms = Math.max(0, lifetimeMs);
+      bubble.ytGoneAt = Date.now() + ms;
       if (!bubble.reducedMotion) {
         bubble.fadeTimer = window.setTimeout(() => {
           bubble.fadeTimer = 0;
@@ -22289,7 +22299,7 @@ ${sourceCol}
           // 発言者のサムネ・ハンドル名・ID・リンクをセットで(§3.5)。サムネは観測済みのプロフィール > uid から導出 > 匿名は identicon。
           resolveSpeaker: (sp) => resolvePickupSpeaker(sp, { profileAvatarUrl: profileAvatarMap && profileAvatarMap[String(sp?.userId || "")]?.avatarUrl, profileNickname: profileAvatarMap && profileAvatarMap[String(sp?.userId || "")]?.nickname })
         });
-        updatePickupBanner(null);
+        queueMicrotask(() => updatePickupBanner(null));
       }
       if (result.speeches.length > 0) {
         for (const speech of result.speeches) {
