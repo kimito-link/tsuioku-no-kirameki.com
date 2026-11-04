@@ -180,6 +180,324 @@
     return start + Math.max(0, off) * 1e3;
   }
 
+  // src/shared/html/escape.js
+  function escapeHtml(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s);
+  }
+
+  // src/lib/deriveAvatarUrlFromUid.js
+  var AVATAR_HOST = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
+  function deriveAvatarUrlFromUid(uid, size = "s") {
+    const numUid = normalizeUid(uid);
+    if (numUid == null) return "";
+    const dirNum = Math.floor(numUid / 1e4);
+    const sz = size === "m" ? "m" : "s";
+    return `${AVATAR_HOST}/${sz}/${dirNum}/${numUid}.jpg`;
+  }
+  function normalizeUid(uid) {
+    if (uid == null) return null;
+    if (typeof uid === "number") {
+      if (!Number.isFinite(uid) || uid < 0 || !Number.isInteger(uid)) return null;
+      return uid;
+    }
+    if (typeof uid === "string") {
+      const t = uid.trim();
+      if (!/^[0-9]+$/.test(t)) return null;
+      const n = Number(t);
+      if (!Number.isFinite(n) || n < 0) return null;
+      return n;
+    }
+    return null;
+  }
+
+  // src/lib/supportGrowthTileSrc.js
+  function isHttpOrHttpsUrl(url) {
+    const s = String(url || "").trim();
+    return /^https?:\/\//i.test(s);
+  }
+  var NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg";
+  function isWeakNiconicoUserIconHttpUrl(url) {
+    const s = String(url || "").trim();
+    if (!isHttpOrHttpsUrl(s)) return false;
+    return /\/usericon\/defaults\//i.test(s);
+  }
+  function isAnonymousStyleNicoUserId(userId) {
+    const s = String(userId || "").trim();
+    if (!s) return true;
+    if (/^\d{5,14}$/.test(s)) return false;
+    if (/^a:/i.test(s)) return true;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
+    return true;
+  }
+
+  // src/lib/commentTickerNameLink.js
+  function canLinkCommentTickerName(userId) {
+    const s = String(userId || "").trim();
+    if (!s) return false;
+    return !isAnonymousStyleNicoUserId(s);
+  }
+  function buildCommentTickerNameHref(userId) {
+    if (!canLinkCommentTickerName(userId)) return "";
+    const s = String(userId || "").trim();
+    return `https://www.nicovideo.jp/user/${encodeURIComponent(s)}`;
+  }
+
+  // src/lib/userProfileLinkHtml.js
+  function buildUserProfileLinkedLabelHtml(userKey, label) {
+    const text = String(label ?? "");
+    const escaped = escapeHtml(text);
+    const href = buildCommentTickerNameHref(userKey);
+    if (!href) return escaped;
+    return `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer" class="nl-user-profile-link">${escaped}</a>`;
+  }
+
+  // src/lib/nicoAnonymousDisplay.js
+  var NICO_HASHED_ANON_USER_ID_RE = /^[A-Za-z0-9_-]{16,40}$/;
+  function isNiconicoHashedAnonymousUserId(userId) {
+    const s = String(userId ?? "").trim();
+    if (!s) return false;
+    if (s.startsWith("__")) return false;
+    if (/^\d+$/.test(s)) return false;
+    return NICO_HASHED_ANON_USER_ID_RE.test(s);
+  }
+  function isNiconicoAnonymousUserId(userId) {
+    const s = String(userId ?? "").trim();
+    if (/^a:/i.test(s)) {
+      const rest = s.slice(2).trim();
+      return rest.length >= 2;
+    }
+    return isNiconicoHashedAnonymousUserId(s);
+  }
+  function isNiconicoAutoUserPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return /^user\s+[A-Za-z0-9]+$/i.test(n);
+  }
+  function isNiconicoGuestPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return n === "ゲスト";
+  }
+  function anonymousNicknameFallback(userId, nickname) {
+    const nick = String(nickname ?? "").trim();
+    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
+    if (nick && !isPlaceholder) return nick;
+    return isNiconicoAnonymousUserId(userId) ? "匿名" : "";
+  }
+
+  // src/lib/backfillRemoveRecommendedLivePollution.js
+  function isRecommendedUserChipPollutionRow(entry) {
+    if (!entry || typeof entry !== "object") return false;
+    const userId = String(
+      /** @type {{ userId?: unknown }} */
+      entry.userId || ""
+    ).trim();
+    if (!/^\d{5,14}$/.test(userId)) return false;
+    const text = String(
+      /** @type {{ text?: unknown }} */
+      entry.text || ""
+    ).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) return false;
+    const uid = userId;
+    const lower = text.toLowerCase();
+    if (text === uid) return true;
+    if (lower === `u/${uid}`) return true;
+    if (lower === `${uid} u/${uid}`) return true;
+    if (lower === `u/${uid} ${uid}`) return true;
+    if (/^https:\/\/(www\.)?nicovideo\.jp\/user\/\d{5,14}\/?$/i.test(text) && text.includes(uid)) {
+      return true;
+    }
+    return false;
+  }
+
+  // src/lib/userRooms.js
+  var UNKNOWN_USER_KEY = "__unknown__";
+  function shortUserKeyDisplay(userKey) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) return "";
+    const s = String(userKey);
+    return s.length <= 18 ? s : `${s.slice(0, 8)}…${s.slice(-6)}`;
+  }
+  function displayUserLabel(userKey, nickname) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) {
+      return "ID未取得（DOMに投稿者情報なし）";
+    }
+    const name = anonymousNicknameFallback(userKey, nickname);
+    const shortId = shortUserKeyDisplay(userKey);
+    if (name) return `${name}（${shortId}）`;
+    return shortId;
+  }
+  function sampleEntriesEvenly(list, sampleMax) {
+    if (list.length <= sampleMax) return [...list];
+    const out = [];
+    const step = list.length / sampleMax;
+    for (let i = 0; i < sampleMax; i++) {
+      out.push(list[Math.floor(i * step)]);
+    }
+    return out;
+  }
+  function aggregateCommentsByUser(entries, options) {
+    let list = Array.isArray(entries) ? entries : [];
+    const sampleMax = typeof options?.sampleMaxEntries === "number" && options.sampleMaxEntries > 0 ? Math.floor(options.sampleMaxEntries) : 0;
+    if (sampleMax > 0 && list.length > sampleMax) {
+      list = sampleEntriesEvenly(list, sampleMax);
+    }
+    const requireText = !!options?.requireText;
+    const trackCharTotals = options?.trackCharTotals === true;
+    const maxRooms = typeof options?.maxRooms === "number" && options.maxRooms > 0 ? Math.floor(options.maxRooms) : 0;
+    const sortByCount = options?.sortByCount === true;
+    const map = /* @__PURE__ */ new Map();
+    for (const e of list) {
+      const uid = e?.userId ? String(e.userId).trim() : "";
+      const userKey = uid || UNKNOWN_USER_KEY;
+      const capturedAt = Number(e?.capturedAt || 0);
+      const text = String(e?.text || "").trim();
+      if (requireText && !text) continue;
+      if (requireText && isRecommendedUserChipPollutionRow(e)) continue;
+      const nickname = String(e?.nickname || "").trim();
+      const rawAv = String(e?.avatarUrl || "").trim();
+      const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
+      if (!map.has(userKey)) {
+        map.set(userKey, {
+          userKey,
+          nickname: "",
+          count: 0,
+          lastAt: 0,
+          lastText: "",
+          avatarUrl: "",
+          totalChars: 0
+        });
+      }
+      const row = map.get(userKey);
+      row.count += 1;
+      if (trackCharTotals) row.totalChars += text.length;
+      if (nickname) {
+        if (!row.nickname) row.nickname = nickname;
+        else if (nickname.length > row.nickname.length) row.nickname = nickname;
+      }
+      if (capturedAt >= row.lastAt) {
+        row.lastAt = capturedAt;
+        row.lastText = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+        if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
+      }
+    }
+    let rows = [...map.values()];
+    if (sortByCount) {
+      rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
+    } else {
+      rows.sort((a, b) => b.lastAt - a.lastAt);
+    }
+    if (maxRooms > 0 && rows.length > maxRooms) {
+      rows = rows.slice(0, maxRooms);
+    }
+    if (!trackCharTotals) {
+      return rows.map(({ totalChars: _tc, ...rest }) => rest);
+    }
+    return rows;
+  }
+
+  // src/lib/reportUserThumb.js
+  var NICO_USER_ICON_CDN_BASE = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
+  function buildNiconicoDefaultUserIconUrl(uid) {
+    const s = String(uid || "").trim();
+    if (!/^\d{5,14}$/.test(s)) return "";
+    const bucket = Math.floor(Number(s) / 1e4);
+    return `${NICO_USER_ICON_CDN_BASE}/${bucket}/${s}.jpg`;
+  }
+  function resolveReportUserThumbSrc(opts) {
+    const userId = String(opts?.userId || "").trim();
+    const avatarUrl = String(opts?.avatarUrl || "").trim();
+    if (isHttpOrHttpsUrl(avatarUrl)) {
+      return avatarUrl;
+    }
+    if (!userId || userId === "__unknown__") return "";
+    if (/^\d{5,14}$/.test(userId)) {
+      return buildNiconicoDefaultUserIconUrl(userId);
+    }
+    if (typeof opts?.identiconResolver === "function") {
+      const r = opts.identiconResolver(userId);
+      if (typeof r === "string" && r.length > 0) return r;
+    }
+    return "";
+  }
+
+  // src/lib/giftThrowLedgerTableHtml.js
+  var DEFAULT_USERICON_ONERROR_ATTR = 'data-on-error-fallback="blank"';
+  function formatLedgerNumber(v) {
+    const n = typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : NaN;
+    return Number.isFinite(n) ? n.toLocaleString("ja-JP") : "—";
+  }
+  function wrapThumbWithProfileLink(userId, innerHtml, maskShare = false) {
+    const uid = String(userId || "").trim();
+    if (maskShare || !/^\d{1,18}$/.test(uid)) return innerHtml;
+    return `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`;
+  }
+  function buildGiftLedgerUserIdentityCells(identity, opts = {}) {
+    const maskShare = opts.maskShare === true;
+    const uid = String(identity.userId || "").trim();
+    const rawLabel = uid && /^\d{1,18}$/.test(uid) ? displayUserLabel(uid, identity.senderLabel || "") : String(identity.senderLabel || "").trim() || "（不明）";
+    const accountHtml = uid && /^\d{1,18}$/.test(uid) ? buildUserProfileLinkedLabelHtml(uid, rawLabel) : escapeHtml(rawLabel);
+    const thumbSrc = maskShare ? "" : resolveReportUserThumbSrc({
+      userId: uid,
+      avatarUrl: String(identity.senderAvatarUrl || "").trim(),
+      identiconResolver: opts.identiconResolver
+    });
+    const thumbInner = thumbSrc ? `<img class="nl-gift-ledger-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="nl-gift-ledger-thumb nl-gift-ledger-thumb--empty"></span>';
+    const thumbCell = wrapThumbWithProfileLink(uid, thumbInner, maskShare);
+    const idInner = !uid ? escapeHtml("—") : /^\d{1,18}$/.test(uid) ? buildUserProfileLinkedLabelHtml(uid, uid) : escapeHtml(uid);
+    const idHtml = `<span class="nl-gift-ledger-mono">${idInner}</span>`;
+    return { thumbCell, accountHtml, idHtml };
+  }
+  function buildGiftLedgerItemThumbHtml(thumbnailUrl, size = 28) {
+    const src = safeHttpUrl(thumbnailUrl);
+    if (src) {
+      return `<img class="nl-gift-ledger-row__thumb" src="${escapeHtml(src)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`;
+    }
+    return `<span class="nl-gift-ledger-row__thumb nl-gift-ledger-row__thumb--empty" style="width:${size}px;height:${size}px"></span>`;
+  }
+  function buildGiftThrowLedgerTableRowHtml(row, index, opts = {}) {
+    const idCells = buildGiftLedgerUserIdentityCells(
+      {
+        userId: row.userId,
+        senderLabel: row.senderLabel,
+        senderAvatarUrl: row.senderAvatarUrl
+      },
+      opts
+    );
+    const itemThumbInner = buildGiftLedgerItemThumbHtml(row.thumbnailUrl, 28);
+    const points = `${formatLedgerNumber(row.points)} pt`;
+    const sourceCol = opts.showSource !== false ? `<td data-label="出典" class="nl-gift-ledger-evidence">${escapeHtml(formatGiftThrowSourceLabel(row.source))}</td>` : "";
+    return `<tr>
+<td data-label="#">${index + 1}</td>
+<td data-label="時刻" class="nl-gift-ledger-time">${escapeHtml(row.timeLabel || "—")}</td>
+<td data-label="アイテム" class="nl-gift-ledger-itemcell">${itemThumbInner}<span>${escapeHtml(row.itemName || "—")}</span></td>
+<td data-label="サムネ">${idCells.thumbCell}</td>
+<td data-label="アカウント" class="nl-gift-ledger-sender">${idCells.accountHtml}</td>
+<td data-label="ID">${idCells.idHtml}</td>
+<td data-label="pt" class="nl-num">${escapeHtml(points)}</td>
+${sourceCol}
+</tr>`;
+  }
+  function formatGiftThrowSourceLabel(source) {
+    const s = String(source || "").trim();
+    if (s === "koken-api") return "koken API";
+    if (s === "dom-scrape") return "公式DOM";
+    if (s === "merged") return "統合";
+    if (s === "gift-sub-app") return "履歴タブ";
+    return s || "—";
+  }
+  function buildGiftThrowLedgerTableSectionHtml(rows, meta, opts = {}) {
+    if (!rows.length) return "";
+    const totalCount = Math.max(0, Math.floor(Number(meta.totalCount) || rows.length));
+    const shownCount = Math.max(0, Math.floor(Number(meta.shownCount) || rows.length));
+    const showSource = meta.showSource !== false;
+    const caption = totalCount > shownCount ? `投げ一覧（${totalCount} 件中 新しい ${shownCount} 件）` : `投げ一覧（${totalCount} 件）`;
+    const tableRows = rows.map((row, i) => buildGiftThrowLedgerTableRowHtml(row, i, { ...opts, showSource })).join("");
+    const sourceNote = meta.payloadSource ? `<p class="nl-gift-ledger-spec-note">データ源: ${escapeHtml(formatGiftThrowSourceLabel(meta.payloadSource))}</p>` : "";
+    const headSource = showSource ? "<th>出典</th>" : "";
+    return `<section class="nl-gift-ledger-section" aria-label="個別ギフト投げ一覧"><h3 class="nl-gift-ledger-head">${escapeHtml(caption)}</h3>` + sourceNote + `<div class="nl-gift-ledger-scroll"><table class="nl-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th>${headSource}</tr></thead><tbody>${tableRows}</tbody></table></div></section>`;
+  }
+
   // src/lib/youtube/ytWording.js
   var TOP_FAN_RULES = [
     [
@@ -852,6 +1170,7 @@
           if (g[1] === "subApp") {
             const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
             zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
+            allThrowHistory = hist;
             scheduleTopFanRest();
           }
           const laneRead = !!list && list.some((x) => x.startsWith("nls_gift_users_"));
@@ -1276,61 +1595,41 @@
     return wrap;
   }
   var zeroPtGifts = [];
+  var allThrowHistory = [];
   function ensureZeroPtGifts() {
     const panel = document.getElementById("northStarLaneThrows-giftHistory");
-    const old = document.getElementById("yt-zero-pt-gifts");
-    if (!panel || panel.hidden || !zeroPtGifts.length) {
-      if (old) old.remove();
-      return;
-    }
-    const sig = zeroPtGifts.map((h) => String(h.kokenHistoryId || "")).join("|");
-    if (old && old.parentElement === panel && old.getAttribute("data-sig") === sig) return;
-    if (old) old.remove();
-    const box = document.createElement("div");
-    box.id = "yt-zero-pt-gifts";
-    box.setAttribute("data-sig", sig);
-    box.style.cssText = "margin:8px 4px 2px;font-size:12px;";
-    const head = document.createElement("div");
-    head.textContent = `YouTube のギフト（金額が出ないもの・${zeroPtGifts.length}件）`;
-    head.style.cssText = "font-weight:700;margin-bottom:4px;";
-    box.appendChild(head);
-    const ol = document.createElement("ol");
-    ol.style.cssText = "list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;";
-    for (const h of zeroPtGifts) {
-      const li = document.createElement("li");
-      li.style.cssText = "display:grid;grid-template-columns:60px 22px minmax(0,96px) 22px minmax(0,1fr);align-items:center;gap:8px;";
-      const t = document.createElement("span");
-      t.textContent = String(h.time || "—");
-      t.style.cssText = "color:#64748b;font-variant-numeric:tabular-nums;";
-      li.appendChild(t);
-      const thumb = String(h.thumbnailUrl || "");
-      const slot = document.createElement("span");
-      slot.style.cssText = "width:22px;height:22px;display:inline-flex;";
-      li.appendChild(slot);
-      if (/^https:\/\//.test(thumb)) {
-        const gi = document.createElement("img");
-        gi.alt = "";
-        gi.src = thumb;
-        gi.width = 22;
-        gi.height = 22;
-        gi.style.cssText = "flex:none;object-fit:contain;";
-        gi.addEventListener("error", () => gi.remove(), { once: true });
-        slot.appendChild(gi);
-      }
-      const item = document.createElement("span");
-      item.textContent = String(h.itemName || "ギフト");
-      item.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-      li.appendChild(item);
-      const name = String(h.senderName || "");
-      li.appendChild(ytFaceOrLetter(String(h.senderAvatarUrl || ""), name));
-      const who = document.createElement("span");
-      who.textContent = name;
-      who.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;";
-      li.appendChild(who);
-      ol.appendChild(li);
-    }
-    box.appendChild(ol);
-    panel.appendChild(box);
+    if (!panel || panel.hidden || !zeroPtGifts.length) return;
+    const section = panel.querySelector("section.nl-gift-ledger-section");
+    if (!section) return;
+    const sig = allThrowHistory.map((h) => String(h.kokenHistoryId || "")).join("|");
+    if (section.getAttribute("data-yt-all") === sig) return;
+    const shown = allThrowHistory.slice(0, 20);
+    const rows = shown.map((h) => ({
+      timeLabel: String(h.time || "—"),
+      itemName: String(h.itemName || "ギフト"),
+      points: Number(h.points) > 0 ? Math.trunc(Number(h.points)) : NaN,
+      thumbnailUrl: String(h.thumbnailUrl || ""),
+      userId: String(h.userId || ""),
+      senderLabel: String(h.senderName || ""),
+      senderAvatarUrl: String(h.senderAvatarUrl || ""),
+      source: "youtube"
+    }));
+    const html = buildGiftThrowLedgerTableSectionHtml(rows, {
+      totalCount: allThrowHistory.length,
+      shownCount: rows.length,
+      payloadSource: "youtube"
+    });
+    if (!html) return;
+    const holder = document.createElement("div");
+    holder.innerHTML = html;
+    const next = holder.firstElementChild;
+    if (!next) return;
+    next.setAttribute("data-yt-all", sig);
+    next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
+      if (/^—/.test(String(td.textContent || "").trim())) td.textContent = "—";
+    });
+    next.querySelectorAll("img").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
+    section.replaceWith(next);
   }
   function ensureTopFanRest() {
     ensureZeroPtGifts();
@@ -1388,7 +1687,7 @@
     if (!document.body) return;
     fixSubtree(document.body);
     new MutationObserver((muts) => {
-      if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, #yt-zero-pt-gifts")))) scheduleTopFanRest();
+      if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, [data-yt-all]")))) scheduleTopFanRest();
       for (const m of muts) {
         if (m.type === "characterData") fixTextNode(
           /** @type {Text} */
@@ -2068,14 +2367,6 @@
     return { early, mid, late };
   }
 
-  // src/shared/html/escape.js
-  function escapeHtml(s) {
-    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-  function escapeAttr(s) {
-    return escapeHtml(s);
-  }
-
   // src/lib/privacyDisplay.js
   function maskLabelForShare(label) {
     const t = String(label || "").trim();
@@ -2130,72 +2421,6 @@
       ".nl-yukkuri-line--tanunee .nl-yukkuri-name{color:#7a5a3f;}",
       ".nl-yukkuri-text{margin:0;font-size:14px;line-height:1.5;color:#222;}"
     ].join("");
-  }
-
-  // src/lib/deriveAvatarUrlFromUid.js
-  var AVATAR_HOST = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
-  function deriveAvatarUrlFromUid(uid, size = "s") {
-    const numUid = normalizeUid(uid);
-    if (numUid == null) return "";
-    const dirNum = Math.floor(numUid / 1e4);
-    const sz = size === "m" ? "m" : "s";
-    return `${AVATAR_HOST}/${sz}/${dirNum}/${numUid}.jpg`;
-  }
-  function normalizeUid(uid) {
-    if (uid == null) return null;
-    if (typeof uid === "number") {
-      if (!Number.isFinite(uid) || uid < 0 || !Number.isInteger(uid)) return null;
-      return uid;
-    }
-    if (typeof uid === "string") {
-      const t = uid.trim();
-      if (!/^[0-9]+$/.test(t)) return null;
-      const n = Number(t);
-      if (!Number.isFinite(n) || n < 0) return null;
-      return n;
-    }
-    return null;
-  }
-
-  // src/lib/supportGrowthTileSrc.js
-  function isHttpOrHttpsUrl(url) {
-    const s = String(url || "").trim();
-    return /^https?:\/\//i.test(s);
-  }
-  var NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg";
-  function isWeakNiconicoUserIconHttpUrl(url) {
-    const s = String(url || "").trim();
-    if (!isHttpOrHttpsUrl(s)) return false;
-    return /\/usericon\/defaults\//i.test(s);
-  }
-  function isAnonymousStyleNicoUserId(userId) {
-    const s = String(userId || "").trim();
-    if (!s) return true;
-    if (/^\d{5,14}$/.test(s)) return false;
-    if (/^a:/i.test(s)) return true;
-    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
-    return true;
-  }
-
-  // src/lib/commentTickerNameLink.js
-  function canLinkCommentTickerName(userId) {
-    const s = String(userId || "").trim();
-    if (!s) return false;
-    return !isAnonymousStyleNicoUserId(s);
-  }
-  function buildCommentTickerNameHref(userId) {
-    if (!canLinkCommentTickerName(userId)) return "";
-    const s = String(userId || "").trim();
-    return `https://www.nicovideo.jp/user/${encodeURIComponent(s)}`;
-  }
-
-  // src/lib/userProfileLinkHtml.js
-  function buildUserProfileLinkedLabelHtml(userKey, label) {
-    const text = String(label ?? "");
-    const escaped = escapeHtml(text);
-    const href = buildCommentTickerNameHref(userKey);
-    if (!href) return escaped;
-    return `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer" class="nl-user-profile-link">${escaped}</a>`;
   }
 
   // src/lib/mangaBroadcastSummary.js
@@ -3762,173 +3987,6 @@ ${links.length ? `<div class="mkt-bcaster__links">${links.join("")}</div>` : ""}
       return broadcasterNameLinkedHtml(model);
     }
     return escapeHtml(str(fallbackName) || "-");
-  }
-
-  // src/lib/nicoAnonymousDisplay.js
-  var NICO_HASHED_ANON_USER_ID_RE = /^[A-Za-z0-9_-]{16,40}$/;
-  function isNiconicoHashedAnonymousUserId(userId) {
-    const s = String(userId ?? "").trim();
-    if (!s) return false;
-    if (s.startsWith("__")) return false;
-    if (/^\d+$/.test(s)) return false;
-    return NICO_HASHED_ANON_USER_ID_RE.test(s);
-  }
-  function isNiconicoAnonymousUserId(userId) {
-    const s = String(userId ?? "").trim();
-    if (/^a:/i.test(s)) {
-      const rest = s.slice(2).trim();
-      return rest.length >= 2;
-    }
-    return isNiconicoHashedAnonymousUserId(s);
-  }
-  function isNiconicoAutoUserPlaceholderNickname(nickname) {
-    const n = String(nickname ?? "").trim();
-    return /^user\s+[A-Za-z0-9]+$/i.test(n);
-  }
-  function isNiconicoGuestPlaceholderNickname(nickname) {
-    const n = String(nickname ?? "").trim();
-    return n === "ゲスト";
-  }
-  function anonymousNicknameFallback(userId, nickname) {
-    const nick = String(nickname ?? "").trim();
-    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
-    if (nick && !isPlaceholder) return nick;
-    return isNiconicoAnonymousUserId(userId) ? "匿名" : "";
-  }
-
-  // src/lib/backfillRemoveRecommendedLivePollution.js
-  function isRecommendedUserChipPollutionRow(entry) {
-    if (!entry || typeof entry !== "object") return false;
-    const userId = String(
-      /** @type {{ userId?: unknown }} */
-      entry.userId || ""
-    ).trim();
-    if (!/^\d{5,14}$/.test(userId)) return false;
-    const text = String(
-      /** @type {{ text?: unknown }} */
-      entry.text || ""
-    ).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-    if (!text) return false;
-    const uid = userId;
-    const lower = text.toLowerCase();
-    if (text === uid) return true;
-    if (lower === `u/${uid}`) return true;
-    if (lower === `${uid} u/${uid}`) return true;
-    if (lower === `u/${uid} ${uid}`) return true;
-    if (/^https:\/\/(www\.)?nicovideo\.jp\/user\/\d{5,14}\/?$/i.test(text) && text.includes(uid)) {
-      return true;
-    }
-    return false;
-  }
-
-  // src/lib/userRooms.js
-  var UNKNOWN_USER_KEY = "__unknown__";
-  function shortUserKeyDisplay(userKey) {
-    if (!userKey || userKey === UNKNOWN_USER_KEY) return "";
-    const s = String(userKey);
-    return s.length <= 18 ? s : `${s.slice(0, 8)}…${s.slice(-6)}`;
-  }
-  function displayUserLabel(userKey, nickname) {
-    if (!userKey || userKey === UNKNOWN_USER_KEY) {
-      return "ID未取得（DOMに投稿者情報なし）";
-    }
-    const name = anonymousNicknameFallback(userKey, nickname);
-    const shortId = shortUserKeyDisplay(userKey);
-    if (name) return `${name}（${shortId}）`;
-    return shortId;
-  }
-  function sampleEntriesEvenly(list, sampleMax) {
-    if (list.length <= sampleMax) return [...list];
-    const out = [];
-    const step = list.length / sampleMax;
-    for (let i = 0; i < sampleMax; i++) {
-      out.push(list[Math.floor(i * step)]);
-    }
-    return out;
-  }
-  function aggregateCommentsByUser(entries, options) {
-    let list = Array.isArray(entries) ? entries : [];
-    const sampleMax = typeof options?.sampleMaxEntries === "number" && options.sampleMaxEntries > 0 ? Math.floor(options.sampleMaxEntries) : 0;
-    if (sampleMax > 0 && list.length > sampleMax) {
-      list = sampleEntriesEvenly(list, sampleMax);
-    }
-    const requireText = !!options?.requireText;
-    const trackCharTotals = options?.trackCharTotals === true;
-    const maxRooms = typeof options?.maxRooms === "number" && options.maxRooms > 0 ? Math.floor(options.maxRooms) : 0;
-    const sortByCount = options?.sortByCount === true;
-    const map = /* @__PURE__ */ new Map();
-    for (const e of list) {
-      const uid = e?.userId ? String(e.userId).trim() : "";
-      const userKey = uid || UNKNOWN_USER_KEY;
-      const capturedAt = Number(e?.capturedAt || 0);
-      const text = String(e?.text || "").trim();
-      if (requireText && !text) continue;
-      if (requireText && isRecommendedUserChipPollutionRow(e)) continue;
-      const nickname = String(e?.nickname || "").trim();
-      const rawAv = String(e?.avatarUrl || "").trim();
-      const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
-      if (!map.has(userKey)) {
-        map.set(userKey, {
-          userKey,
-          nickname: "",
-          count: 0,
-          lastAt: 0,
-          lastText: "",
-          avatarUrl: "",
-          totalChars: 0
-        });
-      }
-      const row = map.get(userKey);
-      row.count += 1;
-      if (trackCharTotals) row.totalChars += text.length;
-      if (nickname) {
-        if (!row.nickname) row.nickname = nickname;
-        else if (nickname.length > row.nickname.length) row.nickname = nickname;
-      }
-      if (capturedAt >= row.lastAt) {
-        row.lastAt = capturedAt;
-        row.lastText = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-        if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
-      }
-    }
-    let rows = [...map.values()];
-    if (sortByCount) {
-      rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
-    } else {
-      rows.sort((a, b) => b.lastAt - a.lastAt);
-    }
-    if (maxRooms > 0 && rows.length > maxRooms) {
-      rows = rows.slice(0, maxRooms);
-    }
-    if (!trackCharTotals) {
-      return rows.map(({ totalChars: _tc, ...rest }) => rest);
-    }
-    return rows;
-  }
-
-  // src/lib/reportUserThumb.js
-  var NICO_USER_ICON_CDN_BASE = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
-  function buildNiconicoDefaultUserIconUrl(uid) {
-    const s = String(uid || "").trim();
-    if (!/^\d{5,14}$/.test(s)) return "";
-    const bucket = Math.floor(Number(s) / 1e4);
-    return `${NICO_USER_ICON_CDN_BASE}/${bucket}/${s}.jpg`;
-  }
-  function resolveReportUserThumbSrc(opts) {
-    const userId = String(opts?.userId || "").trim();
-    const avatarUrl = String(opts?.avatarUrl || "").trim();
-    if (isHttpOrHttpsUrl(avatarUrl)) {
-      return avatarUrl;
-    }
-    if (!userId || userId === "__unknown__") return "";
-    if (/^\d{5,14}$/.test(userId)) {
-      return buildNiconicoDefaultUserIconUrl(userId);
-    }
-    if (typeof opts?.identiconResolver === "function") {
-      const r = opts.identiconResolver(userId);
-      if (typeof r === "string" && r.length > 0) return r;
-    }
-    return "";
   }
 
   // src/lib/userThumbGrid.js
@@ -7823,7 +7881,7 @@ ${embedCss}`), HTML_REPORT_EMBED_SCOPE);
   }
 
   // src/lib/marketingChartsHtml.js
-  var DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${escapeHtml(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
+  var DEFAULT_USERICON_ONERROR_ATTR2 = `onerror="this.onerror=null;this.src='${escapeHtml(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
   function formatSilenceMs(ms) {
     if (ms <= 0) return "—";
     const s = Math.floor(ms / 1e3);
@@ -8314,9 +8372,9 @@ ${dots}
         avatarUrl: "",
         identiconResolver
       });
-      const thumbCell = wrapThumbWithProfileLink(
+      const thumbCell = wrapThumbWithProfileLink2(
         d.userId,
-        thumbSrc ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
+        thumbSrc ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
       );
       return `<tr>
 <td>${i + 1}</td>
@@ -8351,9 +8409,9 @@ ${dots}
         avatarUrl: "",
         identiconResolver
       });
-      const thumbCell = wrapThumbWithProfileLink(
+      const thumbCell = wrapThumbWithProfileLink2(
         u.userId,
-        thumbSrc ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
+        thumbSrc ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
       );
       const cells = u.attendance.map(
         (v) => v ? '<td class="mkt-att-cell mkt-att-cell--on" aria-label="出席">●</td>' : '<td class="mkt-att-cell mkt-att-cell--off" aria-label="不参加">·</td>'
@@ -8671,7 +8729,7 @@ ${lineFor("confusion", "#94a3b8")}
 <div class="mkt-kpi-grid"><div class="mkt-kpi"><span class="mkt-kpi__icon">📡</span><span class="mkt-kpi__val">${reach.coefficient.toFixed(2)}</span><span class="mkt-kpi__label">リーチ係数</span></div></div>
 </section>`;
   }
-  function wrapThumbWithProfileLink(userId, innerHtml, maskShare = false) {
+  function wrapThumbWithProfileLink2(userId, innerHtml, maskShare = false) {
     const uid = String(userId == null ? "" : userId).trim();
     if (maskShare || !/^\d{1,18}$/.test(uid)) return innerHtml;
     return `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`;
@@ -8692,8 +8750,8 @@ ${lineFor("confusion", "#94a3b8")}
       const rawLabel = row && String(row.name || "").trim() ? String(row.name).trim() : `ID ${uid}`;
       const nameHtml = maskShare ? escapeHtml(maskLabelForShare(rawLabel)) : buildUserProfileLinkedLabelHtml(uid, rawLabel);
       const thumbSrc = maskShare ? "" : resolveReportUserThumbSrc({ userId: uid, avatarUrl: row && row.thumbnailUrl ? String(row.thumbnailUrl) : "", identiconResolver });
-      const thumbImg = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
-      const thumbCell = wrapThumbWithProfileLink(uid, thumbImg, maskShare);
+      const thumbImg = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink2(uid, thumbImg, maskShare);
       const last = Number(e.lastAt) > 0 ? `最後に増えたのを検知 ${escapeHtml(giftMomentClock(Number(e.lastAt)))}・+${escapeHtml(formatEventRankingNumber(Number(e.lastDelta) || 0))}pt(増加を検知した回数 ${escapeHtml(String(Number(e.n) || 0))}回)` : "増えたのは未検知";
       return `<li class="mkt-ad-obs-item">${thumbCell}<span class="mkt-gm-sender">${nameHtml}</span><span class="mkt-ad-obs-text">初めて検知 ${escapeHtml(giftMomentClock(Number(e.firstAt)))}・そのとき ${escapeHtml(formatEventRankingNumber(Number(e.firstTotal) || 0))}pt ／ ${last}・いま ${escapeHtml(formatEventRankingNumber(Number(e.lastTotal) || 0))}pt</span></li>`;
     }).join("");
@@ -8724,8 +8782,8 @@ ${lineFor("confusion", "#94a3b8")}
         const rawLabel = g.userId && /^\d+$/.test(g.userId) ? displayUserLabel(g.userId, g.senderName) : g.senderName || "名無し";
         const nameHtml = maskShare ? escapeHtml(maskLabelForShare(rawLabel)) : g.userId && /^\d+$/.test(g.userId) ? buildUserProfileLinkedLabelHtml(g.userId, rawLabel) : escapeHtml(rawLabel);
         const thumbSrc = maskShare ? "" : resolveReportUserThumbSrc({ userId: g.userId || "", avatarUrl: g.avatarUrl || "", identiconResolver });
-        const thumbImg = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
-        const thumbCell = wrapThumbWithProfileLink(g.userId, thumbImg, maskShare);
+        const thumbImg = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
+        const thumbCell = wrapThumbWithProfileLink2(g.userId, thumbImg, maskShare);
         return `<li class="mkt-gm-gift">${thumbCell}<span class="mkt-gm-sender">${nameHtml}</span><span class="mkt-gm-item">${escapeHtml(g.itemName || "(名称未取得)")}</span><span class="mkt-gm-pt">${escapeHtml(formatEventRankingNumber(g.points))}pt</span></li>`;
       }).join("");
       const bC = m.before.comments;
@@ -8792,8 +8850,8 @@ ${topics}
         avatarUrl: "",
         identiconResolver
       });
-      const thumbImg = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
-      const thumbCell = wrapThumbWithProfileLink(row.userId, thumbImg, maskShare);
+      const thumbImg = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink2(row.userId, thumbImg, maskShare);
       return `<tr>
 <td data-label="#">${i + 1}</td>
 <td data-label="サムネ">${thumbCell}</td>
@@ -8868,7 +8926,7 @@ ${notes}
   function giftLedgerItemThumbHtml(thumbnailUrl, maskShare, size = 28) {
     const src = maskShare ? "" : String(thumbnailUrl || "").trim();
     if (src) {
-      return `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(src)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`;
+      return `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(src)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>`;
     }
     return `<span class="mkt-gift-ledger-item__thumb mkt-gift-ledger-item__thumb--empty" style="width:${size}px;height:${size}px"></span>`;
   }
@@ -8899,8 +8957,8 @@ ${notes}
       avatarUrl: String(identity.senderAvatarUrl || "").trim(),
       identiconResolver
     });
-    const thumbInner = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
-    const thumbCell = wrapThumbWithProfileLink(uid, thumbInner, maskShare);
+    const thumbInner = thumbSrc ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
+    const thumbCell = wrapThumbWithProfileLink2(uid, thumbInner, maskShare);
     const idInner = maskShare || !uid ? escapeHtml(maskShare ? "—" : uid || "—") : /^\d{1,18}$/.test(uid) ? buildUserProfileLinkedLabelHtml(uid, uid) : escapeHtml(uid);
     const idHtml = `<span class="mkt-mono">${idInner}</span>`;
     return { thumbCell, accountHtml, idHtml };
@@ -8947,14 +9005,14 @@ ${notes}
 <tbody>${senderRows}</tbody>
 </table></div>` : "";
     const itemChips = ledger.itemAggregates.length ? `<div class="mkt-gift-ledger-items">${ledger.itemAggregates.map((row) => {
-      const thumb = row.thumbnailUrl ? `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(row.thumbnailUrl)}" alt="" width="32" height="32" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-gift-ledger-item__thumb mkt-gift-ledger-item__thumb--empty"></span>';
+      const thumb = row.thumbnailUrl ? `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(row.thumbnailUrl)}" alt="" width="32" height="32" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-gift-ledger-item__thumb mkt-gift-ledger-item__thumb--empty"></span>';
       const ptNote = row.points > 0 ? ` / ${escapeHtml(formatEventRankingNumber(row.points))}pt` : "";
       return `<span class="mkt-gift-ledger-item">${thumb}<span class="mkt-gift-ledger-item__name">${escapeHtml(row.itemName)}</span><strong>×${row.count}</strong>${ptNote}</span>`;
     }).join("")}</div>` : "";
     const tableRows = ledger.rows.map((row, i) => {
       const idCells = giftLedgerUserIdentityCells(row, maskShare, identiconResolver);
       const itemThumbSrc = maskShare ? "" : String(row.thumbnailUrl || "").trim();
-      const itemThumbInner = itemThumbSrc ? `<img class="mkt-gift-ledger-row__thumb" src="${escapeHtml(itemThumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-gift-ledger-row__thumb mkt-gift-ledger-row__thumb--empty"></span>';
+      const itemThumbInner = itemThumbSrc ? `<img class="mkt-gift-ledger-row__thumb" src="${escapeHtml(itemThumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-gift-ledger-row__thumb mkt-gift-ledger-row__thumb--empty"></span>';
       const points = `${formatEventRankingNumber(row.points)} pt`;
       return `<tr>
 <td data-label="#">${i + 1}</td>
@@ -9458,9 +9516,9 @@ ${giftItems}
       avatarUrl: row.avatarUrl || "",
       identiconResolver
     });
-    return wrapThumbWithProfileLink(
+    return wrapThumbWithProfileLink2(
       row.userId,
-      thumbSrc ? `<img class="mkt-supporter-avatar" src="${escapeAttr(thumbSrc)}" alt="" width="34" height="34" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : `<span class="mkt-supporter-avatar mkt-supporter-avatar--empty" aria-hidden="true">${rank}</span>`
+      thumbSrc ? `<img class="mkt-supporter-avatar" src="${escapeAttr(thumbSrc)}" alt="" width="34" height="34" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : `<span class="mkt-supporter-avatar mkt-supporter-avatar--empty" aria-hidden="true">${rank}</span>`
     );
   }
   function supporterChikuranSummaryLine(rows, maskShare) {
@@ -10289,10 +10347,10 @@ ${MARKETING_RENDER_IDLE_SCRIPT_HTML}
       const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
       const countText = `${u.count}件`;
       const followHtml = followerInlineHtml(followByUid.get(String(u.userId || "")) || null, maskShare);
-      const avatarInner = `<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>`;
+      const avatarInner = `<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}></span>`;
       const searchHay = `${rawLabel} ${uidForLabel}`.toLowerCase();
       return `<li class="mkt-thumb-grid__cell" data-search="${escapeAttr(searchHay)}">
-${wrapThumbWithProfileLink(u.userId, avatarInner)}
+${wrapThumbWithProfileLink2(u.userId, avatarInner)}
 <span class="mkt-thumb-grid__label">${labelHtml}</span>
 ${followHtml}
 <span class="mkt-thumb-grid__count">${escapeHtml(countText)}</span>
@@ -10425,7 +10483,7 @@ ${anonymousBlock}
       const rowUid = String(row?.userId || "").trim();
       const nameHtml = /^\d{1,18}$/.test(rowUid) ? buildUserProfileLinkedLabelHtml(rowUid, name) : escapeHtml(name);
       const thumbSrc = safeEventRankingThumbnailUrl(row?.thumbnailUrl);
-      const thumbHtml = wrapThumbWithProfileLink(
+      const thumbHtml = wrapThumbWithProfileLink2(
         rowUid,
         thumbSrc ? `<img class="mkt-event-rank__thumb" src="${escapeAttr(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">` : '<span class="mkt-event-rank__thumb mkt-event-rank__thumb--empty"></span>'
       );
@@ -10646,8 +10704,8 @@ ${yLabelsC}${xLabels}${bars}
         avatarUrl: u.avatarUrl || "",
         identiconResolver
       });
-      const thumbInner = thumbSrc ? `<img class="mkt-cf-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-cf-thumb mkt-cf-thumb--empty"></span>';
-      const thumbCell = wrapThumbWithProfileLink(u.userId, thumbInner, maskShare);
+      const thumbInner = thumbSrc ? `<img class="mkt-cf-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-cf-thumb mkt-cf-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink2(u.userId, thumbInner, maskShare);
       const followers = typeof u.followerCount === "number" ? formatEventRankingNumber(u.followerCount) : "—";
       const following = typeof u.followeeCount === "number" ? formatEventRankingNumber(u.followeeCount) : "—";
       const level = typeof u.userLevel === "number" && u.userLevel > 0 ? String(u.userLevel) : "—";
@@ -11140,8 +11198,8 @@ ${commenterFollowingListPanelHtml(analytics, r)}
         avatarUrl: lookup.avatarUrl || "",
         identiconResolver
       });
-      const thumbInner = thumbSrc ? `<img class="mkt-spd-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-spd-thumb mkt-spd-thumb--empty"></span>';
-      const thumbCell = wrapThumbWithProfileLink(row.userId, thumbInner, maskShare);
+      const thumbInner = thumbSrc ? `<img class="mkt-spd-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-spd-thumb mkt-spd-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink2(row.userId, thumbInner, maskShare);
       const nickname = escapeHtml(row.nickname || row.userId);
       const segmentLabelHtml = segmentLabel ? `<span class="mkt-spd-segment-label">${escapeHtml(segmentLabel)}</span>` : "";
       const nameCellHtml = !maskShare && /^\d{1,18}$/.test(row.userId) ? `<a class="mkt-spd-user-link" href="https://www.nicovideo.jp/user/${encodeURIComponent(row.userId)}" target="_blank" rel="noopener noreferrer">${nickname}</a>${segmentLabelHtml}` : `${nickname}${segmentLabelHtml}`;
@@ -11187,7 +11245,7 @@ ${commenterFollowingListPanelHtml(analytics, r)}
         avatarUrl: u.avatarUrl || "",
         identiconResolver
       });
-      const avImg = wrapThumbWithProfileLink(
+      const avImg = wrapThumbWithProfileLink2(
         u.userId,
         !resolvedAvatar ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>' : `<img src="${escapeHtml(resolvedAvatar)}" class="mkt-rank-av" alt="" loading="lazy" referrerpolicy="no-referrer">`,
         maskShare

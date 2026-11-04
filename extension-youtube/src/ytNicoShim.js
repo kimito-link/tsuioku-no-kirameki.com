@@ -15,6 +15,7 @@
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
+import { buildGiftThrowLedgerTableSectionHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
@@ -528,6 +529,7 @@ if (real && real.storage && real.storage.local && real.tabs) {
         if (g[1] === 'subApp') {
           const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
           zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
+          allThrowHistory = hist;
           scheduleTopFanRest();
         }
         // 応援レーンの「ギフト列」は ギフトを投げた人(nls_gift_users_)と一緒にこのキーを読み、
@@ -1036,65 +1038,49 @@ function ytFaceOrLetter(url, name) {
 }
 
 // 投げ一覧: ニコ生版の表は pt が 0 の行を出さない(ニコ生のギフトには必ず pt がある)。YouTube の「ギフト」
-//   (ジュエルのスタンプ)は金額が画面に出ないので落ちていた(見出し4件・表2行)。YouTube 版だけ、表の下に別に出す。
+//   (ジュエルのスタンプ)は金額が画面に出ないので落ちていた(見出し4件・表2行)。YouTube 版だけ、ニコ生版と同じ
+//   表の部品(buildGiftThrowLedgerTableSectionHtml)で、金額の出ない行も入れた表に描き直す(pt は「—」)。
+//   別の欄で足すとニコ生版の表と見た目がそろわなかった(りんく「ニコ生の方がきれい」2026-11-04)。
 /** @type {any[]} */
 let zeroPtGifts = [];
+/** @type {any[]} */
+let allThrowHistory = [];
 function ensureZeroPtGifts() {
   const panel = document.getElementById('northStarLaneThrows-giftHistory');
-  const old = document.getElementById('yt-zero-pt-gifts');
-  if (!panel || panel.hidden || !zeroPtGifts.length) {
-    if (old) old.remove();
-    return;
-  }
-  const sig = zeroPtGifts.map((h) => String(h.kokenHistoryId || '')).join('|');
-  if (old && old.parentElement === panel && old.getAttribute('data-sig') === sig) return;
-  if (old) old.remove();
-  const box = document.createElement('div');
-  box.id = 'yt-zero-pt-gifts';
-  box.setAttribute('data-sig', sig);
-  box.style.cssText = 'margin:8px 4px 2px;font-size:12px;';
-  const head = document.createElement('div');
-  head.textContent = `YouTube のギフト（金額が出ないもの・${zeroPtGifts.length}件）`;
-  head.style.cssText = 'font-weight:700;margin-bottom:4px;';
-  box.appendChild(head);
-  const ol = document.createElement('ol');
-  ol.style.cssText = 'list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;';
-  for (const h of zeroPtGifts) {
-    const li = document.createElement('li');
-    // 列をそろえる(時刻・絵・名前・顔・送った人)。絵が無い行も同じ幅をあける
-    li.style.cssText = 'display:grid;grid-template-columns:60px 22px minmax(0,96px) 22px minmax(0,1fr);align-items:center;gap:8px;';
-    const t = document.createElement('span');
-    t.textContent = String(h.time || '—');
-    t.style.cssText = 'color:#64748b;font-variant-numeric:tabular-nums;';
-    li.appendChild(t);
-    const thumb = String(h.thumbnailUrl || '');
-    const slot = document.createElement('span');
-    slot.style.cssText = 'width:22px;height:22px;display:inline-flex;';
-    li.appendChild(slot);
-    if (/^https:\/\//.test(thumb)) {
-      const gi = document.createElement('img');
-      gi.alt = '';
-      gi.src = thumb;
-      gi.width = 22;
-      gi.height = 22;
-      gi.style.cssText = 'flex:none;object-fit:contain;';
-      gi.addEventListener('error', () => gi.remove(), { once: true });
-      slot.appendChild(gi);
-    }
-    const item = document.createElement('span');
-    item.textContent = String(h.itemName || 'ギフト');
-    item.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-    li.appendChild(item);
-    const name = String(h.senderName || '');
-    li.appendChild(ytFaceOrLetter(String(h.senderAvatarUrl || ''), name));
-    const who = document.createElement('span');
-    who.textContent = name;
-    who.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;';
-    li.appendChild(who);
-    ol.appendChild(li);
-  }
-  box.appendChild(ol);
-  panel.appendChild(box);
+  if (!panel || panel.hidden || !zeroPtGifts.length) return;
+  const section = panel.querySelector('section.nl-gift-ledger-section');
+  if (!section) return;
+  const sig = allThrowHistory.map((h) => String(h.kokenHistoryId || '')).join('|');
+  if (section.getAttribute('data-yt-all') === sig) return;
+  const shown = allThrowHistory.slice(0, 20);
+  const rows = shown.map((h) => ({
+    timeLabel: String(h.time || '—'),
+    itemName: String(h.itemName || 'ギフト'),
+    points: Number(h.points) > 0 ? Math.trunc(Number(h.points)) : NaN,
+    thumbnailUrl: String(h.thumbnailUrl || ''),
+    userId: String(h.userId || ''),
+    senderLabel: String(h.senderName || ''),
+    senderAvatarUrl: String(h.senderAvatarUrl || ''),
+    source: 'youtube',
+  }));
+  const html = buildGiftThrowLedgerTableSectionHtml(rows, {
+    totalCount: allThrowHistory.length,
+    shownCount: rows.length,
+    payloadSource: 'youtube',
+  });
+  if (!html) return;
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const next = holder.firstElementChild;
+  if (!next) return;
+  next.setAttribute('data-yt-all', sig);
+  // 金額の出ない行の pt は「— pt」ではなく「—」
+  next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
+    if (/^—/.test(String(td.textContent || '').trim())) td.textContent = '—';
+  });
+  // 絵の読み込みに失敗したら消す(拡張の画面ではインラインの onerror が使えない)
+  next.querySelectorAll('img').forEach((img) => img.addEventListener('error', () => img.remove(), { once: true }));
+  section.replaceWith(next);
 }
 
 function ensureTopFanRest() {
@@ -1153,7 +1139,7 @@ function startDomFixer() {
   if (!document.body) return;
   fixSubtree(document.body);
   new MutationObserver((muts) => {
-    if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === 'childList' && !(m.target instanceof Element && m.target.closest('#yt-topfan-rest, #yt-zero-pt-gifts')))) scheduleTopFanRest();
+    if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === 'childList' && !(m.target instanceof Element && m.target.closest('#yt-topfan-rest, [data-yt-all]')))) scheduleTopFanRest();
     for (const m of muts) {
       if (m.type === 'characterData') fixTextNode(/** @type {Text} */ (m.target));
       else if (m.type === 'attributes') {

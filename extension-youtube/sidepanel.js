@@ -187,6 +187,525 @@
     return start + Math.max(0, off) * 1e3;
   }
 
+  // src/shared/html/escape.js
+  function escapeHtml2(s5) {
+    return String(s5 || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function escapeAttr(s5) {
+    return escapeHtml2(s5);
+  }
+
+  // src/lib/deriveAvatarUrlFromUid.js
+  var AVATAR_HOST = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
+  function deriveAvatarUrlFromUid(uid, size = "s") {
+    const numUid = normalizeUid(uid);
+    if (numUid == null) return "";
+    const dirNum = Math.floor(numUid / 1e4);
+    const sz = size === "m" ? "m" : "s";
+    return `${AVATAR_HOST}/${sz}/${dirNum}/${numUid}.jpg`;
+  }
+  function normalizeUid(uid) {
+    if (uid == null) return null;
+    if (typeof uid === "number") {
+      if (!Number.isFinite(uid) || uid < 0 || !Number.isInteger(uid)) return null;
+      return uid;
+    }
+    if (typeof uid === "string") {
+      const t = uid.trim();
+      if (!/^[0-9]+$/.test(t)) return null;
+      const n2 = Number(t);
+      if (!Number.isFinite(n2) || n2 < 0) return null;
+      return n2;
+    }
+    return null;
+  }
+  function extractUidFromAvatarUrl(url) {
+    if (typeof url !== "string" || !url) return null;
+    const m = url.match(
+      /\/nicoaccount\/usericon\/[sm]\/\d+\/(\d+)\.(?:jpg|jpeg|png|gif)$/i
+    );
+    return m ? m[1] : null;
+  }
+  function pickAvatarUrlForUid(uid, interceptedAvatars, size = "s") {
+    const numUid = normalizeUid(uid);
+    if (numUid == null) return "";
+    const key = String(numUid);
+    let intercepted = "";
+    if (interceptedAvatars instanceof Map) {
+      intercepted = interceptedAvatars.get(key) || "";
+    } else if (interceptedAvatars && typeof interceptedAvatars === "object") {
+      intercepted = /** @type {any} */
+      interceptedAvatars[key] || "";
+    }
+    if (intercepted) return intercepted;
+    return deriveAvatarUrlFromUid(numUid, size);
+  }
+
+  // src/lib/supportGrowthTileSrc.js
+  function isHttpOrHttpsUrl(url) {
+    const s5 = String(url || "").trim();
+    return /^https?:\/\//i.test(s5);
+  }
+  var NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg";
+  function niconicoDefaultUserIconUrl(userId) {
+    const s5 = String(userId || "").trim();
+    if (!/^\d{5,14}$/.test(s5)) return "";
+    const n2 = Number(s5);
+    if (!Number.isFinite(n2) || n2 < 1) return "";
+    return deriveAvatarUrlFromUid(s5);
+  }
+  function isWeakNiconicoUserIconHttpUrl(url) {
+    const s5 = String(url || "").trim();
+    if (!isHttpOrHttpsUrl(s5)) return false;
+    return /\/usericon\/defaults\//i.test(s5);
+  }
+  function isNiconicoSyntheticDefaultUserIconUrl(avatarUrl, userId) {
+    const url = String(avatarUrl || "").trim();
+    const uid = String(userId || "").trim();
+    if (!isHttpOrHttpsUrl(url) || !/^\d{5,14}$/.test(uid)) return false;
+    const expected = niconicoDefaultUserIconUrl(uid);
+    return Boolean(expected && url === expected);
+  }
+  function isAnonymousStyleNicoUserId(userId) {
+    const s5 = String(userId || "").trim();
+    if (!s5) return true;
+    if (/^\d{5,14}$/.test(s5)) return false;
+    if (/^a:/i.test(s5)) return true;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s5)) return true;
+    return true;
+  }
+  function pickSupportGrowthFallbackTileSrc(userId, httpCandidate, yukkuriSrc, tvSrc) {
+    if (isHttpOrHttpsUrl(httpCandidate)) {
+      return String(httpCandidate).trim();
+    }
+    const y = String(yukkuriSrc || "").trim();
+    const t = String(tvSrc || "").trim();
+    if (isAnonymousStyleNicoUserId(userId)) {
+      return t || y;
+    }
+    const syn = niconicoDefaultUserIconUrl(userId);
+    if (isHttpOrHttpsUrl(syn)) return syn;
+    return y || t;
+  }
+  function pickSupportGrowthTileWithOptionalIdenticon(userId, httpCandidate, yukkuriSrc, tvSrc, identiconOpts) {
+    if (isHttpOrHttpsUrl(httpCandidate)) {
+      return String(httpCandidate).trim();
+    }
+    const uid = String(userId || "").trim();
+    if (identiconOpts?.anonymousIdenticonEnabled !== false && uid && isAnonymousStyleNicoUserId(uid)) {
+      const data = String(identiconOpts.anonymousIdenticonDataUrl || "").trim();
+      if (data) return data;
+    }
+    return pickSupportGrowthFallbackTileSrc(
+      userId,
+      httpCandidate,
+      yukkuriSrc,
+      tvSrc
+    );
+  }
+  function resolveSupportGrowthTileSrc(p) {
+    const def = String(p.defaultSrc || "");
+    if (isHttpOrHttpsUrl(p.entryAvatarUrl)) {
+      return String(p.entryAvatarUrl).trim();
+    }
+    const derived = niconicoDefaultUserIconUrl(p.userId);
+    if (isHttpOrHttpsUrl(derived)) {
+      return derived;
+    }
+    if (p.isOwnPosted && isHttpOrHttpsUrl(p.viewerAvatarUrl)) {
+      return String(p.viewerAvatarUrl).trim();
+    }
+    return def;
+  }
+  function userLaneDedupeKey(p) {
+    const u = String(p?.userId || "").trim();
+    if (u) return `u:${u}`;
+    if (isHttpOrHttpsUrl(p?.avatarHttpCandidate)) {
+      return `t:${String(p.avatarHttpCandidate).trim()}`;
+    }
+    const s5 = String(p?.stableId || "").trim();
+    if (s5) return `s:${s5}`;
+    return "";
+  }
+  function userLaneResolvedThumbScore(userId, httpCandidate, verifiedUids) {
+    const c = String(httpCandidate || "").trim();
+    if (!isHttpOrHttpsUrl(c)) return 0;
+    if (isWeakNiconicoUserIconHttpUrl(c)) return 0;
+    const u = String(userId || "").trim();
+    if (/^[0-9]{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) {
+      if (verifiedUids && typeof verifiedUids.has === "function" && verifiedUids.has(u)) return 2;
+      return 1;
+    }
+    return 2;
+  }
+  function commentEnrichmentAvatarScore(userId, url) {
+    const c = String(url || "").trim();
+    if (!isHttpOrHttpsUrl(c)) return 0;
+    if (isWeakNiconicoUserIconHttpUrl(c)) return 1;
+    const u = String(userId || "").trim();
+    if (/^\d{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) return 1;
+    return 2;
+  }
+  function pickStrongestAvatarUrlForUser(userId, orderedCandidates) {
+    const u = String(userId || "").trim();
+    let best = "";
+    let bestSc = 0;
+    if (!Array.isArray(orderedCandidates)) return "";
+    for (const raw of orderedCandidates) {
+      const c = String(raw || "").trim();
+      if (!c) continue;
+      const sc = commentEnrichmentAvatarScore(u, c);
+      if (sc > bestSc) {
+        bestSc = sc;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  // src/lib/commentTickerNameLink.js
+  function canLinkCommentTickerName(userId) {
+    const s5 = String(userId || "").trim();
+    if (!s5) return false;
+    return !isAnonymousStyleNicoUserId(s5);
+  }
+  function buildCommentTickerNameHref(userId) {
+    if (!canLinkCommentTickerName(userId)) return "";
+    const s5 = String(userId || "").trim();
+    return `https://www.nicovideo.jp/user/${encodeURIComponent(s5)}`;
+  }
+
+  // src/lib/userProfileLinkHtml.js
+  function buildUserProfileLinkedLabelHtml(userKey, label) {
+    const text = String(label ?? "");
+    const escaped = escapeHtml2(text);
+    const href = buildCommentTickerNameHref(userKey);
+    if (!href) return escaped;
+    return `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer" class="nl-user-profile-link">${escaped}</a>`;
+  }
+
+  // src/lib/nicoAnonymousDisplay.js
+  var NICO_HASHED_ANON_USER_ID_RE = /^[A-Za-z0-9_-]{16,40}$/;
+  function isNiconicoHashedAnonymousUserId(userId) {
+    const s5 = String(userId ?? "").trim();
+    if (!s5) return false;
+    if (s5.startsWith("__")) return false;
+    if (/^\d+$/.test(s5)) return false;
+    return NICO_HASHED_ANON_USER_ID_RE.test(s5);
+  }
+  function isNiconicoAnonymousUserId(userId) {
+    const s5 = String(userId ?? "").trim();
+    if (/^a:/i.test(s5)) {
+      const rest = s5.slice(2).trim();
+      return rest.length >= 2;
+    }
+    return isNiconicoHashedAnonymousUserId(s5);
+  }
+  function isNiconicoAutoUserPlaceholderNickname(nickname) {
+    const n2 = String(nickname ?? "").trim();
+    return /^user\s+[A-Za-z0-9]+$/i.test(n2);
+  }
+  function isNiconicoGuestPlaceholderNickname(nickname) {
+    const n2 = String(nickname ?? "").trim();
+    return n2 === "ゲスト";
+  }
+  function anonymousNicknameFallback(userId, nickname) {
+    const nick = String(nickname ?? "").trim();
+    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
+    if (nick && !isPlaceholder) return nick;
+    return isNiconicoAnonymousUserId(userId) ? "匿名" : "";
+  }
+  function compactNicoLaneUserId(userId) {
+    const s5 = String(userId ?? "").trim();
+    if (!s5) return "";
+    if (/^\d{5,14}$/.test(s5)) {
+      return s5.length <= 18 ? s5 : `${s5.slice(0, 8)}…${s5.slice(-6)}`;
+    }
+    if (/^a:/i.test(s5)) {
+      const rest = s5.slice(2).trim();
+      const head = rest.slice(0, 4);
+      if (rest.length <= 5) return `a:${rest}`;
+      return `a:${head}…`;
+    }
+    if (s5.length <= 12) return s5;
+    return `${s5.slice(0, 5)}…${s5.slice(-3)}`;
+  }
+
+  // src/lib/backfillRemoveRecommendedLivePollution.js
+  function isRecommendedLivePollutionRow(entry) {
+    if (!entry || typeof entry !== "object") return false;
+    const text = String(
+      /** @type {{ text?: unknown }} */
+      entry.text || ""
+    ).trim();
+    const userId = String(
+      /** @type {{ userId?: unknown }} */
+      entry.userId || ""
+    ).trim();
+    if (/^\d+(?:時間\d*)?分経過$/.test(text)) return true;
+    if (/^\d+\s*(?:時間|分|日)前$/.test(text)) return true;
+    if (text === "LIVE" || text === "タイムシフト" || text === "公開終了") return true;
+    if (/^lv\d+$/i.test(userId)) return true;
+    if (/^\d{1,2}:\d{2}\s*開始$/.test(text)) return true;
+    return false;
+  }
+  function isRecommendedUserChipPollutionRow(entry) {
+    if (!entry || typeof entry !== "object") return false;
+    const userId = String(
+      /** @type {{ userId?: unknown }} */
+      entry.userId || ""
+    ).trim();
+    if (!/^\d{5,14}$/.test(userId)) return false;
+    const text = String(
+      /** @type {{ text?: unknown }} */
+      entry.text || ""
+    ).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) return false;
+    const uid = userId;
+    const lower = text.toLowerCase();
+    if (text === uid) return true;
+    if (lower === `u/${uid}`) return true;
+    if (lower === `${uid} u/${uid}`) return true;
+    if (lower === `u/${uid} ${uid}`) return true;
+    if (/^https:\/\/(www\.)?nicovideo\.jp\/user\/\d{5,14}\/?$/i.test(text) && text.includes(uid)) {
+      return true;
+    }
+    return false;
+  }
+  function backfillRemoveRecommendedUserChipPollution(stored) {
+    if (!Array.isArray(stored)) return { cleaned: [], removedCount: 0 };
+    const cleaned = [];
+    let removedCount = 0;
+    for (const e of stored) {
+      if (isRecommendedUserChipPollutionRow(e)) {
+        removedCount += 1;
+        continue;
+      }
+      cleaned.push(e);
+    }
+    return { cleaned, removedCount };
+  }
+  function backfillRemoveRecommendedLivePollution(stored) {
+    if (!Array.isArray(stored)) return { cleaned: [], removedCount: 0 };
+    const cleaned = [];
+    let removedCount = 0;
+    for (const e of stored) {
+      if (isRecommendedLivePollutionRow(e)) {
+        removedCount += 1;
+        continue;
+      }
+      cleaned.push(e);
+    }
+    return { cleaned, removedCount };
+  }
+
+  // src/lib/userRooms.js
+  var UNKNOWN_USER_KEY = "__unknown__";
+  function shortUserKeyDisplay(userKey) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) return "";
+    const s5 = String(userKey);
+    return s5.length <= 18 ? s5 : `${s5.slice(0, 8)}…${s5.slice(-6)}`;
+  }
+  function displayUserLabel(userKey, nickname) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) {
+      return "ID未取得（DOMに投稿者情報なし）";
+    }
+    const name = anonymousNicknameFallback(userKey, nickname);
+    const shortId = shortUserKeyDisplay(userKey);
+    if (name) return `${name}（${shortId}）`;
+    return shortId;
+  }
+  function sampleEntriesEvenly(list, sampleMax) {
+    if (list.length <= sampleMax) return [...list];
+    const out = [];
+    const step = list.length / sampleMax;
+    for (let i = 0; i < sampleMax; i++) {
+      out.push(list[Math.floor(i * step)]);
+    }
+    return out;
+  }
+  function aggregateCommentsByUser(entries, options) {
+    let list = Array.isArray(entries) ? entries : [];
+    const sampleMax = typeof options?.sampleMaxEntries === "number" && options.sampleMaxEntries > 0 ? Math.floor(options.sampleMaxEntries) : 0;
+    if (sampleMax > 0 && list.length > sampleMax) {
+      list = sampleEntriesEvenly(list, sampleMax);
+    }
+    const requireText = !!options?.requireText;
+    const trackCharTotals = options?.trackCharTotals === true;
+    const maxRooms = typeof options?.maxRooms === "number" && options.maxRooms > 0 ? Math.floor(options.maxRooms) : 0;
+    const sortByCount = options?.sortByCount === true;
+    const map = /* @__PURE__ */ new Map();
+    for (const e of list) {
+      const uid = e?.userId ? String(e.userId).trim() : "";
+      const userKey = uid || UNKNOWN_USER_KEY;
+      const capturedAt = Number(e?.capturedAt || 0);
+      const text = String(e?.text || "").trim();
+      if (requireText && !text) continue;
+      if (requireText && isRecommendedUserChipPollutionRow(e)) continue;
+      const nickname = String(e?.nickname || "").trim();
+      const rawAv = String(e?.avatarUrl || "").trim();
+      const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
+      if (!map.has(userKey)) {
+        map.set(userKey, {
+          userKey,
+          nickname: "",
+          count: 0,
+          lastAt: 0,
+          lastText: "",
+          avatarUrl: "",
+          totalChars: 0
+        });
+      }
+      const row = map.get(userKey);
+      row.count += 1;
+      if (trackCharTotals) row.totalChars += text.length;
+      if (nickname) {
+        if (!row.nickname) row.nickname = nickname;
+        else if (nickname.length > row.nickname.length) row.nickname = nickname;
+      }
+      if (capturedAt >= row.lastAt) {
+        row.lastAt = capturedAt;
+        row.lastText = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+        if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
+      }
+    }
+    let rows = [...map.values()];
+    if (sortByCount) {
+      rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
+    } else {
+      rows.sort((a, b) => b.lastAt - a.lastAt);
+    }
+    if (maxRooms > 0 && rows.length > maxRooms) {
+      rows = rows.slice(0, maxRooms);
+    }
+    if (!trackCharTotals) {
+      return rows.map(({ totalChars: _tc, ...rest }) => rest);
+    }
+    return rows;
+  }
+
+  // src/lib/reportUserThumb.js
+  var NICO_USER_ICON_CDN_BASE = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
+  function buildNiconicoDefaultUserIconUrl(uid) {
+    const s5 = String(uid || "").trim();
+    if (!/^\d{5,14}$/.test(s5)) return "";
+    const bucket = Math.floor(Number(s5) / 1e4);
+    return `${NICO_USER_ICON_CDN_BASE}/${bucket}/${s5}.jpg`;
+  }
+  function resolveReportUserThumbSrc(opts) {
+    const userId = String(opts?.userId || "").trim();
+    const avatarUrl = String(opts?.avatarUrl || "").trim();
+    if (isHttpOrHttpsUrl(avatarUrl)) {
+      return avatarUrl;
+    }
+    if (!userId || userId === "__unknown__") return "";
+    if (/^\d{5,14}$/.test(userId)) {
+      return buildNiconicoDefaultUserIconUrl(userId);
+    }
+    if (typeof opts?.identiconResolver === "function") {
+      const r = opts.identiconResolver(userId);
+      if (typeof r === "string" && r.length > 0) return r;
+    }
+    return "";
+  }
+
+  // src/lib/giftThrowLedgerTableHtml.js
+  var DEFAULT_USERICON_ONERROR_ATTR = 'data-on-error-fallback="blank"';
+  function formatLedgerNumber(v) {
+    const n2 = typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : NaN;
+    return Number.isFinite(n2) ? n2.toLocaleString("ja-JP") : "—";
+  }
+  function wrapThumbWithProfileLink(userId, innerHtml, maskShare = false) {
+    const uid = String(userId || "").trim();
+    if (maskShare || !/^\d{1,18}$/.test(uid)) return innerHtml;
+    return `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`;
+  }
+  function buildGiftLedgerUserIdentityCells(identity, opts = {}) {
+    const maskShare = opts.maskShare === true;
+    const uid = String(identity.userId || "").trim();
+    const rawLabel = uid && /^\d{1,18}$/.test(uid) ? displayUserLabel(uid, identity.senderLabel || "") : String(identity.senderLabel || "").trim() || "（不明）";
+    const accountHtml = uid && /^\d{1,18}$/.test(uid) ? buildUserProfileLinkedLabelHtml(uid, rawLabel) : escapeHtml2(rawLabel);
+    const thumbSrc = maskShare ? "" : resolveReportUserThumbSrc({
+      userId: uid,
+      avatarUrl: String(identity.senderAvatarUrl || "").trim(),
+      identiconResolver: opts.identiconResolver
+    });
+    const thumbInner = thumbSrc ? `<img class="nl-gift-ledger-thumb" src="${escapeHtml2(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="nl-gift-ledger-thumb nl-gift-ledger-thumb--empty"></span>';
+    const thumbCell = wrapThumbWithProfileLink(uid, thumbInner, maskShare);
+    const idInner = !uid ? escapeHtml2("—") : /^\d{1,18}$/.test(uid) ? buildUserProfileLinkedLabelHtml(uid, uid) : escapeHtml2(uid);
+    const idHtml = `<span class="nl-gift-ledger-mono">${idInner}</span>`;
+    return { thumbCell, accountHtml, idHtml };
+  }
+  function buildGiftLedgerItemThumbHtml(thumbnailUrl, size = 28) {
+    const src = safeHttpUrl(thumbnailUrl);
+    if (src) {
+      return `<img class="nl-gift-ledger-row__thumb" src="${escapeHtml2(src)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`;
+    }
+    return `<span class="nl-gift-ledger-row__thumb nl-gift-ledger-row__thumb--empty" style="width:${size}px;height:${size}px"></span>`;
+  }
+  function buildGiftThrowLedgerTableRowHtml(row, index, opts = {}) {
+    const idCells = buildGiftLedgerUserIdentityCells(
+      {
+        userId: row.userId,
+        senderLabel: row.senderLabel,
+        senderAvatarUrl: row.senderAvatarUrl
+      },
+      opts
+    );
+    const itemThumbInner = buildGiftLedgerItemThumbHtml(row.thumbnailUrl, 28);
+    const points = `${formatLedgerNumber(row.points)} pt`;
+    const sourceCol = opts.showSource !== false ? `<td data-label="出典" class="nl-gift-ledger-evidence">${escapeHtml2(formatGiftThrowSourceLabel(row.source))}</td>` : "";
+    return `<tr>
+<td data-label="#">${index + 1}</td>
+<td data-label="時刻" class="nl-gift-ledger-time">${escapeHtml2(row.timeLabel || "—")}</td>
+<td data-label="アイテム" class="nl-gift-ledger-itemcell">${itemThumbInner}<span>${escapeHtml2(row.itemName || "—")}</span></td>
+<td data-label="サムネ">${idCells.thumbCell}</td>
+<td data-label="アカウント" class="nl-gift-ledger-sender">${idCells.accountHtml}</td>
+<td data-label="ID">${idCells.idHtml}</td>
+<td data-label="pt" class="nl-num">${escapeHtml2(points)}</td>
+${sourceCol}
+</tr>`;
+  }
+  function formatGiftThrowSourceLabel(source) {
+    const s5 = String(source || "").trim();
+    if (s5 === "koken-api") return "koken API";
+    if (s5 === "dom-scrape") return "公式DOM";
+    if (s5 === "merged") return "統合";
+    if (s5 === "gift-sub-app") return "履歴タブ";
+    return s5 || "—";
+  }
+  function buildGiftThrowLedgerTableSectionHtml(rows, meta, opts = {}) {
+    if (!rows.length) return "";
+    const totalCount = Math.max(0, Math.floor(Number(meta.totalCount) || rows.length));
+    const shownCount = Math.max(0, Math.floor(Number(meta.shownCount) || rows.length));
+    const showSource = meta.showSource !== false;
+    const caption = totalCount > shownCount ? `投げ一覧（${totalCount} 件中 新しい ${shownCount} 件）` : `投げ一覧（${totalCount} 件）`;
+    const tableRows = rows.map((row, i) => buildGiftThrowLedgerTableRowHtml(row, i, { ...opts, showSource })).join("");
+    const sourceNote = meta.payloadSource ? `<p class="nl-gift-ledger-spec-note">データ源: ${escapeHtml2(formatGiftThrowSourceLabel(meta.payloadSource))}</p>` : "";
+    const headSource = showSource ? "<th>出典</th>" : "";
+    return `<section class="nl-gift-ledger-section" aria-label="個別ギフト投げ一覧"><h3 class="nl-gift-ledger-head">${escapeHtml2(caption)}</h3>` + sourceNote + `<div class="nl-gift-ledger-scroll"><table class="nl-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th>${headSource}</tr></thead><tbody>${tableRows}</tbody></table></div></section>`;
+  }
+  function giftThrowRowFromSubAppHistory(raw, payloadSource = "") {
+    const r = (
+      /** @type {Record<string, unknown>} */
+      raw || {}
+    );
+    const points = Number(r.points);
+    if (!Number.isFinite(points) || points <= 0) return null;
+    const userId = String(r.userId || "").trim();
+    const senderName = String(r.senderName || "").trim() || "名無し";
+    return {
+      timeLabel: String(r.time || "").trim() || "—",
+      itemName: String(r.itemName || "").trim() || "（名称未取得）",
+      points: Math.trunc(points),
+      thumbnailUrl: safeHttpUrl(r.thumbnailUrl),
+      userId,
+      senderLabel: senderName,
+      senderAvatarUrl: safeHttpUrl(r.senderAvatarUrl),
+      source: payloadSource || "koken-api"
+    };
+  }
+
   // src/lib/youtube/ytWording.js
   var TOP_FAN_RULES = [
     [
@@ -859,6 +1378,7 @@
           if (g[1] === "subApp") {
             const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
             zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
+            allThrowHistory = hist;
             scheduleTopFanRest();
           }
           const laneRead = !!list && list.some((x) => x.startsWith("nls_gift_users_"));
@@ -1283,61 +1803,41 @@
     return wrap;
   }
   var zeroPtGifts = [];
+  var allThrowHistory = [];
   function ensureZeroPtGifts() {
     const panel = document.getElementById("northStarLaneThrows-giftHistory");
-    const old = document.getElementById("yt-zero-pt-gifts");
-    if (!panel || panel.hidden || !zeroPtGifts.length) {
-      if (old) old.remove();
-      return;
-    }
-    const sig = zeroPtGifts.map((h) => String(h.kokenHistoryId || "")).join("|");
-    if (old && old.parentElement === panel && old.getAttribute("data-sig") === sig) return;
-    if (old) old.remove();
-    const box = document.createElement("div");
-    box.id = "yt-zero-pt-gifts";
-    box.setAttribute("data-sig", sig);
-    box.style.cssText = "margin:8px 4px 2px;font-size:12px;";
-    const head = document.createElement("div");
-    head.textContent = `YouTube のギフト（金額が出ないもの・${zeroPtGifts.length}件）`;
-    head.style.cssText = "font-weight:700;margin-bottom:4px;";
-    box.appendChild(head);
-    const ol = document.createElement("ol");
-    ol.style.cssText = "list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;";
-    for (const h of zeroPtGifts) {
-      const li = document.createElement("li");
-      li.style.cssText = "display:grid;grid-template-columns:60px 22px minmax(0,96px) 22px minmax(0,1fr);align-items:center;gap:8px;";
-      const t = document.createElement("span");
-      t.textContent = String(h.time || "—");
-      t.style.cssText = "color:#64748b;font-variant-numeric:tabular-nums;";
-      li.appendChild(t);
-      const thumb = String(h.thumbnailUrl || "");
-      const slot = document.createElement("span");
-      slot.style.cssText = "width:22px;height:22px;display:inline-flex;";
-      li.appendChild(slot);
-      if (/^https:\/\//.test(thumb)) {
-        const gi = document.createElement("img");
-        gi.alt = "";
-        gi.src = thumb;
-        gi.width = 22;
-        gi.height = 22;
-        gi.style.cssText = "flex:none;object-fit:contain;";
-        gi.addEventListener("error", () => gi.remove(), { once: true });
-        slot.appendChild(gi);
-      }
-      const item = document.createElement("span");
-      item.textContent = String(h.itemName || "ギフト");
-      item.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-      li.appendChild(item);
-      const name = String(h.senderName || "");
-      li.appendChild(ytFaceOrLetter(String(h.senderAvatarUrl || ""), name));
-      const who = document.createElement("span");
-      who.textContent = name;
-      who.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;";
-      li.appendChild(who);
-      ol.appendChild(li);
-    }
-    box.appendChild(ol);
-    panel.appendChild(box);
+    if (!panel || panel.hidden || !zeroPtGifts.length) return;
+    const section = panel.querySelector("section.nl-gift-ledger-section");
+    if (!section) return;
+    const sig = allThrowHistory.map((h) => String(h.kokenHistoryId || "")).join("|");
+    if (section.getAttribute("data-yt-all") === sig) return;
+    const shown = allThrowHistory.slice(0, 20);
+    const rows = shown.map((h) => ({
+      timeLabel: String(h.time || "—"),
+      itemName: String(h.itemName || "ギフト"),
+      points: Number(h.points) > 0 ? Math.trunc(Number(h.points)) : NaN,
+      thumbnailUrl: String(h.thumbnailUrl || ""),
+      userId: String(h.userId || ""),
+      senderLabel: String(h.senderName || ""),
+      senderAvatarUrl: String(h.senderAvatarUrl || ""),
+      source: "youtube"
+    }));
+    const html = buildGiftThrowLedgerTableSectionHtml(rows, {
+      totalCount: allThrowHistory.length,
+      shownCount: rows.length,
+      payloadSource: "youtube"
+    });
+    if (!html) return;
+    const holder = document.createElement("div");
+    holder.innerHTML = html;
+    const next = holder.firstElementChild;
+    if (!next) return;
+    next.setAttribute("data-yt-all", sig);
+    next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
+      if (/^—/.test(String(td.textContent || "").trim())) td.textContent = "—";
+    });
+    next.querySelectorAll("img").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
+    section.replaceWith(next);
   }
   function ensureTopFanRest() {
     ensureZeroPtGifts();
@@ -1395,7 +1895,7 @@
     if (!document.body) return;
     fixSubtree(document.body);
     new MutationObserver((muts) => {
-      if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, #yt-zero-pt-gifts")))) scheduleTopFanRest();
+      if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, [data-yt-all]")))) scheduleTopFanRest();
       for (const m of muts) {
         if (m.type === "characterData") fixTextNode(
           /** @type {Text} */
@@ -2149,174 +2649,6 @@
     return nonNegNumOrNull(sources?.ndgrValue);
   }
 
-  // src/lib/deriveAvatarUrlFromUid.js
-  var AVATAR_HOST = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
-  function deriveAvatarUrlFromUid(uid, size = "s") {
-    const numUid = normalizeUid(uid);
-    if (numUid == null) return "";
-    const dirNum = Math.floor(numUid / 1e4);
-    const sz = size === "m" ? "m" : "s";
-    return `${AVATAR_HOST}/${sz}/${dirNum}/${numUid}.jpg`;
-  }
-  function normalizeUid(uid) {
-    if (uid == null) return null;
-    if (typeof uid === "number") {
-      if (!Number.isFinite(uid) || uid < 0 || !Number.isInteger(uid)) return null;
-      return uid;
-    }
-    if (typeof uid === "string") {
-      const t = uid.trim();
-      if (!/^[0-9]+$/.test(t)) return null;
-      const n2 = Number(t);
-      if (!Number.isFinite(n2) || n2 < 0) return null;
-      return n2;
-    }
-    return null;
-  }
-  function extractUidFromAvatarUrl(url) {
-    if (typeof url !== "string" || !url) return null;
-    const m = url.match(
-      /\/nicoaccount\/usericon\/[sm]\/\d+\/(\d+)\.(?:jpg|jpeg|png|gif)$/i
-    );
-    return m ? m[1] : null;
-  }
-  function pickAvatarUrlForUid(uid, interceptedAvatars, size = "s") {
-    const numUid = normalizeUid(uid);
-    if (numUid == null) return "";
-    const key = String(numUid);
-    let intercepted = "";
-    if (interceptedAvatars instanceof Map) {
-      intercepted = interceptedAvatars.get(key) || "";
-    } else if (interceptedAvatars && typeof interceptedAvatars === "object") {
-      intercepted = /** @type {any} */
-      interceptedAvatars[key] || "";
-    }
-    if (intercepted) return intercepted;
-    return deriveAvatarUrlFromUid(numUid, size);
-  }
-
-  // src/lib/supportGrowthTileSrc.js
-  function isHttpOrHttpsUrl(url) {
-    const s5 = String(url || "").trim();
-    return /^https?:\/\//i.test(s5);
-  }
-  var NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg";
-  function niconicoDefaultUserIconUrl(userId) {
-    const s5 = String(userId || "").trim();
-    if (!/^\d{5,14}$/.test(s5)) return "";
-    const n2 = Number(s5);
-    if (!Number.isFinite(n2) || n2 < 1) return "";
-    return deriveAvatarUrlFromUid(s5);
-  }
-  function isWeakNiconicoUserIconHttpUrl(url) {
-    const s5 = String(url || "").trim();
-    if (!isHttpOrHttpsUrl(s5)) return false;
-    return /\/usericon\/defaults\//i.test(s5);
-  }
-  function isNiconicoSyntheticDefaultUserIconUrl(avatarUrl, userId) {
-    const url = String(avatarUrl || "").trim();
-    const uid = String(userId || "").trim();
-    if (!isHttpOrHttpsUrl(url) || !/^\d{5,14}$/.test(uid)) return false;
-    const expected = niconicoDefaultUserIconUrl(uid);
-    return Boolean(expected && url === expected);
-  }
-  function isAnonymousStyleNicoUserId(userId) {
-    const s5 = String(userId || "").trim();
-    if (!s5) return true;
-    if (/^\d{5,14}$/.test(s5)) return false;
-    if (/^a:/i.test(s5)) return true;
-    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s5)) return true;
-    return true;
-  }
-  function pickSupportGrowthFallbackTileSrc(userId, httpCandidate, yukkuriSrc, tvSrc) {
-    if (isHttpOrHttpsUrl(httpCandidate)) {
-      return String(httpCandidate).trim();
-    }
-    const y = String(yukkuriSrc || "").trim();
-    const t = String(tvSrc || "").trim();
-    if (isAnonymousStyleNicoUserId(userId)) {
-      return t || y;
-    }
-    const syn = niconicoDefaultUserIconUrl(userId);
-    if (isHttpOrHttpsUrl(syn)) return syn;
-    return y || t;
-  }
-  function pickSupportGrowthTileWithOptionalIdenticon(userId, httpCandidate, yukkuriSrc, tvSrc, identiconOpts) {
-    if (isHttpOrHttpsUrl(httpCandidate)) {
-      return String(httpCandidate).trim();
-    }
-    const uid = String(userId || "").trim();
-    if (identiconOpts?.anonymousIdenticonEnabled !== false && uid && isAnonymousStyleNicoUserId(uid)) {
-      const data = String(identiconOpts.anonymousIdenticonDataUrl || "").trim();
-      if (data) return data;
-    }
-    return pickSupportGrowthFallbackTileSrc(
-      userId,
-      httpCandidate,
-      yukkuriSrc,
-      tvSrc
-    );
-  }
-  function resolveSupportGrowthTileSrc(p) {
-    const def = String(p.defaultSrc || "");
-    if (isHttpOrHttpsUrl(p.entryAvatarUrl)) {
-      return String(p.entryAvatarUrl).trim();
-    }
-    const derived = niconicoDefaultUserIconUrl(p.userId);
-    if (isHttpOrHttpsUrl(derived)) {
-      return derived;
-    }
-    if (p.isOwnPosted && isHttpOrHttpsUrl(p.viewerAvatarUrl)) {
-      return String(p.viewerAvatarUrl).trim();
-    }
-    return def;
-  }
-  function userLaneDedupeKey(p) {
-    const u = String(p?.userId || "").trim();
-    if (u) return `u:${u}`;
-    if (isHttpOrHttpsUrl(p?.avatarHttpCandidate)) {
-      return `t:${String(p.avatarHttpCandidate).trim()}`;
-    }
-    const s5 = String(p?.stableId || "").trim();
-    if (s5) return `s:${s5}`;
-    return "";
-  }
-  function userLaneResolvedThumbScore(userId, httpCandidate, verifiedUids) {
-    const c = String(httpCandidate || "").trim();
-    if (!isHttpOrHttpsUrl(c)) return 0;
-    if (isWeakNiconicoUserIconHttpUrl(c)) return 0;
-    const u = String(userId || "").trim();
-    if (/^[0-9]{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) {
-      if (verifiedUids && typeof verifiedUids.has === "function" && verifiedUids.has(u)) return 2;
-      return 1;
-    }
-    return 2;
-  }
-  function commentEnrichmentAvatarScore(userId, url) {
-    const c = String(url || "").trim();
-    if (!isHttpOrHttpsUrl(c)) return 0;
-    if (isWeakNiconicoUserIconHttpUrl(c)) return 1;
-    const u = String(userId || "").trim();
-    if (/^\d{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) return 1;
-    return 2;
-  }
-  function pickStrongestAvatarUrlForUser(userId, orderedCandidates) {
-    const u = String(userId || "").trim();
-    let best = "";
-    let bestSc = 0;
-    if (!Array.isArray(orderedCandidates)) return "";
-    for (const raw of orderedCandidates) {
-      const c = String(raw || "").trim();
-      if (!c) continue;
-      const sc = commentEnrichmentAvatarScore(u, c);
-      if (sc > bestSc) {
-        bestSc = sc;
-        best = c;
-      }
-    }
-    return best;
-  }
-
   // src/lib/formatDateTime.js
   function formatDateTime(value) {
     const n2 = Number(value);
@@ -2508,35 +2840,6 @@
         cur.continue();
       };
     });
-  }
-
-  // src/shared/html/escape.js
-  function escapeHtml2(s5) {
-    return String(s5 || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-  function escapeAttr(s5) {
-    return escapeHtml2(s5);
-  }
-
-  // src/lib/commentTickerNameLink.js
-  function canLinkCommentTickerName(userId) {
-    const s5 = String(userId || "").trim();
-    if (!s5) return false;
-    return !isAnonymousStyleNicoUserId(s5);
-  }
-  function buildCommentTickerNameHref(userId) {
-    if (!canLinkCommentTickerName(userId)) return "";
-    const s5 = String(userId || "").trim();
-    return `https://www.nicovideo.jp/user/${encodeURIComponent(s5)}`;
-  }
-
-  // src/lib/userProfileLinkHtml.js
-  function buildUserProfileLinkedLabelHtml(userKey, label) {
-    const text = String(label ?? "");
-    const escaped = escapeHtml2(text);
-    const href = buildCommentTickerNameHref(userKey);
-    if (!href) return escaped;
-    return `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer" class="nl-user-profile-link">${escaped}</a>`;
   }
 
   // src/lib/broadcasterProfileCard.js
@@ -4071,231 +4374,6 @@
     };
   }
 
-  // src/lib/nicoAnonymousDisplay.js
-  var NICO_HASHED_ANON_USER_ID_RE = /^[A-Za-z0-9_-]{16,40}$/;
-  function isNiconicoHashedAnonymousUserId(userId) {
-    const s5 = String(userId ?? "").trim();
-    if (!s5) return false;
-    if (s5.startsWith("__")) return false;
-    if (/^\d+$/.test(s5)) return false;
-    return NICO_HASHED_ANON_USER_ID_RE.test(s5);
-  }
-  function isNiconicoAnonymousUserId(userId) {
-    const s5 = String(userId ?? "").trim();
-    if (/^a:/i.test(s5)) {
-      const rest = s5.slice(2).trim();
-      return rest.length >= 2;
-    }
-    return isNiconicoHashedAnonymousUserId(s5);
-  }
-  function isNiconicoAutoUserPlaceholderNickname(nickname) {
-    const n2 = String(nickname ?? "").trim();
-    return /^user\s+[A-Za-z0-9]+$/i.test(n2);
-  }
-  function isNiconicoGuestPlaceholderNickname(nickname) {
-    const n2 = String(nickname ?? "").trim();
-    return n2 === "ゲスト";
-  }
-  function anonymousNicknameFallback(userId, nickname) {
-    const nick = String(nickname ?? "").trim();
-    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
-    if (nick && !isPlaceholder) return nick;
-    return isNiconicoAnonymousUserId(userId) ? "匿名" : "";
-  }
-  function compactNicoLaneUserId(userId) {
-    const s5 = String(userId ?? "").trim();
-    if (!s5) return "";
-    if (/^\d{5,14}$/.test(s5)) {
-      return s5.length <= 18 ? s5 : `${s5.slice(0, 8)}…${s5.slice(-6)}`;
-    }
-    if (/^a:/i.test(s5)) {
-      const rest = s5.slice(2).trim();
-      const head = rest.slice(0, 4);
-      if (rest.length <= 5) return `a:${rest}`;
-      return `a:${head}…`;
-    }
-    if (s5.length <= 12) return s5;
-    return `${s5.slice(0, 5)}…${s5.slice(-3)}`;
-  }
-
-  // src/lib/backfillRemoveRecommendedLivePollution.js
-  function isRecommendedLivePollutionRow(entry) {
-    if (!entry || typeof entry !== "object") return false;
-    const text = String(
-      /** @type {{ text?: unknown }} */
-      entry.text || ""
-    ).trim();
-    const userId = String(
-      /** @type {{ userId?: unknown }} */
-      entry.userId || ""
-    ).trim();
-    if (/^\d+(?:時間\d*)?分経過$/.test(text)) return true;
-    if (/^\d+\s*(?:時間|分|日)前$/.test(text)) return true;
-    if (text === "LIVE" || text === "タイムシフト" || text === "公開終了") return true;
-    if (/^lv\d+$/i.test(userId)) return true;
-    if (/^\d{1,2}:\d{2}\s*開始$/.test(text)) return true;
-    return false;
-  }
-  function isRecommendedUserChipPollutionRow(entry) {
-    if (!entry || typeof entry !== "object") return false;
-    const userId = String(
-      /** @type {{ userId?: unknown }} */
-      entry.userId || ""
-    ).trim();
-    if (!/^\d{5,14}$/.test(userId)) return false;
-    const text = String(
-      /** @type {{ text?: unknown }} */
-      entry.text || ""
-    ).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-    if (!text) return false;
-    const uid = userId;
-    const lower = text.toLowerCase();
-    if (text === uid) return true;
-    if (lower === `u/${uid}`) return true;
-    if (lower === `${uid} u/${uid}`) return true;
-    if (lower === `u/${uid} ${uid}`) return true;
-    if (/^https:\/\/(www\.)?nicovideo\.jp\/user\/\d{5,14}\/?$/i.test(text) && text.includes(uid)) {
-      return true;
-    }
-    return false;
-  }
-  function backfillRemoveRecommendedUserChipPollution(stored) {
-    if (!Array.isArray(stored)) return { cleaned: [], removedCount: 0 };
-    const cleaned = [];
-    let removedCount = 0;
-    for (const e of stored) {
-      if (isRecommendedUserChipPollutionRow(e)) {
-        removedCount += 1;
-        continue;
-      }
-      cleaned.push(e);
-    }
-    return { cleaned, removedCount };
-  }
-  function backfillRemoveRecommendedLivePollution(stored) {
-    if (!Array.isArray(stored)) return { cleaned: [], removedCount: 0 };
-    const cleaned = [];
-    let removedCount = 0;
-    for (const e of stored) {
-      if (isRecommendedLivePollutionRow(e)) {
-        removedCount += 1;
-        continue;
-      }
-      cleaned.push(e);
-    }
-    return { cleaned, removedCount };
-  }
-
-  // src/lib/userRooms.js
-  var UNKNOWN_USER_KEY = "__unknown__";
-  function shortUserKeyDisplay(userKey) {
-    if (!userKey || userKey === UNKNOWN_USER_KEY) return "";
-    const s5 = String(userKey);
-    return s5.length <= 18 ? s5 : `${s5.slice(0, 8)}…${s5.slice(-6)}`;
-  }
-  function displayUserLabel(userKey, nickname) {
-    if (!userKey || userKey === UNKNOWN_USER_KEY) {
-      return "ID未取得（DOMに投稿者情報なし）";
-    }
-    const name = anonymousNicknameFallback(userKey, nickname);
-    const shortId = shortUserKeyDisplay(userKey);
-    if (name) return `${name}（${shortId}）`;
-    return shortId;
-  }
-  function sampleEntriesEvenly(list, sampleMax) {
-    if (list.length <= sampleMax) return [...list];
-    const out = [];
-    const step = list.length / sampleMax;
-    for (let i = 0; i < sampleMax; i++) {
-      out.push(list[Math.floor(i * step)]);
-    }
-    return out;
-  }
-  function aggregateCommentsByUser(entries, options) {
-    let list = Array.isArray(entries) ? entries : [];
-    const sampleMax = typeof options?.sampleMaxEntries === "number" && options.sampleMaxEntries > 0 ? Math.floor(options.sampleMaxEntries) : 0;
-    if (sampleMax > 0 && list.length > sampleMax) {
-      list = sampleEntriesEvenly(list, sampleMax);
-    }
-    const requireText = !!options?.requireText;
-    const trackCharTotals = options?.trackCharTotals === true;
-    const maxRooms = typeof options?.maxRooms === "number" && options.maxRooms > 0 ? Math.floor(options.maxRooms) : 0;
-    const sortByCount = options?.sortByCount === true;
-    const map = /* @__PURE__ */ new Map();
-    for (const e of list) {
-      const uid = e?.userId ? String(e.userId).trim() : "";
-      const userKey = uid || UNKNOWN_USER_KEY;
-      const capturedAt = Number(e?.capturedAt || 0);
-      const text = String(e?.text || "").trim();
-      if (requireText && !text) continue;
-      if (requireText && isRecommendedUserChipPollutionRow(e)) continue;
-      const nickname = String(e?.nickname || "").trim();
-      const rawAv = String(e?.avatarUrl || "").trim();
-      const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
-      if (!map.has(userKey)) {
-        map.set(userKey, {
-          userKey,
-          nickname: "",
-          count: 0,
-          lastAt: 0,
-          lastText: "",
-          avatarUrl: "",
-          totalChars: 0
-        });
-      }
-      const row = map.get(userKey);
-      row.count += 1;
-      if (trackCharTotals) row.totalChars += text.length;
-      if (nickname) {
-        if (!row.nickname) row.nickname = nickname;
-        else if (nickname.length > row.nickname.length) row.nickname = nickname;
-      }
-      if (capturedAt >= row.lastAt) {
-        row.lastAt = capturedAt;
-        row.lastText = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-        if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
-      }
-    }
-    let rows = [...map.values()];
-    if (sortByCount) {
-      rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
-    } else {
-      rows.sort((a, b) => b.lastAt - a.lastAt);
-    }
-    if (maxRooms > 0 && rows.length > maxRooms) {
-      rows = rows.slice(0, maxRooms);
-    }
-    if (!trackCharTotals) {
-      return rows.map(({ totalChars: _tc, ...rest }) => rest);
-    }
-    return rows;
-  }
-
-  // src/lib/reportUserThumb.js
-  var NICO_USER_ICON_CDN_BASE = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
-  function buildNiconicoDefaultUserIconUrl(uid) {
-    const s5 = String(uid || "").trim();
-    if (!/^\d{5,14}$/.test(s5)) return "";
-    const bucket = Math.floor(Number(s5) / 1e4);
-    return `${NICO_USER_ICON_CDN_BASE}/${bucket}/${s5}.jpg`;
-  }
-  function resolveReportUserThumbSrc(opts) {
-    const userId = String(opts?.userId || "").trim();
-    const avatarUrl = String(opts?.avatarUrl || "").trim();
-    if (isHttpOrHttpsUrl(avatarUrl)) {
-      return avatarUrl;
-    }
-    if (!userId || userId === "__unknown__") return "";
-    if (/^\d{5,14}$/.test(userId)) {
-      return buildNiconicoDefaultUserIconUrl(userId);
-    }
-    if (typeof opts?.identiconResolver === "function") {
-      const r = opts.identiconResolver(userId);
-      if (typeof r === "string" && r.length > 0) return r;
-    }
-    return "";
-  }
-
   // src/lib/userThumbGrid.js
   var THUMB_USER_KIND_NUMERIC = "numeric";
   var THUMB_USER_KIND_ANONYMOUS = "anonymous";
@@ -5730,8 +5808,8 @@
   var NEWCOMER_WINDOW_MS = 30 * 60 * 1e3;
 
   // src/lib/marketingChartsHtml.js
-  var DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${escapeHtml2(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
-  function wrapThumbWithProfileLink(userId, innerHtml, maskShare = false) {
+  var DEFAULT_USERICON_ONERROR_ATTR2 = `onerror="this.onerror=null;this.src='${escapeHtml2(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
+  function wrapThumbWithProfileLink2(userId, innerHtml, maskShare = false) {
     const uid = String(userId == null ? "" : userId).trim();
     if (maskShare || !/^\d{1,18}$/.test(uid)) return innerHtml;
     return `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`;
@@ -5863,8 +5941,8 @@ ${detailFooter}
         avatarUrl: u.avatarUrl || "",
         identiconResolver
       });
-      const thumbInner = thumbSrc ? `<img class="mkt-cf-thumb" src="${escapeHtml2(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>` : '<span class="mkt-cf-thumb mkt-cf-thumb--empty"></span>';
-      const thumbCell = wrapThumbWithProfileLink(u.userId, thumbInner, maskShare);
+      const thumbInner = thumbSrc ? `<img class="mkt-cf-thumb" src="${escapeHtml2(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="mkt-cf-thumb mkt-cf-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink2(u.userId, thumbInner, maskShare);
       const followers = typeof u.followerCount === "number" ? formatEventRankingNumber(u.followerCount) : "—";
       const following = typeof u.followeeCount === "number" ? formatEventRankingNumber(u.followeeCount) : "—";
       const level = typeof u.userLevel === "number" && u.userLevel > 0 ? String(u.userLevel) : "—";
@@ -13813,103 +13891,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       entry?.capturedAt
     ) || 0;
     return `${lid}|t:${at}|${text.slice(0, 80)}`;
-  }
-
-  // src/lib/giftThrowLedgerTableHtml.js
-  var DEFAULT_USERICON_ONERROR_ATTR2 = 'data-on-error-fallback="blank"';
-  function formatLedgerNumber(v) {
-    const n2 = typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : NaN;
-    return Number.isFinite(n2) ? n2.toLocaleString("ja-JP") : "—";
-  }
-  function wrapThumbWithProfileLink2(userId, innerHtml, maskShare = false) {
-    const uid = String(userId || "").trim();
-    if (maskShare || !/^\d{1,18}$/.test(uid)) return innerHtml;
-    return `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`;
-  }
-  function buildGiftLedgerUserIdentityCells(identity, opts = {}) {
-    const maskShare = opts.maskShare === true;
-    const uid = String(identity.userId || "").trim();
-    const rawLabel = uid && /^\d{1,18}$/.test(uid) ? displayUserLabel(uid, identity.senderLabel || "") : String(identity.senderLabel || "").trim() || "（不明）";
-    const accountHtml = uid && /^\d{1,18}$/.test(uid) ? buildUserProfileLinkedLabelHtml(uid, rawLabel) : escapeHtml2(rawLabel);
-    const thumbSrc = maskShare ? "" : resolveReportUserThumbSrc({
-      userId: uid,
-      avatarUrl: String(identity.senderAvatarUrl || "").trim(),
-      identiconResolver: opts.identiconResolver
-    });
-    const thumbInner = thumbSrc ? `<img class="nl-gift-ledger-thumb" src="${escapeHtml2(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>` : '<span class="nl-gift-ledger-thumb nl-gift-ledger-thumb--empty"></span>';
-    const thumbCell = wrapThumbWithProfileLink2(uid, thumbInner, maskShare);
-    const idInner = !uid ? escapeHtml2("—") : /^\d{1,18}$/.test(uid) ? buildUserProfileLinkedLabelHtml(uid, uid) : escapeHtml2(uid);
-    const idHtml = `<span class="nl-gift-ledger-mono">${idInner}</span>`;
-    return { thumbCell, accountHtml, idHtml };
-  }
-  function buildGiftLedgerItemThumbHtml(thumbnailUrl, size = 28) {
-    const src = safeHttpUrl(thumbnailUrl);
-    if (src) {
-      return `<img class="nl-gift-ledger-row__thumb" src="${escapeHtml2(src)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR2}>`;
-    }
-    return `<span class="nl-gift-ledger-row__thumb nl-gift-ledger-row__thumb--empty" style="width:${size}px;height:${size}px"></span>`;
-  }
-  function buildGiftThrowLedgerTableRowHtml(row, index, opts = {}) {
-    const idCells = buildGiftLedgerUserIdentityCells(
-      {
-        userId: row.userId,
-        senderLabel: row.senderLabel,
-        senderAvatarUrl: row.senderAvatarUrl
-      },
-      opts
-    );
-    const itemThumbInner = buildGiftLedgerItemThumbHtml(row.thumbnailUrl, 28);
-    const points = `${formatLedgerNumber(row.points)} pt`;
-    const sourceCol = opts.showSource !== false ? `<td data-label="出典" class="nl-gift-ledger-evidence">${escapeHtml2(formatGiftThrowSourceLabel(row.source))}</td>` : "";
-    return `<tr>
-<td data-label="#">${index + 1}</td>
-<td data-label="時刻" class="nl-gift-ledger-time">${escapeHtml2(row.timeLabel || "—")}</td>
-<td data-label="アイテム" class="nl-gift-ledger-itemcell">${itemThumbInner}<span>${escapeHtml2(row.itemName || "—")}</span></td>
-<td data-label="サムネ">${idCells.thumbCell}</td>
-<td data-label="アカウント" class="nl-gift-ledger-sender">${idCells.accountHtml}</td>
-<td data-label="ID">${idCells.idHtml}</td>
-<td data-label="pt" class="nl-num">${escapeHtml2(points)}</td>
-${sourceCol}
-</tr>`;
-  }
-  function formatGiftThrowSourceLabel(source) {
-    const s5 = String(source || "").trim();
-    if (s5 === "koken-api") return "koken API";
-    if (s5 === "dom-scrape") return "公式DOM";
-    if (s5 === "merged") return "統合";
-    if (s5 === "gift-sub-app") return "履歴タブ";
-    return s5 || "—";
-  }
-  function buildGiftThrowLedgerTableSectionHtml(rows, meta, opts = {}) {
-    if (!rows.length) return "";
-    const totalCount = Math.max(0, Math.floor(Number(meta.totalCount) || rows.length));
-    const shownCount = Math.max(0, Math.floor(Number(meta.shownCount) || rows.length));
-    const showSource = meta.showSource !== false;
-    const caption = totalCount > shownCount ? `投げ一覧（${totalCount} 件中 新しい ${shownCount} 件）` : `投げ一覧（${totalCount} 件）`;
-    const tableRows = rows.map((row, i) => buildGiftThrowLedgerTableRowHtml(row, i, { ...opts, showSource })).join("");
-    const sourceNote = meta.payloadSource ? `<p class="nl-gift-ledger-spec-note">データ源: ${escapeHtml2(formatGiftThrowSourceLabel(meta.payloadSource))}</p>` : "";
-    const headSource = showSource ? "<th>出典</th>" : "";
-    return `<section class="nl-gift-ledger-section" aria-label="個別ギフト投げ一覧"><h3 class="nl-gift-ledger-head">${escapeHtml2(caption)}</h3>` + sourceNote + `<div class="nl-gift-ledger-scroll"><table class="nl-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th>${headSource}</tr></thead><tbody>${tableRows}</tbody></table></div></section>`;
-  }
-  function giftThrowRowFromSubAppHistory(raw, payloadSource = "") {
-    const r = (
-      /** @type {Record<string, unknown>} */
-      raw || {}
-    );
-    const points = Number(r.points);
-    if (!Number.isFinite(points) || points <= 0) return null;
-    const userId = String(r.userId || "").trim();
-    const senderName = String(r.senderName || "").trim() || "名無し";
-    return {
-      timeLabel: String(r.time || "").trim() || "—",
-      itemName: String(r.itemName || "").trim() || "（名称未取得）",
-      points: Math.trunc(points),
-      thumbnailUrl: safeHttpUrl(r.thumbnailUrl),
-      userId,
-      senderLabel: senderName,
-      senderAvatarUrl: safeHttpUrl(r.senderAvatarUrl),
-      source: payloadSource || "koken-api"
-    };
   }
 
   // src/lib/giftHistoryViewModel.js
@@ -45633,7 +45614,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T04:56" ? String("yt-2026-11-04T04:56") : "dev";
+      const buildId = "yt-2026-11-04T04:58" ? String("yt-2026-11-04T04:58") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45696,7 +45677,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T04:56" ? String("yt-2026-11-04T04:56") : "dev";
+            return "yt-2026-11-04T04:58" ? String("yt-2026-11-04T04:58") : "dev";
           } catch {
             return "dev";
           }
