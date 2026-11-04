@@ -773,7 +773,29 @@ function setupLiveChatObserver() {
       queueFlush();
     } else if (!parsed.iconUrl && retryCount < 3) {
       setTimeout(() => inspectElement(el, retryCount + 1), 250 * (retryCount + 1));
+    } else if (!parsed.iconUrl) {
+      watchLateIcon(el);
     }
+  };
+
+  // チャット欄の下の方(画面に出ていない行)は、顔の img に 1×1 の透明な絵が入っていて、
+  //   画面に出たときに本物の顔(yt4.ggpht.com)に変わる。数回の読み直しでは間に合わない(ギフトの送り主で実例)。
+  //   顔の src が変わったら読み直し、本物の顔が取れたら補完送信する(上の「後から入った場合」の枝)。
+  /** @type {WeakSet<Element>} */
+  const lateIconWatched = new WeakSet();
+  /** @param {Element} el */
+  const watchLateIcon = (el) => {
+    if (lateIconWatched.has(el) || typeof MutationObserver !== 'function') return;
+    lateIconWatched.add(el);
+    const mo = new MutationObserver(() => {
+      const p = parseYtChatElement(el);
+      if (p && p.iconUrl) {
+        mo.disconnect();
+        inspectElement(el, 3);
+      }
+    });
+    mo.observe(el, { attributes: true, subtree: true, attributeFilter: ['src'] });
+    setTimeout(() => mo.disconnect(), 10 * 60 * 1000);
   };
 
   const scanAllExisting = (root = document) => {

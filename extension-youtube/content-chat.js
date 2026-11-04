@@ -1077,7 +1077,23 @@
         queueFlush();
       } else if (!parsed.iconUrl && retryCount < 3) {
         setTimeout(() => inspectElement(el, retryCount + 1), 250 * (retryCount + 1));
+      } else if (!parsed.iconUrl) {
+        watchLateIcon(el);
       }
+    };
+    const lateIconWatched = /* @__PURE__ */ new WeakSet();
+    const watchLateIcon = (el) => {
+      if (lateIconWatched.has(el) || typeof MutationObserver !== "function") return;
+      lateIconWatched.add(el);
+      const mo = new MutationObserver(() => {
+        const p = parseYtChatElement(el);
+        if (p && p.iconUrl) {
+          mo.disconnect();
+          inspectElement(el, 3);
+        }
+      });
+      mo.observe(el, { attributes: true, subtree: true, attributeFilter: ["src"] });
+      setTimeout(() => mo.disconnect(), 10 * 60 * 1e3);
     };
     const scanAllExisting = (root = document) => {
       try {
