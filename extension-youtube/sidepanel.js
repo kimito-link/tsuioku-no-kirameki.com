@@ -1016,7 +1016,12 @@ ${sourceCol}
 
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
+  function ytVenueThrowableGiftEvents(v) {
+    if (!IS_VENUE_CONTEXT || !Array.isArray(v)) return v;
+    return v.map((e) => e && !(Number(e.point) > 0) && String(e.itemName || "") ? { ...e, point: 1 } : e);
+  }
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
+  var IS_VENUE_CONTEXT = YT_SHIM_IN_PAGE || typeof location !== "undefined" && /\/venue\.html$/.test(String(location.pathname || ""));
   var COMMENTS_PREFIX = "nls_comments_";
   var TAIL_PREFIX = "nls_ctail_";
   var LAST_WATCH_URL_KEY = "nls_last_watch_url";
@@ -1454,6 +1459,7 @@ ${sourceCol}
             await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
           );
           let v = gifts ? gifts[g[1]] : null;
+          if (g[1] === "giftEvents") v = ytVenueThrowableGiftEvents(v);
           if (g[1] === "subApp") {
             const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
             zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
@@ -1619,7 +1625,7 @@ ${sourceCol}
           );
           if (gifts && gifts.count > 0) {
             for (const [pre, field] of GIFT_KEY_PREFIXES) {
-              const v = gifts[field];
+              const v = field === "giftEvents" ? ytVenueThrowableGiftEvents(gifts[field]) : gifts[field];
               if (v != null) synth[`${pre}${lv}`] = { newValue: v };
             }
           }
@@ -46170,7 +46176,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T12:15" ? String("yt-2026-11-04T12:15") : "dev";
+      const buildId = "yt-2026-11-04T12:17" ? String("yt-2026-11-04T12:17") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46188,7 +46194,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.77") : "";
+    const bundledVersion = true ? String("0.1.78") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46233,7 +46239,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T12:15" ? String("yt-2026-11-04T12:15") : "dev";
+            return "yt-2026-11-04T12:17" ? String("yt-2026-11-04T12:17") : "dev";
           } catch {
             return "dev";
           }
