@@ -808,12 +808,7 @@ ${sourceCol}
 
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
-  function ytVenueThrowableGiftEvents(v) {
-    if (!IS_VENUE_CONTEXT || !Array.isArray(v)) return v;
-    return v.map((e) => e && !(Number(e.point) > 0) && String(e.itemName || "") ? { ...e, point: 1 } : e);
-  }
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
-  var IS_VENUE_CONTEXT = YT_SHIM_IN_PAGE || typeof location !== "undefined" && /\/venue\.html$/.test(String(location.pathname || ""));
   var COMMENTS_PREFIX = "nls_comments_";
   var TAIL_PREFIX = "nls_ctail_";
   var LAST_WATCH_URL_KEY = "nls_last_watch_url";
@@ -1142,6 +1137,7 @@ ${sourceCol}
       inPageCommentCache.set(vid, next);
     } catch {
       if (!cur) return null;
+      if (full) cur.fullAt = now;
     }
     const c = inPageCommentCache.get(vid);
     if (!c) return null;
@@ -1274,7 +1270,6 @@ ${sourceCol}
             await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
           );
           let v = gifts ? gifts[g[1]] : null;
-          if (g[1] === "giftEvents") v = ytVenueThrowableGiftEvents(v);
           if (g[1] === "subApp") {
             const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
             zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
@@ -1440,7 +1435,7 @@ ${sourceCol}
           );
           if (gifts && gifts.count > 0) {
             for (const [pre, field] of GIFT_KEY_PREFIXES) {
-              const v = field === "giftEvents" ? ytVenueThrowableGiftEvents(gifts[field]) : gifts[field];
+              const v = gifts[field];
               if (v != null) synth[`${pre}${lv}`] = { newValue: v };
             }
           }
@@ -1945,7 +1940,8 @@ ${sourceCol}
     if (YT_SHIM_IN_PAGE) {
       const root = document.getElementById("nlsb-venue-root");
       if (!root) {
-        setTimeout(startDomFixer, 500);
+        const onWatch = /^\/(watch|live\/)/.test(String(location.pathname || ""));
+        setTimeout(startDomFixer, onWatch ? 500 : 3e3);
         return;
       }
       startDomFixerOn(root, true);
