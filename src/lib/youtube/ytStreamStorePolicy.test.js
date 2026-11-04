@@ -233,4 +233,17 @@ describe('mergeYtStreamSummary の配信開始時刻', () => {
     expect(b.startedAt).toBe(1781434926000);
     expect(b.createdAt).toBe(1793000000000);
   });
+  it('目安の開始時刻は早いほうだけ残し、正確な値が来たら上書きする', async () => {
+    const { mergeYtStreamSummary } = await import('./ytStreamStorePolicy.js');
+    const a = mergeYtStreamSummary(undefined, { videoId: 'v', startedAt: 1000_000, startedAtApprox: true }, 5000_000);
+    expect(a.startedAt).toBe(1000_000);
+    expect(a.startedAtApprox).toBe(true);
+    const b = mergeYtStreamSummary(a, { videoId: 'v', startedAt: 1960_000, startedAtApprox: true }, 5000_000);
+    expect(b.startedAt).toBe(1000_000);
+    const c = mergeYtStreamSummary(b, { videoId: 'v', startedAt: 940_000, startedAtApprox: true }, 5000_000);
+    expect(c.startedAt).toBe(940_000);
+    const d = mergeYtStreamSummary(c, { videoId: 'v', startedAt: 1200_000 }, 5000_000);
+    expect(d.startedAt).toBe(1200_000);
+    expect(d.startedAtApprox).toBeUndefined();
+  });
 });

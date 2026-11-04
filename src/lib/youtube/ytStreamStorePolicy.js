@@ -91,11 +91,21 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
 
   // 配信が本当に始まった時刻(ページの「ライブ配信開始日」・ms)。分からなければ前の値のまま。
   const okTime = (/** @type {unknown} */ v) => typeof v === 'number' && Number.isFinite(v) && v > 0;
-  const startedAt = okTime(patch?.startedAt)
-    ? Math.floor(/** @type {number} */ (patch.startedAt))
-    : okTime(prev.startedAt)
-      ? Math.floor(prev.startedAt)
-      : null;
+  // 目安(「3 時間前にライブ配信開始」から出した値・startedAtApprox)は本当の開始より必ず後か同じなので、
+  //   前の値より早いときだけ使う(見るたびに後ろへずれないように)。正確な値はいつでも上書きする。
+  const approx = patch?.startedAtApprox === true;
+  let startedAt = okTime(prev.startedAt) ? Math.floor(prev.startedAt) : null;
+  let startedAtApprox = prev.startedAtApprox === true;
+  if (okTime(patch?.startedAt)) {
+    const v = Math.floor(/** @type {number} */ (patch.startedAt));
+    if (!approx) {
+      startedAt = v;
+      startedAtApprox = false;
+    } else if (startedAt === null || v < startedAt) {
+      startedAt = v;
+      startedAtApprox = true;
+    }
+  }
 
   const createdAt =
     typeof prev.createdAt === 'number' && Number.isFinite(prev.createdAt) && prev.createdAt > 0
@@ -114,6 +124,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     chatFilterLabel,
     itemCount,
     startedAt,
+    ...(startedAtApprox ? { startedAtApprox: true } : {}),
     createdAt,
     updatedAt: nowMs,
   };

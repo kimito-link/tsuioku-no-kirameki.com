@@ -640,7 +640,18 @@
       }
     } catch {
     }
-    return readRelativeStartedAt();
+    return null;
+  }
+  var fetchedStartedAt = /* @__PURE__ */ new Map();
+  function fetchExactStartedAt(videoId) {
+    if (!videoId || fetchedStartedAt.has(videoId)) return;
+    fetchedStartedAt.set(videoId, null);
+    void fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: "include" }).then((r) => r.ok ? r.text() : "").then((html) => {
+      const m = String(html || "").match(/"startTimestamp":"([^"]+)"/);
+      const ms = m ? Date.parse(m[1]) : NaN;
+      if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) fetchedStartedAt.set(videoId, ms);
+    }).catch(() => {
+    });
   }
   function readRelativeStartedAt() {
     try {
@@ -700,6 +711,16 @@
     } catch {
     }
   }
+  function startedAtFields(videoId) {
+    const exact = readStreamStartedAt(videoId);
+    if (exact) return { startedAt: exact };
+    const fetched = fetchedStartedAt.get(videoId);
+    if (fetched) return { startedAt: fetched };
+    const approx = readRelativeStartedAt();
+    if (!approx) return {};
+    fetchExactStartedAt(videoId);
+    return { startedAt: approx, startedAtApprox: true };
+  }
   function setupWatchPageMetaObserver() {
     const sendMeta = () => {
       if (!isYtWatchLikeUrl(String(window.location.href || ""))) return;
@@ -743,7 +764,7 @@
           broadcasterHandle,
           broadcasterIconUrl: readBroadcasterIconUrl(),
           concurrentViewers: viewers,
-          startedAt: readStreamStartedAt(videoId)
+          ...startedAtFields(videoId)
         }
       });
       if (viewers === null) saveViewerProbe();

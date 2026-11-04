@@ -847,6 +847,11 @@
             await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
           );
           let v = gifts ? gifts[g[1]] : null;
+          if (g[1] === "subApp") {
+            const hist = Array.isArray(gifts?.subApp?.history) ? gifts.subApp.history : [];
+            zeroPtGifts = hist.filter((h) => !(Number(h?.points) > 0));
+            scheduleTopFanRest();
+          }
           const laneRead = !!list && list.some((x) => x.startsWith("nls_gift_users_"));
           if (g[1] === "koken" && !laneRead) {
             const lbKey = `yt_leaderboard_${vid}`;
@@ -1251,7 +1256,79 @@
       ensureTopFanRest();
     }, 0);
   }
+  function ytFaceOrLetter(url, name) {
+    const wrap = document.createElement("span");
+    const letter = (String(name || "").replace(/^@/, "").trim().charAt(0) || "?").toUpperCase();
+    let hue = 0;
+    for (const ch of String(name || "")) hue = (hue * 31 + ch.charCodeAt(0)) % 360;
+    wrap.textContent = letter;
+    wrap.style.cssText = `width:22px;height:22px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;background:hsl(${hue} 45% 50%);overflow:hidden;position:relative;`;
+    if (/^https:\/\//.test(url)) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = url;
+      img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;";
+      img.addEventListener("error", () => img.remove(), { once: true });
+      wrap.appendChild(img);
+    }
+    return wrap;
+  }
+  var zeroPtGifts = [];
+  function ensureZeroPtGifts() {
+    const panel = document.getElementById("northStarLaneThrows-giftHistory");
+    const old = document.getElementById("yt-zero-pt-gifts");
+    if (!panel || panel.hidden || !zeroPtGifts.length) {
+      if (old) old.remove();
+      return;
+    }
+    const sig = zeroPtGifts.map((h) => String(h.kokenHistoryId || "")).join("|");
+    if (old && old.parentElement === panel && old.getAttribute("data-sig") === sig) return;
+    if (old) old.remove();
+    const box = document.createElement("div");
+    box.id = "yt-zero-pt-gifts";
+    box.setAttribute("data-sig", sig);
+    box.style.cssText = "margin:8px 4px 2px;font-size:12px;";
+    const head = document.createElement("div");
+    head.textContent = `YouTube のギフト（金額が出ないもの・${zeroPtGifts.length}件）`;
+    head.style.cssText = "font-weight:700;margin-bottom:4px;";
+    box.appendChild(head);
+    const ol = document.createElement("ol");
+    ol.style.cssText = "list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;";
+    for (const h of zeroPtGifts) {
+      const li = document.createElement("li");
+      li.style.cssText = "display:flex;align-items:center;gap:8px;";
+      const t = document.createElement("span");
+      t.textContent = String(h.time || "—");
+      t.style.cssText = "width:56px;color:#64748b;flex:none;";
+      li.appendChild(t);
+      const thumb = String(h.thumbnailUrl || "");
+      if (/^https:\/\//.test(thumb)) {
+        const gi = document.createElement("img");
+        gi.alt = "";
+        gi.src = thumb;
+        gi.width = 22;
+        gi.height = 22;
+        gi.style.cssText = "flex:none;object-fit:contain;";
+        gi.addEventListener("error", () => gi.remove(), { once: true });
+        li.appendChild(gi);
+      }
+      const item = document.createElement("span");
+      item.textContent = String(h.itemName || "ギフト");
+      item.style.cssText = "flex:none;";
+      li.appendChild(item);
+      const name = String(h.senderName || "");
+      li.appendChild(ytFaceOrLetter(String(h.senderAvatarUrl || ""), name));
+      const who = document.createElement("span");
+      who.textContent = name;
+      who.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;";
+      li.appendChild(who);
+      ol.appendChild(li);
+    }
+    box.appendChild(ol);
+    panel.appendChild(box);
+  }
   function ensureTopFanRest() {
+    ensureZeroPtGifts();
     const body = document.getElementById("northStarLaneBody-contributionRanking");
     const old = document.getElementById("yt-topfan-rest");
     const rows = kokenIsTopFans ? topFanRestRows : [];
@@ -1282,15 +1359,8 @@
       rank.textContent = String(r.rank || "");
       rank.style.cssText = "width:22px;text-align:right;color:#64748b;flex:none;";
       li.appendChild(rank);
-      const img = document.createElement("img");
-      img.width = 22;
-      img.height = 22;
-      img.alt = "";
-      img.style.cssText = "border-radius:50%;flex:none;object-fit:cover;background:#e2e8f0;";
-      if (/^https:\/\//.test(String(r.thumbnailUrl || ""))) img.src = String(r.thumbnailUrl);
-      img.addEventListener("error", () => img.removeAttribute("src"), { once: true });
-      li.appendChild(img);
       const name = String(r.name || "");
+      li.appendChild(ytFaceOrLetter(String(r.thumbnailUrl || ""), name));
       const a = document.createElement("a");
       a.textContent = name;
       if (/^@\S+$/.test(name)) {
@@ -1313,7 +1383,7 @@
     if (!document.body) return;
     fixSubtree(document.body);
     new MutationObserver((muts) => {
-      if (topFanRestRows.length && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest")))) scheduleTopFanRest();
+      if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === "childList" && !(m.target instanceof Element && m.target.closest("#yt-topfan-rest, #yt-zero-pt-gifts")))) scheduleTopFanRest();
       for (const m of muts) {
         if (m.type === "characterData") fixTextNode(
           /** @type {Text} */
