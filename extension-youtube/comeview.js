@@ -598,7 +598,7 @@
     const name = String(r?.name || "").trim();
     const key = personKey || channelId || (name ? `name:${name}` : "");
     const at = Number(r?.recordedAt || 0) || Date.now();
-    const postedAt = r?.replay ? ytReplayPostedAt(String(r?.ts || ""), Number(r?._streamStartedAt || 0), at) : ytPostedAtFromClock(String(r?.ts || ""), at);
+    const postedAt = Number(r?.postedAtMs) > 0 ? Number(r.postedAtMs) : r?.replay ? ytReplayPostedAt(String(r?.ts || ""), Number(r?._streamStartedAt || 0), at) : ytPostedAtFromClock(String(r?.ts || ""), at);
     const capturedAt = r?.replay && IS_MARKETING_PAGE && postedAt > 0 ? postedAt : at;
     return {
       id: String(r?.id || r?.pk || `yt${i}`),

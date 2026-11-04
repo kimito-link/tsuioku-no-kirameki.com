@@ -1256,6 +1256,27 @@
     });
   } catch {
   }
+  var KEY_BACKFILL_STATE = "yt_backfill_state";
+  function pickBackfillVideo(summaries, state, now) {
+    let best = "";
+    let bestEnded = 0;
+    for (const [vid, sum] of Object.entries(summaries)) {
+      if (!/^[A-Za-z0-9_-]{11}$/.test(vid)) continue;
+      const endedAt = Number(sum?.endedAt || 0) || (now - Number(sum?.updatedAt || now) > 20 * 6e4 ? Number(sum.updatedAt) : 0);
+      if (!(endedAt > 0) || now - endedAt < 12e4) continue;
+      if (now - endedAt > 7 * 24 * 36e5) continue;
+      const st = state[vid] || {};
+      if (st.status === "done") continue;
+      if (Number(st.tries || 0) >= 48) continue;
+      const wait = st.status === "running" ? 6e5 : 9e5;
+      if (st.lastTryAt && now - Number(st.lastTryAt) < wait) continue;
+      if (endedAt > bestEnded) {
+        best = vid;
+        bestEnded = endedAt;
+      }
+    }
+    return best;
+  }
   var SWITCH_LEAK_CLEANUPS = [{ key: "yt_cleanup_switch_leak_GRvNsGECdtc", target: "GRvNsGECdtc", prev: "ZcCrxy_B4fg" }];
   async function runSwitchLeakCleanups() {
     for (const job of SWITCH_LEAK_CLEANUPS) {
@@ -1374,6 +1395,58 @@
       void chrome.storage.local.set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows } }).catch(() => {
       });
       return false;
+    }
+    if (message.type === "YT_BACKFILL_NEXT") {
+      runSerialized(async () => {
+        const data = await chrome.storage.local.get([STORAGE_KEYS.STREAM_SUMMARIES, KEY_BACKFILL_STATE]);
+        const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+        const state = data[KEY_BACKFILL_STATE] || {};
+        const now = Date.now();
+        const vid = pickBackfillVideo(summaries, state, now);
+        if (!vid) return { videoId: "" };
+        const prev = state[vid] || {};
+        state[vid] = { ...prev, status: "running", lastTryAt: now, tries: Number(prev.tries || 0) + 1 };
+        await chrome.storage.local.set({ [KEY_BACKFILL_STATE]: state });
+        return { videoId: vid, endedAt: Number(summaries[vid]?.endedAt || 0) };
+      }).then((res) => sendResponse(res)).catch(() => sendResponse({ videoId: "" }));
+      return true;
+    }
+    if (message.type === "YT_BACKFILL_ITEMS") {
+      runSerialized(async () => {
+        const payload = message.payload || {};
+        const videoId = String(payload.videoId || "").trim();
+        const incoming = Array.isArray(payload.items) ? payload.items : [];
+        if (!videoId || !incoming.length) return { added: 0 };
+        const items = incoming.filter((x) => x && x.id).map((x) => ({ ...x, recordedAt: Number(x.postedAtMs) > 0 ? Number(x.postedAtMs) : Date.now() }));
+        const res = await appendYtStreamCommentsIdb(videoId, items);
+        const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
+        const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+        if (summaries[videoId] && res.newlyAdded.length) {
+          summaries[videoId] = mergeYtStreamSummary(summaries[videoId], { videoId, itemCount: res.totalCount }, Date.now());
+          await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
+        }
+        return { added: res.newlyAdded.length, total: res.totalCount };
+      }).then((res) => sendResponse(res)).catch((err) => sendResponse({ added: 0, error: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_BACKFILL_DONE") {
+      runSerialized(async () => {
+        const payload = message.payload || {};
+        const videoId = String(payload.videoId || "").trim();
+        if (!videoId) return;
+        const data = await chrome.storage.local.get(KEY_BACKFILL_STATE);
+        const state = data[KEY_BACKFILL_STATE] || {};
+        state[videoId] = {
+          ...state[videoId] || {},
+          status: String(payload.status || "error"),
+          finishedAt: Date.now(),
+          added: Number(payload.added || 0),
+          calls: Number(payload.calls || 0),
+          reason: String(payload.reason || "").slice(0, 200)
+        };
+        await chrome.storage.local.set({ [KEY_BACKFILL_STATE]: state });
+      }).then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }));
+      return true;
     }
     if (message.type === "YT_CHAT_ITEMS") {
       runSerialized(async () => {

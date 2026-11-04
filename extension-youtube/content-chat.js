@@ -326,6 +326,109 @@
     }
   }
 
+  // src/lib/youtube/ytReplayChatJson.js
+  function plainText(t) {
+    if (!t) return "";
+    if (typeof t.simpleText === "string") return t.simpleText;
+    const runs = Array.isArray(t.runs) ? t.runs : [];
+    return runs.map((r) => {
+      if (typeof r?.text === "string") return r.text;
+      const em = r?.emoji;
+      if (em) {
+        const sc = Array.isArray(em.shortcuts) && em.shortcuts[0] ? String(em.shortcuts[0]) : "";
+        if (sc) return sc.replace(/^:|:$/g, "");
+        const label = em.image?.accessibility?.accessibilityData?.label;
+        return label ? String(label) : "";
+      }
+      return "";
+    }).join("");
+  }
+  function lastThumbUrl(thumbs) {
+    const list = Array.isArray(thumbs?.thumbnails) ? thumbs.thumbnails : [];
+    const url = String(list.length ? list[list.length - 1]?.url || "" : "");
+    const full = url.startsWith("//") ? `https:${url}` : url;
+    return /^https:\/\//.test(full) ? full : "";
+  }
+  function badgesOf(r) {
+    const list = Array.isArray(r?.authorBadges) ? r.authorBadges : [];
+    return list.map((b) => String(b?.liveChatAuthorBadgeRenderer?.tooltip || b?.liveChatAuthorBadgeRenderer?.accessibility?.accessibilityData?.label || "")).filter(Boolean);
+  }
+  function ytReplayItemToRecord(item) {
+    if (!item || typeof item !== "object") return null;
+    const kinds = [
+      ["liveChatTextMessageRenderer", "text"],
+      ["liveChatPaidMessageRenderer", "superchat"],
+      ["liveChatPaidStickerRenderer", "sticker"],
+      ["liveChatMembershipItemRenderer", "membership"],
+      ["liveChatSponsorshipsGiftPurchaseAnnouncementRenderer", "membership_gift"]
+    ];
+    for (const [key, kind] of kinds) {
+      let r = item[key];
+      if (!r) continue;
+      const head = kind === "membership_gift" ? r?.header?.liveChatSponsorshipsHeaderRenderer || {} : r;
+      const id = String(r.id || "").trim();
+      if (!id) return null;
+      const usec = Number(r.timestampUsec || head.timestampUsec || 0);
+      const postedAtMs = Number.isFinite(usec) && usec > 0 ? Math.floor(usec / 1e3) : 0;
+      const name = plainText(head.authorName).trim();
+      const channelId = String(r.authorExternalChannelId || head.authorExternalChannelId || "").trim();
+      let text = plainText(r.message);
+      if (!text && kind === "membership") text = plainText(r.headerSubtext) || plainText(r.headerPrimaryText);
+      if (!text && kind === "membership_gift") text = plainText(head.primaryText);
+      if (!text && kind === "sticker") {
+        text = String(r.sticker?.accessibility?.accessibilityData?.label || "") || "スーパーステッカー";
+      }
+      let amount = 0;
+      let currency = "";
+      if (kind === "superchat" || kind === "sticker") {
+        const p = parsePurchaseAmount(plainText(r.purchaseAmountText));
+        amount = p.amount;
+        currency = p.currency;
+      }
+      if (!name && !text && amount <= 0) return null;
+      return {
+        id,
+        channelId,
+        name,
+        iconUrl: lastThumbUrl(head.authorPhoto),
+        text,
+        kind,
+        amount,
+        currency,
+        badges: badgesOf(head),
+        ts: "",
+        postedAtMs,
+        backfill: true
+      };
+    }
+    return null;
+  }
+  function ytReplayResponseToRecords(json) {
+    const cont = json?.continuationContents?.liveChatContinuation || {};
+    const actions = Array.isArray(cont.actions) ? cont.actions : [];
+    const items = [];
+    let lastOffsetMs = 0;
+    for (const a of actions) {
+      const rep = a?.replayChatItemAction;
+      if (!rep) continue;
+      const off = Number(rep.videoOffsetTimeMsec || 0);
+      if (Number.isFinite(off) && off > lastOffsetMs) lastOffsetMs = off;
+      for (const inner of Array.isArray(rep.actions) ? rep.actions : []) {
+        const rec = ytReplayItemToRecord(inner?.addChatItemAction?.item);
+        if (rec) items.push(rec);
+      }
+    }
+    let next = "";
+    for (const c of Array.isArray(cont.continuations) ? cont.continuations : []) {
+      const v = c?.liveChatReplayContinuationData?.continuation || c?.playerSeekContinuationData?.continuation || "";
+      if (v) {
+        next = String(v);
+        break;
+      }
+    }
+    return { items, next, lastOffsetMs };
+  }
+
   // src/lib/youtube/ytPageMeta.js
   var VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   function parseYtVideoIdFromUrl(rawUrl) {
@@ -1199,6 +1302,78 @@
     };
     setInterval(tick, 3e3);
   }
+  function setupArchiveBackfillRunner() {
+    let running = false;
+    const ask = (msg) => new Promise((resolve) => {
+      try {
+        if (!chrome?.runtime?.id) return resolve(null);
+        chrome.runtime.sendMessage(msg, (res) => {
+          void chrome.runtime.lastError;
+          resolve(res || null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const runOne = async (videoId) => {
+      let calls = 0;
+      let added = 0;
+      try {
+        const html = await (await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: "include" })).text();
+        const clientVersion = (html.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/) || [])[1] || "";
+        const apiKey = (html.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1] || "";
+        const at = html.indexOf('"liveChatRenderer"');
+        const tail = at >= 0 ? html.slice(at, at + 2e4) : "";
+        let cont = (tail.match(/"reloadContinuationData":\{"continuation":"([^"]+)"/) || [])[1] || "";
+        if (!cont || !/"isReplay":true/.test(tail) || !clientVersion) {
+          await ask({ type: "YT_BACKFILL_DONE", payload: { videoId, status: "not_ready", calls, added, reason: cont ? "no_replay" : "no_continuation" } });
+          return;
+        }
+        const context = { client: { clientName: "WEB", clientVersion, hl: "ja", gl: "JP" } };
+        const seen = /* @__PURE__ */ new Set();
+        let emptyStreak = 0;
+        while (cont && calls < 3e3) {
+          if (seen.has(cont)) break;
+          seen.add(cont);
+          calls += 1;
+          const url = `https://www.youtube.com/youtubei/v1/live_chat/get_live_chat_replay?prettyPrint=false${apiKey ? `&key=${encodeURIComponent(apiKey)}` : ""}`;
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ context, continuation: cont })
+          });
+          if (!res.ok) throw new Error(`http_${res.status}`);
+          const { items, next } = ytReplayResponseToRecords(await res.json());
+          if (items.length) {
+            emptyStreak = 0;
+            for (let i = 0; i < items.length; i += 200) {
+              const r = await ask({ type: "YT_BACKFILL_ITEMS", payload: { videoId, items: items.slice(i, i + 200) } });
+              added += Number(r?.added || 0);
+            }
+          } else if (++emptyStreak > 20) break;
+          cont = next;
+          await sleep(700);
+        }
+        await ask({ type: "YT_BACKFILL_DONE", payload: { videoId, status: "done", calls, added } });
+      } catch (err) {
+        await ask({ type: "YT_BACKFILL_DONE", payload: { videoId, status: "error", calls, added, reason: String(err) } });
+      }
+    };
+    const tick = async () => {
+      if (running) return;
+      running = true;
+      try {
+        const job = await ask({ type: "YT_BACKFILL_NEXT" });
+        if (job && job.videoId) await runOne(String(job.videoId));
+      } finally {
+        running = false;
+      }
+    };
+    setTimeout(() => void tick(), 3e4);
+    setInterval(() => void tick(), 12e4);
+  }
   function init() {
     const path = String(window.location.pathname || "");
     if (path.startsWith("/live_chat")) {
@@ -1210,6 +1385,7 @@
       setupWatchPageMetaObserver();
       setupVideoFrameCapture();
       setupResumeAfterReload();
+      setupArchiveBackfillRunner();
     }
   }
   init();

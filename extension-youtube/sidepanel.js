@@ -606,7 +606,7 @@
     const name = String(r?.name || "").trim();
     const key = personKey || channelId || (name ? `name:${name}` : "");
     const at = Number(r?.recordedAt || 0) || Date.now();
-    const postedAt = r?.replay ? ytReplayPostedAt(String(r?.ts || ""), Number(r?._streamStartedAt || 0), at) : ytPostedAtFromClock(String(r?.ts || ""), at);
+    const postedAt = Number(r?.postedAtMs) > 0 ? Number(r.postedAtMs) : r?.replay ? ytReplayPostedAt(String(r?.ts || ""), Number(r?._streamStartedAt || 0), at) : ytPostedAtFromClock(String(r?.ts || ""), at);
     const capturedAt = r?.replay && IS_MARKETING_PAGE && postedAt > 0 ? postedAt : at;
     return {
       id: String(r?.id || r?.pk || `yt${i}`),
@@ -45630,7 +45630,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T03:50" ? String("yt-2026-11-04T03:50") : "dev";
+      const buildId = "yt-2026-11-04T04:14" ? String("yt-2026-11-04T04:14") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -45648,7 +45648,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.40") : "";
+    const bundledVersion = true ? String("0.1.41") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -45693,7 +45693,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T03:50" ? String("yt-2026-11-04T03:50") : "dev";
+            return "yt-2026-11-04T04:14" ? String("yt-2026-11-04T04:14") : "dev";
           } catch {
             return "dev";
           }

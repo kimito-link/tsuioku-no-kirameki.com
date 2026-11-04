@@ -320,6 +320,38 @@ try {
   // alarms が使えない環境では従来どおり手で 🔄
 }
 
+const KEY_BACKFILL_STATE = 'yt_backfill_state';
+/**
+ * 次に埋める配信を1つ選ぶ。終わって2分以上たち、まだ埋め終わっていない配信。
+ * アーカイブの処理が終わるまでチャットが出ないので、出ていなければ15分あけて試し直す(最大48回=約12時間)。
+ * 走っている途中で止まったもの(running のまま10分)も試し直す。
+ * @param {Record<string, any>} summaries
+ * @param {Record<string, any>} state
+ * @param {number} now
+ */
+function pickBackfillVideo(summaries, state, now) {
+  let best = '';
+  let bestEnded = 0;
+  for (const [vid, sum] of Object.entries(summaries)) {
+    if (!/^[A-Za-z0-9_-]{11}$/.test(vid)) continue;
+    // 終わった時刻が分かっている配信。分からなくても、20分以上コメントが来ていない配信は終わったかもしれないので
+    //   試す(まだ配信中なら、読みに行った側がアーカイブのチャットが無いと返し、15分あけて試し直す)。
+    const endedAt = Number(sum?.endedAt || 0) || (now - Number(sum?.updatedAt || now) > 20 * 60_000 ? Number(sum.updatedAt) : 0);
+    if (!(endedAt > 0) || now - endedAt < 120_000) continue;
+    if (now - endedAt > 7 * 24 * 3600_000) continue; // 1週間より前の配信は追わない
+    const st = state[vid] || {};
+    if (st.status === 'done') continue;
+    if (Number(st.tries || 0) >= 48) continue;
+    const wait = st.status === 'running' ? 600_000 : 900_000;
+    if (st.lastTryAt && now - Number(st.lastTryAt) < wait) continue;
+    if (endedAt > bestEnded) {
+      best = vid;
+      bestEnded = endedAt;
+    }
+  }
+  return best;
+}
+
 // 0.1.37 一回きりの片付け(りんく 2026-11-04 OK): 0.1.35 までは、配信を切り替えた瞬間にチャット欄に残っていた
 //   前の配信のコメントが新しい配信の記録に入っていた。実機で分かった1件(初音ミク ZcCrxy_B4fg → DaiGo GRvNsGECdtc・
 //   11:30:53 の最初の1秒に23件)だけを、見分けの条件(ytSwitchLeakCleanup.js)に当てはまる分に限って消す。
@@ -475,6 +507,71 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows } })
       .catch(() => {});
     return false;
+  }
+
+  // ---- 配信が終わったあと、アーカイブのチャットから記録の抜けを埋める(0.1.41・りんく 2026-11-04 OK) ----
+  //   ニコ生版は公式のギフト履歴が配信の最初から返るのでさかのぼれるが、YouTube は配信中に前の分を取る窓口が無い。
+  //   終わるとアーカイブのチャット(リプレイ)に全部残るので、YouTube のタブ(content)が裏で読んで送ってくる。
+  if (message.type === 'YT_BACKFILL_NEXT') {
+    runSerialized(async () => {
+      const data = await chrome.storage.local.get([STORAGE_KEYS.STREAM_SUMMARIES, KEY_BACKFILL_STATE]);
+      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      const state = data[KEY_BACKFILL_STATE] || {};
+      const now = Date.now();
+      const vid = pickBackfillVideo(summaries, state, now);
+      if (!vid) return { videoId: '' };
+      const prev = state[vid] || {};
+      state[vid] = { ...prev, status: 'running', lastTryAt: now, tries: Number(prev.tries || 0) + 1 };
+      await chrome.storage.local.set({ [KEY_BACKFILL_STATE]: state });
+      return { videoId: vid, endedAt: Number(summaries[vid]?.endedAt || 0) };
+    })
+      .then((res) => sendResponse(res))
+      .catch(() => sendResponse({ videoId: '' }));
+    return true;
+  }
+  if (message.type === 'YT_BACKFILL_ITEMS') {
+    runSerialized(async () => {
+      const payload = message.payload || {};
+      const videoId = String(payload.videoId || '').trim();
+      const incoming = Array.isArray(payload.items) ? payload.items : [];
+      if (!videoId || !incoming.length) return { added: 0 };
+      // 記録した時刻=書かれた時刻にする(時刻の順に並び、コメビュの読み上げは古いものとして読まない)
+      const items = incoming
+        .filter((x) => x && x.id)
+        .map((x) => ({ ...x, recordedAt: Number(x.postedAtMs) > 0 ? Number(x.postedAtMs) : Date.now() }));
+      const res = await appendYtStreamCommentsIdb(videoId, items);
+      const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
+      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      if (summaries[videoId] && res.newlyAdded.length) {
+        summaries[videoId] = mergeYtStreamSummary(summaries[videoId], { videoId, itemCount: res.totalCount }, Date.now());
+        await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
+      }
+      return { added: res.newlyAdded.length, total: res.totalCount };
+    })
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ added: 0, error: String(err) }));
+    return true;
+  }
+  if (message.type === 'YT_BACKFILL_DONE') {
+    runSerialized(async () => {
+      const payload = message.payload || {};
+      const videoId = String(payload.videoId || '').trim();
+      if (!videoId) return;
+      const data = await chrome.storage.local.get(KEY_BACKFILL_STATE);
+      const state = data[KEY_BACKFILL_STATE] || {};
+      state[videoId] = {
+        ...(state[videoId] || {}),
+        status: String(payload.status || 'error'),
+        finishedAt: Date.now(),
+        added: Number(payload.added || 0),
+        calls: Number(payload.calls || 0),
+        reason: String(payload.reason || '').slice(0, 200),
+      };
+      await chrome.storage.local.set({ [KEY_BACKFILL_STATE]: state });
+    })
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
   }
 
   if (message.type === 'YT_CHAT_ITEMS') {
