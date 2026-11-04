@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "追憶のきらめき for YouTube（試作）",
-  "version": "0.1.74",
+  "version": "0.1.75",
   "description": "YouTube Live のチャット・スーパーチャット・メンバーをローカル記録し、3つのレーンと通貨別応援者ランキング、VOICEVOXによる人ごとの声で振り返る試作拡張機能。",
   "icons": {
     "16": "images/logo/konta-yukkuri-icon-16.png",
@@ -59,6 +59,41 @@
       ],
       "run_at": "document_idle",
       "all_frames": true
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "venue-inline.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "data/ouen-banner.json",
+        "comeview.html",
+        "images/toumeilink.png",
+        "images/avatar-parts/*",
+        "images/yukkuri-charactore-english/*/*.png",
+        "sound/voice-complete.mp3",
+        "sound/voice-watch.mp3",
+        "sound/effect-gift.mp3",
+        "sound/effect-ad.mp3",
+        "sound/effect-rank-up.mp3",
+        "sound/effect-rank-down.mp3",
+        "sound/effect-milestone-soft.mp3",
+        "sound/effect-milestone-hard.mp3",
+        "sound/effect-milestone-jackpot.mp3",
+        "sound/tiers/*.mp3",
+        "sound/custom/*"
+      ],
+      "matches": [
+        "https://www.youtube.com/*"
+      ]
     }
   ]
 }

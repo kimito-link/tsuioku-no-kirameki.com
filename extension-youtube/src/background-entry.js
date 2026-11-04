@@ -24,6 +24,8 @@ import {
   deleteYtCommentsByPks,
 } from './ytIdbStore.js';
 import { pickSwitchLeakPks } from '../../src/lib/youtube/ytSwitchLeakCleanup.js';
+// ニコ生版の background にある、会場とコメビュの受け口(VOICEVOX 中継・読み手の取り合い・窓を開く)の写し
+import './background-nico-relay.js';
 
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
@@ -448,6 +450,16 @@ async function resolveHandleIcons(handles) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
+
+  // 視聴ページの中の会場(venue-inline.js)は拡張の IndexedDB を読めないので、ここで読んで渡す
+  if (message.type === 'YT_GET_STREAM_COMMENTS') {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    const vid = String(message.videoId || '');
+    getYtStreamCommentsByVideoId(vid)
+      .then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] }))
+      .catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
+    return true;
+  }
 
   if (message.type === 'YT_CAPTURE_FRAME') {
     (async () => {

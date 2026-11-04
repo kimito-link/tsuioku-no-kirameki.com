@@ -20,6 +20,21 @@ const popupDefine = {
   NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION),
 };
 
+// ニコ生版 venueBar.js は配信を視聴ページの URL(/watch/lv…)から決める(liveIdFromPathname)。YouTube の視聴ページでは
+//   決められないので、YouTube 版のバンドルの中だけ、配信を教える口を末尾に足す(ファイル自体は書き換えない・ニコ生版は不変)。
+const ytVenueLiveIdPlugin = {
+  name: 'yt-venue-live-id',
+  setup(b) {
+    b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
+      contents:
+        readFileSync(args.path, 'utf8') +
+        '\n/** YouTube 版のバンドルだけに足す口(scripts/build-youtube-ext.mjs) */\nexport function __ytSetVenueLiveId(v) { _forcedLiveId = v ? String(v) : null; }\n',
+      loader: 'js',
+      resolveDir: dirname(args.path),
+    }));
+  },
+};
+
 const common = {
   bundle: true,
   format: 'iife',
@@ -91,11 +106,14 @@ await Promise.all([
   }),
   build({
     ...common,
-    // 視聴ページの「🏟 会場モード」ボタンと、ページの上に重ねる会場(ニコ生版と同じ形・2026-11-04)
-    entryPoints: [resolve(root, 'extension-youtube/src/venue-overlay-content.js')],
-    outfile: resolve(root, 'extension-youtube/venue-overlay.js'),
+    // 視聴ページの「🏟 会場モード」= ニコ生版 venueBar.js の mountVenueBarButton をそのまま視聴ページで動かす
+    entryPoints: [resolve(root, 'extension-youtube/src/venue-inline-entry.js')],
+    outfile: resolve(root, 'extension-youtube/venue-inline.js'),
+    target: ['chrome100'],
+    define: popupDefine,
+    plugins: [ytVenueLiveIdPlugin],
     banner: {
-      js: '// venue-overlay.js — YouTube 視聴ページの会場モードボタンと、ページに重ねる会場\n/* eslint-disable */',
+      js: '// venue-inline.js — ニコ生版の視聴ページの会場モード(venueBar.js 本物)+ YouTube の記録を読む入口のバンドル\n/* eslint-disable */',
     },
   }),
   build({

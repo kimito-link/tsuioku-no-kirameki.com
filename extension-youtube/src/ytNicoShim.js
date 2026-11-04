@@ -22,6 +22,12 @@ import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/y
 import { buildYtGiftBags } from './ytGiftToNico.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
+// 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
+//   YouTube 版も同じく視聴ページの中で会場を動かす(venue-inline-entry.js)。そのときは:
+//   ・記録(IndexedDB)は拡張のもので、ページからは読めないので background に読んでもらう
+//   ・画面の直しは会場の中だけ(YouTube のページ自体の文字は触らない)
+//   ・chrome.tabs は無い(タブの写しはしない)
+export const YT_SHIM_IN_PAGE = typeof location !== 'undefined' && location.protocol !== 'chrome-extension:';
 const COMMENTS_PREFIX = 'nls_comments_';
 // ニコ生版の「テール」(まだ本体に畳み込んでいない新着)。ニコ生版の popup は、本体の全件を一度読んだら
 // 同じ配信のあいだはその控えを使い回し、新着はテールから足す。YouTube 版は本体とテールを分けて持たないので、
@@ -476,10 +482,20 @@ export function ytOwnerRowsLast(list, sum) {
   return [...list.filter((r) => !isOwner(r)), ...list.filter(isOwner)];
 }
 
+/** @param {string} vid */
+async function getCommentsViaBackground(vid) {
+  try {
+    const res = await real?.runtime?.sendMessage?.({ type: 'YT_GET_STREAM_COMMENTS', videoId: vid });
+    return Array.isArray(res?.items) ? res.items : [];
+  } catch {
+    return [];
+  }
+}
+
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
-  const items = await getYtStreamCommentsByVideoId(vid);
+  const items = YT_SHIM_IN_PAGE ? await getCommentsViaBackground(vid) : await getYtStreamCommentsByVideoId(vid);
   const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
   // 顔の分からない人(YouTube のギフトだけ送った人など)は、トップファンの順位表の顔を名前で引く
   /** @type {Map<string, string>} */
@@ -560,7 +576,7 @@ function registerBroadcastersFromSummaries() {
 
 // ---- chrome の差し替え(本物の上に薄くかぶせる) ----
 const real = /** @type {any} */ (globalThis).chrome;
-if (real && real.storage && real.storage.local && real.tabs) {
+if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)) {
   const realLocal = real.storage.local;
   const realGet = realLocal.get.bind(realLocal);
   // 前に開いた配信の疑似 lv(nls_last_watch_url 等に残る)も引けるよう、記録のある配信を先に全部登録しておく
@@ -680,6 +696,7 @@ if (real && real.storage && real.storage.local && real.tabs) {
     return p;
   };
 
+  if (real.tabs) {
   /** @param {Function} fn */
   const wrapTabsFn = (fn) => {
     return (/** @type {any[]} */ ...args) => {
@@ -779,6 +796,8 @@ if (real && real.storage && real.storage.local && real.tabs) {
         return fn(...out);
       });
   }
+
+  } // real.tabs
 
   // ---- 4. YouTube の記録が増えたら、コメントのキーが変わったと知らせる ----
   const onChanged = real.storage.onChanged;
@@ -885,8 +904,8 @@ if (real && real.storage && real.storage.local && real.tabs) {
       try {
         if (!real.runtime?.id) {
           clearInterval(pollTimer);
-          // 開いたままの窓は新しい版で開き直す(1分に1回まで)
-          try {
+          // 開いたままの窓は新しい版で開き直す(1分に1回まで)。視聴ページの中の会場はページを読み直さない(YouTube を巻き込む)
+          if (!YT_SHIM_IN_PAGE) try {
             const last = Number(sessionStorage.getItem('nl_yt_page_orphan_reload_at') || 0);
             if (Date.now() - last > 60_000) {
               sessionStorage.setItem('nl_yt_page_orphan_reload_at', String(Date.now()));
@@ -1073,7 +1092,10 @@ const SC_BUBBLE_BG =
 /** @param {(s: string) => string} reword */
 function rewordTopFanHeadings(reword) {
   if (typeof document === 'undefined' || !document.body) return;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  // 視聴ページの中では会場の中だけ(YouTube のページの文字は触らない)
+  const base = YT_SHIM_IN_PAGE ? document.getElementById('nlsb-venue-root') : document.body;
+  if (!base) return;
+  const walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = walker.nextNode())) {
     const v = String(n.nodeValue || '');
@@ -1412,18 +1434,35 @@ function ensureTopFanRest() {
 }
 
 function startDomFixer() {
+  if (YT_SHIM_IN_PAGE) {
+    // 視聴ページの中では、会場(ニコ生版 venueBar.js の root)の中だけを直す。会場は開いたときに作られるので出るまで待つ
+    const root = document.getElementById('nlsb-venue-root');
+    if (!root) {
+      setTimeout(startDomFixer, 500);
+      return;
+    }
+    startDomFixerOn(root, true);
+    return;
+  }
   if (!document.body) return;
-  fixSubtree(document.body);
+  startDomFixerOn(document.body, /\/venue\.html$/.test(String(location.pathname || '')));
+}
+/**
+ * @param {Element} target
+ * @param {boolean} isVenue
+ */
+function startDomFixerOn(target, isVenue) {
+  fixSubtree(target);
   // 画面に先に出た数字IDは、あとで誰か分かっても文字が変わらないので直しが届かない(会場の席で実例)。
   //   会場の画面だけ、新しく人を覚えたときに【文字だけ】直し直す。
   //   ★画像や全体の直し直しはしない(サイドパネルで全体を直し直したら顔の一覧がちらついた・0.1.51)
-  if (/\/venue\.html$/.test(String(location.pathname || ''))) {
+  if (isVenue) {
     let fixedAtVersion = uidRegVersion;
     setInterval(() => {
       if (fixedAtVersion === uidRegVersion || document.hidden) return;
       fixedAtVersion = uidRegVersion;
       try {
-        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const w = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
         for (let n = w.nextNode(); n; n = w.nextNode()) {
           if (/8\d{9}/.test(String(n.nodeValue || ''))) fixTextNode(/** @type {Text} */ (n));
         }
@@ -1444,7 +1483,7 @@ function startDomFixer() {
         else if (m.attributeName === 'data-nl-uid') fixUidLabelAttr(el);
       } else m.addedNodes.forEach(fixSubtree);
     }
-  }).observe(document.body, {
+  }).observe(target, {
     childList: true,
     subtree: true,
     characterData: true,
