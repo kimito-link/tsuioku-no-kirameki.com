@@ -18,6 +18,17 @@ function currentVideoId() {
   }
 }
 
+// ニコ生版の会場は、ニコ生の視聴ページの文字の大きさ(16px)を受け継ぐ前提で作られている(例: 人の札の幅 26ch)。
+//   YouTube の視聴ページは html の文字が 10px なので、札が 140px に細くなり1〜2文字ずつ折り返していた(2026-11-04 実測:
+//   ニコ生 224px・YouTube 140px)。会場の根元だけ、ニコ生のページと同じ 16px にする(会場の中の見た目はニコ生版のまま)。
+function ensureBaseFontSize() {
+  if (document.getElementById('ytNlsbVenueBaseFont')) return;
+  const st = document.createElement('style');
+  st.id = 'ytNlsbVenueBaseFont';
+  st.textContent = '#nlsb-venue-root{font-size:16px;}';
+  (document.head || document.documentElement).appendChild(st);
+}
+
 let mountedVid = '';
 function sync() {
   const vid = currentVideoId();
@@ -25,6 +36,7 @@ function sync() {
   if (!vid) return; // 視聴ページ以外へ移っても、出した会場はそのまま(次の動画で lv を切り替える)
   __ytSetVenueLiveId(pseudoLvForVideoId(vid));
   mountedVid = vid;
+  ensureBaseFontSize();
   if (!document.getElementById('nlsb-venue-root')) mountVenueBarButton();
 }
 
