@@ -1061,12 +1061,16 @@ function ensureZeroPtGifts() {
   ol.style.cssText = 'list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;';
   for (const h of zeroPtGifts) {
     const li = document.createElement('li');
-    li.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    // 列をそろえる(時刻・絵・名前・顔・送った人)。絵が無い行も同じ幅をあける
+    li.style.cssText = 'display:grid;grid-template-columns:60px 22px minmax(0,96px) 22px minmax(0,1fr);align-items:center;gap:8px;';
     const t = document.createElement('span');
     t.textContent = String(h.time || '—');
-    t.style.cssText = 'width:56px;color:#64748b;flex:none;';
+    t.style.cssText = 'color:#64748b;font-variant-numeric:tabular-nums;';
     li.appendChild(t);
     const thumb = String(h.thumbnailUrl || '');
+    const slot = document.createElement('span');
+    slot.style.cssText = 'width:22px;height:22px;display:inline-flex;';
+    li.appendChild(slot);
     if (/^https:\/\//.test(thumb)) {
       const gi = document.createElement('img');
       gi.alt = '';
@@ -1075,11 +1079,11 @@ function ensureZeroPtGifts() {
       gi.height = 22;
       gi.style.cssText = 'flex:none;object-fit:contain;';
       gi.addEventListener('error', () => gi.remove(), { once: true });
-      li.appendChild(gi);
+      slot.appendChild(gi);
     }
     const item = document.createElement('span');
     item.textContent = String(h.itemName || 'ギフト');
-    item.style.cssText = 'flex:none;';
+    item.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     li.appendChild(item);
     const name = String(h.senderName || '');
     li.appendChild(ytFaceOrLetter(String(h.senderAvatarUrl || ''), name));
