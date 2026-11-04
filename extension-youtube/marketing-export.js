@@ -1506,15 +1506,21 @@ ${sourceCol}
     rewriteLaneFirstLines(byShown);
   }
   var SUPPORT_LANE_SEL = "#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd";
+  var LANE_KIND_WORDS = /(^|\n)\s*(スパチャ|ギフト|メンバー|ステッカー)\s*(\n|$)/;
   function rewriteLaneFirstLines(byShown) {
     if (typeof document === "undefined" || !byShown.size) return;
     for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
       for (const tile of Array.from(lane.children)) {
+        if (tile.hasAttribute("data-yt-kind-done") || LANE_KIND_WORDS.test(String(
+          /** @type {HTMLElement} */
+          tile.innerText ?? ""
+        ))) continue;
         const w = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT);
         for (let n = w.nextNode(); n; n = w.nextNode()) {
           const k = byShown.get(String(n.nodeValue || "").trim());
           if (k) {
             n.nodeValue = k;
+            tile.setAttribute("data-yt-kind-done", "1");
             break;
           }
         }

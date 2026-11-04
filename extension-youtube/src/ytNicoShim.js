@@ -966,15 +966,19 @@ const SUPPORT_LANE_SEL = '#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sce
  * @名前 しか分からない人は1行目と2行目(名前)が同じ文字なので、最初の1つだけ直す(名前は残す)。
  * @param {Map<string, string>} byShown
  */
+const LANE_KIND_WORDS = /(^|\n)\s*(スパチャ|ギフト|メンバー|ステッカー)\s*(\n|$)/;
 function rewriteLaneFirstLines(byShown) {
   if (typeof document === 'undefined' || !byShown.size) return;
   for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
     for (const tile of Array.from(lane.children)) {
+      // 札がもう付いているタイルは触らない(付いた後にもう一度呼ばれると、2行目の名前まで札にしてしまう・0.1.65 実機)
+      if (tile.hasAttribute('data-yt-kind-done') || LANE_KIND_WORDS.test(String(/** @type {HTMLElement} */ (tile).innerText ?? ''))) continue;
       const w = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT);
       for (let n = w.nextNode(); n; n = w.nextNode()) {
         const k = byShown.get(String(n.nodeValue || '').trim());
         if (k) {
           n.nodeValue = k;
+          tile.setAttribute('data-yt-kind-done', '1');
           break;
         }
       }
