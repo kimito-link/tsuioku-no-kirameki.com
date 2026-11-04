@@ -1014,11 +1014,67 @@ ${sourceCol}
     };
   }
 
+  // src/lib/userIdPreference.js
+  function userIdObservationStrength(userId) {
+    const s5 = String(userId ?? "").trim();
+    if (!s5) return 0;
+    if (/^\d{5,14}$/.test(s5)) return 2;
+    return 1;
+  }
+  function pickStrongerUserId(existing, incoming, tiePrefer = "incoming") {
+    const ex = String(existing ?? "").trim();
+    const inc = String(incoming ?? "").trim();
+    if (!inc) return ex;
+    if (!ex) return inc;
+    const se = userIdObservationStrength(ex);
+    const si = userIdObservationStrength(inc);
+    if (si > se) return inc;
+    if (si < se) return ex;
+    if (inc === ex) return ex;
+    return tiePrefer === "existing" ? ex : inc;
+  }
+
+  // src/shared/avatar/clampAvatarUrl.js
+  var AVATAR_URL_DEFAULT_MAX = 2e3;
+  function clampAvatarUrl(raw, max = AVATAR_URL_DEFAULT_MAX) {
+    if (typeof raw !== "string") return "";
+    const s5 = raw.trim();
+    if (!s5) return "";
+    const cap = Math.floor(Number(max));
+    if (!Number.isFinite(cap) || cap <= 0) return "";
+    return s5.length <= cap ? s5 : s5.slice(0, cap);
+  }
+
+  // src/lib/commentRecord.js
+  var COMMENT_TEXT_MAX_CHARS = 1e3;
+  function normalizeCommentText(value) {
+    return String(value || "").replace(/\r\n/g, "\n").split("\n").map((l) => l.trim()).join("\n").trim().slice(0, COMMENT_TEXT_MAX_CHARS);
+  }
+  function buildDedupeKey(liveId, rec) {
+    const text = normalizeCommentText(rec.text);
+    const no = String(rec.commentNo ?? "").trim();
+    if (no) {
+      return `${liveId}|${no}|${text}`;
+    }
+    const sec = Math.floor(Number(rec.capturedAt || 0) / 1e3);
+    const uid = String(rec.userId ?? "").trim();
+    return `${liveId}||${text}|${sec}|${uid}`;
+  }
+
+  // src/lib/commentTailBuffer.js
+  var TAIL_MAX_ROWS = 2e3;
+  function tailStorageKey(liveId) {
+    const id = String(liveId || "").trim().toLowerCase();
+    return `nls_ctail_${id}`;
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
   var COMMENTS_PREFIX = "nls_comments_";
   var TAIL_PREFIX = "nls_ctail_";
+  var IS_VENUE_CONTEXT = YT_SHIM_IN_PAGE || typeof location !== "undefined" && /\/venue\.html$/.test(String(location.pathname || ""));
+  var tailForContext = (arr) => IS_VENUE_CONTEXT && Array.isArray(arr) && arr.length > TAIL_MAX_ROWS ? arr.slice(arr.length - TAIL_MAX_ROWS) : arr;
   var LAST_WATCH_URL_KEY = "nls_last_watch_url";
   function newestVideoIdOf(sums) {
     let best = "";
@@ -1464,7 +1520,7 @@ ${sourceCol}
             lastAskedLv = lv2;
             shimDiag.commentGets += 1;
             const arr = await buildCommentsForLv(lv2);
-            if (arr) bag[k] = arr;
+            if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
             continue;
           }
           const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));
@@ -1638,7 +1694,7 @@ ${sourceCol}
         const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ""}`;
         if (lastNotified.get(lv) === sig) return;
         lastNotified.set(lv, sig);
-        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: arr } };
+        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: tailForContext(arr) } };
         try {
           const gifts = (
             /** @type {Record<string, any>} */
@@ -20108,53 +20164,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
     })
   ]);
 
-  // src/lib/userIdPreference.js
-  function userIdObservationStrength(userId) {
-    const s5 = String(userId ?? "").trim();
-    if (!s5) return 0;
-    if (/^\d{5,14}$/.test(s5)) return 2;
-    return 1;
-  }
-  function pickStrongerUserId(existing, incoming, tiePrefer = "incoming") {
-    const ex = String(existing ?? "").trim();
-    const inc = String(incoming ?? "").trim();
-    if (!inc) return ex;
-    if (!ex) return inc;
-    const se = userIdObservationStrength(ex);
-    const si = userIdObservationStrength(inc);
-    if (si > se) return inc;
-    if (si < se) return ex;
-    if (inc === ex) return ex;
-    return tiePrefer === "existing" ? ex : inc;
-  }
-
-  // src/shared/avatar/clampAvatarUrl.js
-  var AVATAR_URL_DEFAULT_MAX = 2e3;
-  function clampAvatarUrl(raw, max = AVATAR_URL_DEFAULT_MAX) {
-    if (typeof raw !== "string") return "";
-    const s5 = raw.trim();
-    if (!s5) return "";
-    const cap = Math.floor(Number(max));
-    if (!Number.isFinite(cap) || cap <= 0) return "";
-    return s5.length <= cap ? s5 : s5.slice(0, cap);
-  }
-
-  // src/lib/commentRecord.js
-  var COMMENT_TEXT_MAX_CHARS = 1e3;
-  function normalizeCommentText(value) {
-    return String(value || "").replace(/\r\n/g, "\n").split("\n").map((l) => l.trim()).join("\n").trim().slice(0, COMMENT_TEXT_MAX_CHARS);
-  }
-  function buildDedupeKey(liveId, rec) {
-    const text = normalizeCommentText(rec.text);
-    const no = String(rec.commentNo ?? "").trim();
-    if (no) {
-      return `${liveId}|${no}|${text}`;
-    }
-    const sec = Math.floor(Number(rec.capturedAt || 0) / 1e3);
-    const uid = String(rec.userId ?? "").trim();
-    return `${liveId}||${text}|${sec}|${uid}`;
-  }
-
   // src/lib/commentKindnessNudge.js
   var COMMENT_KINDNESS_CONFIRM_JA = "そのまま送るなら、もう一度「コメント送信」を押してね。";
   var COMMENT_KINDNESS_RULES = [
@@ -20321,12 +20330,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   }
   function isThumbAutoEnabled(v) {
     return v === true;
-  }
-
-  // src/lib/commentTailBuffer.js
-  function tailStorageKey(liveId) {
-    const id = String(liveId || "").trim().toLowerCase();
-    return `nls_ctail_${id}`;
   }
 
   // src/lib/panelLiveSummary.js
@@ -46198,7 +46201,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T15:07" ? String("yt-2026-11-04T15:07") : "dev";
+      const buildId = "yt-2026-11-04T15:12" ? String("yt-2026-11-04T15:12") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46216,7 +46219,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.84") : "";
+    const bundledVersion = true ? String("0.1.85") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46261,7 +46264,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T15:07" ? String("yt-2026-11-04T15:07") : "dev";
+            return "yt-2026-11-04T15:12" ? String("yt-2026-11-04T15:12") : "dev";
           } catch {
             return "dev";
           }

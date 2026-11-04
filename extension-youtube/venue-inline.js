@@ -827,11 +827,20 @@ ${sourceCol}
     };
   }
 
+  // src/lib/commentTailBuffer.js
+  var TAIL_MAX_ROWS = 2e3;
+  function tailStorageKey(liveId) {
+    const id = String(liveId || "").trim().toLowerCase();
+    return `nls_ctail_${id}`;
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
   var COMMENTS_PREFIX = "nls_comments_";
   var TAIL_PREFIX = "nls_ctail_";
+  var IS_VENUE_CONTEXT = YT_SHIM_IN_PAGE || typeof location !== "undefined" && /\/venue\.html$/.test(String(location.pathname || ""));
+  var tailForContext = (arr) => IS_VENUE_CONTEXT && Array.isArray(arr) && arr.length > TAIL_MAX_ROWS ? arr.slice(arr.length - TAIL_MAX_ROWS) : arr;
   var LAST_WATCH_URL_KEY = "nls_last_watch_url";
   function newestVideoIdOf(sums) {
     let best = "";
@@ -1277,7 +1286,7 @@ ${sourceCol}
             lastAskedLv = lv2;
             shimDiag.commentGets += 1;
             const arr = await buildCommentsForLv(lv2);
-            if (arr) bag[k] = arr;
+            if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
             continue;
           }
           const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));
@@ -1451,7 +1460,7 @@ ${sourceCol}
         const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ""}`;
         if (lastNotified.get(lv) === sig) return;
         lastNotified.set(lv, sig);
-        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: arr } };
+        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: tailForContext(arr) } };
         try {
           const gifts = (
             /** @type {Record<string, any>} */
@@ -5264,12 +5273,6 @@ ${sourceCol}
     gift_large: 60,
     milestone_hard: 50
   });
-
-  // src/lib/commentTailBuffer.js
-  function tailStorageKey(liveId) {
-    const id = String(liveId || "").trim().toLowerCase();
-    return `nls_ctail_${id}`;
-  }
 
   // src/lib/venueSpeech.js
   function venueSpeechKey(row) {
@@ -19600,7 +19603,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T15:07") : ""
+          buildId: true ? String("yt-2026-11-04T15:12") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

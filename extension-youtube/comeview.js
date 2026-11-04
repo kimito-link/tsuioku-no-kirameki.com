@@ -715,11 +715,31 @@ ${sourceCol}
     };
   }
 
+  // src/shared/avatar/clampAvatarUrl.js
+  var AVATAR_URL_DEFAULT_MAX = 2e3;
+  function clampAvatarUrl(raw, max = AVATAR_URL_DEFAULT_MAX) {
+    if (typeof raw !== "string") return "";
+    const s = raw.trim();
+    if (!s) return "";
+    const cap = Math.floor(Number(max));
+    if (!Number.isFinite(cap) || cap <= 0) return "";
+    return s.length <= cap ? s : s.slice(0, cap);
+  }
+
+  // src/lib/commentTailBuffer.js
+  var TAIL_MAX_ROWS = 2e3;
+  function tailStorageKey(liveId) {
+    const id = String(liveId || "").trim().toLowerCase();
+    return `nls_ctail_${id}`;
+  }
+
   // extension-youtube/src/ytNicoShim.js
   var KEY_YT_SUMMARIES = "yt_stream_summaries";
   var YT_SHIM_IN_PAGE = typeof location !== "undefined" && location.protocol !== "chrome-extension:";
   var COMMENTS_PREFIX = "nls_comments_";
   var TAIL_PREFIX = "nls_ctail_";
+  var IS_VENUE_CONTEXT = YT_SHIM_IN_PAGE || typeof location !== "undefined" && /\/venue\.html$/.test(String(location.pathname || ""));
+  var tailForContext = (arr) => IS_VENUE_CONTEXT && Array.isArray(arr) && arr.length > TAIL_MAX_ROWS ? arr.slice(arr.length - TAIL_MAX_ROWS) : arr;
   var LAST_WATCH_URL_KEY = "nls_last_watch_url";
   function newestVideoIdOf(sums) {
     let best = "";
@@ -1165,7 +1185,7 @@ ${sourceCol}
             lastAskedLv = lv2;
             shimDiag.commentGets += 1;
             const arr = await buildCommentsForLv(lv2);
-            if (arr) bag[k] = arr;
+            if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
             continue;
           }
           const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));
@@ -1339,7 +1359,7 @@ ${sourceCol}
         const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ""}`;
         if (lastNotified.get(lv) === sig) return;
         lastNotified.set(lv, sig);
-        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: arr } };
+        const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: tailForContext(arr) } };
         try {
           const gifts = (
             /** @type {Record<string, any>} */
@@ -2526,23 +2546,6 @@ ${sourceCol}
       left: left !== null && left > -MAX_W && left < MAX_W ? left : null,
       top: top !== null && top > -MAX_H && top < MAX_H ? top : null
     };
-  }
-
-  // src/shared/avatar/clampAvatarUrl.js
-  var AVATAR_URL_DEFAULT_MAX = 2e3;
-  function clampAvatarUrl(raw, max = AVATAR_URL_DEFAULT_MAX) {
-    if (typeof raw !== "string") return "";
-    const s = raw.trim();
-    if (!s) return "";
-    const cap = Math.floor(Number(max));
-    if (!Number.isFinite(cap) || cap <= 0) return "";
-    return s.length <= cap ? s : s.slice(0, cap);
-  }
-
-  // src/lib/commentTailBuffer.js
-  function tailStorageKey(liveId) {
-    const id = String(liveId || "").trim().toLowerCase();
-    return `nls_ctail_${id}`;
   }
 
   // src/lib/commentChunkStore.js
