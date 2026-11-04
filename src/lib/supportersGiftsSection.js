@@ -19,8 +19,11 @@ import { escapeHtml } from './htmlEscape.js';
 import { giftLedgerSenderKey } from './marketingGiftThrowLedger.js';
 import { toEpochMs } from './timeAuthority.js';
 
-/** 1人あたりに載せるコメント本文の最大件数(超えた分は「ほか N 件」と注記。件数そのものは実数)。 */
-export const SUPPORTERS_GIFTS_MAX_COMMENTS_PER_USER = 1000;
+/**
+ * 1人あたりに載せるコメント本文の最大件数(超えた分は「ほか N 件」と注記。件数そのものは実数)。
+ * v0.1.1859: 1000→200(マーケHTMLを軽く)。全部の本文は「コメント記録」の章(全文検索・ユーザー別)にある。
+ */
+export const SUPPORTERS_GIFTS_MAX_COMMENTS_PER_USER = 200;
 /** ギフトを出していない(コメントだけの)人を載せる最大人数(ギフトを出した人は必ず載せる)。 */
 export const SUPPORTERS_GIFTS_MAX_COMMENT_ONLY_USERS = 300;
 /** 開いた状態で出す上位の人数。 */
@@ -53,6 +56,50 @@ export const SUPPORTERS_GIFTS_CSS = `
 `;
 
 /**
+ * v0.1.1859: コメントの表は【開いたときに作る】。本文は <script type="application/json" id="mktSgData"> に
+ * {人の番号: [[時刻, 本文], ...]} で入れておき、<details> を開いた瞬間に tbody を組み立てる。
+ * (旧: 全員分の表を最初から HTML に並べていた=実ファイルで要素 38,000・1.5MB。閉じていても DOM は作られる。)
+ * 開いた状態で始まる上位の人は、読み込み直後にこの script が組み立てる。
+ */
+const SUPPORTERS_GIFTS_LAZY_SCRIPT = `<script>
+(function () {
+  var list = document.getElementById('mktSgList');
+  var dataEl = document.getElementById('mktSgData');
+  if (!list || !dataEl) return;
+  var data = {};
+  try { data = JSON.parse(dataEl.textContent || '{}') || {}; } catch (e) { data = {}; }
+  function build(d) {
+    if (!d || d.getAttribute('data-sg-built') === '1') return;
+    var key = d.getAttribute('data-sg');
+    var tb = d.querySelector('tbody[data-sg-cm]');
+    var rows = key != null ? data[key] : null;
+    if (!tb || !rows) return;
+    d.setAttribute('data-sg-built', '1');
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < rows.length; i++) {
+      var tr = document.createElement('tr');
+      var t = document.createElement('td');
+      t.className = 'mkt-sg__time';
+      t.textContent = rows[i][0];
+      var b = document.createElement('td');
+      b.textContent = rows[i][1];
+      tr.appendChild(t);
+      tr.appendChild(b);
+      frag.appendChild(tr);
+    }
+    tb.appendChild(frag);
+  }
+  window.__mktSgBuild = build;
+  window.__mktSgData = data;
+  var items = list.querySelectorAll('details.mkt-sg[data-sg]');
+  for (var k = 0; k < items.length; k++) {
+    if (items[k].open) build(items[k]);
+    items[k].addEventListener('toggle', function () { if (this.open) build(this); });
+  }
+})();
+</script>`;
+
+/**
  * 検索窓の動き(外部送信なし・入力は端末内で絞り込むだけ)。
  * 名前・ID・コメント本文・ギフトのアイテムのどれかに含まれる人だけ残し、その人の表では一致した行だけ残す。
  * 空に戻せば元に戻る(開閉も戻す)。textContent は初回に1度だけ読んで控える(入力のたびにDOMを読まない)。
@@ -80,13 +127,20 @@ const SUPPORTERS_GIFTS_SEARCH_SCRIPT = `<script>
       result.textContent = '';
       return;
     }
-    if (!hays) hays = items.map(function (d) { return norm(d.textContent); });
+    if (!hays) hays = items.map(function (d) {
+      var extra = '';
+      var key = d.getAttribute('data-sg');
+      var rows = key != null && window.__mktSgData ? window.__mktSgData[key] : null;
+      if (rows && d.getAttribute('data-sg-built') !== '1') for (var j = 0; j < rows.length; j++) extra += ' ' + rows[j][1];
+      return norm(d.textContent + extra);
+    });
     var hit = 0;
     items.forEach(function (d, i) {
       var ok = hays[i].indexOf(q) >= 0;
       d.hidden = !ok;
       if (!ok) return;
       hit++;
+      if (window.__mktSgBuild) window.__mktSgBuild(d);
       d.setAttribute('open', '');
       var sm = d.querySelector('summary');
       var summaryHit = norm(sm ? sm.textContent : '').indexOf(q) >= 0;
@@ -237,6 +291,15 @@ export function buildSupportersGiftsRows(input) {
   return out;
 }
 
+/**
+ * <script type="application/json"> に入れても閉じタグ・HTML として解釈されない JSON 文字列。
+ * 本文は第三者の入力なので < と、JS で行末扱いになる U+2028/2029 を逃がす。
+ * @param {unknown} value
+ */
+export function supportersGiftsJsonForScript(value) {
+  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+}
+
 /** @param {number} n */
 const fmt = (n) => Number(n || 0).toLocaleString('ja-JP');
 
@@ -272,6 +335,8 @@ ${head}
     (mask ? ' 共有モード(伏せ字)のため、名前・コメント本文・アイテムの内訳は出していません。' : '') +
     `</p>`;
 
+  /** @type {Record<string, [string, string][]>} 開いたときに作るコメント表の中身(人の番号→[時刻, 本文])。 */
+  const lazyComments = {};
   const items = list.map((row, i) => {
     const meta = `<span class="mkt-sg__meta">コメント ${fmt(row.commentCount)} 件${row.giftCount > 0 ? ` ／ ギフト ${fmt(row.giftCount)} 回・${fmt(row.giftPoints)} pt` : ''}</span>`;
     if (mask) {
@@ -285,12 +350,11 @@ ${head}
           .map((g) => `<tr><td class="mkt-sg__time">${escapeHtml(g.timeLabel)}</td><td>${escapeHtml(g.itemName)}</td><td>${fmt(g.points)} pt</td></tr>`)
           .join('')}</tbody></table>`
       : '';
+    if (row.comments.length) lazyComments[String(i)] = row.comments.map((cm) => [formatClockJst(cm.at), cm.text]);
     const commentsHtml = row.comments.length
-      ? `<h4>コメント(${fmt(row.commentCount)}件)</h4><table class="mkt-sg__table"><thead><tr><th>時刻</th><th>コメント</th></tr></thead><tbody>${row.comments
-          .map((cm) => `<tr><td class="mkt-sg__time">${escapeHtml(formatClockJst(cm.at))}</td><td>${escapeHtml(cm.text)}</td></tr>`)
-          .join('')}</tbody></table>${row.commentsOmitted > 0 ? `<p class="mkt-sg__more">ほか ${fmt(row.commentsOmitted)} 件(長いため省略。件数は実数です)</p>` : ''}`
+      ? `<h4>コメント(${fmt(row.commentCount)}件)</h4><table class="mkt-sg__table"><thead><tr><th>時刻</th><th>コメント</th></tr></thead><tbody data-sg-cm></tbody></table>${row.commentsOmitted > 0 ? `<p class="mkt-sg__more">ほか ${fmt(row.commentsOmitted)} 件(長いため省略。件数は実数です。全部は「コメント記録」の章にあります)</p>` : ''}`
       : '';
-    return `<details class="mkt-sg"${i < openTop ? ' open' : ''}><summary><span class="mkt-sg__rank">#${i + 1}</span>${idc.thumbCell} ${idc.accountHtml} ${idc.idHtml} ${meta}</summary><div class="mkt-sg__body">${giftsHtml}${commentsHtml}</div></details>`;
+    return `<details class="mkt-sg" data-sg="${i}"${i < openTop ? ' open' : ''}><summary><span class="mkt-sg__rank">#${i + 1}</span>${idc.thumbCell} ${idc.accountHtml} ${idc.idHtml} ${meta}</summary><div class="mkt-sg__body">${giftsHtml}${commentsHtml}</div></details>`;
   });
 
   const searchBox = mask
@@ -304,6 +368,6 @@ ${searchBox}
 ${items.slice(0, SUPPORTERS_GIFTS_VISIBLE).join('\n')}
 ${items.length > SUPPORTERS_GIFTS_VISIBLE ? `<details class="mkt-sg-rest"><summary>残り ${fmt(items.length - SUPPORTERS_GIFTS_VISIBLE)}人を見る</summary>\n${items.slice(SUPPORTERS_GIFTS_VISIBLE).join('\n')}\n</details>` : ''}
 </div>
-${mask ? '' : SUPPORTERS_GIFTS_SEARCH_SCRIPT}
+${mask ? '' : `<script type="application/json" id="mktSgData">${supportersGiftsJsonForScript(lazyComments)}</script>${SUPPORTERS_GIFTS_LAZY_SCRIPT}${SUPPORTERS_GIFTS_SEARCH_SCRIPT}`}
 </section>`;
 }
