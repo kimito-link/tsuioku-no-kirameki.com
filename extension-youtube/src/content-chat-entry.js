@@ -5,6 +5,7 @@ import {
   parseYtChatElement,
   extractYtWatchConcurrentViewersFromText,
 } from '../../src/lib/youtube/ytChatParse.js';
+import { ytReplayResponseToRecords } from '../../src/lib/youtube/ytReplayChatJson.js';
 import {
   parseYtVideoIdFromUrl,
   isYtWatchLikeUrl,
@@ -1040,6 +1041,91 @@ function setupResumeAfterReload() {
   setInterval(tick, 3000);
 }
 
+/**
+ * 配信が終わったあと、アーカイブのチャット(リプレイ)を裏で読んで記録の抜けを埋める(0.1.41)。
+ * 動画は再生しない。background に「次に埋める配信」を聞き、あればこのタブが YouTube に直接問い合わせる
+ * (同じ youtube.com なのでログインのまま読める)。チャットのコメントの id は画面から記録したものと同じなので、
+ * 同じものは background が飛ばし、無いものだけ足す。読み上げはしない。
+ */
+function setupArchiveBackfillRunner() {
+  let running = false;
+  /** @param {any} msg @returns {Promise<any>} */
+  const ask = (msg) =>
+    new Promise((resolve) => {
+      try {
+        if (!chrome?.runtime?.id) return resolve(null);
+        chrome.runtime.sendMessage(msg, (res) => {
+          void chrome.runtime.lastError;
+          resolve(res || null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+  const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** @param {string} videoId */
+  const runOne = async (videoId) => {
+    let calls = 0;
+    let added = 0;
+    try {
+      const html = await (await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: 'include' })).text();
+      const clientVersion = (html.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/) || [])[1] || '';
+      const apiKey = (html.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1] || '';
+      const at = html.indexOf('"liveChatRenderer"');
+      const tail = at >= 0 ? html.slice(at, at + 20000) : '';
+      let cont = (tail.match(/"reloadContinuationData":\{"continuation":"([^"]+)"/) || [])[1] || '';
+      if (!cont || !/"isReplay":true/.test(tail) || !clientVersion) {
+        // 終わった直後はアーカイブの処理中でチャットがまだ無い→あとで試し直す
+        await ask({ type: 'YT_BACKFILL_DONE', payload: { videoId, status: 'not_ready', calls, added, reason: cont ? 'no_replay' : 'no_continuation' } });
+        return;
+      }
+      const context = { client: { clientName: 'WEB', clientVersion, hl: 'ja', gl: 'JP' } };
+      const seen = new Set();
+      let emptyStreak = 0;
+      while (cont && calls < 3000) {
+        if (seen.has(cont)) break;
+        seen.add(cont);
+        calls += 1;
+        const url = `https://www.youtube.com/youtubei/v1/live_chat/get_live_chat_replay?prettyPrint=false${apiKey ? `&key=${encodeURIComponent(apiKey)}` : ''}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ context, continuation: cont }),
+        });
+        if (!res.ok) throw new Error(`http_${res.status}`);
+        const { items, next } = ytReplayResponseToRecords(await res.json());
+        if (items.length) {
+          emptyStreak = 0;
+          for (let i = 0; i < items.length; i += 200) {
+            const r = await ask({ type: 'YT_BACKFILL_ITEMS', payload: { videoId, items: items.slice(i, i + 200) } });
+            added += Number(r?.added || 0);
+          }
+        } else if (++emptyStreak > 20) break;
+        cont = next;
+        await sleep(700); // YouTube に負担をかけないよう間をあける
+      }
+      await ask({ type: 'YT_BACKFILL_DONE', payload: { videoId, status: 'done', calls, added } });
+    } catch (err) {
+      await ask({ type: 'YT_BACKFILL_DONE', payload: { videoId, status: 'error', calls, added, reason: String(err) } });
+    }
+  };
+
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const job = await ask({ type: 'YT_BACKFILL_NEXT' });
+      if (job && job.videoId) await runOne(String(job.videoId));
+    } finally {
+      running = false;
+    }
+  };
+  setTimeout(() => void tick(), 30_000);
+  setInterval(() => void tick(), 120_000);
+}
+
 function init() {
   const path = String(window.location.pathname || '');
   if (path.startsWith('/live_chat')) {
@@ -1053,6 +1139,7 @@ function init() {
     setupWatchPageMetaObserver();
     setupVideoFrameCapture();
     setupResumeAfterReload();
+    setupArchiveBackfillRunner();
   }
 }
 

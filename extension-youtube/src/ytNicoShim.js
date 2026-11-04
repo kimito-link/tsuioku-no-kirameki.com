@@ -194,7 +194,10 @@ export function ytRecordToNicoEntry(r, i, lv, personKey) {
   const name = String(r?.name || '').trim();
   const key = personKey || channelId || (name ? `name:${name}` : '');
   const at = Number(r?.recordedAt || 0) || Date.now();
-  const postedAt = r?.replay
+  // 配信が終わったあとにアーカイブから埋めた分は、書かれた本当の時刻(postedAtMs)を持っている
+  const postedAt = Number(r?.postedAtMs) > 0
+    ? Number(r.postedAtMs)
+    : r?.replay
     ? ytReplayPostedAt(String(r?.ts || ''), Number(r?._streamStartedAt || 0), at)
     : ytPostedAtFromClock(String(r?.ts || ''), at);
   // マーケHTML の時間の分析は capturedAt(記録した時刻)で並べる。アーカイブは開いた時・見た時に記録するので
