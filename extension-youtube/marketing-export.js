@@ -1984,7 +1984,8 @@ ${sourceCol}
     });
     anchor.after(btn);
   }
-  if (typeof document !== "undefined" && /\/sidepanel\.html$/.test(String(location.pathname || ""))) {
+  var YT_VENUE_WINDOW_ENABLED = false;
+  if (YT_VENUE_WINDOW_ENABLED && typeof document !== "undefined" && /\/sidepanel\.html$/.test(String(location.pathname || ""))) {
     const tryVenue = () => {
       ensureVenueButton();
       if (!document.getElementById("ytOpenVenueBtn")) setTimeout(tryVenue, 1e3);
