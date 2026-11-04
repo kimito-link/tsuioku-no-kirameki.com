@@ -1230,17 +1230,23 @@ function startDomFixer() {
   if (!document.body) return;
   fixSubtree(document.body);
   // 画面に先に出た数字IDは、あとで誰か分かっても文字が変わらないので直しが届かない(会場の席で実例)。
-  //   新しく人を覚えたときだけ、画面全体を直し直す。
-  let fixedAtVersion = uidRegVersion;
-  setInterval(() => {
-    if (fixedAtVersion === uidRegVersion || document.hidden) return;
-    fixedAtVersion = uidRegVersion;
-    try {
-      fixSubtree(document.body);
-    } catch {
-      /* no-op */
-    }
-  }, 2000);
+  //   会場の画面だけ、新しく人を覚えたときに【文字だけ】直し直す。
+  //   ★画像や全体の直し直しはしない(サイドパネルで全体を直し直したら顔の一覧がちらついた・0.1.51)
+  if (/\/venue\.html$/.test(String(location.pathname || ''))) {
+    let fixedAtVersion = uidRegVersion;
+    setInterval(() => {
+      if (fixedAtVersion === uidRegVersion || document.hidden) return;
+      fixedAtVersion = uidRegVersion;
+      try {
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = w.nextNode(); n; n = w.nextNode()) {
+          if (/8\d{9}/.test(String(n.nodeValue || ''))) fixTextNode(/** @type {Text} */ (n));
+        }
+      } catch {
+        /* no-op */
+      }
+    }, 2000);
+  }
   new MutationObserver((muts) => {
     if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === 'childList' && !(m.target instanceof Element && m.target.closest('#yt-topfan-rest, [data-yt-all]')))) scheduleTopFanRest();
     for (const m of muts) {
