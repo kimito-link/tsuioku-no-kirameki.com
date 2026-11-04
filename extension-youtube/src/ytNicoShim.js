@@ -426,11 +426,55 @@ export function ytLeaderboardToKoken(board, entries, lv) {
 }
 
 /** @param {string} lv */
+/**
+ * 配信ごとに「最初に見た順」を覚える(id → 番号)。ニコ生版の画面は、一度並べたコメントの順が変わらない前提
+ * (アイコンの一覧は「はじめの360件で固定」し、新しいコメントは後ろに足すだけ)。記録の並び(受け取った時刻順)の
+ * 途中に後から行が入ると、それより後ろのマスが全部1つずつずれ、一覧全体がちらついていた
+ * (2026-11-04 計器: 10秒で約335マスが「1つ前のマスのコメント」に入れ替わっていた)。
+ * 一度並べた行の順は変えず、新しく見た行は必ず最後に足す。
+ * @type {Map<string, Map<string, number>>}
+ */
+const stableOrderByLv = new Map();
+/**
+ * @param {string} lv
+ * @param {any[]} list 記録の行(受け取った時刻順)
+ * @returns {any[]} 一度並べた順を保った行
+ */
+export function ytStableOrder(lv, list) {
+  let ord = stableOrderByLv.get(lv);
+  if (!ord) {
+    ord = new Map();
+    stableOrderByLv.set(lv, ord);
+  }
+  const keyOf = (/** @type {any} */ r, /** @type {number} */ i) => String(r?.id || r?.pk || `#${i}`);
+  list.forEach((r, i) => {
+    const k = keyOf(r, i);
+    if (!ord.has(k)) ord.set(k, ord.size);
+  });
+  return list
+    .map((r, i) => ({ r, n: /** @type {number} */ (ord.get(keyOf(r, i))) }))
+    .sort((a, b) => a.n - b.n)
+    .map((x) => x.r);
+}
+
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
   const items = await getYtStreamCommentsByVideoId(vid);
-  const list = Array.isArray(items) ? items : [];
+  const list = ytStableOrder(lv, Array.isArray(items) ? items : []);
+  // 顔の分からない人(YouTube のギフトだけ送った人など)は、トップファンの順位表の顔を名前で引く
+  /** @type {Map<string, string>} */
+  const boardIconByName = new Map();
+  try {
+    const lbKey = `yt_leaderboard_${vid}`;
+    const lb = (await real?.storage?.local?.get?.(lbKey))?.[lbKey];
+    for (const row of Array.isArray(lb?.rows) ? lb.rows : []) {
+      const icon = ytUsableIcon(row?.iconUrl);
+      if (icon && row?.name) boardIconByName.set(normName(row.name), icon);
+    }
+  } catch {
+    /* 順位表が無くても記録は出す */
+  }
   const who = buildYtPersonResolver(list);
   let streamStartedAt = 0;
   if (list.some((r) => r?.replay)) {
@@ -446,7 +490,7 @@ async function buildCommentsForLvUncached(lv) {
   const out = list.map((r, i) => {
     const key = who.keyOf(r);
     // スパチャの欄の顔は読み込み前の仮の絵(data: など)のことがある。https の顔だけ使い、無ければ同じ人の別の記録の顔を使う。
-    const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key);
+    const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key) || boardIconByName.get(normName(r?.name)) || '';
     const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
     return e;
@@ -850,6 +894,21 @@ function rebuildLaneKindLabels(hist) {
     const kind = /スーパーチャット/.test(name) ? 'スパチャ' : /メンバー/.test(name) ? 'メンバー' : /ステッカー/.test(name) ? 'ステッカー' : 'ギフト';
     const cur = laneKindLabelByUid.get(uid);
     if (!cur || rank[/** @type {keyof typeof rank} */ (kind)] > rank[/** @type {keyof typeof rank} */ (cur)]) laneKindLabelByUid.set(uid, kind);
+  }
+  // 札が分かる前に描かれたタイル(1行目が UC… に直された後)も札にする。描き直しを待たない。
+  if (typeof document === 'undefined' || !laneKindLabelByUid.size) return;
+  /** @type {Map<string, string>} 画面の1行目の文字(UC… など) → 札 */
+  const byShown = new Map();
+  for (const [uid, kind] of laneKindLabelByUid) {
+    const shown = ytLabelForUid(uid);
+    if (shown && shown.startsWith('UC')) byShown.set(shown, kind); // @名前 は2行目の名前と同じ文字なので触らない
+  }
+  for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
+    const w = document.createTreeWalker(lane, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const k = byShown.get(String(n.nodeValue || '').trim());
+      if (k) n.nodeValue = k;
+    }
   }
 }
 const SUPPORT_LANE_SEL = '#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd';
