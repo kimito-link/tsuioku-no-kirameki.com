@@ -15,7 +15,7 @@
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
-import { buildGiftThrowLedgerTableSectionHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
+import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
@@ -974,6 +974,8 @@ function ytFixHtmlString(html) {
     const OFF = 'data-ytoff-on';
     const parked = html.replace(/(\s)on([a-z]+=)/gi, `$1${OFF}$2`);
     const doc = new DOMParser().parseFromString(parked, 'text/html');
+    // 投げ一覧の作り直しは疑似ID入りの行を足すので、YouTube への直し(fixSubtree)より先に
+    ytRebuildMarketingLedger(doc);
     fixSubtree(doc.documentElement);
     if (doc.getElementById('mkt-kpi')) ytTrimMarketingDoc(doc);
     // 全文検索の索引(data-search)にも疑似 lv・数字ID が入っているので、同じく YouTube に戻す
@@ -1045,6 +1047,88 @@ function ytFaceOrLetter(url, name) {
 let zeroPtGifts = [];
 /** @type {any[]} */
 let allThrowHistory = [];
+/**
+ * 投げ一覧の表を YouTube 向けに整える(パネルとマーケHTMLで共通)。
+ * @param {ParentNode} root
+ */
+function ytDecorateLedger(root) {
+  const next = root;
+  // 金額の出ない行の pt は「— pt」ではなく「—」
+  next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
+    if (/^—/.test(String(td.textContent || '').trim())) td.textContent = '—';
+  });
+  // アカウント欄の「（UC…）」は ID 列と重なって長いので名前だけにする
+  next.querySelectorAll('td.nl-gift-ledger-sender, td.mkt-gift-sender').forEach((td) => {
+    const walker = (td.ownerDocument || document).createTreeWalker(td, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      n.nodeValue = String(n.nodeValue || '').replace(/（[^（）]*）\s*$/, '');
+    }
+  });
+  // 絵の無いギフトは空の四角ではなく印を入れる(メンバー加入は★・スパチャは¥・ステッカーは✦・ほかは🎁)
+  next.querySelectorAll('.nl-gift-ledger-row__thumb--empty, .mkt-gift-ledger-row__thumb--empty').forEach((box) => {
+    const name = String(box.parentElement?.textContent || '');
+    box.textContent = /メンバー/.test(name) ? '★' : /スーパーチャット/.test(name) ? '¥' : /ステッカー/.test(name) ? '✦' : '🎁';
+    box.style.cssText += ';display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6';
+  });
+  // 絵の読み込みに失敗したら消す(拡張の画面ではインラインの onerror が使えない)
+  next.querySelectorAll('img').forEach((img) => img.addEventListener('error', () => img.remove(), { once: true }));
+}
+
+/**
+ * マーケHTMLの「投げ一覧」は pt の無い行を落とす(ニコ生のギフトは必ず pt があるため)。
+ * YouTube はメンバー加入・ギフトに金額が無いので、パネルと同じくニコ生の表の部品で全件の行に作り直す。
+ * 共有用に伏せる出力のときは触らない(伏せていない名前を足さないため)。
+ * @param {Document} doc
+ */
+function ytRebuildMarketingLedger(doc) {
+  const section = doc.getElementById('mkt-gift-ledger');
+  if (!section || !allThrowHistory.length) return;
+  if (String(doc.body?.textContent || '').includes('共有向けに表示名を伏せた出力')) return;
+  const rows = allThrowHistory.slice(0, 200).map((h) => ({
+    timeLabel: String(h.time || '—'),
+    itemName: String(h.itemName || 'ギフト'),
+    points: Number(h.points) > 0 ? Math.trunc(Number(h.points)) : NaN,
+    thumbnailUrl: String(h.thumbnailUrl || ''),
+    userId: String(h.userId || ''),
+    senderLabel: String(h.senderName || ''),
+    senderAvatarUrl: String(h.senderAvatarUrl || ''),
+    source: 'youtube',
+  }));
+  const html = rows
+    .map((r, i) => buildGiftThrowLedgerTableRowHtml(r, i))
+    .join('')
+    .replace(/nl-gift-ledger-sender/g, 'mkt-gift-sender')
+    .replace(/nl-gift-ledger-evidence/g, 'mkt-gift-evidence')
+    .replace(/nl-gift-ledger-thumb/g, 'mkt-gift-thumb')
+    .replace(/nl-gift-ledger-mono/g, 'mkt-mono')
+    .replace(/nl-gift-ledger-/g, 'mkt-gift-ledger-')
+    .replace(/\bnl-num\b/g, 'mkt-num')
+    .replace(/nl-user-thumb-link/g, 'mkt-user-thumb-link');
+  let table = section.querySelector('table.mkt-gift-ledger-table');
+  if (!table) {
+    const head = doc.createElement('h3');
+    head.className = 'mkt-subhead';
+    head.textContent = '投げ一覧（新しい順）';
+    const wrap = doc.createElement('div');
+    wrap.className = 'mkt-table-scroll';
+    wrap.innerHTML = '<table class="mkt-rank mkt-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th><th>出典</th></tr></thead><tbody></tbody></table>';
+    section.append(head, wrap);
+    table = wrap.querySelector('table');
+  }
+  const tbody = table?.querySelector('tbody');
+  if (!tbody) return;
+  tbody.innerHTML = html;
+  const note = table.closest('.mkt-table-scroll')?.previousElementSibling;
+  if (note && note.classList.contains('mkt-note') && /表示は新しい順に/.test(String(note.textContent))) note.remove();
+  if (allThrowHistory.length > rows.length) {
+    const p = doc.createElement('p');
+    p.className = 'mkt-note';
+    p.textContent = `表示は新しい順に ${rows.length} 件まで（全 ${allThrowHistory.length} 件）。`;
+    table.closest('.mkt-table-scroll')?.before(p);
+  }
+  ytDecorateLedger(tbody);
+}
+
 function ensureZeroPtGifts() {
   const panel = document.getElementById('northStarLaneThrows-giftHistory');
   if (!panel || panel.hidden || !zeroPtGifts.length) return;
@@ -1074,25 +1158,7 @@ function ensureZeroPtGifts() {
   const next = holder.firstElementChild;
   if (!next) return;
   next.setAttribute('data-yt-all', sig);
-  // 金額の出ない行の pt は「— pt」ではなく「—」
-  next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
-    if (/^—/.test(String(td.textContent || '').trim())) td.textContent = '—';
-  });
-  // アカウント欄の「（UC…）」は ID 列と重なって長いので名前だけにする
-  next.querySelectorAll('td.nl-gift-ledger-sender').forEach((td) => {
-    const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      n.nodeValue = String(n.nodeValue || '').replace(/（[^（）]*）\s*$/, '');
-    }
-  });
-  // 絵の無いギフトは空の四角ではなく印を入れる(メンバー加入は★・スパチャは¥・ステッカーは✦・ほかは🎁)
-  next.querySelectorAll('.nl-gift-ledger-row__thumb--empty').forEach((box) => {
-    const name = String(box.parentElement?.textContent || '');
-    box.textContent = /メンバー/.test(name) ? '★' : /スーパーチャット/.test(name) ? '¥' : /ステッカー/.test(name) ? '✦' : '🎁';
-    box.style.cssText += ';display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6';
-  });
-  // 絵の読み込みに失敗したら消す(拡張の画面ではインラインの onerror が使えない)
-  next.querySelectorAll('img').forEach((img) => img.addEventListener('error', () => img.remove(), { once: true }));
+  ytDecorateLedger(next);
   section.replaceWith(next);
 }
 
