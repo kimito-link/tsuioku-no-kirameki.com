@@ -107,6 +107,13 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     }
   }
 
+  // 配信が終わった時刻(視聴ページの endTimestamp)。一度分かったら残す。
+  const endedAt = okTime(patch?.endedAt)
+    ? Math.floor(/** @type {number} */ (patch.endedAt))
+    : okTime(prev.endedAt)
+      ? Math.floor(prev.endedAt)
+      : null;
+
   const createdAt =
     typeof prev.createdAt === 'number' && Number.isFinite(prev.createdAt) && prev.createdAt > 0
       ? prev.createdAt
@@ -125,6 +132,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     itemCount,
     startedAt,
     ...(startedAtApprox ? { startedAtApprox: true } : {}),
+    ...(endedAt ? { endedAt } : {}),
     createdAt,
     updatedAt: nowMs,
   };

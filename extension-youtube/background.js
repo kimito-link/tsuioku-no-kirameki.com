@@ -737,6 +737,10 @@
         startedAtApprox = true;
       }
     }
+    const endedAt = okTime(patch?.endedAt) ? Math.floor(
+      /** @type {number} */
+      patch.endedAt
+    ) : okTime(prev.endedAt) ? Math.floor(prev.endedAt) : null;
     const createdAt = typeof prev.createdAt === "number" && Number.isFinite(prev.createdAt) && prev.createdAt > 0 ? prev.createdAt : nowMs;
     return {
       videoId,
@@ -751,6 +755,7 @@
       itemCount,
       startedAt,
       ...startedAtApprox ? { startedAtApprox: true } : {},
+      ...endedAt ? { endedAt } : {},
       createdAt,
       updatedAt: nowMs
     };
@@ -1348,7 +1353,8 @@
             concurrentViewers: typeof payload.concurrentViewers === "number" ? payload.concurrentViewers : void 0,
             // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
             startedAt: typeof payload.startedAt === "number" && !Object.entries(summaries).some(([vid, s]) => vid !== videoId && Number(s?.startedAt) === payload.startedAt) ? payload.startedAt : void 0,
-            startedAtApprox: payload.startedAtApprox === true
+            startedAtApprox: payload.startedAtApprox === true,
+            endedAt: typeof payload.endedAt === "number" ? payload.endedAt : void 0
           },
           Date.now()
         );

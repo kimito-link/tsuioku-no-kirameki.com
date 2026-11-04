@@ -444,6 +444,38 @@ function saveViewerProbe() {
  * 視聴ページ（/watch・/live/ID）で配信タイトル・配信者名・アイコン・同時視聴数を拾って SW へ通知する。
  * YouTube はページ遷移しない（SPA）ので、どのページで読み込まれても動き、URL が視聴ページの時だけ送る。
  */
+// 配信が終わると、説明欄が「4 時間前にライブ配信開始」→「4 時間前にライブ配信」に変わる。
+//   そのとき視聴ページを1回取り寄せて "endTimestamp"(終わった時刻)を読む(経過が終わったあとも増え続けていた)。
+/** @type {Map<string, number | null>} */
+const fetchedEndedAt = new Map();
+function pageSaysEnded() {
+  try {
+    const box = document.querySelector('ytd-watch-metadata #info-container, ytd-watch-info-text, ytd-watch-metadata #description');
+    const text = String(box?.textContent || '').replace(/\s+/g, ' ');
+    return /\d+\s*(分|時間|日)前にライブ配信(?!開始)/.test(text) || /Streamed live/i.test(text);
+  } catch {
+    return false;
+  }
+}
+/** @param {string} videoId */
+function endedAtFields(videoId) {
+  if (!videoId || !pageSaysEnded()) return {};
+  const got = fetchedEndedAt.get(videoId);
+  if (got) return { endedAt: got };
+  if (fetchedEndedAt.has(videoId)) return {};
+  fetchedEndedAt.set(videoId, null);
+  void fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: 'include' })
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((html) => {
+      const m = String(html || '').match(/"endTimestamp":"([^"]+)"/);
+      const ms = m ? Date.parse(m[1]) : NaN;
+      if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) fetchedEndedAt.set(videoId, ms);
+      else fetchedEndedAt.delete(videoId); // まだ終わり時刻が載っていない→あとでもう一度
+    })
+    .catch(() => fetchedEndedAt.delete(videoId));
+  return {};
+}
+
 /**
  * 開始時刻: ページの欄(正確)→取り寄せた視聴ページ(正確)→「N 時間前にライブ配信開始」(目安・approx)。
  * @param {string} videoId
@@ -510,6 +542,7 @@ function setupWatchPageMetaObserver() {
         broadcasterIconUrl: readBroadcasterIconUrl(),
         concurrentViewers: viewers,
         ...startedAtFields(videoId),
+        ...endedAtFields(videoId),
       },
     });
     if (viewers === null) saveViewerProbe();
