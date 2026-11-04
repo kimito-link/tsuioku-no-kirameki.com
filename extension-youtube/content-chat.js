@@ -1048,6 +1048,7 @@
       if (retired) return;
       if (staleEls.has(el)) return;
       if (el.isConnected === false) return;
+      if (typeof el.closest === "function" && el.closest("yt-live-chat-banner-renderer, yt-live-chat-banner-manager")) return;
       const waitMs = switchGraceUntil - Date.now();
       if (waitMs > 0) {
         setTimeout(() => inspectElement(el, retryCount), waitMs + 50);

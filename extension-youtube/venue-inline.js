@@ -939,7 +939,7 @@ ${sourceCol}
   function ytIconForNumericUid(uid) {
     return ytIconByNumericUid.get(String(uid || "")) || "";
   }
-  function ytRecordToNicoEntry(r, i, lv, personKey) {
+  function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     const channelId = String(r?.channelId || "").trim();
     const name = String(r?.name || "").trim();
     const key = personKey || channelId || (name ? `name:${name}` : "");
@@ -949,7 +949,15 @@ ${sourceCol}
     return {
       id: String(r?.id || r?.pk || `yt${i}`),
       liveId: lv,
-      commentNo: String(i + 1),
+      // コメントの番号はニコ生版では本物の番号(変わらない)。会場・コメビュはこの番号で「もう読んだか」を見分ける。
+      //   並び順(配信者の行を最後に回す等)で振ると、新しいコメントが来るたびに同じコメントの番号が変わり、
+      //   読んだコメントを新しいと思って読み直し(「ほか○件」にまとまる)、本当の新着を読み飛ばしていた(2026-11-04 りんく実機)。
+      //   初めて見た順の番号(ytStableOrder と同じ)にする。
+      commentNo: String(Number.isFinite(stableNo) && /** @type {number} */
+      stableNo >= 0 ? (
+        /** @type {number} */
+        stableNo + 1
+      ) : i + 1),
       text: String(r?.text || ""),
       userId: numericUidForYtKey(key),
       ytChannelId: /^UC/.test(key) ? key : channelId,
@@ -1095,13 +1103,20 @@ ${sourceCol}
     };
   }
   var stableOrderByLv = /* @__PURE__ */ new Map();
+  function ytStableKeyOf(r, i) {
+    return String(r?.id || r?.pk || `#${i}`);
+  }
+  function ytStableNoOf(lv, r) {
+    const n = stableOrderByLv.get(lv)?.get(ytStableKeyOf(r, -1));
+    return typeof n === "number" ? n : -1;
+  }
   function ytStableOrder(lv, list) {
     let ord = stableOrderByLv.get(lv);
     if (!ord) {
       ord = /* @__PURE__ */ new Map();
       stableOrderByLv.set(lv, ord);
     }
-    const keyOf2 = (r, i) => String(r?.id || r?.pk || `#${i}`);
+    const keyOf2 = ytStableKeyOf;
     list.forEach((r, i) => {
       const k = keyOf2(r, i);
       if (!ord.has(k)) ord.set(k, ord.size);
@@ -1167,7 +1182,7 @@ ${sourceCol}
         icon = ytUsableIcon(handleIcons[handleKey]?.icon);
         if (!icon && !handleIcons[handleKey]) wantHandles.add(nm);
       }
-      const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
+      const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
       return e;
     });
@@ -19557,7 +19572,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T11:42") : ""
+          buildId: true ? String("yt-2026-11-04T12:10") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

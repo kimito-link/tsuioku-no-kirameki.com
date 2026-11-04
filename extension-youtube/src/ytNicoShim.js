@@ -199,7 +199,7 @@ export function ytIconForNumericUid(uid) {
  * @param {string} lv
  * @param {string} [personKey] 同じ人をまとめた鍵(UC… / handle:@… / name:…)
  */
-export function ytRecordToNicoEntry(r, i, lv, personKey) {
+export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
   const channelId = String(r?.channelId || '').trim();
   const name = String(r?.name || '').trim();
   const key = personKey || channelId || (name ? `name:${name}` : '');
@@ -217,7 +217,11 @@ export function ytRecordToNicoEntry(r, i, lv, personKey) {
   return {
     id: String(r?.id || r?.pk || `yt${i}`),
     liveId: lv,
-    commentNo: String(i + 1),
+    // コメントの番号はニコ生版では本物の番号(変わらない)。会場・コメビュはこの番号で「もう読んだか」を見分ける。
+    //   並び順(配信者の行を最後に回す等)で振ると、新しいコメントが来るたびに同じコメントの番号が変わり、
+    //   読んだコメントを新しいと思って読み直し(「ほか○件」にまとまる)、本当の新着を読み飛ばしていた(2026-11-04 りんく実機)。
+    //   初めて見た順の番号(ytStableOrder と同じ)にする。
+    commentNo: String(Number.isFinite(stableNo) && /** @type {number} */ (stableNo) >= 0 ? /** @type {number} */ (stableNo) + 1 : i + 1),
     text: String(r?.text || ''),
     userId: numericUidForYtKey(key),
     ytChannelId: /^UC/.test(key) ? key : channelId,
@@ -446,13 +450,26 @@ const stableOrderByLv = new Map();
  * @param {any[]} list 記録の行(受け取った時刻順)
  * @returns {any[]} 一度並べた順を保った行
  */
+/** @param {any} r @param {number} i */
+function ytStableKeyOf(r, i) {
+  return String(r?.id || r?.pk || `#${i}`);
+}
+/**
+ * その行を初めて見た順の番号(0 から)。ytStableOrder を通った行だけ(通っていなければ -1)。
+ * @param {string} lv
+ * @param {any} r
+ */
+export function ytStableNoOf(lv, r) {
+  const n = stableOrderByLv.get(lv)?.get(ytStableKeyOf(r, -1));
+  return typeof n === 'number' ? n : -1;
+}
 export function ytStableOrder(lv, list) {
   let ord = stableOrderByLv.get(lv);
   if (!ord) {
     ord = new Map();
     stableOrderByLv.set(lv, ord);
   }
-  const keyOf = (/** @type {any} */ r, /** @type {number} */ i) => String(r?.id || r?.pk || `#${i}`);
+  const keyOf = ytStableKeyOf;
   list.forEach((r, i) => {
     const k = keyOf(r, i);
     if (!ord.has(k)) ord.set(k, ord.size);
@@ -542,7 +559,7 @@ async function buildCommentsForLvUncached(lv) {
       icon = ytUsableIcon(handleIcons[handleKey]?.icon);
       if (!icon && !handleIcons[handleKey]) wantHandles.add(nm);
     }
-    const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
+    const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
     return e;
   });
