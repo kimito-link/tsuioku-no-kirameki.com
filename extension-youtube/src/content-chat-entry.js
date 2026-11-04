@@ -1140,6 +1140,9 @@ function init() {
     setupVideoFrameCapture();
     setupResumeAfterReload();
     setupArchiveBackfillRunner();
+    // 縦長の配信(ショートのライブ)などでは、トップファンの画面がチャット欄の中ではなく最上位のページに出る
+    //   (2026-11-04 実機 JaZeZj3hZhE: トップファンが出ているのに「スパチャの合計順」になっていた)。こちらでも読む。
+    setupLeaderboardReader();
   }
 }
 

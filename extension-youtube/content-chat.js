@@ -1386,6 +1386,7 @@
       setupVideoFrameCapture();
       setupResumeAfterReload();
       setupArchiveBackfillRunner();
+      setupLeaderboardReader();
     }
   }
   init();
