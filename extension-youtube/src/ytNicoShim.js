@@ -1078,6 +1078,19 @@ function ensureZeroPtGifts() {
   next.querySelectorAll('td[data-label="pt"]').forEach((td) => {
     if (/^—/.test(String(td.textContent || '').trim())) td.textContent = '—';
   });
+  // アカウント欄の「（UC…）」は ID 列と重なって長いので名前だけにする
+  next.querySelectorAll('td.nl-gift-ledger-sender').forEach((td) => {
+    const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      n.nodeValue = String(n.nodeValue || '').replace(/（[^（）]*）\s*$/, '');
+    }
+  });
+  // 絵の無いギフトは空の四角ではなく印を入れる(メンバー加入は★・ほかは🎁)
+  next.querySelectorAll('.nl-gift-ledger-row__thumb--empty').forEach((box) => {
+    const name = String(box.parentElement?.textContent || '');
+    box.textContent = /メンバー/.test(name) ? '★' : '🎁';
+    box.style.cssText += ';display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6';
+  });
   // 絵の読み込みに失敗したら消す(拡張の画面ではインラインの onerror が使えない)
   next.querySelectorAll('img').forEach((img) => img.addEventListener('error', () => img.remove(), { once: true }));
   section.replaceWith(next);
