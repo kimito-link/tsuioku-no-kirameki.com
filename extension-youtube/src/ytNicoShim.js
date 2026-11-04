@@ -1394,6 +1394,26 @@ if (typeof HTMLImageElement !== 'undefined' && typeof Element !== 'undefined') {
           return ih.get.call(this);
         },
         set(v) {
+          // 計器(0.1.60): 応援アイコンの一覧が丸ごと消される(作り直し)とき、誰が呼んだかを数える
+          if (v === '' && this.id === 'sceneStoryGrowth') {
+            try {
+              const why = /** @type {any} */ (globalThis).__ytFlickerWhy;
+              if (why) {
+                const names = String(new Error().stack || '')
+                  .split('\n')
+                  .slice(2, 8)
+                  .map((l) => (/at (?:async )?([\w$.<>]+) \(/.exec(l) || [])[1] || '?')
+                  .join('<');
+                why.clears[names] = (why.clears[names] || 0) + 1;
+                const imgs = this.querySelectorAll('img');
+                const icons = this.querySelectorAll('img.nl-story-growth-icon');
+                const k = `imgs${imgs.length}/icons${icons.length}/cells${this.childElementCount}`;
+                why.before[k] = (why.before[k] || 0) + 1;
+              }
+            } catch {
+              /* 計器は描画を止めない */
+            }
+          }
           let s = v;
           if (typeof s === 'string' && s.includes('usericon')) {
             s = s.replace(GLOBAL_RE, (all, uid) => {
@@ -1426,6 +1446,7 @@ if (typeof document !== 'undefined' && /\/(sidepanel|venue)\.html$/.test(String(
     if (s.startsWith('chrome-extension:')) return 'ext-image';
     return 'other';
   };
+  /** @type {any} */ (globalThis).__ytFlickerWhy = { clears: {}, before: {}, idChanges: 0, idSamples: [], srcSamples: [] };
   /** @type {WeakMap<Element, number>} */
   let perImg = new WeakMap();
   let win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: /** @type {Record<string, number>} */ ({}), where: /** @type {Record<string, number>} */ ({}) };
@@ -1437,11 +1458,28 @@ if (typeof document !== 'undefined' && /\/(sidepanel|venue)\.html$/.test(String(
     if (!document.body) return;
     new MutationObserver((muts) => {
       for (const m of muts) {
+        if (m.type === 'attributes' && m.attributeName === 'data-comment-id') {
+          // 同じマスが別のコメントに入れ替わった(並びがずれた)回数
+          if (m.oldValue && m.oldValue !== /** @type {Element} */ (m.target).getAttribute('data-comment-id')) {
+            const why = /** @type {any} */ (globalThis).__ytFlickerWhy;
+            why.idChanges += 1;
+            if (why.idSamples.length < 4) {
+              why.idSamples.push({ idx: /** @type {Element} */ (m.target).getAttribute('data-comment-index'), from: String(m.oldValue).slice(0, 40), to: String(/** @type {Element} */ (m.target).getAttribute('data-comment-id')).slice(0, 40) });
+            }
+          }
+          continue;
+        }
         if (m.type === 'attributes' && m.target instanceof HTMLImageElement && m.attributeName === 'src') {
           const img = m.target;
           const t = `${kindOf(m.oldValue || '')}→${kindOf(img.getAttribute('src') || '')}`;
           if (t.split('→')[0] === t.split('→')[1] && m.oldValue === img.getAttribute('src')) continue;
           win.srcChanges += 1;
+          {
+            const why = /** @type {any} */ (globalThis).__ytFlickerWhy;
+            if (why.srcSamples.length < 3 && img.closest('#sceneStoryGrowth')) {
+              why.srcSamples.push({ idx: img.getAttribute('data-comment-index'), from: String(m.oldValue || '').slice(-60), to: String(img.getAttribute('src') || '').slice(-60) });
+            }
+          }
           win.byTransition[t] = (win.byTransition[t] || 0) + 1;
           const n = (perImg.get(img) || 0) + 1;
           perImg.set(img, n);
@@ -1462,9 +1500,11 @@ if (typeof document !== 'undefined' && /\/(sidepanel|venue)\.html$/.test(String(
           }
         }
       }
-    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'], attributeOldValue: true });
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['src', 'data-comment-id'], attributeOldValue: true });
     setInterval(() => {
-      const snap = { at: Date.now(), page: location.pathname.split('/').pop(), version: chrome.runtime.getManifest?.().version, ...win };
+      const why = /** @type {any} */ (globalThis).__ytFlickerWhy;
+      const snap = { at: Date.now(), page: location.pathname.split('/').pop(), version: chrome.runtime.getManifest?.().version, ...win, why: { ...why } };
+      /** @type {any} */ (globalThis).__ytFlickerWhy = { clears: {}, before: {}, idChanges: 0, idSamples: [], srcSamples: [] };
       win = { srcChanges: 0, imgAdds: 0, flips: 0, byTransition: {}, where: {} };
       perImg = new WeakMap();
       void (async () => {
