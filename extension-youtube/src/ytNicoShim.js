@@ -170,7 +170,7 @@ export function ytKeyForNumericUid(uid) {
  * @param {string} uid
  */
 export function ytChannelUrlForNumericUid(uid) {
-  const key = ytKeyForNumericUid(uid);
+  const key = ytKeyForNumericUid(uid).replace(/^topfan:/, '');
   if (/^UC[A-Za-z0-9_-]{22}$/.test(key)) return `https://www.youtube.com/channel/${key}`;
   const h = key.startsWith('handle:@') ? key.slice('handle:@'.length) : '';
   return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : '';
@@ -409,7 +409,12 @@ export function ytLeaderboardToKoken(board, entries, lv) {
     rows: rows.map((/** @type {any} */ r) => {
       const name = String(r?.name || '');
       const hit = byName.get(normName(name));
-      const uid = hit?.uid || numericUidForYtKey(`handle:${name.startsWith('@') ? name : `@${name}`}`);
+      // ★トップファンの行には、応援レーンの人とは別の数字IDを付ける(頭に topfan:)。
+      //   同じ数字IDだと、ニコ生版はこの欄の数字(XP)を「その人が投げたギフトの pt」として
+      //   レーンの顔に 🎁 で付け、ギフトを投げた人としてりんく段に上げてしまう(XP はギフトではない・0.1.53 実機)。
+      //   リンク・名前・顔は topfan: を外して元の人のものを使う。
+      const personKey = (hit?.uid && ytKeyForNumericUid(hit.uid)) || `handle:${name.startsWith('@') ? name : `@${name}`}`;
+      const uid = numericUidForYtKey(`topfan:${personKey}`);
       const icon = String(r?.iconUrl || '') || hit?.icon || '';
       if (icon) ytIconByNumericUid.set(uid, icon);
       return {
@@ -796,7 +801,7 @@ const PSEUDO_UID_RE = /8\d{9}/g;
 
 /** @param {string} uid */
 function ytLabelForUid(uid) {
-  const key = ytKeyForNumericUid(uid);
+  const key = ytKeyForNumericUid(uid).replace(/^topfan:/, '');
   if (!key) return '';
   if (key.startsWith('name:')) return '';
   if (key.startsWith('handle:')) return key.slice('handle:'.length);

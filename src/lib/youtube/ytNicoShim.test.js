@@ -35,7 +35,9 @@ describe('ytLeaderboardToKoken', () => {
       entries,
       'lv900000000001',
     );
-    expect(k?.rows[0].userPageUrl).toBe('https://www.nicovideo.jp/user/8123456789');
+    // レーンの人(8123456789)とは別の数字ID(XP をギフトとしてレーンに付けないため)。
+    expect(k?.rows[0].userPageUrl).toMatch(/user\/8\d{9}$/);
+    expect(k?.rows[0].userPageUrl).not.toBe('https://www.nicovideo.jp/user/8123456789');
     expect(k?.rows[0].contribution).toBe(84480);
     expect(k?.rows[0].thumbnailUrl).toBe('https://yt3.ggpht.com/x');
     expect(k?.rows[1].userPageUrl).toMatch(/user\/8\d{9}$/);
