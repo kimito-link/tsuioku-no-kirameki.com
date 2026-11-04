@@ -15,7 +15,7 @@
 
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
-import { ytWording, ytWordingTopFanToSuperChatRank } from '../../src/lib/youtube/ytWording.js';
+import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
@@ -518,7 +518,11 @@ if (real && real.storage && real.storage.local && real.tabs) {
           await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
         );
         let v = gifts ? gifts[g[1]] : null;
-        if (g[1] === 'koken') {
+        // 応援レーンの「ギフト列」は ギフトを投げた人(nls_gift_users_)と一緒にこのキーを読み、
+        //   ここに入っている人を「ギフトを投げた人」として並べる。トップファンの XP はチャットや視聴でもたまり、
+        //   ギフトではないので、その読みにはスパチャ・ギフトの合計だけを渡す(XP の人がギフト列に並んでいた)。
+        const laneRead = !!list && list.some((x) => x.startsWith('nls_gift_users_'));
+        if (g[1] === 'koken' && !laneRead) {
           // トップファンの順位があれば、そちらを「ギフト貢献度」にする(YouTube 公式の応援ランキング)
           const lbKey = `yt_leaderboard_${vid}`;
           const lb = /** @type {Record<string, any>} */ (await realGet(lbKey))?.[lbKey];
@@ -527,7 +531,8 @@ if (real && real.storage && real.storage.local && real.tabs) {
           if (v != null) {
             const wasTopFans = kokenIsTopFans;
             kokenIsTopFans = !!fromBoard;
-            if (wasTopFans && !kokenIsTopFans) rewordTopFansAsSuperChatRank();
+            if (wasTopFans && !kokenIsTopFans) rewordTopFanHeadings(ytWordingTopFanToSuperChatRank);
+            if (!wasTopFans && kokenIsTopFans) rewordTopFanHeadings(ytWordingSuperChatRankToTopFan);
           }
         }
         if (v != null) bag[k] = v;
@@ -858,13 +863,15 @@ const EMPTY_THUMB_SEL = '[class*="thumb--empty"]';
 const SC_BUBBLE_BG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E\") center/70% no-repeat";
 // ギフト貢献度の欄がスパチャの合計の順位だと分かった時点で、もう「トップファン」と直して出した文字を戻す
-function rewordTopFansAsSuperChatRank() {
+// (逆に、アーカイブのあとでトップファンの順位表がある配信へ移ったら、トップファンの言葉に戻す)
+/** @param {(s: string) => string} reword */
+function rewordTopFanHeadings(reword) {
   if (typeof document === 'undefined' || !document.body) return;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = walker.nextNode())) {
     const v = String(n.nodeValue || '');
-    const next = ytWordingTopFanToSuperChatRank(v);
+    const next = reword(v);
     if (next !== v) n.nodeValue = next;
   }
 }

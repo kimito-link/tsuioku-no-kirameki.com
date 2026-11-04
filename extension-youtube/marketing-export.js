@@ -240,17 +240,20 @@
   function ytWordingTopFanToSuperChatRank(text) {
     let out = String(text ?? "");
     if (!/トップファン|XP/.test(out)) return out;
-    for (let i = 0; i < 3; i += 1) {
-      const from = (
-        /** @type {string} */
-        TOP_FAN_RULES[i][1]
-      );
-      out = out.split(from).join(
-        /** @type {string} */
-        SUPERCHAT_RANK_RULES[i][1]
-      );
-    }
+    out = swapOnce(out, TOP_FAN_RULES, SUPERCHAT_RANK_RULES);
     return out.replace(/(\d[\d,]*) XP\b/g, "$1 pt");
+  }
+  function ytWordingSuperChatRankToTopFan(text) {
+    let out = String(text ?? "");
+    if (!/スパチャの合計順|スーパーチャット・ギフトの合計の順位/.test(out)) return out;
+    return swapOnce(out, SUPERCHAT_RANK_RULES, TOP_FAN_RULES);
+  }
+  function swapOnce(text, fromRules, toRules) {
+    const map = /* @__PURE__ */ new Map();
+    for (let i = 0; i < 3; i += 1) map.set(String(fromRules[i][1]), String(toRules[i][1]));
+    const keys = [...map.keys()].sort((a, b) => b.length - a.length);
+    const re = new RegExp(keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+    return text.replace(re, (m) => map.get(m) ?? m);
   }
 
   // src/lib/youtube/ytSuperChatTier.js
@@ -845,7 +848,8 @@
             await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
           );
           let v = gifts ? gifts[g[1]] : null;
-          if (g[1] === "koken") {
+          const laneRead = !!list && list.some((x) => x.startsWith("nls_gift_users_"));
+          if (g[1] === "koken" && !laneRead) {
             const lbKey = `yt_leaderboard_${vid}`;
             const lb = (
               /** @type {Record<string, any>} */
@@ -856,7 +860,8 @@
             if (v != null) {
               const wasTopFans = kokenIsTopFans;
               kokenIsTopFans = !!fromBoard;
-              if (wasTopFans && !kokenIsTopFans) rewordTopFansAsSuperChatRank();
+              if (wasTopFans && !kokenIsTopFans) rewordTopFanHeadings(ytWordingTopFanToSuperChatRank);
+              if (!wasTopFans && kokenIsTopFans) rewordTopFanHeadings(ytWordingSuperChatRankToTopFan);
             }
           }
           if (v != null) bag[k] = v;
@@ -1123,13 +1128,13 @@
   }
   var EMPTY_THUMB_SEL = '[class*="thumb--empty"]';
   var SC_BUBBLE_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3Ctext x='12' y='14' font-size='9' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23333'%3E%24%3C/text%3E%3C/svg%3E") center/70% no-repeat`;
-  function rewordTopFansAsSuperChatRank() {
+  function rewordTopFanHeadings(reword) {
     if (typeof document === "undefined" || !document.body) return;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let n;
     while (n = walker.nextNode()) {
       const v = String(n.nodeValue || "");
-      const next = ytWordingTopFanToSuperChatRank(v);
+      const next = reword(v);
       if (next !== v) n.nodeValue = next;
     }
   }
