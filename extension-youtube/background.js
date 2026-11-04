@@ -1326,6 +1326,38 @@
     }
   }
   void runSwitchLeakCleanups();
+  var KEY_HANDLE_ICONS = "yt_handle_icons";
+  var handleIconsBusy = false;
+  async function resolveHandleIcons(handles) {
+    if (handleIconsBusy || !handles.length) return;
+    handleIconsBusy = true;
+    try {
+      const bag = await chrome.storage.local.get(KEY_HANDLE_ICONS);
+      const map = bag && bag[KEY_HANDLE_ICONS] || {};
+      let changed = false;
+      for (const h of handles) {
+        const k = h.toLowerCase();
+        const cur = map[k];
+        if (cur && (cur.icon || Date.now() - Number(cur.at || 0) < 864e5)) continue;
+        let icon = "";
+        try {
+          const res = await fetch(`https://www.youtube.com/${encodeURIComponent(h).replace(/^%40/, "@")}`, { credentials: "omit" });
+          if (res.ok) {
+            const html = await res.text();
+            const m = html.match(/<meta property="og:image" content="([^"]+)"/);
+            const u = m ? m[1].replace(/&amp;/g, "&") : "";
+            if (/^https:\/\/yt\d?\.(ggpht|googleusercontent)\.com\//.test(u)) icon = u;
+          }
+        } catch {
+        }
+        map[k] = { icon, at: Date.now() };
+        changed = true;
+      }
+      if (changed) await chrome.storage.local.set({ [KEY_HANDLE_ICONS]: map });
+    } finally {
+      handleIconsBusy = false;
+    }
+  }
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message.type !== "string") return false;
     if (message.type === "YT_CAPTURE_FRAME") {
@@ -1412,6 +1444,11 @@
         return { ok: true, videoId };
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
+    }
+    if (message.type === "YT_HANDLE_ICONS") {
+      const handles = (Array.isArray(message.handles) ? message.handles : []).map((h) => String(h || "").trim()).filter((h) => /^@[^\s/?#]{1,100}$/.test(h));
+      void resolveHandleIcons(handles.slice(0, 5));
+      return false;
     }
     if (message.type === "YT_LEADERBOARD") {
       const payload = message.payload || {};

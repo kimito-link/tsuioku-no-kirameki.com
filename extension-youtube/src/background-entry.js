@@ -411,6 +411,41 @@ async function runSwitchLeakCleanups() {
 }
 void runSwitchLeakCleanups();
 
+const KEY_HANDLE_ICONS = 'yt_handle_icons';
+let handleIconsBusy = false;
+/** @param {string[]} handles */
+async function resolveHandleIcons(handles) {
+  if (handleIconsBusy || !handles.length) return;
+  handleIconsBusy = true;
+  try {
+    const bag = await chrome.storage.local.get(KEY_HANDLE_ICONS);
+    const map = (bag && bag[KEY_HANDLE_ICONS]) || {};
+    let changed = false;
+    for (const h of handles) {
+      const k = h.toLowerCase();
+      const cur = map[k];
+      if (cur && (cur.icon || Date.now() - Number(cur.at || 0) < 86400000)) continue;
+      let icon = '';
+      try {
+        const res = await fetch(`https://www.youtube.com/${encodeURIComponent(h).replace(/^%40/, '@')}`, { credentials: 'omit' });
+        if (res.ok) {
+          const html = await res.text();
+          const m = html.match(/<meta property="og:image" content="([^"]+)"/);
+          const u = m ? m[1].replace(/&amp;/g, '&') : '';
+          if (/^https:\/\/yt\d?\.(ggpht|googleusercontent)\.com\//.test(u)) icon = u;
+        }
+      } catch {
+        /* 取れなければ次の日にもう一度 */
+      }
+      map[k] = { icon, at: Date.now() };
+      changed = true;
+    }
+    if (changed) await chrome.storage.local.set({ [KEY_HANDLE_ICONS]: map });
+  } finally {
+    handleIconsBusy = false;
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
 
@@ -528,6 +563,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'YT_HANDLE_ICONS') {
+    // 顔の分からない人(YouTube のギフトだけ送った人など・@名前 しか分からない)の顔を、チャンネルのページの
+    // og:image(チャンネルのアイコン)から引いて yt_handle_icons に覚える。1回に5人まで・失敗は1日おいて再挑戦。
+    const handles = (Array.isArray(message.handles) ? message.handles : [])
+      .map((h) => String(h || '').trim())
+      .filter((h) => /^@[^\s/?#]{1,100}$/.test(h));
+    void resolveHandleIcons(handles.slice(0, 5));
+    return false;
+  }
   if (message.type === 'YT_LEADERBOARD') {
     // YouTube の「トップファン」の順位。配信ごとに最新の1つだけ置く(ニコ生版の「ギフト貢献度」の欄に出す)
     const payload = message.payload || {};

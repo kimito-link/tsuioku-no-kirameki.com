@@ -1316,6 +1316,12 @@ ${sourceCol}
       }
     } catch {
     }
+    let handleIcons = {};
+    try {
+      handleIcons = (await real?.storage?.local?.get?.("yt_handle_icons"))?.yt_handle_icons || {};
+    } catch {
+    }
+    const wantHandles = /* @__PURE__ */ new Set();
     const who = buildYtPersonResolver(list);
     let streamStartedAt = 0;
     if (list.some((r) => r?.replay)) {
@@ -1329,12 +1335,25 @@ ${sourceCol}
     }
     const out = list.map((r, i) => {
       const key = who.keyOf(r);
-      const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key) || boardIconByName.get(normName(r?.name)) || "";
+      const nm = String(r?.name || "").trim();
+      const handleKey = nm.startsWith("@") ? nm.toLowerCase() : "";
+      let icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key) || boardIconByName.get(normName(r?.name)) || "";
+      if (!icon && handleKey) {
+        icon = ytUsableIcon(handleIcons[handleKey]?.icon);
+        if (!icon && !handleIcons[handleKey]) wantHandles.add(nm);
+      }
       const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
       if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
       return e;
     });
     registerBroadcastersFromSummaries();
+    if (wantHandles.size) {
+      try {
+        void Promise.resolve(real?.runtime?.sendMessage?.({ type: "YT_HANDLE_ICONS", handles: [...wantHandles].slice(0, 5) })).catch(() => {
+        });
+      } catch {
+      }
+    }
     return out;
   }
   var knownSummaries = {};
@@ -1571,6 +1590,10 @@ ${sourceCol}
       };
       add((changes, area) => {
         if (area !== "local") return;
+        if (changes.yt_handle_icons && lastAskedLv) {
+          lastNotified.delete(lastAskedLv);
+          void notifyLv(lastAskedLv, void 0);
+        }
         for (const ck of Object.keys(changes)) {
           if (!ck.startsWith("yt_leaderboard_")) continue;
           const vid = ck.slice("yt_leaderboard_".length);
@@ -1686,17 +1709,26 @@ ${sourceCol}
     const byShown = /* @__PURE__ */ new Map();
     for (const [uid, kind] of laneKindLabelByUid) {
       const shown = ytLabelForUid(uid);
-      if (shown && shown.startsWith("UC")) byShown.set(shown, kind);
+      if (shown) byShown.set(shown, kind);
     }
+    rewriteLaneFirstLines(byShown);
+  }
+  var SUPPORT_LANE_SEL = "#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd";
+  function rewriteLaneFirstLines(byShown) {
+    if (typeof document === "undefined" || !byShown.size) return;
     for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
-      const w = document.createTreeWalker(lane, NodeFilter.SHOW_TEXT);
-      for (let n2 = w.nextNode(); n2; n2 = w.nextNode()) {
-        const k = byShown.get(String(n2.nodeValue || "").trim());
-        if (k) n2.nodeValue = k;
+      for (const tile of Array.from(lane.children)) {
+        const w = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT);
+        for (let n2 = w.nextNode(); n2; n2 = w.nextNode()) {
+          const k = byShown.get(String(n2.nodeValue || "").trim());
+          if (k) {
+            n2.nodeValue = k;
+            break;
+          }
+        }
       }
     }
   }
-  var SUPPORT_LANE_SEL = "#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd";
   function fixTextNode(node) {
     const parentTag = node.parentNode && /** @type {Element} */
     node.parentNode.tagName;
@@ -2229,6 +2261,29 @@ ${sourceCol}
       }
     } catch {
     }
+  }
+  if (typeof document !== "undefined" && /\/sidepanel\.html$/.test(String(location.pathname || ""))) {
+    const paintGridNote = () => {
+      const grid = document.getElementById("sceneStoryGrowth");
+      const label = document.getElementById("sceneStoryGaugeLabel");
+      if (!grid || !label || !grid.parentNode) return;
+      const m = String(label.textContent || "").match(/応援\s*([\d,]+)\s*コメント（グリッドははじめの\s*([\d,]+)\s*件で固定・そのあとの\s*([\d,]+)\s*件/);
+      let note = document.getElementById("ytGridFullNote");
+      if (!m) {
+        if (note) note.remove();
+        return;
+      }
+      if (!note) {
+        note = document.createElement("div");
+        note.id = "ytGridFullNote";
+        note.setAttribute("role", "status");
+        note.style.cssText = "margin:6px 0;padding:6px 10px;border-radius:8px;background:#fff4d6;border:1px solid #f0c36d;color:#5a4300;font-size:12px;font-weight:700;line-height:1.5;";
+        grid.parentNode.insertBefore(note, grid);
+      }
+      const text = `いま ${m[1]} 件。この一覧は顔が動かないように、はじめの ${m[2]} 件で止めています。そのあとの ${m[3]} 件(新しく来た人)は、上の応援レーンに出ています。`;
+      if (note.textContent !== text) note.textContent = text;
+    };
+    setInterval(paintGridNote, 2e3);
   }
   if (typeof document !== "undefined" && /\/(sidepanel|venue)\.html$/.test(String(location.pathname || ""))) {
     const kindOf = (src) => {
@@ -46042,7 +46097,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T06:55" ? String("yt-2026-11-04T06:55") : "dev";
+      const buildId = "yt-2026-11-04T07:00" ? String("yt-2026-11-04T07:00") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46060,7 +46115,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.64") : "";
+    const bundledVersion = true ? String("0.1.65") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46105,7 +46160,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T06:55" ? String("yt-2026-11-04T06:55") : "dev";
+            return "yt-2026-11-04T07:00" ? String("yt-2026-11-04T07:00") : "dev";
           } catch {
             return "dev";
           }

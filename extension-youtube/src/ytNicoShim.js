@@ -494,6 +494,16 @@ async function buildCommentsForLvUncached(lv) {
   } catch {
     /* 順位表が無くても記録は出す */
   }
+  // @名前 しか分からない人の顔(裏でチャンネルのページから引いたもの)
+  /** @type {Record<string, { icon?: string }>} */
+  let handleIcons = {};
+  try {
+    handleIcons = (await real?.storage?.local?.get?.('yt_handle_icons'))?.yt_handle_icons || {};
+  } catch {
+    /* 無くても記録は出す */
+  }
+  /** @type {Set<string>} 顔を引きに行く @名前 */
+  const wantHandles = new Set();
   const who = buildYtPersonResolver(list);
   let streamStartedAt = 0;
   if (list.some((r) => r?.replay)) {
@@ -509,13 +519,26 @@ async function buildCommentsForLvUncached(lv) {
   const out = list.map((r, i) => {
     const key = who.keyOf(r);
     // スパチャの欄の顔は読み込み前の仮の絵(data: など)のことがある。https の顔だけ使い、無ければ同じ人の別の記録の顔を使う。
-    const icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key) || boardIconByName.get(normName(r?.name)) || '';
+    const nm = String(r?.name || '').trim();
+    const handleKey = nm.startsWith('@') ? nm.toLowerCase() : '';
+    let icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key) || boardIconByName.get(normName(r?.name)) || '';
+    if (!icon && handleKey) {
+      icon = ytUsableIcon(handleIcons[handleKey]?.icon);
+      if (!icon && !handleIcons[handleKey]) wantHandles.add(nm);
+    }
     const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key);
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
     return e;
   });
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
   registerBroadcastersFromSummaries();
+  if (wantHandles.size) {
+    try {
+      void Promise.resolve(real?.runtime?.sendMessage?.({ type: 'YT_HANDLE_ICONS', handles: [...wantHandles].slice(0, 5) })).catch(() => {});
+    } catch {
+      /* 次の読み直しでまた頼む */
+    }
+  }
   return out;
 }
 
@@ -790,6 +813,11 @@ if (real && real.storage && real.storage.local && real.tabs) {
     };
     add((/** @type {Record<string, any>} */ changes, /** @type {string} */ area) => {
       if (area !== 'local') return;
+      // 顔が新しく分かったら、件数が同じでも描き直してもらう
+      if (changes.yt_handle_icons && lastAskedLv) {
+        lastNotified.delete(lastAskedLv);
+        void notifyLv(lastAskedLv, undefined);
+      }
       for (const ck of Object.keys(changes)) {
         if (!ck.startsWith('yt_leaderboard_')) continue;
         const vid = ck.slice('yt_leaderboard_'.length);
@@ -924,21 +952,35 @@ function rebuildLaneKindLabels(hist) {
   }
   // 札が分かる前に描かれたタイル(1行目が UC… に直された後)も札にする。描き直しを待たない。
   if (typeof document === 'undefined' || !laneKindLabelByUid.size) return;
-  /** @type {Map<string, string>} 画面の1行目の文字(UC… など) → 札 */
+  /** @type {Map<string, string>} 画面の1行目の文字(UC… / @名前) → 札 */
   const byShown = new Map();
   for (const [uid, kind] of laneKindLabelByUid) {
     const shown = ytLabelForUid(uid);
-    if (shown && shown.startsWith('UC')) byShown.set(shown, kind); // @名前 は2行目の名前と同じ文字なので触らない
+    if (shown) byShown.set(shown, kind);
   }
+  rewriteLaneFirstLines(byShown);
+}
+const SUPPORT_LANE_SEL = '#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd';
+/**
+ * 応援レーンの各タイルで、1行目(最初に見つかった、ID と同じ文字の行)だけを札に直す。
+ * @名前 しか分からない人は1行目と2行目(名前)が同じ文字なので、最初の1つだけ直す(名前は残す)。
+ * @param {Map<string, string>} byShown
+ */
+function rewriteLaneFirstLines(byShown) {
+  if (typeof document === 'undefined' || !byShown.size) return;
   for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
-    const w = document.createTreeWalker(lane, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) {
-      const k = byShown.get(String(n.nodeValue || '').trim());
-      if (k) n.nodeValue = k;
+    for (const tile of Array.from(lane.children)) {
+      const w = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const k = byShown.get(String(n.nodeValue || '').trim());
+        if (k) {
+          n.nodeValue = k;
+          break;
+        }
+      }
     }
   }
 }
-const SUPPORT_LANE_SEL = '#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sceneStoryUserLaneAd';
 /** @param {Text} node */
 function fixTextNode(node) {
   const parentTag = node.parentNode && /** @type {Element} */ (node.parentNode).tagName;
@@ -1552,6 +1594,34 @@ if (typeof HTMLImageElement !== 'undefined' && typeof Element !== 'undefined') {
 }
 
 // ---- 計器: ちらつき(顔の絵の差し替え・作り直し)を数える(サイドパネル・会場) ----
+// アイコン一覧が「はじめの360件で固定」になったとき、一覧の上に目立つ一言を出す(2026-11-04 りんく「ではそれで」)。
+//   固定はニコ生版と同じ(顔が動かず人を追える)。ただ、下の小さい説明だけでは「増えない=止まった」に見えるので、
+//   いまの件数と「新しい人は上の応援レーンに出ている」ことを一覧の真上に書く。ニコ生版の部品には手を入れない。
+if (typeof document !== 'undefined' && /\/sidepanel\.html$/.test(String(location.pathname || ''))) {
+  const paintGridNote = () => {
+    const grid = document.getElementById('sceneStoryGrowth');
+    const label = document.getElementById('sceneStoryGaugeLabel');
+    if (!grid || !label || !grid.parentNode) return;
+    const m = String(label.textContent || '').match(/応援\s*([\d,]+)\s*コメント（グリッドははじめの\s*([\d,]+)\s*件で固定・そのあとの\s*([\d,]+)\s*件/);
+    let note = document.getElementById('ytGridFullNote');
+    if (!m) {
+      if (note) note.remove();
+      return;
+    }
+    if (!note) {
+      note = document.createElement('div');
+      note.id = 'ytGridFullNote';
+      note.setAttribute('role', 'status');
+      note.style.cssText =
+        'margin:6px 0;padding:6px 10px;border-radius:8px;background:#fff4d6;border:1px solid #f0c36d;color:#5a4300;font-size:12px;font-weight:700;line-height:1.5;';
+      grid.parentNode.insertBefore(note, grid);
+    }
+    const text = `いま ${m[1]} 件。この一覧は顔が動かないように、はじめの ${m[2]} 件で止めています。そのあとの ${m[3]} 件(新しく来た人)は、上の応援レーンに出ています。`;
+    if (note.textContent !== text) note.textContent = text;
+  };
+  setInterval(paintGridNote, 2000);
+}
+
 // りんく「こちらに確認もとめないで計器で検知して」(2026-11-04)。10秒ごとに storage の yt_diag_flicker に書く。
 //   srcChanges: 画面にある img の src が変わった回数 / imgAdds: img が新しく作られた回数(描き直し)
 //   flips: 同じ img が10秒の間に2回以上 src を変えた数(=ちらつきの本体) / byTransition: 「前の絵の種類→次」の回数
