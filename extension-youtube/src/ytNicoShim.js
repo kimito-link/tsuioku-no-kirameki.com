@@ -700,15 +700,9 @@ if (real && real.storage && real.storage.local && real.tabs) {
       } catch {
         /* ギフトが作れなくてもコメントは知らせる */
       }
-      try {
-        const vid = videoIdForPseudoLv(lv);
-        const lbKey = `yt_leaderboard_${vid}`;
-        const lb = /** @type {Record<string, any>} */ (await realGet(lbKey))?.[lbKey];
-        const fromBoard = lb ? ytLeaderboardToKoken(lb, arr, lv) : null;
-        if (fromBoard) synth[`nls_koken_api_contrib_${lv}`] = { newValue: fromBoard };
-      } catch {
-        /* no-op */
-      }
+      // ★トップファン(XP)はここでは流さない。変わったよの知らせの中身(newValue)をそのまま使う受け手
+      //   (応援レーンのギフト列)が XP の人を「ギフトを投げた人」としてりんく段に上げてしまう(0.1.51 で実例)。
+      //   ギフト貢献度の欄は知らせを受けて読み直すので、読み直しのときにトップファンを渡す(上の shimGet)。
       shimDiag.notified += 1;
       shimDiag.listeners = listeners.length;
       shimDiag.lastNotifiedAt = Date.now();
@@ -728,9 +722,10 @@ if (real && real.storage && real.storage.local && real.tabs) {
         const vid = ck.slice('yt_leaderboard_'.length);
         const lv = pseudoLvForVideoId(vid);
         void buildCommentsForLv(lv).then((arr) => {
-          const koken = ytLeaderboardToKoken(changes[ck].newValue, arr || [], lv);
-          if (!koken) return;
-          const synth = { [`nls_koken_api_contrib_${lv}`]: { newValue: koken } };
+          // 知らせの中身はスパチャ・ギフトの合計(XP ではない)。欄は知らせを受けて読み直し、そこでトップファンを受け取る
+          const sum = knownSummaries?.[vid];
+          const gifts = /** @type {Record<string, any>} */ (buildYtGiftBags(arr || [], lv, { startedAt: ytTrustedStartedAt(sum, vid) }));
+          const synth = { [`nls_koken_api_contrib_${lv}`]: { newValue: gifts?.koken ?? null } };
           for (const fn of listeners) {
             try {
               fn(synth, 'local');

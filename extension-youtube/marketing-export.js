@@ -1312,17 +1312,6 @@ ${sourceCol}
           }
         } catch {
         }
-        try {
-          const vid = videoIdForPseudoLv(lv);
-          const lbKey = `yt_leaderboard_${vid}`;
-          const lb = (
-            /** @type {Record<string, any>} */
-            (await realGet(lbKey))?.[lbKey]
-          );
-          const fromBoard = lb ? ytLeaderboardToKoken(lb, arr, lv) : null;
-          if (fromBoard) synth[`nls_koken_api_contrib_${lv}`] = { newValue: fromBoard };
-        } catch {
-        }
         shimDiag.notified += 1;
         shimDiag.listeners = listeners.length;
         shimDiag.lastNotifiedAt = Date.now();
@@ -1341,9 +1330,12 @@ ${sourceCol}
           const vid = ck.slice("yt_leaderboard_".length);
           const lv = pseudoLvForVideoId(vid);
           void buildCommentsForLv(lv).then((arr) => {
-            const koken = ytLeaderboardToKoken(changes[ck].newValue, arr || [], lv);
-            if (!koken) return;
-            const synth = { [`nls_koken_api_contrib_${lv}`]: { newValue: koken } };
+            const sum = knownSummaries?.[vid];
+            const gifts = (
+              /** @type {Record<string, any>} */
+              buildYtGiftBags(arr || [], lv, { startedAt: ytTrustedStartedAt(sum, vid) })
+            );
+            const synth = { [`nls_koken_api_contrib_${lv}`]: { newValue: gifts?.koken ?? null } };
             for (const fn of listeners) {
               try {
                 fn(synth, "local");
