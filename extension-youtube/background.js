@@ -1227,7 +1227,8 @@
             broadcasterIconUrl: payload.broadcasterIconUrl ? String(payload.broadcasterIconUrl) : void 0,
             broadcasterHandle: payload.broadcasterHandle ? String(payload.broadcasterHandle) : void 0,
             concurrentViewers: typeof payload.concurrentViewers === "number" ? payload.concurrentViewers : void 0,
-            startedAt: typeof payload.startedAt === "number" ? payload.startedAt : void 0
+            // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
+            startedAt: typeof payload.startedAt === "number" && !Object.entries(summaries).some(([vid, s]) => vid !== videoId && Number(s?.startedAt) === payload.startedAt) ? payload.startedAt : void 0
           },
           Date.now()
         );

@@ -228,12 +228,36 @@ export function ytRecordToNicoEntry(r, i, lv, personKey) {
  * @param {string} videoId
  * @param {string} tabTitle
  */
-export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
+/**
+ * 配信の開始時刻。前の動画の開始時刻がそのまま移ってしまった記録(古い版で記録したもの)は信じない:
+ * 自分より先に記録を始めた別の動画と同じ開始時刻なら、それは前の動画のもの。
+ * @param {any} sum
+ * @param {string} videoId
+ * @param {Record<string, any>} [all]
+ */
+function ytTrustedStartedAt(sum, videoId, all) {
+  const t = Number(sum?.startedAt || 0);
+  if (!(t > 0)) return 0;
+  const mine = Number(sum?.createdAt || 0);
+  for (const [vid, other] of Object.entries(all || knownSummaries || {})) {
+    if (vid === videoId) continue;
+    if (Number(other?.startedAt) === t && Number(other?.createdAt || 0) <= mine) return 0;
+  }
+  return t;
+}
+
+/**
+ * @param {any} sum
+ * @param {string} videoId
+ * @param {string} tabTitle
+ * @param {Record<string, any>} [all] 全部の配信のまとめ(開始時刻の取り違えを見分けるため)
+ */
+export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。分からないときだけ、記録を始めた時刻で代わりにする。
-  const startedAt = Number(sum?.startedAt || 0) || Number(sum?.createdAt || 0);
+  const startedAt = ytTrustedStartedAt(sum, videoId, all) || Number(sum?.createdAt || 0);
   const ucId = String(sum?.broadcasterChannelId || '');
   const handle = String(sum?.broadcasterHandle || '');
   // UC… が分からない配信は、記録の中の同じ名前の人(配信者がチャットに書いていれば UC… が分かる)→ @名前 の順で決める
@@ -346,7 +370,7 @@ function buildCommentsForLv(lv) {
 async function buildGiftBagsForLv(lv, summary) {
   const entries = await buildCommentsForLv(lv);
   if (!entries) return undefined;
-  return buildYtGiftBags(entries, lv, { startedAt: Number(summary?.startedAt || 0) });
+  return buildYtGiftBags(entries, lv, { startedAt: ytTrustedStartedAt(summary, videoIdForPseudoLv(lv)) });
 }
 
 /**
@@ -402,7 +426,7 @@ async function buildCommentsForLvUncached(lv) {
     try {
       const bag = await real.storage.local.get(KEY_YT_SUMMARIES);
       const sum = bag?.[KEY_YT_SUMMARIES]?.[vid];
-      streamStartedAt = Number(sum?.startedAt || 0);
+      streamStartedAt = ytTrustedStartedAt(sum, vid, bag?.[KEY_YT_SUMMARIES]);
     } catch {
       /* 分からなければ受け取った時刻 */
     }
@@ -558,7 +582,9 @@ if (real && real.storage && real.storage.local && real.tabs) {
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
         // 先に記録を読む(アーカイブかどうか・配信者の UC… が記録から分かるため)
         const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
-        const snapshot = /** @type {Record<string, any>} */ (ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || '')));
+        const snapshot = /** @type {Record<string, any>} */ (
+          ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ''), (bag && bag[KEY_YT_SUMMARIES]) || {})
+        );
         // 「ギフトpt」= YouTube の有料の応援の合計(円にしたおよその額)
         if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
         return { ok: true, snapshot };
@@ -638,7 +664,7 @@ if (real && real.storage && real.storage.local && real.tabs) {
       /** @type {Record<string, { newValue: any }>} */
       const synth = { [`${COMMENTS_PREFIX}${lv}`]: { newValue: arr }, [`${TAIL_PREFIX}${lv}`]: { newValue: arr } };
       try {
-        const gifts = /** @type {Record<string, any>} */ (buildYtGiftBags(arr, lv, { startedAt: Number(summary?.startedAt || 0) }));
+        const gifts = /** @type {Record<string, any>} */ (buildYtGiftBags(arr, lv, { startedAt: ytTrustedStartedAt(summary, videoIdForPseudoLv(lv)) }));
         if (gifts && gifts.count > 0) {
           for (const [pre, field] of GIFT_KEY_PREFIXES) {
             const v = gifts[field];

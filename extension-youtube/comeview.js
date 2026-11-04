@@ -617,10 +617,20 @@
       ytCurrency: String(r?.currency || "")
     };
   }
-  function ytSummaryToNicoSnapshot(sum, videoId, tabTitle) {
+  function ytTrustedStartedAt(sum, videoId, all) {
+    const t = Number(sum?.startedAt || 0);
+    if (!(t > 0)) return 0;
+    const mine = Number(sum?.createdAt || 0);
+    for (const [vid, other] of Object.entries(all || knownSummaries || {})) {
+      if (vid === videoId) continue;
+      if (Number(other?.startedAt) === t && Number(other?.createdAt || 0) <= mine) return 0;
+    }
+    return t;
+  }
+  function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     const lv = pseudoLvForVideoId(videoId);
     const viewers = typeof sum?.concurrentViewers === "number" ? sum.concurrentViewers : NaN;
-    const startedAt = Number(sum?.startedAt || 0) || Number(sum?.createdAt || 0);
+    const startedAt = ytTrustedStartedAt(sum, videoId, all) || Number(sum?.createdAt || 0);
     const ucId = String(sum?.broadcasterChannelId || "");
     const handle = String(sum?.broadcasterHandle || "");
     const ucFromRecords = !ucId && handle ? ucByNameHint.get(normName(handle)) || "" : "";
@@ -704,7 +714,7 @@
   async function buildGiftBagsForLv(lv, summary) {
     const entries = await buildCommentsForLv(lv);
     if (!entries) return void 0;
-    return buildYtGiftBags(entries, lv, { startedAt: Number(summary?.startedAt || 0) });
+    return buildYtGiftBags(entries, lv, { startedAt: ytTrustedStartedAt(summary, videoIdForPseudoLv(lv)) });
   }
   function ytLeaderboardToKoken(board, entries, lv) {
     const rows = Array.isArray(board?.rows) ? board.rows : [];
@@ -749,7 +759,7 @@
       try {
         const bag = await real.storage.local.get(KEY_YT_SUMMARIES);
         const sum = bag?.[KEY_YT_SUMMARIES]?.[vid];
-        streamStartedAt = Number(sum?.startedAt || 0);
+        streamStartedAt = ytTrustedStartedAt(sum, vid, bag?.[KEY_YT_SUMMARIES]);
       } catch {
       }
     }
@@ -891,7 +901,7 @@
           const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => void 0);
           const snapshot = (
             /** @type {Record<string, any>} */
-            ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ""))
+            ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ""), bag && bag[KEY_YT_SUMMARIES] || {})
           );
           if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;
           return { ok: true, snapshot };
@@ -955,7 +965,7 @@
         try {
           const gifts = (
             /** @type {Record<string, any>} */
-            buildYtGiftBags(arr, lv, { startedAt: Number(summary?.startedAt || 0) })
+            buildYtGiftBags(arr, lv, { startedAt: ytTrustedStartedAt(summary, videoIdForPseudoLv(lv)) })
           );
           if (gifts && gifts.count > 0) {
             for (const [pre, field] of GIFT_KEY_PREFIXES) {
