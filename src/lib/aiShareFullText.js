@@ -448,6 +448,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    // 2026-11-04 計器: 吹き出しが一気に出た束(過去ログ/まとめ届き/本当に一気)の1行。
+    try {
+      const bbLine = String(/** @type {any} */ (venueSeatsDiag)?.bubbleBurst?.line || '');
+      if (bbLine) lines.push(bbLine);
+    } catch {
+      /* no-op */
+    }
     // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断(使用時のみ)。「ちゃんと飛ぶか・音が出るか」を共有に載せる。
     try {
       const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now(), (Array.isArray(livesData) ? livesData : []).map((/** @type {any} */ l) => l?.lv));
