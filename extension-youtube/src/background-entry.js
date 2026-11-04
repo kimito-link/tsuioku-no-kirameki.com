@@ -448,6 +448,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             !Object.entries(summaries).some(([vid, s]) => vid !== videoId && Number(s?.startedAt) === payload.startedAt)
               ? payload.startedAt
               : undefined,
+          startedAtApprox: payload.startedAtApprox === true,
         },
         Date.now(),
       );

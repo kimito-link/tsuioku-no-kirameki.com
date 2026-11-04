@@ -721,10 +721,22 @@
     const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || "").trim();
     const itemCount = typeof patch?.itemCount === "number" && Number.isFinite(patch.itemCount) && patch.itemCount >= 0 ? Math.floor(patch.itemCount) : typeof prev.itemCount === "number" && Number.isFinite(prev.itemCount) ? Math.floor(prev.itemCount) : 0;
     const okTime = (v) => typeof v === "number" && Number.isFinite(v) && v > 0;
-    const startedAt = okTime(patch?.startedAt) ? Math.floor(
-      /** @type {number} */
-      patch.startedAt
-    ) : okTime(prev.startedAt) ? Math.floor(prev.startedAt) : null;
+    const approx = patch?.startedAtApprox === true;
+    let startedAt = okTime(prev.startedAt) ? Math.floor(prev.startedAt) : null;
+    let startedAtApprox = prev.startedAtApprox === true;
+    if (okTime(patch?.startedAt)) {
+      const v = Math.floor(
+        /** @type {number} */
+        patch.startedAt
+      );
+      if (!approx) {
+        startedAt = v;
+        startedAtApprox = false;
+      } else if (startedAt === null || v < startedAt) {
+        startedAt = v;
+        startedAtApprox = true;
+      }
+    }
     const createdAt = typeof prev.createdAt === "number" && Number.isFinite(prev.createdAt) && prev.createdAt > 0 ? prev.createdAt : nowMs;
     return {
       videoId,
@@ -738,6 +750,7 @@
       chatFilterLabel,
       itemCount,
       startedAt,
+      ...startedAtApprox ? { startedAtApprox: true } : {},
       createdAt,
       updatedAt: nowMs
     };
@@ -1334,7 +1347,8 @@
             broadcasterHandle: payload.broadcasterHandle ? String(payload.broadcasterHandle) : void 0,
             concurrentViewers: typeof payload.concurrentViewers === "number" ? payload.concurrentViewers : void 0,
             // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
-            startedAt: typeof payload.startedAt === "number" && !Object.entries(summaries).some(([vid, s]) => vid !== videoId && Number(s?.startedAt) === payload.startedAt) ? payload.startedAt : void 0
+            startedAt: typeof payload.startedAt === "number" && !Object.entries(summaries).some(([vid, s]) => vid !== videoId && Number(s?.startedAt) === payload.startedAt) ? payload.startedAt : void 0,
+            startedAtApprox: payload.startedAtApprox === true
           },
           Date.now()
         );

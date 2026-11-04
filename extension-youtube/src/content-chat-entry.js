@@ -353,7 +353,26 @@ function readStreamStartedAt(videoId) {
   } catch {
     // ignore
   }
-  return readRelativeStartedAt();
+  return null;
+}
+
+// ページ内で別の配信へ移ったあとは、上の欄が新しい配信に変わらない。同じ YouTube の視聴ページを1回だけ
+//   取り寄せて、中の "startTimestamp"(配信の開始時刻・秒まで)を読む(0.1.39・目安の「3 時間前」だと
+//   見るたびに最大1時間ずれ、投げ一覧の時刻が16分動いた 2026-11-04 実機)。
+/** @type {Map<string, number | null>} */
+const fetchedStartedAt = new Map();
+/** @param {string} videoId */
+function fetchExactStartedAt(videoId) {
+  if (!videoId || fetchedStartedAt.has(videoId)) return;
+  fetchedStartedAt.set(videoId, null);
+  void fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { credentials: 'include' })
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((html) => {
+      const m = String(html || '').match(/"startTimestamp":"([^"]+)"/);
+      const ms = m ? Date.parse(m[1]) : NaN;
+      if (Number.isFinite(ms) && ms > 0 && ms <= Date.now()) fetchedStartedAt.set(videoId, ms);
+    })
+    .catch(() => {});
 }
 
 /**
@@ -425,6 +444,21 @@ function saveViewerProbe() {
  * 視聴ページ（/watch・/live/ID）で配信タイトル・配信者名・アイコン・同時視聴数を拾って SW へ通知する。
  * YouTube はページ遷移しない（SPA）ので、どのページで読み込まれても動き、URL が視聴ページの時だけ送る。
  */
+/**
+ * 開始時刻: ページの欄(正確)→取り寄せた視聴ページ(正確)→「N 時間前にライブ配信開始」(目安・approx)。
+ * @param {string} videoId
+ */
+function startedAtFields(videoId) {
+  const exact = readStreamStartedAt(videoId);
+  if (exact) return { startedAt: exact };
+  const fetched = fetchedStartedAt.get(videoId);
+  if (fetched) return { startedAt: fetched };
+  const approx = readRelativeStartedAt();
+  if (!approx) return {};
+  fetchExactStartedAt(videoId); // 生配信中だと分かったときだけ取り寄せる
+  return { startedAt: approx, startedAtApprox: true };
+}
+
 function setupWatchPageMetaObserver() {
   const sendMeta = () => {
     if (!isYtWatchLikeUrl(String(window.location.href || ''))) return;
@@ -475,7 +509,7 @@ function setupWatchPageMetaObserver() {
         broadcasterHandle,
         broadcasterIconUrl: readBroadcasterIconUrl(),
         concurrentViewers: viewers,
-        startedAt: readStreamStartedAt(videoId),
+        ...startedAtFields(videoId),
       },
     });
     if (viewers === null) saveViewerProbe();
