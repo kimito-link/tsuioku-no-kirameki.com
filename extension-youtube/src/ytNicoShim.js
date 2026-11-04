@@ -1085,10 +1085,10 @@ function ensureZeroPtGifts() {
       n.nodeValue = String(n.nodeValue || '').replace(/（[^（）]*）\s*$/, '');
     }
   });
-  // 絵の無いギフトは空の四角ではなく印を入れる(メンバー加入は★・ほかは🎁)
+  // 絵の無いギフトは空の四角ではなく印を入れる(メンバー加入は★・スパチャは¥・ステッカーは✦・ほかは🎁)
   next.querySelectorAll('.nl-gift-ledger-row__thumb--empty').forEach((box) => {
     const name = String(box.parentElement?.textContent || '');
-    box.textContent = /メンバー/.test(name) ? '★' : '🎁';
+    box.textContent = /メンバー/.test(name) ? '★' : /スーパーチャット/.test(name) ? '¥' : /ステッカー/.test(name) ? '✦' : '🎁';
     box.style.cssText += ';display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;border-radius:6px;background:#e8f4ff;color:#2b7bd6';
   });
   // 絵の読み込みに失敗したら消す(拡張の画面ではインラインの onerror が使えない)
