@@ -813,7 +813,7 @@ ${sourceCol}
     return ytKeyByNumericUid.get(String(uid || "")) || "";
   }
   function ytChannelUrlForNumericUid(uid) {
-    const key = ytKeyForNumericUid(uid);
+    const key = ytKeyForNumericUid(uid).replace(/^topfan:/, "");
     if (/^UC[A-Za-z0-9_-]{22}$/.test(key)) return `https://www.youtube.com/channel/${key}`;
     const h = key.startsWith("handle:@") ? key.slice("handle:@".length) : "";
     return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : "";
@@ -967,7 +967,8 @@ ${sourceCol}
       rows: rows.map((r) => {
         const name = String(r?.name || "");
         const hit = byName.get(normName(name));
-        const uid = hit?.uid || numericUidForYtKey(`handle:${name.startsWith("@") ? name : `@${name}`}`);
+        const personKey = hit?.uid && ytKeyForNumericUid(hit.uid) || `handle:${name.startsWith("@") ? name : `@${name}`}`;
+        const uid = numericUidForYtKey(`topfan:${personKey}`);
         const icon = String(r?.iconUrl || "") || hit?.icon || "";
         if (icon) ytIconByNumericUid.set(uid, icon);
         return {
@@ -1300,7 +1301,7 @@ ${sourceCol}
   var NICO_USER_LINK_RE = /^https?:\/\/(?:www\.)?nicovideo\.jp\/user\/(\d+)/;
   var PSEUDO_UID_RE = /8\d{9}/g;
   function ytLabelForUid(uid) {
-    const key = ytKeyForNumericUid(uid);
+    const key = ytKeyForNumericUid(uid).replace(/^topfan:/, "");
     if (!key) return "";
     if (key.startsWith("name:")) return "";
     if (key.startsWith("handle:")) return key.slice("handle:".length);
