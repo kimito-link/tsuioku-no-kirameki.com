@@ -55,3 +55,12 @@ describe('ytStableOrder(一度並べたコメントの順を変えない・ち�
     expect(ytStableOrder(lv, [a, x, b, c, d]).map((r) => r.id)).toEqual(['a', 'b', 'c', 'x', 'd']);
   });
 });
+
+describe('ytOwnerRowsLast(配信者のコメントを最後に回す)', () => {
+  it('owner バッジ・配信者の UC… の行は最後、ほかの順は変えない', async () => {
+    const { ytOwnerRowsLast } = await import('../../../extension-youtube/src/ytNicoShim.js');
+    const rows = [{ id: 'a' }, { id: 'o', badges: ['owner'] }, { id: 'b' }, { id: 'c', channelId: 'UCown' }, { id: 'd' }];
+    expect(ytOwnerRowsLast(rows, { broadcasterChannelId: 'UCown' }).map((r) => r.id)).toEqual(['a', 'b', 'd', 'o', 'c']);
+    expect(ytOwnerRowsLast([{ id: 'a' }], {}).map((r) => r.id)).toEqual(['a']);
+  });
+});

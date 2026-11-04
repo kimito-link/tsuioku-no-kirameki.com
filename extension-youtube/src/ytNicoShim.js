@@ -457,11 +457,30 @@ export function ytStableOrder(lv, list) {
     .map((x) => x.r);
 }
 
+/**
+ * 配信者が書いたコメントは列の最後に回す。ニコ生版は配信者のコメントを一覧から除くが、除く判断(配信者の数字ID)が
+ * 読み直しごとに揺れると(UC… が後から分かる等)、配信者のコメントがある回と無い回で、それより後ろのマスが全部
+ * 1つずつずれる(2026-11-04 計器: 読み直しのたびに約335マスが前後に入れ替わり、配信者のコメントは1件)。
+ * 最後にあれば、除かれても除かれなくても前のマスは動かない。
+ * @param {any[]} list
+ * @param {any} sum yt_stream_summaries の1件
+ */
+export function ytOwnerRowsLast(list, sum) {
+  const ch = String(sum?.broadcasterChannelId || '');
+  const handle = normName(sum?.broadcasterHandle);
+  const isOwner = (/** @type {any} */ r) =>
+    (Array.isArray(r?.badges) && r.badges.includes('owner')) ||
+    (!!ch && String(r?.channelId || '') === ch) ||
+    (!!handle && normName(r?.name) === handle);
+  if (!list.some(isOwner)) return list;
+  return [...list.filter((r) => !isOwner(r)), ...list.filter(isOwner)];
+}
+
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
   const items = await getYtStreamCommentsByVideoId(vid);
-  const list = ytStableOrder(lv, Array.isArray(items) ? items : []);
+  const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
   // 顔の分からない人(YouTube のギフトだけ送った人など)は、トップファンの順位表の顔を名前で引く
   /** @type {Map<string, string>} */
   const boardIconByName = new Map();
@@ -671,6 +690,14 @@ if (real && real.storage && real.storage.local && real.tabs) {
           return { ok: true, dataUrl: res.dataUrl, liveId: pseudoLvForVideoId(vid) };
         }
         return { ok: false, errorCode: String(res?.reason || 'capture_failed') };
+      });
+    }
+    if (type === 'NLS_EXPORT_INTERCEPT_CACHE') {
+      // ニコ生版はここで、視聴ページが通信から拾った人の情報(名前・顔)をもらう。YouTube 版は記録そのものに
+      // 名前と顔が入っているので、渡す物は無い。答えないと「ページとの通信に失敗しました」と出るので、空で正常と答える。
+      return realTabsGet(tabId).then((tab) => {
+        const vid = parseYtVideoIdFromUrl(String(tab?.url || ''));
+        return { ok: true, items: [], liveId: vid ? pseudoLvForVideoId(vid) : '', frameHref: String(tab?.url || '') };
       });
     }
     if (type === 'NLS_POST_COMMENT') {
