@@ -17,7 +17,13 @@ import {
   enqueueYtVoiceItem,
 } from '../../src/lib/youtube/ytVoiceQueue.js';
 import { mergeYtStreamSummary } from '../../src/lib/youtube/ytStreamStorePolicy.js';
-import { appendYtStreamCommentsIdb, resetYtCommentsDb } from './ytIdbStore.js';
+import {
+  appendYtStreamCommentsIdb,
+  resetYtCommentsDb,
+  getYtStreamCommentsByVideoId,
+  deleteYtCommentsByPks,
+} from './ytIdbStore.js';
+import { pickSwitchLeakPks } from '../../src/lib/youtube/ytSwitchLeakCleanup.js';
 
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
@@ -313,6 +319,34 @@ try {
 } catch {
   // alarms が使えない環境では従来どおり手で 🔄
 }
+
+// 0.1.37 一回きりの片付け(りんく 2026-11-04 OK): 0.1.35 までは、配信を切り替えた瞬間にチャット欄に残っていた
+//   前の配信のコメントが新しい配信の記録に入っていた。実機で分かった1件(初音ミク ZcCrxy_B4fg → DaiGo GRvNsGECdtc・
+//   11:30:53 の最初の1秒に23件)だけを、見分けの条件(ytSwitchLeakCleanup.js)に当てはまる分に限って消す。
+const SWITCH_LEAK_CLEANUPS = [{ key: 'yt_cleanup_switch_leak_GRvNsGECdtc', target: 'GRvNsGECdtc', prev: 'ZcCrxy_B4fg' }];
+async function runSwitchLeakCleanups() {
+  for (const job of SWITCH_LEAK_CLEANUPS) {
+    try {
+      const done = await chrome.storage.local.get(job.key);
+      if (done && done[job.key]) continue;
+      const target = await getYtStreamCommentsByVideoId(job.target);
+      const prev = await getYtStreamCommentsByVideoId(job.prev);
+      if (!target.length || !prev.length) continue; // 記録が無い PC では何もしない(印も付けない)
+      const pks = pickSwitchLeakPks(target, prev);
+      const total = pks.length ? await deleteYtCommentsByPks(job.target, pks) : target.length;
+      const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
+      const summaries = (data && data[STORAGE_KEYS.STREAM_SUMMARIES]) || {};
+      if (summaries[job.target]) {
+        summaries[job.target] = { ...summaries[job.target], itemCount: total };
+        await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
+      }
+      await chrome.storage.local.set({ [job.key]: { at: Date.now(), removed: pks.length, total } });
+    } catch {
+      // 失敗したら印を付けず、次に起きたときにもう一度
+    }
+  }
+}
+void runSwitchLeakCleanups();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
