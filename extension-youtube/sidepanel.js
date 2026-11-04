@@ -46129,7 +46129,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-04T07:18" ? String("yt-2026-11-04T07:18") : "dev";
+      const buildId = "yt-2026-11-04T07:23" ? String("yt-2026-11-04T07:23") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46147,7 +46147,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.69") : "";
+    const bundledVersion = true ? String("0.1.70") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46192,7 +46192,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-04T07:18" ? String("yt-2026-11-04T07:18") : "dev";
+            return "yt-2026-11-04T07:23" ? String("yt-2026-11-04T07:23") : "dev";
           } catch {
             return "dev";
           }
