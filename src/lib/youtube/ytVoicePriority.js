@@ -16,11 +16,22 @@ export const YT_VOICE_CROWD_QUEUE = 2;
  * @returns {boolean}
  */
 export function ytIsImportantVoiceRow(row, firstOfUser) {
-  if (firstOfUser) return true;
-  if (!row || typeof row !== 'object') return false;
-  if (IMPORTANT_KINDS.has(String(row.kind || ''))) return true;
-  const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || '').toLowerCase()) : [];
-  return badges.some((b) => IMPORTANT_BADGES.has(b));
+  return ytImportantVoiceReason(row, firstOfUser) !== '';
+}
+
+/**
+ * 大事な理由(計器用)。大事でなければ ''。
+ * @param {{ kind?: unknown, badges?: unknown }} row
+ * @param {boolean} firstOfUser
+ * @returns {'' | 'kind' | 'badge' | 'first'}
+ */
+export function ytImportantVoiceReason(row, firstOfUser) {
+  if (row && typeof row === 'object') {
+    if (IMPORTANT_KINDS.has(String(row.kind || ''))) return 'kind';
+    const badges = Array.isArray(row.badges) ? row.badges.map((b) => String(b || '').toLowerCase()) : [];
+    if (badges.some((b) => IMPORTANT_BADGES.has(b))) return 'badge';
+  }
+  return firstOfUser ? 'first' : '';
 }
 
 /**
@@ -30,12 +41,22 @@ export function ytIsImportantVoiceRow(row, firstOfUser) {
  * @returns {boolean[]} rows と同じ並びの「大事か」
  */
 export function ytMarkImportantVoiceRows(rows, personKeyOf) {
+  return ytImportantVoiceReasons(rows, personKeyOf).map((r) => r !== '');
+}
+
+/**
+ * ytMarkImportantVoiceRows の理由つき版(計器用)。
+ * @param {ReadonlyArray<any>} rows
+ * @param {(row: any) => string} personKeyOf
+ * @returns {Array<'' | 'kind' | 'badge' | 'first'>}
+ */
+export function ytImportantVoiceReasons(rows, personKeyOf) {
   const seen = new Set();
   return (Array.isArray(rows) ? rows : []).map((r) => {
     const k = String(personKeyOf(r) || '');
     const first = !!k && !seen.has(k);
     if (k) seen.add(k);
-    return ytIsImportantVoiceRow(r, first);
+    return ytImportantVoiceReason(r, first);
   });
 }
 

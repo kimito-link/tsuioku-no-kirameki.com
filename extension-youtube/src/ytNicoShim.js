@@ -21,7 +21,7 @@ import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/yout
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
-import { ytMarkImportantVoiceRows } from '../../src/lib/youtube/ytVoicePriority.js';
+import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
@@ -554,7 +554,12 @@ async function getCommentsViaBackground(vid) {
 }
 
 /** 会場の読み上げで大事なコメントのキー(venueSpeech.js の venueSpeechKey と同じ形 no:<番号>) */
-const ytVoiceImportantKeys = new Set();
+/** @type {Map<string, string>} キー → 大事な理由(kind/badge/first) */
+const ytVoiceImportantKeys = new Map();
+/** @param {string} key @returns {string} 大事な理由(大事でなければ '') */
+export function ytImportantVoiceReasonOfKey(key) {
+  return ytVoiceImportantKeys.get(String(key || '')) || '';
+}
 /** @param {string} key */
 export function ytIsImportantVoiceKey(key) {
   return ytVoiceImportantKeys.has(String(key || ''));
@@ -591,7 +596,7 @@ async function buildCommentsForLvUncached(lv) {
   const wantHandles = new Set();
   const who = buildYtPersonResolver(list);
   // 会場の読み上げ: 混んでいるときは大事なコメントだけ読む(りんく決定 2026-11-04)。どれが大事かの印をここで付ける
-  const important = IS_VENUE_CONTEXT ? ytMarkImportantVoiceRows(list, (r) => who.keyOf(r)) : null;
+  const important = IS_VENUE_CONTEXT ? ytImportantVoiceReasons(list, (r) => who.keyOf(r)) : null;
   let streamStartedAt = 0;
   if (list.some((r) => r?.replay)) {
     replayVideoIds.add(vid);
@@ -615,7 +620,7 @@ async function buildCommentsForLvUncached(lv) {
     }
     const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
-    if (important?.[i]) ytVoiceImportantKeys.add(`no:${e.commentNo}`);
+    if (important?.[i]) ytVoiceImportantKeys.set(`no:${e.commentNo}`, important[i]);
     return e;
   });
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
