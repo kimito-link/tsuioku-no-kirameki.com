@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1892',
+    date: '2026-11-05',
+    summary: 'マーケ総合サマリに最大同接を出す',
+    items: Object.freeze([
+      'マーケの「総合サマリ」の先頭に「最大同接」(同時に見ていた人数の最大)と平均を出すようにしました。YouTube には延べの来場者数が無いので、同接がサマリのどこにも出ていませんでした'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1891',
     date: '2026-11-05',
     summary: 'YouTube の同接をパネルを閉じても記録',
@@ -189,15 +197,8 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ギフト欄の作りを記録する仕組みが、アイテムを見つけられなかったときに何も残していませんでした。見つからないときも、どの窓で動いたか・画像や入れ子の窓がいくつ見えたかを残し、親のページでは窓の一覧も残すようにしました。読むだけで、押したり送ったりはしません'
     ])
-  }),
-  Object.freeze({
-    version: '0.1.1871',
-    date: '2026-11-05',
-    summary: '公式ギフト欄の作りを記録する',
-    items: Object.freeze([
-      '会場からギフトを選べるようにする準備として、公式のギフト欄を開いたときに、アイテムの並び方(画像・pt・押す場所)と確認の窓の形を、この PC の中にだけ記録します。読むだけで、押したり送ったりはしません'
-    ])
   })
+
 ]);
 
 

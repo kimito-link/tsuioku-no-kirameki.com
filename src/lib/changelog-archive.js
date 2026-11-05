@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1871',
+    date: '2026-11-05',
+    summary: '公式ギフト欄の作りを記録する',
+    items: Object.freeze([
+      '会場からギフトを選べるようにする準備として、公式のギフト欄を開いたときに、アイテムの並び方(画像・pt・押す場所)と確認の窓の形を、この PC の中にだけ記録します。読むだけで、押したり送ったりはしません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1870',
     date: '2026-11-05',
     summary: '会場からギフト画面を開く',
