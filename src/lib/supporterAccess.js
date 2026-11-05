@@ -14,6 +14,7 @@ import {
   SUPPORTER_GATE_ENFORCED,
   decideFeatureAccess,
   isValidSupporterCode,
+  shouldShowCreditBadge,
   shouldRefreshLicense,
   verifyLicenseToken
 } from './supporterLicense.js';
@@ -119,6 +120,26 @@ export async function checkMarketingAccess(deps) {
     nowMs
   });
   return { ...decision, hasCode };
+}
+
+/**
+ * コメビュの隅の「追憶のきらめき」の印を出すか(手元の証明書だけで決める=配信中に通信しない)。
+ *   ★判定に失敗したら出さない側(配信画面に勝手にロゴが出るほうが困る)。
+ * @param {{ storage: StorageLike, nowMs?: number, enforced?: boolean, publicKeys?: Readonly<Record<string, string>> }} deps
+ */
+export async function checkCreditBadge(deps) {
+  const enforced = deps.enforced ?? SUPPORTER_GATE_ENFORCED;
+  if (!enforced) return false;
+  try {
+    const bag = (await deps.storage.get([KEY_SUPPORTER_LICENSE])) || {};
+    const license = typeof bag[KEY_SUPPORTER_LICENSE] === 'string' ? bag[KEY_SUPPORTER_LICENSE] : '';
+    const v = license
+      ? await verifyLicenseToken(license, { nowMs: deps.nowMs ?? Date.now(), publicKeys: deps.publicKeys })
+      : null;
+    return shouldShowCreditBadge({ enforced, licenseStatus: v ? v.status : null });
+  } catch {
+    return false;
+  }
 }
 
 /**

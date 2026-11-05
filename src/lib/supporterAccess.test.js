@@ -3,6 +3,7 @@ import {
   KEY_SUPPORTER_CODE,
   KEY_SUPPORTER_FIRST_SEEN_AT,
   KEY_SUPPORTER_LICENSE,
+  checkCreditBadge,
   checkMarketingAccess,
   saveSupporterCode
 } from './supporterAccess.js';
@@ -95,5 +96,21 @@ describe('supporterAccess', () => {
     expect(st.m.get(KEY_SUPPORTER_CODE)).toBe(CODE);
     expect(await saveSupporterCode({ storage: st, code: ` ${CODE} `, fetchImpl: okFetch('lic') })).toBe('ok');
     expect(st.m.get(KEY_SUPPORTER_LICENSE)).toBe('lic');
+  });
+});
+
+describe('supporterAccess: コメビュの隅の印', () => {
+  it('既定(関所が開いている)は出さない・通信しない', async () => {
+    expect(await checkCreditBadge({ storage: memStorage() })).toBe(false);
+  });
+  it('関所を閉めると無料の人に出し、有効な証明書があれば出さない', async () => {
+    const s = await signer();
+    const lic = await s.make(T0 + 30 * DAY);
+    expect(await checkCreditBadge({ storage: memStorage(), enforced: true, nowMs: T0 })).toBe(true);
+    expect(await checkCreditBadge({ storage: memStorage({ [KEY_SUPPORTER_LICENSE]: lic }), enforced: true, nowMs: T0, publicKeys: s.keys })).toBe(false);
+  });
+  it('読めないときは出さない側', async () => {
+    const broken = { get: async () => { throw new Error('x'); }, set: async () => {} };
+    expect(await checkCreditBadge({ storage: broken, enforced: true })).toBe(false);
   });
 });
