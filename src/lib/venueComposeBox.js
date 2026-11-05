@@ -272,16 +272,16 @@ export function createVenueGiftStrip(opts) {
   hint.className = 'nlsb-gift-hint';
   hint.style.cssText = 'flex:0 0 auto;font-size:10px;line-height:1.15;white-space:nowrap;opacity:.85';
   const paintMode = () => {
-    hint.textContent = direct ? '押すとすぐ贈る' : '2回押して贈る';
-    hint.title = direct ? 'アイテムを1回押すと、ポイントを使ってすぐ贈ります(手数料が足されます)' : 'アイテムを1回押すと「贈る?」と出ます。もう一度押すと、ポイントを使って贈ります(手数料が足されます)';
+    hint.textContent = direct ? '押すと公式の確認' : '2回押すと公式の確認';
+    hint.title = direct ? 'アイテムを押すと公式の購入の確認が出ます。公式の「購入します」を押すと贈られます(手数料が足されます)' : 'アイテムを1回押すと「贈る?」と出ます。もう一度押すと公式の購入の確認が出ます。公式の「購入します」を押すと贈られます(手数料が足されます)';
     for (const b of strip.querySelectorAll('.nlsb-gift-item')) {
       const base = String(b.getAttribute('data-label') || '');
-      /** @type {HTMLElement} */ (b).title = direct ? `${base}(1回押すとすぐ贈ります・ポイントが使われます)` : `${base}(2回押すと会場のまま贈ります・1回目は「贈る?」と出るだけ)`;
+      /** @type {HTMLElement} */ (b).title = direct ? `${base}(押すと公式の購入の確認が出ます)` : `${base}(2回押すと公式の購入の確認が出ます・1回目は「贈る?」と出るだけ)`;
     }
     if (!modeBtn) return;
     modeBtn.textContent = direct ? '1回' : '2回';
     modeBtn.setAttribute('aria-pressed', direct ? 'true' : 'false');
-    modeBtn.title = direct ? '1回押すとすぐ贈ります(押すと2回押しに戻す)' : '2回押すと贈ります(押すと「1回で贈る」にする)';
+    modeBtn.title = direct ? '1回押すと公式の確認が出ます(押すと2回押しに戻す)' : '2回押すと公式の確認が出ます(押すと1回押しにする)';
     modeBtn.style.background = direct ? '#c0392b' : '';
     modeBtn.style.color = direct ? '#fff' : '';
   };
@@ -322,11 +322,10 @@ export function createVenueGiftStrip(opts) {
       pt.textContent = it.pt.replace(/\s+/g, '');
       pt.style.cssText = 'font-size:10px;white-space:nowrap';
       b.append(pt);
-      const label = `${it.name ? it.name + ' ' : ''}${it.pt.replace(/\s+/g, '')}`;
       const send = async () => {
         if (Date.now() < busyUntil) return; // 続けて押しても二重に贈らない
-        busyUntil = Date.now() + 15000; // 結果が返るまで(最長10秒)は受けない
-        pt.textContent = '…';
+        busyUntil = Date.now() + 32000; // 結果が返るまで(本人が公式で確定するのを最長30秒待つ)は受けない
+        pt.textContent = '公式で確認…'; // v0.1.1887: 公式の購入の確認を本人が押すまで待つ
         let res = null;
         try { res = await opts.press(it.key, { direct: true }); } catch { res = null; }
         if (res && res.ok && res.sent) {
@@ -334,8 +333,7 @@ export function createVenueGiftStrip(opts) {
         } else if (res && res.notFound) {
           pt.textContent = '見つかりません'; // 公式の欄にこのアイテムが無かった(何も押していない)
         } else if (res && res.ok) {
-          try { opts.tuck?.(true, `「${label}」を押しましたが、贈れたかを確かめられませんでした。公式の欄に確認が出ていれば、値段を確かめて公式のボタンで贈れます。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
-          pt.textContent = '公式で確認';
+          pt.textContent = '贈っていません'; // 公式の確認で購入を押さなかった(30秒)・ポイントは減っていない
         } else {
           pt.textContent = '開けません';
         }
