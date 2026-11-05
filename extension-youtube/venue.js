@@ -17678,7 +17678,7 @@ ${sourceCol}
     const doc = opts.doc || document;
     const form = doc.createElement("form");
     form.className = "nlsb-compose";
-    form.style.cssText = "display:inline-flex;align-items:center;gap:4px;margin:0;";
+    form.style.cssText = "position:relative;display:inline-flex;align-items:center;gap:4px;margin:0;";
     const input = doc.createElement("input");
     input.type = "text";
     input.className = "nlsb-compose-input";
@@ -17693,7 +17693,7 @@ ${sourceCol}
     btn.disabled = true;
     const status = doc.createElement("span");
     status.className = "nlsb-compose-status";
-    status.style.cssText = "font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    status.style.cssText = "position:absolute;top:calc(100% + 4px);left:0;z-index:5;width:max-content;max-width:min(360px,80vw);padding:4px 10px;border-radius:8px;background:rgba(255,255,255,0.97);box-shadow:0 1px 4px rgba(0,0,0,0.3);font-size:12px;font-weight:600;line-height:1.4;white-space:normal;pointer-events:none;";
     status.hidden = true;
     let busy = false;
     let clearTimer = 0;
@@ -17710,7 +17710,7 @@ ${sourceCol}
       setTimeout(() => {
         status.hidden = true;
         clearTimer = 0;
-      }, r.ok ? 2500 : 8e3);
+      }, r.ok ? 2500 : 12e3);
     };
     const send = async () => {
       const text = input.value.replace(/\s+/g, " ").trim();
@@ -20501,7 +20501,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T08:00") : ""
+          buildId: true ? String("yt-2026-11-05T08:04") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
