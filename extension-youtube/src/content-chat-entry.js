@@ -985,6 +985,18 @@ function setupSuperChatOpenBridge() {
             // 記録できなくても続ける
           }
         };
+        // 0.1.117: すでにサポートの画面が開いている(入力欄の帯に「閉じる」が見えている)なら押さずに開いた扱い。
+        //   押すと見えていないボタン(幅0)を押してしまう(りんく実機の2回目の記録)。
+        const closeBtn = scopes
+          .map((sc) => sc.querySelector('#close-button button, #close-button'))
+          .find((el) => el && el.getBoundingClientRect().width > 0);
+        if (closeBtn) {
+          diag.picked = '(already-open)';
+          saveDiag();
+          sendResponse({ ok: true });
+          return undefined;
+        }
+        if (btn && !(btn.getBoundingClientRect().width > 0)) diag.picked += '(width0)';
         if (!btn) {
           saveDiag();
           sendResponse({ ok: false, reason: 'no-superchat-button' });
@@ -1017,26 +1029,22 @@ function setupSuperChatOpenBridge() {
           const cs = getComputedStyle(el);
           return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity || 1) > 0.05;
         };
-        // YouTube の部品(Polymer)は click() だけでは反応しないことがある(押した扱いを mousedown/up から作る)ので、
-        //   指で押したのと同じ順にイベントを送る。
+        // 0.1.117: 0.1.116 の down/up+click は開いて閉じる(2回押し)おそれがあるので click() 1回に戻す
+        //   (0.1.115 の記録で、1回目の click で入力欄の帯が「閉じる」ボタンつきの画面に替わっていた)。
         const tgt = /** @type {HTMLElement} */ (btn.matches('button') ? btn : btn.querySelector('button') || btn);
         const r0 = tgt.getBoundingClientRect();
-        const pt = { bubbles: true, cancelable: true, composed: true, clientX: r0.left + r0.width / 2, clientY: r0.top + r0.height / 2, button: 0 };
         diag.tag = tgt.localName;
         diag.rect = [Math.round(r0.left), Math.round(r0.top), Math.round(r0.width), Math.round(r0.height)];
-        try {
-          tgt.dispatchEvent(new PointerEvent('pointerdown', { ...pt, pointerType: 'mouse', isPrimary: true }));
-          tgt.dispatchEvent(new MouseEvent('mousedown', pt));
-          tgt.dispatchEvent(new PointerEvent('pointerup', { ...pt, pointerType: 'mouse', isPrimary: true }));
-          tgt.dispatchEvent(new MouseEvent('mouseup', pt));
-        } catch {
-          // 古い環境は click だけ
-        }
         tgt.click();
         (async () => {
           for (let i = 0; i < 12; i += 1) {
             await new Promise((r) => setTimeout(r, 150));
             const fresh = [...added].filter((el) => el.isConnected && shown(el) && !el.contains(btn));
+            // 入力欄の帯が「閉じる」つきのサポート画面に替わったのも開いた扱い(0.1.115 の記録)。
+            const closeNow = scopes
+              .map((sc) => sc.querySelector('#close-button button, #close-button'))
+              .find((el) => el && el.getBoundingClientRect().width > 0);
+            if (closeNow) fresh.push(closeNow);
             if (fresh.length) {
               mo.disconnect();
               diag.opened = fresh.slice(0, 6).map((el) => el.localName + (el.id ? '#' + el.id : ''));

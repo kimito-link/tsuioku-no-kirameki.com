@@ -1262,6 +1262,14 @@
             } catch {
             }
           };
+          const closeBtn = scopes.map((sc) => sc.querySelector("#close-button button, #close-button")).find((el) => el && el.getBoundingClientRect().width > 0);
+          if (closeBtn) {
+            diag.picked = "(already-open)";
+            saveDiag();
+            sendResponse({ ok: true });
+            return void 0;
+          }
+          if (btn && !(btn.getBoundingClientRect().width > 0)) diag.picked += "(width0)";
           if (!btn) {
             saveDiag();
             sendResponse({ ok: false, reason: "no-superchat-button" });
@@ -1295,21 +1303,15 @@
             btn.matches("button") ? btn : btn.querySelector("button") || btn
           );
           const r0 = tgt.getBoundingClientRect();
-          const pt = { bubbles: true, cancelable: true, composed: true, clientX: r0.left + r0.width / 2, clientY: r0.top + r0.height / 2, button: 0 };
           diag.tag = tgt.localName;
           diag.rect = [Math.round(r0.left), Math.round(r0.top), Math.round(r0.width), Math.round(r0.height)];
-          try {
-            tgt.dispatchEvent(new PointerEvent("pointerdown", { ...pt, pointerType: "mouse", isPrimary: true }));
-            tgt.dispatchEvent(new MouseEvent("mousedown", pt));
-            tgt.dispatchEvent(new PointerEvent("pointerup", { ...pt, pointerType: "mouse", isPrimary: true }));
-            tgt.dispatchEvent(new MouseEvent("mouseup", pt));
-          } catch {
-          }
           tgt.click();
           (async () => {
             for (let i = 0; i < 12; i += 1) {
               await new Promise((r) => setTimeout(r, 150));
               const fresh = [...added].filter((el) => el.isConnected && shown(el) && !el.contains(btn));
+              const closeNow = scopes.map((sc) => sc.querySelector("#close-button button, #close-button")).find((el) => el && el.getBoundingClientRect().width > 0);
+              if (closeNow) fresh.push(closeNow);
               if (fresh.length) {
                 mo.disconnect();
                 diag.opened = fresh.slice(0, 6).map((el) => el.localName + (el.id ? "#" + el.id : ""));
