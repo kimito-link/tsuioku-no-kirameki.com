@@ -4790,5 +4790,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1861', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日の窓で数える値(古いコミットが窓から外れた分だけ 0.1.1858 の 43 から減った)'
+  }),
+  Object.freeze({
+    version: '0.1.1892', metric: 'bundle-kb', value: 1418,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1861 の 1414 から +4(1862〜1889 のニコ生の直しの分。YouTube 同梱は別の束 yt-*.js で popup.js には入らない)。最良 1360 より上なのは以前から'
+  }),
+  Object.freeze({
+    version: '0.1.1892', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1892', metric: 'cross-checked-claims', value: 40,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値(古いコミットが窓から外れた分だけ 0.1.1861 の 41 から減った)'
   })
 ]);

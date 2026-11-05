@@ -22,6 +22,9 @@ export default [
       'extension/dist/**',
       // app/dist/** は Web版(app.tsuioku-no-kirameki.com)の esbuild minified 出力。
       'app/dist/**',
+      // YouTube 版のビルド出力(scripts/build-youtube-ext.mjs が作る束ね・写し)。
+      'extension-youtube/dist/**',
+      'extension-youtube/*.js',
       // mobile/scripts/** は web-ios-android キットからコピーした App Store 提出の道具(キット側で検査済み・
       //   書き換えずに保つ=キットとの差分を小さく)。mobile/node_modules・mobile/ios は CI が作る。
       'mobile/**',
@@ -505,6 +508,12 @@ export default [
       sourceType: 'script',
       globals: { ...browserChrome }
     }
+  },
+  {
+    // YouTube 版のブラウザで動く入口(extension-youtube/src)。各ファイル冒頭の /* global */ と重なっても止めない。
+    files: ['extension-youtube/src/**/*.js'],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: { ...browserChrome } },
+    rules: { 'no-redeclare': ['error', { builtinGlobals: false }] }
   },
   {
     // Web版(app.tsuioku-no-kirameki.com)の閲覧ページ。chrome.* には依存しない純ブラウザ。
