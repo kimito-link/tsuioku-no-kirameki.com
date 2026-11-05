@@ -71,7 +71,7 @@ describe('JS: setTucked とボタン・トグルの配線', () => {
     const a = src.indexOf('let tuckBtn = null;');
     expect(a).toBeGreaterThan(0);
     expect(src.slice(a, a + 400)).toContain('if (!isStandalone) {');
-    expect(src).toContain('headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn,');
+    expect(src).toContain('...(tuckBtn ? [tuckBtn] : []), rosterBtn,'); // v0.1.1870 前に「🎁 ギフト」が並ぶ
   });
 
   it('★トグルを押したとき、しまい中なら戻す(会場の開閉より優先)', () => {
