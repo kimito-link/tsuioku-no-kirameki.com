@@ -61,7 +61,7 @@ YouTube には 184（匿名）が無いので、ニコ生のたぬ姉レーン�
 
 ```
 extension-youtube/
-  manifest.json            MV3・name「追憶のきらめき for YouTube（試作）」・host: https://www.youtube.com/*
+  manifest.standalone.json MV3(正本・読み込み用 manifest.json は build-youtube-ext.mjs が写す)・name「追憶のきらめき for YouTube（試作）」・host: https://www.youtube.com/*
                            permissions: storage, sidePanel ／ host に http://127.0.0.1:50021/*（VOICEVOX）
   content-chat.js          live_chat iframe で動く（all_frames: true）。MutationObserver で新着を拾い SW へ送る
   background.js            受け取って保存・読み上げキューへ
