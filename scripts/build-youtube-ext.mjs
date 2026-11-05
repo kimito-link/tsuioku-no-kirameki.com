@@ -95,6 +95,18 @@ function setupYtDefaultIconTier(b) {
     loader: 'js',
     resolveDir: dirname(args.path),
   }));
+  // ★応援レーン(りんく欄)の段は supportGridDisplayTier ではなく domain/lane/tier.js の resolveLaneTier で決まる
+  //   (0.1.99 では上だけ書き換えて効かなかった・りんく実機 2026-11-05)。こちらも同じ答えで下げる。
+  b.onLoad({ filter: /src[\\/]domain[\\/]lane[\\/]tier\.js$/ }, (args) => ({
+    contents: replaceOnce(
+      readFileSync(args.path, 'utf8'),
+      '  if (matchesLinkPolicy(entry)) return 3;',
+      "  if (matchesLinkPolicy(entry)) return typeof globalThis.__ytIsDefaultIconUid === 'function' && globalThis.__ytIsDefaultIconUid(uid) ? 2 : 3;",
+      '文字アイコンの人はこん太欄(レーンの段)'
+    ),
+    loader: 'js',
+    resolveDir: dirname(args.path),
+  }));
 }
 const ytScreenPlugin = { name: 'yt-screen', setup: setupYtDefaultIconTier };
 
