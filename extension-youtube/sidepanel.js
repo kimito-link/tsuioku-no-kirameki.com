@@ -2,7 +2,7 @@
 /* eslint-disable */
 (() => {
   // extension-youtube/src/ytDefaultIcon.js
-  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v3";
+  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v4";
   function ytIconColorStats(rgba, w, h) {
     const counts = /* @__PURE__ */ new Map();
     const cx = (w - 1) / 2;
@@ -33,7 +33,9 @@
     return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey };
   }
   function ytLooksLikeDefaultLetterIcon(url, stats) {
-    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.62 && stats.bgSat >= 5;
+    const k = Number(stats.bgKey) || 0;
+    const nearWhite = (k >> 8 & 15) >= 12 && (k >> 4 & 15) >= 12 && (k & 15) >= 12;
+    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.62 && !nearWhite;
   }
   function ytIconSilhouetteIoU(rgba, w, h, bgKey) {
     const bg = [(bgKey >> 8 & 15) * 16 + 8, (bgKey >> 4 & 15) * 16 + 8, (bgKey & 15) * 16 + 8];
@@ -46613,7 +46615,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T05:42" ? String("yt-2026-11-05T05:42") : "dev";
+      const buildId = "yt-2026-11-05T05:57" ? String("yt-2026-11-05T05:57") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46631,7 +46633,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.104") : "";
+    const bundledVersion = true ? String("0.1.105") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46676,7 +46678,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T05:42" ? String("yt-2026-11-05T05:42") : "dev";
+            return "yt-2026-11-05T05:57" ? String("yt-2026-11-05T05:57") : "dev";
           } catch {
             return "dev";
           }

@@ -2,7 +2,7 @@
 /* eslint-disable */
 (() => {
   // extension-youtube/src/ytDefaultIcon.js
-  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v3";
+  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v4";
   function ytIconColorStats(rgba, w, h) {
     const counts = /* @__PURE__ */ new Map();
     const cx = (w - 1) / 2;
@@ -33,7 +33,9 @@
     return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey };
   }
   function ytLooksLikeDefaultLetterIcon(url, stats) {
-    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.62 && stats.bgSat >= 5;
+    const k = Number(stats.bgKey) || 0;
+    const nearWhite = (k >> 8 & 15) >= 12 && (k >> 4 & 15) >= 12 && (k & 15) >= 12;
+    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.62 && !nearWhite;
   }
   function ytIconSilhouetteIoU(rgba, w, h, bgKey) {
     const bg = [(bgKey >> 8 & 15) * 16 + 8, (bgKey >> 4 & 15) * 16 + 8, (bgKey & 15) * 16 + 8];
@@ -20087,7 +20089,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T05:42") : ""
+          buildId: true ? String("yt-2026-11-05T05:57") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
