@@ -53,6 +53,21 @@ function patchVenueBarPickupOnScreen(src) {
   src = replaceOnce(src, '    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n', '    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n    if (bubble.voiceState === \'pending\' && bubble.speechKey) { try { /** @type {any} */ (globalThis).__ytDropVoiceKey?.(bubble.speechKey); } catch { /* 声の後始末の失敗で描画を止めない */ } }\n', '消えた吹き出しの声');
   // 吹き出しを出し終えてから選ぶ(ニコ生版は吹き出しより先に選んでいた)
   src = replaceOnce(src, '      updatePickupBanner(null);\n    }\n    // ユーザー方針「しゃべった人を席に出して吹かせる」', '      queueMicrotask(() => updatePickupBanner(null));\n    }\n    // ユーザー方針「しゃべった人を席に出して吹かせる」', 'PICK UP を吹き出しの後に');
+  // 0.1.103 計器の直し: 会場を開いた瞬間に直近3件を吹き出す(primeEmit)分は、開く前に届いた発言なので
+  //   「受信→キュー」の遅れに数えない(数えると1件で最大60秒が平均に入り、過疎配信では何分も「遅れ」が残っていた・
+  //   PC 計測 2026-11-05: 実際の受信→キューは約0.06秒)。ニコ生版は後で同じ直し。
+  src = replaceOnce(
+    src,
+    '    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });\n',
+    '    const __ytPrimeBurst = !(speechState && speechState.primed === true);\n    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });\n',
+    '開いた瞬間の分の印'
+  );
+  src = replaceOnce(
+    src,
+    '          receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,\n',
+    '          receivedAt: __ytPrimeBurst ? undefined : speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,\n',
+    '開いた瞬間の分は受信→キューに数えない'
+  );
   return src;
 }
 
