@@ -17480,39 +17480,46 @@ ${sourceCol}
     const doc = opts.doc || document;
     const form = doc.createElement("form");
     form.className = "nlsb-compose";
-    form.style.cssText = "position:relative;display:inline-flex;align-items:center;gap:4px;margin:0;";
+    form.style.cssText = "position:relative;display:flex;align-items:center;justify-content:center;gap:6px;margin:0;flex:1 1 100%;order:-1;min-width:0;";
     const input = doc.createElement("input");
     input.type = "text";
     input.className = "nlsb-compose-input";
     input.placeholder = "ここから発言";
     input.maxLength = 200;
     input.autocomplete = "off";
-    input.style.cssText = "width:180px;max-width:40vw;height:26px;box-sizing:border-box;padding:2px 8px;border-radius:13px;border:1px solid rgba(0,0,0,0.25);background:rgba(255,255,255,0.96);color:#1f2328;font-size:12px;";
+    const box = doc.createElement("div");
+    box.style.cssText = "position:relative;flex:0 1 520px;min-width:0;display:flex;";
+    input.style.cssText = "flex:1 1 auto;width:100%;min-width:0;height:34px;box-sizing:border-box;padding:4px 14px;border-radius:17px;border:1px solid rgba(0,0,0,0.25);background:rgba(255,255,255,0.96);color:#1f2328;font-size:14px;";
     const btn = doc.createElement("button");
     btn.type = "submit";
     btn.className = "nlsb-comeview-btn nlsb-compose-send";
     btn.textContent = "送信";
     btn.disabled = true;
+    btn.style.minHeight = "34px";
     const status = doc.createElement("span");
     status.className = "nlsb-compose-status";
-    status.style.cssText = "position:absolute;top:calc(100% + 4px);left:0;z-index:5;width:max-content;max-width:min(360px,80vw);padding:4px 10px;border-radius:8px;background:rgba(255,255,255,0.97);box-shadow:0 1px 4px rgba(0,0,0,0.3);font-size:12px;font-weight:600;line-height:1.4;white-space:normal;pointer-events:none;";
+    status.style.cssText = "position:absolute;inset:0;z-index:2;display:none;align-items:center;box-sizing:border-box;padding:0 14px;border-radius:17px;border:1px solid currentColor;background:#fff;overflow:hidden;font-size:12px;font-weight:600;line-height:1.3;white-space:normal;pointer-events:none;";
     status.hidden = true;
-    let busy = false;
     let clearTimer = 0;
+    const hide = () => {
+      status.hidden = true;
+      status.style.display = "none";
+      if (clearTimer) clearTimeout(clearTimer);
+      clearTimer = 0;
+    };
+    let busy = false;
     const sync2 = () => {
       btn.disabled = busy || !input.value.trim();
     };
     const show = (r) => {
       status.hidden = false;
+      status.style.display = "flex";
       status.textContent = r.text;
       status.title = r.text;
       status.style.color = r.ok ? "#1a7f37" : "#cf222e";
       if (clearTimer) clearTimeout(clearTimer);
       clearTimer = /** @type {any} */
-      setTimeout(() => {
-        status.hidden = true;
-        clearTimer = 0;
-      }, r.ok ? 2500 : 12e3);
+      setTimeout(hide, r.ok ? 2500 : 12e3);
     };
     const send = async () => {
       const text = input.value.replace(/\s+/g, " ").trim();
@@ -17534,7 +17541,10 @@ ${sourceCol}
       show(r);
       sync2();
     };
-    input.addEventListener("input", sync2);
+    input.addEventListener("input", () => {
+      hide();
+      sync2();
+    });
     for (const type of ["keydown", "keyup", "keypress"]) {
       input.addEventListener(type, (ev) => {
         ev.stopPropagation();
@@ -17549,7 +17559,8 @@ ${sourceCol}
       ev.preventDefault();
       void send();
     });
-    form.append(input, btn, status);
+    box.append(input, status);
+    form.append(box, btn);
     return form;
   }
 
@@ -19809,7 +19820,7 @@ ${sourceCol}
     } else {
       headerRight.append(...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
     }
-    header.append(title, headerRight);
+    header.append(title, ...composeBox ? [composeBox] : [], headerRight);
     const topBar = document.createElement("div");
     topBar.className = "nlsb-topbar";
     topBar.hidden = true;
@@ -20303,7 +20314,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T08:04") : ""
+          buildId: true ? String("yt-2026-11-05T09:03") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
