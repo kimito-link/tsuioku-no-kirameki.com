@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1164 件
+## ⚠️ 役割コメントが無いソース 10 / 1169 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -85,7 +85,8 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (8)
+- 📁 **api/** (9)
+  - `billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
   - `device.js` — スマホ版の「利用者ごとの鍵」の受け口(v0.1.1730・スマホ化 利用者ごとの鍵 第a段)。
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
@@ -94,7 +95,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (120)
+- 📁 **app/** (122)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -231,6 +232,8 @@
   - `live.html`
   - `phone.html`
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
+  - `supporter.html`
+  - `supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - 📁 **council-scout/** (26)
   - 📁 **briefs/** (26)
     - `2026-07-16.md`
@@ -1171,7 +1174,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2294)
+- 📁 **src/** (2300)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1473,7 +1476,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2018)
+  - 📁 **lib/** (2022)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3136,8 +3139,12 @@
     - `supportVisualExpanded.test.js`
     - `supportVisualStoryCopy.js` — アイコン列・診断ブロックで共有する文言（二重定義防止）。
     - `supportVisualStoryCopy.test.js`
+    - `supporterAccess.js` — 【層】L1 拡張の画面から呼ぶ部品(chrome.storage と fetch を外から受け取る=試験で差し替えられる)
+    - `supporterAccess.test.js`
     - `supporterChikuranScore.js` — 「応援者ちくらん β」用のローカル集計コア。
     - `supporterChikuranScore.test.js`
+    - `supporterLicense.js` — 【層】L0 判定層(純粋関数 + WebCrypto の署名確認だけ)
+    - `supporterLicense.test.js`
     - `supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
     - `supporterPowerScoring.test.js`
     - `supporterRanking.js` — 「この配信の応援者ランキング(ちくらん風)」の純ロジック(v0.1.865)。
@@ -3495,7 +3502,9 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (14)
+  - 📁 **server/** (16)
+    - `billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `billingApi.test.js`
     - `deviceApi.test.js`
     - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `fanLinkApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
@@ -3624,7 +3633,7 @@
   - `gen-og-live-ranking.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (68)
+- 📁 **tsuioku-no-kirameki/** (70)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -3706,3 +3715,5 @@
   - `robots.txt`
   - `site.webmanifest`
   - `sitemap.xml`
+  - `terms.html`
+  - `tokushoho.html`
