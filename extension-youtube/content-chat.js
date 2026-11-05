@@ -1196,6 +1196,33 @@
     } catch {
     }
   }
+  function watchPaidAfterSuperChatOpen(videoId) {
+    const list = document.querySelector("yt-live-chat-item-list-renderer #items") || document.querySelector("yt-live-chat-item-list-renderer");
+    if (!list || typeof MutationObserver !== "function") return;
+    const rec = { openAt: Date.now(), videoId, paid: (
+      /** @type {{ at: number, author: string, amount: string, text: string }[]} */
+      []
+    ) };
+    const text = (el, sel) => String(el.querySelector(sel)?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60);
+    const save = () => {
+      try {
+        chrome.storage.local.set({ yt_diag_superchat_paid: rec });
+      } catch {
+      }
+    };
+    save();
+    const mo = new MutationObserver((recs) => {
+      for (const r of recs) {
+        for (const n of r.addedNodes) {
+          if (!(n instanceof Element) || !/^yt-live-chat-paid-(message|sticker)-renderer$/.test(n.localName) || rec.paid.length >= 10) continue;
+          rec.paid.push({ at: Date.now(), author: text(n, "#author-name"), amount: text(n, "#purchase-amount, #purchase-amount-chip"), text: text(n, "#message") });
+          save();
+        }
+      }
+    });
+    mo.observe(list, { childList: true, subtree: true });
+    setTimeout(() => mo.disconnect(), 18e4);
+  }
   function setupSuperChatOpenBridge() {
     if (String(window.location.pathname || "").startsWith("/live_chat_replay")) return;
     try {
@@ -1256,6 +1283,10 @@
               []
             )
           };
+          try {
+            watchPaidAfterSuperChatOpen(mine);
+          } catch {
+          }
           const saveDiag = () => {
             try {
               chrome.storage.local.set({ yt_diag_superchat: diag });
