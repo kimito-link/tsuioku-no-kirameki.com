@@ -69,3 +69,19 @@ export function ytShouldVoiceWhenCrowded(s) {
   if (s.important) return true;
   return !(Number(s.queueLength) >= YT_VOICE_CROWD_QUEUE);
 }
+
+/**
+ * 混んでいるときの早口(2026-11-05 りんく選択「少し早口にする」)。speedScale に足す量。
+ *   混み具合 = 読みに来たコメントのうち待ち2件以上だった割合の EMA(0〜1)。15秒混まなければ 0。
+ *   0.35 で声は約1.35倍(人ごとの速さの差はそのまま)。ニコ生版の上限(0.8)よりずっと控えめにする。
+ * @param {number} crowdEma
+ * @param {number} sinceCrowdedMs 最後に混んでいた時からの経過
+ * @returns {number}
+ */
+export function ytCrowdSpeedBoost(crowdEma, sinceCrowdedMs) {
+  if (!(Number(sinceCrowdedMs) >= 0) || Number(sinceCrowdedMs) > 15_000) return 0;
+  const e = Number(crowdEma) || 0;
+  if (e >= 0.4) return 0.35;
+  if (e >= 0.15) return 0.25;
+  return 0;
+}

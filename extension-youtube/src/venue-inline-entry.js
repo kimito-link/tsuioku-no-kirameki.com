@@ -8,7 +8,7 @@ import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey } from './ytNicoShim.js
 import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets } from './ytLocalAssetUrls.js';
 import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
-import { ytShouldVoiceWhenCrowded, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
+import { ytShouldVoiceWhenCrowded, ytCrowdSpeedBoost, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
@@ -139,6 +139,23 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
   proto.__ytCrowdWrapped = true;
   const realEnqueue = proto.enqueue;
   let lastCrowdDiagAt = 0;
+  // 2026-11-05 りんく選択「混んでいるとき少し早口にする」: 上の絞り込みで待ちが2件ほどに保たれるので、ニコ生版の
+  //   「待ちが増えたら早口」(computeVoiceCongestion)が上の段まで届かない。直近の混み具合(読みに来たコメントのうち
+  //   待ち2件以上だった割合)で早口を足す。早口に合わせて長い文の上限もニコ生版の仕組みで短くなる(capVoiceMaxCharsByBoost)。
+  //   上げるだけ(ニコ生版の早口より遅くしない)・15秒混まなければ元に戻る。
+  let crowdEma = 0;
+  let lastCrowdedAt = 0;
+  const realResolveBoost = proto._resolveEffectiveSpeedBoost;
+  if (typeof realResolveBoost === 'function') {
+    proto._resolveEffectiveSpeedBoost = function (/** @type {number} */ congestionBoost) {
+      const base = realResolveBoost.call(this, congestionBoost);
+      const extra = ytCrowdSpeedBoost(crowdEma, Date.now() - lastCrowdedAt);
+      const d = /** @type {any} */ (this.diag);
+      d.ytCrowdBoost = extra;
+      if (extra > base) d.ytCrowdBoostTotal = (Number(d.ytCrowdBoostTotal) || 0) + 1;
+      return Math.max(base, extra);
+    };
+  }
   proto.enqueue = function (/** @type {any[]} */ items) {
     if (!Array.isArray(items)) return realEnqueue.call(this, items);
     /** @type {any[]} */
@@ -156,7 +173,12 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
       // 計器(0.1.90): 読み上げに来たコメントの数・混んでいた回数・大事な理由ごとの数(絞り込みが効いているかを見る)
       const d = /** @type {any} */ (this.diag);
       d.ytCommentTotal = (Number(d.ytCommentTotal) || 0) + 1;
-      if (queueLength >= YT_VOICE_CROWD_QUEUE) d.ytCrowdedTotal = (Number(d.ytCrowdedTotal) || 0) + 1;
+      const crowdedNow = queueLength >= YT_VOICE_CROWD_QUEUE;
+      if (crowdedNow) {
+        d.ytCrowdedTotal = (Number(d.ytCrowdedTotal) || 0) + 1;
+        lastCrowdedAt = Date.now();
+      }
+      crowdEma = crowdEma * 0.9 + (crowdedNow ? 0.1 : 0);
       if (important) {
         d.ytReason = d.ytReason || {};
         d.ytReason[reason] = (Number(d.ytReason[reason]) || 0) + 1;
@@ -184,7 +206,7 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
       try {
         if (isExtensionContextAlive()) {
           void chrome.storage.local.set({
-            yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0, commentTotal: Number(/** @type {any} */ (this.diag).ytCommentTotal) || 0, crowdedTotal: Number(/** @type {any} */ (this.diag).ytCrowdedTotal) || 0, reasons: { .../** @type {any} */ (this.diag).ytReason } },
+            yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0, commentTotal: Number(/** @type {any} */ (this.diag).ytCommentTotal) || 0, crowdedTotal: Number(/** @type {any} */ (this.diag).ytCrowdedTotal) || 0, crowdEma: Math.round(crowdEma * 100) / 100, crowdBoost: Number(/** @type {any} */ (this.diag).ytCrowdBoost) || 0, crowdBoostTotal: Number(/** @type {any} */ (this.diag).ytCrowdBoostTotal) || 0, reasons: { .../** @type {any} */ (this.diag).ytReason } },
           }).catch(() => {});
         }
       } catch {

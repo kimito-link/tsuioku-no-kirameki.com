@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ytIsImportantVoiceRow, ytMarkImportantVoiceRows, ytShouldVoiceWhenCrowded } from './ytVoicePriority.js';
+import { ytCrowdSpeedBoost } from './ytVoicePriority.js';
 
 describe('ytVoicePriority(混んだら大事なものだけ読む)', () => {
   it('スパチャ・メンバー・YouTube のギフト・配信者/モデレーターは大事', () => {
@@ -18,5 +19,14 @@ describe('ytVoicePriority(混んだら大事なものだけ読む)', () => {
     expect(ytShouldVoiceWhenCrowded({ important: false, queueLength: 1 })).toBe(true);
     expect(ytShouldVoiceWhenCrowded({ important: false, queueLength: 2 })).toBe(false);
     expect(ytShouldVoiceWhenCrowded({ important: true, queueLength: 30 })).toBe(true);
+  });
+});
+
+describe('ytCrowdSpeedBoost', () => {
+  it('混み具合に応じて早口を足し、15秒混まなければ戻す', () => {
+    expect(ytCrowdSpeedBoost(0.5, 1000)).toBe(0.35);
+    expect(ytCrowdSpeedBoost(0.2, 1000)).toBe(0.25);
+    expect(ytCrowdSpeedBoost(0.1, 1000)).toBe(0);
+    expect(ytCrowdSpeedBoost(0.9, 16_000)).toBe(0);
   });
 });
