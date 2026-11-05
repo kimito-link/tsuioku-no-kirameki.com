@@ -1,6 +1,149 @@
 // venue-inline.js — ニコ生版の視聴ページの会場モード(venueBar.js 本物)+ YouTube の記録を読む入口のバンドル
 /* eslint-disable */
 (() => {
+  // extension-youtube/src/ytDefaultIcon.js
+  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v1";
+  function ytIconColorStats(rgba, w, h) {
+    const counts = /* @__PURE__ */ new Map();
+    const cx = (w - 1) / 2;
+    const cy = (h - 1) / 2;
+    const r = Math.min(w, h) * 0.45;
+    let total = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+        const i = (y * w + x) * 4;
+        const k = rgba[i] >> 4 << 8 | rgba[i + 1] >> 4 << 4 | rgba[i + 2] >> 4;
+        counts.set(k, (counts.get(k) || 0) + 1);
+        total += 1;
+      }
+    }
+    if (!total) return { t1: 0, c5: 0 };
+    let max = 0;
+    let c5 = 0;
+    for (const n of counts.values()) {
+      if (n > max) max = n;
+      if (n / total >= 5e-3) c5 += 1;
+    }
+    return { t1: max / total, c5 };
+  }
+  function ytLooksLikeDefaultLetterIcon(url, stats) {
+    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.8 && stats.c5 <= 6;
+  }
+  function ytIconCacheKey(url) {
+    return String(url || "").replace(/=s\d+[^/]*$/, "");
+  }
+  function s64Url(url) {
+    const u = String(url || "");
+    return /=s\d+/.test(u) ? u.replace(/=s\d+/, "=s64") : u;
+  }
+  function makeYtDefaultIconJudge(chromeApi, onLearned) {
+    const known = /* @__PURE__ */ new Map();
+    const pending = /* @__PURE__ */ new Set();
+    const queue = [];
+    let running = 0;
+    let saveTimer = 0;
+    let loaded = false;
+    try {
+      void Promise.resolve(chromeApi?.storage?.local?.get?.(YT_DEFAULT_ICON_STORE_KEY)).then((bag) => {
+        const saved = bag?.[YT_DEFAULT_ICON_STORE_KEY];
+        if (saved && typeof saved === "object") {
+          for (const [k, v] of Object.entries(saved)) if (!known.has(k)) known.set(k, v === 1 || v === true);
+          if (known.size) onLearned?.();
+        }
+      }).catch(() => {
+      }).finally(() => {
+        loaded = true;
+        pump();
+      });
+    } catch {
+      loaded = true;
+    }
+    function save() {
+      if (saveTimer) return;
+      saveTimer = /** @type {any} */
+      setTimeout(() => {
+        saveTimer = 0;
+        const obj = {};
+        const entries = [...known.entries()].slice(-3e3);
+        for (const [k, v] of entries) obj[k] = v ? 1 : 0;
+        try {
+          void Promise.resolve(chromeApi?.storage?.local?.set?.({ [YT_DEFAULT_ICON_STORE_KEY]: obj })).catch(() => {
+          });
+        } catch {
+        }
+      }, 2e3);
+    }
+    async function classify(url) {
+      const res = await fetch(s64Url(url), { credentials: "omit" });
+      if (!res.ok) throw new Error(String(res.status));
+      const bmp = await createImageBitmap(await res.blob());
+      const w = 64;
+      const h = 64;
+      const cv = new OffscreenCanvas(w, h);
+      const ctx = (
+        /** @type {OffscreenCanvasRenderingContext2D} */
+        cv.getContext("2d")
+      );
+      ctx.drawImage(bmp, 0, 0, w, h);
+      bmp.close?.();
+      return ytLooksLikeDefaultLetterIcon(url, ytIconColorStats(ctx.getImageData(0, 0, w, h).data, w, h));
+    }
+    function pump() {
+      if (!loaded) return;
+      while (running < 2 && queue.length) {
+        const url = (
+          /** @type {string} */
+          queue.shift()
+        );
+        const key = ytIconCacheKey(url);
+        if (known.has(key)) {
+          pending.delete(key);
+          continue;
+        }
+        running += 1;
+        classify(url).then((isDefault) => {
+          known.set(key, isDefault);
+          save();
+          if (isDefault) onLearned?.();
+        }).catch(() => {
+          known.set(key, false);
+        }).finally(() => {
+          pending.delete(key);
+          running -= 1;
+          pump();
+        });
+      }
+    }
+    return {
+      /**
+       * 別の画面(会場など)が見分けて残した結果を取り込む。
+       * @param {unknown} saved
+       */
+      merge(saved) {
+        if (!saved || typeof saved !== "object") return;
+        for (const [k, v] of Object.entries(saved)) known.set(k, v === 1 || v === true);
+      },
+      /**
+       * 最初からの文字アイコンか。まだ分からないときは false を返し、裏で見に行く。
+       * @param {string} url
+       */
+      isDefault(url) {
+        const u = String(url || "");
+        if (!/^https:\/\/yt\d\.(ggpht|googleusercontent)\.com\//.test(u) || !/\/ytc\//.test(u)) return false;
+        const key = ytIconCacheKey(u);
+        const v = known.get(key);
+        if (v !== void 0) return v;
+        if (!pending.has(key) && typeof fetch === "function" && typeof OffscreenCanvas === "function") {
+          pending.add(key);
+          queue.push(u);
+          pump();
+        }
+        return false;
+      }
+    };
+  }
+
   // src/lib/youtube/ytLaneAssign.js
   var YT_LANES = Object.freeze({
     RINKU: "rinku",
@@ -1385,6 +1528,11 @@ ${sourceCol}
     /** @type {any} */
     globalThis.chrome
   );
+  var ytDefaultIconJudge = real?.storage?.local ? makeYtDefaultIconJudge(real) : null;
+  globalThis.__ytIsDefaultIconUid = (uid) => {
+    const icon = ytIconByNumericUid.get(String(uid || ""));
+    return !!icon && !!ytDefaultIconJudge?.isDefault(icon);
+  };
   if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)) {
     const realLocal = real.storage.local;
     const realGet = realLocal.get.bind(realLocal);
@@ -1626,7 +1774,8 @@ ${sourceCol}
       };
       add((changes, area) => {
         if (area !== "local") return;
-        if (changes.yt_handle_icons && lastAskedLv) {
+        if (changes[YT_DEFAULT_ICON_STORE_KEY]) ytDefaultIconJudge?.merge(changes[YT_DEFAULT_ICON_STORE_KEY].newValue);
+        if ((changes.yt_handle_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
           lastNotified.delete(lastAskedLv);
           void notifyLv(lastAskedLv, void 0);
         }
@@ -8688,7 +8837,8 @@ ${sourceCol}
     ];
     const flags = { observed, strongNick, hasThumb, hasAnyAvatar, hasObservedAvatar, isNumericId, isAnonymous };
     const tierRaw = !uid ? SUPPORT_GRID_TIER_TANU : TIER_RULES.find((r) => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU;
-    const tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);
+    let tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);
+    if (tier === SUPPORT_GRID_TIER_LINK && typeof globalThis.__ytIsDefaultIconUid === "function" && globalThis.__ytIsDefaultIconUid(uid)) tier = SUPPORT_GRID_TIER_KONTA;
     const demotedAnonymousKontaToTanu = tierRaw === SUPPORT_GRID_TIER_KONTA && tier === SUPPORT_GRID_TIER_TANU;
     const demotedAnonymousLinkToKonta = false;
     return {
@@ -19903,7 +20053,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T04:51") : ""
+          buildId: true ? String("yt-2026-11-05T05:11") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

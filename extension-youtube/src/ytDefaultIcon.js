@@ -1,0 +1,183 @@
+// ytDefaultIcon.js — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
+//
+// りんく(2026-11-05)「自分でちゃんと設定している人は認知してほしい」= 自分でアイコンを設定した人はりんく欄、
+//   最初からの文字アイコンのままの人はこん太欄。URL の形(/ytc/)だけでは写真の人も同じ形なので見分けられない。
+// 見分け方(PC の実データ 45人で試験・文字アイコン5人を全部当て、誤りなし):
+//   URL に /ytc/ があり、真ん中の丸の中で「いちばん多い色の割合」が 0.80 以上、「0.5%以上ある色の数」が 6 以下。
+//   色は各チャンネル16段に丸めて数える。画像は s64 で見る(試験と同じ大きさ)。
+// ★件数が少ない試験で決めた値。迷うときは「自分で設定した人」(りんく欄)に倒す=間違えても認知が減らない側。
+
+export const YT_DEFAULT_ICON_STORE_KEY = 'yt_default_icon_v1';
+
+/**
+ * 画素から見分けの数字を出す(純関数・試験用に分けてある)。
+ * @param {Uint8ClampedArray|number[]} rgba 幅 w × 高さ h の RGBA
+ * @param {number} w
+ * @param {number} h
+ * @returns {{ t1: number, c5: number }}
+ */
+export function ytIconColorStats(rgba, w, h) {
+  /** @type {Map<number, number>} */
+  const counts = new Map();
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2;
+  const r = Math.min(w, h) * 0.45;
+  let total = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+      const i = (y * w + x) * 4;
+      const k = ((rgba[i] >> 4) << 8) | ((rgba[i + 1] >> 4) << 4) | (rgba[i + 2] >> 4);
+      counts.set(k, (counts.get(k) || 0) + 1);
+      total += 1;
+    }
+  }
+  if (!total) return { t1: 0, c5: 0 };
+  let max = 0;
+  let c5 = 0;
+  for (const n of counts.values()) {
+    if (n > max) max = n;
+    if (n / total >= 0.005) c5 += 1;
+  }
+  return { t1: max / total, c5 };
+}
+
+/**
+ * @param {string} url
+ * @param {{ t1: number, c5: number }} stats
+ */
+export function ytLooksLikeDefaultLetterIcon(url, stats) {
+  return /\/ytc\//.test(String(url || '')) && stats.t1 >= 0.8 && stats.c5 <= 6;
+}
+
+/** 同じ人の顔は大きさ違いの URL で来るので、大きさを外して鍵にする */
+export function ytIconCacheKey(url) {
+  return String(url || '').replace(/=s\d+[^/]*$/, '');
+}
+
+/** @param {string} url */
+function s64Url(url) {
+  const u = String(url || '');
+  return /=s\d+/.test(u) ? u.replace(/=s\d+/, '=s64') : u;
+}
+
+/**
+ * 見分けた結果を覚えておく入れ物(画面ごとに1つ)。結果は storage にも残して、次に開いたときは見直さない。
+ * @param {any} chromeApi
+ * @param {() => void} [onLearned] 新しく見分けがついたとき(描き直しのきっかけ)
+ */
+export function makeYtDefaultIconJudge(chromeApi, onLearned) {
+  /** @type {Map<string, boolean>} */
+  const known = new Map();
+  /** @type {Set<string>} */
+  const pending = new Set();
+  /** @type {string[]} */
+  const queue = [];
+  let running = 0;
+  let saveTimer = 0;
+  let loaded = false;
+
+  try {
+    void Promise.resolve(chromeApi?.storage?.local?.get?.(YT_DEFAULT_ICON_STORE_KEY))
+      .then((bag) => {
+        const saved = bag?.[YT_DEFAULT_ICON_STORE_KEY];
+        if (saved && typeof saved === 'object') {
+          for (const [k, v] of Object.entries(saved)) if (!known.has(k)) known.set(k, v === 1 || v === true);
+          if (known.size) onLearned?.();
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        loaded = true;
+        pump();
+      });
+  } catch {
+    loaded = true;
+  }
+
+  function save() {
+    if (saveTimer) return;
+    saveTimer = /** @type {any} */ (setTimeout(() => {
+      saveTimer = 0;
+      /** @type {Record<string, number>} */
+      const obj = {};
+      // 増えすぎないように新しい方から 3000 件
+      const entries = [...known.entries()].slice(-3000);
+      for (const [k, v] of entries) obj[k] = v ? 1 : 0;
+      try {
+        void Promise.resolve(chromeApi?.storage?.local?.set?.({ [YT_DEFAULT_ICON_STORE_KEY]: obj })).catch(() => {});
+      } catch {
+        /* 残せなくても今の画面では使える */
+      }
+    }, 2000));
+  }
+
+  /** @param {string} url */
+  async function classify(url) {
+    const res = await fetch(s64Url(url), { credentials: 'omit' });
+    if (!res.ok) throw new Error(String(res.status));
+    const bmp = await createImageBitmap(await res.blob());
+    const w = 64;
+    const h = 64;
+    const cv = new OffscreenCanvas(w, h);
+    const ctx = /** @type {OffscreenCanvasRenderingContext2D} */ (cv.getContext('2d'));
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close?.();
+    return ytLooksLikeDefaultLetterIcon(url, ytIconColorStats(ctx.getImageData(0, 0, w, h).data, w, h));
+  }
+
+  function pump() {
+    if (!loaded) return;
+    while (running < 2 && queue.length) {
+      const url = /** @type {string} */ (queue.shift());
+      const key = ytIconCacheKey(url);
+      if (known.has(key)) {
+        pending.delete(key);
+        continue;
+      }
+      running += 1;
+      classify(url)
+        .then((isDefault) => {
+          known.set(key, isDefault);
+          save();
+          if (isDefault) onLearned?.();
+        })
+        .catch(() => {
+          known.set(key, false); // 取れない顔は「自分で設定した人」扱い(りんく欄のまま)
+        })
+        .finally(() => {
+          pending.delete(key);
+          running -= 1;
+          pump();
+        });
+    }
+  }
+
+  return {
+    /**
+     * 別の画面(会場など)が見分けて残した結果を取り込む。
+     * @param {unknown} saved
+     */
+    merge(saved) {
+      if (!saved || typeof saved !== 'object') return;
+      for (const [k, v] of Object.entries(saved)) known.set(k, v === 1 || v === true);
+    },
+    /**
+     * 最初からの文字アイコンか。まだ分からないときは false を返し、裏で見に行く。
+     * @param {string} url
+     */
+    isDefault(url) {
+      const u = String(url || '');
+      if (!/^https:\/\/yt\d\.(ggpht|googleusercontent)\.com\//.test(u) || !/\/ytc\//.test(u)) return false;
+      const key = ytIconCacheKey(u);
+      const v = known.get(key);
+      if (v !== undefined) return v;
+      if (!pending.has(key) && typeof fetch === 'function' && typeof OffscreenCanvas === 'function') {
+        pending.add(key);
+        queue.push(u);
+        pump();
+      }
+      return false;
+    },
+  };
+}

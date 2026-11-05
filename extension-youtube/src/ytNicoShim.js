@@ -13,6 +13,7 @@
 //      それ以外のキー(設定など)は本物の storage にそのまま読み書きする=ニコ生版の設定スイッチがそのまま動く。
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
+import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
@@ -660,6 +661,17 @@ function registerBroadcastersFromSummaries() {
 
 // ---- chrome の差し替え(本物の上に薄くかぶせる) ----
 const real = /** @type {any} */ (globalThis).chrome;
+
+// 0.1.99 りんく(2026-11-05)「自分でちゃんと設定している人は認知してほしい」: 最初からの文字アイコンのままの人は
+//   りんく欄ではなくこん太欄へ。段を決める部品(supportGridDisplayTier.js)は YouTube 版のビルドで
+//   globalThis.__ytIsDefaultIconUid を見る(scripts/build-youtube-ext.mjs)。
+/** @type {ReturnType<typeof makeYtDefaultIconJudge>|null} */
+const ytDefaultIconJudge = real?.storage?.local ? makeYtDefaultIconJudge(real) : null;
+/** @param {string} uid */
+/** @type {any} */ (globalThis).__ytIsDefaultIconUid = (uid) => {
+  const icon = ytIconByNumericUid.get(String(uid || ''));
+  return !!icon && !!ytDefaultIconJudge?.isDefault(icon);
+};
 if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)) {
   const realLocal = real.storage.local;
   const realGet = realLocal.get.bind(realLocal);
@@ -939,7 +951,9 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     add((/** @type {Record<string, any>} */ changes, /** @type {string} */ area) => {
       if (area !== 'local') return;
       // 顔が新しく分かったら、件数が同じでも描き直してもらう
-      if (changes.yt_handle_icons && lastAskedLv) {
+      // 最初からの文字アイコンの見分けが増えたら、段(りんく/こん太)が変わるので描き直してもらう(0.1.99)
+      if (changes[YT_DEFAULT_ICON_STORE_KEY]) ytDefaultIconJudge?.merge(changes[YT_DEFAULT_ICON_STORE_KEY].newValue);
+      if ((changes.yt_handle_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
         lastNotified.delete(lastAskedLv);
         void notifyLv(lastAskedLv, undefined);
       }

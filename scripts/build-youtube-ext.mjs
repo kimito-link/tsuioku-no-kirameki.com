@@ -81,10 +81,28 @@ function setupLightProbePatch(b) {
 }
 
 
+// 0.1.99 りんく(2026-11-05)「自分でちゃんと設定している人は認知してほしい」: YouTube は全員に名前があるので、
+//   ニコ生版の決まり(名前＋数字ID=りんく)だと全員りんく欄になる。最初からの文字アイコンのままの人はこん太欄へ下げる。
+//   見分けは ytNicoShim(ytDefaultIcon.js)が画像で行い globalThis.__ytIsDefaultIconUid で答える。YouTube 版だけ。
+function setupYtDefaultIconTier(b) {
+  b.onLoad({ filter: /src[\\/]lib[\\/]supportGridDisplayTier\.js$/ }, (args) => ({
+    contents: replaceOnce(
+      readFileSync(args.path, 'utf8'),
+      '  const tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);', // ★このファイルは CRLF なので改行を目印に入れない
+      "  let tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);\n  if (tier === SUPPORT_GRID_TIER_LINK && typeof globalThis.__ytIsDefaultIconUid === 'function' && globalThis.__ytIsDefaultIconUid(uid)) tier = SUPPORT_GRID_TIER_KONTA;",
+      '文字アイコンの人はこん太欄'
+    ),
+    loader: 'js',
+    resolveDir: dirname(args.path),
+  }));
+}
+const ytScreenPlugin = { name: 'yt-screen', setup: setupYtDefaultIconTier };
+
 const ytVenueLiveIdPlugin = {
   name: 'yt-venue-live-id',
   setup(b) {
     setupLightProbePatch(b);
+    setupYtDefaultIconTier(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents:
         patchVenueBarForPickup(readFileSync(args.path, 'utf8')) +
@@ -100,6 +118,7 @@ const ytVenuePickupPlugin = {
   name: 'yt-venue-pickup',
   setup(b) {
     setupLightProbePatch(b);
+    setupYtDefaultIconTier(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents: patchVenueBarForPickup(readFileSync(args.path, 'utf8')),
       loader: 'js',
@@ -141,6 +160,7 @@ await Promise.all([
     outfile: resolve(root, 'extension-youtube/sidepanel.js'),
     target: ['chrome100'],
     define: popupDefine,
+    plugins: [ytScreenPlugin],
     banner: {
       js: '// sidepanel.js — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル\n/* eslint-disable */',
     },
@@ -152,6 +172,7 @@ await Promise.all([
     outfile: resolve(root, 'extension-youtube/marketing-export.js'),
     target: ['chrome100'],
     define: popupDefine,
+    plugins: [ytScreenPlugin],
     banner: {
       js: '// marketing-export.js — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル\n/* eslint-disable */',
     },
@@ -163,6 +184,7 @@ await Promise.all([
     outfile: resolve(root, 'extension-youtube/comeview.js'),
     target: ['chrome100'],
     define: popupDefine,
+    plugins: [ytScreenPlugin],
     banner: {
       js: '// comeview.js — ニコ生版 comeview-entry.js(本物)+ YouTube の記録を読む入口のバンドル\n/* eslint-disable */',
     },
