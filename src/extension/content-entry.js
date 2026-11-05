@@ -14315,7 +14315,8 @@ async function start() {
    *   ★設定の読み取りに失敗したら【出す】側に倒す(機能が黙って消えるのを避ける)。
    */
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
-    _venueApi = mountVenueBarButton();
+    // v0.1.1867: 会場から発言(パネルの「コメント送信」と同じ postCommentFromContentAsync で公式コメント欄へ送る)
+    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }) });
   }
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
