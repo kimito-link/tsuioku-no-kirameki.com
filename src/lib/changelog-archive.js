@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1868',
+    date: '2026-11-05',
+    summary: '会場の発言欄を中央に・大きく',
+    items: Object.freeze([
+      '会場モードの「ここから発言」の欄を、上の帯の中央に移して大きくしました(高さ34px・文字14px・幅は最大およそ500px)。幅が狭いときは1段下に回り、右のボタンを押し出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1867',
     date: '2026-11-05',
     summary: '会場モードから発言できるように',

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, newGiftDrawers, describeGiftDrawers, waitGiftPressResult, readGiftBalance, giftPressOutcome, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
+import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, newGiftDrawers, describeGiftDrawers, waitGiftPressResult, readGiftBalance, giftPressOutcome, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
 import { createVenueGiftStrip } from './venueComposeBox.js';
 
 // 2026-11-05 りんくの画面(番組ギフト・3列の枠・画像と「500 pt」の数字と pt が別の部品)に似せた形
@@ -93,18 +93,15 @@ describe('子の窓と放送ページのやりとり', () => {
     const btns = strip.querySelectorAll('button');
     expect(btns).toHaveLength(2);
     expect(strip.style.display).toBe('inline-flex');
-    /** @type {HTMLButtonElement} */ (btns[1]).click();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(store.data[GIFT_ITEM_PRESS_REQ_KEY]).toBeUndefined(); // 1回目は押さない
-    expect(btns[1].textContent).toMatch(/贈る\?/);
-    /** @type {HTMLButtonElement} */ (btns[1]).click();
+    expect(btns).toHaveLength(2);
+    /** @type {HTMLButtonElement} */ (btns[1]).click(); // v0.1.1888: 1回押しで公式の確認を開く(確定は本人)
     await new Promise((r) => setTimeout(r, 900));
     expect(store.data[GIFT_ITEM_PRESS_REQ_KEY].key).toBe('ハゲ|500pt');
     expect(hit).toEqual(['a']);
   });
 });
 
-describe('1回で贈る(設定でオンの人だけ)', () => {
+describe('会場の帯からギフト(確定は本人が公式で押す)', () => {
   /** @returns {any} */
   const memStore = () => {
     /** @type {Record<string, any>} */
@@ -122,15 +119,7 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
       onChanged: (/** @type {(c: any) => void} */ f) => { subs.push(f); }
     };
   };
-  it('確認の「贈る」だけを探す(購入・キャンセルや前から見えていたものは押さない)', () => {
-    document.body.innerHTML = '<button>ポイント購入</button><button>キャンセル</button><button id="old">贈る</button><div><button id="new">贈る</button></div>';
-    const vis = (/** @type {Element} */ el) => { el.getBoundingClientRect = () => /** @type {any} */ ({ width: 80, height: 30 }); };
-    for (const b of document.querySelectorAll('button')) vis(b);
-    const old = /** @type {Element} */ (document.getElementById('old'));
-    expect(findGiftConfirmButton(document, new Set([old]))?.id).toBe('new');
-    expect(findGiftConfirmButton(document)?.id).toBe('old');
-  });
-  it('オンなら1回押しで、アイテムを押したあとに出た確認の「贈る」まで押して「贈りました」と出す', async () => {
+  it('帯を押すと公式の購入の確認を開くだけで、確定ボタンは押さない。本人が押して残高が減ったら「贈りました(33pt)」', async () => {
     document.body.innerHTML = '<div id="bal">テスト さん 1,000 pt</div>' + PANEL;
     const store = memStore();
     /** @type {string[]} */
@@ -139,37 +128,35 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
       c.addEventListener('click', () => {
         hit.push(String(c.getAttribute('data-id')));
         const dlg = document.createElement('div');
-        dlg.innerHTML = '<p>このギフトを贈りますか</p><button class="cancel">キャンセル</button><button class="ok">贈る</button>';
+        dlg.className = 'drawer-content';
+        dlg.innerHTML = '<p>1個30 pt (+ 3 pt) 価格:33 pt</p><p>購入後のキャンセルはできません</p><button class="ok">利用規約に同意してこのギフトを購入します</button>';
+        dlg.getBoundingClientRect = () => /** @type {any} */ ({ width: 300, height: 120 });
         for (const b of dlg.querySelectorAll('button')) b.getBoundingClientRect = () => /** @type {any} */ ({ width: 80, height: 30 });
-        dlg.querySelector('.ok')?.addEventListener('click', () => { hit.push('confirm'); const bal = document.getElementById('bal'); if (bal) bal.textContent = 'テスト さん 985 pt'; setTimeout(() => { if (bal) bal.textContent = 'テスト さん 945 pt'; }, 350); }); // 残高は段階的に減る(PC 実測 2377→2362→2344)
+        dlg.querySelector('.ok')?.addEventListener('click', () => { hit.push('confirm'); const bal = document.getElementById('bal'); if (bal) bal.textContent = 'テスト さん 985 pt'; setTimeout(() => { if (bal) bal.textContent = 'テスト さん 967 pt'; }, 350); }); // 残高は段階的に減る(PC 実測 2377→2362→2344)
         document.body.append(dlg);
       });
     }
     const frameWin = /** @type {any} */ ({ self: 1, top: 2, location: { hostname: 'gift.nicovideo.jp', pathname: '/live/lv9/purchase' }, document, setInterval: window.setInterval.bind(window), clearInterval: window.clearInterval.bind(window), setTimeout: window.setTimeout.bind(window) });
     startGiftItemsPublisher(frameWin, store);
     await new Promise((r) => setTimeout(r, 700));
-    let saved = false;
     const strip = createVenueGiftStrip({
       subscribe: (cb) => subscribeGiftItems(store, '/watch/lv9', cb),
       press: async (key, o) => { let at = 0; const r = requestGiftItemPress(document, key, store.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); const v = await waitGiftPressResult(store, at); return { ok: r.ok || !!v, ...giftPressOutcome(v) }; },
-      oneTap: { get: () => false, set: (on) => { saved = on; } },
       doc: document
     });
     await new Promise((r) => setTimeout(r, 10));
-    const mode = /** @type {HTMLButtonElement} */ (strip.querySelector('.nlsb-gift-mode'));
-    expect(mode.textContent).toBe('2回'); // 既定はオフ
-    mode.click();
-    expect(saved).toBe(true);
-    expect(mode.textContent).toBe('1回');
+    expect(strip.querySelector('.nlsb-gift-mode')).toBeNull(); // 1回/2回の切り替えは無い
     const item = /** @type {HTMLButtonElement} */ (strip.querySelectorAll('.nlsb-gift-item')[1]);
     item.click();
-    item.click(); // 続けて押しても二重には贈らない
-    await new Promise((r) => setTimeout(r, 2600)); // 残高が落ち着いたら結果を書く(途中の値で数えない)
+    item.click(); // 続けて押しても二重には開かない
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(hit).toEqual(['a']); // 拡張は確定ボタンを押さない
+    expect(item.textContent).toMatch(/公式で確認/);
+    /** @type {HTMLButtonElement} */ (document.querySelector('.drawer-content .ok')).click(); // 本人が公式の確定を押す
+    await new Promise((r) => setTimeout(r, 1500)); // 残高が落ち着いたら結果を書く(途中の値で数えない)
     expect(hit).toEqual(['a', 'confirm']);
-    expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].confirmed).toBe(true);
-    expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].spent).toBe(55);
-    expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].clicks.some((/** @type {any} */ c) => c.text === '贈る' && c.trusted === false)).toBe(true);
-    expect(item.textContent).toMatch(/贈りました\(55pt\)/);
+    expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].spent).toBe(33);
+    expect(item.textContent).toMatch(/贈りました\(33pt\)/);
   }, 10000);
 });
 
@@ -185,14 +172,12 @@ describe('帯のアイテムが公式の欄の奥にあっても押せる', () =
   });
 });
 
-describe('購入の引き出し(drawer)の中の確定ボタン', () => {
-  it('新しく開いた引き出しの中の「購入する」を押す候補にし、ポイント購入やキャンセルは選ばない・値段を読む', () => {
+describe('購入の引き出し(drawer)の計器', () => {
+  it('新しく開いた引き出しのボタンと値段を記録する(押しはしない)', () => {
     document.body.innerHTML = '<button id="charge">ポイントを購入</button><div class="drawer-content" id="d"><p>1個30 pt (+ 3 pt) 価格:33 pt</p><p>購入後のキャンセルはできません</p><button id="cancel">キャンセル</button><button id="buy">購入する</button></div>';
     for (const el of document.querySelectorAll('button, .drawer-content')) /** @type {any} */ (el).getBoundingClientRect = () => ({ width: 80, height: 30 });
     const drawers = newGiftDrawers(document, new Set());
     expect(drawers.map((d) => d.id)).toEqual(['d']);
-    expect(findGiftConfirmButton(document, new Set(), drawers)?.id).toBe('buy');
-    expect(findGiftConfirmButton(document, new Set(), [])).toBeNull(); // 引き出しの外では「購入」は押さない
     const info = describeGiftDrawers(drawers);
     expect(info.price).toBe('33pt');
     expect(info.buttons.map((b) => b.text)).toEqual(['キャンセル', '購入する']);
@@ -209,14 +194,12 @@ describe('贈れたかを残高で確かめる(v0.1.1884)', () => {
 });
 
 describe('帯の説明(v0.1.1885)', () => {
-  it('帯の先頭に押し方を見える文字で出し、1回押しにすると文言が変わる', async () => {
+  it('帯の先頭に押し方を見える文字で出す', async () => {
     const { createVenueGiftStrip } = await import('./venueComposeBox.js');
     /** @type {any} */
     let feed = null;
-    const strip = createVenueGiftStrip(/** @type {any} */ ({ subscribe: (/** @type {any} */ f) => { feed = f; }, press: async () => ({ ok: true }), oneTap: { get: () => false, set: () => {} } }));
+    const strip = createVenueGiftStrip(/** @type {any} */ ({ subscribe: (/** @type {any} */ f) => { feed = f; }, press: async () => ({ ok: true }) }));
     feed([{ key: 'a|30 pt', name: 'a', pt: '30 pt', img: '' }]);
-    expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('2回押すと公式の確認');
-    /** @type {HTMLElement} */ (strip.querySelector('.nlsb-gift-mode')).click();
     expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('押すと公式の確認');
   });
 });
