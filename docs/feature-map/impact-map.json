@@ -9258,6 +9258,16 @@
       ]
     },
     {
+      "file": "src/lib/storyGrowthRebuildReasons.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/storyUserLaneContaminationGuard.js",
       "featureCount": 1,
       "features": [

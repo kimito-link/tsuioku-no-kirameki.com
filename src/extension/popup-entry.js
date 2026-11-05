@@ -931,6 +931,7 @@ import {
 } from '../lib/watchSnapshotAlignment.js';
 import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
 import { createBroadcasterUidTracker } from '../lib/broadcasterUidTracker.js';
+import { STORY_GROWTH_REBUILD_REASON, createStoryGrowthRebuildReasonState, noteStoryGrowthRebuildReason, noteStoryGrowthTarget, publishStoryGrowthRebuildNote } from '../lib/storyGrowthRebuildReasons.js';
 import { isMarketingExportTabFinished } from '../lib/marketingExportTabState.js';
 
 /**
@@ -8658,7 +8659,7 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
   const n = STORY_GROWTH_STATE.renderedCount;
   const imgs = root.querySelectorAll('img.nl-story-growth-icon');
   if (imgs.length !== n) {
-    rebuildStoryGrowth(root, n);
+    rebuildStoryGrowth(root, n, STORY_GROWTH_REBUILD_REASON.DOM_MISMATCH, n);
     return;
   }
   const accent = buildStoryAccentForWindow(n);
@@ -8699,6 +8700,17 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
 const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
 // v0.1.1215: 全消し再構築ではなく「既存マスの中身のすり替え」を観測する(churn の盲点)。
 const STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
+// v0.1.1875: 応援マスを「なぜ」全部作り直したか(入口別)。ちらつき計の補足欄へ載せる(4秒ごとに書かれる=実機で読める)。
+const STORY_GROWTH_REBUILD_REASONS = createStoryGrowthRebuildReasonState();
+const STORY_REBUILD_TARGET_SIG = { v: '' };
+/** @param {string} reason 空なら記録せず補足欄だけ書き直す @param {{ from?: number, to?: number, dom?: number, liveSame?: boolean }} [info] */
+function noteStoryGrowthRebuildAndPublish(reason, info = {}) {
+  try {
+    const now = Date.now();
+    if (reason) noteStoryGrowthRebuildReason(STORY_GROWTH_REBUILD_REASONS, { reason, atMs: now, ...info });
+    publishStoryGrowthRebuildNote(STORY_GROWTH_REBUILD_REASONS, /** @type {any} */ (globalThis).__nlsFlickerMeter?.meter, now);
+  } catch { /* 計器の失敗は描画を止めない */ }
+}
 
 /**
  * v0.1.1616計器: 各マスが「どのコメントか」「誰として数えたか」を控えて、前回との食い違いを数える(観測のみ)。
@@ -8718,7 +8730,14 @@ function noteStoryGrowthIdentitiesNow(n) {
   } catch { /* 計器の失敗は描画を止めない */ }
 }
 
-function rebuildStoryGrowth(root, total) {
+/**
+ * @param {HTMLElement} root
+ * @param {number} total
+ * @param {string} [reason] v0.1.1875計器: 入口(空なら記録しない=呼び元で記録済み/初回)
+ * @param {number} [from] 作り直す前に描いていた数
+ */
+function rebuildStoryGrowth(root, total, reason = '', from = 0) {
+  if (reason) noteStoryGrowthRebuildAndPublish(reason, { from, to: total, dom: root.querySelectorAll('img.nl-story-growth-icon').length });
   // ★v0.1.1462: 全消し再構築=DOMを最も動かす経路。実測する。
   return _measuredSection('rebuildStoryGrowth', () => rebuildStoryGrowthImpl(root, total));
 }
@@ -8782,7 +8801,14 @@ function syncStoryGrowth(liveId, count, root) {
   const changedLive = STORY_GROWTH_STATE.liveId !== nextLiveId;
   const changedRoot = STORY_GROWTH_STATE.root !== root;
 
+  // v0.1.1875計器: 目標件数と配信の行き来を控える(件数が揺れると縮小→作り直しになる)。
+  try {
+    noteStoryGrowthTarget(STORY_GROWTH_REBUILD_REASONS, { liveKey: nextLiveId, target });
+    const _tSig = `${STORY_GROWTH_REBUILD_REASONS.liveFlips}|${STORY_GROWTH_REBUILD_REASONS.targets.join(',')}`;
+    if (_tSig !== STORY_REBUILD_TARGET_SIG.v) { STORY_REBUILD_TARGET_SIG.v = _tSig; noteStoryGrowthRebuildAndPublish(''); }
+  } catch { /* 計器の失敗は描画を止めない */ }
   if (changedLive || changedRoot) {
+    if (STORY_GROWTH_STATE.renderedCount > 0 || (root && root.childElementCount > 0)) noteStoryGrowthRebuildAndPublish(changedLive ? STORY_GROWTH_REBUILD_REASON.LIVE : STORY_GROWTH_REBUILD_REASON.ROOT, { from: STORY_GROWTH_STATE.renderedCount, to: target, dom: root ? root.childElementCount : 0, liveSame: !changedLive });
     clearStoryGrowthTimer();
     if (changedLive) {
       storyAvatarLoadGuard.clearFailedUrls();
@@ -8829,8 +8855,9 @@ function syncStoryGrowth(liveId, count, root) {
   }
 
   if (STORY_GROWTH_STATE.renderedCount > STORY_GROWTH_STATE.targetCount) {
+    const _shrinkFrom = STORY_GROWTH_STATE.renderedCount;
     STORY_GROWTH_STATE.renderedCount = STORY_GROWTH_STATE.targetCount;
-    rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount);
+    rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount, STORY_GROWTH_REBUILD_REASON.SHRINK, _shrinkFrom);
   }
 
   const tgt = STORY_GROWTH_STATE.targetCount;
@@ -8848,7 +8875,7 @@ function syncStoryGrowth(liveId, count, root) {
       domCount: root.querySelectorAll('img.nl-story-growth-icon').length,
       sourceOffset: STORY_GROWTH_STATE.sourceOffset
     })) appendStoryGrowthCells(root, rnd, tgt);
-    else rebuildStoryGrowth(root, tgt);
+    else rebuildStoryGrowth(root, tgt, rnd > 0 ? STORY_GROWTH_REBUILD_REASON.GROW_FULL : '', rnd);
     STORY_GROWTH_STATE.renderedCount = tgt;
     patchStoryGrowthIconsFromSource(root, { pulseLast: true });
     STORY_GROWTH_STATE.sourceSig = storySourceSignature();
@@ -8868,6 +8895,7 @@ function syncStoryGrowth(liveId, count, root) {
   }
 
   if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
+    noteStoryGrowthRebuildAndPublish(STORY_GROWTH_REBUILD_REASON.EMPTY, { from: root.childElementCount, to: 0, dom: root.childElementCount });
     root.innerHTML = '';
   }
 }
