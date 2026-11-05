@@ -131,3 +131,18 @@ describe('applyVenuePickupView — diff-skip', () => {
     expect(() => applyVenuePickupView(null, buildVenuePickupView(null))).not.toThrow();
   });
 });
+
+describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
+  it('映像の中心に合わせ、幅は映像から余白を引いた分まで', async () => {
+    const { venuePickupPlacement } = await import('./venuePickupBanner.js');
+    // PC 実測(YouTube 1400px): 映像 x16 w960・会場 x0 → 中心 496・幅 936 は上限 860 で止まる
+    expect(venuePickupPlacement({ left: 16, top: 68, width: 960, height: 540 }, { left: 0, top: 56, width: 1400 })).toEqual({ left: 496, top: 20, width: 860 });
+    // 映像が狭いと映像の幅に収める
+    expect(venuePickupPlacement({ left: 0, top: 200, width: 600, height: 338 }, { left: 0, top: 56, width: 1000 })).toEqual({ left: 300, top: 152, width: 576 });
+  });
+  it('映像が見つからない・小さすぎるときは null(CSS の既定のまま)', async () => {
+    const { venuePickupPlacement } = await import('./venuePickupBanner.js');
+    expect(venuePickupPlacement(null, { left: 0, top: 0, width: 1000 })).toBeNull();
+    expect(venuePickupPlacement({ left: 0, top: 0, width: 100, height: 60 }, { left: 0, top: 0, width: 1000 })).toBeNull();
+  });
+});
