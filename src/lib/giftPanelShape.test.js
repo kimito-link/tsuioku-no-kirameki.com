@@ -39,5 +39,6 @@ describe('公式ギフト欄の作りを記録する計器', () => {
     const s = captureGiftPanelShape(document);
     expect(s?.tiles.length).toBe(1);
     expect(s?.tiles[0].pt).toBe('100pt');
+    expect(s?.ptSkel?.[0]).toMatch(/^span\./);
   });
 });

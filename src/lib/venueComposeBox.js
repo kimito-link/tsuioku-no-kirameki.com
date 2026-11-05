@@ -159,7 +159,7 @@ const GIFT_SIDEBAR_ROOT_SEL =
  *   記録のために裏でランキングタブを開くので、そのまま開くとランキングが出てしまう(りんく 2026-11-05)。
  *   欄が描かれるのを待って 0.25 秒ごとに最大 12 回探し、見つけたら1回だけ押す。既に選ばれていれば押さない。
  * @param {Document} doc
- * @param {{ tries?: number, waitMs?: number }} [opts]
+ * @param {{ tries?: number, waitMs?: number, rootSel?: string }} [opts]  rootSel: ギフトの子の窓では 'body'(窓全体がギフト欄)
  */
 export function showGiftItemsTabSoon(doc, opts = {}) {
   const win = doc.defaultView;
@@ -168,10 +168,13 @@ export function showGiftItemsTabSoon(doc, opts = {}) {
   const step = () => {
     left -= 1;
     try {
-      for (const root of doc.querySelectorAll(GIFT_SIDEBAR_ROOT_SEL)) {
+      for (const root of doc.querySelectorAll(opts.rootSel ?? GIFT_SIDEBAR_ROOT_SEL)) {
         const tab = findGiftSidebarItemsTabElement(root);
         if (!tab) continue;
-        const sel = tab.getAttribute('aria-selected') === 'true' || /(?:^|[\s_-])(?:active|selected|current)/i.test(String(tab.getAttribute('class') || ''));
+        const clsOf = (/** @type {Element | null} */ el) => String(el?.getAttribute('class') || '');
+        const sel =
+          tab.getAttribute('aria-selected') === 'true' ||
+          /(?:^|[\s_-])(?:active|selected|current)/i.test(`${clsOf(tab)} ${clsOf(tab.parentElement)}`);
         if (!sel) tab.click();
         return;
       }
@@ -204,4 +207,23 @@ export function openOfficialGiftPanel(doc) {
   } catch {
     return { ok: false, reason: 'error' };
   }
+}
+
+/** v0.1.1874: 会場の「🎁 ギフト」を押した合図(親のページ → ギフトの子の窓)。chrome.storage.local のキー */
+export const GIFT_ITEMS_TAB_REQ_KEY = 'nls_gift_items_tab_req';
+
+/**
+ * v0.1.1874: ギフトの子の窓(gift.nicovideo.jp/…/purchase)で、会場から開いた合図を受けたら番組ギフトのタブへ切り替える。
+ *   タブは子の窓の中にあり、親のページからは押せない(別ドメイン)ので、子の窓の content script が押す。合図から10秒以内だけ。
+ * @param {Window} win
+ * @param {(cb: (changes: Record<string, { newValue?: any }>) => void) => void} onStorageChanged
+ */
+export function startGiftItemsTabResponder(win, onStorageChanged) {
+  let top = true;
+  try { top = win.self === win.top; } catch { top = false; }
+  if (top || !/(^|\.)gift\.nicovideo\.jp$/.test(String(win.location.hostname || '')) || !/\/purchase/.test(String(win.location.pathname || ''))) return;
+  onStorageChanged((changes) => {
+    const at = Number(changes?.[GIFT_ITEMS_TAB_REQ_KEY]?.newValue?.at || 0);
+    if (at && Date.now() - at < 10000) showGiftItemsTabSoon(win.document, { rootSel: 'body' });
+  });
 }
