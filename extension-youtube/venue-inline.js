@@ -20380,7 +20380,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T09:49") : ""
+          buildId: true ? String("yt-2026-11-05T09:55") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -23283,7 +23283,17 @@ ${sourceCol}
         openGift: () => chrome.runtime.sendMessage({ type: "YT_OPEN_SUPERCHAT", videoId: mountedVid }),
         giftLabel: "💲 スーパーチャット",
         // 0.1.114: ボタンに出す短い理由(未ログインはボタンが無いので「見つかりません」でなくログインの案内)。
-        giftReasonText: (reason) => ({ "not-signed-in": "ログインすると使えます", "no-tab": "チャット欄が見つかりません", "no-chat-frame": "チャット欄が見つかりません" })[String(reason || "")] || ""
+        // 0.1.115: 押したのに画面が開かなかったら会場を戻し、押したボタンの名前を出す(りんく実機「会場がとじるだけ」)。
+        giftReasonText: (reason) => {
+          const r = String(reason || "");
+          if (r.startsWith("no-superchat-panel")) return `開けませんでした(${r.slice("no-superchat-panel:".length) || "?"})`;
+          return {
+            "not-signed-in": "ログインすると使えます",
+            "no-tab": "チャット欄が見つかりません",
+            "no-chat-frame": "チャット欄が見つかりません",
+            "no-superchat-button": "この配信ではボタンがありません"
+          }[r] || "";
+        }
       });
   }
   ytInstallLocalAssetUrls();
