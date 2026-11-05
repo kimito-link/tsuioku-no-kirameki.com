@@ -6716,8 +6716,7 @@ export function mountVenueBarButton(options = {}) {
     //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
     //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
     const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
-    // v0.1.1866: 開いた瞬間の直近3件(primeEmit)は開く前に届いた発言なので「受信→キュー」の遅れに数えない
-    //   (数えると1件で最大60秒が平均に入り、過疎配信では何分も「遅れ」が残っていた。実際は約0.06秒・YouTube 版 0.1.103 で確認)。
+    // v0.1.1866: 開いた瞬間の直近3件(primeEmit)は開く前に届いた発言なので「受信→キュー」の遅れに数えない(数えると過疎配信で何分も「遅れ」が残った)。
     const primeBurst = !(speechState && speechState.primed === true);
     const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
     speechState = {
