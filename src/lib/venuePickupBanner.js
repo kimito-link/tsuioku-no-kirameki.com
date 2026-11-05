@@ -150,3 +150,23 @@ export function applyVenuePickupView(els, view) {
   else els.root.removeAttribute('data-empty');
   return true;
 }
+
+/**
+ * v0.1.1869 PICK UP の吹き出しを「映像の上端中央」に置く位置(純関数)。
+ *   会場全体の中央だと YouTube のチャット欄に はみ出した(PC 実測 1400px で 146px)。
+ *   上端は額縁の3キャラ(会場の上の余白)に重ならないよう minTop より上へは出さない。
+ * @param {{ left:number, top:number, width:number, height:number } | null | undefined} video 映像の矩形(画面座標)
+ * @param {{ left:number, top:number, width:number }} layout 吹き出しの親(stageLayout)の矩形(画面座標)
+ * @param {{ maxWidth?: number, minTop?: number, margin?: number }} [opts]
+ * @returns {{ left:number, top:number, width:number } | null} 親の中での中心 x・上端・幅(映像が分からなければ null=CSS の既定)
+ */
+export function venuePickupPlacement(video, layout, opts = {}) {
+  if (!video || !layout || !(video.width >= 240) || !(video.height >= 120)) return null;
+  const maxWidth = opts.maxWidth ?? 860;
+  const minTop = opts.minTop ?? 20;
+  const margin = opts.margin ?? 12;
+  const width = Math.round(Math.max(200, Math.min(maxWidth, video.width - margin * 2)));
+  const left = Math.round(video.left - layout.left + video.width / 2);
+  const top = Math.round(Math.max(minTop, video.top - layout.top + 8));
+  return { left, top, width };
+}

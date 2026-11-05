@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1841',
+    date: '2026-10-31',
+    summary: 'VOICEVOX再起動後も準備中と正しく出す',
+    items: Object.freeze([
+      '読み上げを ON にするたびに、声の「初めて」と速さを数え直すようにしました。VOICEVOX を途中で再起動したり GPU に切り替えたりした後も、起動直後の遅れに「準備中」の案内が出て、古い速さで遅い PC と決めつけません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1840',
     date: '2026-10-31',
     summary: '読み上げの遅れの理由を画面で分かるように',

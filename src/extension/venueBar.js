@@ -5,7 +5,8 @@ import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/come
 import {
   applyVenuePickupView,
   buildVenuePickupView,
-  createVenuePickupBanner
+  createVenuePickupBanner,
+  venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
@@ -635,35 +636,37 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
   }
-  /* v0.1.1230 ピックアップ枠(BSP風): 会場ヘッダー直下に常設。高さを先に確保して
-     出たり消えたりで下の段が動かないようにする(ユーザー報告「上下に動く」の対策と同趣旨)。 */
+  /* v0.1.1230 ピックアップ枠(BSP風)。v0.1.1869 りんく「上にもってきたほうがみやすい」(Canva の見本=映像の上に大きな白い吹き出し):
+     ひな壇の一番下にあった帯を、映像の上端中央の大きな吹き出しにした。stageLayout 直下に絶対配置するので
+     出たり消えたりしても席の段は動かない。空のときは出さない(案内文の大きな白い枠で映像をふさがない)。
+     ★下地は不透明(v0.1.1337: 半透明だと後ろのページの文字と重なって読めなかった)。 */
   .nlsb-pickup {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    z-index: 7;
+    transform: translateX(-50%);
+    width: min(860px, calc(100% - 180px));
+    box-sizing: border-box;
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    margin: 4px 0 6px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 190, 90, 0.55);
-    /*
-     * ★v0.1.1337: 地の色を【不透明で】敷く(実機で読めなくなっていた)。
-     *   旧: linear-gradient のみ = 透明度 0.22〜0.06 の帯だけ。
-     *   会場の暗い背景の上なら成立するが、後ろにニコ生のページ(カテゴリタグ等)が
-     *   透けると文字と背景が重なって【判読不能】になる。実機スクリーンショットで確認。
-     *   さらに data-empty の opacity:0.55 が乗ると実質 0.03〜0.12 まで薄くなっていた。
-     *   → 不透明の下地(#2a2118 相当)を先に置き、その上に既存のグラデを重ねる。
-     *     色は会場の暗色系に馴染ませる(白背景でも黒背景でも読める濃さ)。
-     */
-    background-color: rgba(38, 30, 20, 0.92);
-    background-image: linear-gradient(90deg, rgba(255, 176, 62, 0.28), rgba(255, 176, 62, 0.1));
-    color: #fff5e8;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-    font-size: 13px;
-    line-height: 1.35;
+    gap: 12px;
+    min-height: 64px;
+    padding: 10px 22px;
+    border-radius: 28px;
+    border: 2px solid rgba(255, 176, 62, 0.9);
+    background: #fffdf8;
+    color: #1f2328;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    font-size: 18px;
+    line-height: 1.4;
+    pointer-events: auto;
   }
-  /* ★空のときも【薄くしすぎない】(0.55 だと下地ごと透けて読めなくなる)。 */
-  .nlsb-pickup[data-empty='1'] { opacity: 0.85; }
+  /* 吹き出しの尻尾(左下)。枠線色の三角の上に地の色の三角を重ねる。 */
+  .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
+  .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
+  .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
+  .nlsb-pickup[data-empty='1'] { display: none; }
   .nlsb-pickup__badge {
     flex: 0 0 auto;
     font-size: 10px;
@@ -676,12 +679,12 @@ const VENUE_CSS = `
   }
   .nlsb-pickup__face {
     flex: 0 0 auto;
-    width: 30px;
-    height: 30px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     object-fit: cover;
-    background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 1px rgba(255, 245, 232, 0.45);
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
   }
   .nlsb-pickup__face[hidden] { display: none; }
   .nlsb-pickup__main {
@@ -695,14 +698,14 @@ const VENUE_CSS = `
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; /* 長文は2行まで */
+    overflow-wrap: anywhere;
+    font-weight: 700;
   }
   .nlsb-pickup__meta {
     flex: 0 0 auto;
-    font-size: 11px;
-    opacity: 0.8;
+    font-size: 12px;
+    opacity: 0.75;
     color: inherit;
     text-decoration: none;
     overflow: hidden;
@@ -2997,14 +3000,26 @@ export function mountVenueBarButton(options = {}) {
     try {
       const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
       applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
+      placePickup();
     } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
-  // seating は下端のひな壇だけ(header + pickup + seats)。
-  seating.append(header, pickupEls.root, topBar, seatsHost);
+  /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
+  function placePickup() {
+    if (pickupEls.root.hasAttribute('data-empty')) return;
+    const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
+    const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
+    pickupEls.root.style.left = at ? `${at.left}px` : '';
+    pickupEls.root.style.top = at ? `${at.top}px` : '';
+    pickupEls.root.style.width = at ? `${at.width}px` : '';
+  }
+  window.addEventListener('resize', () => { try { placePickup(); } catch { /* 位置合わせの失敗は無視(CSS の既定位置のまま) */ } });
+  // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
+  seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   // 3キャラ常駐は配信画面の「まわり(左右の縁)」に出す(会場の席とは重ねない=邪魔にしない)。
   //   stageLayout 基準=映像セーフエリアの高さに合わせて左右に配置できる。
-  stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer);
+  stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer, pickupEls.root);
   // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
   //   セリフがクリップされず・アバターに潜らない。席の座標を測ってこの上に頭上配置する。
   const bubbleLayer = document.createElement('div');
