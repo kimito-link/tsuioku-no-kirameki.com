@@ -9318,6 +9318,16 @@
       ]
     },
     {
+      "file": "src/lib/supporterAccess.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
       "file": "src/lib/supporterChikuranScore.js",
       "featureCount": 1,
       "features": [
@@ -9325,6 +9335,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/supporterLicense.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
       ]
     },
     {
