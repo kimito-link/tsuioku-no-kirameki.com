@@ -8234,6 +8234,7 @@ ${sourceCol}
       return { idLine, nameLine: formatNicknameWithUidFallback(uid, "") || "（未取得）" };
     }
     if (nick) {
+      if (/^UC[\w-]{20,}$/.test(uid)) return { idLine: nick, nameLine: idLine };
       return { idLine, nameLine: nick };
     }
     return { idLine, nameLine: formatNicknameWithUidFallback(uid, "") || "（未取得）" };
@@ -20103,7 +20104,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T03:14") : ""
+          buildId: true ? String("yt-2026-11-05T04:25") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
