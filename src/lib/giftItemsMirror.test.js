@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, newGiftDrawers, describeGiftDrawers, waitGiftPressResult, readGiftBalance, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
+import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, newGiftDrawers, describeGiftDrawers, waitGiftPressResult, readGiftBalance, giftPressOutcome, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
 import { createVenueGiftStrip } from './venueComposeBox.js';
 
 // 2026-11-05 りんくの画面(番組ギフト・3列の枠・画像と「500 pt」の数字と pt が別の部品)に似せた形
@@ -131,7 +131,7 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
     expect(findGiftConfirmButton(document)?.id).toBe('old');
   });
   it('オンなら1回押しで、アイテムを押したあとに出た確認の「贈る」まで押して「贈りました」と出す', async () => {
-    document.body.innerHTML = PANEL;
+    document.body.innerHTML = '<div id="bal">テスト さん 1,000 pt</div>' + PANEL;
     const store = memStore();
     /** @type {string[]} */
     const hit = [];
@@ -141,7 +141,7 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
         const dlg = document.createElement('div');
         dlg.innerHTML = '<p>このギフトを贈りますか</p><button class="cancel">キャンセル</button><button class="ok">贈る</button>';
         for (const b of dlg.querySelectorAll('button')) b.getBoundingClientRect = () => /** @type {any} */ ({ width: 80, height: 30 });
-        dlg.querySelector('.ok')?.addEventListener('click', () => { hit.push('confirm'); });
+        dlg.querySelector('.ok')?.addEventListener('click', () => { hit.push('confirm'); const bal = document.getElementById('bal'); if (bal) bal.textContent = 'テスト さん 945 pt'; });
         document.body.append(dlg);
       });
     }
@@ -151,7 +151,7 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
     let saved = false;
     const strip = createVenueGiftStrip({
       subscribe: (cb) => subscribeGiftItems(store, '/watch/lv9', cb),
-      press: async (key, o) => { let at = 0; const r = requestGiftItemPress(document, key, store.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); const v = await waitGiftPressResult(store, at); return { ok: r.ok || !!v, sent: v?.confirmed === true }; },
+      press: async (key, o) => { let at = 0; const r = requestGiftItemPress(document, key, store.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); const v = await waitGiftPressResult(store, at); return { ok: r.ok || !!v, ...giftPressOutcome(v) }; },
       oneTap: { get: () => false, set: (on) => { saved = on; } },
       doc: document
     });
@@ -164,10 +164,12 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
     const item = /** @type {HTMLButtonElement} */ (strip.querySelectorAll('.nlsb-gift-item')[1]);
     item.click();
     item.click(); // 続けて押しても二重には贈らない
-    await new Promise((r) => setTimeout(r, 4200));
+    await new Promise((r) => setTimeout(r, 1800)); // 残高が減ったらすぐ結果を書く(3秒待たない)
     expect(hit).toEqual(['a', 'confirm']);
     expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].confirmed).toBe(true);
-    expect(item.textContent).toMatch(/贈りました/);
+    expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].spent).toBe(55);
+    expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].clicks.some((/** @type {any} */ c) => c.text === '贈る' && c.trusted === false)).toBe(true);
+    expect(item.textContent).toMatch(/贈りました\(55pt\)/);
   }, 10000);
 });
 
@@ -216,5 +218,14 @@ describe('帯の説明(v0.1.1885)', () => {
     expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('2回押して贈る');
     /** @type {HTMLElement} */ (strip.querySelector('.nlsb-gift-mode')).click();
     expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('押すとすぐ贈る');
+  });
+});
+
+describe('贈れたかは残高で決める(v0.1.1886)', () => {
+  it('確定ボタンを押していなくても、残高が減っていれば贈れた扱いにして実際の値段を出す', () => {
+    expect(giftPressOutcome({ found: true, confirmed: false, spent: 55 })).toEqual({ sent: true, notFound: false, price: '55pt' });
+    expect(giftPressOutcome({ found: true, confirmed: false, spent: 0, price: '' })).toEqual({ sent: false, notFound: false, price: '' });
+    expect(giftPressOutcome({ found: false, confirmed: false })).toEqual({ sent: false, notFound: true, price: '' });
+    expect(giftPressOutcome(null).sent).toBe(false);
   });
 });
