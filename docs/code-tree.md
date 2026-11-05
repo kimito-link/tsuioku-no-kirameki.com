@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1107 件
+## ⚠️ 役割コメントが無いソース 9 / 1108 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -1000,7 +1000,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2240)
+- 📁 **src/** (2243)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1302,7 +1302,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1964)
+  - 📁 **lib/** (1967)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3160,6 +3160,8 @@
     - `voiceAssignment.test.js`
     - `voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
     - `voiceBubbleRealtimeParity.test.js`
+    - `voiceBusyPriority.js` — v0.1.1861: 読み上げが混んでいる時は「大事なもの」だけ読む(ニコ生版・会場とコメビュで共用)。
+    - `voiceBusyPriority.test.js`
     - `voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
     - `voiceComment.test.js`
     - `voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
@@ -3194,6 +3196,7 @@
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
+    - `voicePlayerBusyPriority.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
     - `voicePlayerOverloadKeep.test.js`
     - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
