@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1878',
+    date: '2026-11-05',
+    summary: '会場のギフトは2回押しで選ぶ',
+    items: Object.freeze([
+      '会場の帯のアイテムは、1回目の押下で「もう一度」と出し、3秒以内にもう一度押したときだけ公式のギフト欄でそのアイテムを選ぶようにしました。1回の押し間違いでは何も起きません',
+      '会場の帯から選んだあと、公式の欄に何が出たか(確認の窓など)を3秒だけ記録するようにしました(この PC の中だけ・押したり贈ったりはしません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1877',
     date: '2026-11-05',
     summary: '会場のギフトは安い順・1,000pt まで',
