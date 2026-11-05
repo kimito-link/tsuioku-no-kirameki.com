@@ -30,3 +30,25 @@ export function canAppendStoryGrowthCells(s) {
   if (offset !== 0) return false;
   return true;
 }
+
+/**
+ * v0.1.1889: 応援マスが減るとき、全部作り直さずに末尾のマスだけ削ってよいか(純関数)。
+ * 実機(2026-11-05)で件数が 58↔57 と交互に揺れ、減るたびに全58枚を作り直してチカチカしていた。
+ * 先頭からの並びは変わらないので、余ったマスを末尾から外せば残りの <img> は顔を保ったまま。
+ * 条件は「足す」と同じ型(どれか外れたら従来どおり作り直す=安全側)。
+ * @param {{ renderedCount?: number, targetCount?: number, domCount?: number, sourceOffset?: number }} s
+ * @returns {boolean}
+ */
+export function canTrimStoryGrowthCells(s) {
+  const a = s && typeof s === 'object' ? s : {};
+  const rendered = Number(a.renderedCount);
+  const target = Number(a.targetCount);
+  const dom = Number(a.domCount);
+  const offset = Number(a.sourceOffset) || 0;
+  if (![rendered, target, dom].every(Number.isFinite)) return false;
+  if (target <= 0) return false;
+  if (target >= rendered) return false;
+  if (dom !== rendered) return false;
+  if (offset !== 0) return false;
+  return true;
+}
