@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1877',
+    date: '2026-11-05',
+    summary: '会場のギフトは安い順・1,000pt まで',
+    items: Object.freeze([
+      '会場に並べるギフトのアイテムを、安い順にし、1,000pt までに絞りました。公式の並びのままだと先頭に会員権や数万 pt のアイテムが来ていたためです。プレミアム会員権は配信者へのギフトではないので会場には出しません(高いアイテムや会員権は公式のギフト欄から選べます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1876',
     date: '2026-11-05',
     summary: '応援マスの作り直しの理由を計器に出す',
@@ -184,15 +192,8 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       '読み上げが遅い PC では、ポップアップの読み上げ欄にも「VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に」の案内を出すようにしました。',
       '会場モードの「読み上げが遅れています」と GPU の案内が、後ろのニコ生のコメント欄と重なって読みにくかったので、白い下地を付けて何の上でも読めるようにしました。'
     ])
-  }),
-  Object.freeze({
-    version: '0.1.1851',
-    date: '2026-11-03',
-    summary: 'VOICEVOX が追いつかない間は PC の声で読む',
-    items: Object.freeze([
-      'VOICEVOX が混んで追いつかない間だけ、PC に入っている声(Windows の Haruka・Ayumi・Ichiro・Sayaka など)に自動で切り替えて読むようにしました。人ごとに声の種類・高さ・速さを変えるので、誰のコメントか聞き分けられます(同じ人はいつも同じ声)。切り替えている間は「いまは PC の声で読んでいます」と出ます。VOICEVOX が速くなったら自動で戻ります。'
-    ])
   })
+
 ]);
 
 
