@@ -39,10 +39,10 @@ const okFetch = (license, active = true) =>
   vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true, active, license }) }));
 
 describe('supporterAccess', () => {
-  it('関所が開いている版(既定)は何も聞かずに開ける・初めての日だけ記録する', async () => {
+  it('関所が開いている版は何も聞かずに開ける・初めての日だけ記録する', async () => {
     const st = memStorage();
     const f = vi.fn();
-    const r = await checkMarketingAccess({ storage: st, nowMs: T0, fetchImpl: f });
+    const r = await checkMarketingAccess({ storage: st, nowMs: T0, fetchImpl: f, enforced: false });
     expect(r.allowed).toBe(true);
     expect(r.reason).toBe('gate_open');
     expect(st.m.get(KEY_SUPPORTER_FIRST_SEEN_AT)).toBe(T0);
@@ -101,8 +101,18 @@ describe('supporterAccess', () => {
 });
 
 describe('supporterAccess: コメビュの隅の印', () => {
-  it('既定(関所が開いている)は出さない・通信しない', async () => {
-    expect(await checkCreditBadge({ storage: memStorage() })).toBe(false);
+  it('関所が開いている版は出さない・通信しない', async () => {
+    expect(await checkCreditBadge({ storage: memStorage(), enforced: false })).toBe(false);
+  });
+
+  it('v0.1.1897 から既定で関所が閉まる: 初めて開いた人は14日のお試しで開く・コードが無ければ通信しない', async () => {
+    const st = memStorage();
+    const f = vi.fn();
+    const r = await checkMarketingAccess({ storage: st, nowMs: T0, fetchImpl: f });
+    expect(r.allowed).toBe(true);
+    expect(r.reason).toBe('trial');
+    expect(r.trialDaysLeft).toBe(14);
+    expect(f).not.toHaveBeenCalled();
   });
   it('関所を閉めると無料の人に出し、有効な証明書があれば出さない', async () => {
     const s = await signer();
