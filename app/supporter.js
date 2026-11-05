@@ -17,6 +17,7 @@
   function errorText(j) {
     if (j && j.error === 'billing_not_configured') return 'ただいま準備中です。もう少しお待ちください。';
     if (j && j.error === 'unknown_code') return 'コードが見つかりませんでした。';
+    if (j && j.error === 'not_supporter') return 'このお支払いは追憶のきらめき サポーターのものではないようです。';
     if (j && j.error === 'reset_too_soon') {
       const d = j.nextAtMs ? new Date(j.nextAtMs) : null;
       return 'PC を移せるのは30日に1回です。' + (d ? '次に移せるのは ' + (d.getMonth() + 1) + '月' + d.getDate() + '日 からです。' : '');
