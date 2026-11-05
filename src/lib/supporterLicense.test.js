@@ -158,9 +158,9 @@ describe('supporterLicense: PC の印(1コード1台)', () => {
 });
 
 describe('supporterLicense: 本番の公開鍵', () => {
-  it('k2026a は Ed25519 の公開鍵として読める(32バイト)', async () => {
+  it('k2026b は Ed25519 の公開鍵として読める(32バイト)', async () => {
     const { LICENSE_PUBLIC_KEYS } = await import('./supporterLicense.js');
-    const x = LICENSE_PUBLIC_KEYS.k2026a;
+    const x = LICENSE_PUBLIC_KEYS.k2026b;
     expect(base64urlToBytesForTest(x).length).toBe(32);
     await expect(
       crypto.subtle.importKey('jwk', { kty: 'OKP', crv: 'Ed25519', x }, { name: 'Ed25519' }, false, ['verify'])

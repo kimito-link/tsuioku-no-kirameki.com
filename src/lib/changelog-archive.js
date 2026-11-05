@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1877',
+    date: '2026-11-05',
+    summary: '会場のギフトは安い順・1,000pt まで',
+    items: Object.freeze([
+      '会場に並べるギフトのアイテムを、安い順にし、1,000pt までに絞りました。公式の並びのままだと先頭に会員権や数万 pt のアイテムが来ていたためです。プレミアム会員権は配信者へのギフトではないので会場には出しません(高いアイテムや会員権は公式のギフト欄から選べます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1875',
     date: '2026-11-05',
     summary: '会場にギフトのアイテムを並べる',
