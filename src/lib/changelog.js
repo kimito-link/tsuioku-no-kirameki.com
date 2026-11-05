@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1887',
+    date: '2026-11-05',
+    summary: 'ギフトの帯の説明と贈れた判定を直す',
+    items: Object.freeze([
+      '会場のギフトの帯の説明を本当の動きに合わせました(押すと公式の購入の確認が出て、公式のボタンで贈ります)',
+      '公式の「ギフトを贈りました」の表示と、落ち着いた残高の減りで贈れたかを判定し、値段の数え間違いを直しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1886',
     date: '2026-11-05',
     summary: 'ギフトが贈れたかを残高で判定する',
@@ -181,14 +190,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場の発言欄を中央に・大きく',
     items: Object.freeze([
       '会場モードの「ここから発言」の欄を、上の帯の中央に移して大きくしました(高さ34px・文字14px・幅は最大およそ500px)。幅が狭いときは1段下に回り、右のボタンを押し出しません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1867',
-    date: '2026-11-05',
-    summary: '会場モードから発言できるように',
-    items: Object.freeze([
-      '会場モードの上の帯に「ここから発言」の入力欄を付けました。会場を開いたまま、パネルの「コメント送信」と同じ方法で放送にコメントを送れます。送れなかったときは理由を横に出します。'
     ])
   })
 ]);

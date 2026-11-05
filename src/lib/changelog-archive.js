@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1867',
+    date: '2026-11-05',
+    summary: '会場モードから発言できるように',
+    items: Object.freeze([
+      '会場モードの上の帯に「ここから発言」の入力欄を付けました。会場を開いたまま、パネルの「コメント送信」と同じ方法で放送にコメントを送れます。送れなかったときは理由を横に出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1866',
     date: '2026-11-05',
     summary: '読み上げのテンポと遅れ表示の直し',

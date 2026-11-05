@@ -43,8 +43,8 @@ function appendGiftPressLog(store, entry) {
  */
 export function giftPressOutcome(v) {
   const spent = Number(v?.spent || 0);
-  const sent = v?.confirmed === true || spent > 0;
-  const price = spent > 0 ? `${spent}pt` : typeof v?.price === 'string' ? v.price : '';
+  const sent = v?.confirmed === true || spent > 0 || v?.sentText === true;
+  const price = typeof v?.price === 'string' && v.price ? v.price : spent > 0 ? `${spent}pt` : '';
   return { sent, notFound: v?.found === false, price };
 }
 
@@ -369,6 +369,8 @@ export function startGiftItemsPublisher(win, store) {
       const before = req.direct === true ? visibleConfirmButtons(doc) : new Set();
       const drawersBefore = new Set(newGiftDrawers(doc, new Set()));
       const balanceBefore = readGiftBalance(doc);
+      let sentBefore = false;
+      try { sentBefore = /ギフトを贈りました/.test(String(doc.body?.textContent || '')); } catch { sentBefore = false; }
       try { ok = pressGiftItem(doc, req.key); } catch { ok = false; }
       if (!ok) mo?.disconnect();
       if (!ok && left > 0) win.setTimeout(step, 300);
@@ -403,13 +405,23 @@ export function startGiftItemsPublisher(win, store) {
           if (el && clicks.length < 12) clicks.push({ t: Date.now() - at, text: String(el.textContent || '').replace(/\s+/g, '').slice(0, 20), trusted: e.isTrusted === true });
         };
         try { doc.addEventListener('click', onClick, true); } catch { /* 見張れなくても続ける */ }
-        let polls = 20;
+        // v0.1.1887: 贈る確定は公式の「利用規約に同意してこのギフトを購入します」を本人が押す(PC 実測 13:21・isTrusted=true)。
+        //   本人が押すまで最長25秒待つ。贈れた印は「ギフトを贈りました」の表示か残高の減り。残高は段階的に減ることがある
+        //   (2377→2362→2344)ので、減ったあと同じ値が2回続くまで待ってから spent を出す。
+        let polls = 84;
+        /** @type {number | null} */
+        let prevBal = null;
         const finish = () => {
           polls -= 1;
           const nowBal = readGiftBalance(doc);
           const spentNow = balanceBefore != null && nowBal != null && nowBal < balanceBefore ? balanceBefore - nowBal : 0;
-          const dropped = spentNow > 0;
-          if (!dropped && polls > 0) { win.setTimeout(finish, 300); return; }
+          let sentText = false;
+          try { sentText = /ギフトを贈りました/.test(String(doc.body?.textContent || '')); } catch { sentText = false; }
+          const settled = spentNow > 0 && nowBal === prevBal;
+          prevBal = nowBal;
+          if (sentBefore) sentText = false; // 押す前から出ていた表示(前の贈り物の分)は印にしない
+          const done = settled || polls <= 0 || (sentText && spentNow === 0 && polls < 70);
+          if (!done) { win.setTimeout(finish, 300); return; }
           mo?.disconnect();
           const shown = added.filter((el) => el.isConnected && (() => { const r = el.getBoundingClientRect(); return r.width >= 100 && r.height >= 40; })());
           let drawer = { buttons: /** @type {any[]} */ ([]), price: '' };
@@ -419,10 +431,10 @@ export function startGiftItemsPublisher(win, store) {
               at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, ...conf, drawerButtons: drawer.buttons, price: drawer.price,
               shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
               head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160),
-              balanceBefore, balanceNow: nowBal, spent: spentNow, clicks: clicks.slice(), inst: INSTANCE
+              balanceBefore, balanceNow: nowBal, spent: spentNow, sentText, clicks: clicks.slice(), inst: INSTANCE
             }
           });
-          appendGiftPressLog(store, { reqAt: at, key: req.key, direct: req.direct === true, confirmed: conf.confirmed, spent: spentNow, inst: INSTANCE });
+          appendGiftPressLog(store, { reqAt: at, key: req.key, direct: req.direct === true, confirmed: conf.confirmed, spent: spentNow, sentText, inst: INSTANCE });
         };
         win.setTimeout(finish, 600);
         win.setTimeout(() => { try { doc.removeEventListener('click', onClick, true); } catch { /* 外せなくても害はない */ } }, 16000);
@@ -497,7 +509,7 @@ export function requestGiftItemPress(doc, key, set, opts = {}) {
  * @param {number} [ms]
  * @returns {Promise<any>}
  */
-export function waitGiftPressResult(store, reqAt, ms = 10000) {
+export function waitGiftPressResult(store, reqAt, ms = 30000) {
   return new Promise((resolve) => {
     let done = false;
     const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, ms);
