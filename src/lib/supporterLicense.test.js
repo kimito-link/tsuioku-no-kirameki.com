@@ -8,6 +8,7 @@ import {
   isValidSupporterCode,
   parseLicenseToken,
   shouldRefreshLicense,
+  shouldShowCreditBadge,
   verifyLicenseToken
 } from './supporterLicense.js';
 
@@ -117,5 +118,19 @@ describe('supporterLicense: 取り直しとコードの形', () => {
     expect(isValidSupporterCode('short')).toBe(false);
     expect(isValidSupporterCode('a'.repeat(42) + '!')).toBe(false);
     expect(isValidSupporterCode(123)).toBe(false);
+  });
+});
+
+describe('supporterLicense: コメビュの隅の印', () => {
+  it('関所が開いているあいだは誰にも出さない', () => {
+    expect(shouldShowCreditBadge({ enforced: false, licenseStatus: null })).toBe(false);
+  });
+  it('無料・期限切れ・偽物には出す/サポーターには出さない', () => {
+    expect(shouldShowCreditBadge({ enforced: true, licenseStatus: null })).toBe(true);
+    expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'expired' })).toBe(true);
+    expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'bad_signature' })).toBe(true);
+    expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'valid' })).toBe(false);
+    expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'expired_grace' })).toBe(false);
+    expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'unverifiable' })).toBe(false);
   });
 });

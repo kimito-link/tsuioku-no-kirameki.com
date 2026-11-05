@@ -201,6 +201,18 @@ export function decideFeatureAccess(input) {
   return { allowed: false, reason: 'locked', trialDaysLeft: 0 };
 }
 
+/**
+ * コメビュ(OBS)の隅の「追憶のきらめき」の印を出すか(v0.1.1894・りんく 2026-11-05)。
+ *   無料の人には出し、サポーター(有効・猶予中・確かめられない)には出さない。お試し期間は関係ない。
+ *   関所が開いているあいだは誰にも出さない(=今の利用者にある日突然ロゴが出ない)。
+ * @param {{ enforced: boolean, licenseStatus: LicenseStatus | null }} input
+ */
+export function shouldShowCreditBadge(input) {
+  if (!input.enforced) return false;
+  const st = input.licenseStatus;
+  return !(st === 'valid' || st === 'expired_grace' || st === 'unverifiable');
+}
+
 /** 期限まで残りがこれ未満なら取り直す(10日)。 */
 export const LICENSE_REFRESH_BEFORE_MS = 10 * 24 * 60 * 60 * 1000;
 
