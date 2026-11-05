@@ -205,3 +205,16 @@ describe('贈れたかを残高で確かめる(v0.1.1884)', () => {
     expect(readGiftBalance(document)).toBe(null);
   });
 });
+
+describe('帯の説明(v0.1.1885)', () => {
+  it('帯の先頭に押し方を見える文字で出し、1回押しにすると文言が変わる', async () => {
+    const { createVenueGiftStrip } = await import('./venueComposeBox.js');
+    /** @type {any} */
+    let feed = null;
+    const strip = createVenueGiftStrip(/** @type {any} */ ({ subscribe: (/** @type {any} */ f) => { feed = f; }, press: async () => ({ ok: true }), oneTap: { get: () => false, set: () => {} } }));
+    feed([{ key: 'a|30 pt', name: 'a', pt: '30 pt', img: '' }]);
+    expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('2回押して贈る');
+    /** @type {HTMLElement} */ (strip.querySelector('.nlsb-gift-mode')).click();
+    expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('押すとすぐ贈る');
+  });
+});
