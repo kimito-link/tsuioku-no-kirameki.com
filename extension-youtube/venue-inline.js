@@ -6847,7 +6847,7 @@ ${sourceCol}
     const queueNow = Number(diag?.queueNow);
     if (!Number.isFinite(e2e) || e2e < 0) return { shown: false, lagMs: -1, text: "" };
     const lagMs = Math.round(e2e + (Number.isFinite(up) && up > 0 ? up : 0));
-    if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: "" };
+    if (Number.isFinite(queueNow) && queueNow <= 0) return { shown: false, lagMs, text: "" };
     const shown = prevShown ? lagMs >= VOICE_LAG_NOTICE_HIDE_MS : lagMs >= VOICE_LAG_NOTICE_SHOW_MS;
     if (!shown) return { shown: false, lagMs, text: "" };
     const sec = Math.round(lagMs / 1e3);
@@ -20058,7 +20058,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T05:27") : ""
+          buildId: true ? String("yt-2026-11-05T05:34") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

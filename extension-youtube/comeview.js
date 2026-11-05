@@ -7203,7 +7203,7 @@ ${sourceCol}
     const queueNow = Number(diag?.queueNow);
     if (!Number.isFinite(e2e) || e2e < 0) return { shown: false, lagMs: -1, text: "" };
     const lagMs = Math.round(e2e + (Number.isFinite(up) && up > 0 ? up : 0));
-    if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: "" };
+    if (Number.isFinite(queueNow) && queueNow <= 0) return { shown: false, lagMs, text: "" };
     const shown = prevShown ? lagMs >= VOICE_LAG_NOTICE_HIDE_MS : lagMs >= VOICE_LAG_NOTICE_SHOW_MS;
     if (!shown) return { shown: false, lagMs, text: "" };
     const sec = Math.round(lagMs / 1e3);
