@@ -687,6 +687,7 @@
 | `src/lib/giftHistoryOfficialReconcile.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistorySourcePreference.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryViewModel.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftItemsMirror.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftLaneOfficialFill.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentumAnalytics.js` | 1 | ポップアップ(応援レーン) |
