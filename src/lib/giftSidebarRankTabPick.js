@@ -51,3 +51,29 @@ export function findGiftSidebarRankTabElement(sidebarRoot) {
   }
   return { element: null, finder: '' };
 }
+
+/** v0.1.1873: アイテム一覧のタブ名(上ほど優先)。「ギフト履歴」「マイギフト」「ランキング」とは完全一致で区別する */
+const ITEMS_TAB_NAMES = ['番組ギフト', 'ギフト', 'ギフトを贈る', 'ギフト一覧', 'アイテム'];
+
+/**
+ * ギフト欄の中から「アイテムの一覧」タブを選ぶ(会場の「🎁 ギフト」で開いたとき用)。
+ *   記録のために裏でランキングタブへ切り替えるので、開いたままだとランキングが出てしまう。
+ *   ページ全体は探さない(おすすめ番組のリンク等を押さないため)。
+ * @param {Element | null} sidebarRoot
+ * @returns {HTMLElement | null}
+ */
+export function findGiftSidebarItemsTabElement(sidebarRoot) {
+  if (!(sidebarRoot instanceof HTMLElement)) return null;
+  try {
+    const els = [...sidebarRoot.querySelectorAll('[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"]')].filter(
+      (el) => el instanceof HTMLElement && el.querySelectorAll('[role="tab"], button, a, li').length === 0
+    );
+    for (const name of ITEMS_TAB_NAMES) {
+      const hit = els.find((el) => String(el.textContent || '').replace(/\s+/g, '') === name);
+      if (hit) return /** @type {HTMLElement} */ (hit);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}

@@ -43,6 +43,8 @@ export function captureGiftPanelShape(doc, opts = {}) {
     if (el.children.length > 0) continue;
     const t = String(el.textContent || '');
     if (t.length <= 20 && PT_RE.test(t)) ptEls.push(el);
+    // v0.1.1873: 「100」と「pt」が別の部品に分かれている形も拾う(数字の部品を pt として扱う)
+    else if (/^\s*[\d,]+\s*$/.test(t) && el.parentElement && String(el.parentElement.textContent || '').length <= 20 && PT_RE.test(String(el.parentElement.textContent || ''))) ptEls.push(el);
     if (ptEls.length > 200) break;
   }
   /** @type {any[]} */
@@ -66,7 +68,7 @@ export function captureGiftPanelShape(doc, opts = {}) {
       attrs: dataAttrNames(tile),
       click: click ? { tag: click.localName, cls: shortClass(click), attrs: dataAttrNames(click) } : null,
       img: img ? { src: safeSrc(img.getAttribute('src') || ''), alt: String(img.getAttribute('alt') || '').slice(0, 40) } : null,
-      pt: String(pt.textContent || '').trim(),
+      pt: PT_RE.test(String(pt.textContent || '')) ? String(pt.textContent || '').trim() : String(pt.parentElement?.textContent || '').replace(/\s+/g, ' ').trim(),
       ptCls: shortClass(pt),
       name: nameEl ? String(nameEl.textContent || '').trim() : '',
     });
@@ -152,7 +154,8 @@ export function startGiftPanelRecorder(win, save) {
   let last = '';
   const started = Date.now();
   const tick = () => {
-    if (Date.now() - started > 30 * 60 * 1000) {
+    // v0.1.1873: 親のページはギフト欄の箱があるときだけ読むので止めない(30分後に開いた欄も記録する)。子の窓は30分で止める
+    if (!isTop && Date.now() - started > 30 * 60 * 1000) {
       win.clearInterval(timer);
       return;
     }
@@ -161,8 +164,12 @@ export function startGiftPanelRecorder(win, save) {
       if (isTop && !doc.querySelector('[class*="web-view-panel"], [class*="gift-sidebar" i], [class*="gift-panel" i]')) return;
       // v0.1.1872: 中身が拾えなくても「動いた・何が見えた」を必ず残す(子の窓は常に、親は iframe 一覧つき)
       const shape = captureGiftPanelShape(doc) || { tiles: [], tabs: [], dialogs: [], tileCount: 0 };
+      /** @type {Record<string, unknown>} */
       const extra = isTop ? { frames: listFrames(doc) } : {};
       const census = frameCensus(doc);
+      // v0.1.1873: 子の窓は見えている文字の頭 240 字も残す(アイテム名と pt が並ぶか、履歴やランキングだけかを見分ける)
+      const head = isTop ? '' : String(doc.body?.innerText || doc.body?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+      if (head) extra.head = head;
       const sig = JSON.stringify([shape, extra, census.imgs, census.shadowHosts, census.iframes]);
       if (sig === last) return;
       last = sig;

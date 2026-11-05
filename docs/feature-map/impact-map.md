@@ -374,6 +374,7 @@
 | `src/lib/giftEventStore.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftHistoryMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/giftRankingLaneOptIn.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/giftSidebarRankTabPick.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/giftSubAppFrameSource.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftSubAppRelayDiag.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftThrowProjectile.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -695,7 +696,6 @@
 | `src/lib/giftRecord.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftRelayStorageLiveId.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftSenderObservation.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/giftSidebarRankTabPick.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftSubAppHistoryBlocksHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftSubAppIframeDomShape.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftSubAppRelayTrust.js` | 1 | 記録エンジン(watchページ常駐) |
