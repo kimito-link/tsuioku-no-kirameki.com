@@ -3013,7 +3013,7 @@ export function mountVenueBarButton(options = {}) {
     const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
     const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
     pickupEls.root.style.width = at ? `${at.width}px` : '';
-    pickupDrag.place(at); // v0.1.1895 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
+    pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
   const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup); // ドラッグで動かし位置を覚える・resize で置き直す
   // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。

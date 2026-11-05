@@ -44,7 +44,7 @@ describe('配線: 吹き出しを大事な表示に被せない(v0.1.1760)', () 
   });
 });
 
-describe('配線: PICK UP をドラッグで動かす(v0.1.1895)', () => {
+describe('配線: PICK UP をドラッグで動かす(v0.1.1899)', () => {
   const drag = readFileSync(new URL('./venuePickupDrag.js', import.meta.url), 'utf8');
   it('★会場は placePickup で位置をドラッグ部品に任せる', () => {
     expect(venueBar).toContain('pickupDrag.place(at);');
