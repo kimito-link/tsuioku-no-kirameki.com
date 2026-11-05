@@ -2,7 +2,7 @@
 //
 // 使い方:
 //   node scripts/stage-youtube-submission.mjs [version]
-//   （version 省略時は extension-youtube/manifest.json の version を使用）
+//   （version 省略時は extension-youtube/manifest.json の version を使用。manifest.json は node scripts/build-youtube-ext.mjs が manifest.standalone.json から写す）
 //
 // 出力:
 //   build/submission-youtube-<version>/
