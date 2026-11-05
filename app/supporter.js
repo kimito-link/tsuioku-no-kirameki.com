@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   /** ★りんくさんが価格を決めたらここを直す(Stripe 側の価格と同じ値)。 */
-  const SUPPORTER_PRICES = { yearly: '年額 5,000円', monthly: '月額 500円' };
+  const SUPPORTER_PRICES = { yearly: '年額 9,800円', monthly: '月額 980円' };
   const API = '/api/billing';
 
   function $(id) { return document.getElementById(id); }
