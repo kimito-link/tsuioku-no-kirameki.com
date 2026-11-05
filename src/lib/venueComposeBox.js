@@ -232,7 +232,9 @@ export function startGiftItemsTabResponder(win, onStorageChanged) {
  * v0.1.1875: 会場に公式ギフト欄と同じアイテムを並べる帯(りんく 2026-11-05 の選択「アイテムを並べ確認は公式」)。
  *   並びは公式のギフト欄を一度開いたときに読んだもの(画像と pt)。押すと会場をしまい、公式の欄で同じアイテムを押す。
  *   贈るかどうかの確認は公式の画面で本人がする(拡張は確認の「贈る」を押さない)。並びがまだ無ければ帯は出さない。
- * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string) => Promise<{ ok?: boolean, reason?: string }> | { ok?: boolean, reason?: string }, tuck?: (on: boolean) => void, doc?: Document }} opts
+ *   v0.1.1879: 設定「1回で贈る」(既定オフ・帯の端の「1回」で切り替え)がオンの人は、1回押すと会場のまま公式の確認まで押して贈る
+ *   (りんく 2026-11-05 の選択)。贈れたら「贈りました」、確認が見つからなければ会場をしまって公式の欄を見せる。続けて押しても2秒は受けない。
+ * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean }> | { ok?: boolean, reason?: string, sent?: boolean }, tuck?: (on: boolean) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
  * @returns {HTMLSpanElement}
  */
 export function createVenueGiftStrip(opts) {
@@ -242,6 +244,27 @@ export function createVenueGiftStrip(opts) {
   strip.style.cssText = 'display:none;align-items:center;gap:4px;max-width:46vw;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;vertical-align:middle';
   let sig = '';
   let armed = '';
+  let direct = false;
+  let busyUntil = 0;
+  /** @type {HTMLButtonElement | null} */
+  let modeBtn = null;
+  const paintMode = () => {
+    if (!modeBtn) return;
+    modeBtn.textContent = direct ? '1回' : '2回';
+    modeBtn.setAttribute('aria-pressed', direct ? 'true' : 'false');
+    modeBtn.title = direct ? '1回押すと贈ります(押すと2回押しに戻す)' : '2回押してから公式の欄で選びます(押すと「1回で贈る」にする)';
+    modeBtn.style.background = direct ? '#c0392b' : '';
+    modeBtn.style.color = direct ? '#fff' : '';
+  };
+  if (opts.oneTap) {
+    modeBtn = doc.createElement('button');
+    modeBtn.type = 'button';
+    modeBtn.className = 'nlsb-comeview-btn nlsb-gift-mode';
+    modeBtn.style.cssText = 'flex:0 0 auto;font-size:10px;padding:2px 4px';
+    modeBtn.addEventListener('click', () => { direct = !direct; armed = ''; paintMode(); try { opts.oneTap?.set(direct); } catch { /* 保存できなくても今は効く */ } });
+    paintMode();
+    void Promise.resolve(opts.oneTap.get()).then((on) => { direct = on === true; paintMode(); }).catch(() => {});
+  }
   /** @param {{ key: string, name: string, pt: string, img: string }[]} items */
   const render = (items) => {
     const next = JSON.stringify(items.map((it) => [it.key, it.img]));
@@ -271,6 +294,23 @@ export function createVenueGiftStrip(opts) {
       pt.style.cssText = 'font-size:10px;white-space:nowrap';
       b.append(pt);
       b.addEventListener('click', async () => {
+        if (direct) {
+          if (Date.now() < busyUntil) return; // 続けて押しても二重に贈らない
+          busyUntil = Date.now() + 2000;
+          pt.textContent = '…';
+          let res = null;
+          try { res = await opts.press(it.key, { direct: true }); } catch { res = null; }
+          if (res && res.ok && res.sent) {
+            pt.textContent = '贈りました';
+          } else if (res && res.ok) {
+            try { opts.tuck?.(true); } catch { /* しまえなくても一言は出す */ }
+            pt.textContent = '公式で確認';
+          } else {
+            pt.textContent = '開けません';
+          }
+          setTimeout(() => { pt.textContent = it.pt.replace(/\s+/g, ''); }, 3000);
+          return;
+        }
         // v0.1.1878: 2回押しで進む(1回目は「もう一度で選ぶ」と出すだけ)。公式の欄がアイテムを押した時点で贈る作りでも、会場で1回の誤タップでは贈られないように
         if (armed !== it.key) {
           armed = it.key;
@@ -290,6 +330,7 @@ export function createVenueGiftStrip(opts) {
       });
       strip.append(b);
     }
+    if (modeBtn) strip.append(modeBtn);
     strip.style.display = items.length ? 'inline-flex' : 'none';
   };
   try { opts.subscribe(render); } catch { /* 並びが読めなければ帯を出さないだけ */ }
