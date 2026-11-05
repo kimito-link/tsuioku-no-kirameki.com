@@ -17781,7 +17781,7 @@ ${sourceCol}
     btn.title = "公式のギフト画面を開きます(会場はいったんしまいます・右下の「▲ 会場に戻る」で戻せます)";
     btn.addEventListener("click", async () => {
       try {
-        opts.tuck?.(true);
+        opts.tuck?.(true, `公式の${label.replace(/^\S+\s/, "")}の画面を開きました。公式の画面で選んで送るまで、お金やポイントは使われません。戻るときは右下の「▲ 会場に戻る」`);
       } catch {
       }
       let res = null;
@@ -20058,7 +20058,7 @@ ${sourceCol}
       tuckBtn.title = "コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます";
       tuckBtn.addEventListener("click", () => setTucked(true));
     }
-    const giftBtn = !isStandalone && typeof options.openGift === "function" ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on) => setTucked(on) }) : null;
+    const giftBtn = !isStandalone && typeof options.openGift === "function" ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on, note2) => setTucked(on, note2) }) : null;
     const composeBox = !isStandalone && typeof options.postComment === "function" ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null;
     const note = document.createElement("div");
     note.className = "nlsb-note";
@@ -20578,7 +20578,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T11:22") : ""
+          buildId: true ? String("yt-2026-11-05T12:42") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -23201,8 +23201,32 @@ ${sourceCol}
     };
     let tucked = false;
     const TOGGLE_LABEL_OPEN = toggle.textContent || "🏟 会場モード";
-    const setTucked = (next) => {
+    let tuckNote = null;
+    let tuckNoteSeq = 0;
+    const showTuckNote = (text) => {
+      if (!text) {
+        tuckNote?.remove();
+        tuckNote = null;
+        return;
+      }
+      if (!tuckNote) {
+        tuckNote = document.createElement("div");
+        tuckNote.className = "nlsb-tuck-note";
+        tuckNote.setAttribute("role", "status");
+        tuckNote.style.cssText = "position:fixed;right:16px;bottom:72px;z-index:2147483646;max-width:min(360px,calc(100vw - 32px));padding:10px 12px;border-radius:10px;background:#fff;color:#222;font-size:13px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer";
+        tuckNote.title = "押すと消えます";
+        tuckNote.addEventListener("click", () => showTuckNote(""));
+        document.body.append(tuckNote);
+      }
+      tuckNote.textContent = text;
+      const seq = ++tuckNoteSeq;
+      setTimeout(() => {
+        if (seq === tuckNoteSeq) showTuckNote("");
+      }, 15e3);
+    };
+    const setTucked = (next, note2) => {
       tucked = next === true;
+      showTuckNote(tucked ? note2 : "");
       root.classList.toggle("nlsb-is-tucked", tucked);
       toggle.textContent = tucked ? "▲ 会場に戻る" : TOGGLE_LABEL_OPEN;
       toggle.setAttribute("aria-label", tucked ? "会場に戻る" : "会場モード");
