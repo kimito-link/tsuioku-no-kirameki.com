@@ -52,14 +52,14 @@ describe('CSS: しまう中は箱だけ隠し、トグルのピルを出す', ()
 describe('JS: setTucked とボタン・トグルの配線', () => {
   it('★状態と setTucked があり、hidden 属性を使わない', () => {
     expect(src).toContain('let tucked = false;');
-    const body = slice('const setTucked = (next) =>', 'const setOpen = (nextOpen, persist) =>');
+    const body = slice('const setTucked = (next, note) =>', 'const setOpen = (nextOpen, persist) =>');
     expect(body).toContain("root.classList.toggle('nlsb-is-tucked', tucked)");
     expect(body).not.toMatch(/\.hidden\s*=/);
     expect(body).not.toContain("setAttribute('hidden'");
   });
 
   it('★しまうとき、開いているパネルとホバーカードを閉じる(入力中に残らない)', () => {
-    const body = slice('const setTucked = (next) =>', 'const setOpen = (nextOpen, persist) =>');
+    const body = slice('const setTucked = (next, note) =>', 'const setOpen = (nextOpen, persist) =>');
     expect(body).toContain('closeSpeechPanel()');
     expect(body).toContain('toggleRosterPanel(false)');
     expect(body).toContain('toggleDiagPanel(false)');

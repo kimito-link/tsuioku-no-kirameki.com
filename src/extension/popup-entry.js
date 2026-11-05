@@ -8700,10 +8700,10 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
 const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
 // v0.1.1215: 全消し再構築ではなく「既存マスの中身のすり替え」を観測する(churn の盲点)。
 const STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
-// v0.1.1877: 応援マスを「なぜ」全部作り直したか(入口別)。ちらつき計の補足欄へ載せる(4秒ごとに書かれる=実機で読める)。
+// v0.1.1889: 応援マスを「なぜ」全部作り直したか(入口別)。ちらつき計の補足欄へ載せる(4秒ごとに書かれる=実機で読める)。
 const STORY_GROWTH_REBUILD_REASONS = createStoryGrowthRebuildReasonState();
 const STORY_REBUILD_TARGET_SIG = { v: '', liveId: '', target: -1, entries: /** @type {PopupCommentEntry[]} */ ([]) };
-/** v0.1.1877計器: 件数が少しだけ変わったとき、余分な1件が何者か(位置・自分の投稿・配信者・ID無し・先出し)を数える。O(件数)は件数が変わった回だけ。 */
+/** v0.1.1889計器: 件数が少しだけ変わったとき、余分な1件が何者か(位置・自分の投稿・配信者・ID無し・先出し)を数える。O(件数)は件数が変わった回だけ。 */
 function noteStoryGrowthEntryDiffNow(target) {
   try {
     const st = STORY_REBUILD_TARGET_SIG;
@@ -8752,7 +8752,7 @@ function noteStoryGrowthIdentitiesNow(n) {
 /**
  * @param {HTMLElement} root
  * @param {number} total
- * @param {string} [reason] v0.1.1877計器: 入口(空なら記録しない=呼び元で記録済み/初回)
+ * @param {string} [reason] v0.1.1889計器: 入口(空なら記録しない=呼び元で記録済み/初回)
  * @param {number} [from] 作り直す前に描いていた数
  */
 function rebuildStoryGrowth(root, total, reason = '', from = 0) {
@@ -8820,7 +8820,7 @@ function syncStoryGrowth(liveId, count, root) {
   const changedLive = STORY_GROWTH_STATE.liveId !== nextLiveId;
   const changedRoot = STORY_GROWTH_STATE.root !== root;
 
-  // v0.1.1877計器: 目標件数と配信の行き来を控える(件数が揺れると縮小→作り直しになる)。
+  // v0.1.1889計器: 目標件数と配信の行き来を控える(件数が揺れると縮小→作り直しになる)。
   try {
     noteStoryGrowthTarget(STORY_GROWTH_REBUILD_REASONS, { liveKey: nextLiveId, target });
     const _tSig = `${STORY_GROWTH_REBUILD_REASONS.liveFlips}|${STORY_GROWTH_REBUILD_REASONS.targets.join(',')}`;
@@ -8878,7 +8878,7 @@ function syncStoryGrowth(liveId, count, root) {
     const _shrinkFrom = STORY_GROWTH_STATE.renderedCount;
     const _cells = root.querySelectorAll('.nl-story-growth-cell');
     STORY_GROWTH_STATE.renderedCount = STORY_GROWTH_STATE.targetCount;
-    // v0.1.1877: 件数が 58↔57 と揺れるたびに全マスを作り直してチカチカしていた(実機の補足欄で確定)。
+    // v0.1.1889: 件数が 58↔57 と揺れるたびに全マスを作り直してチカチカしていた(実機の補足欄で確定)。
     //   並びの先頭は変わらないので、余ったマスを末尾から外すだけにする(残りの顔は保ったまま)。
     if (canTrimStoryGrowthCells({ renderedCount: _shrinkFrom, targetCount: STORY_GROWTH_STATE.targetCount, domCount: _cells.length, sourceOffset: STORY_GROWTH_STATE.sourceOffset })) {
       for (let i = _cells.length - 1; i >= STORY_GROWTH_STATE.targetCount; i -= 1) _cells[i].remove();
@@ -10861,7 +10861,7 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
   if (img instanceof HTMLImageElement) {
     const rel = northStarLaneGadgetCharaPathByTier(laneId, tier);
     try {
-      const u = chrome.runtime.getURL(rel); // v0.1.1877: 同じ画像なら書かない(待機中も毎秒約6回、同じ src を書き直していた)
+      const u = chrome.runtime.getURL(rel); // v0.1.1889: 同じ画像なら書かない(待機中も毎秒約6回、同じ src を書き直していた)
       if (img.getAttribute('src') !== u) img.src = u;
     } catch {
       img.removeAttribute('src');

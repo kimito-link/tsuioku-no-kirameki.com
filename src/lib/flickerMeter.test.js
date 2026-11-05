@@ -122,7 +122,7 @@ describe('formatFlickerLine', () => {
   });
 });
 
-describe('flickerMeter 補足欄(v0.1.1877)', () => {
+describe('flickerMeter 補足欄(v0.1.1889)', () => {
   it('setNote は snapshot と速報の1行に載り、同じ文では dirty にしない', async () => {
     const { createFlickerMeter: make, formatFlickerLine: fmt } = await import('./flickerMeter.js');
     const m = make({ now: () => 1000 });

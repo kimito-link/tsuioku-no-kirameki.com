@@ -4,7 +4,7 @@
  * 【この箱に入らないもの】描画・storage への書き込み(載せるのは flickerMeter の補足欄)
  * 【書けるstorageキー】なし
  *
- * storyGrowthRebuildReasons.js — v0.1.1877
+ * storyGrowthRebuildReasons.js — v0.1.1889
  *
  * ■ なぜ要るか(2026-11-05 りんく「ニコニコはまたチカチカしています」)
  *   ちらつき計(v0.1.1686)の実測: サイドパネルを開いて271秒で #sceneStoryGrowth の作り直し 10,076+9,978、
@@ -33,7 +33,7 @@ export const STORY_GROWTH_REBUILD_REASON = Object.freeze({
   DOM_MISMATCH: 'dom',
   /** 目標0件で根を空にした。 */
   EMPTY: 'empty',
-  /** v0.1.1877: 縮小を末尾のマスだけ削って済ませた(作り直しではない)。 */
+  /** v0.1.1889: 縮小を末尾のマスだけ削って済ませた(作り直しではない)。 */
   TRIM: 'trim'
 });
 
@@ -62,7 +62,7 @@ export function createStoryGrowthRebuildReasonState() {
 }
 
 /**
- * v0.1.1877: 前回と今回の並び(コメントの安定 id の配列)を比べ、件数が少しだけ違うとき、
+ * v0.1.1889: 前回と今回の並び(コメントの安定 id の配列)を比べ、件数が少しだけ違うとき、
  * 余分な1件が「どちらの側の何番目か」を返す。違いが無い/大きすぎるときは null。
  * @param {readonly string[]} prevIds
  * @param {readonly string[]} nextIds

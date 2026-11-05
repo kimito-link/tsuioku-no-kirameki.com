@@ -31,7 +31,7 @@ describe('canAppendStoryGrowthCells', () => {
   });
 });
 
-describe('canTrimStoryGrowthCells (v0.1.1877)', () => {
+describe('canTrimStoryGrowthCells (v0.1.1889)', () => {
   it('同じ並びで少し減るときは末尾を削ってよい', async () => {
     const { canTrimStoryGrowthCells } = await import('./storyGrowthAppendPlan.js');
     expect(canTrimStoryGrowthCells({ renderedCount: 58, targetCount: 57, domCount: 58, sourceOffset: 0 })).toBe(true);

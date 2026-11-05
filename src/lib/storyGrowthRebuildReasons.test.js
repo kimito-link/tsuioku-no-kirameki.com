@@ -49,7 +49,7 @@ describe('storyGrowthRebuildReasons', () => {
   });
 });
 
-describe('findStoryEntryDiff / noteStoryEntryDiff (v0.1.1877)', () => {
+describe('findStoryEntryDiff / noteStoryEntryDiff (v0.1.1889)', () => {
   it('末尾に1件多い側と位置を返す', () => {
     expect(findStoryEntryDiff(['a', 'b', 'c'], ['a', 'b'])).toEqual({ index: 2, extraIn: 'prev', atEnd: true });
     expect(findStoryEntryDiff(['a', 'b'], ['a', 'b', 'c'])).toEqual({ index: 2, extraIn: 'next', atEnd: true });

@@ -405,7 +405,7 @@ export default [
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
     // v0.1.1852: 遅い PC なら GPU の案内を出す配線(import 1行+呼び出し4行=+5)。中身は popup/wireVoiceGpuTip.js。
-    // v0.1.1877: 応援マスの作り直しの入口別計器と末尾だけ削る縮小(+56: import 1・状態と補足欄の書き込み関数・各入口の記録・北極星キャラ絵の同値スキップ2)。数え方と文言は lib の storyGrowthRebuildReasons.js。
+    // v0.1.1889: 応援マスの作り直しの入口別計器と末尾だけ削る縮小(+56: import 1・状態と補足欄の書き込み関数・各入口の記録・北極星キャラ絵の同値スキップ2)。数え方と文言は lib の storyGrowthRebuildReasons.js。
     rules: { 'max-lines': ['error', { max: 21807, skipBlankLines: false, skipComments: false }] }
   },
   {
@@ -437,7 +437,9 @@ export default [
     // v0.1.1867: 会場から発言(会場に postComment を渡す+コメント1行)=+1。入力欄は lib の venueComposeBox.js。
     // v0.1.1870: 会場のギフトボタン(公式のギフト画面を開く lib の import 1行)=+1。
     // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
-    rules: { 'max-lines': ['error', { max: 19578, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1874: ギフトの子の窓で番組ギフトのタブへ切り替える合図の受け手(起動1行)=+1。中身は lib の venueComposeBox.js。
+    // v0.1.1875: 会場のギフトのアイテムの帯(import 1行)=+1。読む・置く・押すは lib の giftItemsMirror.js。
+    rules: { 'max-lines': ['error', { max: 19580, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -468,8 +470,10 @@ export default [
     // v0.1.1867: 会場から発言(import 1行+入力欄を作る1行)=+2。入力欄は lib の venueComposeBox.js。
     // v0.1.1870: 会場の「🎁 ギフト」(ボタンを作る1行・lib の createVenueGiftButton)=+1。
     // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
+    // v0.1.1875: 会場に公式と同じギフトのアイテムを並べる帯(作る1行・lib の createVenueGiftStrip)=+1。
+    // v0.1.1880: ギフトから会場をしまったとき、理由と次の一手を右下に出す(りんく「何の説明もないと何が起こったのかと思う」)=+21。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7400, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7422, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

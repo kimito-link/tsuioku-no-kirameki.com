@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1110 件
+## ⚠️ 役割コメントが無いソース 9 / 1111 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -1000,7 +1000,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2248)
+- 📁 **src/** (2250)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1302,7 +1302,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1972)
+  - 📁 **lib/** (1974)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1885,6 +1885,8 @@
     - `giftHistorySourcePreference.test.js`
     - `giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
     - `giftHistoryViewModel.test.js`
+    - `giftItemsMirror.js` — ニコ生の公式ギフト欄(gift.nicovideo.jp/…/purchase の子の窓)のアイテムを会場に並べるための読み取りと押下(v0.1.1875)。
+    - `giftItemsMirror.test.js`
     - `giftLaneOfficialFill.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `giftLaneOfficialFill.test.js`
     - `giftLaneOfficialFillWiring.test.js`

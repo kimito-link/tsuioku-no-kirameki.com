@@ -375,7 +375,7 @@ import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
-import { createVenueComposeBox, createVenueGiftButton } from '../lib/venueComposeBox.js';
+import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } from '../lib/venueComposeBox.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -2629,7 +2629,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any } }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -2842,7 +2842,8 @@ export function mountVenueBarButton(options = {}) {
     tuckBtn.title = 'コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます';
     tuckBtn.addEventListener('click', () => setTucked(true));
   }
-  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on) => setTucked(on) }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
+  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on, note) => setTucked(on, note), stripHint: !!options.giftItems }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
+  const giftStrip = !isStandalone && options.giftItems ? createVenueGiftStrip({ ...options.giftItems, tuck: (on, note) => setTucked(on, note) }) : null; // v0.1.1875 公式と同じアイテムの帯(lib の venueComposeBox.js)
   const composeBox = !isStandalone && typeof options.postComment === 'function' ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null; // v0.1.1867 会場から発言(lib の venueComposeBox.js)
   const note = document.createElement('div');
   note.className = 'nlsb-note';
@@ -2851,9 +2852,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
   } else {
-    headerRight.append(...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
   header.append(title, ...(composeBox ? [composeBox] : []), headerRight); // v0.1.1868 発言欄は中央
 
@@ -7213,9 +7214,30 @@ export function mountVenueBarButton(options = {}) {
   /** v0.1.1654: 会場を一時的にしまっているか(会場自体は開いたまま・閉じると必ず解除)。 */
   let tucked = false;
   const TOGGLE_LABEL_OPEN = toggle.textContent || '🏟 会場モード';
-  /** @param {boolean} next */
-  const setTucked = (next) => {
+  /** @type {HTMLDivElement | null} */
+  let tuckNote = null;
+  let tuckNoteSeq = 0;
+  /** v0.1.1880: しまった理由と次の一手を右下に出す(ギフトから会場をしまったとき・りんく「何の説明もないと何が起こったのかと思う」) */
+  /** @param {string} [text] */
+  const showTuckNote = (text) => {
+    if (!text) { tuckNote?.remove(); tuckNote = null; return; }
+    if (!tuckNote) {
+      tuckNote = document.createElement('div');
+      tuckNote.className = 'nlsb-tuck-note';
+      tuckNote.setAttribute('role', 'status');
+      tuckNote.style.cssText = 'position:fixed;right:16px;bottom:72px;z-index:2147483646;max-width:min(360px,calc(100vw - 32px));padding:10px 12px;border-radius:10px;background:#fff;color:#222;font-size:13px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
+      tuckNote.title = '押すと消えます';
+      tuckNote.addEventListener('click', () => showTuckNote(''));
+      document.body.append(tuckNote);
+    }
+    tuckNote.textContent = text;
+    const seq = ++tuckNoteSeq;
+    setTimeout(() => { if (seq === tuckNoteSeq) showTuckNote(''); }, 15000);
+  };
+  /** @param {boolean} next @param {string} [note] */
+  const setTucked = (next, note) => {
     tucked = next === true;
+    showTuckNote(tucked ? note : '');
     root.classList.toggle('nlsb-is-tucked', tucked);
     toggle.textContent = tucked ? '▲ 会場に戻る' : TOGGLE_LABEL_OPEN;
     toggle.setAttribute('aria-label', tucked ? '会場に戻る' : '会場モード');
