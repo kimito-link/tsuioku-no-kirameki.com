@@ -43,7 +43,7 @@ function appendGiftPressLog(store, entry) {
  */
 export function giftPressOutcome(v) {
   const spent = Number(v?.spent || 0);
-  const sent = v?.confirmed === true || spent > 0 || v?.sentText === true;
+  const sent = spent > 0 || v?.sentText === true;
   const price = typeof v?.price === 'string' && v.price ? v.price : spent > 0 ? `${spent}pt` : '';
   return { sent, notFound: v?.found === false, price };
 }
@@ -172,49 +172,14 @@ export const GIFT_ITEMS_KEY = 'nls_gift_items_v1';
 export const GIFT_ITEM_PRESS_REQ_KEY = 'nls_gift_item_press_req';
 /** v0.1.1878 計器: 押したあと3秒で何が出たか(確認の窓が出たか)。押したもの・出てきた部品の class と文字の頭だけ */
 export const GIFT_ITEM_PRESS_RESULT_KEY = 'nls_gift_item_press_result';
-/** v0.1.1879: 設定「会場から1回で贈る」(既定オフ・りんく 2026-11-05 の選択)。オンの人だけ、帯を1回押すと公式の確認の「贈る」まで押す */
-export const GIFT_ONE_TAP_KEY = 'nls_venue_gift_one_tap_v1';
-
-const CONFIRM_RE = /^(ギフトを)?贈る$|^贈る[(（]?[\d,]+\s*pt[)）]?$|^[\d,]+\s*ptで?贈る$/;
-const NOT_CONFIRM_RE = /購入|チャージ|買う|キャンセル|やめる|閉じる/;
-
-/** v0.1.1883: アイテムを押すと出る購入の引き出し(drawer)の中でだけ許す確定ボタンの文字(RC 実測: div.drawer-content・「購入後のキャンセルはできません」) */
-const DRAWER_CONFIRM_RE = /^(購入する|購入|購入して贈る|贈る|ギフトを贈る)$/;
-const DRAWER_NOT_CONFIRM_RE = /ポイント|チャージ|キャンセル|やめる|閉じる|規約/;
+/** v0.1.1888: 購入の確定は必ず本人が公式の「利用規約に同意してこのギフトを購入します」で押す(りんく 2026-11-05 の選択)。
+ *   拡張は確定ボタンを探さない・押さない。帯はアイテムを押して公式の確認(引き出し)を開くところまで。 */
 const DRAWER_SEL = '[class*="drawer"], [role="dialog"], [aria-modal="true"]';
 
 /** @param {Element} el */
 function isShown(el) {
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.height > 0;
-}
-
-/**
- * 公式の確認の「贈る」ボタンを探す(見えていて押せるものだけ)。exclude は押す前から見えていたもの(新しく出たものだけを押す)。
- *   scopes を渡したときは、その中(=押したあと新しく開いた購入の引き出し)だけで「購入する」も確定として探す。
- * @param {Document} doc
- * @param {Set<Element>} [exclude]
- * @param {Element[]} [scopes]
- * @returns {HTMLElement | null}
- */
-export function findGiftConfirmButton(doc, exclude, scopes) {
-  for (const scope of scopes || []) {
-    for (const el of scope.querySelectorAll('button, [role="button"]')) {
-      if (exclude?.has(el)) continue;
-      const t = String(el.textContent || '').replace(/\s+/g, '');
-      if (!t || t.length > 20 || DRAWER_NOT_CONFIRM_RE.test(t) || !DRAWER_CONFIRM_RE.test(t)) continue;
-      if (/** @type {any} */ (el).disabled || el.getAttribute('aria-disabled') === 'true' || !isShown(el)) continue;
-      return /** @type {HTMLElement} */ (el);
-    }
-  }
-  for (const el of doc.querySelectorAll('button, [role="button"]')) {
-    if (exclude?.has(el)) continue;
-    const t = String(el.textContent || '').replace(/\s+/g, '');
-    if (!t || t.length > 20 || NOT_CONFIRM_RE.test(t) || !CONFIRM_RE.test(t)) continue;
-    if (/** @type {any} */ (el).disabled || el.getAttribute('aria-disabled') === 'true' || !isShown(el)) continue;
-    return /** @type {HTMLElement} */ (el);
-  }
-  return null;
 }
 
 /**
@@ -243,14 +208,6 @@ export function describeGiftDrawers(drawers) {
     if (m && !price) price = `${m[1]}pt`;
   }
   return { buttons, price };
-}
-
-/** @param {Document} doc */
-function visibleConfirmButtons(doc) {
-  /** @type {Set<Element>} */
-  const seen = new Set();
-  for (let el = findGiftConfirmButton(doc, seen); el; el = findGiftConfirmButton(doc, seen)) seen.add(el);
-  return seen;
 }
 
 /**
@@ -366,7 +323,6 @@ export function startGiftItemsPublisher(win, store) {
       const added = [];
       const mo = typeof MutationObserver === 'function' ? new MutationObserver((recs) => { for (const r of recs) for (const n of r.addedNodes) if (n instanceof Element && added.length < 200) added.push(n); }) : null;
       try { mo?.observe(doc.body, { childList: true, subtree: true }); } catch { /* 見張れなくても押す */ }
-      const before = req.direct === true ? visibleConfirmButtons(doc) : new Set();
       const drawersBefore = new Set(newGiftDrawers(doc, new Set()));
       const balanceBefore = readGiftBalance(doc);
       let sentBefore = false;
@@ -374,30 +330,9 @@ export function startGiftItemsPublisher(win, store) {
       try { ok = pressGiftItem(doc, req.key); } catch { ok = false; }
       if (!ok) mo?.disconnect();
       if (!ok && left > 0) win.setTimeout(step, 300);
-      if (!ok && left <= 0) void store.set({ [GIFT_ITEM_PRESS_RESULT_KEY]: { at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: false, confirmed: false } }); // 見つからなかったことも残す(会場に「見つかりません」と出す)
+      if (!ok && left <= 0) void store.set({ [GIFT_ITEM_PRESS_RESULT_KEY]: { at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: false } }); // 見つからなかったことも残す(会場に「見つかりません」と出す)
       if (ok) {
-        /** @type {{ confirmed: boolean, confirmText: string }} */
-        const conf = { confirmed: false, confirmText: '' };
-        if (req.direct === true) {
-          // v0.1.1879: 1回で贈る(設定でオンの人だけ)。アイテムを押したあと新しく出た確認の「贈る」を1回だけ押す
-          let tries = 12;
-          const look = () => {
-            tries -= 1;
-            let btn = null;
-            try { btn = findGiftConfirmButton(doc, before, newGiftDrawers(doc, drawersBefore)); } catch { btn = null; }
-            if (btn) {
-              conf.confirmed = true;
-              conf.confirmText = String(btn.textContent || '').replace(/\s+/g, '').slice(0, 20);
-              btn.click();
-              return;
-            }
-            if (tries > 0) win.setTimeout(look, 200);
-          };
-          win.setTimeout(look, 150);
-        }
-        // v0.1.1886: ニコニコはアイテムを押しただけで贈られることがある(PC 実測 13:13・引き出しが出ず confirmed:false のまま 55pt 減った)。
-        //   「押したか」ではなく「残高が減ったか」を正とし、減ったらすぐ結果を書く(最長6秒待つ)。誰が押したかを見るため、
-        //   窓の中のクリックを capture で記録する(isTrusted=true なら人の手・false ならスクリプト)。inst は窓ごとの番号。
+        // v0.1.1886: 窓の中のクリックを capture で記録する(isTrusted=true なら人の手)。inst は窓ごとの番号(二重の処理を見分ける)。
         /** @type {{ t: number, text: string, trusted: boolean }[]} */
         const clicks = [];
         const onClick = (/** @type {Event} */ e) => {
@@ -428,13 +363,13 @@ export function startGiftItemsPublisher(win, store) {
           try { drawer = describeGiftDrawers(newGiftDrawers(doc, drawersBefore)); } catch { /* 計器が読めなくても結果は残す */ }
           void store.set({
             [GIFT_ITEM_PRESS_RESULT_KEY]: {
-              at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, ...conf, drawerButtons: drawer.buttons, price: drawer.price,
+              at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, drawerButtons: drawer.buttons, price: drawer.price,
               shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
               head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160),
               balanceBefore, balanceNow: nowBal, spent: spentNow, sentText, clicks: clicks.slice(), inst: INSTANCE
             }
           });
-          appendGiftPressLog(store, { reqAt: at, key: req.key, direct: req.direct === true, confirmed: conf.confirmed, spent: spentNow, sentText, inst: INSTANCE });
+          appendGiftPressLog(store, { reqAt: at, key: req.key, direct: req.direct === true, spent: spentNow, sentText, inst: INSTANCE });
         };
         win.setTimeout(finish, 600);
         win.setTimeout(() => { try { doc.removeEventListener('click', onClick, true); } catch { /* 外せなくても害はない */ } }, 16000);
@@ -491,7 +426,7 @@ export function subscribeGiftItems(store, pathname, cb) {
  * @param {Document} doc
  * @param {string} key
  * @param {GiftStore['set']} set
- * @param {{ direct?: boolean, onAt?: (at: number) => void }} [opts]  direct=1回で贈る(設定でオンの人だけ)
+ * @param {{ direct?: boolean, onAt?: (at: number) => void }} [opts]  direct=押したあと贈れたかの結果を待つ(会場の帯から)
  * @returns {{ ok: boolean, reason?: string }}
  */
 export function requestGiftItemPress(doc, key, set, opts = {}) {
