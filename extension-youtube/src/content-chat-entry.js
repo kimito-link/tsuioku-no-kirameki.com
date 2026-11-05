@@ -920,6 +920,34 @@ function setupCommentSendBridge() {
  *   拡張はボタンを押すだけで、金額の選択・支払いは YouTube 本体の画面で利用者がする。
  *   ボタンはログインしていて、その配信でスーパーチャットが使えるときだけある。無ければ理由を返す(会場が「見つかりません」と出す)。
  */
+/**
+ * 0.1.120: スーパーチャットの画面を開いたあと3分間、チャットに流れた有料メッセージ(送り主・金額)を記録する。
+ *   拡張は画面を開くだけなので、本当に送れたかは「チャットに有料メッセージが出たか」でしか分からない
+ *   (りんく 2026-11-05「送れたはず」を記録で確かめられなかった)。記録先は yt_diag_superchat_paid。
+ * @param {string} videoId
+ */
+function watchPaidAfterSuperChatOpen(videoId) {
+  const list = document.querySelector('yt-live-chat-item-list-renderer #items') || document.querySelector('yt-live-chat-item-list-renderer');
+  if (!list || typeof MutationObserver !== 'function') return;
+  const rec = { openAt: Date.now(), videoId, paid: /** @type {{ at: number, author: string, amount: string, text: string }[]} */ ([]) };
+  const text = (/** @type {Element} */ el, /** @type {string} */ sel) => String(el.querySelector(sel)?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const save = () => {
+    try { chrome.storage.local.set({ yt_diag_superchat_paid: rec }); } catch { /* 記録できなくても続ける */ }
+  };
+  save();
+  const mo = new MutationObserver((recs) => {
+    for (const r of recs) {
+      for (const n of r.addedNodes) {
+        if (!(n instanceof Element) || !/^yt-live-chat-paid-(message|sticker)-renderer$/.test(n.localName) || rec.paid.length >= 10) continue;
+        rec.paid.push({ at: Date.now(), author: text(n, '#author-name'), amount: text(n, '#purchase-amount, #purchase-amount-chip'), text: text(n, '#message') });
+        save();
+      }
+    }
+  });
+  mo.observe(list, { childList: true, subtree: true });
+  setTimeout(() => mo.disconnect(), 180000);
+}
+
 function setupSuperChatOpenBridge() {
   if (String(window.location.pathname || '').startsWith('/live_chat_replay')) return;
   try {
@@ -978,6 +1006,7 @@ function setupSuperChatOpenBridge() {
           tag: '',
           rect: /** @type {number[]} */ ([]),
         };
+        try { watchPaidAfterSuperChatOpen(mine); } catch { /* 計器が動かなくても開く */ }
         const saveDiag = () => {
           try {
             chrome.storage.local.set({ yt_diag_superchat: diag });
