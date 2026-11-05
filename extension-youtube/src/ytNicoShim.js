@@ -384,7 +384,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined> }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 /** popup が最後にコメントを聞いてきた配信(=いま画面に出ている配信) */
 let lastAskedLv = '';
@@ -519,6 +519,8 @@ export function ytOwnerRowsLast(list, sum) {
  */
 const inPageCommentCache = new Map();
 const IN_PAGE_FULL_REFRESH_MS = 30_000;
+/** @type {Map<string, number>} 直接届いた行(YT_LIVE_ROWS)で作り直す間だけ、background に聞きに行かない */
+const inPageSkipFetchUntil = new Map();
 /**
  * @param {string} vid
  * @returns {Promise<any[] | null>} null = 受け取れなかった(前の控えも無い)
@@ -526,6 +528,11 @@ const IN_PAGE_FULL_REFRESH_MS = 30_000;
 async function getCommentsViaBackground(vid) {
   const cur = inPageCommentCache.get(vid);
   const now = Date.now();
+  // 直接届いた行で作り直すときは、background へ聞きに行かない(往復の分だけ吹き出しが遅れる)
+  if (cur && inPageSkipFetchUntil.get(vid) > now) {
+    inPageSkipFetchUntil.delete(vid);
+    return [...cur.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+  }
   const full = !cur || now - cur.fullAt > IN_PAGE_FULL_REFRESH_MS;
   try {
     const res = await real?.runtime?.sendMessage?.(
@@ -974,6 +981,28 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         void notifyLv(pseudoLvForVideoId(vid), next[vid]);
       }
     });
+    // 2026-11-05 りんく「もっとリアルタイムに」: background が保存より先に届けた新しい行(YT_LIVE_ROWS)を控えに足して、すぐ会場に知らせる。
+    //   (保存→まとめの書き込み→知らせ、を待たない。ニコ生版の部品はそのまま=知らせの中身が早く来るだけ)
+    if (YT_SHIM_IN_PAGE && real.runtime?.onMessage?.addListener) {
+      real.runtime.onMessage.addListener((/** @type {any} */ msg) => {
+        if (!msg || msg.type !== 'YT_LIVE_ROWS' || !Array.isArray(msg.items)) return;
+        const vid = String(msg.videoId || '');
+        const cur = inPageCommentCache.get(vid);
+        if (!cur) return; // まだ会場がこの配信を読んでいない(最初の全件で入る)
+        let added = 0;
+        for (const r of msg.items) {
+          const k = String(r?.pk || r?.id || '');
+          if (!k || cur.byPk.has(k)) continue;
+          cur.byPk.set(k, r);
+          added += 1;
+        }
+        if (!added) return;
+        shimDiag.liveRows = (Number(shimDiag.liveRows) || 0) + added;
+        shimDiag.lastLiveRowsAt = Date.now();
+        inPageSkipFetchUntil.set(vid, Date.now() + 1000);
+        void notifyLv(pseudoLvForVideoId(vid), undefined);
+      });
+    }
     // 知らせが来なくても(まとめの書き込みが遅れる・落ちる)、開いている配信は3秒ごとに記録を見直す
     // ★拡張が入れ替わった(更新された)あと、開いたままのコメビュ等の窓では chrome.* が使えなくなり、
     //   ここが毎回「Extension context invalidated」を投げてエラー一覧に積もる。切れていたら見回りをやめる。

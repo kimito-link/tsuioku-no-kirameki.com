@@ -1732,6 +1732,19 @@
       return true;
     }
     if (message.type === "YT_CHAT_ITEMS") {
+      try {
+        const tabId = sender?.tab?.id;
+        const p0 = message.payload || {};
+        const vidNow = String(p0.videoId || extractVideoIdFromSender(sender) || "").trim();
+        if (typeof tabId === "number" && vidNow && Array.isArray(p0.items) && p0.items.length) {
+          const recs = prepareYtCommentsForIdb(vidNow, p0.items);
+          if (recs.length) {
+            void Promise.resolve(chrome.tabs.sendMessage(tabId, { type: "YT_LIVE_ROWS", videoId: vidNow, items: recs }, { frameId: 0 })).catch(() => {
+            });
+          }
+        }
+      } catch {
+      }
       runSerialized(async () => {
         const payload = message.payload || {};
         const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || "").trim() || "live_default";

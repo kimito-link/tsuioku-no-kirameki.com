@@ -16,7 +16,7 @@ import {
   resolveYtVoiceForChannel,
   enqueueYtVoiceItem,
 } from '../../src/lib/youtube/ytVoiceQueue.js';
-import { mergeYtStreamSummary } from '../../src/lib/youtube/ytStreamStorePolicy.js';
+import { mergeYtStreamSummary, prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
 import {
   appendYtStreamCommentsIdb,
   resetYtCommentsDb,
@@ -686,6 +686,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'YT_CHAT_ITEMS') {
+    // 2026-11-05 りんく「もっとリアルタイムに」: 同じタブの視聴ページの会場へ、保存より先にそのまま届ける。
+    //   保存(下の runSerialized)は他の仕事と1列に並ぶので、そこを待つと吹き出しが数秒遅れていた(PC 実測 中央値3.9秒)。
+    //   届けるのは保存と同じ形(pk・recordedAt 付き)。あとで保存から来る同じ行は pk/id で同じ行として扱われる。
+    try {
+      const tabId = sender?.tab?.id;
+      const p0 = message.payload || {};
+      const vidNow = String(p0.videoId || extractVideoIdFromSender(sender) || '').trim();
+      if (typeof tabId === 'number' && vidNow && Array.isArray(p0.items) && p0.items.length) {
+        const recs = prepareYtCommentsForIdb(vidNow, p0.items);
+        if (recs.length) {
+          void Promise.resolve(chrome.tabs.sendMessage(tabId, { type: 'YT_LIVE_ROWS', videoId: vidNow, items: recs }, { frameId: 0 })).catch(() => {});
+        }
+      }
+    } catch {
+      /* 直接届けられなくても、保存からいつもどおり届く */
+    }
     runSerialized(async () => {
       const payload = message.payload || {};
       const videoId =

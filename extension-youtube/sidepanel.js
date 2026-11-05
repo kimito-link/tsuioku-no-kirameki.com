@@ -1379,7 +1379,7 @@ ${sourceCol}
     return { keyOf: keyOf2, iconOf: (key) => iconByKey.get(key) || "" };
   }
   var commentsCache = /* @__PURE__ */ new Map();
-  var shimDiag = { notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: (
+  var shimDiag = { liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: (
     /** @type {string[]} */
     []
   ) };
@@ -1458,9 +1458,14 @@ ${sourceCol}
   }
   var inPageCommentCache = /* @__PURE__ */ new Map();
   var IN_PAGE_FULL_REFRESH_MS = 3e4;
+  var inPageSkipFetchUntil = /* @__PURE__ */ new Map();
   async function getCommentsViaBackground(vid) {
     const cur = inPageCommentCache.get(vid);
     const now = Date.now();
+    if (cur && inPageSkipFetchUntil.get(vid) > now) {
+      inPageSkipFetchUntil.delete(vid);
+      return [...cur.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+    }
     const full = !cur || now - cur.fullAt > IN_PAGE_FULL_REFRESH_MS;
     try {
       const res = await real?.runtime?.sendMessage?.(
@@ -1842,6 +1847,26 @@ ${sourceCol}
           void notifyLv(pseudoLvForVideoId(vid), next[vid]);
         }
       });
+      if (YT_SHIM_IN_PAGE && real.runtime?.onMessage?.addListener) {
+        real.runtime.onMessage.addListener((msg) => {
+          if (!msg || msg.type !== "YT_LIVE_ROWS" || !Array.isArray(msg.items)) return;
+          const vid = String(msg.videoId || "");
+          const cur = inPageCommentCache.get(vid);
+          if (!cur) return;
+          let added = 0;
+          for (const r of msg.items) {
+            const k = String(r?.pk || r?.id || "");
+            if (!k || cur.byPk.has(k)) continue;
+            cur.byPk.set(k, r);
+            added += 1;
+          }
+          if (!added) return;
+          shimDiag.liveRows = (Number(shimDiag.liveRows) || 0) + added;
+          shimDiag.lastLiveRowsAt = Date.now();
+          inPageSkipFetchUntil.set(vid, Date.now() + 1e3);
+          void notifyLv(pseudoLvForVideoId(vid), void 0);
+        });
+      }
       const pollTimer = setInterval(() => {
         try {
           if (!real.runtime?.id) {
@@ -46366,7 +46391,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T00:21" ? String("yt-2026-11-05T00:21") : "dev";
+      const buildId = "yt-2026-11-05T00:26" ? String("yt-2026-11-05T00:26") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46384,7 +46409,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.91") : "";
+    const bundledVersion = true ? String("0.1.92") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46429,7 +46454,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T00:21" ? String("yt-2026-11-05T00:21") : "dev";
+            return "yt-2026-11-05T00:26" ? String("yt-2026-11-05T00:26") : "dev";
           } catch {
             return "dev";
           }
