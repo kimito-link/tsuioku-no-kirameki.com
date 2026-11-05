@@ -56,6 +56,8 @@ export function createVenueBubbleBurstState() {
     peakRatePerSec: 0,
     /** 同じ人の同じ文がもう一度吹いた回数(別キー=読み直しの疑い) */
     sameTextRepeat: 0,
+    /** v0.1.1862: 過去の番号として吹き出さなかった件数 */
+    skippedOld: 0,
     /** commentNo を持たない合成キー(c:…)で吹いた件数(読み直しが起きうるキー) */
     noCommentNo: 0,
     /** @type {Map<string, string>} 人+文 → 最後に吹いたキー(上限 REPEAT_MEMO_MAX) */
@@ -77,7 +79,7 @@ function commentNoOf(row) {
  * @param {ReturnType<typeof createVenueBubbleBurstState>|null|undefined} state
  * @param {{ at: number, path: string, source?: string,
  *   rows?: ReadonlyArray<unknown>, speeches?: ReadonlyArray<{ key?: string, speakerKey?: string, text?: string }>,
- *   fresh?: number, shown?: number }} obs
+ *   fresh?: number, shown?: number, skippedOld?: number }} obs
  */
 export function observeVenueSpeechBatch(state, obs) {
   if (!state || typeof state !== 'object' || !obs || typeof obs !== 'object') return;
@@ -85,6 +87,8 @@ export function observeVenueSpeechBatch(state, obs) {
   const path = String(obs.path || 'unknown');
   const source = String(obs.source || '') || (path === 'live' ? 'unknown' : path);
   const rows = Array.isArray(obs.rows) ? obs.rows : [];
+  // v0.1.1862: 過去の番号として吹き出さずに既読にした件数(直した後に効いているかを見る)。
+  state.skippedOld += Math.max(0, Math.floor(Number(obs.skippedOld) || 0));
   const speeches = Array.isArray(obs.speeches) ? obs.speeches : [];
 
   // 過去判定は「この束が来る前の最大番号」と比べる(束の中の新しい行で自分を古く見せない)。
@@ -194,6 +198,7 @@ export function toVenueBubbleBurstDiag(state, now) {
       ` / 最大${state.maxShown}件同時 / 上限で出さず${state.capDropped}件` +
       ` / 配信の流量 最大${Math.round(state.peakRatePerSec * 10) / 10}件/秒` +
       ` / 同じ人の同じ文${state.sameTextRepeat}回・番号なし${state.noCommentNo}件` +
+      ` / 過去の番号で出さず${state.skippedOld}件` +
       ` / ${paths}` +
       lastStr;
   }
@@ -207,6 +212,7 @@ export function toVenueBubbleBurstDiag(state, now) {
     peakRatePerSec: Math.round(state.peakRatePerSec * 10) / 10,
     sameTextRepeat: state.sameTextRepeat,
     noCommentNo: state.noCommentNo,
+    skippedOld: state.skippedOld,
     byPath: { ...state.byPath },
     burstBySource: { ...state.burstBySource },
     burstByKind: { ...state.burstByKind },

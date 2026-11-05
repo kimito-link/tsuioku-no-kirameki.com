@@ -76,15 +76,20 @@ export function liveFeedSpeechRows(rows) {
  * 新着発言を抽出する純関数。
  *
  * @param {ReadonlyArray<Record<string, unknown>>} rows ライブ新着コメント(昇順=古い→新しい想定)
- * @param {{ seenKeys?: Set<string>|null, primed?: boolean }} state
+ * @param {{ seenKeys?: Set<string>|null, primed?: boolean, hiNo?: number }} state
+ *   hiNo=これまでに見た最大の commentNo(過去のコメントを見分ける基準・無ければ 0)
  *   seenKeys=既に処理済みのコメントキー集合 / primed=初回シード済みか(false なら初回=吹き出さない)
- * @param {{ maxEmit?: number, primeEmit?: number }} [opts] maxEmit=1回の抽出で返す最大件数(同時多発の洪水を防ぐ・既定8)/ primeEmit=初回に出す直近件数(既定0=初回無音)
+ * @param {{ maxEmit?: number, primeEmit?: number, oldNoGap?: number }} [opts] maxEmit=1回の抽出で返す最大件数(同時多発の洪水を防ぐ・既定8)/ primeEmit=初回に出す直近件数(既定0=初回無音)
  * @returns {{
  *   speeches: Array<{ key: string, speakerKey: string, userId: string, name: string, text: string, capturedAt: number }>,
  *   seenKeys: Set<string>,
  *   primed: boolean,
- *   freshCount?: number
+ *   freshCount?: number,
+ *   hiNo?: number,
+ *   skippedOld?: number
  * }}
+ *   oldNoGap>0 のとき、最大の commentNo よりこれ以上小さい番号の行は「過去のコメント」として
+ *   既読にだけして吹き出さない(skippedOld に数える)。0/未指定は従来どおり(判定しない)。
  *   speeches=新着発言(初回や該当なしは空)。seenKeys/primed=次回呼び出しに渡す更新後の状態。
  */
 export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
@@ -98,6 +103,24 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
     Number.isFinite(opts.primeEmit) && opts.primeEmit > 0 ? Math.floor(opts.primeEmit) : 0;
   const seen = state.seenKeys instanceof Set ? new Set(state.seenKeys) : new Set();
   const wasPrimed = state.primed === true;
+  // v0.1.1862: 過去のコメントの見分け。過去ログ取り込み(backfill)の行も新着と同じ経路で届き、
+  //   何十分も前のコメントが24件ずつ一気に吹き出していた(りんく実機・計器 venueBubbleBurst)。
+  //   commentNo は配信全体の通し番号なので、今までの最大(この束の分も含む)より oldNoGap 以上
+  //   小さい番号は「今しゃべったコメントではない」=既読にだけする。番号の無い行は対象外。
+  const oldNoGap =
+    Number.isFinite(opts.oldNoGap) && Number(opts.oldNoGap) > 0 ? Math.floor(Number(opts.oldNoGap)) : 0;
+  let hiNo = Number.isFinite(Number(state.hiNo)) && Number(state.hiNo) > 0 ? Math.floor(Number(state.hiNo)) : 0;
+  for (const r of list) {
+    const n = Number(r?.commentNo ?? r?.no);
+    if (Number.isFinite(n) && n > hiNo) hiNo = Math.floor(n);
+  }
+  /** @param {Record<string, unknown>} r */
+  const isOldRow = (r) => {
+    if (oldNoGap <= 0 || hiNo <= 0) return false;
+    const n = Number(r?.commentNo ?? r?.no);
+    return Number.isFinite(n) && n > 0 && n < hiNo - oldNoGap;
+  };
+  let skippedOld = 0;
 
   // text のある行だけを発言とみなす(システム行/空行は吹き出さない)。
   const speakable = [];
@@ -114,15 +137,17 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
   //   seen に入れず後続の fresh 抽出に回して吹き出す(過疎番組の寂しさ対策)。
   let primeSet = null;
   if (!wasPrimed) {
+    // 開いた瞬間の「直近 N 件」も過去の番号は選ばない(過去ログが末尾に付いた束で古い発言を出さない)。
+    const primeable = oldNoGap > 0 ? speakable.filter((s) => !isOldRow(s.row)) : speakable;
     primeSet = new Set(
-      speakable.slice(Math.max(0, speakable.length - primeEmit)).map((s) => s.key)
+      primeable.slice(Math.max(0, primeable.length - primeEmit)).map((s) => s.key)
     );
     for (const s of speakable) {
       if (primeSet.has(s.key)) continue; // 直近 N 件は seen に入れない(吹き出す)
       seen.add(s.key);
     }
     if (primeEmit <= 0) {
-      return { speeches: [], seenKeys: seen, primed: true, freshCount: 0 };
+      return { speeches: [], seenKeys: seen, primed: true, freshCount: 0, hiNo, skippedOld: 0 };
     }
   }
 
@@ -132,6 +157,7 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
   for (const s of speakable) {
     if (seen.has(s.key)) continue;
     seen.add(s.key);
+    if (isOldRow(s.row)) { skippedOld += 1; continue; }
     const speakerKey = venueSpeakerKey(s.row);
     if (!speakerKey) continue; // 席に紐付けられない発言者(無名・匿名)は吹き出さない
     fresh.push({
@@ -156,11 +182,13 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
       speeches,
       seenKeys: new Set(arr.slice(arr.length - SEEN_CAP)),
       primed: true,
-      freshCount: fresh.length
+      freshCount: fresh.length,
+      hiNo,
+      skippedOld
     };
   }
   // freshCount: maxEmit で切る前の新着数(計器 venueBubbleBurst 用・挙動には使わない)。
-  return { speeches, seenKeys: seen, primed: true, freshCount: fresh.length };
+  return { speeches, seenKeys: seen, primed: true, freshCount: fresh.length, hiNo, skippedOld };
 }
 
 /**
