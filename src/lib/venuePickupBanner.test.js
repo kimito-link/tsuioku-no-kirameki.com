@@ -147,7 +147,7 @@ describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
   });
 });
 
-describe('PICK UP をドラッグで動かして覚える(v0.1.1894)', () => {
+describe('PICK UP をドラッグで動かして覚える(v0.1.1895)', () => {
   it('保存値の形を確かめる(壊れた値は null=自動位置・範囲外は 0〜1 に締める)', async () => {
     const { normalizeVenuePickupSavedPos } = await import('./venuePickupBanner.js');
     expect(normalizeVenuePickupSavedPos(null)).toBeNull();

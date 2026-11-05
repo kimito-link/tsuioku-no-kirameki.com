@@ -668,7 +668,7 @@ const VENUE_CSS = `
     line-height: 1.4;
     pointer-events: auto;
     cursor: grab;
-    touch-action: none; /* v0.1.1894 ドラッグで動かす(指でもページがスクロールしない) */
+    touch-action: none; /* v0.1.1895 ドラッグで動かす(指でもページがスクロールしない) */
     user-select: none;
   }
   .nlsb-pickup[data-dragging='1'] { cursor: grabbing; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
@@ -3007,7 +3007,7 @@ export function mountVenueBarButton(options = {}) {
    */
   /** @type {Array<any>} */
   let pickupRing = [];
-  // v0.1.1894 ドラッグで置いた位置(下の placePickup/ドラッグ処理で使う)。
+  // v0.1.1895 ドラッグで置いた位置(下の placePickup/ドラッグ処理で使う)。
   /** @type {{ cx:number, top:number } | null} */
   let pickupSavedPos = null;
   /** @type {{ id:number, sx:number, sy:number, cx0:number, top0:number, moved:boolean } | null} */
@@ -3028,7 +3028,7 @@ export function mountVenueBarButton(options = {}) {
     const layoutRect = stageLayout.getBoundingClientRect();
     const at = venuePickupPlacement(video, layoutRect);
     pickupEls.root.style.width = at ? `${at.width}px` : '';
-    // v0.1.1894: ドラッグで置いた位置があればそこ(幅は映像に合わせたまま・会場の内側に締める)。
+    // v0.1.1895: ドラッグで置いた位置があればそこ(幅は映像に合わせたまま・会場の内側に締める)。
     if (pickupDrag) return; // ドラッグ中は指に任せる
     const saved = venuePickupSavedPlacement(pickupSavedPos, layoutRect, pickupEls.root.getBoundingClientRect());
     pickupEls.root.style.left = saved ? `${saved.left}px` : (at ? `${at.left}px` : '');
@@ -3037,7 +3037,7 @@ export function mountVenueBarButton(options = {}) {
     else pickupEls.root.removeAttribute('data-moved');
   }
   /*
-   * v0.1.1894 りんく「ドラッグでうごかせるようにしておきたい」: PICK UP の吹き出しを指/マウスで動かし、位置を覚える。
+   * v0.1.1895 りんく「ドラッグでうごかせるようにしておきたい」: PICK UP の吹き出しを指/マウスで動かし、位置を覚える。
    *   位置は会場に対する割合(KEY_VENUE_PICKUP_POS)。ダブルクリックで自動位置(映像の上端中央)へ戻す。
    *   名前のリンク(a[href])から始めた押下はドラッグにしない(リンクを開けるように)。
    */

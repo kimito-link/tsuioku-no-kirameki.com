@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1894',
+    version: '0.1.1895',
     date: '2026-11-06',
     summary: 'PICK UP の吹き出しをドラッグで動かせる',
     items: Object.freeze([
