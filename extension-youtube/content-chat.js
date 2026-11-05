@@ -1321,8 +1321,9 @@
             }
             mo.disconnect();
             diag.changed = [...added].slice(0, 12).map((el) => el.localName + (el.id ? "#" + el.id : ""));
+            diag.unconfirmed = true;
             saveDiag();
-            return { ok: false, reason: "no-superchat-panel:" + diag.picked };
+            return { ok: true, unconfirmed: true };
           })().then((r) => sendResponse(r)).catch((e) => sendResponse({ ok: false, reason: String(e) }));
           return true;
         } catch (e) {
