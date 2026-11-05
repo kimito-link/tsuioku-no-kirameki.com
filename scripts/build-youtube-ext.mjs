@@ -108,13 +108,36 @@ function setupYtDefaultIconTier(b) {
     resolveDir: dirname(args.path),
   }));
 }
-const ytScreenPlugin = { name: 'yt-screen', setup: setupYtDefaultIconTier };
+const ytScreenPlugin = {
+  name: 'yt-screen',
+  setup(b) {
+    setupYtDefaultIconTier(b);
+    setupLagNoticePatch(b);
+  },
+};
+
+// 0.1.102(2026-11-05 りんく画面「読み上げが約19秒遅れています」): 待ちが0件なのに遅れの案内が出ていた。
+//   ニコ生版は「前に出していた」ときだけ待ち0で消すので、開き直した直後(前に出していない)は、古い平均(受信→キュー)が
+//   大きいだけで待ち0でも出てしまう。待ちが0件なら遅れていないので出さない。ニコ生版にも後で同じ直し。
+function setupLagNoticePatch(b) {
+  b.onLoad({ filter: /src[\\/]lib[\\/]voiceLagNotice\.js$/ }, (args) => ({
+    contents: replaceOnce(
+      readFileSync(args.path, 'utf8'),
+      '  if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: \'\' };',
+      '  if (Number.isFinite(queueNow) && queueNow <= 0) return { shown: false, lagMs, text: \'\' };',
+      '待ち0件なら遅れの案内を出さない'
+    ),
+    loader: 'js',
+    resolveDir: dirname(args.path),
+  }));
+}
 
 const ytVenueLiveIdPlugin = {
   name: 'yt-venue-live-id',
   setup(b) {
     setupLightProbePatch(b);
     setupYtDefaultIconTier(b);
+    setupLagNoticePatch(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents:
         patchVenueBarForPickup(readFileSync(args.path, 'utf8')) +
@@ -131,6 +154,7 @@ const ytVenuePickupPlugin = {
   setup(b) {
     setupLightProbePatch(b);
     setupYtDefaultIconTier(b);
+    setupLagNoticePatch(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents: patchVenueBarForPickup(readFileSync(args.path, 'utf8')),
       loader: 'js',
