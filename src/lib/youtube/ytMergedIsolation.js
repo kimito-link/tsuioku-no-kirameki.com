@@ -15,6 +15,8 @@
 //      ニコ生版の記録を汚すので送らない(返事なし=別の拡張だったときと同じ)。会場・コメビュを開く頼みは
 //      YouTube 版の裏方の名前(YT_OPEN_…)に変える。
 
+import { SUPPORTER_SHARED_KEY_PREFIX } from '../supporterAccess.js';
+
 export const YT_MERGED_KEY_PREFIX = 'ytm:';
 export const YT_OWN_IDB_NAME = 'yt_kirameki_db';
 
@@ -41,16 +43,26 @@ export const YT_MERGED_RENAMED_MESSAGES = Object.freeze({
   NLS_OPEN_VENUE: 'YT_OPEN_VENUE',
 });
 
+/**
+ * ニコ生版と YouTube 版で共有するキーの頭(v0.1.1893 課金: サポーターのコード・証明書は1人1つ)。
+ */
+export const YT_MERGED_SHARED_KEY_PREFIXES = Object.freeze([SUPPORTER_SHARED_KEY_PREFIX]);
+
+/** @param {string} s */
+function isSharedKey(s) {
+  return YT_MERGED_SHARED_KEY_PREFIXES.some((p) => s.startsWith(p));
+}
+
 /** @param {string} k */
 export function ytMergedStorageKey(k) {
   const s = String(k);
-  return s.startsWith('yt_') || s.startsWith(YT_MERGED_KEY_PREFIX) ? s : YT_MERGED_KEY_PREFIX + s;
+  return s.startsWith('yt_') || isSharedKey(s) || s.startsWith(YT_MERGED_KEY_PREFIX) ? s : YT_MERGED_KEY_PREFIX + s;
 }
 
 /** 保存場所のキー → YouTube 版の画面から見えるキー(見せないものは null) @param {string} k */
 export function ytMergedVisibleKey(k) {
   const s = String(k);
-  if (s.startsWith('yt_')) return s;
+  if (s.startsWith('yt_') || isSharedKey(s)) return s;
   if (s.startsWith(YT_MERGED_KEY_PREFIX)) return s.slice(YT_MERGED_KEY_PREFIX.length);
   return null;
 }
