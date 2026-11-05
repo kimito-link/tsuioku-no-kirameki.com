@@ -130,6 +130,38 @@ export const GIFT_ITEMS_KEY = 'nls_gift_items_v1';
 export const GIFT_ITEM_PRESS_REQ_KEY = 'nls_gift_item_press_req';
 /** v0.1.1878 計器: 押したあと3秒で何が出たか(確認の窓が出たか)。押したもの・出てきた部品の class と文字の頭だけ */
 export const GIFT_ITEM_PRESS_RESULT_KEY = 'nls_gift_item_press_result';
+/** v0.1.1879: 設定「会場から1回で贈る」(既定オフ・りんく 2026-11-05 の選択)。オンの人だけ、帯を1回押すと公式の確認の「贈る」まで押す */
+export const GIFT_ONE_TAP_KEY = 'nls_venue_gift_one_tap_v1';
+
+const CONFIRM_RE = /^(ギフトを)?贈る$|^贈る[(（]?[\d,]+\s*pt[)）]?$|^[\d,]+\s*ptで?贈る$/;
+const NOT_CONFIRM_RE = /購入|チャージ|買う|キャンセル|やめる|閉じる/;
+
+/**
+ * 公式の確認の「贈る」ボタンを探す(見えていて押せるものだけ)。exclude は押す前から見えていたもの(新しく出たものだけを押す)。
+ * @param {Document} doc
+ * @param {Set<Element>} [exclude]
+ * @returns {HTMLElement | null}
+ */
+export function findGiftConfirmButton(doc, exclude) {
+  for (const el of doc.querySelectorAll('button, [role="button"]')) {
+    if (exclude?.has(el)) continue;
+    const t = String(el.textContent || '').replace(/\s+/g, '');
+    if (!t || t.length > 20 || NOT_CONFIRM_RE.test(t) || !CONFIRM_RE.test(t)) continue;
+    if (/** @type {any} */ (el).disabled || el.getAttribute('aria-disabled') === 'true') continue;
+    const r = el.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) continue;
+    return /** @type {HTMLElement} */ (el);
+  }
+  return null;
+}
+
+/** @param {Document} doc */
+function visibleConfirmButtons(doc) {
+  /** @type {Set<Element>} */
+  const seen = new Set();
+  for (let el = findGiftConfirmButton(doc, seen); el; el = findGiftConfirmButton(doc, seen)) seen.add(el);
+  return seen;
+}
 
 /**
  * 計器用: アイテムの枠のあたりの骨組み(タグ・class・data-* の名前だけ。文字は取らない)。
@@ -244,16 +276,36 @@ export function startGiftItemsPublisher(win, store) {
       const added = [];
       const mo = typeof MutationObserver === 'function' ? new MutationObserver((recs) => { for (const r of recs) for (const n of r.addedNodes) if (n instanceof Element && added.length < 200) added.push(n); }) : null;
       try { mo?.observe(doc.body, { childList: true, subtree: true }); } catch { /* 見張れなくても押す */ }
+      const before = req.direct === true ? visibleConfirmButtons(doc) : new Set();
       try { ok = pressGiftItem(doc, req.key); } catch { ok = false; }
       if (!ok) mo?.disconnect();
       if (!ok && left > 0) win.setTimeout(step, 300);
       if (ok) {
+        /** @type {{ confirmed: boolean, confirmText: string }} */
+        const conf = { confirmed: false, confirmText: '' };
+        if (req.direct === true) {
+          // v0.1.1879: 1回で贈る(設定でオンの人だけ)。アイテムを押したあと新しく出た確認の「贈る」を1回だけ押す
+          let tries = 12;
+          const look = () => {
+            tries -= 1;
+            let btn = null;
+            try { btn = findGiftConfirmButton(doc, before); } catch { btn = null; }
+            if (btn) {
+              conf.confirmed = true;
+              conf.confirmText = String(btn.textContent || '').replace(/\s+/g, '').slice(0, 20);
+              btn.click();
+              return;
+            }
+            if (tries > 0) win.setTimeout(look, 200);
+          };
+          win.setTimeout(look, 150);
+        }
         win.setTimeout(() => {
           mo?.disconnect();
           const shown = added.filter((el) => el.isConnected && (() => { const r = el.getBoundingClientRect(); return r.width >= 100 && r.height >= 40; })());
           void store.set({
             [GIFT_ITEM_PRESS_RESULT_KEY]: {
-              at: Date.now(), reqAt: at, key: req.key,
+              at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, ...conf,
               shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
               head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160)
             }
@@ -301,13 +353,36 @@ export function subscribeGiftItems(store, pathname, cb) {
  * @param {Document} doc
  * @param {string} key
  * @param {GiftStore['set']} set
+ * @param {{ direct?: boolean, onAt?: (at: number) => void }} [opts]  direct=1回で贈る(設定でオンの人だけ)
  * @returns {{ ok: boolean, reason?: string }}
  */
-export function requestGiftItemPress(doc, key, set) {
+export function requestGiftItemPress(doc, key, set, opts = {}) {
   const at = Date.now();
-  void set({ [GIFT_ITEMS_TAB_REQ_KEY]: { at }, [GIFT_ITEM_PRESS_REQ_KEY]: { at, key } });
+  void set({ [GIFT_ITEMS_TAB_REQ_KEY]: { at }, [GIFT_ITEM_PRESS_REQ_KEY]: { at, key, ...(opts.direct ? { direct: true } : {}) } });
+  opts.onAt?.(at);
   const open = [...doc.querySelectorAll('iframe')].some((f) => !/^chrome-extension:/.test(String(f.getAttribute('src') || '')) && f.closest('[class*="web-view-panel"], [class*="main-area"], [class*="rich-view"], [class*="gift"]') && f.getBoundingClientRect().width > 100);
   return open ? { ok: true } : openOfficialGiftPanel(doc);
+}
+
+/**
+ * 子の窓が押したあとの結果(GIFT_ITEM_PRESS_RESULT_KEY)を待つ。reqAt が合うものだけ。来なければ null。
+ * @param {GiftStore} store
+ * @param {number} reqAt
+ * @param {number} [ms]
+ * @returns {Promise<any>}
+ */
+export function waitGiftPressResult(store, reqAt, ms = 10000) {
+  return new Promise((resolve) => {
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, ms);
+    store.onChanged((changes) => {
+      const v = changes?.[GIFT_ITEM_PRESS_RESULT_KEY]?.newValue;
+      if (done || !v || v.reqAt !== reqAt) return;
+      done = true;
+      clearTimeout(t);
+      resolve(v);
+    });
+  });
 }
 
 /**
