@@ -121,3 +121,18 @@ describe('formatFlickerLine', () => {
     expect(formatFlickerLine(m.snapshot(), Date.now())).toContain('計器自身7ms');
   });
 });
+
+describe('flickerMeter 補足欄(v0.1.1875)', () => {
+  it('setNote は snapshot と速報の1行に載り、同じ文では dirty にしない', async () => {
+    const { createFlickerMeter: make, formatFlickerLine: fmt } = await import('./flickerMeter.js');
+    const m = make({ now: () => 1000 });
+    m.takeDirty();
+    m.setNote('storyGrowthRebuild', '応援マスの作り直し1回(件数の縮小1)');
+    expect(m.takeDirty()).toBe(true);
+    m.setNote('storyGrowthRebuild', '応援マスの作り直し1回(件数の縮小1)');
+    expect(m.takeDirty()).toBe(false);
+    const snap = m.snapshot();
+    expect(snap.notes.storyGrowthRebuild).toContain('件数の縮小1');
+    expect(fmt(snap, 1000)).toContain('補足: 応援マスの作り直し1回(件数の縮小1)');
+  });
+});
