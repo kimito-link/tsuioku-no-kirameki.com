@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1869',
+    date: '2026-11-05',
+    summary: 'PICK UP を映像の上の大きな吹き出しに',
+    items: Object.freeze([
+      '会場の PICK UP を、ひな壇の一番下の細い帯から、映像の上端中央の大きな吹き出しに移しました(顔44px・文字18px・長い文は2行まで)。拾うコメントが無いときは出さないので、映像をふさぎません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1868',
     date: '2026-11-05',
     summary: '会場の発言欄を中央に・大きく',
