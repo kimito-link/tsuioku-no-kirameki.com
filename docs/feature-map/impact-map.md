@@ -977,6 +977,7 @@
 | `src/lib/storyGrowthCellSwap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthChurn.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthLimits.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyGrowthRebuildReasons.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneContaminationGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneRenderSignature.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/suggestInitialInlinePanelPlacement.js` | 1 | 記録エンジン(watchページ常駐) |
