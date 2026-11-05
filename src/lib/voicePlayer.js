@@ -203,7 +203,7 @@ export class VoicePlayer {
     this._playbackEmaMs = -1;
     this._expectedPlayEmaMs = -1;
     this._arrivalWindowState = null;
-    // v0.1.1860: 「その配信で初めてのコメント」を覚える(混雑時は大事なものだけ読む)。
+    // v0.1.1861: 「その配信で初めてのコメント」を覚える(混雑時は大事なものだけ読む)。
     this._firstSpeakerState = createVoiceFirstSpeakerState();
     this._dropCountGateTotal = 0;
     this._dropHeadStaleTotal = 0;
@@ -1222,7 +1222,7 @@ export class VoicePlayer {
       this._arrivalWindowState = foldVoiceArrivalWindow(this._arrivalWindowState, Date.now(), 1);
       this.diag.arrivalPerMin = this._arrivalWindowState.arrivalPerMin;
 
-      // v0.1.1860: 混雑(読み上げ待ち2件以上)のときは大事なもの(ギフト・広告・配信者・その配信で
+      // v0.1.1861: 混雑(読み上げ待ち2件以上)のときは大事なもの(ギフト・広告・配信者・その配信で
       //   初めてのコメント)だけ読む。吹き出しは出す(onDropped で声なしの寿命へ)。初めてかどうかは
       //   読まなかった件でも覚える(次のコメントは「2回目」)。
       const userKey = this._voiceUserKeyForItem(item);

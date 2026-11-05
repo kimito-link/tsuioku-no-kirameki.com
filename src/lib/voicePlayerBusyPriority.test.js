@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-// v0.1.1860: 混雑時は大事なものだけ読む(本番の VoicePlayer を実 import して確かめる)。
+// v0.1.1861: 混雑時は大事なものだけ読む(本番の VoicePlayer を実 import して確かめる)。
 import { VoicePlayer } from './voicePlayer.js';
 
 describe('VoicePlayer 混雑時は大事なものだけ読む', () => {

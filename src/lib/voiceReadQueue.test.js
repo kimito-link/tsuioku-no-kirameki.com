@@ -398,7 +398,7 @@ describe('pushVoiceQueue keep(2026-11-03: 合成中の件は捨てない)', () =
   it('keep を渡さなければ従来どおり最古から捨てる', () => {
     expect(pushVoiceQueue(['a', 'b'], 'c', { max: 2 }).dropped).toEqual(['a']);
   });
-  it('v0.1.1860: 溢れたらふつうの件から捨て、届いたばかりのギフト(前に入る)は残す', () => {
+  it('v0.1.1861: 溢れたらふつうの件から捨て、届いたばかりのギフト(前に入る)は残す', () => {
     const g1 = { body: 'g1', priority: 'high' };
     const g2 = { body: 'g2', priority: 'high' };
     const a = { body: 'a', priority: 'normal' };

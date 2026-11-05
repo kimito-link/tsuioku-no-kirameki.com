@@ -3158,7 +3158,7 @@
     - `voiceAssignment.test.js`
     - `voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
     - `voiceBubbleRealtimeParity.test.js`
-    - `voiceBusyPriority.js` — v0.1.1860: 読み上げが混んでいる時は「大事なもの」だけ読む(ニコ生版・会場とコメビュで共用)。
+    - `voiceBusyPriority.js` — v0.1.1861: 読み上げが混んでいる時は「大事なもの」だけ読む(ニコ生版・会場とコメビュで共用)。
     - `voiceBusyPriority.test.js`
     - `voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
     - `voiceComment.test.js`
