@@ -40,11 +40,12 @@ export const SUPPORTER_GATE_ENFORCED = true;
 /**
  * 拡張に入れる公開鍵(kid → JWK の x)。★秘密鍵は Vercel の環境変数 LICENSE_SIGNING_JWK だけに置く。
  *   鍵を替えるときは新しい kid を足し、古い kid は消さない(配った証明書が切れるまで=最低 LICENSE_TTL_MS)。
- *   k2026a = 最初の本番の鍵(v0.1.1897・2026-11-06 作成)。秘密鍵は Vercel の LICENSE_SIGNING_JWK にだけある。
+ *   k2026b = 本番の鍵(v0.1.1898・2026-11-06 PC 上で作成)。秘密鍵は Vercel の LICENSE_SIGNING_JWK にだけある。
+ *   (k2026a は秘密鍵を Vercel に入れる前に破棄したので外した=それで署名された証明書は存在しない)
  * @type {Readonly<Record<string, string>>}
  */
 export const LICENSE_PUBLIC_KEYS = Object.freeze({
-  k2026a: '9Gc8DLqkTI0hJLszRwsTPUGQvItGyZeD9yuM8w6T5fI'
+  k2026b: '0C-kZWHtV_HITatoflirRwKlbfZ02hp2MzXwB4THxLc'
 });
 
 /** 利用者がコピーして拡張に入れる「サポーターのコード」の形(base64url 32〜64文字)。 */
