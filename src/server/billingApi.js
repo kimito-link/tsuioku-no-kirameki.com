@@ -210,6 +210,10 @@ export function createBillingService(deps) {
 
   /** Stripe の契約の中身を台帳へ写す(顧客 ID で1件にまとめる)。 */
   async function upsertFromSubscription(sub, extra = {}) {
+    // ★同じ Stripe アカウントには別サービスの商品もある。追憶の価格を含まない契約は台帳に入れない
+    //   (入れると、別サービスの購入者がサポーターになったり、同じ顧客の別契約で状態が上書きされる)。
+    const ourItem = (sub?.items?.data || []).find((it) => planFromPriceId(it?.price?.id, env) !== 'supporter');
+    if (!ourItem) return null;
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
     if (!customerId) return null;
     const custKey = billingKeys.customer('stripe', customerId);
@@ -221,8 +225,8 @@ export function createBillingService(deps) {
       acct = { acctId, provider: 'stripe', customerId, createdAtMs: t, codeHash: '', email: '' };
       await upstash(['SET', custKey, acctId]);
     }
-    const priceId = sub.items?.data?.[0]?.price?.id || acct.priceId || '';
-    const periodEnd = sub.current_period_end ?? sub.items?.data?.[0]?.current_period_end;
+    const priceId = ourItem.price.id;
+    const periodEnd = sub.current_period_end ?? ourItem.current_period_end;
     acct = {
       ...acct,
       subscriptionId: sub.id || acct.subscriptionId || '',
@@ -268,7 +272,7 @@ export function createBillingService(deps) {
       if (!paid || !s.subscription) return { status: 402, body: { ok: false, error: 'not_paid' } };
       const sub = typeof s.subscription === 'string' ? await stripe.getSubscription(s.subscription) : s.subscription;
       const acct = await upsertFromSubscription(sub, { email: s.customer_details?.email || '' });
-      if (!acct) return { status: 502, body: { ok: false, error: 'no_customer' } };
+      if (!acct) return { status: 404, body: { ok: false, error: 'not_supporter' } };
       let code = await upstash(['GET', billingKeys.sessionCode(sessionId)]);
       if (!code) {
         code = newCode();

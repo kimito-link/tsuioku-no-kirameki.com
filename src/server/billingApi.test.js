@@ -93,6 +93,30 @@ async function setup() {
   return { svc, up, state, stripe, x };
 }
 
+describe('billingApi: 同じ Stripe アカウントの別サービスの購入', () => {
+  it('追憶の価格を含まない契約はコードを出さず、台帳にも入れない', async () => {
+    const { svc, state, up } = await setup();
+    state.sub = sub('active', { items: { data: [{ price: { id: 'price_other_service' } }] } });
+    const r = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    expect(r.status).toBe(404);
+    expect(r.body.error).toBe('not_supporter');
+    expect([...up.store.keys()].some((k) => k.startsWith('billing:acct:'))).toBe(false);
+  });
+
+  it('webhook で別サービスの契約が来ても、同じ顧客の追憶の契約は上書きされない', async () => {
+    const { svc, state, up } = await setup();
+    const a = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    expect(a.status).toBe(200);
+    state.sub = sub('canceled', { id: 'sub_other', items: { data: [{ price: { id: 'price_other_service' } }] } });
+    const body = JSON.stringify({ id: 'evt_other', type: 'customer.subscription.deleted', data: { object: { id: 'sub_other' } } });
+    const w = await svc.webhook({ rawBody: body, signature: signed(body) });
+    expect(w.status).toBe(200);
+    const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
+    expect(acct.status).toBe('active');
+    expect(acct.subscriptionId).toBe('sub_1');
+  });
+});
+
 describe('billingApi: 申し込み→支払い直後→取り直し', () => {
   it('申し込みは年額を既定にし、戻り先は supporter 画面', async () => {
     const { svc, stripe } = await setup();
