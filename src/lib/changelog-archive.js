@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1839',
+    date: '2026-10-31',
+    summary: 'イベント欄の拡張のエラーも止める',
+    items: Object.freeze([
+      'イベントに参加している配信で、順位の欄にあるりんくの絵の書き方が安全設定に止められ、拡張機能の管理画面にエラーが積もっていました。ギフト一覧と同じ直し方で、エラーが出ないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1838',
     date: '2026-10-31',
     summary: 'ギフト一覧で出ていた拡張のエラーを止める',
