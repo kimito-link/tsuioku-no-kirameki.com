@@ -8219,6 +8219,16 @@ ${sourceCol}
     else els.root.removeAttribute("data-empty");
     return true;
   }
+  function venuePickupPlacement(video, layout, opts = {}) {
+    if (!video || !layout || !(video.width >= 240) || !(video.height >= 120)) return null;
+    const maxWidth = opts.maxWidth ?? 860;
+    const minTop = opts.minTop ?? 20;
+    const margin = opts.margin ?? 12;
+    const width = Math.round(Math.max(200, Math.min(maxWidth, video.width - margin * 2)));
+    const left = Math.round(video.left - layout.left + video.width / 2);
+    const top = Math.round(Math.max(minTop, video.top - layout.top + 8));
+    return { left, top, width };
+  }
 
   // src/lib/pickLatestComment.js
   function pickLatestCommentEntry(list) {
@@ -17736,7 +17746,7 @@ ${sourceCol}
      ★下地は不透明(v0.1.1337: 半透明だと後ろのページの文字と重なって読めなかった)。 */
   .nlsb-pickup {
     position: absolute;
-    top: 6px;
+    top: 20px;
     left: 50%;
     z-index: 7;
     transform: translateX(-50%);
@@ -19929,9 +19939,25 @@ ${sourceCol}
           if (!rows.length) return;
         }
         applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
+        placePickup();
       } catch {
       }
     };
+    function placePickup() {
+      if (pickupEls.root.hasAttribute("data-empty")) return;
+      const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll("video"));
+      const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+      const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
+      pickupEls.root.style.left = at ? `${at.left}px` : "";
+      pickupEls.root.style.top = at ? `${at.top}px` : "";
+      pickupEls.root.style.width = at ? `${at.width}px` : "";
+    }
+    window.addEventListener("resize", () => {
+      try {
+        placePickup();
+      } catch {
+      }
+    });
     seating.append(header, topBar, seatsHost);
     stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer, pickupEls.root);
     const bubbleLayer = document.createElement("div");
@@ -20316,7 +20342,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T09:18") : ""
+          buildId: true ? String("yt-2026-11-05T09:30") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
