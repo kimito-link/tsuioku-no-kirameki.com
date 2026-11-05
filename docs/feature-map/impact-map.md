@@ -984,7 +984,9 @@
 | `src/lib/suggestInitialInlinePanelPlacement.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/summarizeDevMonitorGiftRanking.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/summarizeGiftSubAppHistoryDiag.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/supporterAccess.js` | 1 | コメビュ(別窓) |
 | `src/lib/supporterChikuranScore.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/supporterLicense.js` | 1 | コメビュ(別窓) |
 | `src/lib/supporterPowerScoring.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/supporterRankingDom.js` | 1 | 状態速報ページ |
 | `src/lib/supporterRowToPersonTile.js` | 1 | 状態速報ページ |

@@ -144,3 +144,14 @@ describe('installYtMergedIsolation', () => {
     expect(open.mock.calls).toEqual([['ytm:nls_thumbs', 2], ['yt_kirameki_db', 1]]);
   });
 });
+
+describe('ytMergedIsolation: サポーターのキーは共有(v0.1.1893 課金)', () => {
+  it('nls_supporter_ はそのまま通す=ニコ生版で入れたコードが YouTube 版のマーケ HTML でも使える', async () => {
+    const { ytMergedStorageKey, ytMergedVisibleKey, YT_MERGED_SHARED_KEY_PREFIXES } = await import('./ytMergedIsolation.js');
+    const { KEY_SUPPORTER_CODE, SUPPORTER_SHARED_KEY_PREFIX } = await import('../supporterAccess.js');
+    expect(YT_MERGED_SHARED_KEY_PREFIXES).toContain(SUPPORTER_SHARED_KEY_PREFIX);
+    expect(ytMergedStorageKey(KEY_SUPPORTER_CODE)).toBe(KEY_SUPPORTER_CODE);
+    expect(ytMergedVisibleKey(KEY_SUPPORTER_CODE)).toBe(KEY_SUPPORTER_CODE);
+    expect(ytMergedStorageKey('nls_other')).toBe('ytm:nls_other');
+  });
+});

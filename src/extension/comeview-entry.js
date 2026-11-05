@@ -35,6 +35,7 @@ import {
   pickComeviewGeometryToSave
 } from '../lib/comeviewWindowGeometry.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
+import { checkCreditBadge } from '../lib/supporterAccess.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
 import {
   isCommentDbAvailable,
@@ -2601,8 +2602,17 @@ function wireButtons() {
   window.addEventListener('pagehide', saveWindowGeometry);
 }
 
+/** v0.1.1894: 無料の人の OBS 画面の隅の印(サポーターのコードを入れたら次に開いたとき消える)。 */
+function applyCreditBadge() {
+  void checkCreditBadge({ storage: chrome.storage.local }).then((show) => {
+    const el = document.getElementById('cvCredit');
+    if (el) el.hidden = !show;
+  });
+}
+
 async function main() {
   if (isObsMode()) document.body.classList.add('is-obs');
+  applyCreditBadge();
   const urlLiveId = resolveLiveIdFromUrl();
   _explicitLiveId = !!urlLiveId; // ?lv= 明示窓は配信切替に追従しない(固定窓)
   /*
