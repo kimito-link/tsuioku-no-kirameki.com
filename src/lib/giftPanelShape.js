@@ -31,7 +31,7 @@ function safeSrc(s) {
 /**
  * @param {Document} doc
  * @param {{ maxTiles?: number }} [opts]
- * @returns {null | { tiles: any[], tabs: any[], dialogs: any[], tileCount: number }}
+ * @returns {null | { tiles: any[], tabs: any[], dialogs: any[], tileCount: number, ptSkel?: string[] }}
  */
 export function captureGiftPanelShape(doc, opts = {}) {
   const maxTiles = opts.maxTiles ?? 24;
@@ -55,6 +55,7 @@ export function captureGiftPanelShape(doc, opts = {}) {
     let tile = pt.parentElement;
     for (let i = 0; i < 4 && tile && !tile.querySelector('img'); i += 1) tile = tile.parentElement;
     if (!tile || seen.has(tile) || !tile.querySelector('img')) continue;
+    if (tile.querySelector('[class*="point-charge"]')) continue; // v0.1.1874: 自分の所持ポイントの欄はアイテムではない
     seen.add(tile);
     const img = /** @type {HTMLImageElement | null} */ (tile.querySelector('img'));
     const click = clickableOf(tile) || clickableOf(pt);
@@ -90,7 +91,21 @@ export function captureGiftPanelShape(doc, opts = {}) {
       text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
     }));
   if (!tiles.length && !dialogs.length && !tabs.length) return null;
-  return { tiles, tabs, dialogs, tileCount: seen.size };
+  // v0.1.1874: pt の部品の祖先の骨組み(タグと class だけ・文字は取らない)。アイテムの枠の形を1回で知るため
+  const ptSkel = ptEls
+    .filter((el) => !el.closest('[class*="point-charge"]') && !el.closest('section')?.querySelector('[class*="point-charge"]'))
+    .slice(0, 3)
+    .map((el) => {
+      /** @type {string[]} */
+      const chain = [];
+      let a = /** @type {Element | null} */ (el);
+      for (let i = 0; i < 8 && a && a !== root; i += 1, a = a.parentElement) {
+        const bg = a instanceof HTMLElement && /url\(/.test(a.style.backgroundImage || '') ? '[bg]' : '';
+        chain.push(`${a.localName}.${shortClass(a).split(' ').slice(0, 2).join('.')}(${a.children.length})${bg}${a.querySelector('img') ? '[img]' : ''}`);
+      }
+      return chain.join(' < ').slice(0, 900);
+    });
+  return { tiles, tabs, dialogs, tileCount: seen.size, ptSkel };
 }
 
 /**
@@ -168,7 +183,10 @@ export function startGiftPanelRecorder(win, save) {
       const extra = isTop ? { frames: listFrames(doc) } : {};
       const census = frameCensus(doc);
       // v0.1.1873: 子の窓は見えている文字の頭 240 字も残す(アイテム名と pt が並ぶか、履歴やランキングだけかを見分ける)
-      const head = isTop ? '' : String(doc.body?.innerText || doc.body?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+      let head = isTop ? '' : String(doc.body?.innerText || doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+      // v0.1.1874: 頭の「〇〇 さん 61 pt」(本人の名前)は残さない。タブ名から先だけを残す
+      const tabAt = head.search(/番組ギフト|マイギフト|履歴|ランキング/);
+      head = (tabAt >= 0 ? head.slice(tabAt) : head.replace(/^.*?さん/, '')).slice(0, 240);
       if (head) extra.head = head;
       const sig = JSON.stringify([shape, extra, census.imgs, census.shadowHosts, census.iframes]);
       if (sig === last) return;

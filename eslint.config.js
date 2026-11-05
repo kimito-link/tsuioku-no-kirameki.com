@@ -436,7 +436,8 @@ export default [
     // v0.1.1867: 会場から発言(会場に postComment を渡す+コメント1行)=+1。入力欄は lib の venueComposeBox.js。
     // v0.1.1870: 会場のギフトボタン(公式のギフト画面を開く lib の import 1行)=+1。
     // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
-    rules: { 'max-lines': ['error', { max: 19578, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1874: ギフトの子の窓で番組ギフトのタブへ切り替える合図の受け手(起動1行)=+1。中身は lib の venueComposeBox.js。
+    rules: { 'max-lines': ['error', { max: 19579, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
