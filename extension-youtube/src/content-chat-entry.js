@@ -870,7 +870,14 @@ function setupCommentSendBridge() {
           const signIn = document.querySelector(
             'yt-live-chat-message-input-renderer #sign-in, yt-live-chat-restricted-participation-renderer, yt-live-chat-message-input-renderer yt-button-renderer a[href*="ServiceLogin"]',
           );
-          return { ok: false, reason: signIn ? 'not-signed-in' : 'no-input' };
+          // 0.1.109: ログインしていないチャットは入力欄の部品ごと無く、下の帯(#input-panel)に「ログインしてチャットを始める」の
+          //   リンクだけがある(PC の別ブラウザで確認 2026-11-05)。これも「ログインしていない」として伝える。
+          const panel = document.querySelector('#input-panel');
+          const signedOut =
+            !!signIn ||
+            !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') ||
+            /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ''));
+          return { ok: false, reason: signedOut ? 'not-signed-in' : 'no-input' };
         }
         input.focus();
         try {
