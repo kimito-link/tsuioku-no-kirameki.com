@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ytIconColorStats, ytLooksLikeDefaultLetterIcon, ytIconCacheKey, makeYtDefaultIconJudge } from '../../../extension-youtube/src/ytDefaultIcon.js';
+import { ytIconColorStats, ytLooksLikeDefaultLetterIcon, ytLooksLikeDefaultIcon, ytIconCacheKey, makeYtDefaultIconJudge } from '../../../extension-youtube/src/ytDefaultIcon.js';
 
 /** @param {(x:number,y:number)=>number[]} f */
 function img(f, w = 64, h = 64) {
@@ -29,6 +29,22 @@ describe('最初からの文字アイコンを見分ける(0.1.101)', () => {
     const s = ytIconColorStats(a, 64, 64);
     expect(s.t1).toBeLessThan(0.8);
     expect(ytLooksLikeDefaultLetterIcon(YTC, s)).toBe(true);
+  });
+  it('灰色の背景に明るい頭と肩(人の形の既定アイコン)→ 最初からのアイコン', () => {
+    const a = img((x, y) => {
+      const nx = (x - 31.5) / 32;
+      const ny = (y - 31.5) / 32;
+      const fig = nx * nx + (ny + 0.25) ** 2 <= 0.1 || (ny > 0.25 && (nx / 0.72) ** 2 + ((ny - 0.85) / 0.6) ** 2 <= 1);
+      return fig ? [210, 210, 210] : [130, 100, 100];
+    });
+    expect(ytLooksLikeDefaultLetterIcon(YTC, ytIconColorStats(a, 64, 64))).toBe(false);
+    expect(ytLooksLikeDefaultIcon(YTC, a, 64, 64)).toBe(true);
+  });
+  it('文字アイコンは人の形とは別に当たり、写真はどちらにも当たらない', () => {
+    const letter = img((x, y) => (x > 26 && x < 38 && y > 20 && y < 44 ? [255, 255, 255] : [0, 120, 200]));
+    const photo = img((x, y) => [(x * 4) & 255, (y * 4) & 255, ((x + y) * 3) & 255]);
+    expect(ytLooksLikeDefaultIcon(YTC, letter, 64, 64)).toBe(true);
+    expect(ytLooksLikeDefaultIcon(YTC, photo, 64, 64)).toBe(false);
   });
   it('/ytc/ が無い URL は単色でも文字アイコンにしない', () => {
     const a = img(() => [0, 120, 200]);

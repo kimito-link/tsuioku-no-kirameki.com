@@ -10,14 +10,15 @@
 // ★件数が少ない試験で決めた値。迷うときは「自分で設定した人」(りんく欄)に倒す=間違えても認知が減らない側。
 
 // v2: 見分け方を変えたので、v1 の結果(取りこぼしの 0)は使わない
-export const YT_DEFAULT_ICON_STORE_KEY = 'yt_default_icon_v2';
+// v3: 人の形(人影)の既定アイコンも見分けるようにしたので、v2 の結果(人影の 0)は使わない
+export const YT_DEFAULT_ICON_STORE_KEY = 'yt_default_icon_v3';
 
 /**
  * 画素から見分けの数字を出す(純関数・試験用に分けてある)。
  * @param {Uint8ClampedArray|number[]} rgba 幅 w × 高さ h の RGBA
  * @param {number} w
  * @param {number} h
- * @returns {{ t1: number, c5: number, bgSat: number }}
+ * @returns {{ t1: number, c5: number, bgSat: number, bgKey: number }}
  */
 export function ytIconColorStats(rgba, w, h) {
   /** @type {Map<number, number>} */
@@ -35,7 +36,7 @@ export function ytIconColorStats(rgba, w, h) {
       total += 1;
     }
   }
-  if (!total) return { t1: 0, c5: 0, bgSat: 0 };
+  if (!total) return { t1: 0, c5: 0, bgSat: 0, bgKey: 0 };
   let max = 0;
   let maxKey = 0;
   let c5 = 0;
@@ -47,7 +48,7 @@ export function ytIconColorStats(rgba, w, h) {
     if (n / total >= 0.005) c5 += 1;
   }
   const ch = [(maxKey >> 8) & 15, (maxKey >> 4) & 15, maxKey & 15];
-  return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch) };
+  return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey };
 }
 
 /**
@@ -56,6 +57,53 @@ export function ytIconColorStats(rgba, w, h) {
  */
 export function ytLooksLikeDefaultLetterIcon(url, stats) {
   return /\/ytc\//.test(String(url || '')) && stats.t1 >= 0.62 && stats.bgSat >= 5;
+}
+
+/**
+ * 0.1.104 りんく画面(灰色の人の形 @森…・前の配信の紫の人影): YouTube の「人の形」の既定アイコン。
+ *   一色の背景に明るい頭と肩。色では分からない(灰色は色付きでない)ので、形の重なり(IoU)で見る。
+ *   PC 実データ 72人で 人影 2/2(IoU .92)・誤り0(人影以外の最大 .49・文字アイコンは .03〜.19)。
+ * @param {Uint8ClampedArray|number[]} rgba
+ * @param {number} w
+ * @param {number} h
+ * @param {number} bgKey ytIconColorStats の bgKey(いちばん多い色)
+ */
+export function ytIconSilhouetteIoU(rgba, w, h, bgKey) {
+  const bg = [((bgKey >> 8) & 15) * 16 + 8, ((bgKey >> 4) & 15) * 16 + 8, (bgKey & 15) * 16 + 8];
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2;
+  const r = Math.min(w, h) * 0.45;
+  let inter = 0;
+  let union = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+      const i = (y * w + x) * 4;
+      const fg = Math.abs(rgba[i] - bg[0]) + Math.abs(rgba[i + 1] - bg[1]) + Math.abs(rgba[i + 2] - bg[2]) > 60;
+      const nx = (x - cx) / (w / 2);
+      const ny = (y - cy) / (h / 2);
+      const head = nx * nx + (ny + 0.25) ** 2 <= 0.33 * 0.33;
+      const body = ny > 0.25 && (nx / 0.72) ** 2 + ((ny - 0.85) / 0.6) ** 2 <= 1;
+      const tpl = head || body;
+      if (fg && tpl) inter += 1;
+      if (fg || tpl) union += 1;
+    }
+  }
+  return union ? inter / union : 0;
+}
+
+/**
+ * 最初からのアイコン(文字アイコン・人の形)か。
+ * @param {string} url
+ * @param {Uint8ClampedArray|number[]} rgba
+ * @param {number} w
+ * @param {number} h
+ */
+export function ytLooksLikeDefaultIcon(url, rgba, w, h) {
+  if (!/\/ytc\//.test(String(url || ''))) return false;
+  const stats = ytIconColorStats(rgba, w, h);
+  if (ytLooksLikeDefaultLetterIcon(url, stats)) return true;
+  return ytIconSilhouetteIoU(rgba, w, h, stats.bgKey) >= 0.7;
 }
 
 /** 同じ人の顔は大きさ違いの URL で来るので、大きさを外して鍵にする */
@@ -131,7 +179,7 @@ export function makeYtDefaultIconJudge(chromeApi, onLearned) {
     const ctx = /** @type {OffscreenCanvasRenderingContext2D} */ (cv.getContext('2d'));
     ctx.drawImage(bmp, 0, 0, w, h);
     bmp.close?.();
-    return ytLooksLikeDefaultLetterIcon(url, ytIconColorStats(ctx.getImageData(0, 0, w, h).data, w, h));
+    return ytLooksLikeDefaultIcon(url, ctx.getImageData(0, 0, w, h).data, w, h);
   }
 
   function pump() {

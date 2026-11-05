@@ -2,7 +2,7 @@
 /* eslint-disable */
 (() => {
   // extension-youtube/src/ytDefaultIcon.js
-  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v2";
+  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v3";
   function ytIconColorStats(rgba, w, h) {
     const counts = /* @__PURE__ */ new Map();
     const cx = (w - 1) / 2;
@@ -18,7 +18,7 @@
         total += 1;
       }
     }
-    if (!total) return { t1: 0, c5: 0, bgSat: 0 };
+    if (!total) return { t1: 0, c5: 0, bgSat: 0, bgKey: 0 };
     let max = 0;
     let maxKey = 0;
     let c5 = 0;
@@ -30,10 +30,39 @@
       if (n2 / total >= 5e-3) c5 += 1;
     }
     const ch = [maxKey >> 8 & 15, maxKey >> 4 & 15, maxKey & 15];
-    return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch) };
+    return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey };
   }
   function ytLooksLikeDefaultLetterIcon(url, stats) {
     return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.62 && stats.bgSat >= 5;
+  }
+  function ytIconSilhouetteIoU(rgba, w, h, bgKey) {
+    const bg = [(bgKey >> 8 & 15) * 16 + 8, (bgKey >> 4 & 15) * 16 + 8, (bgKey & 15) * 16 + 8];
+    const cx = (w - 1) / 2;
+    const cy = (h - 1) / 2;
+    const r = Math.min(w, h) * 0.45;
+    let inter = 0;
+    let union = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+        const i = (y * w + x) * 4;
+        const fg = Math.abs(rgba[i] - bg[0]) + Math.abs(rgba[i + 1] - bg[1]) + Math.abs(rgba[i + 2] - bg[2]) > 60;
+        const nx = (x - cx) / (w / 2);
+        const ny = (y - cy) / (h / 2);
+        const head = nx * nx + (ny + 0.25) ** 2 <= 0.33 * 0.33;
+        const body = ny > 0.25 && (nx / 0.72) ** 2 + ((ny - 0.85) / 0.6) ** 2 <= 1;
+        const tpl = head || body;
+        if (fg && tpl) inter += 1;
+        if (fg || tpl) union += 1;
+      }
+    }
+    return union ? inter / union : 0;
+  }
+  function ytLooksLikeDefaultIcon(url, rgba, w, h) {
+    if (!/\/ytc\//.test(String(url || ""))) return false;
+    const stats = ytIconColorStats(rgba, w, h);
+    if (ytLooksLikeDefaultLetterIcon(url, stats)) return true;
+    return ytIconSilhouetteIoU(rgba, w, h, stats.bgKey) >= 0.7;
   }
   function ytIconCacheKey(url) {
     return String(url || "").replace(/=s\d+[^/]*$/, "");
@@ -92,7 +121,7 @@
       );
       ctx.drawImage(bmp, 0, 0, w, h);
       bmp.close?.();
-      return ytLooksLikeDefaultLetterIcon(url, ytIconColorStats(ctx.getImageData(0, 0, w, h).data, w, h));
+      return ytLooksLikeDefaultIcon(url, ctx.getImageData(0, 0, w, h).data, w, h);
     }
     function pump() {
       if (!loaded) return;
@@ -46584,7 +46613,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T05:37" ? String("yt-2026-11-05T05:37") : "dev";
+      const buildId = "yt-2026-11-05T05:42" ? String("yt-2026-11-05T05:42") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46602,7 +46631,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.103") : "";
+    const bundledVersion = true ? String("0.1.104") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46647,7 +46676,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T05:37" ? String("yt-2026-11-05T05:37") : "dev";
+            return "yt-2026-11-05T05:42" ? String("yt-2026-11-05T05:42") : "dev";
           } catch {
             return "dev";
           }
