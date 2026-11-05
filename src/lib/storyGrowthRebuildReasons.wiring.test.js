@@ -19,6 +19,13 @@ describe('応援マスの作り直しの入口別計器の配線', () => {
     expect(calls.length).toBe(3);
     for (const c of calls) expect(c[1]).toMatch(/STORY_GROWTH_REBUILD_REASON\.(SHRINK|GROW_FULL|DOM_MISMATCH)/);
   });
+  it('★件数の縮小は、条件が揃えば末尾のマスだけ外す(全部作り直さない)', () => {
+    const b = bodyOf('syncStoryGrowth');
+    expect(b).toMatch(/if \(canTrimStoryGrowthCells\(/);
+    expect(b).toContain('_cells[i].remove()');
+    expect(b).toContain('STORY_GROWTH_REBUILD_REASON.TRIM');
+    expect(b).toMatch(/\} else rebuildStoryGrowth\([^)]*STORY_GROWTH_REBUILD_REASON\.SHRINK/);
+  });
   it('配信切替・空にする経路も記録し、目標件数を毎回控える', () => {
     const b = bodyOf('syncStoryGrowth');
     expect(b).toContain('STORY_GROWTH_REBUILD_REASON.LIVE');

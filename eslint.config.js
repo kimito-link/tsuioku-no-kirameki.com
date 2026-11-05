@@ -405,8 +405,8 @@ export default [
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
     // v0.1.1852: 遅い PC なら GPU の案内を出す配線(import 1行+呼び出し4行=+5)。中身は popup/wireVoiceGpuTip.js。
-    // v0.1.1875: 応援マスの作り直しの入口別計器(+28: import 1・状態と補足欄の書き込み関数・各入口の記録)。数え方と文言は lib の storyGrowthRebuildReasons.js。
-    rules: { 'max-lines': ['error', { max: 21779, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1877: 応援マスの作り直しの入口別計器と末尾だけ削る縮小(+54: import 1・状態と補足欄の書き込み関数・各入口の記録)。数え方と文言は lib の storyGrowthRebuildReasons.js。
+    rules: { 'max-lines': ['error', { max: 21805, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

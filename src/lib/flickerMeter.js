@@ -55,7 +55,7 @@ export function createFlickerMeter(deps = {}) {
   let dirty = false;
   let selfMs = 0;
   let events = 0;
-  /** v0.1.1875: 画面の持ち主(popup)が書く補足の1行(例: 応援マスの作り直しの入口別)。名前→文。 */
+  /** v0.1.1877: 画面の持ち主(popup)が書く補足の1行(例: 応援マスの作り直しの入口別)。名前→文。 */
   /** @type {Record<string, string>} */
   let notes = {};
 
@@ -137,7 +137,7 @@ export function createFlickerMeter(deps = {}) {
       return d;
     },
     /**
-     * v0.1.1875: 補足の1行を書く(同じ文なら何もしない)。ちらつき計と同じ4秒ごとの書き込みに乗る。
+     * v0.1.1877: 補足の1行を書く(同じ文なら何もしない)。ちらつき計と同じ4秒ごとの書き込みに乗る。
      * @param {string} name @param {string} text
      */
     setNote(name, text) {
