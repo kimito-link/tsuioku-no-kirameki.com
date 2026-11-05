@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1863',
+    date: '2026-11-05',
+    summary: 'りんく欄を元の決まりに戻す',
+    items: Object.freeze([
+      'りんく欄に、ギフトか広告を送った人しか出ていませんでした(10月14日の v0.1.1621 から)。元の決まりに戻し、コメントだけの人でも、IDと本人のサムネが分かればりんく欄に出るようにしました。ギフトや広告を送った人も、今までどおりりんく欄に入ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1861',
     date: '2026-11-04',
     summary: '混んだら大事なコメントだけ読み上げる',
@@ -180,15 +188,7 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ギフトの投げ一覧を描くたびに、拡張機能の管理画面へ「Content Security Policy」のエラーが積もっていました。アイコンが読めないときの差し替えを安全設定に沿った書き方に直し、エラーが出ないようにしました。読めないアイコンは公式の既定アイコンになります。'
     ])
-  }),
-  Object.freeze({
-    version: '0.1.1837',
-    date: '2026-10-31',
-    summary: 'コメントを流す間は画面を消さない',
-    items: Object.freeze([
-      'iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。'
-    ])
-  }),
+  })
 ]);
 
 
