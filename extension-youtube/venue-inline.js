@@ -859,6 +859,13 @@ ${sourceCol}
     if (s.important) return true;
     return !(Number(s.queueLength) >= YT_VOICE_CROWD_QUEUE);
   }
+  function ytCrowdSpeedBoost(crowdEma, sinceCrowdedMs) {
+    if (!(Number(sinceCrowdedMs) >= 0) || Number(sinceCrowdedMs) > 15e3) return 0;
+    const e = Number(crowdEma) || 0;
+    if (e >= 0.4) return 0.35;
+    if (e >= 0.15) return 0.25;
+    return 0;
+  }
 
   // extension-youtube/src/ytLocalAssetUrls.js
   var ASSET_RE = /^(?:images|sound)\/[\w\-./]+\.(?:png|jpe?g|gif|webp|svg|mp3|ogg|wav)$/i;
@@ -19812,7 +19819,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-04T23:53") : ""
+          buildId: true ? String("yt-2026-11-05T00:21") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22771,6 +22778,22 @@ ${sourceCol}
     proto.__ytCrowdWrapped = true;
     const realEnqueue = proto.enqueue;
     let lastCrowdDiagAt = 0;
+    let crowdEma = 0;
+    let lastCrowdedAt = 0;
+    const realResolveBoost = proto._resolveEffectiveSpeedBoost;
+    if (typeof realResolveBoost === "function") {
+      proto._resolveEffectiveSpeedBoost = function(congestionBoost) {
+        const base = realResolveBoost.call(this, congestionBoost);
+        const extra = ytCrowdSpeedBoost(crowdEma, Date.now() - lastCrowdedAt);
+        const d = (
+          /** @type {any} */
+          this.diag
+        );
+        d.ytCrowdBoost = extra;
+        if (extra > base) d.ytCrowdBoostTotal = (Number(d.ytCrowdBoostTotal) || 0) + 1;
+        return Math.max(base, extra);
+      };
+    }
     proto.enqueue = function(items) {
       if (!Array.isArray(items)) return realEnqueue.call(this, items);
       const keep = [];
@@ -22788,7 +22811,12 @@ ${sourceCol}
           this.diag
         );
         d.ytCommentTotal = (Number(d.ytCommentTotal) || 0) + 1;
-        if (queueLength >= YT_VOICE_CROWD_QUEUE) d.ytCrowdedTotal = (Number(d.ytCrowdedTotal) || 0) + 1;
+        const crowdedNow = queueLength >= YT_VOICE_CROWD_QUEUE;
+        if (crowdedNow) {
+          d.ytCrowdedTotal = (Number(d.ytCrowdedTotal) || 0) + 1;
+          lastCrowdedAt = Date.now();
+        }
+        crowdEma = crowdEma * 0.9 + (crowdedNow ? 0.1 : 0);
         if (important) {
           d.ytReason = d.ytReason || {};
           d.ytReason[reason] = (Number(d.ytReason[reason]) || 0) + 1;
@@ -22820,6 +22848,12 @@ ${sourceCol}
               ) || 0, crowdedTotal: Number(
                 /** @type {any} */
                 this.diag.ytCrowdedTotal
+              ) || 0, crowdEma: Math.round(crowdEma * 100) / 100, crowdBoost: Number(
+                /** @type {any} */
+                this.diag.ytCrowdBoost
+              ) || 0, crowdBoostTotal: Number(
+                /** @type {any} */
+                this.diag.ytCrowdBoostTotal
               ) || 0, reasons: { .../** @type {any} */
               this.diag.ytReason } }
             }).catch(() => {
