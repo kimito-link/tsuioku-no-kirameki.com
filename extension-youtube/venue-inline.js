@@ -2,7 +2,7 @@
 /* eslint-disable */
 (() => {
   // extension-youtube/src/ytDefaultIcon.js
-  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v4";
+  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v5";
   function ytIconColorStats(rgba, w, h) {
     const counts = /* @__PURE__ */ new Map();
     const cx = (w - 1) / 2;
@@ -18,7 +18,7 @@
         total += 1;
       }
     }
-    if (!total) return { t1: 0, c5: 0, bgSat: 0, bgKey: 0 };
+    if (!total) return { t1: 0, c5: 0, bgSat: 0, bgKey: 0, tone: 0 };
     let max = 0;
     let maxKey = 0;
     let c5 = 0;
@@ -30,12 +30,36 @@
       if (n / total >= 5e-3) c5 += 1;
     }
     const ch = [maxKey >> 8 & 15, maxKey >> 4 & 15, maxKey & 15];
-    return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey };
+    return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey, tone: ytIconWhiteInkTone(rgba, w, h, maxKey) };
+  }
+  function ytIconWhiteInkTone(rgba, w, h, bgKey) {
+    const bg = [(bgKey >> 8 & 15) * 16 + 8, (bgKey >> 4 & 15) * 16 + 8, (bgKey & 15) * 16 + 8];
+    const v = [255 - bg[0], 255 - bg[1], 255 - bg[2]];
+    const vv = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+    const cx = (w - 1) / 2;
+    const cy = (h - 1) / 2;
+    const r = Math.min(w, h) * 0.45;
+    let total = 0;
+    let near = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+        const i = (y * w + x) * 4;
+        const d = [rgba[i] - bg[0], rgba[i + 1] - bg[1], rgba[i + 2] - bg[2]];
+        const t = vv > 0 ? Math.min(1, Math.max(0, (d[0] * v[0] + d[1] * v[1] + d[2] * v[2]) / vv)) : 0;
+        const e0 = d[0] - t * v[0];
+        const e1 = d[1] - t * v[1];
+        const e2 = d[2] - t * v[2];
+        total += 1;
+        if (e0 * e0 + e1 * e1 + e2 * e2 <= 24 * 24) near += 1;
+      }
+    }
+    return total ? near / total : 0;
   }
   function ytLooksLikeDefaultLetterIcon(url, stats) {
     const k = Number(stats.bgKey) || 0;
     const nearWhite = (k >> 8 & 15) >= 12 && (k >> 4 & 15) >= 12 && (k & 15) >= 12;
-    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.62 && !nearWhite;
+    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.4 && Number(stats.tone) >= 0.98 && !nearWhite;
   }
   function ytIconSilhouetteIoU(rgba, w, h, bgKey) {
     const bg = [(bgKey >> 8 & 15) * 16 + 8, (bgKey >> 4 & 15) * 16 + 8, (bgKey & 15) * 16 + 8];
@@ -20174,7 +20198,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T06:25") : ""
+          buildId: true ? String("yt-2026-11-05T06:43") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
