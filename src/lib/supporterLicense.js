@@ -30,19 +30,22 @@ export const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
 export const LICENSE_TTL_MS = 35 * 24 * 60 * 60 * 1000;
 
 /**
- * 関所を閉めるか。★false のあいだは誰でもマーケ HTML を使える(第4段で true にする)。
+ * 関所を閉めるか。★v0.1.1897(第4段・りんく「ぜんぶやって」2026-11-06)で true にした。
+ *   閉めても、初めてマーケ HTML を開いた日から14日はお試しで開ける(今の利用者も同じ)。
  *   サーバー側の止め方は api/billing.js の SUPPORTER_GATE 環境変数ではなく、ここ=拡張の版で決める
  *   (拡張はサーバーに聞かずに判定するので、止めたいときは版を出す。緊急時は公開鍵を外さずに false の版を出す)。
  */
-export const SUPPORTER_GATE_ENFORCED = false;
+export const SUPPORTER_GATE_ENFORCED = true;
 
 /**
  * 拡張に入れる公開鍵(kid → JWK の x)。★秘密鍵は Vercel の環境変数 LICENSE_SIGNING_JWK だけに置く。
  *   鍵を替えるときは新しい kid を足し、古い kid は消さない(配った証明書が切れるまで=最低 LICENSE_TTL_MS)。
- *   第4段で本番の鍵を作って入れる(いまは空=どの証明書も unknown_key。関所が開いている間は影響なし)。
+ *   k2026a = 最初の本番の鍵(v0.1.1897・2026-11-06 作成)。秘密鍵は Vercel の LICENSE_SIGNING_JWK にだけある。
  * @type {Readonly<Record<string, string>>}
  */
-export const LICENSE_PUBLIC_KEYS = Object.freeze({});
+export const LICENSE_PUBLIC_KEYS = Object.freeze({
+  k2026a: '9Gc8DLqkTI0hJLszRwsTPUGQvItGyZeD9yuM8w6T5fI'
+});
 
 /** 利用者がコピーして拡張に入れる「サポーターのコード」の形(base64url 32〜64文字)。 */
 const SUPPORTER_CODE_RE = /^[A-Za-z0-9_-]{32,64}$/;
