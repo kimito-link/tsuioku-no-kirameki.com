@@ -2,7 +2,7 @@
 /* eslint-disable */
 (() => {
   // extension-youtube/src/ytDefaultIcon.js
-  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v1";
+  var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v2";
   function ytIconColorStats(rgba, w, h) {
     const counts = /* @__PURE__ */ new Map();
     const cx = (w - 1) / 2;
@@ -18,17 +18,22 @@
         total += 1;
       }
     }
-    if (!total) return { t1: 0, c5: 0 };
+    if (!total) return { t1: 0, c5: 0, bgSat: 0 };
     let max = 0;
+    let maxKey = 0;
     let c5 = 0;
-    for (const n2 of counts.values()) {
-      if (n2 > max) max = n2;
+    for (const [k, n2] of counts) {
+      if (n2 > max) {
+        max = n2;
+        maxKey = k;
+      }
       if (n2 / total >= 5e-3) c5 += 1;
     }
-    return { t1: max / total, c5 };
+    const ch = [maxKey >> 8 & 15, maxKey >> 4 & 15, maxKey & 15];
+    return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch) };
   }
   function ytLooksLikeDefaultLetterIcon(url, stats) {
-    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.8 && stats.c5 <= 6;
+    return /\/ytc\//.test(String(url || "")) && stats.t1 >= 0.62 && stats.bgSat >= 5;
   }
   function ytIconCacheKey(url) {
     return String(url || "").replace(/=s\d+[^/]*$/, "");
@@ -46579,7 +46584,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T05:26" ? String("yt-2026-11-05T05:26") : "dev";
+      const buildId = "yt-2026-11-05T05:27" ? String("yt-2026-11-05T05:27") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46597,7 +46602,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.100") : "";
+    const bundledVersion = true ? String("0.1.101") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46642,7 +46647,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T05:26" ? String("yt-2026-11-05T05:26") : "dev";
+            return "yt-2026-11-05T05:27" ? String("yt-2026-11-05T05:27") : "dev";
           } catch {
             return "dev";
           }

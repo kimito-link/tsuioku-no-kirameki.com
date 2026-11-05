@@ -9,7 +9,7 @@ function img(f, w = 64, h = 64) {
 }
 const YTC = 'https://yt4.ggpht.com/ytc/AIdro_abc=s64-c-k-c0x00ffffff-no-rj';
 
-describe('最初からの文字アイコンを見分ける(0.1.99)', () => {
+describe('最初からの文字アイコンを見分ける(0.1.101)', () => {
   it('単色の丸に白い1文字 → 文字アイコン', () => {
     const a = img((x, y) => (x > 26 && x < 38 && y > 20 && y < 44 ? [255, 255, 255] : [0, 120, 200]));
     const s = ytIconColorStats(a, 64, 64);
@@ -19,6 +19,16 @@ describe('最初からの文字アイコンを見分ける(0.1.99)', () => {
   it('色の多い写真 → 自分で設定した人', () => {
     const a = img((x, y) => [(x * 4) & 255, (y * 4) & 255, ((x + y) * 3) & 255]);
     expect(ytLooksLikeDefaultLetterIcon(YTC, ytIconColorStats(a, 64, 64))).toBe(false);
+  });
+  it('白い背景に字(書道など)は文字アイコンにしない', () => {
+    const a = img((x, y) => (x > 20 && x < 44 && y > 16 && y < 48 && (x + y) % 3 === 0 ? [20, 20, 20] : [250, 250, 250]));
+    expect(ytLooksLikeDefaultLetterIcon(YTC, ytIconColorStats(a, 64, 64))).toBe(false);
+  });
+  it('2文字・画数の多い字(背景の割合が 0.8 未満)も文字アイコン', () => {
+    const a = img((x, y) => (x > 8 && x < 56 && y > 12 && y < 52 && (x + y) % 2 === 0 ? [255, 255, 255] : [230, 60, 120]));
+    const s = ytIconColorStats(a, 64, 64);
+    expect(s.t1).toBeLessThan(0.8);
+    expect(ytLooksLikeDefaultLetterIcon(YTC, s)).toBe(true);
   });
   it('/ytc/ が無い URL は単色でも文字アイコンにしない', () => {
     const a = img(() => [0, 120, 200]);
