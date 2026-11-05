@@ -85,8 +85,8 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   bgInitYieldTotal: number,    // もう片方のページが使用中で裏の読み込みを見送った回数(v0.1.1781)
  *   readerYieldTotal: number,    // 同じ配信をもう片方のページが読んでいるので読まなかったコメント数(v0.1.1794)
  *   ngMutedTotal: number,        // v0.1.1812: コメビュで NG にした人なので読まなかったコメント数(会場)
- *   busySkipTotal: number,       // v0.1.1860: 混雑(待ち2件以上)で大事でないので読まなかったコメント数(吹き出しだけ)
- *   busyImportantTotal: number,  // v0.1.1860: 混雑中でも大事なもの(ギフト・広告・配信者・初コメ)として読む列に入れた数
+ *   busySkipTotal: number,       // v0.1.1861: 混雑(待ち2件以上)で大事でないので読まなかったコメント数(吹き出しだけ)
+ *   busyImportantTotal: number,  // v0.1.1861: 混雑中でも大事なもの(ギフト・広告・配信者・初コメ)として読む列に入れた数
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
  *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数

@@ -26,7 +26,7 @@ export function pushVoiceQueue(queue, item, { max = 5, keep } = {}) {
   const limit = Number.isFinite(rawMax) ? Math.max(0, Math.floor(rawMax)) : 5;
   const dropCount = Math.max(0, current.length - limit);
   if (dropCount === 0) return { queue: current, dropped: [] };
-  // v0.1.1860: 捨てる順は「ふつうの件の古い順」→「優先(ギフト・広告)の古い順」。優先の件は列の前に
+  // v0.1.1861: 捨てる順は「ふつうの件の古い順」→「優先(ギフト・広告)の古い順」。優先の件は列の前に
   //   入るため、これまでは溢れた瞬間に届いたばかりのギフトから捨てていた(混雑時ほど大事なものが消える)。
   //   keep(x) が true の件・今入れた件は捨てない(守る件が多ければ上限を少し超えて残る)。
   //   keep が無いときだけ、最後の手段として今入れた件も捨ててよい(上限 0 等・従来どおり有界)。

@@ -207,9 +207,9 @@ const VOICE_ASSIGNMENTS_KEY = KEY_VOICE_ASSIGNMENTS;
 const VOICE_READ_NAME_KEY = KEY_VOICE_READ_NAME_ENABLED;
 
 let _liveId = '';
-/** v0.1.1860: 配信者(混雑時でも読む)。content が書く nls_live_broadcaster_ctx_v1 の写し。 */
+/** v0.1.1861: 配信者(混雑時でも読む)。content が書く nls_live_broadcaster_ctx_v1 の写し。 */
 let _broadcasterCtx = normalizeBroadcasterCtx(null);
-/** v0.1.1860: 「その配信で初めてのコメント」を覚える(会場 VoicePlayer と同じ部品)。 */
+/** v0.1.1861: 「その配信で初めてのコメント」を覚える(会場 VoicePlayer と同じ部品)。 */
 const _voiceFirstSpeakerState = createVoiceFirstSpeakerState();
 /** 今の配信の配信者 uid(別の配信の記録なら空)。 */
 function broadcasterUidForVoice() {
@@ -1213,7 +1213,7 @@ function enqueueVoiceTimelineItems(items) {
     }
     _voiceArrivalWindow = foldVoiceArrivalWindow(_voiceArrivalWindow, Date.now(), 1);
     _voiceDiag.arrivalPerMin = _voiceArrivalWindow.arrivalPerMin;
-    // v0.1.1860: 混雑(読み上げ待ち2件以上)のときは大事なもの(ギフト・広告・配信者・その配信で
+    // v0.1.1861: 混雑(読み上げ待ち2件以上)のときは大事なもの(ギフト・広告・配信者・その配信で
     //   初めてのコメント)だけ読む。吹き出し・一覧はそのまま(会場 VoicePlayer と同じ部品)。
     const userKey = voiceUserKeyForItem(item);
     const importance = classifyVoiceImportance({
