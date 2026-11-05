@@ -97,7 +97,7 @@ export function ytWordingTopFanToSuperChatRank(text) {
  * @returns {string}
  */
 export function ytWordingSuperChatRankToTopFan(text) {
-  let out = String(text ?? '');
+  const out = String(text ?? '');
   if (!/スパチャの合計順|スーパーチャット・ギフトの合計の順位/.test(out)) return out;
   return swapOnce(out, SUPERCHAT_RANK_RULES, TOP_FAN_RULES);
 }

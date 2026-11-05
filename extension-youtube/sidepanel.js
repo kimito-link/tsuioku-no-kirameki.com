@@ -780,7 +780,7 @@ ${sourceCol}
     return out.replace(/(\d[\d,]*) XP\b/g, "$1 pt");
   }
   function ytWordingSuperChatRankToTopFan(text) {
-    let out = String(text ?? "");
+    const out = String(text ?? "");
     if (!/スパチャの合計順|スーパーチャット・ギフトの合計の順位/.test(out)) return out;
     return swapOnce(out, SUPERCHAT_RANK_RULES, TOP_FAN_RULES);
   }
@@ -46413,7 +46413,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T03:09" ? String("yt-2026-11-05T03:09") : "dev";
+      const buildId = "yt-2026-11-05T03:14" ? String("yt-2026-11-05T03:14") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46476,7 +46476,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T03:09" ? String("yt-2026-11-05T03:09") : "dev";
+            return "yt-2026-11-05T03:14" ? String("yt-2026-11-05T03:14") : "dev";
           } catch {
             return "dev";
           }

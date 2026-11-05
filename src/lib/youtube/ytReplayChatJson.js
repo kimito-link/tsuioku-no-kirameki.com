@@ -56,7 +56,7 @@ export function ytReplayItemToRecord(item) {
     ['liveChatSponsorshipsGiftPurchaseAnnouncementRenderer', 'membership_gift'],
   ];
   for (const [key, kind] of kinds) {
-    let r = item[key];
+    const r = item[key];
     if (!r) continue;
     // メンバーシップのギフトは中身が header の下にある
     const head = kind === 'membership_gift' ? r?.header?.liveChatSponsorshipsHeaderRenderer || {} : r;
