@@ -114,7 +114,7 @@ export function readGiftItems(doc, opts = {}) {
  * @returns {boolean}
  */
 export function pressGiftItem(doc, key) {
-  const hit = readGiftItems(doc).find((it) => it.key === key);
+  const hit = readGiftItems(doc, { max: 400 }).find((it) => it.key === key); // v0.1.1881: 帯は安い順で欄の奥の方のアイテムが多い(既定の40件で切ると見つからなかった)
   if (!hit) return false;
   const target =
     /** @type {HTMLElement | null} */ (hit.el.querySelector('img')?.closest('button, a, [role="button"], [tabindex]')) ||
@@ -122,6 +122,7 @@ export function pressGiftItem(doc, key) {
     /** @type {HTMLElement | null} */ (hit.el.querySelector('button, [role="button"]')) ||
     /** @type {HTMLElement} */ (hit.el);
   if (/贈る|購入|送る/.test(leafText(target)) && !/pt/.test(leafText(target))) return false; // 確認の「贈る」を誤って押さない
+  try { target.scrollIntoView({ block: 'center' }); } catch { /* 送れなくても押す */ }
   target.click();
   return true;
 }
@@ -280,6 +281,7 @@ export function startGiftItemsPublisher(win, store) {
       try { ok = pressGiftItem(doc, req.key); } catch { ok = false; }
       if (!ok) mo?.disconnect();
       if (!ok && left > 0) win.setTimeout(step, 300);
+      if (!ok && left <= 0) void store.set({ [GIFT_ITEM_PRESS_RESULT_KEY]: { at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: false, confirmed: false } }); // 見つからなかったことも残す(会場に「見つかりません」と出す)
       if (ok) {
         /** @type {{ confirmed: boolean, confirmText: string }} */
         const conf = { confirmed: false, confirmText: '' };
@@ -305,7 +307,7 @@ export function startGiftItemsPublisher(win, store) {
           const shown = added.filter((el) => el.isConnected && (() => { const r = el.getBoundingClientRect(); return r.width >= 100 && r.height >= 40; })());
           void store.set({
             [GIFT_ITEM_PRESS_RESULT_KEY]: {
-              at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, ...conf,
+              at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, ...conf,
               shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
               head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160)
             }

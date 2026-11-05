@@ -248,10 +248,10 @@ export function startGiftItemsTabResponder(win, onStorageChanged) {
 /**
  * v0.1.1875: 会場に公式ギフト欄と同じアイテムを並べる帯(りんく 2026-11-05 の選択「アイテムを並べ確認は公式」)。
  *   並びは公式のギフト欄を一度開いたときに読んだもの(画像と pt)。押すと会場をしまい、公式の欄で同じアイテムを押す。
- *   贈るかどうかの確認は公式の画面で本人がする(拡張は確認の「贈る」を押さない)。並びがまだ無ければ帯は出さない。
+ *   v0.1.1881: 2回押し(既定)も会場のまま贈る。1回目は「贈る?」、3秒以内の2回目でアイテムと公式の確認の「贈る」を押す(りんく「2回押すといろんなページに飛ぶ」)。並びがまだ無ければ帯は出さない。
  *   v0.1.1879: 設定「1回で贈る」(既定オフ・帯の端の「1回」で切り替え)がオンの人は、1回押すと会場のまま公式の確認まで押して贈る
  *   (りんく 2026-11-05 の選択)。贈れたら「贈りました」、確認が見つからなければ会場をしまって公式の欄を見せる。続けて押しても2秒は受けない。
- * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean }> | { ok?: boolean, reason?: string, sent?: boolean }, tuck?: (on: boolean, note?: string) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
+ * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean }> | { ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean }, tuck?: (on: boolean, note?: string) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
  * @returns {HTMLSpanElement}
  */
 export function createVenueGiftStrip(opts) {
@@ -268,12 +268,12 @@ export function createVenueGiftStrip(opts) {
   const paintMode = () => {
     for (const b of strip.querySelectorAll('.nlsb-gift-item')) {
       const base = String(b.getAttribute('data-label') || '');
-      /** @type {HTMLElement} */ (b).title = direct ? `${base}(1回押すとすぐ贈ります・ポイントが使われます)` : `${base}(2回押すと公式のギフト欄でこのアイテムを選びます。贈るのは公式の「贈る」を押したとき)`;
+      /** @type {HTMLElement} */ (b).title = direct ? `${base}(1回押すとすぐ贈ります・ポイントが使われます)` : `${base}(2回押すと会場のまま贈ります・1回目は「贈る?」と出るだけ)`;
     }
     if (!modeBtn) return;
     modeBtn.textContent = direct ? '1回' : '2回';
     modeBtn.setAttribute('aria-pressed', direct ? 'true' : 'false');
-    modeBtn.title = direct ? '1回押すとすぐ贈ります(押すと2回押しに戻す)' : '2回押してから公式の欄で選びます(押すと「1回で贈る」にする)';
+    modeBtn.title = direct ? '1回押すとすぐ贈ります(押すと2回押しに戻す)' : '2回押すと贈ります(押すと「1回で贈る」にする)';
     modeBtn.style.background = direct ? '#c0392b' : '';
     modeBtn.style.color = direct ? '#fff' : '';
   };
@@ -315,40 +315,37 @@ export function createVenueGiftStrip(opts) {
       pt.style.cssText = 'font-size:10px;white-space:nowrap';
       b.append(pt);
       const label = `${it.name ? it.name + ' ' : ''}${it.pt.replace(/\s+/g, '')}`;
-      b.addEventListener('click', async () => {
-        if (direct) {
-          if (Date.now() < busyUntil) return; // 続けて押しても二重に贈らない
-          busyUntil = Date.now() + 2000;
-          pt.textContent = '…';
-          let res = null;
-          try { res = await opts.press(it.key, { direct: true }); } catch { res = null; }
-          if (res && res.ok && res.sent) {
-            pt.textContent = '贈りました';
-          } else if (res && res.ok) {
-            try { opts.tuck?.(true, `「${label}」を公式のギフト欄で選びましたが、確認の「贈る」が見つかりませんでした。贈られたかは欄の「履歴」で確かめてください。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
-            pt.textContent = '公式で確認';
-          } else {
-            pt.textContent = '開けません';
-          }
-          setTimeout(() => { pt.textContent = it.pt.replace(/\s+/g, ''); }, 3000);
-          return;
+      const send = async () => {
+        if (Date.now() < busyUntil) return; // 続けて押しても二重に贈らない
+        busyUntil = Date.now() + 15000; // 結果が返るまで(最長10秒)は受けない
+        pt.textContent = '…';
+        let res = null;
+        try { res = await opts.press(it.key, { direct: true }); } catch { res = null; }
+        if (res && res.ok && res.sent) {
+          pt.textContent = '贈りました';
+        } else if (res && res.notFound) {
+          pt.textContent = '見つかりません'; // 公式の欄にこのアイテムが無かった(何も押していない)
+        } else if (res && res.ok) {
+          try { opts.tuck?.(true, `「${label}」を公式のギフト欄で選びましたが、確認の「贈る」が見つかりませんでした。贈られたかは欄の「履歴」で確かめてください。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
+          pt.textContent = '公式で確認';
+        } else {
+          pt.textContent = '開けません';
         }
-        // v0.1.1878: 2回押しで進む(1回目は「もう一度で選ぶ」と出すだけ)。公式の欄がアイテムを押した時点で贈る作りでも、会場で1回の誤タップでは贈られないように
+        busyUntil = Date.now() + 2000;
+        setTimeout(() => { pt.textContent = it.pt.replace(/\s+/g, ''); }, 3000);
+      };
+      b.addEventListener('click', async () => {
+        if (direct) { await send(); return; }
+        // v0.1.1881: 2回押しも会場のまま贈る(1回目は「贈る?」と出すだけ・3秒以内の2回目で贈る)。
+        //   以前は2回目で公式の欄へ飛ばしていたが、りんく「2回押すといろんなページに飛ぶのでアイテムを並べる意味をなしていない」
         if (armed !== it.key) {
           armed = it.key;
-          pt.textContent = 'もう一度';
+          pt.textContent = '贈る?';
           setTimeout(() => { if (armed === it.key) { armed = ''; pt.textContent = it.pt.replace(/\s+/g, ''); } }, 3000);
           return;
         }
         armed = '';
-        pt.textContent = it.pt.replace(/\s+/g, '');
-        try { opts.tuck?.(true, `会場の帯で選んだ「${label}」を公式のギフト欄で選びました。贈るなら右の欄で確かめて「贈る」を押してください(帯の右端を「1回」にすると会場から1回で贈れます)。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても押すのは試す */ }
-        let res = null;
-        try { res = await opts.press(it.key); } catch { res = null; }
-        if (res && res.ok) return;
-        try { opts.tuck?.(false); } catch { /* 戻せなくても一言は出す */ }
-        pt.textContent = '開けません';
-        setTimeout(() => { pt.textContent = it.pt.replace(/\s+/g, ''); }, 3000);
+        await send();
       });
       strip.append(b);
     }

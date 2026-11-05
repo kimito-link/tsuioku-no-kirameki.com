@@ -96,7 +96,7 @@ describe('子の窓と放送ページのやりとり', () => {
     /** @type {HTMLButtonElement} */ (btns[1]).click();
     await new Promise((r) => setTimeout(r, 50));
     expect(store.data[GIFT_ITEM_PRESS_REQ_KEY]).toBeUndefined(); // 1回目は押さない
-    expect(btns[1].textContent).toMatch(/もう一度/);
+    expect(btns[1].textContent).toMatch(/贈る\?/);
     /** @type {HTMLButtonElement} */ (btns[1]).click();
     await new Promise((r) => setTimeout(r, 900));
     expect(store.data[GIFT_ITEM_PRESS_REQ_KEY].key).toBe('ハゲ|500pt');
@@ -169,4 +169,16 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
     expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].confirmed).toBe(true);
     expect(item.textContent).toMatch(/贈りました/);
   }, 10000);
+});
+
+describe('帯のアイテムが公式の欄の奥にあっても押せる', () => {
+  it('41件目より後ろのアイテムも見つけて押す', () => {
+    const cards = Array.from({ length: 60 }, (_, i) => `<div class="card" data-id="${i}"><img src="https://cdn.example/${i}.png" alt="品${i}"><p class="price"><span>${1000 + i}</span><small>pt</small></p></div>`).join('');
+    document.body.innerHTML = `<div class="grid">${cards}</div>`;
+    /** @type {string[]} */
+    const hit = [];
+    for (const c of document.querySelectorAll('.card')) c.addEventListener('click', () => { hit.push(String(c.getAttribute('data-id'))); });
+    expect(pressGiftItem(document, '品55|1055pt')).toBe(true);
+    expect(hit).toEqual(['55']);
+  });
 });
