@@ -1054,8 +1054,11 @@ function setupSuperChatOpenBridge() {
           }
           mo.disconnect();
           diag.changed = [...added].slice(0, 12).map((el) => el.localName + (el.id ? '#' + el.id : ''));
+          diag.unconfirmed = true;
           saveDiag();
-          return { ok: false, reason: 'no-superchat-panel:' + diag.picked };
+          // 0.1.118: 正しいボタンを押せたなら、開いたのを見つけられなくても成功扱い(会場を戻すと開いた画面を隠してしまう・りんく 11-05)。
+          //   会場へは「▲ 会場に戻る」で戻れる。見つけられなかった記録は yt_diag_superchat.unconfirmed に残す。
+          return { ok: true, unconfirmed: true };
         })()
           .then((r) => sendResponse(r))
           .catch((e) => sendResponse({ ok: false, reason: String(e) }));
