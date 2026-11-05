@@ -30,3 +30,15 @@ describe('canAppendStoryGrowthCells', () => {
     expect(canAppendStoryGrowthCells({ ...ok, renderedCount: undefined })).toBe(false);
   });
 });
+
+describe('canTrimStoryGrowthCells (v0.1.1877)', () => {
+  it('同じ並びで少し減るときは末尾を削ってよい', async () => {
+    const { canTrimStoryGrowthCells } = await import('./storyGrowthAppendPlan.js');
+    expect(canTrimStoryGrowthCells({ renderedCount: 58, targetCount: 57, domCount: 58, sourceOffset: 0 })).toBe(true);
+    expect(canTrimStoryGrowthCells({ renderedCount: 58, targetCount: 0, domCount: 58, sourceOffset: 0 })).toBe(false);
+    expect(canTrimStoryGrowthCells({ renderedCount: 58, targetCount: 58, domCount: 58, sourceOffset: 0 })).toBe(false);
+    expect(canTrimStoryGrowthCells({ renderedCount: 58, targetCount: 57, domCount: 50, sourceOffset: 0 })).toBe(false);
+    expect(canTrimStoryGrowthCells({ renderedCount: 58, targetCount: 57, domCount: 58, sourceOffset: 3 })).toBe(false);
+    expect(canTrimStoryGrowthCells(null)).toBe(false);
+  });
+});
