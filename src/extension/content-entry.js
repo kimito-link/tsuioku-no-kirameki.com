@@ -7,6 +7,7 @@ import {
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
 import { mountVenueBarButton } from './venueBar.js';
+import { openOfficialGiftPanel } from '../lib/venueComposeBox.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -14316,7 +14317,7 @@ async function start() {
    */
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
     // v0.1.1867: 会場から発言(パネルの「コメント送信」と同じ postCommentFromContentAsync で公式コメント欄へ送る)
-    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }) });
+    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }), openGift: async () => openOfficialGiftPanel(document) });
   }
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();

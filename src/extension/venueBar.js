@@ -375,7 +375,7 @@ import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
-import { createVenueComposeBox } from '../lib/venueComposeBox.js';
+import { createVenueComposeBox, createVenueGiftButton } from '../lib/venueComposeBox.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -2629,7 +2629,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean }>, giftLabel?: string }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -2842,6 +2842,7 @@ export function mountVenueBarButton(options = {}) {
     tuckBtn.title = 'コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます';
     tuckBtn.addEventListener('click', () => setTucked(true));
   }
+  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, tuck: (on) => setTucked(on) }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
   const composeBox = !isStandalone && typeof options.postComment === 'function' ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null; // v0.1.1867 会場から発言(lib の venueComposeBox.js)
   const note = document.createElement('div');
   note.className = 'nlsb-note';
@@ -2850,9 +2851,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(composeBox ? [composeBox] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+    headerRight.append(...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
   } else {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
+    headerRight.append(...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
   header.append(title, ...(composeBox ? [composeBox] : []), headerRight); // v0.1.1868 発言欄は中央
 
