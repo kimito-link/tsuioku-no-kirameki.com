@@ -973,6 +973,8 @@
       audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
       audioQuery.outputSamplingRate = _outputSamplingRate;
       audioQuery.outputStereo = false;
+      audioQuery.prePhonemeLength = 0.05;
+      audioQuery.postPhonemeLength = 0.05;
       const queryMs = nowMs() - queryStartAt;
       stage = "synth";
       const synthStartAt = nowMs();
@@ -1103,7 +1105,7 @@
   // src/lib/voiceLightFallback.js
   var LIGHT_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
   var LIGHT_VOICE_MAX_CHARS = 60;
-  var LIGHT_VOICE_PROBE_INTERVAL_MS = 3e4;
+  var LIGHT_VOICE_PROBE_INTERVAL_MS = 6e3;
   var LIGHT_VOICE_PROBE_TEXT = "てすと";
   function shouldUseLightVoice(s) {
     return !!s && s.setting !== "off" && s.available === true && s.overloaded === true;

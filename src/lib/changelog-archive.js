@@ -24,6 +24,22 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1838',
+    date: '2026-10-31',
+    summary: 'ギフト一覧で出ていた拡張のエラーを止める',
+    items: Object.freeze([
+      'ギフトの投げ一覧を描くたびに、拡張機能の管理画面へ「Content Security Policy」のエラーが積もっていました。アイコンが読めないときの差し替えを安全設定に沿った書き方に直し、エラーが出ないようにしました。読めないアイコンは公式の既定アイコンになります。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1837',
+    date: '2026-10-31',
+    summary: 'コメントを流す間は画面を消さない',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1836',
     date: '2026-10-31',
     summary: 'つなぎ直しで同じコメントが二重に出ないように',

@@ -20425,11 +20425,30 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.1866",
+      date: "2026-11-05",
+      summary: "読み上げのテンポと遅れ表示の直し",
+      items: Object.freeze([
+        "読み上げの声の前後の無音を短くしました(1件あたり約0.1秒短く、テンポよく読みます)。",
+        "VOICEVOX が混んで軽い声に切り替わったあと、元の声に戻るまでの時間を短くしました(約2分半→約30秒)。",
+        "読み上げ待ちが0件なのに「読み上げが約○秒遅れています」と出ることがあったのを直しました(会場を開いた瞬間の分を遅れに数えていました)。"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.1863",
       date: "2026-11-05",
       summary: "りんく欄を元の決まりに戻す",
       items: Object.freeze([
         "りんく欄に、ギフトか広告を送った人しか出ていませんでした(10月14日の v0.1.1621 から)。元の決まりに戻し、コメントだけの人でも、IDと本人のサムネが分かればりんく欄に出るようにしました。ギフトや広告を送った人も、今までどおりりんく欄に入ります。"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.1861",
+      date: "2026-11-04",
+      summary: "混んだら大事なコメントだけ読み上げる",
+      items: Object.freeze([
+        "読み上げが追いつかず待ちが2件以上たまっているときは、大事なものだけ読むようにしました。大事なもの=ギフト・ニコニ広告・配信者のコメント・その配信で初めてコメントした人。それ以外のコメントは吹き出しや一覧には出ますが、声は飛ばします。混んでいないときは今までどおり全部読みます(会場とコメビュの両方)。",
+        "待ちがあふれたとき、届いたばかりのギフト・広告の読み上げから先に捨ててしまうことがありました。ふつうのコメントから先に捨てるようにしました。"
       ])
     }),
     Object.freeze({
@@ -20577,22 +20596,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       summary: "イベント欄の拡張のエラーも止める",
       items: Object.freeze([
         "イベントに参加している配信で、順位の欄にあるりんくの絵の書き方が安全設定に止められ、拡張機能の管理画面にエラーが積もっていました。ギフト一覧と同じ直し方で、エラーが出ないようにしました。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1838",
-      date: "2026-10-31",
-      summary: "ギフト一覧で出ていた拡張のエラーを止める",
-      items: Object.freeze([
-        "ギフトの投げ一覧を描くたびに、拡張機能の管理画面へ「Content Security Policy」のエラーが積もっていました。アイコンが読めないときの差し替えを安全設定に沿った書き方に直し、エラーが出ないようにしました。読めないアイコンは公式の既定アイコンになります。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1837",
-      date: "2026-10-31",
-      summary: "コメントを流す間は画面を消さない",
-      items: Object.freeze([
-        "iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。"
       ])
     })
   ]);
@@ -46615,7 +46618,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T05:57" ? String("yt-2026-11-05T05:57") : "dev";
+      const buildId = "yt-2026-11-05T06:25" ? String("yt-2026-11-05T06:25") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46633,7 +46636,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.105") : "";
+    const bundledVersion = true ? String("0.1.106") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46678,7 +46681,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T05:57" ? String("yt-2026-11-05T05:57") : "dev";
+            return "yt-2026-11-05T06:25" ? String("yt-2026-11-05T06:25") : "dev";
           } catch {
             return "dev";
           }
