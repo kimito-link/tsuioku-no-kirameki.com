@@ -321,7 +321,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 275</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 276</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -411,6 +411,7 @@
 - `src/lib/giftHistoryOfficialReconcile.js` — 北極星ギフト履歴: 公式番組累計 pt と履歴 API 合計の表示整合（v0.1.581）。
 - `src/lib/giftHistorySourcePreference.js` — ギフト履歴レーンの「どのデータ源を表示するか」を決める純関数（v0.1.395）。
 - `src/lib/giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
+- `src/lib/giftItemsMirror.js` — ニコ生の公式ギフト欄(gift.nicovideo.jp/…/purchase の子の窓)のアイテムを会場に並べるための読み取りと押下(v0.1.1875)。
 - `src/lib/giftLaneOfficialFill.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/giftPanelShape.js` — ニコ生の公式ギフト欄(番組ギフト)の作りを、読み取りだけで記録する計器(v0.1.1871)。
 - `src/lib/giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
@@ -1010,7 +1011,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 301</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1276,6 +1277,7 @@
 - `src/lib/storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
 - `src/lib/storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
 - `src/lib/storyGrowthAppendPlan.js` — 応援マス(グリッド)を「増えた分だけ足す」か「全部作り直す」かの判定(純関数・I/O禁止)。v0.1.1689
+- `src/lib/storyGrowthRebuildReasons.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない)
 - `src/lib/supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
 - `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
@@ -1319,6 +1321,9 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
+### 💾 記録件数 (1版)
+- `v0.1.1876` 2026-11-05 — 応援マスの作り直しの理由を計器に出す
+
 ### 🏟 会場・席 (12版)
 - `v0.1.1875` 2026-11-05 — 会場にギフトのアイテムを並べる
 - `v0.1.1874` 2026-11-05 — ギフト欄の中で番組ギフトのタブへ
@@ -1347,13 +1352,15 @@
 - `v0.1.1863` 2026-11-05 — りんく欄を元の決まりに戻す
 - `v0.1.1861` 2026-11-04 — 混んだら大事なコメントだけ読み上げる
 
-### 🔊 読み上げ (6版)
+### 🔊 読み上げ (5版)
 - `v0.1.1866` 2026-11-05 — 読み上げのテンポと遅れ表示の直し
 - `v0.1.1861` 2026-11-04 — 混んだら大事なコメントだけ読み上げる
 - `v0.1.1855` 2026-11-03 — 拡張の更新後に F5 しなくても動くように
 - `v0.1.1852` 2026-11-03 — GPU の案内をポップアップにも・会場で読みやすく
 - `v0.1.1851` 2026-11-03 — VOICEVOX が追いつかない間は PC の声で読む
-- `v0.1.1850` 2026-11-03 — 混んだ配信で読み上げが全く鳴らないのを修正
+
+### 🩺 診断・状態速報 (1版)
+- `v0.1.1876` 2026-11-05 — 応援マスの作り直しの理由を計器に出す
 
 ### ⚡ 描画・性能 (2版)
 - `v0.1.1857` 2026-11-03 — メディアキットを配信者ごとに・さらに軽く

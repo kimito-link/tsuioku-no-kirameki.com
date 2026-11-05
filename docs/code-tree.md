@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1109 件
+## ⚠️ 役割コメントが無いソース 9 / 1115 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -258,7 +258,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (364)
+- 📁 **docs/** (368)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -596,6 +596,10 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
+  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
@@ -1000,7 +1004,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2245)
+- 📁 **src/** (2254)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1302,7 +1306,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1969)
+  - 📁 **lib/** (1978)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1522,6 +1526,10 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -1885,6 +1893,8 @@
     - `giftHistorySourcePreference.test.js`
     - `giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
     - `giftHistoryViewModel.test.js`
+    - `giftItemsMirror.js` — ニコ生の公式ギフト欄(gift.nicovideo.jp/…/purchase の子の窓)のアイテムを会場に並べるための読み取りと押下(v0.1.1875)。
+    - `giftItemsMirror.test.js`
     - `giftLaneOfficialFill.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `giftLaneOfficialFill.test.js`
     - `giftLaneOfficialFillWiring.test.js`
@@ -2864,6 +2874,9 @@
     - `storyGrowthKeepFace.wiring.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
     - `storyGrowthLimits.test.js`
+    - `storyGrowthRebuildReasons.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない)
+    - `storyGrowthRebuildReasons.test.js`
+    - `storyGrowthRebuildReasons.wiring.test.js`
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
     - `storyLaneAvatarSrc.test.js`
     - `storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
