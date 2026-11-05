@@ -944,32 +944,74 @@ function setupSuperChatOpenBridge() {
           ...document.querySelectorAll('yt-live-chat-message-input-renderer'),
           ...(panel ? [panel] : []),
         ];
-        const sel = [
-          '#product-picker button',
-          '#picker-buttons button[aria-label*="Super Chat"]',
-          '#picker-buttons button[aria-label*="スーパーチャット"]',
-          'button[aria-label*="Super Chat"]',
-          'button[aria-label*="スーパーチャット"]',
-        ];
-        /** @type {HTMLElement | null} */
-        let btn = null;
+        const labelOf = (/** @type {Element} */ el) =>
+          String(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        /** @type {HTMLElement[]} */
+        const all = [];
         for (const scope of scopes) {
-          for (const q of sel) {
-            for (const el of scope.querySelectorAll(q)) {
-              if (el.closest('#reply-button, yt-live-chat-reply-button-view-model, yt-live-chat-item-list-renderer')) continue;
-              btn = /** @type {HTMLElement} */ (el);
-              break;
-            }
-            if (btn) break;
+          for (const el of scope.querySelectorAll('button, [role="button"]')) {
+            if (el.closest('#reply-button, yt-live-chat-reply-button-view-model, yt-live-chat-item-list-renderer')) continue;
+            if (!all.includes(/** @type {HTMLElement} */ (el))) all.push(/** @type {HTMLElement} */ (el));
           }
-          if (btn) break;
         }
+        // 0.1.115: りんく実機(ログイン中)で「押すと会場がしまうだけ」=何かのボタンは押せたが画面が開かなかった。
+        //   名前(aria-label)でスーパーチャット/購入のボタンを優先し、無ければ #product-picker の中。押したら開いたかを見る。
+        const SC_RE = /Super ?Chat|スーパーチャット|Super ?Sticker|スーパーステッカー|購入|Buy|\$|￥|¥/i;
+        const btn =
+          all.find((el) => SC_RE.test(labelOf(el))) ||
+          all.find((el) => !!el.closest('#product-picker')) ||
+          null;
+        const diag = {
+          at: Date.now(),
+          videoId: mine,
+          buttons: all.slice(0, 20).map((el) => ({
+            label: labelOf(el),
+            id: el.id || '',
+            parent: el.parentElement?.closest('[id]')?.id || '',
+            tag: el.parentElement?.localName || '',
+            w: Math.round(el.getBoundingClientRect().width),
+          })),
+          picked: btn ? labelOf(btn) || btn.closest('[id]')?.id || '?' : '',
+          opened: /** @type {string[]} */ ([]),
+        };
+        const saveDiag = () => {
+          try {
+            chrome.storage.local.set({ yt_diag_superchat: diag });
+          } catch {
+            // 記録できなくても続ける
+          }
+        };
         if (!btn) {
+          saveDiag();
           sendResponse({ ok: false, reason: 'no-superchat-button' });
           return undefined;
         }
+        // 押す前に見えていた「開く画面」の部品を数え、押したあと増えたかで開いたかを決める。
+        const OPEN_SEL =
+          'yt-live-chat-product-picker-renderer, yt-live-chat-message-buy-flow-renderer, [class*="buy-flow"], [class*="purchase"], tp-yt-paper-dialog, tp-yt-iron-dropdown, yt-sheet-view-model, ytd-popup-container *[role="dialog"], [role="dialog"]';
+        const visibleOpen = () =>
+          [...document.querySelectorAll(OPEN_SEL)].filter((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 40 && r.height > 40 && getComputedStyle(el).visibility !== 'hidden';
+          });
+        const before = new Set(visibleOpen());
         btn.click();
-        sendResponse({ ok: true });
+        (async () => {
+          for (let i = 0; i < 10; i += 1) {
+            await new Promise((r) => setTimeout(r, 150));
+            const fresh = visibleOpen().filter((el) => !before.has(el));
+            if (fresh.length) {
+              diag.opened = fresh.slice(0, 5).map((el) => el.localName + (el.id ? '#' + el.id : ''));
+              saveDiag();
+              return { ok: true };
+            }
+          }
+          saveDiag();
+          return { ok: false, reason: 'no-superchat-panel:' + diag.picked };
+        })()
+          .then((r) => sendResponse(r))
+          .catch((e) => sendResponse({ ok: false, reason: String(e) }));
+        return true;
       } catch (e) {
         sendResponse({ ok: false, reason: String(e) });
       }
