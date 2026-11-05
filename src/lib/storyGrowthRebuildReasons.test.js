@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   STORY_GROWTH_REBUILD_REASON as R,
   createStoryGrowthRebuildReasonState,
+  findStoryEntryDiff,
+  noteStoryEntryDiff,
   formatStoryGrowthRebuildReasons,
   noteStoryGrowthRebuildReason,
   noteStoryGrowthTarget
@@ -44,5 +46,28 @@ describe('storyGrowthRebuildReasons', () => {
     expect(s.recent.length).toBe(8);
     expect(s.targets.length).toBe(12);
     expect(s.counts[R.DOM_MISMATCH]).toBe(20);
+  });
+});
+
+describe('findStoryEntryDiff / noteStoryEntryDiff (v0.1.1877)', () => {
+  it('末尾に1件多い側と位置を返す', () => {
+    expect(findStoryEntryDiff(['a', 'b', 'c'], ['a', 'b'])).toEqual({ index: 2, extraIn: 'prev', atEnd: true });
+    expect(findStoryEntryDiff(['a', 'b'], ['a', 'b', 'c'])).toEqual({ index: 2, extraIn: 'next', atEnd: true });
+  });
+  it('途中に挟まった1件も見つける', () => {
+    expect(findStoryEntryDiff(['a', 'c'], ['a', 'x', 'c'])).toEqual({ index: 1, extraIn: 'next', atEnd: false });
+  });
+  it('同じ件数・大きく違うときは null', () => {
+    expect(findStoryEntryDiff(['a'], ['b'])).toBeNull();
+    expect(findStoryEntryDiff([], ['a', 'b', 'c'])).toBeNull();
+  });
+  it('余分な1件の特徴を数えて1行に出す。末尾だけ削るは作り直しに数えない', () => {
+    const s = createStoryGrowthRebuildReasonState();
+    noteStoryEntryDiff(s, '末尾・自分の投稿');
+    noteStoryEntryDiff(s, '末尾・自分の投稿');
+    noteStoryGrowthRebuildReason(s, { reason: R.TRIM, from: 58, to: 57, dom: 58 });
+    const line = formatStoryGrowthRebuildReasons(s, 0);
+    expect(line).toContain('応援マスの作り直し0回(末尾だけ削る1)');
+    expect(line).toContain('件数が揺れたときの余分な1件: 末尾・自分の投稿×2');
   });
 });
