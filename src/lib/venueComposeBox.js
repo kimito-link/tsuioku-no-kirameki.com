@@ -125,7 +125,7 @@ export function createVenueComposeBox(post, opts = {}) {
  *   押すと先に会場をしまい(公式の画面が会場の帯に隠れないように・PC 実測でギフト欄の下半分が隠れた)、公式のボタンを押す。
  *   買う・贈る操作は公式の画面で本人がする(拡張は画面を開くところまで)。公式のボタンが見つからなければ会場を戻して一言出す。
  * @param {() => Promise<{ ok?: boolean, reason?: string }> | { ok?: boolean, reason?: string }} openGift
- * @param {{ doc?: Document, label?: string, reasonText?: (reason: string) => string, tuck?: (on: boolean, note?: string) => void }} [opts]
+ * @param {{ doc?: Document, label?: string, reasonText?: (reason: string) => string, tuck?: (on: boolean, note?: string) => void, stripHint?: boolean }} [opts]
  * @returns {HTMLButtonElement}
  */
 export function createVenueGiftButton(openGift, opts = {}) {
@@ -137,7 +137,9 @@ export function createVenueGiftButton(openGift, opts = {}) {
   btn.textContent = label;
   btn.title = '公式のギフト画面を開きます(会場はいったんしまいます・右下の「▲ 会場に戻る」で戻せます)';
   btn.addEventListener('click', async () => {
-    try { opts.tuck?.(true, `公式の${label.replace(/^\S+\s/, '')}の画面を開きました。右の欄でアイテムを選び、公式の「贈る」を押すと贈れます(ここではまだ何も使っていません)。戻るときは右下の「▲ 会場に戻る」`); } catch { /* しまえなくても開くのは試す */ }
+    // v0.1.1885: 会場の帯にもアイテムが並ぶことを書く(りんく「でるけど それも説明ないと不親切」)。YouTube には帯が無いので opts.stripHint で切り替える
+    const tail = opts.stripHint ? '右下の「▲ 会場に戻る」で会場に戻ると、帯に同じアイテムが並び、会場のまま押して贈れます' : '戻るときは右下の「▲ 会場に戻る」';
+    try { opts.tuck?.(true, `公式の${label.replace(/^\S+\s/, '')}の画面を開きました(ここではまだ何も使っていません)。右の欄で選んで公式のボタンを押しても贈れます。${tail}`); } catch { /* しまえなくても開くのは試す */ }
     /** @type {{ ok?: boolean, reason?: string } | null} */
     let res = null;
     try { res = await openGift(); } catch { res = null; }
@@ -265,7 +267,13 @@ export function createVenueGiftStrip(opts) {
   let busyUntil = 0;
   /** @type {HTMLButtonElement | null} */
   let modeBtn = null;
+  // v0.1.1885: 帯の先頭に「どう押すと何が起きるか」を常に見える文字で出す(title はマウスを載せないと出ない)
+  const hint = doc.createElement('span');
+  hint.className = 'nlsb-gift-hint';
+  hint.style.cssText = 'flex:0 0 auto;font-size:10px;line-height:1.15;white-space:nowrap;opacity:.85';
   const paintMode = () => {
+    hint.textContent = direct ? '押すとすぐ贈る' : '2回押して贈る';
+    hint.title = direct ? 'アイテムを1回押すと、ポイントを使ってすぐ贈ります(手数料が足されます)' : 'アイテムを1回押すと「贈る?」と出ます。もう一度押すと、ポイントを使って贈ります(手数料が足されます)';
     for (const b of strip.querySelectorAll('.nlsb-gift-item')) {
       const base = String(b.getAttribute('data-label') || '');
       /** @type {HTMLElement} */ (b).title = direct ? `${base}(1回押すとすぐ贈ります・ポイントが使われます)` : `${base}(2回押すと会場のまま贈ります・1回目は「贈る?」と出るだけ)`;
@@ -291,7 +299,7 @@ export function createVenueGiftStrip(opts) {
     const next = JSON.stringify(items.map((it) => [it.key, it.img]));
     if (next === sig) return; // 同じ並びなら作り直さない(ちらつかせない)
     sig = next;
-    strip.replaceChildren();
+    strip.replaceChildren(hint);
     for (const it of items) {
       const b = doc.createElement('button');
       b.type = 'button';

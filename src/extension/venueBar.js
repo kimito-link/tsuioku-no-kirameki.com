@@ -2842,7 +2842,7 @@ export function mountVenueBarButton(options = {}) {
     tuckBtn.title = 'コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます';
     tuckBtn.addEventListener('click', () => setTucked(true));
   }
-  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on, note) => setTucked(on, note) }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
+  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on, note) => setTucked(on, note), stripHint: !!options.giftItems }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
   const giftStrip = !isStandalone && options.giftItems ? createVenueGiftStrip({ ...options.giftItems, tuck: (on, note) => setTucked(on, note) }) : null; // v0.1.1875 公式と同じアイテムの帯(lib の venueComposeBox.js)
   const composeBox = !isStandalone && typeof options.postComment === 'function' ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null; // v0.1.1867 会場から発言(lib の venueComposeBox.js)
   const note = document.createElement('div');
