@@ -1229,7 +1229,7 @@
               );
             }
           }
-          const SC_RE = /Super ?Chat|スーパーチャット|Super ?Sticker|スーパーステッカー|購入|Buy|\$|￥|¥/i;
+          const SC_RE = /をサポート|^Support|Super ?Chat|スーパーチャット|Super ?Sticker|スーパーステッカー|購入|Buy|\$|￥|¥/i;
           const btn = all.find((el) => SC_RE.test(labelOf(el))) || all.find((el) => !!el.closest("#product-picker")) || null;
           const diag = {
             at: Date.now(),
@@ -1245,6 +1245,15 @@
             opened: (
               /** @type {string[]} */
               []
+            ),
+            changed: (
+              /** @type {string[]} */
+              []
+            ),
+            tag: "",
+            rect: (
+              /** @type {number[]} */
+              []
             )
           };
           const saveDiag = () => {
@@ -1258,23 +1267,58 @@
             sendResponse({ ok: false, reason: "no-superchat-button" });
             return void 0;
           }
-          const OPEN_SEL = 'yt-live-chat-product-picker-renderer, yt-live-chat-message-buy-flow-renderer, [class*="buy-flow"], [class*="purchase"], tp-yt-paper-dialog, tp-yt-iron-dropdown, yt-sheet-view-model, ytd-popup-container *[role="dialog"], [role="dialog"]';
-          const visibleOpen = () => [...document.querySelectorAll(OPEN_SEL)].filter((el) => {
-            const r = el.getBoundingClientRect();
-            return r.width > 40 && r.height > 40 && getComputedStyle(el).visibility !== "hidden";
+          const added = /* @__PURE__ */ new Set();
+          const mo = new MutationObserver((recs) => {
+            for (const rec of recs) {
+              if (rec.type === "childList") rec.addedNodes.forEach((n) => n instanceof Element && added.add(n));
+              else if (rec.target instanceof Element) added.add(rec.target);
+            }
           });
-          const before = new Set(visibleOpen());
-          btn.click();
+          try {
+            mo.observe(document.documentElement, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              attributeFilter: ["hidden", "opened", "aria-hidden", "style", "aria-expanded"]
+            });
+          } catch {
+          }
+          const shown = (el) => {
+            if (el.closest("yt-live-chat-item-list-renderer")) return false;
+            const r = el.getBoundingClientRect();
+            if (!(r.width >= 120 && r.height >= 60)) return false;
+            const cs = getComputedStyle(el);
+            return cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity || 1) > 0.05;
+          };
+          const tgt = (
+            /** @type {HTMLElement} */
+            btn.matches("button") ? btn : btn.querySelector("button") || btn
+          );
+          const r0 = tgt.getBoundingClientRect();
+          const pt = { bubbles: true, cancelable: true, composed: true, clientX: r0.left + r0.width / 2, clientY: r0.top + r0.height / 2, button: 0 };
+          diag.tag = tgt.localName;
+          diag.rect = [Math.round(r0.left), Math.round(r0.top), Math.round(r0.width), Math.round(r0.height)];
+          try {
+            tgt.dispatchEvent(new PointerEvent("pointerdown", { ...pt, pointerType: "mouse", isPrimary: true }));
+            tgt.dispatchEvent(new MouseEvent("mousedown", pt));
+            tgt.dispatchEvent(new PointerEvent("pointerup", { ...pt, pointerType: "mouse", isPrimary: true }));
+            tgt.dispatchEvent(new MouseEvent("mouseup", pt));
+          } catch {
+          }
+          tgt.click();
           (async () => {
-            for (let i = 0; i < 10; i += 1) {
+            for (let i = 0; i < 12; i += 1) {
               await new Promise((r) => setTimeout(r, 150));
-              const fresh = visibleOpen().filter((el) => !before.has(el));
+              const fresh = [...added].filter((el) => el.isConnected && shown(el) && !el.contains(btn));
               if (fresh.length) {
-                diag.opened = fresh.slice(0, 5).map((el) => el.localName + (el.id ? "#" + el.id : ""));
+                mo.disconnect();
+                diag.opened = fresh.slice(0, 6).map((el) => el.localName + (el.id ? "#" + el.id : ""));
                 saveDiag();
                 return { ok: true };
               }
             }
+            mo.disconnect();
+            diag.changed = [...added].slice(0, 12).map((el) => el.localName + (el.id ? "#" + el.id : ""));
             saveDiag();
             return { ok: false, reason: "no-superchat-panel:" + diag.picked };
           })().then((r) => sendResponse(r)).catch((e) => sendResponse({ ok: false, reason: String(e) }));

@@ -20380,7 +20380,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T09:55") : ""
+          buildId: true ? String("yt-2026-11-05T10:01") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -23286,7 +23286,7 @@ ${sourceCol}
         // 0.1.115: 押したのに画面が開かなかったら会場を戻し、押したボタンの名前を出す(りんく実機「会場がとじるだけ」)。
         giftReasonText: (reason) => {
           const r = String(reason || "");
-          if (r.startsWith("no-superchat-panel")) return `開けませんでした(${r.slice("no-superchat-panel:".length) || "?"})`;
+          if (r.startsWith("no-superchat-panel")) return "開けませんでした";
           return {
             "not-signed-in": "ログインすると使えます",
             "no-tab": "チャット欄が見つかりません",

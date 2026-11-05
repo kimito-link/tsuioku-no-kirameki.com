@@ -956,7 +956,8 @@ function setupSuperChatOpenBridge() {
         }
         // 0.1.115: りんく実機(ログイン中)で「押すと会場がしまうだけ」=何かのボタンは押せたが画面が開かなかった。
         //   名前(aria-label)でスーパーチャット/購入のボタンを優先し、無ければ #product-picker の中。押したら開いたかを見る。
-        const SC_RE = /Super ?Chat|スーパーチャット|Super ?Sticker|スーパーステッカー|購入|Buy|\$|￥|¥/i;
+        // 0.1.116: りんく実機(ログイン中)の記録=日本語のボタン名は「@<チャンネル> をサポート」(英語は Support)。
+        const SC_RE = /をサポート|^Support|Super ?Chat|スーパーチャット|Super ?Sticker|スーパーステッカー|購入|Buy|\$|￥|¥/i;
         const btn =
           all.find((el) => SC_RE.test(labelOf(el))) ||
           all.find((el) => !!el.closest('#product-picker')) ||
@@ -973,6 +974,9 @@ function setupSuperChatOpenBridge() {
           })),
           picked: btn ? labelOf(btn) || btn.closest('[id]')?.id || '?' : '',
           opened: /** @type {string[]} */ ([]),
+          changed: /** @type {string[]} */ ([]),
+          tag: '',
+          rect: /** @type {number[]} */ ([]),
         };
         const saveDiag = () => {
           try {
@@ -986,26 +990,62 @@ function setupSuperChatOpenBridge() {
           sendResponse({ ok: false, reason: 'no-superchat-button' });
           return undefined;
         }
-        // 押す前に見えていた「開く画面」の部品を数え、押したあと増えたかで開いたかを決める。
-        const OPEN_SEL =
-          'yt-live-chat-product-picker-renderer, yt-live-chat-message-buy-flow-renderer, [class*="buy-flow"], [class*="purchase"], tp-yt-paper-dialog, tp-yt-iron-dropdown, yt-sheet-view-model, ytd-popup-container *[role="dialog"], [role="dialog"]';
-        const visibleOpen = () =>
-          [...document.querySelectorAll(OPEN_SEL)].filter((el) => {
-            const r = el.getBoundingClientRect();
-            return r.width > 40 && r.height > 40 && getComputedStyle(el).visibility !== 'hidden';
+        // 0.1.116: 押したあとに増えた「見える大きめの部品」を全部拾う(購入画面の部品名を決め打ちしない)。
+        //   りんく実機で opened=[] だった=決め打ちの名前に当たらなかったか、押せていなかった。
+        /** @type {Set<Element>} */
+        const added = new Set();
+        const mo = new MutationObserver((recs) => {
+          for (const rec of recs) {
+            if (rec.type === 'childList') rec.addedNodes.forEach((n) => n instanceof Element && added.add(n));
+            else if (rec.target instanceof Element) added.add(rec.target);
+          }
+        });
+        try {
+          mo.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['hidden', 'opened', 'aria-hidden', 'style', 'aria-expanded'],
           });
-        const before = new Set(visibleOpen());
-        btn.click();
+        } catch {
+          // 見張れなくても押すのは試す
+        }
+        const shown = (/** @type {Element} */ el) => {
+          if (el.closest('yt-live-chat-item-list-renderer')) return false;
+          const r = el.getBoundingClientRect();
+          if (!(r.width >= 120 && r.height >= 60)) return false;
+          const cs = getComputedStyle(el);
+          return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity || 1) > 0.05;
+        };
+        // YouTube の部品(Polymer)は click() だけでは反応しないことがある(押した扱いを mousedown/up から作る)ので、
+        //   指で押したのと同じ順にイベントを送る。
+        const tgt = /** @type {HTMLElement} */ (btn.matches('button') ? btn : btn.querySelector('button') || btn);
+        const r0 = tgt.getBoundingClientRect();
+        const pt = { bubbles: true, cancelable: true, composed: true, clientX: r0.left + r0.width / 2, clientY: r0.top + r0.height / 2, button: 0 };
+        diag.tag = tgt.localName;
+        diag.rect = [Math.round(r0.left), Math.round(r0.top), Math.round(r0.width), Math.round(r0.height)];
+        try {
+          tgt.dispatchEvent(new PointerEvent('pointerdown', { ...pt, pointerType: 'mouse', isPrimary: true }));
+          tgt.dispatchEvent(new MouseEvent('mousedown', pt));
+          tgt.dispatchEvent(new PointerEvent('pointerup', { ...pt, pointerType: 'mouse', isPrimary: true }));
+          tgt.dispatchEvent(new MouseEvent('mouseup', pt));
+        } catch {
+          // 古い環境は click だけ
+        }
+        tgt.click();
         (async () => {
-          for (let i = 0; i < 10; i += 1) {
+          for (let i = 0; i < 12; i += 1) {
             await new Promise((r) => setTimeout(r, 150));
-            const fresh = visibleOpen().filter((el) => !before.has(el));
+            const fresh = [...added].filter((el) => el.isConnected && shown(el) && !el.contains(btn));
             if (fresh.length) {
-              diag.opened = fresh.slice(0, 5).map((el) => el.localName + (el.id ? '#' + el.id : ''));
+              mo.disconnect();
+              diag.opened = fresh.slice(0, 6).map((el) => el.localName + (el.id ? '#' + el.id : ''));
               saveDiag();
               return { ok: true };
             }
           }
+          mo.disconnect();
+          diag.changed = [...added].slice(0, 12).map((el) => el.localName + (el.id ? '#' + el.id : ''));
           saveDiag();
           return { ok: false, reason: 'no-superchat-panel:' + diag.picked };
         })()
