@@ -593,7 +593,7 @@ ${sourceCol}
     return out.replace(/(\d[\d,]*) XP\b/g, "$1 pt");
   }
   function ytWordingSuperChatRankToTopFan(text) {
-    let out = String(text ?? "");
+    const out = String(text ?? "");
     if (!/スパチャの合計順|スーパーチャット・ギフトの合計の順位/.test(out)) return out;
     return swapOnce(out, SUPERCHAT_RANK_RULES, TOP_FAN_RULES);
   }
@@ -19887,7 +19887,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T03:09") : ""
+          buildId: true ? String("yt-2026-11-05T03:14") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

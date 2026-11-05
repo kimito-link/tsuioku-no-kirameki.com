@@ -6448,9 +6448,8 @@ function renderStoryUserLane() {
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
-  // v0.1.1863: りんく段は元の定義(数値ID＋本物の個人サムネの人)に戻した。v0.1.1621 で入れた
-  //   「ギフト/広告の人だけ」の絞りは外す(りんく 2026-11-05「ギフトコメントのしばりはにこにこでもなかった」)。
-  //   ギフト/広告で支えた人を候補へ足す mergeSupporterLinkCandidates はそのまま。
+  // v0.1.1863: りんく段は元の定義(数値ID＋本物の個人サムネ)に戻した(v0.1.1621 の「ギフト/広告の人だけ」を外す・
+  //   りんく 2026-11-05)。ギフト/広告で支えた人を足す mergeSupporterLinkCandidates はそのまま。
   let laneDiagDeduped = 0;
   let laneDiagT3 = 0;
   let laneDiagT2 = 0;

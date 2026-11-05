@@ -365,7 +365,7 @@
       ["liveChatSponsorshipsGiftPurchaseAnnouncementRenderer", "membership_gift"]
     ];
     for (const [key, kind] of kinds) {
-      let r = item[key];
+      const r = item[key];
       if (!r) continue;
       const head = kind === "membership_gift" ? r?.header?.liveChatSponsorshipsHeaderRenderer || {} : r;
       const id = String(r.id || "").trim();
