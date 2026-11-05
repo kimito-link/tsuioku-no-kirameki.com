@@ -6025,7 +6025,7 @@ ${sourceCol}
   var LIGHT_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
   var LIGHT_VOICE_RATE = 1.2;
   var LIGHT_VOICE_MAX_CHARS = 60;
-  var LIGHT_VOICE_PROBE_INTERVAL_MS = 3e4;
+  var LIGHT_VOICE_PROBE_INTERVAL_MS = 6e3;
   var LIGHT_VOICE_PROBE_TEXT = "てすと";
   function pickJapaneseVoices(voices) {
     if (!Array.isArray(voices)) return [];
@@ -19877,7 +19877,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T00:30") : ""
+          buildId: true ? String("yt-2026-11-05T00:36") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

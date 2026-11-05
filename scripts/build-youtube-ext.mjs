@@ -56,9 +56,22 @@ function patchVenueBarPickupOnScreen(src) {
   return src;
 }
 
+// 会議(2026-11-05): VOICEVOX が混んで PC の声に切り替わると、戻るには速い合成が5回続く必要があるのに、PC の声の間は
+//   30秒に1回しか VOICEVOX を確かめないので、原因が消えても戻るまで最短2分半かかっていた(PC 実測 約3分)。
+//   YouTube 版だけ確かめる間隔を6秒にする(短い「てすと」1回=エンジンの邪魔は小さい・二重に頼まない仕組みはそのまま)。
+//   ニコ生版は審査後に同じ直し。
+function setupLightProbePatch(b) {
+  b.onLoad({ filter: /src[\\/]lib[\\/]voiceLightFallback\.js$/ }, (args) => ({
+    contents: replaceOnce(readFileSync(args.path, 'utf8'), 'export const LIGHT_VOICE_PROBE_INTERVAL_MS = 30000;', 'export const LIGHT_VOICE_PROBE_INTERVAL_MS = 6000;', 'PC の声から戻る確かめの間隔'),
+    loader: 'js',
+    resolveDir: dirname(args.path),
+  }));
+}
+
 const ytVenueLiveIdPlugin = {
   name: 'yt-venue-live-id',
   setup(b) {
+    setupLightProbePatch(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents:
         patchVenueBarForPickup(readFileSync(args.path, 'utf8')) +
@@ -73,6 +86,7 @@ const ytVenueLiveIdPlugin = {
 const ytVenuePickupPlugin = {
   name: 'yt-venue-pickup',
   setup(b) {
+    setupLightProbePatch(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents: patchVenueBarForPickup(readFileSync(args.path, 'utf8')),
       loader: 'js',
