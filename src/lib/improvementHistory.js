@@ -4792,17 +4792,17 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '30日の窓で数える値(古いコミットが窓から外れた分だけ 0.1.1858 の 43 から減った)'
   }),
   Object.freeze({
-    version: '0.1.1865', metric: 'bundle-kb', value: 1415,
+    version: '0.1.1868', metric: 'bundle-kb', value: 1415,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '0.1.1861 の 1414 から +1(popup が読む venueSeatsDiag に一気出しの行の項目を足した)。最良 1360 より上なのは以前から'
+    note: '一気出しの計器の項目を popup が読む venueSeatsDiag に足した分(+1 程度)。最良 1360 より上なのは以前から'
   }),
   Object.freeze({
-    version: '0.1.1865', metric: 'gate-selftest', value: 4,
+    version: '0.1.1868', metric: 'gate-selftest', value: 4,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.1865', metric: 'cross-checked-claims', value: 43,
+    version: '0.1.1868', metric: 'cross-checked-claims', value: 42,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: '30日の窓で数える値。最良 55 より下なのは以前から(0.1.1861 の 41 から +2)'
+    note: '30日の窓で数える値。最良 55 より下なのは以前から'
   })
 ]);

@@ -38,6 +38,10 @@ describe('decideVoiceLagNotice', () => {
     expect(decideVoiceLagNotice(true, { e2eAvgMs: 9000, queueNow: 0 }).shown).toBe(false);
   });
 
+  it('v0.1.1866: 前に出していなくても、読み上げ待ちが空なら出さない(開き直した直後)', () => {
+    expect(decideVoiceLagNotice(false, { e2eAvgMs: 19000, queueNow: 0 }).shown).toBe(false);
+  });
+
   it('閾値の順序と文言の「8秒」が本物の基準と一致する(§12.7)', () => {
     expect(VOICE_LAG_NOTICE_HIDE_MS).toBeLessThan(VOICE_LAG_NOTICE_SHOW_MS);
     expect(VOICE_LAG_NOTICE_SHOW_MS).toBeLessThan(VOICE_STALE_MS_NORMAL);

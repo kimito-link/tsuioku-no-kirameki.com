@@ -460,10 +460,11 @@ export default [
     // v0.1.1852: 遅れの一言と GPU の案内に不透明な下地(後ろのコメント欄と重なって読めなかった・コメント2行+下地4行+隠す1行)=+7。
     // v0.1.1855: 発言パネルが記録を読めなかったとき(拡張が切れた/時間切れ)に理由を返し、ホバーと同じ手元の発言を代わりに出す配線=+15。文言と HTML は lib の venueSpeechStats.js。
     // v0.1.1861: 読み上げに配信 id と配信者 uid を渡す(混雑時は大事なものだけ読む・判定は lib の voiceBusyPriority.js)=+1。
-    // v0.1.1864: 吹き出しの一気出しの計器の配線(import 1行+状態1行+束ごとの記録7行+経路の名札3行+JSDoc・速報への1行)=+19。判定は lib の venueBubbleBurst.js。
-    // v0.1.1865: 過去の番号を吹き出さない定数(コメント2行)と state の hiNo・計器への1行=+6。判定は lib の venueSpeech.js(oldNoGap)。
+    // v0.1.1866: 会場を開いた瞬間の3件を読み上げの遅れに数えない(印1行+コメント1行)=+2。
+    // v0.1.1867: 吹き出しの一気出しの計器の配線(import 1行+状態1行+束ごとの記録7行+経路の名札3行+JSDoc・速報への1行)=+19。判定は lib の venueBubbleBurst.js。
+    // v0.1.1868: 過去の番号を吹き出さない定数(コメント2行)と state の hiNo・計器への1行=+6。判定は lib の venueSpeech.js(oldNoGap)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7405, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7408, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
