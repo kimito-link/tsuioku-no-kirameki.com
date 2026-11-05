@@ -6,13 +6,9 @@ import {
   applyVenuePickupView,
   buildVenuePickupView,
   createVenuePickupBanner,
-  venuePickupPlacement,
-  VENUE_PICKUP_DRAG_THRESHOLD_PX,
-  clampVenuePickupPx,
-  normalizeVenuePickupSavedPos,
-  venuePickupPosToSave,
-  venuePickupSavedPlacement
+  venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
+import { attachVenuePickupDrag } from './venuePickupDrag.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
   buildVenueSeating,
@@ -108,8 +104,7 @@ import {
   isEffectSoundEnabled,
   // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(giftDeltaFallback.js)向け。
   officialGiftPointsAggregateStorageKey,
-  giftSubAppHistoryStorageKey,
-  KEY_VENUE_PICKUP_POS
+  giftSubAppHistoryStorageKey
 } from '../lib/storageKeys.js';
 import {
   EFFECT_SOUND_KINDS,
@@ -667,11 +662,7 @@ const VENUE_CSS = `
     font-size: 18px;
     line-height: 1.4;
     pointer-events: auto;
-    cursor: grab;
-    touch-action: none; /* v0.1.1895 ドラッグで動かす(指でもページがスクロールしない) */
-    user-select: none;
   }
-  .nlsb-pickup[data-dragging='1'] { cursor: grabbing; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
   /* 吹き出しの尻尾(左下)。枠線色の三角の上に地の色の三角を重ねる。 */
   .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
   .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
@@ -3007,11 +2998,6 @@ export function mountVenueBarButton(options = {}) {
    */
   /** @type {Array<any>} */
   let pickupRing = [];
-  // v0.1.1895 ドラッグで置いた位置(下の placePickup/ドラッグ処理で使う)。
-  /** @type {{ cx:number, top:number } | null} */
-  let pickupSavedPos = null;
-  /** @type {{ id:number, sx:number, sy:number, cx0:number, top0:number, moved:boolean } | null} */
-  let pickupDrag = null;
   /** @param {ReadonlyArray<any>|null} fallbackRows リングが空のときの従来入力(表示行) */
   const updatePickupBanner = (fallbackRows) => {
     try {
@@ -3025,75 +3011,11 @@ export function mountVenueBarButton(options = {}) {
     if (pickupEls.root.hasAttribute('data-empty')) return;
     const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
     const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
-    const layoutRect = stageLayout.getBoundingClientRect();
-    const at = venuePickupPlacement(video, layoutRect);
+    const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
     pickupEls.root.style.width = at ? `${at.width}px` : '';
-    // v0.1.1895: ドラッグで置いた位置があればそこ(幅は映像に合わせたまま・会場の内側に締める)。
-    if (pickupDrag) return; // ドラッグ中は指に任せる
-    const saved = venuePickupSavedPlacement(pickupSavedPos, layoutRect, pickupEls.root.getBoundingClientRect());
-    pickupEls.root.style.left = saved ? `${saved.left}px` : (at ? `${at.left}px` : '');
-    pickupEls.root.style.top = saved ? `${saved.top}px` : (at ? `${at.top}px` : '');
-    if (saved) pickupEls.root.setAttribute('data-moved', '1');
-    else pickupEls.root.removeAttribute('data-moved');
+    pickupDrag.place(at); // v0.1.1895 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
-  /*
-   * v0.1.1895 りんく「ドラッグでうごかせるようにしておきたい」: PICK UP の吹き出しを指/マウスで動かし、位置を覚える。
-   *   位置は会場に対する割合(KEY_VENUE_PICKUP_POS)。ダブルクリックで自動位置(映像の上端中央)へ戻す。
-   *   名前のリンク(a[href])から始めた押下はドラッグにしない(リンクを開けるように)。
-   */
-  void safeStorageLocalGet(KEY_VENUE_PICKUP_POS).then((bag) => {
-    pickupSavedPos = normalizeVenuePickupSavedPos(bag?.[KEY_VENUE_PICKUP_POS]);
-    try { placePickup(); } catch { /* 位置合わせの失敗は無視 */ }
-  }).catch(() => {});
-  pickupEls.root.title = 'ドラッグで動かせます(ダブルクリックで元の位置)';
-  pickupEls.root.addEventListener('pointerdown', (ev) => {
-    if (ev.button !== 0) return;
-    if (ev.target instanceof Element && ev.target.closest('a[href]')) return;
-    const r = pickupEls.root.getBoundingClientRect();
-    const L = stageLayout.getBoundingClientRect();
-    pickupDrag = { id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, cx0: r.left + r.width / 2 - L.left, top0: r.top - L.top, moved: false };
-  });
-  // ★動きと離しは window で受ける(速く動かすと最初の move で吹き出しの外へ出て、吹き出しに届かず止まった・e2e で実測)。
-  window.addEventListener('pointermove', (ev) => {
-    const d = pickupDrag;
-    if (!d || ev.pointerId !== d.id) return;
-    const dx = ev.clientX - d.sx;
-    const dy = ev.clientY - d.sy;
-    if (!d.moved) {
-      if (Math.hypot(dx, dy) < VENUE_PICKUP_DRAG_THRESHOLD_PX) return;
-      d.moved = true;
-      try { pickupEls.root.setPointerCapture(ev.pointerId); } catch { /* 取れなくても動かす */ }
-      pickupEls.root.setAttribute('data-dragging', '1');
-    }
-    ev.preventDefault();
-    const L = stageLayout.getBoundingClientRect();
-    const p = clampVenuePickupPx(d.cx0 + dx, d.top0 + dy, L, pickupEls.root.getBoundingClientRect());
-    pickupEls.root.style.left = `${p.left}px`;
-    pickupEls.root.style.top = `${p.top}px`;
-  });
-  const endPickupDrag = (/** @type {PointerEvent} */ ev) => {
-    const d = pickupDrag;
-    if (!d || ev.pointerId !== d.id) return;
-    pickupDrag = null;
-    pickupEls.root.removeAttribute('data-dragging');
-    if (!d.moved) return;
-    const L = stageLayout.getBoundingClientRect();
-    const r = pickupEls.root.getBoundingClientRect();
-    const toSave = venuePickupPosToSave({ left: r.left + r.width / 2 - L.left, top: r.top - L.top }, L);
-    if (!toSave) return;
-    pickupSavedPos = toSave;
-    pickupEls.root.setAttribute('data-moved', '1');
-    void safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: toSave }).catch(() => {});
-  };
-  window.addEventListener('pointerup', endPickupDrag);
-  window.addEventListener('pointercancel', endPickupDrag);
-  pickupEls.root.addEventListener('dblclick', (ev) => {
-    if (ev.target instanceof Element && ev.target.closest('a[href]')) return;
-    pickupSavedPos = null;
-    void safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: null }).catch(() => {});
-    try { placePickup(); } catch { /* 位置合わせの失敗は無視 */ }
-  });
-  window.addEventListener('resize', () => { try { placePickup(); } catch { /* 位置合わせの失敗は無視(CSS の既定位置のまま) */ } });
+  const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup); // ドラッグで動かし位置を覚える・resize で置き直す
   // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
   seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。

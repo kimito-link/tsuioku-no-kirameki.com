@@ -45,14 +45,21 @@ describe('配線: 吹き出しを大事な表示に被せない(v0.1.1760)', () 
 });
 
 describe('配線: PICK UP をドラッグで動かす(v0.1.1895)', () => {
-  it('★ドラッグで置いた位置を覚え、自動位置より優先し、ダブルクリックで戻す', () => {
-    expect(venueBar).toContain("pickupEls.root.addEventListener('pointerdown'");
-    expect(venueBar).toContain('safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: toSave })');
-    expect(venueBar).toContain('venuePickupSavedPlacement(pickupSavedPos, layoutRect');
-    expect(venueBar).toContain("pickupEls.root.addEventListener('dblclick'");
+  const drag = readFileSync(new URL('./venuePickupDrag.js', import.meta.url), 'utf8');
+  it('★会場は placePickup で位置をドラッグ部品に任せる', () => {
+    expect(venueBar).toContain('pickupDrag.place(at);');
+    expect(venueBar).toContain('attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup)');
+  });
+  it('★置いた位置を覚え、窓の内側に締め、ダブルクリックで戻す・リンクはドラッグにしない', () => {
+    expect(drag).toContain('safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: toSave })');
+    expect(drag).toContain("root.addEventListener('dblclick'");
+    expect(drag).toContain('viewportBounds(L)');
+    expect(drag).toMatch(/pointerdown'[\s\S]{0,120}closest\('a\[href\]'\)\) return;/);
     // 速く動かしても置いていかれない(動き・離しは window で受ける)
-    expect(venueBar).toContain("window.addEventListener('pointerup', endPickupDrag);");
-    // 名前のリンクから始めた押下はドラッグにしない
-    expect(venueBar).toMatch(/pointerdown'[\s\S]{0,120}closest\('a\[href\]'\)\) return;/);
+    expect(drag).toContain("window.addEventListener('pointerup', endDrag);");
+  });
+  it('★「ドラッグで動かせます」が分かる(つまみ+札)', () => {
+    expect(drag).toContain("grip.textContent = '⠿';");
+    expect(drag).toContain('ドラッグで動かせます');
   });
 });

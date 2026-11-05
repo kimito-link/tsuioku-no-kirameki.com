@@ -174,7 +174,9 @@ export function venuePickupPlacement(video, layout, opts = {}) {
 /**
  * v0.1.1895 PICK UP の吹き出しをドラッグで好きな位置へ(りんく「ドラッグでうごかせるようにしておきたい」)。
  *   位置は会場(stageLayout)に対する割合で覚える=窓の大きさが変わっても同じあたりに出る。
- *   置ける範囲は会場の内側だけ(吹き出しが丸ごと見える範囲に締める・画面の外へ失くさない)。
+ *   置ける範囲は画面(窓)の内側(吹き出しが丸ごと見える範囲に締める・画面の外へ失くさない)。
+ *   ★会場の枠ではなく窓で締める: 放送ページの会場は上端がニコ生のヘッダーの下にあり、映像の上端より上へ持っていけなかった(りんく実機 11/06)。
+ *   そのため保存する割合は会場の外(負や1超)もあり得る(-2〜3 に締める)。
  *   ★ダブルクリックで元の自動位置(映像の上端中央)に戻す。
  */
 
@@ -184,7 +186,7 @@ export const VENUE_PICKUP_DRAG_THRESHOLD_PX = 4;
 /**
  * 保存値の形を確かめる(壊れた値・旧形は null=自動位置。§3.6 fail-soft)。
  * @param {unknown} raw
- * @returns {{ cx: number, top: number } | null} cx=中心xの割合・top=上端の割合(どちらも 0〜1)
+ * @returns {{ cx: number, top: number } | null} cx=中心xの割合・top=上端の割合(会場に対して。窓で締めるので -2〜3)
  */
 export function normalizeVenuePickupSavedPos(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -192,28 +194,40 @@ export function normalizeVenuePickupSavedPos(raw) {
   const cx = Number(o.cx);
   const top = Number(o.top);
   if (!Number.isFinite(cx) || !Number.isFinite(top)) return null;
-  return { cx: Math.min(1, Math.max(0, cx)), top: Math.min(1, Math.max(0, top)) };
+  const c = (/** @type {number} */ v) => Math.min(3, Math.max(-2, v));
+  return { cx: c(cx), top: c(top) };
 }
 
 /**
- * 吹き出しの中心x・上端(会場の中の px)を、吹き出しが丸ごと会場に収まるよう締める。
+ * 吹き出しの中心x・上端(会場の中の px)を、吹き出しが丸ごと置ける範囲に収まるよう締める。
  * @param {number} cxPx
  * @param {number} topPx
  * @param {{ width:number, height:number }} layout 会場の大きさ
  * @param {{ width:number, height:number }} box 吹き出しの大きさ(尻尾 20px 込みで見る)
+ * @param {{ minX:number, minY:number, maxX:number, maxY:number }} [bounds] 置ける範囲(会場の座標)。省略時は会場の内側
  * @returns {{ left:number, top:number }} left=中心x(CSS の translateX(-50%) と対)
  */
-export function clampVenuePickupPx(cxPx, topPx, layout, box) {
+export function clampVenuePickupPx(cxPx, topPx, layout, box, bounds) {
   const W = Math.max(0, Number(layout?.width) || 0);
   const H = Math.max(0, Number(layout?.height) || 0);
+  const B = bounds || { minX: 0, minY: 0, maxX: W, maxY: H };
   const w = Math.max(0, Number(box?.width) || 0);
   const h = Math.max(0, Number(box?.height) || 0) + 20; // 尻尾(::before bottom:-20px)まで見せる
-  const minX = w / 2;
-  const maxX = W - w / 2;
-  const left = maxX < minX ? W / 2 : Math.min(maxX, Math.max(minX, Number(cxPx) || 0));
-  const maxY = H - h;
-  const top = maxY < 0 ? 0 : Math.min(maxY, Math.max(0, Number(topPx) || 0));
+  const minX = B.minX + w / 2;
+  const maxX = B.maxX - w / 2;
+  const left = maxX < minX ? (B.minX + B.maxX) / 2 : Math.min(maxX, Math.max(minX, Number(cxPx) || 0));
+  const maxY = B.maxY - h;
+  const top = maxY < B.minY ? B.minY : Math.min(maxY, Math.max(B.minY, Number(topPx) || 0));
   return { left: Math.round(left), top: Math.round(top) };
+}
+
+/**
+ * 窓(画面)の内側を、会場の座標で表す(clampVenuePickupPx の bounds)。
+ * @param {{ left:number, top:number }} layoutRect 会場の矩形(画面座標)
+ * @param {{ width:number, height:number }} viewport 窓の大きさ
+ */
+export function venuePickupViewportBounds(layoutRect, viewport) {
+  return { minX: -layoutRect.left, minY: -layoutRect.top, maxX: viewport.width - layoutRect.left, maxY: viewport.height - layoutRect.top };
 }
 
 /**
@@ -221,12 +235,13 @@ export function clampVenuePickupPx(cxPx, topPx, layout, box) {
  * @param {{ cx:number, top:number } | null} saved
  * @param {{ width:number, height:number }} layout
  * @param {{ width:number, height:number }} box
+ * @param {{ minX:number, minY:number, maxX:number, maxY:number }} [bounds]
  * @returns {{ left:number, top:number } | null} 保存値が無ければ null(=自動位置)
  */
-export function venuePickupSavedPlacement(saved, layout, box) {
+export function venuePickupSavedPlacement(saved, layout, box, bounds) {
   const s = normalizeVenuePickupSavedPos(saved);
   if (!s || !(Number(layout?.width) > 0) || !(Number(layout?.height) > 0)) return null;
-  return clampVenuePickupPx(s.cx * layout.width, s.top * layout.height, layout, box);
+  return clampVenuePickupPx(s.cx * layout.width, s.top * layout.height, layout, box, bounds);
 }
 
 /**
