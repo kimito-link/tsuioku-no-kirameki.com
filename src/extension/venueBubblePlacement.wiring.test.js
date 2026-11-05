@@ -44,7 +44,7 @@ describe('配線: 吹き出しを大事な表示に被せない(v0.1.1760)', () 
   });
 });
 
-describe('配線: PICK UP をドラッグで動かす(v0.1.1894)', () => {
+describe('配線: PICK UP をドラッグで動かす(v0.1.1895)', () => {
   it('★ドラッグで置いた位置を覚え、自動位置より優先し、ダブルクリックで戻す', () => {
     expect(venueBar).toContain("pickupEls.root.addEventListener('pointerdown'");
     expect(venueBar).toContain('safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: toSave })');
