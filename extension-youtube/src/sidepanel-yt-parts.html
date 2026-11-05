@@ -1,0 +1,525 @@
+<!--
+  sidepanel-yt-parts.html — YouTube 版だけにある部品（scripts/build-youtube-sidepanel-html.mjs が読む）。
+  サイドパネルの本体は extension/popup.html（ニコ生版）を丸ごと写して作る。ここに書くのは
+  ニコ生版に無い部品（配信の選択・読み上げ設定・コメビュ3レーン）と、その見た目だけ。
+  ★extension-youtube/sidepanel.html は生成物なので直接直さない。
+-->
+<!-- part:css -->
+      :root {
+        --nl-text-soft: #8a7568;
+        --nl-ok: #3fa66a;
+        --nl-warn: #d99a2b;
+        --nl-bad: #e15a76;
+        --nl-radius-sm: 8px;
+        --nl-radius-md: 12px;
+        --nl-radius-pill: 999px;
+        --nl-shadow-card: 0 1px 6px rgba(120, 80, 50, 0.08);
+        --nl-border-strong: #d8b89f;
+        --nl-accent-soft: #ffd9e6;
+      }
+            .nl-yt-stream-bar {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 6px;
+              flex-wrap: wrap;
+              padding: 4px 8px;
+              margin: 0 0 6px;
+              border-radius: 9px;
+              background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+              border: 1px solid color-mix(in srgb, var(--nl-border) 75%, transparent);
+              font-size: 10.5px;
+            }
+      
+            .nl-yt-stream-bar__summary {
+              color: var(--nl-text-sub);
+              font-weight: 700;
+              min-width: 0;
+              flex: 1 1 160px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+      
+            .nl-yt-stream-bar select {
+              font-size: 10.5px;
+              padding: 2px 6px;
+              max-width: 100%;
+            }
+      
+            .currency-grid {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+            }
+      
+            .currency-box {
+              background: var(--nl-surface);
+              border: 1px solid var(--nl-border);
+              border-radius: var(--nl-radius-sm);
+              padding: 6px 7px;
+            }
+      
+            .currency-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: baseline;
+              font-weight: 800;
+              font-size: 10.5px;
+              color: var(--nl-text);
+              margin-bottom: 5px;
+              border-bottom: 1px solid var(--nl-border);
+              padding-bottom: 3px;
+            }
+      
+            .control-row {
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 8px;
+            }
+      
+            .voice-mode-field {
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              flex: 1 1 210px;
+              min-width: 0;
+            }
+      
+            .voice-mode-label {
+              white-space: nowrap;
+              flex-shrink: 0;
+              font-weight: 700;
+            }
+      
+            .voice-mode-field select {
+              flex: 1 1 auto;
+              min-width: 0;
+              max-width: 100%;
+            }
+      
+            .filter-pill {
+              display: inline-flex;
+              align-items: center;
+              padding: 1px 7px;
+              border-radius: var(--nl-radius-pill);
+              font-size: 10px;
+              font-weight: 700;
+              background: var(--nl-bg);
+              border: 1px solid var(--nl-border);
+              color: var(--nl-text-sub);
+            }
+      
+            .notice-banner {
+              padding: 6px 9px;
+              border-radius: var(--nl-radius-sm);
+              background: linear-gradient(180deg, #fffaf0, #fff4db);
+              border: 1px solid #f5d28d;
+              color: #6b4f18;
+              font-size: 11px;
+              line-height: 1.4;
+            }
+      
+            .notice-banner.is-warning {
+              background: #fff3e0;
+              border-color: var(--nl-warn);
+              color: #7c4a03;
+            }
+      
+            .voice-status-box {
+              padding: 6px 9px;
+              border-radius: var(--nl-radius-sm);
+              font-size: 11px;
+              border: 1px solid var(--nl-border);
+              background: var(--nl-bg);
+              color: var(--nl-text);
+            }
+      
+            .voice-status-box.is-offline {
+              background: #fff5f5;
+              border-color: color-mix(in srgb, var(--nl-bad) 55%, var(--nl-border));
+              color: #7a2436;
+            }
+      
+            .voice-status-box.is-online {
+              background: #f2fbf6;
+              border-color: color-mix(in srgb, var(--nl-ok) 55%, var(--nl-border));
+              color: #1e5c3a;
+            }
+      
+            .autoswitch-badge {
+              display: none;
+              padding: 5px 8px;
+              border-radius: var(--nl-radius-sm);
+              background: #fff4e5;
+              border: 1px solid var(--nl-warn);
+              color: #7c4a03;
+              font-size: 11px;
+              font-weight: 700;
+            }
+      
+            .autoswitch-badge.is-active {
+              display: block;
+            }
+      
+            .voice-last-spoken {
+              font-size: 11px;
+              color: var(--nl-text-soft);
+            }
+      
+            /* コメビュ3レーン（折りたたみ内） */
+            .lanes-grid {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 8px;
+            }
+      
+            .lane-col {
+              background: var(--nl-surface);
+              border: 1px solid var(--nl-border);
+              border-radius: var(--nl-radius-md);
+              box-shadow: var(--nl-shadow-card);
+              display: flex;
+              flex-direction: column;
+              min-width: 0;
+              max-height: 380px;
+              padding: 6px;
+            }
+      
+            .lane-rinku {
+              border-top: 3px solid var(--nl-accent);
+            }
+      
+            .lane-konta {
+              border-top: 3px solid var(--nl-warn);
+            }
+      
+            .lane-tanunee {
+              border-top: 3px solid var(--nl-ok);
+            }
+      
+            .lane-list {
+              overflow-y: auto;
+              flex: 1 1 auto;
+              display: flex;
+              flex-direction: column;
+              gap: 5px;
+              padding: 2px;
+            }
+      
+            /* コメント行内のユーザー表示 */
+            .chat-item .nl-story-userlane-cell {
+              display: inline-flex;
+              flex-direction: row;
+              align-items: center;
+              justify-content: flex-start;
+              gap: 6px;
+              min-width: 0;
+              max-width: 100%;
+              border-radius: 999px;
+              padding-right: 4px;
+            }
+      
+            a.nl-story-userlane-cell--linkable,
+            a.author-link {
+              text-decoration: none;
+              color: var(--nl-text);
+              cursor: pointer;
+              font-weight: 700;
+            }
+      
+            a.nl-story-userlane-cell--linkable:hover,
+            a.author-link:hover {
+              color: var(--nl-accent);
+              text-decoration: underline;
+            }
+      
+            .chat-item {
+              background: var(--nl-bg);
+              border: 1px solid var(--nl-border);
+              border-radius: var(--nl-radius-sm);
+              padding: 5px 7px;
+              font-size: 11.5px;
+              color: var(--nl-text);
+            }
+      
+            .chat-item.kind-superchat,
+            .chat-item.kind-sticker {
+              background: linear-gradient(
+                90deg,
+                color-mix(in srgb, #ffb020 16%, var(--nl-surface)),
+                color-mix(in srgb, #ff7eb6 12%, var(--nl-surface))
+              );
+              border: 1px solid color-mix(in srgb, #ffb020 45%, var(--nl-border));
+            }
+      
+            .chat-item.kind-membership,
+            .chat-item.kind-membership_gift {
+              background: linear-gradient(
+                90deg,
+                color-mix(in srgb, var(--nl-ok) 12%, var(--nl-surface)),
+                color-mix(in srgb, var(--nl-accent) 10%, var(--nl-surface))
+              );
+              border: 1px solid color-mix(in srgb, var(--nl-ok) 40%, var(--nl-border));
+            }
+      
+            .chat-item-head {
+              display: flex;
+              align-items: center;
+              gap: 5px;
+              flex-wrap: wrap;
+              margin-bottom: 3px;
+            }
+      
+            .chat-text {
+              word-break: break-word;
+              color: var(--nl-text);
+              line-height: 1.38;
+              padding-left: 2px;
+            }
+      
+            .empty-hint,
+            .nl-story-userlane__empty-note {
+              grid-column: 1 / -1;
+              margin: 2px 0;
+              padding: 8px;
+              font-size: 10.5px;
+              line-height: 1.4;
+              font-weight: 600;
+              color: var(--nl-text-sub);
+              text-align: center;
+              border-radius: 8px;
+              background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+              border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+            }
+      
+            .nl-voice-engine-note {
+              white-space: pre-line;
+              margin: 4px 0 6px;
+              padding: 6px 8px;
+              border-radius: 8px;
+              background: #fff7e6;
+              color: #b45309;
+              font-size: 11.5px;
+              font-weight: 600;
+              line-height: 1.45;
+            }
+      .avatar-img {
+        width: var(--nl-lane-avatar);
+        height: var(--nl-lane-avatar);
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border-strong) 82%, #fff 18%);
+        box-shadow: 0 1px 3px rgba(120, 80, 50, 0.14);
+        background: var(--nl-bg);
+        flex-shrink: 0;
+      }
+
+      .channel-id-tag {
+        color: var(--nl-text-sub);
+        font-weight: 600;
+        font-size: 9.5px;
+        font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+      }
+
+      .voice-pill {
+        font-size: 9.5px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: var(--nl-radius-pill);
+        background: var(--nl-accent-soft);
+        color: var(--nl-text);
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 35%, var(--nl-border));
+      }
+
+      .amount-pill {
+        font-size: 10px;
+        font-weight: 800;
+        padding: 1px 7px;
+        border-radius: var(--nl-radius-pill);
+        background: #fff0c2;
+        border: 1px solid #e6a817;
+        color: #7c4a03;
+      }
+
+      .member-pill {
+        font-size: 9.5px;
+        font-weight: 800;
+        padding: 1px 6px;
+        border-radius: var(--nl-radius-pill);
+        background: #e6f7ed;
+        border: 1px solid color-mix(in srgb, var(--nl-ok) 45%, var(--nl-border));
+        color: #1e5c3a;
+      }
+      /* 応援タイムラインは段ごと全幅に(見出しの「応援 N件」で1列目が広がり、最新コメントの欄が潰れるのを防ぐ) */
+      .nl-stats-bar > .nl-support-timeline {
+        grid-column: 1 / -1;
+      }
+<!-- /part:css -->
+<!-- part:top -->
+    <p id="yt-voice-engine-banner" class="nl-voice-engine-note" role="status" aria-live="polite" hidden></p>
+
+    <!-- 配信選択バー -->
+    <div class="nl-yt-stream-bar" aria-label="記録中の配信">
+      <span class="nl-yt-stream-bar__summary" id="yt-stream-summary">
+        YouTube Live の視聴ページを開くと自動でチャットを記録します
+      </span>
+      <select id="yt-stream-select" aria-label="記録済み配信の選択">
+        <option value="">配信を選択…</option>
+      </select>
+    </div>
+
+<!-- /part:top -->
+<!-- part:settings -->
+    <details class="nl-frame-theme-details" id="yt-settings-details">
+      <summary class="nl-frame-theme-details__summary">
+        <span class="nl-frame-theme-details__summary-left">
+          🔊 読み上げ設定（VOICEVOX）・全件取得のヒント
+        </span>
+        <span class="nl-frame-theme-details__summary-meta">
+          <span id="yt-voice-queue-info">待機キュー: 0件</span>
+          <span class="filter-pill" id="yt-detected-filter-badge">チャット表示: 検出待ち</span>
+        </span>
+      </summary>
+      <div class="nl-frame-theme-details__body">
+        <div class="control-row">
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; white-space: nowrap">
+            <input type="checkbox" id="yt-voice-enabled" checked />
+            <span>読み上げ ON（パネル閉鎖中も継続）</span>
+          </label>
+          <label class="voice-mode-field">
+            <span class="voice-mode-label">モード:</span>
+            <select id="yt-voice-mode">
+              <option value="all">全部読む</option>
+              <option value="select">選んで読む（スパチャ・メンバー・配信者名入り）</option>
+            </select>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 4px; white-space: nowrap">
+            <span>配信者名キーワード:</span>
+            <input
+              type="text"
+              id="yt-broadcaster-name-input"
+              placeholder="例: りんく"
+              style="width: 105px"
+            />
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap" title="VOICEVOX の合成が時間切れになり続ける間だけ、PC に入っている声（Windows の声）で人ごとに声・高さ・速さを変えて読みます。速くなったら自動で VOICEVOX に戻ります。">
+            <input type="checkbox" id="yt-voice-light" checked />
+            <span>追いつかない間は PC の声で読む</span>
+          </label>
+          <button type="button" id="yt-voice-recheck-btn">VOICEVOX 再確認</button>
+          <button type="button" id="yt-voice-clear-btn">キュー消去</button>
+        </div>
+
+        <div id="yt-voice-autoswitch-badge" class="autoswitch-badge">
+          キューが一定数（8件以上）たまったため、自動で「選んで読む」モードに切り替えています。
+        </div>
+
+        <p id="yt-voice-engine-note" class="nl-voice-engine-note" role="status" hidden></p>
+        <div id="yt-voice-status-box" class="voice-status-box is-offline" role="status">
+          VOICEVOX の接続状態を確認しています…
+        </div>
+
+        <div id="yt-voice-last-spoken" class="voice-last-spoken">
+          読み上げ履歴: まだ再生されたコメントはありません（同じチャンネルIDの投稿者は毎回同じ声で読まれます）
+        </div>
+
+        <div class="notice-banner" id="yt-all-chat-notice">
+          <strong>全件記録のヒント</strong>: YouTube チャット欄が「上位のチャット（トップチャット）」だと一部コメントが隠れます。拡張が開いたときに自動で「すべてのチャット」へ切り替えます。
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; margin-top: 4px">
+            <input type="checkbox" id="yt-auto-all-chat" checked />
+            <span>チャットを自動で「すべてのチャット」にする</span>
+          </label>
+        </div>
+      </div>
+    </details>
+
+<!-- /part:settings -->
+<!-- part:comeview -->
+    <details class="nl-frame-theme-details" id="yt-comeview-details">
+      <summary class="nl-frame-theme-details__summary">
+        <span class="nl-frame-theme-details__summary-left">
+          💬 コメビュ（3レーンのコメント一覧: りんく・こん太・たぬ姉）
+        </span>
+        <span class="nl-frame-theme-details__summary-meta" id="yt-comeview-summary-meta">
+          合計 0件
+        </span>
+      </summary>
+      <div class="nl-frame-theme-details__body">
+        <div class="lanes-grid">
+          <div class="lane-col lane-rinku" id="lane-rinku">
+            <div class="nl-story-userlane-guide">
+              <div class="nl-story-userlane-guide__lines">
+                <div class="nl-story-userlane-guide__line">
+                  <img
+                    class="nl-story-userlane-guide__face"
+                    src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+                    alt="りんく"
+                    width="26"
+                    height="26"
+                    decoding="async"
+                  />
+                  <span class="nl-story-userlane-guide__text">りんくレーン（配信者・モデレーター）</span>
+                  <span class="nl-story-userlane-guide__count" id="lane-rinku-count">0件</span>
+                </div>
+              </div>
+            </div>
+            <div class="lane-list" id="lane-rinku-list">
+              <div class="empty-hint">配信者本人・モデレーターのコメントがここに表示されます</div>
+            </div>
+          </div>
+
+          <div class="lane-col lane-konta" id="lane-konta">
+            <div class="nl-story-userlane-guide">
+              <div class="nl-story-userlane-guide__lines">
+                <div class="nl-story-userlane-guide__line">
+                  <img
+                    class="nl-story-userlane-guide__face"
+                    src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+                    alt="こん太"
+                    width="26"
+                    height="26"
+                    decoding="async"
+                  />
+                  <span class="nl-story-userlane-guide__text">こん太レーン（スパチャ・メンバー・ギフト）</span>
+                  <span class="nl-story-userlane-guide__count" id="lane-konta-count">0件</span>
+                </div>
+              </div>
+            </div>
+            <div class="lane-list" id="lane-konta-list">
+              <div class="empty-hint">スパチャ・ステッカー・メンバー・ギフトの応援がここに表示されます</div>
+            </div>
+          </div>
+
+          <div class="lane-col lane-tanunee" id="lane-tanunee">
+            <div class="nl-story-userlane-guide">
+              <div class="nl-story-userlane-guide__lines">
+                <div class="nl-story-userlane-guide__line">
+                  <img
+                    class="nl-story-userlane-guide__face"
+                    src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+                    alt="たぬ姉"
+                    width="26"
+                    height="26"
+                    decoding="async"
+                  />
+                  <span class="nl-story-userlane-guide__text">たぬ姉レーン（一般リスナー）</span>
+                  <span class="nl-story-userlane-guide__count" id="lane-tanunee-count">0件</span>
+                </div>
+              </div>
+            </div>
+            <div class="lane-list" id="lane-tanunee-list">
+              <div class="empty-hint">一般リスナーのコメントがここに表示されます</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+<!-- /part:comeview -->
