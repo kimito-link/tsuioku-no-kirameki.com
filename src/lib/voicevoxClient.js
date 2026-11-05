@@ -785,6 +785,9 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     //   2026-10-29: 「高音質」を選んだ人だけ 24kHz(合成は遅くなる・速い PC 向け)。
     audioQuery.outputSamplingRate = _outputSamplingRate;
     audioQuery.outputStereo = false;
+    // v0.1.1866: 声の前後の無音を VOICEVOX 既定の0.1秒→0.05秒に(1件あたり約0.1秒短く・合成も軽く。YouTube 版 0.1.95 で確認)。
+    audioQuery.prePhonemeLength = 0.05;
+    audioQuery.postPhonemeLength = 0.05;
 
     const queryMs = nowMs() - queryStartAt;
     stage = 'synth';
