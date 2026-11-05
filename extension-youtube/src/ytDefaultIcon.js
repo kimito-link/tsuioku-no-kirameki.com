@@ -2,19 +2,22 @@
 //
 // りんく(2026-11-05)「自分でちゃんと設定している人は認知してほしい」= 自分でアイコンを設定した人はりんく欄、
 //   最初からの文字アイコンのままの人はこん太欄。URL の形(/ytc/)だけでは写真の人も同じ形なので見分けられない。
-// 見分け方(PC の実データ 45人で試験・文字アイコン5人を全部当て、誤りなし):
-//   URL に /ytc/ があり、真ん中の丸の中で「いちばん多い色の割合」が 0.80 以上、「0.5%以上ある色の数」が 6 以下。
-//   色は各チャンネル16段に丸めて数える。画像は s64 で見る(試験と同じ大きさ)。
+// 見分け方(0.1.101・PC の実データ 2配信65人で試験・文字アイコン9人を全部当て、誤りなし):
+//   URL に /ytc/ があり、真ん中の丸の中で「いちばん多い色(=背景)の割合」が 0.62 以上、かつその色が色付き
+//   (各チャンネル16段で 最大−最小 が 5 以上=白・灰色の背景の書道や写真を外す)。
+//   0.1.99 の「割合0.80以上・色6以下」は、2文字や画数の多い字(ちゃ・メ・玄・Z)を取りこぼした(実機 4/9)。
+//   画像は s64 で見る(試験と同じ大きさ)。
 // ★件数が少ない試験で決めた値。迷うときは「自分で設定した人」(りんく欄)に倒す=間違えても認知が減らない側。
 
-export const YT_DEFAULT_ICON_STORE_KEY = 'yt_default_icon_v1';
+// v2: 見分け方を変えたので、v1 の結果(取りこぼしの 0)は使わない
+export const YT_DEFAULT_ICON_STORE_KEY = 'yt_default_icon_v2';
 
 /**
  * 画素から見分けの数字を出す(純関数・試験用に分けてある)。
  * @param {Uint8ClampedArray|number[]} rgba 幅 w × 高さ h の RGBA
  * @param {number} w
  * @param {number} h
- * @returns {{ t1: number, c5: number }}
+ * @returns {{ t1: number, c5: number, bgSat: number }}
  */
 export function ytIconColorStats(rgba, w, h) {
   /** @type {Map<number, number>} */
@@ -32,22 +35,27 @@ export function ytIconColorStats(rgba, w, h) {
       total += 1;
     }
   }
-  if (!total) return { t1: 0, c5: 0 };
+  if (!total) return { t1: 0, c5: 0, bgSat: 0 };
   let max = 0;
+  let maxKey = 0;
   let c5 = 0;
-  for (const n of counts.values()) {
-    if (n > max) max = n;
+  for (const [k, n] of counts) {
+    if (n > max) {
+      max = n;
+      maxKey = k;
+    }
     if (n / total >= 0.005) c5 += 1;
   }
-  return { t1: max / total, c5 };
+  const ch = [(maxKey >> 8) & 15, (maxKey >> 4) & 15, maxKey & 15];
+  return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch) };
 }
 
 /**
  * @param {string} url
- * @param {{ t1: number, c5: number }} stats
+ * @param {{ t1: number, bgSat: number }} stats
  */
 export function ytLooksLikeDefaultLetterIcon(url, stats) {
-  return /\/ytc\//.test(String(url || '')) && stats.t1 >= 0.8 && stats.c5 <= 6;
+  return /\/ytc\//.test(String(url || '')) && stats.t1 >= 0.62 && stats.bgSat >= 5;
 }
 
 /** 同じ人の顔は大きさ違いの URL で来るので、大きさを外して鍵にする */
