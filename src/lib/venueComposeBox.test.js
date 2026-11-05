@@ -71,6 +71,36 @@ describe('会場のギフトボタン', () => {
     expect(clicked).toBe(1);
     expect(removed).toBe(1);
   });
+  it('開いたあと番組ギフトのタブへ切り替える(選ばれていれば押さない)', async () => {
+    const { showGiftItemsTabSoon } = await import('./venueComposeBox.js');
+    document.body.innerHTML = '<div class="___gift-sidebar___a"><button id="r" aria-selected="true">ランキング</button><button id="g" aria-selected="false">番組ギフト</button></div>';
+    let n = 0;
+    document.getElementById('g')?.addEventListener('click', () => { n++; });
+    showGiftItemsTabSoon(document, { waitMs: 1 });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(n).toBe(1);
+    document.getElementById('g')?.setAttribute('aria-selected', 'true');
+    showGiftItemsTabSoon(document, { waitMs: 1 });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(n).toBe(1);
+  });
+  it('ギフトの子の窓は合図を受けたら番組ギフトのタブを押す(li の class で選択中なら押さない)', async () => {
+    const { startGiftItemsTabResponder, GIFT_ITEMS_TAB_REQ_KEY } = await import('./venueComposeBox.js');
+    document.body.innerHTML = '<ul><li class="item"><button class="button" id="g">番組ギフト</button></li><li class="item is-active"><button class="button">ランキング</button></li></ul>';
+    let n = 0;
+    document.getElementById('g')?.addEventListener('click', () => { n++; });
+    /** @type {any} */
+    let cb = null;
+    const win = /** @type {any} */ ({ self: 1, top: 2, location: { hostname: 'gift.nicovideo.jp', pathname: '/live/lv1/purchase' }, document });
+    startGiftItemsTabResponder(win, (f) => { cb = f; });
+    cb({ [GIFT_ITEMS_TAB_REQ_KEY]: { newValue: { at: Date.now() } } });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(n).toBe(1);
+    document.getElementById('g')?.parentElement?.classList.add('is-active');
+    cb({ [GIFT_ITEMS_TAB_REQ_KEY]: { newValue: { at: Date.now() } } });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(n).toBe(1);
+  });
   it('ボタンが無ければ no-button(押さない)', async () => {
     const { openOfficialGiftPanel } = await import('./venueComposeBox.js');
     const doc = /** @type {any} */ ({ querySelector: () => null, getElementById: () => null });
