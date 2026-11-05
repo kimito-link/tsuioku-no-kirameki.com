@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1842',
+    date: '2026-10-31',
+    summary: '止まった取り込みの立て直しを直す',
+    items: Object.freeze([
+      'コメントの取り込みが止まったときに自動で立て直す仕組みが、ニコ生の応答を読み違えて空振りしていました。スマホ版で確かめた読み方に揃え、次の位置を正しくたどれるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1841',
     date: '2026-10-31',
     summary: 'VOICEVOX再起動後も準備中と正しく出す',

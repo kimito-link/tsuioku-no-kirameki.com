@@ -57,3 +57,23 @@ describe('会場から発言する入力欄', () => {
     expect(form.querySelector('.nlsb-compose-status')?.textContent).toBe('Extension context invalidated.');
   });
 });
+
+describe('会場のギフトボタン', () => {
+  it('公式のギフトボタンを押し、記録用の透明化を外す', async () => {
+    const { openOfficialGiftPanel } = await import('./venueComposeBox.js');
+    let clicked = 0;
+    let removed = 0;
+    const doc = /** @type {any} */ ({
+      querySelector: (sel) => (sel === '[class*="gift-button"]' ? { click: () => { clicked++; } } : null),
+      getElementById: (id) => (id === 'nls-stealth-gift-sidebar' ? { remove: () => { removed++; } } : null)
+    });
+    expect(openOfficialGiftPanel(doc)).toEqual({ ok: true });
+    expect(clicked).toBe(1);
+    expect(removed).toBe(1);
+  });
+  it('ボタンが無ければ no-button(押さない)', async () => {
+    const { openOfficialGiftPanel } = await import('./venueComposeBox.js');
+    const doc = /** @type {any} */ ({ querySelector: () => null, getElementById: () => null });
+    expect(openOfficialGiftPanel(doc)).toEqual({ ok: false, reason: 'no-button' });
+  });
+});
