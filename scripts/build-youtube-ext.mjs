@@ -53,48 +53,25 @@ function patchVenueBarPickupOnScreen(src) {
   src = replaceOnce(src, '    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n', '    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n    if (bubble.voiceState === \'pending\' && bubble.speechKey) { try { /** @type {any} */ (globalThis).__ytDropVoiceKey?.(bubble.speechKey); } catch { /* 声の後始末の失敗で描画を止めない */ } }\n', '消えた吹き出しの声');
   // 吹き出しを出し終えてから選ぶ(ニコ生版は吹き出しより先に選んでいた)
   src = replaceOnce(src, '      updatePickupBanner(null);\n    }\n    // ユーザー方針「しゃべった人を席に出して吹かせる」', '      queueMicrotask(() => updatePickupBanner(null));\n    }\n    // ユーザー方針「しゃべった人を席に出して吹かせる」', 'PICK UP を吹き出しの後に');
-  // 0.1.103 計器の直し: 会場を開いた瞬間に直近3件を吹き出す(primeEmit)分は、開く前に届いた発言なので
-  //   「受信→キュー」の遅れに数えない(数えると1件で最大60秒が平均に入り、過疎配信では何分も「遅れ」が残っていた・
-  //   PC 計測 2026-11-05: 実際の受信→キューは約0.06秒)。ニコ生版は後で同じ直し。
-  src = replaceOnce(
-    src,
-    '    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });\n',
-    '    const __ytPrimeBurst = !(speechState && speechState.primed === true);\n    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });\n',
-    '開いた瞬間の分の印'
-  );
-  src = replaceOnce(
-    src,
-    '          receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,\n',
-    '          receivedAt: __ytPrimeBurst ? undefined : speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,\n',
-    '開いた瞬間の分は受信→キューに数えない'
-  );
   return src;
 }
 
-// 会議(2026-11-05): VOICEVOX が混んで PC の声に切り替わると、戻るには速い合成が5回続く必要があるのに、PC の声の間は
-//   30秒に1回しか VOICEVOX を確かめないので、原因が消えても戻るまで最短2分半かかっていた(PC 実測 約3分)。
-//   YouTube 版だけ確かめる間隔を6秒にする(短い「てすと」1回=エンジンの邪魔は小さい・二重に頼まない仕組みはそのまま)。
-//   ニコ生版は審査後に同じ直し。
-function setupLightProbePatch(b) {
-  // 0.1.95: 声の前後の無音を VOICEVOX 既定の0.1秒→0.05秒に。1件あたり約0.1秒短くなり、
-  //   合成の手間も同じだけ減る(会議 2026-11-05「もっとテンポよく」)。ニコ生版は審査後に同じ直し。
-  b.onLoad({ filter: /src[\\/]lib[\\/]voicevoxClient\.js$/ }, (args) => ({
+// 0.1.106: ニコ生版 v0.1.1861 の「混んだら大事なものだけ」(voicePlayer の中)は、YouTube のスパチャ・メンバー・バッジを
+//   知らないので、同じ人の2回目のスパチャを読まずに飛ばしてしまう。YouTube 版は先に入れた自前の選び方
+//   (venue-inline-entry.js・ytVoicePriority.js・2026-11-04 りんく決定)があるので、ニコ生版の方は YouTube 版では使わない
+//   (master を取り込む前と同じ動き)。
+function setupYtBusyPatch(b) {
+  b.onLoad({ filter: /src[\\/]lib[\\/]voiceBusyPriority\.js$/ }, (args) => ({
     contents: replaceOnce(
       readFileSync(args.path, 'utf8'),
-      '    audioQuery.outputStereo = false;\n',
-      '    audioQuery.outputStereo = false;\n    audioQuery.prePhonemeLength = 0.05;\n    audioQuery.postPhonemeLength = 0.05;\n',
-      '声の前後の無音'
+      '  return busy && !input?.importance;',
+      '  return busy && !input?.importance && false; // YouTube 版は自前の選び方(ytVoicePriority.js)',
+      'ニコ生版の混雑時の絞り込みを使わない'
     ),
     loader: 'js',
     resolveDir: dirname(args.path),
   }));
-  b.onLoad({ filter: /src[\\/]lib[\\/]voiceLightFallback\.js$/ }, (args) => ({
-    contents: replaceOnce(readFileSync(args.path, 'utf8'), 'export const LIGHT_VOICE_PROBE_INTERVAL_MS = 30000;', 'export const LIGHT_VOICE_PROBE_INTERVAL_MS = 6000;', 'PC の声から戻る確かめの間隔'),
-    loader: 'js',
-    resolveDir: dirname(args.path),
-  }));
 }
-
 
 // 0.1.99 りんく(2026-11-05)「自分でちゃんと設定している人は認知してほしい」: YouTube は全員に名前があるので、
 //   ニコ生版の決まり(名前＋数字ID=りんく)だと全員りんく欄になる。最初からの文字アイコンのままの人はこん太欄へ下げる。
@@ -127,32 +104,15 @@ const ytScreenPlugin = {
   name: 'yt-screen',
   setup(b) {
     setupYtDefaultIconTier(b);
-    setupLagNoticePatch(b);
+    setupYtBusyPatch(b);
   },
 };
-
-// 0.1.102(2026-11-05 りんく画面「読み上げが約19秒遅れています」): 待ちが0件なのに遅れの案内が出ていた。
-//   ニコ生版は「前に出していた」ときだけ待ち0で消すので、開き直した直後(前に出していない)は、古い平均(受信→キュー)が
-//   大きいだけで待ち0でも出てしまう。待ちが0件なら遅れていないので出さない。ニコ生版にも後で同じ直し。
-function setupLagNoticePatch(b) {
-  b.onLoad({ filter: /src[\\/]lib[\\/]voiceLagNotice\.js$/ }, (args) => ({
-    contents: replaceOnce(
-      readFileSync(args.path, 'utf8'),
-      '  if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: \'\' };',
-      '  if (Number.isFinite(queueNow) && queueNow <= 0) return { shown: false, lagMs, text: \'\' };',
-      '待ち0件なら遅れの案内を出さない'
-    ),
-    loader: 'js',
-    resolveDir: dirname(args.path),
-  }));
-}
 
 const ytVenueLiveIdPlugin = {
   name: 'yt-venue-live-id',
   setup(b) {
-    setupLightProbePatch(b);
     setupYtDefaultIconTier(b);
-    setupLagNoticePatch(b);
+    setupYtBusyPatch(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents:
         patchVenueBarForPickup(readFileSync(args.path, 'utf8')) +
@@ -167,9 +127,8 @@ const ytVenueLiveIdPlugin = {
 const ytVenuePickupPlugin = {
   name: 'yt-venue-pickup',
   setup(b) {
-    setupLightProbePatch(b);
     setupYtDefaultIconTier(b);
-    setupLagNoticePatch(b);
+    setupYtBusyPatch(b);
     b.onLoad({ filter: /src[\\/]extension[\\/]venueBar\.js$/ }, (args) => ({
       contents: patchVenueBarForPickup(readFileSync(args.path, 'utf8')),
       loader: 'js',

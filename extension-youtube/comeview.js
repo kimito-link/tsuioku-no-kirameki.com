@@ -5657,6 +5657,8 @@ ${sourceCol}
       audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
       audioQuery.outputSamplingRate = _outputSamplingRate;
       audioQuery.outputStereo = false;
+      audioQuery.prePhonemeLength = 0.05;
+      audioQuery.postPhonemeLength = 0.05;
       const queryMs = nowMs() - queryStartAt;
       stage = "synth";
       const synthStartAt = nowMs();
@@ -6959,16 +6961,28 @@ ${sourceCol}
     const rawMax = Number(max);
     const limit = Number.isFinite(rawMax) ? Math.max(0, Math.floor(rawMax)) : 5;
     const dropCount = Math.max(0, current.length - limit);
-    if (typeof keep !== "function" || dropCount === 0) {
-      return {
-        queue: current.slice(dropCount),
-        dropped: current.slice(0, dropCount)
-      };
+    if (dropCount === 0) return { queue: current, dropped: [] };
+    const isHigh = (x) => !!x && typeof x === "object" && /** @type {{priority?: string}} */
+    x.priority === "high";
+    const hasKeep = typeof keep === "function";
+    const dropSet = /* @__PURE__ */ new Set();
+    const passes = [
+      (x) => x !== item && !isHigh(x),
+      (x) => x !== item && isHigh(x),
+      (x) => !hasKeep && x === item
+    ];
+    for (const pass of passes) {
+      for (const x of current) {
+        if (dropSet.size >= dropCount) break;
+        if (dropSet.has(x) || !pass(x)) continue;
+        if (hasKeep && keep(x)) continue;
+        dropSet.add(x);
+      }
     }
     const dropped = [];
     const kept = [];
     for (const x of current) {
-      if (dropped.length < dropCount && x !== item && !keep(x)) dropped.push(x);
+      if (dropSet.has(x)) dropped.push(x);
       else kept.push(x);
     }
     return { queue: kept, dropped };
@@ -7246,6 +7260,92 @@ ${sourceCol}
     };
   }
 
+  // src/lib/parseGiftComment.js
+  function parseGiftCommentText(text) {
+    if (typeof text !== "string") return null;
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    const re = /^(?:【[^】]*】\s*)*(.+?)さんがギフト[「『](.+?)[（(](\d+)\s*pt[)）][」』]を贈りました/;
+    const m = trimmed.match(re);
+    if (!m) return null;
+    const sender = m[1].trim();
+    const item = m[2].trim();
+    const point = parseInt(m[3], 10);
+    if (!sender || !item || !Number.isFinite(point) || point < 0) return null;
+    const rankMatch = trimmed.match(/【ギフト貢献(\d+)位】/);
+    if (rankMatch) {
+      const rank = parseInt(rankMatch[1], 10);
+      if (Number.isFinite(rank) && rank > 0) {
+        return { sender, item, point, rank };
+      }
+    }
+    return { sender, item, point };
+  }
+  function parseNicoadPointToken(raw) {
+    const normalized = String(raw || "").replace(/,/g, "").replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 65248));
+    const point = parseInt(normalized, 10);
+    return Number.isFinite(point) && point > 0 ? point : null;
+  }
+  function parseNicoadCommentText(text) {
+    if (typeof text !== "string") return null;
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    const re = /^(?:【[^】]*】\s*)*(.+?)さんが([\d,０-９]+)\s*pt(?:広告しました|の(?:ニコニコ)?広告)/i;
+    const m = trimmed.match(re);
+    if (!m) return null;
+    const sender = m[1].trim();
+    const point = parseNicoadPointToken(m[2]);
+    if (!sender || point == null) return null;
+    return { sender, point };
+  }
+
+  // src/lib/voiceBusyPriority.js
+  var VOICE_BUSY_QUEUE_MIN = 2;
+  var VOICE_FIRST_SPEAKER_CAP = 2e4;
+  function classifyVoiceImportance(input) {
+    const o = input && typeof input === "object" ? input : {};
+    if (o.kind === "gift") return "gift";
+    const text = typeof o.text === "string" ? o.text : "";
+    if (text) {
+      if (parseGiftCommentText(text)) return "gift";
+      if (parseNicoadCommentText(text)) return "ad";
+    }
+    const uid = String(o.userId ?? "").trim();
+    const caster = String(o.broadcasterUid ?? "").trim();
+    if (uid && caster && uid === caster) return "broadcaster";
+    if (o.isModerator === true) return "moderator";
+    if (o.firstInLive === true) return "first";
+    return "";
+  }
+  function shouldSkipVoiceWhenBusy(input) {
+    const n = Number(input?.queueLength);
+    const busy = Number.isFinite(n) && n >= VOICE_BUSY_QUEUE_MIN;
+    return busy && !input?.importance && false;
+  }
+  function voicePriorityForImportance(importance) {
+    return importance === "gift" || importance === "ad" ? "high" : "normal";
+  }
+  function createVoiceFirstSpeakerState() {
+    return { liveId: "", seen: /* @__PURE__ */ new Set() };
+  }
+  function noteVoiceSpeakerInLive(state, liveId, userKey) {
+    if (!state || !(state.seen instanceof Set)) return false;
+    const lv = String(liveId ?? "").trim().toLowerCase();
+    if (lv !== state.liveId) {
+      state.liveId = lv;
+      state.seen.clear();
+    }
+    const key = String(userKey ?? "").trim();
+    if (!key) return false;
+    if (state.seen.has(key)) return false;
+    if (state.seen.size >= VOICE_FIRST_SPEAKER_CAP) {
+      const oldest = state.seen.values().next().value;
+      if (oldest !== void 0) state.seen.delete(oldest);
+    }
+    state.seen.add(key);
+    return true;
+  }
+
   // src/lib/voicePlayer.js
   var VOICE_ALIVE_RETRY_BACKOFF_MS = Object.freeze([0, 500, 1500]);
   var SILENT_WAV_DATA_URI = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
@@ -7321,6 +7421,8 @@ ${sourceCol}
       bgInitYieldTotal: 0,
       readerYieldTotal: 0,
       ngMutedTotal: 0,
+      busySkipTotal: 0,
+      busyImportantTotal: 0,
       refreshVoicedTotal: 0,
       backlogSkipTotal: 0,
       bigBatchTotal: 0,
@@ -7480,6 +7582,8 @@ ${sourceCol}
       bgInitYieldTotal: num2(d.bgInitYieldTotal, base.bgInitYieldTotal),
       readerYieldTotal: num2(d.readerYieldTotal, base.readerYieldTotal),
       ngMutedTotal: num2(d.ngMutedTotal, base.ngMutedTotal),
+      busySkipTotal: num2(d.busySkipTotal, base.busySkipTotal),
+      busyImportantTotal: num2(d.busyImportantTotal, base.busyImportantTotal),
       refreshVoicedTotal: num2(d.refreshVoicedTotal, base.refreshVoicedTotal),
       backlogSkipTotal: num2(d.backlogSkipTotal, base.backlogSkipTotal),
       bigBatchTotal: num2(d.bigBatchTotal, base.bigBatchTotal),
@@ -8709,6 +8813,26 @@ ${sourceCol}
     }
   }
 
+  // src/lib/broadcastContext.js
+  var KEY_LIVE_BROADCASTER_CTX = "nls_live_broadcaster_ctx_v1";
+  function emptyBroadcasterCtx() {
+    return { uid: "", iconUrl: "", liveId: "", updatedAt: 0 };
+  }
+  function normalizeBroadcasterCtx(raw) {
+    if (!raw || typeof raw !== "object") return emptyBroadcasterCtx();
+    const o = (
+      /** @type {Record<string, unknown>} */
+      raw
+    );
+    const updatedAtNum = Number(o.updatedAt);
+    return {
+      uid: String(o.uid ?? "").trim(),
+      iconUrl: String(o.iconUrl ?? "").trim(),
+      liveId: String(o.liveId ?? "").trim(),
+      updatedAt: Number.isFinite(updatedAtNum) && updatedAtNum > 0 ? updatedAtNum : 0
+    };
+  }
+
   // src/lib/comeviewTimelineDiff.js
   function diffComeviewTimeline(domKeys, timeline) {
     const dom = Array.isArray(domKeys) ? domKeys.filter((k) => typeof k === "string" && k) : [];
@@ -8804,6 +8928,20 @@ ${sourceCol}
   var VOICE_ASSIGNMENTS_KEY = KEY_VOICE_ASSIGNMENTS;
   var VOICE_READ_NAME_KEY = KEY_VOICE_READ_NAME_ENABLED;
   var _liveId = "";
+  var _broadcasterCtx = normalizeBroadcasterCtx(null);
+  var _voiceFirstSpeakerState = createVoiceFirstSpeakerState();
+  function broadcasterUidForVoice() {
+    const own = String(_broadcasterCtx.liveId || "").trim().toLowerCase();
+    if (own && _liveId && own !== _liveId) return "";
+    return _broadcasterCtx.uid;
+  }
+  async function loadBroadcasterCtxForVoice() {
+    try {
+      const bag = await runStorageOpWithTimeout(() => chrome.storage.local.get(KEY_LIVE_BROADCASTER_CTX), 3e3);
+      _broadcasterCtx = normalizeBroadcasterCtx(bag?.[KEY_LIVE_BROADCASTER_CTX]);
+    } catch {
+    }
+  }
   var _paused = false;
   var _timer = null;
   var _lastReconcileAt = 0;
@@ -9541,9 +9679,7 @@ ${sourceCol}
       if (!item || item.kind !== "comment" && item.kind !== "gift") continue;
       const name = _voiceReadNameEnabled ? String(item.nickname || "").trim() : "";
       let body = "";
-      let isHighPriority = false;
       if (item.kind === "gift") {
-        isHighPriority = true;
         const count = item.gift?.count > 1 ? `を${item.gift.count}個` : "を";
         body = `ギフト、${item.gift?.name || "アイテム"}${count}贈りました。${item.gift?.message || ""}`.trim();
       } else {
@@ -9560,13 +9696,30 @@ ${sourceCol}
       }
       _voiceArrivalWindow = foldVoiceArrivalWindow(_voiceArrivalWindow, Date.now(), 1);
       _voiceDiag.arrivalPerMin = _voiceArrivalWindow.arrivalPerMin;
+      const userKey = voiceUserKeyForItem(item);
+      const importance = classifyVoiceImportance({
+        kind: item.kind,
+        text: item.kind === "gift" ? "" : body,
+        userId: item.userId,
+        isModerator: item.isModerator,
+        broadcasterUid: broadcasterUidForVoice(),
+        firstInLive: noteVoiceSpeakerInLive(_voiceFirstSpeakerState, _liveId, userKey)
+      });
+      if (shouldSkipVoiceWhenBusy({ queueLength: _voiceQueue.length, importance })) {
+        _voiceDiag.busySkipTotal = (Number(_voiceDiag.busySkipTotal) || 0) + 1;
+        notifyVoiceItemDropped(item);
+        continue;
+      }
+      if (importance && _voiceQueue.length >= VOICE_BUSY_QUEUE_MIN) {
+        _voiceDiag.busyImportantTotal = (Number(_voiceDiag.busyImportantTotal) || 0) + 1;
+      }
       const candidate = {
-        userKey: voiceUserKeyForItem(item),
+        userKey,
         name,
         body,
         count: 1,
         enqueuedAt: Date.now(),
-        priority: isHighPriority ? "high" : "normal",
+        priority: voicePriorityForImportance(importance),
         // v0.1.1799: 鳴り始め・鳴り終わり・捨てた時の知らせ(試験の1件ごとの記録用・会場 VoicePlayer と同じ名前)。
         onAudioStart: item.onAudioStart,
         onAudioEnd: item.onAudioEnd,
@@ -10519,6 +10672,9 @@ ${sourceCol}
         const m = url.toLowerCase().match(/lv\d{1,15}/);
         if (m && m[0] !== _liveId) void switchToLiveId(m[0]);
       }
+      if (changes[KEY_LIVE_BROADCASTER_CTX]) {
+        _broadcasterCtx = normalizeBroadcasterCtx(changes[KEY_LIVE_BROADCASTER_CTX].newValue);
+      }
       if (pinKey && changes[pinKey]) renderPin(changes[pinKey].newValue);
       if (changes[COMEVIEW_USER_NOTES_KEY]) {
         _userNotes = normalizeComeviewUserNotes(
@@ -10706,6 +10862,7 @@ ${sourceCol}
       meta.textContent = _liveId ? _liveId : "配信を探しています…";
     }
     void initializeVoiceReading();
+    void loadBroadcasterCtxForVoice();
     void loadNgList();
     await requestFullRefresh(true);
     const detailReq = resolveDetailRequestFromUrl();
