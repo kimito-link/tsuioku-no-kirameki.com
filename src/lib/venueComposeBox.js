@@ -3,6 +3,8 @@
 //   送り方(post)は呼び出し側が渡す: ニコ生=content script の postCommentFromContentAsync、YouTube=YT_SEND_COMMENT。
 //   ★キー入力は会場の外へ伝えない(ページ側のショートカットや会場の Esc で閉じるに食われないように)。
 
+import { findGiftSidebarItemsTabElement } from './giftSidebarRankTabPick.js';
+
 /** @typedef {{ ok?: boolean, error?: unknown, reason?: unknown }} VenuePostResult */
 
 /**
@@ -149,6 +151,38 @@ export function createVenueGiftButton(openGift, opts = {}) {
   return btn;
 }
 
+const GIFT_SIDEBAR_ROOT_SEL =
+  '[class*="gift-sidebar"], [class*="rich-view"], [class*="gift-modal"], [class*="gift-popup"], [class*="gift-balloon"], [class*="gift-dialog"], [class*="gift-overlay"], [class*="program-gift-richview"]';
+
+/**
+ * v0.1.1873: ギフト欄が開いたら「番組ギフト」(アイテム一覧)のタブへ切り替える。
+ *   記録のために裏でランキングタブを開くので、そのまま開くとランキングが出てしまう(りんく 2026-11-05)。
+ *   欄が描かれるのを待って 0.25 秒ごとに最大 12 回探し、見つけたら1回だけ押す。既に選ばれていれば押さない。
+ * @param {Document} doc
+ * @param {{ tries?: number, waitMs?: number }} [opts]
+ */
+export function showGiftItemsTabSoon(doc, opts = {}) {
+  const win = doc.defaultView;
+  if (!win || typeof doc.querySelectorAll !== 'function') return;
+  let left = opts.tries ?? 12;
+  const step = () => {
+    left -= 1;
+    try {
+      for (const root of doc.querySelectorAll(GIFT_SIDEBAR_ROOT_SEL)) {
+        const tab = findGiftSidebarItemsTabElement(root);
+        if (!tab) continue;
+        const sel = tab.getAttribute('aria-selected') === 'true' || /(?:^|[\s_-])(?:active|selected|current)/i.test(String(tab.getAttribute('class') || ''));
+        if (!sel) tab.click();
+        return;
+      }
+    } catch {
+      return;
+    }
+    if (left > 0) win.setTimeout(step, opts.waitMs ?? 250);
+  };
+  win.setTimeout(step, opts.waitMs ?? 250);
+}
+
 /**
  * ニコ生の公式ギフトボタンを押してギフト画面を開く(会場の「🎁 ギフト」から)。
  *   ボタンは CSS Modules のハッシュ名(___gift-button___HASH)なので部分一致で探す(content-entry の自動取得と同じ探し方)。
@@ -165,6 +199,7 @@ export function openOfficialGiftPanel(doc) {
     if (!btn || typeof (/** @type {any} */ (btn)).click !== 'function') return { ok: false, reason: 'no-button' };
     doc.getElementById('nls-stealth-gift-sidebar')?.remove();
     /** @type {HTMLElement} */ (btn).click();
+    showGiftItemsTabSoon(doc);
     return { ok: true };
   } catch {
     return { ok: false, reason: 'error' };

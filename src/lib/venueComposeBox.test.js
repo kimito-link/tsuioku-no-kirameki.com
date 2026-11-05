@@ -71,6 +71,19 @@ describe('会場のギフトボタン', () => {
     expect(clicked).toBe(1);
     expect(removed).toBe(1);
   });
+  it('開いたあと番組ギフトのタブへ切り替える(選ばれていれば押さない)', async () => {
+    const { showGiftItemsTabSoon } = await import('./venueComposeBox.js');
+    document.body.innerHTML = '<div class="___gift-sidebar___a"><button id="r" aria-selected="true">ランキング</button><button id="g" aria-selected="false">番組ギフト</button></div>';
+    let n = 0;
+    document.getElementById('g')?.addEventListener('click', () => { n++; });
+    showGiftItemsTabSoon(document, { waitMs: 1 });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(n).toBe(1);
+    document.getElementById('g')?.setAttribute('aria-selected', 'true');
+    showGiftItemsTabSoon(document, { waitMs: 1 });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(n).toBe(1);
+  });
   it('ボタンが無ければ no-button(押さない)', async () => {
     const { openOfficialGiftPanel } = await import('./venueComposeBox.js');
     const doc = /** @type {any} */ ({ querySelector: () => null, getElementById: () => null });

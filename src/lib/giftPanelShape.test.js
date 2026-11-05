@@ -34,4 +34,10 @@ describe('公式ギフト欄の作りを記録する計器', () => {
     expect(f[0].name).toBe('g');
     expect(f[0].inPanel).toBe(true);
   });
+  it('数字と pt が別の部品でも拾う', () => {
+    document.body.innerHTML = `<ul><li><button><img src="https://cdn.example/a.png"><span>う</span><p><span>100</span><span>pt</span></p></button></li></ul>`;
+    const s = captureGiftPanelShape(document);
+    expect(s?.tiles.length).toBe(1);
+    expect(s?.tiles[0].pt).toBe('100pt');
+  });
 });
