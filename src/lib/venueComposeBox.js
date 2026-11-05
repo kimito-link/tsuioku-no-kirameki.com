@@ -123,7 +123,7 @@ export function createVenueComposeBox(post, opts = {}) {
  *   押すと先に会場をしまい(公式の画面が会場の帯に隠れないように・PC 実測でギフト欄の下半分が隠れた)、公式のボタンを押す。
  *   買う・贈る操作は公式の画面で本人がする(拡張は画面を開くところまで)。公式のボタンが見つからなければ会場を戻して一言出す。
  * @param {() => Promise<{ ok?: boolean, reason?: string }> | { ok?: boolean, reason?: string }} openGift
- * @param {{ doc?: Document, label?: string, reasonText?: (reason: string) => string, tuck?: (on: boolean) => void }} [opts]
+ * @param {{ doc?: Document, label?: string, reasonText?: (reason: string) => string, tuck?: (on: boolean, note?: string) => void }} [opts]
  * @returns {HTMLButtonElement}
  */
 export function createVenueGiftButton(openGift, opts = {}) {
@@ -135,7 +135,7 @@ export function createVenueGiftButton(openGift, opts = {}) {
   btn.textContent = label;
   btn.title = '公式のギフト画面を開きます(会場はいったんしまいます・右下の「▲ 会場に戻る」で戻せます)';
   btn.addEventListener('click', async () => {
-    try { opts.tuck?.(true); } catch { /* しまえなくても開くのは試す */ }
+    try { opts.tuck?.(true, `公式の${label.replace(/^\S+\s/, '')}の画面を開きました。公式の画面で選んで送るまで、お金やポイントは使われません。戻るときは右下の「▲ 会場に戻る」`); } catch { /* しまえなくても開くのは試す */ }
     /** @type {{ ok?: boolean, reason?: string } | null} */
     let res = null;
     try { res = await openGift(); } catch { res = null; }

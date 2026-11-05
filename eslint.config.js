@@ -469,8 +469,9 @@ export default [
     // v0.1.1867: 会場から発言(import 1行+入力欄を作る1行)=+2。入力欄は lib の venueComposeBox.js。
     // v0.1.1870: 会場の「🎁 ギフト」(ボタンを作る1行・lib の createVenueGiftButton)=+1。
     // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
+    // YouTube 0.1.119: ギフト/スーパーチャットで会場をしまうとき理由と次の一手を右下に出す(りんく「何の説明もないと何が起こったのかと思う」)=+21。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7400, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7421, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

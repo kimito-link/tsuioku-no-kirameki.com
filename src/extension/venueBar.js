@@ -2842,7 +2842,7 @@ export function mountVenueBarButton(options = {}) {
     tuckBtn.title = 'コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます';
     tuckBtn.addEventListener('click', () => setTucked(true));
   }
-  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on) => setTucked(on) }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
+  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on, note) => setTucked(on, note) }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
   const composeBox = !isStandalone && typeof options.postComment === 'function' ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null; // v0.1.1867 会場から発言(lib の venueComposeBox.js)
   const note = document.createElement('div');
   note.className = 'nlsb-note';
@@ -7213,9 +7213,30 @@ export function mountVenueBarButton(options = {}) {
   /** v0.1.1654: 会場を一時的にしまっているか(会場自体は開いたまま・閉じると必ず解除)。 */
   let tucked = false;
   const TOGGLE_LABEL_OPEN = toggle.textContent || '🏟 会場モード';
-  /** @param {boolean} next */
-  const setTucked = (next) => {
+  /** @type {HTMLDivElement | null} */
+  let tuckNote = null;
+  let tuckNoteSeq = 0;
+  /** しまった理由と次の一手を右下に出す(ギフト/スーパーチャットから会場をしまったとき・りんく「何の説明もないと何が起こったのかと思う」) */
+  /** @param {string} [text] */
+  const showTuckNote = (text) => {
+    if (!text) { tuckNote?.remove(); tuckNote = null; return; }
+    if (!tuckNote) {
+      tuckNote = document.createElement('div');
+      tuckNote.className = 'nlsb-tuck-note';
+      tuckNote.setAttribute('role', 'status');
+      tuckNote.style.cssText = 'position:fixed;right:16px;bottom:72px;z-index:2147483646;max-width:min(360px,calc(100vw - 32px));padding:10px 12px;border-radius:10px;background:#fff;color:#222;font-size:13px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
+      tuckNote.title = '押すと消えます';
+      tuckNote.addEventListener('click', () => showTuckNote(''));
+      document.body.append(tuckNote);
+    }
+    tuckNote.textContent = text;
+    const seq = ++tuckNoteSeq;
+    setTimeout(() => { if (seq === tuckNoteSeq) showTuckNote(''); }, 15000);
+  };
+  /** @param {boolean} next @param {string} [note] */
+  const setTucked = (next, note) => {
     tucked = next === true;
+    showTuckNote(tucked ? note : '');
     root.classList.toggle('nlsb-is-tucked', tucked);
     toggle.textContent = tucked ? '▲ 会場に戻る' : TOGGLE_LABEL_OPEN;
     toggle.setAttribute('aria-label', tucked ? '会場に戻る' : '会場モード');
