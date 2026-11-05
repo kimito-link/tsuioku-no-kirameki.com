@@ -12315,6 +12315,8 @@ ${sourceCol}
       audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
       audioQuery.outputSamplingRate = _outputSamplingRate;
       audioQuery.outputStereo = false;
+      audioQuery.prePhonemeLength = 0.05;
+      audioQuery.postPhonemeLength = 0.05;
       const queryMs = nowMs() - queryStartAt;
       stage = "synth";
       const synthStartAt = nowMs();
@@ -20093,7 +20095,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T00:36") : ""
+          buildId: true ? String("yt-2026-11-05T01:18") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
