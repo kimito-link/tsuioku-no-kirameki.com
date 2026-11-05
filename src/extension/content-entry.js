@@ -8,6 +8,7 @@ import {
 } from '../lib/broadcastUrl.js';
 import { mountVenueBarButton } from './venueBar.js';
 import { openOfficialGiftPanel } from '../lib/venueComposeBox.js';
+import { startGiftPanelRecorder } from '../lib/giftPanelShape.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -19572,5 +19573,6 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   //   履歴 relay 経路を起動。iframe 内では shouldRunWatchContentInThisFrame() が
   //   false で start() が早期 return するため、独立して起動する。
   try { maybeStartGiftSubAppIframeRelay(); } catch { /* no-op */ }
+  try { startGiftPanelRecorder(window, (o) => { chrome.storage.local.set(o).catch(() => {}); }); } catch { /* v0.1.1871 公式ギフト欄の作りを記録(lib/giftPanelShape.js) */ }
   start().catch((err) => reportSilentErrorToStorage('start', err));
 }
