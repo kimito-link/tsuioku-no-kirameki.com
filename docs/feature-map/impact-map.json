@@ -2998,6 +2998,18 @@
       ]
     },
     {
+      "file": "src/lib/giftSidebarRankTabPick.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/giftSubAppFrameSource.js",
       "featureCount": 2,
       "features": [
@@ -6336,6 +6348,16 @@
       ]
     },
     {
+      "file": "src/lib/giftItemsMirror.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/giftLaneOfficialFill.js",
       "featureCount": 1,
       "features": [
@@ -6417,16 +6439,6 @@
     },
     {
       "file": "src/lib/giftSenderObservation.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/giftSidebarRankTabPick.js",
       "featureCount": 1,
       "features": [
         "content"

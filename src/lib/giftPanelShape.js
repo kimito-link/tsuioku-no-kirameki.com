@@ -4,6 +4,8 @@
 //   ログインしていない試験用ブラウザでは中身が出ない(「ログインする必要があります」)ので、本人の画面で記録する。
 //   押さない・送らない・名前など個人の情報は取らない(アイテム名と pt と部品の名前だけ)。
 
+import { giftItemSkeleton } from './giftItemsMirror.js';
+
 const PT_RE = /^\s*[\d,]+\s*pt\s*$/i;
 const TAB_WORDS = ['番組ギフト', 'マイギフト', '履歴', 'ランキング'];
 
@@ -31,7 +33,7 @@ function safeSrc(s) {
 /**
  * @param {Document} doc
  * @param {{ maxTiles?: number }} [opts]
- * @returns {null | { tiles: any[], tabs: any[], dialogs: any[], tileCount: number }}
+ * @returns {null | { tiles: any[], tabs: any[], dialogs: any[], tileCount: number, ptSkel?: string[] }}
  */
 export function captureGiftPanelShape(doc, opts = {}) {
   const maxTiles = opts.maxTiles ?? 24;
@@ -43,6 +45,8 @@ export function captureGiftPanelShape(doc, opts = {}) {
     if (el.children.length > 0) continue;
     const t = String(el.textContent || '');
     if (t.length <= 20 && PT_RE.test(t)) ptEls.push(el);
+    // v0.1.1873: 「100」と「pt」が別の部品に分かれている形も拾う(数字の部品を pt として扱う)
+    else if (/^\s*[\d,]+\s*$/.test(t) && el.parentElement && String(el.parentElement.textContent || '').length <= 20 && PT_RE.test(String(el.parentElement.textContent || ''))) ptEls.push(el);
     if (ptEls.length > 200) break;
   }
   /** @type {any[]} */
@@ -53,6 +57,7 @@ export function captureGiftPanelShape(doc, opts = {}) {
     let tile = pt.parentElement;
     for (let i = 0; i < 4 && tile && !tile.querySelector('img'); i += 1) tile = tile.parentElement;
     if (!tile || seen.has(tile) || !tile.querySelector('img')) continue;
+    if (tile.querySelector('[class*="point-charge"]')) continue; // v0.1.1874: 自分の所持ポイントの欄はアイテムではない
     seen.add(tile);
     const img = /** @type {HTMLImageElement | null} */ (tile.querySelector('img'));
     const click = clickableOf(tile) || clickableOf(pt);
@@ -66,7 +71,7 @@ export function captureGiftPanelShape(doc, opts = {}) {
       attrs: dataAttrNames(tile),
       click: click ? { tag: click.localName, cls: shortClass(click), attrs: dataAttrNames(click) } : null,
       img: img ? { src: safeSrc(img.getAttribute('src') || ''), alt: String(img.getAttribute('alt') || '').slice(0, 40) } : null,
-      pt: String(pt.textContent || '').trim(),
+      pt: PT_RE.test(String(pt.textContent || '')) ? String(pt.textContent || '').trim() : String(pt.parentElement?.textContent || '').replace(/\s+/g, ' ').trim(),
       ptCls: shortClass(pt),
       name: nameEl ? String(nameEl.textContent || '').trim() : '',
     });
@@ -88,7 +93,21 @@ export function captureGiftPanelShape(doc, opts = {}) {
       text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
     }));
   if (!tiles.length && !dialogs.length && !tabs.length) return null;
-  return { tiles, tabs, dialogs, tileCount: seen.size };
+  // v0.1.1874: pt の部品の祖先の骨組み(タグと class だけ・文字は取らない)。アイテムの枠の形を1回で知るため
+  const ptSkel = ptEls
+    .filter((el) => !el.closest('[class*="point-charge"]') && !el.closest('section')?.querySelector('[class*="point-charge"]'))
+    .slice(0, 3)
+    .map((el) => {
+      /** @type {string[]} */
+      const chain = [];
+      let a = /** @type {Element | null} */ (el);
+      for (let i = 0; i < 8 && a && a !== root; i += 1, a = a.parentElement) {
+        const bg = a instanceof HTMLElement && /url\(/.test(a.style.backgroundImage || '') ? '[bg]' : '';
+        chain.push(`${a.localName}.${shortClass(a).split(' ').slice(0, 2).join('.')}(${a.children.length})${bg}${a.querySelector('img') ? '[img]' : ''}`);
+      }
+      return chain.join(' < ').slice(0, 900);
+    });
+  return { tiles, tabs, dialogs, tileCount: seen.size, ptSkel };
 }
 
 /**
@@ -152,7 +171,8 @@ export function startGiftPanelRecorder(win, save) {
   let last = '';
   const started = Date.now();
   const tick = () => {
-    if (Date.now() - started > 30 * 60 * 1000) {
+    // v0.1.1873: 親のページはギフト欄の箱があるときだけ読むので止めない(30分後に開いた欄も記録する)。子の窓は30分で止める
+    if (!isTop && Date.now() - started > 30 * 60 * 1000) {
       win.clearInterval(timer);
       return;
     }
@@ -161,8 +181,16 @@ export function startGiftPanelRecorder(win, save) {
       if (isTop && !doc.querySelector('[class*="web-view-panel"], [class*="gift-sidebar" i], [class*="gift-panel" i]')) return;
       // v0.1.1872: 中身が拾えなくても「動いた・何が見えた」を必ず残す(子の窓は常に、親は iframe 一覧つき)
       const shape = captureGiftPanelShape(doc) || { tiles: [], tabs: [], dialogs: [], tileCount: 0 };
+      /** @type {Record<string, unknown>} */
       const extra = isTop ? { frames: listFrames(doc) } : {};
       const census = frameCensus(doc);
+      // v0.1.1873: 子の窓は見えている文字の頭 240 字も残す(アイテム名と pt が並ぶか、履歴やランキングだけかを見分ける)
+      let head = isTop ? '' : String(doc.body?.innerText || doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+      // v0.1.1874: 頭の「〇〇 さん 61 pt」(本人の名前)は残さない。タブ名から先だけを残す
+      const tabAt = head.search(/番組ギフト|マイギフト|履歴|ランキング/);
+      head = (tabAt >= 0 ? head.slice(tabAt) : head.replace(/^.*?さん/, '')).slice(0, 240);
+      if (head) extra.head = head;
+      if (!isTop) extra.skel = giftItemSkeleton(doc); // v0.1.1875: アイテムの枠の骨組み(文字なし)
       const sig = JSON.stringify([shape, extra, census.imgs, census.shadowHosts, census.iframes]);
       if (sig === last) return;
       last = sig;

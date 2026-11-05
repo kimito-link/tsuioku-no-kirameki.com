@@ -7,8 +7,9 @@ import {
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
 import { mountVenueBarButton } from './venueBar.js';
-import { openOfficialGiftPanel } from '../lib/venueComposeBox.js';
+import { openOfficialGiftPanel, GIFT_ITEMS_TAB_REQ_KEY, startGiftItemsTabResponder } from '../lib/venueComposeBox.js';
 import { startGiftPanelRecorder } from '../lib/giftPanelShape.js';
+import { startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, chromeGiftStore, waitGiftPressResult, giftPressOutcome } from '../lib/giftItemsMirror.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -14318,7 +14319,7 @@ async function start() {
    */
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
     // v0.1.1867: 会場から発言(パネルの「コメント送信」と同じ postCommentFromContentAsync で公式コメント欄へ送る)
-    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }), openGift: async () => openOfficialGiftPanel(document) });
+    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }), openGift: async () => { /* v0.1.1874 ギフトの子の窓へ番組ギフトの合図 */ chrome.storage.local.set({ [GIFT_ITEMS_TAB_REQ_KEY]: { at: Date.now() } }).catch(() => {}); return openOfficialGiftPanel(document); }, giftItems: { subscribe: (cb) => subscribeGiftItems(chromeGiftStore(), location.pathname, cb), press: async (key, o) => { const st = chromeGiftStore(); let at = 0; const r = requestGiftItemPress(document, key, st.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); if (!o?.direct) return r; const v = await waitGiftPressResult(st, at); return { ok: r.ok || !!v, reason: r.reason, ...giftPressOutcome(v) }; } } });
   }
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
@@ -19574,5 +19575,6 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   //   false で start() が早期 return するため、独立して起動する。
   try { maybeStartGiftSubAppIframeRelay(); } catch { /* no-op */ }
   try { startGiftPanelRecorder(window, (o) => { chrome.storage.local.set(o).catch(() => {}); }); } catch { /* v0.1.1871 公式ギフト欄の作りを記録(lib/giftPanelShape.js) */ }
+  try { startGiftItemsTabResponder(window, chromeGiftStore().onChanged); startGiftItemsPublisher(window, chromeGiftStore()); } catch { /* v0.1.1874〜1875 ギフトの子の窓: 番組ギフトのタブ・アイテムの並びと押下(lib/giftItemsMirror.js) */ }
   start().catch((err) => reportSilentErrorToStorage('start', err));
 }
