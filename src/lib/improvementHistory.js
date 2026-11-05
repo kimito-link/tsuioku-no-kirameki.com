@@ -4780,7 +4780,7 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1861', metric: 'bundle-kb', value: 1414,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '0.1.1858 と同じ(この版の計器は会場 venue.js 側で popup は変えていない)。最良 1360 より上なのは以前から'
+    note: '0.1.1858 と同じ 1414(今回の変更は会場とコメビュの読み上げで popup はほぼ変わらない)。最良 1360 より上なのは以前から'
   }),
   Object.freeze({
     version: '0.1.1861', metric: 'gate-selftest', value: 4,
@@ -4789,20 +4789,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1861', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: '30日の窓で数える値。古いコミットが窓から外れて 43→41(この版のせいではない)'
+    note: '30日の窓で数える値(古いコミットが窓から外れた分だけ 0.1.1858 の 43 から減った)'
   }),
   Object.freeze({
-    version: '0.1.1862', metric: 'bundle-kb', value: 1414,
+    version: '0.1.1865', metric: 'bundle-kb', value: 1415,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '0.1.1861 と同じ(直したのは会場 venue.js 側)。最良 1360 より上なのは以前から'
+    note: '0.1.1861 の 1414 から +1(popup が読む venueSeatsDiag に一気出しの行の項目を足した)。最良 1360 より上なのは以前から'
   }),
   Object.freeze({
-    version: '0.1.1862', metric: 'gate-selftest', value: 4,
+    version: '0.1.1865', metric: 'gate-selftest', value: 4,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.1862', metric: 'cross-checked-claims', value: 42,
+    version: '0.1.1865', metric: 'cross-checked-claims', value: 43,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: '30日の窓で数える値。最良 55 より下なのは以前から(この版で +1)'
+    note: '30日の窓で数える値。最良 55 より下なのは以前から(0.1.1861 の 41 から +2)'
   })
 ]);

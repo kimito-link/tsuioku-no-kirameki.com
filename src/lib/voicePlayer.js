@@ -59,6 +59,14 @@ import {
 } from './voiceVolume.js';
 import { decideVoiceGpuTip, decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
+  classifyVoiceImportance,
+  createVoiceFirstSpeakerState,
+  noteVoiceSpeakerInLive,
+  shouldSkipVoiceWhenBusy,
+  VOICE_BUSY_QUEUE_MIN,
+  voicePriorityForImportance
+} from './voiceBusyPriority.js';
+import {
   KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, forgetWeakVoicePcIfFast
 } from './voiceNarrowing.js';
 
@@ -195,6 +203,8 @@ export class VoicePlayer {
     this._playbackEmaMs = -1;
     this._expectedPlayEmaMs = -1;
     this._arrivalWindowState = null;
+    // v0.1.1861: 「その配信で初めてのコメント」を覚える(混雑時は大事なものだけ読む)。
+    this._firstSpeakerState = createVoiceFirstSpeakerState();
     this._dropCountGateTotal = 0;
     this._dropHeadStaleTotal = 0;
     this._dropSweepStaleTotal = 0;
@@ -1188,10 +1198,7 @@ export class VoicePlayer {
 
       const name = this.readNameEnabled ? String(item.nickname || '').trim() : '';
       let body = '';
-      let isHighPriority = false;
-      
       if (item.kind === 'gift') {
-        isHighPriority = true;
         const count = item.gift?.count > 1 ? `を${item.gift.count}個` : 'を';
         body = `ギフト、${item.gift?.name || 'アイテム'}${count}贈りました。${item.gift?.message || ''}`.trim();
       } else {
@@ -1215,13 +1222,35 @@ export class VoicePlayer {
       this._arrivalWindowState = foldVoiceArrivalWindow(this._arrivalWindowState, Date.now(), 1);
       this.diag.arrivalPerMin = this._arrivalWindowState.arrivalPerMin;
 
+      // v0.1.1861: 混雑(読み上げ待ち2件以上)のときは大事なもの(ギフト・広告・配信者・その配信で
+      //   初めてのコメント)だけ読む。吹き出しは出す(onDropped で声なしの寿命へ)。初めてかどうかは
+      //   読まなかった件でも覚える(次のコメントは「2回目」)。
+      const userKey = this._voiceUserKeyForItem(item);
+      const importance = classifyVoiceImportance({
+        kind: item.kind,
+        text: item.kind === 'gift' ? '' : body,
+        userId: item.userId,
+        isModerator: item.isModerator,
+        broadcasterUid: item.broadcasterUid,
+        firstInLive: noteVoiceSpeakerInLive(this._firstSpeakerState, item.liveId, userKey)
+      });
+      if (shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance })) {
+        this.diag.busySkipTotal = (Number(this.diag.busySkipTotal) || 0) + 1;
+        if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }
+        this._notifyDropped(item);
+        continue;
+      }
+      if (importance && this.queue.length >= VOICE_BUSY_QUEUE_MIN) {
+        this.diag.busyImportantTotal = (Number(this.diag.busyImportantTotal) || 0) + 1;
+      }
+
       const candidate = {
-        userKey: this._voiceUserKeyForItem(item),
+        userKey,
         name,
         body,
         count: 1,
         enqueuedAt: Date.now(),
-        priority: isHighPriority ? 'high' : 'normal',
+        priority: voicePriorityForImportance(importance),
         // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
         onPlayStart: item.onPlayStart,
         // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。

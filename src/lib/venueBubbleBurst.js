@@ -56,7 +56,7 @@ export function createVenueBubbleBurstState() {
     peakRatePerSec: 0,
     /** 同じ人の同じ文がもう一度吹いた回数(別キー=読み直しの疑い) */
     sameTextRepeat: 0,
-    /** v0.1.1862: 過去の番号として吹き出さなかった件数 */
+    /** v0.1.1865: 過去の番号として吹き出さなかった件数 */
     skippedOld: 0,
     /** commentNo を持たない合成キー(c:…)で吹いた件数(読み直しが起きうるキー) */
     noCommentNo: 0,
@@ -87,7 +87,7 @@ export function observeVenueSpeechBatch(state, obs) {
   const path = String(obs.path || 'unknown');
   const source = String(obs.source || '') || (path === 'live' ? 'unknown' : path);
   const rows = Array.isArray(obs.rows) ? obs.rows : [];
-  // v0.1.1862: 過去の番号として吹き出さずに既読にした件数(直した後に効いているかを見る)。
+  // v0.1.1865: 過去の番号として吹き出さずに既読にした件数(直した後に効いているかを見る)。
   state.skippedOld += Math.max(0, Math.floor(Number(obs.skippedOld) || 0));
   const speeches = Array.isArray(obs.speeches) ? obs.speeches : [];
 

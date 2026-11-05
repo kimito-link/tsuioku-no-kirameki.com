@@ -103,7 +103,7 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
     Number.isFinite(opts.primeEmit) && opts.primeEmit > 0 ? Math.floor(opts.primeEmit) : 0;
   const seen = state.seenKeys instanceof Set ? new Set(state.seenKeys) : new Set();
   const wasPrimed = state.primed === true;
-  // v0.1.1862: 過去のコメントの見分け。過去ログ取り込み(backfill)の行も新着と同じ経路で届き、
+  // v0.1.1865: 過去のコメントの見分け。過去ログ取り込み(backfill)の行も新着と同じ経路で届き、
   //   何十分も前のコメントが24件ずつ一気に吹き出していた(りんく実機・計器 venueBubbleBurst)。
   //   commentNo は配信全体の通し番号なので、今までの最大(この束の分も含む)より oldNoGap 以上
   //   小さい番号は「今しゃべったコメントではない」=既読にだけする。番号の無い行は対象外。

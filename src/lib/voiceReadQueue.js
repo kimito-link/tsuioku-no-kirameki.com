@@ -25,17 +25,35 @@ export function pushVoiceQueue(queue, item, { max = 5, keep } = {}) {
   const rawMax = Number(max);
   const limit = Number.isFinite(rawMax) ? Math.max(0, Math.floor(rawMax)) : 5;
   const dropCount = Math.max(0, current.length - limit);
-  if (typeof keep !== 'function' || dropCount === 0) {
-    return {
-      queue: current.slice(dropCount),
-      dropped: current.slice(0, dropCount)
-    };
+  if (dropCount === 0) return { queue: current, dropped: [] };
+  // v0.1.1861: 捨てる順は「ふつうの件の古い順」→「優先(ギフト・広告)の古い順」。優先の件は列の前に
+  //   入るため、これまでは溢れた瞬間に届いたばかりのギフトから捨てていた(混雑時ほど大事なものが消える)。
+  //   keep(x) が true の件・今入れた件は捨てない(守る件が多ければ上限を少し超えて残る)。
+  //   keep が無いときだけ、最後の手段として今入れた件も捨ててよい(上限 0 等・従来どおり有界)。
+  /** @param {unknown} x */
+  const isHigh = (x) => !!x && typeof x === 'object' && /** @type {{priority?: string}} */ (x).priority === 'high';
+  const hasKeep = typeof keep === 'function';
+  /** @type {Set<T>} */
+  const dropSet = new Set();
+  const passes = [
+    (/** @type {T} */ x) => x !== item && !isHigh(x),
+    (/** @type {T} */ x) => x !== item && isHigh(x),
+    (/** @type {T} */ x) => !hasKeep && x === item
+  ];
+  for (const pass of passes) {
+    for (const x of current) {
+      if (dropSet.size >= dropCount) break;
+      if (dropSet.has(x) || !pass(x)) continue;
+      if (hasKeep && keep(x)) continue;
+      dropSet.add(x);
+    }
   }
-  // 古い順に、守る件を飛ばして dropCount 件まで捨てる(守る件が多ければ上限を少し超えて残る)。
+  /** @type {T[]} */
   const dropped = [];
+  /** @type {T[]} */
   const kept = [];
   for (const x of current) {
-    if (dropped.length < dropCount && x !== item && !keep(x)) dropped.push(x);
+    if (dropSet.has(x)) dropped.push(x);
     else kept.push(x);
   }
   return { queue: kept, dropped };
