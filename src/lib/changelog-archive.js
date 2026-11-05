@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1863',
+    date: '2026-11-05',
+    summary: 'りんく欄を元の決まりに戻す',
+    items: Object.freeze([
+      'りんく欄に、ギフトか広告を送った人しか出ていませんでした(10月14日の v0.1.1621 から)。元の決まりに戻し、コメントだけの人でも、IDと本人のサムネが分かればりんく欄に出るようにしました。ギフトや広告を送った人も、今までどおりりんく欄に入ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1861',
     date: '2026-11-04',
     summary: '混んだら大事なコメントだけ読み上げる',
