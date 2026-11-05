@@ -1382,6 +1382,9 @@
     });
   }
   async function relayCommentToChatFrame(videoId, text) {
+    return relayToChatFrame(videoId, { type: "YT_SEND_COMMENT_TO_FRAME", videoId, text });
+  }
+  async function relayToChatFrame(videoId, payload) {
     const tabs = await chrome.tabs.query({ url: ["https://www.youtube.com/*"] });
     const scored = tabs.map((t) => {
       const vid = parseYtVideoIdFromUrl(String(t.url || ""));
@@ -1396,7 +1399,7 @@
     for (const { t } of scored) {
       if (typeof t.id !== "number") continue;
       try {
-        const res = await chrome.tabs.sendMessage(t.id, { type: "YT_SEND_COMMENT_TO_FRAME", videoId, text });
+        const res = await chrome.tabs.sendMessage(t.id, payload);
         if (res && res.ok) return res;
         if (res) last = res;
       } catch {
@@ -1624,6 +1627,11 @@
         });
         return { ok: true };
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
+      return true;
+    }
+    if (message.type === "YT_OPEN_SUPERCHAT") {
+      const videoId = String(message.videoId || "");
+      relayToChatFrame(videoId, { type: "YT_OPEN_SUPERCHAT_IN_FRAME", videoId }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, reason: String(err) }));
       return true;
     }
     if (message.type === "YT_SEND_COMMENT") {

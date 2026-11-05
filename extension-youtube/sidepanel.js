@@ -20449,6 +20449,14 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.1870",
+      date: "2026-11-05",
+      summary: "会場からギフト画面を開く",
+      items: Object.freeze([
+        "会場の上の帯に「🎁 ギフト」を付けました。押すと会場をいったんしまって、公式のギフト画面を開きます。ギフトを選んで贈るのは公式の画面でご自身で行います。右下の「▲ 会場に戻る」で会場に戻れます。"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.1869",
       date: "2026-11-05",
       summary: "PICK UP を映像の上の大きな吹き出しに",
@@ -20612,14 +20620,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       summary: "過去コメントの埋め直しの読み違いを直す",
       items: Object.freeze([
         "途中から開いた配信で過去のコメントを埋める仕組みが、ニコ生の応答から「次に読む位置」を取り違えることがありました。正しい位置をたどるようにしたので、埋め直しが途中で止まりにくくなります"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1842",
-      date: "2026-10-31",
-      summary: "止まった取り込みの立て直しを直す",
-      items: Object.freeze([
-        "コメントの取り込みが止まったときに自動で立て直す仕組みが、ニコ生の応答を読み違えて空振りしていました。スマホ版で確かめた読み方に揃え、次の位置を正しくたどれるようにしました"
       ])
     })
   ]);
@@ -46642,7 +46642,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T09:30" ? String("yt-2026-11-05T09:30") : "dev";
+      const buildId = "yt-2026-11-05T09:38" ? String("yt-2026-11-05T09:38") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46660,7 +46660,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.112") : "";
+    const bundledVersion = true ? String("0.1.113") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46705,7 +46705,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T09:30" ? String("yt-2026-11-05T09:30") : "dev";
+            return "yt-2026-11-05T09:38" ? String("yt-2026-11-05T09:38") : "dev";
           } catch {
             return "dev";
           }
