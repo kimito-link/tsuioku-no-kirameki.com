@@ -10861,7 +10861,8 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
   if (img instanceof HTMLImageElement) {
     const rel = northStarLaneGadgetCharaPathByTier(laneId, tier);
     try {
-      img.src = chrome.runtime.getURL(rel);
+      const u = chrome.runtime.getURL(rel); // v0.1.1877: 同じ画像なら書かない(待機中も毎秒約6回、同じ src を書き直していた)
+      if (img.getAttribute('src') !== u) img.src = u;
     } catch {
       img.removeAttribute('src');
     }
@@ -11028,7 +11029,8 @@ function paintNorthStarGiftHistorySummaryGadget(body, rooms, unitSuffix, totals 
     // サマリー表示時は値が出ている前提なので、満面の笑み相当（full）で固定
     const rel = northStarLaneGadgetCharaPathByTier('programPoints', 'full');
     try {
-      img.src = chrome.runtime.getURL(rel);
+      const u = chrome.runtime.getURL(rel);
+      if (img.getAttribute('src') !== u) img.src = u;
     } catch {
       img.removeAttribute('src');
     }
