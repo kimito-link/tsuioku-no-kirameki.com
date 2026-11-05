@@ -9,7 +9,7 @@ import {
 import { mountVenueBarButton } from './venueBar.js';
 import { openOfficialGiftPanel, GIFT_ITEMS_TAB_REQ_KEY, startGiftItemsTabResponder } from '../lib/venueComposeBox.js';
 import { startGiftPanelRecorder } from '../lib/giftPanelShape.js';
-import { startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, chromeGiftStore, waitGiftPressResult, GIFT_ONE_TAP_KEY } from '../lib/giftItemsMirror.js';
+import { startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, chromeGiftStore, waitGiftPressResult, giftPressOutcome, GIFT_ONE_TAP_KEY } from '../lib/giftItemsMirror.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -14319,7 +14319,7 @@ async function start() {
    */
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
     // v0.1.1867: 会場から発言(パネルの「コメント送信」と同じ postCommentFromContentAsync で公式コメント欄へ送る)
-    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }), openGift: async () => { /* v0.1.1874 ギフトの子の窓へ番組ギフトの合図 */ chrome.storage.local.set({ [GIFT_ITEMS_TAB_REQ_KEY]: { at: Date.now() } }).catch(() => {}); return openOfficialGiftPanel(document); }, giftItems: { subscribe: (cb) => subscribeGiftItems(chromeGiftStore(), location.pathname, cb), press: async (key, o) => { const st = chromeGiftStore(); let at = 0; const r = requestGiftItemPress(document, key, st.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); if (!o?.direct) return r; const v = await waitGiftPressResult(st, at); return { ok: r.ok || !!v, reason: r.reason, sent: v?.confirmed === true, notFound: v?.found === false, price: typeof v?.price === 'string' ? v.price : '' }; }, oneTap: { get: async () => (await chrome.storage.local.get(GIFT_ONE_TAP_KEY))?.[GIFT_ONE_TAP_KEY] === true, set: (on) => { chrome.storage.local.set({ [GIFT_ONE_TAP_KEY]: on === true }).catch(() => {}); } } } });
+    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }), openGift: async () => { /* v0.1.1874 ギフトの子の窓へ番組ギフトの合図 */ chrome.storage.local.set({ [GIFT_ITEMS_TAB_REQ_KEY]: { at: Date.now() } }).catch(() => {}); return openOfficialGiftPanel(document); }, giftItems: { subscribe: (cb) => subscribeGiftItems(chromeGiftStore(), location.pathname, cb), press: async (key, o) => { const st = chromeGiftStore(); let at = 0; const r = requestGiftItemPress(document, key, st.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); if (!o?.direct) return r; const v = await waitGiftPressResult(st, at); return { ok: r.ok || !!v, reason: r.reason, ...giftPressOutcome(v) }; }, oneTap: { get: async () => (await chrome.storage.local.get(GIFT_ONE_TAP_KEY))?.[GIFT_ONE_TAP_KEY] === true, set: (on) => { chrome.storage.local.set({ [GIFT_ONE_TAP_KEY]: on === true }).catch(() => {}); } } } });
   }
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();

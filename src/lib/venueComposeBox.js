@@ -334,7 +334,7 @@ export function createVenueGiftStrip(opts) {
         } else if (res && res.notFound) {
           pt.textContent = '見つかりません'; // 公式の欄にこのアイテムが無かった(何も押していない)
         } else if (res && res.ok) {
-          try { opts.tuck?.(true, `「${label}」の購入の確認が公式の欄に出ています(まだ贈っていません)。値段を確かめて公式のボタンを押すと贈れます。やめるときは閉じてください。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
+          try { opts.tuck?.(true, `「${label}」を押しましたが、贈れたかを確かめられませんでした。公式の欄に確認が出ていれば、値段を確かめて公式のボタンで贈れます。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
           pt.textContent = '公式で確認';
         } else {
           pt.textContent = '開けません';

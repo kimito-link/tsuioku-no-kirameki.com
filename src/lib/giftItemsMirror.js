@@ -20,6 +20,34 @@ export function readGiftBalance(doc) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** 窓(スクリプト)ごとの番号。同じ押下を2つの窓が処理していないかを記録で見分ける */
+const INSTANCE = Math.random().toString(36).slice(2, 8);
+export const GIFT_ITEM_PRESS_LOG_KEY = 'nls_gift_item_press_log';
+
+/**
+ * 押した記録を直近20件だけ残す(結果のキーは最後の1件しか持たないので、続けて押すと前の記録が消えていた)
+ * @param {{ get: (k: string) => any, set: (o: Record<string, any>) => any }} store
+ * @param {Record<string, any>} entry
+ */
+function appendGiftPressLog(store, entry) {
+  void Promise.resolve(store.get(GIFT_ITEM_PRESS_LOG_KEY)).then((r) => {
+    const prev = Array.isArray(r?.[GIFT_ITEM_PRESS_LOG_KEY]) ? r[GIFT_ITEM_PRESS_LOG_KEY] : [];
+    return store.set({ [GIFT_ITEM_PRESS_LOG_KEY]: [...prev, { at: Date.now(), ...entry }].slice(-20) });
+  }).catch(() => { /* 残せなくても押す流れは壊さない */ });
+}
+
+/**
+ * 押した結果から「贈れたか」と値段を決める。残高が減っていれば贈れた(確定ボタンを拡張が押したかどうかは問わない)
+ * @param {any} v nls_gift_item_press_result
+ * @returns {{ sent: boolean, notFound: boolean, price: string }}
+ */
+export function giftPressOutcome(v) {
+  const spent = Number(v?.spent || 0);
+  const sent = v?.confirmed === true || spent > 0;
+  const price = spent > 0 ? `${spent}pt` : typeof v?.price === 'string' ? v.price : '';
+  return { sent, notFound: v?.found === false, price };
+}
+
 /** アイテムではない pt(自分の所持ポイント欄・放送画面の「あと ◯pt」) */
 const NOT_ITEM_SEL = '[class*="point-charge"], [class*="remaining-points"], [class*="program-gift-information"], [class*="point-balance"]';
 /** 名前に使わない行(図鑑の数・案内リンク) */
@@ -365,7 +393,23 @@ export function startGiftItemsPublisher(win, store) {
           };
           win.setTimeout(look, 150);
         }
-        win.setTimeout(() => {
+        // v0.1.1886: ニコニコはアイテムを押しただけで贈られることがある(PC 実測 13:13・引き出しが出ず confirmed:false のまま 55pt 減った)。
+        //   「押したか」ではなく「残高が減ったか」を正とし、減ったらすぐ結果を書く(最長6秒待つ)。誰が押したかを見るため、
+        //   窓の中のクリックを capture で記録する(isTrusted=true なら人の手・false ならスクリプト)。inst は窓ごとの番号。
+        /** @type {{ t: number, text: string, trusted: boolean }[]} */
+        const clicks = [];
+        const onClick = (/** @type {Event} */ e) => {
+          const el = e.target instanceof Element ? e.target.closest('button, [role="button"], a') || e.target : null;
+          if (el && clicks.length < 12) clicks.push({ t: Date.now() - at, text: String(el.textContent || '').replace(/\s+/g, '').slice(0, 20), trusted: e.isTrusted === true });
+        };
+        try { doc.addEventListener('click', onClick, true); } catch { /* 見張れなくても続ける */ }
+        let polls = 20;
+        const finish = () => {
+          polls -= 1;
+          const nowBal = readGiftBalance(doc);
+          const spentNow = balanceBefore != null && nowBal != null && nowBal < balanceBefore ? balanceBefore - nowBal : 0;
+          const dropped = spentNow > 0;
+          if (!dropped && polls > 0) { win.setTimeout(finish, 300); return; }
           mo?.disconnect();
           const shown = added.filter((el) => el.isConnected && (() => { const r = el.getBoundingClientRect(); return r.width >= 100 && r.height >= 40; })());
           let drawer = { buttons: /** @type {any[]} */ ([]), price: '' };
@@ -375,10 +419,13 @@ export function startGiftItemsPublisher(win, store) {
               at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, ...conf, drawerButtons: drawer.buttons, price: drawer.price,
               shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
               head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160),
-              balanceBefore
+              balanceBefore, balanceNow: nowBal, spent: spentNow, clicks: clicks.slice(), inst: INSTANCE
             }
           });
-        }, 3000);
+          appendGiftPressLog(store, { reqAt: at, key: req.key, direct: req.direct === true, confirmed: conf.confirmed, spent: spentNow, inst: INSTANCE });
+        };
+        win.setTimeout(finish, 600);
+        win.setTimeout(() => { try { doc.removeEventListener('click', onClick, true); } catch { /* 外せなくても害はない */ } }, 16000);
         // v0.1.1884: 3秒の記録だけでは「贈れたか」が分からなかった(confirmed:false でも実際は贈られていた実例)。
         // 15秒後にポイント残高を読み直し、減った分を spent として足して残す(押したかではなく、減ったかを見る)
         win.setTimeout(() => {
@@ -387,7 +434,7 @@ export function startGiftItemsPublisher(win, store) {
             const prev = cur?.[GIFT_ITEM_PRESS_RESULT_KEY];
             if (!prev || prev.reqAt !== at) return;
             const spent = balanceBefore != null && balanceAfter != null ? balanceBefore - balanceAfter : null;
-            void store.set({ [GIFT_ITEM_PRESS_RESULT_KEY]: { ...prev, checkedAt: Date.now(), balanceAfter, spent } });
+            void store.set({ [GIFT_ITEM_PRESS_RESULT_KEY]: { ...prev, checkedAt: Date.now(), balanceAfter, spent, clicks: clicks.slice() } });
           }).catch(() => { /* 読めなくても押す流れは壊さない */ });
         }, 15000);
       }
