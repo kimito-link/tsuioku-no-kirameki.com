@@ -1158,7 +1158,13 @@ function rewriteLaneFirstLines(byShown) {
       for (let n = w.nextNode(); n; n = w.nextNode()) {
         const k = byShown.get(String(n.nodeValue || '').trim());
         if (k) {
-          n.nodeValue = k;
+          // @ハンドルを1行目に入れ替えた後のタイルは UC… が2行目にあるので、1行目=札・2行目=@ハンドルに直す(0.1.97)
+          const nameEl = n.parentElement;
+          const idEl = nameEl?.classList.contains('nl-story-userlane-meta__name') ? nameEl.previousElementSibling : null;
+          if (idEl?.classList.contains('nl-story-userlane-meta__id')) {
+            n.nodeValue = String(idEl.textContent || '');
+            idEl.textContent = k;
+          } else n.nodeValue = k;
           tile.setAttribute('data-yt-kind-done', '1');
           break;
         }
@@ -1183,6 +1189,20 @@ function fixTextNode(node) {
     if (/^8\d{9}$/.test(uid) && laneKindLabelByUid.has(uid) && node.parentElement?.closest(SUPPORT_LANE_SEL)) {
       node.nodeValue = /** @type {string} */ (laneKindLabelByUid.get(uid));
       return;
+    }
+    // 0.1.97 りんく(2026-11-05)「@ああああ を先に出して後で ID」: 人物タイル(応援レーン・会場の席)は
+    //   1行目に @ハンドル、2行目に UC… を出す。YouTube はチャンネル ID より @ハンドルの方がその人だと分かる。
+    //   (ニコ生版の部品は1行目=ID・2行目=名前で描くので、ここで入れ替える。札の人は上の分岐で1行目=札のまま)
+    const idEl = node.parentElement;
+    if (/^8\d{9}$/.test(uid) && idEl?.classList.contains('nl-story-userlane-meta__id') && ytKeyForNumericUid(uid)) {
+      const nameEl = idEl.nextElementSibling;
+      const nm = String(nameEl?.textContent || '').trim();
+      const label = ytLabelForUid(uid);
+      if (nameEl?.classList.contains('nl-story-userlane-meta__name') && nm && label && nm !== label && !/^8\d{9}$/.test(nm)) {
+        node.nodeValue = nm;
+        nameEl.textContent = label;
+        return;
+      }
     }
   }
   let next = ytWording(v, { topFans: kokenIsTopFans }); // ニコニコの言葉 → YouTube の言葉(決まった文言だけ)
@@ -2065,3 +2085,5 @@ if (typeof document !== 'undefined' && /\/(sidepanel|venue)\.html$/.test(String(
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
 }
+/** テスト用(人物タイルの行の入れ替えを確かめる) */
+export { fixTextNode as __fixTextNodeForTest };

@@ -2004,7 +2004,12 @@ ${sourceCol}
         for (let n2 = w.nextNode(); n2; n2 = w.nextNode()) {
           const k = byShown.get(String(n2.nodeValue || "").trim());
           if (k) {
-            n2.nodeValue = k;
+            const nameEl = n2.parentElement;
+            const idEl = nameEl?.classList.contains("nl-story-userlane-meta__name") ? nameEl.previousElementSibling : null;
+            if (idEl?.classList.contains("nl-story-userlane-meta__id")) {
+              n2.nodeValue = String(idEl.textContent || "");
+              idEl.textContent = k;
+            } else n2.nodeValue = k;
             tile.setAttribute("data-yt-kind-done", "1");
             break;
           }
@@ -2028,6 +2033,17 @@ ${sourceCol}
         node.nodeValue = /** @type {string} */
         laneKindLabelByUid.get(uid);
         return;
+      }
+      const idEl = node.parentElement;
+      if (/^8\d{9}$/.test(uid) && idEl?.classList.contains("nl-story-userlane-meta__id") && ytKeyForNumericUid(uid)) {
+        const nameEl = idEl.nextElementSibling;
+        const nm = String(nameEl?.textContent || "").trim();
+        const label = ytLabelForUid(uid);
+        if (nameEl?.classList.contains("nl-story-userlane-meta__name") && nm && label && nm !== label && !/^8\d{9}$/.test(nm)) {
+          node.nodeValue = nm;
+          nameEl.textContent = label;
+          return;
+        }
       }
     }
     let next = ytWording(v, { topFans: kokenIsTopFans });
@@ -25633,7 +25649,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       return { idLine, nameLine: formatNicknameWithUidFallback(uid, "") || "（未取得）" };
     }
     if (nick) {
-      if (/^UC[\w-]{20,}$/.test(uid)) return { idLine: nick, nameLine: idLine };
       return { idLine, nameLine: nick };
     }
     return { idLine, nameLine: formatNicknameWithUidFallback(uid, "") || "（未取得）" };
@@ -46414,7 +46429,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T04:25" ? String("yt-2026-11-05T04:25") : "dev";
+      const buildId = "yt-2026-11-05T04:51" ? String("yt-2026-11-05T04:51") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46432,7 +46447,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.97") : "";
+    const bundledVersion = true ? String("0.1.98") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46477,7 +46492,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T04:25" ? String("yt-2026-11-05T04:25") : "dev";
+            return "yt-2026-11-05T04:51" ? String("yt-2026-11-05T04:51") : "dev";
           } catch {
             return "dev";
           }

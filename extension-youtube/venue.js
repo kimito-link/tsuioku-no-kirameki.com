@@ -1770,7 +1770,12 @@ ${sourceCol}
         for (let n = w.nextNode(); n; n = w.nextNode()) {
           const k = byShown.get(String(n.nodeValue || "").trim());
           if (k) {
-            n.nodeValue = k;
+            const nameEl = n.parentElement;
+            const idEl = nameEl?.classList.contains("nl-story-userlane-meta__name") ? nameEl.previousElementSibling : null;
+            if (idEl?.classList.contains("nl-story-userlane-meta__id")) {
+              n.nodeValue = String(idEl.textContent || "");
+              idEl.textContent = k;
+            } else n.nodeValue = k;
             tile.setAttribute("data-yt-kind-done", "1");
             break;
           }
@@ -1794,6 +1799,17 @@ ${sourceCol}
         node.nodeValue = /** @type {string} */
         laneKindLabelByUid.get(uid);
         return;
+      }
+      const idEl = node.parentElement;
+      if (/^8\d{9}$/.test(uid) && idEl?.classList.contains("nl-story-userlane-meta__id") && ytKeyForNumericUid(uid)) {
+        const nameEl = idEl.nextElementSibling;
+        const nm = String(nameEl?.textContent || "").trim();
+        const label = ytLabelForUid(uid);
+        if (nameEl?.classList.contains("nl-story-userlane-meta__name") && nm && label && nm !== label && !/^8\d{9}$/.test(nm)) {
+          node.nodeValue = nm;
+          nameEl.textContent = label;
+          return;
+        }
       }
     }
     let next = ytWording(v, { topFans: kokenIsTopFans });
@@ -8234,7 +8250,6 @@ ${sourceCol}
       return { idLine, nameLine: formatNicknameWithUidFallback(uid, "") || "（未取得）" };
     }
     if (nick) {
-      if (/^UC[\w-]{20,}$/.test(uid)) return { idLine: nick, nameLine: idLine };
       return { idLine, nameLine: nick };
     }
     return { idLine, nameLine: formatNicknameWithUidFallback(uid, "") || "（未取得）" };
@@ -20104,7 +20119,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T04:25") : ""
+          buildId: true ? String("yt-2026-11-05T04:51") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
