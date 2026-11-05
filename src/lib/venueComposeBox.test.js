@@ -57,3 +57,42 @@ describe('会場から発言する入力欄', () => {
     expect(form.querySelector('.nlsb-compose-status')?.textContent).toBe('Extension context invalidated.');
   });
 });
+
+describe('会場のギフトボタン', () => {
+  it('公式のギフトボタンを押し、記録用の透明化を外す', async () => {
+    const { openOfficialGiftPanel } = await import('./venueComposeBox.js');
+    let clicked = 0;
+    let removed = 0;
+    const doc = /** @type {any} */ ({
+      querySelector: (sel) => (sel === '[class*="gift-button"]' ? { click: () => { clicked++; } } : null),
+      getElementById: (id) => (id === 'nls-stealth-gift-sidebar' ? { remove: () => { removed++; } } : null)
+    });
+    expect(openOfficialGiftPanel(doc)).toEqual({ ok: true });
+    expect(clicked).toBe(1);
+    expect(removed).toBe(1);
+  });
+  it('ボタンが無ければ no-button(押さない)', async () => {
+    const { openOfficialGiftPanel } = await import('./venueComposeBox.js');
+    const doc = /** @type {any} */ ({ querySelector: () => null, getElementById: () => null });
+    expect(openOfficialGiftPanel(doc)).toEqual({ ok: false, reason: 'no-button' });
+  });
+  it('見つからないときの一言はボタンの名前に合わせる(YouTube はスーパーチャット)', async () => {
+    const { createVenueGiftButton } = await import('./venueComposeBox.js');
+    const tucks = [];
+    const btn = createVenueGiftButton(async () => ({ ok: false }), { label: '💲 スーパーチャット', tuck: (on) => tucks.push(on) });
+    btn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(btn.textContent).toBe('スーパーチャットのボタンが見つかりません');
+    expect(tucks).toEqual([true, false]);
+  });
+  it('理由の言い換えがあればそれを出す(未ログインなど)', async () => {
+    const { createVenueGiftButton } = await import('./venueComposeBox.js');
+    const btn = createVenueGiftButton(async () => ({ ok: false, reason: 'not-signed-in' }), {
+      label: '💲 スーパーチャット',
+      reasonText: (r) => (r === 'not-signed-in' ? 'ログインすると使えます' : ''),
+    });
+    btn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(btn.textContent).toBe('ログインすると使えます');
+  });
+});

@@ -117,3 +117,56 @@ export function createVenueComposeBox(post, opts = {}) {
   form.append(box, btn);
   return form;
 }
+
+/**
+ * 会場から公式のギフト画面を開くボタン(2026-11-05 りんく「ここからアイテムを気軽に」→判断カード「公式ギフトの窓をすぐ開く」)。
+ *   押すと先に会場をしまい(公式の画面が会場の帯に隠れないように・PC 実測でギフト欄の下半分が隠れた)、公式のボタンを押す。
+ *   買う・贈る操作は公式の画面で本人がする(拡張は画面を開くところまで)。公式のボタンが見つからなければ会場を戻して一言出す。
+ * @param {() => Promise<{ ok?: boolean, reason?: string }> | { ok?: boolean, reason?: string }} openGift
+ * @param {{ doc?: Document, label?: string, reasonText?: (reason: string) => string, tuck?: (on: boolean) => void }} [opts]
+ * @returns {HTMLButtonElement}
+ */
+export function createVenueGiftButton(openGift, opts = {}) {
+  const doc = opts.doc || document;
+  const btn = doc.createElement('button');
+  btn.type = 'button';
+  btn.className = 'nlsb-comeview-btn nlsb-gift-open';
+  const label = opts.label || '🎁 ギフト';
+  btn.textContent = label;
+  btn.title = '公式のギフト画面を開きます(会場はいったんしまいます・右下の「▲ 会場に戻る」で戻せます)';
+  btn.addEventListener('click', async () => {
+    try { opts.tuck?.(true); } catch { /* しまえなくても開くのは試す */ }
+    /** @type {{ ok?: boolean, reason?: string } | null} */
+    let res = null;
+    try { res = await openGift(); } catch { res = null; }
+    if (res && res.ok) return;
+    try { opts.tuck?.(false); } catch { /* 戻せなくても一言は出す */ }
+    let why = '';
+    try { why = res?.reason && opts.reasonText ? String(opts.reasonText(res.reason) || '') : ''; } catch { why = ''; }
+    btn.textContent = why || `${label.replace(/^\S+\s+/, '')}のボタンが見つかりません`; // 「🎁 ギフト」→「ギフトの…」・YouTube は「スーパーチャットの…」
+    setTimeout(() => { btn.textContent = label; }, 4000);
+  });
+  return btn;
+}
+
+/**
+ * ニコ生の公式ギフトボタンを押してギフト画面を開く(会場の「🎁 ギフト」から)。
+ *   ボタンは CSS Modules のハッシュ名(___gift-button___HASH)なので部分一致で探す(content-entry の自動取得と同じ探し方)。
+ *   記録用に裏でギフト欄を開くときの透明化(#nls-stealth-gift-sidebar)が残っていると本人に見えないので外す。
+ * @param {Document} doc
+ * @returns {{ ok: boolean, reason?: string }}
+ */
+export function openOfficialGiftPanel(doc) {
+  try {
+    const btn =
+      doc.querySelector('[class*="gift-button"]') ||
+      doc.querySelector('button[aria-label*="ギフト"]') ||
+      doc.querySelector('button[title*="ギフト"]');
+    if (!btn || typeof (/** @type {any} */ (btn)).click !== 'function') return { ok: false, reason: 'no-button' };
+    doc.getElementById('nls-stealth-gift-sidebar')?.remove();
+    /** @type {HTMLElement} */ (btn).click();
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'error' };
+  }
+}

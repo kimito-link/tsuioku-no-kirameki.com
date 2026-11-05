@@ -22,6 +22,9 @@ export default [
       'extension/dist/**',
       // app/dist/** は Web版(app.tsuioku-no-kirameki.com)の esbuild minified 出力。
       'app/dist/**',
+      // YouTube 版のビルド出力(scripts/build-youtube-ext.mjs が作る束ね・写し)。
+      'extension-youtube/dist/**',
+      'extension-youtube/*.js',
       // mobile/scripts/** は web-ios-android キットからコピーした App Store 提出の道具(キット側で検査済み・
       //   書き換えずに保つ=キットとの差分を小さく)。mobile/node_modules・mobile/ios は CI が作る。
       'mobile/**',
@@ -434,7 +437,8 @@ export default [
     // v0.1.1830: 作りたて host を古いと捨てて開くたび4回作り直していたのを止める(+5行: 一度でも DOM に入った host の WeakSet と記録2か所)。
     // v0.1.1855: 拡張の入れ替え後に古い版のまま止まったページが自分で読み込み直す(import 1行+呼び出しとコメント2行)=+3。中身は lib の orphanTabAutoReload.js。
     // v0.1.1867: 会場から発言(会場に postComment を渡す+コメント1行)=+1。入力欄は lib の venueComposeBox.js。
-    rules: { 'max-lines': ['error', { max: 19575, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1870: 会場のギフトボタン(公式のギフト画面を開く lib の import 1行)=+1。
+    rules: { 'max-lines': ['error', { max: 19576, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -463,9 +467,10 @@ export default [
     // v0.1.1861: 読み上げに配信 id と配信者 uid を渡す(混雑時は大事なものだけ読む・判定は lib の voiceBusyPriority.js)=+1。
     // v0.1.1866: 会場を開いた瞬間の3件を読み上げの遅れに数えない(印1行+コメント1行)=+2。
     // v0.1.1867: 会場から発言(import 1行+入力欄を作る1行)=+2。入力欄は lib の venueComposeBox.js。
+    // v0.1.1870: 会場の「🎁 ギフト」(ボタンを作る1行・lib の createVenueGiftButton)=+1。
     // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7399, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7400, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -497,6 +502,12 @@ export default [
       sourceType: 'script',
       globals: { ...browserChrome }
     }
+  },
+  {
+    // YouTube 版のブラウザで動く入口(extension-youtube/src)。各ファイル冒頭の /* global */ と重なっても止めない。
+    files: ['extension-youtube/src/**/*.js'],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: { ...browserChrome } },
+    rules: { 'no-redeclare': ['error', { builtinGlobals: false }] }
   },
   {
     // Web版(app.tsuioku-no-kirameki.com)の閲覧ページ。chrome.* には依存しない純ブラウザ。
