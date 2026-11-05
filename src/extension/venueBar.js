@@ -6797,6 +6797,7 @@ export function mountVenueBarButton(options = {}) {
           text: speech.text,
           // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
           receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
+          liveId: liveIdFromPathname(), broadcasterUid: _lastBroadcasterUid, // v0.1.1861: 混雑時に配信者・初コメを読む判定
           // ★キャラライブの相槌はここに乗せる(2026-08-25)。
           //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
           //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
