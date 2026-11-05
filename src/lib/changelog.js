@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1890',
+    date: '2026-11-05',
+    summary: 'YouTube Live にも対応(試作版を本体に)',
+    items: Object.freeze([
+      'YouTube Live の配信でもチャット・スーパーチャット・メンバーを記録し、ニコ生と同じ画面(3つのレーン・会場・コメビュ・読み上げ・マーケ)で振り返れるようにしました。YouTube のタブで拡張のボタンを押すと YouTube 用のパネルが開きます',
+      'YouTube の記録と設定はニコ生の記録と分けて保存します(互いの数字や設定は混ざりません)',
+      'YouTube のページを読むための権限(youtube.com・YouTube の画像)と、読み上げの予備の声・会場で配信を映すための権限が増えました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1888',
     date: '2026-11-05',
     summary: 'ギフトの確定は本人が公式で押す形に',
@@ -182,14 +192,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'PICK UP を映像の上の大きな吹き出しに',
     items: Object.freeze([
       '会場の PICK UP を、ひな壇の一番下の細い帯から、映像の上端中央の大きな吹き出しに移しました(顔44px・文字18px・長い文は2行まで)。拾うコメントが無いときは出さないので、映像をふさぎません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1868',
-    date: '2026-11-05',
-    summary: '会場の発言欄を中央に・大きく',
-    items: Object.freeze([
-      '会場モードの「ここから発言」の欄を、上の帯の中央に移して大きくしました(高さ34px・文字14px・幅は最大およそ500px)。幅が狭いときは1段下に回り、右のボタンを押し出しません。'
     ])
   })
 ]);

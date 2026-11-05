@@ -11,6 +11,9 @@ try { importScripts('dist/backfill-sw.js'); } catch (e) { console.warn('[NLS] ba
 // v0.1.1802: 開発版(展開して読み込み)が、拡張のフォルダの新しい版に自分で入れ替わる(キット extension-self-update)。
 //   ストア版(manifest に update_url)では何もしない。
 try { importScripts('dist/self-update-sw.js'); } catch (e) { console.warn('[NLS] self-update load failed', e); } // eslint-disable-line no-undef
+// 2026-11-05 りんく「メインに統合したい」: YouTube Live 版を同梱(記録・会場・コメビュの受け口は YT_… の名前だけで答える)。
+//   中身は extension-youtube/src/background-entry.js(scripts/youtube-build.mjs が本体向けに束ねる)。
+try { importScripts('dist/yt-background.js'); } catch (e) { console.warn('[NLS] youtube load failed', e); } // eslint-disable-line no-undef
 
 /** 2分おきの見回りを予約する(self-update-sw.js が読めなかった時は何もしない)。 */
 function ensureSelfUpdateAlarm() {
@@ -3527,6 +3530,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+/** 同梱した YouTube 版(2026-11-05): YouTube のタブでは埋め込みの設定に関係なくサイドパネル(パネルの中身は YouTube 版に切り替わる・sidepanel-iframe-boot-entry) */
+const YT_TAB_URL_RE = /^https:\/\/www\.youtube\.com\//;
+
 chrome.action.onClicked.addListener((tab) => {
   /*
    * ★spike(2026-08-06): Side Panel を「見てから判断する」ための最小プレビュー。
@@ -3559,8 +3565,9 @@ chrome.action.onClicked.addListener((tab) => {
    *       → 未設定・キャッシュ未読込・読み取り失敗、すべてサイドパネル側に倒れる
    */
   const wantsInline =
-    __toolbarActionPolicyMem === 'prefer_focus_inline' ||
-    __toolbarActionPolicyMem === 'always_open_popup';
+    (__toolbarActionPolicyMem === 'prefer_focus_inline' ||
+      __toolbarActionPolicyMem === 'always_open_popup') &&
+    !YT_TAB_URL_RE.test(String((tab && tab.url) || ''));
   if (!wantsInline && tid !== chrome.tabs.TAB_ID_NONE) {
     try {
       /*
