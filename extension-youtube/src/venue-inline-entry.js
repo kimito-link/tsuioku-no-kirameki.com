@@ -64,6 +64,11 @@ function sync() {
       // 0.1.113: 💲 スーパーチャットの窓を開く(ニコ生版 v0.1.1870 のギフトと同じ。支払いは YouTube 本体で利用者がする)。
       openGift: () => chrome.runtime.sendMessage({ type: 'YT_OPEN_SUPERCHAT', videoId: mountedVid }),
       giftLabel: '💲 スーパーチャット',
+      // 0.1.114: ボタンに出す短い理由(未ログインはボタンが無いので「見つかりません」でなくログインの案内)。
+      giftReasonText: (reason) =>
+        ({ 'not-signed-in': 'ログインすると使えます', 'no-tab': 'チャット欄が見つかりません', 'no-chat-frame': 'チャット欄が見つかりません' })[
+          String(reason || '')
+        ] || '',
     });
 }
 
