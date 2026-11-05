@@ -29,7 +29,7 @@ export function createVenueComposeBox(post, opts = {}) {
   const doc = opts.doc || document;
   const form = doc.createElement('form');
   form.className = 'nlsb-compose';
-  form.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin:0;';
+  form.style.cssText = 'position:relative;display:inline-flex;align-items:center;gap:4px;margin:0;';
   const input = doc.createElement('input');
   input.type = 'text';
   input.className = 'nlsb-compose-input';
@@ -46,7 +46,11 @@ export function createVenueComposeBox(post, opts = {}) {
   btn.disabled = true;
   const status = doc.createElement('span');
   status.className = 'nlsb-compose-status';
-  status.style.cssText = 'font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+  // 結果の一言は入力欄の下に浮かせる(並びに入れると帯が折り返して入力欄が横へ跳ぶ)。不透明な下地で動画の上でも読める。
+  status.style.cssText =
+    'position:absolute;top:calc(100% + 4px);left:0;z-index:5;width:max-content;max-width:min(360px,80vw);' +
+    'padding:4px 10px;border-radius:8px;background:rgba(255,255,255,0.97);box-shadow:0 1px 4px rgba(0,0,0,0.3);' +
+    'font-size:12px;font-weight:600;line-height:1.4;white-space:normal;pointer-events:none;';
   status.hidden = true;
   let busy = false;
   let clearTimer = 0;
@@ -63,7 +67,7 @@ export function createVenueComposeBox(post, opts = {}) {
     clearTimer = /** @type {any} */ (setTimeout(() => {
       status.hidden = true;
       clearTimer = 0;
-    }, r.ok ? 2500 : 8000));
+    }, r.ok ? 2500 : 12000));
   };
   const send = async () => {
     const text = input.value.replace(/\s+/g, ' ').trim();
