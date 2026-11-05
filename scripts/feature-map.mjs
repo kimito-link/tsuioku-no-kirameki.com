@@ -104,6 +104,9 @@ const EXCLUDE = [/\.test\.js$/, /node_modules/];
  *   意図的に片側だけにするなら、ここに1行足してから再生成する。
  */
 const DOM_ATTR_DISCONNECT_BASELINE = new Set([
+  /* ── YouTube 版(2026-11-05 本体に同梱): 書き手は extension-youtube/content-chat-main.js(ページの世界・setAttribute)、
+   * 読み手は src/lib/youtube/ytChatParse.js の el.getAttribute?.(…)(?. 付きの呼び出しをこの解析が拾えない)。繋がっている。 */
+  'data-nl-author-photo',
   /* ── 🟠 書き手だけ: 読み手が【CSS(.html)】に居る ─────────────────
    * この解析は .js しか読まないので、CSS セレクタで使う属性は必ずここに出る。
    * ★偽陽性であって借金ではない(実コードで1件ずつ確認済み)。

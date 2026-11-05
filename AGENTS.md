@@ -15,6 +15,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
   ローカル PC (`chrome.storage.local`) の中にのみ記録し、放送終了後に
   3 つのレーン（りんく／こん太／たぬ姉）＋活発度の色分けで振り返れるよう
   可視化すること。
+  ★0.1.1890〜 YouTube Live（`www.youtube.com`）も同じ画面で記録する（本体に同梱・`extension/yt-*.html`・`extension/dist/yt-*.js`）。
 
 ---
 
@@ -30,7 +31,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **提出履歴・ストア掲載文の正本**: [docs/releases/cws-store-listing.md](docs/releases/cws-store-listing.md) 冒頭（★ここの版番号は提出のたびに更新する）
 - **CWS Developer Dashboard 入力の正本**: [docs/releases/cws-submission-texts.md](docs/releases/cws-submission-texts.md)
   - 提出時に毎回そこから貼り直す運用（再構築コスト削減）
-- **ホスト権限（提出版）**: `https://*.nicovideo.jp/*`・`https://app.tsuioku-no-kirameki.com/*`（WEBで共有・既定OFF）・`https://suggestqueries.google.com/*`（評判チェック）・`http://127.0.0.1:50021/*`（VOICEVOX）。開発用 `localhost`/`127.0.0.1:3456` は `stage-submission.py` が除外
+- **ホスト権限（提出版）**: `https://*.nicovideo.jp/*`・`https://app.tsuioku-no-kirameki.com/*`（WEBで共有・既定OFF）・`https://suggestqueries.google.com/*`（評判チェック）・`http://127.0.0.1:50021/*`（VOICEVOX）。★0.1.1890〜は YouTube Live 同梱で `https://www.youtube.com/*`・`https://yt3.ggpht.com/*`・`https://yt4.ggpht.com/*`・`https://yt3.googleusercontent.com/*` と permissions `tts`・`declarativeNetRequestWithHostAccess` が増える(未提出・`docs/releases/cws-next-submission.md` 冒頭)。開発用 `localhost`/`127.0.0.1:3456` は `stage-submission.py` が除外
 ### ★提出は「全自動」（AI も人間もここを最初に読むこと）
 
 **Chrome Web Store への提出は、審査送信までコマンド1本で完了する。**

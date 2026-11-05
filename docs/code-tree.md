@@ -947,7 +947,7 @@
   - `comeview.js` — ニコ生版 comeview-entry.js(本物)+ YouTube の記録を読む入口のバンドル
   - `content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
   - `content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
-  - `manifest.json`
+  - `manifest.standalone.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
   - `marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
