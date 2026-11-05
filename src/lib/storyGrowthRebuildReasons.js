@@ -4,7 +4,7 @@
  * 【この箱に入らないもの】描画・storage への書き込み(載せるのは flickerMeter の補足欄)
  * 【書けるstorageキー】なし
  *
- * storyGrowthRebuildReasons.js — v0.1.1875
+ * storyGrowthRebuildReasons.js — v0.1.1877
  *
  * ■ なぜ要るか(2026-11-05 りんく「ニコニコはまたチカチカしています」)
  *   ちらつき計(v0.1.1686)の実測: サイドパネルを開いて271秒で #sceneStoryGrowth の作り直し 10,076+9,978、
@@ -32,7 +32,9 @@ export const STORY_GROWTH_REBUILD_REASON = Object.freeze({
   /** 中身の更新時に、画面の枚数が描いた数と合わなかった。 */
   DOM_MISMATCH: 'dom',
   /** 目標0件で根を空にした。 */
-  EMPTY: 'empty'
+  EMPTY: 'empty',
+  /** v0.1.1877: 縮小を末尾のマスだけ削って済ませた(作り直しではない)。 */
+  TRIM: 'trim'
 });
 
 /** @type {Readonly<Record<string, string>>} */
@@ -42,7 +44,8 @@ const LABELS = Object.freeze({
   shrink: '件数の縮小',
   grow: '足せない増加',
   dom: '枚数のずれ',
-  empty: '空に'
+  empty: '空に',
+  trim: '末尾だけ削る'
 });
 
 /** 直近の記録を何件持つか。 */
@@ -50,12 +53,44 @@ export const STORY_GROWTH_REBUILD_RECENT_MAX = 8;
 
 /**
  * @typedef {{ reason: string, from: number, to: number, dom: number, liveSame: boolean, atMs: number }} RebuildEvent
- * @typedef {{ counts: Record<string, number>, recent: RebuildEvent[], targets: number[], liveFlips: number, lastLiveKey: string }} RebuildReasonState
+ * @typedef {{ counts: Record<string, number>, recent: RebuildEvent[], targets: number[], liveFlips: number, lastLiveKey: string, diffs: Record<string, number>, lastDiff: string }} RebuildReasonState
  */
 
 /** @returns {RebuildReasonState} */
 export function createStoryGrowthRebuildReasonState() {
-  return { counts: {}, recent: [], targets: [], liveFlips: 0, lastLiveKey: '' };
+  return { counts: {}, recent: [], targets: [], liveFlips: 0, lastLiveKey: '', diffs: {}, lastDiff: '' };
+}
+
+/**
+ * v0.1.1877: 前回と今回の並び(コメントの安定 id の配列)を比べ、件数が少しだけ違うとき、
+ * 余分な1件が「どちらの側の何番目か」を返す。違いが無い/大きすぎるときは null。
+ * @param {readonly string[]} prevIds
+ * @param {readonly string[]} nextIds
+ * @param {number} [maxDelta]
+ * @returns {{ index: number, extraIn: 'prev'|'next', atEnd: boolean } | null}
+ */
+export function findStoryEntryDiff(prevIds, nextIds, maxDelta = 2) {
+  const a = Array.isArray(prevIds) ? prevIds : [];
+  const b = Array.isArray(nextIds) ? nextIds : [];
+  const d = b.length - a.length;
+  if (d === 0 || Math.abs(d) > maxDelta) return null;
+  const longer = d > 0 ? b : a;
+  const shorter = d > 0 ? a : b;
+  let i = 0;
+  while (i < shorter.length && shorter[i] === longer[i]) i += 1;
+  return { index: i, extraIn: d > 0 ? 'next' : 'prev', atEnd: i >= shorter.length };
+}
+
+/**
+ * 件数が揺れたときの「余分な1件」の特徴を1つ数える(例: '末尾・自分の投稿')。
+ * @param {RebuildReasonState} state
+ * @param {string} label
+ */
+export function noteStoryEntryDiff(state, label) {
+  if (!state || !label) return;
+  if (!state.diffs) state.diffs = {};
+  state.diffs[label] = (state.diffs[label] || 0) + 1;
+  state.lastDiff = label;
 }
 
 /** @param {unknown} v */
@@ -115,9 +150,9 @@ export function noteStoryGrowthTarget(state, ev) {
 export function formatStoryGrowthRebuildReasons(state, nowMs) {
   if (!state || typeof state !== 'object') return '';
   const entries = Object.entries(state.counts || {}).filter(([, n]) => n > 0);
-  const total = entries.reduce((s, [, n]) => s + n, 0);
+  const total = entries.filter(([k]) => k !== STORY_GROWTH_REBUILD_REASON.TRIM).reduce((s, [, n]) => s + n, 0);
   const tgt = Array.isArray(state.targets) ? state.targets : [];
-  if (!total && tgt.length <= 1 && !state.liveFlips) return '';
+  if (!entries.length && tgt.length <= 1 && !state.liveFlips) return '';
   const byReason = entries.length
     ? entries.sort((a, b) => b[1] - a[1]).map(([k, n]) => `${LABELS[k] || k}${n}`).join('・')
     : 'なし';
@@ -131,7 +166,15 @@ export function formatStoryGrowthRebuildReasons(state, nowMs) {
   return `応援マスの作り直し${total}回(${byReason})` +
     ` / 目標件数の推移 ${tgt.join('→') || '—'}` +
     ` / 配信の行き来${int(state.liveFlips)}回` +
-    (recent ? ` / 直近: ${recent}` : '');
+    (recent ? ` / 直近: ${recent}` : '') +
+    formatDiffs(state);
+}
+
+/** @param {RebuildReasonState} state */
+function formatDiffs(state) {
+  const d = Object.entries(state.diffs || {}).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  if (!d.length) return '';
+  return ` / 件数が揺れたときの余分な1件: ${d.map(([k, n]) => `${k}×${n}`).join('、')}`;
 }
 
 /**
