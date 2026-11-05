@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1852',
+    date: '2026-11-03',
+    summary: 'GPU の案内をポップアップにも・会場で読みやすく',
+    items: Object.freeze([
+      '読み上げが遅い PC では、ポップアップの読み上げ欄にも「VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に」の案内を出すようにしました。',
+      '会場モードの「読み上げが遅れています」と GPU の案内が、後ろのニコ生のコメント欄と重なって読みにくかったので、白い下地を付けて何の上でも読めるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1851',
     date: '2026-11-03',
     summary: 'VOICEVOX が追いつかない間は PC の声で読む',
