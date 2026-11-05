@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY } from './giftItemsMirror.js';
+import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, waitGiftPressResult, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
 import { createVenueGiftStrip } from './venueComposeBox.js';
 
 // 2026-11-05 りんくの画面(番組ギフト・3列の枠・画像と「500 pt」の数字と pt が別の部品)に似せた形
@@ -102,4 +102,71 @@ describe('子の窓と放送ページのやりとり', () => {
     expect(store.data[GIFT_ITEM_PRESS_REQ_KEY].key).toBe('ハゲ|500pt');
     expect(hit).toEqual(['a']);
   });
+});
+
+describe('1回で贈る(設定でオンの人だけ)', () => {
+  /** @returns {any} */
+  const memStore = () => {
+    /** @type {Record<string, any>} */
+    const data = {};
+    /** @type {((c: any) => void)[]} */
+    const subs = [];
+    return {
+      data,
+      get: async (/** @type {string} */ k) => ({ [k]: data[k] }),
+      set: async (/** @type {Record<string, any>} */ o) => {
+        const ch = {};
+        for (const [k, v] of Object.entries(o)) { data[k] = v; /** @type {any} */ (ch)[k] = { newValue: v }; }
+        for (const f of subs) f(ch);
+      },
+      onChanged: (/** @type {(c: any) => void} */ f) => { subs.push(f); }
+    };
+  };
+  it('確認の「贈る」だけを探す(購入・キャンセルや前から見えていたものは押さない)', () => {
+    document.body.innerHTML = '<button>ポイント購入</button><button>キャンセル</button><button id="old">贈る</button><div><button id="new">贈る</button></div>';
+    const vis = (/** @type {Element} */ el) => { el.getBoundingClientRect = () => /** @type {any} */ ({ width: 80, height: 30 }); };
+    for (const b of document.querySelectorAll('button')) vis(b);
+    const old = /** @type {Element} */ (document.getElementById('old'));
+    expect(findGiftConfirmButton(document, new Set([old]))?.id).toBe('new');
+    expect(findGiftConfirmButton(document)?.id).toBe('old');
+  });
+  it('オンなら1回押しで、アイテムを押したあとに出た確認の「贈る」まで押して「贈りました」と出す', async () => {
+    document.body.innerHTML = PANEL;
+    const store = memStore();
+    /** @type {string[]} */
+    const hit = [];
+    for (const c of document.querySelectorAll('.card')) {
+      c.addEventListener('click', () => {
+        hit.push(String(c.getAttribute('data-id')));
+        const dlg = document.createElement('div');
+        dlg.innerHTML = '<p>このギフトを贈りますか</p><button class="cancel">キャンセル</button><button class="ok">贈る</button>';
+        for (const b of dlg.querySelectorAll('button')) b.getBoundingClientRect = () => /** @type {any} */ ({ width: 80, height: 30 });
+        dlg.querySelector('.ok')?.addEventListener('click', () => { hit.push('confirm'); });
+        document.body.append(dlg);
+      });
+    }
+    const frameWin = /** @type {any} */ ({ self: 1, top: 2, location: { hostname: 'gift.nicovideo.jp', pathname: '/live/lv9/purchase' }, document, setInterval: window.setInterval.bind(window), clearInterval: window.clearInterval.bind(window), setTimeout: window.setTimeout.bind(window) });
+    startGiftItemsPublisher(frameWin, store);
+    await new Promise((r) => setTimeout(r, 700));
+    let saved = false;
+    const strip = createVenueGiftStrip({
+      subscribe: (cb) => subscribeGiftItems(store, '/watch/lv9', cb),
+      press: async (key, o) => { let at = 0; const r = requestGiftItemPress(document, key, store.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); const v = await waitGiftPressResult(store, at); return { ok: r.ok || !!v, sent: v?.confirmed === true }; },
+      oneTap: { get: () => false, set: (on) => { saved = on; } },
+      doc: document
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    const mode = /** @type {HTMLButtonElement} */ (strip.querySelector('.nlsb-gift-mode'));
+    expect(mode.textContent).toBe('2回'); // 既定はオフ
+    mode.click();
+    expect(saved).toBe(true);
+    expect(mode.textContent).toBe('1回');
+    const item = /** @type {HTMLButtonElement} */ (strip.querySelectorAll('.nlsb-gift-item')[1]);
+    item.click();
+    item.click(); // 続けて押しても二重には贈らない
+    await new Promise((r) => setTimeout(r, 4200));
+    expect(hit).toEqual(['a', 'confirm']);
+    expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].confirmed).toBe(true);
+    expect(item.textContent).toMatch(/贈りました/);
+  }, 10000);
 });
