@@ -94,6 +94,10 @@ describe('子の窓と放送ページのやりとり', () => {
     expect(btns).toHaveLength(2);
     expect(strip.style.display).toBe('inline-flex');
     /** @type {HTMLButtonElement} */ (btns[1]).click();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(store.data[GIFT_ITEM_PRESS_REQ_KEY]).toBeUndefined(); // 1回目は押さない
+    expect(btns[1].textContent).toMatch(/もう一度/);
+    /** @type {HTMLButtonElement} */ (btns[1]).click();
     await new Promise((r) => setTimeout(r, 900));
     expect(store.data[GIFT_ITEM_PRESS_REQ_KEY].key).toBe('ハゲ|500pt');
     expect(hit).toEqual(['a']);

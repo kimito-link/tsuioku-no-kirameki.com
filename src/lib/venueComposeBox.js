@@ -241,6 +241,7 @@ export function createVenueGiftStrip(opts) {
   strip.className = 'nlsb-gift-strip';
   strip.style.cssText = 'display:none;align-items:center;gap:4px;max-width:46vw;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;vertical-align:middle';
   let sig = '';
+  let armed = '';
   /** @param {{ key: string, name: string, pt: string, img: string }[]} items */
   const render = (items) => {
     const next = JSON.stringify(items.map((it) => [it.key, it.img]));
@@ -251,7 +252,7 @@ export function createVenueGiftStrip(opts) {
       const b = doc.createElement('button');
       b.type = 'button';
       b.className = 'nlsb-comeview-btn nlsb-gift-item';
-      b.title = `${it.name ? it.name + ' ' : ''}${it.pt}(公式のギフト欄で確認してから贈ります)`;
+      b.title = `${it.name ? it.name + ' ' : ''}${it.pt}(2回押すと公式のギフト欄でこのアイテムを選びます)`;
       b.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;padding:2px 4px;min-width:40px;line-height:1.1;flex:0 0 auto';
       if (/^https:\/\//.test(it.img)) {
         const im = doc.createElement('img');
@@ -270,6 +271,15 @@ export function createVenueGiftStrip(opts) {
       pt.style.cssText = 'font-size:10px;white-space:nowrap';
       b.append(pt);
       b.addEventListener('click', async () => {
+        // v0.1.1878: 2回押しで進む(1回目は「もう一度で選ぶ」と出すだけ)。公式の欄がアイテムを押した時点で贈る作りでも、会場で1回の誤タップでは贈られないように
+        if (armed !== it.key) {
+          armed = it.key;
+          pt.textContent = 'もう一度';
+          setTimeout(() => { if (armed === it.key) { armed = ''; pt.textContent = it.pt.replace(/\s+/g, ''); } }, 3000);
+          return;
+        }
+        armed = '';
+        pt.textContent = it.pt.replace(/\s+/g, '');
         try { opts.tuck?.(true); } catch { /* しまえなくても押すのは試す */ }
         let res = null;
         try { res = await opts.press(it.key); } catch { res = null; }
