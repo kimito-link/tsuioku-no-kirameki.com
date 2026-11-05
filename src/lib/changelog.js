@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1891',
+    date: '2026-11-05',
+    summary: 'YouTube の同接をパネルを閉じても記録',
+    items: Object.freeze([
+      'YouTube の同時視聴者数を、サイドパネルを閉じていても1分ごとに記録するようにしました。会場モードで見ている間の同接がマーケの「同接推移カーブ」から抜けていました(27分の配信で5分〜25分が空)',
+      '同接がまだ読めていないときの「0人」を記録しないようにしました(開始時の0人で平均が下がっていました)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1890',
     date: '2026-11-05',
     summary: 'YouTube Live にも対応(試作版を本体に)',
@@ -187,14 +196,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '公式ギフト欄の作りを記録する',
     items: Object.freeze([
       '会場からギフトを選べるようにする準備として、公式のギフト欄を開いたときに、アイテムの並び方(画像・pt・押す場所)と確認の窓の形を、この PC の中にだけ記録します。読むだけで、押したり送ったりはしません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1870',
-    date: '2026-11-05',
-    summary: '会場からギフト画面を開く',
-    items: Object.freeze([
-      '会場の上の帯に「🎁 ギフト」を付けました。押すと会場をいったんしまって、公式のギフト画面を開きます。ギフトを選んで贈るのは公式の画面でご自身で行います。右下の「▲ 会場に戻る」で会場に戻れます。'
     ])
   })
 ]);

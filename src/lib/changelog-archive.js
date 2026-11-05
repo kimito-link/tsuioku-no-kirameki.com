@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1870',
+    date: '2026-11-05',
+    summary: '会場からギフト画面を開く',
+    items: Object.freeze([
+      '会場の上の帯に「🎁 ギフト」を付けました。押すと会場をいったんしまって、公式のギフト画面を開きます。ギフトを選んで贈るのは公式の画面でご自身で行います。右下の「▲ 会場に戻る」で会場に戻れます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1869',
     date: '2026-11-05',
     summary: 'PICK UP を映像の上の大きな吹き出しに',

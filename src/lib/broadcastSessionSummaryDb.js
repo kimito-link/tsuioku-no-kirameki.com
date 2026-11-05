@@ -42,10 +42,13 @@ export const BROADCAST_SUMMARY_MAX_PER_LIVE = 200;
  * - 新行は broadcastSessionSummaryFlush.js で snapshot から自動的に埋まる。
  */
 
-/** @returns {Promise<IDBDatabase>} */
-export function openBroadcastSessionSummaryDb() {
+/**
+ * @param {string} [name] 既定はニコ生版の DB。本体に同梱した YouTube 版の background は ytm: 付きの名前を渡す(ytViewerSampler.js)
+ * @returns {Promise<IDBDatabase>}
+ */
+export function openBroadcastSessionSummaryDb(name = BROADCAST_SUMMARY_DB_NAME) {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(BROADCAST_SUMMARY_DB_NAME, DB_VERSION);
+    const req = indexedDB.open(name, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(BROADCAST_SUMMARY_STORE)) {
