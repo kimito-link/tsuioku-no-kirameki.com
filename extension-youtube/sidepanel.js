@@ -20215,7 +20215,7 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
-      version: "0.1.1861",
+      version: "0.1.1863",
       date: "2026-11-05",
       summary: "りんく欄を元の決まりに戻す",
       items: Object.freeze([
@@ -46405,7 +46405,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T03:07" ? String("yt-2026-11-05T03:07") : "dev";
+      const buildId = "yt-2026-11-05T03:08" ? String("yt-2026-11-05T03:08") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46468,7 +46468,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T03:07" ? String("yt-2026-11-05T03:07") : "dev";
+            return "yt-2026-11-05T03:08" ? String("yt-2026-11-05T03:08") : "dev";
           } catch {
             return "dev";
           }

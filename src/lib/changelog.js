@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1861',
+    version: '0.1.1863',
     date: '2026-11-05',
     summary: 'りんく欄を元の決まりに戻す',
     items: Object.freeze([
