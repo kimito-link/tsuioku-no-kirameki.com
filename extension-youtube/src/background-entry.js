@@ -236,6 +236,15 @@ async function speakLightTts(text, userKey) {
  * @param {string} text
  */
 async function relayCommentToChatFrame(videoId, text) {
+  return relayToChatFrame(videoId, { type: 'YT_SEND_COMMENT_TO_FRAME', videoId, text });
+}
+
+/**
+ * その配信を開いているタブのチャット欄へ1通渡す(コメント送信・0.1.113 スーパーチャットの窓を開く)。
+ * @param {string} videoId
+ * @param {Record<string, unknown>} payload
+ */
+async function relayToChatFrame(videoId, payload) {
   const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
   const scored = tabs
     .map((t) => {
@@ -253,7 +262,7 @@ async function relayCommentToChatFrame(videoId, text) {
   for (const { t } of scored) {
     if (typeof t.id !== 'number') continue;
     try {
-      const res = await chrome.tabs.sendMessage(t.id, { type: 'YT_SEND_COMMENT_TO_FRAME', videoId, text });
+      const res = await chrome.tabs.sendMessage(t.id, payload);
       if (res && res.ok) return res;
       if (res) last = res;
     } catch {
@@ -540,6 +549,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+
+  if (message.type === 'YT_OPEN_SUPERCHAT') {
+    const videoId = String(message.videoId || '');
+    relayToChatFrame(videoId, { type: 'YT_OPEN_SUPERCHAT_IN_FRAME', videoId })
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, reason: String(err) }));
     return true;
   }
 

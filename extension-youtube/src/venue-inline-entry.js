@@ -61,6 +61,9 @@ function sync() {
     mountVenueBarButton({
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
       postReasonText: ytCommentSendReasonText,
+      // 0.1.113: 💲 スーパーチャットの窓を開く(ニコ生版 v0.1.1870 のギフトと同じ。支払いは YouTube 本体で利用者がする)。
+      openGift: () => chrome.runtime.sendMessage({ type: 'YT_OPEN_SUPERCHAT', videoId: mountedVid }),
+      giftLabel: '💲 スーパーチャット',
     });
 }
 

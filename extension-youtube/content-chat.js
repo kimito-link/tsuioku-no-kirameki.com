@@ -1196,6 +1196,46 @@
     } catch {
     }
   }
+  function setupSuperChatOpenBridge() {
+    if (String(window.location.pathname || "").startsWith("/live_chat_replay")) return;
+    try {
+      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+        if (!msg || msg.type !== "YT_OPEN_SUPERCHAT_IN_FRAME") return void 0;
+        const want = String(msg.videoId || "");
+        const mine = resolveCurrentVideoId();
+        if (want && mine && want !== mine) return void 0;
+        try {
+          const sel = [
+            "yt-live-chat-message-input-renderer #product-picker button",
+            "#product-picker button",
+            '#picker-buttons button[aria-label*="Super Chat"]',
+            '#picker-buttons button[aria-label*="スーパーチャット"]',
+            'button[aria-label*="Super Chat"]',
+            'button[aria-label*="スーパーチャット"]',
+            'button[aria-label*="Super Thanks"]'
+          ];
+          let btn = null;
+          for (const q of sel) {
+            btn = /** @type {HTMLElement | null} */
+            document.querySelector(q);
+            if (btn) break;
+          }
+          if (!btn) {
+            const panel = document.querySelector("#input-panel");
+            const signedOut = !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') || /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ""));
+            sendResponse({ ok: false, reason: signedOut ? "not-signed-in" : "no-superchat-button" });
+            return void 0;
+          }
+          btn.click();
+          sendResponse({ ok: true });
+        } catch (e) {
+          sendResponse({ ok: false, reason: String(e) });
+        }
+        return void 0;
+      });
+    } catch {
+    }
+  }
   function setupVideoFrameCapture() {
     try {
       chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -1401,6 +1441,7 @@
       setupLiveChatObserver();
       setupAutoAllChat();
       setupCommentSendBridge();
+      setupSuperChatOpenBridge();
       setupLeaderboardReader();
     } else if (window.top === window) {
       setupWatchPageMetaObserver();

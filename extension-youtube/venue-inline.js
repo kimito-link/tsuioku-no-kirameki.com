@@ -17573,6 +17573,37 @@ ${sourceCol}
     form.append(box, btn);
     return form;
   }
+  function createVenueGiftButton(openGift, opts = {}) {
+    const doc = opts.doc || document;
+    const btn = doc.createElement("button");
+    btn.type = "button";
+    btn.className = "nlsb-comeview-btn nlsb-gift-open";
+    const label = opts.label || "🎁 ギフト";
+    btn.textContent = label;
+    btn.title = "公式のギフト画面を開きます(会場はいったんしまいます・右下の「▲ 会場に戻る」で戻せます)";
+    btn.addEventListener("click", async () => {
+      try {
+        opts.tuck?.(true);
+      } catch {
+      }
+      let res = null;
+      try {
+        res = await openGift();
+      } catch {
+        res = null;
+      }
+      if (res && res.ok) return;
+      try {
+        opts.tuck?.(false);
+      } catch {
+      }
+      btn.textContent = `${label.replace(/^\S+\s+/, "")}のボタンが見つかりません`;
+      setTimeout(() => {
+        btn.textContent = label;
+      }, 4e3);
+    });
+    return btn;
+  }
 
   // src/extension/venueBar.js
   var VENUE_ROSTER_ENABLED = false;
@@ -19823,14 +19854,15 @@ ${sourceCol}
       tuckBtn.title = "コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます";
       tuckBtn.addEventListener("click", () => setTucked(true));
     }
+    const giftBtn = !isStandalone && typeof options.openGift === "function" ? createVenueGiftButton(options.openGift, { label: options.giftLabel, tuck: (on) => setTucked(on) }) : null;
     const composeBox = !isStandalone && typeof options.postComment === "function" ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null;
     const note = document.createElement("div");
     note.className = "nlsb-note";
     note.textContent = `全コメント集計・最大${VENUE_FULLSCREEN_MAX_SEATS}席`;
     if (venueWindowBtn) {
-      headerRight.append(...composeBox ? [composeBox] : [], ...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+      headerRight.append(...giftBtn ? [giftBtn] : [], ...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
     } else {
-      headerRight.append(...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
+      headerRight.append(...giftBtn ? [giftBtn] : [], ...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
     }
     header.append(title, ...composeBox ? [composeBox] : [], headerRight);
     const topBar = document.createElement("div");
@@ -20342,7 +20374,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T09:30") : ""
+          buildId: true ? String("yt-2026-11-05T09:38") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -23240,7 +23272,10 @@ ${sourceCol}
     if (!document.getElementById("nlsb-venue-root"))
       mountVenueBarButton({
         postComment: (text) => chrome.runtime.sendMessage({ type: "YT_SEND_COMMENT", videoId: mountedVid, text }),
-        postReasonText: ytCommentSendReasonText
+        postReasonText: ytCommentSendReasonText,
+        // 0.1.113: 💲 スーパーチャットの窓を開く(ニコ生版 v0.1.1870 のギフトと同じ。支払いは YouTube 本体で利用者がする)。
+        openGift: () => chrome.runtime.sendMessage({ type: "YT_OPEN_SUPERCHAT", videoId: mountedVid }),
+        giftLabel: "💲 スーパーチャット"
       });
   }
   ytInstallLocalAssetUrls();

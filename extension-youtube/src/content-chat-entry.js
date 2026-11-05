@@ -916,6 +916,54 @@ function setupCommentSendBridge() {
 }
 
 /**
+ * 0.1.113: 会場の「💲 スーパーチャット」ボタンから、YouTube 本体のスーパーチャットの窓を開く(ニコ生版 v0.1.1870 のギフトと同じ)。
+ *   拡張はボタンを押すだけで、金額の選択・支払いは YouTube 本体の画面で利用者がする。
+ *   ボタンはログインしていて、その配信でスーパーチャットが使えるときだけある。無ければ理由を返す(会場が「見つかりません」と出す)。
+ */
+function setupSuperChatOpenBridge() {
+  if (String(window.location.pathname || '').startsWith('/live_chat_replay')) return;
+  try {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (!msg || msg.type !== 'YT_OPEN_SUPERCHAT_IN_FRAME') return undefined;
+      const want = String(msg.videoId || '');
+      const mine = resolveCurrentVideoId();
+      if (want && mine && want !== mine) return undefined;
+      try {
+        const sel = [
+          'yt-live-chat-message-input-renderer #product-picker button',
+          '#product-picker button',
+          '#picker-buttons button[aria-label*="Super Chat"]',
+          '#picker-buttons button[aria-label*="スーパーチャット"]',
+          'button[aria-label*="Super Chat"]',
+          'button[aria-label*="スーパーチャット"]',
+          'button[aria-label*="Super Thanks"]',
+        ];
+        let btn = null;
+        for (const q of sel) {
+          btn = /** @type {HTMLElement | null} */ (document.querySelector(q));
+          if (btn) break;
+        }
+        if (!btn) {
+          const panel = document.querySelector('#input-panel');
+          const signedOut =
+            !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') ||
+            /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ''));
+          sendResponse({ ok: false, reason: signedOut ? 'not-signed-in' : 'no-superchat-button' });
+          return undefined;
+        }
+        btn.click();
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, reason: String(e) });
+      }
+      return undefined;
+    });
+  } catch {
+    // context invalidated
+  }
+}
+
+/**
  * 視聴ページの動画を1枚の PNG にする（📷 スクショ）。広告中や DRM 動画では失敗することがある。
  */
 function setupVideoFrameCapture() {
@@ -1166,6 +1214,7 @@ function init() {
     // アーカイブのリプレイも「上位のチャットのリプレイ」⇄「チャットのリプレイ」の2択で、2つ目が全部(生配信と同じ並び)
     setupAutoAllChat();
     setupCommentSendBridge();
+    setupSuperChatOpenBridge();
     setupLeaderboardReader();
   } else if (window.top === window) {
     // 最上位の YouTube ページ（トップから視聴ページへ遷移しても動くよう、どのページでも待機）
