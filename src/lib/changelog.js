@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1877',
+    date: '2026-11-05',
+    summary: '会場のギフトは安い順・1,000pt まで',
+    items: Object.freeze([
+      '会場に並べるギフトのアイテムを、安い順にし、1,000pt までに絞りました。公式の並びのままだと先頭に会員権や数万 pt のアイテムが来ていたためです。プレミアム会員権は配信者へのギフトではないので会場には出しません(高いアイテムや会員権は公式のギフト欄から選べます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1875',
     date: '2026-11-05',
     summary: '会場にギフトのアイテムを並べる',
@@ -182,14 +190,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'VOICEVOX が追いつかない間は PC の声で読む',
     items: Object.freeze([
       'VOICEVOX が混んで追いつかない間だけ、PC に入っている声(Windows の Haruka・Ayumi・Ichiro・Sayaka など)に自動で切り替えて読むようにしました。人ごとに声の種類・高さ・速さを変えるので、誰のコメントか聞き分けられます(同じ人はいつも同じ声)。切り替えている間は「いまは PC の声で読んでいます」と出ます。VOICEVOX が速くなったら自動で戻ります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1850',
-    date: '2026-11-03',
-    summary: '混んだ配信で読み上げが全く鳴らないのを修正',
-    items: Object.freeze([
-      'VOICEVOX が混んで1件の合成に十数秒かかる PC で、コメントが次々来ると読み上げが1つも鳴らないことがありました(毎分150件の配信で、読めたのは2件)。新しいコメントが来るたびに、合成中のコメントを捨てて頼み直していたのが原因です。混んでいる間は合成中のコメントを最後まで待って読むようにしたので、遅れても声は出ます。速さは VOICEVOX を GPU にするのが一番効きます。'
     ])
   })
 ]);

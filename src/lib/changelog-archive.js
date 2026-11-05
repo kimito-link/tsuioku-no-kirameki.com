@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1850',
+    date: '2026-11-03',
+    summary: '混んだ配信で読み上げが全く鳴らないのを修正',
+    items: Object.freeze([
+      'VOICEVOX が混んで1件の合成に十数秒かかる PC で、コメントが次々来ると読み上げが1つも鳴らないことがありました(毎分150件の配信で、読めたのは2件)。新しいコメントが来るたびに、合成中のコメントを捨てて頼み直していたのが原因です。混んでいる間は合成中のコメントを最後まで待って読むようにしたので、遅れても声は出ます。速さは VOICEVOX を GPU にするのが一番効きます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1848',
     date: '2026-11-01',
     summary: 'VOICEVOX を GPU にする案内を見やすく',
