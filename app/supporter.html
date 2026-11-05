@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>追憶のきらめき サポーター</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      /* 配色の正本は リポジトリ直下 DESIGN.md(Tsuioku Warm Pastel)。app/phone.html と同じトークン。 */
+      :root {
+        color-scheme: light;
+        --nl-bg: #fff7ec;
+        --nl-text: #4a3b34;
+        --nl-text-soft: #8a7568;
+        --nl-border: #e3c9b5;
+        --nl-card-bg: #fffdf9;
+        --nl-accent: #f06aa0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--nl-bg);
+        color: var(--nl-text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+        line-height: 1.6;
+        padding: 24px 16px 32px;
+      }
+      main { max-width: 520px; margin: 0 auto; }
+      h1 { font-size: 21px; margin: 0 0 6px; text-align: center; }
+      .lead { color: var(--nl-text-soft); font-size: 14px; margin: 0 0 18px; text-align: center; }
+      .card {
+        background: var(--nl-card-bg);
+        border: 1px solid var(--nl-border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 1px 6px rgba(120, 80, 50, 0.08);
+      }
+      .card h2 { font-size: 15px; margin: 0 0 8px; }
+      ul { margin: 0; padding-left: 1.2em; font-size: 14px; }
+      .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .plan {
+        border: 2px solid var(--nl-border);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+        text-align: center;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+      }
+      .plan.is-best { border-color: var(--nl-accent); }
+      .plan .price { font-size: 20px; font-weight: 800; }
+      .plan .note { font-size: 12px; color: var(--nl-text-soft); }
+      .badge { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--nl-accent); border-radius: 999px; padding: 1px 8px; }
+      button.primary {
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        border: 0;
+        background: var(--nl-accent);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      code#code {
+        display: block;
+        word-break: break-all;
+        padding: 10px;
+        background: #fff;
+        border: 1px dashed var(--nl-accent);
+        border-radius: 8px;
+        font-size: 13px;
+        margin: 8px 0;
+      }
+      .msg { font-size: 13px; color: var(--nl-text-soft); }
+      .err { color: #c4314b; }
+      footer { text-align: center; font-size: 12px; color: var(--nl-text-soft); margin-top: 18px; }
+      footer a { color: inherit; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>追憶のきらめき サポーター</h1>
+      <p class="lead">配信のあとに、案件やスポンサーに見せられる資料を作れます。</p>
+
+      <!-- 申し込み前 -->
+      <section id="joinView">
+        <div class="card">
+          <h2>サポーターでできること</h2>
+          <ul>
+            <li>マーケ HTML(配信の分析レポート)</li>
+            <li>メディアキット(自分の配信の紹介資料)</li>
+            <li>スパチャ・ギフトの集計、視聴維持率、配信をまたいだ推移</li>
+          </ul>
+          <p class="msg">コメントの記録・振り返り・読み上げ・スマホでの表示は、これまでどおり無料です。</p>
+        </div>
+        <div class="card">
+          <h2>料金</h2>
+          <div class="plans">
+            <button class="plan is-best" type="button" data-plan="yearly">
+              <span class="badge">おすすめ</span>
+              <div class="price" id="priceYearly">年額</div>
+              <div class="note">2か月分おトク</div>
+            </button>
+            <button class="plan" type="button" data-plan="monthly">
+              <div class="price" id="priceMonthly">月額</div>
+              <div class="note">いつでも解約できます</div>
+            </button>
+          </div>
+          <p class="msg">支払いは Stripe(カード・Apple Pay・Google Pay)。カード番号はこちらには届きません。</p>
+          <p class="msg err" id="joinErr" hidden></p>
+        </div>
+      </section>
+
+      <!-- 支払い直後 -->
+      <section id="doneView" hidden>
+        <div class="card">
+          <h2>ありがとうございます</h2>
+          <p>下の「サポーターのコード」をコピーして、拡張のマーケ HTML の画面に貼り付けてください。</p>
+          <code id="code"></code>
+          <button class="primary" type="button" id="copyBtn">コードをコピー</button>
+          <p class="msg">★このコードは大切に保管してください(PC を買い替えたときも同じコードで使えます)。</p>
+        </div>
+      </section>
+
+      <!-- 解約・一時停止 -->
+      <section class="card">
+        <h2>契約の確認・一時停止・解約</h2>
+        <p class="msg">サポーターのコードを入れると、Stripe の画面で契約の確認・カードの変更・一時停止・解約ができます。</p>
+        <input id="portalCode" type="text" autocomplete="off" spellcheck="false" placeholder="サポーターのコード" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--nl-border);margin-bottom:8px" />
+        <button class="primary" type="button" id="portalBtn">契約の画面を開く</button>
+        <p class="msg err" id="portalErr" hidden></p>
+      </section>
+
+      <footer>
+        <a href="https://tsuioku-no-kirameki.com/tokushoho.html">特定商取引法に基づく表記</a> ·
+        <a href="https://tsuioku-no-kirameki.com/terms.html">利用規約</a> ·
+        <a href="https://tsuioku-no-kirameki.com/privacy.html">プライバシーポリシー</a>
+      </footer>
+    </main>
+    <script src="/app/supporter.js"></script>
+  </body>
+</html>

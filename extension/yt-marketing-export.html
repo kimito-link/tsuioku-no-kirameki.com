@@ -227,6 +227,49 @@
       #mktErrorStage.is-visible {
         display: flex;
       }
+      /* ── サポーター(有料)の案内(v0.1.1893・関所が閉まっているときだけ出る) ── */
+      #mktLockStage {
+        display: none;
+        width: 100%;
+        max-width: 480px;
+        text-align: center;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      #mktLockStage.is-visible {
+        display: flex;
+      }
+      #mktLockTitle {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--nl-accent);
+      }
+      #mktLockText,
+      #mktLockMsg {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--nl-text-sub);
+        white-space: pre-wrap;
+      }
+      .mkt-lock-code {
+        display: flex;
+        gap: 6px;
+        width: 100%;
+        max-width: 360px;
+      }
+      .mkt-lock-code input {
+        flex: 1;
+        min-width: 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-card-bg);
+        color: inherit;
+        font-size: 12px;
+      }
       .mkt-done-icon {
         font-size: 44px;
         line-height: 1;
@@ -349,6 +392,20 @@
       <p id="mktErrorTitle">分析でエラーが発生しました</p>
       <p id="mktErrorText"></p>
       <button id="mktRetryBtn" class="mkt-retry-btn" type="button" hidden>もう一度実行</button>
+    </section>
+
+    <!-- サポーター(有料)の案内。v0.1.1893: 関所(SUPPORTER_GATE_ENFORCED)が閉まっていてお試しも過ぎたときだけ出る。 -->
+    <section id="mktLockStage">
+      <div class="mkt-done-icon">💎</div>
+      <p id="mktLockTitle">マーケ HTML はサポーター向けの機能です</p>
+      <p id="mktLockText">メディアキット・スパチャ/ギフト集計・視聴維持率など、案件やスポンサーに見せられる資料を作れます。
+コメントの記録・振り返り・読み上げは、これまでどおり無料です。</p>
+      <button id="mktLockJoinBtn" class="mkt-retry-btn" type="button">サポーターになる</button>
+      <div class="mkt-lock-code">
+        <input id="mktLockCodeInput" type="text" autocomplete="off" spellcheck="false" placeholder="サポーターのコードを貼り付け" />
+        <button id="mktLockCodeBtn" class="mkt-retry-btn" type="button">入れる</button>
+      </div>
+      <p id="mktLockMsg"></p>
     </section>
 
     <!-- 何があっても先に動く軽量guard(status-guard.jsと同型)。素のファイル・esbuild非経由。 -->
