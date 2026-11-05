@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1844',
+    date: '2026-10-31',
+    summary: 'Android アプリでもコメントを流せるように',
+    items: Object.freeze([
+      'Android アプリで「💬 コメントを流す」を押すと「この配信は終わっているか、見られない配信です」と出て、放送中でもコメントが受け取れませんでした。Android だとニコニコがスマホ向けのページを返し、そこに接続先が載っていなかったためです。PC と同じページを受け取るようにしたので、Android でもコメントが流れます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1843',
     date: '2026-10-31',
     summary: '過去コメントの埋め直しの読み違いを直す',

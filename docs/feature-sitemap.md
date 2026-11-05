@@ -321,7 +321,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 274</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 275</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -412,6 +412,7 @@
 - `src/lib/giftHistorySourcePreference.js` — ギフト履歴レーンの「どのデータ源を表示するか」を決める純関数（v0.1.395）。
 - `src/lib/giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
 - `src/lib/giftLaneOfficialFill.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/giftPanelShape.js` — ニコ生の公式ギフト欄(番組ギフト)の作りを、読み取りだけで記録する計器(v0.1.1871)。
 - `src/lib/giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
 - `src/lib/giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
 - `src/lib/giftSenderObservation.js` — v0.1.214: anonymous gift（userId 空）も nickname を bucket key にして
@@ -1334,7 +1335,8 @@
 - `v0.1.1869` 2026-11-05 — PICK UP を映像の上の大きな吹き出しに
 - `v0.1.1861` 2026-11-04 — 混んだら大事なコメントだけ読み上げる
 
-### 🎁 ギフト (4版)
+### 🎁 ギフト (5版)
+- `v0.1.1872` 2026-11-05 — ギフト欄の記録で見えた物も残す
 - `v0.1.1871` 2026-11-05 — 公式ギフト欄の作りを記録する
 - `v0.1.1870` 2026-11-05 — 会場からギフト画面を開く
 - `v0.1.1863` 2026-11-05 — りんく欄を元の決まりに戻す
@@ -1356,7 +1358,6 @@
 - `v0.1.1856` 2026-11-03 — マーケHTMLのスクロールを軽く
 - `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
 
-### その他 (3版)
+### その他 (2版)
 - `v0.1.1858` 2026-11-04 — マーケHTMLを撮り直せないのを直す
 - `v0.1.1854` 2026-11-03 — マーケを1つに・視聴維持率を追加
-- `v0.1.1844` 2026-10-31 — Android アプリでもコメントを流せるように

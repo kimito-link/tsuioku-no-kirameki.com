@@ -92,7 +92,47 @@ export function captureGiftPanelShape(doc, opts = {}) {
 }
 
 /**
- * 3秒ごとに読み取り、変わったときだけ保存する(キー nls_diag_gift_panel:<host><path>)。
+ * v0.1.1872: 中身が拾えなくても「この窓で動いたか・何が見えたか」を残すための数え上げ。
+ * @param {Document} doc
+ */
+export function frameCensus(doc) {
+  const root = doc.body;
+  if (!root) return { bodyText: 0, els: 0, imgs: 0, shadowHosts: 0, iframes: 0 };
+  const all = root.querySelectorAll('*');
+  let shadowHosts = 0;
+  for (const el of all) if (/** @type {any} */ (el).shadowRoot) shadowHosts += 1;
+  return {
+    bodyText: String(root.textContent || '').length,
+    els: all.length,
+    imgs: root.querySelectorAll('img').length,
+    canvases: root.querySelectorAll('canvas').length,
+    shadowHosts,
+    iframes: root.querySelectorAll('iframe').length,
+  };
+}
+
+/**
+ * v0.1.1872: 親のページにある iframe の一覧(どの窓にギフトの中身があるかを知るため)。src は https のみ・パスまで。
+ * @param {Document} doc
+ */
+export function listFrames(doc) {
+  return [...doc.querySelectorAll('iframe')].slice(0, 20).map((f) => {
+    const src = String(f.getAttribute('src') || '');
+    let where = '';
+    try {
+      const u = new URL(src, 'https://live.nicovideo.jp/');
+      where = u.protocol === 'https:' ? `${u.hostname}${u.pathname}`.slice(0, 120) : u.protocol;
+    } catch {
+      where = src ? 'bad' : '';
+    }
+    const r = f.getBoundingClientRect();
+    const inPanel = !!f.closest('[class*="web-view-panel"], [class*="gift" i], [class*="rich-view" i]');
+    return { src: where, name: String(f.getAttribute('name') || '').slice(0, 40), w: Math.round(r.width), h: Math.round(r.height), inPanel, cls: shortClass(f.parentElement || f) };
+  });
+}
+
+/**
+ * 3秒ごとに読み取り、変わったときだけ保存する(v0.1.1872: 中身ゼロでも数え上げを保存)(キー nls_diag_gift_panel:<host><path>)。
  *   親のページは公式のギフト欄の箱があるときだけ読む(重くしない)。30分で止める(計器なので常駐させない)。
  * @param {Window} win
  * @param {(obj: Record<string, unknown>) => void} save
@@ -105,8 +145,10 @@ export function startGiftPanelRecorder(win, save) {
     isTop = true;
   }
   const loc = win.location;
-  if (!/(^|\.)nicovideo\.jp$/.test(String(loc.hostname || ''))) return;
-  const key = `nls_diag_gift_panel:${loc.hostname}${loc.pathname}`.slice(0, 120);
+  // v0.1.1872: about:blank / srcdoc の子の窓(親がニコ生のとき)も記録する(中身を後から書き込む窓がある)
+  const blankChild = !isTop && /^about:/.test(String(loc.protocol || ''));
+  if (!blankChild && !/(^|\.)nicovideo\.jp$/.test(String(loc.hostname || ''))) return;
+  const key = blankChild ? `nls_diag_gift_panel:about:${String(win.name || '').slice(0, 40)}` : `nls_diag_gift_panel:${loc.hostname}${loc.pathname}`.slice(0, 120);
   let last = '';
   const started = Date.now();
   const tick = () => {
@@ -117,12 +159,14 @@ export function startGiftPanelRecorder(win, save) {
     try {
       const doc = win.document;
       if (isTop && !doc.querySelector('[class*="web-view-panel"], [class*="gift-sidebar" i], [class*="gift-panel" i]')) return;
-      const shape = captureGiftPanelShape(doc);
-      if (!shape) return;
-      const sig = JSON.stringify(shape);
+      // v0.1.1872: 中身が拾えなくても「動いた・何が見えた」を必ず残す(子の窓は常に、親は iframe 一覧つき)
+      const shape = captureGiftPanelShape(doc) || { tiles: [], tabs: [], dialogs: [], tileCount: 0 };
+      const extra = isTop ? { frames: listFrames(doc) } : {};
+      const census = frameCensus(doc);
+      const sig = JSON.stringify([shape, extra, census.imgs, census.shadowHosts, census.iframes]);
       if (sig === last) return;
       last = sig;
-      save({ [key]: { at: Date.now(), href: String(loc.href || '').slice(0, 200), top: isTop, ...shape } });
+      save({ [key]: { at: Date.now(), href: String(loc.href || '').slice(0, 200), top: isTop, census, ...extra, ...shape } });
     } catch {
       // 読み取りの失敗は無視(計器)
     }

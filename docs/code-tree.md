@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1108 件
+## ⚠️ 役割コメントが無いソース 9 / 1109 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -1000,7 +1000,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2243)
+- 📁 **src/** (2245)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1302,7 +1302,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1967)
+  - 📁 **lib/** (1969)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1892,6 +1892,8 @@
     - `giftMomentAnalytics.test.js`
     - `giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
     - `giftMomentumAnalytics.test.js`
+    - `giftPanelShape.js` — ニコ生の公式ギフト欄(番組ギフト)の作りを、読み取りだけで記録する計器(v0.1.1871)。
+    - `giftPanelShape.test.js`
     - `giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
     - `giftQuickStatsHtml.test.js`
     - `giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
