@@ -17,10 +17,13 @@
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
+  DEVICE_RESET_INTERVAL_MS,
   FEATURE_MARKETING,
   LICENSE_TTL_MS,
   bytesToBase64url,
+  deviceTagFor,
   encodeLicenseBody,
+  isValidDeviceId,
   isValidSupporterCode
 } from '../lib/supporterLicense.js';
 
@@ -152,15 +155,24 @@ export function createStripeClient({ fetchImpl = fetch, env = process.env } = {}
 
 /**
  * 証明書に署名する(Ed25519・秘密鍵は env の JWK)。
- * @param {{ sub: string, plan: string, nowMs: number, env?: Record<string, string|undefined>, subtle?: SubtleCrypto }} p
+ *   dev = その PC の印(v0.1.1896・1コード1台)。拡張は自分の印と違う証明書を使わない。
+ * @param {{ sub: string, plan: string, nowMs: number, dev?: string, env?: Record<string, string|undefined>, subtle?: SubtleCrypto }} p
  */
-export async function signLicense({ sub, plan, nowMs, env = process.env, subtle = globalThis.crypto.subtle }) {
+export async function signLicense({ sub, plan, nowMs, dev, env = process.env, subtle = globalThis.crypto.subtle }) {
   const jwkText = env.LICENSE_SIGNING_JWK;
   const kid = env.LICENSE_SIGNING_KID;
   if (!jwkText || !kid) throw new Error('license_key_not_configured');
   const jwk = JSON.parse(jwkText);
   const key = await subtle.importKey('jwk', { kty: 'OKP', crv: 'Ed25519', d: jwk.d, x: jwk.x }, { name: 'Ed25519' }, false, ['sign']);
-  const body = encodeLicenseBody({ kid, sub, plan, feat: [FEATURE_MARKETING], iat: nowMs, exp: nowMs + LICENSE_TTL_MS });
+  const body = encodeLicenseBody({
+    kid,
+    sub,
+    plan,
+    feat: [FEATURE_MARKETING],
+    iat: nowMs,
+    exp: nowMs + LICENSE_TTL_MS,
+    ...(dev ? { dev } : {})
+  });
   const sig = new Uint8Array(await subtle.sign({ name: 'Ed25519' }, key, new TextEncoder().encode(body)));
   return `${body}.${bytesToBase64url(sig)}`;
 }
@@ -172,7 +184,7 @@ export async function signLicense({ sub, plan, nowMs, env = process.env, subtle 
  *   stripe: ReturnType<typeof createStripeClient>,
  *   nowMs?: () => number,
  *   newCode?: () => string,
- *   sign?: (p: { sub: string, plan: string, nowMs: number }) => Promise<string>,
+ *   sign?: (p: { sub: string, plan: string, nowMs: number, dev?: string }) => Promise<string>,
  *   env?: Record<string, string|undefined>
  * }} deps
  */
@@ -225,9 +237,9 @@ export function createBillingService(deps) {
     return acct;
   }
 
-  async function licenseFor(acct) {
+  async function licenseFor(acct, dev) {
     if (!isAccountEntitled(acct)) return null;
-    return sign({ sub: acct.acctId, plan: acct.plan, nowMs: now() });
+    return sign({ sub: acct.acctId, plan: acct.plan, nowMs: now(), dev });
   }
 
   return {
@@ -266,15 +278,46 @@ export function createBillingService(deps) {
         await saveAccount({ ...acct, codeHash });
         await upstash(['SET', billingKeys.sessionCode(sessionId), code, 'EX', String(SESSION_CODE_TTL_SECONDS)]);
       }
-      return { status: 200, body: { ok: true, code, license: await licenseFor(acct), plan: acct.plan } };
+      // ★証明書はここでは出さない(PC の印が無い証明書はどの PC でも使えてしまう)。拡張がコードで取りに来る。
+      return { status: 200, body: { ok: true, code, plan: acct.plan } };
     },
 
-    /** 拡張が証明書を取り直す。 */
-    async license({ code }) {
+    /**
+     * 拡張が証明書を取り直す。1つのコードは1台だけ(最初に取りに来た PC を覚える)。
+     *   ほかの PC からは 409 device_limit(サポーターページの「この PC に移す」で入れ替える)。
+     */
+    async license({ code, device }) {
       const acct = await accountByCode(code);
       if (!acct) return { status: 404, body: { ok: false, error: 'unknown_code' } };
-      const license = await licenseFor(acct);
+      if (!isValidDeviceId(device)) return { status: 400, body: { ok: false, error: 'bad_device' } };
+      const tag = await deviceTagFor(device);
+      if (!tag) return { status: 500, body: { ok: false, error: 'device_tag' } };
+      if (!isAccountEntitled(acct)) {
+        return { status: 200, body: { ok: true, active: false, license: null, plan: acct.plan, status: acct.status } };
+      }
+      if (acct.deviceTag && acct.deviceTag !== tag) {
+        return { status: 409, body: { ok: false, error: 'device_limit' } };
+      }
+      if (!acct.deviceTag) await saveAccount({ ...acct, deviceTag: tag, deviceBoundAtMs: now() });
+      const license = await licenseFor(acct, tag);
       return { status: 200, body: { ok: true, active: Boolean(license), license, plan: acct.plan, status: acct.status } };
+    },
+
+    /**
+     * 「この PC に移す」: 覚えている PC を忘れる(次に取りに来た PC が新しい1台になる)。30日に1回まで。
+     *   ★前の PC の手元の証明書は期限(+猶予)まで残る。使い回しを繰り返せないよう間隔で抑える。
+     */
+    async devicesReset({ code }) {
+      const acct = await accountByCode(code);
+      if (!acct) return { status: 404, body: { ok: false, error: 'unknown_code' } };
+      if (!acct.deviceTag) return { status: 200, body: { ok: true } };
+      const t = now();
+      const last = Number(acct.deviceResetAtMs) || 0;
+      if (last && t - last < DEVICE_RESET_INTERVAL_MS) {
+        return { status: 429, body: { ok: false, error: 'reset_too_soon', nextAtMs: last + DEVICE_RESET_INTERVAL_MS } };
+      }
+      await saveAccount({ ...acct, deviceTag: '', deviceBoundAtMs: 0, deviceResetAtMs: t });
+      return { status: 200, body: { ok: true } };
     },
 
     /** 解約・一時停止・カード変更(Stripe の顧客ポータル)。 */

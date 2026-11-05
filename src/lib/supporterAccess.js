@@ -13,7 +13,10 @@
 import {
   SUPPORTER_GATE_ENFORCED,
   decideFeatureAccess,
+  deviceTagFor,
+  isValidDeviceId,
   isValidSupporterCode,
+  bytesToBase64url,
   shouldShowCreditBadge,
   shouldRefreshLicense,
   verifyLicenseToken
@@ -22,6 +25,8 @@ import {
 export const KEY_SUPPORTER_CODE = 'nls_supporter_code_v1';
 export const KEY_SUPPORTER_LICENSE = 'nls_supporter_license_v1';
 export const KEY_SUPPORTER_FIRST_SEEN_AT = 'nls_supporter_first_seen_at_v1';
+/** この PC の印(v0.1.1896・1コード1台)。乱数で1回だけ作り、消さない。 */
+export const KEY_SUPPORTER_DEVICE = 'nls_supporter_device_v1';
 /** YouTube 版と共有するキーの頭(ytMergedIsolation が「ytm:」を付けずに通す)。 */
 export const SUPPORTER_SHARED_KEY_PREFIX = 'nls_supporter_';
 
@@ -37,10 +42,44 @@ export const SUPPORTER_PAGE_URL = 'https://app.tsuioku-no-kirameki.com/supporter
  */
 
 /**
+ * この PC の印を読む(無ければ作って保存する)。保存できない環境でもその場の印は返す。
+ * @param {StorageLike} storage
+ * @returns {Promise<string>}
+ */
+export async function getOrCreateDeviceId(storage) {
+  try {
+    const bag = (await storage.get([KEY_SUPPORTER_DEVICE])) || {};
+    if (isValidDeviceId(bag[KEY_SUPPORTER_DEVICE])) return bag[KEY_SUPPORTER_DEVICE];
+  } catch {
+    /* 読めなければ作る */
+  }
+  const bytes = new Uint8Array(18);
+  globalThis.crypto.getRandomValues(bytes);
+  const id = bytesToBase64url(bytes);
+  try {
+    await storage.set({ [KEY_SUPPORTER_DEVICE]: id });
+  } catch {
+    /* 保存できなくても今回は使う */
+  }
+  return id;
+}
+
+/**
+ * 証明書がこの PC 用か(dev が無い古い証明書・印を計算できない環境は通す)。
+ * @param {{ dev?: string } | null | undefined} payload
+ * @param {string} deviceId
+ */
+export async function isLicenseForThisDevice(payload, deviceId) {
+  if (!payload || !payload.dev) return true;
+  const tag = await deviceTagFor(deviceId);
+  return tag == null || tag === payload.dev;
+}
+
+/**
  * 証明書を取り直す(届かなければ null=手元のものを使い続ける)。
  * @param {string} code
- * @param {{ fetchImpl?: typeof fetch, timeoutMs?: number }} [opts]
- * @returns {Promise<{ active: boolean, license: string | null } | { unknownCode: true } | null>}
+ * @param {{ fetchImpl?: typeof fetch, timeoutMs?: number, deviceId?: string }} [opts]
+ * @returns {Promise<{ active: boolean, license: string | null } | { unknownCode: true } | { deviceLimit: true } | null>}
  */
 export async function fetchSupporterLicense(code, opts = {}) {
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
@@ -49,11 +88,12 @@ export async function fetchSupporterLicense(code, opts = {}) {
   try {
     const res = await fetchImpl(`${SUPPORTER_API_BASE}?action=license`, {
       method: 'POST',
-      headers: { 'x-supporter-code': code, 'Content-Type': 'application/json' },
+      headers: { 'x-supporter-code': code, 'x-supporter-device': opts.deviceId || '', 'Content-Type': 'application/json' },
       body: '{}',
       signal: ctl?.signal
     });
     if (res.status === 404) return { unknownCode: true };
+    if (res.status === 409) return { deviceLimit: true };
     if (!res.ok) return null;
     /** @type {any} */
     const j = await res.json().catch(() => /** @type {any} */ (null));
@@ -97,10 +137,19 @@ export async function checkMarketingAccess(deps) {
   }
   const code = typeof bag[KEY_SUPPORTER_CODE] === 'string' ? bag[KEY_SUPPORTER_CODE] : '';
   let license = typeof bag[KEY_SUPPORTER_LICENSE] === 'string' ? bag[KEY_SUPPORTER_LICENSE] : '';
-  let v = license ? await verifyLicenseToken(license, { nowMs, publicKeys: deps.publicKeys }) : null;
+  const deviceId = await getOrCreateDeviceId(deps.storage);
+  /** 証明書を確かめる(ほかの PC 用の証明書は無いものとして扱う=1コード1台)。 */
+  const verifyHere = async (/** @type {string} */ tok) => {
+    if (!tok) return null;
+    const r = await verifyLicenseToken(tok, { nowMs, publicKeys: deps.publicKeys });
+    return (await isLicenseForThisDevice(r.payload, deviceId)) ? r : null;
+  };
+  let v = await verifyHere(license);
   const hasCode = isValidSupporterCode(code);
+  let deviceLimit = false;
   if (shouldRefreshLicense({ hasCode, payload: v && v.status !== 'bad_signature' ? v.payload : null, nowMs })) {
-    const got = await fetchSupporterLicense(code, { fetchImpl: deps.fetchImpl });
+    const got = await fetchSupporterLicense(code, { fetchImpl: deps.fetchImpl, deviceId });
+    if (got && 'deviceLimit' in got) deviceLimit = true;
     if (got && 'active' in got) {
       license = got.license || '';
       try {
@@ -109,7 +158,7 @@ export async function checkMarketingAccess(deps) {
       } catch {
         /* 保存できなくても今回の判定には使う */
       }
-      v = license ? await verifyLicenseToken(license, { nowMs, publicKeys: deps.publicKeys }) : null;
+      v = await verifyHere(license);
     }
   }
   const decision = decideFeatureAccess({
@@ -119,7 +168,7 @@ export async function checkMarketingAccess(deps) {
     firstSeenAtMs,
     nowMs
   });
-  return { ...decision, hasCode };
+  return { ...decision, hasCode, deviceLimit };
 }
 
 /**
@@ -131,11 +180,12 @@ export async function checkCreditBadge(deps) {
   const enforced = deps.enforced ?? SUPPORTER_GATE_ENFORCED;
   if (!enforced) return false;
   try {
-    const bag = (await deps.storage.get([KEY_SUPPORTER_LICENSE])) || {};
+    const bag = (await deps.storage.get([KEY_SUPPORTER_LICENSE, KEY_SUPPORTER_DEVICE])) || {};
     const license = typeof bag[KEY_SUPPORTER_LICENSE] === 'string' ? bag[KEY_SUPPORTER_LICENSE] : '';
-    const v = license
+    let v = license
       ? await verifyLicenseToken(license, { nowMs: deps.nowMs ?? Date.now(), publicKeys: deps.publicKeys })
       : null;
+    if (v && !(await isLicenseForThisDevice(v.payload, String(bag[KEY_SUPPORTER_DEVICE] || '')))) v = null;
     return shouldShowCreditBadge({ enforced, licenseStatus: v ? v.status : null });
   } catch {
     return false;
@@ -145,13 +195,18 @@ export async function checkCreditBadge(deps) {
 /**
  * 利用者が入れたコードを保存し、すぐ証明書を取りに行く。
  * @param {{ storage: StorageLike, code: string, fetchImpl?: typeof fetch }} p
- * @returns {Promise<'ok' | 'inactive' | 'unknown' | 'bad_format' | 'offline'>}
+ * @returns {Promise<'ok' | 'inactive' | 'unknown' | 'bad_format' | 'offline' | 'device_limit'>}
  */
 export async function saveSupporterCode(p) {
   const code = String(p.code || '').trim();
   if (!isValidSupporterCode(code)) return 'bad_format';
-  const got = await fetchSupporterLicense(code, { fetchImpl: p.fetchImpl });
+  const deviceId = await getOrCreateDeviceId(p.storage);
+  const got = await fetchSupporterLicense(code, { fetchImpl: p.fetchImpl, deviceId });
   if (got && 'unknownCode' in got) return 'unknown';
+  if (got && 'deviceLimit' in got) {
+    await p.storage.set({ [KEY_SUPPORTER_CODE]: code });
+    return 'device_limit';
+  }
   const lic = got && 'license' in got ? got.license : null;
   await p.storage.set({ [KEY_SUPPORTER_CODE]: code, ...(lic ? { [KEY_SUPPORTER_LICENSE]: lic } : {}) });
   if (!got || !('active' in got)) return 'offline';

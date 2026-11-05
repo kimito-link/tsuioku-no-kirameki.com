@@ -3,8 +3,9 @@
  * サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
  *
  *   POST /api/billing?action=checkout  { plan: 'monthly'|'yearly' }  → { url }(Stripe の申し込み画面)
- *   POST /api/billing?action=claim     { sessionId }                  → { code, license }(支払い直後に1回)
- *   POST /api/billing?action=license   x-supporter-code               → { active, license }(拡張が取り直す)
+ *   POST /api/billing?action=claim     { sessionId }                  → { code }(支払い直後に1回・証明書は拡張がコードで取る)
+ *   POST /api/billing?action=license   x-supporter-code + x-supporter-device → { active, license }(拡張が取り直す・1コード1台=ほかの PC は 409)
+ *   POST /api/billing?action=devices_reset x-supporter-code          → { ok }(この PC に移す・30日に1回)
  *   POST /api/billing?action=portal    x-supporter-code               → { url }(解約・一時停止・カード変更)
  *   POST /api/billing?action=webhook   Stripe-Signature + 生の本文     → Stripe からの通知
  *
@@ -66,7 +67,8 @@ export default async function handler(req, res, deps = {}) {
       const code = String(req.headers?.['x-supporter-code'] || body.code || '');
       if (action === 'checkout') r = await svc.checkout({ plan: body.plan === 'monthly' ? 'monthly' : 'yearly' });
       else if (action === 'claim') r = await svc.claim({ sessionId: body.sessionId });
-      else if (action === 'license') r = await svc.license({ code });
+      else if (action === 'license') r = await svc.license({ code, device: String(req.headers?.['x-supporter-device'] || '') });
+      else if (action === 'devices_reset') r = await svc.devicesReset({ code });
       else if (action === 'portal') r = await svc.portal({ code });
       else r = { status: 404, body: { ok: false, error: 'unknown_action' } };
     }

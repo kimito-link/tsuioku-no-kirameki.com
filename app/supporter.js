@@ -17,6 +17,10 @@
   function errorText(j) {
     if (j && j.error === 'billing_not_configured') return 'ただいま準備中です。もう少しお待ちください。';
     if (j && j.error === 'unknown_code') return 'コードが見つかりませんでした。';
+    if (j && j.error === 'reset_too_soon') {
+      const d = j.nextAtMs ? new Date(j.nextAtMs) : null;
+      return 'PC を移せるのは30日に1回です。' + (d ? '次に移せるのは ' + (d.getMonth() + 1) + '月' + d.getDate() + '日 からです。' : '');
+    }
     return '通信に失敗しました。時間をおいてもう一度お試しください。';
   }
 
@@ -43,6 +47,7 @@
       if (j && j.code) {
         $('code').textContent = j.code;
         $('portalCode').value = j.code;
+        $('moveCode').value = j.code;
       } else {
         $('code').textContent = '支払いの確認ができませんでした。数分たってからこのページを読み込み直してください。';
       }
@@ -61,5 +66,12 @@
       if (j && j.url && /^https:\/\/billing\.stripe\.com\//.test(j.url)) location.href = j.url;
       else show($('portalErr'), errorText(j));
     }, function () { show($('portalErr'), errorText(null)); });
+  });
+  $('moveBtn').addEventListener('click', function () {
+    show($('moveMsg'), '');
+    const code = ($('moveCode').value || '').trim();
+    post('devices_reset', {}, code).then(function (j) {
+      show($('moveMsg'), j && j.ok ? '移す準備ができました。新しい PC の拡張でマーケ HTML を開き、コードを貼り付けてください。' : errorText(j));
+    }, function () { show($('moveMsg'), errorText(null)); });
   });
 })();

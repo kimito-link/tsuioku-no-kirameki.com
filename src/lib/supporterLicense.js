@@ -52,6 +52,44 @@ export function isValidSupporterCode(s) {
   return typeof s === 'string' && SUPPORTER_CODE_RE.test(s.trim());
 }
 
+/**
+ * 1つのコードで使える PC の数(v0.1.1896・りんく 2026-11-05「1人1台のみ」)。
+ *   記録は配信した PC の中にしか無い=マーケ HTML を作れるのも実質その1台。使い回しだけを止める。
+ */
+export const MAX_DEVICES_PER_CODE = 1;
+
+/** 「この PC に移す」(登録のやり直し)ができる間隔(30日に1回)。 */
+export const DEVICE_RESET_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** 拡張がこの PC 用に作る印(乱数・base64url 16〜64文字)。端末 ID(30日で消える)とは別物。 */
+const DEVICE_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+
+/** @param {unknown} s */
+export function isValidDeviceId(s) {
+  return typeof s === 'string' && DEVICE_ID_RE.test(s);
+}
+
+/** 証明書の dev に入れる長さ(sha256 の16進の先頭)。 */
+export const DEVICE_TAG_HEX_LEN = 24;
+
+/**
+ * PC の印から証明書の dev を作る(サーバーと拡張で同じ値になる)。中身の印そのものは証明書に入れない。
+ * @param {string} deviceId
+ * @param {SubtleCrypto | null | undefined} [subtle]
+ * @returns {Promise<string | null>} 作れない環境では null(=呼び出し側は確かめずに通す)
+ */
+export async function deviceTagFor(deviceId, subtle = globalThis.crypto?.subtle) {
+  if (!subtle || !isValidDeviceId(deviceId)) return null;
+  try {
+    const buf = new Uint8Array(await subtle.digest('SHA-256', new TextEncoder().encode(`dev:${deviceId}`)));
+    let hex = '';
+    for (const b of buf) hex += b.toString(16).padStart(2, '0');
+    return hex.slice(0, DEVICE_TAG_HEX_LEN);
+  } catch {
+    return null;
+  }
+}
+
 /** @param {Uint8Array} bytes */
 export function bytesToBase64url(bytes) {
   let bin = '';
@@ -77,7 +115,8 @@ export function base64urlToBytes(s) {
  *   plan: string,
  *   feat: string[],
  *   iat: number,
- *   exp: number
+ *   exp: number,
+ *   dev?: string
  * }} LicensePayload
  */
 
@@ -112,7 +151,8 @@ export function parseLicenseToken(token) {
       plan: typeof p.plan === 'string' ? p.plan : '',
       feat,
       iat: p.iat,
-      exp: p.exp
+      exp: p.exp,
+      ...(typeof p.dev === 'string' && p.dev ? { dev: p.dev } : {})
     },
     body: parts[0],
     sig: parts[1]
