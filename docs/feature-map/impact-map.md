@@ -445,6 +445,7 @@
 | `src/lib/venueBubbleChurn.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueBubbleLifecycle.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueCharacterFrame.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueComposeBox.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueCrowdMotion.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueDisplayRows.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueDragScroll.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -688,6 +689,7 @@
 | `src/lib/giftLaneOfficialFill.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentumAnalytics.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftPanelShape.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftQuickStatsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftRankStripConfig.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftRecord.js` | 1 | 記録エンジン(watchページ常駐) |

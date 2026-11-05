@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1843',
+    date: '2026-10-31',
+    summary: '過去コメントの埋め直しの読み違いを直す',
+    items: Object.freeze([
+      '途中から開いた配信で過去のコメントを埋める仕組みが、ニコ生の応答から「次に読む位置」を取り違えることがありました。正しい位置をたどるようにしたので、埋め直しが途中で止まりにくくなります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1842',
     date: '2026-10-31',
     summary: '止まった取り込みの立て直しを直す',

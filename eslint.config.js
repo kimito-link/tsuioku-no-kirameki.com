@@ -435,7 +435,8 @@ export default [
     // v0.1.1855: 拡張の入れ替え後に古い版のまま止まったページが自分で読み込み直す(import 1行+呼び出しとコメント2行)=+3。中身は lib の orphanTabAutoReload.js。
     // v0.1.1867: 会場から発言(会場に postComment を渡す+コメント1行)=+1。入力欄は lib の venueComposeBox.js。
     // v0.1.1870: 会場のギフトボタン(公式のギフト画面を開く lib の import 1行)=+1。
-    rules: { 'max-lines': ['error', { max: 19576, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
+    rules: { 'max-lines': ['error', { max: 19578, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
