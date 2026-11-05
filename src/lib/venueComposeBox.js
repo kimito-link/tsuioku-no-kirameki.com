@@ -125,7 +125,7 @@ export function createVenueComposeBox(post, opts = {}) {
  *   押すと先に会場をしまい(公式の画面が会場の帯に隠れないように・PC 実測でギフト欄の下半分が隠れた)、公式のボタンを押す。
  *   買う・贈る操作は公式の画面で本人がする(拡張は画面を開くところまで)。公式のボタンが見つからなければ会場を戻して一言出す。
  * @param {() => Promise<{ ok?: boolean, reason?: string }> | { ok?: boolean, reason?: string }} openGift
- * @param {{ doc?: Document, label?: string, reasonText?: (reason: string) => string, tuck?: (on: boolean) => void }} [opts]
+ * @param {{ doc?: Document, label?: string, reasonText?: (reason: string) => string, tuck?: (on: boolean, note?: string) => void }} [opts]
  * @returns {HTMLButtonElement}
  */
 export function createVenueGiftButton(openGift, opts = {}) {
@@ -137,7 +137,7 @@ export function createVenueGiftButton(openGift, opts = {}) {
   btn.textContent = label;
   btn.title = '公式のギフト画面を開きます(会場はいったんしまいます・右下の「▲ 会場に戻る」で戻せます)';
   btn.addEventListener('click', async () => {
-    try { opts.tuck?.(true); } catch { /* しまえなくても開くのは試す */ }
+    try { opts.tuck?.(true, `公式の${label.replace(/^\S+\s/, '')}の画面を開きました。右の欄でアイテムを選び、公式の「贈る」を押すと贈れます(ここではまだ何も使っていません)。戻るときは右下の「▲ 会場に戻る」`); } catch { /* しまえなくても開くのは試す */ }
     /** @type {{ ok?: boolean, reason?: string } | null} */
     let res = null;
     try { res = await openGift(); } catch { res = null; }
@@ -149,6 +149,22 @@ export function createVenueGiftButton(openGift, opts = {}) {
     setTimeout(() => { btn.textContent = label; }, 4000);
   });
   return btn;
+}
+
+/**
+ * v0.1.1880: 公式のギフト欄の上端(「ギフト」の見出しと所持ポイント)が画面の上に隠れていたら、見える位置までページを送る
+ *   (りんく 2026-11-05 のスクショ: ページが下に送られていて欄の見出しが見えず、何が開いたか分からなかった)。
+ * @param {Document} doc
+ */
+export function scrollGiftPanelIntoView(doc) {
+  try {
+    const f = [...doc.querySelectorAll('iframe')].find((x) => /gift\.nicovideo\.jp/.test(String(x.getAttribute('src') || '')) && x.getBoundingClientRect().width > 100);
+    const el = /** @type {Element | null} */ (f?.closest('[class*="gift"], [class*="rich-view"]') || f || null);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    const view = doc.defaultView;
+    if (view && (top < 0 || top > view.innerHeight * 0.6)) view.scrollBy({ top: top - 80, behavior: 'smooth' });
+  } catch { /* 送れなくても開いたまま */ }
 }
 
 const GIFT_SIDEBAR_ROOT_SEL =
@@ -203,6 +219,7 @@ export function openOfficialGiftPanel(doc) {
     doc.getElementById('nls-stealth-gift-sidebar')?.remove();
     /** @type {HTMLElement} */ (btn).click();
     showGiftItemsTabSoon(doc);
+    setTimeout(() => scrollGiftPanelIntoView(doc), 600);
     return { ok: true };
   } catch {
     return { ok: false, reason: 'error' };
@@ -234,7 +251,7 @@ export function startGiftItemsTabResponder(win, onStorageChanged) {
  *   贈るかどうかの確認は公式の画面で本人がする(拡張は確認の「贈る」を押さない)。並びがまだ無ければ帯は出さない。
  *   v0.1.1879: 設定「1回で贈る」(既定オフ・帯の端の「1回」で切り替え)がオンの人は、1回押すと会場のまま公式の確認まで押して贈る
  *   (りんく 2026-11-05 の選択)。贈れたら「贈りました」、確認が見つからなければ会場をしまって公式の欄を見せる。続けて押しても2秒は受けない。
- * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean }> | { ok?: boolean, reason?: string, sent?: boolean }, tuck?: (on: boolean) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
+ * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean }> | { ok?: boolean, reason?: string, sent?: boolean }, tuck?: (on: boolean, note?: string) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
  * @returns {HTMLSpanElement}
  */
 export function createVenueGiftStrip(opts) {
@@ -249,10 +266,14 @@ export function createVenueGiftStrip(opts) {
   /** @type {HTMLButtonElement | null} */
   let modeBtn = null;
   const paintMode = () => {
+    for (const b of strip.querySelectorAll('.nlsb-gift-item')) {
+      const base = String(b.getAttribute('data-label') || '');
+      /** @type {HTMLElement} */ (b).title = direct ? `${base}(1回押すとすぐ贈ります・ポイントが使われます)` : `${base}(2回押すと公式のギフト欄でこのアイテムを選びます。贈るのは公式の「贈る」を押したとき)`;
+    }
     if (!modeBtn) return;
     modeBtn.textContent = direct ? '1回' : '2回';
     modeBtn.setAttribute('aria-pressed', direct ? 'true' : 'false');
-    modeBtn.title = direct ? '1回押すと贈ります(押すと2回押しに戻す)' : '2回押してから公式の欄で選びます(押すと「1回で贈る」にする)';
+    modeBtn.title = direct ? '1回押すとすぐ贈ります(押すと2回押しに戻す)' : '2回押してから公式の欄で選びます(押すと「1回で贈る」にする)';
     modeBtn.style.background = direct ? '#c0392b' : '';
     modeBtn.style.color = direct ? '#fff' : '';
   };
@@ -275,7 +296,7 @@ export function createVenueGiftStrip(opts) {
       const b = doc.createElement('button');
       b.type = 'button';
       b.className = 'nlsb-comeview-btn nlsb-gift-item';
-      b.title = `${it.name ? it.name + ' ' : ''}${it.pt}(2回押すと公式のギフト欄でこのアイテムを選びます)`;
+      b.setAttribute('data-label', `${it.name ? it.name + ' ' : ''}${it.pt}`);
       b.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;padding:2px 4px;min-width:40px;line-height:1.1;flex:0 0 auto';
       if (/^https:\/\//.test(it.img)) {
         const im = doc.createElement('img');
@@ -293,6 +314,7 @@ export function createVenueGiftStrip(opts) {
       pt.textContent = it.pt.replace(/\s+/g, '');
       pt.style.cssText = 'font-size:10px;white-space:nowrap';
       b.append(pt);
+      const label = `${it.name ? it.name + ' ' : ''}${it.pt.replace(/\s+/g, '')}`;
       b.addEventListener('click', async () => {
         if (direct) {
           if (Date.now() < busyUntil) return; // 続けて押しても二重に贈らない
@@ -303,7 +325,7 @@ export function createVenueGiftStrip(opts) {
           if (res && res.ok && res.sent) {
             pt.textContent = '贈りました';
           } else if (res && res.ok) {
-            try { opts.tuck?.(true); } catch { /* しまえなくても一言は出す */ }
+            try { opts.tuck?.(true, `「${label}」を公式のギフト欄で選びましたが、確認の「贈る」が見つかりませんでした。贈られたかは欄の「履歴」で確かめてください。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
             pt.textContent = '公式で確認';
           } else {
             pt.textContent = '開けません';
@@ -320,7 +342,7 @@ export function createVenueGiftStrip(opts) {
         }
         armed = '';
         pt.textContent = it.pt.replace(/\s+/g, '');
-        try { opts.tuck?.(true); } catch { /* しまえなくても押すのは試す */ }
+        try { opts.tuck?.(true, `会場の帯で選んだ「${label}」を公式のギフト欄で選びました。贈るなら右の欄で確かめて「贈る」を押してください(帯の右端を「1回」にすると会場から1回で贈れます)。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても押すのは試す */ }
         let res = null;
         try { res = await opts.press(it.key); } catch { res = null; }
         if (res && res.ok) return;
@@ -331,6 +353,7 @@ export function createVenueGiftStrip(opts) {
       strip.append(b);
     }
     if (modeBtn) strip.append(modeBtn);
+    paintMode();
     strip.style.display = items.length ? 'inline-flex' : 'none';
   };
   try { opts.subscribe(render); } catch { /* 並びが読めなければ帯を出さないだけ */ }
