@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY } from './giftItemsMirror.js';
+import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY } from './giftItemsMirror.js';
 import { createVenueGiftStrip } from './venueComposeBox.js';
 
 // 2026-11-05 りんくの画面(番組ギフト・3列の枠・画像と「500 pt」の数字と pt が別の部品)に似せた形
@@ -41,6 +41,14 @@ describe('公式ギフト欄のアイテムを読む', () => {
   });
 });
 
+describe('会場に出すアイテムを選ぶ', () => {
+  it('安い順・1,000pt まで・会員権は出さない(RC 実測の並び)', () => {
+    const raw = ['プレミアム会員権（30日）|1,400 pt', '召喚獣|50,000 pt', '栗|300 pt', 'お月見（5種ランダム）|1,000 pt', '焼き芋（音付き）|3,000 pt', '草|50 pt', 'ニコる|50 pt', 'ひよこ|100 pt', 'プレミアム会員権（7日）|500 pt']
+      .map((k) => ({ name: k.split('|')[0], pt: k.split('|')[1], key: k }));
+    expect(pickVenueGiftItems(raw).map((it) => it.name)).toEqual(['草', 'ニコる', 'ひよこ', '栗', 'お月見（5種ランダム）']);
+  });
+});
+
 describe('子の窓と放送ページのやりとり', () => {
   /** @returns {any} */
   const memStore = () => {
@@ -69,12 +77,12 @@ describe('子の窓と放送ページのやりとり', () => {
     startGiftItemsPublisher(frameWin, store);
     await new Promise((r) => setTimeout(r, 700));
     expect(store.data[GIFT_ITEMS_KEY].lv).toBe('lv9');
-    expect(store.data[GIFT_ITEMS_KEY].items).toHaveLength(3);
+    expect(store.data[GIFT_ITEMS_KEY].items).toHaveLength(2); // 3,000pt は会場に出さない
     /** @type {any[]} */
     let shown = [];
     subscribeGiftItems(store, '/watch/lv9', (items) => { shown = items; });
     await new Promise((r) => setTimeout(r, 10));
-    expect(shown.map((it) => it.pt)).toEqual(['500pt', '100pt', '3,000pt']);
+    expect(shown.map((it) => it.pt)).toEqual(['100pt', '500pt']); // 安い順
     /** @type {any[]} */
     let other = [];
     subscribeGiftItems(store, '/watch/lv1', (items) => { other = items; });
@@ -83,11 +91,11 @@ describe('子の窓と放送ページのやりとり', () => {
     const strip = createVenueGiftStrip({ subscribe: (cb) => subscribeGiftItems(store, '/watch/lv9', cb), press: (key) => requestGiftItemPress(document, key, store.set), doc: document });
     await new Promise((r) => setTimeout(r, 10));
     const btns = strip.querySelectorAll('button');
-    expect(btns).toHaveLength(3);
+    expect(btns).toHaveLength(2);
     expect(strip.style.display).toBe('inline-flex');
     /** @type {HTMLButtonElement} */ (btns[1]).click();
     await new Promise((r) => setTimeout(r, 900));
-    expect(store.data[GIFT_ITEM_PRESS_REQ_KEY].key).toBe('ハゲ小|100pt');
-    expect(hit).toEqual(['b']);
+    expect(store.data[GIFT_ITEM_PRESS_REQ_KEY].key).toBe('ハゲ|500pt');
+    expect(hit).toEqual(['a']);
   });
 });

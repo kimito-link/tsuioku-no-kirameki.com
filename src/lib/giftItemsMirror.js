@@ -165,6 +165,36 @@ export function giftItemSkeleton(doc) {
   return { chain: chain.join(' < ').slice(0, 1200), outline: outline.slice(0, 4000) };
 }
 
+/** 会場に出す上限(pt)。これより高いアイテムは会場に出さない(公式の欄では選べる)。 */
+export const VENUE_GIFT_MAX_PT = 1000;
+/** 配信者へのギフトではないもの(会員権の購入など)は会場に出さない */
+const NOT_VENUE_GIFT_RE = /会員権|プレミアム会員/;
+
+/** @param {string} pt @returns {number} */
+export function ptValue(pt) {
+  const n = Number(String(pt || '').replace(/[^\d]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * v0.1.1877: 会場に出すアイテムを選ぶ。安い順・上限 1,000pt・会員権を除く・24個まで。
+ *   公式の並びのまま出すと先頭に 1,400〜100,000pt(会員権・召喚獣)が来ていた(RC 実測 2026-11-05)。
+ *   1回押せば贈れそうに見える帯の先頭に高額品を置かない。
+ * @template {{ name: string, pt: string }} T
+ * @param {T[]} items
+ * @param {{ maxPt?: number, max?: number }} [opts]
+ * @returns {T[]}
+ */
+export function pickVenueGiftItems(items, opts = {}) {
+  const maxPt = opts.maxPt ?? VENUE_GIFT_MAX_PT;
+  return items
+    .map((it, i) => ({ it, i, v: ptValue(it.pt) }))
+    .filter(({ it, v }) => v > 0 && v <= maxPt && !NOT_VENUE_GIFT_RE.test(it.name))
+    .sort((a, b) => a.v - b.v || a.i - b.i)
+    .slice(0, opts.max ?? 24)
+    .map(({ it }) => it);
+}
+
 /** @param {string} path */
 function lvOf(path) {
   return (/(lv\d+)/.exec(String(path || '')) || [])[1] || '';
@@ -192,7 +222,7 @@ export function startGiftItemsPublisher(win, store) {
   const publish = () => {
     if (Date.now() - started > 30 * 60 * 1000) return win.clearInterval(timer);
     try {
-      const items = readGiftItems(doc, { max: 24 }).map(({ key, name, pt, img }) => ({ key, name, pt, img }));
+      const items = pickVenueGiftItems(readGiftItems(doc, { max: 200 }).map(({ key, name, pt, img }) => ({ key, name, pt, img })));
       const sig = JSON.stringify(items);
       if (!items.length || sig === last) return;
       last = sig;
