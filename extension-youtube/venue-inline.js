@@ -20058,7 +20058,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T05:34") : ""
+          buildId: true ? String("yt-2026-11-05T05:37") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -22318,6 +22318,7 @@ ${sourceCol}
       applyVenueHeat(rows);
       pruneSpeechStreaks(speechStreaks, Date.now());
       const speechReceivedAt = Date.now();
+      const __ytPrimeBurst = !(speechState && speechState.primed === true);
       const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
       speechState = {
         seenKeys: result.seenKeys,
@@ -22369,7 +22370,7 @@ ${sourceCol}
             key: speech.key,
             text: speech.text,
             // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
-            receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
+            receivedAt: __ytPrimeBurst ? void 0 : speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
             // ★キャラライブの相槌はここに乗せる(2026-08-25)。
             //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
             //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
