@@ -1766,7 +1766,12 @@ ${sourceCol}
         for (let n = w.nextNode(); n; n = w.nextNode()) {
           const k = byShown.get(String(n.nodeValue || "").trim());
           if (k) {
-            n.nodeValue = k;
+            const nameEl = n.parentElement;
+            const idEl = nameEl?.classList.contains("nl-story-userlane-meta__name") ? nameEl.previousElementSibling : null;
+            if (idEl?.classList.contains("nl-story-userlane-meta__id")) {
+              n.nodeValue = String(idEl.textContent || "");
+              idEl.textContent = k;
+            } else n.nodeValue = k;
             tile.setAttribute("data-yt-kind-done", "1");
             break;
           }
@@ -1790,6 +1795,17 @@ ${sourceCol}
         node.nodeValue = /** @type {string} */
         laneKindLabelByUid.get(uid);
         return;
+      }
+      const idEl = node.parentElement;
+      if (/^8\d{9}$/.test(uid) && idEl?.classList.contains("nl-story-userlane-meta__id") && ytKeyForNumericUid(uid)) {
+        const nameEl = idEl.nextElementSibling;
+        const nm = String(nameEl?.textContent || "").trim();
+        const label = ytLabelForUid(uid);
+        if (nameEl?.classList.contains("nl-story-userlane-meta__name") && nm && label && nm !== label && !/^8\d{9}$/.test(nm)) {
+          node.nodeValue = nm;
+          nameEl.textContent = label;
+          return;
+        }
       }
     }
     let next = ytWording(v, { topFans: kokenIsTopFans });
