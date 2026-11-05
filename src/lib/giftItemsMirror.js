@@ -128,6 +128,8 @@ export function pressGiftItem(doc, key) {
 
 export const GIFT_ITEMS_KEY = 'nls_gift_items_v1';
 export const GIFT_ITEM_PRESS_REQ_KEY = 'nls_gift_item_press_req';
+/** v0.1.1878 計器: 押したあと3秒で何が出たか(確認の窓が出たか)。押したもの・出てきた部品の class と文字の頭だけ */
+export const GIFT_ITEM_PRESS_RESULT_KEY = 'nls_gift_item_press_result';
 
 /**
  * 計器用: アイテムの枠のあたりの骨組み(タグ・class・data-* の名前だけ。文字は取らない)。
@@ -238,8 +240,26 @@ export function startGiftItemsPublisher(win, store) {
     const step = () => {
       left -= 1;
       let ok = false;
+      /** @type {Element[]} */
+      const added = [];
+      const mo = typeof MutationObserver === 'function' ? new MutationObserver((recs) => { for (const r of recs) for (const n of r.addedNodes) if (n instanceof Element && added.length < 200) added.push(n); }) : null;
+      try { mo?.observe(doc.body, { childList: true, subtree: true }); } catch { /* 見張れなくても押す */ }
       try { ok = pressGiftItem(doc, req.key); } catch { ok = false; }
+      if (!ok) mo?.disconnect();
       if (!ok && left > 0) win.setTimeout(step, 300);
+      if (ok) {
+        win.setTimeout(() => {
+          mo?.disconnect();
+          const shown = added.filter((el) => el.isConnected && (() => { const r = el.getBoundingClientRect(); return r.width >= 100 && r.height >= 40; })());
+          void store.set({
+            [GIFT_ITEM_PRESS_RESULT_KEY]: {
+              at: Date.now(), reqAt: at, key: req.key,
+              shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
+              head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+            }
+          });
+        }, 3000);
+      }
     };
     win.setTimeout(step, 400); // 番組ギフトのタブへ切り替わって並びが描かれるのを待つ
   };
