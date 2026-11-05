@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1837',
+    date: '2026-10-31',
+    summary: 'コメントを流す間は画面を消さない',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1836',
     date: '2026-10-31',
     summary: 'つなぎ直しで同じコメントが二重に出ないように',
