@@ -2847,11 +2847,11 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(composeBox ? [composeBox] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
   } else {
     headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
-  header.append(title, headerRight);
+  header.append(title, ...(composeBox ? [composeBox] : []), headerRight); // v0.1.1868 発言欄は中央
 
   // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
   //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる

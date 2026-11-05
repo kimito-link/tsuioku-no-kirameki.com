@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1840',
+    date: '2026-10-31',
+    summary: '読み上げの遅れの理由を画面で分かるように',
+    items: Object.freeze([
+      '読み上げが遅れたときの案内に、VOICEVOX を起動した直後は初めて使う声の準備で遅れること・続けて読むうちに速くなることを書くようにしました。準備が済んでも遅いときだけ GPU の案内を出します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1839',
     date: '2026-10-31',
     summary: 'イベント欄の拡張のエラーも止める',
