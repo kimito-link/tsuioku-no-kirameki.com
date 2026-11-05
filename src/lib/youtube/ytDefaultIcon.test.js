@@ -50,6 +50,25 @@ describe('最初からの文字アイコンを見分ける(0.1.105)', () => {
     const a = img((x, y) => (x > 24 && x < 40 && y > 18 && y < 46 && (x + y) % 2 === 0 ? [255, 255, 255] : [8, 72, 56]));
     expect(ytLooksLikeDefaultLetterIcon(YTC, ytIconColorStats(a, 64, 64))).toBe(true);
   });
+  it('0.1.107: 黒地に赤いロゴ(白い字ではない)は文字アイコンにしない', () => {
+    const a = img((x, y) => (x > 14 && x < 50 && y > 24 && y < 40 ? [220, 30, 40] : [0, 0, 0]));
+    const s = ytIconColorStats(a, 64, 64);
+    expect(s.t1).toBeGreaterThan(0.62);
+    expect(s.tone).toBeLessThan(0.98);
+    expect(ytLooksLikeDefaultLetterIcon(YTC, s)).toBe(false);
+  });
+  it('0.1.107: 背景の割合 0.5 の大きな2文字(白い字・縁はなめらか)も文字アイコン', () => {
+    const a = img((x, y) => {
+      if (!(x > 10 && x < 54 && y > 10 && y < 54)) return [40, 90, 160];
+      if ((x + y) % 2 === 0) return [255, 255, 255];
+      if ((x + y) % 4 === 1) return [148, 172, 208]; // 背景と白の中間(縁)
+      return [40, 90, 160];
+    });
+    const s = ytIconColorStats(a, 64, 64);
+    expect(s.t1).toBeLessThan(0.62);
+    expect(s.tone).toBeGreaterThan(0.98);
+    expect(ytLooksLikeDefaultLetterIcon(YTC, s)).toBe(true);
+  });
   it('/ytc/ が無い URL は単色でも文字アイコンにしない', () => {
     const a = img(() => [0, 120, 200]);
     expect(ytLooksLikeDefaultLetterIcon('https://yt4.ggpht.com/abc=s64', ytIconColorStats(a, 64, 64))).toBe(false);

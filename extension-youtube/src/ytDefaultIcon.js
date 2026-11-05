@@ -7,19 +7,24 @@
 //   (白い背景の書道や絵を外す・0.1.105)。
 //   0.1.99 の「割合0.80以上・色6以下」は、2文字や画数の多い字(ちゃ・メ・玄・Z)を取りこぼした(実機 4/9)。
 //   画像は s64 で見る(試験と同じ大きさ)。
+// 0.1.107(自動巡回 8配信347人・文字113人): 割合0.62だと画数の多い2文字(割合0.46〜0.60)を14人取りこぼし、黒地のロゴ・
+//   帯の文字など本物の画像3枚を文字と間違えた。文字アイコンは「一色の背景に白い字」=どの画素も背景色と白を結ぶ線の上
+//   (なめらかな縁を含む)にある。その割合(tone)が 0.98 以上・背景の割合 0.40 以上・背景が白に近くない、にする
+//   (文字は tone 0.988 以上・本物の画像は 0.906 以下で、347人を全部当てた)。
 // ★件数が少ない試験で決めた値。迷うときは「自分で設定した人」(りんく欄)に倒す=間違えても認知が減らない側。
 
 // v2: 見分け方を変えたので、v1 の結果(取りこぼしの 0)は使わない
 // v3: 人の形(人影)の既定アイコンも見分けるようにしたので、v2 の結果(人影の 0)は使わない
 // v4: 暗い背景の文字アイコン(緑の「は」)を取りこぼしたので見分け方を変えた
-export const YT_DEFAULT_ICON_STORE_KEY = 'yt_default_icon_v4';
+// v5: 白い字の割合(tone)で見るようにしたので、v4 の結果は使わない
+export const YT_DEFAULT_ICON_STORE_KEY = 'yt_default_icon_v5';
 
 /**
  * 画素から見分けの数字を出す(純関数・試験用に分けてある)。
  * @param {Uint8ClampedArray|number[]} rgba 幅 w × 高さ h の RGBA
  * @param {number} w
  * @param {number} h
- * @returns {{ t1: number, c5: number, bgSat: number, bgKey: number }}
+ * @returns {{ t1: number, c5: number, bgSat: number, bgKey: number, tone: number }}
  */
 export function ytIconColorStats(rgba, w, h) {
   /** @type {Map<number, number>} */
@@ -37,7 +42,7 @@ export function ytIconColorStats(rgba, w, h) {
       total += 1;
     }
   }
-  if (!total) return { t1: 0, c5: 0, bgSat: 0, bgKey: 0 };
+  if (!total) return { t1: 0, c5: 0, bgSat: 0, bgKey: 0, tone: 0 };
   let max = 0;
   let maxKey = 0;
   let c5 = 0;
@@ -49,19 +54,51 @@ export function ytIconColorStats(rgba, w, h) {
     if (n / total >= 0.005) c5 += 1;
   }
   const ch = [(maxKey >> 8) & 15, (maxKey >> 4) & 15, maxKey & 15];
-  return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey };
+  return { t1: max / total, c5, bgSat: Math.max(...ch) - Math.min(...ch), bgKey: maxKey, tone: ytIconWhiteInkTone(rgba, w, h, maxKey) };
+}
+
+/**
+ * 「一色の背景に白い字」らしさ(0.1.107)。丸の中の画素のうち、背景色→白の線から RGB で 24 以内にある割合。
+ * @param {Uint8ClampedArray|number[]} rgba
+ * @param {number} w
+ * @param {number} h
+ * @param {number} bgKey
+ */
+export function ytIconWhiteInkTone(rgba, w, h, bgKey) {
+  const bg = [((bgKey >> 8) & 15) * 16 + 8, ((bgKey >> 4) & 15) * 16 + 8, (bgKey & 15) * 16 + 8];
+  const v = [255 - bg[0], 255 - bg[1], 255 - bg[2]];
+  const vv = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2;
+  const r = Math.min(w, h) * 0.45;
+  let total = 0;
+  let near = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+      const i = (y * w + x) * 4;
+      const d = [rgba[i] - bg[0], rgba[i + 1] - bg[1], rgba[i + 2] - bg[2]];
+      const t = vv > 0 ? Math.min(1, Math.max(0, (d[0] * v[0] + d[1] * v[1] + d[2] * v[2]) / vv)) : 0;
+      const e0 = d[0] - t * v[0];
+      const e1 = d[1] - t * v[1];
+      const e2 = d[2] - t * v[2];
+      total += 1;
+      if (e0 * e0 + e1 * e1 + e2 * e2 <= 24 * 24) near += 1;
+    }
+  }
+  return total ? near / total : 0;
 }
 
 /**
  * @param {string} url
- * @param {{ t1: number, bgSat?: number, bgKey: number }} stats
+ * @param {{ t1: number, bgSat?: number, bgKey: number, tone?: number }} stats
  */
 export function ytLooksLikeDefaultLetterIcon(url, stats) {
   // 0.1.105: 「背景が色付き(bgSat≥5)」だと暗い背景(濃い緑の「は」・bgSat 4)を落とした。外したいのは白い背景の絵・書道
   //   なので「背景が白に近くない(3チャンネルとも16段で12以上、ではない)」にする(3配信73人で文字10/10・誤り0)。
   const k = Number(stats.bgKey) || 0;
   const nearWhite = ((k >> 8) & 15) >= 12 && ((k >> 4) & 15) >= 12 && (k & 15) >= 12;
-  return /\/ytc\//.test(String(url || '')) && stats.t1 >= 0.62 && !nearWhite;
+  return /\/ytc\//.test(String(url || '')) && stats.t1 >= 0.4 && Number(stats.tone) >= 0.98 && !nearWhite;
 }
 
 /**
