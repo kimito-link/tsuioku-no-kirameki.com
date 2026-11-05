@@ -567,6 +567,9 @@ export function devMonitorTrendStorageKey(liveId) {
   return `${KEY_DEV_MONITOR_TREND_PREFIX}${String(liveId || '').trim() || '_'}`;
 }
 
+/** 会場の PICK UP 吹き出しをドラッグで置いた位置(会場に対する割合 {cx, top}・無ければ自動位置)。v0.1.1894 */
+export const KEY_VENUE_PICKUP_POS = 'nls_venue_pickup_pos_v1';
+
 /** ギフト/広告/順位変動の効果音を鳴らすか(既定 true=ON)。 */
 export const KEY_EFFECT_SOUND_ENABLED = 'nls_effect_sound_enabled_v1';
 

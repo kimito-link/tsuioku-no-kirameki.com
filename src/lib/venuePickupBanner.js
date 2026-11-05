@@ -170,3 +170,75 @@ export function venuePickupPlacement(video, layout, opts = {}) {
   const top = Math.round(Math.max(minTop, video.top - layout.top + 8));
   return { left, top, width };
 }
+
+/**
+ * v0.1.1894 PICK UP の吹き出しをドラッグで好きな位置へ(りんく「ドラッグでうごかせるようにしておきたい」)。
+ *   位置は会場(stageLayout)に対する割合で覚える=窓の大きさが変わっても同じあたりに出る。
+ *   置ける範囲は会場の内側だけ(吹き出しが丸ごと見える範囲に締める・画面の外へ失くさない)。
+ *   ★ダブルクリックで元の自動位置(映像の上端中央)に戻す。
+ */
+
+/** これ未満の動きはクリック扱い(ドラッグにしない)。 */
+export const VENUE_PICKUP_DRAG_THRESHOLD_PX = 4;
+
+/**
+ * 保存値の形を確かめる(壊れた値・旧形は null=自動位置。§3.6 fail-soft)。
+ * @param {unknown} raw
+ * @returns {{ cx: number, top: number } | null} cx=中心xの割合・top=上端の割合(どちらも 0〜1)
+ */
+export function normalizeVenuePickupSavedPos(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = /** @type {any} */ (raw);
+  const cx = Number(o.cx);
+  const top = Number(o.top);
+  if (!Number.isFinite(cx) || !Number.isFinite(top)) return null;
+  return { cx: Math.min(1, Math.max(0, cx)), top: Math.min(1, Math.max(0, top)) };
+}
+
+/**
+ * 吹き出しの中心x・上端(会場の中の px)を、吹き出しが丸ごと会場に収まるよう締める。
+ * @param {number} cxPx
+ * @param {number} topPx
+ * @param {{ width:number, height:number }} layout 会場の大きさ
+ * @param {{ width:number, height:number }} box 吹き出しの大きさ(尻尾 20px 込みで見る)
+ * @returns {{ left:number, top:number }} left=中心x(CSS の translateX(-50%) と対)
+ */
+export function clampVenuePickupPx(cxPx, topPx, layout, box) {
+  const W = Math.max(0, Number(layout?.width) || 0);
+  const H = Math.max(0, Number(layout?.height) || 0);
+  const w = Math.max(0, Number(box?.width) || 0);
+  const h = Math.max(0, Number(box?.height) || 0) + 20; // 尻尾(::before bottom:-20px)まで見せる
+  const minX = w / 2;
+  const maxX = W - w / 2;
+  const left = maxX < minX ? W / 2 : Math.min(maxX, Math.max(minX, Number(cxPx) || 0));
+  const maxY = H - h;
+  const top = maxY < 0 ? 0 : Math.min(maxY, Math.max(0, Number(topPx) || 0));
+  return { left: Math.round(left), top: Math.round(top) };
+}
+
+/**
+ * 保存値(割合)→ 会場の中の px(締めたあと)。
+ * @param {{ cx:number, top:number } | null} saved
+ * @param {{ width:number, height:number }} layout
+ * @param {{ width:number, height:number }} box
+ * @returns {{ left:number, top:number } | null} 保存値が無ければ null(=自動位置)
+ */
+export function venuePickupSavedPlacement(saved, layout, box) {
+  const s = normalizeVenuePickupSavedPos(saved);
+  if (!s || !(Number(layout?.width) > 0) || !(Number(layout?.height) > 0)) return null;
+  return clampVenuePickupPx(s.cx * layout.width, s.top * layout.height, layout, box);
+}
+
+/**
+ * ドラッグで置いた px(締めたあと)→ 保存する割合。
+ * @param {{ left:number, top:number }} px
+ * @param {{ width:number, height:number }} layout
+ * @returns {{ cx:number, top:number } | null}
+ */
+export function venuePickupPosToSave(px, layout) {
+  if (!(Number(layout?.width) > 0) || !(Number(layout?.height) > 0)) return null;
+  return normalizeVenuePickupSavedPos({
+    cx: Math.round((px.left / layout.width) * 10000) / 10000,
+    top: Math.round((px.top / layout.height) * 10000) / 10000
+  });
+}

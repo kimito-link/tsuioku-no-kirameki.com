@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1894',
+    date: '2026-11-06',
+    summary: 'PICK UP の吹き出しをドラッグで動かせる',
+    items: Object.freeze([
+      '会場の映像の上に出る「PICK UP」の吹き出しを、マウスや指でつかんで好きな場所へ動かせるようにしました。置いた場所は覚えていて、会場を開き直しても同じ場所に出ます。',
+      '動かせるのは会場の中だけです(画面の外へ失くさない)。窓の大きさを変えても、同じあたりに出ます。',
+      '吹き出しをダブルクリックすると、元の位置(映像の上端の真ん中)に戻ります。名前のリンクは今までどおり押せます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1889',
     date: '2026-11-05',
     summary: '応援マスが件数の揺れで全部作り直されるのを止める',
@@ -185,14 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場からギフト画面を開く',
     items: Object.freeze([
       '会場の上の帯に「🎁 ギフト」を付けました。押すと会場をいったんしまって、公式のギフト画面を開きます。ギフトを選んで贈るのは公式の画面でご自身で行います。右下の「▲ 会場に戻る」で会場に戻れます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1869',
-    date: '2026-11-05',
-    summary: 'PICK UP を映像の上の大きな吹き出しに',
-    items: Object.freeze([
-      '会場の PICK UP を、ひな壇の一番下の細い帯から、映像の上端中央の大きな吹き出しに移しました(顔44px・文字18px・長い文は2行まで)。拾うコメントが無いときは出さないので、映像をふさぎません。'
     ])
   })
 ]);
