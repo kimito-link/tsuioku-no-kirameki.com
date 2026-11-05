@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, waitGiftPressResult, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
+import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, newGiftDrawers, describeGiftDrawers, waitGiftPressResult, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
 import { createVenueGiftStrip } from './venueComposeBox.js';
 
 // 2026-11-05 りんくの画面(番組ギフト・3列の枠・画像と「500 pt」の数字と pt が別の部品)に似せた形
@@ -180,5 +180,19 @@ describe('帯のアイテムが公式の欄の奥にあっても押せる', () =
     for (const c of document.querySelectorAll('.card')) c.addEventListener('click', () => { hit.push(String(c.getAttribute('data-id'))); });
     expect(pressGiftItem(document, '品55|1055pt')).toBe(true);
     expect(hit).toEqual(['55']);
+  });
+});
+
+describe('購入の引き出し(drawer)の中の確定ボタン', () => {
+  it('新しく開いた引き出しの中の「購入する」を押す候補にし、ポイント購入やキャンセルは選ばない・値段を読む', () => {
+    document.body.innerHTML = '<button id="charge">ポイントを購入</button><div class="drawer-content" id="d"><p>1個30 pt (+ 3 pt) 価格:33 pt</p><p>購入後のキャンセルはできません</p><button id="cancel">キャンセル</button><button id="buy">購入する</button></div>';
+    for (const el of document.querySelectorAll('button, .drawer-content')) /** @type {any} */ (el).getBoundingClientRect = () => ({ width: 80, height: 30 });
+    const drawers = newGiftDrawers(document, new Set());
+    expect(drawers.map((d) => d.id)).toEqual(['d']);
+    expect(findGiftConfirmButton(document, new Set(), drawers)?.id).toBe('buy');
+    expect(findGiftConfirmButton(document, new Set(), [])).toBeNull(); // 引き出しの外では「購入」は押さない
+    const info = describeGiftDrawers(drawers);
+    expect(info.price).toBe('33pt');
+    expect(info.buttons.map((b) => b.text)).toEqual(['キャンセル', '購入する']);
   });
 });

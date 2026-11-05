@@ -137,23 +137,71 @@ export const GIFT_ONE_TAP_KEY = 'nls_venue_gift_one_tap_v1';
 const CONFIRM_RE = /^(ギフトを)?贈る$|^贈る[(（]?[\d,]+\s*pt[)）]?$|^[\d,]+\s*ptで?贈る$/;
 const NOT_CONFIRM_RE = /購入|チャージ|買う|キャンセル|やめる|閉じる/;
 
+/** v0.1.1883: アイテムを押すと出る購入の引き出し(drawer)の中でだけ許す確定ボタンの文字(RC 実測: div.drawer-content・「購入後のキャンセルはできません」) */
+const DRAWER_CONFIRM_RE = /^(購入する|購入|購入して贈る|贈る|ギフトを贈る)$/;
+const DRAWER_NOT_CONFIRM_RE = /ポイント|チャージ|キャンセル|やめる|閉じる|規約/;
+const DRAWER_SEL = '[class*="drawer"], [role="dialog"], [aria-modal="true"]';
+
+/** @param {Element} el */
+function isShown(el) {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0;
+}
+
 /**
  * 公式の確認の「贈る」ボタンを探す(見えていて押せるものだけ)。exclude は押す前から見えていたもの(新しく出たものだけを押す)。
+ *   scopes を渡したときは、その中(=押したあと新しく開いた購入の引き出し)だけで「購入する」も確定として探す。
  * @param {Document} doc
  * @param {Set<Element>} [exclude]
+ * @param {Element[]} [scopes]
  * @returns {HTMLElement | null}
  */
-export function findGiftConfirmButton(doc, exclude) {
+export function findGiftConfirmButton(doc, exclude, scopes) {
+  for (const scope of scopes || []) {
+    for (const el of scope.querySelectorAll('button, [role="button"]')) {
+      if (exclude?.has(el)) continue;
+      const t = String(el.textContent || '').replace(/\s+/g, '');
+      if (!t || t.length > 20 || DRAWER_NOT_CONFIRM_RE.test(t) || !DRAWER_CONFIRM_RE.test(t)) continue;
+      if (/** @type {any} */ (el).disabled || el.getAttribute('aria-disabled') === 'true' || !isShown(el)) continue;
+      return /** @type {HTMLElement} */ (el);
+    }
+  }
   for (const el of doc.querySelectorAll('button, [role="button"]')) {
     if (exclude?.has(el)) continue;
     const t = String(el.textContent || '').replace(/\s+/g, '');
     if (!t || t.length > 20 || NOT_CONFIRM_RE.test(t) || !CONFIRM_RE.test(t)) continue;
-    if (/** @type {any} */ (el).disabled || el.getAttribute('aria-disabled') === 'true') continue;
-    const r = el.getBoundingClientRect();
-    if (!(r.width > 0 && r.height > 0)) continue;
+    if (/** @type {any} */ (el).disabled || el.getAttribute('aria-disabled') === 'true' || !isShown(el)) continue;
     return /** @type {HTMLElement} */ (el);
   }
   return null;
+}
+
+/**
+ * 押したあと新しく開いた購入の引き出し(押す前から見えていたものは除く)。
+ * @param {Document} doc
+ * @param {Set<Element>} before
+ */
+export function newGiftDrawers(doc, before) {
+  return [...doc.querySelectorAll(DRAWER_SEL)].filter((el) => !before.has(el) && isShown(el));
+}
+
+/**
+ * 計器: 引き出しの中のボタン(文字・押せるか・class)と「価格: 33 pt」(手数料込みの実際の値段)。
+ * @param {Element[]} drawers
+ */
+export function describeGiftDrawers(drawers) {
+  /** @type {{ text: string, disabled: boolean, cls: string }[]} */
+  const buttons = [];
+  let price = '';
+  for (const d of drawers) {
+    for (const el of d.querySelectorAll('button, [role="button"], input[type="submit"]')) {
+      if (buttons.length >= 12) break;
+      buttons.push({ text: String(el.textContent || /** @type {any} */ (el).value || '').replace(/\s+/g, ' ').trim().slice(0, 30), disabled: !!(/** @type {any} */ (el).disabled || el.getAttribute('aria-disabled') === 'true'), cls: String(el.getAttribute('class') || '').slice(0, 60) });
+    }
+    const m = /価格[:：]\s*([\d,]+)\s*pt/.exec(String(d.textContent || ''));
+    if (m && !price) price = `${m[1]}pt`;
+  }
+  return { buttons, price };
 }
 
 /** @param {Document} doc */
@@ -278,6 +326,7 @@ export function startGiftItemsPublisher(win, store) {
       const mo = typeof MutationObserver === 'function' ? new MutationObserver((recs) => { for (const r of recs) for (const n of r.addedNodes) if (n instanceof Element && added.length < 200) added.push(n); }) : null;
       try { mo?.observe(doc.body, { childList: true, subtree: true }); } catch { /* 見張れなくても押す */ }
       const before = req.direct === true ? visibleConfirmButtons(doc) : new Set();
+      const drawersBefore = new Set(newGiftDrawers(doc, new Set()));
       try { ok = pressGiftItem(doc, req.key); } catch { ok = false; }
       if (!ok) mo?.disconnect();
       if (!ok && left > 0) win.setTimeout(step, 300);
@@ -291,7 +340,7 @@ export function startGiftItemsPublisher(win, store) {
           const look = () => {
             tries -= 1;
             let btn = null;
-            try { btn = findGiftConfirmButton(doc, before); } catch { btn = null; }
+            try { btn = findGiftConfirmButton(doc, before, newGiftDrawers(doc, drawersBefore)); } catch { btn = null; }
             if (btn) {
               conf.confirmed = true;
               conf.confirmText = String(btn.textContent || '').replace(/\s+/g, '').slice(0, 20);
@@ -305,9 +354,11 @@ export function startGiftItemsPublisher(win, store) {
         win.setTimeout(() => {
           mo?.disconnect();
           const shown = added.filter((el) => el.isConnected && (() => { const r = el.getBoundingClientRect(); return r.width >= 100 && r.height >= 40; })());
+          let drawer = { buttons: /** @type {any[]} */ ([]), price: '' };
+          try { drawer = describeGiftDrawers(newGiftDrawers(doc, drawersBefore)); } catch { /* 計器が読めなくても結果は残す */ }
           void store.set({
             [GIFT_ITEM_PRESS_RESULT_KEY]: {
-              at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, ...conf,
+              at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, ...conf, drawerButtons: drawer.buttons, price: drawer.price,
               shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
               head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160)
             }
