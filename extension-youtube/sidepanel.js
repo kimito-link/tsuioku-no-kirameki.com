@@ -20449,6 +20449,14 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.1869",
+      date: "2026-11-05",
+      summary: "PICK UP を映像の上の大きな吹き出しに",
+      items: Object.freeze([
+        "会場の PICK UP を、ひな壇の一番下の細い帯から、映像の上端中央の大きな吹き出しに移しました(顔44px・文字18px・長い文は2行まで)。拾うコメントが無いときは出さないので、映像をふさぎません。"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.1868",
       date: "2026-11-05",
       summary: "会場の発言欄を中央に・大きく",
@@ -20612,14 +20620,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       summary: "止まった取り込みの立て直しを直す",
       items: Object.freeze([
         "コメントの取り込みが止まったときに自動で立て直す仕組みが、ニコ生の応答を読み違えて空振りしていました。スマホ版で確かめた読み方に揃え、次の位置を正しくたどれるようにしました"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1841",
-      date: "2026-10-31",
-      summary: "VOICEVOX再起動後も準備中と正しく出す",
-      items: Object.freeze([
-        "読み上げを ON にするたびに、声の「初めて」と速さを数え直すようにしました。VOICEVOX を途中で再起動したり GPU に切り替えたりした後も、起動直後の遅れに「準備中」の案内が出て、古い速さで遅い PC と決めつけません"
       ])
     })
   ]);
@@ -46642,7 +46642,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T09:03" ? String("yt-2026-11-05T09:03") : "dev";
+      const buildId = "yt-2026-11-05T09:18" ? String("yt-2026-11-05T09:18") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46660,7 +46660,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.110") : "";
+    const bundledVersion = true ? String("0.1.111") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46705,7 +46705,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T09:03" ? String("yt-2026-11-05T09:03") : "dev";
+            return "yt-2026-11-05T09:18" ? String("yt-2026-11-05T09:18") : "dev";
           } catch {
             return "dev";
           }
