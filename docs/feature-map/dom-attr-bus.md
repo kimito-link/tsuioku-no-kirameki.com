@@ -29,6 +29,7 @@
 - 🟠 **data-nls-page-intercept-href** — 書く人だけ: extension/page-intercept-entry.js
 - 🟠 **data-nls-page-intercept-referrer** — 書く人だけ: extension/page-intercept-entry.js
 - 🟠 **data-nls-warmup-state** — 書く人だけ: extension/content-entry.js
+- 🔵 **data-nl-author-photo** — 読む人だけ: lib/youtube/ytChatParse.js
 - 🔵 **data-nl-src** — 読む人だけ: extension/sidepanel-iframe-boot-entry.js
 - 🔵 **data-nl-trio-slot** — 読む人だけ: extension/popup-entry.js
 
@@ -39,6 +40,7 @@
 | `data-nl-acq-mode` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-acq-tier` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-anonymous-avatar-key` | lib/avatarPartsComposer.js<br>lib/supportTimelineHtml.js | lib/avatarPartsComposer.js |
+| `data-nl-author-photo` | — | lib/youtube/ytChatParse.js |
 | `data-nl-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-click-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-concurrent-chara-jump-bound` | extension/popup-entry.js | extension/popup-entry.js |
