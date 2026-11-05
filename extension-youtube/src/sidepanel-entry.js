@@ -1,6 +1,7 @@
 // sidepanel-entry.js — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
 /* global window, chrome, document, performance, URL, Blob, fetch, setTimeout */
 
+import { YT_COMMENT_SEND_REASON_JA } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { formatNumberJa, safeHttpUrl } from '../../src/lib/htmlText.js';
 import { anonymousIdenticonDataUrl } from '../../src/lib/anonymousIdenticon.js';
 import { VOICEVOX_BASE_URL } from '../../src/lib/voicevoxClient.js';
@@ -1107,16 +1108,7 @@ async function loadSelectedStreamForExport() {
   return { summary, items };
 }
 
-const COMMENT_SEND_REASON_JA = Object.freeze({
-  'no-tab': 'この配信の YouTube タブが見つかりません。視聴ページを開いてください。',
-  'no-chat-frame': 'チャット欄が見つかりません。視聴ページでチャットを表示してください。',
-  'no-input': 'チャットの入力欄がありません（チャットが閉じている・アーカイブ・コメント制限中かもしれません）。',
-  'not-signed-in': 'YouTube にログインしていないので送れません。YouTube 側でログインしてください。',
-  'no-send-button': '送信ボタンが見つかりません。YouTube の画面が変わったかもしれません。',
-  'send-disabled': 'YouTube 側で送信できない状態です（低速モード・メンバー限定など）。',
-  'still-in-box': '送信ボタンを押しましたが、文字が入力欄に残っています。YouTube 側の画面を確認してください。',
-  empty: 'コメントが空です。',
-});
+const COMMENT_SEND_REASON_JA = YT_COMMENT_SEND_REASON_JA;
 
 function bindComposeAndExportEvents() {
   const input = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('commentInput'));

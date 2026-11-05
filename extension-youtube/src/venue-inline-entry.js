@@ -10,6 +10,7 @@ import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
 import { ytShouldVoiceWhenCrowded, ytCrowdSpeedBoost, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
 // ニコ生版の放送ページと同じ見回り: 拡張が入れ替わったあと古い版のまま止まったページを、自分で読み込み直す
@@ -55,7 +56,12 @@ function sync() {
   __ytSetVenueLiveId(pseudoLvForVideoId(vid));
   mountedVid = vid;
   ensureBaseFontSize();
-  if (!document.getElementById('nlsb-venue-root')) mountVenueBarButton();
+  // 会場から発言(ニコ生版 v0.1.1867 と同じ入力欄)。送り方はサイドパネルの「コメント送信」と同じ YT_SEND_COMMENT。
+  if (!document.getElementById('nlsb-venue-root'))
+    mountVenueBarButton({
+      postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
+      postReasonText: ytCommentSendReasonText,
+    });
 }
 
 // 会場の画像はネットワークを通さず blob: で読む(ytLocalAssetUrls.js・YouTube のページの見張りがエラー一覧に積もるため)。

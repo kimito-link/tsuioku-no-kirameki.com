@@ -17665,6 +17665,92 @@ ${sourceCol}
     });
   }
 
+  // src/lib/venueComposeBox.js
+  function venueComposeResultText(res, reasonText) {
+    if (res && res.ok) return { ok: true, text: "送信しました" };
+    const err = String(res?.error || "").trim();
+    if (err) return { ok: false, text: err };
+    const reason = String(res?.reason || "").trim();
+    const mapped = reason && typeof reasonText === "function" ? String(reasonText(reason) || "") : "";
+    return { ok: false, text: mapped || `送信できませんでした${reason ? `(${reason})` : ""}` };
+  }
+  function createVenueComposeBox(post, opts = {}) {
+    const doc = opts.doc || document;
+    const form = doc.createElement("form");
+    form.className = "nlsb-compose";
+    form.style.cssText = "display:inline-flex;align-items:center;gap:4px;margin:0;";
+    const input = doc.createElement("input");
+    input.type = "text";
+    input.className = "nlsb-compose-input";
+    input.placeholder = "ここから発言";
+    input.maxLength = 200;
+    input.autocomplete = "off";
+    input.style.cssText = "width:180px;max-width:40vw;height:26px;box-sizing:border-box;padding:2px 8px;border-radius:13px;border:1px solid rgba(0,0,0,0.25);background:rgba(255,255,255,0.96);color:#1f2328;font-size:12px;";
+    const btn = doc.createElement("button");
+    btn.type = "submit";
+    btn.className = "nlsb-comeview-btn nlsb-compose-send";
+    btn.textContent = "送信";
+    btn.disabled = true;
+    const status = doc.createElement("span");
+    status.className = "nlsb-compose-status";
+    status.style.cssText = "font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    status.hidden = true;
+    let busy = false;
+    let clearTimer = 0;
+    const sync = () => {
+      btn.disabled = busy || !input.value.trim();
+    };
+    const show = (r) => {
+      status.hidden = false;
+      status.textContent = r.text;
+      status.title = r.text;
+      status.style.color = r.ok ? "#1a7f37" : "#cf222e";
+      if (clearTimer) clearTimeout(clearTimer);
+      clearTimer = /** @type {any} */
+      setTimeout(() => {
+        status.hidden = true;
+        clearTimer = 0;
+      }, r.ok ? 2500 : 8e3);
+    };
+    const send = async () => {
+      const text = input.value.replace(/\s+/g, " ").trim();
+      if (!text || busy) return;
+      busy = true;
+      sync();
+      let res = null;
+      try {
+        res = await post(text);
+      } catch (e) {
+        res = { ok: false, error: e && typeof e === "object" && "message" in e ? String(
+          /** @type {any} */
+          e.message
+        ) : String(e) };
+      }
+      busy = false;
+      const r = venueComposeResultText(res, opts.reasonText);
+      if (r.ok) input.value = "";
+      show(r);
+      sync();
+    };
+    input.addEventListener("input", sync);
+    for (const type of ["keydown", "keyup", "keypress"]) {
+      input.addEventListener(type, (ev) => {
+        ev.stopPropagation();
+        const ke = (
+          /** @type {KeyboardEvent} */
+          ev
+        );
+        if (type === "keydown" && ke.key === "Escape") input.blur();
+      });
+    }
+    form.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      void send();
+    });
+    form.append(input, btn, status);
+    return form;
+  }
+
   // src/extension/venueBar.js
   var VENUE_ROSTER_ENABLED = false;
   var VENUE_SPEECH_PANEL_MAX = 1e3;
@@ -19912,11 +19998,12 @@ ${sourceCol}
       tuckBtn.title = "コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます";
       tuckBtn.addEventListener("click", () => setTucked(true));
     }
+    const composeBox = !isStandalone && typeof options.postComment === "function" ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null;
     const note = document.createElement("div");
     note.className = "nlsb-note";
     note.textContent = `全コメント集計・最大${VENUE_FULLSCREEN_MAX_SEATS}席`;
     if (venueWindowBtn) {
-      headerRight.append(...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+      headerRight.append(...composeBox ? [composeBox] : [], ...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
     } else {
       headerRight.append(...tuckBtn ? [tuckBtn] : [], rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
     }
@@ -20414,7 +20501,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T06:43") : ""
+          buildId: true ? String("yt-2026-11-05T08:00") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
