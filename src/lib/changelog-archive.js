@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1851',
+    date: '2026-11-03',
+    summary: 'VOICEVOX が追いつかない間は PC の声で読む',
+    items: Object.freeze([
+      'VOICEVOX が混んで追いつかない間だけ、PC に入っている声(Windows の Haruka・Ayumi・Ichiro・Sayaka など)に自動で切り替えて読むようにしました。人ごとに声の種類・高さ・速さを変えるので、誰のコメントか聞き分けられます(同じ人はいつも同じ声)。切り替えている間は「いまは PC の声で読んでいます」と出ます。VOICEVOX が速くなったら自動で戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1850',
     date: '2026-11-03',
     summary: '混んだ配信で読み上げが全く鳴らないのを修正',

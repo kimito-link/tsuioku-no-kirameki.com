@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1878',
+    date: '2026-11-05',
+    summary: '会場のギフトは2回押しで選ぶ',
+    items: Object.freeze([
+      '会場の帯のアイテムは、1回目の押下で「もう一度」と出し、3秒以内にもう一度押したときだけ公式のギフト欄でそのアイテムを選ぶようにしました。1回の押し間違いでは何も起きません',
+      '会場の帯から選んだあと、公式の欄に何が出たか(確認の窓など)を3秒だけ記録するようにしました(この PC の中だけ・押したり贈ったりはしません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1877',
     date: '2026-11-05',
     summary: '会場のギフトは安い順・1,000pt まで',
@@ -182,14 +191,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '読み上げが遅い PC では、ポップアップの読み上げ欄にも「VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に」の案内を出すようにしました。',
       '会場モードの「読み上げが遅れています」と GPU の案内が、後ろのニコ生のコメント欄と重なって読みにくかったので、白い下地を付けて何の上でも読めるようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1851',
-    date: '2026-11-03',
-    summary: 'VOICEVOX が追いつかない間は PC の声で読む',
-    items: Object.freeze([
-      'VOICEVOX が混んで追いつかない間だけ、PC に入っている声(Windows の Haruka・Ayumi・Ichiro・Sayaka など)に自動で切り替えて読むようにしました。人ごとに声の種類・高さ・速さを変えるので、誰のコメントか聞き分けられます(同じ人はいつも同じ声)。切り替えている間は「いまは PC の声で読んでいます」と出ます。VOICEVOX が速くなったら自動で戻ります。'
     ])
   })
 ]);
