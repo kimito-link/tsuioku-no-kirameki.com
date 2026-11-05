@@ -7,6 +7,19 @@ import { openOfficialGiftPanel, showGiftItemsTabSoon, GIFT_ITEMS_TAB_REQ_KEY } f
 
 const PT_RE = /^\s*[\d,]+\s*pt\s*$/i;
 const NUM_RE = /^\s*[\d,]+\s*$/;
+/**
+ * ギフト窓の上に出ている自分のポイント残高(「〇〇 さん 2,498 pt」)を読む。読めなければ null
+ * @param {Document} doc
+ * @returns {number|null}
+ */
+export function readGiftBalance(doc) {
+  const text = String(doc?.body?.innerText || doc?.body?.textContent || '').replace(/\s+/g, ' ').slice(0, 400);
+  const m = text.match(/さん\s*([\d,]+)\s*pt/);
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
 /** アイテムではない pt(自分の所持ポイント欄・放送画面の「あと ◯pt」) */
 const NOT_ITEM_SEL = '[class*="point-charge"], [class*="remaining-points"], [class*="program-gift-information"], [class*="point-balance"]';
 /** 名前に使わない行(図鑑の数・案内リンク) */
@@ -327,6 +340,7 @@ export function startGiftItemsPublisher(win, store) {
       try { mo?.observe(doc.body, { childList: true, subtree: true }); } catch { /* 見張れなくても押す */ }
       const before = req.direct === true ? visibleConfirmButtons(doc) : new Set();
       const drawersBefore = new Set(newGiftDrawers(doc, new Set()));
+      const balanceBefore = readGiftBalance(doc);
       try { ok = pressGiftItem(doc, req.key); } catch { ok = false; }
       if (!ok) mo?.disconnect();
       if (!ok && left > 0) win.setTimeout(step, 300);
@@ -360,10 +374,22 @@ export function startGiftItemsPublisher(win, store) {
             [GIFT_ITEM_PRESS_RESULT_KEY]: {
               at: Date.now(), reqAt: at, key: req.key, direct: req.direct === true, found: true, ...conf, drawerButtons: drawer.buttons, price: drawer.price,
               shown: shown.slice(0, 6).map((el) => ({ tag: el.localName, cls: String(el.getAttribute('class') || '').slice(0, 80), role: el.getAttribute('role') || '', text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })),
-              head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+              head: String(doc.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+              balanceBefore
             }
           });
         }, 3000);
+        // v0.1.1884: 3秒の記録だけでは「贈れたか」が分からなかった(confirmed:false でも実際は贈られていた実例)。
+        // 15秒後にポイント残高を読み直し、減った分を spent として足して残す(押したかではなく、減ったかを見る)
+        win.setTimeout(() => {
+          const balanceAfter = readGiftBalance(doc);
+          void Promise.resolve(store.get(GIFT_ITEM_PRESS_RESULT_KEY)).then((cur) => {
+            const prev = cur?.[GIFT_ITEM_PRESS_RESULT_KEY];
+            if (!prev || prev.reqAt !== at) return;
+            const spent = balanceBefore != null && balanceAfter != null ? balanceBefore - balanceAfter : null;
+            void store.set({ [GIFT_ITEM_PRESS_RESULT_KEY]: { ...prev, checkedAt: Date.now(), balanceAfter, spent } });
+          }).catch(() => { /* 読めなくても押す流れは壊さない */ });
+        }, 15000);
       }
     };
     win.setTimeout(step, 400); // 番組ギフトのタブへ切り替わって並びが描かれるのを待つ

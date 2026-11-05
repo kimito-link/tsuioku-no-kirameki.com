@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, newGiftDrawers, describeGiftDrawers, waitGiftPressResult, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
+import { pickVenueGiftItems, readGiftItems, pressGiftItem, startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, giftItemSkeleton, findGiftConfirmButton, newGiftDrawers, describeGiftDrawers, waitGiftPressResult, readGiftBalance, GIFT_ITEMS_KEY, GIFT_ITEM_PRESS_REQ_KEY, GIFT_ITEM_PRESS_RESULT_KEY } from './giftItemsMirror.js';
 import { createVenueGiftStrip } from './venueComposeBox.js';
 
 // 2026-11-05 りんくの画面(番組ギフト・3列の枠・画像と「500 pt」の数字と pt が別の部品)に似せた形
@@ -194,5 +194,14 @@ describe('購入の引き出し(drawer)の中の確定ボタン', () => {
     const info = describeGiftDrawers(drawers);
     expect(info.price).toBe('33pt');
     expect(info.buttons.map((b) => b.text)).toEqual(['キャンセル', '購入する']);
+  });
+});
+
+describe('贈れたかを残高で確かめる(v0.1.1884)', () => {
+  it('ギフト窓の「〇〇 さん 2,498 pt」から残高を読む', () => {
+    document.body.innerHTML = '<div>ギフト 君斗りんく＠クリエイター応援 さん 2,498 pt 番組ギフト マイギフト</div><p>100 pt</p>';
+    expect(readGiftBalance(document)).toBe(2498);
+    document.body.innerHTML = '<div>ギフト 番組ギフト 100 pt</div>';
+    expect(readGiftBalance(document)).toBe(null);
   });
 });
