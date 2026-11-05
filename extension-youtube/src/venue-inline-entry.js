@@ -68,7 +68,7 @@ function sync() {
       // 0.1.115: 押したのに画面が開かなかったら会場を戻し、押したボタンの名前を出す(りんく実機「会場がとじるだけ」)。
       giftReasonText: (reason) => {
         const r = String(reason || '');
-        if (r.startsWith('no-superchat-panel')) return `開けませんでした(${r.slice('no-superchat-panel:'.length) || '?'})`;
+        if (r.startsWith('no-superchat-panel')) return '開けませんでした'; // 0.1.116 押したボタン名は記録(yt_diag_superchat)にだけ残す(帯の幅が伸びるので)
         return (
           {
             'not-signed-in': 'ログインすると使えます',
