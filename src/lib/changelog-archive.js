@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1848',
+    date: '2026-11-01',
+    summary: 'VOICEVOX を GPU にする案内を見やすく',
+    items: Object.freeze([
+      '読み上げが遅い PC では、会場モードとコメビュの読み上げボタンの横に「⚡ 読み上げを速くするには: VOICEVOX の「設定」→「オプション」→「エンジンモード」を「GPU」に」と、遅いと分かっている間ずっと出すようにしました。以前は「遅れています」の長い一文の最後に付いていて見落としやすく、VOICEVOX の画面の場所も「オプション」が抜けていました。GPU を使える PC だけに出し、VOICEVOX を起動した直後の準備中は出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1847',
     date: '2026-10-31',
     summary: 'アプリの読み上げを人ごとに違う声に',

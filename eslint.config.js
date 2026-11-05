@@ -437,7 +437,8 @@ export default [
     // v0.1.1870: 会場のギフトボタン(公式のギフト画面を開く lib の import 1行)=+1。
     // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
     // v0.1.1874: ギフトの子の窓で番組ギフトのタブへ切り替える合図の受け手(起動1行)=+1。中身は lib の venueComposeBox.js。
-    rules: { 'max-lines': ['error', { max: 19579, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1875: 会場のギフトのアイテムの帯(import 1行)=+1。読む・置く・押すは lib の giftItemsMirror.js。
+    rules: { 'max-lines': ['error', { max: 19580, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -468,8 +469,9 @@ export default [
     // v0.1.1867: 会場から発言(import 1行+入力欄を作る1行)=+2。入力欄は lib の venueComposeBox.js。
     // v0.1.1870: 会場の「🎁 ギフト」(ボタンを作る1行・lib の createVenueGiftButton)=+1。
     // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
+    // v0.1.1875: 会場に公式と同じギフトのアイテムを並べる帯(作る1行・lib の createVenueGiftStrip)=+1。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7400, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7401, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

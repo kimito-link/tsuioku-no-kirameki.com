@@ -4,6 +4,8 @@
 //   ログインしていない試験用ブラウザでは中身が出ない(「ログインする必要があります」)ので、本人の画面で記録する。
 //   押さない・送らない・名前など個人の情報は取らない(アイテム名と pt と部品の名前だけ)。
 
+import { giftItemSkeleton } from './giftItemsMirror.js';
+
 const PT_RE = /^\s*[\d,]+\s*pt\s*$/i;
 const TAB_WORDS = ['番組ギフト', 'マイギフト', '履歴', 'ランキング'];
 
@@ -188,6 +190,7 @@ export function startGiftPanelRecorder(win, save) {
       const tabAt = head.search(/番組ギフト|マイギフト|履歴|ランキング/);
       head = (tabAt >= 0 ? head.slice(tabAt) : head.replace(/^.*?さん/, '')).slice(0, 240);
       if (head) extra.head = head;
+      if (!isTop) extra.skel = giftItemSkeleton(doc); // v0.1.1875: アイテムの枠の骨組み(文字なし)
       const sig = JSON.stringify([shape, extra, census.imgs, census.shadowHosts, census.iframes]);
       if (sig === last) return;
       last = sig;

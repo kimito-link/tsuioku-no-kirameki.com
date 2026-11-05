@@ -227,3 +227,61 @@ export function startGiftItemsTabResponder(win, onStorageChanged) {
     if (at && Date.now() - at < 10000) showGiftItemsTabSoon(win.document, { rootSel: 'body' });
   });
 }
+
+/**
+ * v0.1.1875: 会場に公式ギフト欄と同じアイテムを並べる帯(りんく 2026-11-05 の選択「アイテムを並べ確認は公式」)。
+ *   並びは公式のギフト欄を一度開いたときに読んだもの(画像と pt)。押すと会場をしまい、公式の欄で同じアイテムを押す。
+ *   贈るかどうかの確認は公式の画面で本人がする(拡張は確認の「贈る」を押さない)。並びがまだ無ければ帯は出さない。
+ * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string) => Promise<{ ok?: boolean, reason?: string }> | { ok?: boolean, reason?: string }, tuck?: (on: boolean) => void, doc?: Document }} opts
+ * @returns {HTMLSpanElement}
+ */
+export function createVenueGiftStrip(opts) {
+  const doc = opts.doc || document;
+  const strip = doc.createElement('span');
+  strip.className = 'nlsb-gift-strip';
+  strip.style.cssText = 'display:none;align-items:center;gap:4px;max-width:46vw;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;vertical-align:middle';
+  let sig = '';
+  /** @param {{ key: string, name: string, pt: string, img: string }[]} items */
+  const render = (items) => {
+    const next = JSON.stringify(items.map((it) => [it.key, it.img]));
+    if (next === sig) return; // 同じ並びなら作り直さない(ちらつかせない)
+    sig = next;
+    strip.replaceChildren();
+    for (const it of items) {
+      const b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'nlsb-comeview-btn nlsb-gift-item';
+      b.title = `${it.name ? it.name + ' ' : ''}${it.pt}(公式のギフト欄で確認してから贈ります)`;
+      b.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;padding:2px 4px;min-width:40px;line-height:1.1;flex:0 0 auto';
+      if (/^https:\/\//.test(it.img)) {
+        const im = doc.createElement('img');
+        im.src = it.img;
+        im.alt = it.name || '';
+        im.loading = 'lazy';
+        im.referrerPolicy = 'no-referrer';
+        im.style.cssText = 'width:26px;height:26px;object-fit:contain;border-radius:4px';
+        im.addEventListener('error', () => { im.replaceWith(doc.createTextNode('🎁')); }, { once: true });
+        b.append(im);
+      } else {
+        b.append(doc.createTextNode('🎁'));
+      }
+      const pt = doc.createElement('span');
+      pt.textContent = it.pt.replace(/\s+/g, '');
+      pt.style.cssText = 'font-size:10px;white-space:nowrap';
+      b.append(pt);
+      b.addEventListener('click', async () => {
+        try { opts.tuck?.(true); } catch { /* しまえなくても押すのは試す */ }
+        let res = null;
+        try { res = await opts.press(it.key); } catch { res = null; }
+        if (res && res.ok) return;
+        try { opts.tuck?.(false); } catch { /* 戻せなくても一言は出す */ }
+        pt.textContent = '開けません';
+        setTimeout(() => { pt.textContent = it.pt.replace(/\s+/g, ''); }, 3000);
+      });
+      strip.append(b);
+    }
+    strip.style.display = items.length ? 'inline-flex' : 'none';
+  };
+  try { opts.subscribe(render); } catch { /* 並びが読めなければ帯を出さないだけ */ }
+  return strip;
+}
