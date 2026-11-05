@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import billingHandler from '../../api/billing.js';
+import billingHandler, { readRawBody } from '../../api/billing.js';
 import { DEVICE_RESET_INTERVAL_MS, deviceTagFor, verifyLicenseToken } from '../lib/supporterLicense.js';
 import {
   billingKeys,
@@ -292,6 +292,16 @@ describe('api/billing: 受け口', () => {
     await billingHandler({ method: 'POST', query: { action: 'license' }, headers: {}, body: {} }, res, { stripe: { configured: false } });
     log.mockRestore();
     expect(res.code).toBe(503);
+  });
+  it('生の本文は req.body より先に流れから読む(整形済みの本文をそのまま署名に使う)', async () => {
+    const { Readable } = await import('node:stream');
+    const pretty = '{\n  "id": "evt_1",\n  "type": "x"\n}';
+    const req = Readable.from([Buffer.from(pretty)]);
+    let touched = false;
+    Object.defineProperty(req, 'body', { get() { touched = true; return JSON.parse(pretty); } });
+    const raw = await readRawBody(req);
+    expect(raw).toBe(pretty);
+    expect(touched).toBe(false);
   });
   it('GET は 405', async () => {
     const res = mkRes();
