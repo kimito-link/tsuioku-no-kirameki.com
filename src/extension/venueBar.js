@@ -5,7 +5,8 @@ import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/come
 import {
   applyVenuePickupView,
   buildVenuePickupView,
-  createVenuePickupBanner
+  createVenuePickupBanner,
+  venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
@@ -641,7 +642,7 @@ const VENUE_CSS = `
      ★下地は不透明(v0.1.1337: 半透明だと後ろのページの文字と重なって読めなかった)。 */
   .nlsb-pickup {
     position: absolute;
-    top: 6px;
+    top: 20px;
     left: 50%;
     z-index: 7;
     transform: translateX(-50%);
@@ -2999,8 +3000,20 @@ export function mountVenueBarButton(options = {}) {
     try {
       const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
       applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
+      placePickup();
     } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
+  /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
+  function placePickup() {
+    if (pickupEls.root.hasAttribute('data-empty')) return;
+    const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
+    const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
+    pickupEls.root.style.left = at ? `${at.left}px` : '';
+    pickupEls.root.style.top = at ? `${at.top}px` : '';
+    pickupEls.root.style.width = at ? `${at.width}px` : '';
+  }
+  window.addEventListener('resize', () => { try { placePickup(); } catch { /* 位置合わせの失敗は無視(CSS の既定位置のまま) */ } });
   // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
   seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。

@@ -463,9 +463,9 @@ export default [
     // v0.1.1861: 読み上げに配信 id と配信者 uid を渡す(混雑時は大事なものだけ読む・判定は lib の voiceBusyPriority.js)=+1。
     // v0.1.1866: 会場を開いた瞬間の3件を読み上げの遅れに数えない(印1行+コメント1行)=+2。
     // v0.1.1867: 会場から発言(import 1行+入力欄を作る1行)=+2。入力欄は lib の venueComposeBox.js。
-    // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行)=+2。
+    // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7386, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7399, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
