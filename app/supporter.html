@@ -123,7 +123,7 @@
           <p>下の「サポーターのコード」をコピーして、拡張のマーケ HTML の画面に貼り付けてください。</p>
           <code id="code"></code>
           <button class="primary" type="button" id="copyBtn">コードをコピー</button>
-          <p class="msg">★このコードは大切に保管してください(PC を買い替えたときも同じコードで使えます)。</p>
+          <p class="msg">★このコードは大切に保管してください。1つのコードで使えるのは PC 1台です(買い替えたときは下の「この PC に移す」)。</p>
         </div>
       </section>
 
@@ -134,6 +134,15 @@
         <input id="portalCode" type="text" autocomplete="off" spellcheck="false" placeholder="サポーターのコード" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--nl-border);margin-bottom:8px" />
         <button class="primary" type="button" id="portalBtn">契約の画面を開く</button>
         <p class="msg err" id="portalErr" hidden></p>
+      </section>
+
+      <!-- この PC に移す(1コード1台) -->
+      <section class="card">
+        <h2>PC を買い替えたとき</h2>
+        <p class="msg">1つのコードで使えるのは PC 1台です。新しい PC で使うときは、コードを入れて「この PC に移す」を押してから、新しい PC の拡張にコードを貼り付けてください。移せるのは30日に1回です。</p>
+        <input id="moveCode" type="text" autocomplete="off" spellcheck="false" placeholder="サポーターのコード" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--nl-border);margin-bottom:8px" />
+        <button class="primary" type="button" id="moveBtn">この PC に移す</button>
+        <p class="msg" id="moveMsg" hidden></p>
       </section>
 
       <footer>

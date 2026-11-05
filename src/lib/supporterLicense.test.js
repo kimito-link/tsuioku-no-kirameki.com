@@ -4,7 +4,9 @@ import {
   TRIAL_MS,
   bytesToBase64url,
   decideFeatureAccess,
+  deviceTagFor,
   encodeLicenseBody,
+  isValidDeviceId,
   isValidSupporterCode,
   parseLicenseToken,
   shouldRefreshLicense,
@@ -132,5 +134,25 @@ describe('supporterLicense: コメビュの隅の印', () => {
     expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'valid' })).toBe(false);
     expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'expired_grace' })).toBe(false);
     expect(shouldShowCreditBadge({ enforced: true, licenseStatus: 'unverifiable' })).toBe(false);
+  });
+});
+
+describe('supporterLicense: PC の印(1コード1台)', () => {
+  it('印の形・同じ印は同じ dev・違う印は違う dev・作れない環境は null', async () => {
+    expect(isValidDeviceId('a'.repeat(24))).toBe(true);
+    expect(isValidDeviceId('short')).toBe(false);
+    expect(isValidDeviceId('a b'.repeat(10))).toBe(false);
+    const a = await deviceTagFor('a'.repeat(24));
+    expect(a).toMatch(/^[0-9a-f]{24}$/);
+    expect(await deviceTagFor('a'.repeat(24))).toBe(a);
+    expect(await deviceTagFor('b'.repeat(24))).not.toBe(a);
+    expect(await deviceTagFor('a'.repeat(24), null)).toBeNull();
+    expect(await deviceTagFor('bad')).toBeNull();
+  });
+  it('証明書の dev は読み取りで残り、無い証明書も読める(後方互換)', () => {
+    const withDev = encodeLicenseBody({ kid: 'k', sub: 's', plan: 'yearly', feat: [], iat: 1, exp: 2, dev: 'abc' });
+    expect(parseLicenseToken(`${withDev}.x`)?.payload.dev).toBe('abc');
+    const noDev = encodeLicenseBody({ kid: 'k', sub: 's', plan: 'yearly', feat: [], iat: 1, exp: 2 });
+    expect(parseLicenseToken(`${noDev}.x`)?.payload.dev).toBeUndefined();
   });
 });

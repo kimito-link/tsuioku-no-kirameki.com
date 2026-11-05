@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import billingHandler from '../../api/billing.js';
-import { verifyLicenseToken } from '../lib/supporterLicense.js';
+import { DEVICE_RESET_INTERVAL_MS, deviceTagFor, verifyLicenseToken } from '../lib/supporterLicense.js';
 import {
   billingKeys,
   createBillingService,
@@ -12,6 +12,8 @@ import {
 
 const NOW = Date.UTC(2026, 10, 6, 12);
 const WH_SECRET = 'whsec_test';
+const DEV1 = 'd'.repeat(24);
+const DEV2 = 'e'.repeat(24);
 
 function memUpstash() {
   const store = new Map();
@@ -101,15 +103,18 @@ describe('billingApi: 申し込み→支払い直後→取り直し', () => {
     expect(p.success_url).toBe('https://app.tsuioku-no-kirameki.com/supporter?session_id={CHECKOUT_SESSION_ID}');
   });
 
-  it('支払い直後にコードと有効な証明書が出る・読み直しても同じコード', async () => {
+  it('支払い直後にコードが出る(証明書は出さない)・読み直しても同じコード・拡張はコードで有効な証明書を取れる', async () => {
     const { svc, x, up } = await setup();
     const a = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
     expect(a.status).toBe(200);
+    expect(a.body.license).toBeUndefined();
     const b = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
     expect(b.body.code).toBe(a.body.code);
-    const v = await verifyLicenseToken(a.body.license, { nowMs: NOW, publicKeys: { k1: x } });
+    const lic = (await svc.license({ code: a.body.code, device: DEV1 })).body.license;
+    const v = await verifyLicenseToken(lic, { nowMs: NOW, publicKeys: { k1: x } });
     expect(v.status).toBe('valid');
     expect(v.payload?.feat).toEqual(['marketing']);
+    expect(v.payload?.dev).toBe(await deviceTagFor(DEV1));
     // サーバーにはコードそのものは残らない(ハッシュだけ・支払い直後の24時間の見せ直し用を除く)
     const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
     expect(JSON.stringify(acct)).not.toContain(a.body.code);
@@ -127,27 +132,87 @@ describe('billingApi: 申し込み→支払い直後→取り直し', () => {
   it('コードで証明書を取り直せる・解約後は出ない・知らないコードは 404', async () => {
     const { svc, state } = await setup();
     const { code } = (await svc.claim({ sessionId: 'cs_test_abcdefgh' })).body;
-    expect((await svc.license({ code })).body.active).toBe(true);
+    expect((await svc.license({ code, device: DEV1 })).body.active).toBe(true);
     state.sub = sub('canceled');
     const raw = JSON.stringify({ id: 'evt_1', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } });
     expect((await svc.webhook({ rawBody: raw, signature: signed(raw) })).status).toBe(200);
-    const after = (await svc.license({ code })).body;
+    const after = (await svc.license({ code, device: DEV1 })).body;
     expect(after.active).toBe(false);
     expect(after.license).toBeNull();
-    expect((await svc.license({ code: 'z'.repeat(43) })).status).toBe(404);
+    expect((await svc.license({ code: 'z'.repeat(43), device: DEV1 })).status).toBe(404);
   });
 
   it('再請求中(past_due)は止めない', async () => {
     const { svc, state } = await setup();
     state.sub = sub('past_due');
     const { code } = (await svc.claim({ sessionId: 'cs_test_abcdefgh' })).body;
-    expect((await svc.license({ code })).body.active).toBe(true);
+    expect((await svc.license({ code, device: DEV1 })).body.active).toBe(true);
   });
 
   it('顧客ポータルの URL を返す', async () => {
     const { svc } = await setup();
     const { code } = (await svc.claim({ sessionId: 'cs_test_abcdefgh' })).body;
     expect((await svc.portal({ code })).body.url).toBe('https://portal.stripe.test/cus_1');
+  });
+});
+
+describe('billingApi: 1コード1台(v0.1.1896)', () => {
+  it('最初の PC だけ通す・ほかの PC は 409・同じ PC は何度でも', async () => {
+    const { svc } = await setup();
+    const { code } = (await svc.claim({ sessionId: 'cs_test_abcdefgh' })).body;
+    expect((await svc.license({ code, device: DEV1 })).status).toBe(200);
+    const other = await svc.license({ code, device: DEV2 });
+    expect(other.status).toBe(409);
+    expect(other.body.error).toBe('device_limit');
+    expect((await svc.license({ code, device: DEV1 })).body.active).toBe(true);
+  });
+
+  it('PC の印が無い・形が違うと 400', async () => {
+    const { svc } = await setup();
+    const { code } = (await svc.claim({ sessionId: 'cs_test_abcdefgh' })).body;
+    expect((await svc.license({ code, device: '' })).status).toBe(400);
+    expect((await svc.license({ code, device: 'short' })).status).toBe(400);
+  });
+
+  it('解約中は PC を覚えない(再開したら別の PC でも使える)', async () => {
+    const { svc, state } = await setup();
+    const { code } = (await svc.claim({ sessionId: 'cs_test_abcdefgh' })).body;
+    state.sub = sub('canceled');
+    const raw = JSON.stringify({ id: 'evt_c', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } });
+    await svc.webhook({ rawBody: raw, signature: signed(raw) });
+    expect((await svc.license({ code, device: DEV1 })).body.active).toBe(false);
+    state.sub = sub('active');
+    const raw2 = JSON.stringify({ id: 'evt_r', type: 'customer.subscription.updated', data: { object: { id: 'sub_1' } } });
+    await svc.webhook({ rawBody: raw2, signature: signed(raw2) });
+    expect((await svc.license({ code, device: DEV2 })).body.active).toBe(true);
+  });
+
+  it('この PC に移す: 移すと新しい PC が通り、30日以内の2回目は 429', async () => {
+    let t = NOW;
+    const { env } = await keyEnv();
+    const up = memUpstash();
+    const state = { sub: sub('active') };
+    const svc = createBillingService({
+      upstash: up.fn,
+      stripe: fakeStripe(state),
+      env,
+      nowMs: () => t,
+      newCode: () => 'c'.repeat(43),
+      sign: (p) => signLicense({ ...p, env })
+    });
+    const { code } = (await svc.claim({ sessionId: 'cs_test_abcdefgh' })).body;
+    expect((await svc.devicesReset({ code })).status).toBe(200); // まだ PC が無い=何もしない(回数に数えない)
+    expect((await svc.license({ code, device: DEV1 })).status).toBe(200);
+    expect((await svc.devicesReset({ code })).status).toBe(200);
+    expect((await svc.license({ code, device: DEV2 })).status).toBe(200);
+    expect((await svc.license({ code, device: DEV1 })).status).toBe(409);
+    t += 10 * 86400000;
+    const again = await svc.devicesReset({ code });
+    expect(again.status).toBe(429);
+    expect(again.body.nextAtMs).toBe(NOW + DEVICE_RESET_INTERVAL_MS);
+    t = NOW + DEVICE_RESET_INTERVAL_MS;
+    expect((await svc.devicesReset({ code })).status).toBe(200);
+    expect((await svc.devicesReset({ code: 'z'.repeat(43) })).status).toBe(404);
   });
 });
 
