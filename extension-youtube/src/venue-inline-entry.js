@@ -144,6 +144,28 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
   //   待ち2件以上だった割合)で早口を足す。早口に合わせて長い文の上限もニコ生版の仕組みで短くなる(capVoiceMaxCharsByBoost)。
   //   上げるだけ(ニコ生版の早口より遅くしない)・15秒混まなければ元に戻る。
   let crowdEma = 0;
+  /** @type {any} */
+  let ytLastPlayer = null;
+  // 会議(2026-11-05): 読む前に押し出されて消えた吹き出しの声が、あとから鳴るとずれて聞こえる。消えた吹き出しの声は列から外す。
+  //   会場(venueBar.js)の removeBubble からビルド時の書き換えで呼ぶ(scripts/build-youtube-ext.mjs)。いま鳴っている先頭は触らない。
+  /** @type {any} */ (globalThis).__ytDropVoiceKey = (/** @type {string} */ key) => {
+    const p = ytLastPlayer;
+    if (!p || !key || !Array.isArray(p.queue)) return;
+    const idx = p.queue.findIndex((q, i) => q && q.ytKey === String(key) && !(i === 0 && p.playing));
+    if (idx < 0) return;
+    const [item] = p.queue.splice(idx, 1);
+    try {
+      p.prefetches?.delete?.(item);
+    } catch {
+      /* no-op */
+    }
+    p.diag.ytBubbleGoneDrop = (Number(p.diag.ytBubbleGoneDrop) || 0) + 1;
+    try {
+      p._notifyDropped?.(item);
+    } catch {
+      /* no-op */
+    }
+  };
   let lastCrowdedAt = 0;
   const realResolveBoost = proto._resolveEffectiveSpeedBoost;
   if (typeof realResolveBoost === 'function') {
@@ -199,6 +221,12 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
       keep.push(it);
     }
     const r = realEnqueue.call(this, keep);
+    // 吹き出しが消えたらその声も読まない(下の __ytDropVoiceKey)ために、列の項目にコメントのキーを付ける
+    ytLastPlayer = this;
+    for (const it of keep) {
+      if (!it || !it.key || typeof it.onDropped !== 'function') continue;
+      for (const q of Array.isArray(this.queue) ? this.queue : []) if (q && q.onDropped === it.onDropped) q.ytKey = String(it.key);
+    }
     // 計器は別のキーに書く(ニコ生版の読み上げ計器の保存は決まった項目だけを写すので、ここで足した数は残らない)
     const now = Date.now();
     if (now - lastCrowdDiagAt > 3000) {
@@ -206,7 +234,7 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
       try {
         if (isExtensionContextAlive()) {
           void chrome.storage.local.set({
-            yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0, commentTotal: Number(/** @type {any} */ (this.diag).ytCommentTotal) || 0, crowdedTotal: Number(/** @type {any} */ (this.diag).ytCrowdedTotal) || 0, crowdEma: Math.round(crowdEma * 100) / 100, crowdBoost: Number(/** @type {any} */ (this.diag).ytCrowdBoost) || 0, crowdBoostTotal: Number(/** @type {any} */ (this.diag).ytCrowdBoostTotal) || 0, reasons: { .../** @type {any} */ (this.diag).ytReason } },
+            yt_diag_voice_crowd: { at: now, crowdSkipTotal: Number(this.diag.ytCrowdSkipTotal) || 0, importantTotal: Number(this.diag.ytImportantTotal) || 0, queueNow: Array.isArray(this.queue) ? this.queue.length : 0, commentTotal: Number(/** @type {any} */ (this.diag).ytCommentTotal) || 0, crowdedTotal: Number(/** @type {any} */ (this.diag).ytCrowdedTotal) || 0, crowdEma: Math.round(crowdEma * 100) / 100, crowdBoost: Number(/** @type {any} */ (this.diag).ytCrowdBoost) || 0, crowdBoostTotal: Number(/** @type {any} */ (this.diag).ytCrowdBoostTotal) || 0, bubbleGoneDrop: Number(/** @type {any} */ (this.diag).ytBubbleGoneDrop) || 0, reasons: { .../** @type {any} */ (this.diag).ytReason } },
           }).catch(() => {});
         }
       } catch {

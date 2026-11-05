@@ -49,6 +49,8 @@ function patchVenueBarPickupOnScreen(src) {
   );
   // すぐ消える予定の吹き出し(後から出た吹き出しに隠れて消える等)は候補にしない: 消える時刻を覚える
   src = replaceOnce(src, '    const ms = Math.max(0, lifetimeMs);\n    if (!bubble.reducedMotion) {', '    const ms = Math.max(0, lifetimeMs);\n    bubble.ytGoneAt = Date.now() + ms;\n    if (!bubble.reducedMotion) {', '吹き出しの消える時刻');
+  // 読む前に消えた吹き出し(押し出し・寿命)の声は列から外す(venue-inline-entry.js の __ytDropVoiceKey・会議 2026-11-05)
+  src = replaceOnce(src, '    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n', '    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n    if (bubble.voiceState === \'pending\' && bubble.speechKey) { try { /** @type {any} */ (globalThis).__ytDropVoiceKey?.(bubble.speechKey); } catch { /* 声の後始末の失敗で描画を止めない */ } }\n', '消えた吹き出しの声');
   // 吹き出しを出し終えてから選ぶ(ニコ生版は吹き出しより先に選んでいた)
   src = replaceOnce(src, '      updatePickupBanner(null);\n    }\n    // ユーザー方針「しゃべった人を席に出して吹かせる」', '      queueMicrotask(() => updatePickupBanner(null));\n    }\n    // ユーザー方針「しゃべった人を席に出して吹かせる」', 'PICK UP を吹き出しの後に');
   return src;

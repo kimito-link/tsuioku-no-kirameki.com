@@ -764,7 +764,7 @@ function setupLiveChatObserver() {
       } else if (retryCount < 3) {
         setTimeout(() => inspectElement(el, retryCount + 1), 200 * (retryCount + 1));
       }
-      pendingBatch.push(isReplay ? { ...parsed, replay: true } : parsed);
+      pendingBatch.push(isReplay ? { ...parsed, replay: true, seenAt: Date.now() } : { ...parsed, seenAt: Date.now() });
       queueFlush();
       return;
     }
@@ -772,7 +772,7 @@ function setupLiveChatObserver() {
     // 初回取得時に遅延ロードで空だったアイコン URL が後から入った場合は補完送信する
     if (parsed.iconUrl && !seenWithIconIds.has(parsed.id)) {
       rememberIconId(parsed.id);
-      pendingBatch.push(isReplay ? { ...parsed, replay: true } : parsed);
+      pendingBatch.push(isReplay ? { ...parsed, replay: true, seenAt: Date.now() } : { ...parsed, seenAt: Date.now() });
       queueFlush();
     } else if (!parsed.iconUrl && retryCount < 3) {
       setTimeout(() => inspectElement(el, retryCount + 1), 250 * (retryCount + 1));

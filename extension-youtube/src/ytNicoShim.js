@@ -983,6 +983,33 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     });
     // 2026-11-05 りんく「もっとリアルタイムに」: background が保存より先に届けた新しい行(YT_LIVE_ROWS)を控えに足して、すぐ会場に知らせる。
     //   (保存→まとめの書き込み→知らせ、を待たない。ニコ生版の部品はそのまま=知らせの中身が早く来るだけ)
+    /** @type {number[]} */
+    const liveLagSamples = [];
+    let liveDiagTimer = 0;
+    const writeLiveDiagSoon = () => {
+      if (liveDiagTimer) return;
+      liveDiagTimer = /** @type {any} */ (setTimeout(() => {
+        liveDiagTimer = 0;
+        try {
+          if (!real.runtime?.id) return;
+          const sorted = [...liveLagSamples].sort((a, b) => a - b);
+          const pick = (q) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] : -1);
+          void real.storage.local.set({
+            yt_diag_live_rows: {
+              at: Date.now(),
+              liveRows: shimDiag.liveRows,
+              lastLiveRowsAt: shimDiag.lastLiveRowsAt,
+              notified: shimDiag.notified,
+              lastNotifiedAt: shimDiag.lastNotifiedAt,
+              lastCount: shimDiag.lastCount,
+              seenToBubbleMs: { n: sorted.length, p50: pick(0.5), p90: pick(0.9), max: sorted.length ? sorted[sorted.length - 1] : -1, last: liveLagSamples.slice(-10) },
+            },
+          }).catch(() => {});
+        } catch {
+          /* 計器は本体を止めない */
+        }
+      }, 3000));
+    };
     if (YT_SHIM_IN_PAGE && real.runtime?.onMessage?.addListener) {
       real.runtime.onMessage.addListener((/** @type {any} */ msg) => {
         if (!msg || msg.type !== 'YT_LIVE_ROWS' || !Array.isArray(msg.items)) return;
@@ -1000,7 +1027,14 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         shimDiag.liveRows = (Number(shimDiag.liveRows) || 0) + added;
         shimDiag.lastLiveRowsAt = Date.now();
         inPageSkipFetchUntil.set(vid, Date.now() + 1000);
-        void notifyLv(pseudoLvForVideoId(vid), undefined);
+        const seen = msg.items.map((r) => Number(r?.seenAt) || 0).filter((x) => x > 0);
+        void notifyLv(pseudoLvForVideoId(vid), undefined).then(() => {
+          // 計器(0.1.93): チャット欄で拾ってから会場に渡し終える(吹き出しが出る)までの時間。会場の吹き出しは知らせの中で同期で出る
+          const now = Date.now();
+          for (const t of seen) liveLagSamples.push(now - t);
+          if (liveLagSamples.length > 60) liveLagSamples.splice(0, liveLagSamples.length - 60);
+          writeLiveDiagSoon();
+        });
       });
     }
     // 知らせが来なくても(まとめの書き込みが遅れる・落ちる)、開いている配信は3秒ごとに記録を見直す
