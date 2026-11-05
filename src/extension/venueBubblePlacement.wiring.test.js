@@ -43,3 +43,16 @@ describe('配線: 吹き出しを大事な表示に被せない(v0.1.1760)', () 
     expect(venueBar).not.toContain(".trim() || 'コメント';");
   });
 });
+
+describe('配線: PICK UP をドラッグで動かす(v0.1.1894)', () => {
+  it('★ドラッグで置いた位置を覚え、自動位置より優先し、ダブルクリックで戻す', () => {
+    expect(venueBar).toContain("pickupEls.root.addEventListener('pointerdown'");
+    expect(venueBar).toContain('safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: toSave })');
+    expect(venueBar).toContain('venuePickupSavedPlacement(pickupSavedPos, layoutRect');
+    expect(venueBar).toContain("pickupEls.root.addEventListener('dblclick'");
+    // 速く動かしても置いていかれない(動き・離しは window で受ける)
+    expect(venueBar).toContain("window.addEventListener('pointerup', endPickupDrag);");
+    // 名前のリンクから始めた押下はドラッグにしない
+    expect(venueBar).toMatch(/pointerdown'[\s\S]{0,120}closest\('a\[href\]'\)\) return;/);
+  });
+});
