@@ -340,7 +340,7 @@ export function createVenueGiftStrip(opts) {
         //   以前は2回目で公式の欄へ飛ばしていたが、りんく「2回押すといろんなページに飛ぶのでアイテムを並べる意味をなしていない」
         if (armed !== it.key) {
           armed = it.key;
-          pt.textContent = '贈る?';
+          pt.textContent = `${it.pt.replace(/\s+/g, '')}贈る?`; // 何を使うか見えたまま確かめる
           setTimeout(() => { if (armed === it.key) { armed = ''; pt.textContent = it.pt.replace(/\s+/g, ''); } }, 3000);
           return;
         }
