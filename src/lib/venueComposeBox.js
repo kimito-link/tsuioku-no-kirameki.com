@@ -141,7 +141,7 @@ export function createVenueGiftButton(openGift, opts = {}) {
     try { res = await openGift(); } catch { res = null; }
     if (res && res.ok) return;
     try { opts.tuck?.(false); } catch { /* 戻せなくても一言は出す */ }
-    btn.textContent = 'ギフトのボタンが見つかりません';
+    btn.textContent = `${label.replace(/^\S+\s+/, '')}のボタンが見つかりません`; // 「🎁 ギフト」→「ギフトの…」・YouTube は「スーパーチャットの…」
     setTimeout(() => { btn.textContent = label; }, 4000);
   });
   return btn;
