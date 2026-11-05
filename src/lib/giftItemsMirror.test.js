@@ -141,7 +141,7 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
         const dlg = document.createElement('div');
         dlg.innerHTML = '<p>このギフトを贈りますか</p><button class="cancel">キャンセル</button><button class="ok">贈る</button>';
         for (const b of dlg.querySelectorAll('button')) b.getBoundingClientRect = () => /** @type {any} */ ({ width: 80, height: 30 });
-        dlg.querySelector('.ok')?.addEventListener('click', () => { hit.push('confirm'); const bal = document.getElementById('bal'); if (bal) bal.textContent = 'テスト さん 945 pt'; });
+        dlg.querySelector('.ok')?.addEventListener('click', () => { hit.push('confirm'); const bal = document.getElementById('bal'); if (bal) bal.textContent = 'テスト さん 985 pt'; setTimeout(() => { if (bal) bal.textContent = 'テスト さん 945 pt'; }, 350); }); // 残高は段階的に減る(PC 実測 2377→2362→2344)
         document.body.append(dlg);
       });
     }
@@ -164,7 +164,7 @@ describe('1回で贈る(設定でオンの人だけ)', () => {
     const item = /** @type {HTMLButtonElement} */ (strip.querySelectorAll('.nlsb-gift-item')[1]);
     item.click();
     item.click(); // 続けて押しても二重には贈らない
-    await new Promise((r) => setTimeout(r, 1800)); // 残高が減ったらすぐ結果を書く(3秒待たない)
+    await new Promise((r) => setTimeout(r, 2600)); // 残高が落ち着いたら結果を書く(途中の値で数えない)
     expect(hit).toEqual(['a', 'confirm']);
     expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].confirmed).toBe(true);
     expect(store.data[GIFT_ITEM_PRESS_RESULT_KEY].spent).toBe(55);
@@ -215,9 +215,9 @@ describe('帯の説明(v0.1.1885)', () => {
     let feed = null;
     const strip = createVenueGiftStrip(/** @type {any} */ ({ subscribe: (/** @type {any} */ f) => { feed = f; }, press: async () => ({ ok: true }), oneTap: { get: () => false, set: () => {} } }));
     feed([{ key: 'a|30 pt', name: 'a', pt: '30 pt', img: '' }]);
-    expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('2回押して贈る');
+    expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('2回押すと公式の確認');
     /** @type {HTMLElement} */ (strip.querySelector('.nlsb-gift-mode')).click();
-    expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('押すとすぐ贈る');
+    expect(strip.querySelector('.nlsb-gift-hint')?.textContent).toBe('押すと公式の確認');
   });
 });
 
