@@ -17795,7 +17795,13 @@ ${sourceCol}
         opts.tuck?.(false);
       } catch {
       }
-      btn.textContent = `${label.replace(/^\S+\s+/, "")}のボタンが見つかりません`;
+      let why = "";
+      try {
+        why = res?.reason && opts.reasonText ? String(opts.reasonText(res.reason) || "") : "";
+      } catch {
+        why = "";
+      }
+      btn.textContent = why || `${label.replace(/^\S+\s+/, "")}のボタンが見つかりません`;
       setTimeout(() => {
         btn.textContent = label;
       }, 4e3);
@@ -20052,7 +20058,7 @@ ${sourceCol}
       tuckBtn.title = "コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます";
       tuckBtn.addEventListener("click", () => setTucked(true));
     }
-    const giftBtn = !isStandalone && typeof options.openGift === "function" ? createVenueGiftButton(options.openGift, { label: options.giftLabel, tuck: (on) => setTucked(on) }) : null;
+    const giftBtn = !isStandalone && typeof options.openGift === "function" ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on) => setTucked(on) }) : null;
     const composeBox = !isStandalone && typeof options.postComment === "function" ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null;
     const note = document.createElement("div");
     note.className = "nlsb-note";
@@ -20572,7 +20578,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T09:38") : ""
+          buildId: true ? String("yt-2026-11-05T09:49") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

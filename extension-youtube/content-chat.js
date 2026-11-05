@@ -1205,25 +1205,38 @@
         const mine = resolveCurrentVideoId();
         if (want && mine && want !== mine) return void 0;
         try {
+          const panel = document.querySelector("#input-panel");
+          const signedOut = !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') || /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ""));
+          if (signedOut) {
+            sendResponse({ ok: false, reason: "not-signed-in" });
+            return void 0;
+          }
+          const scopes = [
+            ...document.querySelectorAll("yt-live-chat-message-input-renderer"),
+            ...panel ? [panel] : []
+          ];
           const sel = [
-            "yt-live-chat-message-input-renderer #product-picker button",
             "#product-picker button",
             '#picker-buttons button[aria-label*="Super Chat"]',
             '#picker-buttons button[aria-label*="スーパーチャット"]',
             'button[aria-label*="Super Chat"]',
-            'button[aria-label*="スーパーチャット"]',
-            'button[aria-label*="Super Thanks"]'
+            'button[aria-label*="スーパーチャット"]'
           ];
           let btn = null;
-          for (const q of sel) {
-            btn = /** @type {HTMLElement | null} */
-            document.querySelector(q);
+          for (const scope of scopes) {
+            for (const q of sel) {
+              for (const el of scope.querySelectorAll(q)) {
+                if (el.closest("#reply-button, yt-live-chat-reply-button-view-model, yt-live-chat-item-list-renderer")) continue;
+                btn = /** @type {HTMLElement} */
+                el;
+                break;
+              }
+              if (btn) break;
+            }
             if (btn) break;
           }
           if (!btn) {
-            const panel = document.querySelector("#input-panel");
-            const signedOut = !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') || /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ""));
-            sendResponse({ ok: false, reason: signedOut ? "not-signed-in" : "no-superchat-button" });
+            sendResponse({ ok: false, reason: "no-superchat-button" });
             return void 0;
           }
           btn.click();

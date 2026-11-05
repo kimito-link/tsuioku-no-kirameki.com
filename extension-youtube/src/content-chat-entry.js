@@ -929,26 +929,43 @@ function setupSuperChatOpenBridge() {
       const mine = resolveCurrentVideoId();
       if (want && mine && want !== mine) return undefined;
       try {
+        // 先に未ログインを見る(ログインしていないとスーパーチャットのボタン自体が無い)。
+        const panel = document.querySelector('#input-panel');
+        const signedOut =
+          !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') ||
+          /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ''));
+        if (signedOut) {
+          sendResponse({ ok: false, reason: 'not-signed-in' });
+          return undefined;
+        }
+        // 0.1.114: 探すのは入力欄の帯(#input-panel・入力欄の部品)の中だけ。チャット全体を探すと、
+        //   他の人のスーパーチャットに付く「この Super Chat に返信します」(#reply-button)を押してしまう(PC 実測 2026-11-05)。
+        const scopes = [
+          ...document.querySelectorAll('yt-live-chat-message-input-renderer'),
+          ...(panel ? [panel] : []),
+        ];
         const sel = [
-          'yt-live-chat-message-input-renderer #product-picker button',
           '#product-picker button',
           '#picker-buttons button[aria-label*="Super Chat"]',
           '#picker-buttons button[aria-label*="スーパーチャット"]',
           'button[aria-label*="Super Chat"]',
           'button[aria-label*="スーパーチャット"]',
-          'button[aria-label*="Super Thanks"]',
         ];
+        /** @type {HTMLElement | null} */
         let btn = null;
-        for (const q of sel) {
-          btn = /** @type {HTMLElement | null} */ (document.querySelector(q));
+        for (const scope of scopes) {
+          for (const q of sel) {
+            for (const el of scope.querySelectorAll(q)) {
+              if (el.closest('#reply-button, yt-live-chat-reply-button-view-model, yt-live-chat-item-list-renderer')) continue;
+              btn = /** @type {HTMLElement} */ (el);
+              break;
+            }
+            if (btn) break;
+          }
           if (btn) break;
         }
         if (!btn) {
-          const panel = document.querySelector('#input-panel');
-          const signedOut =
-            !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') ||
-            /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ''));
-          sendResponse({ ok: false, reason: signedOut ? 'not-signed-in' : 'no-superchat-button' });
+          sendResponse({ ok: false, reason: 'no-superchat-button' });
           return undefined;
         }
         btn.click();
