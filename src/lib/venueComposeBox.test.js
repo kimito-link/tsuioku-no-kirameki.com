@@ -76,4 +76,13 @@ describe('会場のギフトボタン', () => {
     const doc = /** @type {any} */ ({ querySelector: () => null, getElementById: () => null });
     expect(openOfficialGiftPanel(doc)).toEqual({ ok: false, reason: 'no-button' });
   });
+  it('見つからないときの一言はボタンの名前に合わせる(YouTube はスーパーチャット)', async () => {
+    const { createVenueGiftButton } = await import('./venueComposeBox.js');
+    const tucks = [];
+    const btn = createVenueGiftButton(async () => ({ ok: false }), { label: '💲 スーパーチャット', tuck: (on) => tucks.push(on) });
+    btn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(btn.textContent).toBe('スーパーチャットのボタンが見つかりません');
+    expect(tucks).toEqual([true, false]);
+  });
 });
