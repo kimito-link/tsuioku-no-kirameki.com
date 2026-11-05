@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1867',
+    date: '2026-11-05',
+    summary: '会場モードから発言できるように',
+    items: Object.freeze([
+      '会場モードの上の帯に「ここから発言」の入力欄を付けました。会場を開いたまま、パネルの「コメント送信」と同じ方法で放送にコメントを送れます。送れなかったときは理由を横に出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1866',
     date: '2026-11-05',
     summary: '読み上げのテンポと遅れ表示の直し',
@@ -181,14 +189,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '読み上げの遅れの理由を画面で分かるように',
     items: Object.freeze([
       '読み上げが遅れたときの案内に、VOICEVOX を起動した直後は初めて使う声の準備で遅れること・続けて読むうちに速くなることを書くようにしました。準備が済んでも遅いときだけ GPU の案内を出します'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1839',
-    date: '2026-10-31',
-    summary: 'イベント欄の拡張のエラーも止める',
-    items: Object.freeze([
-      'イベントに参加している配信で、順位の欄にあるりんくの絵の書き方が安全設定に止められ、拡張機能の管理画面にエラーが積もっていました。ギフト一覧と同じ直し方で、エラーが出ないようにしました。'
     ])
   })
 ]);

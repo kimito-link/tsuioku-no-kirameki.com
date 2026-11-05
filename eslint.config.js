@@ -433,7 +433,8 @@ export default [
     // v0.1.1829: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
     // v0.1.1830: 作りたて host を古いと捨てて開くたび4回作り直していたのを止める(+5行: 一度でも DOM に入った host の WeakSet と記録2か所)。
     // v0.1.1855: 拡張の入れ替え後に古い版のまま止まったページが自分で読み込み直す(import 1行+呼び出しとコメント2行)=+3。中身は lib の orphanTabAutoReload.js。
-    rules: { 'max-lines': ['error', { max: 19574, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1867: 会場から発言(会場に postComment を渡す+コメント1行)=+1。入力欄は lib の venueComposeBox.js。
+    rules: { 'max-lines': ['error', { max: 19575, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -461,8 +462,9 @@ export default [
     // v0.1.1855: 発言パネルが記録を読めなかったとき(拡張が切れた/時間切れ)に理由を返し、ホバーと同じ手元の発言を代わりに出す配線=+15。文言と HTML は lib の venueSpeechStats.js。
     // v0.1.1861: 読み上げに配信 id と配信者 uid を渡す(混雑時は大事なものだけ読む・判定は lib の voiceBusyPriority.js)=+1。
     // v0.1.1866: 会場を開いた瞬間の3件を読み上げの遅れに数えない(印1行+コメント1行)=+2。
+    // v0.1.1867: 会場から発言(import 1行+入力欄を作る1行)=+2。入力欄は lib の venueComposeBox.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7382, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7384, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
