@@ -535,6 +535,30 @@ describe('buildMarketingDashboardHtml', () => {
     expect(section).not.toContain('https://example.test/avatar.jpg');
   });
 
+  it('総合サマリに最大同接と平均を出す(YouTube は来場が無く同接だけ・v0.1.1892)', () => {
+    const base = Date.now() - 1_200_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'c1', liveId: 'lv909222920668', commentNo: '1', text: 'こんにちは', userId: '1', nickname: 'a', capturedAt: base, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const r = aggregateMarketingReport(comments, 'lv909222920668');
+    const section = (/** @type {string} */ h) => h.match(/<section class="mkt-section mkt-section--data-summary"[\s\S]*?<\/section>/)?.[0] || '';
+    const withSamples = section(buildMarketingDashboardHtml(r, {
+      commentsForAnalytics: comments,
+      sessionSummaryRows: [
+        { liveId: 'lv909222920668', capturedAt: base, officialViewerCount: 18000 },
+        { liveId: 'lv909222920668', capturedAt: base + 60_000, officialViewerCount: 19800 },
+        { liveId: 'lv909222920668', capturedAt: base + 120_000, officialViewerCount: 19200 }
+      ]
+    }));
+    expect(withSamples).toContain('最大同接');
+    expect(withSamples).toContain('19,800人');
+    expect(withSamples).toContain('平均 19,000人 · 公式 · 3点');
+    const none = section(buildMarketingDashboardHtml(r, { commentsForAnalytics: comments }));
+    expect(none).toContain('最大同接');
+    expect(none).toMatch(/最大同接<\/span>\s*<strong class="mkt-data-card__value">未取得/);
+  });
+
   it('多種類の入力データからマーケ総合サマリを出す', () => {
     const base = Date.now() - 1_200_000;
     /** @type {import('./commentRecord.js').StoredComment[]} */
