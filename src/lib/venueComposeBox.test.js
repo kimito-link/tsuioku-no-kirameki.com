@@ -85,4 +85,14 @@ describe('会場のギフトボタン', () => {
     expect(btn.textContent).toBe('スーパーチャットのボタンが見つかりません');
     expect(tucks).toEqual([true, false]);
   });
+  it('理由の言い換えがあればそれを出す(未ログインなど)', async () => {
+    const { createVenueGiftButton } = await import('./venueComposeBox.js');
+    const btn = createVenueGiftButton(async () => ({ ok: false, reason: 'not-signed-in' }), {
+      label: '💲 スーパーチャット',
+      reasonText: (r) => (r === 'not-signed-in' ? 'ログインすると使えます' : ''),
+    });
+    btn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(btn.textContent).toBe('ログインすると使えます');
+  });
 });
