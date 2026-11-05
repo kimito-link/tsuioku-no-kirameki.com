@@ -20215,6 +20215,14 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.1861",
+      date: "2026-11-05",
+      summary: "りんく欄を元の決まりに戻す",
+      items: Object.freeze([
+        "りんく欄に、ギフトか広告を送った人しか出ていませんでした(10月14日の v0.1.1621 から)。元の決まりに戻し、コメントだけの人でも、IDと本人のサムネが分かればりんく欄に出るようにしました。ギフトや広告を送った人も、今までどおりりんく欄に入ります。"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.1858",
       date: "2026-11-04",
       summary: "マーケHTMLを撮り直せないのを直す",
@@ -20375,14 +20383,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       summary: "コメントを流す間は画面を消さない",
       items: Object.freeze([
         "iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1836",
-      date: "2026-10-31",
-      summary: "つなぎ直しで同じコメントが二重に出ないように",
-      items: Object.freeze([
-        "iPhone アプリの「💬 コメントを流す」で、通信が切れて自動でつなぎ直したとき、直前のコメントがもう一度並ぶことがありました。一度並べたコメントとギフトは二度並べないようにしました。"
       ])
     })
   ]);
@@ -25432,24 +25432,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   }
 
   // src/lib/laneLinkTier.js
-  function supporterUidSet(giftPicks, adPicks) {
-    const out = /* @__PURE__ */ new Set();
-    for (const list of [giftPicks, adPicks]) {
-      for (const p of Array.isArray(list) ? list : []) {
-        const uid = String(
-          /** @type {any} */
-          p?.entry?.userId ?? ""
-        ).trim();
-        if (uid) out.add(uid);
-      }
-    }
-    return out;
-  }
-  function linkTierFor(tier, userId, supporters) {
-    if (tier !== 3) return tier;
-    if (!supporters || supporters.size === 0) return tier;
-    return supporters.has(String(userId ?? "").trim()) ? 3 : 2;
-  }
   function isRealThumbSrc(src) {
     const s5 = String(src ?? "").trim();
     if (!/^https?:\/\//i.test(s5)) return false;
@@ -37935,7 +37917,6 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     aggList = selfLane.aggregates;
     if (selfLane.viewerUserId) ownPostedUidSet.add(selfLane.viewerUserId);
     const candidates = [];
-    const _linkSupporters = supporterUidSet(STORY_SOURCE_STATE.giftThrowerPicks, STORY_SOURCE_STATE.adThrowerPicks);
     let laneDiagDeduped = 0;
     let laneDiagT3 = 0;
     let laneDiagT2 = 0;
@@ -37998,7 +37979,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
       laneDiagDeduped += 1;
       if (ex.strongNick) laneDiagStrongNick += 1;
       if (ex.hasPersonalThumb) laneDiagPersonalThumb += 1;
-      const _tier = linkTierFor(row.profileTier, uidRaw, _linkSupporters);
+      const _tier = row.profileTier;
       if (_tier === 3) laneDiagT3 += 1;
       else if (_tier === 2) laneDiagT2 += 1;
       else laneDiagT1 += 1;
@@ -46424,7 +46405,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T01:18" ? String("yt-2026-11-05T01:18") : "dev";
+      const buildId = "yt-2026-11-05T03:07" ? String("yt-2026-11-05T03:07") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46442,7 +46423,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.95") : "";
+    const bundledVersion = true ? String("0.1.96") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46487,7 +46468,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T01:18" ? String("yt-2026-11-05T01:18") : "dev";
+            return "yt-2026-11-05T03:07" ? String("yt-2026-11-05T03:07") : "dev";
           } catch {
             return "dev";
           }

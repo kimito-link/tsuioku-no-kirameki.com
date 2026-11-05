@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1836',
+    date: '2026-10-31',
+    summary: 'つなぎ直しで同じコメントが二重に出ないように',
+    items: Object.freeze([
+      'iPhone アプリの「💬 コメントを流す」で、通信が切れて自動でつなぎ直したとき、直前のコメントがもう一度並ぶことがありました。一度並べたコメントとギフトは二度並べないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1835',
     date: '2026-10-31',
     summary: 'アプリのコメントに顔アイコンを出す',
