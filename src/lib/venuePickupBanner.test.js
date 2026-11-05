@@ -154,7 +154,9 @@ describe('PICK UP をドラッグで動かして覚える(v0.1.1895)', () => {
     expect(normalizeVenuePickupSavedPos('x')).toBeNull();
     expect(normalizeVenuePickupSavedPos({ cx: 'a', top: 0.2 })).toBeNull();
     expect(normalizeVenuePickupSavedPos({ cx: 0.3, top: 0.2 })).toEqual({ cx: 0.3, top: 0.2 });
-    expect(normalizeVenuePickupSavedPos({ cx: 1.5, top: -1 })).toEqual({ cx: 1, top: 0 });
+    // 窓で締めるので会場の外(負・1超)も覚える。ただし極端な値は -2〜3 に締める
+    expect(normalizeVenuePickupSavedPos({ cx: 1.5, top: -0.2 })).toEqual({ cx: 1.5, top: -0.2 });
+    expect(normalizeVenuePickupSavedPos({ cx: 99, top: -99 })).toEqual({ cx: 3, top: -2 });
   });
   it('★吹き出しは丸ごと会場の中に締める(尻尾 20px 込み・画面の外へ失くさない)', async () => {
     const { clampVenuePickupPx } = await import('./venuePickupBanner.js');
@@ -165,6 +167,14 @@ describe('PICK UP をドラッグで動かして覚える(v0.1.1895)', () => {
     expect(clampVenuePickupPx(5000, 5000, layout, box)).toEqual({ left: 800, top: 500 });
     // 会場より広い吹き出しは中央
     expect(clampVenuePickupPx(10, 10, { width: 300, height: 600 }, box).left).toBe(150);
+  });
+  it('★窓で締めれば会場の上端より上(ニコ生のヘッダーの上)まで持っていける(りんく実機 11/06「上に持っていける限界」)', async () => {
+    const { clampVenuePickupPx, venuePickupViewportBounds } = await import('./venuePickupBanner.js');
+    // 会場は画面の y=195 から。窓は 1024x1100
+    const layout = { width: 1000, height: 800 };
+    const bounds = venuePickupViewportBounds({ left: 0, top: 195 }, { width: 1024, height: 1100 });
+    expect(bounds).toEqual({ minX: -0, minY: -195, maxX: 1024, maxY: 905 });
+    expect(clampVenuePickupPx(500, -500, layout, { width: 400, height: 80 }, bounds)).toEqual({ left: 500, top: -195 });
   });
   it('★置いた位置は割合で覚え、窓の大きさが変わっても同じあたりに出る', async () => {
     const { venuePickupPosToSave, venuePickupSavedPlacement } = await import('./venuePickupBanner.js');

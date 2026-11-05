@@ -31,11 +31,15 @@ const rectOf = (page) => page.evaluate(() => {
   return { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2, L: { x: L.left, y: L.top, w: L.width, h: L.height } };
 });
 
-test('PICK UP: ドラッグで動き、会場の外へ出ず、開き直しても同じ場所・ダブルクリックで戻る', async ({ context }) => {
+test('PICK UP: つまみと札が出て、ドラッグで動き、窓の外へ出ず、会場の上へも行け、開き直しても同じ場所・ダブルクリックで戻る', async ({ context }) => {
   const page = await openVenue(context);
   const before = await rectOf(page);
   console.log('[pickup-drag] before', JSON.stringify(before));
   expect(before.w).toBeGreaterThan(100);
+  // 0) 「ドラッグで動かせます」が分かる: つまみが見え、触れると札が出る
+  await expect(page.locator('.nlsb-pickup__grip')).toBeVisible();
+  await page.mouse.move(before.x + 30, before.y + 10);
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector('.nlsb-pickup__hint')).opacity)).toBe('1');
 
   // 1) 右下へ 100,250 引っ張る(幅 860 の吹き出しは横に動ける幅が狭い)
   const sx = before.x + 30; const sy = before.y + before.h / 2;
@@ -51,7 +55,7 @@ test('PICK UP: ドラッグで動き、会場の外へ出ず、開き直して�
   console.log('[pickup-drag] saved', JSON.stringify(saved));
   expect(saved[KEY]).toBeTruthy();
 
-  // 2) 画面の外へ大きく引っ張っても会場の内側に止まる
+  // 2) 画面の外へ大きく引っ張っても窓の内側に止まる(venue.html では会場≒窓)
   const m = await rectOf(page);
   await page.mouse.move(m.x + 30, m.y + 10);
   await page.mouse.down();
@@ -61,27 +65,38 @@ test('PICK UP: ドラッグで動き、会場の外へ出ず、開き直して�
   console.log('[pickup-drag] edge', JSON.stringify(edge));
   // ★速く動かして最初の move で吹き出しの外へ出ても、置いていかれずに付いてくる
   expect(edge.y).toBeGreaterThan(moved.y + 100);
-  expect(edge.x + edge.w).toBeLessThanOrEqual(edge.L.x + edge.L.w + 1);
-  expect(edge.y + edge.h + 20).toBeLessThanOrEqual(edge.L.y + edge.L.h + 1);
+  expect(Math.round(edge.x + edge.w)).toBe(1280); // 窓の右端
+  expect(Math.round(edge.y + edge.h + 20)).toBe(800); // 尻尾まで窓の下端
+
+  // 2b) 会場の上端より上(窓の上端)まで持っていける
+  const e2 = await rectOf(page);
+  await page.mouse.move(e2.x + 30, e2.y + 10);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i += 1) await page.mouse.move(e2.x + 30, e2.y + 10 - 200 * i);
+  await page.mouse.up();
+  const top = await rectOf(page);
+  console.log('[pickup-drag] top', JSON.stringify(top));
+  expect(top.y).toBeLessThan(top.L.y);
+  expect(Math.round(top.y)).toBe(0);
 
   // 3) 開き直しても同じ場所
   await page.reload();
   await openVenue(context, page);
   const again = await rectOf(page);
   console.log('[pickup-drag] reopened', JSON.stringify(again));
-  expect(Math.abs(again.x - edge.x)).toBeLessThanOrEqual(2);
-  expect(Math.abs(again.y - edge.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(again.x - top.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(again.y - top.y)).toBeLessThanOrEqual(2);
 
   // 4) 小さく押しただけ(4px 未満)では動かない
-  await page.mouse.move(again.x + 30, again.y + 10);
+  await page.mouse.move(again.x + 30, again.y + 30);
   await page.mouse.down();
-  await page.mouse.move(again.x + 32, again.y + 11);
+  await page.mouse.move(again.x + 32, again.y + 31);
   await page.mouse.up();
   const click = await rectOf(page);
   expect(Math.abs(click.x - again.x)).toBeLessThanOrEqual(1);
 
   // 5) ダブルクリックで元の自動位置へ
-  await page.mouse.dblclick(again.x + 30, again.y + 10);
+  await page.mouse.dblclick(again.x + 30, again.y + 30);
   await page.waitForTimeout(200);
   const reset = await rectOf(page);
   console.log('[pickup-drag] reset', JSON.stringify(reset));
