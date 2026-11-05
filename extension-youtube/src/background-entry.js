@@ -24,6 +24,7 @@ import {
   getYtStreamCommentsSince,
   deleteYtCommentsByPks,
 } from './ytIdbStore.js';
+import { createYtViewerSampler } from '../../src/lib/youtube/ytViewerSampler.js';
 import { pickSwitchLeakPks } from '../../src/lib/youtube/ytSwitchLeakCleanup.js';
 // ニコ生版の background にある、会場とコメビュの受け口(VOICEVOX 中継・読み手の取り合い・窓を開く)の写し
 import './background-nico-relay.js';
@@ -37,6 +38,9 @@ import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightF
 //   パネルの開き方・offscreen・自分で入れ替わる仕組みは本体のものを使う(ここで触ると本体の動きが変わる)。
 /* global NL_YT_MERGED */
 const YT_MERGED = typeof NL_YT_MERGED !== 'undefined' && NL_YT_MERGED === true;
+
+// パネルを閉じていても同接を1分ごとに記録する(マーケの同接推移カーブ・ytViewerSampler.js)
+const ytViewerSampler = createYtViewerSampler({ merged: YT_MERGED });
 
 const STORAGE_KEYS = Object.freeze({
   STREAM_SUMMARIES: 'yt_stream_summaries',
@@ -616,6 +620,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
         [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId,
       });
+      void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
       return { ok: true, videoId };
     })
       .then((res) => sendResponse(res))

@@ -973,6 +973,236 @@
     });
   }
 
+  // src/lib/broadcastSessionSummaryDb.js
+  var BROADCAST_SUMMARY_DB_NAME = "nls_broadcast_summary_v1";
+  var BROADCAST_SUMMARY_STORE = "samples";
+  var DB_VERSION2 = 1;
+  var BROADCAST_SUMMARY_MAX_ROWS = 5e3;
+  var BROADCAST_SUMMARY_MAX_PER_LIVE = 200;
+  function openBroadcastSessionSummaryDb(name = BROADCAST_SUMMARY_DB_NAME) {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(name, DB_VERSION2);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(BROADCAST_SUMMARY_STORE)) {
+          const s = db.createObjectStore(BROADCAST_SUMMARY_STORE, {
+            keyPath: "id",
+            autoIncrement: true
+          });
+          s.createIndex("byLiveCaptured", ["liveId", "capturedAt"], {
+            unique: false
+          });
+          s.createIndex("byCapturedAt", "capturedAt", { unique: false });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function appendBroadcastSessionSummarySample(db, row) {
+    const lid = String(row.liveId || "").trim().toLowerCase();
+    if (!lid) return;
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(BROADCAST_SUMMARY_STORE, "readwrite");
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const addReq = store.add({ ...row, liveId: lid });
+      addReq.onerror = () => reject(addReq.error);
+      tx.oncomplete = () => resolve(void 0);
+      tx.onerror = () => reject(tx.error);
+    });
+    await pruneBroadcastSessionSummaryForLive(db, lid);
+    await pruneBroadcastSessionSummaryGlobal(db);
+  }
+  async function listBroadcastSessionSummaryForLive(db, liveId, limit) {
+    const lid = String(liveId || "").trim().toLowerCase();
+    if (!lid) return [];
+    const lim = typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 30;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BROADCAST_SUMMARY_STORE, "readonly");
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const idx = store.index("byLiveCaptured");
+      const range = IDBKeyRange.bound([lid, 0], [lid, Number.MAX_SAFE_INTEGER]);
+      const req = idx.openCursor(range, "prev");
+      const out = [];
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (!cur || out.length >= lim) {
+          resolve(out);
+          return;
+        }
+        out.push(
+          /** @type {BroadcastSessionSummaryRow} */
+          cur.value
+        );
+        cur.continue();
+      };
+    });
+  }
+  async function pruneBroadcastSessionSummaryForLive(db, liveId) {
+    const lid = String(liveId || "").trim().toLowerCase();
+    if (!lid) return;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BROADCAST_SUMMARY_STORE, "readwrite");
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const idx = store.index("byLiveCaptured");
+      const range = IDBKeyRange.bound([lid, 0], [lid, Number.MAX_SAFE_INTEGER]);
+      const req = idx.openCursor(range, "next");
+      const all = [];
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (cur) {
+          all.push(
+            /** @type {BroadcastSessionSummaryRow} */
+            cur.value
+          );
+          cur.continue();
+          return;
+        }
+        if (all.length <= BROADCAST_SUMMARY_MAX_PER_LIVE) {
+          resolve(void 0);
+          return;
+        }
+        all.sort((a, b) => a.capturedAt - b.capturedAt);
+        const drop = all.length - BROADCAST_SUMMARY_MAX_PER_LIVE;
+        for (let i = 0; i < drop; i += 1) {
+          const id = all[i].id;
+          if (typeof id === "number") store.delete(id);
+        }
+      };
+      tx.oncomplete = () => resolve(void 0);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function pruneBroadcastSessionSummaryGlobal(db) {
+    const total = await new Promise((resolve, reject) => {
+      const tx = db.transaction(BROADCAST_SUMMARY_STORE, "readonly");
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const r = store.count();
+      r.onerror = () => reject(r.error);
+      r.onsuccess = () => resolve(r.result);
+    });
+    if (total <= BROADCAST_SUMMARY_MAX_ROWS) return;
+    const toDrop = total - BROADCAST_SUMMARY_MAX_ROWS;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BROADCAST_SUMMARY_STORE, "readwrite");
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const idx = store.index("byCapturedAt");
+      const curReq = idx.openCursor();
+      let dropped = 0;
+      curReq.onerror = () => reject(curReq.error);
+      curReq.onsuccess = () => {
+        const cur = curReq.result;
+        if (!cur || dropped >= toDrop) {
+          return;
+        }
+        const row = (
+          /** @type {BroadcastSessionSummaryRow} */
+          cur.value
+        );
+        const id = row.id;
+        if (typeof id === "number") {
+          store.delete(id);
+          dropped += 1;
+        }
+        cur.continue();
+      };
+      tx.oncomplete = () => resolve(void 0);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // src/lib/youtube/ytPseudoLv.js
+  function computePseudoLvForVideoId(videoId) {
+    const id = String(videoId || "");
+    if (!id) return "";
+    let h1 = 2166136261;
+    let h2 = 16777619;
+    for (let i = 0; i < id.length; i += 1) {
+      const c = id.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+      h2 = Math.imul(h2 ^ c, 16777629) >>> 0;
+    }
+    const n = (h1 % 1e6 * 1e6 + h2 % 1e6) % 1e12;
+    return `lv${String(9 * 1e11 + n % 1e11)}`;
+  }
+
+  // src/lib/youtube/ytViewerSampler.js
+  var YT_VIEWER_SAMPLE_INTERVAL_MS = 6e4;
+  function shouldSampleYtViewers(lastAt, videoId, viewers, now) {
+    if (!videoId || typeof viewers !== "number" || !Number.isFinite(viewers) || viewers <= 0 || viewers > 1e8) return false;
+    const prev = lastAt.get(videoId) || 0;
+    return now - prev >= YT_VIEWER_SAMPLE_INTERVAL_MS - 2e3;
+  }
+  function ytViewerSampleRow(videoId, viewers, now, summary, base) {
+    const v = Math.floor(viewers);
+    const items = Number(summary?.itemCount) || 0;
+    const from = base && typeof base === "object" ? { ...base } : {};
+    delete from.id;
+    return {
+      uniqueKnownCommenters: 0,
+      giftUserCount: 0,
+      officialCommentCount: null,
+      officialCaptureRatio: null,
+      ...summary?.title ? { broadcastTitle: String(summary.title) } : {},
+      ...summary?.broadcasterName ? { broadcasterName: String(summary.broadcasterName) } : {},
+      ...summary?.broadcasterIconUrl ? { broadcasterIconUrl: String(summary.broadcasterIconUrl) } : {},
+      ...from,
+      liveId: computePseudoLvForVideoId(videoId),
+      capturedAt: now,
+      watchUrl: String(from.watchUrl || `https://www.youtube.com/watch?v=${videoId}`),
+      recording: true,
+      commentStorageCount: Math.max(items, Number(from.commentStorageCount) || 0),
+      // 画面(ytNicoShim)は YouTube の「N人が視聴中」を officialViewerCount に入れている。同じ欄に同じ意味で入れる
+      officialViewerCount: v,
+      peakConcurrentEstimate: v,
+      source: "yt-background"
+    };
+  }
+  function createYtViewerSampler({ merged }) {
+    const lastAt = /* @__PURE__ */ new Map();
+    const dbName = merged ? `ytm:${BROADCAST_SUMMARY_DB_NAME}` : BROADCAST_SUMMARY_DB_NAME;
+    return {
+      /**
+       * @param {string} videoId
+       * @param {unknown} viewers
+       * @param {{ itemCount?: number, title?: string, broadcasterName?: string, broadcasterIconUrl?: string }} [summary]
+       */
+      async maybeSample(videoId, viewers, summary) {
+        const now = Date.now();
+        if (!shouldSampleYtViewers(lastAt, videoId, viewers, now)) return false;
+        lastAt.set(videoId, now);
+        let db;
+        try {
+          db = await openBroadcastSessionSummaryDb(dbName);
+          const recent = await listBroadcastSessionSummaryForLive(db, computePseudoLvForVideoId(videoId), 5).catch(() => (
+            /** @type {any[]} */
+            []
+          ));
+          const base = recent.find((r) => r && /** @type {any} */
+          r.source !== "yt-background") || recent[0] || null;
+          await appendBroadcastSessionSummarySample(db, ytViewerSampleRow(
+            videoId,
+            /** @type {number} */
+            viewers,
+            now,
+            summary,
+            base
+          ));
+          return true;
+        } catch {
+          return false;
+        } finally {
+          try {
+            db?.close();
+          } catch {
+          }
+        }
+      }
+    };
+  }
+
   // src/lib/youtube/ytSwitchLeakCleanup.js
   function authorKey(it) {
     const ch = String(it?.channelId || "").trim();
@@ -1238,6 +1468,7 @@
   // extension-youtube/src/background-entry.js
   var lastIngestDiagAt = 0;
   var YT_MERGED2 = false;
+  var ytViewerSampler = createYtViewerSampler({ merged: YT_MERGED2 });
   var STORAGE_KEYS = Object.freeze({
     STREAM_SUMMARIES: "yt_stream_summaries",
     ACTIVE_VIDEO_ID: "yt_active_video_id",
@@ -1677,6 +1908,7 @@
           [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
           [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId
         });
+        void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
         return { ok: true, videoId };
       }).then((res) => sendResponse(res)).catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;

@@ -13,6 +13,7 @@
 //      それ以外のキー(設定など)は本物の storage にそのまま読み書きする=ニコ生版の設定スイッチがそのまま動く。
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
+import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
@@ -101,16 +102,7 @@ export function pseudoLvForVideoId(videoId) {
   if (!id) return '';
   const known = lvByVideoId.get(id);
   if (known) return known;
-  // FNV-1a 64bit 相当を 2 本の 32bit で作り、12桁に丸める(衝突は実用上起きない)
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-  for (let i = 0; i < id.length; i += 1) {
-    const c = id.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
-    h2 = Math.imul(h2 ^ c, 0x0100019d) >>> 0;
-  }
-  const n = ((h1 % 1000000) * 1000000 + (h2 % 1000000)) % 1000000000000;
-  const lv = `lv${String(9 * 100000000000 + (n % 100000000000))}`;
+  const lv = computePseudoLvForVideoId(id);
   lvByVideoId.set(id, lv);
   videoIdByLv.set(lv, id);
   return lv;
@@ -323,7 +315,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
     viewerCountFromDom: null,
     viewerCountSource: 'dom',
-    officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
+    officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null, // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める

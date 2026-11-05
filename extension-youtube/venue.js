@@ -1,6 +1,21 @@
 // venue.js — ニコ生版 venue-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 /* eslint-disable */
 (() => {
+  // src/lib/youtube/ytPseudoLv.js
+  function computePseudoLvForVideoId(videoId) {
+    const id = String(videoId || "");
+    if (!id) return "";
+    let h1 = 2166136261;
+    let h2 = 16777619;
+    for (let i = 0; i < id.length; i += 1) {
+      const c = id.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+      h2 = Math.imul(h2 ^ c, 16777629) >>> 0;
+    }
+    const n = (h1 % 1e6 * 1e6 + h2 % 1e6) % 1e12;
+    return `lv${String(9 * 1e11 + n % 1e11)}`;
+  }
+
   // extension-youtube/src/ytDefaultIcon.js
   var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v5";
   function ytIconColorStats(rgba, w, h) {
@@ -1171,15 +1186,7 @@ ${sourceCol}
     if (!id) return "";
     const known = lvByVideoId.get(id);
     if (known) return known;
-    let h1 = 2166136261;
-    let h2 = 16777619;
-    for (let i = 0; i < id.length; i += 1) {
-      const c = id.charCodeAt(i);
-      h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
-      h2 = Math.imul(h2 ^ c, 16777629) >>> 0;
-    }
-    const n = (h1 % 1e6 * 1e6 + h2 % 1e6) % 1e12;
-    const lv = `lv${String(9 * 1e11 + n % 1e11)}`;
+    const lv = computePseudoLvForVideoId(id);
     lvByVideoId.set(id, lv);
     videoIdByLv.set(lv, id);
     return lv;
@@ -1316,7 +1323,8 @@ ${sourceCol}
       // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
       viewerCountFromDom: null,
       viewerCountSource: "dom",
-      officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
+      officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null,
+      // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
       officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
       // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
       //   配信が終わっていたら(endedAt)、終わった時刻までで止める
@@ -20659,7 +20667,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T14:18") : ""
+          buildId: true ? String("yt-2026-11-05T14:36") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };

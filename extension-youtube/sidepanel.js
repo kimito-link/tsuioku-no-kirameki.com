@@ -1,6 +1,21 @@
 // sidepanel.js — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 /* eslint-disable */
 (() => {
+  // src/lib/youtube/ytPseudoLv.js
+  function computePseudoLvForVideoId(videoId) {
+    const id = String(videoId || "");
+    if (!id) return "";
+    let h1 = 2166136261;
+    let h2 = 16777619;
+    for (let i = 0; i < id.length; i += 1) {
+      const c = id.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+      h2 = Math.imul(h2 ^ c, 16777629) >>> 0;
+    }
+    const n2 = (h1 % 1e6 * 1e6 + h2 % 1e6) % 1e12;
+    return `lv${String(9 * 1e11 + n2 % 1e11)}`;
+  }
+
   // extension-youtube/src/ytDefaultIcon.js
   var YT_DEFAULT_ICON_STORE_KEY = "yt_default_icon_v5";
   function ytIconColorStats(rgba, w, h) {
@@ -1405,15 +1420,7 @@ ${sourceCol}
     if (!id) return "";
     const known = lvByVideoId.get(id);
     if (known) return known;
-    let h1 = 2166136261;
-    let h2 = 16777619;
-    for (let i = 0; i < id.length; i += 1) {
-      const c = id.charCodeAt(i);
-      h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
-      h2 = Math.imul(h2 ^ c, 16777629) >>> 0;
-    }
-    const n2 = (h1 % 1e6 * 1e6 + h2 % 1e6) % 1e12;
-    const lv = `lv${String(9 * 1e11 + n2 % 1e11)}`;
+    const lv = computePseudoLvForVideoId(id);
     lvByVideoId.set(id, lv);
     videoIdByLv.set(lv, id);
     return lv;
@@ -1550,7 +1557,8 @@ ${sourceCol}
       // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
       viewerCountFromDom: null,
       viewerCountSource: "dom",
-      officialViewerCount: Number.isFinite(viewers) && viewers >= 0 ? viewers : null,
+      officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null,
+      // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
       officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
       // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
       //   配信が終わっていたら(endedAt)、終わった時刻までで止める
@@ -3297,6 +3305,7 @@ ${sourceCol}
     let dirty = false;
     let selfMs = 0;
     let events = 0;
+    let notes = {};
     const stat = (key) => {
       let s5 = regions.get(key);
       if (s5) return s5;
@@ -3369,6 +3378,17 @@ ${sourceCol}
         dirty = false;
         return d;
       },
+      /**
+       * v0.1.1889: 補足の1行を書く(同じ文なら何もしない)。ちらつき計と同じ4秒ごとの書き込みに乗る。
+       * @param {string} name @param {string} text
+       */
+      setNote(name, text) {
+        const k = String(name || "");
+        const v = String(text || "");
+        if (!k || notes[k] === v) return;
+        notes = { ...notes, [k]: v };
+        dirty = true;
+      },
       /** 計器自身が使った時間[ms]を足す(MutationObserver のコールバック全体の時間を呼び手が渡す)。 */
       addSelfMs(ms) {
         selfMs += ms;
@@ -3381,7 +3401,8 @@ ${sourceCol}
           events,
           selfMs: Math.round(selfMs),
           regions: toPlain(regions),
-          open: openFrozen ? toPlain(openFrozen) : null
+          open: openFrozen ? toPlain(openFrozen) : null,
+          notes: { ...notes }
         };
       },
       reset() {
@@ -3390,6 +3411,7 @@ ${sourceCol}
         dirty = false;
         selfMs = 0;
         events = 0;
+        notes = {};
       }
     };
   }
@@ -3769,9 +3791,9 @@ ${sourceCol}
   var DB_VERSION2 = 1;
   var BROADCAST_SUMMARY_MAX_ROWS = 5e3;
   var BROADCAST_SUMMARY_MAX_PER_LIVE = 200;
-  function openBroadcastSessionSummaryDb() {
+  function openBroadcastSessionSummaryDb(name = BROADCAST_SUMMARY_DB_NAME) {
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open(BROADCAST_SUMMARY_DB_NAME, DB_VERSION2);
+      const req = indexedDB.open(name, DB_VERSION2);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(BROADCAST_SUMMARY_STORE)) {
@@ -13368,6 +13390,19 @@ ${commenterFollowingListPanelHtml(analytics, r)}
     if (offset !== 0) return false;
     return true;
   }
+  function canTrimStoryGrowthCells(s5) {
+    const a = s5 && typeof s5 === "object" ? s5 : {};
+    const rendered = Number(a.renderedCount);
+    const target = Number(a.targetCount);
+    const dom = Number(a.domCount);
+    const offset = Number(a.sourceOffset) || 0;
+    if (![rendered, target, dom].every(Number.isFinite)) return false;
+    if (target <= 0) return false;
+    if (target >= rendered) return false;
+    if (dom !== rendered) return false;
+    if (offset !== 0) return false;
+    return true;
+  }
 
   // src/lib/selfWrittenStorageKeys.js
   var SELF_WRITTEN_PATTERNS = Object.freeze([
@@ -20449,6 +20484,36 @@ ${commenterFollowingListPanelHtml(analytics, r)}
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.1891",
+      date: "2026-11-05",
+      summary: "YouTube の同接をパネルを閉じても記録",
+      items: Object.freeze([
+        "YouTube の同時視聴者数を、サイドパネルを閉じていても1分ごとに記録するようにしました。会場モードで見ている間の同接がマーケの「同接推移カーブ」から抜けていました(27分の配信で5分〜25分が空)",
+        "同接がまだ読めていないときの「0人」を記録しないようにしました(開始時の0人で平均が下がっていました)"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.1890",
+      date: "2026-11-05",
+      summary: "YouTube Live にも対応(試作版を本体に)",
+      items: Object.freeze([
+        "YouTube Live の配信でもチャット・スーパーチャット・メンバーを記録し、ニコ生と同じ画面(3つのレーン・会場・コメビュ・読み上げ・マーケ)で振り返れるようにしました。YouTube のタブで拡張のボタンを押すと YouTube 用のパネルが開きます",
+        "YouTube の記録と設定はニコ生の記録と分けて保存します(互いの数字や設定は混ざりません)",
+        "YouTube のページを読むための権限(youtube.com・YouTube の画像)と、読み上げの予備の声・会場で配信を映すための権限が増えました"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.1889",
+      date: "2026-11-05",
+      summary: "応援マスが件数の揺れで全部作り直されるのを止める",
+      items: Object.freeze([
+        "サイドパネルの応援マス(顔のアイコンの並び)がチカチカしていました。ちらつき計に作り直しの理由を出す計器を足して実機で測ったところ、件数が 58→57→58… と約1秒ごとに1件だけ揺れ、減るたびに全58枚を作り直していました(40秒で34回・すべて「件数の縮小」)。作り直した顔は仮の顔から描き直しになるため、一斉にちらついて見えていました。",
+        "減るときは、全部を作り直さずに末尾のマスだけ外すようにしました。並びの先頭は変わらないので、残りの顔はそのままです。",
+        "ちらつき計の補足欄に、作り直しの入口ごとの回数・直近の「何件→何件」・目標の件数の推移と、件数が揺れたときの余分な1件が何者か(末尾か途中か・自分の投稿・配信者・ID無し・先出し)を出すようにしました。件数がなぜ揺れるかは、この数字で特定してから直します。",
+        "取得状況のキャラ絵(北極星のレーン)が、待機中も毎秒約6回、同じ画像を書き直していました。同じ画像なら書かないようにしました。"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.1888",
       date: "2026-11-05",
       summary: "ギフトの確定は本人が公式で押す形に",
@@ -20597,30 +20662,6 @@ ${commenterFollowingListPanelHtml(analytics, r)}
       summary: "公式ギフト欄の作りを記録する",
       items: Object.freeze([
         "会場からギフトを選べるようにする準備として、公式のギフト欄を開いたときに、アイテムの並び方(画像・pt・押す場所)と確認の窓の形を、この PC の中にだけ記録します。読むだけで、押したり送ったりはしません"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1870",
-      date: "2026-11-05",
-      summary: "会場からギフト画面を開く",
-      items: Object.freeze([
-        "会場の上の帯に「🎁 ギフト」を付けました。押すと会場をいったんしまって、公式のギフト画面を開きます。ギフトを選んで贈るのは公式の画面でご自身で行います。右下の「▲ 会場に戻る」で会場に戻れます。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1869",
-      date: "2026-11-05",
-      summary: "PICK UP を映像の上の大きな吹き出しに",
-      items: Object.freeze([
-        "会場の PICK UP を、ひな壇の一番下の細い帯から、映像の上端中央の大きな吹き出しに移しました(顔44px・文字18px・長い文は2行まで)。拾うコメントが無いときは出さないので、映像をふさぎません。"
-      ])
-    }),
-    Object.freeze({
-      version: "0.1.1868",
-      date: "2026-11-05",
-      summary: "会場の発言欄を中央に・大きく",
-      items: Object.freeze([
-        "会場モードの「ここから発言」の欄を、上の帯の中央に移して大きくしました(高さ34px・文字14px・幅は最大およそ500px)。幅が狭いときは1段下に回り、右のボタンを押し出しません。"
       ])
     })
   ]);
@@ -34199,6 +34240,108 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     };
   }
 
+  // src/lib/storyGrowthRebuildReasons.js
+  var STORY_GROWTH_REBUILD_REASON = Object.freeze({
+    /** 配信 id が変わった(空 '' との行き来を含む)。根を空にしてから描き直す。 */
+    LIVE: "live",
+    /** 根の要素が差し替わった。 */
+    ROOT: "root",
+    /** 目標の件数が描いた数より減った。 */
+    SHRINK: "shrink",
+    /** 増えたが「足すだけ」の条件を満たさなかった。 */
+    GROW_FULL: "grow",
+    /** 中身の更新時に、画面の枚数が描いた数と合わなかった。 */
+    DOM_MISMATCH: "dom",
+    /** 目標0件で根を空にした。 */
+    EMPTY: "empty",
+    /** v0.1.1889: 縮小を末尾のマスだけ削って済ませた(作り直しではない)。 */
+    TRIM: "trim"
+  });
+  var LABELS = Object.freeze({
+    live: "配信切替",
+    root: "根の差替",
+    shrink: "件数の縮小",
+    grow: "足せない増加",
+    dom: "枚数のずれ",
+    empty: "空に",
+    trim: "末尾だけ削る"
+  });
+  var STORY_GROWTH_REBUILD_RECENT_MAX = 8;
+  function createStoryGrowthRebuildReasonState() {
+    return { counts: {}, recent: [], targets: [], liveFlips: 0, lastLiveKey: "", diffs: {}, lastDiff: "" };
+  }
+  function findStoryEntryDiff(prevIds, nextIds, maxDelta = 2) {
+    const a = Array.isArray(prevIds) ? prevIds : [];
+    const b = Array.isArray(nextIds) ? nextIds : [];
+    const d = b.length - a.length;
+    if (d === 0 || Math.abs(d) > maxDelta) return null;
+    const longer = d > 0 ? b : a;
+    const shorter = d > 0 ? a : b;
+    let i = 0;
+    while (i < shorter.length && shorter[i] === longer[i]) i += 1;
+    return { index: i, extraIn: d > 0 ? "next" : "prev", atEnd: i >= shorter.length };
+  }
+  function noteStoryEntryDiff(state, label) {
+    if (!state || !label) return;
+    if (!state.diffs) state.diffs = {};
+    state.diffs[label] = (state.diffs[label] || 0) + 1;
+    state.lastDiff = label;
+  }
+  var int = (v) => {
+    const n2 = Math.floor(Number(v));
+    return Number.isFinite(n2) && n2 >= 0 ? n2 : 0;
+  };
+  function noteStoryGrowthRebuildReason(state, ev) {
+    if (!state || !ev) return;
+    const reason = String(ev.reason || "?");
+    state.counts[reason] = (state.counts[reason] || 0) + 1;
+    state.recent.push({
+      reason,
+      from: int(ev.from),
+      to: int(ev.to),
+      dom: int(ev.dom),
+      liveSame: ev.liveSame !== false,
+      atMs: Number(ev.atMs) || 0
+    });
+    if (state.recent.length > STORY_GROWTH_REBUILD_RECENT_MAX) state.recent.shift();
+  }
+  function noteStoryGrowthTarget(state, ev) {
+    if (!state || !ev) return;
+    const key = String(ev.liveKey || "");
+    if (key !== state.lastLiveKey) {
+      if (state.targets.length) state.liveFlips += 1;
+      state.lastLiveKey = key;
+    }
+    const t = int(ev.target);
+    const last = state.targets[state.targets.length - 1];
+    if (last !== t) {
+      state.targets.push(t);
+      if (state.targets.length > 12) state.targets.shift();
+    }
+  }
+  function formatStoryGrowthRebuildReasons(state, nowMs) {
+    if (!state || typeof state !== "object") return "";
+    const entries = Object.entries(state.counts || {}).filter(([, n2]) => n2 > 0);
+    const total = entries.filter(([k]) => k !== STORY_GROWTH_REBUILD_REASON.TRIM).reduce((s5, [, n2]) => s5 + n2, 0);
+    const tgt = Array.isArray(state.targets) ? state.targets : [];
+    if (!entries.length && tgt.length <= 1 && !state.liveFlips) return "";
+    const byReason = entries.length ? entries.sort((a, b) => b[1] - a[1]).map(([k, n2]) => `${LABELS[k] || k}${n2}`).join("・") : "なし";
+    const recent = (state.recent || []).slice(-4).map((e) => {
+      const ago = nowMs && e.atMs ? `${Math.max(0, Math.round((nowMs - e.atMs) / 100) / 10)}秒前` : "";
+      return `${LABELS[e.reason] || e.reason} ${e.from}→${e.to}(画面${e.dom}${e.liveSame ? "" : "・配信が変化"})${ago ? ` ${ago}` : ""}`;
+    }).join("、");
+    return `応援マスの作り直し${total}回(${byReason}) / 目標件数の推移 ${tgt.join("→") || "—"} / 配信の行き来${int(state.liveFlips)}回` + (recent ? ` / 直近: ${recent}` : "") + formatDiffs(state);
+  }
+  function formatDiffs(state) {
+    const d = Object.entries(state.diffs || {}).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    if (!d.length) return "";
+    return ` / 件数が揺れたときの余分な1件: ${d.map(([k, n2]) => `${k}×${n2}`).join("、")}`;
+  }
+  function publishStoryGrowthRebuildNote(state, meter, nowMs) {
+    if (!meter || typeof meter.setNote !== "function") return;
+    meter.setNote("storyGrowthRebuild", formatStoryGrowthRebuildReasons(state, nowMs));
+  }
+
   // src/lib/marketingExportTabState.js
   var MARKETING_EXPORT_STATE_PARAM = "state";
   function isMarketingExportTabFinished(tabUrl) {
@@ -39803,7 +39946,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     const n2 = STORY_GROWTH_STATE.renderedCount;
     const imgs = root.querySelectorAll("img.nl-story-growth-icon");
     if (imgs.length !== n2) {
-      rebuildStoryGrowth(root, n2);
+      rebuildStoryGrowth(root, n2, STORY_GROWTH_REBUILD_REASON.DOM_MISMATCH, n2);
       return;
     }
     const accent = buildStoryAccentForWindow(n2);
@@ -39841,6 +39984,43 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
   }
   var STORY_GROWTH_CHURN = createStoryGrowthChurnState();
   var STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
+  var STORY_GROWTH_REBUILD_REASONS = createStoryGrowthRebuildReasonState();
+  var STORY_REBUILD_TARGET_SIG = { v: "", liveId: "", target: -1, entries: (
+    /** @type {PopupCommentEntry[]} */
+    []
+  ) };
+  function noteStoryGrowthEntryDiffNow(target) {
+    try {
+      const st = STORY_REBUILD_TARGET_SIG;
+      const next = STORY_SOURCE_STATE.entries.slice(0, STORY_GROWTH_MAX_CELLS);
+      if (st.target >= 0 && target !== st.target && st.liveId === STORY_SOURCE_STATE.liveId) {
+        const diff = findStoryEntryDiff(st.entries.map((e) => commentStableId(e) || ""), next.map((e) => commentStableId(e) || ""));
+        if (diff) {
+          const e = (diff.extraIn === "next" ? next : st.entries)[diff.index];
+          const uid = String(e?.userId || "").trim();
+          const bc = _broadcasterUidTracker.current().uid;
+          noteStoryEntryDiff(STORY_GROWTH_REBUILD_REASONS, [diff.atEnd ? "末尾" : `途中(${diff.index + 1}番目)`, e?.selfPosted === true ? "自分の投稿" : "", bc && uid === bc ? "配信者" : "", uid ? "" : "ID無し", _instantPushBuffer.includes(e) ? "先出し" : ""].filter(Boolean).join("・"));
+        }
+      }
+      st.target = target;
+      st.liveId = STORY_SOURCE_STATE.liveId;
+      st.entries = next;
+    } catch {
+    }
+  }
+  function noteStoryGrowthRebuildAndPublish(reason, info = {}) {
+    try {
+      const now = Date.now();
+      if (reason) noteStoryGrowthRebuildReason(STORY_GROWTH_REBUILD_REASONS, { reason, atMs: now, ...info });
+      publishStoryGrowthRebuildNote(
+        STORY_GROWTH_REBUILD_REASONS,
+        /** @type {any} */
+        globalThis.__nlsFlickerMeter?.meter,
+        now
+      );
+    } catch {
+    }
+  }
   function noteStoryGrowthIdentitiesNow(n2) {
     try {
       const ids = new Array(n2);
@@ -39854,7 +40034,8 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
     }
   }
-  function rebuildStoryGrowth(root, total) {
+  function rebuildStoryGrowth(root, total, reason = "", from = 0) {
+    if (reason) noteStoryGrowthRebuildAndPublish(reason, { from, to: total, dom: root.querySelectorAll("img.nl-story-growth-icon").length });
     return _measuredSection("rebuildStoryGrowth", () => rebuildStoryGrowthImpl(root, total));
   }
   function rebuildStoryGrowthImpl(root, total) {
@@ -39898,7 +40079,18 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     const target = Math.min(targetFull, STORY_GROWTH_MAX_CELLS);
     const changedLive = STORY_GROWTH_STATE.liveId !== nextLiveId;
     const changedRoot = STORY_GROWTH_STATE.root !== root;
+    try {
+      noteStoryGrowthTarget(STORY_GROWTH_REBUILD_REASONS, { liveKey: nextLiveId, target });
+      const _tSig = `${STORY_GROWTH_REBUILD_REASONS.liveFlips}|${STORY_GROWTH_REBUILD_REASONS.targets.join(",")}`;
+      if (target !== STORY_REBUILD_TARGET_SIG.target) noteStoryGrowthEntryDiffNow(target);
+      if (_tSig !== STORY_REBUILD_TARGET_SIG.v) {
+        STORY_REBUILD_TARGET_SIG.v = _tSig;
+        noteStoryGrowthRebuildAndPublish("");
+      }
+    } catch {
+    }
     if (changedLive || changedRoot) {
+      if (STORY_GROWTH_STATE.renderedCount > 0 || root && root.childElementCount > 0) noteStoryGrowthRebuildAndPublish(changedLive ? STORY_GROWTH_REBUILD_REASON.LIVE : STORY_GROWTH_REBUILD_REASON.ROOT, { from: STORY_GROWTH_STATE.renderedCount, to: target, dom: root ? root.childElementCount : 0, liveSame: !changedLive });
       clearStoryGrowthTimer();
       if (changedLive) {
         storyAvatarLoadGuard.clearFailedUrls();
@@ -39931,8 +40123,13 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
       root.style.setProperty("--nl-story-icon-size", iconPx);
     }
     if (STORY_GROWTH_STATE.renderedCount > STORY_GROWTH_STATE.targetCount) {
+      const _shrinkFrom = STORY_GROWTH_STATE.renderedCount;
+      const _cells = root.querySelectorAll(".nl-story-growth-cell");
       STORY_GROWTH_STATE.renderedCount = STORY_GROWTH_STATE.targetCount;
-      rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount);
+      if (canTrimStoryGrowthCells({ renderedCount: _shrinkFrom, targetCount: STORY_GROWTH_STATE.targetCount, domCount: _cells.length, sourceOffset: STORY_GROWTH_STATE.sourceOffset })) {
+        for (let i = _cells.length - 1; i >= STORY_GROWTH_STATE.targetCount; i -= 1) _cells[i].remove();
+        noteStoryGrowthRebuildAndPublish(STORY_GROWTH_REBUILD_REASON.TRIM, { from: _shrinkFrom, to: STORY_GROWTH_STATE.targetCount, dom: _cells.length });
+      } else rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount, STORY_GROWTH_REBUILD_REASON.SHRINK, _shrinkFrom);
     }
     const tgt = STORY_GROWTH_STATE.targetCount;
     const rnd = STORY_GROWTH_STATE.renderedCount;
@@ -39944,7 +40141,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         domCount: root.querySelectorAll("img.nl-story-growth-icon").length,
         sourceOffset: STORY_GROWTH_STATE.sourceOffset
       })) appendStoryGrowthCells(root, rnd, tgt);
-      else rebuildStoryGrowth(root, tgt);
+      else rebuildStoryGrowth(root, tgt, rnd > 0 ? STORY_GROWTH_REBUILD_REASON.GROW_FULL : "", rnd);
       STORY_GROWTH_STATE.renderedCount = tgt;
       patchStoryGrowthIconsFromSource(root, { pulseLast: true });
       STORY_GROWTH_STATE.sourceSig = storySourceSignature();
@@ -39956,6 +40153,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
       patchStoryGrowthIconsFromSource(root, { pulseLast: false });
     }
     if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
+      noteStoryGrowthRebuildAndPublish(STORY_GROWTH_REBUILD_REASON.EMPTY, { from: root.childElementCount, to: 0, dom: root.childElementCount });
       root.innerHTML = "";
     }
   }
@@ -41414,7 +41612,8 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     if (img instanceof HTMLImageElement) {
       const rel = northStarLaneGadgetCharaPathByTier(laneId, tier);
       try {
-        img.src = chrome.runtime.getURL(rel);
+        const u = chrome.runtime.getURL(rel);
+        if (img.getAttribute("src") !== u) img.src = u;
       } catch {
         img.removeAttribute("src");
       }
@@ -41516,7 +41715,8 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     if (img instanceof HTMLImageElement) {
       const rel = northStarLaneGadgetCharaPathByTier("programPoints", "full");
       try {
-        img.src = chrome.runtime.getURL(rel);
+        const u = chrome.runtime.getURL(rel);
+        if (img.getAttribute("src") !== u) img.src = u;
       } catch {
         img.removeAttribute("src");
       }
@@ -46643,7 +46843,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T14:18" ? String("yt-2026-11-05T14:18") : "dev";
+      const buildId = "yt-2026-11-05T14:36" ? String("yt-2026-11-05T14:36") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46661,7 +46861,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     } catch {
       manifestVersion = "";
     }
-    const bundledVersion = true ? String("0.1.120") : "";
+    const bundledVersion = true ? String("0.1.121") : "";
     const result = detectVersionMismatch(bundledVersion, manifestVersion);
     if (result.mismatch) {
       el.textContent = result.message;
@@ -46706,7 +46906,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T14:18" ? String("yt-2026-11-05T14:18") : "dev";
+            return "yt-2026-11-05T14:36" ? String("yt-2026-11-05T14:36") : "dev";
           } catch {
             return "dev";
           }
