@@ -61,6 +61,18 @@ function patchVenueBarPickupOnScreen(src) {
 //   YouTube 版だけ確かめる間隔を6秒にする(短い「てすと」1回=エンジンの邪魔は小さい・二重に頼まない仕組みはそのまま)。
 //   ニコ生版は審査後に同じ直し。
 function setupLightProbePatch(b) {
+  // 0.1.95: 声の前後の無音を VOICEVOX 既定の0.1秒→0.05秒に。1件あたり約0.1秒短くなり、
+  //   合成の手間も同じだけ減る(会議 2026-11-05「もっとテンポよく」)。ニコ生版は審査後に同じ直し。
+  b.onLoad({ filter: /src[\\/]lib[\\/]voicevoxClient\.js$/ }, (args) => ({
+    contents: replaceOnce(
+      readFileSync(args.path, 'utf8'),
+      '    audioQuery.outputStereo = false;\n',
+      '    audioQuery.outputStereo = false;\n    audioQuery.prePhonemeLength = 0.05;\n    audioQuery.postPhonemeLength = 0.05;\n',
+      '声の前後の無音'
+    ),
+    loader: 'js',
+    resolveDir: dirname(args.path),
+  }));
   b.onLoad({ filter: /src[\\/]lib[\\/]voiceLightFallback\.js$/ }, (args) => ({
     contents: replaceOnce(readFileSync(args.path, 'utf8'), 'export const LIGHT_VOICE_PROBE_INTERVAL_MS = 30000;', 'export const LIGHT_VOICE_PROBE_INTERVAL_MS = 6000;', 'PC の声から戻る確かめの間隔'),
     loader: 'js',
