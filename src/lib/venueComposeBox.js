@@ -250,10 +250,9 @@ export function startGiftItemsTabResponder(win, onStorageChanged) {
 /**
  * v0.1.1875: 会場に公式ギフト欄と同じアイテムを並べる帯(りんく 2026-11-05 の選択「アイテムを並べ確認は公式」)。
  *   並びは公式のギフト欄を一度開いたときに読んだもの(画像と pt)。押すと会場をしまい、公式の欄で同じアイテムを押す。
- *   v0.1.1881: 2回押し(既定)も会場のまま贈る。1回目は「贈る?」、3秒以内の2回目でアイテムと公式の確認の「贈る」を押す(りんく「2回押すといろんなページに飛ぶ」)。並びがまだ無ければ帯は出さない。
- *   v0.1.1879: 設定「1回で贈る」(既定オフ・帯の端の「1回」で切り替え)がオンの人は、1回押すと会場のまま公式の確認まで押して贈る
- *   (りんく 2026-11-05 の選択)。贈れたら「贈りました」、確認が見つからなければ会場をしまって公式の欄を見せる。続けて押しても2秒は受けない。
- * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean, price?: string }> | { ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean, price?: string }, tuck?: (on: boolean, note?: string) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
+ *   v0.1.1888: 押すと公式の購入の確認(引き出し)が開く。確定は本人が公式のボタンで押す(拡張は押さない・りんく 2026-11-05 の選択)。
+ *   贈れたら「贈りました(33pt)」、30秒押されなければ「贈っていません」。結果が返るまでは続けて押しても受けない。
+ * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean, price?: string }> | { ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean, price?: string }, tuck?: (on: boolean, note?: string) => void, doc?: Document }} opts
  * @returns {HTMLSpanElement}
  */
 export function createVenueGiftStrip(opts) {
@@ -262,38 +261,14 @@ export function createVenueGiftStrip(opts) {
   strip.className = 'nlsb-gift-strip';
   strip.style.cssText = 'display:none;align-items:center;gap:4px;max-width:46vw;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;vertical-align:middle';
   let sig = '';
-  let armed = '';
-  let direct = false;
   let busyUntil = 0;
-  /** @type {HTMLButtonElement | null} */
-  let modeBtn = null;
-  // v0.1.1885: 帯の先頭に「どう押すと何が起きるか」を常に見える文字で出す(title はマウスを載せないと出ない)
+  // v0.1.1885/1888: 帯の先頭に「どう押すと何が起きるか」を常に見える文字で出す(title はマウスを載せないと出ない)。
+  //   v0.1.1888: 購入の確定は本人が公式で押す(りんく 2026-11-05 の選択)ので、帯は1回押しで公式の確認を開くだけ(2回押し・1回押しの切り替えは撤去)。
   const hint = doc.createElement('span');
   hint.className = 'nlsb-gift-hint';
   hint.style.cssText = 'flex:0 0 auto;font-size:10px;line-height:1.15;white-space:nowrap;opacity:.85';
-  const paintMode = () => {
-    hint.textContent = direct ? '押すと公式の確認' : '2回押すと公式の確認';
-    hint.title = direct ? 'アイテムを押すと公式の購入の確認が出ます。公式の「購入します」を押すと贈られます(手数料が足されます)' : 'アイテムを1回押すと「贈る?」と出ます。もう一度押すと公式の購入の確認が出ます。公式の「購入します」を押すと贈られます(手数料が足されます)';
-    for (const b of strip.querySelectorAll('.nlsb-gift-item')) {
-      const base = String(b.getAttribute('data-label') || '');
-      /** @type {HTMLElement} */ (b).title = direct ? `${base}(押すと公式の購入の確認が出ます)` : `${base}(2回押すと公式の購入の確認が出ます・1回目は「贈る?」と出るだけ)`;
-    }
-    if (!modeBtn) return;
-    modeBtn.textContent = direct ? '1回' : '2回';
-    modeBtn.setAttribute('aria-pressed', direct ? 'true' : 'false');
-    modeBtn.title = direct ? '1回押すと公式の確認が出ます(押すと2回押しに戻す)' : '2回押すと公式の確認が出ます(押すと1回押しにする)';
-    modeBtn.style.background = direct ? '#c0392b' : '';
-    modeBtn.style.color = direct ? '#fff' : '';
-  };
-  if (opts.oneTap) {
-    modeBtn = doc.createElement('button');
-    modeBtn.type = 'button';
-    modeBtn.className = 'nlsb-comeview-btn nlsb-gift-mode';
-    modeBtn.style.cssText = 'flex:0 0 auto;font-size:10px;padding:2px 4px';
-    modeBtn.addEventListener('click', () => { direct = !direct; armed = ''; paintMode(); try { opts.oneTap?.set(direct); } catch { /* 保存できなくても今は効く */ } });
-    paintMode();
-    void Promise.resolve(opts.oneTap.get()).then((on) => { direct = on === true; paintMode(); }).catch(() => {});
-  }
+  hint.textContent = '押すと公式の確認';
+  hint.title = 'アイテムを押すと公式の購入の確認が出ます。公式の「利用規約に同意してこのギフトを購入します」を押すと贈られます(手数料が足されます)';
   /** @param {{ key: string, name: string, pt: string, img: string }[]} items */
   const render = (items) => {
     const next = JSON.stringify(items.map((it) => [it.key, it.img]));
@@ -340,23 +315,10 @@ export function createVenueGiftStrip(opts) {
         busyUntil = Date.now() + 2000;
         setTimeout(() => { pt.textContent = it.pt.replace(/\s+/g, ''); }, 3000);
       };
-      b.addEventListener('click', async () => {
-        if (direct) { await send(); return; }
-        // v0.1.1881: 2回押しも会場のまま贈る(1回目は「贈る?」と出すだけ・3秒以内の2回目で贈る)。
-        //   以前は2回目で公式の欄へ飛ばしていたが、りんく「2回押すといろんなページに飛ぶのでアイテムを並べる意味をなしていない」
-        if (armed !== it.key) {
-          armed = it.key;
-          pt.textContent = `${it.pt.replace(/\s+/g, '')}贈る?`; // 何を使うか見えたまま確かめる
-          setTimeout(() => { if (armed === it.key) { armed = ''; pt.textContent = it.pt.replace(/\s+/g, ''); } }, 3000);
-          return;
-        }
-        armed = '';
-        await send();
-      });
+      b.title = `${it.name ? it.name + ' ' : ''}${it.pt.replace(/\s+/g, '')}(押すと公式の購入の確認が出ます)`;
+      b.addEventListener('click', () => { void send(); });
       strip.append(b);
     }
-    if (modeBtn) strip.append(modeBtn);
-    paintMode();
     strip.style.display = items.length ? 'inline-flex' : 'none';
   };
   try { opts.subscribe(render); } catch { /* 並びが読めなければ帯を出さないだけ */ }
