@@ -470,8 +470,9 @@ export default [
     // v0.1.1870: 会場の「🎁 ギフト」(ボタンを作る1行・lib の createVenueGiftButton)=+1。
     // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
     // v0.1.1875: 会場に公式と同じギフトのアイテムを並べる帯(作る1行・lib の createVenueGiftStrip)=+1。
+    // v0.1.1880: ギフトから会場をしまったとき、理由と次の一手を右下に出す(りんく「何の説明もないと何が起こったのかと思う」)=+21。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7401, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7422, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
