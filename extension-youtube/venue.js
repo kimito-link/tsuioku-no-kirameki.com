@@ -1613,6 +1613,33 @@ ${sourceCol}
           void notifyLv(pseudoLvForVideoId(vid), next[vid]);
         }
       });
+      const liveLagSamples = [];
+      let liveDiagTimer = 0;
+      const writeLiveDiagSoon = () => {
+        if (liveDiagTimer) return;
+        liveDiagTimer = /** @type {any} */
+        setTimeout(() => {
+          liveDiagTimer = 0;
+          try {
+            if (!real.runtime?.id) return;
+            const sorted = [...liveLagSamples].sort((a, b) => a - b);
+            const pick = (q) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] : -1;
+            void real.storage.local.set({
+              yt_diag_live_rows: {
+                at: Date.now(),
+                liveRows: shimDiag.liveRows,
+                lastLiveRowsAt: shimDiag.lastLiveRowsAt,
+                notified: shimDiag.notified,
+                lastNotifiedAt: shimDiag.lastNotifiedAt,
+                lastCount: shimDiag.lastCount,
+                seenToBubbleMs: { n: sorted.length, p50: pick(0.5), p90: pick(0.9), max: sorted.length ? sorted[sorted.length - 1] : -1, last: liveLagSamples.slice(-10) }
+              }
+            }).catch(() => {
+            });
+          } catch {
+          }
+        }, 3e3);
+      };
       if (YT_SHIM_IN_PAGE && real.runtime?.onMessage?.addListener) {
         real.runtime.onMessage.addListener((msg) => {
           if (!msg || msg.type !== "YT_LIVE_ROWS" || !Array.isArray(msg.items)) return;
@@ -1630,7 +1657,13 @@ ${sourceCol}
           shimDiag.liveRows = (Number(shimDiag.liveRows) || 0) + added;
           shimDiag.lastLiveRowsAt = Date.now();
           inPageSkipFetchUntil.set(vid, Date.now() + 1e3);
-          void notifyLv(pseudoLvForVideoId(vid), void 0);
+          const seen = msg.items.map((r) => Number(r?.seenAt) || 0).filter((x) => x > 0);
+          void notifyLv(pseudoLvForVideoId(vid), void 0).then(() => {
+            const now = Date.now();
+            for (const t of seen) liveLagSamples.push(now - t);
+            if (liveLagSamples.length > 60) liveLagSamples.splice(0, liveLagSamples.length - 60);
+            writeLiveDiagSoon();
+          });
         });
       }
       const pollTimer = setInterval(() => {
@@ -20060,7 +20093,7 @@ ${sourceCol}
            *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
            *     esbuild の define で置換される値なので、型宣言は無い。
            */
-          buildId: true ? String("yt-2026-11-05T00:26") : ""
+          buildId: true ? String("yt-2026-11-05T00:30") : ""
         };
         const verdict = venueHoverCardPresenceVerdict(census);
         return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
@@ -20520,6 +20553,12 @@ ${sourceCol}
     const removeBubble = (bubble) => {
       if (!bubble || bubble.removed) return;
       bubble.removed = true;
+      if (bubble.voiceState === "pending" && bubble.speechKey) {
+        try {
+          globalThis.__ytDropVoiceKey?.(bubble.speechKey);
+        } catch {
+        }
+      }
       try {
         observeVenueBubbleRemoval(_bubbleChurn, bubble.voiceState);
       } catch {
