@@ -462,7 +462,15 @@ ${sourceCol}
     let out = v;
     const rules = [...opts.topFans === false ? SUPERCHAT_RANK_RULES : TOP_FAN_RULES, ...RULES];
     for (const [from, to] of rules) {
-      out = typeof from === "string" ? out.split(from).join(to) : out.replace(from, to);
+      out = typeof from === "string" ? out.split(from).join(
+        /** @type {string} */
+        to
+      ) : out.replace(
+        /** @type {RegExp} */
+        from,
+        /** @type {string} */
+        to
+      );
     }
     return out;
   }

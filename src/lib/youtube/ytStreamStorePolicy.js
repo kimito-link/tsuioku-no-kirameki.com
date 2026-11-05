@@ -38,7 +38,9 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   concurrentViewers?: number | null,
  *   chatFilterLabel?: string,
  *   itemCount?: number,
- *   startedAt?: number | null
+ *   startedAt?: number | null,
+ *   startedAtApprox?: boolean,
+ *   endedAt?: number | null
  * }} patch
  * @param {number} [nowMs]
  * @returns {{

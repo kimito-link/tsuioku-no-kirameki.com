@@ -761,7 +761,15 @@ ${sourceCol}
     let out = v;
     const rules = [...opts.topFans === false ? SUPERCHAT_RANK_RULES : TOP_FAN_RULES, ...RULES];
     for (const [from, to] of rules) {
-      out = typeof from === "string" ? out.split(from).join(to) : out.replace(from, to);
+      out = typeof from === "string" ? out.split(from).join(
+        /** @type {string} */
+        to
+      ) : out.replace(
+        /** @type {RegExp} */
+        from,
+        /** @type {string} */
+        to
+      );
     }
     return out;
   }
@@ -46405,7 +46413,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "yt-2026-11-05T03:08" ? String("yt-2026-11-05T03:08") : "dev";
+      const buildId = "yt-2026-11-05T03:09" ? String("yt-2026-11-05T03:09") : "dev";
       valueEl.textContent = `v${version}・b${buildId}`;
     } catch {
       valueEl.textContent = "—";
@@ -46468,7 +46476,7 @@ chrome://components で「Optimization Guide On Device Model」を最新化し�
         })(),
         buildId: (() => {
           try {
-            return "yt-2026-11-05T03:08" ? String("yt-2026-11-05T03:08") : "dev";
+            return "yt-2026-11-05T03:09" ? String("yt-2026-11-05T03:09") : "dev";
           } catch {
             return "dev";
           }

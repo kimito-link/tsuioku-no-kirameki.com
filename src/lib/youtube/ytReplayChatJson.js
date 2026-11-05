@@ -11,7 +11,7 @@ function plainText(t) {
   if (typeof t.simpleText === 'string') return t.simpleText;
   const runs = Array.isArray(t.runs) ? t.runs : [];
   return runs
-    .map((r) => {
+    .map((/** @type {any} */ r) => {
       if (typeof r?.text === 'string') return r.text;
       const em = r?.emoji;
       if (em) {
@@ -37,7 +37,7 @@ function lastThumbUrl(thumbs) {
 function badgesOf(r) {
   const list = Array.isArray(r?.authorBadges) ? r.authorBadges : [];
   return list
-    .map((b) => String(b?.liveChatAuthorBadgeRenderer?.tooltip || b?.liveChatAuthorBadgeRenderer?.accessibility?.accessibilityData?.label || ''))
+    .map((/** @type {any} */ b) => String(b?.liveChatAuthorBadgeRenderer?.tooltip || b?.liveChatAuthorBadgeRenderer?.accessibility?.accessibilityData?.label || ''))
     .filter(Boolean);
 }
 
