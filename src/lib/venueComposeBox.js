@@ -251,7 +251,7 @@ export function startGiftItemsTabResponder(win, onStorageChanged) {
  *   v0.1.1881: 2回押し(既定)も会場のまま贈る。1回目は「贈る?」、3秒以内の2回目でアイテムと公式の確認の「贈る」を押す(りんく「2回押すといろんなページに飛ぶ」)。並びがまだ無ければ帯は出さない。
  *   v0.1.1879: 設定「1回で贈る」(既定オフ・帯の端の「1回」で切り替え)がオンの人は、1回押すと会場のまま公式の確認まで押して贈る
  *   (りんく 2026-11-05 の選択)。贈れたら「贈りました」、確認が見つからなければ会場をしまって公式の欄を見せる。続けて押しても2秒は受けない。
- * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean }> | { ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean }, tuck?: (on: boolean, note?: string) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
+ * @param {{ subscribe: (cb: (items: { key: string, name: string, pt: string, img: string }[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => Promise<{ ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean, price?: string }> | { ok?: boolean, reason?: string, sent?: boolean, notFound?: boolean, price?: string }, tuck?: (on: boolean, note?: string) => void, oneTap?: { get: () => Promise<boolean> | boolean, set: (on: boolean) => void }, doc?: Document }} opts
  * @returns {HTMLSpanElement}
  */
 export function createVenueGiftStrip(opts) {
@@ -322,11 +322,11 @@ export function createVenueGiftStrip(opts) {
         let res = null;
         try { res = await opts.press(it.key, { direct: true }); } catch { res = null; }
         if (res && res.ok && res.sent) {
-          pt.textContent = '贈りました';
+          pt.textContent = res.price ? `贈りました(${res.price})` : '贈りました';
         } else if (res && res.notFound) {
           pt.textContent = '見つかりません'; // 公式の欄にこのアイテムが無かった(何も押していない)
         } else if (res && res.ok) {
-          try { opts.tuck?.(true, `「${label}」を公式のギフト欄で選びましたが、確認の「贈る」が見つかりませんでした。贈られたかは欄の「履歴」で確かめてください。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
+          try { opts.tuck?.(true, `「${label}」の購入の確認が公式の欄に出ています(まだ贈っていません)。値段を確かめて公式のボタンを押すと贈れます。やめるときは閉じてください。右下の「▲ 会場に戻る」で戻れます`); } catch { /* しまえなくても一言は出す */ }
           pt.textContent = '公式で確認';
         } else {
           pt.textContent = '開けません';
