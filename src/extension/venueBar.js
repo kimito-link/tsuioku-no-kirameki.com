@@ -391,6 +391,9 @@ const BUBBLE_FADE_MS = 600;
 // v0.1.755 リアルタイム完璧化: 同時表示数を 6→12 に拡大。洪水時に「出してすぐ最古を消す」で
 //   一瞬しか見えない問題を緩和(寿命は流速可変で短くするので画面は埋まり続けない)。
 const BUBBLE_MAX = 12;
+// v0.1.1862: 今までの最大のコメント番号よりこれ以上小さい番号は過去のコメント(取り込み)=吹き出さない。
+//   NHK 実況級(毎秒20件)でも 300 件=15秒ぶんは遅れて届いた新着として通す。
+const VENUE_OLD_SPEECH_NO_GAP = 300;
 // 吹き出し流速(件/秒)を測る短い窓。寿命可変(速いほど短命)の入力。
 const BUBBLE_FLOW_WINDOW_MS = 3_000;
 const BUBBLE_TEXT_MAX = 36;
@@ -3442,8 +3445,8 @@ export function mountVenueBarButton(options = {}) {
   let speechInFlight = false;
   let speechGeneration = 0;
   let speechLiveId = '';
-  /** @type {{ seenKeys: Set<string>|null, primed: boolean }} */
-  let speechState = { seenKeys: null, primed: false };
+  /** @type {{ seenKeys: Set<string>|null, primed: boolean, hiNo: number }} */
+  let speechState = { seenKeys: null, primed: false, hiNo: 0 };
   // 「会話の連鎖」(v0.1.743+): 発言者キー→{連続数,最終発言時刻}。連続発言で席が継続的に輝く。
   /** @type {Map<string, { count: number, lastAt: number }>} */
   const speechStreaks = new Map();
@@ -5209,7 +5212,7 @@ export function mountVenueBarButton(options = {}) {
   const resetSpeechTracking = (nextLiveId = '') => {
     speechGeneration += 1;
     speechLiveId = nextLiveId;
-    speechState = { seenKeys: null, primed: false };
+    speechState = { seenKeys: null, primed: false, hiNo: 0 };
     speechStreaks.clear();
     // 前状態保持(lastGood)も破棄: 配信切替/閉じる時は前配信の参加者を持ち越さない(INV-3)。
     lastGoodRows = [];
@@ -6725,10 +6728,12 @@ export function mountVenueBarButton(options = {}) {
     //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
     //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
     const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
-    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
+    // v0.1.1862: oldNoGap=過去ログ取り込みの古い番号は吹き出さない(既読にだけする・lib の venueSpeech.js)。
+    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3, oldNoGap: VENUE_OLD_SPEECH_NO_GAP });
     speechState = {
       seenKeys: result.seenKeys,
-      primed: result.primed
+      primed: result.primed,
+      hiNo: Number(result.hiNo) || 0
     };
     // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
     if (result.speeches.length > 0) voicePlayer.diag.venueGate = voicePlayer.enabled ? 'ok' : 'voice-off';
@@ -6835,7 +6840,8 @@ export function mountVenueBarButton(options = {}) {
     try {
       observeVenueSpeechBatch(_bubbleBurst, {
         at: Date.now(), path, source, rows, speeches: result.speeches,
-          fresh: Number(result.freshCount) || 0, shown: _burstShown
+          fresh: Number(result.freshCount) || 0, shown: _burstShown,
+        skippedOld: Number(result.skippedOld) || 0
       });
     } catch { /* 計器失敗は描画を止めない */ }
   };

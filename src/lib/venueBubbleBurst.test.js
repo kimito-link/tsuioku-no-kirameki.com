@@ -93,3 +93,47 @@ describe('venueBubbleBurst(吹き出しの一気出し計器)', () => {
     expect(() => observeVenueSpeechBatch(createVenueBubbleBurstState(), /** @type {any} */ (null))).not.toThrow();
   });
 });
+
+describe('v0.1.1862 過去の番号は吹き出さない(oldNoGap)', () => {
+  const run = (rowsList, gap) => {
+    let st = { seenKeys: new Set(), primed: true, hiNo: 0 };
+    const out = [];
+    for (const rows of rowsList) {
+      const r = pickNewVenueSpeech(rows, st, { maxEmit: 24, primeEmit: 3, oldNoGap: gap });
+      st = { seenKeys: r.seenKeys, primed: r.primed, hiNo: r.hiNo || 0 };
+      out.push(r);
+    }
+    return out;
+  };
+  const old = [];
+  for (let i = 1; i <= 800; i++) old.push(row(i));
+
+  it('新着の後に届いた過去ログ800件は1件も吹かず、既読になる', () => {
+    const res = run([[row(5000)], old, old], 300);
+    expect(res[1].speeches).toHaveLength(0);
+    expect(res[1].skippedOld).toBe(800);
+    expect(res[2].skippedOld).toBe(0); // 2回目は既読
+  });
+
+  it('同じ束に新着と過去ログが混ざっても新着だけ吹く', () => {
+    const res = run([[...old, row(5001), row(5002)]], 300);
+    expect(res[0].speeches.map((s) => s.key)).toEqual(['no:5001', 'no:5002']);
+  });
+
+  it('少し遅れて届いた新着(差が300未満)は吹く', () => {
+    const res = run([[row(5000)], [row(4800)]], 300);
+    expect(res[1].speeches).toHaveLength(1);
+  });
+
+  it('番号の無い行は対象外・oldNoGap 未指定は従来どおり', () => {
+    const res = run([[row(5000)], [{ text: 'x', userId: 'a:1', capturedAt: 1 }]], 300);
+    expect(res[1].speeches).toHaveLength(1);
+    expect(run([[row(5000)], old], 0)[1].speeches).toHaveLength(24);
+  });
+
+  it('開いた瞬間の直近3件に過去の番号を選ばない', () => {
+    const st = { seenKeys: new Set(), primed: false, hiNo: 0 };
+    const r = pickNewVenueSpeech([row(5000), row(5001), row(5002), row(1), row(2)], st, { maxEmit: 24, primeEmit: 3, oldNoGap: 300 });
+    expect(r.speeches.map((s) => s.key)).toEqual(['no:5000', 'no:5001', 'no:5002']);
+  });
+});

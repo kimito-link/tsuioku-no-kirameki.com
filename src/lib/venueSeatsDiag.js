@@ -40,7 +40,7 @@
  *     drops: number, shrinkRefused: number, worstDrop: number, worstFrom: number, worstTo: number, worstCause: string }|null,
  *   bubbleChurn: { line: string }|null,
  *   bubbleBurst: { line: string, bursts: number, maxShown: number, capDropped: number,
- *     sameTextRepeat: number, noCommentNo: number, peakRatePerSec: number,
+ *     sameTextRepeat: number, noCommentNo: number, skippedOld: number, peakRatePerSec: number,
  *     burstByKind: Record<string, number>, burstBySource: Record<string, number> }|null,
  *   mirrorIntakeLine: string,
  *   mirrorIntake: { changedEvents:number, keyMatched:number, keyMissed:number, accepted:number,
@@ -325,6 +325,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         capDropped: Math.max(0, Math.floor(num(bbIn.capDropped, 0))),
         sameTextRepeat: Math.max(0, Math.floor(num(bbIn.sameTextRepeat, 0))),
         noCommentNo: Math.max(0, Math.floor(num(bbIn.noCommentNo, 0))),
+        skippedOld: Math.max(0, Math.floor(num(bbIn.skippedOld, 0))),
         peakRatePerSec: Math.max(0, num(bbIn.peakRatePerSec, 0)),
         burstByKind: countDict(bbIn.burstByKind),
         burstBySource: countDict(bbIn.burstBySource)
