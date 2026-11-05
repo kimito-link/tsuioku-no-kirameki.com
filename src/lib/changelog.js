@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1861',
+    date: '2026-11-05',
+    summary: 'りんく欄を元の決まりに戻す',
+    items: Object.freeze([
+      'りんく欄に、ギフトか広告を送った人しか出ていませんでした(10月14日の v0.1.1621 から)。元の決まりに戻し、コメントだけの人でも、IDと本人のサムネが分かればりんく欄に出るようにしました。ギフトや広告を送った人も、今までどおりりんく欄に入ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1858',
     date: '2026-11-04',
     summary: 'マーケHTMLを撮り直せないのを直す',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'コメントを流す間は画面を消さない',
     items: Object.freeze([
       'iPhone アプリの「💬 コメントを流す」を押している間は、スマホの画面が自動で消えないようにしました。画面が消えるとアプリが止まり、コメントも読み上げも止まってしまうためです。止めると元に戻ります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1836',
-    date: '2026-10-31',
-    summary: 'つなぎ直しで同じコメントが二重に出ないように',
-    items: Object.freeze([
-      'iPhone アプリの「💬 コメントを流す」で、通信が切れて自動でつなぎ直したとき、直前のコメントがもう一度並ぶことがありました。一度並べたコメントとギフトは二度並べないようにしました。'
     ])
   })
 ]);
