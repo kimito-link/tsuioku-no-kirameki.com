@@ -24,9 +24,11 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **拡張 ID（公開版/CWS）**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **拡張 ID（開発版/unpacked・恒久固定）**: `ohifblceplfkfajfecaoaclmkiahfflm`
   （v0.1.1529 で manifest に `key` を追加して固定。以前はフォルダパス由来で不安定（旧 `edpellgokebgpjboflekdmmlnjgajnfn`）＝リロード固着の一因だった。`key` の公開鍵は秘密でないので git 管理。CRX秘密鍵 `dev-extension.pem` は gitignore 済＝コミットしない。提出版には `stage-submission.py` が `key` を落とす。`scripts/check-chrome-load-path.mjs` がこの恒久IDを参照する）
-- **公開中**: **0.1.1728**（2026-10-21 `cws-publish.mjs --publish` で提出→同日通過・公開。権限は前回 0.1.1473 と同一）
-- **審査中**: 0.1.1848（2026-11-03 提出。`cws-publish.mjs --publish` → `status:["OK"]`。権限は 0.1.1728 と同一。提出前にダッシュボードの「プライバシー」の単一用途・ホスト権限の理由を貼り直した＝`cws-submission-texts.md` §1・§2-8z）
-- **前回公開**: 0.1.1473（2026-08-22）
+- **公開中**: **0.1.1848**（2026-11-03 提出→通過・公開。権限は 0.1.1728 と同一）
+- **審査中**: 0.1.1901（2026-11-06 提出・YouTube Live 同梱＋サポーター課金。権限が増えた=`tts`・`declarativeNetRequestWithHostAccess`・YouTube の4ホスト。ZIP 17,864,064 bytes・150 ファイル）
+  - ★**権限が増える版は API アップロードだと「プライバシー」に新しい権限の理由欄が出ない**（再読み込みしても出ず、送信時に「理由が必要」で止まる）。ダッシュボードの「パッケージ」から同じ ZIP を**手で**アップロードし直すと欄が出た。今後、権限が増える版は最初からダッシュボードで手アップロードする
+  - 貼り直した欄: 単一用途(§1)・ホスト権限(§2-8z)・tts(§2-8f)・declarativeNetRequestWithHostAccess(§2-8g)・データ使用「認証に関する情報」✅・「詳細な説明」。送信はダッシュボードの「審査のため送信」（自動公開 ON）
+- **前回公開**: 0.1.1728（2026-10-21）
 - **審査状況の確認**: v1.1 API は審査状態を返さない（`projection=DRAFT` のみ）・v2 fetchStatus は現在の認証では 403。公開ストアページの「バージョン」表示で確認する
 - **提出履歴・ストア掲載文の正本**: [docs/releases/cws-store-listing.md](docs/releases/cws-store-listing.md) 冒頭（★ここの版番号は提出のたびに更新する）
 - **CWS Developer Dashboard 入力の正本**: [docs/releases/cws-submission-texts.md](docs/releases/cws-submission-texts.md)
