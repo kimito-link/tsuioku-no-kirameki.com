@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1882',
+    date: '2026-11-05',
+    summary: '帯の「贈る?」に値段を出したままにする',
+    items: Object.freeze([
+      '会場のギフトの帯で1回目を押したとき、値段を消さずに「30pt贈る?」のように出すようにしました(何ポイント使うか見たまま確かめられます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1881',
     date: '2026-11-05',
     summary: '会場の帯の2回押しも会場のまま贈る',
