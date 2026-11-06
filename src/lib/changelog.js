@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1910',
+    date: '2026-11-06',
+    summary: 'スマホで隠した人を読み上げでも出さない',
+    items: Object.freeze([
+      'スマホの「🚩 見たくない人を隠す」で隠した人のコメントを、WEB版の読み上げ(PC の VOICEVOX の声)でも読まないようにしました。以前は画面からは消えても声だけ聞こえていました。',
+      'スマホアプリで放送 URL を貼る形(「💬 コメントを流す」)にも 🚩 を付けました。隠した人のコメントは並べず、読み上げもしません。隠すのはこの端末の画面だけで、PC の記録は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1908',
     date: '2026-11-06',
     summary: 'マーケHTMLをさらに軽く',
@@ -189,15 +198,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '会場からギフトを押したあと、ポイント残高が減ったら「贈りました(55pt)」と手数料込みの値段を出します(公式がアイテムを押しただけで贈る場合も正しく出ます)',
       '押した記録を直近20件残し、誰がどのボタンを押したかも記録します'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1885',
-    date: '2026-11-05',
-    summary: '会場のギフトの帯に押し方の説明を出す',
-    items: Object.freeze([
-      '会場のギフトの帯の先頭に「2回押して贈る」(1回押しのときは「押すとすぐ贈る」)と見える文字で出します',
-      '🎁ギフトで公式の欄を開いたとき、会場に戻ると帯のアイテムから会場のまま贈れることも案内します'
     ])
   })
 ]);
