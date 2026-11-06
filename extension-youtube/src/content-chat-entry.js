@@ -6,6 +6,7 @@ import {
   extractYtWatchConcurrentViewersFromText,
 } from '../../src/lib/youtube/ytChatParse.js';
 import { ytReplayResponseToRecords } from '../../src/lib/youtube/ytReplayChatJson.js';
+import { createYtEchoDedupe } from '../../src/lib/youtube/ytChatEchoDedupe.js';
 import {
   parseYtVideoIdFromUrl,
   isYtWatchLikeUrl,
@@ -668,6 +669,14 @@ function setupLiveChatObserver() {
   const staleEls = new WeakSet();
   let switchGraceUntil = 0;
   const SWITCH_GRACE_MS = 4000;
+  // 0.1.1905: 自分の送ったコメントは仮の行→本物の行に id が変わるので、同じコメントを2回記録・2回読み上げていた
+  //   (2026-11-06 りんく実機「2回うったことになっている」)。差し替えは1件として扱う(ytChatEchoDedupe.js)。
+  const echoDedupe = createYtEchoDedupe();
+  let echoDropTotal = 0;
+  /** @type {WeakSet<Element>} 一度「少し待って見直す」にした行 */
+  const echoWaited = new WeakSet();
+  /** @type {any[]} */
+  let echoDropRecent = [];
 
   const rememberId = (id) => {
     seenIds.add(id);
@@ -824,7 +833,24 @@ function setupLiveChatObserver() {
     }
 
     if (!seenIds.has(parsed.id)) {
+      const echo = !isReplay && parsed.kind === 'text' ? echoDedupe.classify(parsed, el, { waited: echoWaited.has(el) }) : 'new';
+      if (echo === 'wait') {
+        echoWaited.add(el);
+        setTimeout(() => inspectElement(el, retryCount), 1200);
+        return;
+      }
       rememberId(parsed.id);
+      if (echo === 'echo') {
+        rememberIconId(parsed.id); // 同じコメントの差し替え: 送らず、後で顔が入っても送り直さない
+        echoDropTotal += 1;
+        echoDropRecent = [...echoDropRecent, { at: Date.now(), who: String(parsed.name || '').slice(0, 40), text: String(parsed.text || '').slice(0, 40), id: String(parsed.id).slice(0, 60) }].slice(-10);
+        try {
+          void chrome.storage.local.set({ yt_diag_echo_drop: { at: Date.now(), total: echoDropTotal, recent: echoDropRecent } }).catch(() => {});
+        } catch {
+          /* 計器は本体を止めない */
+        }
+        return;
+      }
       if (parsed.iconUrl) {
         rememberIconId(parsed.id);
       } else if (retryCount < 3) {
