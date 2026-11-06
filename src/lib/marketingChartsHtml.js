@@ -1395,7 +1395,11 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
   const cards = analysis.moments
     .slice(0, SHOW)
     .map((m) => {
+      // v0.1.1908: 1つの瞬間に並べる送り主は先頭8件まで(連鎖で数百件並んで重かった)。残りは「ほか N件」。
+      const GIFT_LINES_MAX = 8;
+      const restGifts = m.gifts.length - GIFT_LINES_MAX;
       const giftLines = m.gifts
+        .slice(0, GIFT_LINES_MAX)
         .map((g) => {
           const rawLabel = g.userId && /^\d+$/.test(g.userId) ? displayUserLabel(g.userId, g.senderName) : g.senderName || '名無し';
           const nameHtml = maskShare
@@ -1412,7 +1416,10 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
           const thumbCell = wrapThumbWithProfileLink(g.userId, thumbImg, maskShare);
           return `<li class="mkt-gm-gift">${thumbCell}<span class="mkt-gm-sender">${nameHtml}</span><span class="mkt-gm-item">${escapeHtml(g.itemName || '(名称未取得)')}</span><span class="mkt-gm-pt">${escapeHtml(formatEventRankingNumber(g.points))}pt</span></li>`;
         })
-        .join('');
+        .join('') +
+        (restGifts > 0
+          ? `<li class="mkt-gm-gift mkt-gm-gift--more">ほか ${restGifts}件(全部は「ギフト投げ履歴」の表にあります)</li>`
+          : '');
       const bC = m.before.comments;
       const aC = m.after.comments;
       const diff = aC - bC;
@@ -5345,6 +5352,7 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-gm-time{font-size:.8rem;color:#93c5fd;font-variant-numeric:tabular-nums;margin-bottom:.35rem}
 .mkt-gm-gifts{list-style:none;margin:0 0 .4rem;padding:0}
 .mkt-gm-gift{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;margin:.15rem 0;font-size:.85rem}
+.mkt-gm-gift--more{color:#94a3b8}
 .mkt-gm-sender{font-weight:700;overflow-wrap:anywhere}
 .mkt-gm-item{color:#cbd5e1}
 .mkt-gm-pt{margin-left:auto;font-variant-numeric:tabular-nums;color:#fde68a}
