@@ -34,7 +34,7 @@ function base64ToBuffer(b64) {
 /**
  * @param {{ token: string, fetchImpl?: typeof fetch, Ctx?: any, setIntervalImpl?: typeof setInterval, keepWhenHidden?: () => boolean, skipNo?: (no: string) => boolean }} a
  *   keepWhenHidden: iPhone アプリ(live-view-native.js)の中では、画面を閉じても声を取りに行き続ける。
- *   skipNo: v0.1.1905 鳴らさない声(🚩 で隠した人のコメント)か。鳴らす直前に聞く(隠した直後から効く)。
+ *   skipNo: v0.1.1907 鳴らさない声(🚩 で隠した人のコメント)か。鳴らす直前に聞く(隠した直後から効く)。
  */
 export function createPhoneVoice(a) {
   const fetchImpl = a.fetchImpl || ((u, i) => fetch(u, i));

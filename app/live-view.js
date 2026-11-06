@@ -815,7 +815,7 @@ function liveIdFromSnapshot(jsonBlob) {
 }
 
 /**
- * v0.1.1905: コメント番号→書いた人(隠す前の行から覚える)。WEB版の読み上げは PC の声を番号だけで受け取るので、
+ * v0.1.1907: コメント番号→書いた人(隠す前の行から覚える)。WEB版の読み上げは PC の声を番号だけで受け取るので、
  *   隠した人の声を鳴らさないためにここで引く。
  * @type {Map<string, string>}
  */
@@ -1114,7 +1114,7 @@ function bootstrap() {
   }
   // v0.1.1763: iPhone アプリの中は iPhone 内蔵の声で読む(画面を閉じても続く・PC の VOICEVOX が無くても読める)。
   //   プラグインが無い古いアプリ・Safari・PC のブラウザは今までどおり PC の VOICEVOX の声。
-  //   v0.1.1905: 🚩 で隠した人のコメントは読まない(skipNo。アプリの端末の声は隠した後の行から読むので元から読まない)。
+  //   v0.1.1907: 🚩 で隠した人のコメントは読まない(skipNo。アプリの端末の声は隠した後の行から読むので元から読まない)。
   _voice = createNativeSpeechVoice()
     || createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground(), skipNo: isHiddenPersonVoiceNo, ...(_demo ? { fetchImpl: _demo.voiceFetch } : {}) });
   _native.setVoiceOn(() => Boolean(_voice && _voice.isOn()));
