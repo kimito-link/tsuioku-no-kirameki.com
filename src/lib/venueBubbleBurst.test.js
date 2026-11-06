@@ -94,7 +94,7 @@ describe('venueBubbleBurst(吹き出しの一気出し計器)', () => {
   });
 });
 
-describe('v0.1.1909 過去の番号は吹き出さない(oldNoGap)', () => {
+describe('v0.1.1914 過去の番号は吹き出さない(oldNoGap)', () => {
   const run = (rowsList, gap) => {
     let st = { seenKeys: new Set(), primed: true, hiNo: 0 };
     const out = [];
