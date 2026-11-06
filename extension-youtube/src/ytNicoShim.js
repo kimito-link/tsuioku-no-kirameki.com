@@ -22,6 +22,7 @@ import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopF
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
+import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
@@ -854,7 +855,10 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       return realTabsGet(tabId).then(async (tab) => {
         const vid = parseYtVideoIdFromUrl(String(tab?.url || ''));
         const res = await real.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: vid, text: String(message?.text || '') });
-        return res && res.ok ? { ok: true } : { ok: false, error: String(res?.reason || res?.error || 'send_failed') };
+        if (res && res.ok) return { ok: true };
+        // 0.1.1903: 理由コード(not-signed-in 等)をそのまま出さず、サイドパネル・会場と同じ日本語にする。
+        const code = String(res?.reason || res?.error || 'send_failed');
+        return { ok: false, error: ytCommentSendReasonText(code, String(res?.note || '')) || code };
       });
     }
     return null;

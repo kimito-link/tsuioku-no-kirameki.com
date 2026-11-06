@@ -49,7 +49,10 @@
 | `data-nl-hoisted` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-lane-user-detail-wired` | extension/popup/wireLaneUserDetailOpen.js | extension/popup/wireLaneUserDetailOpen.js |
 | `data-nl-on-error-bound` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-pickup-avatar` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
 | `data-nl-pickup-key` | lib/venuePickupBanner.js | lib/venuePickupBanner.js |
+| `data-nl-pickup-name` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
+| `data-nl-pickup-uid` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
 | `data-nl-popup-content-painted` | extension/popup-entry.js | — |
 | `data-nl-popup-primary-cloak` | lib/cloakNotForSidePanel.js | extension/sidepanel-entry.js |
 | `data-nl-recording` | extension/popup-entry.js | extension/popup-entry.js |

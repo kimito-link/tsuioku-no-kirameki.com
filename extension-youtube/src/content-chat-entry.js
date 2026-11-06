@@ -6,6 +6,7 @@ import {
   extractYtWatchConcurrentViewersFromText,
 } from '../../src/lib/youtube/ytChatParse.js';
 import { ytReplayResponseToRecords } from '../../src/lib/youtube/ytReplayChatJson.js';
+import { classifyYtChatInputBlock } from '../../src/lib/youtube/ytChatInputBlock.js';
 import {
   parseYtVideoIdFromUrl,
   isYtWatchLikeUrl,
@@ -861,23 +862,35 @@ function setupCommentSendBridge() {
       (async () => {
         const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
         if (!text) return { ok: false, reason: 'empty' };
-        const input = /** @type {HTMLElement | null} */ (
-          document.querySelector(
-            'yt-live-chat-text-input-field-renderer #input[contenteditable], #input.yt-live-chat-text-input-field-renderer, yt-live-chat-message-input-renderer #input[contenteditable]',
-          )
-        );
+        const INPUT_SEL =
+          'yt-live-chat-text-input-field-renderer #input[contenteditable], #input.yt-live-chat-text-input-field-renderer, yt-live-chat-message-input-renderer #input[contenteditable]';
+        let input = /** @type {HTMLElement | null} */ (document.querySelector(INPUT_SEL));
+        // 0.1.1903: チャット欄を読み込み直した直後は入力欄がまだ無いことがある。少しだけ待ってから理由を判定する。
+        for (let i = 0; !input && i < 6; i += 1) {
+          await sleep(250);
+          input = /** @type {HTMLElement | null} */ (document.querySelector(INPUT_SEL));
+        }
         if (!input) {
-          const signIn = document.querySelector(
-            'yt-live-chat-message-input-renderer #sign-in, yt-live-chat-restricted-participation-renderer, yt-live-chat-message-input-renderer yt-button-renderer a[href*="ServiceLogin"]',
-          );
           // 0.1.109: ログインしていないチャットは入力欄の部品ごと無く、下の帯(#input-panel)に「ログインしてチャットを始める」の
-          //   リンクだけがある(PC の別ブラウザで確認 2026-11-05)。これも「ログインしていない」として伝える。
-          const panel = document.querySelector('#input-panel');
-          const signedOut =
-            !!signIn ||
-            !!panel?.querySelector('a[href*="ServiceLogin"], a[href*="accounts.google.com"]') ||
-            /ログインしてチャット|Sign in to chat/i.test(String(panel?.textContent || ''));
-          return { ok: false, reason: signedOut ? 'not-signed-in' : 'no-input' };
+          //   リンクだけがある(PC の別ブラウザで確認 2026-11-05)。
+          // 0.1.1903: メンバー限定・登録者限定の帯(ログインしていても出る)を「ログインしていない」と言っていたのを分ける。
+          const block = classifyYtChatInputBlock(document);
+          try {
+            chrome.storage.local.set({
+              yt_diag_comment_send_fail: {
+                at: Date.now(),
+                videoId: mine,
+                reason: block.reason,
+                note: block.note,
+                tags: [...new Set([...document.querySelectorAll('#input-panel *, yt-live-chat-restricted-participation-renderer')].map((el) => el.localName))]
+                  .filter((t) => t.includes('-'))
+                  .slice(0, 30),
+              },
+            });
+          } catch {
+            // 記録できなくても続ける
+          }
+          return { ok: false, reason: block.reason, note: block.note };
         }
         input.focus();
         try {

@@ -5,12 +5,12 @@
 
 import { findGiftSidebarItemsTabElement } from './giftSidebarRankTabPick.js';
 
-/** @typedef {{ ok?: boolean, error?: unknown, reason?: unknown }} VenuePostResult */
+/** @typedef {{ ok?: boolean, error?: unknown, reason?: unknown, note?: unknown }} VenuePostResult */
 
 /**
  * 送信結果を画面の一言にする(純関数)。
  * @param {VenuePostResult | null | undefined} res
- * @param {(reason: string) => string} [reasonText] 理由コードを日本語にする(YouTube 版用)
+ * @param {(reason: string, note: string) => string} [reasonText] 理由コードを日本語にする(YouTube 版用・note=YouTube 側の案内文)
  * @returns {{ ok: boolean, text: string }}
  */
 export function venueComposeResultText(res, reasonText) {
@@ -18,13 +18,13 @@ export function venueComposeResultText(res, reasonText) {
   const err = String(res?.error || '').trim();
   if (err) return { ok: false, text: err };
   const reason = String(res?.reason || '').trim();
-  const mapped = reason && typeof reasonText === 'function' ? String(reasonText(reason) || '') : '';
+  const mapped = reason && typeof reasonText === 'function' ? String(reasonText(reason, String(res?.note || '').trim()) || '') : '';
   return { ok: false, text: mapped || `送信できませんでした${reason ? `(${reason})` : ''}` };
 }
 
 /**
  * @param {(text: string) => Promise<VenuePostResult>} post
- * @param {{ doc?: Document, reasonText?: (reason: string) => string }} [opts]
+ * @param {{ doc?: Document, reasonText?: (reason: string, note: string) => string }} [opts]
  * @returns {HTMLFormElement}
  */
 export function createVenueComposeBox(post, opts = {}) {

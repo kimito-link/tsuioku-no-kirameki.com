@@ -1,7 +1,7 @@
 // sidepanel-entry.js — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
 /* global window, chrome, document, performance, URL, Blob, fetch, setTimeout */
 
-import { YT_COMMENT_SEND_REASON_JA } from '../../src/lib/youtube/ytCommentSendReason.js';
+import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { formatNumberJa, safeHttpUrl } from '../../src/lib/htmlText.js';
 import { anonymousIdenticonDataUrl } from '../../src/lib/anonymousIdenticon.js';
 import { VOICEVOX_BASE_URL } from '../../src/lib/voicevoxClient.js';
@@ -1108,7 +1108,6 @@ async function loadSelectedStreamForExport() {
   return { summary, items };
 }
 
-const COMMENT_SEND_REASON_JA = YT_COMMENT_SEND_REASON_JA;
 
 function bindComposeAndExportEvents() {
   const input = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('commentInput'));
@@ -1137,7 +1136,7 @@ function bindComposeAndExportEvents() {
     } else {
       const reason = String(res?.reason || '');
       setComposeStatus(
-        /** @type {Record<string,string>} */ (COMMENT_SEND_REASON_JA)[reason] || `送信できませんでした（${reason || '理由不明'}）`,
+        ytCommentSendReasonText(reason, String(res?.note || '')) || `送信できませんでした（${reason || '理由不明'}）`,
         'error',
       );
     }
