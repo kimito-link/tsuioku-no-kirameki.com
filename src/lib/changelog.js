@@ -18,6 +18,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1916',
+    date: '2026-11-07',
+    summary: 'Twitch の配信も記録できるように(試作)',
+    items: Object.freeze([
+      'Twitch の配信ページ(twitch.tv/チャンネル名)を開くと、チャットを記録するようにしました。ニコ生・YouTube と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
+      'チャットは Twitch 公式の読み取り専用の接続で読みます(ログインは要りません)。Bits・サブスク・ギフトサブ・レイドも記録し、Bits は応援の合計(pt)に入ります。',
+      'サイドパネルと会場からのコメント送信は、Twitch の画面の入力欄に書いて送ります(Twitch にログインしているときだけ送れます)。',
+      '記録は YouTube と同じくこの PC の中にだけ置き、外へは送りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1915',
     date: '2026-11-07',
     summary: 'YouTube の過去ログ取り込みでも混ざりを直す',
@@ -184,15 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'マーケ総合サマリに最大同接を出す',
     items: Object.freeze([
       'マーケの「総合サマリ」の先頭に「最大同接」(同時に見ていた人数の最大)と平均を出すようにしました。YouTube には延べの来場者数が無いので、同接がサマリのどこにも出ていませんでした'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1891',
-    date: '2026-11-05',
-    summary: 'YouTube の同接をパネルを閉じても記録',
-    items: Object.freeze([
-      'YouTube の同時視聴者数を、サイドパネルを閉じていても1分ごとに記録するようにしました。会場モードで見ている間の同接がマーケの「同接推移カーブ」から抜けていました(27分の配信で5分〜25分が空)',
-      '同接がまだ読めていないときの「0人」を記録しないようにしました(開始時の0人で平均が下がっていました)'
     ])
   })
 ]);

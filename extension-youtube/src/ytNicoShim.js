@@ -18,9 +18,11 @@ import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIc
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
-import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan } from '../../src/lib/youtube/ytWording.js';
+import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForTwitch } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { parseTwChannelFromUrl } from '../../src/lib/twitch/twIrcParse.js';
+import { isTwStreamKey, twLoginOfStreamKey, twChannelUrlOfLogin, twChannelUrlOfStreamKey } from '../../src/lib/twitch/twStreamKey.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
@@ -123,12 +125,55 @@ export function videoIdForPseudoLv(lv) {
 function mapTab(tab) {
   if (!tab || typeof tab !== 'object') return tab;
   const url = String(tab.url || tab.pendingUrl || '');
-  if (!isYtWatchLikeUrl(url)) return tab;
-  const vid = parseYtVideoIdFromUrl(url);
+  if (!isWatchLikeTabUrl(url)) return tab;
+  const vid = streamKeyForWatchUrl(url);
   if (!vid) return tab;
   const lv = pseudoLvForVideoId(vid);
   return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: undefined, __ytUrl: url };
 }
+
+// ---- 2a. Twitch の視聴タブ(council/twitch-support-PLAN.md) ----
+// Twitch の記録は YouTube と同じ置き場に、配信キー 'tw.<login>.<配信番号>'(videoId の位置)で入っている。
+//   タブの URL(twitch.tv/<login>)には配信番号が無いので、そのチャンネルのいちばん新しい記録の配信キーを使う。
+/** @param {string} login */
+function twNewestKeyForLogin(login) {
+  const pre = `tw.${login}.`;
+  let best = '';
+  let bestAt = -1;
+  for (const [key, sum] of Object.entries(knownSummaries || {})) {
+    if (!key.startsWith(pre)) continue;
+    const at = Number(sum?.updatedAt || 0);
+    if (at > bestAt) {
+      bestAt = at;
+      best = key;
+    }
+  }
+  return best;
+}
+
+/** 視聴タブの URL → 配信キー(YouTube は videoId・Twitch は記録のある配信キー)。分からなければ '' @param {string} url */
+export function streamKeyForWatchUrl(url) {
+  const u = String(url || '');
+  if (isYtWatchLikeUrl(u)) return parseYtVideoIdFromUrl(u);
+  const login = parseTwChannelFromUrl(u);
+  return login ? twNewestKeyForLogin(login) : '';
+}
+
+/** 1本の配信を見ているタブか(YouTube の視聴ページ・Twitch のチャンネルページ) @param {string} url */
+export function isWatchLikeTabUrl(url) {
+  return isYtWatchLikeUrl(String(url || '')) || Boolean(parseTwChannelFromUrl(String(url || '')));
+}
+
+/** 配信キー → その配信のページ(YouTube の動画・Twitch のチャンネル) @param {string} key */
+export function watchUrlForStreamKey(key) {
+  const k = String(key || '');
+  if (!k) return '';
+  if (isTwStreamKey(k)) return twChannelUrlOfStreamKey(k);
+  return `https://www.youtube.com/watch?v=${k}`;
+}
+
+/** @type {Map<string, string>} Twitch の人の鍵(tw:<user-id>)→ login(ページの URL に使う) */
+const twLoginByKey = new Map();
 
 // ---- 2b. YouTube の人 ⇔ ニコ生版が「本人のID」として扱える数字のID ----
 // ニコ生版は「数字のユーザーID」の人だけを本人として上の段(りんく・こん太)へ並べる(匿名 a: はたぬ姉)。
@@ -181,6 +226,7 @@ export function ytKeyForNumericUid(uid) {
  */
 export function ytChannelUrlForNumericUid(uid) {
   const key = ytKeyForNumericUid(uid).replace(/^topfan:/, '');
+  if (key.startsWith('tw:')) return twChannelUrlOfLogin(key.startsWith('tw:@') ? key.slice(4) : twLoginByKey.get(key) || '');
   if (/^UC[A-Za-z0-9_-]{22}$/.test(key)) return `https://www.youtube.com/channel/${key}`;
   const h = key.startsWith('handle:@') ? key.slice('handle:@'.length) : '';
   return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : '';
@@ -207,6 +253,7 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
   const channelId = String(r?.channelId || '').trim();
   const name = String(r?.name || '').trim();
   const key = personKey || channelId || (name ? `name:${name}` : '');
+  if (key.startsWith('tw:') && r?.login) twLoginByKey.set(key, String(r.login));
   const at = Number(r?.recordedAt || 0) || Date.now();
   // 配信が終わったあとにアーカイブから埋めた分は、書かれた本当の時刻(postedAtMs)を持っている
   const postedAt = Number(r?.postedAtMs) > 0
@@ -239,6 +286,7 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     // リプレイ(アーカイブ)は時刻表示が経過時間なので、配信の開始時刻 + 経過時間にする
     ytPostedAt: postedAt,
     ytKind: String(r?.kind || 'text'),
+    ...(channelId.startsWith('tw:') ? { ytPlatform: 'twitch', ...(Number(r?.giftCount) > 0 ? { ytGiftCount: Number(r.giftCount) } : {}) } : {}),
     ...(r?.giftName ? { ytGiftName: String(r.giftName) } : {}),
     ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
     ytAmount: Number(r?.amount || 0),
@@ -289,6 +337,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const chId = ucId || ucFromRecords;
   const bKey = chId || (handle ? `handle:${handle}` : '');
   const bUid = bKey ? numericUidForYtKey(bKey) : '';
+  const isTw = isTwStreamKey(videoId);
+  if (isTw && chId.startsWith('tw:') && handle) twLoginByKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
   const bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
   if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
@@ -298,7 +348,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     liveId: lv,
     broadcastTitle: String(sum?.title || ''),
     broadcasterName: String(sum?.broadcasterName || ''),
-    thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    thumbnailUrl: isTw
+      ? `https://static-cdn.jtvnw.net/previews-ttv/live_user_${twLoginOfStreamKey(videoId)}-440x248.jpg`
+      : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     tags: [],
     startAtText: '',
     links: [],
@@ -306,7 +358,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     scripts: [],
     noopenerLinks: [],
     broadcasterUserId: bUid,
-    broadcasterPageUrl: chId
+    broadcasterPageUrl: isTw
+      ? twChannelUrlOfStreamKey(videoId)
+      : chId
       ? `https://www.youtube.com/channel/${chId}`
       : handle
         ? `https://www.youtube.com/${encodeURI(handle)}`
@@ -818,7 +872,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     if (type === 'NLS_EXPORT_WATCH_SNAPSHOT') {
       return realTabsGet(tabId).then(async (tab) => {
         const url = String(tab?.url || '');
-        const vid = parseYtVideoIdFromUrl(url);
+        const vid = streamKeyForWatchUrl(url);
         if (!vid) return { ok: false, error: 'not_youtube' };
         const bag = await realGet(KEY_YT_SUMMARIES);
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
@@ -835,7 +889,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     if (type === 'NLS_CAPTURE_SCREENSHOT') {
       // ニコ生版の「スクショ」= 動画の今のコマを画像にする。YouTube 版はもともと持っている YT_CAPTURE_FRAME で撮る。
       return realTabsGet(tabId).then(async (tab) => {
-        const vid = parseYtVideoIdFromUrl(String(tab?.url || ''));
+        const vid = streamKeyForWatchUrl(String(tab?.url || ''));
         const res = await real.runtime.sendMessage({ type: 'YT_CAPTURE_FRAME', videoId: vid });
         if (res && res.ok && typeof res.dataUrl === 'string') {
           return { ok: true, dataUrl: res.dataUrl, liveId: pseudoLvForVideoId(vid) };
@@ -847,18 +901,18 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       // ニコ生版はここで、視聴ページが通信から拾った人の情報(名前・顔)をもらう。YouTube 版は記録そのものに
       // 名前と顔が入っているので、渡す物は無い。答えないと「ページとの通信に失敗しました」と出るので、空で正常と答える。
       return realTabsGet(tabId).then((tab) => {
-        const vid = parseYtVideoIdFromUrl(String(tab?.url || ''));
+        const vid = streamKeyForWatchUrl(String(tab?.url || ''));
         return { ok: true, items: [], liveId: vid ? pseudoLvForVideoId(vid) : '', frameHref: String(tab?.url || '') };
       });
     }
     if (type === 'NLS_POST_COMMENT') {
       return realTabsGet(tabId).then(async (tab) => {
-        const vid = parseYtVideoIdFromUrl(String(tab?.url || ''));
+        const vid = streamKeyForWatchUrl(String(tab?.url || ''));
         const res = await real.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: vid, text: String(message?.text || '') });
         if (res && res.ok) return { ok: true };
         // 0.1.1912: 理由コード(not-signed-in 等)をそのまま出さず、サイドパネル・会場と同じ日本語にする。
         const code = String(res?.reason || res?.error || 'send_failed');
-        return { ok: false, error: ytCommentSendReasonText(code, String(res?.note || '')) || code };
+        return { ok: false, error: ytCommentSendReasonText(code, String(res?.note || ''), isTwStreamKey(vid) ? 'twitch' : '') || code };
       });
     }
     return null;
@@ -867,7 +921,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     const cb = typeof args[args.length - 1] === 'function' ? args.pop() : null;
     const [tabId, message] = args;
     const p = realTabsGet(tabId)
-      .then((tab) => (isYtWatchLikeUrl(String(tab?.url || '')) ? answerForYtTab(tabId, message) : null))
+      .then((tab) => (isWatchLikeTabUrl(String(tab?.url || '')) ? answerForYtTab(tabId, message) : null))
       .catch(() => null)
       .then((answered) => (answered ? answered : realSendMessage(...args)));
     if (cb) {
@@ -973,6 +1027,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       }
       if (!changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};
+      knownSummaries = next; // Twitch のタブ → 配信キーの引き当て(twNewestKeyForLogin)が新しい配信を知るため
       const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
       // 見ている配信が変わったら「最後に見ていた配信」も変わったと知らせる(コメビュが新しい配信へ追従する)
       const newestNext = newestVideoIdOf(next);
@@ -1090,6 +1145,9 @@ const PSEUDO_UID_RE = /8\d{9}/g;
 function ytLabelForUid(uid) {
   const key = ytKeyForNumericUid(uid).replace(/^topfan:/, '');
   if (!key) return '';
+  // Twitch の人は @ログイン名(YouTube の @ハンドルと同じ扱い)。分からなければ出さない(tw:数字 は人には意味が無い)
+  if (key.startsWith('tw:@')) return `@${key.slice(4)}`;
+  if (key.startsWith('tw:')) return twLoginByKey.get(key) ? `@${twLoginByKey.get(key)}` : '';
   if (key.startsWith('name:')) return '';
   if (key.startsWith('handle:')) return key.slice('handle:'.length);
   return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
@@ -1103,7 +1161,7 @@ function ytFixPseudoLvText(text) {
   return String(text)
     .replace(PSEUDO_WATCH_URL_RE, (all, lv) => {
       const vid = videoIdForPseudoLv(lv);
-      return vid ? `https://www.youtube.com/watch?v=${vid}` : all;
+      return vid ? watchUrlForStreamKey(vid) : all;
     })
     .replace(PSEUDO_LV_RE, (lv) => videoIdForPseudoLv(lv) || lv);
 }
@@ -1215,10 +1273,23 @@ function fixTextNode(node) {
       }
     }
   }
-  let next = ytWording(v, { topFans: kokenIsTopFans }); // ニコニコの言葉 → YouTube の言葉(決まった文言だけ)
+  let next = screenWording(v); // ニコニコの言葉 → YouTube(Twitch)の言葉(決まった文言だけ)
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
   if (next !== v) node.nodeValue = next;
+}
+
+/** いま画面に出ている配信が Twitch か(視聴ページの中なら Twitch のページか) */
+function screenIsTwitch() {
+  if (YT_SHIM_IN_PAGE) return /(^|\.)twitch\.tv$/i.test(String(location.hostname || ''));
+  // 画面がまだコメントを聞いてくる前(最初の描画)は、いちばん新しく記録が増えた配信で決める
+  return isTwStreamKey(lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : newestVideoIdOf(knownSummaries));
+}
+
+/** 画面の決まった文言の置き換え。Twitch の配信なら、YouTube の言葉にした所だけをさらに Twitch の言葉に @param {string} t */
+function screenWording(t) {
+  const w = ytWording(t, { topFans: kokenIsTopFans });
+  return w !== t && screenIsTwitch() ? ytWordingForTwitch(w) : w;
 }
 
 // ニコ生版のコメビュは名前の横に data-nl-uid(数字ID)を CSS で「(数字)」と出す。疑似IDなので、
@@ -1236,7 +1307,7 @@ function fixUidLabelAttr(el) {
 function fixTitleAttr(el) {
   const t = el.getAttribute('title');
   if (!t) return;
-  let next = ytWording(t, { topFans: kokenIsTopFans });
+  let next = screenWording(t);
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
   if (next !== t) el.setAttribute('title', next);
 }
@@ -1481,7 +1552,7 @@ function ytRebuildMarketingLedger(doc) {
     userId: String(h.userId || ''),
     senderLabel: String(h.senderName || ''),
     senderAvatarUrl: String(h.senderAvatarUrl || ''),
-    source: 'youtube',
+    source: screenIsTwitch() ? 'twitch' : 'youtube',
   }));
   const html = rows
     .map((r, i) => buildGiftThrowLedgerTableRowHtml(r, i))
@@ -1534,12 +1605,12 @@ function ensureZeroPtGifts() {
     userId: String(h.userId || ''),
     senderLabel: String(h.senderName || ''),
     senderAvatarUrl: String(h.senderAvatarUrl || ''),
-    source: 'youtube',
+    source: screenIsTwitch() ? 'twitch' : 'youtube',
   }));
   const html = buildGiftThrowLedgerTableSectionHtml(rows, {
     totalCount: allThrowHistory.length,
     shownCount: rows.length,
-    payloadSource: 'youtube',
+    payloadSource: screenIsTwitch() ? 'twitch' : 'youtube',
   });
   if (!html) return;
   const holder = document.createElement('div');

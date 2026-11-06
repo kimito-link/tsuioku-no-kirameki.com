@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1891',
+    date: '2026-11-05',
+    summary: 'YouTube の同接をパネルを閉じても記録',
+    items: Object.freeze([
+      'YouTube の同時視聴者数を、サイドパネルを閉じていても1分ごとに記録するようにしました。会場モードで見ている間の同接がマーケの「同接推移カーブ」から抜けていました(27分の配信で5分〜25分が空)',
+      '同接がまだ読めていないときの「0人」を記録しないようにしました(開始時の0人で平均が下がっていました)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1890',
     date: '2026-11-05',
     summary: 'YouTube Live にも対応(試作版を本体に)',

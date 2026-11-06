@@ -117,3 +117,15 @@ function swapOnce(text, fromRules, toRules) {
   const re = new RegExp(keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
   return text.replace(re, (m) => map.get(m) ?? m);
 }
+
+/**
+ * Twitch の配信を同じ画面で見せるとき(council/twitch-support-PLAN.md)、ytWording が YouTube の言葉にした所だけを
+ *   Twitch の言葉にする。ytWording が何も変えなかった文字(コメント本文など)には使わないこと。
+ * @param {string} text ytWording の結果
+ */
+export function ytWordingForTwitch(text) {
+  return String(text ?? '')
+    .split('スーパーチャット').join('Bits')
+    .split('スパチャ').join('Bits')
+    .split('YouTube').join('Twitch');
+}
