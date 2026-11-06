@@ -3425,7 +3425,7 @@
     - `voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
     - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
     - `voiceLoadingState.test.js`
-    - `voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1912・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
+    - `voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1911・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
     - `voiceLongCommentShorten.test.js`
     - `voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
     - `voiceNarrowing.test.js`
