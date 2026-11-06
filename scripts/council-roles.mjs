@@ -427,6 +427,9 @@ export function weightOf(label) {
     // 個別に軽い重みを与えない。leadにはcloud weight1が存在しないため、weight2でも
     // 事実上のlead主力になる（当初mistral-large-3-675bで採った理屈と同一。
     // そちらは2026-07-23にEOLし撤去済み・詳細はcouncil-lineup.mjsのコメント参照）。
+    // ★2026-11-03: Nemotron 3.5 Super は新顔なので予備(3)から（恒久ルール3）。下の "nvidia"→2 より前に置くこと（if は先勝ち）。
+    //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ（council-lineup.mjs の同エントリ参照）。
+    if (n.includes("nemotron-3.5")) return 3;
     if (n.includes("nvidia") || n.includes("qwen3.5-122b")) return 2;
     // 2026-07-03/07-04 設計: 予備クラウド専用の reserve 層。同役割に安定勢(weight1)が
     // いる限り絶対に選ばれない（weight昇順ソートのため）。安定勢が不在/全滅した時だけ浮上する。

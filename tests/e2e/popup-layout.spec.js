@@ -131,7 +131,7 @@ test.describe('popup layout', () => {
         '.nl-record',
         '.nl-comment-compose--primary',
         '.nl-compose-quick-toolbar',
-        '#exportJson',
+        '#exportMarketingQuickBtn',
         '#supportVisualDetails',
         '#userRoomList'
       ];

@@ -5,8 +5,10 @@ import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/come
 import {
   applyVenuePickupView,
   buildVenuePickupView,
-  createVenuePickupBanner
+  createVenuePickupBanner,
+  venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
+import { attachVenuePickupDrag } from './venuePickupDrag.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
   buildVenueSeating,
@@ -135,7 +137,7 @@ import { highlightLedgerReadKeys, isHighlightWorthyKind, planHighlightAppend } f
 // anonymousIdenticonDataUrl は P3(v0.1.1117)で venueLaneBuckets(①正本委譲)側へ移動=venueBar 直参照なし。
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
-import { speechSupportLine, speechEmptyMessage, parseTileStatsText } from '../lib/venueSpeechStats.js';
+import { speechSupportLine, speechEmptyMessage, speechFallbackListHtml, parseTileStatsText } from '../lib/venueSpeechStats.js';
 import { giftThrowsForUser, giftThrowsSectionHtml } from '../lib/venueGiftThrowsForUser.js';
 import { adObservationNote, adObservationStorageKey } from '../lib/adObservationLog.js';
 import { isContextInvalidatedError } from '../lib/reportSilentError.js';
@@ -374,6 +376,7 @@ import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
+import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } from '../lib/venueComposeBox.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -634,35 +637,37 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
   }
-  /* v0.1.1230 ピックアップ枠(BSP風): 会場ヘッダー直下に常設。高さを先に確保して
-     出たり消えたりで下の段が動かないようにする(ユーザー報告「上下に動く」の対策と同趣旨)。 */
+  /* v0.1.1230 ピックアップ枠(BSP風)。v0.1.1869 りんく「上にもってきたほうがみやすい」(Canva の見本=映像の上に大きな白い吹き出し):
+     ひな壇の一番下にあった帯を、映像の上端中央の大きな吹き出しにした。stageLayout 直下に絶対配置するので
+     出たり消えたりしても席の段は動かない。空のときは出さない(案内文の大きな白い枠で映像をふさがない)。
+     ★下地は不透明(v0.1.1337: 半透明だと後ろのページの文字と重なって読めなかった)。 */
   .nlsb-pickup {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    z-index: 7;
+    transform: translateX(-50%);
+    width: min(860px, calc(100% - 180px));
+    box-sizing: border-box;
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    margin: 4px 0 6px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 190, 90, 0.55);
-    /*
-     * ★v0.1.1337: 地の色を【不透明で】敷く(実機で読めなくなっていた)。
-     *   旧: linear-gradient のみ = 透明度 0.22〜0.06 の帯だけ。
-     *   会場の暗い背景の上なら成立するが、後ろにニコ生のページ(カテゴリタグ等)が
-     *   透けると文字と背景が重なって【判読不能】になる。実機スクリーンショットで確認。
-     *   さらに data-empty の opacity:0.55 が乗ると実質 0.03〜0.12 まで薄くなっていた。
-     *   → 不透明の下地(#2a2118 相当)を先に置き、その上に既存のグラデを重ねる。
-     *     色は会場の暗色系に馴染ませる(白背景でも黒背景でも読める濃さ)。
-     */
-    background-color: rgba(38, 30, 20, 0.92);
-    background-image: linear-gradient(90deg, rgba(255, 176, 62, 0.28), rgba(255, 176, 62, 0.1));
-    color: #fff5e8;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-    font-size: 13px;
-    line-height: 1.35;
+    gap: 12px;
+    min-height: 64px;
+    padding: 10px 22px;
+    border-radius: 28px;
+    border: 2px solid rgba(255, 176, 62, 0.9);
+    background: #fffdf8;
+    color: #1f2328;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    font-size: 18px;
+    line-height: 1.4;
+    pointer-events: auto;
   }
-  /* ★空のときも【薄くしすぎない】(0.55 だと下地ごと透けて読めなくなる)。 */
-  .nlsb-pickup[data-empty='1'] { opacity: 0.85; }
+  /* 吹き出しの尻尾(左下)。枠線色の三角の上に地の色の三角を重ねる。 */
+  .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
+  .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
+  .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
+  .nlsb-pickup[data-empty='1'] { display: none; }
   .nlsb-pickup__badge {
     flex: 0 0 auto;
     font-size: 10px;
@@ -675,12 +680,12 @@ const VENUE_CSS = `
   }
   .nlsb-pickup__face {
     flex: 0 0 auto;
-    width: 30px;
-    height: 30px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     object-fit: cover;
-    background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 1px rgba(255, 245, 232, 0.45);
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
   }
   .nlsb-pickup__face[hidden] { display: none; }
   .nlsb-pickup__main {
@@ -694,14 +699,14 @@ const VENUE_CSS = `
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; /* 長文は2行まで */
+    overflow-wrap: anywhere;
+    font-weight: 700;
   }
   .nlsb-pickup__meta {
     flex: 0 0 auto;
-    font-size: 11px;
-    opacity: 0.8;
+    font-size: 12px;
+    opacity: 0.75;
     color: inherit;
     text-decoration: none;
     overflow: hidden;
@@ -2625,7 +2630,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any } }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -2798,6 +2803,13 @@ export function mountVenueBarButton(options = {}) {
   // 2026-11-01: GPU の案内(遅れの一言とは別の行・文言と判定は voiceLagNotice.decideVoiceGpuTip)。出すときだけ見える。
   const voiceGpuTip = Object.assign(/** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()), { className: 'nlsb-voice-gpu-tip', hidden: true });
   voiceGpuTip.style.cssText += 'color:#b45309;font-weight:600;';
+  // 2026-11-03 りんく: 会場の帯は半透明で、後ろのニコ生のコメント入力欄と文字が重なって読めなかった。
+  //   遅れの一言と GPU の案内だけ、不透明な下地を敷いて何の上でも読めるようにする。
+  voiceLag.hidden = true;
+  for (const el of [voiceLag, voiceGpuTip]) {
+    el.style.cssText += 'background:rgba(255,255,255,0.96);padding:2px 8px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.18);';
+  }
+  voiceGpuTip.style.background = '#fff7e6';
 
   let venueWindowBtn = null;
   if (!isStandalone) {
@@ -2831,6 +2843,9 @@ export function mountVenueBarButton(options = {}) {
     tuckBtn.title = 'コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます';
     tuckBtn.addEventListener('click', () => setTucked(true));
   }
+  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on, note) => setTucked(on, note), stripHint: !!options.giftItems }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
+  const giftStrip = !isStandalone && options.giftItems ? createVenueGiftStrip({ ...options.giftItems, tuck: (on, note) => setTucked(on, note) }) : null; // v0.1.1875 公式と同じアイテムの帯(lib の venueComposeBox.js)
+  const composeBox = !isStandalone && typeof options.postComment === 'function' ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null; // v0.1.1867 会場から発言(lib の venueComposeBox.js)
   const note = document.createElement('div');
   note.className = 'nlsb-note';
   // 2026-06-22 会場「全員500人」: 席上限の表示も実定数に追従させる(150 固定の取り残しを是正)。
@@ -2838,11 +2853,11 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
   } else {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
-  header.append(title, headerRight);
+  header.append(title, ...(composeBox ? [composeBox] : []), headerRight); // v0.1.1868 発言欄は中央
 
   // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
   //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる
@@ -2981,21 +2996,32 @@ export function mountVenueBarButton(options = {}) {
    * ピックアップ枠の入力(2026-10-17): 表示行(storage集計/鏡由来=text空)ではなく、届いた発言(吹き出し・読み上げと同じ speeches)を積む独立のリングから選ぶ。
    *   以前は commitDisplay の表示行から選んでいたため、発言を行へ混ぜた直後の1回しか本文が乗らず枠が案内文のままだった(実機+headlessで再現)。正本=venuePickupRing.js。
    */
-  /** @type {Array<any>} */
-  let pickupRing = [];
+  let pickupRing = /** @type {Array<any>} */ ([]);
   /** @param {ReadonlyArray<any>|null} fallbackRows リングが空のときの従来入力(表示行) */
   const updatePickupBanner = (fallbackRows) => {
     try {
       const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
-      applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
+      const picked = pickTickerHighlightEntry(rows, Date.now());
+      applyVenuePickupView(pickupEls, buildVenuePickupView(picked));
+      placePickup(); if (picked.why === 'scored' && picked.entry !== pickupRing[pickupRing.length - 1]) pickupDrag.later(() => updatePickupBanner(null)); // v0.1.1901: 窓の中の前の1件を出している間に新しい発言が来たら、窓が過ぎてから選び直す(過疎だと次の更新が来ず前の1件が10分出続けた)
     } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
-  // seating は下端のひな壇だけ(header + pickup + seats)。
-  seating.append(header, pickupEls.root, topBar, seatsHost);
+  /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
+  function placePickup() {
+    if (pickupEls.root.hasAttribute('data-empty')) return;
+    const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
+    const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
+    pickupEls.root.style.width = at ? `${at.width}px` : '';
+    pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
+  }
+  const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)
+  // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
+  seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   // 3キャラ常駐は配信画面の「まわり(左右の縁)」に出す(会場の席とは重ねない=邪魔にしない)。
   //   stageLayout 基準=映像セーフエリアの高さに合わせて左右に配置できる。
-  stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer);
+  stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer, pickupEls.root);
   // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
   //   セリフがクリップされず・アバターに潜らない。席の座標を測ってこの上に頭上配置する。
   const bubbleLayer = document.createElement('div');
@@ -3304,7 +3330,11 @@ export function mountVenueBarButton(options = {}) {
       try {
         statsText = String(anchorEl.querySelector('[data-stats]')?.getAttribute('data-stats') || '');
       } catch { /* 取れなくてもパネルは開く */ }
-      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc, statsText });
+      // v0.1.1855: ホバーと同じ手元の発言も渡す(保存した記録が読めないときの代わり・新しい取得ゼロ)。
+      const fallbackTexts = Array.isArray(data?.recentTexts) && data.recentTexts.length
+        ? data.recentTexts
+        : (data?.lastText ? [data.lastText] : []);
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || fromTile.name || ''), avatarSrc, statsText, fallbackTexts });
     });
   };
   wireSpeechPanelDelegation(seatsHost);
@@ -3388,7 +3418,7 @@ export function mountVenueBarButton(options = {}) {
       /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
     ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
-    onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; },
+    onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; voiceLag.hidden = !text; },
     onGpuTip: (/** @type {string} */ text) => { voiceGpuTip.textContent = text; voiceGpuTip.title = text; voiceGpuTip.hidden = !text; },
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
@@ -4007,14 +4037,18 @@ export function mountVenueBarButton(options = {}) {
    * ★呼ばれるのはクリックの瞬間だけ(常時のstorage readは1件も増やさない)。
    *   大配信では read が browser process を詰まらせる既知の地雷があるため、
    *   タイムアウト付きで走らせ、失敗しても会場の描画は止めない。
+   * v0.1.1855: 読めなかった(拡張が切れた/時間切れ)ことも返す。以前は失敗も [] で「記録はありません」と言い切っていた。
    * @param {string} liveId
-   * @returns {Promise<any[]>}
+   * @returns {Promise<{ rows: any[], readFailed: boolean, contextLost: boolean }>}
    */
   const readVenueCommentRowsForSpeech = async (liveId) => {
     const lid = String(liveId || '').trim();
-    if (!lid) return [];
+    if (!lid) return { rows: [], readFailed: true, contextLost: false };
+    // 拡張が更新されたタブでは chrome.storage が全部失敗する=読む前に分かる(hasVenueExtensionContext と同じ判定)。
+    if (!hasVenueExtensionContext()) return { rows: [], readFailed: true, contextLost: true };
     /** @type {unknown[]} */
     let rows = [];
+    let readFailed = false;
     try {
       const result = await runStorageOpWithTimeout(
         () => readChunkedComments(lid, commentsStorageKey(lid), (keys) => chrome.storage.local.get(keys)),
@@ -4023,6 +4057,7 @@ export function mountVenueBarButton(options = {}) {
       rows = Array.isArray(result?.rows) ? result.rows : [];
     } catch {
       rows = [];
+      readFailed = true; // チャンクが読めなかった(テールだけでは古い発言が欠ける)
     }
     /*
      * ★v0.1.1287: テール(nls_ctail_<lv>)も読む。会場の発言パネルだけが読んでいなかった。
@@ -4051,7 +4086,7 @@ export function mountVenueBarButton(options = {}) {
     } catch {
       /* テールは任意=読めなくてもチャンク分で動く */
     }
-    return rows;
+    return { rows, readFailed, contextLost: !hasVenueExtensionContext() };
   };
 
   /*
@@ -4141,7 +4176,8 @@ export function mountVenueBarButton(options = {}) {
   /**
    * その人の全発言を読み込んでパネルに出す。
    * ★storage read はこの関数の中だけ=クリックした瞬間だけ(常時readを増やさない)。
-   * @param {{ uid: string, displayName: string, avatarSrc?: string, statsText?: string }} who
+   * @param {{ uid: string, displayName: string, avatarSrc?: string, statsText?: string, fallbackTexts?: unknown }} who
+   *   fallbackTexts: ホバーカードと同じ「会場が手元に持っている直近の発言」(新しい取得ゼロ)。保存した記録から1件も取れないときだけ使う。
    */
   const openSpeechPanelFor = async (who) => {
     const uid = String(who?.uid || '').trim();
@@ -4171,9 +4207,11 @@ export function mountVenueBarButton(options = {}) {
     /** @type {Array<{ text?: unknown, capturedAt?: unknown }>} */
     let rows = [];
     let total = 0;
+    let readState = { readFailed: false, contextLost: false };
     try {
       const lid = String(activeLiveId || liveIdFromPathname() || '');
-      const raw = await readVenueCommentRowsForSpeech(lid);
+      const { rows: raw, ...st } = await readVenueCommentRowsForSpeech(lid);
+      readState = st;
       // v0.1.1248(2026-08-04 真因確定): extractUserCommentRows が期待するのは
       //   comeviewUserKeyForRow が返す【接頭辞つきキー】('u:<userId>' / 'n:<name>')であり、
       //   生の uid ではない(comeviewActions.js:226 は完全一致で照合する)。
@@ -4189,6 +4227,7 @@ export function mountVenueBarButton(options = {}) {
     } catch {
       rows = [];
       total = 0;
+      readState = { readFailed: true, contextLost: !hasVenueExtensionContext() };
     }
     if (speechPanel.hidden || gen !== speechOpenGen) return; // 読み込み中に閉じられた/別の人のパネルに替わった
 
@@ -4209,7 +4248,8 @@ export function mountVenueBarButton(options = {}) {
             );
           })
           .join('')
-      : '';
+      // v0.1.1855: 記録から1件も取れなければ、ホバーと同じ手元の直近の発言で代わりに出す(2026-11-03 実機: ホバーは発言2・パネルは「記録なし」)。
+      : speechFallbackListHtml(total ? [] : who?.fallbackTexts, readState, escapeHtml, VENUE_SPEECH_PANEL_MAX);
     const note = total > rows.length ? `（新しい ${rows.length} 件を表示 / 全 ${total} 件）` : `（全 ${total} 件）`;
     /*
      * ★「この人がここでどうしていたか」の一言を見出しにも出す（2026-08-30）。
@@ -4241,7 +4281,7 @@ export function mountVenueBarButton(options = {}) {
       (speechSupportLine(statsText)
         ? `<div class="nlsb-speech-support">${escapeHtml(speechSupportLine(statsText))}</div>`
         : '') +
-      `<div class="nlsb-roster-list">${listHtml || `<div class="nlsb-roster-empty">${escapeHtml(speechEmptyMessage(statsText))}</div>`}</div>`;
+      `<div class="nlsb-roster-list">${listHtml || `<div class="nlsb-roster-empty">${escapeHtml(speechEmptyMessage(statsText, readState))}</div>`}</div>`;
     const closeBtn2 = speechPanel.querySelector('.nlsb-roster-close');
     if (closeBtn2) closeBtn2.addEventListener('click', () => closeSpeechPanel());
     // v0.1.1659: ギフトの明細は発言一覧とは別に後から差し込む(パネルを待たせない・取れなくても発言一覧はそのまま)。
@@ -6695,6 +6735,8 @@ export function mountVenueBarButton(options = {}) {
     //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
     //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
     const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
+    // v0.1.1866: 開いた瞬間の直近3件(primeEmit)は開く前に届いた発言なので「受信→キュー」の遅れに数えない(数えると過疎配信で何分も「遅れ」が残った)。
+    const primeBurst = !(speechState && speechState.primed === true);
     const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
     speechState = {
       seenKeys: result.seenKeys,
@@ -6775,7 +6817,8 @@ export function mountVenueBarButton(options = {}) {
           key: speech.key,
           text: speech.text,
           // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
-          receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
+          receivedAt: primeBurst ? undefined : speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
+          liveId: liveIdFromPathname(), broadcasterUid: _lastBroadcasterUid, // v0.1.1861: 混雑時に配信者・初コメを読む判定
           // ★キャラライブの相槌はここに乗せる(2026-08-25)。
           //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
           //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
@@ -7068,7 +7111,8 @@ export function mountVenueBarButton(options = {}) {
     // キャラライブも止める(rAF を回したまま放置すると拡張更新後も裏で描き続ける)。
     try { charaLive.destroy(); } catch { /* no-op */ }
     try {
-      title.textContent = '⚠ 拡張が更新されました。ページを再読み込み(F5)してください';
+      // v0.1.1855: ページが自分で読み込み直す(content-entry.js の startOrphanTabAutoReload)。打ちかけのコメントがある間は待つ。
+      title.textContent = '⚠ 拡張が新しい版になりました。このページを自動で読み込み直します(コメント入力中は待ちます)';
       title.style.color = '#ffcf66';
     } catch { /* no-op */ }
   };
@@ -7170,9 +7214,30 @@ export function mountVenueBarButton(options = {}) {
   /** v0.1.1654: 会場を一時的にしまっているか(会場自体は開いたまま・閉じると必ず解除)。 */
   let tucked = false;
   const TOGGLE_LABEL_OPEN = toggle.textContent || '🏟 会場モード';
-  /** @param {boolean} next */
-  const setTucked = (next) => {
+  /** @type {HTMLDivElement | null} */
+  let tuckNote = null;
+  let tuckNoteSeq = 0;
+  /** v0.1.1880: しまった理由と次の一手を右下に出す(ギフトから会場をしまったとき・りんく「何の説明もないと何が起こったのかと思う」) */
+  /** @param {string} [text] */
+  const showTuckNote = (text) => {
+    if (!text) { tuckNote?.remove(); tuckNote = null; return; }
+    if (!tuckNote) {
+      tuckNote = document.createElement('div');
+      tuckNote.className = 'nlsb-tuck-note';
+      tuckNote.setAttribute('role', 'status');
+      tuckNote.style.cssText = 'position:fixed;right:16px;bottom:72px;z-index:2147483646;max-width:min(360px,calc(100vw - 32px));padding:10px 12px;border-radius:10px;background:#fff;color:#222;font-size:13px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
+      tuckNote.title = '押すと消えます';
+      tuckNote.addEventListener('click', () => showTuckNote(''));
+      document.body.append(tuckNote);
+    }
+    tuckNote.textContent = text;
+    const seq = ++tuckNoteSeq;
+    setTimeout(() => { if (seq === tuckNoteSeq) showTuckNote(''); }, 15000);
+  };
+  /** @param {boolean} next @param {string} [note] */
+  const setTucked = (next, note) => {
     tucked = next === true;
+    showTuckNote(tucked ? note : '');
     root.classList.toggle('nlsb-is-tucked', tucked);
     toggle.textContent = tucked ? '▲ 会場に戻る' : TOGGLE_LABEL_OPEN;
     toggle.setAttribute('aria-label', tucked ? '会場に戻る' : '会場モード');

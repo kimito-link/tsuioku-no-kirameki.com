@@ -22,8 +22,10 @@ export const VOICE_OVERLOAD_RECOVER_STREAK = 5;
 export const VOICE_OVERLOAD_FAST_MS = 3000;
 
 /** 混雑中の打ち切り(ms)。実測の最悪(問い合わせ7秒・合成10秒)が収まる長さ。 */
-export const VOICE_OVERLOAD_QUERY_TIMEOUT_MS = 15000;
-export const VOICE_OVERLOAD_SYNTH_TIMEOUT_MS = 20000;
+// 2026-11-03: 15/20秒→30/45秒。実測で混雑中の audio_query が平均11.7秒・合成が25秒かかり、
+//   打ち切った依頼も VOICEVOX は最後まで計算して次を遅らせていた。混雑中は1件ずつしか頼まないので長く待つ。
+export const VOICE_OVERLOAD_QUERY_TIMEOUT_MS = 30000;
+export const VOICE_OVERLOAD_SYNTH_TIMEOUT_MS = 45000;
 
 /** @returns {{ overloaded: boolean, timeoutStreak: number, fastStreak: number }} */
 export function createVoiceOverloadState() {

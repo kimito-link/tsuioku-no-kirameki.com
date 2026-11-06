@@ -22,6 +22,9 @@ export default [
       'extension/dist/**',
       // app/dist/** は Web版(app.tsuioku-no-kirameki.com)の esbuild minified 出力。
       'app/dist/**',
+      // YouTube 版のビルド出力(scripts/build-youtube-ext.mjs が作る束ね・写し)。
+      'extension-youtube/dist/**',
+      'extension-youtube/*.js',
       // mobile/scripts/** は web-ios-android キットからコピーした App Store 提出の道具(キット側で検査済み・
       //   書き換えずに保つ=キットとの差分を小さく)。mobile/node_modules・mobile/ios は CI が作る。
       'mobile/**',
@@ -404,7 +407,9 @@ export default [
     //   拡張の中では口が null=PC の送信経路は不変。中継の通信・印は app/live-view-post.js、判定は lib の phonePost.js。
     // v0.1.1749: 読み上げ音量スライダーの配線(+2行: import と呼び出し)。配線は popup/wireVoiceVolumeSlider.js、正規化は lib の voiceVolume.js。
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
-    rules: { 'max-lines': ['error', { max: 21746, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1852: 遅い PC なら GPU の案内を出す配線(import 1行+呼び出し4行=+5)。中身は popup/wireVoiceGpuTip.js。
+    // v0.1.1889: 応援マスの作り直しの入口別計器と末尾だけ削る縮小(+56: import 1・状態と補足欄の書き込み関数・各入口の記録・北極星キャラ絵の同値スキップ2)。数え方と文言は lib の storyGrowthRebuildReasons.js。
+    rules: { 'max-lines': ['error', { max: 21807, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -431,7 +436,13 @@ export default [
     // v0.1.1825: 横付きパネルが右へはみ出したら置いた後の実測で縮める/below へ(+18行: import・記憶・実測と再描画)。判定は lib の besideOverflowGuard.js。
     // v0.1.1829: コメビュの読み上げへの近道(import 1行+呼び出しとコメント2行)。port の管理は comeviewLivePushHost.js・判定は lib の comeviewLivePush.js。
     // v0.1.1830: 作りたて host を古いと捨てて開くたび4回作り直していたのを止める(+5行: 一度でも DOM に入った host の WeakSet と記録2か所)。
-    rules: { 'max-lines': ['error', { max: 19571, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1855: 拡張の入れ替え後に古い版のまま止まったページが自分で読み込み直す(import 1行+呼び出しとコメント2行)=+3。中身は lib の orphanTabAutoReload.js。
+    // v0.1.1867: 会場から発言(会場に postComment を渡す+コメント1行)=+1。入力欄は lib の venueComposeBox.js。
+    // v0.1.1870: 会場のギフトボタン(公式のギフト画面を開く lib の import 1行)=+1。
+    // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
+    // v0.1.1874: ギフトの子の窓で番組ギフトのタブへ切り替える合図の受け手(起動1行)=+1。中身は lib の venueComposeBox.js。
+    // v0.1.1875: 会場のギフトのアイテムの帯(import 1行)=+1。読む・置く・押すは lib の giftItemsMirror.js。
+    rules: { 'max-lines': ['error', { max: 19580, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -455,8 +466,17 @@ export default [
     // v0.1.1832: 席が無い人の吹き出しを診断の行の上に出す配線(viewportFloor 1行)と、名前の無い人を「匿名NNN」で出す4行=+5。
     // v0.1.1833: 読み上げの音質の設定を効かせる(import 1行+呼び出し1行)=+2。中身は voiceQualitySetting.js / lib の voiceQuality.js。
     // v0.1.1848: GPU の案内を遅れの一言とは別の行に出す(span 生成と色2行+コメント1行+onGpuTip の配線1行)=+4。文言と判定は lib の voiceLagNotice.decideVoiceGpuTip。
+    // v0.1.1852: 遅れの一言と GPU の案内に不透明な下地(後ろのコメント欄と重なって読めなかった・コメント2行+下地4行+隠す1行)=+7。
+    // v0.1.1855: 発言パネルが記録を読めなかったとき(拡張が切れた/時間切れ)に理由を返し、ホバーと同じ手元の発言を代わりに出す配線=+15。文言と HTML は lib の venueSpeechStats.js。
+    // v0.1.1861: 読み上げに配信 id と配信者 uid を渡す(混雑時は大事なものだけ読む・判定は lib の voiceBusyPriority.js)=+1。
+    // v0.1.1866: 会場を開いた瞬間の3件を読み上げの遅れに数えない(印1行+コメント1行)=+2。
+    // v0.1.1867: 会場から発言(import 1行+入力欄を作る1行)=+2。入力欄は lib の venueComposeBox.js。
+    // v0.1.1870: 会場の「🎁 ギフト」(ボタンを作る1行・lib の createVenueGiftButton)=+1。
+    // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
+    // v0.1.1875: 会場に公式と同じギフトのアイテムを並べる帯(作る1行・lib の createVenueGiftStrip)=+1。
+    // v0.1.1880: ギフトから会場をしまったとき、理由と次の一手を右下に出す(りんく「何の説明もないと何が起こったのかと思う」)=+21。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7357, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7422, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -488,6 +508,12 @@ export default [
       sourceType: 'script',
       globals: { ...browserChrome }
     }
+  },
+  {
+    // YouTube 版のブラウザで動く入口(extension-youtube/src)。各ファイル冒頭の /* global */ と重なっても止めない。
+    files: ['extension-youtube/src/**/*.js'],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: { ...browserChrome } },
+    rules: { 'no-redeclare': ['error', { builtinGlobals: false }] }
   },
   {
     // Web版(app.tsuioku-no-kirameki.com)の閲覧ページ。chrome.* には依存しない純ブラウザ。

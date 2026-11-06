@@ -8560,6 +8560,7 @@
       }
 
       .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      .nl-comment-compose--primary .nl-compose-quick-toolbar #exportMarketingQuickBtn,
       .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
       .nl-comment-compose--primary .nl-compose-quick-toolbar #reloadWatchTabBtn {
         width: auto;
@@ -9344,7 +9345,9 @@
         outline-offset: 2px;
       }
 
-      #exportJson {
+      /* v0.1.1854: 保存はマーケHTML 1つに。旧「HTML」と同じ押しやすい主ボタンの見た目にする。 */
+      #exportJson,
+      #exportMarketingQuickBtn {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -9363,28 +9366,33 @@
         transition: background 0.15s ease, transform 0.1s ease;
       }
 
-      #exportJson:hover:not(:disabled) {
+      #exportJson:hover:not(:disabled),
+      #exportMarketingQuickBtn:hover:not(:disabled) {
         background: var(--nl-accent-hover);
       }
 
-      #exportJson:active:not(:disabled) {
+      #exportJson:active:not(:disabled),
+      #exportMarketingQuickBtn:active:not(:disabled) {
         transform: scale(0.98);
       }
 
       @media (prefers-reduced-motion: reduce) {
-        #exportJson:active:not(:disabled) {
+        #exportJson:active:not(:disabled),
+        #exportMarketingQuickBtn:active:not(:disabled) {
           transform: none;
         }
       }
 
-      #exportJson:disabled {
+      #exportJson:disabled,
+      #exportMarketingQuickBtn:disabled {
         background: #cbd5e1;
         color: #64748b;
         cursor: not-allowed;
         box-shadow: none;
       }
 
-      #exportJson:focus-visible {
+      #exportJson:focus-visible,
+      #exportMarketingQuickBtn:focus-visible {
         outline: 2px solid #fff;
         outline-offset: 2px;
         box-shadow: 0 0 0 4px rgb(15 143 216 / 45%);
@@ -9399,6 +9407,8 @@
       }
 
       body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
+      body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #exportMarketingQuickBtn,
+      body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #exportMarketingQuickBtn,
       body.nl-tight .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
       body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
       body.nl-compact .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
@@ -11852,6 +11862,10 @@
               </span>
             </label>
           </div>
+          <!-- 2026-11-03(りんく「POP とか会場モードに記載すべき」): 読み上げが遅い PC だと記録されているときだけ、
+               VOICEVOX を GPU にする案内を出す。配線は popup/wireVoiceGpuTip.js、文言は lib の voiceLagNotice.js。 -->
+          <p id="voiceGpuTip" class="nl-record-sub__hint" hidden
+            style="color:#b45309;font-weight:600;background:#fff7e6;border-radius:8px;padding:6px 8px;margin:4px 0;"></p>
           <!-- 2026-10-29: 読み上げの声の音質(出力サンプリングレート)。既定は今までどおり標準(16kHz・v0.1.1063 で合成が約30%速いため)。
                高音質(24kHz)は自分で選んだ人だけ。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。 -->
           <div class="nl-record-sub">
@@ -12292,9 +12306,11 @@
               aria-label="書き出しと watch の再読み込み"
               aria-describedby="exportToolbarHint"
             >
+              <!-- v0.1.1854: 「HTML」の中身はマーケの1章に入った(ボタンはマーケ1つ)。要素は保存先の情報(dataset)を持つので残して隠す。 -->
               <button
                 type="button"
                 id="exportJson"
+                hidden
                 disabled
                 title="HTMLレポートを保存"
                 aria-label="HTMLレポートを保存。メタ情報・保存コメントをまとめた検索用HTMLをダウンロードします。"
@@ -12308,12 +12324,12 @@
                 type="button"
                 id="exportMarketingQuickBtn"
                 disabled
-                title="マーケ分析+メディアキットを1つのHTMLで保存"
-                aria-label="マーケ分析とメディアキットを1つのHTMLで保存。グラフと指標、共有用の実績サマリがまとまっています。"
+                title="マーケ分析・視聴維持率・メディアキット・コメント記録を全部1つのHTMLで保存"
+                aria-label="マーケHTML。マーケ分析・視聴維持率・メディアキット・コメント記録を全部1つのHTMLで保存。グラフと指標、最後まで見た人の割合、共有用の実績サマリ、コメント全文の検索とCSVがまとまっています。"
               >
                 <span class="nl-compose-qbtn__row">
                   <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
-                  <span class="nl-compose-qbtn__word">マーケ</span>
+                  <span class="nl-compose-qbtn__word">マーケHTML</span>
                 </span>
               </button>
               <button
@@ -12431,7 +12447,7 @@
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
           id="exportToolbarHint"
         >
-          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（なふだ・取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
+          マーケHTML（分析・コメント記録をまとめて1つのHTML）・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（なふだ・取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
         </p>
         <details
           class="nl-export-toolbar__details nl-compose-primary-more"

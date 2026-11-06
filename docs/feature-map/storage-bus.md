@@ -128,7 +128,7 @@
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_OUTCOME` | — | extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | extension/status-entry.js | extension/live-view-entry.js |
-| `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
+| `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/comeview-entry.js<br>extension/venueBar.js |
 | `KEY_LIVE_EVENTS_TAIL` | extension/content-entry.js | — |
 | `KEY_LIVE_EVENTS_WANTED` | extension/liveEventsPublisher.js | extension/content-entry.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/marketing-export-entry.js<br>extension/popup-entry.js |
@@ -167,6 +167,7 @@
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/marketing-export-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_VENUE_BUTTON_VISIBLE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | — |
+| `KEY_VENUE_PICKUP_POS` | extension/venuePickupDrag.js | extension/venuePickupDrag.js |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_ASSIGNMENTS` | — | extension/phoneVoicePublisher.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |

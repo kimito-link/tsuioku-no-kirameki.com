@@ -45,6 +45,12 @@ export const VOICE_GPU_TIP_TEXT = '⚡ 読み上げを速くするには: VOICEV
 export const VOICE_WARMING_TEXT = 'VOICEVOX を起動した直後は、初めて使う声の準備で遅れます。続けて読むうちに速くなります';
 
 /**
+ * 2026-11-03: VOICEVOX が追いつかず、PC の声(Windows の声)で読んでいる間の一言(voiceLightFallback.js)。
+ *   声が変わったのを「壊れた」と思わせないために、なぜ変わったか・いつ戻るかを書く。
+ */
+export const VOICE_LIGHT_ACTIVE_TEXT = 'VOICEVOX が追いつかないので、いまは PC の声で読んでいます。VOICEVOX が速くなったら自動で戻ります';
+
+/**
  * まだ声の準備中か(2回目以降の合成が十分に測れていない)。
  * @param {{ warmSynthSamples?: number, warmRtfSamples?: number }} diag
  */
@@ -79,18 +85,21 @@ export function decideVoiceGpuTip(diag, gpuCapable) {
 
 /**
  * @param {boolean} prevShown 直前に出していたか
- * @param {{ e2eAvgMs?: number, upstreamEmaMs?: number, queueNow?: number, warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number, voiceOverloaded?: boolean }} diag
+ * @param {{ e2eAvgMs?: number, upstreamEmaMs?: number, queueNow?: number, warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number, voiceOverloaded?: boolean, lightVoiceActive?: boolean }} diag
  * @param {{ gpuCapable?: boolean|null }} [_opts] 2026-11-01 から GPU の案内は decideVoiceGpuTip へ移した(呼び出し側の互換のため受け取るだけ)
  * @returns {{ shown: boolean, lagMs: number, text: string }}
  */
 export function decideVoiceLagNotice(prevShown, diag, _opts = {}) {
+  // 2026-11-03: 軽い声で読んでいる間は、遅れではなく「声を切り替えた」ことを伝える(遅れの平均は VOICEVOX の頃の値)。
+  if (diag?.lightVoiceActive === true) return { shown: true, lagMs: -1, text: VOICE_LIGHT_ACTIVE_TEXT };
   const e2e = Number(diag?.e2eAvgMs);
   const up = Number(diag?.upstreamEmaMs);
   const queueNow = Number(diag?.queueNow);
   if (!Number.isFinite(e2e) || e2e < 0) return { shown: false, lagMs: -1, text: '' };
   const lagMs = Math.round(e2e + (Number.isFinite(up) && up > 0 ? up : 0));
   // 待ちが空になった=もう追いついている。古い平均で出し続けない。
-  if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: '' };
+  // v0.1.1866: 前に出していなくても待ち0なら出さない(開き直した直後に古い平均だけで「約19秒遅れ」が出ていた・YouTube 版 0.1.102 で確認)。
+  if (Number.isFinite(queueNow) && queueNow <= 0) return { shown: false, lagMs, text: '' };
   const shown = prevShown ? lagMs >= VOICE_LAG_NOTICE_HIDE_MS : lagMs >= VOICE_LAG_NOTICE_SHOW_MS;
   if (!shown) return { shown: false, lagMs, text: '' };
   const sec = Math.round(lagMs / 1000);

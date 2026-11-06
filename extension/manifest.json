@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "君斗りんくの追憶のきらめき",
-  "version": "0.1.1849",
+  "version": "0.1.1905",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy2D/OmG4MwfDWDpw0lQ0BuMFStFPcDuuAHvQ5RB/TF2jzUKYjIFNqi+QDrnLEdFz7zNe3Wo6t8TzTeMJmTAguvlHM9hLHsF4jkwWL/lWz0x3DWZqTnw+lCh418eCFbjO+MkjDyDIOwIAO1gV2q+8wJ0HwSfGO8jcToBilHAP4kaxJSpC+MZftfbhngPI7TFrZY0j2BTpkp2HHG5ocXzsqhSD+Z2VU/xHvRNm9o823Bcfn8p3QIrRBu2w2iOlSuVl2j2b4nNR59GLis20aorT6HS5Jr8AYp/raftka/uiS0FWcJFpp3jshxpOqQ7OmPaAIoTcpshBTC+o6krbW9x0lwIDAQAB",
   "description": "ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます（開発識別子: nicolivelog）。",
   "icons": {
@@ -19,18 +19,24 @@
     "tabs",
     "webNavigation",
     "sidePanel",
-    "offscreen"
+    "offscreen",
+    "tts",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "https://*.nicovideo.jp/*",
     "https://app.tsuioku-no-kirameki.com/*",
     "https://suggestqueries.google.com/*",
+    "https://www.youtube.com/*",
+    "https://yt3.ggpht.com/*",
+    "https://yt4.ggpht.com/*",
+    "https://yt3.googleusercontent.com/*",
     "http://127.0.0.1:50021/*",
     "http://127.0.0.1:3456/*",
     "http://localhost:3456/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' https://*.nicovideo.jp;"
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' https://*.nicovideo.jp https://www.youtube.com;"
   },
   "background": {
     "service_worker": "background.js"
@@ -74,6 +80,37 @@
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/live_chat*"
+      ],
+      "js": [
+        "dist/yt-content-chat-main.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "dist/yt-content-chat.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "dist/yt-venue-inline.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "web_accessible_resources": [
@@ -105,6 +142,29 @@
         "https://*.nicovideo.jp/*",
         "http://127.0.0.1:3456/*",
         "http://localhost:3456/*"
+      ]
+    },
+    {
+      "resources": [
+        "data/ouen-banner.json",
+        "yt-comeview.html",
+        "images/toumeilink.png",
+        "images/avatar-parts/*",
+        "images/yukkuri-charactore-english/*/*.png",
+        "sound/voice-complete.mp3",
+        "sound/voice-watch.mp3",
+        "sound/effect-gift.mp3",
+        "sound/effect-ad.mp3",
+        "sound/effect-rank-up.mp3",
+        "sound/effect-rank-down.mp3",
+        "sound/effect-milestone-soft.mp3",
+        "sound/effect-milestone-hard.mp3",
+        "sound/effect-milestone-jackpot.mp3",
+        "sound/tiers/*.mp3",
+        "sound/custom/*"
+      ],
+      "matches": [
+        "https://www.youtube.com/*"
       ]
     }
   ]

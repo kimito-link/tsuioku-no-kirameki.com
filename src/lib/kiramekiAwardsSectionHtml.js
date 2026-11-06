@@ -2,11 +2,11 @@
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 
 export const KIRAMEKI_AWARDS_CSS = `
-.kirameki-awards { margin: 2rem 0; }
-.kirameki-awards__heading { font-size: 1.4rem; margin-bottom: 0.4rem; color: #14171a; }
-.kirameki-awards__lead { color: #3a4046; font-size: 0.92rem; margin-bottom: 1.5rem; line-height: 1.6; }
-.kirameki-awards__group { margin-bottom: 1.5rem; }
-.kirameki-awards__group-label { font-size: 1.05rem; font-weight: 700; color: #1f2429; border-bottom: 2px solid #d4d8dd; padding-bottom: 0.3rem; margin-bottom: 0.8rem; }
+.kirameki-awards { margin: 2rem 0; grid-column: 1 / -1; }
+.kirameki-awards__heading { font-size: 1.4rem; margin-bottom: 0.4rem; color: #e2e8f0; }
+.kirameki-awards__lead { color: #94a3b8; font-size: 0.92rem; margin-bottom: 1.5rem; line-height: 1.6; }
+.kirameki-awards__group { margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 0 0.8rem; }
+.kirameki-awards__group-label { font-size: 1.05rem; font-weight: 700; color: #e2e8f0; border-bottom: 2px solid #334155; padding-bottom: 0.3rem; margin-bottom: 0.8rem; grid-column: 1 / -1; }
 .kirameki-award { background: #fafafa; border: 1px solid #d8dadd; border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; }
 .kirameki-award--all { background: linear-gradient(135deg, #fff4cc, #fff0e0); border-color: #f0b400; }
 .kirameki-award--daily { background: #eaf3ff; border-color: #5aa7e8; }

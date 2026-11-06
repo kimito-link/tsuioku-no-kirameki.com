@@ -383,3 +383,36 @@ describe('capVoiceMaxCharsByBoost(速度を上げる局面では本文も短く�
     expect(capVoiceMaxCharsByBoost(undefined, undefined)).toBe(60);
   });
 });
+
+describe('pushVoiceQueue keep(2026-11-03: 合成中の件は捨てない)', () => {
+  it('keep が true の件を飛ばして、次に古い件から捨てる', () => {
+    const r = pushVoiceQueue(['a', 'b', 'c'], 'd', { max: 3, keep: (x) => x === 'a' });
+    expect(r.queue).toEqual(['a', 'c', 'd']);
+    expect(r.dropped).toEqual(['b']);
+  });
+  it('守る件しか無ければ上限を超えて残す(新しい件は捨てない)', () => {
+    const r = pushVoiceQueue(['a'], 'b', { max: 1, keep: () => true });
+    expect(r.queue).toEqual(['a', 'b']);
+    expect(r.dropped).toEqual([]);
+  });
+  it('keep を渡さなければ従来どおり最古から捨てる', () => {
+    expect(pushVoiceQueue(['a', 'b'], 'c', { max: 2 }).dropped).toEqual(['a']);
+  });
+  it('v0.1.1861: 溢れたらふつうの件から捨て、届いたばかりのギフト(前に入る)は残す', () => {
+    const g1 = { body: 'g1', priority: 'high' };
+    const g2 = { body: 'g2', priority: 'high' };
+    const a = { body: 'a', priority: 'normal' };
+    const b = { body: 'b', priority: 'normal' };
+    const r1 = pushVoiceQueue([g1, a, b], g2, { max: 3 });
+    expect(r1.queue).toEqual([g1, g2, b]);
+    expect(r1.dropped).toEqual([a]);
+    // keep ありでも同じ順(守る件は飛ばす)
+    const r2 = pushVoiceQueue([a, b], g2, { max: 2, keep: (x) => x === a });
+    expect(r2.queue).toEqual([g2, a]);
+    expect(r2.dropped).toEqual([b]);
+    // 全部ギフトなら古いギフトから捨てる(有界)
+    const r3 = pushVoiceQueue([g1], g2, { max: 1 });
+    expect(r3.queue).toEqual([g2]);
+    expect(r3.dropped).toEqual([g1]);
+  });
+});

@@ -26,7 +26,7 @@ describe('発言パネルの応援(ギフト・広告)', () => {
   it('★パネルは応援の一行を出し、0件の文言も応援の有無で変える', () => {
     expect(iOpen).toBeGreaterThan(0);
     expect(open).toContain('speechSupportLine(statsText)');
-    expect(open).toContain('speechEmptyMessage(statsText)');
+    expect(open).toContain('speechEmptyMessage(statsText, readState)');
     expect(open).toContain('nlsb-speech-support');
   });
 

@@ -26,7 +26,7 @@ describe('スマホ: 見たくない人を隠す(審査 1.2)', () => {
     expect(recentPeopleForBlock([{ userId: 'a', name: 'A', text: '1' }, { userId: 'b', name: 'B', text: '2' }, { userId: 'a', name: 'A', text: '3' }]).map((x) => x.text)).toEqual(['3', '2']);
   });
   it('配線: 取ったまとめ・新着の両方に当て、アプリの中でだけ 🚩 を付ける', () => {
-    // v0.1.1844: 隠す前に番号→書いた人を覚えてから当てる(rememberAuthorsAndBlock)
+    // v0.1.1905: 隠す前に番号→書いた人を覚えてから当てる(rememberAuthorsAndBlock)
     expect(liveView).toContain('return applyPhoneBlocklist(jsonBlob, readBlocklist());');
     expect(liveView).toContain('return rememberAuthorsAndBlock(data);');
     expect(liveView).toContain('if (_demo) return rememberAuthorsAndBlock(await _demo.snapshot());');
@@ -35,7 +35,7 @@ describe('スマホ: 見たくない人を隠す(審査 1.2)', () => {
   });
 });
 
-describe('v0.1.1844: 隠した人を読み上げ・拡張なしの形でも出さない', () => {
+describe('v0.1.1905: 隠した人を読み上げ・拡張なしの形でも出さない', () => {
   it('dropBlockedRows: 隠す人の行だけ抜く・誰もいなければ同じ配列', () => {
     const rows = [{ userId: '1', no: '1' }, { userId: '2', no: '2' }, { no: '3' }];
     expect(dropBlockedRows(rows, ['2']).map((r) => r.no)).toEqual(['1', '3']);

@@ -27,9 +27,10 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 9 / 1096 件
+## ⚠️ 役割コメントが無いソース 10 / 1171 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
+- `extension-youtube/cloak-failsafe.js`
 - `scripts/build.mjs`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
@@ -84,7 +85,8 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (8)
+- 📁 **api/** (9)
+  - `billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
   - `device.js` — スマホ版の「利用者ごとの鍵」の受け口(v0.1.1730・スマホ化 利用者ごとの鍵 第a段)。
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
@@ -93,7 +95,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (120)
+- 📁 **app/** (122)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -230,6 +232,8 @@
   - `live.html`
   - `phone.html`
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
+  - `supporter.html`
+  - `supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - 📁 **council-scout/** (26)
   - 📁 **briefs/** (26)
     - `2026-07-16.md`
@@ -258,7 +262,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (364)
+- 📁 **docs/** (365)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -370,7 +374,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (178)
+  - 📁 **handoff/** (179)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -550,6 +554,7 @@
     - `venue-transport-effect-SPEC-2026-08-08.md`
     - `voicevox-any-pc-DESIGN.md`
     - `winv-clipboard-freeze-synthesis.md`
+    - `youtube-ext-prototype-HANDOFF.md`
   - 📁 **marketing/** (1)
     - `x-article-live-ranking-2026-09-14.md`
   - 📁 **patent-unique-voice-reading-filing-final/** (1)
@@ -638,7 +643,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (139)
+- 📁 **extension/** (143)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -791,6 +796,171 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
+  - `yt-comeview.html`
+  - `yt-marketing-export.html`
+  - `yt-sidepanel.html`
+  - `yt-venue.html`
+- 📁 **extension-youtube/** (148)
+  - 📁 **data/** (1)
+    - `ouen-banner.json`
+  - 📁 **images/** (72)
+    - 📁 **avatar-parts/** (22)
+      - `cheek-0.png`
+      - `cheek-1.png`
+      - `eyes-jito.png`
+      - `eyes-open.png`
+      - `eyes-sleepy.png`
+      - `eyes-smile.png`
+      - `eyes-sparkle.png`
+      - `eyes-surprised.png`
+      - `hair-bob.png`
+      - `hair-center-part.png`
+      - `hair-long.png`
+      - `hair-mushroom.png`
+      - `hair-ponytail.png`
+      - `hair-short-flip.png`
+      - `hair-twintail.png`
+      - `hair-wolf.png`
+      - `mouth-mu.png`
+      - `mouth-omega.png`
+      - `mouth-open.png`
+      - `mouth-pokan.png`
+      - `mouth-smile.png`
+      - `mouth-smirk.png`
+    - 📁 **logo/** (6)
+      - `kimito-link-color.png`
+      - `kimito-maru-black.png`
+      - `konta-yukkuri-icon-128.png`
+      - `konta-yukkuri-icon-16.png`
+      - `konta-yukkuri-icon-32.png`
+      - `konta-yukkuri-icon-48.png`
+    - 📁 **marketing-html-avatars/** (3)
+      - `konta-72.png`
+      - `rink-72.png`
+      - `tanu-72.png`
+    - 📁 **yukkuri-charactore-english/** (40)
+      - 📁 **konta/** (12)
+        - `kitsune-yukkuri-blink-mouth-closed.png`
+        - `kitsune-yukkuri-blink-mouth-closed.thumb128.png`
+        - `kitsune-yukkuri-blink-mouth-open.png`
+        - `kitsune-yukkuri-half-eyes-mouth-closed.png`
+        - `kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `kitsune-yukkuri-half-eyes-mouth-open.png`
+        - `kitsune-yukkuri-mouth-closed.png`
+        - `kitsune-yukkuri-normal.png`
+        - `kitsune-yukkuri-normal.thumb128.png`
+        - `kitsune-yukkuri-smile-mouth-closed.png`
+        - `kitsune-yukkuri-smile-mouth-open.png`
+        - `kitsune-yukkuri-smile-mouth-open.thumb128.png`
+      - 📁 **link/** (15)
+        - `link-normal.png`
+        - `link-yukkuri-blink-mouth-closed.png`
+        - `link-yukkuri-blink-mouth-closed.thumb128.png`
+        - `link-yukkuri-blink-mouth-open.png`
+        - `link-yukkuri-fuji-background.png`
+        - `link-yukkuri-half-eyes-mouth-closed.png`
+        - `link-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `link-yukkuri-half-eyes-mouth-open.png`
+        - `link-yukkuri-normal-mouth-closed.png`
+        - `link-yukkuri-normal-mouth-closed.thumb128.png`
+        - `link-yukkuri-normal-mouth-open.png`
+        - `link-yukkuri-normal-mouth-open.thumb128.png`
+        - `link-yukkuri-smile-mouth-closed.png`
+        - `link-yukkuri-smile-mouth-open.png`
+        - `link-yukkuri-smile-mouth-open.thumb128.png`
+      - 📁 **tanunee/** (13)
+        - `tanuki-yukkuri-blink-mouth-closed.png`
+        - `tanuki-yukkuri-blink-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-blink-mouth-open.png`
+        - `tanuki-yukkuri-half-eyes-mouth-closed.png`
+        - `tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-half-eyes-mouth-open.png`
+        - `tanuki-yukkuri-normal-mouth-closed.png`
+        - `tanuki-yukkuri-normal-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-normal-mouth-open.png`
+        - `tanuki-yukkuri-normal-mouth-open.thumb128.png`
+        - `tanuki-yukkuri-smile-mouth-closed.png`
+        - `tanuki-yukkuri-smile-mouth-open.png`
+        - `tanuki-yukkuri-smile-mouth-open.thumb128.png`
+    - `toumeilink.png`
+  - 📁 **sound/** (39)
+    - 📁 **tiers/** (29)
+      - `ad-1.mp3`
+      - `ad-2.mp3`
+      - `ad-3.mp3`
+      - `gift-large-1.mp3`
+      - `gift-large-2.mp3`
+      - `gift-large-3.mp3`
+      - `gift-medium-1.mp3`
+      - `gift-medium-2.mp3`
+      - `gift-medium-3.mp3`
+      - `gift-mega-1.mp3`
+      - `gift-mega-2.mp3`
+      - `gift-mega-3.mp3`
+      - `gift-small-1.mp3`
+      - `gift-small-2.mp3`
+      - `gift-small-3.mp3`
+      - `milestone-hard-1.mp3`
+      - `milestone-hard-2.mp3`
+      - `milestone-hard-3.mp3`
+      - `milestone-jackpot-1.mp3`
+      - `milestone-jackpot-2.mp3`
+      - `milestone-jackpot-3.mp3`
+      - `milestone-soft-1.mp3`
+      - `milestone-soft-2.mp3`
+      - `milestone-soft-3.mp3`
+      - `rank-up-1.mp3`
+      - `rank-up-2.mp3`
+      - `rank-up-3.mp3`
+      - `reach-1.mp3`
+      - `reach-2.mp3`
+    - `CREDITS.md`
+    - `effect-ad.mp3`
+    - `effect-gift.mp3`
+    - `effect-milestone-hard.mp3`
+    - `effect-milestone-jackpot.mp3`
+    - `effect-milestone-soft.mp3`
+    - `effect-rank-down.mp3`
+    - `effect-rank-up.mp3`
+    - `voice-complete.mp3`
+    - `voice-watch.mp3`
+  - 📁 **src/** (19)
+    - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
+    - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
+    - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
+    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
+    - `marketing-export-nico-entry.js` — ニコ生版のマーケ画面(本物 marketing-export-entry.js)を YouTube の記録で動かす入口。
+    - `offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
+    - `sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
+    - `sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
+    - `sidepanel-yt-parts.html`
+    - `sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
+    - `venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
+    - `venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
+    - `ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
+    - `ytGiftToNico.js` — YouTube の有料の応援(スーパーチャット・スーパーステッカー・メンバー加入・メンバーシップギフト)を、
+    - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
+    - `ytLocalAssetUrls.js` — YouTube の視聴ページの中の会場(content script)で、拡張の中の画像・音を
+    - `ytMergedIsolationBoot.js` — 本体に同梱した YouTube 版の画面・視聴ページの入口で、いちばん先に動く仕切り。
+    - `ytNicoShim.js` — ニコ生版のサイドパネル(本物の popup-entry.js)を、YouTube の記録で動かすための「入口の差し替え」。
+    - `ytVenueOverlayPrep.js` — 会場(venue.html)を YouTube の視聴ページの上に重ねて開くときの下ごしらえ。
+  - `background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
+  - `cloak-failsafe.js` — ⚠️ 役割コメント無し
+  - `comeview.html`
+  - `comeview.js` — ニコ生版 comeview-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+  - `content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
+  - `content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
+  - `manifest.standalone.json`
+  - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
+  - `marketing-export.html`
+  - `marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+  - `offscreen.html`
+  - `offscreen.js` — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル
+  - `sidepanel.html`
+  - `sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+  - `venue-inline.js` — ニコ生版の視聴ページの会場モード(venueBar.js 本物)+ YouTube の記録を読む入口のバンドル
+  - `venue.html`
+  - `venue.js` — ニコ生版 venue-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - 📁 **mobile/** (65)
   - 📁 **assets/** (1)
     - `splash.png`
@@ -865,7 +1035,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (104)
+- 📁 **scripts/** (109)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -908,6 +1078,8 @@
   - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
+  - `build-youtube-ext.mjs` — YouTube Live 試作拡張（extension-youtube/）の esbuild バンドルスクリプト
+  - `build-youtube-sidepanel-html.mjs` — YouTube 版のサイドパネル HTML = ニコ生版 popup.html の完全コピー。
   - `build.mjs` — ⚠️ 役割コメント無し
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
   - `census-watch.mjs` — 配置後の「更新→F5→溜まるまで待つ→速報を読む→基準線と比べる」を機械にする(2026-10-20)。
@@ -928,6 +1100,7 @@
   - `council-roles.stance.test.js`
   - `council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
   - `council-synth.test.js`
+  - `council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
   - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
   - `dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
@@ -968,12 +1141,14 @@
   - `split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
   - `split-changelog.mjs` — scripts/split-changelog.mjs — changelog.js を直近20版(本体)と旧版(archive)に分割
   - `stage-submission.py`
+  - `stage-youtube-submission.mjs` — YouTube Live 版 Chrome ウェブストア提出用 ZIP ステージングスクリプト
   - `status-live.mjs` — 状態速報(status.html の「AI共有」全文)を、コピー&貼り付けせずにターミナルへ取得する CLI。
   - `sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+  - `youtube-build.mjs` — YouTube 版の束ね方(esbuild の書き換えと入口の一覧)。2 か所から使う:
 - 📁 **sound-src/** (23)
   - 📁 **soundeffect-lab/** (19)
     - `clearing1.mp3`
@@ -999,7 +1174,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2222)
+- 📁 **src/** (2304)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1036,8 +1211,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (104)
-    - 📁 **popup/** (15)
+  - 📁 **extension/** (108)
+    - 📁 **popup/** (17)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1052,6 +1227,8 @@
       - `renderAcquisitionDashboard.test.js`
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
+      - `wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
+      - `wireVoiceGpuTip.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
       - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
@@ -1092,6 +1269,7 @@
     - `ndgrViewBasePick.wiring.test.js`
     - `noSpeechNote.wiring.test.js`
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+    - `orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
     - `phoneDemoFeed.test.js`
@@ -1138,6 +1316,7 @@
     - `venueBubblePlacement.wiring.test.js`
     - `venueBubblePlacer.js` — 会場(PC)の吹き出しを DOM の実寸から置く薄い層。
     - `venueLaneEmptyKeep.wiring.test.js`
+    - `venuePickupDrag.js` — v0.1.1899 PICK UP の吹き出しをドラッグで動かし、位置を覚える(りんく「ドラッグでうごかせるようにしておきたい」)。
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
@@ -1298,7 +1477,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1949)
+  - 📁 **lib/** (2025)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1314,6 +1493,54 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
+    - 📁 **youtube/** (47)
+      - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
+      - `ytChatContinuationVideoId.test.js`
+      - `ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
+      - `ytChatParse.test.js`
+      - `ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
+      - `ytCommentSendReason.test.js`
+      - `ytDefaultIcon.test.js`
+      - `ytGiftToNico.test.js`
+      - `ytIdbStoreOwner.test.js`
+      - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
+      - `ytLaneAssign.test.js`
+      - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
+      - `ytMergedIsolation.test.js`
+      - `ytNicoShim.test.js`
+      - `ytNicoShimHandleFirst.test.js`
+      - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
+      - `ytPageMeta.test.js`
+      - `ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
+      - `ytPanelRoute.test.js`
+      - `ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
+      - `ytPostedAt.test.js`
+      - `ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
+      - `ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
+      - `ytRankLinesHtml.test.js`
+      - `ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
+      - `ytReplayChatJson.test.js`
+      - `ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
+      - `ytReportHtml.test.js`
+      - `ytStageSubmission.test.js`
+      - `ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
+      - `ytStreamStorePolicy.test.js`
+      - `ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
+      - `ytSuperChatTier.test.js`
+      - `ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
+      - `ytSupportRanking.test.js`
+      - `ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
+      - `ytSwitchLeakCleanup.test.js`
+      - `ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
+      - `ytUserLaneTiers.test.js`
+      - `ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
+      - `ytViewerSampler.test.js`
+      - `ytVoicePriority.js` — YouTube 版の会場の読み上げで、混んでいるときに「大事なコメント」だけを読むための純関数。
+      - `ytVoicePriority.test.js`
+      - `ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
+      - `ytVoiceQueue.test.js`
+      - `ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
+      - `ytWording.test.js`
     - `AGENTS.md`
     - `aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
     - `aboutBlankGapVerdict.test.js`
@@ -1881,6 +2108,8 @@
     - `giftHistorySourcePreference.test.js`
     - `giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
     - `giftHistoryViewModel.test.js`
+    - `giftItemsMirror.js` — ニコ生の公式ギフト欄(gift.nicovideo.jp/…/purchase の子の窓)のアイテムを会場に並べるための読み取りと押下(v0.1.1875)。
+    - `giftItemsMirror.test.js`
     - `giftLaneOfficialFill.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `giftLaneOfficialFill.test.js`
     - `giftLaneOfficialFillWiring.test.js`
@@ -1888,6 +2117,8 @@
     - `giftMomentAnalytics.test.js`
     - `giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
     - `giftMomentumAnalytics.test.js`
+    - `giftPanelShape.js` — ニコ生の公式ギフト欄(番組ギフト)の作りを、読み取りだけで記録する計器(v0.1.1871)。
+    - `giftPanelShape.test.js`
     - `giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
     - `giftQuickStatsHtml.test.js`
     - `giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
@@ -1958,6 +2189,8 @@
     - `htmlReportCommenterFollowSection.test.js`
     - `htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
     - `htmlReportConceptGuide.test.js`
+    - `htmlReportEmbed.js` — v0.1.1854: 旧「HTMLレポート」(コメント全文・検索・CSV・ユーザー別・自分のコメント等)を、
+    - `htmlReportEmbed.test.js`
     - `htmlReportFullCount.wiring.test.js`
     - `htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
     - `htmlText.test.js`
@@ -2251,6 +2484,8 @@
     - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
     - `marketingExportAdObsWiring.test.js`
     - `marketingExportMaskWiring.test.js`
+    - `marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
+    - `marketingExportTabState.test.js`
     - `marketingFullCount.wiring.test.js`
     - `marketingGiftThrowLedger.js` — マーケ分析 HTML 用: 「誰が・どのアイテムを・いくら投げたか」の投げ履歴台帳を組み立てる純関数。
     - `marketingGiftThrowLedger.test.js`
@@ -2426,6 +2661,8 @@
     - `opaqueCanvasNoBlack.wiring.test.js`
     - `openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
     - `openingFiveMinuteCorrelation.test.js`
+    - `orphanTabAutoReload.js` — 拡張が入れ替わった後、開いたままの放送ページが古い版のまま止まるのを、ページ自身が見つけて読み込み直す。
+    - `orphanTabAutoReload.test.js`
     - `ouenBanner.js` — 応援動画バナーの表示判断（純粋関数）。
     - `ouenBanner.test.js`
     - `ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
@@ -2852,6 +3089,9 @@
     - `storyGrowthKeepFace.wiring.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
     - `storyGrowthLimits.test.js`
+    - `storyGrowthRebuildReasons.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない)
+    - `storyGrowthRebuildReasons.test.js`
+    - `storyGrowthRebuildReasons.wiring.test.js`
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
     - `storyLaneAvatarSrc.test.js`
     - `storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
@@ -2903,8 +3143,12 @@
     - `supportVisualExpanded.test.js`
     - `supportVisualStoryCopy.js` — アイコン列・診断ブロックで共有する文言（二重定義防止）。
     - `supportVisualStoryCopy.test.js`
+    - `supporterAccess.js` — 【層】L1 拡張の画面から呼ぶ部品(chrome.storage と fetch を外から受け取る=試験で差し替えられる)
+    - `supporterAccess.test.js`
     - `supporterChikuranScore.js` — 「応援者ちくらん β」用のローカル集計コア。
     - `supporterChikuranScore.test.js`
+    - `supporterLicense.js` — 【層】L0 判定層(純粋関数 + WebCrypto の署名確認だけ)
+    - `supporterLicense.test.js`
     - `supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
     - `supporterPowerScoring.test.js`
     - `supporterRanking.js` — 「この配信の応援者ランキング(ちくらん風)」の純ロジック(v0.1.865)。
@@ -3013,6 +3257,8 @@
     - `venueCharacterFrame.test.js`
     - `venueClickThrough.wiring.test.js`
     - `venueCloseRelease.wiring.test.js`
+    - `venueComposeBox.js` — 会場モードから発言する1行の入力欄(2026-11-05 りんく「会場モードにも発言送信できたら」)。
+    - `venueComposeBox.test.js`
     - `venueCrowdMotion.js` — 会場の観客シルエット群を「生きている会場」にするための動きパラメータ(純関数)。
     - `venueCrowdMotion.test.js`
     - `venueDisplayRows.js` — 会場モードの「空っぽ・途中で消える・ちらつき」根治の正本(2026-06-15・会議+根本原因調査)。
@@ -3137,6 +3383,9 @@
     - `viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
     - `viewerCelebrationMatch.test.js`
     - `viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `viewerRetentionEstimate.js` — 視聴維持率（推定）: 「最後まで配信を見ていたか」を、コメントした人ひとりずつ推定する。
+    - `viewerRetentionEstimate.test.js`
+    - `viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
     - `viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
     - `viewerSelfLaneAggregate.test.js`
     - `voiceAgeGate.js` — 読み上げアイテムが鮮度切れかどうか判定する純関数。
@@ -3145,6 +3394,8 @@
     - `voiceAssignment.test.js`
     - `voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
     - `voiceBubbleRealtimeParity.test.js`
+    - `voiceBusyPriority.js` — v0.1.1861: 読み上げが混んでいる時は「大事なもの」だけ読む(ニコ生版・会場とコメビュで共用)。
+    - `voiceBusyPriority.test.js`
     - `voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
     - `voiceComment.test.js`
     - `voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
@@ -3165,6 +3416,9 @@
     - `voiceLagBudget.test.js`
     - `voiceLagNotice.js` — 読み上げが大きく遅れているときの一言(会場・コメビュ共通)。DOM も chrome API も触らない純関数。
     - `voiceLagNotice.test.js`
+    - `voiceLightFallback.js` — VOICEVOX が追いつかないときだけ、PC に入っている軽い声(Windows の声)で読む(純関数)。
+    - `voiceLightFallback.test.js`
+    - `voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
     - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
     - `voiceLoadingState.test.js`
     - `voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
@@ -3176,7 +3430,9 @@
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
+    - `voicePlayerBusyPriority.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
+    - `voicePlayerOverloadKeep.test.js`
     - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
     - `voiceQuality.test.js`
     - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
@@ -3250,7 +3506,9 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (14)
+  - 📁 **server/** (16)
+    - `billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `billingApi.test.js`
     - `deviceApi.test.js`
     - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `fanLinkApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
@@ -3280,13 +3538,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (83)
+- 📁 **tests/** (84)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (76)
+  - 📁 **e2e/** (77)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3365,6 +3623,7 @@
     - `thumbnail-capture.spec.js`
     - `timeline-fill-standalone-window.spec.js`
     - `venue-entry-effect.spec.js`
+    - `venue-pickup-drag.spec.js`
     - `watch-messaging.spec.js`
   - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
@@ -3379,7 +3638,7 @@
   - `gen-og-live-ranking.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (66)
+- 📁 **tsuioku-no-kirameki/** (70)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -3404,8 +3663,11 @@
       - `yukkuri-thread.css`
     - 📁 **js/** (1)
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (38)
-    - 📁 **lp/** (5)
+  - 📁 **images/** (40)
+    - 📁 **lp/** (7)
+      - 📁 **phone/** (2)
+        - `phone-start.webp`
+        - `phone-supporters.webp`
       - `kimito-link-color.webp`
       - `kimito-link-ginga-color.webp`
       - `kimito-maru-black.webp`
@@ -3458,3 +3720,5 @@
   - `robots.txt`
   - `site.webmanifest`
   - `sitemap.xml`
+  - `terms.html`
+  - `tokushoho.html`
