@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 67</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 68</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
@@ -192,6 +192,7 @@
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+- `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
 - `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
 - `src/lib/youtube/ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
 
@@ -1387,7 +1388,7 @@
 ### 📥 コメント取得 (1版)
 - `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
-### 🏟 会場・席 (13版)
+### 🏟 会場・席 (12版)
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
@@ -1400,7 +1401,6 @@
 - `v0.1.1886` 2026-11-05 — ギフトが贈れたかを残高で判定する
 - `v0.1.1885` 2026-11-05 — 会場のギフトの帯に押し方の説明を出す
 - `v0.1.1884` 2026-11-05 — ギフトが贈れたかを残高で確かめる
-- `v0.1.1883` 2026-11-05 — 公式の購入の確認の中で確定を押す
 
 ### 🎈 吹き出し (3版)
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
@@ -1425,7 +1425,8 @@
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 - `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
-### その他 (5版)
+### その他 (6版)
+- `v0.1.1907` 2026-11-06 — YouTube の混ざった記録を片付ける
 - `v0.1.1901` 2026-11-06 — PICK UP が古い1件のまま残るのを直す
 - `v0.1.1898` 2026-11-06 — サポーターの確認に本番の鍵を使う
 - `v0.1.1896` 2026-11-06 — サポーターのコードは1台の PC だけで使える
