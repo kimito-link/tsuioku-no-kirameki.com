@@ -52,6 +52,7 @@ function fakeStripe(state) {
       customer_details: { email: 'fan@example.com' }
     })),
     getSubscription: vi.fn(async () => state.sub),
+    getEvent: vi.fn(async (id) => (state.events || {})[id] || null),
     createPortal: vi.fn(async (p) => ({ url: `https://portal.stripe.test/${p.customer}` }))
   };
 }
@@ -114,6 +115,32 @@ describe('billingApi: 同じ Stripe アカウントの別サービスの購入',
     const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
     expect(acct.status).toBe('active');
     expect(acct.subscriptionId).toBe('sub_1');
+  });
+});
+
+describe('billingApi: 署名が合わない通知', () => {
+  it('Stripe に実在するイベントなら、聞き直した中身で台帳を更新する', async () => {
+    const { svc, state, up } = await setup();
+    await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    state.sub = sub('canceled');
+    const real = { id: 'evt_realevent1', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } };
+    state.events = { evt_realevent1: real };
+    const body = JSON.stringify(real);
+    const w = await svc.webhook({ rawBody: body, signature: 't=1,v1=bad' });
+    expect(w.status).toBe(200);
+    const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
+    expect(acct.status).toBe('canceled');
+  });
+
+  it('Stripe に無いイベント(偽の通知)は 400 で、台帳は変わらない', async () => {
+    const { svc, state, up } = await setup();
+    await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    state.sub = sub('canceled');
+    const body = JSON.stringify({ id: 'evt_forgedevent', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } });
+    const w = await svc.webhook({ rawBody: body, signature: 't=1,v1=bad' });
+    expect(w.status).toBe(400);
+    const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
+    expect(acct.status).toBe('active');
   });
 });
 

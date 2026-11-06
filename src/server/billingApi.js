@@ -149,6 +149,7 @@ export function createStripeClient({ fetchImpl = fetch, env = process.env } = {}
     createCheckout: (params) => call('POST', 'checkout/sessions', params),
     getCheckout: (id) => call('GET', `checkout/sessions/${encodeURIComponent(id)}`, { expand: ['subscription'] }),
     getSubscription: (id) => call('GET', `subscriptions/${encodeURIComponent(id)}`),
+    getEvent: (id) => call('GET', `events/${encodeURIComponent(id)}`),
     createPortal: (params) => call('POST', 'billing_portal/sessions', params)
   };
 }
@@ -340,7 +341,6 @@ export function createBillingService(deps) {
         secret: env.STRIPE_WEBHOOK_SECRET || '',
         nowSec: Math.floor(now() / 1000)
       });
-      if (!ok) return { status: 400, body: { ok: false, error: 'bad_signature' } };
       let ev;
       try {
         ev = JSON.parse(rawBody);
@@ -348,6 +348,22 @@ export function createBillingService(deps) {
         return { status: 400, body: { ok: false, error: 'bad_json' } };
       }
       if (!ev?.id) return { status: 400, body: { ok: false, error: 'bad_event' } };
+      if (!ok) {
+        // ★署名が合わないとき(実行環境が本文を解析し直して生の本文が失われた等)は、
+        //   届いた中身を信じずに Stripe へイベント ID で聞き直し、その中身だけを使う。
+        //   偽の通知は Stripe に存在しないので 400 のまま。
+        if (typeof ev.id !== 'string' || !/^evt_[A-Za-z0-9_]{8,200}$/.test(ev.id) || !stripe.getEvent) {
+          return { status: 400, body: { ok: false, error: 'bad_signature' } };
+        }
+        let fetched = null;
+        try {
+          fetched = await stripe.getEvent(ev.id);
+        } catch {
+          fetched = null;
+        }
+        if (!fetched?.id || fetched.id !== ev.id) return { status: 400, body: { ok: false, error: 'bad_signature' } };
+        ev = fetched;
+      }
       const seen = await upstash(['SET', billingKeys.event(ev.id), '1', 'NX', 'EX', String(EVENT_SEEN_TTL_SECONDS)]);
       if (seen === null) return { status: 200, body: { ok: true, duplicate: true } };
       const obj = ev.data?.object || {};
