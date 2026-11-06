@@ -1051,7 +1051,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 323</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 324</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1355,6 +1355,7 @@
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
 - `src/lib/youtube/ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
+- `src/lib/youtube/ytChatInputBlock.js` — YouTube のチャット欄に入力欄が無いとき、その理由を見分ける(content-chat-entry の「ここから発言」用)。
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
@@ -1391,6 +1392,7 @@
 - `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
 ### 🏟 会場・席 (9版)
+- `v0.1.1912` 2026-11-06 — YouTube でログイン中なのに送れない表示を直す
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
@@ -1399,17 +1401,15 @@
 - `v0.1.1891` 2026-11-05 — YouTube の同接をパネルを閉じても記録
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 - `v0.1.1888` 2026-11-05 — ギフトの確定は本人が公式で押す形に
-- `v0.1.1887` 2026-11-05 — ギフトの帯の説明と贈れた判定を直す
 
 ### 🎈 吹き出し (3版)
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (2版)
 - `v0.1.1908` 2026-11-06 — マーケHTMLをさらに軽く
 - `v0.1.1888` 2026-11-05 — ギフトの確定は本人が公式で押す形に
-- `v0.1.1887` 2026-11-05 — ギフトの帯の説明と贈れた判定を直す
 
 ### 🔊 読み上げ (5版)
 - `v0.1.1911` 2026-11-06 — 長いコメントは質問の結びを残して読む
