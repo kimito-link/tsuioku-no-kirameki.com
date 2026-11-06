@@ -21,7 +21,7 @@ import { toEpochMs } from './timeAuthority.js';
 
 /**
  * 1人あたりに載せるコメント本文の最大件数(超えた分は「ほか N 件」と注記。件数そのものは実数)。
- * v0.1.1906: 1000→200(マーケHTMLを軽く)。全部の本文は「コメント記録」の章(全文検索・ユーザー別)にある。
+ * v0.1.1908: 1000→200(マーケHTMLを軽く)。全部の本文は「コメント記録」の章(全文検索・ユーザー別)にある。
  */
 export const SUPPORTERS_GIFTS_MAX_COMMENTS_PER_USER = 200;
 /** ギフトを出していない(コメントだけの)人を載せる最大人数(ギフトを出した人は必ず載せる)。 */
@@ -56,7 +56,7 @@ export const SUPPORTERS_GIFTS_CSS = `
 `;
 
 /**
- * v0.1.1906: コメントの表は【開いたときに作る】。本文は <script type="application/json" id="mktSgData"> に
+ * v0.1.1908: コメントの表は【開いたときに作る】。本文は <script type="application/json" id="mktSgData"> に
  * {人の番号: [[時刻, 本文], ...]} で入れておき、<details> を開いた瞬間に tbody を組み立てる。
  * (旧: 全員分の表を最初から HTML に並べていた=実ファイルで要素 38,000・1.5MB。閉じていても DOM は作られる。)
  * 開いた状態で始まる上位の人は、読み込み直後にこの script が組み立てる。

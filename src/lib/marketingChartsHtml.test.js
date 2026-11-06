@@ -159,7 +159,7 @@ describe('ギフトの瞬間の章(v0.1.1672)', () => {
     expect(html).toContain('ギフトが原因とは限りません');
     expect(html).toContain('href="#mkt-gift-moments"'); // 目次にも出る
   });
-  it('v0.1.1906: 1つの瞬間の送り主は8件まで並べ、残りは「ほか N件」(全部はギフト投げ履歴)', () => {
+  it('v0.1.1908: 1つの瞬間の送り主は8件まで並べ、残りは「ほか N件」(全部はギフト投げ履歴)', () => {
     const report = aggregateMarketingReport(comments, 'lv9');
     const many = Array.from({ length: 12 }, (_, n) => ({
       kokenHistoryId: `h${n}`, userId: String(200 + n), senderName: `送り主${n}さん`, itemName: '花', points: 10, contribution: 100,

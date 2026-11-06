@@ -1395,7 +1395,7 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
   const cards = analysis.moments
     .slice(0, SHOW)
     .map((m) => {
-      // v0.1.1906: 1つの瞬間に並べる送り主は先頭8件まで(連鎖で数百件並んで重かった)。残りは「ほか N件」。
+      // v0.1.1908: 1つの瞬間に並べる送り主は先頭8件まで(連鎖で数百件並んで重かった)。残りは「ほか N件」。
       const GIFT_LINES_MAX = 8;
       const restGifts = m.gifts.length - GIFT_LINES_MAX;
       const giftLines = m.gifts
