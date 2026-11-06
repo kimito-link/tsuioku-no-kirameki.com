@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1903',
+    date: '2026-11-06',
+    summary: 'YouTube で自分の発言が2件・2回読まれるのを直す',
+    items: Object.freeze([
+      'YouTube の配信で自分がコメントを送ると、チャット欄には1件なのに記録が2件になり、読み上げも2回流れていました。YouTube が送ったコメントを仮の行から本物の行へ差し替えるのを、別のコメントとして数えていたためです。差し替えは1件として扱うようにしました。',
+      '同じ人が同じ文を本当に2回書いたときは、これまでどおり2件記録します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1901',
     date: '2026-11-06',
     summary: 'PICK UP が古い1件のまま残るのを直す',
@@ -187,15 +196,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '帯の「贈る?」に値段を出したままにする',
     items: Object.freeze([
       '会場のギフトの帯で1回目を押したとき、値段を消さずに「30pt贈る?」のように出すようにしました(何ポイント使うか見たまま確かめられます)'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1881',
-    date: '2026-11-05',
-    summary: '会場の帯の2回押しも会場のまま贈る',
-    items: Object.freeze([
-      '会場のギフトの帯は、2回押し(既定)でも公式の欄へ飛ばさず会場のまま贈るようにしました。1回目は「贈る?」と出るだけで、3秒以内にもう一度押すと贈ります',
-      '帯のアイテムが公式の欄の奥(41番目より後ろ)にあると押せていなかったのを直しました。見つからないときは「見つかりません」と出します(何も使いません)'
     ])
   })
 ]);
