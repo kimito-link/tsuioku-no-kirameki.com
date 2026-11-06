@@ -11,10 +11,10 @@ function mount(maskShare = false) {
     broadcasterUserId: '999'
   });
   const html = sectionSupportersGiftsHtml(rows, { maskShare, openTop: 10 });
-  document.body.innerHTML = html.replace(/<script>[\s\S]*?<\/script>/, '');
-  const script = (html.match(/<script>([\s\S]*?)<\/script>/) || [])[1];
-  if (script) new Function(script)();
-  return { html, hasScript: !!script };
+  document.body.innerHTML = html;
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  for (const sc of scripts) new Function(sc)();
+  return { html, hasScript: scripts.length > 0 };
 }
 
 describe('応援者とギフトの検索窓', () => {
@@ -62,6 +62,62 @@ describe('応援者とギフトの検索窓', () => {
     const { html, hasScript } = mount(true);
     expect(html).not.toContain('mktSgSearch');
     expect(hasScript).toBe(false);
+  });
+});
+
+describe('v0.1.1908: コメントの表は開いたときに作る', () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  function mountScripts(html) {
+    document.body.innerHTML = html;
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    for (const sc of scripts) new Function(sc)();
+  }
+
+  it('開いて始まる上位の人は読み込み直後に表ができ、閉じた人は開くまで行を作らない', () => {
+    const rows = buildSupportersGiftsRows({
+      comments: [c('111', 'いちばん', 1000), c('222', 'にばん', 2000), c('222', 'にばん2', 2500)],
+      giftRows: []
+    });
+    const html = sectionSupportersGiftsHtml(rows, { maskShare: false, openTop: 1 });
+    expect(html).not.toContain('<td>いちばん</td>');
+    mountScripts(html);
+    const [first, second] = Array.from(document.querySelectorAll('details.mkt-sg'));
+    // 並びはコメント件数降順: 先頭=222(2件・開いて始まる)・次=111(1件・閉じている)
+    expect(first.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(second.querySelectorAll('tbody tr')).toHaveLength(0);
+    second.open = true;
+    second.dispatchEvent(new Event('toggle'));
+    expect(second.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(second.textContent).toContain('いちばん');
+    second.dispatchEvent(new Event('toggle'));
+    expect(second.querySelectorAll('tbody tr')).toHaveLength(1);
+  });
+
+  it('まだ表を作っていない人のコメントも検索で見つかり、開いて一致した行だけ残す', () => {
+    const rows = buildSupportersGiftsRows({
+      comments: [c('111', 'いちばん', 1000), c('222', 'さがす言葉', 2000), c('222', 'べつ', 2500)],
+      giftRows: []
+    });
+    mountScripts(sectionSupportersGiftsHtml(rows, { maskShare: false, openTop: 0 }));
+    const input = /** @type {HTMLInputElement} */ (document.getElementById('mktSgSearch'));
+    input.value = 'さがす';
+    input.dispatchEvent(new Event('input'));
+    vi.advanceTimersByTime(200);
+    const visible = Array.from(document.querySelectorAll('details.mkt-sg')).filter((d) => !d.hidden);
+    expect(visible).toHaveLength(1);
+    const trs = Array.from(visible[0].querySelectorAll('tbody tr'));
+    expect(trs).toHaveLength(2);
+    expect(trs.filter((r) => !r.hidden)).toHaveLength(1);
+  });
+
+  it('本文に </script> があってもデータの外に漏れない', () => {
+    const rows = buildSupportersGiftsRows({ comments: [c('111', '</script><img src=x onerror=alert(1)>', 1000)], giftRows: [] });
+    const html = sectionSupportersGiftsHtml(rows, { maskShare: false, openTop: 1 });
+    expect(html).not.toContain('</script><img');
+    mountScripts(html);
+    expect(document.querySelector('img')).toBeNull();
+    expect(document.querySelector('tbody td:last-child').textContent).toBe('</script><img src=x onerror=alert(1)>');
   });
 });
 
