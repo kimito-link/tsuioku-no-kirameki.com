@@ -4340,6 +4340,16 @@
       ]
     },
     {
+      "file": "app/live-view-block.js",
+      "featureCount": 1,
+      "features": [
+        "live-ranking"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)"
+      ]
+    },
+    {
       "file": "app/live-view-native-voice.js",
       "featureCount": 1,
       "features": [
@@ -8127,6 +8137,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/phoneBlocklist.js",
+      "featureCount": 1,
+      "features": [
+        "live-ranking"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {

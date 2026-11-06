@@ -18,6 +18,7 @@
     "extension/dist",
     "**/*.test.js",
     "src/lib/changelog-archive.js",
+    "src/lib/improvementHistory.js",
     "src/extension/self-update.js"
   ]
 }

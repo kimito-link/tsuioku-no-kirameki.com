@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1885',
+    date: '2026-11-05',
+    summary: '会場のギフトの帯に押し方の説明を出す',
+    items: Object.freeze([
+      '会場のギフトの帯の先頭に「2回押して贈る」(1回押しのときは「押すとすぐ贈る」)と見える文字で出します',
+      '🎁ギフトで公式の欄を開いたとき、会場に戻ると帯のアイテムから会場のまま贈れることも案内します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1884',
     date: '2026-11-05',
     summary: 'ギフトが贈れたかを残高で確かめる',
