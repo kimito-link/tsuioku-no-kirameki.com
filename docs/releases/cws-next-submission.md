@@ -1,3 +1,13 @@
+# ★0.1.1897〜(サポーター=有料のマーケ HTML)の提出メモ(2026-11-06・YouTube 同梱と一緒に出す)
+
+- **権限は増えない**(課金は既存の `app.tsuioku-no-kirameki.com` を使う)。CWS に課金機能は無いので外部決済(Stripe)。
+- **貼り直す欄**: 単一用途(§1・738字)・ホスト権限の統合欄(§2-8z・941字)・データ使用で「認証に関する情報」に✅(サポーターのコード)。
+  「詳細な説明」は [cws-store-listing.md](cws-store-listing.md) に「■ 料金」の段を追加済み(一部有料の明記)。
+- **privacy.html** §4-3「サポーター」に PC ごとの識別子を追記済み。特商法 `tokushoho.html`・規約 `terms.html` は公開済み。
+- 本番の通し確認(2026-11-06): 決済→コード発行→webhook(再送で成功)→証明書(kid k2026b・valid・dev 一致)まで OK。
+
+---
+
 # ★0.1.1890〜(YouTube Live 同梱)の提出メモ(2026-11-06・まだ提出しない・りんくの OK 待ち)
 
 - **権限が増える**: permissions に `tts`・`declarativeNetRequestWithHostAccess`、host_permissions に
