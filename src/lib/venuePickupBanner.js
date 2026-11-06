@@ -146,6 +146,10 @@ export function applyVenuePickupView(els, view) {
       els.face.removeAttribute('src');
     }
   }
+  // v0.1.1900: 顔/名前クリックで「この人の発言」パネルを開くための手がかり(venuePickupDrag.js が読む)。
+  els.root.dataset.nlPickupUid = sp ? String(sp.uid || '') : '';
+  els.root.dataset.nlPickupName = sp ? String(sp.name || '') : '';
+  els.root.dataset.nlPickupAvatar = sp ? String(sp.avatar || '') : '';
   if (view?.empty) els.root.setAttribute('data-empty', '1');
   else els.root.removeAttribute('data-empty');
   return true;
