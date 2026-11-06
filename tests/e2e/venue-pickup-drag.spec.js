@@ -105,3 +105,36 @@ test('PICK UP: つまみと札が出て、ドラッグで動き、窓の外へ�
   const cleared = await page.evaluate((k) => chrome.storage.local.get(k), KEY);
   expect(cleared[KEY] ?? null).toBeNull();
 });
+
+test('PICK UP: 顔か名前のクリックでその人の発言パネルが開き、ドラッグでは開かない(v0.1.1900)', async ({ context }) => {
+  const page = await openVenue(context);
+  await page.evaluate(() => {
+    const el = /** @type {HTMLElement} */ (document.querySelector('.nlsb-pickup'));
+    el.dataset.nlPickupUid = '12345678';
+    el.dataset.nlPickupName = 'テストさん';
+    const meta = el.querySelector('.nlsb-pickup__meta');
+    meta.textContent = 'テストさん ・ ID:12345678';
+    meta.setAttribute('href', 'https://www.nicovideo.jp/user/12345678');
+    window.dispatchEvent(new Event('resize'));
+  });
+  const panelOpen = () => page.evaluate(() => {
+    const p = document.querySelector('.nlsb-speech-panel');
+    return !!p && !p.hidden;
+  });
+  const metaBox = await page.locator('.nlsb-pickup__meta').boundingBox();
+  // 名前から始めてドラッグ → 動くがパネルは開かない・新しいタブも開かない
+  const pagesBefore = context.pages().length;
+  await page.mouse.move(metaBox.x + 10, metaBox.y + 5);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i += 1) await page.mouse.move(metaBox.x + 10, metaBox.y + 5 + 30 * i);
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  expect(await panelOpen()).toBe(false);
+  expect(context.pages().length).toBe(pagesBefore);
+  // 動かさずに名前をクリック → 発言パネルが開き、見出しにその人の名前
+  const meta2 = await page.locator('.nlsb-pickup__meta').boundingBox();
+  await page.mouse.click(meta2.x + 10, meta2.y + 5);
+  await expect.poll(panelOpen).toBe(true);
+  await expect(page.locator('.nlsb-speech-panel')).toContainText('テストさん');
+  expect(context.pages().length).toBe(pagesBefore);
+});

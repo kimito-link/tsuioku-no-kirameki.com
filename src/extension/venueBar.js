@@ -3015,7 +3015,7 @@ export function mountVenueBarButton(options = {}) {
     pickupEls.root.style.width = at ? `${at.width}px` : '';
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
-  const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup); // ドラッグで動かし位置を覚える・resize で置き直す
+  const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)
   // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
   seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。

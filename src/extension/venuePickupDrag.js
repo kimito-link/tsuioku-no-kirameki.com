@@ -20,9 +20,12 @@ import { safeStorageLocalGet, safeStorageLocalSet } from '../lib/safeStorageLoca
  * @param {HTMLElement} root 吹き出し
  * @param {HTMLElement} layoutEl 吹き出しの親(会場)
  * @param {() => void} replace 自動位置/保存位置で置き直す(venueBar の placePickup)。窓の resize でも呼ぶ
+ * @param {(who: { uid: string, displayName: string, avatarSrc: string, fallbackTexts: string[] }) => void} [openWho]
+ *   v0.1.1900 りんく「PICKUP がどんな人か知りたい場合すぐ ACCESS できるようにしたい・ドラッグと両立」:
+ *   顔か名前をクリックしたら、その人の発言パネル(席のアイコンクリックと同じ)を開く。ドラッグした直後のクリックは開かない。
  * @returns {{ place: (at: { left:number, top:number } | null) => void, dragging: () => boolean }}
  */
-export function attachVenuePickupDrag(root, layoutEl, replace) {
+export function attachVenuePickupDrag(root, layoutEl, replace, openWho) {
   /** @type {{ cx:number, top:number } | null} */
   let savedPos = null;
   /** 一度でも動かしたことがあるか(保存キーが在る=null でも学習済み)。無ければ初めて出たときに案内を数秒出す。 */
@@ -30,6 +33,8 @@ export function attachVenuePickupDrag(root, layoutEl, replace) {
   let introShown = false;
   /** @type {{ id:number, sx:number, sy:number, cx0:number, top0:number, moved:boolean } | null} */
   let drag = null;
+  /** 直前の押下がドラッグだったか(その後に来る click で発言パネルを開かない)。 */
+  let justDragged = false;
   const relayout = () => { try { replace(); } catch { /* 位置合わせの失敗は無視 */ } };
   const viewportBounds = (/** @type {DOMRect} */ L) => venuePickupViewportBounds(L, { width: window.innerWidth, height: window.innerHeight });
   void safeStorageLocalGet(KEY_VENUE_PICKUP_POS).then((bag) => {
@@ -42,7 +47,7 @@ export function attachVenuePickupDrag(root, layoutEl, replace) {
   // ★りんく「ドラッグでうごかせますとユーザーがわかるようにしてほしい」: つまみ(⠿)を常に出し、
   //   上に「ドラッグで動かせます」の札を、触れたとき・まだ動かしたことのない人には初めて出たときに数秒出す。
   //   スタイルはインライン(会場の CSS は venueBar の行数ラチェットがあるため・ここで完結させる)。
-  root.title = 'ドラッグで動かせます(ダブルクリックで元の位置)';
+  // ★吹き出し全体の title は付けない(自前の札とブラウザの吹き出しが二重に出て、名前の行を隠した・りんく実機 11/06)。
   root.style.cursor = 'grab';
   root.style.touchAction = 'none';
   root.style.userSelect = 'none';
@@ -53,7 +58,7 @@ export function attachVenuePickupDrag(root, layoutEl, replace) {
   Object.assign(grip.style, { flex: '0 0 auto', marginLeft: 'auto', fontSize: '22px', lineHeight: '1', color: 'rgba(31, 35, 40, 0.4)', letterSpacing: '-2px' });
   const hint = root.ownerDocument.createElement('span');
   hint.className = 'nlsb-pickup__hint';
-  hint.textContent = '✋ ドラッグで動かせます(ダブルクリックで元の位置)';
+  hint.textContent = openWho ? '✋ ドラッグで移動 ・ 顔か名前をクリックでこの人の発言' : '✋ ドラッグで動かせます(ダブルクリックで元の位置)';
   hint.setAttribute('aria-hidden', 'true');
   Object.assign(hint.style, {
     position: 'absolute', top: '-30px', right: '18px', padding: '3px 10px', borderRadius: '999px',
@@ -61,6 +66,30 @@ export function attachVenuePickupDrag(root, layoutEl, replace) {
     pointerEvents: 'none', opacity: '0', transition: 'opacity 0.2s'
   });
   root.append(grip, hint);
+  /** 顔・名前(=押すとこの人の発言が開く所)。指の形にして、触れたら言葉で案内する。 */
+  const whoTargets = () => /** @type {HTMLElement[]} */ ([root.querySelector('.nlsb-pickup__face'), root.querySelector('.nlsb-pickup__meta')].filter(Boolean));
+  if (openWho) {
+    for (const el of whoTargets()) {
+      el.style.cursor = 'pointer';
+      el.title = 'クリックでこの人の発言を見る';
+      el.setAttribute('draggable', 'false'); // リンクを掴むとブラウザのリンクドラッグが始まり、吹き出しのドラッグが途切れる
+    }
+    root.addEventListener('click', (ev) => {
+      const wasDrag = justDragged;
+      justDragged = false;
+      const t = ev.target instanceof Element ? ev.target : null;
+      const onWho = t && whoTargets().some((el) => el.contains(t));
+      if (!onWho) return;
+      // Ctrl/Cmd/Shift/中クリックは名前リンクの標準動作(新しいタブでプロフィール)に任せる=席のタイルと同じ決まり。
+      if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+      ev.preventDefault();
+      if (wasDrag) return;
+      const uid = String(root.dataset.nlPickupUid || '').trim();
+      if (!uid) return; // 誰か分からない行(ギフトの旧入力等)は開かない
+      const body = String(root.querySelector('.nlsb-pickup__body')?.textContent || '').trim();
+      openWho({ uid, displayName: String(root.dataset.nlPickupName || ''), avatarSrc: String(root.dataset.nlPickupAvatar || ''), fallbackTexts: body ? [body] : [] });
+    });
+  }
   let hintTimer = 0;
   const showHint = (/** @type {boolean} */ on, ms = 0) => {
     clearTimeout(hintTimer);
@@ -77,7 +106,9 @@ export function attachVenuePickupDrag(root, layoutEl, replace) {
 
   root.addEventListener('pointerdown', (ev) => {
     if (ev.button !== 0) return;
-    if (ev.target instanceof Element && ev.target.closest('a[href]')) return;
+    justDragged = false;
+    // 名前リンクから始めてもドラッグできる(動かなければ click=発言パネル)。発言パネルが無い使い方だけ従来どおりリンク優先。
+    if (!openWho && ev.target instanceof Element && ev.target.closest('a[href]')) return;
     const r = root.getBoundingClientRect();
     const L = layoutEl.getBoundingClientRect();
     drag = { id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, cx0: r.left + r.width / 2 - L.left, top0: r.top - L.top, moved: false };
@@ -109,6 +140,7 @@ export function attachVenuePickupDrag(root, layoutEl, replace) {
     root.removeAttribute('data-dragging');
     root.style.cursor = 'grab';
     if (!d.moved) return;
+    justDragged = true;
     learned = true;
     const L = layoutEl.getBoundingClientRect();
     const r = root.getBoundingClientRect();
@@ -122,6 +154,7 @@ export function attachVenuePickupDrag(root, layoutEl, replace) {
   window.addEventListener('pointercancel', endDrag);
   root.addEventListener('dblclick', (ev) => {
     if (ev.target instanceof Element && ev.target.closest('a[href]')) return;
+    if (openWho && ev.target instanceof Element && whoTargets().some((el) => el.contains(/** @type {Node} */ (ev.target)))) return; // 顔・名前はクリック=発言パネル
     savedPos = null;
     void safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: null }).catch(() => {});
     relayout();
