@@ -8,6 +8,7 @@ import {
   createVenuePickupBanner,
   venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
+import { attachVenuePickupDrag } from './venuePickupDrag.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
   buildVenueSeating,
@@ -2995,14 +2996,14 @@ export function mountVenueBarButton(options = {}) {
    * ピックアップ枠の入力(2026-10-17): 表示行(storage集計/鏡由来=text空)ではなく、届いた発言(吹き出し・読み上げと同じ speeches)を積む独立のリングから選ぶ。
    *   以前は commitDisplay の表示行から選んでいたため、発言を行へ混ぜた直後の1回しか本文が乗らず枠が案内文のままだった(実機+headlessで再現)。正本=venuePickupRing.js。
    */
-  /** @type {Array<any>} */
-  let pickupRing = [];
+  let pickupRing = /** @type {Array<any>} */ ([]);
   /** @param {ReadonlyArray<any>|null} fallbackRows リングが空のときの従来入力(表示行) */
   const updatePickupBanner = (fallbackRows) => {
     try {
       const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
-      applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
-      placePickup();
+      const picked = pickTickerHighlightEntry(rows, Date.now());
+      applyVenuePickupView(pickupEls, buildVenuePickupView(picked));
+      placePickup(); if (picked.why === 'scored' && picked.entry !== pickupRing[pickupRing.length - 1]) pickupDrag.later(() => updatePickupBanner(null)); // v0.1.1901: 窓の中の前の1件を出している間に新しい発言が来たら、窓が過ぎてから選び直す(過疎だと次の更新が来ず前の1件が10分出続けた)
     } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
   /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
@@ -3011,11 +3012,10 @@ export function mountVenueBarButton(options = {}) {
     const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
     const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
     const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
-    pickupEls.root.style.left = at ? `${at.left}px` : '';
-    pickupEls.root.style.top = at ? `${at.top}px` : '';
     pickupEls.root.style.width = at ? `${at.width}px` : '';
+    pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
-  window.addEventListener('resize', () => { try { placePickup(); } catch { /* 位置合わせの失敗は無視(CSS の既定位置のまま) */ } });
+  const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)
   // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
   seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。

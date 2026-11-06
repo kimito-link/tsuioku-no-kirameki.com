@@ -197,6 +197,9 @@ export function pickTickerHighlightEntry(list, nowMs, opts = {}) {
     let score = isGift ? 100 : 0;
     if (len >= TICKER_MIN_TEXT_LEN && len <= TICKER_SWEET_LEN_MAX) score += 10;
     else if (len <= 120) score += 5;
+    // v0.1.1901: 120字を超える長文も候補に残す(以前は 0 点=候補外で、YouTube の質問コメントのような長文が
+    //   窓の中の短めの前の1件に負け続けた・りんく実機)。読みやすさの加点は短い方が上のまま。
+    else score += 2;
     score -= Math.max(0, dup - 1) * 8;
 
     if (score <= 0) continue;
