@@ -11,6 +11,7 @@ import {
   isYtWatchLikeUrl,
   pickYtBroadcasterIconUrl,
 } from '../../src/lib/youtube/ytPageMeta.js';
+import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 
 /** チャットを自動で「すべて」に切り替えるか（サイドパネルの設定・既定オン） */
 const AUTO_ALL_CHAT_KEY = 'yt_auto_all_chat_v1';
@@ -31,7 +32,29 @@ const MAX_SEEN_IDS = 5000;
  * 現在のページまたは親フレームから YouTube の videoId を特定する。
  * @returns {string}
  */
+/**
+ * ★0.1.1904(2026-11-06 りんく実機): チャット欄は、自分の URL の continuation から「どの配信のチャットか」を読む。
+ *   親のページの動画IDは、チャット欄が前の配信のまま残っていると違う配信を指す(ABEMA のページの記録に石川典行さんの配信の人が
+ *   全部入っていた)。チャット欄自身の印を親の URL より先に信じる。読めなければ今までどおり親の URL。
+ * @returns {string}
+ */
+let frameVidHref = '';
+let frameVidCached = '';
+function chatFrameOwnVideoId() {
+  const href = String(window.location.href || '');
+  if (href === frameVidHref) return frameVidCached; // コメント1件ごとに呼ばれるので、URL が同じなら読み直さない
+  frameVidHref = href;
+  try {
+    frameVidCached = ytVideoIdFromChatFrameUrl(href);
+  } catch {
+    frameVidCached = '';
+  }
+  return frameVidCached;
+}
+
 function resolveCurrentVideoId() {
+  const frameVid = chatFrameOwnVideoId();
+  if (frameVid) return frameVid;
   const own = parseYtVideoIdFromUrl(String(window.location.href || ''));
   if (own) return own;
   try {
@@ -695,6 +718,32 @@ function setupLiveChatObserver() {
   let retired = false;
   let retiredHref = '';
 
+  // 計器: チャット欄の配信と親のページの配信が食い違った回数(yt_diag_chat_frame_vid)。見た目は変えない。
+  let mismatchCount = 0;
+  let lastMismatchKey = '';
+  const noteFrameTopMismatch = () => {
+    try {
+      const frameVid = chatFrameOwnVideoId();
+      let topVid = '';
+      try {
+        topVid = window.top && window.top !== window ? parseYtVideoIdFromUrl(String(window.top.location.href || '')) : '';
+      } catch {
+        topVid = '';
+      }
+      if (!frameVid || !topVid || frameVid === topVid) return;
+      const key = `${frameVid}>${topVid}`;
+      if (key === lastMismatchKey) return;
+      lastMismatchKey = key;
+      mismatchCount += 1;
+      if (!chrome?.runtime?.id) return;
+      void chrome.storage.local
+        .set({ yt_diag_chat_frame_vid: { at: Date.now(), frameVid, topVid, count: mismatchCount } })
+        .catch(() => {});
+    } catch {
+      /* 計器は本体を止めない */
+    }
+  };
+
   const markAllStale = () => {
     try {
       const nodes = document.querySelectorAll(CHAT_ITEM_SELECTOR);
@@ -707,6 +756,23 @@ function setupLiveChatObserver() {
   /** 動画IDが変わったかを見て、変わっていたら区切る */
   const checkVideoSwitch = () => {
     const vid = resolveCurrentVideoId();
+    noteFrameTopMismatch();
+    // チャット欄自身の印で配信が分かるときは、その印が変わった(=このチャット欄が別の配信のチャットに移った)ときだけ区切る。
+    //   親のページだけが別の配信へ移っても、このチャット欄の中身はこのチャット欄の配信のものとして記録し続ける。
+    if (chatFrameOwnVideoId()) {
+      if (vid && vid !== boundVideoId) {
+        if (flushTimer !== null) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        if (pendingBatch.length) flushBatch(); // 前の動画IDで送り切る
+        markAllStale();
+        retired = false;
+        boundVideoId = vid;
+        switchGraceUntil = Date.now() + SWITCH_GRACE_MS;
+      }
+      return;
+    }
     if (retired) {
       const href = String(window.location.href || '');
       if (vid && vid !== boundVideoId && href !== retiredHref) {

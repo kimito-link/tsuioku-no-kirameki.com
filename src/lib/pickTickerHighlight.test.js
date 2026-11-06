@@ -255,3 +255,19 @@ describe('tickerHighlightKey — diff-skip(ちらつき/重さ対策)', () => {
     expect(() => tickerHighlightKey(null)).not.toThrow();
   });
 });
+
+describe('pickTickerHighlightEntry — 長文も候補に残す(v0.1.1901)', () => {
+  it('★120字を超える長文だけが窓にあれば、その長文が scored で選ばれる(以前は候補外=fallback)', () => {
+    const long = 'これは長い質問コメントです。'.repeat(12);
+    expect(long.length).toBeGreaterThan(120);
+    const r = pickTickerHighlightEntry([entry(BASE - 1000, long)], BASE + 100);
+    expect(r.why).toBe('scored');
+    expect(r.entry?.text).toBe(long);
+  });
+  it('★窓を抜けたあと(選び直し時)は新しい長文が出る=前の1件が出続けない', () => {
+    const a = entry(BASE - 1000, 'ひとつめの普通の長さのコメントです', { userId: '1' });
+    const b = entry(BASE + 3000, 'あとから来た長い質問です。'.repeat(12), { userId: '2' });
+    const later = pickTickerHighlightEntry([a, b], BASE + 3000 + 15_500);
+    expect(later.entry).toBe(b);
+  });
+});

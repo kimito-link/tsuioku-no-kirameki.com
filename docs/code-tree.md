@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1170 件
+## ⚠️ 役割コメントが無いソース 10 / 1172 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1174,7 +1174,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2302)
+- 📁 **src/** (2306)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1211,7 +1211,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (107)
+  - 📁 **extension/** (108)
     - 📁 **popup/** (17)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1316,6 +1316,7 @@
     - `venueBubblePlacement.wiring.test.js`
     - `venueBubblePlacer.js` — 会場(PC)の吹き出しを DOM の実寸から置く薄い層。
     - `venueLaneEmptyKeep.wiring.test.js`
+    - `venuePickupDrag.js` — v0.1.1899 PICK UP の吹き出しをドラッグで動かし、位置を覚える(りんく「ドラッグでうごかせるようにしておきたい」)。
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
@@ -1476,7 +1477,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2024)
+  - 📁 **lib/** (2027)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1492,13 +1493,16 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
-    - 📁 **youtube/** (44)
+    - 📁 **youtube/** (47)
+      - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
+      - `ytChatContinuationVideoId.test.js`
       - `ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
       - `ytChatParse.test.js`
       - `ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
       - `ytCommentSendReason.test.js`
       - `ytDefaultIcon.test.js`
       - `ytGiftToNico.test.js`
+      - `ytIdbStoreOwner.test.js`
       - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
       - `ytLaneAssign.test.js`
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
@@ -3417,7 +3421,7 @@
     - `voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
     - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
     - `voiceLoadingState.test.js`
-    - `voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1902・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
+    - `voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1907・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
     - `voiceLongCommentShorten.test.js`
     - `voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
     - `voiceNarrowing.test.js`
@@ -3536,13 +3540,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (83)
+- 📁 **tests/** (84)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (76)
+  - 📁 **e2e/** (77)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3621,6 +3625,7 @@
     - `thumbnail-capture.spec.js`
     - `timeline-fill-standalone-window.spec.js`
     - `venue-entry-effect.spec.js`
+    - `venue-pickup-drag.spec.js`
     - `watch-messaging.spec.js`
   - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
