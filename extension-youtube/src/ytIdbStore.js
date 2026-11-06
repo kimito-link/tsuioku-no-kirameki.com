@@ -4,10 +4,13 @@
 import { prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
 
 const DB_NAME = 'yt_kirameki_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_COMMENTS = 'comments';
 const INDEX_BY_VIDEO_ID = 'by_videoId';
 const INDEX_BY_VIDEO_ID_RECORDED_AT = 'by_videoId_recordedAt';
+// DB Version 3(0.1.1904): コメントの id(YouTube が1件ごとに付ける番号)で引く索引。
+//   1件のコメントは1つの配信にしか無い。別の配信の記録に同じ id が既にあれば、それは別の配信のコメントなので入れない。
+const INDEX_BY_ID = 'by_id';
 
 /** @type {Promise<any> | null} */
 let dbPromise = null;
@@ -53,6 +56,9 @@ export function openYtCommentsDb() {
         if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID)) {
           store.createIndex(INDEX_BY_VIDEO_ID, 'videoId', { unique: false });
         }
+        if (store && !store.indexNames.contains(INDEX_BY_ID)) {
+          store.createIndex(INDEX_BY_ID, 'id', { unique: false });
+        }
         if (store && !store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
           store.createIndex(INDEX_BY_VIDEO_ID_RECORDED_AT, ['videoId', 'recordedAt'], {
             unique: false,
@@ -97,11 +103,17 @@ export function openYtCommentsDb() {
  * 1つの配信（`videoId`）に新着コメント群を追加保存する（上限間引きなし・全件保存）。
  * 既に同一 `pk`（`videoId::id`）が存在するコメントはスキップし、新規追加されたものだけ `newlyAdded` に返す。
  *
+ * ★opts.rejectOwnedElsewhere(0.1.1904・2026-11-06 りんく実機「前の配信の人が混ざる」): 同じ id のコメントが
+ *   別の配信の記録に既にあれば入れない(`rejected` にその id と持ち主の配信を返す)。チャット欄が前の配信のまま残って
+ *   同じコメントを別の配信として送ってきても、先に記録された配信のものとして扱う。YouTube の中の形(URL の印など)に
+ *   頼らない守り=形が変わっても効く。チャット欄からの記録だけで使う(アーカイブの埋め直しは配信を名指しで読むので使わない)。
+ *
  * @param {string} videoId
  * @param {any[]} incomingItems
- * @returns {Promise<{ newlyAdded: any[], totalCount: number }>}
+ * @param {{ rejectOwnedElsewhere?: boolean }} [opts]
+ * @returns {Promise<{ newlyAdded: any[], totalCount: number, rejected: Array<{ id: string, owner: string }> }>}
  */
-export async function appendYtStreamCommentsIdb(videoId, incomingItems) {
+export async function appendYtStreamCommentsIdb(videoId, incomingItems, opts = {}) {
   const vid = String(videoId || '').trim();
   const records = prepareYtCommentsForIdb(vid, incomingItems);
   const db = await openYtCommentsDb();
@@ -113,7 +125,10 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems) {
 
     /** @type {any[]} */
     const newlyAdded = [];
+    /** @type {Array<{ id: string, owner: string }>} */
+    const rejected = [];
     let totalCount = 0;
+    const byId = opts.rejectOwnedElsewhere && store.indexNames.contains(INDEX_BY_ID) ? store.index(INDEX_BY_ID) : null;
 
     let idx = 0;
     const processNext = () => {
@@ -127,6 +142,26 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems) {
 
       const rec = records[idx];
       idx += 1;
+      if (byId && rec.id) {
+        const ownReq = byId.getAll(IDBKeyRange.only(rec.id), 4);
+        ownReq.onsuccess = () => {
+          const rows = Array.isArray(ownReq.result) ? ownReq.result : [];
+          const other = rows.find((r) => r && r.videoId && r.videoId !== vid);
+          if (other) {
+            rejected.push({ id: String(rec.id), owner: String(other.videoId) });
+            processNext();
+            return;
+          }
+          putOne(rec);
+        };
+        ownReq.onerror = () => putOne(rec); // 索引が読めなくても記録は止めない
+        return;
+      }
+      putOne(rec);
+    };
+
+    /** @param {any} rec */
+    const putOne = (rec) => {
       const getReq = store.get(rec.pk);
       getReq.onsuccess = () => {
         const existing = getReq.result;
@@ -149,7 +184,7 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems) {
     processNext();
 
     tx.oncomplete = () => {
-      resolve({ newlyAdded, totalCount });
+      resolve({ newlyAdded, totalCount, rejected });
     };
     tx.onerror = () => {
       reject(tx.error || new Error('idb_append_failed'));
