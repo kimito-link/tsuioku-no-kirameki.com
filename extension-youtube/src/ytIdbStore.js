@@ -107,11 +107,13 @@ export function openYtCommentsDb() {
  *   別の配信の記録に既にあれば入れない(`rejected` にその id と持ち主の配信を返す)。チャット欄が前の配信のまま残って
  *   同じコメントを別の配信として送ってきても、先に記録された配信のものとして扱う。YouTube の中の形(URL の印など)に
  *   頼らない守り=形が変わっても効く。チャット欄からの記録だけで使う(アーカイブの埋め直しは配信を名指しで読むので使わない)。
+ * ★opts.claimFromOthers(0.1.1915・2026-11-07 実データで83件の重複): アーカイブの埋め直し用。アーカイブはその配信自身の
+ *   チャットなので本物。同じ id が別の配信の記録にあれば、そちらを消して(`reclaimed` に消した行を返す)この配信に入れる。
  *
  * @param {string} videoId
  * @param {any[]} incomingItems
- * @param {{ rejectOwnedElsewhere?: boolean }} [opts]
- * @returns {Promise<{ newlyAdded: any[], totalCount: number, rejected: Array<{ id: string, owner: string }> }>}
+ * @param {{ rejectOwnedElsewhere?: boolean, claimFromOthers?: boolean }} [opts]
+ * @returns {Promise<{ newlyAdded: any[], totalCount: number, rejected: Array<{ id: string, owner: string }>, reclaimed: Array<{ id: string, from: string, row: any }> }>}
  */
 export async function appendYtStreamCommentsIdb(videoId, incomingItems, opts = {}) {
   const vid = String(videoId || '').trim();
@@ -128,7 +130,10 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems, opts = {
     /** @type {Array<{ id: string, owner: string }>} */
     const rejected = [];
     let totalCount = 0;
-    const byId = opts.rejectOwnedElsewhere && store.indexNames.contains(INDEX_BY_ID) ? store.index(INDEX_BY_ID) : null;
+    /** @type {Array<{ id: string, from: string, row: any }>} */
+    const reclaimed = [];
+    const wantOwnerCheck = Boolean(opts.rejectOwnedElsewhere || opts.claimFromOthers);
+    const byId = wantOwnerCheck && store.indexNames.contains(INDEX_BY_ID) ? store.index(INDEX_BY_ID) : null;
 
     let idx = 0;
     const processNext = () => {
@@ -146,6 +151,16 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems, opts = {
         const ownReq = byId.getAll(IDBKeyRange.only(rec.id), 4);
         ownReq.onsuccess = () => {
           const rows = Array.isArray(ownReq.result) ? ownReq.result : [];
+          if (opts.claimFromOthers) {
+            // アーカイブ(その配信自身のリプレイ)から来た分は本物。別の配信に紛れ込んでいた同じコメントを消して取り戻す。
+            for (const r of rows) {
+              if (!r || !r.videoId || r.videoId === vid || !r.pk) continue;
+              store.delete(r.pk);
+              reclaimed.push({ id: String(rec.id), from: String(r.videoId), row: r });
+            }
+            putOne(rec);
+            return;
+          }
           const other = rows.find((r) => r && r.videoId && r.videoId !== vid);
           if (other) {
             rejected.push({ id: String(rec.id), owner: String(other.videoId) });
@@ -184,7 +199,7 @@ export async function appendYtStreamCommentsIdb(videoId, incomingItems, opts = {
     processNext();
 
     tx.oncomplete = () => {
-      resolve({ newlyAdded, totalCount, rejected });
+      resolve({ newlyAdded, totalCount, rejected, reclaimed });
     };
     tx.onerror = () => {
       reject(tx.error || new Error('idb_append_failed'));

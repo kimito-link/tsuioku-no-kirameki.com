@@ -31,6 +31,11 @@ describe('pickYtCrossVideoDuplicates', () => {
     expect(b).toEqual(a);
   });
 
+  it('アーカイブから埋めた行(postedAtMs あり)は、記録した時刻が後でも本物として残す', () => {
+    const out = pickYtCrossVideoDuplicates([r('H6Te1YPEYvI', 'x', 100), r('U1x0E4tXVk4', 'x', 900, { postedAtMs: 900 })]);
+    expect(out.deletePks).toEqual(['H6Te1YPEYvI::x']);
+  });
+
   it('1つの配信にしか無いコメント・id の無い行には触らない', () => {
     const out = pickYtCrossVideoDuplicates([r('A', 'x', 1), r('B', 'y', 2), { pk: 'B::', id: '', videoId: 'B' }, null]);
     expect(out.deletePks).toEqual([]);
