@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import billingHandler from '../../api/billing.js';
+import billingHandler, { readRawBody } from '../../api/billing.js';
 import { DEVICE_RESET_INTERVAL_MS, deviceTagFor, verifyLicenseToken } from '../lib/supporterLicense.js';
 import {
   billingKeys,
@@ -52,6 +52,7 @@ function fakeStripe(state) {
       customer_details: { email: 'fan@example.com' }
     })),
     getSubscription: vi.fn(async () => state.sub),
+    getEvent: vi.fn(async (id) => (state.events || {})[id] || null),
     createPortal: vi.fn(async (p) => ({ url: `https://portal.stripe.test/${p.customer}` }))
   };
 }
@@ -92,6 +93,56 @@ async function setup() {
   });
   return { svc, up, state, stripe, x };
 }
+
+describe('billingApi: 同じ Stripe アカウントの別サービスの購入', () => {
+  it('追憶の価格を含まない契約はコードを出さず、台帳にも入れない', async () => {
+    const { svc, state, up } = await setup();
+    state.sub = sub('active', { items: { data: [{ price: { id: 'price_other_service' } }] } });
+    const r = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    expect(r.status).toBe(404);
+    expect(r.body.error).toBe('not_supporter');
+    expect([...up.store.keys()].some((k) => k.startsWith('billing:acct:'))).toBe(false);
+  });
+
+  it('webhook で別サービスの契約が来ても、同じ顧客の追憶の契約は上書きされない', async () => {
+    const { svc, state, up } = await setup();
+    const a = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    expect(a.status).toBe(200);
+    state.sub = sub('canceled', { id: 'sub_other', items: { data: [{ price: { id: 'price_other_service' } }] } });
+    const body = JSON.stringify({ id: 'evt_other', type: 'customer.subscription.deleted', data: { object: { id: 'sub_other' } } });
+    const w = await svc.webhook({ rawBody: body, signature: signed(body) });
+    expect(w.status).toBe(200);
+    const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
+    expect(acct.status).toBe('active');
+    expect(acct.subscriptionId).toBe('sub_1');
+  });
+});
+
+describe('billingApi: 署名が合わない通知', () => {
+  it('Stripe に実在するイベントなら、聞き直した中身で台帳を更新する', async () => {
+    const { svc, state, up } = await setup();
+    await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    state.sub = sub('canceled');
+    const real = { id: 'evt_realevent1', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } };
+    state.events = { evt_realevent1: real };
+    const body = JSON.stringify(real);
+    const w = await svc.webhook({ rawBody: body, signature: 't=1,v1=bad' });
+    expect(w.status).toBe(200);
+    const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
+    expect(acct.status).toBe('canceled');
+  });
+
+  it('Stripe に無いイベント(偽の通知)は 400 で、台帳は変わらない', async () => {
+    const { svc, state, up } = await setup();
+    await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    state.sub = sub('canceled');
+    const body = JSON.stringify({ id: 'evt_forgedevent', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } });
+    const w = await svc.webhook({ rawBody: body, signature: 't=1,v1=bad' });
+    expect(w.status).toBe(400);
+    const acct = JSON.parse([...up.store.entries()].find(([k]) => k.startsWith('billing:acct:'))[1]);
+    expect(acct.status).toBe('active');
+  });
+});
 
 describe('billingApi: 申し込み→支払い直後→取り直し', () => {
   it('申し込みは年額を既定にし、戻り先は supporter 画面', async () => {
@@ -268,6 +319,16 @@ describe('api/billing: 受け口', () => {
     await billingHandler({ method: 'POST', query: { action: 'license' }, headers: {}, body: {} }, res, { stripe: { configured: false } });
     log.mockRestore();
     expect(res.code).toBe(503);
+  });
+  it('生の本文は req.body より先に流れから読む(整形済みの本文をそのまま署名に使う)', async () => {
+    const { Readable } = await import('node:stream');
+    const pretty = '{\n  "id": "evt_1",\n  "type": "x"\n}';
+    const req = Readable.from([Buffer.from(pretty)]);
+    let touched = false;
+    Object.defineProperty(req, 'body', { get() { touched = true; return JSON.parse(pretty); } });
+    const raw = await readRawBody(req);
+    expect(raw).toBe(pretty);
+    expect(touched).toBe(false);
   });
   it('GET は 405', async () => {
     const res = mkRes();

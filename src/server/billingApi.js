@@ -149,6 +149,7 @@ export function createStripeClient({ fetchImpl = fetch, env = process.env } = {}
     createCheckout: (params) => call('POST', 'checkout/sessions', params),
     getCheckout: (id) => call('GET', `checkout/sessions/${encodeURIComponent(id)}`, { expand: ['subscription'] }),
     getSubscription: (id) => call('GET', `subscriptions/${encodeURIComponent(id)}`),
+    getEvent: (id) => call('GET', `events/${encodeURIComponent(id)}`),
     createPortal: (params) => call('POST', 'billing_portal/sessions', params)
   };
 }
@@ -210,6 +211,10 @@ export function createBillingService(deps) {
 
   /** Stripe の契約の中身を台帳へ写す(顧客 ID で1件にまとめる)。 */
   async function upsertFromSubscription(sub, extra = {}) {
+    // ★同じ Stripe アカウントには別サービスの商品もある。追憶の価格を含まない契約は台帳に入れない
+    //   (入れると、別サービスの購入者がサポーターになったり、同じ顧客の別契約で状態が上書きされる)。
+    const ourItem = (sub?.items?.data || []).find((it) => planFromPriceId(it?.price?.id, env) !== 'supporter');
+    if (!ourItem) return null;
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
     if (!customerId) return null;
     const custKey = billingKeys.customer('stripe', customerId);
@@ -221,8 +226,8 @@ export function createBillingService(deps) {
       acct = { acctId, provider: 'stripe', customerId, createdAtMs: t, codeHash: '', email: '' };
       await upstash(['SET', custKey, acctId]);
     }
-    const priceId = sub.items?.data?.[0]?.price?.id || acct.priceId || '';
-    const periodEnd = sub.current_period_end ?? sub.items?.data?.[0]?.current_period_end;
+    const priceId = ourItem.price.id;
+    const periodEnd = sub.current_period_end ?? ourItem.current_period_end;
     acct = {
       ...acct,
       subscriptionId: sub.id || acct.subscriptionId || '',
@@ -268,7 +273,7 @@ export function createBillingService(deps) {
       if (!paid || !s.subscription) return { status: 402, body: { ok: false, error: 'not_paid' } };
       const sub = typeof s.subscription === 'string' ? await stripe.getSubscription(s.subscription) : s.subscription;
       const acct = await upsertFromSubscription(sub, { email: s.customer_details?.email || '' });
-      if (!acct) return { status: 502, body: { ok: false, error: 'no_customer' } };
+      if (!acct) return { status: 404, body: { ok: false, error: 'not_supporter' } };
       let code = await upstash(['GET', billingKeys.sessionCode(sessionId)]);
       if (!code) {
         code = newCode();
@@ -336,7 +341,6 @@ export function createBillingService(deps) {
         secret: env.STRIPE_WEBHOOK_SECRET || '',
         nowSec: Math.floor(now() / 1000)
       });
-      if (!ok) return { status: 400, body: { ok: false, error: 'bad_signature' } };
       let ev;
       try {
         ev = JSON.parse(rawBody);
@@ -344,6 +348,22 @@ export function createBillingService(deps) {
         return { status: 400, body: { ok: false, error: 'bad_json' } };
       }
       if (!ev?.id) return { status: 400, body: { ok: false, error: 'bad_event' } };
+      if (!ok) {
+        // ★署名が合わないとき(実行環境が本文を解析し直して生の本文が失われた等)は、
+        //   届いた中身を信じずに Stripe へイベント ID で聞き直し、その中身だけを使う。
+        //   偽の通知は Stripe に存在しないので 400 のまま。
+        if (typeof ev.id !== 'string' || !/^evt_[A-Za-z0-9_]{8,200}$/.test(ev.id) || !stripe.getEvent) {
+          return { status: 400, body: { ok: false, error: 'bad_signature' } };
+        }
+        let fetched = null;
+        try {
+          fetched = await stripe.getEvent(ev.id);
+        } catch {
+          fetched = null;
+        }
+        if (!fetched?.id || fetched.id !== ev.id) return { status: 400, body: { ok: false, error: 'bad_signature' } };
+        ev = fetched;
+      }
       const seen = await upstash(['SET', billingKeys.event(ev.id), '1', 'NX', 'EX', String(EVENT_SEEN_TTL_SECONDS)]);
       if (seen === null) return { status: 200, body: { ok: true, duplicate: true } };
       const obj = ev.data?.object || {};
