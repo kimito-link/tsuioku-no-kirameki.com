@@ -58,7 +58,7 @@ export function mountPhoneBlockUi(a) {
 }
 
 /**
- * 「見たくない人を隠す・報告する」の板を開く。v0.1.1905: 拡張なしの形(💬 コメントを流す)からも使う。
+ * 「見たくない人を隠す・報告する」の板を開く。v0.1.1907: 拡張なしの形(💬 コメントを流す)からも使う。
  * @param {{ getRows: () => any[], onChange: () => void }} a
  */
 export function openPhoneBlockSheet(a) {

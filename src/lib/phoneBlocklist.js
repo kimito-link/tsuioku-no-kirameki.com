@@ -87,7 +87,7 @@ export function dropBlockedRows(rows, blocked) {
 export const COMMENT_AUTHOR_MEMORY_MAX = 600;
 
 /**
- * v0.1.1905: コメント番号ごとに書いた人を覚える(隠す前の行から)。
+ * v0.1.1907: コメント番号ごとに書いた人を覚える(隠す前の行から)。
  *   WEB版の読み上げは PC の声を「番号」だけで受け取るので、隠した人の声かどうかを番号から引くために使う。
  * @param {Map<string, string>} map 呼び出し側が持ち続ける(この関数が足して、古い方を捨てる)
  * @param {any[]} rows
