@@ -1,5 +1,6 @@
 // voicevoxClient.js — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 import { normalizeVoiceReadingBody } from './voiceReadingNormalize.js';
+import { shortenLongCommentForVoice } from './voiceLongCommentShorten.js';
 import {
   StreamedVoice,
   createWavStreamParser,
@@ -870,9 +871,8 @@ export function buildVoiceReadingText(row, { maxChars = 60 } = {}) {
       ? Math.floor(rawMaxChars)
       : 60;
   // 2026-10-28: 笑いの w・拍手の 8・同じ文字の連打も読みやすく(voiceReadingNormalize.js)。
-  const body = Array.from(normalizeVoiceReadingBody(rawText))
-    .slice(0, limit)
-    .join('');
+  // v0.1.1900: 上限で文字の途中から切らず、質問の結びと直前の言い分を残して短くする(voiceLongCommentShorten.js)。
+  const body = shortenLongCommentForVoice(normalizeVoiceReadingBody(rawText), limit);
   if (!body) return '';
   // v0.1.1813: 名前も本文と同じ整え方で読む(「たろうｗｗｗ」を「ダブリュー…」と読まない・絵文字だけの名前は読まない)。
   const name = normalizeVoiceReadingBody(String(row?.name || ''));
