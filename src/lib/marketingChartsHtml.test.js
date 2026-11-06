@@ -159,6 +159,18 @@ describe('ギフトの瞬間の章(v0.1.1672)', () => {
     expect(html).toContain('ギフトが原因とは限りません');
     expect(html).toContain('href="#mkt-gift-moments"'); // 目次にも出る
   });
+  it('v0.1.1908: 1つの瞬間の送り主は8件まで並べ、残りは「ほか N件」(全部はギフト投げ履歴)', () => {
+    const report = aggregateMarketingReport(comments, 'lv9');
+    const many = Array.from({ length: 12 }, (_, n) => ({
+      kokenHistoryId: `h${n}`, userId: String(200 + n), senderName: `送り主${n}さん`, itemName: '花', points: 10, contribution: 100,
+      publishedAt: Math.floor((T0 + 20 * MIN + n * 1000) / 1000)
+    }));
+    const html = buildMarketingDashboardHtml(report, { giftSubAppHistory: hist({ history: many }), commentsForAnalytics: comments });
+    const i = html.indexOf('id="mkt-gift-moments"');
+    const sec = html.slice(i, html.indexOf('</section>', i));
+    expect((sec.match(/class="mkt-gm-gift"/g) || []).length).toBe(8);
+    expect(sec).toContain('ほか 4件(全部は「ギフト投げ履歴」の表にあります)');
+  });
   it('★履歴が無いと章も目次も出ない', () => {
     const report = aggregateMarketingReport(comments, 'lv9');
     const html = buildMarketingDashboardHtml(report, { commentsForAnalytics: comments });
