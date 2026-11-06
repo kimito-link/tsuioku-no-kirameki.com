@@ -42,7 +42,7 @@
  *   指標が宣言済みで出所を特定できたものだけを入れた
  *   (抽出できても出所が書けないものは**入れない**＝検算できないため)。
  *
- * ★tsconfig の型検査から外している(v0.1.1906)。件数が増えて tsc が TS2590
+ * ★tsconfig の型検査から外している(v0.1.1909)。件数が増えて tsc が TS2590
  *   「union type that is too complex to represent」で落ちたため(changelog-archive.js と同じ扱い)。
  *   ロジックを持たないデータで、読むのは scripts/ の検査だけ(どちらも tsconfig の外)。
  */
@@ -4880,16 +4880,16 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '30日の窓で数える値。0.1.1897 と同じ 40'
   }),
   Object.freeze({
-    version: '0.1.1906', metric: 'bundle-kb', value: 1418,
+    version: '0.1.1909', metric: 'bundle-kb', value: 1418,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
     note: '一気出しの計器の項目を popup が読む venueSeatsDiag に足した分。最良 1360 より上なのは以前から'
   }),
   Object.freeze({
-    version: '0.1.1906', metric: 'gate-selftest', value: 4,
+    version: '0.1.1909', metric: 'gate-selftest', value: 4,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.1906', metric: 'cross-checked-claims', value: 41,
+    version: '0.1.1909', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日の窓で数える値。最良 55 より下なのは以前から'
   })
