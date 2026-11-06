@@ -119,4 +119,39 @@ describe('appendYtStreamCommentsIdb の rejectOwnedElsewhere', () => {
     expect(new Set(keys.map((k) => k.id)).size).toBe(keys.length);
     expect(keys.length).toBe(truth.size);
   });
+
+  it('アーカイブの埋め直しは本物: 別の配信に先に紛れ込んでいた同じコメントを消して取り戻す(0.1.1915)', async () => {
+    const s = await freshStore();
+    // 前の配信のチャット欄が残ったまま、U1x0 のコメントが H6Te の記録に先に入ってしまった
+    await s.appendYtStreamCommentsIdb('H6Te1YPEYvI', [row('u1'), row('u2'), row('h1')], { rejectOwnedElsewhere: true });
+    // 本物の配信の生の記録は弾かれてしまう(先に入った方が持ち主扱い)
+    const live = await s.appendYtStreamCommentsIdb('U1x0E4tXVk4', [row('u1')], { rejectOwnedElsewhere: true });
+    expect(live.rejected.length).toBe(1);
+    // 配信が終わってアーカイブから埋めると、本物の配信に戻る
+    const res = await s.appendYtStreamCommentsIdb(
+      'U1x0E4tXVk4',
+      [{ ...row('u1'), postedAtMs: 50 }, { ...row('u2'), postedAtMs: 60 }],
+      { claimFromOthers: true },
+    );
+    expect(res.reclaimed.map((r) => [r.id, r.from])).toEqual([
+      ['u1', 'H6Te1YPEYvI'],
+      ['u2', 'H6Te1YPEYvI'],
+    ]);
+    expect(res.reclaimed[0].row.pk).toBe('H6Te1YPEYvI::u1');
+    expect((await s.getYtStreamCommentsByVideoId('H6Te1YPEYvI')).map((r) => r.id)).toEqual(['h1']);
+    expect((await s.getYtStreamCommentsByVideoId('U1x0E4tXVk4')).map((r) => r.id).sort()).toEqual(['u1', 'u2']);
+    const keys = await s.readAllYtCommentKeys();
+    expect(pickYtCrossVideoDuplicates(keys).deletePks).toEqual([]);
+    // そのあと同じコメントが前の配信として来ても入らない
+    const again = await s.appendYtStreamCommentsIdb('H6Te1YPEYvI', [row('u1')], { rejectOwnedElsewhere: true });
+    expect(again.rejected).toEqual([{ id: 'u1', owner: 'U1x0E4tXVk4' }]);
+  });
+
+  it('片付けは、アーカイブから埋めた行を記録の早さより優先して残す', async () => {
+    const s = await freshStore();
+    await s.appendYtStreamCommentsIdb('mSm2z0d2eHs', [{ ...row('a1'), recordedAt: 100 }]);
+    await s.appendYtStreamCommentsIdb('5MzFWlv5ghk', [{ ...row('a1'), recordedAt: 900, postedAtMs: 900 }]);
+    const pick = pickYtCrossVideoDuplicates(await s.readAllYtCommentKeys());
+    expect(pick.deletePks).toEqual(['mSm2z0d2eHs::a1']);
+  });
 });
