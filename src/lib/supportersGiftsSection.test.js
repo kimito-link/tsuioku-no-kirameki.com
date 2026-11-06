@@ -84,7 +84,7 @@ describe('sectionSupportersGiftsHtml: 畳める章の HTML', () => {
     const html = sectionSupportersGiftsHtml(rows, { maskShare: false, renderIdentity: identity });
     expect(html).toContain('id="mkt-supporters-gifts"');
     expect((html.match(/<details/g) || []).length).toBe(2);
-    // v0.1.1859: コメント本文は開いたときに作る表のデータ(JSON)に入る。< は \u003c に逃がす(閉じタグにならない)。
+    // v0.1.1906: コメント本文は開いたときに作る表のデータ(JSON)に入る。< は \u003c に逃がす(閉じタグにならない)。
     expect(html).toContain('\\u003cb>x\\u003c/b>');
     expect(html).not.toContain('<td><b>');
     expect(html).toContain('星&lt;i&gt;');

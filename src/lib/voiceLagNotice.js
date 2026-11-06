@@ -98,7 +98,8 @@ export function decideVoiceLagNotice(prevShown, diag, _opts = {}) {
   if (!Number.isFinite(e2e) || e2e < 0) return { shown: false, lagMs: -1, text: '' };
   const lagMs = Math.round(e2e + (Number.isFinite(up) && up > 0 ? up : 0));
   // 待ちが空になった=もう追いついている。古い平均で出し続けない。
-  if (Number.isFinite(queueNow) && queueNow <= 0 && prevShown) return { shown: false, lagMs, text: '' };
+  // v0.1.1866: 前に出していなくても待ち0なら出さない(開き直した直後に古い平均だけで「約19秒遅れ」が出ていた・YouTube 版 0.1.102 で確認)。
+  if (Number.isFinite(queueNow) && queueNow <= 0) return { shown: false, lagMs, text: '' };
   const shown = prevShown ? lagMs >= VOICE_LAG_NOTICE_HIDE_MS : lagMs >= VOICE_LAG_NOTICE_SHOW_MS;
   if (!shown) return { shown: false, lagMs, text: '' };
   const sec = Math.round(lagMs / 1000);

@@ -66,6 +66,21 @@
         background: transparent;
       }
       body.is-obs .cv-toolbar { display: none; }
+      /* v0.1.1894: 無料の人の OBS 画面の隅の印。OBS 透過のときだけ見える。 */
+      .cv-credit {
+        position: fixed;
+        right: 8px;
+        bottom: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.35);
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 11px;
+        line-height: 1.6;
+        pointer-events: none;
+        z-index: 50;
+      }
+      body:not(.is-obs) .cv-credit { display: none; }
       body.is-obs .cv-row {
         background: rgb(0 0 0 / 38%);
         color: #fff;
@@ -704,6 +719,8 @@
       </div>
       <div class="cv-panel-body" id="cvPanelBody"></div>
     </div>
+    <!-- v0.1.1894: 無料の人の OBS 画面の隅に出す小さな印(サポーターは出ない・関所が開いているあいだは誰にも出ない)。 -->
+    <div class="cv-credit" id="cvCredit" hidden>💬 追憶のきらめき</div>
     <script src="dist/comeview.js"></script>
   </body>
 </html>

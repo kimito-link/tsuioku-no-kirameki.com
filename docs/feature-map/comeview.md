@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_VOICE_DIAG`, `KEY_VOICE_WEAK_PC`, `fn:comeviewPinStorageKey`
-- 読むキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VOICE_NARROW_MODE`, `KEY_VOICE_QUALITY`, `KEY_VOICE_VOLUME_PERCENT`, `KEY_VOICE_WEAK_PC`
+- 読むキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_LAST_WATCH_URL`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VOICE_NARROW_MODE`, `KEY_VOICE_QUALITY`, `KEY_VOICE_VOLUME_PERCENT`, `KEY_VOICE_WEAK_PC`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -25,6 +25,7 @@ graph LR
   n_comeview --> n_src_lib_avatarFaceWorkerClient_js["lib/avatarFaceWorkerClient.js"]:::shared
   n_comeview --> n_src_lib_avatarPartAnchors_js["lib/avatarPartAnchors.js"]:::shared
   n_comeview --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
+  n_comeview --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
   n_comeview --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
   n_comeview --> n_src_lib_comeviewInstantRender_js["lib/comeviewInstantRender.js"]
   n_comeview --> n_src_lib_comeviewLivePush_js["lib/comeviewLivePush.js"]:::shared
@@ -46,14 +47,13 @@ graph LR
   n_comeview --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_comeview --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_comeview --> n_src_lib_noSpeechNote_js["lib/noSpeechNote.js"]
+  n_comeview --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
   n_comeview --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
   n_comeview --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_comeview --> n_src_lib_storageRefreshTriggerKey_js["lib/storageRefreshTriggerKey.js"]:::shared
   n_comeview --> n_src_lib_supportActivityTimeline_js["lib/supportActivityTimeline.js"]:::shared
   n_comeview --> n_src_lib_supportGridDisplayTier_js["lib/supportGridDisplayTier.js"]:::shared
-  n_comeview --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
-  n_comeview --> n_src_lib_supportTimelineHtml_js["lib/supportTimelineHtml.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 35 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 40 ファイル省略（全件は storage-bus.md / metafile 参照）。

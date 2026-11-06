@@ -69,6 +69,7 @@ import { isContextInvalidatedError as isExtensionContextInvalidatedError } from 
 import { triggerAnchorBlobDownload } from '../lib/blobDownload.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
+import { SUPPORTER_PAGE_URL, checkMarketingAccess, saveSupporterCode } from '../lib/supporterAccess.js';
 import { isCommentDbAvailable, openCommentDb, countCommentsForLive, readAllCommentsForLive as readAllCommentsFromDb } from '../lib/commentDb.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
 import { readStorageBagWithRetry, normalizeUserCommentProfileMap } from '../lib/userCommentProfileCache.js';
@@ -488,12 +489,66 @@ function showErrorStage(text, showRetry) {
   if (err) err.classList.add('is-visible');
 }
 
+// ── サポーター(有料)の関所(v0.1.1893・課金 第3段) ──
+//   SUPPORTER_GATE_ENFORCED=false のあいだは checkMarketingAccess が必ず allowed=true を返す=今の動きと同じ。
+//   判定に失敗したら開ける側に倒す(払った人を締め出さない)。
+
+const SUPPORTER_CODE_MESSAGES = Object.freeze({
+  ok: 'ありがとうございます。サポーターとして確認できました。',
+  inactive: 'このコードの契約は今は止まっています。申し込み画面から再開できます。',
+  unknown: 'このコードは見つかりませんでした。支払い後の画面に出たコードを貼り付けてください。',
+  bad_format: 'コードの形が違います。支払い後の画面に出たコードをそのまま貼り付けてください。',
+  offline: 'コードを保存しました。サーバーに届かなかったので、つながったときに確認します。',
+  device_limit:
+    'このコードは別の PC で使われています(1つのコードで使えるのは1台です)。PC を移すときは、サポーターのページの「この PC に移す」を押してから、もう一度貼り付けてください。'
+});
+
+/** @returns {Promise<boolean>} 開けてよいか */
+async function passSupporterGate() {
+  try {
+    const r = await checkMarketingAccess({ storage: chrome.storage.local });
+    return r.allowed;
+  } catch {
+    return true;
+  }
+}
+
+/** @param {string} lid */
+function showLockStage(lid) {
+  stopWaitCharCycle();
+  const wait = document.getElementById('mktWaitStage');
+  const lock = document.getElementById('mktLockStage');
+  const msg = document.getElementById('mktLockMsg');
+  const input = /** @type {HTMLInputElement|null} */ (document.getElementById('mktLockCodeInput'));
+  if (wait) wait.style.display = 'none';
+  const join = document.getElementById('mktLockJoinBtn');
+  if (join) join.onclick = () => void chrome.tabs.create({ url: SUPPORTER_PAGE_URL });
+  const codeBtn = document.getElementById('mktLockCodeBtn');
+  if (codeBtn) {
+    codeBtn.onclick = async () => {
+      const r = await saveSupporterCode({ storage: chrome.storage.local, code: input?.value || '' }).catch(() => 'offline');
+      if (msg) msg.textContent = SUPPORTER_CODE_MESSAGES[/** @type {keyof typeof SUPPORTER_CODE_MESSAGES} */ (r)] || '';
+      if (r === 'ok') {
+        lock?.classList.remove('is-visible');
+        if (wait) wait.style.display = 'flex';
+        startWaitCharCycle();
+        void runExport(lid);
+      }
+    };
+  }
+  if (lock) lock.classList.add('is-visible');
+}
+
 // ── stage 4: メイン処理(既存パイプラインを呼び出し順序・引数不変で実行) ──
 
 /** @param {string} lid */
 async function runExport(lid) {
   if (!lid) {
     showErrorStage('URLに ?lv=lv×××××× が指定されていません。\n拡張のポップアップから開き直してください。');
+    return;
+  }
+  if (!(await passSupporterGate())) {
+    showLockStage(lid);
     return;
   }
 
