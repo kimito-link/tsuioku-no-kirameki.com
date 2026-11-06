@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1172 件
+## ⚠️ 役割コメントが無いソース 10 / 1173 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1174,7 +1174,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2306)
+- 📁 **src/** (2308)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1477,7 +1477,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2027)
+  - 📁 **lib/** (2029)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1493,9 +1493,11 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
-    - 📁 **youtube/** (49)
+    - 📁 **youtube/** (51)
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
+      - `ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
+      - `ytChatEchoDedupe.test.js`
       - `ytChatInputBlock.js` — YouTube のチャット欄に入力欄が無いとき、その理由を見分ける(content-chat-entry の「ここから発言」用)。
       - `ytChatInputBlock.test.js`
       - `ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
