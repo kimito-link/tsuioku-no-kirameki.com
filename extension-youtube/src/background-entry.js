@@ -374,6 +374,36 @@ if (!YT_MERGED) try {
   // alarms が使えない環境では従来どおり手で 🔄
 }
 
+// ★0.1.1904(2026-11-06 りんく実機「前の配信の人が混ざる」): コメントの id → そのコメントが記録された配信。
+//   1件のコメントは1つの配信にしか無い。別の配信として送られてきたら(チャット欄が前の配信のまま残っていたとき)入れない。
+//   正本は IndexedDB の索引(ytIdbStore.js by_id)。これは保存より先に会場へ届けるときに使う手元の控え(最新 20,000 件)。
+/** @type {Map<string, string>} */
+const ytCommentOwnerById = new Map();
+const YT_COMMENT_OWNER_CAP = 20000;
+/** @param {string} id @param {string} vid */
+function noteYtCommentOwner(id, vid) {
+  if (!id || !vid) return;
+  ytCommentOwnerById.delete(id);
+  ytCommentOwnerById.set(id, vid);
+  if (ytCommentOwnerById.size > YT_COMMENT_OWNER_CAP) {
+    const first = ytCommentOwnerById.keys().next().value;
+    if (first) ytCommentOwnerById.delete(first);
+  }
+}
+let ytOwnerRejectTotal = 0;
+/** @param {string} videoId @param {{ newlyAdded?: any[], rejected?: Array<{ id: string, owner: string }> }} res */
+function rememberYtCommentOwners(videoId, res) {
+  for (const r of res?.newlyAdded || []) noteYtCommentOwner(String(r?.id || ''), videoId);
+  const rej = res?.rejected || [];
+  if (!rej.length) return;
+  for (const r of rej) noteYtCommentOwner(r.id, r.owner);
+  ytOwnerRejectTotal += rej.length;
+  // 計器: 別の配信のコメントとして入れなかった数(どの配信に・どの配信のものが来たか)。見た目は変えない。
+  void chrome.storage.local
+    .set({ yt_diag_owner_reject: { at: Date.now(), total: ytOwnerRejectTotal, last: { to: videoId, from: rej[0].owner, n: rej.length } } })
+    .catch(() => {});
+}
+
 const KEY_BACKFILL_STATE = 'yt_backfill_state';
 /**
  * 次に埋める配信を1つ選ぶ。終わって2分以上たち、まだ埋め終わっていない配信。
@@ -680,6 +710,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .filter((x) => x && x.id)
         .map((x) => ({ ...x, recordedAt: Number(x.postedAtMs) > 0 ? Number(x.postedAtMs) : Date.now() }));
       const res = await appendYtStreamCommentsIdb(videoId, items);
+      rememberYtCommentOwners(videoId, { newlyAdded: res.newlyAdded });
       const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
       const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
       if (summaries[videoId] && res.newlyAdded.length) {
@@ -723,7 +754,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const p0 = message.payload || {};
       const vidNow = String(p0.videoId || extractVideoIdFromSender(sender) || '').trim();
       if (typeof tabId === 'number' && vidNow && Array.isArray(p0.items) && p0.items.length) {
-        const recs = prepareYtCommentsForIdb(vidNow, p0.items);
+        // 別の配信の記録に入っていると分かっているコメントは、保存より先に会場へ届けない(保存の側でも入れない)
+        const recs = prepareYtCommentsForIdb(vidNow, p0.items).filter((r) => {
+          const owner = ytCommentOwnerById.get(String(r?.id || ''));
+          return !owner || owner === vidNow;
+        });
         if (recs.length) {
           void Promise.resolve(chrome.tabs.sendMessage(tabId, { type: 'YT_LIVE_ROWS', videoId: vidNow, items: recs }, { frameId: 0 })).catch(() => {});
         }
@@ -794,11 +829,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // 失敗したら、つながりを開き直して1回だけやり直す(切れたつながりで黙って保存できなくなるのを防ぐ)
       let idbResult;
       try {
-        idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+        idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming, { rejectOwnedElsewhere: true });
       } catch (err) {
         resetYtCommentsDb();
         try {
-          idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming);
+          idbResult = await appendYtStreamCommentsIdb(videoId, enrichedIncoming, { rejectOwnedElsewhere: true });
         } catch (err2) {
           void chrome.storage.local.set({
             yt_ingest_diag: { at: Date.now(), ok: false, videoId, error: String(err2 || err).slice(0, 200) },
@@ -806,6 +841,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw err2;
         }
       }
+      rememberYtCommentOwners(videoId, idbResult);
       if (Date.now() - lastIngestDiagAt > 30000) {
         lastIngestDiagAt = Date.now();
         void chrome.storage.local.set({
