@@ -43,3 +43,35 @@ describe('配線: 吹き出しを大事な表示に被せない(v0.1.1760)', () 
     expect(venueBar).not.toContain(".trim() || 'コメント';");
   });
 });
+
+describe('配線: PICK UP をドラッグで動かす(v0.1.1899)', () => {
+  const drag = readFileSync(new URL('./venuePickupDrag.js', import.meta.url), 'utf8');
+  it('★会場は placePickup で位置をドラッグ部品に任せる', () => {
+    expect(venueBar).toContain('pickupDrag.place(at);');
+    expect(venueBar).toContain('attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup');
+  });
+  it('★窓の中の前の1件を出している間に新着が来たら、少し後に選び直す(v0.1.1901・古い1件が出続ける対策)', () => {
+    expect(venueBar).toContain("if (picked.why === 'scored' && picked.entry !== pickupRing[pickupRing.length - 1]) pickupDrag.later(() => updatePickupBanner(null));");
+    expect(drag).toContain('later(fn, ms = 15_500) {');
+    expect(drag).toContain('if (laterTimer) return;');
+  });
+  it('★置いた位置を覚え、窓の内側に締め、ダブルクリックで戻す', () => {
+    expect(drag).toContain('safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: toSave })');
+    expect(drag).toContain("root.addEventListener('dblclick'");
+    expect(drag).toContain('viewportBounds(L)');
+    // 名前リンクから始めてもドラッグでき、動かなければクリック=発言パネル(v0.1.1900)
+    expect(drag).toContain("if (!openWho && ev.target instanceof Element && ev.target.closest('a[href]')) return;");
+    // 速く動かしても置いていかれない(動き・離しは window で受ける)
+    expect(drag).toContain("window.addEventListener('pointerup', endDrag);");
+  });
+  it('★顔か名前のクリックで発言パネル(ドラッグ直後は開かない・v0.1.1900)', () => {
+    expect(venueBar).toContain('attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) =>');
+    expect(venueBar).toMatch(/void openSpeechPanelFor\(who\); \}\);/);
+    expect(drag).toContain('if (wasDrag) return;');
+    expect(drag).not.toContain("root.title = ");
+  });
+  it('★「ドラッグで動かせます」が分かる(つまみ+札)', () => {
+    expect(drag).toContain("grip.textContent = '⠿';");
+    expect(drag).toContain('ドラッグで動かせます');
+  });
+});
