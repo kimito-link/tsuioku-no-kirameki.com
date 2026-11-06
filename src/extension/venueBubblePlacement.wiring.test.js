@@ -50,6 +50,11 @@ describe('配線: PICK UP をドラッグで動かす(v0.1.1899)', () => {
     expect(venueBar).toContain('pickupDrag.place(at);');
     expect(venueBar).toContain('attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup');
   });
+  it('★窓の中の前の1件を出している間に新着が来たら、少し後に選び直す(v0.1.1901・古い1件が出続ける対策)', () => {
+    expect(venueBar).toContain("if (picked.why === 'scored' && picked.entry !== pickupRing[pickupRing.length - 1]) pickupDrag.later(() => updatePickupBanner(null));");
+    expect(drag).toContain('later(fn, ms = 15_500) {');
+    expect(drag).toContain('if (laterTimer) return;');
+  });
   it('★置いた位置を覚え、窓の内側に締め、ダブルクリックで戻す', () => {
     expect(drag).toContain('safeStorageLocalSet({ [KEY_VENUE_PICKUP_POS]: toSave })');
     expect(drag).toContain("root.addEventListener('dblclick'");

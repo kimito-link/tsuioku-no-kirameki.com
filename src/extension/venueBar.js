@@ -2996,14 +2996,14 @@ export function mountVenueBarButton(options = {}) {
    * ピックアップ枠の入力(2026-10-17): 表示行(storage集計/鏡由来=text空)ではなく、届いた発言(吹き出し・読み上げと同じ speeches)を積む独立のリングから選ぶ。
    *   以前は commitDisplay の表示行から選んでいたため、発言を行へ混ぜた直後の1回しか本文が乗らず枠が案内文のままだった(実機+headlessで再現)。正本=venuePickupRing.js。
    */
-  /** @type {Array<any>} */
-  let pickupRing = [];
+  let pickupRing = /** @type {Array<any>} */ ([]);
   /** @param {ReadonlyArray<any>|null} fallbackRows リングが空のときの従来入力(表示行) */
   const updatePickupBanner = (fallbackRows) => {
     try {
       const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
-      applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
-      placePickup();
+      const picked = pickTickerHighlightEntry(rows, Date.now());
+      applyVenuePickupView(pickupEls, buildVenuePickupView(picked));
+      placePickup(); if (picked.why === 'scored' && picked.entry !== pickupRing[pickupRing.length - 1]) pickupDrag.later(() => updatePickupBanner(null)); // v0.1.1901: 窓の中の前の1件を出している間に新しい発言が来たら、窓が過ぎてから選び直す(過疎だと次の更新が来ず前の1件が10分出続けた)
     } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
   /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
