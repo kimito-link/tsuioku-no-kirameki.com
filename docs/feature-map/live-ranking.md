@@ -13,6 +13,7 @@
 ```mermaid
 graph LR
   n_live_ranking["Web版 追憶のきらめき ランキング(/live/)"]
+  n_live_ranking --> n_app_live_view_block_js["app/live-view-block.js"]
   n_live_ranking --> n_app_live_view_native_voice_js["app/live-view-native-voice.js"]
   n_live_ranking --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_live_ranking --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
@@ -38,6 +39,7 @@ graph LR
   n_live_ranking --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_live_ranking --> n_src_lib_nicoadContributionRankingApi_js["lib/nicoadContributionRankingApi.js"]:::shared
   n_live_ranking --> n_src_lib_nicoliveRankingPick_js["lib/nicoliveRankingPick.js"]
+  n_live_ranking --> n_src_lib_phoneBlocklist_js["lib/phoneBlocklist.js"]
   n_live_ranking --> n_src_lib_phoneVoice_js["lib/phoneVoice.js"]:::shared
   n_live_ranking --> n_src_lib_protobufVarint_js["lib/protobufVarint.js"]:::shared
   n_live_ranking --> n_src_lib_timeAuthority_js["lib/timeAuthority.js"]:::shared
