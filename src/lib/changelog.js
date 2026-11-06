@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1906',
+    version: '0.1.1909',
     date: '2026-11-06',
     summary: '昔のコメントが会場で一気に出ないように',
     items: Object.freeze([
@@ -26,11 +26,20 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     ])
   }),
   Object.freeze({
-    version: '0.1.1905',
+    version: '0.1.1908',
     date: '2026-11-06',
     summary: '吹き出しの一気出しを数える計器',
     items: Object.freeze([
       '会場で吹き出しが一度にたくさん出たとき、それが「本当にコメントが一気に来た」のか、「過去ログの取り込みで昔のコメントがまとめて流れた」のか、「書き込み待ちで溜まった分がまとめて届いた」のかを数えて、状態速報に1行で出すようにしました。見た目や動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1905',
+    date: '2026-11-06',
+    summary: 'YouTube で自分の発言が2件・2回読まれるのを直す',
+    items: Object.freeze([
+      'YouTube の配信で自分がコメントを送ると、チャット欄には1件なのに記録が2件になり、読み上げも2回流れていました。YouTube が送ったコメントを仮の行から本物の行へ差し替えるのを、別のコメントとして数えていたためです。差し替えは1件として扱うようにしました。',
+      '同じ人が同じ文を本当に2回書いたときは、これまでどおり2件記録します。'
     ])
   }),
   Object.freeze({
@@ -186,14 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '会場のギフトの帯の先頭に「2回押して贈る」(1回押しのときは「押すとすぐ贈る」)と見える文字で出します',
       '🎁ギフトで公式の欄を開いたとき、会場に戻ると帯のアイテムから会場のまま贈れることも案内します'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1884',
-    date: '2026-11-05',
-    summary: 'ギフトが贈れたかを残高で確かめる',
-    items: Object.freeze([
-      '会場からギフトを押したあと、15秒後にポイント残高を読み直して、減った分を記録します(押したかではなく、本当に贈れたかを確かめるため)'
     ])
   })
 ]);

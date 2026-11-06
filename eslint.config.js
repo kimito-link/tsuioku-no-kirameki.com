@@ -475,8 +475,8 @@ export default [
     // v0.1.1869: PICK UP を映像の上端の大きな吹き出しに(尻尾の CSS 2行+映像の中央へ置く配線 13行)=+15。位置は lib の venuePickupPlacement。
     // v0.1.1875: 会場に公式と同じギフトのアイテムを並べる帯(作る1行・lib の createVenueGiftStrip)=+1。
     // v0.1.1880: ギフトから会場をしまったとき、理由と次の一手を右下に出す(りんく「何の説明もないと何が起こったのかと思う」)=+21。
-    // v0.1.1905: 吹き出しの一気出しの計器の配線(import 1行+状態1行+束ごとの記録7行+経路の名札3行+JSDoc・速報への1行)=+19。判定は lib の venueBubbleBurst.js。
-    // v0.1.1906: 過去の番号を吹き出さない定数(コメント2行)と state の hiNo・計器への1行=+6。判定は lib の venueSpeech.js(oldNoGap)。
+    // v0.1.1908: 吹き出しの一気出しの計器の配線(import 1行+状態1行+束ごとの記録7行+経路の名札3行+JSDoc・速報への1行)=+19。判定は lib の venueBubbleBurst.js。
+    // v0.1.1909: 過去の番号を吹き出さない定数(コメント2行)と state の hiNo・計器への1行=+6。判定は lib の venueSpeech.js(oldNoGap)。
     files: ['src/extension/venueBar.js'],
     rules: { 'max-lines': ['error', { max: 7447, skipBlankLines: false, skipComments: false }] }
   },
