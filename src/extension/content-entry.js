@@ -729,7 +729,7 @@ let periodicDeepWeakPassTick = 0;
  * v0.1.752 会場リアルタイム化: mountVenueBarButton が返す API({ onLiveComments })。
  * persistCommentRows が新着コメントを storage 往復を待たず会場へ即流すために保持する。
  * 未マウント時は null(タップは optional chaining + try/catch で無害)。
- * @type {{ onLiveComments: (liveId: string, rows: ReadonlyArray<Record<string, unknown>>) => void }|null}
+ * @type {{ onLiveComments: (liveId: string, rows: ReadonlyArray<Record<string, unknown>>, source?: string) => void }|null}
  */
 let _venueApi = null;
 /** 長めの待ちのあいだ、オリジナルキャラクターりんくで「読み込み中」と示す（web_accessible と一致させる） */
@@ -12223,7 +12223,7 @@ function persistCommentRows(rows, opts = {}) {
   //   後から storage 経路で来る同じコメントとは seenKeys で dedup される(二重吹き出し無し)。
   //   会場の処理が throw しても録画パイプラインを壊さないよう try/catch で握りつぶす(fail-safe)。
   try {
-    _venueApi?.onLiveComments?.(liveId, filtered);
+    _venueApi?.onLiveComments?.(liveId, filtered, sourceKey);
   } catch {
     /* no-op: 会場通知の失敗はコメント記録に影響させない */
   }
