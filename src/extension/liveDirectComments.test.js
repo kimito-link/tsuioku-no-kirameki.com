@@ -171,7 +171,7 @@ describe('mountDirectComments', () => {
   });
 });
 
-describe('v0.1.1907: 拡張なしの形でも 🚩 で隠せる', () => {
+describe('v0.1.1910: 拡張なしの形でも 🚩 で隠せる', () => {
   const src = readFileSync('src/extension/liveDirectComments.js', 'utf8');
   it('アプリの中では「💬 コメントを流す」の横に 🚩 を出す', () => {
     document.body.innerHTML = '<main id="list"></main>';

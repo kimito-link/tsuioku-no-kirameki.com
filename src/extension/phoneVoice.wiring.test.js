@@ -37,7 +37,7 @@ describe('createPhoneVoice', () => {
     expect(fetchImpl.mock.calls[1][0]).toBe('/api/status?v=tok&action=voice&after=5');
     vi.unstubAllGlobals();
   });
-  it('v0.1.1907: skipNo が true の声(🚩 で隠した人)は鳴らさずに次へ進む', async () => {
+  it('v0.1.1910: skipNo が true の声(🚩 で隠した人)は鳴らさずに次へ進む', async () => {
     vi.stubGlobal('localStorage', { getItem: () => 'on', setItem: () => {} });
     class Ctx {
       state = 'running';
