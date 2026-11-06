@@ -472,7 +472,9 @@ void runSwitchLeakCleanups();
 //   別の配信の記録にも入ってしまったコメントを消す。同じ id が2つ以上の配信にあれば、先に記録した1件だけ残す
 //   (ytCrossVideoDuplicates.js)。消した記録は控え(yt_cleanup_cross_video_v1_removed)に全部残すので、あとで戻せる。
 //   0.1.1904 からは入口で同じ id を入れないので、片付けたものは戻ってこない。
-const KEY_CROSS_VIDEO_CLEANUP = 'yt_cleanup_cross_video_v1';
+// ★v2(0.1.1915・2026-11-07 実データで83件残り): アーカイブから埋めた行を本物として優先する決め方に変えたので、もう1回だけ片付ける。
+//   v1 の結果と控え(yt_cleanup_cross_video_v1・_removed)はそのまま残す。
+const KEY_CROSS_VIDEO_CLEANUP = 'yt_cleanup_cross_video_v2';
 async function runCrossVideoCleanupOnce() {
   try {
     const done = await chrome.storage.local.get(KEY_CROSS_VIDEO_CLEANUP);
@@ -768,14 +770,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const items = incoming
         .filter((x) => x && x.id)
         .map((x) => ({ ...x, recordedAt: Number(x.postedAtMs) > 0 ? Number(x.postedAtMs) : Date.now() }));
-      const res = await appendYtStreamCommentsIdb(videoId, items);
+      // ★0.1.1915: アーカイブはその配信自身のチャット=本物。別の配信に紛れ込んでいた同じコメントは消して取り戻す
+      //   (それまでは入口の確認が無く、同じコメントが2つの配信に残っていた・2026-11-07 実データ83件)。
+      const res = await appendYtStreamCommentsIdb(videoId, items, { claimFromOthers: true });
       rememberYtCommentOwners(videoId, { newlyAdded: res.newlyAdded });
+      const reclaimed = Array.isArray(res.reclaimed) ? res.reclaimed : [];
+      for (const r of reclaimed) noteYtCommentOwner(r.id, videoId);
+      /** @type {Record<string, number>} */
+      let otherTotals = {};
+      if (reclaimed.length) {
+        // 消した行の控え(片付けと同じ所に足す・あとで戻せる)
+        const backupKey = `${KEY_CROSS_VIDEO_CLEANUP}_removed`;
+        const prev = (await chrome.storage.local.get(backupKey))?.[backupKey];
+        const prevRows = Array.isArray(prev?.rows) ? prev.rows : [];
+        const seen = new Set(prevRows.map((/** @type {any} */ x) => String(x?.pk || '')));
+        const add = reclaimed.map((r) => r.row).filter((x) => x && !seen.has(String(x.pk || '')));
+        await chrome.storage.local.set({ [backupKey]: { at: Date.now(), rows: prevRows.concat(add) } });
+        const fromVids = [...new Set(reclaimed.map((r) => r.from))];
+        otherTotals = (await deleteYtCommentPksAcrossVideos([], fromVids)).totals;
+        // 計器: アーカイブが別の配信から取り戻した数
+        void chrome.storage.local
+          .set({ yt_diag_backfill_reclaim: { at: Date.now(), to: videoId, n: reclaimed.length, from: fromVids.slice(0, 5) } })
+          .catch(() => {});
+      }
       const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
       const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      let changed = false;
       if (summaries[videoId] && res.newlyAdded.length) {
         summaries[videoId] = mergeYtStreamSummary(summaries[videoId], { videoId, itemCount: res.totalCount }, Date.now());
-        await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
+        changed = true;
       }
+      for (const [v, total] of Object.entries(otherTotals)) {
+        if (!summaries[v]) continue;
+        summaries[v] = { ...summaries[v], itemCount: total };
+        changed = true;
+      }
+      if (changed) await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
       return { added: res.newlyAdded.length, total: res.totalCount };
     })
       .then((res) => sendResponse(res))

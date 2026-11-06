@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1890',
+    date: '2026-11-05',
+    summary: 'YouTube Live にも対応(試作版を本体に)',
+    items: Object.freeze([
+      'YouTube Live の配信でもチャット・スーパーチャット・メンバーを記録し、ニコ生と同じ画面(3つのレーン・会場・コメビュ・読み上げ・マーケ)で振り返れるようにしました。YouTube のタブで拡張のボタンを押すと YouTube 用のパネルが開きます',
+      'YouTube の記録と設定はニコ生の記録と分けて保存します(互いの数字や設定は混ざりません)',
+      'YouTube のページを読むための権限(youtube.com・YouTube の画像)と、読み上げの予備の声・会場で配信を映すための権限が増えました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1889',
     date: '2026-11-05',
     summary: '応援マスが件数の揺れで全部作り直されるのを止める',

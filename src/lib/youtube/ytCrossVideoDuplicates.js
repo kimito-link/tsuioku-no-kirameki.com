@@ -4,7 +4,10 @@
 //   入れていた(Kai Cenat の @Christopher-c9h が 高松あいさんの記録に12件など)。YouTube のコメントは1件ごとに id があり、
 //   1件は1つの配信にしか無い。同じ id が2つ以上の配信の記録にあれば、いちばん早く記録された1件だけを本物として残し、
 //   ほかを消す(紛れ込みは必ず「配信を移ったあと」=本物より後に記録される)。
-//   同じ時刻なら、アーカイブの埋め直しで書かれた時刻(postedAtMs)を持つ方 → videoId の並び順で決める(毎回同じ答え)。
+//   同じ時刻なら videoId の並び順で決める(毎回同じ答え)。
+// ★0.1.1915(2026-11-07 実データ): アーカイブの埋め直しで入った行(postedAtMs を持つ)は、その配信自身のリプレイから
+//   読んだ本物なので、記録した時刻より優先して残す。v1 は「早く記録した方」だけで決めたため、前の配信のチャット欄が
+//   残ったまま先に記録された紛れ込みの方を残し、本物を消したことがあった(30件・あとでアーカイブが戻した)。
 
 /**
  * @typedef {{ pk: string, id: string, videoId: string, recordedAt?: number, postedAtMs?: number }} YtCommentKeyRow
@@ -16,12 +19,13 @@
  * @returns {number} a を残すべきなら負
  */
 function compareOwner(a, b) {
-  const ta = Number(a?.recordedAt) || Number.MAX_SAFE_INTEGER;
-  const tb = Number(b?.recordedAt) || Number.MAX_SAFE_INTEGER;
-  if (ta !== tb) return ta - tb;
+  // アーカイブ(その配信自身のリプレイ)から埋めた行=postedAtMs を持つ行は本物なので最優先(0.1.1915)
   const pa = Number(a?.postedAtMs) > 0 ? 0 : 1;
   const pb = Number(b?.postedAtMs) > 0 ? 0 : 1;
   if (pa !== pb) return pa - pb;
+  const ta = Number(a?.recordedAt) || Number.MAX_SAFE_INTEGER;
+  const tb = Number(b?.recordedAt) || Number.MAX_SAFE_INTEGER;
+  if (ta !== tb) return ta - tb;
   return String(a?.videoId || '') < String(b?.videoId || '') ? -1 : String(a?.videoId || '') > String(b?.videoId || '') ? 1 : 0;
 }
 
