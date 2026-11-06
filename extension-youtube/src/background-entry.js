@@ -23,9 +23,13 @@ import {
   getYtStreamCommentsByVideoId,
   getYtStreamCommentsSince,
   deleteYtCommentsByPks,
+  readAllYtCommentKeys,
+  deleteYtCommentPksAcrossVideos,
+  getYtCommentsByPks,
 } from './ytIdbStore.js';
 import { createYtViewerSampler } from '../../src/lib/youtube/ytViewerSampler.js';
 import { pickSwitchLeakPks } from '../../src/lib/youtube/ytSwitchLeakCleanup.js';
+import { pickYtCrossVideoDuplicates } from '../../src/lib/youtube/ytCrossVideoDuplicates.js';
 // ニコ生版の background にある、会場とコメビュの受け口(VOICEVOX 中継・読み手の取り合い・窓を開く)の写し
 import './background-nico-relay.js';
 
@@ -463,6 +467,61 @@ async function runSwitchLeakCleanups() {
   }
 }
 void runSwitchLeakCleanups();
+
+// 0.1.1907 一回きりの片付け(りんく 2026-11-06「消して」): 0.1.1903 までに、チャット欄が前の配信のまま残って
+//   別の配信の記録にも入ってしまったコメントを消す。同じ id が2つ以上の配信にあれば、先に記録した1件だけ残す
+//   (ytCrossVideoDuplicates.js)。消した記録は控え(yt_cleanup_cross_video_v1_removed)に全部残すので、あとで戻せる。
+//   0.1.1904 からは入口で同じ id を入れないので、片付けたものは戻ってこない。
+const KEY_CROSS_VIDEO_CLEANUP = 'yt_cleanup_cross_video_v1';
+async function runCrossVideoCleanupOnce() {
+  try {
+    const done = await chrome.storage.local.get(KEY_CROSS_VIDEO_CLEANUP);
+    if (done && done[KEY_CROSS_VIDEO_CLEANUP]) return;
+    const rows = await readAllYtCommentKeys();
+    const pick = pickYtCrossVideoDuplicates(rows);
+    const deleting = new Set(pick.deletePks);
+    for (const r of rows) {
+      if (r.id && r.videoId && !deleting.has(r.pk)) noteYtCommentOwner(r.id, r.videoId);
+    }
+    let removedCount = 0;
+    if (pick.deletePks.length) {
+      const vids = Object.keys(pick.byVideo);
+      // ★消す前に控えを取る(消したあとに止まっても、控えは必ず残っている)。控えは足していく。
+      const toRemove = await getYtCommentsByPks(pick.deletePks);
+      const backupKey = `${KEY_CROSS_VIDEO_CLEANUP}_removed`;
+      const prevBackup = (await chrome.storage.local.get(backupKey))?.[backupKey];
+      const prevRows = Array.isArray(prevBackup?.rows) ? prevBackup.rows : [];
+      const seenPk = new Set(prevRows.map((/** @type {any} */ x) => String(x?.pk || '')));
+      await chrome.storage.local.set({
+        [backupKey]: { at: Date.now(), rows: prevRows.concat(toRemove.filter((x) => !seenPk.has(String(x?.pk || '')))) },
+      });
+      const { totals, removed } = await deleteYtCommentPksAcrossVideos(pick.deletePks, vids);
+      removedCount = removed.length;
+      await runSerialized(async () => {
+        const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
+        const summaries = (data && data[STORAGE_KEYS.STREAM_SUMMARIES]) || {};
+        let changed = false;
+        for (const [vid, total] of Object.entries(totals)) {
+          if (!summaries[vid]) continue;
+          summaries[vid] = { ...summaries[vid], itemCount: total };
+          changed = true;
+        }
+        if (changed) await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
+      });
+    }
+    await chrome.storage.local.set({
+      [KEY_CROSS_VIDEO_CLEANUP]: { at: Date.now(), scanned: rows.length, removed: removedCount, byVideo: pick.byVideo, pairs: pick.pairs },
+    });
+  } catch (err) {
+    // 失敗したら印を付けず、次に起きたときにもう一度(途中まで消えていても、残りを次で消す・二度消しは起きない)
+    try {
+      void chrome.storage.local.set({ [`${KEY_CROSS_VIDEO_CLEANUP}_error`]: { at: Date.now(), error: String(err).slice(0, 200) } });
+    } catch {
+      /* no-op */
+    }
+  }
+}
+void runCrossVideoCleanupOnce();
 
 const KEY_HANDLE_ICONS = 'yt_handle_icons';
 let handleIconsBusy = false;
