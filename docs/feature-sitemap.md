@@ -307,7 +307,7 @@
 - `src/lib/watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
 - `src/lib/watchTabPrioritize.js` — watch タブ候補リストを「対象 watch URL に最も近い」順に並べ替える純粋関数。
-- `src/lib/youtube/ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1903・2026-11-06 りんく実機)。
+- `src/lib/youtube/ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
 - `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
 
@@ -1049,7 +1049,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 322</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 323</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1352,6 +1352,7 @@
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
+- `src/lib/youtube/ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
@@ -1387,6 +1388,7 @@
 - `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
 ### 🏟 会場・席 (13版)
+- `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
 - `v0.1.1897` 2026-11-06 — マーケ HTML はサポーター向けに(14日お試し)
@@ -1399,26 +1401,26 @@
 - `v0.1.1885` 2026-11-05 — 会場のギフトの帯に押し方の説明を出す
 - `v0.1.1884` 2026-11-05 — ギフトが贈れたかを残高で確かめる
 - `v0.1.1883` 2026-11-05 — 公式の購入の確認の中で確定を押す
-- `v0.1.1882` 2026-11-05 — 帯の「贈る?」に値段を出したままにする
 
-### 🎈 吹き出し (2版)
+### 🎈 吹き出し (3版)
+- `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
 
-### 🎁 ギフト (6版)
+### 🎁 ギフト (5版)
 - `v0.1.1888` 2026-11-05 — ギフトの確定は本人が公式で押す形に
 - `v0.1.1887` 2026-11-05 — ギフトの帯の説明と贈れた判定を直す
 - `v0.1.1886` 2026-11-05 — ギフトが贈れたかを残高で判定する
 - `v0.1.1885` 2026-11-05 — 会場のギフトの帯に押し方の説明を出す
 - `v0.1.1884` 2026-11-05 — ギフトが贈れたかを残高で確かめる
-- `v0.1.1882` 2026-11-05 — 帯の「贈る?」に値段を出したままにする
 
 ### 🔊 読み上げ (3版)
-- `v0.1.1903` 2026-11-06 — YouTube で自分の発言が2件・2回読まれるのを直す
+- `v0.1.1905` 2026-11-06 — YouTube で自分の発言が2件・2回読まれるのを直す
 - `v0.1.1897` 2026-11-06 — マーケ HTML はサポーター向けに(14日お試し)
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 
-### 🪟 応援レーン・タイル (3版)
+### 🪟 応援レーン・タイル (4版)
+- `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 - `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
