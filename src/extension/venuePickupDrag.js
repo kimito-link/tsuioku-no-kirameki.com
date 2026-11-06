@@ -23,7 +23,7 @@ import { safeStorageLocalGet, safeStorageLocalSet } from '../lib/safeStorageLoca
  * @param {(who: { uid: string, displayName: string, avatarSrc: string, fallbackTexts: string[] }) => void} [openWho]
  *   v0.1.1900 りんく「PICKUP がどんな人か知りたい場合すぐ ACCESS できるようにしたい・ドラッグと両立」:
  *   顔か名前をクリックしたら、その人の発言パネル(席のアイコンクリックと同じ)を開く。ドラッグした直後のクリックは開かない。
- * @returns {{ place: (at: { left:number, top:number } | null) => void, dragging: () => boolean }}
+ * @returns {{ place: (at: { left:number, top:number } | null) => void, dragging: () => boolean, later: (fn: () => void, ms?: number) => void }}
  */
 export function attachVenuePickupDrag(root, layoutEl, replace, openWho) {
   /** @type {{ cx:number, top:number } | null} */
@@ -35,6 +35,7 @@ export function attachVenuePickupDrag(root, layoutEl, replace, openWho) {
   let drag = null;
   /** 直前の押下がドラッグだったか(その後に来る click で発言パネルを開かない)。 */
   let justDragged = false;
+  let laterTimer = 0;
   const relayout = () => { try { replace(); } catch { /* 位置合わせの失敗は無視 */ } };
   const viewportBounds = (/** @type {DOMRect} */ L) => venuePickupViewportBounds(L, { width: window.innerWidth, height: window.innerHeight });
   void safeStorageLocalGet(KEY_VENUE_PICKUP_POS).then((bag) => {
@@ -174,6 +175,16 @@ export function attachVenuePickupDrag(root, layoutEl, replace, openWho) {
         showHint(true, 6000);
       }
     },
-    dragging: () => !!drag
+    dragging: () => !!drag,
+    /**
+     * v0.1.1901: 少し後に1回だけ fn を呼ぶ(重ねて頼まれても1本)。PICK UP の選び直し用。
+     *   既定は 7秒の区切り+8秒の遡り+α=選定の窓を確実に抜ける長さ(pickTickerHighlight.js の TICKER_BUCKET_MS + TICKER_LOOKBACK_MS)。
+     * @param {() => void} fn
+     * @param {number} [ms]
+     */
+    later(fn, ms = 15_500) {
+      if (laterTimer) return;
+      laterTimer = Number(setTimeout(() => { laterTimer = 0; try { fn(); } catch { /* 選び直しの失敗は無視 */ } }, ms));
+    }
   };
 }
