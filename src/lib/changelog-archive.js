@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1886',
+    date: '2026-11-05',
+    summary: 'ギフトが贈れたかを残高で判定する',
+    items: Object.freeze([
+      '会場からギフトを押したあと、ポイント残高が減ったら「贈りました(55pt)」と手数料込みの値段を出します(公式がアイテムを押しただけで贈る場合も正しく出ます)',
+      '押した記録を直近20件残し、誰がどのボタンを押したかも記録します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1885',
     date: '2026-11-05',
     summary: '会場のギフトの帯に押し方の説明を出す',
