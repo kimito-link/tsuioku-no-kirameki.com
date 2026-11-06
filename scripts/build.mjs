@@ -11,6 +11,7 @@ import {
   FINGERPRINT_SCHEMA,
   judgeBuildInputsHealthy
 } from '../src/lib/distFingerprint.js';
+import { ytBuildTargets, writeYtMergedHtml } from './youtube-build.mjs';
 
 // .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 //   ★これが無いと `npm run build` が空キービルドになり、status の「WEBサイトURLで共有」ボタンが
@@ -245,6 +246,11 @@ const targets = [
     target: 'es2020'
   }
 ];
+
+// 2026-11-05 りんく「メインに統合したい(ダウンロード数を分けたくない)」: YouTube 版を本体に同梱する。
+//   束は extension/dist/yt-*.js、画面は extension/yt-*.html(ニコ生版の画面の完全コピー)。書き換えと入口は scripts/youtube-build.mjs。
+writeYtMergedHtml();
+targets.push(...ytBuildTargets({ merged: true, define: popupDefine }));
 
 const results = await Promise.all(targets.map((t) => esbuild.build({ ...common, ...t, metafile: true })));
 

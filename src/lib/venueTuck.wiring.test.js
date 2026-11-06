@@ -52,14 +52,14 @@ describe('CSS: しまう中は箱だけ隠し、トグルのピルを出す', ()
 describe('JS: setTucked とボタン・トグルの配線', () => {
   it('★状態と setTucked があり、hidden 属性を使わない', () => {
     expect(src).toContain('let tucked = false;');
-    const body = slice('const setTucked = (next) =>', 'const setOpen = (nextOpen, persist) =>');
+    const body = slice('const setTucked = (next, note) =>', 'const setOpen = (nextOpen, persist) =>');
     expect(body).toContain("root.classList.toggle('nlsb-is-tucked', tucked)");
     expect(body).not.toMatch(/\.hidden\s*=/);
     expect(body).not.toContain("setAttribute('hidden'");
   });
 
   it('★しまうとき、開いているパネルとホバーカードを閉じる(入力中に残らない)', () => {
-    const body = slice('const setTucked = (next) =>', 'const setOpen = (nextOpen, persist) =>');
+    const body = slice('const setTucked = (next, note) =>', 'const setOpen = (nextOpen, persist) =>');
     expect(body).toContain('closeSpeechPanel()');
     expect(body).toContain('toggleRosterPanel(false)');
     expect(body).toContain('toggleDiagPanel(false)');
@@ -71,7 +71,7 @@ describe('JS: setTucked とボタン・トグルの配線', () => {
     const a = src.indexOf('let tuckBtn = null;');
     expect(a).toBeGreaterThan(0);
     expect(src.slice(a, a + 400)).toContain('if (!isStandalone) {');
-    expect(src).toContain('headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn,');
+    expect(src).toContain('...(tuckBtn ? [tuckBtn] : []), rosterBtn,'); // v0.1.1870 前に「🎁 ギフト」が並ぶ
   });
 
   it('★トグルを押したとき、しまい中なら戻す(会場の開閉より優先)', () => {

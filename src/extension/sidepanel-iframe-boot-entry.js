@@ -12,6 +12,7 @@
 import { createSidepanelIframeLoader, IFRAME_START_MAX_WAIT_MS } from '../lib/sidepanelIframeLoader.js';
 import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
 import { SIDE_PANEL_WATCH_TAB_QUERY, lvFromWatchUrl, pickPanelLv } from '../lib/sidePanelLvFromTabs.js';
+import { YT_PANEL_SRC, isYtPanelSrc, isYtPanelTabUrl } from '../lib/youtube/ytPanelRoute.js';
 
 /** 親の最初の描画(first-paint)が出るか、上限の時間が来たら解決する関門。タイマーで見る(rAF は隠れた文書で止まるので使わない)。 */
 function firstPaintOrTimeout() {
@@ -59,6 +60,8 @@ try {
           chrome.tabs.query(SIDE_PANEL_WATCH_TAB_QUERY),
           chrome.tabs.query({ active: true, currentWindow: true }).catch(() => /** @type {chrome.tabs.Tab[]} */ ([]))
         ]);
+        // 2026-11-05 同梱した YouTube 版: YouTube のタブで開いたら中身は YouTube 版(ytPanelRoute.js)
+        if (isYtPanelTabUrl(activeTabs && activeTabs[0] && activeTabs[0].url)) return YT_PANEL_SRC;
         const picked = pickPanelLv({ activeUrl: activeTabs && activeTabs[0] && activeTabs[0].url, currentLv: shownLv(), watchTabs });
         return picked.lv ? buildSidePanelIframeSrc(base, `?lv=${picked.lv}`) : '';
       },
@@ -77,6 +80,10 @@ try {
         try {
           if (!tab || !tab.active) return;
           if (ownWindowId != null && tab.windowId !== ownWindowId) return; // このパネルが居るウィンドウのタブだけ
+          if (isYtPanelTabUrl(tab.url)) {
+            if (!isYtPanelSrc(ifr.getAttribute('src'))) loader.update(YT_PANEL_SRC); // YouTube のタブへ移ったら YouTube 版に
+            return;
+          }
           const lv = lvFromWatchUrl(tab.url);
           if (!lv || lv === shownLv()) return;
           loader.update(buildSidePanelIframeSrc(base, `?lv=${lv}`));

@@ -39,10 +39,10 @@ describe('venueButtonVisible — 既定は表示(安全側)', () => {
 describe('venueButtonVisible — 配線(読む・書く・使う)', () => {
   it('★視聴ページ側: ゲートを通してからボタンを出す', () => {
     expect(contentSrc).toMatch(
-      /if \(isWatchInlinePanelTopFrame\(\) && \(await readVenueButtonVisible\(\)\)\) \{\n\s*_venueApi = mountVenueBarButton\(\);\n\s*\}/
+      /if \(isWatchInlinePanelTopFrame\(\) && \(await readVenueButtonVisible\(\)\)\) \{\n(?:\s*\/\/[^\n]*\n)?\s*_venueApi = mountVenueBarButton\([^\n]*\);\n\s*\}/
     );
     // ゲート無しの裸の呼び出しが残っていないこと(変異で戻したら赤)。
-    const bare = contentSrc.match(/\n\s*_venueApi = mountVenueBarButton\(\);/g) || [];
+    const bare = contentSrc.match(/\n\s*_venueApi = mountVenueBarButton\(/g) || [];
     expect(bare).toHaveLength(1);
   });
 
