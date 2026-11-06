@@ -671,7 +671,7 @@
 - `src/lib/voiceLightFallback.js` — VOICEVOX が追いつかないときだけ、PC に入っている軽い声(Windows の声)で読む(純関数)。
 - `src/lib/voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
-- `src/lib/voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1901・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
+- `src/lib/voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1902・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
 - `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
@@ -1413,7 +1413,7 @@
 - `v0.1.1879` 2026-11-05 — 会場のギフトを1回押しで贈れる設定
 
 ### 🔊 読み上げ (3版)
-- `v0.1.1901` 2026-11-06 — 長いコメントは質問の結びを残して読む
+- `v0.1.1902` 2026-11-06 — 長いコメントは質問の結びを残して読む
 - `v0.1.1897` 2026-11-06 — マーケ HTML はサポーター向けに(14日お試し)
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 
