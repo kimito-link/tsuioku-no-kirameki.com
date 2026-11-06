@@ -166,6 +166,9 @@ export function ytBuildTargets({ merged, define }) {
   ];
   // チャット欄のページ自身の世界で動く小さな手伝い(単体版は手書きのファイルをそのまま使う。本体向けは指紋に入るよう束ねて置く)
   if (merged) {
+    // Twitch の視聴ページの入口(council/twitch-support-PLAN.md)。記録は YouTube 版と同じ口へ送る=本体向けだけに置く
+    list.push({ entryPoints: [src('tw-content-entry.js')], outfile: out('tw-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// tw-content.js — Twitch の視聴ページでチャット(公式の読み取り専用 IRC)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
     list.push({ entryPoints: [resolve(root, 'extension-youtube/content-chat-main.js')], outfile: out('content-chat-main.js'), target: 'chrome114', define: def });
   }
   // offscreen は1つしか持てないので、本体向けには作らない(本体の offscreen を使う・YouTube の読み上げはコメビュ)

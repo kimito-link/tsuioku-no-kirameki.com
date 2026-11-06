@@ -350,7 +350,8 @@ def verify_zip(zip_path: Path) -> None:
         'dist/yt-background.js',
         'dist/yt-content-chat.js',
         'dist/yt-content-chat-main.js',
-        'dist/yt-venue-inline.js'
+        'dist/yt-venue-inline.js',
+        'dist/yt-tw-content.js'
     }
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = set(zf.namelist())

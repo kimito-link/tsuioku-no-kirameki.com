@@ -4,12 +4,11 @@
 //   動画の疑似 lv を venueBar に教えてから(ビルド時に足す __ytSetVenueLiveId)、ニコ生版と同じ呼び方で出す。
 //   会場の作り・見た目・席・吹き出し・読み上げはニコ生版の venueBar.js のまま(手を加えない)。
 //   ★2026-11-04 りんく「このかたちがいい」(ニコ生版の視聴ページのボタン)・「画面をくろくおおわないで」(0.1.69 の重ね窓は撤去)。
-import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey } from './ytNicoShim.js';
+import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey, streamKeyForWatchUrl } from './ytNicoShim.js';
 import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets } from './ytLocalAssetUrls.js';
 import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
 import { ytShouldVoiceWhenCrowded, ytCrowdSpeedBoost, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
@@ -18,10 +17,12 @@ import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/ven
 import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 
-/** @returns {string} 視聴ページ(/watch?v= ・ /live/<id>)の動画 id。視聴ページでなければ '' */
+/** Twitch の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
+const IS_TWITCH_PAGE = /(^|\.)twitch\.tv$/i.test(String(location.hostname || ''));
+
+/** @returns {string} 視聴ページの配信キー(YouTube は動画 id・Twitch は記録のある配信キー)。視聴ページでなければ '' */
 function currentVideoId() {
-  const href = String(location.href || '');
-  return isYtWatchLikeUrl(href) ? parseYtVideoIdFromUrl(href) : '';
+  return streamKeyForWatchUrl(String(location.href || ''));
 }
 
 // ニコ生版の会場は、ニコ生の視聴ページの文字の大きさ(16px)を受け継ぐ前提で作られている(例: 人の札の幅 26ch)。
@@ -57,6 +58,12 @@ function sync() {
   mountedVid = vid;
   ensureBaseFontSize();
   // 会場から発言(ニコ生版 v0.1.1867 と同じ入力欄)。送り方はサイドパネルの「コメント送信」と同じ YT_SEND_COMMENT。
+  if (!document.getElementById('nlsb-venue-root') && IS_TWITCH_PAGE)
+    // Twitch: 公式のギフト(Bits)の窓を開く口はまだ無いので、ギフトのボタンは出さない(押しても何も起きないボタンを置かない)
+    mountVenueBarButton({
+      postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
+      postReasonText: (reason) => ytCommentSendReasonText(reason, '', 'twitch'),
+    });
   if (!document.getElementById('nlsb-venue-root'))
     mountVenueBarButton({
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
