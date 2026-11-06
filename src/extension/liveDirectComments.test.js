@@ -1,4 +1,5 @@
 /** @vitest-environment happy-dom */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   nativeHttpOf,
@@ -167,6 +168,20 @@ describe('mountDirectComments', () => {
     expect(mountDirectComments({ lv: '', mountBefore: document.getElementById('list'), cap })).toBe(false);
     expect(mountDirectComments({ lv: 'lv1234567', mountBefore: document.getElementById('list'), cap })).toBe(true);
     expect(document.querySelector('[data-direct-toggle]')?.textContent).toContain('コメントを流す');
+  });
+});
+
+describe('v0.1.1910: 拡張なしの形でも 🚩 で隠せる', () => {
+  const src = readFileSync('src/extension/liveDirectComments.js', 'utf8');
+  it('アプリの中では「💬 コメントを流す」の横に 🚩 を出す', () => {
+    document.body.innerHTML = '<main id="list"></main>';
+    const cap = nativeCap({ get: async () => ({ status: 200, data: '' }) });
+    mountDirectComments({ lv: 'lv1234567', mountBefore: document.getElementById('list'), cap });
+    expect(document.querySelector('[data-direct-block]')?.textContent).toBe('🚩');
+  });
+  it('★隠した人は並べないし読まない(並べる前・読み上げに渡す前に抜く)', () => {
+    expect(src).toContain('const rows = dropBlockedRows(freshDirectRows(all, seenComments, (r) => r.no), readBlocklist());');
+    expect(src).toMatch(/dropBlockedRows[\s\S]*if \(voice\) voice\.onRows\(rows\);/);
   });
 });
 

@@ -639,7 +639,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 53</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -675,6 +675,7 @@
 - `src/lib/voiceLightFallback.js` — VOICEVOX が追いつかないときだけ、PC に入っている軽い声(Windows の声)で読む(純関数)。
 - `src/lib/voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
+- `src/lib/voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1911・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
 - `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
@@ -1051,7 +1052,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 323</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 324</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1355,6 +1356,7 @@
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
 - `src/lib/youtube/ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
+- `src/lib/youtube/ytChatInputBlock.js` — YouTube のチャット欄に入力欄が無いとき、その理由を見分ける(content-chat-entry の「ここから発言」用)。
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
@@ -1383,18 +1385,17 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (2版)
+### 💾 記録件数 (1版)
 - `v0.1.1908` 2026-11-06 — マーケHTMLをさらに軽く
-- `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
-### 📥 コメント取得 (3版)
+### 📥 コメント取得 (2版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
-- `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
-### 🏟 会場・席 (11版)
+### 🏟 会場・席 (10版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
+- `v0.1.1912` 2026-11-06 — YouTube でログイン中なのに送れない表示を直す
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
@@ -1402,8 +1403,6 @@
 - `v0.1.1892` 2026-11-05 — マーケ総合サマリに最大同接を出す
 - `v0.1.1891` 2026-11-05 — YouTube の同接をパネルを閉じても記録
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
-- `v0.1.1888` 2026-11-05 — ギフトの確定は本人が公式で押す形に
-- `v0.1.1887` 2026-11-05 — ギフトの帯の説明と贈れた判定を直す
 
 ### 🎈 吹き出し (5版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
@@ -1412,22 +1411,21 @@
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (1版)
 - `v0.1.1908` 2026-11-06 — マーケHTMLをさらに軽く
-- `v0.1.1888` 2026-11-05 — ギフトの確定は本人が公式で押す形に
-- `v0.1.1887` 2026-11-05 — ギフトの帯の説明と贈れた判定を直す
 
-### 🔊 読み上げ (4版)
+### 🔊 読み上げ (6版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
+- `v0.1.1911` 2026-11-06 — 長いコメントは質問の結びを残して読む
+- `v0.1.1910` 2026-11-06 — スマホで隠した人を読み上げでも出さない
 - `v0.1.1905` 2026-11-06 — YouTube で自分の発言が2件・2回読まれるのを直す
 - `v0.1.1897` 2026-11-06 — マーケ HTML はサポーター向けに(14日お試し)
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 
-### 🪟 応援レーン・タイル (4版)
+### 🪟 応援レーン・タイル (3版)
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
-- `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器

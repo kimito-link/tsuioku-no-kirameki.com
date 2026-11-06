@@ -41,10 +41,6 @@
  * ★初期値は changelog 1,349版から実際に抽出した before→after 18件のうち、
  *   指標が宣言済みで出所を特定できたものだけを入れた
  *   (抽出できても出所が書けないものは**入れない**＝検算できないため)。
- *
- * ★tsconfig の型検査から外している(v0.1.1914)。件数が増えて tsc が TS2590
- *   「union type that is too complex to represent」で落ちたため(changelog-archive.js と同じ扱い)。
- *   ロジックを持たないデータで、読むのは scripts/ の検査だけ(どちらも tsconfig の外)。
  */
 export const IMPROVEMENT_HISTORY = Object.freeze([
   /* ── 診断の所要(小さいほど良い) ───────────────────────────── */
@@ -4880,9 +4876,23 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '30日の窓で数える値。0.1.1897 と同じ 40'
   }),
   Object.freeze({
-    version: '0.1.1914', metric: 'bundle-kb', value: 1418,
+    version: '0.1.1910', metric: 'bundle-kb', value: 1419,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '一気出しの計器の項目を popup が読む venueSeatsDiag に足した分。最良 1360 より上なのは以前から'
+    note: '直したのはスマホの WEB 版(app/)で、popup に増えたのは変更履歴の二文だけ。最良 1360 より上なのは以前から'
+  }),
+  Object.freeze({
+    version: '0.1.1910', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1910', metric: 'cross-checked-claims', value: 39,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値(古いコミットが窓から外れた分の増減)'
+  }),
+  Object.freeze({
+    version: '0.1.1914', metric: 'bundle-kb', value: 1419,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '直したのは会場(venue)の吹き出しで、popup に増えたのは変更履歴の二文だけ。最良 1360 より上なのは以前から'
   }),
   Object.freeze({
     version: '0.1.1914', metric: 'gate-selftest', value: 4,
@@ -4891,6 +4901,6 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1914', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: '30日の窓で数える値。最良 55 より下なのは以前から'
+    note: '30日の窓で数える値(古いコミットが窓から外れた分の増減)'
   })
 ]);
