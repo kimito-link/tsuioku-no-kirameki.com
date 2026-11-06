@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1884',
+    date: '2026-11-05',
+    summary: 'ギフトが贈れたかを残高で確かめる',
+    items: Object.freeze([
+      '会場からギフトを押したあと、15秒後にポイント残高を読み直して、減った分を記録します(押したかではなく、本当に贈れたかを確かめるため)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1883',
     date: '2026-11-05',
     summary: '公式の購入の確認の中で確定を押す',
