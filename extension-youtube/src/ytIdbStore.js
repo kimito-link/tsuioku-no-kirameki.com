@@ -287,3 +287,94 @@ export async function deleteYtCommentsByPks(videoId, pks) {
     tx.onerror = () => reject(tx.error || new Error('idb_delete_failed'));
   });
 }
+
+/**
+ * 全配信の記録を、紛れ込みの見分けに要る欄(pk・id・videoId・recordedAt・postedAtMs)だけにして読む(片付け用・1回きり)。
+ * @returns {Promise<Array<{ pk: string, id: string, videoId: string, recordedAt: number, postedAtMs?: number }>>}
+ */
+export async function readAllYtCommentKeys() {
+  const db = await openYtCommentsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_COMMENTS], 'readonly');
+    const req = tx.objectStore(STORE_COMMENTS).openCursor();
+    /** @type {any[]} */
+    const out = [];
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return;
+      const v = cur.value || {};
+      out.push({ pk: String(v.pk || ''), id: String(v.id || ''), videoId: String(v.videoId || ''), recordedAt: Number(v.recordedAt || 0), postedAtMs: Number(v.postedAtMs || 0) });
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error || new Error('idb_cursor_failed'));
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error || new Error('idb_cursor_failed'));
+  });
+}
+
+/**
+ * pk を指定して消す(配信をまたいだ片付け用)。消した記録そのもの(控え・あとで戻せるように)と、
+ * 消したあとの配信ごとの件数を返す。
+ * @param {string[]} pks
+ * @param {string[]} videoIds 件数を数え直す配信
+ * @returns {Promise<{ totals: Record<string, number>, removed: any[] }>}
+ */
+export async function deleteYtCommentPksAcrossVideos(pks, videoIds) {
+  const db = await openYtCommentsDb();
+  /** @type {any[]} */
+  const removed = await new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_COMMENTS], 'readwrite');
+    const store = tx.objectStore(STORE_COMMENTS);
+    /** @type {any[]} */
+    const out = [];
+    for (const pk of pks) {
+      const g = store.get(pk);
+      g.onsuccess = () => {
+        if (!g.result) return;
+        out.push(g.result);
+        store.delete(pk);
+      };
+    }
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error || new Error('idb_delete_failed'));
+  });
+  /** @type {Record<string, number>} */
+  const totals = await new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_COMMENTS], 'readonly');
+    const idx = tx.objectStore(STORE_COMMENTS).index(INDEX_BY_VIDEO_ID);
+    /** @type {Record<string, number>} */
+    const t = {};
+    for (const vid of videoIds) {
+      const c = idx.count(IDBKeyRange.only(vid));
+      c.onsuccess = () => {
+        t[vid] = Number(c.result || 0);
+      };
+    }
+    tx.oncomplete = () => resolve(t);
+    tx.onerror = () => reject(tx.error || new Error('idb_count_failed'));
+  });
+  return { totals, removed };
+}
+
+/**
+ * pk を指定して記録そのものを読む(消す前に控えを取るため)。
+ * @param {string[]} pks
+ * @returns {Promise<any[]>}
+ */
+export async function getYtCommentsByPks(pks) {
+  const db = await openYtCommentsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_COMMENTS], 'readonly');
+    const store = tx.objectStore(STORE_COMMENTS);
+    /** @type {any[]} */
+    const out = [];
+    for (const pk of pks) {
+      const g = store.get(pk);
+      g.onsuccess = () => {
+        if (g.result) out.push(g.result);
+      };
+    }
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error || new Error('idb_get_failed'));
+  });
+}

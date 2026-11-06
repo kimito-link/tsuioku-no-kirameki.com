@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 67</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 68</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
@@ -192,6 +192,7 @@
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+- `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
 - `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
 - `src/lib/youtube/ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
 
@@ -205,7 +206,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 102</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 103</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -307,6 +308,7 @@
 - `src/lib/watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
 - `src/lib/watchTabPrioritize.js` — watch タブ候補リストを「対象 watch URL に最も近い」順に並べ替える純粋関数。
+- `src/lib/youtube/ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
 - `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
 
@@ -672,7 +674,7 @@
 - `src/lib/voiceLightFallback.js` — VOICEVOX が追いつかないときだけ、PC に入っている軽い声(Windows の声)で読む(純関数)。
 - `src/lib/voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
-- `src/lib/voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1907・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
+- `src/lib/voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1910・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
 - `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
@@ -1387,7 +1389,7 @@
 ### 📥 コメント取得 (1版)
 - `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
-### 🏟 会場・席 (13版)
+### 🏟 会場・席 (11版)
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
@@ -1399,23 +1401,21 @@
 - `v0.1.1887` 2026-11-05 — ギフトの帯の説明と贈れた判定を直す
 - `v0.1.1886` 2026-11-05 — ギフトが贈れたかを残高で判定する
 - `v0.1.1885` 2026-11-05 — 会場のギフトの帯に押し方の説明を出す
-- `v0.1.1884` 2026-11-05 — ギフトが贈れたかを残高で確かめる
-- `v0.1.1883` 2026-11-05 — 公式の購入の確認の中で確定を押す
 
 ### 🎈 吹き出し (3版)
 - `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
 - `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
 - `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
 
-### 🎁 ギフト (5版)
+### 🎁 ギフト (4版)
 - `v0.1.1888` 2026-11-05 — ギフトの確定は本人が公式で押す形に
 - `v0.1.1887` 2026-11-05 — ギフトの帯の説明と贈れた判定を直す
 - `v0.1.1886` 2026-11-05 — ギフトが贈れたかを残高で判定する
 - `v0.1.1885` 2026-11-05 — 会場のギフトの帯に押し方の説明を出す
-- `v0.1.1884` 2026-11-05 — ギフトが贈れたかを残高で確かめる
 
-### 🔊 読み上げ (3版)
-- `v0.1.1907` 2026-11-06 — 長いコメントは質問の結びを残して読む
+### 🔊 読み上げ (4版)
+- `v0.1.1910` 2026-11-06 — 長いコメントは質問の結びを残して読む
+- `v0.1.1905` 2026-11-06 — YouTube で自分の発言が2件・2回読まれるのを直す
 - `v0.1.1897` 2026-11-06 — マーケ HTML はサポーター向けに(14日お試し)
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 
@@ -1425,7 +1425,8 @@
 - `v0.1.1890` 2026-11-05 — YouTube Live にも対応(試作版を本体に)
 - `v0.1.1889` 2026-11-05 — 応援マスが件数の揺れで全部作り直されるのを止める
 
-### その他 (5版)
+### その他 (6版)
+- `v0.1.1907` 2026-11-06 — YouTube の混ざった記録を片付ける
 - `v0.1.1901` 2026-11-06 — PICK UP が古い1件のまま残るのを直す
 - `v0.1.1898` 2026-11-06 — サポーターの確認に本番の鍵を使う
 - `v0.1.1896` 2026-11-06 — サポーターのコードは1台の PC だけで使える
