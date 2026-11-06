@@ -114,7 +114,7 @@ import { createNativeSpeechVoice } from './live-view-native-voice.js';
 import { createDemoSource, isDemoToken } from './live-view-demo.js';
 // iPhone アプリの「🚩 見たくない人を隠す・報告する」(審査 1.2)。隠すのはこの端末の画面だけ。
 import { mountPhoneBlockUi, readBlocklist } from './live-view-block.js';
-import { applyPhoneBlocklist } from '../src/lib/phoneBlocklist.js';
+import { applyPhoneBlocklist, isBlockedCommentNo, rememberCommentAuthors } from '../src/lib/phoneBlocklist.js';
 import { mergeLiveRowsIntoMirror } from '../src/lib/liveEvents.js';
 import { pickSpokenTickerRow } from '../src/lib/phoneVoice.js';
 import { mountPhoneFit } from './live-view-phone-fit.js';
@@ -814,8 +814,24 @@ function liveIdFromSnapshot(jsonBlob) {
   return pickSnapshotLiveId(jsonBlob);
 }
 
+/**
+ * v0.1.1910: コメント番号→書いた人(隠す前の行から覚える)。WEB版の読み上げは PC の声を番号だけで受け取るので、
+ *   隠した人の声を鳴らさないためにここで引く。
+ * @type {Map<string, string>}
+ */
+const _commentAuthors = new Map();
+/** @param {string} no 声のコメント番号 */
+function isHiddenPersonVoiceNo(no) {
+  return isBlockedCommentNo(_commentAuthors, no, readBlocklist());
+}
+/** @param {any} jsonBlob 隠す前のまとめ */
+function rememberAuthorsAndBlock(jsonBlob) {
+  try { rememberCommentAuthors(_commentAuthors, jsonBlob?.commentTimelineMirror?.rows || []); } catch { /* 覚えられなくても表示は続ける */ }
+  return applyPhoneBlocklist(jsonBlob, readBlocklist());
+}
+
 async function fetchSnapshot(token) {
-  if (_demo) return applyPhoneBlocklist(await _demo.snapshot(), readBlocklist());
+  if (_demo) return rememberAuthorsAndBlock(await _demo.snapshot());
   /** @type {Record<string, string>} */
   const headers = _lastEtag && _latestSnapshot ? { 'If-None-Match': _lastEtag } : {};
   const res = await fetch(`/api/status?v=${encodeURIComponent(token)}`, { cache: 'no-store', headers });
@@ -835,7 +851,7 @@ async function fetchSnapshot(token) {
     return null;
   }
   _lastEtag = res.headers.get('ETag') || '';
-  return applyPhoneBlocklist(data, readBlocklist());
+  return rememberAuthorsAndBlock(data);
 }
 
 /** 初回: snapshot を取得→鏡を storage へ→lv を URL に焼く→本物 popup を起動。 */
@@ -955,6 +971,7 @@ function withRealtimeRows(jsonBlob) {
 /** @param {string} liveId @param {any[]} rows */
 function onRealtimeRows(liveId, rows) {
   if (!_latestSnapshot || !_shownLiveId || liveId !== _shownLiveId) return;
+  try { rememberCommentAuthors(_commentAuthors, rows); } catch { /* 覚えられなくても表示は続ける */ }
   const blocked = new Set(readBlocklist());
   if (blocked.size) rows = rows.filter((r) => !blocked.has(String(r && r.userId || '')));
   _realtimeRows = [..._realtimeRows, ...rows].slice(-60);
@@ -1097,8 +1114,9 @@ function bootstrap() {
   }
   // v0.1.1763: iPhone アプリの中は iPhone 内蔵の声で読む(画面を閉じても続く・PC の VOICEVOX が無くても読める)。
   //   プラグインが無い古いアプリ・Safari・PC のブラウザは今までどおり PC の VOICEVOX の声。
+  //   v0.1.1910: 🚩 で隠した人のコメントは読まない(skipNo。アプリの端末の声は隠した後の行から読むので元から読まない)。
   _voice = createNativeSpeechVoice()
-    || createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground(), ...(_demo ? { fetchImpl: _demo.voiceFetch } : {}) });
+    || createPhoneVoice({ token, keepWhenHidden: () => _native.keepAliveInBackground(), skipNo: isHiddenPersonVoiceNo, ...(_demo ? { fetchImpl: _demo.voiceFetch } : {}) });
   _native.setVoiceOn(() => Boolean(_voice && _voice.isOn()));
   // v0.1.1742: 会場の吹き出しを読み上げの声に合わせる(声が鳴った瞬間に、その人の吹き出しを出す)。
   _venue.setVoiceActive(() => Boolean(_voice && _voice.isOn() && _voice.isReady() && _voice.pcState() === 'ok'));

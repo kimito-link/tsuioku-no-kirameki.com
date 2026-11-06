@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・159 ファイル）
+## ⚠️ 影響大（3機能以上に波及・160 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -79,6 +79,7 @@
 - `src/lib/voiceFailureTaxonomy.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceLagBudget.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceLagNotice.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/voiceLongCommentShorten.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceNgMute.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voicePlaybackQuality.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceStageTiming.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
@@ -243,6 +244,7 @@
 | `src/lib/voiceFailureTaxonomy.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceLagBudget.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceLagNotice.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/voiceLongCommentShorten.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceNgMute.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voicePlaybackQuality.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceStageTiming.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
@@ -486,6 +488,7 @@
 | `src/lib/voiceInputDevices.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/watchCelebrationOverlay.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `app/app.js` | 1 | Web版 状態(スマホ) |
+| `app/live-view-block.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `app/live-view-native-voice.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/data/acquirers/laneFromStorage.js` | 1 | ポップアップ(応援レーン) |
 | `src/data/sources/laneFromStoredComments.js` | 1 | ポップアップ(応援レーン) |
@@ -865,6 +868,7 @@
 | `src/lib/passiveMirrorLiveIdGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/persistableCommentRow.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/persistThrottle.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/phoneBlocklist.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/phonePost.js` | 1 | 状態速報ページ |
 | `src/lib/phoneVoiceEncode.js` | 1 | 状態速報ページ |
 | `src/lib/phoneVoiceSender.js` | 1 | 状態速報ページ |
