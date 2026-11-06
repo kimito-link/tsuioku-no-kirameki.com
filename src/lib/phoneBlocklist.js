@@ -68,3 +68,52 @@ export function recentPeopleForBlock(rows, max = 15) {
   }
   return out;
 }
+
+/**
+ * 隠す人の行を抜く(コメントの行の並び用)。隠す人がいなければ同じ配列を返す。
+ * @template T
+ * @param {T[]} rows
+ * @param {string[]} blocked
+ * @returns {T[]}
+ */
+export function dropBlockedRows(rows, blocked) {
+  if (!Array.isArray(rows)) return [];
+  if (!Array.isArray(blocked) || blocked.length === 0) return rows;
+  const set = new Set(blocked);
+  return rows.filter((r) => !set.has(String(/** @type {any} */ (r)?.userId || '')));
+}
+
+/** コメント番号→書いた人 を覚えておく件数(古い方から忘れる)。 */
+export const COMMENT_AUTHOR_MEMORY_MAX = 600;
+
+/**
+ * v0.1.1910: コメント番号ごとに書いた人を覚える(隠す前の行から)。
+ *   WEB版の読み上げは PC の声を「番号」だけで受け取るので、隠した人の声かどうかを番号から引くために使う。
+ * @param {Map<string, string>} map 呼び出し側が持ち続ける(この関数が足して、古い方を捨てる)
+ * @param {any[]} rows
+ * @param {number} [max]
+ */
+export function rememberCommentAuthors(map, rows, max = COMMENT_AUTHOR_MEMORY_MAX) {
+  if (!(map instanceof Map) || !Array.isArray(rows)) return map;
+  for (const r of rows) {
+    const no = String(r?.no ?? '');
+    const userId = String(r?.userId || '').trim();
+    if (!/^\d{1,10}$/.test(no) || !userId) continue;
+    map.delete(no);
+    map.set(no, userId);
+  }
+  while (map.size > max) map.delete(/** @type {string} */ (map.keys().next().value));
+  return map;
+}
+
+/**
+ * この番号のコメントは隠した人のものか(書いた人が分からなければ false=読む)。
+ * @param {Map<string, string>} map
+ * @param {string} no
+ * @param {string[]} blocked
+ */
+export function isBlockedCommentNo(map, no, blocked) {
+  if (!(map instanceof Map) || !Array.isArray(blocked) || blocked.length === 0) return false;
+  const userId = map.get(String(no ?? ''));
+  return Boolean(userId && blocked.includes(userId));
+}
