@@ -1,3 +1,5 @@
+# ★2026-11-06 0.1.1901 を提出済み（YouTube 同梱＋サポーター課金をまとめて1回で）。下の2つのメモはこの版の内容。
+
 # ★0.1.1897〜(サポーター=有料のマーケ HTML)の提出メモ(2026-11-06・YouTube 同梱と一緒に出す)
 
 - **権限は増えない**(課金は既存の `app.tsuioku-no-kirameki.com` を使う)。CWS に課金機能は無いので外部決済(Stripe)。
@@ -8,7 +10,7 @@
 
 ---
 
-# ★0.1.1890〜(YouTube Live 同梱)の提出メモ(2026-11-06・まだ提出しない・りんくの OK 待ち)
+# ★0.1.1890〜(YouTube Live 同梱)の提出メモ(2026-11-06・0.1.1901 で提出済み)
 
 - **権限が増える**: permissions に `tts`・`declarativeNetRequestWithHostAccess`、host_permissions に
   `https://www.youtube.com/*`・`https://yt3.ggpht.com/*`・`https://yt4.ggpht.com/*`・`https://yt3.googleusercontent.com/*`。
