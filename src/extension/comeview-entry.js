@@ -35,6 +35,7 @@ import {
   pickComeviewGeometryToSave
 } from '../lib/comeviewWindowGeometry.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
+import { checkCreditBadge } from '../lib/supporterAccess.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
 import {
   isCommentDbAvailable,
@@ -152,6 +153,15 @@ import {
 } from '../lib/avatarPartsComposer.js';
 import { isVoiceItemStale, VOICE_STALE_MS_NORMAL } from '../lib/voiceAgeGate.js';
 import { runStorageOpWithTimeout } from '../lib/storageOpTimeout.js';
+import { KEY_LIVE_BROADCASTER_CTX, normalizeBroadcasterCtx } from '../lib/broadcastContext.js';
+import {
+  classifyVoiceImportance,
+  createVoiceFirstSpeakerState,
+  noteVoiceSpeakerInLive,
+  shouldSkipVoiceWhenBusy,
+  VOICE_BUSY_QUEUE_MIN,
+  voicePriorityForImportance
+} from '../lib/voiceBusyPriority.js';
 import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
   shouldRenderLoading,
@@ -198,6 +208,24 @@ const VOICE_ASSIGNMENTS_KEY = KEY_VOICE_ASSIGNMENTS;
 const VOICE_READ_NAME_KEY = KEY_VOICE_READ_NAME_ENABLED;
 
 let _liveId = '';
+/** v0.1.1861: 配信者(混雑時でも読む)。content が書く nls_live_broadcaster_ctx_v1 の写し。 */
+let _broadcasterCtx = normalizeBroadcasterCtx(null);
+/** v0.1.1861: 「その配信で初めてのコメント」を覚える(会場 VoicePlayer と同じ部品)。 */
+const _voiceFirstSpeakerState = createVoiceFirstSpeakerState();
+/** 今の配信の配信者 uid(別の配信の記録なら空)。 */
+function broadcasterUidForVoice() {
+  const own = String(_broadcasterCtx.liveId || '').trim().toLowerCase();
+  if (own && _liveId && own !== _liveId) return '';
+  return _broadcasterCtx.uid;
+}
+async function loadBroadcasterCtxForVoice() {
+  try {
+    const bag = await runStorageOpWithTimeout(() => chrome.storage.local.get(KEY_LIVE_BROADCASTER_CTX), 3000);
+    _broadcasterCtx = normalizeBroadcasterCtx(bag?.[KEY_LIVE_BROADCASTER_CTX]);
+  } catch {
+    // 読めなくても読み上げは止めない(配信者の判定だけ効かない)。
+  }
+}
 let _paused = false;
 let _timer = null;
 let _lastReconcileAt = 0;
@@ -1169,9 +1197,7 @@ function enqueueVoiceTimelineItems(items) {
       ? String(item.nickname || '').trim()
       : '';
     let body = '';
-    let isHighPriority = false;
     if (item.kind === 'gift') {
-      isHighPriority = true;
       const count = item.gift?.count > 1 ? `を${item.gift.count}個` : 'を';
       body = `ギフト、${item.gift?.name || 'アイテム'}${count}贈りました。${item.gift?.message || ''}`.trim();
     } else {
@@ -1188,13 +1214,32 @@ function enqueueVoiceTimelineItems(items) {
     }
     _voiceArrivalWindow = foldVoiceArrivalWindow(_voiceArrivalWindow, Date.now(), 1);
     _voiceDiag.arrivalPerMin = _voiceArrivalWindow.arrivalPerMin;
+    // v0.1.1861: 混雑(読み上げ待ち2件以上)のときは大事なもの(ギフト・広告・配信者・その配信で
+    //   初めてのコメント)だけ読む。吹き出し・一覧はそのまま(会場 VoicePlayer と同じ部品)。
+    const userKey = voiceUserKeyForItem(item);
+    const importance = classifyVoiceImportance({
+      kind: item.kind,
+      text: item.kind === 'gift' ? '' : body,
+      userId: item.userId,
+      isModerator: item.isModerator,
+      broadcasterUid: broadcasterUidForVoice(),
+      firstInLive: noteVoiceSpeakerInLive(_voiceFirstSpeakerState, _liveId, userKey)
+    });
+    if (shouldSkipVoiceWhenBusy({ queueLength: _voiceQueue.length, importance })) {
+      _voiceDiag.busySkipTotal = (Number(_voiceDiag.busySkipTotal) || 0) + 1;
+      notifyVoiceItemDropped(item);
+      continue;
+    }
+    if (importance && _voiceQueue.length >= VOICE_BUSY_QUEUE_MIN) {
+      _voiceDiag.busyImportantTotal = (Number(_voiceDiag.busyImportantTotal) || 0) + 1;
+    }
     const candidate = {
-      userKey: voiceUserKeyForItem(item),
+      userKey,
       name,
       body,
       count: 1,
       enqueuedAt: Date.now(),
-      priority: isHighPriority ? 'high' : 'normal',
+      priority: voicePriorityForImportance(importance),
       // v0.1.1799: 鳴り始め・鳴り終わり・捨てた時の知らせ(試験の1件ごとの記録用・会場 VoicePlayer と同じ名前)。
       onAudioStart: item.onAudioStart,
       onAudioEnd: item.onAudioEnd,
@@ -2336,6 +2381,9 @@ function wireStorageChanges() {
       const m = url.toLowerCase().match(/lv\d{1,15}/);
       if (m && m[0] !== _liveId) void switchToLiveId(m[0]);
     }
+    if (changes[KEY_LIVE_BROADCASTER_CTX]) {
+      _broadcasterCtx = normalizeBroadcasterCtx(changes[KEY_LIVE_BROADCASTER_CTX].newValue);
+    }
     if (pinKey && changes[pinKey]) renderPin(changes[pinKey].newValue);
     if (changes[COMEVIEW_USER_NOTES_KEY]) {
       _userNotes = normalizeComeviewUserNotes(
@@ -2554,8 +2602,17 @@ function wireButtons() {
   window.addEventListener('pagehide', saveWindowGeometry);
 }
 
+/** v0.1.1894: 無料の人の OBS 画面の隅の印(サポーターのコードを入れたら次に開いたとき消える)。 */
+function applyCreditBadge() {
+  void checkCreditBadge({ storage: chrome.storage.local }).then((show) => {
+    const el = document.getElementById('cvCredit');
+    if (el) el.hidden = !show;
+  });
+}
+
 async function main() {
   if (isObsMode()) document.body.classList.add('is-obs');
+  applyCreditBadge();
   const urlLiveId = resolveLiveIdFromUrl();
   _explicitLiveId = !!urlLiveId; // ?lv= 明示窓は配信切替に追従しない(固定窓)
   /*
@@ -2587,6 +2644,7 @@ async function main() {
   }
   // 設定系は画面表示をブロックしない(失敗しても既定で動く)。
   void initializeVoiceReading();
+  void loadBroadcasterCtxForVoice();
   void loadNgList();
   await requestFullRefresh(true);
   // パネルのタイムライン行クリックから ?user= 付きで開かれたら、詳細を自動で開く。

@@ -25,6 +25,8 @@ export const SUPPORTERS_GIFTS_MAX_COMMENTS_PER_USER = 1000;
 export const SUPPORTERS_GIFTS_MAX_COMMENT_ONLY_USERS = 300;
 /** 開いた状態で出す上位の人数。 */
 export const SUPPORTERS_GIFTS_OPEN_TOP = 10;
+/** 一覧に最初から並べる人数。残りは「残り N 人」に畳む(畳んだ中のサムネは開くまで描かれない=スクロールが重くならない)。 */
+export const SUPPORTERS_GIFTS_VISIBLE = 50;
 
 /** 章専用の CSS(マーケの CSS 文字列へ連結する)。 */
 export const SUPPORTERS_GIFTS_CSS = `
@@ -32,6 +34,7 @@ export const SUPPORTERS_GIFTS_CSS = `
 .mkt-sg{border:1px solid #334155;border-radius:8px;background:#0f172a;color:#e2e8f0}
 .mkt-sg>summary{cursor:pointer;padding:8px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .mkt-sg>summary:hover{background:#162033}
+.mkt-sg-rest>summary{cursor:pointer;color:#93c5fd;padding:8px 2px}
 .mkt-sg a{color:#7dd3fc}
 .mkt-sg__rank{font-weight:700;min-width:2.2em;color:#fbbf24}
 .mkt-sg__meta{color:#aab6c8;font-size:.92em}
@@ -61,6 +64,8 @@ const SUPPORTERS_GIFTS_SEARCH_SCRIPT = `<script>
   var list = document.getElementById('mktSgList');
   if (!input || !result || !list) return;
   var items = Array.prototype.slice.call(list.querySelectorAll('details.mkt-sg'));
+  var rest = list.querySelector('details.mkt-sg-rest');
+  var restWasOpen = !!(rest && rest.open);
   var hays = null;
   var wasOpen = items.map(function (d) { return d.hasAttribute('open'); });
   var timer = 0;
@@ -68,6 +73,7 @@ const SUPPORTERS_GIFTS_SEARCH_SCRIPT = `<script>
   function apply() {
     var q = norm(input.value).trim();
     var rows = list.querySelectorAll('tbody tr');
+    if (rest) rest.open = q ? true : restWasOpen;
     if (!q) {
       items.forEach(function (d, i) { d.hidden = false; if (wasOpen[i]) d.setAttribute('open', ''); else d.removeAttribute('open'); });
       for (var r = 0; r < rows.length; r++) rows[r].hidden = false;
@@ -295,7 +301,8 @@ ${head}
 ${note}
 ${searchBox}
 <div class="mkt-sg-list" id="mktSgList">
-${items.join('\n')}
+${items.slice(0, SUPPORTERS_GIFTS_VISIBLE).join('\n')}
+${items.length > SUPPORTERS_GIFTS_VISIBLE ? `<details class="mkt-sg-rest"><summary>残り ${fmt(items.length - SUPPORTERS_GIFTS_VISIBLE)}人を見る</summary>\n${items.slice(SUPPORTERS_GIFTS_VISIBLE).join('\n')}\n</details>` : ''}
 </div>
 ${mask ? '' : SUPPORTERS_GIFTS_SEARCH_SCRIPT}
 </section>`;

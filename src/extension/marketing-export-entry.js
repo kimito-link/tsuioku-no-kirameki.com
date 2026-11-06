@@ -30,7 +30,11 @@ import '../lib/extDocBusyCensusBoot.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
 import { buildMediaKitDocument } from '../lib/mediaKitExport.js';
-import { attachCommenterFollowToReport, buildYukkuriImageDataUrlMap } from './popup/report/htmlReportDocument.js';
+import {
+  attachCommenterFollowToReport,
+  buildHtmlReportDocument,
+  buildYukkuriImageDataUrlMap
+} from './popup/report/htmlReportDocument.js';
 import {
   giftUsersStorageKey,
   eventDomStorageKey,
@@ -65,14 +69,16 @@ import { isContextInvalidatedError as isExtensionContextInvalidatedError } from 
 import { triggerAnchorBlobDownload } from '../lib/blobDownload.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
+import { SUPPORTER_PAGE_URL, checkMarketingAccess, saveSupporterCode } from '../lib/supporterAccess.js';
 import { isCommentDbAvailable, openCommentDb, countCommentsForLive, readAllCommentsForLive as readAllCommentsFromDb } from '../lib/commentDb.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
 import { readStorageBagWithRetry, normalizeUserCommentProfileMap } from '../lib/userCommentProfileCache.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
-import { exportWaitLinesForKind } from '../lib/exportWaitNarration.js';
+import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
+import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 
 /**
  * @typedef {{
@@ -427,9 +433,32 @@ function setWaitStageText(text, progressPct) {
   }
 }
 
+/** 処理を始めるときは「終わった」印を消す(処理中のタブを popup が作り直さないように)。 */
+function clearTabFinished() {
+  try {
+    const u = new URL(location.href);
+    if (!u.searchParams.has(MARKETING_EXPORT_STATE_PARAM)) return;
+    u.searchParams.delete(MARKETING_EXPORT_STATE_PARAM);
+    history.replaceState(null, '', u.toString());
+  } catch {
+    /* no-op */
+  }
+}
+
+/** @param {'done'|'error'} state */
+function markTabFinished(state) {
+  // v0.1.1858: 終わったことを URL に残す。popup はこれを見て、もう一度押されたら作り直す(前に出すだけにしない)。
+  try {
+    history.replaceState(null, '', withMarketingExportState(location.href, state));
+  } catch {
+    /* no-op */
+  }
+}
+
 /** @param {string} text */
 function showDoneStage(text) {
   stopWaitCharCycle();
+  markTabFinished('done');
   const wait = document.getElementById('mktWaitStage');
   const done = document.getElementById('mktDoneStage');
   const doneText = document.getElementById('mktDoneText');
@@ -441,6 +470,7 @@ function showDoneStage(text) {
 /** @param {string} text @param {boolean} [showRetry] */
 function showErrorStage(text, showRetry) {
   stopWaitCharCycle();
+  markTabFinished('error');
   const wait = document.getElementById('mktWaitStage');
   const err = document.getElementById('mktErrorStage');
   const errText = document.getElementById('mktErrorText');
@@ -452,10 +482,61 @@ function showErrorStage(text, showRetry) {
     retryBtn.onclick = () => {
       err?.classList.remove('is-visible');
       if (wait) wait.style.display = 'flex';
+      clearTabFinished();
       void runExport(liveIdFromUrl());
     };
   }
   if (err) err.classList.add('is-visible');
+}
+
+// ── サポーター(有料)の関所(v0.1.1893・課金 第3段) ──
+//   SUPPORTER_GATE_ENFORCED=false のあいだは checkMarketingAccess が必ず allowed=true を返す=今の動きと同じ。
+//   判定に失敗したら開ける側に倒す(払った人を締め出さない)。
+
+const SUPPORTER_CODE_MESSAGES = Object.freeze({
+  ok: 'ありがとうございます。サポーターとして確認できました。',
+  inactive: 'このコードの契約は今は止まっています。申し込み画面から再開できます。',
+  unknown: 'このコードは見つかりませんでした。支払い後の画面に出たコードを貼り付けてください。',
+  bad_format: 'コードの形が違います。支払い後の画面に出たコードをそのまま貼り付けてください。',
+  offline: 'コードを保存しました。サーバーに届かなかったので、つながったときに確認します。',
+  device_limit:
+    'このコードは別の PC で使われています(1つのコードで使えるのは1台です)。PC を移すときは、サポーターのページの「この PC に移す」を押してから、もう一度貼り付けてください。'
+});
+
+/** @returns {Promise<boolean>} 開けてよいか */
+async function passSupporterGate() {
+  try {
+    const r = await checkMarketingAccess({ storage: chrome.storage.local });
+    return r.allowed;
+  } catch {
+    return true;
+  }
+}
+
+/** @param {string} lid */
+function showLockStage(lid) {
+  stopWaitCharCycle();
+  const wait = document.getElementById('mktWaitStage');
+  const lock = document.getElementById('mktLockStage');
+  const msg = document.getElementById('mktLockMsg');
+  const input = /** @type {HTMLInputElement|null} */ (document.getElementById('mktLockCodeInput'));
+  if (wait) wait.style.display = 'none';
+  const join = document.getElementById('mktLockJoinBtn');
+  if (join) join.onclick = () => void chrome.tabs.create({ url: SUPPORTER_PAGE_URL });
+  const codeBtn = document.getElementById('mktLockCodeBtn');
+  if (codeBtn) {
+    codeBtn.onclick = async () => {
+      const r = await saveSupporterCode({ storage: chrome.storage.local, code: input?.value || '' }).catch(() => 'offline');
+      if (msg) msg.textContent = SUPPORTER_CODE_MESSAGES[/** @type {keyof typeof SUPPORTER_CODE_MESSAGES} */ (r)] || '';
+      if (r === 'ok') {
+        lock?.classList.remove('is-visible');
+        if (wait) wait.style.display = 'flex';
+        startWaitCharCycle();
+        void runExport(lid);
+      }
+    };
+  }
+  if (lock) lock.classList.add('is-visible');
 }
 
 // ── stage 4: メイン処理(既存パイプラインを呼び出し順序・引数不変で実行) ──
@@ -464,6 +545,10 @@ function showErrorStage(text, showRetry) {
 async function runExport(lid) {
   if (!lid) {
     showErrorStage('URLに ?lv=lv×××××× が指定されていません。\n拡張のポップアップから開き直してください。');
+    return;
+  }
+  if (!(await passSupporterGate())) {
+    showLockStage(lid);
     return;
   }
 
@@ -632,7 +717,10 @@ async function runExport(lid) {
             const bag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
             return normalizeUserCommentProfileMap(bag?.[KEY_USER_COMMENT_PROFILE_CACHE]);
           },
-          maskSupporters: maskShareLabels
+          maskSupporters: maskShareLabels,
+          // v0.1.1857: 記録は見た配信全部なので、この配信の配信者の配信だけで集計する(他の配信者の数字を混ぜない)。
+          broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
+          currentLiveId: lid
         }),
         60_000,
         'media_kit_build_timeout'
@@ -642,8 +730,35 @@ async function runExport(lid) {
       mediaKitHtml = '';
     }
     mktProf.mark('media_kit');
+    // v0.1.1854: 旧「HTML」ボタンの中身(コメント全文・検索・CSV・ユーザー別など)も同じ HTML の1章に入れる(ボタンをマーケ1つにまとめる)。
+    //   マーケ側にある章(来場・興味タグ・イベント順位・サムネ一覧・フォロー情報)は二重に出さない。失敗・打ち切りでも分析レポートは必ず出す(fail-soft)。
+    //   「共有用に伏せる」のときは名前入りのコメント一覧になるので章ごと入れない。
+    let htmlReportHtml = '';
+    if (!maskShareLabels) {
+      setWaitStageText('コメント記録をまとめています…', 90);
+      try {
+        htmlReportHtml = await withTimeout(
+          buildHtmlReportDocument(
+            comments,
+            snapshot,
+            '',
+            lid,
+            `https://live.nicovideo.jp/watch/${lid}`,
+            null,
+            { ...buildHtmlReportDeps(snapshot), watchSnapshotStorageKey, embedForMarketing: true }
+          ),
+          resolveHtmlReportBuildTimeoutMs(comments.length),
+          'html_report_build_timeout'
+        );
+      } catch {
+        htmlReportHtml = '';
+      }
+    }
+    mktProf.mark('html_report');
     const html = buildMarketingDashboardHtml(report, {
       mediaKitHtml,
+      htmlReportHtml,
+      programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
       maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
@@ -717,6 +832,7 @@ async function runExport(lid) {
 
 function bootstrap() {
   /** @type {any} */ (window).__NL_MKTEXPORT_BOOTED = true;
+  clearTabFinished();
   startWaitCharCycle();
   const skipBtn = document.getElementById('mktSkipBtn');
   if (skipBtn) skipBtn.hidden = true; // MVP: セクション演出はPR3で追加、今は待機演出のみのため非表示

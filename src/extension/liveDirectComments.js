@@ -331,13 +331,13 @@ export function mountDirectComments(a) {
   /** @type {Set<string>} */
   const seenGifts = new Set();
   /**
-   * v0.1.1844: 🚩 の「隠す」候補にする最近のコメント(古→新)。並べた行の data-uid と組で、隠したら画面からも消す。
+   * v0.1.1905: 🚩 の「隠す」候補にする最近のコメント(古→新)。並べた行の data-uid と組で、隠したら画面からも消す。
    * @type {{ no: string, text: string, name: string, userId: string }[]}
    */
   let recent = [];
   /** @param {{ no: string, text: string, name: string, userId: string }[]} all */
   const onComments = (all) => {
-    // v0.1.1844: 🚩 で隠した人は並べないし読まない(PC とつなぐ形と同じ・この端末の中だけ)。
+    // v0.1.1905: 🚩 で隠した人は並べないし読まない(PC とつなぐ形と同じ・この端末の中だけ)。
     const rows = dropBlockedRows(freshDirectRows(all, seenComments, (r) => r.no), readBlocklist());
     if (!rows.length) return;
     recent = recent.concat(rows).slice(-DIRECT_COMMENTS_MAX);

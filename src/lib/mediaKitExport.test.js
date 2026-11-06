@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildMediaKitDocument, MEDIA_KIT_LIVE_LIMIT } from './mediaKitExport.js';
+import {
+  buildMediaKitDocument,
+  MEDIA_KIT_LIVE_LIMIT,
+  MEDIA_KIT_SCAN_LIVE_LIMIT,
+  pickLivesForBroadcaster
+} from './mediaKitExport.js';
 
 const db = { close: vi.fn() };
 const base = (over = {}) => ({
@@ -67,5 +72,41 @@ describe('buildMediaKitDocument', () => {
     await buildMediaKitDocument(base({ listLiveIds }));
     expect(listLiveIds).toHaveBeenCalledWith(db, { limit: MEDIA_KIT_LIVE_LIMIT });
     expect(MEDIA_KIT_LIVE_LIMIT).toBe(60);
+  });
+
+  it('配信者を渡すと、その配信者の配信だけで集計する(他の配信者の配信を混ぜない)', async () => {
+    const listLiveIds = vi.fn(async () => ['lvA1', 'lvB1', 'lvA2', 'lvB2']);
+    const owner = { lvA1: '111', lvA2: '111', lvB1: '222', lvB2: '222' };
+    const listSummaryForLive = vi.fn(async (_db, lid) => [
+      { liveId: lid, broadcasterUserId: owner[lid], broadcasterName: owner[lid] === '111' ? 'A' : 'B', capturedAt: 1 }
+    ]);
+    const storageGet = vi.fn(async () => ({}));
+    const read = vi.fn(async () => []);
+    await buildMediaKitDocument(
+      base({ listLiveIds, listSummaryForLive, storageGet, readAllCommentsForLive: read, broadcasterUserId: '111', currentLiveId: 'lvA1' })
+    );
+    expect(listLiveIds).toHaveBeenCalledWith(db, { limit: MEDIA_KIT_SCAN_LIVE_LIMIT });
+    expect(read.mock.calls.map((c) => c[0])).toEqual(['lvA1', 'lvA2']);
+    const keys = storageGet.mock.calls[0][0];
+    expect(keys.some((k) => k.includes('lvB'))).toBe(false);
+  });
+});
+
+describe('pickLivesForBroadcaster', () => {
+  const rows = new Map([
+    ['lv1', [{ broadcasterUserId: '1' }]],
+    ['lv2', [{ broadcasterUserId: '2' }]],
+    ['lv3', [{}, { broadcasterUserId: '1' }]],
+    ['lv4', []]
+  ]);
+  it('どれか1行でも一致すれば残す・上限で止める', () => {
+    expect(pickLivesForBroadcaster(['lv1', 'lv2', 'lv3', 'lv4'], rows, { broadcasterUserId: '1', limit: 60 })).toEqual(['lv1', 'lv3']);
+    expect(pickLivesForBroadcaster(['lv1', 'lv2', 'lv3'], rows, { broadcasterUserId: '1', limit: 1 })).toEqual(['lv1']);
+  });
+  it('今の配信は行に配信者が無くても残す', () => {
+    expect(pickLivesForBroadcaster(['lv4', 'lv1'], rows, { broadcasterUserId: '1', currentLiveId: 'lv4', limit: 60 })).toEqual(['lv4', 'lv1']);
+  });
+  it('配信者が分からないときは今の配信だけ', () => {
+    expect(pickLivesForBroadcaster(['lv1', 'lv2', 'lv4'], rows, { broadcasterUserId: '', currentLiveId: 'lv4', limit: 60 })).toEqual(['lv4']);
   });
 });

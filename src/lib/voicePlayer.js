@@ -19,6 +19,14 @@ import {
   capVoiceSynthDepthForOverload
 } from './voiceEngineOverload.js';
 import { observeVoicePlayback } from './voicePlaybackQuality.js';
+import {
+  LIGHT_VOICE_MAX_CHARS,
+  LIGHT_VOICE_PROBE_TEXT,
+  lightVoiceToneFor,
+  shouldProbeVoicevox,
+  shouldUseLightVoice
+} from './voiceLightFallback.js';
+import { createLightSpeaker } from './voiceLightSpeaker.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
   capVoiceMaxCharsByBoost,
@@ -50,6 +58,14 @@ import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, measureVoiceWavLevel, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT, voiceTargetPeak
 } from './voiceVolume.js';
 import { decideVoiceGpuTip, decideVoiceLagNotice } from './voiceLagNotice.js';
+import {
+  classifyVoiceImportance,
+  createVoiceFirstSpeakerState,
+  noteVoiceSpeakerInLive,
+  shouldSkipVoiceWhenBusy,
+  VOICE_BUSY_QUEUE_MIN,
+  voicePriorityForImportance
+} from './voiceBusyPriority.js';
 import {
   KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, forgetWeakVoicePcIfFast
 } from './voiceNarrowing.js';
@@ -137,6 +153,18 @@ export class VoicePlayer {
     this._weakPcState = { saved: false };
     /** 2026-10-31: 合成の時間切れが続いたら「混雑中」=1件ずつ・長めに待つ(voiceEngineOverload.js)。 */
     this._overload = createVoiceOverloadState();
+    /** 2026-11-03: VOICEVOX に頼んでまだ返ってきていない合成の数(混雑中は1件ずつ頼むため)。 */
+    this._synthInFlight = 0;
+    /**
+     * 2026-11-03: VOICEVOX が追いつかない間だけ使う軽い声(voiceLightFallback.js)。
+     *   既定はブラウザの読み上げ(Windows の声)。無い環境では null=VOICEVOX だけで読む。
+     */
+    this.lightSpeaker = deps.lightSpeaker === undefined ? createLightSpeaker() : deps.lightSpeaker;
+    /** 'auto'(既定)か 'off'(VOICEVOX だけで読む)。 */
+    this.lightVoiceSetting = 'auto';
+    this._lightProbeAt = 0;
+    /** 軽い声で続けて読めなかった回数。3回続いたらこの ON の間は使わない(無音のまま切り替え続けないため)。 */
+    this._lightFailStreak = 0;
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
 
@@ -175,6 +203,8 @@ export class VoicePlayer {
     this._playbackEmaMs = -1;
     this._expectedPlayEmaMs = -1;
     this._arrivalWindowState = null;
+    // v0.1.1861: 「その配信で初めてのコメント」を覚える(混雑時は大事なものだけ読む)。
+    this._firstSpeakerState = createVoiceFirstSpeakerState();
     this._dropCountGateTotal = 0;
     this._dropHeadStaleTotal = 0;
     this._dropSweepStaleTotal = 0;
@@ -586,6 +616,9 @@ export class VoicePlayer {
     let timedOut = false;
     const startedAt = Date.now();
     const overloadTimeouts = resolveVoiceOverloadTimeouts(this._overload.overloaded);
+    this._synthInFlight += 1;
+    let settled = false;
+    const settle = () => { if (!settled) { settled = true; this._synthInFlight = Math.max(0, this._synthInFlight - 1); } };
     // 同期で呼ぶ(enqueue 直後に合成が起動していることを既存テストが固定している=v0.1.800)。
     let started;
     try {
@@ -604,6 +637,7 @@ export class VoicePlayer {
     return Promise.resolve(started)
       .then(
         (wav) => {
+          settle();
           /** @type {any} */
           let r = null;
           try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(this.diag, r); } catch { /* 計器は本体を止めない */ }
@@ -625,6 +659,7 @@ export class VoicePlayer {
           return wav;
         },
         (err) => {
+          settle();
           try { track.end(timing, false); } catch { /* no-op */ }
           this._noteOverload({ timedOut, ok: false });
           throw err;
@@ -700,6 +735,11 @@ export class VoicePlayer {
       this.prefetches.clear();
       return;
     }
+    // 2026-11-03: 軽い声で読んでいる間は VOICEVOX に読み上げを頼まない(速さの確かめだけ)。
+    if (this._useLightVoice()) {
+      this._maybeProbeVoicevox();
+      return;
+    }
     // 2026-10-31: エンジンが混雑中(時間切れが続いた)なら、同時に頼むのは今読む1件だけ。
     const depth = capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
       pending: this.queue.length
@@ -711,6 +751,10 @@ export class VoicePlayer {
     for (let i = 0; i < depth && i < this.queue.length; i++) {
       const item = this.queue[i];
       if (!item) continue;
+      // 2026-11-03: 混雑中は、VOICEVOX がまだ前の合成をしている間は次を頼まない。
+      //   拡張が諦めた依頼も VOICEVOX は最後まで計算するので、重ねて頼むほど全部が遅れる
+      //   (実測: CPU 100%・時間切れ1,940件)。頼まなかった件は順番が来たときに頼む。
+      if (this._overload.overloaded && this._synthInFlight > 0 && !this.prefetches.has(item)) continue;
       wanted.add(item);
       this._ensurePrefetch(item, generation);
     }
@@ -718,6 +762,74 @@ export class VoicePlayer {
     for (const key of this.prefetches.keys()) {
       if (!wanted.has(key)) this.prefetches.delete(key);
     }
+  }
+
+  /**
+   * 2026-11-03: VOICEVOX が混雑中(時間切れが続いた)なら、合成を頼み済みの件を守る判定を返す。
+   *   混雑していなければ null(=従来どおり件数・鮮度で捨てる)。
+   * @returns {((x: any) => boolean) | null}
+   */
+  _inflightKeeper() {
+    if (!this._overload.overloaded) return null;
+    return (x) => this.prefetches.has(x);
+  }
+
+  /** 2026-11-03: 今、軽い声で読むか(VOICEVOX が混雑中で、軽い声が使えるときだけ)。 */
+  _useLightVoice() {
+    let available = false;
+    try { available = !!this.lightSpeaker && this._lightFailStreak < 3 && this.lightSpeaker.available(); } catch { available = false; }
+    const on = shouldUseLightVoice({ overloaded: this._overload.overloaded, available, setting: this.lightVoiceSetting });
+    this.diag.lightVoiceActive = on;
+    return on;
+  }
+
+  /** 軽い声で読んでいる間、ときどき VOICEVOX に短い文を頼んで速さを確かめる(速ければ混雑が解けて戻る)。 */
+  _maybeProbeVoicevox() {
+    const nowMs = Date.now();
+    if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) return;
+    this._lightProbeAt = nowMs;
+    try {
+      const voice = this.resolveVoice('', this.assignments, this.styleIds);
+      void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).catch(() => null);
+    } catch { /* 確かめられなくても軽い声で読み続ける */ }
+  }
+
+  /**
+   * 2026-11-03: 1件を軽い声で読む。人ごとの声(どの声・高さ・速さ)は voiceLightFallback.lightVoiceToneFor。
+   * @param {any} item
+   * @param {number} generation
+   */
+  async _playLight(item, generation) {
+    this._maybeProbeVoicevox();
+    const text = buildMergedVoiceText(item, { maxChars: LIGHT_VOICE_MAX_CHARS });
+    const speaker = this.lightSpeaker;
+    let started = false;
+    if (text && speaker) {
+      const tone = lightVoiceToneFor(String(item.userKey || ''), speaker.voices().length);
+      this.stopCurrent = () => speaker.cancel();
+      try {
+        started = await speaker.speak(text, tone, {
+          onStart: () => { if (typeof item.onAudioStart === 'function') item.onAudioStart(); }
+        });
+      } catch { started = false; }
+      this.stopCurrent = null;
+    }
+    if (started && typeof item.onAudioEnd === 'function') item.onAudioEnd();
+    if (typeof item.onPlayStart === 'function') item.onPlayStart();
+    if (text && speaker) this._lightFailStreak = started ? 0 : this._lightFailStreak + 1;
+    if (!started || generation !== this.generation) {
+      this._notifyDropped(item);
+      return;
+    }
+    this.diag.spokenTotal += 1;
+    this.diag.lightSpokenTotal = (Number(this.diag.lightSpokenTotal) || 0) + 1;
+    this.diag.lastSpokenBase = Date.now();
+    const denom = this.diag.spokenTotal + this.diag.staleDropTotal;
+    this.diag.voicedRatio = denom > 0 ? this.diag.spokenTotal / denom : -1;
+    this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
+    this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+    this._emitDiag();
+    this._updateLagNotice(); // 「PC の声で読んでいます」を出す
   }
 
   async _drainQueue() {
@@ -738,12 +850,15 @@ export class VoicePlayer {
           //   コメントが流れている限り「今のコメント」は必ず1つ読む方が体感が良い(無音より新着優先)。
           //   古い分だけ捨て、最新(末尾)を残してそのまま再生フローへ進める。
           const newest = this.queue[this.queue.length - 1];
-          const dropped = this.queue.slice(0, this.queue.length - 1);
+          // 2026-11-03: 混雑中は合成中の件も残す(捨てても VOICEVOX は止まらず、作業だけ無駄になる)。
+          const keepInflight = this._inflightKeeper();
+          const survivors = this.queue.filter((q) => q === newest || (keepInflight ? keepInflight(q) : false));
+          const dropped = this.queue.filter((q) => !survivors.includes(q));
           for (const d of dropped) {
             if (typeof d.onPlayStart === 'function') d.onPlayStart();
             this._notifyDropped(d); // v0.1.799: 鳴らず破棄→吹き出しを unvoiced へ
           }
-          this.queue = [newest];
+          this.queue = survivors;
           if (dropped.length > 0) {
             this._showSkipped(dropped.length);
             this.diag.staleDropTotal += dropped.length;
@@ -775,7 +890,11 @@ export class VoicePlayer {
         foldVoiceStageEma(this.diag, 'queueWaitEmaMs', measureVoiceGapMs(item.enqueuedAt, _serviceStart));
 
         const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
-        if (ageCheck.stale) {
+        // 2026-11-03: 混雑中は、合成を頼み済みの件と、後ろにもう新しい件が無い件は古くても読む
+        //   (遅い PC ではどの件も8秒を超えるので、ここで捨てると1件も鳴らない)。
+        const keepInflight = this._inflightKeeper();
+        const keepAnyway = !!keepInflight && (keepInflight(item) || this.queue.length === 0);
+        if (ageCheck.stale && !keepAnyway) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
           this._notifyDropped(item); // v0.1.799: stale で鳴らず破棄→吹き出しを unvoiced へ
           this._showSkipped(1);
@@ -787,6 +906,12 @@ export class VoicePlayer {
           this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
           this._emitDiag();
           this.prefetches.delete(item);
+          continue;
+        }
+
+        // 2026-11-03: VOICEVOX が追いつかない間は軽い声で読む(すでに合成を頼んだ件はそれを待つ)。
+        if (this._useLightVoice() && !this.prefetches.has(item)) {
+          await this._playLight(item, generation);
           continue;
         }
 
@@ -1073,10 +1198,7 @@ export class VoicePlayer {
 
       const name = this.readNameEnabled ? String(item.nickname || '').trim() : '';
       let body = '';
-      let isHighPriority = false;
-      
       if (item.kind === 'gift') {
-        isHighPriority = true;
         const count = item.gift?.count > 1 ? `を${item.gift.count}個` : 'を';
         body = `ギフト、${item.gift?.name || 'アイテム'}${count}贈りました。${item.gift?.message || ''}`.trim();
       } else {
@@ -1100,13 +1222,35 @@ export class VoicePlayer {
       this._arrivalWindowState = foldVoiceArrivalWindow(this._arrivalWindowState, Date.now(), 1);
       this.diag.arrivalPerMin = this._arrivalWindowState.arrivalPerMin;
 
+      // v0.1.1861: 混雑(読み上げ待ち2件以上)のときは大事なもの(ギフト・広告・配信者・その配信で
+      //   初めてのコメント)だけ読む。吹き出しは出す(onDropped で声なしの寿命へ)。初めてかどうかは
+      //   読まなかった件でも覚える(次のコメントは「2回目」)。
+      const userKey = this._voiceUserKeyForItem(item);
+      const importance = classifyVoiceImportance({
+        kind: item.kind,
+        text: item.kind === 'gift' ? '' : body,
+        userId: item.userId,
+        isModerator: item.isModerator,
+        broadcasterUid: item.broadcasterUid,
+        firstInLive: noteVoiceSpeakerInLive(this._firstSpeakerState, item.liveId, userKey)
+      });
+      if (shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance })) {
+        this.diag.busySkipTotal = (Number(this.diag.busySkipTotal) || 0) + 1;
+        if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }
+        this._notifyDropped(item);
+        continue;
+      }
+      if (importance && this.queue.length >= VOICE_BUSY_QUEUE_MIN) {
+        this.diag.busyImportantTotal = (Number(this.diag.busyImportantTotal) || 0) + 1;
+      }
+
       const candidate = {
-        userKey: this._voiceUserKeyForItem(item),
+        userKey,
         name,
         body,
         count: 1,
         enqueuedAt: Date.now(),
-        priority: isHighPriority ? 'high' : 'normal',
+        priority: voicePriorityForImportance(importance),
         // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
         onPlayStart: item.onPlayStart,
         // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。
@@ -1138,7 +1282,7 @@ export class VoicePlayer {
       // v0.1.1800: 待っている件の文字数から上限を見積もる(長い声の直後に平均が膨らんで、続く短い
       //   コメントまで飛ばしていた)。見積もれなければ従来の this._effectiveQueueMax。
       const queueMax = this._resolveQueueMaxByChars(candidate);
-      const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax });
+      const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax, keep: this._inflightKeeper() });
       this.queue = pushed.queue;
       noteVoicePaceArrival(this._paceState, candidate.enqueuedAt);
       

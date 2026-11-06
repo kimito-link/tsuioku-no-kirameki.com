@@ -55,6 +55,9 @@ export function createFlickerMeter(deps = {}) {
   let dirty = false;
   let selfMs = 0;
   let events = 0;
+  /** v0.1.1889: 画面の持ち主(popup)が書く補足の1行(例: 応援マスの作り直しの入口別)。名前→文。 */
+  /** @type {Record<string, string>} */
+  let notes = {};
 
   /** @param {string} key */
   const stat = (key) => {
@@ -133,6 +136,17 @@ export function createFlickerMeter(deps = {}) {
       dirty = false;
       return d;
     },
+    /**
+     * v0.1.1889: 補足の1行を書く(同じ文なら何もしない)。ちらつき計と同じ4秒ごとの書き込みに乗る。
+     * @param {string} name @param {string} text
+     */
+    setNote(name, text) {
+      const k = String(name || '');
+      const v = String(text || '');
+      if (!k || notes[k] === v) return;
+      notes = { ...notes, [k]: v };
+      dirty = true;
+    },
     /** 計器自身が使った時間[ms]を足す(MutationObserver のコールバック全体の時間を呼び手が渡す)。 */
     addSelfMs(/** @type {number} */ ms) {
       selfMs += ms;
@@ -145,7 +159,8 @@ export function createFlickerMeter(deps = {}) {
         events,
         selfMs: Math.round(selfMs),
         regions: toPlain(regions),
-        open: openFrozen ? toPlain(openFrozen) : null
+        open: openFrozen ? toPlain(openFrozen) : null,
+        notes: { ...notes }
       };
     },
     reset() {
@@ -154,6 +169,7 @@ export function createFlickerMeter(deps = {}) {
       dirty = false;
       selfMs = 0;
       events = 0;
+      notes = {};
     }
   };
 }
@@ -179,7 +195,7 @@ const score = (/** @type {RegionStat} */ s) => s.flips * 20 + s.same * 3 + s.mut
 
 /**
  * 状態速報の1行。記録が無ければ ''。数字だけを出し、原因は断定しない。
- * @param {{ at?: number, sinceMs?: number, events?: number, selfMs?: number, regions?: Record<string, any>, open?: Record<string, any>|null } | null | undefined} snap
+ * @param {{ at?: number, sinceMs?: number, events?: number, selfMs?: number, regions?: Record<string, any>, open?: Record<string, any>|null, notes?: Record<string, string> } | null | undefined} snap
  * @param {number} nowMs
  * @param {{ top?: number }} [opts]
  * @returns {string}
@@ -207,5 +223,7 @@ export function formatFlickerLine(snap, nowMs, opts = {}) {
   const parts = [`ちらつき計(開いて${sec}秒・${age}・往復の合計${totalFlips}・計器自身${Number(snap.selfMs) || 0}ms)`];
   if (snap.open) parts.push(`開いた直後15秒の上位: ${fmt(rank(snap.open))}`);
   parts.push(`全体の上位: ${fmt(rank(snap.regions))}`);
+  const notes = snap.notes && typeof snap.notes === 'object' ? Object.values(snap.notes).filter((v) => typeof v === 'string' && v) : [];
+  if (notes.length) parts.push(`補足: ${notes.join(' ｜ ')}`);
   return parts.join(' / ');
 }

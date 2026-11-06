@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it } from 'vitest';
-import { buildMediaKitHtml } from './mediaKitHtml.js';
+import { buildMediaKitHtml, dedupeSameWindows } from './mediaKitHtml.js';
 
 const BASE_STATS = {
   broadcaster: {
@@ -214,5 +214,27 @@ describe('情報セットの原則(AGENTS.md §3.5)', () => {
     });
     expect(html).toContain('href="https://www.nicovideo.jp/user/4046119"');
     expect(html).not.toContain('https://www.nicovideo.jp/user/a:XYZ');
+  });
+});
+
+describe('同じ数字が並ぶ期間の列を出さない(v0.1.1857)', () => {
+  it('長い期間の配信数が短い期間と同じなら、その列は出さない', () => {
+    const w30 = { ...BASE_STATS.windows[0] };
+    const same = { ...BASE_STATS, windows: [w30, { ...w30, days: 60 }, { ...w30, days: 90 }] };
+    const doc = parse(buildMediaKitHtml(same));
+    const headers = [...doc.querySelectorAll('thead th')].map((node) => node.textContent);
+    expect(headers).toEqual(['指標', '過去30日']);
+    expect(doc.querySelector('.lead')?.textContent).toContain('過去30日の配信実績');
+  });
+  it('配信数が増える期間は残す', () => {
+    const out = dedupeSameWindows([
+      { days: 30, liveCount: 3 },
+      { days: 60, liveCount: 3 },
+      { days: 90, liveCount: 5 }
+    ]);
+    expect(out.map((w) => w.days)).toEqual([30, 90]);
+  });
+  it('応援者の見出しは濃い字色(暗いマーケの見出し色に負けない)', () => {
+    expect(buildMediaKitHtml(BASE_STATS)).toContain('.supporters h2 { margin: 0 0 6px; font-size: 20px; color: var(--nl-ink); }');
   });
 });

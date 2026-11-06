@@ -7,6 +7,9 @@ import {
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
 import { mountVenueBarButton } from './venueBar.js';
+import { openOfficialGiftPanel, GIFT_ITEMS_TAB_REQ_KEY, startGiftItemsTabResponder } from '../lib/venueComposeBox.js';
+import { startGiftPanelRecorder } from '../lib/giftPanelShape.js';
+import { startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, chromeGiftStore, waitGiftPressResult, giftPressOutcome } from '../lib/giftItemsMirror.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -654,6 +657,7 @@ import {
   normalizeCommentPanelAutoRestoreEnabled
 } from '../lib/commentPanelHealthProbe.js';
 import { pushLiveCommentsToComeview } from './comeviewLivePushHost.js';
+import { startOrphanTabAutoReloadInPage } from './orphanTabAutoReloadHost.js';
 
 /**
  * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string, avatarObserved?: boolean }} ParsedCommentRow
@@ -14304,6 +14308,8 @@ function createDevMonitorOverlay() {
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
+  // v0.1.1855: 拡張が新しい版に入れ替わってこのページが古い版のまま止まったら、自分で読み込み直す(F5 不要・入力中は待つ)。
+  if (isWatchInlinePanelTopFrame()) startOrphanTabAutoReloadInPage(() => hasExtensionContext());
   /*
    * ★v0.1.1271(ユーザー要望): 会場モードのボタンを出すかを設定で選べるようにした。
    *   「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、
@@ -14312,7 +14318,8 @@ async function start() {
    *   ★設定の読み取りに失敗したら【出す】側に倒す(機能が黙って消えるのを避ける)。
    */
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
-    _venueApi = mountVenueBarButton();
+    // v0.1.1867: 会場から発言(パネルの「コメント送信」と同じ postCommentFromContentAsync で公式コメント欄へ送る)
+    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }), openGift: async () => { /* v0.1.1874 ギフトの子の窓へ番組ギフトの合図 */ chrome.storage.local.set({ [GIFT_ITEMS_TAB_REQ_KEY]: { at: Date.now() } }).catch(() => {}); return openOfficialGiftPanel(document); }, giftItems: { subscribe: (cb) => subscribeGiftItems(chromeGiftStore(), location.pathname, cb), press: async (key, o) => { const st = chromeGiftStore(); let at = 0; const r = requestGiftItemPress(document, key, st.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); if (!o?.direct) return r; const v = await waitGiftPressResult(st, at); return { ok: r.ok || !!v, reason: r.reason, ...giftPressOutcome(v) }; } } });
   }
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
@@ -19567,5 +19574,7 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   //   履歴 relay 経路を起動。iframe 内では shouldRunWatchContentInThisFrame() が
   //   false で start() が早期 return するため、独立して起動する。
   try { maybeStartGiftSubAppIframeRelay(); } catch { /* no-op */ }
+  try { startGiftPanelRecorder(window, (o) => { chrome.storage.local.set(o).catch(() => {}); }); } catch { /* v0.1.1871 公式ギフト欄の作りを記録(lib/giftPanelShape.js) */ }
+  try { startGiftItemsTabResponder(window, chromeGiftStore().onChanged); startGiftItemsPublisher(window, chromeGiftStore()); } catch { /* v0.1.1874〜1875 ギフトの子の窓: 番組ギフトのタブ・アイテムの並びと押下(lib/giftItemsMirror.js) */ }
   start().catch((err) => reportSilentErrorToStorage('start', err));
 }

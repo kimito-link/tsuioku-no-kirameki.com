@@ -19,11 +19,11 @@ describe('syncStoryGrowth は増えた分だけ足す経路を通る', () => {
   it('★「足りないとき」の分岐は canAppendStoryGrowthCells で分かれ、足す側は appendStoryGrowthCells を呼ぶ', () => {
     expect(body).toMatch(/if \(canAppendStoryGrowthCells\(/);
     expect(body).toContain('appendStoryGrowthCells(root, rnd, tgt)');
-    expect(body).toMatch(/else rebuildStoryGrowth\(root, tgt\);/);
+    expect(body).toMatch(/else rebuildStoryGrowth\(root, tgt[,)]/); // v0.1.1875: 計器の入口名が後ろに付く
   });
   it('★足りないときに無条件で rebuildStoryGrowth(root, tgt) を呼ぶ形が残っていない', () => {
     // rebuildStoryGrowth(root, tgt) は else の1か所だけ(縮小・切替の rebuild は別の引数)
-    const calls = body.match(/rebuildStoryGrowth\(root, tgt\)/g) || [];
+    const calls = body.match(/rebuildStoryGrowth\(root, tgt[,)]/g) || [];
     expect(calls.length).toBe(1);
   });
   it('★足す関数は既存のマスを消さない(innerHTML を触らない)', () => {

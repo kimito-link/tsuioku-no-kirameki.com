@@ -71,7 +71,7 @@ import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
-import { canAppendStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
+import { canAppendStoryGrowthCells, canTrimStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
 import { isSlowStorageKey, isThrottledExtraStorageKey } from '../lib/storageTriggerPolicy.js';
@@ -685,7 +685,7 @@ import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, n
 import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
 import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
-import { linkTierFor, mergeSupporterLinkCandidates, supporterUidSet } from '../lib/laneLinkTier.js';
+import { mergeSupporterLinkCandidates } from '../lib/laneLinkTier.js';
 import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesByCount } from '../lib/laneCountOrder.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
@@ -913,6 +913,7 @@ import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS }
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
 import { wireVoiceVolumeSlider } from './popup/wireVoiceVolumeSlider.js';
+import { wireVoiceGpuTip } from './popup/wireVoiceGpuTip.js';
 import { wireVoiceNarrowSelect } from './popup/wireVoiceNarrowSelect.js';
 import { wireVoiceQualitySelect } from './popup/wireVoiceQualitySelect.js';
 import {
@@ -930,6 +931,8 @@ import {
 } from '../lib/watchSnapshotAlignment.js';
 import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
 import { createBroadcasterUidTracker } from '../lib/broadcasterUidTracker.js';
+import { STORY_GROWTH_REBUILD_REASON, createStoryGrowthRebuildReasonState, findStoryEntryDiff, noteStoryEntryDiff, noteStoryGrowthRebuildReason, noteStoryGrowthTarget, publishStoryGrowthRebuildNote } from '../lib/storyGrowthRebuildReasons.js';
+import { isMarketingExportTabFinished } from '../lib/marketingExportTabState.js';
 
 /**
  * @typedef {{
@@ -6446,8 +6449,8 @@ function renderStoryUserLane() {
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
-  // v0.1.1621: りんく段は /live/ と同じ定義(ギフト/広告で支えた人だけ)。コメントだけの人は本物のサムネがあってもこん太へ。
-  const _linkSupporters = supporterUidSet(STORY_SOURCE_STATE.giftThrowerPicks, STORY_SOURCE_STATE.adThrowerPicks);
+  // v0.1.1863: りんく段は元の定義(数値ID＋本物の個人サムネ)に戻した(v0.1.1621 の「ギフト/広告の人だけ」を外す・
+  //   りんく 2026-11-05)。ギフト/広告で支えた人を足す mergeSupporterLinkCandidates はそのまま。
   let laneDiagDeduped = 0;
   let laneDiagT3 = 0;
   let laneDiagT2 = 0;
@@ -6522,7 +6525,7 @@ function renderStoryUserLane() {
     laneDiagDeduped += 1;
     if (ex.strongNick) laneDiagStrongNick += 1;
     if (ex.hasPersonalThumb) laneDiagPersonalThumb += 1;
-    const _tier = linkTierFor(row.profileTier, uidRaw, _linkSupporters);
+    const _tier = row.profileTier;
     if (_tier === 3) laneDiagT3 += 1;
     else if (_tier === 2) laneDiagT2 += 1;
     else laneDiagT1 += 1;
@@ -8656,7 +8659,7 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
   const n = STORY_GROWTH_STATE.renderedCount;
   const imgs = root.querySelectorAll('img.nl-story-growth-icon');
   if (imgs.length !== n) {
-    rebuildStoryGrowth(root, n);
+    rebuildStoryGrowth(root, n, STORY_GROWTH_REBUILD_REASON.DOM_MISMATCH, n);
     return;
   }
   const accent = buildStoryAccentForWindow(n);
@@ -8697,6 +8700,36 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
 const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
 // v0.1.1215: 全消し再構築ではなく「既存マスの中身のすり替え」を観測する(churn の盲点)。
 const STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
+// v0.1.1889: 応援マスを「なぜ」全部作り直したか(入口別)。ちらつき計の補足欄へ載せる(4秒ごとに書かれる=実機で読める)。
+const STORY_GROWTH_REBUILD_REASONS = createStoryGrowthRebuildReasonState();
+const STORY_REBUILD_TARGET_SIG = { v: '', liveId: '', target: -1, entries: /** @type {PopupCommentEntry[]} */ ([]) };
+/** v0.1.1889計器: 件数が少しだけ変わったとき、余分な1件が何者か(位置・自分の投稿・配信者・ID無し・先出し)を数える。O(件数)は件数が変わった回だけ。 */
+function noteStoryGrowthEntryDiffNow(target) {
+  try {
+    const st = STORY_REBUILD_TARGET_SIG;
+    const next = STORY_SOURCE_STATE.entries.slice(0, STORY_GROWTH_MAX_CELLS);
+    if (st.target >= 0 && target !== st.target && st.liveId === STORY_SOURCE_STATE.liveId) {
+      const diff = findStoryEntryDiff(st.entries.map((e) => commentStableId(e) || ''), next.map((e) => commentStableId(e) || ''));
+      if (diff) {
+        const e = (diff.extraIn === 'next' ? next : st.entries)[diff.index];
+        const uid = String(e?.userId || '').trim();
+        const bc = _broadcasterUidTracker.current().uid;
+        noteStoryEntryDiff(STORY_GROWTH_REBUILD_REASONS, [diff.atEnd ? '末尾' : `途中(${diff.index + 1}番目)`, e?.selfPosted === true ? '自分の投稿' : '', bc && uid === bc ? '配信者' : '', uid ? '' : 'ID無し', _instantPushBuffer.includes(e) ? '先出し' : ''].filter(Boolean).join('・'));
+      }
+    }
+    st.target = target;
+    st.liveId = STORY_SOURCE_STATE.liveId;
+    st.entries = next;
+  } catch { /* 計器の失敗は描画を止めない */ }
+}
+/** @param {string} reason 空なら記録せず補足欄だけ書き直す @param {{ from?: number, to?: number, dom?: number, liveSame?: boolean }} [info] */
+function noteStoryGrowthRebuildAndPublish(reason, info = {}) {
+  try {
+    const now = Date.now();
+    if (reason) noteStoryGrowthRebuildReason(STORY_GROWTH_REBUILD_REASONS, { reason, atMs: now, ...info });
+    publishStoryGrowthRebuildNote(STORY_GROWTH_REBUILD_REASONS, /** @type {any} */ (globalThis).__nlsFlickerMeter?.meter, now);
+  } catch { /* 計器の失敗は描画を止めない */ }
+}
 
 /**
  * v0.1.1616計器: 各マスが「どのコメントか」「誰として数えたか」を控えて、前回との食い違いを数える(観測のみ)。
@@ -8716,7 +8749,14 @@ function noteStoryGrowthIdentitiesNow(n) {
   } catch { /* 計器の失敗は描画を止めない */ }
 }
 
-function rebuildStoryGrowth(root, total) {
+/**
+ * @param {HTMLElement} root
+ * @param {number} total
+ * @param {string} [reason] v0.1.1889計器: 入口(空なら記録しない=呼び元で記録済み/初回)
+ * @param {number} [from] 作り直す前に描いていた数
+ */
+function rebuildStoryGrowth(root, total, reason = '', from = 0) {
+  if (reason) noteStoryGrowthRebuildAndPublish(reason, { from, to: total, dom: root.querySelectorAll('img.nl-story-growth-icon').length });
   // ★v0.1.1462: 全消し再構築=DOMを最も動かす経路。実測する。
   return _measuredSection('rebuildStoryGrowth', () => rebuildStoryGrowthImpl(root, total));
 }
@@ -8780,7 +8820,15 @@ function syncStoryGrowth(liveId, count, root) {
   const changedLive = STORY_GROWTH_STATE.liveId !== nextLiveId;
   const changedRoot = STORY_GROWTH_STATE.root !== root;
 
+  // v0.1.1889計器: 目標件数と配信の行き来を控える(件数が揺れると縮小→作り直しになる)。
+  try {
+    noteStoryGrowthTarget(STORY_GROWTH_REBUILD_REASONS, { liveKey: nextLiveId, target });
+    const _tSig = `${STORY_GROWTH_REBUILD_REASONS.liveFlips}|${STORY_GROWTH_REBUILD_REASONS.targets.join(',')}`;
+    if (target !== STORY_REBUILD_TARGET_SIG.target) noteStoryGrowthEntryDiffNow(target);
+    if (_tSig !== STORY_REBUILD_TARGET_SIG.v) { STORY_REBUILD_TARGET_SIG.v = _tSig; noteStoryGrowthRebuildAndPublish(''); }
+  } catch { /* 計器の失敗は描画を止めない */ }
   if (changedLive || changedRoot) {
+    if (STORY_GROWTH_STATE.renderedCount > 0 || (root && root.childElementCount > 0)) noteStoryGrowthRebuildAndPublish(changedLive ? STORY_GROWTH_REBUILD_REASON.LIVE : STORY_GROWTH_REBUILD_REASON.ROOT, { from: STORY_GROWTH_STATE.renderedCount, to: target, dom: root ? root.childElementCount : 0, liveSame: !changedLive });
     clearStoryGrowthTimer();
     if (changedLive) {
       storyAvatarLoadGuard.clearFailedUrls();
@@ -8827,8 +8875,15 @@ function syncStoryGrowth(liveId, count, root) {
   }
 
   if (STORY_GROWTH_STATE.renderedCount > STORY_GROWTH_STATE.targetCount) {
+    const _shrinkFrom = STORY_GROWTH_STATE.renderedCount;
+    const _cells = root.querySelectorAll('.nl-story-growth-cell');
     STORY_GROWTH_STATE.renderedCount = STORY_GROWTH_STATE.targetCount;
-    rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount);
+    // v0.1.1889: 件数が 58↔57 と揺れるたびに全マスを作り直してチカチカしていた(実機の補足欄で確定)。
+    //   並びの先頭は変わらないので、余ったマスを末尾から外すだけにする(残りの顔は保ったまま)。
+    if (canTrimStoryGrowthCells({ renderedCount: _shrinkFrom, targetCount: STORY_GROWTH_STATE.targetCount, domCount: _cells.length, sourceOffset: STORY_GROWTH_STATE.sourceOffset })) {
+      for (let i = _cells.length - 1; i >= STORY_GROWTH_STATE.targetCount; i -= 1) _cells[i].remove();
+      noteStoryGrowthRebuildAndPublish(STORY_GROWTH_REBUILD_REASON.TRIM, { from: _shrinkFrom, to: STORY_GROWTH_STATE.targetCount, dom: _cells.length });
+    } else rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount, STORY_GROWTH_REBUILD_REASON.SHRINK, _shrinkFrom);
   }
 
   const tgt = STORY_GROWTH_STATE.targetCount;
@@ -8846,7 +8901,7 @@ function syncStoryGrowth(liveId, count, root) {
       domCount: root.querySelectorAll('img.nl-story-growth-icon').length,
       sourceOffset: STORY_GROWTH_STATE.sourceOffset
     })) appendStoryGrowthCells(root, rnd, tgt);
-    else rebuildStoryGrowth(root, tgt);
+    else rebuildStoryGrowth(root, tgt, rnd > 0 ? STORY_GROWTH_REBUILD_REASON.GROW_FULL : '', rnd);
     STORY_GROWTH_STATE.renderedCount = tgt;
     patchStoryGrowthIconsFromSource(root, { pulseLast: true });
     STORY_GROWTH_STATE.sourceSig = storySourceSignature();
@@ -8866,6 +8921,7 @@ function syncStoryGrowth(liveId, count, root) {
   }
 
   if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
+    noteStoryGrowthRebuildAndPublish(STORY_GROWTH_REBUILD_REASON.EMPTY, { from: root.childElementCount, to: 0, dom: root.childElementCount });
     root.innerHTML = '';
   }
 }
@@ -10805,7 +10861,8 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
   if (img instanceof HTMLImageElement) {
     const rel = northStarLaneGadgetCharaPathByTier(laneId, tier);
     try {
-      img.src = chrome.runtime.getURL(rel);
+      const u = chrome.runtime.getURL(rel); // v0.1.1889: 同じ画像なら書かない(待機中も毎秒約6回、同じ src を書き直していた)
+      if (img.getAttribute('src') !== u) img.src = u;
     } catch {
       img.removeAttribute('src');
     }
@@ -10972,7 +11029,8 @@ function paintNorthStarGiftHistorySummaryGadget(body, rooms, unitSuffix, totals 
     // サマリー表示時は値が出ている前提なので、満面の笑み相当（full）で固定
     const rel = northStarLaneGadgetCharaPathByTier('programPoints', 'full');
     try {
-      img.src = chrome.runtime.getURL(rel);
+      const u = chrome.runtime.getURL(rel);
+      if (img.getAttribute('src') !== u) img.src = u;
     } catch {
       img.removeAttribute('src');
     }
@@ -17525,7 +17583,7 @@ async function openOrFocusMarketingExportTab(lv) {
       }
     });
     if (match && match.id != null) {
-      await chrome.tabs.update(match.id, { active: true });
+      await chrome.tabs.update(match.id, isMarketingExportTabFinished(match.url || '') ? { url, active: true } : { active: true }); // v0.1.1858: 終わったタブは作り直す
       if (match.windowId != null) await chrome.windows.update(match.windowId, { focused: true });
       return;
     }
@@ -19808,6 +19866,10 @@ async function initPopup() {
   });
 
   wireVoiceVolumeSlider(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P2: 読み上げ音量
+  wireVoiceGpuTip(document, {
+    get: safeStorageLocalGet,
+    onChanged: (fn) => chrome.storage?.onChanged?.addListener((changes, area) => { if (area === 'local') fn(changes); })
+  }); // 2026-11-03: 遅い PC なら GPU の案内
   wireVoiceNarrowSelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P3: 声の絞り込み
   wireVoiceQualitySelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // 声の音質(既定16kHz)
   const effectSoundToggle = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));

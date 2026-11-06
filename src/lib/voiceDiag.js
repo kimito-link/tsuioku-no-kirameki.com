@@ -56,6 +56,8 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   dropCountGateTotal: number,  // 2026-07-28計器: 件数ゲート最古dropの累計(3分別のうちの1つ)
  *   dropHeadStaleTotal: number,  // 2026-07-28計器: 先頭itemの単体stale破棄の累計
  *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
+ *   lightSpokenTotal: number,  // 2026-11-03計器: VOICEVOX が追いつかず軽い声(Windows の声)で読んだ件数
+ *   lightVoiceActive: boolean, // 2026-11-03計器: 今、軽い声で読んでいるか
  *   synthNullTotal: number,      // 2026-08-01計器: 合成がnullで返り読まれずに消えた累計
  *   synthNullNearTimeout: number,// 同上のうち時間切れ(8000ms上限付近)由来の件数
  *   audioBlockedTotal: number,   // v0.1.1327計器: ブラウザの自動再生ブロック(NotAllowedError)で鳴らせなかった累計
@@ -83,6 +85,8 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   bgInitYieldTotal: number,    // もう片方のページが使用中で裏の読み込みを見送った回数(v0.1.1781)
  *   readerYieldTotal: number,    // 同じ配信をもう片方のページが読んでいるので読まなかったコメント数(v0.1.1794)
  *   ngMutedTotal: number,        // v0.1.1812: コメビュで NG にした人なので読まなかったコメント数(会場)
+ *   busySkipTotal: number,       // v0.1.1861: 混雑(待ち2件以上)で大事でないので読まなかったコメント数(吹き出しだけ)
+ *   busyImportantTotal: number,  // v0.1.1861: 混雑中でも大事なもの(ギフト・広告・配信者・初コメ)として読む列に入れた数
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
  *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数
@@ -160,6 +164,8 @@ export function makeInitialVoiceDiag() {
     dropCountGateTotal: 0,
     dropHeadStaleTotal: 0,
     dropSweepStaleTotal: 0,
+    lightSpokenTotal: 0,
+    lightVoiceActive: false,
     // v0.1.1213: 合成が null で返って消えた件(時間切れ内訳つき)。
     synthNullTotal: 0,
     synthNullNearTimeout: 0,
@@ -192,6 +198,8 @@ export function makeInitialVoiceDiag() {
     bgInitYieldTotal: 0,
     readerYieldTotal: 0,
     ngMutedTotal: 0,
+    busySkipTotal: 0,
+    busyImportantTotal: 0,
     refreshVoicedTotal: 0,
     backlogSkipTotal: 0,
     bigBatchTotal: 0,
@@ -319,6 +327,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
     dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
+    lightSpokenTotal: num(d.lightSpokenTotal, base.lightSpokenTotal),
+    lightVoiceActive: d.lightVoiceActive === true,
     upstreamEmaMs: num(d.upstreamEmaMs, base.upstreamEmaMs),
     lastUpstreamMs: num(d.lastUpstreamMs, base.lastUpstreamMs),
     queueWaitEmaMs: num(d.queueWaitEmaMs, base.queueWaitEmaMs),
@@ -340,6 +350,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     bgInitYieldTotal: num(d.bgInitYieldTotal, base.bgInitYieldTotal),
     readerYieldTotal: num(d.readerYieldTotal, base.readerYieldTotal),
     ngMutedTotal: num(d.ngMutedTotal, base.ngMutedTotal),
+    busySkipTotal: num(d.busySkipTotal, base.busySkipTotal),
+    busyImportantTotal: num(d.busyImportantTotal, base.busyImportantTotal),
     refreshVoicedTotal: num(d.refreshVoicedTotal, base.refreshVoicedTotal),
     backlogSkipTotal: num(d.backlogSkipTotal, base.backlogSkipTotal),
     bigBatchTotal: num(d.bigBatchTotal, base.bigBatchTotal),
