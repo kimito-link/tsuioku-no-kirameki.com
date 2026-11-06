@@ -856,7 +856,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const vid = parseYtVideoIdFromUrl(String(tab?.url || ''));
         const res = await real.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: vid, text: String(message?.text || '') });
         if (res && res.ok) return { ok: true };
-        // 0.1.1908: 理由コード(not-signed-in 等)をそのまま出さず、サイドパネル・会場と同じ日本語にする。
+        // 0.1.1911: 理由コード(not-signed-in 等)をそのまま出さず、サイドパネル・会場と同じ日本語にする。
         const code = String(res?.reason || res?.error || 'send_failed');
         return { ok: false, error: ytCommentSendReasonText(code, String(res?.note || '')) || code };
       });

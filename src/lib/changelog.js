@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1908',
+    version: '0.1.1911',
     date: '2026-11-06',
     summary: 'YouTube でログイン中なのに送れない表示を直す',
     items: Object.freeze([
