@@ -334,6 +334,7 @@
 | `src/shared/niconico/liveId.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/extension/venueBar.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/extension/venueBubblePlacer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/extension/venuePickupDrag.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/adMessageLines.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/aiSharePopupDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/arrivalEffect.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -374,6 +375,7 @@
 | `src/lib/giftEventStore.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftHistoryMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/giftRankingLaneOptIn.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/giftSidebarRankTabPick.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/giftSubAppFrameSource.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftSubAppRelayDiag.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftThrowProjectile.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -446,6 +448,7 @@
 | `src/lib/venueBubbleChurn.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueBubbleLifecycle.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueCharacterFrame.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueComposeBox.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueCrowdMotion.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueDisplayRows.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueDragScroll.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -686,15 +689,16 @@
 | `src/lib/giftHistoryOfficialReconcile.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistorySourcePreference.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryViewModel.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftItemsMirror.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftLaneOfficialFill.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentumAnalytics.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftPanelShape.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftQuickStatsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftRankStripConfig.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftRecord.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftRelayStorageLiveId.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftSenderObservation.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/giftSidebarRankTabPick.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftSubAppHistoryBlocksHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftSubAppIframeDomShape.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftSubAppRelayTrust.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -976,12 +980,15 @@
 | `src/lib/storyGrowthCellSwap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthChurn.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthLimits.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyGrowthRebuildReasons.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneContaminationGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneRenderSignature.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/suggestInitialInlinePanelPlacement.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/summarizeDevMonitorGiftRanking.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/summarizeGiftSubAppHistoryDiag.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/supporterAccess.js` | 1 | コメビュ(別窓) |
 | `src/lib/supporterChikuranScore.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/supporterLicense.js` | 1 | コメビュ(別窓) |
 | `src/lib/supporterPowerScoring.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/supporterRankingDom.js` | 1 | 状態速報ページ |
 | `src/lib/supporterRowToPersonTile.js` | 1 | 状態速報ページ |
