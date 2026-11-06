@@ -544,7 +544,7 @@ export async function buildHtmlReportDocument(
       ? deps.readOfficialEventDomBundleFromStorage(lidForSummary)
       : Promise.resolve(null),
     deps.resolveBroadcasterProfileModel(snapshot, liveId),
-    // v0.1.1859: マーケに入れるときは漫画版を出さない(#560)ので、コマ絵(PNG 数百KB×数枚)を読まない。
+    // v0.1.1906: マーケに入れるときは漫画版を出さない(#560)ので、コマ絵(PNG 数百KB×数枚)を読まない。
     embed ? Promise.resolve({}) : buildYukkuriImageDataUrlMap(),
     Promise.all([
       fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.link),

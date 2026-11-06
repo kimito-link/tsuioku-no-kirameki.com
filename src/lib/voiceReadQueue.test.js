@@ -398,4 +398,21 @@ describe('pushVoiceQueue keep(2026-11-03: 合成中の件は捨てない)', () =
   it('keep を渡さなければ従来どおり最古から捨てる', () => {
     expect(pushVoiceQueue(['a', 'b'], 'c', { max: 2 }).dropped).toEqual(['a']);
   });
+  it('v0.1.1861: 溢れたらふつうの件から捨て、届いたばかりのギフト(前に入る)は残す', () => {
+    const g1 = { body: 'g1', priority: 'high' };
+    const g2 = { body: 'g2', priority: 'high' };
+    const a = { body: 'a', priority: 'normal' };
+    const b = { body: 'b', priority: 'normal' };
+    const r1 = pushVoiceQueue([g1, a, b], g2, { max: 3 });
+    expect(r1.queue).toEqual([g1, g2, b]);
+    expect(r1.dropped).toEqual([a]);
+    // keep ありでも同じ順(守る件は飛ばす)
+    const r2 = pushVoiceQueue([a, b], g2, { max: 2, keep: (x) => x === a });
+    expect(r2.queue).toEqual([g2, a]);
+    expect(r2.dropped).toEqual([b]);
+    // 全部ギフトなら古いギフトから捨てる(有界)
+    const r3 = pushVoiceQueue([g1], g2, { max: 1 });
+    expect(r3.queue).toEqual([g2]);
+    expect(r3.dropped).toEqual([g1]);
+  });
 });

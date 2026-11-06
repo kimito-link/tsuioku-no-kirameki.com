@@ -65,7 +65,7 @@ describe('応援者とギフトの検索窓', () => {
   });
 });
 
-describe('v0.1.1859: コメントの表は開いたときに作る', () => {
+describe('v0.1.1906: コメントの表は開いたときに作る', () => {
   beforeEach(() => vi.useFakeTimers());
 
   function mountScripts(html) {

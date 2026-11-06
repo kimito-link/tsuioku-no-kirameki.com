@@ -1395,7 +1395,7 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
   const cards = analysis.moments
     .slice(0, SHOW)
     .map((m) => {
-      // v0.1.1859: 1つの瞬間に並べる送り主は先頭8件まで(連鎖で数百件並んで重かった)。残りは「ほか N件」。
+      // v0.1.1906: 1つの瞬間に並べる送り主は先頭8件まで(連鎖で数百件並んで重かった)。残りは「ほか N件」。
       const GIFT_LINES_MAX = 8;
       const restGifts = m.gifts.length - GIFT_LINES_MAX;
       const giftLines = m.gifts
@@ -2206,6 +2206,8 @@ function buildMarketingGiftItemRows(giftEvents, officialGiftHistory) {
  *   giftMomentum: import('./giftMomentumAnalytics.js').GiftMomentumAnalysis,
  *   supporterChikuran: ReturnType<typeof buildSupporterChikuranRows>,
  *   sessionSummaryRows: readonly unknown[],
+ *   concurrentSeries?: import('./concurrentTimelineSeries.js').ConcurrentTimelineSeries,
+ *   concurrentPeak: import('./concurrentPeakAnalysis.js').ConcurrentPeakAnalysis,
  *   pastBroadcasts: readonly unknown[],
  *   giftUsers: readonly unknown[],
  *   giftEvents: readonly unknown[],
@@ -2382,7 +2384,25 @@ function buildMarketingDataSummary(input) {
     input.giftEvents,
     input.officialGiftHistory
   );
+  // v0.1.1892: 同接(同時に見ている人数)のピークと平均。同接推移カーブと同じ時系列から出す。
+  //   YouTube には延べの来場者数が無く、同接だけが取れる(「同接2万なのにサマリに無い」2026-11-05 りんく)。
+  const concurrentPoints = input.concurrentSeries?.points || [];
+  const concurrentAvg = concurrentPoints.length
+    ? Math.round(concurrentPoints.reduce((/** @type {number} */ a, /** @type {{ value: number }} */ p) => a + p.value, 0) / concurrentPoints.length)
+    : 0;
+  const concurrentKind =
+    input.concurrentSeries?.source === 'official' ? '公式' : input.concurrentSeries?.source === 'estimated' ? '推定' : '公式/推定';
+  const concurrentCard = {
+    label: '最大同接',
+    value: concurrentPoints.length && input.concurrentPeak.peakValue > 0
+      ? `${formatEventRankingNumber(input.concurrentPeak.peakValue)}人`
+      : '未取得',
+    hint: concurrentPoints.length
+      ? `平均 ${formatEventRankingNumber(concurrentAvg)}人 · ${concurrentKind} · ${concurrentPoints.length}点`
+      : '同時に見ていた人数(パネルか会場を開いている間に記録)'
+  };
   const cards = [
+    concurrentCard,
     {
       label: 'コメントした人',
       value:
@@ -3296,6 +3316,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     giftMomentum,
     supporterChikuran,
     sessionSummaryRows,
+    concurrentSeries,
+    concurrentPeak,
     pastBroadcasts: pastBroadcastsForLayer,
     giftUsers: giftUsersForSg,
     giftEvents: giftEventsForAnalytics,
