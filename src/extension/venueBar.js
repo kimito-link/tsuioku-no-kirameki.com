@@ -394,7 +394,7 @@ const BUBBLE_FADE_MS = 600;
 // v0.1.755 リアルタイム完璧化: 同時表示数を 6→12 に拡大。洪水時に「出してすぐ最古を消す」で
 //   一瞬しか見えない問題を緩和(寿命は流速可変で短くするので画面は埋まり続けない)。
 const BUBBLE_MAX = 12;
-// v0.1.1909: 今までの最大のコメント番号よりこれ以上小さい番号は過去のコメント(取り込み)=吹き出さない。
+// v0.1.1914: 今までの最大のコメント番号よりこれ以上小さい番号は過去のコメント(取り込み)=吹き出さない。
 //   NHK 実況級(毎秒20件)でも 300 件=15秒ぶんは遅れて届いた新着として通す。
 const VENUE_OLD_SPEECH_NO_GAP = 300;
 // 吹き出し流速(件/秒)を測る短い窓。寿命可変(速いほど短命)の入力。
@@ -6749,7 +6749,7 @@ export function mountVenueBarButton(options = {}) {
     const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
     // v0.1.1866: 開いた瞬間の直近3件(primeEmit)は開く前に届いた発言なので「受信→キュー」の遅れに数えない(数えると過疎配信で何分も「遅れ」が残った)。
     const primeBurst = !(speechState && speechState.primed === true);
-    // v0.1.1909: oldNoGap=過去ログ取り込みの古い番号は吹き出さない(既読にだけする・lib の venueSpeech.js)。
+    // v0.1.1914: oldNoGap=過去ログ取り込みの古い番号は吹き出さない(既読にだけする・lib の venueSpeech.js)。
     const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3, oldNoGap: VENUE_OLD_SPEECH_NO_GAP });
     speechState = {
       seenKeys: result.seenKeys,
