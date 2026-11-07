@@ -373,11 +373,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *   ある login クッキー(HttpOnly ではない)で見る。どちらも分からなければ「分からない」=送ってみる。
  */
 function twSignedOut() {
-  const hasLoginButton = !!document.querySelector('[data-a-target="login-button"], [data-a-target="signup-button"]');
-  const hasUserMenu = !!document.querySelector('[data-a-target="user-menu-toggle"]');
+  // ★user-menu-toggle は未ログインでもある(2026-11-07 実配信 caedrel ほか4チャンネルで確認)ので判定に使わない
   const hasLoginCookie = /(?:^|;\s*)login=[^;]+/.test(String(document.cookie || ''));
-  if (hasUserMenu || hasLoginCookie) return false;
-  return hasLoginButton;
+  if (hasLoginCookie) return false;
+  return !!document.querySelector('[data-a-target="login-button"], [data-a-target="signup-button"]');
 }
 
 /** @param {string} reason */
