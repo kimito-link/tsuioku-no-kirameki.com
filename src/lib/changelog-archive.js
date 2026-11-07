@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1892',
+    date: '2026-11-05',
+    summary: 'マーケ総合サマリに最大同接を出す',
+    items: Object.freeze([
+      'マーケの「総合サマリ」の先頭に「最大同接」(同時に見ていた人数の最大)と平均を出すようにしました。YouTube には延べの来場者数が無いので、同接がサマリのどこにも出ていませんでした'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1891',
     date: '2026-11-05',
     summary: 'YouTube の同接をパネルを閉じても記録',

@@ -28,6 +28,12 @@ const LINES = [
   `@badges=subscriber/0;display-name=NewSub;id=m-3;login=newsub;msg-id=sub;msg-param-sub-plan=1000;room-id=99;system-msg=NewSub\\ssubscribed;tmi-sent-ts=1762480002123;user-id=1003 :tmi.twitch.tv USERNOTICE #${LOGIN}`,
   `@badges=;display-name=Other;id=m-4;room-id=7;tmi-sent-ts=1762480003123;user-id=1004 :other!other@other.tmi.twitch.tv PRIVMSG #otherchan :別のチャンネル`,
 ];
+// 少し遅れて来る行: まとめてギフトサブ(計器 gifts=5 になる)と、顔の問い合わせが 400ms の待ちに間に合わない人
+const LATE_LINES = [
+  `@badges=;display-name=Giver;id=m-5;login=giver;msg-id=submysterygift;msg-param-mass-gift-count=5;msg-param-sub-plan=1000;room-id=99;tmi-sent-ts=1762480004123;user-id=1005 :tmi.twitch.tv USERNOTICE #${LOGIN}`,
+  `@badges=;color=;display-name=LateFan;id=m-6;room-id=99;tmi-sent-ts=1762480005123;user-id=1006 :late_fan!late_fan@late_fan.tmi.twitch.tv PRIVMSG #${LOGIN} :おそくなりました`,
+];
+const LATE_ICON = 'https://static-cdn.jtvnw.net/jtv_user_pictures/late_fan-70x70.png';
 
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>${LOGIN} - Twitch</title></head><body>
 <div data-a-target="chat-input"><div contenteditable="true" id="in"></div></div>
@@ -58,6 +64,7 @@ function startFakeIrc() {
       if (text.startsWith(`JOIN #${LOGIN}`)) {
         ws.send(`:justinfan!justinfan@justinfan.tmi.twitch.tv JOIN #${LOGIN}\r\n`);
         setTimeout(() => ws.send(LINES.join('\r\n') + '\r\n'), 300);
+        setTimeout(() => ws.send(LATE_LINES.join('\r\n') + '\r\n'), 2500);
       }
     });
   });
@@ -121,8 +128,16 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   await context.route('https://gql.twitch.tv/**', async (route) => {
     const body = String(route.request().postData() || '');
     gqlBodies.push(body);
+    if (body.includes('late_fan')) await new Promise((r) => setTimeout(r, 1200));
     const json = body.includes('users(logins')
-      ? { data: { users: [{ login: 'fan_a', profileImageURL: 'https://static-cdn.jtvnw.net/jtv_user_pictures/fan_a-70x70.png' }] } }
+      ? {
+          data: {
+            users: [
+              { login: 'fan_a', profileImageURL: 'https://static-cdn.jtvnw.net/jtv_user_pictures/fan_a-70x70.png' },
+              ...(body.includes('late_fan') ? [{ login: 'late_fan', profileImageURL: LATE_ICON }] : []),
+            ],
+          },
+        }
       : {
           data: {
             user: {
@@ -163,9 +178,19 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
     )
     .toEqual([
       'membership:NewSub:サブスク Tier 1:0::-',
+      'membership_gift:Giver:ギフトサブを5件贈りました:0::-',
       'superchat:Bitter:おめでとう:500:BITS:-',
+      'text:LateFan:おそくなりました:0::-',
       'text:ファンA:わこつ:0::face',
     ]);
+
+  // 計器: ギフトサブは件数で数える(金額 0 を足して常に 0 だった)。間に合わなかった顔はあとで yt_tw_icons に置く
+  await expect
+    .poll(async () => {
+      const b = await sw.evaluate(async () => chrome.storage.local.get(['yt_diag_tw_chat', 'yt_tw_icons']));
+      return { gifts: b.yt_diag_tw_chat?.gifts, subs: b.yt_diag_tw_chat?.subs, late: b.yt_tw_icons?.late_fan || '' };
+    }, { timeout: 15_000 })
+    .toEqual({ gifts: 5, subs: 1, late: LATE_ICON });
 
   // 配信のまとめ(配信者・同接・開始時刻)
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
@@ -183,6 +208,19 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   expect(res).toMatchObject({ ok: true });
   expect(await page.evaluate(() => /** @type {any} */ (window).__sent)).toEqual(['こんにちは Twitch']);
 
+  // 未ログイン(ヘッダーにログインボタン)なら、入力欄があっても打たずに理由を返す(Twitch は未ログインでも入力欄を出す)
+  await page.evaluate(() => {
+    const b = document.createElement('button');
+    b.setAttribute('data-a-target', 'login-button');
+    b.id = 'login';
+    document.body.prepend(b);
+  });
+  const res2 = await ext.evaluate((key) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: key, text: 'みえないはず' }), KEY);
+  expect(res2).toMatchObject({ ok: false, reason: 'not-signed-in' });
+  expect(await page.evaluate(() => /** @type {any} */ (window).__sent)).toEqual(['こんにちは Twitch']);
+  expect((await sw.evaluate(async () => chrome.storage.local.get('yt_diag_tw_send_fail'))).yt_diag_tw_send_fail?.reason).toBe('not-signed-in');
+  await page.evaluate(() => document.getElementById('login')?.remove());
+
   // ニコ生版の画面(yt-sidepanel.html)に、Twitch のコメントと配信者が出る
   await page.bringToFront();
   await ext.reload();
@@ -195,4 +233,6 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   const text = await bodyText();
   expect(text).not.toMatch(/tw:\d/);
   expect(text).not.toContain('データ源: youtube');
+  // ランキング欄に YouTube の言葉(スパチャ・トップファン)を残さない(2026-11-07 実配信で残っていた)
+  expect(text).not.toMatch(/スパチャ|スーパーチャット|トップファン/);
 });
