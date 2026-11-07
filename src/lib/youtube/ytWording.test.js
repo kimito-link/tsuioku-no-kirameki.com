@@ -51,3 +51,32 @@ describe('niconico だけの文', () => {
     expect(ytWording('サムネ・名前は数値ID時のみ niconico ユーザーページへリンクします(共有モードでは非表示)。')).toBe('サムネ・名前は YouTube のチャンネルへリンクします(共有モードでは非表示)。');
   });
 });
+
+describe('Twitch の画面の言葉(2026-11-07 実配信で残っていた文)', () => {
+  const NICO_SENTENCE = 'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。';
+  it('ニコ生の文 → 合計の順位の言葉 → Twitch の言葉', async () => {
+    const { ytWording, ytWordingForTwitch } = await import('./ytWording.js');
+    const out = ytWordingForTwitch(ytWording(NICO_SENTENCE, { topFans: false }));
+    expect(out).not.toMatch(/スパチャ|スーパーチャット|トップファン|YouTube|XP/);
+    expect(out).toContain('Bits・ギフトサブの合計の順位');
+    expect(ytWordingForTwitch(ytWording('ギフト貢献度', { topFans: false }))).toBe('Bits の合計順');
+    expect(ytWordingForTwitch(ytWording('410貢', { topFans: false }))).toBe('410 pt');
+  });
+  it('トップファンの言葉で描いたあと入れ替えた途中の文も直す', async () => {
+    const { ytWordingTwitchFixed } = await import('./ytWording.js');
+    const seen = [
+      'Twitch のスパチャの合計順（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。',
+      'スーパーチャット・ギフトの合計の順位（上位）を表示します。トップファンの順位が出ていない配信（アーカイブなど）で使います。',
+      'YouTube のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。',
+    ];
+    for (const t of seen) {
+      const out = ytWordingTwitchFixed(t);
+      expect(out).not.toMatch(/スパチャ|スーパーチャット|トップファン|YouTube|XP/);
+    }
+    expect(ytWordingTwitchFixed('スパチャの合計順')).toBe('Bits の合計順');
+  });
+  it('コメント本文の「スパチャ」単独は触らない', async () => {
+    const { ytWordingTwitchFixed } = await import('./ytWording.js');
+    expect(ytWordingTwitchFixed('スパチャありがとう')).toBe('スパチャありがとう');
+  });
+});

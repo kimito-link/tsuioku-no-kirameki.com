@@ -43,6 +43,7 @@ const diag = {
   raids: 0,
   iconAsked: 0,
   iconFound: 0,
+  iconLate: 0,
   gqlFail: 0,
   updatedAt: 0,
 };
@@ -107,6 +108,36 @@ async function fetchStreamInfo(login) {
 const iconByLogin = new Map();
 /** @type {Set<string>} */
 const iconPending = new Set();
+// 400ms の待ちに間に合わず顔なしで記録した人。あとで顔が分かったら storage(yt_tw_icons)に置き、画面が描くときに埋める
+//   (記録は同じ id を2回入れられないので、記録そのものは書き直さない。2026-11-07 実配信 caedrel で顔ありの23人が顔なし)
+const TW_LATE_ICONS_KEY = 'yt_tw_icons';
+const TW_LATE_ICONS_MAX = 3000;
+/** @type {Set<string>} */
+const lateWanted = new Set();
+/** @type {Record<string, string>} */
+let lateIcons = {};
+let lateLoaded = false;
+let lateTimer = 0;
+function saveLateIconsSoon() {
+  if (lateTimer) return;
+  lateTimer = setTimeout(async () => {
+    lateTimer = 0;
+    try {
+      if (!lateLoaded) {
+        const old = (await chrome.storage.local.get(TW_LATE_ICONS_KEY))?.[TW_LATE_ICONS_KEY];
+        if (old && typeof old === 'object') lateIcons = { ...old, ...lateIcons };
+        lateLoaded = true;
+      }
+      const keys = Object.keys(lateIcons);
+      if (keys.length > TW_LATE_ICONS_MAX) {
+        for (const k of keys.slice(0, keys.length - TW_LATE_ICONS_MAX)) delete lateIcons[k];
+      }
+      void chrome.storage.local.set({ [TW_LATE_ICONS_KEY]: lateIcons });
+    } catch {
+      /* 拡張が入れ替わった直後 */
+    }
+  }, 1500);
+}
 
 /** @param {string[]} logins */
 async function lookupIcons(logins) {
@@ -122,6 +153,12 @@ async function lookupIcons(logins) {
       const url = found.get(l) || '';
       iconByLogin.set(l, url);
       if (url) diag.iconFound += 1;
+      if (lateWanted.delete(l) && url) {
+        delete lateIcons[l];
+        lateIcons[l] = url;
+        diag.iconLate += 1;
+        saveLateIconsSoon();
+      }
     }
   } catch {
     diag.gqlFail += 1;
@@ -161,6 +198,10 @@ function startReader(login, key) {
       await Promise.race([lookupIcons(need), new Promise((r) => setTimeout(r, ICON_WAIT_MS))]);
     }
     const items = batch.map((r) => ({ ...r, iconUrl: iconByLogin.get(r.login) || '' }));
+    for (const r of items) {
+      if (!r.iconUrl && r.login && !iconByLogin.has(r.login)) lateWanted.add(r.login);
+    }
+    if (lateWanted.size > 5000) lateWanted.clear();
     diag.items += items.length;
     safeSendMessage({ type: 'YT_CHAT_ITEMS', payload: { videoId: key, chatFilterLabel: '', items } });
     saveDiagSoon();
@@ -194,7 +235,8 @@ function startReader(login, key) {
     if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
     if (r.kind === 'superchat') diag.bits += r.amount;
     else if (r.kind === 'membership') diag.subs += 1;
-    else if (r.kind === 'membership_gift') diag.gifts += r.amount;
+    // ギフトサブは金額 0(件数は giftCount)。金額を足していたので計器が常に 0 だった(2026-11-07 実配信)
+    else if (r.kind === 'membership_gift') diag.gifts += Math.max(1, Number(r.giftCount) || 1);
     else if (r.kind === 'tw_raid') diag.raids += 1;
     pending.push(r);
     if (!flushTimer) flushTimer = setTimeout(() => void flush(), FLUSH_MS);
@@ -325,9 +367,31 @@ const TW_INPUT_SEL = '[data-a-target="chat-input"] [contenteditable="true"], [da
 const TW_SEND_SEL = 'button[data-a-target="chat-send-button"]';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * ログインしていないと分かるか。Twitch は未ログインでも入力欄と送信ボタンを出す(押すとログインを促す)ので、
+ *   入力欄の有無では分からない(2026-11-07 実配信 3 チャンネルで確認)。ヘッダーのログインボタンと、ログイン中にだけ
+ *   ある login クッキー(HttpOnly ではない)で見る。どちらも分からなければ「分からない」=送ってみる。
+ */
+function twSignedOut() {
+  const hasLoginButton = !!document.querySelector('[data-a-target="login-button"], [data-a-target="signup-button"]');
+  const hasUserMenu = !!document.querySelector('[data-a-target="user-menu-toggle"]');
+  const hasLoginCookie = /(?:^|;\s*)login=[^;]+/.test(String(document.cookie || ''));
+  if (hasUserMenu || hasLoginCookie) return false;
+  return hasLoginButton;
+}
+
+/** @param {string} reason */
+function noteSendFail(reason) {
+  try {
+    void chrome.storage.local.set({ yt_diag_tw_send_fail: { at: Date.now(), reason, channel: diag.channel } });
+  } catch {
+    /* no-op */
+  }
+}
+
 /** 入力欄が無い理由 */
 function twInputBlockReason() {
-  if (document.querySelector('[data-a-target="login-button"], [data-a-target="signup-button"]')) return 'not-signed-in';
+  if (twSignedOut()) return 'not-signed-in';
   if (document.querySelector('[data-test-selector="chat-input-restricted"], [data-a-target="chat-input-restricted"]')) return 'chat-restricted';
   return 'no-input';
 }
@@ -338,6 +402,11 @@ try {
     (async () => {
       const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 500);
       if (!text) return { ok: false, reason: 'empty' };
+      // 未ログインで打つと、Twitch がログインの窓を出すだけで送られない。打つ前に止めて理由を出す
+      if (twSignedOut()) {
+        noteSendFail('not-signed-in');
+        return { ok: false, reason: 'not-signed-in' };
+      }
       let input = /** @type {HTMLElement | null} */ (document.querySelector(TW_INPUT_SEL));
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -345,11 +414,7 @@ try {
       }
       if (!input) {
         const reason = twInputBlockReason();
-        try {
-          void chrome.storage.local.set({ yt_diag_tw_send_fail: { at: Date.now(), reason, channel: diag.channel } });
-        } catch {
-          /* no-op */
-        }
+        noteSendFail(reason);
         return { ok: false, reason };
       }
       input.focus();
@@ -368,8 +433,14 @@ try {
       }
       await sleep(120);
       const btn = /** @type {HTMLButtonElement | null} */ (document.querySelector(TW_SEND_SEL));
-      if (!btn) return { ok: false, reason: 'no-send-button' };
-      if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return { ok: false, reason: 'send-disabled' };
+      if (!btn) {
+        noteSendFail('no-send-button');
+        return { ok: false, reason: 'no-send-button' };
+      }
+      if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+        noteSendFail('send-disabled');
+        return { ok: false, reason: 'send-disabled' };
+      }
       btn.click();
       await sleep(400);
       const left = String((input instanceof HTMLTextAreaElement ? input.value : input.textContent) || '').trim();

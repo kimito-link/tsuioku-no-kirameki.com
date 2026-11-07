@@ -18,6 +18,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1917',
+    date: '2026-11-07',
+    summary: 'Twitch の画面の言葉・顔・送信の直し',
+    items: Object.freeze([
+      'Twitch の配信の画面に残っていた YouTube の言葉(スパチャの合計順・トップファン)を、Bits・ギフトサブの合計の順位に直しました。',
+      'Twitch にログインしていないときは、コメントを打たずに「ログインしていない」と理由を出すようにしました(Twitch は未ログインでも入力欄を出すため)。',
+      '記録のときに顔の取得が間に合わなかった人も、あとで分かった顔を画面に出すようにしました。',
+      '計器のギフトサブの数が常に 0 だったのを、贈った件数で数えるように直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1916',
     date: '2026-11-07',
     summary: 'Twitch の配信も記録できるように(試作)',
@@ -187,14 +198,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'マーケ HTML を有料の「サポーター」向けにするための土台を入れました。今はまだ関所を開けたままなので、これまでどおり誰でも無料で使えます',
       '申し込みのページ・特定商取引法の表記・利用規約と、プライバシーポリシーの支払いの項目を用意しました(公開前)'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1892',
-    date: '2026-11-05',
-    summary: 'マーケ総合サマリに最大同接を出す',
-    items: Object.freeze([
-      'マーケの「総合サマリ」の先頭に「最大同接」(同時に見ていた人数の最大)と平均を出すようにしました。YouTube には延べの来場者数が無いので、同接がサマリのどこにも出ていませんでした'
     ])
   })
 ]);

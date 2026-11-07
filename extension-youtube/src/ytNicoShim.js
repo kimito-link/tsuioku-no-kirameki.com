@@ -18,7 +18,7 @@ import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIc
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
-import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForTwitch } from '../../src/lib/youtube/ytWording.js';
+import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForTwitch, ytWordingTwitchFixed } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { parseTwChannelFromUrl } from '../../src/lib/twitch/twIrcParse.js';
@@ -647,6 +647,16 @@ async function buildCommentsForLvUncached(lv) {
   } catch {
     /* 無くても記録は出す */
   }
+  // Twitch: 記録のときに顔が間に合わなかった人の顔(視聴ページがあとで引いたもの・tw-content-entry.js)
+  /** @type {Record<string, string>} */
+  let twLateIcons = {};
+  if (isTwStreamKey(vid)) {
+    try {
+      twLateIcons = (await real?.storage?.local?.get?.('yt_tw_icons'))?.yt_tw_icons || {};
+    } catch {
+      /* 無くても記録は出す */
+    }
+  }
   /** @type {Set<string>} 顔を引きに行く @名前 */
   const wantHandles = new Set();
   const who = buildYtPersonResolver(list);
@@ -669,6 +679,7 @@ async function buildCommentsForLvUncached(lv) {
     const nm = String(r?.name || '').trim();
     const handleKey = nm.startsWith('@') ? nm.toLowerCase() : '';
     let icon = ytUsableIcon(r?.iconUrl) || who.iconOf(key) || boardIconByName.get(normName(r?.name)) || '';
+    if (!icon && r?.login) icon = ytUsableIcon(twLateIcons[String(r.login)]) || '';
     if (!icon && handleKey) {
       icon = ytUsableIcon(handleIcons[handleKey]?.icon);
       if (!icon && !handleIcons[handleKey]) wantHandles.add(nm);
@@ -1003,7 +1014,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       // 顔が新しく分かったら、件数が同じでも描き直してもらう
       // 最初からの文字アイコンの見分けが増えたら、段(りんく/こん太)が変わるので描き直してもらう(0.1.99)
       if (changes[YT_DEFAULT_ICON_STORE_KEY]) ytDefaultIconJudge?.merge(changes[YT_DEFAULT_ICON_STORE_KEY].newValue);
-      if ((changes.yt_handle_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
+      if ((changes.yt_handle_icons || changes.yt_tw_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
         lastNotified.delete(lastAskedLv);
         void notifyLv(lastAskedLv, undefined);
       }
@@ -1288,8 +1299,10 @@ function screenIsTwitch() {
 
 /** 画面の決まった文言の置き換え。Twitch の配信なら、YouTube の言葉にした所だけをさらに Twitch の言葉に @param {string} t */
 function screenWording(t) {
-  const w = ytWording(t, { topFans: kokenIsTopFans });
-  return w !== t && screenIsTwitch() ? ytWordingForTwitch(w) : w;
+  // Twitch にはトップファンの順位表が無い=ランキング欄は最初から「合計の順位」の言葉で描く
+  if (!screenIsTwitch()) return ytWording(t, { topFans: kokenIsTopFans });
+  const w = ytWording(t, { topFans: false });
+  return w !== t ? ytWordingForTwitch(w) : ytWordingTwitchFixed(w);
 }
 
 // ニコ生版のコメビュは名前の横に data-nl-uid(数字ID)を CSS で「(数字)」と出す。疑似IDなので、
@@ -1336,11 +1349,14 @@ function rewordTopFanHeadings(reword) {
   // 視聴ページの中では会場の中だけ(YouTube のページの文字は触らない)
   const base = YT_SHIM_IN_PAGE ? document.getElementById('nlsb-venue-root') : document.body;
   if (!base) return;
+  const twitch = screenIsTwitch();
   const walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = walker.nextNode())) {
     const v = String(n.nodeValue || '');
-    const next = reword(v);
+    let next = reword(v);
+    // Twitch の画面なら、入れ替えた見出しも Twitch の言葉に(入れ替えだけだと「Twitch のスパチャの合計順」が残った)
+    if (twitch) next = ytWordingTwitchFixed(next);
     if (next !== v) n.nodeValue = next;
   }
 }
