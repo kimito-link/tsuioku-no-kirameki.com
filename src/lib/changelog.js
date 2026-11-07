@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1918',
+    date: '2026-11-07',
+    summary: 'Twitch の未ログインの見分けを直す',
+    items: Object.freeze([
+      'Twitch にログインしていないのにコメントを打ってしまうことがあったのを直しました(ログインしていなくてもあるメニューのボタンを、ログインの印と見ていました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1917',
     date: '2026-11-07',
     summary: 'Twitch の画面の言葉・顔・送信の直し',
@@ -189,15 +197,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '無料の人の OBS コメビュに小さな印(まだ出ない)',
     items: Object.freeze([
       'コメビュを OBS 透過で出したとき、無料の人は画面の隅に小さく「追憶のきらめき」と出し、サポーターは出さない仕組みを入れました。今はまだ関所を開けたままなので、誰にも出ません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1893',
-    date: '2026-11-06',
-    summary: 'サポーター(有料)の土台を用意(まだ無料)',
-    items: Object.freeze([
-      'マーケ HTML を有料の「サポーター」向けにするための土台を入れました。今はまだ関所を開けたままなので、これまでどおり誰でも無料で使えます',
-      '申し込みのページ・特定商取引法の表記・利用規約と、プライバシーポリシーの支払いの項目を用意しました(公開前)'
     ])
   })
 ]);

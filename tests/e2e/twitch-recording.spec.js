@@ -36,6 +36,7 @@ const LATE_LINES = [
 const LATE_ICON = 'https://static-cdn.jtvnw.net/jtv_user_pictures/late_fan-70x70.png';
 
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>${LOGIN} - Twitch</title></head><body>
+<button data-a-target="user-menu-toggle">メニュー</button>
 <div data-a-target="chat-input"><div contenteditable="true" id="in"></div></div>
 <button data-a-target="chat-send-button" id="send">チャット</button>
 <script>

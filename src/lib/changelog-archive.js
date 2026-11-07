@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1893',
+    date: '2026-11-06',
+    summary: 'サポーター(有料)の土台を用意(まだ無料)',
+    items: Object.freeze([
+      'マーケ HTML を有料の「サポーター」向けにするための土台を入れました。今はまだ関所を開けたままなので、これまでどおり誰でも無料で使えます',
+      '申し込みのページ・特定商取引法の表記・利用規約と、プライバシーポリシーの支払いの項目を用意しました(公開前)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1892',
     date: '2026-11-05',
     summary: 'マーケ総合サマリに最大同接を出す',
