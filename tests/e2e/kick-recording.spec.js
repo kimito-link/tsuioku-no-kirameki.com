@@ -1,10 +1,12 @@
-// kick-recording.spec.js — Kick の配信ページを開くと、チャット(ページ自身が使う Pusher)を記録し、サイドパネル側からコメントを送れるか
+// kick-recording.spec.js — Kick の配信ページを開くと、チャット(ページ自身が使うリアルタイムの接続)を記録し、サイドパネル側からコメントを送れるか
 //   (council/kick-support-PLAN.md・計器で確かめる: りんくに見え方を聞かない)。
 //
 // 本物の Kick には出ない(CI もクラウドも出られない):
 //   - kick.com のページ・/api/v2/channels/<slug> の応答 → Playwright の route で差し替え
-//   - ws-us2.pusher.com の WebSocket → Chromium の名前解決を 127.0.0.1 に向け、手元の TLS の WebSocket で Pusher の役をする
-//     (twitch-recording.spec.js と同じ作り。イベントの形は Kick のページが受けているものの推定=PC 実測で確かめる)。
+//   - つなぎ先 API(web.kick.com/api/v1/realtime/*)→ route で差し替え
+//   - realtime.<region>.platform.kick.com(Centrifugo)と ws-us2.pusher.com(予備)の WebSocket → Chromium の名前解決を
+//     127.0.0.1 に向け、手元の TLS の WebSocket で役をする(twitch-recording.spec.js と同じ作り。
+//     イベントの形は 2026-11-08 の PC 実測で本物から写した)。
 import { test as base, chromium, expect } from '@playwright/test';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -25,21 +27,37 @@ const KEY = `kk.${SLUG}.${STREAM_ID}`;
 const ROOM = `chatrooms.${CHATROOM}.v2`;
 const LATE_ICON = 'https://files.kick.com/images/user/1006/profile_image/late.webp';
 
-/** @param {string} event @param {any} data @param {string} [channel] */
-const ev = (event, data, channel = ROOM) => JSON.stringify({ event, channel, data: JSON.stringify(data) });
-const chat = (id, uid, username, slug, content) =>
-  ev('App\\Events\\ChatMessageEvent', { id, chatroom_id: CHATROOM, content, type: 'message', created_at: '2026-11-08T09:59:58+00:00', sender: { id: uid, username, slug, identity: { color: '#00FF00', badges: [] } } });
+/** イベント1件(届く方式に合わせてあとで包む) @param {string} event @param {any} data @param {string} [channel] */
+const ev = (event, data, channel = ROOM) => ({ event, channel, data });
+const chat = (id, uid, username, slug, content, extra = {}) =>
+  ev('App\\Events\\ChatMessageEvent', { id, chatroom_id: CHATROOM, content, type: 'message', created_at: '2026-11-08T09:59:58+00:00', sender: { id: uid, username, slug, identity: { color: '#00FF00', badges: [] } }, ...extra });
+const kicks = (tx, amount, gname) =>
+  ev('KicksGifted', { gift_transaction_id: tx, message: amount > 1 ? 'がんばれ' : '', sender: { id: 1002, username: 'Kicker', username_color: '#FF2C56', profile_picture: 'https://files.kick.com/images/user/1002/profile_image/k.webp' }, gift: { gift_id: gname, name: gname, amount, type: 'BASIC', tier: 'BASIC' }, created_at: '2026-11-08T09:59:58.318794143Z' }, `channel_${CHANNEL_ID}`);
 
+// 形は 2026-11-08 の PC 実測(本物の Kick)に合わせてある(memory kick-realtime-protocol)
 const FIRST = [
   chat('m-1', 1001, 'ファンA', 'fan-a', 'わこつ [emote:1:KEKW]'),
-  ev('App\\Events\\SubscriptionEvent', { chatroom_id: CHATROOM, username: 'NewSub', months: 1 }),
-  chat('m-other', 1004, 'Other', 'other', '別の部屋').replace(`"chatroom_id\\":${CHATROOM}`, '"chatroom_id\\":5'),
+  chat('m-7', 1007, 'New_Sub', 'new_sub', 'はじめまして'),
+  ev('App\\Events\\SubscriptionEvent', { chatroom_id: CHATROOM, username: 'New_Sub', months: 1 }),
+  { ...chat('m-other', 1004, 'Other', 'other', '別の部屋'), data: { ...chat('m-other', 1004, 'Other', 'other', '別の部屋').data, chatroom_id: 5 } },
+  ev('App\\Events\\MessageDeletedEvent', { id: 'd-1', message: { id: 'm-1' }, aiModerated: true }),
 ];
 const LATE = [
-  ev('KicksGifted', { message: 'がんばれ', sender: { id: 1002, username: 'Kicker' }, gift: { gift_id: 'rage', name: 'Rage Quit', amount: 500 } }, `channel_${CHANNEL_ID}`),
-  ev('App\\Events\\GiftedSubscriptionsEvent', { chatroom_id: CHATROOM, gifted_usernames: ['a1', 'b2', 'c3', 'd4', 'e5'], gifter_username: 'Giver', gifter_total: 5 }),
+  kicks('tx-1', 500, 'Rage Quit'),
+  kicks('tx-2', 1, 'Hell Yeah'),
+  kicks('tx-3', 1, 'Hell Yeah'),
+  ev('KicksLeaderboardUpdated', { gifts_lifetime: [{ user_id: 1002, username: 'Kicker', quantity: 502 }] }, `channel_${CHANNEL_ID}`),
+  ev('GiftedSubscriptionsEvent', { chatroom_id: CHATROOM, correlation_id: 'c-1', gifted_usernames: ['a1', 'b2'], gifter_username: 'Giver', gifted_total: 5, gifter_total: 9, chunk_details: null }, `chatroom_${CHATROOM}`),
+  chat('m-8', 1008, 'Fan8', 'fan8', '', { type: 'celebration', metadata: { celebration: { id: 'c', type: 'subscription_renewed', total_months: 26 } } }),
+  ev('RewardRedeemedEvent', { reward_title: '歌って', user_id: 1001, channel_id: CHANNEL_ID, username: 'ファンA', user_input: '星座になれたら', reward_background_color: '#FEA0CF' }, `chatroom_${CHATROOM}`),
   chat('m-6', 1006, 'LateFan', 'late-fan', 'おそくなりました'),
 ];
+
+/** Centrifugo の形で包む(複数を改行でまとめて1フレームにする=本物と同じ) @param {Array<any>} list */
+const asCentrifugo = (list) =>
+  list.map((e) => JSON.stringify({ push: { channel: e.channel, pub: { data: { event: e.event, data: JSON.stringify(e.data) } } } })).join('\n');
+/** Pusher の形で包む @param {any} e */
+const asPusher = (e) => JSON.stringify({ event: e.event, channel: e.channel, data: JSON.stringify(e.data) });
 
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>${SLUG} | Kick</title></head><body>
 <div id="chatroom-footer"><div contenteditable="true" id="message-input" data-lexical-editor="true"></div>
@@ -53,12 +71,15 @@ const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>${SLU
   });
 </script></body></html>`;
 
-/** 手元の TLS の WebSocket(Kick のページが使う Pusher の役)を立てる */
-function startFakePusher() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kk-pusher-'));
+const CENT_HOST = 'realtime.us-west-2.platform.kick.com';
+const PUSHER_HOST = 'ws-us2.pusher.com';
+
+/** 手元の TLS の WebSocket(Kick のリアルタイム=Centrifugo と、予備の Pusher の役)を立てる */
+function startFakeRealtime() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kk-rt-'));
   const key = path.join(dir, 'key.pem');
   const cert = path.join(dir, 'cert.pem');
-  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=ws-us2.pusher.com', '-addext', 'subjectAltName=DNS:ws-us2.pusher.com'], { stdio: 'ignore' });
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', `/CN=${CENT_HOST}`, '-addext', `subjectAltName=DNS:${CENT_HOST},DNS:${PUSHER_HOST}`], { stdio: 'ignore' });
   const server = https.createServer({ key: fs.readFileSync(key), cert: fs.readFileSync(cert) });
   const wss = new WebSocketServer({ server });
   /** @type {string[]} */
@@ -66,19 +87,41 @@ function startFakePusher() {
   /** @type {string[]} */
   const urls = [];
   wss.on('connection', (ws, req) => {
-    urls.push(String(req.url || ''));
-    ws.send(JSON.stringify({ event: 'pusher:connection_established', data: JSON.stringify({ socket_id: '1.2', activity_timeout: 120 }) }));
+    const url = String(req.url || '');
+    urls.push(url);
     let sent = false;
+    if (url.startsWith('/app/')) {
+      ws.send(JSON.stringify({ event: 'pusher:connection_established', data: JSON.stringify({ socket_id: '1.2', activity_timeout: 120 }) }));
+      ws.on('message', (data) => {
+        const text = String(data);
+        received.push(text);
+        const m = JSON.parse(text);
+        if (m.event === 'pusher:subscribe') {
+          ws.send(JSON.stringify({ event: 'pusher_internal:subscription_succeeded', channel: m.data.channel, data: '{}' }));
+          if (m.data.channel === ROOM && !sent) {
+            sent = true;
+            setTimeout(() => FIRST.forEach((f) => ws.send(asPusher(f))), 300);
+            setTimeout(() => LATE.forEach((f) => ws.send(asPusher(f))), 2500);
+          }
+        }
+      });
+      return;
+    }
+    // Centrifugo: connect(token)→ subscribe ごとに返事。サーバーの ping は {}
     ws.on('message', (data) => {
-      const text = String(data);
-      received.push(text);
-      const m = JSON.parse(text);
-      if (m.event === 'pusher:subscribe') {
-        ws.send(JSON.stringify({ event: 'pusher_internal:subscription_succeeded', channel: m.data.channel, data: '{}' }));
-        if (m.data.channel === ROOM && !sent) {
-          sent = true;
-          setTimeout(() => FIRST.forEach((f) => ws.send(f)), 300);
-          setTimeout(() => LATE.forEach((f) => ws.send(f)), 2500);
+      for (const line of String(data).split('\n')) {
+        if (!line.trim()) continue;
+        received.push(line);
+        const m = JSON.parse(line);
+        if (m.connect) ws.send(JSON.stringify({ id: m.id, connect: { client: 'c1', version: '6', expires: true, ttl: 2700, ping: 25, pong: true } }));
+        if (m.subscribe) {
+          ws.send(JSON.stringify({ id: m.id, subscribe: {} }));
+          if (m.subscribe.channel === ROOM && !sent) {
+            sent = true;
+            setTimeout(() => ws.send('{}'), 100);
+            setTimeout(() => ws.send(asCentrifugo(FIRST)), 300);
+            setTimeout(() => LATE.forEach((f) => ws.send(asCentrifugo([f]))), 2500);
+          }
         }
       }
     });
@@ -94,12 +137,12 @@ function startFakePusher() {
 
 const test = base.extend({
   // eslint-disable-next-line no-empty-pattern -- Playwright fixture API
-  pusher: async ({}, use) => {
-    const p = await startFakePusher();
+  rt: async ({}, use) => {
+    const p = await startFakeRealtime();
     await use(p);
     await /** @type {any} */ (p).close();
   },
-  context: async ({ pusher }, use) => {
+  context: async ({ rt }, use) => {
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
       ignoreHTTPSErrors: true,
@@ -107,8 +150,8 @@ const test = base.extend({
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,
-        `--host-resolver-rules=MAP ws-us2.pusher.com:443 127.0.0.1:${/** @type {any} */ (pusher).port}`,
-        `--ignore-certificate-errors-spki-list=${/** @type {any} */ (pusher).spki}`,
+        `--host-resolver-rules=MAP ${CENT_HOST}:443 127.0.0.1:${/** @type {any} */ (rt).port}, MAP ${PUSHER_HOST}:443 127.0.0.1:${/** @type {any} */ (rt).port}`,
+        `--ignore-certificate-errors-spki-list=${/** @type {any} */ (rt).spki}`,
         '--ignore-certificate-errors',
         '--no-proxy-server',
         '--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights',
@@ -133,7 +176,74 @@ async function extWorker(context) {
   }
 }
 
-test('Kick のチャットを記録し、送信も届く', async ({ context, pusher }) => {
+const PUSHER_FALLBACK_KEY = 'abcdef0123456789abcd';
+
+/**
+ * つなぎ先 API(web.kick.com)の役。本物と同じく CORS を返す(コンテンツスクリプトの fetch は kick.com の出どころで飛ぶ)
+ * @param {import('@playwright/test').BrowserContext} context @param {'centrifugo' | 'pusher'} mode @param {string[]} asked
+ */
+async function routeRealtimeApi(context, mode, asked) {
+  await context.route('https://web.kick.com/**', async (route) => {
+    const req = route.request();
+    const cors = {
+      'Access-Control-Allow-Origin': 'https://kick.com',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Headers': 'content-type, accept',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
+    const p = new URL(req.url()).pathname;
+    if (p === '/api/v1/realtime/connection') {
+      const body = JSON.parse(req.postData() || '{}');
+      const accepts = (body?.capabilities?.accepted_providers || []).map((/** @type {any} */ x) => x.provider);
+      asked.push(accepts.join('+'));
+      const conn =
+        mode === 'centrifugo' && accepts.includes('centrifugo')
+          ? { provider: 'centrifugo', credentials: { url: `wss://${CENT_HOST}/connection/websocket` } }
+          : { provider: 'pusher', credentials: { app_key: PUSHER_FALLBACK_KEY, cluster: 'us2' } };
+      return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ data: { connections: [conn], mode: 'websocket' }, message: 'success' }) });
+    }
+    if (p === '/api/v1/realtime/auth/connection') {
+      return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ data: { token: 'fake.token-1234567890' } }) });
+    }
+    return route.fulfill({ status: 404, headers: cors, body: '' });
+  });
+}
+
+const WANT_ROWS = [
+  'kk_reward:kk:1001:ファンA:「歌って」を交換しました: 星座になれたら:0::face',
+  'membership:kk:1007:New_Sub:サブスク:0::-',
+  'membership:kk:1008:Fan8:サブスク(26か月目):0::-',
+  'membership_gift:kk:@giver:Giver:ギフトサブを5件贈りました:0::-',
+  'superchat:kk:1002:Kicker:Hell Yeahを贈りました:1:KICKS:face',
+  'superchat:kk:1002:Kicker:Hell Yeahを贈りました:1:KICKS:face',
+  'superchat:kk:1002:Kicker:がんばれ:500:KICKS:face',
+  'text:kk:1001:ファンA:わこつ KEKW:0::face',
+  'text:kk:1006:LateFan:おそくなりました:0::-',
+  'text:kk:1007:New_Sub:はじめまして:0::-',
+];
+
+/** @param {any} sw */
+const readRows = (sw) =>
+  sw.evaluate(
+    (/** @type {string} */ key) =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('yt_kirameki_db');
+        req.onsuccess = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('comments')) return resolve([]);
+          const all = db.transaction('comments').objectStore('comments').index('by_videoId').getAll(IDBKeyRange.only(key));
+          all.onsuccess = () => resolve(all.result.map((/** @type {any} */ r) => `${r.kind}:${r.channelId}:${r.name}:${r.text}:${r.amount}:${r.currency}:${r.iconUrl ? 'face' : '-'}`).sort());
+          all.onerror = () => resolve([]);
+        };
+        req.onerror = () => resolve([]);
+      }),
+    KEY,
+  );
+
+test('Kick のチャットを記録し、送信も届く', async ({ context, rt }) => {
+  const asked = [];
+  await routeRealtimeApi(context, 'centrifugo', asked);
   await context.route('https://kick.com/**', async (route) => {
     const url = new URL(route.request().url());
     const m = url.pathname.match(/^\/api\/v2\/channels\/([^/]+)$/);
@@ -160,52 +270,31 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, pus
   const page = await context.newPage();
   await page.goto(`https://kick.com/${SLUG}`);
 
-  // 記録(IndexedDB yt_kirameki_db)に、このチャットルームの5件だけが入る(別の部屋の行は入れない)
-  await expect
-    .poll(
-      () =>
-        sw.evaluate(
-          (key) =>
-            new Promise((resolve) => {
-              const req = indexedDB.open('yt_kirameki_db');
-              req.onsuccess = () => {
-                const db = req.result;
-                if (!db.objectStoreNames.contains('comments')) return resolve([]);
-                const all = db.transaction('comments').objectStore('comments').index('by_videoId').getAll(IDBKeyRange.only(key));
-                all.onsuccess = () => resolve(all.result.map((/** @type {any} */ r) => `${r.kind}:${r.name}:${r.text}:${r.amount}:${r.currency}:${r.iconUrl ? 'face' : '-'}`).sort());
-                all.onerror = () => resolve([]);
-              };
-              req.onerror = () => resolve([]);
-            }),
-          KEY,
-        ),
-      { timeout: 30_000 },
-    )
-    .toEqual([
-      'membership:NewSub:サブスク:0::-',
-      'membership_gift:Giver:ギフトサブを5件贈りました:0::-',
-      'superchat:Kicker:がんばれ:500:KICKS:-',
-      'text:LateFan:おそくなりました:0::-',
-      'text:ファンA:わこつ KEKW:0::face',
-    ]);
+  // 記録(IndexedDB yt_kirameki_db)に、このチャットルームの分だけが入る(別の部屋の行は入れない)。
+  //   連続した同じ Kicks(tx-2・tx-3)は1件に潰さない。名前だけのサブスクは、チャットで見た本物の id にそろう
+  await expect.poll(() => readRows(sw), { timeout: 30_000 }).toEqual(WANT_ROWS);
 
   // 計器: イベントの数・ギフトサブの件数・Kicks・間に合わなかった顔(yt_kk_icons)
   await expect
     .poll(async () => {
       const b = await sw.evaluate(async () => chrome.storage.local.get(['yt_diag_kk_chat', 'yt_kk_icons']));
       const d = b.yt_diag_kk_chat || {};
-      return { gifts: d.gifts, subs: d.subs, kicks: d.kicks, wsState: d.wsState, late: b.yt_kk_icons?.['late-fan'] || '' };
+      return { gifts: d.gifts, subs: d.subs, kicks: d.kicks, wsState: d.wsState, late: b.yt_kk_icons?.['late-fan'] || '', provider: d.provider, deleted: d.deleted, rewards: d.rewards, subscribed: d.subscribed };
     }, { timeout: 15_000 })
-    .toEqual({ gifts: 5, subs: 1, kicks: 500, wsState: 'open', late: LATE_ICON });
+    .toEqual({ gifts: 5, subs: 2, kicks: 502, wsState: 'open', late: LATE_ICON, provider: 'centrifugo', deleted: 1, rewards: 1, subscribed: 4 });
 
   // 配信のまとめ(配信者・同接・開始時刻)
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
   expect(sum).toMatchObject({ title: 'テスト配信', broadcasterName: 'テストきっく', broadcasterHandle: SLUG, concurrentViewers: 12 });
   expect(Number(sum.startedAt)).toBe(Date.parse('2026-11-08T09:00:00Z'));
 
-  // Pusher には公開キーでつなぎ、チャットルームを購読している(ログインの情報は送らない)
-  expect(/** @type {any} */ (pusher).urls[0]).toMatch(/^\/app\/[0-9a-f]{20}\?protocol=7/);
-  expect(/** @type {any} */ (pusher).received.some((l) => l.includes(`"channel":"${ROOM}"`))).toBe(true);
+  // つなぎ先は Kick に聞いて Centrifugo へ。token で connect し、チャットルームを購読している(ping の {} にも返す)
+  expect(asked[0]).toBe('pusher+centrifugo');
+  const got = /** @type {any} */ (rt);
+  expect(got.urls[0]).toBe('/connection/websocket');
+  expect(got.received.some((/** @type {string} */ l) => l.includes('"token":"fake.token-1234567890"'))).toBe(true);
+  expect(got.received.some((/** @type {string} */ l) => l.includes(`"channel":"${ROOM}"`))).toBe(true);
+  expect(got.received).toContain('{}');
 
   // サイドパネル・会場と同じ口(YT_SEND_COMMENT)から送ると、Kick の入力欄に書かれて送信ボタンが押される
   const ext = await context.newPage();
@@ -238,4 +327,29 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, pus
   expect(text).not.toMatch(/kk:\d/);
   expect(text).not.toContain('データ源: youtube');
   expect(text).not.toMatch(/スパチャ|スーパーチャット|トップファン/);
+});
+
+test('Centrifugo が使えないときは、API が返す Pusher の鍵で読む', async ({ context, rt }) => {
+  const asked = [];
+  await routeRealtimeApi(context, 'pusher', asked);
+  await context.route('https://kick.com/**', async (route) => {
+    const m = new URL(route.request().url()).pathname.match(/^\/api\/v2\/channels\/([^/]+)$/);
+    if (!m) return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: PAGE_HTML });
+    if (m[1] === SLUG) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: CHANNEL_ID, user_id: 66, slug: SLUG, chatroom: { id: CHATROOM }, user: { username: 'テストきっく' }, livestream: { id: Number(STREAM_ID), is_live: true, session_title: 'テスト配信', viewer_count: 12, start_time: '2026-11-08 09:00:00' } }),
+      });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ slug: m[1], chatroom: { id: 1 }, user: { username: m[1], profile_pic: null } }) });
+  });
+  await context.route('https://files.kick.com/**', (route) => route.fulfill({ status: 404, body: '' }));
+  const sw = await extWorker(context);
+  const page = await context.newPage();
+  await page.goto(`https://kick.com/${SLUG}`);
+  await expect.poll(async () => (await readRows(sw)).length, { timeout: 30_000 }).toBe(WANT_ROWS.length);
+  const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_kk_chat'))).yt_diag_kk_chat;
+  expect(d).toMatchObject({ provider: 'pusher', pusherKey: PUSHER_FALLBACK_KEY, wsState: 'open' });
+  expect(/** @type {any} */ (rt).urls[0]).toMatch(new RegExp(`^/app/${PUSHER_FALLBACK_KEY}\\?protocol=7`));
 });

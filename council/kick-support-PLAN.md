@@ -41,3 +41,15 @@
 
 ## ストア
 - ホスト権限 kick.com が増える → ダッシュボードから手アップロード(Twitch と一緒に1回で出す)。
+
+## 2026-11-08 PC 実測の結果と作り直し(v0.1.1922)
+
+- 0.1.1919 は本物の Kick で **0件**だった。固定で持たせた Pusher の鍵2本が全クラスタで 4001(無効)。
+- Kick のページは `POST web.kick.com/api/v1/realtime/connection` でつなぎ先を聞き、Centrifugo
+  (`wss://realtime.<region>.platform.kick.com/connection/websocket`・token は `/api/v1/realtime/auth/connection`)で受けている。
+  → 鍵を固定せず毎回 API に聞く(`src/lib/kick/kickRealtime.js`)。第一候補 Centrifugo、つながらなければ API が返す Pusher の鍵。
+- 実データとの食い違いを直した: 再サブスク(ChatMessageEvent の type:celebration)・Kicks の id(gift_transaction_id)と顔
+  (profile_picture)・ギフトサブの件数(gifted_total)・名前だけの通知の人キー(チャットで見た本物の id/slug)・ポイント交換
+  (RewardRedeemedEvent → kind 'kk_reward')。
+- 未対応: 消されたコメント・BAN を記録から外す(YouTube/Twitch も未対応=全プラットフォームで別に設計)、公式ランキング
+  (`/api/v2/channels/<slug>/leaderboards`・ソケットの KicksLeaderboardUpdated/GiftsLeaderboardUpdated)。

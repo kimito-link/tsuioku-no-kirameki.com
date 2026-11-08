@@ -1,8 +1,10 @@
 // kick-content-entry.js — Kick の視聴ページ(kick.com/<チャンネル>)で、チャットを読んで記録に渡す入口。
-/* global chrome, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLTextAreaElement, Event, KeyboardEvent */
+/* global chrome, crypto, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLTextAreaElement, Event, KeyboardEvent */
 //
 // ★設計(council/kick-support-PLAN.md・Twitch の tw-content-entry.js と同じ形)
-//   - 読むのは Kick のページ自身が使う Pusher(ログイン無しで購読できる)。DOM より壊れにくい。
+//   - 読むのは Kick のページ自身が使うリアルタイムの接続(ログイン無しで購読できる)。DOM より壊れにくい。
+//     ★2026-11-08 PC 実測: 固定の Pusher の鍵は無効になっていた(0件)。つなぎ先は毎回 Kick の API に聞く
+//       (src/lib/kick/kickRealtime.js)。第一候補は Centrifugo、だめなら API が返す Pusher の鍵。
 //   - 記録は YouTube 版と同じ口(YT_STREAM_META / YT_CHAT_ITEMS)へ送る。配信キー(videoId の位置)は 'kk.<slug>.<配信番号>'。
 //   - チャットルームの番号・配信番号・開始時刻・同接・顔は、kick.com のページ自身が使う /api/v2/channels/<slug> から読む
 //     (形を確かめ、取れなければ代わりの値)。配信していないチャンネルのページでは記録しない(つながない)。
@@ -11,10 +13,18 @@
 import { parseKickChannelFromUrl, parsePusherFrame, parseKickEvent, parseKickDeleted } from '../../src/lib/kick/kickChatParse.js';
 import { kickChannelApiUrl, parseKickChannel, parseKickUserIcon } from '../../src/lib/kick/kickApi.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
-
-// Kick のページが使う Pusher の公開キー(新しい順)。つながらなければ次を試す
-const PUSHER_KEYS = ['32cbd69e4b950bf97679', 'eb1d5f283081a78b932c'];
-const pusherUrl = (/** @type {string} */ key) => `wss://ws-us2.pusher.com/app/${key}?protocol=7&client=js&version=8.4.0&flash=false`;
+import {
+  KICK_REALTIME_CONNECTION_URL,
+  KICK_REALTIME_AUTH_URL,
+  kickRealtimeConnectionBody,
+  parseKickRealtimeConnection,
+  parseKickRealtimeToken,
+  kickPusherUrl,
+  kickRealtimeChannels,
+  centrifugoConnectMsg,
+  centrifugoSubscribeMsg,
+  parseCentrifugoFrames,
+} from '../../src/lib/kick/kickRealtime.js';
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
@@ -31,7 +41,12 @@ const diag = {
   wsState: 'idle',
   wsConnects: 0,
   wsLastErrorAt: 0,
+  /** つないだ方式('centrifugo' / 'pusher')と、つなぎ先を聞く API の失敗数 */
+  provider: '',
+  realtimeHost: '',
+  routeFail: 0,
   pusherKey: '',
+  rewards: 0,
   subscribed: 0,
   frames: 0,
   /** @type {Record<string, number>} 来たイベント名ごとの数(名前が変わったら気づくため) */
@@ -72,6 +87,27 @@ function saveDiagSoon() {
       /* no-op */
     }
   }, 2000);
+}
+
+/** @param {string} url @param {any} body */
+async function postJson(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`kick_${res.status}`);
+  return res.json();
+}
+
+function newClientId() {
+  try {
+    if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+  } catch {
+    /* 下へ */
+  }
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-4000-8000-${Math.random().toString(16).slice(2, 14)}`;
 }
 
 /** @param {string} url */
@@ -192,7 +228,6 @@ function startReader(slug, key, ids) {
   let backoff = 1000;
   let reconnectTimer = 0;
   let pingTimer = 0;
-  let keyIndex = 0;
   let established = false;
   /** @type {any[]} */
   let pending = [];
@@ -225,18 +260,54 @@ function startReader(slug, key, ids) {
     }
   };
 
-  /** @param {string} raw */
-  const onFrame = (raw) => {
+  /** 名前(小文字)→ チャットで見た本物の user id と slug @type {Map<string, { id: string, slug: string }>} */
+  const whoByName = new Map();
+
+  /** 1件のイベント(Centrifugo / Pusher 共通の形)@param {{ event: string, channel: string, data: Record<string, any> | null }} f */
+  const onEvent = (f) => {
+    const evName = f.event.replace(/^App\\Events\\/, '').slice(0, 60);
+    diag.events[evName] = (diag.events[evName] || 0) + 1;
+    const del = parseKickDeleted(f);
+    if (del) {
+      diag.deleted += 1;
+      return;
+    }
+    const r = parseKickEvent(f, {
+      chatroomId: ids.chatroomId,
+      idOfSlug: (s) => idBySlug.get(s) || '',
+      who: (name) => whoByName.get(String(name || '').toLowerCase()) || null,
+    });
+    if (!r) return;
+    if (r.kind === 'text' && r.login && r.channelId.startsWith('kk:') && !r.channelId.startsWith('kk:@')) {
+      idBySlug.set(r.login, r.channelId.slice(3));
+      whoByName.set(r.name.toLowerCase(), { id: r.channelId.slice(3), slug: r.login });
+      if (idBySlug.size > 20000) idBySlug.clear();
+      if (whoByName.size > 20000) whoByName.clear();
+    }
+    if (r.iconUrl && r.login && !iconBySlug.has(r.login)) iconBySlug.set(r.login, r.iconUrl);
+    if (seen.has(r.id)) return;
+    seen.add(r.id);
+    if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
+    if (r.kind === 'superchat') diag.kicks += r.amount;
+    else if (r.kind === 'membership') diag.subs += 1;
+    else if (r.kind === 'membership_gift') diag.gifts += Math.max(1, Number(r.giftCount) || 1);
+    else if (r.kind === 'kk_host') diag.hosts += 1;
+    else if (r.kind === 'kk_reward') diag.rewards += 1;
+    pending.push(r);
+    if (!flushTimer) flushTimer = setTimeout(() => void flush(), FLUSH_MS);
+  };
+
+  const chans = kickRealtimeChannels(ids.chatroomId, ids.channelId);
+
+  /** Pusher の1通 @param {string} raw */
+  const onPusherFrame = (raw) => {
     const f = parsePusherFrame(raw);
     if (!f) return;
     diag.frames += 1;
     if (f.event === 'pusher:connection_established') {
       established = true;
       diag.wsState = 'open';
-      diag.pusherKey = PUSHER_KEYS[keyIndex];
       backoff = 1000;
-      const chans = [`chatrooms.${ids.chatroomId}.v2`, `chatroom_${ids.chatroomId}`];
-      if (ids.channelId) chans.push(`channel.${ids.channelId}`, `channel_${ids.channelId}`);
       for (const channel of chans) send({ event: 'pusher:subscribe', data: { auth: '', channel } });
       saveDiagSoon();
       return;
@@ -246,57 +317,96 @@ function startReader(slug, key, ids) {
       diag.subscribed += 1;
       return;
     }
-    if (f.event === 'pusher:error') {
-      // 4001 = キーが無い(Kick がキーを替えた)→ 次のキー
-      const code = Number(f.data?.code);
-      if (!established && code >= 4000 && code < 4100 && keyIndex + 1 < PUSHER_KEYS.length) keyIndex += 1;
-      return;
-    }
     if (f.event.startsWith('pusher')) return;
-    const evName = f.event.replace(/^App\\Events\\/, '').slice(0, 60);
-    diag.events[evName] = (diag.events[evName] || 0) + 1;
-    const del = parseKickDeleted(f);
-    if (del) {
-      diag.deleted += 1;
-      return;
-    }
-    const r = parseKickEvent(f, { chatroomId: ids.chatroomId, idOfSlug: (s) => idBySlug.get(s) || '' });
-    if (!r) return;
-    if (r.kind === 'text' && r.login && r.channelId.startsWith('kk:') && !r.channelId.startsWith('kk:@')) {
-      idBySlug.set(r.login, r.channelId.slice(3));
-      if (idBySlug.size > 20000) idBySlug.clear();
-    }
-    if (seen.has(r.id)) return;
-    seen.add(r.id);
-    if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
-    if (r.kind === 'superchat') diag.kicks += r.amount;
-    else if (r.kind === 'membership') diag.subs += 1;
-    else if (r.kind === 'membership_gift') diag.gifts += Math.max(1, Number(r.giftCount) || 1);
-    else if (r.kind === 'kk_host') diag.hosts += 1;
-    pending.push(r);
-    if (!flushTimer) flushTimer = setTimeout(() => void flush(), FLUSH_MS);
+    onEvent(f);
   };
 
-  const connect = () => {
+  /** Centrifugo の1フレーム @param {string} raw */
+  const onCentFrame = (raw) => {
+    for (const m of parseCentrifugoFrames(raw)) {
+      diag.frames += 1;
+      if (m.type === 'ping') {
+        try {
+          ws?.send('{}');
+        } catch {
+          /* no-op */
+        }
+      } else if (m.type === 'reply') {
+        if (m.id === 1 && m.ok) {
+          established = true;
+          diag.wsState = 'open';
+          backoff = 1000;
+          chans.forEach((channel, i) => send(centrifugoSubscribeMsg(channel, i + 2)));
+          saveDiagSoon();
+        } else if (m.id >= 2 && m.ok) diag.subscribed += 1;
+        else if (!m.ok) diag.wsLastErrorAt = Date.now();
+      } else if (m.type === 'push') onEvent(m);
+    }
+  };
+
+  // つなぎ方の順番。Centrifugo でつながらなかったら次は Pusher を試す(交互)
+  let preferPusher = false;
+
+  /** つなぎ先を Kick に聞く(失敗したら null) */
+  const resolveRoute = async () => {
+    const clientId = newClientId();
+    try {
+      const routes = parseKickRealtimeConnection(
+        await postJson(KICK_REALTIME_CONNECTION_URL, kickRealtimeConnectionBody(clientId, preferPusher ? ['pusher'] : ['pusher', 'centrifugo'])),
+      );
+      const route = routes.find((r) => r.provider === (preferPusher ? 'pusher' : 'centrifugo')) || routes[0];
+      if (!route) throw new Error('no_route');
+      if (route.provider === 'pusher') return { kind: 'pusher', url: kickPusherUrl(route.key, route.cluster), key: route.key, token: '' };
+      const token = parseKickRealtimeToken(await postJson(KICK_REALTIME_AUTH_URL, { client_id: clientId }));
+      if (!token) throw new Error('no_token');
+      return { kind: 'centrifugo', url: route.url, key: '', token };
+    } catch {
+      diag.routeFail += 1;
+      saveDiagSoon();
+      return null;
+    }
+  };
+
+  const connect = async () => {
     if (stopped) return;
     established = false;
+    diag.wsState = 'resolving';
+    const route = await resolveRoute();
+    if (stopped) return;
+    if (!route) {
+      diag.wsState = 'closed';
+      preferPusher = !preferPusher;
+      scheduleReconnect();
+      return;
+    }
+    diag.provider = route.kind;
+    diag.pusherKey = route.key;
+    try {
+      diag.realtimeHost = new URL(route.url).host;
+    } catch {
+      diag.realtimeHost = '';
+    }
     diag.wsState = 'connecting';
     diag.wsConnects += 1;
     try {
-      ws = new WebSocket(pusherUrl(PUSHER_KEYS[keyIndex]));
+      ws = new WebSocket(route.url);
     } catch {
       scheduleReconnect();
       return;
     }
-    ws.onmessage = (ev) => onFrame(typeof ev.data === 'string' ? ev.data : '');
+    if (route.kind === 'centrifugo') {
+      ws.onopen = () => send(centrifugoConnectMsg(route.token));
+      ws.onmessage = (ev) => onCentFrame(typeof ev.data === 'string' ? ev.data : '');
+    } else {
+      ws.onmessage = (ev) => onPusherFrame(typeof ev.data === 'string' ? ev.data : '');
+    }
     ws.onerror = () => {
       diag.wsLastErrorAt = Date.now();
     };
     ws.onclose = () => {
       diag.wsState = 'closed';
-      // つながってすぐ切れた(キーが違う等)なら、次のキーを試す
-      if (!established && keyIndex + 1 < PUSHER_KEYS.length) keyIndex += 1;
-      else if (!established) keyIndex = 0;
+      // つながらずに切れた → 次はもう一方の方式を試す。つながっていたら同じ方式で(token はもらい直す)
+      if (!established) preferPusher = !preferPusher;
       saveDiagSoon();
       scheduleReconnect();
     };
@@ -306,17 +416,17 @@ function startReader(slug, key, ids) {
     if (stopped || reconnectTimer) return;
     reconnectTimer = setTimeout(() => {
       reconnectTimer = 0;
-      connect();
+      void connect();
     }, backoff);
     backoff = Math.min(backoff * 2, 60_000);
   };
 
-  // Pusher は 120 秒何も無いと切る。こちらからも1分おきに ping
+  // Pusher は 120 秒何も無いと切る。こちらからも1分おきに ping(Centrifugo はサーバーの {} に返すだけでよい)
   pingTimer = setInterval(() => {
-    if (established) send({ event: 'pusher:ping', data: {} });
+    if (established && diag.provider === 'pusher') send({ event: 'pusher:ping', data: {} });
   }, 60_000);
 
-  connect();
+  void connect();
   return () => {
     stopped = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -411,8 +521,14 @@ const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)
  */
 function kkSignedOut() {
   if (/(?:^|;\s*)session_token=[^;]+/.test(String(document.cookie || ''))) return false;
+  // 実測 2026-11-08: 未ログインでは data-testid="login" が2つ(1つは見えない・文字なし)。見えるものだけを印にする
   const btns = [...document.querySelectorAll('button, a')].slice(0, 400);
-  return btns.some((b) => /^(?:log ?in|sign ?in|ログイン)$/i.test(String(b.textContent || '').trim()) || b.getAttribute('data-testid') === 'login');
+  return btns.some(
+    (b) =>
+      (/^(?:log ?in|sign ?in|ログイン)$/i.test(String(b.textContent || '').trim()) || b.getAttribute('data-testid') === 'login') &&
+      typeof b.getClientRects === 'function' &&
+      b.getClientRects().length > 0,
+  );
 }
 
 /** @param {string} reason */

@@ -11,7 +11,19 @@ export function isKickSlug(s) {
   return /^[a-z0-9][a-z0-9_-]{1,24}$/.test(String(s || ''));
 }
 
-/** 名前 → slug(Kick は小文字・_ は - に) @param {unknown} name */
+/** 顔の URL として使ってよいか(Kick の画像置き場の https だけ) @param {unknown} url */
+export function safeKickImageUrl(url) {
+  const u = String(url || '').trim();
+  if (!/^https:\/\/[a-z0-9.-]*(?:kick\.com|files\.kick\.com|kick-files-prod\.s3[a-z0-9.-]*\.amazonaws\.com|kickcdn\.com)\//i.test(u)) return '';
+  if (/default-profile|\/default\//i.test(u)) return '';
+  return u;
+}
+
+/**
+ * 名前 → slug の推測(Kick は小文字・_ は - にすることが多い)。
+ *   ★実測で `_` のままの人もいた(kanata_2525)ので、チャットで見た本物の slug があればそちらを使う(ctx.who)。
+ * @param {unknown} name
+ */
 export function kickSlugOfName(name) {
   const s = String(name || '').trim().toLowerCase().replace(/_/g, '-');
   return isKickSlug(s) ? s : '';
@@ -105,8 +117,9 @@ function badgeTypes(badges) {
 /**
  * Pusher のイベント1件 → 記録の1件。記録しないイベント・形が違うものは null。
  * @param {{ event: string, channel?: string, data: Record<string, any> | null }} frame
- * @param {{ chatroomId?: string | number, idOfSlug?: (slug: string) => string, nowMs?: number }} [ctx]
+ * @param {{ chatroomId?: string | number, idOfSlug?: (slug: string) => string, who?: (name: string) => ({ id: string, slug: string } | null), nowMs?: number }} [ctx]
  *   idOfSlug: チャットで見た人の slug → user id(サブスク等の通知には id が無いので、同じ人にそろえる)
+ *   who: チャットで見た人の名前(大小文字は問わない)→ 本物の user id と slug
  * @returns {KickItem | null}
  */
 export function parseKickEvent(frame, ctx = {}) {
@@ -117,6 +130,13 @@ export function parseKickEvent(frame, ctx = {}) {
   const now = Number(ctx.nowMs) || Date.now();
   // 別のチャットルームの行は捨てる(chatroom_id がある行だけ確かめる)
   if (room && d.chatroom_id != null && String(d.chatroom_id) !== room) return null;
+  /** 名前だけの通知(サブスク・ギフトサブ・ホスト)→ チャットで見た本物の id・slug(無ければ推測) @param {string} name */
+  const whoOf = (name) => {
+    const w = name && ctx.who ? ctx.who(name) : null;
+    const slug = w && isKickSlug(w.slug) ? w.slug : kickSlugOfName(name);
+    const id = w && /^\d{1,20}$/.test(String(w.id || '')) ? String(w.id) : '';
+    return { slug, id };
+  };
   const personKey = (/** @type {unknown} */ id, /** @type {string} */ slug) => {
     const s = String(id ?? '').trim();
     if (/^\d{1,20}$/.test(s)) return `kk:${s}`;
@@ -134,8 +154,25 @@ export function parseKickEvent(frame, ctx = {}) {
     const slug = String(s.slug || '').trim().toLowerCase() || kickSlugOfName(name);
     const text = stripKickEmotes(d.content).trim();
     const channelId = personKey(s.id, slug);
-    if (!name || !channelId || !text) return null;
+    if (!name || !channelId || (!text && d.type !== 'celebration')) return null;
     const identity = obj(s.identity);
+    // 再サブスクの「お祝い」(type:'celebration')はチャットの形で来る。サブスクとして数える(実測 2026-11-08)
+    const celeb = d.type === 'celebration' ? obj(obj(d.metadata)?.celebration) : null;
+    if (celeb && /subscription/.test(String(celeb.type || ''))) {
+      const months = Math.max(1, Math.floor(Number(celeb.total_months) || 1));
+      return {
+        ...base,
+        id: `kk-${id}`,
+        channelId,
+        name,
+        login: slug,
+        text: `サブスク(${months}か月目)${text ? `「${text}」` : ''}`,
+        kind: 'membership',
+        subMonths: months,
+        badges: badgeTypes(identity?.badges),
+        postedAtMs: parseKickTime(d.created_at) || now,
+      };
+    }
     return {
       ...base,
       id: `kk-${id}`,
@@ -152,9 +189,10 @@ export function parseKickEvent(frame, ctx = {}) {
 
   if (ev === 'SubscriptionEvent') {
     const name = String(d.username || '').trim();
-    const slug = kickSlugOfName(name);
+    const w = whoOf(name);
+    const slug = w.slug;
     const months = Math.max(1, Math.floor(Number(d.months) || 1));
-    const channelId = personKey(d.user_id, slug);
+    const channelId = personKey(d.user_id ?? w.id, slug);
     if (!name || !channelId) return null;
     return {
       ...base,
@@ -172,12 +210,15 @@ export function parseKickEvent(frame, ctx = {}) {
   if (ev === 'GiftedSubscriptionsEvent') {
     const name = String(d.gifter_username || '').trim();
     const list = Array.isArray(d.gifted_usernames) ? d.gifted_usernames : [];
-    const count = Math.max(1, list.length || Math.floor(Number(d.gifted_count) || 0) || 1);
-    const slug = kickSlugOfName(name);
-    const channelId = name ? personKey(d.gifter_id, slug) : 'kk:@anonymous';
+    // 実測の項目は gifted_total(贈った件数)。名前一覧は分割されて来ることがある
+    const count = Math.max(1, Math.floor(Number(d.gifted_total) || 0) || list.length || Math.floor(Number(d.gifted_count) || 0) || 1);
+    const w = whoOf(name);
+    const slug = w.slug;
+    const channelId = name ? personKey(d.gifter_id ?? w.id, slug) : 'kk:@anonymous';
+    const corr = String(d.correlation_id || '').trim();
     return {
       ...base,
-      id: `kk-gift-${slug || 'anon'}-${list.slice(0, 3).join(',')}-${count}-${Math.floor(now / 10000)}`,
+      id: corr ? `kk-gift-${corr.slice(0, 80)}` : `kk-gift-${slug || 'anon'}-${list.slice(0, 3).join(',')}-${count}-${Math.floor(now / 10000)}`,
       channelId,
       name: name || '匿名',
       login: slug,
@@ -190,9 +231,10 @@ export function parseKickEvent(frame, ctx = {}) {
 
   if (ev === 'StreamHostEvent') {
     const name = String(d.host_username || '').trim();
-    const slug = kickSlugOfName(name);
+    const w = whoOf(name);
+    const slug = w.slug;
     const viewers = Math.max(0, Math.floor(Number(d.number_viewers) || 0));
-    const channelId = personKey(null, slug);
+    const channelId = personKey(w.id || null, slug);
     if (!name || !channelId) return null;
     const msg = String(d.optional_message || '').trim();
     return {
@@ -213,15 +255,19 @@ export function parseKickEvent(frame, ctx = {}) {
     const g = obj(d.gift);
     const amount = Math.max(0, Math.floor(Number(g?.amount ?? d.amount) || 0));
     const name = String(s?.username || d.username || '').trim();
-    const slug = String(s?.slug || '').toLowerCase() || kickSlugOfName(name);
-    const channelId = personKey(s?.id ?? d.user_id, slug);
+    const w = whoOf(name);
+    const slug = (isKickSlug(String(s?.slug || '').toLowerCase()) ? String(s?.slug).toLowerCase() : '') || w.slug;
+    const channelId = personKey(s?.id ?? d.user_id ?? w.id, slug);
     if (!name || !channelId || amount <= 0) return null;
     const gname = String(g?.name || '').trim();
     const msg = stripKickEmotes(d.message).trim();
     const gid = String(g?.gift_id || g?.id || '');
+    // 実測では id が無く gift_transaction_id がある(同じ人の連続ギフトを1件に潰さないため、これを使う)
+    const tx = String(d.gift_transaction_id || d.id || '').trim().slice(0, 80);
     return {
       ...base,
-      id: `kk-kicks-${String(d.id || '') || `${slug}-${gid}-${amount}-${Math.floor(now / 2000)}`}`,
+      iconUrl: safeKickImageUrl(s?.profile_picture),
+      id: `kk-kicks-${tx || `${slug}-${gid}-${amount}-${Math.floor(now / 2000)}`}`,
       channelId,
       name,
       login: slug,
@@ -229,6 +275,26 @@ export function parseKickEvent(frame, ctx = {}) {
       kind: 'superchat',
       amount,
       currency: 'KICKS',
+      postedAtMs: parseKickTime(d.created_at) || now,
+    };
+  }
+  // チャンネルポイントの交換(Kick の「リワード」)。実測 2026-11-08: chatroom_<id> に来る
+  if (ev === 'RewardRedeemedEvent') {
+    const name = String(d.username || '').trim();
+    const title = String(d.reward_title || '').trim().slice(0, 80);
+    const w = whoOf(name);
+    const channelId = personKey(d.user_id ?? w.id, w.slug);
+    if (!name || !channelId || !title) return null;
+    const input = stripKickEmotes(d.user_input).trim().slice(0, 300);
+    const rid = String(d.id || d.redemption_id || '').trim().slice(0, 80);
+    return {
+      ...base,
+      id: rid ? `kk-reward-${rid}` : `kk-reward-${w.slug || name}-${title}-${Math.floor(now / 2000)}`,
+      channelId,
+      name,
+      login: w.slug,
+      text: `「${title}」を交換しました${input ? `: ${input}` : ''}`,
+      kind: 'kk_reward',
       postedAtMs: parseKickTime(d.created_at) || now,
     };
   }

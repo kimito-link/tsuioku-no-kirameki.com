@@ -18,6 +18,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1922',
+    date: '2026-11-08',
+    summary: 'Kick のチャットが本物で記録されるように',
+    items: Object.freeze([
+      'Kick のチャットが本物の配信で1件も記録できていなかったのを直しました(Kick が接続の仕組みを変えていました)。つなぎ先を毎回 Kick に聞くようにしたので、また変わっても追いつきます。',
+      '再サブスクのお祝い・チャンネルポイントの交換も記録するようにしました。',
+      '同じ人が続けて贈った Kicks が1件にまとまってしまうのを直しました。ギフトサブの件数も正しく数えます。',
+      'サブスクなど名前だけで届く通知を、チャットで見た同じ人にそろえるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1921',
     date: '2026-11-08',
     summary: 'Kick の配信も記録できるように(試作)',
@@ -193,15 +204,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'サポーターの確認に本番の鍵を使う',
     items: Object.freeze([
       'サポーターかどうかを確かめる鍵を、本番のサーバーと同じものに入れ替えました(見た目や使い方は変わりません)'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1897',
-    date: '2026-11-06',
-    summary: 'マーケ HTML はサポーター向けに(14日お試し)',
-    items: Object.freeze([
-      'マーケ HTML はサポーター(月額980円・年額9,800円)向けの機能になりました。初めてマーケ HTML を開いた日から14日間は、だれでも無料でお試しできます',
-      'サポーターでない人のコメビュを OBS 透過で出すと、隅に小さく「追憶のきらめき」と出ます(サポーターは出ません)。記録・読み上げ・会場・スマホ・YouTube 版などはこれまでどおり無料です'
     ])
   })
 ]);

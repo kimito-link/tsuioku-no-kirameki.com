@@ -3,19 +3,13 @@
 //
 // ★council/kick-support-PLAN.md・AGENTS.md §3.6: 形が違えば null。顔の URL は Kick の画像置き場だけ通す。
 
-import { isKickSlug, parseKickTime } from './kickChatParse.js';
+import { isKickSlug, parseKickTime, safeKickImageUrl } from './kickChatParse.js';
+
+export { safeKickImageUrl };
 
 /** @param {unknown} v */
 function obj(v) {
   return v && typeof v === 'object' ? /** @type {Record<string, any>} */ (v) : null;
-}
-
-/** 顔の URL として使ってよいか(Kick の画像置き場の https だけ) @param {unknown} url */
-export function safeKickImageUrl(url) {
-  const u = String(url || '').trim();
-  if (!/^https:\/\/[a-z0-9.-]*(?:kick\.com|files\.kick\.com|kick-files-prod\.s3[a-z0-9.-]*\.amazonaws\.com|kickcdn\.com)\//i.test(u)) return '';
-  if (/default-profile|\/default\//i.test(u)) return '';
-  return u;
 }
 
 /** @param {string} slug */

@@ -110,9 +110,10 @@ graph LR
   f1 --> f1_0["src/kick-content-entry.js"]
   f1 --> f1_1["lib/kick/kickChatParse.js"]
   f1 --> f1_2["lib/kick/kickApi.js"]
-  f1 --> f1_3["lib/platform/streamPlatform.js"]
-  f1 --> f1_4["e2e/kick-recording.spec.js"]
-  f1 --> f1_5["kick-support-PLAN.md"]
+  f1 --> f1_3["lib/kick/kickRealtime.js"]
+  f1 --> f1_4["lib/platform/streamPlatform.js"]
+  f1 --> f1_5["e2e/kick-recording.spec.js"]
+  f1 --> f1_6["kick-support-PLAN.md"]
   HUB --> f2["コメント送信(確認/プロファイル)"]
   f2 --> f2_0["lib/commentSubmitConfirm.js"]
   f2 --> f2_1["lib/commentSubmitProfiling.js"]
@@ -429,14 +430,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2327 件</sub>
+<sub>ファイル 2329 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（108 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（117 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（2048 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（2050 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（16 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -481,11 +482,12 @@ Twitch の視聴ページで公式の読み取り専用 IRC を読み、YouTube 
 - [`council/twitch-support-PLAN.md`](../council/twitch-support-PLAN.md)
 
 ### Kick の配信を記録(本体に同梱)  〔Kick / 記録 / 他プラットフォーム〕
-Kick の視聴ページで、ページ自身が使う Pusher(ログイン不要)を読み、Twitch と同じ口で YouTube 版の記録(配信キー kk.<slug>.<配信番号>)へ渡す。Twitch・Kick の違い(リンク・言葉・送信先・顔の置き場)は streamPlatform.js の表で引く。計器 yt_diag_kk_chat
+Kick の視聴ページで、ページ自身が使うリアルタイムの接続(つなぎ先は毎回 Kick の API に聞く・第一候補 Centrifugo・予備は API が返す Pusher の鍵・ログイン不要)を読み、Twitch と同じ口で YouTube 版の記録(配信キー kk.<slug>.<配信番号>)へ渡す。Twitch・Kick の違い(リンク・言葉・送信先・顔の置き場)は streamPlatform.js の表で引く。計器 yt_diag_kk_chat
 
 - [`extension-youtube/src/kick-content-entry.js`](../extension-youtube/src/kick-content-entry.js)
 - [`src/lib/kick/kickChatParse.js`](../src/lib/kick/kickChatParse.js)
 - [`src/lib/kick/kickApi.js`](../src/lib/kick/kickApi.js)
+- [`src/lib/kick/kickRealtime.js`](../src/lib/kick/kickRealtime.js)
 - [`src/lib/platform/streamPlatform.js`](../src/lib/platform/streamPlatform.js)
 - [`tests/e2e/kick-recording.spec.js`](../tests/e2e/kick-recording.spec.js)
 - [`council/kick-support-PLAN.md`](../council/kick-support-PLAN.md)

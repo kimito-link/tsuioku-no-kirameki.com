@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1185 件
+## ⚠️ 役割コメントが無いソース 10 / 1186 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1176,7 +1176,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2327)
+- 📁 **src/** (2329)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1479,14 +1479,16 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2048)
+  - 📁 **lib/** (2050)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
-    - 📁 **kick/** (3)
+    - 📁 **kick/** (5)
       - `kickApi.js` — kick.com のページ自身が使う API(/api/v2/channels/<slug>)の応答を、形を確かめて読む(純関数)
       - `kickChatParse.js` — Kick のチャット(ページ自身が使う Pusher)の1件を、YouTube 版の記録と同じ形にする(純関数)
       - `kickChatParse.test.js`
+      - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
+      - `kickRealtime.test.js`
     - 📁 **mcpBridge/** (11)
       - `buildLiveMcpSnapshot.js` — L0 Evidence（拡張の観測データ）→ L1 Canonical Snapshot 変換。
       - `buildLiveMcpSnapshot.test.js`
