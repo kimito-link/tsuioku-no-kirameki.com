@@ -1339,11 +1339,14 @@ function fixUidLabelAttr(el) {
 
 /** @param {Element} el */
 function fixTitleAttr(el) {
-  const t = el.getAttribute('title');
-  if (!t) return;
-  let next = screenWording(t);
-  if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
-  if (next !== t) el.setAttribute('title', next);
+  // title と aria-label(読み上げソフトが読む)の両方を直す
+  for (const name of ['title', 'aria-label']) {
+    const t = el.getAttribute(name);
+    if (!t) continue;
+    let next = screenWording(t);
+    if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
+    if (next !== t) el.setAttribute(name, next);
+  }
 }
 
 // ニコ生版はアイコンが無い人の顔を数字IDから(ニコニコの置き場所に)作るが、疑似IDなのでそこには無い。
@@ -1416,7 +1419,7 @@ function fixSubtree(root) {
   el.querySelectorAll('[data-nl-uid]').forEach(fixUidLabelAttr);
   el.querySelectorAll('img[src*="nicoaccount/usericon"]').forEach(fixImg);
   el.querySelectorAll('a[href*="nicovideo.jp/user/"], a[href*="live.nicovideo.jp/watch/lv9"]').forEach(fixAnchor);
-  el.querySelectorAll('[title]').forEach(fixTitleAttr);
+  el.querySelectorAll('[title], [aria-label]').forEach(fixTitleAttr);
   if (el.matches(EMPTY_THUMB_SEL)) fixEmptyThumb(el);
   el.querySelectorAll(EMPTY_THUMB_SEL).forEach(fixEmptyThumb);
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -1746,7 +1749,21 @@ function startDomFixer() {
     return;
   }
   if (!document.body) return;
+  hideNicoOnlyParts();
   startDomFixerOn(document.body, /\/(?:yt-)?venue\.html$/.test(String(location.pathname || '')));
+}
+
+/**
+ * ニコ生の公式の設定を切り替えるだけの部品(なふだ)は、YouTube・Twitch・Kick には相手が無い
+ * (押してもニコ生の視聴タブを探して「配信のタブが開いていません」になる・説明文も「ニコ生そのものの設定」「放送者さん」)。
+ * 画面の写しは変えず、見せないだけにする(2026-11-08 Kick 実測で見える文字に残っていた)。
+ */
+function hideNicoOnlyParts() {
+  if (document.getElementById('yt-hide-nico-only')) return;
+  const st = document.createElement('style');
+  st.id = 'yt-hide-nico-only';
+  st.textContent = '.nl-nameplate-inline, .nl-record-sub:has(#nameplateOnBtn) { display: none !important; }';
+  (document.head || document.documentElement).appendChild(st);
 }
 /**
  * @param {Element} target
@@ -1779,7 +1796,7 @@ function startDomFixerOn(target, isVenue) {
       else if (m.type === 'attributes') {
         const el = /** @type {Element} */ (m.target);
         if (m.attributeName === 'href' && el.tagName === 'A') fixAnchor(el);
-        else if (m.attributeName === 'title') fixTitleAttr(el);
+        else if (m.attributeName === 'title' || m.attributeName === 'aria-label') fixTitleAttr(el);
         else if (m.attributeName === 'src' && el.tagName === 'IMG') fixImg(el);
         else if (m.attributeName === 'data-nl-uid') fixUidLabelAttr(el);
       } else m.addedNodes.forEach(fixSubtree);
@@ -1789,7 +1806,7 @@ function startDomFixerOn(target, isVenue) {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['href', 'title', 'src', 'data-nl-uid'],
+    attributeFilter: ['href', 'title', 'aria-label', 'src', 'data-nl-uid'],
   });
 }
 if (typeof document !== 'undefined') {

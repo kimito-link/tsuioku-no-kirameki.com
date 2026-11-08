@@ -341,6 +341,14 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   const all = await ext.evaluate(() => document.body.textContent || '');
   expect(all).not.toContain('このPCの記録から数えます');
   expect(all).toContain('Kick 公式の Kicks ランキング');
+  // ニコ生だけの部品(なふだ)は見せない・ランキング欄の補足(title・aria-label)にも「ニコ生」「放送者」を残さない
+  const left = await ext.evaluate(() => {
+    const vis = document.body.innerText.split('\n').filter((l) => /ニコ生|放送者/.test(l));
+    const attrs = [];
+    for (const el of document.querySelectorAll('*')) for (const name of ['title', 'aria-label']) if (/ニコ生|放送者/.test(el.getAttribute(name) || '')) attrs.push(`${el.tagName}#${el.id} ${name}`);
+    return { vis, attrs };
+  });
+  expect(left).toEqual({ vis: [], attrs: [] });
 });
 
 test('Centrifugo が使えないときは、API が返す Pusher の鍵で読む', async ({ context, rt }) => {

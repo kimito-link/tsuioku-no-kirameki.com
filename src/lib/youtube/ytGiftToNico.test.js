@@ -24,6 +24,15 @@ describe('buildYtGiftBags', () => {
   it('知らない通貨はそのままの数', () => {
     expect(ytAmountToPoints(3, 'XYZ')).toBe(3);
   });
+  it('Bits・Kicks は1つ1pt(行ごとに丸めて合計がずれない)', () => {
+    expect(ytAmountToPoints(1, 'KICKS')).toBe(1);
+    expect(ytAmountToPoints(1, 'kicks')).toBe(1);
+    expect(ytAmountToPoints(100, 'BITS')).toBe(100);
+    const one = (/** @type {string} */ id) => ({ id, userId: '8000000009', nickname: 'k', ytKind: 'superchat', ytPlatform: 'kick', ytAmount: 1, ytCurrency: 'KICKS', capturedAt: 1 });
+    const g = buildYtGiftBags([one('a'), one('b')], 'lv1');
+    expect(g.totalPoints).toBe(2);
+    expect(g.throws?.[0].totalPoints).toBe(2);
+  });
 });
 
 describe('ytAmountLabel (元の金額)', () => {

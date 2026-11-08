@@ -52,6 +52,20 @@ describe('niconico だけの文', () => {
   });
 });
 
+describe('ランキング欄の補足の「ニコ生」(2026-11-08 Kick 実測で title・aria-label に残っていた)', () => {
+  it('どのサービスでも「ニコ生」を出さない', async () => {
+    const { ytWording } = await import('./ytWording.js');
+    for (const t of [
+      'パーセントではありません。ニコ生側の一覧がDOMに出るまでの待機表示です。',
+      'ニコ生プレイヤー表示の番組ギフト累計pt。下の一覧合計（履歴API）とは別指標です',
+      'ニコ生 ランキング',
+    ]) {
+      expect(ytWording(t)).not.toContain('ニコ生');
+      expect(ytWording(t, { topFans: false })).not.toContain('ニコ生');
+    }
+  });
+});
+
 describe('Twitch の画面の言葉(2026-11-07 実配信で残っていた文)', () => {
   const NICO_SENTENCE = 'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。';
   it('ニコ生の文 → 合計の順位の言葉 → Twitch の言葉', async () => {

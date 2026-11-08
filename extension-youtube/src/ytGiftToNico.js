@@ -31,10 +31,13 @@ const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
   INR: 1.8,
   BRL: 27,
   MXN: 8,
-  // Twitch の Bits(1 Bit ≒ 1.4 円・視聴者が買う値段の目安)。council/twitch-support-PLAN.md
-  BITS: 1.4,
-  // Kick の Kicks(100 Kicks ≒ 1 ドル前後・1 Kick ≒ 1.5 円の目安)。council/kick-support-PLAN.md
-  KICKS: 1.5,
+  // Twitch の Bits・Kick の Kicks は 1 つ = 1 pt(円にしない)。
+  //   ★以前は 1 Bit = 1.4・1 Kick = 1.5 にして行ごとに丸めていたため、1 Kick の行が 2 pt になり、
+  //     少額が重なるほど合計がずれた(2026-11-08 本物の Kick で 1 Kicks → 2 pt・2 Kicks → 4 pt)。
+  //     公式のランキングも Bits/Kicks の数で並ぶので、数のまま数えたほうがそろう。
+  //     Twitch・Kick の画面に出るのはそのサービスの応援だけなので、円の額と並べて比べる所は無い。
+  BITS: 1,
+  KICKS: 1,
 });
 
 /**
