@@ -62,7 +62,9 @@ export function isLikelyInternalNdgGiftOrCampaignLabel(s) {
       break;
     }
   }
-  if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
+  // v0.1.1929: 26字以上だけ。Twitch・Kick のログイン名は英数字と _ で最大25字(実例 luna_umbra_the_hellhound=24字が
+  //   Twitch 公式 Bits ランキングの1位で「名無し」になった・2026-11-08 PC 実測)。人の名前を内部ラベル扱いしない。
+  if (/^[a-z][a-z0-9_]{25,}$/i.test(t) && !hasNonAscii) return true;
   // 「unei_niconico」を含む = niconico 運営内部ラベル確定（めがくろ誤表示 fix）
   if (/unei_niconico/i.test(t)) return true;
   // 数字プレフィックス + snake_case ASCII（YYYYMMDD_xxx_NN 風）
