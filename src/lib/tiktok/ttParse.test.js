@@ -80,11 +80,11 @@ describe('配信の情報(/api-live/user/room/)', () => {
     const info = parseTtRoomInfo({
       data: {
         liveRoom: { status: 2, title: 'たいとる', startTime: 1762640000, liveRoomStats: { userCount: 333, enterCount: 900 } },
-        user: { roomId: '7571234567890123456', nickname: 'はいしんしゃ', uniqueId: 'Some.User', avatarThumb: AV, status: 2 },
+        user: { id: '6900000000000000001', roomId: '7571234567890123456', nickname: 'はいしんしゃ', uniqueId: 'Some.User', avatarThumb: AV, status: 2 },
       },
       statusCode: 0,
     });
-    expect(info).toMatchObject({ roomId: '7571234567890123456', isLive: true, title: 'たいとる', name: 'はいしんしゃ', uniqueId: 'some.user', iconUrl: AV, viewers: 333, startedAtMs: 1762640000000 });
+    expect(info).toMatchObject({ userId: '6900000000000000001', roomId: '7571234567890123456', isLive: true, title: 'たいとる', name: 'はいしんしゃ', uniqueId: 'some.user', iconUrl: AV, viewers: 333, startedAtMs: 1762640000000 });
   });
   it('配信なし(status 4)・形が違う', () => {
     expect(parseTtRoomInfo({ data: { liveRoom: { status: 4 }, user: { roomId: '7571234567890123456' } } })?.isLive).toBe(false);

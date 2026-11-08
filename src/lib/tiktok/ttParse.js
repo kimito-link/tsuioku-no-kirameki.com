@@ -112,7 +112,10 @@ export function parseTtRoomInfo(json) {
   const status = Math.floor(num(room?.status ?? user?.status));
   const stats = obj(room?.liveRoomStats);
   const viewers = stats && Number.isFinite(Number(stats.userCount)) ? Math.floor(num(stats.userCount)) : null;
+  const userId = str(user?.id);
   return {
+    // 配信者の userId(コメントの人キー tt:<userId> とそろえる)
+    userId: /^\d{1,20}$/.test(userId) && userId !== '0' ? userId : '',
     roomId: /^\d{5,20}$/.test(roomId) ? roomId : '',
     status,
     isLive: status === 2 && /^\d{5,20}$/.test(roomId),

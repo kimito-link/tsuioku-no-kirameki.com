@@ -234,7 +234,7 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
       return json({
         data: {
           liveRoom: { status: on ? 2 : 4, title: who === OTHER ? 'しずかな配信' : 'ざつだん配信', startTime: Math.floor(T0 / 1000) - 60, liveRoomStats: { userCount: 50, enterCount: 300 } },
-          user: { roomId: room, nickname: who === OTHER ? 'しずか' : 'はいしんしゃ', uniqueId: who, avatarThumb: AV, status: on ? 2 : 4 },
+          user: { id: who === OTHER ? '6900000000000000002' : '6900000000000000001', roomId: room, nickname: who === OTHER ? 'しずか' : 'はいしんしゃ', uniqueId: who, avatarThumb: AV, status: on ? 2 : 4 },
         },
         statusCode: 0,
       });
@@ -287,7 +287,7 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
     .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.concurrentViewers, { timeout: 40_000 })
     .toBe(77);
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
-  expect(sum).toMatchObject({ title: 'ざつだん配信', broadcasterName: 'はいしんしゃ', broadcasterHandle: UNIQUE });
+  expect(sum).toMatchObject({ title: 'ざつだん配信', broadcasterName: 'はいしんしゃ', broadcasterHandle: UNIQUE, broadcasterChannelId: 'tt:6900000000000000001' });
   expect(Number(sum.startedAt)).toBe((Math.floor(T0 / 1000) - 60) * 1000);
 
   // 送信: 入力欄(contenteditable)に書いて送信ボタン

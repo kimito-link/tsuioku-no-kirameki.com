@@ -413,7 +413,8 @@ async function check() {
         videoId: key,
         title: info.title || `${info.name || `@${uniqueId}`}の配信`,
         broadcasterName: info.name || `@${uniqueId}`,
-        broadcasterChannelId: `tt:@${uniqueId}`,
+        // 人キーはコメントと同じ tt:<userId>(配信者が自分でコメントしたときに同じ人として扱う)。分からなければ名前で
+        broadcasterChannelId: info.userId ? `tt:${info.userId}` : `tt:@${uniqueId}`,
         broadcasterHandle: uniqueId,
         broadcasterIconUrl: info.iconUrl || '',
         concurrentViewers: viewers != null && viewers >= 0 ? viewers : undefined,
