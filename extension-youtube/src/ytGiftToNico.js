@@ -31,6 +31,8 @@ const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
   INR: 1.8,
   BRL: 27,
   MXN: 8,
+  // Twitch の Bits(1 Bit ≒ 1.4 円・視聴者が買う値段の目安)。council/twitch-support-PLAN.md
+  BITS: 1.4,
 });
 
 /**
@@ -53,6 +55,13 @@ const ITEM_NAME = /** @type {Record<string, string>} */ ({
   yt_gift: 'ギフト',
 });
 
+/** Twitch の記録の名前(サブスク・ギフトサブ・Bits)。kind は YouTube と同じ形にそろえてある(src/lib/twitch/twIrcParse.js) */
+const TW_ITEM_NAME = /** @type {Record<string, string>} */ ({
+  superchat: 'Bits',
+  membership: 'サブスク',
+  membership_gift: 'ギフトサブ',
+});
+
 /**
  * 元の金額を、その通貨の書き方で出す(例: ¥1,000 / $5.00 / €2.00)。pt は円にしたおよその額なので、
  * 外国の通貨では元の金額を並べないと誤解される。
@@ -64,6 +73,7 @@ export function ytAmountLabel(amount, currency) {
   const a = Number(amount);
   if (!Number.isFinite(a) || a <= 0) return '';
   const cur = String(currency || '').toUpperCase();
+  if (cur === 'BITS') return `${a.toLocaleString('ja-JP')} Bits`;
   if (/^[A-Z]{3}$/.test(cur)) {
     try {
       return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: cur }).format(a);
@@ -82,7 +92,7 @@ export function isYtPaidKind(kind) {
 /**
  * @param {Array<{
  *   id?: string, userId?: string, nickname?: string, avatarUrl?: string, text?: string,
- *   capturedAt?: number, ytPostedAt?: number, ytKind?: string, ytGiftName?: string, ytGiftImageUrl?: string, ytAmount?: number, ytCurrency?: string
+ *   capturedAt?: number, ytPostedAt?: number, ytKind?: string, ytPlatform?: string, ytGiftName?: string, ytGiftImageUrl?: string, ytAmount?: number, ytCurrency?: string
  * }>} entries ytNicoShim が作ったニコ生形のコメント行
  * @param {string} lv 疑似 lv
  * @param {{ startedAt?: number, now?: number }} [opts]
@@ -106,13 +116,22 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     const uid = String(e.userId || '').trim();
     const nickname = String(e.nickname || '').trim();
     const kind = String(e.ytKind || '');
-    const baseItemName = ITEM_NAME[kind];
+    const baseItemName = (String(e.ytPlatform || '') === 'twitch' && TW_ITEM_NAME[kind]) || ITEM_NAME[kind];
     const amountLabel = ytAmountLabel(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
     // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
     // YouTube の新しい「ギフト」(ジュエルのスタンプ)はギフトの名前と絵がある(例: ハイ)。金額は出ないので pt は 0
     const giftName = kind === 'yt_gift' ? String(e.ytGiftName || '').trim() : '';
     const giftThumb = kind === 'yt_gift' ? String(e.ytGiftImageUrl || '') : '';
-    const itemName = giftName || (amountLabel ? `${baseItemName} ${amountLabel}` : baseItemName);
+    const twGiftCount = Number(e.ytGiftCount || 0);
+    const itemName =
+      giftName ||
+      (String(e.ytCurrency || '').toUpperCase() === 'BITS' && amountLabel
+        ? amountLabel // Twitch の Bits は「500 Bits」だけ(「Bits 500 Bits」と重ねない)
+        : amountLabel
+        ? `${baseItemName} ${amountLabel}`
+        : twGiftCount > 1
+        ? `${baseItemName} ×${twGiftCount}`
+        : baseItemName);
     const point = ytAmountToPoints(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
     const at = Number(e.ytPostedAt) || Number(e.capturedAt) || now;
     const pubSec = Math.floor(at / 1000);
@@ -188,7 +207,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
       ? {
           liveId: lv,
           capturedAt: now,
-          source: 'youtube',
+          source: paid.some((e) => String(e?.ytPlatform || '') === 'twitch') ? 'twitch' : 'youtube',
           history,
           totalCounts: [...byItem.values()].sort((a, b) => b.count - a.count),
           officialTotalPoint: totalPoints,
