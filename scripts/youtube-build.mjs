@@ -175,6 +175,9 @@ export function ytBuildTargets({ merged, define }) {
     // ふわっちの視聴ページの入口(council/whowatch-support-PLAN.md)。Kick と同じく本体向けだけ
     list.push({ entryPoints: [src('ww-content-entry.js')], outfile: out('ww-content.js'), target: 'chrome114', define: def, ...page,
       banner: { js: '// ww-content.js — ふわっちの視聴ページで配信とコメント(ページ自身が使う API)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // SHOWROOM の部屋のページの入口(council/showroom-support-PLAN.md)。本体向けだけ
+    list.push({ entryPoints: [src('sr-content-entry.js')], outfile: out('sr-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// sr-content.js — SHOWROOM の部屋のページでコメントとギフト(ページ自身が使うソケット)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
     list.push({ entryPoints: [resolve(root, 'extension-youtube/content-chat-main.js')], outfile: out('content-chat-main.js'), target: 'chrome114', define: def });
   }
   // offscreen は1つしか持てないので、本体向けには作らない(本体の offscreen を使う・YouTube の読み上げはコメビュ)

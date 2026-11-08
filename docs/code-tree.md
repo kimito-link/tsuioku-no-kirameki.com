@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1191 件
+## ⚠️ 役割コメントが無いソース 10 / 1193 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -800,7 +800,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (152)
+- 📁 **extension-youtube/** (153)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -924,7 +924,7 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (23)
+  - 📁 **src/** (24)
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
@@ -937,6 +937,7 @@
     - `sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
     - `sidepanel-yt-parts.html`
     - `sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
+    - `sr-content-entry.js` — SHOWROOM の部屋のページ(www.showroom-live.com/r/<room_url_key>)で、コメントとギフトを読んで記録に渡す入口。
     - `tw-content-entry.js` — Twitch の視聴ページ(www.twitch.tv/<チャンネル>)で、チャットを読んで記録に渡す入口。
     - `venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
     - `venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
@@ -1178,7 +1179,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2335)
+- 📁 **src/** (2337)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1481,7 +1482,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2056)
+  - 📁 **lib/** (2058)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1507,6 +1508,9 @@
       - `streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
       - `streamEmotes.test.js`
       - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick)の違いを1か所にまとめた表(純関数)
+    - 📁 **showroom/** (2)
+      - `srParse.js` — SHOWROOM の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
+      - `srParse.test.js`
     - 📁 **twitch/** (8)
       - `twGql.js` — twitch.tv の画面自身が使っている GQL の応答を「形から検証して」読む(純関数)
       - `twGql.test.js`
@@ -3577,13 +3581,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (87)
+- 📁 **tests/** (88)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (80)
+  - 📁 **e2e/** (81)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3649,6 +3653,7 @@
     - `popup-window-empty-history-whitespace.spec.js`
     - `refresh-storage-hang-resilient.spec.js`
     - `save-ctx-invalidated-recovery.spec.js`
+    - `showroom-recording.spec.js`
     - `sidepanel-first-byte-paint.spec.js`
     - `sidepanel-flash-capture.spec.js`
     - `sidepanel-lane-stability-monkey.spec.js`

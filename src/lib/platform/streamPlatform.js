@@ -8,6 +8,7 @@
 import { isTwStreamKey, twLoginOfStreamKey, buildTwStreamKey } from '../twitch/twStreamKey.js';
 import { parseTwChannelFromUrl, isTwLogin } from '../twitch/twIrcParse.js';
 import { isKickSlug, parseKickChannelFromUrl } from '../kick/kickChatParse.js';
+import { isSrStreamKey, srRoomKeyOfStreamKey, parseSrRoomKeyFromUrl, isSrRoomKey, srRoomUrl, buildSrStreamKey } from '../showroom/srParse.js';
 import { isWwStreamKey, wwLiveIdOfStreamKey, parseWwLiveIdFromUrl, isWwLiveId, isWwUserPath, wwPageUrl, buildWwStreamKey } from '../whowatch/wwParse.js';
 
 export const KK_STREAM_KEY_PREFIX = 'kk.';
@@ -41,7 +42,7 @@ function kickSlugOfStreamKey(key) {
 
 /**
  * @typedef {{
- *   id: 'twitch' | 'kick' | 'whowatch', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
+ *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
@@ -49,7 +50,7 @@ function kickSlugOfStreamKey(key) {
  * }} StreamPlatform
  */
 
-/** @type {Record<'twitch' | 'kick' | 'whowatch', StreamPlatform>} */
+/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom', StreamPlatform>} */
 export const STREAM_PLATFORMS = Object.freeze({
   twitch: Object.freeze({
     id: /** @type {'twitch'} */ ('twitch'),
@@ -117,9 +118,32 @@ export const STREAM_PLATFORMS = Object.freeze({
     thumbUrl: () => '',
     buildStreamKey: (/** @type {string} */ liveId, /** @type {any} */ opts) => buildWwStreamKey(liveId, opts),
   }),
+  // SHOWROOM(council/showroom-support-PLAN.md)。部屋のページ /r/<room_url_key>。人のページへのリンクはまだ無い(login は空)
+  showroom: Object.freeze({
+    id: /** @type {'showroom'} */ ('showroom'),
+    name: 'SHOWROOM',
+    keyHead: 'sr.',
+    personHead: 'sr:',
+    paid: 'ギフト',
+    paidCurrency: 'SRPT',
+    tabUrl: 'https://www.showroom-live.com/*',
+    sendType: 'SR_SEND_COMMENT',
+    lateIconsKey: 'yt_sr_icons',
+    emotesKey: '',
+    rankSentence: 'ギフトの pt の合計の順位（上位）を表示します。このPCの記録から数えます。',
+    officialBoard: '「貢献ランキング」',
+    noSubs: true,
+    isStreamKey: isSrStreamKey,
+    loginOfStreamKey: srRoomKeyOfStreamKey,
+    channelFromUrl: parseSrRoomKeyFromUrl,
+    isLogin: isSrRoomKey,
+    channelUrl: srRoomUrl,
+    thumbUrl: () => '',
+    buildStreamKey: (/** @type {string} */ roomKey, /** @type {any} */ opts) => buildSrStreamKey(roomKey, opts),
+  }),
 });
 
-const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch];
+const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom];
 
 /** 配信キー → サービス(YouTube なら null) @param {unknown} key */
 export function platformOfStreamKey(key) {
@@ -148,5 +172,6 @@ export function platformOfHostname(hostname) {
   if (/(^|\.)twitch\.tv$/.test(h)) return STREAM_PLATFORMS.twitch;
   if (/^(?:www\.)?kick\.com$/.test(h)) return STREAM_PLATFORMS.kick;
   if (/^(?:www\.)?whowatch\.tv$/.test(h)) return STREAM_PLATFORMS.whowatch;
+  if (/^(?:www\.)?showroom-live\.com$/.test(h)) return STREAM_PLATFORMS.showroom;
   return null;
 }

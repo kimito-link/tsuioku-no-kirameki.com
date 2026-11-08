@@ -918,6 +918,12 @@
   - `src/lib/platform/streamPlatform.js`
   - `tests/e2e/whowatch-recording.spec.js`
   - `council/whowatch-support-PLAN.md`
+- **SHOWROOM の配信を記録(本体に同梱)** — SHOWROOM の部屋のページ(/r/<room_url_key>)で、ページと同じ口(room/status・live_info・ソケット online.showroom-live.com に SUB)を読み、開いた時点の分は comment_log・gift_log から。有料ギフトは gift_list の point × 個数で superchat(SRPT)・無料ギフトは記録しない。公式の順位(summary_ranking)を YT_LEADERBOARD へ。配信キー sr.<room_url_key>.<live_id>・計器 yt_diag_sr_chat
+  - `extension-youtube/src/sr-content-entry.js`
+  - `src/lib/showroom/srParse.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/showroom-recording.spec.js`
+  - `council/showroom-support-PLAN.md`
 - **応援レーンタイル→発言一覧(comeview 詳細)** — popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)
   - `src/lib/comeviewUserDetailLink.js`
   - `src/extension/popup/wireLaneUserDetailOpen.js`
@@ -1425,7 +1431,7 @@
 - `v0.1.1932` 2026-11-08 — ふわっちのアイテム・匿名の人・文字化けを直す
 - `v0.1.1929` 2026-11-08 — 長い英数字の名前が「名無し」になるのを直す
 
-### 🏟 会場・席 (8版)
+### 🏟 会場・席 (7版)
 - `v0.1.1932` 2026-11-08 — ふわっちのアイテム・匿名の人・文字化けを直す
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
 - `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
@@ -1433,14 +1439,14 @@
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
-- `v0.1.1912` 2026-11-06 — YouTube でログイン中なのに送れない表示を直す
 
 ### 🎈 吹き出し (3版)
 - `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🎁 ギフト (8版)
+### 🎁 ギフト (9版)
+- `v0.1.1933` 2026-11-08 — SHOWROOM の配信を記録(試作)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
 - `v0.1.1926` 2026-11-08 — Twitch 公式の Bits ランキングを出す
 - `v0.1.1923` 2026-11-08 — Kick 公式の Kicks ランキングを出す
