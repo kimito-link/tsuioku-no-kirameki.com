@@ -42,6 +42,8 @@ const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
   WWITEM: 1,
   // SHOWROOM のギフトの pt(gift_list の point × 個数)。数のまま
   SRPT: 1,
+  // ミクチャのギフトのコイン(items の price × 個数)。数のまま
+  MXCOIN: 1,
 });
 
 /**
@@ -70,9 +72,10 @@ const PLATFORM_ITEM_NAME = /** @type {Record<string, Record<string, string>>} */
   kick: { superchat: 'Kicks', membership: 'サブスク', membership_gift: 'ギフトサブ' },
   whowatch: { superchat: 'アイテム' },
   showroom: { superchat: 'ギフト' },
+  mixch: { superchat: 'ギフト' },
 });
 /** 「500 Bits」「500 Kicks」と数で書く通貨 */
-const COUNT_CURRENCY = /** @type {Record<string, string>} */ ({ BITS: 'Bits', KICKS: 'Kicks', WWITEM: '個', SRPT: 'pt' });
+const COUNT_CURRENCY = /** @type {Record<string, string>} */ ({ BITS: 'Bits', KICKS: 'Kicks', WWITEM: '個', SRPT: 'pt', MXCOIN: 'コイン' });
 
 /**
  * 元の金額を、その通貨の書き方で出す(例: ¥1,000 / $5.00 / €2.00)。pt は円にしたおよその額なので、
@@ -133,7 +136,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
     // YouTube の新しい「ギフト」(ジュエルのスタンプ)はギフトの名前と絵がある(例: ハイ)。金額は出ないので pt は 0
     // ふわっちのアイテム・SHOWROOM のギフトも名前と絵がある
-    const named = kind === 'yt_gift' || /^(?:whowatch|showroom)$/.test(String(e.ytPlatform || ''));
+    const named = kind === 'yt_gift' || /^(?:whowatch|showroom|mixch)$/.test(String(e.ytPlatform || ''));
     const giftName = named ? String(e.ytGiftName || '').trim() : '';
     const giftThumb = named ? String(e.ytGiftImageUrl || '') : '';
     const twGiftCount = Number(e.ytGiftCount || 0);

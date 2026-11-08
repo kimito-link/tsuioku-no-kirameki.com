@@ -1,0 +1,427 @@
+// mx-content-entry.js — ミクチャの配信ページ(mixch.tv/u/<番号>/live)で、コメントとギフトを読んで記録に渡す入口。
+/* global chrome, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLInputElement, HTMLTextAreaElement, Event, KeyboardEvent */
+//
+// ★設計(council/mixch-support-PLAN.md・SHOWROOM の sr-content-entry.js と同じ形)
+//   - 形は 2026-11-08 の PC 実測(本物・ログインなし)から。ページ自身と同じ口を読む:
+//     配信 /api-web/users/<A>/live → ソケット wss://chat.mixch.tv/torte/room/<A>(受けるだけ)。
+//     開いた時点の分は /api-web/lives/<A>/messages から(同じコメントはソケットと同じ message_id=重ねない)。
+//   - ギフトの値段は /items/available の price × 個数(単位はコインとみている)。名前の口は未発見なので「ギフト」と出す。
+//   - 公式の順位は今月のファンランキング(score つき)を YT_LEADERBOARD へ。
+//   - 記録は YT_STREAM_META / YT_CHAT_ITEMS へ。配信キーは 'mx.<A>.<live_session_id>'。
+//   - 配信の終わりは /api-web/users/<A>/live で配信の情報が消えたとき(終わりの印は未実測・計器 liveStatus で見る)。
+
+import {
+  MX_ORIGIN,
+  parseMxUserIdFromUrl,
+  mxLiveInfoUrl,
+  mxMessagesUrl,
+  mxRankingUrl,
+  mxItemsUrls,
+  parseMxLive,
+  parseMxItems,
+  parseMxSocketFrame,
+  mxMessageRows,
+  mxKindOf,
+  parseMxMessage,
+  parseMxRanking,
+  buildMxStreamKey,
+} from '../../src/lib/mixch/mxParse.js';
+
+const META_EVERY_MS = 30_000;
+const BOARD_EVERY_MS = 120_000;
+const FLUSH_MS = 200;
+const MAX_SEEN = 8000;
+
+/** 計器(状態速報と同じく storage に置く) */
+const diag = {
+  v: 1,
+  userId: '',
+  sessionId: '',
+  streamKey: '',
+  live: /** @type {boolean | null} */ (null),
+  /** @type {Record<string, number>} broadcasterInfo.live_status の値ごとの数(終わりの印を探すため) */
+  liveStatus: {},
+  wsState: 'idle',
+  wsConnects: 0,
+  frames: 0,
+  /** @type {Record<string, number>} ソケットの kind ごとの数(知らない kind に気づくため) */
+  kinds: {},
+  comments: 0,
+  gifts: 0,
+  giftCoin: 0,
+  unknownGifts: 0,
+  backlog: 0,
+  items: 0,
+  dropped: 0,
+  itemList: 0,
+  itemsVia: '',
+  boardRows: 0,
+  apiFail: 0,
+  lastError: '',
+  updatedAt: 0,
+};
+
+function safeSendMessage(/** @type {any} */ msg) {
+  try {
+    if (!chrome?.runtime?.id) return;
+    chrome.runtime.sendMessage(msg, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch {
+    /* 拡張が入れ替わった直後 */
+  }
+}
+
+let diagTimer = 0;
+function saveDiagSoon() {
+  if (diagTimer) return;
+  diagTimer = setTimeout(() => {
+    diagTimer = 0;
+    diag.updatedAt = Date.now();
+    try {
+      void chrome.storage.local.set({ yt_diag_mx_chat: { ...diag, kinds: { ...diag.kinds }, liveStatus: { ...diag.liveStatus } } });
+    } catch {
+      /* no-op */
+    }
+  }, 2000);
+}
+
+/** @param {string} url */
+async function getJson(url) {
+  const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`mx_${res.status}`);
+  return res.json();
+}
+/** @param {string} url */
+async function tryJson(url) {
+  if (!url) return null;
+  try {
+    return await getJson(url);
+  } catch (e) {
+    diag.apiFail += 1;
+    diag.lastError = String(/** @type {any} */ (e)?.message || e).slice(0, 80);
+    return null;
+  }
+}
+
+// ---- 1配信ぶんの読み取り ----
+let current = /** @type {null | { userId: string, key: string, stop: () => void }} */ (null);
+
+/**
+ * @param {string} userId
+ * @param {string} sessionId
+ * @param {string} key
+ * @param {string} socketUrl
+ * @param {(viewers: number) => void} onViewers
+ */
+function startReader(userId, sessionId, key, socketUrl, onViewers) {
+  let stopped = false;
+  /** @type {WebSocket | null} */
+  let ws = null;
+  let backoff = 1000;
+  let reconnectTimer = 0;
+  let flushTimer = 0;
+  let boardAt = 0;
+  /** @type {any[]} */
+  let pending = [];
+  /** @type {Set<string>} */
+  const seen = new Set();
+  /** @type {Map<string, { price: number, imageUrl: string }>} */
+  let items = new Map();
+
+  const flush = () => {
+    flushTimer = 0;
+    if (stopped || !pending.length) return;
+    const rows = pending.sort((a, b) => a.postedAtMs - b.postedAtMs);
+    pending = [];
+    diag.items += rows.length;
+    safeSendMessage({ type: 'YT_CHAT_ITEMS', payload: { videoId: key, chatFilterLabel: '', items: rows } });
+    saveDiagSoon();
+  };
+  /** @param {any} raw */
+  const take = (raw) => {
+    const kind = mxKindOf(raw);
+    if (kind === 10 && Number.isFinite(Number(raw?.viewer))) onViewers(Math.max(0, Math.floor(Number(raw.viewer))));
+    const r = parseMxMessage(raw, { userId, items });
+    if (!r) {
+      if (kind === 0 || raw?.item_id != null) diag.dropped += 1;
+      return;
+    }
+    if (seen.has(r.id)) return;
+    seen.add(r.id);
+    if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
+    if (r.giftName) {
+      diag.gifts += 1;
+      diag.giftCoin += r.amount;
+      if (!r.amount) diag.unknownGifts += 1;
+    } else diag.comments += 1;
+    pending.push(r);
+    if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);
+  };
+
+  const loadItems = async () => {
+    for (const url of mxItemsUrls(sessionId)) {
+      try {
+        const m = parseMxItems(await getJson(url));
+        if (m.size) {
+          items = m;
+          diag.itemsVia = url.includes('/api-web/') ? 'api-web' : 'root';
+          break;
+        }
+      } catch {
+        /* 次の候補 */
+      }
+    }
+    diag.itemList = items.size;
+  };
+
+  const loadBoard = async () => {
+    const rows = parseMxRanking(await tryJson(mxRankingUrl(userId)));
+    boardAt = Date.now();
+    if (stopped || !rows.length) return;
+    diag.boardRows = rows.length;
+    safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows } });
+    saveDiagSoon();
+  };
+
+  const loadBacklog = async () => {
+    const rows = mxMessageRows(await tryJson(mxMessagesUrl(userId)));
+    if (stopped) return;
+    diag.backlog += rows.length;
+    rows.forEach(take);
+  };
+
+  /** @param {string} raw */
+  const onFrame = (raw) => {
+    diag.frames += 1;
+    for (const m of parseMxSocketFrame(raw)) {
+      const k = String(mxKindOf(m));
+      diag.kinds[k] = (diag.kinds[k] || 0) + 1;
+      take(m);
+    }
+    saveDiagSoon();
+  };
+
+  const connect = () => {
+    if (stopped) return;
+    if (!socketUrl) {
+      diag.wsState = 'no-url';
+      return;
+    }
+    diag.wsState = 'connecting';
+    diag.wsConnects += 1;
+    try {
+      ws = new WebSocket(socketUrl);
+    } catch {
+      scheduleReconnect();
+      return;
+    }
+    ws.onopen = () => {
+      diag.wsState = 'open';
+      backoff = 1000;
+      saveDiagSoon();
+    };
+    ws.onmessage = (ev) => onFrame(typeof ev.data === 'string' ? ev.data : '');
+    ws.onclose = () => {
+      diag.wsState = 'closed';
+      saveDiagSoon();
+      scheduleReconnect();
+    };
+  };
+  const scheduleReconnect = () => {
+    if (stopped || reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = 0;
+      connect();
+      // つなぎ直しの間の分を取り戻す(同じ message_id は重ねない)
+      void loadBacklog();
+    }, backoff);
+    backoff = Math.min(backoff * 2, 60_000);
+  };
+  const boardTimer = setInterval(() => {
+    if (!stopped && Date.now() - boardAt >= BOARD_EVERY_MS) void loadBoard();
+  }, 15_000);
+
+  void (async () => {
+    await loadItems();
+    if (stopped) return;
+    connect();
+    void loadBacklog();
+    void loadBoard();
+  })();
+
+  return () => {
+    stopped = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    clearInterval(boardTimer);
+    flush();
+    try {
+      ws?.close();
+    } catch {
+      /* no-op */
+    }
+    diag.wsState = 'idle';
+  };
+}
+
+let lastInfoAt = 0;
+let checking = false;
+/** ソケットの kind 10 から来た視聴数(次の配信情報の送信で使う) */
+let latestViewers = /** @type {number | null} */ (null);
+
+async function check() {
+  if (checking) return;
+  const userId = parseMxUserIdFromUrl(location.href);
+  if (!userId) {
+    if (current) {
+      current.stop();
+      current = null;
+    }
+    diag.userId = '';
+    return;
+  }
+  if (current?.userId === userId && Date.now() - lastInfoAt < META_EVERY_MS) return;
+  checking = true;
+  try {
+    const info = parseMxLive(await tryJson(mxLiveInfoUrl(userId)), userId);
+    lastInfoAt = Date.now();
+    diag.userId = userId;
+    if (!info) return saveDiagSoon();
+    diag.live = info.isLive;
+    if (info.liveStatus) diag.liveStatus[info.liveStatus] = (diag.liveStatus[info.liveStatus] || 0) + 1;
+    if (!info.isLive) {
+      if (current) {
+        const endedKey = current.key;
+        current.stop();
+        current = null;
+        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+      }
+      diag.streamKey = '';
+      return saveDiagSoon();
+    }
+    const key = buildMxStreamKey(userId, { sessionId: info.sessionId });
+    if (!key) return saveDiagSoon();
+    if (!current || current.key !== key) {
+      current?.stop();
+      latestViewers = null;
+      current = { userId, key, stop: startReader(userId, info.sessionId, key, info.chat, (v) => (latestViewers = v)) };
+      diag.streamKey = key;
+      diag.sessionId = info.sessionId;
+    }
+    const viewers = latestViewers ?? info.viewers;
+    safeSendMessage({
+      type: 'YT_STREAM_META',
+      payload: {
+        videoId: key,
+        title: info.title || `${info.name || 'ミクチャ'}の配信`,
+        broadcasterName: info.name || `ミクチャ${userId.slice(-4)}`,
+        broadcasterChannelId: `mx:${userId}`,
+        broadcasterHandle: userId,
+        broadcasterIconUrl: info.iconUrl || '',
+        concurrentViewers: viewers != null && viewers >= 0 ? viewers : undefined,
+        ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+      },
+    });
+    saveDiagSoon();
+  } finally {
+    checking = false;
+  }
+}
+
+// ---- サイドパネル・会場からのコメント送信 ----
+// 未ログインのときは入力欄が無く「コメントするにはログインしてください」が出る(2026-11-08 PC 実測)。
+//   ログイン中の入力欄の形は未実測なので、コメントの入力欄らしいものを広めに探す。/api-web/login-status が null なら未ログイン。
+const MX_INPUT_SEL = 'textarea[placeholder*="コメント"], input[placeholder*="コメント"], form textarea, form input[type="text"]';
+const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
+
+/** ログインしていないと分かるか(分からなければ false=送ってみる) */
+async function mxSignedOut() {
+  try {
+    const res = await fetch(`${MX_ORIGIN}/api-web/login-status`, { credentials: 'include', headers: { Accept: 'application/json' } });
+    if (!res.ok) return false;
+    const body = (await res.text()).trim();
+    return body === '' || body === 'null';
+  } catch {
+    return false;
+  }
+}
+
+/** 「送信する」ボタン(文字で探す) */
+function findSendButton() {
+  for (const b of Array.from(document.querySelectorAll('button'))) {
+    if (/送信/.test(String(b.textContent || ''))) return /** @type {HTMLButtonElement} */ (b);
+  }
+  return null;
+}
+
+/** @param {string} reason */
+function noteSendFail(reason) {
+  try {
+    void chrome.storage.local.set({ yt_diag_mx_send_fail: { at: Date.now(), reason, userId: diag.userId } });
+  } catch {
+    /* no-op */
+  }
+}
+
+try {
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (!msg || msg.type !== 'MX_SEND_COMMENT') return undefined;
+    (async () => {
+      const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      if (!text) return { ok: false, reason: 'empty' };
+      if (await mxSignedOut()) {
+        noteSendFail('not-signed-in');
+        return { ok: false, reason: 'not-signed-in' };
+      }
+      let input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.querySelector(MX_INPUT_SEL));
+      for (let i = 0; !input && i < 6; i += 1) {
+        await sleep(250);
+        input = /** @type {any} */ (document.querySelector(MX_INPUT_SEL));
+      }
+      if (!input) {
+        noteSendFail('no-input');
+        return { ok: false, reason: 'no-input' };
+      }
+      input.focus();
+      const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, text);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(150);
+      const btn = findSendButton();
+      if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
+        noteSendFail('send-disabled');
+        return { ok: false, reason: 'send-disabled' };
+      }
+      if (btn) btn.click();
+      else {
+        const opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+        input.dispatchEvent(new KeyboardEvent('keydown', opts));
+        input.dispatchEvent(new KeyboardEvent('keyup', opts));
+      }
+      await sleep(400);
+      const ok = String(input.value || '').trim() !== text;
+      try {
+        void chrome.storage.local.set({ yt_diag_mx_send_last: { at: Date.now(), ok, len: text.length, userId: diag.userId, via: btn ? 'button' : 'enter' } });
+      } catch {
+        /* no-op */
+      }
+      if (!ok) noteSendFail('still-in-box');
+      return { ok, reason: ok ? '' : 'still-in-box' };
+    })()
+      .then((r) => sendResponse(r))
+      .catch((e) => sendResponse({ ok: false, reason: String(e) }));
+    return true;
+  });
+} catch {
+  /* 拡張が入れ替わった直後 */
+}
+
+let lastHref = '';
+setInterval(() => {
+  if (location.href !== lastHref) {
+    lastHref = location.href;
+    lastInfoAt = 0;
+  }
+  void check();
+}, 1000);
+window.addEventListener('pagehide', () => current?.stop());

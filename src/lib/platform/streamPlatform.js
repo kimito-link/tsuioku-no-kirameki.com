@@ -9,6 +9,7 @@ import { isTwStreamKey, twLoginOfStreamKey, buildTwStreamKey } from '../twitch/t
 import { parseTwChannelFromUrl, isTwLogin } from '../twitch/twIrcParse.js';
 import { isKickSlug, parseKickChannelFromUrl } from '../kick/kickChatParse.js';
 import { isSrStreamKey, srRoomKeyOfStreamKey, parseSrRoomKeyFromUrl, isSrRoomKey, srRoomUrl, buildSrStreamKey } from '../showroom/srParse.js';
+import { isMxStreamKey, mxUserIdOfStreamKey, parseMxUserIdFromUrl, isMxUserId, mxLiveUrl, buildMxStreamKey } from '../mixch/mxParse.js';
 import { isWwStreamKey, wwLiveIdOfStreamKey, parseWwLiveIdFromUrl, isWwLiveId, isWwUserPath, wwPageUrl, buildWwStreamKey } from '../whowatch/wwParse.js';
 
 export const KK_STREAM_KEY_PREFIX = 'kk.';
@@ -42,7 +43,7 @@ function kickSlugOfStreamKey(key) {
 
 /**
  * @typedef {{
- *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
+ *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
@@ -50,7 +51,7 @@ function kickSlugOfStreamKey(key) {
  * }} StreamPlatform
  */
 
-/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom', StreamPlatform>} */
+/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch', StreamPlatform>} */
 export const STREAM_PLATFORMS = Object.freeze({
   twitch: Object.freeze({
     id: /** @type {'twitch'} */ ('twitch'),
@@ -141,9 +142,32 @@ export const STREAM_PLATFORMS = Object.freeze({
     thumbUrl: () => '',
     buildStreamKey: (/** @type {string} */ roomKey, /** @type {any} */ opts) => buildSrStreamKey(roomKey, opts),
   }),
+  // ミクチャ(council/mixch-support-PLAN.md)。配信のページ /u/<番号>/live。login の位置に配信者の番号を置く
+  mixch: Object.freeze({
+    id: /** @type {'mixch'} */ ('mixch'),
+    name: 'ミクチャ',
+    keyHead: 'mx.',
+    personHead: 'mx:',
+    paid: 'ギフト',
+    paidCurrency: 'MXCOIN',
+    tabUrl: 'https://mixch.tv/*',
+    sendType: 'MX_SEND_COMMENT',
+    lateIconsKey: 'yt_mx_icons',
+    emotesKey: '',
+    rankSentence: 'ギフトのコインの合計の順位（上位）を表示します。このPCの記録から数えます。',
+    officialBoard: '「今月のファンランキング」',
+    noSubs: true,
+    isStreamKey: isMxStreamKey,
+    loginOfStreamKey: mxUserIdOfStreamKey,
+    channelFromUrl: parseMxUserIdFromUrl,
+    isLogin: isMxUserId,
+    channelUrl: mxLiveUrl,
+    thumbUrl: () => '',
+    buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildMxStreamKey(a, opts),
+  }),
 });
 
-const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom];
+const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom, STREAM_PLATFORMS.mixch];
 
 /** 配信キー → サービス(YouTube なら null) @param {unknown} key */
 export function platformOfStreamKey(key) {
@@ -173,5 +197,6 @@ export function platformOfHostname(hostname) {
   if (/^(?:www\.)?kick\.com$/.test(h)) return STREAM_PLATFORMS.kick;
   if (/^(?:www\.)?whowatch\.tv$/.test(h)) return STREAM_PLATFORMS.whowatch;
   if (/^(?:www\.)?showroom-live\.com$/.test(h)) return STREAM_PLATFORMS.showroom;
+  if (/^(?:www\.)?mixch\.tv$/.test(h)) return STREAM_PLATFORMS.mixch;
   return null;
 }

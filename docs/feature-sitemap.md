@@ -924,6 +924,12 @@
   - `src/lib/platform/streamPlatform.js`
   - `tests/e2e/showroom-recording.spec.js`
   - `council/showroom-support-PLAN.md`
+- **ミクチャの配信を記録(本体に同梱)** — ミクチャの配信のページ(/u/<番号>/live)で、ページと同じ口(users/<番号>/live・ソケット chat.mixch.tv/torte/room・lives/<番号>/messages・items/available)からコメントとギフトを読み、YouTube 版と同じ記録へ渡す。配信キー mx.<番号>.<live_session_id>・ギフトは price × 個数(MXCOIN)・計器 yt_diag_mx_chat
+  - `extension-youtube/src/mx-content-entry.js`
+  - `src/lib/mixch/mxParse.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/mixch-recording.spec.js`
+  - `council/mixch-support-PLAN.md`
 - **応援レーンタイル→発言一覧(comeview 詳細)** — popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)
   - `src/lib/comeviewUserDetailLink.js`
   - `src/extension/popup/wireLaneUserDetailOpen.js`
@@ -1420,10 +1426,9 @@
 - `v0.1.1922` 2026-11-08 — Kick のチャットが本物で記録されるように
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 
-### 📥 コメント取得 (3版)
+### 📥 コメント取得 (2版)
 - `v0.1.1932` 2026-11-08 — ふわっちのアイテム・匿名の人・文字化けを直す
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
-- `v0.1.1915` 2026-11-07 — YouTube の過去ログ取り込みでも混ざりを直す
 
 ### 🙂 匿名(184) (3版)
 - `v0.1.1934` 2026-11-08 — ふわっちの匿名・運営・配信名を直す
@@ -1440,7 +1445,8 @@
 ### 🎈 吹き出し (1版)
 - `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 
-### 🎁 ギフト (9版)
+### 🎁 ギフト (10版)
+- `v0.1.1936` 2026-11-08 — ミクチャの配信を記録(試作)
 - `v0.1.1933` 2026-11-08 — SHOWROOM の配信を記録(試作)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
 - `v0.1.1926` 2026-11-08 — Twitch 公式の Bits ランキングを出す
