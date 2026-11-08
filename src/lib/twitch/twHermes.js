@@ -109,3 +109,121 @@ export function parseTwRedemption(data, channel) {
     rewardCost: Math.max(0, Math.floor(Number(reward?.cost) || 0)),
   };
 }
+
+/** ハイプトレインの話題 @param {string} channelId */
+export function twHypeTopic(channelId) {
+  const id = String(channelId || '');
+  return /^\d{1,20}$/.test(id) ? `hype-train-events-v2.${id}` : '';
+}
+
+/** 予想(チャンネルポイントで当てる)の話題 @param {string} channelId */
+export function twPredictionTopic(channelId) {
+  const id = String(channelId || '');
+  return /^\d{1,20}$/.test(id) ? `predictions-channel-v1.${id}` : '';
+}
+
+/**
+ * 配信者の名前で残す1行(ハイプトレインのレベル・予想の結果)。
+ * @param {{ channel: string, channelId: string, broadcasterName?: string }} ctx
+ * @param {string} id @param {string} text @param {string} kind @param {number} [atMs]
+ */
+function broadcasterRow(ctx, id, text, kind, atMs = 0) {
+  const login = String(ctx.channel || '').toLowerCase();
+  const cid = String(ctx.channelId || '');
+  return {
+    id,
+    channelId: /^\d{1,20}$/.test(cid) ? `tw:${cid}` : `tw:@${login}`,
+    name: String(ctx.broadcasterName || login),
+    login,
+    iconUrl: '',
+    badges: ['broadcaster'],
+    ts: '',
+    postedAtMs: atMs,
+    channel: login,
+    roomId: cid,
+    color: '',
+    text,
+    kind,
+    amount: 0,
+    currency: '',
+  };
+}
+
+/** @param {unknown} s */
+function twSourceLabel(s) {
+  const v = String(s || '').toUpperCase();
+  if (v.includes('BITS')) return 'Bits';
+  if (v.includes('SUB')) return 'サブスク';
+  return '';
+}
+
+/**
+ * ハイプトレイン(2026-11-08 PC 実測の形)→ 記録の1行。記録しない通知・形が違えば null。
+ * - hype-train-level-up: 配信者の名前で「ハイプトレインがレベル N になりました」(同じレベルは1回)
+ * - hype-train-conductor-update: その人の名前で「ハイプトレインの車掌になりました(Bits)」
+ * - hype-train-end: 配信者の名前で「ハイプトレインが終わりました(レベル N)」
+ * 進み具合(progression)は1件ごとに来るので記録しない(Bits・サブスクの行は IRC で記録済み)。
+ * @param {Record<string, any> | null} data notification の中身
+ * @param {{ channel: string, channelId: string, broadcasterName?: string, lastLevel?: number, nowMs?: number }} ctx
+ * @returns {null | { row: ReturnType<typeof broadcasterRow>, level?: number }}
+ */
+export function parseTwHypeTrain(data, ctx) {
+  const t = String(data?.type || '');
+  const d = obj(data?.data);
+  if (!d || !/^hype-train-/.test(t)) return null;
+  const now = Number(ctx.nowMs) || 0;
+  if (t === 'hype-train-level-up') {
+    const level = Math.floor(Number(obj(obj(d.progress)?.level)?.value) || 0);
+    const trainId = String(obj(d.hype_train)?.id || '').trim();
+    if (!(level >= 1) || !trainId) return null;
+    return { row: broadcasterRow(ctx, `tw-hype-${trainId}-lv${level}`, `ハイプトレインがレベル${level}になりました`, 'tw_hype', now), level };
+  }
+  if (t === 'hype-train-end') {
+    const trainId = String(d.id || '').trim();
+    if (!trainId) return null;
+    const lv = Math.floor(Number(ctx.lastLevel) || 0);
+    const atSec = Number(d.ended_at);
+    const at = atSec > 1e12 ? atSec : atSec > 1e9 ? atSec * 1000 : now;
+    return { row: broadcasterRow(ctx, `tw-hype-${trainId}-end`, `ハイプトレインが終わりました${lv >= 1 ? `(レベル${lv})` : ''}`, 'tw_hype', at) };
+  }
+  if (t === 'hype-train-conductor-update') {
+    const u = obj(d.user);
+    const login = String(u?.login || '').toLowerCase();
+    const userId = String(u?.id || '').trim();
+    if (!/^[a-z0-9_]{1,25}$/.test(login)) return null;
+    const src = twSourceLabel(d.source);
+    const row = broadcasterRow(ctx, `tw-hype-cond-${String(d.id || '').trim() || 'x'}-${String(d.source || '')}-${userId || login}`, `ハイプトレインの車掌になりました${src ? `(${src})` : ''}`, 'tw_hype', now);
+    return {
+      row: {
+        ...row,
+        channelId: /^\d{1,20}$/.test(userId) ? `tw:${userId}` : `tw:@${login}`,
+        name: String(u?.display_name || login),
+        login,
+        badges: [],
+      },
+    };
+  }
+  return null;
+}
+
+/**
+ * 予想の結果(event-updated で status が RESOLVED)→ 配信者の名前で1行。それ以外・形が違えば null。
+ * 「予想「勝てる?」の結果: 「はい」(12人・3,400ポイント)」
+ * @param {Record<string, any> | null} data
+ * @param {{ channel: string, channelId: string, broadcasterName?: string, nowMs?: number }} ctx
+ */
+export function parseTwPrediction(data, ctx) {
+  if (String(data?.type || '') !== 'event-updated') return null;
+  const e = obj(obj(data?.data)?.event);
+  if (!e || String(e.status || '') !== 'RESOLVED') return null;
+  const id = String(e.id || '').trim();
+  const title = String(e.title || '').trim();
+  const outcomes = Array.isArray(e.outcomes) ? e.outcomes.map(obj).filter(Boolean) : [];
+  const win = outcomes.find((o) => String(o?.id || '') === String(e.winning_outcome_id || ''));
+  if (!id || !title || !win) return null;
+  const users = Math.max(0, Math.floor(Number(win.total_users) || 0));
+  const pts = Math.max(0, Math.floor(Number(win.total_points) || 0));
+  const detail = users || pts ? `(${users.toLocaleString('ja-JP')}人・${pts.toLocaleString('ja-JP')}ポイント)` : '';
+  const at = Date.parse(String(e.ended_at || ''));
+  return broadcasterRow(ctx, `tw-pred-${id}`, `予想「${title}」の結果: 「${String(win.title || '').trim()}」${detail}`, 'tw_prediction', Number.isFinite(at) ? at : Number(ctx.nowMs) || 0);
+}

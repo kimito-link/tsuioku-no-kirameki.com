@@ -22,7 +22,17 @@ import {
   parseTwUsersIcons,
   parseTwLeaderboards,
 } from '../../src/lib/twitch/twGql.js';
-import { twHermesUrl, twRewardTopic, twHermesSubscribeMsg, parseTwHermesFrame, parseTwRedemption } from '../../src/lib/twitch/twHermes.js';
+import {
+  twHermesUrl,
+  twRewardTopic,
+  twHypeTopic,
+  twPredictionTopic,
+  twHermesSubscribeMsg,
+  parseTwHermesFrame,
+  parseTwRedemption,
+  parseTwHypeTrain,
+  parseTwPrediction,
+} from '../../src/lib/twitch/twHermes.js';
 import { createEmoteSaver } from './pfEmoteStore.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
@@ -65,6 +75,9 @@ const diag = {
   hermesState: 'idle',
   hermesConnects: 0,
   hermesSubscribed: 0,
+  /** ハイプトレイン(レベル・車掌・終わり)・予想の結果の行数 */
+  hype: 0,
+  predictions: 0,
   hermesError: '',
   redemptions: 0,
   updatedAt: 0,
@@ -195,6 +208,9 @@ async function lookupIcons(logins) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { login: string, key: string, stop: () => void }} */ (null);
+/** 配信者の表示名(GQL で分かったもの・ハイプトレイン等の行の名前) */
+let lastBroadcasterName = '';
+const broadcasterName = () => lastBroadcasterName;
 
 /**
  * @param {string} login
@@ -330,6 +346,11 @@ function startReader(login, key, channelId = '') {
   let hKeepMs = 30_000;
   let hLastAt = 0;
   const topic = twRewardTopic(channelId);
+  // ハイプトレイン・予想も同じ口で受ける(2026-11-08 PC 実測で、ログインなしで購読でき形も取れた)
+  const extraTopics = [twHypeTopic(channelId), twPredictionTopic(channelId)].filter(Boolean);
+  /** 購読の id → 話題(リワードの購読が通ったかを見分ける) @type {Map<string, string>} */
+  const subTopics = new Map();
+  let hypeLevel = 0;
   const hConnect = (url = '') => {
     if (stopped || !topic) return;
     diag.hermesState = 'connecting';
@@ -348,16 +369,21 @@ function startReader(login, key, channelId = '') {
         hBackoff = 2000;
         hKeepMs = (f.keepaliveSec + 20) * 1000;
         diag.hermesState = 'open';
-        const id = `nl-${Date.now().toString(36)}`;
-        try {
-          hws?.send(JSON.stringify(twHermesSubscribeMsg(topic, id)));
-        } catch {
-          /* no-op */
-        }
+        subTopics.clear();
+        [topic, ...extraTopics].forEach((tp, i) => {
+          const id = `nl-${Date.now().toString(36)}-${i}`;
+          subTopics.set(id, tp);
+          try {
+            hws?.send(JSON.stringify(twHermesSubscribeMsg(tp, id)));
+          } catch {
+            /* no-op */
+          }
+        });
       } else if (f.type === 'subscribed') {
-        hermesRewardsOk = f.ok;
+        const tp = subTopics.get(f.subId) || topic;
+        if (tp === topic) hermesRewardsOk = f.ok;
         if (f.ok) diag.hermesSubscribed += 1;
-        else diag.hermesError = f.error;
+        else diag.hermesError = `${tp.split('.')[0]}:${f.error}`;
         saveDiagSoon();
       } else if (f.type === 'reconnect') {
         const next = f.url;
@@ -371,9 +397,25 @@ function startReader(login, key, channelId = '') {
         hConnect(next);
       } else if (f.type === 'notification') {
         const r = parseTwRedemption(f.data, login);
-        if (!r) return;
-        diag.redemptions += 1;
-        push(r);
+        if (r) {
+          diag.redemptions += 1;
+          push(r);
+          return;
+        }
+        const ctx = { channel: login, channelId, broadcasterName: broadcasterName(), lastLevel: hypeLevel, nowMs: Date.now() };
+        const h = parseTwHypeTrain(f.data, ctx);
+        if (h) {
+          if (h.level) hypeLevel = Math.max(hypeLevel, h.level);
+          if (/-end$/.test(h.row.id)) hypeLevel = 0;
+          diag.hype += 1;
+          push(h.row);
+          return;
+        }
+        const p = parseTwPrediction(f.data, ctx);
+        if (p) {
+          diag.predictions += 1;
+          push(p);
+        }
       }
     };
     hws.onclose = () => {
@@ -510,6 +552,7 @@ async function check() {
       saveDiagSoon();
       return;
     }
+    lastBroadcasterName = String(info?.displayName || login);
     const key = buildTwStreamKey(login, { streamId: info?.streamId, startedAtMs: info?.startedAtMs || null });
     if (!key) return;
     if (!current || current.key !== key) {

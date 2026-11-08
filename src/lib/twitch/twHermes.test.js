@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { twHermesUrl, twRewardTopic, twHermesSubscribeMsg, parseTwHermesFrame, parseTwRedemption } from './twHermes.js';
+import {
+  twHermesUrl,
+  twRewardTopic,
+  twHypeTopic,
+  twPredictionTopic,
+  twHermesSubscribeMsg,
+  parseTwHermesFrame,
+  parseTwRedemption,
+  parseTwHypeTrain,
+  parseTwPrediction,
+} from './twHermes.js';
 
 // 形は 2026-11-08 の PC 実測(本物の Hermes・ログインなし)と、twitch.tv の reward-redeemed の形から写した
 describe('Twitch の通知の口(Hermes)', () => {
@@ -45,5 +55,61 @@ describe('Twitch の通知の口(Hermes)', () => {
     expect(parseTwRedemption({ type: 'custom-reward-updated', data: {} }, 'x')).toBeNull();
     expect(parseTwRedemption({ type: 'reward-redeemed', data: { redemption: { id: 'r', user: { login: 'a' }, reward: {} } } }, 'x')).toBeNull();
     expect(parseTwRedemption(null, 'x')).toBeNull();
+  });
+});
+
+describe('ハイプトレイン・予想(2026-11-08 PC 実測の形)', () => {
+  const ctx = { channel: 'testchan', channelId: '99', broadcasterName: 'テストちゃん', nowMs: 1_000 };
+  it('話題名', () => {
+    expect(twHypeTopic('99')).toBe('hype-train-events-v2.99');
+    expect(twPredictionTopic('99')).toBe('predictions-channel-v1.99');
+    expect(twHypeTopic('abc')).toBe('');
+  });
+  it('レベルアップは配信者の名前で1行(同じレベルは同じ id)', () => {
+    const r = parseTwHypeTrain({ type: 'hype-train-level-up', data: { progress: { level: { value: 3 } }, hype_train: { id: 'T1' } } }, ctx);
+    expect(r?.level).toBe(3);
+    expect(r?.row).toMatchObject({ id: 'tw-hype-T1-lv3', channelId: 'tw:99', name: 'テストちゃん', text: 'ハイプトレインがレベル3になりました', kind: 'tw_hype' });
+  });
+  it('終わりは最後のレベルを添える・ended_at は秒でもミリ秒でも', () => {
+    const r = parseTwHypeTrain({ type: 'hype-train-end', data: { id: 'T1', ended_at: 1762600000 } }, { ...ctx, lastLevel: 4 });
+    expect(r?.row).toMatchObject({ id: 'tw-hype-T1-end', text: 'ハイプトレインが終わりました(レベル4)', postedAtMs: 1762600000000 });
+  });
+  it('車掌はその人の名前で', () => {
+    const r = parseTwHypeTrain(
+      { type: 'hype-train-conductor-update', data: { id: 'C1', source: 'SUBS', user: { id: '5', login: 'fan_a', display_name: 'ファンA' } } },
+      ctx,
+    );
+    expect(r?.row).toMatchObject({ channelId: 'tw:5', name: 'ファンA', login: 'fan_a', text: 'ハイプトレインの車掌になりました(サブスク)' });
+  });
+  it('進み具合・形の違うものは記録しない', () => {
+    expect(parseTwHypeTrain({ type: 'hype-train-progression', data: { quantity: 1 } }, ctx)).toBeNull();
+    expect(parseTwHypeTrain({ type: 'hype-train-level-up', data: { progress: {} } }, ctx)).toBeNull();
+    expect(parseTwHypeTrain(null, ctx)).toBeNull();
+  });
+  it('予想は決着したときだけ・勝った選択肢と人数', () => {
+    const ev = (status) => ({
+      type: 'event-updated',
+      data: {
+        event: {
+          id: 'P1',
+          status,
+          title: '勝てる?',
+          winning_outcome_id: 'o1',
+          ended_at: '2026-11-08T12:00:00Z',
+          outcomes: [
+            { id: 'o1', title: 'はい', total_users: 12, total_points: 3400 },
+            { id: 'o2', title: 'いいえ', total_users: 3, total_points: 100 },
+          ],
+        },
+      },
+    });
+    expect(parseTwPrediction(ev('ACTIVE'), ctx)).toBeNull();
+    expect(parseTwPrediction(ev('RESOLVED'), ctx)).toMatchObject({
+      id: 'tw-pred-P1',
+      name: 'テストちゃん',
+      text: '予想「勝てる?」の結果: 「はい」(12人・3,400ポイント)',
+      kind: 'tw_prediction',
+      postedAtMs: Date.parse('2026-11-08T12:00:00Z'),
+    });
   });
 });

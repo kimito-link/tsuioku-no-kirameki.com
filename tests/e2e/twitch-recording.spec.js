@@ -43,6 +43,18 @@ const REDEEM = {
     redemption: { id: 'r-1', user: { id: '1001', login: 'fan_a', display_name: 'ファンA' }, channel_id: '99', redeemed_at: '2026-11-08T11:00:01Z', reward: { id: 'rw-1', title: '水を飲んで', cost: 500 }, user_input: 'がんばって', status: 'UNFULFILLED' },
   },
 };
+// ハイプトレインのレベルアップ・予想の決着(2026-11-08 PC 実測の形から必要な所だけ)
+const HYPE = { type: 'hype-train-level-up', data: { time_to_expire: 300, progress: { level: { value: 2, goal: 1000 }, value: 10, goal: 1000, total: 1500 }, hype_train: { id: 'ht-1' } } };
+const PRED = {
+  type: 'event-updated',
+  data: {
+    timestamp: '2026-11-08T11:30:00Z',
+    event: {
+      id: 'p-1', status: 'RESOLVED', title: '勝てる?', winning_outcome_id: 'o-1', ended_at: '2026-11-08T11:30:00Z',
+      outcomes: [{ id: 'o-1', title: 'はい', total_points: 3400, total_users: 12 }, { id: 'o-2', title: 'いいえ', total_points: 100, total_users: 3 }],
+    },
+  },
+};
 const LATE_ICON = 'https://static-cdn.jtvnw.net/jtv_user_pictures/late_fan-70x70.png';
 
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>${LOGIN} - Twitch</title></head><body>
@@ -80,7 +92,9 @@ function startFakeIrc() {
         hermes.push(m?.subscribe?.pubsub?.topic || '');
         if (m.type !== 'subscribe') return;
         ws.send(JSON.stringify({ type: 'subscribeResponse', subscribeResponse: { result: 'ok', subscription: { id: m.subscribe.id } } }));
-        setTimeout(() => ws.send(JSON.stringify({ type: 'notification', notification: { subscription: { id: m.subscribe.id }, type: 'pubsub', pubsub: JSON.stringify(REDEEM) } })), 200);
+        const tp = String(m.subscribe.pubsub.topic || '');
+        const body = tp.startsWith('community-points') ? REDEEM : tp.startsWith('hype-train') ? HYPE : tp.startsWith('predictions') ? PRED : null;
+        if (body) setTimeout(() => ws.send(JSON.stringify({ type: 'notification', notification: { subscription: { id: m.subscribe.id }, type: 'pubsub', pubsub: JSON.stringify(body) } })), 200);
       });
       return;
     }
@@ -220,10 +234,14 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
       'superchat:Bitter:おめでとう:500:BITS:-',
       'text:LateFan:おそくなりました:0::-',
       'text:ファンA:わこつ Kappa:0::face',
+      'tw_hype:テストちゃん:ハイプトレインがレベル2になりました:0::-',
+      'tw_prediction:テストちゃん:予想「勝てる?」の結果: 「はい」(12人・3,400ポイント):0::-',
       'tw_reward:ファンA:「水を飲んで」を交換しました: がんばって:0::face',
     ]);
   // Hermes にはチャンネルの数字の id で、リワードの話題だけを購読した
   expect(irc.hermes).toContain('community-points-channel-v1.99');
+  expect(irc.hermes).toContain('hype-train-events-v2.99');
+  expect(irc.hermes).toContain('predictions-channel-v1.99');
 
   // 計器: ギフトサブは件数で数える(金額 0 を足して常に 0 だった)。間に合わなかった顔はあとで yt_tw_icons に置く
   await expect
