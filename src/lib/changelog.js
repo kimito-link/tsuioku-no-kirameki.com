@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1938',
+    date: '2026-11-08',
+    summary: 'コメビュでギフトが2行に見えるのを直す',
+    items: Object.freeze([
+      'ミクチャ・SHOWROOM・ふわっちのギフトが、コメビュで「ギフト」だけの行とギフトのカードの2行に見えていたのを、カードだけにしました。言葉が添えてあるギフトは今までどおり行も出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1937',
     date: '2026-11-08',
     summary: 'ミクチャの順位の単位と見出しを直す',
@@ -206,17 +214,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'Twitch の未ログインの見分けを直す',
     items: Object.freeze([
       'Twitch にログインしていないのにコメントを打ってしまうことがあったのを直しました(ログインしていなくてもあるメニューのボタンを、ログインの印と見ていました)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1917',
-    date: '2026-11-07',
-    summary: 'Twitch の画面の言葉・顔・送信の直し',
-    items: Object.freeze([
-      'Twitch の配信の画面に残っていた YouTube の言葉(スパチャの合計順・トップファン)を、Bits・ギフトサブの合計の順位に直しました。',
-      'Twitch にログインしていないときは、コメントを打たずに「ログインしていない」と理由を出すようにしました(Twitch は未ログインでも入力欄を出すため)。',
-      '記録のときに顔の取得が間に合わなかった人も、あとで分かった顔を画面に出すようにしました。',
-      '計器のギフトサブの数が常に 0 だったのを、贈った件数で数えるように直しました。'
     ])
   })
 ]);

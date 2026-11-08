@@ -10008,6 +10008,16 @@
       ]
     },
     {
+      "file": "src/lib/youtube/ytGiftOnlyRow.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
       "file": "src/server/nicoliveGuest.js",
       "featureCount": 1,
       "features": [

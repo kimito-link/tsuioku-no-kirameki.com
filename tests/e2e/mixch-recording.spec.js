@@ -214,6 +214,19 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   const text = await bodyText();
   expect(text).not.toMatch(/mx:\d|mx\.\d|スパチャ|スーパーチャット|トップファン|ギフトサブ/);
 
+  // コメビュ: ギフトはカードだけ(「ギフト」だけの行とカードの2行にしない・2026-11-08 PC 実測)
+  const cv = await context.newPage();
+  await cv.goto(`${sw.url().replace(/\/[^/]*$/, '')}/yt-comeview.html`);
+  const cvCount = () =>
+    cv.evaluate(() => ({
+      rows: [...document.querySelectorAll('.nl-tl-row')].filter((e) => /おおもの/.test(e.textContent || '')).length,
+      cards: [...document.querySelectorAll('.nl-tl-gift')].filter((e) => /おおもの/.test(e.textContent || '')).length,
+      comment: [...document.querySelectorAll('.nl-tl-row')].some((e) => /ファンA/.test(e.textContent || '')),
+    }));
+  await expect.poll(cvCount, { timeout: 30_000 }).toEqual({ rows: 0, cards: 1, comment: true });
+  await cv.close();
+  await page.bringToFront();
+
   // 未ログインだとミクチャはページを読み直さずに /login へ移す。止まった理由が計器に残り、上書きで消えない
   await page.evaluate(() => history.pushState(null, '', '/login'));
   const mxDiag = async () => (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_mx_chat'))).yt_diag_mx_chat || {};
