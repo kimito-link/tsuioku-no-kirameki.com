@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1189 件
+## ⚠️ 役割コメントが無いソース 10 / 1191 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -800,7 +800,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (151)
+- 📁 **extension-youtube/** (152)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -924,7 +924,7 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (22)
+  - 📁 **src/** (23)
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
@@ -940,6 +940,7 @@
     - `tw-content-entry.js` — Twitch の視聴ページ(www.twitch.tv/<チャンネル>)で、チャットを読んで記録に渡す入口。
     - `venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
     - `venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
+    - `ww-content-entry.js` — ふわっちの視聴ページ(whowatch.tv/viewer/<配信の番号>)で、配信とコメントを読んで記録に渡す入口。
     - `ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
     - `ytGiftToNico.js` — YouTube の有料の応援(スーパーチャット・スーパーステッカー・メンバー加入・メンバーシップギフト)を、
     - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
@@ -1177,7 +1178,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2333)
+- 📁 **src/** (2335)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1480,7 +1481,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2054)
+  - 📁 **lib/** (2056)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1515,6 +1516,9 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
+    - 📁 **whowatch/** (2)
+      - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
+      - `wwParse.test.js`
     - 📁 **youtube/** (56)
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -3573,13 +3577,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (86)
+- 📁 **tests/** (87)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (79)
+  - 📁 **e2e/** (80)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3662,6 +3666,7 @@
     - `venue-entry-effect.spec.js`
     - `venue-pickup-drag.spec.js`
     - `watch-messaging.spec.js`
+    - `whowatch-recording.spec.js`
   - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
     - `laneImportContract.js` — 応援レーンの「輸入契約」(テスト専用の定数・実装コードは import しない)。

@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1910',
+    date: '2026-11-06',
+    summary: 'スマホで隠した人を読み上げでも出さない',
+    items: Object.freeze([
+      'スマホの「🚩 見たくない人を隠す」で隠した人のコメントを、WEB版の読み上げ(PC の VOICEVOX の声)でも読まないようにしました。以前は画面からは消えても声だけ聞こえていました。',
+      'スマホアプリで放送 URL を貼る形(「💬 コメントを流す」)にも 🚩 を付けました。隠した人のコメントは並べず、読み上げもしません。隠すのはこの端末の画面だけで、PC の記録は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1908',
     date: '2026-11-06',
     summary: 'マーケHTMLをさらに軽く',

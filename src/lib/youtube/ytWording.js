@@ -136,7 +136,7 @@ function swapOnce(text, fromRules, toRules) {
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string }} WordingPlatform
+ * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean }} WordingPlatform
  *   name: 'Twitch' / 'Kick'、paid: 'Bits' / 'Kicks'(src/lib/platform/streamPlatform.js の表)
  *   officialBoard: そのサービスの画面での公式ランキングの名前(例: Kick の「歴代トップKICKユーザー」)
  *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・無ければ累計)。Twitch はチャンネルごとに違う
@@ -146,12 +146,13 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const fixedRulesCache = new Map();
 /** @param {WordingPlatform} p */
 function fixedRules(p) {
-  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}`;
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.noSubs ? 1 : 0}`;
   const hit = fixedRulesCache.get(k);
   if (hit) return hit;
   const svc = `(?:YouTube|${esc(p.name)})`;
   const paid = `(?:スパチャ|${esc(p.paid)})`;
-  const heading = `${p.paid}・ギフトサブの合計の順位`;
+  // ふわっちにはサブスクが無いので「ギフトサブ」を書かない
+  const heading = p.noSubs ? `${p.paid}の合計の順位` : `${p.paid}・ギフトサブの合計の順位`;
   const word = `${p.paid} の合計順`;
   const off = officialWords(p);
   /** @type {Array<[RegExp, string]>} */

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ytWording } from './ytWording.js';
+import { ytWording, ytWordingPlatformFixed } from './ytWording.js';
+import { STREAM_PLATFORMS } from '../platform/streamPlatform.js';
 
 describe('ytWording', () => {
   it('rewrites the gift-contribution lane for YouTube top fans', () => {
@@ -162,5 +163,13 @@ describe('折りたたみの中のニコ生だけの説明(2026-11-08 Twitch 実
       'こん太: 並びやすいよ。',
     );
     expect(ytWording('ニコ生のページが読み取る通信から、拡張が')).toBe('配信のページが読み取る通信から、拡張が');
+  });
+});
+
+describe('ふわっちの言葉', () => {
+  it('サブスクが無いので「ギフトサブ」を書かない', () => {
+    const p = STREAM_PLATFORMS.whowatch;
+    expect(ytWordingPlatformFixed('スーパーチャット・ギフトの合計の順位', p)).toBe('アイテムの合計の順位');
+    expect(ytWordingPlatformFixed('スーパーチャット・ギフトの合計の順位', STREAM_PLATFORMS.kick)).toBe('Kicks・ギフトサブの合計の順位');
   });
 });

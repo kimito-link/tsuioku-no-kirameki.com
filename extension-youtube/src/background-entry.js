@@ -37,6 +37,7 @@ import './background-nico-relay.js';
 let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey } from '../../src/lib/platform/streamPlatform.js';
+import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 
 // 本体に同梱したとき(scripts/youtube-build.mjs の本体向け束・2026-11-05): 本体の background.js が importScripts で読む。
@@ -689,6 +690,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     relayCommentToChatFrame(String(message.videoId || ''), String(message.text || ''))
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, reason: String(err) }));
+    return true;
+  }
+
+  // ふわっちの視聴ページが API を直接読めなかったとき(CORS 等)の代わり。ふわっちのページから・API の決まった形の URL だけ
+  //   (council/whowatch-support-PLAN.md・どちらで読めたかは計器 yt_diag_ww_chat の via に出る)
+  if (message.type === 'YT_WW_API_GET') {
+    const url = String(message.url || '');
+    const from = String(sender?.tab?.url || sender?.url || '');
+    if (!isWwApiUrl(url) || !/^https:\/\/(?:www\.)?whowatch\.tv\//.test(from)) {
+      sendResponse({ ok: false, reason: 'bad-url' });
+      return false;
+    }
+    fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' } })
+      .then(async (res) => (res.ok ? { ok: true, json: await res.json() } : { ok: false, reason: `http_${res.status}` }))
+      .then((r) => sendResponse(r))
+      .catch((err) => sendResponse({ ok: false, reason: String(err).slice(0, 80) }));
     return true;
   }
 

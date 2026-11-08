@@ -1031,7 +1031,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       // 顔が新しく分かったら、件数が同じでも描き直してもらう
       // 最初からの文字アイコンの見分けが増えたら、段(りんく/こん太)が変わるので描き直してもらう(0.1.99)
       if (changes[YT_DEFAULT_ICON_STORE_KEY]) ytDefaultIconJudge?.merge(changes[YT_DEFAULT_ICON_STORE_KEY].newValue);
-      if ((changes.yt_handle_icons || changes.yt_tw_icons || changes.yt_kk_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
+      if ((changes.yt_handle_icons || changes.yt_tw_icons || changes.yt_kk_icons || changes.yt_ww_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
         lastNotified.delete(lastAskedLv);
         void notifyLv(lastAskedLv, undefined);
       }
@@ -1807,7 +1807,7 @@ function emoteDictReady() {
 
 /** @param {string} key @param {unknown} raw */
 function setEmoteDict(key, raw) {
-  const p = Object.values(STREAM_PLATFORMS).find((x) => x.emotesKey === key);
+  const p = key ? Object.values(STREAM_PLATFORMS).find((x) => x.emotesKey === key) : null;
   if (!p) return;
   /** @type {Map<string, string>} */
   const m = new Map();
@@ -1831,7 +1831,7 @@ function setEmoteDict(key, raw) {
 }
 
 function startEmotes() {
-  const keys = Object.values(STREAM_PLATFORMS).map((p) => p.emotesKey);
+  const keys = Object.values(STREAM_PLATFORMS).map((p) => p.emotesKey).filter(Boolean);
   try {
     Promise.resolve(real?.storage?.local?.get?.(keys))
       .then((got) => {

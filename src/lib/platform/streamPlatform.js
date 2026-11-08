@@ -8,6 +8,7 @@
 import { isTwStreamKey, twLoginOfStreamKey, buildTwStreamKey } from '../twitch/twStreamKey.js';
 import { parseTwChannelFromUrl, isTwLogin } from '../twitch/twIrcParse.js';
 import { isKickSlug, parseKickChannelFromUrl } from '../kick/kickChatParse.js';
+import { isWwStreamKey, wwLiveIdOfStreamKey, parseWwLiveIdFromUrl, isWwLiveId, isWwUserPath, wwPageUrl, buildWwStreamKey } from '../whowatch/wwParse.js';
 
 export const KK_STREAM_KEY_PREFIX = 'kk.';
 
@@ -40,15 +41,15 @@ function kickSlugOfStreamKey(key) {
 
 /**
  * @typedef {{
- *   id: 'twitch' | 'kick', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
+ *   id: 'twitch' | 'kick' | 'whowatch', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
- *   buildStreamKey: (login: string, opts?: any, now?: number) => string,
+ *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean,
  * }} StreamPlatform
  */
 
-/** @type {Record<'twitch' | 'kick', StreamPlatform>} */
+/** @type {Record<'twitch' | 'kick' | 'whowatch', StreamPlatform>} */
 export const STREAM_PLATFORMS = Object.freeze({
   twitch: Object.freeze({
     id: /** @type {'twitch'} */ ('twitch'),
@@ -92,9 +93,33 @@ export const STREAM_PLATFORMS = Object.freeze({
     thumbUrl: () => '',
     buildStreamKey: buildKickStreamKey,
   }),
+  // ふわっち(council/whowatch-support-PLAN.md)。タブの URL は viewer/<配信の番号> なので、login の位置に配信の番号を置く。
+  //   人のページは user_path(w:… 等)。channelUrl は数字なら視聴ページ・それ以外はプロフィールにする。
+  whowatch: Object.freeze({
+    id: /** @type {'whowatch'} */ ('whowatch'),
+    name: 'ふわっち',
+    keyHead: 'ww.',
+    personHead: 'ww:',
+    paid: 'アイテム',
+    paidCurrency: 'WWPT',
+    tabUrl: 'https://whowatch.tv/*',
+    sendType: 'WW_SEND_COMMENT',
+    lateIconsKey: 'yt_ww_icons',
+    // ふわっちの絵文字は画像の名前が無い(本文はそのまま)ので覚えない
+    emotesKey: '',
+    rankSentence: 'アイテムの合計の順位（上位）を表示します。このPCの記録から数えます。',
+    noSubs: true,
+    isStreamKey: isWwStreamKey,
+    loginOfStreamKey: wwLiveIdOfStreamKey,
+    channelFromUrl: parseWwLiveIdFromUrl,
+    isLogin: (/** @type {unknown} */ l) => isWwLiveId(l) || isWwUserPath(l),
+    channelUrl: wwPageUrl,
+    thumbUrl: () => '',
+    buildStreamKey: (/** @type {string} */ liveId, /** @type {any} */ opts) => buildWwStreamKey(liveId, opts),
+  }),
 });
 
-const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick];
+const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch];
 
 /** 配信キー → サービス(YouTube なら null) @param {unknown} key */
 export function platformOfStreamKey(key) {
@@ -122,5 +147,6 @@ export function platformOfHostname(hostname) {
   const h = String(hostname || '').toLowerCase();
   if (/(^|\.)twitch\.tv$/.test(h)) return STREAM_PLATFORMS.twitch;
   if (/^(?:www\.)?kick\.com$/.test(h)) return STREAM_PLATFORMS.kick;
+  if (/^(?:www\.)?whowatch\.tv$/.test(h)) return STREAM_PLATFORMS.whowatch;
   return null;
 }
