@@ -144,10 +144,15 @@ describe('コメント', () => {
     expect(a?.channelId).toBe('ww:n:たぬきA');
     expect(a?.login).toBe('');
     expect(b?.channelId).toBe('ww:n:たぬきB');
+    // 本物の形: 匿名の印はコメントの直下
+    const c = parseWwComment({ id: 12, anonymized: true, is_tanuki: true, user: { id: 1, name: 'たぬきC', user_path: 'w:shared' }, message: 'z' }, { liveId: '1' });
+    expect(c?.channelId).toBe('ww:n:たぬきC');
+    expect(c?.login).toBe('');
   });
   it('運営のお知らせは人として記録しない', () => {
     expect(parseWwComment({ id: 10, comment_type: 'BY_SYSTEM', user: { id: 3, name: 'x' }, message: 'お知らせ' }, { liveId: '1' })).toBe(null);
     expect(parseWwComment({ id: 11, user: { id: 3, name: 'ふわっち運営' }, message: 'お知らせ' }, { liveId: '1' })).toBe(null);
+    expect(parseWwComment({ id: 13, comment_type: 'BY_PLAYITEM', user: { id: 3, name: 'ふわっち運営＠ねこにゃんず学園 文化祭' }, message: 'a', play_item_pattern: { name: 'x' } }, { liveId: '1' })).toBe(null);
   });
   it('形が違う1件は捨てる', () => {
     expect(parseWwComment(null, { liveId: '1' })).toBe(null);

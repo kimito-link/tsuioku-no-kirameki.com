@@ -203,6 +203,8 @@ export function wwPlainText(html) {
 /** 運営のお知らせ(人の発言ではない)。順位表に人として入れない */
 const SYSTEM_TYPE_RE = /SYSTEM|NOTICE|ADMIN|OFFICIAL|ANNOUNCE/i;
 const SYSTEM_NAMES = new Set(['ふわっち運営', 'ふわっち']);
+/** 「ふわっち運営＠ねこにゃんず学園 文化祭」のように、運営の名前の後ろに催しの名前が付く(2026-11-08 PC 実測) */
+const SYSTEM_NAME_HEAD_RE = /^ふわっち運営/;
 
 /**
  * コメント1件 → 記録の1件。記録しないもの・形が違うものは null。
@@ -217,19 +219,21 @@ export function parseWwComment(raw, ctx) {
   const user = parseWwUser(c.user);
   if (!user) return null;
   const type = str(pick(c, ['comment_type', 'type'])).slice(0, 40);
-  if (SYSTEM_TYPE_RE.test(type) || SYSTEM_NAMES.has(user.name)) return null;
+  if (SYSTEM_TYPE_RE.test(type) || SYSTEM_NAMES.has(user.name) || SYSTEM_NAME_HEAD_RE.test(user.name)) return null;
+  // 匿名の印は user の中ではなくコメントの直下に来る(2026-11-08 PC 実測)。どちらにあっても匿名として扱う
+  const anonymous = user.anonymous || c.anonymized === true || c.is_tanuki === true;
   const rawText = str(pick(c, ['message', 'comment', 'body', 'text']));
   const text = (c.not_escaped === true || /<[a-z/][^>]*>/i.test(rawText) ? wwPlainText(rawText) : rawText.replace(/\s+/g, ' ').trim()).slice(0, 500);
   const postedAtMs = wwTimeMs(pick(c, ['posted_at', 'created_at', 'timestamp'])) || Number(ctx.nowMs) || Date.now();
   const item = /^BY_PLAYITEM$/i.test(type) || c.play_item_pattern ? parseWwItem(c) : null;
   const name = user.name || user.userPath || `ふわっち${user.id.slice(-4)}`;
   // 匿名の人は id が共有なので、名前で見分ける(同じ名前の匿名は同じ人として数える)
-  const channelId = user.anonymous ? `ww:n:${name.slice(0, 40)}` : `ww:${user.id}`;
+  const channelId = anonymous ? `ww:n:${name.slice(0, 40)}` : `ww:${user.id}`;
   const base = {
     id: `ww-${id}`,
     channelId,
     name,
-    login: user.anonymous ? '' : user.userPath,
+    login: anonymous ? '' : user.userPath,
     iconUrl: user.iconUrl,
     badges: type && !/^by_(?:public|playitem)$/i.test(type) ? [type.toLowerCase()] : [],
     ts: '',

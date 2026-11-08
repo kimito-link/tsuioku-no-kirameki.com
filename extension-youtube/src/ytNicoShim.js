@@ -1176,6 +1176,8 @@ function ytLabelForUid(uid) {
   // Twitch の人は @ログイン名(YouTube の @ハンドルと同じ扱い)。分からなければ出さない(tw:数字 は人には意味が無い)
   const pp = platformOfPersonKey(key);
   if (pp && key.startsWith(`${pp.personHead}@`)) return `@${key.slice(4)}`;
+  // ふわっちの匿名の人(ww:n:名前)は ID が無い。空欄にせず「匿名」と出す(ニコ生の 184 と同じ扱い)
+  if (pp && key.startsWith(`${pp.personHead}n:`)) return '匿名';
   if (pp) return loginByPersonKey.get(key) ? `@${loginByPersonKey.get(key)}` : '';
   if (key.startsWith('name:')) return '';
   if (key.startsWith('handle:')) return key.slice('handle:'.length);
@@ -1192,7 +1194,23 @@ function ytFixPseudoLvText(text) {
       const vid = videoIdForPseudoLv(lv);
       return vid ? watchUrlForStreamKey(vid) : all;
     })
-    .replace(PSEUDO_LV_RE, (lv) => videoIdForPseudoLv(lv) || lv);
+    .replace(PSEUDO_LV_RE, (lv) => streamLabelForText(videoIdForPseudoLv(lv)) || lv);
+}
+
+/**
+ * 文の中に出す配信の名前。YouTube は動画ID のまま。Twitch・Kick・ふわっち 等の配信キー(ww.番号.番号)は
+ *   人が読めないので、配信の題 → 「配信者の名前の配信」→ 「サービス名の配信」の順で出す。
+ * @param {string} key
+ */
+function streamLabelForText(key) {
+  if (!key) return '';
+  const plat = platformOfStreamKey(key);
+  if (!plat) return key;
+  const sum = /** @type {any} */ (knownSummaries)?.[key];
+  const title = String(sum?.title || '').trim();
+  if (title) return title;
+  const who = String(sum?.broadcasterName || '').trim();
+  return who ? `${who}の配信` : `${plat.name}の配信`;
 }
 
 /** @param {Element} a */
