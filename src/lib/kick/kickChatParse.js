@@ -5,6 +5,7 @@
 //   形が違う・欠けている1件は null を返して捨てる(AGENTS.md §3.6)。
 //   出す形は twIrcParse.js と同じ: { id, channelId:'kk:<user id>', name, login(slug), iconUrl:'', text, kind, amount, currency,
 //   badges, ts:'', postedAtMs, channel(chatroom id), color, subMonths?, giftCount?, subTier? }
+import { kickEmotesFromContent } from '../platform/streamEmotes.js';
 
 /** チャンネル名(URL の slug)として正しいか @param {unknown} s */
 export function isKickSlug(s) {
@@ -55,6 +56,12 @@ export function parseKickChannelFromUrl(url) {
   if (RESERVED.has(seg[0])) return '';
   if (seg.length > 1) return ''; // /foo/videos 等はチャンネルの別ページ
   return isKickSlug(seg[0]) ? seg[0] : '';
+}
+
+/** @param {unknown} content */
+function emotesOf(content) {
+  const emotes = kickEmotesFromContent(content);
+  return emotes.length ? { emotes } : {};
 }
 
 /** 本文の絵文字 [emote:123:KEKW] → KEKW(読み上げ・表示で数字を出さない) @param {unknown} text */
@@ -110,7 +117,7 @@ function badgeTypes(badges) {
  * @typedef {{
  *   id: string, channelId: string, name: string, login: string, iconUrl: string, text: string, kind: string,
  *   amount: number, currency: string, badges: string[], ts: string, postedAtMs: number, channel: string, color: string,
- *   subMonths?: number, giftCount?: number, subTier?: string
+ *   subMonths?: number, giftCount?: number, subTier?: string, emotes?: { name: string, url: string }[]
  * }} KickItem
  */
 
@@ -184,6 +191,8 @@ export function parseKickEvent(frame, ctx = {}) {
       badges: badgeTypes(identity?.badges),
       color: /^#[0-9a-f]{6}$/i.test(String(identity?.color || '')) ? String(identity?.color) : '',
       postedAtMs: parseKickTime(d.created_at) || now,
+      // 絵文字の名前 → 画像(本文は名前のまま・画面だけ画像にする)
+      ...emotesOf(d.content),
     };
   }
 

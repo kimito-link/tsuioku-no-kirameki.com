@@ -41,7 +41,7 @@ function kickSlugOfStreamKey(key) {
 /**
  * @typedef {{
  *   id: 'twitch' | 'kick', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
- *   tabUrl: string, sendType: string, lateIconsKey: string, rankSentence: string, officialBoard?: string,
+ *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
  *   buildStreamKey: (login: string, opts?: any, now?: number) => string,
@@ -60,6 +60,8 @@ export const STREAM_PLATFORMS = Object.freeze({
     tabUrl: 'https://www.twitch.tv/*',
     sendType: 'TW_SEND_COMMENT',
     lateIconsKey: 'yt_tw_icons',
+    // 絵文字の名前 → 画像の URL(streamEmotes.js・画面の本文だけ画像にする)
+    emotesKey: 'yt_tw_emotes',
     rankSentence: 'Bits・ギフトサブの合計の順位（上位）を表示します。Twitch 公式のランキングが読めないため、このPCの記録から数えます。',
     isStreamKey: isTwStreamKey,
     loginOfStreamKey: twLoginOfStreamKey,
@@ -79,6 +81,7 @@ export const STREAM_PLATFORMS = Object.freeze({
     tabUrl: 'https://kick.com/*',
     sendType: 'KICK_SEND_COMMENT',
     lateIconsKey: 'yt_kk_icons',
+    emotesKey: 'yt_kk_emotes',
     rankSentence: 'Kicks・ギフトサブの合計の順位（上位）を表示します。このPCの記録から数えます。',
     officialBoard: '「歴代トップKICKユーザー」',
     isStreamKey: isKickStreamKey,

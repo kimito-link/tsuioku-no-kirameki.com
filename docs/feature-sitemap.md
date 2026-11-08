@@ -125,9 +125,10 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 67</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 68</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+- `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
 - `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
@@ -1068,7 +1069,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 325</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 326</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1300,6 +1301,7 @@
 - `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
+- `src/lib/platform/streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
 - `src/lib/popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
@@ -1413,14 +1415,16 @@
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🏟 会場・席 (5版)
+### 🏟 会場・席 (6版)
+- `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 - `v0.1.1921` 2026-11-08 — Kick の配信も記録できるように(試作)
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 - `v0.1.1912` 2026-11-06 — YouTube でログイン中なのに送れない表示を直す
 
-### 🎈 吹き出し (2版)
+### 🎈 吹き出し (3版)
+- `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
@@ -1435,13 +1439,13 @@
 - `v0.1.1908` 2026-11-06 — マーケHTMLをさらに軽く
 
 ### 🔊 読み上げ (7版)
+- `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 - `v0.1.1925` 2026-11-08 — Kicks・Bits を1つ1ptに・なふだを隠す
 - `v0.1.1921` 2026-11-08 — Kick の配信も記録できるように(試作)
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1911` 2026-11-06 — 長いコメントは質問の結びを残して読む
 - `v0.1.1910` 2026-11-06 — スマホで隠した人を読み上げでも出さない
-- `v0.1.1905` 2026-11-06 — YouTube で自分の発言が2件・2回読まれるのを直す
 
 ### 🪟 応援レーン・タイル (2版)
 - `v0.1.1921` 2026-11-08 — Kick の配信も記録できるように(試作)

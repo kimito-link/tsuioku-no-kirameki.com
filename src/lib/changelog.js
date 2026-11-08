@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1928',
+    date: '2026-11-08',
+    summary: 'Twitch・Kick の絵文字を画像で表示',
+    items: Object.freeze([
+      'Twitch・Kick のチャットの絵文字(Kappa・KEKW など)を、コメビュの一覧・会場の吹き出し・ピン留めなどで画像として表示するようにしました。',
+      '記録と読み上げは今までどおり絵文字の名前のままです。画像が読めないときは名前の文字で出ます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1927',
     date: '2026-11-08',
     summary: 'Twitch のポイント交換をリワード名つきで記録',
@@ -196,15 +205,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '0.1.1903 までに、別の配信のコメントが今の配信の記録に紛れ込んでいた分を、更新後に1回だけ片付けます。YouTube のコメントは1件ごとに番号があり1つの配信にしか無いので、同じ番号が2つの配信にあれば、先に記録した配信の1件だけを残し、ほかを消します。',
       '消す前に、消すコメントの控えを拡張の中に残します(あとで戻せるように)。片付けは1回きりで、終わったあとに同じコメントが来ても別の配信の記録には入りません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1905',
-    date: '2026-11-06',
-    summary: 'YouTube で自分の発言が2件・2回読まれるのを直す',
-    items: Object.freeze([
-      'YouTube の配信で自分がコメントを送ると、チャット欄には1件なのに記録が2件になり、読み上げも2回流れていました。YouTube が送ったコメントを仮の行から本物の行へ差し替えるのを、別のコメントとして数えていたためです。差し替えは1件として扱うようにしました。',
-      '同じ人が同じ文を本当に2回書いたときは、これまでどおり2件記録します。'
     ])
   })
 ]);

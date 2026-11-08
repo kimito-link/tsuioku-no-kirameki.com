@@ -23,7 +23,7 @@ const STREAM_ID = '41234567890';
 const KEY = `tw.${LOGIN}.${STREAM_ID}`;
 
 const LINES = [
-  `@badges=;color=#1E90FF;display-name=ファンA;id=m-1;room-id=99;tmi-sent-ts=1762480000123;user-id=1001 :fan_a!fan_a@fan_a.tmi.twitch.tv PRIVMSG #${LOGIN} :わこつ`,
+  `@badges=;color=#1E90FF;display-name=ファンA;emotes=25:4-8;id=m-1;room-id=99;tmi-sent-ts=1762480000123;user-id=1001 :fan_a!fan_a@fan_a.tmi.twitch.tv PRIVMSG #${LOGIN} :わこつ Kappa`,
   `@badges=;bits=500;color=;display-name=Bitter;id=m-2;room-id=99;tmi-sent-ts=1762480001123;user-id=1002 :bitter!bitter@bitter.tmi.twitch.tv PRIVMSG #${LOGIN} :Cheer500 おめでとう`,
   `@badges=subscriber/0;display-name=NewSub;id=m-3;login=newsub;msg-id=sub;msg-param-sub-plan=1000;room-id=99;system-msg=NewSub\\ssubscribed;tmi-sent-ts=1762480002123;user-id=1003 :tmi.twitch.tv USERNOTICE #${LOGIN}`,
   `@badges=;display-name=Other;id=m-4;room-id=7;tmi-sent-ts=1762480003123;user-id=1004 :other!other@other.tmi.twitch.tv PRIVMSG #otherchan :別のチャンネル`,
@@ -183,6 +183,11 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
     await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(json) });
   });
   await context.route('https://static-cdn.jtvnw.net/**', (route) => route.fulfill({ status: 404, body: '' }));
+  // 絵文字の画像(1×1 の PNG)。顔は 404 のまま(あとから足したルートが先に効く)
+  const PNG_1PX = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
+  await context.route('https://static-cdn.jtvnw.net/emoticons/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG_1PX }),
+  );
 
   const sw = await extWorker(context);
   const page = await context.newPage();
@@ -214,7 +219,7 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
       'membership_gift:Giver:ギフトサブを5件贈りました:0::-',
       'superchat:Bitter:おめでとう:500:BITS:-',
       'text:LateFan:おそくなりました:0::-',
-      'text:ファンA:わこつ:0::face',
+      'text:ファンA:わこつ Kappa:0::face',
       'tw_reward:ファンA:「水を飲んで」を交換しました: がんばって:0::face',
     ]);
   // Hermes にはチャンネルの数字の id で、リワードの話題だけを購読した
@@ -280,4 +285,23 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   expect(gqlBodies.some((b) => b.includes('"operationName":"ChannelLeaderboards"') && b.includes('"channelID":"99"'))).toBe(true);
   const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_tw_chat'))).yt_diag_tw_chat;
   expect(d).toMatchObject({ boardRows: 2, boardFrom: 'gql:persisted', boardPeriod: 'MONTH' });
+
+  // 絵文字(Kappa)は名前 → 画像の対応を覚え、コメントの一覧では画像で見せる。文字は消さない(textContent はそのまま)
+  await expect
+    .poll(async () => (await sw.evaluate(async () => chrome.storage.local.get('yt_tw_emotes'))).yt_tw_emotes, { timeout: 10_000 })
+    .toEqual({ Kappa: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' });
+  expect(d.emotes).toBe(1);
+  await ext.evaluate(() => {
+    const det = /** @type {HTMLDetailsElement | null} */ (document.getElementById('supportTimelineDetails'));
+    if (det && !det.open) {
+      det.open = true;
+      det.dispatchEvent(new Event('toggle'));
+    }
+  });
+  await expect
+    .poll(() => ext.evaluate(() => {
+      const e = document.querySelector('.nl-tl-row__text .nl-emote');
+      return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${/emoticons\/v2\/25\//.test(/** @type {HTMLElement} */ (e).style.backgroundImage)}|${e.closest('.nl-tl-row__text')?.textContent}` : '';
+    }), { timeout: 20_000 })
+    .toBe('Kappa|true|true|わこつ Kappa');
 });

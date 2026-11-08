@@ -16,6 +16,7 @@
 //   - チャンネルポイントの交換(本文つき・custom-reward-id / メッセージを目立たせる highlighted-message)→ kind 'tw_reward'
 //   - 連続視聴の記念(viewermilestone)→ kind 'tw_milestone'(何回連続か = amount)
 //   - 通常のコメント      → kind 'text'
+import { twEmotesFromTag } from '../platform/streamEmotes.js';
 
 /** IRC tags の値のエスケープを戻す(https://ircv3.net/specs/extensions/message-tags#escaping-values) */
 /** @param {unknown} v */
@@ -151,7 +152,7 @@ export function twSubTierLabel(plan) {
  *   id: string, channelId: string, name: string, login: string, iconUrl: string, text: string,
  *   kind: 'text' | 'superchat' | 'membership' | 'membership_gift' | 'tw_raid' | 'tw_reward' | 'tw_milestone',
  *   amount: number, currency: string, badges: string[], ts: string, postedAtMs: number,
- *   channel: string, roomId: string, color: string, subTier?: string, subMonths?: number, giftCount?: number, giftPartOf?: string, rewardId?: string
+ *   channel: string, roomId: string, color: string, subTier?: string, subMonths?: number, giftCount?: number, giftPartOf?: string, rewardId?: string, emotes?: { name: string, url: string }[]
  * }}
  */
 export function parseTwChatLine(line) {
@@ -193,7 +194,9 @@ export function parseTwChatLine(line) {
       // rewardId: 同じ交換は Hermes(リワードの名前つき)でも届く。Hermes が読めている間は入口でこちらを捨てる
       return { ...base, text: `${what}: ${text}`, kind: 'tw_reward', amount: 0, currency: '', rewardId: String(tags['custom-reward-id'] || '') };
     }
-    return { ...base, text, kind: 'text', amount: 0, currency: '' };
+    // 絵文字(Kappa 等)の名前 → 画像。本文は名前のまま(画面だけ画像にする・streamEmotes.js)
+    const emotes = twEmotesFromTag(tags.emotes, text);
+    return { ...base, text, kind: 'text', amount: 0, currency: '', ...(emotes.length ? { emotes } : {}) };
   }
 
   // USERNOTICE

@@ -268,6 +268,9 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ slug, chatroom: { id: 1 }, user: { username: slug, profile_pic: pic } }) });
   });
   await context.route('https://files.kick.com/**', (route) => route.fulfill({ status: 404, body: '' }));
+  // 絵文字の画像(1×1 の PNG)。顔は 404 のまま(あとから足したルートが先に効く)
+  const PNG_1PX = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
+  await context.route('https://files.kick.com/emotes/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG_1PX }));
 
   const sw = await extWorker(context);
   const page = await context.newPage();
@@ -350,6 +353,24 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
     return { vis, attrs };
   });
   expect(left).toEqual({ vis: [], attrs: [] });
+
+  // 絵文字(KEKW)は名前 → 画像の対応を覚え、コメントの一覧では画像で見せる(文字は残す)
+  expect((await sw.evaluate(async () => chrome.storage.local.get('yt_kk_emotes'))).yt_kk_emotes).toEqual({
+    KEKW: 'https://files.kick.com/emotes/1/fullsize',
+  });
+  await ext.evaluate(() => {
+    const det = /** @type {HTMLDetailsElement | null} */ (document.getElementById('supportTimelineDetails'));
+    if (det && !det.open) {
+      det.open = true;
+      det.dispatchEvent(new Event('toggle'));
+    }
+  });
+  await expect
+    .poll(() => ext.evaluate(() => {
+      const e = document.querySelector('.nl-tl-row__text .nl-emote');
+      return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${e.closest('.nl-tl-row__text')?.textContent}` : '';
+    }), { timeout: 20_000 })
+    .toBe('KEKW|true|わこつ KEKW');
 });
 
 test('Centrifugo が使えないときは、API が返す Pusher の鍵で読む', async ({ context, rt }) => {

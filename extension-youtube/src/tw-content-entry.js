@@ -23,6 +23,7 @@ import {
   parseTwLeaderboards,
 } from '../../src/lib/twitch/twGql.js';
 import { twHermesUrl, twRewardTopic, twHermesSubscribeMsg, parseTwHermesFrame, parseTwRedemption } from '../../src/lib/twitch/twHermes.js';
+import { createEmoteSaver } from './pfEmoteStore.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
@@ -34,6 +35,8 @@ const BOARD_EVERY_MS = 2 * 60_000;
 
 /** 計器(状態速報と同じく storage に置く・りんくに聞かずに数で確かめる) */
 const diag = {
+  /** 覚えた絵文字の数(画面で画像にする名前) */
+  emotes: 0,
   v: 1,
   channel: '',
   streamKey: '',
@@ -79,6 +82,8 @@ function safeSendMessage(msg) {
 }
 
 let diagTimer = 0;
+/** 絵文字の名前 → 画像(画面で本文を画像にする・pfEmoteStore.js) */
+const emoteSaver = createEmoteSaver('yt_tw_emotes');
 function saveDiagSoon() {
   if (diagTimer) return;
   diagTimer = setTimeout(() => {
@@ -225,6 +230,7 @@ function startReader(login, key, channelId = '') {
     }
     if (lateWanted.size > 5000) lateWanted.clear();
     diag.items += items.length;
+    diag.emotes = emoteSaver.takeFrom(items);
     safeSendMessage({ type: 'YT_CHAT_ITEMS', payload: { videoId: key, chatFilterLabel: '', items } });
     saveDiagSoon();
   };

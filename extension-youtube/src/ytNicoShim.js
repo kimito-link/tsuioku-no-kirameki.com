@@ -21,7 +21,8 @@ import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml 
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
-import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname } from '../../src/lib/platform/streamPlatform.js';
+import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS } from '../../src/lib/platform/streamPlatform.js';
+import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
@@ -1416,6 +1417,7 @@ function fixEmptyThumb(el) {
 function fixSubtree(root) {
   if (root.nodeType === 3) {
     fixTextNode(/** @type {Text} */ (root));
+    decorateEmotes(/** @type {Text} */ (root));
     return;
   }
   if (root.nodeType !== 1) return;
@@ -1432,7 +1434,14 @@ function fixSubtree(root) {
   el.querySelectorAll(EMPTY_THUMB_SEL).forEach(fixEmptyThumb);
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   let n;
-  while ((n = walker.nextNode())) fixTextNode(/** @type {Text} */ (n));
+  /** @type {Text[]} */
+  const texts = [];
+  while ((n = walker.nextNode())) {
+    fixTextNode(/** @type {Text} */ (n));
+    if (emoteDictReady()) texts.push(/** @type {Text} */ (n));
+  }
+  // 絵文字の置き換えは文字の場所を入れ替えるので、歩き終えてから
+  for (const t of texts) decorateEmotes(t);
 }
 
 // マーケHTML などの保存ファイルは、画面の直し(上の fixSubtree)が届かない文字列として作られる。
@@ -1758,6 +1767,7 @@ function startDomFixer() {
   }
   if (!document.body) return;
   hideNicoOnlyParts();
+  startEmotes();
   startDomFixerOn(document.body, /\/(?:yt-)?venue\.html$/.test(String(location.pathname || '')));
 }
 
@@ -1773,6 +1783,138 @@ function hideNicoOnlyParts() {
   st.textContent = '.nl-nameplate-inline, .nl-record-sub:has(#nameplateOnBtn) { display: none !important; }';
   (document.head || document.documentElement).appendChild(st);
 }
+// ---- Twitch・Kick の絵文字を画像で見せる(0.1.1928) ----
+// 記録の本文は絵文字の名前(Kappa・KEKW)のまま。コメントの本文が出る所だけ、名前と同じ語を画像に見せる。
+//   ★文字は消さない(画像は背景にして文字を透明にする)= textContent を読む部品(PICK UP のドラッグ・
+//   吹き出しの書き直し判定など)はそのまま動く。画像が読めなければ文字のまま(§3.6)。
+/** コメントの本文が出る所(コメビュの一覧・会場の吹き出し・ピン・PICK UP・人の詳細・ホバーの最後の一言) */
+const EMOTE_HOST_SEL =
+  '.nl-tl-row__text, .nlsb-bubble-text, .cv-panel-text, .cv-pin-text, .nlsb-hover-card__last-text, .nlsb-pickup__body';
+/** サービス(twitch/kick)→ 名前 → URL @type {Map<string, Map<string, string>>} */
+const emoteDicts = new Map();
+/** URL → 読めたか(読み込み中は Promise) @type {Map<string, boolean | Promise<boolean>>} */
+const emoteImgState = new Map();
+
+/** 今の画面のサービスの対応表(YouTube・ニコ生なら null) */
+function currentEmoteDict() {
+  const p = screenPlatformBase();
+  const d = p ? emoteDicts.get(p.id) : null;
+  return d && d.size ? d : null;
+}
+function emoteDictReady() {
+  return emoteDicts.size > 0 && currentEmoteDict() !== null;
+}
+
+/** @param {string} key @param {unknown} raw */
+function setEmoteDict(key, raw) {
+  const p = Object.values(STREAM_PLATFORMS).find((x) => x.emotesKey === key);
+  if (!p) return;
+  /** @type {Map<string, string>} */
+  const m = new Map();
+  if (raw && typeof raw === 'object') {
+    for (const [k, v] of Object.entries(/** @type {Record<string, unknown>} */ (raw))) {
+      if (isEmoteName(k) && isSafeEmoteUrl(v)) m.set(k, String(v));
+    }
+  }
+  const had = emoteDicts.get(p.id)?.size || 0;
+  emoteDicts.set(p.id, m);
+  // 新しく覚えた絵文字は、もう出ている本文にも当てる
+  if (m.size > had && document.body) {
+    for (const el of document.querySelectorAll(EMOTE_HOST_SEL)) {
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      /** @type {Text[]} */
+      const ts = [];
+      for (let n = w.nextNode(); n; n = w.nextNode()) ts.push(/** @type {Text} */ (n));
+      ts.forEach(decorateEmotes);
+    }
+  }
+}
+
+function startEmotes() {
+  const keys = Object.values(STREAM_PLATFORMS).map((p) => p.emotesKey);
+  try {
+    Promise.resolve(real?.storage?.local?.get?.(keys))
+      .then((got) => {
+        for (const k of keys) if (got?.[k]) setEmoteDict(k, got[k]);
+      })
+      .catch(() => {});
+    real?.storage?.onChanged?.addListener?.((/** @type {any} */ changes, /** @type {string} */ area) => {
+      if (area && area !== 'local') return;
+      for (const k of keys) if (changes?.[k]) setEmoteDict(k, changes[k].newValue);
+    });
+  } catch {
+    /* 絵文字が出なくても本文は文字で出る */
+  }
+  if (!document.getElementById('yt-emote-style')) {
+    const st = document.createElement('style');
+    st.id = 'yt-emote-style';
+    st.textContent =
+      '.nl-emote.is-ready{display:inline-block;width:1.6em;height:1.6em;vertical-align:middle;overflow:hidden;' +
+      'white-space:nowrap;color:transparent !important;-webkit-text-fill-color:transparent;text-shadow:none !important;' +
+      'background:center/contain no-repeat;margin:0 .08em;line-height:1.6em;font-size:inherit}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+}
+
+/** 画像を先に読んでみる(読めたものだけ画像にする) @param {string} url */
+function loadEmoteImg(url) {
+  const st = emoteImgState.get(url);
+  if (st !== undefined) return Promise.resolve(st);
+  const p = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  }).then((ok) => {
+    emoteImgState.set(url, /** @type {boolean} */ (ok));
+    if (emoteImgState.size > 2000) emoteImgState.clear();
+    return /** @type {boolean} */ (ok);
+  });
+  emoteImgState.set(url, p);
+  return p;
+}
+
+/** @param {HTMLElement} span @param {string} url */
+function showEmoteImg(span, url) {
+  void loadEmoteImg(url).then((ok) => {
+    if (!ok || !span.isConnected) return;
+    span.style.backgroundImage = `url("${url}")`;
+    span.classList.add('is-ready');
+  });
+}
+
+/**
+ * コメントの本文の文字のうち、絵文字の名前と同じ語を画像の部品にする。
+ * @param {Text} node
+ */
+function decorateEmotes(node) {
+  try {
+    const parent = node.parentElement;
+    if (!parent || parent.classList.contains('nl-emote')) return;
+    const dict = currentEmoteDict();
+    if (!dict) return;
+    if (!parent.closest(EMOTE_HOST_SEL)) return;
+    const segs = splitTextByEmotes(String(node.nodeValue || ''), dict);
+    if (!segs) return;
+    const frag = document.createDocumentFragment();
+    for (const sg of segs) {
+      if (sg.t === 'text') {
+        frag.appendChild(document.createTextNode(sg.v));
+        continue;
+      }
+      const span = document.createElement('span');
+      span.className = 'nl-emote';
+      span.textContent = sg.name;
+      span.title = sg.name;
+      frag.appendChild(span);
+      showEmoteImg(span, sg.url);
+    }
+    node.replaceWith(frag);
+  } catch {
+    /* 失敗したら文字のまま */
+  }
+}
+
 /**
  * @param {Element} target
  * @param {boolean} isVenue
@@ -1800,7 +1942,10 @@ function startDomFixerOn(target, isVenue) {
   new MutationObserver((muts) => {
     if ((topFanRestRows.length || zeroPtGifts.length) && muts.some((m) => m.type === 'childList' && !(m.target instanceof Element && m.target.closest('#yt-topfan-rest, [data-yt-all]')))) scheduleTopFanRest();
     for (const m of muts) {
-      if (m.type === 'characterData') fixTextNode(/** @type {Text} */ (m.target));
+      if (m.type === 'characterData') {
+        fixTextNode(/** @type {Text} */ (m.target));
+        decorateEmotes(/** @type {Text} */ (m.target));
+      }
       else if (m.type === 'attributes') {
         const el = /** @type {Element} */ (m.target);
         if (m.attributeName === 'href' && el.tagName === 'A') fixAnchor(el);
