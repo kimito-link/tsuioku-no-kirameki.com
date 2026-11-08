@@ -181,6 +181,11 @@ export function ytBuildTargets({ merged, define }) {
     // ミクチャの配信ページの入口(council/mixch-support-PLAN.md)。本体向けだけ
     list.push({ entryPoints: [src('mx-content-entry.js')], outfile: out('mx-content.js'), target: 'chrome114', define: def, ...page,
       banner: { js: '// mx-content.js — ミクチャの配信ページでコメントとギフト(ページ自身が使うソケット)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // TikTok LIVE の配信ページの入口(council/tiktok-support-PLAN.md)。ページ自身の世界の写し役と、記録へ渡す入口の2つ。本体向けだけ
+    list.push({ entryPoints: [src('tt-main-entry.js')], outfile: out('tt-main.js'), target: 'chrome114', define: def,
+      banner: { js: '// tt-main.js — TikTok の配信ページ自身の世界で、ページのソケットの受信と gift/list を写して入口へ渡すバンドル\n/* eslint-disable */' } });
+    list.push({ entryPoints: [src('tt-content-entry.js')], outfile: out('tt-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// tt-content.js — TikTok の配信ページでコメントとギフト(ページ自身のソケットの写し)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
     list.push({ entryPoints: [resolve(root, 'extension-youtube/content-chat-main.js')], outfile: out('content-chat-main.js'), target: 'chrome114', define: def });
   }
   // offscreen は1つしか持てないので、本体向けには作らない(本体の offscreen を使う・YouTube の読み上げはコメビュ)

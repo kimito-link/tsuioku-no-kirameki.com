@@ -44,6 +44,8 @@ const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
   SRPT: 1,
   // ミクチャのギフトのコイン(items の price × 個数)。数のまま
   MXCOIN: 1,
+  // TikTok のギフトのコイン(diamondCount × 個数)。数のまま
+  TTCOIN: 1,
 });
 
 /**
@@ -73,9 +75,10 @@ const PLATFORM_ITEM_NAME = /** @type {Record<string, Record<string, string>>} */
   whowatch: { superchat: 'アイテム' },
   showroom: { superchat: 'ギフト' },
   mixch: { superchat: 'ギフト' },
+  tiktok: { superchat: 'ギフト' },
 });
 /** 「500 Bits」「500 Kicks」と数で書く通貨 */
-const COUNT_CURRENCY = /** @type {Record<string, string>} */ ({ BITS: 'Bits', KICKS: 'Kicks', WWITEM: '個', SRPT: 'pt', MXCOIN: 'コイン' });
+const COUNT_CURRENCY = /** @type {Record<string, string>} */ ({ BITS: 'Bits', KICKS: 'Kicks', WWITEM: '個', SRPT: 'pt', MXCOIN: 'コイン', TTCOIN: 'コイン' });
 
 /**
  * 元の金額を、その通貨の書き方で出す(例: ¥1,000 / $5.00 / €2.00)。pt は円にしたおよその額なので、

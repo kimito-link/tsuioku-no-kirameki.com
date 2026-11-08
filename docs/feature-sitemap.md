@@ -932,6 +932,14 @@
   - `src/lib/platform/streamPlatform.js`
   - `tests/e2e/mixch-recording.spec.js`
   - `council/mixch-support-PLAN.md`
+- **TikTok LIVE の配信を記録(本体に同梱)** — TikTok の配信のページ(/@<名前>/live)で、ページ自身の世界の写し役(tt-main)がページのソケット(webcast-ws・X-Bogus 署名つき)の受信と gift/list を写し、入口(tt-content)が gzip を解いて protobuf を読み、YouTube 版と同じ記録へ渡す。ログインしていないとソケットが開かない=計器 stopReason login-required とページの知らせ。配信キー tt.<名前>.<roomId>・ギフトは diamondCount × 個数(TTCOIN)・連打は終わりの印で1回・計器 yt_diag_tt_chat
+  - `extension-youtube/src/tt-main-entry.js`
+  - `extension-youtube/src/tt-content-entry.js`
+  - `src/lib/tiktok/ttParse.js`
+  - `src/lib/tiktok/ttProto.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/tiktok-recording.spec.js`
+  - `council/tiktok-support-PLAN.md`
 - **応援レーンタイル→発言一覧(comeview 詳細)** — popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)
   - `src/lib/comeviewUserDetailLink.js`
   - `src/extension/popup/wireLaneUserDetailOpen.js`
@@ -1446,6 +1454,7 @@
 - `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 
 ### 🎁 ギフト (11版)
+- `v0.1.1940` 2026-11-09 — TikTok LIVE の配信を記録する(試作)
 - `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 - `v0.1.1938` 2026-11-08 — コメビュでギフトが2行に見えるのを直す
 - `v0.1.1937` 2026-11-08 — ミクチャの順位の単位と見出しを直す
@@ -1456,7 +1465,6 @@
 - `v0.1.1923` 2026-11-08 — Kick 公式の Kicks ランキングを出す
 - `v0.1.1922` 2026-11-08 — Kick のチャットが本物で記録されるように
 - `v0.1.1921` 2026-11-08 — Kick の配信も記録できるように(試作)
-- `v0.1.1920` 2026-11-08 — YouTube の金額の出ないギフトを分かりやすく
 
 ### 🔊 読み上げ (4版)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)

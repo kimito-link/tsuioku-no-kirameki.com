@@ -7,7 +7,7 @@ export const YT_PANEL_SRC = 'yt-sidepanel.html?inline=1&dock=sidepanel';
 /** @param {unknown} url */
 export function isYtPanelTabUrl(url) {
   // Twitch のタブも同じ画面(YouTube 版の画面=ニコ生版の完全コピー)で見せる。記録は同じ置き場(council/twitch-support-PLAN.md)
-  return /^https:\/\/(?:www\.(?:youtube\.com|twitch\.tv)|(?:www\.)?(?:kick\.com|whowatch\.tv|showroom-live\.com|mixch\.tv))\//.test(String(url || ''));
+  return /^https:\/\/(?:www\.(?:youtube\.com|twitch\.tv)|(?:www\.)?(?:kick\.com|whowatch\.tv|showroom-live\.com|mixch\.tv|tiktok\.com))\//.test(String(url || ''));
 }
 
 /** いま iframe が YouTube 版を見せているか @param {unknown} src */

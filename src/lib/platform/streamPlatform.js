@@ -10,6 +10,7 @@ import { parseTwChannelFromUrl, isTwLogin } from '../twitch/twIrcParse.js';
 import { isKickSlug, parseKickChannelFromUrl } from '../kick/kickChatParse.js';
 import { isSrStreamKey, srRoomKeyOfStreamKey, parseSrRoomKeyFromUrl, isSrRoomKey, srRoomUrl, buildSrStreamKey } from '../showroom/srParse.js';
 import { isMxStreamKey, mxUserIdOfStreamKey, parseMxUserIdFromUrl, isMxUserId, mxLiveUrl, buildMxStreamKey } from '../mixch/mxParse.js';
+import { isTtStreamKey, ttUniqueIdOfStreamKey, parseTtUniqueIdFromUrl, isTtUniqueId, ttLiveUrl, buildTtStreamKey } from '../tiktok/ttParse.js';
 import { isWwStreamKey, wwLiveIdOfStreamKey, parseWwLiveIdFromUrl, isWwLiveId, isWwUserPath, wwPageUrl, buildWwStreamKey } from '../whowatch/wwParse.js';
 
 export const KK_STREAM_KEY_PREFIX = 'kk.';
@@ -43,7 +44,7 @@ function kickSlugOfStreamKey(key) {
 
 /**
  * @typedef {{
- *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
+ *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
@@ -51,7 +52,7 @@ function kickSlugOfStreamKey(key) {
  * }} StreamPlatform
  */
 
-/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch', StreamPlatform>} */
+/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok', StreamPlatform>} */
 export const STREAM_PLATFORMS = Object.freeze({
   twitch: Object.freeze({
     id: /** @type {'twitch'} */ ('twitch'),
@@ -168,9 +169,34 @@ export const STREAM_PLATFORMS = Object.freeze({
     thumbUrl: () => '',
     buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildMxStreamKey(a, opts),
   }),
+  // TikTok LIVE(council/tiktok-support-PLAN.md)。配信のページ /@<名前>/live。login の位置に名前(小文字)を置く
+  tiktok: Object.freeze({
+    id: /** @type {'tiktok'} */ ('tiktok'),
+    name: 'TikTok',
+    keyHead: 'tt.',
+    personHead: 'tt:',
+    paid: 'ギフト',
+    paidCurrency: 'TTCOIN',
+    tabUrl: 'https://www.tiktok.com/*',
+    sendType: 'TT_SEND_COMMENT',
+    lateIconsKey: 'yt_tt_icons',
+    emotesKey: '',
+    rankSentence: 'ギフトのコインの合計の順位（上位）を表示します。このPCの記録から数えます。',
+    officialBoard: '「配信中の視聴者ランキング」',
+    // 視聴者ランキングの score(この配信で贈ったコインとみている・未確認)
+    boardUnit: 'コイン',
+    noSubs: true,
+    isStreamKey: isTtStreamKey,
+    loginOfStreamKey: ttUniqueIdOfStreamKey,
+    channelFromUrl: parseTtUniqueIdFromUrl,
+    isLogin: (/** @type {unknown} */ l) => isTtUniqueId(l),
+    channelUrl: ttLiveUrl,
+    thumbUrl: () => '',
+    buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildTtStreamKey(a, opts),
+  }),
 });
 
-const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom, STREAM_PLATFORMS.mixch];
+const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom, STREAM_PLATFORMS.mixch, STREAM_PLATFORMS.tiktok];
 
 /** 配信キー → サービス(YouTube なら null) @param {unknown} key */
 export function platformOfStreamKey(key) {
@@ -201,5 +227,6 @@ export function platformOfHostname(hostname) {
   if (/^(?:www\.)?whowatch\.tv$/.test(h)) return STREAM_PLATFORMS.whowatch;
   if (/^(?:www\.)?showroom-live\.com$/.test(h)) return STREAM_PLATFORMS.showroom;
   if (/^(?:www\.)?mixch\.tv$/.test(h)) return STREAM_PLATFORMS.mixch;
+  if (/^(?:www\.)?tiktok\.com$/.test(h)) return STREAM_PLATFORMS.tiktok;
   return null;
 }

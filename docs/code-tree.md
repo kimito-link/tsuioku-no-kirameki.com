@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1197 件
+## ⚠️ 役割コメントが無いソース 10 / 1201 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -800,7 +800,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (154)
+- 📁 **extension-youtube/** (156)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -924,7 +924,7 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (25)
+  - 📁 **src/** (27)
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
@@ -939,6 +939,8 @@
     - `sidepanel-yt-parts.html`
     - `sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
     - `sr-content-entry.js` — SHOWROOM の部屋のページ(www.showroom-live.com/r/<room_url_key>)で、コメントとギフトを読んで記録に渡す入口。
+    - `tt-content-entry.js` — TikTok LIVE の配信ページ(tiktok.com/@<名前>/live)で、コメントとギフトを読んで記録に渡す入口。
+    - `tt-main-entry.js` — TikTok のページ自身の世界(MAIN)で動く小さな写し役(council/tiktok-support-PLAN.md)。
     - `tw-content-entry.js` — Twitch の視聴ページ(www.twitch.tv/<チャンネル>)で、チャットを読んで記録に渡す入口。
     - `venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
     - `venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
@@ -1180,7 +1182,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2343)
+- 📁 **src/** (2348)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1483,7 +1485,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2064)
+  - 📁 **lib/** (2069)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1517,6 +1519,12 @@
     - 📁 **showroom/** (2)
       - `srParse.js` — SHOWROOM の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `srParse.test.js`
+    - 📁 **tiktok/** (5)
+      - `ttParse.js` — TikTok LIVE の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
+      - `ttParse.real.test.js`
+      - `ttParse.test.js`
+      - `ttProto.js` — TikTok LIVE のソケットの中身(protobuf)を読む、小さな自前の読み取り(council/tiktok-support-PLAN.md)。
+      - `ttProto.test.js`
     - 📁 **twitch/** (8)
       - `twGql.js` — twitch.tv の画面自身が使っている GQL の応答を「形から検証して」読む(純関数)
       - `twGql.test.js`
@@ -3589,13 +3597,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (89)
+- 📁 **tests/** (90)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (82)
+  - 📁 **e2e/** (83)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3675,6 +3683,7 @@
     - `support-activity-timeline.spec.js`
     - `support-timeline-persist-open.spec.js`
     - `thumbnail-capture.spec.js`
+    - `tiktok-recording.spec.js`
     - `timeline-fill-standalone-window.spec.js`
     - `twitch-recording.spec.js`
     - `venue-entry-effect.spec.js`

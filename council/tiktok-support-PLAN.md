@@ -21,3 +21,16 @@
 - WebSocket の URL(クエリの値は抜く)、受信フレームの先頭バイト・gzip の有無、ack を送っているか、type(WebcastChatMessage 等)の種類と数。
 - チャット欄・ギフトの DOM の data-e2e 属性と入れ子。
 - 送信欄の場所と未ログイン時の表示。
+
+## 2026-11-09 PC 実測の結果と作り(v0.1.1940)
+- ★ログインしていないとコメントのソケット(webcast-ws)自体が開かない(映像だけ流れる・6分でコメント0件)。
+  → 配信中なのに 20 秒たってもソケットが開かなければ、計器 yt_diag_tt_chat.stopReason='login-required' とページ右下の知らせ。
+- 読み方は候補1(ページ自身のソケットを写す)に決めた。X-Bogus 署名つきなので自分では開けない。
+  tt-main-entry.js(MAIN・document_start)が WebSocket を Proxy で包み、受信を写すだけ(送らない・止めない)。
+  入口(document_idle)が hello と言うまで最大 400 通ためる。gift/list の応答も写す(日本語の名前・combo)。
+- 枠: PushFrame{6 "pb", 7 "msg"|"hb", 8 gzip} → Response{1[] Message{1 型, 2 中身, 3 msgId}}。
+  番号は ttParse.js の先頭に書いた。本物の枠(伏せ字)は ttParse.real.test.js に入れて試験している。
+- 連打: combo の途中は field 3=1・終わりは 9=1(3 なし)。combo でないギフトは 9 が来ない=すぐ数える(一覧の combo で引く)。
+  終わりの印が来ない連打は 8 秒待って最後の数で数える(計器 comboTimeouts)。
+- 配信の終わりは /api-live/user/room/ の liveRoom.status(2=配信中・4=配信なし)を 30 秒おきに。ControlMessage は未実測。
+- 未確認: startTime の単位(秒とみている)・視聴者ランキングの score の単位(コインとみている)・英語名(gift 15.16)。

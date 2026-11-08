@@ -18,6 +18,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1940',
+    date: '2026-11-09',
+    summary: 'TikTok LIVE の配信を記録する(試作)',
+    items: Object.freeze([
+      'TikTok LIVE の配信のページ(tiktok.com/@名前/live)を開くと、コメントとギフトを記録するようにしました。ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャと同じ画面で見られます。',
+      'TikTok はログインしていないとコメントが届きません。ログインしていないときは、配信のページの右下に理由を出します。',
+      'ギフトは TikTok のコインの数で数えます。連打のギフトは連打が終わったときに1回だけ数えます。',
+      'TikTok のページを読む許可が増えました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1939',
     date: '2026-11-08',
     summary: 'ミクチャのギフトに絵を出す',
@@ -205,16 +216,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'チャットは Kick のページが使っている接続でそのまま読みます(ログインは要りません)。Kicks・サブスク・ギフトサブ・ホストも記録し、Kicks は応援の合計(pt)に入ります。',
       'サイドパネルと会場からのコメント送信は、Kick の画面の入力欄に書いて送ります(Kick にログインしているときだけ送れます)。',
       '記録は YouTube・Twitch と同じくこの PC の中にだけ置き、外へは送りません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1920',
-    date: '2026-11-08',
-    summary: 'YouTube の金額の出ないギフトを分かりやすく',
-    items: Object.freeze([
-      'YouTube の「ギフト」(ジュエルのスタンプ)やメンバーシップギフトは金額が出ないため、ギフト履歴で「0pt」と出ていました。何を送ったか(例「ハイ」)を出し、ホバーで中身が分かるようにしました。',
-      '同じ人がりんく段とギフト列の両方に居るとき、ギフト列のアイコンにホバー・クリックしても何も出なかったのを直しました。',
-      '日本語の @ハンドルの人もクリックで YouTube のチャンネルを開けるようにしました。'
     ])
   })
 ]);

@@ -23,7 +23,7 @@ export const YT_COMMENT_SEND_REASON_JA = Object.freeze({
 export function ytCommentSendReasonText(reason, note, platform) {
   const base0 = /** @type {Record<string,string>} */ (YT_COMMENT_SEND_REASON_JA)[String(reason || '')] || '';
   // Twitch/Kick の配信(council/twitch-support-PLAN.md・kick-support-PLAN.md)は同じ理由コードで、サービス名だけ変える
-  const svc = platform === 'twitch' ? 'Twitch' : platform === 'kick' ? 'Kick' : platform === 'whowatch' ? 'ふわっち' : platform === 'showroom' ? 'SHOWROOM' : platform === 'mixch' ? 'ミクチャ' : 'YouTube';
+  const svc = platform === 'twitch' ? 'Twitch' : platform === 'kick' ? 'Kick' : platform === 'whowatch' ? 'ふわっち' : platform === 'showroom' ? 'SHOWROOM' : platform === 'mixch' ? 'ミクチャ' : platform === 'tiktok' ? 'TikTok' : 'YouTube';
   const base = svc !== 'YouTube' ? base0.replace(/YouTube/g, svc) : base0;
   const n = String(note || '').trim();
   if (base && n && reason === 'chat-restricted') return `${base}${svc} の案内:「${n}」`;
