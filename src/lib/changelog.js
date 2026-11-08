@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1919',
+    version: '0.1.1920',
     date: '2026-11-08',
     summary: 'YouTube の金額の出ないギフトを分かりやすく',
     items: Object.freeze([
