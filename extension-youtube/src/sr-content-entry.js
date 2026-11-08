@@ -196,6 +196,9 @@ function startReader(roomId, key, bc) {
     diag.types[t] = (diag.types[t] || 0) + 1;
     if (t === '1') push(parseSrComment(f.msg, { roomId }));
     else if (t === '2') push(parseSrGift(f.msg, { roomId, gifts }));
+    // t=101 は配信が終わった知らせ。room/status の is_live=false は 5〜25 秒遅れて来る(2026-11-08 PC 実測)ので、
+    // ここでは止めず、部屋の状態を5秒おきに読みに行かせる(誤って止めない)
+    else if (t === '101') endHintAt = Date.now();
     saveDiagSoon();
   };
 
@@ -275,6 +278,8 @@ function startReader(roomId, key, bc) {
 }
 
 let lastInfoAt = 0;
+/** 配信の終わりの知らせ(ソケット t=101)を受けた時刻。この1分は部屋の状態を5秒おきに読む */
+let endHintAt = 0;
 let checking = false;
 
 async function check() {
@@ -288,7 +293,8 @@ async function check() {
     diag.roomKey = '';
     return;
   }
-  if (current?.roomKey === roomKey && Date.now() - lastInfoAt < META_EVERY_MS) return;
+  const every = Date.now() - endHintAt < 60_000 ? 5_000 : META_EVERY_MS;
+  if (current?.roomKey === roomKey && Date.now() - lastInfoAt < every) return;
   checking = true;
   try {
     const st = parseSrRoomStatus(await tryJson(srRoomStatusUrl(roomKey)));

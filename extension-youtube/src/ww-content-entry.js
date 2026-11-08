@@ -124,6 +124,7 @@ function startReader(liveId) {
   let stopped = false;
   let timer = 0;
   let lastUpdatedAt = 0;
+  let finalPollDone = false;
   let wait = POLL_MS;
   let key = '';
   let metaAt = 0;
@@ -226,6 +227,15 @@ function startReader(liveId) {
     saveDiagSoon();
 
     if (info.isLive === false) {
+      // 終わったと分かった応答には、直前の数秒のコメントがまだ載っていないことがある(2026-11-08 PC 実測で1件)。
+      // 3秒おいて最初から読み直してから止める(同じコメントは同じ id なので二重にはならない)
+      if (!finalPollDone) {
+        finalPollDone = true;
+        lastUpdatedAt = 0;
+        wait = POLL_MS;
+        timer = setTimeout(() => void poll(), 3000);
+        return;
+      }
       endedLives.add(liveId);
       if (key) safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: key, endedAt: Date.now() } });
       stopped = true;
