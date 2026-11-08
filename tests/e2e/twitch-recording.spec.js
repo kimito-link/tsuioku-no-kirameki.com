@@ -130,7 +130,14 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
     const body = String(route.request().postData() || '');
     gqlBodies.push(body);
     if (body.includes('late_fan')) await new Promise((r) => setTimeout(r, 1200));
-    const json = body.includes('users(logins')
+    // 公式の応援ランキング(ChannelLeaderboards・登録済みの問い合わせ)。期間は今月(チャンネルごとに違う)
+    const node = (/** @type {number} */ rank, /** @type {number} */ score, /** @type {string} */ login, /** @type {string} */ displayName) => ({ node: { rank, score, user: { id: String(rank), login, displayName } } });
+    const json = body.includes('ChannelLeaderboards')
+      ? [{ data: { user: { channel: { leaderboardTimePeriod: 'MONTH', leaderboardSet: {
+          bits: { items: { edges: [node(1, 123456, 'big_cheer', 'ビッグチア'), node(2, 500, 'bitter', 'Bitter')] } },
+          subGift: { items: { edges: [] } },
+        } } } } }]
+      : body.includes('users(logins')
       ? {
           data: {
             users: [
@@ -236,4 +243,13 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   expect(text).not.toContain('データ源: youtube');
   // ランキング欄に YouTube の言葉(スパチャ・トップファン)を残さない(2026-11-07 実配信で残っていた)
   expect(text).not.toMatch(/スパチャ|スーパーチャット|トップファン/);
+  // Twitch 公式の Bits ランキング(今月)が「ギフト貢献度」の欄に出る・記録から数えた言葉は出さない
+  const all = await ext.evaluate(() => document.body.textContent || '');
+  expect(all).toContain('Twitch 公式の Bits ランキング（今月）');
+  expect(all).toContain('ビッグチア');
+  expect(all).toContain('123,456 Bits');
+  expect(all).not.toContain('このPCの記録から数えます');
+  expect(gqlBodies.some((b) => b.includes('"operationName":"ChannelLeaderboards"') && b.includes('"channelID":"99"'))).toBe(true);
+  const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_tw_chat'))).yt_diag_tw_chat;
+  expect(d).toMatchObject({ boardRows: 2, boardFrom: 'gql:persisted', boardPeriod: 'MONTH' });
 });

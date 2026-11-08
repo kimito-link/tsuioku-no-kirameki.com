@@ -126,3 +126,28 @@ describe('Kick の公式ランキングを出しているときの言葉', () =>
     expect(ytWordingPlatformOfficial('こんにちは', KICK)).toBe('こんにちは');
   });
 });
+
+describe('公式ランキングの期間・名前・数の区切り(2026-11-08 PC 実測)', () => {
+  it('Kick は「歴代トップKICKユーザー」と同じ値と書く・大きい数は3桁ごとに区切る', async () => {
+    const { ytWording, ytWordingPlatformOfficial, officialWords } = await import('./ytWording.js');
+    const { STREAM_PLATFORMS } = await import('../platform/streamPlatform.js');
+    const kick = STREAM_PLATFORMS.kick;
+    expect(officialWords(kick).sentence).toContain('Kick のチャット欄のランキングの「歴代トップKICKユーザー」と同じ値です。');
+    expect(officialWords(kick).heading).toBe('Kick 公式の Kicks ランキング（累計）');
+    expect(ytWordingPlatformOfficial(ytWording('550000貢', { topFans: true }), kick)).toBe('550,000 Kicks');
+  });
+  it('Twitch はチャンネルごとの期間を見出しに出す・記録の言葉に戻せる', async () => {
+    const { ytWording, ytWordingPlatformOfficial, ytWordingPlatformFixed, officialWords } = await import('./ytWording.js');
+    const { STREAM_PLATFORMS } = await import('../platform/streamPlatform.js');
+    const tw = { ...STREAM_PLATFORMS.twitch, boardPeriod: 'MONTH' };
+    const off = officialWords(tw);
+    expect(off.heading).toBe('Twitch 公式の Bits ランキング（今月）');
+    expect(off.sentence).toContain('（今月・上位）');
+    expect(STREAM_PLATFORMS.twitch.rankSentence).not.toContain('公式の応援ランキングが無い');
+    const nico = 'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。';
+    expect(ytWordingPlatformOfficial(ytWording(nico, { topFans: true }), tw)).toBe(off.sentence);
+    expect(ytWordingPlatformFixed(off.heading, tw)).toBe('Bits・ギフトサブの合計の順位');
+    expect(officialWords({ ...tw, boardPeriod: 'WEEK' }).heading).toBe('Twitch 公式の Bits ランキング（今週）');
+    expect(officialWords({ ...tw, boardPeriod: '' }).heading).toBe('Twitch 公式の Bits ランキング（累計）');
+  });
+});

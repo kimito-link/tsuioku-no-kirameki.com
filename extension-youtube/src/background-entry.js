@@ -757,8 +757,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || '').trim();
     const rows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
     if (!videoId || !rows.length) return false;
+    // Twitch の公式ランキングは期間がチャンネルごとに違う(累計・今月・今週・今日)。見出しに出すので一緒に置く
+    const period = ['ALLTIME', 'MONTH', 'WEEK', 'DAY'].includes(String(payload.period || '')) ? String(payload.period) : '';
     void chrome.storage.local
-      .set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows } })
+      .set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows, ...(period ? { period } : {}) } })
       .catch(() => {});
     return false;
   }

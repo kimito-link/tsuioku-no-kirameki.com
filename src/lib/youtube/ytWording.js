@@ -131,15 +131,17 @@ function swapOnce(text, fromRules, toRules) {
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * @typedef {{ name: string, paid: string, rankSentence: string }} WordingPlatform
+ * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string }} WordingPlatform
  *   name: 'Twitch' / 'Kick'、paid: 'Bits' / 'Kicks'(src/lib/platform/streamPlatform.js の表)
+ *   officialBoard: そのサービスの画面での公式ランキングの名前(例: Kick の「歴代トップKICKユーザー」)
+ *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・無ければ累計)。Twitch はチャンネルごとに違う
  */
 
 /** @type {Map<string, Array<[RegExp, string]>>} */
 const fixedRulesCache = new Map();
 /** @param {WordingPlatform} p */
 function fixedRules(p) {
-  const k = `${p.name}|${p.paid}`;
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}`;
   const hit = fixedRulesCache.get(k);
   if (hit) return hit;
   const svc = `(?:YouTube|${esc(p.name)})`;
@@ -164,14 +166,24 @@ function fixedRules(p) {
   return rules;
 }
 
+/** 公式ランキングの期間の言葉 [文の中・見出し] */
+const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
+  ALLTIME: ['これまでの累計', '累計'],
+  MONTH: ['今月', '今月'],
+  WEEK: ['今週', '今週'],
+  DAY: ['今日', '今日'],
+});
+
 /**
- * そのサービスの公式ランキング(Kick の Kicks ランキング等)を「ギフト貢献度」の欄に入れているときの言葉。
+ * そのサービスの公式ランキング(Kick の Kicks ランキング・Twitch の Bits ランキング)を「ギフト貢献度」の欄に入れているときの言葉。
  * @param {WordingPlatform} p
  */
 export function officialWords(p) {
+  const [inSentence, inHeading] = BOARD_PERIOD_WORDS[String(p.boardPeriod || 'ALLTIME')] || BOARD_PERIOD_WORDS.ALLTIME;
   return {
-    sentence: `${p.name} 公式の ${p.paid} ランキング（これまでの累計・上位）を表示します。${p.name} のチャット欄のランキングと同じ値です。`,
-    heading: `${p.name} 公式の ${p.paid} ランキング（累計）`,
+    // Kick のチャット欄のランキングは6つあり、最初に見えるのは週間のサブ。どれと同じかを名前で書く(2026-11-08 PC 実測)
+    sentence: `${p.name} 公式の ${p.paid} ランキング（${inSentence}・上位）を表示します。${p.name} のチャット欄のランキング${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
+    heading: `${p.name} 公式の ${p.paid} ランキング（${inHeading}）`,
     word: `${p.paid} ランキング`,
   };
 }
@@ -180,7 +192,7 @@ export function officialWords(p) {
 const officialRulesCache = new Map();
 /** @param {WordingPlatform} p */
 function officialRules(p) {
-  const k = `${p.name}|${p.paid}`;
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}`;
   const hit = officialRulesCache.get(k);
   if (hit) return hit;
   const off = officialWords(p);
@@ -195,7 +207,8 @@ function officialRules(p) {
     [new RegExp(`${svc} 公式のトップファン（XP の順位）`, 'g'), off.heading],
     [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフト(?:サブ)?の合計の順位`, 'g'), off.heading],
     [new RegExp(`トップファン|${paid}の合計順|${esc(p.paid)} の合計順`, 'g'), off.word],
-    [/(\d[\d,]*) XP\b/g, `$1 ${p.paid}`],
+    // 公式の数は大きい(550,000 Kicks など)ので3桁ごとに区切る
+    [/(\d[\d,]*) XP\b/g, /** @type {any} */ ((/** @type {string} */ _m, /** @type {string} */ n) => `${Number(n.replace(/,/g, '')).toLocaleString('ja-JP')} ${p.paid}`)],
   ];
   officialRulesCache.set(k, rules);
   return rules;
@@ -209,7 +222,7 @@ function officialRules(p) {
 export function ytWordingPlatformOfficial(text, p) {
   let out = String(text ?? '');
   if (!/トップファン|スパチャ|スーパーチャット|XP/.test(out) && !out.includes(p.paid)) return out;
-  for (const [from, to] of officialRules(p)) out = out.replace(from, to);
+  for (const [from, to] of officialRules(p)) out = out.replace(from, /** @type {any} */ (to));
   return out;
 }
 
@@ -244,7 +257,7 @@ export function ytWordingForPlatform(text, p) {
 const TWITCH_WORDING = {
   name: 'Twitch',
   paid: 'Bits',
-  rankSentence: 'Bits・ギフトサブの合計の順位（上位）を表示します。Twitch には公式の応援ランキングが無いため、このPCの記録から数えます。',
+  rankSentence: 'Bits・ギフトサブの合計の順位（上位）を表示します。Twitch 公式のランキングが読めないため、このPCの記録から数えます。',
 };
 
 /** @param {string} text */

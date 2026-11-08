@@ -715,6 +715,8 @@ let kokenIsTopFans = true;
 // Twitch/Kick の配信で「ギフト貢献度」の欄にそのサービスの公式ランキング(Kick の Kicks ランキング等)が入っているか。
 //   入っていなければ記録から数えた合計の順位(既定)。言葉の直しを切り替える
 let platformOfficial = false;
+/** Twitch の公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・Kick は累計なので空) */
+let platformBoardPeriod = '';
 function registerBroadcastersFromSummaries() {
   for (const [vid, sum] of Object.entries(knownSummaries)) {
     try {
@@ -816,6 +818,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
             scheduleTopFanRest();
           } else topFanRestRows = [];
           const plat = screenPlatform();
+          if (plat) platformBoardPeriod = fromBoard ? String(lb?.period || '') : '';
           if (plat && platformOfficial !== !!fromBoard) {
             platformOfficial = !!fromBoard;
             rewordTopFanHeadings((t) => t);
@@ -1304,8 +1307,13 @@ function fixTextNode(node) {
   if (next !== v) node.nodeValue = next;
 }
 
-/** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
+/** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null)。言葉に使うので公式ランキングの期間も載せる */
 function screenPlatform() {
+  const p = screenPlatformBase();
+  return p && platformBoardPeriod ? { ...p, boardPeriod: platformBoardPeriod } : p;
+}
+/** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
+function screenPlatformBase() {
   if (YT_SHIM_IN_PAGE) return platformOfHostname(location.hostname);
   // 画面がまだコメントを聞いてくる前(最初の描画)は、いちばん新しく記録が増えた配信で決める
   return platformOfStreamKey(lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : newestVideoIdOf(knownSummaries));

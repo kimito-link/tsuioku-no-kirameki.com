@@ -341,6 +341,7 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   const all = await ext.evaluate(() => document.body.textContent || '');
   expect(all).not.toContain('このPCの記録から数えます');
   expect(all).toContain('Kick 公式の Kicks ランキング');
+  expect(all).toContain('「歴代トップKICKユーザー」と同じ値です');
   // ニコ生だけの部品(なふだ)は見せない・ランキング欄の補足(title・aria-label)にも「ニコ生」「放送者」を残さない
   const left = await ext.evaluate(() => {
     const vis = document.body.innerText.split('\n').filter((l) => /ニコ生|放送者/.test(l));

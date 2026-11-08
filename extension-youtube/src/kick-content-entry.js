@@ -28,7 +28,17 @@ import {
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
-const ICON_PARALLEL = 2;
+// 顔は1人ずつ・間をあけて聞く。混んだ配信で毎秒聞いて Kick に 429(多すぎ)を返され、
+//   自分の配信の問い合わせまで 429 になった(2026-11-08 PC 実測・約7分で 429 が 375 回)。
+const ICON_PARALLEL = 1;
+/** 公式の順位表をソケットで受けないまま、この時間たったら API で読み直す */
+const BOARD_REFRESH_MS = 5 * 60_000;
+const ICON_GAP_MS = 1500;
+/** 429 を受けたら少し休む(続けば倍に・最大5分) */
+const ICON_PAUSE_MIN_MS = 30_000;
+const ICON_PAUSE_MAX_MS = 300_000;
+/** 取れなかった人は、しばらく聞き直さない */
+const ICON_RETRY_AFTER_MS = 10 * 60_000;
 const MAX_SEEN = 5000;
 
 /** 計器(状態速報と同じく storage に置く・りんくに聞かずに数で確かめる) */
@@ -64,6 +74,9 @@ const diag = {
   iconAsked: 0,
   iconFound: 0,
   iconLate: 0,
+  /** 顔の問い合わせで 429 を受けた回数と、休んだ回数 */
+  icon429: 0,
+  iconPaused: 0,
   apiFail: 0,
   updatedAt: 0,
 };
@@ -170,11 +183,27 @@ function saveLateIconsSoon() {
 
 /** @type {Array<() => void>} */
 let iconWaiters = [];
+let iconNextAt = 0;
+let iconPauseMs = 0;
+let iconPumpTimer = 0;
+/** @type {Map<string, number>} slug → 取れなかった時刻 */
+const iconFailedAt = new Map();
 function pumpIcons() {
+  const now = Date.now();
+  if (iconRunning < ICON_PARALLEL && iconQueue.length && now < iconNextAt) {
+    if (!iconPumpTimer) {
+      iconPumpTimer = setTimeout(() => {
+        iconPumpTimer = 0;
+        pumpIcons();
+      }, iconNextAt - now);
+    }
+    return;
+  }
   while (iconRunning < ICON_PARALLEL && iconQueue.length) {
     const slug = /** @type {string} */ (iconQueue.shift());
     iconRunning += 1;
     diag.iconAsked += 1;
+    iconNextAt = Date.now() + ICON_GAP_MS;
     void (async () => {
       try {
         const url = parseKickUserIcon(await getJson(kickChannelApiUrl(slug)));
@@ -186,9 +215,20 @@ function pumpIcons() {
           diag.iconLate += 1;
           saveLateIconsSoon();
         }
-      } catch {
+        iconPauseMs = 0;
+      } catch (e) {
         diag.apiFail += 1;
-        // 取れなかった人は次の発言でもう一度聞く(iconBySlug に入れない)
+        // 取れなかった人は、しばらくしてからもう一度聞く(iconBySlug に入れない)
+        iconFailedAt.set(slug, Date.now());
+        if (iconFailedAt.size > 5000) iconFailedAt.clear();
+        if (String(/** @type {any} */ (e)?.message || '') === 'kick_429') {
+          diag.icon429 += 1;
+          diag.iconPaused += 1;
+          iconPauseMs = Math.min(ICON_PAUSE_MAX_MS, iconPauseMs ? iconPauseMs * 2 : ICON_PAUSE_MIN_MS);
+          iconNextAt = Date.now() + iconPauseMs;
+          // 休む間に溜まった頼みは捨てる(待っている記録は顔なしで先に出し、あとで顔を足す)
+          for (const q of iconQueue.splice(0)) iconPending.delete(q);
+        }
       } finally {
         iconPending.delete(slug);
         iconRunning -= 1;
@@ -205,6 +245,8 @@ function pumpIcons() {
 function lookupIcons(slugs) {
   for (const s of slugs) {
     if (!s || iconBySlug.has(s) || iconPending.has(s)) continue;
+    const failed = iconFailedAt.get(s);
+    if (failed && Date.now() - failed < ICON_RETRY_AFTER_MS) continue;
     // 混んでいるときは古い頼みを捨てる(新しく話した人を先に)
     if (iconQueue.length > 60) iconPending.delete(/** @type {string} */ (iconQueue.shift()));
     iconPending.add(s);
@@ -305,15 +347,17 @@ function startReader(slug, key, ids) {
   const chans = kickRealtimeChannels(ids.chatroomId, ids.channelId);
 
   /** 公式の Kicks ランキングを記録側へ(YouTube のトップファンと同じ口・ギフト貢献度の欄に出る) @param {any} rows @param {string} from */
+  let boardAt = 0;
   const sendBoard = (rows, from) => {
     if (!Array.isArray(rows) || !rows.length) return;
+    boardAt = Date.now();
     diag.boardRows = rows.length;
     diag.boardFrom = from;
     safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows } });
     saveDiagSoon();
   };
-  // 開いた時点の順位表(以後はソケットの KicksLeaderboardUpdated で届く)。id はチャンネルかユーザーか未確定なので両方試す
-  void (async () => {
+  // 順位表を API で読む。答えるのはチャンネル id(2026-11-08 PC 実測・ユーザー id は空の一覧)。念のためユーザー id も試す
+  const fetchBoard = async () => {
     for (const id of [ids.channelId, ids.userId]) {
       const url = kickKicksLeaderboardUrl(id);
       if (!url || stopped) continue;
@@ -326,7 +370,14 @@ function startReader(slug, key, ids) {
     }
     diag.boardFail += 1;
     saveDiagSoon();
-  })();
+  };
+  // 開いた時点で1回。以後はソケットの KicksLeaderboardUpdated で届くが、Kicks が来ない配信では
+  //   「最終更新: 7分前（少し前の値）」と古く見えた(値は正しい)ので、5分届かなければ API で読み直す
+  void fetchBoard();
+  const boardTimer = setInterval(() => {
+    if (stopped) return clearInterval(boardTimer);
+    if (Date.now() - boardAt >= BOARD_REFRESH_MS) void fetchBoard();
+  }, 60_000);
 
   /** Pusher の1通 @param {string} raw */
   const onPusherFrame = (raw) => {

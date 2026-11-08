@@ -51,3 +51,44 @@ describe('twStreamKey', () => {
     expect(buildTwStreamKey('a b')).toBe('');
   });
 });
+
+describe('Twitch 公式の応援ランキング(ChannelLeaderboards・2026-11-08 PC 実測の形)', async () => {
+  const { parseTwLeaderboards, buildTwLeaderboardsQuery, buildTwLeaderboardsFallbackQuery } = await import('./twGql.js');
+  const node = (rank, score, login, displayName) => ({ node: { rank, score, user: login ? { id: '1', login, displayName } : null } });
+  it('期間と Bits・ギフトサブの順位を読む・壊れた行だけ捨てる', () => {
+    const r = parseTwLeaderboards([
+      {
+        data: {
+          user: {
+            channel: {
+              leaderboardTimePeriod: 'MONTH',
+              leaderboardSet: {
+                bits: { items: { edges: [node(1, 5000, 'Big_Fan', 'でかファン'), node(2, 300, null, ''), node(3, 0, 'zero', 'z'), node(4, 120, 'small', '')] }, secondsRemaining: 10 },
+                subGift: { items: { edges: [node(1, 25, 'giver', 'Giver')] } },
+              },
+            },
+          },
+        },
+      },
+    ]);
+    expect(r).toEqual({
+      period: 'MONTH',
+      bits: [
+        { rank: 1, name: 'でかファン', login: 'big_fan', xp: 5000, iconUrl: '' },
+        { rank: 2, name: 'small', login: 'small', xp: 120, iconUrl: '' },
+      ],
+      subGift: [{ rank: 1, name: 'Giver', login: 'giver', xp: 25, iconUrl: '' }],
+    });
+  });
+  it('知らない期間は累計・形が違えば null', () => {
+    expect(parseTwLeaderboards({ data: { user: { channel: { leaderboardTimePeriod: 'YEAR', leaderboardSet: {} } } } })?.period).toBe('ALLTIME');
+    expect(parseTwLeaderboards({ data: { user: { channel: { leaderboardSet: null } } } })).toBeNull();
+    expect(parseTwLeaderboards({ errors: [{ message: 'PersistedQueryNotFound' }] })).toBeNull();
+    expect(parseTwLeaderboards(null)).toBeNull();
+  });
+  it('問い合わせ', () => {
+    expect(buildTwLeaderboardsQuery('713936733')).toMatchObject({ operationName: 'ChannelLeaderboards', variables: { first: 10, channelID: '713936733' } });
+    expect(buildTwLeaderboardsQuery('x')).toBeNull();
+    expect(buildTwLeaderboardsFallbackQuery('a"){x}')?.query).toContain('user(login:"ax")');
+  });
+});

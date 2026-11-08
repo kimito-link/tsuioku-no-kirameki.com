@@ -16,8 +16,11 @@ import {
   buildTwStreamInfoQuery,
   buildTwStreamInfoMinimalQuery,
   buildTwUsersIconQuery,
+  buildTwLeaderboardsQuery,
+  buildTwLeaderboardsFallbackQuery,
   parseTwStreamInfo,
   parseTwUsersIcons,
+  parseTwLeaderboards,
 } from '../../src/lib/twitch/twGql.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
@@ -25,6 +28,8 @@ const META_EVERY_MS = 30_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
 const MAX_SEEN = 5000;
+/** 公式の応援ランキングを読み直す間(ページのチャット欄の順位表も数分おきにしか変わらない) */
+const BOARD_EVERY_MS = 2 * 60_000;
 
 /** 計器(状態速報と同じく storage に置く・りんくに聞かずに数で確かめる) */
 const diag = {
@@ -47,6 +52,11 @@ const diag = {
   iconFound: 0,
   iconLate: 0,
   gqlFail: 0,
+  /** 公式の応援ランキング: 行数・どこから(gql:persisted / gql:query)・期間・読めなかった回数 */
+  boardRows: 0,
+  boardFrom: '',
+  boardPeriod: '',
+  boardFail: 0,
   updatedAt: 0,
 };
 
@@ -306,6 +316,53 @@ function startReader(login, key) {
 
 let lastInfoAt = 0;
 let checking = false;
+let lastBoardAt = 0;
+let lastBoardKey = '';
+
+/**
+ * Twitch 公式の Bits ランキングを記録側へ(Kick の Kicks ランキング・YouTube のトップファンと同じ口・「ギフト貢献度」の欄に出る)。
+ * 読めないとき・Bits の順位が空のときは送らない(画面はこの PC の記録から数えた順位のまま)。
+ * @param {string} login @param {string} userId @param {string} key
+ */
+async function sendTwBoard(login, userId, key) {
+  lastBoardAt = Date.now();
+  lastBoardKey = key;
+  /** @type {ReturnType<typeof parseTwLeaderboards>} */
+  let board = null;
+  let from = '';
+  const persisted = buildTwLeaderboardsQuery(userId);
+  if (persisted) {
+    try {
+      board = parseTwLeaderboards(await gql(persisted));
+      if (board) from = 'gql:persisted';
+    } catch {
+      /* 下の手書きの問い合わせへ */
+    }
+  }
+  if (!board) {
+    const q = buildTwLeaderboardsFallbackQuery(login);
+    try {
+      board = q ? parseTwLeaderboards(await gql(q)) : null;
+      if (board) from = 'gql:query';
+    } catch {
+      /* 読めない */
+    }
+  }
+  if (!board || !board.bits.length) {
+    diag.boardFail += 1;
+    saveDiagSoon();
+    return;
+  }
+  // 順位表には顔が無いので、チャットと同じ方法で顔を聞く(待ちすぎない)
+  const logins = board.bits.map((r) => r.login).filter((l) => !iconByLogin.has(l));
+  if (logins.length) await Promise.race([lookupIcons(logins), new Promise((r) => setTimeout(r, 3000))]);
+  const rows = board.bits.map((r) => ({ rank: r.rank, name: r.name, xp: r.xp, iconUrl: iconByLogin.get(r.login) || '' }));
+  diag.boardRows = rows.length;
+  diag.boardFrom = from;
+  diag.boardPeriod = board.period;
+  safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows, period: board.period } });
+  saveDiagSoon();
+}
 
 async function check() {
   if (checking) return;
@@ -358,6 +415,7 @@ async function check() {
         ...(info?.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
       },
     });
+    if (info?.userId && (lastBoardKey !== key || Date.now() - lastBoardAt >= BOARD_EVERY_MS)) void sendTwBoard(login, info.userId, key);
     saveDiagSoon();
   } finally {
     checking = false;
