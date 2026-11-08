@@ -363,3 +363,10 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     });
   });
 });
+
+describe('同じ人が2つの段に居るとき、席の外のタイルにもカードを出す(2026-11-08 ギフト列で無反応)', () => {
+  it('resolveSeatlessHoverData は「席の中のタイル」だけを対象外にする(席番号だけで null にしない)', () => {
+    expect(venueBarSrc).toMatch(/seatIdx >= 0 && el\.closest\?\.\('\.nlsb-seat'\)\) return null;/);
+    expect(venueBarSrc).not.toMatch(/if \(Number\.isInteger\(seatIdx\) && seatIdx >= 0\) return null;/);
+  });
+});

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1894',
+    date: '2026-11-06',
+    summary: '無料の人の OBS コメビュに小さな印(まだ出ない)',
+    items: Object.freeze([
+      'コメビュを OBS 透過で出したとき、無料の人は画面の隅に小さく「追憶のきらめき」と出し、サポーターは出さない仕組みを入れました。今はまだ関所を開けたままなので、誰にも出ません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1893',
     date: '2026-11-06',
     summary: 'サポーター(有料)の土台を用意(まだ無料)',
