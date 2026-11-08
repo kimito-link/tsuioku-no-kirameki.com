@@ -31,7 +31,7 @@ describe('ミクチャの URL', () => {
   it('API とソケットの URL', () => {
     expect(mxLiveInfoUrl('12')).toBe('https://mixch.tv/api-web/users/12/live');
     expect(mxMessagesUrl('12')).toBe('https://mixch.tv/api-web/lives/12/messages');
-    expect(mxItemsUrls('99')[0]).toBe('https://mixch.tv/api-web/items/available?live_session_id=99');
+    expect(mxItemsUrls('99')[0]).toBe('https://mixch.tv/items/available?live_session_id=99');
     expect(mxItemsUrls('x')).toEqual([]);
     expect(mxSocketUrl('wss://chat.mixch.tv/torte/room/12', '12')).toBe('wss://chat.mixch.tv/torte/room/12');
     expect(mxSocketUrl('wss://evil.example/x', '12')).toBe('wss://chat.mixch.tv/torte/room/12');

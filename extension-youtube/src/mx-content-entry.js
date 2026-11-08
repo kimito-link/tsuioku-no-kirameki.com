@@ -58,6 +58,8 @@ const diag = {
   boardRows: 0,
   apiFail: 0,
   lastError: '',
+  /** 記録が止まった理由('login-redirect' = 未ログインでミクチャにログイン画面へ飛ばされた) */
+  stopReason: '',
   updatedAt: 0,
 };
 
@@ -180,7 +182,8 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     boardAt = Date.now();
     if (stopped || !rows.length) return;
     diag.boardRows = rows.length;
-    safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows } });
+    // ミクチャの順位は今月のファンランキング(見出しを「今月」にする)
+    safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows, period: 'MONTH' } });
     saveDiagSoon();
   };
 
@@ -269,6 +272,26 @@ let checking = false;
 /** ソケットの kind 10 から来た視聴数(次の配信情報の送信で使う) */
 let latestViewers = /** @type {number | null} */ (null);
 
+// 未ログインで配信を開くと、約5分(302秒)でミクチャがログイン画面(/login)へ飛ばす(2026-11-08 PC 実測)。
+//   ページが変わるので記録はそこで止まる。止まった理由を計器に残す(前のページの計器は live=true のまま残っていた)
+let loginNoted = false;
+function noteLoginRedirect() {
+  if (loginNoted || !/^\/login\b/.test(String(location.pathname || ''))) return;
+  loginNoted = true;
+  try {
+    void Promise.resolve(chrome.storage.local.get('yt_diag_mx_chat'))
+      .then((bag) => {
+        const prev = bag?.yt_diag_mx_chat;
+        // 直前(2分以内)に配信を記録していたときだけ(ふつうにログインしに来たときは書かない)
+        if (!prev || !prev.streamKey || Date.now() - Number(prev.updatedAt || 0) > 120_000) return;
+        return chrome.storage.local.set({ yt_diag_mx_chat: { ...prev, live: null, stopReason: 'login-redirect', stoppedAt: Date.now() } });
+      })
+      .catch(() => {});
+  } catch {
+    /* 拡張が入れ替わった直後 */
+  }
+}
+
 async function check() {
   if (checking) return;
   const userId = parseMxUserIdFromUrl(location.href);
@@ -278,6 +301,7 @@ async function check() {
       current = null;
     }
     diag.userId = '';
+    noteLoginRedirect();
     return;
   }
   if (current?.userId === userId && Date.now() - lastInfoAt < META_EVERY_MS) return;

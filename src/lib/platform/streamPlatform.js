@@ -47,7 +47,7 @@ function kickSlugOfStreamKey(key) {
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
- *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean,
+ *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean, boardUnit?: string,
  * }} StreamPlatform
  */
 
@@ -133,6 +133,7 @@ export const STREAM_PLATFORMS = Object.freeze({
     emotesKey: '',
     rankSentence: 'ギフトの pt の合計の順位（上位）を表示します。このPCの記録から数えます。',
     officialBoard: '「貢献ランキング」',
+    boardUnit: 'pt',
     noSubs: true,
     isStreamKey: isSrStreamKey,
     loginOfStreamKey: srRoomKeyOfStreamKey,
@@ -156,6 +157,8 @@ export const STREAM_PLATFORMS = Object.freeze({
     emotesKey: '',
     rankSentence: 'ギフトのコインの合計の順位（上位）を表示します。このPCの記録から数えます。',
     officialBoard: '「今月のファンランキング」',
+    // ファンランキングの score。コメビュのギフトの pt と単位をそろえる
+    boardUnit: 'pt',
     noSubs: true,
     isStreamKey: isMxStreamKey,
     loginOfStreamKey: mxUserIdOfStreamKey,

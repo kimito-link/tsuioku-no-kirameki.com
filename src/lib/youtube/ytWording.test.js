@@ -173,3 +173,15 @@ describe('ふわっちの言葉', () => {
     expect(ytWordingPlatformFixed('スーパーチャット・ギフトの合計の順位', STREAM_PLATFORMS.kick)).toBe('Kicks・ギフトサブの合計の順位');
   });
 });
+
+describe('ミクチャ・SHOWROOM の公式ランキングの単位と期間(2026-11-08 PC 実測)', () => {
+  it('数は pt(「6,430 ギフト」にしない)・ミクチャは今月', async () => {
+    const { ytWording, ytWordingPlatformOfficial, officialWords } = await import('./ytWording.js');
+    const { STREAM_PLATFORMS } = await import('../platform/streamPlatform.js');
+    const mx = { ...STREAM_PLATFORMS.mixch, boardPeriod: 'MONTH' };
+    expect(ytWordingPlatformOfficial(ytWording('6,430貢', { topFans: true }), mx)).toBe('6,430 pt');
+    expect(ytWordingPlatformOfficial(ytWording('6430貢', { topFans: true }), STREAM_PLATFORMS.showroom)).toBe('6,430 pt');
+    expect(officialWords(mx).heading).toBe('ミクチャ 公式の ギフト ランキング（今月）');
+    expect(officialWords(mx).sentence).toContain('今月・上位');
+  });
+});

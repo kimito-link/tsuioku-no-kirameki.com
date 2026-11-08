@@ -136,10 +136,11 @@ function swapOnce(text, fromRules, toRules) {
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean }} WordingPlatform
+ * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean, boardUnit?: string }} WordingPlatform
  *   name: 'Twitch' / 'Kick'、paid: 'Bits' / 'Kicks'(src/lib/platform/streamPlatform.js の表)
  *   officialBoard: そのサービスの画面での公式ランキングの名前(例: Kick の「歴代トップKICKユーザー」)
  *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・無ければ累計)。Twitch はチャンネルごとに違う
+ *   boardUnit: 公式ランキングの数の単位(無ければ paid。SHOWROOM・ミクチャは paid が「ギフト」なので「6,430 ギフト」にならないよう pt)
  */
 
 /** @type {Map<string, Array<[RegExp, string]>>} */
@@ -198,7 +199,7 @@ export function officialWords(p) {
 const officialRulesCache = new Map();
 /** @param {WordingPlatform} p */
 function officialRules(p) {
-  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}`;
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.boardUnit || ''}`;
   const hit = officialRulesCache.get(k);
   if (hit) return hit;
   const off = officialWords(p);
@@ -214,7 +215,7 @@ function officialRules(p) {
     [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフト(?:サブ)?の合計の順位`, 'g'), off.heading],
     [new RegExp(`トップファン|${paid}の合計順|${esc(p.paid)} の合計順`, 'g'), off.word],
     // 公式の数は大きい(550,000 Kicks など)ので3桁ごとに区切る
-    [/(\d[\d,]*) XP\b/g, /** @type {any} */ ((/** @type {string} */ _m, /** @type {string} */ n) => `${Number(n.replace(/,/g, '')).toLocaleString('ja-JP')} ${p.paid}`)],
+    [/(\d[\d,]*) XP\b/g, /** @type {any} */ ((/** @type {string} */ _m, /** @type {string} */ n) => `${Number(n.replace(/,/g, '')).toLocaleString('ja-JP')} ${p.boardUnit || p.paid}`)],
   ];
   officialRulesCache.set(k, rules);
   return rules;

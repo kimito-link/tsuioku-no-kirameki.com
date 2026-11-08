@@ -55,7 +55,8 @@ export function mxRankingUrl(a) {
 export function mxItemsUrls(sessionId) {
   if (!/^\d{1,20}$/.test(String(sessionId))) return [];
   const q = `available?live_session_id=${sessionId}`;
-  return [`${MX_ORIGIN}/api-web/items/${q}`, `${MX_ORIGIN}/items/${q}`];
+  // /api-web/items は 302 で飛ばされる(2026-11-08 PC 実測・全部屋 root で取れた)。root を先に試す
+  return [`${MX_ORIGIN}/items/${q}`, `${MX_ORIGIN}/api-web/items/${q}`];
 }
 /** ソケットの URL(liveInfo.chat がこの形のときだけ使う。無ければ番号から作る) @param {unknown} chat @param {string} a */
 export function mxSocketUrl(chat, a) {
