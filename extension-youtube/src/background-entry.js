@@ -38,7 +38,18 @@ let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
+import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
+
+const mxGiftImages = createMxGiftImageResolver({
+  fetchJson: async (url) => {
+    const res = await fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`http_${res.status}`);
+    return res.json();
+  },
+  storageGet: async (key) => (await chrome.storage.local.get(key))?.[key],
+  storageSet: (bag) => chrome.storage.local.set(bag),
+});
 
 // 本体に同梱したとき(scripts/youtube-build.mjs の本体向け束・2026-11-05): 本体の background.js が importScripts で読む。
 //   パネルの開き方・offscreen・自分で入れ替わる仕組みは本体のものを使う(ここで触ると本体の動きが変わる)。
@@ -705,6 +716,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' } })
       .then(async (res) => (res.ok ? { ok: true, json: await res.json() } : { ok: false, reason: `http_${res.status}` }))
       .then((r) => sendResponse(r))
+      .catch((err) => sendResponse({ ok: false, reason: String(err).slice(0, 80) }));
+    return true;
+  }
+
+  // ミクチャのギフトの絵(資源の置き場は CORS が無いのでページから読めない・2026-11-08 PC 実測)。ミクチャのページから・番号だけ
+  if (message.type === 'YT_MX_GIFT_IMAGES') {
+    const from = String(sender?.tab?.url || sender?.url || '');
+    if (!/^https:\/\/mixch\.tv\//.test(from)) {
+      sendResponse({ ok: false, reason: 'bad-origin' });
+      return false;
+    }
+    mxGiftImages(Array.isArray(message.ids) ? message.ids : [])
+      .then((images) => sendResponse({ ok: true, images }))
       .catch((err) => sendResponse({ ok: false, reason: String(err).slice(0, 80) }));
     return true;
   }

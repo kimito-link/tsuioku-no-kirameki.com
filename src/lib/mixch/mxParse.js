@@ -133,21 +133,58 @@ export function parseMxLive(json, aHint = '') {
 }
 
 /**
- * /items/available → item_id → { price, imageUrl }
+ * /items/available → item_id → { price, resourceId, imageUrl }
+ *   items[].url は絵ではなくページへのリンク(mixch.tv/p/…・2026-11-08 PC 実測)なので使わない。
+ *   絵は resource_id から ギフトの資源(MX_RES_BASE)を引いて決める(imageUrl はあとで入れる)。
  * @param {unknown} json
- * @returns {Map<string, { price: number, imageUrl: string }>}
+ * @returns {Map<string, MxItem>}
  */
 export function parseMxItems(json) {
   const o = obj(json);
-  /** @type {Map<string, { price: number, imageUrl: string }>} */
+  /** @type {Map<string, MxItem>} */
   const out = new Map();
   for (const it of Array.isArray(o?.items) ? o.items : []) {
     const r = obj(it);
     const id = str(r?.id);
     if (!r || !/^\d{1,12}$/.test(id)) continue;
-    out.set(id, { price: Math.floor(num(r.price)), imageUrl: safeMxImageUrl(r.url) });
+    const res = str(r.resource_id);
+    out.set(id, { price: Math.floor(num(r.price)), resourceId: /^\d{1,9}$/.test(res) ? res : '', imageUrl: '' });
   }
   return out;
+}
+/** @typedef {{ price: number, resourceId: string, imageUrl: string, imageTried?: boolean }} MxItem */
+
+// ---- ギフトの絵(2026-11-08 PC 実測) ----
+//   index.json → {resources:[{id, file}]}(file は / で始まる)→ 土台 + file の JSON の preview(/ で始まる)→ 土台 + preview が絵。
+//   どちらも Access-Control-Allow-Origin が無いので、読むのはバックグラウンド(ホスト権限)。
+export const MX_RES_BASE = 'https://d2uqarpmf42qy0.cloudfront.net/torte_web_resources';
+export const MX_RES_INDEX_URL = `${MX_RES_BASE}/index.json`;
+const RES_PATH_RE = /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_.-]+)*$/;
+/** @param {unknown} p @param {RegExp} ext */
+function safeResPath(p, ext) {
+  const s = str(p).trim();
+  if (!RES_PATH_RE.test(s) || s.includes('..') || !ext.test(s)) return '';
+  return s;
+}
+/** index.json → resource_id → file の URL @param {unknown} json @returns {Map<string, string>} */
+export function parseMxResourceIndex(json) {
+  const o = obj(json);
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  for (const it of Array.isArray(o?.resources) ? o.resources : []) {
+    const r = obj(it);
+    const id = str(r?.id);
+    const file = safeResPath(r?.file, /\.json$/i);
+    if (!/^\d{1,9}$/.test(id) || !file) continue;
+    out.set(id, `${MX_RES_BASE}${file}`);
+    if (out.size >= 5000) break;
+  }
+  return out;
+}
+/** 資源の JSON → 絵の URL(無ければ '') @param {unknown} json */
+export function mxResourcePreviewUrl(json) {
+  const p = safeResPath(obj(json)?.preview, /\.(?:png|jpe?g|webp|gif)$/i);
+  return p ? `${MX_RES_BASE}${p}` : '';
 }
 
 /** ソケットの1通 → JSON の行の配列(読めなければ空)。1通に配列が来ても全部返す @param {unknown} raw @returns {Record<string, any>[]} */
@@ -177,7 +214,7 @@ export function mxKindOf(v) {
 /**
  * コメントかギフト1件 → 記録の1件。記録しないもの(入室・状態など)・形が違うものは null。
  * @param {unknown} raw
- * @param {{ userId: string, items?: Map<string, { price: number, imageUrl: string }>, nowMs?: number }} ctx
+ * @param {{ userId: string, items?: Map<string, MxItem>, nowMs?: number }} ctx
  */
 export function parseMxMessage(raw, ctx) {
   const c = obj(raw);
@@ -225,7 +262,7 @@ export function parseMxMessage(raw, ctx) {
     amount,
     currency: amount > 0 ? MX_CURRENCY : '',
     giftName,
-    ...(it?.imageUrl ? { giftImageUrl: it.imageUrl } : {}),
+    ...(it?.imageUrl && safeMxImageUrl(it.imageUrl) ? { giftImageUrl: it.imageUrl } : {}),
     ...(count > 1 ? { giftCount: count } : {}),
   };
 }

@@ -55,6 +55,9 @@ const diag = {
   dropped: 0,
   itemList: 0,
   itemsVia: '',
+  /** 絵の分かったギフトの種類の数・絵を聞けなかった回数 */
+  giftImages: 0,
+  giftImageFail: 0,
   boardRows: 0,
   apiFail: 0,
   lastError: '',
@@ -129,7 +132,7 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
   let pending = [];
   /** @type {Set<string>} */
   const seen = new Set();
-  /** @type {Map<string, { price: number, imageUrl: string }>} */
+  /** @type {Map<string, import('../../src/lib/mixch/mxParse.js').MxItem>} */
   let items = new Map();
 
   const flush = () => {
@@ -141,8 +144,62 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     safeSendMessage({ type: 'YT_CHAT_ITEMS', payload: { videoId: key, chatFilterLabel: '', items: rows } });
     saveDiagSoon();
   };
-  /** @param {any} raw */
-  const take = (raw) => {
+  // ギフトの絵: 初めて見たギフトの種類はバックグラウンドに絵を聞いてから記録する(最大2秒待つ・待てなければ絵なし)
+  /** @type {any[]} */
+  let held = [];
+  /** @type {Set<string>} */
+  const askIds = new Set();
+  let askTimer = 0;
+  const releaseHeld = () => {
+    const list = held;
+    held = [];
+    for (const raw of list) take(raw, true);
+  };
+  const askImages = () => {
+    askTimer = 0;
+    const ids = [...askIds];
+    askIds.clear();
+    if (!ids.length) return;
+    let done = false;
+    /** @param {Record<string, string>} images */
+    const apply = (images) => {
+      if (done) return;
+      done = true;
+      for (const it of items.values()) {
+        if (!it.resourceId || !ids.includes(it.resourceId)) continue;
+        it.imageTried = true;
+        const u = String(images?.[it.resourceId] || '');
+        if (u) it.imageUrl = u;
+      }
+      diag.giftImages = [...items.values()].filter((it) => it.imageUrl).length;
+      releaseHeld();
+    };
+    const timer = setTimeout(() => apply({}), 2000);
+    try {
+      if (!chrome?.runtime?.id) return apply({});
+      chrome.runtime.sendMessage({ type: 'YT_MX_GIFT_IMAGES', ids }, (r) => {
+        void chrome.runtime.lastError;
+        clearTimeout(timer);
+        if (!r?.ok) diag.giftImageFail += 1;
+        apply(r?.ok ? r.images : {});
+      });
+    } catch {
+      clearTimeout(timer);
+      apply({});
+    }
+  };
+  /** @param {any} raw @param {boolean} [again] 絵を待ったあと */
+  const take = (raw, again = false) => {
+    if (!again && raw?.item_id != null) {
+      const it = items.get(String(raw.item_id));
+      if (it && it.resourceId && !it.imageUrl && !it.imageTried) {
+        held.push(raw);
+        askIds.add(it.resourceId);
+        if (!askTimer) askTimer = setTimeout(askImages, 100);
+        return;
+      }
+    }
+    if (stopped) return;
     const kind = mxKindOf(raw);
     if (kind === 10 && Number.isFinite(Number(raw?.viewer))) onViewers(Math.max(0, Math.floor(Number(raw.viewer))));
     const r = parseMxMessage(raw, { userId, items });
@@ -192,7 +249,7 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     const rows = mxMessageRows(await tryJson(mxMessagesUrl(userId)));
     if (stopped) return;
     diag.backlog += rows.length;
-    rows.forEach(take);
+    rows.forEach((r) => take(r));
   };
 
   /** @param {string} raw */
@@ -255,6 +312,9 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
   })();
 
   return () => {
+    // 絵を待っていたギフトも絵なしで残す
+    if (askTimer) clearTimeout(askTimer);
+    releaseHeld();
     stopped = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
     clearInterval(boardTimer);

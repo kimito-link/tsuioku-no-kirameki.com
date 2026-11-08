@@ -65,10 +65,11 @@ describe('配信の情報', () => {
 });
 
 describe('メッセージ', () => {
-  const items = parseMxItems({ items: [{ id: 501, price: 100, url: 'https://d2uqarpmf42qy0.cloudfront.net/torte_web_resources/501.png' }, { id: 'x' }] });
+  const items = parseMxItems({ items: [{ id: 501, price: 100, resource_id: 376, url: 'https://mixch.tv/p/gk26o21v' }, { id: 'x' }] });
   it('アイテムの一覧', () => {
     expect(items.size).toBe(1);
-    expect(items.get('501')).toEqual({ price: 100, imageUrl: 'https://d2uqarpmf42qy0.cloudfront.net/torte_web_resources/501.png' });
+    // url はページへのリンクなので絵にしない。絵は resource_id から引く
+    expect(items.get('501')).toEqual({ price: 100, resourceId: '376', imageUrl: '' });
   });
   it('コメント', () => {
     expect(parseMxMessage({ kind: 0, message_id: 'a-1', user_id: 11, name: 'ファンA', body: ' わこつ ', created: 1700000001 }, { userId: '5' })).toMatchObject({
@@ -119,5 +120,28 @@ describe('配信キーとサービスの表', () => {
     expect(platformChannelOfUrl('https://mixch.tv/u/5/live')).toEqual({ platform: STREAM_PLATFORMS.mixch, login: '5' });
     expect(platformOfHostname('mixch.tv')).toBe(STREAM_PLATFORMS.mixch);
     expect(platformOfStreamKey('sr.room.1')).toBe(STREAM_PLATFORMS.showroom);
+  });
+});
+
+describe('ギフトの絵(資源の index.json → file → preview・2026-11-08 PC 実測の形)', () => {
+  it('土台 + file / 土台 + preview。形の違う・外へ出る値は捨てる', async () => {
+    const { parseMxResourceIndex, mxResourcePreviewUrl, MX_RES_BASE } = await import('./mxParse.js');
+    const idx = parseMxResourceIndex({
+      resources: [
+        { id: 1, file: '/scom_thunder/single.json' },
+        { id: 376, file: '/scom_mikkuma_10000/scom_mikkuma_10000.json' },
+        { id: 2, file: '../x.json' },
+        { id: 3, file: 'https://evil.example/a.json' },
+        { id: 4, file: '/a/b.png' },
+      ],
+    });
+    expect([...idx.keys()]).toEqual(['1', '376']);
+    expect(idx.get('1')).toBe(`${MX_RES_BASE}/scom_thunder/single.json`);
+    expect(mxResourcePreviewUrl({ preview: '/scom_thunder/thumbThunderLv1.png' })).toBe(
+      'https://d2uqarpmf42qy0.cloudfront.net/torte_web_resources/scom_thunder/thumbThunderLv1.png',
+    );
+    expect(mxResourcePreviewUrl({ preview: '//evil.example/a.png' })).toBe('');
+    expect(mxResourcePreviewUrl({ preview: '/a/../b.png' })).toBe('');
+    expect(mxResourcePreviewUrl({})).toBe('');
   });
 });

@@ -41,7 +41,9 @@ const LIVE = {
   displayPoint: 1000,
   loginInfo: null,
 };
-const ITEMS = { items: [{ id: 501, price: 100, url: 'https://d2uqarpmf42qy0.cloudfront.net/torte_web_resources/501.png', kind: 1 }, { id: 502, price: 3000, url: '', kind: 1 }], tabs: [] };
+// url は絵ではなくページへのリンク。絵は resource_id → 資源の index.json → file → preview(2026-11-08 PC 実測)
+const ITEMS = { items: [{ id: 501, price: 100, resource_id: 376, url: 'https://mixch.tv/p/gk26o21v', kind: 1 }, { id: 502, price: 3000, resource_id: 12, kind: 1 }], tabs: [] };
+const RES = 'https://d2uqarpmf42qy0.cloudfront.net/torte_web_resources';
 // 開いた時点の分(新しい順・本物と同じ)
 const MESSAGES = [
   { kind: 42, message_id: 'm-gift-1', user_id: 13, name: 'ギフトさん', profile_image_url: ICON, item_id: 501, count: 2, anonymous: 0, created: T0 + 3 },
@@ -152,13 +154,21 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   let signedIn = true;
   let live = true;
   await context.route('https://d2jtsb989t238a.cloudfront.net/**', (route) => route.fulfill({ status: 404, body: '' }));
-  await context.route('https://d2uqarpmf42qy0.cloudfront.net/**', (route) => route.fulfill({ status: 404, body: '' }));
+  await context.route('https://d2uqarpmf42qy0.cloudfront.net/**', (route) => {
+    const u = route.request().url();
+    const json = (/** @type {any} */ body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    // 本物と同じく CORS のヘッダは付けない(ページからは読めない=バックグラウンドが読む)
+    if (u === `${RES}/index.json`) return json({ resources: [{ id: 376, file: '/m/m.json' }, { id: 12, file: '/n/n.json' }] });
+    if (u === `${RES}/m/m.json`) return json({ type: 1, preview: '/m/thumb.png' });
+    if (u === `${RES}/n/n.json`) return json({ type: 1 });
+    return route.fulfill({ status: 404, body: '' });
+  });
   await context.route('https://mixch.tv/**', async (route) => {
     const u = new URL(route.request().url());
     const json = (/** @type {any} */ body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (u.pathname === `/api-web/users/${A}/live`) return json(live ? LIVE : { broadcasterInfo: { ...LIVE.broadcasterInfo, live_status: 0 }, liveInfo: null });
     if (u.pathname === `/api-web/lives/${A}/messages`) return json(MESSAGES);
-    if (u.pathname === '/api-web/items/available') return u.searchParams.get('live_session_id') === String(SESSION) ? json(ITEMS) : route.fulfill({ status: 400, body: '' });
+    if (u.pathname === '/items/available' || u.pathname === '/api-web/items/available') return u.searchParams.get('live_session_id') === String(SESSION) ? json(ITEMS) : route.fulfill({ status: 400, body: '' });
     if (u.pathname === `/api-web/users/${A}/fans/ranking/monthly`) return json({ month: 11, superfans: [{ id: 15, name: 'おおもの', score: 90000, profile_image_url: ICON }, { id: 13, name: 'ギフトさん', score: 500 }] });
     if (u.pathname === '/api-web/login-status') return route.fulfill({ status: 200, contentType: 'application/json', body: signedIn ? JSON.stringify({ user_id: 500 }) : 'null' });
     if (u.pathname.startsWith('/api-web/') || u.pathname.startsWith('/items/')) return route.fulfill({ status: 404, body: '' });
@@ -176,9 +186,23 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   await expect
     .poll(async () => {
       const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_mx_chat'))).yt_diag_mx_chat || {};
-      return { wsState: d.wsState, giftCoin: d.giftCoin, itemList: d.itemList, itemsVia: d.itemsVia, boardRows: d.boardRows, k10: d.kinds?.['10'] };
+      return { wsState: d.wsState, giftCoin: d.giftCoin, itemList: d.itemList, itemsVia: d.itemsVia, boardRows: d.boardRows, k10: d.kinds?.['10'], giftImages: d.giftImages };
     }, { timeout: 15_000 })
-    .toEqual({ wsState: 'open', giftCoin: 3450, itemList: 2, itemsVia: 'api-web', boardRows: 2, k10: 1 });
+    .toEqual({ wsState: 'open', giftCoin: 3450, itemList: 2, itemsVia: 'root', boardRows: 2, k10: 1, giftImages: 1 });
+
+  // ギフトの絵: 資源の preview が分かったギフト(item 501)だけ絵つき。preview の無いもの・一覧に無いものは絵なし
+  const giftImages = await sw.evaluate(
+    (/** @type {string} */ key) =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('yt_kirameki_db');
+        req.onsuccess = () => {
+          const all = req.result.transaction('comments').objectStore('comments').index('by_videoId').getAll(IDBKeyRange.only(key));
+          all.onsuccess = () => resolve(all.result.filter((/** @type {any} */ r) => r.kind === 'superchat').map((/** @type {any} */ r) => `${r.name}:${r.giftImageUrl || '-'}`).sort());
+        };
+      }),
+    KEY,
+  );
+  expect(giftImages).toEqual([`ギフトさん:${RES}/m/thumb.png`, 'ふしぎ:-', 'おおもの:-', `匿名:${RES}/m/thumb.png`].sort());
 
   // 公式の今月のファンランキング(score つき)が YouTube のトップファンと同じ置き場に入る
   const board = await sw.evaluate(async (key) => (await chrome.storage.local.get(`yt_leaderboard_${key}`))[`yt_leaderboard_${key}`], KEY);
