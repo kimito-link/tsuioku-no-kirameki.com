@@ -3111,7 +3111,7 @@ export function mountVenueBarButton(options = {}) {
       if (idx < 0 || idx >= items.length) return null;
       const it = items[idx];
       const seatIdx = Number(it?._venueSeatIndex);
-      if (Number.isInteger(seatIdx) && seatIdx >= 0) return null; // 席ありは対象外
+      if (Number.isInteger(seatIdx) && seatIdx >= 0 && el.closest?.('.nlsb-seat')) return null; // 席の中だけ対象外(同じ人が2段に居ると片方は席の外=ここで解決・2026-11-08 ギフト列が無反応)
       const u = String(it?.entry?.userId || '').trim();
       /*
        * ★2026-08-29: ここは以前 count:0 / lastAt:0 のゼロ埋めリテラルを返していた。
