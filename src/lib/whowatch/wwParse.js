@@ -10,8 +10,11 @@
 //   badges, ts:'', postedAtMs, channel(live id), color, giftName?, giftImageUrl?, giftCount? }
 
 export const WW_API_ORIGIN = 'https://api.whowatch.tv';
-/** ふわっちのアイテムの値段の通貨(単位は PC で確かめる・それまでは 1 = 1 pt で数える) */
-export const WW_CURRENCY = 'WWPT';
+/**
+ * ふわっちのアイテムの数え方。値段はコメントにも公開の API にも無い(2026-11-08 PC 実測)ので、個数で数える(1個 = 1)。
+ *   画面では「3 個」と出る(ytGiftToNico.js の COUNT_CURRENCY)。
+ */
+export const WW_CURRENCY = 'WWITEM';
 
 /** 配信の番号として正しいか @param {unknown} s */
 export function isWwLiveId(s) {
@@ -115,6 +118,8 @@ export function parseWwUser(raw) {
   const userPath = str(u.user_path);
   return {
     id,
+    // 匿名の人(anonymized / is_tanuki)の id は配信をまたいで十数種類しかない共有の番号(2026-11-08 PC 実測: 1つの id に38人分の名前)
+    anonymous: u.anonymized === true || u.is_tanuki === true,
     name: str(pick(u, ['name', 'nickname', 'screen_name'])).slice(0, 80),
     userPath: isWwUserPath(userPath) ? userPath : '',
     iconUrl: safeWwImageUrl(pick(u, ['icon_url', 'icon', 'image_url', 'profile_image_url'])),
@@ -160,26 +165,44 @@ export function parseWwLive(json, liveIdHint = '') {
 }
 
 /**
- * コメントに付いたアイテム(投げ銭)→ { name, imageUrl, count, unitPt, totalPt }。アイテムでなければ null。
- *   ★形は推定(item / play_item / gift のどれか)。PC で確かめる。
+ * コメントに付いたアイテム(投げ銭)→ { name, imageUrl, count }。アイテムでなければ null。
+ *   本物の形(2026-11-08 PC 実測): comment_type "BY_PLAYITEM" と play_item_pattern{ id, name, image_url, quantity(いつも1) }・
+ *   個数は comment.item_count(1〜100)。値段はどこにも無い。
  * @param {Record<string, any>} c
  */
 export function parseWwItem(c) {
-  const it = obj(c.item) || obj(c.play_item) || obj(c.gift) || obj(obj(c.play_item_pattern)?.item);
+  const it = obj(c.play_item_pattern) || obj(c.play_item) || obj(c.item);
   if (!it) return null;
   const name = str(pick(it, ['name', 'item_name', 'title'])).slice(0, 60);
-  const count = Math.max(1, Math.floor(num(pick(c, ['item_count', 'count'])) || num(pick(it, ['count', 'item_count'])) || 1));
-  const unitPt = num(pick(it, ['point', 'price', 'pt', 'value', 'cost']));
-  const totalPt = num(pick(c, ['total_point', 'point'])) || unitPt * count;
-  if (!name && !totalPt) return null;
-  return {
-    name,
-    imageUrl: safeWwImageUrl(pick(it, ['image_url', 'icon_url', 'image', 'thumbnail_url'])),
-    count,
-    unitPt,
-    totalPt: Math.min(totalPt, 1e9),
-  };
+  if (!name) return null;
+  const count = Math.min(10000, Math.max(1, Math.floor(num(c.item_count) || num(it.quantity) || 1)));
+  return { name, imageUrl: safeWwImageUrl(pick(it, ['image_url', 'icon_url', 'image'])), count };
 }
+
+const ENTITIES = /** @type {Record<string, string>} */ ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" });
+/**
+ * not_escaped: true のコメント(アイテム・お知らせ)は本文に HTML が入る(<b> <img> <br>)。タグを除いて文字だけにする。
+ *   画面は文字として出すので HTML としては動かないが、タグが見えていた(2026-11-08 PC 実測)。
+ * @param {unknown} html
+ */
+export function wwPlainText(html) {
+  return String(html ?? '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<img\b[^>]*\balt\s*=\s*"([^"]*)"[^>]*>/gi, '$1')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&(#\d{1,6}|#x[0-9a-f]{1,6}|[a-z]{2,6});/gi, (m, e) => {
+      const k = String(e).toLowerCase();
+      if (ENTITIES[k] != null) return ENTITIES[k];
+      const code = k.startsWith('#x') ? parseInt(k.slice(2), 16) : k.startsWith('#') ? Number(k.slice(1)) : NaN;
+      return Number.isFinite(code) && code > 31 && code < 0x110000 ? String.fromCodePoint(code) : m;
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** 運営のお知らせ(人の発言ではない)。順位表に人として入れない */
+const SYSTEM_TYPE_RE = /SYSTEM|NOTICE|ADMIN|OFFICIAL|ANNOUNCE/i;
+const SYSTEM_NAMES = new Set(['ふわっち運営', 'ふわっち']);
 
 /**
  * コメント1件 → 記録の1件。記録しないもの・形が違うものは null。
@@ -193,17 +216,22 @@ export function parseWwComment(raw, ctx) {
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return null;
   const user = parseWwUser(c.user);
   if (!user) return null;
-  const text = str(pick(c, ['message', 'comment', 'body', 'text'])).replace(/\s+/g, ' ').slice(0, 500);
-  const postedAtMs = wwTimeMs(pick(c, ['posted_at', 'created_at', 'timestamp'])) || Number(ctx.nowMs) || Date.now();
-  const item = parseWwItem(c);
   const type = str(pick(c, ['comment_type', 'type'])).slice(0, 40);
+  if (SYSTEM_TYPE_RE.test(type) || SYSTEM_NAMES.has(user.name)) return null;
+  const rawText = str(pick(c, ['message', 'comment', 'body', 'text']));
+  const text = (c.not_escaped === true || /<[a-z/][^>]*>/i.test(rawText) ? wwPlainText(rawText) : rawText.replace(/\s+/g, ' ').trim()).slice(0, 500);
+  const postedAtMs = wwTimeMs(pick(c, ['posted_at', 'created_at', 'timestamp'])) || Number(ctx.nowMs) || Date.now();
+  const item = /^BY_PLAYITEM$/i.test(type) || c.play_item_pattern ? parseWwItem(c) : null;
+  const name = user.name || user.userPath || `ふわっち${user.id.slice(-4)}`;
+  // 匿名の人は id が共有なので、名前で見分ける(同じ名前の匿名は同じ人として数える)
+  const channelId = user.anonymous ? `ww:n:${name.slice(0, 40)}` : `ww:${user.id}`;
   const base = {
     id: `ww-${id}`,
-    channelId: `ww:${user.id}`,
-    name: user.name || user.userPath || `ふわっち${user.id.slice(-4)}`,
-    login: user.userPath,
+    channelId,
+    name,
+    login: user.anonymous ? '' : user.userPath,
     iconUrl: user.iconUrl,
-    badges: type && !/^by_public$/i.test(type) ? [type.toLowerCase()] : [],
+    badges: type && !/^by_(?:public|playitem)$/i.test(type) ? [type.toLowerCase()] : [],
     ts: '',
     postedAtMs,
     channel: String(ctx.liveId || ''),
@@ -212,11 +240,11 @@ export function parseWwComment(raw, ctx) {
   if (item) {
     return {
       ...base,
-      text: text || (item.name ? `${item.name}${item.count > 1 ? ` ×${item.count}` : ''}` : ''),
-      kind: item.totalPt > 0 ? 'superchat' : 'text',
-      amount: item.totalPt,
-      currency: item.totalPt > 0 ? WW_CURRENCY : '',
-      ...(item.name ? { giftName: item.name } : {}),
+      text: text || `${item.name}${item.count > 1 ? ` ×${item.count}` : ''}`,
+      kind: 'superchat',
+      amount: item.count,
+      currency: WW_CURRENCY,
+      giftName: item.name,
       ...(item.imageUrl ? { giftImageUrl: item.imageUrl } : {}),
       ...(item.count > 1 ? { giftCount: item.count } : {}),
     };

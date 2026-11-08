@@ -10,7 +10,8 @@
 
 import { parseWwLiveIdFromUrl, wwLiveApiUrl, parseWwLive, parseWwComment, buildWwStreamKey } from '../../src/lib/whowatch/wwParse.js';
 
-const POLL_MS = 3000;
+// ページ自身は10秒おき(polling_interval)。3秒で取りこぼし0・遅れ中央値1.6秒だった(2026-11-08 PC 実測)ので、間を取って5秒
+const POLL_MS = 5000;
 const POLL_MAX_MS = 60_000;
 const META_EVERY_MS = 30_000;
 const MAX_SEEN = 8000;
@@ -34,7 +35,7 @@ const diag = {
   dropped: 0,
   items: 0,
   paid: 0,
-  paidPt: 0,
+  paidItems: 0,
   withIcon: 0,
   /** @type {Record<string, string[]>} 届いた項目の名前(形の確かめ用) */
   shapes: {},
@@ -138,7 +139,8 @@ function startReader(liveId) {
       type: 'YT_STREAM_META',
       payload: {
         videoId: key,
-        title: info.title || '',
+        // 題の無い配信でコメビュの見出しに配信キー(ww.番号.番号)が出ていた(2026-11-08 PC 実測)
+        title: info.title || `${u?.name || 'ふわっち'}の配信`,
         broadcasterName: u?.name || u?.userPath || '',
         broadcasterChannelId: u ? `ww:${u.id}` : '',
         broadcasterHandle: u?.userPath || '',
@@ -195,7 +197,7 @@ function startReader(liveId) {
     for (const c of raw) {
       noteShape('comment', c);
       noteShape('commentUser', c?.user);
-      for (const k of ['item', 'play_item', 'gift']) if (c?.[k]) noteShape(`comment.${k}`, c[k]);
+      for (const k of ['play_item_pattern', 'item', 'play_item', 'gift']) if (c?.[k]) noteShape(`comment.${k}`, c[k]);
       const t = String(c?.comment_type ?? c?.type ?? '').slice(0, 40);
       if (t) diag.types[t] = (diag.types[t] || 0) + 1;
       const r = parseWwComment(c, { liveId });
@@ -208,7 +210,7 @@ function startReader(liveId) {
       if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
       if (r.kind === 'superchat') {
         diag.paid += 1;
-        diag.paidPt += r.amount;
+        diag.paidItems += r.amount;
       }
       if (r.iconUrl) diag.withIcon += 1;
       items.push(r);
@@ -263,11 +265,13 @@ function check() {
 
 // ---- サイドパネル・会場からのコメント送信 ----
 // ふわっち本体の入力欄に書いて送る。入力欄・ボタンの形は PC で確かめる(それまでは広めに探す)。
-const WW_INPUT_SEL = 'textarea[placeholder*="コメント"], input[placeholder*="コメント"], textarea[name="comment"], input[name="comment"], form textarea';
+const WW_INPUT_SEL = 'form.item-form-area input, form.item-form-area textarea, textarea[placeholder*="コメント"], input[placeholder*="コメント"], textarea[name="comment"], input[name="comment"], form textarea';
 const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 
 /** ログインしていないと分かるか(見えている「ログイン」ボタンがあり、入力欄が無い・使えない) */
 function wwSignedOut(/** @type {Element | null} */ input) {
+  // 未ログインは入力欄と送信ボタンが disabled で、placeholder が「コメントを送るにはログインが必要です」(2026-11-08 PC 実測)
+  if (input && /ログイン/.test(String(input.getAttribute('placeholder') || ''))) return true;
   const usable = input && !(/** @type {any} */ (input).disabled) && !(/** @type {any} */ (input).readOnly);
   if (usable) return false;
   const btns = [...document.querySelectorAll('button, a')].slice(0, 400);

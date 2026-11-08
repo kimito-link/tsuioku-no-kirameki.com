@@ -2050,6 +2050,12 @@ if (typeof document !== 'undefined' && /\/(?:yt-)?venue\.html$/.test(String(loca
       if (tries < 20) setTimeout(() => swapEmbed(el, tries + 1), 300);
       return;
     }
+    // Twitch・Kick・ふわっちの配信に YouTube の埋め込みを作ると、YouTube のエラー(152-4)が映る(2026-11-08 PC 実測)。
+    //   そのサービスの映像は外へ埋め込めないので、枠ごと外す(視聴ページに重ねた会場と同じ)
+    if (platformOfStreamKey(vid)) {
+      el.remove();
+      return;
+    }
     el.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
     el.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     el.src = `https://www.youtube.com/embed/${encodeURIComponent(vid)}?autoplay=1&mute=1`;

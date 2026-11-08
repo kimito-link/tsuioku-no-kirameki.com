@@ -10,6 +10,7 @@ import {
   parseWwLive,
   parseWwComment,
   parseWwItem,
+  wwPlainText,
   buildWwStreamKey,
   isWwStreamKey,
   wwLiveIdOfStreamKey,
@@ -86,7 +87,7 @@ describe('配信の情報', () => {
     const info = parseWwLive(LIVE, '555');
     expect(info?.liveId).toBe('555');
     expect(info?.title).toBe('ざつだん');
-    expect(info?.user).toEqual({ id: '42', name: 'はいしんしゃ', userPath: 'w:host', iconUrl: 'https://img.whowatch.tv/u/42.jpg' });
+    expect(info?.user).toEqual({ id: '42', anonymous: false, name: 'はいしんしゃ', userPath: 'w:host', iconUrl: 'https://img.whowatch.tv/u/42.jpg' });
     expect(info?.isLive).toBe(true);
     expect(info?.viewers).toBe(120);
     expect(info?.updatedAt).toBe(1700000002500);
@@ -123,13 +124,30 @@ describe('コメント', () => {
     });
     expect(parseWwComment(LIVE.comments[0], { liveId: '555' })?.badges).toEqual([]);
   });
-  it('アイテムは superchat(pt)にして名前と絵を持つ', () => {
-    const c = { id: 3, user: { id: 9, name: 'ファンC' }, message: '', item_count: 3, item: { name: 'ハート', point: 100, image_url: 'https://img.whowatch.tv/items/heart.png' } };
+  it('アイテム(本物の形: BY_PLAYITEM・play_item_pattern・item_count)は個数で数える', () => {
+    const c = { id: 3, comment_type: 'BY_PLAYITEM', not_escaped: true, user: { id: 9, name: 'ファンC' }, message: '<b>ファンC</b>さんが<br>ハートを贈りました', item_count: 3, play_item_pattern: { id: 5, name: 'ハート', image_url: 'https://img.whowatch.tv/items/heart.png', quantity: 1 } };
     const r = parseWwComment(c, { liveId: '555' });
-    expect(r).toMatchObject({ kind: 'superchat', amount: 300, currency: 'WWPT', giftName: 'ハート', giftImageUrl: 'https://img.whowatch.tv/items/heart.png', giftCount: 3, text: 'ハート ×3' });
-    expect(parseWwItem({ play_item: { name: 'x' } })).toMatchObject({ name: 'x', totalPt: 0 });
-    // 値段の分からないアイテムは本文として残す
-    expect(parseWwComment({ id: 4, user: { id: 9 }, play_item: { name: 'スター' } }, { liveId: '1' })).toMatchObject({ kind: 'text', text: 'スター', giftName: 'スター' });
+    expect(r).toMatchObject({ kind: 'superchat', amount: 3, currency: 'WWITEM', giftName: 'ハート', giftImageUrl: 'https://img.whowatch.tv/items/heart.png', giftCount: 3, text: 'ファンCさんが ハートを贈りました' });
+    expect(r?.badges).toEqual([]);
+    expect(parseWwItem({ play_item_pattern: { name: 'x' } })).toMatchObject({ name: 'x', count: 1 });
+    expect(parseWwItem({ play_item_pattern: {} })).toBe(null);
+    // 名前の無いアイテムは普通のコメント
+    expect(parseWwComment({ id: 4, comment_type: 'BY_PLAYITEM', user: { id: 9 }, message: 'a', play_item_pattern: {} }, { liveId: '1' })).toMatchObject({ kind: 'text' });
+  });
+  it('HTML の入った本文は文字だけにする', () => {
+    expect(wwPlainText('<b>A</b>&amp;B<br/>C <img src="x" alt="★"> &#12354;&lt;3')).toBe('A&B C ★ あ<3');
+    expect(parseWwComment({ id: 7, user: { id: 2 }, not_escaped: true, message: '<b>こんにちは</b>' }, { liveId: '1' })?.text).toBe('こんにちは');
+  });
+  it('匿名の人は共有の id でなく名前で見分ける', () => {
+    const a = parseWwComment({ id: 8, user: { id: 1, name: 'たぬきA', anonymized: true, user_path: 'w:anon' }, message: 'x' }, { liveId: '1' });
+    const b = parseWwComment({ id: 9, user: { id: 1, name: 'たぬきB', is_tanuki: true }, message: 'y' }, { liveId: '1' });
+    expect(a?.channelId).toBe('ww:n:たぬきA');
+    expect(a?.login).toBe('');
+    expect(b?.channelId).toBe('ww:n:たぬきB');
+  });
+  it('運営のお知らせは人として記録しない', () => {
+    expect(parseWwComment({ id: 10, comment_type: 'BY_SYSTEM', user: { id: 3, name: 'x' }, message: 'お知らせ' }, { liveId: '1' })).toBe(null);
+    expect(parseWwComment({ id: 11, user: { id: 3, name: 'ふわっち運営' }, message: 'お知らせ' }, { liveId: '1' })).toBe(null);
   });
   it('形が違う1件は捨てる', () => {
     expect(parseWwComment(null, { liveId: '1' })).toBe(null);

@@ -36,3 +36,12 @@
 - 計器 `yt_diag_ww_chat`: via(page/bg)・polls/pollFail/lastError・届いた項目の名前(shapes)・comment_type ごとの数・新しい順か・アイテムの数と pt。
 - 送信は入力欄(placeholder に「コメント」)+ form の送信ボタン。形は要実測。
 - 試験: wwParse.test.js・tests/e2e/whowatch-recording.spec.js(偽のふわっち・バックグラウンド経由も)。
+
+## PC 実測(2026-11-08・v0.1.1931)と v0.1.1932 の直し
+- 記録率 100%(対照のソケットと 1,162/1,162)・読み取り失敗 0・遅れ中央値 1.6 秒・終了(FINISHED)で止まる・顔は img.whowatch.tv。
+- アイテムの本物: comment_type BY_PLAYITEM・play_item_pattern{id,name,image_url,quantity=1}・個数 item_count。**値段はどこにも無い**→個数で数える(通貨 WWITEM・「N 個」)。
+- 匿名(anonymized / is_tanuki)の user.id は共有(全配信で13種類)→人キーは ww:n:<名前>。
+- not_escaped: true の本文は HTML 入り→タグを除く。運営のお知らせ(BY_SYSTEM 等・「ふわっち運営」)は記録しない。
+- 送信欄: form.item-form-area の入力欄。未ログインは disabled・placeholder「コメントを送るにはログインが必要です」。
+- ページの本線は WebSocket(wss://ws.whowatch.tv/socket/websocket?vsn=2.0.0・Phoenix・room:<番号> に phx_join {p: jwt}・shout/remove)。jwt は lives の応答にありログイン不要。今は API を5秒おきに読む(ページは10秒)。WebSocket への切り替えは次の候補。
+- ★ページを開くだけで匿名ユーザーが作られる(POST /users)。試験では止めるか偽の応答にする。

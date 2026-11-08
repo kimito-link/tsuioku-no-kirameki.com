@@ -16,7 +16,7 @@ const HOST_ID = 42;
 const KEY = `ww.${LIVE_ID}.${HOST_ID}`;
 
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>ふわっち</title></head><body>
-<form id="f"><textarea placeholder="コメントを入力"></textarea><button type="submit">送信</button></form>
+<form id="f" class="item-form-area"><textarea placeholder="コメントを入力"></textarea><button type="submit">送信</button></form>
 <script>
   window.__sent = [];
   document.getElementById('f').addEventListener('submit', (e) => {
@@ -63,9 +63,13 @@ const LIVE = (status) => ({
   view_count: 33,
   live_status: status,
 });
-// 新しい順で届く(資料による推定)
+// 新しい順で届く
 const FIRST = [
-  { id: 103, user: user(9, 'アイテムさん', { icon_url: 'https://img.whowatch.tv/u/9.jpg' }), message: '', item_count: 2, item: { name: 'ハート', point: 100, image_url: 'https://img.whowatch.tv/items/h.png' }, posted_at: Date.parse('2026-11-08T09:00:03Z') },
+  // アイテムの形は 2026-11-08 の PC 実測(本物)から写した(値は作りもの)
+  { id: 106, comment_type: 'BY_PUBLIC', user: user(1, '匿名たぬきB', { is_tanuki: true }), message: 'たぬB', posted_at: Date.parse('2026-11-08T09:00:05Z') },
+  { id: 105, comment_type: 'BY_PUBLIC', user: user(1, '匿名たぬきA', { anonymized: true }), message: 'たぬA', posted_at: Date.parse('2026-11-08T09:00:04Z') },
+  { id: 107, comment_type: 'BY_SYSTEM', not_escaped: true, user: user(2, 'ふわっち運営'), message: '<b>お知らせ</b>', posted_at: Date.parse('2026-11-08T09:00:06Z') },
+  { id: 103, comment_type: 'BY_PLAYITEM', not_escaped: true, user: user(9, 'アイテムさん', { icon_url: 'https://img.whowatch.tv/u/9.jpg' }), message: '<b>アイテムさん</b>が<br>ハートを2個贈りました', item_count: 2, play_item_pattern: { id: 5, name: 'ハート', image_url: 'https://img.whowatch.tv/items/h.png', quantity: 1 }, posted_at: Date.parse('2026-11-08T09:00:03Z') },
   { id: 102, user: user(8, 'ファンB'), message: 'こんばんは', posted_at: Date.parse('2026-11-08T09:00:02Z'), comment_type: 'BY_PUBLIC' },
   { id: 101, user: user(7, 'ファンA', { icon_url: 'https://img.whowatch.tv/u/7.jpg' }), message: 'わこつ', posted_at: Date.parse('2026-11-08T09:00:01Z') },
   { id: 100, message: '形がちがう' },
@@ -73,11 +77,13 @@ const FIRST = [
 const LATER = [{ id: 104, user: user(7, 'ファンA', { icon_url: 'https://img.whowatch.tv/u/7.jpg' }), message: 'おかえり', posted_at: Date.parse('2026-11-08T09:00:09Z') }];
 
 const WANT_ROWS = [
-  'superchat:ww:9:アイテムさん:ハート ×2:200:WWPT:face',
+  'superchat:ww:9:アイテムさん:アイテムさんが ハートを2個贈りました:2:WWITEM:face',
   'text:ww:7:ファンA:おかえり:0::face',
   'text:ww:7:ファンA:わこつ:0::face',
   'text:ww:8:ファンB:こんばんは:0::-',
-];
+  'text:ww:n:匿名たぬきA:匿名たぬきA:たぬA:0::-',
+  'text:ww:n:匿名たぬきB:匿名たぬきB:たぬB:0::-',
+].sort();
 
 /** @param {any} sw */
 const readRows = (sw) =>
@@ -129,9 +135,9 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   await expect
     .poll(async () => {
       const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_ww_chat'))).yt_diag_ww_chat || {};
-      return { via: d.via, streamKey: d.streamKey, dropped: d.dropped, paid: d.paid, paidPt: d.paidPt, newestFirst: d.newestFirst, isLive: d.isLive, hasItemShape: (d.shapes?.['comment.item'] || []).includes('point') };
+      return { via: d.via, streamKey: d.streamKey, dropped: d.dropped, paid: d.paid, paidItems: d.paidItems, newestFirst: d.newestFirst, isLive: d.isLive, hasItemShape: (d.shapes?.['comment.play_item_pattern'] || []).includes('name') };
     }, { timeout: 15_000 })
-    .toEqual({ via: 'page', streamKey: KEY, dropped: 1, paid: 1, paidPt: 200, newestFirst: true, isLive: true, hasItemShape: true });
+    .toEqual({ via: 'page', streamKey: KEY, dropped: 2, paid: 1, paidItems: 2, newestFirst: true, isLive: true, hasItemShape: true });
 
   // 配信のまとめ(配信者・同接・開始時刻)
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
@@ -145,6 +151,20 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   expect(res).toMatchObject({ ok: true });
   expect(await page.evaluate(() => /** @type {any} */ (window).__sent)).toEqual(['こんにちは ふわっち']);
 
+  // 未ログイン(本物: 入力欄が disabled・placeholder「コメントを送るにはログインが必要です」)なら、打たずに理由を返す
+  await page.evaluate(() => {
+    const t = /** @type {HTMLTextAreaElement} */ (document.querySelector('textarea'));
+    t.disabled = true;
+    t.placeholder = 'コメントを送るにはログインが必要です';
+  });
+  const res2 = await ext.evaluate((key) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: key, text: 'みえないはず' }), KEY);
+  expect(res2).toMatchObject({ ok: false, reason: 'not-signed-in' });
+  await page.evaluate(() => {
+    const t = /** @type {HTMLTextAreaElement} */ (document.querySelector('textarea'));
+    t.disabled = false;
+    t.placeholder = 'コメントを入力';
+  });
+
   // ニコ生版の画面(yt-sidepanel.html)に、ふわっちのコメントと配信者が出る・言葉はふわっちの言葉
   await page.bringToFront();
   await ext.reload();
@@ -154,7 +174,7 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
     await expect.poll(bodyText, { timeout: 30_000 }).toContain(want);
   }
   const text = await bodyText();
-  expect(text).not.toMatch(/ww:\d/);
+  expect(text).not.toMatch(/ww:\d|ww:n:|<b>|&lt;/);
   expect(text).not.toMatch(/スパチャ|スーパーチャット|トップファン|ギフトサブ/);
 
   // 配信が終わったと分かったら、終わった時刻を送って読むのをやめる
@@ -182,7 +202,7 @@ test('ページから API を読めない(CORS・拒否)ときは、バックグ
   const sw = await extWorker(context);
   const page = await context.newPage();
   await page.goto(`https://whowatch.tv/viewer/${LIVE_ID}`);
-  await expect.poll(async () => (await readRows(sw)).length, { timeout: 30_000 }).toBe(3);
+  await expect.poll(async () => (await readRows(sw)).length, { timeout: 30_000 }).toBe(5);
   await expect
     .poll(async () => {
       const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_ww_chat'))).yt_diag_ww_chat || {};
