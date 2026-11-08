@@ -33,6 +33,8 @@ const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
   MXN: 8,
   // Twitch の Bits(1 Bit ≒ 1.4 円・視聴者が買う値段の目安)。council/twitch-support-PLAN.md
   BITS: 1.4,
+  // Kick の Kicks(100 Kicks ≒ 1 ドル前後・1 Kick ≒ 1.5 円の目安)。council/kick-support-PLAN.md
+  KICKS: 1.5,
 });
 
 /**
@@ -55,12 +57,13 @@ const ITEM_NAME = /** @type {Record<string, string>} */ ({
   yt_gift: 'ギフト',
 });
 
-/** Twitch の記録の名前(サブスク・ギフトサブ・Bits)。kind は YouTube と同じ形にそろえてある(src/lib/twitch/twIrcParse.js) */
-const TW_ITEM_NAME = /** @type {Record<string, string>} */ ({
-  superchat: 'Bits',
-  membership: 'サブスク',
-  membership_gift: 'ギフトサブ',
+/** Twitch/Kick の記録の名前(サブスク・ギフトサブ・Bits/Kicks)。kind は YouTube と同じ形にそろえてある(twIrcParse.js・kickChatParse.js) */
+const PLATFORM_ITEM_NAME = /** @type {Record<string, Record<string, string>>} */ ({
+  twitch: { superchat: 'Bits', membership: 'サブスク', membership_gift: 'ギフトサブ' },
+  kick: { superchat: 'Kicks', membership: 'サブスク', membership_gift: 'ギフトサブ' },
 });
+/** 「500 Bits」「500 Kicks」と数で書く通貨 */
+const COUNT_CURRENCY = /** @type {Record<string, string>} */ ({ BITS: 'Bits', KICKS: 'Kicks' });
 
 /**
  * 元の金額を、その通貨の書き方で出す(例: ¥1,000 / $5.00 / €2.00)。pt は円にしたおよその額なので、
@@ -73,7 +76,7 @@ export function ytAmountLabel(amount, currency) {
   const a = Number(amount);
   if (!Number.isFinite(a) || a <= 0) return '';
   const cur = String(currency || '').toUpperCase();
-  if (cur === 'BITS') return `${a.toLocaleString('ja-JP')} Bits`;
+  if (COUNT_CURRENCY[cur]) return `${a.toLocaleString('ja-JP')} ${COUNT_CURRENCY[cur]}`;
   if (/^[A-Z]{3}$/.test(cur)) {
     try {
       return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: cur }).format(a);
@@ -116,7 +119,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     const uid = String(e.userId || '').trim();
     const nickname = String(e.nickname || '').trim();
     const kind = String(e.ytKind || '');
-    const baseItemName = (String(e.ytPlatform || '') === 'twitch' && TW_ITEM_NAME[kind]) || ITEM_NAME[kind];
+    const baseItemName = PLATFORM_ITEM_NAME[String(e.ytPlatform || '')]?.[kind] || ITEM_NAME[kind];
     const amountLabel = ytAmountLabel(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
     // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
     // YouTube の新しい「ギフト」(ジュエルのスタンプ)はギフトの名前と絵がある(例: ハイ)。金額は出ないので pt は 0
@@ -125,8 +128,8 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     const twGiftCount = Number(e.ytGiftCount || 0);
     const itemName =
       giftName ||
-      (String(e.ytCurrency || '').toUpperCase() === 'BITS' && amountLabel
-        ? amountLabel // Twitch の Bits は「500 Bits」だけ(「Bits 500 Bits」と重ねない)
+      (COUNT_CURRENCY[String(e.ytCurrency || '').toUpperCase()] && amountLabel
+        ? amountLabel // Twitch の Bits・Kick の Kicks は「500 Bits」だけ(「Bits 500 Bits」と重ねない)
         : amountLabel
         ? `${baseItemName} ${amountLabel}`
         : twGiftCount > 1
@@ -207,7 +210,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
       ? {
           liveId: lv,
           capturedAt: now,
-          source: paid.some((e) => String(e?.ytPlatform || '') === 'twitch') ? 'twitch' : 'youtube',
+          source: String(paid.find((e) => e?.ytPlatform)?.ytPlatform || 'youtube'),
           history,
           totalCounts: [...byItem.values()].sort((a, b) => b.count - a.count),
           officialTotalPoint: totalPoints,

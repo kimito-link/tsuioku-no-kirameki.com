@@ -18,6 +18,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1919',
+    date: '2026-11-08',
+    summary: 'Kick の配信も記録できるように(試作)',
+    items: Object.freeze([
+      'Kick の配信ページ(kick.com/チャンネル名)を開くと、チャットを記録するようにしました。ニコ生・YouTube・Twitch と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
+      'チャットは Kick のページが使っている接続でそのまま読みます(ログインは要りません)。Kicks・サブスク・ギフトサブ・ホストも記録し、Kicks は応援の合計(pt)に入ります。',
+      'サイドパネルと会場からのコメント送信は、Kick の画面の入力欄に書いて送ります(Kick にログインしているときだけ送れます)。',
+      '記録は YouTube・Twitch と同じくこの PC の中にだけ置き、外へは送りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1918',
     date: '2026-11-07',
     summary: 'Twitch の未ログインの見分けを直す',
@@ -189,14 +200,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'サポーターのコードは1台の PC だけで使える',
     items: Object.freeze([
       'サポーターのコードは1つにつき PC 1台で使えるようにしました。ほかの PC に貼り付けると案内が出ます。PC を買い替えたときは、サポーターのページの「この PC に移す」で移せます(30日に1回)。今はまだ関所を開けたままなので、誰にも影響はありません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1894',
-    date: '2026-11-06',
-    summary: '無料の人の OBS コメビュに小さな印(まだ出ない)',
-    items: Object.freeze([
-      'コメビュを OBS 透過で出したとき、無料の人は画面の隅に小さく「追憶のきらめき」と出し、サポーターは出さない仕組みを入れました。今はまだ関所を開けたままなので、誰にも出ません'
     ])
   })
 ]);

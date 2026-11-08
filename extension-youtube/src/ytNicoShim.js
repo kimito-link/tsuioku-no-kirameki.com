@@ -18,11 +18,10 @@ import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIc
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
-import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForTwitch, ytWordingTwitchFixed } from '../../src/lib/youtube/ytWording.js';
+import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
-import { parseTwChannelFromUrl } from '../../src/lib/twitch/twIrcParse.js';
-import { isTwStreamKey, twLoginOfStreamKey, twChannelUrlOfLogin, twChannelUrlOfStreamKey } from '../../src/lib/twitch/twStreamKey.js';
+import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname } from '../../src/lib/platform/streamPlatform.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
@@ -132,12 +131,12 @@ function mapTab(tab) {
   return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: undefined, __ytUrl: url };
 }
 
-// ---- 2a. Twitch の視聴タブ(council/twitch-support-PLAN.md) ----
-// Twitch の記録は YouTube と同じ置き場に、配信キー 'tw.<login>.<配信番号>'(videoId の位置)で入っている。
-//   タブの URL(twitch.tv/<login>)には配信番号が無いので、そのチャンネルのいちばん新しい記録の配信キーを使う。
-/** @param {string} login */
-function twNewestKeyForLogin(login) {
-  const pre = `tw.${login}.`;
+// ---- 2a. Twitch・Kick の視聴タブ(council/twitch-support-PLAN.md・kick-support-PLAN.md) ----
+// Twitch・Kick の記録は YouTube と同じ置き場に、配信キー 'tw.<login>.<配信番号>' / 'kk.<slug>.<配信番号>'(videoId の位置)で入っている。
+//   タブの URL(twitch.tv/<login>・kick.com/<slug>)には配信番号が無いので、そのチャンネルのいちばん新しい記録の配信キーを使う。
+/** @param {string} keyHead 'tw.' / 'kk.' @param {string} login */
+function newestKeyForChannel(keyHead, login) {
+  const pre = `${keyHead}${login}.`;
   let best = '';
   let bestAt = -1;
   for (const [key, sum] of Object.entries(knownSummaries || {})) {
@@ -151,29 +150,30 @@ function twNewestKeyForLogin(login) {
   return best;
 }
 
-/** 視聴タブの URL → 配信キー(YouTube は videoId・Twitch は記録のある配信キー)。分からなければ '' @param {string} url */
+/** 視聴タブの URL → 配信キー(YouTube は videoId・Twitch/Kick は記録のある配信キー)。分からなければ '' @param {string} url */
 export function streamKeyForWatchUrl(url) {
   const u = String(url || '');
   if (isYtWatchLikeUrl(u)) return parseYtVideoIdFromUrl(u);
-  const login = parseTwChannelFromUrl(u);
-  return login ? twNewestKeyForLogin(login) : '';
+  const ch = platformChannelOfUrl(u);
+  return ch ? newestKeyForChannel(ch.platform.keyHead, ch.login) : '';
 }
 
-/** 1本の配信を見ているタブか(YouTube の視聴ページ・Twitch のチャンネルページ) @param {string} url */
+/** 1本の配信を見ているタブか(YouTube の視聴ページ・Twitch/Kick のチャンネルページ) @param {string} url */
 export function isWatchLikeTabUrl(url) {
-  return isYtWatchLikeUrl(String(url || '')) || Boolean(parseTwChannelFromUrl(String(url || '')));
+  return isYtWatchLikeUrl(String(url || '')) || Boolean(platformChannelOfUrl(String(url || '')));
 }
 
-/** 配信キー → その配信のページ(YouTube の動画・Twitch のチャンネル) @param {string} key */
+/** 配信キー → その配信のページ(YouTube の動画・Twitch/Kick のチャンネル) @param {string} key */
 export function watchUrlForStreamKey(key) {
   const k = String(key || '');
   if (!k) return '';
-  if (isTwStreamKey(k)) return twChannelUrlOfStreamKey(k);
+  const p = platformOfStreamKey(k);
+  if (p) return p.channelUrl(p.loginOfStreamKey(k));
   return `https://www.youtube.com/watch?v=${k}`;
 }
 
-/** @type {Map<string, string>} Twitch の人の鍵(tw:<user-id>)→ login(ページの URL に使う) */
-const twLoginByKey = new Map();
+/** @type {Map<string, string>} Twitch/Kick の人の鍵(tw:<user-id> / kk:<user-id>)→ login(ページの URL に使う) */
+const loginByPersonKey = new Map();
 
 // ---- 2b. YouTube の人 ⇔ ニコ生版が「本人のID」として扱える数字のID ----
 // ニコ生版は「数字のユーザーID」の人だけを本人として上の段(りんく・こん太)へ並べる(匿名 a: はたぬ姉)。
@@ -226,7 +226,8 @@ export function ytKeyForNumericUid(uid) {
  */
 export function ytChannelUrlForNumericUid(uid) {
   const key = ytKeyForNumericUid(uid).replace(/^topfan:/, '');
-  if (key.startsWith('tw:')) return twChannelUrlOfLogin(key.startsWith('tw:@') ? key.slice(4) : twLoginByKey.get(key) || '');
+  const pp = platformOfPersonKey(key);
+  if (pp) return pp.channelUrl(key.startsWith(`${pp.personHead}@`) ? key.slice(4) : loginByPersonKey.get(key) || '');
   if (/^UC[A-Za-z0-9_-]{22}$/.test(key)) return `https://www.youtube.com/channel/${key}`;
   const h = key.startsWith('handle:@') ? key.slice('handle:@'.length) : '';
   return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : '';
@@ -253,7 +254,7 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
   const channelId = String(r?.channelId || '').trim();
   const name = String(r?.name || '').trim();
   const key = personKey || channelId || (name ? `name:${name}` : '');
-  if (key.startsWith('tw:') && r?.login) twLoginByKey.set(key, String(r.login));
+  if (platformOfPersonKey(key) && r?.login) loginByPersonKey.set(key, String(r.login));
   const at = Number(r?.recordedAt || 0) || Date.now();
   // 配信が終わったあとにアーカイブから埋めた分は、書かれた本当の時刻(postedAtMs)を持っている
   const postedAt = Number(r?.postedAtMs) > 0
@@ -286,7 +287,7 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     // リプレイ(アーカイブ)は時刻表示が経過時間なので、配信の開始時刻 + 経過時間にする
     ytPostedAt: postedAt,
     ytKind: String(r?.kind || 'text'),
-    ...(channelId.startsWith('tw:') ? { ytPlatform: 'twitch', ...(Number(r?.giftCount) > 0 ? { ytGiftCount: Number(r.giftCount) } : {}) } : {}),
+    ...(platformOfPersonKey(channelId) ? { ytPlatform: platformOfPersonKey(channelId)?.id, ...(Number(r?.giftCount) > 0 ? { ytGiftCount: Number(r.giftCount) } : {}) } : {}),
     ...(r?.giftName ? { ytGiftName: String(r.giftName) } : {}),
     ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
     ytAmount: Number(r?.amount || 0),
@@ -337,8 +338,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const chId = ucId || ucFromRecords;
   const bKey = chId || (handle ? `handle:${handle}` : '');
   const bUid = bKey ? numericUidForYtKey(bKey) : '';
-  const isTw = isTwStreamKey(videoId);
-  if (isTw && chId.startsWith('tw:') && handle) twLoginByKey.set(chId, handle.replace(/^@/, ''));
+  const plat = platformOfStreamKey(videoId);
+  if (plat && chId.startsWith(plat.personHead) && handle) loginByPersonKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
   const bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
   if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
@@ -348,8 +349,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     liveId: lv,
     broadcastTitle: String(sum?.title || ''),
     broadcasterName: String(sum?.broadcasterName || ''),
-    thumbnailUrl: isTw
-      ? `https://static-cdn.jtvnw.net/previews-ttv/live_user_${twLoginOfStreamKey(videoId)}-440x248.jpg`
+    thumbnailUrl: plat
+      ? plat.thumbUrl(plat.loginOfStreamKey(videoId))
       : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     tags: [],
     startAtText: '',
@@ -358,8 +359,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     scripts: [],
     noopenerLinks: [],
     broadcasterUserId: bUid,
-    broadcasterPageUrl: isTw
-      ? twChannelUrlOfStreamKey(videoId)
+    broadcasterPageUrl: plat
+      ? plat.channelUrl(plat.loginOfStreamKey(videoId))
       : chId
       ? `https://www.youtube.com/channel/${chId}`
       : handle
@@ -647,12 +648,13 @@ async function buildCommentsForLvUncached(lv) {
   } catch {
     /* 無くても記録は出す */
   }
-  // Twitch: 記録のときに顔が間に合わなかった人の顔(視聴ページがあとで引いたもの・tw-content-entry.js)
+  // Twitch/Kick: 記録のときに顔が間に合わなかった人の顔(視聴ページがあとで引いたもの・tw-/kick-content-entry.js)
   /** @type {Record<string, string>} */
   let twLateIcons = {};
-  if (isTwStreamKey(vid)) {
+  const vidPlat = platformOfStreamKey(vid);
+  if (vidPlat) {
     try {
-      twLateIcons = (await real?.storage?.local?.get?.('yt_tw_icons'))?.yt_tw_icons || {};
+      twLateIcons = (await real?.storage?.local?.get?.(vidPlat.lateIconsKey))?.[vidPlat.lateIconsKey] || {};
     } catch {
       /* 無くても記録は出す */
     }
@@ -923,7 +925,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (res && res.ok) return { ok: true };
         // 0.1.1912: 理由コード(not-signed-in 等)をそのまま出さず、サイドパネル・会場と同じ日本語にする。
         const code = String(res?.reason || res?.error || 'send_failed');
-        return { ok: false, error: ytCommentSendReasonText(code, String(res?.note || ''), isTwStreamKey(vid) ? 'twitch' : '') || code };
+        return { ok: false, error: ytCommentSendReasonText(code, String(res?.note || ''), platformOfStreamKey(vid)?.id || '') || code };
       });
     }
     return null;
@@ -1014,7 +1016,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       // 顔が新しく分かったら、件数が同じでも描き直してもらう
       // 最初からの文字アイコンの見分けが増えたら、段(りんく/こん太)が変わるので描き直してもらう(0.1.99)
       if (changes[YT_DEFAULT_ICON_STORE_KEY]) ytDefaultIconJudge?.merge(changes[YT_DEFAULT_ICON_STORE_KEY].newValue);
-      if ((changes.yt_handle_icons || changes.yt_tw_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
+      if ((changes.yt_handle_icons || changes.yt_tw_icons || changes.yt_kk_icons || changes[YT_DEFAULT_ICON_STORE_KEY]) && lastAskedLv) {
         lastNotified.delete(lastAskedLv);
         void notifyLv(lastAskedLv, undefined);
       }
@@ -1038,7 +1040,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       }
       if (!changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};
-      knownSummaries = next; // Twitch のタブ → 配信キーの引き当て(twNewestKeyForLogin)が新しい配信を知るため
+      knownSummaries = next; // Twitch/Kick のタブ → 配信キーの引き当て(newestKeyForChannel)が新しい配信を知るため
       const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
       // 見ている配信が変わったら「最後に見ていた配信」も変わったと知らせる(コメビュが新しい配信へ追従する)
       const newestNext = newestVideoIdOf(next);
@@ -1157,8 +1159,9 @@ function ytLabelForUid(uid) {
   const key = ytKeyForNumericUid(uid).replace(/^topfan:/, '');
   if (!key) return '';
   // Twitch の人は @ログイン名(YouTube の @ハンドルと同じ扱い)。分からなければ出さない(tw:数字 は人には意味が無い)
-  if (key.startsWith('tw:@')) return `@${key.slice(4)}`;
-  if (key.startsWith('tw:')) return twLoginByKey.get(key) ? `@${twLoginByKey.get(key)}` : '';
+  const pp = platformOfPersonKey(key);
+  if (pp && key.startsWith(`${pp.personHead}@`)) return `@${key.slice(4)}`;
+  if (pp) return loginByPersonKey.get(key) ? `@${loginByPersonKey.get(key)}` : '';
   if (key.startsWith('name:')) return '';
   if (key.startsWith('handle:')) return key.slice('handle:'.length);
   return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
@@ -1284,25 +1287,26 @@ function fixTextNode(node) {
       }
     }
   }
-  let next = screenWording(v); // ニコニコの言葉 → YouTube(Twitch)の言葉(決まった文言だけ)
+  let next = screenWording(v); // ニコニコの言葉 → YouTube(Twitch・Kick)の言葉(決まった文言だけ)
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
   if (next !== v) node.nodeValue = next;
 }
 
-/** いま画面に出ている配信が Twitch か(視聴ページの中なら Twitch のページか) */
-function screenIsTwitch() {
-  if (YT_SHIM_IN_PAGE) return /(^|\.)twitch\.tv$/i.test(String(location.hostname || ''));
+/** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
+function screenPlatform() {
+  if (YT_SHIM_IN_PAGE) return platformOfHostname(location.hostname);
   // 画面がまだコメントを聞いてくる前(最初の描画)は、いちばん新しく記録が増えた配信で決める
-  return isTwStreamKey(lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : newestVideoIdOf(knownSummaries));
+  return platformOfStreamKey(lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : newestVideoIdOf(knownSummaries));
 }
 
-/** 画面の決まった文言の置き換え。Twitch の配信なら、YouTube の言葉にした所だけをさらに Twitch の言葉に @param {string} t */
+/** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t */
 function screenWording(t) {
   // Twitch にはトップファンの順位表が無い=ランキング欄は最初から「合計の順位」の言葉で描く
-  if (!screenIsTwitch()) return ytWording(t, { topFans: kokenIsTopFans });
+  const p = screenPlatform();
+  if (!p) return ytWording(t, { topFans: kokenIsTopFans });
   const w = ytWording(t, { topFans: false });
-  return w !== t ? ytWordingForTwitch(w) : ytWordingTwitchFixed(w);
+  return w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
 }
 
 // ニコ生版のコメビュは名前の横に data-nl-uid(数字ID)を CSS で「(数字)」と出す。疑似IDなので、
@@ -1349,14 +1353,14 @@ function rewordTopFanHeadings(reword) {
   // 視聴ページの中では会場の中だけ(YouTube のページの文字は触らない)
   const base = YT_SHIM_IN_PAGE ? document.getElementById('nlsb-venue-root') : document.body;
   if (!base) return;
-  const twitch = screenIsTwitch();
+  const plat = screenPlatform();
   const walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = walker.nextNode())) {
     const v = String(n.nodeValue || '');
     let next = reword(v);
-    // Twitch の画面なら、入れ替えた見出しも Twitch の言葉に(入れ替えだけだと「Twitch のスパチャの合計順」が残った)
-    if (twitch) next = ytWordingTwitchFixed(next);
+    // Twitch/Kick の画面なら、入れ替えた見出しもそのサービスの言葉に(入れ替えだけだと「Twitch のスパチャの合計順」が残った)
+    if (plat) next = ytWordingPlatformFixed(next, plat);
     if (next !== v) n.nodeValue = next;
   }
 }
@@ -1568,7 +1572,7 @@ function ytRebuildMarketingLedger(doc) {
     userId: String(h.userId || ''),
     senderLabel: String(h.senderName || ''),
     senderAvatarUrl: String(h.senderAvatarUrl || ''),
-    source: screenIsTwitch() ? 'twitch' : 'youtube',
+    source: screenPlatform()?.id || 'youtube',
   }));
   const html = rows
     .map((r, i) => buildGiftThrowLedgerTableRowHtml(r, i))
@@ -1621,12 +1625,12 @@ function ensureZeroPtGifts() {
     userId: String(h.userId || ''),
     senderLabel: String(h.senderName || ''),
     senderAvatarUrl: String(h.senderAvatarUrl || ''),
-    source: screenIsTwitch() ? 'twitch' : 'youtube',
+    source: screenPlatform()?.id || 'youtube',
   }));
   const html = buildGiftThrowLedgerTableSectionHtml(rows, {
     totalCount: allThrowHistory.length,
     shownCount: rows.length,
-    payloadSource: screenIsTwitch() ? 'twitch' : 'youtube',
+    payloadSource: screenPlatform()?.id || 'youtube',
   });
   if (!html) return;
   const holder = document.createElement('div');

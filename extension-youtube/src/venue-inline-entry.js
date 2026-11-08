@@ -14,11 +14,13 @@ import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReas
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
 // ニコ生版の放送ページと同じ見回り: 拡張が入れ替わったあと古い版のまま止まったページを、自分で読み込み直す
 //   (content-entry.js の startOrphanTabAutoReloadInPage。2026-11-04 実機: 更新後も古い会場が動き続け、キャラ画像が読めない)。
+import { platformOfHostname } from '../../src/lib/platform/streamPlatform.js';
 import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 
-/** Twitch の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
-const IS_TWITCH_PAGE = /(^|\.)twitch\.tv$/i.test(String(location.hostname || ''));
+/** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
+const PAGE_PLATFORM = platformOfHostname(location.hostname);
+const IS_TWITCH_PAGE = !!PAGE_PLATFORM;
 
 /** @returns {string} 視聴ページの配信キー(YouTube は動画 id・Twitch は記録のある配信キー)。視聴ページでなければ '' */
 function currentVideoId() {
@@ -59,10 +61,10 @@ function sync() {
   ensureBaseFontSize();
   // 会場から発言(ニコ生版 v0.1.1867 と同じ入力欄)。送り方はサイドパネルの「コメント送信」と同じ YT_SEND_COMMENT。
   if (!document.getElementById('nlsb-venue-root') && IS_TWITCH_PAGE)
-    // Twitch: 公式のギフト(Bits)の窓を開く口はまだ無いので、ギフトのボタンは出さない(押しても何も起きないボタンを置かない)
+    // Twitch/Kick: 公式のギフト(Bits/Kicks)の窓を開く口はまだ無いので、ギフトのボタンは出さない(押しても何も起きないボタンを置かない)
     mountVenueBarButton({
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
-      postReasonText: (reason) => ytCommentSendReasonText(reason, '', 'twitch'),
+      postReasonText: (reason) => ytCommentSendReasonText(reason, '', PAGE_PLATFORM?.id || ''),
     });
   if (!document.getElementById('nlsb-venue-root'))
     mountVenueBarButton({

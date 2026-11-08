@@ -13,6 +13,8 @@ describe('ytPanelRoute', () => {
   it('Twitch のタブも同じ画面', () => {
     expect(isYtPanelTabUrl('https://www.twitch.tv/kimito_link')).toBe(true);
     expect(isYtPanelTabUrl('https://twitch.tv.evil.example/')).toBe(false);
+    expect(isYtPanelTabUrl('https://kick.com/kimito-link')).toBe(true);
+    expect(isYtPanelTabUrl('https://kick.com.evil.example/')).toBe(false);
   });
   it('いま YouTube 版を見せているか', () => {
     expect(isYtPanelSrc(YT_PANEL_SRC)).toBe(true);

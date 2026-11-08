@@ -80,3 +80,15 @@ describe('Twitch の画面の言葉(2026-11-07 実配信で残っていた文)',
     expect(ytWordingTwitchFixed('スパチャありがとう')).toBe('スパチャありがとう');
   });
 });
+
+describe('Kick の画面の言葉', () => {
+  const KICK = { name: 'Kick', paid: 'Kicks', rankSentence: 'Kicks・ギフトサブの合計の順位（上位）を表示します。このPCの記録から数えます。' };
+  it('ランキング欄を Kick の言葉に', async () => {
+    const { ytWording, ytWordingForPlatform, ytWordingPlatformFixed } = await import('./ytWording.js');
+    expect(ytWordingForPlatform(ytWording('ギフト貢献度', { topFans: false }), KICK)).toBe('Kicks の合計順');
+    const s = ytWordingForPlatform(ytWording('ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。', { topFans: false }), KICK);
+    expect(s).toBe(KICK.rankSentence);
+    expect(ytWordingPlatformFixed('YouTube のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。', KICK)).toBe(KICK.rankSentence);
+    expect(ytWordingPlatformFixed('スパチャありがとう', KICK)).toBe('スパチャありがとう');
+  });
+});

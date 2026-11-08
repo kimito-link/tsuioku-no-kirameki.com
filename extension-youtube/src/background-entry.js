@@ -36,8 +36,7 @@ import './background-nico-relay.js';
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
-import { parseTwChannelFromUrl } from '../../src/lib/twitch/twIrcParse.js';
-import { twLoginOfStreamKey } from '../../src/lib/twitch/twStreamKey.js';
+import { platformOfStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 
 // 本体に同梱したとき(scripts/youtube-build.mjs の本体向け束・2026-11-05): 本体の background.js が importScripts で読む。
@@ -261,19 +260,20 @@ async function relayCommentToChatFrame(videoId, text) {
  * @param {Record<string, unknown>} payload
  */
 async function relayToChatFrame(videoId, payload) {
-  // Twitch の配信(配信キー tw.<login>.…)は、そのチャンネルを開いている Twitch のタブへ(tw-content-entry.js が受ける)
-  const twLogin = twLoginOfStreamKey(videoId);
-  if (twLogin) {
+  // Twitch/Kick の配信(配信キー tw.<login>.… / kk.<slug>.…)は、そのチャンネルを開いているタブへ(tw-/kick-content-entry.js が受ける)
+  const plat = platformOfStreamKey(videoId);
+  const twLogin = plat ? plat.loginOfStreamKey(videoId) : '';
+  if (plat && twLogin) {
     if (payload.type !== 'YT_SEND_COMMENT_TO_FRAME') return { ok: false, reason: 'unsupported' };
-    const twTabs = (await chrome.tabs.query({ url: ['https://www.twitch.tv/*'] }))
-      .filter((t) => parseTwChannelFromUrl(String(t.url || '')) === twLogin)
+    const twTabs = (await chrome.tabs.query({ url: [plat.tabUrl] }))
+      .filter((t) => plat.channelFromUrl(String(t.url || '')) === twLogin)
       .sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)));
     if (!twTabs.length) return { ok: false, reason: 'no-tab' };
     let lastTw = { ok: false, reason: 'no-chat-frame' };
     for (const t of twTabs) {
       if (typeof t.id !== 'number') continue;
       try {
-        const res = await chrome.tabs.sendMessage(t.id, { ...payload, type: 'TW_SEND_COMMENT' }, { frameId: 0 });
+        const res = await chrome.tabs.sendMessage(t.id, { ...payload, type: plat.sendType }, { frameId: 0 });
         if (res && res.ok) return res;
         if (res) lastTw = res;
       } catch {
