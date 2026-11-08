@@ -27,6 +27,7 @@ import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReas
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
+import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -230,7 +231,9 @@ export function ytChannelUrlForNumericUid(uid) {
   if (pp) return pp.channelUrl(key.startsWith(`${pp.personHead}@`) ? key.slice(4) : loginByPersonKey.get(key) || '');
   if (/^UC[A-Za-z0-9_-]{22}$/.test(key)) return `https://www.youtube.com/channel/${key}`;
   const h = key.startsWith('handle:@') ? key.slice('handle:@'.length) : '';
-  return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? `https://www.youtube.com/@${h}` : '';
+  // YouTube の @ハンドルは日本語などの文字も使える(例 @ぶらっくしろっぷ)。英数字だけを通していたので、
+  //   日本語ハンドルの人はリンクが外れてクリックしても何も起きなかった(2026-11-08 りんく)。
+  return /^[\p{L}\p{M}\p{N}._-]{3,30}$/u.test(h) ? `https://www.youtube.com/@${encodeURIComponent(h)}` : '';
 }
 
 /** @type {Map<string, string>} 数字ID → その人の YouTube のアイコン(分かっている人だけ) */
@@ -1609,7 +1612,28 @@ function ytRebuildMarketingLedger(doc) {
   ytDecorateLedger(tbody);
 }
 
+/**
+ * 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援(YouTube のギフト・メンバーシップギフト等)だけの人は
+ *   「0pt」ではなく何を送ったかを出し、ホバーで中身が分かるようにする(ytZeroPtGiftLabel.js)。
+ */
+function ytLabelZeroPtGiftCards() {
+  const body = document.getElementById('northStarLaneBody-giftHistory');
+  if (!body || !zeroPtGifts.length) return;
+  const labels = buildZeroPtSenderLabels(allThrowHistory);
+  if (!labels.size) return;
+  body.querySelectorAll('[role="listitem"]').forEach((line) => {
+    const countEl = line.querySelector('.nl-top-support-rank__count');
+    if (!countEl || !isZeroPtCountText(countEl.textContent)) return;
+    const name = String(line.querySelector('.nl-top-support-rank__name')?.textContent || '').trim();
+    const info = labels.get(name);
+    if (!info) return;
+    countEl.textContent = info.label;
+    line.setAttribute('title', info.title);
+  });
+}
+
 function ensureZeroPtGifts() {
+  ytLabelZeroPtGiftCards();
   const panel = document.getElementById('northStarLaneThrows-giftHistory');
   if (!panel || panel.hidden || !zeroPtGifts.length) return;
   const section = panel.querySelector('section.nl-gift-ledger-section');

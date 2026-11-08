@@ -4946,16 +4946,30 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '30日の窓で数える値(0.1.1917 の 42 から +1・過去最良は古いコミットが窓から外れたため届かない)'
   }),
   Object.freeze({
-    version: '0.1.1919', metric: 'bundle-kb', value: 1421,
+    version: '0.1.1920', metric: 'bundle-kb', value: 1421,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.1919(Kick)と同じ大きさ。過去最良 1360 との差は YouTube 同梱以降の機能の分(0.1.1921 で Kick と合流した時に追記)'
+  }),
+  Object.freeze({
+    version: '0.1.1920', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1920', metric: 'cross-checked-claims', value: 12,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '浅い clone で測ったため直近30日のコミットが数えきれていない値(同じ日の 0.1.1918/1919 は 43)。0.1.1921 で Kick と合流した時に追記'
+  }),
+  Object.freeze({
+    version: '0.1.1921', metric: 'bundle-kb', value: 1421,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
     note: 'Kick 対応でサービスの表(streamPlatform.js)と Kick の言葉が popup にも入った分の +1KB。過去最良 1360 との差は YouTube 同梱以降の機能の分'
   }),
   Object.freeze({
-    version: '0.1.1919', metric: 'gate-selftest', value: 4,
+    version: '0.1.1921', metric: 'gate-selftest', value: 4,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.1919', metric: 'cross-checked-claims', value: 43,
+    version: '0.1.1921', metric: 'cross-checked-claims', value: 43,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日の窓で数える値(0.1.1918 と同じ 43・過去最良は古いコミットが窓から外れたため届かない)'
   })

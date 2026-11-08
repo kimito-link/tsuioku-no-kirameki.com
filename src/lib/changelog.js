@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1919',
+    version: '0.1.1921',
     date: '2026-11-08',
     summary: 'Kick の配信も記録できるように(試作)',
     items: Object.freeze([
@@ -26,6 +26,16 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'チャットは Kick のページが使っている接続でそのまま読みます(ログインは要りません)。Kicks・サブスク・ギフトサブ・ホストも記録し、Kicks は応援の合計(pt)に入ります。',
       'サイドパネルと会場からのコメント送信は、Kick の画面の入力欄に書いて送ります(Kick にログインしているときだけ送れます)。',
       '記録は YouTube・Twitch と同じくこの PC の中にだけ置き、外へは送りません。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1920',
+    date: '2026-11-08',
+    summary: 'YouTube の金額の出ないギフトを分かりやすく',
+    items: Object.freeze([
+      'YouTube の「ギフト」(ジュエルのスタンプ)やメンバーシップギフトは金額が出ないため、ギフト履歴で「0pt」と出ていました。何を送ったか(例「ハイ」)を出し、ホバーで中身が分かるようにしました。',
+      '同じ人がりんく段とギフト列の両方に居るとき、ギフト列のアイコンにホバー・クリックしても何も出なかったのを直しました。',
+      '日本語の @ハンドルの人もクリックで YouTube のチャンネルを開けるようにしました。'
     ])
   }),
   Object.freeze({
@@ -192,14 +202,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'マーケ HTML はサポーター(月額980円・年額9,800円)向けの機能になりました。初めてマーケ HTML を開いた日から14日間は、だれでも無料でお試しできます',
       'サポーターでない人のコメビュを OBS 透過で出すと、隅に小さく「追憶のきらめき」と出ます(サポーターは出ません)。記録・読み上げ・会場・スマホ・YouTube 版などはこれまでどおり無料です'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1896',
-    date: '2026-11-06',
-    summary: 'サポーターのコードは1台の PC だけで使える',
-    items: Object.freeze([
-      'サポーターのコードは1つにつき PC 1台で使えるようにしました。ほかの PC に貼り付けると案内が出ます。PC を買い替えたときは、サポーターのページの「この PC に移す」で移せます(30日に1回)。今はまだ関所を開けたままなので、誰にも影響はありません'
     ])
   })
 ]);
