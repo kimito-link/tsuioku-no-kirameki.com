@@ -41,6 +41,8 @@ const diag = {
   subs: 0,
   gifts: 0,
   raids: 0,
+  rewards: 0,
+  milestones: 0,
   iconAsked: 0,
   iconFound: 0,
   iconLate: 0,
@@ -238,6 +240,8 @@ function startReader(login, key) {
     // ギフトサブは金額 0(件数は giftCount)。金額を足していたので計器が常に 0 だった(2026-11-07 実配信)
     else if (r.kind === 'membership_gift') diag.gifts += Math.max(1, Number(r.giftCount) || 1);
     else if (r.kind === 'tw_raid') diag.raids += 1;
+    else if (r.kind === 'tw_reward') diag.rewards += 1;
+    else if (r.kind === 'tw_milestone') diag.milestones += 1;
     pending.push(r);
     if (!flushTimer) flushTimer = setTimeout(() => void flush(), FLUSH_MS);
   };

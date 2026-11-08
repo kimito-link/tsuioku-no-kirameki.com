@@ -13,6 +13,8 @@
 //   - サブスク/再サブスク → kind 'membership'(何か月目か = subMonths)
 //   - ギフトサブ          → kind 'membership_gift'(まとめ贈りの件数 = giftCount)
 //   - レイド              → kind 'tw_raid'(人数を amount)
+//   - チャンネルポイントの交換(本文つき・custom-reward-id / メッセージを目立たせる highlighted-message)→ kind 'tw_reward'
+//   - 連続視聴の記念(viewermilestone)→ kind 'tw_milestone'(何回連続か = amount)
 //   - 通常のコメント      → kind 'text'
 
 /** IRC tags の値のエスケープを戻す(https://ircv3.net/specs/extensions/message-tags#escaping-values) */
@@ -147,7 +149,7 @@ export function twSubTierLabel(plan) {
  * @param {string} line
  * @returns {null | {
  *   id: string, channelId: string, name: string, login: string, iconUrl: string, text: string,
- *   kind: 'text' | 'superchat' | 'membership' | 'membership_gift' | 'tw_raid',
+ *   kind: 'text' | 'superchat' | 'membership' | 'membership_gift' | 'tw_raid' | 'tw_reward' | 'tw_milestone',
  *   amount: number, currency: string, badges: string[], ts: string, postedAtMs: number,
  *   channel: string, roomId: string, color: string, subTier?: string, subMonths?: number, giftCount?: number, giftPartOf?: string
  * }}
@@ -185,6 +187,11 @@ export function parseTwChatLine(line) {
       return { ...base, text: stripCheermotes(text), kind: 'superchat', amount: bits, currency: 'BITS' };
     }
     if (!text.trim()) return null;
+    // チャンネルポイントで本文つきの交換をした行(交換の名前は IRC に乗らない=本文だけ残す)
+    if (tags['custom-reward-id'] || tags['msg-id'] === 'highlighted-message') {
+      const what = tags['msg-id'] === 'highlighted-message' ? 'メッセージを目立たせる' : 'ポイント交換';
+      return { ...base, text: `${what}: ${text}`, kind: 'tw_reward', amount: 0, currency: '' };
+    }
     return { ...base, text, kind: 'text', amount: 0, currency: '' };
   }
 
@@ -228,6 +235,17 @@ export function parseTwChatLine(line) {
       text: `${Number(tags['msg-param-viewerCount'] || 0) || 0}人でレイドしてきました`,
       kind: 'tw_raid',
       amount: Number(tags['msg-param-viewerCount'] || 0) || 0,
+      currency: '',
+    };
+  }
+  if (msgId === 'viewermilestone') {
+    const n = Number(tags['msg-param-value'] || 0) || 0;
+    const note = String(userText || '').trim();
+    return {
+      ...base,
+      text: `${n > 0 ? `${n}回連続で` : '続けて'}見に来ました${note ? `「${note}」` : ''}`,
+      kind: 'tw_milestone',
+      amount: n,
       currency: '',
     };
   }
