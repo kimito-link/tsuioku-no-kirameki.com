@@ -22,6 +22,7 @@ import {
   parseTwUsersIcons,
   parseTwLeaderboards,
 } from '../../src/lib/twitch/twGql.js';
+import { twHermesUrl, twRewardTopic, twHermesSubscribeMsg, parseTwHermesFrame, parseTwRedemption } from '../../src/lib/twitch/twHermes.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
@@ -57,6 +58,12 @@ const diag = {
   boardFrom: '',
   boardPeriod: '',
   boardFail: 0,
+  /** Hermes(リワードの名前つきの交換): 状態・つないだ回数・購読できたか・届いた交換 */
+  hermesState: 'idle',
+  hermesConnects: 0,
+  hermesSubscribed: 0,
+  hermesError: '',
+  redemptions: 0,
   updatedAt: 0,
 };
 
@@ -188,8 +195,11 @@ let current = /** @type {null | { login: string, key: string, stop: () => void }
  * @param {string} login
  * @param {string} key
  */
-function startReader(login, key) {
+/** @param {string} login @param {string} key @param {string} [channelId] 数字の id(Hermes の購読に使う) */
+function startReader(login, key, channelId = '') {
   let stopped = false;
+  /** Hermes でリワードの交換を受けられているか(受けられている間は IRC の本文つきの交換を捨てる=二重に数えない) */
+  let hermesRewardsOk = false;
   /** @type {WebSocket | null} */
   let ws = null;
   let backoff = 1000;
@@ -242,6 +252,12 @@ function startReader(login, key) {
     if (!r || r.channel !== login) return;
     // まとめ贈り(submysterygift)の内訳の1人ずつの行は記録しない(まとめの1行に件数がある・二重に数えない)
     if (r.giftPartOf) return;
+    if (hermesRewardsOk && /** @type {any} */ (r).rewardId) return;
+    push(r);
+  };
+
+  /** 記録へ渡す1行(IRC と Hermes の共通の入口) @param {any} r */
+  const push = (r) => {
     if (seen.has(r.id)) return;
     seen.add(r.id);
     if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
@@ -299,9 +315,102 @@ function startReader(login, key) {
     backoff = Math.min(backoff * 2, 60_000);
   };
 
+  // ---- Hermes(twitch.tv のページ自身が使う通知の口)。リワードの名前つきの交換を受ける ----
+  /** @type {WebSocket | null} */
+  let hws = null;
+  let hBackoff = 2000;
+  let hTimer = 0;
+  let hWatch = 0;
+  let hKeepMs = 30_000;
+  let hLastAt = 0;
+  const topic = twRewardTopic(channelId);
+  const hConnect = (url = '') => {
+    if (stopped || !topic) return;
+    diag.hermesState = 'connecting';
+    diag.hermesConnects += 1;
+    try {
+      hws = new WebSocket(url || twHermesUrl(TW_WEB_CLIENT_ID));
+    } catch {
+      hRetry();
+      return;
+    }
+    hws.onmessage = (ev) => {
+      hLastAt = Date.now();
+      const f = parseTwHermesFrame(typeof ev.data === 'string' ? ev.data : '');
+      if (!f) return;
+      if (f.type === 'welcome') {
+        hBackoff = 2000;
+        hKeepMs = (f.keepaliveSec + 20) * 1000;
+        diag.hermesState = 'open';
+        const id = `nl-${Date.now().toString(36)}`;
+        try {
+          hws?.send(JSON.stringify(twHermesSubscribeMsg(topic, id)));
+        } catch {
+          /* no-op */
+        }
+      } else if (f.type === 'subscribed') {
+        hermesRewardsOk = f.ok;
+        if (f.ok) diag.hermesSubscribed += 1;
+        else diag.hermesError = f.error;
+        saveDiagSoon();
+      } else if (f.type === 'reconnect') {
+        const next = f.url;
+        hermesRewardsOk = false;
+        try {
+          if (hws) hws.onclose = null;
+          hws?.close();
+        } catch {
+          /* no-op */
+        }
+        hConnect(next);
+      } else if (f.type === 'notification') {
+        const r = parseTwRedemption(f.data, login);
+        if (!r) return;
+        diag.redemptions += 1;
+        push(r);
+      }
+    };
+    hws.onclose = () => {
+      hermesRewardsOk = false;
+      diag.hermesState = 'closed';
+      saveDiagSoon();
+      hRetry();
+    };
+  };
+  const hRetry = () => {
+    if (stopped || hTimer) return;
+    hTimer = setTimeout(() => {
+      hTimer = 0;
+      hConnect();
+    }, hBackoff);
+    hBackoff = Math.min(hBackoff * 2, 120_000);
+  };
+  // keepalive が途絶えたら(つながったまま黙った)つなぎ直す
+  hWatch = setInterval(() => {
+    if (stopped || !hws || diag.hermesState !== 'open') return;
+    if (Date.now() - hLastAt > hKeepMs) {
+      try {
+        hws.close();
+      } catch {
+        /* no-op */
+      }
+    }
+  }, 10_000);
+
   connect();
+  hConnect();
   return () => {
     stopped = true;
+    hermesRewardsOk = false;
+    if (hTimer) clearTimeout(hTimer);
+    clearInterval(hWatch);
+    try {
+      if (hws) hws.onclose = null;
+      hws?.close();
+    } catch {
+      /* no-op */
+    }
+    diag.hermesState = 'idle';
     if (reconnectTimer) clearTimeout(reconnectTimer);
     if (flushTimer) clearTimeout(flushTimer);
     void flush();
@@ -399,7 +508,7 @@ async function check() {
     if (!key) return;
     if (!current || current.key !== key) {
       current?.stop();
-      current = { login, key, stop: startReader(login, key) };
+      current = { login, key, stop: startReader(login, key, info?.userId || '') };
       diag.streamKey = key;
     }
     safeSendMessage({

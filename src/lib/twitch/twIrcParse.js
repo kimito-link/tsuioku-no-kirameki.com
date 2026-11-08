@@ -151,7 +151,7 @@ export function twSubTierLabel(plan) {
  *   id: string, channelId: string, name: string, login: string, iconUrl: string, text: string,
  *   kind: 'text' | 'superchat' | 'membership' | 'membership_gift' | 'tw_raid' | 'tw_reward' | 'tw_milestone',
  *   amount: number, currency: string, badges: string[], ts: string, postedAtMs: number,
- *   channel: string, roomId: string, color: string, subTier?: string, subMonths?: number, giftCount?: number, giftPartOf?: string
+ *   channel: string, roomId: string, color: string, subTier?: string, subMonths?: number, giftCount?: number, giftPartOf?: string, rewardId?: string
  * }}
  */
 export function parseTwChatLine(line) {
@@ -190,7 +190,8 @@ export function parseTwChatLine(line) {
     // チャンネルポイントで本文つきの交換をした行(交換の名前は IRC に乗らない=本文だけ残す)
     if (tags['custom-reward-id'] || tags['msg-id'] === 'highlighted-message') {
       const what = tags['msg-id'] === 'highlighted-message' ? 'メッセージを目立たせる' : 'ポイント交換';
-      return { ...base, text: `${what}: ${text}`, kind: 'tw_reward', amount: 0, currency: '' };
+      // rewardId: 同じ交換は Hermes(リワードの名前つき)でも届く。Hermes が読めている間は入口でこちらを捨てる
+      return { ...base, text: `${what}: ${text}`, kind: 'tw_reward', amount: 0, currency: '', rewardId: String(tags['custom-reward-id'] || '') };
     }
     return { ...base, text, kind: 'text', amount: 0, currency: '' };
   }

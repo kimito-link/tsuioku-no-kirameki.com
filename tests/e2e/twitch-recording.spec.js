@@ -32,7 +32,17 @@ const LINES = [
 const LATE_LINES = [
   `@badges=;display-name=Giver;id=m-5;login=giver;msg-id=submysterygift;msg-param-mass-gift-count=5;msg-param-sub-plan=1000;room-id=99;tmi-sent-ts=1762480004123;user-id=1005 :tmi.twitch.tv USERNOTICE #${LOGIN}`,
   `@badges=;color=;display-name=LateFan;id=m-6;room-id=99;tmi-sent-ts=1762480005123;user-id=1006 :late_fan!late_fan@late_fan.tmi.twitch.tv PRIVMSG #${LOGIN} :おそくなりました`,
+  // 本文つきのリワード交換は IRC にも来る(名前なし)。Hermes で名前つきを受けているので、こちらは記録しない
+  `@badges=;color=;custom-reward-id=rw-1;display-name=ファンA;id=m-7;room-id=99;tmi-sent-ts=1762480006123;user-id=1001 :fan_a!fan_a@fan_a.tmi.twitch.tv PRIVMSG #${LOGIN} :がんばって`,
 ];
+// Hermes(twitch.tv のページが使う通知の口)で届くリワードの交換(名前つき)
+const REDEEM = {
+  type: 'reward-redeemed',
+  data: {
+    timestamp: '2026-11-08T11:00:00Z',
+    redemption: { id: 'r-1', user: { id: '1001', login: 'fan_a', display_name: 'ファンA' }, channel_id: '99', redeemed_at: '2026-11-08T11:00:01Z', reward: { id: 'rw-1', title: '水を飲んで', cost: 500 }, user_input: 'がんばって', status: 'UNFULFILLED' },
+  },
+};
 const LATE_ICON = 'https://static-cdn.jtvnw.net/jtv_user_pictures/late_fan-70x70.png';
 
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>${LOGIN} - Twitch</title></head><body>
@@ -53,12 +63,27 @@ function startFakeIrc() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-irc-'));
   const key = path.join(dir, 'key.pem');
   const cert = path.join(dir, 'cert.pem');
-  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=irc-ws.chat.twitch.tv', '-addext', 'subjectAltName=DNS:irc-ws.chat.twitch.tv'], { stdio: 'ignore' });
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=irc-ws.chat.twitch.tv', '-addext', 'subjectAltName=DNS:irc-ws.chat.twitch.tv,DNS:hermes.twitch.tv'], { stdio: 'ignore' });
   const server = https.createServer({ key: fs.readFileSync(key), cert: fs.readFileSync(cert) });
   const wss = new WebSocketServer({ server });
   /** @type {string[]} */
   const received = [];
-  wss.on('connection', (ws) => {
+  /** @type {string[]} Hermes で受けた1通 */
+  const hermes = [];
+  wss.on('connection', (ws, req) => {
+    if (String(req.url || '').startsWith('/v1')) {
+      // Hermes の役: welcome → 購読に ok → リワードの交換を1件
+      hermes.push(`url:${req.url}`);
+      ws.send(JSON.stringify({ type: 'welcome', welcome: { keepaliveSec: 10, recoveryUrl: 'x', sessionId: 's' }, id: 'w', timestamp: '' }));
+      ws.on('message', (data) => {
+        const m = JSON.parse(String(data));
+        hermes.push(m?.subscribe?.pubsub?.topic || '');
+        if (m.type !== 'subscribe') return;
+        ws.send(JSON.stringify({ type: 'subscribeResponse', subscribeResponse: { result: 'ok', subscription: { id: m.subscribe.id } } }));
+        setTimeout(() => ws.send(JSON.stringify({ type: 'notification', notification: { subscription: { id: m.subscribe.id }, type: 'pubsub', pubsub: JSON.stringify(REDEEM) } })), 200);
+      });
+      return;
+    }
     ws.on('message', (data) => {
       const text = String(data);
       received.push(text);
@@ -74,7 +99,7 @@ function startFakeIrc() {
       const port = /** @type {any} */ (server.address()).port;
       // 自分で作った証明書を、この試験の Chromium にだけ信じさせる(--ignore-certificate-errors-spki-list)
       const spki = execFileSync('sh', ['-c', `openssl x509 -in '${cert}' -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64`]).toString().trim();
-      resolve({ port, spki, received, close: () => new Promise((r) => { wss.close(); server.close(() => r(undefined)); }) });
+      resolve({ port, spki, received, hermes, close: () => new Promise((r) => { wss.close(); server.close(() => r(undefined)); }) });
     });
   });
 }
@@ -95,7 +120,7 @@ const test = base.extend({
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,
-        `--host-resolver-rules=MAP irc-ws.chat.twitch.tv:443 127.0.0.1:${/** @type {any} */ (irc).port}`,
+        `--host-resolver-rules=MAP irc-ws.chat.twitch.tv:443 127.0.0.1:${/** @type {any} */ (irc).port}, MAP hermes.twitch.tv:443 127.0.0.1:${/** @type {any} */ (irc).port}`,
         `--ignore-certificate-errors-spki-list=${/** @type {any} */ (irc).spki}`,
         '--ignore-certificate-errors',
         '--no-proxy-server',
@@ -190,7 +215,10 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
       'superchat:Bitter:おめでとう:500:BITS:-',
       'text:LateFan:おそくなりました:0::-',
       'text:ファンA:わこつ:0::face',
+      'tw_reward:ファンA:「水を飲んで」を交換しました: がんばって:0::face',
     ]);
+  // Hermes にはチャンネルの数字の id で、リワードの話題だけを購読した
+  expect(irc.hermes).toContain('community-points-channel-v1.99');
 
   // 計器: ギフトサブは件数で数える(金額 0 を足して常に 0 だった)。間に合わなかった顔はあとで yt_tw_icons に置く
   await expect

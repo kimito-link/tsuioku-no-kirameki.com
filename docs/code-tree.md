@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1186 件
+## ⚠️ 役割コメントが無いソース 10 / 1187 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1176,7 +1176,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2329)
+- 📁 **src/** (2331)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1479,7 +1479,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2050)
+  - 📁 **lib/** (2052)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1503,9 +1503,11 @@
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
     - 📁 **platform/** (1)
       - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick)の違いを1か所にまとめた表(純関数)
-    - 📁 **twitch/** (6)
+    - 📁 **twitch/** (8)
       - `twGql.js` — twitch.tv の画面自身が使っている GQL の応答を「形から検証して」読む(純関数)
       - `twGql.test.js`
+      - `twHermes.js` — twitch.tv のページ自身が使う通知の口(Hermes)の1通を読む(純関数)
+      - `twHermes.test.js`
       - `twIrcParse.js` — Twitch のチャット(IRC over WebSocket)1行を、YouTube 版と同じ「チャット1件」の形に直す(純関数)
       - `twIrcParse.test.js`
       - `twShim.test.js`
