@@ -92,3 +92,23 @@ describe('Kick の画面の言葉', () => {
     expect(ytWordingPlatformFixed('スパチャありがとう', KICK)).toBe('スパチャありがとう');
   });
 });
+
+describe('Kick の公式ランキングを出しているときの言葉', () => {
+  const KICK = { name: 'Kick', paid: 'Kicks', rankSentence: 'Kicks・ギフトサブの合計の順位（上位）を表示します。このPCの記録から数えます。' };
+  it('どの段階の言葉からでも公式の言葉になり、公式の順位表が無くなれば記録の言葉に戻る', async () => {
+    const { ytWording, ytWordingPlatformOfficial, ytWordingPlatformFixed, officialWords } = await import('./ytWording.js');
+    const off = officialWords(KICK);
+    const nico = 'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。';
+    expect(ytWordingPlatformOfficial(ytWording(nico, { topFans: true }), KICK)).toBe(off.sentence);
+    expect(ytWordingPlatformOfficial(KICK.rankSentence, KICK)).toBe(off.sentence);
+    expect(ytWordingPlatformOfficial(ytWording('公式の貢献度ランキング（niconico の表示に準拠）', { topFans: true }), KICK)).toBe(off.heading);
+    expect(ytWordingPlatformOfficial('Kicks・ギフトサブの合計の順位', KICK)).toBe(off.heading);
+    expect(ytWordingPlatformOfficial(ytWording('ギフト貢献度', { topFans: true }), KICK)).toBe('Kicks ランキング');
+    expect(ytWordingPlatformOfficial(ytWording('9,502貢', { topFans: true }), KICK)).toBe('9,502 Kicks');
+    // 2回掛けても壊れない・戻せる
+    expect(ytWordingPlatformOfficial(off.sentence, KICK)).toBe(off.sentence);
+    expect(ytWordingPlatformFixed(off.sentence, KICK)).toBe(KICK.rankSentence);
+    expect(ytWordingPlatformFixed(off.heading, KICK)).toBe('Kicks・ギフトサブの合計の順位');
+    expect(ytWordingPlatformOfficial('こんにちは', KICK)).toBe('こんにちは');
+  });
+});

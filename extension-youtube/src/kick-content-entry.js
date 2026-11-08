@@ -11,7 +11,7 @@
 //   - Pusher のイベント名・項目名は公式の文書が無い。計器(yt_diag_kk_chat)で PC 実測して確かめる。
 
 import { parseKickChannelFromUrl, parsePusherFrame, parseKickEvent, parseKickDeleted } from '../../src/lib/kick/kickChatParse.js';
-import { kickChannelApiUrl, parseKickChannel, parseKickUserIcon } from '../../src/lib/kick/kickApi.js';
+import { kickChannelApiUrl, parseKickChannel, parseKickUserIcon, parseKickKicksLeaderboard, kickKicksLeaderboardUrl } from '../../src/lib/kick/kickApi.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
   KICK_REALTIME_CONNECTION_URL,
@@ -47,6 +47,10 @@ const diag = {
   routeFail: 0,
   pusherKey: '',
   rewards: 0,
+  /** 公式の Kicks ランキング(行数・どこから・どの id で取れたか) */
+  boardRows: 0,
+  boardFrom: '',
+  boardFail: 0,
   subscribed: 0,
   frames: 0,
   /** @type {Record<string, number>} 来たイベント名ごとの数(名前が変わったら気づくため) */
@@ -219,7 +223,7 @@ let current = /** @type {null | { slug: string, key: string, stop: () => void }}
 /**
  * @param {string} slug
  * @param {string} key
- * @param {{ chatroomId: string, channelId: string }} ids
+ * @param {{ chatroomId: string, channelId: string, userId?: string }} ids
  */
 function startReader(slug, key, ids) {
   let stopped = false;
@@ -267,6 +271,7 @@ function startReader(slug, key, ids) {
   const onEvent = (f) => {
     const evName = f.event.replace(/^App\\Events\\/, '').slice(0, 60);
     diag.events[evName] = (diag.events[evName] || 0) + 1;
+    if (evName === 'KicksLeaderboardUpdated') return sendBoard(parseKickKicksLeaderboard(f.data), 'socket');
     const del = parseKickDeleted(f);
     if (del) {
       diag.deleted += 1;
@@ -298,6 +303,30 @@ function startReader(slug, key, ids) {
   };
 
   const chans = kickRealtimeChannels(ids.chatroomId, ids.channelId);
+
+  /** 公式の Kicks ランキングを記録側へ(YouTube のトップファンと同じ口・ギフト貢献度の欄に出る) @param {any} rows @param {string} from */
+  const sendBoard = (rows, from) => {
+    if (!Array.isArray(rows) || !rows.length) return;
+    diag.boardRows = rows.length;
+    diag.boardFrom = from;
+    safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows } });
+    saveDiagSoon();
+  };
+  // 開いた時点の順位表(以後はソケットの KicksLeaderboardUpdated で届く)。id はチャンネルかユーザーか未確定なので両方試す
+  void (async () => {
+    for (const id of [ids.channelId, ids.userId]) {
+      const url = kickKicksLeaderboardUrl(id);
+      if (!url || stopped) continue;
+      try {
+        const rows = parseKickKicksLeaderboard(await getJson(url));
+        if (rows.length) return sendBoard(rows, `api:${id === ids.channelId ? 'channel' : 'user'}`);
+      } catch {
+        /* 次の id */
+      }
+    }
+    diag.boardFail += 1;
+    saveDiagSoon();
+  })();
 
   /** Pusher の1通 @param {string} raw */
   const onPusherFrame = (raw) => {
@@ -485,7 +514,7 @@ async function check() {
     if (!key) return;
     if (!current || current.key !== key) {
       current?.stop();
-      current = { slug, key, stop: startReader(slug, key, { chatroomId: info.chatroomId, channelId: info.channelId }) };
+      current = { slug, key, stop: startReader(slug, key, { chatroomId: info.chatroomId, channelId: info.channelId, userId: info.userId }) };
       diag.streamKey = key;
     }
     if (info.iconUrl) iconBySlug.set(slug, info.iconUrl);

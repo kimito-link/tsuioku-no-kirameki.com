@@ -62,3 +62,34 @@ export function parseKickUserIcon(json) {
   const user = obj(o.user) || o;
   return safeKickImageUrl(user.profile_pic ?? user.profilepic ?? o.profile_pic);
 }
+
+/**
+ * Kick 公式の Kicks ランキング → 順位表の行(YouTube のトップファンと同じ口 YT_LEADERBOARD に渡す形)。
+ *   ソケットの KicksLeaderboardUpdated は gifts_lifetime/gifts_month/gifts_week、
+ *   API(web.kick.com/api/v1/kicks/<id>/leaderboard)は kicks_gifts_lifetime 等(2026-11-08 PC 実測)。
+ *   どちらもこれまでの累計(lifetime)を使う。形が違えば []。
+ * @param {unknown} json
+ * @returns {Array<{ rank: number, name: string, xp: number, iconUrl: string }>}
+ */
+export function parseKickKicksLeaderboard(json) {
+  const o = obj(json);
+  const d = obj(o?.data) || o;
+  const list = d?.gifts_lifetime ?? d?.kicks_gifts_lifetime ?? obj(d?.leaderboard)?.gifts_lifetime;
+  if (!Array.isArray(list)) return [];
+  /** @type {Array<{ rank: number, name: string, xp: number, iconUrl: string }>} */
+  const out = [];
+  for (const r0 of list.slice(0, 50)) {
+    const r = obj(r0);
+    const name = String(r?.username || '').trim().slice(0, 60);
+    const xp = Math.floor(Number(r?.quantity) || 0);
+    if (!name || xp <= 0) continue; // 壊れた1行だけ捨てる
+    out.push({ rank: out.length + 1, name, xp, iconUrl: '' });
+  }
+  return out;
+}
+
+/** @param {string | number} id チャンネル id かユーザー id(どちらか実測で確かめる) */
+export function kickKicksLeaderboardUrl(id) {
+  const s = String(id ?? '').trim();
+  return /^\d{1,20}$/.test(s) ? `https://web.kick.com/api/v1/kicks/${s}/leaderboard` : '';
+}

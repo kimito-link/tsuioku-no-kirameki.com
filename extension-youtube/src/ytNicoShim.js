@@ -18,7 +18,7 @@ import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIc
 import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
-import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed } from '../../src/lib/youtube/ytWording.js';
+import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname } from '../../src/lib/platform/streamPlatform.js';
@@ -712,6 +712,9 @@ async function buildCommentsForLvUncached(lv) {
 let knownSummaries = {};
 // 「ギフト貢献度」の欄に入れたのが YouTube のトップファン(XP)か、スパチャの合計の順位(pt)か。言葉の直しを切り替える。
 let kokenIsTopFans = true;
+// Twitch/Kick の配信で「ギフト貢献度」の欄にそのサービスの公式ランキング(Kick の Kicks ランキング等)が入っているか。
+//   入っていなければ記録から数えた合計の順位(既定)。言葉の直しを切り替える
+let platformOfficial = false;
 function registerBroadcastersFromSummaries() {
   for (const [vid, sum] of Object.entries(knownSummaries)) {
     try {
@@ -812,6 +815,11 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
             topFanRestRows = fromBoard.rows.slice(10);
             scheduleTopFanRest();
           } else topFanRestRows = [];
+          const plat = screenPlatform();
+          if (plat && platformOfficial !== !!fromBoard) {
+            platformOfficial = !!fromBoard;
+            rewordTopFanHeadings((t) => t);
+          }
           if (v != null) {
             const wasTopFans = kokenIsTopFans;
             kokenIsTopFans = !!fromBoard;
@@ -1308,6 +1316,12 @@ function screenWording(t) {
   // Twitch にはトップファンの順位表が無い=ランキング欄は最初から「合計の順位」の言葉で描く
   const p = screenPlatform();
   if (!p) return ytWording(t, { topFans: kokenIsTopFans });
+  if (platformOfficial) {
+    // 公式ランキングの言葉(Kick 公式の Kicks ランキング)。YouTube の言葉にした所はそのサービスの言葉に
+    const w1 = ytWording(t, { topFans: true });
+    const o = ytWordingPlatformOfficial(w1, p);
+    return w1 !== t ? o.split('スーパーチャット').join(p.paid).split('スパチャ').join(p.paid).split('YouTube').join(p.name) : o;
+  }
   const w = ytWording(t, { topFans: false });
   return w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
 }
@@ -1363,7 +1377,7 @@ function rewordTopFanHeadings(reword) {
     const v = String(n.nodeValue || '');
     let next = reword(v);
     // Twitch/Kick の画面なら、入れ替えた見出しもそのサービスの言葉に(入れ替えだけだと「Twitch のスパチャの合計順」が残った)
-    if (plat) next = ytWordingPlatformFixed(next, plat);
+    if (plat) next = platformOfficial ? ytWordingPlatformOfficial(next, plat) : ytWordingPlatformFixed(next, plat);
     if (next !== v) n.nodeValue = next;
   }
 }

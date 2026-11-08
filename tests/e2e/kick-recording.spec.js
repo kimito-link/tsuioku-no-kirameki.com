@@ -46,7 +46,7 @@ const LATE = [
   kicks('tx-1', 500, 'Rage Quit'),
   kicks('tx-2', 1, 'Hell Yeah'),
   kicks('tx-3', 1, 'Hell Yeah'),
-  ev('KicksLeaderboardUpdated', { gifts_lifetime: [{ user_id: 1002, username: 'Kicker', quantity: 502 }] }, `channel_${CHANNEL_ID}`),
+  ev('KicksLeaderboardUpdated', { gifts_lifetime: [{ user_id: 1002, username: 'Kicker', quantity: 9502 }, { user_id: 1001, username: 'ファンA', quantity: 300 }], gifts_lifetime_enabled: true, gifts_week: [] }, `channel_${CHANNEL_ID}`),
   ev('GiftedSubscriptionsEvent', { chatroom_id: CHATROOM, correlation_id: 'c-1', gifted_usernames: ['a1', 'b2'], gifter_username: 'Giver', gifted_total: 5, gifter_total: 9, chunk_details: null }, `chatroom_${CHATROOM}`),
   chat('m-8', 1008, 'Fan8', 'fan8', '', { type: 'celebration', metadata: { celebration: { id: 'c', type: 'subscription_renewed', total_months: 26 } } }),
   ev('RewardRedeemedEvent', { reward_title: '歌って', user_id: 1001, channel_id: CHANNEL_ID, username: 'ファンA', user_input: '星座になれたら', reward_background_color: '#FEA0CF' }, `chatroom_${CHATROOM}`),
@@ -203,6 +203,9 @@ async function routeRealtimeApi(context, mode, asked) {
           : { provider: 'pusher', credentials: { app_key: PUSHER_FALLBACK_KEY, cluster: 'us2' } };
       return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ data: { connections: [conn], mode: 'websocket' }, message: 'success' }) });
     }
+    if (p === `/api/v1/kicks/${CHANNEL_ID}/leaderboard`) {
+      return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ data: { kicks_gifts_lifetime: [{ user_id: 1002, username: 'Kicker', quantity: 9000 }, { user_id: 1001, username: 'ファンA', quantity: 300 }], kicks_gifts_week: [] } }) });
+    }
     if (p === '/api/v1/realtime/auth/connection') {
       return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ data: { token: 'fake.token-1234567890' } }) });
     }
@@ -279,9 +282,16 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
     .poll(async () => {
       const b = await sw.evaluate(async () => chrome.storage.local.get(['yt_diag_kk_chat', 'yt_kk_icons']));
       const d = b.yt_diag_kk_chat || {};
-      return { gifts: d.gifts, subs: d.subs, kicks: d.kicks, wsState: d.wsState, late: b.yt_kk_icons?.['late-fan'] || '', provider: d.provider, deleted: d.deleted, rewards: d.rewards, subscribed: d.subscribed };
+      return { gifts: d.gifts, subs: d.subs, kicks: d.kicks, wsState: d.wsState, late: b.yt_kk_icons?.['late-fan'] || '', provider: d.provider, deleted: d.deleted, rewards: d.rewards, subscribed: d.subscribed, boardFrom: d.boardFrom };
     }, { timeout: 15_000 })
-    .toEqual({ gifts: 5, subs: 2, kicks: 502, wsState: 'open', late: LATE_ICON, provider: 'centrifugo', deleted: 1, rewards: 1, subscribed: 4 });
+    .toEqual({ gifts: 5, subs: 2, kicks: 502, wsState: 'open', late: LATE_ICON, provider: 'centrifugo', deleted: 1, rewards: 1, subscribed: 4, boardFrom: 'socket' });
+
+  // 公式の Kicks ランキング(開いた時点は API・以後はソケット)が、YouTube のトップファンと同じ置き場に入る
+  const board = await sw.evaluate(async (key) => (await chrome.storage.local.get(`yt_leaderboard_${key}`))[`yt_leaderboard_${key}`], KEY);
+  expect(board.rows.slice(0, 2)).toEqual([
+    { rank: 1, name: 'Kicker', xp: 9502, iconUrl: '' },
+    { rank: 2, name: 'ファンA', xp: 300, iconUrl: '' },
+  ]);
 
   // 配信のまとめ(配信者・同接・開始時刻)
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
@@ -320,13 +330,17 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   await ext.reload();
   await page.bringToFront();
   const bodyText = () => ext.evaluate(() => document.body.innerText);
-  for (const want of ['ファンA', 'テストきっく', '500 Kicks', '@fan-a']) {
+  for (const want of ['ファンA', 'テストきっく', '500 Kicks', '@fan-a', 'Kicks ランキング']) {
     await expect.poll(bodyText, { timeout: 30_000 }).toContain(want);
   }
   const text = await bodyText();
   expect(text).not.toMatch(/kk:\d/);
   expect(text).not.toContain('データ源: youtube');
   expect(text).not.toMatch(/スパチャ|スーパーチャット|トップファン/);
+  // 公式ランキングがあるので「このPCの記録から数えます」の言葉は出さない
+  const all = await ext.evaluate(() => document.body.textContent || '');
+  expect(all).not.toContain('このPCの記録から数えます');
+  expect(all).toContain('Kick 公式の Kicks ランキング');
 });
 
 test('Centrifugo が使えないときは、API が返す Pusher の鍵で読む', async ({ context, rt }) => {

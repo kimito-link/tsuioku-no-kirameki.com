@@ -142,8 +142,13 @@ function fixedRules(p) {
   const paid = `(?:スパチャ|${esc(p.paid)})`;
   const heading = `${p.paid}・ギフトサブの合計の順位`;
   const word = `${p.paid} の合計順`;
+  const off = officialWords(p);
   /** @type {Array<[RegExp, string]>} */
   const rules = [
+    // 公式ランキングの言葉で描いたあと、公式の順位表が無いと分かった(配信が変わった等)→ 記録から数えた言葉へ
+    [new RegExp(esc(off.sentence), 'g'), p.rankSentence],
+    [new RegExp(esc(off.heading), 'g'), heading],
+    [new RegExp(esc(off.word), 'g'), word],
     [new RegExp(`${svc} のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。`, 'g'), p.rankSentence],
     [new RegExp(`${svc} の${paid}の合計順（チャットでの応援の XP の順位・上位）を表示します。チャット欄の(?:トップファン|${paid}の合計順)の画面から読み取ります。`, 'g'), p.rankSentence],
     [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフトの合計の順位（上位）を表示します。(?:トップファン|${paid}の合計順)の順位が出ていない配信（アーカイブなど）で使います。`, 'g'), p.rankSentence],
@@ -153,6 +158,55 @@ function fixedRules(p) {
   ];
   fixedRulesCache.set(k, rules);
   return rules;
+}
+
+/**
+ * そのサービスの公式ランキング(Kick の Kicks ランキング等)を「ギフト貢献度」の欄に入れているときの言葉。
+ * @param {WordingPlatform} p
+ */
+export function officialWords(p) {
+  return {
+    sentence: `${p.name} 公式の ${p.paid} ランキング（これまでの累計・上位）を表示します。${p.name} のチャット欄のランキングと同じ値です。`,
+    heading: `${p.name} 公式の ${p.paid} ランキング（累計）`,
+    word: `${p.paid} ランキング`,
+  };
+}
+
+/** @type {Map<string, Array<[RegExp, string]>>} */
+const officialRulesCache = new Map();
+/** @param {WordingPlatform} p */
+function officialRules(p) {
+  const k = `${p.name}|${p.paid}`;
+  const hit = officialRulesCache.get(k);
+  if (hit) return hit;
+  const off = officialWords(p);
+  const svc = `(?:YouTube|${esc(p.name)})`;
+  const paid = `(?:スパチャ|${esc(p.paid)})`;
+  /** @type {Array<[RegExp, string]>} 長い文 → 見出し → 語 の順(文の中の語を先に変えて文を壊さない) */
+  const rules = [
+    [new RegExp(esc(p.rankSentence), 'g'), off.sentence],
+    [new RegExp(`${svc} のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。`, 'g'), off.sentence],
+    [new RegExp(`${svc} の${paid}の合計順（チャットでの応援の XP の順位・上位）を表示します。チャット欄の(?:トップファン|${paid}の合計順)の画面から読み取ります。`, 'g'), off.sentence],
+    [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフト(?:サブ)?の合計の順位（上位）を表示します。(?:トップファン|${paid}の合計順)の順位が出ていない配信（アーカイブなど）で使います。`, 'g'), off.sentence],
+    [new RegExp(`${svc} 公式のトップファン（XP の順位）`, 'g'), off.heading],
+    [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフト(?:サブ)?の合計の順位`, 'g'), off.heading],
+    [new RegExp(`トップファン|${paid}の合計順|${esc(p.paid)} の合計順`, 'g'), off.word],
+    [/(\d[\d,]*) XP\b/g, `$1 ${p.paid}`],
+  ];
+  officialRulesCache.set(k, rules);
+  return rules;
+}
+
+/**
+ * 公式ランキングを出しているときの言葉に直す(どの段階の言葉で描いた文字に掛けてもよい・コメント本文に当たらない決まった文だけ)。
+ * @param {string} text
+ * @param {WordingPlatform} p
+ */
+export function ytWordingPlatformOfficial(text, p) {
+  let out = String(text ?? '');
+  if (!/トップファン|スパチャ|スーパーチャット|XP/.test(out) && !out.includes(p.paid)) return out;
+  for (const [from, to] of officialRules(p)) out = out.replace(from, to);
+  return out;
 }
 
 /**

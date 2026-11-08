@@ -9,6 +9,7 @@ import {
   safeKickRealtimeUrl,
 } from './kickRealtime.js';
 import { parseKickEvent } from './kickChatParse.js';
+import { parseKickKicksLeaderboard, kickKicksLeaderboardUrl } from './kickApi.js';
 
 const NOW = Date.parse('2026-11-08T10:00:00Z');
 
@@ -108,5 +109,20 @@ describe('実データの形のイベント', () => {
     const r = parseKickEvent(f('RewardRedeemedEvent', { reward_title: '歌って', user_id: 1001, channel_id: 55, username: 'fan', user_input: '[emote:1:KEKW] お願い', reward_background_color: '#FEA0CF' }), ctx);
     expect(r).toMatchObject({ kind: 'kk_reward', channelId: 'kk:1001', text: '「歌って」を交換しました: KEKW お願い' });
     expect(parseKickEvent(f('RewardRedeemedEvent', { username: 'fan' }), ctx)).toBeNull();
+  });
+});
+
+describe('Kick 公式の Kicks ランキング', () => {
+  it('ソケットの形と API の形のどちらも累計を読む・壊れた行だけ捨てる', () => {
+    const sock = { gifts_lifetime: [{ user_id: 1, username: 'genga8888', quantity: 550000 }, { username: '', quantity: 5 }, { username: 'b', quantity: 0 }, { username: 'c', quantity: 12 }], gifts_week: [] };
+    expect(parseKickKicksLeaderboard(sock)).toEqual([
+      { rank: 1, name: 'genga8888', xp: 550000, iconUrl: '' },
+      { rank: 2, name: 'c', xp: 12, iconUrl: '' },
+    ]);
+    expect(parseKickKicksLeaderboard({ data: { kicks_gifts_lifetime: [{ username: 'a', quantity: 3 }] } })).toEqual([{ rank: 1, name: 'a', xp: 3, iconUrl: '' }]);
+    expect(parseKickKicksLeaderboard({ data: {} })).toEqual([]);
+    expect(parseKickKicksLeaderboard(null)).toEqual([]);
+    expect(kickKicksLeaderboardUrl('55')).toBe('https://web.kick.com/api/v1/kicks/55/leaderboard');
+    expect(kickKicksLeaderboardUrl('x')).toBe('');
   });
 });

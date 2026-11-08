@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1898',
+    date: '2026-11-06',
+    summary: 'サポーターの確認に本番の鍵を使う',
+    items: Object.freeze([
+      'サポーターかどうかを確かめる鍵を、本番のサーバーと同じものに入れ替えました(見た目や使い方は変わりません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1897',
     date: '2026-11-06',
     summary: 'マーケ HTML はサポーター向けに(14日お試し)',
