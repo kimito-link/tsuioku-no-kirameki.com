@@ -218,6 +218,8 @@ const readRows = (sw) =>
 test('TikTok のコメント・ギフト・配信中の順位を記録し、送信も届く・未ログインは理由を出す', async ({ context, sock }) => {
   test.setTimeout(150_000);
   let live = true;
+  /** @type {Record<string, number>} 配信の情報の口を読んだ回数(名前ごと) */
+  const infoCalls = {};
   await context.route(/^https:\/\/[^/]*tiktokcdn\.com\//, (route) => route.fulfill({ status: 404, body: '' }));
   await context.route('https://webcast.tiktok.com/**', (route) => {
     const u = new URL(route.request().url());
@@ -229,6 +231,7 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
     const json = (/** @type {any} */ body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (u.pathname === '/api-live/user/room/') {
       const who = String(u.searchParams.get('uniqueId') || '');
+      infoCalls[who] = (infoCalls[who] || 0) + 1;
       const room = who === OTHER ? OTHER_ROOM : ROOM;
       const on = who === OTHER || live;
       return json({
@@ -312,6 +315,10 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
   await expect
     .poll(async () => Number((await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.endedAt || 0), { timeout: 45_000 })
     .toBeGreaterThan(0);
+  // 配信が終わったページを開いたままでも、毎秒は読みに行かない(2026-11-09 PC 実測: 1 秒おきに読み 403 になった)
+  const callsAtEnd = infoCalls[UNIQUE] || 0;
+  await page.waitForTimeout(8000);
+  expect((infoCalls[UNIQUE] || 0) - callsAtEnd).toBeLessThanOrEqual(1);
 
   // 未ログイン(ページがコメントのソケットを開かない)= 20 秒で計器に理由・ページの右下に知らせ・送信は打たずに理由
   await page.goto(`https://www.tiktok.com/@${OTHER}/live`);

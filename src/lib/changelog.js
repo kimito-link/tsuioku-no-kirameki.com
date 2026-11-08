@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1941',
+    date: '2026-11-09',
+    summary: '終わった配信のページで毎秒読みに行かない',
+    items: Object.freeze([
+      'TikTok・ミクチャ・SHOWROOM で、配信が終わったページや読み取りに失敗し続けるページを開いたままにすると、配信の情報を1秒おきに読みに行っていたのを直しました(配信していないときは1分おき・失敗したときは間を広げて最大5分おき)。',
+      'TikTok の状態の記録が、配信の終わった別のタブの値で上書きされないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1940',
     date: '2026-11-09',
     summary: 'TikTok LIVE の配信を記録する(試作)',
@@ -205,17 +214,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       '再サブスクのお祝い・チャンネルポイントの交換も記録するようにしました。',
       '同じ人が続けて贈った Kicks が1件にまとまってしまうのを直しました。ギフトサブの件数も正しく数えます。',
       'サブスクなど名前だけで届く通知を、チャットで見た同じ人にそろえるようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1921',
-    date: '2026-11-08',
-    summary: 'Kick の配信も記録できるように(試作)',
-    items: Object.freeze([
-      'Kick の配信ページ(kick.com/チャンネル名)を開くと、チャットを記録するようにしました。ニコ生・YouTube・Twitch と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
-      'チャットは Kick のページが使っている接続でそのまま読みます(ログインは要りません)。Kicks・サブスク・ギフトサブ・ホストも記録し、Kicks は応援の合計(pt)に入ります。',
-      'サイドパネルと会場からのコメント送信は、Kick の画面の入力欄に書いて送ります(Kick にログインしているときだけ送れます)。',
-      '記録は YouTube・Twitch と同じくこの PC の中にだけ置き、外へは送りません。'
     ])
   })
 ]);

@@ -25,6 +25,7 @@ import {
   parseSrRanking,
   buildSrStreamKey,
 } from '../../src/lib/showroom/srParse.js';
+import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -277,7 +278,8 @@ function startReader(roomId, key, bc) {
   };
 }
 
-let lastInfoAt = 0;
+// 記録中でなくても同じページは決めた間隔でしか読まない(2026-11-09 TikTok の PC 実測: 配信が終わったページで毎秒読み 403 になった・同じ形だった)
+const infoGate = createInfoPollGate({ liveMs: META_EVERY_MS, idleMs: 60_000, failBaseMs: 30_000, failMaxMs: 300_000 });
 /** 配信の終わりの知らせ(ソケット t=101)を受けた時刻。この1分は部屋の状態を5秒おきに読む */
 let endHintAt = 0;
 let checking = false;
@@ -293,12 +295,13 @@ async function check() {
     diag.roomKey = '';
     return;
   }
-  const every = Date.now() - endHintAt < 60_000 ? 5_000 : META_EVERY_MS;
-  if (current?.roomKey === roomKey && Date.now() - lastInfoAt < every) return;
+  // 終わり際(ソケットの終わりの印から1分)だけ 5 秒おきに確かめる
+  const endSoon = Date.now() - endHintAt < 60_000 ? 5_000 : undefined;
+  if (!infoGate.due(roomKey, Date.now(), endSoon)) return;
   checking = true;
   try {
     const st = parseSrRoomStatus(await tryJson(srRoomStatusUrl(roomKey)));
-    lastInfoAt = Date.now();
+    infoGate.done(roomKey, !st ? 'fail' : st.isLive ? 'live' : 'idle', Date.now());
     diag.roomKey = roomKey;
     if (!st) return saveDiagSoon();
     diag.roomId = st.roomId;
@@ -433,7 +436,7 @@ let lastHref = '';
 setInterval(() => {
   if (location.href !== lastHref) {
     lastHref = location.href;
-    lastInfoAt = 0;
+    infoGate.reset();
   }
   void check();
 }, 1000);

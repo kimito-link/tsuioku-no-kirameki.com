@@ -24,6 +24,17 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1921',
+    date: '2026-11-08',
+    summary: 'Kick の配信も記録できるように(試作)',
+    items: Object.freeze([
+      'Kick の配信ページ(kick.com/チャンネル名)を開くと、チャットを記録するようにしました。ニコ生・YouTube・Twitch と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
+      'チャットは Kick のページが使っている接続でそのまま読みます(ログインは要りません)。Kicks・サブスク・ギフトサブ・ホストも記録し、Kicks は応援の合計(pt)に入ります。',
+      'サイドパネルと会場からのコメント送信は、Kick の画面の入力欄に書いて送ります(Kick にログインしているときだけ送れます)。',
+      '記録は YouTube・Twitch と同じくこの PC の中にだけ置き、外へは送りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1920',
     date: '2026-11-08',
     summary: 'YouTube の金額の出ないギフトを分かりやすく',

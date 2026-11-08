@@ -25,6 +25,7 @@ import {
   parseTtMemberViewers,
   buildTtStreamKey,
 } from '../../src/lib/tiktok/ttParse.js';
+import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -80,14 +81,25 @@ function safeSendMessage(/** @type {any} */ msg) {
   }
 }
 
+/** このタブの印(計器をタブで分け合うため) */
+const TAB_TOKEN = Math.random().toString(36).slice(2, 10);
 let diagTimer = 0;
 function saveDiagSoon() {
   if (diagTimer) return;
   diagTimer = setTimeout(() => {
     diagTimer = 0;
     diag.updatedAt = Date.now();
+    const snap = { ...diag, tab: TAB_TOKEN, types: { ...diag.types }, liveStatus: { ...diag.liveStatus } };
     try {
-      void chrome.storage.local.set({ yt_diag_tt_chat: { ...diag, types: { ...diag.types }, liveStatus: { ...diag.liveStatus } } });
+      // 計器は1つの置き場をタブで分け合う。記録していないタブ(配信が終わったページ等)は、別のタブが
+      //   2分以内に記録中として書いた計器を上書きしない(2026-11-09 PC 実測: 終わったタブの値で記録中の値が消えた)
+      void Promise.resolve(diag.streamKey ? null : chrome.storage.local.get('yt_diag_tt_chat'))
+        .then((bag) => {
+          const prev = bag?.yt_diag_tt_chat;
+          if (prev && prev.tab !== TAB_TOKEN && prev.streamKey && Date.now() - Number(prev.updatedAt || 0) < 120_000) return;
+          return chrome.storage.local.set({ yt_diag_tt_chat: snap });
+        })
+        .catch(() => {});
     } catch {
       /* no-op */
     }
@@ -356,7 +368,8 @@ try {
   /* no-op */
 }
 
-let lastInfoAt = 0;
+// 記録中でなくても同じページは決めた間隔でしか読まない(2026-11-09 PC 実測: 配信が終わったページで毎秒読み 403 になった)
+const infoGate = createInfoPollGate({ liveMs: META_EVERY_MS, idleMs: 60_000, failBaseMs: 30_000, failMaxMs: 300_000 });
 let checking = false;
 
 async function check() {
@@ -371,11 +384,11 @@ async function check() {
     setLoginNote(false);
     return;
   }
-  if (current?.uniqueId === uniqueId && Date.now() - lastInfoAt < META_EVERY_MS) return checkLogin();
+  if (!infoGate.due(uniqueId, Date.now())) return checkLogin();
   checking = true;
   try {
     const info = parseTtRoomInfo(await tryJson(ttRoomInfoUrl(uniqueId)));
-    lastInfoAt = Date.now();
+    infoGate.done(uniqueId, !info ? 'fail' : info.isLive ? 'live' : 'idle', Date.now());
     diag.uniqueId = uniqueId;
     if (!info) return saveDiagSoon();
     diag.live = info.isLive;
@@ -508,7 +521,7 @@ let lastHref = '';
 setInterval(() => {
   if (location.href !== lastHref) {
     lastHref = location.href;
-    lastInfoAt = 0;
+    infoGate.reset();
   }
   void check();
 }, 1000);

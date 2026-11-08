@@ -26,6 +26,7 @@ import {
   parseMxRanking,
   buildMxStreamKey,
 } from '../../src/lib/mixch/mxParse.js';
+import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 120_000;
@@ -328,7 +329,8 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
   };
 }
 
-let lastInfoAt = 0;
+// 記録中でなくても同じページは決めた間隔でしか読まない(2026-11-09 TikTok の PC 実測: 配信が終わったページで毎秒読み 403 になった・同じ形だった)
+const infoGate = createInfoPollGate({ liveMs: META_EVERY_MS, idleMs: 60_000, failBaseMs: 30_000, failMaxMs: 300_000 });
 let checking = false;
 /** ソケットの kind 10 から来た視聴数(次の配信情報の送信で使う) */
 let latestViewers = /** @type {number | null} */ (null);
@@ -374,11 +376,11 @@ async function check() {
     noteLoginRedirect();
     return;
   }
-  if (current?.userId === userId && Date.now() - lastInfoAt < META_EVERY_MS) return;
+  if (!infoGate.due(userId, Date.now())) return;
   checking = true;
   try {
     const info = parseMxLive(await tryJson(mxLiveInfoUrl(userId)), userId);
-    lastInfoAt = Date.now();
+    infoGate.done(userId, !info ? 'fail' : info.isLive ? 'live' : 'idle', Date.now());
     diag.userId = userId;
     if (!info) return saveDiagSoon();
     diag.live = info.isLive;
@@ -517,7 +519,7 @@ let lastHref = '';
 setInterval(() => {
   if (location.href !== lastHref) {
     lastHref = location.href;
-    lastInfoAt = 0;
+    infoGate.reset();
   }
   void check();
 }, 1000);
