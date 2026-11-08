@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1920',
+    date: '2026-11-08',
+    summary: 'YouTube の金額の出ないギフトを分かりやすく',
+    items: Object.freeze([
+      'YouTube の「ギフト」(ジュエルのスタンプ)やメンバーシップギフトは金額が出ないため、ギフト履歴で「0pt」と出ていました。何を送ったか(例「ハイ」)を出し、ホバーで中身が分かるようにしました。',
+      '同じ人がりんく段とギフト列の両方に居るとき、ギフト列のアイコンにホバー・クリックしても何も出なかったのを直しました。',
+      '日本語の @ハンドルの人もクリックで YouTube のチャンネルを開けるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1918',
     date: '2026-11-07',
     summary: 'Twitch の未ログインの見分けを直す',
@@ -189,14 +199,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'サポーターのコードは1台の PC だけで使える',
     items: Object.freeze([
       'サポーターのコードは1つにつき PC 1台で使えるようにしました。ほかの PC に貼り付けると案内が出ます。PC を買い替えたときは、サポーターのページの「この PC に移す」で移せます(30日に1回)。今はまだ関所を開けたままなので、誰にも影響はありません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1894',
-    date: '2026-11-06',
-    summary: '無料の人の OBS コメビュに小さな印(まだ出ない)',
-    items: Object.freeze([
-      'コメビュを OBS 透過で出したとき、無料の人は画面の隅に小さく「追憶のきらめき」と出し、サポーターは出さない仕組みを入れました。今はまだ関所を開けたままなので、誰にも出ません'
     ])
   })
 ]);

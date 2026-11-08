@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1180 件
+## ⚠️ 役割コメントが無いソース 10 / 1181 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1175,7 +1175,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2320)
+- 📁 **src/** (2323)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1478,7 +1478,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2041)
+  - 📁 **lib/** (2044)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1501,7 +1501,7 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **youtube/** (53)
+    - 📁 **youtube/** (56)
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
       - `ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
@@ -1523,6 +1523,7 @@
       - `ytMergedIsolation.test.js`
       - `ytNicoShim.test.js`
       - `ytNicoShimHandleFirst.test.js`
+      - `ytNicoShimHandleUrl.test.js`
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
       - `ytPageMeta.test.js`
       - `ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
@@ -1555,6 +1556,8 @@
       - `ytVoiceQueue.test.js`
       - `ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
       - `ytWording.test.js`
+      - `ytZeroPtGiftLabel.js` — 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援しかしていない人の「0pt」を
+      - `ytZeroPtGiftLabel.test.js`
     - `AGENTS.md`
     - `aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
     - `aboutBlankGapVerdict.test.js`
