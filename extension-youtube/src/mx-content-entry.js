@@ -60,6 +60,7 @@ const diag = {
   lastError: '',
   /** 記録が止まった理由('login-redirect' = 未ログインでミクチャにログイン画面へ飛ばされた) */
   stopReason: '',
+  stoppedAt: 0,
   updatedAt: 0,
 };
 
@@ -278,6 +279,15 @@ let loginNoted = false;
 function noteLoginRedirect() {
   if (loginNoted || !/^\/login\b/.test(String(location.pathname || ''))) return;
   loginNoted = true;
+  // ミクチャはページを読み直さずに /login へ移る(同じ計器がメモリに残る)。メモリの計器に書かないと、
+  //   次の saveDiagSoon が live=true のまま上書きして理由が消えた(2026-11-08 PC 実測・1〜2秒後)
+  if (diag.streamKey) {
+    diag.live = null;
+    diag.stopReason = 'login-redirect';
+    diag.stoppedAt = Date.now();
+    saveDiagSoon();
+    return;
+  }
   try {
     void Promise.resolve(chrome.storage.local.get('yt_diag_mx_chat'))
       .then((bag) => {
@@ -331,6 +341,9 @@ async function check() {
       current = { userId, key, stop: startReader(userId, info.sessionId, key, info.chat, (v) => (latestViewers = v)) };
       diag.streamKey = key;
       diag.sessionId = info.sessionId;
+      diag.stopReason = '';
+      diag.stoppedAt = 0;
+      loginNoted = false;
     }
     const viewers = latestViewers ?? info.viewers;
     safeSendMessage({

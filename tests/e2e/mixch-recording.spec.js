@@ -214,6 +214,16 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   const text = await bodyText();
   expect(text).not.toMatch(/mx:\d|mx\.\d|スパチャ|スーパーチャット|トップファン|ギフトサブ/);
 
+  // 未ログインだとミクチャはページを読み直さずに /login へ移す。止まった理由が計器に残り、上書きで消えない
+  await page.evaluate(() => history.pushState(null, '', '/login'));
+  const mxDiag = async () => (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_mx_chat'))).yt_diag_mx_chat || {};
+  await expect.poll(async () => (await mxDiag()).stopReason, { timeout: 15_000 }).toBe('login-redirect');
+  await page.waitForTimeout(3000);
+  expect(await mxDiag()).toMatchObject({ stopReason: 'login-redirect', live: null });
+  await page.goto(`https://mixch.tv/u/${A}/live`);
+  // 開き直すと記録が戻り、理由は消える
+  await expect.poll(async () => { const d = await mxDiag(); return `${d.streamKey}|${d.stopReason}`; }, { timeout: 30_000 }).toBe(`${KEY}|`);
+
   // 配信が終わったら(配信の情報が消えたら)終わった時刻を送る
   live = false;
   await expect
