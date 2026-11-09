@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1972',
+    date: '2026-11-10',
+    summary: '裏方が古いままなら自分で入れ替わる',
+    items: Object.freeze([
+      '新しい版にしたのに裏で動く記録係が前の版のまま動いていたら、それに気づいて自分で読み込み直すようにしました(繰り返さないよう30分に1回まで・ストア版では何もしません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1971',
     date: '2026-11-10',
     summary: '裏方の更新が古いまま残る件を直す',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '他サービスで新着が横の欄に出る遅れを減らす',
     items: Object.freeze([
       'YouTube・Kick・SHOWROOM などで、横の欄が裏のタブの配信の記録まで毎回組み立てていたため、見ている配信の新着が数秒遅れていました。見ている配信だけを組み立てるようにしました'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1952',
-    date: '2026-11-09',
-    summary: '他サービスの横の欄の描き直しすぎを直す',
-    items: Object.freeze([
-      'YouTube・Kick・SHOWROOM などで、コメントの束が届くたびに横の欄が描き直していたのを、ニコ生版と同じ間引きにしました(新しいコメントの表示の速さは変わりません)'
     ])
   })
 ]);

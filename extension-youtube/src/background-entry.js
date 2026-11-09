@@ -42,6 +42,7 @@ import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
 import { ytVoiceAssignPersistDecision, YT_VOICE_ASSIGN_PERSIST_MS } from '../../src/lib/youtube/ytVoiceAssignPersist.js';
+import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
 
@@ -98,6 +99,9 @@ let voiceAssignMem = null;
  *   bootAt が書き込みのたびに変わっていれば service worker の作り直し(控えが毎回空になる)。
  *   SW の devtools から globalThis.__ytVoiceAssignDiag で読む。yt_diag_sw_boot には起動の回数と直近の時刻を残す。
  */
+/* global NL_BUILD_ID */
+/** このバンドルの build id(esbuild の define・無ければ空) */
+const SW_RUNNING_BUILD_ID = typeof NL_BUILD_ID !== 'undefined' ? String(NL_BUILD_ID) : '';
 const voiceAssignDiag = { bootAt: Date.now(), now: 0, later: 0, flush: 0, memMissReads: 0, gaps: /** @type {number[]} */ ([]) };
 try {
   /** @type {any} */ (globalThis).__ytVoiceAssignDiag = voiceAssignDiag;
@@ -105,8 +109,31 @@ try {
     const prev = bag?.yt_diag_sw_boot || {};
     const recent = Array.isArray(prev.recent) ? prev.recent.slice(-19) : [];
     recent.push(voiceAssignDiag.bootAt);
-    return chrome.storage.local.set({ yt_diag_sw_boot: { count: (Number(prev.count) || 0) + 1, recent } });
+    return chrome.storage.local.set({ yt_diag_sw_boot: { count: (Number(prev.count) || 0) + 1, recent, buildId: SW_RUNNING_BUILD_ID } });
   }).catch(() => {});
+  // ★v0.1.1972: 古い中身のまま動いていたら1回だけ読み込み直す(src/lib/swStaleCheck.js)
+  void (async () => {
+    let diskText = null;
+    try {
+      const res = await fetch(chrome.runtime.getURL('dist/yt-background.js'), { cache: 'no-store' });
+      diskText = res.ok ? await res.text() : null;
+    } catch {
+      diskText = null;
+    }
+    const bag = await chrome.storage.local.get('yt_diag_sw_stale').catch(() => ({}));
+    const prev = bag?.yt_diag_sw_stale || {};
+    const now = Date.now();
+    const decision = swStaleDecision({
+      runningBuildId: SW_RUNNING_BUILD_ID,
+      diskText,
+      isStore: Boolean(chrome.runtime.getManifest()?.update_url),
+      lastReloadAt: Number(prev.lastReloadAt) || 0,
+      now,
+    });
+    const next = { at: now, decision, running: SW_RUNNING_BUILD_ID, lastReloadAt: decision === 'reload' ? now : Number(prev.lastReloadAt) || 0, reloads: (Number(prev.reloads) || 0) + (decision === 'reload' ? 1 : 0) };
+    await chrome.storage.local.set({ yt_diag_sw_stale: next }).catch(() => {});
+    if (decision === 'reload') chrome.runtime.reload();
+  })().catch(() => {});
 } catch {
   /* 計器は失敗しても記録を止めない */
 }

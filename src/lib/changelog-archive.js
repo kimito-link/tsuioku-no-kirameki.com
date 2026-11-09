@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1952',
+    date: '2026-11-09',
+    summary: '他サービスの横の欄の描き直しすぎを直す',
+    items: Object.freeze([
+      'YouTube・Kick・SHOWROOM などで、コメントの束が届くたびに横の欄が描き直していたのを、ニコ生版と同じ間引きにしました(新しいコメントの表示の速さは変わりません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1951',
     date: '2026-11-09',
     summary: '他サービスの横の欄で前面タブを正しく拾う',
