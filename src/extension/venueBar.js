@@ -379,6 +379,9 @@ import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, with
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } from '../lib/venueComposeBox.js';
+// 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
+import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
+import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -2480,7 +2483,7 @@ function ensureVenueStyle() {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = VENUE_CSS;
+  style.textContent = VENUE_CSS + VENUE_STAT_STRIP_CSS;
   (document.head || document.documentElement).appendChild(style);
 }
 
@@ -2862,7 +2865,15 @@ export function mountVenueBarButton(options = {}) {
   } else {
     headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
-  header.append(title, ...(composeBox ? [composeBox] : []), headerRight); // v0.1.1868 発言欄は中央
+  // 2026-11-09: パネルの数字カードと同じ数字の帯(ヘッダーの2行目・値は数字カードの鏡をそのまま出す=lib の venueStatStrip.js)。
+  const statStrip = createVenueStatStrip(document, {
+    faces: {
+      link: resolveVenueAssetUrl('images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png'),
+      konta: resolveVenueAssetUrl('images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png'),
+      tanu: resolveVenueAssetUrl('images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png')
+    }
+  });
+  header.append(title, ...(composeBox ? [composeBox] : []), headerRight, statStrip.el); // v0.1.1868 発言欄は中央
 
   // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
   //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる
@@ -3707,6 +3718,19 @@ export function mountVenueBarButton(options = {}) {
     } catch { /* お祝いの失敗で会場を止めない */ }
   };
   let _panelSummaryLastSeenAt = 0;
+  /** 数字カードの鏡(パネルが書く・KEY_STAT_CARDS_MIRROR)。開いた瞬間の catch-up と onChanged の newValue で更新(追加 read なし)。 */
+  /** @type {unknown} */
+  let statCardsMirrorSnap = null;
+  /** 数字の帯を描く(値は鏡のまま・記録はパネルが閉じていても動く正本で補う)。古さの判定があるので定期の見回りからも呼ぶ。 */
+  const paintStatStrip = () => {
+    try {
+      statStrip.paint(buildVenueStatStripModel(statCardsMirrorSnap, {
+        liveId: String(activeLiveId || liveIdFromPathname() || ''),
+        nowMs: Date.now(),
+        recordedCount: panelSummarySnap ? selectDisplayRecordedCount(panelSummarySnap) : null
+      }));
+    } catch { /* 帯の失敗で会場を止めない */ }
+  };
   /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */
   /** @type {Map<string, number>} */
   const venueTransientFirstSeen = new Map();
@@ -6636,7 +6660,7 @@ export function mountVenueBarButton(options = {}) {
         // ★v0.1.1300: この配信専用の鏡(v2)と受領証も一緒に読む。
         const _mirrorKey = laneMirrorKeyFor(_catchUpLiveId);
         const _receiptKey = laneReceiptKeyFor(_catchUpLiveId);
-        const _keys = [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR];
+        const _keys = [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, KEY_STAT_CARDS_MIRROR];
         if (_panelKey) _keys.push(_panelKey);
         if (_mirrorKey) _keys.push(_mirrorKey, _receiptKey);
         const bag = await runStorageOpWithTimeout(() => chrome.storage.local.get(_keys), 3000);
@@ -6668,6 +6692,9 @@ export function mountVenueBarButton(options = {}) {
         if (open && ((storySnap && typeof storySnap === 'object') || (panelSnap && typeof panelSnap === 'object'))) {
           renderStoryDiagMirrorPanel();
         }
+        const statSnap = bag?.[KEY_STAT_CARDS_MIRROR];
+        if (open && statSnap && typeof statSnap === 'object') statCardsMirrorSnap = statSnap;
+        if (open) paintStatStrip();
         // v0.1.1207: 鏡の catch-up が決着した瞬間(取れた/空だった のどちらも決着)。
         try {
           noteVenueMirrorSettled(_openLatency, Date.now(), {
@@ -6921,6 +6948,7 @@ export function mountVenueBarButton(options = {}) {
     if (!hasVenueExtensionContext()) { markContextInvalidated(); return; }
     const liveId = liveIdFromPathname();
     if (!liveId) return;
+    paintStatStrip(); // 鏡の古さ(パネルが閉じた)を見回る。署名が同じなら DOM を触らない=read も描き直しも増えない
     if (speechLiveId !== liveId) resetSpeechTracking(liveId);
     const generation = speechGeneration;
     const tailKey = tailStorageKey(liveId);
@@ -6963,6 +6991,7 @@ export function mountVenueBarButton(options = {}) {
           _panelSummaryLastSeenAt = Date.now();
           noteCheerCount();
           renderStoryDiagMirrorPanel();
+          paintStatStrip();
         }
       }
     } catch (err) {
@@ -7093,6 +7122,13 @@ export function mountVenueBarButton(options = {}) {
       _panelSummaryLastSeenAt = Date.now();
       noteCheerCount();
       renderStoryDiagMirrorPanel();
+      paintStatStrip();
+    }
+    // 2026-11-09: 数字カードの鏡(パネルが書く)。newValue 直採用=追加 read なし。
+    const statChange = changes[KEY_STAT_CARDS_MIRROR];
+    if (statChange && statChange.newValue && typeof statChange.newValue === 'object') {
+      statCardsMirrorSnap = statChange.newValue;
+      paintStatStrip();
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に

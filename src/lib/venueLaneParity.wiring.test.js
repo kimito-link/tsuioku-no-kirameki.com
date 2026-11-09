@@ -184,7 +184,7 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
      *   (配信ごとキー v2 と受領証キーを条件付きで足すため)。
      *   固定するのは「catch-up の get に storyDiag と旧鏡キーが含まれる」という意図。
      */
-    expect(venueBarSrc).toMatch(/const _keys = \[KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR\];/);
+    expect(venueBarSrc).toMatch(/const _keys = \[KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, KEY_STAT_CARDS_MIRROR\];/);
     expect(venueBarSrc).toMatch(/if \(_panelKey\) _keys\.push\(_panelKey\);/);
     expect(venueBarSrc).toMatch(/chrome\.storage\.local\.get\(_keys\)/);
     expect(venueBarSrc).toMatch(/changes\[KEY_STORY_DIAG_MIRROR\]/);

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1896',
+    date: '2026-11-06',
+    summary: 'サポーターのコードは1台の PC だけで使える',
+    items: Object.freeze([
+      'サポーターのコードは1つにつき PC 1台で使えるようにしました。ほかの PC に貼り付けると案内が出ます。PC を買い替えたときは、サポーターのページの「この PC に移す」で移せます(30日に1回)。今はまだ関所を開けたままなので、誰にも影響はありません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1894',
     date: '2026-11-06',
     summary: '無料の人の OBS コメビュに小さな印(まだ出ない)',
