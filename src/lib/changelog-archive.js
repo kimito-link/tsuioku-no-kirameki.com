@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1950',
+    date: '2026-11-09',
+    summary: '別タブの探り読みで横の欄が重くならない',
+    items: Object.freeze([
+      '横の欄(サイドパネル)が、配信でないページを前面にしているとき、開いている全部の配信タブの記録を読み込みに行く処理(最大27秒かかっていました)を YouTube 系では行わないようにしました。その間に表示の言葉が別のサービスに変わることもなくなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1949',
     date: '2026-11-09',
     summary: '別サービスへ移ると横の欄をまっさらにする',

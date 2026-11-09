@@ -93,6 +93,23 @@ const DEFAULT_VOICE_SETTINGS = Object.freeze({
  * @type {Record<string, any> | null}
  */
 let voiceAssignMem = null;
+/**
+ * ★v0.1.1970 計器: 30秒の間引きが混んだ配信で効いていない(PC 実測 240秒で46回・間隔1〜14秒)原因を切り分ける。
+ *   bootAt が書き込みのたびに変わっていれば service worker の作り直し(控えが毎回空になる)。
+ *   SW の devtools から globalThis.__ytVoiceAssignDiag で読む。yt_diag_sw_boot には起動の回数と直近の時刻を残す。
+ */
+const voiceAssignDiag = { bootAt: Date.now(), now: 0, later: 0, flush: 0, memMissReads: 0, gaps: /** @type {number[]} */ ([]) };
+try {
+  /** @type {any} */ (globalThis).__ytVoiceAssignDiag = voiceAssignDiag;
+  void chrome.storage.local.get('yt_diag_sw_boot').then((bag) => {
+    const prev = bag?.yt_diag_sw_boot || {};
+    const recent = Array.isArray(prev.recent) ? prev.recent.slice(-19) : [];
+    recent.push(voiceAssignDiag.bootAt);
+    return chrome.storage.local.set({ yt_diag_sw_boot: { count: (Number(prev.count) || 0) + 1, recent } });
+  }).catch(() => {});
+} catch {
+  /* 計器は失敗しても記録を止めない */
+}
 let voiceAssignDirty = false;
 let voiceAssignWrittenAt = 0;
 /** @type {ReturnType<typeof setTimeout> | null} */
@@ -105,6 +122,8 @@ function scheduleVoiceAssignFlush() {
     void runSerialized(async () => {
       if (!voiceAssignDirty || !voiceAssignMem) return;
       voiceAssignDirty = false;
+      voiceAssignDiag.flush++;
+      if (voiceAssignWrittenAt) voiceAssignDiag.gaps = [...voiceAssignDiag.gaps.slice(-19), Date.now() - voiceAssignWrittenAt];
       voiceAssignWrittenAt = Date.now();
       await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_ASSIGNMENTS]: voiceAssignMem });
     }).catch(() => {
@@ -988,6 +1007,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ...DEFAULT_VOICE_SETTINGS,
         ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
       };
+      if (!voiceAssignMem) {
+        voiceAssignDiag.memMissReads++;
+        // storage から読んだ直後=storage と控えは同じ。service worker が作り直されても、その直後の束で
+        // すぐ書かないよう「いま書いた」扱いにする(作り直しが続くと書き込みが束ごとに戻るため・v0.1.1970)
+        if (!voiceAssignWrittenAt) voiceAssignWrittenAt = Date.now();
+      }
       const assignmentsAtStart = voiceAssignMem || data[STORAGE_KEYS.VOICE_ASSIGNMENTS] || {};
       let assignments = assignmentsAtStart;
       let voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
@@ -1097,8 +1122,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (assignWrite === 'now') {
         updates[STORAGE_KEYS.VOICE_ASSIGNMENTS] = assignments;
         voiceAssignDirty = false;
+        voiceAssignDiag.now++;
+        if (voiceAssignWrittenAt) voiceAssignDiag.gaps = [...voiceAssignDiag.gaps.slice(-19), Date.now() - voiceAssignWrittenAt];
         voiceAssignWrittenAt = Date.now();
       } else if (assignWrite === 'later') {
+        voiceAssignDiag.later++;
         scheduleVoiceAssignFlush();
       }
       if (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID]) {

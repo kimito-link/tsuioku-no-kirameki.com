@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1970',
+    date: '2026-11-10',
+    summary: '声の割り当ての間引きを作り直し後も保つ',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで、裏の記録係が作り直された直後でも、人ごとの声の割り当てをすぐ書き直さないようにしました(30秒に1回の間引きが混んだ配信で効いていなかった件の手当てと、原因を確かめる計器)。声の割り当ては変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1969',
     date: '2026-11-10',
     summary: '記録の多い配信は全件の読み直しを間引く',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '他サービスの横の欄で前面タブを正しく拾う',
     items: Object.freeze([
       'YouTube・Kick・SHOWROOM などの横の欄で、前面のウィンドウのタブも配信として読めるようにしました(ニコ生版と同じ)。あわせて、横の欄が何度も読み直している原因を調べる計器を足しました'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1950',
-    date: '2026-11-09',
-    summary: '別タブの探り読みで横の欄が重くならない',
-    items: Object.freeze([
-      '横の欄(サイドパネル)が、配信でないページを前面にしているとき、開いている全部の配信タブの記録を読み込みに行く処理(最大27秒かかっていました)を YouTube 系では行わないようにしました。その間に表示の言葉が別のサービスに変わることもなくなります。'
     ])
   })
 ]);

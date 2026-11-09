@@ -27,4 +27,8 @@ describe('記録係の配線(v0.1.1968)', () => {
   it('控えがあるときは割り当てを storage から読み直さない', () => {
     expect(src).toMatch(/voiceAssignMem \? \[\] : \[STORAGE_KEYS\.VOICE_ASSIGNMENTS\]/);
   });
+  it('控えが空(service worker の作り直し直後)のときは「いま書いた」扱いにする(v0.1.1970)', () => {
+    expect(src).toMatch(/memMissReads\+\+;[\s\S]{0,300}if \(!voiceAssignWrittenAt\) voiceAssignWrittenAt = Date\.now\(\);/);
+    expect(src).toContain('__ytVoiceAssignDiag');
+  });
 });
