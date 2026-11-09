@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1945',
+    date: '2026-11-09',
+    summary: '拡張の入れ替え時に他サービスのタブも読み込み直す',
+    items: Object.freeze([
+      '拡張が新しい版に入れ替わったとき、YouTube だけでなく Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の配信ページのタブも自動で読み込み直すようにしました(古い版のまま止まり、記録が 0 のままになることがありました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1944',
     date: '2026-11-09',
     summary: 'TikTok のスタンプだけのコメントも記録する',

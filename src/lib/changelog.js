@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1965',
+    date: '2026-11-09',
+    summary: '人が多い配信で横の欄の描き直しを軽く',
+    items: Object.freeze([
+      '人が2,000人を超える配信で、横の欄の描き直しのたびに重かった所を3つ軽くしました。りんく段の札の確認で全員分の文字の配置を計算していた所、段の寸法を測るときに全員分の席を探していた所、顔のない人の絵を覚えておける数(2,000人)を超えて毎回作り直していた所です。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1964',
     date: '2026-11-09',
     summary: '大きな配信で記録の組み立てを重ねない',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '横の欄がどの配信を出したかを診断に記録',
     items: Object.freeze([
       '横の欄(サイドパネル)とコメビュが、どのサービスのどの配信を表示に選んだか・その理由を診断に記録するようにしました(Kick や SHOWROOM を見ていても横の欄が YouTube に戻る件の原因を数字で確かめるため。表示の動きはまだ変えていません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1945',
-    date: '2026-11-09',
-    summary: '拡張の入れ替え時に他サービスのタブも読み込み直す',
-    items: Object.freeze([
-      '拡張が新しい版に入れ替わったとき、YouTube だけでなく Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の配信ページのタブも自動で読み込み直すようにしました(古い版のまま止まり、記録が 0 のままになることがありました)。'
     ])
   })
 ]);

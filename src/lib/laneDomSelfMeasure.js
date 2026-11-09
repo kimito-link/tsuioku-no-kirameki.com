@@ -39,10 +39,13 @@ function visibleTilesOf(lane) {
     ? Array.from(lane.querySelectorAll(TILE_SELECTOR))
     : Array.from(lane.children || []).filter((c) => c?.classList?.contains(TILE_CLASS));
   const out = [];
+  // v0.1.1965: 席(会場)が1つも無い段(横の欄)では、タイルごとの closest を省く(結果は同じ)。
+  //   Kick 1万7千行・りんく段 2,046人で measureLane が自己時間の最上位だった(PC プロファイル 20秒中 0.64秒)。
+  const hasSeats = typeof lane.querySelector === 'function' ? !!lane.querySelector(SEAT_SELECTOR) : true;
   for (const tile of all) {
     if (tile.hidden === true) continue;
     // 空席の中身は会場側が可視から除外する(幽霊)。①も同じく除外しないと先頭が別人になる。
-    const seat = typeof tile.closest === 'function' ? tile.closest(SEAT_SELECTOR) : null;
+    const seat = hasSeats && typeof tile.closest === 'function' ? tile.closest(SEAT_SELECTOR) : null;
     const inSeat = !!(seat && lane.contains(seat));
     if (inSeat && seat.classList.contains(SEAT_EMPTY_CLASS)) continue;
     out.push(tile);

@@ -269,3 +269,16 @@ describe('0.1.1964: 記録の組み立てを重ねて走らせない', () => {
     expect(del).toBeGreaterThan(wait);
   });
 });
+
+describe('0.1.1965: りんく段の札の付け直しでタイルごとのレイアウト計算をしない', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  const body = shim.slice(shim.indexOf('function rewriteLaneFirstLines(byShown) {'), shim.indexOf('function fixTextNode('));
+  it('innerText を読まない(文字の部品で札の有無を見る)', () => {
+    expect(body.length).toBeGreaterThan(100);
+    expect(body).not.toContain('.innerText');
+    expect(body).toContain("LANE_KIND_WORD_SET.has(String(n.nodeValue || '').trim())");
+  });
+  it('札が付いていたタイルにも済みの印を付ける(次から読まない)', () => {
+    expect(body).toMatch(/LANE_KIND_WORD_SET\.has[\s\S]{0,80}tile\.setAttribute\('data-yt-kind-done', '1'\);\s*continue;/);
+  });
+});

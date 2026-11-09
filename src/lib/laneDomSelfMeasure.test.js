@@ -194,3 +194,27 @@ describe('measureLaneDomSelf', () => {
     expect(measureLaneDomSelf({ laneLink: lane() }).dpr).toBe(1.75);
   });
 });
+
+describe('v0.1.1965: 席の無い段ではタイルごとの closest を省く(結果は同じ)', () => {
+  it('席が無い段では closest を呼ばない', () => {
+    const a = tile(10, 20, false, 'u1');
+    const b = tile(10, 20, false, 'u2');
+    let calls = 0;
+    for (const t of [a, b]) {
+      const orig = t.closest.bind(t);
+      t.closest = (sel) => {
+        calls += 1;
+        return orig(sel);
+      };
+    }
+    const r = measureLaneDomSelf({ laneLink: lane(a, b) });
+    expect(r.perTier.link.visible).toBe(2);
+    expect(r.perTier.link.keys).toEqual(['u1', 'u2']);
+    expect(calls).toBe(0);
+  });
+  it('席がある段では従来どおり空席を除く', () => {
+    const r = measureLaneDomSelf({ laneLink: lane(seat(tile(10, 20, false, 'u1')), seat(tile(10, 20, false, 'u2'), true)) });
+    expect(r.perTier.link.visible).toBe(1);
+    expect(r.perTier.link.keys).toEqual(['u1']);
+  });
+});

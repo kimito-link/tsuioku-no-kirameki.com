@@ -1582,15 +1582,24 @@ const SUPPORT_LANE_SEL = '#sceneStoryUserLaneLink, #sceneStoryUserLaneGift, #sce
  * @名前 しか分からない人は1行目と2行目(名前)が同じ文字なので、最初の1つだけ直す(名前は残す)。
  * @param {Map<string, string>} byShown
  */
-const LANE_KIND_WORDS = /(^|\n)\s*(スパチャ|ギフト|メンバー|ステッカー)\s*(\n|$)/;
+const LANE_KIND_WORD_SET = new Set(['スパチャ', 'ギフト', 'メンバー', 'ステッカー']);
 function rewriteLaneFirstLines(byShown) {
   if (typeof document === 'undefined' || !byShown.size) return;
   for (const lane of document.querySelectorAll(SUPPORT_LANE_SEL)) {
     for (const tile of Array.from(lane.children)) {
       // 札がもう付いているタイルは触らない(付いた後にもう一度呼ばれると、2行目の名前まで札にしてしまう・0.1.65 実機)
-      if (tile.hasAttribute('data-yt-kind-done') || LANE_KIND_WORDS.test(String(/** @type {HTMLElement} */ (tile).innerText ?? ''))) continue;
+      if (tile.hasAttribute('data-yt-kind-done')) continue;
+      // 0.1.1965: 札が付いているかを innerText(タイルごとにレイアウトを計算する)ではなく、文字の部品で見る。
+      //   Kick 1万7千行・りんく段 2,046人で、ギフトの履歴が変わるたびに全タイルの innerText を読み、自己時間の上位だった。
+      /** @type {Text[]} */
+      const texts = [];
       const w = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT);
-      for (let n = w.nextNode(); n; n = w.nextNode()) {
+      for (let n = w.nextNode(); n; n = w.nextNode()) texts.push(/** @type {Text} */ (n));
+      if (texts.some((n) => LANE_KIND_WORD_SET.has(String(n.nodeValue || '').trim()))) {
+        tile.setAttribute('data-yt-kind-done', '1');
+        continue;
+      }
+      for (const n of texts) {
         const k = byShown.get(String(n.nodeValue || '').trim());
         if (k) {
           // @ハンドルを1行目に入れ替えた後のタイルは UC… が2行目にあるので、1行目=札・2行目=@ハンドルに直す(0.1.97)
