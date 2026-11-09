@@ -48,43 +48,49 @@ graph LR
   d9 --> d9_1["dist/ 〔ビルド成果物〕"]
   d9 --> d9_2["images/ 〔画像〕"]
   d9 --> d9_3["sound/ 〔音声〕"]
-  ROOT --> d10["memory/ 〔メモリ/知見〕"]
-  d10 --> d10_0["archive/ 〔メモリ/履歴〕"]
-  d10 --> d10_1["avatar-parts/ 〔アバター/画像〕"]
-  ROOT --> d11["mobile/ 〔iOS〕"]
-  d11 --> d11_0["assets/ 〔iOS/画像〕"]
-  d11 --> d11_1["release-notes/ 〔iOS/ストア〕"]
-  d11 --> d11_2["scripts/ 〔iOS/ストア〕"]
-  d11 --> d11_3["store-assets/ 〔iOS/ストア〕"]
-  ROOT --> d12["scripts/ 〔ビルド/自動生成〕"]
-  d12 --> d12_0["audit/ 〔監査/CSS/会場〕"]
-  d12 --> d12_1["lib/ 〔ビルド/共有〕"]
-  d12 --> d12_2["perf-ab/ 〔性能/計測〕"]
-  d12 --> d12_3["xserver/ 〔デプロイ/webhook〕"]
-  ROOT --> d13["sound-src/ 〔音声/素材〕"]
-  d13 --> d13_0["soundeffect-lab/ 〔音声/素材〕"]
-  ROOT --> d14["src/ 〔ソース〕"]
-  d14 --> d14_0["data/ 〔コメント/取得〕"]
-  d14 --> d14_1["domain/ 〔応援/集約/識別子〕"]
-  d14 --> d14_2["extension/ 〔entry/記録/会場/応援〕"]
-  d14 --> d14_3["fixtures/ 〔テスト〕"]
-  d14 --> d14_4["images/ 〔画像〕"]
-  d14 --> d14_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
-  d14 --> d14_6["server/ 〔API/公開/ランキング〕"]
-  d14 --> d14_7["shared/ 〔共有/アバター〕"]
-  d14 --> d14_8["sound/ 〔音声〕"]
-  ROOT --> d15["tests/ 〔テスト〕"]
-  d15 --> d15_0["contract/ 〔テスト/契約〕"]
-  d15 --> d15_1["e2e/ 〔テスト/E2E/描画〕"]
-  d15 --> d15_2["helpers/ 〔テスト/共有〕"]
-  ROOT --> d16["tools/ 〔ツール〕"]
-  d16 --> d16_0["mcp-nicolive/ 〔MCP/診断〕"]
-  ROOT --> d17["tsuioku-no-kirameki/ 〔LP/公開〕"]
-  d17 --> d17_0["articles/ 〔記事/公開〕"]
-  d17 --> d17_1["assets/ 〔LP/共有〕"]
-  d17 --> d17_2["images/ 〔画像〕"]
-  d17 --> d17_3["live/ 〔LP/公開/ランキング〕"]
-  d17 --> d17_4["sound/ 〔音声/公開〕"]
+  ROOT --> d10["extension-youtube/ 〔YouTube/試作/記録/読み上げ〕"]
+  d10 --> d10_0["data/"]
+  d10 --> d10_1["dist/"]
+  d10 --> d10_2["images/ 〔YouTube/画像〕"]
+  d10 --> d10_3["sound/"]
+  d10 --> d10_4["src/ 〔YouTube/entry/記録〕"]
+  ROOT --> d11["memory/ 〔メモリ/知見〕"]
+  d11 --> d11_0["archive/ 〔メモリ/履歴〕"]
+  d11 --> d11_1["avatar-parts/ 〔アバター/画像〕"]
+  ROOT --> d12["mobile/ 〔iOS〕"]
+  d12 --> d12_0["assets/ 〔iOS/画像〕"]
+  d12 --> d12_1["release-notes/ 〔iOS/ストア〕"]
+  d12 --> d12_2["scripts/ 〔iOS/ストア〕"]
+  d12 --> d12_3["store-assets/ 〔iOS/ストア〕"]
+  ROOT --> d13["scripts/ 〔ビルド/自動生成〕"]
+  d13 --> d13_0["audit/ 〔監査/CSS/会場〕"]
+  d13 --> d13_1["lib/ 〔ビルド/共有〕"]
+  d13 --> d13_2["perf-ab/ 〔性能/計測〕"]
+  d13 --> d13_3["xserver/ 〔デプロイ/webhook〕"]
+  ROOT --> d14["sound-src/ 〔音声/素材〕"]
+  d14 --> d14_0["soundeffect-lab/ 〔音声/素材〕"]
+  ROOT --> d15["src/ 〔ソース〕"]
+  d15 --> d15_0["data/ 〔コメント/取得〕"]
+  d15 --> d15_1["domain/ 〔応援/集約/識別子〕"]
+  d15 --> d15_2["extension/ 〔entry/記録/会場/応援〕"]
+  d15 --> d15_3["fixtures/ 〔テスト〕"]
+  d15 --> d15_4["images/ 〔画像〕"]
+  d15 --> d15_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
+  d15 --> d15_6["server/ 〔API/公開/ランキング〕"]
+  d15 --> d15_7["shared/ 〔共有/アバター〕"]
+  d15 --> d15_8["sound/ 〔音声〕"]
+  ROOT --> d16["tests/ 〔テスト〕"]
+  d16 --> d16_0["contract/ 〔テスト/契約〕"]
+  d16 --> d16_1["e2e/ 〔テスト/E2E/描画〕"]
+  d16 --> d16_2["helpers/ 〔テスト/共有〕"]
+  ROOT --> d17["tools/ 〔ツール〕"]
+  d17 --> d17_0["mcp-nicolive/ 〔MCP/診断〕"]
+  ROOT --> d18["tsuioku-no-kirameki/ 〔LP/公開〕"]
+  d18 --> d18_0["articles/ 〔記事/公開〕"]
+  d18 --> d18_1["assets/ 〔LP/共有〕"]
+  d18 --> d18_2["images/ 〔画像〕"]
+  d18 --> d18_3["live/ 〔LP/公開/ランキング〕"]
+  d18 --> d18_4["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -92,222 +98,230 @@ graph LR
 ```mermaid
 graph LR
   HUB["機能"]
-  HUB --> f0["コメント送信(確認/プロファイル)"]
-  f0 --> f0_0["lib/commentSubmitConfirm.js"]
-  f0 --> f0_1["lib/commentSubmitProfiling.js"]
-  HUB --> f1["popup スクロール(要素を見せる)"]
-  f1 --> f1_0["lib/nlMainScrollReveal.js"]
-  HUB --> f2["会場ドラッグスクロール(パン)"]
-  f2 --> f2_0["lib/venueDragScroll.js"]
-  HUB --> f3["コメント収穫(DOM 観測)"]
-  f3 --> f3_0["lib/commentHarvest.js"]
-  f3 --> f3_1["lib/nicoliveDom.js"]
-  HUB --> f4["過去ログ取得(バックフィル巡回)"]
-  f4 --> f4_0["lib/ndgrBackfillCrawl.js"]
-  f4 --> f4_1["lib/ndgrViewBasePick.js"]
-  HUB --> f5["コメント重複除去(NDGR)"]
-  f5 --> f5_0["lib/ndgrMessageDedupe.js"]
-  HUB --> f6["応援レーン集約(誰が候補か)"]
-  f6 --> f6_0["lib/userLaneCandidatesFromStorage.js"]
-  HUB --> f7["人物タイル描画(丸サムネ)"]
-  f7 --> f7_0["lib/personTileDom.js"]
-  HUB --> f8["応援レーンタイル→発言一覧(comeview 詳細)"]
-  f8 --> f8_0["lib/comeviewUserDetailLink.js"]
-  f8 --> f8_1["extension/popup/wireLaneUserDetailOpen.js"]
-  f8 --> f8_2["extension/comeview-entry.js"]
-  HUB --> f9["会場の席割り"]
-  f9 --> f9_0["lib/venueSeats.js"]
-  HUB --> f10["背景群衆(来場者数の表現)"]
-  f10 --> f10_0["lib/crowdRasterizer.js"]
-  HUB --> f11["読み上げ(再生/キュー/年齢ゲート)"]
-  f11 --> f11_0["lib/voicePlayer.js"]
-  f11 --> f11_1["lib/voiceReadQueue.js"]
-  f11 --> f11_2["lib/voiceAgeGate.js"]
-  HUB --> f12["会場読み上げ診断(遅延の切り分け)"]
-  f12 --> f12_0["lib/voiceDiag.js"]
-  f12 --> f12_1["lib/voiceDiagKey.js"]
-  f12 --> f12_2["extension/comeview-entry.js"]
-  f12 --> f12_3["extension/status-entry.js"]
-  HUB --> f13["パネル描画診断(白化/ローディング固着)"]
-  f13 --> f13_0["lib/perfDiag.js"]
-  f13 --> f13_1["extension/popup-entry.js"]
-  f13 --> f13_2["extension/status-entry.js"]
-  HUB --> f14["ギフト投擲演出"]
-  f14 --> f14_0["lib/giftThrowProjectile.js"]
-  HUB --> f15["吹き出し寿命管理"]
-  f15 --> f15_0["lib/venueBubbleLifecycle.js"]
-  HUB --> f16["HTMLレポート生成"]
-  f16 --> f16_0["extension/popup-entry.js"]
-  HUB --> f17["レポートのコメント源(全件storage)"]
-  f17 --> f17_0["lib/pickCommentsForExport.js"]
-  f17 --> f17_1["extension/popup-entry.js"]
-  HUB --> f18["レポート内容プレビュー(DL前のリアルタイム可視化)"]
-  f18 --> f18_0["lib/reportPreview.js"]
-  f18 --> f18_1["lib/reportPreviewKey.js"]
-  f18 --> f18_2["lib/reportPreviewPublish.js"]
-  f18 --> f18_3["extension/popup-entry.js"]
-  f18 --> f18_4["extension/status-entry.js"]
-  HUB --> f19["応援レーンのタイル3行目(🎁pt/📣pt/💬件)"]
-  f19 --> f19_0["lib/laneTileStats.js"]
-  f19 --> f19_1["lib/laneHeatTracker.js"]
-  f19 --> f19_2["lib/commentDeltaTier.js"]
-  f19 --> f19_3["lib/laneMirror.js"]
-  f19 --> f19_4["lib/venueLaneMirrorSupply.js"]
-  f19 --> f19_5["extension/story/renderStoryUserLaneDom.js"]
-  HUB --> f20["公式「本家コメ」チップの速さ(+N/分)"]
-  f20 --> f20_0["lib/officialCommentRate.js"]
-  f20 --> f20_1["extension/popup-entry.js"]
-  HUB --> f21["スマホ版の利用者ごとの鍵(発行・削除・上限)"]
-  f21 --> f21_0["device.js"]
-  f21 --> f21_1["status.js"]
-  f21 --> f21_2["lib/deviceAuth.js"]
-  f21 --> f21_3["server/deviceStore.js"]
-  f21 --> f21_4["lib/devicePublishCredentials.js"]
-  f21 --> f21_5["extension/statusDeviceCred.js"]
-  f21 --> f21_6["extension/status-entry.js"]
-  f21 --> f21_7["extension/statusPublisherHost.js"]
-  f21 --> f21_8["extension/statusSmartphoneCard.js"]
-  f21 --> f21_9["extension/popup-entry.js"]
-  f21 --> f21_10["lib/statusPublisherPlan.js"]
-  HUB --> f22["拡張なしでスマホから見る(放送URL・ファンにも公開)"]
-  f22 --> f22_0["live-ranking.js"]
-  f22 --> f22_1["lib/phoneStartLink.js"]
-  f22 --> f22_2["phone.js"]
-  f22 --> f22_3["lib/fanLink.js"]
-  f22 --> f22_4["server/fanLinkApi.js"]
-  f22 --> f22_5["extension/fanLinkClient.js"]
-  f22 --> f22_6["extension/statusSmartphoneCard.js"]
-  f22 --> f22_7["extension/liveDirectComments.js"]
-  f22 --> f22_8["lib/ndgrLiveFollow.js"]
-  HUB --> f23["スマホから生放送にコメント(PC中継)"]
-  f23 --> f23_0["post.js"]
-  f23 --> f23_1["lib/phonePost.js"]
-  f23 --> f23_2["extension/phonePostRelay.js"]
-  f23 --> f23_3["live-view-post.js"]
-  f23 --> f23_4["extension/statusSmartphoneCard.js"]
-  f23 --> f23_5["extension/popup-entry.js"]
-  HUB --> f24["応援ライブビュー(リアルタイム盛り上がり・新規タブ)"]
-  f24 --> f24_0["live-view.html"]
-  f24 --> f24_1["extension/live-view-entry.js"]
-  f24 --> f24_2["lib/heatLevel.js"]
-  f24 --> f24_3["lib/userThumbGrid.js"]
-  f24 --> f24_4["lib/userLaneMergeGiftThrowers.js"]
-  HUB --> f25["盛り上がり判定(熱量・移植可能な純関数)"]
-  f25 --> f25_0["lib/heatLevel.js"]
-  HUB --> f26["診断/ちくらん タブ+カードクリックで応援者展開"]
-  f26 --> f26_0["extension/status-entry.js"]
-  f26 --> f26_1["status.html"]
-  f26 --> f26_2["lib/supporterRanking.js"]
-  HUB --> f27["ちくらん風 配信カード(サムネ+来場+コメント+ギフト)"]
-  f27 --> f27_0["lib/chikuranCard.js"]
-  f27 --> f27_1["extension/status-entry.js"]
-  f27 --> f27_2["extension/content-entry.js"]
-  HUB --> f28["応援者ランキング(ちくらん風・将来の Kimito Link ランキング)"]
-  f28 --> f28_0["lib/supporterRanking.js"]
-  f28 --> f28_1["lib/reportPreview.js"]
-  f28 --> f28_2["extension/status-entry.js"]
-  HUB --> f29["状態→放送の導線(配信カードから watch へ)"]
-  f29 --> f29_0["lib/watchLink.js"]
-  f29 --> f29_1["extension/status-entry.js"]
-  HUB --> f30["数字の自己矛盾の自動検知(self-verifying)"]
-  f30 --> f30_0["lib/numberConsistency.js"]
-  f30 --> f30_1["lib/statusActionAdvisor.js"]
-  HUB --> f31["診断の信頼度メーター(数値の意味注釈)"]
-  f31 --> f31_0["lib/metricConfidence.js"]
-  f31 --> f31_1["lib/reportPreview.js"]
-  f31 --> f31_2["extension/status-entry.js"]
-  HUB --> f32["時系列トレンド(スナップショットで見えない劣化検知)"]
-  f32 --> f32_0["lib/statusTrend.js"]
-  f32 --> f32_1["lib/statusTrendKey.js"]
+  HUB --> f0["Twitch の配信を記録(本体に同梱)"]
+  f0 --> f0_0["src/tw-content-entry.js"]
+  f0 --> f0_1["lib/twitch/twIrcParse.js"]
+  f0 --> f0_2["lib/twitch/twStreamKey.js"]
+  f0 --> f0_3["lib/twitch/twGql.js"]
+  f0 --> f0_4["src/ytNicoShim.js"]
+  f0 --> f0_5["e2e/twitch-recording.spec.js"]
+  f0 --> f0_6["twitch-support-PLAN.md"]
+  HUB --> f1["コメント送信(確認/プロファイル)"]
+  f1 --> f1_0["lib/commentSubmitConfirm.js"]
+  f1 --> f1_1["lib/commentSubmitProfiling.js"]
+  HUB --> f2["popup スクロール(要素を見せる)"]
+  f2 --> f2_0["lib/nlMainScrollReveal.js"]
+  HUB --> f3["会場ドラッグスクロール(パン)"]
+  f3 --> f3_0["lib/venueDragScroll.js"]
+  HUB --> f4["コメント収穫(DOM 観測)"]
+  f4 --> f4_0["lib/commentHarvest.js"]
+  f4 --> f4_1["lib/nicoliveDom.js"]
+  HUB --> f5["過去ログ取得(バックフィル巡回)"]
+  f5 --> f5_0["lib/ndgrBackfillCrawl.js"]
+  f5 --> f5_1["lib/ndgrViewBasePick.js"]
+  HUB --> f6["コメント重複除去(NDGR)"]
+  f6 --> f6_0["lib/ndgrMessageDedupe.js"]
+  HUB --> f7["応援レーン集約(誰が候補か)"]
+  f7 --> f7_0["lib/userLaneCandidatesFromStorage.js"]
+  HUB --> f8["人物タイル描画(丸サムネ)"]
+  f8 --> f8_0["lib/personTileDom.js"]
+  HUB --> f9["応援レーンタイル→発言一覧(comeview 詳細)"]
+  f9 --> f9_0["lib/comeviewUserDetailLink.js"]
+  f9 --> f9_1["extension/popup/wireLaneUserDetailOpen.js"]
+  f9 --> f9_2["extension/comeview-entry.js"]
+  HUB --> f10["会場の席割り"]
+  f10 --> f10_0["lib/venueSeats.js"]
+  HUB --> f11["背景群衆(来場者数の表現)"]
+  f11 --> f11_0["lib/crowdRasterizer.js"]
+  HUB --> f12["読み上げ(再生/キュー/年齢ゲート)"]
+  f12 --> f12_0["lib/voicePlayer.js"]
+  f12 --> f12_1["lib/voiceReadQueue.js"]
+  f12 --> f12_2["lib/voiceAgeGate.js"]
+  HUB --> f13["会場読み上げ診断(遅延の切り分け)"]
+  f13 --> f13_0["lib/voiceDiag.js"]
+  f13 --> f13_1["lib/voiceDiagKey.js"]
+  f13 --> f13_2["extension/comeview-entry.js"]
+  f13 --> f13_3["extension/status-entry.js"]
+  HUB --> f14["パネル描画診断(白化/ローディング固着)"]
+  f14 --> f14_0["lib/perfDiag.js"]
+  f14 --> f14_1["extension/popup-entry.js"]
+  f14 --> f14_2["extension/status-entry.js"]
+  HUB --> f15["ギフト投擲演出"]
+  f15 --> f15_0["lib/giftThrowProjectile.js"]
+  HUB --> f16["吹き出し寿命管理"]
+  f16 --> f16_0["lib/venueBubbleLifecycle.js"]
+  HUB --> f17["HTMLレポート生成"]
+  f17 --> f17_0["extension/popup-entry.js"]
+  HUB --> f18["レポートのコメント源(全件storage)"]
+  f18 --> f18_0["lib/pickCommentsForExport.js"]
+  f18 --> f18_1["extension/popup-entry.js"]
+  HUB --> f19["レポート内容プレビュー(DL前のリアルタイム可視化)"]
+  f19 --> f19_0["lib/reportPreview.js"]
+  f19 --> f19_1["lib/reportPreviewKey.js"]
+  f19 --> f19_2["lib/reportPreviewPublish.js"]
+  f19 --> f19_3["extension/popup-entry.js"]
+  f19 --> f19_4["extension/status-entry.js"]
+  HUB --> f20["応援レーンのタイル3行目(🎁pt/📣pt/💬件)"]
+  f20 --> f20_0["lib/laneTileStats.js"]
+  f20 --> f20_1["lib/laneHeatTracker.js"]
+  f20 --> f20_2["lib/commentDeltaTier.js"]
+  f20 --> f20_3["lib/laneMirror.js"]
+  f20 --> f20_4["lib/venueLaneMirrorSupply.js"]
+  f20 --> f20_5["extension/story/renderStoryUserLaneDom.js"]
+  HUB --> f21["公式「本家コメ」チップの速さ(+N/分)"]
+  f21 --> f21_0["lib/officialCommentRate.js"]
+  f21 --> f21_1["extension/popup-entry.js"]
+  HUB --> f22["スマホ版の利用者ごとの鍵(発行・削除・上限)"]
+  f22 --> f22_0["device.js"]
+  f22 --> f22_1["status.js"]
+  f22 --> f22_2["lib/deviceAuth.js"]
+  f22 --> f22_3["server/deviceStore.js"]
+  f22 --> f22_4["lib/devicePublishCredentials.js"]
+  f22 --> f22_5["extension/statusDeviceCred.js"]
+  f22 --> f22_6["extension/status-entry.js"]
+  f22 --> f22_7["extension/statusPublisherHost.js"]
+  f22 --> f22_8["extension/statusSmartphoneCard.js"]
+  f22 --> f22_9["extension/popup-entry.js"]
+  f22 --> f22_10["lib/statusPublisherPlan.js"]
+  HUB --> f23["拡張なしでスマホから見る(放送URL・ファンにも公開)"]
+  f23 --> f23_0["live-ranking.js"]
+  f23 --> f23_1["lib/phoneStartLink.js"]
+  f23 --> f23_2["phone.js"]
+  f23 --> f23_3["lib/fanLink.js"]
+  f23 --> f23_4["server/fanLinkApi.js"]
+  f23 --> f23_5["extension/fanLinkClient.js"]
+  f23 --> f23_6["extension/statusSmartphoneCard.js"]
+  f23 --> f23_7["extension/liveDirectComments.js"]
+  f23 --> f23_8["lib/ndgrLiveFollow.js"]
+  HUB --> f24["スマホから生放送にコメント(PC中継)"]
+  f24 --> f24_0["post.js"]
+  f24 --> f24_1["lib/phonePost.js"]
+  f24 --> f24_2["extension/phonePostRelay.js"]
+  f24 --> f24_3["live-view-post.js"]
+  f24 --> f24_4["extension/statusSmartphoneCard.js"]
+  f24 --> f24_5["extension/popup-entry.js"]
+  HUB --> f25["応援ライブビュー(リアルタイム盛り上がり・新規タブ)"]
+  f25 --> f25_0["live-view.html"]
+  f25 --> f25_1["extension/live-view-entry.js"]
+  f25 --> f25_2["lib/heatLevel.js"]
+  f25 --> f25_3["lib/userThumbGrid.js"]
+  f25 --> f25_4["lib/userLaneMergeGiftThrowers.js"]
+  HUB --> f26["盛り上がり判定(熱量・移植可能な純関数)"]
+  f26 --> f26_0["lib/heatLevel.js"]
+  HUB --> f27["診断/ちくらん タブ+カードクリックで応援者展開"]
+  f27 --> f27_0["extension/status-entry.js"]
+  f27 --> f27_1["status.html"]
+  f27 --> f27_2["lib/supporterRanking.js"]
+  HUB --> f28["ちくらん風 配信カード(サムネ+来場+コメント+ギフト)"]
+  f28 --> f28_0["lib/chikuranCard.js"]
+  f28 --> f28_1["extension/status-entry.js"]
+  f28 --> f28_2["extension/content-entry.js"]
+  HUB --> f29["応援者ランキング(ちくらん風・将来の Kimito Link ランキング)"]
+  f29 --> f29_0["lib/supporterRanking.js"]
+  f29 --> f29_1["lib/reportPreview.js"]
+  f29 --> f29_2["extension/status-entry.js"]
+  HUB --> f30["状態→放送の導線(配信カードから watch へ)"]
+  f30 --> f30_0["lib/watchLink.js"]
+  f30 --> f30_1["extension/status-entry.js"]
+  HUB --> f31["数字の自己矛盾の自動検知(self-verifying)"]
+  f31 --> f31_0["lib/numberConsistency.js"]
+  f31 --> f31_1["lib/statusActionAdvisor.js"]
+  HUB --> f32["診断の信頼度メーター(数値の意味注釈)"]
+  f32 --> f32_0["lib/metricConfidence.js"]
+  f32 --> f32_1["lib/reportPreview.js"]
   f32 --> f32_2["extension/status-entry.js"]
-  f32 --> f32_3["lib/statusActionAdvisor.js"]
-  HUB --> f33["状態速報の整形"]
-  f33 --> f33_0["lib/statusFormat.js"]
-  HUB --> f34["記録件数の単調化(減らない表示)"]
-  f34 --> f34_0["lib/monotonicCommentCount.js"]
-  HUB --> f35["storage キー定義"]
-  f35 --> f35_0["lib/storageKeys.js"]
-  HUB --> f36["AI診断の状態速報集約"]
-  f36 --> f36_0["lib/aiSharePopupDiagKey.js"]
-  f36 --> f36_1["extension/status-entry.js"]
-  HUB --> f37["状態速報の全体マインドマップ"]
-  f37 --> f37_0["lib/statusMindmapModel.js"]
+  HUB --> f33["時系列トレンド(スナップショットで見えない劣化検知)"]
+  f33 --> f33_0["lib/statusTrend.js"]
+  f33 --> f33_1["lib/statusTrendKey.js"]
+  f33 --> f33_2["extension/status-entry.js"]
+  f33 --> f33_3["lib/statusActionAdvisor.js"]
+  HUB --> f34["状態速報の整形"]
+  f34 --> f34_0["lib/statusFormat.js"]
+  HUB --> f35["記録件数の単調化(減らない表示)"]
+  f35 --> f35_0["lib/monotonicCommentCount.js"]
+  HUB --> f36["storage キー定義"]
+  f36 --> f36_0["lib/storageKeys.js"]
+  HUB --> f37["AI診断の状態速報集約"]
+  f37 --> f37_0["lib/aiSharePopupDiagKey.js"]
   f37 --> f37_1["extension/status-entry.js"]
-  HUB --> f38["状態速報の対処カード(症状→原因→次の一手)"]
-  f38 --> f38_0["lib/statusActionAdvisor.js"]
+  HUB --> f38["状態速報の全体マインドマップ"]
+  f38 --> f38_0["lib/statusMindmapModel.js"]
   f38 --> f38_1["extension/status-entry.js"]
-  HUB --> f39["サイト健全性検証(リンク切れ防止)"]
-  f39 --> f39_0["lib/siteLinkHealth.js"]
-  f39 --> f39_1["site-health.mjs"]
-  HUB --> f40["影響範囲マップ(変えたら何が壊れるか)"]
-  f40 --> f40_0["feature-map.mjs"]
-  f40 --> f40_1["feature-map/impact-map.md"]
-  HUB --> f41["全体マップ(全地図への入口)"]
-  f41 --> f41_0["MAP.md"]
-  HUB --> f42["影響範囲ゲート(規律を自動化)"]
-  f42 --> f42_0["impact-check.mjs"]
-  f42 --> f42_1["feature-map/impact-map.json"]
-  HUB --> f43["ランキング(/live/)の X シェア"]
-  f43 --> f43_0["lib/xIntentUrl.js"]
-  f43 --> f43_1["lib/liveRankingView.js"]
-  f43 --> f43_2["extension/live-ranking-entry.js"]
-  f43 --> f43_3["live/index.html"]
-  f43 --> f43_4["gen-og-live-ranking.py"]
-  HUB --> f44["ランキング(/live/)のコメント件数集計"]
-  f44 --> f44_0["lib/liveCommentTally.js"]
-  f44 --> f44_1["live-comment-tally.mjs"]
-  f44 --> f44_2["live-ranking.js"]
-  f44 --> f44_3["lib/liveRankingView.js"]
-  f44 --> f44_4["extension/live-ranking-entry.js"]
-  f44 --> f44_5["workflows/live-ranking.yml"]
-  HUB --> f45["ランキング(/live/)ギフト増分バッジ"]
-  f45 --> f45_0["lib/liveGiftPulse.js"]
-  f45 --> f45_1["extension/live-ranking-entry.js"]
-  f45 --> f45_2["live/index.html"]
-  HUB --> f46["ランキング(/live/)4段アイコン列"]
-  f46 --> f46_0["lib/liveLaneBuckets.js"]
+  HUB --> f39["状態速報の対処カード(症状→原因→次の一手)"]
+  f39 --> f39_0["lib/statusActionAdvisor.js"]
+  f39 --> f39_1["extension/status-entry.js"]
+  HUB --> f40["サイト健全性検証(リンク切れ防止)"]
+  f40 --> f40_0["lib/siteLinkHealth.js"]
+  f40 --> f40_1["site-health.mjs"]
+  HUB --> f41["影響範囲マップ(変えたら何が壊れるか)"]
+  f41 --> f41_0["feature-map.mjs"]
+  f41 --> f41_1["feature-map/impact-map.md"]
+  HUB --> f42["全体マップ(全地図への入口)"]
+  f42 --> f42_0["MAP.md"]
+  HUB --> f43["影響範囲ゲート(規律を自動化)"]
+  f43 --> f43_0["impact-check.mjs"]
+  f43 --> f43_1["feature-map/impact-map.json"]
+  HUB --> f44["ランキング(/live/)の X シェア"]
+  f44 --> f44_0["lib/xIntentUrl.js"]
+  f44 --> f44_1["lib/liveRankingView.js"]
+  f44 --> f44_2["extension/live-ranking-entry.js"]
+  f44 --> f44_3["live/index.html"]
+  f44 --> f44_4["gen-og-live-ranking.py"]
+  HUB --> f45["ランキング(/live/)のコメント件数集計"]
+  f45 --> f45_0["lib/liveCommentTally.js"]
+  f45 --> f45_1["live-comment-tally.mjs"]
+  f45 --> f45_2["live-ranking.js"]
+  f45 --> f45_3["lib/liveRankingView.js"]
+  f45 --> f45_4["extension/live-ranking-entry.js"]
+  f45 --> f45_5["workflows/live-ranking.yml"]
+  HUB --> f46["ランキング(/live/)ギフト増分バッジ"]
+  f46 --> f46_0["lib/liveGiftPulse.js"]
   f46 --> f46_1["extension/live-ranking-entry.js"]
   f46 --> f46_2["live/index.html"]
-  HUB --> f47["ランキング(/live/)ホバーで直近の発言"]
-  f47 --> f47_0["live-recent-comments.js"]
-  f47 --> f47_1["server/nicoliveGuest.js"]
-  f47 --> f47_2["lib/liveRecentHoverCard.js"]
-  f47 --> f47_3["extension/live-ranking-entry.js"]
-  f47 --> f47_4["live/index.html"]
-  HUB --> f48["ランキング(/live/)の配信ごと OGP"]
-  f48 --> f48_0["live-og.js"]
-  f48 --> f48_1["live-og-image.js"]
-  f48 --> f48_2["lib/liveOgHtml.js"]
-  f48 --> f48_3["lib/liveOgStats.js"]
-  f48 --> f48_4["lib/liveRankingView.js"]
-  f48 --> f48_5["live-og-bake.mjs"]
-  f48 --> f48_6["og-live-compose.py"]
-  f48 --> f48_7["workflows/live-ranking.yml"]
-  f48 --> f48_8[""]
-  HUB --> f49["dist 鮮度ゲート(buildId無限差分ループ根治)"]
-  f49 --> f49_0["lib/distFingerprint.js"]
-  f49 --> f49_1["check-dist-fresh.mjs"]
-  f49 --> f49_2["build.mjs"]
-  f49 --> f49_3["pre-push"]
-  f49 --> f49_4["pre-commit"]
-  HUB --> f50["横断応援者ランキング(デバイス内・段B)"]
-  f50 --> f50_0["lib/crossSupporterRanking.js"]
-  f50 --> f50_1["lib/commenterHistoricalAnalytics.js"]
-  f50 --> f50_2["lib/supporterRanking.js"]
-  f50 --> f50_3["lib/marketingChartsHtml.js"]
-  HUB --> f51["/live/ コメント速度演出・応援者チップ・熱いチップ"]
-  f51 --> f51_0["lib/liveMotion.js"]
-  f51 --> f51_1["lib/liveGiftPulse.js"]
-  f51 --> f51_2["extension/live-ranking-entry.js"]
-  f51 --> f51_3["live/index.html"]
-  HUB --> f52["/live/ Kick セクション(ほかの配信サービス)"]
-  f52 --> f52_0["live-platforms.js"]
-  f52 --> f52_1["server/kickApi.js"]
-  f52 --> f52_2["lib/kickLivestreams.js"]
-  f52 --> f52_3["lib/livePlatformsHtml.js"]
-  f52 --> f52_4["extension/live-ranking-entry.js"]
-  f52 --> f52_5["live/index.html"]
-  f52 --> f52_6["workflows/live-ranking.yml"]
+  HUB --> f47["ランキング(/live/)4段アイコン列"]
+  f47 --> f47_0["lib/liveLaneBuckets.js"]
+  f47 --> f47_1["extension/live-ranking-entry.js"]
+  f47 --> f47_2["live/index.html"]
+  HUB --> f48["ランキング(/live/)ホバーで直近の発言"]
+  f48 --> f48_0["live-recent-comments.js"]
+  f48 --> f48_1["server/nicoliveGuest.js"]
+  f48 --> f48_2["lib/liveRecentHoverCard.js"]
+  f48 --> f48_3["extension/live-ranking-entry.js"]
+  f48 --> f48_4["live/index.html"]
+  HUB --> f49["ランキング(/live/)の配信ごと OGP"]
+  f49 --> f49_0["live-og.js"]
+  f49 --> f49_1["live-og-image.js"]
+  f49 --> f49_2["lib/liveOgHtml.js"]
+  f49 --> f49_3["lib/liveOgStats.js"]
+  f49 --> f49_4["lib/liveRankingView.js"]
+  f49 --> f49_5["live-og-bake.mjs"]
+  f49 --> f49_6["og-live-compose.py"]
+  f49 --> f49_7["workflows/live-ranking.yml"]
+  f49 --> f49_8[""]
+  HUB --> f50["dist 鮮度ゲート(buildId無限差分ループ根治)"]
+  f50 --> f50_0["lib/distFingerprint.js"]
+  f50 --> f50_1["check-dist-fresh.mjs"]
+  f50 --> f50_2["build.mjs"]
+  f50 --> f50_3["pre-push"]
+  f50 --> f50_4["pre-commit"]
+  HUB --> f51["横断応援者ランキング(デバイス内・段B)"]
+  f51 --> f51_0["lib/crossSupporterRanking.js"]
+  f51 --> f51_1["lib/commenterHistoricalAnalytics.js"]
+  f51 --> f51_2["lib/supporterRanking.js"]
+  f51 --> f51_3["lib/marketingChartsHtml.js"]
+  HUB --> f52["/live/ コメント速度演出・応援者チップ・熱いチップ"]
+  f52 --> f52_0["lib/liveMotion.js"]
+  f52 --> f52_1["lib/liveGiftPulse.js"]
+  f52 --> f52_2["extension/live-ranking-entry.js"]
+  f52 --> f52_3["live/index.html"]
+  HUB --> f53["/live/ Kick セクション(ほかの配信サービス)"]
+  f53 --> f53_0["live-platforms.js"]
+  f53 --> f53_1["server/kickApi.js"]
+  f53 --> f53_2["lib/kickLivestreams.js"]
+  f53 --> f53_3["lib/livePlatformsHtml.js"]
+  f53 --> f53_4["extension/live-ranking-entry.js"]
+  f53 --> f53_5["live/index.html"]
+  f53 --> f53_6["workflows/live-ranking.yml"]
 ```
 
 ---
@@ -329,10 +343,10 @@ graph LR
 <sub>ファイル 5 件</sub>
 
 ## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og / live-platforms)  〔API〕
-<sub>ファイル 8 件</sub>
+<sub>ファイル 9 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
-<sub>ファイル 124 件</sub>
+<sub>ファイル 126 件</sub>
 
 - `audio-test/`（7 件） — スマホで鳴る音声形式の実機テスト用の短い声(audio-test.html が使う・同じ声を形式ごとに用意)  〔Web版〕
 - `demo/`（1 件） — スマホ版デモ(/live-view?v=demo)の作り物の見本(scripts/build-phone-demo-snapshot.mjs が生成)  〔Web版 / デモ〕
@@ -340,7 +354,7 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 396 件</sub>
+<sub>ファイル 397 件</sub>
 
 - `auto/`（8 件） — 会議の自動実行ログ(code/design の JSON)  〔会議 / 自動生成〕
 
@@ -350,12 +364,12 @@ graph LR
 - `briefs/`（26 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 364 件</sub>
+<sub>ファイル 365 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — 公開前の記事下書き(防御的公開の草稿)  〔記事 / 下書き〕
 - `feature-map/`（15 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
-- `handoff/`（178 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `handoff/`（179 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — 読み上げ手法の出願関連(現在は MOVED=移設済みの残置)  〔特許 / 履歴〕
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
@@ -364,12 +378,21 @@ graph LR
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 155 件</sub>
+<sub>ファイル 168 件</sub>
 
 - `data/`（1 件） — 拡張同梱の静的データ(応援バナー定義 json)  〔データ / 応援〕
-- `dist/`（16 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
+- `dist/`（25 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
+
+## `extension-youtube/` — YouTube Live 版の試作拡張(単一用途分離)。manifest/content-chat/background/sidepanel/offscreen  〔YouTube / 試作 / 記録 / 読み上げ〕
+<sub>ファイル 150 件</sub>
+
+- `data/`（1 件） — ⚠️ 未記入（ROLES に追記）
+- `dist/`（1 件） — ⚠️ 未記入（ROLES に追記）
+- `images/`（72 件） — YouTube Live 版試作拡張のアイコン・キャラ画像(ニコ生版と共通の3キャラ)  〔YouTube / 画像〕
+- `sound/`（39 件） — ⚠️ 未記入（ROLES に追記）
+- `src/`（20 件） — YouTube Live 版試作拡張のバンドル entry(content-chat/background/sidepanel/offscreen)  〔YouTube / entry / 記録〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕
 <sub>ファイル 132 件</sub>
@@ -386,7 +409,7 @@ graph LR
 - `store-assets/`（15 件） — App Store の掲載文・アイコン・撮影計画・審査メモの正本  〔iOS / ストア〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 105 件</sub>
+<sub>ファイル 109 件</sub>
 
 - `audit/`（4 件） — 「面(popup/会場/別窓/・live)の間でCSSとDOMがずれていないか」を機械で洗う監査(静的=一度も効かないCSSの検出+基準値のラチェット / 実ブラウザ=hidden・押せない・はみ出し・クリック透過)  〔監査 / CSS / 会場〕
 - `lib/`（4 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
@@ -399,23 +422,23 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2241 件</sub>
+<sub>ファイル 2325 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（107 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（108 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（117 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1965 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
-- `server/`（14 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
+- `lib/`（2046 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `server/`（16 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
 ## `tests/` — E2E / contract テスト(layer 依存・描画 spec 等)  〔テスト〕
-<sub>ファイル 83 件</sub>
+<sub>ファイル 86 件</sub>
 
 - `contract/`（4 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
-- `e2e/`（76 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
+- `e2e/`（79 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
 - `helpers/`（3 件） — テスト共有ヘルパ(配線テストのソース走査等)  〔テスト / 共有〕
 
 ## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ・OG カード画像合成 等)  〔ツール〕
@@ -424,7 +447,7 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 68 件</sub>
+<sub>ファイル 70 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `assets/`（4 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
@@ -438,6 +461,17 @@ graph LR
 
 > 「あの挙動どこ?」の逆引き。`scripts/repo-tree-map.mjs` の `FEATURES` 辞書が正本（実コードで裏取りした担当のみ）。
 > 新しい機能を足すときは、実際に grep して司っているファイルを確かめてから `FEATURES` に1行足す。
+
+### Twitch の配信を記録(本体に同梱)  〔Twitch / 記録 / 他プラットフォーム〕
+Twitch の視聴ページで公式の読み取り専用 IRC を読み、YouTube 版と同じ記録(yt_kirameki_db・配信キー tw.<login>.<配信番号>)へ渡す。画面は YouTube 版(=ニコ生版の完全コピー)をそのまま使い、リンク・言葉・送信先だけ Twitch にする。計器 yt_diag_tw_chat
+
+- [`extension-youtube/src/tw-content-entry.js`](../extension-youtube/src/tw-content-entry.js)
+- [`src/lib/twitch/twIrcParse.js`](../src/lib/twitch/twIrcParse.js)
+- [`src/lib/twitch/twStreamKey.js`](../src/lib/twitch/twStreamKey.js)
+- [`src/lib/twitch/twGql.js`](../src/lib/twitch/twGql.js)
+- [`extension-youtube/src/ytNicoShim.js`](../extension-youtube/src/ytNicoShim.js)
+- [`tests/e2e/twitch-recording.spec.js`](../tests/e2e/twitch-recording.spec.js)
+- [`council/twitch-support-PLAN.md`](../council/twitch-support-PLAN.md)
 
 ### コメント送信(確認/プロファイル)  〔送信 / コメント〕
 拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも
@@ -816,9 +850,12 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（2）
+## ⚠️ 役割が未記入のディレクトリ（5）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
 - `"src/`
 - `"src/images/`
+- `extension-youtube/data/`
+- `extension-youtube/dist/`
+- `extension-youtube/sound/`

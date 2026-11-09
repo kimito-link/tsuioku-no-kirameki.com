@@ -1,0 +1,160 @@
+/**
+ * ytWording.js — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
+ *
+ * 画面とプログラムはニコ生版の写し(ニコ生版のソースは変えない)。描き上がった画面の文字だけを、
+ * ytNicoShim の画面の直し(数字ID・リンクを直しているのと同じ所)でこの表の通りに置き換える。
+ * コメント本文を誤って書き換えないよう、決まった文言だけを置き換える(「ニコ生」を一律に置き換えない)。
+ */
+
+// 「ギフト貢献度」欄の言葉。YouTube のトップファン(XP の順位表)を入れているときだけ使う。
+const TOP_FAN_RULES = [
+  [
+    'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。',
+    'YouTube のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。',
+  ],
+  ['公式の貢献度ランキング（niconico の表示に準拠）', 'YouTube 公式のトップファン（XP の順位）'],
+  ['ギフト貢献度', 'トップファン'],
+  // 数字のあとの単位「貢」→ XP(例: 410貢 → 410 XP)
+  [/(\d[\d,]*)\s*貢(?![献])/g, '$1 XP'],
+];
+
+// トップファンの順位表が無い配信(アーカイブなど)は、入口がスパチャの合計の順位を入れている。XP ではないので pt にする。
+const SUPERCHAT_RANK_RULES = [
+  [
+    'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトを投げた人がいない配信では空になります（広告ポイントとは別系統です）。',
+    'スーパーチャット・ギフトの合計の順位（上位）を表示します。トップファンの順位が出ていない配信（アーカイブなど）で使います。',
+  ],
+  ['公式の貢献度ランキング（niconico の表示に準拠）', 'スーパーチャット・ギフトの合計の順位'],
+  ['ギフト貢献度', 'スパチャの合計順'],
+  [/(\d[\d,]*)\s*貢(?![献])/g, '$1 pt'],
+];
+
+const RULES = [
+  ['ニコ生の応援コメントを、このPCで見える化', 'YouTube の応援コメントを、このPCで見える化'],
+  ['ニコニコ生放送 トップ', 'YouTube トップ'],
+  ['ニコ生の視聴ページの右下に', 'YouTube の視聴ページの右下に'],
+  ['ニコ生の画面改修でパネルが', 'YouTube の画面改修でパネルが'],
+  ['ニコ生公式の表示は変わりません', 'YouTube 公式の表示は変わりません'],
+  // マーケHTML の説明文(ニコ生版の文をそのまま使っている所)
+  ['ニコニコユーザーID: ', 'YouTube チャンネル: '],
+  ['配信者がニコニコでハンドル名を変更した場合、ここの表示と niconico の最新表示が異なることがあります', '配信者が YouTube でハンドル名を変更した場合、ここの表示と YouTube の最新表示が異なることがあります'],
+  ['サムネ・名前は数値ID時のみ niconico ユーザーページへリンクします', 'サムネ・名前は YouTube のチャンネルへリンクします'],
+  ['ニコ生は「誰がいつ入って、いつ出たか」を公開していません', 'YouTube は「誰がいつ入って、いつ出たか」を公開していません'],
+  ['ニコ生の「この番組へのギフト履歴」に近い形で', 'YouTube のスーパーチャット・ギフトを'],
+  ['ニコ生の匿名ギフトは「名無し」にまとまることがあります。', ''],
+  ['ニコ生上で公開されている応援(コメント・ギフト)', 'YouTube 上で公開されている応援(コメント・スーパーチャット)'],
+  ['ニコ生上で公開されているコメント・ギフト情報', 'YouTube 上で公開されているコメント・スーパーチャット情報'],
+  ['ニコニコの公開プロフィールから', 'YouTube の公開ページから'],
+  ['ニコ広告', '広告'],
+  // YouTube には来場者数(延べの入場数)がない。「取れていない」と書くと故障に見えるので、無いものとして書く
+  ['来場者数が取れていないため「来場 X 人中 Y 人がコメント」は表示できません。視聴ページを開いた状態で配信を記録し、再出力してください。', 'YouTube には来場者数（延べの入場数）がないため、「来場 X 人中 Y 人がコメント」は出しません。'],
+  ['（来場者数は未取得）', ''],
+  ['来場データ不足', 'YouTube に来場者数なし'],
+  ['配信ページを開いたまま記録すると取得できます', 'YouTube には来場者数がありません'],
+  ['手元記録の発言者数（来場者数が未取得のため参加率は出せません）', '手元記録の発言者数'],
+  ['広告ランキング未取得（配信ページで記録）', 'YouTube に広告ランキングなし'],
+  ['来場者数が未取得のため、来場とコメントの変換率は判定できません。', 'YouTube には来場者数がないため、来場とコメントの変換率は出しません。'],
+  // 「ページの通信から人の情報をもらう」取り込みは YouTube では使わない(記録に名前と顔が入っている)。0件は正常
+  ['取り込みは成功しましたが0件でした。watchを開いたままポップアップを更新するか、ページを再読み込みしてください。', 'YouTube 版では使いません（記録に名前と顔が入っているため・正常）。'],
+];
+
+/** 置き換えが起こりうる文字か(速く素通しするため) */
+const QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした/;
+
+/**
+ * @param {string} text
+ * @param {{ topFans?: boolean }} [opts] topFans=false: ギフト貢献度の欄がスパチャの合計の順位のとき
+ * @returns {string}
+ */
+export function ytWording(text, opts = {}) {
+  const v = String(text ?? '');
+  if (!QUICK.test(v)) return v;
+  let out = v;
+  const rules = [...(opts.topFans === false ? SUPERCHAT_RANK_RULES : TOP_FAN_RULES), ...RULES];
+  for (const [from, to] of rules) {
+    out = typeof from === 'string' ? out.split(from).join(/** @type {string} */ (to)) : out.replace(/** @type {RegExp} */ (from), /** @type {string} */ (to));
+  }
+  return out;
+}
+
+/**
+ * 先に「トップファン」の言葉で直してしまった画面を、スパチャの合計の順位の言葉に戻す
+ * (どちらを入れたかは、ギフト貢献度の欄を読んだときに初めて分かるため)。
+ * @param {string} text
+ * @returns {string}
+ */
+export function ytWordingTopFanToSuperChatRank(text) {
+  let out = String(text ?? '');
+  if (!/トップファン|XP/.test(out)) return out;
+  out = swapOnce(out, TOP_FAN_RULES, SUPERCHAT_RANK_RULES);
+  return out.replace(/(\d[\d,]*) XP\b/g, '$1 pt');
+}
+
+/**
+ * 逆向き: 一度「スパチャの合計順」の言葉にした画面を、トップファンの言葉に戻す
+ * (アーカイブを見たあと、トップファンの順位表がある配信へ移ったとき)。数字の単位は描き直しで直るので触らない。
+ * @param {string} text
+ * @returns {string}
+ */
+export function ytWordingSuperChatRankToTopFan(text) {
+  const out = String(text ?? '');
+  if (!/スパチャの合計順|スーパーチャット・ギフトの合計の順位/.test(out)) return out;
+  return swapOnce(out, SUPERCHAT_RANK_RULES, TOP_FAN_RULES);
+}
+
+/**
+ * 言い換えの1〜3番目(文・見出し・語)を、1回の走査で置き換える。順に置き換えると、置き換えた後の文の中の
+ * 「トップファン」をもう一度置き換えて文を壊していた(「トップファンの順位が出ていない」→「スパチャの合計順の順位…」)。
+ * @param {string} text
+ * @param {any[]} fromRules
+ * @param {any[]} toRules
+ */
+function swapOnce(text, fromRules, toRules) {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  for (let i = 0; i < 3; i += 1) map.set(String(fromRules[i][1]), String(toRules[i][1]));
+  const keys = [...map.keys()].sort((a, b) => b.length - a.length);
+  const re = new RegExp(keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  return text.replace(re, (m) => map.get(m) ?? m);
+}
+
+// Twitch には YouTube のトップファン(XP の順位表)も公式の応援ランキングも無い。「ギフト貢献度」の欄には
+//   この PC の記録から数えた Bits・ギフトサブの合計の順位が入る。YouTube 版の言葉のどの段階の文でも
+//   (トップファンの言葉で描いたあとスパチャの合計順へ入れ替えた途中の文も)ここで Twitch の言葉にそろえる。
+//   どれも決まった長い文言なので、コメント本文に当たることはない(2026-11-07 実配信の計器で残りを発見)。
+const TW_RANK_SENTENCE = 'Bits・ギフトサブの合計の順位（上位）を表示します。Twitch には公式の応援ランキングが無いため、このPCの記録から数えます。';
+const TW_RANK_HEADING = 'Bits・ギフトサブの合計の順位';
+const TW_RANK_WORD = 'Bits の合計順';
+const TWITCH_FIXED_RULES = /** @type {Array<[string|RegExp, string]>} */ ([
+  [/(?:YouTube|Twitch) のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。/g, TW_RANK_SENTENCE],
+  [/(?:YouTube|Twitch) の(?:スパチャ|Bits)の合計順（チャットでの応援の XP の順位・上位）を表示します。チャット欄の(?:トップファン|スパチャの合計順|Bitsの合計順)の画面から読み取ります。/g, TW_RANK_SENTENCE],
+  [/(?:スーパーチャット|Bits)・ギフトの合計の順位（上位）を表示します。(?:トップファン|スパチャの合計順|Bitsの合計順)の順位が出ていない配信（アーカイブなど）で使います。/g, TW_RANK_SENTENCE],
+  [/(?:YouTube|Twitch) 公式のトップファン（XP の順位）/g, TW_RANK_HEADING],
+  [/(?:スーパーチャット|Bits)・ギフトの合計の順位/g, TW_RANK_HEADING],
+  [/スパチャの合計順|Bitsの合計順/g, TW_RANK_WORD],
+]);
+
+/**
+ * Twitch の画面に残る、ランキング欄の決まった文言を Twitch の言葉にする(どの文字に掛けてもよい)。
+ * @param {string} text
+ */
+export function ytWordingTwitchFixed(text) {
+  let out = String(text ?? '');
+  if (!/トップファン|スパチャ|スーパーチャット|Bits/.test(out)) return out;
+  for (const [from, to] of TWITCH_FIXED_RULES) out = out.replace(/** @type {RegExp} */ (from), to);
+  return out;
+}
+
+/**
+ * Twitch の配信を同じ画面で見せるとき(council/twitch-support-PLAN.md)、ytWording が YouTube の言葉にした所だけを
+ *   Twitch の言葉にする。ytWording が何も変えなかった文字(コメント本文など)には使わないこと。
+ * @param {string} text ytWording の結果
+ */
+export function ytWordingForTwitch(text) {
+  return ytWordingTwitchFixed(String(text ?? ''))
+    .split('スーパーチャット').join('Bits')
+    .split('スパチャ').join('Bits')
+    .split('トップファン').join(TW_RANK_WORD)
+    .replace(/(\d[\d,]*) XP\b/g, '$1 pt')
+    .split('YouTube').join('Twitch');
+}

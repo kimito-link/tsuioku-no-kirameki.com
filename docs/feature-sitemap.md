@@ -44,8 +44,11 @@
   - `src/lib/ndgrViewBasePick.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 66</summary>
 
+- `extension-youtube/content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
+- `extension-youtube/src/background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
+- `extension-youtube/src/content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
 - `scripts/measure-ndgr-crawls.mjs` — 拡張の NDGR 巡回(前方向の立て直し・過去埋め)を本物の配信に当てて数える。
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
@@ -107,6 +110,7 @@
 - `src/lib/swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
 - `src/lib/swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
 - `src/lib/userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
+- `src/lib/youtube/ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
 - `tests/helpers/wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
 
 </details>
@@ -121,8 +125,10 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 67</summary>
 
+- `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+- `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
@@ -181,9 +187,13 @@
 - `src/lib/storedCommentEntriesNormalize.js` — 保存済みコメント配列の重複潰し（純粋関数）。
 - `src/lib/storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
 - `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
+- `src/lib/supporterAccess.js` — 【層】L1 拡張の画面から呼ぶ部品(chrome.storage と fetch を外から受け取る=試験で差し替えられる)
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+- `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
+- `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
+- `src/lib/youtube/ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
 
 </details>
 
@@ -195,7 +205,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 101</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 103</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -297,6 +307,8 @@
 - `src/lib/watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
 - `src/lib/watchTabPrioritize.js` — watch タブ候補リストを「対象 watch URL に最も近い」順に並べ替える純粋関数。
+- `src/lib/youtube/ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
+- `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
 
 </details>
@@ -321,10 +333,19 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 273</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 292</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
+- `extension-youtube/comeview.js` — ニコ生版 comeview-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+- `extension-youtube/src/comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
+- `extension-youtube/src/venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
+- `extension-youtube/src/venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
+- `extension-youtube/src/ytGiftToNico.js` — YouTube の有料の応援(スーパーチャット・スーパーステッカー・メンバー加入・メンバーシップギフト)を、
+- `extension-youtube/src/ytLocalAssetUrls.js` — YouTube の視聴ページの中の会場(content script)で、拡張の中の画像・音を
+- `extension-youtube/src/ytVenueOverlayPrep.js` — 会場(venue.html)を YouTube の視聴ページの上に重ねて開くときの下ごしらえ。
+- `extension-youtube/venue-inline.js` — ニコ生版の視聴ページの会場モード(venueBar.js 本物)+ YouTube の記録を読む入口のバンドル
+- `extension-youtube/venue.js` — ニコ生版 venue-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
@@ -351,6 +372,7 @@
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
 - `src/extension/venueBubblePlacer.js` — 会場(PC)の吹き出しを DOM の実寸から置く薄い層。
+- `src/extension/venuePickupDrag.js` — v0.1.1899 PICK UP の吹き出しをドラッグで動かし、位置を覚える(りんく「ドラッグでうごかせるようにしておきたい」)。
 - `src/lib/adLanePicksFromRooms.js` — 広告ランキング行(officialDomRankingRowsToStripRooms の room)を、popup/会場の人物タイル
 - `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
 - `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
@@ -411,7 +433,9 @@
 - `src/lib/giftHistoryOfficialReconcile.js` — 北極星ギフト履歴: 公式番組累計 pt と履歴 API 合計の表示整合（v0.1.581）。
 - `src/lib/giftHistorySourcePreference.js` — ギフト履歴レーンの「どのデータ源を表示するか」を決める純関数（v0.1.395）。
 - `src/lib/giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
+- `src/lib/giftItemsMirror.js` — ニコ生の公式ギフト欄(gift.nicovideo.jp/…/purchase の子の窓)のアイテムを会場に並べるための読み取りと押下(v0.1.1875)。
 - `src/lib/giftLaneOfficialFill.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/giftPanelShape.js` — ニコ生の公式ギフト欄(番組ギフト)の作りを、読み取りだけで記録する計器(v0.1.1871)。
 - `src/lib/giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
 - `src/lib/giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
 - `src/lib/giftSenderObservation.js` — v0.1.214: anonymous gift（userId 空）も nickname を bucket key にして
@@ -548,8 +572,10 @@
 - `src/lib/venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
 - `src/lib/venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
 - `src/lib/venueAvatarReport.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/venueBubbleBurst.js` — 会場の吹き出しが「一気に出る」瞬間を数える計器(観測のみ・2026-11-04)。
 - `src/lib/venueBubbleChurn.js` — 会場「応援TOP」吹き出しchurnの実測計器(診断先行アプローチ)。
 - `src/lib/venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
+- `src/lib/venueComposeBox.js` — 会場モードから発言する1行の入力欄(2026-11-05 りんく「会場モードにも発言送信できたら」)。
 - `src/lib/venueCrowdMotion.js` — 会場の観客シルエット群を「生きている会場」にするための動きパラメータ(純関数)。
 - `src/lib/venueDisplayRows.js` — 会場モードの「空っぽ・途中で消える・ちらつき」根治の正本(2026-06-15・会議+根本原因調査)。
 - `src/lib/venueDomCensus.js` — 会場5段の【実DOM国勢調査(census)】。
@@ -581,6 +607,7 @@
 - `src/lib/venueSpeechCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/venueSpeechStats.js` — 会場の発言パネルに出す「この人の応援(ギフト・広告)」の一行(純関数・DOM 非依存)。v0.1.1658。
 - `src/lib/venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
+- `src/lib/venueStatStrip.js` — 会場モードの「数字の帯」(2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」)。
 - `src/lib/venueTileCountCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
 - `src/lib/venueYukkuriNamedCensus.js` — 「名前ありゆっくり顔」実害確定計器(診断先行アプローチ)。
@@ -591,6 +618,10 @@
 - `src/lib/watchPageViewerProfile.js` — watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
 - `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
 - `src/lib/yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
+- `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
+- `src/lib/youtube/ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
+- `src/lib/youtube/ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
+- `src/lib/youtube/ytZeroPtGiftLabel.js` — 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援しかしていない人の「0pt」を
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
 - `tests/helpers/laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
@@ -609,10 +640,14 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 47</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
+- `extension-youtube/background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
+- `extension-youtube/offscreen.js` — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル
+- `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
+- `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
@@ -641,6 +676,7 @@
 - `src/lib/voiceLightFallback.js` — VOICEVOX が追いつかないときだけ、PC に入っている軽い声(Windows の声)で読む(純関数)。
 - `src/lib/voiceLightSpeaker.js` — ブラウザの読み上げ(speechSynthesis・Windows では PC に入っている声)で1件読む。
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
+- `src/lib/voiceLongCommentShorten.js` — 長いコメントを「要点を残して」読み上げ用に短くする(v0.1.1911・2026-11-06 りんく「読み上げ式の放送では長くなりがち」)。
 - `src/lib/voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
 - `src/lib/voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
 - `src/lib/voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
@@ -657,6 +693,8 @@
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 - `src/lib/voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
+- `src/lib/youtube/ytVoicePriority.js` — YouTube 版の会場の読み上げで、混んでいるときに「大事なコメント」だけを読むための純関数。
+- `src/lib/youtube/ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
 - `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 
 </details>
@@ -669,10 +707,15 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 47</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
 
+- `api/billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
+- `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
+- `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+- `extension-youtube/src/marketing-export-nico-entry.js` — ニコ生版のマーケ画面(本物 marketing-export-entry.js)を YouTube の記録で動かす入口。
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
+- `scripts/build-youtube-sidepanel-html.mjs` — YouTube 版のサイドパネル HTML = ニコ生版 popup.html の完全コピー。
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
 - `scripts/layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
 - `src/extension/marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
@@ -717,6 +760,8 @@
 - `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
 - `src/lib/viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
+- `src/lib/youtube/ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
+- `src/lib/youtube/ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
 - `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
 
 </details>
@@ -851,6 +896,14 @@
 > 🦊こん太: 見つけたら分類してあげるのだ。
 > 🦝たぬ姉: FEATURE_CATEGORY に1行足すだけなのだ。
 
+- **Twitch の配信を記録(本体に同梱)** — Twitch の視聴ページで公式の読み取り専用 IRC を読み、YouTube 版と同じ記録(yt_kirameki_db・配信キー tw.<login>.<配信番号>)へ渡す。画面は YouTube 版(=ニコ生版の完全コピー)をそのまま使い、リンク・言葉・送信先だけ Twitch にする。計器 yt_diag_tw_chat
+  - `extension-youtube/src/tw-content-entry.js`
+  - `src/lib/twitch/twIrcParse.js`
+  - `src/lib/twitch/twStreamKey.js`
+  - `src/lib/twitch/twGql.js`
+  - `extension-youtube/src/ytNicoShim.js`
+  - `tests/e2e/twitch-recording.spec.js`
+  - `council/twitch-support-PLAN.md`
 - **応援レーンタイル→発言一覧(comeview 詳細)** — popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)
   - `src/lib/comeviewUserDetailLink.js`
   - `src/extension/popup/wireLaneUserDetailOpen.js`
@@ -1008,7 +1061,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 324</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1018,6 +1071,13 @@
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
 - `app/live-view.js` — global NL_BUILD_ID
+- `app/supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
+- `extension-youtube/content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
+- `extension-youtube/src/sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
+- `extension-youtube/src/sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
+- `extension-youtube/src/sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
+- `extension-youtube/src/ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
+- `extension-youtube/src/ytMergedIsolationBoot.js` — 本体に同梱した YouTube 版の画面・視聴ページの入口で、いちばん先に動く仕切り。
 - `extension/background.js` — MV3 Service Worker
 - `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
 - `mobile/scripts/android-patch-signing.mjs` — Patch <target>/app/build.gradle so `bundleRelease` produces a signed AAB.
@@ -1062,6 +1122,7 @@
 - `scripts/build-phone-demo-snapshot.mjs` — スマホ版のデモ(/live-view?v=demo)の土台 app/demo/snapshot.json を作る。
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
+- `scripts/build-youtube-ext.mjs` — YouTube Live 試作拡張（extension-youtube/）の esbuild バンドルスクリプト
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
 - `scripts/census-watch.mjs` — 配置後の「更新→F5→溜まるまで待つ→速報を読む→基準線と比べる」を機械にする(2026-10-20)。
 - `scripts/check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。
@@ -1102,9 +1163,11 @@
 - `scripts/scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
 - `scripts/scout-models.mjs` — Council Scout — 会議メンバー名簿（council-lineup.mjs）の「AI社員の日課」化。
 - `scripts/setup-claude-code.mjs` — プロジェクト用 Claude Code 設定を .claude/settings.json に展開する。
+- `scripts/stage-youtube-submission.mjs` — YouTube Live 版 Chrome ウェブストア提出用 ZIP ステージングスクリプト
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- `scripts/youtube-build.mjs` — YouTube 版の束ね方(esbuild の書き換えと入口の一覧)。2 か所から使う:
 - `src/build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
@@ -1274,7 +1337,9 @@
 - `src/lib/storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
 - `src/lib/storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
 - `src/lib/storyGrowthAppendPlan.js` — 応援マス(グリッド)を「増えた分だけ足す」か「全部作り直す」かの判定(純関数・I/O禁止)。v0.1.1689
+- `src/lib/storyGrowthRebuildReasons.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない)
 - `src/lib/supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
+- `src/lib/supporterLicense.js` — 【層】L0 判定層(純粋関数 + WebCrypto の署名確認だけ)
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
 - `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
 - `src/lib/symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
@@ -1299,6 +1364,18 @@
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
+- `src/lib/youtube/ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
+- `src/lib/youtube/ytChatInputBlock.js` — YouTube のチャット欄に入力欄が無いとき、その理由を見分ける(content-chat-entry の「ここから発言」用)。
+- `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
+- `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
+- `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
+- `src/lib/youtube/ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
+- `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
+- `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
+- `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
+- `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
+- `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
+- `src/server/billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/server/liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
 - `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
@@ -1317,41 +1394,62 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🏟 会場・席 (4版)
-- `v0.1.1861` 2026-11-04 — 混んだら大事なコメントだけ読み上げる
-- `v0.1.1855` 2026-11-03 — 拡張の更新後に F5 しなくても動くように
-- `v0.1.1852` 2026-11-03 — GPU の案内をポップアップにも・会場で読みやすく
-- `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
+### 💾 記録件数 (2版)
+- `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
+- `v0.1.1908` 2026-11-06 — マーケHTMLをさらに軽く
 
-### 🎈 吹き出し (1版)
-- `v0.1.1861` 2026-11-04 — 混んだら大事なコメントだけ読み上げる
+### 📥 コメント取得 (4版)
+- `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
+- `v0.1.1915` 2026-11-07 — YouTube の過去ログ取り込みでも混ざりを直す
+- `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
+- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🎁 ギフト (3版)
-- `v0.1.1861` 2026-11-04 — 混んだら大事なコメントだけ読み上げる
-- `v0.1.1839` 2026-10-31 — イベント欄の拡張のエラーも止める
-- `v0.1.1838` 2026-10-31 — ギフト一覧で出ていた拡張のエラーを止める
+### 🏟 会場・席 (9版)
+- `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
+- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
+- `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
+- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
+- `v0.1.1912` 2026-11-06 — YouTube でログイン中なのに送れない表示を直す
+- `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
+- `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
+- `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
+- `v0.1.1897` 2026-11-06 — マーケ HTML はサポーター向けに(14日お試し)
 
-### 🔊 読み上げ (11版)
-- `v0.1.1861` 2026-11-04 — 混んだら大事なコメントだけ読み上げる
-- `v0.1.1855` 2026-11-03 — 拡張の更新後に F5 しなくても動くように
-- `v0.1.1852` 2026-11-03 — GPU の案内をポップアップにも・会場で読みやすく
-- `v0.1.1851` 2026-11-03 — VOICEVOX が追いつかない間は PC の声で読む
-- `v0.1.1850` 2026-11-03 — 混んだ配信で読み上げが全く鳴らないのを修正
-- `v0.1.1848` 2026-11-01 — VOICEVOX を GPU にする案内を見やすく
-- `v0.1.1847` 2026-10-31 — アプリの読み上げを人ごとに違う声に
-- `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
-- `v0.1.1841` 2026-10-31 — VOICEVOX再起動後も準備中と正しく出す
-- `v0.1.1840` 2026-10-31 — 読み上げの遅れの理由を画面で分かるように
-- `v0.1.1837` 2026-10-31 — コメントを流す間は画面を消さない
+### 🎈 吹き出し (5版)
+- `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
+- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
+- `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
+- `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
+- `v0.1.1899` 2026-11-06 — PICK UP の吹き出しをドラッグで動かせる
 
-### ⚡ 描画・性能 (3版)
-- `v0.1.1857` 2026-11-03 — メディアキットを配信者ごとに・さらに軽く
-- `v0.1.1856` 2026-11-03 — マーケHTMLのスクロールを軽く
-- `v0.1.1846` 2026-10-31 — 重い配信でも読み上げが無音にならないように
+### 🎁 ギフト (5版)
+- `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
+- `v0.1.1920` 2026-11-08 — YouTube の金額の出ないギフトを分かりやすく
+- `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
+- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
+- `v0.1.1908` 2026-11-06 — マーケHTMLをさらに軽く
 
-### その他 (5版)
-- `v0.1.1858` 2026-11-04 — マーケHTMLを撮り直せないのを直す
-- `v0.1.1854` 2026-11-03 — マーケを1つに・視聴維持率を追加
-- `v0.1.1844` 2026-10-31 — Android アプリでもコメントを流せるように
-- `v0.1.1843` 2026-10-31 — 過去コメントの埋め直しの読み違いを直す
-- `v0.1.1842` 2026-10-31 — 止まった取り込みの立て直しを直す
+### 🔊 読み上げ (6版)
+- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
+- `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
+- `v0.1.1911` 2026-11-06 — 長いコメントは質問の結びを残して読む
+- `v0.1.1910` 2026-11-06 — スマホで隠した人を読み上げでも出さない
+- `v0.1.1905` 2026-11-06 — YouTube で自分の発言が2件・2回読まれるのを直す
+- `v0.1.1897` 2026-11-06 — マーケ HTML はサポーター向けに(14日お試し)
+
+### 🪟 応援レーン・タイル (3版)
+- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
+- `v0.1.1904` 2026-11-06 — YouTube で別の配信の人が記録に混ざるのを直す
+- `v0.1.1900` 2026-11-06 — PICK UP の顔か名前でその人の発言を開く
+
+### 🩺 診断・状態速報 (1版)
+- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
+
+### ⚡ 描画・性能 (1版)
+- `v0.1.1908` 2026-11-06 — マーケHTMLをさらに軽く
+
+### その他 (4版)
+- `v0.1.1918` 2026-11-07 — Twitch の未ログインの見分けを直す
+- `v0.1.1907` 2026-11-06 — YouTube の混ざった記録を片付ける
+- `v0.1.1901` 2026-11-06 — PICK UP が古い1件のまま残るのを直す
+- `v0.1.1898` 2026-11-06 — サポーターの確認に本番の鍵を使う

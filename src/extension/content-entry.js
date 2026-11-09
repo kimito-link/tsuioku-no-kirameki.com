@@ -7,6 +7,9 @@ import {
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
 import { mountVenueBarButton } from './venueBar.js';
+import { openOfficialGiftPanel, GIFT_ITEMS_TAB_REQ_KEY, startGiftItemsTabResponder } from '../lib/venueComposeBox.js';
+import { startGiftPanelRecorder } from '../lib/giftPanelShape.js';
+import { startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, chromeGiftStore, waitGiftPressResult, giftPressOutcome } from '../lib/giftItemsMirror.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -726,7 +729,7 @@ let periodicDeepWeakPassTick = 0;
  * v0.1.752 会場リアルタイム化: mountVenueBarButton が返す API({ onLiveComments })。
  * persistCommentRows が新着コメントを storage 往復を待たず会場へ即流すために保持する。
  * 未マウント時は null(タップは optional chaining + try/catch で無害)。
- * @type {{ onLiveComments: (liveId: string, rows: ReadonlyArray<Record<string, unknown>>) => void }|null}
+ * @type {{ onLiveComments: (liveId: string, rows: ReadonlyArray<Record<string, unknown>>, source?: string) => void }|null}
  */
 let _venueApi = null;
 /** 長めの待ちのあいだ、オリジナルキャラクターりんくで「読み込み中」と示す（web_accessible と一致させる） */
@@ -12220,7 +12223,7 @@ function persistCommentRows(rows, opts = {}) {
   //   後から storage 経路で来る同じコメントとは seenKeys で dedup される(二重吹き出し無し)。
   //   会場の処理が throw しても録画パイプラインを壊さないよう try/catch で握りつぶす(fail-safe)。
   try {
-    _venueApi?.onLiveComments?.(liveId, filtered);
+    _venueApi?.onLiveComments?.(liveId, filtered, sourceKey);
   } catch {
     /* no-op: 会場通知の失敗はコメント記録に影響させない */
   }
@@ -14315,7 +14318,8 @@ async function start() {
    *   ★設定の読み取りに失敗したら【出す】側に倒す(機能が黙って消えるのを避ける)。
    */
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
-    _venueApi = mountVenueBarButton();
+    // v0.1.1867: 会場から発言(パネルの「コメント送信」と同じ postCommentFromContentAsync で公式コメント欄へ送る)
+    _venueApi = mountVenueBarButton({ postComment: (text) => postCommentFromContentAsync(text, { fastSubmit: true }), openGift: async () => { /* v0.1.1874 ギフトの子の窓へ番組ギフトの合図 */ chrome.storage.local.set({ [GIFT_ITEMS_TAB_REQ_KEY]: { at: Date.now() } }).catch(() => {}); return openOfficialGiftPanel(document); }, giftItems: { subscribe: (cb) => subscribeGiftItems(chromeGiftStore(), location.pathname, cb), press: async (key, o) => { const st = chromeGiftStore(); let at = 0; const r = requestGiftItemPress(document, key, st.set, { direct: o?.direct === true, onAt: (a) => { at = a; } }); if (!o?.direct) return r; const v = await waitGiftPressResult(st, at); return { ok: r.ok || !!v, reason: r.reason, ...giftPressOutcome(v) }; } } });
   }
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
@@ -19570,5 +19574,7 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   //   履歴 relay 経路を起動。iframe 内では shouldRunWatchContentInThisFrame() が
   //   false で start() が早期 return するため、独立して起動する。
   try { maybeStartGiftSubAppIframeRelay(); } catch { /* no-op */ }
+  try { startGiftPanelRecorder(window, (o) => { chrome.storage.local.set(o).catch(() => {}); }); } catch { /* v0.1.1871 公式ギフト欄の作りを記録(lib/giftPanelShape.js) */ }
+  try { startGiftItemsTabResponder(window, chromeGiftStore().onChanged); startGiftItemsPublisher(window, chromeGiftStore()); } catch { /* v0.1.1874〜1875 ギフトの子の窓: 番組ギフトのタブ・アイテムの並びと押下(lib/giftItemsMirror.js) */ }
   start().catch((err) => reportSilentErrorToStorage('start', err));
 }

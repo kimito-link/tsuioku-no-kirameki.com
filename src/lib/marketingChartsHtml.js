@@ -1395,7 +1395,11 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
   const cards = analysis.moments
     .slice(0, SHOW)
     .map((m) => {
+      // v0.1.1908: 1つの瞬間に並べる送り主は先頭8件まで(連鎖で数百件並んで重かった)。残りは「ほか N件」。
+      const GIFT_LINES_MAX = 8;
+      const restGifts = m.gifts.length - GIFT_LINES_MAX;
       const giftLines = m.gifts
+        .slice(0, GIFT_LINES_MAX)
         .map((g) => {
           const rawLabel = g.userId && /^\d+$/.test(g.userId) ? displayUserLabel(g.userId, g.senderName) : g.senderName || '名無し';
           const nameHtml = maskShare
@@ -1412,7 +1416,10 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
           const thumbCell = wrapThumbWithProfileLink(g.userId, thumbImg, maskShare);
           return `<li class="mkt-gm-gift">${thumbCell}<span class="mkt-gm-sender">${nameHtml}</span><span class="mkt-gm-item">${escapeHtml(g.itemName || '(名称未取得)')}</span><span class="mkt-gm-pt">${escapeHtml(formatEventRankingNumber(g.points))}pt</span></li>`;
         })
-        .join('');
+        .join('') +
+        (restGifts > 0
+          ? `<li class="mkt-gm-gift mkt-gm-gift--more">ほか ${restGifts}件(全部は「ギフト投げ履歴」の表にあります)</li>`
+          : '');
       const bC = m.before.comments;
       const aC = m.after.comments;
       const diff = aC - bC;
@@ -2199,6 +2206,8 @@ function buildMarketingGiftItemRows(giftEvents, officialGiftHistory) {
  *   giftMomentum: import('./giftMomentumAnalytics.js').GiftMomentumAnalysis,
  *   supporterChikuran: ReturnType<typeof buildSupporterChikuranRows>,
  *   sessionSummaryRows: readonly unknown[],
+ *   concurrentSeries?: import('./concurrentTimelineSeries.js').ConcurrentTimelineSeries,
+ *   concurrentPeak: import('./concurrentPeakAnalysis.js').ConcurrentPeakAnalysis,
  *   pastBroadcasts: readonly unknown[],
  *   giftUsers: readonly unknown[],
  *   giftEvents: readonly unknown[],
@@ -2375,7 +2384,25 @@ function buildMarketingDataSummary(input) {
     input.giftEvents,
     input.officialGiftHistory
   );
+  // v0.1.1892: 同接(同時に見ている人数)のピークと平均。同接推移カーブと同じ時系列から出す。
+  //   YouTube には延べの来場者数が無く、同接だけが取れる(「同接2万なのにサマリに無い」2026-11-05 りんく)。
+  const concurrentPoints = input.concurrentSeries?.points || [];
+  const concurrentAvg = concurrentPoints.length
+    ? Math.round(concurrentPoints.reduce((/** @type {number} */ a, /** @type {{ value: number }} */ p) => a + p.value, 0) / concurrentPoints.length)
+    : 0;
+  const concurrentKind =
+    input.concurrentSeries?.source === 'official' ? '公式' : input.concurrentSeries?.source === 'estimated' ? '推定' : '公式/推定';
+  const concurrentCard = {
+    label: '最大同接',
+    value: concurrentPoints.length && input.concurrentPeak.peakValue > 0
+      ? `${formatEventRankingNumber(input.concurrentPeak.peakValue)}人`
+      : '未取得',
+    hint: concurrentPoints.length
+      ? `平均 ${formatEventRankingNumber(concurrentAvg)}人 · ${concurrentKind} · ${concurrentPoints.length}点`
+      : '同時に見ていた人数(パネルか会場を開いている間に記録)'
+  };
   const cards = [
+    concurrentCard,
     {
       label: 'コメントした人',
       value:
@@ -3289,6 +3316,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     giftMomentum,
     supporterChikuran,
     sessionSummaryRows,
+    concurrentSeries,
+    concurrentPeak,
     pastBroadcasts: pastBroadcastsForLayer,
     giftUsers: giftUsersForSg,
     giftEvents: giftEventsForAnalytics,
@@ -5323,6 +5352,7 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-gm-time{font-size:.8rem;color:#93c5fd;font-variant-numeric:tabular-nums;margin-bottom:.35rem}
 .mkt-gm-gifts{list-style:none;margin:0 0 .4rem;padding:0}
 .mkt-gm-gift{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;margin:.15rem 0;font-size:.85rem}
+.mkt-gm-gift--more{color:#94a3b8}
 .mkt-gm-sender{font-weight:700;overflow-wrap:anywhere}
 .mkt-gm-item{color:#cbd5e1}
 .mkt-gm-pt{margin-left:auto;font-variant-numeric:tabular-nums;color:#fde68a}

@@ -33,7 +33,8 @@ describe('全拡張文書が忙しさ台帳の起動処理を import してい�
       expect(html, `${h}.html が dist/${h}.js を読んでいる`).toMatch(/dist\/[a-z-]+\.js/);
     }
     // extension/ 直下の html 一覧と一致(新しい文書を足したのに台帳に載せ忘れていたら赤)
-    const files = readdirHtml();
+    //   yt-*.html は同梱した YouTube 版の画面=ニコ生版の画面の完全コピー(同じ entry を束ねる・scripts/youtube-build.mjs)なので除く
+    const files = readdirHtml().filter((f) => !f.startsWith('yt-'));
     expect(files.sort()).toEqual(htmls.slice().sort());
   });
 

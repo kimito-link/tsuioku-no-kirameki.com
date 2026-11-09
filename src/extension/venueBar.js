@@ -5,8 +5,10 @@ import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/come
 import {
   applyVenuePickupView,
   buildVenuePickupView,
-  createVenuePickupBanner
+  createVenuePickupBanner,
+  venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
+import { attachVenuePickupDrag } from './venuePickupDrag.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
   buildVenueSeating,
@@ -159,6 +161,8 @@ import {
   observeVenueBubbleRemoval,
   toVenueBubbleChurnDiag
 } from '../lib/venueBubbleChurn.js';
+// 2026-11-04 計器(観測のみ): 吹き出しが「一気に出る」束を経路・取り込み元・実際の流量と並べて数える。
+import { createVenueBubbleBurstState, observeVenueSpeechBatch, toVenueBubbleBurstDiag } from '../lib/venueBubbleBurst.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 // v0.1.1118 鏡enrich(P4): ①が解決済みの顔URL(鏡displaySrc)を追加のenrich源にする(新規readゼロ)。
 import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../lib/venueMirrorAvatarEnrich.js';
@@ -374,6 +378,10 @@ import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
+import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } from '../lib/venueComposeBox.js';
+// 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
+import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
+import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -389,6 +397,9 @@ const BUBBLE_FADE_MS = 600;
 // v0.1.755 リアルタイム完璧化: 同時表示数を 6→12 に拡大。洪水時に「出してすぐ最古を消す」で
 //   一瞬しか見えない問題を緩和(寿命は流速可変で短くするので画面は埋まり続けない)。
 const BUBBLE_MAX = 12;
+// v0.1.1914: 今までの最大のコメント番号よりこれ以上小さい番号は過去のコメント(取り込み)=吹き出さない。
+//   NHK 実況級(毎秒20件)でも 300 件=15秒ぶんは遅れて届いた新着として通す。
+const VENUE_OLD_SPEECH_NO_GAP = 300;
 // 吹き出し流速(件/秒)を測る短い窓。寿命可変(速いほど短命)の入力。
 const BUBBLE_FLOW_WINDOW_MS = 3_000;
 const BUBBLE_TEXT_MAX = 36;
@@ -634,35 +645,37 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
   }
-  /* v0.1.1230 ピックアップ枠(BSP風): 会場ヘッダー直下に常設。高さを先に確保して
-     出たり消えたりで下の段が動かないようにする(ユーザー報告「上下に動く」の対策と同趣旨)。 */
+  /* v0.1.1230 ピックアップ枠(BSP風)。v0.1.1869 りんく「上にもってきたほうがみやすい」(Canva の見本=映像の上に大きな白い吹き出し):
+     ひな壇の一番下にあった帯を、映像の上端中央の大きな吹き出しにした。stageLayout 直下に絶対配置するので
+     出たり消えたりしても席の段は動かない。空のときは出さない(案内文の大きな白い枠で映像をふさがない)。
+     ★下地は不透明(v0.1.1337: 半透明だと後ろのページの文字と重なって読めなかった)。 */
   .nlsb-pickup {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    z-index: 7;
+    transform: translateX(-50%);
+    width: min(860px, calc(100% - 180px));
+    box-sizing: border-box;
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    margin: 4px 0 6px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 190, 90, 0.55);
-    /*
-     * ★v0.1.1337: 地の色を【不透明で】敷く(実機で読めなくなっていた)。
-     *   旧: linear-gradient のみ = 透明度 0.22〜0.06 の帯だけ。
-     *   会場の暗い背景の上なら成立するが、後ろにニコ生のページ(カテゴリタグ等)が
-     *   透けると文字と背景が重なって【判読不能】になる。実機スクリーンショットで確認。
-     *   さらに data-empty の opacity:0.55 が乗ると実質 0.03〜0.12 まで薄くなっていた。
-     *   → 不透明の下地(#2a2118 相当)を先に置き、その上に既存のグラデを重ねる。
-     *     色は会場の暗色系に馴染ませる(白背景でも黒背景でも読める濃さ)。
-     */
-    background-color: rgba(38, 30, 20, 0.92);
-    background-image: linear-gradient(90deg, rgba(255, 176, 62, 0.28), rgba(255, 176, 62, 0.1));
-    color: #fff5e8;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-    font-size: 13px;
-    line-height: 1.35;
+    gap: 12px;
+    min-height: 64px;
+    padding: 10px 22px;
+    border-radius: 28px;
+    border: 2px solid rgba(255, 176, 62, 0.9);
+    background: #fffdf8;
+    color: #1f2328;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    font-size: 18px;
+    line-height: 1.4;
+    pointer-events: auto;
   }
-  /* ★空のときも【薄くしすぎない】(0.55 だと下地ごと透けて読めなくなる)。 */
-  .nlsb-pickup[data-empty='1'] { opacity: 0.85; }
+  /* 吹き出しの尻尾(左下)。枠線色の三角の上に地の色の三角を重ねる。 */
+  .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
+  .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
+  .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
+  .nlsb-pickup[data-empty='1'] { display: none; }
   .nlsb-pickup__badge {
     flex: 0 0 auto;
     font-size: 10px;
@@ -675,12 +688,12 @@ const VENUE_CSS = `
   }
   .nlsb-pickup__face {
     flex: 0 0 auto;
-    width: 30px;
-    height: 30px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     object-fit: cover;
-    background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 1px rgba(255, 245, 232, 0.45);
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
   }
   .nlsb-pickup__face[hidden] { display: none; }
   .nlsb-pickup__main {
@@ -694,14 +707,14 @@ const VENUE_CSS = `
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; /* 長文は2行まで */
+    overflow-wrap: anywhere;
+    font-weight: 700;
   }
   .nlsb-pickup__meta {
     flex: 0 0 auto;
-    font-size: 11px;
-    opacity: 0.8;
+    font-size: 12px;
+    opacity: 0.75;
     color: inherit;
     text-decoration: none;
     overflow: hidden;
@@ -2470,7 +2483,7 @@ function ensureVenueStyle() {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = VENUE_CSS;
+  style.textContent = VENUE_CSS + VENUE_STAT_STRIP_CSS;
   (document.head || document.documentElement).appendChild(style);
 }
 
@@ -2625,7 +2638,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any } }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -2838,6 +2851,9 @@ export function mountVenueBarButton(options = {}) {
     tuckBtn.title = 'コメントを打つあいだ会場をしまいます(記録は続きます)。右下の「▲ 会場に戻る」で戻せます';
     tuckBtn.addEventListener('click', () => setTucked(true));
   }
+  const giftBtn = !isStandalone && typeof options.openGift === 'function' ? createVenueGiftButton(options.openGift, { label: options.giftLabel, reasonText: options.giftReasonText, tuck: (on, note) => setTucked(on, note), stripHint: !!options.giftItems }) : null; // v0.1.1870 公式のギフト画面を開く(lib の venueComposeBox.js)
+  const giftStrip = !isStandalone && options.giftItems ? createVenueGiftStrip({ ...options.giftItems, tuck: (on, note) => setTucked(on, note) }) : null; // v0.1.1875 公式と同じアイテムの帯(lib の venueComposeBox.js)
+  const composeBox = !isStandalone && typeof options.postComment === 'function' ? createVenueComposeBox(options.postComment, { reasonText: options.postReasonText }) : null; // v0.1.1867 会場から発言(lib の venueComposeBox.js)
   const note = document.createElement('div');
   note.className = 'nlsb-note';
   // 2026-06-22 会場「全員500人」: 席上限の表示も実定数に追従させる(150 固定の取り残しを是正)。
@@ -2845,11 +2861,19 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
   } else {
-    headerRight.append(...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
-  header.append(title, headerRight);
+  // 2026-11-09: パネルの数字カードと同じ数字の帯(ヘッダーの2行目・値は数字カードの鏡をそのまま出す=lib の venueStatStrip.js)。
+  const statStrip = createVenueStatStrip(document, {
+    faces: {
+      link: resolveVenueAssetUrl('images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png'),
+      konta: resolveVenueAssetUrl('images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png'),
+      tanu: resolveVenueAssetUrl('images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png')
+    }
+  });
+  header.append(title, ...(composeBox ? [composeBox] : []), headerRight, statStrip.el); // v0.1.1868 発言欄は中央
 
   // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
   //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる
@@ -2988,21 +3012,32 @@ export function mountVenueBarButton(options = {}) {
    * ピックアップ枠の入力(2026-10-17): 表示行(storage集計/鏡由来=text空)ではなく、届いた発言(吹き出し・読み上げと同じ speeches)を積む独立のリングから選ぶ。
    *   以前は commitDisplay の表示行から選んでいたため、発言を行へ混ぜた直後の1回しか本文が乗らず枠が案内文のままだった(実機+headlessで再現)。正本=venuePickupRing.js。
    */
-  /** @type {Array<any>} */
-  let pickupRing = [];
+  let pickupRing = /** @type {Array<any>} */ ([]);
   /** @param {ReadonlyArray<any>|null} fallbackRows リングが空のときの従来入力(表示行) */
   const updatePickupBanner = (fallbackRows) => {
     try {
       const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
-      applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
+      const picked = pickTickerHighlightEntry(rows, Date.now());
+      applyVenuePickupView(pickupEls, buildVenuePickupView(picked));
+      placePickup(); if (picked.why === 'scored' && picked.entry !== pickupRing[pickupRing.length - 1]) pickupDrag.later(() => updatePickupBanner(null)); // v0.1.1901: 窓の中の前の1件を出している間に新しい発言が来たら、窓が過ぎてから選び直す(過疎だと次の更新が来ず前の1件が10分出続けた)
     } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
-  // seating は下端のひな壇だけ(header + pickup + seats)。
-  seating.append(header, pickupEls.root, topBar, seatsHost);
+  /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
+  function placePickup() {
+    if (pickupEls.root.hasAttribute('data-empty')) return;
+    const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
+    const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
+    pickupEls.root.style.width = at ? `${at.width}px` : '';
+    pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
+  }
+  const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)
+  // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
+  seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   // 3キャラ常駐は配信画面の「まわり(左右の縁)」に出す(会場の席とは重ねない=邪魔にしない)。
   //   stageLayout 基準=映像セーフエリアの高さに合わせて左右に配置できる。
-  stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer);
+  stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer, pickupEls.root);
   // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
   //   セリフがクリップされず・アバターに潜らない。席の座標を測ってこの上に頭上配置する。
   const bubbleLayer = document.createElement('div');
@@ -3087,7 +3122,7 @@ export function mountVenueBarButton(options = {}) {
       if (idx < 0 || idx >= items.length) return null;
       const it = items[idx];
       const seatIdx = Number(it?._venueSeatIndex);
-      if (Number.isInteger(seatIdx) && seatIdx >= 0) return null; // 席ありは対象外
+      if (Number.isInteger(seatIdx) && seatIdx >= 0 && el.closest?.('.nlsb-seat')) return null; // 席の中だけ対象外(同じ人が2段に居ると片方は席の外=ここで解決・2026-11-08 ギフト列が無反応)
       const u = String(it?.entry?.userId || '').trim();
       /*
        * ★2026-08-29: ここは以前 count:0 / lastAt:0 のゼロ埋めリテラルを返していた。
@@ -3440,8 +3475,8 @@ export function mountVenueBarButton(options = {}) {
   let speechInFlight = false;
   let speechGeneration = 0;
   let speechLiveId = '';
-  /** @type {{ seenKeys: Set<string>|null, primed: boolean }} */
-  let speechState = { seenKeys: null, primed: false };
+  /** @type {{ seenKeys: Set<string>|null, primed: boolean, hiNo: number }} */
+  let speechState = { seenKeys: null, primed: false, hiNo: 0 };
   // 「会話の連鎖」(v0.1.743+): 発言者キー→{連続数,最終発言時刻}。連続発言で席が継続的に輝く。
   /** @type {Map<string, { count: number, lastAt: number }>} */
   const speechStreaks = new Map();
@@ -3683,6 +3718,19 @@ export function mountVenueBarButton(options = {}) {
     } catch { /* お祝いの失敗で会場を止めない */ }
   };
   let _panelSummaryLastSeenAt = 0;
+  /** 数字カードの鏡(パネルが書く・KEY_STAT_CARDS_MIRROR)。開いた瞬間の catch-up と onChanged の newValue で更新(追加 read なし)。 */
+  /** @type {unknown} */
+  let statCardsMirrorSnap = null;
+  /** 数字の帯を描く(値は鏡のまま・記録はパネルが閉じていても動く正本で補う)。古さの判定があるので定期の見回りからも呼ぶ。 */
+  const paintStatStrip = () => {
+    try {
+      statStrip.paint(buildVenueStatStripModel(statCardsMirrorSnap, {
+        liveId: String(activeLiveId || liveIdFromPathname() || ''),
+        nowMs: Date.now(),
+        recordedCount: panelSummarySnap ? selectDisplayRecordedCount(panelSummarySnap) : null
+      }));
+    } catch { /* 帯の失敗で会場を止めない */ }
+  };
   /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */
   /** @type {Map<string, number>} */
   const venueTransientFirstSeen = new Map();
@@ -3717,6 +3765,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-21 応援TOP吹き出しchurn計器(診断先行アプローチ): 生成頻度・寿命分布・強制退去を
   //   累積で数える(観測のみ・修正はしない)。
   const _bubbleChurn = createVenueBubbleChurnState();
+  const _bubbleBurst = createVenueBubbleBurstState();
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
   let _topBarShownOnce = false;
@@ -5206,7 +5255,7 @@ export function mountVenueBarButton(options = {}) {
   const resetSpeechTracking = (nextLiveId = '') => {
     speechGeneration += 1;
     speechLiveId = nextLiveId;
-    speechState = { seenKeys: null, primed: false };
+    speechState = { seenKeys: null, primed: false, hiNo: 0 };
     speechStreaks.clear();
     // 前状態保持(lastGood)も破棄: 配信切替/閉じる時は前配信の参加者を持ち越さない(INV-3)。
     lastGoodRows = [];
@@ -6183,6 +6232,8 @@ export function mountVenueBarButton(options = {}) {
       tileCountCensus: toVenueTileCountDiag(_tileCountCensus, Date.now()),
       // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
       bubbleChurn: toVenueBubbleChurnDiag(_bubbleChurn),
+      // 2026-11-04 計器: 吹き出しが一気に出た束(過去ログ/まとめ届き/本当に一気)。★ここに載せないと状態速報に出ない。
+      bubbleBurst: toVenueBubbleBurstDiag(_bubbleBurst, Date.now()),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now()),
       // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。ユーザー報告
       //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため。
@@ -6609,7 +6660,7 @@ export function mountVenueBarButton(options = {}) {
         // ★v0.1.1300: この配信専用の鏡(v2)と受領証も一緒に読む。
         const _mirrorKey = laneMirrorKeyFor(_catchUpLiveId);
         const _receiptKey = laneReceiptKeyFor(_catchUpLiveId);
-        const _keys = [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR];
+        const _keys = [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, KEY_STAT_CARDS_MIRROR];
         if (_panelKey) _keys.push(_panelKey);
         if (_mirrorKey) _keys.push(_mirrorKey, _receiptKey);
         const bag = await runStorageOpWithTimeout(() => chrome.storage.local.get(_keys), 3000);
@@ -6641,6 +6692,9 @@ export function mountVenueBarButton(options = {}) {
         if (open && ((storySnap && typeof storySnap === 'object') || (panelSnap && typeof panelSnap === 'object'))) {
           renderStoryDiagMirrorPanel();
         }
+        const statSnap = bag?.[KEY_STAT_CARDS_MIRROR];
+        if (open && statSnap && typeof statSnap === 'object') statCardsMirrorSnap = statSnap;
+        if (open) paintStatStrip();
         // v0.1.1207: 鏡の catch-up が決着した瞬間(取れた/空だった のどちらも決着)。
         try {
           noteVenueMirrorSettled(_openLatency, Date.now(), {
@@ -6704,8 +6758,12 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.752: storage poll とリアルタイム live feed の両方が通る共通処理。引数 rows から
   //   新着発言を抽出(pickNewVenueSpeech)→席へマージ→吹き出し+読み上げ。両経路が同じ
   //   speechState.seenKeys を共有するので、同じコメントが poll と live で来ても1回だけ吹く。
-  /** @param {Array<Record<string, any>>} rows */
-  const processSpeechRows = (rows) => {
+  /**
+   * @param {Array<Record<string, any>>} rows
+   * @param {string} [path] 計器用: live(同じタブの即時経路)/tail(テール書き込み)/poll(storage 再読込)
+   * @param {string} [source] 計器用: 取り込み元(ndgr/ndgr_forward/backfill/deep…・live 経路のみ)
+   */
+  const processSpeechRows = (rows, path = 'unknown', source = '') => {
     // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
     applyVenueHeat(rows);
     // 「会話の連鎖」: 発言が途切れた人のストリークを掃除(席のグローが自然に消える)。
@@ -6716,10 +6774,14 @@ export function mountVenueBarButton(options = {}) {
     //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
     //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
     const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
-    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
+    // v0.1.1866: 開いた瞬間の直近3件(primeEmit)は開く前に届いた発言なので「受信→キュー」の遅れに数えない(数えると過疎配信で何分も「遅れ」が残った)。
+    const primeBurst = !(speechState && speechState.primed === true);
+    // v0.1.1914: oldNoGap=過去ログ取り込みの古い番号は吹き出さない(既読にだけする・lib の venueSpeech.js)。
+    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3, oldNoGap: VENUE_OLD_SPEECH_NO_GAP });
     speechState = {
       seenKeys: result.seenKeys,
-      primed: result.primed
+      primed: result.primed,
+      hiNo: Number(result.hiNo) || 0
     };
     // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
     if (result.speeches.length > 0) voicePlayer.diag.venueGate = voicePlayer.enabled ? 'ok' : 'voice-off';
@@ -6771,6 +6833,7 @@ export function mountVenueBarButton(options = {}) {
         commitDisplay(baseRows);
       }
     }
+    let _burstShown = 0;
     for (const speech of result.speeches) {
       // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
       //   旧実装は読み上げON時に onPlayStart(声の再生開始)で吹き出していたが、VOICEVOXが
@@ -6778,6 +6841,7 @@ export function mountVenueBarButton(options = {}) {
       //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
       //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
       const bubble = showSpeechBubble(speech);
+      if (bubble) _burstShown += 1;
       // v0.1.778: ギフト/広告コメントなら投げ主のサムネから中央映像へアイテムを投げる。
       maybeThrowGiftFromSpeech(speech);
       // 2026-07-06: 来場システムメッセージならパチンコ入賞演出(保留玉が入る)として投げる。
@@ -6796,7 +6860,7 @@ export function mountVenueBarButton(options = {}) {
           key: speech.key,
           text: speech.text,
           // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
-          receivedAt: speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
+          receivedAt: primeBurst ? undefined : speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
           liveId: liveIdFromPathname(), broadcasterUid: _lastBroadcasterUid, // v0.1.1861: 混雑時に配信者・初コメを読む判定
           // ★キャラライブの相槌はここに乗せる(2026-08-25)。
           //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
@@ -6821,6 +6885,14 @@ export function mountVenueBarButton(options = {}) {
         else venueReaderLease.whenMine(liveIdFromPathname(), voiceIt, () => { if (bubble) markBubbleResolved(bubble); voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1; });
       }
     }
+    // 2026-11-04 計器(観測のみ): この束で何件吹いたか・経路・取り込み元・その時の配信の流量。
+    try {
+      observeVenueSpeechBatch(_bubbleBurst, {
+        at: Date.now(), path, source, rows, speeches: result.speeches,
+          fresh: Number(result.freshCount) || 0, shown: _burstShown,
+        skippedOld: Number(result.skippedOld) || 0
+      });
+    } catch { /* 計器失敗は描画を止めない */ }
   };
 
   // v0.1.754 ストリーム駆動在席: 在席 Map の変更を rAF で集約して席へ反映。コメント怒涛でも
@@ -6852,15 +6924,16 @@ export function mountVenueBarButton(options = {}) {
   /**
    * @param {string} incomingLiveId
    * @param {ReadonlyArray<Record<string, unknown>>} rows
+   * @param {string} [source] 計器用: 取り込み元(persistCommentRows の source)
    */
-  const onLiveComments = (incomingLiveId, rows) => {
+  const onLiveComments = (incomingLiveId, rows, source = '') => {
     if (!open) return; // 閉じている間は何もしない(開いた時に pollSpeech が storage から再シード)
     const cur = liveIdFromPathname();
     if (!cur || cur !== incomingLiveId) return; // 配信切替中の遅延コールバックは捨てる
     if (speechLiveId !== cur) resetSpeechTracking(cur); // pollSpeech と同じ追従
     const feedRows = liveFeedSpeechRows(rows);
     if (feedRows.length === 0) return;
-    processSpeechRows(feedRows); // 吹き出し/読み上げ(従来どおり)
+    processSpeechRows(feedRows, 'live', String(source || '')); // 吹き出し/読み上げ(従来どおり)
     // v0.1.754: 在席は「通過した瞬間に touch」。storage 集計を待たない=3時間でも O(席数)。
     //   touchRoster が requireText/userId を内部で守る(匿名/本文空は席に入れない・v0.1.740)。
     if (!rosterDriven) return;
@@ -6875,6 +6948,7 @@ export function mountVenueBarButton(options = {}) {
     if (!hasVenueExtensionContext()) { markContextInvalidated(); return; }
     const liveId = liveIdFromPathname();
     if (!liveId) return;
+    paintStatStrip(); // 鏡の古さ(パネルが閉じた)を見回る。署名が同じなら DOM を触らない=read も描き直しも増えない
     if (speechLiveId !== liveId) resetSpeechTracking(liveId);
     const generation = speechGeneration;
     const tailKey = tailStorageKey(liveId);
@@ -6907,7 +6981,7 @@ export function mountVenueBarButton(options = {}) {
       const summary = /** @type {{ recent?: unknown }|undefined} */ (bag?.[summaryKey]);
       const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
       const rows = tailRows.length > 0 ? tailRows : recentRows;
-      processSpeechRows(rows);
+      processSpeechRows(rows, 'poll');
       const aggregatePoints = bag?.[giftPointsAggregateKey];
       if (typeof aggregatePoints === 'number') handleGiftPointsAggregate(aggregatePoints);
       if (panelKey) {
@@ -6917,6 +6991,7 @@ export function mountVenueBarButton(options = {}) {
           _panelSummaryLastSeenAt = Date.now();
           noteCheerCount();
           renderStoryDiagMirrorPanel();
+          paintStatStrip();
         }
       }
     } catch (err) {
@@ -6942,7 +7017,7 @@ export function mountVenueBarButton(options = {}) {
     //   storage.local.get 再取得=1往復の遅延)していた。tail が変わったら newValue を直接
     //   processSpeechRows へ渡し、再取得を省いて即座に吹き出し/読み上げする(コメビュと同経路)。
     if (changes[tailKey] && Array.isArray(changes[tailKey].newValue)) {
-      processSpeechRows(/** @type {Array<Record<string, any>>} */ (changes[tailKey].newValue));
+      processSpeechRows(/** @type {Array<Record<string, any>>} */ (changes[tailKey].newValue), 'tail');
     } else if (changes[tailKey] || changes[summaryKey]) {
       // tail が無い(summary だけ等)時は従来どおり storage から読む保険。
       void pollSpeech();
@@ -7047,6 +7122,13 @@ export function mountVenueBarButton(options = {}) {
       _panelSummaryLastSeenAt = Date.now();
       noteCheerCount();
       renderStoryDiagMirrorPanel();
+      paintStatStrip();
+    }
+    // 2026-11-09: 数字カードの鏡(パネルが書く)。newValue 直採用=追加 read なし。
+    const statChange = changes[KEY_STAT_CARDS_MIRROR];
+    if (statChange && statChange.newValue && typeof statChange.newValue === 'object') {
+      statCardsMirrorSnap = statChange.newValue;
+      paintStatStrip();
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に
@@ -7193,9 +7275,30 @@ export function mountVenueBarButton(options = {}) {
   /** v0.1.1654: 会場を一時的にしまっているか(会場自体は開いたまま・閉じると必ず解除)。 */
   let tucked = false;
   const TOGGLE_LABEL_OPEN = toggle.textContent || '🏟 会場モード';
-  /** @param {boolean} next */
-  const setTucked = (next) => {
+  /** @type {HTMLDivElement | null} */
+  let tuckNote = null;
+  let tuckNoteSeq = 0;
+  /** v0.1.1880: しまった理由と次の一手を右下に出す(ギフトから会場をしまったとき・りんく「何の説明もないと何が起こったのかと思う」) */
+  /** @param {string} [text] */
+  const showTuckNote = (text) => {
+    if (!text) { tuckNote?.remove(); tuckNote = null; return; }
+    if (!tuckNote) {
+      tuckNote = document.createElement('div');
+      tuckNote.className = 'nlsb-tuck-note';
+      tuckNote.setAttribute('role', 'status');
+      tuckNote.style.cssText = 'position:fixed;right:16px;bottom:72px;z-index:2147483646;max-width:min(360px,calc(100vw - 32px));padding:10px 12px;border-radius:10px;background:#fff;color:#222;font-size:13px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
+      tuckNote.title = '押すと消えます';
+      tuckNote.addEventListener('click', () => showTuckNote(''));
+      document.body.append(tuckNote);
+    }
+    tuckNote.textContent = text;
+    const seq = ++tuckNoteSeq;
+    setTimeout(() => { if (seq === tuckNoteSeq) showTuckNote(''); }, 15000);
+  };
+  /** @param {boolean} next @param {string} [note] */
+  const setTucked = (next, note) => {
     tucked = next === true;
+    showTuckNote(tucked ? note : '');
     root.classList.toggle('nlsb-is-tucked', tucked);
     toggle.textContent = tucked ? '▲ 会場に戻る' : TOGGLE_LABEL_OPEN;
     toggle.setAttribute('aria-label', tucked ? '会場に戻る' : '会場モード');
