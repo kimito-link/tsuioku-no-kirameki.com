@@ -282,3 +282,19 @@ describe('0.1.1965: りんく段の札の付け直しでタイルごとのレイ
     expect(body).toMatch(/LANE_KIND_WORD_SET\.has[\s\S]{0,80}tile\.setAttribute\('data-yt-kind-done', '1'\);\s*continue;/);
   });
 });
+
+describe('0.1.1966: 記録の組み立ての読み出しを同時に始め、段ごとの時間を計器に残す', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  const body = shim.slice(shim.indexOf('async function buildCommentsForLvUncached(lv) {'), shim.indexOf('const out = list.map('));
+  it('顔の控え3つの読み出しは記録の読み出しを待つ前に始める', () => {
+    const side = body.indexOf('const sidePromise = Promise.all(');
+    const fetch = body.indexOf('await getCommentsViaBackground(vid)');
+    expect(side).toBeGreaterThan(0);
+    expect(fetch).toBeGreaterThan(side);
+    expect(body).not.toMatch(/await real\?\.storage\?\.local\?\.get\?\./);
+  });
+  it('段ごとの時間(最初の1回・最長・最後)を残す', () => {
+    expect(shim).toContain('recordBuildPhases({ fetchMs: tFetchDone - tStart,');
+    expect(shim).toContain('if (!shimDiag.buildPhaseFirst) shimDiag.buildPhaseFirst =');
+  });
+});

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1946',
+    date: '2026-11-09',
+    summary: '横の欄がどの配信を出したかを診断に記録',
+    items: Object.freeze([
+      '横の欄(サイドパネル)とコメビュが、どのサービスのどの配信を表示に選んだか・その理由を診断に記録するようにしました(Kick や SHOWROOM を見ていても横の欄が YouTube に戻る件の原因を数字で確かめるため。表示の動きはまだ変えていません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1945',
     date: '2026-11-09',
     summary: '拡張の入れ替え時に他サービスのタブも読み込み直す',

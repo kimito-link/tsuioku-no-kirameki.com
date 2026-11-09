@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1966',
+    date: '2026-11-09',
+    summary: '横の欄を開いた直後の読み込みを同時に',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで横の欄が記録を組み立てるとき、記録と顔の控え3つを1つずつ順番に読んでいたのを、同時に読み始めるようにしました。開いた直後の最初の表示がどこで待っているかを測る計器も足しました。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1965',
     date: '2026-11-09',
     summary: '人が多い配信で横の欄の描き直しを軽く',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '記録の無い部屋で前の別の配信を出さない',
     items: Object.freeze([
       '横の欄(サイドパネル)で、まだ記録の無いチャンネル(配信前の部屋など)を前面にしたとき、前に見ていた別のサービスの配信を出し続けず、その部屋の「記録 0」を出すようにしました。配信者名は部屋のチャンネル名を出します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1946',
-    date: '2026-11-09',
-    summary: '横の欄がどの配信を出したかを診断に記録',
-    items: Object.freeze([
-      '横の欄(サイドパネル)とコメビュが、どのサービスのどの配信を表示に選んだか・その理由を診断に記録するようにしました(Kick や SHOWROOM を見ていても横の欄が YouTube に戻る件の原因を数字で確かめるため。表示の動きはまだ変えていません)。'
     ])
   })
 ]);

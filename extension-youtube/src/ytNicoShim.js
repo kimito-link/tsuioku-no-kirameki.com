@@ -463,7 +463,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined>, done?: boolean }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む(組み立て中は重ねない) */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { builds: 0, buildJoined: 0, buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { builds: 0, buildJoined: 0, buildPhaseFirst: /** @type {any} */ (null), buildPhaseMax: /** @type {any} */ (null), buildPhaseLast: /** @type {any} */ (null), buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
 const PANEL_SERVICE = PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '';
@@ -791,18 +791,49 @@ export function ytIsImportantVoiceKey(key) {
   return ytVoiceImportantKeys.has(String(key || ''));
 }
 
+/**
+ * 0.1.1966 計器: 組み立て1回の段ごとの時間。最初の1回(開いた直後)と、合計が最も長かった回を残す。
+ * @param {{ fetchMs: number, storageMs: number, sideWaitMs: number, mapMs: number, rows: number }} ph
+ */
+function recordBuildPhases(ph) {
+  const total = ph.fetchMs + ph.sideWaitMs + ph.mapMs;
+  const at = Date.now();
+  if (!shimDiag.buildPhaseFirst) shimDiag.buildPhaseFirst = { ...ph, total, at };
+  const max = /** @type {any} */ (shimDiag.buildPhaseMax);
+  if (!max || total > Number(max.total || 0)) shimDiag.buildPhaseMax = { ...ph, total, at };
+  shimDiag.buildPhaseLast = { ...ph, total, at };
+}
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
+  // 0.1.1966: 記録の読み出しと、顔の控え3つ(順位表・@名前・後から引いた顔)の読み出しを同時に始める(前は1つずつ待っていた)。
+  //   あわせて各段の時間を計器に残す(開いた直後の最初の組み立てが Kick 1万8千行で 70秒・どこで待っているかの名指し用)。
+  const tStart = Date.now();
+  const lbKey = `yt_leaderboard_${vid}`;
+  const vidPlat = platformOfStreamKey(vid);
+  /** @param {string} key */
+  const getKey = (key) => {
+    try {
+      return Promise.resolve(real?.storage?.local?.get?.(key)).then((bag) => bag?.[key], () => undefined);
+    } catch {
+      return Promise.resolve(undefined);
+    }
+  };
+  let tStorageDone = 0;
+  const sidePromise = Promise.all([getKey(lbKey), getKey('yt_handle_icons'), vidPlat ? getKey(vidPlat.lateIconsKey) : Promise.resolve(undefined)]).then((r) => {
+    tStorageDone = Date.now();
+    return r;
+  });
   const items = await getCommentsViaBackground(vid);
+  const tFetchDone = Date.now();
   if (items == null) return undefined;
+  const [lb, handleIconsRaw, lateIconsRaw] = await sidePromise;
+  const tSideDone = Date.now();
   const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
   // 顔の分からない人(YouTube のギフトだけ送った人など)は、トップファンの順位表の顔を名前で引く
   /** @type {Map<string, string>} */
   const boardIconByName = new Map();
   try {
-    const lbKey = `yt_leaderboard_${vid}`;
-    const lb = (await real?.storage?.local?.get?.(lbKey))?.[lbKey];
     for (const row of Array.isArray(lb?.rows) ? lb.rows : []) {
       const icon = ytUsableIcon(row?.iconUrl);
       if (icon && row?.name) boardIconByName.set(normName(row.name), icon);
@@ -812,23 +843,10 @@ async function buildCommentsForLvUncached(lv) {
   }
   // @名前 しか分からない人の顔(裏でチャンネルのページから引いたもの)
   /** @type {Record<string, { icon?: string }>} */
-  let handleIcons = {};
-  try {
-    handleIcons = (await real?.storage?.local?.get?.('yt_handle_icons'))?.yt_handle_icons || {};
-  } catch {
-    /* 無くても記録は出す */
-  }
+  const handleIcons = handleIconsRaw && typeof handleIconsRaw === 'object' ? handleIconsRaw : {};
   // Twitch/Kick: 記録のときに顔が間に合わなかった人の顔(視聴ページがあとで引いたもの・tw-/kick-content-entry.js)
   /** @type {Record<string, string>} */
-  let twLateIcons = {};
-  const vidPlat = platformOfStreamKey(vid);
-  if (vidPlat) {
-    try {
-      twLateIcons = (await real?.storage?.local?.get?.(vidPlat.lateIconsKey))?.[vidPlat.lateIconsKey] || {};
-    } catch {
-      /* 無くても記録は出す */
-    }
-  }
+  const twLateIcons = vidPlat && lateIconsRaw && typeof lateIconsRaw === 'object' ? lateIconsRaw : {};
   /** @type {Set<string>} 顔を引きに行く @名前 */
   const wantHandles = new Set();
   const who = buildYtPersonResolver(list);
@@ -863,6 +881,7 @@ async function buildCommentsForLvUncached(lv) {
   });
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
   registerBroadcastersFromSummaries();
+  recordBuildPhases({ fetchMs: tFetchDone - tStart, storageMs: (tStorageDone || tSideDone) - tStart, sideWaitMs: tSideDone - tFetchDone, mapMs: Date.now() - tSideDone, rows: out.length });
   if (wantHandles.size) {
     try {
       void Promise.resolve(real?.runtime?.sendMessage?.({ type: 'YT_HANDLE_ICONS', handles: [...wantHandles].slice(0, 5) })).catch(() => {});
