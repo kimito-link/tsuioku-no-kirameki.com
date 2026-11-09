@@ -203,3 +203,39 @@ describe('createCoalescedRefreshScheduler', () => {
     });
   });
 });
+
+describe('0.1.1957: 描き直しが重いときだけ間隔を広げる', () => {
+  it('軽い描き直し(100ms 以下)なら間隔は 450ms のまま', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: createClock() });
+    sched.notePaintCost(40);
+    sched.notePaintCost(100);
+    expect(sched.highFreqIntervalMs()).toBe(450);
+  });
+  it('1回300ms の描き直しが続くと、間隔は約900ms(描き直しの3倍)に広がる', () => {
+    const clock = createClock();
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: clock });
+    for (let i = 0; i < 10; i++) sched.notePaintCost(300);
+    expect(sched.highFreqIntervalMs()).toBe(900);
+    let n = 0;
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++);
+    expect(n).toBe(1);
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++);
+    clock.advance(600);
+    expect(n).toBe(1); // 450ms ではまだ描かない
+    clock.advance(300);
+    expect(n).toBe(2); // 900ms で末尾の1回
+  });
+  it('どれだけ重くても 1.5秒より空けない', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: createClock() });
+    for (let i = 0; i < 10; i++) sched.notePaintCost(5000);
+    expect(sched.highFreqIntervalMs()).toBe(1500);
+  });
+  it('設定トグルなど高頻度でない変更は、重くても待たせない', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: createClock() });
+    for (let i = 0; i < 10; i++) sched.notePaintCost(300);
+    let n = 0;
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++);
+    sched.schedule({ allHighFreq: false, initialDone: true }, () => n++);
+    expect(n).toBe(2);
+  });
+});

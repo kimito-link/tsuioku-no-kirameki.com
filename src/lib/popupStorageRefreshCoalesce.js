@@ -30,6 +30,7 @@
  * @param {{
  *   throttleMs?: number,
  *   slowThrottleMs?: number,
+ *   maxAdaptiveMs?: number,
  *   deps?: Partial<CoalesceDeps>
  * }} [opts]
  */
@@ -45,6 +46,17 @@ export function createCoalescedRefreshScheduler(opts = {}) {
   const setT = opts.deps?.setTimer || ((fn, ms) => setTimeout(fn, ms));
   /** @type {(id: unknown) => void} */
   const clearT = opts.deps?.clearTimer || ((id) => clearTimeout(/** @type {any} */ (id)));
+
+  // 0.1.1957: 描き直しが重いとき(行が数千ある配信・遅い PC)は、間隔を描き直しの時間の COST_FACTOR 倍まで広げる。
+  //   PC 実測(Kick 9,000行): 1回約300ms の描き直しが 450ms ごとに走り、横の欄の空き時間が60秒中0.1〜0.5秒しかなかった。
+  //   軽いとき(既定の配信)は throttleMs のまま=挙動は変わらない。上限 maxAdaptiveMs。
+  const COST_FACTOR = 3;
+  const maxAdaptiveMs = Number.isFinite(opts.maxAdaptiveMs)
+    ? Math.max(0, /** @type {number} */ (opts.maxAdaptiveMs))
+    : 1500;
+  /** 描き直し1回の時間のならし(ms)。0 = まだ測っていない */
+  let paintCostEma = 0;
+  const highFreqMs = () => Math.max(throttleMs, Math.min(maxAdaptiveMs, Math.round(paintCostEma * COST_FACTOR)));
 
   // 未描画状態は「十分昔に描画した」と等価に扱い、初回の先行描画を必ず通す。
   let lastPaintAt = Number.NEGATIVE_INFINITY;
@@ -71,7 +83,7 @@ export function createCoalescedRefreshScheduler(opts = {}) {
       return;
     }
     // ★設計V3b: 遅い側のキーだけの変更は、高頻度側より長い間隔(既定 3 秒)で先行＋末尾のスロットル。
-    const effectiveMs = ctx.allSlow === true && !ctx.allHighFreq ? slowThrottleMs : throttleMs;
+    const effectiveMs = ctx.allSlow === true && !ctx.allHighFreq ? slowThrottleMs : highFreqMs();
     if (!ctx.allHighFreq && ctx.allSlow !== true) {
       // 非高頻度の変更（例: 設定トグル）は遅延させない
       clearTrailing();
@@ -133,10 +145,23 @@ export function createCoalescedRefreshScheduler(opts = {}) {
     return true;
   }
 
+  /**
+   * 描き直し1回にかかった時間を知らせる(重いときだけ間隔を広げるため)。
+   * @param {number} ms
+   */
+  function notePaintCost(ms) {
+    const v = Number(ms);
+    if (!Number.isFinite(v) || v < 0) return;
+    paintCostEma = paintCostEma === 0 ? v : paintCostEma * 0.7 + v * 0.3;
+  }
+
   return {
     schedule,
     scheduleImmediate,
     cancel,
+    notePaintCost,
+    /** 読み取り専用: いまの高頻度キーの間隔(ms・計器とテスト用) */
+    highFreqIntervalMs: highFreqMs,
     /** 読み取り専用: 最後に runRefresh が呼ばれた時刻（テスト用） */
     lastPaintAtForTest: () => lastPaintAt
   };

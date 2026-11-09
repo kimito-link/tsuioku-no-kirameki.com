@@ -15900,6 +15900,15 @@ async function refresh() {
     missingIdCount >= Math.ceil(arr.length * 0.4);
 
   function paintWatchPopupUi() {
+    // 0.1.1957: 描き直しの時間を測り、重いときだけ次の描き直しまでの間隔を広げる(popupStorageRefreshCoalesce.js)
+    const _paintT0 = performance.now();
+    try {
+      paintWatchPopupUiBody();
+    } finally {
+      coalescedRefreshScheduler.notePaintCost(performance.now() - _paintT0);
+    }
+  }
+  function paintWatchPopupUiBody() {
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
     // total(=arr.length・O(1))は常時表示「記録している応援コメント N 件です」
     //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
