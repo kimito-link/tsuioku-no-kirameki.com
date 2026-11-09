@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1210 件
+## ⚠️ 役割コメントが無いソース 10 / 1211 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2368)
+- 📁 **src/** (2370)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2088)
+  - 📁 **lib/** (2090)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1546,7 +1546,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (66)
+    - 📁 **youtube/** (68)
       - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -1605,6 +1605,8 @@
       - `ytUserLaneTiers.test.js`
       - `ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
       - `ytViewerSampler.test.js`
+      - `ytVoiceAssignPersist.js` — YouTube 系(YouTube・Twitch・Kick ほか)の「人ごとの声の割り当て」(yt_voice_assignments)を
+      - `ytVoiceAssignPersist.test.js`
       - `ytVoicePriority.js` — YouTube 版の会場の読み上げで、混んでいるときに「大事なコメント」だけを読むための純関数。
       - `ytVoicePriority.test.js`
       - `ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）

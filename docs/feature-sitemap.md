@@ -643,7 +643,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 55</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -696,6 +696,7 @@
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 - `src/lib/voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
+- `src/lib/youtube/ytVoiceAssignPersist.js` — YouTube 系(YouTube・Twitch・Kick ほか)の「人ごとの声の割り当て」(yt_voice_assignments)を
 - `src/lib/youtube/ytVoicePriority.js` — YouTube 版の会場の読み上げで、混んでいるときに「大事なコメント」だけを読むための純関数。
 - `src/lib/youtube/ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
 - `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
@@ -1464,6 +1465,7 @@
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
 ### その他 (14版)
+- `v0.1.1968` 2026-11-10 — 声の割り当ての書き直しを30秒に1回へ
 - `v0.1.1966` 2026-11-09 — 横の欄を開いた直後の読み込みを同時に
 - `v0.1.1964` 2026-11-09 — 大きな配信で記録の組み立てを重ねない
 - `v0.1.1963` 2026-11-09 — 配信情報の読み込みが返らないと止まる所を直す
@@ -1477,4 +1479,3 @@
 - `v0.1.1951` 2026-11-09 — 他サービスの横の欄で前面タブを正しく拾う
 - `v0.1.1950` 2026-11-09 — 別タブの探り読みで横の欄が重くならない
 - `v0.1.1949` 2026-11-09 — 別サービスへ移ると横の欄をまっさらにする
-- `v0.1.1948` 2026-11-09 — 横の欄が裏のタブの配信に引っ張られない

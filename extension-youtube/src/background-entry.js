@@ -41,6 +41,7 @@ import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
+import { ytVoiceAssignPersistDecision, YT_VOICE_ASSIGN_PERSIST_MS } from '../../src/lib/youtube/ytVoiceAssignPersist.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
 
@@ -84,6 +85,33 @@ const DEFAULT_VOICE_SETTINGS = Object.freeze({
   lightVoice: 'auto',
   availableStyleIds: Array.from(YT_DEFAULT_STYLE_IDS),
 });
+
+/**
+ * ★v0.1.1968: 人ごとの声の割り当て(yt_voice_assignments・数百KB)の控え。束ごとに storage から読み書きすると
+ *   onChanged で全ページへ新旧の値が配られ横の欄が数分止まった(PC 実測)。控えを正にし、変わったときだけ
+ *   最短30秒に1回書く(src/lib/youtube/ytVoiceAssignPersist.js)。
+ * @type {Record<string, any> | null}
+ */
+let voiceAssignMem = null;
+let voiceAssignDirty = false;
+let voiceAssignWrittenAt = 0;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let voiceAssignTimer = null;
+function scheduleVoiceAssignFlush() {
+  if (voiceAssignTimer) return;
+  const wait = Math.max(1000, YT_VOICE_ASSIGN_PERSIST_MS - (Date.now() - voiceAssignWrittenAt));
+  voiceAssignTimer = setTimeout(() => {
+    voiceAssignTimer = null;
+    void runSerialized(async () => {
+      if (!voiceAssignDirty || !voiceAssignMem) return;
+      voiceAssignDirty = false;
+      voiceAssignWrittenAt = Date.now();
+      await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_ASSIGNMENTS]: voiceAssignMem });
+    }).catch(() => {
+      voiceAssignDirty = true;
+    });
+  }, wait);
+}
 
 /** 並列メッセージによる storage / IndexedDB 競合を防ぐ直列化キュー */
 let storageJobChain = Promise.resolve();
@@ -948,7 +976,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         STORAGE_KEYS.STREAM_SUMMARIES,
         STORAGE_KEYS.ACTIVE_VIDEO_ID,
         STORAGE_KEYS.VOICE_SETTINGS,
-        STORAGE_KEYS.VOICE_ASSIGNMENTS,
+        ...(voiceAssignMem ? [] : [STORAGE_KEYS.VOICE_ASSIGNMENTS]),
         STORAGE_KEYS.VOICE_QUEUE,
         STORAGE_KEYS.VOICE_STATE,
       ]);
@@ -960,7 +988,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ...DEFAULT_VOICE_SETTINGS,
         ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
       };
-      let assignments = data[STORAGE_KEYS.VOICE_ASSIGNMENTS] || {};
+      const assignmentsAtStart = voiceAssignMem || data[STORAGE_KEYS.VOICE_ASSIGNMENTS] || {};
+      let assignments = assignmentsAtStart;
       let voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
         ? data[STORAGE_KEYS.VOICE_QUEUE]
         : [];
@@ -1058,10 +1087,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       const updates = {
         [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
-        [STORAGE_KEYS.VOICE_ASSIGNMENTS]: assignments,
         [STORAGE_KEYS.VOICE_QUEUE]: voiceQueue,
         [STORAGE_KEYS.VOICE_STATE]: voiceState,
       };
+      // 声の割り当ては控えを正にし、変わったときだけ最短30秒に1回書く(v0.1.1968)
+      voiceAssignMem = assignments;
+      if (assignments !== assignmentsAtStart) voiceAssignDirty = true;
+      const assignWrite = ytVoiceAssignPersistDecision({ dirty: voiceAssignDirty, lastWrittenAt: voiceAssignWrittenAt, now: Date.now() });
+      if (assignWrite === 'now') {
+        updates[STORAGE_KEYS.VOICE_ASSIGNMENTS] = assignments;
+        voiceAssignDirty = false;
+        voiceAssignWrittenAt = Date.now();
+      } else if (assignWrite === 'later') {
+        scheduleVoiceAssignFlush();
+      }
       if (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID]) {
         updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
       }

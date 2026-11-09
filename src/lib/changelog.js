@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1968',
+    date: '2026-11-10',
+    summary: '声の割り当ての書き直しを30秒に1回へ',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで、人ごとの声の割り当て(数百KB)をコメントの束ごとに丸ごと書き直していたのを、変わったときだけ・最短30秒に1回にしました。人の多い配信で横の欄やコメビュが長く固まるのを和らげます。声の割り当ては変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1967',
     date: '2026-11-09',
     summary: '応援レーンの塗り直しで動かす枚数を最小に',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '別サービスへ移ると横の欄をまっさらにする',
     items: Object.freeze([
       '横の欄(サイドパネル)で、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のあいだで別の配信のタブへ移ったら、ニコ生版と同じく中身を読み込み直すようにしました。前のサービスの言葉(「Kicks ランキング」など)が残らなくなります。YouTube のトップなど配信でないページでは、いま出している配信を保ちます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1948',
-    date: '2026-11-09',
-    summary: '横の欄が裏のタブの配信に引っ張られない',
-    items: Object.freeze([
-      'Kick・SHOWROOM・TikTok などの配信ページが「いま見ている配信」を自分で記録するようにしました(ニコ生版と同じ決まり)。横の欄とコメビュは、これまでの「記録が最近増えた配信」ではなく、最後に前面で見た配信を出します。裏で記録中の YouTube タブに引っ張られて表示が戻ることがなくなります。'
     ])
   })
 ]);

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1948',
+    date: '2026-11-09',
+    summary: '横の欄が裏のタブの配信に引っ張られない',
+    items: Object.freeze([
+      'Kick・SHOWROOM・TikTok などの配信ページが「いま見ている配信」を自分で記録するようにしました(ニコ生版と同じ決まり)。横の欄とコメビュは、これまでの「記録が最近増えた配信」ではなく、最後に前面で見た配信を出します。裏で記録中の YouTube タブに引っ張られて表示が戻ることがなくなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1947',
     date: '2026-11-09',
     summary: '記録の無い部屋で前の別の配信を出さない',
