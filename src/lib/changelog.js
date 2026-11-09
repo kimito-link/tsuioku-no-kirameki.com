@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1953',
+    date: '2026-11-09',
+    summary: '他サービスで新着が横の欄に出る遅れを減らす',
+    items: Object.freeze([
+      'YouTube・Kick・SHOWROOM などで、横の欄が裏のタブの配信の記録まで毎回組み立てていたため、見ている配信の新着が数秒遅れていました。見ている配信だけを組み立てるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1952',
     date: '2026-11-09',
     summary: '他サービスの横の欄の描き直しすぎを直す',
@@ -183,17 +191,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       '「ふわっち運営＠催しの名前」のような運営のお知らせを、応援した人として数えないようにしました。',
       'コメビュの見出しなどに出ていた「ww.番号.番号」を、配信の題(無ければ配信者の名前)で出すようにしました。Twitch・Kick・SHOWROOM も同じです。',
       'ふわっちの匿名の人の ID 欄は空欄でなく「匿名」と出します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1933',
-    date: '2026-11-08',
-    summary: 'SHOWROOM の配信を記録(試作)',
-    items: Object.freeze([
-      'SHOWROOM の部屋のページ(showroom-live.com/r/部屋の名前)を開くと、コメントとギフトを記録するようにしました。ニコ生・YouTube・Twitch・Kick・ふわっちと同じ画面で見られます。',
-      '有料のギフトは名前・絵・pt(値段 × 個数)つきで記録します。星や種などの無料のギフトは数が多いので記録しません。',
-      'SHOWROOM 公式の貢献ランキング(pt つき)をギフト貢献度の欄に出します。',
-      '未ログインのときは送信の前に止めます。'
     ])
   })
 ]);

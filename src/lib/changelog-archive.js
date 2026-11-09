@@ -24,6 +24,17 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1933',
+    date: '2026-11-08',
+    summary: 'SHOWROOM の配信を記録(試作)',
+    items: Object.freeze([
+      'SHOWROOM の部屋のページ(showroom-live.com/r/部屋の名前)を開くと、コメントとギフトを記録するようにしました。ニコ生・YouTube・Twitch・Kick・ふわっちと同じ画面で見られます。',
+      '有料のギフトは名前・絵・pt(値段 × 個数)つきで記録します。星や種などの無料のギフトは数が多いので記録しません。',
+      'SHOWROOM 公式の貢献ランキング(pt つき)をギフト貢献度の欄に出します。',
+      '未ログインのときは送信の前に止めます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1932',
     date: '2026-11-08',
     summary: 'ふわっちのアイテム・匿名の人・文字化けを直す',

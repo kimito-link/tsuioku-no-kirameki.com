@@ -525,6 +525,19 @@ let lastAskedLv = '';
 let lastStreamValue = null;
 /** 最後に「最後に見た配信」として知らせた疑似 lv */
 let lastAnnouncedLv = '';
+/**
+ * 0.1.1953: この画面が最近コメントを聞いた配信(lv → 最後に聞いた時刻)。探り読みは入れない。
+ *   記録の更新の知らせ(notifyLv)は、この画面が見ている配信だけに出す。
+ * @type {Map<string, number>}
+ */
+const recentlyAskedLvs = new Map();
+const RECENT_ASK_MS = 60_000;
+/** @param {string} lv */
+function isWatchedByThisScreen(lv) {
+  if (!recentlyAskedLvs.size) return true; // まだ何も聞かれていない(開いた直後)は従来どおり
+  const at = recentlyAskedLvs.get(lv);
+  return at != null && Date.now() - at < RECENT_ASK_MS;
+}
 /** @type {(lv: string, reason: string) => void} 知らせる口(storage の見張りを付けたところで差し替わる) */
 let announceLastWatch = () => {};
 /** @param {string} lv */
@@ -902,6 +915,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
             continue;
           }
           lastAskedLv = lv;
+          recentlyAskedLvs.set(lv, Date.now());
           panelDiag.asked(lv, isProbe);
           shimDiag.commentGets += 1;
           const arr = await buildCommentsForLv(lv);
@@ -1263,7 +1277,15 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       if (lastAnnouncedLv) announceLastWatch(lvOfLastStream(lastStreamValue), 'resolve');
       for (const vid of Object.keys(next)) {
         if (prev[vid] && Number(prev[vid].updatedAt || 0) === Number(next[vid]?.updatedAt || 0)) continue;
-        void notifyLv(pseudoLvForVideoId(vid), next[vid]);
+        // 0.1.1953: この画面が見ていない配信の記録は組み立てない(裏のタブの全件を IndexedDB から毎回組み、
+        //   見ている配信の更新が数秒遅れていた・PC 実測 1952 Kick 中央値 3.5秒)。ニコ生版の受け手も自分の lv だけ見る
+        const lvOf = pseudoLvForVideoId(vid);
+        if (!isWatchedByThisScreen(lvOf)) {
+          panelDiag.notify(false);
+          continue;
+        }
+        panelDiag.notify(true);
+        void notifyLv(lvOf, next[vid]);
       }
     });
     // 2026-11-05 りんく「もっとリアルタイムに」: background が保存より先に届けた新しい行(YT_LIVE_ROWS)を控えに足して、すぐ会場に知らせる。

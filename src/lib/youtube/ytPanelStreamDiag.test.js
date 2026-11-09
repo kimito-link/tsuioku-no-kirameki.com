@@ -187,3 +187,20 @@ describe('0.1.1951: 読み込み直しを越えた累計・storage の変化の�
     expect(s.storageChangedEvents).toBe(1);
   });
 });
+
+describe('0.1.1953: 見ていない配信の記録は組み立てない', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  it('記録の更新の知らせは、この画面が最近聞いた配信だけ(探り読みは入れない)', () => {
+    expect(shim).toContain('if (!isWatchedByThisScreen(lvOf)) {');
+    const probeAt = shim.indexOf('if (isProbe) {');
+    const setAt = shim.indexOf('recentlyAskedLvs.set(lv, Date.now());');
+    expect(setAt).toBeGreaterThan(probeAt);
+  });
+  it('計器は built / skipped を数える', () => {
+    const d = make();
+    d.notify(true);
+    d.notify(false);
+    d.notify(false);
+    expect(d.snapshot().recordNotify).toEqual({ built: 1, skipped: 2 });
+  });
+});

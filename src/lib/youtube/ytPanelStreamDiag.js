@@ -99,6 +99,8 @@ export function createPanelStreamDiag(deps) {
     /** 0.1.1951: この画面が受けた storage の変化(キー名の数字は N に=どのキーが描き直しを呼んでいるか) */
     storageChangedKeys: /** @type {Record<string, number>} */ ({}),
     storageChangedEvents: 0,
+    /** 0.1.1953: 記録の更新の知らせ(見ている配信=built / 見ていない配信=skipped で組み立てなかった) */
+    recordNotify: { built: 0, skipped: 0 },
     /** 配信のページなのに配信キーに写せなかったタブ(記録の無い部屋など) */
     unmappedWatchTabs: { count: 0, lastHost: '', lastAt: 0 },
     /** 探り読み(1回の get で comments を2配信以上聞く) */
@@ -215,6 +217,11 @@ export function createPanelStreamDiag(deps) {
           s.storageChangedKeys[name] = (s.storageChangedKeys[name] || 0) + 1;
         } else s.storageChangedKeys['(other)'] = (s.storageChangedKeys['(other)'] || 0) + 1;
       }
+    },
+    /** @param {boolean} built */
+    notify(built) {
+      if (built) s.recordNotify.built += 1;
+      else s.recordNotify.skipped += 1;
     },
     /** @param {string} url */
     unmappedWatchTab(url) {
