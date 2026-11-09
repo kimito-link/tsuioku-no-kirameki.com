@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1947',
+    date: '2026-11-09',
+    summary: '記録の無い部屋で前の別の配信を出さない',
+    items: Object.freeze([
+      '横の欄(サイドパネル)で、まだ記録の無いチャンネル(配信前の部屋など)を前面にしたとき、前に見ていた別のサービスの配信を出し続けず、その部屋の「記録 0」を出すようにしました。配信者名は部屋のチャンネル名を出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1946',
     date: '2026-11-09',
     summary: '横の欄がどの配信を出したかを診断に記録',

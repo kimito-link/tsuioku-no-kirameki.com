@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2367)
+- 📁 **src/** (2368)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1220,7 +1220,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (108)
+  - 📁 **extension/** (109)
     - 📁 **popup/** (17)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1241,11 +1241,12 @@
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
       - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
-    - 📁 **story/** (6)
+    - 📁 **story/** (7)
       - `laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
       - `laneContentLod.test.js`
       - `laneContentLodThumbArrival.test.js`
       - `laneShrinkScenario.test.js`
+      - `reconcileLaneChildren.test.js`
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
       - `renderStoryUserLaneDom.test.js`
     - `avatar-face-worker-entry.js` — 匿名の顔を合成する専用 Worker(v0.1.1681)。

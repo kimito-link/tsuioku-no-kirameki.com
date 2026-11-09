@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1967',
+    date: '2026-11-09',
+    summary: '応援レーンの塗り直しで動かす枚数を最小に',
+    items: Object.freeze([
+      '応援レーン(アイコンの列)を塗り直すたびに、全員のアイコンをいったん外して付け直していたのを、順番が変わった人・増えた人・減った人だけ動かすようにしました。人数の多い配信で横の欄が重くなるのを和らげます。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1966',
     date: '2026-11-09',
     summary: '横の欄を開いた直後の読み込みを同時に',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '横の欄が裏のタブの配信に引っ張られない',
     items: Object.freeze([
       'Kick・SHOWROOM・TikTok などの配信ページが「いま見ている配信」を自分で記録するようにしました(ニコ生版と同じ決まり)。横の欄とコメビュは、これまでの「記録が最近増えた配信」ではなく、最後に前面で見た配信を出します。裏で記録中の YouTube タブに引っ張られて表示が戻ることがなくなります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1947',
-    date: '2026-11-09',
-    summary: '記録の無い部屋で前の別の配信を出さない',
-    items: Object.freeze([
-      '横の欄(サイドパネル)で、まだ記録の無いチャンネル(配信前の部屋など)を前面にしたとき、前に見ていた別のサービスの配信を出し続けず、その部屋の「記録 0」を出すようにしました。配信者名は部屋のチャンネル名を出します。'
     ])
   })
 ]);

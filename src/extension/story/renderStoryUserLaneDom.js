@@ -580,6 +580,35 @@ export function resetStoryUserLaneDom(els) {
 }
 
 /**
+ * v0.1.1967: 段の子を nodes の並びにそろえる。同じ場所にあるものは触らず、要らないものを外し、
+ *   足りないもの・場所が変わったものだけ insertBefore で動かす(結果の並びは replaceChildren(...nodes) と同じ)。
+ *   1人が順位を上げた/下げた・新しい人が入った、のどれも数回の移動で済む。
+ * @param {Element} el
+ * @param {Node[]} nodes
+ */
+export function reconcileLaneChildren(el, nodes) {
+  const want = new Set(nodes);
+  for (let c = el.firstChild; c; ) {
+    const next = c.nextSibling;
+    if (!want.has(c)) el.removeChild(c);
+    c = next;
+  }
+  let cur = el.firstChild;
+  for (const n of nodes) {
+    if (n === cur) {
+      cur = cur.nextSibling;
+      continue;
+    }
+    // cur が後ろへ下がった人なら、そのまま残して先へ進む(その人の番が来たときに動かす)
+    if (cur && cur.nextSibling === n) {
+      cur = n.nextSibling;
+      continue;
+    }
+    el.insertBefore(n, cur);
+  }
+}
+
+/**
  * @param {HTMLElement} el
  * @param {Array<{ displaySrc: string, title: string, meta: { idLine: string, nameLine: string }, entry: { userId?: string } }>} items
  * @param {StoryUserLaneDomIo} io
@@ -607,7 +636,8 @@ function fillLaneTier(el, items, io, wrapTileEl) {
   //   filledKeys(一度詰めた人)は保持される=戻さない(一方通行)。
   forgetLaneContentLod(el);
   const laneNameForLod = laneNameOfEl(el);
-  const frag = document.createDocumentFragment();
+  /** @type {Node[]} 段に並べる順(0.1.1967: 断片に移すと使い回すタイルが一度外れるので、配列に集める) */
+  const order = [];
   /** @type {Array<HTMLElement|null>} */
   const tileNodes = new Array(items.length).fill(null);
   // v0.1.1692: 前回と見た目の鍵が同じ人のタイルは作り直さず使い回す(1人変わるたびに段の全員の <img> が新品になり、
@@ -664,7 +694,7 @@ function fillLaneTier(el, items, io, wrapTileEl) {
         tileNodes[i] = realEl;
         hollowEl.replaceWith(realEl);
       });
-      frag.appendChild(hollowEl);
+      order.push(hollowEl);
       continue;
     }
     // v0.1.1692: 前回と見た目の鍵が同じ人のタイルがあれば、新しく作らずそれを入れる(stats だけ追従)。
@@ -673,7 +703,7 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     if (reused) {
       applyLaneTileStatsAttr(reused, p);
       tileNodes[i] = reused;
-      frag.appendChild(reused);
+      order.push(reused);
       continue;
     }
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
@@ -711,9 +741,12 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     } catch { /* io 未注入等でも描画は止めない */ }
     applyLaneTileStatsAttr(tileEl, p);
     tileNodes[i] = tileEl;
-    frag.appendChild(typeof wrapTileEl === 'function' ? wrapTileEl(tileEl, p, i) : tileEl);
+    order.push(typeof wrapTileEl === 'function' ? wrapTileEl(tileEl, p, i) : tileEl);
   }
-  el.replaceChildren(frag);
+  // v0.1.1967: 全員を外して付け直す(replaceChildren)のをやめ、変わった所だけ動かす。
+  //   Kick 2万4千行・りんく段 3,700人で、描き直しのたびに全員分が外れて付き直り、21秒で 11,167個の付け直しになっていた
+  //   (PC 実測・MutationObserver)。使い回したタイルは同じ場所にあれば触らない。最後の DOM の並びは前と同じ。
+  reconcileLaneChildren(el, order);
   el.hidden = false;
   _laneTierLastKey.set(el, key);
   _laneTileNodes.set(el, tileNodes);
