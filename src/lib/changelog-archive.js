@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1951',
+    date: '2026-11-09',
+    summary: '他サービスの横の欄で前面タブを正しく拾う',
+    items: Object.freeze([
+      'YouTube・Kick・SHOWROOM などの横の欄で、前面のウィンドウのタブも配信として読めるようにしました(ニコ生版と同じ)。あわせて、横の欄が何度も読み直している原因を調べる計器を足しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1950',
     date: '2026-11-09',
     summary: '別タブの探り読みで横の欄が重くならない',

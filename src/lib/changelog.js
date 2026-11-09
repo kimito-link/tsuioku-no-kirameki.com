@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1971',
+    date: '2026-11-10',
+    summary: '裏方の更新が古いまま残る件を直す',
+    items: Object.freeze([
+      '拡張を新しい版に入れ替えても、裏で動く記録係(YouTube・Twitch・Kick などの分)が古い中身のまま動き続けることがありました。版ごとに裏方の本体も必ず入れ替わるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1970',
     date: '2026-11-10',
     summary: '声の割り当ての間引きを作り直し後も保つ',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '他サービスの横の欄の描き直しすぎを直す',
     items: Object.freeze([
       'YouTube・Kick・SHOWROOM などで、コメントの束が届くたびに横の欄が描き直していたのを、ニコ生版と同じ間引きにしました(新しいコメントの表示の速さは変わりません)'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1951',
-    date: '2026-11-09',
-    summary: '他サービスの横の欄で前面タブを正しく拾う',
-    items: Object.freeze([
-      'YouTube・Kick・SHOWROOM などの横の欄で、前面のウィンドウのタブも配信として読めるようにしました(ニコ生版と同じ)。あわせて、横の欄が何度も読み直している原因を調べる計器を足しました'
     ])
   })
 ]);

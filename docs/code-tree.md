@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1212 件
+## ⚠️ 役割コメントが無いソース 10 / 1213 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2372)
+- 📁 **src/** (2374)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2092)
+  - 📁 **lib/** (2094)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3250,6 +3250,8 @@
     - `swCommentChunkKeyMirror.test.js`
     - `swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
     - `swCrawlSlots.test.js`
+    - `swScriptStamp.js` — service worker の本体(extension/background.js)に、束ねた中身の指紋を1行で刻む(v0.1.1971)。
+    - `swScriptStamp.test.js`
     - `symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
     - `symptomVerdicts.test.js`
     - `symptomVerdicts.wiring.test.js`

@@ -1109,7 +1109,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 329</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 330</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1394,6 +1394,7 @@
 - `src/lib/supporterLicense.js` — 【層】L0 判定層(純粋関数 + WebCrypto の署名確認だけ)
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
 - `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
+- `src/lib/swScriptStamp.js` — service worker の本体(extension/background.js)に、束ねた中身の指紋を1行で刻む(v0.1.1971)。
 - `src/lib/symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
 - `src/lib/tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
 - `src/lib/timeAuthority.js` — timeAuthority — 「その値がいつ真だったか」と「その値は判定に使えるか」の【唯一の正本】。
@@ -1467,6 +1468,7 @@
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
 ### その他 (13版)
+- `v0.1.1971` 2026-11-10 — 裏方の更新が古いまま残る件を直す
 - `v0.1.1970` 2026-11-10 — 声の割り当ての間引きを作り直し後も保つ
 - `v0.1.1968` 2026-11-10 — 声の割り当ての書き直しを30秒に1回へ
 - `v0.1.1966` 2026-11-09 — 横の欄を開いた直後の読み込みを同時に
@@ -1479,4 +1481,3 @@
 - `v0.1.1955` 2026-11-09 — 行が多い配信で横の欄が遅くなるのを減らす
 - `v0.1.1953` 2026-11-09 — 他サービスで新着が横の欄に出る遅れを減らす
 - `v0.1.1952` 2026-11-09 — 他サービスの横の欄の描き直しすぎを直す
-- `v0.1.1951` 2026-11-09 — 他サービスの横の欄で前面タブを正しく拾う
