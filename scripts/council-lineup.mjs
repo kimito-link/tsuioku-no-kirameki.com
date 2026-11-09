@@ -377,7 +377,9 @@ export const LINEUP = [
   //   reasoning_effort:'low' は効かない（79363ms・finish=length）。enable_thinking 単体 / reasoning.effort は 400（NIMが未対応のパラメータ）。
   // ★2026-10-17 timeoutMs: 90000 を追加: 推論を切っても NIM の応答が遅く、実会議(COUNCIL_FULL)で 267243ms（既定150秒のabort後の再試行で完走）。
   //   1体の遅さが会議全体を止める（会議は並列で、律速は最も遅いメンバー）。scout の実疎通と同じ90秒で諦めて失敗として数える（採用基準: 遅さで会議を止める枠は置かない）。
-  { label: 'nvidia/deepseek-v4.1-flash', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4.1-flash', apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
+  // ★2026-11-09 timeoutMs 90000→150000: 本番条件の実測で 86.5秒(11/5)・108.9秒(11/9)。90秒だと答えが届く前に打ち切る日が出る。
+  //  150秒は openaiChat の既定と同じ。並列会議の律速は lead(nemotron-3-ultra・実測30〜104秒)なので全体は遅くならない。
+  { label: 'nvidia/deepseek-v4.1-flash', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4.1-flash', apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 150000, requires: ['N'], liveProbe: true },
 
   // ★2026-11-03 追加（会議メンバーを11/3時点の最新へ・generalist の予備 weight3）:
   //  NVIDIA Nemotron 3.5 Super（2026-10-15 公開・120B/12B有効）。名簿の nemotron 系（3-ultra-550b・CF の 3-120b）より新しい世代。
@@ -390,6 +392,30 @@ export const LINEUP = [
   //  恒久ルール3: 新顔は予備から。label に "nvidia" を含むと weightOf が 2 にするため、council-roles.mjs に "nemotron-3.5"→3 の行を足した。
   //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。timeoutMs は NIM の遅さ（33秒実績）を見て90秒。
   { label: 'nvidia/nemotron-3.5-super', provider: 'nvidia', rawId: 'nvidia/nemotron-3.5-super-vl-120b-a12b', apiModel: 'nvidia/nemotron-3.5-super-vl-120b-a12b', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
+  // ★2026-11-05 追加（会議メンバーを11/5時点の最強へ・generalist の予備 weight3）:
+  //  NVIDIA Nemotron 3.5 Lightning（30B/3B有効の速い型）。council-roles.mjs の "nemotron-3.5"→3 行がそのまま効く（roles は無変更）。
+  //  実測（scripts/council-trial.mjs・本番と同じ max_tokens 1600 / temperature 0.6・りんくのPC・11/5）:
+  //   推論オフ(enable_thinking=false): 9638ms / 5614ms / 10834ms で3/3 OK（本文746〜1256字）。
+  //   既定(推論オン): 19208ms / 21022ms / 14020ms で3/3 EMPTY ＝推論オフ必須。
+  //  中身: 名簿の主力と同じ形（結論→理由→懸念）で答えられた。super(5〜33秒)より速い予備として足す。
+  //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。
+  { label: 'nvidia/nemotron-3.5-lightning', provider: 'nvidia', rawId: 'nvidia/nemotron-3.5-lightning-30b-a3b', apiModel: 'nvidia/nemotron-3.5-lightning-30b-a3b', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
+  // ★2026-11-05 試して見送った新顔（11/5 の council-trial 実測）:
+  //  - Kimi K3.1 Pro / Muse Spark Open / Qwen3.8-Max: NVIDIA に無く(404)、OpenRouter では有料のみ（:free 無し）。
+  //  - gemini-3.8-flash: 1回 OK(7.0秒) のあと 503 が2回（同時に 3.7-flash も 503 が2回）。まだ混雑。入れ替えは保留。
+  //  - Mistral Large 4: Mistral 経由も NVIDIA 経由も本文空（NVIDIA は推論のみで 68〜191秒）。
+  //  - GLM 5.3（NVIDIA・CF）/ MiniMax M3.1 / Kimi K2.6・K2.7-code（CF）: 推論オフでも本文空。
+  //  - cloudflare/qwen3.8-27b: 推論オフで1回 OK(10.5秒)。groq に同じモデルが主力で居るため見送り。
+  //  - meta/muse-glimmer-30b: OK だが 25〜159秒と遅い。nvidia/step-5-preview: 本文に思考メモが混ざる。
+  // ★2026-11-09 再測定（council-trial・りんくのPC。名簿の変更は上の deepseek の timeoutMs だけ）:
+  //  - nemotron-3.5-lightning(推論オフ) 3/3 OK（13.4〜18.9秒・1226〜1421字）、nemotron-3.5-super(推論オフ) 3/3 OK（4.8〜8.2秒）＝2体とも安定。
+  //  - gemini-3.7-flash: 3回とも失敗（120秒/240秒タイムアウト・503）。11/3・11/5 も503が続く。generalist には 2.5-flash(w1)と nemotron-3.5 2体(w3)が居るので
+  //    席は埋まる。入れ替え先の gemini-3.8-flash も3回失敗（503・タイムアウト）なので今回は据え置き。
+  //  - cloudflare/nemotron-120b: OK / 推論のみ空 / 途中切れ で割れた（11/3・11/5 と同じ傾向）。統合の最後の砦なので据え置き。
+  //  - Kimi K3.1 Pro: build.nvidia.com に Free Endpoint と出たが、NVIDIA の /v1/models に無く 404（11/6・11/9 とも）。
+  //  - NVIDIA の一覧は 85→84件（増えた0・消えたのは meta/llama-3.2-11b-vision-instruct）。OpenRouter :free の新顔 liquid/lfm-3-1.7b は 429 で未測定。
+  //  - SambaNova は今回、多くのモデルが 402「支払い方法の登録が必要」（gemma-4-31B-it だけ OK）。名簿に SambaNova は残っていない。
+  //  - Mistral Large 4 は3回とも本文空。GLM 5.3・MiniMax・Step 5 は空かタイムアウト。cloudflare/qwen3.8-27b は推論オフで OK だが groq に同じモデルが主力で居る。
   // ★2026-11-03 試して見送った新顔（同じ council-trial で実測。再挑戦するときの出発点）:
   //  - Gemini 4 Argon / 3.1 Pro: 429 quota（無料枠では呼べない。有料プラン専用）。
   //  - gemini-3.8-flash: 4回とも 503 high demand（名簿の 3.7-flash も同日4回 503）。混雑が引いたら再測定して 3.7 と入れ替える候補。
@@ -556,7 +582,11 @@ export const LINEUP = [
   //   なお MiniMax-M2.7 は下記コメントで「402で無料枠対象外」と記録しているが、本日は
   //   200で応答した＝SambaNovaの無料枠対象は時期で変わる。下の記述は当時の実測として
   //   残す（履歴を書き換えない）が、再検討する際は必ず再測定すること。
-  { label: 'sambanova/deepseek-v3.1', provider: 'sambanova', rawId: 'DeepSeek-V3.1', apiModel: 'DeepSeek-V3.1', opts: {}, requires: ['SN'], liveProbe: true },
+  // ★2026-11-05 撤去（sambanova/deepseek-v3.1・critic weight4）: 11/5 の実測で 410 "not available on SambaNova Cloud"。
+  //  これまでの 401(キー失効)・429(混雑) と違い、410 はモデル自体の提供終了＝キーを作り直しても戻らない。
+  //  同じキーで他の SambaNova モデルは 429/400 を返した（キーとプロバイダは生きている）ので、このモデルだけの死と判断。
+  //  critic 役は groq/gpt-oss-120b・nvidia/deepseek-v4.1-flash・cloudflare/deepseek-v4.1-flash・mistral/magistral-small が残る。
+  //  roleOf/weightOf の "deepseek-v3"・"sambanova" 判定行は消さない（前例どおり）。
   //  2026-08-18 撤去（上のうち llama-3.3-70b）: 実測で使い物にならない——本日の検証6会議で
   //  召集4回すべて429、単発プローブも3回中3回429（"Meta-Llama-3.3-70B-Instruct-8k is
   //  currently experiencing high demand"）。さらに同日Groqが本線llama-3.3-70bを廃止（404）し、
