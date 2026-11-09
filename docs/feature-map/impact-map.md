@@ -909,6 +909,7 @@
 | `src/lib/privacyDisplay.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/probeRecommendedLiveSection.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/probeWatchPageDomStructure.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/profileCacheWritePace.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/profileResolveState.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/provisionalLaneCommentRows.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/pruneLiveViewPublishBlob.js` | 1 | 状態速報ページ |

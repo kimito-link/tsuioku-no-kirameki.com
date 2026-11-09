@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1976',
+    date: '2026-11-10',
+    summary: '人の多い配信で名前と顔の控えを書く回数を減らす',
+    items: Object.freeze([
+      '名前と顔の控えが2,000人を超えたら、横の欄から控え全体を書くのを30秒に1回にしました(8万行の配信で110秒に3.6MB書いていた)。横の欄の中ではこれまでどおりすぐ使います。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1975',
     date: '2026-11-10',
     summary: '人がとても多い配信は応援レーンを2,000人までに',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '描き直しが重いときは間隔を広げる',
     items: Object.freeze([
       'コメントが数千行ある配信や遅い PC では、横の欄の描き直し1回に時間がかかり、描き直しが休みなく続いて固まりがちでした。描き直しが重いときだけ、次の描き直しまでの間隔をその時間の3倍(最大1.5秒)まで広げます。軽いときは今までどおりです'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1956',
-    date: '2026-11-09',
-    summary: '行が多いときの横の欄の描き直しを軽くする',
-    items: Object.freeze([
-      'コメントが数千行ある配信で、横の欄が描き直すたびに全員の顔画像を選び直し、行を並べ直していました。同じ人・同じ条件の顔は前の答えを使い、既に並んでいる行は並べ直さないようにしました。表示される顔と順番は変わりません'
     ])
   })
 ]);

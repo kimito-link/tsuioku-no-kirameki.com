@@ -749,6 +749,7 @@ import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
 import { createLaneMirrorPacer } from '../lib/laneMirrorPublishPace.js';
 import { laneCrowdLimit } from '../lib/laneCrowdLimit.js';
+import { createProfileCacheWritePacer } from '../lib/profileCacheWritePace.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
@@ -4853,6 +4854,11 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
  *   storage.onChanged の newValue を権威として更新・寿命60秒・読み出し中の変化は古い結果で上書きしない。
  */
 const _profileCacheMemo = createStorageKeyMemo(KEY_USER_COMMENT_PROFILE_CACHE);
+// ★v0.1.1976: 大きい控え(2,000人超)は全体の書き込みを30秒に1回へ(src/lib/profileCacheWritePace.js)
+const _profileCacheWritePacer = createProfileCacheWritePacer({
+  flush: () => { if (popupUserCommentProfileMap) void storageSetSafe({ [KEY_USER_COMMENT_PROFILE_CACHE]: popupUserCommentProfileMap }); }
+});
+/** @type {any} */ (globalThis).__profileCacheWritePaceDiag = _profileCacheWritePacer.diag;
 const _calibrationRingMemo = createStorageKeyMemo(KEY_CONCURRENT_CALIBRATION_RING_V1);
 let _calibrationFitVersion = -1;
 try {
@@ -4948,7 +4954,7 @@ async function runDeferredUserCommentProfileHydrate(ctx) {
     setArr(prof.arr);
     const save = {};
     if (prof.commentsPatched && mainWriteAllowed) save[commentsKey] = prof.arr;
-    if (prof.cacheTouched || hydrated) {
+    if ((prof.cacheTouched || hydrated) && _profileCacheWritePacer.offer(Object.keys(popupUserCommentProfileMap || {}).length)) {
       save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
     }
     if (Object.keys(save).length) {
@@ -15823,7 +15829,7 @@ async function refresh() {
       ) {
         save[key] = applied;
       }
-      if (profAfterNormalize.cacheTouched) {
+      if (profAfterNormalize.cacheTouched && _profileCacheWritePacer.offer(Object.keys(popupUserCommentProfileMap || {}).length)) {
         save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
       }
       if (Object.keys(save).length) {

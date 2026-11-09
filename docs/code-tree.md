@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1217 件
+## ⚠️ 役割コメントが無いソース 10 / 1218 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2382)
+- 📁 **src/** (2384)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2102)
+  - 📁 **lib/** (2104)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2898,6 +2898,8 @@
     - `probeRecommendedLiveSection.test.js`
     - `probeWatchPageDomStructure.js` — v0.1.201: ニコ生 watch ページ主要 DOM の存在を観測する純関数。
     - `probeWatchPageDomStructure.test.js`
+    - `profileCacheWritePace.js` — 横の欄が「名前・顔の控え」(nls_user_comment_profile_v1)を書く間隔(v0.1.1976)。
+    - `profileCacheWritePace.test.js`
     - `profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
     - `profileResolveState.test.js`
     - `protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。

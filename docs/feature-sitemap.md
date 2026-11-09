@@ -1111,7 +1111,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 332</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 333</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1357,6 +1357,7 @@
 - `src/lib/popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
 - `src/lib/prefersReducedMotion.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/lib/prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
+- `src/lib/profileCacheWritePace.js` — 横の欄が「名前・顔の控え」(nls_user_comment_profile_v1)を書く間隔(v0.1.1976)。
 - `src/lib/profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
 - `src/lib/protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
 - `src/lib/pruneLiveViewPublishBlob.js` — 純Web公開ペイロード(jsonBlob)の容量 prune はしご純関数
@@ -1470,6 +1471,7 @@
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
 ### その他 (12版)
+- `v0.1.1976` 2026-11-10 — 人の多い配信で名前と顔の控えを書く回数を減らす
 - `v0.1.1974` 2026-11-10 — YouTube系でコメントの控えの全件書き込みをやめる
 - `v0.1.1972` 2026-11-10 — 裏方が古いままなら自分で入れ替わる
 - `v0.1.1971` 2026-11-10 — 裏方の更新が古いまま残る件を直す
@@ -1481,4 +1483,3 @@
 - `v0.1.1961` 2026-11-09 — 描き直しのたびのタブ問い合わせを減らす
 - `v0.1.1959` 2026-11-09 — 同じ公式ランキングは書き直さない
 - `v0.1.1958` 2026-11-09 — 切り替わる直前の横の欄が次の配信を描かない
-- `v0.1.1956` 2026-11-09 — 行が多いときの横の欄の描き直しを軽くする

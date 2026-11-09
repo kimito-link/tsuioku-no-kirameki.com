@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1956',
+    date: '2026-11-09',
+    summary: '行が多いときの横の欄の描き直しを軽くする',
+    items: Object.freeze([
+      'コメントが数千行ある配信で、横の欄が描き直すたびに全員の顔画像を選び直し、行を並べ直していました。同じ人・同じ条件の顔は前の答えを使い、既に並んでいる行は並べ直さないようにしました。表示される顔と順番は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1955',
     date: '2026-11-09',
     summary: '行が多い配信で横の欄が遅くなるのを減らす',
