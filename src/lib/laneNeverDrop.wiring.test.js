@@ -43,7 +43,8 @@ describe('lane-never-drop の配線(配線忘れ=CI赤)', () => {
   it('★keeper が bucket へ渡る候補に効いている(呼び出し削除でCI赤)', () => {
     expect(popupSrc).toMatch(/applyLaneRosterKeeper\(\s*_laneRosterKeeperState/);
     expect(popupSrc).toMatch(/merged:\s*rosteredCandidates/);
-    expect(popupSrc).toMatch(/bucketStoryUserLanePicks\(\s*rosteredCandidates\s*,\s*limit\s*\)/);
+    // v0.1.1975(りんく決定 2026-11-10): 候補が2,000人を超える配信だけ laneCrowdLimit が上限を付ける(超えなければ limit=Infinity のまま)。
+    expect(popupSrc).toMatch(/bucketStoryUserLanePicks\(\s*rosteredCandidates\s*,\s*laneCrowdLimit\(rosteredCandidates\.length,\s*limit\)\s*\)/);
   });
 
   it('★keeper は sort より前に呼ばれている(順序が逆転したらCI赤)', () => {

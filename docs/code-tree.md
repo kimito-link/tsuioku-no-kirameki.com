@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1216 件
+## ⚠️ 役割コメントが無いソース 10 / 1217 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2380)
+- 📁 **src/** (2382)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2100)
+  - 📁 **lib/** (2102)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2381,6 +2381,8 @@
     - `laneCountOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneCountOrder.test.js`
     - `laneCountOrderWiring.wiring.test.js`
+    - `laneCrowdLimit.js` — 人数がとても多い配信だけ、応援レーンに並べる人数を絞る(v0.1.1975・りんく決定 2026-11-10)。
+    - `laneCrowdLimit.test.js`
     - `laneCssSync.parity.test.js`
     - `laneDensityLod.wiring.test.js`
     - `laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。

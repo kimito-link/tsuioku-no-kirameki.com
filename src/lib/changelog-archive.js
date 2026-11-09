@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1955',
+    date: '2026-11-09',
+    summary: '行が多い配信で横の欄が遅くなるのを減らす',
+    items: Object.freeze([
+      'Kick などで記録が数千行になると、横の欄がコメントのたびに全部の行を読み直して組み立てていたため、新着が数秒遅れていました。あいだは新しい行だけを読み、続けて届いた知らせは1回にまとめるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1954',
     date: '2026-11-09',
     summary: 'PC の声が止められたらクリックを案内する',

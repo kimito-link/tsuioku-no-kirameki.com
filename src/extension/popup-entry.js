@@ -748,6 +748,7 @@ import { KEY_LANE_MIRROR, laneMirrorKeyFor, laneMirrorReadKeys, pickLaneMirrorSn
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
 import { createLaneMirrorPacer } from '../lib/laneMirrorPublishPace.js';
+import { laneCrowdLimit } from '../lib/laneCrowdLimit.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
@@ -6585,7 +6586,8 @@ function renderStoryUserLane() {
   rosteredCandidates.length = 0;
   rosteredCandidates.push(..._countOrdered);
 
-  const buckets = bucketStoryUserLanePicks(rosteredCandidates, limit);
+  // ★v0.1.1975: 候補が2,000人を超える配信だけ上位2,000人まで(残りはフッターの「ほか M人」・src/lib/laneCrowdLimit.js)
+  const buckets = bucketStoryUserLanePicks(rosteredCandidates, laneCrowdLimit(rosteredCandidates.length, limit));
   const picked = flattenStoryUserLaneBuckets(buckets);
   // v0.1.1231 Phase1 計器: 誰が消えたかを測る(挙動不変・個数だけでは入れ替わりが見えないため)。
   noteLaneRoster(_laneRosterDeltaState, { liveId: STORY_SOURCE_STATE.liveId, picks: picked, candidateTotal: rosteredCandidates.length });
