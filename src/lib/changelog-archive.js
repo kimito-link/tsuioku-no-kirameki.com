@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1959',
+    date: '2026-11-09',
+    summary: '同じ公式ランキングは書き直さない',
+    items: Object.freeze([
+      'TikTok・SHOWROOM などは、順位が変わっていなくても決まった間隔で同じ公式ランキングを送ってきます。そのたびに保存し直し、横の欄がすぐ描き直して、その配信の全コメントを組み立て直していました。順位・名前・数・顔・期間が前回と同じなら保存しないようにしました。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1958',
     date: '2026-11-09',
     summary: '切り替わる直前の横の欄が次の配信を描かない',

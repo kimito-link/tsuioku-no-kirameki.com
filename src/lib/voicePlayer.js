@@ -373,6 +373,25 @@ export class VoicePlayer {
   }
 
   /**
+   * v0.1.1979: 待ちの1件を、まだ声づくりを頼んでいなければ読まずに外す(会場が吹き出しを声に合わせて待たせ、
+   *   3秒たっても順番が来ない件を「読まずに吹き出しだけ」にするため・venueBubbleVoiceHold.js)。
+   *   声づくりを頼み済み(prefetches にある)の件と、もう待ちから取り出された件は触らない(作った声を捨てない)。
+   * @param {Function} onDropped enqueue に渡した onDropped(件の目印)
+   * @returns {'dropped'|'inflight'|'not-queued'}
+   */
+  dropQueuedUnstarted(onDropped) {
+    const i = typeof onDropped === 'function' ? this.queue.findIndex((q) => q && q.onDropped === onDropped) : -1;
+    if (i < 0) return 'not-queued';
+    const item = this.queue[i];
+    if (this.prefetches.has(item)) return 'inflight';
+    this.queue.splice(i, 1);
+    if (typeof item.onPlayStart === 'function') item.onPlayStart();
+    this._notifyDropped(item);
+    this._updateLagNotice();
+    return 'dropped';
+  }
+
+  /**
    * v0.1.773 長時間ラグ対策: 待機中のキューだけを破棄して「今」へリセットする。
    *   再生中の1本は止めない(stop と違い不協和を出さない)。タブが裏に回って drain が
    *   スロットリングされ溜まった backlog を、可視復帰時に一掃して定常ラグの蓄積を断つ。
