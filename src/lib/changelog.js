@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1962',
+    date: '2026-11-09',
+    summary: 'ギフトの欄の読み込みを1回にまとめる',
+    items: Object.freeze([
+      '横の欄が描き直すとき、ギフトの欄5つ分を別々に読み、そのたびに配信の一覧を読み直してギフトの集計を作り直していました。1回の読みの中では配信の一覧を1回だけ読み、同じ記録ならギフトの集計も前の答えを使うようにしました。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1961',
     date: '2026-11-09',
     summary: '描き直しのたびのタブ問い合わせを減らす',
@@ -167,15 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'TikTok で漏れたコメントの理由を計器に残す',
     items: Object.freeze([
       'TikTok で画面には出たのに記録されなかったコメントがあったとき、その理由(送り主が読めない・本文が空・番号が無いなど)を状態の記録に数えて残すようにしました。記録の仕方そのものは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1941',
-    date: '2026-11-09',
-    summary: '終わった配信のページで毎秒読みに行かない',
-    items: Object.freeze([
-      'TikTok・ミクチャ・SHOWROOM で、配信が終わったページや読み取りに失敗し続けるページを開いたままにすると、配信の情報を1秒おきに読みに行っていたのを直しました(配信していないときは1分おき・失敗したときは間を広げて最大5分おき)。',
-      'TikTok の状態の記録が、配信の終わった別のタブの値で上書きされないようにしました。'
     ])
   })
 ]);

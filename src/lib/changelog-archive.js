@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1941',
+    date: '2026-11-09',
+    summary: '終わった配信のページで毎秒読みに行かない',
+    items: Object.freeze([
+      'TikTok・ミクチャ・SHOWROOM で、配信が終わったページや読み取りに失敗し続けるページを開いたままにすると、配信の情報を1秒おきに読みに行っていたのを直しました(配信していないときは1分おき・失敗したときは間を広げて最大5分おき)。',
+      'TikTok の状態の記録が、配信の終わった別のタブの値で上書きされないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1940',
     date: '2026-11-09',
     summary: 'TikTok LIVE の配信を記録する(試作)',

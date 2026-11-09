@@ -463,7 +463,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined> }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { builds: 0, buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
 const PANEL_SERVICE = PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '';
@@ -554,7 +554,17 @@ let announceLastWatch = () => {};
 function buildCommentsForLv(lv) {
   const hit = commentsCache.get(lv);
   if (hit && Date.now() - hit.at < 1500) return hit.p;
+  // 0.1.1962 計器: 組み立て1回の時間と行数(1万行超で横の欄が遅れる件の名指し用)
+  const t0 = Date.now();
   const p = buildCommentsForLvUncached(lv);
+  void p.then((arr) => {
+    const ms = Date.now() - t0;
+    shimDiag.builds = (Number(shimDiag.builds) || 0) + 1;
+    shimDiag.buildMsTotal = (Number(shimDiag.buildMsTotal) || 0) + ms;
+    shimDiag.buildMsMax = Math.max(Number(shimDiag.buildMsMax) || 0, ms);
+    shimDiag.buildMsLast = ms;
+    shimDiag.buildRowsLast = Array.isArray(arr) ? arr.length : 0;
+  }, () => {});
   commentsCache.set(lv, { at: Date.now(), p });
   return p;
 }
@@ -566,8 +576,16 @@ function buildCommentsForLv(lv) {
 async function buildGiftBagsForLv(lv, summary) {
   const entries = await buildCommentsForLv(lv);
   if (!entries) return undefined;
-  return buildYtGiftBags(entries, lv, { startedAt: ytTrustedStartedAt(summary, videoIdForPseudoLv(lv)) });
+  const startedAt = ytTrustedStartedAt(summary, videoIdForPseudoLv(lv));
+  // 0.1.1962: 同じ組み立て結果(1.5秒の使い回し)・同じ開始時刻なら、ギフトの袋も前の答えを使う(1回の読みでギフトのキーを5つ聞かれる)
+  const memo = giftBagsMemo.get(entries);
+  if (memo && memo.lv === lv && memo.startedAt === startedAt) return memo.bags;
+  const bags = buildYtGiftBags(entries, lv, { startedAt });
+  giftBagsMemo.set(entries, { lv, startedAt, bags });
+  return bags;
 }
+/** @type {WeakMap<any[], { lv: string, startedAt: number, bags: any }>} 組み立てた行の配列 → ギフトの袋 */
+const giftBagsMemo = new WeakMap();
 
 /**
  * YouTube の「トップファン」(XP 順位)を、ニコ生版の「ギフト貢献度」(公式ランキング)の形にする。
@@ -928,6 +946,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       (list || []).filter((k) => k.startsWith(COMMENTS_PREFIX)).map((k) => k.slice(COMMENTS_PREFIX.length).toLowerCase()),
     );
     const isProbe = askedCommentLvs.size >= 2;
+    /** @type {Promise<any> | null} */
+    let sumsOnce = null;
     const probeT0 = Date.now();
     if (list) {
       for (const k of list) {
@@ -964,7 +984,9 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const vid = videoIdForPseudoLv(lv);
         if (!vid) continue;
         if (await staleFrameHold.wait(isOtherServiceThanPanel(lv))) shimDiag.staleFrameHeld = staleFrameHold.heldCount();
-        const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES));
+        // 0.1.1962: 1回の読みでギフトのキーを5つ聞かれても、配信の一覧(yt_stream_summaries)を読むのは1回だけ
+        if (!sumsOnce) sumsOnce = Promise.resolve(realGet(KEY_YT_SUMMARIES));
+        const sums = /** @type {Record<string, any>} */ (await sumsOnce);
         const gifts = /** @type {Record<string, any> | undefined} */ (
           await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
         );
