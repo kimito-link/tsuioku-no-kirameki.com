@@ -251,6 +251,27 @@ export async function getYtStreamCommentsByVideoId(videoId) {
 }
 
 /**
+ * その配信の記録の行数だけを数える(v0.1.1978)。行の中身は取り出さないので、8万行でもすぐ返る。
+ *   横の欄が開いた直後に「記録 N 件」を出すために使う(全件の読み出しを待たない)。
+ * @param {string} videoId
+ * @returns {Promise<number>}
+ */
+export async function countYtStreamComments(videoId) {
+  const vid = String(videoId || '').trim();
+  if (!vid) return 0;
+  const db = await openYtCommentsDb();
+  return new Promise((resolve, reject) => {
+    const store = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS);
+    // 全件読み(getYtStreamCommentsByVideoId)と同じ索引・同じ範囲で数える(数と中身がずれないように)
+    const req = store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)
+      ? store.index(INDEX_BY_VIDEO_ID_RECORDED_AT).count(IDBKeyRange.bound([vid, 0], [vid, Number.MAX_SAFE_INTEGER]))
+      : store.index(INDEX_BY_VIDEO_ID).count(IDBKeyRange.only(vid));
+    req.onsuccess = () => resolve(Number(req.result) || 0);
+    req.onerror = () => reject(req.error || new Error('idb_count_failed'));
+  });
+}
+
+/**
  * 指定された配信（`videoId`）について、`afterRecordedAt` 以降に記録された新着コメントだけを
  * 複合インデックス `by_videoId_recordedAt` で差分取得する（storage 変化のたびに全件 getAll しない）。
  *

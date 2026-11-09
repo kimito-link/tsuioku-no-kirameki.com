@@ -24,5 +24,9 @@ describe('getYtStreamCommentsByVideoId(区切り読み)', () => {
     expect(out.every((r) => r.videoId === 'vidAAAAAAAA')).toBe(true);
     const at = out.map((r) => Number(r.recordedAt));
     expect(at).toEqual([...at].sort((a, b) => a - b));
+    // v0.1.1978: 行数だけ数える口は、全件読みの行数と同じ(別の配信は数えない)
+    expect(await s.countYtStreamComments('vidAAAAAAAA')).toBe(5600);
+    expect(await s.countYtStreamComments('vidBBBBBBBB')).toBe(1);
+    expect(await s.countYtStreamComments('none')).toBe(0);
   }, 30000);
 });

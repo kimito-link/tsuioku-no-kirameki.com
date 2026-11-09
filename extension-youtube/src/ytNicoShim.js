@@ -15,7 +15,8 @@
 
 import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
-import { getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
+import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
+import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
@@ -49,6 +50,7 @@ const COMMENTS_PREFIX = 'nls_comments_';
 // テールにも全件を渡す(popup が既存の重複畳み込み=mergeTailRowsIntoDisplay で控えと重ねて、増えた分だけが足される)。
 // これが無いと、控えのまま件数も最新コメントも止まる(0.1.11 までの「リアルタイムで反映されない」)。
 const TAIL_PREFIX = 'nls_ctail_';
+const SUMMARY_PREFIX = summaryStorageKey('');
 // ニコ生版のテールは最新 TAIL_MAX_ROWS(2,000)件まで(commentTailBuffer.js)。会場は読んだコメントを最新 4,000 件まで覚えて
 //   (venueSpeech.js SEEN_CAP)、それより古いものは忘れる。YouTube 版がテールに全件(例 7,451件)を渡すと、忘れた古いコメントを
 //   新しいと思って何度も吹き出し・読み上げていた(2026-11-04 りんく実機「同じ言葉を連呼」「吹き出しが出すぎ」・計器 1分2,051件)。
@@ -465,7 +467,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined>, done?: boolean }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む(組み立て中は重ねない) */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { builds: 0, buildJoined: 0, buildPhaseFirst: /** @type {any} */ (null), buildPhaseMax: /** @type {any} */ (null), buildPhaseLast: /** @type {any} */ (null), buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, commentWritesDropped: 0, commentRowsWriteDropped: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { builds: 0, buildJoined: 0, buildPhaseFirst: /** @type {any} */ (null), buildPhaseMax: /** @type {any} */ (null), buildPhaseLast: /** @type {any} */ (null), buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, commentWritesDropped: 0, commentRowsWriteDropped: 0, summaryAnswered: 0, tailDeferred: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
 const PANEL_SERVICE = PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '';
@@ -552,6 +554,8 @@ function isWatchedByThisScreen(lv) {
 }
 /** @type {(lv: string, reason: string) => void} 知らせる口(storage の見張りを付けたところで差し替わる) */
 let announceLastWatch = () => {};
+/** @type {Set<string>} 一度でも組み上がった配信(v0.1.1978: 最初の組み立て中だけ、軽量読みのテールを待たせない) */
+const everBuiltLvs = new Set();
 /** @param {string} lv */
 function buildCommentsForLv(lv) {
   const hit = commentsCache.get(lv);
@@ -580,6 +584,7 @@ function buildCommentsForLv(lv) {
     shimDiag.buildMsMax = Math.max(Number(shimDiag.buildMsMax) || 0, ms);
     shimDiag.buildMsLast = ms;
     shimDiag.buildRowsLast = Array.isArray(arr) ? arr.length : 0;
+    if (Array.isArray(arr)) everBuiltLvs.add(lv);
   }, () => {});
   commentsCache.set(lv, slot);
   return p;
@@ -1009,8 +1014,35 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           lastAskedLv = lv;
           recentlyAskedLvs.set(lv, Date.now());
           shimDiag.commentGets += 1;
+          // ★v0.1.1978: 横の欄の軽量読み(テールと件数の控えを一緒に聞く)には、最初の組み立てが終わるまでテールを待たせない。
+          //   待たせると件数の控えまで一緒に遅れ、popup は 900ms×4回の時間切れで何も受け取れなかった。
+          //   組み立ては始めておく(あとから来る全件の読み出しと知らせが使う)。一度組み上がった配信は今までどおり待って渡す。
+          if (!IS_VENUE_CONTEXT && k.startsWith(TAIL_PREFIX) && !everBuiltLvs.has(lv) && list.includes(`${SUMMARY_PREFIX}${lv}`)) {
+            void buildCommentsForLv(lv).catch(() => {});
+            shimDiag.tailDeferred = (Number(shimDiag.tailDeferred) || 0) + 1;
+            continue;
+          }
           const arr = await buildCommentsForLv(lv);
           if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
+          continue;
+        }
+        // ★v0.1.1978: 件数だけの軽い控え(nls_csummary_<lv>)にも答える。ニコ生版の横の欄は、開いた直後にこれで
+        //   「記録 N 件」を出し、全件はあとから読む(popup の軽量読み)。YouTube 系は答えていなかったので、
+        //   8万行の配信では全件を読み終わるまで数字が空だった(PC 実測・遅い条件で2分以上)。行数は IndexedDB で数えるだけ。
+        //   視聴ページの中(YT_SHIM_IN_PAGE)は IndexedDB に届かないので今までどおり。
+        if (!YT_SHIM_IN_PAGE && k.startsWith(SUMMARY_PREFIX)) {
+          const lv = k.slice(SUMMARY_PREFIX.length).toLowerCase();
+          const vid = videoIdForPseudoLv(lv);
+          if (!vid || isProbe) continue;
+          try {
+            const n = await countYtStreamComments(vid);
+            if (n > 0) {
+              bag[k] = buildCommentSummary({ liveId: lv, recordedCount: n, recentRows: [] });
+              shimDiag.summaryAnswered = (Number(shimDiag.summaryAnswered) || 0) + 1;
+            }
+          } catch {
+            /* 数えられなければ今までどおり(全件の読み出しを待つ) */
+          }
           continue;
         }
         const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));

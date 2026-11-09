@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1978',
+    date: '2026-11-10',
+    summary: '大きな記録でも開いてすぐ記録の件数を出す',
+    items: Object.freeze([
+      'YouTube・Kick などで横の欄を開いたとき、全件を読み終わる前に「記録 N 件」を先に出すようにしました(ニコ生と同じ出し方)。8万行の配信では、数字が出るまで遅いPCで2分以上かかっていました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1977',
     date: '2026-11-10',
     summary: '大きな記録を少しずつ読み、開いた直後も固まらない',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '同じ公式ランキングは書き直さない',
     items: Object.freeze([
       'TikTok・SHOWROOM などは、順位が変わっていなくても決まった間隔で同じ公式ランキングを送ってきます。そのたびに保存し直し、横の欄がすぐ描き直して、その配信の全コメントを組み立て直していました。順位・名前・数・顔・期間が前回と同じなら保存しないようにしました。表示は変わりません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1958',
-    date: '2026-11-09',
-    summary: '切り替わる直前の横の欄が次の配信を描かない',
-    items: Object.freeze([
-      '前面の配信を別のサービス(例: Kick から TikTok)に変えた瞬間、まもなく作り直される前の横の欄が、新しい配信のコメントを先に聞きに来て全行を組み立てることがありました(行の多い配信ではその分重くなります)。この食い違いのときは最大3秒だけ返事を待ち、作り直された新しい欄が描くようにしました。作り直されなかったときは3秒後にいつもどおり描きます'
     ])
   })
 ]);
