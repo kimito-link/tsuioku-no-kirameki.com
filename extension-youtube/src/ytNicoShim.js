@@ -460,10 +460,10 @@ export function buildYtPersonResolver(items) {
   return { keyOf, iconOf: (key) => iconByKey.get(key) || '' };
 }
 
-/** @type {Map<string, { at: number, p: Promise<any[] | undefined> }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む */
+/** @type {Map<string, { at: number, p: Promise<any[] | undefined>, done?: boolean }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む(組み立て中は重ねない) */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { builds: 0, buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { builds: 0, buildJoined: 0, buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
 const PANEL_SERVICE = PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '';
@@ -554,9 +554,23 @@ let announceLastWatch = () => {};
 function buildCommentsForLv(lv) {
   const hit = commentsCache.get(lv);
   if (hit && Date.now() - hit.at < 1500) return hit.p;
+  // 0.1.1964: 組み立て中(まだ終わっていない)なら、それを待つ。1.5秒を過ぎるたびに新しい組み立てを始めると、
+  //   1回が数秒かかる大きな配信で組み立てが何本も重なり、互いに遅らせ合っていた(PC 実測 Kick 13,000行: 482秒で 303回・合計 766秒)
+  if (hit && !hit.done) {
+    shimDiag.buildJoined = (Number(shimDiag.buildJoined) || 0) + 1;
+    return hit.p;
+  }
   // 0.1.1962 計器: 組み立て1回の時間と行数(1万行超で横の欄が遅れる件の名指し用)
   const t0 = Date.now();
   const p = buildCommentsForLvUncached(lv);
+  /** @type {{ at: number, p: Promise<any[] | undefined>, done?: boolean }} */
+  const slot = { at: Date.now(), p, done: false };
+  const finish = () => {
+    slot.done = true;
+    // 終わった時刻から1.5秒は使い回す(始めた時刻だと、長い組み立てのあと即座にもう1本始まる)
+    slot.at = Date.now();
+  };
+  void p.then(finish, finish);
   void p.then((arr) => {
     const ms = Date.now() - t0;
     shimDiag.builds = (Number(shimDiag.builds) || 0) + 1;
@@ -565,7 +579,7 @@ function buildCommentsForLv(lv) {
     shimDiag.buildMsLast = ms;
     shimDiag.buildRowsLast = Array.isArray(arr) ? arr.length : 0;
   }, () => {});
-  commentsCache.set(lv, { at: Date.now(), p });
+  commentsCache.set(lv, slot);
   return p;
 }
 
@@ -1290,6 +1304,9 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     };
     /** @param {string} lv @param {any} summary */
     const notifyLvOnce = async (lv, summary) => {
+      // 0.1.1964: 組み立て中のものがあれば終わるのを待ってから作り直す(2本同時に走らせない)
+      const running = commentsCache.get(lv);
+      if (running && !running.done) await running.p.catch(() => undefined);
       commentsCache.delete(lv);
       const arr = await buildCommentsForLv(lv).catch(() => undefined);
       if (!arr) return;

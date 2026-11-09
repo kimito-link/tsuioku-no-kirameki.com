@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1964',
+    date: '2026-11-09',
+    summary: '大きな配信で記録の組み立てを重ねない',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで記録が数千件を超えると、横の欄が記録を組み立て直すのに1回数秒かかり、終わる前に次の組み立てが始まって何本も重なっていました(Kick 1万3千件で 8分に 303回・合計 766秒)。組み立て中は新しく始めずにそれを待ち、終わってから1.5秒は同じ結果を使うようにしました。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1963',
     date: '2026-11-09',
     summary: '配信情報の読み込みが返らないと止まる所を直す',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '拡張の入れ替え時に他サービスのタブも読み込み直す',
     items: Object.freeze([
       '拡張が新しい版に入れ替わったとき、YouTube だけでなく Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の配信ページのタブも自動で読み込み直すようにしました(古い版のまま止まり、記録が 0 のままになることがありました)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1944',
-    date: '2026-11-09',
-    summary: 'TikTok のスタンプだけのコメントも記録する',
-    items: Object.freeze([
-      'TikTok で、本文がなくスタンプだけのコメントが記録から漏れていたのを直しました。スタンプは「[スタンプ]」として個数ぶん残します(本文つきのときは本文の後ろに並べます)。'
     ])
   })
 ]);

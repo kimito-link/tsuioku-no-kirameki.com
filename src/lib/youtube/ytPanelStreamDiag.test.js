@@ -245,3 +245,27 @@ describe('0.1.1962: 1回の読みでギフトのキーを5つ聞かれても、�
     expect(shim).toContain('shimDiag.buildMsMax = Math.max(');
   });
 });
+
+describe('0.1.1964: 記録の組み立てを重ねて走らせない', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  const body = shim.slice(shim.indexOf('function buildCommentsForLv(lv) {'), shim.indexOf('async function buildGiftBagsForLv('));
+  it('組み立て中なら新しく始めずに、それを待つ(1.5秒の使い回しの後でも)', () => {
+    const ttl = body.indexOf('if (hit && Date.now() - hit.at < 1500) return hit.p;');
+    const join = body.indexOf('if (hit && !hit.done) {');
+    const start = body.indexOf('buildCommentsForLvUncached(lv)');
+    expect(ttl).toBeGreaterThan(0);
+    expect(join).toBeGreaterThan(ttl);
+    expect(start).toBeGreaterThan(join);
+  });
+  it('使い回しの1.5秒は終わった時刻から数える', () => {
+    expect(body).toMatch(/slot\.done = true;\s*\/\/[^\n]*\n\s*slot\.at = Date\.now\(\);/);
+    expect(body).toContain('void p.then(finish, finish);');
+  });
+  it('新着の知らせで作り直すときも、組み立て中のものが終わってから', () => {
+    const once = shim.slice(shim.indexOf('const notifyLvOnce = async (lv, summary) => {'));
+    const wait = once.indexOf('if (running && !running.done) await running.p.catch(() => undefined);');
+    const del = once.indexOf('commentsCache.delete(lv);');
+    expect(wait).toBeGreaterThan(0);
+    expect(del).toBeGreaterThan(wait);
+  });
+});

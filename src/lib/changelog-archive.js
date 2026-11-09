@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1944',
+    date: '2026-11-09',
+    summary: 'TikTok のスタンプだけのコメントも記録する',
+    items: Object.freeze([
+      'TikTok で、本文がなくスタンプだけのコメントが記録から漏れていたのを直しました。スタンプは「[スタンプ]」として個数ぶん残します(本文つきのときは本文の後ろに並べます)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1943',
     date: '2026-11-09',
     summary: 'ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない',
