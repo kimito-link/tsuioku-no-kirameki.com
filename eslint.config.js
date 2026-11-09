@@ -411,7 +411,8 @@ export default [
     // v0.1.1889: 応援マスの作り直しの入口別計器と末尾だけ削る縮小(+56: import 1・状態と補足欄の書き込み関数・各入口の記録・北極星キャラ絵の同値スキップ2)。数え方と文言は lib の storyGrowthRebuildReasons.js。
     // v0.1.1957: 描き直しの時間を測って間隔を広げる配線(+9: 測る外側の関数と本体の分離)。間隔の仕組みは lib の popupStorageRefreshCoalesce.js。
     // v0.1.1961: タブの問い合わせを描き直し1回の中で使い回す配線(+15: 使い回しの入口と、タブが動いたら捨てる知らせ)。仕組みは lib の shortLivedMemo.js。
-    rules: { 'max-lines': ['error', { max: 21831, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1973: 人が多い配信は応援レーンの写しを書く間隔を空ける配線(+5: import の差し替え・間隔係の生成と計器・入口の1行)。仕組みは lib の laneMirrorPublishPace.js。
+    rules: { 'max-lines': ['error', { max: 21836, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

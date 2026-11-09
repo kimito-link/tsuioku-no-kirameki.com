@@ -335,7 +335,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 294</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 295</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -478,6 +478,7 @@
 - `src/lib/laneMirrorContract.js` — `KEY_LANE_MIRROR`(応援レーンの鏡)の【契約の正本】。
 - `src/lib/laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
 - `src/lib/laneMirrorPerLivePublish.js` — laneMirrorPerLivePublish — 配信ごとの鏡(v2)と実DOM受領証を storage へ書く薄いグルー。
+- `src/lib/laneMirrorPublishPace.js` — 応援レーンの鏡(nls_lane_mirror_v1 / nls_lane_mirror_v2_<lv>)を書く間隔を、人数に合わせて決める(v0.1.1973)。
 - `src/lib/laneMirrorWriteGate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/laneMirrorWriterYield.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lanePublishSkipDiag.js` — lanePublishSkipDiag — 応援レーン鏡の publish が「到達したか/何で見送られたか」を1行にする純関数。
@@ -1462,13 +1463,14 @@
 ### 🔊 読み上げ (1版)
 - `v0.1.1954` 2026-11-09 — PC の声が止められたらクリックを案内する
 
-### 🪟 応援レーン・タイル (1版)
+### 🪟 応援レーン・タイル (2版)
+- `v0.1.1973` 2026-11-10 — 人が多い配信は応援レーンの写しの書き込みを間引く
 - `v0.1.1967` 2026-11-09 — 応援レーンの塗り直しで動かす枚数を最小に
 
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
-### その他 (13版)
+### その他 (12版)
 - `v0.1.1972` 2026-11-10 — 裏方が古いままなら自分で入れ替わる
 - `v0.1.1971` 2026-11-10 — 裏方の更新が古いまま残る件を直す
 - `v0.1.1970` 2026-11-10 — 声の割り当ての間引きを作り直し後も保つ
@@ -1481,4 +1483,3 @@
 - `v0.1.1958` 2026-11-09 — 切り替わる直前の横の欄が次の配信を描かない
 - `v0.1.1956` 2026-11-09 — 行が多いときの横の欄の描き直しを軽くする
 - `v0.1.1955` 2026-11-09 — 行が多い配信で横の欄が遅くなるのを減らす
-- `v0.1.1953` 2026-11-09 — 他サービスで新着が横の欄に出る遅れを減らす

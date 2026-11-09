@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1953',
+    date: '2026-11-09',
+    summary: '他サービスで新着が横の欄に出る遅れを減らす',
+    items: Object.freeze([
+      'YouTube・Kick・SHOWROOM などで、横の欄が裏のタブの配信の記録まで毎回組み立てていたため、見ている配信の新着が数秒遅れていました。見ている配信だけを組み立てるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1952',
     date: '2026-11-09',
     summary: '他サービスの横の欄の描き直しすぎを直す',

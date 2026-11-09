@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1973',
+    date: '2026-11-10',
+    summary: '人が多い配信は応援レーンの写しの書き込みを間引く',
+    items: Object.freeze([
+      '記録が数万行ある配信(Kick など)で、横の欄が開いた直後から長く固まる件の手当て。新しい人が来るたびに応援レーンの写し(数百KB)を書き直し、それが拡張の全画面へ配られていた。人数が500人を超えたら、写しを書く間隔を人数に応じて延ばします(最長30秒・最後の状態は必ず書きます・配信が替わったときは待ちません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1972',
     date: '2026-11-10',
     summary: '裏方が古いままなら自分で入れ替わる',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'PC の声が止められたらクリックを案内する',
     items: Object.freeze([
       'ページを読み込み直したあと一度もクリックしていないと、Chrome は PC の声を鳴らしません。そのときは読み上げが無音のままでしたが、「この配信ページを1回クリックしてください」と会場に出すようにしました。クリックすると、すぐ PC の声で読み始めます'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1953',
-    date: '2026-11-09',
-    summary: '他サービスで新着が横の欄に出る遅れを減らす',
-    items: Object.freeze([
-      'YouTube・Kick・SHOWROOM などで、横の欄が裏のタブの配信の記録まで毎回組み立てていたため、見ている配信の新着が数秒遅れていました。見ている配信だけを組み立てるようにしました'
     ])
   })
 ]);

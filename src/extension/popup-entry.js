@@ -747,6 +747,7 @@ import { KEY_LANE_MIRROR, laneMirrorKeyFor, laneMirrorReadKeys, pickLaneMirrorSn
 // ★v0.1.1300: 配信ごと鏡(v2)+受領証の書き出し(storage I/O グルーは lib へ抽出=max-lines ラチェット遵守)。
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
+import { createLaneMirrorPacer } from '../lib/laneMirrorPublishPace.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
@@ -7270,12 +7271,16 @@ const _laneImportShadow = createLaneImportShadowState();
 
 /** v0.1.1581: 配信別の鏡(v2)は「同じ内容なら60秒に1回まで」に絞る(書くたびに全拡張ページへ onChanged が全文で配られる)。 */
 const _laneMirrorWriteGate = createLaneMirrorWriteGate({ changeFloorMs: 8000 }); // 件数・バッジ・発言抜粋だけの変化は8秒にまとめる(顔ぶれが変われば即)
+/** v0.1.1973: 人が多い配信は鏡を書く間隔を延ばす(間隔内は最後の1つだけ後で書く・src/lib/laneMirrorPublishPace.js) */
+const _laneMirrorPacer = createLaneMirrorPacer({ onFlush: (input) => publishLaneMirror(input) });
+/** @type {any} */ (globalThis).__laneMirrorPaceDiag = _laneMirrorPacer.diag;
 /** @param {{ liveId: string, buckets: Record<string, unknown[]>, domSelf: unknown,
  *   pickedLength: number, totalCandidates: number }} input */
 function publishLaneMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
+    if (!_laneMirrorPacer.gate(input)) return; // ★v0.1.1973: 人が多い配信は間隔を空ける
     // ★v0.1.1234: 鏡capも撤廃(①レーンと揃える)。
     //   旧: cap=48 固定。①だけ上限撤廃したため、会場で「①DOM 可視286 ≠ 鏡48」となり
     //   238人が③に載らなかった(実配信 lv351091938 で観測)。limitと鏡capの分離は
