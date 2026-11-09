@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1181 件
+## ⚠️ 役割コメントが無いソース 10 / 1182 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1175,7 +1175,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2323)
+- 📁 **src/** (2325)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1478,7 +1478,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2044)
+  - 📁 **lib/** (2046)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3379,6 +3379,8 @@
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
     - `venueSpeechSupport.wiring.test.js`
+    - `venueStatStrip.js` — 会場モードの「数字の帯」(2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」)。
+    - `venueStatStrip.test.js`
     - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
     - `venueStoryDiagMirrorPanel.test.js`
     - `venueTanuLane.wiring.test.js`
@@ -3559,13 +3561,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (85)
+- 📁 **tests/** (86)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (78)
+  - 📁 **e2e/** (79)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3646,6 +3648,7 @@
     - `twitch-recording.spec.js`
     - `venue-entry-effect.spec.js`
     - `venue-pickup-drag.spec.js`
+    - `venue-stat-strip.spec.js`
     - `watch-messaging.spec.js`
   - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
