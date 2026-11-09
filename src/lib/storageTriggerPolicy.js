@@ -22,7 +22,19 @@ const THROTTLED_EXTRA_PATTERNS = Object.freeze([
   /^nls_user_comment_profile_v\d+$/i,
   // content がギフトの度に書く。表示は 450ms 遅れても支障がない。
   /^nls_gift_history_throws_lv\d{1,15}$/i,
-  /^nls_gift_subapp_history_lv\d{1,15}$/i
+  /^nls_gift_subapp_history_lv\d{1,15}$/i,
+  /*
+   * ★v0.1.1952: YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の記録係は、コメントの束ごとに
+   *   yt_stream_summaries・yt_voice_*・yt_active_video_id を1回で書く(extension-youtube/src/background-entry.js YT_CHAT_ITEMS)。
+   *   ニコ生版で同じ役の nls_cdb_summary_<lv> は間引き側なのに、こちらは未知のキー=即時側を素通りし、
+   *   横の欄が束ごとに描き直していた(PC 実測 0.1.1951: SHOWROOM/TikTok/ふわっち/YouTube 前面で tabs.query 毎秒21〜29回・
+   *   storage の変化の最多が yt_stream_summaries と yt_voice_state)。ニコ生版と同じ間引き側へ。
+   */
+  /^yt_stream_summaries$/i,
+  /^yt_voice_state$/i,
+  /^yt_voice_assignments$/i,
+  /^yt_voice_queue$/i,
+  /^yt_active_video_id$/i
 ]);
 
 /**

@@ -129,3 +129,12 @@ describe('拡張プロセスの忙しさ台帳(v0.1.1580)は自己書き込み�
     expect(isAllSelfWrittenRenderArtifacts(['nls_ext_process_census_v1', 'nls_comments_lv351100897'])).toBe(false);
   });
 });
+
+describe('v0.1.1952: YouTube 系の計器は描き直さない', () => {
+  it('yt_diag_* は自己書き込み扱い・データキーは違う', () => {
+    expect(isSelfWrittenRenderArtifactKey('yt_diag_panel_stream_sidepanel')).toBe(true);
+    expect(isSelfWrittenRenderArtifactKey('yt_diag_kk_chat')).toBe(true);
+    expect(isSelfWrittenRenderArtifactKey('yt_stream_summaries')).toBe(false);
+    expect(isAllSelfWrittenRenderArtifacts(['yt_diag_live_rows', 'nls_perf_diag_lv1'])).toBe(true);
+  });
+});

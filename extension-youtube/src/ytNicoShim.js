@@ -472,7 +472,7 @@ const panelDiagCore = createPanelStreamDiag({
 });
 const PANEL_DIAG_CTX = panelStreamDiagContext(typeof location !== 'undefined' ? location.pathname : '');
 let panelDiagTimer = 0;
-// 書き込みは 10 秒に1回まで(yt_diag_live_rows と同じ型・nls_ でないキー=popup の描き直しを起こさない)。画面ごとに別のキー
+// 書き込みは 10 秒に1回まで(yt_diag_live_rows と同じ型・yt_diag_ は描き直さないキー=selfWrittenStorageKeys.js)。画面ごとに別のキー
 const panelDiagWriteNow = () => {
   try {
     const c = /** @type {any} */ (globalThis).chrome;

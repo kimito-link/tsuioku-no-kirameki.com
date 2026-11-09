@@ -10,6 +10,7 @@ import { platformOfStreamKey } from '../platform/streamPlatform.js';
 export const YT_PANEL_STREAM_DIAG_KEY_PREFIX = 'yt_diag_panel_stream_';
 const HIST = 10;
 const CALLERS_MAX = 12;
+const STORAGE_KEYS_MAX = 24;
 
 /**
  * storage のキー名を数え上げ用にまとめる(数字の並びは N・長さは40字まで)。
@@ -210,7 +211,7 @@ export function createPanelStreamDiag(deps) {
       s.storageChangedEvents += 1;
       for (const k of keys) {
         const name = normalizeStorageKeyName(k);
-        if (name in s.storageChangedKeys || Object.keys(s.storageChangedKeys).length < CALLERS_MAX) {
+        if (name in s.storageChangedKeys || Object.keys(s.storageChangedKeys).length < STORAGE_KEYS_MAX) {
           s.storageChangedKeys[name] = (s.storageChangedKeys[name] || 0) + 1;
         } else s.storageChangedKeys['(other)'] = (s.storageChangedKeys['(other)'] || 0) + 1;
       }
