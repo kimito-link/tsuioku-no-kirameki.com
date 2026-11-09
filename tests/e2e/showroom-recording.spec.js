@@ -210,6 +210,10 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
 
   // 配信のまとめ(部屋の名前・視聴数・開始時刻)
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
+  await expect
+    .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })
+    .toContain(KEY.slice(0, KEY.lastIndexOf('.') + 1));
   expect(sum).toMatchObject({ broadcasterName: 'テストのへや', broadcasterHandle: ROOM_KEY, concurrentViewers: 77 });
   expect(Number(sum.startedAt)).toBe(T0 * 1000);
 

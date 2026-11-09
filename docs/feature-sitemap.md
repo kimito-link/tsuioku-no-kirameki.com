@@ -1099,7 +1099,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 327</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 328</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1111,6 +1111,7 @@
 - `app/live-view.js` — global NL_BUILD_ID
 - `app/supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - `extension-youtube/content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
+- `extension-youtube/src/pfLastStreamUrl.js` — YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページが、
 - `extension-youtube/src/sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
 - `extension-youtube/src/sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
 - `extension-youtube/src/sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
@@ -1443,14 +1444,10 @@
 - `v0.1.1932` 2026-11-08 — ふわっちのアイテム・匿名の人・文字化けを直す
 - `v0.1.1929` 2026-11-08 — 長い英数字の名前が「名無し」になるのを直す
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
 - `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 - `v0.1.1932` 2026-11-08 — ふわっちのアイテム・匿名の人・文字化けを直す
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
-- `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
-
-### 🎈 吹き出し (1版)
-- `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 
 ### 🎁 ギフト (7版)
 - `v0.1.1940` 2026-11-09 — TikTok LIVE の配信を記録する(試作)
@@ -1461,9 +1458,8 @@
 - `v0.1.1933` 2026-11-08 — SHOWROOM の配信を記録(試作)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
 
-### 🔊 読み上げ (2版)
+### 🔊 読み上げ (1版)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
-- `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
@@ -1472,7 +1468,8 @@
 - `v0.1.1946` 2026-11-09 — 横の欄がどの配信を出したかを診断に記録
 - `v0.1.1937` 2026-11-08 — ミクチャの順位の単位と見出しを直す
 
-### その他 (8版)
+### その他 (9版)
+- `v0.1.1948` 2026-11-09 — 横の欄が裏のタブの配信に引っ張られない
 - `v0.1.1947` 2026-11-09 — 記録の無い部屋で前の別の配信を出さない
 - `v0.1.1945` 2026-11-09 — 拡張の入れ替え時に他サービスのタブも読み込み直す
 - `v0.1.1944` 2026-11-09 — TikTok のスタンプだけのコメントも記録する

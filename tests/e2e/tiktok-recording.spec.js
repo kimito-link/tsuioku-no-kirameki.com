@@ -293,6 +293,10 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
     .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.concurrentViewers, { timeout: 40_000 })
     .toBe(77);
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
+  await expect
+    .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })
+    .toContain(KEY.slice(0, KEY.lastIndexOf('.') + 1));
   expect(sum).toMatchObject({ title: 'ざつだん配信', broadcasterName: 'はいしんしゃ', broadcasterHandle: UNIQUE, broadcasterChannelId: 'tt:6900000000000000001' });
   expect(Number(sum.startedAt)).toBe((Math.floor(T0 / 1000) - 60) * 1000);
 

@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1928',
+    date: '2026-11-08',
+    summary: 'Twitch・Kick の絵文字を画像で表示',
+    items: Object.freeze([
+      'Twitch・Kick のチャットの絵文字(Kappa・KEKW など)を、コメビュの一覧・会場の吹き出し・ピン留めなどで画像として表示するようにしました。',
+      '記録と読み上げは今までどおり絵文字の名前のままです。画像が読めないときは名前の文字で出ます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1927',
     date: '2026-11-08',
     summary: 'Twitch のポイント交換をリワード名つきで記録',

@@ -17,6 +17,7 @@ import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/ven
 import { platformOfHostname } from '../../src/lib/platform/streamPlatform.js';
 import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -48,8 +49,12 @@ function setRootShown(/** @type {boolean} */ shown) {
   }
   root.style.display = shown ? '' : 'none';
 }
+/** 0.1.1948: このページが「最後に見た配信」を記録する(ニコ生版 rememberWatchPageUrl と同じ決まり・pfLastStreamUrl.js) */
+const lastStreamRemember =
+  window.top === window ? installLastStreamUrlRemember({ getKey: (url) => streamKeyForWatchUrl(url), isAlive: () => isExtensionContextAlive() }) : null;
 function sync() {
   const vid = currentVideoId();
+  if (vid) lastStreamRemember?.remember(false); // URL が変わったときだけ書く(同じ URL は書き直さない)
   if (!vid) {
     setRootShown(false);
     return;

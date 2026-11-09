@@ -29,6 +29,7 @@ import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
+import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { createPanelStreamDiag, panelStreamDiagContext, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
@@ -485,6 +486,12 @@ const panelDiag = /** @type {ReturnType<typeof createPanelStreamDiag>} */ (
 /** @type {any} */ (globalThis).__ytPanelStreamDiag = panelDiagCore;
 /** popup が最後にコメントを聞いてきた配信(=いま画面に出ている配信) */
 let lastAskedLv = '';
+/** @type {any} 配信ページが最後に書いた「最後に見た配信」(yt_last_stream_url の値) */
+let lastStreamValue = null;
+/** 最後に「最後に見た配信」として知らせた疑似 lv */
+let lastAnnouncedLv = '';
+/** @type {(lv: string, reason: string) => void} 知らせる口(storage の見張りを付けたところで差し替わる) */
+let announceLastWatch = () => {};
 /** @param {string} lv */
 function buildCommentsForLv(lv) {
   const hit = commentsCache.get(lv);
@@ -789,15 +796,34 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   const realLocal = real.storage.local;
   const realGet = realLocal.get.bind(realLocal);
   // 前に開いた配信の疑似 lv(nls_last_watch_url 等に残る)も引けるよう、記録のある配信を先に全部登録しておく
-  const knownVideosReady = Promise.resolve(realGet(KEY_YT_SUMMARIES))
+  const knownVideosReady = Promise.resolve(realGet([KEY_YT_SUMMARIES, YT_LAST_STREAM_URL_KEY]))
     .then((bag) => {
       knownSummaries = (bag && bag[KEY_YT_SUMMARIES]) || {};
+      lastStreamValue = (bag && bag[YT_LAST_STREAM_URL_KEY]) || null;
       for (const vid of Object.keys(knownSummaries)) pseudoLvForVideoId(vid);
       registerBroadcastersFromSummaries();
     })
     .catch(() => {});
 
-  const lastWatchUrlFromSummaries = async () => {
+  // ---- 「最後に見た配信」(0.1.1948・council/panel-stream-selection-SPEC.md §4-C2) ----
+  //   正本は配信ページ自身が書く yt_last_stream_url(pfLastStreamUrl.js・ニコ生版 rememberWatchPageUrl の写し)。
+  //   shim はそれを疑似 lv の nls_last_watch_url に【翻訳するだけ】。以前は「記録が最近更新された配信」で推測していたので、
+  //   裏で記録中の YouTube タブに引っ張られていた(PC 計測 0.1.1946: source newest 1106 / page 0)。
+  /** @param {any} v yt_last_stream_url の値 @returns {string} 疑似 lv('' = 分からない) */
+  const lvOfLastStream = (v) => {
+    const url = String(v?.url || '');
+    const key = url ? streamKeyForWatchUrl(url) : '';
+    return key ? pseudoLvForVideoId(key) : '';
+  };
+  const lastWatchUrl = async () => {
+    await knownVideosReady;
+    const lv = lvOfLastStream(lastStreamValue);
+    if (lv) {
+      panelDiag.lastWatch('page', lv);
+      if (!lastAnnouncedLv) lastAnnouncedLv = lv;
+      return `https://live.nicovideo.jp/watch/${lv}`;
+    }
+    // まだどのページも書いていない(入れたばかり)ときだけ、最近更新された配信を使う(計器 source:'newest' に出る)
     const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
     const vid = newestVideoIdOf(sums);
     panelDiag.lastWatch(vid ? 'newest' : 'none', vid ? pseudoLvForVideoId(vid) : '');
@@ -825,7 +851,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (k === LAST_WATCH_URL_KEY) {
           // ニコ生版のコメビュ等は「最後に見ていた配信」をこのキーから決める。YouTube 版では、
           // 記録がいちばん新しく更新された配信(=いま見ている配信)の疑似 watch URL を渡す。
-          const url = await lastWatchUrlFromSummaries();
+          const url = await lastWatchUrl();
           if (url) bag[k] = url;
           continue;
         }
@@ -893,7 +919,23 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   //   ニコ生版の部品が同接の数を来場として写していた(2026-11-04 計器: official.viewers が同接と同じ 1,065)。
   const realSet = realLocal.set.bind(realLocal);
   realLocal.set = (/** @type {any} */ items, /** @type {any} */ cb) => {
-    if (items && typeof items === 'object' && LAST_WATCH_URL_KEY in items) panelDiag.popupLastWatchWrite(items[LAST_WATCH_URL_KEY]);
+    if (items && typeof items === 'object' && LAST_WATCH_URL_KEY in items) {
+      panelDiag.popupLastWatchWrite(items[LAST_WATCH_URL_KEY]);
+      // 0.1.1948: popup(ニコ生版)が疑似 lv の URL を nls_last_watch_url に書こうとしたら、本物の配信ページの URL に戻して
+      //   yt_last_stream_url へ向け直す(ニコ生の引き出しに疑似 lv を漏らさない)。同じ配信なら書かない(書き合いで描き直しを起こさない)
+      const m = /\/watch\/(lv\d{1,15})/.exec(String(items[LAST_WATCH_URL_KEY] || ''));
+      const key = m ? videoIdForPseudoLv(m[1].toLowerCase()) : '';
+      if (key) {
+        items = { ...items };
+        delete items[LAST_WATCH_URL_KEY];
+        const url = watchUrlForStreamKey(key);
+        if (url && pseudoLvForVideoId(key) !== lvOfLastStream(lastStreamValue)) {
+          lastStreamValue = { url, key, at: Date.now() };
+          items[YT_LAST_STREAM_URL_KEY] = lastStreamValue;
+        }
+        if (!Object.keys(items).length) return Promise.resolve(typeof cb === 'function' ? cb() : undefined);
+      }
+    }
     try {
       const m = items && items.nls_stat_cards_mirror_v1;
       if (m && typeof m === 'object' && m.official && typeof m.official === 'object') {
@@ -1074,6 +1116,23 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       listeners.push(fn);
       add(fn);
     };
+    /**
+     * 「最後に見た配信」が変わったと popup・コメビュに知らせる(本物の nls_last_watch_url の変化と同じ形)。同じ配信は続けて配らない。
+     * @param {string} lv @param {string} reason 'page'(ページが書いた)/ 'resolve'(部屋の引き当てが変わった)
+     */
+    announceLastWatch = (lv, reason) => {
+      if (!lv || lv === lastAnnouncedLv) return;
+      lastAnnouncedLv = lv;
+      panelDiag.announce(lv, reason);
+      const synthUrl = { [LAST_WATCH_URL_KEY]: { newValue: `https://live.nicovideo.jp/watch/${lv}` } };
+      for (const fn of listeners) {
+        try {
+          fn(synthUrl, 'local');
+        } catch {
+          /* no-op */
+        }
+      }
+    };
     /** @type {Map<string, string>} lv → 最後に知らせた記録の「件数:最後のid」 */
     const lastNotified = new Map();
     /**
@@ -1144,23 +1203,18 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           }
         });
       }
+      if (changes[YT_LAST_STREAM_URL_KEY]) {
+        lastStreamValue = changes[YT_LAST_STREAM_URL_KEY].newValue || null;
+        announceLastWatch(lvOfLastStream(lastStreamValue), 'page');
+      }
       if (!changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};
       knownSummaries = next; // Twitch/Kick のタブ → 配信キーの引き当て(newestKeyForChannel)が新しい配信を知るため
       const prev = changes[KEY_YT_SUMMARIES].oldValue || {};
       // 見ている配信が変わったら「最後に見ていた配信」も変わったと知らせる(コメビュが新しい配信へ追従する)
-      const newestNext = newestVideoIdOf(next);
-      if (newestNext && newestNext !== newestVideoIdOf(prev)) {
-        const synthUrl = { [LAST_WATCH_URL_KEY]: { newValue: `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(newestNext)}` } };
-        panelDiag.announce(pseudoLvForVideoId(newestNext), 'summaries');
-        for (const fn of listeners) {
-          try {
-            fn(synthUrl, 'local');
-          } catch {
-            /* no-op */
-          }
-        }
-      }
+      // 0.1.1948: 記録の更新で「最後に見た配信が変わった」とは知らせない(裏のタブの記録で別の配信へ飛ばない・PC 計測 1946: 362回)。
+      //   例外は1つ: いま見ている部屋の引き当てが変わったとき(記録の無かった部屋が配信を始めた=仮のキー→本物のキー)
+      if (lastAnnouncedLv) announceLastWatch(lvOfLastStream(lastStreamValue), 'resolve');
       for (const vid of Object.keys(next)) {
         if (prev[vid] && Number(prev[vid].updatedAt || 0) === Number(next[vid]?.updatedAt || 0)) continue;
         void notifyLv(pseudoLvForVideoId(vid), next[vid]);

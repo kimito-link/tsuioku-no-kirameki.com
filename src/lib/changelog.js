@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1948',
+    date: '2026-11-09',
+    summary: '横の欄が裏のタブの配信に引っ張られない',
+    items: Object.freeze([
+      'Kick・SHOWROOM・TikTok などの配信ページが「いま見ている配信」を自分で記録するようにしました(ニコ生版と同じ決まり)。横の欄とコメビュは、これまでの「記録が最近増えた配信」ではなく、最後に前面で見た配信を出します。裏で記録中の YouTube タブに引っ張られて表示が戻ることがなくなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1947',
     date: '2026-11-09',
     summary: '記録の無い部屋で前の別の配信を出さない',
@@ -194,15 +202,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Twitch・Kick の長いログイン名(英数字と _ で23〜25字)が、ランキングで「名無し」になっていたのを直しました。ニコ生の内部ラベルを除く判定が人の名前まで除いていました。',
       'Twitch・Kick・YouTube の画面で、折りたたみの中に残っていたニコ生だけの説明(なふだ・ニコの匿名ID など)を外しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1928',
-    date: '2026-11-08',
-    summary: 'Twitch・Kick の絵文字を画像で表示',
-    items: Object.freeze([
-      'Twitch・Kick のチャットの絵文字(Kappa・KEKW など)を、コメビュの一覧・会場の吹き出し・ピン留めなどで画像として表示するようにしました。',
-      '記録と読み上げは今までどおり絵文字の名前のままです。画像が読めないときは名前の文字で出ます。'
     ])
   })
 ]);

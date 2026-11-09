@@ -141,6 +141,10 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
 
   // 配信のまとめ(配信者・同接・開始時刻)
   const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
+  await expect
+    .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })
+    .toContain(KEY.slice(0, KEY.lastIndexOf('.') + 1));
   expect(sum).toMatchObject({ title: 'テストざつだん', broadcasterName: 'テストはいしん', broadcasterHandle: 'w:u42', concurrentViewers: 33 });
   expect(Number(sum.startedAt)).toBe(Date.parse('2026-11-08T09:00:00Z'));
 
