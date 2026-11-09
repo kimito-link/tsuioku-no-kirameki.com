@@ -1106,7 +1106,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 327</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 328</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1367,6 +1367,7 @@
 - `src/lib/scoreAnnounce.js` — 配信採点「結果発表シーケンス」の純関数プランナー(council/broadcast-scoring-SYNTHESIS.md
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
 - `src/lib/shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/shortLivedMemo.js` — 0.1.1961: 同じ問い合わせを短い間だけ使い回す(答えを待っている間の重複もまとめる)。
 - `src/lib/sidepanelCloakDuration.js` — 幕(cloak)が「いつ外れたか / まだ残っているか」を要約する純関数。
 - `src/lib/sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
 - `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
@@ -1445,9 +1446,6 @@
 ### 🏟 会場・席 (1版)
 - `v0.1.1954` 2026-11-09 — PC の声が止められたらクリックを案内する
 
-### 🎁 ギフト (1版)
-- `v0.1.1940` 2026-11-09 — TikTok LIVE の配信を記録する(試作)
-
 ### 🔊 読み上げ (1版)
 - `v0.1.1954` 2026-11-09 — PC の声が止められたらクリックを案内する
 
@@ -1457,7 +1455,8 @@
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
-### その他 (16版)
+### その他 (17版)
+- `v0.1.1961` 2026-11-09 — 描き直しのたびのタブ問い合わせを減らす
 - `v0.1.1959` 2026-11-09 — 同じ公式ランキングは書き直さない
 - `v0.1.1958` 2026-11-09 — 切り替わる直前の横の欄が次の配信を描かない
 - `v0.1.1956` 2026-11-09 — 行が多いときの横の欄の描き直しを軽くする

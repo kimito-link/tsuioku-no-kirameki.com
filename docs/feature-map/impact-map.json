@@ -8988,6 +8988,16 @@
       ]
     },
     {
+      "file": "src/lib/shortLivedMemo.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/shouldRearmBackfillForOfficialGap.js",
       "featureCount": 1,
       "features": [

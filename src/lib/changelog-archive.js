@@ -24,6 +24,17 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1940',
+    date: '2026-11-09',
+    summary: 'TikTok LIVE の配信を記録する(試作)',
+    items: Object.freeze([
+      'TikTok LIVE の配信のページ(tiktok.com/@名前/live)を開くと、コメントとギフトを記録するようにしました。ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャと同じ画面で見られます。',
+      'TikTok はログインしていないとコメントが届きません。ログインしていないときは、配信のページの右下に理由を出します。',
+      'ギフトは TikTok のコインの数で数えます。連打のギフトは連打が終わったときに1回だけ数えます。',
+      'TikTok のページを読む許可が増えました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1939',
     date: '2026-11-08',
     summary: 'ミクチャのギフトに絵を出す',

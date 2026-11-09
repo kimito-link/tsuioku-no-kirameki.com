@@ -1,6 +1,7 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
+import { createShortLivedMemo } from '../lib/shortLivedMemo.js';
 import '../lib/extDocBusyCensusBoot.js';
 // v0.1.1686: ちらつき計(サイドパネルの popup だけ・画面の書き換えを数えて状態速報に出す)。import するだけで起動。
 import '../lib/flickerMeterBoot.js';
@@ -933,6 +934,13 @@ import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
 import { createBroadcasterUidTracker } from '../lib/broadcasterUidTracker.js';
 import { STORY_GROWTH_REBUILD_REASON, createStoryGrowthRebuildReasonState, findStoryEntryDiff, noteStoryEntryDiff, noteStoryGrowthRebuildReason, noteStoryGrowthTarget, publishStoryGrowthRebuildNote } from '../lib/storyGrowthRebuildReasons.js';
 import { isMarketingExportTabFinished } from '../lib/marketingExportTabState.js';
+
+// 0.1.1961: 描き直し1回で約3回呼ばれ、毎回タブを3通り問い合わせていた。400ms の間は前の答え(写し)を使い、タブが動いたら捨てる
+const watchTabCandidatesMemo = createShortLivedMemo((w) => collectWatchTabCandidatesUncached(w), { ttlMs: 400 });
+try {
+  const clearTabMemo = () => watchTabCandidatesMemo.clear();
+  for (const ev of [chrome.tabs?.onActivated, chrome.tabs?.onUpdated, chrome.tabs?.onRemoved, chrome.tabs?.onCreated, chrome.windows?.onFocusChanged]) ev?.addListener?.(clearTabMemo);
+} catch { /* タブの知らせが取れない画面では 400ms で古くなるだけ */ }
 
 /**
  * @typedef {{
@@ -16730,7 +16738,14 @@ async function collectDataBackedWatchLvs(openWatchUrls) {
  * `getLastFocused({ windowTypes:['normal'] })` の active を先に列挙する（pickWatchUrl と同じ考え方）。
  * @param {string} watchUrl
  */
+/** @param {string} watchUrl */
 async function collectWatchTabCandidates(watchUrl) {
+  const list = await watchTabCandidatesMemo.get(String(watchUrl || '').trim());
+  return list.map((t) => ({ ...t }));
+}
+
+/** @param {string} watchUrl */
+async function collectWatchTabCandidatesUncached(watchUrl) {
   /** @type {{ id: number, url: string, lastAccessed: number, active: boolean, audible: boolean }[]} */
   const out = [];
   const w = String(watchUrl || '').trim();

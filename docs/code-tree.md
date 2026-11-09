@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1207 件
+## ⚠️ 役割コメントが無いソース 10 / 1208 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2361)
+- 📁 **src/** (2363)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1486,7 +1486,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2082)
+  - 📁 **lib/** (2084)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3014,6 +3014,8 @@
     - `sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
     - `shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `shareKeysFile.test.js`
+    - `shortLivedMemo.js` — 0.1.1961: 同じ問い合わせを短い間だけ使い回す(答えを待っている間の重複もまとめる)。
+    - `shortLivedMemo.test.js`
     - `shouldRearmBackfillForOfficialGap.js` — 自動補充の核心: 「公式コメント件数と記録件数のギャップが大きいまま、NDGR バックフィルが
     - `shouldRearmBackfillForOfficialGap.test.js`
     - `shouldSkipDeepHarvest.js` — NDGR がリアルタイムでコメントを提供している間は deep harvest（仮想リスト走査）を

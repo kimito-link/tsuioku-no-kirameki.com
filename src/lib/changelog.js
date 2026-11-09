@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1961',
+    date: '2026-11-09',
+    summary: '描き直しのたびのタブ問い合わせを減らす',
+    items: Object.freeze([
+      '横の欄は描き直し1回の中で開いているタブの一覧を約3回ずつ問い合わせていました(1分で400〜600回)。0.4秒の間は前の答えを使い、タブを切り替えたり開閉したりしたらすぐ問い合わせ直すようにしました。表示は変わりません(0.1.1960 は別の作業で使っているので飛ばしています)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1959',
     date: '2026-11-09',
     summary: '同じ公式ランキングは書き直さない',
@@ -168,17 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'TikTok・ミクチャ・SHOWROOM で、配信が終わったページや読み取りに失敗し続けるページを開いたままにすると、配信の情報を1秒おきに読みに行っていたのを直しました(配信していないときは1分おき・失敗したときは間を広げて最大5分おき)。',
       'TikTok の状態の記録が、配信の終わった別のタブの値で上書きされないようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1940',
-    date: '2026-11-09',
-    summary: 'TikTok LIVE の配信を記録する(試作)',
-    items: Object.freeze([
-      'TikTok LIVE の配信のページ(tiktok.com/@名前/live)を開くと、コメントとギフトを記録するようにしました。ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャと同じ画面で見られます。',
-      'TikTok はログインしていないとコメントが届きません。ログインしていないときは、配信のページの右下に理由を出します。',
-      'ギフトは TikTok のコインの数で数えます。連打のギフトは連打が終わったときに1回だけ数えます。',
-      'TikTok のページを読む許可が増えました。'
     ])
   })
 ]);
