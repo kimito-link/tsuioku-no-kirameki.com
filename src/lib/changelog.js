@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1959',
+    date: '2026-11-09',
+    summary: '同じ公式ランキングは書き直さない',
+    items: Object.freeze([
+      'TikTok・SHOWROOM などは、順位が変わっていなくても決まった間隔で同じ公式ランキングを送ってきます。そのたびに保存し直し、横の欄がすぐ描き直して、その配信の全コメントを組み立て直していました。順位・名前・数・顔・期間が前回と同じなら保存しないようにしました。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1958',
     date: '2026-11-09',
     summary: '切り替わる直前の横の欄が次の配信を描かない',
@@ -171,15 +179,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'TikTok はログインしていないとコメントが届きません。ログインしていないときは、配信のページの右下に理由を出します。',
       'ギフトは TikTok のコインの数で数えます。連打のギフトは連打が終わったときに1回だけ数えます。',
       'TikTok のページを読む許可が増えました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1939',
-    date: '2026-11-08',
-    summary: 'ミクチャのギフトに絵を出す',
-    items: Object.freeze([
-      'ミクチャのギフトを、ミクチャで見えているのと同じ絵つきで記録するようにしました(投げ一覧・コメビュ・会場に出ます)。',
-      '絵の置き場(ミクチャの画像サーバー)を読む許可が増えました。絵が取れないときは今までどおり絵なしで記録します。'
     ])
   })
 ]);

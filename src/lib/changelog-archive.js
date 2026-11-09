@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1939',
+    date: '2026-11-08',
+    summary: 'ミクチャのギフトに絵を出す',
+    items: Object.freeze([
+      'ミクチャのギフトを、ミクチャで見えているのと同じ絵つきで記録するようにしました(投げ一覧・コメビュ・会場に出ます)。',
+      '絵の置き場(ミクチャの画像サーバー)を読む許可が増えました。絵が取れないときは今までどおり絵なしで記録します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1938',
     date: '2026-11-08',
     summary: 'コメビュでギフトが2行に見えるのを直す',

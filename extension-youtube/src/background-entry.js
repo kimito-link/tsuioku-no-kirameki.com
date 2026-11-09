@@ -40,6 +40,9 @@ import { platformOfStreamKey, isStreamTabToReload, STREAM_PLATFORM_TAB_URLS } fr
 import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
+import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
+/** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
+const lastLeaderboardSig = new Map();
 
 const mxGiftImages = createMxGiftImageResolver({
   fetchJson: async (url) => {
@@ -808,9 +811,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!videoId || !rows.length) return false;
     // Twitch の公式ランキングは期間がチャンネルごとに違う(累計・今月・今週・今日)。見出しに出すので一緒に置く
     const period = ['ALLTIME', 'MONTH', 'WEEK', 'DAY'].includes(String(payload.period || '')) ? String(payload.period) : '';
+    // 0.1.1959: 中身が前回と同じなら書かない(TikTok・SHOWROOM は同じ表を決まった間隔で送ってくる。書くたびに横の欄が描き直していた)
+    const sig = ytLeaderboardSig(rows, period);
+    if (lastLeaderboardSig.get(videoId) === sig) return false;
+    lastLeaderboardSig.set(videoId, sig);
+    if (lastLeaderboardSig.size > 200) lastLeaderboardSig.delete(lastLeaderboardSig.keys().next().value);
     void chrome.storage.local
       .set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows, ...(period ? { period } : {}) } })
-      .catch(() => {});
+      .catch(() => lastLeaderboardSig.delete(videoId));
     return false;
   }
 

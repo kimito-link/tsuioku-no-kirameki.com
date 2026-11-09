@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 68</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 69</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -193,6 +193,7 @@
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
 - `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
+- `src/lib/youtube/ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
 - `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
 - `src/lib/youtube/ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
 
@@ -1441,13 +1442,11 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🏟 会場・席 (2版)
+### 🏟 会場・席 (1版)
 - `v0.1.1954` 2026-11-09 — PC の声が止められたらクリックを案内する
-- `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 
-### 🎁 ギフト (2版)
+### 🎁 ギフト (1版)
 - `v0.1.1940` 2026-11-09 — TikTok LIVE の配信を記録する(試作)
-- `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 
 ### 🔊 読み上げ (1版)
 - `v0.1.1954` 2026-11-09 — PC の声が止められたらクリックを案内する
@@ -1458,7 +1457,8 @@
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
-### その他 (15版)
+### その他 (16版)
+- `v0.1.1959` 2026-11-09 — 同じ公式ランキングは書き直さない
 - `v0.1.1958` 2026-11-09 — 切り替わる直前の横の欄が次の配信を描かない
 - `v0.1.1956` 2026-11-09 — 行が多いときの横の欄の描き直しを軽くする
 - `v0.1.1955` 2026-11-09 — 行が多い配信で横の欄が遅くなるのを減らす
