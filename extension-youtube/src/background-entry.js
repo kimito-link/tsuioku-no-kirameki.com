@@ -36,7 +36,7 @@ import './background-nico-relay.js';
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
-import { platformOfStreamKey } from '../../src/lib/platform/streamPlatform.js';
+import { platformOfStreamKey, isStreamTabToReload, STREAM_PLATFORM_TAB_URLS } from '../../src/lib/platform/streamPlatform.js';
 import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
@@ -346,6 +346,14 @@ async function reloadExistingYtWatchTabs(reason) {
     tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/watch*', 'https://www.youtube.com/live/*'] });
   } catch {
     return;
+  }
+  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページも同じく止まる
+  //   (2026-11-09 実機: 更新前から開いていた SHOWROOM のタブが記録 0 のまま)。配信ページの形の URL だけ読み込み直す
+  try {
+    const others = await chrome.tabs.query({ url: [...STREAM_PLATFORM_TAB_URLS] });
+    for (const t of others) if (isStreamTabToReload(t.url)) tabs.push(t);
+  } catch {
+    // no-op
   }
   let reloaded = 0;
   for (const tab of tabs) {

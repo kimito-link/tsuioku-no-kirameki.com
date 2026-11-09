@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1945',
+    date: '2026-11-09',
+    summary: '拡張の入れ替え時に他サービスのタブも読み込み直す',
+    items: Object.freeze([
+      '拡張が新しい版に入れ替わったとき、YouTube だけでなく Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の配信ページのタブも自動で読み込み直すようにしました(古い版のまま止まり、記録が 0 のままになることがありました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1944',
     date: '2026-11-09',
     summary: 'TikTok のスタンプだけのコメントも記録する',
@@ -199,16 +207,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Kick のランキングの説明を「チャット欄の「歴代トップKICKユーザー」と同じ値」に直しました(チャット欄で最初に見える一覧は週間のサブで、別の一覧のため)。',
       'ランキングの大きい数を 550,000 のように3桁ごとに区切りました。Kick で Kicks がしばらく来ないときも、5分ごとに読み直して「少し前の値」のままにならないようにしました。',
       'Kick で顔を聞く間をあけ、「多すぎ」と返されたら少し休むようにしました(混んだ配信で Kick に断られていたため)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1925',
-    date: '2026-11-08',
-    summary: 'Kicks・Bits を1つ1ptに・なふだを隠す',
-    items: Object.freeze([
-      'Kick の Kicks と Twitch の Bits を、1つ1ptで数えるようにしました。これまでは円の目安に直して1行ずつ丸めていたため、1 Kick が 2pt になり、少額が重なるほど合計がずれていました。公式のランキングと同じ数で並びます。',
-      'YouTube・Twitch・Kick の画面では、ニコ生だけの設定「なふだ」の切り替えを出さないようにしました(押しても相手がいないため)。',
-      'ランキング欄の説明(マウスを乗せると出る文・読み上げソフト向けの名前)に残っていた「ニコ生」の言葉を直しました。'
     ])
   })
 ]);

@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1925',
+    date: '2026-11-08',
+    summary: 'Kicks・Bits を1つ1ptに・なふだを隠す',
+    items: Object.freeze([
+      'Kick の Kicks と Twitch の Bits を、1つ1ptで数えるようにしました。これまでは円の目安に直して1行ずつ丸めていたため、1 Kick が 2pt になり、少額が重なるほど合計がずれていました。公式のランキングと同じ数で並びます。',
+      'YouTube・Twitch・Kick の画面では、ニコ生だけの設定「なふだ」の切り替えを出さないようにしました(押しても相手がいないため)。',
+      'ランキング欄の説明(マウスを乗せると出る文・読み上げソフト向けの名前)に残っていた「ニコ生」の言葉を直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1924',
     date: '2026-11-08',
     summary: 'Twitch のポイント交換と連続視聴を記録',

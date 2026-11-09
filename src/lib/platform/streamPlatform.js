@@ -219,6 +219,19 @@ export function platformChannelOfUrl(url) {
   return null;
 }
 
+/** 各サービスのタブを探すときの URL の形(chrome.tabs.query 用) */
+export const STREAM_PLATFORM_TAB_URLS = Object.freeze(LIST.map((p) => p.tabUrl));
+
+/**
+ * 拡張が入れ替わったときに読み込み直す、配信ページのタブか(YouTube 以外のサービス)。
+ * 入れ替わると開いていたページの content script は止まり、記録が 0 のままになる(2026-11-09 実機: SHOWROOM)。
+ * 配信ページの形の URL だけ(トップや一覧のページは読み込み直さない)
+ * @param {unknown} url
+ */
+export function isStreamTabToReload(url) {
+  return !!platformChannelOfUrl(url);
+}
+
 /** ホスト名 → サービス(そのサイトのページの中で動いているとき) @param {unknown} hostname */
 export function platformOfHostname(hostname) {
   const h = String(hostname || '').toLowerCase();
