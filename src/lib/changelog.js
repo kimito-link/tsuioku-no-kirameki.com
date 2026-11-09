@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1943',
+    date: '2026-11-09',
+    summary: 'ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない',
+    items: Object.freeze([
+      'ミクチャと SHOWROOM でも、状態の記録が配信の終わった別のタブの値で上書きされないようにしました(TikTok と同じ守り)。記録そのものには影響ありません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1942',
     date: '2026-11-09',
     summary: 'TikTok で漏れたコメントの理由を計器に残す',
@@ -202,15 +210,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Twitch のチャンネルポイントで本文つきの交換(「メッセージを目立たせる」など)をした人を、ポイント交換として記録するようにしました。',
       'Twitch の「連続で見に来た」記念(視聴ストリーク)も、何回連続かと一緒に記録します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1923',
-    date: '2026-11-08',
-    summary: 'Kick 公式の Kicks ランキングを出す',
-    items: Object.freeze([
-      'Kick の配信では「ギフト貢献度」の欄に、Kick 公式の Kicks ランキング(これまでの累計)を出すようにしました。チャット欄のランキングと同じ値で、Kicks が贈られるたびに更新されます。',
-      '公式のランキングが取れないときは、これまでどおりこの PC の記録から数えた順位を出します。'
     ])
   })
 ]);

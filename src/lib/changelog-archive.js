@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1923',
+    date: '2026-11-08',
+    summary: 'Kick 公式の Kicks ランキングを出す',
+    items: Object.freeze([
+      'Kick の配信では「ギフト貢献度」の欄に、Kick 公式の Kicks ランキング(これまでの累計)を出すようにしました。チャット欄のランキングと同じ値で、Kicks が贈られるたびに更新されます。',
+      '公式のランキングが取れないときは、これまでどおりこの PC の記録から数えた順位を出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1922',
     date: '2026-11-08',
     summary: 'Kick のチャットが本物で記録されるように',

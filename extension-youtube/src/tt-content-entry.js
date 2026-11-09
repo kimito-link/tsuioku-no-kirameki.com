@@ -27,6 +27,7 @@ import {
   buildTtStreamKey,
 } from '../../src/lib/tiktok/ttParse.js';
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
+import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -87,7 +88,7 @@ function safeSendMessage(/** @type {any} */ msg) {
 }
 
 /** このタブの印(計器をタブで分け合うため) */
-const TAB_TOKEN = Math.random().toString(36).slice(2, 10);
+const TAB_TOKEN = makeDiagTabToken();
 let diagTimer = 0;
 function saveDiagSoon() {
   if (diagTimer) return;
@@ -100,8 +101,7 @@ function saveDiagSoon() {
       //   2分以内に記録中として書いた計器を上書きしない(2026-11-09 PC 実測: 終わったタブの値で記録中の値が消えた)
       void Promise.resolve(diag.streamKey ? null : chrome.storage.local.get('yt_diag_tt_chat'))
         .then((bag) => {
-          const prev = bag?.yt_diag_tt_chat;
-          if (prev && prev.tab !== TAB_TOKEN && prev.streamKey && Date.now() - Number(prev.updatedAt || 0) < 120_000) return;
+          if (shouldSkipDiagWrite(bag?.yt_diag_tt_chat, { tab: TAB_TOKEN, streamKey: diag.streamKey, now: Date.now() })) return;
           return chrome.storage.local.set({ yt_diag_tt_chat: snap });
         })
         .catch(() => {});

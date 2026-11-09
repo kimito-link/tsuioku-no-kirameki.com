@@ -186,9 +186,9 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   await expect
     .poll(async () => {
       const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_mx_chat'))).yt_diag_mx_chat || {};
-      return { wsState: d.wsState, giftCoin: d.giftCoin, itemList: d.itemList, itemsVia: d.itemsVia, boardRows: d.boardRows, k10: d.kinds?.['10'], giftImages: d.giftImages };
+      return { wsState: d.wsState, giftCoin: d.giftCoin, itemList: d.itemList, itemsVia: d.itemsVia, boardRows: d.boardRows, k10: d.kinds?.['10'], giftImages: d.giftImages, tab: /^[a-z0-9]{4,}$/.test(String(d.tab || '')) };
     }, { timeout: 15_000 })
-    .toEqual({ wsState: 'open', giftCoin: 3450, itemList: 2, itemsVia: 'root', boardRows: 2, k10: 1, giftImages: 1 });
+    .toEqual({ wsState: 'open', giftCoin: 3450, itemList: 2, itemsVia: 'root', boardRows: 2, k10: 1, giftImages: 1, tab: true });
 
   // ギフトの絵: 資源の preview が分かったギフト(item 501)だけ絵つき。preview の無いもの・一覧に無いものは絵なし
   const giftImages = await sw.evaluate(

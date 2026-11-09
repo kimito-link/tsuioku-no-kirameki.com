@@ -796,7 +796,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 91</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 92</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `mobile/scripts/verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
@@ -865,6 +865,7 @@
 - `src/lib/opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
 - `src/lib/opSoundEffectDiagKey.js` — 操作音(opSoundDirector.js・Phase D1)の「押下/成功/発音」観測値を
 - `src/lib/panelWakeCurtainDiagKey.js` — 「幕(シェード)が全画面を覆った回数」の観測値を popup-entry.js が書き、status が読む storage キー。
+- `src/lib/platform/diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
 - `src/lib/popupDiagUptimeNote.js` — popup 固有診断が「popup 起動から何秒後の値か」を明示する注記を作る純関数(v0.1.1211)。
@@ -1450,7 +1451,7 @@
 ### 🎈 吹き出し (1版)
 - `v0.1.1928` 2026-11-08 — Twitch・Kick の絵文字を画像で表示
 
-### 🎁 ギフト (9版)
+### 🎁 ギフト (8版)
 - `v0.1.1940` 2026-11-09 — TikTok LIVE の配信を記録する(試作)
 - `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 - `v0.1.1938` 2026-11-08 — コメビュでギフトが2行に見えるのを直す
@@ -1459,7 +1460,6 @@
 - `v0.1.1933` 2026-11-08 — SHOWROOM の配信を記録(試作)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
 - `v0.1.1926` 2026-11-08 — Twitch 公式の Bits ランキングを出す
-- `v0.1.1923` 2026-11-08 — Kick 公式の Kicks ランキングを出す
 
 ### 🔊 読み上げ (3版)
 - `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
@@ -1472,7 +1472,8 @@
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1937` 2026-11-08 — ミクチャの順位の単位と見出しを直す
 
-### その他 (6版)
+### その他 (7版)
+- `v0.1.1943` 2026-11-09 — ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない
 - `v0.1.1942` 2026-11-09 — TikTok で漏れたコメントの理由を計器に残す
 - `v0.1.1941` 2026-11-09 — 終わった配信のページで毎秒読みに行かない
 - `v0.1.1935` 2026-11-08 — ふわっち・SHOWROOM の終わり際を直す

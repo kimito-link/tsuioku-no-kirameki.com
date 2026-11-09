@@ -26,6 +26,7 @@ import {
   buildSrStreamKey,
 } from '../../src/lib/showroom/srParse.js';
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
+import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -72,14 +73,24 @@ function safeSendMessage(/** @type {any} */ msg) {
   }
 }
 
+/** このタブの印(計器をタブで分け合うため) */
+const TAB_TOKEN = makeDiagTabToken();
 let diagTimer = 0;
 function saveDiagSoon() {
   if (diagTimer) return;
   diagTimer = setTimeout(() => {
     diagTimer = 0;
     diag.updatedAt = Date.now();
+    const snap = { ...diag, tab: TAB_TOKEN, types: { ...diag.types } };
     try {
-      void chrome.storage.local.set({ yt_diag_sr_chat: { ...diag, types: { ...diag.types } } });
+      // 記録していないタブ(配信が終わったページ等)は、別のタブが2分以内に記録中として書いた計器を上書きしない
+      //   (2026-11-09 PC 実測: 終わったタブの値で記録中の値が一時的に消えた)
+      void Promise.resolve(diag.streamKey ? null : chrome.storage.local.get('yt_diag_sr_chat'))
+        .then((bag) => {
+          if (shouldSkipDiagWrite(bag?.yt_diag_sr_chat, { tab: TAB_TOKEN, streamKey: diag.streamKey, now: Date.now() })) return;
+          return chrome.storage.local.set({ yt_diag_sr_chat: snap });
+        })
+        .catch(() => {});
     } catch {
       /* no-op */
     }

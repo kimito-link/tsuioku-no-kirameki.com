@@ -197,9 +197,9 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   await expect
     .poll(async () => {
       const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_sr_chat'))).yt_diag_sr_chat || {};
-      return { wsState: d.wsState, freeGifts: d.freeGifts, giftPt: d.giftPt, giftList: d.giftList, boardFrom: d.boardFrom, t8: d.types?.['8'] };
+      return { wsState: d.wsState, freeGifts: d.freeGifts, giftPt: d.giftPt, giftList: d.giftList, boardFrom: d.boardFrom, t8: d.types?.['8'], tab: /^[a-z0-9]{4,}$/.test(String(d.tab || '')) };
     }, { timeout: 15_000 })
-    .toEqual({ wsState: 'open', freeGifts: 1, giftPt: 70, giftList: 2, boardFrom: 'summary', t8: 1 });
+    .toEqual({ wsState: 'open', freeGifts: 1, giftPt: 70, giftList: 2, boardFrom: 'summary', t8: 1, tab: true });
 
   // 公式の順位(pt つき)が YouTube のトップファンと同じ置き場に入る
   const board = await sw.evaluate(async (key) => (await chrome.storage.local.get(`yt_leaderboard_${key}`))[`yt_leaderboard_${key}`], KEY);
