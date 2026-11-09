@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1942',
+    date: '2026-11-09',
+    summary: 'TikTok で漏れたコメントの理由を計器に残す',
+    items: Object.freeze([
+      'TikTok で画面には出たのに記録されなかったコメントがあったとき、その理由(送り主が読めない・本文が空・番号が無いなど)を状態の記録に数えて残すようにしました。記録の仕方そのものは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1941',
     date: '2026-11-09',
     summary: '終わった配信のページで毎秒読みに行かない',
@@ -203,17 +211,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Kick の配信では「ギフト貢献度」の欄に、Kick 公式の Kicks ランキング(これまでの累計)を出すようにしました。チャット欄のランキングと同じ値で、Kicks が贈られるたびに更新されます。',
       '公式のランキングが取れないときは、これまでどおりこの PC の記録から数えた順位を出します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1922',
-    date: '2026-11-08',
-    summary: 'Kick のチャットが本物で記録されるように',
-    items: Object.freeze([
-      'Kick のチャットが本物の配信で1件も記録できていなかったのを直しました(Kick が接続の仕組みを変えていました)。つなぎ先を毎回 Kick に聞くようにしたので、また変わっても追いつきます。',
-      '再サブスクのお祝い・チャンネルポイントの交換も記録するようにしました。',
-      '同じ人が続けて贈った Kicks が1件にまとまってしまうのを直しました。ギフトサブの件数も正しく数えます。',
-      'サブスクなど名前だけで届く通知を、チャットで見た同じ人にそろえるようにしました。'
     ])
   })
 ]);

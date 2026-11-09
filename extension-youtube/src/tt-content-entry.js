@@ -17,6 +17,7 @@ import {
   parseTtPushFrame,
   parseTtResponse,
   parseTtChat,
+  ttChatDropReason,
   parseTtGift,
   parseTtGiftList,
   ttGiftRow,
@@ -61,6 +62,10 @@ const diag = {
   giftList: 0,
   items: 0,
   dropped: 0,
+  /** @type {Record<string, number>} 捨てた理由ごとの数(chat:no-text など) */
+  dropReasons: {},
+  /** @type {Record<string, number>} 読まない型のうち、コメントらしい名前の型(Chat・Emote・Barrage を含む)の数 */
+  chatLikeSkipped: {},
   boardRows: 0,
   apiFail: 0,
   lastError: '',
@@ -89,7 +94,7 @@ function saveDiagSoon() {
   diagTimer = setTimeout(() => {
     diagTimer = 0;
     diag.updatedAt = Date.now();
-    const snap = { ...diag, tab: TAB_TOKEN, types: { ...diag.types }, liveStatus: { ...diag.liveStatus } };
+    const snap = { ...diag, tab: TAB_TOKEN, types: { ...diag.types }, dropReasons: { ...diag.dropReasons }, chatLikeSkipped: { ...diag.chatLikeSkipped }, liveStatus: { ...diag.liveStatus } };
     try {
       // 計器は1つの置き場をタブで分け合う。記録していないタブ(配信が終わったページ等)は、別のタブが
       //   2分以内に記録中として書いた計器を上書きしない(2026-11-09 PC 実測: 終わったタブの値で記録中の値が消えた)
@@ -198,11 +203,18 @@ function startReader(uniqueId, roomId, key) {
     if (m.type === 'WebcastChatMessage') {
       const r = parseTtChat(m.payload, { msgId: m.msgId, uniqueId, nowMs: now });
       if (r) add(r);
-      else diag.dropped += 1;
+      else {
+        diag.dropped += 1;
+        const why = `chat:${ttChatDropReason(m.payload, m.msgId)}`;
+        diag.dropReasons[why] = (diag.dropReasons[why] || 0) + 1;
+      }
     } else if (m.type === 'WebcastGiftMessage') {
       const g = parseTtGift(m.payload, { gifts: giftInfo, nowMs: now });
       if (g) addGifts(combo.push(g, now));
-      else diag.dropped += 1;
+      else {
+        diag.dropped += 1;
+        diag.dropReasons['gift:bad'] = (diag.dropReasons['gift:bad'] || 0) + 1;
+      }
     } else if (m.type === 'WebcastRoomUserSeqMessage') {
       const s = parseTtRoomUserSeq(m.payload);
       if (s.viewers != null) latestViewers = s.viewers;
@@ -215,6 +227,9 @@ function startReader(uniqueId, roomId, key) {
     } else if (m.type === 'WebcastMemberMessage') {
       const v = parseTtMemberViewers(m.payload);
       if (v != null) latestViewers = v;
+    } else if (/Chat|Emote|Barrage|Comment/i.test(m.type)) {
+      // コメント欄に出るのに読んでいない型があるかもしれない(画面と記録の差の手がかり)
+      diag.chatLikeSkipped[m.type] = (diag.chatLikeSkipped[m.type] || 0) + 1;
     }
   };
 

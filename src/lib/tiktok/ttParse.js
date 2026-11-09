@@ -223,6 +223,20 @@ export function parseTtChat(payload, ctx = {}) {
 }
 
 /**
+ * コメントを捨てた理由(計器で漏れの原因を見るため)
+ * @param {Uint8Array} payload
+ * @param {string} msgId
+ * @returns {'no-user' | 'no-text' | 'no-id' | 'other'}
+ */
+export function ttChatDropReason(payload, msgId) {
+  const m = new PbMsg(payload);
+  if (!parseTtUser(m.msg(2))) return 'no-user';
+  if (!m.str(3).trim()) return 'no-text';
+  if (!/^\d{1,20}$/.test(String(msgId || '')) || msgId === '0') return 'no-id';
+  return 'other';
+}
+
+/**
  * @typedef {{ id: string, name: string, diamond: number, combo: boolean, type: number, imageUrl: string }} TtGiftInfo
  */
 

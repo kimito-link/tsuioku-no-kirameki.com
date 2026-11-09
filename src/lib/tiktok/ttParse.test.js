@@ -17,6 +17,7 @@ import {
   ttUniqueIdOfStreamKey,
   ttRoomIdOfSocketUrl,
   safeTtImageUrl,
+  ttChatDropReason,
 } from './ttParse.js';
 
 // 小さな書き手(試験用・番号は 2026-11-09 PC 実測の形)
@@ -132,6 +133,9 @@ describe('コメント', () => {
     expect(parseTtChat(new Uint8Array([...fb(3, 'x')]), { msgId: '1' })).toBe(null);
     expect(parseTtChat(new Uint8Array([...fb(2, user(5, 'a', 'aa')), ...fb(3, '')]), { msgId: '1' })).toBe(null);
     expect(parseTtChat(new Uint8Array([...fb(2, user(5, 'a', 'aa')), ...fb(3, 'x')]), { msgId: '' })).toBe(null);
+    expect(ttChatDropReason(new Uint8Array([...fb(3, 'x')]), '1')).toBe('no-user');
+    expect(ttChatDropReason(new Uint8Array([...fb(2, user(5, 'a', 'aa')), ...fb(3, '')]), '1')).toBe('no-text');
+    expect(ttChatDropReason(new Uint8Array([...fb(2, user(5, 'a', 'aa')), ...fb(3, 'x')]), '')).toBe('no-id');
   });
 });
 
