@@ -24,6 +24,18 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1936',
+    date: '2026-11-08',
+    summary: 'ミクチャの配信を記録(試作)',
+    items: Object.freeze([
+      'ミクチャの配信のページ(mixch.tv/u/番号/live)を開くと、コメントとギフトを記録するようにしました。ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM と同じ画面で見られます。',
+      'ギフトはコイン(値段 × 個数)と絵つきで記録します。アイテムの名前はまだ取れないので「ギフト」と出します。',
+      'ミクチャ公式の今月のファンランキングをギフト貢献度の欄に出します。',
+      'SHOWROOM のページで、ふわっち用の読み取りが一緒に動いていたのを止めました。',
+      '未ログインのときは送信の前に止めます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1935',
     date: '2026-11-08',
     summary: 'ふわっち・SHOWROOM の終わり際を直す',

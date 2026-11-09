@@ -635,12 +635,23 @@ export function ytStableOrder(lv, list) {
     stableOrderByLv.set(lv, ord);
   }
   const keyOf = ytStableKeyOf;
-  list.forEach((r, i) => {
-    const k = keyOf(r, i);
-    if (!ord.has(k)) ord.set(k, ord.size);
-  });
+  /** @type {number[]} */
+  const ns = new Array(list.length);
+  // 0.1.1956: 記録はたいてい既に初めて見た順に並んでいる。そのときは並べ替えずにそのまま返す(数千行を毎回並べ直していた)
+  let sorted = true;
+  for (let i = 0; i < list.length; i++) {
+    const k = keyOf(list[i], i);
+    let n = ord.get(k);
+    if (n === undefined) {
+      n = ord.size;
+      ord.set(k, n);
+    }
+    ns[i] = n;
+    if (i > 0 && n < ns[i - 1]) sorted = false;
+  }
+  if (sorted) return list.slice();
   return list
-    .map((r, i) => ({ r, n: /** @type {number} */ (ord.get(keyOf(r, i))) }))
+    .map((r, i) => ({ r, n: ns[i] }))
     .sort((a, b) => a.n - b.n)
     .map((x) => x.r);
 }

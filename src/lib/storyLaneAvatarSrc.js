@@ -46,6 +46,40 @@ import { resolveSupportGrowthTileSrc } from './supportGrowthTileSrc.js';
  * @returns {string} 解決した http(s) URL。解決不能なら ''。
  */
 export function resolveStoryLaneAvatarSrc(entry, ctx) {
+  // 0.1.1956: 同じ入力の答えを覚えておく(PC 実測: Kick 8,000行で1分に約200万回呼ばれていた)。
+  //   この関数は入力だけで答えが決まる(下の部品はどれも外の状態を読まない)ので、答えは覚えない場合と同じ。
+  const snap = ctx?.snapshot;
+  const rawUserId = entry?.userId;
+  const key = [
+    rawUserId === undefined ? '\u0001u' : rawUserId === null ? '\u0001n' : typeof rawUserId === 'string' ? `s${rawUserId}` : `o${String(rawUserId)}`,
+    String(entry?.avatarUrl ?? ''),
+    String(snap?.broadcasterUserId ?? ''),
+    String(snap?.broadcasterIconUrl ?? ''),
+    String(snap?.viewerUserId ?? ''),
+    String(snap?.viewerAvatarUrl ?? ''),
+    snap?.viewerAvatarUrl == null ? '0' : '1',
+    ctx?.isOwnPosted === true ? '1' : '0',
+    String(ctx?.rememberedAvatar ?? '')
+  ].join('\u0000');
+  const hit = _resolveMemo.get(key);
+  if (hit !== undefined) return hit;
+  const out = resolveStoryLaneAvatarSrcUncached(entry, ctx);
+  if (_resolveMemo.size >= RESOLVE_MEMO_MAX) _resolveMemo.clear();
+  _resolveMemo.set(key, out);
+  return out;
+}
+
+const RESOLVE_MEMO_MAX = 50_000;
+/** @type {Map<string, string>} */
+const _resolveMemo = new Map();
+
+/**
+ * 覚えない版(試験で「覚えた答え=覚えない答え」を確かめるために出す)。
+ * @param {Parameters<typeof resolveStoryLaneAvatarSrc>[0]} entry
+ * @param {Parameters<typeof resolveStoryLaneAvatarSrc>[1]} ctx
+ * @returns {string}
+ */
+export function resolveStoryLaneAvatarSrcUncached(entry, ctx) {
   const snap = ctx?.snapshot;
   const bc = String(snap?.broadcasterUserId || '').trim();
   const broadcasterIconUrl = String(snap?.broadcasterIconUrl || '').trim();
