@@ -51,6 +51,14 @@ export const VOICE_WARMING_TEXT = 'VOICEVOX を起動した直後は、初めて
 export const VOICE_LIGHT_ACTIVE_TEXT = 'VOICEVOX が追いつかないので、いまは PC の声で読んでいます。VOICEVOX が速くなったら自動で戻ります';
 
 /**
+ * 2026-11-09 りんく「この注意書きかいたほうがいい」: PC の声が Chrome に止められている間の一言。
+ *   裏取り: speechSynthesis の失敗理由が 'not-allowed'(voiceLightSpeaker.lastError)のときだけ出す。
+ *   Chrome は読み込み直したあと一度もクリックしていないページでは声を鳴らさない(自動再生の決まり)。
+ *   りんくの PC で無音→配信ページを1回クリックで鳴り始めた(2026-11-09 16:5x JST)。
+ */
+export const VOICE_LIGHT_BLOCKED_TEXT = '🔈 PC の声で読み上げるには、この配信ページを1回クリックしてください(Chrome は読み込み直したあと、クリックするまで声を鳴らしません)';
+
+/**
  * まだ声の準備中か(2回目以降の合成が十分に測れていない)。
  * @param {{ warmSynthSamples?: number, warmRtfSamples?: number }} diag
  */
@@ -85,11 +93,13 @@ export function decideVoiceGpuTip(diag, gpuCapable) {
 
 /**
  * @param {boolean} prevShown 直前に出していたか
- * @param {{ e2eAvgMs?: number, upstreamEmaMs?: number, queueNow?: number, warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number, voiceOverloaded?: boolean, lightVoiceActive?: boolean }} diag
+ * @param {{ e2eAvgMs?: number, upstreamEmaMs?: number, queueNow?: number, warmSynthEmaMs?: number, warmSynthSamples?: number, coldSynthMaxMs?: number, voiceOverloaded?: boolean, lightVoiceActive?: boolean, lightVoiceBlocked?: boolean }} diag
  * @param {{ gpuCapable?: boolean|null }} [_opts] 2026-11-01 から GPU の案内は decideVoiceGpuTip へ移した(呼び出し側の互換のため受け取るだけ)
  * @returns {{ shown: boolean, lagMs: number, text: string }}
  */
 export function decideVoiceLagNotice(prevShown, diag, _opts = {}) {
+  // 2026-11-09: Chrome に止められて無音のときは、何をすれば鳴るかを最優先で出す(声の切り替えより先)。
+  if (diag?.lightVoiceBlocked === true) return { shown: true, lagMs: -1, text: VOICE_LIGHT_BLOCKED_TEXT };
   // 2026-11-03: 軽い声で読んでいる間は、遅れではなく「声を切り替えた」ことを伝える(遅れの平均は VOICEVOX の頃の値)。
   if (diag?.lightVoiceActive === true) return { shown: true, lagMs: -1, text: VOICE_LIGHT_ACTIVE_TEXT };
   const e2e = Number(diag?.e2eAvgMs);

@@ -20,7 +20,8 @@ const WATCHDOG_EXTRA_MS = 5000;
  *   available: () => boolean,
  *   voices: () => any[],
  *   speak: (text: string, tone: { voiceIndex: number, pitch: number, rate: number }, hooks?: { onStart?: () => void }) => Promise<boolean>,
- *   cancel: () => void
+ *   cancel: () => void,
+ *   lastError: () => string
  * }}
  */
 export function createLightSpeaker(deps = {}) {
@@ -29,6 +30,12 @@ export function createLightSpeaker(deps = {}) {
   if (!synth || typeof synth.speak !== 'function' || typeof Utterance !== 'function') return null;
   /** @type {any[]} */
   let cached = [];
+  /**
+   * 2026-11-09: 直前の1件が失敗した理由(SpeechSynthesisErrorEvent.error・成功なら '')。
+   *   Chrome は読み込み直したあと一度もクリックしていないページでは 'not-allowed' で鳴らさない
+   *   (りんくの PC で実際に無音になり、クリックで鳴り始めた)。理由を捨てると画面で案内できないので残す。
+   */
+  let lastError = '';
   const refresh = () => {
     try { cached = pickJapaneseVoices(synth.getVoices?.() || []); } catch { cached = []; }
   };
@@ -39,6 +46,7 @@ export function createLightSpeaker(deps = {}) {
     available: () => { if (!cached.length) refresh(); return cached.length > 0; },
     voices: () => cached,
     cancel: () => { try { synth.cancel(); } catch { /* no-op */ } },
+    lastError: () => lastError,
     speak(text, tone, hooks = {}) {
       return new Promise((resolve) => {
         if (!cached.length) refresh();
@@ -46,6 +54,7 @@ export function createLightSpeaker(deps = {}) {
         if (!t || !cached.length) { resolve(false); return; }
         let started = false;
         let done = false;
+        lastError = '';
         const finish = () => { if (done) return; done = true; clearTimeout(timer); resolve(started); };
         const u = new Utterance(t);
         u.voice = cached[tone.voiceIndex % cached.length];
@@ -54,9 +63,14 @@ export function createLightSpeaker(deps = {}) {
         u.rate = tone.rate;
         u.onstart = () => { started = true; try { hooks.onStart?.(); } catch { /* 吹き出し側の失敗で読みを止めない */ } };
         u.onend = finish;
-        u.onerror = finish;
+        u.onerror = (/** @type {any} */ ev) => {
+          const code = typeof ev?.error === 'string' ? ev.error : 'unknown';
+          // 自分で止めた(cancel/割り込み)のは失敗の理由にしない。
+          if (code !== 'canceled' && code !== 'interrupted') lastError = code;
+          finish();
+        };
         const timer = setTimeout(() => { try { synth.cancel(); } catch { /* no-op */ } finish(); }, t.length * MAX_MS_PER_CHAR + WATCHDOG_EXTRA_MS);
-        try { synth.speak(u); } catch { finish(); }
+        try { synth.speak(u); } catch { lastError = 'speak-threw'; finish(); }
       });
     }
   };
