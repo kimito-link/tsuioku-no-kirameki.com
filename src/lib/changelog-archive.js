@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1935',
+    date: '2026-11-08',
+    summary: 'ふわっち・SHOWROOM の終わり際を直す',
+    items: Object.freeze([
+      'ふわっちの配信が終わったとき、終わる直前のコメントを取りこぼさないよう、もう一度読み直してから止めるようにしました。',
+      'SHOWROOM の配信が終わったことに、これまでより早く(最大30秒→数秒)気づくようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1934',
     date: '2026-11-08',
     summary: 'ふわっちの匿名・運営・配信名を直す',

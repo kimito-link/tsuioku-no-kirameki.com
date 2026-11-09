@@ -15,7 +15,7 @@
 
 import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
-import { getYtStreamCommentsByVideoId } from './ytIdbStore.js';
+import { getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
@@ -462,7 +462,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined> }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
 const panelDiagCore = createPanelStreamDiag({
@@ -677,6 +677,23 @@ const inPageSkipFetchUntil = new Map();
  * @param {string} vid
  * @returns {Promise<any[] | null>} null = 受け取れなかった(前の控えも無い)
  */
+/**
+ * 0.1.1955: 記録の読み出し口。視聴ページの中は background に頼み、拡張の画面(横の欄・コメビュ)は IndexedDB を直接読む。
+ *   どちらも初回と30秒ごとは全件、あいだは新しく記録された分だけ(横の欄が毎秒約4回、7,000行を全部読み直していた・PC 実測)。
+ * @param {string} vid
+ * @param {number | undefined} afterRecordedAt undefined = 全件
+ * @returns {Promise<any[]>}
+ */
+async function fetchStreamRows(vid, afterRecordedAt) {
+  if (!YT_SHIM_IN_PAGE) {
+    return afterRecordedAt === undefined ? getYtStreamCommentsByVideoId(vid) : getYtStreamCommentsSince(vid, afterRecordedAt);
+  }
+  const res = await real?.runtime?.sendMessage?.(
+    afterRecordedAt === undefined ? { type: 'YT_GET_STREAM_COMMENTS', videoId: vid } : { type: 'YT_GET_STREAM_COMMENTS', videoId: vid, afterRecordedAt },
+  );
+  if (!res || res.ok === false || !Array.isArray(res.items)) throw new Error('no_items');
+  return res.items;
+}
 async function getCommentsViaBackground(vid) {
   const cur = inPageCommentCache.get(vid);
   const now = Date.now();
@@ -687,12 +704,9 @@ async function getCommentsViaBackground(vid) {
   }
   const full = !cur || now - cur.fullAt > IN_PAGE_FULL_REFRESH_MS;
   try {
-    const res = await real?.runtime?.sendMessage?.(
-      full ? { type: 'YT_GET_STREAM_COMMENTS', videoId: vid } : { type: 'YT_GET_STREAM_COMMENTS', videoId: vid, afterRecordedAt: cur.lastRecordedAt },
-    );
-    if (!res || res.ok === false || !Array.isArray(res.items)) throw new Error('no_items');
+    const items = await fetchStreamRows(vid, full ? undefined : /** @type {NonNullable<typeof cur>} */ (cur).lastRecordedAt);
     const next = full ? { byPk: new Map(), lastRecordedAt: 0, fullAt: now } : /** @type {NonNullable<typeof cur>} */ (cur);
-    for (const r of res.items) {
+    for (const r of items) {
       const k = String(r?.pk || r?.id || '');
       if (!k) continue;
       next.byPk.set(k, r);
@@ -727,7 +741,7 @@ export function ytIsImportantVoiceKey(key) {
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
-  const items = YT_SHIM_IN_PAGE ? await getCommentsViaBackground(vid) : await getYtStreamCommentsByVideoId(vid);
+  const items = await getCommentsViaBackground(vid);
   if (items == null) return undefined;
   const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
   // 顔の分からない人(YouTube のギフトだけ送った人など)は、トップファンの順位表の顔を名前で引く
@@ -1200,7 +1214,37 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
      * @param {string} lv
      * @param {any} summary
      */
-    const notifyLv = async (lv, summary) => {
+    /**
+     * 0.1.1955: 同じ配信の組み立てが走っている間に来た知らせは1回にまとめる(終わってからもう1回だけ組み立てる)。
+     *   PC 実測: 知らせ 429回/分に対し組み立て 221回/分・1回 7,000行で、横の欄の空き時間が60秒中0.4秒だった。
+     * @type {Map<string, { again: boolean, summary: any, p: Promise<void> }>}
+     */
+    const notifyRunning = new Map();
+    /** @param {string} lv @param {any} summary */
+    const notifyLv = (lv, summary) => {
+      const cur = notifyRunning.get(lv);
+      if (cur) {
+        cur.again = true;
+        if (summary !== undefined) cur.summary = summary;
+        shimDiag.notifyCoalesced = (Number(shimDiag.notifyCoalesced) || 0) + 1;
+        return cur.p;
+      }
+      const st = { again: false, summary, p: Promise.resolve() };
+      st.p = (async () => {
+        try {
+          do {
+            st.again = false;
+            await notifyLvOnce(lv, st.summary);
+          } while (st.again);
+        } finally {
+          notifyRunning.delete(lv);
+        }
+      })();
+      notifyRunning.set(lv, st);
+      return st.p;
+    };
+    /** @param {string} lv @param {any} summary */
+    const notifyLvOnce = async (lv, summary) => {
       commentsCache.delete(lv);
       const arr = await buildCommentsForLv(lv).catch(() => undefined);
       if (!arr) return;

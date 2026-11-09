@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1955',
+    date: '2026-11-09',
+    summary: '行が多い配信で横の欄が遅くなるのを減らす',
+    items: Object.freeze([
+      'Kick などで記録が数千行になると、横の欄がコメントのたびに全部の行を読み直して組み立てていたため、新着が数秒遅れていました。あいだは新しい行だけを読み、続けて届いた知らせは1回にまとめるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1954',
     date: '2026-11-09',
     summary: 'PC の声が止められたらクリックを案内する',
@@ -179,15 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'ミクチャ公式の今月のファンランキングをギフト貢献度の欄に出します。',
       'SHOWROOM のページで、ふわっち用の読み取りが一緒に動いていたのを止めました。',
       '未ログインのときは送信の前に止めます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1935',
-    date: '2026-11-08',
-    summary: 'ふわっち・SHOWROOM の終わり際を直す',
-    items: Object.freeze([
-      'ふわっちの配信が終わったとき、終わる直前のコメントを取りこぼさないよう、もう一度読み直してから止めるようにしました。',
-      'SHOWROOM の配信が終わったことに、これまでより早く(最大30秒→数秒)気づくようにしました。'
     ])
   })
 ]);

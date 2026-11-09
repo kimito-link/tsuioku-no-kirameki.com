@@ -204,3 +204,16 @@ describe('0.1.1953: 見ていない配信の記録は組み立てない', () => 
     expect(d.snapshot().recordNotify).toEqual({ built: 1, skipped: 2 });
   });
 });
+
+describe('0.1.1955: 行が多いときに横の欄が全行を読み直し続けない', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  it('拡張の画面も、あいだは新しく記録された分だけ読む(全件は初回と30秒ごと)', () => {
+    expect(shim).toContain('getYtStreamCommentsSince(vid, afterRecordedAt)');
+    expect(shim).toContain('const items = await getCommentsViaBackground(vid);');
+    expect(shim).not.toContain('YT_SHIM_IN_PAGE ? await getCommentsViaBackground(vid) : await getYtStreamCommentsByVideoId(vid)');
+  });
+  it('同じ配信の組み立て中に来た知らせは、終わってから1回にまとめる', () => {
+    expect(shim).toContain('const notifyRunning = new Map();');
+    expect(shim).toMatch(/do \{\s*st\.again = false;\s*await notifyLvOnce\(lv, st\.summary\);\s*\} while \(st\.again\);/);
+  });
+});
