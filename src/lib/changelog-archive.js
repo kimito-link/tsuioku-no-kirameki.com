@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1931',
+    date: '2026-11-08',
+    summary: 'ふわっちの配信を記録(試作)',
+    items: Object.freeze([
+      'ふわっちの視聴ページ(whowatch.tv/viewer/配信の番号)を開くと、コメントとアイテムを記録するようにしました。ニコ生・YouTube・Twitch・Kick と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
+      'アイテムは名前と絵つきで、値段(pt)の合計で順位を数えます。',
+      'まだ本物のふわっちで確かめる前の試作です。読めた形は計器に残し、確かめてから直します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1930',
     date: '2026-11-08',
     summary: 'Twitch のハイプトレインと予想の結果を記録',

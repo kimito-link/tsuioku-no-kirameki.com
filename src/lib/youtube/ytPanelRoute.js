@@ -1,6 +1,6 @@
 // ytPanelRoute.js — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
 //   パネルはタブ専用にしない(タブを移るたびに隠れて再表示=縞・v0.1.1696)。中の iframe の src だけを付け替える
-//   (sidepanel-iframe-boot-entry.js)。YouTube 版の画面 yt-sidepanel.html は scripts/youtube-build.mjs の生成物。
+//   (sidepanel-iframe-boot-entry.js)。0.1.1949〜 src に配信キー(&stream=)を焼き、配信が変われば読み込み直す。YouTube 版の画面 yt-sidepanel.html は scripts/youtube-build.mjs の生成物。
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from './ytPageMeta.js';
 import { platformChannelOfUrl } from '../platform/streamPlatform.js';
 
@@ -8,7 +8,8 @@ export const YT_PANEL_SRC = 'yt-sidepanel.html?inline=1&dock=sidepanel';
 
 /** @param {unknown} url */
 export function isYtPanelTabUrl(url) {
-  // Twitch のタブも同じ画面(YouTube 版の画面=ニコ生版の完全コピー)で見せる。記録は同じ置き場(council/twitch-support-PLAN.md)
+  // YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)のタブは同じ画面(YouTube 版=ニコ生版の完全コピー)で見せる。
+  //   ホストだけで決める(どの配信かは ytPanelStreamKeyOfUrl・council/panel-stream-selection-SPEC.md)
   return /^https:\/\/(?:www\.(?:youtube\.com|twitch\.tv)|(?:www\.)?(?:kick\.com|whowatch\.tv|showroom-live\.com|mixch\.tv|tiktok\.com))\//.test(String(url || ''));
 }
 

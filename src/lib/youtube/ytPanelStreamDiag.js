@@ -9,6 +9,31 @@ import { platformOfStreamKey } from '../platform/streamPlatform.js';
 
 export const YT_PANEL_STREAM_DIAG_KEY_PREFIX = 'yt_diag_panel_stream_';
 const HIST = 10;
+const CALLERS_MAX = 12;
+
+/**
+ * storage のキー名を数え上げ用にまとめる(数字の並びは N・長さは40字まで)。
+ * @param {unknown} key
+ */
+export function normalizeStorageKeyName(key) {
+  return String(key || '').replace(/\d+/g, 'N').slice(0, 40);
+}
+
+/**
+ * 呼び出し元の関数名だけを取り出す(URL・行番号は残さない)。skip に当たる枠は飛ばす。
+ * @param {unknown} stack Error().stack @param {RegExp} [skip]
+ */
+export function callerNameFromStack(stack, skip = /measuredTabsQuery|wrapTabsFn|callerNameFromStack|Promise|<anonymous>|(?:^|\.)query$|withTimeout/) {
+  const lines = String(stack || '').split('\n').slice(1);
+  for (const line of lines) {
+    const m = /^\s*at\s+(?:async\s+)?([\w$.]+)\s+\(/.exec(line);
+    if (!m) continue;
+    const name = m[1];
+    if (skip.test(name)) continue;
+    return name.slice(0, 60);
+  }
+  return '(anonymous)';
+}
 
 /** 配信キー → 'youtube' / サービス id / '' @param {unknown} key */
 export function serviceOfStreamKey(key) {
@@ -67,6 +92,12 @@ export function createPanelStreamDiag(deps) {
     /** tabs.query({active:true}) の結果 */
     activeQuery: /** @type {Array<{at:number, host:string, mapped:boolean, service:string, ms:number}>} */ ([]),
     tabsQuery: { calls: 0, slowOver1100ms: 0, emptyActive: 0 },
+    /** 0.1.1951: 前面タブの問い合わせの多さの内訳(誰が呼んだか=関数名だけ・1秒あたりの最大) */
+    tabsQueryCallers: /** @type {Record<string, number>} */ ({}),
+    tabsQueryPeakPerSec: 0,
+    /** 0.1.1951: この画面が受けた storage の変化(キー名の数字は N に=どのキーが描き直しを呼んでいるか) */
+    storageChangedKeys: /** @type {Record<string, number>} */ ({}),
+    storageChangedEvents: 0,
     /** 配信のページなのに配信キーに写せなかったタブ(記録の無い部屋など) */
     unmappedWatchTabs: { count: 0, lastHost: '', lastAt: 0 },
     /** 探り読み(1回の get で comments を2配信以上聞く) */
@@ -77,8 +108,14 @@ export function createPanelStreamDiag(deps) {
     panelStreamService: String(deps.panelService || ''),
     /** 外枠のサービスと、画面が聞いた配信のサービスが食い違った回数(SPEC §3-a: 0 でなければ言葉の元文保持を検討) */
     contentPlatformMismatch: 0,
+    /** 0.1.1951: 読み込み直しを越えた累計(外枠が配信ごとに iframe を作り直すと上の数は 0 に戻るため) */
+    lifetime: { frames: 1, contentPlatformMismatch: 0, askedSwitches: 0 },
   };
+  /** 前の iframe までの累計 */
+  const base = { frames: 0, contentPlatformMismatch: 0, askedSwitches: 0 };
   let lastAsked = '';
+  let secAt = -1;
+  let secCalls = 0;
 
   /** @param {string} lv */
   const svc = (lv) => serviceOfStreamKey(lvToKey(lv));
@@ -100,12 +137,29 @@ export function createPanelStreamDiag(deps) {
       const id = String(lv || '');
       if (!probe && id && lastAsked && id !== lastAsked) s.askedSwitches += 1;
       if (!probe && id) lastAsked = id;
-      if (!probe && id && s.panelStreamService && svc(id) && svc(id) !== s.panelStreamService) s.contentPlatformMismatch += 1;
+      let mismatched = false;
+      if (!probe && id && s.panelStreamService && svc(id) && svc(id) !== s.panelStreamService) {
+        s.contentPlatformMismatch += 1;
+        mismatched = true;
+      }
       const prev = s.askedLvHistory[s.askedLvHistory.length - 1];
       // 同じ配信を続けて聞くのは1件にまとめる(3秒ごとの見直しで履歴が埋まらない)
       if (prev && prev.lv === id && prev.probe === probe) prev.at = t;
       else pushCapped(s.askedLvHistory, { at: t, lv: id, service: svc(id), probe });
       s.at = t;
+      return mismatched; // true = すぐ書く(この iframe はまもなく作り直されるかもしれない)
+    },
+    /**
+     * 前の iframe が書いた値から累計を引き継ぐ(起動時に1回)。
+     * @param {any} prev
+     */
+    seedLifetime(prev) {
+      const l = prev && typeof prev === 'object' ? prev.lifetime : null;
+      if (!l || typeof l !== 'object') return;
+      for (const k of /** @type {Array<keyof typeof base>} */ (['frames', 'contentPlatformMismatch', 'askedSwitches'])) {
+        const v = Number(l[k]);
+        if (Number.isFinite(v) && v > 0) base[k] = v;
+      }
     },
     /** @param {string} lv @param {string} reason */
     announce(lv, reason) {
@@ -126,10 +180,21 @@ export function createPanelStreamDiag(deps) {
       s.popupLastWatchWrites.lastAt = t;
       s.at = t;
     },
-    /** @param {{ url: string, mappedKey: string, ms: number, empty: boolean }} q */
+    /** @param {{ url: string, mappedKey: string, ms: number, empty: boolean, caller?: string }} q */
     activeQuery(q) {
       const t = now();
       s.tabsQuery.calls += 1;
+      const sec = Math.floor(t / 1000);
+      if (sec !== secAt) {
+        secAt = sec;
+        secCalls = 0;
+      }
+      secCalls += 1;
+      if (secCalls > s.tabsQueryPeakPerSec) s.tabsQueryPeakPerSec = secCalls;
+      const caller = String(q.caller || '?').slice(0, 60);
+      if (caller in s.tabsQueryCallers || Object.keys(s.tabsQueryCallers).length < CALLERS_MAX) {
+        s.tabsQueryCallers[caller] = (s.tabsQueryCallers[caller] || 0) + 1;
+      } else s.tabsQueryCallers['(other)'] = (s.tabsQueryCallers['(other)'] || 0) + 1;
       if (q.ms > 1100) s.tabsQuery.slowOver1100ms += 1;
       if (q.empty) s.tabsQuery.emptyActive += 1;
       const entry = { at: t, host: hostOfUrl(q.url), mapped: !!q.mappedKey, service: q.mappedKey ? serviceOfStreamKey(q.mappedKey) : '', ms: Math.round(q.ms) };
@@ -139,6 +204,16 @@ export function createPanelStreamDiag(deps) {
         prev.ms = Math.max(prev.ms, entry.ms);
       } else pushCapped(s.activeQuery, entry);
       s.at = t;
+    },
+    /** @param {string[]} keys */
+    storageChanged(keys) {
+      s.storageChangedEvents += 1;
+      for (const k of keys) {
+        const name = normalizeStorageKeyName(k);
+        if (name in s.storageChangedKeys || Object.keys(s.storageChangedKeys).length < CALLERS_MAX) {
+          s.storageChangedKeys[name] = (s.storageChangedKeys[name] || 0) + 1;
+        } else s.storageChangedKeys['(other)'] = (s.storageChangedKeys['(other)'] || 0) + 1;
+      }
     },
     /** @param {string} url */
     unmappedWatchTab(url) {
@@ -162,6 +237,11 @@ export function createPanelStreamDiag(deps) {
       s.at = now();
     },
     snapshot() {
+      s.lifetime = {
+        frames: base.frames + 1,
+        contentPlatformMismatch: base.contentPlatformMismatch + s.contentPlatformMismatch,
+        askedSwitches: base.askedSwitches + s.askedSwitches,
+      };
       return JSON.parse(JSON.stringify(s));
     },
   };

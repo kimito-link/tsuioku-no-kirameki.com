@@ -31,7 +31,7 @@ import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey } from '../../src/lib/youtube/ytPanelRoute.js';
-import { createPanelStreamDiag, panelStreamDiagContext, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
+import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -473,19 +473,32 @@ const panelDiagCore = createPanelStreamDiag({
 const PANEL_DIAG_CTX = panelStreamDiagContext(typeof location !== 'undefined' ? location.pathname : '');
 let panelDiagTimer = 0;
 // 書き込みは 10 秒に1回まで(yt_diag_live_rows と同じ型・nls_ でないキー=popup の描き直しを起こさない)。画面ごとに別のキー
+const panelDiagWriteNow = () => {
+  try {
+    const c = /** @type {any} */ (globalThis).chrome;
+    if (!c?.runtime?.id || !c?.storage?.local) return;
+    void Promise.resolve(c.storage.local.set({ [`${YT_PANEL_STREAM_DIAG_KEY_PREFIX}${PANEL_DIAG_CTX}`]: panelDiagCore.snapshot() })).catch(() => {});
+  } catch {
+    /* 計器は本体を止めない */
+  }
+};
 const panelDiagSoon = () => {
   if (panelDiagTimer) return;
   panelDiagTimer = /** @type {any} */ (setTimeout(() => {
     panelDiagTimer = 0;
-    try {
-      const c = /** @type {any} */ (globalThis).chrome;
-      if (!c?.runtime?.id || !c?.storage?.local) return;
-      void Promise.resolve(c.storage.local.set({ [`${YT_PANEL_STREAM_DIAG_KEY_PREFIX}${PANEL_DIAG_CTX}`]: panelDiagCore.snapshot() })).catch(() => {});
-    } catch {
-      /* 計器は本体を止めない */
-    }
+    panelDiagWriteNow();
   }, 10_000));
 };
+// 0.1.1951: 前の iframe の累計を引き継ぐ(外枠が配信ごとに作り直すので、数がその iframe の分しか残らなかった)
+try {
+  const c0 = /** @type {any} */ (globalThis).chrome;
+  if (c0?.runtime?.id && c0?.storage?.local) {
+    const key0 = `${YT_PANEL_STREAM_DIAG_KEY_PREFIX}${PANEL_DIAG_CTX}`;
+    void Promise.resolve(c0.storage.local.get(key0)).then((bag) => panelDiagCore.seedLifetime(bag?.[key0]), () => {});
+  }
+} catch {
+  /* no-op */
+}
 /** 記録したら書き込みを予約する写し(計器の失敗で本体を止めない) */
 const panelDiag = /** @type {ReturnType<typeof createPanelStreamDiag>} */ (
   Object.fromEntries(
@@ -494,7 +507,9 @@ const panelDiag = /** @type {ReturnType<typeof createPanelStreamDiag>} */ (
       (/** @type {any[]} */ ...a) => {
         try {
           const r = /** @type {any} */ (fn)(...a);
-          if (name !== 'snapshot') panelDiagSoon();
+          // storage の変化を数えただけでは書かない(自分の書き込みの変化で書き続ける輪を作らない)
+          if (name === 'asked' && r === true) panelDiagWriteNow(); // 食い違いは iframe が作り直される前にすぐ残す
+          else if (name !== 'snapshot' && name !== 'storageChanged' && name !== 'seedLifetime') panelDiagSoon();
           return r;
         } catch {
           return undefined;
@@ -1016,11 +1031,12 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     if (!opts || typeof opts !== 'object' || opts.active !== true) return realTabsQueryFn(...args);
     const cb = typeof args[args.length - 1] === 'function' ? args.pop() : null;
     const t0 = Date.now();
+    const caller = callerNameFromStack(new Error().stack); // 0.1.1951: 問い合わせの多さの犯人探し(関数名だけ)
     const p = Promise.resolve(realTabsQueryFn(...args)).then((res) => {
       const first = Array.isArray(res) ? res[0] : null;
       const url = String(first?.url || first?.pendingUrl || '');
       const key = url && isWatchLikeTabUrl(url) ? streamKeyForWatchUrl(url) : '';
-      panelDiag.activeQuery({ url, mappedKey: key, ms: Date.now() - t0, empty: !first });
+      panelDiag.activeQuery({ url, mappedKey: key, ms: Date.now() - t0, empty: !first, caller });
       return res;
     });
     if (cb) {
@@ -1030,15 +1046,16 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     return p;
   };
   real.tabs.query = wrapTabsFn(measuredTabsQuery);
-  // 計器: windows.getLastFocused は写していない(層 B の写し漏れ)。前面が配信のページだった回数を数えるだけ
+  // 0.1.1951: windows.getLastFocused の tabs も写す(層 B の写し漏れ・SPEC §7)。計器は「写す前に配信のページで、写せなかった」回数を数える
   if (real.windows && typeof real.windows.getLastFocused === 'function') {
     const realGetLastFocused = real.windows.getLastFocused.bind(real.windows);
     real.windows.getLastFocused = (/** @type {any[]} */ ...args) => {
       const cb = typeof args[args.length - 1] === 'function' ? args.pop() : null;
       const p = Promise.resolve(realGetLastFocused(...args)).then((w) => {
         const act = Array.isArray(w?.tabs) ? w.tabs.find((/** @type {any} */ t) => t?.active) : null;
-        panelDiag.lastFocused(!!act && isWatchLikeTabUrl(String(act.url || '')));
-        return w;
+        const actUrl = String(act?.url || act?.pendingUrl || '');
+        panelDiag.lastFocused(!!act && isWatchLikeTabUrl(actUrl) && !streamKeyForWatchUrl(actUrl));
+        return w && Array.isArray(w.tabs) ? { ...w, tabs: w.tabs.map(mapTab) } : w;
       });
       if (cb) {
         p.then(cb, () => cb(undefined));
@@ -1206,6 +1223,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     };
     add((/** @type {Record<string, any>} */ changes, /** @type {string} */ area) => {
       if (area !== 'local') return;
+      panelDiag.storageChanged(Object.keys(changes)); // 0.1.1951: どのキーの変化が描き直しを呼んでいるか(問い合わせの多さの犯人探し)
       // 顔が新しく分かったら、件数が同じでも描き直してもらう
       // 最初からの文字アイコンの見分けが増えたら、段(りんく/こん太)が変わるので描き直してもらう(0.1.99)
       if (changes[YT_DEFAULT_ICON_STORE_KEY]) ytDefaultIconJudge?.merge(changes[YT_DEFAULT_ICON_STORE_KEY].newValue);

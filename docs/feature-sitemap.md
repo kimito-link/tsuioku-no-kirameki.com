@@ -334,7 +334,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 293</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 292</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -368,7 +368,6 @@
 - `src/extension/comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
 - `src/extension/comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
-- `src/extension/sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -796,7 +795,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 92</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `mobile/scripts/verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
@@ -890,7 +889,6 @@
 - `src/lib/supportVisualStoryCopy.js` — アイコン列・診断ブロックで共有する文言（二重定義防止）。
 - `src/lib/watchPopupLoadDiagnostics.js` — watch インラインパネルの読み込みフェーズ計測（DevTools / 実機メモ用）。
 - `src/lib/watchSnapshotAlignment.js` — content からの応答(intercept/AI診断 等)が現在解決済の watch と同じ配信由来か判定し別 live の混入を防ぐ。
-- `src/lib/youtube/ytPanelStreamDiag.js` — 横の欄(サイドパネル)・コメビュが「どの配信を出したか」を数える計器(0.1.1946)。
 
 </details>
 
@@ -942,6 +940,14 @@
   - `src/lib/platform/streamPlatform.js`
   - `tests/e2e/tiktok-recording.spec.js`
   - `council/tiktok-support-PLAN.md`
+- **横の欄の配信選び(YouTube 系)** — 横の欄・コメビュが YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のどの配信を出すかをニコ生版と同じ3層で決める。外枠は前面タブの配信キーを iframe の src(&stream=)に焼いて配信が変わったら読み込み直す・配信ページが「最後に見た配信」(yt_last_stream_url)を自分で書く・shim がそれを疑似 lv に翻訳して渡す・探り読み(2配信以上の comments)には答えない。記録の無い部屋は仮の配信キー。計器 yt_diag_panel_stream_<画面>
+  - `src/extension/sidepanel-iframe-boot-entry.js`
+  - `src/lib/youtube/ytPanelRoute.js`
+  - `extension-youtube/src/pfLastStreamUrl.js`
+  - `extension-youtube/src/ytNicoShim.js`
+  - `src/lib/youtube/ytPanelStreamDiag.js`
+  - `tests/e2e/sidepanel-stream-follow.spec.js`
+  - `council/panel-stream-selection-SPEC.md`
 - **応援レーンタイル→発言一覧(comeview 詳細)** — popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)
   - `src/lib/comeviewUserDetailLink.js`
   - `src/extension/popup/wireLaneUserDetailOpen.js`
@@ -1099,7 +1105,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 328</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 326</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1111,7 +1117,6 @@
 - `app/live-view.js` — global NL_BUILD_ID
 - `app/supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - `extension-youtube/content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
-- `extension-youtube/src/pfLastStreamUrl.js` — YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページが、
 - `extension-youtube/src/sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
 - `extension-youtube/src/sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
 - `extension-youtube/src/sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
@@ -1411,7 +1416,6 @@
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
-- `src/lib/youtube/ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
@@ -1443,31 +1447,24 @@
 - `v0.1.1934` 2026-11-08 — ふわっちの匿名・運営・配信名を直す
 - `v0.1.1932` 2026-11-08 — ふわっちのアイテム・匿名の人・文字化けを直す
 
-### 🏟 会場・席 (3版)
+### 🏟 会場・席 (2版)
 - `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 - `v0.1.1932` 2026-11-08 — ふわっちのアイテム・匿名の人・文字化けを直す
-- `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
 
-### 🎁 ギフト (7版)
+### 🎁 ギフト (6版)
 - `v0.1.1940` 2026-11-09 — TikTok LIVE の配信を記録する(試作)
 - `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 - `v0.1.1938` 2026-11-08 — コメビュでギフトが2行に見えるのを直す
 - `v0.1.1937` 2026-11-08 — ミクチャの順位の単位と見出しを直す
 - `v0.1.1936` 2026-11-08 — ミクチャの配信を記録(試作)
 - `v0.1.1933` 2026-11-08 — SHOWROOM の配信を記録(試作)
-- `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
-
-### 🔊 読み上げ (1版)
-- `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
-
-### 🪟 応援レーン・タイル (1版)
-- `v0.1.1931` 2026-11-08 — ふわっちの配信を記録(試作)
 
 ### 🩺 診断・状態速報 (2版)
 - `v0.1.1946` 2026-11-09 — 横の欄がどの配信を出したかを診断に記録
 - `v0.1.1937` 2026-11-08 — ミクチャの順位の単位と見出しを直す
 
-### その他 (10版)
+### その他 (11版)
+- `v0.1.1951` 2026-11-09 — 他サービスの横の欄で前面タブを正しく拾う
 - `v0.1.1950` 2026-11-09 — 別タブの探り読みで横の欄が重くならない
 - `v0.1.1949` 2026-11-09 — 別サービスへ移ると横の欄をまっさらにする
 - `v0.1.1948` 2026-11-09 — 横の欄が裏のタブの配信に引っ張られない

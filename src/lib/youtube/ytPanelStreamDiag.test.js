@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createPanelStreamDiag, hostOfUrl, panelStreamDiagContext, serviceOfStreamKey } from './ytPanelStreamDiag.js';
+import { callerNameFromStack, createPanelStreamDiag, hostOfUrl, normalizeStorageKeyName, panelStreamDiagContext, serviceOfStreamKey } from './ytPanelStreamDiag.js';
 
 const keys = /** @type {Record<string, string>} */ ({ lv1: 'dQw4w9WgXcQ', lv2: 'kk.someone.123', lv3: 'sr.room.456' });
 const make = () => {
@@ -129,5 +129,61 @@ describe('0.1.1950: 探り読みには答えない(SPEC §4-C3)', () => {
     const popup = readFileSync(new URL('../../../src/extension/popup-entry.js', import.meta.url), 'utf8');
     const fn = popup.slice(popup.indexOf('async function collectDataBackedWatchLvs'));
     expect(fn.slice(0, 3000)).toContain('keys.push(commentsStorageKey(lv));');
+  });
+});
+
+describe('0.1.1951: 前面タブの問い合わせの多さの内訳', () => {
+  it('呼び出し元は関数名だけ(包み・URL は残さない)', () => {
+    const stack = [
+      'Error',
+      '    at measuredTabsQuery (chrome-extension://abc/dist/yt-popup.js:1:100)',
+      '    at Object.query (chrome-extension://abc/dist/yt-popup.js:1:200)',
+      '    at async refresh (chrome-extension://abc/dist/yt-popup.js:1:300)',
+    ].join('\n');
+    expect(callerNameFromStack(stack)).toBe('refresh');
+    expect(callerNameFromStack('Error\n    at chrome-extension://abc/x.js:1:1')).toBe('(anonymous)');
+  });
+  it('呼び出し元ごとに数え、1秒あたりの最大を残す(種類は12まで)', () => {
+    let t = 5000;
+    const d = createPanelStreamDiag({ now: () => t, lvToKey: () => '' });
+    for (let i = 0; i < 5; i++) d.activeQuery({ url: '', mappedKey: '', ms: 1, empty: true, caller: 'refresh' });
+    t = 6500;
+    d.activeQuery({ url: '', mappedKey: '', ms: 1, empty: true, caller: 'collectWatchTabCandidates' });
+    for (let i = 0; i < 20; i++) d.activeQuery({ url: '', mappedKey: '', ms: 1, empty: true, caller: `f${i}` });
+    const s = d.snapshot();
+    expect(s.tabsQueryPeakPerSec).toBe(21);
+    expect(s.tabsQueryCallers.refresh).toBe(5);
+    expect(Object.keys(s.tabsQueryCallers).length).toBe(13);
+    expect(s.tabsQueryCallers['(other)']).toBe(10);
+    expect(JSON.stringify(s)).not.toContain('chrome-extension');
+  });
+});
+
+describe('0.1.1951: 層 B の写し漏れ(windows.getLastFocused)', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  it('getLastFocused の tabs を mapTab で写す', () => {
+    expect(shim).toContain('{ ...w, tabs: w.tabs.map(mapTab) }');
+  });
+});
+
+describe('0.1.1951: 読み込み直しを越えた累計・storage の変化の内訳', () => {
+  it('前の iframe の累計を引き継ぎ、食い違いのときは true を返す(すぐ書く合図)', () => {
+    const d = createPanelStreamDiag({ now: () => 1, lvToKey: (lv) => keys[lv] || '', panelService: 'kick' });
+    d.seedLifetime({ lifetime: { frames: 3, contentPlatformMismatch: 2, askedSwitches: 5 } });
+    expect(d.asked('lv2', false)).toBe(false);
+    expect(d.asked('lv1', false)).toBe(true);
+    const s = d.snapshot();
+    expect(s.lifetime).toEqual({ frames: 4, contentPlatformMismatch: 3, askedSwitches: 6 });
+    d.seedLifetime(null);
+    d.seedLifetime({ lifetime: { frames: 'x' } });
+    expect(d.snapshot().lifetime.frames).toBe(4);
+  });
+  it('storage のキー名は数字を N にまとめて数える', () => {
+    const d = make();
+    d.storageChanged(['nls_comments_lv123', 'nls_comments_lv456', 'yt_diag_sr_chat']);
+    const s = d.snapshot();
+    expect(normalizeStorageKeyName('nls_panel_summary_lv9')).toBe('nls_panel_summary_lvN');
+    expect(s.storageChangedKeys).toEqual({ nls_comments_lvN: 2, yt_diag_sr_chat: 1 });
+    expect(s.storageChangedEvents).toBe(1);
   });
 });

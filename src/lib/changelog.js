@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1951',
+    date: '2026-11-09',
+    summary: '他サービスの横の欄で前面タブを正しく拾う',
+    items: Object.freeze([
+      'YouTube・Kick・SHOWROOM などの横の欄で、前面のウィンドウのタブも配信として読めるようにしました(ニコ生版と同じ)。あわせて、横の欄が何度も読み直している原因を調べる計器を足しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1950',
     date: '2026-11-09',
     summary: '別タブの探り読みで横の欄が重くならない',
@@ -189,16 +197,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'ふわっちの匿名の人が別々の人なのに1人にまとめられていたのを、名前で見分けるようにしました。',
       'アイテムやお知らせの本文に HTML のタグが文字のまま見えていたのを直しました。運営のお知らせは人として数えません。',
       '別窓の会場で、Twitch・Kick・ふわっちの配信に YouTube のエラーが映っていたのを出さないようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1931',
-    date: '2026-11-08',
-    summary: 'ふわっちの配信を記録(試作)',
-    items: Object.freeze([
-      'ふわっちの視聴ページ(whowatch.tv/viewer/配信の番号)を開くと、コメントとアイテムを記録するようにしました。ニコ生・YouTube・Twitch・Kick と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
-      'アイテムは名前と絵つきで、値段(pt)の合計で順位を数えます。',
-      'まだ本物のふわっちで確かめる前の試作です。読めた形は計器に残し、確かめてから直します。'
     ])
   })
 ]);
