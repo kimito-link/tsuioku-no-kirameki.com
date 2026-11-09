@@ -5686,5 +5686,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1973', metric: 'cross-checked-claims', value: 52,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '30日の窓で数える値(過去最良は古いコミットが窓から外れたため届かない)'
+  }),
+  Object.freeze({
+    version: '0.1.1974', metric: 'bundle-kb', value: 1418,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'popup は変えていない(変更は YouTube 系の入口 ytNicoShim の書き込みの門のみ)'
+  }),
+  Object.freeze({
+    version: '0.1.1974', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1974', metric: 'cross-checked-claims', value: 53,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '30日の窓で数える値(過去最良は古いコミットが窓から外れたため届かない)'
   })
 ]);

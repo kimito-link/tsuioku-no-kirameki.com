@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1974',
+    date: '2026-11-10',
+    summary: 'YouTube系でコメントの控えの全件書き込みをやめる',
+    items: Object.freeze([
+      'Kick など YouTube 系の横の欄が、記録のコメント全部(1万2千行で約5.5MB)を90秒に39回書き直していた件。YouTube 系のコメントの正本は記録係の保存(IndexedDB)で、この控えは誰も読まないので書かないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1973',
     date: '2026-11-10',
     summary: '人が多い配信は応援レーンの写しの書き込みを間引く',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '行が多い配信で横の欄が遅くなるのを減らす',
     items: Object.freeze([
       'Kick などで記録が数千行になると、横の欄がコメントのたびに全部の行を読み直して組み立てていたため、新着が数秒遅れていました。あいだは新しい行だけを読み、続けて届いた知らせは1回にまとめるようにしました'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1954',
-    date: '2026-11-09',
-    summary: 'PC の声が止められたらクリックを案内する',
-    items: Object.freeze([
-      'ページを読み込み直したあと一度もクリックしていないと、Chrome は PC の声を鳴らしません。そのときは読み上げが無音のままでしたが、「この配信ページを1回クリックしてください」と会場に出すようにしました。クリックすると、すぐ PC の声で読み始めます'
     ])
   })
 ]);

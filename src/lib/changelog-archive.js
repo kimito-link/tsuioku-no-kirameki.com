@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1954',
+    date: '2026-11-09',
+    summary: 'PC の声が止められたらクリックを案内する',
+    items: Object.freeze([
+      'ページを読み込み直したあと一度もクリックしていないと、Chrome は PC の声を鳴らしません。そのときは読み上げが無音のままでしたが、「この配信ページを1回クリックしてください」と会場に出すようにしました。クリックすると、すぐ PC の声で読み始めます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1953',
     date: '2026-11-09',
     summary: '他サービスで新着が横の欄に出る遅れを減らす',

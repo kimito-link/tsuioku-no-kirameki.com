@@ -34,6 +34,7 @@ import { readYtPanelStreamKey } from '../../src/lib/youtube/ytPanelRoute.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
+import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -464,7 +465,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined>, done?: boolean }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む(組み立て中は重ねない) */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { builds: 0, buildJoined: 0, buildPhaseFirst: /** @type {any} */ (null), buildPhaseMax: /** @type {any} */ (null), buildPhaseLast: /** @type {any} */ (null), buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { builds: 0, buildJoined: 0, buildPhaseFirst: /** @type {any} */ (null), buildPhaseMax: /** @type {any} */ (null), buildPhaseLast: /** @type {any} */ (null), buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, commentWritesDropped: 0, commentRowsWriteDropped: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
 const PANEL_SERVICE = PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '';
@@ -1069,6 +1070,16 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   //   ニコ生版の部品が同接の数を来場として写していた(2026-11-04 計器: official.viewers が同接と同じ 1,065)。
   const realSet = realLocal.set.bind(realLocal);
   realLocal.set = (/** @type {any} */ items, /** @type {any} */ cb) => {
+    // ★v0.1.1974: 疑似 lv のコメントの控え(全件 約5.5MB)は書かない。正本は IndexedDB で、読み出しはここが IndexedDB から組む
+    {
+      const d = dropPseudoLvCommentWrites(items, (lv) => !!videoIdForPseudoLv(lv));
+      if (d.dropped) {
+        shimDiag.commentWritesDropped += d.dropped;
+        shimDiag.commentRowsWriteDropped += d.droppedBytesApprox;
+        items = d.items;
+        if (!Object.keys(items).length) return Promise.resolve(typeof cb === 'function' ? cb() : undefined);
+      }
+    }
     if (items && typeof items === 'object' && LAST_WATCH_URL_KEY in items) {
       panelDiag.popupLastWatchWrite(items[LAST_WATCH_URL_KEY]);
       // 0.1.1948: popup(ニコ生版)が疑似 lv の URL を nls_last_watch_url に書こうとしたら、本物の配信ページの URL に戻して
