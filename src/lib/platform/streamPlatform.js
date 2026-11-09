@@ -219,6 +219,25 @@ export function platformChannelOfUrl(url) {
   return null;
 }
 
+/**
+ * まだ記録の無いチャンネル(配信前・配信していない部屋)のタブに使う仮の配信キー。
+ * 記録が無いと '' を返していたので、横の欄は前に見ていた別のサービス(YouTube 等)の配信を出し続けていた
+ * (2026-11-09 りんく「ショールーム一瞬かわったのですがまた youtube のがでてきてしまっています」)。
+ * 仮のキーで「このチャンネル・記録 0」を見せる。どのサービスの形にも合う番号 00000 を使い、形に合わなければ ''
+ * @param {StreamPlatform} platform
+ * @param {string} login
+ */
+export function placeholderStreamKeyForChannel(platform, login) {
+  if (!platform || !login) return '';
+  const key = `${platform.keyHead}${login}.00000`;
+  return platformOfStreamKey(key) === platform ? key : '';
+}
+
+/** 仮の配信キーか(記録の置き場には書かない) @param {unknown} key */
+export function isPlaceholderStreamKey(key) {
+  return /\.00000$/.test(String(key || '')) && !!platformOfStreamKey(key);
+}
+
 /** 各サービスのタブを探すときの URL の形(chrome.tabs.query 用) */
 export const STREAM_PLATFORM_TAB_URLS = Object.freeze(LIST.map((p) => p.tabUrl));
 

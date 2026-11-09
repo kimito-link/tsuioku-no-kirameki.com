@@ -21,7 +21,7 @@ import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml 
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
-import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS } from '../../src/lib/platform/streamPlatform.js';
+import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
@@ -161,7 +161,10 @@ export function streamKeyForWatchUrl(url) {
   const u = String(url || '');
   if (isYtWatchLikeUrl(u)) return parseYtVideoIdFromUrl(u);
   const ch = platformChannelOfUrl(u);
-  return ch ? newestKeyForChannel(ch.platform.keyHead, ch.login) : '';
+  if (!ch) return '';
+  // 0.1.1947: 記録の無いチャンネル(配信前の部屋など)は仮のキー '<頭><login>.00000' で「記録 0」を見せる。
+  //   空を返すとタブが写らず、popup は探り読み→「最近更新された別の配信」へ落ちていた(PC 計測 0.1.1946: unmappedWatchTabs 124)
+  return newestKeyForChannel(ch.platform.keyHead, ch.login) || placeholderStreamKeyForChannel(ch.platform, ch.login);
 }
 
 /** 1本の配信を見ているタブか(YouTube の視聴ページ・Twitch/Kick のチャンネルページ) @param {string} url */
@@ -356,7 +359,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     url: `https://live.nicovideo.jp/watch/${lv}`,
     liveId: lv,
     broadcastTitle: String(sum?.title || ''),
-    broadcasterName: String(sum?.broadcasterName || ''),
+    // 仮キー(記録の無い部屋)は記録に名前が無いので、URL のチャンネル名を出す(別の配信の名前に倒さない)
+    broadcasterName: String(sum?.broadcasterName || '') || (plat && isPlaceholderStreamKey(videoId) ? plat.loginOfStreamKey(videoId) : ''),
     thumbnailUrl: plat
       ? plat.thumbUrl(plat.loginOfStreamKey(videoId))
       : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,

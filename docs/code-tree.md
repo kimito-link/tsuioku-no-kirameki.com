@@ -1182,7 +1182,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2355)
+- 📁 **src/** (2356)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1485,7 +1485,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2076)
+  - 📁 **lib/** (2077)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1542,7 +1542,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (60)
+    - 📁 **youtube/** (61)
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
       - `ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
@@ -1567,6 +1567,7 @@
       - `ytNicoShim.test.js`
       - `ytNicoShimHandleFirst.test.js`
       - `ytNicoShimHandleUrl.test.js`
+      - `ytNicoShimPlaceholder.test.js`
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
       - `ytPageMeta.test.js`
       - `ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。

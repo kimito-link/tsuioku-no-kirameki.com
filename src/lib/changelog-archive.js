@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1927',
+    date: '2026-11-08',
+    summary: 'Twitch のポイント交換をリワード名つきで記録',
+    items: Object.freeze([
+      'Twitch のチャンネルポイントの交換を、リワードの名前つきで記録するようにしました(「「水を飲んで」を交換しました」など)。これまでは本文つきの交換しか分からず、名前もありませんでした。',
+      '同じ交換を2回数えないよう、名前つきで受けられている間は、チャット欄側の名前の無い交換の行を記録しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1926',
     date: '2026-11-08',
     summary: 'Twitch 公式の Bits ランキングを出す',

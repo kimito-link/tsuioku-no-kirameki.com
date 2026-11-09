@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1947',
+    date: '2026-11-09',
+    summary: '記録の無い部屋で前の別の配信を出さない',
+    items: Object.freeze([
+      '横の欄(サイドパネル)で、まだ記録の無いチャンネル(配信前の部屋など)を前面にしたとき、前に見ていた別のサービスの配信を出し続けず、その部屋の「記録 0」を出すようにしました。配信者名は部屋のチャンネル名を出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1946',
     date: '2026-11-09',
     summary: '横の欄がどの配信を出したかを診断に記録',
@@ -195,15 +203,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Twitch・Kick のチャットの絵文字(Kappa・KEKW など)を、コメビュの一覧・会場の吹き出し・ピン留めなどで画像として表示するようにしました。',
       '記録と読み上げは今までどおり絵文字の名前のままです。画像が読めないときは名前の文字で出ます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1927',
-    date: '2026-11-08',
-    summary: 'Twitch のポイント交換をリワード名つきで記録',
-    items: Object.freeze([
-      'Twitch のチャンネルポイントの交換を、リワードの名前つきで記録するようにしました(「「水を飲んで」を交換しました」など)。これまでは本文つきの交換しか分からず、名前もありませんでした。',
-      '同じ交換を2回数えないよう、名前つきで受けられている間は、チャット欄側の名前の無い交換の行を記録しません。'
     ])
   })
 ]);

@@ -21,3 +21,25 @@ describe('拡張の入れ替え時に読み込み直すタブ(YouTube 以外)', 
     expect(STREAM_PLATFORM_TAB_URLS.length).toBe(6);
   });
 });
+
+import { placeholderStreamKeyForChannel, isPlaceholderStreamKey, STREAM_PLATFORMS, platformOfStreamKey } from './streamPlatform.js';
+
+describe('記録の無いチャンネルの仮の配信キー', () => {
+  it('6サービスとも、そのサービスの配信キーとして読める', () => {
+    const logins = { twitch: 'somechannel', kick: 'somechannel', whowatch: '12345', showroom: '62f_room', mixch: '12345678', tiktok: 'some.user' };
+    for (const [id, login] of Object.entries(logins)) {
+      const p = STREAM_PLATFORMS[/** @type {keyof typeof STREAM_PLATFORMS} */ (id)];
+      const key = placeholderStreamKeyForChannel(p, login);
+      expect(key, id).toBe(`${p.keyHead}${login}.00000`);
+      expect(platformOfStreamKey(key), id).toBe(p);
+      expect(p.loginOfStreamKey(key), id).toBe(login);
+      expect(isPlaceholderStreamKey(key), id).toBe(true);
+    }
+  });
+  it('形に合わない名前・空は作らない。本物のキーは仮ではない', () => {
+    expect(placeholderStreamKeyForChannel(STREAM_PLATFORMS.mixch, 'abc')).toBe('');
+    expect(placeholderStreamKeyForChannel(STREAM_PLATFORMS.showroom, '')).toBe('');
+    expect(isPlaceholderStreamKey('sr.room.123456')).toBe(false);
+    expect(isPlaceholderStreamKey('abc00000')).toBe(false);
+  });
+});
