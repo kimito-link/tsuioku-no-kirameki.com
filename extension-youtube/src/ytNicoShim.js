@@ -878,6 +878,14 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (k.startsWith(COMMENTS_PREFIX) || k.startsWith(TAIL_PREFIX)) {
           const lv = k.slice((k.startsWith(TAIL_PREFIX) ? TAIL_PREFIX : COMMENTS_PREFIX).length).toLowerCase();
           if (!videoIdForPseudoLv(lv)) continue;
+          // 0.1.1950: 探り読み(popup の collectDataBackedWatchLvs が1回で全タブの comments を聞く)には答えない(SPEC §4-C3)。
+          //   ニコ生版の探り読みは軽い get だが、YouTube 系では全タブの全件を IndexedDB から組み(PC 計測 最大 27秒)、
+          //   lastAskedLv を最後のタブへ書き換えて言葉のサービスまで変えていた。前面が配信ページなら探り読みは走らないので、
+          //   答えないときは popup が「最後に見た配信」(yt_last_stream_url の翻訳)へ進む=層 C が正しい答えを持つ。
+          if (isProbe) {
+            panelDiag.asked(lv, true);
+            continue;
+          }
           lastAskedLv = lv;
           panelDiag.asked(lv, isProbe);
           shimDiag.commentGets += 1;

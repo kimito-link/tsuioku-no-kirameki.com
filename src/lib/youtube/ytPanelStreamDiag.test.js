@@ -113,3 +113,21 @@ describe('0.1.1949: 外枠の配信と中身の食い違い', () => {
     expect(s.contentPlatformMismatch).toBe(1);
   });
 });
+
+describe('0.1.1950: 探り読みには答えない(SPEC §4-C3)', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  it('探り読みの判定(comments を2配信以上)が lastAskedLv の更新と全件の組み立てより先にある', () => {
+    const probeAt = shim.indexOf('if (isProbe) {');
+    const askedAt = shim.indexOf('lastAskedLv = lv;', probeAt);
+    const buildAt = shim.indexOf('await buildCommentsForLv(lv)', probeAt);
+    expect(probeAt).toBeGreaterThan(-1);
+    expect(askedAt).toBeGreaterThan(probeAt);
+    expect(buildAt).toBeGreaterThan(askedAt);
+    expect(shim).toContain('const isProbe = askedCommentLvs.size >= 2;');
+  });
+  it('popup 自身の表示用の読みは1配信ずつ(探り読みだけが複数配信を1回で聞く)', () => {
+    const popup = readFileSync(new URL('../../../src/extension/popup-entry.js', import.meta.url), 'utf8');
+    const fn = popup.slice(popup.indexOf('async function collectDataBackedWatchLvs'));
+    expect(fn.slice(0, 3000)).toContain('keys.push(commentsStorageKey(lv));');
+  });
+});
