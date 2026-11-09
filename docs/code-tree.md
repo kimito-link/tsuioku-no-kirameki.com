@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1211 件
+## ⚠️ 役割コメントが無いソース 10 / 1212 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2370)
+- 📁 **src/** (2372)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2090)
+  - 📁 **lib/** (2092)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1546,7 +1546,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (68)
+    - 📁 **youtube/** (70)
       - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -1561,6 +1561,8 @@
       - `ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
       - `ytCrossVideoDuplicates.test.js`
       - `ytDefaultIcon.test.js`
+      - `ytFullRefreshInterval.js` — YouTube 系の横の欄・会場が「記録を全件読み直す」間隔(v0.1.1969)。
+      - `ytFullRefreshInterval.test.js`
       - `ytGiftOnlyRow.js` — ふわっち・SHOWROOM・ミクチャのギフトは、記録ではコメントの行(本文=ギフトの名前)としても残る。
       - `ytGiftOnlyRow.test.js`
       - `ytGiftToNico.test.js`

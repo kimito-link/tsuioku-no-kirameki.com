@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1969',
+    date: '2026-11-10',
+    summary: '記録の多い配信は全件の読み直しを間引く',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで、横の欄や会場が記録を全件読み直すのを、行数に関係なく30秒ごとにしていたのを、行数に応じて30秒〜5分ごとにしました(5,000行までは今までどおり)。新しいコメントはこれまでどおりすぐ届きます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1968',
     date: '2026-11-10',
     summary: '声の割り当ての書き直しを30秒に1回へ',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '別タブの探り読みで横の欄が重くならない',
     items: Object.freeze([
       '横の欄(サイドパネル)が、配信でないページを前面にしているとき、開いている全部の配信タブの記録を読み込みに行く処理(最大27秒かかっていました)を YouTube 系では行わないようにしました。その間に表示の言葉が別のサービスに変わることもなくなります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1949',
-    date: '2026-11-09',
-    summary: '別サービスへ移ると横の欄をまっさらにする',
-    items: Object.freeze([
-      '横の欄(サイドパネル)で、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のあいだで別の配信のタブへ移ったら、ニコ生版と同じく中身を読み込み直すようにしました。前のサービスの言葉(「Kicks ランキング」など)が残らなくなります。YouTube のトップなど配信でないページでは、いま出している配信を保ちます。'
     ])
   })
 ]);

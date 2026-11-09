@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1949',
+    date: '2026-11-09',
+    summary: '別サービスへ移ると横の欄をまっさらにする',
+    items: Object.freeze([
+      '横の欄(サイドパネル)で、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のあいだで別の配信のタブへ移ったら、ニコ生版と同じく中身を読み込み直すようにしました。前のサービスの言葉(「Kicks ランキング」など)が残らなくなります。YouTube のトップなど配信でないページでは、いま出している配信を保ちます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1948',
     date: '2026-11-09',
     summary: '横の欄が裏のタブの配信に引っ張られない',

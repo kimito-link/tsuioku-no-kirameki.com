@@ -33,6 +33,7 @@ import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey } from '../../src/lib/youtube/ytPanelRoute.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
+import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -718,12 +719,11 @@ export function ytOwnerRowsLast(list, sum) {
 }
 
 /**
- * 視聴ページの中の会場の記録の控え(配信ごと)。初回と30秒ごとは全件、あいだは新しく記録された分だけを background にもらう
+ * 視聴ページの中の会場の記録の控え(配信ごと)。初回とときどき(行数に応じて30秒〜5分ごと・v0.1.1969)は全件、あいだは新しく記録された分だけを background にもらう
  * (3秒ごとに全件を受け取り直すと、長い配信でメッセージが大きくなり、失敗すると空の会場になる・Grok の点検 2026-11-04)。
  * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number }>}
  */
 const inPageCommentCache = new Map();
-const IN_PAGE_FULL_REFRESH_MS = 30_000;
 /** @type {Map<string, number>} 直接届いた行(YT_LIVE_ROWS)で作り直す間だけ、background に聞きに行かない */
 const inPageSkipFetchUntil = new Map();
 /**
@@ -732,7 +732,7 @@ const inPageSkipFetchUntil = new Map();
  */
 /**
  * 0.1.1955: 記録の読み出し口。視聴ページの中は background に頼み、拡張の画面(横の欄・コメビュ)は IndexedDB を直接読む。
- *   どちらも初回と30秒ごとは全件、あいだは新しく記録された分だけ(横の欄が毎秒約4回、7,000行を全部読み直していた・PC 実測)。
+ *   どちらも初回とときどき(行数に応じて30秒〜5分ごと・v0.1.1969)は全件、あいだは新しく記録された分だけ(横の欄が毎秒約4回、7,000行を全部読み直していた・PC 実測)。
  * @param {string} vid
  * @param {number | undefined} afterRecordedAt undefined = 全件
  * @returns {Promise<any[]>}
@@ -755,7 +755,8 @@ async function getCommentsViaBackground(vid) {
     inPageSkipFetchUntil.delete(vid);
     return [...cur.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
   }
-  const full = !cur || now - cur.fullAt > IN_PAGE_FULL_REFRESH_MS;
+  // ★v0.1.1969: 全件の読み直し間隔を行数に比例(5,000行まで30秒・上限5分)。5万行で30秒ごとに約28MBを受け取っていた
+  const full = !cur || now - cur.fullAt > ytFullRefreshIntervalMs(cur.byPk.size);
   try {
     const items = await fetchStreamRows(vid, full ? undefined : /** @type {NonNullable<typeof cur>} */ (cur).lastRecordedAt);
     const next = full ? { byPk: new Map(), lastRecordedAt: 0, fullAt: now } : /** @type {NonNullable<typeof cur>} */ (cur);
