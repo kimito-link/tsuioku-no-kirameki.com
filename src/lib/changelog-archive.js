@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1957',
+    date: '2026-11-09',
+    summary: '描き直しが重いときは間隔を広げる',
+    items: Object.freeze([
+      'コメントが数千行ある配信や遅い PC では、横の欄の描き直し1回に時間がかかり、描き直しが休みなく続いて固まりがちでした。描き直しが重いときだけ、次の描き直しまでの間隔をその時間の3倍(最大1.5秒)まで広げます。軽いときは今までどおりです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1956',
     date: '2026-11-09',
     summary: '行が多いときの横の欄の描き直しを軽くする',

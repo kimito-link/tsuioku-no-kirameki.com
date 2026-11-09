@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 69</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 70</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -192,6 +192,7 @@
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+- `src/lib/youtube/ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
 - `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
 - `src/lib/youtube/ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
 - `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
@@ -1467,10 +1468,8 @@
 - `v0.1.1973` 2026-11-10 — 人が多い配信は応援レーンの写しの書き込みを間引く
 - `v0.1.1967` 2026-11-09 — 応援レーンの塗り直しで動かす枚数を最小に
 
-### ⚡ 描画・性能 (1版)
-- `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
-
-### その他 (12版)
+### その他 (13版)
+- `v0.1.1977` 2026-11-10 — 大きな記録を少しずつ読み、開いた直後も固まらない
 - `v0.1.1976` 2026-11-10 — 人の多い配信で名前と顔の控えを書く回数を減らす
 - `v0.1.1974` 2026-11-10 — YouTube系でコメントの控えの全件書き込みをやめる
 - `v0.1.1972` 2026-11-10 — 裏方が古いままなら自分で入れ替わる
