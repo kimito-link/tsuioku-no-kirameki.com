@@ -31,7 +31,8 @@ import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey } from '../../src/lib/youtube/ytPanelRoute.js';
-import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
+import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
+import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -462,14 +463,23 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined> }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
+const PANEL_SERVICE = PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '';
 const panelDiagCore = createPanelStreamDiag({
   now: () => Date.now(),
   lvToKey: (lv) => videoIdForPseudoLv(lv),
-  panelService: PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '',
+  panelService: PANEL_SERVICE,
 });
+// 0.1.1958: 外枠が焼いたサービスと違う配信を聞かれた=まもなく作り直される古い画面。最初の食い違いから3秒は返事を待たせる
+const staleFrameHold = createStaleFrameHold({ now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)) });
+/** @param {string} lv */
+const isOtherServiceThanPanel = (lv) => {
+  if (!PANEL_SERVICE) return false;
+  const s = serviceOfStreamKey(videoIdForPseudoLv(lv));
+  return !!s && s !== PANEL_SERVICE;
+};
 const PANEL_DIAG_CTX = panelStreamDiagContext(typeof location !== 'undefined' ? location.pathname : '');
 let panelDiagTimer = 0;
 // 書き込みは 10 秒に1回まで(yt_diag_live_rows と同じ型・yt_diag_ は描き直さないキー=selfWrittenStorageKeys.js)。画面ごとに別のキー
@@ -939,9 +949,10 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
             panelDiag.asked(lv, true);
             continue;
           }
+          panelDiag.asked(lv, isProbe);
+          if (await staleFrameHold.wait(isOtherServiceThanPanel(lv))) shimDiag.staleFrameHeld = staleFrameHold.heldCount();
           lastAskedLv = lv;
           recentlyAskedLvs.set(lv, Date.now());
-          panelDiag.asked(lv, isProbe);
           shimDiag.commentGets += 1;
           const arr = await buildCommentsForLv(lv);
           if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
@@ -952,6 +963,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const lv = k.slice(g[0].length).toLowerCase();
         const vid = videoIdForPseudoLv(lv);
         if (!vid) continue;
+        if (await staleFrameHold.wait(isOtherServiceThanPanel(lv))) shimDiag.staleFrameHeld = staleFrameHold.heldCount();
         const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES));
         const gifts = /** @type {Record<string, any> | undefined} */ (
           await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])

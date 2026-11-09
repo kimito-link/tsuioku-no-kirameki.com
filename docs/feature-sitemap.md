@@ -1105,7 +1105,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 326</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 327</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1418,6 +1418,7 @@
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
+- `src/lib/youtube/ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
@@ -1444,10 +1445,9 @@
 - `v0.1.1954` 2026-11-09 — PC の声が止められたらクリックを案内する
 - `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (2版)
 - `v0.1.1940` 2026-11-09 — TikTok LIVE の配信を記録する(試作)
 - `v0.1.1939` 2026-11-08 — ミクチャのギフトに絵を出す
-- `v0.1.1938` 2026-11-08 — コメビュでギフトが2行に見えるのを直す
 
 ### 🔊 読み上げ (1版)
 - `v0.1.1954` 2026-11-09 — PC の声が止められたらクリックを案内する
@@ -1458,7 +1458,8 @@
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
-### その他 (14版)
+### その他 (15版)
+- `v0.1.1958` 2026-11-09 — 切り替わる直前の横の欄が次の配信を描かない
 - `v0.1.1956` 2026-11-09 — 行が多いときの横の欄の描き直しを軽くする
 - `v0.1.1955` 2026-11-09 — 行が多い配信で横の欄が遅くなるのを減らす
 - `v0.1.1953` 2026-11-09 — 他サービスで新着が横の欄に出る遅れを減らす

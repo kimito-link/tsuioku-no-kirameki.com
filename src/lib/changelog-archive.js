@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1938',
+    date: '2026-11-08',
+    summary: 'コメビュでギフトが2行に見えるのを直す',
+    items: Object.freeze([
+      'ミクチャ・SHOWROOM・ふわっちのギフトが、コメビュで「ギフト」だけの行とギフトのカードの2行に見えていたのを、カードだけにしました。言葉が添えてあるギフトは今までどおり行も出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1937',
     date: '2026-11-08',
     summary: 'ミクチャの順位の単位と見出しを直す',

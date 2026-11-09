@@ -217,3 +217,17 @@ describe('0.1.1955: 行が多いときに横の欄が全行を読み直し続け
     expect(shim).toMatch(/do \{\s*st\.again = false;\s*await notifyLvOnce\(lv, st\.summary\);\s*\} while \(st\.again\);/);
   });
 });
+
+describe('0.1.1958: 切り替わる直前の古い横の欄は、次の配信を組み立てない', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  it('コメントとギフトの読みで、外枠と違うサービスなら待ってから答える', () => {
+    const waits = shim.match(/await staleFrameHold\.wait\(isOtherServiceThanPanel\(lv\)\)/g) || [];
+    expect(waits.length).toBe(2);
+  });
+  it('待つのは「聞かれた配信」を lastAskedLv に入れる前(言葉のサービスを先に変えない)', () => {
+    const i = shim.indexOf('await staleFrameHold.wait(isOtherServiceThanPanel(lv))');
+    const j = shim.indexOf('lastAskedLv = lv;');
+    expect(i).toBeGreaterThan(0);
+    expect(j).toBeGreaterThan(i);
+  });
+});
