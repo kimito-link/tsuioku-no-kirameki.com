@@ -29,6 +29,7 @@ import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
+import { createPanelStreamDiag, panelStreamDiagContext, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -128,7 +129,10 @@ function mapTab(tab) {
   const url = String(tab.url || tab.pendingUrl || '');
   if (!isWatchLikeTabUrl(url)) return tab;
   const vid = streamKeyForWatchUrl(url);
-  if (!vid) return tab;
+  if (!vid) {
+    panelDiag.unmappedWatchTab(url); // 計器: 配信のページなのに写せない(記録の無い部屋など)
+    return tab;
+  }
   const lv = pseudoLvForVideoId(vid);
   return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: undefined, __ytUrl: url };
 }
@@ -439,6 +443,42 @@ const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
 const shimDiag = { liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
+// 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
+const panelDiagCore = createPanelStreamDiag({ now: () => Date.now(), lvToKey: (lv) => videoIdForPseudoLv(lv) });
+const PANEL_DIAG_CTX = panelStreamDiagContext(typeof location !== 'undefined' ? location.pathname : '');
+let panelDiagTimer = 0;
+// 書き込みは 10 秒に1回まで(yt_diag_live_rows と同じ型・nls_ でないキー=popup の描き直しを起こさない)。画面ごとに別のキー
+const panelDiagSoon = () => {
+  if (panelDiagTimer) return;
+  panelDiagTimer = /** @type {any} */ (setTimeout(() => {
+    panelDiagTimer = 0;
+    try {
+      const c = /** @type {any} */ (globalThis).chrome;
+      if (!c?.runtime?.id || !c?.storage?.local) return;
+      void Promise.resolve(c.storage.local.set({ [`${YT_PANEL_STREAM_DIAG_KEY_PREFIX}${PANEL_DIAG_CTX}`]: panelDiagCore.snapshot() })).catch(() => {});
+    } catch {
+      /* 計器は本体を止めない */
+    }
+  }, 10_000));
+};
+/** 記録したら書き込みを予約する写し(計器の失敗で本体を止めない) */
+const panelDiag = /** @type {ReturnType<typeof createPanelStreamDiag>} */ (
+  Object.fromEntries(
+    Object.entries(panelDiagCore).map(([name, fn]) => [
+      name,
+      (/** @type {any[]} */ ...a) => {
+        try {
+          const r = /** @type {any} */ (fn)(...a);
+          if (name !== 'snapshot') panelDiagSoon();
+          return r;
+        } catch {
+          return undefined;
+        }
+      },
+    ]),
+  )
+);
+/** @type {any} */ (globalThis).__ytPanelStreamDiag = panelDiagCore;
 /** popup が最後にコメントを聞いてきた配信(=いま画面に出ている配信) */
 let lastAskedLv = '';
 /** @param {string} lv */
@@ -756,6 +796,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   const lastWatchUrlFromSummaries = async () => {
     const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
     const vid = newestVideoIdOf(sums);
+    panelDiag.lastWatch(vid ? 'newest' : 'none', vid ? pseudoLvForVideoId(vid) : '');
     return vid ? `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(vid)}` : '';
   };
 
@@ -769,6 +810,12 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       keys == null ? null : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
     const bag = /** @type {Record<string, any>} */ (await realGet(keys));
     if (list) for (const k of list) if (/^nls_/.test(k) && !shimDiag.keysAsked.includes(k.replace(/lv\d+/, 'LV'))) shimDiag.keysAsked.push(k.replace(/lv\d+/, 'LV'));
+    // 計器: 1回の読みでコメントを2配信以上聞く = popup の探り読み(collectDataBackedWatchLvs)
+    const askedCommentLvs = new Set(
+      (list || []).filter((k) => k.startsWith(COMMENTS_PREFIX)).map((k) => k.slice(COMMENTS_PREFIX.length).toLowerCase()),
+    );
+    const isProbe = askedCommentLvs.size >= 2;
+    const probeT0 = Date.now();
     if (list) {
       for (const k of list) {
         if (k === LAST_WATCH_URL_KEY) {
@@ -782,6 +829,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           const lv = k.slice((k.startsWith(TAIL_PREFIX) ? TAIL_PREFIX : COMMENTS_PREFIX).length).toLowerCase();
           if (!videoIdForPseudoLv(lv)) continue;
           lastAskedLv = lv;
+          panelDiag.asked(lv, isProbe);
           shimDiag.commentGets += 1;
           const arr = await buildCommentsForLv(lv);
           if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
@@ -834,12 +882,14 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (v != null) bag[k] = v;
       }
     }
+    if (isProbe) panelDiag.probe(askedCommentLvs.size, Date.now() - probeT0);
     return bag;
   };
   // 数字カードの写し(状態速報・会場が読む)にも、来場は「—」で書く。YouTube に延べの来場者数は無く、
   //   ニコ生版の部品が同接の数を来場として写していた(2026-11-04 計器: official.viewers が同接と同じ 1,065)。
   const realSet = realLocal.set.bind(realLocal);
   realLocal.set = (/** @type {any} */ items, /** @type {any} */ cb) => {
+    if (items && typeof items === 'object' && LAST_WATCH_URL_KEY in items) panelDiag.popupLastWatchWrite(items[LAST_WATCH_URL_KEY]);
     try {
       const m = items && items.nls_stat_cards_mirror_v1;
       if (m && typeof m === 'object' && m.official && typeof m.official === 'object') {
@@ -885,7 +935,44 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   // 写す前の本物(YouTube の URL のまま)を控えておく
   const realTabsGetFn = real.tabs.get.bind(real.tabs);
   const realTabsGet = (/** @type {number} */ id) => Promise.resolve(realTabsGetFn(id));
-  real.tabs.query = wrapTabsFn(real.tabs.query);
+  // 計器: 前面タブの問い合わせ({active:true})の結果と時間(MAP §4-2・PC 仮説 H-a の裏取り)。結果は変えない
+  const realTabsQueryFn = real.tabs.query.bind(real.tabs);
+  const measuredTabsQuery = (/** @type {any[]} */ ...args) => {
+    const opts = args[0];
+    if (!opts || typeof opts !== 'object' || opts.active !== true) return realTabsQueryFn(...args);
+    const cb = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+    const t0 = Date.now();
+    const p = Promise.resolve(realTabsQueryFn(...args)).then((res) => {
+      const first = Array.isArray(res) ? res[0] : null;
+      const url = String(first?.url || first?.pendingUrl || '');
+      const key = url && isWatchLikeTabUrl(url) ? streamKeyForWatchUrl(url) : '';
+      panelDiag.activeQuery({ url, mappedKey: key, ms: Date.now() - t0, empty: !first });
+      return res;
+    });
+    if (cb) {
+      p.then(cb, () => cb(undefined));
+      return undefined;
+    }
+    return p;
+  };
+  real.tabs.query = wrapTabsFn(measuredTabsQuery);
+  // 計器: windows.getLastFocused は写していない(層 B の写し漏れ)。前面が配信のページだった回数を数えるだけ
+  if (real.windows && typeof real.windows.getLastFocused === 'function') {
+    const realGetLastFocused = real.windows.getLastFocused.bind(real.windows);
+    real.windows.getLastFocused = (/** @type {any[]} */ ...args) => {
+      const cb = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+      const p = Promise.resolve(realGetLastFocused(...args)).then((w) => {
+        const act = Array.isArray(w?.tabs) ? w.tabs.find((/** @type {any} */ t) => t?.active) : null;
+        panelDiag.lastFocused(!!act && isWatchLikeTabUrl(String(act.url || '')));
+        return w;
+      });
+      if (cb) {
+        p.then(cb, () => cb(undefined));
+        return undefined;
+      }
+      return p;
+    };
+  }
   real.tabs.get = wrapTabsFn(real.tabs.get);
 
   // ---- ニコ生版が視聴タブ(の content script)へ送る問い合わせのうち、YouTube でも答えられるものを答える ----
@@ -1061,6 +1148,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       const newestNext = newestVideoIdOf(next);
       if (newestNext && newestNext !== newestVideoIdOf(prev)) {
         const synthUrl = { [LAST_WATCH_URL_KEY]: { newValue: `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(newestNext)}` } };
+        panelDiag.announce(pseudoLvForVideoId(newestNext), 'summaries');
         for (const fn of listeners) {
           try {
             fn(synthUrl, 'local');

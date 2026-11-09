@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1203 件
+## ⚠️ 役割コメントが無いソース 10 / 1204 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1182,7 +1182,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2353)
+- 📁 **src/** (2355)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1485,7 +1485,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2074)
+  - 📁 **lib/** (2076)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1542,7 +1542,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (58)
+    - 📁 **youtube/** (60)
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
       - `ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
@@ -1571,6 +1571,8 @@
       - `ytPageMeta.test.js`
       - `ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
       - `ytPanelRoute.test.js`
+      - `ytPanelStreamDiag.js` — 横の欄(サイドパネル)・コメビュが「どの配信を出したか」を数える計器(0.1.1946)。
+      - `ytPanelStreamDiag.test.js`
       - `ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
       - `ytPostedAt.test.js`
       - `ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。

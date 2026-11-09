@@ -1,0 +1,102 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { createPanelStreamDiag, hostOfUrl, panelStreamDiagContext, serviceOfStreamKey } from './ytPanelStreamDiag.js';
+
+const keys = /** @type {Record<string, string>} */ ({ lv1: 'dQw4w9WgXcQ', lv2: 'kk.someone.123', lv3: 'sr.room.456' });
+const make = () => {
+  let t = 1000;
+  const d = createPanelStreamDiag({ now: () => (t += 10), lvToKey: (lv) => keys[lv] || '' });
+  return d;
+};
+
+describe('ytPanelStreamDiag(横の欄の配信選びの計器)', () => {
+  it('配信キーからサービスを出す', () => {
+    expect(serviceOfStreamKey('dQw4w9WgXcQ')).toBe('youtube');
+    expect(serviceOfStreamKey('kk.someone.123')).toBe('kick');
+    expect(serviceOfStreamKey('')).toBe('');
+  });
+
+  it('URL はホストだけ残す(パス・クエリは残さない)', () => {
+    expect(hostOfUrl('https://kick.com/someone?x=1')).toBe('kick.com');
+    expect(hostOfUrl('not a url')).toBe('');
+  });
+
+  it('画面ごとに書き先を分ける', () => {
+    expect(panelStreamDiagContext('/yt-sidepanel.html')).toBe('sidepanel');
+    expect(panelStreamDiagContext('/comeview.html')).toBe('comeview');
+    expect(panelStreamDiagContext('/yt-comeview.html')).toBe('comeview');
+    expect(panelStreamDiagContext('/watch')).toBe('page');
+  });
+
+  it('聞かれた配信の切り替わりを数える(探り読みは数えない・同じ配信の連続は1件)', () => {
+    const d = make();
+    d.asked('lv2', false);
+    d.asked('lv2', false);
+    d.asked('lv1', true);
+    d.asked('lv1', false);
+    d.asked('lv2', false);
+    const s = d.snapshot();
+    expect(s.askedSwitches).toBe(2);
+    expect(s.askedLvHistory.map((/** @type {any} */ h) => `${h.service}:${h.probe}`)).toEqual([
+      'kick:false',
+      'youtube:true',
+      'youtube:false',
+      'kick:false',
+    ]);
+  });
+
+  it('知らせ・最後に見た配信の出どころ・popup の書き込みを数える', () => {
+    const d = make();
+    d.lastWatch('newest', 'lv1');
+    d.announce('lv1', 'summaries');
+    d.popupLastWatchWrite('https://live.nicovideo.jp/watch/lv3');
+    d.popupLastWatchWrite('https://live.nicovideo.jp/watch/lv999');
+    const s = d.snapshot();
+    expect(s.lastWatch).toMatchObject({ source: 'newest', service: 'youtube' });
+    expect(s.lastWatch.counts.newest).toBe(1);
+    expect(s.announceCounts.summaries).toBe(1);
+    expect(s.popupLastWatchWrites).toMatchObject({ count: 2, pseudo: 1, lastService: 'niconico' });
+  });
+
+  it('前面タブの問い合わせ: 遅い・空・写せない を数える', () => {
+    const d = make();
+    d.activeQuery({ url: 'https://www.showroom-live.com/r/room', mappedKey: '', ms: 1500, empty: false });
+    d.activeQuery({ url: '', mappedKey: '', ms: 5, empty: true });
+    d.activeQuery({ url: 'https://kick.com/someone', mappedKey: 'kk.someone.123', ms: 5, empty: false });
+    const s = d.snapshot();
+    expect(s.tabsQuery).toEqual({ calls: 3, slowOver1100ms: 1, emptyActive: 1 });
+    expect(s.activeQuery.map((/** @type {any} */ q) => `${q.host}:${q.mapped}:${q.service}`)).toEqual([
+      'www.showroom-live.com:false:',
+      ':false:',
+      'kick.com:true:kick',
+    ]);
+  });
+
+  it('履歴は10件まで', () => {
+    const d = make();
+    for (let i = 0; i < 25; i++) d.announce(i % 2 ? 'lv1' : 'lv2', 'summaries');
+    expect(d.snapshot().announceHistory.length).toBe(10);
+  });
+
+  it('★名前・本文・URL 全体を残さない(残すのはホスト・サービス・疑似 lv だけ)', () => {
+    const d = make();
+    d.activeQuery({ url: 'https://kick.com/secret-name?token=abc', mappedKey: '', ms: 1, empty: false });
+    d.unmappedWatchTab('https://www.tiktok.com/@secret-name/live');
+    const json = JSON.stringify(d.snapshot());
+    expect(json).not.toContain('secret-name');
+    expect(json).not.toContain('token');
+  });
+});
+
+describe('配線: shim が計器を呼び、この版では画面の動きを変えない', () => {
+  const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
+  it('計器の呼び出しがある', () => {
+    for (const call of ['panelDiag.asked(', 'panelDiag.announce(', 'panelDiag.lastWatch(', 'panelDiag.popupLastWatchWrite(', 'panelDiag.activeQuery(', 'panelDiag.probe(', 'panelDiag.lastFocused(', 'panelDiag.unmappedWatchTab(']) {
+      expect(shim).toContain(call);
+    }
+  });
+  it('★再発明だった案(前面タブ探し・自前の読み込み直し)は入れない(SPEC §3)', () => {
+    expect(shim).not.toContain('frontWatchKey');
+    expect(shim).not.toContain('reloadIfWordingPlatformChanged');
+  });
+});
