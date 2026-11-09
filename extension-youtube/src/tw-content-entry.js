@@ -34,6 +34,7 @@ import {
   parseTwPrediction,
 } from '../../src/lib/twitch/twHermes.js';
 import { createEmoteSaver } from './pfEmoteStore.js';
+import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
@@ -117,6 +118,7 @@ async function gql(body) {
     headers: { 'Client-Id': TW_WEB_CLIENT_ID, 'Content-Type': 'text/plain;charset=UTF-8' },
     body: JSON.stringify(body),
     credentials: 'omit',
+    signal: platformFetchTimeoutSignal(),
   });
   if (!res.ok) throw new Error(`gql_${res.status}`);
   return res.json();

@@ -28,6 +28,7 @@ import {
 } from '../../src/lib/mixch/mxParse.js';
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
+import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 120_000;
@@ -106,7 +107,7 @@ function saveDiagSoon() {
 
 /** @param {string} url */
 async function getJson(url) {
-  const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { credentials: 'include', signal: platformFetchTimeoutSignal(), headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`mx_${res.status}`);
   return res.json();
 }
@@ -447,7 +448,7 @@ const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)
 /** ログインしていないと分かるか(分からなければ false=送ってみる) */
 async function mxSignedOut() {
   try {
-    const res = await fetch(`${MX_ORIGIN}/api-web/login-status`, { credentials: 'include', headers: { Accept: 'application/json' } });
+    const res = await fetch(`${MX_ORIGIN}/api-web/login-status`, { credentials: 'include', signal: platformFetchTimeoutSignal(), headers: { Accept: 'application/json' } });
     if (!res.ok) return false;
     const body = (await res.text()).trim();
     return body === '' || body === 'null';

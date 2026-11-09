@@ -26,6 +26,7 @@ import {
   parseCentrifugoFrames,
 } from '../../src/lib/kick/kickRealtime.js';
 import { createEmoteSaver } from './pfEmoteStore.js';
+import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
@@ -115,7 +116,7 @@ function saveDiagSoon() {
 async function postJson(url, body) {
   const res = await fetch(url, {
     method: 'POST',
-    credentials: 'include',
+    credentials: 'include', signal: platformFetchTimeoutSignal(),
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -134,7 +135,7 @@ function newClientId() {
 
 /** @param {string} url */
 async function getJson(url) {
-  const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { credentials: 'include', signal: platformFetchTimeoutSignal(), headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`kick_${res.status}`);
   return res.json();
 }

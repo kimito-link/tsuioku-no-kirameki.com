@@ -27,6 +27,7 @@ import {
 } from '../../src/lib/showroom/srParse.js';
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
+import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -99,7 +100,7 @@ function saveDiagSoon() {
 
 /** @param {string} url */
 async function getJson(url) {
-  const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { credentials: 'include', signal: platformFetchTimeoutSignal(), headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`sr_${res.status}`);
   return res.json();
 }

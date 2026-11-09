@@ -1107,7 +1107,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 328</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 329</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1339,6 +1339,7 @@
 - `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
+- `src/lib/platform/fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
 - `src/lib/platform/streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
@@ -1462,6 +1463,7 @@
 - `v0.1.1957` 2026-11-09 — 描き直しが重いときは間隔を広げる
 
 ### その他 (15版)
+- `v0.1.1963` 2026-11-09 — 配信情報の読み込みが返らないと止まる所を直す
 - `v0.1.1961` 2026-11-09 — 描き直しのたびのタブ問い合わせを減らす
 - `v0.1.1959` 2026-11-09 — 同じ公式ランキングは書き直さない
 - `v0.1.1958` 2026-11-09 — 切り替わる直前の横の欄が次の配信を描かない
@@ -1476,4 +1478,3 @@
 - `v0.1.1947` 2026-11-09 — 記録の無い部屋で前の別の配信を出さない
 - `v0.1.1945` 2026-11-09 — 拡張の入れ替え時に他サービスのタブも読み込み直す
 - `v0.1.1944` 2026-11-09 — TikTok のスタンプだけのコメントも記録する
-- `v0.1.1943` 2026-11-09 — ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない

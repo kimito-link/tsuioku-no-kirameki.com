@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1963',
+    date: '2026-11-09',
+    summary: '配信情報の読み込みが返らないと止まる所を直す',
+    items: Object.freeze([
+      'Kick・Twitch・SHOWROOM・ミクチャ・TikTok で、配信の情報(同時接続など)を読みに行ったときに返事が返ってこないと、それ以降ずっと読み直さない作りになっていました。15秒で打ち切って、次の見回りで読み直すようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1962',
     date: '2026-11-09',
     summary: 'ギフトの欄の読み込みを1回にまとめる',
@@ -169,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'TikTok のスタンプだけのコメントも記録する',
     items: Object.freeze([
       'TikTok で、本文がなくスタンプだけのコメントが記録から漏れていたのを直しました。スタンプは「[スタンプ]」として個数ぶん残します(本文つきのときは本文の後ろに並べます)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1943',
-    date: '2026-11-09',
-    summary: 'ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない',
-    items: Object.freeze([
-      'ミクチャと SHOWROOM でも、状態の記録が配信の終わった別のタブの値で上書きされないようにしました(TikTok と同じ守り)。記録そのものには影響ありません。'
     ])
   })
 ]);

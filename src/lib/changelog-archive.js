@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1943',
+    date: '2026-11-09',
+    summary: 'ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない',
+    items: Object.freeze([
+      'ミクチャと SHOWROOM でも、状態の記録が配信の終わった別のタブの値で上書きされないようにしました(TikTok と同じ守り)。記録そのものには影響ありません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1942',
     date: '2026-11-09',
     summary: 'TikTok で漏れたコメントの理由を計器に残す',
