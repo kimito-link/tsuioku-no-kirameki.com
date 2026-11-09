@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "33e410e21b3c96ccdd054f18acf5ee5ea49c828f29d9b0ae87f1f7099dfb8b0d",
+  "fingerprint": "857aac69653a4e0a2ea3e365bac39f5579c6679379fffc4353e7155e6f406b1b",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -999,9 +999,9 @@
     "extension/dist/backfill-sw.js": "aead0e5add7a0dbe68c7bbe6cc6d2c38d03dddb46a1a5a6969284c6ff1cac39c",
     "extension/dist/self-update-sw.js": "dea5ff6a1a74ddd763e44766de0a78f9dcb68d6fbe37edde3f9bc6b931a5f74e",
     "extension/dist/content.js": "fd098198a81e808a4e0ad614c427c8283af9304a8f49bd9dde990eb024e62dd6",
-    "extension/dist/popup.js": "77ba7c189900cf2bf40c5e3e420718e3dda49dae94003eebc9f04ab272e4ab7b",
+    "extension/dist/popup.js": "0e91d8ec9aa143d725f0495cc2f6e481cb6041104a2f813792a8ce3c3d11b269",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "88eebecbad8838e3262aa575837a20807fc63539313d57770b9dcd259b5e94bf",
+    "extension/dist/status.js": "2918630180e29f411b238afc4d140a2c66e95d1134b877c506165c0dd04c0750",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "b4d7ea670492b88d8a0c83cd16800f489d5ed5c4f3b4779c3a64250dcde62eb3",
     "extension/dist/comeview.js": "1b390004ce1ecbb2095af37220952955b66ff040455fe388ae955a7fbc2cdb97",
@@ -1011,12 +1011,12 @@
     "extension/dist/avatar-face-worker.js": "7d17a9a9d2f53cf8c90373ccb940ee2e458b0b9f04ed5bb83b349ab394945af9",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "92625ae889f4bae9de70b2f3d8a8acd9d144eb1a5f92c71807f6eb6d496e8b41",
-    "app/dist/live-view.js": "5439c006cac3a872096416150e9c8802ea442c048c9885c577fafc66fda49eb5",
+    "app/dist/live-view.js": "8228d8962b491b13bacb8d046ded22008c0cacbd5e9084ee4481366ebf9c0ba8",
     "app/dist/phone.js": "b8584722ba772174b0b0e344546de1692c1f8022a6a87105986247a07665b684",
     "app/dist/live-ranking.js": "3f2ed6c9dbe98397436f59edc261694111ecf66bfbc59a746878b0257e93a514",
     "extension/dist/yt-content-chat.js": "14c7ddbf669120177df3c5da52bd4b82302e9e862279abfbcd5e51a68aefc341",
     "extension/dist/yt-background.js": "92bef430dc529ad49784a5dc2a18a533781dddacd8bb38731e08b52c4ce171f0",
-    "extension/dist/yt-sidepanel.js": "3a460f5f55290db2ea6f79d6bfe0a6589e872173b26215e5c6616a6c797cb5de",
+    "extension/dist/yt-sidepanel.js": "8f7dd11720a5cec5137736057df7c1ac5da34d9d98c017c182f047f8a5d18edd",
     "extension/dist/yt-marketing-export.js": "1ab167e7068c66345d6c5796268e70647bd39f6aa5543dee7ebcec5e53baec53",
     "extension/dist/yt-comeview.js": "fd784c49c42e67926ca7151b28cb797bcfed1386900363c98f2fc3b9c8d75d0c",
     "extension/dist/yt-venue.js": "a608568df3a53bb9142733467c0f95946214abaedd10068b15b5798c7a8137f9",
@@ -1027,7 +1027,7 @@
     "extension/dist/yt-sr-content.js": "79cafaac40397798bef6d15196f0128431819f2361b924a0a4d737ec0fd25d54",
     "extension/dist/yt-mx-content.js": "e394ab056537e9ffde444018f371c66101e3510faeee68256a263822d02e3302",
     "extension/dist/yt-tt-main.js": "e63cca6b853f5b8ad820b5973cec58a697312975483e9682d7f9567780f58517",
-    "extension/dist/yt-tt-content.js": "b52402b46ff6a8969776e317ce64ccc6750db9b7d8174e48c6ed30aecb2ab959",
+    "extension/dist/yt-tt-content.js": "7e7a812217c54594146f8007a5348c4e88576da836b510a383ea2679db79d920",
     "extension/dist/yt-content-chat-main.js": "eabb977eeebf8812e3c33c50f3c27f2c1c11c0c0f510a54744420dc631f7412c"
   }
 }

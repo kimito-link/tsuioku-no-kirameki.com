@@ -137,6 +137,21 @@ describe('コメント', () => {
     expect(ttChatDropReason(new Uint8Array([...fb(2, user(5, 'a', 'aa')), ...fb(3, '')]), '1')).toBe('no-text');
     expect(ttChatDropReason(new Uint8Array([...fb(2, user(5, 'a', 'aa')), ...fb(3, 'x')]), '')).toBe('no-id');
   });
+  // 2026-11-09 PC 実測の形: field 13 の繰り返し {1 位置, 2 {1 数字の ID, 2 {1[] 絵の URL, 5 色}, 8 種類}}
+  const SIMG = 'https://p19-webcast.tiktokcdn.com/webcast-sg/stamp/a.png~tplv-obj.image';
+  const stamp = (/** @type {string} */ id) => fb(13, [...fv(1, 0), ...fb(2, [...fb(1, id), ...fb(2, [...fb(1, SIMG), ...fb(1, SIMG), ...fb(5, '#FFFFFF')]), ...fb(8, 'sticker1')])]);
+  it('スタンプだけのコメントも記録する(本文の代わりに [スタンプ] を個数ぶん)', () => {
+    const only = new Uint8Array([...common(1762640001234), ...fb(2, user(5, 'a', 'aa')), ...stamp('7300000000000000001'), ...stamp('7300000000000000002')]);
+    expect(parseTtChat(only, { msgId: '9', nowMs: 1762640005000 })?.text).toBe('[スタンプ][スタンプ]');
+    expect(ttChatDropReason(only, '9')).toBe('other');
+    const mixed = new Uint8Array([...common(1762640001234), ...fb(2, user(5, 'a', 'aa')), ...fb(3, 'わこつ'), ...stamp('7300000000000000001')]);
+    expect(parseTtChat(mixed, { msgId: '10', nowMs: 1762640005000 })?.text).toBe('わこつ [スタンプ]');
+  });
+  it('ID も TikTok の絵もない field 13 はスタンプと数えない', () => {
+    const bad = new Uint8Array([...fb(2, user(5, 'a', 'aa')), ...fb(13, fb(2, [...fb(1, 'abc'), ...fb(2, fb(1, 'https://example.com/x.png'))]))]);
+    expect(parseTtChat(bad, { msgId: '11', nowMs: 1762640005000 })).toBe(null);
+    expect(ttChatDropReason(bad, '11')).toBe('no-text');
+  });
 });
 
 /** @param {{ giftId: number, count: number, end?: boolean, group?: number, type?: number, diamond?: number, en?: string, uid?: string }} o */

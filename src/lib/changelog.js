@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1944',
+    date: '2026-11-09',
+    summary: 'TikTok のスタンプだけのコメントも記録する',
+    items: Object.freeze([
+      'TikTok で、本文がなくスタンプだけのコメントが記録から漏れていたのを直しました。スタンプは「[スタンプ]」として個数ぶん残します(本文つきのときは本文の後ろに並べます)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1943',
     date: '2026-11-09',
     summary: 'ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない',
@@ -201,15 +209,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Kick の Kicks と Twitch の Bits を、1つ1ptで数えるようにしました。これまでは円の目安に直して1行ずつ丸めていたため、1 Kick が 2pt になり、少額が重なるほど合計がずれていました。公式のランキングと同じ数で並びます。',
       'YouTube・Twitch・Kick の画面では、ニコ生だけの設定「なふだ」の切り替えを出さないようにしました(押しても相手がいないため)。',
       'ランキング欄の説明(マウスを乗せると出る文・読み上げソフト向けの名前)に残っていた「ニコ生」の言葉を直しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1924',
-    date: '2026-11-08',
-    summary: 'Twitch のポイント交換と連続視聴を記録',
-    items: Object.freeze([
-      'Twitch のチャンネルポイントで本文つきの交換(「メッセージを目立たせる」など)をした人を、ポイント交換として記録するようにしました。',
-      'Twitch の「連続で見に来た」記念(視聴ストリーク)も、何回連続かと一緒に記録します。'
     ])
   })
 ]);

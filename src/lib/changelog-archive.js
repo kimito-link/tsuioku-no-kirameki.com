@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1924',
+    date: '2026-11-08',
+    summary: 'Twitch のポイント交換と連続視聴を記録',
+    items: Object.freeze([
+      'Twitch のチャンネルポイントで本文つきの交換(「メッセージを目立たせる」など)をした人を、ポイント交換として記録するようにしました。',
+      'Twitch の「連続で見に来た」記念(視聴ストリーク)も、何回連続かと一緒に記録します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1923',
     date: '2026-11-08',
     summary: 'Kick 公式の Kicks ランキングを出す',

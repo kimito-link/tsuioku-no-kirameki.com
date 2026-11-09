@@ -205,6 +205,34 @@ function baseRow(u, postedAtMs, uniqueIdOfStream) {
   };
 }
 
+/** スタンプ1個の表し方(TikTok のスタンプには名前が来ない・2026-11-09 PC 実測) */
+export const TT_STAMP_TEXT = '[スタンプ]';
+
+/**
+ * コメントについたスタンプの数。field 13 の繰り返し1つ=スタンプ1個
+ * (13.2.1 = 数字の ID・13.2.2.1 = tiktokcdn の絵。2026-11-09 PC 実測で、本文が空の行も本文つきの行も同じ道筋)
+ * @param {PbMsg} m
+ */
+export function ttStampCount(m) {
+  let n = 0;
+  for (const e of m.allMsg(13)) {
+    const inner = e.msg(2);
+    if (/^\d{1,20}$/.test(inner.str(1)) || inner.msg(2).allStr(1).some((u) => !!safeTtImageUrl(u))) n += 1;
+  }
+  return Math.min(n, 20);
+}
+
+/**
+ * 本文の後ろにスタンプを並べる(本文の中の位置は来ているが値を未確認なので、後ろにまとめる)
+ * @param {string} text
+ * @param {number} stamps
+ */
+export function withTtStamps(text, stamps) {
+  if (!stamps) return text;
+  const tail = TT_STAMP_TEXT.repeat(stamps);
+  return text ? `${text} ${tail}` : tail;
+}
+
 /**
  * WebcastChatMessage → 記録の1行
  * @param {Uint8Array} payload
@@ -214,7 +242,7 @@ export function parseTtChat(payload, ctx = {}) {
   const m = new PbMsg(payload);
   const u = parseTtUser(m.msg(2));
   if (!u) return null;
-  const text = m.str(3).replace(/\s+/g, ' ').trim().slice(0, 500);
+  const text = withTtStamps(m.str(3).replace(/\s+/g, ' ').trim(), ttStampCount(m)).slice(0, 500);
   if (!text) return null;
   const mid = String(ctx.msgId || '');
   if (!/^\d{1,20}$/.test(mid) || mid === '0') return null;
@@ -231,7 +259,7 @@ export function parseTtChat(payload, ctx = {}) {
 export function ttChatDropReason(payload, msgId) {
   const m = new PbMsg(payload);
   if (!parseTtUser(m.msg(2))) return 'no-user';
-  if (!m.str(3).trim()) return 'no-text';
+  if (!m.str(3).trim() && !ttStampCount(m)) return 'no-text';
   if (!/^\d{1,20}$/.test(String(msgId || '')) || msgId === '0') return 'no-id';
   return 'other';
 }

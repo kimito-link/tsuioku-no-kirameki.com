@@ -93,6 +93,8 @@ const FRAMES = [
   frame([
     ['WebcastRoomUserSeqMessage', seq(77), 5001],
     ['WebcastChatMessage', chat('12', 'ファンB', 'こんばんは', T0 + 5000), 5002],
+    // スタンプだけのコメント(本文の field 3 が無く field 13 にスタンプ・2026-11-09 PC 実測の形)
+    ['WebcastChatMessage', [...common(T0 + 5100), ...fb(2, user('13', 'ファンC', 'u13')), ...fb(13, [...fv(1, 0), ...fb(2, [...fb(1, '7300000000000000001'), ...fb(2, fb(1, GIMG))])])], 5003],
   ]),
 ];
 const GIFT_LIST = {
@@ -109,6 +111,7 @@ const WANT_ROWS = [
   'superchat:tt:41:ふしぎ:Mystery ×2:10:TTCOIN:face',
   'text:tt:11:ファンA:わこつ:0::face',
   'text:tt:12:ファンB:こんばんは:0::face',
+  'text:tt:13:ファンC:[スタンプ]:0::face',
 ];
 
 /** @param {boolean} socket ログイン済み(ページがコメントのソケットを開く) @param {string} room */
@@ -261,9 +264,9 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
   await expect
     .poll(async () => {
       const d = await ttDiag();
-      return { wsState: d.wsState, giftCoin: d.giftCoin, giftList: d.giftList, boardRows: d.boardRows, comboTimeouts: d.comboTimeouts, gzipFail: d.gzipFail, stopReason: d.stopReason, chats: d.types?.WebcastChatMessage };
+      return { wsState: d.wsState, giftCoin: d.giftCoin, giftList: d.giftList, boardRows: d.boardRows, comboTimeouts: d.comboTimeouts, gzipFail: d.gzipFail, stopReason: d.stopReason, chats: d.types?.WebcastChatMessage, noText: d.dropReasons?.['chat:no-text'] || 0 };
     }, { timeout: 15_000 })
-    .toEqual({ wsState: 'open', giftCoin: 513, giftList: 2, boardRows: 2, comboTimeouts: 1, gzipFail: 0, stopReason: '', chats: 3 });
+    .toEqual({ wsState: 'open', giftCoin: 513, giftList: 2, boardRows: 2, comboTimeouts: 1, gzipFail: 0, stopReason: '', chats: 4, noText: 0 });
 
   // 配信中の視聴者の順位(score つき)が YouTube のトップファンと同じ置き場に入る
   const board = await sw.evaluate(async (key) => (await chrome.storage.local.get(`yt_leaderboard_${key}`))[`yt_leaderboard_${key}`], KEY);
