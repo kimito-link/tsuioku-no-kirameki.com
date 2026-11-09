@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1942',
+    date: '2026-11-09',
+    summary: 'TikTok で漏れたコメントの理由を計器に残す',
+    items: Object.freeze([
+      'TikTok で画面には出たのに記録されなかったコメントがあったとき、その理由(送り主が読めない・本文が空・番号が無いなど)を状態の記録に数えて残すようにしました。記録の仕方そのものは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1941',
     date: '2026-11-09',
     summary: '終わった配信のページで毎秒読みに行かない',

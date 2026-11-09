@@ -34,6 +34,16 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     ])
   }),
   Object.freeze({
+    version: '0.1.1960',
+    date: '2026-11-09',
+    summary: '会場モードにも記録や同時接続の数字を出す',
+    items: Object.freeze([
+      '横の欄の上にある数字(記録・推定同時接続・来場者数・来場・本家コメ・経過・広告pt・ギフトpt)を、会場モードのヘッダーにも出すようにしました。数字は横の欄と同じものです。',
+      '横の欄を閉じていて数字が更新されないときは、記録以外を薄く出して「経過」は「—」にします(記録は横の欄を閉じていても増え続けます)。',
+      'ニコ生と YouTube の会場の両方に出ます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1959',
     date: '2026-11-09',
     summary: '同じ公式ランキングは書き直さない',
@@ -167,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'ミクチャ・SHOWROOM の状態の記録を別タブで上書きしない',
     items: Object.freeze([
       'ミクチャと SHOWROOM でも、状態の記録が配信の終わった別のタブの値で上書きされないようにしました(TikTok と同じ守り)。記録そのものには影響ありません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1942',
-    date: '2026-11-09',
-    summary: 'TikTok で漏れたコメントの理由を計器に残す',
-    items: Object.freeze([
-      'TikTok で画面には出たのに記録されなかったコメントがあったとき、その理由(送り主が読めない・本文が空・番号が無いなど)を状態の記録に数えて残すようにしました。記録の仕方そのものは変わりません。'
     ])
   })
 ]);
