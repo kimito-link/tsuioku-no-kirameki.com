@@ -988,6 +988,22 @@
       ]
     },
     {
+      "file": "src/lib/statCardsMirrorKey.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/storageOpTimeout.js",
       "featureCount": 4,
       "features": [
@@ -1224,6 +1240,22 @@
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceLongCommentShorten.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
@@ -2518,6 +2550,18 @@
       ]
     },
     {
+      "file": "src/extension/venuePickupDrag.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/adMessageLines.js",
       "featureCount": 2,
       "features": [
@@ -2995,6 +3039,18 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/giftSidebarRankTabPick.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
       ]
     },
     {
@@ -3658,18 +3714,6 @@
       ]
     },
     {
-      "file": "src/lib/statCardsMirrorKey.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/statusFastDiagLite.js",
       "featureCount": 2,
       "features": [
@@ -3814,6 +3858,18 @@
       ]
     },
     {
+      "file": "src/lib/venueBubbleBurst.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueBubbleChurn.js",
       "featureCount": 2,
       "features": [
@@ -3839,6 +3895,18 @@
     },
     {
       "file": "src/lib/venueCharacterFrame.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueComposeBox.js",
       "featureCount": 2,
       "features": [
         "content",
@@ -4198,6 +4266,18 @@
       ]
     },
     {
+      "file": "src/lib/venueStatStrip.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueStoryDiagMirrorPanel.js",
       "featureCount": 2,
       "features": [
@@ -4301,6 +4381,16 @@
       ],
       "labels": [
         "Web版 状態(スマホ)"
+      ]
+    },
+    {
+      "file": "app/live-view-block.js",
+      "featureCount": 1,
+      "features": [
+        "live-ranking"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {
@@ -6324,6 +6414,16 @@
       ]
     },
     {
+      "file": "src/lib/giftItemsMirror.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/giftLaneOfficialFill.js",
       "featureCount": 1,
       "features": [
@@ -6351,6 +6451,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/giftPanelShape.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
       ]
     },
     {
@@ -6395,16 +6505,6 @@
     },
     {
       "file": "src/lib/giftSenderObservation.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/giftSidebarRankTabPick.js",
       "featureCount": 1,
       "features": [
         "content"
@@ -8084,6 +8184,16 @@
       ]
     },
     {
+      "file": "src/lib/phoneBlocklist.js",
+      "featureCount": 1,
+      "features": [
+        "live-ranking"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)"
+      ]
+    },
+    {
       "file": "src/lib/phonePost.js",
       "featureCount": 1,
       "features": [
@@ -9224,6 +9334,16 @@
       ]
     },
     {
+      "file": "src/lib/storyGrowthRebuildReasons.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/storyUserLaneContaminationGuard.js",
       "featureCount": 1,
       "features": [
@@ -9274,6 +9394,16 @@
       ]
     },
     {
+      "file": "src/lib/supporterAccess.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
       "file": "src/lib/supporterChikuranScore.js",
       "featureCount": 1,
       "features": [
@@ -9281,6 +9411,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/supporterLicense.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
       ]
     },
     {

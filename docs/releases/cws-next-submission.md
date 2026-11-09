@@ -1,3 +1,28 @@
+# ★2026-11-06 0.1.1901 を提出済み（YouTube 同梱＋サポーター課金をまとめて1回で）。下の2つのメモはこの版の内容。
+
+# ★0.1.1897〜(サポーター=有料のマーケ HTML)の提出メモ(2026-11-06・YouTube 同梱と一緒に出す)
+
+- **権限は増えない**(課金は既存の `app.tsuioku-no-kirameki.com` を使う)。CWS に課金機能は無いので外部決済(Stripe)。
+- **貼り直す欄**: 単一用途(§1・738字)・ホスト権限の統合欄(§2-8z・941字)・データ使用で「認証に関する情報」に✅(サポーターのコード)。
+  「詳細な説明」は [cws-store-listing.md](cws-store-listing.md) に「■ 料金」の段を追加済み(一部有料の明記)。
+- **privacy.html** §4-3「サポーター」に PC ごとの識別子を追記済み。特商法 `tokushoho.html`・規約 `terms.html` は公開済み。
+- 本番の通し確認(2026-11-06): 決済→コード発行→webhook(再送で成功)→証明書(kid k2026b・valid・dev 一致)まで OK。
+
+---
+
+# ★0.1.1890〜(YouTube Live 同梱)の提出メモ(2026-11-06・0.1.1901 で提出済み)
+
+- **権限が増える**: permissions に `tts`・`declarativeNetRequestWithHostAccess`、host_permissions に
+  `https://www.youtube.com/*`・`https://yt3.ggpht.com/*`・`https://yt4.ggpht.com/*`・`https://yt3.googleusercontent.com/*`。
+  りんくの判断で「最初から全員に付ける」(optional にしない・2026-11-05 カード)。
+  → **ストア版を更新した利用者には Chrome が「新しい権限」の確認を出し、承認するまで拡張が止まる**。
+- **貼り直す欄**: 単一用途(§1・605字)・ホスト権限の統合欄(§2-8z・854字)・tts(§2-8f)・declarativeNetRequestWithHostAccess(§2-8g)。
+  正本は [cws-submission-texts.md](cws-submission-texts.md)。「詳細な説明」は [cws-store-listing.md](cws-store-listing.md)(YouTube の段を追加済み)。
+- **privacy.html** は 2026-11-06 版で §1・§4-1b・§5 に YouTube を追記済み(審査員はライブ URL を見る=master マージ後に Vercel 反映を確認)。
+- YouTube の記録は外へ送らない(「スマホで見る」等の共有はニコ生の画面だけ)。文言はすべてこれに揃えている。
+
+---
+
 # 次回 CWS 提出のまとめ（公開中 0.1.1728 → 0.1.1848）
 
 - **作成日**: 2026-10-22（master = 0.1.1747 時点）

@@ -32,14 +32,16 @@ function base64ToBuffer(b64) {
 }
 
 /**
- * @param {{ token: string, fetchImpl?: typeof fetch, Ctx?: any, setIntervalImpl?: typeof setInterval, keepWhenHidden?: () => boolean }} a
+ * @param {{ token: string, fetchImpl?: typeof fetch, Ctx?: any, setIntervalImpl?: typeof setInterval, keepWhenHidden?: () => boolean, skipNo?: (no: string) => boolean }} a
  *   keepWhenHidden: iPhone アプリ(live-view-native.js)の中では、画面を閉じても声を取りに行き続ける。
+ *   skipNo: v0.1.1910 鳴らさない声(🚩 で隠した人のコメント)か。鳴らす直前に聞く(隠した直後から効く)。
  */
 export function createPhoneVoice(a) {
   const fetchImpl = a.fetchImpl || ((u, i) => fetch(u, i));
   const Ctx = a.Ctx || globalThis.AudioContext || /** @type {any} */ (globalThis).webkitAudioContext;
   const every = a.setIntervalImpl || setInterval;
   const keepWhenHidden = a.keepWhenHidden || (() => false);
+  const skipNo = a.skipNo || (() => false);
   /** @type {any} */
   let ctx = null;
   let on = readOn();
@@ -79,9 +81,15 @@ export function createPhoneVoice(a) {
     }
   }
 
+  /** @param {string} no */
+  function safeSkip(no) {
+    try { return Boolean(skipNo(String(no))); } catch { return false; }
+  }
+
   function playNext() {
     if (playing || !on || !ctx || ctx.state !== 'running') return;
-    const clip = queue.shift();
+    let clip = queue.shift();
+    while (clip && safeSkip(clip.no)) clip = queue.shift();
     if (!clip) return;
     playing = true;
     const done = () => { playing = false; playNext(); };

@@ -45,6 +45,14 @@ const ROLES = {
   'extension/images': { role: 'アイコン・ロゴのマスター画像', tags: ['画像'] },
   'extension/dist': { role: 'ビルド成果物(content/popup/status 等の bundle)。build が生成', tags: ['ビルド成果物'] },
   'extension/sound': { role: '読み上げ・完了音などの音声素材', tags: ['音声'] },
+  'extension-youtube': { role: 'YouTube Live 版の試作拡張(単一用途分離)。manifest/content-chat/background/sidepanel/offscreen', tags: ['YouTube', '試作', '記録', '読み上げ'] },
+  'extension-youtube/src': { role: 'YouTube Live 版試作拡張のバンドル entry(content-chat/background/sidepanel/offscreen)', tags: ['YouTube', 'entry', '記録'] },
+  'extension-youtube/images': { role: 'YouTube Live 版試作拡張のアイコン・キャラ画像(ニコ生版と共通の3キャラ)', tags: ['YouTube', '画像'] },
+  'extension-youtube/images/logo': { role: 'YouTube Live 版試作拡張のロゴ・アイコン画像', tags: ['YouTube', '画像'] },
+  'extension-youtube/images/yukkuri-charactore-english': { role: 'YouTube Live 版3レーン見出し・フォールバック用の3キャラ画像(りんく/こん太/たぬ姉)', tags: ['YouTube', '画像', 'キャラ'] },
+  'extension-youtube/images/yukkuri-charactore-english/link': { role: 'りんく(配信者視点レーン)のキャラ画像', tags: ['YouTube', '画像', 'キャラ'] },
+  'extension-youtube/images/yukkuri-charactore-english/konta': { role: 'こん太(ファン視点レーン)のキャラ画像', tags: ['YouTube', '画像', 'キャラ'] },
+  'extension-youtube/images/yukkuri-charactore-english/tanunee': { role: 'たぬ姉(一般コメントレーン)のキャラ画像', tags: ['YouTube', '画像', 'キャラ'] },
 
   'src': { role: 'LP 側 + 純粋関数ライブラリの源', tags: ['ソース'] },
   'src/lib': { role: '純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半', tags: ['色', '速度', 'コメント', 'レポート', '純粋関数'] },
@@ -125,6 +133,7 @@ const ROLES = {
  * @type {{ feature: string, desc: string, paths: string[], tags?: string[] }[]}
  */
 const FEATURES = [
+  { feature: 'Twitch の配信を記録(本体に同梱)', desc: 'Twitch の視聴ページで公式の読み取り専用 IRC を読み、YouTube 版と同じ記録(yt_kirameki_db・配信キー tw.<login>.<配信番号>)へ渡す。画面は YouTube 版(=ニコ生版の完全コピー)をそのまま使い、リンク・言葉・送信先だけ Twitch にする。計器 yt_diag_tw_chat', paths: ['extension-youtube/src/tw-content-entry.js', 'src/lib/twitch/twIrcParse.js', 'src/lib/twitch/twStreamKey.js', 'src/lib/twitch/twGql.js', 'extension-youtube/src/ytNicoShim.js', 'tests/e2e/twitch-recording.spec.js', 'council/twitch-support-PLAN.md'], tags: ['Twitch', '記録', '他プラットフォーム'] },
   { feature: 'コメント送信(確認/プロファイル)', desc: '拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも', paths: ['src/lib/commentSubmitConfirm.js', 'src/lib/commentSubmitProfiling.js'], tags: ['送信', 'コメント'] },
   { feature: 'popup スクロール(要素を見せる)', desc: '.nl-main などスクロール親で、子要素を見せるための scrollTop 加算 delta を計算', paths: ['src/lib/nlMainScrollReveal.js'], tags: ['popup', 'スクロール'] },
   { feature: '会場ドラッグスクロール(パン)', desc: '会場を左ドラッグで縦スクロール(パン)する純ロジック。venueBar が pointer を配線して呼ぶ', paths: ['src/lib/venueDragScroll.js'], tags: ['会場', 'スクロール'] },

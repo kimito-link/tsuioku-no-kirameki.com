@@ -211,6 +211,9 @@ def stage(version: str) -> Path:
     #   ボタンから開くため提出物に必須(従来は漏れていてストア版で 404 になっていた)。
     copy_file(EXT_DIR / 'status.html', dest / 'status.html')
     copy_file(EXT_DIR / 'comeview.html', dest / 'comeview.html')
+    # 2026-11-05 同梱した YouTube 版の画面(scripts/youtube-build.mjs の生成物)。パネルは background.js の setOptions が開く
+    for yt_page in sorted(EXT_DIR.glob('yt-*.html')):
+        copy_file(yt_page, dest / yt_page.name)
     copy_tree(EXT_DIR / 'dist', dest / 'dist')
     # dist/.gitkeep は提出物に不要
     gitkeep = dest / 'dist' / '.gitkeep'
@@ -342,7 +345,13 @@ def verify_zip(zip_path: Path) -> None:
         # v0.1.1681: 匿名の顔の合成 Worker。無いと全部メインスレッド合成(数秒の詰まり)へ黙って戻るので必須にする。
         'dist/avatar-face-worker.js',
         # v0.1.1693: サイドパネルの iframe を読み込ませる極小スクリプト。無いとパネルの中身が永久に空になるので必須にする。
-        'dist/sidepanel-iframe-boot.js'
+        'dist/sidepanel-iframe-boot.js',
+        'yt-sidepanel.html',
+        'dist/yt-background.js',
+        'dist/yt-content-chat.js',
+        'dist/yt-content-chat-main.js',
+        'dist/yt-venue-inline.js',
+        'dist/yt-tw-content.js'
     }
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = set(zf.namelist())

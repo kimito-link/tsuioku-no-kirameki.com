@@ -22,8 +22,12 @@ export const LIGHT_VOICE_PITCHES = Object.freeze([0.8, 0.95, 1.1, 1.25, 1.4]);
 export const LIGHT_VOICE_RATE = 1.2;
 /** 1件で読む最大の文字数(長文で次のコメントが何十秒も待たされないように)。 */
 export const LIGHT_VOICE_MAX_CHARS = 60;
-/** 軽い声で読んでいる間、VOICEVOX の速さを確かめに行く間隔。 */
-export const LIGHT_VOICE_PROBE_INTERVAL_MS = 30000;
+/**
+ * 軽い声で読んでいる間、VOICEVOX の速さを確かめに行く間隔。
+ * v0.1.1866: 30秒→6秒。戻るには速い合成が5回続く必要があり、30秒間隔だと原因が消えても戻るまで最短2分半かかっていた
+ *   (短い「てすと」1回なのでエンジンの邪魔は小さい・YouTube 版 0.1.94 で確認)。
+ */
+export const LIGHT_VOICE_PROBE_INTERVAL_MS = 6000;
 /** 速さを確かめるときに VOICEVOX に頼む文(短いほどエンジンを邪魔しない)。 */
 export const LIGHT_VOICE_PROBE_TEXT = 'てすと';
 

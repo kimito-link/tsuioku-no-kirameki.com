@@ -38,6 +38,10 @@
  *     missing: number, silent: number, hoverOpened: number, hoverWithLines: number, hoverEmptyButSpoke: number, hoverLied: number }|null,
  *   tileCountCensus: { line: string, verdict: 'ok'|'warn'|'idle', paints: number, changes: number, last: number, max: number,
  *     drops: number, shrinkRefused: number, worstDrop: number, worstFrom: number, worstTo: number, worstCause: string }|null,
+ *   bubbleChurn: { line: string }|null,
+ *   bubbleBurst: { line: string, bursts: number, maxShown: number, capDropped: number,
+ *     sameTextRepeat: number, noCommentNo: number, skippedOld: number, peakRatePerSec: number,
+ *     burstByKind: Record<string, number>, burstBySource: Record<string, number> }|null,
  *   mirrorIntakeLine: string,
  *   mirrorIntake: { changedEvents:number, keyMatched:number, keyMissed:number, accepted:number,
  *     rejectedByGate:number, lastMissedKeys:string[], lastExpectedKey:string,
@@ -85,6 +89,10 @@ export function makeInitialVenueSeatsDiag() {
     speechCensus: /** @type {VenueSeatsDiagState['speechCensus']} */ (null),
     // 2026-10-13: 会場の人数の増減(減った瞬間の証拠取り)。未観測は null=状態速報に出ない。
     tileCountCensus: /** @type {VenueSeatsDiagState['tileCountCensus']} */ (null),
+    // 2026-11-04: 吹き出しの churn と一気出しの1行。★ここを通さないと状態速報に届かない
+    //   (bubbleChurn は 2026-07-21 から速報側が読んでいたが、ここで落ちていて一度も届いていなかった)。
+    bubbleChurn: /** @type {VenueSeatsDiagState['bubbleChurn']} */ (null),
+    bubbleBurst: /** @type {VenueSeatsDiagState['bubbleBurst']} */ (null),
     // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
     mirrorIntakeLine: '',
     /*
@@ -297,6 +305,32 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         worstCause: String(tcIn.worstCause || '')
       }
     : null;
+  // 2026-11-04: 吹き出しの churn / 一気出し。検証済みのフィールドだけ通す(数を数える辞書は数値だけ・件数上限)。
+  const bcIn = /** @type {any} */ (d.bubbleChurn && typeof d.bubbleChurn === 'object' ? d.bubbleChurn : null);
+  const bubbleChurn = bcIn ? { line: String(bcIn.line || '') } : null;
+  const bbIn = /** @type {any} */ (d.bubbleBurst && typeof d.bubbleBurst === 'object' ? d.bubbleBurst : null);
+  /** @param {unknown} o */
+  const countDict = (o) => {
+    /** @type {Record<string, number>} */
+    const out = {};
+    if (!o || typeof o !== 'object') return out;
+    for (const [k, v] of Object.entries(o).slice(0, 12)) out[String(k).slice(0, 24)] = Math.max(0, Math.floor(num(v, 0)));
+    return out;
+  };
+  const bubbleBurst = bbIn
+    ? {
+        line: String(bbIn.line || ''),
+        bursts: Math.max(0, Math.floor(num(bbIn.bursts, 0))),
+        maxShown: Math.max(0, Math.floor(num(bbIn.maxShown, 0))),
+        capDropped: Math.max(0, Math.floor(num(bbIn.capDropped, 0))),
+        sameTextRepeat: Math.max(0, Math.floor(num(bbIn.sameTextRepeat, 0))),
+        noCommentNo: Math.max(0, Math.floor(num(bbIn.noCommentNo, 0))),
+        skippedOld: Math.max(0, Math.floor(num(bbIn.skippedOld, 0))),
+        peakRatePerSec: Math.max(0, num(bbIn.peakRatePerSec, 0)),
+        burstByKind: countDict(bbIn.burstByKind),
+        burstBySource: countDict(bbIn.burstBySource)
+      }
+    : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -321,6 +355,8 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     yukkuriNamedCensus,
     speechCensus,
     tileCountCensus,
+    bubbleChurn,
+    bubbleBurst,
     /*
      * ★v0.1.1317: 会場が鏡を受け取れているかの1行(会場が完全一致しない件の切り分け)。
      *   文字列1本だけ通す(未知の巨大オブジェクトを写さない=このファイルの既存方針)。
