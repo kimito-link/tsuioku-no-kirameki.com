@@ -30,6 +30,7 @@ import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.j
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
+import { readYtPanelStreamKey } from '../../src/lib/youtube/ytPanelRoute.js';
 import { createPanelStreamDiag, panelStreamDiagContext, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
@@ -88,6 +89,21 @@ try {
 } catch {
   /* no-op */
 }
+
+// 0.1.1949: 外枠(sidepanel-iframe-boot-entry)が src に焼いた「どの配信か」('yt:<videoId>' / '<サービス id>:<login>')。サイドパネルだけ
+const PANEL_STREAM_KEY = (() => {
+  try {
+    return /\/(?:yt-)?sidepanel\.html$/.test(String(location.pathname || '')) ? readYtPanelStreamKey(location.search) : '';
+  } catch {
+    return '';
+  }
+})();
+/** @param {string} key 外枠の配信キー → サービス(YouTube は null=言葉を変えない) */
+function platformOfPanelStreamKey(key) {
+  const id = String(key || '').split(':')[0];
+  return id && id !== 'yt' ? LIST_PLATFORMS.find((p) => p.id === id) || null : null;
+}
+const LIST_PLATFORMS = Object.values(STREAM_PLATFORMS);
 
 // ---- 2. videoId ⇔ 疑似 lv ----
 /** @type {Map<string, string>} lv → videoId */
@@ -449,7 +465,11 @@ const commentsCache = new Map();
 const shimDiag = { liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
-const panelDiagCore = createPanelStreamDiag({ now: () => Date.now(), lvToKey: (lv) => videoIdForPseudoLv(lv) });
+const panelDiagCore = createPanelStreamDiag({
+  now: () => Date.now(),
+  lvToKey: (lv) => videoIdForPseudoLv(lv),
+  panelService: PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '',
+});
 const PANEL_DIAG_CTX = panelStreamDiagContext(typeof location !== 'undefined' ? location.pathname : '');
 let panelDiagTimer = 0;
 // 書き込みは 10 秒に1回まで(yt_diag_live_rows と同じ型・nls_ でないキー=popup の描き直しを起こさない)。画面ごとに別のキー
@@ -1480,8 +1500,10 @@ function screenPlatform() {
 /** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
 function screenPlatformBase() {
   if (YT_SHIM_IN_PAGE) return platformOfHostname(location.hostname);
-  // 画面がまだコメントを聞いてくる前(最初の描画)は、いちばん新しく記録が増えた配信で決める
-  return platformOfStreamKey(lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : newestVideoIdOf(knownSummaries));
+  if (lastAskedLv) return platformOfStreamKey(videoIdForPseudoLv(lastAskedLv));
+  // 画面がまだコメントを聞いてくる前(最初の描画)は、外枠が src に焼いた配信のサービス(0.1.1949)。無ければ最近記録が増えた配信
+  if (PANEL_STREAM_KEY) return platformOfPanelStreamKey(PANEL_STREAM_KEY);
+  return platformOfStreamKey(newestVideoIdOf(knownSummaries));
 }
 
 /** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t */

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1949',
+    date: '2026-11-09',
+    summary: '別サービスへ移ると横の欄をまっさらにする',
+    items: Object.freeze([
+      '横の欄(サイドパネル)で、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のあいだで別の配信のタブへ移ったら、ニコ生版と同じく中身を読み込み直すようにしました。前のサービスの言葉(「Kicks ランキング」など)が残らなくなります。YouTube のトップなど配信でないページでは、いま出している配信を保ちます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1948',
     date: '2026-11-09',
     summary: '横の欄が裏のタブの配信に引っ張られない',
@@ -193,15 +201,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Twitch のハイプトレインを記録するようにしました(「ハイプトレインがレベル3になりました」「車掌になりました」「終わりました」)。',
       'Twitch の予想(チャンネルポイントで当てる)が決着したら、結果を記録します(「予想「勝てる?」の結果: 「はい」(12人・3,400ポイント)」)。',
       'どちらもログインなしで受けられます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1929',
-    date: '2026-11-08',
-    summary: '長い英数字の名前が「名無し」になるのを直す',
-    items: Object.freeze([
-      'Twitch・Kick の長いログイン名(英数字と _ で23〜25字)が、ランキングで「名無し」になっていたのを直しました。ニコ生の内部ラベルを除く判定が人の名前まで除いていました。',
-      'Twitch・Kick・YouTube の画面で、折りたたみの中に残っていたニコ生だけの説明(なふだ・ニコの匿名ID など)を外しました。'
     ])
   })
 ]);

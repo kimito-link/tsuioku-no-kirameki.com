@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1929',
+    date: '2026-11-08',
+    summary: '長い英数字の名前が「名無し」になるのを直す',
+    items: Object.freeze([
+      'Twitch・Kick の長いログイン名(英数字と _ で23〜25字)が、ランキングで「名無し」になっていたのを直しました。ニコ生の内部ラベルを除く判定が人の名前まで除いていました。',
+      'Twitch・Kick・YouTube の画面で、折りたたみの中に残っていたニコ生だけの説明(なふだ・ニコの匿名ID など)を外しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1928',
     date: '2026-11-08',
     summary: 'Twitch・Kick の絵文字を画像で表示',

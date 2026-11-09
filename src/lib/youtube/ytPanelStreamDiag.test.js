@@ -100,3 +100,16 @@ describe('配線: shim が計器を呼び、この版では画面の動きを変
     expect(shim).not.toContain('reloadIfWordingPlatformChanged');
   });
 });
+
+describe('0.1.1949: 外枠の配信と中身の食い違い', () => {
+  it('外枠が Kick なのに画面が YouTube を聞いたら数える(探り読みは数えない)', () => {
+    let t = 0;
+    const d = createPanelStreamDiag({ now: () => ++t, lvToKey: (lv) => keys[lv] || '', panelService: 'kick' });
+    d.asked('lv2', false);
+    d.asked('lv1', true);
+    d.asked('lv1', false);
+    const s = d.snapshot();
+    expect(s.panelStreamService).toBe('kick');
+    expect(s.contentPlatformMismatch).toBe(1);
+  });
+});

@@ -3607,13 +3607,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (90)
+- 📁 **tests/** (91)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (83)
+  - 📁 **e2e/** (84)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3684,6 +3684,7 @@
     - `sidepanel-first-byte-paint.spec.js`
     - `sidepanel-flash-capture.spec.js`
     - `sidepanel-lane-stability-monkey.spec.js`
+    - `sidepanel-stream-follow.spec.js`
     - `smoke.spec.js`
     - `snapshot-fetch-hang-resilient.spec.js`
     - `storage-banners.spec.js`

@@ -46,7 +46,7 @@ function pushCapped(arr, v) {
 }
 
 /**
- * @param {{ now: () => number, lvToKey: (lv: string) => string }} deps
+ * @param {{ now: () => number, lvToKey: (lv: string) => string, panelService?: string }} deps
  */
 export function createPanelStreamDiag(deps) {
   const now = deps.now;
@@ -73,6 +73,10 @@ export function createPanelStreamDiag(deps) {
     probe: { calls: 0, lvs: 0, maxMs: 0, lastMs: 0 },
     /** windows.getLastFocused の前面タブが配信ページだったのに写されていない回数 */
     lastFocused: { calls: 0, watchLikeUnmapped: 0 },
+    /** 0.1.1949: 外枠が src に焼いた配信のサービス('' = 焼いていない) */
+    panelStreamService: String(deps.panelService || ''),
+    /** 外枠のサービスと、画面が聞いた配信のサービスが食い違った回数(SPEC §3-a: 0 でなければ言葉の元文保持を検討) */
+    contentPlatformMismatch: 0,
   };
   let lastAsked = '';
 
@@ -96,6 +100,7 @@ export function createPanelStreamDiag(deps) {
       const id = String(lv || '');
       if (!probe && id && lastAsked && id !== lastAsked) s.askedSwitches += 1;
       if (!probe && id) lastAsked = id;
+      if (!probe && id && s.panelStreamService && svc(id) && svc(id) !== s.panelStreamService) s.contentPlatformMismatch += 1;
       const prev = s.askedLvHistory[s.askedLvHistory.length - 1];
       // 同じ配信を続けて聞くのは1件にまとめる(3秒ごとの見直しで履歴が埋まらない)
       if (prev && prev.lv === id && prev.probe === probe) prev.at = t;
