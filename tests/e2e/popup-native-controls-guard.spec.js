@@ -99,4 +99,38 @@ test.describe('パネルの部品はブラウザ既定の見た目のまま出�
       for (const r of rects) expect(r.height).toBeGreaterThanOrEqual(40);
     });
   }
+
+  // v0.1.2022: 状態ページにも見た目の指定が無いボタンが38個あった(効果音の ▶ 試聴など)。ほかの画面も同じ物差しで守る。
+  for (const pagePath of [
+    'status.html',
+    'comeview.html',
+    'venue.html?lv=lv888888888',
+    'marketing-export.html',
+    'live-view.html'
+  ]) {
+    test(`${pagePath} のボタンに見た目の指定がある`, async ({ context }) => {
+      let sw = context.serviceWorkers()[0];
+      if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
+      const extensionId = new URL(sw.url()).hostname;
+      const page = await context.newPage();
+      await page.goto(`chrome-extension://${extensionId}/${pagePath}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000
+      });
+      // 後から作られるボタン(状態ページの一覧など)が出そろうのを待つ。
+      await page.waitForTimeout(4000);
+      const nativeButtons = await page.evaluate(() => {
+        /** @type {string[]} */
+        const out = [];
+        for (const b of document.querySelectorAll('button, input[type=button], input[type=submit]')) {
+          const cs = getComputedStyle(b);
+          if (cs.borderTopStyle === 'outset' || cs.backgroundColor === 'rgb(239, 239, 239)') {
+            out.push(`${b.id || b.className || '(名前なし)'}: ${(b.textContent || '').trim().slice(0, 16)}`);
+          }
+        }
+        return out;
+      });
+      expect(nativeButtons, '見た目の指定が無いボタン').toEqual([]);
+    });
+  }
 });

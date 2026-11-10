@@ -204,6 +204,26 @@
         .y-row .speaker img { width: 44px; height: 44px; }
         .y-row .bubble::after { display: none; }
       }
+      /* v0.1.2022: 見た目の指定が無いボタン(効果音の ▶ 試聴・評判チェックの「チェック」など)が
+         ブラウザ既定の灰色のまま出ていた。:where で重みを0にしてあるので、ほかの規則が必ず勝つ。 */
+      :where(button:not([class]):not([style])) {
+        background: var(--nl-card-bg);
+        color: var(--nl-text);
+        border: 1px solid var(--nl-border);
+        padding: 4px 10px;
+        min-height: 28px;
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+      }
+      :where(button:not([class]):not([style])):hover {
+        border-color: var(--nl-accent);
+      }
+      :where(button:not([class]):not([style])):disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
       .status-buttons {
         display: flex;
         flex-wrap: wrap;
