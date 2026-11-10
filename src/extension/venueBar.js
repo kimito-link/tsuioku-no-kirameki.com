@@ -383,7 +383,7 @@ import { shouldHoldBubbleForVoice, VENUE_BUBBLE_VOICE_HOLD_MS } from '../lib/ven
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
-import { createVenueStatSelfPoller, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
+import { createVenueStatSelfPoller, createStatMirrorLiveness, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -3732,13 +3732,15 @@ export function mountVenueBarButton(options = {}) {
     fetchSource: () => (typeof options.getStatCardsSource === 'function' ? options.getStatCardsSource() : requestWatchSnapshotViaTabs(chrome, liveIdFromPathname())),
     onSnap: (snap) => { statCardsSelfSnap = snap; paintStatStrip(); }
   });
+  const statMirrorLiveness = createStatMirrorLiveness();
   const paintStatStrip = () => {
     try {
       const liveId = String(activeLiveId || liveIdFromPathname() || '');
       const recordedCount = panelSummarySnap ? selectDisplayRecordedCount(panelSummarySnap) : null;
-      const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap });
+      statMirrorLiveness.observe(statCardsMirrorSnap); // 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない
+      const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId) });
       statStrip.paint(model);
-      if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror', recordedCount });
+      if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror' && statMirrorLiveness.isLive(Date.now(), liveId), recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }
   };
   /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */

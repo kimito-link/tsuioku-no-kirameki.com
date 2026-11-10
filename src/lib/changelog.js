@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2006',
+    date: '2026-11-10',
+    summary: '会場の数字が開いた直後の値で止まらない',
+    items: Object.freeze([
+      'ニコ生で会場モードを開くと、最初の約1分、数字が放送ページを開いた瞬間の値(記録 1 件など)のまま止まっていました。横の欄が動いていないときは、会場が自分で読んだ新しい数字をすぐ出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1997',
     date: '2026-11-10',
     summary: '大きな記録で長く固まらない(合間に手を返す)',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '裏方の更新が古いまま残る件を直す',
     items: Object.freeze([
       '拡張を新しい版に入れ替えても、裏で動く記録係(YouTube・Twitch・Kick などの分)が古い中身のまま動き続けることがありました。版ごとに裏方の本体も必ず入れ替わるようにしました'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1970',
-    date: '2026-11-10',
-    summary: '声の割り当ての間引きを作り直し後も保つ',
-    items: Object.freeze([
-      'YouTube・Twitch・Kick などで、裏の記録係が作り直された直後でも、人ごとの声の割り当てをすぐ書き直さないようにしました(30秒に1回の間引きが混んだ配信で効いていなかった件の手当てと、原因を確かめる計器)。声の割り当ては変わりません'
     ])
   })
 ]);

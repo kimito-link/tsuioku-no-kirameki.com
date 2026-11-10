@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1970',
+    date: '2026-11-10',
+    summary: '声の割り当ての間引きを作り直し後も保つ',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで、裏の記録係が作り直された直後でも、人ごとの声の割り当てをすぐ書き直さないようにしました(30秒に1回の間引きが混んだ配信で効いていなかった件の手当てと、原因を確かめる計器)。声の割り当ては変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1969',
     date: '2026-11-10',
     summary: '記録の多い配信は全件の読み直しを間引く',

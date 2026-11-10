@@ -135,6 +135,16 @@ describe('パネルを開かなくても数字が付く(会場が自分で作っ
     expect(k.records.text).toBe('75');
   });
 
+  it('★鏡が新しく見えても動いていない(隠れた欄が1回書いたきり)なら写しを出す(2026-11-10 PC 実測: ニコ生で最初の約1分 記録 1 のまま)', () => {
+    const m = buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW, selfSnap: self(), mirrorLive: false });
+    expect(m.source).toBe('self');
+    expect(byKey(m).concurrent.text).toBe('55');
+    // 写しがまだ無いあいだは鏡のまま(空にしない)
+    expect(buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW, mirrorLive: false }).source).toBe('mirror');
+    // 動いている鏡は鏡が正
+    expect(buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW, selfSnap: self(), mirrorLive: true }).source).toBe('mirror');
+  });
+
   it('別の配信の写し・古い写しは使わない', () => {
     expect(buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, selfSnap: mirror({ liveId: 'lv9' }) }).source).toBe('none');
     const old = buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, selfSnap: mirror({ capturedAt: NOW - 300_000 }) });

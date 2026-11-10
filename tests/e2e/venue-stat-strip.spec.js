@@ -142,3 +142,23 @@ test('パネルを開かなくても: 別窓の会場(venue.html)が視聴タブ
   console.log('[stat-strip standalone self]', JSON.stringify(st));
   expect(Object.values(st.vals).filter((v) => v && v !== '—').length).toBeGreaterThan(0);
 });
+
+/*
+ * 2026-11-10 PC 実測(ニコ生): 視聴ページを開くだけで隠れた欄が鏡を1回書き、そのあと書かない。
+ * 会場の帯がその「開いた瞬間の値」(記録 1 など)のまま約1分止まった。
+ * 1回書いたきりの鏡は「動いている」と扱わず、会場が自分で読んだ数字をすぐ出す。
+ */
+test('1回書いたきりの鏡(隠れた欄)では止まらない: 会場が自分で読んだ数字に切り替わる', async ({ context }) => {
+  const id = await extId(context);
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(E2E_MOCK_WATCH_URL, { waitUntil: 'load', timeout: 60_000 });
+  const sw = context.serviceWorkers().find((w) => w.url().includes(id));
+  const frozen = mirror(Date.now(), { liveId: MOCK_LV, recordsText: '1', visitor: { text: '1', isPlaceholder: false } });
+  await sw.evaluate(([k, v]) => chrome.storage.local.set({ [k]: v }), [KEY, frozen]);
+  await page.locator('.nlsb-toggle').click({ timeout: 30_000 });
+  await expect(page.locator('.nlsb-stat-strip')).toHaveAttribute('data-source', 'self', { timeout: 20_000 });
+  const st = await stripState(page);
+  console.log('[stat-strip frozen mirror]', JSON.stringify(st));
+  expect(st.vals.visitor).not.toBe('1');
+});

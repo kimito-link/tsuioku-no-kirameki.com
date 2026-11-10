@@ -1044,7 +1044,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (109)
+- 📁 **scripts/** (110)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1154,6 +1154,7 @@
   - `status-live.mjs` — 状態速報(status.html の「AI共有」全文)を、コピー&貼り付けせずにターミナルへ取得する CLI。
   - `sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
+  - `vercel-ignore-build.sh`
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
