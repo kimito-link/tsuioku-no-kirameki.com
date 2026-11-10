@@ -803,7 +803,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 92</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `mobile/scripts/verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
@@ -891,6 +891,7 @@
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusRefreshInterval.js` — 状態画面(status.html)の自動更新の間隔を決める(純関数)。v0.1.1698
 - `src/lib/statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
+- `src/lib/storyDiagCountsPace.js` — 診断用の数え上げ(顔が付いた件数など)を、大きな記録では毎回やり直さないための判定(純関数)。
 - `src/lib/storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
 - `src/lib/storyDiagTotalSource.js` — 「記録している応援コメント N 件」の N を1箇所で決める純関数。
 - `src/lib/summarizeGiftSubAppHistoryDiag.js` — v0.1.201: gift sub-app DOM の payload を診断 JSON 用 summary に変換する純関数。
@@ -1469,9 +1470,6 @@
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
 - `v0.1.1979` 2026-11-10 — 吹き出しを読み上げの声と一緒に出す
 
-### 🎁 ギフト (1版)
-- `v0.1.1962` 2026-11-09 — ギフトの欄の読み込みを1回にまとめる
-
 ### 🔊 読み上げ (2版)
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
 - `v0.1.1979` 2026-11-10 — 吹き出しを読み上げの声と一緒に出す
@@ -1480,6 +1478,9 @@
 - `v0.1.1975` 2026-11-10 — 人がとても多い配信は応援レーンを2,000人までに
 - `v0.1.1973` 2026-11-10 — 人が多い配信は応援レーンの写しの書き込みを間引く
 - `v0.1.1967` 2026-11-09 — 応援レーンの塗り直しで動かす枚数を最小に
+
+### 🩺 診断・状態速報 (1版)
+- `v0.1.1982` 2026-11-10 — 大きな記録で診断の数え直しを減らす
 
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく

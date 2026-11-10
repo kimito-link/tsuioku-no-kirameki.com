@@ -750,6 +750,7 @@ import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
 import { createLaneMirrorPacer } from '../lib/laneMirrorPublishPace.js';
 import { laneCrowdLimit } from '../lib/laneCrowdLimit.js';
 import { createRefreshDutyGate } from '../lib/refreshDutyGate.js';
+import { createStoryDiagCountsPaceState, shouldReuseStoryDiagCounts } from '../lib/storyDiagCountsPace.js';
 import { createProfileCacheWritePacer } from '../lib/profileCacheWritePace.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
@@ -4845,6 +4846,8 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
   );
 }
 
+const _storyDiagCountsPace = createStoryDiagCountsPaceState(); // v0.1.1982: 診断用の数え上げの間隔(lib/storyDiagCountsPace.js)
+const _storyDiagCountsPacePaint = createStoryDiagCountsPaceState();
 // ★v0.1.1981: 定期の見回り(3秒ごと)が画面を描き直しだけで埋めないための門(src/lib/refreshDutyGate.js)
 const _refreshDutyGate = createRefreshDutyGate();
 try { /** @type {any} */ (globalThis).__refreshDutyGateDiag = _refreshDutyGate.diag; } catch { /* 計器の公開の失敗で止めない */ }
@@ -7566,6 +7569,7 @@ function renderStoryAvatarDiag() {
 }
 
 function resetStoryAvatarDiagState() {
+  _storyDiagCountsPace.lv = ''; _storyDiagCountsPacePaint.lv = ''; // v0.1.1982: 0 に戻したら、次は必ず数え直す
   STORY_AVATAR_DIAG_STATE.total = 0;
   STORY_AVATAR_DIAG_STATE.totalSource = 'fallback';
   STORY_AVATAR_DIAG_STATE.panelAgeSec = null;
@@ -15877,16 +15881,17 @@ async function refresh() {
   STORY_AVATAR_DIAG_STATE.total = _totalResolved.total;
   STORY_AVATAR_DIAG_STATE.totalSource = _totalResolved.source;
   STORY_AVATAR_DIAG_STATE.panelAgeSec = _totalResolved.panelAgeSec;
-  STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
-  STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
-  STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
-  {
+  // ★v0.1.1982: 診断用の数え上げは、大きな記録(5,000行以上)で行数が同じあいだは60秒に1回(src/lib/storyDiagCountsPace.js)。
+  if (!shouldReuseStoryDiagCounts(_storyDiagCountsPace, { lv, len: arr.length, nowMs: Date.now() })) {
+    STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
+    STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
+    STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
     const resolvedAvatar = countResolvedAvatarEntries(arr, lv);
     STORY_AVATAR_DIAG_STATE.resolvedAvatar = resolvedAvatar.total;
     STORY_AVATAR_DIAG_STATE.resolvedUniqueAvatar = resolvedAvatar.unique;
+    STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(arr, lv);
+    STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
   }
-  STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(arr, lv);
-  STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
   // 2026-07-14: total/withUid/selfSaved を同一lv内で単調化(churn根治・C-3)。
   Object.assign(STORY_AVATAR_DIAG_STATE, applyStoryDiagMonotonic(_storyDiagMonotonicState, lv, STORY_AVATAR_DIAG_STATE));
   STORY_AVATAR_DIAG_STATE.diagRegressions = _storyDiagMonotonicState.diagRegressions;
@@ -15982,7 +15987,8 @@ async function refresh() {
     //   毎 paint(450ms)走っていた arr 全件 O(N) ×2 を、同じ diagPaintDeferActive 配下へ移す。
     //   module 状態なので前回値が残り、詳細を後で開いた時は次の非スクロール paint で最新化。
     //   selfPending は arr 非依存(recents 由来・軽い)なので defer 外に残す。
-    if (!diagPaintDeferActive) {
+    // ★v0.1.1982: ここも、大きな記録で行数が同じあいだは60秒に1回(上の数え上げと同じ規則・別の状態)。
+    if (!diagPaintDeferActive && !shouldReuseStoryDiagCounts(_storyDiagCountsPacePaint, { lv, len: arr.length, nowMs: Date.now() })) {
       STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
       STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
       STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);

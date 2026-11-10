@@ -415,7 +415,8 @@ export default [
     // v0.1.1975: 人数がとても多い配信だけ応援レーンを2,000人までにする配線(+2: import と理由の1行)。仕組みは lib の laneCrowdLimit.js。
     // v0.1.1981: 大きな記録で画面が描き直しだけで埋まるのを防ぐ配線=+20(定期の見回りの門 import・状態・測る2行・見送る2行/顔の数え上げの覚え書き 9行/描き直し間隔の上限 3行)。門は lib の refreshDutyGate.js。
     // v0.1.1976: 大きい名前・顔の控えを書く間隔を空ける配線(+6: import・間隔係の生成と計器)。仕組みは lib の profileCacheWritePace.js。
-    rules: { 'max-lines': ['error', { max: 21865, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1982: 大きな記録で診断用の数え上げを毎回やり直さない配線(+6: import・状態2つ・入口2か所・切替時の初期化)。仕組みは lib の storyDiagCountsPace.js。
+    rules: { 'max-lines': ['error', { max: 21871, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

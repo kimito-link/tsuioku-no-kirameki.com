@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1982',
+    date: '2026-11-10',
+    summary: '大きな記録で診断の数え直しを減らす',
+    items: Object.freeze([
+      'コメントがとても多い記録を開いているとき、診断用の数え上げを1分に1回にして、横の欄が固まる時間を減らしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1981',
     date: '2026-11-10',
     summary: '大きな記録で横の欄が固まりにくく',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '配信情報の読み込みが返らないと止まる所を直す',
     items: Object.freeze([
       'Kick・Twitch・SHOWROOM・ミクチャ・TikTok で、配信の情報(同時接続など)を読みに行ったときに返事が返ってこないと、それ以降ずっと読み直さない作りになっていました。15秒で打ち切って、次の見回りで読み直すようにしました'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1962',
-    date: '2026-11-09',
-    summary: 'ギフトの欄の読み込みを1回にまとめる',
-    items: Object.freeze([
-      '横の欄が描き直すとき、ギフトの欄5つ分を別々に読み、そのたびに配信の一覧を読み直してギフトの集計を作り直していました。1回の読みの中では配信の一覧を1回だけ読み、同じ記録ならギフトの集計も前の答えを使うようにしました。表示は変わりません'
     ])
   })
 ]);

@@ -987,6 +987,7 @@
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentEntriesNormalize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyDiagCountsPace.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDiagMonotonic.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthAppendPlan.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthCellSwap.js` | 1 | ポップアップ(応援レーン) |
