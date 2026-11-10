@@ -7180,6 +7180,16 @@
       ]
     },
     {
+      "file": "src/lib/laneAggregatesMemo.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneCountOrder.js",
       "featureCount": 1,
       "features": [

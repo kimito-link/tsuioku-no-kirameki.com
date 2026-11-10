@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1971',
+    date: '2026-11-10',
+    summary: '裏方の更新が古いまま残る件を直す',
+    items: Object.freeze([
+      '拡張を新しい版に入れ替えても、裏で動く記録係(YouTube・Twitch・Kick などの分)が古い中身のまま動き続けることがありました。版ごとに裏方の本体も必ず入れ替わるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1970',
     date: '2026-11-10',
     summary: '声の割り当ての間引きを作り直し後も保つ',

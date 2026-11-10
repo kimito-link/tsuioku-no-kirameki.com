@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2007',
+    date: '2026-11-10',
+    summary: '大きな記録で同じ集計をやり直さない',
+    items: Object.freeze([
+      '数万行の配信で、記録が変わっていないのに描画のたびに全員分を数え直していた所を、前の結果を使うようにしました。ふつうの大きさの配信は今までと同じです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2006',
     date: '2026-11-10',
     summary: '会場の数字が開いた直後の値で止まらない',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '裏方が古いままなら自分で入れ替わる',
     items: Object.freeze([
       '新しい版にしたのに裏で動く記録係が前の版のまま動いていたら、それに気づいて自分で読み込み直すようにしました(繰り返さないよう30分に1回まで・ストア版では何もしません)'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1971',
-    date: '2026-11-10',
-    summary: '裏方の更新が古いまま残る件を直す',
-    items: Object.freeze([
-      '拡張を新しい版に入れ替えても、裏で動く記録係(YouTube・Twitch・Kick などの分)が古い中身のまま動き続けることがありました。版ごとに裏方の本体も必ず入れ替わるようにしました'
     ])
   })
 ]);

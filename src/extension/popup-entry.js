@@ -73,7 +73,8 @@ import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
 import { shouldSkipLaneSecondRender } from '../lib/laneSecondRenderPolicy.js';
-import { shouldDeferLanePaintForBigRecord, shouldYieldForBigRecord, yieldToMainThread } from '../lib/bigRecordYield.js';
+import { BIG_RECORD_YIELD_MIN_ROWS, shouldDeferLanePaintForBigRecord, shouldYieldForBigRecord, yieldToMainThread } from '../lib/bigRecordYield.js';
+import { createLaneAggregatesMemo } from '../lib/laneAggregatesMemo.js';
 import { canAppendStoryGrowthCells, canTrimStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
@@ -7860,6 +7861,9 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
 /** v0.1.1617: gift/ad picks の持ち越し台帳と計器(同じ配信へ戻ったとき restored / 別の配信へ替わったとき cleared)。 */
 const _giftAdPicksCarry = createGiftAdPicksCarry();
 const _giftAdPicksCarryDiag = { restored: 0, cleared: 0, keptGift: 0, keptAd: 0 };
+// ★v0.1.2007: 数万行の記録で、同じ記録を描画のたびに人ごとに数え直さない(lib/laneAggregatesMemo.js)
+const _laneAggregatesMemo = createLaneAggregatesMemo({ compute: (rows, lid, o) => userLaneCandidatesFromStorage(rows, lid, o), minRows: BIG_RECORD_YIELD_MIN_ROWS });
+try { /** @type {any} */ (globalThis).__laneAggregatesMemoDiag = _laneAggregatesMemo.diag; } catch { /* 計器だけ */ }
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
   const list = Array.isArray(displayList) ? displayList : [];
@@ -7917,7 +7921,7 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = 
   // 0.1.79: 4層目=集約時に broadcaster icon 取り違え除外。正本(2026-06-17): userLaneCandidatesFromStorage
   //   は会場(venueBar.js)と同一純関数=popup列と会場席は同じ集約を共有し顔ぶれ一致が正(「鏡映」設計・匿名a:含む)。
   STORY_SOURCE_STATE.laneAggregates = nextLiveId
-    ? userLaneCandidatesFromStorage(
+    ? _laneAggregatesMemo.get(
         STORY_SOURCE_STATE.storageRowsForCurrentLive,
         nextLiveId,
         {
