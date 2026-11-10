@@ -20,6 +20,7 @@
  */
 import { buildWatchMetaCardAudienceViewModel } from './buildWatchMetaCardAudienceViewModel.js';
 import { buildStatCardsMirrorSnapshot } from './statCardsMirror.js';
+import { ageMsOf } from './timeAuthority.js';
 
 /** 自分で作り直す間隔[ms]。同接・経過は分単位でしか変わらないので 15秒で足りる。 */
 export const VENUE_STAT_SELF_INTERVAL_MS = 15_000;
@@ -73,6 +74,45 @@ export function buildStatCardsFromWatchSnapshot(source, opts = {}) {
     snap.official = { ...snap.official, viewers: { text: '—', isPlaceholder: true } };
   }
   return snap;
+}
+
+/** 鏡が「動いている」とみなす書き込みの間隔。動いているパネルは数秒ごとに値が変わって書き直す。 */
+export const VENUE_STAT_MIRROR_LIVE_GAP_MS = 25_000;
+
+/**
+ * パネルが本当に動いているかを、鏡の書き込みの間隔で見る(状態はここに閉じ込める)。
+ * 鏡は「値が変わったときだけ」書かれる。隠れた欄は開いた瞬間に1回書いたきりで止まるので、
+ * capturedAt の新しさだけでは「動いている」と区別できない(2026-11-10 PC 実測・ニコ生)。
+ * 続けて2回、間隔 gapMs 以内で書かれ、最後の書き込みも gapMs 以内なら動いている。
+ * @param {{ gapMs?: number }} [opts]
+ * @returns {{ observe: (snap: any) => void, isLive: (nowMs: number, liveId: string) => boolean }}
+ */
+export function createStatMirrorLiveness(opts = {}) {
+  const gapMs = Number(opts.gapMs) > 0 ? Number(opts.gapMs) : VENUE_STAT_MIRROR_LIVE_GAP_MS;
+  let lid = '';
+  let prevAt = 0;
+  let lastAt = 0;
+  return {
+    observe(snap) {
+      const at = Number(snap && typeof snap === 'object' ? snap.capturedAt : NaN);
+      const id = String((snap && typeof snap === 'object' && snap.liveId) || '').trim().toLowerCase();
+      if (!Number.isFinite(at) || at <= 0 || !id) return;
+      if (id !== lid) {
+        lid = id;
+        prevAt = 0;
+        lastAt = at;
+        return;
+      }
+      if (at === lastAt) return;
+      prevAt = lastAt;
+      lastAt = at;
+    },
+    isLive(nowMs, liveId) {
+      if (!lid || String(liveId || '').trim().toLowerCase() !== lid || !prevAt) return false;
+      const sinceLast = ageMsOf(lastAt, nowMs);
+      return lastAt - prevAt <= gapMs && sinceLast != null && sinceLast <= gapMs;
+    }
+  };
 }
 
 /**

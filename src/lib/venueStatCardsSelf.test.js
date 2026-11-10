@@ -130,3 +130,36 @@ describe('requestWatchSnapshotViaTabs(別窓の会場)', () => {
     expect(await requestWatchSnapshotViaTabs({}, 'lv123')).toBeNull();
   });
 });
+
+describe('createStatMirrorLiveness(パネルが本当に動いているか)', () => {
+  const T = 1_800_000_000_000;
+  it('1回書いたきりの鏡は動いていない', async () => {
+    const { createStatMirrorLiveness } = await import('./venueStatCardsSelf.js');
+    const l = createStatMirrorLiveness();
+    expect(l.isLive(T, 'lv1')).toBe(false);
+    l.observe({ liveId: 'lv1', capturedAt: T });
+    l.observe({ liveId: 'lv1', capturedAt: T }); // 同じ鏡を何度見ても1回
+    expect(l.isLive(T + 1000, 'lv1')).toBe(false);
+  });
+  it('間隔25秒以内で続けて書かれていれば動いている。途絶えたら動いていない', async () => {
+    const { createStatMirrorLiveness } = await import('./venueStatCardsSelf.js');
+    const l = createStatMirrorLiveness();
+    l.observe({ liveId: 'LV1', capturedAt: T });
+    l.observe({ liveId: 'lv1', capturedAt: T + 4000 });
+    expect(l.isLive(T + 5000, 'lv1')).toBe(true);
+    expect(l.isLive(T + 4000 + 25_001, 'lv1')).toBe(false);
+    l.observe({ liveId: 'lv1', capturedAt: T + 64_000 }); // 1分ぶり(静かな配信の「経過」だけ)
+    expect(l.isLive(T + 64_500, 'lv1')).toBe(false);
+  });
+  it('別の配信に変わったら数え直す・壊れた鏡で落ちない', async () => {
+    const { createStatMirrorLiveness } = await import('./venueStatCardsSelf.js');
+    const l = createStatMirrorLiveness();
+    l.observe({ liveId: 'lv1', capturedAt: T });
+    l.observe({ liveId: 'lv1', capturedAt: T + 2000 });
+    l.observe({ liveId: 'lv2', capturedAt: T + 3000 });
+    expect(l.isLive(T + 3500, 'lv2')).toBe(false);
+    expect(l.isLive(T + 3500, 'lv1')).toBe(false);
+    l.observe(null); l.observe({ liveId: 'lv2' }); l.observe('x');
+    expect(l.isLive(T + 3500, 'lv2')).toBe(false);
+  });
+});
