@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2022',
+    version: '0.1.2030',
     date: '2026-11-10',
     summary: '状態ページのボタンの見た目をそろえた',
     items: Object.freeze([
