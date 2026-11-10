@@ -703,6 +703,10 @@ jobs:
           # Reviewer contact info — Apple validates phone format and
           # rejects obviously-fake numbers. Stored as a repo secret.
           IOS_REVIEW_CONTACT_PHONE: ${{ secrets.IOS_REVIEW_CONTACT_PHONE }}
+          # 氏名・メールも repo に書かず Secret から。未設定なら App Store Connect の今の値を使う。
+          IOS_REVIEW_CONTACT_FIRST_NAME: ${{ secrets.IOS_REVIEW_CONTACT_FIRST_NAME }}
+          IOS_REVIEW_CONTACT_LAST_NAME: ${{ secrets.IOS_REVIEW_CONTACT_LAST_NAME }}
+          IOS_REVIEW_CONTACT_EMAIL: ${{ secrets.IOS_REVIEW_CONTACT_EMAIL }}
           IOS_CONTENT_RIGHTS: USES_THIRD_PARTY_CONTENT
           IOS_PRIMARY_CATEGORY: ENTERTAINMENT
           # 審査が通っても自動では公開しない(公開は人が押す)。

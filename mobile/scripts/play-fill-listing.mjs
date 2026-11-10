@@ -69,7 +69,9 @@ const PLAY_ASSETS_DIR = path.join(REPO, 'store-assets', 'play');
 const FULL_DESCRIPTION_FILE = path.join(PLAY_ASSETS_DIR, 'listing-copy.md');
 const PRODUCTION_DOMAIN = cfg('identity.productionDomain');
 const CONTACT = {
-  contactEmail: cfg('contact.email'),
+  // ★連絡先メールは app.config.json に書かない(個人情報を repo に置かない)。
+  //   Secret PLAY_CONTACT_EMAIL から受け取る。未設定なら下の [3] を飛ばし、ストアの今の値を残す。
+  contactEmail: process.env.PLAY_CONTACT_EMAIL || undefined,
   contactWebsite: cfg('contact.marketingUrl') || (PRODUCTION_DOMAIN ? `https://${PRODUCTION_DOMAIN}` : undefined),
   // contactPhone intentionally omitted. Play allows blank, and Apple review
   // receives the phone number through App Store Connect review-detail fields.
@@ -191,7 +193,9 @@ async function uploadStoreImages(api, sa, editId) {
     console.log(`  ${PLAY_LOCALE} listing updated.`);
 
     console.log('\n[3] PUT /details (developer contact info)...');
-    try {
+    if (!CONTACT.contactEmail) {
+      console.log('  PLAY_CONTACT_EMAIL 未設定のため飛ばします(ストアに入っている連絡先をそのまま残す)。');
+    } else try {
       await api('PUT', `/edits/${edit.id}/details`, {
         defaultLanguage: PLAY_LOCALE,
         ...CONTACT,

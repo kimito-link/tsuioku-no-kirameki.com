@@ -78,6 +78,9 @@ const steps = [
   // ★v0.1.1508: CLAUDE.md 1行目の `@AGENTS.md` import が生きているか(AGENTS.md が context に入る入口)。
   //   CLAUDE.md が「この検査が赤くする」と書きながら検査が存在しなかった(check-doc-rot が検出)。
   ['agent-bootstrap', 'check:agent-bootstrap'],
+  // ★2026-11-10: 審査の連絡先(氏名・電話・メール)が mobile/app.config.json に戻っていないか。
+  //   公開リポジトリに個人の氏名が載っていた。値は GitHub Secrets から渡す。
+  ['no-personal-contact', 'check:no-personal-contact'],
   ['tree-map', 'tree-map:check'],
   ['site-health', 'site-health:check'],
   ['feature-map', 'feature-map:check'],

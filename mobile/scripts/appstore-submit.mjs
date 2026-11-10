@@ -497,11 +497,15 @@ function buildDefaultReviewNotes() {
   return lines.join('\n');
 }
 
+// ★審査の連絡先(氏名・電話・メール)は個人情報なので app.config.json に書かない。
+//   GitHub Secrets(IOS_REVIEW_CONTACT_*)から受け取る。未設定のときは App Store Connect に
+//   既に入っている値をそのまま使う(下の ensureReviewDetail の pick)。
+//   repo に戻らないよう scripts/check-no-personal-contact.mjs が verify:cc で守る。
 const REVIEW_CONTACT_DEFAULTS = {
-  contactFirstName: process.env.IOS_REVIEW_CONTACT_FIRST_NAME || APP_CONFIG.contact?.firstName,
-  contactLastName: process.env.IOS_REVIEW_CONTACT_LAST_NAME || APP_CONFIG.contact?.lastName,
-  contactPhone: process.env.IOS_REVIEW_CONTACT_PHONE || APP_CONFIG.contact?.phoneE164,
-  contactEmail: process.env.IOS_REVIEW_CONTACT_EMAIL || APP_CONFIG.contact?.email,
+  contactFirstName: process.env.IOS_REVIEW_CONTACT_FIRST_NAME || undefined,
+  contactLastName: process.env.IOS_REVIEW_CONTACT_LAST_NAME || undefined,
+  contactPhone: process.env.IOS_REVIEW_CONTACT_PHONE || undefined,
+  contactEmail: process.env.IOS_REVIEW_CONTACT_EMAIL || undefined,
   demoAccountRequired: _DEMO_REQUIRED,
   demoAccountName: _DEMO_USER,
   demoAccountPassword: _DEMO_PASS,
