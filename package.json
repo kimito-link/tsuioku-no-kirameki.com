@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.2023",
+  "version": "0.1.2036",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -28,6 +28,8 @@
     "check:tracked-imports:selftest": "node scripts/check-tracked-imports.mjs --selftest",
     "check:agent-bootstrap": "node scripts/check-agent-bootstrap.mjs",
     "check:agent-bootstrap:selftest": "node scripts/check-agent-bootstrap.mjs --selftest",
+    "check:no-personal-contact": "node scripts/check-no-personal-contact.mjs",
+    "check:no-personal-contact:selftest": "node scripts/check-no-personal-contact.mjs --selftest",
     "diagnostics": "node ../web-ios-android/templates/diagnostics/run.mjs .",
     "context": "node ../web-ios-android/templates/scripts/context-engine.mjs --write .instrument-context.md .",
     "context:check": "node ../web-ios-android/templates/scripts/context-engine.mjs --check .",

@@ -31,8 +31,8 @@
     "iconSource": "store-assets/appstore/app-icon-1024.png"
   },
   "contact": {
-    "email": "info@best-trust.biz",
-    "phoneE164": "+81 90 0000 0000",
+    "email": null,
+    "phoneE164": null,
     "firstName": null,
     "lastName": null,
     "supportUrl": "https://tsuioku-no-kirameki.com/",

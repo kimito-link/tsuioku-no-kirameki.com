@@ -71,6 +71,82 @@ test.describe('パネルの部品はブラウザ既定の見た目のまま出�
     expect(found.markersOutside, '枠からはみ出す三角').toEqual([]);
   });
 
+  // v0.1.2031: 「ギフトランキング取得を開始」の説明文が白い字のままで、明るい背景では読めなかった(比 1.03)。
+  // 背景と字の明るさの比が 1.5 未満(ほぼ見えない)の文字が無いことを守る。絵や模様の上の字は測らない。
+  test('背景に溶けて読めない文字が無い', async ({ context }) => {
+    const popup = await openWiredPopup(context, 400);
+    const invisible = await popup.evaluate(() => {
+      for (const d of document.querySelectorAll('details')) d.open = true;
+      // 既定では隠れている案内も測る(色の指定は出ていなくても決まっている)。
+      const prompt = document.getElementById('giftRankingFetchPrompt');
+      if (prompt) prompt.hidden = false;
+      /** @param {string} c */
+      const parse = (c) => {
+        const m = c.match(/rgba?\(([^)]+)\)/);
+        if (!m) return null;
+        const a = m[1].split(/[ ,/]+/).map(Number);
+        return { r: a[0], g: a[1], b: a[2], a: a.length > 3 ? a[3] : 1 };
+      };
+      /** @param {{r:number,g:number,b:number}} c */
+      const lum = (c) => {
+        /** @param {number} v */
+        const f = (v) => {
+          const x = v / 255;
+          return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+      };
+      /**
+       * @param {{r:number,g:number,b:number,a:number}} top
+       * @param {{r:number,g:number,b:number,a:number}} bot
+       */
+      const over = (top, bot) => ({
+        r: top.r * top.a + bot.r * (1 - top.a),
+        g: top.g * top.a + bot.g * (1 - top.a),
+        b: top.b * top.a + bot.b * (1 - top.a),
+        a: 1
+      });
+      /** @param {Element} el */
+      const backgroundOf = (el) => {
+        const layers = [];
+        for (let e = /** @type {Element|null} */ (el); e; e = e.parentElement) {
+          const cs = getComputedStyle(e);
+          if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
+          const c = parse(cs.backgroundColor);
+          if (c && c.a > 0) {
+            layers.push(c);
+            if (c.a >= 1) break;
+          }
+        }
+        let base = { r: 255, g: 255, b: 255, a: 1 };
+        for (let i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
+        return base;
+      };
+      /** @type {string[]} */
+      const out = [];
+      const seen = new Set();
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const text = (walker.currentNode.textContent || '').trim();
+        const el = walker.currentNode.parentElement;
+        if (text.length < 2 || !el || seen.has(el)) continue;
+        seen.add(el);
+        if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue;
+        const cs = getComputedStyle(el);
+        const fg0 = parse(cs.color);
+        const bg = backgroundOf(el);
+        if (!fg0 || !bg) continue;
+        const fg = over(fg0, bg);
+        const a = lum(fg);
+        const b = lum(bg);
+        const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        if (ratio < 1.5) out.push(`${ratio.toFixed(2)} ${el.id || el.className || el.tagName}: ${text.slice(0, 16)}`);
+      }
+      return out;
+    });
+    expect(invisible, '背景に溶けて読めない文字').toEqual([]);
+  });
+
   for (const width of [400, 320]) {
     test(`上部の操作ボタン列は幅 ${width}px で2行以内・高さがそろう`, async ({ context }) => {
       const popup = await openWiredPopup(context, width);
@@ -97,6 +173,40 @@ test.describe('パネルの部品はブラウザ既定の見た目のまま出�
       }
       // 押しやすさ(40px 以上)は保つ。
       for (const r of rects) expect(r.height).toBeGreaterThanOrEqual(40);
+    });
+  }
+
+  // v0.1.2030: 状態ページにも見た目の指定が無いボタンが38個あった(効果音の ▶ 試聴など)。ほかの画面も同じ物差しで守る。
+  for (const pagePath of [
+    'status.html',
+    'comeview.html',
+    'venue.html?lv=lv888888888',
+    'marketing-export.html',
+    'live-view.html'
+  ]) {
+    test(`${pagePath} のボタンに見た目の指定がある`, async ({ context }) => {
+      let sw = context.serviceWorkers()[0];
+      if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
+      const extensionId = new URL(sw.url()).hostname;
+      const page = await context.newPage();
+      await page.goto(`chrome-extension://${extensionId}/${pagePath}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000
+      });
+      // 後から作られるボタン(状態ページの一覧など)が出そろうのを待つ。
+      await page.waitForTimeout(4000);
+      const nativeButtons = await page.evaluate(() => {
+        /** @type {string[]} */
+        const out = [];
+        for (const b of document.querySelectorAll('button, input[type=button], input[type=submit]')) {
+          const cs = getComputedStyle(b);
+          if (cs.borderTopStyle === 'outset' || cs.backgroundColor === 'rgb(239, 239, 239)') {
+            out.push(`${b.id || b.className || '(名前なし)'}: ${(b.textContent || '').trim().slice(0, 16)}`);
+          }
+        }
+        return out;
+      });
+      expect(nativeButtons, '見た目の指定が無いボタン').toEqual([]);
     });
   }
 });

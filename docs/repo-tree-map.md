@@ -16,81 +16,79 @@
 ```mermaid
 graph LR
   ROOT["リポジトリ"]
-  ROOT --> d0["”src/"]
-  d0 --> d0_0["images/"]
-  ROOT --> d1[".codex/ 〔Codex/エージェント〕"]
-  d1 --> d1_0["agents/ 〔Codex/エージェント〕"]
-  ROOT --> d2[".codex-osint/ 〔OSINT/調査〕"]
-  ROOT --> d3["_docs/ 〔横断/KB〕"]
-  ROOT --> d4["api/ 〔API〕"]
-  ROOT --> d5["app/ 〔Web版〕"]
-  d5 --> d5_0["audio-test/ 〔Web版〕"]
-  d5 --> d5_1["demo/ 〔Web版/デモ〕"]
-  d5 --> d5_2["dist/ 〔ビルド成果物〕"]
-  d5 --> d5_3["images/ 〔Web版/画像〕"]
-  ROOT --> d6["council/ 〔会議/設計〕"]
-  d6 --> d6_0["auto/ 〔会議/自動生成〕"]
-  ROOT --> d7["council-scout/ 〔会議/調査〕"]
-  d7 --> d7_0["briefs/ 〔会議/原稿〕"]
-  ROOT --> d8["docs/ 〔設計/レポート〕"]
-  d8 --> d8_0["article-assets/ 〔記事/画像〕"]
-  d8 --> d8_1["article-drafts/ 〔記事/下書き〕"]
-  d8 --> d8_2["feature-map/ 〔依存図/自動生成〕"]
-  d8 --> d8_3["handoff/ 〔引継ぎ/設計〕"]
-  d8 --> d8_4["marketing/ 〔マーケ/原稿〕"]
-  d8 --> d8_5["patent-unique-voice-reading-filing-final/ 〔特許/履歴〕"]
-  d8 --> d8_6["policies/ 〔方針〕"]
-  d8 --> d8_7["releases/ 〔リリース〕"]
-  d8 --> d8_8["research/ 〔調査/レポート〕"]
-  d8 --> d8_9["workflows/ 〔ワークフロー〕"]
-  ROOT --> d9["extension/ 〔配布/manifest〕"]
+  ROOT --> d0[".codex/ 〔Codex/エージェント〕"]
+  d0 --> d0_0["agents/ 〔Codex/エージェント〕"]
+  ROOT --> d1[".codex-osint/ 〔OSINT/調査〕"]
+  ROOT --> d2["_docs/ 〔横断/KB〕"]
+  ROOT --> d3["api/ 〔API〕"]
+  ROOT --> d4["app/ 〔Web版〕"]
+  d4 --> d4_0["audio-test/ 〔Web版〕"]
+  d4 --> d4_1["demo/ 〔Web版/デモ〕"]
+  d4 --> d4_2["dist/ 〔ビルド成果物〕"]
+  d4 --> d4_3["images/ 〔Web版/画像〕"]
+  ROOT --> d5["council/ 〔会議/設計〕"]
+  d5 --> d5_0["auto/ 〔会議/自動生成〕"]
+  ROOT --> d6["council-scout/ 〔会議/調査〕"]
+  d6 --> d6_0["briefs/ 〔会議/原稿〕"]
+  ROOT --> d7["docs/ 〔設計/レポート〕"]
+  d7 --> d7_0["article-assets/ 〔記事/画像〕"]
+  d7 --> d7_1["article-drafts/ 〔記事/下書き〕"]
+  d7 --> d7_2["feature-map/ 〔依存図/自動生成〕"]
+  d7 --> d7_3["handoff/ 〔引継ぎ/設計〕"]
+  d7 --> d7_4["marketing/ 〔マーケ/原稿〕"]
+  d7 --> d7_5["patent-unique-voice-reading-filing-final/ 〔特許/履歴〕"]
+  d7 --> d7_6["policies/ 〔方針〕"]
+  d7 --> d7_7["releases/ 〔リリース〕"]
+  d7 --> d7_8["research/ 〔調査/レポート〕"]
+  d7 --> d7_9["workflows/ 〔ワークフロー〕"]
+  ROOT --> d8["extension/ 〔配布/manifest〕"]
+  d8 --> d8_0["data/ 〔データ/応援〕"]
+  d8 --> d8_1["dist/ 〔ビルド成果物〕"]
+  d8 --> d8_2["images/ 〔画像〕"]
+  d8 --> d8_3["sound/ 〔音声〕"]
+  ROOT --> d9["extension-youtube/ 〔YouTube/試作/記録/読み上げ〕"]
   d9 --> d9_0["data/ 〔データ/応援〕"]
   d9 --> d9_1["dist/ 〔ビルド成果物〕"]
-  d9 --> d9_2["images/ 〔画像〕"]
+  d9 --> d9_2["images/ 〔YouTube/画像〕"]
   d9 --> d9_3["sound/ 〔音声〕"]
-  ROOT --> d10["extension-youtube/ 〔YouTube/試作/記録/読み上げ〕"]
-  d10 --> d10_0["data/"]
-  d10 --> d10_1["dist/"]
-  d10 --> d10_2["images/ 〔YouTube/画像〕"]
-  d10 --> d10_3["sound/"]
-  d10 --> d10_4["src/ 〔YouTube/entry/記録〕"]
-  ROOT --> d11["memory/ 〔メモリ/知見〕"]
-  d11 --> d11_0["archive/ 〔メモリ/履歴〕"]
-  d11 --> d11_1["avatar-parts/ 〔アバター/画像〕"]
-  ROOT --> d12["mobile/ 〔iOS〕"]
-  d12 --> d12_0["assets/ 〔iOS/画像〕"]
-  d12 --> d12_1["release-notes/ 〔iOS/ストア〕"]
-  d12 --> d12_2["scripts/ 〔iOS/ストア〕"]
-  d12 --> d12_3["store-assets/ 〔iOS/ストア〕"]
-  ROOT --> d13["scripts/ 〔ビルド/自動生成〕"]
-  d13 --> d13_0["audit/ 〔監査/CSS/会場〕"]
-  d13 --> d13_1["lib/ 〔ビルド/共有〕"]
-  d13 --> d13_2["perf-ab/ 〔性能/計測〕"]
-  d13 --> d13_3["xserver/ 〔デプロイ/webhook〕"]
-  ROOT --> d14["sound-src/ 〔音声/素材〕"]
-  d14 --> d14_0["soundeffect-lab/ 〔音声/素材〕"]
-  ROOT --> d15["src/ 〔ソース〕"]
-  d15 --> d15_0["data/ 〔コメント/取得〕"]
-  d15 --> d15_1["domain/ 〔応援/集約/識別子〕"]
-  d15 --> d15_2["extension/ 〔entry/記録/会場/応援〕"]
-  d15 --> d15_3["fixtures/ 〔テスト〕"]
-  d15 --> d15_4["images/ 〔画像〕"]
-  d15 --> d15_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
-  d15 --> d15_6["server/ 〔API/公開/ランキング〕"]
-  d15 --> d15_7["shared/ 〔共有/アバター〕"]
-  d15 --> d15_8["sound/ 〔音声〕"]
-  ROOT --> d16["tests/ 〔テスト〕"]
-  d16 --> d16_0["contract/ 〔テスト/契約〕"]
-  d16 --> d16_1["e2e/ 〔テスト/E2E/描画〕"]
-  d16 --> d16_2["helpers/ 〔テスト/共有〕"]
-  ROOT --> d17["tools/ 〔ツール〕"]
-  d17 --> d17_0["mcp-nicolive/ 〔MCP/診断〕"]
-  ROOT --> d18["tsuioku-no-kirameki/ 〔LP/公開〕"]
-  d18 --> d18_0["articles/ 〔記事/公開〕"]
-  d18 --> d18_1["assets/ 〔LP/共有〕"]
-  d18 --> d18_2["images/ 〔画像〕"]
-  d18 --> d18_3["live/ 〔LP/公開/ランキング〕"]
-  d18 --> d18_4["sound/ 〔音声/公開〕"]
+  d9 --> d9_4["src/ 〔YouTube/entry/記録〕"]
+  ROOT --> d10["memory/ 〔メモリ/知見〕"]
+  d10 --> d10_0["archive/ 〔メモリ/履歴〕"]
+  d10 --> d10_1["avatar-parts/ 〔アバター/画像〕"]
+  ROOT --> d11["mobile/ 〔iOS〕"]
+  d11 --> d11_0["assets/ 〔iOS/画像〕"]
+  d11 --> d11_1["release-notes/ 〔iOS/ストア〕"]
+  d11 --> d11_2["scripts/ 〔iOS/ストア〕"]
+  d11 --> d11_3["store-assets/ 〔iOS/ストア〕"]
+  ROOT --> d12["scripts/ 〔ビルド/自動生成〕"]
+  d12 --> d12_0["audit/ 〔監査/CSS/会場〕"]
+  d12 --> d12_1["lib/ 〔ビルド/共有〕"]
+  d12 --> d12_2["perf-ab/ 〔性能/計測〕"]
+  d12 --> d12_3["xserver/ 〔デプロイ/webhook〕"]
+  ROOT --> d13["sound-src/ 〔音声/素材〕"]
+  d13 --> d13_0["soundeffect-lab/ 〔音声/素材〕"]
+  ROOT --> d14["src/ 〔ソース〕"]
+  d14 --> d14_0["data/ 〔コメント/取得〕"]
+  d14 --> d14_1["domain/ 〔応援/集約/識別子〕"]
+  d14 --> d14_2["extension/ 〔entry/記録/会場/応援〕"]
+  d14 --> d14_3["fixtures/ 〔テスト〕"]
+  d14 --> d14_4["images/ 〔画像〕"]
+  d14 --> d14_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
+  d14 --> d14_6["server/ 〔API/公開/ランキング〕"]
+  d14 --> d14_7["shared/ 〔共有/アバター〕"]
+  d14 --> d14_8["sound/ 〔音声〕"]
+  ROOT --> d15["tests/ 〔テスト〕"]
+  d15 --> d15_0["contract/ 〔テスト/契約〕"]
+  d15 --> d15_1["e2e/ 〔テスト/E2E/描画〕"]
+  d15 --> d15_2["helpers/ 〔テスト/共有〕"]
+  ROOT --> d16["tools/ 〔ツール〕"]
+  d16 --> d16_0["mcp-nicolive/ 〔MCP/診断〕"]
+  ROOT --> d17["tsuioku-no-kirameki/ 〔LP/公開〕"]
+  d17 --> d17_0["articles/ 〔記事/公開〕"]
+  d17 --> d17_1["assets/ 〔LP/共有〕"]
+  d17 --> d17_2["images/ 〔画像〕"]
+  d17 --> d17_3["live/ 〔LP/公開/ランキング〕"]
+  d17 --> d17_4["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -368,11 +366,6 @@ graph LR
 
 ---
 
-## `"src/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 17 件</sub>
-
-- `images/`（17 件） — ⚠️ 未記入（ROLES に追記）
-
 ## `.codex/` — Codex CLI 用のエージェント定義(司令塔から呼ぶ実装役)  〔Codex / エージェント〕
 <sub>ファイル 5 件</sub>
 
@@ -406,7 +399,7 @@ graph LR
 - `briefs/`（26 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 365 件</sub>
+<sub>ファイル 367 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — 公開前の記事下書き(防御的公開の草稿)  〔記事 / 下書き〕
@@ -415,7 +408,7 @@ graph LR
 - `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — 読み上げ手法の出願関連(現在は MOVED=移設済みの残置)  〔特許 / 履歴〕
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
-- `releases/`（6 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
+- `releases/`（8 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
 - `research/`（2 件） — ディープリサーチ成果(ギフトランキング等の調査)  〔調査 / レポート〕
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
@@ -430,10 +423,10 @@ graph LR
 ## `extension-youtube/` — YouTube Live 版の試作拡張(単一用途分離)。manifest/content-chat/background/sidepanel/offscreen  〔YouTube / 試作 / 記録 / 読み上げ〕
 <sub>ファイル 158 件</sub>
 
-- `data/`（1 件） — ⚠️ 未記入（ROLES に追記）
-- `dist/`（1 件） — ⚠️ 未記入（ROLES に追記）
+- `data/`（1 件） — YouTube 同梱ビルドの静的データ(応援バナー定義 json)  〔データ / 応援〕
+- `dist/`（1 件） — YouTube 同梱ビルドの成果物。build が生成  〔ビルド成果物〕
 - `images/`（72 件） — YouTube Live 版試作拡張のアイコン・キャラ画像(ニコ生版と共通の3キャラ)  〔YouTube / 画像〕
-- `sound/`（39 件） — ⚠️ 未記入（ROLES に追記）
+- `sound/`（39 件） — YouTube 同梱ビルドの読み上げ・完了音  〔音声〕
 - `src/`（28 件） — YouTube Live 版試作拡張のバンドル entry(content-chat/background/sidepanel/offscreen)  〔YouTube / entry / 記録〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕
@@ -451,7 +444,7 @@ graph LR
 - `store-assets/`（15 件） — App Store の掲載文・アイコン・撮影計画・審査メモの正本  〔iOS / ストア〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 110 件</sub>
+<sub>ファイル 111 件</sub>
 
 - `audit/`（4 件） — 「面(popup/会場/別窓/・live)の間でCSSとDOMがずれていないか」を機械で洗う監査(静的=一度も効かないCSSの検出+基準値のラチェット / 実ブラウザ=hidden・押せない・はみ出し・クリック透過)  〔監査 / CSS / 会場〕
 - `lib/`（4 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
@@ -464,13 +457,13 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2414 件</sub>
+<sub>ファイル 2431 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（109 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
-- `images/`（117 件） — LP / CWS 提出物のマスター画像  〔画像〕
+- `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
 - `lib/`（2134 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（16 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
@@ -952,12 +945,4 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（5）
-
-以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
-
-- `"src/`
-- `"src/images/`
-- `extension-youtube/data/`
-- `extension-youtube/dist/`
-- `extension-youtube/sound/`
+✅ すべてのディレクトリに役割が記入済み。

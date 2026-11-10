@@ -11,7 +11,8 @@ import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
  * - ヘッダー（ビルドバッジ付近）にクイックバーが表示される。
  * - 「横付き」「下」チップで配置が切り替わり、storage(nls_inline_panel_placement)に
  *   保存される（既存 saveInlinePanelPlacement 経由＝二重管理しない）。
- * - 現在値ラベルが追従する。狭幅でも見切れない（右端が viewport 内）。
+ * - 選択と実配置が一致するときは状態テキストを出さない。aria-pressed は追従する。
+ * - 狭幅でも見切れない（右端が viewport 内）。
  */
 
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -70,8 +71,8 @@ test('ヘッダー位置クイックバー: 表示・切替・保存・見切れ
   console.log('after beside click, placement:', afterBeside);
   expect(afterBeside).toBe('beside');
 
-  // 現在値ラベル・aria-pressed が追従。
-  await expect(popup.locator('#nlPlacementQuickValue')).toContainText('横付き');
+  // 一致時は状態テキストを隠す。選択は色だけでなく aria-pressed で残す。
+  await expect(popup.locator('#nlPlacementQuickValue')).toBeHidden();
   await expect(popup.locator('#nlPlacementQuickBeside')).toHaveAttribute('aria-pressed', 'true');
 
   // 「下」チップを押す → storage が below に。
@@ -85,6 +86,7 @@ test('ヘッダー位置クイックバー: 表示・切替・保存・見切れ
   expect(afterBelow).toBe('below');
   await expect(popup.locator('#nlPlacementQuickBelow')).toHaveAttribute('aria-pressed', 'true');
   await expect(popup.locator('#nlPlacementQuickBeside')).toHaveAttribute('aria-pressed', 'false');
+  await expect(popup.locator('#nlPlacementQuickValue')).toBeHidden();
 
   await popup.screenshot({ path: 'test-results/header-placement-quickbar.png', fullPage: false });
 });

@@ -3746,8 +3746,10 @@
         grid-column: 1 / -1;
         margin-top: 4px;
         padding: 10px 12px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px dashed rgba(255, 255, 255, 0.18);
+        /* v0.1.2031: 暗い背景の頃の白い字・白い点線のままで、明るい背景では説明文が読めなかった
+           (コントラスト比 1.03)。色は配色の変数から取る(暗い配色でも読める)。 */
+        background: var(--nl-bg-soft);
+        border: 1px dashed var(--nl-border);
         border-radius: 8px;
         display: flex;
         flex-direction: column;
@@ -3766,7 +3768,7 @@
         margin: 0;
         font-size: 12px;
         line-height: 1.5;
-        color: var(--nl-text-soft, rgba(255, 255, 255, 0.78));
+        color: var(--nl-muted);
       }
       .nl-gift-ranking-prompt__btn {
         cursor: pointer;
@@ -10455,7 +10457,7 @@
        * 0.1.69 (AY): empty state「履歴ゼロ」フォールバック用。
        * 拡張インストール直後・本当に何もない場合は、stat cards / count+ticker /
        * lane / session-summary / gift-quick を全部 hide してすっきりさせる。
-       * 残るのは: nlVersionBadge / noWatchRankingHint（4 ボタン導線）/
+       * 残るのは: noWatchRankingHint（4 ボタン導線）/
        * character scene（語り）/ 詳細設定 / 配色プリセット のみ。
        *
        * 「履歴あり empty」では cards に前回データが入るので hide しない。
@@ -10916,21 +10918,13 @@
         id="nlPopupPrimary"
         aria-busy="true"
       >
-      <div
-        id="nlVersionBadge"
-        class="nl-version-badge"
-        role="status"
-        aria-label="拡張バージョン（新ビルド反映の確認用）"
-        title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。npm run build のあと chrome://extensions で「更新」し、watch ページも再読み込みしてください。"
-      >
-        <span class="nl-version-badge__label">ビルド</span>
-        <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
-      </div>
       <!--
         v0.1.334: ページ内パネルの位置クイック切替（詳細設定の奥にあった
-        inlinePanelPlacement を、ヘッダーから直接・現在値明示つきで操作）。
+        inlinePanelPlacement を、ヘッダーから直接操作）。
         既定 hidden。JS が「watch を扱える文脈」と判定したら外す。
         保存は既存 saveInlinePanelPlacement を呼ぶだけ＝storage キーを増やさず二重管理しない。
+        v0.1.2033: 状態テキストは、押したボタンと実際の配置が食い違うときだけ出す。
+        一致時は #nlPlacementQuickValue を hidden のままにする（選択は aria-pressed）。
       -->
       <div
         id="nlPlacementQuickbar"
@@ -10944,6 +10938,7 @@
           id="nlPlacementQuickValue"
           class="nl-placement-quickbar__value"
           title="ページ内パネルを視聴ページのどこに出すか。実際の位置は視聴中タブの幅でも変わります（広いと横付きになりやすい）。"
+          hidden
           >—</span
         >
         <span class="nl-placement-quickbar__toggles">
@@ -11379,9 +11374,9 @@
         <section
           id="northStarLanes"
           class="nl-north-star-lanes"
-          aria-label="公式値レーン（北極星 6 項目、常設）"
+          aria-label="公式の数字"
         >
-          <h3 class="nl-north-star-lanes__title">公式値レーン（取得可否に関わらず常設）</h3>
+          <h3 class="nl-north-star-lanes__title">公式の数字</h3>
           <!-- Antigravity §6.4 (v0.1.291): 北極星 3 キャラ trio パネル。
                rink/konta/tanu の 3 体を並列表示し、それぞれ担当レーンの取得率と
                tier 表情を反映。slot ↔ laneId 対応は
@@ -12860,6 +12855,16 @@
       <details class="nl-dev-monitor-details" id="devMonitorDetails">
         <summary>詳しい状況（開発・切り分け用・折りたたみ）</summary>
         <div class="nl-dev-monitor-details__body">
+          <div
+            id="nlVersionBadge"
+            class="nl-version-badge"
+            role="status"
+            aria-label="拡張バージョン（新ビルド反映の確認用）"
+            title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。npm run build のあと chrome://extensions で「更新」し、watch ページも再読み込みしてください。"
+          >
+            <span class="nl-version-badge__label">ビルド</span>
+            <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
+          </div>
           <div
             id="storyAvatarDiagDevMonitor"
             class="nl-story-diag-dev"

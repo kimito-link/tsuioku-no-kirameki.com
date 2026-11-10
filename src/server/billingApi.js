@@ -263,7 +263,7 @@ export function createBillingService(deps) {
       return { status: 200, body: { ok: true, url: s.url } };
     },
 
-    /** 支払い直後: 契約を台帳に入れ、コードと証明書を返す(画面を読み直しても同じコード)。 */
+    /** 支払い直後: 契約を台帳に入れ、コードを返す(24時間は読み直しても同じコード・その後は出さない)。 */
     async claim({ sessionId }) {
       if (typeof sessionId !== 'string' || !/^cs_[A-Za-z0-9_]{8,200}$/.test(sessionId)) {
         return { status: 400, body: { ok: false, error: 'bad_session' } };
@@ -276,9 +276,12 @@ export function createBillingService(deps) {
       if (!acct) return { status: 404, body: { ok: false, error: 'not_supporter' } };
       let code = await upstash(['GET', billingKeys.sessionCode(sessionId)]);
       if (!code) {
+        // ★コードを出すのは1つの契約につき1回だけ。見せ直しの期間(24時間)が過ぎた後に同じ URL を
+        //   開き直しても作り直さない(作り直すと拡張に入れてあるコードが無効になり、URL を知る人が
+        //   新しいコードを受け取れてしまう)。
+        if (acct.codeHash) return { status: 409, body: { ok: false, error: 'code_already_issued' } };
         code = newCode();
         const codeHash = sha256Hex(code);
-        if (acct.codeHash) await upstash(['DEL', billingKeys.code(acct.codeHash)]); // 新しいコードに替える
         await upstash(['SET', billingKeys.code(codeHash), acct.acctId]);
         await saveAccount({ ...acct, codeHash });
         await upstash(['SET', billingKeys.sessionCode(sessionId), code, 'EX', String(SESSION_CODE_TTL_SECONDS)]);

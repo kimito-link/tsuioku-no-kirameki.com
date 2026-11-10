@@ -144,6 +144,23 @@ describe('billingApi: 署名が合わない通知', () => {
   });
 });
 
+describe('billingApi: 支払い完了の URL を後から開き直す', () => {
+  it('見せ直しの期間が過ぎた後は、コードを作り直さず 409。元のコードは使えるまま', async () => {
+    const { svc, up } = await setup();
+    const a = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    expect(a.status).toBe(200);
+    // 24時間たって、見せ直し用の控えが消えた
+    up.store.delete('billing:sescode:cs_test_abcdefgh');
+    const b = await svc.claim({ sessionId: 'cs_test_abcdefgh' });
+    expect(b.status).toBe(409);
+    expect(b.body.error).toBe('code_already_issued');
+    expect(b.body.code).toBeUndefined();
+    const lic = await svc.license({ code: a.body.code, device: DEV1 });
+    expect(lic.status).toBe(200);
+    expect(lic.body.active).toBe(true);
+  });
+});
+
 describe('billingApi: 申し込み→支払い直後→取り直し', () => {
   it('申し込みは年額を既定にし、戻り先は supporter 画面', async () => {
     const { svc, stripe } = await setup();

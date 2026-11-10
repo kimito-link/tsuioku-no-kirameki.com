@@ -1,6 +1,6 @@
 # 応援レーン + popup 全体のアーキテクチャ再設計
 
-_Status: DRAFT — 2026-04-18 初版 / owner: info@best-trust.biz_
+_Status: DRAFT — 2026-04-18 初版_
 _Goal: ずっと使える将来を見越した設計。星野ロミ「surechigai-lite-handoff」の構造に合わせて薄くする。_
 
 ---

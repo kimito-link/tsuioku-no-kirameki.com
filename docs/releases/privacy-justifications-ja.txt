@@ -1,0 +1,115 @@
+権限が必要な理由（ホスト権限の統合欄。下の貼り付け本文は1,000字以内。範囲は privacy.html §4 と同じ）
+
+--- 統合欄に貼る本文 ---
+・https://*.nicovideo.jp/* : ニコ生の視聴ページのコメントを本人のPCに記録します。
+
+・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live のチャットとアイコンをPCに記録します。外へは送りません。
+
+・https://www.twitch.tv/* : Twitch のチャットを本人のPCに記録します。外へは送りません。
+
+・https://kick.com/* : Kick のチャットを本人のPCに記録します。外へは送りません。
+
+・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっちのコメントとアイテムを本人のPCに記録します。外へは送りません。
+
+・https://www.showroom-live.com/* : SHOWROOM のコメントとギフトを本人のPCに記録します。外へは送りません。
+
+・https://mixch.tv/* と https://d2uqarpmf42qy0.cloudfront.net/* : ミクチャのコメントとギフトを記録し、ギフトの絵を表示します。外へは送りません。
+
+・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトを本人のPCに記録します。外へは送りません。
+
+・http://127.0.0.1:50021/* : 読み上げONのときだけ、このPCのVOICEVOXへ音声合成を頼みます。
+
+・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」を自分でONにしたときだけニコ生の画面を送ります(最新1件・24時間で消え、OFFで削除)。契約確認はコードとPCごとの識別子だけです。上の他サービスの記録は送りません。
+
+・https://suggestqueries.google.com/* : 入力した配信者名の検索候補だけを取得します。
+
+広告・行動トラッキング・第三者提供には使いません。詳細はプライバシーポリシー。
+
+### 2-9c. ホスト権限 Twitch (`https://www.twitch.tv/*`) が必要な理由(0.1.1916〜・0.1.2036 の統合欄に収録)
+
+★2026-11-10: 統合欄 §2-8z（995字）と単一用途 §1 に Twitch を入れた。privacy.html §4-1c。
+
+> 単一用途そのものです。利用者が開いている Twitch の配信ページ (www.twitch.tv) に content script を入れ、その配信のチャット (コメント・ビッツ・サブスク・ギフト・レイド) と配信名・同時視聴者数を読み取り、本人の PC (chrome.storage.local / IndexedDB) に記録します。チャットは Twitch 公式の読み取り専用チャットサーバーからログインなしで受け取ります。拡張の画面からコメントを送るときは、Twitch のページの入力欄に書き込んで送信ボタンを押すだけです。Twitch の記録を外へ送ることはありません。利用者の Twitch アカウントの認証情報は取得しません。
+
+### 2-9d. ホスト権限 Kick (`https://kick.com/*`) が必要な理由(0.1.2036)
+
+> 単一用途そのものです。利用者が開いている Kick の配信ページに content script を入れ、チャット（コメント・Kicks・サブスク・ギフトサブ）と配信情報を読み取り、本人の PC に記録します。拡張の画面からコメントを送るときは、Kick のページの入力欄に書き込んで送るだけです。Kick の記録を外へ送ることはありません。利用者の Kick の認証情報は取得しません。privacy.html §4-1d。
+
+### 2-9e. ホスト権限 ふわっち (`https://whowatch.tv/*`・`https://api.whowatch.tv/*`) が必要な理由(0.1.2036)
+
+> 単一用途そのものです。利用者が開いているふわっちの視聴ページと、そのページが使う配信 API（api.whowatch.tv のその配信）からコメントとアイテムを読み取り、本人の PC に記録します。ふわっちの記録を外へ送ることはありません。利用者の認証情報は取得しません。privacy.html §4-1e。
+
+### 2-9f. ホスト権限 SHOWROOM (`https://www.showroom-live.com/*`) が必要な理由(0.1.2036)
+
+> 単一用途そのものです。利用者が開いている SHOWROOM の部屋のページからコメント・ギフト・貢献ランキングを読み取り、本人の PC に記録します。SHOWROOM の記録を外へ送ることはありません。利用者の認証情報は取得しません。privacy.html §4-1f。
+
+### 2-9g. ホスト権限 ミクチャ (`https://mixch.tv/*`・`https://d2uqarpmf42qy0.cloudfront.net/*`) が必要な理由(0.1.2036)
+
+> 単一用途そのものです。利用者が開いているミクチャの配信ページからコメント・ギフト・今月のファンランキングを読み取り、本人の PC に記録します。cloudfront.net のその置き場はギフトの絵を表示するためだけに読みます。絵が取れないときは絵なしで記録します。ミクチャの記録を外へ送ることはありません。利用者の認証情報は取得しません。privacy.html §4-1g。
+
+### 2-9h. ホスト権限 TikTok (`https://www.tiktok.com/*`) が必要な理由(0.1.2036)
+
+> 単一用途そのものです。利用者が開いている TikTok LIVE の配信ページからコメントとギフトを読み取り、本人の PC に記録します。ログインしていないとコメントは届かず、その理由を配信ページに出します。TikTok の記録を外へ送ることはありません。利用者の認証情報は取得しません。privacy.html §4-1h。
+
+---
+
+## 3. データ使用 (Data Usage)
+
+| 項目 | チェック | 理由 |
+|------|----------|------|
+| 個人を特定できる情報 | ✅ | ニコ生の数値ユーザー ID、YouTube のチャンネル ID、Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の公開の利用者 ID を、開いている配信の記録として端末内に保存。privacy.html §2・§5 と整合 |
+| 健康に関する情報 | ❌ | 該当なし |
+| 財務状況や支払い | ❌ | 支払いは Stripe の外部ページで完結し、拡張は支払い情報に触れない |
+| 認証に関する情報 | ✅ | 有料のサポーターのコード(契約確認用の合言葉)を保存し、契約確認時にサーバーへ送る。privacy.html §4-3「サポーター」と整合 |
+| 個人的コミュニケーション | ❌ | ニコ生コメントは公開放送でありプライベート通信ではない |
+| 位置情報 | ❌ | 該当なし |
+| ウェブ履歴 | ❌ | 宣言した配信ページ（ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok）以外の閲覧履歴は触らない |
+| ユーザーのアクティビティ | ✅ | 視聴者の出入り・コメント時刻等の行動情報を保存 |
+| ウェブサイトのコンテンツ | ✅ | コメント本文・アバター URL を保存 |
+
+**3 つの宣言**（すべて該当）:
+- 私は、承認されている以外の用途で第三者にユーザーデータを販売、転送しません ✅
+- 私はアイテムの唯一の目的と関係のない目的でユーザーデータを使用または転送しません ✅
+- 私は信用力を判断する目的または融資目的でユーザーデータを使用または転送しません ✅
+
+**プライバシーポリシー URL**: `https://tsuioku-no-kirameki.com/privacy.html`
+
+---
+
+## 4. リモートコード使用宣言
+
+> いいえ、リモートコード を使用していません
+
+すべての JS / Wasm は拡張パッケージに同梱。eval / 外部 import / 動的 `<script>` 注入は使用しない。
+
+---
+
+## 5. 提出時のチェックリスト
+
+審査送信前に必ず確認する:
+
+1. ✅ 「単一用途の説明」末尾の AI 連携記述が **「未実装」表現** になっているか
+   （`privacy.html` §6 と整合）
+2. ✅ 「データ使用 → 個人を特定できる情報」にチェックが入っているか
+   （`privacy.html` §2 のユーザー ID 保存と整合）
+3. ✅ scripting / downloads / alarms / tabs / webNavigation / sidePanel / offscreen / tts / declarativeNetRequestWithHostAccess と、ホスト権限
+   （nicovideo.jp / YouTube 4 つ / app.tsuioku-no-kirameki.com / suggestqueries.google.com / 127.0.0.1:50021）の理由欄が空欄でないか
+4. ✅ アップロード ZIP は `python scripts/stage-submission.py <version>` で生成した
+   `build/tsuioku-no-kirameki-X.X.X.zip` で、master の version と一致しているか
+5. ✅ 「審査の合格後に自動的に公開する」が意図通りか（再確認）
+6. ✅ 各テキスト欄を入力後 **「下書きとして保存」を押した** か（保存忘れ防止）
+
+---
+
+## 6. 文書の更新ルール
+
+このファイルを更新するタイミング:
+
+- `extension/manifest.json` の `permissions` / `host_permissions` を変更した
+- `tsuioku-no-kirameki/privacy.html` の本文を変更した
+- 機能を追加して「単一用途の説明」の中核部分を見直す必要が出た
+- CWS 審査でリジェクトされて文言修正を求められた
+
+更新時は **AGENTS.md §2 の CWS ステータス節にリンクを残す** こと。
+
+記録は既定で利用者の PC の中だけです。「スマホで見る」で当プロジェクトのサーバーへ送るのはニコニコ生放送の画面だけです。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の記録は送りません。運営者は株式会社ベストトラストです。

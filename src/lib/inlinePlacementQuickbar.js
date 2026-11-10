@@ -52,9 +52,13 @@ const BESIDE_MIN_WIDTH_HINT_PX = 1100;
  *   viewportInnerWidth 1065 < 1100 で beside→below 降格していた）。
  * - besideActive / belowActive: 2 トグルチップの押下状態（保存値基準）。dock_bottom/
  *   floating のときは両方 false（「他の位置」を選んでいる）。
+ * - statusText: ヘッダーに出す状態テキスト。押したボタンと実際の配置が食い違うとき
+ *   （例: 横付き選択だが狭い画面で下に出る）だけ中身がある。一致時、または実効不明で
+ *   チップがその選択を表しているときは ''（ボタンと重複するので出さない）。
+ *   dock_bottom / floating はチップが表さないので、ラベルだけを返す。
  *
  * @param {{ placement?: string, effectivePlacement?: string }} input
- * @returns {{ currentLabel: string, effectiveNote: string, besideNarrowHint: string, besideActive: boolean, belowActive: boolean }}
+ * @returns {{ currentLabel: string, effectiveNote: string, besideNarrowHint: string, besideActive: boolean, belowActive: boolean, statusText: string }}
  */
 export function buildPlacementQuickbarModel(input) {
   const placement = String(input?.placement || '').trim() || 'dock_bottom';
@@ -73,11 +77,16 @@ export function buildPlacementQuickbarModel(input) {
     besideNarrowHint = `横付きは画面が広いとき（約${BESIDE_MIN_WIDTH_HINT_PX}px〜）に切り替わります。ウィンドウを広げると横に並びます。`;
   }
 
+  const chipRepresents = placement === 'beside' || placement === 'below';
+  const disagrees = eff !== '' && eff !== placement;
+  const statusText = !chipRepresents || disagrees ? currentLabel + effectiveNote : '';
+
   return {
     currentLabel,
     effectiveNote,
     besideNarrowHint,
     besideActive: placement === 'beside',
-    belowActive: placement === 'below'
+    belowActive: placement === 'below',
+    statusText
   };
 }

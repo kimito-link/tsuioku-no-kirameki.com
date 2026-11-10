@@ -30,6 +30,9 @@ jobs:
       - name: dist freshness (build 忘れ / --no-verify の押し通し / マージ commit の不整合)
         run: node scripts/check-dist-fresh.mjs --ref HEAD
 
+      - name: 連絡先の個人情報が repo に入っていないか (氏名・電話・メール)
+        run: node scripts/check-no-personal-contact.mjs && node scripts/check-no-personal-contact.mjs --selftest
+
       - name: Verify (tests, lint, typecheck, build)
         run: npm run verify
 

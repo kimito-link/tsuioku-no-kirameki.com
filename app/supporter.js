@@ -49,6 +49,8 @@
         $('code').textContent = j.code;
         $('portalCode').value = j.code;
         $('moveCode').value = j.code;
+      } else if (j && j.error === 'code_already_issued') {
+        $('code').textContent = 'コードをこのページで表示できるのは、お支払いから24時間です。控えたコードをお使いください。分からなくなったときはお問い合わせください。';
       } else {
         $('code').textContent = '支払いの確認ができませんでした。数分たってからこのページを読み込み直してください。';
       }
