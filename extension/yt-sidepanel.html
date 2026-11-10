@@ -3746,8 +3746,10 @@
         grid-column: 1 / -1;
         margin-top: 4px;
         padding: 10px 12px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px dashed rgba(255, 255, 255, 0.18);
+        /* v0.1.2031: 暗い背景の頃の白い字・白い点線のままで、明るい背景では説明文が読めなかった
+           (コントラスト比 1.03)。色は配色の変数から取る(暗い配色でも読める)。 */
+        background: var(--nl-bg-soft);
+        border: 1px dashed var(--nl-border);
         border-radius: 8px;
         display: flex;
         flex-direction: column;
@@ -3766,7 +3768,7 @@
         margin: 0;
         font-size: 12px;
         line-height: 1.5;
-        color: var(--nl-text-soft, rgba(255, 255, 255, 0.78));
+        color: var(--nl-muted);
       }
       .nl-gift-ranking-prompt__btn {
         cursor: pointer;
