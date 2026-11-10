@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1905',
+    date: '2026-11-06',
+    summary: 'YouTube で自分の発言が2件・2回読まれるのを直す',
+    items: Object.freeze([
+      'YouTube の配信で自分がコメントを送ると、チャット欄には1件なのに記録が2件になり、読み上げも2回流れていました。YouTube が送ったコメントを仮の行から本物の行へ差し替えるのを、別のコメントとして数えていたためです。差し替えは1件として扱うようにしました。',
+      '同じ人が同じ文を本当に2回書いたときは、これまでどおり2件記録します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1904',
     date: '2026-11-06',
     summary: 'YouTube で別の配信の人が記録に混ざるのを直す',

@@ -20135,11 +20135,10 @@ async function initPopup() {
 
   /*
    * v0.1.334: ヘッダーの「パネル位置」クイックバー。
-   * - 現在値ラベルを表示（保存値ベース・同期計算のみ・await は storage 読みのみ）。
-   * - 横付き/下チップ click は既存 saveInlinePanelPlacement を直接呼ぶ（storage キーを
-   *   増やさず二重管理しない）。dock_bottom/floating 選択時は両チップ非アクティブ。
+   * v0.1.2033: 状態テキストは選択と実配置が食い違うときだけ出す（一致時は隠す）。
+   * - 横付き/下は既存 saveInlinePanelPlacement を直接呼ぶ（storage キーを増やさない）。
+   *   dock_bottom/floating 選択時は両チップ非アクティブ。aria-pressed は保存値のまま。
    * - 「詳細」は設定 details を開いて配置セクションへスクロール（4状態すべて触れる導線）。
-   * - watch を扱える文脈でのみ表示（action popup も watch タブ対象に保存が効くので表示）。
    */
   const quickbarEl = $('nlPlacementQuickbar');
   const quickbarValueEl = $('nlPlacementQuickValue');
@@ -20168,7 +20167,8 @@ async function initPopup() {
     }
     const model = buildPlacementQuickbarModel({ placement, effectivePlacement });
     if (quickbarValueEl instanceof HTMLElement) {
-      quickbarValueEl.textContent = model.currentLabel + (model.effectiveNote || '');
+      quickbarValueEl.textContent = model.statusText;
+      quickbarValueEl.hidden = model.statusText === '';
     }
     if (quickbarBesideEl instanceof HTMLElement) {
       quickbarBesideEl.setAttribute('aria-pressed', model.besideActive ? 'true' : 'false');
