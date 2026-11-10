@@ -5987,5 +5987,18 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.2012', metric: 'cross-checked-claims', value: 56,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.2022', metric: 'bundle-kb', value: 1429,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '2012 と同じ(master の 0.1.2021 の取り込み=popup.html の CSS と venueBar.js の1行で、popup.js は増えない)'
+  }),
+  Object.freeze({
+    version: '0.1.2022', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2022', metric: 'cross-checked-claims', value: 56,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
   })
 ]);

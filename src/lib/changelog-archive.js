@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1977',
+    date: '2026-11-10',
+    summary: '大きな記録を少しずつ読み、開いた直後も固まらない',
+    items: Object.freeze([
+      'YouTube・Kick などの記録を開くとき、5,000行ずつ読んで合間に画面へ手を返すようにしました(8万行を一度に読むと、遅いPCでは約48秒返事がありませんでした)。読む行と順番は同じです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1976',
     date: '2026-11-10',
     summary: '人の多い配信で名前と顔の控えを書く回数を減らす',

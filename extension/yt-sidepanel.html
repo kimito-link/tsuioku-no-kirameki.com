@@ -1562,6 +1562,8 @@
         font-weight: 700;
         color: var(--nl-muted);
         list-style-position: outside;
+        /* v0.1.2021: 三角が枠の左へはみ出していた。三角の分だけ内側へ寄せる。 */
+        margin-left: 1.2em;
       }
 
       .nl-story-diag__body {
@@ -7127,7 +7129,8 @@
         font-weight: 600;
         color: var(--nl-muted);
         list-style-position: outside;
-        margin-left: 0.5rem;
+        /* v0.1.2021: 0.5rem だと三角が枠の左へはみ出す。三角の分だけ内側へ寄せる。 */
+        margin-left: 1.35em;
       }
 
       .nl-dev-monitor-details[open] > summary {
@@ -8570,6 +8573,25 @@
         box-sizing: border-box;
       }
 
+      /* v0.1.2021: ボタン列がパネル上部へ移った後(hoistQuickToolbarToTop)も、同じ並び方にする。
+         上の規則は compose の中に居るときだけ効くので、移動後はマーケとスクショが1行ずつ占有し、
+         コメビュと読み上げはブラウザ既定の灰色のままだった。ここで6個とも同じ高さ・同じ並びにする。 */
+      .nl-compose-quick-toolbar #exportJson,
+      .nl-compose-quick-toolbar #exportMarketingQuickBtn,
+      .nl-compose-quick-toolbar #captureScreenshot,
+      .nl-compose-quick-toolbar #reloadWatchTabBtn,
+      .nl-compose-quick-toolbar #openComeviewBtn,
+      .nl-compose-quick-toolbar #openComeviewVoiceBtn {
+        width: auto;
+        flex: 1 1 92px;
+        min-width: min(100%, 84px);
+        max-width: 100%;
+        box-sizing: border-box;
+        min-height: 40px;
+        padding: 8px 10px;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.88), 15px);
+      }
+
       .nl-compose-qbtn__row {
         display: inline-flex;
         align-items: center;
@@ -8816,20 +8838,74 @@
         opacity: 0.88;
       }
 
-      #reloadWatchTabBtn {
+      #reloadWatchTabBtn,
+      #openComeviewBtn,
+      #openComeviewVoiceBtn {
         border: 1px solid var(--nl-border);
         border-radius: 10px;
         background: var(--nl-bg-soft);
         color: var(--nl-text);
         padding: 10px 12px;
         min-height: 44px;
+        font: inherit;
         font-size: clamp(11px, calc(var(--nl-base-font) * 0.85), 15px);
         font-weight: 700;
         cursor: pointer;
         flex-shrink: 0;
       }
 
-      #reloadWatchTabBtn:disabled {
+      #reloadWatchTabBtn:hover:not(:disabled),
+      #openComeviewBtn:hover:not(:disabled),
+      #openComeviewVoiceBtn:hover:not(:disabled) {
+        border-color: var(--nl-accent);
+        color: var(--nl-accent);
+      }
+
+      #reloadWatchTabBtn:focus-visible,
+      #openComeviewBtn:focus-visible,
+      #openComeviewVoiceBtn:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+      }
+
+      #reloadWatchTabBtn:disabled,
+      #openComeviewBtn:disabled,
+      #openComeviewVoiceBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* v0.1.2021: 小さな押しボタン(なふだの「表示する」「隠す」など)。見た目の指定が無く、
+         ブラウザ既定の灰色のまま出ていた。 */
+      .nl-mini-btn,
+      .nl-session-summary-actions button {
+        font: inherit;
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.82), 13px);
+        font-weight: 700;
+        line-height: 1.2;
+        min-height: 30px;
+        padding: 5px 12px;
+        border: 1px solid var(--nl-border);
+        border-radius: 999px;
+        background: var(--nl-bg-soft);
+        color: var(--nl-text);
+        cursor: pointer;
+      }
+
+      .nl-mini-btn:hover:not(:disabled),
+      .nl-session-summary-actions button:hover:not(:disabled) {
+        border-color: var(--nl-accent);
+        color: var(--nl-accent);
+      }
+
+      .nl-mini-btn:focus-visible,
+      .nl-session-summary-actions button:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+      }
+
+      .nl-mini-btn:disabled,
+      .nl-session-summary-actions button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }

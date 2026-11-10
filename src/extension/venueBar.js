@@ -1621,7 +1621,7 @@ const VENUE_CSS = `
     color: var(--nl-muted);
     font-size: 10px;
     font-weight: 700;
-    list-style-position: outside;
+    list-style-position: inside; /* v0.1.2021: outside だと三角が枠の左へはみ出す */
   }
   .nlsb-story-diag .nl-story-diag__body {
     margin-top: 6px;
