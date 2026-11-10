@@ -4,7 +4,7 @@
 //   動画の疑似 lv を venueBar に教えてから(ビルド時に足す __ytSetVenueLiveId)、ニコ生版と同じ呼び方で出す。
 //   会場の作り・見た目・席・吹き出し・読み上げはニコ生版の venueBar.js のまま(手を加えない)。
 //   ★2026-11-04 りんく「このかたちがいい」(ニコ生版の視聴ページのボタン)・「画面をくろくおおわないで」(0.1.69 の重ね窓は撤去)。
-import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey, streamKeyForWatchUrl } from './ytNicoShim.js';
+import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey, streamKeyForWatchUrl, ytSummaryToNicoSnapshot } from './ytNicoShim.js';
 import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets } from './ytLocalAssetUrls.js';
 import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
@@ -40,6 +40,19 @@ function ensureBaseFontSize() {
 }
 
 let mountedVid = '';
+/**
+ * 会場の数字の帯の材料(ニコ生版 v0.1.1963・パネルを開かなくても数字が出る)。パネルが受け取るのと同じ形のスナップショットを、
+ *   配信のまとめ(yt_stream_summaries)から作る(記録件数はまとめの itemCount)。15秒に1回まで(venueStatCardsSelf.js)。
+ */
+async function statCardsSource() {
+  const vid = mountedVid;
+  if (!vid) return null;
+  const bag = await chrome.storage.local.get('yt_stream_summaries');
+  const all = (bag && bag.yt_stream_summaries) || {};
+  const sum = all[vid];
+  if (!sum) return null;
+  return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all) };
+}
 /** 視聴ページ以外(ホーム・検索など)へ移ったら、会場をしまって隠す。ニコ生の視聴ページは移るとページごと消えるのと同じに見せる */
 function setRootShown(/** @type {boolean} */ shown) {
   const root = /** @type {HTMLElement|null} */ (document.getElementById('nlsb-venue-root'));
@@ -68,11 +81,13 @@ function sync() {
   if (!document.getElementById('nlsb-venue-root') && IS_TWITCH_PAGE)
     // Twitch/Kick: 公式のギフト(Bits/Kicks)の窓を開く口はまだ無いので、ギフトのボタンは出さない(押しても何も起きないボタンを置かない)
     mountVenueBarButton({
+      getStatCardsSource: statCardsSource,
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
       postReasonText: (reason) => ytCommentSendReasonText(reason, '', PAGE_PLATFORM?.id || ''),
     });
   if (!document.getElementById('nlsb-venue-root'))
     mountVenueBarButton({
+      getStatCardsSource: statCardsSource,
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
       postReasonText: ytCommentSendReasonText,
       // 0.1.113: 💲 スーパーチャットの窓を開く(ニコ生版 v0.1.1870 のギフトと同じ。支払いは YouTube 本体で利用者がする)。

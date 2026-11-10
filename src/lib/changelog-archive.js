@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1968',
+    date: '2026-11-10',
+    summary: '声の割り当ての書き直しを30秒に1回へ',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで、人ごとの声の割り当て(数百KB)をコメントの束ごとに丸ごと書き直していたのを、変わったときだけ・最短30秒に1回にしました。人の多い配信で横の欄やコメビュが長く固まるのを和らげます。声の割り当ては変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1967',
     date: '2026-11-09',
     summary: '応援レーンの塗り直しで動かす枚数を最小に',

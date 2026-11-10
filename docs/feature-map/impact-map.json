@@ -700,6 +700,22 @@
       ]
     },
     {
+      "file": "src/lib/concurrentEstimate.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "live-ranking",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/customSoundStore.js",
       "featureCount": 4,
       "features": [
@@ -1672,6 +1688,20 @@
       ]
     },
     {
+      "file": "src/lib/buildWatchMetaCardAudienceViewModel.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/celebrationCharaAssets.js",
       "featureCount": 3,
       "features": [
@@ -1770,20 +1800,6 @@
       ]
     },
     {
-      "file": "src/lib/concurrentEstimate.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "live-ranking",
-        "popup"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "Web版 追憶のきらめき ランキング(/live/)",
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/displayRecordedCount.js",
       "featureCount": 3,
       "features": [
@@ -1799,6 +1815,20 @@
     },
     {
       "file": "src/lib/effectDirector.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/formatOfficialStreamAgeMinutes.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -1910,6 +1940,20 @@
       ]
     },
     {
+      "file": "src/lib/liveCommenterStats.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/ndgrChatRows.js",
       "featureCount": 3,
       "features": [
@@ -1953,6 +1997,20 @@
     },
     {
       "file": "src/lib/officialDomRankingRowsToStripRooms.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/officialNicoStatsStripDigest.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -2022,6 +2080,34 @@
       ]
     },
     {
+      "file": "src/lib/popupConcurrentEstimateGate.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/popupWatchMetaConcurrentGate.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/recentTextRing.js",
       "featureCount": 3,
       "features": [
@@ -2047,6 +2133,20 @@
         "ポップアップ(応援レーン)",
         "状態速報ページ",
         "Web版 状態(スマホ)"
+      ]
+    },
+    {
+      "file": "src/lib/statCardsMirror.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
       ]
     },
     {
@@ -2494,6 +2594,48 @@
       "labels": [
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/watchAudienceCopy.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/watchConcurrentEstimateUiCopy.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/watchMetaCardStateGate.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
         "会場モード(standalone)"
       ]
     },
@@ -4278,6 +4420,18 @@
       ]
     },
     {
+      "file": "src/lib/venueStatCardsSelf.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueStatStrip.js",
       "featureCount": 2,
       "features": [
@@ -5257,16 +5411,6 @@
     },
     {
       "file": "src/lib/buildNorthStarAdRankingStatsHtml.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/buildWatchMetaCardAudienceViewModel.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -6306,16 +6450,6 @@
       ]
     },
     {
-      "file": "src/lib/formatOfficialStreamAgeMinutes.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/forwardReactivation.js",
       "featureCount": 1,
       "features": [
@@ -7236,16 +7370,6 @@
       ]
     },
     {
-      "file": "src/lib/liveCommenterStats.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/liveCommentTally.js",
       "featureCount": 1,
       "features": [
@@ -8006,16 +8130,6 @@
       ]
     },
     {
-      "file": "src/lib/officialNicoStatsStripDigest.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/officialStatsWindow.js",
       "featureCount": 1,
       "features": [
@@ -8356,16 +8470,6 @@
       ]
     },
     {
-      "file": "src/lib/popupConcurrentEstimateGate.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/popupContextBarModel.js",
       "featureCount": 1,
       "features": [
@@ -8467,16 +8571,6 @@
     },
     {
       "file": "src/lib/popupVisibilityGate.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/popupWatchMetaConcurrentGate.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -9157,16 +9251,6 @@
     },
     {
       "file": "src/lib/standalonePopupClose.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/statCardsMirror.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -9936,26 +10020,6 @@
       ]
     },
     {
-      "file": "src/lib/watchAudienceCopy.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/watchConcurrentEstimateUiCopy.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/watchContext.js",
       "featureCount": 1,
       "features": [
@@ -9993,16 +10057,6 @@
       ],
       "labels": [
         "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/watchMetaCardStateGate.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
       ]
     },
     {

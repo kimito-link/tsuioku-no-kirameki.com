@@ -5,6 +5,7 @@
  *   (4) YouTube 版の会場(yt-venue.html・保存場所が ytm: 付き)でも出る。
  */
 import { test, expect } from './fixtures.js';
+import { E2E_MOCK_WATCH_URL } from './constants.js';
 
 const LV = 'lv348888888';
 const KEY = 'nls_stat_cards_mirror_v1';
@@ -91,4 +92,53 @@ test('YouTube 版の会場(yt-venue.html)でも数字の帯が出る(保存場�
   await expect(valOf(page, 'records')).toHaveText('42');
   await expect(valOf(page, 'concurrent')).toHaveText('108');
   await expect(valOf(page, 'streamAge')).toHaveText('—');
+});
+
+/*
+ * 2026-11-10 りんく「POPをひらかなくても数字がつくようにしてほしい」。
+ * 横の欄(パネル)を一度も開かず、鏡(nls_stat_cards_mirror_v1)が無い状態で会場を開いても、
+ * 会場が視聴ページの値から自分で数字を付ける(data-source="self")。
+ */
+
+const MOCK_LV = 'lv888888888';
+const stripState = (page) =>
+  page.evaluate(() => {
+    const el = document.querySelector('.nlsb-stat-strip');
+    if (!el) return null;
+    /** @type {Record<string, string>} */
+    const vals = {};
+    for (const c of el.querySelectorAll('[data-stat]')) vals[c.getAttribute('data-stat')] = c.querySelector('.nlsb-stat__val').textContent;
+    return { source: el.getAttribute('data-source'), stale: el.getAttribute('data-stale'), vals };
+  });
+
+test('パネルを開かなくても: 視聴ページの中の会場が自分で数字を付ける', async ({ context }) => {
+  const id = await extId(context);
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(E2E_MOCK_WATCH_URL, { waitUntil: 'load', timeout: 60_000 });
+  // パネルは出ていない・鏡も無い(=一度も開いていない人と同じ)
+  const sw = context.serviceWorkers().find((w) => w.url().includes(id));
+  expect(await sw.evaluate((k) => chrome.storage.local.get(k), KEY)).toEqual({});
+  await page.locator('.nlsb-toggle').click({ timeout: 30_000 });
+  await expect(page.locator('.nlsb-stat-strip')).toHaveAttribute('data-source', 'self', { timeout: 20_000 });
+  const st = await stripState(page);
+  console.log('[stat-strip inline self]', JSON.stringify(st));
+  expect(st.stale).toBe('0');
+  // 「—」だけの帯ではない(視聴ページから読めた数字が1つ以上付く)
+  expect(Object.values(st.vals).filter((v) => v && v !== '—').length).toBeGreaterThan(0);
+  // 会場は storage の鏡を書かない(パネルと書き手を取り合わない)
+  expect(await sw.evaluate((k) => chrome.storage.local.get(k), KEY)).toEqual({});
+});
+
+test('パネルを開かなくても: 別窓の会場(venue.html)が視聴タブに聞いて数字を付ける', async ({ context }) => {
+  const id = await extId(context);
+  const watch = await context.newPage();
+  await watch.goto(E2E_MOCK_WATCH_URL, { waitUntil: 'load', timeout: 60_000 });
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`chrome-extension://${id}/venue.html?lv=${MOCK_LV}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.nlsb-stat-strip')).toHaveAttribute('data-source', 'self', { timeout: 20_000 });
+  const st = await stripState(page);
+  console.log('[stat-strip standalone self]', JSON.stringify(st));
+  expect(Object.values(st.vals).filter((v) => v && v !== '—').length).toBeGreaterThan(0);
 });

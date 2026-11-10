@@ -37,6 +37,7 @@ graph LR
   n_venue --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_venue --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
   n_venue --> n_src_lib_bubblePlacement_js["lib/bubblePlacement.js"]:::shared
+  n_venue --> n_src_lib_buildWatchMetaCardAudienceViewModel_js["lib/buildWatchMetaCardAudienceViewModel.js"]:::shared
   n_venue --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
   n_venue --> n_src_lib_charaLiveCensus_js["lib/charaLiveCensus.js"]:::shared
   n_venue --> n_src_lib_charaLiveCheerTrigger_js["lib/charaLiveCheerTrigger.js"]:::shared
@@ -50,10 +51,9 @@ graph LR
   n_venue --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
   n_venue --> n_src_lib_commentTailBuffer_js["lib/commentTailBuffer.js"]:::shared
   n_venue --> n_src_lib_commentTickerNameLink_js["lib/commentTickerNameLink.js"]:::shared
+  n_venue --> n_src_lib_concurrentEstimate_js["lib/concurrentEstimate.js"]:::shared
   n_venue --> n_src_lib_crowdRasterizer_js["lib/crowdRasterizer.js"]:::shared
-  n_venue --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
-  n_venue --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 152 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 164 ファイル省略（全件は storage-bus.md / metafile 参照）。

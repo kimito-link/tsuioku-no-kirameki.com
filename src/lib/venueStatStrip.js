@@ -13,6 +13,9 @@
  *   - 経過は時刻がずれるので「—」に戻す
  *   - ほかの数字は最後の値を薄く出し、title で「パネルが閉じていて更新が止まっています」と伝える
  * ★別の配信の鏡は使わない(liveId が違えば無いのと同じ)。
+ * ★2026-11-10 りんく「POPをひらかなくても数字がつくようにしてほしい」: パネルが閉じていて鏡が無い/古いときは、
+ *   会場が自分で作った写し(opts.selfSnap・venueStatCardsSelf.js が視聴ページの値から、パネルと同じ部品で作る)を使う。
+ *   新しい鏡があるあいだは鏡が正(パネルと同じ数字)。
  *
  * chrome 非依存(テスト可能)。DOM は document 互換のものを引数で受ける。
  *
@@ -31,7 +34,7 @@ export const VENUE_STAT_STRIP_STALE_TITLE =
 /**
  * @typedef {'records'|'concurrent'|'visitor'|'viewers'|'comments'|'streamAge'|'adPts'|'giftPts'} VenueStatKey
  * @typedef {{ key: VenueStatKey, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu' }} VenueStatItem
- * @typedef {{ source: 'mirror'|'fallback'|'none', stale: boolean, ageMs: number|null, items: VenueStatItem[] }} VenueStatStripModel
+ * @typedef {{ source: 'mirror'|'self'|'fallback'|'none', stale: boolean, ageMs: number|null, items: VenueStatItem[] }} VenueStatStripModel
  */
 
 const PH = '—';
@@ -50,6 +53,7 @@ function chipOf(c) {
 
 /** @param {unknown} n */
 function formatCount(n) {
+  if (n == null || n === '') return ''; // Number(null) は 0 = 「取れなかった」を「0件」と出さない
   const v = Number(n);
   if (!Number.isFinite(v) || v < 0) return '';
   try {
@@ -63,8 +67,9 @@ function formatCount(n) {
  * 鏡(と記録件数の正本)から、帯に出す8つの数字を決める純関数。
  *
  * @param {any} snap KEY_STAT_CARDS_MIRROR の中身(StatCardsMirrorSnapshot)。null 可
- * @param {{ liveId?: string, nowMs?: number, recordedCount?: number|null, staleMs?: number }} [opts]
+ * @param {{ liveId?: string, nowMs?: number, recordedCount?: number|null, staleMs?: number, selfSnap?: any }} [opts]
  *   recordedCount: panel_summary の recordedCount(selectDisplayRecordedCount 済み)。パネルが閉じていても動く記録件数
+ *   selfSnap: 会場が自分で作った写し(同じ形)。鏡が無い/古く、これが同じ配信で新しいときだけ使う
  * @returns {VenueStatStripModel}
  */
 export function buildVenueStatStripModel(snap, opts = {}) {
@@ -72,20 +77,31 @@ export function buildVenueStatStripModel(snap, opts = {}) {
   const nowMs = Number.isFinite(Number(opts.nowMs)) ? Number(opts.nowMs) : Date.now();
   const staleMs = Number.isFinite(Number(opts.staleMs)) && Number(opts.staleMs) > 0 ? Number(opts.staleMs) : VENUE_STAT_STRIP_STALE_MS;
 
-  const s = snap && typeof snap === 'object' ? snap : null;
-  const snapLive = s ? str(s.liveId).trim().toLowerCase() : '';
-  // 別の配信の鏡は使わない(liveId が分からないときも使わない=取り違えの方が害が大きい)。
-  const usable = !!s && !!liveId && snapLive === liveId;
-  // 鏡の古さ(時点の読み方は timeAuthority に任せる=null を「たった今」と読まない)。
-  const ageMs = usable ? ageMsOf(s.capturedAt, nowMs) : null;
-  const stale = usable && (ageMs == null || ageMs > staleMs);
+  /** 同じ配信で、新しい(staleMs 以内)か。別の配信・liveId 不明は使わない(取り違えの方が害が大きい)。 */
+  const judge = (/** @type {any} */ x) => {
+    const o = x && typeof x === 'object' ? x : null;
+    const ok = !!o && !!liveId && str(o.liveId).trim().toLowerCase() === liveId;
+    // 古さ(時点の読み方は timeAuthority に任せる=null を「たった今」と読まない)。
+    const age = ok ? ageMsOf(o.capturedAt, nowMs) : null;
+    return { o, ok, age, fresh: ok && age != null && age <= staleMs };
+  };
+  const mirror = judge(snap);
+  const self = judge(opts.selfSnap);
+  // 新しい鏡が正。無い/古いときだけ、会場が自分で作った新しい写しを使う。
+  const useSelf = !mirror.fresh && self.fresh;
+  const picked = useSelf ? self : mirror;
+  const s = picked.o;
+  const usable = picked.ok;
+  const ageMs = picked.age;
+  const stale = usable && !picked.fresh;
 
   const fallbackRecords = formatCount(opts.recordedCount);
 
   // 記録: 新しい鏡ならパネルと同じ文字。古い/無いときは正本の件数(パネルが閉じていても動く)。
   let records = { text: PH, isPlaceholder: true };
   const mirrorRecords = usable ? str(s.recordsText).trim() : '';
-  if (usable && !stale && mirrorRecords) {
+  // (自分で作った写しの件数は最大15秒古いので、その場で動く正本の件数があればそちら)
+  if (usable && !stale && mirrorRecords && !(useSelf && fallbackRecords)) {
     records = { text: mirrorRecords, isPlaceholder: s.recordsIsPlaceholder === true };
   } else if (fallbackRecords) {
     records = { text: fallbackRecords, isPlaceholder: false };
@@ -120,8 +136,8 @@ export function buildVenueStatStripModel(snap, opts = {}) {
     { key: 'giftPts', label: 'ギフトpt', ...giftPts, unit: '', face: '' }
   ];
 
-  /** @type {'mirror'|'fallback'|'none'} */
-  const source = usable && !stale ? 'mirror' : fallbackRecords || usable ? 'fallback' : 'none';
+  /** @type {'mirror'|'self'|'fallback'|'none'} */
+  const source = usable && !stale ? (useSelf ? 'self' : 'mirror') : fallbackRecords || usable ? 'fallback' : 'none';
   return { source, stale, ageMs, items };
 }
 

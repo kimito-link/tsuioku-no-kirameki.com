@@ -383,6 +383,7 @@ import { shouldHoldBubbleForVoice, VENUE_BUBBLE_VOICE_HOLD_MS } from '../lib/ven
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
+import { createVenueStatSelfPoller, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -2639,7 +2640,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any } }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any }, getStatCardsSource?: () => any }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -3723,13 +3724,21 @@ export function mountVenueBarButton(options = {}) {
   /** @type {unknown} */
   let statCardsMirrorSnap = null;
   /** 数字の帯を描く(値は鏡のまま・記録はパネルが閉じていても動く正本で補う)。古さの判定があるので定期の見回りからも呼ぶ。 */
+  /** 2026-11-10 りんく「POPをひらかなくても数字がつくように」: 鏡が無い/古いあいだ、会場が自分で作る写し(15秒に1回まで・lib の venueStatCardsSelf.js)。 */
+  /** @type {unknown} */
+  let statCardsSelfSnap = null;
+  const statSelfPoller = createVenueStatSelfPoller({
+    // 視聴ページの中の会場は呼び出し元が材料を渡す。別窓の会場は視聴ページのタブに、パネルと同じ問い合わせをする。
+    fetchSource: () => (typeof options.getStatCardsSource === 'function' ? options.getStatCardsSource() : requestWatchSnapshotViaTabs(chrome, liveIdFromPathname())),
+    onSnap: (snap) => { statCardsSelfSnap = snap; paintStatStrip(); }
+  });
   const paintStatStrip = () => {
     try {
-      statStrip.paint(buildVenueStatStripModel(statCardsMirrorSnap, {
-        liveId: String(activeLiveId || liveIdFromPathname() || ''),
-        nowMs: Date.now(),
-        recordedCount: panelSummarySnap ? selectDisplayRecordedCount(panelSummarySnap) : null
-      }));
+      const liveId = String(activeLiveId || liveIdFromPathname() || '');
+      const recordedCount = panelSummarySnap ? selectDisplayRecordedCount(panelSummarySnap) : null;
+      const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap });
+      statStrip.paint(model);
+      if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror', recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }
   };
   /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */
