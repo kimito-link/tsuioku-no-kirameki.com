@@ -25,6 +25,7 @@ import {
   noteLag,
   noteLongTask,
   noteOnChanged,
+  approxJsonBytes,
   summarizeDocCensus
 } from './extDocBusyCensus.js';
 import { EXT_CENSUS_MESSAGE_TYPE } from './extProcessCensusKey.js';
@@ -112,7 +113,7 @@ export function startExtDocBusyCensus(env) {
             nowMs: t,
             bytesOf: () => {
               const v = changes[k] && changes[k].newValue;
-              return v === undefined ? 0 : JSON.stringify(v).length;
+              return approxJsonBytes(v);
             }
           });
         }

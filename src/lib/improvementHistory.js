@@ -5805,5 +5805,18 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1982', metric: 'cross-checked-claims', value: 55,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.1983', metric: 'bundle-kb', value: 1420,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '1982 と同じ大きさ(今回の変更は YouTube 系の入口 shim と計器の見積もりで、popup.js は計器の数行だけ)。過去最小 1360 より大きいのは他サイト対応と大きな記録の対策の分'
+  }),
+  Object.freeze({
+    version: '0.1.1983', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1983', metric: 'cross-checked-claims', value: 55,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
   })
 ]);

@@ -27,6 +27,7 @@ import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/pl
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
+import { ytTailAfterFull } from '../../src/lib/youtube/ytTailAfterFull.js';
 import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
@@ -567,11 +568,10 @@ const lastFullAnswered = new Map();
 /** @param {string} lv @param {any[]} arr */
 function tailForScreen(lv, arr) {
   if (IS_VENUE_CONTEXT) return tailForContext(arr);
-  if (lastFullAnswered.get(lv) === arr && arr.length > TAIL_MAX_ROWS) {
-    shimDiag.tailShort = (Number(shimDiag.tailShort) || 0) + 1;
-    return arr.slice(arr.length - TAIL_MAX_ROWS);
-  }
-  return arr;
+  // ★v0.1.1983: 生放送の途中(全件を渡したあとに増えた)も、増えた行と最新 TAIL_MAX_ROWS 件だけを渡す(ytTailAfterFull.js)。
+  const t = ytTailAfterFull(arr, lastFullAnswered.get(lv), TAIL_MAX_ROWS);
+  if (t.short) shimDiag.tailShort = (Number(shimDiag.tailShort) || 0) + 1;
+  return t.rows;
 }
 /** @type {Set<string>} 一度でも組み上がった配信(v0.1.1978: 最初の組み立て中だけ、軽量読みのテールを待たせない) */
 const everBuiltLvs = new Set();
@@ -856,6 +856,13 @@ function recordBuildPhases(ph) {
  * @type {Map<string, { cache: any, ver: number, epoch: number, sumSig: string, out: any[] }>}
  */
 const builtMemo = new Map();
+/**
+ * ★v0.1.1983: 記録の行(控えの中の同じ物)→ 前に作った popup 用の行と、そのときの材料。
+ *   材料(配信・人のキー・顔・開始時刻・番号・並びの位置)が全部同じなら、作り直さずに前の行を返す。
+ *   控えの行が差し替わる(全件の読み直し・同じ行の更新)と別の物になるので、自動で作り直しになる。
+ * @type {WeakMap<object, { lv: string, key: string, icon: string, st: number, no: number, i: number, e: any }>}
+ */
+const builtEntryMemo = new WeakMap();
 /** 顔の控え(順位表・@名前・後から引いた顔・文字アイコンの見分け)が変わるたびに進む番号 */
 let buildSideEpoch = 0;
 /** @param {string[]} keys storage で変わったキー */
@@ -940,6 +947,7 @@ async function buildCommentsForLvUncached(lv) {
       /* 分からなければ受け取った時刻 */
     }
   }
+  let rowsMade = 0;
   const out = list.map((r, i) => {
     const key = who.keyOf(r);
     // スパチャの欄の顔は読み込み前の仮の絵(data: など)のことがある。https の顔だけ使い、無ければ同じ人の別の記録の顔を使う。
@@ -951,7 +959,18 @@ async function buildCommentsForLvUncached(lv) {
       icon = ytUsableIcon(handleIcons[handleKey]?.icon);
       if (!icon && !handleIcons[handleKey]) wantHandles.add(nm);
     }
-    const e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, ytStableNoOf(lv, r));
+    // ★v0.1.1983: 前の組み立てと材料が同じ行は、前に作った行をそのまま使う(生放送の途中は新着のたびに全行を作り直していた)。
+    const no = ytStableNoOf(lv, r);
+    const prev = r && typeof r === 'object' ? builtEntryMemo.get(r) : undefined;
+    /** @type {ReturnType<typeof ytRecordToNicoEntry>} */
+    let e;
+    if (prev && prev.lv === lv && prev.key === key && prev.icon === icon && prev.st === streamStartedAt && prev.no === no && prev.i === i) {
+      e = prev.e;
+    } else {
+      e = ytRecordToNicoEntry({ ...r, iconUrl: icon, _streamStartedAt: streamStartedAt }, i, lv, key, no);
+      if (r && typeof r === 'object') builtEntryMemo.set(r, { lv, key, icon, st: streamStartedAt, no, i, e });
+      rowsMade += 1;
+    }
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
     if (important?.[i]) ytVoiceImportantKeys.set(`no:${e.commentNo}`, important[i]);
     return e;
@@ -960,6 +979,8 @@ async function buildCommentsForLvUncached(lv) {
   registerBroadcastersFromSummaries();
   if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) builtMemo.set(lv, { cache: memoCache, ver: memoVer, epoch: memoEpoch, sumSig: memoSumSig, out });
   else builtMemo.delete(lv);
+  shimDiag.rowsMadeLast = rowsMade;
+  shimDiag.rowsReusedLast = out.length - rowsMade;
   recordBuildPhases({ fetchMs: tFetchDone - tStart, storageMs: (tStorageDone || tSideDone) - tStart, sideWaitMs: tSideDone - tFetchDone, mapMs: Date.now() - tSideDone, rows: out.length });
   if (wantHandles.size) {
     try {

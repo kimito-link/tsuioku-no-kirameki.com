@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1983',
+    date: '2026-11-10',
+    summary: '生放送中の大きな記録を軽くする',
+    items: Object.freeze([
+      'コメントがとても多い配信を生放送中に開いているとき、3秒ごとの見回りが新着だけを扱うようにして、横の欄が固まる時間を減らしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1982',
     date: '2026-11-10',
     summary: '大きな記録で診断の数え直しを減らす',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '大きな配信で記録の組み立てを重ねない',
     items: Object.freeze([
       'YouTube・Twitch・Kick などで記録が数千件を超えると、横の欄が記録を組み立て直すのに1回数秒かかり、終わる前に次の組み立てが始まって何本も重なっていました(Kick 1万3千件で 8分に 303回・合計 766秒)。組み立て中は新しく始めずにそれを待ち、終わってから1.5秒は同じ結果を使うようにしました。表示は変わりません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1963',
-    date: '2026-11-09',
-    summary: '配信情報の読み込みが返らないと止まる所を直す',
-    items: Object.freeze([
-      'Kick・Twitch・SHOWROOM・ミクチャ・TikTok で、配信の情報(同時接続など)を読みに行ったときに返事が返ってこないと、それ以降ずっと読み直さない作りになっていました。15秒で打ち切って、次の見回りで読み直すようにしました'
     ])
   })
 ]);

@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 70</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 71</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -196,6 +196,7 @@
 - `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
 - `src/lib/youtube/ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
 - `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
+- `src/lib/youtube/ytTailAfterFull.js` — v0.1.1983: 全件を一度渡したあとのテール(新着の差分)を、短くして渡す。
 - `src/lib/youtube/ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
 
 </details>
@@ -1486,6 +1487,7 @@
 - `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく
 
 ### その他 (10版)
+- `v0.1.1983` 2026-11-10 — 生放送中の大きな記録を軽くする
 - `v0.1.1977` 2026-11-10 — 大きな記録を少しずつ読み、開いた直後も固まらない
 - `v0.1.1976` 2026-11-10 — 人の多い配信で名前と顔の控えを書く回数を減らす
 - `v0.1.1974` 2026-11-10 — YouTube系でコメントの控えの全件書き込みをやめる
@@ -1495,4 +1497,3 @@
 - `v0.1.1968` 2026-11-10 — 声の割り当ての書き直しを30秒に1回へ
 - `v0.1.1966` 2026-11-09 — 横の欄を開いた直後の読み込みを同時に
 - `v0.1.1964` 2026-11-09 — 大きな配信で記録の組み立てを重ねない
-- `v0.1.1963` 2026-11-09 — 配信情報の読み込みが返らないと止まる所を直す

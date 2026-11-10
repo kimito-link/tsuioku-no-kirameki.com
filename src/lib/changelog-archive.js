@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1963',
+    date: '2026-11-09',
+    summary: '配信情報の読み込みが返らないと止まる所を直す',
+    items: Object.freeze([
+      'Kick・Twitch・SHOWROOM・ミクチャ・TikTok で、配信の情報(同時接続など)を読みに行ったときに返事が返ってこないと、それ以降ずっと読み直さない作りになっていました。15秒で打ち切って、次の見回りで読み直すようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1962',
     date: '2026-11-09',
     summary: 'ギフトの欄の読み込みを1回にまとめる',
