@@ -3,6 +3,7 @@
   "buildCommand": null,
   "installCommand": null,
   "outputDirectory": ".",
+  "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "headers": [
     {
       "source": "/(.*)",
