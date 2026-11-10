@@ -479,8 +479,9 @@ export default [
     // v0.1.1914: 過去の番号を吹き出さない定数(コメント2行)と state の hiNo・計器への1行=+6。判定は lib の venueSpeech.js(oldNoGap)。
     // v0.1.1960: 会場の数字の帯(りんく「これを会場モードでもいれたほうが利便性たかい」)の配線=+36(import 3行・帯を作る8行・描く関数14行・catch-up/onChanged/見回り)。値の決め方と DOM・CSS は lib の venueStatStrip.js。
     // v0.1.1995: パネルを開かなくても数字の帯が出る(りんく「POPをひらかなくても数字がつくように」)の配線=+9(import 1行・自分で作る写しの置き場と見回り役 8行)。作り方は lib の venueStatCardsSelf.js。
+    // v0.1.2005: 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない(PC 実測: ニコ生で最初の約1分、古い数字で止まる)の配線=+2。判定は lib の venueStatCardsSelf.js(createStatMirrorLiveness)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7492, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7494, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

@@ -67,7 +67,7 @@ function formatCount(n) {
  * 鏡(と記録件数の正本)から、帯に出す8つの数字を決める純関数。
  *
  * @param {any} snap KEY_STAT_CARDS_MIRROR の中身(StatCardsMirrorSnapshot)。null 可
- * @param {{ liveId?: string, nowMs?: number, recordedCount?: number|null, staleMs?: number, selfSnap?: any }} [opts]
+ * @param {{ liveId?: string, nowMs?: number, recordedCount?: number|null, staleMs?: number, selfSnap?: any, mirrorLive?: boolean }} [opts]
  *   recordedCount: panel_summary の recordedCount(selectDisplayRecordedCount 済み)。パネルが閉じていても動く記録件数
  *   selfSnap: 会場が自分で作った写し(同じ形)。鏡が無い/古く、これが同じ配信で新しいときだけ使う
  * @returns {VenueStatStripModel}
@@ -88,7 +88,9 @@ export function buildVenueStatStripModel(snap, opts = {}) {
   const mirror = judge(snap);
   const self = judge(opts.selfSnap);
   // 新しい鏡が正。無い/古いときだけ、会場が自分で作った新しい写しを使う。
-  const useSelf = !mirror.fresh && self.fresh;
+  // mirrorLive===false: 鏡は新しく見えても、パネルが動いていない(隠れた欄が開いた瞬間に1回書いたきり)=写しがあれば写しを出す。
+  //   2026-11-10 PC 実測: ニコ生で開いて最初の約1分、開いた瞬間の値(記録 1 など)のまま止まった。
+  const useSelf = self.fresh && (!mirror.fresh || opts.mirrorLive === false);
   const picked = useSelf ? self : mirror;
   const s = picked.o;
   const usable = picked.ok;
