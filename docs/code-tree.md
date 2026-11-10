@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1182 件
+## ⚠️ 役割コメントが無いソース 10 / 1183 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1175,7 +1175,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2325)
+- 📁 **src/** (2327)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1478,7 +1478,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2046)
+  - 📁 **lib/** (2048)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3379,6 +3379,8 @@
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
     - `venueSpeechSupport.wiring.test.js`
+    - `venueStatCardsSelf.js` — 会場が自分で作る「数字カードの写し」(2026-11-10 りんく「POPをひらかなくても数字がつくようにしてほしい」)。
+    - `venueStatCardsSelf.test.js`
     - `venueStatStrip.js` — 会場モードの「数字の帯」(2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」)。
     - `venueStatStrip.test.js`
     - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
