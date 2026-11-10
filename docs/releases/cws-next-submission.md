@@ -1,3 +1,12 @@
+# ★次に出す版の宿題(2026-11-10 点検で発覚): Twitch の権限 `https://www.twitch.tv/*` が 0.1.1916 から manifest に入っている
+
+- 0.1.1901(審査中)には入っていない。**次の提出で権限が増える**=ダッシュボードから手でアップロードする(AGENTS §2)。
+- 貼り直す欄: 単一用途(§1)に Twitch を足す・ホスト権限の統合欄(§2-8z)に [cws-submission-texts.md](cws-submission-texts.md) §2-9c を入れる(1,000字に収まるよう詰める)。
+- `privacy.html` §4-1c に Twitch を記載済み(2026-11-10)。「詳細な説明」([cws-store-listing.md](cws-store-listing.md))にも Twitch を足す。
+- PR #591(Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)を入れるなら、同じ3点(privacy.html・単一用途/ホスト権限・詳細な説明)をその PR の中で足す。
+
+---
+
 # ★2026-11-06 0.1.1901 を提出済み（YouTube 同梱＋サポーター課金をまとめて1回で）。下の2つのメモはこの版の内容。
 
 # ★0.1.1897〜(サポーター=有料のマーケ HTML)の提出メモ(2026-11-06・YouTube 同梱と一緒に出す)
