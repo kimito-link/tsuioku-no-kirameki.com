@@ -35,7 +35,10 @@ import {
   classifyPrompt, parseCategory, selectMembers, CATEGORIES, weightOf,
 } from './council-roles.mjs';
 import { LINEUP, ENV_NAMES } from './council-lineup.mjs';
-import { orderSynthChain, shouldWaitAndRetry } from './council-synth.mjs';
+import {
+  orderSynthChain, shouldWaitAndRetry,
+  SYNTH_MAX_TOKENS, buildSynthSystem, buildSynthPrompt, checkSynthAnswer, pickLeastIncomplete,
+} from './council-synth.mjs';
 
 const args = process.argv.slice(2);
 let question = '';
@@ -139,8 +142,6 @@ const REVISE = process.env.COUNCIL_REVISE === '1' || QUALITY;
 const SYNTH = process.env.COUNCIL_SYNTH !== '0' || QUALITY;
 // 統合役を「最強クラウド」に固定するか（2026-07-04設計・既定ON）。0で従来のlead選出に戻す。
 const SYNTH_STRONG = process.env.COUNCIL_SYNTH_STRONG !== '0';
-// ②統合の出力指定（council-roles の DEFAULT_FORMAT と同じ4ブロックを短文で示す）。
-const DEFAULT_FORMAT_HINT = '「結論／根拠／反論・リスク／具体案」';
 // 2026-07-03 設計: QUALITY時はCRITICS=2が2席使うため want 側が痩せないよう既定+1(5)。
 const MAX_MEMBERS = Number(process.env.COUNCIL_MAX_MEMBERS) || (QUALITY ? 5 : 4);
 
@@ -172,7 +173,17 @@ let OLLAMA = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
 if (!/^https?:\/\//.test(OLLAMA)) OLLAMA = 'http://' + OLLAMA;
 OLLAMA = OLLAMA.replace('0.0.0.0', '127.0.0.1');
 
-/** @typedef {{label:string, role:string, kind:string, run:(prompt:string, system?:string)=>Promise<string>}} Member */
+/** @typedef {{label:string, role:string, kind:string, run:(prompt:string, system?:string, o?:{minOutTokens?:number})=>Promise<string>}} Member */
+
+/**
+ * 出力上限を呼び出しごとに引き上げる（2026-11-10・②統合用）。o.minOutTokens が無ければ何も変えない。
+ * 名簿の opts に max_tokens を実測で決めてあるモデル（例: groq/qwen3.8-27b の800）は、その値を動かさない
+ * ——上げると構造的に落ちると確かめてある値だから。
+ */
+function outOpts(opts, o) {
+  if (!o?.minOutTokens || opts?.max_tokens) return opts;
+  return { ...(opts || {}), max_tokens: o.minOutTokens };
+}
 
 /**
  * thinking 系モデル（qwen3.6-27b / qwen3-32b 等）が content に混ぜる <think>…</think> を除去する。
@@ -276,11 +287,11 @@ async function geminiChat(model, prompt, system = '', timeoutMs = 90000) {
 }
 
 /** Anthropic Messages API を叩く（OpenAI非互換: x-api-key / system別フィールド / content配列）。 */
-async function anthropicChat(model, prompt, system = '', timeoutMs = 120000) {
+async function anthropicChat(model, prompt, system = '', timeoutMs = 120000, maxTokens = 1600) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const body = { model, max_tokens: 1600, temperature: 0.6, messages: [{ role: 'user', content: prompt }] };
+    const body = { model, max_tokens: maxTokens, temperature: 0.6, messages: [{ role: 'user', content: prompt }] };
     if (system) body.system = system;
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal: ctrl.signal,
@@ -300,13 +311,13 @@ async function anthropicChat(model, prompt, system = '', timeoutMs = 120000) {
 }
 
 /** ollama /api/generate(stream:false)。spinner汚染を避けるため run でなく API。 */
-async function ollamaChat(model, prompt, system = '', timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS) || 180000) {
+async function ollamaChat(model, prompt, system = '', timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS) || 180000, numPredict = 1600) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const body = {
       model, prompt, stream: false, think: false,
-      options: { temperature: 0.6, num_predict: 1600 },
+      options: { temperature: 0.6, num_predict: numPredict },
     };
     if (system) body.system = system;
     const r = await fetch(`${OLLAMA}/api/generate`, {
@@ -335,9 +346,9 @@ const CF_URL = CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}
 // 記録して1行報告し、そのまま投げ直す（本セッションの以降のラウンド/敗者復活選定は
 // exhaustedLabels を見て除外する側の責務。ここでは記録だけ行う・永続化はしない）。
 const push = (label, kind, run, rawId = '', provider = '') => {
-  const wrapped = async (p, s) => {
+  const wrapped = async (p, s, o) => {
     try {
-      return await run(p, s);
+      return await run(p, s, o);
     } catch (e) {
       if (e?.tpdExhausted && !exhaustedLabels.has(label)) {
         exhaustedLabels.add(label);
@@ -359,13 +370,13 @@ const push = (label, kind, run, rawId = '', provider = '') => {
 // （片方に足し忘れると該当メンバーが無言で消える。下の欠落ログはそれを可視化する）。
 const ENV_FLAGS = { G, N, O, E, CF, CF_ACC, SN, MI };
 const PROVIDER_RUN = {
-  groq: (entry) => (p, s) => openaiChat(GROQ, G, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
+  groq: (entry) => (p, s, o) => openaiChat(GROQ, G, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
   gemini: (entry) => (p, s) => geminiChat(entry.apiModel, p, s, entry.timeoutMs || undefined),
-  nvidia: (entry) => (p, s) => openaiChat(NV, N, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
-  cloudflare: (entry) => (p, s) => openaiChat(CF_URL, CF, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
-  openrouter: (entry) => (p, s) => openaiChat(OR, O, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
-  sambanova: (entry) => (p, s) => openaiChat(SNV, SN, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
-  mistral: (entry) => (p, s) => openaiChat(MIS, MI, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
+  nvidia: (entry) => (p, s, o) => openaiChat(NV, N, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
+  cloudflare: (entry) => (p, s, o) => openaiChat(CF_URL, CF, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
+  openrouter: (entry) => (p, s, o) => openaiChat(OR, O, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
+  sambanova: (entry) => (p, s, o) => openaiChat(SNV, SN, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
+  mistral: (entry) => (p, s, o) => openaiChat(MIS, MI, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
 };
 // openaiChat/geminiChat の timeoutMs 既定引数を上書きしないよう、未指定時は
 // 呼び出し側の既定値に委ねる（下の runFor が entry.timeoutMs 未設定なら省略する）。
@@ -377,7 +388,7 @@ function runFor(entry) {
     if (entry.provider === 'groq' || entry.provider === 'nvidia' || entry.provider === 'cloudflare' || entry.provider === 'openrouter' || entry.provider === 'sambanova' || entry.provider === 'mistral') {
       const url = { groq: GROQ, nvidia: NV, cloudflare: CF_URL, openrouter: OR, sambanova: SNV, mistral: MIS }[entry.provider];
       const key = { groq: G, nvidia: N, cloudflare: CF, openrouter: O, sambanova: SN, mistral: MI }[entry.provider];
-      return (p, s) => openaiChat(url, key, entry.apiModel, p, s, entry.opts);
+      return (p, s, o) => openaiChat(url, key, entry.apiModel, p, s, outOpts(entry.opts, o));
     }
     if (entry.provider === 'gemini') return (p, s) => geminiChat(entry.apiModel, p, s);
   }
@@ -423,7 +434,7 @@ for (const entry of LINEUP) {
 // キーを env に入れた日から自動で会議に降臨する（プランA・従量課金）。OpenAI 非互換なので専用 fetch。
 const ANTHRO = process.env.ANTHROPIC_API_KEY;
 const ANTHRO_MODEL = process.env.COUNCIL_CLAUDE_MODEL || 'claude-opus-5-5';
-if (ANTHRO) push(`anthropic/${ANTHRO_MODEL}`, 'cloud', (p, s) => anthropicChat(ANTHRO_MODEL, p, s));
+if (ANTHRO) push(`anthropic/${ANTHRO_MODEL}`, 'cloud', (p, s, o) => anthropicChat(ANTHRO_MODEL, p, s, undefined, o?.minOutTokens || undefined));
 // ローカル(オフライン保険・別頭脳・無料無制限)。MEETING_LOCAL_MODELS=csv で上書き可。
 // ※ glm-5.2:cloud は Ollama サブスク必須(無料は subscription エラー)のため不採用。
 // 2026-06-24 棚卸し: gemma4:31b(19GB/最重量・統括は latest+Opus で代替) を削除。
@@ -461,7 +472,7 @@ const localModels = (process.env.MEETING_LOCAL_MODELS || LOCAL_DEFAULT.join(',')
 for (const m of localModels) {
   // provider='ollama' で起動時ライブ実在チェックに参加させる（下記 fetchLiveModelIds 参照）。
   // rawId=モデル名そのもの（Ollamaは1台構成でIDのゆらぎが無いためlabelと同じでよい）。
-  push(`local/${m}`, 'local', (p, s) => ollamaChat(m, p, s), m, 'ollama');
+  push(`local/${m}`, 'local', (p, s, o) => ollamaChat(m, p, s, undefined, o?.minOutTokens || undefined), m, 'ollama');
 }
 
 // ── 起動時ライブ実在チェック（2026-07-01 追加）────────────────────────────────
@@ -574,11 +585,16 @@ async function verifyLiveModels() {
 /** あるメンバーに、役割注入込みの prompt/system を作って1回実行する。 */
 async function askOnce(member, taskText, extraContext = '') {
   let system = '';
-  if (ROLES_ON) {
+  // ★member.systemOverride（②統合だけが付ける）があれば、モデル名から決まる役割文より優先する。
+  //  モデル名で決めると、統合の筆頭 groq/gpt-oss-120b が「批判役」の型を受け取り、統合せずに批判文を返していた
+  //  （2026-11-10・理由は council-synth.mjs 冒頭）。
+  if (typeof member.systemOverride === 'string') {
+    system = member.systemOverride;
+  } else if (ROLES_ON) {
     system = buildSystem({ modelName: member.label, taskText }).system;
   }
   const prompt = extraContext ? `${taskText}\n\n${extraContext}` : taskText;
-  return member.run(prompt, system);
+  return member.run(prompt, system, member.minOutTokens ? { minOutTokens: member.minOutTokens } : undefined);
 }
 
 /**
@@ -997,33 +1013,50 @@ async function council(members, label, key) {
         console.error(`[${label}] ②統合: 入力見積もり約${estimatedTokens}トークン → 上限の小さい ${moved.join(', ')} を後ろへ回す`);
         noteEvent('synth-reordered', { round: label, moved, estimatedTokens });
       }
-      const synthPrompt = () =>
-        `【会議メンバー全員の回答（批判・修正済み）】\n${all}\n\n` +
-        `あなたは統括役。次の手順で統合すること:\n` +
-        `(1)対立点の列挙: メンバー間で結論が食い違う点を箇条書きで挙げる。批判役同士の指摘が食い違う場合も対立点として挙げ、どちらが正しいか判定する。無ければ「対立なし」と書く。\n` +
-        `(2)判定: 各対立点についてどちらを採るか理由付きで決める。単なる折衷は禁止。両者の前提を組み替えて両立させる第三案が実在する場合のみ、それを採ってよい。\n` +
-        `(3)少数意見の検分: 多数派の前提そのものを否定する意見があれば、無視せず「採用/却下＋理由」を明示する。【最重要】印の付いた批判が最終案で解決されているかを必ず確認する。\n` +
-        `(4)自己検証: 自分の統合ロジックを2文で要約し、(2)の判定と矛盾していないことを確かめてから最終案を書く。\n` +
-        `最終案は ${DEFAULT_FORMAT_HINT} の4見出しで。優先順位を付け、何を捨てるかまで決める。あれもこれもにしない。` +
-        `最終案は『A案/B案どちらにしますか』と問い返さず、【判断基準】の順（ガードレール→LTV÷CPA→回収の早さ→保守の手間の少なさ）で1案に断定する。`;
+      // 2026-11-10: 統合役へ渡す文（system・本文）と、手順が書かれたかの検査は council-synth.mjs に置く。
+      //  統合役には「統合役だけの system」と「広げた出力上限」を付けて呼ぶ（モデル名から決まる役割文は使わない）。
+      const synthSystem = buildSynthSystem();
+      const synthPrompt = () => buildSynthPrompt(all);
+      const asSynth = (cand) => ({ ...cand, role: 'lead', systemOverride: synthSystem, minOutTokens: SYNTH_MAX_TOKENS });
+      // 手順(1)〜(4)か4見出しが欠けた統合は「成立」にしない。次の候補へ進み、最後まで全部そろわなければ
+      // 欠けの最も少ない1件を「手順欠け」と名前に付けて残す（黙って成功扱いにしない・捨てもしない）。
+      const incomplete = [];
+      let synthDone = false;
       for (let ci = 0; ci < chain.length; ci++) {
         const cand = chain[ci];
         console.error(`[${label}] ②統合: ${cand.label} が1案に束ねる${ci > 0 ? '（次点フォールバック）' : ''}`);
-        let sres = await runRound([{ ...cand, role: 'lead' }], question, synthPrompt);
+        let sres = await runRound([asSynth(cand)], question, synthPrompt);
         if (sres[0]?.error && ci === 0 && shouldWaitAndRetry(sres[0].error)) {
           const w = tpmWaitMs(sres[0].error);
           console.error(`[${label}] ②統合: 筆頭 ${cand.label} がTPM 429 → ${Math.round(w / 1000)}秒待って同一入力で1回だけ再試行`);
           await new Promise(r => setTimeout(r, w));
-          sres = await runRound([{ ...cand, role: 'lead' }], question, synthPrompt);
+          sres = await runRound([asSynth(cand)], question, synthPrompt);
         }
         if (sres[0] && !sres[0].error) {
-          shown.push({ ...sres[0], label: cand.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
-          break;
+          const check = checkSynthAnswer(sres[0].answer);
+          if (check.ok) {
+            shown.push({ ...sres[0], label: cand.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
+            synthDone = true;
+            break;
+          }
+          const lacking = [...check.missingSteps, ...check.missingBlocks.map(b => '見出し:' + b)];
+          incomplete.push({ cand, res: sres[0], check, lacking });
+          noteEvent('synth-steps-missing', { round: label, cand: cand.label, missing: lacking });
+          console.error(`[${label}] ②統合: ${cand.label} の統合文に ${lacking.join('・')} が無い`
+            + (ci < chain.length - 1 ? ' → 次点へ' : ''));
+          continue;
         }
         noteEvent('synth-failed', { round: label, cand: cand.label, error: String(sres[0]?.error || '(no result)').slice(0, 120) });
         console.error(`[${label}] ②統合失敗: ${cand.label}: ${String(sres[0]?.error || '(no result)').slice(0, 120)}`
           + (ci < chain.length - 1 ? ' → 次点へ' : ''));
-        if (ci === chain.length - 1) {
+      }
+      if (!synthDone) {
+        const best = pickLeastIncomplete(incomplete);
+        if (best) {
+          console.error(`[${label}] ②統合: 手順がそろった統合は無し。欠けの最も少ない ${best.cand.label} を「手順欠け」として残す（${best.lacking.join('・')} は司令塔が補うこと）`);
+          noteEvent('synth-incomplete-kept', { round: label, cand: best.cand.label, missing: best.lacking });
+          shown.push({ ...best.res, label: best.cand.label + ' [統合・手順欠け]', role: 'lead', ms: best.res.ms, synthesis: true, stepsMissing: best.lacking });
+        } else {
           console.error(`[${label}] ②統合: 全候補失敗。統合なしで素の回答のみ記録する（司令塔が手動で統合すること）`);
           noteEvent('synth-none', { round: label, tried: chain.length });
         }
