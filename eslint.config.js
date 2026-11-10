@@ -418,7 +418,8 @@ export default [
     // v0.1.1982: 大きな記録で診断用の数え上げを毎回やり直さない配線(+6: import・状態2つ・入口2か所・切替時の初期化)。仕組みは lib の storyDiagCountsPace.js。
     // v0.1.1985: 描き直しがどの段で待っているかの計器(+10: import・生成と公開・段の入口7か所)と、1回まるごとの時間を間隔係へ知らせる配線(+6)。
     //   同じ版で名前・顔の控えの学ぶ/補う/刈るを lib へ出して -11。計器は lib の refreshStageClock.js、間隔は popupStorageRefreshCoalesce.js。
-    rules: { 'max-lines': ['error', { max: 21876, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1986: 描き直し1回ごとに休みの門へ知らせる配線と、走っている最中は定期の見回りで次を積まない配線(+5: 理由の注記4行・判定1行・計器1行・古い1行を削除)。
+    rules: { 'max-lines': ['error', { max: 21881, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

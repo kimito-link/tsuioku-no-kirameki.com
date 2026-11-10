@@ -69,3 +69,34 @@ describe('popup の配線', () => {
     expect(src).toContain('const r = mergeEntriesIntoUserCommentProfileMap(popupUserCommentProfileMap, arr);');
   });
 });
+
+describe('行ごとに学んだ・補ったときと同じ結果(v0.1.1986 の近道)', () => {
+  // 近道なしの素直なやり方(1985 までと同じ手順)と比べる
+  const naive = async (map, arr, nowMs) => {
+    const { upsertUserCommentProfileFromEntry, applyUserCommentProfileMapToEntries, pruneUserCommentProfileMap } = await import('./userCommentProfileCache.js');
+    for (const e of arr) upsertUserCommentProfileFromEntry(map, e);
+    const ap = applyUserCommentProfileMapToEntries(arr, map);
+    return { arr: ap.patched > 0 ? ap.next : arr, map: pruneUserCommentProfileMap(map, undefined, { nowMs }) };
+  };
+  const strip = (m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { nickname: v.nickname, avatarUrl: v.avatarUrl }]));
+  it('名前を変えた人(A→B→A)・顔が途中から付く人・名前の無い行が混ざっても同じ', async () => {
+    const REAL_NOW = Date.now(); // 素直なやり方は更新時刻に本物の「いま」を使うので、刈る基準も本物の時刻にする
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const nicks = ['', 'a', 'alice', 'アリス', 'user12345', '匿名', 'longer name here'];
+    const arr = Array.from({ length: 3000 }, (_, i) => {
+      const u = Math.floor(rnd() * 120);
+      return {
+        userId: String(100000 + u),
+        nickname: nicks[Math.floor(rnd() * nicks.length)],
+        avatarUrl: rnd() < 0.5 ? '' : `https://example.com/icon/${u}-${Math.floor(rnd() * 2)}.png`,
+        capturedAt: REAL_NOW - 100000 + i
+      };
+    });
+    const a = mergeEntriesIntoUserCommentProfileMap({}, arr, { nowMs: REAL_NOW });
+    const b = await naive({}, arr, REAL_NOW);
+    expect(Object.keys(b.map).length).toBeGreaterThan(50); // 比べる相手が空でないこと
+    expect(strip(a.map)).toEqual(strip(b.map));
+    expect(a.arr).toEqual(b.arr);
+  });
+});

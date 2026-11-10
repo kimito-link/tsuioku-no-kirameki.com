@@ -418,10 +418,27 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
 }
 
 /** @param {string} name */
-const normName = (name) => String(name || '').trim().replace(/^@/, '').toLowerCase();
+// ★v0.1.1986: 同じ名前は何万回も聞かれる(8万行・6,500人の配信で、組み立てのたびに行ごとに2〜3回)。文字列は前の答えを使う(結果は同じ)。
+/** @type {Map<string, string>} */
+const normNameMemo = new Map();
+const normName = (name) => {
+  if (typeof name !== 'string') return String(name || '').trim().replace(/^@/, '').toLowerCase();
+  let v = normNameMemo.get(name);
+  if (v === undefined) {
+    v = name.trim().replace(/^@/, '').toLowerCase();
+    if (normNameMemo.size >= 50_000) normNameMemo.clear();
+    normNameMemo.set(name, v);
+  }
+  return v;
+};
 
 /** @param {unknown} url @returns {string} https の顔の画像だけ(仮の絵・空は '') */
 function ytUsableIcon(url) {
+  // ★v0.1.1986: ふつうの形(https:// で始まり、最後が半角の文字)は整形と正規表現を通さずに返す(結果は同じ)
+  if (typeof url === 'string' && url.startsWith('https://')) {
+    const last = url.charCodeAt(url.length - 1);
+    if (last > 32 && last < 127) return url;
+  }
   const u = String(url || '').trim();
   return /^https:\/\//i.test(u) ? u : '';
 }

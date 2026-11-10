@@ -55,7 +55,10 @@ export function isRecommendedUserChipPollutionRow(entry) {
   if (!entry || typeof entry !== 'object') return false;
   const userId = String(/** @type {{ userId?: unknown }} */ (entry).userId || '').trim();
   if (!/^\d{5,14}$/.test(userId)) return false;
-  const text = String(/** @type {{ text?: unknown }} */ (entry).text || '')
+  const rawText = String(/** @type {{ text?: unknown }} */ (entry).text || '');
+  // ★v0.1.1986: 下の判定はどれも本文に ID の数字が入っているときだけ当たる。入っていない行(ほぼ全部)は空白の整形をせずに帰る(結果は同じ)
+  if (!rawText.includes(userId)) return false;
+  const text = rawText
     .replace(/\u00a0/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

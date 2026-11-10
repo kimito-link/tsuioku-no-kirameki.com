@@ -87,7 +87,15 @@ describe('popup の配線', () => {
   it('定期の見回りだけが門を通る(見送るときは数字カードだけ更新)', () => {
     expect(src).toContain('if (_refreshDutyGate.shouldSkip(Date.now())) { void applyLightweightPanelSummaryCards(); return; }');
   });
-  it('描き直し1回の時間は safeRefresh で測る', () => {
-    expect(src).toContain('_refreshDutyGate.noteRun(_refreshT0, Date.now());');
+  it('描き直し1回ごとに門へ知らせる(続けて走る分が全部終わるのを待たない・v0.1.1986)', () => {
+    const at = src.indexOf('const refreshCoalescer = createRefreshCoalescer(() => {');
+    expect(at).toBeGreaterThan(0);
+    const body = src.slice(at, src.indexOf('const safeRefresh = () => {', at));
+    expect(body).toContain('_refreshDutyGate.noteRun(t0, Date.now());');
+    expect(src).not.toContain('_refreshDutyGate.noteRun(_refreshT0');
+  });
+  it('描き直しが走っている最中は、定期の見回りで次の1回を積まない(v0.1.1986)', () => {
+    const at = src.indexOf('if (_refreshDutyGate.shouldSkip(Date.now()))');
+    expect(src.slice(at - 200, at)).toContain('if (refreshCoalescer.isRunning()) { void applyLightweightPanelSummaryCards(); return; }');
   });
 });

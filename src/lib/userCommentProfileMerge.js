@@ -34,11 +34,21 @@ export function mergeEntriesIntoUserCommentProfileMap(map, arr, opts = {}) {
   const beforeCount = Object.keys(before).length;
   /** @type {Map<string, number>} この回で新しく入った人 → 最後に見た時刻 */
   const lastSeenOfNew = new Map();
+  // ★v0.1.1986: 同じ人の、直前に学んだのと同じ名前・同じ顔の行は学び直さない(同じ入力を続けて学んでも控えは変わらない)。
+  //   名前を変えた人(A→B→A)は変わり目ごとに学ぶので、行ごとに学んだときと結果は同じ。
+  /** @type {Map<string, string>} 人 → 直前に学んだ「名前\0顔」 */
+  const lastLearned = new Map();
   for (const e of arr) {
-    const row = /** @type {{ userId?: unknown, capturedAt?: unknown }} */ (e);
-    const changed = upsertUserCommentProfileFromEntry(map, /** @type {any} */ (e));
+    const row = /** @type {{ userId?: unknown, capturedAt?: unknown, nickname?: unknown, avatarUrl?: unknown }} */ (e);
     const uid = String(row?.userId || '').trim();
-    if (!uid || before[uid]) continue;
+    if (!uid) continue;
+    const sig = `${String(row?.nickname || '')}\u0000${String(row?.avatarUrl || '')}`;
+    let changed = false;
+    if (lastLearned.get(uid) !== sig) {
+      lastLearned.set(uid, sig);
+      changed = upsertUserCommentProfileFromEntry(map, /** @type {any} */ (e));
+    }
+    if (before[uid]) continue;
     if (!changed && !lastSeenOfNew.has(uid)) continue;
     const at = toEpochMs(row?.capturedAt); // 時刻の読み方は timeAuthority に任せる
     const seen = at >= 1_000_000_000_000 ? Math.min(nowMs, at) : nowMs;

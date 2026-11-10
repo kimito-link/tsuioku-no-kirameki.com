@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1966',
+    date: '2026-11-09',
+    summary: '横の欄を開いた直後の読み込みを同時に',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで横の欄が記録を組み立てるとき、記録と顔の控え3つを1つずつ順番に読んでいたのを、同時に読み始めるようにしました。開いた直後の最初の表示がどこで待っているかを測る計器も足しました。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1965',
     date: '2026-11-09',
     summary: '人が多い配信で横の欄の描き直しを軽く',

@@ -9,6 +9,8 @@ import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
  * @returns {boolean}
  */
 export function isHttpOrHttpsUrl(url) {
+  // ★v0.1.1986: 行ごと・人ごとに何万回も呼ばれる。ふつうの形(小文字で始まる文字列)は整形と正規表現を通さずに答える(結果は同じ)
+  if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) return true;
   const s = String(url || '').trim();
   return /^https?:\/\//i.test(s);
 }

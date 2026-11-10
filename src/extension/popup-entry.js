@@ -1521,6 +1521,7 @@ let _refreshReasonTag = 'unknown';
 /** @param {string} reason 描き直し(または見送り)の理由を1件積む。 */
 function noteRepaintReason(reason) {
   _repaintReasonCounts = addRepaintReason(_repaintReasonCounts, reason);
+  try { const d = /** @type {any} */ (globalThis).__refreshStageDiag; if (d) d.reasons = _repaintReasonCounts; } catch { /* 計器だけ */ } // v0.1.1986: 何が描き直しを起こしたかを段の計器と並べて読む
 }
 /** @param {string} tag 次の paint をこのタグで計上する。 */
 function tagRefreshReason(tag) {
@@ -19439,11 +19440,14 @@ async function initPopup() {
     return Promise.resolve(refresh()).finally(() => {
       _refreshStageClock.end(Date.now());
       coalescedRefreshScheduler.noteCycleCost(Date.now() - t0);
+      // ★v0.1.1986: 休みの門には1回ごとに知らせる。前は「続けて走る分が全部終わってから」知らせていたので、
+      //   走っている最中に定期の見回りが「あとでもう1回」を積み続けると、いつまでも終わらず門が一度も閉じなかった
+      //   (PC 実測・CPU 4倍遅く: 門の runs が 300秒たっても 0。手元の生放送のまね: 12回が切れ目なく続いた)。
+      _refreshDutyGate.noteRun(t0, Date.now());
     });
   });
   const safeRefresh = () => {
     if (!hasExtensionContext()) return Promise.resolve();
-    const _refreshT0 = Date.now();
     return refreshCoalescer.request()
       .catch((e) => {
         if (!isExtensionContextInvalidatedError(e)) {
@@ -19451,7 +19455,6 @@ async function initPopup() {
         }
       })
       .finally(() => {
-        _refreshDutyGate.noteRun(_refreshT0, Date.now()); // v0.1.1981: 重い描き直しのあとは定期の見回りを休む(lib/refreshDutyGate.js)
         const wasInitialRefresh = !initialRefreshDone;
         initialRefreshDone = true;
         // 初回 refresh が終わった瞬間、ロードシェードをフェードアウト。
@@ -21544,6 +21547,8 @@ async function initPopup() {
         // v0.1.1037: heavy 全件読み進行中は refresh 見送り(追い越しレース=ちかちか防止)。数字カードは軽量 panel で継続。
         if (watchMetaCache.heavyReadActive) { void applyLightweightPanelSummaryCards(); return; }
         // ★v0.1.1981: 直前の描き直しが重かったら、その3倍の時間は定期の見回りを休む(8万行の配信・遅い PC で画面が描き直しだけで埋まるのを防ぐ)。
+        // ★v0.1.1986: 描き直しが走っている最中は、定期の見回りで「あとでもう1回」を積まない(新しいコメントは storage の知らせが別に積む)。
+        if (refreshCoalescer.isRunning()) { void applyLightweightPanelSummaryCards(); return; }
         if (_refreshDutyGate.shouldSkip(Date.now())) { void applyLightweightPanelSummaryCards(); return; }
         // 0.1.92: stale-while-revalidate パターン。
         //   key だけ無効化して fetch を促し、snapshot 自体は保持して

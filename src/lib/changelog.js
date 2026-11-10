@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1986',
+    date: '2026-11-10',
+    summary: '大きな配信で描き直しが切れ目なく続くのを止めた',
+    items: Object.freeze([
+      'コメントが数万件ある配信(Kick など)を遅いPCで開いているとき、横の欄の描き直しが終わるとすぐ次が始まり、休みなく続いていました。1回終わるごとに休みを入れるようにしました。あわせて、同じ人のコメントの名前と顔の確認を1回で済ませるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1985',
     date: '2026-11-10',
     summary: '重い描き直しのあとは間隔を空ける',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '応援レーンの塗り直しで動かす枚数を最小に',
     items: Object.freeze([
       '応援レーン(アイコンの列)を塗り直すたびに、全員のアイコンをいったん外して付け直していたのを、順番が変わった人・増えた人・減った人だけ動かすようにしました。人数の多い配信で横の欄が重くなるのを和らげます。表示は変わりません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1966',
-    date: '2026-11-09',
-    summary: '横の欄を開いた直後の読み込みを同時に',
-    items: Object.freeze([
-      'YouTube・Twitch・Kick などで横の欄が記録を組み立てるとき、記録と顔の控え3つを1つずつ順番に読んでいたのを、同時に読み始めるようにしました。開いた直後の最初の表示がどこで待っているかを測る計器も足しました。表示は変わりません'
     ])
   })
 ]);

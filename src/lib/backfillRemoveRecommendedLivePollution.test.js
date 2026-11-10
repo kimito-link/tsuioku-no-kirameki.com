@@ -250,3 +250,24 @@ describe('backfillRemoveRecommendedUserChipPollution', () => {
     expect(r.cleaned[0].text).toBe('本物');
   });
 });
+
+describe('isRecommendedUserChipPollutionRow の近道(v0.1.1986)', () => {
+  it('空白の入り方が違っても、近道の前と同じ答えになる', () => {
+    const uid = '12345678';
+    const cases = [
+      [uid, true],
+      [`  ${uid}\u00a0`, true],
+      [`u/${uid}`, true],
+      [`${uid}\u00a0 u/${uid}`, true],
+      [`U/${uid}   ${uid}`, true],
+      [`https://www.nicovideo.jp/user/${uid}/`, true],
+      [`https://www.nicovideo.jp/user/99999999`, false],
+      [`こんにちは ${uid}`, false],
+      ['こんにちは', false],
+      ['', false]
+    ];
+    for (const [text, want] of cases) {
+      expect(isRecommendedUserChipPollutionRow({ userId: uid, text })).toBe(want);
+    }
+  });
+});
