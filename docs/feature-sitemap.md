@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 71</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 72</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -190,6 +190,7 @@
 - `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
 - `src/lib/supporterAccess.js` — 【層】L1 拡張の画面から呼ぶ部品(chrome.storage と fetch を外から受け取る=試験で差し替えられる)
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
+- `src/lib/userCommentProfileMerge.js` — 横の欄(popup)の描き直しごとに、記録の行から名前・顔の控えを学び、行を補い、控えを刈る1回分。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
 - `src/lib/youtube/ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
@@ -1487,6 +1488,7 @@
 - `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく
 
 ### その他 (10版)
+- `v0.1.1984` 2026-11-10 — 人の多い配信で描き直しが続くのを直す
 - `v0.1.1983` 2026-11-10 — 生放送中の大きな記録を軽くする
 - `v0.1.1977` 2026-11-10 — 大きな記録を少しずつ読み、開いた直後も固まらない
 - `v0.1.1976` 2026-11-10 — 人の多い配信で名前と顔の控えを書く回数を減らす
@@ -1496,4 +1498,3 @@
 - `v0.1.1970` 2026-11-10 — 声の割り当ての間引きを作り直し後も保つ
 - `v0.1.1968` 2026-11-10 — 声の割り当ての書き直しを30秒に1回へ
 - `v0.1.1966` 2026-11-09 — 横の欄を開いた直後の読み込みを同時に
-- `v0.1.1964` 2026-11-09 — 大きな配信で記録の組み立てを重ねない

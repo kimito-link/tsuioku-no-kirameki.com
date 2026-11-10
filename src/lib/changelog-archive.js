@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1964',
+    date: '2026-11-09',
+    summary: '大きな配信で記録の組み立てを重ねない',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで記録が数千件を超えると、横の欄が記録を組み立て直すのに1回数秒かかり、終わる前に次の組み立てが始まって何本も重なっていました(Kick 1万3千件で 8分に 303回・合計 766秒)。組み立て中は新しく始めずにそれを待ち、終わってから1.5秒は同じ結果を使うようにしました。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1963',
     date: '2026-11-09',
     summary: '配信情報の読み込みが返らないと止まる所を直す',

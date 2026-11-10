@@ -574,11 +574,10 @@ import {
   applyUserCommentProfileMapToEntries,
   hydrateUserCommentProfileMapFromStorage,
   normalizeUserCommentProfileMap,
-  pruneUserCommentProfileMap,
   readStorageBagWithRetry,
-  upsertUserCommentProfileFromEntry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
+import { mergeEntriesIntoUserCommentProfileMap } from '../lib/userCommentProfileMerge.js';
 import { createStorageKeyMemo } from '../lib/storageKeyMemo.js';
 import {
   isHttpOrHttpsUrl,
@@ -4908,24 +4907,10 @@ function popupMergeUserCommentProfileCache(arr) {
   if (!popupUserCommentProfileMap) {
     return { arr, commentsPatched: false, cacheTouched: false };
   }
-  let cacheTouched = false;
-  for (const e of arr) {
-    if (upsertUserCommentProfileFromEntry(popupUserCommentProfileMap, e)) {
-      cacheTouched = true;
-    }
-  }
-  const ap = applyUserCommentProfileMapToEntries(arr, popupUserCommentProfileMap);
-  const nextArr = ap.patched > 0 ? ap.next : arr;
-  const beforeK = Object.keys(popupUserCommentProfileMap).length;
-  popupUserCommentProfileMap = pruneUserCommentProfileMap(popupUserCommentProfileMap);
-  if (Object.keys(popupUserCommentProfileMap).length !== beforeK) {
-    cacheTouched = true;
-  }
-  return {
-    arr: nextArr,
-    commentsPatched: ap.patched > 0,
-    cacheTouched
-  };
+  // v0.1.1984: 学ぶ・補う・刈るは lib の1関数(人数が上限を超える配信で描き直しが止まらなくなるのを防ぐ・userCommentProfileMerge.js)
+  const r = mergeEntriesIntoUserCommentProfileMap(popupUserCommentProfileMap, arr);
+  popupUserCommentProfileMap = r.map;
+  return { arr: r.arr, commentsPatched: r.commentsPatched, cacheTouched: r.cacheTouched };
 }
 
 /**
@@ -18443,6 +18428,7 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
     noteRepaintReason('self_write_skipped');
     return;
   }
+  _refreshDutyGate.noteChange(Date.now(), keys); // v0.1.1984: 外からの変化を見た(来ていない間は定期の見回りを長く休む・lib/refreshDutyGate.js)
   // v0.1.440: 隠れタブ(他タブが前面)では re-render を skip して多タブ reflow N→1 を達成。
   //   可視復帰時の catch-up は既存 visibilitychange listener が担うので追加処理は不要。
   //   描画パスには触らない＝v0.1.421/422 パネル消失リグレッションを構造的に再発させない。

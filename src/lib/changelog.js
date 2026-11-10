@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1984',
+    date: '2026-11-10',
+    summary: '人の多い配信で描き直しが続くのを直す',
+    items: Object.freeze([
+      '5,000人を超える人がコメントした配信を開くと、何も変わっていないのに描き直しが続いて横の欄が重くなる問題を直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1983',
     date: '2026-11-10',
     summary: '生放送中の大きな記録を軽くする',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '人が多い配信で横の欄の描き直しを軽く',
     items: Object.freeze([
       '人が2,000人を超える配信で、横の欄の描き直しのたびに重かった所を3つ軽くしました。りんく段の札の確認で全員分の文字の配置を計算していた所、段の寸法を測るときに全員分の席を探していた所、顔のない人の絵を覚えておける数(2,000人)を超えて毎回作り直していた所です。表示は変わりません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1964',
-    date: '2026-11-09',
-    summary: '大きな配信で記録の組み立てを重ねない',
-    items: Object.freeze([
-      'YouTube・Twitch・Kick などで記録が数千件を超えると、横の欄が記録を組み立て直すのに1回数秒かかり、終わる前に次の組み立てが始まって何本も重なっていました(Kick 1万3千件で 8分に 303回・合計 766秒)。組み立て中は新しく始めずにそれを待ち、終わってから1.5秒は同じ結果を使うようにしました。表示は変わりません'
     ])
   })
 ]);

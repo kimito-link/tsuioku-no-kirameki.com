@@ -10,16 +10,26 @@
 export const REFRESH_DUTY_REST_FACTOR = 3;
 export const REFRESH_DUTY_MIN_COST_MS = 1000;
 export const REFRESH_DUTY_MAX_REST_MS = 60_000;
+// ★v0.1.1984: 重い描き直しのあと、外からの変化(storage の知らせ)が1つも来ていないなら、定期の見回りは QUIET_MAX_REST_MS まで休む。
+//   終わった配信の大きな記録を開いているだけのとき、何も変わっていないのに 8万行を読み直して描き直していた
+//   (手元の計測・CPU 4倍遅く・2,000人ぶんのマスあり: 1回 約10秒を 40秒おき)。変化の知らせが来たら次の見回りは通す。
+export const REFRESH_DUTY_QUIET_MAX_REST_MS = 300_000;
 
 /**
- * @param {{ restFactor?: number, minCostMs?: number, maxRestMs?: number }} [opts]
+ * @param {{ restFactor?: number, minCostMs?: number, maxRestMs?: number, quietMaxRestMs?: number }} [opts]
  */
 export function createRefreshDutyGate(opts = {}) {
   const restFactor = Number.isFinite(opts.restFactor) ? Math.max(0, Number(opts.restFactor)) : REFRESH_DUTY_REST_FACTOR;
   const minCostMs = Number.isFinite(opts.minCostMs) ? Math.max(0, Number(opts.minCostMs)) : REFRESH_DUTY_MIN_COST_MS;
   const maxRestMs = Number.isFinite(opts.maxRestMs) ? Math.max(0, Number(opts.maxRestMs)) : REFRESH_DUTY_MAX_REST_MS;
+  const quietMaxRestMs = Number.isFinite(opts.quietMaxRestMs) ? Math.max(0, Number(opts.quietMaxRestMs)) : REFRESH_DUTY_QUIET_MAX_REST_MS;
   let restUntil = 0;
-  const diag = { runs: 0, skipped: 0, lastCostMs: 0, lastRestMs: 0, maxCostMs: 0 };
+  /** 直前の1回の始まり・終わり・重かったか、最後に外からの変化を見た時刻 */
+  let lastStart = 0;
+  let lastEnd = 0;
+  let lastHeavy = false;
+  let lastChangeAt = 0;
+  const diag = { runs: 0, skipped: 0, skippedQuiet: 0, changes: 0, lastChangeKeys: '', lastCostMs: 0, lastRestMs: 0, maxCostMs: 0 };
   return {
     diag,
     /**
@@ -38,6 +48,22 @@ export function createRefreshDutyGate(opts = {}) {
       const rest = cost < minCostMs ? 0 : Math.min(maxRestMs, cost * restFactor);
       diag.lastRestMs = Math.round(rest);
       restUntil = e + rest;
+      lastStart = s;
+      lastEnd = e;
+      lastHeavy = cost >= minCostMs;
+    },
+    /**
+     * 外からの変化(自分の書き込み以外の storage の知らせ)を見た。
+     * @param {number} nowMs
+     * @param {string[]} [keys] 変わったキー(計器用)
+     */
+    noteChange(nowMs, keys) {
+      const now = Number(nowMs);
+      if (!Number.isFinite(now)) return;
+      diag.changes += 1;
+      // どのキーの変化だったか(犯人探し用・キーの族だけ。配信の番号は落とす)
+      if (Array.isArray(keys)) diag.lastChangeKeys = keys.slice(0, 4).map((k) => String(k).replace(/\d{4,}/g, '#').slice(0, 40)).join(',');
+      if (now > lastChangeAt) lastChangeAt = now;
     },
     /**
      * 定期の見回りを今回は見送るか。
@@ -45,9 +71,18 @@ export function createRefreshDutyGate(opts = {}) {
      */
     shouldSkip(nowMs) {
       const now = Number(nowMs);
-      if (!Number.isFinite(now) || now >= restUntil) return false;
-      diag.skipped += 1;
-      return true;
+      if (!Number.isFinite(now)) return false;
+      if (now < restUntil) {
+        diag.skipped += 1;
+        return true;
+      }
+      // 重い1回のあと、その始まりより後に変化を1つも見ていないなら、まだ休む(始まりより後の変化は読み落としているかもしれないので通す)
+      if (lastHeavy && lastChangeAt < lastStart && now < lastEnd + quietMaxRestMs) {
+        diag.skipped += 1;
+        diag.skippedQuiet += 1;
+        return true;
+      }
+      return false;
     }
   };
 }
