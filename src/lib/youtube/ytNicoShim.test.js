@@ -83,3 +83,35 @@ describe('コメントの番号(会場・コメビュの「もう読んだか」
     expect(new Set(Object.values(second)).size).toBe(4);
   });
 });
+
+describe('ytNameIndexOf(名前から人を引く表を、同じ記録では作り直さない・0.1.2011)', () => {
+  it('同じ配列なら同じ表を返し、別の配列なら作り直す', async () => {
+    const { ytNameIndexOf } = await import('../../../extension-youtube/src/ytNicoShim.js');
+    const entries = [
+      { userId: '9001', nickname: '@aaa', avatarUrl: 'https://yt3.ggpht.com/a' },
+      { userId: '9002', nickname: '@bbb', avatarUrl: '' },
+    ];
+    const a = ytNameIndexOf(entries);
+    expect(ytNameIndexOf(entries)).toBe(a);
+    expect(a.size).toBe(2);
+    const other = entries.slice();
+    const b = ytNameIndexOf(other);
+    expect(b).not.toBe(a);
+    expect([...b.keys()]).toEqual([...a.keys()]);
+  });
+
+  it('配列でない入力は空の表(控えない)', async () => {
+    const { ytNameIndexOf } = await import('../../../extension-youtube/src/ytNicoShim.js');
+    expect(ytNameIndexOf(/** @type {any} */ (null)).size).toBe(0);
+  });
+
+  it('ytLeaderboardToKoken は表を使い回しても同じ答え', async () => {
+    const { ytLeaderboardToKoken } = await import('../../../extension-youtube/src/ytNicoShim.js');
+    const entries = [{ userId: '9001', nickname: '@aaa', avatarUrl: 'https://yt3.ggpht.com/a' }];
+    const board = { capturedAt: 5, rows: [{ rank: 1, name: '@aaa', xp: 10, iconUrl: '' }] };
+    const k1 = ytLeaderboardToKoken(board, entries, 'lv900000000001');
+    const k2 = ytLeaderboardToKoken(board, entries, 'lv900000000001');
+    expect(k2).toEqual(k1);
+    expect(k1.rows[0].thumbnailUrl).toBe('https://yt3.ggpht.com/a');
+  });
+});

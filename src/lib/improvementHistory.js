@@ -5961,5 +5961,18 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.2010', metric: 'cross-checked-claims', value: 56,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.2011', metric: 'bundle-kb', value: 1429,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '2010 と同じ(変更は YouTube 側の yt-sidepanel.js の中・popup.js は変わらない)'
+  }),
+  Object.freeze({
+    version: '0.1.2011', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2011', metric: 'cross-checked-claims', value: 56,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
   })
 ]);

@@ -647,6 +647,28 @@ async function buildGiftBagsForLv(lv, summary) {
 /** @type {WeakMap<any[], { lv: string, startedAt: number, bags: any }>} 組み立てた行の配列 → ギフトの袋 */
 const giftBagsMemo = new WeakMap();
 
+/** @type {WeakMap<any[], Map<string, { uid: string, icon: string }>>} 組み立てた行の配列 → 名前から人を引く表 */
+const nameIndexMemo = new WeakMap();
+/**
+ * 記録の行から「名前 → 数字IDと顔」の表を作る。同じ配列(組み立ての使い回し)なら前に作った表を返す。
+ *   0.1.2011: 公式の順位を聞かれるたびに全行から作り直していた(会社の PC・8万行・CPU 4倍遅く: 90秒に68回・約2秒)。
+ * @param {any[]} entries
+ * @returns {Map<string, { uid: string, icon: string }>}
+ */
+export function ytNameIndexOf(entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  const hit = nameIndexMemo.get(list);
+  if (hit) return hit;
+  /** @type {Map<string, { uid: string, icon: string }>} */
+  const byName = new Map();
+  for (const e of list) {
+    const n = normName(e?.nickname);
+    if (n && e?.userId) byName.set(n, { uid: String(e.userId), icon: String(e.avatarUrl || '') || byName.get(n)?.icon || '' });
+  }
+  if (Array.isArray(entries)) nameIndexMemo.set(list, byName);
+  return byName;
+}
+
 /**
  * YouTube の「トップファン」(XP 順位)を、ニコ生版の「ギフト貢献度」(公式ランキング)の形にする。
  * 順位表には @handle しか無いので、記録の中の同じ名前の人(=同じ数字ID)に結びつける。
@@ -657,12 +679,7 @@ const giftBagsMemo = new WeakMap();
 export function ytLeaderboardToKoken(board, entries, lv) {
   const rows = Array.isArray(board?.rows) ? board.rows : [];
   if (!rows.length) return null;
-  /** @type {Map<string, { uid: string, icon: string }>} */
-  const byName = new Map();
-  for (const e of Array.isArray(entries) ? entries : []) {
-    const n = normName(e?.nickname);
-    if (n && e?.userId) byName.set(n, { uid: String(e.userId), icon: String(e.avatarUrl || '') || byName.get(n)?.icon || '' });
-  }
+  const byName = ytNameIndexOf(entries);
   return {
     liveId: lv,
     capturedAt: Number(board.capturedAt) || Date.now(),

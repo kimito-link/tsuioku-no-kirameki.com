@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2011',
+    date: '2026-11-10',
+    summary: '公式順位の名前の表を作り直さない',
+    items: Object.freeze([
+      'YouTube・Kick などで公式の応援順位を表示するとき、名前から人を引く表を記録が同じあいだは使い回すようにしました。コメントが数万件ある配信で、遅いPCの固まりが減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2010',
     date: '2026-11-10',
     summary: '人の多い配信で遠い顔は後から読む',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '人の多い配信で名前と顔の控えを書く回数を減らす',
     items: Object.freeze([
       '名前と顔の控えが2,000人を超えたら、横の欄から控え全体を書くのを30秒に1回にしました(8万行の配信で110秒に3.6MB書いていた)。横の欄の中ではこれまでどおりすぐ使います。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1975',
-    date: '2026-11-10',
-    summary: '人がとても多い配信は応援レーンを2,000人までに',
-    items: Object.freeze([
-      '応援レーンの候補が2,000人を超える配信(Kick の大きな配信など)だけ、段の順(りんく→こん太→たぬ姉)・コメントの多い順に2,000人まで顔を並べ、残りはレーン下の「ほか M人」に人数で出します。約6,500人の記録で横の欄が開いた直後から固まっていた件の手当て(りんく決定 2026-11-10)。普段の配信は今までどおり全員です。'
     ])
   })
 ]);
