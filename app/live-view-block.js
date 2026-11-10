@@ -7,7 +7,7 @@
 import { PHONE_BLOCKLIST_KEY, PHONE_BLOCKLIST_MAX, parseBlocklist, recentPeopleForBlock } from '../src/lib/phoneBlocklist.js';
 
 const NICONICO_REPORT_URL = 'https://qa.nicovideo.jp/';
-const CONTACT_MAIL = 'mailto:info@best-trust.biz?subject=%E8%BF%BD%E6%86%B6%E3%81%AE%E3%81%8D%E3%82%89%E3%82%81%E3%81%8D%20%E5%A0%B1%E5%91%8A';
+const CONTACT_MAIL = 'mailto:admin@kimito-link.com?subject=%E8%BF%BD%E6%86%B6%E3%81%AE%E3%81%8D%E3%82%89%E3%82%81%E3%81%8D%20%E5%A0%B1%E5%91%8A';
 
 export function readBlocklist() {
   try { return parseBlocklist(localStorage.getItem(PHONE_BLOCKLIST_KEY)); } catch { return []; }

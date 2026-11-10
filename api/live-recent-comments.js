@@ -85,13 +85,14 @@ async function fetchBinary(url, o) {
 
 /**
  * 保存済み集計(COMMENTS_KEY)から、その番組の対象 uid 集合を作る。
+ *   ★対象は「/live/ のコメント順位表に載っている人」だけ。要求された uid をそのまま足さない
+ *     (足すと、誰でも任意の番組・任意の人の直近発言を引き出せ、任意の lv でニコ生へ取りに行かせられる)。
+ *     集計に無い番組は空集合=呼び出し側が 404 で返し、ニコ生へは行かない。
  * @param {string} lv
- * @param {string} wantUid 要求された uid(必ず含める)。
  * @returns {Promise<Set<string>>}
  */
-async function targetUidsFor(lv, wantUid) {
+async function targetUidsFor(lv) {
   const set = new Set();
-  if (wantUid) set.add(wantUid);
   try {
     const raw = await upstash(['GET', COMMENTS_KEY]);
     const stored = raw ? JSON.parse(raw) : null;
@@ -104,7 +105,7 @@ async function targetUidsFor(lv, wantUid) {
       if (u) set.add(u);
     }
   } catch {
-    // 集計が読めなくても要求 uid だけで進める(found:0 でも 200)。
+    // 集計が読めなければ空集合(呼び出し側が 404・ニコ生へは行かない)。
   }
   return set;
 }
@@ -208,6 +209,13 @@ export default async function handler(req, res) {
       return;
     }
 
+    // (2b) 順位表に載っている番組・人だけ受け付ける(ニコ生へ行く前に確かめる)。
+    const targets = await targetUidsFor(lv);
+    if (targets.size === 0 || (wantUid && !targets.has(wantUid))) {
+      res.status(404).json({ ok: false, error: 'not_listed' });
+      return;
+    }
+
     // (3) 番組ごとに握手を 1 本へ絞る。取れなければ 202(少し待って再試行してもらう)。
     const lockKey = RECENT_LOCK_PREFIX + lv;
     let locked = null;
@@ -222,7 +230,6 @@ export default async function handler(req, res) {
     }
 
     try {
-      const targets = await targetUidsFor(lv, wantUid);
       const html = await fetchWatchHtml(lv, { timeoutMs: RECENT_HTTP_TIMEOUT_MS, ua: RECENT_UA });
       if (!html) {
         res.status(502).json({ ok: false, error: 'upstream' });

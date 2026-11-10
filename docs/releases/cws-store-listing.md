@@ -283,7 +283,7 @@ A. ニコ生トップ・ランキング導線、それから「前回の配信�
 
 ■ 運営・お問い合わせ
 
-運営主体: Kimito-Link Project
+運営主体: 株式会社ベストトラスト
 公式サイト: https://kimito-link.com/
 紹介ページ: https://tsuioku-no-kirameki.com/
 プライバシーポリシー: https://tsuioku-no-kirameki.com/privacy.html
