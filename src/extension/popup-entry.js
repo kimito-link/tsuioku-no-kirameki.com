@@ -510,7 +510,7 @@ import {
 } from '../lib/commentDb.js';
 import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
-import { normalizeStoredCommentEntries } from '../lib/storedCommentEntriesNormalize.js';
+import { createAppliedEntriesMemo } from '../lib/appliedEntriesMemo.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 import {
   formatAiShareDiagnosticsMarkdown,
@@ -580,7 +580,6 @@ import {
   readStorageBagWithRetry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
-import { mergeEntriesIntoUserCommentProfileMap } from '../lib/userCommentProfileMerge.js';
 import { createStorageKeyMemo } from '../lib/storageKeyMemo.js';
 import {
   isHttpOrHttpsUrl,
@@ -4910,12 +4909,15 @@ let popupUserCommentProfileMap = /** @type {null|Record<string, { nickname?: str
  * @param {PopupCommentEntry[]} arr
  * @returns {{ arr: PopupCommentEntry[], commentsPatched: boolean, cacheTouched: boolean }}
  */
+const _appliedEntriesMemo = createAppliedEntriesMemo();
+try { /** @type {any} */ (globalThis).__appliedEntriesMemoDiag = _appliedEntriesMemo.diag; } catch { /* 計器だけ */ }
 function popupMergeUserCommentProfileCache(arr) {
   if (!popupUserCommentProfileMap) {
     return { arr, commentsPatched: false, cacheTouched: false };
   }
   // v0.1.1984: 学ぶ・補う・刈るは lib の1関数(人数が上限を超える配信で描き直しが止まらなくなるのを防ぐ・userCommentProfileMerge.js)
-  const r = mergeEntriesIntoUserCommentProfileMap(popupUserCommentProfileMap, arr);
+  //   ★v0.1.2023: 大きな記録で同じ行・同じ控えなら結果を使い回す(毎回新しい配列を返して下流の記憶を外さない・appliedEntriesMemo.js)
+  const r = _appliedEntriesMemo.merge(popupUserCommentProfileMap, arr);
   popupUserCommentProfileMap = r.map;
   return { arr: r.arr, commentsPatched: r.commentsPatched, cacheTouched: r.cacheTouched };
 }
@@ -15843,9 +15845,7 @@ async function refresh() {
   );
   const applyStoredCommentEntries = async (nextArr, allowWrite) => {
     let applied = nextArr;
-    const normalizedStored = normalizeStoredCommentEntries(
-      /** @type {PopupCommentEntry[]} */ (applied)
-    );
+    const normalizedStored = _appliedEntriesMemo.normalize(/** @type {PopupCommentEntry[]} */ (applied));
     if (normalizedStored.changed) {
       applied = normalizedStored.next;
     }

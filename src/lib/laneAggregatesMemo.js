@@ -31,7 +31,7 @@ export function createLaneAggregatesMemo(deps) {
   const minRows = Math.max(0, Number(deps.minRows) || 0);
   /** @type {{ rows: readonly unknown[], sig: string, out: T } | null} 行は写しで持つ(元の配列があとで書き換わっても比べられるように) */
   let last = null;
-  const diag = { hits: 0, misses: 0, bypassed: 0 };
+  const diag = { hits: 0, misses: 0, bypassed: 0, missBySig: 0, missByLen: 0, missByRow: 0 };
   return {
     diag,
     /**
@@ -53,6 +53,12 @@ export function createLaneAggregatesMemo(deps) {
         return last.out;
       }
       diag.misses += 1;
+      // v0.1.2023 計器: 何が違って数え直したか(配信・配信者の情報 / 行数 / 行そのもの)
+      if (last) {
+        if (last.sig !== sig) diag.missBySig += 1;
+        else if (last.rows.length !== list.length) diag.missByLen += 1;
+        else diag.missByRow += 1;
+      }
       const out = deps.compute(list, liveId, opts);
       last = { rows: list.slice(), sig, out };
       return out;

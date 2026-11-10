@@ -6000,5 +6000,18 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.2022', metric: 'cross-checked-claims', value: 56,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.2023', metric: 'bundle-kb', value: 1432,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '+3KB = appliedEntriesMemo.js(大きな記録で正規化と名前・顔の重ね直しの結果を使い回す器・新規)と、mergeTailRowsIntoDisplay の「変わらないなら同じ物を返す」判定、laneAggregatesMemo の外れ理由の計器。'
+  }),
+  Object.freeze({
+    version: '0.1.2023', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2023', metric: 'cross-checked-claims', value: 56,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
   })
 ]);

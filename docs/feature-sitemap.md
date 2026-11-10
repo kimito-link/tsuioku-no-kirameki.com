@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 73</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 74</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -135,6 +135,7 @@
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
 - `src/extension/liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
+- `src/lib/appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/bigRecordYield.js` — 大きな記録(数万行・数千人)を扱うとき、長い仕事の合間に画面へ手を返すための決まり(v0.1.1997)。
 - `src/lib/blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
@@ -1465,10 +1466,9 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (3版)
+### 💾 記録件数 (2版)
 - `v0.1.2010` 2026-11-10 — 人の多い配信で遠い顔は後から読む
 - `v0.1.1996` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
-- `v0.1.1978` 2026-11-10 — 大きな記録でも開いてすぐ記録の件数を出す
 
 ### 🏟 会場・席 (6版)
 - `v0.1.2022` 2026-11-10 — 横の欄のボタンの見た目をそろえた
@@ -1501,7 +1501,8 @@
 - `v0.1.1985` 2026-11-10 — 重い描き直しのあとは間隔を空ける
 - `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく
 
-### その他 (6版)
+### その他 (7版)
+- `v0.1.2023` 2026-11-10 — 大きな記録で同じ行を作り直さない
 - `v0.1.2011` 2026-11-10 — 公式順位の名前の表を作り直さない
 - `v0.1.2009` 2026-11-10 — 大きな記録で繰り返す計算を減らす
 - `v0.1.2008` 2026-11-10 — 数千人の応援マスを少しずつ足して固まらない

@@ -89,3 +89,38 @@ describe('mergeTailRowsIntoDisplay', () => {
     expect(out).toHaveLength(5001);
   });
 });
+
+describe('mergeTailRowsIntoDisplay: 変わらないなら同じ物を返す(v0.1.2023)', () => {
+  const base = () => [
+    { id: 'a', liveId: 'lv1', commentNo: '1', text: 'one', userId: 'u1', nickname: 'n1', avatarUrl: 'https://x/1.png', capturedAt: 1 },
+    { id: 'b', liveId: 'lv1', commentNo: '2', text: 'two', userId: 'u2', nickname: 'n2', avatarUrl: '', capturedAt: 2 },
+    { id: 'c', liveId: 'lv1', commentNo: '3', text: 'three', userId: null, capturedAt: 3 }
+  ];
+  it('テールが本体と同じ中身(別の物)なら base そのものを返す', () => {
+    const b = base();
+    const tail = b.slice(1).map((r) => ({ ...r }));
+    expect(mergeTailRowsIntoDisplay(b, tail, { liveId: 'lv1' })).toBe(b);
+  });
+  it('1行だけ補われるなら、その行だけ新しく、他の行は元の物のまま', () => {
+    const b = base();
+    const tail = [{ ...b[1] }, { ...b[2], userId: 'u3', nickname: 'n3' }];
+    const out = mergeTailRowsIntoDisplay(b, tail, { liveId: 'lv1' });
+    expect(out).not.toBe(b);
+    expect(out[0]).toBe(b[0]);
+    expect(out[1]).toBe(b[1]);
+    expect(out[2]).toEqual({ ...b[2], userId: 'u3', nickname: 'n3' });
+    expect(b[2].userId).toBe(null);
+  });
+  it('新しい行が足されるなら新しい配列', () => {
+    const b = base();
+    const out = mergeTailRowsIntoDisplay(b, [{ id: 'd', liveId: 'lv1', commentNo: '4', text: 'four', userId: 'u4', capturedAt: 4 }], { liveId: 'lv1' });
+    expect(out).not.toBe(b);
+    expect(out.length).toBe(4);
+  });
+  it('統合で項目が増えるとき(userId の無い行に null が付く)は変わった扱い', () => {
+    const b = [{ id: 'a', liveId: 'lv1', commentNo: '1', text: 'one', capturedAt: 1 }];
+    const out = mergeTailRowsIntoDisplay(b, [{ ...b[0] }], { liveId: 'lv1' });
+    expect(out).not.toBe(b);
+    expect(out[0]).toEqual({ ...b[0], userId: null });
+  });
+});

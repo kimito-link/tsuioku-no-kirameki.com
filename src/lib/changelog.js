@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2023',
+    date: '2026-11-10',
+    summary: '大きな記録で同じ行を作り直さない',
+    items: Object.freeze([
+      '数万件の記録を開いたとき、中身が変わっていないのに行と人ごとの集計を何度も作り直していたのをやめ、遅いPCでの固まりを減らしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2022',
     date: '2026-11-10',
     summary: '横の欄のボタンの見た目をそろえた',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '吹き出しを読み上げの声と一緒に出す',
     items: Object.freeze([
       '会場の吹き出しを、読み上げの声が鳴り始める時に出すようにしました。3秒待っても声が始まらないコメントは、読まずにすぐ吹き出しだけ出します。読み上げを使っていないときは今までどおりすぐ出ます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1978',
-    date: '2026-11-10',
-    summary: '大きな記録でも開いてすぐ記録の件数を出す',
-    items: Object.freeze([
-      'YouTube・Kick などで横の欄を開いたとき、全件を読み終わる前に「記録 N 件」を先に出すようにしました(ニコ生と同じ出し方)。8万行の配信では、数字が出るまで遅いPCで2分以上かかっていました。'
     ])
   })
 ]);

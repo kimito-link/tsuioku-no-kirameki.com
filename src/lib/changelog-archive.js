@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1978',
+    date: '2026-11-10',
+    summary: '大きな記録でも開いてすぐ記録の件数を出す',
+    items: Object.freeze([
+      'YouTube・Kick などで横の欄を開いたとき、全件を読み終わる前に「記録 N 件」を先に出すようにしました(ニコ生と同じ出し方)。8万行の配信では、数字が出るまで遅いPCで2分以上かかっていました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1977',
     date: '2026-11-10',
     summary: '大きな記録を少しずつ読み、開いた直後も固まらない',

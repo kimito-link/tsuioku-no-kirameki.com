@@ -66,7 +66,10 @@ describe('mergeEntriesIntoUserCommentProfileMap', () => {
 describe('popup の配線', () => {
   it('学ぶ・補う・刈るは lib の1関数を通す', () => {
     const src = readFileSync(new URL('../extension/popup-entry.js', import.meta.url), 'utf8');
-    expect(src).toContain('const r = mergeEntriesIntoUserCommentProfileMap(popupUserCommentProfileMap, arr);');
+    // v0.1.2023: 大きな記録は同じ入力の結果を使い回す器(appliedEntriesMemo.js)経由。器の中身は同じ lib の1関数。
+    expect(src).toContain('const r = _appliedEntriesMemo.merge(popupUserCommentProfileMap, arr);');
+    const memoSrc = readFileSync(new URL('./appliedEntriesMemo.js', import.meta.url), 'utf8');
+    expect(memoSrc).toContain('mergeEntriesIntoUserCommentProfileMap(map, arr, mergeOpts)');
   });
 });
 

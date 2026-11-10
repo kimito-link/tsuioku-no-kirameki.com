@@ -48,12 +48,12 @@ graph LR
   n_popup --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_popup --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
+  n_popup --> n_src_lib_appliedEntriesMemo_js["lib/appliedEntriesMemo.js"]
   n_popup --> n_src_lib_audienceEngagementGap_js["lib/audienceEngagementGap.js"]
   n_popup --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
   n_popup --> n_src_lib_autoSectionCensus_js["lib/autoSectionCensus.js"]
   n_popup --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
-  n_popup --> n_src_lib_avatarComposeDiagLine_js["lib/avatarComposeDiagLine.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 488 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 489 ファイル省略（全件は storage-bus.md / metafile 参照）。

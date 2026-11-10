@@ -34,7 +34,11 @@ const LOOKBACK_EXTRA = 64;
  * @param {unknown} tail テール(未畳み込みの新着)の表示行
  * @param {{ liveId?: string, keyOf?: (row: any) => string }} [opts]
  *   liveId: tail の行に liveId が無いとき(書き出し側の生の行)に、キー計算だけ補う。keyOf はテスト用の差し替え。
- * @returns {any[]} 新しい配列(引数は変更しない)。tail が空なら base をそのまま返す。
+ * @returns {any[]} 新しい配列(引数は変更しない)。tail が空、または足す行も変わる行も無いなら base をそのまま返す。
+ *
+ * ■ v0.1.2023(大きな記録の描き直し): 全件が読めたあとも、テール(直近2,000行)は読み直しのたびに【新しい物】で届く。
+ *   中身が本体と同じでも、統合が毎回 新しい行・新しい配列を作っていたので、下流の「同じ行なら数え直さない」記憶が外れ、
+ *   8万行の配信で読み直しのたびに表示用の行と人ごとの集計を全部作り直していた(手元の計測: 外れ4回中4回がこれ)。
  */
 export function mergeTailRowsIntoDisplay(base, tail, opts) {
   const baseRows = Array.isArray(base) ? base : [];
@@ -59,22 +63,40 @@ export function mergeTailRowsIntoDisplay(base, tail, opts) {
   }
 
   const out = baseRows.slice();
+  let touched = false;
   for (const row of tailRows) {
     if (!row || typeof row !== 'object') {
       out.push(row);
+      touched = true;
       continue;
     }
     const hit = indexByKey.get(keyOf(row));
     if (hit == null) {
       out.push(row);
+      touched = true;
       continue;
     }
-    out[hit] = /** @type {any} */ (
-      mergeStoredCommentDedupeVariants(
-        /** @type {Record<string, unknown>} */ (out[hit]),
-        /** @type {Record<string, unknown>} */ (row)
-      )
-    );
+    const prev = /** @type {Record<string, unknown>} */ (out[hit]);
+    const merged = mergeStoredCommentDedupeVariants(prev, /** @type {Record<string, unknown>} */ (row));
+    // ★v0.1.2023: 統合しても中身が変わらない行は、元の行(同じ物)のまま置く。
+    if (sameRowFields(prev, merged)) continue;
+    out[hit] = /** @type {any} */ (merged);
+    touched = true;
   }
-  return out;
+  // ★v0.1.2023: 何も足さず何も変わらなかったら base そのものを返す(中身は同じ。下流の「同じ配列なら作り直さない」記憶を外さない)。
+  return touched ? out : baseRows;
+}
+
+/**
+ * 統合後の行が元の行と同じ中身か(統合は元の行の写しに数項目を上書きするだけなので、項目ごとの === で足りる)。
+ * @param {Record<string, unknown>} prev
+ * @param {Record<string, unknown>} merged
+ */
+function sameRowFields(prev, merged) {
+  let n = 0;
+  for (const k in merged) {
+    if (merged[k] !== prev[k] || !(k in prev)) return false;
+    n += 1;
+  }
+  return n === Object.keys(prev).length;
 }
