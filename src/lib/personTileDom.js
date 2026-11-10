@@ -39,7 +39,9 @@ import { nicoUserPageUrl } from './nicoUserPage.js';
  *   isHttpOrHttpsUrl: (u: unknown) => boolean,
  *   storyTileUsesYukkuriTvStyle: (requested: string, display: string) => boolean,
  *   upgradeAnonymousAvatarImage?: (img: HTMLImageElement, userKey: string, sizePx?: number) => unknown,
- *   cachedAnonymousFace?: (userKey: string) => string
+ *   cachedAnonymousFace?: (userKey: string) => string,
+ *   deferFarImages?: boolean,
+ *   whenNearViewport?: (img: HTMLImageElement) => Promise<boolean>
  * }} PersonTileIo
  */
 
@@ -81,8 +83,22 @@ export function buildPersonTileEl(p, io) {
     typeof io.cachedAnonymousFace === 'function'
       ? io.cachedAnonymousFace(fullUid)
       : '';
+  // v0.1.2010: 人の多い段(横の欄)では、画面から遠いマスの画像は近くに来てから読む(io.deferFarImages)。
+  //   開いた直後に 2,000 人分の仮の顔と本物の顔の確かめ(1人につき画像2〜3回)が一度に走り、
+  //   遅いPCで記録の読み出しの返事が受け取れなくなっていた(会社の PC・CPU 4倍遅く: 件数が出るまで 31〜48 秒)。
+  //   会場は 3D 変形で可視判定が崩れるので使わない(呼び出し側が渡さない・下の loading="lazy" 撤回の経緯と同じ)。
+  const deferFar = io.deferFarImages === true && typeof io.whenNearViewport === 'function';
+  if (deferFar) img.loading = 'lazy'; // src より先に付ける(後から付けても読み込みは始まっている)
   img.src = cachedFace || displayLane;
-  io.storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
+  if (deferFar && displayLane !== requestedLane && io.isHttpOrHttpsUrl(requestedLane)) {
+    // 本物の顔の確かめ(隠し画像での読み込み試験)は、マスが画面の近くに来てから始める。
+    void Promise.resolve(io.whenNearViewport(img)).then((near) => {
+      if (!near || img.isConnected === false) return;
+      io.storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
+    }).catch(() => { /* 待ちの失敗で描画を止めない */ });
+  } else {
+    io.storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
+  }
   img.classList.toggle(
     'nl-avatar--tv-fallback',
     io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane)

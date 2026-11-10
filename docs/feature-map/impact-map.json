@@ -322,6 +322,96 @@
       ]
     },
     {
+      "file": "src/lib/avatarComposeDiagLine.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarFaceStore.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarFaceWorkerClient.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarPartAnchors.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarPartsComposer.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewRows.js",
       "featureCount": 5,
       "features": [
@@ -1548,48 +1638,6 @@
       ]
     },
     {
-      "file": "src/lib/avatarComposeDiagLine.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/avatarFaceStore.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/avatarFaceWorkerClient.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/avatarFallbackFromUrl.js",
       "featureCount": 3,
       "features": [
@@ -1601,34 +1649,6 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/avatarPartAnchors.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/avatarPartsComposer.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
       ]
     },
     {

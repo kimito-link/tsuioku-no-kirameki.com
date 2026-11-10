@@ -21,6 +21,7 @@ import {
 import { formatLaneTilePulse, formatLaneTileStats } from '../../lib/laneTileStats.js';
 import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
 import { buildPersonTileEl } from '../../lib/personTileDom.js';
+import { createViewportGate } from '../../lib/avatarPartsComposer.js';
 import { judgeLaneWindow } from '../../lib/laneWindowVerdict.js';
 // v0.1.1113 実DOM census(Tri-Parity): タイルへ照合キーを恒久刻印するための純関数(葉lib同士=循環なし)。
 import { venueLaneParityKey } from '../../lib/venueLaneParity.js';
@@ -609,6 +610,18 @@ export function reconcileLaneChildren(el, nodes) {
   }
 }
 
+/** 遠いマスの画像を待たせる門(画面の上下 600px に入ったら通す)。IntersectionObserver が無い環境では待たせない(v0.1.2010)。 */
+const _laneFarImageGate = createViewportGate({ marginPx: 600 });
+try { /** @type {any} */ (globalThis).__laneFarImageDiag = { pending: () => _laneFarImageGate.pendingCount() }; } catch { /* 計器だけ */ }
+/**
+ * @param {any} io
+ * @returns {any} deferFarImages と whenNearViewport を足した io(元の io は書き換えない)
+ */
+function laneFarImageIo(io) {
+  if (!io || typeof io !== 'object') return io;
+  return { ...io, deferFarImages: true, whenNearViewport: (/** @type {any} */ img) => _laneFarImageGate.whenNear(img) };
+}
+
 /**
  * ★v0.1.2008: 大きな段を分けて足している途中の予約(段ごと)。新しい描画が来たら古い予約は捨てる。
  * @type {WeakMap<HTMLElement, { timer: ReturnType<typeof setTimeout> }>}
@@ -661,6 +674,8 @@ function fillLaneTier(el, items, io, wrapTileEl, onSettled, carry) {
     hasWrap: typeof wrapTileEl === 'function',
     canSchedule: typeof setTimeout === 'function'
   });
+  // v0.1.2010: 人の多い段は、遠いマスの画像を近くに来てから読む(会場=wrap ありは progressive が偽なので対象外)。
+  const tileIo = progressive ? laneFarImageIo(io) : io;
   let newBuilt = 0;
   let deferred = 0;
   /** @type {Node[]} 段に並べる順(0.1.1967: 断片に移すと使い回すタイルが一度外れるので、配列に集める) */
@@ -741,7 +756,7 @@ function fillLaneTier(el, items, io, wrapTileEl, onSettled, carry) {
     newBuilt += 1;
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
     // ループ・hidden 制御(=レイアウト)はここに残す。全消しでなく変化時だけ replaceChildren で一括差替。
-    const tileEl = buildPersonTileEl(p, io);
+    const tileEl = buildPersonTileEl(p, tileIo);
     // 2026-07-20 計器(観測のみ・新規生成タイルのみ対象=diff-skip温存分は対象外): span実体なのに
     //   computed cursor が pointer になっている個体を数える。失敗は握る(描画を止めない)。
     try {

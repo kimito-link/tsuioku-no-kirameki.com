@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2010',
+    date: '2026-11-10',
+    summary: '人の多い配信で遠い顔は後から読む',
+    items: Object.freeze([
+      '応援マスが600人以上ある配信では、画面から遠いマスの顔の画像を、近くにスクロールしてから読み込むようにしました。開いた直後に2,000人分の画像を一度に読んで、遅いPCで件数の表示が遅れるのを減らします。会場は今までどおりです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2009',
     date: '2026-11-10',
     summary: '大きな記録で繰り返す計算を減らす',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '人がとても多い配信は応援レーンを2,000人までに',
     items: Object.freeze([
       '応援レーンの候補が2,000人を超える配信(Kick の大きな配信など)だけ、段の順(りんく→こん太→たぬ姉)・コメントの多い順に2,000人まで顔を並べ、残りはレーン下の「ほか M人」に人数で出します。約6,500人の記録で横の欄が開いた直後から固まっていた件の手当て(りんく決定 2026-11-10)。普段の配信は今までどおり全員です。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1974',
-    date: '2026-11-10',
-    summary: 'YouTube系でコメントの控えの全件書き込みをやめる',
-    items: Object.freeze([
-      'Kick など YouTube 系の横の欄が、記録のコメント全部(1万2千行で約5.5MB)を90秒に39回書き直していた件。YouTube 系のコメントの正本は記録係の保存(IndexedDB)で、この控えは誰も読まないので書かないようにしました。'
     ])
   })
 ]);

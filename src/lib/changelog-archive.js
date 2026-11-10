@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1974',
+    date: '2026-11-10',
+    summary: 'YouTube系でコメントの控えの全件書き込みをやめる',
+    items: Object.freeze([
+      'Kick など YouTube 系の横の欄が、記録のコメント全部(1万2千行で約5.5MB)を90秒に39回書き直していた件。YouTube 系のコメントの正本は記録係の保存(IndexedDB)で、この控えは誰も読まないので書かないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1973',
     date: '2026-11-10',
     summary: '人が多い配信は応援レーンの写しの書き込みを間引く',

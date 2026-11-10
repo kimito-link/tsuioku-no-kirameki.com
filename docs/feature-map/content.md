@@ -36,7 +36,12 @@ graph LR
   n_content --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
   n_content --> n_src_lib_autoBackupState_js["lib/autoBackupState.js"]
   n_content --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
+  n_content --> n_src_lib_avatarComposeDiagLine_js["lib/avatarComposeDiagLine.js"]:::shared
+  n_content --> n_src_lib_avatarFaceStore_js["lib/avatarFaceStore.js"]:::shared
+  n_content --> n_src_lib_avatarFaceWorkerClient_js["lib/avatarFaceWorkerClient.js"]:::shared
   n_content --> n_src_lib_avatarFallbackFromUrl_js["lib/avatarFallbackFromUrl.js"]:::shared
+  n_content --> n_src_lib_avatarPartAnchors_js["lib/avatarPartAnchors.js"]:::shared
+  n_content --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_content --> n_src_lib_avatarUrlCompare_js["lib/avatarUrlCompare.js"]:::shared
   n_content --> n_src_lib_backfillCapturedAt_js["lib/backfillCapturedAt.js"]:::shared
   n_content --> n_src_lib_backfillFlushThreshold_js["lib/backfillFlushThreshold.js"]
@@ -48,12 +53,7 @@ graph LR
   n_content --> n_src_lib_backfillSlotAutoThrottle_js["lib/backfillSlotAutoThrottle.js"]
   n_content --> n_src_lib_backfillSlotPool_js["lib/backfillSlotPool.js"]:::shared
   n_content --> n_src_lib_backfillTransientRetry_js["lib/backfillTransientRetry.js"]:::shared
-  n_content --> n_src_lib_backfillVisibilityRearm_js["lib/backfillVisibilityRearm.js"]
-  n_content --> n_src_lib_besideOverflowGuard_js["lib/besideOverflowGuard.js"]
-  n_content --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
-  n_content --> n_src_lib_broadcastUrl_js["lib/broadcastUrl.js"]:::shared
-  n_content --> n_src_lib_broadcasterProfileCard_js["lib/broadcasterProfileCard.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 357 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 362 ファイル省略（全件は storage-bus.md / metafile 参照）。
