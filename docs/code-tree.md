@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1224 件
+## ⚠️ 役割コメントが無いソース 10 / 1225 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2400)
+- 📁 **src/** (2402)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2120)
+  - 📁 **lib/** (2122)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2948,6 +2948,8 @@
     - `refreshCycleDeadline.test.js`
     - `refreshDutyGate.js` — 定期の描き直し(3秒ごとの見回り)が、画面を描き直しだけで埋めないようにする門(純関数)。
     - `refreshDutyGate.test.js`
+    - `refreshStageClock.js` — 描き直し1回(refresh)が「いまどの段にいるか・各段に何ミリ秒かかったか」を残す計器(純関数)。
+    - `refreshStageClock.test.js`
     - `refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
     - `refreshTaskGuard.test.js`
     - `rememberedAvatarIndex.js` — 「同じ userId で過去に取れた avatarUrl」を O(1) で引く索引(純粋関数)。

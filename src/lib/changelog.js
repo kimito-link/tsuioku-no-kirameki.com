@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1985',
+    date: '2026-11-10',
+    summary: '重い描き直しのあとは間隔を空ける',
+    items: Object.freeze([
+      'コメントがとても多い配信で、重い描き直しが終わった直後に次の描き直しが始まらないようにしました(かかった時間の3倍は空けます)。普通の配信の速さは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1984',
     date: '2026-11-10',
     summary: '人の多い配信で描き直しが続くのを直す',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '横の欄を開いた直後の読み込みを同時に',
     items: Object.freeze([
       'YouTube・Twitch・Kick などで横の欄が記録を組み立てるとき、記録と顔の控え3つを1つずつ順番に読んでいたのを、同時に読み始めるようにしました。開いた直後の最初の表示がどこで待っているかを測る計器も足しました。表示は変わりません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1965',
-    date: '2026-11-09',
-    summary: '人が多い配信で横の欄の描き直しを軽く',
-    items: Object.freeze([
-      '人が2,000人を超える配信で、横の欄の描き直しのたびに重かった所を3つ軽くしました。りんく段の札の確認で全員分の文字の配置を計算していた所、段の寸法を測るときに全員分の席を探していた所、顔のない人の絵を覚えておける数(2,000人)を超えて毎回作り直していた所です。表示は変わりません'
     ])
   })
 ]);

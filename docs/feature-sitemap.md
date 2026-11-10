@@ -1116,7 +1116,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 334</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 335</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1372,6 +1372,7 @@
 - `src/lib/refreshCoalescer.js` — 描き直し(refresh)の「実行中に来た要求は、あとで1回にまとめる」合流器(時計は deps で注入)。v0.1.1687
 - `src/lib/refreshCycleDeadline.js` — 1サイクル全体の締切を持ち、各 read の timeout を残り時間に切り詰める。
 - `src/lib/refreshDutyGate.js` — 定期の描き直し(3秒ごとの見回り)が、画面を描き直しだけで埋めないようにする門(純関数)。
+- `src/lib/refreshStageClock.js` — 描き直し1回(refresh)が「いまどの段にいるか・各段に何ミリ秒かかったか」を残す計器(純関数)。
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
 - `src/lib/resolveOfficialPoints.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1462,11 +1463,10 @@
 ### 💾 記録件数 (1版)
 - `v0.1.1978` 2026-11-10 — 大きな記録でも開いてすぐ記録の件数を出す
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
 - `v0.1.1979` 2026-11-10 — 吹き出しを読み上げの声と一緒に出す
 - `v0.1.1969` 2026-11-10 — 記録の多い配信は全件の読み直しを間引く
-- `v0.1.1965` 2026-11-09 — 人が多い配信で横の欄の描き直しを軽く
 
 ### 🎈 吹き出し (2版)
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
@@ -1484,7 +1484,8 @@
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1982` 2026-11-10 — 大きな記録で診断の数え直しを減らす
 
-### ⚡ 描画・性能 (1版)
+### ⚡ 描画・性能 (2版)
+- `v0.1.1985` 2026-11-10 — 重い描き直しのあとは間隔を空ける
 - `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく
 
 ### その他 (10版)

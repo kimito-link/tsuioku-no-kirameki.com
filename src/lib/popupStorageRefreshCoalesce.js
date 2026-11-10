@@ -56,7 +56,14 @@ export function createCoalescedRefreshScheduler(opts = {}) {
     : 1500;
   /** 描き直し1回の時間のならし(ms)。0 = まだ測っていない */
   let paintCostEma = 0;
-  const highFreqMs = () => Math.max(throttleMs, Math.min(maxAdaptiveMs, Math.round(paintCostEma * COST_FACTOR)));
+  // ★v0.1.1985: 描く時間だけでなく、描き直し1回まるごと(読む・整える・描く)の時間も見る。
+  //   8万行の配信では描くのは1回3秒でも、まるごとでは12秒かかり、「描く時間の3倍」の間隔(9秒)より長いので
+  //   終わった直後に次が始まっていた(手元の計測・CPU 4倍遅く・生放送のまね: 空き時間 3%)。
+  //   まるごとの時間は CYCLE_MIN_COST_MS 以上のときだけ数える(普通の配信の 450ms の間隔は変えない)。
+  const CYCLE_MIN_COST_MS = 1000;
+  /** 描き直し1回まるごとの時間のならし(ms)。0 = 軽い/まだ測っていない */
+  let cycleCostEma = 0;
+  const highFreqMs = () => Math.max(throttleMs, Math.min(maxAdaptiveMs, Math.round(Math.max(paintCostEma, cycleCostEma) * COST_FACTOR)));
 
   // 未描画状態は「十分昔に描画した」と等価に扱い、初回の先行描画を必ず通す。
   let lastPaintAt = Number.NEGATIVE_INFINITY;
@@ -103,11 +110,19 @@ export function createCoalescedRefreshScheduler(opts = {}) {
     // 直近に既に paint 済み: trailing を一度だけ積む（デバウンスのように延長しない）
     if (trailingTimer == null) {
       const delay = Math.max(0, effectiveMs - sinceLast);
-      trailingTimer = setT(() => {
+      const effNow = () => (ctx.allSlow === true && !ctx.allHighFreq ? slowThrottleMs : highFreqMs());
+      const fire = () => {
         trailingTimer = null;
+        // v0.1.1985: 待っている間に重い1回が終わって間隔が延びていたら、残りを待ち直す(終わった直後に始めない)
+        const remain = effNow() - (nowFn() - lastPaintAt);
+        if (remain > 5) {
+          trailingTimer = setT(fire, remain);
+          return;
+        }
         runRefresh();
         lastPaintAt = nowFn();
-      }, delay);
+      };
+      trailingTimer = setT(fire, delay);
     }
   }
 
@@ -155,11 +170,27 @@ export function createCoalescedRefreshScheduler(opts = {}) {
     paintCostEma = paintCostEma === 0 ? v : paintCostEma * 0.7 + v * 0.3;
   }
 
+  /**
+   * 描き直し1回まるごと(読む・整える・描く)が終わった。重かったら、次までの間隔を「終わった時刻」から数え直す。
+   * @param {number} ms かかった時間
+   */
+  function noteCycleCost(ms) {
+    const v = Number(ms);
+    if (!Number.isFinite(v) || v < 0) return;
+    if (v < CYCLE_MIN_COST_MS) {
+      cycleCostEma = 0;
+      return;
+    }
+    cycleCostEma = cycleCostEma === 0 ? v : cycleCostEma * 0.7 + v * 0.3;
+    if (Number.isFinite(lastPaintAt)) lastPaintAt = nowFn();
+  }
+
   return {
     schedule,
     scheduleImmediate,
     cancel,
     notePaintCost,
+    noteCycleCost,
     /** 読み取り専用: いまの高頻度キーの間隔(ms・計器とテスト用) */
     highFreqIntervalMs: highFreqMs,
     /** 読み取り専用: 最後に runRefresh が呼ばれた時刻（テスト用） */

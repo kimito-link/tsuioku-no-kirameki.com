@@ -749,6 +749,7 @@ import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
 import { createLaneMirrorPacer } from '../lib/laneMirrorPublishPace.js';
 import { laneCrowdLimit } from '../lib/laneCrowdLimit.js';
 import { createRefreshDutyGate } from '../lib/refreshDutyGate.js';
+import { createRefreshStageClock } from '../lib/refreshStageClock.js';
 import { createStoryDiagCountsPaceState, shouldReuseStoryDiagCounts } from '../lib/storyDiagCountsPace.js';
 import { createProfileCacheWritePacer } from '../lib/profileCacheWritePace.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
@@ -4850,6 +4851,8 @@ const _storyDiagCountsPacePaint = createStoryDiagCountsPaceState();
 // ★v0.1.1981: 定期の見回り(3秒ごと)が画面を描き直しだけで埋めないための門(src/lib/refreshDutyGate.js)
 const _refreshDutyGate = createRefreshDutyGate();
 try { /** @type {any} */ (globalThis).__refreshDutyGateDiag = _refreshDutyGate.diag; } catch { /* 計器の公開の失敗で止めない */ }
+const _refreshStageClock = createRefreshStageClock();
+try { /** @type {any} */ (globalThis).__refreshStageDiag = _refreshStageClock.diag; } catch { /* 計器の公開の失敗で止めない */ }
 
 // v0.1.773: hasOwnPostedEntryForUserId は廃止。集約ごとに storageCtx 全件を走査する O(集約×N) で
 //   popup メインスレッドを塞ぐ性能問題だったため、buildOwnPostedUserIdSet で事前に1パス集合化し、
@@ -14938,6 +14941,7 @@ async function refresh() {
    *   各メンバを withTimeout + 個別フォールバックで握り、固まっても best-effort で描画を続行する。
    *   通常時（高速解決）はタイムアウトに到達しないので挙動は完全に不変。
    */
+  _refreshStageClock.enter('tabs', Date.now()); // v0.1.1985: どの段で待っているかの計器(lib/refreshStageClock.js)
   const [tabs, lastFocusedNormal, openBagRaw, allTabsForData] = await Promise.all([
     withTimeout(
       chrome.tabs.query({ active: true, currentWindow: true }),
@@ -15038,6 +15042,7 @@ async function refresh() {
   // activeTab が既に watch なら自タブ尊重で混信救済は不要＝storage 走査も省く。
   if (!isNicoLiveWatchUrl(String(tabs[0]?.url || '').trim()) && !INLINE_OWN_WATCH_URL) {
     try {
+      _refreshStageClock.enter('dataBacked', Date.now());
       dataBacked = await collectDataBackedWatchLvs(openWatchUrls);
     } catch {
       /* best-effort: 失敗時は従来順で解決 */
@@ -15525,6 +15530,7 @@ async function refresh() {
   // v0.1.1630: プロフィール cache(332KB)は、記憶が新しければ get のキーから外す(毎回の読み直しをやめる)。
   const _profFresh = _profileCacheMemo.isFresh(Date.now());
   const _profV0 = _profileCacheMemo.version();
+  _refreshStageClock.enter('lightRead', Date.now());
   const lightData = await readStorageBagWithRetry(
     () =>
       chrome.storage.local.get([
@@ -15847,7 +15853,9 @@ async function refresh() {
     }
     return applied;
   };
+  _refreshStageClock.enter('apply', Date.now());
   arr = await applyStoredCommentEntries(arr, readCommentsOk);
+  _refreshStageClock.enter('paint', Date.now());
   // v0.1.505: メイン書き戻し後にテール（未畳み込み新着）を表示用に concat。書き戻しは
   //   メインのみなので、テールがメインへ二重永続することはない。
   if (tailDisplayRows.length) {
@@ -16345,6 +16353,7 @@ async function refresh() {
       //   settle → finally が必ず走り、フラグが構造的に stranded し得なくなる。
       //   通常 fetch の内部 retry は最大 ~11s 進行し得るので 15s と十分余裕を取る
       //   （正常だが遅いだけの fetch は中断しない）。
+      _refreshStageClock.enter('snapshot', Date.now());
       snapResult = await withTimeout(
         requestWatchPageSnapshotFromOpenTab(url),
         SNAPSHOT_FETCH_TIMEOUT_MS,
@@ -16513,6 +16522,7 @@ async function refresh() {
       //   裸 await されており、多タブ stall で永久 pending → background async タスクが
       //   settle せず次の refresh 周期が詰まる → 全カード「—」固定再発の本丸の真因。
       //   12s で有界化。タイムアウトしたら空 items + diag.code='timeout' で best-effort 続行。
+      _refreshStageClock.enter('intercept', Date.now());
       const interceptResult = await refreshTaskGuarded(
         requestInterceptCacheFromOpenTab(url, { deep: shouldDeep }),
         12_000,
@@ -17766,7 +17776,8 @@ const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   throttleMs: 450,
   // ★v0.1.1981: 描き直しが重いときの間隔の上限を 1.5秒→20秒に(間隔は描き直しの時間の3倍)。1回が数秒かかる配信(8万行・遅い PC)で
   //   1.5秒ごとに描き直すと画面が描き直しだけで埋まる。軽い配信(1回 150ms 未満)は 450ms のまま。
-  maxAdaptiveMs: 20_000
+  // ★v0.1.1985: 上限を 20秒→60秒に(定期の見回りの門と同じ上限)。間隔は「描き直し1回まるごとの時間」の3倍でも決まるようになった。
+  maxAdaptiveMs: 60_000
 });
 /**
  * ★v0.1.1450: 北極星 tick(独立レーン描画)専用のスロットル。
@@ -19421,7 +19432,15 @@ async function initPopup() {
   // 枠テーマの DOM 取得・listener は frameTheme.wireFrameTheme(下で 1 回呼ぶ)へ移設。
 
   // v0.1.1687: refresh は並走させない(実行中に来た要求は「あとで1回」にまとめる=起動直後の約0.1秒おき10回超の連発を断つ)。
-  const refreshCoalescer = createRefreshCoalescer(() => refresh());
+  // v0.1.1985: 描き直し1回まるごとの時間を間隔係に知らせる(重い配信で、終わった直後に次が始まるのを防ぐ・popupStorageRefreshCoalesce.js)
+  const refreshCoalescer = createRefreshCoalescer(() => {
+    const t0 = Date.now();
+    _refreshStageClock.begin(t0);
+    return Promise.resolve(refresh()).finally(() => {
+      _refreshStageClock.end(Date.now());
+      coalescedRefreshScheduler.noteCycleCost(Date.now() - t0);
+    });
+  });
   const safeRefresh = () => {
     if (!hasExtensionContext()) return Promise.resolve();
     const _refreshT0 = Date.now();
