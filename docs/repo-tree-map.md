@@ -409,7 +409,7 @@ graph LR
 - `store-assets/`（15 件） — App Store の掲載文・アイコン・撮影計画・審査メモの正本  〔iOS / ストア〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 109 件</sub>
+<sub>ファイル 110 件</sub>
 
 - `audit/`（4 件） — 「面(popup/会場/別窓/・live)の間でCSSとDOMがずれていないか」を機械で洗う監査(静的=一度も効かないCSSの検出+基準値のラチェット / 実ブラウザ=hidden・押せない・はみ出し・クリック透過)  〔監査 / CSS / 会場〕
 - `lib/`（4 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
@@ -435,10 +435,10 @@ graph LR
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
 ## `tests/` — E2E / contract テスト(layer 依存・描画 spec 等)  〔テスト〕
-<sub>ファイル 86 件</sub>
+<sub>ファイル 87 件</sub>
 
 - `contract/`（4 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
-- `e2e/`（79 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
+- `e2e/`（80 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
 - `helpers/`（3 件） — テスト共有ヘルパ(配線テストのソース走査等)  〔テスト / 共有〕
 
 ## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ・OG カード画像合成 等)  〔ツール〕
