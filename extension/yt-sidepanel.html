@@ -10920,9 +10920,11 @@
       >
       <!--
         v0.1.334: ページ内パネルの位置クイック切替（詳細設定の奥にあった
-        inlinePanelPlacement を、ヘッダーから直接・現在値明示つきで操作）。
+        inlinePanelPlacement を、ヘッダーから直接操作）。
         既定 hidden。JS が「watch を扱える文脈」と判定したら外す。
         保存は既存 saveInlinePanelPlacement を呼ぶだけ＝storage キーを増やさず二重管理しない。
+        v0.1.2033: 状態テキストは、押したボタンと実際の配置が食い違うときだけ出す。
+        一致時は #nlPlacementQuickValue を hidden のままにする（選択は aria-pressed）。
       -->
       <div
         id="nlPlacementQuickbar"
@@ -10936,6 +10938,7 @@
           id="nlPlacementQuickValue"
           class="nl-placement-quickbar__value"
           title="ページ内パネルを視聴ページのどこに出すか。実際の位置は視聴中タブの幅でも変わります（広いと横付きになりやすい）。"
+          hidden
           >—</span
         >
         <span class="nl-placement-quickbar__toggles">

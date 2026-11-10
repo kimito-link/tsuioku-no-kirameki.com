@@ -97,5 +97,38 @@ describe('inlinePlacementQuickbar', () => {
       const m = buildPlacementQuickbarModel({});
       expect(m.currentLabel).toBe('画面下いっぱい');
     });
+
+    it('選択チップと実配置が一致するときは状態テキストを出さない', () => {
+      expect(
+        buildPlacementQuickbarModel({ placement: 'beside', effectivePlacement: 'beside' }).statusText
+      ).toBe('');
+      expect(
+        buildPlacementQuickbarModel({ placement: 'below', effectivePlacement: 'below' }).statusText
+      ).toBe('');
+      // 実効不明（action popup）もチップが選択を表すので、同じ言葉を重ねない
+      expect(buildPlacementQuickbarModel({ placement: 'beside' }).statusText).toBe('');
+      expect(buildPlacementQuickbarModel({ placement: 'below' }).statusText).toBe('');
+    });
+
+    it('食い違うときだけ状態テキストを出す（横付き選択→狭タブで下）', () => {
+      const m = buildPlacementQuickbarModel({
+        placement: 'beside',
+        effectivePlacement: 'below'
+      });
+      expect(m.statusText).toContain('横付き');
+      expect(m.statusText).toContain('今は');
+      expect(m.statusText).toContain('プレイヤー行の下');
+      expect(m.besideActive).toBe(true);
+    });
+
+    it('チップが表さない配置は状態テキストを出す', () => {
+      expect(buildPlacementQuickbarModel({ placement: 'dock_bottom' }).statusText).toBe(
+        '画面下いっぱい'
+      );
+      expect(
+        buildPlacementQuickbarModel({ placement: 'floating', effectivePlacement: 'floating' })
+          .statusText
+      ).toBe('ポップアップ風');
+    });
   });
 });

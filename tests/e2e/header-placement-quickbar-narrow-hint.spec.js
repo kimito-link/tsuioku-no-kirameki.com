@@ -70,10 +70,14 @@ test('インライン狭ウィンドウで横付き保存時: 降格ヒントが
     fullPage: false
   });
 
-  // 広幅へリサイズ → 実効が beside になりヒントが消える（resize 追従, debounce 150ms）。
+  // 広幅へリサイズ → 実効が beside になり、ヒントも重複する状態テキストも消える。
+  // 選択は aria-pressed のまま（色だけに頼らない）。
   await popup.setViewportSize({ width: 1300, height: 720 });
   await expect(hint).toBeHidden({ timeout: 4000 });
-  await expect(popup.locator('#nlPlacementQuickValue')).not.toContainText('今は');
+  const wideValue = popup.locator('#nlPlacementQuickValue');
+  await expect(wideValue).toBeHidden();
+  expect(await wideValue.textContent()).not.toContain('今は');
+  await expect(popup.locator('#nlPlacementQuickBeside')).toHaveAttribute('aria-pressed', 'true');
 
   await popup.screenshot({
     path: 'test-results/header-placement-quickbar-wide-nohint.png',
