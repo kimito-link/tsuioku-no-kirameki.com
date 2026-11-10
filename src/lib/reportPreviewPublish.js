@@ -6,6 +6,22 @@ import { KEY_REPORT_PREVIEW, buildReportPreviewRecord } from './reportPreviewKey
 let _lastWriteAt = 0; // 最後に publish した時刻(間引き用・モジュール内に閉じる)。
 let _busy = false; // 重い全件集計の多重実行を防ぐ再入フラグ。
 
+/** この行数以上の記録は、下書きの集計の間隔を延ばす(全行をなめる集計なので、大きな記録で画面を止めない・v0.1.2012)。 */
+export const REPORT_PREVIEW_BIG_ROWS = 20_000;
+export const REPORT_PREVIEW_MIN_GAP_MS = 15_000;
+export const REPORT_PREVIEW_BIG_GAP_MS = 120_000;
+
+/**
+ * 下書きの集計の最小間隔。ふつうの記録は15秒、大きな記録は2分。
+ *   会社の PC(81,110 行・CPU 4 倍遅い)で、90 秒に 約 1.7 秒をこの集計に使っていた(画面には出ない・状態速報用)。
+ * @param {unknown} rowCount 記録の行数
+ * @returns {number} ms
+ */
+export function reportPreviewMinGapMs(rowCount) {
+  const n = Number(rowCount);
+  return Number.isFinite(n) && n >= REPORT_PREVIEW_BIG_ROWS ? REPORT_PREVIEW_BIG_GAP_MS : REPORT_PREVIEW_MIN_GAP_MS;
+}
+
 /**
  * レポート(HTML/マーケ/メディアキット)の「DL前」主要KPIを status 速報へ publish する。
  * popup-entry.js の行数膨張(max-lines ラチェット)を避けるため producer 本体をここへ集約。レポートが

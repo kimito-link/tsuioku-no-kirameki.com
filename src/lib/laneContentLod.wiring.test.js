@@ -54,7 +54,7 @@ describe('中身LOD: 描画側への配線', () => {
 
   it('★hollow でも frag に append される = タイル枚数が減らない(幕の解除条件を守る)', () => {
     const code = stripComments(read(RENDERER));
-    // hollow 分岐の中で frag.appendChild(hollowEl) してから continue していること。
+    // hollow 分岐の中で order.push(hollowEl)(v0.1.1967〜 順番配列) してから continue していること。
     //   ★v0.1.1572: 旧版は「ファイル中の最初の shouldRenderHollow(=import 行)から最初の continue; まで」を
     //     走査しており、別の関数に continue; が1つ足されるだけで赤になり、0個になると slice(0,-1) で
     //     全文を見て緑になる偽陰性があった。fillLaneTier の本体(括弧対応)だけを見て、空振りは断言で止める。
@@ -64,7 +64,7 @@ describe('中身LOD: 描画側への配線', () => {
     expect(start, 'fillLaneTier 内に shouldRenderHollow( が無い').toBeGreaterThan(-1);
     const cont = fn.indexOf('continue;', start);
     expect(cont, 'hollow 分岐の continue; が無い').toBeGreaterThan(start);
-    expect(fn.slice(start, cont)).toContain('frag.appendChild(hollowEl)');
+    expect(fn.slice(start, cont)).toContain('order.push(hollowEl)');
   });
 
   it('★diff-skip の鍵(storyLaneTierBodyKey)に位置・LOD を混ぜていない', () => {

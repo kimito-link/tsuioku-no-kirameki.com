@@ -409,7 +409,21 @@ export default [
     // v0.1.1816: 即時プッシュ再描画に「隠れている間は1.5秒に1回まで」の指定(+1行)。間隔の仕組みは lib の coalescedRepaintScheduler.js。
     // v0.1.1852: 遅い PC なら GPU の案内を出す配線(import 1行+呼び出し4行=+5)。中身は popup/wireVoiceGpuTip.js。
     // v0.1.1889: 応援マスの作り直しの入口別計器と末尾だけ削る縮小(+56: import 1・状態と補足欄の書き込み関数・各入口の記録・北極星キャラ絵の同値スキップ2)。数え方と文言は lib の storyGrowthRebuildReasons.js。
-    rules: { 'max-lines': ['error', { max: 21807, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1957: 描き直しの時間を測って間隔を広げる配線(+9: 測る外側の関数と本体の分離)。間隔の仕組みは lib の popupStorageRefreshCoalesce.js。
+    // v0.1.1961: タブの問い合わせを描き直し1回の中で使い回す配線(+15: 使い回しの入口と、タブが動いたら捨てる知らせ)。仕組みは lib の shortLivedMemo.js。
+    // v0.1.1973: 人が多い配信は応援レーンの写しを書く間隔を空ける配線(+5: import の差し替え・間隔係の生成と計器・入口の1行)。仕組みは lib の laneMirrorPublishPace.js。
+    // v0.1.1975: 人数がとても多い配信だけ応援レーンを2,000人までにする配線(+2: import と理由の1行)。仕組みは lib の laneCrowdLimit.js。
+    // v0.1.1981: 大きな記録で画面が描き直しだけで埋まるのを防ぐ配線=+20(定期の見回りの門 import・状態・測る2行・見送る2行/顔の数え上げの覚え書き 9行/描き直し間隔の上限 3行)。門は lib の refreshDutyGate.js。
+    // v0.1.1976: 大きい名前・顔の控えを書く間隔を空ける配線(+6: import・間隔係の生成と計器)。仕組みは lib の profileCacheWritePace.js。
+    // v0.1.1982: 大きな記録で診断用の数え上げを毎回やり直さない配線(+6: import・状態2つ・入口2か所・切替時の初期化)。仕組みは lib の storyDiagCountsPace.js。
+    // v0.1.1985: 描き直しがどの段で待っているかの計器(+10: import・生成と公開・段の入口7か所)と、1回まるごとの時間を間隔係へ知らせる配線(+6)。
+    //   同じ版で名前・顔の控えの学ぶ/補う/刈るを lib へ出して -11。計器は lib の refreshStageClock.js、間隔は popupStorageRefreshCoalesce.js。
+    // v0.1.1986: 描き直し1回ごとに休みの門へ知らせる配線と、走っている最中は定期の見回りで次を積まない配線(+5: 理由の注記4行・判定1行・計器1行・古い1行を削除)。
+    // v0.1.1987: 応援マスの2回目の描画を省く配線(+9: import・計器の生成と公開2行・理由の注記1行・判定5行)。仕組みは lib の laneSecondRenderPolicy.js。
+    // v0.1.1997: 大きな記録で合間に画面へ手を返す配線(+15: import・応援マスを次の仕事へ回す8行・正規化のあと2行・読み出しの続き4行)。決まりは lib の bigRecordYield.js。
+    // v0.1.2007: 応援マスの集計の控えの配線(+4: import・控えの生成と計器の公開3行)。仕組みは lib の laneAggregatesMemo.js。
+    // v0.1.2008: 応援マスを分けて足し終えたときに実DOMを測り直す配線(+6)。分け方は lib の laneProgressiveFill.js と story/renderStoryUserLaneDom.js。
+    rules: { 'max-lines': ['error', { max: 21915, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -478,10 +492,12 @@ export default [
     // v0.1.1913: 吹き出しの一気出しの計器の配線(import 1行+状態1行+束ごとの記録7行+経路の名札3行+JSDoc・速報への1行)=+19。判定は lib の venueBubbleBurst.js。
     // v0.1.1914: 過去の番号を吹き出さない定数(コメント2行)と state の hiNo・計器への1行=+6。判定は lib の venueSpeech.js(oldNoGap)。
     // v0.1.1960: 会場の数字の帯(りんく「これを会場モードでもいれたほうが利便性たかい」)の配線=+36(import 3行・帯を作る8行・描く関数14行・catch-up/onChanged/見回り)。値の決め方と DOM・CSS は lib の venueStatStrip.js。
+    // v0.1.1979: 吹き出しを声と一緒に出す(りんく決定「声と一緒に出す」)の配線=+36(import・待たせるかの判定・出す関数・3秒の見切り・計器)。待たせる条件は lib の venueBubbleVoiceHold.js。
+    // v0.1.1980: 吹き出しを待たせる計器に「待たせている間に声の側で外された件」を足す=+1(PC 実測で held 491 のうち 377 件の行き先が数えられていなかった)。
     // v0.1.1995: パネルを開かなくても数字の帯が出る(りんく「POPをひらかなくても数字がつくように」)の配線=+9(import 1行・自分で作る写しの置き場と見回り役 8行)。作り方は lib の venueStatCardsSelf.js。
     // v0.1.2005: 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない(PC 実測: ニコ生で最初の約1分、古い数字で止まる)の配線=+2。判定は lib の venueStatCardsSelf.js(createStatMirrorLiveness)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7494, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7531, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

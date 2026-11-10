@@ -129,6 +129,24 @@ export function noteLag(c, lagMs) {
   if (d > c.lg.max) c.lg.max = d;
 }
 
+/** これより長い配列は、先頭の行だけ測って見積もる(v0.1.1983) */
+export const EXT_CENSUS_BYTES_SAMPLE_ROWS = 200;
+
+/**
+ * 値を JSON にしたときのおおよその長さ。長い配列は先頭 EXT_CENSUS_BYTES_SAMPLE_ROWS 行だけを測って行数で伸ばす。
+ *   8万行の配列を 30 秒ごとに丸ごと JSON にしていた(手元の計測・CPU 4倍遅く: 1回 約0.8秒止まる)。計器が本体を止めない。
+ * @param {unknown} v
+ * @returns {number}
+ */
+export function approxJsonBytes(v) {
+  if (v === undefined) return 0;
+  if (Array.isArray(v) && v.length > EXT_CENSUS_BYTES_SAMPLE_ROWS * 2) {
+    const head = JSON.stringify(v.slice(0, EXT_CENSUS_BYTES_SAMPLE_ROWS)).length;
+    return Math.round((head / EXT_CENSUS_BYTES_SAMPLE_ROWS) * v.length);
+  }
+  return JSON.stringify(v).length;
+}
+
 /**
  * storage.onChanged を1キーぶん数える。バイトは族ごとに BYTES_SAMPLE_MS に1回だけ測る。
  * @param {DocCensus} c

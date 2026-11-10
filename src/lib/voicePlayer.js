@@ -165,6 +165,14 @@ export class VoicePlayer {
     this._lightProbeAt = 0;
     /** 軽い声で続けて読めなかった回数。3回続いたらこの ON の間は使わない(無音のまま切り替え続けないため)。 */
     this._lightFailStreak = 0;
+    /**
+     * 2026-11-09: PC の声が Chrome に止められている('not-allowed'=読み込み直したあと未クリック)。
+     *   この間は「配信ページを1回クリックして」と画面に出し、クリックされたら数え直して再び試す。
+     */
+    this._lightBlocked = false;
+    this._activationListening = false;
+    /** クリックを待つ相手(既定はこのページ・試験では差し替える)。 */
+    this._activationTarget = deps.activationTarget || globalThis;
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
 
@@ -362,6 +370,25 @@ export class VoicePlayer {
     if (typeof this.stopCurrent === 'function') this.stopCurrent();
     this.stopCurrent = null;
     this._updateLagNotice(); // 止めたら遅れの一言も消す(待ちは空)。
+  }
+
+  /**
+   * v0.1.1979: 待ちの1件を、まだ声づくりを頼んでいなければ読まずに外す(会場が吹き出しを声に合わせて待たせ、
+   *   3秒たっても順番が来ない件を「読まずに吹き出しだけ」にするため・venueBubbleVoiceHold.js)。
+   *   声づくりを頼み済み(prefetches にある)の件と、もう待ちから取り出された件は触らない(作った声を捨てない)。
+   * @param {Function} onDropped enqueue に渡した onDropped(件の目印)
+   * @returns {'dropped'|'inflight'|'not-queued'}
+   */
+  dropQueuedUnstarted(onDropped) {
+    const i = typeof onDropped === 'function' ? this.queue.findIndex((q) => q && q.onDropped === onDropped) : -1;
+    if (i < 0) return 'not-queued';
+    const item = this.queue[i];
+    if (this.prefetches.has(item)) return 'inflight';
+    this.queue.splice(i, 1);
+    if (typeof item.onPlayStart === 'function') item.onPlayStart();
+    this._notifyDropped(item);
+    this._updateLagNotice();
+    return 'dropped';
   }
 
   /**
@@ -816,7 +843,10 @@ export class VoicePlayer {
     }
     if (started && typeof item.onAudioEnd === 'function') item.onAudioEnd();
     if (typeof item.onPlayStart === 'function') item.onPlayStart();
-    if (text && speaker) this._lightFailStreak = started ? 0 : this._lightFailStreak + 1;
+    if (text && speaker) {
+      this._lightFailStreak = started ? 0 : this._lightFailStreak + 1;
+      this._noteLightResult(started, speaker);
+    }
     if (!started || generation !== this.generation) {
       this._notifyDropped(item);
       return;
@@ -830,6 +860,56 @@ export class VoicePlayer {
     this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
     this._emitDiag();
     this._updateLagNotice(); // 「PC の声で読んでいます」を出す
+  }
+
+  /**
+   * 2026-11-09: 軽い声の失敗理由を計器に残し、Chrome に止められたら(not-allowed)画面で案内する。
+   * @param {boolean} started
+   * @param {any} speaker
+   */
+  _noteLightResult(started, speaker) {
+    let err = '';
+    try { err = typeof speaker.lastError === 'function' ? String(speaker.lastError() || '') : ''; } catch { err = ''; }
+    if (started) {
+      if (this._lightBlocked) { this._lightBlocked = false; this.diag.lightVoiceBlocked = false; this._updateLagNotice(); }
+      return;
+    }
+    if (!err) return;
+    this.diag.lightLastError = err;
+    this.diag.lightErrorTotal = (Number(this.diag.lightErrorTotal) || 0) + 1;
+    if (err !== 'not-allowed') return;
+    this.diag.lightBlockedTotal = (Number(this.diag.lightBlockedTotal) || 0) + 1;
+    if (!this._lightBlocked) {
+      this._lightBlocked = true;
+      this.diag.lightVoiceBlocked = true;
+      this._listenForActivation();
+      this._emitDiag();
+      this._updateLagNotice();
+    }
+  }
+
+  /** ページがクリック・キー操作されたら、止められていた PC の声をもう一度試せるようにする。 */
+  _listenForActivation() {
+    const g = /** @type {any} */ (this._activationTarget);
+    if (this._activationListening || typeof g.addEventListener !== 'function') return;
+    this._activationListening = true;
+    const onAct = () => {
+      try {
+        g.removeEventListener('pointerdown', onAct, true);
+        g.removeEventListener('keydown', onAct, true);
+      } catch { /* no-op */ }
+      this._activationListening = false;
+      this._lightBlocked = false;
+      this.diag.lightVoiceBlocked = false;
+      this._lightFailStreak = 0;
+      this.diag.lightActivatedAt = Date.now();
+      this._emitDiag();
+      this._updateLagNotice();
+    };
+    try {
+      g.addEventListener('pointerdown', onAct, true);
+      g.addEventListener('keydown', onAct, true);
+    } catch { this._activationListening = false; }
   }
 
   async _drainQueue() {

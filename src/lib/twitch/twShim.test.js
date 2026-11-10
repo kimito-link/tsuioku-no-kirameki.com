@@ -49,7 +49,7 @@ describe('Twitch の記録 → ニコ生版の画面(ytNicoShim)', () => {
 
 describe('Twitch の有料の応援 → ギフトの記録', async () => {
   const { buildYtGiftBags } = await import('../../../extension-youtube/src/ytGiftToNico.js');
-  it('Bits は pt(円の目安)・サブスクとギフトサブは Twitch の名前', () => {
+  it('Bits は1つ1pt(丸めない)・サブスクとギフトサブは Twitch の名前', () => {
     const lv = pseudoLvForVideoId('tw.kimito_link.9');
     const bits = parseTwChatLine(LINE.replace(';color=;', ';bits=500;color=;').replace('わこつ', 'Cheer500 おめ'));
     const sub = parseTwChatLine(
@@ -62,6 +62,6 @@ describe('Twitch の有料の応援 → ギフトの記録', async () => {
     const bags = buildYtGiftBags(entries, lv, {});
     const names = bags.giftEvents.map((/** @type {any} */ x) => x.itemName);
     expect(names).toEqual(['500 Bits', 'サブスク', 'ギフトサブ ×5']);
-    expect(bags.giftEvents[0].point).toBe(700);
+    expect(bags.giftEvents[0].point).toBe(500);
   });
 });

@@ -240,3 +240,20 @@ describe('formatExtProcessCensusLines — 速報の文言(誤診させない)', 
     expect(formatExtProcessCensusLines(rec, T0).join('\n')).toMatch(/popup-watch×3/);
   });
 });
+
+describe('approxJsonBytes: 長い配列は先頭だけ測って見積もる(v0.1.1983)', () => {
+  it('短い値はそのままの長さ', async () => {
+    const { approxJsonBytes } = await import('./extDocBusyCensus.js');
+    expect(approxJsonBytes(undefined)).toBe(0);
+    expect(approxJsonBytes({ a: 1 })).toBe(JSON.stringify({ a: 1 }).length);
+    const small = Array.from({ length: 300 }, (_, i) => ({ id: i }));
+    expect(approxJsonBytes(small)).toBe(JSON.stringify(small).length);
+  });
+  it('長い配列は本当の長さに近い見積もり(±20%)', async () => {
+    const { approxJsonBytes } = await import('./extDocBusyCensus.js');
+    const big = Array.from({ length: 50000 }, (_, i) => ({ id: `m${i}`, text: 'comment text here' }));
+    const real = JSON.stringify(big).length;
+    const est = approxJsonBytes(big);
+    expect(Math.abs(est - real) / real).toBeLessThan(0.2);
+  });
+});

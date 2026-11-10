@@ -128,3 +128,22 @@ describe('resolveStoryLaneAvatarSrc', () => {
     expect(out).not.toBe(HTTP_AV);
   });
 });
+
+describe('0.1.1956: 覚えた答えは覚えない答えと同じ', async () => {
+  const { resolveStoryLaneAvatarSrc: memo, resolveStoryLaneAvatarSrcUncached: raw } = await import('./storyLaneAvatarSrc.js');
+  it('ばらばらの入力 2万通りで、2回目(覚えた答え)も覚えない答えと一致する', () => {
+    const uids = [undefined, null, '', '12345', ' 12345 ', '67890', 'a:xyz', 'yt:UCabc', 98765, '1'];
+    const avs = [undefined, '', 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/1/12345.jpg', 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/6/67890.jpg?x=1', 'https://yt3.ggpht.com/a', ' https://yt3.ggpht.com/a ', 'data:image/png;base64,xx', 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg'];
+    const snaps = [null, undefined, {}, { broadcasterUserId: '12345', broadcasterIconUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/1/12345.jpg' }, { viewerUserId: '67890', viewerAvatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/6/67890.jpg' }, { broadcasterUserId: '67890', viewerUserId: '12345', viewerAvatarUrl: 'https://yt3.ggpht.com/a' }];
+    const rems = [undefined, '', 'https://yt3.ggpht.com/a', 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/1/12345.jpg'];
+    let seed = 7;
+    const pick = (/** @type {any[]} */ a) => { seed = (seed * 1103515245 + 12345) % 2147483648; return a[seed % a.length]; };
+    for (let i = 0; i < 20000; i++) {
+      const entry = { userId: pick(uids), avatarUrl: pick(avs) };
+      const ctx = { snapshot: pick(snaps), isOwnPosted: pick([true, false, undefined]), rememberedAvatar: pick(rems) };
+      const want = raw(entry, /** @type {any} */ (ctx));
+      expect(memo(entry, /** @type {any} */ (ctx))).toBe(want);
+      expect(memo({ ...entry }, /** @type {any} */ ({ ...ctx }))).toBe(want);
+    }
+  });
+});

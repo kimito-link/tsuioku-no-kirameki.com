@@ -1,9 +1,9 @@
-# ★次に出す版の宿題(2026-11-10 点検で発覚): Twitch の権限 `https://www.twitch.tv/*` が 0.1.1916 から manifest に入っている
+# ★次に出す版(0.1.2036): Twitch に加え Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のホスト権限が増える
 
-- 0.1.1901(審査中)には入っていない。**次の提出で権限が増える**=ダッシュボードから手でアップロードする(AGENTS §2)。
-- 貼り直す欄: 単一用途(§1)に Twitch を足す・ホスト権限の統合欄(§2-8z)に [cws-submission-texts.md](cws-submission-texts.md) §2-9c を入れる(1,000字に収まるよう詰める)。
-- `privacy.html` §4-1c に Twitch を記載済み(2026-11-10)。「詳細な説明」([cws-store-listing.md](cws-store-listing.md))にも Twitch を足す。
-- PR #591(Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)を入れるなら、同じ3点(privacy.html・単一用途/ホスト権限・詳細な説明)をその PR の中で足す。
+- 0.1.1901(審査中)にはこれらのホストは入っていない。**次の提出で権限が増える**=ダッシュボードから手でアップロードする(AGENTS §2)。API アップロードだと新しい権限の理由欄が出ない。
+- 貼り直す欄: 単一用途(§1・780字)・ホスト権限の統合欄(§2-8z・995字)。正本は [cws-submission-texts.md](cws-submission-texts.md) の §1 と §2-8z。個別の理由は §2-9c〜§2-9h。
+- `privacy.html` は §4-1c〜§4-1h と §5 に記載済み(2026-11-10)。「詳細な説明」は [cws-store-listing.md](cws-store-listing.md)。貼り付け用の写しは同じフォルダの `description-ja.txt` と `privacy-justifications-ja.txt`。
+- どの配信の記録も既定ではこの PC の中だけ。「スマホで見る」で送るのはニコニコ生放送の画面だけ。運営者の表示は株式会社ベストトラスト。
 
 ---
 

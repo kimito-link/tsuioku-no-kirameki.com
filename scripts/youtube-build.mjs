@@ -169,6 +169,23 @@ export function ytBuildTargets({ merged, define }) {
     // Twitch の視聴ページの入口(council/twitch-support-PLAN.md)。記録は YouTube 版と同じ口へ送る=本体向けだけに置く
     list.push({ entryPoints: [src('tw-content-entry.js')], outfile: out('tw-content.js'), target: 'chrome114', define: def, ...page,
       banner: { js: '// tw-content.js — Twitch の視聴ページでチャット(公式の読み取り専用 IRC)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // Kick の視聴ページの入口(council/kick-support-PLAN.md)。Twitch と同じく本体向けだけ
+    list.push({ entryPoints: [src('kick-content-entry.js')], outfile: out('kick-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// kick-content.js — Kick の視聴ページでチャット(ページ自身が使う Pusher)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // ふわっちの視聴ページの入口(council/whowatch-support-PLAN.md)。Kick と同じく本体向けだけ
+    list.push({ entryPoints: [src('ww-content-entry.js')], outfile: out('ww-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// ww-content.js — ふわっちの視聴ページで配信とコメント(ページ自身が使う API)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // SHOWROOM の部屋のページの入口(council/showroom-support-PLAN.md)。本体向けだけ
+    list.push({ entryPoints: [src('sr-content-entry.js')], outfile: out('sr-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// sr-content.js — SHOWROOM の部屋のページでコメントとギフト(ページ自身が使うソケット)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // ミクチャの配信ページの入口(council/mixch-support-PLAN.md)。本体向けだけ
+    list.push({ entryPoints: [src('mx-content-entry.js')], outfile: out('mx-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// mx-content.js — ミクチャの配信ページでコメントとギフト(ページ自身が使うソケット)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // TikTok LIVE の配信ページの入口(council/tiktok-support-PLAN.md)。ページ自身の世界の写し役と、記録へ渡す入口の2つ。本体向けだけ
+    list.push({ entryPoints: [src('tt-main-entry.js')], outfile: out('tt-main.js'), target: 'chrome114', define: def,
+      banner: { js: '// tt-main.js — TikTok の配信ページ自身の世界で、ページのソケットの受信と gift/list を写して入口へ渡すバンドル\n/* eslint-disable */' } });
+    list.push({ entryPoints: [src('tt-content-entry.js')], outfile: out('tt-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// tt-content.js — TikTok の配信ページでコメントとギフト(ページ自身のソケットの写し)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
     list.push({ entryPoints: [resolve(root, 'extension-youtube/content-chat-main.js')], outfile: out('content-chat-main.js'), target: 'chrome114', define: def });
   }
   // offscreen は1つしか持てないので、本体向けには作らない(本体の offscreen を使う・YouTube の読み上げはコメビュ)

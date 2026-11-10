@@ -1,6 +1,7 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
+import { createShortLivedMemo } from '../lib/shortLivedMemo.js';
 import '../lib/extDocBusyCensusBoot.js';
 // v0.1.1686: ちらつき計(サイドパネルの popup だけ・画面の書き換えを数えて状態速報に出す)。import するだけで起動。
 import '../lib/flickerMeterBoot.js';
@@ -71,6 +72,9 @@ import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
+import { shouldSkipLaneSecondRender } from '../lib/laneSecondRenderPolicy.js';
+import { BIG_RECORD_YIELD_MIN_ROWS, shouldDeferLanePaintForBigRecord, shouldYieldForBigRecord, yieldToMainThread } from '../lib/bigRecordYield.js';
+import { createLaneAggregatesMemo } from '../lib/laneAggregatesMemo.js';
 import { canAppendStoryGrowthCells, canTrimStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
@@ -506,7 +510,7 @@ import {
 } from '../lib/commentDb.js';
 import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
-import { normalizeStoredCommentEntries } from '../lib/storedCommentEntriesNormalize.js';
+import { createAppliedEntriesMemo } from '../lib/appliedEntriesMemo.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 import {
   formatAiShareDiagnosticsMarkdown,
@@ -573,9 +577,7 @@ import {
   applyUserCommentProfileMapToEntries,
   hydrateUserCommentProfileMapFromStorage,
   normalizeUserCommentProfileMap,
-  pruneUserCommentProfileMap,
   readStorageBagWithRetry,
-  upsertUserCommentProfileFromEntry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
 import { createStorageKeyMemo } from '../lib/storageKeyMemo.js';
@@ -746,6 +748,12 @@ import { KEY_LANE_MIRROR, laneMirrorKeyFor, laneMirrorReadKeys, pickLaneMirrorSn
 // ★v0.1.1300: 配信ごと鏡(v2)+受領証の書き出し(storage I/O グルーは lib へ抽出=max-lines ラチェット遵守)。
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
+import { createLaneMirrorPacer } from '../lib/laneMirrorPublishPace.js';
+import { laneCrowdLimit } from '../lib/laneCrowdLimit.js';
+import { createRefreshDutyGate } from '../lib/refreshDutyGate.js';
+import { createRefreshStageClock } from '../lib/refreshStageClock.js';
+import { createStoryDiagCountsPaceState, shouldReuseStoryDiagCounts } from '../lib/storyDiagCountsPace.js';
+import { createProfileCacheWritePacer } from '../lib/profileCacheWritePace.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
@@ -800,7 +808,7 @@ import {
 } from '../lib/devMonitorAvatarStats.js';
 import { readMergedTrendSeries, readTrendSeries } from '../lib/devMonitorTrendSession.js';
 import { renderAcquisitionDashboard } from './popup/renderAcquisitionDashboard.js';
-import { publishReportPreviewThrottled } from '../lib/reportPreviewPublish.js';
+import { publishReportPreviewThrottled, reportPreviewMinGapMs } from '../lib/reportPreviewPublish.js';
 import {
   summarizeCommentRecordBreakdown,
   formatCommentRecordBreakdownLine
@@ -933,6 +941,13 @@ import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
 import { createBroadcasterUidTracker } from '../lib/broadcasterUidTracker.js';
 import { STORY_GROWTH_REBUILD_REASON, createStoryGrowthRebuildReasonState, findStoryEntryDiff, noteStoryEntryDiff, noteStoryGrowthRebuildReason, noteStoryGrowthTarget, publishStoryGrowthRebuildNote } from '../lib/storyGrowthRebuildReasons.js';
 import { isMarketingExportTabFinished } from '../lib/marketingExportTabState.js';
+
+// 0.1.1961: 描き直し1回で約3回呼ばれ、毎回タブを3通り問い合わせていた。400ms の間は前の答え(写し)を使い、タブが動いたら捨てる
+const watchTabCandidatesMemo = createShortLivedMemo((w) => collectWatchTabCandidatesUncached(w), { ttlMs: 400 });
+try {
+  const clearTabMemo = () => watchTabCandidatesMemo.clear();
+  for (const ev of [chrome.tabs?.onActivated, chrome.tabs?.onUpdated, chrome.tabs?.onRemoved, chrome.tabs?.onCreated, chrome.windows?.onFocusChanged]) ev?.addListener?.(clearTabMemo);
+} catch { /* タブの知らせが取れない画面では 400ms で古くなるだけ */ }
 
 /**
  * @typedef {{
@@ -1508,6 +1523,7 @@ let _refreshReasonTag = 'unknown';
 /** @param {string} reason 描き直し(または見送り)の理由を1件積む。 */
 function noteRepaintReason(reason) {
   _repaintReasonCounts = addRepaintReason(_repaintReasonCounts, reason);
+  try { const d = /** @type {any} */ (globalThis).__refreshStageDiag; if (d) d.reasons = _repaintReasonCounts; } catch { /* 計器だけ */ } // v0.1.1986: 何が描き直しを起こしたかを段の計器と並べて読む
 }
 /** @param {string} tag 次の paint をこのタグで計上する。 */
 function tagRefreshReason(tag) {
@@ -4833,6 +4849,14 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
   );
 }
 
+const _storyDiagCountsPace = createStoryDiagCountsPaceState(); // v0.1.1982: 診断用の数え上げの間隔(lib/storyDiagCountsPace.js)
+const _storyDiagCountsPacePaint = createStoryDiagCountsPaceState();
+// ★v0.1.1981: 定期の見回り(3秒ごと)が画面を描き直しだけで埋めないための門(src/lib/refreshDutyGate.js)
+const _refreshDutyGate = createRefreshDutyGate();
+try { /** @type {any} */ (globalThis).__refreshDutyGateDiag = _refreshDutyGate.diag; } catch { /* 計器の公開の失敗で止めない */ }
+const _refreshStageClock = createRefreshStageClock();
+try { /** @type {any} */ (globalThis).__refreshStageDiag = _refreshStageClock.diag; } catch { /* 計器の公開の失敗で止めない */ }
+
 // v0.1.773: hasOwnPostedEntryForUserId は廃止。集約ごとに storageCtx 全件を走査する O(集約×N) で
 //   popup メインスレッドを塞ぐ性能問題だったため、buildOwnPostedUserIdSet で事前に1パス集合化し、
 //   各ループは O(1) の has() で判定する(りんく列・ギフト列とも)。
@@ -4843,6 +4867,11 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
  *   storage.onChanged の newValue を権威として更新・寿命60秒・読み出し中の変化は古い結果で上書きしない。
  */
 const _profileCacheMemo = createStorageKeyMemo(KEY_USER_COMMENT_PROFILE_CACHE);
+// ★v0.1.1976: 大きい控え(2,000人超)は全体の書き込みを30秒に1回へ(src/lib/profileCacheWritePace.js)
+const _profileCacheWritePacer = createProfileCacheWritePacer({
+  flush: () => { if (popupUserCommentProfileMap) void storageSetSafe({ [KEY_USER_COMMENT_PROFILE_CACHE]: popupUserCommentProfileMap }); }
+});
+/** @type {any} */ (globalThis).__profileCacheWritePaceDiag = _profileCacheWritePacer.diag;
 const _calibrationRingMemo = createStorageKeyMemo(KEY_CONCURRENT_CALIBRATION_RING_V1);
 let _calibrationFitVersion = -1;
 try {
@@ -4880,28 +4909,17 @@ let popupUserCommentProfileMap = /** @type {null|Record<string, { nickname?: str
  * @param {PopupCommentEntry[]} arr
  * @returns {{ arr: PopupCommentEntry[], commentsPatched: boolean, cacheTouched: boolean }}
  */
+const _appliedEntriesMemo = createAppliedEntriesMemo();
+try { /** @type {any} */ (globalThis).__appliedEntriesMemoDiag = _appliedEntriesMemo.diag; } catch { /* 計器だけ */ }
 function popupMergeUserCommentProfileCache(arr) {
   if (!popupUserCommentProfileMap) {
     return { arr, commentsPatched: false, cacheTouched: false };
   }
-  let cacheTouched = false;
-  for (const e of arr) {
-    if (upsertUserCommentProfileFromEntry(popupUserCommentProfileMap, e)) {
-      cacheTouched = true;
-    }
-  }
-  const ap = applyUserCommentProfileMapToEntries(arr, popupUserCommentProfileMap);
-  const nextArr = ap.patched > 0 ? ap.next : arr;
-  const beforeK = Object.keys(popupUserCommentProfileMap).length;
-  popupUserCommentProfileMap = pruneUserCommentProfileMap(popupUserCommentProfileMap);
-  if (Object.keys(popupUserCommentProfileMap).length !== beforeK) {
-    cacheTouched = true;
-  }
-  return {
-    arr: nextArr,
-    commentsPatched: ap.patched > 0,
-    cacheTouched
-  };
+  // v0.1.1984: 学ぶ・補う・刈るは lib の1関数(人数が上限を超える配信で描き直しが止まらなくなるのを防ぐ・userCommentProfileMerge.js)
+  //   ★v0.1.2023: 大きな記録で同じ行・同じ控えなら結果を使い回す(毎回新しい配列を返して下流の記憶を外さない・appliedEntriesMemo.js)
+  const r = _appliedEntriesMemo.merge(popupUserCommentProfileMap, arr);
+  popupUserCommentProfileMap = r.map;
+  return { arr: r.arr, commentsPatched: r.commentsPatched, cacheTouched: r.cacheTouched };
 }
 
 /**
@@ -4938,7 +4956,7 @@ async function runDeferredUserCommentProfileHydrate(ctx) {
     setArr(prof.arr);
     const save = {};
     if (prof.commentsPatched && mainWriteAllowed) save[commentsKey] = prof.arr;
-    if (prof.cacheTouched || hydrated) {
+    if ((prof.cacheTouched || hydrated) && _profileCacheWritePacer.offer(Object.keys(popupUserCommentProfileMap || {}).length)) {
       save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
     }
     if (Object.keys(save).length) {
@@ -5050,9 +5068,18 @@ function countResolvedAvatarEntries(entries, liveId) {
   if (!lid || !list.length) return { total: 0, unique: 0 };
   let total = 0;
   const unique = new Set();
+  // ★v0.1.1981: 同じ人・同じ顔URL・自分の投稿かどうかが同じなら、顔の決め方も同じ答えになる(この1回の数え上げの間は
+  //   覚えている顔も視聴ページの情報も変わらない)。8万行の配信で、顔の解決と URL の分解を8万回していた(手元の計測で最大の重さ)。
+  /** @type {Map<string, string>} */
+  const keyMemo = new Map();
   for (const entry of list) {
-    const src = storyGrowthAvatarSrcCandidate(entry, lid, list);
-    const key = avatarCompareKey(src);
+    const uidRaw = entry?.userId;
+    const memoKey = `${uidRaw === undefined ? '\u0001u' : uidRaw === null ? '\u0001n' : typeof uidRaw === 'string' ? `s${uidRaw}` : `o${String(uidRaw)}`}\u0000${String(entry?.avatarUrl ?? '')}\u0000${isOwnPostedSupportComment(entry, lid, list) ? '1' : '0'}`;
+    let key = keyMemo.get(memoKey);
+    if (key === undefined) {
+      key = avatarCompareKey(storyGrowthAvatarSrcCandidate(entry, lid, list));
+      keyMemo.set(memoKey, key);
+    }
     if (!key) continue;
     total += 1;
     unique.add(key);
@@ -6576,7 +6603,8 @@ function renderStoryUserLane() {
   rosteredCandidates.length = 0;
   rosteredCandidates.push(..._countOrdered);
 
-  const buckets = bucketStoryUserLanePicks(rosteredCandidates, limit);
+  // ★v0.1.1975: 候補が2,000人を超える配信だけ上位2,000人まで(残りはフッターの「ほか M人」・src/lib/laneCrowdLimit.js)
+  const buckets = bucketStoryUserLanePicks(rosteredCandidates, laneCrowdLimit(rosteredCandidates.length, limit));
   const picked = flattenStoryUserLaneBuckets(buckets);
   // v0.1.1231 Phase1 計器: 誰が消えたかを測る(挙動不変・個数だけでは入れ替わりが見えないため)。
   noteLaneRoster(_laneRosterDeltaState, { liveId: STORY_SOURCE_STATE.liveId, picks: picked, candidateTotal: rosteredCandidates.length });
@@ -6695,7 +6723,12 @@ function renderStoryUserLane() {
   // 2026-07-14(Patch 2): 候補総数を渡し、切られたぶんは「ほか M人」と誠実に併記する(黙って切らない)。
   //   ★v0.1.1232: ①は上限撤廃で通常「ほか M人」は出ない(全員表示)が、器は③鏡(cap 48)の宣言に必要。
   paintStoryUserLaneDomFilled(els, faces, bucketsWithStats, laneDisplayedTotal, laneDomIo, {
-    totalCandidates: rosteredCandidates.length
+    totalCandidates: rosteredCandidates.length,
+    // ★v0.1.2008: 大きな段を分けて足し終えたら、実DOMを測り直す(途中の枚数のまま鏡へ運ばない・下の _laneDomSelfLast と同じ形)
+    onTiersSettled: () => {
+      const settledSelf = measureLaneDomSelf(els);
+      _laneDomSelfLast = { ...settledSelf, measuredAt: Date.now(), fingerprint: laneDomFingerprint(perTierKeysOf(settledSelf)), fingerprintFor: _lastPublishedLaneMirrorHash };
+    }
   });
   // C1: paint と同じ同期フレームで①実DOMを測り、後段の鏡publishへ渡す(TOCTOU防止)。
   const laneDomSelf = measureLaneDomSelf(els);
@@ -7262,12 +7295,16 @@ const _laneImportShadow = createLaneImportShadowState();
 
 /** v0.1.1581: 配信別の鏡(v2)は「同じ内容なら60秒に1回まで」に絞る(書くたびに全拡張ページへ onChanged が全文で配られる)。 */
 const _laneMirrorWriteGate = createLaneMirrorWriteGate({ changeFloorMs: 8000 }); // 件数・バッジ・発言抜粋だけの変化は8秒にまとめる(顔ぶれが変われば即)
+/** v0.1.1973: 人が多い配信は鏡を書く間隔を延ばす(間隔内は最後の1つだけ後で書く・src/lib/laneMirrorPublishPace.js) */
+const _laneMirrorPacer = createLaneMirrorPacer({ onFlush: (input) => publishLaneMirror(input) });
+/** @type {any} */ (globalThis).__laneMirrorPaceDiag = _laneMirrorPacer.diag;
 /** @param {{ liveId: string, buckets: Record<string, unknown[]>, domSelf: unknown,
  *   pickedLength: number, totalCandidates: number }} input */
 function publishLaneMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
+    if (!_laneMirrorPacer.gate(input)) return; // ★v0.1.1973: 人が多い配信は間隔を空ける
     // ★v0.1.1234: 鏡capも撤廃(①レーンと揃える)。
     //   旧: cap=48 固定。①だけ上限撤廃したため、会場で「①DOM 可視286 ≠ 鏡48」となり
     //   238人が③に載らなかった(実配信 lv351091938 で観測)。limitと鏡capの分離は
@@ -7531,6 +7568,7 @@ function renderStoryAvatarDiag() {
 }
 
 function resetStoryAvatarDiagState() {
+  _storyDiagCountsPace.lv = ''; _storyDiagCountsPacePaint.lv = ''; // v0.1.1982: 0 に戻したら、次は必ず数え直す
   STORY_AVATAR_DIAG_STATE.total = 0;
   STORY_AVATAR_DIAG_STATE.totalSource = 'fallback';
   STORY_AVATAR_DIAG_STATE.panelAgeSec = null;
@@ -7686,9 +7724,19 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
  * @param {readonly unknown[]} displayEntries
  * @param {readonly unknown[]} storageRows
  */
+const _laneSecondRenderDiag = { skipped: 0, rendered: 0, deferred: 0, coalesced: 0 };
+try { /** @type {any} */ (globalThis).__laneSecondRenderDiag = _laneSecondRenderDiag; } catch { /* 計器だけ */ }
 async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) {
   const lid = String(liveId || '').trim().toLowerCase();
   const seq = ++_storyLanePaintSeq;
+  // ★v0.1.1997: 数千人いる配信では、応援マスの組み立てを次の仕事へ回す(lib/bigRecordYield.js)。
+  //   1回の読み直しの中で描画が2〜3回続くので、そのたびに全員分を組み立てると数秒固まる(PC 実測 Kick 約6,500人)。
+  //   回している間に次の描画が来たら古い方はやめる=同じ読み直しの中では最後の1回だけ組み立てる。
+  if (lid && shouldDeferLanePaintForBigRecord(STORY_SOURCE_STATE.laneAggregates.length)) {
+    _laneSecondRenderDiag.deferred += 1;
+    await yieldToMainThread();
+    if (seq !== _storyLanePaintSeq) { _laneSecondRenderDiag.coalesced += 1; return; }
+  }
 
   const profileMap =
     popupUserCommentProfileMap &&
@@ -7795,7 +7843,13 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
     if (g.kept) { STORY_SOURCE_STATE.giftThrowerPicks = g.picks; _giftAdPicksCarryDiag.keptGift += 1; }
     if (ad.kept) { STORY_SOURCE_STATE.adThrowerPicks = ad.picks; _giftAdPicksCarryDiag.keptAd += 1; }
   }
-  renderStoryUserLane();
+  // ★v0.1.1987: 数千人いる配信で、ギフト/広告の列が読み込みの前後で同じなら、同じ応援マスを組み立て直さない(lib/laneSecondRenderPolicy.js)。
+  const _skipSecond = shouldSkipLaneSecondRender({
+    peopleCount: STORY_SOURCE_STATE.laneAggregates.length,
+    prevGift: _prevGiftPicks, nextGift: STORY_SOURCE_STATE.giftThrowerPicks,
+    prevAd: _prevAdPicks, nextAd: STORY_SOURCE_STATE.adThrowerPicks
+  });
+  if (_skipSecond) _laneSecondRenderDiag.skipped += 1; else { _laneSecondRenderDiag.rendered += 1; renderStoryUserLane(); }
   renderStoryAvatarDiag();
 }
 
@@ -7814,6 +7868,9 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
 /** v0.1.1617: gift/ad picks の持ち越し台帳と計器(同じ配信へ戻ったとき restored / 別の配信へ替わったとき cleared)。 */
 const _giftAdPicksCarry = createGiftAdPicksCarry();
 const _giftAdPicksCarryDiag = { restored: 0, cleared: 0, keptGift: 0, keptAd: 0 };
+// ★v0.1.2007: 数万行の記録で、同じ記録を描画のたびに人ごとに数え直さない(lib/laneAggregatesMemo.js)
+const _laneAggregatesMemo = createLaneAggregatesMemo({ compute: (rows, lid, o) => userLaneCandidatesFromStorage(rows, lid, o), minRows: BIG_RECORD_YIELD_MIN_ROWS });
+try { /** @type {any} */ (globalThis).__laneAggregatesMemoDiag = _laneAggregatesMemo.diag; } catch { /* 計器だけ */ }
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
   const list = Array.isArray(displayList) ? displayList : [];
@@ -7871,7 +7928,7 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = 
   // 0.1.79: 4層目=集約時に broadcaster icon 取り違え除外。正本(2026-06-17): userLaneCandidatesFromStorage
   //   は会場(venueBar.js)と同一純関数=popup列と会場席は同じ集約を共有し顔ぶれ一致が正(「鏡映」設計・匿名a:含む)。
   STORY_SOURCE_STATE.laneAggregates = nextLiveId
-    ? userLaneCandidatesFromStorage(
+    ? _laneAggregatesMemo.get(
         STORY_SOURCE_STATE.storageRowsForCurrentLive,
         nextLiveId,
         {
@@ -14914,6 +14971,7 @@ async function refresh() {
    *   各メンバを withTimeout + 個別フォールバックで握り、固まっても best-effort で描画を続行する。
    *   通常時（高速解決）はタイムアウトに到達しないので挙動は完全に不変。
    */
+  _refreshStageClock.enter('tabs', Date.now()); // v0.1.1985: どの段で待っているかの計器(lib/refreshStageClock.js)
   const [tabs, lastFocusedNormal, openBagRaw, allTabsForData] = await Promise.all([
     withTimeout(
       chrome.tabs.query({ active: true, currentWindow: true }),
@@ -15014,6 +15072,7 @@ async function refresh() {
   // activeTab が既に watch なら自タブ尊重で混信救済は不要＝storage 走査も省く。
   if (!isNicoLiveWatchUrl(String(tabs[0]?.url || '').trim()) && !INLINE_OWN_WATCH_URL) {
     try {
+      _refreshStageClock.enter('dataBacked', Date.now());
       dataBacked = await collectDataBackedWatchLvs(openWatchUrls);
     } catch {
       /* best-effort: 失敗時は従来順で解決 */
@@ -15501,6 +15560,7 @@ async function refresh() {
   // v0.1.1630: プロフィール cache(332KB)は、記憶が新しければ get のキーから外す(毎回の読み直しをやめる)。
   const _profFresh = _profileCacheMemo.isFresh(Date.now());
   const _profV0 = _profileCacheMemo.version();
+  _refreshStageClock.enter('lightRead', Date.now());
   const lightData = await readStorageBagWithRetry(
     () =>
       chrome.storage.local.get([
@@ -15785,12 +15845,12 @@ async function refresh() {
   );
   const applyStoredCommentEntries = async (nextArr, allowWrite) => {
     let applied = nextArr;
-    const normalizedStored = normalizeStoredCommentEntries(
-      /** @type {PopupCommentEntry[]} */ (applied)
-    );
+    const normalizedStored = _appliedEntriesMemo.normalize(/** @type {PopupCommentEntry[]} */ (applied));
     if (normalizedStored.changed) {
       applied = normalizedStored.next;
     }
+    // ★v0.1.1997: 数万行の記録では、正規化と名前・顔の重ね直しの間で画面に手を返す(lib/bigRecordYield.js)
+    if (shouldYieldForBigRecord(applied.length)) await yieldToMainThread();
     const profAfterNormalize = popupMergeUserCommentProfileCache(applied);
     applied = profAfterNormalize.arr;
     if (
@@ -15808,7 +15868,7 @@ async function refresh() {
       ) {
         save[key] = applied;
       }
-      if (profAfterNormalize.cacheTouched) {
+      if (profAfterNormalize.cacheTouched && _profileCacheWritePacer.offer(Object.keys(popupUserCommentProfileMap || {}).length)) {
         save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
       }
       if (Object.keys(save).length) {
@@ -15823,7 +15883,9 @@ async function refresh() {
     }
     return applied;
   };
+  _refreshStageClock.enter('apply', Date.now());
   arr = await applyStoredCommentEntries(arr, readCommentsOk);
+  _refreshStageClock.enter('paint', Date.now());
   // v0.1.505: メイン書き戻し後にテール（未畳み込み新着）を表示用に concat。書き戻しは
   //   メインのみなので、テールがメインへ二重永続することはない。
   if (tailDisplayRows.length) {
@@ -15842,16 +15904,17 @@ async function refresh() {
   STORY_AVATAR_DIAG_STATE.total = _totalResolved.total;
   STORY_AVATAR_DIAG_STATE.totalSource = _totalResolved.source;
   STORY_AVATAR_DIAG_STATE.panelAgeSec = _totalResolved.panelAgeSec;
-  STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
-  STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
-  STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
-  {
+  // ★v0.1.1982: 診断用の数え上げは、大きな記録(5,000行以上)で行数が同じあいだは60秒に1回(src/lib/storyDiagCountsPace.js)。
+  if (!shouldReuseStoryDiagCounts(_storyDiagCountsPace, { lv, len: arr.length, nowMs: Date.now() })) {
+    STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
+    STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
+    STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
     const resolvedAvatar = countResolvedAvatarEntries(arr, lv);
     STORY_AVATAR_DIAG_STATE.resolvedAvatar = resolvedAvatar.total;
     STORY_AVATAR_DIAG_STATE.resolvedUniqueAvatar = resolvedAvatar.unique;
+    STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(arr, lv);
+    STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
   }
-  STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(arr, lv);
-  STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
   // 2026-07-14: total/withUid/selfSaved を同一lv内で単調化(churn根治・C-3)。
   Object.assign(STORY_AVATAR_DIAG_STATE, applyStoryDiagMonotonic(_storyDiagMonotonicState, lv, STORY_AVATAR_DIAG_STATE));
   STORY_AVATAR_DIAG_STATE.diagRegressions = _storyDiagMonotonicState.diagRegressions;
@@ -15900,6 +15963,15 @@ async function refresh() {
     missingIdCount >= Math.ceil(arr.length * 0.4);
 
   function paintWatchPopupUi() {
+    // 0.1.1957: 描き直しの時間を測り、重いときだけ次の描き直しまでの間隔を広げる(popupStorageRefreshCoalesce.js)
+    const _paintT0 = performance.now();
+    try {
+      paintWatchPopupUiBody();
+    } finally {
+      coalescedRefreshScheduler.notePaintCost(performance.now() - _paintT0);
+    }
+  }
+  function paintWatchPopupUiBody() {
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
     // total(=arr.length・O(1))は常時表示「記録している応援コメント N 件です」
     //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
@@ -15938,7 +16010,8 @@ async function refresh() {
     //   毎 paint(450ms)走っていた arr 全件 O(N) ×2 を、同じ diagPaintDeferActive 配下へ移す。
     //   module 状態なので前回値が残り、詳細を後で開いた時は次の非スクロール paint で最新化。
     //   selfPending は arr 非依存(recents 由来・軽い)なので defer 外に残す。
-    if (!diagPaintDeferActive) {
+    // ★v0.1.1982: ここも、大きな記録で行数が同じあいだは60秒に1回(上の数え上げと同じ規則・別の状態)。
+    if (!diagPaintDeferActive && !shouldReuseStoryDiagCounts(_storyDiagCountsPacePaint, { lv, len: arr.length, nowMs: Date.now() })) {
       STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
       STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
       STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
@@ -16153,7 +16226,7 @@ async function refresh() {
         _perfDeferActive
       );
       // v0.1.858: レポート(DL前)主要KPIを status へ(本体は reportPreviewPublish.js・15秒間引き・純観測)。
-      publishReportPreviewThrottled(lv, { resolveComments: resolveCommentsForHtmlExport, getSnapshot: () => watchMetaCache.snapshot, now: () => Date.now() });
+      publishReportPreviewThrottled(lv, { resolveComments: resolveCommentsForHtmlExport, getSnapshot: () => watchMetaCache.snapshot, now: () => Date.now(), minGapMs: reportPreviewMinGapMs(arr.length) }); // v0.1.2012: 大きな記録は2分に1回
     }
     // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
     //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、
@@ -16238,7 +16311,11 @@ async function refresh() {
       chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null,
       readAtMs: Date.now() // heavyRace根治(B): fresh-read 再利用の基準時刻(読了時点で完全だった証跡)
     };
+    // ★v0.1.1997: 数万行の記録では、読み出しの続きで正規化・描画まで一気に走らせない(lib/bigRecordYield.js)
+    const _bigRecord = shouldYieldForBigRecord(arr.length);
+    if (_bigRecord) await yieldToMainThread();
     arr = await applyStoredCommentEntries(arr, true);
+    if (_bigRecord) await yieldToMainThread();
     // v0.1.505: heavy 再描画でもテール（未畳み込み新着）を表示用に concat（書き戻しはメインのみ）。
     if (tailDisplayRows.length) {
       arr = mergeTailRowsIntoDisplay(arr, tailDisplayRows, { liveId: lv });
@@ -16310,6 +16387,7 @@ async function refresh() {
       //   settle → finally が必ず走り、フラグが構造的に stranded し得なくなる。
       //   通常 fetch の内部 retry は最大 ~11s 進行し得るので 15s と十分余裕を取る
       //   （正常だが遅いだけの fetch は中断しない）。
+      _refreshStageClock.enter('snapshot', Date.now());
       snapResult = await withTimeout(
         requestWatchPageSnapshotFromOpenTab(url),
         SNAPSHOT_FETCH_TIMEOUT_MS,
@@ -16478,6 +16556,7 @@ async function refresh() {
       //   裸 await されており、多タブ stall で永久 pending → background async タスクが
       //   settle せず次の refresh 周期が詰まる → 全カード「—」固定再発の本丸の真因。
       //   12s で有界化。タイムアウトしたら空 items + diag.code='timeout' で best-effort 続行。
+      _refreshStageClock.enter('intercept', Date.now());
       const interceptResult = await refreshTaskGuarded(
         requestInterceptCacheFromOpenTab(url, { deep: shouldDeep }),
         12_000,
@@ -16721,7 +16800,14 @@ async function collectDataBackedWatchLvs(openWatchUrls) {
  * `getLastFocused({ windowTypes:['normal'] })` の active を先に列挙する（pickWatchUrl と同じ考え方）。
  * @param {string} watchUrl
  */
+/** @param {string} watchUrl */
 async function collectWatchTabCandidates(watchUrl) {
+  const list = await watchTabCandidatesMemo.get(String(watchUrl || '').trim());
+  return list.map((t) => ({ ...t }));
+}
+
+/** @param {string} watchUrl */
+async function collectWatchTabCandidatesUncached(watchUrl) {
   /** @type {{ id: number, url: string, lastAccessed: number, active: boolean, audible: boolean }[]} */
   const out = [];
   const w = String(watchUrl || '').trim();
@@ -17721,7 +17807,11 @@ async function downloadBlobViaChromeDownloads(blob, filename) {
  * 純関数側は src/lib/popupStorageRefreshCoalesce.js にあり、ユニットテスト済み。
  */
 const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
-  throttleMs: 450
+  throttleMs: 450,
+  // ★v0.1.1981: 描き直しが重いときの間隔の上限を 1.5秒→20秒に(間隔は描き直しの時間の3倍)。1回が数秒かかる配信(8万行・遅い PC)で
+  //   1.5秒ごとに描き直すと画面が描き直しだけで埋まる。軽い配信(1回 150ms 未満)は 450ms のまま。
+  // ★v0.1.1985: 上限を 20秒→60秒に(定期の見回りの門と同じ上限)。間隔は「描き直し1回まるごとの時間」の3倍でも決まるようになった。
+  maxAdaptiveMs: 60_000
 });
 /**
  * ★v0.1.1450: 北極星 tick(独立レーン描画)専用のスロットル。
@@ -18383,6 +18473,7 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
     noteRepaintReason('self_write_skipped');
     return;
   }
+  _refreshDutyGate.noteChange(Date.now(), keys); // v0.1.1984: 外からの変化を見た(来ていない間は定期の見回りを長く休む・lib/refreshDutyGate.js)
   // v0.1.440: 隠れタブ(他タブが前面)では re-render を skip して多タブ reflow N→1 を達成。
   //   可視復帰時の catch-up は既存 visibilitychange listener が担うので追加処理は不要。
   //   描画パスには触らない＝v0.1.421/422 パネル消失リグレッションを構造的に再発させない。
@@ -19375,7 +19466,19 @@ async function initPopup() {
   // 枠テーマの DOM 取得・listener は frameTheme.wireFrameTheme(下で 1 回呼ぶ)へ移設。
 
   // v0.1.1687: refresh は並走させない(実行中に来た要求は「あとで1回」にまとめる=起動直後の約0.1秒おき10回超の連発を断つ)。
-  const refreshCoalescer = createRefreshCoalescer(() => refresh());
+  // v0.1.1985: 描き直し1回まるごとの時間を間隔係に知らせる(重い配信で、終わった直後に次が始まるのを防ぐ・popupStorageRefreshCoalesce.js)
+  const refreshCoalescer = createRefreshCoalescer(() => {
+    const t0 = Date.now();
+    _refreshStageClock.begin(t0);
+    return Promise.resolve(refresh()).finally(() => {
+      _refreshStageClock.end(Date.now());
+      coalescedRefreshScheduler.noteCycleCost(Date.now() - t0);
+      // ★v0.1.1986: 休みの門には1回ごとに知らせる。前は「続けて走る分が全部終わってから」知らせていたので、
+      //   走っている最中に定期の見回りが「あとでもう1回」を積み続けると、いつまでも終わらず門が一度も閉じなかった
+      //   (PC 実測・CPU 4倍遅く: 門の runs が 300秒たっても 0。手元の生放送のまね: 12回が切れ目なく続いた)。
+      _refreshDutyGate.noteRun(t0, Date.now());
+    });
+  });
   const safeRefresh = () => {
     if (!hasExtensionContext()) return Promise.resolve();
     return refreshCoalescer.request()
@@ -21476,6 +21579,10 @@ async function initPopup() {
         }
         // v0.1.1037: heavy 全件読み進行中は refresh 見送り(追い越しレース=ちかちか防止)。数字カードは軽量 panel で継続。
         if (watchMetaCache.heavyReadActive) { void applyLightweightPanelSummaryCards(); return; }
+        // ★v0.1.1981: 直前の描き直しが重かったら、その3倍の時間は定期の見回りを休む(8万行の配信・遅い PC で画面が描き直しだけで埋まるのを防ぐ)。
+        // ★v0.1.1986: 描き直しが走っている最中は、定期の見回りで「あとでもう1回」を積まない(新しいコメントは storage の知らせが別に積む)。
+        if (refreshCoalescer.isRunning()) { void applyLightweightPanelSummaryCards(); return; }
+        if (_refreshDutyGate.shouldSkip(Date.now())) { void applyLightweightPanelSummaryCards(); return; }
         // 0.1.92: stale-while-revalidate パターン。
         //   key だけ無効化して fetch を促し、snapshot 自体は保持して
         //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。

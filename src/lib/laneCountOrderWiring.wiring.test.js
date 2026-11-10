@@ -10,7 +10,7 @@ describe('popup-entry: レーンの並びは件数の多い順', () => {
   it('★名簿合流のあと・段分けの前に orderLaneCandidatesByCount を通す', () => {
     const keeper = popup.indexOf('applyLaneRosterKeeper(_laneRosterKeeperState, {');
     const order = popup.indexOf('orderLaneCandidatesByCount(_laneCountOrderState, {');
-    const bucket = popup.indexOf('bucketStoryUserLanePicks(rosteredCandidates, limit)');
+    const bucket = popup.indexOf('bucketStoryUserLanePicks(rosteredCandidates, laneCrowdLimit(rosteredCandidates.length, limit))');
     expect(keeper).toBeGreaterThan(0);
     expect(order).toBeGreaterThan(keeper);
     expect(bucket).toBeGreaterThan(order);

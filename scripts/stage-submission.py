@@ -351,7 +351,13 @@ def verify_zip(zip_path: Path) -> None:
         'dist/yt-content-chat.js',
         'dist/yt-content-chat-main.js',
         'dist/yt-venue-inline.js',
-        'dist/yt-tw-content.js'
+        'dist/yt-tw-content.js',
+        'dist/yt-kick-content.js',
+        'dist/yt-ww-content.js',
+        'dist/yt-sr-content.js',
+        'dist/yt-mx-content.js',
+        'dist/yt-tt-main.js',
+        'dist/yt-tt-content.js'
     }
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = set(zf.namelist())

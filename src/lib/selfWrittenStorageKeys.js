@@ -157,7 +157,12 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
    */
   /^nls_score_announce_diag_v\d+$/i,
   /^nls_report_preview_v\d+$/i,
-  /^nls_recording_watchdog_v\d+$/i
+  /^nls_recording_watchdog_v\d+$/i,
+  /*
+   * ★v0.1.1952: YouTube 系の計器(yt_diag_*)。popup の描画は読まない(PC で状態を測るためだけ)。
+   *   「nls_ でないキーなら描き直しを起こさない」と思い込んでいたが、未知のキーは即時側=描き直していた。
+   */
+  /^yt_diag_/i
 ]);
 
 /**

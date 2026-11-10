@@ -218,6 +218,66 @@ function isWeakMergedDisplayNickname(nick) {
 }
 
 /**
+ * 1行ぶんの補い方を決める(補わないなら null)。applyUserCommentProfileMapToEntries の行ごとの判定そのもの。
+ * @param {string} uid
+ * @param {UserCommentProfileCacheEntry} hit 控えのその人の行
+ * @param {string} curNick 行のいまの名前(trim 済み)
+ * @param {string} curAv 行のいまの顔 URL(trim 済み)
+ * @returns {null | { nickname?: string, avatarUrl?: string }}
+ */
+function decideProfilePatch(uid, hit, curNick, curAv) {
+  const candNick = String(hit.nickname || '').trim();
+  const candAv = String(hit.avatarUrl || '').trim();
+  /** @type {{ nickname?: string, avatarUrl?: string }} */
+  const patch = {};
+  let changed = false;
+
+  if (candNick) {
+    const candInternal = isLikelyInternalNdgGiftOrCampaignLabel(candNick);
+    const curInternal = isLikelyInternalNdgGiftOrCampaignLabel(curNick);
+    const candTrust = isTrustworthySupportGridDisplayNickname(candNick, uid);
+    const preferNick =
+      candNick !== curNick &&
+      ((!curNick && (!candInternal || candTrust)) ||
+        (curInternal && !candInternal) ||
+        (!curInternal &&
+          !candInternal &&
+          (!curNick || candNick.length > curNick.length)) ||
+        (isWeakMergedDisplayNickname(curNick) && candTrust && !candInternal));
+    if (preferNick) {
+      patch.nickname = candNick;
+      changed = true;
+    }
+  }
+  if (
+    candAv &&
+    isHttpOrHttpsUrl(candAv) &&
+    !isWeakNiconicoUserIconHttpUrl(candAv) &&
+    // 0.1.83: 普遍ガード — URL 埋め込み uid とエントリ uid の一致を要求
+    isAvatarUrlForUserId(candAv, uid)
+  ) {
+    const curStrong =
+      curAv &&
+      isHttpOrHttpsUrl(curAv) &&
+      !isWeakNiconicoUserIconHttpUrl(curAv);
+    if (!curStrong) {
+      patch.avatarUrl = candAv;
+      changed = true;
+    }
+  }
+  // 0.1.83: 既存 entry の avatarUrl が uid と一致しない場合は掃除（過去汚染データの除去）
+  if (
+    curAv &&
+    isHttpOrHttpsUrl(curAv) &&
+    !isAvatarUrlForUserId(curAv, uid)
+  ) {
+    patch.avatarUrl = '';
+    changed = true;
+  }
+  return changed ? patch : null;
+}
+
+/**
  * @template T
  * @param {T[]} entries
  * @param {Record<string, UserCommentProfileCacheEntry>} map
@@ -228,6 +288,10 @@ export function applyUserCommentProfileMapToEntries(entries, map) {
     return { next: entries, patched: 0 };
   }
   let patched = 0;
+  // ★v0.1.1986: 同じ人・同じ名前・同じ顔の行は、補い方も同じ。行ごとに判定をやり直さず、組み合わせごとに1回だけ決める
+  //   (8万行・6,500人の配信で、行ごとの正規表現の判定が描き直し1回の約1割を占めていた)。結果は行ごとに判定したときと同じ。
+  /** @type {Map<string, null | { nickname?: string, avatarUrl?: string }>} */
+  const patchMemo = new Map();
   const next = entries.map((e) => {
     const uid = String(
       /** @type {{ userId?: string|null }} */ (e)?.userId || ''
@@ -239,59 +303,18 @@ export function applyUserCommentProfileMapToEntries(entries, map) {
     const curNick = String(
       /** @type {{ nickname?: string }} */ (e)?.nickname || ''
     ).trim();
-    const candNick = String(hit.nickname || '').trim();
     const curAv = String(
       /** @type {{ avatarUrl?: string }} */ (e)?.avatarUrl || ''
     ).trim();
-    const candAv = String(hit.avatarUrl || '').trim();
-
-    let out = /** @type {T} */ (e);
-    let changed = false;
-
-    if (candNick) {
-      const candInternal = isLikelyInternalNdgGiftOrCampaignLabel(candNick);
-      const curInternal = isLikelyInternalNdgGiftOrCampaignLabel(curNick);
-      const candTrust = isTrustworthySupportGridDisplayNickname(candNick, uid);
-      const preferNick =
-        candNick !== curNick &&
-        ((!curNick && (!candInternal || candTrust)) ||
-          (curInternal && !candInternal) ||
-          (!curInternal &&
-            !candInternal &&
-            (!curNick || candNick.length > curNick.length)) ||
-          (isWeakMergedDisplayNickname(curNick) && candTrust && !candInternal));
-      if (preferNick) {
-        out = { ...out, nickname: candNick };
-        changed = true;
-      }
+    const memoKey = `${uid}\u0000${curNick}\u0000${curAv}`;
+    let patch = patchMemo.get(memoKey);
+    if (patch === undefined) {
+      patch = decideProfilePatch(uid, hit, curNick, curAv);
+      patchMemo.set(memoKey, patch);
     }
-    if (
-      candAv &&
-      isHttpOrHttpsUrl(candAv) &&
-      !isWeakNiconicoUserIconHttpUrl(candAv) &&
-      // 0.1.83: 普遍ガード — URL 埋め込み uid とエントリ uid の一致を要求
-      isAvatarUrlForUserId(candAv, uid)
-    ) {
-      const curStrong =
-        curAv &&
-        isHttpOrHttpsUrl(curAv) &&
-        !isWeakNiconicoUserIconHttpUrl(curAv);
-      if (!curStrong) {
-        out = { ...out, avatarUrl: candAv };
-        changed = true;
-      }
-    }
-    // 0.1.83: 既存 entry の avatarUrl が uid と一致しない場合は掃除（過去汚染データの除去）
-    if (
-      curAv &&
-      isHttpOrHttpsUrl(curAv) &&
-      !isAvatarUrlForUserId(curAv, uid)
-    ) {
-      out = { ...out, avatarUrl: '' };
-      changed = true;
-    }
-    if (changed) patched += 1;
-    return out;
+    if (!patch) return e;
+    patched += 1;
+    return /** @type {T} */ ({ ...e, ...patch });
   });
   return { next, patched };
 }

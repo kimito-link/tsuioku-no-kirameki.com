@@ -16,18 +16,38 @@ import {
   buildTwStreamInfoQuery,
   buildTwStreamInfoMinimalQuery,
   buildTwUsersIconQuery,
+  buildTwLeaderboardsQuery,
+  buildTwLeaderboardsFallbackQuery,
   parseTwStreamInfo,
   parseTwUsersIcons,
+  parseTwLeaderboards,
 } from '../../src/lib/twitch/twGql.js';
+import {
+  twHermesUrl,
+  twRewardTopic,
+  twHypeTopic,
+  twPredictionTopic,
+  twHermesSubscribeMsg,
+  parseTwHermesFrame,
+  parseTwRedemption,
+  parseTwHypeTrain,
+  parseTwPrediction,
+} from '../../src/lib/twitch/twHermes.js';
+import { createEmoteSaver } from './pfEmoteStore.js';
+import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
 const MAX_SEEN = 5000;
+/** 公式の応援ランキングを読み直す間(ページのチャット欄の順位表も数分おきにしか変わらない) */
+const BOARD_EVERY_MS = 2 * 60_000;
 
 /** 計器(状態速報と同じく storage に置く・りんくに聞かずに数で確かめる) */
 const diag = {
+  /** 覚えた絵文字の数(画面で画像にする名前) */
+  emotes: 0,
   v: 1,
   channel: '',
   streamKey: '',
@@ -41,10 +61,26 @@ const diag = {
   subs: 0,
   gifts: 0,
   raids: 0,
+  rewards: 0,
+  milestones: 0,
   iconAsked: 0,
   iconFound: 0,
   iconLate: 0,
   gqlFail: 0,
+  /** 公式の応援ランキング: 行数・どこから(gql:persisted / gql:query)・期間・読めなかった回数 */
+  boardRows: 0,
+  boardFrom: '',
+  boardPeriod: '',
+  boardFail: 0,
+  /** Hermes(リワードの名前つきの交換): 状態・つないだ回数・購読できたか・届いた交換 */
+  hermesState: 'idle',
+  hermesConnects: 0,
+  hermesSubscribed: 0,
+  /** ハイプトレイン(レベル・車掌・終わり)・予想の結果の行数 */
+  hype: 0,
+  predictions: 0,
+  hermesError: '',
+  redemptions: 0,
   updatedAt: 0,
 };
 
@@ -60,6 +96,8 @@ function safeSendMessage(msg) {
 }
 
 let diagTimer = 0;
+/** 絵文字の名前 → 画像(画面で本文を画像にする・pfEmoteStore.js) */
+const emoteSaver = createEmoteSaver('yt_tw_emotes');
 function saveDiagSoon() {
   if (diagTimer) return;
   diagTimer = setTimeout(() => {
@@ -80,6 +118,7 @@ async function gql(body) {
     headers: { 'Client-Id': TW_WEB_CLIENT_ID, 'Content-Type': 'text/plain;charset=UTF-8' },
     body: JSON.stringify(body),
     credentials: 'omit',
+    signal: platformFetchTimeoutSignal(),
   });
   if (!res.ok) throw new Error(`gql_${res.status}`);
   return res.json();
@@ -171,13 +210,19 @@ async function lookupIcons(logins) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { login: string, key: string, stop: () => void }} */ (null);
+/** 配信者の表示名(GQL で分かったもの・ハイプトレイン等の行の名前) */
+let lastBroadcasterName = '';
+const broadcasterName = () => lastBroadcasterName;
 
 /**
  * @param {string} login
  * @param {string} key
  */
-function startReader(login, key) {
+/** @param {string} login @param {string} key @param {string} [channelId] 数字の id(Hermes の購読に使う) */
+function startReader(login, key, channelId = '') {
   let stopped = false;
+  /** Hermes でリワードの交換を受けられているか(受けられている間は IRC の本文つきの交換を捨てる=二重に数えない) */
+  let hermesRewardsOk = false;
   /** @type {WebSocket | null} */
   let ws = null;
   let backoff = 1000;
@@ -203,6 +248,7 @@ function startReader(login, key) {
     }
     if (lateWanted.size > 5000) lateWanted.clear();
     diag.items += items.length;
+    diag.emotes = emoteSaver.takeFrom(items);
     safeSendMessage({ type: 'YT_CHAT_ITEMS', payload: { videoId: key, chatFilterLabel: '', items } });
     saveDiagSoon();
   };
@@ -230,6 +276,12 @@ function startReader(login, key) {
     if (!r || r.channel !== login) return;
     // まとめ贈り(submysterygift)の内訳の1人ずつの行は記録しない(まとめの1行に件数がある・二重に数えない)
     if (r.giftPartOf) return;
+    if (hermesRewardsOk && /** @type {any} */ (r).rewardId) return;
+    push(r);
+  };
+
+  /** 記録へ渡す1行(IRC と Hermes の共通の入口) @param {any} r */
+  const push = (r) => {
     if (seen.has(r.id)) return;
     seen.add(r.id);
     if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
@@ -238,6 +290,8 @@ function startReader(login, key) {
     // ギフトサブは金額 0(件数は giftCount)。金額を足していたので計器が常に 0 だった(2026-11-07 実配信)
     else if (r.kind === 'membership_gift') diag.gifts += Math.max(1, Number(r.giftCount) || 1);
     else if (r.kind === 'tw_raid') diag.raids += 1;
+    else if (r.kind === 'tw_reward') diag.rewards += 1;
+    else if (r.kind === 'tw_milestone') diag.milestones += 1;
     pending.push(r);
     if (!flushTimer) flushTimer = setTimeout(() => void flush(), FLUSH_MS);
   };
@@ -285,9 +339,128 @@ function startReader(login, key) {
     backoff = Math.min(backoff * 2, 60_000);
   };
 
+  // ---- Hermes(twitch.tv のページ自身が使う通知の口)。リワードの名前つきの交換を受ける ----
+  /** @type {WebSocket | null} */
+  let hws = null;
+  let hBackoff = 2000;
+  let hTimer = 0;
+  let hWatch = 0;
+  let hKeepMs = 30_000;
+  let hLastAt = 0;
+  const topic = twRewardTopic(channelId);
+  // ハイプトレイン・予想も同じ口で受ける(2026-11-08 PC 実測で、ログインなしで購読でき形も取れた)
+  const extraTopics = [twHypeTopic(channelId), twPredictionTopic(channelId)].filter(Boolean);
+  /** 購読の id → 話題(リワードの購読が通ったかを見分ける) @type {Map<string, string>} */
+  const subTopics = new Map();
+  let hypeLevel = 0;
+  const hConnect = (url = '') => {
+    if (stopped || !topic) return;
+    diag.hermesState = 'connecting';
+    diag.hermesConnects += 1;
+    try {
+      hws = new WebSocket(url || twHermesUrl(TW_WEB_CLIENT_ID));
+    } catch {
+      hRetry();
+      return;
+    }
+    hws.onmessage = (ev) => {
+      hLastAt = Date.now();
+      const f = parseTwHermesFrame(typeof ev.data === 'string' ? ev.data : '');
+      if (!f) return;
+      if (f.type === 'welcome') {
+        hBackoff = 2000;
+        hKeepMs = (f.keepaliveSec + 20) * 1000;
+        diag.hermesState = 'open';
+        subTopics.clear();
+        [topic, ...extraTopics].forEach((tp, i) => {
+          const id = `nl-${Date.now().toString(36)}-${i}`;
+          subTopics.set(id, tp);
+          try {
+            hws?.send(JSON.stringify(twHermesSubscribeMsg(tp, id)));
+          } catch {
+            /* no-op */
+          }
+        });
+      } else if (f.type === 'subscribed') {
+        const tp = subTopics.get(f.subId) || topic;
+        if (tp === topic) hermesRewardsOk = f.ok;
+        if (f.ok) diag.hermesSubscribed += 1;
+        else diag.hermesError = `${tp.split('.')[0]}:${f.error}`;
+        saveDiagSoon();
+      } else if (f.type === 'reconnect') {
+        const next = f.url;
+        hermesRewardsOk = false;
+        try {
+          if (hws) hws.onclose = null;
+          hws?.close();
+        } catch {
+          /* no-op */
+        }
+        hConnect(next);
+      } else if (f.type === 'notification') {
+        const r = parseTwRedemption(f.data, login);
+        if (r) {
+          diag.redemptions += 1;
+          push(r);
+          return;
+        }
+        const ctx = { channel: login, channelId, broadcasterName: broadcasterName(), lastLevel: hypeLevel, nowMs: Date.now() };
+        const h = parseTwHypeTrain(f.data, ctx);
+        if (h) {
+          if (h.level) hypeLevel = Math.max(hypeLevel, h.level);
+          if (/-end$/.test(h.row.id)) hypeLevel = 0;
+          diag.hype += 1;
+          push(h.row);
+          return;
+        }
+        const p = parseTwPrediction(f.data, ctx);
+        if (p) {
+          diag.predictions += 1;
+          push(p);
+        }
+      }
+    };
+    hws.onclose = () => {
+      hermesRewardsOk = false;
+      diag.hermesState = 'closed';
+      saveDiagSoon();
+      hRetry();
+    };
+  };
+  const hRetry = () => {
+    if (stopped || hTimer) return;
+    hTimer = setTimeout(() => {
+      hTimer = 0;
+      hConnect();
+    }, hBackoff);
+    hBackoff = Math.min(hBackoff * 2, 120_000);
+  };
+  // keepalive が途絶えたら(つながったまま黙った)つなぎ直す
+  hWatch = setInterval(() => {
+    if (stopped || !hws || diag.hermesState !== 'open') return;
+    if (Date.now() - hLastAt > hKeepMs) {
+      try {
+        hws.close();
+      } catch {
+        /* no-op */
+      }
+    }
+  }, 10_000);
+
   connect();
+  hConnect();
   return () => {
     stopped = true;
+    hermesRewardsOk = false;
+    if (hTimer) clearTimeout(hTimer);
+    clearInterval(hWatch);
+    try {
+      if (hws) hws.onclose = null;
+      hws?.close();
+    } catch {
+      /* no-op */
+    }
+    diag.hermesState = 'idle';
     if (reconnectTimer) clearTimeout(reconnectTimer);
     if (flushTimer) clearTimeout(flushTimer);
     void flush();
@@ -302,6 +475,53 @@ function startReader(login, key) {
 
 let lastInfoAt = 0;
 let checking = false;
+let lastBoardAt = 0;
+let lastBoardKey = '';
+
+/**
+ * Twitch 公式の Bits ランキングを記録側へ(Kick の Kicks ランキング・YouTube のトップファンと同じ口・「ギフト貢献度」の欄に出る)。
+ * 読めないとき・Bits の順位が空のときは送らない(画面はこの PC の記録から数えた順位のまま)。
+ * @param {string} login @param {string} userId @param {string} key
+ */
+async function sendTwBoard(login, userId, key) {
+  lastBoardAt = Date.now();
+  lastBoardKey = key;
+  /** @type {ReturnType<typeof parseTwLeaderboards>} */
+  let board = null;
+  let from = '';
+  const persisted = buildTwLeaderboardsQuery(userId);
+  if (persisted) {
+    try {
+      board = parseTwLeaderboards(await gql(persisted));
+      if (board) from = 'gql:persisted';
+    } catch {
+      /* 下の手書きの問い合わせへ */
+    }
+  }
+  if (!board) {
+    const q = buildTwLeaderboardsFallbackQuery(login);
+    try {
+      board = q ? parseTwLeaderboards(await gql(q)) : null;
+      if (board) from = 'gql:query';
+    } catch {
+      /* 読めない */
+    }
+  }
+  if (!board || !board.bits.length) {
+    diag.boardFail += 1;
+    saveDiagSoon();
+    return;
+  }
+  // 順位表には顔が無いので、チャットと同じ方法で顔を聞く(待ちすぎない)
+  const logins = board.bits.map((r) => r.login).filter((l) => !iconByLogin.has(l));
+  if (logins.length) await Promise.race([lookupIcons(logins), new Promise((r) => setTimeout(r, 3000))]);
+  const rows = board.bits.map((r) => ({ rank: r.rank, name: r.name, xp: r.xp, iconUrl: iconByLogin.get(r.login) || '' }));
+  diag.boardRows = rows.length;
+  diag.boardFrom = from;
+  diag.boardPeriod = board.period;
+  safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows, period: board.period } });
+  saveDiagSoon();
+}
 
 async function check() {
   if (checking) return;
@@ -334,11 +554,12 @@ async function check() {
       saveDiagSoon();
       return;
     }
+    lastBroadcasterName = String(info?.displayName || login);
     const key = buildTwStreamKey(login, { streamId: info?.streamId, startedAtMs: info?.startedAtMs || null });
     if (!key) return;
     if (!current || current.key !== key) {
       current?.stop();
-      current = { login, key, stop: startReader(login, key) };
+      current = { login, key, stop: startReader(login, key, info?.userId || '') };
       diag.streamKey = key;
     }
     safeSendMessage({
@@ -354,6 +575,7 @@ async function check() {
         ...(info?.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
       },
     });
+    if (info?.userId && (lastBoardKey !== key || Date.now() - lastBoardAt >= BOARD_EVERY_MS)) void sendTwBoard(login, info.userId, key);
     saveDiagSoon();
   } finally {
     checking = false;

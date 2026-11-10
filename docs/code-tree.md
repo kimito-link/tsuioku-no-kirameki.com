@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1184 件
+## ⚠️ 役割コメントが無いソース 10 / 1232 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -234,7 +234,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (365)
+- 📁 **docs/** (367)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -533,12 +533,14 @@
     - `MOVED.md`
   - 📁 **policies/** (1)
     - `STATS_FAILURE_MODES.md`
-  - 📁 **releases/** (6)
+  - 📁 **releases/** (8)
     - `0.1.7-x-article.md`
     - `cws-next-submission.md`
     - `cws-publish-api-setup.md`
     - `cws-store-listing.md`
     - `cws-submission-texts.md`
+    - `description-ja.txt`
+    - `privacy-justifications-ja.txt`
     - `tweet-0.1.1473.md`
   - 📁 **research/** (2)
     - `gift-ranking-deep-research-2026-05-15.md`
@@ -772,7 +774,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (149)
+- 📁 **extension-youtube/** (157)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -896,20 +898,28 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (20)
+  - 📁 **src/** (28)
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
     - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
+    - `kick-content-entry.js` — Kick の視聴ページ(kick.com/<チャンネル>)で、チャットを読んで記録に渡す入口。
     - `marketing-export-nico-entry.js` — ニコ生版のマーケ画面(本物 marketing-export-entry.js)を YouTube の記録で動かす入口。
+    - `mx-content-entry.js` — ミクチャの配信ページ(mixch.tv/u/<番号>/live)で、コメントとギフトを読んで記録に渡す入口。
     - `offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
+    - `pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
+    - `pfLastStreamUrl.js` — YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページが、
     - `sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
     - `sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
     - `sidepanel-yt-parts.html`
     - `sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
+    - `sr-content-entry.js` — SHOWROOM の部屋のページ(www.showroom-live.com/r/<room_url_key>)で、コメントとギフトを読んで記録に渡す入口。
+    - `tt-content-entry.js` — TikTok LIVE の配信ページ(tiktok.com/@<名前>/live)で、コメントとギフトを読んで記録に渡す入口。
+    - `tt-main-entry.js` — TikTok のページ自身の世界(MAIN)で動く小さな写し役(council/tiktok-support-PLAN.md)。
     - `tw-content-entry.js` — Twitch の視聴ページ(www.twitch.tv/<チャンネル>)で、チャットを読んで記録に渡す入口。
     - `venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
     - `venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
+    - `ww-content-entry.js` — ふわっちの視聴ページ(whowatch.tv/viewer/<配信の番号>)で、配信とコメントを読んで記録に渡す入口。
     - `ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
     - `ytGiftToNico.js` — YouTube の有料の応援(スーパーチャット・スーパーステッカー・メンバー加入・メンバーシップギフト)を、
     - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
@@ -1149,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2344)
+- 📁 **src/** (2431)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1186,7 +1196,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (108)
+  - 📁 **extension/** (109)
     - 📁 **popup/** (17)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1207,11 +1217,12 @@
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
       - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
-    - 📁 **story/** (6)
+    - 📁 **story/** (7)
       - `laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
       - `laneContentLod.test.js`
       - `laneContentLodThumbArrival.test.js`
       - `laneShrinkScenario.test.js`
+      - `reconcileLaneChildren.test.js`
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
       - `renderStoryUserLaneDom.test.js`
     - `avatar-face-worker-entry.js` — 匿名の顔を合成する専用 Worker(v0.1.1681)。
@@ -1477,10 +1488,16 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2048)
+  - 📁 **lib/** (2134)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
+    - 📁 **kick/** (5)
+      - `kickApi.js` — kick.com のページ自身が使う API(/api/v2/channels/<slug>)の応答を、形を確かめて読む(純関数)
+      - `kickChatParse.js` — Kick のチャット(ページ自身が使う Pusher)の1件を、YouTube 版の記録と同じ形にする(純関数)
+      - `kickChatParse.test.js`
+      - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
+      - `kickRealtime.test.js`
     - 📁 **mcpBridge/** (11)
       - `buildLiveMcpSnapshot.js` — L0 Evidence（拡張の観測データ）→ L1 Canonical Snapshot 変換。
       - `buildLiveMcpSnapshot.test.js`
@@ -1493,14 +1510,45 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
-    - 📁 **twitch/** (6)
+    - 📁 **mixch/** (4)
+      - `mxGiftImages.js` — ミクチャのギフトの絵を resource_id から引く(バックグラウンドで使う・council/mixch-support-PLAN.md)。
+      - `mxGiftImages.test.js`
+      - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
+      - `mxParse.test.js`
+    - 📁 **platform/** (10)
+      - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
+      - `diagTabShare.test.js`
+      - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `fetchTimeout.test.js`
+      - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
+      - `infoPollGate.test.js`
+      - `streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
+      - `streamEmotes.test.js`
+      - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick)の違いを1か所にまとめた表(純関数)
+      - `streamPlatform.reload.test.js`
+    - 📁 **showroom/** (2)
+      - `srParse.js` — SHOWROOM の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
+      - `srParse.test.js`
+    - 📁 **tiktok/** (5)
+      - `ttParse.js` — TikTok LIVE の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
+      - `ttParse.real.test.js`
+      - `ttParse.test.js`
+      - `ttProto.js` — TikTok LIVE のソケットの中身(protobuf)を読む、小さな自前の読み取り(council/tiktok-support-PLAN.md)。
+      - `ttProto.test.js`
+    - 📁 **twitch/** (8)
       - `twGql.js` — twitch.tv の画面自身が使っている GQL の応答を「形から検証して」読む(純関数)
       - `twGql.test.js`
+      - `twHermes.js` — twitch.tv のページ自身が使う通知の口(Hermes)の1通を読む(純関数)
+      - `twHermes.test.js`
       - `twIrcParse.js` — Twitch のチャット(IRC over WebSocket)1行を、YouTube 版と同じ「チャット1件」の形に直す(純関数)
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **youtube/** (56)
+    - 📁 **whowatch/** (2)
+      - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
+      - `wwParse.test.js`
+    - 📁 **youtube/** (79)
+      - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
       - `ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
@@ -1509,24 +1557,36 @@
       - `ytChatInputBlock.test.js`
       - `ytChatParse.js` — YouTube Live チャット DOM 1要素の取得・正規化パーサー（純関数）
       - `ytChatParse.test.js`
+      - `ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
+      - `ytChunkedRead.test.js`
       - `ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
       - `ytCommentSendReason.test.js`
       - `ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
       - `ytCrossVideoDuplicates.test.js`
       - `ytDefaultIcon.test.js`
+      - `ytFullRefreshInterval.js` — YouTube 系の横の欄・会場が「記録を全件読み直す」間隔(v0.1.1969)。
+      - `ytFullRefreshInterval.test.js`
+      - `ytGiftOnlyRow.js` — ふわっち・SHOWROOM・ミクチャのギフトは、記録ではコメントの行(本文=ギフトの名前)としても残る。
+      - `ytGiftOnlyRow.test.js`
       - `ytGiftToNico.test.js`
+      - `ytIdbStoreChunkedRead.test.js`
       - `ytIdbStoreOwner.test.js`
       - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
       - `ytLaneAssign.test.js`
+      - `ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
+      - `ytLeaderboardSig.test.js`
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
       - `ytMergedIsolation.test.js`
       - `ytNicoShim.test.js`
       - `ytNicoShimHandleFirst.test.js`
       - `ytNicoShimHandleUrl.test.js`
+      - `ytNicoShimPlaceholder.test.js`
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
       - `ytPageMeta.test.js`
       - `ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
       - `ytPanelRoute.test.js`
+      - `ytPanelStreamDiag.js` — 横の欄(サイドパネル)・コメビュが「どの配信を出したか」を数える計器(0.1.1946)。
+      - `ytPanelStreamDiag.test.js`
       - `ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
       - `ytPostedAt.test.js`
       - `ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
@@ -1536,7 +1596,13 @@
       - `ytReplayChatJson.test.js`
       - `ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
       - `ytReportHtml.test.js`
+      - `ytShimBuildReuse.wiring.test.js`
+      - `ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
+      - `ytShimCommentWrites.test.js`
+      - `ytShimSummaryAnswer.wiring.test.js`
       - `ytStageSubmission.test.js`
+      - `ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
+      - `ytStaleFrameHold.test.js`
       - `ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
       - `ytStreamStorePolicy.test.js`
       - `ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
@@ -1545,10 +1611,14 @@
       - `ytSupportRanking.test.js`
       - `ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
       - `ytSwitchLeakCleanup.test.js`
+      - `ytTailAfterFull.js` — v0.1.1983: 全件を一度渡したあとのテール(新着の差分)を、短くして渡す。
+      - `ytTailAfterFull.test.js`
       - `ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
       - `ytUserLaneTiers.test.js`
       - `ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
       - `ytViewerSampler.test.js`
+      - `ytVoiceAssignPersist.js` — YouTube 系(YouTube・Twitch・Kick ほか)の「人ごとの声の割り当て」(yt_voice_assignments)を
+      - `ytVoiceAssignPersist.test.js`
       - `ytVoicePriority.js` — YouTube 版の会場の読み上げで、混んでいるときに「大事なコメント」だけを読むための純関数。
       - `ytVoicePriority.test.js`
       - `ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
@@ -1592,6 +1662,8 @@
     - `anonLabelSingleSource.test.js`
     - `anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
     - `anonymousIdenticon.test.js`
+    - `appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
+    - `appliedEntriesMemo.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
     - `arrivalEffect.test.js`
     - `audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
@@ -1678,6 +1750,8 @@
     - `bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
     - `besideOverflowGuard.js` — 横付き(beside)パネルが視聴行の中に入った結果、ページが横にはみ出したかを判定する純粋関数。
     - `besideOverflowGuard.test.js`
+    - `bigRecordYield.js` — 大きな記録(数万行・数千人)を扱うとき、長い仕事の合間に画面へ手を返すための決まり(v0.1.1997)。
+    - `bigRecordYield.test.js`
     - `blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
     - `blackCurtainLedger.test.js`
     - `blackCurtainLedgerWiring.wiring.test.js`
@@ -1900,6 +1974,7 @@
     - `commentTimelineMirror.js` — コメントタイムラインの「鏡」スナップショット純関数（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
     - `commentTimelineMirror.test.js`
     - `commentTimelineMirrorKey.js` — コメントタイムライン鏡の storage キー正本（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
+    - `commentTimelineMirrorLazy.test.js`
     - `commentTimelineReport.js` — 状態速報に「応援コメント(最新N件・本文)」を出す整形 lib。
     - `commentTimelineReport.test.js`
     - `commentVelocityTimeline.js` — コメントの時系列粒度集計と「笑い密度（L4 笑いの瞬間検出）」を純粋関数で計算する。
@@ -2313,12 +2388,16 @@
     - `kokenGiftHistoryApi.js` — koken 公式「ギフト履歴（個別イベント）」無認証 JSON API の URL 組立 & 正規化（純関数）。
     - `kokenGiftHistoryApi.test.js`
     - `kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
+    - `laneAggregatesMemo.js` — 応援マスの元(人ごとの集計)を、同じ記録に対して何度も数え直さないための控え(v0.1.2007)。
+    - `laneAggregatesMemo.test.js`
     - `laneAvatarSize.wiring.test.js`
     - `laneContentLod.wiring.test.js`
     - `laneContentLodDiag.wiring.test.js`
     - `laneCountOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneCountOrder.test.js`
     - `laneCountOrderWiring.wiring.test.js`
+    - `laneCrowdLimit.js` — 人数がとても多い配信だけ、応援レーンに並べる人数を絞る(v0.1.1975・りんく決定 2026-11-10)。
+    - `laneCrowdLimit.test.js`
     - `laneCssSync.parity.test.js`
     - `laneDensityLod.wiring.test.js`
     - `laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
@@ -2352,6 +2431,8 @@
     - `laneMirrorPerLivePublish.test.js`
     - `laneMirrorPerLiveWiring.wiring.test.js`
     - `laneMirrorPublishNotSkipped.wiring.test.js`
+    - `laneMirrorPublishPace.js` — 応援レーンの鏡(nls_lane_mirror_v1 / nls_lane_mirror_v2_<lv>)を書く間隔を、人数に合わせて決める(v0.1.1973)。
+    - `laneMirrorPublishPace.test.js`
     - `laneMirrorRecentTextsCarry.test.js`
     - `laneMirrorWriteGate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneMirrorWriteGate.test.js`
@@ -2361,6 +2442,8 @@
     - `laneMirrorWriterYieldWiring.wiring.test.js`
     - `laneNeverDrop.integration.test.js`
     - `laneNeverDrop.wiring.test.js`
+    - `laneProgressiveFill.js` — 大きな段(応援マスが数百〜数千個)を、1回で全部作らずに数回に分けて足すための決まり(v0.1.2008)。
+    - `laneProgressiveFill.test.js`
     - `lanePublishSkipDiag.js` — lanePublishSkipDiag — 応援レーン鏡の publish が「到達したか/何で見送られたか」を1行にする純関数。
     - `lanePublishSkipDiag.test.js`
     - `lanePublishSkipWiring.test.js`
@@ -2374,6 +2457,8 @@
     - `laneSceneEnvelope.reachability.test.js`
     - `laneSceneEnvelope.receipts.test.js`
     - `laneSceneEnvelope.test.js`
+    - `laneSecondRenderPolicy.js` — 応援マスの「ギフト/広告の読み込み後の2回目の描画」を省いてよいかの判定(純関数)。
+    - `laneSecondRenderPolicy.test.js`
     - `laneShrinkGuardWiring.test.js`
     - `laneSupplyFailClosed.wiring.test.js`
     - `laneSupplyOriginDiag.js` — 応援レーンの供給元(誰が entriesProvisional を書いたか)を名指しする計器。
@@ -2832,6 +2917,8 @@
     - `probeRecommendedLiveSection.test.js`
     - `probeWatchPageDomStructure.js` — v0.1.201: ニコ生 watch ページ主要 DOM の存在を観測する純関数。
     - `probeWatchPageDomStructure.test.js`
+    - `profileCacheWritePace.js` — 横の欄が「名前・顔の控え」(nls_user_comment_profile_v1)を書く間隔(v0.1.1976)。
+    - `profileCacheWritePace.test.js`
     - `profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
     - `profileResolveState.test.js`
     - `protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
@@ -2870,6 +2957,10 @@
     - `refreshCoalescerWiring.wiring.test.js`
     - `refreshCycleDeadline.js` — 1サイクル全体の締切を持ち、各 read の timeout を残り時間に切り詰める。
     - `refreshCycleDeadline.test.js`
+    - `refreshDutyGate.js` — 定期の描き直し(3秒ごとの見回り)が、画面を描き直しだけで埋めないようにする門(純関数)。
+    - `refreshDutyGate.test.js`
+    - `refreshStageClock.js` — 描き直し1回(refresh)が「いまどの段にいるか・各段に何ミリ秒かかったか」を残す計器(純関数)。
+    - `refreshStageClock.test.js`
     - `refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
     - `refreshTaskGuard.test.js`
     - `rememberedAvatarIndex.js` — 「同じ userId で過去に取れた avatarUrl」を O(1) で引く索引(純粋関数)。
@@ -2961,6 +3052,8 @@
     - `sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
     - `shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `shareKeysFile.test.js`
+    - `shortLivedMemo.js` — 0.1.1961: 同じ問い合わせを短い間だけ使い回す(答えを待っている間の重複もまとめる)。
+    - `shortLivedMemo.test.js`
     - `shouldRearmBackfillForOfficialGap.js` — 自動補充の核心: 「公式コメント件数と記録件数のギャップが大きいまま、NDGR バックフィルが
     - `shouldRearmBackfillForOfficialGap.test.js`
     - `shouldSkipDeepHarvest.js` — NDGR がリアルタイムでコメントを提供している間は deep harvest（仮想リスト走査）を
@@ -3089,6 +3182,8 @@
     - `storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
     - `storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
     - `storyDetailRelatedEntries.test.js`
+    - `storyDiagCountsPace.js` — 診断用の数え上げ(顔が付いた件数など)を、大きな記録では毎回やり直さないための判定(純関数)。
+    - `storyDiagCountsPace.test.js`
     - `storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
     - `storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
     - `storyDiagMonotonic.test.js`
@@ -3188,6 +3283,10 @@
     - `swCommentChunkKeyMirror.test.js`
     - `swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
     - `swCrawlSlots.test.js`
+    - `swScriptStamp.js` — service worker の本体(extension/background.js)に、束ねた中身の指紋を1行で刻む(v0.1.1971)。
+    - `swScriptStamp.test.js`
+    - `swStaleCheck.js` — service worker が古い中身のまま動いていないかを確かめ、古ければ1回だけ拡張を読み込み直す(v0.1.1972)。
+    - `swStaleCheck.test.js`
     - `symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
     - `symptomVerdicts.test.js`
     - `symptomVerdicts.wiring.test.js`
@@ -3234,6 +3333,8 @@
     - `unknownVsAbsent.test.js`
     - `userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、
     - `userCommentProfileCache.test.js`
+    - `userCommentProfileMerge.js` — 横の欄(popup)の描き直しごとに、記録の行から名前・顔の控えを学び、行を補い、控えを刈る1回分。
+    - `userCommentProfileMerge.test.js`
     - `userEntryAvatarResolve.js` — 1 ユーザーエントリーのアバター状態を組み立てる純関数レイヤ。
     - `userEntryAvatarResolve.test.js`
     - `userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
@@ -3270,6 +3371,8 @@
     - `venueBubbleChurn.test.js`
     - `venueBubbleLifecycle.js` — 吹き出しの寿命を「読み上げ(TTS)」に連動させる純関数群。
     - `venueBubbleLifecycle.test.js`
+    - `venueBubbleVoiceHold.js` — 会場の吹き出しを「声が始まる時」に出すかどうか(v0.1.1979・2026-11-10 りんく決定「声と一緒に出す」)。
+    - `venueBubbleVoiceHold.test.js`
     - `venueButtonVisible.wiring.test.js`
     - `venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
     - `venueCharacterFrame.test.js`
@@ -3562,13 +3665,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (87)
+- 📁 **tests/** (93)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (80)
+  - 📁 **e2e/** (86)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3605,9 +3708,11 @@
     - `inline-panel-align.spec.js`
     - `inline-panel-realtime-refresh.spec.js`
     - `inline-panel-visibility-recover.spec.js`
+    - `kick-recording.spec.js`
     - `lane-wait-honest.spec.js`
     - `live-chat-check.spec.js`
     - `lp-preview.spec.js`
+    - `mixch-recording.spec.js`
     - `multitab-inline-panel-not-blank.spec.js`
     - `multitab-monkey-no-blank.spec.js`
     - `multitab-storage-contention.spec.js`
@@ -3634,9 +3739,11 @@
     - `popup-window-empty-history-whitespace.spec.js`
     - `refresh-storage-hang-resilient.spec.js`
     - `save-ctx-invalidated-recovery.spec.js`
+    - `showroom-recording.spec.js`
     - `sidepanel-first-byte-paint.spec.js`
     - `sidepanel-flash-capture.spec.js`
     - `sidepanel-lane-stability-monkey.spec.js`
+    - `sidepanel-stream-follow.spec.js`
     - `smoke.spec.js`
     - `snapshot-fetch-hang-resilient.spec.js`
     - `storage-banners.spec.js`
@@ -3646,12 +3753,14 @@
     - `support-activity-timeline.spec.js`
     - `support-timeline-persist-open.spec.js`
     - `thumbnail-capture.spec.js`
+    - `tiktok-recording.spec.js`
     - `timeline-fill-standalone-window.spec.js`
     - `twitch-recording.spec.js`
     - `venue-entry-effect.spec.js`
     - `venue-pickup-drag.spec.js`
     - `venue-stat-strip.spec.js`
     - `watch-messaging.spec.js`
+    - `whowatch-recording.spec.js`
   - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
     - `laneImportContract.js` — 応援レーンの「輸入契約」(テスト専用の定数・実装コードは import しない)。

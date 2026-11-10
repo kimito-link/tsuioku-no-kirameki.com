@@ -65,11 +65,20 @@ describe('anonymousIdenticonDataUrl: 使い回し', () => {
     expect(anonymousIdenticonDataUrl('', 64)).toBe('');
     expect(anonymousIdenticonDataUrl('  ', 64)).toBe('');
   });
-  it('★上限つき: 3000人分を作っても件数は 2000 以下(メモリが無限に増えない)', () => {
+  it('★上限つき: 8000人分を作っても件数は 6000 以下(メモリが無限に増えない・v0.1.1965 で 2000→6000)', () => {
     clearAnonymousIdenticonCacheForTest();
-    for (let i = 0; i < 3000; i += 1) anonymousIdenticonDataUrl(`a:u${i}`, 64);
-    expect(anonymousIdenticonCacheSizeForTest()).toBeLessThanOrEqual(2000);
-    expect(anonymousIdenticonCacheSizeForTest()).toBeGreaterThan(1500);
+    for (let i = 0; i < 8000; i += 1) anonymousIdenticonDataUrl(`a:u${i}`, 64);
+    expect(anonymousIdenticonCacheSizeForTest()).toBeLessThanOrEqual(6000);
+    expect(anonymousIdenticonCacheSizeForTest()).toBeGreaterThan(5500);
+  });
+  it('★v0.1.1965: 2,500人を毎回なめても2周目は作り直さない(上限を超えると1件も当たらなくなる件)', () => {
+    clearAnonymousIdenticonCacheForTest();
+    const ids = Array.from({ length: 2500 }, (_, i) => `a:w${i}`);
+    for (const id of ids) anonymousIdenticonDataUrl(id, 64);
+    const size = anonymousIdenticonCacheSizeForTest();
+    for (const id of ids) anonymousIdenticonDataUrl(id, 64);
+    expect(anonymousIdenticonCacheSizeForTest()).toBe(size);
+    expect(size).toBe(2500);
   });
 });
 

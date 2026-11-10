@@ -168,6 +168,7 @@ import {
   resolveVoiceLoadingView,
   VOICE_LOADING_FLICKER_GUARD_MS
 } from '../lib/voiceLoadingState.js';
+import { isYtGiftOnlyCommentRow } from '../lib/youtube/ytGiftOnlyRow.js';
 
 /** POP のタイムラインと同じ既定アバター(extension ルート相対・popup.html と同一)。 */
 const DEFAULT_TILE_IMG =
@@ -1730,7 +1731,8 @@ function updateCommentCount() {
  * limit 件を返すため、ここでは全候補を通してから末尾120件へ絞る。
  */
 function buildAllComeviewTimeline(comments, gifts) {
-  const commentList = Array.isArray(comments) ? comments : [];
+  // 他サービスのギフトはコメントの行にも残るので、カードと重なるだけの行は外す(ニコ生の行には当たらない)
+  const commentList = (Array.isArray(comments) ? comments : []).filter((c) => !isYtGiftOnlyCommentRow(c));
   const giftList = Array.isArray(gifts) ? gifts : [];
   return buildSupportActivityTimeline(commentList, giftList, {
     order: 'asc',

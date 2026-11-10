@@ -203,3 +203,98 @@ describe('createCoalescedRefreshScheduler', () => {
     });
   });
 });
+
+describe('0.1.1957: 描き直しが重いときだけ間隔を広げる', () => {
+  it('軽い描き直し(100ms 以下)なら間隔は 450ms のまま', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: createClock() });
+    sched.notePaintCost(40);
+    sched.notePaintCost(100);
+    expect(sched.highFreqIntervalMs()).toBe(450);
+  });
+  it('1回300ms の描き直しが続くと、間隔は約900ms(描き直しの3倍)に広がる', () => {
+    const clock = createClock();
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: clock });
+    for (let i = 0; i < 10; i++) sched.notePaintCost(300);
+    expect(sched.highFreqIntervalMs()).toBe(900);
+    let n = 0;
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++);
+    expect(n).toBe(1);
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++);
+    clock.advance(600);
+    expect(n).toBe(1); // 450ms ではまだ描かない
+    clock.advance(300);
+    expect(n).toBe(2); // 900ms で末尾の1回
+  });
+  it('どれだけ重くても 1.5秒より空けない', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: createClock() });
+    for (let i = 0; i < 10; i++) sched.notePaintCost(5000);
+    expect(sched.highFreqIntervalMs()).toBe(1500);
+  });
+  it('設定トグルなど高頻度でない変更は、重くても待たせない', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: createClock() });
+    for (let i = 0; i < 10; i++) sched.notePaintCost(300);
+    let n = 0;
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++);
+    sched.schedule({ allHighFreq: false, initialDone: true }, () => n++);
+    expect(n).toBe(2);
+  });
+});
+
+describe('0.1.1985: 描き直し1回まるごとの時間でも間隔を広げ、終わった時刻から数える', () => {
+  it('まるごとが軽い(1秒未満)なら間隔は変わらない', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, maxAdaptiveMs: 60_000, deps: createClock() });
+    sched.noteCycleCost(400);
+    sched.noteCycleCost(999);
+    expect(sched.highFreqIntervalMs()).toBe(450);
+  });
+  it('まるごと 4秒かかる配信は、間隔が 12秒(3倍)になる', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, maxAdaptiveMs: 60_000, deps: createClock() });
+    sched.notePaintCost(1000);
+    sched.noteCycleCost(4000);
+    expect(sched.highFreqIntervalMs()).toBe(12_000);
+  });
+  it('重い1回のあと軽くなったら、間隔は描く時間だけで決まる', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, maxAdaptiveMs: 60_000, deps: createClock() });
+    sched.noteCycleCost(4000);
+    sched.noteCycleCost(300);
+    expect(sched.highFreqIntervalMs()).toBe(450);
+  });
+  it('重い1回が終わった時刻から間隔を数える(終わった直後に次を始めない)', () => {
+    const clock = createClock();
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, maxAdaptiveMs: 60_000, deps: clock });
+    let n = 0;
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++); // 始まり(t=0)
+    expect(n).toBe(1);
+    clock.advance(4000); // 4秒かかって終わった
+    sched.noteCycleCost(4000);
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++); // 終わった直後の知らせ
+    expect(n).toBe(1);
+    clock.advance(11_000);
+    expect(n).toBe(1); // 終わってから 11秒: まだ
+    clock.advance(1_000);
+    expect(n).toBe(2); // 終わってから 12秒で1回
+  });
+  it('待っている間に重い1回が終わって間隔が延びたら、残りを待ち直す', () => {
+    const clock = createClock();
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, maxAdaptiveMs: 60_000, deps: clock });
+    let n = 0;
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++); // t=0
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++); // 450ms 後に末尾の1回を予約
+    clock.advance(200);
+    sched.noteCycleCost(2000); // 予約の前に、重い1回が終わった(間隔 6秒・t=200 から数える)
+    clock.advance(250); // t=450: 予約の時刻
+    expect(n).toBe(1); // まだ描かない
+    clock.advance(5700); // t=6150
+    expect(n).toBe(1);
+    clock.advance(100); // t=6250 (>= 200+6000)
+    expect(n).toBe(2);
+  });
+  it('設定トグルなど高頻度でない変更は、重くても待たせない', () => {
+    const sched = createCoalescedRefreshScheduler({ throttleMs: 450, maxAdaptiveMs: 60_000, deps: createClock() });
+    let n = 0;
+    sched.schedule({ allHighFreq: true, initialDone: true }, () => n++);
+    sched.noteCycleCost(8000);
+    sched.schedule({ allHighFreq: false, initialDone: true }, () => n++);
+    expect(n).toBe(2);
+  });
+});

@@ -125,16 +125,19 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 67</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 74</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+- `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
 - `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
 - `src/extension/liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
+- `src/lib/appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
+- `src/lib/bigRecordYield.js` — 大きな記録(数万行・数千人)を扱うとき、長い仕事の合間に画面へ手を返すための決まり(v0.1.1997)。
 - `src/lib/blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
 - `src/lib/bootTimeline.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない。時刻・記録は呼び出し側が渡す)
@@ -189,10 +192,14 @@
 - `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
 - `src/lib/supporterAccess.js` — 【層】L1 拡張の画面から呼ぶ部品(chrome.storage と fetch を外から受け取る=試験で差し替えられる)
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
+- `src/lib/userCommentProfileMerge.js` — 横の欄(popup)の描き直しごとに、記録の行から名前・顔の控えを学び、行を補い、控えを刈る1回分。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+- `src/lib/youtube/ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
 - `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
+- `src/lib/youtube/ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
 - `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
+- `src/lib/youtube/ytTailAfterFull.js` — v0.1.1983: 全件を一度渡したあとのテール(新着の差分)を、短くして渡す。
 - `src/lib/youtube/ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
 
 </details>
@@ -205,7 +212,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 103</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 104</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -267,6 +274,7 @@
 - `src/lib/kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
 - `src/lib/kiramekiAwardsSectionHtml.js` — HTMLレポートの「きらめき表彰」セクション(CSS+各賞カード)の組み立て。
 - `src/lib/kokenContributionRankingApi.js` — koken 公式「ギフト貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/laneAggregatesMemo.js` — 応援マスの元(人ごとの集計)を、同じ記録に対して何度も数え直さないための控え(v0.1.2007)。
 - `src/lib/liveChannelSwitch.js` — 「別の配信へ移動(SPA遷移)するとパネルが壊れる」問題の修正(2026-07-06)。
 - `src/lib/liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
 - `src/lib/liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
@@ -333,7 +341,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 293</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 299</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -367,7 +375,6 @@
 - `src/extension/comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
 - `src/extension/comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
-- `src/extension/sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -469,6 +476,7 @@
 - `src/lib/kokenGiftHistoryApi.js` — koken 公式「ギフト履歴（個別イベント）」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
 - `src/lib/laneCountOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/laneCrowdLimit.js` — 人数がとても多い配信だけ、応援レーンに並べる人数を絞る(v0.1.1975・りんく決定 2026-11-10)。
 - `src/lib/laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/laneDiag.js` — 応援アイコン列(popup レーン)の「人数整合」診断。popup が描いたレーンの純観測値を組み立てる純関数群。
 - `src/lib/laneDiagKey.js` — 応援アイコン列(popup レーン)の「人数整合」観測値を popup が書き、status が読む storage キー。
@@ -477,12 +485,15 @@
 - `src/lib/laneMirrorContract.js` — `KEY_LANE_MIRROR`(応援レーンの鏡)の【契約の正本】。
 - `src/lib/laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
 - `src/lib/laneMirrorPerLivePublish.js` — laneMirrorPerLivePublish — 配信ごとの鏡(v2)と実DOM受領証を storage へ書く薄いグルー。
+- `src/lib/laneMirrorPublishPace.js` — 応援レーンの鏡(nls_lane_mirror_v1 / nls_lane_mirror_v2_<lv>)を書く間隔を、人数に合わせて決める(v0.1.1973)。
 - `src/lib/laneMirrorWriteGate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/laneMirrorWriterYield.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/laneProgressiveFill.js` — 大きな段(応援マスが数百〜数千個)を、1回で全部作らずに数回に分けて足すための決まり(v0.1.2008)。
 - `src/lib/lanePublishSkipDiag.js` — lanePublishSkipDiag — 応援レーン鏡の publish が「到達したか/何で見送られたか」を1行にする純関数。
 - `src/lib/laneRosterDelta.js` — 応援レーンの「誰が消えたか」を測る純関数(v0.1.1231・Phase 1 計器)。
 - `src/lib/laneRosterKeeper.js` — 応援レーンの「名簿キーパー」(v0.1.1232・Phase 2 蓄積器)。
 - `src/lib/laneSceneEnvelope.js` — LaneScene一致証明の封筒(純関数)。lanescene-structural-review-DESIGN.md のMVP実装。
+- `src/lib/laneSecondRenderPolicy.js` — 応援マスの「ギフト/広告の読み込み後の2回目の描画」を省いてよいかの判定(純関数)。
 - `src/lib/laneSupplyOriginDiag.js` — 応援レーンの供給元(誰が entriesProvisional を書いたか)を名指しする計器。
 - `src/lib/laneTickProbe.js` — ①popup の独立描画トリガ(tickIndependentNorthStar)の自己診断(v0.1.1123)。
 - `src/lib/laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -496,6 +507,7 @@
 - `src/lib/migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
 - `src/lib/migrateInlinePanelFloatToDock.js` — 旧「ポップアップ風（floating）」利用者を画面下ドックへ一度だけ移す（公式右パネルとの衝突緩和）。
 - `src/lib/migrateSuggestInitialInlinePanelPlacement.js` — 新規インストール時のみ、インライン配置キーが未保存なら画面幅で既定を一度書き込む。
+- `src/lib/mixch/mxGiftImages.js` — ミクチャのギフトの絵を resource_id から引く(バックグラウンドで使う・council/mixch-support-PLAN.md)。
 - `src/lib/nameplateToggleFinder.js` — ニコ生公式の「なふだを表示」トグルを見つける(純関数)。
 - `src/lib/nicoadCelebrationKey.js` — ニコ広/ギフトのシステムコメント演出を「同じコメントで二度光らせない」ための
 - `src/lib/nicoAnonymousDisplay.js` — ニコ生の匿名ユーザーID（a: で始まる内部ID）向けの表示補完。
@@ -619,6 +631,8 @@
 - `src/lib/watchPageViewerProfile.js` — watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
 - `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
 - `src/lib/yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
+- `src/lib/youtube/ytFullRefreshInterval.js` — YouTube 系の横の欄・会場が「記録を全件読み直す」間隔(v0.1.1969)。
+- `src/lib/youtube/ytGiftOnlyRow.js` — ふわっち・SHOWROOM・ミクチャのギフトは、記録ではコメントの行(本文=ギフトの名前)としても残る。
 - `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
 - `src/lib/youtube/ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
 - `src/lib/youtube/ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
@@ -641,7 +655,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 56</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -661,6 +675,7 @@
 - `src/lib/phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
 - `src/lib/phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
+- `src/lib/venueBubbleVoiceHold.js` — 会場の吹き出しを「声が始まる時」に出すかどうか(v0.1.1979・2026-11-10 りんく決定「声と一緒に出す」)。
 - `src/lib/venuePickupSpeaker.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
 - `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
@@ -694,6 +709,7 @@
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 - `src/lib/voiceWarmup.js` — VOICEVOX の声を使う前に温めておく(2026-10-26・VOICEVOX 0.26 の計測から)。
+- `src/lib/youtube/ytVoiceAssignPersist.js` — YouTube 系(YouTube・Twitch・Kick ほか)の「人ごとの声の割り当て」(yt_voice_assignments)を
 - `src/lib/youtube/ytVoicePriority.js` — YouTube 版の会場の読み上げで、混んでいるときに「大事なコメント」だけを読むための純関数。
 - `src/lib/youtube/ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
 - `src/server/phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
@@ -795,7 +811,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 91</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `mobile/scripts/verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
@@ -864,6 +880,7 @@
 - `src/lib/opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
 - `src/lib/opSoundEffectDiagKey.js` — 操作音(opSoundDirector.js・Phase D1)の「押下/成功/発音」観測値を
 - `src/lib/panelWakeCurtainDiagKey.js` — 「幕(シェード)が全画面を覆った回数」の観測値を popup-entry.js が書き、status が読む storage キー。
+- `src/lib/platform/diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
 - `src/lib/popupDiagUptimeNote.js` — popup 固有診断が「popup 起動から何秒後の値か」を明示する注記を作る純関数(v0.1.1211)。
@@ -882,6 +899,7 @@
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusRefreshInterval.js` — 状態画面(status.html)の自動更新の間隔を決める(純関数)。v0.1.1698
 - `src/lib/statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
+- `src/lib/storyDiagCountsPace.js` — 診断用の数え上げ(顔が付いた件数など)を、大きな記録では毎回やり直さないための判定(純関数)。
 - `src/lib/storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
 - `src/lib/storyDiagTotalSource.js` — 「記録している応援コメント N 件」の N を1箇所で決める純関数。
 - `src/lib/summarizeGiftSubAppHistoryDiag.js` — v0.1.201: gift sub-app DOM の payload を診断 JSON 用 summary に変換する純関数。
@@ -905,6 +923,48 @@
   - `extension-youtube/src/ytNicoShim.js`
   - `tests/e2e/twitch-recording.spec.js`
   - `council/twitch-support-PLAN.md`
+- **Kick の配信を記録(本体に同梱)** — Kick の視聴ページで、ページ自身が使うリアルタイムの接続(つなぎ先は毎回 Kick の API に聞く・第一候補 Centrifugo・予備は API が返す Pusher の鍵・ログイン不要)を読み、Twitch と同じ口で YouTube 版の記録(配信キー kk.<slug>.<配信番号>)へ渡す。Twitch・Kick の違い(リンク・言葉・送信先・顔の置き場)は streamPlatform.js の表で引く。計器 yt_diag_kk_chat
+  - `extension-youtube/src/kick-content-entry.js`
+  - `src/lib/kick/kickChatParse.js`
+  - `src/lib/kick/kickApi.js`
+  - `src/lib/kick/kickRealtime.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/kick-recording.spec.js`
+  - `council/kick-support-PLAN.md`
+- **ふわっちの配信を記録(本体に同梱・試作)** — ふわっちの視聴ページ(whowatch.tv/viewer/<番号>)で、ページ自身が使う API(api.whowatch.tv/lives/<番号>?last_updated_at=…)を3秒おきに読み、Kick と同じ口で YouTube 版の記録(配信キー ww.<番号>.<配信者 id>)へ渡す。アイテムは superchat(pt・名前と絵つき)。ページから読めなければバックグラウンドが代わりに読む(YT_WW_API_GET)。形は非公式資料による推定で、届いた項目の名前を計器 yt_diag_ww_chat に残して PC で確かめる
+  - `extension-youtube/src/ww-content-entry.js`
+  - `src/lib/whowatch/wwParse.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/whowatch-recording.spec.js`
+  - `council/whowatch-support-PLAN.md`
+- **SHOWROOM の配信を記録(本体に同梱)** — SHOWROOM の部屋のページ(/r/<room_url_key>)で、ページと同じ口(room/status・live_info・ソケット online.showroom-live.com に SUB)を読み、開いた時点の分は comment_log・gift_log から。有料ギフトは gift_list の point × 個数で superchat(SRPT)・無料ギフトは記録しない。公式の順位(summary_ranking)を YT_LEADERBOARD へ。配信キー sr.<room_url_key>.<live_id>・計器 yt_diag_sr_chat
+  - `extension-youtube/src/sr-content-entry.js`
+  - `src/lib/showroom/srParse.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/showroom-recording.spec.js`
+  - `council/showroom-support-PLAN.md`
+- **ミクチャの配信を記録(本体に同梱)** — ミクチャの配信のページ(/u/<番号>/live)で、ページと同じ口(users/<番号>/live・ソケット chat.mixch.tv/torte/room・lives/<番号>/messages・items/available)からコメントとギフトを読み、YouTube 版と同じ記録へ渡す。配信キー mx.<番号>.<live_session_id>・ギフトは price × 個数(MXCOIN)・計器 yt_diag_mx_chat
+  - `extension-youtube/src/mx-content-entry.js`
+  - `src/lib/mixch/mxParse.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/mixch-recording.spec.js`
+  - `council/mixch-support-PLAN.md`
+- **TikTok LIVE の配信を記録(本体に同梱)** — TikTok の配信のページ(/@<名前>/live)で、ページ自身の世界の写し役(tt-main)がページのソケット(webcast-ws・X-Bogus 署名つき)の受信と gift/list を写し、入口(tt-content)が gzip を解いて protobuf を読み、YouTube 版と同じ記録へ渡す。ログインしていないとソケットが開かない=計器 stopReason login-required とページの知らせ。配信キー tt.<名前>.<roomId>・ギフトは diamondCount × 個数(TTCOIN)・連打は終わりの印で1回・計器 yt_diag_tt_chat
+  - `extension-youtube/src/tt-main-entry.js`
+  - `extension-youtube/src/tt-content-entry.js`
+  - `src/lib/tiktok/ttParse.js`
+  - `src/lib/tiktok/ttProto.js`
+  - `src/lib/platform/streamPlatform.js`
+  - `tests/e2e/tiktok-recording.spec.js`
+  - `council/tiktok-support-PLAN.md`
+- **横の欄の配信選び(YouTube 系)** — 横の欄・コメビュが YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のどの配信を出すかをニコ生版と同じ3層で決める。外枠は前面タブの配信キーを iframe の src(&stream=)に焼いて配信が変わったら読み込み直す・配信ページが「最後に見た配信」(yt_last_stream_url)を自分で書く・shim がそれを疑似 lv に翻訳して渡す・探り読み(2配信以上の comments)には答えない。記録の無い部屋は仮の配信キー。計器 yt_diag_panel_stream_<画面>
+  - `src/extension/sidepanel-iframe-boot-entry.js`
+  - `src/lib/youtube/ytPanelRoute.js`
+  - `extension-youtube/src/pfLastStreamUrl.js`
+  - `extension-youtube/src/ytNicoShim.js`
+  - `src/lib/youtube/ytPanelStreamDiag.js`
+  - `tests/e2e/sidepanel-stream-follow.spec.js`
+  - `council/panel-stream-selection-SPEC.md`
 - **応援レーンタイル→発言一覧(comeview 詳細)** — popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)
   - `src/lib/comeviewUserDetailLink.js`
   - `src/extension/popup/wireLaneUserDetailOpen.js`
@@ -1062,7 +1122,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 325</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 336</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1295,6 +1355,9 @@
 - `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
+- `src/lib/platform/fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/platform/infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
+- `src/lib/platform/streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
 - `src/lib/popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
@@ -1306,6 +1369,7 @@
 - `src/lib/popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
 - `src/lib/prefersReducedMotion.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/lib/prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
+- `src/lib/profileCacheWritePace.js` — 横の欄が「名前・顔の控え」(nls_user_comment_profile_v1)を書く間隔(v0.1.1976)。
 - `src/lib/profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
 - `src/lib/protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
 - `src/lib/pruneLiveViewPublishBlob.js` — 純Web公開ペイロード(jsonBlob)の容量 prune はしご純関数
@@ -1314,6 +1378,8 @@
 - `src/lib/recentTextRing.js` — 「その人の直近N件の発言」を保持する固定長リングの純関数(v0.1.1218)。
 - `src/lib/refreshCoalescer.js` — 描き直し(refresh)の「実行中に来た要求は、あとで1回にまとめる」合流器(時計は deps で注入)。v0.1.1687
 - `src/lib/refreshCycleDeadline.js` — 1サイクル全体の締切を持ち、各 read の timeout を残り時間に切り詰める。
+- `src/lib/refreshDutyGate.js` — 定期の描き直し(3秒ごとの見回り)が、画面を描き直しだけで埋めないようにする門(純関数)。
+- `src/lib/refreshStageClock.js` — 描き直し1回(refresh)が「いまどの段にいるか・各段に何ミリ秒かかったか」を残す計器(純関数)。
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
 - `src/lib/resolveOfficialPoints.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1322,6 +1388,7 @@
 - `src/lib/scoreAnnounce.js` — 配信採点「結果発表シーケンス」の純関数プランナー(council/broadcast-scoring-SYNTHESIS.md
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
 - `src/lib/shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/shortLivedMemo.js` — 0.1.1961: 同じ問い合わせを短い間だけ使い回す(答えを待っている間の重複もまとめる)。
 - `src/lib/sidepanelCloakDuration.js` — 幕(cloak)が「いつ外れたか / まだ残っているか」を要約する純関数。
 - `src/lib/sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
 - `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
@@ -1344,6 +1411,8 @@
 - `src/lib/supporterLicense.js` — 【層】L0 判定層(純粋関数 + WebCrypto の署名確認だけ)
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
 - `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
+- `src/lib/swScriptStamp.js` — service worker の本体(extension/background.js)に、束ねた中身の指紋を1行で刻む(v0.1.1971)。
+- `src/lib/swStaleCheck.js` — service worker が古い中身のまま動いていないかを確かめ、古ければ1回だけ拡張を読み込み直す(v0.1.1972)。
 - `src/lib/symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
 - `src/lib/tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
 - `src/lib/timeAuthority.js` — timeAuthority — 「その値がいつ真だったか」と「その値は判定に使えるか」の【唯一の正本】。
@@ -1354,6 +1423,7 @@
 - `src/lib/trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
 - `src/lib/trailingPublisher.js` — 「先に1回・間引いた分は最後に1回」書く小さな仕組み(DOM も chrome API も触らない)。
 - `src/lib/trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
+- `src/lib/twitch/twHermes.js` — twitch.tv のページ自身が使う通知の口(Hermes)の1通を読む(純関数)
 - `src/lib/unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
 - `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
@@ -1371,9 +1441,10 @@
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
-- `src/lib/youtube/ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
+- `src/lib/youtube/ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
+- `src/lib/youtube/ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
@@ -1422,21 +1493,21 @@
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🎁 ギフト (5版)
+### 🎁 ギフト (6版)
+- `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
 - `v0.1.1920` 2026-11-08 — YouTube の金額の出ないギフトを分かりやすく
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🔊 読み上げ (7版)
+### 🔊 読み上げ (6版)
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
 - `v0.1.2032` 2026-11-10 — ビルドの札を詳しい状況の先頭へ移した
 - `v0.1.2021` 2026-11-10 — 横の欄のボタンの見た目をそろえた
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1911` 2026-11-06 — 長いコメントは質問の結びを残して読む
-- `v0.1.1910` 2026-11-06 — スマホで隠した人を読み上げでも出さない
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)

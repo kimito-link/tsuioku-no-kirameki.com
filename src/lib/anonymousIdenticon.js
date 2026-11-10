@@ -126,7 +126,9 @@ function shade(hex, f) {
 }
 
 /** 使い回しの上限(1件 約3KB → 約6MB)。1配信の匿名の人数(数百〜2千)を覆い、無限には増えない。 */
-const IDENTICON_CACHE_MAX = 2000;
+// v0.1.1965: 2000 → 6000。古い順に捨てる表は、描き直しで毎回なめる人数が上限を超えると1件も当たらなくなる
+//   (Kick の大きな配信でりんく段だけで 2,046人・PC プロファイルで毎回作り直していた)。1件は約2.5KB=6000件で約15MB。
+const IDENTICON_CACHE_MAX = 6000;
 /** @type {Map<string, string>} */
 const identiconCache = new Map();
 

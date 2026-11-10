@@ -36,9 +36,25 @@ import './background-nico-relay.js';
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
-import { parseTwChannelFromUrl } from '../../src/lib/twitch/twIrcParse.js';
-import { twLoginOfStreamKey } from '../../src/lib/twitch/twStreamKey.js';
+import { platformOfStreamKey, isStreamTabToReload, STREAM_PLATFORM_TAB_URLS } from '../../src/lib/platform/streamPlatform.js';
+import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
+import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
+import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
+import { ytVoiceAssignPersistDecision, YT_VOICE_ASSIGN_PERSIST_MS } from '../../src/lib/youtube/ytVoiceAssignPersist.js';
+import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
+/** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
+const lastLeaderboardSig = new Map();
+
+const mxGiftImages = createMxGiftImageResolver({
+  fetchJson: async (url) => {
+    const res = await fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`http_${res.status}`);
+    return res.json();
+  },
+  storageGet: async (key) => (await chrome.storage.local.get(key))?.[key],
+  storageSet: (bag) => chrome.storage.local.set(bag),
+});
 
 // 本体に同梱したとき(scripts/youtube-build.mjs の本体向け束・2026-11-05): 本体の background.js が importScripts で読む。
 //   パネルの開き方・offscreen・自分で入れ替わる仕組みは本体のものを使う(ここで触ると本体の動きが変わる)。
@@ -70,6 +86,78 @@ const DEFAULT_VOICE_SETTINGS = Object.freeze({
   lightVoice: 'auto',
   availableStyleIds: Array.from(YT_DEFAULT_STYLE_IDS),
 });
+
+/**
+ * ★v0.1.1968: 人ごとの声の割り当て(yt_voice_assignments・数百KB)の控え。束ごとに storage から読み書きすると
+ *   onChanged で全ページへ新旧の値が配られ横の欄が数分止まった(PC 実測)。控えを正にし、変わったときだけ
+ *   最短30秒に1回書く(src/lib/youtube/ytVoiceAssignPersist.js)。
+ * @type {Record<string, any> | null}
+ */
+let voiceAssignMem = null;
+/**
+ * ★v0.1.1970 計器: 30秒の間引きが混んだ配信で効いていない(PC 実測 240秒で46回・間隔1〜14秒)原因を切り分ける。
+ *   bootAt が書き込みのたびに変わっていれば service worker の作り直し(控えが毎回空になる)。
+ *   SW の devtools から globalThis.__ytVoiceAssignDiag で読む。yt_diag_sw_boot には起動の回数と直近の時刻を残す。
+ */
+/* global NL_BUILD_ID */
+/** このバンドルの build id(esbuild の define・無ければ空) */
+const SW_RUNNING_BUILD_ID = typeof NL_BUILD_ID !== 'undefined' ? String(NL_BUILD_ID) : '';
+const voiceAssignDiag = { bootAt: Date.now(), now: 0, later: 0, flush: 0, memMissReads: 0, gaps: /** @type {number[]} */ ([]) };
+try {
+  /** @type {any} */ (globalThis).__ytVoiceAssignDiag = voiceAssignDiag;
+  void chrome.storage.local.get('yt_diag_sw_boot').then((bag) => {
+    const prev = bag?.yt_diag_sw_boot || {};
+    const recent = Array.isArray(prev.recent) ? prev.recent.slice(-19) : [];
+    recent.push(voiceAssignDiag.bootAt);
+    return chrome.storage.local.set({ yt_diag_sw_boot: { count: (Number(prev.count) || 0) + 1, recent, buildId: SW_RUNNING_BUILD_ID } });
+  }).catch(() => {});
+  // ★v0.1.1972: 古い中身のまま動いていたら1回だけ読み込み直す(src/lib/swStaleCheck.js)
+  void (async () => {
+    let diskText = null;
+    try {
+      const res = await fetch(chrome.runtime.getURL('dist/yt-background.js'), { cache: 'no-store' });
+      diskText = res.ok ? await res.text() : null;
+    } catch {
+      diskText = null;
+    }
+    const bag = await chrome.storage.local.get('yt_diag_sw_stale').catch(() => ({}));
+    const prev = bag?.yt_diag_sw_stale || {};
+    const now = Date.now();
+    const decision = swStaleDecision({
+      runningBuildId: SW_RUNNING_BUILD_ID,
+      diskText,
+      isStore: Boolean(chrome.runtime.getManifest()?.update_url),
+      lastReloadAt: Number(prev.lastReloadAt) || 0,
+      now,
+    });
+    const next = { at: now, decision, running: SW_RUNNING_BUILD_ID, lastReloadAt: decision === 'reload' ? now : Number(prev.lastReloadAt) || 0, reloads: (Number(prev.reloads) || 0) + (decision === 'reload' ? 1 : 0) };
+    await chrome.storage.local.set({ yt_diag_sw_stale: next }).catch(() => {});
+    if (decision === 'reload') chrome.runtime.reload();
+  })().catch(() => {});
+} catch {
+  /* 計器は失敗しても記録を止めない */
+}
+let voiceAssignDirty = false;
+let voiceAssignWrittenAt = 0;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let voiceAssignTimer = null;
+function scheduleVoiceAssignFlush() {
+  if (voiceAssignTimer) return;
+  const wait = Math.max(1000, YT_VOICE_ASSIGN_PERSIST_MS - (Date.now() - voiceAssignWrittenAt));
+  voiceAssignTimer = setTimeout(() => {
+    voiceAssignTimer = null;
+    void runSerialized(async () => {
+      if (!voiceAssignDirty || !voiceAssignMem) return;
+      voiceAssignDirty = false;
+      voiceAssignDiag.flush++;
+      if (voiceAssignWrittenAt) voiceAssignDiag.gaps = [...voiceAssignDiag.gaps.slice(-19), Date.now() - voiceAssignWrittenAt];
+      voiceAssignWrittenAt = Date.now();
+      await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_ASSIGNMENTS]: voiceAssignMem });
+    }).catch(() => {
+      voiceAssignDirty = true;
+    });
+  }, wait);
+}
 
 /** 並列メッセージによる storage / IndexedDB 競合を防ぐ直列化キュー */
 let storageJobChain = Promise.resolve();
@@ -261,19 +349,20 @@ async function relayCommentToChatFrame(videoId, text) {
  * @param {Record<string, unknown>} payload
  */
 async function relayToChatFrame(videoId, payload) {
-  // Twitch の配信(配信キー tw.<login>.…)は、そのチャンネルを開いている Twitch のタブへ(tw-content-entry.js が受ける)
-  const twLogin = twLoginOfStreamKey(videoId);
-  if (twLogin) {
+  // Twitch/Kick の配信(配信キー tw.<login>.… / kk.<slug>.…)は、そのチャンネルを開いているタブへ(tw-/kick-content-entry.js が受ける)
+  const plat = platformOfStreamKey(videoId);
+  const twLogin = plat ? plat.loginOfStreamKey(videoId) : '';
+  if (plat && twLogin) {
     if (payload.type !== 'YT_SEND_COMMENT_TO_FRAME') return { ok: false, reason: 'unsupported' };
-    const twTabs = (await chrome.tabs.query({ url: ['https://www.twitch.tv/*'] }))
-      .filter((t) => parseTwChannelFromUrl(String(t.url || '')) === twLogin)
+    const twTabs = (await chrome.tabs.query({ url: [plat.tabUrl] }))
+      .filter((t) => plat.channelFromUrl(String(t.url || '')) === twLogin)
       .sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)));
     if (!twTabs.length) return { ok: false, reason: 'no-tab' };
     let lastTw = { ok: false, reason: 'no-chat-frame' };
     for (const t of twTabs) {
       if (typeof t.id !== 'number') continue;
       try {
-        const res = await chrome.tabs.sendMessage(t.id, { ...payload, type: 'TW_SEND_COMMENT' }, { frameId: 0 });
+        const res = await chrome.tabs.sendMessage(t.id, { ...payload, type: plat.sendType }, { frameId: 0 });
         if (res && res.ok) return res;
         if (res) lastTw = res;
       } catch {
@@ -334,6 +423,14 @@ async function reloadExistingYtWatchTabs(reason) {
     tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/watch*', 'https://www.youtube.com/live/*'] });
   } catch {
     return;
+  }
+  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページも同じく止まる
+  //   (2026-11-09 実機: 更新前から開いていた SHOWROOM のタブが記録 0 のまま)。配信ページの形の URL だけ読み込み直す
+  try {
+    const others = await chrome.tabs.query({ url: [...STREAM_PLATFORM_TAB_URLS] });
+    for (const t of others) if (isStreamTabToReload(t.url)) tabs.push(t);
+  } catch {
+    // no-op
   }
   let reloaded = 0;
   for (const tab of tabs) {
@@ -692,6 +789,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // ふわっちの視聴ページが API を直接読めなかったとき(CORS 等)の代わり。ふわっちのページから・API の決まった形の URL だけ
+  //   (council/whowatch-support-PLAN.md・どちらで読めたかは計器 yt_diag_ww_chat の via に出る)
+  if (message.type === 'YT_WW_API_GET') {
+    const url = String(message.url || '');
+    const from = String(sender?.tab?.url || sender?.url || '');
+    if (!isWwApiUrl(url) || !/^https:\/\/(?:www\.)?whowatch\.tv\//.test(from)) {
+      sendResponse({ ok: false, reason: 'bad-url' });
+      return false;
+    }
+    fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' } })
+      .then(async (res) => (res.ok ? { ok: true, json: await res.json() } : { ok: false, reason: `http_${res.status}` }))
+      .then((r) => sendResponse(r))
+      .catch((err) => sendResponse({ ok: false, reason: String(err).slice(0, 80) }));
+    return true;
+  }
+
+  // ミクチャのギフトの絵(資源の置き場は CORS が無いのでページから読めない・2026-11-08 PC 実測)。ミクチャのページから・番号だけ
+  if (message.type === 'YT_MX_GIFT_IMAGES') {
+    const from = String(sender?.tab?.url || sender?.url || '');
+    if (!/^https:\/\/mixch\.tv\//.test(from)) {
+      sendResponse({ ok: false, reason: 'bad-origin' });
+      return false;
+    }
+    mxGiftImages(Array.isArray(message.ids) ? message.ids : [])
+      .then((images) => sendResponse({ ok: true, images }))
+      .catch((err) => sendResponse({ ok: false, reason: String(err).slice(0, 80) }));
+    return true;
+  }
+
   if (message.type === 'YT_STREAM_META') {
     runSerialized(async () => {
       const payload = message.payload || {};
@@ -757,9 +883,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || '').trim();
     const rows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
     if (!videoId || !rows.length) return false;
+    // Twitch の公式ランキングは期間がチャンネルごとに違う(累計・今月・今週・今日)。見出しに出すので一緒に置く
+    const period = ['ALLTIME', 'MONTH', 'WEEK', 'DAY'].includes(String(payload.period || '')) ? String(payload.period) : '';
+    // 0.1.1959: 中身が前回と同じなら書かない(TikTok・SHOWROOM は同じ表を決まった間隔で送ってくる。書くたびに横の欄が描き直していた)
+    const sig = ytLeaderboardSig(rows, period);
+    if (lastLeaderboardSig.get(videoId) === sig) return false;
+    lastLeaderboardSig.set(videoId, sig);
+    if (lastLeaderboardSig.size > 200) lastLeaderboardSig.delete(lastLeaderboardSig.keys().next().value);
     void chrome.storage.local
-      .set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows } })
-      .catch(() => {});
+      .set({ [`yt_leaderboard_${videoId}`]: { videoId, capturedAt: Date.now(), rows, ...(period ? { period } : {}) } })
+      .catch(() => lastLeaderboardSig.delete(videoId));
     return false;
   }
 
@@ -889,7 +1022,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         STORAGE_KEYS.STREAM_SUMMARIES,
         STORAGE_KEYS.ACTIVE_VIDEO_ID,
         STORAGE_KEYS.VOICE_SETTINGS,
-        STORAGE_KEYS.VOICE_ASSIGNMENTS,
+        ...(voiceAssignMem ? [] : [STORAGE_KEYS.VOICE_ASSIGNMENTS]),
         STORAGE_KEYS.VOICE_QUEUE,
         STORAGE_KEYS.VOICE_STATE,
       ]);
@@ -901,7 +1034,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ...DEFAULT_VOICE_SETTINGS,
         ...(data[STORAGE_KEYS.VOICE_SETTINGS] || {}),
       };
-      let assignments = data[STORAGE_KEYS.VOICE_ASSIGNMENTS] || {};
+      if (!voiceAssignMem) {
+        voiceAssignDiag.memMissReads++;
+        // storage から読んだ直後=storage と控えは同じ。service worker が作り直されても、その直後の束で
+        // すぐ書かないよう「いま書いた」扱いにする(作り直しが続くと書き込みが束ごとに戻るため・v0.1.1970)
+        if (!voiceAssignWrittenAt) voiceAssignWrittenAt = Date.now();
+      }
+      const assignmentsAtStart = voiceAssignMem || data[STORAGE_KEYS.VOICE_ASSIGNMENTS] || {};
+      let assignments = assignmentsAtStart;
       let voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
         ? data[STORAGE_KEYS.VOICE_QUEUE]
         : [];
@@ -999,10 +1139,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       const updates = {
         [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
-        [STORAGE_KEYS.VOICE_ASSIGNMENTS]: assignments,
         [STORAGE_KEYS.VOICE_QUEUE]: voiceQueue,
         [STORAGE_KEYS.VOICE_STATE]: voiceState,
       };
+      // 声の割り当ては控えを正にし、変わったときだけ最短30秒に1回書く(v0.1.1968)
+      voiceAssignMem = assignments;
+      if (assignments !== assignmentsAtStart) voiceAssignDirty = true;
+      const assignWrite = ytVoiceAssignPersistDecision({ dirty: voiceAssignDirty, lastWrittenAt: voiceAssignWrittenAt, now: Date.now() });
+      if (assignWrite === 'now') {
+        updates[STORAGE_KEYS.VOICE_ASSIGNMENTS] = assignments;
+        voiceAssignDirty = false;
+        voiceAssignDiag.now++;
+        if (voiceAssignWrittenAt) voiceAssignDiag.gaps = [...voiceAssignDiag.gaps.slice(-19), Date.now() - voiceAssignWrittenAt];
+        voiceAssignWrittenAt = Date.now();
+      } else if (assignWrite === 'later') {
+        voiceAssignDiag.later++;
+        scheduleVoiceAssignFlush();
+      }
       if (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID]) {
         updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
       }

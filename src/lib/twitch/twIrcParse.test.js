@@ -118,3 +118,18 @@ describe('twIrcParse', () => {
     expect(twSubTierLabel('prime')).toBe('Prime');
   });
 });
+
+describe('Twitch のポイント交換・連続視聴', () => {
+  it('本文つきのポイント交換と、メッセージを目立たせる交換', async () => {
+    const { parseTwChatLine } = await import('./twIrcParse.js');
+    const r = parseTwChatLine('@badges=;color=;custom-reward-id=abc-123;display-name=Fan;id=m1;room-id=9;tmi-sent-ts=1700000000000;user-id=42 :fan!fan@fan.tmi.twitch.tv PRIVMSG #chan :歌ってください');
+    expect(r).toMatchObject({ kind: 'tw_reward', text: 'ポイント交換: 歌ってください', channelId: 'tw:42' });
+    const h = parseTwChatLine('@badges=;color=;display-name=Fan;id=m2;msg-id=highlighted-message;room-id=9;tmi-sent-ts=1700000000000;user-id=42 :fan!fan@fan.tmi.twitch.tv PRIVMSG #chan :見て');
+    expect(h).toMatchObject({ kind: 'tw_reward', text: 'メッセージを目立たせる: 見て' });
+  });
+  it('連続視聴の記念(viewermilestone)', async () => {
+    const { parseTwChatLine } = await import('./twIrcParse.js');
+    const r = parseTwChatLine('@badges=;display-name=Fan;id=u1;login=fan;msg-id=viewermilestone;msg-param-category=watch-streak;msg-param-value=5;room-id=9;tmi-sent-ts=1700000000000;user-id=42 :tmi.twitch.tv USERNOTICE #chan :ただいま');
+    expect(r).toMatchObject({ kind: 'tw_milestone', amount: 5, text: '5回連続で見に来ました「ただいま」' });
+  });
+});

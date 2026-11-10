@@ -77,3 +77,69 @@ export function parseTwUsersIcons(json) {
   }
   return out;
 }
+
+// ---- 公式の応援ランキング(Bits・ギフトサブ)----
+//   twitch.tv のチャット欄の上に出る順位表。ページ自身は ChannelLeaderboards(登録済みの問い合わせ)で読む。
+//   ログインなし・公開の Client-Id だけで読める(2026-11-08 PC 実測・12チャンネルすべて 200)。
+//   期間はチャンネルごとに違う(累計・今月・今週・今日)ので、期間も一緒に返す。
+//   登録済みの問い合わせの番号(sha256)は Twitch の更新で変わりうるので、通らなければ手書きの問い合わせで読む。
+const TW_LEADERBOARDS_HASH = 'b6ac858ea030b53622847fcede494c33405175090ac139300c08c79d00dc239e';
+
+/** @param {string} channelId 数字の id */
+export function buildTwLeaderboardsQuery(channelId) {
+  const id = String(channelId || '');
+  if (!/^\d{1,20}$/.test(id)) return null;
+  return {
+    operationName: 'ChannelLeaderboards',
+    variables: { first: 10, channelID: id, rankContextSize: 2 },
+    extensions: { persistedQuery: { version: 1, sha256Hash: TW_LEADERBOARDS_HASH } },
+  };
+}
+
+/** 登録済みの問い合わせが通らないとき @param {string} login */
+export function buildTwLeaderboardsFallbackQuery(login) {
+  const l = String(login || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (!l) return null;
+  const items = 'items{edges{node{rank score user{login displayName}}}}';
+  return { query: `query{user(login:"${l}"){channel{leaderboardTimePeriod leaderboardSet(first:10){bits{${items}} subGift{${items}}}}}}` };
+}
+
+/** @typedef {'ALLTIME' | 'MONTH' | 'WEEK' | 'DAY'} TwBoardPeriod */
+const TW_PERIODS = new Set(['ALLTIME', 'MONTH', 'WEEK', 'DAY']);
+
+/**
+ * @param {any} edges
+ * @returns {Array<{ rank: number, name: string, login: string, xp: number, iconUrl: string }>}
+ */
+function twBoardRows(edges) {
+  /** @type {Array<{ rank: number, name: string, login: string, xp: number, iconUrl: string }>} */
+  const out = [];
+  if (!Array.isArray(edges)) return out;
+  for (const e of edges.slice(0, 50)) {
+    const n = e?.node;
+    const login = String(n?.user?.login || '').toLowerCase();
+    const score = Number(n?.score);
+    // 退会した人(user が null)・数の無い行は捨てる(1行のために全部を捨てない)
+    if (!/^[a-z0-9_]{1,25}$/.test(login) || !Number.isFinite(score) || score <= 0) continue;
+    out.push({ rank: out.length + 1, name: String(n.user.displayName || login), login, xp: Math.floor(score), iconUrl: '' });
+  }
+  return out;
+}
+
+/**
+ * ChannelLeaderboards の応答(配列で来ることもある)→ 期間と Bits・ギフトサブの順位。読めなければ null。
+ * @param {any} json
+ * @returns {null | { period: TwBoardPeriod, bits: ReturnType<typeof twBoardRows>, subGift: ReturnType<typeof twBoardRows> }}
+ */
+export function parseTwLeaderboards(json) {
+  const one = Array.isArray(json) ? json[0] : json;
+  const ch = one?.data?.user?.channel;
+  const set = ch?.leaderboardSet;
+  if (!ch || typeof ch !== 'object' || !set || typeof set !== 'object') return null;
+  const p = String(ch.leaderboardTimePeriod || '').toUpperCase();
+  return {
+    period: /** @type {TwBoardPeriod} */ (TW_PERIODS.has(p) ? p : 'ALLTIME'),
+    bits: twBoardRows(set.bits?.items?.edges),
+    subGift: twBoardRows(set.subGift?.items?.edges),
+  };
+}

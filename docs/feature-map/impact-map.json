@@ -322,6 +322,96 @@
       ]
     },
     {
+      "file": "src/lib/avatarComposeDiagLine.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarFaceStore.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarFaceWorkerClient.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarPartAnchors.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/avatarPartsComposer.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewRows.js",
       "featureCount": 5,
       "features": [
@@ -1548,48 +1638,6 @@
       ]
     },
     {
-      "file": "src/lib/avatarComposeDiagLine.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/avatarFaceStore.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/avatarFaceWorkerClient.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/avatarFallbackFromUrl.js",
       "featureCount": 3,
       "features": [
@@ -1601,34 +1649,6 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/avatarPartAnchors.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/avatarPartsComposer.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
       ]
     },
     {
@@ -1885,6 +1905,20 @@
     },
     {
       "file": "src/lib/laneMirror.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/laneProgressiveFill.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -4036,6 +4070,18 @@
       ]
     },
     {
+      "file": "src/lib/venueBubbleVoiceHold.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueCharacterFrame.js",
       "featureCount": 2,
       "features": [
@@ -5008,6 +5054,16 @@
       ]
     },
     {
+      "file": "src/lib/appliedEntriesMemo.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/audienceEngagementGap.js",
       "featureCount": 1,
       "features": [
@@ -5185,6 +5241,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/bigRecordYield.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -7158,7 +7224,27 @@
       ]
     },
     {
+      "file": "src/lib/laneAggregatesMemo.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneCountOrder.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneCrowdLimit.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -7238,6 +7324,16 @@
       ]
     },
     {
+      "file": "src/lib/laneMirrorPublishPace.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneMirrorWriteGate.js",
       "featureCount": 1,
       "features": [
@@ -7269,6 +7365,16 @@
     },
     {
       "file": "src/lib/laneRosterKeeper.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneSecondRenderPolicy.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -8638,6 +8744,16 @@
       ]
     },
     {
+      "file": "src/lib/profileCacheWritePace.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/profileResolveState.js",
       "featureCount": 1,
       "features": [
@@ -8775,6 +8891,26 @@
       ],
       "labels": [
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/refreshDutyGate.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/refreshStageClock.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -9098,6 +9234,16 @@
       ]
     },
     {
+      "file": "src/lib/shortLivedMemo.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/shouldRearmBackfillForOfficialGap.js",
       "featureCount": 1,
       "features": [
@@ -9359,6 +9505,16 @@
     },
     {
       "file": "src/lib/storyDetailRelatedEntries.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/storyDiagCountsPace.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -9748,6 +9904,16 @@
       ]
     },
     {
+      "file": "src/lib/userCommentProfileMerge.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/userEntryAvatarResolve.js",
       "featureCount": 1,
       "features": [
@@ -10075,6 +10241,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/youtube/ytGiftOnlyRow.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
       ]
     },
     {

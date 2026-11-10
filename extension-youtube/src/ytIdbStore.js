@@ -2,6 +2,7 @@
 /* global indexedDB, IDBKeyRange */
 
 import { prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
+import { readYtRowsInChunks } from '../../src/lib/youtube/ytChunkedRead.js';
 
 const DB_NAME = 'yt_kirameki_db';
 const DB_VERSION = 3;
@@ -222,15 +223,17 @@ export async function getYtStreamCommentsByVideoId(videoId) {
     const tx = db.transaction([STORE_COMMENTS], 'readonly');
     const store = tx.objectStore(STORE_COMMENTS);
     if (store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
-      const index = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
-      const range = IDBKeyRange.bound([vid, 0], [vid, Number.MAX_SAFE_INTEGER]);
-      const req = index.getAll(range);
-      req.onsuccess = () => {
-        resolve(Array.isArray(req.result) ? req.result : []);
-      };
-      req.onerror = () => {
-        reject(req.error || new Error('idb_get_failed'));
-      };
+      // ★v0.1.1977: 5,000行ずつ取り出して合間に手を放す(8万行を1回で取り出すと遅い PC で約48秒返事が無かった)。
+      //   読む行と順番は同じ(src/lib/youtube/ytChunkedRead.js)。区切りごとに別の transaction を開く。
+      readYtRowsInChunks({
+        readChunk: (lower, count) => new Promise((res, rej) => {
+          const req = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS)
+            .index(INDEX_BY_VIDEO_ID_RECORDED_AT)
+            .getAll(IDBKeyRange.bound([vid, lower], [vid, Number.MAX_SAFE_INTEGER]), count);
+          req.onsuccess = () => res(Array.isArray(req.result) ? req.result : []);
+          req.onerror = () => rej(req.error || new Error('idb_get_failed'));
+        })
+      }).then(resolve, reject);
       return;
     }
 
@@ -244,6 +247,27 @@ export async function getYtStreamCommentsByVideoId(videoId) {
     req.onerror = () => {
       reject(req.error || new Error('idb_get_failed'));
     };
+  });
+}
+
+/**
+ * その配信の記録の行数だけを数える(v0.1.1978)。行の中身は取り出さないので、8万行でもすぐ返る。
+ *   横の欄が開いた直後に「記録 N 件」を出すために使う(全件の読み出しを待たない)。
+ * @param {string} videoId
+ * @returns {Promise<number>}
+ */
+export async function countYtStreamComments(videoId) {
+  const vid = String(videoId || '').trim();
+  if (!vid) return 0;
+  const db = await openYtCommentsDb();
+  return new Promise((resolve, reject) => {
+    const store = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS);
+    // 全件読み(getYtStreamCommentsByVideoId)と同じ索引・同じ範囲で数える(数と中身がずれないように)
+    const req = store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)
+      ? store.index(INDEX_BY_VIDEO_ID_RECORDED_AT).count(IDBKeyRange.bound([vid, 0], [vid, Number.MAX_SAFE_INTEGER]))
+      : store.index(INDEX_BY_VIDEO_ID).count(IDBKeyRange.only(vid));
+    req.onsuccess = () => resolve(Number(req.result) || 0);
+    req.onerror = () => reject(req.error || new Error('idb_count_failed'));
   });
 }
 

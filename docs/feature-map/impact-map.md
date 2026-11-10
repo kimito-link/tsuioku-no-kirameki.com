@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・171 ファイル）
+## ⚠️ 影響大（3機能以上に波及・172 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -24,6 +24,11 @@
 - `src/lib/parseGiftComment.js` → **6 機能**: バックフィル SW / コメビュ(別窓) / 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/storageRefreshTriggerKey.js` → **6 機能**: バックフィル SW / コメビュ(別窓) / コメント IDB 書き手 / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/domain/user/identity.js` → **5 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/avatarComposeDiagLine.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/avatarFaceStore.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/avatarFaceWorkerClient.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/avatarPartAnchors.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/avatarPartsComposer.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/comeviewRows.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/extDocBusyCensusBoot.js` → **5 機能**: コメビュ(別窓) / コメント IDB 書き手 / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/giftDisplayNickname.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -100,12 +105,7 @@
 - `src/extension/story/renderStoryUserLaneDom.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/extension/voiceStreamAudio.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/extension/voiceTestHook.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
-- `src/lib/avatarComposeDiagLine.js` → **3 機能**: コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ
-- `src/lib/avatarFaceStore.js` → **3 機能**: コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ
-- `src/lib/avatarFaceWorkerClient.js` → **3 機能**: コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/avatarFallbackFromUrl.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
-- `src/lib/avatarPartAnchors.js` → **3 機能**: コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ
-- `src/lib/avatarPartsComposer.js` → **3 機能**: コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/avatarUrlCompare.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/backfillRinkuNarration.js` → **3 機能**: ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ)
 - `src/lib/broadcastContext.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
@@ -125,6 +125,7 @@
 - `src/lib/instantPushDiagKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/kokenContributionRankingApi.js` → **3 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン)
 - `src/lib/laneMirror.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/laneProgressiveFill.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/laneSceneEnvelope.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/laneTileStats.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/laneWindowVerdict.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
@@ -200,6 +201,11 @@
 | `src/lib/parseGiftComment.js` | 6 | バックフィル SW / コメビュ(別窓) / 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/storageRefreshTriggerKey.js` | 6 | バックフィル SW / コメビュ(別窓) / コメント IDB 書き手 / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/domain/user/identity.js` | 5 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/avatarComposeDiagLine.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/avatarFaceStore.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/avatarFaceWorkerClient.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/avatarPartAnchors.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/avatarPartsComposer.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/comeviewRows.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/extDocBusyCensusBoot.js` | 5 | コメビュ(別窓) / コメント IDB 書き手 / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/giftDisplayNickname.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -276,12 +282,7 @@
 | `src/extension/story/renderStoryUserLaneDom.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/extension/voiceStreamAudio.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/extension/voiceTestHook.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
-| `src/lib/avatarComposeDiagLine.js` | 3 | コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ |
-| `src/lib/avatarFaceStore.js` | 3 | コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ |
-| `src/lib/avatarFaceWorkerClient.js` | 3 | コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/avatarFallbackFromUrl.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
-| `src/lib/avatarPartAnchors.js` | 3 | コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ |
-| `src/lib/avatarPartsComposer.js` | 3 | コメビュ(別窓) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/avatarUrlCompare.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/backfillRinkuNarration.js` | 3 | ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ) |
 | `src/lib/broadcastContext.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -301,6 +302,7 @@
 | `src/lib/instantPushDiagKey.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/kokenContributionRankingApi.js` | 3 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/laneMirror.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/laneProgressiveFill.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/laneSceneEnvelope.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/laneTileStats.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/laneWindowVerdict.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
@@ -470,6 +472,7 @@
 | `src/lib/venueBubbleBurst.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueBubbleChurn.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueBubbleLifecycle.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueBubbleVoiceHold.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueCharacterFrame.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueComposeBox.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueCrowdMotion.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -559,6 +562,7 @@
 | `src/lib/aiShareFastDiagKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareFullText.js` | 1 | 状態速報ページ |
 | `src/lib/aiShareTextChanged.js` | 1 | 状態速報ページ |
+| `src/lib/appliedEntriesMemo.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/audienceEngagementGap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/autoBackupState.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/autoPublishDecision.js` | 1 | 状態速報ページ |
@@ -577,6 +581,7 @@
 | `src/lib/bandScale.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/bandScaleBoot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/besideOverflowGuard.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/bigRecordYield.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/blackScreenOwnerCells.js` | 1 | 状態速報ページ |
 | `src/lib/blobDownload.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/bootTimeline.js` | 1 | ポップアップ(応援レーン) |
@@ -774,7 +779,9 @@
 | `src/lib/kickLivestreams.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/kiramekiAwards.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneAggregatesMemo.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneCountOrder.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneCrowdLimit.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/laneDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDomSelfMeasure.js` | 1 | ポップアップ(応援レーン) |
@@ -782,10 +789,12 @@
 | `src/lib/laneImportShadow.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneLinkTier.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneMirrorPerLivePublish.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneMirrorPublishPace.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneMirrorWriteGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneMirrorWriterYield.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/lanePublishSkipDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneRosterKeeper.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneSecondRenderPolicy.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneSupplyOriginDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneTickProbe.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneTileOscillation.js` | 1 | ポップアップ(応援レーン) |
@@ -922,6 +931,7 @@
 | `src/lib/privacyDisplay.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/probeRecommendedLiveSection.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/probeWatchPageDomStructure.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/profileCacheWritePace.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/profileResolveState.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/provisionalLaneCommentRows.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/pruneLiveViewPublishBlob.js` | 1 | 状態速報ページ |
@@ -936,6 +946,8 @@
 | `src/lib/recordRate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/refreshCoalescer.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/refreshCycleDeadline.js` | 1 | 状態速報ページ |
+| `src/lib/refreshDutyGate.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/refreshStageClock.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/refreshTaskGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/rememberedAvatarIndex.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportCommentsCsv.js` | 1 | ポップアップ(応援レーン) |
@@ -968,6 +980,7 @@
 | `src/lib/sessionSummaryCompareTableHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/sessionSummaryMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/shareKeysFile.js` | 1 | 状態速報ページ |
+| `src/lib/shortLivedMemo.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/shouldRearmBackfillForOfficialGap.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldSkipDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldTriggerOfficialGapDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -995,6 +1008,7 @@
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentEntriesNormalize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyDiagCountsPace.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDiagMonotonic.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthAppendPlan.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthCellSwap.js` | 1 | ポップアップ(応援レーン) |
@@ -1033,6 +1047,7 @@
 | `src/lib/topSupportRankStripStableKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/trimMap.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/unknownVsAbsent.js` | 1 | 状態速報ページ |
+| `src/lib/userCommentProfileMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/userEntryAvatarResolve.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/userLaneDiagSnapshot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/userLaneMergeGiftThrowers.js` | 1 | ポップアップ(応援レーン) |
@@ -1066,4 +1081,5 @@
 | `src/lib/watchUrlFreshness.js` | 1 | 状態速報ページ |
 | `src/lib/xIntentUrl.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/yieldToBrowserPaint.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/youtube/ytGiftOnlyRow.js` | 1 | コメビュ(別窓) |
 | `src/server/nicoliveGuest.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |

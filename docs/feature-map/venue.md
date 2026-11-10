@@ -32,7 +32,12 @@ graph LR
   n_venue --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_venue --> n_src_lib_arrivalEffect_js["lib/arrivalEffect.js"]:::shared
   n_venue --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
+  n_venue --> n_src_lib_avatarComposeDiagLine_js["lib/avatarComposeDiagLine.js"]:::shared
+  n_venue --> n_src_lib_avatarFaceStore_js["lib/avatarFaceStore.js"]:::shared
+  n_venue --> n_src_lib_avatarFaceWorkerClient_js["lib/avatarFaceWorkerClient.js"]:::shared
   n_venue --> n_src_lib_avatarFallbackFromUrl_js["lib/avatarFallbackFromUrl.js"]:::shared
+  n_venue --> n_src_lib_avatarPartAnchors_js["lib/avatarPartAnchors.js"]:::shared
+  n_venue --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_venue --> n_src_lib_avatarUrlCompare_js["lib/avatarUrlCompare.js"]:::shared
   n_venue --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_venue --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
@@ -48,12 +53,7 @@ graph LR
   n_venue --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_venue --> n_src_lib_commentChunkStore_js["lib/commentChunkStore.js"]:::shared
   n_venue --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
-  n_venue --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
-  n_venue --> n_src_lib_commentTailBuffer_js["lib/commentTailBuffer.js"]:::shared
-  n_venue --> n_src_lib_commentTickerNameLink_js["lib/commentTickerNameLink.js"]:::shared
-  n_venue --> n_src_lib_concurrentEstimate_js["lib/concurrentEstimate.js"]:::shared
-  n_venue --> n_src_lib_crowdRasterizer_js["lib/crowdRasterizer.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 163 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 170 ファイル省略（全件は storage-bus.md / metafile 参照）。

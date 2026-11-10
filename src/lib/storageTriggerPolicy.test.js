@@ -135,3 +135,15 @@ describe('v0.1.1607: 最後に視聴した URL の書き合い(複数タブ)', (
     expect(body).toMatch(/document\.visibilityState === 'visible'\) rememberWatchPageUrl\(true\)/);
   });
 });
+
+describe('v0.1.1952: YouTube 系の記録係の書き込みはニコ生版の nls_cdb_summary_ と同じ間引き側', () => {
+  it('yt_stream_summaries・yt_voice_*・yt_active_video_id は間引き側', () => {
+    for (const k of ['yt_stream_summaries', 'yt_voice_state', 'yt_voice_assignments', 'yt_voice_queue', 'yt_active_video_id']) {
+      expect(isThrottledExtraStorageKey(k), k).toBe(true);
+    }
+  });
+  it('設定のキーは即時側のまま', () => {
+    expect(isThrottledExtraStorageKey('yt_voice_settings')).toBe(false);
+    expect(isThrottledExtraStorageKey('yt_stream_summaries_x')).toBe(false);
+  });
+});

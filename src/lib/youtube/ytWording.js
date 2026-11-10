@@ -30,6 +30,15 @@ const SUPERCHAT_RANK_RULES = [
 ];
 
 const RULES = [
+  // ランキング欄の補足(title・aria-label)。どのサービスでも「ニコ生側」の一覧ではない(2026-11-08 Kick 実測で残りを発見)
+  ['パーセントではありません。ニコ生側の一覧がDOMに出るまでの待機表示です。', 'パーセントではありません。一覧が出るまでの待機表示です。'],
+  ['ニコ生プレイヤー表示の番組ギフト累計pt。', '配信全体のギフト累計pt。'],
+  ['ニコ生 ランキング', 'ランキング'],
+  // 折りたたみの中の説明(2026-11-08 Twitch 実測で残りを発見)。なふだはニコ生だけの部品(隠している)
+  ['ニコ生のページが読み取る通信から', '配信のページが読み取る通信から'],
+  ['ニコの匿名ID（a: 形式）はここには載せず、りんく条件を満たすときだけりんく、それ以外はたぬ姉側だよ。', ''],
+  ['詳細設定（記録のON/OFF・なふだ・取り込み・', '詳細設定（記録のON/OFF・取り込み・'],
+  ['「詳細設定（なふだ・取り込み・', '「詳細設定（取り込み・'],
   ['ニコ生の応援コメントを、このPCで見える化', 'YouTube の応援コメントを、このPCで見える化'],
   ['ニコニコ生放送 トップ', 'YouTube トップ'],
   ['ニコ生の視聴ページの右下に', 'YouTube の視聴ページの右下に'],
@@ -59,7 +68,7 @@ const RULES = [
 ];
 
 /** 置き換えが起こりうる文字か(速く素通しするため) */
-const QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした/;
+const QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした|なふだ/;
 
 /**
  * @param {string} text
@@ -118,43 +127,152 @@ function swapOnce(text, fromRules, toRules) {
   return text.replace(re, (m) => map.get(m) ?? m);
 }
 
-// Twitch には YouTube のトップファン(XP の順位表)も公式の応援ランキングも無い。「ギフト貢献度」の欄には
-//   この PC の記録から数えた Bits・ギフトサブの合計の順位が入る。YouTube 版の言葉のどの段階の文でも
-//   (トップファンの言葉で描いたあとスパチャの合計順へ入れ替えた途中の文も)ここで Twitch の言葉にそろえる。
-//   どれも決まった長い文言なので、コメント本文に当たることはない(2026-11-07 実配信の計器で残りを発見)。
-const TW_RANK_SENTENCE = 'Bits・ギフトサブの合計の順位（上位）を表示します。Twitch には公式の応援ランキングが無いため、このPCの記録から数えます。';
-const TW_RANK_HEADING = 'Bits・ギフトサブの合計の順位';
-const TW_RANK_WORD = 'Bits の合計順';
-const TWITCH_FIXED_RULES = /** @type {Array<[string|RegExp, string]>} */ ([
-  [/(?:YouTube|Twitch) のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。/g, TW_RANK_SENTENCE],
-  [/(?:YouTube|Twitch) の(?:スパチャ|Bits)の合計順（チャットでの応援の XP の順位・上位）を表示します。チャット欄の(?:トップファン|スパチャの合計順|Bitsの合計順)の画面から読み取ります。/g, TW_RANK_SENTENCE],
-  [/(?:スーパーチャット|Bits)・ギフトの合計の順位（上位）を表示します。(?:トップファン|スパチャの合計順|Bitsの合計順)の順位が出ていない配信（アーカイブなど）で使います。/g, TW_RANK_SENTENCE],
-  [/(?:YouTube|Twitch) 公式のトップファン（XP の順位）/g, TW_RANK_HEADING],
-  [/(?:スーパーチャット|Bits)・ギフトの合計の順位/g, TW_RANK_HEADING],
-  [/スパチャの合計順|Bitsの合計順/g, TW_RANK_WORD],
-]);
+// Twitch・Kick には YouTube のトップファン(XP の順位表)が無い。「ギフト貢献度」の欄には
+//   この PC の記録から数えた Bits/Kicks・ギフトサブの合計の順位が入る。YouTube 版の言葉のどの段階の文でも
+//   (トップファンの言葉で描いたあとスパチャの合計順へ入れ替えた途中の文も)ここでそのサービスの言葉にそろえる。
+//   どれも決まった長い文言なので、コメント本文に当たることはない(2026-11-07 Twitch 実配信の計器で残りを発見)。
+
+/** @param {string} s */
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * Twitch の画面に残る、ランキング欄の決まった文言を Twitch の言葉にする(どの文字に掛けてもよい)。
- * @param {string} text
+ * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean, boardUnit?: string }} WordingPlatform
+ *   name: 'Twitch' / 'Kick'、paid: 'Bits' / 'Kicks'(src/lib/platform/streamPlatform.js の表)
+ *   officialBoard: そのサービスの画面での公式ランキングの名前(例: Kick の「歴代トップKICKユーザー」)
+ *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・無ければ累計)。Twitch はチャンネルごとに違う
+ *   boardUnit: 公式ランキングの数の単位(無ければ paid。SHOWROOM・ミクチャは paid が「ギフト」なので「6,430 ギフト」にならないよう pt)
  */
-export function ytWordingTwitchFixed(text) {
+
+/** @type {Map<string, Array<[RegExp, string]>>} */
+const fixedRulesCache = new Map();
+/** @param {WordingPlatform} p */
+function fixedRules(p) {
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.noSubs ? 1 : 0}`;
+  const hit = fixedRulesCache.get(k);
+  if (hit) return hit;
+  const svc = `(?:YouTube|${esc(p.name)})`;
+  const paid = `(?:スパチャ|${esc(p.paid)})`;
+  // ふわっちにはサブスクが無いので「ギフトサブ」を書かない
+  const heading = p.noSubs ? `${p.paid}の合計の順位` : `${p.paid}・ギフトサブの合計の順位`;
+  const word = `${p.paid} の合計順`;
+  const off = officialWords(p);
+  /** @type {Array<[RegExp, string]>} */
+  const rules = [
+    // 公式ランキングの言葉で描いたあと、公式の順位表が無いと分かった(配信が変わった等)→ 記録から数えた言葉へ
+    [new RegExp(esc(off.sentence), 'g'), p.rankSentence],
+    [new RegExp(esc(off.heading), 'g'), heading],
+    [new RegExp(esc(off.word), 'g'), word],
+    [new RegExp(`${svc} のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。`, 'g'), p.rankSentence],
+    [new RegExp(`${svc} の${paid}の合計順（チャットでの応援の XP の順位・上位）を表示します。チャット欄の(?:トップファン|${paid}の合計順)の画面から読み取ります。`, 'g'), p.rankSentence],
+    [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフトの合計の順位（上位）を表示します。(?:トップファン|${paid}の合計順)の順位が出ていない配信（アーカイブなど）で使います。`, 'g'), p.rankSentence],
+    [new RegExp(`${svc} 公式のトップファン（XP の順位）`, 'g'), heading],
+    [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフトの合計の順位`, 'g'), heading],
+    [new RegExp(`${paid}の合計順`, 'g'), word],
+  ];
+  fixedRulesCache.set(k, rules);
+  return rules;
+}
+
+/** 公式ランキングの期間の言葉 [文の中・見出し] */
+const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
+  ALLTIME: ['これまでの累計', '累計'],
+  MONTH: ['今月', '今月'],
+  WEEK: ['今週', '今週'],
+  DAY: ['今日', '今日'],
+});
+
+/**
+ * そのサービスの公式ランキング(Kick の Kicks ランキング・Twitch の Bits ランキング)を「ギフト貢献度」の欄に入れているときの言葉。
+ * @param {WordingPlatform} p
+ */
+export function officialWords(p) {
+  const [inSentence, inHeading] = BOARD_PERIOD_WORDS[String(p.boardPeriod || 'ALLTIME')] || BOARD_PERIOD_WORDS.ALLTIME;
+  return {
+    // Kick のチャット欄のランキングは6つあり、最初に見えるのは週間のサブ。どれと同じかを名前で書く(2026-11-08 PC 実測)
+    sentence: `${p.name} 公式の ${p.paid} ランキング（${inSentence}・上位）を表示します。${p.name} のチャット欄のランキング${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
+    heading: `${p.name} 公式の ${p.paid} ランキング（${inHeading}）`,
+    word: `${p.paid} ランキング`,
+  };
+}
+
+/** @type {Map<string, Array<[RegExp, string]>>} */
+const officialRulesCache = new Map();
+/** @param {WordingPlatform} p */
+function officialRules(p) {
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.boardUnit || ''}`;
+  const hit = officialRulesCache.get(k);
+  if (hit) return hit;
+  const off = officialWords(p);
+  const svc = `(?:YouTube|${esc(p.name)})`;
+  const paid = `(?:スパチャ|${esc(p.paid)})`;
+  /** @type {Array<[RegExp, string]>} 長い文 → 見出し → 語 の順(文の中の語を先に変えて文を壊さない) */
+  const rules = [
+    [new RegExp(esc(p.rankSentence), 'g'), off.sentence],
+    [new RegExp(`${svc} のトップファン（チャットでの応援の XP の順位・上位）を表示します。チャット欄のトップファンの画面から読み取ります。`, 'g'), off.sentence],
+    [new RegExp(`${svc} の${paid}の合計順（チャットでの応援の XP の順位・上位）を表示します。チャット欄の(?:トップファン|${paid}の合計順)の画面から読み取ります。`, 'g'), off.sentence],
+    [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフト(?:サブ)?の合計の順位（上位）を表示します。(?:トップファン|${paid}の合計順)の順位が出ていない配信（アーカイブなど）で使います。`, 'g'), off.sentence],
+    [new RegExp(`${svc} 公式のトップファン（XP の順位）`, 'g'), off.heading],
+    [new RegExp(`(?:スーパーチャット|${esc(p.paid)})・ギフト(?:サブ)?の合計の順位`, 'g'), off.heading],
+    [new RegExp(`トップファン|${paid}の合計順|${esc(p.paid)} の合計順`, 'g'), off.word],
+    // 公式の数は大きい(550,000 Kicks など)ので3桁ごとに区切る
+    [/(\d[\d,]*) XP\b/g, /** @type {any} */ ((/** @type {string} */ _m, /** @type {string} */ n) => `${Number(n.replace(/,/g, '')).toLocaleString('ja-JP')} ${p.boardUnit || p.paid}`)],
+  ];
+  officialRulesCache.set(k, rules);
+  return rules;
+}
+
+/**
+ * 公式ランキングを出しているときの言葉に直す(どの段階の言葉で描いた文字に掛けてもよい・コメント本文に当たらない決まった文だけ)。
+ * @param {string} text
+ * @param {WordingPlatform} p
+ */
+export function ytWordingPlatformOfficial(text, p) {
   let out = String(text ?? '');
-  if (!/トップファン|スパチャ|スーパーチャット|Bits/.test(out)) return out;
-  for (const [from, to] of TWITCH_FIXED_RULES) out = out.replace(/** @type {RegExp} */ (from), to);
+  if (!/トップファン|スパチャ|スーパーチャット|XP/.test(out) && !out.includes(p.paid)) return out;
+  for (const [from, to] of officialRules(p)) out = out.replace(from, /** @type {any} */ (to));
   return out;
 }
 
 /**
- * Twitch の配信を同じ画面で見せるとき(council/twitch-support-PLAN.md)、ytWording が YouTube の言葉にした所だけを
- *   Twitch の言葉にする。ytWording が何も変えなかった文字(コメント本文など)には使わないこと。
- * @param {string} text ytWording の結果
+ * Twitch/Kick の画面に残る、ランキング欄の決まった文言をそのサービスの言葉にする(どの文字に掛けてもよい)。
+ * @param {string} text
+ * @param {WordingPlatform} p
  */
-export function ytWordingForTwitch(text) {
-  return ytWordingTwitchFixed(String(text ?? ''))
-    .split('スーパーチャット').join('Bits')
-    .split('スパチャ').join('Bits')
-    .split('トップファン').join(TW_RANK_WORD)
+export function ytWordingPlatformFixed(text, p) {
+  let out = String(text ?? '');
+  if (!/トップファン|スパチャ|スーパーチャット/.test(out) && !out.includes(p.paid)) return out;
+  for (const [from, to] of fixedRules(p)) out = out.replace(from, to);
+  return out;
+}
+
+/**
+ * Twitch/Kick の配信を同じ画面で見せるとき、ytWording が YouTube の言葉にした所だけをそのサービスの言葉にする。
+ *   ytWording が何も変えなかった文字(コメント本文など)には使わないこと。
+ * @param {string} text ytWording の結果
+ * @param {WordingPlatform} p
+ */
+export function ytWordingForPlatform(text, p) {
+  return ytWordingPlatformFixed(String(text ?? ''), p)
+    .split('スーパーチャット').join(p.paid)
+    .split('スパチャ').join(p.paid)
+    .split('トップファン').join(`${p.paid} の合計順`)
     .replace(/(\d[\d,]*) XP\b/g, '$1 pt')
-    .split('YouTube').join('Twitch');
+    .split('YouTube').join(p.name);
+}
+
+/** Twitch の言葉(ytWording.test.js・既存の呼び出しのため) */
+const TWITCH_WORDING = {
+  name: 'Twitch',
+  paid: 'Bits',
+  rankSentence: 'Bits・ギフトサブの合計の順位（上位）を表示します。Twitch 公式のランキングが読めないため、このPCの記録から数えます。',
+};
+
+/** @param {string} text */
+export function ytWordingTwitchFixed(text) {
+  return ytWordingPlatformFixed(text, TWITCH_WORDING);
+}
+
+/** @param {string} text ytWording の結果 */
+export function ytWordingForTwitch(text) {
+  return ytWordingForPlatform(text, TWITCH_WORDING);
 }

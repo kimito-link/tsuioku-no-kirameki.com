@@ -12,7 +12,7 @@
 import { createSidepanelIframeLoader, IFRAME_START_MAX_WAIT_MS } from '../lib/sidepanelIframeLoader.js';
 import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
 import { SIDE_PANEL_WATCH_TAB_QUERY, lvFromWatchUrl, pickPanelLv } from '../lib/sidePanelLvFromTabs.js';
-import { YT_PANEL_SRC, isYtPanelSrc, isYtPanelTabUrl } from '../lib/youtube/ytPanelRoute.js';
+import { isYtPanelSrc, isYtPanelTabUrl, ytPanelStreamKeyOfUrl, buildYtPanelSrc, readYtPanelStreamKey } from '../lib/youtube/ytPanelRoute.js';
 
 /** 親の最初の描画(first-paint)が出るか、上限の時間が来たら解決する関門。タイマーで見る(rAF は隠れた文書で止まるので使わない)。 */
 function firstPaintOrTimeout() {
@@ -61,7 +61,9 @@ try {
           chrome.tabs.query({ active: true, currentWindow: true }).catch(() => /** @type {chrome.tabs.Tab[]} */ ([]))
         ]);
         // 2026-11-05 同梱した YouTube 版: YouTube のタブで開いたら中身は YouTube 版(ytPanelRoute.js)
-        if (isYtPanelTabUrl(activeTabs && activeTabs[0] && activeTabs[0].url)) return YT_PANEL_SRC;
+        //   0.1.1949: どの配信かを src に焼く(&stream=)。配信ページでなければ配信なしの YouTube 版
+        const activeUrl = activeTabs && activeTabs[0] && activeTabs[0].url;
+        if (isYtPanelTabUrl(activeUrl)) return buildYtPanelSrc(ytPanelStreamKeyOfUrl(activeUrl));
         const picked = pickPanelLv({ activeUrl: activeTabs && activeTabs[0] && activeTabs[0].url, currentLv: shownLv(), watchTabs });
         return picked.lv ? buildSidePanelIframeSrc(base, `?lv=${picked.lv}`) : '';
       },
@@ -81,7 +83,11 @@ try {
           if (!tab || !tab.active) return;
           if (ownWindowId != null && tab.windowId !== ownWindowId) return; // このパネルが居るウィンドウのタブだけ
           if (isYtPanelTabUrl(tab.url)) {
-            if (!isYtPanelSrc(ifr.getAttribute('src'))) loader.update(YT_PANEL_SRC); // YouTube のタブへ移ったら YouTube 版に
+            // YouTube 系のタブへ移ったら YouTube 版に。0.1.1949: YouTube 系どうしでも【別の配信】になったら読み込み直す
+            //   (ニコ生版の lv と同じ。配信ページでない=トップ等では今の配信を保つ)
+            const k = ytPanelStreamKeyOfUrl(tab.url);
+            const cur = ifr.getAttribute('src');
+            if (!isYtPanelSrc(cur) || (k && k !== readYtPanelStreamKey(cur))) loader.update(buildYtPanelSrc(k));
             return;
           }
           const lv = lvFromWatchUrl(tab.url);

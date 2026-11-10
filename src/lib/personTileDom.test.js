@@ -209,3 +209,58 @@ describe('buildPersonTileEl: 合成済みの顔があるなら、最初から顔
     expect(cell.querySelector('img').getAttribute('src')).toBe(SVG);
   });
 });
+
+describe('buildPersonTileEl: 遠いマスの画像は近くに来てから読む(v0.1.2010・deferFarImages)', () => {
+  const FALLBACK = 'data:image/svg+xml;utf8,<svg/>';
+  /** @param {(img: any) => Promise<boolean>} whenNearViewport */
+  const ioFar = (whenNearViewport, over = {}) => makeIo({
+    storyAvatarLoadGuard: { pickDisplaySrc: () => FALLBACK, noteRemoteAttempt: vi.fn() },
+    deferFarImages: true,
+    whenNearViewport,
+    ...over
+  });
+
+  it('★指定が無ければ今までどおり(lazy を付けない・確かめはすぐ始める)', () => {
+    const io = makeIo({ storyAvatarLoadGuard: { pickDisplaySrc: () => FALLBACK, noteRemoteAttempt: vi.fn() } });
+    const cell = buildPersonTileEl(makeItem(), io);
+    const img = cell.querySelector('img');
+    expect(img.getAttribute('loading')).toBe(null);
+    expect(io.storyAvatarLoadGuard.noteRemoteAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('★指定があれば loading=lazy が付き、本物の顔の確かめは近くに来るまで始めない', async () => {
+    /** @type {(v: boolean) => void} */ let resolveNear = () => {};
+    const io = ioFar(() => new Promise((r) => { resolveNear = r; }));
+    const cell = buildPersonTileEl(makeItem(), io);
+    document.body.appendChild(cell);
+    const img = cell.querySelector('img');
+    expect(img.getAttribute('loading')).toBe('lazy');
+    expect(img.getAttribute('src')).toBe(FALLBACK);
+    expect(io.storyAvatarLoadGuard.noteRemoteAttempt).not.toHaveBeenCalled();
+    resolveNear(true);
+    await Promise.resolve(); await Promise.resolve();
+    expect(io.storyAvatarLoadGuard.noteRemoteAttempt).toHaveBeenCalledTimes(1);
+    expect(io.storyAvatarLoadGuard.noteRemoteAttempt).toHaveBeenCalledWith(img, 'https://example.test/a.png');
+    cell.remove();
+  });
+
+  it('★近くに来る前に外されたマス(near=false)は確かめを始めない', async () => {
+    const io = ioFar(() => Promise.resolve(false));
+    buildPersonTileEl(makeItem(), io);
+    await Promise.resolve(); await Promise.resolve();
+    expect(io.storyAvatarLoadGuard.noteRemoteAttempt).not.toHaveBeenCalled();
+  });
+
+  it('★もう読めると分かっている顔(表示 src が要求どおり)は待たせない', () => {
+    const io = ioFar(() => new Promise(() => {}), { storyAvatarLoadGuard: { pickDisplaySrc: (s) => s, noteRemoteAttempt: vi.fn() } });
+    buildPersonTileEl(makeItem(), io);
+    expect(io.storyAvatarLoadGuard.noteRemoteAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('★whenNearViewport が無ければ deferFarImages だけでは何も変えない', () => {
+    const io = makeIo({ storyAvatarLoadGuard: { pickDisplaySrc: () => FALLBACK, noteRemoteAttempt: vi.fn() }, deferFarImages: true });
+    const cell = buildPersonTileEl(makeItem(), io);
+    expect(cell.querySelector('img').getAttribute('loading')).toBe(null);
+    expect(io.storyAvatarLoadGuard.noteRemoteAttempt).toHaveBeenCalledTimes(1);
+  });
+});

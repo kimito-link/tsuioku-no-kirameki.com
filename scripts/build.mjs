@@ -12,6 +12,7 @@ import {
   judgeBuildInputsHealthy
 } from '../src/lib/distFingerprint.js';
 import { ytBuildTargets, writeYtMergedHtml } from './youtube-build.mjs';
+import { stampSwScript } from '../src/lib/swScriptStamp.js';
 
 // .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 //   ★これが無いと `npm run build` が空キービルドになり、status の「WEBサイトURLで共有」ボタンが
@@ -299,6 +300,15 @@ const sidecarNext =
 // ★「変わらなければ書かない」(生成物の掟)。buildId は入れていないので同じ入力なら同じ文字列になる。
 if (!existsSync(sidecarPath) || readFileSync(sidecarPath, 'utf8') !== sidecarNext) {
   writeFileSync(sidecarPath, sidecarNext);
+}
+
+// ★v0.1.1971: service worker 本体に指紋を刻む。本体が同じバイトのままだと Chrome が importScripts の古い中身
+//   (dist/yt-background.js など)を使い回し、裏方の修正が届かなかった(PC 実測)。src/lib/swScriptStamp.js
+{
+  const swPath = resolve(ROOT, 'extension/background.js');
+  const swText = readFileSync(swPath, 'utf8');
+  const swNext = stampSwScript(swText, fingerprint.slice(0, 12));
+  if (swNext !== swText) writeFileSync(swPath, swNext);
 }
 
 console.log(

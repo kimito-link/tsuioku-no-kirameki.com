@@ -17,14 +17,15 @@ export const YT_COMMENT_SEND_REASON_JA = Object.freeze({
 /**
  * @param {string} reason
  * @param {string} [note] YouTube 側の案内文(chat-restricted のときに添える)
- * @param {string} [platform] 'twitch' なら文言のサービス名を Twitch にする
+ * @param {string} [platform] 'twitch' / 'kick' / 'whowatch' なら文言のサービス名をそのサービスにする
  * @returns {string} 知らない理由なら ''
  */
 export function ytCommentSendReasonText(reason, note, platform) {
   const base0 = /** @type {Record<string,string>} */ (YT_COMMENT_SEND_REASON_JA)[String(reason || '')] || '';
-  // Twitch の配信(council/twitch-support-PLAN.md)は同じ理由コードで、サービス名だけ Twitch にする
-  const base = platform === 'twitch' ? base0.replace(/YouTube/g, 'Twitch') : base0;
+  // Twitch/Kick の配信(council/twitch-support-PLAN.md・kick-support-PLAN.md)は同じ理由コードで、サービス名だけ変える
+  const svc = platform === 'twitch' ? 'Twitch' : platform === 'kick' ? 'Kick' : platform === 'whowatch' ? 'ふわっち' : platform === 'showroom' ? 'SHOWROOM' : platform === 'mixch' ? 'ミクチャ' : platform === 'tiktok' ? 'TikTok' : 'YouTube';
+  const base = svc !== 'YouTube' ? base0.replace(/YouTube/g, svc) : base0;
   const n = String(note || '').trim();
-  if (base && n && reason === 'chat-restricted') return `${base}${platform === 'twitch' ? 'Twitch' : 'YouTube'} の案内:「${n}」`;
+  if (base && n && reason === 'chat-restricted') return `${base}${svc} の案内:「${n}」`;
   return base;
 }

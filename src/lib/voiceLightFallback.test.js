@@ -176,3 +176,72 @@ describe('軽い声が鳴らない PC', () => {
     expect(p._useLightVoice()).toBe(false);
   });
 });
+
+describe('2026-11-09 Chrome に止められた PC の声(not-allowed)', () => {
+  function blockedSynth() {
+    const s = { getVoices: () => VOICES, addEventListener: vi.fn(), cancel: vi.fn(), blocked: true, spoken: /** @type {any[]} */ ([]),
+      speak(/** @type {any} */ u) {
+        if (s.blocked) setTimeout(() => u.onerror?.({ error: 'not-allowed' }), 0);
+        else { s.spoken.push(u); setTimeout(() => { u.onstart?.(); u.onend?.(); }, 0); }
+      } };
+    return s;
+  }
+  const target = new EventTarget();
+  function makePlayer(synth, onLagNotice) {
+    return new VoicePlayer({
+      storage: { get: vi.fn().mockResolvedValue({}), set: vi.fn().mockResolvedValue() },
+      isObsMode: () => false,
+      audioConstructor: function () { return { play: vi.fn(), pause: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }; },
+      createObjectURL: vi.fn(), revokeObjectURL: vi.fn(),
+      fetchVoicevoxAlive: vi.fn().mockResolvedValue(true),
+      fetchVoiceStyleIds: vi.fn().mockResolvedValue([1]),
+      fetchSynthesizeVoice: vi.fn(() => new Promise(() => {})),
+      resolveVoice: vi.fn().mockReturnValue({ speaker: 1, speedOffset: 0 }),
+      lightSpeaker: createLightSpeaker({ synth, Utterance: FakeUtterance }),
+      onLagNotice,
+      activationTarget: target
+    });
+  }
+
+  it('失敗の理由を残す(cancel/interrupted は理由にしない)', async () => {
+    const synth = blockedSynth();
+    const sp = createLightSpeaker({ synth, Utterance: FakeUtterance });
+    expect(await sp.speak('あ', { voiceIndex: 0, pitch: 1, rate: 1 })).toBe(false);
+    expect(sp.lastError()).toBe('not-allowed');
+    synth.speak = (u) => setTimeout(() => u.onerror?.({ error: 'interrupted' }), 0);
+    await sp.speak('い', { voiceIndex: 0, pitch: 1, rate: 1 });
+    expect(sp.lastError()).toBe('');
+  });
+
+  it('止められたら「配信ページを1回クリック」を出し、クリック後に鳴れば消す', async () => {
+    const { VOICE_LIGHT_BLOCKED_TEXT } = await import('./voiceLagNotice.js');
+    const synth = blockedSynth();
+    const notices = /** @type {string[]} */ ([]);
+    const p = makePlayer(synth, (t) => notices.push(t));
+    await p.enable({ persist: false });
+    p._overload.overloaded = true;
+    p.enqueue([{ kind: 'comment', userId: 'u1', nickname: 'A', text: 'こめんと1' }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(p.diag.lightVoiceBlocked).toBe(true);
+    expect(p.diag.lightLastError).toBe('not-allowed');
+    expect(p.diag.lightBlockedTotal).toBe(1);
+    expect(notices.at(-1)).toBe(VOICE_LIGHT_BLOCKED_TEXT);
+    expect(VOICE_LIGHT_BLOCKED_TEXT).toContain('クリック');
+
+    // クリックされた=Chrome が鳴らしてくれるようになる
+    synth.blocked = false;
+    target.dispatchEvent(new Event('pointerdown'));
+    expect(p.diag.lightVoiceBlocked).toBe(false);
+    expect(p._lightFailStreak).toBe(0);
+    p.enqueue([{ kind: 'comment', userId: 'u2', nickname: 'B', text: 'こめんと2' }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(synth.spoken.length).toBe(1);
+    expect(notices.at(-1)).not.toBe(VOICE_LIGHT_BLOCKED_TEXT);
+  });
+
+  it('止められている間は、軽い声をやめても一言は出し続ける', async () => {
+    const { decideVoiceLagNotice, VOICE_LIGHT_BLOCKED_TEXT } = await import('./voiceLagNotice.js');
+    expect(decideVoiceLagNotice(false, { lightVoiceBlocked: true, lightVoiceActive: false }).text).toBe(VOICE_LIGHT_BLOCKED_TEXT);
+    expect(decideVoiceLagNotice(false, { lightVoiceBlocked: true, lightVoiceActive: true }).text).toBe(VOICE_LIGHT_BLOCKED_TEXT);
+  });
+});
