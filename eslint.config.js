@@ -413,8 +413,9 @@ export default [
     // v0.1.1961: タブの問い合わせを描き直し1回の中で使い回す配線(+15: 使い回しの入口と、タブが動いたら捨てる知らせ)。仕組みは lib の shortLivedMemo.js。
     // v0.1.1973: 人が多い配信は応援レーンの写しを書く間隔を空ける配線(+5: import の差し替え・間隔係の生成と計器・入口の1行)。仕組みは lib の laneMirrorPublishPace.js。
     // v0.1.1975: 人数がとても多い配信だけ応援レーンを2,000人までにする配線(+2: import と理由の1行)。仕組みは lib の laneCrowdLimit.js。
+    // v0.1.1981: 大きな記録で画面が描き直しだけで埋まるのを防ぐ配線=+20(定期の見回りの門 import・状態・測る2行・見送る2行/顔の数え上げの覚え書き 9行/描き直し間隔の上限 3行)。門は lib の refreshDutyGate.js。
     // v0.1.1976: 大きい名前・顔の控えを書く間隔を空ける配線(+6: import・間隔係の生成と計器)。仕組みは lib の profileCacheWritePace.js。
-    rules: { 'max-lines': ['error', { max: 21844, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21865, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

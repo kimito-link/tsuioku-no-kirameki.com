@@ -1113,7 +1113,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 333</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 334</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1368,6 +1368,7 @@
 - `src/lib/recentTextRing.js` — 「その人の直近N件の発言」を保持する固定長リングの純関数(v0.1.1218)。
 - `src/lib/refreshCoalescer.js` — 描き直し(refresh)の「実行中に来た要求は、あとで1回にまとめる」合流器(時計は deps で注入)。v0.1.1687
 - `src/lib/refreshCycleDeadline.js` — 1サイクル全体の締切を持ち、各 read の timeout を残り時間に切り詰める。
+- `src/lib/refreshDutyGate.js` — 定期の描き直し(3秒ごとの見回り)が、画面を描き直しだけで埋めないようにする門(純関数)。
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
 - `src/lib/resolveOfficialPoints.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1480,7 +1481,10 @@
 - `v0.1.1973` 2026-11-10 — 人が多い配信は応援レーンの写しの書き込みを間引く
 - `v0.1.1967` 2026-11-09 — 応援レーンの塗り直しで動かす枚数を最小に
 
-### その他 (11版)
+### ⚡ 描画・性能 (1版)
+- `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく
+
+### その他 (10版)
 - `v0.1.1977` 2026-11-10 — 大きな記録を少しずつ読み、開いた直後も固まらない
 - `v0.1.1976` 2026-11-10 — 人の多い配信で名前と顔の控えを書く回数を減らす
 - `v0.1.1974` 2026-11-10 — YouTube系でコメントの控えの全件書き込みをやめる
@@ -1491,4 +1495,3 @@
 - `v0.1.1966` 2026-11-09 — 横の欄を開いた直後の読み込みを同時に
 - `v0.1.1964` 2026-11-09 — 大きな配信で記録の組み立てを重ねない
 - `v0.1.1963` 2026-11-09 — 配信情報の読み込みが返らないと止まる所を直す
-- `v0.1.1961` 2026-11-09 — 描き直しのたびのタブ問い合わせを減らす

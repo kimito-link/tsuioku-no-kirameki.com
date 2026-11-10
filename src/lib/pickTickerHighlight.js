@@ -80,15 +80,30 @@ function normalizeText(text) {
  * @param {unknown} row
  * @returns {TickerCandidate|null}
  */
-function toCandidate(row) {
+/**
+ * 行の時刻だけを取り出す(toCandidate の ts と同じ決め方)。行でなければ NaN(どの窓にも入らない)。
+ * @param {unknown} row
+ * @returns {number}
+ */
+function candidateTs(row) {
   const o = /** @type {Record<string, unknown>} */ (row && typeof row === 'object' ? row : null);
-  if (!o) return null;
+  if (!o) return NaN;
   // 鏡は at、能動は capturedAt。どちらか有効な方を採る。
   const atRaw = Number(o.at);
   const capRaw = Number(o.capturedAt);
-  const ts = Number.isFinite(atRaw) && atRaw > 0
+  return Number.isFinite(atRaw) && atRaw > 0
     ? atRaw
     : (Number.isFinite(capRaw) && capRaw > 0 ? capRaw : 0);
+}
+
+/**
+ * @param {unknown} row
+ * @returns {TickerCandidate|null}
+ */
+function toCandidate(row) {
+  const o = /** @type {Record<string, unknown>} */ (row && typeof row === 'object' ? row : null);
+  if (!o) return null;
+  const ts = candidateTs(row);
   return {
     ts,
     kind: String(o.kind || 'comment'),
@@ -152,8 +167,11 @@ export function pickTickerHighlightEntry(list, nowMs, opts = {}) {
   /** @type {TickerCandidate[]} */
   const inWindow = [];
   for (const row of rows) {
+    // ★v0.1.1981: 先に時刻だけ見る。窓(直近の数十秒)の外の行まで本文を整えていた(8万行で毎回8万回の正規表現)。
+    const ts = candidateTs(row);
+    if (ts <= windowFrom || ts > windowTo) continue;
     const c = toCandidate(row);
-    if (!c || c.ts <= windowFrom || c.ts > windowTo) continue;
+    if (!c) continue;
     inWindow.push(c);
   }
   if (!inWindow.length) return fallback();

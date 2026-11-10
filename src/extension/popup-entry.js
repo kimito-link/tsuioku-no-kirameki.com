@@ -749,6 +749,7 @@ import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
 import { createLaneMirrorPacer } from '../lib/laneMirrorPublishPace.js';
 import { laneCrowdLimit } from '../lib/laneCrowdLimit.js';
+import { createRefreshDutyGate } from '../lib/refreshDutyGate.js';
 import { createProfileCacheWritePacer } from '../lib/profileCacheWritePace.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
@@ -4844,6 +4845,10 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
   );
 }
 
+// ★v0.1.1981: 定期の見回り(3秒ごと)が画面を描き直しだけで埋めないための門(src/lib/refreshDutyGate.js)
+const _refreshDutyGate = createRefreshDutyGate();
+try { /** @type {any} */ (globalThis).__refreshDutyGateDiag = _refreshDutyGate.diag; } catch { /* 計器の公開の失敗で止めない */ }
+
 // v0.1.773: hasOwnPostedEntryForUserId は廃止。集約ごとに storageCtx 全件を走査する O(集約×N) で
 //   popup メインスレッドを塞ぐ性能問題だったため、buildOwnPostedUserIdSet で事前に1パス集合化し、
 //   各ループは O(1) の has() で判定する(りんく列・ギフト列とも)。
@@ -5066,9 +5071,18 @@ function countResolvedAvatarEntries(entries, liveId) {
   if (!lid || !list.length) return { total: 0, unique: 0 };
   let total = 0;
   const unique = new Set();
+  // ★v0.1.1981: 同じ人・同じ顔URL・自分の投稿かどうかが同じなら、顔の決め方も同じ答えになる(この1回の数え上げの間は
+  //   覚えている顔も視聴ページの情報も変わらない)。8万行の配信で、顔の解決と URL の分解を8万回していた(手元の計測で最大の重さ)。
+  /** @type {Map<string, string>} */
+  const keyMemo = new Map();
   for (const entry of list) {
-    const src = storyGrowthAvatarSrcCandidate(entry, lid, list);
-    const key = avatarCompareKey(src);
+    const uidRaw = entry?.userId;
+    const memoKey = `${uidRaw === undefined ? '\u0001u' : uidRaw === null ? '\u0001n' : typeof uidRaw === 'string' ? `s${uidRaw}` : `o${String(uidRaw)}`}\u0000${String(entry?.avatarUrl ?? '')}\u0000${isOwnPostedSupportComment(entry, lid, list) ? '1' : '0'}`;
+    let key = keyMemo.get(memoKey);
+    if (key === undefined) {
+      key = avatarCompareKey(storyGrowthAvatarSrcCandidate(entry, lid, list));
+      keyMemo.set(memoKey, key);
+    }
     if (!key) continue;
     total += 1;
     unique.add(key);
@@ -17758,7 +17772,10 @@ async function downloadBlobViaChromeDownloads(blob, filename) {
  * 純関数側は src/lib/popupStorageRefreshCoalesce.js にあり、ユニットテスト済み。
  */
 const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
-  throttleMs: 450
+  throttleMs: 450,
+  // ★v0.1.1981: 描き直しが重いときの間隔の上限を 1.5秒→20秒に(間隔は描き直しの時間の3倍)。1回が数秒かかる配信(8万行・遅い PC)で
+  //   1.5秒ごとに描き直すと画面が描き直しだけで埋まる。軽い配信(1回 150ms 未満)は 450ms のまま。
+  maxAdaptiveMs: 20_000
 });
 /**
  * ★v0.1.1450: 北極星 tick(独立レーン描画)専用のスロットル。
@@ -19415,6 +19432,7 @@ async function initPopup() {
   const refreshCoalescer = createRefreshCoalescer(() => refresh());
   const safeRefresh = () => {
     if (!hasExtensionContext()) return Promise.resolve();
+    const _refreshT0 = Date.now();
     return refreshCoalescer.request()
       .catch((e) => {
         if (!isExtensionContextInvalidatedError(e)) {
@@ -19422,6 +19440,7 @@ async function initPopup() {
         }
       })
       .finally(() => {
+        _refreshDutyGate.noteRun(_refreshT0, Date.now()); // v0.1.1981: 重い描き直しのあとは定期の見回りを休む(lib/refreshDutyGate.js)
         const wasInitialRefresh = !initialRefreshDone;
         initialRefreshDone = true;
         // 初回 refresh が終わった瞬間、ロードシェードをフェードアウト。
@@ -21513,6 +21532,8 @@ async function initPopup() {
         }
         // v0.1.1037: heavy 全件読み進行中は refresh 見送り(追い越しレース=ちかちか防止)。数字カードは軽量 panel で継続。
         if (watchMetaCache.heavyReadActive) { void applyLightweightPanelSummaryCards(); return; }
+        // ★v0.1.1981: 直前の描き直しが重かったら、その3倍の時間は定期の見回りを休む(8万行の配信・遅い PC で画面が描き直しだけで埋まるのを防ぐ)。
+        if (_refreshDutyGate.shouldSkip(Date.now())) { void applyLightweightPanelSummaryCards(); return; }
         // 0.1.92: stale-while-revalidate パターン。
         //   key だけ無効化して fetch を促し、snapshot 自体は保持して
         //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。

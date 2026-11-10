@@ -467,7 +467,7 @@ export function buildYtPersonResolver(items) {
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined>, done?: boolean }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む(組み立て中は重ねない) */
 const commentsCache = new Map();
 /** 入口の動きの記録(画面の「詳細」や開発者ツールから見られる: globalThis.__ytNicoShimDiag) */
-const shimDiag = { builds: 0, buildJoined: 0, buildPhaseFirst: /** @type {any} */ (null), buildPhaseMax: /** @type {any} */ (null), buildPhaseLast: /** @type {any} */ (null), buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, commentWritesDropped: 0, commentRowsWriteDropped: 0, summaryAnswered: 0, tailDeferred: 0, keysAsked: /** @type {string[]} */ ([]) };
+const shimDiag = { builds: 0, buildJoined: 0, buildReused: 0, buildPhaseFirst: /** @type {any} */ (null), buildPhaseMax: /** @type {any} */ (null), buildPhaseLast: /** @type {any} */ (null), buildMsTotal: 0, buildMsMax: 0, buildMsLast: 0, buildRowsLast: 0, staleFrameHeld: 0, notifyCoalesced: 0, liveRows: 0, lastLiveRowsAt: 0, notified: 0, listeners: 0, lastNotifiedAt: 0, lastCount: 0, commentGets: 0, commentWritesDropped: 0, commentRowsWriteDropped: 0, summaryAnswered: 0, tailDeferred: 0, tailShort: 0, keysAsked: /** @type {string[]} */ ([]) };
 /** @type {any} */ (globalThis).__ytNicoShimDiag = shimDiag;
 // 0.1.1946: 横の欄・コメビュが「どの配信を出したか」の計器(council/panel-stream-selection-SPEC.md §6)。画面の動きは変えない
 const PANEL_SERVICE = PANEL_STREAM_KEY ? (PANEL_STREAM_KEY.startsWith('yt:') ? 'youtube' : PANEL_STREAM_KEY.split(':')[0]) : '';
@@ -554,6 +554,25 @@ function isWatchedByThisScreen(lv) {
 }
 /** @type {(lv: string, reason: string) => void} 知らせる口(storage の見張りを付けたところで差し替わる) */
 let announceLastWatch = () => {};
+/**
+ * ★v0.1.1981: この画面に最後に全件(nls_comments_)として渡した配列(配信ごと)。
+ *   横の欄・コメビュのテールは「全件を一度読んだあとの新着」を足すためのもの(上の TAIL_PREFIX の説明)。
+ *   いま組み上がっている配列が、最後に全件として渡したものと同じ(=それ以降に何も増えていない)なら、
+ *   テールは最新 TAIL_MAX_ROWS 件で足りる(ニコ生版のテールと同じ大きさ)。8万行の配信で、3秒ごとにテールとして
+ *   8万行を渡し、popup が毎回 8万行+8万行を重ね直していた(手元の計測・CPU 4倍遅く: 300秒のうち 36秒)。
+ *   全件を渡したあとに記録が増えた・全件をまだ渡していないときは、今までどおり全件を渡す(取りこぼさない)。
+ * @type {Map<string, any[]>}
+ */
+const lastFullAnswered = new Map();
+/** @param {string} lv @param {any[]} arr */
+function tailForScreen(lv, arr) {
+  if (IS_VENUE_CONTEXT) return tailForContext(arr);
+  if (lastFullAnswered.get(lv) === arr && arr.length > TAIL_MAX_ROWS) {
+    shimDiag.tailShort = (Number(shimDiag.tailShort) || 0) + 1;
+    return arr.slice(arr.length - TAIL_MAX_ROWS);
+  }
+  return arr;
+}
 /** @type {Set<string>} 一度でも組み上がった配信(v0.1.1978: 最初の組み立て中だけ、軽量読みのテールを待たせない) */
 const everBuiltLvs = new Set();
 /** @param {string} lv */
@@ -727,9 +746,21 @@ export function ytOwnerRowsLast(list, sum) {
 /**
  * 視聴ページの中の会場の記録の控え(配信ごと)。初回とときどき(行数に応じて30秒〜5分ごと・v0.1.1969)は全件、あいだは新しく記録された分だけを background にもらう
  * (3秒ごとに全件を受け取り直すと、長い配信でメッセージが大きくなり、失敗すると空の会場になる・Grok の点検 2026-11-04)。
- * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number }>}
+ * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number, ver?: number, sorted?: any[], sortedVer?: number }>}
  */
 const inPageCommentCache = new Map();
+/**
+ * ★v0.1.1981: 控えの行を受け取った時刻順に並べた配列。控えが変わっていなければ(ver が同じ)前に並べたものを返す
+ *   (8万行を、聞かれるたびに並べ直していた)。
+ * @param {{ byPk: Map<string, any>, ver?: number, sorted?: any[], sortedVer?: number }} c
+ */
+function sortedRowsOfCache(c) {
+  const ver = Number(c.ver) || 0;
+  if (c.sorted && c.sortedVer === ver) return c.sorted;
+  c.sorted = [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+  c.sortedVer = ver;
+  return c.sorted;
+}
 /** @type {Map<string, number>} 直接届いた行(YT_LIVE_ROWS)で作り直す間だけ、background に聞きに行かない */
 const inPageSkipFetchUntil = new Map();
 /**
@@ -759,20 +790,28 @@ async function getCommentsViaBackground(vid) {
   // 直接届いた行で作り直すときは、background へ聞きに行かない(往復の分だけ吹き出しが遅れる)
   if (cur && inPageSkipFetchUntil.get(vid) > now) {
     inPageSkipFetchUntil.delete(vid);
-    return [...cur.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+    return sortedRowsOfCache(cur);
   }
   // ★v0.1.1969: 全件の読み直し間隔を行数に比例(5,000行まで30秒・上限5分)。5万行で30秒ごとに約28MBを受け取っていた
   const full = !cur || now - cur.fullAt > ytFullRefreshIntervalMs(cur.byPk.size);
   try {
     const items = await fetchStreamRows(vid, full ? undefined : /** @type {NonNullable<typeof cur>} */ (cur).lastRecordedAt);
-    const next = full ? { byPk: new Map(), lastRecordedAt: 0, fullAt: now } : /** @type {NonNullable<typeof cur>} */ (cur);
+    const next = full ? { byPk: new Map(), lastRecordedAt: 0, fullAt: now, ver: 0 } : /** @type {NonNullable<typeof cur>} */ (cur);
+    // ★v0.1.1981: 控えが本当に変わったときだけ番号を進める。「新しい分だけ」の読み出しは最後の1行をもう一度返すので、
+    //   受け取った行があるだけでは変わったことにならない(中身が同じ行は数えない)。
+    let changed = false;
     for (const r of items) {
       const k = String(r?.pk || r?.id || '');
       if (!k) continue;
+      if (!changed) {
+        const old = full ? undefined : next.byPk.get(k);
+        if (!old || JSON.stringify(old) !== JSON.stringify(r)) changed = true;
+      }
       next.byPk.set(k, r);
       const at = Number(r?.recordedAt || 0);
       if (at > next.lastRecordedAt) next.lastRecordedAt = at;
     }
+    if (changed) next.ver = (Number(next.ver) || 0) + 1;
     inPageCommentCache.set(vid, next);
   } catch {
     // 受け取れなかったときは空にせず、前の控えをそのまま使う(誰もいない会場にしない)
@@ -783,7 +822,7 @@ async function getCommentsViaBackground(vid) {
   }
   const c = inPageCommentCache.get(vid);
   if (!c) return null;
-  return [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+  return sortedRowsOfCache(c);
 }
 
 /** 会場の読み上げで大事なコメントのキー(venueSpeech.js の venueSpeechKey と同じ形 no:<番号>) */
@@ -810,6 +849,26 @@ function recordBuildPhases(ph) {
   if (!max || total > Number(max.total || 0)) shimDiag.buildPhaseMax = { ...ph, total, at };
   shimDiag.buildPhaseLast = { ...ph, total, at };
 }
+/**
+ * ★v0.1.1981: 前に組み立てた結果の控え(配信ごと)。記録の行も、顔の控え(順位表・@名前・後から引いた顔)も、配信者の情報も
+ *   変わっていなければ、同じ結果をそのまま返す。横の欄は3秒ごとに全件を聞いてくるので、8万行の配信では
+ *   何も変わっていなくても毎回 8万行を組み立て直していた(手元の計測・CPU 4倍遅く: 420秒で 105回・合計 59秒)。
+ * @type {Map<string, { cache: any, ver: number, epoch: number, sumSig: string, out: any[] }>}
+ */
+const builtMemo = new Map();
+/** 顔の控え(順位表・@名前・後から引いた顔・文字アイコンの見分け)が変わるたびに進む番号 */
+let buildSideEpoch = 0;
+/** @param {string[]} keys storage で変わったキー */
+function noteBuildSideKeysChanged(keys) {
+  for (const k of keys) {
+    if (k.startsWith('yt_leaderboard_') || k === 'yt_handle_icons' || /^yt_[a-z]{2}_icons$/.test(k) || k === YT_DEFAULT_ICON_STORE_KEY) {
+      buildSideEpoch += 1;
+      return;
+    }
+  }
+}
+/** @param {any} sum 配信のまとめのうち、組み立てに使う所だけ */
+const buildSumSig = (sum) => `${String(sum?.broadcasterChannelId || '')}|${String(sum?.broadcasterHandle || '')}`;
 async function buildCommentsForLvUncached(lv) {
   const vid = videoIdForPseudoLv(lv);
   if (!vid) return undefined;
@@ -834,6 +893,17 @@ async function buildCommentsForLvUncached(lv) {
   const items = await getCommentsViaBackground(vid);
   const tFetchDone = Date.now();
   if (items == null) return undefined;
+  // ★v0.1.1981: 何も変わっていなければ前の結果を返す(アーカイブの行がある配信は、開始時刻が他の配信のまとめにも左右されるので使わない)
+  const memoCache = inPageCommentCache.get(vid);
+  const memoSumSig = buildSumSig(knownSummaries?.[vid]);
+  const memo = builtMemo.get(lv);
+  if (memo && memoCache && memo.cache === memoCache && memo.ver === (Number(memoCache.ver) || 0) && memo.epoch === buildSideEpoch && memo.sumSig === memoSumSig) {
+    await sidePromise.catch(() => undefined);
+    shimDiag.buildReused = (Number(shimDiag.buildReused) || 0) + 1;
+    return memo.out;
+  }
+  const memoVer = memoCache ? Number(memoCache.ver) || 0 : -1;
+  const memoEpoch = buildSideEpoch;
   const [lb, handleIconsRaw, lateIconsRaw] = await sidePromise;
   const tSideDone = Date.now();
   const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
@@ -888,6 +958,8 @@ async function buildCommentsForLvUncached(lv) {
   });
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
   registerBroadcastersFromSummaries();
+  if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) builtMemo.set(lv, { cache: memoCache, ver: memoVer, epoch: memoEpoch, sumSig: memoSumSig, out });
+  else builtMemo.delete(lv);
   recordBuildPhases({ fetchMs: tFetchDone - tStart, storageMs: (tStorageDone || tSideDone) - tStart, sideWaitMs: tSideDone - tFetchDone, mapMs: Date.now() - tSideDone, rows: out.length });
   if (wantHandles.size) {
     try {
@@ -1023,7 +1095,13 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
             continue;
           }
           const arr = await buildCommentsForLv(lv);
-          if (arr) bag[k] = k.startsWith(TAIL_PREFIX) ? tailForContext(arr) : arr;
+          if (arr) {
+            if (k.startsWith(TAIL_PREFIX)) bag[k] = tailForScreen(lv, arr);
+            else {
+              bag[k] = arr;
+              lastFullAnswered.set(lv, arr);
+            }
+          }
           continue;
         }
         // ★v0.1.1978: 件数だけの軽い控え(nls_csummary_<lv>)にも答える。ニコ生版の横の欄は、開いた直後にこれで
@@ -1406,6 +1484,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     };
     add((/** @type {Record<string, any>} */ changes, /** @type {string} */ area) => {
       if (area !== 'local') return;
+      noteBuildSideKeysChanged(Object.keys(changes)); // v0.1.1981: 顔の控えが変わったら、組み立ての控えを使わない
       panelDiag.storageChanged(Object.keys(changes)); // 0.1.1951: どのキーの変化が描き直しを呼んでいるか(問い合わせの多さの犯人探し)
       // 顔が新しく分かったら、件数が同じでも描き直してもらう
       // 最初からの文字アイコンの見分けが増えたら、段(りんく/こん太)が変わるので描き直してもらう(0.1.99)
@@ -1500,6 +1579,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           added += 1;
         }
         if (!added) return;
+        cur.ver = (Number(cur.ver) || 0) + 1;
         shimDiag.liveRows = (Number(shimDiag.liveRows) || 0) + added;
         shimDiag.lastLiveRowsAt = Date.now();
         inPageSkipFetchUntil.set(vid, Date.now() + 1000);

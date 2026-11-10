@@ -85,7 +85,8 @@ describe('北極星 tick の onChanged は間引かれている', () => {
       /const northStarTickScheduler = createCoalescedRefreshScheduler\(\{\n\s*throttleMs: 700\n\}\);/
     );
     expect(popupCode).toMatch(
-      /const coalescedRefreshScheduler = createCoalescedRefreshScheduler\(\{\n\s*throttleMs: 450\n\}\);/
+      // v0.1.1981: 重いときの間隔の上限(maxAdaptiveMs)が増えた。throttle の値(450ms)は変わらない。
+      /const coalescedRefreshScheduler = createCoalescedRefreshScheduler\(\{\n\s*throttleMs: 450,\n[\s\S]{0,400}?maxAdaptiveMs: 20_000\n\}\);/
     );
   });
 

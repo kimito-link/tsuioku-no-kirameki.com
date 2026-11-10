@@ -92,15 +92,44 @@ export function buildCommentTimelineMirrorSnapshot(args) {
   const capturedAt = Number(a.capturedAt) || 0;
   if (!comments.length && !gifts.length) return null;
 
-  const merged = [
-    ...comments.map((it) => toTimelineRow(it, a.resolveName, a.resolveAvatar)),
-    ...gifts.map((it) => toTimelineRow(it, a.resolveName, a.resolveAvatar, true))
-  ].filter(Boolean);
-  if (!merged.length) return null;
+  // ★v0.1.1981: 全行を鏡の形に直してから最新 cap 件を取っていた(8万行の配信で、顔と名前の解決を8万回・3秒ごと)。
+  //   載るのは最新 cap 件だけなので、先に「載る行か」と時刻だけを軽く見て並べ、鏡の形に直すのは最新 cap 件だけにする。
+  //   結果(rows・totalSeen)は前と同じ(commentTimelineMirror.test.js の同値テスト)。
+  /** @type {Array<{ it: any, gift: boolean, at: number }>} */
+  const kept = [];
+  const consider = (it, gift) => {
+    const o = it && typeof it === 'object' ? it : null;
+    if (!o) return;
+    // 本文がある行は必ず載る。本文が無い行だけ、名前と顔まで見て決める(toTimelineRow と同じ判定)。
+    if (!s(o.text).slice(0, TIMELINE_TEXT_MAX) && !toTimelineRow(o, a.resolveName, a.resolveAvatar, gift)) return;
+    const at = Number(o.at ?? o.date ?? o.vpos ?? o.capturedAt ?? 0);
+    kept.push({ it: o, gift, at: Number.isFinite(at) && at > 0 ? at : 0 });
+  };
+  for (const it of comments) consider(it, false);
+  for (const it of gifts) consider(it, true);
+  if (!kept.length) return null;
 
   // 時刻順(古→新)に並べ、最新 cap 件を取る(末尾=最新)。at が 0 の行は元の順序を保つ安定ソート。
-  merged.sort((x, y) => (x.at || 0) - (y.at || 0));
-  const totalSeen = merged.length;
+  kept.sort((x, y) => x.at - y.at);
+  const totalSeen = kept.length;
+  /** @type {Map<number, any>} 末尾から数えた位置 → 鏡の行(同じ行を2度直さない) */
+  const built = new Map();
+  const merged = {
+    /** @param {number} negCap slice(-cap) と同じ */
+    slice(negCap) {
+      const n = Math.min(kept.length, Math.max(0, -negCap));
+      const out = [];
+      for (let i = kept.length - n; i < kept.length; i += 1) {
+        let row = built.get(i);
+        if (!row) {
+          row = toTimelineRow(kept[i].it, a.resolveName, a.resolveAvatar, kept[i].gift);
+          built.set(i, row);
+        }
+        out.push(row);
+      }
+      return out;
+    }
+  };
 
   let cap = Number.isFinite(a.cap) && a.cap > 0 ? Math.floor(a.cap) : TIMELINE_MIRROR_CAP;
   let rows = merged.slice(-cap);
