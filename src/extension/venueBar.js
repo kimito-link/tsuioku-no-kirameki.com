@@ -1588,16 +1588,16 @@ const VENUE_CSS = `
   .nlsb-story-diag {
     margin: 8px 0 10px;
     padding: 8px 10px 10px;
-    border: 1px solid color-mix(in srgb, var(--nl-border) 74%, transparent);
+    border: 1px solid color-mix(in srgb, var(--nl-surface) 28%, transparent);
     border-radius: 10px;
-    background: color-mix(in srgb, var(--nl-surface) 94%, #f4fbff 6%);
-    color: var(--nl-text-sub);
+    background: var(--nl-text);
+    color: var(--nl-surface);
     font-size: 11px;
     line-height: 1.45;
   }
   .nlsb-story-diag__head {
     margin: 0 0 6px;
-    color: var(--nl-text);
+    color: var(--nl-surface);
     font-size: 11px;
     font-weight: 800;
   }
@@ -1605,19 +1605,19 @@ const VENUE_CSS = `
     margin: 0 0 6px;
   }
   .nlsb-story-diag .nl-story-diag__lead strong {
-    color: var(--nl-text);
+    color: var(--nl-surface);
     font-weight: 800;
   }
   .nlsb-story-diag .nl-story-diag__more {
     margin: 0;
     padding: 4px 8px 6px;
-    border: 1px solid color-mix(in srgb, var(--nl-border) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--nl-surface) 22%, transparent);
     border-radius: 8px;
-    background: color-mix(in srgb, var(--nl-surface) 92%, transparent);
+    background: color-mix(in srgb, var(--nl-text) 84%, var(--nl-surface));
   }
   .nlsb-story-diag .nl-story-diag__summary {
     cursor: pointer;
-    color: var(--nl-muted);
+    color: var(--nl-surface);
     font-size: 10px;
     font-weight: 700;
     list-style-position: inside; /* v0.1.2021: outside だと三角が枠の左へはみ出す */
@@ -1625,8 +1625,8 @@ const VENUE_CSS = `
   .nlsb-story-diag .nl-story-diag__body {
     margin-top: 6px;
     padding-top: 6px;
-    border-top: 1px solid color-mix(in srgb, var(--nl-border) 65%, transparent);
-    color: var(--nl-muted);
+    border-top: 1px solid color-mix(in srgb, var(--nl-surface) 18%, transparent);
+    color: var(--nl-surface);
     font-size: 10px;
     line-height: 1.4;
   }
@@ -1639,7 +1639,7 @@ const VENUE_CSS = `
   }
   .nlsb-story-diag .nl-story-diag__technical {
     margin: 0;
-    color: var(--nl-text-sub);
+    color: var(--nl-surface);
     font-size: 10px;
     overflow-wrap: anywhere;
   }
