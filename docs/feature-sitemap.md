@@ -1062,7 +1062,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 324</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 325</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1130,6 +1130,7 @@
 - `scripts/check-chrome-load-path.mjs` — Chrome が拡張を「同期フォルダ配下から」読み込んでいないか検査する(リロード固着の再発防止・v0.1.1529)。
 - `scripts/check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。
 - `scripts/check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
+- `scripts/check-no-personal-contact.mjs` — 審査の連絡先(氏名・電話・メール)が repo に入っていないことを機械で守る。
 - `scripts/check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
 - `scripts/check-root-cause-claim.mjs` — コミットメッセージの「根治」語を検査する。
 - `scripts/check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
