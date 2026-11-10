@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 72</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 73</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -136,6 +136,7 @@
 - `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
 - `src/extension/liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
+- `src/lib/bigRecordYield.js` — 大きな記録(数万行・数千人)を扱うとき、長い仕事の合間に画面へ手を返すための決まり(v0.1.1997)。
 - `src/lib/blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
 - `src/lib/bootTimeline.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない。時刻・記録は呼び出し側が渡す)
@@ -1466,11 +1467,10 @@
 - `v0.1.1996` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1978` 2026-11-10 — 大きな記録でも開いてすぐ記録の件数を出す
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
 - `v0.1.1996` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
 - `v0.1.1979` 2026-11-10 — 吹き出しを読み上げの声と一緒に出す
-- `v0.1.1969` 2026-11-10 — 記録の多い配信は全件の読み直しを間引く
 
 ### 🎈 吹き出し (2版)
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
@@ -1490,7 +1490,8 @@
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1982` 2026-11-10 — 大きな記録で診断の数え直しを減らす
 
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (3版)
+- `v0.1.1997` 2026-11-10 — 大きな記録で長く固まらない(合間に手を返す)
 - `v0.1.1985` 2026-11-10 — 重い描き直しのあとは間隔を空ける
 - `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく
 

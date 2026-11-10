@@ -5883,5 +5883,18 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1996', metric: 'cross-checked-claims', value: 55,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.1997', metric: 'bundle-kb', value: 1426,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '1996 から 1KB 増(大きな記録で合間に画面へ手を返す決まり bigRecordYield.js の分)'
+  }),
+  Object.freeze({
+    version: '0.1.1997', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1997', metric: 'cross-checked-claims', value: 55,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
   })
 ]);

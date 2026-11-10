@@ -5200,6 +5200,16 @@
       ]
     },
     {
+      "file": "src/lib/bigRecordYield.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/blackScreenOwnerCells.js",
       "featureCount": 1,
       "features": [

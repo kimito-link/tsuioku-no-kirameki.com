@@ -73,6 +73,7 @@ import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
 import { shouldSkipLaneSecondRender } from '../lib/laneSecondRenderPolicy.js';
+import { shouldDeferLanePaintForBigRecord, shouldYieldForBigRecord, yieldToMainThread } from '../lib/bigRecordYield.js';
 import { canAppendStoryGrowthCells, canTrimStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
@@ -7715,11 +7716,19 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
  * @param {readonly unknown[]} displayEntries
  * @param {readonly unknown[]} storageRows
  */
-const _laneSecondRenderDiag = { skipped: 0, rendered: 0 };
+const _laneSecondRenderDiag = { skipped: 0, rendered: 0, deferred: 0, coalesced: 0 };
 try { /** @type {any} */ (globalThis).__laneSecondRenderDiag = _laneSecondRenderDiag; } catch { /* 計器だけ */ }
 async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) {
   const lid = String(liveId || '').trim().toLowerCase();
   const seq = ++_storyLanePaintSeq;
+  // ★v0.1.1997: 数千人いる配信では、応援マスの組み立てを次の仕事へ回す(lib/bigRecordYield.js)。
+  //   1回の読み直しの中で描画が2〜3回続くので、そのたびに全員分を組み立てると数秒固まる(PC 実測 Kick 約6,500人)。
+  //   回している間に次の描画が来たら古い方はやめる=同じ読み直しの中では最後の1回だけ組み立てる。
+  if (lid && shouldDeferLanePaintForBigRecord(STORY_SOURCE_STATE.laneAggregates.length)) {
+    _laneSecondRenderDiag.deferred += 1;
+    await yieldToMainThread();
+    if (seq !== _storyLanePaintSeq) { _laneSecondRenderDiag.coalesced += 1; return; }
+  }
 
   const profileMap =
     popupUserCommentProfileMap &&
@@ -15831,6 +15840,8 @@ async function refresh() {
     if (normalizedStored.changed) {
       applied = normalizedStored.next;
     }
+    // ★v0.1.1997: 数万行の記録では、正規化と名前・顔の重ね直しの間で画面に手を返す(lib/bigRecordYield.js)
+    if (shouldYieldForBigRecord(applied.length)) await yieldToMainThread();
     const profAfterNormalize = popupMergeUserCommentProfileCache(applied);
     applied = profAfterNormalize.arr;
     if (
@@ -16291,7 +16302,11 @@ async function refresh() {
       chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null,
       readAtMs: Date.now() // heavyRace根治(B): fresh-read 再利用の基準時刻(読了時点で完全だった証跡)
     };
+    // ★v0.1.1997: 数万行の記録では、読み出しの続きで正規化・描画まで一気に走らせない(lib/bigRecordYield.js)
+    const _bigRecord = shouldYieldForBigRecord(arr.length);
+    if (_bigRecord) await yieldToMainThread();
     arr = await applyStoredCommentEntries(arr, true);
+    if (_bigRecord) await yieldToMainThread();
     // v0.1.505: heavy 再描画でもテール（未畳み込み新着）を表示用に concat（書き戻しはメインのみ）。
     if (tailDisplayRows.length) {
       arr = mergeTailRowsIntoDisplay(arr, tailDisplayRows, { liveId: lv });

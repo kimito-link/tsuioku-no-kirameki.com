@@ -37,6 +37,7 @@ import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, ser
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
+import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -930,6 +931,10 @@ async function buildCommentsForLvUncached(lv) {
   }
   const memoVer = memoCache ? Number(memoCache.ver) || 0 : -1;
   const memoEpoch = buildSideEpoch;
+  // ★v0.1.1997: 数万行の記録では、読み出しの続きで組み立てまで一気に走らせない(src/lib/bigRecordYield.js)。
+  //   拡張の画面(横の欄・コメビュ)だけ。視聴ページの中(会場)は今までと同じ。
+  const yieldBig = !YT_SHIM_IN_PAGE && shouldYieldForBigRecord(Array.isArray(items) ? items.length : 0);
+  if (yieldBig) await yieldToMainThread();
   const [lb, handleIconsRaw, lateIconsRaw] = await sidePromise;
   const tSideDone = Date.now();
   const list = ytOwnerRowsLast(ytStableOrder(lv, Array.isArray(items) ? items : []), knownSummaries?.[vid]);
@@ -994,6 +999,7 @@ async function buildCommentsForLvUncached(lv) {
     if (important?.[i]) ytVoiceImportantKeys.set(`no:${e.commentNo}`, important[i]);
     return e;
   });
+  if (yieldBig) await yieldToMainThread();
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
   registerBroadcastersFromSummaries();
   if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) builtMemo.set(lv, { cache: memoCache, ver: memoVer, epoch: memoEpoch, sumSig: memoSumSig, out });

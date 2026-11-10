@@ -420,7 +420,8 @@ export default [
     //   同じ版で名前・顔の控えの学ぶ/補う/刈るを lib へ出して -11。計器は lib の refreshStageClock.js、間隔は popupStorageRefreshCoalesce.js。
     // v0.1.1986: 描き直し1回ごとに休みの門へ知らせる配線と、走っている最中は定期の見回りで次を積まない配線(+5: 理由の注記4行・判定1行・計器1行・古い1行を削除)。
     // v0.1.1987: 応援マスの2回目の描画を省く配線(+9: import・計器の生成と公開2行・理由の注記1行・判定5行)。仕組みは lib の laneSecondRenderPolicy.js。
-    rules: { 'max-lines': ['error', { max: 21890, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1997: 大きな記録で合間に画面へ手を返す配線(+15: import・応援マスを次の仕事へ回す8行・正規化のあと2行・読み出しの続き4行)。決まりは lib の bigRecordYield.js。
+    rules: { 'max-lines': ['error', { max: 21905, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

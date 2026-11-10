@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1969',
+    date: '2026-11-10',
+    summary: '記録の多い配信は全件の読み直しを間引く',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などで、横の欄や会場が記録を全件読み直すのを、行数に関係なく30秒ごとにしていたのを、行数に応じて30秒〜5分ごとにしました(5,000行までは今までどおり)。新しいコメントはこれまでどおりすぐ届きます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1968',
     date: '2026-11-10',
     summary: '声の割り当ての書き直しを30秒に1回へ',

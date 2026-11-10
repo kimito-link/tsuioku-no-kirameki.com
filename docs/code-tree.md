@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1227 件
+## ⚠️ 役割コメントが無いソース 10 / 1228 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2406)
+- 📁 **src/** (2408)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2126)
+  - 📁 **lib/** (2128)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1747,6 +1747,8 @@
     - `bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
     - `besideOverflowGuard.js` — 横付き(beside)パネルが視聴行の中に入った結果、ページが横にはみ出したかを判定する純粋関数。
     - `besideOverflowGuard.test.js`
+    - `bigRecordYield.js` — 大きな記録(数万行・数千人)を扱うとき、長い仕事の合間に画面へ手を返すための決まり(v0.1.1997)。
+    - `bigRecordYield.test.js`
     - `blackCurtainLedger.js` — 黒い幕(サイドパネルの縞)の「回ごとの記録」と、ユーザーが言わなくても読める結論の1行(純粋関数・I/O禁止)。v0.1.1690
     - `blackCurtainLedger.test.js`
     - `blackCurtainLedgerWiring.wiring.test.js`
