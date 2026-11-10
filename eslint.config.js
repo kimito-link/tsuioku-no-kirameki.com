@@ -484,8 +484,9 @@ export default [
     // v0.1.1914: 過去の番号を吹き出さない定数(コメント2行)と state の hiNo・計器への1行=+6。判定は lib の venueSpeech.js(oldNoGap)。
     // v0.1.1960: 会場の数字の帯(りんく「これを会場モードでもいれたほうが利便性たかい」)の配線=+36(import 3行・帯を作る8行・描く関数14行・catch-up/onChanged/見回り)。値の決め方と DOM・CSS は lib の venueStatStrip.js。
     // v0.1.1979: 吹き出しを声と一緒に出す(りんく決定「声と一緒に出す」)の配線=+36(import・待たせるかの判定・出す関数・3秒の見切り・計器)。待たせる条件は lib の venueBubbleVoiceHold.js。
+    // v0.1.1980: 吹き出しを待たせる計器に「待たせている間に声の側で外された件」を足す=+1(PC 実測で held 491 のうち 377 件の行き先が数えられていなかった)。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7519, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7520, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

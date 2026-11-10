@@ -60,4 +60,10 @@ describe('venueBar の配線', () => {
     expect(src).toContain('      bubbleKey,\n      seatIndex: seatUsable ? seatIndex : -1,');
     expect(src).toContain('    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n');
   });
+  it('待たせている間に声の側で外された件を、3秒の見切りとは別に数える(v0.1.1980)', () => {
+    expect(src).toContain('droppedWhileHeld: 0');
+    expect(src).toContain('if (!bubbleRevealed && bubbleHoldTimer) _bubbleVoiceHoldDiag.droppedWhileHeld += 1;');
+    // 3秒の見切りは先に bubbleHoldTimer = 0 にしてから外すので、二重に数えない
+    expect(src).toMatch(/bubbleHoldTimer = 0;\n\s+if \(bubbleRevealed\) return;[\s\S]{0,400}dropQueuedUnstarted\(onVoiceDropped\)/);
+  });
 });

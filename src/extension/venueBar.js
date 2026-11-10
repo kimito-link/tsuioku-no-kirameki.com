@@ -6758,7 +6758,7 @@ export function mountVenueBarButton(options = {}) {
 
   // v0.1.1979: 吹き出しを声に合わせる。最後に声が本当に鳴り始めた時刻と、待たせた結果の数(計器・観測のみ)。
   let _lastVoiceAudioStartAt = 0;
-  const _bubbleVoiceHoldDiag = { held: 0, shownWithVoice: 0, timedOutDropped: 0, timedOutKeptVoice: 0 };
+  const _bubbleVoiceHoldDiag = { held: 0, shownWithVoice: 0, droppedWhileHeld: 0, timedOutDropped: 0, timedOutKeptVoice: 0 };
   try { /** @type {any} */ (globalThis).__venueBubbleVoiceHoldDiag = _bubbleVoiceHoldDiag; } catch { /* 計器の公開に失敗しても会場は止めない */ }
   // v0.1.752: storage poll とリアルタイム live feed の両方が通る共通処理。引数 rows から
   //   新着発言を抽出(pickNewVenueSpeech)→席へマージ→吹き出し+読み上げ。両経路が同じ
@@ -6874,6 +6874,7 @@ export function mountVenueBarButton(options = {}) {
         //   bubble が無い(空テキスト等で出なかった)場合は no-op で安全。
         // 鳴らずに捨てられた時: 待たせていた吹き出しを出し、相槌を畳む(声が無いのに頷いたまま残さない)。
         const onVoiceDropped = () => {
+          if (!bubbleRevealed && bubbleHoldTimer) _bubbleVoiceHoldDiag.droppedWhileHeld += 1; // v0.1.1980: 待たせている間に声の側で外された件(3秒の見切りとは別に数える)
           revealBubble();
           if (bubble) markBubbleResolved(bubble);
           charaLive.onCommentSpokenEnd();
