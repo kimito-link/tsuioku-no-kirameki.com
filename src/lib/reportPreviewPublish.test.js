@@ -143,3 +143,13 @@ describe('publishReportPreviewThrottled', () => {
     expect(captures).toHaveLength(0); // 書き込みには至らない
   });
 });
+
+describe('reportPreviewMinGapMs(大きな記録は下書きの集計の間隔を延ばす・v0.1.2012)', () => {
+  it('ふつうの記録は15秒・2万行以上は2分・数でない入力は15秒', async () => {
+    const m = await import('./reportPreviewPublish.js');
+    expect(m.reportPreviewMinGapMs(0)).toBe(m.REPORT_PREVIEW_MIN_GAP_MS);
+    expect(m.reportPreviewMinGapMs(m.REPORT_PREVIEW_BIG_ROWS - 1)).toBe(m.REPORT_PREVIEW_MIN_GAP_MS);
+    expect(m.reportPreviewMinGapMs(m.REPORT_PREVIEW_BIG_ROWS)).toBe(m.REPORT_PREVIEW_BIG_GAP_MS);
+    expect(m.reportPreviewMinGapMs(undefined)).toBe(m.REPORT_PREVIEW_MIN_GAP_MS);
+  });
+});

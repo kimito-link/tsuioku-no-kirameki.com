@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1976',
+    date: '2026-11-10',
+    summary: '人の多い配信で名前と顔の控えを書く回数を減らす',
+    items: Object.freeze([
+      '名前と顔の控えが2,000人を超えたら、横の欄から控え全体を書くのを30秒に1回にしました(8万行の配信で110秒に3.6MB書いていた)。横の欄の中ではこれまでどおりすぐ使います。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1975',
     date: '2026-11-10',
     summary: '人がとても多い配信は応援レーンを2,000人までに',

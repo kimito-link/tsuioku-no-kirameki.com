@@ -809,7 +809,7 @@ import {
 } from '../lib/devMonitorAvatarStats.js';
 import { readMergedTrendSeries, readTrendSeries } from '../lib/devMonitorTrendSession.js';
 import { renderAcquisitionDashboard } from './popup/renderAcquisitionDashboard.js';
-import { publishReportPreviewThrottled } from '../lib/reportPreviewPublish.js';
+import { publishReportPreviewThrottled, reportPreviewMinGapMs } from '../lib/reportPreviewPublish.js';
 import {
   summarizeCommentRecordBreakdown,
   formatCommentRecordBreakdownLine
@@ -16226,7 +16226,7 @@ async function refresh() {
         _perfDeferActive
       );
       // v0.1.858: レポート(DL前)主要KPIを status へ(本体は reportPreviewPublish.js・15秒間引き・純観測)。
-      publishReportPreviewThrottled(lv, { resolveComments: resolveCommentsForHtmlExport, getSnapshot: () => watchMetaCache.snapshot, now: () => Date.now() });
+      publishReportPreviewThrottled(lv, { resolveComments: resolveCommentsForHtmlExport, getSnapshot: () => watchMetaCache.snapshot, now: () => Date.now(), minGapMs: reportPreviewMinGapMs(arr.length) }); // v0.1.2012: 大きな記録は2分に1回
     }
     // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
     //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、

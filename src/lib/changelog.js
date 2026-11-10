@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2012',
+    date: '2026-11-10',
+    summary: '大きな記録はレポート下書きを2分おき',
+    items: Object.freeze([
+      'コメントが2万件以上ある配信では、状態速報に出すレポートの下書きの集計を、15秒おきから2分おきにしました。全部の行を数え直す集計なので、遅いPCの固まりが減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2011',
     date: '2026-11-10',
     summary: '公式順位の名前の表を作り直さない',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '大きな記録を少しずつ読み、開いた直後も固まらない',
     items: Object.freeze([
       'YouTube・Kick などの記録を開くとき、5,000行ずつ読んで合間に画面へ手を返すようにしました(8万行を一度に読むと、遅いPCでは約48秒返事がありませんでした)。読む行と順番は同じです。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1976',
-    date: '2026-11-10',
-    summary: '人の多い配信で名前と顔の控えを書く回数を減らす',
-    items: Object.freeze([
-      '名前と顔の控えが2,000人を超えたら、横の欄から控え全体を書くのを30秒に1回にしました(8万行の配信で110秒に3.6MB書いていた)。横の欄の中ではこれまでどおりすぐ使います。'
     ])
   })
 ]);
