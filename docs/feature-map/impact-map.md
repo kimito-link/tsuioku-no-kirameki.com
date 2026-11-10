@@ -770,6 +770,7 @@
 | `src/lib/laneMirrorWriterYield.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/lanePublishSkipDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneRosterKeeper.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneSecondRenderPolicy.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneSupplyOriginDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneTickProbe.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneTileOscillation.js` | 1 | ポップアップ(応援レーン) |

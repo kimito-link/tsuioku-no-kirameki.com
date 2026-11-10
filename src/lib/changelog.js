@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1987',
+    date: '2026-11-10',
+    summary: '数千人いる配信で応援マスを二度組み立てない',
+    items: Object.freeze([
+      'コメントした人が数千人いる配信(Kick など)では、応援マスを1回の描き直しで2回組み立てていました。ギフトと広告の列が変わっていないときは、2回目を省くようにしました。少人数の配信は今までどおりです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1986',
     date: '2026-11-10',
     summary: '大きな配信で描き直しが切れ目なく続くのを止めた',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '声の割り当ての書き直しを30秒に1回へ',
     items: Object.freeze([
       'YouTube・Twitch・Kick などで、人ごとの声の割り当て(数百KB)をコメントの束ごとに丸ごと書き直していたのを、変わったときだけ・最短30秒に1回にしました。人の多い配信で横の欄やコメビュが長く固まるのを和らげます。声の割り当ては変わりません'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1967',
-    date: '2026-11-09',
-    summary: '応援レーンの塗り直しで動かす枚数を最小に',
-    items: Object.freeze([
-      '応援レーン(アイコンの列)を塗り直すたびに、全員のアイコンをいったん外して付け直していたのを、順番が変わった人・増えた人・減った人だけ動かすようにしました。人数の多い配信で横の欄が重くなるのを和らげます。表示は変わりません'
     ])
   })
 ]);

@@ -7176,6 +7176,16 @@
       ]
     },
     {
+      "file": "src/lib/laneSecondRenderPolicy.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneSupplyOriginDiag.js",
       "featureCount": 1,
       "features": [

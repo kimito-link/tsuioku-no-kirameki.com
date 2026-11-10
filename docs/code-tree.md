@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1225 件
+## ⚠️ 役割コメントが無いソース 10 / 1226 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1183,7 +1183,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2402)
+- 📁 **src/** (2404)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1487,7 +1487,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2122)
+  - 📁 **lib/** (2124)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2448,6 +2448,8 @@
     - `laneSceneEnvelope.reachability.test.js`
     - `laneSceneEnvelope.receipts.test.js`
     - `laneSceneEnvelope.test.js`
+    - `laneSecondRenderPolicy.js` — 応援マスの「ギフト/広告の読み込み後の2回目の描画」を省いてよいかの判定(純関数)。
+    - `laneSecondRenderPolicy.test.js`
     - `laneShrinkGuardWiring.test.js`
     - `laneSupplyFailClosed.wiring.test.js`
     - `laneSupplyOriginDiag.js` — 応援レーンの供給元(誰が entriesProvisional を書いたか)を名指しする計器。

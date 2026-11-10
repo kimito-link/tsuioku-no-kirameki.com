@@ -338,7 +338,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 296</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 297</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -489,6 +489,7 @@
 - `src/lib/laneRosterDelta.js` — 応援レーンの「誰が消えたか」を測る純関数(v0.1.1231・Phase 1 計器)。
 - `src/lib/laneRosterKeeper.js` — 応援レーンの「名簿キーパー」(v0.1.1232・Phase 2 蓄積器)。
 - `src/lib/laneSceneEnvelope.js` — LaneScene一致証明の封筒(純関数)。lanescene-structural-review-DESIGN.md のMVP実装。
+- `src/lib/laneSecondRenderPolicy.js` — 応援マスの「ギフト/広告の読み込み後の2回目の描画」を省いてよいかの判定(純関数)。
 - `src/lib/laneSupplyOriginDiag.js` — 応援レーンの供給元(誰が entriesProvisional を書いたか)を名指しする計器。
 - `src/lib/laneTickProbe.js` — ①popup の独立描画トリガ(tickIndependentNorthStar)の自己診断(v0.1.1123)。
 - `src/lib/laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1472,14 +1473,16 @@
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
 - `v0.1.1979` 2026-11-10 — 吹き出しを読み上げの声と一緒に出す
 
+### 🎁 ギフト (1版)
+- `v0.1.1987` 2026-11-10 — 数千人いる配信で応援マスを二度組み立てない
+
 ### 🔊 読み上げ (2版)
 - `v0.1.1980` 2026-11-10 — 吹き出しを待たせた数の計器を直す
 - `v0.1.1979` 2026-11-10 — 吹き出しを読み上げの声と一緒に出す
 
-### 🪟 応援レーン・タイル (3版)
+### 🪟 応援レーン・タイル (2版)
 - `v0.1.1975` 2026-11-10 — 人がとても多い配信は応援レーンを2,000人までに
 - `v0.1.1973` 2026-11-10 — 人が多い配信は応援レーンの写しの書き込みを間引く
-- `v0.1.1967` 2026-11-09 — 応援レーンの塗り直しで動かす枚数を最小に
 
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.1982` 2026-11-10 — 大きな記録で診断の数え直しを減らす

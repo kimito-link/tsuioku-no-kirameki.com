@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1967',
+    date: '2026-11-09',
+    summary: '応援レーンの塗り直しで動かす枚数を最小に',
+    items: Object.freeze([
+      '応援レーン(アイコンの列)を塗り直すたびに、全員のアイコンをいったん外して付け直していたのを、順番が変わった人・増えた人・減った人だけ動かすようにしました。人数の多い配信で横の欄が重くなるのを和らげます。表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1966',
     date: '2026-11-09',
     summary: '横の欄を開いた直後の読み込みを同時に',

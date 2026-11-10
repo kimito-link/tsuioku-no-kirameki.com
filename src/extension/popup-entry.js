@@ -72,6 +72,7 @@ import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
+import { shouldSkipLaneSecondRender } from '../lib/laneSecondRenderPolicy.js';
 import { canAppendStoryGrowthCells, canTrimStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
@@ -7714,6 +7715,8 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
  * @param {readonly unknown[]} displayEntries
  * @param {readonly unknown[]} storageRows
  */
+const _laneSecondRenderDiag = { skipped: 0, rendered: 0 };
+try { /** @type {any} */ (globalThis).__laneSecondRenderDiag = _laneSecondRenderDiag; } catch { /* 計器だけ */ }
 async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) {
   const lid = String(liveId || '').trim().toLowerCase();
   const seq = ++_storyLanePaintSeq;
@@ -7823,7 +7826,13 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
     if (g.kept) { STORY_SOURCE_STATE.giftThrowerPicks = g.picks; _giftAdPicksCarryDiag.keptGift += 1; }
     if (ad.kept) { STORY_SOURCE_STATE.adThrowerPicks = ad.picks; _giftAdPicksCarryDiag.keptAd += 1; }
   }
-  renderStoryUserLane();
+  // ★v0.1.1987: 数千人いる配信で、ギフト/広告の列が読み込みの前後で同じなら、同じ応援マスを組み立て直さない(lib/laneSecondRenderPolicy.js)。
+  const _skipSecond = shouldSkipLaneSecondRender({
+    peopleCount: STORY_SOURCE_STATE.laneAggregates.length,
+    prevGift: _prevGiftPicks, nextGift: STORY_SOURCE_STATE.giftThrowerPicks,
+    prevAd: _prevAdPicks, nextAd: STORY_SOURCE_STATE.adThrowerPicks
+  });
+  if (_skipSecond) _laneSecondRenderDiag.skipped += 1; else { _laneSecondRenderDiag.rendered += 1; renderStoryUserLane(); }
   renderStoryAvatarDiag();
 }
 
