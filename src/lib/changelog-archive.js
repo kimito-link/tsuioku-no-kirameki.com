@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1897',
+    date: '2026-11-06',
+    summary: 'マーケ HTML はサポーター向けに(14日お試し)',
+    items: Object.freeze([
+      'マーケ HTML はサポーター(月額980円・年額9,800円)向けの機能になりました。初めてマーケ HTML を開いた日から14日間は、だれでも無料でお試しできます',
+      'サポーターでない人のコメビュを OBS 透過で出すと、隅に小さく「追憶のきらめき」と出ます(サポーターは出ません)。記録・読み上げ・会場・スマホ・YouTube 版などはこれまでどおり無料です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1896',
     date: '2026-11-06',
     summary: 'サポーターのコードは1台の PC だけで使える',

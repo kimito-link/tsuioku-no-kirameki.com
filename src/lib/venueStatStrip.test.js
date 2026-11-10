@@ -107,3 +107,43 @@ describe('createVenueStatStrip', () => {
     expect(strip.el.hasAttribute('title')).toBe(false);
   });
 });
+
+describe('パネルを開かなくても数字が付く(会場が自分で作った写し)', () => {
+  const self = () => mirror({ capturedAt: NOW - 3_000, recordsText: '70', concurrent: { estText: '55', estIsPlaceholder: false, subText: '直接値' } });
+
+  it('鏡が無いとき、自分で作った写しを出す(source=self・stale ではない)', () => {
+    const m = buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, selfSnap: self() });
+    const k = byKey(m);
+    expect(m.source).toBe('self');
+    expect(m.stale).toBe(false);
+    expect(k.concurrent.text).toBe('55');
+    expect(k.records.text).toBe('70');
+    expect(k.streamAge.text).toBe('2時間36分');
+  });
+
+  it('新しい鏡があれば鏡が正(パネルと同じ数字)', () => {
+    const m = buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW, selfSnap: self() });
+    expect(m.source).toBe('mirror');
+    expect(byKey(m).concurrent.text).toBe('108');
+  });
+
+  it('鏡が古いとき、新しい写しに切り替わる。記録はその場で動く正本の件数が優先', () => {
+    const m = buildVenueStatStripModel(mirror({ capturedAt: NOW - 300_000 }), { liveId: 'lv123', nowMs: NOW, selfSnap: self(), recordedCount: 75 });
+    const k = byKey(m);
+    expect(m.source).toBe('self');
+    expect(k.concurrent.text).toBe('55');
+    expect(k.records.text).toBe('75');
+  });
+
+  it('別の配信の写し・古い写しは使わない', () => {
+    expect(buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, selfSnap: mirror({ liveId: 'lv9' }) }).source).toBe('none');
+    const old = buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, selfSnap: mirror({ capturedAt: NOW - 300_000 }) });
+    expect(old.source).toBe('none');
+  });
+
+  it('★記録件数が分からない(null)とき「0件」と出さない(2026-11-10 実機: パネル未起動で「記録 0件」)', () => {
+    const k = byKey(buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, recordedCount: null }));
+    expect(k.records.text).toBe('—');
+    expect(byKey(buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, recordedCount: 0 })).records.text).toBe('0');
+  });
+});

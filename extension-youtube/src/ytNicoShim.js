@@ -372,6 +372,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
     viewerCountFromDom: null,
+    noVisitorTotal: true, // 会場が自分で数字の帯を作るとき、同接を「来場」として出さない印(src/lib/venueStatCardsSelf.js)
+    recordedCountHint: typeof sum?.itemCount === 'number' ? sum.itemCount : null, // 同じく、記録件数(まとめの itemCount)
     viewerCountSource: 'dom',
     officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null, // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
