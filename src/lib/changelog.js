@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2008',
+    date: '2026-11-10',
+    summary: '数千人の応援マスを少しずつ足して固まらない',
+    items: Object.freeze([
+      '応援マスが数百人を超える段は、一度に全部作らず 250人ずつ足すようにしました。開いた直後と読み込みのあとの長い固まりが短くなります。既に出ているマスは消えません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2007',
     date: '2026-11-10',
     summary: '大きな記録で同じ集計をやり直さない',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '人が多い配信は応援レーンの写しの書き込みを間引く',
     items: Object.freeze([
       '記録が数万行ある配信(Kick など)で、横の欄が開いた直後から長く固まる件の手当て。新しい人が来るたびに応援レーンの写し(数百KB)を書き直し、それが拡張の全画面へ配られていた。人数が500人を超えたら、写しを書く間隔を人数に応じて延ばします(最長30秒・最後の状態は必ず書きます・配信が替わったときは待ちません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1972',
-    date: '2026-11-10',
-    summary: '裏方が古いままなら自分で入れ替わる',
-    items: Object.freeze([
-      '新しい版にしたのに裏で動く記録係が前の版のまま動いていたら、それに気づいて自分で読み込み直すようにしました(繰り返さないよう30分に1回まで・ストア版では何もしません)'
     ])
   })
 ]);

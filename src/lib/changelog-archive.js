@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1972',
+    date: '2026-11-10',
+    summary: '裏方が古いままなら自分で入れ替わる',
+    items: Object.freeze([
+      '新しい版にしたのに裏で動く記録係が前の版のまま動いていたら、それに気づいて自分で読み込み直すようにしました(繰り返さないよう30分に1回まで・ストア版では何もしません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1971',
     date: '2026-11-10',
     summary: '裏方の更新が古いまま残る件を直す',

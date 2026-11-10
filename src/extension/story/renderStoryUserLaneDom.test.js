@@ -867,3 +867,64 @@ describe('fillLaneTier — 1人変わっても、同じ見た目の人のタイ�
     expect(after[1]).not.toBe(before[1]);
   });
 });
+
+describe('大きな段を分けて足す(v0.1.2008)', () => {
+  const many = (n, prefix = 'u') => Array.from({ length: n }, (_, i) => cell(`${prefix}${100000 + i}`, `https://cdn/${prefix}${i}.jpg`, `人${i}`));
+  const keysOf = (el) => Array.from(el.children).map((c) => c.dataset.userKey);
+  const flush = async () => { for (let i = 0; i < 40; i += 1) await new Promise((r) => setTimeout(r, 0)); };
+
+  it('1,000人の段は1回で全部作らず、足し終えると1回で作ったときと同じ並びになる', async () => {
+    const els = makeEls();
+    document.body.appendChild(els.laneLink);
+    const items = many(1000);
+    let settled = 0;
+    paintStoryUserLaneDomFilled(els, FACES, { link: items, gift: [], ad: [], konta: [], tanu: [] }, 1000, IO, { onTiersSettled: () => { settled += 1; } });
+    expect(els.laneLink.children.length).toBeGreaterThan(0);
+    expect(els.laneLink.children.length).toBeLessThan(1000);
+    expect(settled).toBe(0);
+    await flush();
+    expect(els.laneLink.children.length).toBe(1000);
+    expect(settled).toBe(1);
+    // 1回で作ったとき(小さく分けない会場と同じ作り方)と同じ並び
+    const ref = makeEls();
+    paintStoryUserLaneDomFilled(ref, FACES, { link: items, gift: [], ad: [], konta: [], tanu: [] }, 1000, IO, { wrapTileEl: (t) => t });
+    expect(keysOf(els.laneLink)).toEqual(keysOf(ref.laneLink));
+    els.laneLink.remove();
+  });
+
+  it('既に出ているマスは外さず、新しい人だけを分けて足す', async () => {
+    const els = makeEls();
+    document.body.appendChild(els.laneLink);
+    const base = many(700);
+    paintStoryUserLaneDomFilled(els, FACES, { link: base, gift: [], ad: [], konta: [], tanu: [] }, 700, IO, {});
+    await flush();
+    expect(els.laneLink.children.length).toBe(700);
+    const firstNode = els.laneLink.children[0];
+    const next = [...many(400, 'n'), ...base];
+    paintStoryUserLaneDomFilled(els, FACES, { link: next, gift: [], ad: [], konta: [], tanu: [] }, 1100, IO, {});
+    // 途中でも、前から出ていた 700人は残っている
+    expect(els.laneLink.children.length).toBeGreaterThanOrEqual(700);
+    expect(firstNode.isConnected).toBe(true);
+    await flush();
+    expect(els.laneLink.children.length).toBe(1100);
+    expect(els.laneLink.children[400]).toBe(firstNode); // 前から居た人は、新しい 400人のうしろの同じ並びに居る
+    els.laneLink.remove();
+  });
+
+  it('足している途中で別の並びが来たら、古い続きは足さない', async () => {
+    const els = makeEls();
+    document.body.appendChild(els.laneLink);
+    paintStoryUserLaneDomFilled(els, FACES, { link: many(1000, 'a'), gift: [], ad: [], konta: [], tanu: [] }, 1000, IO, {});
+    const b = many(650, 'b');
+    paintStoryUserLaneDomFilled(els, FACES, { link: b, gift: [], ad: [], konta: [], tanu: [] }, 650, IO, {});
+    await flush();
+    expect(els.laneLink.children.length).toBe(650);
+    els.laneLink.remove();
+  });
+
+  it('ふつうの大きさの段は今までどおり1回で作る', () => {
+    const els = makeEls();
+    paintStoryUserLaneDomFilled(els, FACES, { link: many(500), gift: [], ad: [], konta: [], tanu: [] }, 500, IO, {});
+    expect(els.laneLink.children.length).toBe(500);
+  });
+});

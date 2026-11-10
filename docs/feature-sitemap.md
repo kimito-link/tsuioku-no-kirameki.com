@@ -340,7 +340,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 298</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 299</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -487,6 +487,7 @@
 - `src/lib/laneMirrorPublishPace.js` — 応援レーンの鏡(nls_lane_mirror_v1 / nls_lane_mirror_v2_<lv>)を書く間隔を、人数に合わせて決める(v0.1.1973)。
 - `src/lib/laneMirrorWriteGate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/laneMirrorWriterYield.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/laneProgressiveFill.js` — 大きな段(応援マスが数百〜数千個)を、1回で全部作らずに数回に分けて足すための決まり(v0.1.2008)。
 - `src/lib/lanePublishSkipDiag.js` — lanePublishSkipDiag — 応援レーン鏡の publish が「到達したか/何で見送られたか」を1行にする純関数。
 - `src/lib/laneRosterDelta.js` — 応援レーンの「誰が消えたか」を測る純関数(v0.1.1231・Phase 1 計器)。
 - `src/lib/laneRosterKeeper.js` — 応援レーンの「名簿キーパー」(v0.1.1232・Phase 2 蓄積器)。
@@ -1499,10 +1500,10 @@
 - `v0.1.1981` 2026-11-10 — 大きな記録で横の欄が固まりにくく
 
 ### その他 (7版)
+- `v0.1.2008` 2026-11-10 — 数千人の応援マスを少しずつ足して固まらない
 - `v0.1.1986` 2026-11-10 — 大きな配信で描き直しが切れ目なく続くのを止めた
 - `v0.1.1984` 2026-11-10 — 人の多い配信で描き直しが続くのを直す
 - `v0.1.1983` 2026-11-10 — 生放送中の大きな記録を軽くする
 - `v0.1.1977` 2026-11-10 — 大きな記録を少しずつ読み、開いた直後も固まらない
 - `v0.1.1976` 2026-11-10 — 人の多い配信で名前と顔の控えを書く回数を減らす
 - `v0.1.1974` 2026-11-10 — YouTube系でコメントの控えの全件書き込みをやめる
-- `v0.1.1972` 2026-11-10 — 裏方が古いままなら自分で入れ替わる

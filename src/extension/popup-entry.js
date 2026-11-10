@@ -6721,7 +6721,12 @@ function renderStoryUserLane() {
   // 2026-07-14(Patch 2): 候補総数を渡し、切られたぶんは「ほか M人」と誠実に併記する(黙って切らない)。
   //   ★v0.1.1232: ①は上限撤廃で通常「ほか M人」は出ない(全員表示)が、器は③鏡(cap 48)の宣言に必要。
   paintStoryUserLaneDomFilled(els, faces, bucketsWithStats, laneDisplayedTotal, laneDomIo, {
-    totalCandidates: rosteredCandidates.length
+    totalCandidates: rosteredCandidates.length,
+    // ★v0.1.2008: 大きな段を分けて足し終えたら、実DOMを測り直す(途中の枚数のまま鏡へ運ばない・下の _laneDomSelfLast と同じ形)
+    onTiersSettled: () => {
+      const settledSelf = measureLaneDomSelf(els);
+      _laneDomSelfLast = { ...settledSelf, measuredAt: Date.now(), fingerprint: laneDomFingerprint(perTierKeysOf(settledSelf)), fingerprintFor: _lastPublishedLaneMirrorHash };
+    }
   });
   // C1: paint と同じ同期フレームで①実DOMを測り、後段の鏡publishへ渡す(TOCTOU防止)。
   const laneDomSelf = measureLaneDomSelf(els);

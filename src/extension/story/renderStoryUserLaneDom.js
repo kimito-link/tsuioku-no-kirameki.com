@@ -3,6 +3,7 @@
  * 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
  */
 
+import { mayBuildNewLaneTileNow, shouldFillLaneProgressively } from '../../lib/laneProgressiveFill.js';
 import {
   buildStoryUserLaneEmptyNoteGiftHtml,
   buildStoryUserLaneEmptyNoteKontaHtml,
@@ -609,12 +610,29 @@ export function reconcileLaneChildren(el, nodes) {
 }
 
 /**
+ * ★v0.1.2008: 大きな段を分けて足している途中の予約(段ごと)。新しい描画が来たら古い予約は捨てる。
+ * @type {WeakMap<HTMLElement, { timer: ReturnType<typeof setTimeout> }>}
+ */
+const _laneProgressivePending = new WeakMap();
+/** 計器: 分けて足した回数・足し終えた回数 */
+const _laneProgressiveDiag = { passes: 0, settled: 0, cancelled: 0 };
+try { /** @type {any} */ (globalThis).__laneProgressiveDiag = _laneProgressiveDiag; } catch { /* 計器だけ */ }
+
+/**
  * @param {HTMLElement} el
  * @param {Array<{ displaySrc: string, title: string, meta: { idLine: string, nameLine: string }, entry: { userId?: string } }>} items
  * @param {StoryUserLaneDomIo} io
  * @param {(tileEl: HTMLElement, item: unknown, index: number) => HTMLElement} [wrapTileEl]
+ * @param {() => void} [onSettled] 分けて足した段が最後まで足し終わったときに1回呼ぶ(1回で作れた段では呼ばない)
  */
-function fillLaneTier(el, items, io, wrapTileEl) {
+function fillLaneTier(el, items, io, wrapTileEl, onSettled) {
+  // ★v0.1.2008: 前の「続きを足す」予約は、新しい描画が来た時点で捨てる(古い並びで足さない)
+  const pendingProg = _laneProgressivePending.get(el);
+  if (pendingProg) {
+    clearTimeout(pendingProg.timer);
+    _laneProgressivePending.delete(el);
+    _laneProgressiveDiag.cancelled += 1;
+  }
   if (!items.length) {
     // 空段は毎回同じ結末(key='')。既に空(前回も空)なら DOM を触らない=無駄な再描画/巻き添えを避ける。
     if (_laneTierLastKey.get(el) === '' && !el.firstChild) { el.hidden = true; return; }
@@ -636,6 +654,14 @@ function fillLaneTier(el, items, io, wrapTileEl) {
   //   filledKeys(一度詰めた人)は保持される=戻さない(一方通行)。
   forgetLaneContentLod(el);
   const laneNameForLod = laneNameOfEl(el);
+  // ★v0.1.2008: 大きな段は、新しく作るマスを1回に決まった数までにして、残りは次の仕事で足す(lib/laneProgressiveFill.js)
+  const progressive = shouldFillLaneProgressively({
+    itemCount: items.length,
+    hasWrap: typeof wrapTileEl === 'function',
+    canSchedule: typeof setTimeout === 'function'
+  });
+  let newBuilt = 0;
+  let deferred = 0;
   /** @type {Node[]} 段に並べる順(0.1.1967: 断片に移すと使い回すタイルが一度外れるので、配列に集める) */
   const order = [];
   /** @type {Array<HTMLElement|null>} */
@@ -706,6 +732,12 @@ function fillLaneTier(el, items, io, wrapTileEl) {
       order.push(reused);
       continue;
     }
+    // ★v0.1.2008: この回で作る数を超えた「新しく作るマス」は次の回へ回す(既に出ているマスは上で使い回し済み)
+    if (!mayBuildNewLaneTileNow({ progressive, newBuiltSoFar: newBuilt })) {
+      deferred += 1;
+      continue;
+    }
+    newBuilt += 1;
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
     // ループ・hidden 制御(=レイアウト)はここに残す。全消しでなく変化時だけ replaceChildren で一括差替。
     const tileEl = buildPersonTileEl(p, io);
@@ -748,9 +780,27 @@ function fillLaneTier(el, items, io, wrapTileEl) {
   //   (PC 実測・MutationObserver)。使い回したタイルは同じ場所にあれば触らない。最後の DOM の並びは前と同じ。
   reconcileLaneChildren(el, order);
   el.hidden = false;
-  _laneTierLastKey.set(el, key);
   _laneTileNodes.set(el, tileNodes);
   _laneTierTileKeys.set(el, tileKeys);
+  if (deferred > 0) {
+    // まだ足りない: 「前回と同じ」とみなさせず、続きを次の仕事で足す(出ているマスは次の回で使い回される)
+    _laneTierLastKey.delete(el);
+    _laneProgressiveDiag.passes += 1;
+    const timer = setTimeout(() => {
+      const cur = _laneProgressivePending.get(el);
+      if (!cur || cur.timer !== timer) return;
+      _laneProgressivePending.delete(el);
+      if (!el.isConnected) return;
+      fillLaneTier(el, items, io, wrapTileEl, onSettled);
+    }, 0);
+    _laneProgressivePending.set(el, { timer });
+    return;
+  }
+  _laneTierLastKey.set(el, key);
+  if (progressive && typeof onSettled === 'function') {
+    _laneProgressiveDiag.settled += 1;
+    try { onSettled(); } catch { /* 知らせの失敗で描画を止めない */ }
+  }
   // 計器(観測のみ): 実際に貼り替えた段を数える=churn の実測。
   const laneName = laneNameOfEl(el);
   _laneTierRepaintCount[laneName] = (_laneTierRepaintCount[laneName] || 0) + 1;
@@ -762,7 +812,7 @@ function fillLaneTier(el, items, io, wrapTileEl) {
  * @param {{ link: unknown[], gift: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
- * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number, guides?: boolean, wrapTileEl?: (tileEl: HTMLElement, item: unknown, index: number) => HTMLElement, emptyTextOverrides?: { gift?: string } }} [opts] 診断の total と同じ記録件数
+ * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number, guides?: boolean, onTiersSettled?: () => void, wrapTileEl?: (tileEl: HTMLElement, item: unknown, index: number) => HTMLElement, emptyTextOverrides?: { gift?: string } }} [opts] 診断の total と同じ記録件数
  *   emptyTextOverrides: 空段ノートの差し替え(★会場の fallback 専用。①③は渡さない)
  *   （省略時はレーン直下の第2文なし）。totalCandidates=素性が取れた候補総数（cap 前）で「ほか M人」併記用。
  *   guides=false(v0.1.1120 会場用): キャラ案内帯・空段説明ノート・りんくヒント・フッター
@@ -805,11 +855,13 @@ export function paintStoryUserLaneDomFilled(
   // v0.1.1120: guides=false は案内帯/空段ノート/hint/フッターを【描画パスから除外】する(CSS隠しでない
   //   =構造依存driftなし)。省略時 true=①③status のDOMはバイト一致で不変(reference_venue_cleanup §C-1)。
   const showGuides = !(opts && opts.guides === false);
-  fillLaneTier(laneLink, buckets.link, io, wrapTileEl);
-  fillLaneTier(laneGift, buckets.gift, io, wrapTileEl);
-  if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io, wrapTileEl);
-  fillLaneTier(laneKonta, buckets.konta, io, wrapTileEl);
-  fillLaneTier(laneTanu, buckets.tanu, io, wrapTileEl);
+  // ★v0.1.2008: 大きな段を分けて足し終えたときの知らせ(呼び出し側が実DOMを測り直すため)
+  const onTiersSettled = opts && typeof opts.onTiersSettled === 'function' ? opts.onTiersSettled : undefined;
+  fillLaneTier(laneLink, buckets.link, io, wrapTileEl, onTiersSettled);
+  fillLaneTier(laneGift, buckets.gift, io, wrapTileEl, onTiersSettled);
+  if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io, wrapTileEl, onTiersSettled);
+  fillLaneTier(laneKonta, buckets.konta, io, wrapTileEl, onTiersSettled);
+  fillLaneTier(laneTanu, buckets.tanu, io, wrapTileEl, onTiersSettled);
 
   /*
    * ★v0.1.1475: たぬ姉段が多人数のとき【窓】にする(高さを絞ってスクロール)。

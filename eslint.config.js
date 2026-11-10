@@ -422,7 +422,8 @@ export default [
     // v0.1.1987: 応援マスの2回目の描画を省く配線(+9: import・計器の生成と公開2行・理由の注記1行・判定5行)。仕組みは lib の laneSecondRenderPolicy.js。
     // v0.1.1997: 大きな記録で合間に画面へ手を返す配線(+15: import・応援マスを次の仕事へ回す8行・正規化のあと2行・読み出しの続き4行)。決まりは lib の bigRecordYield.js。
     // v0.1.2007: 応援マスの集計の控えの配線(+4: import・控えの生成と計器の公開3行)。仕組みは lib の laneAggregatesMemo.js。
-    rules: { 'max-lines': ['error', { max: 21909, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2008: 応援マスを分けて足し終えたときに実DOMを測り直す配線(+6)。分け方は lib の laneProgressiveFill.js と story/renderStoryUserLaneDom.js。
+    rules: { 'max-lines': ['error', { max: 21915, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
