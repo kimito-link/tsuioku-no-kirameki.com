@@ -624,8 +624,9 @@ try { /** @type {any} */ (globalThis).__laneProgressiveDiag = _laneProgressiveDi
  * @param {StoryUserLaneDomIo} io
  * @param {(tileEl: HTMLElement, item: unknown, index: number) => HTMLElement} [wrapTileEl]
  * @param {() => void} [onSettled] 分けて足した段が最後まで足し終わったときに1回呼ぶ(1回で作れた段では呼ばない)
+ * @param {{ key: string, tileKeys: string[] }} [carry] 続きの回だけ: 同じ items について前の回で作った鍵(作り直さない)
  */
-function fillLaneTier(el, items, io, wrapTileEl, onSettled) {
+function fillLaneTier(el, items, io, wrapTileEl, onSettled, carry) {
   // ★v0.1.2008: 前の「続きを足す」予約は、新しい描画が来た時点で捨てる(古い並びで足さない)
   const pendingProg = _laneProgressivePending.get(el);
   if (pendingProg) {
@@ -644,7 +645,7 @@ function fillLaneTier(el, items, io, wrapTileEl, onSettled) {
     return;
   }
   // ★diff-skip: 前回と同一 items(見た目の body key 一致)なら DOM を一切触らない=img 温存で churn 消滅。
-  const key = storyLaneTierBodyKey(items);
+  const key = carry ? carry.key : storyLaneTierBodyKey(items);
   if (_laneTierLastKey.get(el) === key && el.firstChild) {
     el.hidden = false; // 温存(再描画しない)。hidden だけ念のため確実に外す(レイアウトは不変)。
     syncLaneTierStatsInPlace(el, items); // v0.1.1562: 貼り替えずに stats(data-stats)だけ追従させる
@@ -668,7 +669,7 @@ function fillLaneTier(el, items, io, wrapTileEl, onSettled) {
   const tileNodes = new Array(items.length).fill(null);
   // v0.1.1692: 前回と見た目の鍵が同じ人のタイルは作り直さず使い回す(1人変わるたびに段の全員の <img> が新品になり、
   //   合成済みの顔が仮の顔に戻る=ちらつきを止める)。会場(wrapTileEl あり)は席ごとの包みがあるので従来どおり全部作る。
-  const tileKeys = items.map(storyLaneTileKey);
+  const tileKeys = carry ? carry.tileKeys : items.map(storyLaneTileKey);
   /** @type {Map<string, HTMLElement[]> | null} */
   let reusePool = null;
   if (typeof wrapTileEl !== 'function') {
@@ -791,7 +792,7 @@ function fillLaneTier(el, items, io, wrapTileEl, onSettled) {
       if (!cur || cur.timer !== timer) return;
       _laneProgressivePending.delete(el);
       if (!el.isConnected) return;
-      fillLaneTier(el, items, io, wrapTileEl, onSettled);
+      fillLaneTier(el, items, io, wrapTileEl, onSettled, { key, tileKeys });
     }, 0);
     _laneProgressivePending.set(el, { timer });
     return;

@@ -112,3 +112,22 @@ describe('observeLaneImportShadow(間引き・計測・行)', () => {
     expect(() => observeLaneImportShadow(st, /** @type {any} */ (null), { nowMs: 1 })).not.toThrow();
   });
 });
+
+describe('laneImportShadowGapMs(大きな記録は間隔を空ける)', () => {
+  it('ふつうの記録は15秒・2万件以上は2分', async () => {
+    const m = await import('./laneImportShadow.js');
+    expect(m.laneImportShadowGapMs(0)).toBe(m.LANE_IMPORT_SHADOW_MIN_GAP_MS);
+    expect(m.laneImportShadowGapMs(m.LANE_IMPORT_SHADOW_BIG_ROWS - 1)).toBe(m.LANE_IMPORT_SHADOW_MIN_GAP_MS);
+    expect(m.laneImportShadowGapMs(m.LANE_IMPORT_SHADOW_BIG_ROWS)).toBe(m.LANE_IMPORT_SHADOW_BIG_GAP_MS);
+    expect(m.laneImportShadowGapMs('x')).toBe(m.LANE_IMPORT_SHADOW_MIN_GAP_MS);
+  });
+  it('大きな記録では15秒後は計算せず、2分後に計算する', async () => {
+    const m = await import('./laneImportShadow.js');
+    const st = m.createLaneImportShadowState();
+    const comments = Array.from({ length: m.LANE_IMPORT_SHADOW_BIG_ROWS }, (_, i) => ({ userId: `a:${i % 50}`, commentNo: i + 1, nickname: '' }));
+    const input = { comments, kokenRows: [], nicoadRows: [], broadcasterUid: '', liveId: 'lv1', mirror: {} };
+    expect(m.observeLaneImportShadow(st, input, { nowMs: 1_000_000 })).toBe(true);
+    expect(m.observeLaneImportShadow(st, input, { nowMs: 1_000_000 + m.LANE_IMPORT_SHADOW_MIN_GAP_MS })).toBe(false);
+    expect(m.observeLaneImportShadow(st, input, { nowMs: 1_000_000 + m.LANE_IMPORT_SHADOW_BIG_GAP_MS })).toBe(true);
+  });
+});

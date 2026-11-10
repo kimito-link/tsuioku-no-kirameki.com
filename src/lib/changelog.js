@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2009',
+    date: '2026-11-10',
+    summary: '大きな記録で繰り返す計算を減らす',
+    items: Object.freeze([
+      'コメントが数万件ある記録で、名前マスを少しずつ作る途中の並びの確かめ直しと、裏で動く見比べの計算を減らしました。遅いPCで固まる時間が短くなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2008',
     date: '2026-11-10',
     summary: '数千人の応援マスを少しずつ足して固まらない',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'YouTube系でコメントの控えの全件書き込みをやめる',
     items: Object.freeze([
       'Kick など YouTube 系の横の欄が、記録のコメント全部(1万2千行で約5.5MB)を90秒に39回書き直していた件。YouTube 系のコメントの正本は記録係の保存(IndexedDB)で、この控えは誰も読まないので書かないようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1973',
-    date: '2026-11-10',
-    summary: '人が多い配信は応援レーンの写しの書き込みを間引く',
-    items: Object.freeze([
-      '記録が数万行ある配信(Kick など)で、横の欄が開いた直後から長く固まる件の手当て。新しい人が来るたびに応援レーンの写し(数百KB)を書き直し、それが拡張の全画面へ配られていた。人数が500人を超えたら、写しを書く間隔を人数に応じて延ばします(最長30秒・最後の状態は必ず書きます・配信が替わったときは待ちません)。'
     ])
   })
 ]);

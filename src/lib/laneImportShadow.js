@@ -22,6 +22,20 @@ import { laneBuckets } from './liveLaneBuckets.js';
 
 /** 影運用の最小間隔(ms)。集計は件数に比例するので、毎描画では走らせない。 */
 export const LANE_IMPORT_SHADOW_MIN_GAP_MS = 15_000;
+/** この件数以上の記録は影運用の間隔を延ばす(集計は件数に比例する計器なので、大きな記録で画面を止めない)。 */
+export const LANE_IMPORT_SHADOW_BIG_ROWS = 20_000;
+/** 大きな記録のときの最小間隔(ms)。 */
+export const LANE_IMPORT_SHADOW_BIG_GAP_MS = 120_000;
+
+/**
+ * 影運用の最小間隔。記録が大きいほど空ける(観測だけの計器が画面の手を奪わないように)。
+ * @param {unknown} commentCount 保存コメントの件数
+ * @returns {number} ms
+ */
+export function laneImportShadowGapMs(commentCount) {
+  const n = Number(commentCount);
+  return Number.isFinite(n) && n >= LANE_IMPORT_SHADOW_BIG_ROWS ? LANE_IMPORT_SHADOW_BIG_GAP_MS : LANE_IMPORT_SHADOW_MIN_GAP_MS;
+}
 
 /** @param {unknown} u @returns {string} */
 function uidOfUserPageUrl(u) {
@@ -169,7 +183,8 @@ export function observeLaneImportShadow(state, input, clock) {
   try {
     if (!state || typeof state !== 'object') return false;
     const nowMs = Number(clock?.nowMs) || 0;
-    if (state.lastAtMs > 0 && nowMs - state.lastAtMs < LANE_IMPORT_SHADOW_MIN_GAP_MS) {
+    const rowCount = Array.isArray(/** @type {any} */ (input)?.comments) ? /** @type {any} */ (input).comments.length : 0;
+    if (state.lastAtMs > 0 && nowMs - state.lastAtMs < laneImportShadowGapMs(rowCount)) {
       state.skipped += 1;
       return false;
     }
