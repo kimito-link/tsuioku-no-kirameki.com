@@ -25,6 +25,7 @@ describe('isYtWatchLikeUrl', () => {
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/live')).toBe(true);
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/live/')).toBe(true);
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan')).toBe(false);
+    expect(isYtWatchLikeUrl('https://www.tiktok.com/@some.one/live')).toBe(false);
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/videos')).toBe(false);
   });
 });

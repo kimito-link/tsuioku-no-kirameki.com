@@ -36,6 +36,8 @@ export function parseYtVideoIdFromUrl(rawUrl) {
 export function ytHandleLivePath(rawUrl) {
   try {
     const u = new URL(String(rawUrl || ''), 'https://www.youtube.com');
+    const host = u.hostname.toLowerCase();
+    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return '';
     const path = u.pathname.replace(/\/$/, '');
     return /^\/@[^/]+\/live$/.test(path) ? path : '';
   } catch {
@@ -52,8 +54,12 @@ export function isYtWatchLikeUrl(rawUrl) {
     const u = new URL(rawUrl, 'https://www.youtube.com');
     const p = u.pathname;
     if (p.startsWith('/live_chat')) return false;
-    // /@名前/live は動画 id が URL に無い。id は canonical か ytInitialData から取る。
-    return p === '/watch' || p.startsWith('/live/') || /^\/@[^/]+\/live\/?$/.test(p);
+    // /@名前/live は YouTube だけ。TikTok も同じ形の URL を使う。
+    if (/^\/@[^/]+\/live\/?$/.test(p)) {
+      const host = u.hostname.toLowerCase();
+      return host === 'youtube.com' || host.endsWith('.youtube.com');
+    }
+    return p === '/watch' || p.startsWith('/live/');
   } catch {
     return false;
   }

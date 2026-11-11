@@ -192,6 +192,8 @@ export function videoIdForYtHandleLive(url, summaries) {
   let path = '';
   try {
     const u = new URL(String(url || ''), 'https://www.youtube.com');
+    const host = u.hostname.toLowerCase();
+    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return '';
     path = u.pathname.replace(/\/$/, '');
     if (!/^\/@[^/]+\/live$/.test(path)) return '';
   } catch {
