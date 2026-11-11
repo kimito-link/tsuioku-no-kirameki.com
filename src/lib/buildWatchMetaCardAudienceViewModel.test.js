@@ -106,6 +106,41 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.subText).toContain('5分内 0人');
   });
 
+  it('番組の視聴数は同時接続と書かず、公式の視聴数として出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        slotViewCount: 37000
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.phase).toBe('ready');
+    expect(vm.concurrent.estText).toBe('37,000');
+    expect(vm.concurrent.estText).not.toBe('推定中');
+    expect(vm.concurrent.subText).not.toBe('材料待ち');
+    expect(vm.concurrent.labelText).toBe('公式の視聴数');
+    expect(vm.concurrent.estTitle).toContain('同時に見ている人数ではありません');
+  });
+
+  it('公式の同時接続があるときは視聴数で置き換えない', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 120,
+        officialStatsUpdatedAt: nowMs - 5_000,
+        slotViewCount: 37000
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('120');
+    expect(vm.concurrent.labelText).toBeUndefined();
+  });
+
   it('公式同接が新鮮なら直接値（~ なし）・sub は直接値', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {

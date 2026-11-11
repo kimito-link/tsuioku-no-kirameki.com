@@ -278,6 +278,7 @@ export function isAbBroadcastJsonUrl(url) {
   if (/^image\.|^img\.|hayabusa/i.test(u.hostname)) return false;
   if (u.pathname.startsWith('/image/')) return false;
   if (/\/comments(?:\/|$)/.test(u.pathname)) return false;
+  if (/\/stats(?:\/|$)/.test(u.pathname)) return true;
   return /\/(?:channels|slots|media|programs|broadcasts?|liveEvents|live-events)(?:\/|$)/.test(u.pathname);
 }
 
@@ -300,14 +301,126 @@ export function abBroadcastImage(raw) {
 }
 
 /**
+ * 0 以上の視聴数。空や桁あふれは null。0 は欄があるときだけ。
+ * @param {Record<string, any>} node
+ * @param {readonly string[]} keys
+ */
+function pickCount(node, keys) {
+  for (const k of keys) {
+    if (node[k] == null || node[k] === '') continue;
+    const n = Number(node[k]);
+    if (Number.isFinite(n) && n >= 0 && n <= 50_000_000) return Math.floor(n);
+  }
+  return null;
+}
+
+/**
+ * 番組詳細の「3.7万」を数にする。視聴の単位が付いていないただの整数は、コメント件数と紛れるので null。
+ * @param {unknown} text
+ * @returns {number|null}
+ */
+export function abCompactCount(text) {
+  const s = String(text || '').replace(/,/g, '').replace(/\s+/g, '');
+  const m = s.match(/^(\d+(?:\.\d+)?)(万|億)(?:回|再生|視聴)?$/);
+  if (!m) return null;
+  let n = Number(m[1]);
+  if (!Number.isFinite(n)) return null;
+  if (m[2] === '万') n *= 10_000;
+  if (m[2] === '億') n *= 100_000_000;
+  if (n < 0 || n > 50_000_000) return null;
+  return Math.round(n);
+}
+
+/**
+ * 画面の短い文字から視聴数を1つ。近くに「視聴」とあればそれを、無ければ「万」「億」が1つだけのとき。
+ * @param {ReadonlyArray<{ text?: string, label?: string }>} snippets
+ * @returns {number|null}
+ */
+export function abViewsFromSnippets(snippets) {
+  /** @type {number|null} */
+  let labeled = null;
+  /** @type {number[]} */
+  const compact = [];
+  for (const s of Array.isArray(snippets) ? snippets : []) {
+    const n = abCompactCount(s?.text);
+    if (n == null) continue;
+    if (/視聴/.test(String(s?.label || ''))) {
+      labeled = n;
+      break;
+    }
+    compact.push(n);
+  }
+  if (labeled != null) return labeled;
+  return compact.length === 1 ? compact[0] : null;
+}
+
+/**
+ * JSON の視聴数と、画面に出ている視聴数。大きく違うときは画面の数（おすすめ欄の別番組を拾わない）。
+ * @param {unknown} jsonCount
+ * @param {unknown} domCount
+ * @returns {number|null}
+ */
+export function abPreferViewCount(jsonCount, domCount) {
+  const ok = (/** @type {unknown} */ v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 50_000_000 ? Math.floor(n) : null;
+  };
+  const j = ok(jsonCount);
+  const d = ok(domCount);
+  if (j == null) return d;
+  if (d == null) return j;
+  const ratio = j / Math.max(1, d);
+  if (ratio < 0.5 || ratio > 2) return d;
+  return j;
+}
+
+/**
+ * ページが受け取る視聴数。`stats.view` は番組の視聴数（3.7万の元）で、同時接続ではない。
+ * `concurrentViewers` と `audienceCount` だけを同時接続にする。コメントの icon は見ない。
+ * @param {unknown} raw
+ * @returns {{ views: number|null, concurrent: number|null, comments: number|null }}
+ */
+export function abAudienceFromPayload(raw) {
+  const root = unwrap(raw);
+  const none = { views: /** @type {number|null} */ (null), concurrent: /** @type {number|null} */ (null), comments: /** @type {number|null} */ (null) };
+  if (!root) return none;
+  /** @type {Record<string, any>[]} */
+  const nodes = [];
+  const push = (/** @type {unknown} */ v) => {
+    const o = obj(v);
+    if (o) nodes.push(o);
+  };
+  push(root.stats);
+  if (!Array.isArray(root.messages) && !Array.isArray(root.comments)) push(root);
+  for (const key of ['slot', 'liveEvent', 'event', 'program', 'episode']) {
+    const n = obj(root[key]);
+    if (!n) continue;
+    push(n.stats);
+    push(n.playback);
+    push(n.realtime);
+    push(n);
+  }
+  let views = /** @type {number|null} */ (null);
+  let concurrent = /** @type {number|null} */ (null);
+  let comments = /** @type {number|null} */ (null);
+  for (const node of nodes) {
+    if (views == null) views = pickCount(node, ['view', 'views', 'viewCount', 'viewers', 'viewerCount']);
+    if (concurrent == null) concurrent = pickCount(node, ['concurrentViewers', 'audienceCount']);
+    if (comments == null) comments = pickCount(node, ['comment', 'comments', 'commentCount']);
+  }
+  return { views, concurrent, comments };
+}
+
+/**
  * ページの応答を、コメントの束と番組情報に分ける。
  * コメントの束にチャンネルロゴが同居していても、ロゴは meta に残す（コメントの icon には入れない）。
  * @param {unknown} raw
- * @returns {{ batch: { chatId: string, isPolling: boolean | null, pollingIntervalSec: number | null, messages: any[] } | null, meta: { title: string, startedAtMs: number | null, viewers: number | null, imageUrl: string, channelId: string } | null } | null}
+ * @returns {{ batch: { chatId: string, isPolling: boolean | null, pollingIntervalSec: number | null, messages: any[] } | null, meta: { title: string, startedAtMs: number | null, viewers: number | null, views: number | null, concurrent: number | null, comments: number | null, imageUrl: string, channelId: string } | null } | null}
  */
 export function abPayloadNotices(raw) {
   const shrunk = shrinkAbPayload(raw);
   const pic = abBroadcastImage(raw);
+  const audience = abAudienceFromPayload(raw);
   const metaBase = shrunk && shrunk.meta ? shrunk.meta : null;
   const imageUrl = pic.imageUrl || (metaBase ? metaBase.imageUrl : '') || '';
   const channelId = pic.channelId || (metaBase ? metaBase.channelId : '') || '';
@@ -319,11 +432,15 @@ export function abPayloadNotices(raw) {
         messages: shrunk.messages,
       }
     : null;
-  const meta = metaBase || imageUrl || channelId
+  const hasAudience = audience.views != null || audience.concurrent != null || audience.comments != null;
+  const meta = metaBase || imageUrl || channelId || hasAudience
     ? {
         title: metaBase ? metaBase.title : '',
         startedAtMs: metaBase ? metaBase.startedAtMs : null,
         viewers: metaBase ? metaBase.viewers : null,
+        views: audience.views,
+        concurrent: audience.concurrent,
+        comments: audience.comments,
         imageUrl,
         channelId,
       }

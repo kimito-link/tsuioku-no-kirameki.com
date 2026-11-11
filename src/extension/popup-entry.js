@@ -9884,6 +9884,8 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       concurrentReadyEl.hidden = audienceVm.concurrent.concurrentReadyHidden;
     }
     if (concurrentCard) {
+      const concurrentLabel = concurrentCard.querySelector(':scope > .nl-live-stat-label');
+      if (concurrentLabel) concurrentLabel.textContent = audienceVm.concurrent.labelText || '推定同時接続';
       if (audienceVm.concurrent.ariaBusy) {
         concurrentCard.setAttribute('aria-busy', 'true');
       } else {

@@ -46,6 +46,7 @@ import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
  *   estIsPlaceholder: boolean,
  *   estTitle: string|null,
  *   subText: string,
+ *   labelText?: string,
  *   concurrentLoadingHidden: boolean,
  *   concurrentReadyHidden: boolean,
  *   ariaBusy: boolean,
@@ -150,7 +151,36 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
   /** @type {number|null} */
   let nextConcurrentEstimated = prev.concurrentEstimated;
 
-  if (showConcurrent) {
+  const slotViews =
+    typeof snapshot.slotViewCount === 'number' &&
+    Number.isFinite(snapshot.slotViewCount) &&
+    snapshot.slotViewCount > 0
+      ? Math.floor(snapshot.slotViewCount)
+      : null;
+  const officialConcurrent =
+    typeof snapshot.officialViewerCount === 'number' &&
+    Number.isFinite(snapshot.officialViewerCount) &&
+    snapshot.officialViewerCount > 0
+      ? snapshot.officialViewerCount
+      : null;
+
+  // 番組の視聴数（ABEMA の 3.7万）は同時接続ではない。推定が作れないあいだは、その数を見出し付きで出す。
+  if (slotViews != null && officialConcurrent == null) {
+    concurrent = {
+      phase: 'ready',
+      estText: slotViews.toLocaleString('ja-JP'),
+      estIsPlaceholder: false,
+      estTitle: '番組詳細に出ている視聴数です。同時に見ている人数ではありません。',
+      subText: '',
+      labelText: '公式の視聴数',
+      concurrentLoadingHidden: true,
+      concurrentReadyHidden: false,
+      ariaBusy: false,
+      numericEstimated: slotViews,
+      charReactionDelta: null
+    };
+    nextConcurrentEstimated = slotViews;
+  } else if (showConcurrent) {
     const streamAge =
       typeof snapshot.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0
         ? snapshot.streamAgeMin

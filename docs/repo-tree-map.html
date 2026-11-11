@@ -195,7 +195,7 @@
     </section>
 <section class="feat">
       <div class="fhead"><span class="fname">ABEMA の配信を記録(本体に同梱)</span> <span class="tag">ABEMA</span><span class="tag">記録</span><span class="tag">他プラットフォーム</span></div>
-      <div class="fdesc">ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が画面に出ている分を全部 YouTube 版と同じ記録へ渡す。読み上げは新しい端の約20秒だけ。番組詳細が開いていてもコメントのタブや吹き出しを、コメントが届くまで押す。チャンネルを切り替えたらやり直す。コメント欄が約250pxのときは PICK UP も画面上の最新コメントも欄の幅で約20文字。配信者カードの画像はページのチャンネルロゴ（公開の logo.png を含む）で、取れなければ代わりの顔。白い丸にはしない。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.&lt;login&gt;.&lt;チャット&gt;・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない</div>
+      <div class="fdesc">ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が画面に出ている分を全部 YouTube 版と同じ記録へ渡す。読み上げは新しい端の約20秒だけ。番組詳細が開いていてもコメントのタブや吹き出しを、コメントが届くまで押す。チャンネルを切り替えたらやり直す。コメント欄が約250pxのときは PICK UP も画面上の最新コメントも欄の幅で約20文字。配信者カードの画像はページのチャンネルロゴ（公開の logo.png を含む）で、取れなければ代わりの顔。白い丸にはしない。番組詳細の視聴数は推定同時接続と書かず「公式の視聴数」として出す。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.&lt;login&gt;.&lt;チャット&gt;・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない</div>
       <div class="fpaths"><code class="path">extension-youtube/src/ab-main-entry.js</code><code class="path">extension-youtube/src/ab-content-entry.js</code><code class="path">src/lib/abema/abParse.js</code><code class="path">src/lib/abema/abParse.test.js</code><code class="path">src/lib/abema/abCommentPanel.js</code><code class="path">src/lib/abema/abCommentPanel.test.js</code><code class="path">src/lib/platform/streamPlatform.js</code></div>
     </section>
 <section class="feat">

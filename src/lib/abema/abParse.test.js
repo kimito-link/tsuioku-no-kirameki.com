@@ -22,6 +22,10 @@ import {
   abUrlsFromSrcset,
   isAbBroadcastJsonUrl,
   abPayloadNotices,
+  abAudienceFromPayload,
+  abCompactCount,
+  abViewsFromSnippets,
+  abPreferViewCount,
   pickAbBroadcasterImage,
 } from './abParse.js';
 import { ytIconForNumericUid, ytSummaryToNicoSnapshot } from '../../../extension-youtube/src/ytNicoShim.js';
@@ -175,6 +179,20 @@ describe('ABEMA のコメント JSON', () => {
     expect(parseAbCommentBatch(stats)).toBe(null);
     expect(parseAbProgramMeta(stats)).toBe(null);
     expect(shrinkAbPayload(stats)).toBe(null);
+    const notice = abPayloadNotices(stats);
+    expect(notice.batch).toBe(null);
+    expect(notice.meta.views).toBe(11580);
+    expect(notice.meta.comments).toBe(580);
+    expect(notice.meta.concurrent).toBe(null);
+    expect(abAudienceFromPayload({ concurrentViewers: 40, viewCount: 37000 }).concurrent).toBe(40);
+    expect(abAudienceFromPayload({ concurrentViewers: 40, viewCount: 37000 }).views).toBe(37000);
+    expect(abCompactCount('3.7万')).toBe(37000);
+    expect(abCompactCount('3,662')).toBe(null);
+    expect(abViewsFromSnippets([{ text: '3.7万', label: '' }])).toBe(37000);
+    expect(abViewsFromSnippets([{ text: '1.2万', label: '' }, { text: '3.7万', label: '視聴数' }])).toBe(37000);
+    expect(abPreferViewCount(37821, 37000)).toBe(37821);
+    expect(abPreferViewCount(500, 37000)).toBe(37000);
+    expect(isAbBroadcastJsonUrl('https://api.p-c3-e.abema-tv.com/v1/broadcast/slots/abc/stats')).toBe(true);
   });
   it('hello までの控えは、番組情報で最初のコメント一覧を押し出さない', () => {
     let q = [];

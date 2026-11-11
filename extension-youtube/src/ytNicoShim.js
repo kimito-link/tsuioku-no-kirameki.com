@@ -410,6 +410,10 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     recordedCountHint: typeof sum?.itemCount === 'number' ? sum.itemCount : null, // 同じく、記録件数(まとめの itemCount)
     viewerCountSource: 'dom',
     officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null, // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
+    // ABEMA の番組詳細の視聴数。同時接続の欄には入れない（見出しは「公式の視聴数」）。
+    slotViewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount > 0 && sum.slotViewCount <= 50_000_000
+      ? Math.floor(sum.slotViewCount)
+      : null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める

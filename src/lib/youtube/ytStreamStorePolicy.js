@@ -36,6 +36,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   broadcasterHandle?: string,
  *   broadcasterIconUrl?: string,
  *   concurrentViewers?: number | null,
+ *   slotViewCount?: number | null,
  *   chatFilterLabel?: string,
  *   itemCount?: number,
  *   startedAt?: number | null,
@@ -83,6 +84,12 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   const prevPeak = plausible(prev.peakConcurrentViewers) ? Math.floor(prev.peakConcurrentViewers) : null;
   const peakConcurrentViewers =
     concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
+  // ABEMA の番組詳細の視聴数（同時接続ではない）。無い配信の要約には欄を足さない。
+  const slotViewCount = plausible(patch?.slotViewCount)
+    ? Math.floor(/** @type {number} */ (patch.slotViewCount))
+    : plausible(prev.slotViewCount)
+      ? Math.floor(prev.slotViewCount)
+      : null;
   const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || '').trim();
   const itemCount =
     typeof patch?.itemCount === 'number' && Number.isFinite(patch.itemCount) && patch.itemCount >= 0
@@ -130,6 +137,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     broadcasterIconUrl,
     concurrentViewers,
     peakConcurrentViewers,
+    ...(slotViewCount != null ? { slotViewCount } : {}),
     chatFilterLabel,
     itemCount,
     startedAt,

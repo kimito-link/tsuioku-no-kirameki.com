@@ -844,6 +844,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           broadcasterHandle: payload.broadcasterHandle ? String(payload.broadcasterHandle) : undefined,
           concurrentViewers:
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
+          slotViewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : undefined,
           // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
           startedAt:
             typeof payload.startedAt === 'number' &&

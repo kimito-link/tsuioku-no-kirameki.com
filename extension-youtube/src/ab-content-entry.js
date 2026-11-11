@@ -15,6 +15,8 @@ import {
   abLinearChannelId,
   abUrlsFromCss,
   abUrlsFromSrcset,
+  abViewsFromSnippets,
+  abPreferViewCount,
 } from '../../src/lib/abema/abParse.js';
 import {
   AB_OPEN_COMMENT_KEY,
@@ -91,8 +93,29 @@ let seen = new Set();
 let pending = [];
 let flushTimer = 0;
 let metaAt = 0;
-/** @type {{ title: string, startedAtMs: number | null, viewers: number | null, imageUrl: string, channelId: string }} */
-let program = { title: '', startedAtMs: null, viewers: null, imageUrl: '', channelId: '' };
+/** @type {{ title: string, startedAtMs: number | null, views: number | null, concurrent: number | null, imageUrl: string, channelId: string }} */
+let program = { title: '', startedAtMs: null, views: null, concurrent: null, imageUrl: '', channelId: '' };
+
+/** 番組詳細に出ている「3.7万」だけを拾う。コメント件数の 3,662 は万が付かないので入れない。 */
+function domSlotViews() {
+  /** @type {{ text: string, label: string }[]} */
+  const snippets = [];
+  try {
+    const nodes = document.querySelectorAll('span, button, a, p, dd');
+    for (let i = 0; i < nodes.length && snippets.length < 12; i += 1) {
+      const el = nodes[i];
+      if (!(el instanceof HTMLElement) || el.childElementCount > 1) continue;
+      const text = (el.textContent || '').trim();
+      if (!text || text.length > 12 || !/[万億]/.test(text)) continue;
+      const parent = el.parentElement;
+      const label = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${parent?.getAttribute('aria-label') || ''} ${String(parent?.className || '')}`;
+      snippets.push({ text, label });
+    }
+  } catch {
+    /* ページの形が違っても記録は続ける */
+  }
+  return abViewsFromSnippets(snippets);
+}
 let sentIcon = '';
 
 /** ページに出ているチャンネル画像か番組画像。コメントした人の顔は集めない。 */
@@ -159,7 +182,9 @@ function sendMeta() {
     payload.broadcasterIconUrl = icon;
     sentIcon = icon;
   }
-  if (program.viewers != null && program.viewers >= 0) payload.concurrentViewers = program.viewers;
+  const views = abPreferViewCount(program.views, domSlotViews());
+  if (views != null) payload.slotViewCount = views;
+  if (program.concurrent != null && program.concurrent >= 0) payload.concurrentViewers = program.concurrent;
   if (program.startedAtMs) {
     payload.startedAt = program.startedAtMs;
     payload.startedAtApprox = false;
@@ -386,7 +411,7 @@ function syncPage() {
   dismissed = false;
   watchStartedAt = login ? Date.now() : 0;
   sentIcon = '';
-  program = { title: '', startedAtMs: null, viewers: null, imageUrl: '', channelId: '' };
+  program = { title: '', startedAtMs: null, views: null, concurrent: null, imageUrl: '', channelId: '' };
   seen = new Set();
   pending = [];
   panel.reset();
@@ -412,7 +437,8 @@ window.addEventListener('message', (ev) => {
     const title = String(data.meta.title || '').slice(0, 200);
     if (title) program.title = title;
     if (Number(data.meta.startedAtMs) > 0) program.startedAtMs = Number(data.meta.startedAtMs);
-    if (data.meta.viewers != null && Number.isFinite(Number(data.meta.viewers))) program.viewers = Number(data.meta.viewers);
+    if (data.meta.views != null && Number.isFinite(Number(data.meta.views))) program.views = Number(data.meta.views);
+    if (data.meta.concurrent != null && Number.isFinite(Number(data.meta.concurrent))) program.concurrent = Number(data.meta.concurrent);
     if (data.meta.imageUrl) program.imageUrl = String(data.meta.imageUrl);
     if (incomingId) program.channelId = incomingId;
     if (streamKey) sendMeta();
