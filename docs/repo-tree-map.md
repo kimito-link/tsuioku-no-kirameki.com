@@ -180,8 +180,9 @@ graph LR
   HUB --> f19["歌枠の曲順とリクエスト"]
   f19 --> f19_0["lib/songSetlist.js"]
   f19 --> f19_1["extension/setlist-entry.js"]
-  f19 --> f19_2["setlist.html"]
-  f19 --> f19_3["setlist-obs.html"]
+  f19 --> f19_2["extension/setlist-obs-entry.js"]
+  f19 --> f19_3["setlist.html"]
+  f19 --> f19_4["setlist-obs.html"]
   HUB --> f20["会場読み上げ診断(遅延の切り分け)"]
   f20 --> f20_0["lib/voiceDiag.js"]
   f20 --> f20_1["lib/voiceDiagKey.js"]
@@ -418,10 +419,10 @@ graph LR
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 177 件</sub>
+<sub>ファイル 178 件</sub>
 
 - `data/`（1 件） — 拡張同梱の静的データ(応援バナー定義 json)  〔データ / 応援〕
-- `dist/`（32 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
+- `dist/`（33 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
@@ -462,11 +463,11 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2436 件</sub>
+<sub>ファイル 2437 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（112 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（113 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
 - `lib/`（2136 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
@@ -645,6 +646,7 @@ popup の応援レーンのタイルを素クリックすると、その人の�
 
 - [`src/lib/songSetlist.js`](../src/lib/songSetlist.js)
 - [`src/extension/setlist-entry.js`](../src/extension/setlist-entry.js)
+- [`src/extension/setlist-obs-entry.js`](../src/extension/setlist-obs-entry.js)
 - [`extension/setlist.html`](../extension/setlist.html)
 - [`extension/setlist-obs.html`](../extension/setlist-obs.html)
 

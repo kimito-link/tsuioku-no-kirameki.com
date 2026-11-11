@@ -3,6 +3,7 @@
  * setlist-entry.js — 歌枠の曲順と、リクエスト言葉。
  * コメントの取り込みはこの画面を開いているあいだだけ（配信ページには足さない）。
  */
+import '../lib/extDocBusyCensusBoot.js';
 import { extractLiveIdFromUrl } from '../lib/broadcastUrl.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
@@ -136,6 +137,17 @@ function renderEditor() {
   }
 }
 
+function commentForSetlist(row) {
+  const src = row && typeof row === 'object' ? row : {};
+  return {
+    text: src.text,
+    userId: src.userId,
+    name: src.name || src.nickname,
+    no: src.no || src.commentNo,
+    at: src.at || src.capturedAt
+  };
+}
+
 async function pollComments() {
   if (document.hidden || !state.requestWords.length) return;
   const store = storage();
@@ -147,7 +159,7 @@ async function pollComments() {
     const key = tailStorageKey(liveId);
     const bag = await store.get(key);
     const rows = Array.isArray(bag?.[key]) ? bag[key] : [];
-    const result = ingestSongRequests(state, rows);
+    const result = ingestSongRequests(state, rows.map(commentForSetlist));
     if (result.added > 0) {
       state = result.state;
       await saveState(state);

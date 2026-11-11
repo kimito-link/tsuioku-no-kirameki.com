@@ -179,6 +179,11 @@ const targets = [
     target: 'chrome100'
   },
   {
+    entryPoints: ['src/extension/setlist-obs-entry.js'],
+    outfile: 'extension/dist/setlist-obs.js',
+    target: 'chrome100'
+  },
+  {
     entryPoints: ['src/extension/venue-entry.js'],
     outfile: 'extension/dist/venue.js',
     target: 'chrome100'

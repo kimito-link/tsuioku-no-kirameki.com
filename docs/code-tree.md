@@ -27,11 +27,12 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 11 / 1236 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
 - `scripts/build.mjs`
+- `src/extension/setlist-obs-entry.js`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
 - `src/lib/mediaKitExport.js`
@@ -1161,7 +1162,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2437)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1198,7 +1199,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (113)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1284,6 +1285,7 @@
     - `self-update.kit-test.mjs` — self-update.test.mjs — self-update.js の試験。拡張へ写すときは import 先のパスだけ直す。
     - `self-update.test.js`
     - `setlist-entry.js` — 歌枠の曲順と、リクエスト言葉。
+    - `setlist-obs-entry.js` — ⚠️ 役割コメント無し
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
     - `smartphoneFreshness.wiring.test.js`

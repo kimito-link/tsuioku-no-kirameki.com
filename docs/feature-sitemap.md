@@ -340,6 +340,7 @@
 - **歌枠の曲順とリクエスト** — リクエスト言葉が先頭にあるコメントだけを曲の希望として残し、曲順をプレーンテキストで出す。OBSは文字だけの画面をウィンドウキャプチャする。ランキングは作らない。取り込みはこの画面を開いているあいだだけ
   - `src/lib/songSetlist.js`
   - `src/extension/setlist-entry.js`
+  - `src/extension/setlist-obs-entry.js`
   - `extension/setlist.html`
   - `extension/setlist-obs.html`
 - **ギフト投擲演出** — 会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群

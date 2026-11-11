@@ -156,7 +156,7 @@ export function requestSeenKey(row) {
   const src = row && typeof row === 'object' ? row : {};
   const no = String(/** @type {any} */ (src).no || /** @type {any} */ (src).commentNo || '').trim();
   if (no) return `n:${no}`.slice(0, 120);
-  const at = Math.max(0, Number(/** @type {any} */ (src).at || /** @type {any} */ (src).capturedAt) || 0);
+  const at = Math.max(0, Number(/** @type {any} */ (src).at) || 0);
   const text = String(/** @type {any} */ (src).text || '').trim().slice(0, 80);
   if (!text) return '';
   return `t:${at}:${text}`.slice(0, 120);
@@ -190,7 +190,7 @@ export function ingestSongRequests(state, comments) {
       title: hit.title,
       name: String(row?.name || row?.nickname || '').trim().slice(0, 80),
       userId: String(row?.userId || '').trim().slice(0, 40),
-      at: Math.max(0, Number(row?.at || row?.capturedAt) || 0),
+      at: Math.max(0, Number(row?.at) || 0),
       status: 'open'
     });
     added += 1;
