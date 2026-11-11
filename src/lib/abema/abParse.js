@@ -508,6 +508,7 @@ export function abCommentRow(msg, ctx) {
 export function enqueueAbMainBacklog(backlog, msg, limit = 40) {
   const next = (Array.isArray(backlog) ? backlog.slice() : []).concat([msg]);
   const cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 40;
+  /** @param {any} m */
   const isComment = (m) => Boolean(m && m.t === 'batch' && Array.isArray(m.body?.messages) && m.body.messages.length > 0);
   let commentCount = 0;
   for (let i = next.length - 1; i >= 0; i -= 1) {
