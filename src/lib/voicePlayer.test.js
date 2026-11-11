@@ -60,11 +60,14 @@ describe('VoicePlayer', () => {
       mockStorage.set.mockClear();
       await p.enable();
       expect(p.enabled).toBe(false);
-      // 読み上げON/OFFキーへの書き込みが起きていないこと。
-      const wroteEnabledKey = mockStorage.set.mock.calls.some(
-        (c) => c[0] && Object.prototype.hasOwnProperty.call(c[0], p.VOICE_READING_ENABLED_KEY)
+      expect(p.readingWanted).toBe(true);
+      expect(p.toggleBusy).toBe(false);
+      // ON の意思は残す。OFF は書かない(エンジンが居ないだけでボタンを戻さない)。
+      const wroteFalse = mockStorage.set.mock.calls.some(
+        (c) => c[0] && c[0][p.VOICE_READING_ENABLED_KEY] === false
       );
-      expect(wroteEnabledKey).toBe(false);
+      expect(wroteFalse).toBe(false);
+      expect(mockStorage.set).toHaveBeenCalledWith({ [p.VOICE_READING_ENABLED_KEY]: true });
     });
 
     it('★失敗後もボタンが押せる状態に戻る(toggleBusy が解除される)', async () => {
@@ -687,7 +690,7 @@ describe('VoicePlayer', () => {
       return { fn, calls, get maxConcurrent() { return maxConcurrent; } };
     }
 
-    it('再生中にバックログがあると先頭1件だけでなく複数件を並行で先行合成する', async () => {
+    it('バックログがあっても合成は1件ずつ(遅いCPUを並行依頼で埋めない)', async () => {
       const gated = makeGatedSynth();
       player.fetchSynthesizeVoice = gated.fn;
       // 音声は ended を手動で起こす(再生中の状態を保てるように)。
@@ -697,7 +700,7 @@ describe('VoicePlayer', () => {
       });
       await player.enable({ persist: false });
 
-      // 6件まとめて投入=詰まり気味(深さ3になるべき文脈)。
+      // 6件まとめて投入しても、同時に頼む合成は1件。
       player.enqueue(
         Array.from({ length: 6 }, (_, i) => ({
           kind: 'comment',
@@ -709,9 +712,8 @@ describe('VoicePlayer', () => {
       // マイクロタスクを回して先読みが起動するのを待つ。
       await new Promise((r) => setTimeout(r, 20));
 
-      // 旧実装(深さ1)なら同時 in-flight は最大2(現在+先読み1)。
-      // 新実装(深さ最大3)なら3件以上が同時に合成される。
-      expect(gated.maxConcurrent).toBeGreaterThanOrEqual(3);
+      expect(gated.maxConcurrent).toBe(1);
+      expect(gated.calls.length).toBe(1);
 
       // 後始末: 保留中の合成を全て解決し、再生も全て ended にして drain を終わらせる。
       for (const c of gated.calls) c.resolveFn();
@@ -765,6 +767,96 @@ describe('VoicePlayer', () => {
       for (const c of gated.calls) c.resolveFn();
       while (endedHandlers.length) endedHandlers.shift()();
       await new Promise((r) => setTimeout(r, 20));
+    });
+  });
+
+  describe('遅い合成の途中でも ON/OFF がすぐ効く', () => {
+    const item = { kind: 'comment', userId: 'u1', nickname: 'n', text: 'hello' };
+
+    it('合成が返る前に OFF にすると、その声は鳴らさず待ちも空', async () => {
+      let resolveSynth;
+      /** @type {AbortSignal|undefined} */
+      let signal;
+      player.fetchSynthesizeVoice = vi.fn((_t, _v, opts) => {
+        signal = opts && opts.signal;
+        return new Promise((r) => { resolveSynth = r; });
+      });
+      await player.enable({ persist: false });
+      player.enqueue([item]);
+      await Promise.resolve();
+      expect(player.fetchSynthesizeVoice).toHaveBeenCalledTimes(1);
+      player.disable();
+      expect(player.enabled).toBe(false);
+      expect(player.readingWanted).toBe(false);
+      expect(player.queue).toEqual([]);
+      expect(player.toggleBusy).toBe(false);
+      expect(signal && signal.aborted).toBe(true);
+      resolveSynth(new ArrayBuffer(8));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(mockAudio.play).not.toHaveBeenCalled();
+    });
+
+    it('生存確認が返る前に OFF にすると、後から成功しても ON に戻らない', async () => {
+      let resolveProbe;
+      player.probeVoicevoxAlive = vi.fn(() => new Promise((r) => { resolveProbe = r; }));
+      const pending = player.enable({ persist: false });
+      await Promise.resolve();
+      expect(player.readingWanted).toBe(true);
+      expect(typeof resolveProbe).toBe('function');
+      player.disable();
+      expect(player.readingWanted).toBe(false);
+      expect(player.toggleBusy).toBe(false);
+      resolveProbe({ ok: true, reason: '' });
+      await pending;
+      expect(player.enabled).toBe(false);
+      expect(player.readingWanted).toBe(false);
+    });
+
+    it('保存が OFF になったら、合成中でもすぐ止める', async () => {
+      /** @type {(changes: object, area: string) => void} */
+      let listener = () => {};
+      player.storageOnChanged = { addListener: (fn) => { listener = fn; } };
+      player._watchVolumeSetting();
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      player.enqueue([item]);
+      await Promise.resolve();
+      listener({ [player.VOICE_READING_ENABLED_KEY]: { newValue: false } }, 'local');
+      expect(player.readingWanted).toBe(false);
+      expect(player.enabled).toBe(false);
+      expect(player.queue).toEqual([]);
+      resolveSynth(new ArrayBuffer(8));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(mockAudio.play).not.toHaveBeenCalled();
+    });
+
+    it('つながっていないときもボタンは ON のまま。OFF は書かない', async () => {
+      player.engineRetryMs = 0;
+      player.fetchVoicevoxAlive = vi.fn().mockResolvedValue(false);
+      const states = [];
+      player.onLoadingState = (s, reason) => states.push([s, reason]);
+      await player.enable({ persist: false });
+      expect(player.readingWanted).toBe(true);
+      expect(player.enabled).toBe(false);
+      expect(player.toggleBusy).toBe(false);
+      expect(states[states.length - 1]).toEqual(['notfound', 'refused']);
+    });
+
+    it('エンジンが後から起きると、押し直さずに声を出せる状態になる', async () => {
+      player.engineRetryMs = 20;
+      let n = 0;
+      player.probeVoicevoxAlive = vi.fn(async () => {
+        n += 1;
+        if (n <= 4) return { ok: false, reason: 'refused' };
+        return { ok: true, reason: '' };
+      });
+      await player.enable({ persist: false });
+      expect(player.enabled).toBe(false);
+      expect(player.readingWanted).toBe(true);
+      await new Promise((r) => setTimeout(r, 80));
+      expect(player.enabled).toBe(true);
+      expect(player.readingWanted).toBe(true);
     });
   });
 });

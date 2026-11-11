@@ -67,6 +67,7 @@ describe('ytMergedIsolation の決まり', () => {
     expect(ytMergedOutgoingMessage({ type: 'NLS_OPEN_COMEVIEW', liveId: 'lv9' })).toEqual({ type: 'YT_OPEN_COMEVIEW', liveId: 'lv9' });
     expect(ytMergedOutgoingMessage({ type: 'NLS_OPEN_VENUE' })).toEqual({ type: 'YT_OPEN_VENUE' });
     expect(ytMergedOutgoingMessage({ type: 'NLS_FETCH_PROXY', url: 'u' })?.type).toBe('NLS_FETCH_PROXY');
+    expect(ytMergedOutgoingMessage({ type: 'NLS_FETCH_PROXY_ABORT', id: '1' })?.type).toBe('NLS_FETCH_PROXY_ABORT');
     expect(ytMergedOutgoingMessage({ type: 'NLS_VOICE_READER_CLAIM' })?.type).toBe('NLS_VOICE_READER_CLAIM');
     // ニコ生版の記録・取得はさせない(疑似の配信番号で本体の記録を汚す)
     expect(ytMergedOutgoingMessage({ type: 'NLS_CDB_APPEND' })).toBe(null);

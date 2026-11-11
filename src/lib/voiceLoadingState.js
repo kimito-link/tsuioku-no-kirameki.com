@@ -67,7 +67,7 @@ export function resolveVoiceLoadingView(state, surface, reason) {
     if (reason === 'timeout') {
       return {
         kind: 'error',
-        text: 'VOICEVOXは起動していますが応答がありません(重い処理中かもしれません。もう一度押すと再接続します)'
+        text: 'VOICEVOXは起動していますが応答がありません(重い処理中かもしれません)'
       };
     }
     if (reason === 'http-error') {
@@ -82,10 +82,10 @@ export function resolveVoiceLoadingView(state, surface, reason) {
         text: '拡張の接続が切れています(ページを再読み込みしてください)'
       };
     }
-    // refused / 不明 = 従来どおり「起動して押し直す」を案内。
+    // refused / 不明 = エンジンに届いていない。ボタンは押したままなので「押し直して」とは言わない。
     return {
       kind: 'error',
-      text: 'VOICEVOXが見つかりません(起動して読み上げを押し直してください)'
+      text: 'VOICEVOXにつながっていません'
     };
   }
 
@@ -102,4 +102,17 @@ export function resolveVoiceLoadingView(state, surface, reason) {
     kind: 'loading',
     text: connecting ? '🎤 接続中…(起動直後は数秒かかります)' : '🎤 マイクチェック中…'
   };
+}
+
+/**
+ * エンジン API が教えられる範囲の中立な一行。
+ *   /supported_devices は「GPU を使えるか」だけを返す。「今 CPU か GPU か」は返さない。
+ *   null は未接続・読めない=この行は出さない(つながっていない案内と混ぜない)。
+ * @param {boolean|null|undefined} gpuCapable probeVoicevoxGpuCapable の戻り
+ * @returns {string}
+ */
+export function voiceEngineDeviceNote(gpuCapable) {
+  if (gpuCapable === true) return 'VOICEVOX: GPUに対応しています（今の計算モードは分かりません）';
+  if (gpuCapable === false) return 'VOICEVOX: GPU非対応のエンジンです';
+  return '';
 }

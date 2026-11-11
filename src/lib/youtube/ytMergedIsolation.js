@@ -36,6 +36,7 @@ const PASS_MESSAGE_TYPES = new Set([
   'NLS_VOICE_READER_CLAIM',
   'NLS_VOICE_READER_RELEASE',
   'NLS_FETCH_PROXY',
+  'NLS_FETCH_PROXY_ABORT',
 ]);
 /** 名前を変えて YouTube 版の裏方へ */
 export const YT_MERGED_RENAMED_MESSAGES = Object.freeze({

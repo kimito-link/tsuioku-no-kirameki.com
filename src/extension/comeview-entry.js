@@ -108,7 +108,7 @@ import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
-import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
+import { VOICE_ALIVE_RETRY_BACKOFF_MS, VOICE_ENGINE_RETRY_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
   computeVoiceCongestion,
   computeVoicePlaybackRate,
@@ -166,6 +166,7 @@ import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
+  voiceEngineDeviceNote,
   VOICE_LOADING_FLICKER_GUARD_MS
 } from '../lib/voiceLoadingState.js';
 import { isYtGiftOnlyCommentRow } from '../lib/youtube/ytGiftOnlyRow.js';
@@ -287,6 +288,16 @@ let _commentCount = 0;
 let _hoverBar = null;
 let _hoverRow = null;
 let _voiceReadingEnabled = false;
+/** ボタンに出す意思。エンジンが居なくても ON のまま。 */
+let _voiceReadingWanted = false;
+let _voiceEnableSerial = 0;
+let _voiceConnectInFlight = false;
+/** @type {Array<() => void>} */
+let _voiceConnectWaiters = [];
+/** @type {Set<AbortController>} */
+const _voiceSynthAborts = new Set();
+let _voiceEngineRetryTimer = 0;
+let _voiceSynthInFlight = 0;
 // v0.1.1794: 同じ配信を会場でも読んでいる時は、先に読み始めた方だけが読む(声の二重・VOICEVOX の取り合いを防ぐ)。
 //   試験(voiceTestRun)は enqueueVoiceTimelineItems を直接呼ぶのでこの関門を通らない。
 const _voiceReaderLease = startVoiceReaderLease(() => _voiceReadingEnabled && !isObsMode() && !!_liveId, () => _liveId, {
@@ -299,12 +310,7 @@ let _voiceStyleIds = [];
 let _voiceAssignments = {};
 let _voiceQueue = [];
 /**
- * v0.1.768: 先読み合成を【深さ1→最大3】に拡張(2026-06-16 会議+実コード裏取り)。
- *   従来は1スロット固定で、N の再生中に N+1 を1件だけ先行合成し、N+2 以降の合成が
- *   遊んでいた=フラッド時に合成が前に出られずコメビュに負ける唯一の構造的理由だった。
- *   item オブジェクトをキーに in-flight WAV Promise を持つ Map にし、詰まり具合に応じて
- *   先頭から深さ分(最大3)を並行で先行合成する。再生は元々1本ずつ=不協和は起きない。
- *   同一 VOICEVOX サーバへの並行 audio_query/synthesis は可能。CPU 有界化のため上限3。
+ * 先読みは1件だけ。遅い CPU では並行の合成が全部を遅くするので、今の1件が終わってから次を頼む。
  * @type {Map<any, { generation: number, promise: Promise<ArrayBuffer|null>, boostAtSynth?: number }>}
  */
 const _voicePrefetches = new Map();
@@ -499,14 +505,15 @@ function isObsMode() {
 function updateVoiceToggle() {
   const button = document.getElementById('cvBtnVoice');
   if (!button) return;
-  button.disabled = _voiceToggleBusy;
-  button.classList.toggle('is-on', _voiceReadingEnabled);
-  button.setAttribute('aria-pressed', String(_voiceReadingEnabled));
-  button.textContent = _voiceReadingEnabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
+  button.disabled = false;
+  button.setAttribute('aria-busy', _voiceToggleBusy ? 'true' : 'false');
+  button.classList.toggle('is-on', _voiceReadingWanted);
+  button.setAttribute('aria-pressed', String(_voiceReadingWanted));
+  button.textContent = _voiceReadingWanted ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
   // v0.1.699: 名前読みトグル(読み上げON時だけ表示)。
   const nameBtn = document.getElementById('cvBtnVoiceName');
   if (nameBtn) {
-    nameBtn.hidden = !_voiceReadingEnabled;
+    nameBtn.hidden = !_voiceReadingWanted;
     nameBtn.classList.toggle('is-on', _voiceReadNameEnabled);
     nameBtn.setAttribute('aria-pressed', String(_voiceReadNameEnabled));
     nameBtn.textContent = _voiceReadNameEnabled ? '名前読み ON' : '名前読み OFF';
@@ -518,7 +525,7 @@ function setVoiceStatus(message) {
   if (!status) return;
   // 臨時メッセージ(audio ブロック警告等)。ローディング演出 class は外す。空クリアも同様。
   status.classList.remove('is-loading');
-  status.classList.toggle('is-error', /見つかりません|ブロック/.test(String(message || '')));
+  status.classList.toggle('is-error', /見つかりません|ブロック|つながっていません/.test(String(message || '')));
   status.textContent = String(message || '');
 }
 
@@ -579,9 +586,20 @@ function normalizeVoiceAssignments(raw) {
   return raw;
 }
 
+function abortVoiceSynths() {
+  for (const ac of _voiceSynthAborts) {
+    try { ac.abort(); } catch { /* no-op */ }
+  }
+  _voiceSynthAborts.clear();
+}
+
 function stopVoicePlayback() {
+  abortVoiceSynths();
   _voiceQueue = [];
   _voiceGeneration += 1;
+  for (const entry of _voicePrefetches.values()) {
+    try { entry.abort?.abort(); } catch { /* no-op */ }
+  }
   _voicePrefetches.clear();
   if (typeof _voiceStopCurrent === 'function') _voiceStopCurrent();
   _voiceStopCurrent = null;
@@ -611,12 +629,38 @@ function updateVoiceGpuTip() {
 }
 
 function disableVoiceReading({ persist = true } = {}) {
+  _voiceEnableSerial += 1;
+  _voiceReadingWanted = false;
   _voiceReadingEnabled = false;
+  if (_voiceEngineRetryTimer) {
+    clearTimeout(_voiceEngineRetryTimer);
+    _voiceEngineRetryTimer = 0;
+  }
   _voiceToggleBusy = false;
   _livePush.close();
   stopVoicePlayback();
+  driveCvVoiceLoading('idle');
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(false);
+}
+
+function scheduleVoiceEngineRetry(serial) {
+  if (_voiceEngineRetryTimer) return;
+  _voiceEngineRetryTimer = window.setTimeout(() => {
+    _voiceEngineRetryTimer = 0;
+    if (serial !== _voiceEnableSerial || !_voiceReadingWanted || _voiceReadingEnabled) return;
+    void connectVoiceReading(serial);
+  }, VOICE_ENGINE_RETRY_MS);
+}
+
+function showVoiceDeviceNote() {
+  if (!_voiceReadingEnabled || !_voiceReadingWanted) return;
+  const text = voiceEngineDeviceNote(_voiceGpuCapable);
+  if (!text) return;
+  const status = document.getElementById('cvVoiceStatus');
+  if (!status) return;
+  status.classList.remove('is-loading', 'is-error');
+  status.textContent = text;
 }
 
 /**
@@ -641,74 +685,97 @@ async function primeCvAudioUnlock() {
 }
 
 async function enableVoiceReading({ persist = true } = {}) {
-  if (isObsMode() || _voiceToggleBusy) return;
-  _voiceToggleBusy = true;
-  updateVoiceToggle();
-  // v0.1.770: 起動待ちは状態駆動の楽しいローディング(遅延ガードで一瞬成功はチラつかせない)。
-  driveCvVoiceLoading('checking');
-  /*
-   * ★v0.1.1329: 会場(VoicePlayer)に入れた3つの修正を【コメビュにも】移す。
-   *   v1326/v1327 は VoicePlayer だけを直しており、独自実装のこちらは素通しだった
-   *   =ユーザーがコメビュのボタンを押している限り「何も変わらない」状態だった。
-   *   (読み上げは2実装に分岐している。同じ症状は両方に出る前提で直す)
-   *
-   *   ① 解錠を最初にやる: クリックの延長でいられる唯一の瞬間。await を挟んだ後では
-   *      Chrome の自動再生ブロックに掛かる。
-   *   ② 再試行 1回 → 3回(バックオフ)。MV3 SW のコールド起床が既定タイムアウトに
-   *      間に合わないことがある。未起動なら即 refused で返るので待ちは増えない。
-   *   ③ 失敗しても OFF を永続保存しない。ユーザーの「ONにしたい」意思を消さない。
-   */
-  await primeCvAudioUnlock();
-  let probe = await probeVoicevoxAlive();
-  if (!probe.ok) {
-    driveCvVoiceLoading('connecting');
-    for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
-      if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
-      probe = await probeVoicevoxAlive();
-      if (probe.ok) break;
-    }
-  }
-  if (!probe.ok) {
-    // ★v0.1.1333: 会場と同じ失敗理由を既存計器へ残す(新しいstorage書き手は増やさない)。
-    _voiceDiag.lastEnableFailReason = String(probe.reason || 'unknown');
-    _voiceDiag.enableFailTotal = (Number(_voiceDiag.enableFailTotal) || 0) + 1;
-    publishVoiceDiag();
-    // ★persist:false = 次に押せばまた試せる(OFFで固定しない)。
-    disableVoiceReading({ persist: false });
-    driveCvVoiceLoading('notfound', probe.reason);
-    return;
-  }
-
-  // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする(会場と同じ)。
-  const allStyleIds = await listVoicevoxStyleIds();
-  // 起動直後のエンジンを捨てる audio_query で起こす(待たない・voiceWarmup.js)。
-  startVoiceWarmup(_voiceWarmup, allStyleIds);
-  // 2026-10-31: 声の「初めて」と温まった速さもこの ON から数え直す(会場と同じ)。
-  _voiceSynthTracker.reset();
-  resetVoiceWarmMeasure(_voiceDiag);
-  _voiceStreamSupported = false;
-  void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
-  _voiceGpuCapable = null;
-  void probeVoicevoxGpuCapable().then((ok) => { _voiceGpuCapable = typeof ok === 'boolean' ? ok : null; }, () => {});
-  _voiceStyleIds = (await prepareVoiceStyleIds(allStyleIds, {
-    readSettings: async () => {
-      const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
-      _voiceSlowEngine = b[KEY_VOICE_WEAK_PC] === true;
-      return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
-    },
-    initSpeaker: (id) => _voiceWarmup.ensureWhenIdle(id) // 合成が走っていない時に裏で(v0.1.1772)
-  })).styleIds;
-  _voiceGeneration += 1;
-  _voiceReadingEnabled = true;
-  _voiceToggleBusy = false;
-  if (_liveId) void _voiceReaderLease?.beat(_liveId);
-  // ★v0.1.1333: 成功時は古い失敗理由を消し、次の状態速報で誤診させない。
-  _voiceDiag.lastEnableFailReason = '';
-  publishVoiceDiag();
-  driveCvVoiceLoading('ready');
+  if (isObsMode()) return;
+  const serial = _voiceEnableSerial;
+  _voiceReadingWanted = true;
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(true);
-  void _livePush.ensure();
+  await connectVoiceReading(serial, persist);
+}
+
+async function connectVoiceReading(serial, persist) {
+  if (serial !== _voiceEnableSerial || !_voiceReadingWanted) return;
+  if (_voiceReadingEnabled) return;
+  if (_voiceConnectInFlight) {
+    await new Promise((resolve) => { _voiceConnectWaiters.push(resolve); });
+    if (serial !== _voiceEnableSerial || !_voiceReadingWanted || _voiceReadingEnabled) return;
+  }
+  _voiceConnectInFlight = true;
+  _voiceToggleBusy = true;
+  updateVoiceToggle();
+  const aborted = () => serial !== _voiceEnableSerial || !_voiceReadingWanted;
+  try {
+    // 解錠はクリックの延長でいられる唯一の瞬間。失敗しても OFF は永続保存しない。
+    await primeCvAudioUnlock();
+    if (aborted()) return;
+    driveCvVoiceLoading('checking');
+    let probe = await probeVoicevoxAlive();
+    if (!probe.ok && !aborted()) {
+      driveCvVoiceLoading('connecting');
+      for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
+        if (aborted()) return;
+        if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+        if (aborted()) return;
+        probe = await probeVoicevoxAlive();
+        if (probe.ok) break;
+      }
+    }
+    if (aborted()) return;
+    if (!probe.ok) {
+      // ★v0.1.1333: 会場と同じ失敗理由を既存計器へ残す(新しいstorage書き手は増やさない)。
+      _voiceDiag.lastEnableFailReason = String(probe.reason || 'unknown');
+      _voiceDiag.enableFailTotal = (Number(_voiceDiag.enableFailTotal) || 0) + 1;
+      publishVoiceDiag();
+      // ボタンは ON のまま。OFF は保存しない。つながるまで声は出さない。
+      _voiceReadingEnabled = false;
+      driveCvVoiceLoading('notfound', probe.reason);
+      scheduleVoiceEngineRetry(serial);
+      return;
+    }
+
+    const allStyleIds = await listVoicevoxStyleIds();
+    if (aborted()) return;
+    startVoiceWarmup(_voiceWarmup, allStyleIds);
+    _voiceSynthTracker.reset();
+    resetVoiceWarmMeasure(_voiceDiag);
+    _voiceStreamSupported = false;
+    void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
+    _voiceGpuCapable = null;
+    void probeVoicevoxGpuCapable().then((ok) => {
+      _voiceGpuCapable = typeof ok === 'boolean' ? ok : null;
+      showVoiceDeviceNote();
+    }, () => {});
+    _voiceStyleIds = (await prepareVoiceStyleIds(allStyleIds, {
+      readSettings: async () => {
+        const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);
+        _voiceSlowEngine = b[KEY_VOICE_WEAK_PC] === true;
+        return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
+      },
+      initSpeaker: (id) => _voiceWarmup.ensureWhenIdle(id)
+    })).styleIds;
+    if (aborted()) return;
+    _voiceGeneration += 1;
+    _voiceReadingEnabled = true;
+    if (_liveId) void _voiceReaderLease?.beat(_liveId);
+    _voiceDiag.lastEnableFailReason = '';
+    publishVoiceDiag();
+    driveCvVoiceLoading('ready');
+    showVoiceDeviceNote();
+    updateVoiceToggle();
+    if (persist) persistVoiceReadingEnabled(true);
+    void _livePush.ensure();
+  } finally {
+    _voiceConnectInFlight = false;
+    if (serial === _voiceEnableSerial) {
+      _voiceToggleBusy = false;
+      updateVoiceToggle();
+    }
+    const waiters = _voiceConnectWaiters;
+    _voiceConnectWaiters = [];
+    for (const wake of waiters) {
+      try { wake(); } catch { /* no-op */ }
+    }
+  }
 }
 
 function voiceUserKeyForItem(item) {
@@ -748,12 +815,17 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
   const track = _voiceSynthTracker.begin(voice?.styleId);
   /** @type {{ queryMs?: number, synthMs?: number }} */
   let timing = {};
+  _voiceSynthInFlight += 1;
+  let settled = false;
+  const settle = () => { if (!settled) { settled = true; _voiceSynthInFlight = Math.max(0, _voiceSynthInFlight - 1); } };
   return synthesizeVoiceWarm(text, voice, {
     onFailure: (info) => recordVoiceSynthFailureReason(info),
     onTiming: (t) => { timing = t || {}; },
-    ...(extra.stream === true ? { stream: true } : {})
+    ...(extra.stream === true ? { stream: true } : {}),
+    ...(extra.signal ? { signal: extra.signal } : {})
   }).then(
     (wav) => {
+      settle();
       /** @type {any} */
       let r = null;
       try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(_voiceDiag, r); } catch { /* 計器は本体を止めない */ }
@@ -772,6 +844,7 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
       return wav;
     },
     (err) => {
+      settle();
       try { track.end(timing, false); } catch { /* no-op */ }
       throw err;
     }
@@ -829,15 +902,17 @@ function ensureVoicePrefetch(item, generation) {
     slowEngine: _voiceSlowEngine,
     textLength: text.length
   });
+  const abort = new AbortController();
+  _voiceSynthAborts.add(abort);
   const promise = synthesizeVoiceTracked(
     text,
     {
       ...assigned,
       speedOffset: assigned.speedOffset + boostAtSynth
     },
-    { stream }
-  ).catch(() => null);
-  _voicePrefetches.set(item, { generation, promise, boostAtSynth });
+    { stream, signal: abort.signal }
+  ).catch(() => null).finally(() => { _voiceSynthAborts.delete(abort); });
+  _voicePrefetches.set(item, { generation, promise, boostAtSynth, abort });
   return promise;
 }
 
@@ -847,21 +922,30 @@ function ensureVoicePrefetch(item, generation) {
  */
 function startVoicePrefetch(generation) {
   if (generation !== _voiceGeneration) {
+    for (const entry of _voicePrefetches.values()) {
+      try { entry.abort?.abort(); } catch { /* no-op */ }
+    }
     _voicePrefetches.clear();
     return;
   }
-  const depth = resolveVoiceSynthDepth(_voiceQueue.length, {
+  // 同時に頼むのは1件。遅い CPU では並行の合成が全部を遅くする。
+  const depth = Math.min(1, resolveVoiceSynthDepth(_voiceQueue.length, {
     pending: _voiceQueue.length
-  });
+  }));
+  _voiceDiag.lastDepth = depth;
   const wanted = new Set();
   for (let i = 0; i < depth && i < _voiceQueue.length; i++) {
     const item = _voiceQueue[i];
     if (!item) continue;
+    if (_voiceSynthInFlight > 0 && !_voicePrefetches.has(item)) continue;
     wanted.add(item);
     ensureVoicePrefetch(item, generation);
   }
-  for (const key of _voicePrefetches.keys()) {
-    if (!wanted.has(key)) _voicePrefetches.delete(key);
+  for (const [key, entry] of _voicePrefetches) {
+    if (!wanted.has(key)) {
+      try { entry.abort?.abort(); } catch { /* no-op */ }
+      _voicePrefetches.delete(key);
+    }
   }
 }
 
@@ -934,13 +1018,14 @@ async function drainVoiceQueue() {
         showVoiceSkipped(1);
         _voiceDiag.staleDropTotal += 1; // v0.1.852 観測。
         notifyVoiceItemDropped(item);
+        const stalePf = _voicePrefetches.get(item);
+        try { stalePf?.abort?.abort(); } catch { /* no-op */ }
         _voicePrefetches.delete(item); // prefetch が stale 向けなら破棄
         continue; // 読まずに捨てる
       }
       const congestion = computeVoiceCongestion(queueLength);
       // v0.1.852 観測: 直近の混雑対応(速度ブースト・先読み深さ)を記録。
       _voiceDiag.lastSpeedBoost = congestion.speedBoost;
-      _voiceDiag.lastDepth = resolveVoiceSynthDepth(queueLength, { pending: queueLength });
       const assigned = resolveVoiceForUser(
         item.userKey,
         _voiceAssignments,
@@ -952,6 +1037,8 @@ async function drainVoiceQueue() {
       const _synthStart = Date.now(); // v0.1.852 観測: 合成所要(先読み済なら待ち時間=ほぼ0)。
       markVoicePhase(prefetch ? 'await_prefetch' : 'await_synth'); // v0.1.895: 合成待ちで止まったか。
       const boostAtSynth = prefetch ? (Number(prefetch.boostAtSynth) || 0) : comeviewSpeedBoost(congestion.speedBoost);
+      const inlineAbort = prefetch ? null : new AbortController();
+      if (inlineAbort) _voiceSynthAborts.add(inlineAbort);
       const wav = prefetch
         ? await prefetch.promise
         : await synthesizeVoiceTracked(
@@ -959,8 +1046,9 @@ async function drainVoiceQueue() {
             {
               ...assigned,
               speedOffset: assigned.speedOffset + boostAtSynth
-            }
-          );
+            },
+            { signal: inlineAbort.signal }
+          ).finally(() => { _voiceSynthAborts.delete(inlineAbort); });
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
       markVoicePhase('synth_done'); // v0.1.895: 合成は通過した(ここで止まれば下の continue/再生で詰まり)。
       if (!wav) {
@@ -2418,14 +2506,10 @@ function wireStorageChanges() {
     }
     if (!isObsMode() && changes[VOICE_READING_ENABLED_KEY]) {
       const nextEnabled = changes[VOICE_READING_ENABLED_KEY].newValue === true;
-      if (!nextEnabled && _voiceReadingEnabled) {
+      if (!nextEnabled && _voiceReadingWanted) {
         disableVoiceReading({ persist: false });
         setVoiceStatus('');
-      } else if (
-        nextEnabled &&
-        !_voiceReadingEnabled &&
-        !_voiceToggleBusy
-      ) {
+      } else if (nextEnabled && !_voiceReadingWanted) {
         void enableVoiceReading({ persist: false });
       }
     }
@@ -2451,7 +2535,7 @@ function wireButtons() {
   const btnVoice = document.getElementById('cvBtnVoice');
   if (btnVoice && !isObsMode()) {
     btnVoice.addEventListener('click', () => {
-      if (_voiceReadingEnabled) {
+      if (_voiceReadingWanted) {
         disableVoiceReading();
         setVoiceStatus('');
       } else {

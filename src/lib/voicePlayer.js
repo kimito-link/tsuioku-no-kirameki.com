@@ -1,6 +1,7 @@
 // @ts-nocheck — VoicePlayer は依存注入(deps)クラス。型は呼び出し側の配線で担保。
 //   comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
+import { voiceEngineDeviceNote } from './voiceLoadingState.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
 import {
@@ -80,6 +81,8 @@ import {
  *   (待つのは「応答が遅いだけ」のときだけ=直したい状況とコストが一致する)。
  */
 export const VOICE_ALIVE_RETRY_BACKOFF_MS = Object.freeze([0, 500, 1500]);
+/** つながっていないまま ON のとき、エンジンを探し直す間隔。0 なら探さない。 */
+export const VOICE_ENGINE_RETRY_MS = 8000;
 
 /**
  * ★v0.1.1327: 音声解錠(audio unlock)用の無音 WAV。
@@ -177,6 +180,17 @@ export class VoicePlayer {
     this.resolveVoice = deps.resolveVoice;
 
     this.enabled = false;
+    /** ボタンに出す意思。エンジンが居なくても ON のまま(enabled は声を出してよいときだけ true)。 */
+    this.readingWanted = false;
+    this._intentSerial = 0;
+    this._connectInFlight = false;
+    /** @type {Array<() => void>} */
+    this._connectWaiters = [];
+    /** @type {Set<AbortController>} */
+    this._synthAborts = new Set();
+    this._engineRetryTimer = 0;
+    this.engineRetryMs = Number.isFinite(Number(deps.engineRetryMs)) ? Number(deps.engineRetryMs) : VOICE_ENGINE_RETRY_MS;
+    this._deviceNote = '';
     this.readNameEnabled = false;
     /** v0.1.1812: コメビュで NG にした人(読まない)。 */
     this.ngKeys = new Set();
@@ -334,12 +348,20 @@ export class VoicePlayer {
         if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
         const ng = changes && changes[COMEVIEW_NG_STORAGE_KEY];
         if (ng) this.ngKeys = voiceNgKeySet(ng.newValue);
+        const en = changes && changes[KEY_VOICE_READING_ENABLED];
+        if (!en) return;
+        const next = en.newValue === true;
+        if (next && this.readingWanted) return;
+        if (!next && !this.readingWanted) return;
+        if (next) void this.enable({ persist: false });
+        else this.disable({ persist: false });
       });
     } catch { /* 購読できなくても起動時の値で鳴らす */ }
   }
 
   _emitToggle() {
-    this.onToggle(this.enabled, this.readNameEnabled, this.toggleBusy);
+    // 第1引数はボタンの ON/OFF(意思)。声を出してよいかは this.enabled。
+    this.onToggle(this.readingWanted, this.readNameEnabled, this.toggleBusy);
   }
 
   _showSkipped(count) {
@@ -360,15 +382,27 @@ export class VoicePlayer {
     }
   }
 
+  _abortSynthControllers() {
+    for (const ac of this._synthAborts) {
+      try { ac.abort(); } catch { /* no-op */ }
+    }
+    this._synthAborts.clear();
+  }
+
   stop() {
+    this._abortSynthControllers();
     const dropped = this.queue;
     this.queue = [];
     this.generation += 1;
+    for (const entry of this.prefetches.values()) {
+      try { entry.abort?.abort(); } catch { /* no-op */ }
+    }
     this.prefetches.clear();
     // v0.1.799: 破棄した待機 item の吹き出しを unvoiced へ(pending のまま床いっぱい残さない)。
     for (const item of dropped) this._notifyDropped(item);
     if (typeof this.stopCurrent === 'function') this.stopCurrent();
     this.stopCurrent = null;
+    try { this.lightSpeaker?.cancel?.(); } catch { /* 軽い声が無くても止めは失敗しない */ }
     this._updateLagNotice(); // 止めたら遅れの一言も消す(待ちは空)。
   }
 
@@ -411,14 +445,39 @@ export class VoicePlayer {
   }
 
   disable({ persist = true } = {}) {
+    this._intentSerial += 1;
+    this.readingWanted = false;
     this.enabled = false;
     this.toggleBusy = false;
+    if (this._engineRetryTimer) {
+      clearTimeout(this._engineRetryTimer);
+      this._engineRetryTimer = 0;
+    }
+    this._deviceNote = '';
     this.stop();
     this.onLoadingState('idle');
     this._emitToggle();
     if (persist && this.storage) {
       this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: false }).catch(() => {});
     }
+  }
+
+  _scheduleEngineRetry(serial) {
+    if (this._engineRetryTimer || !(this.engineRetryMs > 0)) return;
+    this._engineRetryTimer = setTimeout(() => {
+      this._engineRetryTimer = 0;
+      if (serial !== this._intentSerial || !this.readingWanted || this.enabled) return;
+      void this._connect(serial);
+    }, this.engineRetryMs);
+    try { this._engineRetryTimer.unref?.(); } catch { /* ブラウザの timer には unref が無い */ }
+  }
+
+  _emitDeviceNote() {
+    if (!this.enabled || !this.readingWanted) return;
+    const text = voiceEngineDeviceNote(this._gpuCapable);
+    if (!text || text === this._deviceNote) return;
+    this._deviceNote = text;
+    try { this.onStatus(text); } catch { /* 表示の失敗は読み上げに影響させない */ }
   }
 
   /**
@@ -468,95 +527,110 @@ export class VoicePlayer {
   }
 
   async enable({ persist = true } = {}) {
-    if (this.isObsMode() || this.toggleBusy) return;
+    if (this.isObsMode()) return;
+    const serial = this._intentSerial;
+    this.readingWanted = true;
+    this._emitToggle();
+    if (persist && this.storage && serial === this._intentSerial && this.readingWanted) {
+      this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: true }).catch(() => {});
+    }
+    await this._connect(serial);
+  }
+
+  /**
+   * エンジンへつなぐ。ボタンの ON は enable が先に出す。ここが遅くても OFF は serial で無効になる。
+   * @param {number} serial
+   */
+  async _connect(serial) {
+    if (serial !== this._intentSerial || !this.readingWanted) return;
+    if (this.enabled) return;
+    if (this._connectInFlight) {
+      await new Promise((resolve) => { this._connectWaiters.push(resolve); });
+      if (serial !== this._intentSerial || !this.readingWanted || this.enabled) return;
+    }
+    this._connectInFlight = true;
     this.toggleBusy = true;
     this._emitToggle();
-    // ★v0.1.1327: 非同期処理に入る【前】に解錠する。ここが唯一「クリックの延長」に
-    //   居られる瞬間で、await を挟んだ後では手遅れになる。
-    await this.primeAudioUnlock();
-    // v0.1.770: 起動待ちの表示は onLoadingState(状態)が所有する(遅延ガードで一瞬成功はチラつかせない)。
-    //   onStatus(テキスト)は audio ブロック警告など臨時メッセージ専用に残す。
-    this.onLoadingState('checking');
-
-    // 2026-06-14: 会場モード(content script・SW プロキシ経由)では MV3 SW のコールド起床で
-    //   初回の生存確認がタイムアウトしやすい。初回失敗時に再試行する(SW が起きた後の
-    //   2回目はほぼ通る)。VOICEVOX が本当に未起動なら全部失敗して従来どおり案内を出す。
-    //
-    // ★v0.1.1326(ユーザー実機「押してもONにならない」の根治):
-    //   ① 再試行を 1回 → 3回(バックオフ 0/500/1500ms)。MV3 SW の起床が 5000ms でも
-    //      間に合わないことがあり、1回の再試行では取りこぼしていた。
-    //   ② 失敗しても【OFF を永続保存しない】(persist:false)。従来は disable({persist:true})
-    //      でユーザーの「ONにしたい」意思を storage に消しに行っており、これが
-    //      「押しても勝手にOFFに戻る」の直接原因だった。
-    //   ③ 失敗理由(timeout/refused/http-error)を画面に渡す。VOICEVOX が起動しているのに
-    //      「見つかりません」と言っていた誤案内の是正(ユーザー指摘「たちあがってるけどね」)。
-    let probe = await this.probeVoicevoxAlive();
-    if (!probe.ok) {
-      this.onLoadingState('connecting');
-      for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
-        if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
-        probe = await this.probeVoicevoxAlive();
-        if (probe.ok) break;
+    const aborted = () => serial !== this._intentSerial || !this.readingWanted;
+    try {
+      // ★v0.1.1327: 非同期処理に入る【前】に解錠する。ここが唯一「クリックの延長」に居られる瞬間。
+      await this.primeAudioUnlock();
+      if (aborted()) return;
+      this.onLoadingState('checking');
+      let probe = await this.probeVoicevoxAlive();
+      if (!probe.ok && !aborted()) {
+        this.onLoadingState('connecting');
+        for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
+          if (aborted()) return;
+          if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+          if (aborted()) return;
+          probe = await this.probeVoicevoxAlive();
+          if (probe.ok) break;
+        }
       }
-    }
-    if (!probe.ok) {
-      /*
-       * ★v0.1.1331: 失敗理由を【計器にも】残す。
-       *   従来は onLoadingState(画面表示)にしか渡しておらず、ユーザーが
-       *   「押しても一瞬で戻る」と報告しても、状態速報には理由が1文字も出なかった
-       *   =受け取った側(私)が原因を特定できず、推測で版を重ねることになった。
-       *   ★画面に出すだけの情報は、報告に乗らない=無いのと同じ。
-       */
-      this.diag.lastEnableFailReason = String(probe.reason || 'unknown');
-      this.diag.enableFailTotal = (Number(this.diag.enableFailTotal) || 0) + 1;
-      this._emitDiag();
-      // ★persist:false = ユーザーの意思を消さない。次に押せばまた試せる。
-      this.disable({ persist: false });
-      this.onLoadingState('notfound', probe.reason);
-      this.toggleBusy = false;
-      this._emitToggle();
-      return;
-    }
+      if (aborted()) return;
+      if (!probe.ok) {
+        this.diag.lastEnableFailReason = String(probe.reason || 'unknown');
+        this.diag.enableFailTotal = (Number(this.diag.enableFailTotal) || 0) + 1;
+        this._emitDiag();
+        // ボタンは ON のまま。OFF は保存しない。つながるまで声は出さない。
+        this.enabled = false;
+        this.onLoadingState('notfound', probe.reason);
+        this._scheduleEngineRetry(serial);
+        return;
+      }
 
-    // P3: 設定が 'on'、または 'auto' でこのPCが遅いと記録済みなら、固定表の声に絞って先読みする。
-    const allStyleIds = await this.fetchVoiceStyleIds();
-    // 2026-10-26: 温まった記録を消し(エンジンが再起動していても困らないように)、エンジンを1回起こす。
-    startVoiceWarmup(this.voiceWarmup, allStyleIds);
-    // 2026-10-31: 声の「初めて」と温まった速さもこの ON から数え直す(VOICEVOX を再起動していても正しく)。
-    this._synthTracker.reset();
-    resetVoiceWarmMeasure(this.diag);
-    this._streamSupported = false;
-    if (this.probeVoiceStreaming && this.createStreamedAudio) {
-      void Promise.resolve()
-        .then(() => this.probeVoiceStreaming())
-        .then((ok) => { this._streamSupported = ok === true; }, () => {});
-    }
-    this._gpuCapable = null;
-    if (this.probeVoiceGpu) {
-      void Promise.resolve()
-        .then(() => this.probeVoiceGpu())
-        .then((ok) => { this._gpuCapable = typeof ok === 'boolean' ? ok : null; }, () => {});
-    }
-    const prepared = await prepareVoiceStyleIds(allStyleIds, {
-      readSettings: async () => {
-        const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
-        this._slowEngine = b[KEY_VOICE_WEAK_PC] === true;
-        return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
-      },
-      initSpeaker: this.initVoiceSpeaker
-    });
-    this.styleIds = prepared.styleIds;
-    this.diag.voiceNarrowed = prepared.narrowed;
-    this.generation += 1;
-    this.enabled = true;
-    // ★v0.1.1331: 成功したら理由を消す(古い失敗が残り続けて誤診させない)。
-    this.diag.lastEnableFailReason = '';
-    this._emitDiag();
-    this.toggleBusy = false;
-    this.onLoadingState('ready');
-    this._emitToggle();
-    if (persist && this.storage) {
-      this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: true }).catch(() => {});
+      const allStyleIds = await this.fetchVoiceStyleIds();
+      if (aborted()) return;
+      startVoiceWarmup(this.voiceWarmup, allStyleIds);
+      this._synthTracker.reset();
+      resetVoiceWarmMeasure(this.diag);
+      this._streamSupported = false;
+      if (this.probeVoiceStreaming && this.createStreamedAudio) {
+        void Promise.resolve()
+          .then(() => this.probeVoiceStreaming())
+          .then((ok) => { this._streamSupported = ok === true; }, () => {});
+      }
+      this._gpuCapable = null;
+      this._deviceNote = '';
+      if (this.probeVoiceGpu) {
+        void Promise.resolve()
+          .then(() => this.probeVoiceGpu())
+          .then((ok) => {
+            this._gpuCapable = typeof ok === 'boolean' ? ok : null;
+            this._emitDeviceNote();
+          }, () => {});
+      }
+      const prepared = await prepareVoiceStyleIds(allStyleIds, {
+        readSettings: async () => {
+          const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
+          this._slowEngine = b[KEY_VOICE_WEAK_PC] === true;
+          return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
+        },
+        initSpeaker: this.initVoiceSpeaker
+      });
+      if (aborted()) return;
+      this.styleIds = prepared.styleIds;
+      this.diag.voiceNarrowed = prepared.narrowed;
+      this.generation += 1;
+      this.enabled = true;
+      this.diag.lastEnableFailReason = '';
+      this._emitDiag();
+      this.onLoadingState('ready');
+      this._emitDeviceNote();
+      this._emitToggle();
+    } finally {
+      this._connectInFlight = false;
+      const same = serial === this._intentSerial;
+      if (same) {
+        this.toggleBusy = false;
+        this._emitToggle();
+      }
+      const waiters = this._connectWaiters;
+      this._connectWaiters = [];
+      for (const wake of waiters) {
+        try { wake(); } catch { /* no-op */ }
+      }
     }
   }
 
@@ -609,18 +683,20 @@ export class VoicePlayer {
       textLength: text.length
     });
     // v0.1.1224: 失敗理由を計器へ(_synthesizeTracked が onFailure を渡す)。
+    const abort = new AbortController();
+    this._synthAborts.add(abort);
     const promise = this._synthesizeTracked(
       text,
       {
         ...assigned,
         speedOffset: assigned.speedOffset + effBoost
       },
-      { stream }
-    ).catch(() => null);
+      { stream, signal: abort.signal }
+    ).catch(() => null).finally(() => { this._synthAborts.delete(abort); });
     // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
     //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
-    this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length });
+    this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length, abort });
     return promise;
   }
 
@@ -656,7 +732,8 @@ export class VoicePlayer {
           if (reason === 'timeout' || reason === 'query_timeout') timedOut = true;
         },
         onTiming: (t) => { timing = t || {}; },
-        ...(extra.stream === true ? { stream: true } : {})
+        ...(extra.stream === true ? { stream: true } : {}),
+        ...(extra.signal ? { signal: extra.signal } : {})
       });
     } catch (err) {
       started = Promise.reject(err);
@@ -759,6 +836,9 @@ export class VoicePlayer {
    */
   _startPrefetch(generation) {
     if (generation !== this.generation) {
+      for (const entry of this.prefetches.values()) {
+        try { entry.abort?.abort(); } catch { /* no-op */ }
+      }
       this.prefetches.clear();
       return;
     }
@@ -767,10 +847,11 @@ export class VoicePlayer {
       this._maybeProbeVoicevox();
       return;
     }
-    // 2026-10-31: エンジンが混雑中(時間切れが続いた)なら、同時に頼むのは今読む1件だけ。
-    const depth = capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
+    // 同時に頼むのは常に1件。遅い CPU では並行の合成が全部を遅くする(時間切れが積もる)。
+    //   今の1件が終わってから次を頼む。再生とその次の合成は重なってよい。
+    const depth = Math.min(1, capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
       pending: this.queue.length
-    }), this._overload.overloaded);
+    }), this._overload.overloaded));
     // v0.1.1088計器(設計書§2): diag.lastDepth は宣言のみでどこからも代入されていなかった
     //   化石計器。ここで実値を代入して修理する(先読み深さの実測)。
     this.diag.lastDepth = depth;
@@ -781,13 +862,16 @@ export class VoicePlayer {
       // 2026-11-03: 混雑中は、VOICEVOX がまだ前の合成をしている間は次を頼まない。
       //   拡張が諦めた依頼も VOICEVOX は最後まで計算するので、重ねて頼むほど全部が遅れる
       //   (実測: CPU 100%・時間切れ1,940件)。頼まなかった件は順番が来たときに頼む。
-      if (this._overload.overloaded && this._synthInFlight > 0 && !this.prefetches.has(item)) continue;
+      if (this._synthInFlight > 0 && !this.prefetches.has(item)) continue;
       wanted.add(item);
       this._ensurePrefetch(item, generation);
     }
     // キューから消えた item の先読みは破棄(取りこぼした WAV は GC される=メモリ有界)。
-    for (const key of this.prefetches.keys()) {
-      if (!wanted.has(key)) this.prefetches.delete(key);
+    for (const [key, entry] of this.prefetches) {
+      if (!wanted.has(key)) {
+        try { entry.abort?.abort(); } catch { /* no-op */ }
+        this.prefetches.delete(key);
+      }
     }
   }
 
@@ -1010,6 +1094,8 @@ export class VoicePlayer {
         // v0.1.1800: 読んだ文字数(1文字あたりの長さを覚えて、件数の上限を文字数から見積もるため)。
         const spokenChars = pf ? Number(pf.textLength) || 0 : inlineText.length;
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
+        const inlineAbort = pf ? null : new AbortController();
+        if (inlineAbort) this._synthAborts.add(inlineAbort);
         const wav = pf
           ? await pf.promise
           : await this._synthesizeTracked(
@@ -1017,8 +1103,9 @@ export class VoicePlayer {
               {
                 ...assigned,
                 speedOffset: assigned.speedOffset + effBoostNow
-              }
-            );
+              },
+              { signal: inlineAbort.signal }
+            ).finally(() => { this._synthAborts.delete(inlineAbort); });
         this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
         this.diag.lastSpeedBoost = effBoostNow;
         // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-1): 合成待ち時間の

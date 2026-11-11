@@ -655,7 +655,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 56</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -664,6 +664,7 @@
 - `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 - `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
+- `src/extension/popup/wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
 - `src/extension/popup/wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
@@ -1478,7 +1479,8 @@
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🏟 会場・席 (9版)
+### 🏟 会場・席 (10版)
+- `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
 - `v0.1.2021` 2026-11-10 — 横の欄のボタンの見た目をそろえた
 - `v0.1.2005` 2026-11-10 — 会場の数字が開いた直後の値で止まらない
@@ -1502,12 +1504,12 @@
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
 ### 🔊 読み上げ (6版)
+- `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
 - `v0.1.2032` 2026-11-10 — ビルドの札を詳しい状況の先頭へ移した
 - `v0.1.2021` 2026-11-10 — 横の欄のボタンの見た目をそろえた
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1911` 2026-11-06 — 長いコメントは質問の結びを残して読む
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)

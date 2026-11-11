@@ -16,7 +16,7 @@ import {
   buildHtmlReportDocument
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
-import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js'; import { mountOuenBanner } from '../lib/ouenBannerDom.js';
+import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js'; import { mountOuenBanner } from '../lib/ouenBannerDom.js'; import { wirePanelVoiceReadingButton } from './popup/wirePanelVoiceReadingButton.js';
 // v0.1.1080: マイ効果音・ボイス/BGM/操作音の計器が直接 chrome.storage.local を叩くと、
 //   拡張リロード後の古い inline iframe で「Cannot read properties of undefined (reading 'local')」の
 //   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
@@ -21134,7 +21134,7 @@ async function initPopup() {
     }
   };
   $('openComeviewBtn')?.addEventListener('click', () => openComeviewWindow(false));
-  $('openComeviewVoiceBtn')?.addEventListener('click', () => openComeviewWindow(true));
+  wirePanelVoiceReadingButton($);
 
   // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。
   // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。
