@@ -235,6 +235,18 @@ describe('aggregateGiftSubAppHistoryBySender', () => {
     expect(agg?.rooms[0].count).toBeGreaterThan(0);
     expect(agg?.rooms[0].userKey).toMatch(/^\d+$/);
   });
+  it('pt の無いギフトだけの人は、印(keepZeroPointSenders)があるときだけ後ろに並べる(ツイキャスの有料アイテム ✨)', () => {
+    const history = [
+      { senderName: 'すずか', userId: '8000000001', points: 0, itemName: 'お茶爆100' },
+      { senderName: 'ぴぴみ', userId: '8000000002', points: 60, itemName: '延長応援コイン' },
+      { senderName: 'ぴぴみ', userId: '8000000002', points: 1, itemName: 'お茶' },
+    ];
+    expect(aggregateGiftSubAppHistoryBySender({ history })?.rooms.map((r) => r.nickname)).toEqual(['ぴぴみ']);
+    const agg = aggregateGiftSubAppHistoryBySender({ history, keepZeroPointSenders: true });
+    expect(agg?.rooms.map((r) => [r.nickname, r.count])).toEqual([['ぴぴみ', 61], ['すずか', 0]]);
+    expect(agg?.senderCount).toBe(2);
+    expect(agg?.throwCount).toBe(3);
+  });
 });
 
 describe('buildGiftSubAppPayloadFromDomRelay', () => {

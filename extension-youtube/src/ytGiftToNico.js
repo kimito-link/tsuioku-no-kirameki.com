@@ -46,6 +46,8 @@ const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
   MXCOIN: 1,
   // TikTok のギフトのコイン(diamondCount × 個数)。数のまま
   TTCOIN: 1,
+  // ツイキャスのギフトの🍡スコア(ページに出る「+🍡90」の数)。値段は配信の口に出ないので数のまま
+  TCSCORE: 1,
 });
 
 /**
@@ -76,9 +78,10 @@ const PLATFORM_ITEM_NAME = /** @type {Record<string, Record<string, string>>} */
   showroom: { superchat: 'ギフト' },
   mixch: { superchat: 'ギフト' },
   tiktok: { superchat: 'ギフト' },
+  twitcasting: { superchat: 'ギフト' },
 });
 /** 「500 Bits」「500 Kicks」と数で書く通貨 */
-const COUNT_CURRENCY = /** @type {Record<string, string>} */ ({ BITS: 'Bits', KICKS: 'Kicks', WWITEM: '個', SRPT: 'pt', MXCOIN: 'コイン', TTCOIN: 'コイン' });
+const COUNT_CURRENCY = /** @type {Record<string, string>} */ ({ BITS: 'Bits', KICKS: 'Kicks', WWITEM: '個', SRPT: 'pt', MXCOIN: 'コイン', TTCOIN: 'コイン', TCSCORE: 'スコア' });
 
 /**
  * 元の金額を、その通貨の書き方で出す(例: ¥1,000 / $5.00 / €2.00)。pt は円にしたおよその額なので、
@@ -139,7 +142,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
     // YouTube の新しい「ギフト」(ジュエルのスタンプ)はギフトの名前と絵がある(例: ハイ)。金額は出ないので pt は 0
     // ふわっちのアイテム・SHOWROOM のギフトも名前と絵がある
-    const named = kind === 'yt_gift' || /^(?:whowatch|showroom|mixch)$/.test(String(e.ytPlatform || ''));
+    const named = kind === 'yt_gift' || /^(?:whowatch|showroom|mixch|twitcasting)$/.test(String(e.ytPlatform || ''));
     const giftName = named ? String(e.ytGiftName || '').trim() : '';
     const giftThumb = named ? String(e.ytGiftImageUrl || '') : '';
     const twGiftCount = Number(e.ytGiftCount || 0);
@@ -228,6 +231,9 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
           liveId: lv,
           capturedAt: now,
           source: String(paid.find((e) => e?.ytPlatform)?.ytPlatform || 'youtube'),
+          // ツイキャスの有料アイテム(お茶爆など)はスコアが「✨」で数が出ない=0。いちばん高いギフトの送り主が欄から消えないよう、
+          //   0 の人も送り主として並べる(カードの「0pt」は shim がギフトの名前に直す・ytZeroPtGiftLabel.js)。2026-11-12 PC 実配信で発見
+          keepZeroPointSenders: paid.some((e) => e?.ytPlatform === 'twitcasting'),
           history,
           totalCounts: [...byItem.values()].sort((a, b) => b.count - a.count),
           officialTotalPoint: totalPoints,

@@ -643,7 +643,7 @@ export function normalizeKokenGiftHistoryResponse(json, options = {}) {
 /**
  * sub-app / koken `history[]` を北極星・ランク帯用の rooms 形に集計（送り主別 pt 降順）。
  *
- * @param {{ history?: readonly unknown[], capturedAt?: number, source?: string }|null|undefined} payload
+ * @param {{ history?: readonly unknown[], capturedAt?: number, source?: string, keepZeroPointSenders?: boolean }|null|undefined} payload
  * @param {{ maxRooms?: number }} [opts]
  * @returns {{
  *   rooms: { userKey: string; nickname: string; count: number; avatarUrl: string }[];
@@ -664,10 +664,13 @@ export function aggregateGiftSubAppHistoryBySender(payload, opts = {}) {
   /** @type {Map<string, { nickname: string; count: number; avatarUrl: string; throwCount: number }>} */
   const byKey = new Map();
 
+  // 値段がページに出ないギフト(ツイキャスの有料アイテム「✨」など)しか投げていない人も、送り主として並べる(pt は 0 のまま・後ろ)。
+  //   ニコ生のギフトは必ず pt があるので、ニコ生の payload はこの印を持たない=これまでどおり。
+  const keepZero = payload?.keepZeroPointSenders === true;
   for (const raw of history) {
     const r = /** @type {Record<string, unknown>} */ (raw || {});
     const points = nonNegativeInt(r.points);
-    if (!points) continue;
+    if (!points && !keepZero) continue;
     const uid = String(r.userId || '').trim();
     const hasUid = NUMERIC_UID_RE.test(uid);
     const nickname = String(r.senderName || '').trim() || (hasUid ? uid : '名無し');

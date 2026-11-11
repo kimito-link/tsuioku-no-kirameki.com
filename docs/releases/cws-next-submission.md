@@ -1,3 +1,10 @@
+# ★0.1.2087〜: ツイキャス(`https://twitcasting.tv/*`)のホスト権限が増える
+
+- 提出時は単一用途(§1)とホスト権限の統合欄(§2-8z)にツイキャスを足し、個別の理由を [cws-submission-texts.md](cws-submission-texts.md) に1つ足すこと(まだ書いていない)。
+- `privacy.html` は §4-1j と §5 に記載済み(2026-11-12)。読むのは配信ページと同じ口(streamserver.php・eventpubsuburl.php・ソケット)と、公開のサポーターランキング(/<user>/supporter)だけ。
+
+---
+
 # ★次に出す版(0.1.2036): Twitch に加え Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のホスト権限が増える
 
 - 0.1.1901(審査中)にはこれらのホストは入っていない。**次の提出で権限が増える**=ダッシュボードから手でアップロードする(AGENTS §2)。API アップロードだと新しい権限の理由欄が出ない。

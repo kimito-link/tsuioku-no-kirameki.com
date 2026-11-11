@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1259 件
+## ⚠️ 役割コメントが無いソース 10 / 1262 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -803,7 +803,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (160)
+- 📁 **extension-youtube/** (161)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -927,7 +927,7 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (31)
+  - 📁 **src/** (32)
     - `ab-content-entry.js` — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
     - `ab-main-entry.js` — ABEMA のページ自身の世界(MAIN)で動く小さな写し役。
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
@@ -946,6 +946,7 @@
     - `sidepanel-yt-parts.html`
     - `sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
     - `sr-content-entry.js` — SHOWROOM の部屋のページ(www.showroom-live.com/r/<room_url_key>)で、コメントとギフトを読んで記録に渡す入口。
+    - `tc-content-entry.js` — ツイキャスの配信ページ(twitcasting.tv/<user>)で、コメントとギフトを読んで記録に渡す入口。
     - `tt-content-entry.js` — TikTok LIVE の配信ページ(tiktok.com/@<名前>/live)で、コメントとギフトを読んで記録に渡す入口。
     - `tt-main-entry.js` — TikTok のページ自身の世界(MAIN)で動く小さな写し役(council/tiktok-support-PLAN.md)。
     - `tw-content-entry.js` — Twitch の視聴ページ(www.twitch.tv/<チャンネル>)で、チャットを読んで記録に渡す入口。
@@ -1193,7 +1194,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2455)
+- 📁 **src/** (2459)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1502,7 +1503,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2170)
+  - 📁 **lib/** (2174)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1552,7 +1553,7 @@
       - `platformSubBoard.test.js`
       - `streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
       - `streamEmotes.test.js`
-      - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick)の違いを1か所にまとめた表(純関数)
+      - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick・ツイキャス など)の違いを1か所にまとめた表(純関数)
       - `streamPlatform.reload.test.js`
     - 📁 **showroom/** (2)
       - `srParse.js` — SHOWROOM の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
@@ -1563,6 +1564,11 @@
       - `ttParse.test.js`
       - `ttProto.js` — TikTok LIVE のソケットの中身(protobuf)を読む、小さな自前の読み取り(council/tiktok-support-PLAN.md)。
       - `ttProto.test.js`
+    - 📁 **twitcasting/** (4)
+      - `tcPageInfo.js` — ツイキャスの配信ページに出ている数と配信の情報を読む(ページの文字を読むだけ・通信しない)
+      - `tcPageInfo.test.js`
+      - `tcParse.js` — ツイキャス(twitcasting.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
+      - `tcParse.test.js`
     - 📁 **twitch/** (8)
       - `twGql.js` — twitch.tv の画面自身が使っている GQL の応答を「形から検証して」読む(純関数)
       - `twGql.test.js`
@@ -3716,13 +3722,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (99)
+- 📁 **tests/** (100)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (92)
+  - 📁 **e2e/** (93)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3809,6 +3815,7 @@
     - `thumbnail-capture.spec.js`
     - `tiktok-recording.spec.js`
     - `timeline-fill-standalone-window.spec.js`
+    - `twitcasting-recording.spec.js`
     - `twitch-recording.spec.js`
     - `venue-entry-effect.spec.js`
     - `venue-pickup-drag.spec.js`

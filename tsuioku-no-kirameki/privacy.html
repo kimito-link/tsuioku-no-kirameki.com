@@ -400,7 +400,7 @@
         <div class="meta">
           <span>発行者: <strong>株式会社ベストトラスト</strong></span>
           <span>施行日: <strong>2026年4月19日</strong></span>
-          <span>最終更新: <strong>2026年11月11日</strong></span>
+          <span>最終更新: <strong>2026年11月12日</strong></span>
         </div>
       </div>
     </header>
@@ -451,6 +451,7 @@
             <li>Twitch（twitch.tv）の配信ページでも同じようにチャットを読み取り、端末の中だけに記録します（詳しくは 4-1c）。</li>
             <li>Kick（kick.com）・ふわっち（whowatch.tv）・SHOWROOM（showroom-live.com）・ミクチャ（mixch.tv）・TikTok LIVE（tiktok.com）でも、開いている配信のコメントと応援を読み取り、端末の中だけに記録します（詳しくは 4-1d〜4-1h）。これらの記録は外へ送りません。</li>
             <li>ABEMA（abema.tv）でも、開いている放送ページが受け取っているコメントを読み取り、端末の中だけに記録します（詳しくは 4-1i）。外へは送りません。</li>
+            <li>ツイキャス（twitcasting.tv）でも、開いている配信のコメントとギフトを読み取り、端末の中だけに記録します（詳しくは 4-1j）。外へは送りません。</li>
             <li>保存データはいつでも拡張の UI からクリア／書き出し／アンインストールで削除できます。</li>
           </ul>
         </aside>
@@ -485,7 +486,7 @@
               ニコ生の応援コメントは、放送が終わるとスクロールの彼方に流れてしまいがち。それを <b>自分のパソコンの中だけで</b> 拾って育てていける形にまとめ直したのが、この拡張だよ。
             </div>
           </div>
-          <p>本拡張は、ニコニコ生放送における応援コメント・参加者情報を、利用者自身の端末上で可視化・記録することを目的としたブラウザ拡張機能です。2026年11月から、同じ仕組みで <strong>YouTube Live</strong>（<code>www.youtube.com</code>）のライブチャット・スーパーチャット、<strong>Twitch</strong>・<strong>Kick</strong>・<strong>ふわっち</strong>・<strong>SHOWROOM</strong>・<strong>ミクチャ</strong>・<strong>TikTok LIVE</strong> のコメントと応援（ギフト・アイテム）、<strong>ABEMA</strong>（<code>abema.tv</code>）の放送ページが受け取っているコメントも記録・可視化できます。どの配信でも同じ画面です。第三者への情報集約や広告配信を目的としていません。</p>
+          <p>本拡張は、ニコニコ生放送における応援コメント・参加者情報を、利用者自身の端末上で可視化・記録することを目的としたブラウザ拡張機能です。2026年11月から、同じ仕組みで <strong>YouTube Live</strong>（<code>www.youtube.com</code>）のライブチャット・スーパーチャット、<strong>Twitch</strong>・<strong>Kick</strong>・<strong>ふわっち</strong>・<strong>SHOWROOM</strong>・<strong>ミクチャ</strong>・<strong>TikTok LIVE</strong> のコメントと応援（ギフト・アイテム）、<strong>ABEMA</strong>（<code>abema.tv</code>）の放送ページが受け取っているコメント、<strong>ツイキャス</strong>（<code>twitcasting.tv</code>）のコメントとギフトも記録・可視化できます。どの配信でも同じ画面です。第三者への情報集約や広告配信を目的としていません。</p>
         </section>
 
         <section class="box" id="s2">
@@ -633,6 +634,14 @@
             <li>コメントの出ないページや、ログインや地域の制限でページ自身がコメントを受け取れない放送では、記録できないことがあります</li>
             <li>利用者の ABEMA の認証情報を、当プロジェクトが取得・保持することはありません</li>
           </ul>
+          <h3>4-1j. ツイキャス（<code>twitcasting.tv</code>）</h3>
+          <ul>
+            <li>利用者が開いているツイキャスの配信ページ（<code>twitcasting.tv/配信者</code>）で、ページ自身と同じ口から、その配信のコメントとギフトを読み取ります。ログインしていなくても読めます</li>
+            <li>視聴者数・累計視聴・コメント数は、配信ページに出ている数をそのまま使います。ギフトはページに出ている🍡（スコア）で数えます</li>
+            <li>配信者のページの「サポーターランキング」（公開されている順位）を5分おきに読み、同じ画面に出します</li>
+            <li>ツイキャスの記録は端末の中だけに保存します。<strong>共有機能でも送信しません</strong>（共有はニコニコ生放送の画面のみ）</li>
+            <li>利用者のツイキャスの認証情報を、当プロジェクトが取得・保持することはありません</li>
+          </ul>
           <h3>4-2. 読み上げ音声（<code>127.0.0.1:50021</code>）</h3>
           <ul>
             <li>利用者自身の端末で VOICEVOX を起動している場合にのみ、読み上げ音声の合成のため<strong>同一端末内（ローカル）へ</strong>リクエストします。インターネットには出ません</li>
@@ -698,6 +707,7 @@
             <li><code>https://mixch.tv/*</code> とギフトの絵の <code>https://d2uqarpmf42qy0.cloudfront.net/*</code>（4-1g）</li>
             <li><code>https://www.tiktok.com/*</code>（4-1h）</li>
             <li><code>https://abema.tv/*</code>（4-1i）</li>
+            <li><code>https://twitcasting.tv/*</code>（4-1j）</li>
           </ul>
           <p>読むのは、利用者が開いているその配信のコメント・応援・番組情報と、表示に必要な公開画像です。記録は端末の中だけに保存し、これらの配信の記録を当プロジェクトのサーバーへ送ることはありません。</p>
           <p>これらはいずれも、利用者が自身のブラウザでニコニコ生放送・YouTube Live・上の各配信を視聴する過程で既に受信している公開情報、もしくは利用者自身のブラウザセッションで正規に取得可能な情報に限られます。</p>
