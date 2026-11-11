@@ -379,7 +379,12 @@ export const LINEUP = [
   //   1体の遅さが会議全体を止める（会議は並列で、律速は最も遅いメンバー）。scout の実疎通と同じ90秒で諦めて失敗として数える（採用基準: 遅さで会議を止める枠は置かない）。
   // ★2026-11-09 timeoutMs 90000→150000: 本番条件の実測で 86.5秒(11/5)・108.9秒(11/9)。90秒だと答えが届く前に打ち切る日が出る。
   //  150秒は openaiChat の既定と同じ。並列会議の律速は lead(nemotron-3-ultra・実測30〜104秒)なので全体は遅くならない。
-  { label: 'nvidia/deepseek-v4.1-flash', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4.1-flash', apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 150000, requires: ['N'], liveProbe: true },
+  // ★2026-11-11 撤去（nvidia/deepseek-v4.1-flash・critic の予備 weight3）:
+  //  本番条件の試験(council-trial・りんくのPC・11/11)で 0/2（2回とも120秒タイムアウト）。実会議でも 11/5 の全員集合3回中2回が abort。
+  //  150秒に延ばしても届かない日が続く＝席を先取りして失敗するだけの枠になった。critic は groq/gpt-oss-120b(w1) と
+  //  cloudflare/deepseek-v4.1-flash(w4・実会議 11/5 で3/3 OK)が残る。roleOf/weightOf の "deepseek-v4" 行は消さない（前例どおり）。
+  //  戻す条件: council-trial で3回続けて90秒以内に OK が出たとき。
+  //  旧: { label: 'nvidia/deepseek-v4.1-flash', rawId/apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 150000 }（2026-09-23採用）
 
   // ★2026-11-03 追加（会議メンバーを11/3時点の最新へ・generalist の予備 weight3）:
   //  NVIDIA Nemotron 3.5 Super（2026-10-15 公開・120B/12B有効）。名簿の nemotron 系（3-ultra-550b・CF の 3-120b）より新しい世代。
@@ -400,7 +405,23 @@ export const LINEUP = [
   //  中身: 名簿の主力と同じ形（結論→理由→懸念）で答えられた。super(5〜33秒)より速い予備として足す。
   //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。
   { label: 'nvidia/nemotron-3.5-lightning', provider: 'nvidia', rawId: 'nvidia/nemotron-3.5-lightning-30b-a3b', apiModel: 'nvidia/nemotron-3.5-lightning-30b-a3b', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
-  // ★2026-11-05 試して見送った新顔（11/5 の council-trial 実測）:
+  // ★2026-11-11 追加（会議メンバーを11/11時点の最新へ・generalist の予備 weight3）:
+  //  Google DiffusionGemma 26B（26B/4B有効・拡散型の言語モデル。NVIDIA の無料エンドポイント）。
+  //  generalist には nemotron 系が3体（cloudflare/nemotron-120b・nemotron-3.5 super/lightning）居るので、系譜の違う1体を足す。
+  //  実測（scripts/council-trial.mjs・本番と同じ max_tokens 1600 / temperature 0.6・りんくのPC・11/11）:
+  //   3/3 OK・約7秒・本文約891字・推論オフの指定は不要。中身: お題の弱点を「捨てアカ量産→SMS認証で塞ぐ」まで具体化でき、指摘の質が高かった。
+  //  label に "nvidia" を含むので weightOf の "nvidia"→2 に当たる。council-roles.mjs に "diffusiongemma"→3 を足して予備から入れる（恒久ルール3）。
+  //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。
+  { label: 'nvidia/diffusiongemma-26b', provider: 'nvidia', rawId: 'google/diffusiongemma-26b-a4b-it', apiModel: 'google/diffusiongemma-26b-a4b-it', opts: {}, timeoutMs: 90000, requires: ['N'], liveProbe: true },
+  // ★2026-11-11 試して見送った新顔・据え置き（council-trial 実測・りんくのPC。生データは同PCの council-trial-2026-11-11-*.json）:
+  //  - nvidia/nemotron-3.5-bolt-e4b: 3/3 OK・5〜6秒だが内容は無難。generalist の nemotron が既に3体居るので見送り（足すなら diffusiongemma の次）。
+  //  - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning（推論オフ必須で3/3）・poolside/laguna-xs-2.1（3/3・12秒）: 同じ理由で見送り。
+  //  - cloudflare/deepseek-v4-flash-0731・v4-pro-0813（推論オフで3/3）: 名簿の cloudflare/deepseek-v4.1-flash-1017 の旧版なので見送り。
+  //  - cloudflare/glm-5.2（推論オフで3/3・6秒）: Workers Paid 専用モデル＝会議のたびに課金され得るので不採用（11/3 の判断どおり）。
+  //  - Kimi K3.1 Pro（moonshotai/kimi-k3.1-pro）: 3回とも 404・NVIDIA の一覧にも無い（11/6・11/9・11/11）。無料で呼べる経路なし。
+  //  - Gemini 4 Argon / Gemini 4 Carbon(11/10公開): 一覧にはあるが無料枠のクォータ外で 429。gemini-3.1-pro-preview も同じ。
+  //  - mistral-large-4・glm-5.3・kimi-k2.6・step-5・OpenRouter の nemotron 無料版: 本文が空。nvidia/gemma-4-31b-it: 3回とも120秒タイムアウト。
+  //  - nemotron-3.5-super: 実会議 11/5 の3回とも OK だが同じ日なので「7日以上空けた2回」を満たさず予備のまま。lightning は実会議の記録まだ0回。
   //  - Kimi K3.1 Pro / Muse Spark Open / Qwen3.8-Max: NVIDIA に無く(404)、OpenRouter では有料のみ（:free 無し）。
   //  - gemini-3.8-flash: 1回 OK(7.0秒) のあと 503 が2回（同時に 3.7-flash も 503 が2回）。まだ混雑。入れ替えは保留。
   //  - Mistral Large 4: Mistral 経由も NVIDIA 経由も本文空（NVIDIA は推論のみで 68〜191秒）。
@@ -664,8 +685,15 @@ export const LINEUP = [
   //   lead は nvidia + openrouter×2 の生存3体で回っているので穴は空いていない。
   //  ★magistral-small が死んでいる影響は critic に出ていたので、そちらは
   //   上の nvidia/deepseek-v4.1-flash 追加で埋めた（この2体の据え置きとは別の話）。
-  { label: 'mistral/magistral-medium', provider: 'mistral', rawId: 'magistral-medium-latest', apiModel: 'magistral-medium-latest', opts: {}, requires: ['MI'], liveProbe: true },
-  { label: 'mistral/magistral-small', provider: 'mistral', rawId: 'magistral-small-latest', apiModel: 'magistral-small-latest', opts: {}, requires: ['MI'], liveProbe: true },
+  // ★2026-11-11 撤去（mistral/magistral-medium・lead 予備 w3 ／ mistral/magistral-small・critic 予備 w3）:
+  //  11/11 の本番条件試験で2体とも 0/3（すべて 429。30秒あけても0.3秒で即 429）。実会議 11/5 の全員集合3回も 0/3。
+  //  同じキーで codestral・ministral は 200 を返す＝キーは健全で、magistral 系だけ無料枠の対象外か枠が尽きている状態が
+  //  9月から続いている（09-06・09-23・11-03 にも 429 の記録）。「生きていれば発言する」として残してきたが、
+  //  weight3 の席を先取りして毎回失敗するだけになっていた（critic では予備の先頭に座り、健全な cloudflare/deepseek(w4) より先に選ばれる）。
+  //  roleOf/weightOf の "magistral" 行は消さない（前例どおり。戻すときは下の2行を戻すだけ）。
+  //  戻す条件: council-trial で magistral が別日に2回とも 200 で答えたとき。
+  //  旧: { label: 'mistral/magistral-medium', rawId/apiModel: 'magistral-medium-latest', requires: ['MI'], liveProbe: true }
+  //  旧: { label: 'mistral/magistral-small', rawId/apiModel: 'magistral-small-latest', requires: ['MI'], liveProbe: true }
 
   // 2026-08-11 追加 → 2026-08-13 撤去（mistral/devstral-medium）: devstral-medium-latest → implementの予備。
   //  2026-07-31にcloudflare/kimi-k2.7-codeが有料化で撤去されて以来、implement役はローカル
@@ -767,6 +795,11 @@ export const LINEUP = [
   //     載っていても /v1/chat/completions で呼べないモデルがある（採用前に必ず実機で叩く）。
   { label: 'cloudflare/qwen2.5-coder-32b', provider: 'cloudflare', rawId: '@cf/qwen/qwen2.5-coder-32b-instruct', apiModel: '@cf/qwen/qwen2.5-coder-32b-instruct', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
+  // ★2026-11-11 注意（12/1 に中身が変わる）: Google 公式の廃止予定ページで gemini-2.5-flash は「2026-12-01 から
+  //  要求を gemini-3.5-flash-lite に自動で回す」とされている（https://aistudio.google.com/docs/deprecations）。
+  //  この枠は generalist の主力(w1)で、統合の2番手（meeting.mjs）でもある。12/1 より前に後継を決めて入れ替えること。
+  //  候補（11/11 の council-trial で3/3 OK）: gemini-3.8-flash（名簿に予備として居る）・gemini-3.6-flash・gemini-3.5-flash-lite。
+  //  統合の2番手は長い入力で4見出しを書き切れるかが要るので、実会議の統合で試してから決める。
   { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
 
   // 2026-07-04 追加: 2026-06-25には429/503で常用不可だったが、今回の再検証で単発・4並列とも
@@ -800,7 +833,14 @@ export const LINEUP = [
   //  旧: { label: 'gemini-3.6-flash', ... }（2026-09-01採用・当時は3〜4倍速かった）
   //  基準は相対比較に切り替える: 「他の候補より明確に遅くなったら入れ替える」。
   //  Google無料枠は変動が常態と実証されたため「1回でも429/503で即撤去」は適用しない。
-  { label: 'gemini-3.7-flash', provider: 'gemini', rawId: 'gemini-3.7-flash', apiModel: 'gemini-3.7-flash', opts: {}, requires: ['E'] },
+  // ★2026-11-11 入れ替え（gemini-3.7-flash → gemini-3.8-flash）:
+  //  Google 公式の廃止予定ページ（https://aistudio.google.com/docs/deprecations）で、gemini-3.7-flash は
+  //  「エンドポイントは残るが、APIへの要求は自動で gemini-3.8-flash に回す」扱いになっていた＝名前は 3.7 でも中身は 3.8。
+  //  11/3〜11/9 に 3.7 と 3.8 が同じ時刻にそろって 503 だったのもこれで説明がつく。名簿の名前を実物に合わせる。
+  //  実測（council-trial・11/11）: gemini-3.8-flash 3/3 OK（約13秒・889字）。ただし同じ日の別の時間帯は 120秒タイムアウトと102秒＝混む時間帯は遅い。
+  //  weightOf は "gemini-3"→3 のまま（予備）。
+  //  旧: { label: 'gemini-3.7-flash', rawId/apiModel: 'gemini-3.7-flash' }（2026-09-07採用）
+  { label: 'gemini-3.8-flash', provider: 'gemini', rawId: 'gemini-3.8-flash', apiModel: 'gemini-3.8-flash', opts: {}, requires: ['E'] },
 
   // 2026-06-?? 追加 → 2026-07-31 撤去（openrouter/gpt-oss-120b）:
   //   本改修でrawIdを空('')から'openai/gpt-oss-120b:free'に埋めた直後の初回実行で
