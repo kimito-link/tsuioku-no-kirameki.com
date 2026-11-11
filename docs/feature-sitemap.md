@@ -960,7 +960,7 @@
   - `src/lib/platform/streamPlatform.js`
   - `tests/e2e/tiktok-recording.spec.js`
   - `council/tiktok-support-PLAN.md`
-- **ABEMA の配信を記録(本体に同梱)** — ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が再生位置の近くだけ YouTube 版と同じ記録へ渡す。コメント欄が閉じているときは吹き出しを一度だけ開く。コメント欄が約250pxのときは PICK UP も画面上の最新コメントも欄の幅で約20文字。配信者カードの画像はページのチャンネルロゴか番組画像。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
+- **ABEMA の配信を記録(本体に同梱)** — ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が画面に出ている分を全部 YouTube 版と同じ記録へ渡す。読み上げは新しい端の約20秒だけ。コメント欄が閉じているときは吹き出しを一度だけ開く。コメント欄が約250pxのときは PICK UP も画面上の最新コメントも欄の幅で約20文字。配信者カードの画像はページのチャンネルロゴか番組画像。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
   - `extension-youtube/src/ab-main-entry.js`
   - `extension-youtube/src/ab-content-entry.js`
   - `src/lib/abema/abParse.js`

@@ -14,6 +14,7 @@ import {
   parseAbProgramMeta,
   abMessagesNearPlayhead,
   abCommentRow,
+  enqueueAbMainBacklog,
   shrinkAbPayload,
   abChannelLogoUrl,
   pickAbBroadcasterImage,
@@ -88,22 +89,25 @@ describe('ABEMA のコメント JSON', () => {
     expect(shrinkAbPayload({ messages: [] })).toBe(null);
     expect(parseAbProgramMeta(FIXTURE_CHAT_MESSAGES)).toBe(null);
   });
-  it('広い窓は新しい端の 20 秒だけ、狭い窓は全部', () => {
+  it('広い窓もコメントは全部残し、読み上げは新しい端の 20 秒だけ', () => {
     const batch = parseAbCommentBatch(FIXTURE_CHAT_MESSAGES);
     const wide = abMessagesNearPlayhead(batch.messages, { sinceMs: 3_620_000, untilMs: 0 });
-    expect(wide.map((m) => m.text)).toEqual(['いまここ']);
+    expect(wide.map((m) => m.text)).toEqual(['ずっと前', 'こんにちは', 'いまここ']);
+    expect(wide.filter((m) => m.speak).map((m) => m.text)).toEqual(['いまここ']);
     const tight = abMessagesNearPlayhead(batch.messages, { sinceMs: 12_000, untilMs: 0 });
     expect(tight).toHaveLength(3);
+    expect(tight.every((m) => m.speak)).toBe(true);
   });
   it('時刻の無い新しい順の束は先頭 20 件まで残す', () => {
     const messages = Array.from({ length: 30 }, (_, i) => ({ elapsedMs: null, createdAtMs: null, text: String(i) }));
     expect(abMessagesNearPlayhead(messages).map((m) => m.text)).toEqual(messages.slice(0, 20).map((m) => m.text));
     expect(abMessagesNearPlayhead(messages.slice(0, 5))).toHaveLength(5);
   });
-  it('since だけが古い端のときは、届いた中の新しい端に合わせる', () => {
+  it('since だけが古い端のときも一覧は残し、読み上げは新しい端に合わせる', () => {
     const batch = parseAbCommentBatch(FIXTURE_CHAT_MESSAGES);
     const near = abMessagesNearPlayhead(batch.messages, { sinceMs: 0 });
-    expect(near.map((m) => m.text)).toEqual(['いまここ']);
+    expect(near.map((m) => m.text)).toEqual(['ずっと前', 'こんにちは', 'いまここ']);
+    expect(near.filter((m) => m.speak).map((m) => m.text)).toEqual(['いまここ']);
   });
   it('記録の 1 件は人の ID と本文を持ち、リンク用の login は空', () => {
     const batch = parseAbCommentBatch({ data: { messages: FIXTURE_CHAT_MESSAGES.messages, isPolling: true } });
@@ -112,9 +116,10 @@ describe('ABEMA のコメント JSON', () => {
     expect(row.login).toBe('');
     expect(row.kind).toBe('text');
     expect(row.postedAtMs).toBe(1_700_000_000_000);
+    expect(row.skipVoice).toBe(false);
     expect(row.id.startsWith('ab-')).toBe(true);
   });
-  it('実測の comments は新しい順。過去の 100 件は新しい端だけ残す', () => {
+  it('実測の comments は新しい順。1時間分も残し、続きの1件も足す', () => {
     const newest = 1_794_364_815_754;
     const id = 'abm1.chat.chat.11111111-1111-4111-8111-111111111111.01ARZ3NDEKTSV4RRFFQ69G5FAV';
     const comments = [
@@ -136,13 +141,25 @@ describe('ABEMA のコメント JSON', () => {
     expect(batch?.messages[0].createdAtMs).toBe(newest);
     expect(batch?.messages[0].key).toBe(id);
     const first = abMessagesNearPlayhead(batch?.messages, {});
-    expect(first.map((m) => m.text)).toEqual(['20秒前', 'いま']);
+    expect(first).toHaveLength(100);
+    expect(first.slice(-2).map((m) => m.text)).toEqual(['20秒前', 'いま']);
+    expect(first.filter((m) => m.speak).map((m) => m.text)).toEqual(['20秒前', 'いま']);
+    expect(first.find((m) => m.text === '2分前')?.speak).toBe(false);
+    const spoken = abCommentRow(first.find((m) => m.text === 'いま'), { pageLogin: 'n-isekai-anime-3', nowMs: newest + 60_000 });
+    const quiet = abCommentRow(first.find((m) => m.text === '2分前'), { pageLogin: 'n-isekai-anime-3', nowMs: newest + 60_000 });
+    expect(spoken?.skipVoice).toBe(false);
+    expect(spoken?.postedAtMs).toBe(newest);
+    expect(quiet?.skipVoice).toBe(true);
+    expect(quiet?.postedAtMs).toBe(newest - 120_000);
     const live = abMessagesNearPlayhead(batch?.messages, { sinceMs: newest });
-    expect(live.map((m) => m.text)).toEqual(['20秒前', 'いま']);
+    expect(live).toHaveLength(100);
+    expect(live.filter((m) => m.speak).map((m) => m.text)).toEqual(['20秒前', 'いま']);
     const next = parseAbCommentBatch({
       comments: [{ id: `${id}n`, message: 'つぎ', createdAtMs: newest + 4_000, userId: 'A2AmVn58ed3nrb' }],
     });
-    expect(abMessagesNearPlayhead(next?.messages, { sinceMs: newest }).map((m) => m.text)).toEqual(['つぎ']);
+    const followed = abMessagesNearPlayhead(next?.messages, { sinceMs: newest });
+    expect(followed.map((m) => m.text)).toEqual(['つぎ']);
+    expect(followed[0].speak).toBe(true);
     const shrunk = shrinkAbPayload({ comments });
     expect(shrunk.messages[0].createdAtMs).toBe(newest);
     expect(JSON.stringify(shrunk)).not.toContain('A2AmVn58ed3nrb-secret');
@@ -152,6 +169,19 @@ describe('ABEMA のコメント JSON', () => {
     expect(parseAbCommentBatch(stats)).toBe(null);
     expect(parseAbProgramMeta(stats)).toBe(null);
     expect(shrinkAbPayload(stats)).toBe(null);
+  });
+  it('hello までの控えは、番組情報で最初のコメント一覧を押し出さない', () => {
+    let q = [];
+    for (let i = 0; i < 40; i += 1) q = enqueueAbMainBacklog(q, { t: 'meta', meta: { title: `番組${i}` } });
+    q = enqueueAbMainBacklog(q, { t: 'batch', body: { messages: [{ text: 'お尻が見えん' }, { text: 'ここ平和そう' }] } });
+    for (let i = 0; i < 40; i += 1) q = enqueueAbMainBacklog(q, { t: 'meta', meta: { title: `あと${i}` } });
+    const batches = q.filter((m) => m.t === 'batch');
+    expect(batches).toHaveLength(1);
+    expect(batches[0].body.messages).toHaveLength(2);
+    expect(q.length).toBeLessThanOrEqual(40);
+    let many = [];
+    for (let i = 0; i < 9; i += 1) many = enqueueAbMainBacklog(many, { t: 'batch', body: { messages: [{ text: String(i) }] } });
+    expect(many.map((m) => m.body.messages[0].text)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
   });
   it('縮めた JSON に認可や知らない欄は残さない', () => {
     const shrunk = shrinkAbPayload({ ...FIXTURE_CHAT_MESSAGES, authorization: 'secret', token: 'nope' });

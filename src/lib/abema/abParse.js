@@ -7,7 +7,7 @@
 //   欠けている欄・知らない形は捨てる。空の配列で既存の記録を消さない(呼び出し側が 0 件なら送らない)。
 //
 //   since / until は資料によって向きが逆なので、大きい方を新しい端、小さい方を古い端として扱う。
-//   窓が約 25 秒より広ければ、新しい端から 20 秒以内だけ残す(過去のまとめて取得を読み上げに流さない)。
+//   画面に出ている分は全部残す。読み上げ(speak)は新しい端から 20 秒以内だけ true。
 
 export const AB_ORIGIN = 'https://abema.tv';
 /** 再生位置の近くとみなす幅 */
@@ -413,11 +413,11 @@ function viewersOf(v) {
 }
 
 /**
- * 再生位置の近くだけ残す。時刻は createdAtMs（壁時計）を優先し、無ければ elapsedMs。
- * 新しい順でも古い順でも時刻で並べ、新しい端から 20 秒だけ残す。
- * 最初の limit=100（since なし）は過去分が混ざるので、その新しい端だけを残し、読み上げに流さない。
+ * 届いたコメントは全部残す。時刻は createdAtMs（壁時計）を優先し、無ければ elapsedMs。
+ * 新しい順でも古い順でも時刻で並べる。speak は新しい端から 20 秒以内だけ true
+ * （最初の limit=100 に混ざる 1 時間分は記録するが、読み上げには流さない）。
  * since が壁時計なら createdAtMs と、番組内の経過なら elapsedMs と比べる。
- * 時刻が無い束は、ABEMA の新しい順に合わせて先頭 20 件まで。
+ * 時刻が無い束は、ABEMA の新しい順に合わせて先頭 20 件まで（それらは speak）。
  * @param {ReadonlyArray<{ elapsedMs?: number | null, createdAtMs?: number | null }>} messages
  * @param {{ sinceMs?: number | null, untilMs?: number | null }} [win]
  */
@@ -429,8 +429,10 @@ export function abMessagesNearPlayhead(messages, win = {}) {
     if (!m) return null;
     return axis === 'created' ? numOrNull(m.createdAtMs) : numOrNull(m.elapsedMs);
   };
+  /** @param {any[]} rows @param {(m: any) => boolean} speakOf */
+  const tag = (rows, speakOf) => rows.map((m) => ({ ...m, speak: speakOf(m) }));
   const known = list.filter((m) => atOf(m) != null);
-  if (!known.length) return list.length > 20 ? list.slice(0, 20) : list.slice();
+  if (!known.length) return tag(list.length > 20 ? list.slice(0, 20) : list.slice(), () => true);
   /** @type {number[]} */
   const times = known.map((m) => /** @type {number} */ (atOf(m)));
   const newest = Math.max(...times);
@@ -454,18 +456,19 @@ export function abMessagesNearPlayhead(messages, win = {}) {
     }
   }
   const ordered = known.slice().sort((a, b) => /** @type {number} */ (atOf(a)) - /** @type {number} */ (atOf(b)));
-  if (span <= AB_TIGHT_WINDOW_MS) return ordered;
+  if (span <= AB_TIGHT_WINDOW_MS) return tag(ordered, () => true);
   const lo = head - AB_PLAYHEAD_KEEP_MS;
   const hi = head + 5000;
-  return ordered.filter((m) => {
+  return tag(ordered, (m) => {
     const at = atOf(m);
     return at != null && at >= lo && at <= hi;
   });
 }
 
 /**
- * 記録の 1 件。投稿時刻は「いま届いた」にする(保存側が recordedAt を今にする。過去分をまとめて読ませないのは窓の側)。
- * @param {{ key?: string, userId?: string, name?: string, iconUrl?: string, text?: string }} msg
+ * 記録の 1 件。投稿時刻は createdAtMs。無いときはいま。
+ * speak が false の過去分は skipVoice（記録はする。読み上げと PICK UP には流さない）。
+ * @param {{ key?: string, userId?: string, name?: string, iconUrl?: string, text?: string, createdAtMs?: number | null, speak?: boolean }} msg
  * @param {{ pageLogin?: string, nowMs?: number }} ctx
  */
 export function abCommentRow(msg, ctx) {
@@ -474,6 +477,7 @@ export function abCommentRow(msg, ctx) {
   const idPart = String(msg.key).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
   if (idPart.length < 4) return null;
   const now = Number(ctx.nowMs) > 0 ? Number(ctx.nowMs) : Date.now();
+  const created = clockMs(msg.createdAtMs);
   return {
     id: `ab-${idPart}`,
     channelId: `ab:${msg.userId}`,
@@ -483,14 +487,40 @@ export function abCommentRow(msg, ctx) {
     iconUrl: safeAbImageUrl(msg.iconUrl),
     badges: /** @type {string[]} */ ([]),
     ts: '',
-    postedAtMs: now,
+    postedAtMs: created != null ? created : now,
     channel: String(ctx.pageLogin || ''),
     color: '',
     text: String(msg.text).slice(0, 500),
     kind: 'text',
     amount: 0,
     currency: '',
+    skipVoice: msg.speak === false,
   };
+}
+
+/**
+ * hello までの控え。コメントの束は番組情報で押し出さない（最初の一覧を落とさない）。
+ * コメントの束は新しい方を最大 8 件残す。全体は limit 件までで、溢れたら番組情報から捨てる。
+ * @param {any[]} backlog
+ * @param {any} msg
+ * @param {number} [limit]
+ */
+export function enqueueAbMainBacklog(backlog, msg, limit = 40) {
+  const next = (Array.isArray(backlog) ? backlog.slice() : []).concat([msg]);
+  const cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 40;
+  const isComment = (m) => Boolean(m && m.t === 'batch' && Array.isArray(m.body?.messages) && m.body.messages.length > 0);
+  let commentCount = 0;
+  for (let i = next.length - 1; i >= 0; i -= 1) {
+    if (!isComment(next[i])) continue;
+    commentCount += 1;
+    if (commentCount > 8) next.splice(i, 1);
+  }
+  while (next.length > cap) {
+    const i = next.findIndex((m) => !isComment(m));
+    if (i < 0) break;
+    next.splice(i, 1);
+  }
+  return next;
 }
 
 /**

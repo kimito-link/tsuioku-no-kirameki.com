@@ -5,7 +5,7 @@
 //   隔離された世界(ab-content-entry.js)へ渡す。送ったり、ページの受信を止めたりはしない。
 //   認可ヘッダや URL のクエリは渡さない。入口が「hello」と言うまで最大 40 件ためておく。
 
-import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayload } from '../../src/lib/abema/abParse.js';
+import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayload, enqueueAbMainBacklog } from '../../src/lib/abema/abParse.js';
 
 (() => {
   if (window.__nlAbMain) return;
@@ -19,8 +19,7 @@ import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayloa
   /** @param {any} msg */
   const post = (msg) => {
     if (!ready) {
-      backlog.push(msg);
-      if (backlog.length > 40) backlog.shift();
+      backlog = enqueueAbMainBacklog(backlog, msg);
       return;
     }
     try {

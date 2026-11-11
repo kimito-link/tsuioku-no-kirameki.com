@@ -2,8 +2,8 @@
 /* global chrome, location, setTimeout, setInterval, window, document, KeyboardEvent, InputEvent */
 //
 // ★写し役(ab-main-entry.js)の postMessage だけを読む。別ホストへ取りに行かない。
-//   記録は YT_STREAM_META / YT_CHAT_ITEMS。読み上げと会場の PICK UP は、この口に載ったコメントを
-//   ほかの配信と同じく扱う。再生位置から離れた過去分はパーサーが落とす。
+//   記録は YT_STREAM_META / YT_CHAT_ITEMS。画面に出ている分は全部渡す。
+//   読み上げと会場の PICK UP は、新しい端だけ（過去分は skipVoice）。
 //   配信キーは ab.<login>.<チャット>。チャットが変わったら前のキーを終わらせる。
 
 import {

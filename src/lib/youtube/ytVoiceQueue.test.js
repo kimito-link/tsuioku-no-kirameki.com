@@ -35,6 +35,15 @@ describe('buildYtVoiceUserKey / resolveYtVoiceForChannel', () => {
 });
 
 describe('shouldReadYtComment', () => {
+  it('skipVoice の過去分は、全部読むモードでも読まない', () => {
+    expect(
+      shouldReadYtComment(
+        { kind: 'text', badges: [], text: 'ここ平和そう', skipVoice: true },
+        { mode: YT_VOICE_MODES.ALL },
+      ),
+    ).toBe(false);
+  });
+
   it('「全部読む（all）」モードでは通常コメントも含めて読み上げ対象にする', () => {
     expect(
       shouldReadYtComment(
