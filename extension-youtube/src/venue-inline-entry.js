@@ -22,6 +22,8 @@ import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
 const IS_TWITCH_PAGE = !!PAGE_PLATFORM;
+/** 会場の数字の帯を、このページのサービスに合わせる(YouTube のホストは表に無いので youtube)。 */
+const STAT_PLATFORM = PAGE_PLATFORM?.id || 'youtube';
 
 /** @returns {string} 視聴ページの配信キー(YouTube は動画 id・Twitch は記録のある配信キー)。視聴ページでなければ '' */
 function currentVideoId() {
@@ -82,12 +84,14 @@ function sync() {
     // Twitch/Kick: 公式のギフト(Bits/Kicks)の窓を開く口はまだ無いので、ギフトのボタンは出さない(押しても何も起きないボタンを置かない)
     mountVenueBarButton({
       getStatCardsSource: statCardsSource,
+      statPlatform: STAT_PLATFORM,
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
       postReasonText: (reason) => ytCommentSendReasonText(reason, '', PAGE_PLATFORM?.id || ''),
     });
   if (!document.getElementById('nlsb-venue-root'))
     mountVenueBarButton({
       getStatCardsSource: statCardsSource,
+      statPlatform: STAT_PLATFORM,
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
       postReasonText: ytCommentSendReasonText,
       // 0.1.113: 💲 スーパーチャットの窓を開く(ニコ生版 v0.1.1870 のギフトと同じ。支払いは YouTube 本体で利用者がする)。

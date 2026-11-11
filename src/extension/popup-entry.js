@@ -9133,11 +9133,10 @@ function clearWatchMetaCard(opts = {}) {
       : Boolean(watchMetaCache.fetchInflight);
   const error =
     typeof opts.error === 'string' ? opts.error : String(watchMetaCache.fetchError || '');
-  const gate = resolveWatchMetaCardState({
-    snapshot: null,
-    snapshotFetchInflight: inflight,
-    snapshotFetchError: error
-  });
+  const gate0 = resolveWatchMetaCardState({ snapshot: null, snapshotFetchInflight: inflight, snapshotFetchError: error });
+  // ページに数が出るサービスの画面(yt-sidepanel.html の data-nl-page-count-only)は「（接続中…）」等でなく「読み込み中」
+  const gate = document.documentElement?.getAttribute('data-nl-page-count-only') === '1'
+    ? { ...gate0, viewerLabel: '読み込み中', concurrentLabel: '読み込み中' } : gate0;
   if (viewerDomEl) {
     viewerDomEl.textContent = gate.viewerLabel;
     viewerDomEl.classList.toggle(
@@ -9540,6 +9539,18 @@ function paintOfficialNicoStatsStrip(snapshot) {
     applyChip(RATE_ID, RATE_PH);
     return;
   }
+  const foreignPlatform = String(snapshot?.platform || '').trim().toLowerCase();
+  const foreignStats = foreignPlatform && foreignPlatform !== 'niconico';
+  applyChip('officialStatNicoStreamAge', digest.streamAge);
+  if (foreignStats) {
+    // ニコ生の来場・本家コメ・広告pt・ギフトpt は、他のサービスの数字で埋めない。
+    applyChip('officialStatNicoViewers', PH);
+    applyChip('officialStatNicoComments', PH);
+    applyChip(RATE_ID, RATE_PH);
+    applyChip('officialStatNicoAdPts', PH);
+    applyChip('officialStatNicoGiftPts', PH);
+    return;
+  }
   applyChip('officialStatNicoViewers', digest.viewers);
   applyChip('officialStatNicoComments', digest.comments);
   // v0.1.1567: 本家コメの速さ「+66/分」。標本は【値が変わったときだけ】(同値の再描画では積まない)。出せない間は空。
@@ -9548,7 +9559,6 @@ function paintOfficialNicoStatsStrip(snapshot) {
   }
   const rateText = digest.comments.isPlaceholder ? '' : formatCommentRate(_officialCommentRate.ratePerMin(Date.now()));
   applyChip(RATE_ID, { text: rateText, isPlaceholder: rateText === '' });
-  applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
 

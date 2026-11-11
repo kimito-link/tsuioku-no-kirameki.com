@@ -110,6 +110,25 @@ export function resolveBroadcasterFollowTarget(snapshot) {
     };
   }
 
-  // 3. その他は導線なし。
+  // 3. YouTube の /@名前/live は、動画 id が分かる前でも配信者の名前とチャンネルを出す。
+  if (isHttpOrHttpsUrl(pageUrlRaw)) {
+    try {
+      const host = new URL(pageUrlRaw).hostname.toLowerCase();
+      if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+        return {
+          kind: 'channel',
+          name,
+          level,
+          pageUrl: pageUrlRaw,
+          iconUrl: isHttpOrHttpsUrl(iconUrlRaw) ? iconUrlRaw : '',
+          followLabel: 'チャンネルを見る'
+        };
+      }
+    } catch {
+      /* 壊れた URL は導線にしない */
+    }
+  }
+
+  // 4. その他は導線なし。
   return { ...NONE_RESULT };
 }

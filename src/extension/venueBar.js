@@ -2641,7 +2641,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any }, getStatCardsSource?: () => any }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any }, getStatCardsSource?: () => any, statPlatform?: string }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -2870,6 +2870,7 @@ export function mountVenueBarButton(options = {}) {
   }
   // 2026-11-09: パネルの数字カードと同じ数字の帯(ヘッダーの2行目・値は数字カードの鏡をそのまま出す=lib の venueStatStrip.js)。
   const statStrip = createVenueStatStrip(document, {
+    platform: options.statPlatform,
     faces: {
       link: resolveVenueAssetUrl('images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png'),
       konta: resolveVenueAssetUrl('images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png'),
@@ -3750,7 +3751,7 @@ export function mountVenueBarButton(options = {}) {
       const liveId = String(activeLiveId || liveIdFromPathname() || '');
       const recordedCount = panelSummarySnap ? selectDisplayRecordedCount(panelSummarySnap) : null;
       statMirrorLiveness.observe(statCardsMirrorSnap); // 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない
-      const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId) });
+      const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId), platform: options.statPlatform });
       statStrip.paint(model);
       if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror' && statMirrorLiveness.isLive(Date.now(), liveId), recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }

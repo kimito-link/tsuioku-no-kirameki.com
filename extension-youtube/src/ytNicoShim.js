@@ -21,7 +21,7 @@ import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytP
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytHandleLivePath, ytChannelUrlOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
@@ -38,6 +38,8 @@ import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js'
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
+import { tallySupportItems } from '../../src/lib/platform/platformMetrics.js';
+import { watchPlatformMetricChrome } from '../../src/lib/platform/platformMetricChrome.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -180,10 +182,46 @@ function newestKeyForChannel(keyHead, login) {
   return best;
 }
 
+/**
+ * /@名前/live は URL に動画 id が無い。まとめに残した sourceUrl のパスが一致する配信を返す。
+ * @param {string} url
+ * @param {Record<string, any> | null | undefined} summaries
+ * @returns {string}
+ */
+export function videoIdForYtHandleLive(url, summaries) {
+  // /@名前/live・/名前/live・/c/名前/live・/channel/UC…/live のどれでも(YouTube が古い形へ送り直すことがある)
+  const path = ytHandleLivePath(String(url || ''));
+  if (!path) return '';
+  let best = '';
+  let bestAt = -1;
+  const bag = summaries && typeof summaries === 'object' ? summaries : {};
+  for (const [key, sum] of Object.entries(bag)) {
+    if (!/^[A-Za-z0-9_-]{11}$/.test(key)) continue;
+    const stored = ytHandleLivePath(sum?.sourceUrl);
+    if (!stored || stored !== path) continue;
+    const at = Number(sum?.viewersReadAt || sum?.updatedAt || 0);
+    if (at >= bestAt) {
+      bestAt = at;
+      best = key;
+    }
+  }
+  return best;
+}
+
+/**
+ * YouTube の視聴 URL → 配信キー。/@名前/live は、まとめが無くても仮のキーを返す。
+ * @param {string} url
+ * @param {Record<string, any> | null | undefined} summaries
+ */
+export function resolveYtWatchStreamKey(url, summaries) {
+  if (!isYtWatchLikeUrl(url)) return '';
+  return parseYtVideoIdFromUrl(url) || videoIdForYtHandleLive(url, summaries) || ytHandleLivePendingKey(url);
+}
+
 /** 視聴タブの URL → 配信キー(YouTube は videoId・Twitch/Kick は記録のある配信キー)。分からなければ '' @param {string} url */
 export function streamKeyForWatchUrl(url) {
   const u = String(url || '');
-  if (isYtWatchLikeUrl(u)) return parseYtVideoIdFromUrl(u);
+  if (isYtWatchLikeUrl(u)) return resolveYtWatchStreamKey(u, knownSummaries);
   const ch = platformChannelOfUrl(u);
   if (!ch) return '';
   // 0.1.1947: 記録の無いチャンネル(配信前の部屋など)は仮のキー '<頭><login>.00000' で「記録 0」を見せる。
@@ -364,8 +402,11 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
-  // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。分からないときだけ、記録を始めた時刻で代わりにする。
-  const startedAt = ytTrustedStartedAt(sum, videoId, all) || Number(sum?.createdAt || 0);
+  // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。記録を始めた時刻で代わりにすると、
+  // 長い配信を開いた直後に「経過 0分」になる。分からないあいだは出さない。
+  const trustedStart = ytTrustedStartedAt(sum, videoId, all);
+  // 記録を始めた時刻で代わりにしない。長い配信を開いた直後に「経過 0分」になっていた。
+  const startedAt = trustedStart;
   const ucId = String(sum?.broadcasterChannelId || '');
   const handle = String(sum?.broadcasterHandle || '');
   // UC… が分からない配信は、記録の中の同じ名前の人(配信者がチャットに書いていれば UC… が分かる)→ @名前 の順で決める
@@ -373,6 +414,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const chId = ucId || ucFromRecords;
   const bKey = chId || (handle ? `handle:${handle}` : '');
   const bUid = bKey ? numericUidForYtKey(bKey) : '';
+  const pendingHandle = ytHandleOfPendingKey(videoId);
   const plat = platformOfStreamKey(videoId);
   if (plat && chId.startsWith(plat.personHead) && handle) loginByPersonKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
@@ -384,10 +426,12 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     liveId: lv,
     broadcastTitle: String(sum?.title || ''),
     // 仮キー(記録の無い部屋)は記録に名前が無いので、URL のチャンネル名を出す(別の配信の名前に倒さない)
-    broadcasterName: String(sum?.broadcasterName || '') || (plat && isPlaceholderStreamKey(videoId) ? plat.loginOfStreamKey(videoId) : ''),
+    broadcasterName: String(sum?.broadcasterName || '') || (plat && isPlaceholderStreamKey(videoId) ? plat.loginOfStreamKey(videoId) : '') || pendingHandle,
     thumbnailUrl: plat
       ? plat.thumbUrl(plat.loginOfStreamKey(videoId))
-      : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      : ytChannelUrlOfPendingKey(videoId)
+        ? ''
+        : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     tags: [],
     startAtText: '',
     links: [],
@@ -399,9 +443,11 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       ? plat.channelUrl(plat.loginOfStreamKey(videoId))
       : chId
       ? `https://www.youtube.com/channel/${chId}`
-      : handle
-        ? `https://www.youtube.com/${encodeURI(handle)}`
-        : '',
+      : ytChannelUrlOfPendingKey(videoId)
+        ? ytChannelUrlOfPendingKey(videoId)
+        : handle
+          ? `https://www.youtube.com/${encodeURI(handle)}`
+          : '',
     broadcasterIconUrl: bIcon,
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
@@ -410,6 +456,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     recordedCountHint: typeof sum?.itemCount === 'number' ? sum.itemCount : null, // 同じく、記録件数(まとめの itemCount)
     viewerCountSource: 'dom',
     officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null, // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
+    officialViewerStale: Number.isFinite(viewers) && viewers > 0 && sum?.viewersStale === true,
+    officialViewerReadAt: Number(sum?.viewersReadAt || 0) || null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める
@@ -417,7 +465,36 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       startedAt > 0 && !replayVideoIds.has(videoId)
         ? Math.max(0, Math.round(((Number(sum?.endedAt) > startedAt ? Number(sum.endedAt) : Date.now()) - startedAt) / 60000))
         : null,
+    // ニコ生の来場・広告pt・ギフトpt を、このサービスの数字として出さない(src/lib/platform/platformMetrics.js)。
+    platform: plat?.id || 'youtube',
+    officialViewersOnly: true,
+    platformFacts: {
+      viewers: Number.isFinite(viewers) && viewers > 0 ? viewers : null,
+      streamAgeProvenance: trustedStart > 0 ? 'official' : '',
+      support: supportTallyByVid.get(String(videoId || '')) || null,
+      // ABEMA は番組情報欄の「視聴数」「コメント数」(ページに出ている数そのもの・#608 がまとめに入れる)
+      viewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null,
+      commentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null,
+    },
   };
+}
+
+/** この画面で数えたサポートの合計(配信キー → tally)。まとめ(yt_stream_summaries)には書かない。 */
+/** @type {Map<string, any>} */
+const supportTallyByVid = new Map();
+/** @type {() => void} */
+let schedulePlatformChrome = () => {};
+/** 記録の控えが変わったときだけ数え直す。まだ読んでいなければチップ自体を出さない。 */
+function noteSupportTally(vid) {
+  const cache = inPageCommentCache.get(vid);
+  const ver = cache ? Number(cache.ver) || 0 : -1;
+  const prev = supportTallyByVid.get(vid);
+  if (prev && prev.ready === true && prev.ver === ver) return;
+  const rows = cache?.byPk ? [...cache.byPk.values()] : [];
+  const t = tallySupportItems(rows);
+  t.ver = ver;
+  supportTallyByVid.set(vid, t);
+  schedulePlatformChrome();
 }
 
 /** @param {string} name */
@@ -937,6 +1014,7 @@ async function buildCommentsForLvUncached(lv) {
   const items = await getCommentsViaBackground(vid);
   const tFetchDone = Date.now();
   if (items == null) return undefined;
+  noteSupportTally(vid);
   // ★v0.1.1981: 何も変わっていなければ前の結果を返す(アーカイブの行がある配信は、開始時刻が他の配信のまとめにも左右されるので使わない)
   const memoCache = inPageCommentCache.get(vid);
   const memoSumSig = buildSumSig(knownSummaries?.[vid]);
@@ -1874,6 +1952,27 @@ function screenPlatformBase() {
   if (PANEL_STREAM_KEY) return platformOfPanelStreamKey(PANEL_STREAM_KEY);
   return platformOfStreamKey(newestVideoIdOf(knownSummaries));
 }
+
+/** 横の欄の数字を、今の配信のサービスに合わせる。視聴ページの中(会場)にはニコ生のチップが無いので何もしない。 */
+function installPlatformMetricChromeOnce() {
+  if (YT_SHIM_IN_PAGE || typeof document === 'undefined') return;
+  const boot = () => {
+    if (!document.getElementById('watchConcurrentCard') && !document.getElementById('officialStatNicoAdPts')) return;
+    schedulePlatformChrome = watchPlatformMetricChrome(document, () => {
+      const base = screenPlatformBase();
+      const id = base?.id || 'youtube';
+      const vid = lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : '';
+      const sum = vid ? knownSummaries?.[vid] : null;
+      const facts = sum
+        ? ytSummaryToNicoSnapshot(sum, vid, '', knownSummaries).platformFacts
+        : { viewers: null, support: vid ? supportTallyByVid.get(vid) || null : null };
+      return { platform: id, facts };
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+}
+installPlatformMetricChromeOnce();
 
 /** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t */
 function screenWording(t) {

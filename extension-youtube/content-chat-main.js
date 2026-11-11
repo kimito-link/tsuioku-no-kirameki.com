@@ -3,6 +3,8 @@
 // 本物の顔の URL は行のデータ(rawProps.data() / data)に最初から入っているが、拡張の content script(隔離された世界)からは
 // そのデータを読めない。ここ(ページの世界)で読んで、行の属性 data-nl-author-photo に書いておく。content-chat.js がそれを読む。
 // 読むだけで、YouTube の画面には何も足さない・変えない(属性を1つ置くだけ)。
+// 同時視聴者数は、同じページ世界の束（content-chat-main-entry.js）が ytInitialData と
+// updated_metadata から読み、html の data-nl-yt-viewers に置く。画面の文字は変えない。
 (() => {
   if (!/\/live_chat(_replay)?/.test(location.pathname)) return;
   const SEL =

@@ -423,7 +423,8 @@ export default [
     // v0.1.1997: 大きな記録で合間に画面へ手を返す配線(+15: import・応援マスを次の仕事へ回す8行・正規化のあと2行・読み出しの続き4行)。決まりは lib の bigRecordYield.js。
     // v0.1.2007: 応援マスの集計の控えの配線(+4: import・控えの生成と計器の公開3行)。仕組みは lib の laneAggregatesMemo.js。
     // v0.1.2008: 応援マスを分けて足し終えたときに実DOMを測り直す配線(+6)。分け方は lib の laneProgressiveFill.js と story/renderStoryUserLaneDom.js。
-    rules: { 'max-lines': ['error', { max: 21915, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2045: ニコ生以外では来場・本家コメ・広告pt・ギフトpt を公式チップに書かない(+10)。出し分けの正本は lib の platformMetrics.js。
+    rules: { 'max-lines': ['error', { max: 21925, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -497,8 +498,9 @@ export default [
     // v0.1.1995: パネルを開かなくても数字の帯が出る(りんく「POPをひらかなくても数字がつくように」)の配線=+9(import 1行・自分で作る写しの置き場と見回り役 8行)。作り方は lib の venueStatCardsSelf.js。
     // v0.1.2005: 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない(PC 実測: ニコ生で最初の約1分、古い数字で止まる)の配線=+2。判定は lib の venueStatCardsSelf.js(createStatMirrorLiveness)。
     // v0.1.2038: 読み上げ ON の PICK UP を、声が鳴り始めた瞬間に合わせる配線=+13。中身は venuePickupVoice.js と lib の venuePickupPlayback.js。
+    // v0.1.2045: 会場の数字の帯に、ページのサービス名を渡す配線(+1)。出し分けは lib の venueStatStrip.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7544, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7545, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
