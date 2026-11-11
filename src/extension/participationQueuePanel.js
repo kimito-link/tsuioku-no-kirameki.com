@@ -116,7 +116,7 @@ function render(state) {
     view.list.appendChild(empty);
     return;
   }
-  state.order.forEach((person, index) => {
+  state.order.forEach((/** @type {any} */ person, /** @type {number} */ index) => {
     view.list.appendChild(renderRow(person, index, state, waiting));
   });
 }
@@ -242,6 +242,7 @@ function mutate(change, opts = {}) {
   }).catch(() => {});
 }
 
+/** @param {number} g */
 async function reload(g) {
   if (fixture) {
     ready = true;
@@ -271,6 +272,7 @@ async function reload(g) {
   }
 }
 
+/** @param {string} id */
 function rememberHand(id) {
   handed.add(id);
   if (handed.size <= HANDED_MAX) return;
@@ -334,6 +336,7 @@ function scheduleWords() {
   }, WORD_SAVE_MS);
 }
 
+/** @param {Event} ev */
 function onListClick(ev) {
   const target = /** @type {HTMLElement} */ (ev.target);
   const btn = target && target.closest ? target.closest('button[data-act]') : null;

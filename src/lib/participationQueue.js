@@ -97,11 +97,10 @@ export function participationQueueStorageKey(liveId) {
 }
 
 /**
- * 入力された言葉を、保存して画面に出す形にする。
+ * 制御文字を落とす。正規表現に制御文字を書かない。
  * @param {unknown} raw
  * @returns {string}
  */
-/** 制御文字を落とす。正規表現に制御文字を書かない。 */
 function stripControls(raw) {
   let out = '';
   const s = String(raw ?? '');
@@ -113,13 +112,22 @@ function stripControls(raw) {
   return out;
 }
 
+/**
+ * 入力された言葉を、保存して画面に出す形にする。
+ * @param {unknown} raw
+ * @returns {string}
+ */
 export function cleanParticipationWord(raw) {
   let s = stripControls(String(raw ?? '').normalize('NFKC')).trim().replace(/\s+/g, ' ');
   if (s.length > PARTICIPATION_WORD_MAX) s = s.slice(0, PARTICIPATION_WORD_MAX);
   return s;
 }
 
-/** 比較用。英字の大小は区別しない。コメント本文は切らない。 */
+/**
+ * 比較用。英字の大小は区別しない。コメント本文は切らない。
+ * @param {unknown} raw
+ * @returns {string}
+ */
 function foldForMatch(raw) {
   return stripControls(String(raw ?? '').normalize('NFKC')).trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -195,6 +203,7 @@ export function normalizeParticipationQueue(raw) {
   /** @type {Record<string, number>} */
   const counts = {};
   const srcCounts = rec.counts && typeof rec.counts === 'object' && !Array.isArray(rec.counts) ? rec.counts : {};
+  /** @type {Array<[string, number]>} */
   const countEntries = [];
   for (const [k, n] of Object.entries(srcCounts)) {
     const key = String(k || '').trim();
@@ -467,7 +476,7 @@ export function moveParticipation(state, index, delta, nowMs = 0) {
 /**
  * 待ちの並びだけを混ぜる。済の回数は変えない。
  * @param {ParticipationQueueState} state
- * @param {() => number} [rng] 0以上1未満
+ * @param {() => number} [rng] 0 以上 1 未満
  * @param {number} [nowMs]
  * @returns {ParticipationQueueState}
  */

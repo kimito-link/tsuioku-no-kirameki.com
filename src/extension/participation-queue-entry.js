@@ -51,6 +51,7 @@ function start() {
     paint('');
     return;
   }
+  /** @param {unknown} raw */
   const draw = (raw) => {
     const state = normalizeParticipationQueue(raw);
     paint(state.opaque ? '' : formatParticipationObsText(state));
