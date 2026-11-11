@@ -2,7 +2,6 @@
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
 import { createShortLivedMemo } from '../lib/shortLivedMemo.js';
-import { KEY_VOICE_READING_ENABLED } from '../lib/voiceKeys.js';
 import '../lib/extDocBusyCensusBoot.js';
 // v0.1.1686: ちらつき計(サイドパネルの popup だけ・画面の書き換えを数えて状態速報に出す)。import するだけで起動。
 import '../lib/flickerMeterBoot.js';
@@ -17,7 +16,7 @@ import {
   buildHtmlReportDocument
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
-import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js'; import { mountOuenBanner } from '../lib/ouenBannerDom.js';
+import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js'; import { mountOuenBanner } from '../lib/ouenBannerDom.js'; import { wirePanelVoiceReadingButton } from './popup/wirePanelVoiceReadingButton.js';
 // v0.1.1080: マイ効果音・ボイス/BGM/操作音の計器が直接 chrome.storage.local を叩くと、
 //   拡張リロード後の古い inline iframe で「Cannot read properties of undefined (reading 'local')」の
 //   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
@@ -19334,49 +19333,6 @@ function bridgeToolbarPopupToInlinePanel() {
       }
     })();
   }, 0);
-}
-
-/** パネルの「読み上げ」を会場と同じ ON/OFF にする。initPopup の外に置く(関数の行数を増やさない)。 */
-function wirePanelVoiceReadingButton($) {
-  const paintVoiceReadingButton = (on) => {
-    const btn = $('openComeviewVoiceBtn');
-    if (!btn) return;
-    const word = btn.querySelector('.nl-compose-qbtn__word');
-    if (word) word.textContent = on ? '読み上げON' : '読み上げOFF';
-    btn.classList.toggle('is-on', on);
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    const label = on ? '読み上げを止めます' : '読み上げを始めます。VOICEVOX が必要です。';
-    btn.title = label;
-    btn.setAttribute('aria-label', label);
-  };
-  const syncVoiceReadingButton = () => {
-    try {
-      chrome.storage.local.get(KEY_VOICE_READING_ENABLED, (bag) => {
-        try { void chrome.runtime.lastError; } catch { /* no-op */ }
-        paintVoiceReadingButton(bag && bag[KEY_VOICE_READING_ENABLED] === true);
-      });
-    } catch { /* 拡張の外では何もしない */ }
-  };
-  $('openComeviewVoiceBtn')?.addEventListener('click', () => {
-    try {
-      chrome.storage.local.get(KEY_VOICE_READING_ENABLED, (bag) => {
-        try { void chrome.runtime.lastError; } catch { /* no-op */ }
-        const next = !(bag && bag[KEY_VOICE_READING_ENABLED] === true);
-        chrome.storage.local.set({ [KEY_VOICE_READING_ENABLED]: next }, () => {
-          try { void chrome.runtime.lastError; } catch { /* no-op */ }
-          paintVoiceReadingButton(next);
-        });
-      });
-    } catch { /* no-op */ }
-  });
-  try {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area && area !== 'local') return;
-      const c = changes && changes[KEY_VOICE_READING_ENABLED];
-      if (c) paintVoiceReadingButton(c.newValue === true);
-    });
-  } catch { /* no-op */ }
-  syncVoiceReadingButton();
 }
 
 async function initPopup() {

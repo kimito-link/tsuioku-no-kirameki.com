@@ -3419,9 +3419,7 @@ export function mountVenueBarButton(options = {}) {
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
     onDiag: publishVenueVoiceDiag,
     onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
-      // 生存確認や合成の途中でも押せる。disabled にすると OFF が届かない。
-      voiceBtn.disabled = false;
-      voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
+      voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
     },
@@ -3462,7 +3460,6 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(開いて ON の間だけ名乗る・voiceReaderLease.js)。
   const venueReaderLease = startVoiceReaderLease(() => open && voicePlayer.enabled, liveIdFromPathname, { onPageHide: (fn) => window.addEventListener('pagehide', fn) });
   voiceBtn.addEventListener('click', () => {
-    // readingWanted はボタンの表示。enabled は声を出してよいか。接続中の ON もここからすぐ OFF にできる。
     if (voicePlayer.readingWanted) {
       voicePlayer.disable();
     } else {
