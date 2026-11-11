@@ -17,7 +17,7 @@ const read = (rel) => readFileSync(path.join(repoRoot, rel), 'utf8').replace(/\r
 const code = (rel) => read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 /** 拡張プロセスで動く文書のエントリ(extension/*.html に対応する)。 */
-const DOC_ENTRIES = ['popup', 'sidepanel', 'status', 'comeview', 'live-view', 'venue', 'offscreen', 'marketing-export'];
+const DOC_ENTRIES = ['popup', 'sidepanel', 'status', 'comeview', 'live-view', 'venue', 'offscreen', 'marketing-export', 'obs-style'];
 
 describe('全拡張文書が忙しさ台帳の起動処理を import している', () => {
   for (const name of DOC_ENTRIES) {
@@ -27,7 +27,7 @@ describe('全拡張文書が忙しさ台帳の起動処理を import してい�
   }
 
   it('★extension/ の html が増えたら、このテストの一覧(DOC_ENTRIES)も増やす(手で書く表の穴を機械で塞ぐ)', () => {
-    const htmls = ['popup', 'sidepanel', 'status', 'comeview', 'live-view', 'venue', 'offscreen', 'marketing-export'];
+    const htmls = ['popup', 'sidepanel', 'status', 'comeview', 'live-view', 'venue', 'offscreen', 'marketing-export', 'obs-style'];
     for (const h of htmls) {
       const html = read(`extension/${h}.html`);
       expect(html, `${h}.html が dist/${h}.js を読んでいる`).toMatch(/dist\/[a-z-]+\.js/);
