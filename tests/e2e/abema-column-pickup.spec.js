@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { applyVenuePickupBox, VENUE_PICKUP_CSS } from '../../src/lib/venuePickupBanner.js';
 
 /**
- * ABEMA のコメント欄は約 250px。実機では吹き出しが顔＋「そし…」、名前が「D…」になり、
- * サイドパネル上段も「D… ： そし…」だった。
- * 欄の幅が上限。本文は約20文字ぶんの幅。1文字ずつ折れない。
+ * ABEMA のコメント欄は約 250px。欄へ合わせて吹き出しを縮めると、本文が折れてニコ生・YouTube と違って見える。
+ * ページが div を 40px・scale・zoom にしても、PICK UP は 320px 以上で、文字は 18px のまま。
+ * 上段の最新コメントは欄の幅のまま。
  */
 
 const COMMENT = 'そして今日も配信を見てくれてありがとう、いつも応援しています';
@@ -39,7 +39,7 @@ const TICKER_CSS = [
   '      .nl-ticker-latest__text {'
 ].map(cssRule).join('\n');
 
-test('250px の ABEMA コメント欄でも PICK UP と上段カードが約20文字読める', async ({ page }) => {
+test('ABEMA の欄やホスト CSS で PICK UP は縮まず、上段は欄の幅のまま', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.setContent(`<!doctype html>
 <meta charset="utf-8">
@@ -47,11 +47,17 @@ test('250px の ABEMA コメント欄でも PICK UP と上段カードが約20�
   html, body { margin: 0; background: #1a1d24; color: #111; font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; }
   .layout { display: flex; gap: 16px; align-items: flex-start; padding: 16px; }
   .player { flex: 1 1 auto; height: 520px; background: #111; }
-  .abema-page div, .abema-page span {
-    max-width: 100% !important;
+  html body .nlsb-root div, html body .nlsb-root span {
+    max-width: 40px !important;
     min-width: 0 !important;
+    width: 40px !important;
     word-break: break-all !important;
     overflow-wrap: anywhere !important;
+    flex-shrink: 1 !important;
+    zoom: 0.5 !important;
+    transform: scale(0.4) !important;
+    font-size: 8px !important;
+    white-space: normal !important;
   }
   .com-tv-CommentArea {
     position: relative;
@@ -82,17 +88,17 @@ test('250px の ABEMA コメント欄でも PICK UP と上段カードが約20�
   <div class="player"></div>
   <div class="abema-page">
     <p class="cap">ABEMA コメント欄 250px</p>
-    <div class="com-tv-CommentArea">
-      <div class="nlsb-root">
-        <div class="nlsb-pickup">
-          <span class="nlsb-pickup__badge">PICK UP</span>
-          <span class="nlsb-pickup__face" role="img" aria-label=""></span>
-          <span class="nlsb-pickup__main">
-            <span class="nlsb-pickup__body">${COMMENT}</span>
-            <span class="nlsb-pickup__meta">${NAME}</span>
-          </span>
-        </div>
+    <div class="nlsb-root">
+      <div class="nlsb-pickup">
+        <span class="nlsb-pickup__badge">PICK UP</span>
+        <span class="nlsb-pickup__face" role="img" aria-label=""></span>
+        <span class="nlsb-pickup__main">
+          <span class="nlsb-pickup__body">${COMMENT}</span>
+          <span class="nlsb-pickup__meta">${NAME}</span>
+        </span>
       </div>
+    </div>
+    <div class="com-tv-CommentArea">
       <p class="com-tv-CommentBlock">先行のコメント</p>
       <p class="com-tv-CommentBlock">${COMMENT}</p>
     </div>
@@ -121,26 +127,29 @@ test('250px の ABEMA コメント欄でも PICK UP と上段カードが約20�
   </div>
 </div>`);
 
-  /** @type {Array<[string, string, string]>} */
-  const props = [];
-  let fit = false;
-  applyVenuePickupBox({
-    style: { setProperty: (k, v, p) => { props.push([k, v, p || '']); } },
-    classList: { toggle: (name, on) => { if (name === 'is-fit-column') fit = !!on; } }
-  }, 1280, 960, 250);
-  await page.locator('.nlsb-pickup').evaluate((node, spec) => {
-    node.classList.toggle('is-fit-column', spec.fit);
-    for (const [k, v, p] of spec.props) node.style.setProperty(k, v, p);
-  }, { fit, props });
-
   const column = page.locator('.com-tv-CommentArea');
   const bubble = page.locator('.nlsb-pickup');
+  const before = await bubble.boundingBox();
+  expect(before.width).toBeGreaterThanOrEqual(320);
+
+  /** @type {Array<[string, string, string]>} */
+  const props = [];
+  applyVenuePickupBox({
+    style: { setProperty: (k, v, p) => { props.push([k, v, p || '']); } },
+    classList: { remove() {} },
+    querySelectorAll: () => []
+  }, 1280, 960);
+  await bubble.evaluate((node, spec) => {
+    node.classList.remove('is-fit-column');
+    for (const [k, v, p] of spec.props) node.style.setProperty(k, v, p);
+  }, { props });
+
   const columnBox = await column.boundingBox();
   const bubbleBox = await bubble.boundingBox();
   expect(columnBox.width).toBeGreaterThanOrEqual(240);
   expect(columnBox.width).toBeLessThanOrEqual(260);
-  expect(bubbleBox.width).toBeGreaterThanOrEqual(200);
-  expect(bubbleBox.width).toBeLessThanOrEqual(columnBox.width);
+  expect(bubbleBox.width).toBeGreaterThanOrEqual(320);
+  expect(bubbleBox.width).toBeGreaterThan(columnBox.width);
 
   const pickup = await page.evaluate(() => {
     const body = document.querySelector('.nlsb-pickup__body');
@@ -150,12 +159,15 @@ test('250px の ABEMA コメント欄でも PICK UP と上段カードが約20�
     return {
       bodyW: body.getBoundingClientRect().width,
       font,
+      face: document.querySelector('.nlsb-pickup__face').getBoundingClientRect().width,
       cap: body.getBoundingClientRect().width / font,
       lines,
       metaW: meta.getBoundingClientRect().width,
       meta: meta.textContent
     };
   });
+  expect(pickup.font).toBeGreaterThanOrEqual(16);
+  expect(pickup.face).toBeGreaterThanOrEqual(40);
   expect(pickup.cap, `本文の幅 ${pickup.bodyW}px / ${pickup.font}px`).toBeGreaterThanOrEqual(16);
   expect(pickup.lines.length).toBeGreaterThanOrEqual(1);
   expect(pickup.lines.length).toBeLessThanOrEqual(2);

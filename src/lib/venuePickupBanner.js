@@ -22,35 +22,20 @@
 /** 枠のCSSクラス。見た目は VENUE_PICKUP_CSS(会場の CSS へ差し込む)。 */
 export const VENUE_PICKUP_CLASS = 'nlsb-pickup';
 
-/** 吹き出しの上限・下限。親要素の幅ではなく窓(vw)で決める。 */
+/** 吹き出しの上限・下限。親要素の幅ではなく窓(vw)で決める。ニコ生・YouTube・ABEMA で同じ。 */
 export const VENUE_PICKUP_MAX_PX = 860;
 export const VENUE_PICKUP_MIN_PX = 320;
 export const VENUE_PICKUP_VW_GUTTER = 32;
 
 /**
- * ABEMA のコメント欄など、吹き出しを収める列の幅。列が無い・全画面に近いときは 0
- * (そのときは窓と映像の幅を使う)。
- * @param {number} columnWidth
- * @returns {number}
- */
-export function venuePickupColumnWidth(columnWidth) {
-  const column = Number(columnWidth);
-  if (!Number.isFinite(column) || column < 180 || column > 560) return 0;
-  return Math.round(Math.min(VENUE_PICKUP_MAX_PX, Math.max(160, column - 12)));
-}
-
-/**
  * 吹き出しの幅。放送ページの flex や max-width:100% で親が細くても、1文字幅に潰れない。
- * 映像が十分大きいときは映像の幅に合わせる(ニコ生・YouTube と同じ)。小さい・無いときは窓の幅。
- * コメント欄の幅が渡されたときは、その欄が上限(欄より広くして外へ出さない)。
+ * 映像が十分大きいときは映像の幅に合わせる。小さい・無いときは窓の幅。
+ * ABEMA のコメント欄が開いていても、欄の幅では縮めない(ニコ生・YouTube と同じ大きさ)。
  * @param {number} viewportWidth
  * @param {number} [videoWidth]
- * @param {number} [columnWidth]
  * @returns {{ width: number, minWidth: number, maxWidth: number }}
  */
-export function venuePickupReadableBox(viewportWidth, videoWidth = 0, columnWidth = 0) {
-  const fitted = venuePickupColumnWidth(columnWidth);
-  if (fitted > 0) return { width: fitted, minWidth: fitted, maxWidth: fitted };
+export function venuePickupReadableBox(viewportWidth, videoWidth = 0) {
   const vw = Math.max(0, Number(viewportWidth) || 0);
   const maxWidth = Math.max(160, Math.min(VENUE_PICKUP_MAX_PX, Math.max(160, vw - VENUE_PICKUP_VW_GUTTER)));
   const minWidth = Math.min(VENUE_PICKUP_MIN_PX, maxWidth);
@@ -63,26 +48,35 @@ export function venuePickupReadableBox(viewportWidth, videoWidth = 0, columnWidt
 }
 
 /**
- * ホストページの CSS(div の max-width や writing-mode)より強いインライン指定。
- * @param {HTMLElement | { style?: { setProperty?: Function, boxSizing?: string, flexShrink?: string, writingMode?: string, wordBreak?: string, width?: string, minWidth?: string, maxWidth?: string }, classList?: { toggle?: Function } } | null | undefined} el
+ * ホストページの CSS(div の max-width・flex・transform・writing-mode)より強いインライン指定。
+ * スタイルシートの !important にも勝つよう、幅は要素自身へ important で書く。
+ * @param {HTMLElement | { style?: { setProperty?: Function, boxSizing?: string, flexShrink?: string, writingMode?: string, wordBreak?: string, width?: string, minWidth?: string, maxWidth?: string }, classList?: { remove?: Function }, querySelectorAll?: Function } | null | undefined} el
  * @param {number} viewportWidth
  * @param {number} [videoWidth]
- * @param {number} [columnWidth]
  */
-export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0, columnWidth = 0) {
-  const box = venuePickupReadableBox(viewportWidth, videoWidth, columnWidth);
-  const fitColumn = venuePickupColumnWidth(columnWidth) > 0;
-  if (el && el.style && typeof el.style.setProperty === 'function') {
-    const set = (/** @type {string} */ key, /** @type {string} */ value) => el.style.setProperty(key, value, 'important');
-    set('box-sizing', 'border-box');
-    set('flex-shrink', '0');
-    set('writing-mode', 'horizontal-tb');
-    set('word-break', 'normal');
-    set('overflow-wrap', 'break-word');
-    set('width', `${box.width}px`);
-    set('min-width', `${box.minWidth}px`);
-    set('max-width', `${box.maxWidth}px`);
-  } else if (el && el.style) {
+export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0) {
+  const box = venuePickupReadableBox(viewportWidth, videoWidth);
+  const setOn = (/** @type {any} */ node, /** @type {ReadonlyArray<[string, string]>} */ pairs) => {
+    if (node && node.style && typeof node.style.setProperty === 'function') {
+      for (const [key, value] of pairs) node.style.setProperty(key, value, 'important');
+    }
+  };
+  setOn(el, [
+    ['position', 'absolute'],
+    ['box-sizing', 'border-box'],
+    ['flex', '0 0 auto'],
+    ['flex-shrink', '0'],
+    ['flex-wrap', 'nowrap'],
+    ['zoom', '1'],
+    ['transform', 'translateX(-50%)'],
+    ['writing-mode', 'horizontal-tb'],
+    ['word-break', 'normal'],
+    ['overflow-wrap', 'break-word'],
+    ['width', `${box.width}px`],
+    ['min-width', `${box.minWidth}px`],
+    ['max-width', `${box.maxWidth}px`]
+  ]);
+  if (el && el.style && typeof el.style.setProperty !== 'function') {
     el.style.boxSizing = 'border-box';
     el.style.flexShrink = '0';
     el.style.writingMode = 'horizontal-tb';
@@ -91,8 +85,23 @@ export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0, columnWid
     el.style.minWidth = `${box.minWidth}px`;
     el.style.maxWidth = `${box.maxWidth}px`;
   }
-  if (el && el.classList && typeof el.classList.toggle === 'function') {
-    el.classList.toggle('is-fit-column', fitColumn);
+  if (el && el.classList && typeof el.classList.remove === 'function') el.classList.remove('is-fit-column');
+  if (el && typeof el.querySelectorAll === 'function') {
+    for (const node of el.querySelectorAll('.nlsb-pickup__badge, .nlsb-pickup__face, .nlsb-pickup__main, .nlsb-pickup__body, .nlsb-pickup__meta, .nlsb-pickup__grip')) {
+      /** @type {Array<[string, string]>} */
+      const pairs = [
+        ['writing-mode', 'horizontal-tb'],
+        ['word-break', 'normal'],
+        ['overflow-wrap', 'break-word']
+      ];
+      const cls = String(node.className || '');
+      if (cls.includes('nlsb-pickup__face')) pairs.push(['width', '44px'], ['height', '44px'], ['flex', '0 0 auto']);
+      if (cls.includes('nlsb-pickup__badge') || cls.includes('nlsb-pickup__meta') || cls.includes('nlsb-pickup__grip')) {
+        pairs.push(['white-space', 'nowrap'], ['flex-shrink', '0']);
+      }
+      if (cls.includes('nlsb-pickup__body')) pairs.push(['font-size', '18px'], ['white-space', 'normal']);
+      setOn(node, pairs);
+    }
   }
   return box;
 }
@@ -100,25 +109,34 @@ export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0, columnWid
 /**
  * 会場 CSS に差し込む PICK UP の見た目。幅は 100vw。親の 100% だと ABEMA の細い枠で
  * calc(100% - 180px) が 1 文字幅になり、本文が 1 字ずつ折れる。
+ * 幅・字の折り返し・変形は !important。ABEMA が div へ max-width や scale を important で
+ * 書いても、ニコ生・YouTube と同じ大きさのままにする。
  */
 export const VENUE_PICKUP_CSS = `
   html .nlsb-root .nlsb-pickup,
   html .nlsb-root .nlsb-pickup * {
-    writing-mode: horizontal-tb;
-    word-break: normal;
+    writing-mode: horizontal-tb !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
   }
-  .nlsb-pickup {
-    position: absolute;
+  html .nlsb-root .nlsb-pickup * {
+    zoom: 1 !important;
+    transform: none !important;
+  }
+  html .nlsb-root .nlsb-pickup {
+    position: absolute !important;
     top: 20px;
     left: 50%;
     z-index: 7;
-    transform: translateX(-50%);
-    box-sizing: border-box;
-    width: min(860px, calc(100vw - 32px));
-    min-width: min(320px, calc(100vw - 32px));
-    max-width: min(860px, calc(100vw - 32px));
-    flex: 0 0 auto;
-    flex-shrink: 0;
+    transform: translateX(-50%) !important;
+    zoom: 1 !important;
+    box-sizing: border-box !important;
+    width: min(860px, calc(100vw - 32px)) !important;
+    min-width: min(320px, calc(100vw - 32px)) !important;
+    max-width: min(860px, calc(100vw - 32px)) !important;
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    flex-wrap: nowrap !important;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -129,15 +147,15 @@ export const VENUE_PICKUP_CSS = `
     background: #fffdf8;
     color: #1f2328;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-    font-size: 18px;
+    font-size: 18px !important;
     line-height: 1.4;
     pointer-events: auto;
-    white-space: normal;
+    white-space: normal !important;
   }
   .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
   .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
   .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
-  .nlsb-pickup[data-empty='1'] { display: none; }
+  html .nlsb-root .nlsb-pickup[data-empty='1'] { display: none !important; }
   .nlsb-pickup__badge {
     flex: 0 0 auto;
     font-size: 10px;
@@ -149,30 +167,36 @@ export const VENUE_PICKUP_CSS = `
     color: #fff;
     white-space: nowrap;
   }
-  .nlsb-pickup__face {
-    flex: 0 0 auto;
-    width: 44px;
-    height: 44px;
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__face {
+    flex: 0 0 auto !important;
+    width: 44px !important;
+    height: 44px !important;
     border-radius: 50%;
     object-fit: cover;
     background: rgba(0, 0, 0, 0.06);
     box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
   }
   .nlsb-pickup__face[hidden] { display: none; }
-  .nlsb-pickup__main {
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__main {
     flex: 1 1 auto;
-    min-width: 0;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
     display: flex;
     flex-direction: column;
     gap: 1px;
   }
-  .nlsb-pickup__body {
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__body {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
     overflow-wrap: break-word;
-    white-space: normal;
+    white-space: normal !important;
+    font-size: 18px !important;
     font-weight: 700;
   }
   .nlsb-pickup__meta {
@@ -188,38 +212,13 @@ export const VENUE_PICKUP_CSS = `
   }
   .nlsb-pickup__meta:empty { display: none; }
   a.nlsb-pickup__meta[href] { text-decoration: underline; text-underline-offset: 2px; }
-  /*
-   * コメント欄(ABEMA は約 250px)の上に出すとき。欄の幅が上限。本文は次の行で欄いっぱい。
-   * ホストの word-break:break-all !important より強い指定でないと、また 1 文字幅に戻る。
-   */
-  html .nlsb-root .nlsb-pickup.is-fit-column,
-  html .nlsb-root .nlsb-pickup.is-fit-column * {
-    word-break: normal !important;
-    overflow-wrap: break-word !important;
-  }
-  .nlsb-pickup.is-fit-column {
-    container-type: inline-size;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 8px;
-    padding: 8px 10px;
-    min-height: 52px;
-    font-size: 15px;
-  }
-  .nlsb-pickup.is-fit-column .nlsb-pickup__face { width: 28px; height: 28px; }
-  .nlsb-pickup.is-fit-column .nlsb-pickup__main { display: contents; }
-  .nlsb-pickup.is-fit-column .nlsb-pickup__badge { order: 1; }
-  .nlsb-pickup.is-fit-column .nlsb-pickup__face { order: 2; }
-  .nlsb-pickup.is-fit-column .nlsb-pickup__meta { order: 3; flex: 1 1 auto; min-width: 4em; max-width: 100%; }
-  .nlsb-pickup.is-fit-column .nlsb-pickup__grip { order: 4; }
-  .nlsb-pickup.is-fit-column .nlsb-pickup__body {
-    order: 5;
-    flex: 1 0 100%;
-    width: 100%;
-    min-width: 100%;
-    max-width: 100%;
-    font-size: clamp(12px, calc(100cqi / 20), 16px);
-    white-space: normal !important;
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__badge,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__meta,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__grip {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
   }
 `;
 
@@ -354,34 +353,6 @@ export function applyVenuePickupView(els, view) {
   if (view?.empty) els.root.setAttribute('data-empty', '1');
   else els.root.removeAttribute('data-empty');
   return true;
-}
-
-/**
- * コメント欄が見えているときの矩形。細すぎ・画面そのものに近い幅は欄ではない。
- * @param {{ getBoundingClientRect?: () => { left?: number, top?: number, width?: number, height?: number } } | null | undefined} el
- * @returns {{ left: number, top: number, width: number, height: number } | null}
- */
-export function abemaCommentColumnRect(el) {
-  if (!el || typeof el.getBoundingClientRect !== 'function') return null;
-  const r = el.getBoundingClientRect();
-  const width = Number(r && r.width);
-  const height = Number(r && r.height);
-  if (!(width >= 180 && width <= 560 && height >= 80)) return null;
-  return { left: Number(r.left) || 0, top: Number(r.top) || 0, width, height };
-}
-
-/**
- * PICK UP をコメント欄の上端中央へ。幅は欄の内側。
- * @param {{ left: number, top: number, width: number } | null | undefined} column
- * @param {{ left: number, top: number } | null | undefined} layout
- * @returns {{ left: number, top: number, width: number } | null}
- */
-export function venuePickupColumnPlacement(column, layout) {
-  const width = venuePickupColumnWidth(column && column.width);
-  if (!width || !column || !layout) return null;
-  const left = Math.round((Number(column.left) || 0) - (Number(layout.left) || 0) + (Number(column.width) || 0) / 2);
-  const top = Math.round(Math.max(8, (Number(column.top) || 0) - (Number(layout.top) || 0) + 8));
-  return { left, top, width };
 }
 
 /**

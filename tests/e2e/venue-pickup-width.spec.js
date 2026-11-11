@@ -14,7 +14,15 @@ test('PICK UP は細い親とホスト CSS の中でも読める幅', async ({ p
 <style>
   html, body { margin: 0; background: #111; }
   body { display: flex; width: 180px; align-items: flex-start; }
-  div, span { max-width: 100%; min-width: 0; word-break: break-all; }
+  div.nlsb-pickup, div.nlsb-pickup span {
+    max-width: 40px !important;
+    min-width: 0 !important;
+    width: 40px !important;
+    word-break: break-all !important;
+    flex-shrink: 1 !important;
+    zoom: 0.5 !important;
+    transform: scale(0.4) !important;
+  }
   .host { width: 180px; height: 400px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
   ${VENUE_PICKUP_CSS}
 </style>
