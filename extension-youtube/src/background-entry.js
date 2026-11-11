@@ -53,7 +53,7 @@ import {
   summaryStorageKey,
   verifiedBeforeRetire,
 } from '../../src/lib/youtube/ytSplitPersist.js';
-import { capStallPage } from '../../src/lib/stallTrace.js';
+import { capStallPage, freshStallRows } from '../../src/lib/stallTrace.js';
 import {
   appendStallRows,
   putSummary,
@@ -362,17 +362,28 @@ async function ensureSummaryMem() {
  * @param {string} videoId
  * @param {any} summary
  */
+/** 配信ごとの、まとめを IndexedDB に最後に書いた時刻 @type {Map<string, number>} */
+const summaryIdbAt = new Map();
+const YT_SUMMARY_IDB_MIN_GAP_MS = 30_000;
+
 async function publishOneSummary(videoId, summary) {
   const id = String(videoId || '').trim();
   if (!id || !summary) return;
   const mem = await ensureSummaryMem();
+  const justEnded = !!summary.endedAt && !mem[id]?.endedAt;
   mem[id] = summary;
-  try {
-    await putSummary(id, summary);
-  } catch {
-    /* IndexedDB が書けなくても、画面への小さい知らせは続ける */
-  }
   const now = Date.now();
+  // 0.1.2084: IndexedDB への書き込みは1配信あたり30秒に1回まで(終わった配信はすぐ)。
+  //   同じ origin の記録(数百MB)ごと LevelDB の整理が走るので、数秒ごとに書くと書き直しが膨らむ(実測 20分で約420MB)。
+  //   いまのまとめはメモリ(summaryMem)が正本で、画面にはすぐ届く。
+  if (justEnded || now - (summaryIdbAt.get(id) || 0) >= YT_SUMMARY_IDB_MIN_GAP_MS) {
+    summaryIdbAt.set(id, now);
+    try {
+      await putSummary(id, summary);
+    } catch {
+      /* IndexedDB が書けなくても、画面への小さい知らせは続ける */
+    }
+  }
   if (!summaryChromeWriteDue(summaryChromeAt.get(id) || 0, now)) return;
   const slim = slimSummaryForStorage(summary);
   const key = summaryStorageKey(id);
@@ -989,10 +1000,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'NLS_STALL_SUMMARY') {
     if (!sender || sender.id !== chrome.runtime.id) return false;
     const page = String(message.page || 'page').slice(0, 80);
-    const rows = Array.isArray(message.events) ? message.events.slice(-50) : [];
+    const incoming = Array.isArray(message.events) ? message.events.slice(-50) : [];
+    // 0.1.2084: 前に受け取った分は数えない・書かない。新しい分が無ければ何も書かない
+    const rows = freshStallRows(stallByPage[page] || [], incoming);
+    if (!rows.length) return false;
     stallByPage[page] = capStallPage(stallByPage[page] || [], rows);
     const sum = message.summary && typeof message.summary === 'object' ? message.summary : {};
-    void appendStallRows(page, rows).catch(() => {});
+    // IndexedDB に残すのは 100ms 以上の固まりだけ(同じ origin の大きい記録ごと書き直しが走るため、小さい揺れは残さない)
+    const heavy = rows.filter((r) => (Number(r?.dur) || 0) >= 100);
+    if (heavy.length) void appendStallRows(page, heavy).catch(() => {});
     const minuteAgo = Date.now() - 60_000;
     const recent = storageWriteRing.filter((w) => w.t >= minuteAgo);
     const bytes = recent.reduce((n, w) => n + (Number(w.bytes) || 0), 0);

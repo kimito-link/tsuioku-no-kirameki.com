@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseStallSource, capStallPage, createStallRing, stallDomain, stallFileName, startPageStallWatch, STALL_RING_MAX } from './stallTrace.js';
+import { chooseStallSource, capStallPage, freshStallRows, createStallRing, stallDomain, stallFileName, startPageStallWatch, STALL_RING_MAX } from './stallTrace.js';
 
 describe('固まりの記録', () => {
   it('LoAF が使えなければ心拍に戻す', () => {
@@ -91,5 +91,43 @@ describe('固まりの記録', () => {
     expect(made).toBe(10);
     for (const watch of watches) watch.stop();
     expect(cleared).toBe(made);
+  });
+
+  it('送るのは前に送ったあとの新しい分だけ。新しい分が無い回は送らない(同じ50件を毎分送り直さない)', () => {
+    /** @type {() => void} */
+    let tick = () => {};
+    /** @type {any[][]} */
+    const sent = [];
+    const watch = startPageStallWatch({
+      file: 'x.js',
+      hostname: 'example.com',
+      protocol: 'https:',
+      PerformanceObserver: null,
+      requestAnimationFrame: () => 1,
+      cancelAnimationFrame: () => {},
+      setInterval: (cb) => { tick = cb; return 1; },
+      clearInterval: () => {},
+      now: () => 0,
+      send: () => { sent.push(watch.takeFresh()); },
+    });
+    tick();
+    expect(sent.length).toBe(0);
+    watch.ring.note({ t: 1000, dur: 120, file: 'x.js', domain: 'example.com' });
+    watch.ring.note({ t: 2000, dur: 60, file: 'x.js', domain: 'example.com' });
+    tick();
+    expect(sent.map((r) => r.map((e) => e.t))).toEqual([[1000, 2000]]);
+    tick();
+    expect(sent.length).toBe(1);
+    watch.ring.note({ t: 3000, dur: 200, file: 'x.js', domain: 'example.com' });
+    tick();
+    expect(sent[1].map((e) => e.t)).toEqual([3000]);
+    watch.stop();
+  });
+
+  it('裏方は前に受け取った行を二度数えない', () => {
+    const prev = [{ t: 1 }, { t: 2 }];
+    expect(freshStallRows(prev, [{ t: 1 }, { t: 2 }, { t: 3 }])).toEqual([{ t: 3 }]);
+    expect(freshStallRows([], [{ t: 1 }])).toEqual([{ t: 1 }]);
+    expect(capStallPage(prev, [{ t: 2 }, { t: 3 }]).map((r) => r.t)).toEqual([1, 2, 3]);
   });
 });

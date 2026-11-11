@@ -14,7 +14,7 @@ if (!root.__NLS_YT_VENUE_BOOT_ASKED__) {
         file: 'yt-page-boot.js',
         send: (summary) => {
           try {
-            chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: root.__nlStallWatch.ring.events.slice(-50) });
+            chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: root.__nlStallWatch.takeFresh() });
           } catch { /* 計器 */ }
         },
       });

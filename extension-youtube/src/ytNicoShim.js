@@ -77,7 +77,7 @@ try {
             type: 'NLS_STALL_SUMMARY',
             page: location.protocol === 'chrome-extension:' ? 'extension' : (location.hostname || 'page'),
             summary,
-            events: stallWatch.ring.events.slice(-50),
+            events: stallWatch.takeFresh(),
           });
         } catch {
           /* 計器は本体を止めない */

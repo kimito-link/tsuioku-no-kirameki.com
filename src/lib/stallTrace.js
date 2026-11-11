@@ -108,8 +108,22 @@ export function createStallRing() {
  * @returns {{ t: number }[]}
  */
 export function capStallPage(prev, incoming) {
-  const all = (Array.isArray(prev) ? prev : []).concat(Array.isArray(incoming) ? incoming : []);
+  const all = (Array.isArray(prev) ? prev : []).concat(freshStallRows(prev, incoming));
   return all.slice(-STALL_PAGE_KEEP);
+}
+
+/**
+ * 前に受け取った最後の時刻より新しい行だけ(同じ行を二度数えない・二度書かない)。0.1.2084
+ * @template {{ t: number }} T
+ * @param {readonly { t: number }[]} prev
+ * @param {readonly T[]} incoming
+ * @returns {T[]}
+ */
+export function freshStallRows(prev, incoming) {
+  const list = Array.isArray(incoming) ? incoming : [];
+  const p = Array.isArray(prev) ? prev : [];
+  const lastT = p.length ? Number(p[p.length - 1]?.t) || 0 : 0;
+  return list.filter((r) => (Number(r?.t) || 0) > lastT);
 }
 
 /**
@@ -128,7 +142,7 @@ export function capStallPage(prev, incoming) {
  *   hostname?: string,
  *   protocol?: string,
  * }} [deps]
- * @returns {{ stop: () => void, source: 'loaf' | 'heartbeat', ring: ReturnType<typeof createStallRing> }}
+ * @returns {{ stop: () => void, source: 'loaf' | 'heartbeat', ring: ReturnType<typeof createStallRing>, takeFresh: () => { t: number, dur: number, file: string, domain: string, section: string }[] }}
  */
 export function startPageStallWatch(deps = {}) {
   const ring = createStallRing();
@@ -194,15 +208,26 @@ export function startPageStallWatch(deps = {}) {
       rafId = raf(tick);
     }
   }
+  // 0.1.2084: 送るのは前に送ったあとの新しい分だけ。新しい分が無い回は送らない。
+  //   以前は1分ごとに直近50件を丸ごと送り直し、裏方が毎回 IndexedDB に足していた(実測 20分で約420MB の書き直し)。
+  let sentUpTo = 0;
+  const fresh = () => ring.events.filter((e) => e.t > sentUpTo);
+  const takeFresh = () => {
+    const rows = fresh();
+    if (rows.length) sentUpTo = rows[rows.length - 1].t;
+    return rows;
+  };
   const setInt = deps.setInterval || (typeof setInterval !== 'undefined' ? setInterval : null);
   if (setInt && deps.send) {
     timer = setInt(() => {
+      if (!fresh().length) return;
       try { deps.send?.(ring.summary()); } catch { /* 計器は本体を止めない */ }
     }, deps.flushMs || STALL_FLUSH_MS);
   }
   return {
     source: chooseStallSource({ loafSupported: source === 'loaf' }),
     ring,
+    takeFresh,
     stop() {
       stopped = true;
       try { obs?.disconnect(); } catch { /* no-op */ }

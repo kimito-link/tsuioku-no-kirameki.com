@@ -33,7 +33,7 @@ try {
     stallRoot.__nlStallWatch = startPageStallWatch({
       file: 'mx-content-entry.js',
       send: (summary) => {
-        try { chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: stallRoot.__nlStallWatch.ring.events.slice(-50) }); } catch { /* 計器 */ }
+        try { chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: stallRoot.__nlStallWatch.takeFresh() }); } catch { /* 計器 */ }
       },
     });
   }
