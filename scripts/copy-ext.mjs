@@ -71,12 +71,50 @@ function readBuildIdFromDir(dir) {
   }
 }
 
+/** manifest.json の version(読めなければ '') @param {string} dir */
+function readVersion(dir) {
+  try {
+    return String(JSON.parse(readFileSync(resolve(dir, 'manifest.json'), 'utf8')).version || '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 版を比べる(0.1.2086 のような点区切りの数)。a が新しければ正・同じなら 0・古ければ負。
+ * @param {string} a @param {string} b
+ */
+export function compareVersions(a, b) {
+  const pa = String(a).split('.').map((x) => Number(x) || 0);
+  const pb = String(b).split('.').map((x) => Number(x) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
 async function main() {
   if (!existsSync(srcDir)) {
     console.error(`コピー元 extension/ が見つかりません: ${srcDir}`);
     process.exit(1);
   }
   warnIfSynced(destDir);
+
+  // 2026-11-11: 入っている版より古い版で上書きしない(退化させない)。
+  //   2026-11-11、古い worktree から 0.1.2057 を入れて、YouTube の帯(0.1.2068)と ABEMA(0.1.2070)が
+  //   画面から消えた。古い版へ戻したいときだけ NL_EXT_ALLOW_DOWNGRADE=1 を付ける。
+  const srcVersion = readVersion(srcDir);
+  const destVersion = readVersion(destDir);
+  if (srcVersion && destVersion && compareVersions(srcVersion, destVersion) < 0 && process.env.NL_EXT_ALLOW_DOWNGRADE !== '1') {
+    console.error(
+      `\n⛔ コピーを止めました: 入っている版 v${destVersion} より古い v${srcVersion} で上書きしようとしています。\n` +
+        `   コピー元: ${srcDir}\n` +
+        '   古い worktree やブランチからの copy:ext は、直した機能を消します(退化)。\n' +
+        '   最新の master から入れてください。わざと戻すときだけ NL_EXT_ALLOW_DOWNGRADE=1 を付けます。\n'
+    );
+    process.exit(1);
+  }
 
   // コピーで置き換えられる前に、コピー先(旧)の BUILD_ID を読んでおく。
   const oldBuildId = readBuildIdFromDir(destDir);
@@ -145,7 +183,7 @@ async function main() {
   console.log('  → これで OneDrive/Resilio がファイルを触らないので、再読み込みが固着しません。\n');
 }
 
-main().catch((e) => {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((e) => {
   console.error('コピーに失敗しました:', e && e.message ? e.message : e);
   process.exit(1);
 });
