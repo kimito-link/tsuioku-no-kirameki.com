@@ -50,20 +50,14 @@ describe('VoicePlayer.dropQueuedUnstarted', () => {
 
 describe('venueBar の配線', () => {
   const src = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8');
-  it('待つかどうかは lib の判定で決め、声が始まった時・捨てられた時・3秒後に出す', () => {
-    expect(src).toContain('const holdForVoice = shouldHoldBubbleForVoice({');
-    expect(src).toContain('let bubble = holdForVoice ? null : showSpeechBubble(speech);');
-    expect(src).toContain('voicePlayer.dropQueuedUnstarted(onVoiceDropped)');
-    expect(src).toContain('}, VENUE_BUBBLE_VOICE_HOLD_MS);');
+  it('吹き出しと声は lib(venueBubbleVoiceSync.js)の1か所で始める(2026-11-12)', () => {
+    expect(src).toContain('const shownNow = startVenueSpeechBubbleVoice(_bubbleVoiceSync, speech, {');
+    expect(src).toContain('bubbleVoiceSync: summarizeBubbleVoiceSync(_bubbleVoiceSync),');
+    // TDZ 回避: 計器の publish より前で作る
+    expect(src.indexOf('const _bubbleVoiceSync = createVenueBubbleVoiceSyncState();')).toBeLessThan(src.indexOf('bubbleVoiceSync: summarizeBubbleVoiceSync(_bubbleVoiceSync),'));
   });
   it('YouTube 版のビルドが書き換える目印を壊していない', () => {
     expect(src).toContain('      bubbleKey,\n      seatIndex: seatUsable ? seatIndex : -1,');
     expect(src).toContain('    if (!bubble || bubble.removed) return;\n    bubble.removed = true;\n');
-  });
-  it('待たせている間に声の側で外された件を、3秒の見切りとは別に数える(v0.1.1980)', () => {
-    expect(src).toContain('droppedWhileHeld: 0');
-    expect(src).toContain('if (!bubbleRevealed && bubbleHoldTimer) _bubbleVoiceHoldDiag.droppedWhileHeld += 1;');
-    // 3秒の見切りは先に bubbleHoldTimer = 0 にしてから外すので、二重に数えない
-    expect(src).toMatch(/bubbleHoldTimer = 0;\n\s+if \(bubbleRevealed\) return;[\s\S]{0,400}dropQueuedUnstarted\(onVoiceDropped\)/);
   });
 });

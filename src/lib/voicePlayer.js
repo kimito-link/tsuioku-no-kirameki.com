@@ -49,7 +49,7 @@ import {
   updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict,
   computeSustainedPressureBoost, mergeVoiceSpeedBoost, computeBacklogCatchUpBoost,
   createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor,
-  resolveVoiceQueueMaxByChars
+  resolveVoiceQueueMaxByChars, estimateVoiceStartDelayMs
 } from './voiceLagBudget.js';
 import {
   createVoiceSynthTracker, foldVoiceStageEma, measureVoiceGapMs, measureWavAudioMs, recordVoiceE2eSample, recordVoiceStreamDone, recordVoiceSynthStage,
@@ -205,6 +205,8 @@ export class VoicePlayer {
     this.playing = false;
     this.generation = 0;
     this.stopCurrent = null;
+    /** @type {{ item: any, shiftAt: number, playAt: number, expectedMs: number, chars: number, audioStarted: boolean, cancelled: boolean } | null} */
+    this._current = null;
     this.skipTimer = null;
     // v0.1.1065: 会場読み上げの計器。comeview(KEY_VOICE_DIAG)と同形のカウンタを持ち、
     //   onDiag(注入)経由で呼び出し元がstorageへ書く。従来この経路は完全に無計器で、
@@ -423,6 +425,75 @@ export class VoicePlayer {
     this._notifyDropped(item);
     this._updateLagNotice();
     return 'dropped';
+  }
+
+  /**
+   * 2026-11-12: 吹き出しを声に合わせて待たせている件を、声づくりの途中でも外す(会場の待ちの上限・venueBubbleVoiceSync.js)。
+   *   待ちにあれば外して onDropped を呼ぶ('dropped')。もう取り出されて声づくり中なら、鳴らさない印を付ける
+   *   ('cancelled'・できあがった時に onDropped が呼ばれる)。鳴り始めた件・知らない件は触らない('not-queued')。
+   * @param {Function} onDropped
+   * @returns {'dropped'|'cancelled'|'not-queued'}
+   */
+  dropQueuedAny(onDropped) {
+    if (typeof onDropped !== 'function') return 'not-queued';
+    const i = this.queue.findIndex((q) => q && q.onDropped === onDropped);
+    if (i >= 0) {
+      const [item] = this.queue.splice(i, 1);
+      const pf = this.prefetches.get(item);
+      if (pf) {
+        try { pf.abort?.abort(); } catch { /* no-op */ }
+        this.prefetches.delete(item);
+      }
+      if (typeof item.onPlayStart === 'function') item.onPlayStart();
+      this._notifyDropped(item);
+      this._updateLagNotice();
+      return 'dropped';
+    }
+    const cur = this._current;
+    if (cur && cur.item && cur.item.onDropped === onDropped && !cur.audioStarted) {
+      cur.cancelled = true;
+      return 'cancelled';
+    }
+    return 'not-queued';
+  }
+
+  /** 合成時間÷声の長さ(3件以上測れていれば・無ければ 0)。 */
+  _synthRtf() {
+    const rtfSamples = Number(this.diag.warmRtfSamples) || 0;
+    const rtfPermille = Number(this.diag.warmSynthRtfPermille);
+    return rtfSamples >= 3 && rtfPermille > 0 ? rtfPermille / 1000 : 0;
+  }
+
+  /**
+   * 2026-11-12: 待ちにある1件の声が鳴り始めるまでの見込み(会場の吹き出しを待たせるか・venueBubbleVoiceSync.js)。
+   * @param {Function} onDropped 列に入れた時の onDropped(どの件かの印)
+   * @returns {{ ms: number, ahead: number, important: boolean } | null} 待ちに無ければ null
+   */
+  estimateStartDelayMs(onDropped) {
+    try {
+      const i = typeof onDropped === 'function' ? this.queue.findIndex((q) => q && q.onDropped === onDropped) : -1;
+      if (i < 0) return null;
+      const item = this.queue[i];
+      const maxChars = computeVoiceCongestion(this.queue.length).maxChars;
+      const chars = (/** @type {any} */ it) => buildMergedVoiceText(it, { maxChars }).length;
+      const rtf = this._synthRtf();
+      const now = Date.now();
+      const cur = this.playing ? this._current : null;
+      let currentRemainingMs = 0;
+      if (cur) {
+        currentRemainingMs = cur.playAt > 0 && cur.expectedMs > 0
+          ? cur.expectedMs - (now - cur.playAt)
+          : estimateVoiceStartDelayMs({ aheadChars: [cur.chars] }, this._paceState, rtf) - (now - cur.shiftAt);
+      }
+      const ms = estimateVoiceStartDelayMs({
+        currentRemainingMs: Math.max(0, currentRemainingMs),
+        aheadChars: this.queue.slice(0, i).map(chars),
+        selfChars: chars(item)
+      }, this._paceState, rtf);
+      return { ms, ahead: i + (cur ? 1 : 0), important: item.priority === 'high' || !!item.importance };
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -651,9 +722,7 @@ export class VoicePlayer {
       const maxChars = computeVoiceCongestion(this.queue.length + 1).maxChars;
       const counts = [...this.queue, candidate].map((it) => buildMergedVoiceText(it, { maxChars }).length);
       // v0.1.1801: 声を作る速さ(合成時間÷声の長さ)が3件以上測れていれば、作る時間も数える。
-      const rtfSamples = Number(this.diag.warmRtfSamples) || 0;
-      const rtfPermille = Number(this.diag.warmSynthRtfPermille);
-      const synthRtf = rtfSamples >= 3 && rtfPermille > 0 ? rtfPermille / 1000 : 0;
+      const synthRtf = this._synthRtf();
       const byChars = resolveVoiceQueueMaxByChars(counts, this._paceState, synthRtf);
       if (byChars == null) return this._effectiveQueueMax;
       this.diag.queueMaxByChars = byChars;
@@ -921,6 +990,7 @@ export class VoicePlayer {
       try {
         started = await speaker.speak(text, tone, {
           onStart: () => {
+            if (this._current && this._current.item === item) this._current.audioStarted = true;
             if (typeof item.onAudioStart === 'function') item.onAudioStart();
             try { if (typeof item.onAudible === 'function') item.onAudible(); } catch { /* 枠の失敗で再生を止めない */ }
           }
@@ -1050,6 +1120,8 @@ export class VoicePlayer {
 
         const item = this.queue.shift();
         if (!item) continue;
+        // 2026-11-12: 今の件(声が始まるまでの見込み・待ちの上限で鳴らさない印)。
+        this._current = { item, shiftAt: Date.now(), playAt: 0, expectedMs: 0, chars: 0, audioStarted: false, cancelled: false };
         // 2026-07-24計器(段階0=shadow): 1件あたり処理時間(shift〜再生完了)の起点。
         //   staleで即時破棄されたitemは合成/再生を伴わないため計測対象外(下のstale分岐でreturn)。
         const _serviceStart = Date.now();
@@ -1096,6 +1168,7 @@ export class VoicePlayer {
         const inlineText = pf ? '' : buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) });
         // v0.1.1800: 読んだ文字数(1文字あたりの長さを覚えて、件数の上限を文字数から見積もるため)。
         const spokenChars = pf ? Number(pf.textLength) || 0 : inlineText.length;
+        if (this._current && this._current.item === item) this._current.chars = spokenChars;
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const inlineAbort = pf ? null : new AbortController();
         if (inlineAbort) this._synthAborts.add(inlineAbort);
@@ -1116,12 +1189,15 @@ export class VoicePlayer {
         this._synthWaitEmaMs = updateVoiceServiceTimeEma(this._synthWaitEmaMs, this.diag.lastSynthMs);
         this.diag.synthWaitEmaMs = this._synthWaitEmaMs;
 
-        if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
+        // 2026-11-12: 吹き出しの待ちの上限を過ぎた件(dropQueuedAny)は、できあがっても鳴らさない(後から鳴るとずれる)。
+        const cancelledByVenue = !!(this._current && this._current.item === item && this._current.cancelled);
+        if (!wav || cancelledByVenue || !this.enabled || generation !== this.generation || this.isObsMode()) {
           if (isStreamedVoice(wav)) wav.cancel(); // 鳴らさないので受け取りもやめる
           // v0.1.1213: 合成が null で返った件を数える。ここは以前どのカウンタも増やさずに
           //   捨てており、実配信で「需要52.2/分・読めた6件・間引き12件」=約34件が
           //   どの計器にも乗らない穴になっていた(=なぜ読まれないか答えられない)。
           //   無効化/世代替わり/OBSは別事由なので、合成失敗(!wav)のときだけ数える。
+          if (cancelledByVenue) this.diag.venueHoldCancelTotal = (Number(this.diag.venueHoldCancelTotal) || 0) + 1;
           if (!wav) {
             this.diag.synthNullTotal += 1;
             const failure = classifyVoiceSynthNull({ synthMs: this.diag.lastSynthMs });
@@ -1201,8 +1277,10 @@ export class VoicePlayer {
                 this.diag.playPrepEmaMs = this._playPrepEmaMs;
                 _playbackStartAt = Date.now();
                 const durationSec = Number(audio.duration);
+                if (this._current && this._current.item === item) this._current.playAt = _playbackStartAt;
                 if (Number.isFinite(durationSec) && durationSec > 0) {
                   const expectedMs = (durationSec * 1000) / (Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1);
+                  if (this._current && this._current.item === item) this._current.expectedMs = expectedMs;
                   this._expectedPlayEmaMs = updateVoiceServiceTimeEma(this._expectedPlayEmaMs, expectedMs);
                   this.diag.expectedPlayEmaMs = this._expectedPlayEmaMs;
                 }
@@ -1262,6 +1340,10 @@ export class VoicePlayer {
                 recordVoiceE2eSample(this.diag, e2e);
               }
               this._updateLagNotice();
+              if (this._current && this._current.item === item) {
+                this._current.audioStarted = true;
+                if (!this._current.playAt) this._current.playAt = Date.now();
+              }
               // v0.1.771: 実際に再生が始まった瞬間だけ通知(drop/merge/失敗では呼ばれない)。
               //   吹き出しはここで speaking になり、onAudioEnd まで消えない。
               if (typeof item.onAudioStart === 'function') item.onAudioStart();
@@ -1339,6 +1421,7 @@ export class VoicePlayer {
       }
     } finally {
       this.playing = false;
+      this._current = null;
       this._updateLagNotice(); // 待ちが空になったら遅れの一言を消す。
       if (this.enabled && this.queue.length) void this._drainQueue();
     }
@@ -1428,6 +1511,8 @@ export class VoicePlayer {
         count: 1,
         enqueuedAt: Date.now(),
         priority: voicePriorityForImportance(importance),
+        /** 2026-11-12: 大事なもの(配信者・初コメも)。会場が「見込みが長いので読まない」から外す。 */
+        importance,
         // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
         onPlayStart: item.onPlayStart,
         // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。
