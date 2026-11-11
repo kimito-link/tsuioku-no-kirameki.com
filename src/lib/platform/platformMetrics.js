@@ -204,7 +204,7 @@ export function platformSectionPlan(platformId) {
   };
   /** @type {{ rink: string, konta: string, tanu: string }|null} */
   let trio = { rink: 'りんく', konta: 'こん太', tanu: 'たぬ姉' };
-  let concurrentLabel = cap.concurrentLabel || '視聴者数';
+  const concurrentLabel = cap.concurrentLabel || '視聴者数';
   let note = '公式の数は、配信ページが出しているものだけです。合計は、このPCの記録から数えています。';
   const hide = [...NICONICO_ONLY_SECTIONS];
   // 合計順の説明文は言葉の置き換え（公式ランキングの文）に任せる。ここで上書きすると消える。

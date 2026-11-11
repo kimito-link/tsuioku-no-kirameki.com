@@ -76,5 +76,5 @@
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm);
     else arm();
-  } catch (e) { /* 表示の先回りが失敗しても、数字自体はあとから出る */ }
+  } catch { /* 表示の先回りが失敗しても、数字自体はあとから出る */ }
 })();
