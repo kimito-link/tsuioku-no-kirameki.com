@@ -12,6 +12,9 @@ import {
   abMessagesNearPlayhead,
   abCommentRow,
   pickAbBroadcasterImage,
+  abLinearChannelId,
+  abUrlsFromCss,
+  abUrlsFromSrcset,
 } from '../../src/lib/abema/abParse.js';
 import {
   AB_OPEN_COMMENT_KEY,
@@ -105,10 +108,14 @@ function currentBroadcasterImage() {
       if (!/^(?:og:image|twitter:image)/i.test(property || name)) continue;
       metas.push({ property, name, content: el.getAttribute('content') || '' });
     }
-    for (const img of document.querySelectorAll('img')) {
+    for (const el of document.querySelectorAll('img, [style*="abema"], [style*="hayabusa"]')) {
       if (images.length >= 30) break;
-      const src = img instanceof HTMLImageElement ? img.currentSrc || img.getAttribute('src') || '' : '';
-      if (/hayabusa\.io|abema(?:-tv)?\.(?:com|tv|io)/i.test(src)) images.push(src);
+      if (el instanceof HTMLImageElement) {
+        const src = el.currentSrc || el.getAttribute('src') || '';
+        if (/hayabusa\.io|abema(?:-tv)?\.(?:com|tv|io)/i.test(src)) images.push(src);
+        images.push(...abUrlsFromSrcset(el.getAttribute('srcset') || ''));
+      }
+      images.push(...abUrlsFromCss(el.getAttribute('style') || ''));
     }
   } catch {
     /* ページの形が違っても記録は続ける */
@@ -399,12 +406,15 @@ window.addEventListener('message', (ev) => {
   if (!data || data.source !== IN) return;
   if (data.t === 'batch') onBatch(data.body, data.sinceMs, data.untilMs);
   else if (data.t === 'meta' && data.meta) {
+    const expectId = abLinearChannelId(pageLogin);
+    const incomingId = String(data.meta.channelId || '').toLowerCase();
+    if (expectId && incomingId && incomingId !== expectId) return;
     const title = String(data.meta.title || '').slice(0, 200);
     if (title) program.title = title;
     if (Number(data.meta.startedAtMs) > 0) program.startedAtMs = Number(data.meta.startedAtMs);
     if (data.meta.viewers != null && Number.isFinite(Number(data.meta.viewers))) program.viewers = Number(data.meta.viewers);
     if (data.meta.imageUrl) program.imageUrl = String(data.meta.imageUrl);
-    if (data.meta.channelId) program.channelId = String(data.meta.channelId);
+    if (incomingId) program.channelId = incomingId;
     if (streamKey) sendMeta();
   } else if (data.t === 'denied') {
     denied = true;

@@ -9,6 +9,7 @@
 
 import { escapeHtml, escapeAttr } from '../htmlEscape.js';
 import { isHttpOrHttpsUrl } from '../supportGrowthTileSrc.js';
+import { anonymousIdenticonDataUrl } from '../anonymousIdenticon.js';
 
 /**
  * 順位カードの人を表す鍵。チャンネルIDがあればそれ、無ければ表示名から作る(同じ人は同じ鍵)。
@@ -121,10 +122,10 @@ export function buildYtCasterTileHtml(input) {
   const pageUrl = safeYtChannelHref(input?.pageUrl);
   const iconUrl = String(input?.iconUrl || '').trim();
   const followLabel = String(input?.followLabel || 'チャンネル');
+  const usable = /^https:\/\//i.test(iconUrl) || /^data:image\//i.test(iconUrl);
+  const src = usable ? iconUrl : anonymousIdenticonDataUrl(name, 64);
   const iconHtml =
-    iconUrl && /^https:\/\//i.test(iconUrl)
-      ? `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />`
-      : `<span class="nl-top-support-rank__caster-thumb" aria-hidden="true"></span>`;
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(src)}" alt="${escapeAttr(name)}" decoding="async" referrerpolicy="no-referrer" data-fallback-name="${escapeAttr(name)}" />`;
   const title = pageUrl ? `配信者 ${name}（クリックでチャンネルページ）` : `配信者 ${name}`;
   const nameBlock = pageUrl
     ? `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(pageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +

@@ -165,6 +165,31 @@ describe('resolveBroadcasterFollowTarget - URL の安全性', () => {
   });
 });
 
+describe('resolveBroadcasterFollowTarget - 他サービスの画像', () => {
+  it('数値 uid でも、ニコニコ以外の https 画像があればそれを出す', () => {
+    const logo = 'https://image.p-c2-x.abema-tv.com/image/channels/shogi/logo.png?format=png&width=320&height=320';
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: '将棋チャンネル',
+      broadcasterUserId: '8123456789',
+      broadcasterIconUrl: logo
+    });
+    expect(r.kind).toBe('user');
+    expect(r.iconUrl).toBe(logo);
+    expect(r.followLabel).toBe('フォロー');
+  });
+
+  it('数値 uid のニコニコ画像は差し替えない', () => {
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: 'foo',
+      broadcasterUserId: '12345',
+      broadcasterIconUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/999.jpg'
+    });
+    expect(r.iconUrl).toContain('/usericon/');
+    expect(r.iconUrl).toContain('12345.jpg');
+    expect(r.iconUrl).not.toContain('999.jpg');
+  });
+});
+
 describe('resolveBroadcasterFollowTarget - 数値 uid 優先', () => {
   it('uid 数値 + channel pageUrl 両方ある場合は user 経路を優先', () => {
     // 通常の user 放送で念のため pageUrl に user URL が入っているケース

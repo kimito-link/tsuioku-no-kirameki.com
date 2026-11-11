@@ -83,16 +83,18 @@ export function resolveBroadcasterFollowTarget(snapshot) {
   const lvNum = Number(snapshot.broadcasterLevel);
   const level = Number.isFinite(lvNum) && lvNum > 0 ? lvNum : null;
 
-  // 1. 数値 uid → user 経路（既存挙動）。アイコン URL は reportUserThumb の
-  //    `buildNiconicoDefaultUserIconUrl` と完全に揃える（5〜14 桁の数値以外は空）。
+  // 1. 数値 uid → user 経路。ニコニコの人は従来どおり CDN の usericon。
+  //    ABEMA などは合成した数値 uid を持つが、スナップショットにニコニコ以外の
+  //    https 画像（チャンネルロゴ）があればそちらを出す。無いときだけ CDN。
   if (/^\d+$/.test(uid)) {
     const iconFromCdn = buildNiconicoDefaultUserIconUrl(uid);
+    const foreignIcon = /^https:\/\//i.test(iconUrlRaw) && !/nicovideo\.jp|nimg\.jp|nico\.ms/i.test(iconUrlRaw);
     return {
       kind: 'user',
       name,
       level,
       pageUrl: `https://www.nicovideo.jp/user/${uid}`,
-      iconUrl: iconFromCdn,
+      iconUrl: foreignIcon ? iconUrlRaw : iconFromCdn,
       followLabel: 'フォロー'
     };
   }

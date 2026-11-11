@@ -140,11 +140,11 @@ function isAbLogoUrl(url) {
 }
 
 /**
- * リニア放送の login（n- / s-）かチャンネル id から、公開されているチャンネルロゴ。
- * 放送ページに画像がまだ無いときの最後の候補。イベントやエピソードの id からは作らない。
+ * リニア放送の login（n- / s-）かチャンネル id から、チャンネル id だけ取り出す。
+ * イベント（e-）やエピソード（p-）からは作らない。
  * @param {unknown} loginOrChannelId
  */
-export function abChannelLogoUrl(loginOrChannelId) {
+export function abLinearChannelId(loginOrChannelId) {
   const raw = String(loginOrChannelId || '').trim().toLowerCase();
   let id = '';
   if (raw.startsWith('n-') && isAbLogin(raw)) id = raw.slice(2);
@@ -153,8 +153,46 @@ export function abChannelLogoUrl(loginOrChannelId) {
     const cut = rest.indexOf('__');
     id = cut > 0 ? rest.slice(0, cut) : '';
   } else if (!/^[neps]-/.test(raw) && CHANNEL_ID_RE.test(raw)) id = raw;
-  if (!CHANNEL_ID_RE.test(id)) return '';
-  return safeAbImageUrl(`https://hayabusa.io/abema/channels/logo/${id}.w340.png`);
+  return CHANNEL_ID_RE.test(id) ? id : '';
+}
+
+/**
+ * リニア放送の login（n- / s-）かチャンネル id から、公開されているチャンネルロゴ。
+ * 放送ページに画像がまだ無いときの最後の候補。イベントやエピソードの id からは作らない。
+ * 2026-11 に image.p-c2-x.abema-tv.com の logo.png が 200 の PNG で返ることを確認した。
+ * @param {unknown} loginOrChannelId
+ */
+export function abChannelLogoUrl(loginOrChannelId) {
+  const id = abLinearChannelId(loginOrChannelId);
+  if (!id) return '';
+  return safeAbImageUrl(
+    `https://image.p-c2-x.abema-tv.com/image/channels/${id}/logo.png?format=png&width=320&height=320`
+  );
+}
+
+/** srcset の中から使ってよい ABEMA の画像だけ @param {unknown} raw */
+export function abUrlsFromSrcset(raw) {
+  /** @type {string[]} */
+  const out = [];
+  for (const part of String(raw || '').split(',')) {
+    const u = safeAbImageUrl(part.trim().split(/\s+/)[0]);
+    if (u) out.push(u);
+  }
+  return out;
+}
+
+/** style の url() から使ってよい ABEMA の画像だけ @param {unknown} style */
+export function abUrlsFromCss(style) {
+  /** @type {string[]} */
+  const out = [];
+  const re = /url\(\s*(['"]?)(https:[^)'"]+)\1\s*\)/gi;
+  let m;
+  const text = String(style || '');
+  while ((m = re.exec(text))) {
+    const u = safeAbImageUrl(m[2]);
+    if (u) out.push(u);
+  }
+  return out;
 }
 
 /** @param {unknown} v */
@@ -213,11 +251,85 @@ export function pickAbBroadcasterImage(src = {}) {
   }
   const logo = images.find((u) => isAbLogoUrl(u)) || (api && isAbLogoUrl(api) ? api : '');
   if (logo) return logo;
+  // リニアは番組の横長サムネより、公開されているチャンネルロゴを先に出す。
+  const built = abChannelLogoUrl(src.channelId) || abChannelLogoUrl(src.login);
+  if (built) return built;
   if (og) return og;
   if (api) return api;
   const thumb = images.find((u) => /\/programs\/|thumb/i.test(u));
   if (thumb) return thumb;
-  return abChannelLogoUrl(src.channelId) || abChannelLogoUrl(src.login);
+  return '';
+}
+
+/**
+ * チャンネルや番組の JSON か。コメントの口とは別に、ロゴだけ受け取る。
+ * 画像ファイルそのもの（/image/ や画像用ホスト）は JSON ではないので含めない。
+ * @param {unknown} url
+ */
+export function isAbBroadcastJsonUrl(url) {
+  let u;
+  try {
+    u = new URL(String(url || ''), AB_ORIGIN);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:') return false;
+  if (!/(^|\.)abema\.tv$|(^|\.)abema-tv\.com$|(^|\.)abema\.io$/i.test(u.hostname)) return false;
+  if (/^image\.|^img\.|hayabusa/i.test(u.hostname)) return false;
+  if (u.pathname.startsWith('/image/')) return false;
+  if (/\/comments(?:\/|$)/.test(u.pathname)) return false;
+  return /\/(?:channels|slots|media|programs|broadcasts?|liveEvents|live-events)(?:\/|$)/.test(u.pathname);
+}
+
+/**
+ * コメントした人の icon は見ずに、チャンネルロゴか番組画像だけ拾う。
+ * コメントの束と同じ JSON にロゴが入っていても拾える。
+ * @param {unknown} raw
+ * @returns {{ imageUrl: string, channelId: string }}
+ */
+export function abBroadcastImage(raw) {
+  const root = unwrap(raw);
+  if (!root) return { imageUrl: '', channelId: '' };
+  const slot = obj(root.slot) || obj(root.liveEvent) || obj(root.event) || obj(root.program) || obj(root.episode);
+  const pic = slot ? programImage(slot) : { imageUrl: '', channelId: '' };
+  const rootPic = programImage(root);
+  return {
+    imageUrl: pic.imageUrl || rootPic.imageUrl,
+    channelId: pic.channelId || rootPic.channelId,
+  };
+}
+
+/**
+ * ページの応答を、コメントの束と番組情報に分ける。
+ * コメントの束にチャンネルロゴが同居していても、ロゴは meta に残す（コメントの icon には入れない）。
+ * @param {unknown} raw
+ * @returns {{ batch: { chatId: string, isPolling: boolean | null, pollingIntervalSec: number | null, messages: any[] } | null, meta: { title: string, startedAtMs: number | null, viewers: number | null, imageUrl: string, channelId: string } | null } | null}
+ */
+export function abPayloadNotices(raw) {
+  const shrunk = shrinkAbPayload(raw);
+  const pic = abBroadcastImage(raw);
+  const metaBase = shrunk && shrunk.meta ? shrunk.meta : null;
+  const imageUrl = pic.imageUrl || (metaBase ? metaBase.imageUrl : '') || '';
+  const channelId = pic.channelId || (metaBase ? metaBase.channelId : '') || '';
+  const batch = shrunk && Array.isArray(shrunk.messages)
+    ? {
+        chatId: String(shrunk.chatId || ''),
+        isPolling: shrunk.isPolling ?? null,
+        pollingIntervalSec: shrunk.pollingIntervalSec ?? null,
+        messages: shrunk.messages,
+      }
+    : null;
+  const meta = metaBase || imageUrl || channelId
+    ? {
+        title: metaBase ? metaBase.title : '',
+        startedAtMs: metaBase ? metaBase.startedAtMs : null,
+        viewers: metaBase ? metaBase.viewers : null,
+        imageUrl,
+        channelId,
+      }
+    : null;
+  if (!batch && !meta) return null;
+  return { batch, meta };
 }
 
 /**

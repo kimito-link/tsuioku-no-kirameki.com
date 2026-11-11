@@ -9821,18 +9821,11 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       casterFollow.textContent = followTarget.followLabel;
     }
     if (casterIcon) {
-      if (followTarget.iconUrl) {
-        casterIcon.src = followTarget.iconUrl;
-        casterIcon.alt = followTarget.name;
-        casterIcon.style.display = '';
-        casterIcon.onerror = () => { casterIcon.style.display = 'none'; };
-      } else {
-        // チャンネル放送で icon が取れていない場合は非表示にして
-        // 名前 + 「チャンネルを見る」だけを残す
-        casterIcon.removeAttribute('src');
-        casterIcon.alt = '';
-        casterIcon.style.display = 'none';
-      }
+      const face = anonymousIdenticonDataUrl(followTarget.name || '配信', 64);
+      casterIcon.src = followTarget.iconUrl || face;
+      casterIcon.alt = followTarget.name;
+      casterIcon.style.display = '';
+      casterIcon.onerror = () => { const next = identiconFallbackForAvatarUrl(casterIcon.src) || face; if (next && casterIcon.src !== next) casterIcon.src = next; };
     }
     casterBanner.hidden = false;
   } else if (casterBanner) {
@@ -10055,14 +10048,21 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
  */
 function bindOnErrorHandlersWithin(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
-  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"]');
+  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"], img[data-on-error-fallback="face"]');
   imgs.forEach((node) => {
     if (!(node instanceof HTMLImageElement)) return;
     // 二重バインド防止（再描画でも一度だけ）
     if (node.dataset.nlOnErrorBound === '1') return;
     node.dataset.nlOnErrorBound = '1';
 
-    if (node.dataset.onErrorHide === '1') {
+    if (node.dataset.onErrorFallback === 'face') {
+      node.addEventListener('error', () => {
+        try {
+          const face = identiconFallbackForAvatarUrl(node.currentSrc || node.src) || anonymousIdenticonDataUrl(node.dataset.fallbackName || '配信', 64);
+          if (face && node.src !== face) node.src = face;
+        } catch { /* 顔も作れないときだけ空のまま */ }
+      }, { once: true });
+    } else if (node.dataset.onErrorHide === '1') {
       node.addEventListener('error', () => {
         try { node.style.visibility = 'hidden'; } catch { /* ignore */ }
       }, { once: true });
@@ -10088,10 +10088,9 @@ function topSupportRankStripCasterTileHtml() {
     target.kind === 'channel'
       ? `配信者 ${nameWithLv}（クリックでチャンネルページ）`
       : `配信者 ${nameWithLv}（クリックでユーザーページ）`;
-  const iconHtml = target.iconUrl
-    ? `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />`
-    // チャンネル放送で icon が無い時はスペーサーを置いて高さを揃える
-    : `<span class="nl-top-support-rank__caster-thumb" aria-hidden="true"></span>`;
+  const face = anonymousIdenticonDataUrl(target.name || '配信', 64);
+  const iconHtml =
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl || face)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(target.name || '配信')}" />`;
   return (
     `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
     `<span class="nl-top-support-rank__caster-label">配信者</span>` +

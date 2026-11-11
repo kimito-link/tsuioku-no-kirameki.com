@@ -5,7 +5,7 @@
 //   隔離された世界(ab-content-entry.js)へ渡す。送ったり、ページの受信を止めたりはしない。
 //   認可ヘッダや URL のクエリは渡さない。入口が「hello」と言うまで最大 40 件ためておく。
 
-import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayload, enqueueAbMainBacklog } from '../../src/lib/abema/abParse.js';
+import { isAbCommentUrl, isAbBroadcastJsonUrl, abCommentWindowFromUrl, abChatIdFromUrl, abPayloadNotices, enqueueAbMainBacklog } from '../../src/lib/abema/abParse.js';
 
 (() => {
   if (window.__nlAbMain) return;
@@ -44,9 +44,10 @@ import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayloa
     } catch {
       return;
     }
-    const shrunk = shrinkAbPayload(json);
-    if (!shrunk) return;
-    if (shrunk.messages) {
+    const notice = abPayloadNotices(json);
+    if (!notice) return;
+    if (urlMatched && notice.batch) {
+      const shrunk = notice.batch;
       const chatId = shrunk.chatId || abChatIdFromUrl(url);
       const win = url ? abCommentWindowFromUrl(url) : { sinceMs: null, untilMs: null };
       post({
@@ -55,9 +56,8 @@ import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayloa
         untilMs: win.untilMs,
         body: { ...shrunk, chatId },
       });
-      return;
     }
-    if (urlMatched && shrunk.meta) post({ t: 'meta', meta: shrunk.meta });
+    if (notice.meta && (urlMatched || isAbBroadcastJsonUrl(url))) post({ t: 'meta', meta: notice.meta });
   };
 
   /** @param {unknown} url */
@@ -80,11 +80,11 @@ import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayloa
       } catch {
         url = '';
       }
-      if (!matched(url)) return ret;
+      if (!matched(url) && !isAbBroadcastJsonUrl(url)) return ret;
       ret.then((res) => {
         try {
-          if (res.status === 401 || res.status === 403) post({ t: 'denied' });
-          res.clone().text().then((text) => consider(url, text, true)).catch(() => {});
+          if ((res.status === 401 || res.status === 403) && matched(url)) post({ t: 'denied' });
+          res.clone().text().then((text) => consider(url, text, matched(url))).catch(() => {});
         } catch {
           /* 写せなくてもページはそのまま */
         }
@@ -104,10 +104,10 @@ import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayloa
     return xhrOpen.call(this, method, url, ...rest);
   };
   XMLHttpRequest.prototype.send = function abSend(...args) {
-    if (matched(this.__nlAbUrl)) {
+    if (matched(this.__nlAbUrl) || isAbBroadcastJsonUrl(this.__nlAbUrl)) {
       this.addEventListener('load', () => {
         try {
-          if (this.status === 401 || this.status === 403) post({ t: 'denied' });
+          if ((this.status === 401 || this.status === 403) && matched(this.__nlAbUrl)) post({ t: 'denied' });
           let text = '';
           try {
             text = typeof this.responseText === 'string' ? this.responseText : '';
@@ -121,7 +121,7 @@ import { isAbCommentUrl, abCommentWindowFromUrl, abChatIdFromUrl, shrinkAbPayloa
               text = '';
             }
           }
-          consider(this.__nlAbUrl, text, true);
+          consider(this.__nlAbUrl, text, matched(this.__nlAbUrl));
         } catch {
           /* 写せなくてもページはそのまま */
         }
