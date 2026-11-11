@@ -87,6 +87,14 @@ import {
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
 import { takeUnreadVoiceItems } from '../lib/comeviewLivePush.js';
+import {
+  COMEVIEW_EXCLUDE_KEY,
+  COMEVIEW_GIFT_FILTER_KEY,
+  excludeComeviewItems,
+  filterComeviewGiftView,
+  normalizeComeviewExclude,
+  normalizeGiftFilter
+} from '../lib/comeviewGiftFilter.js';
 import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { createComeviewLivePushClient } from './comeviewLivePushClient.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
@@ -388,6 +396,8 @@ function recordVoiceSynthFailureReason(info) {
 
 /** @type {Array<{key:string,name:string,at:number}>} ユーザーNG リスト(storage 永続)。 */
 let _ngList = [];
+let _giftFilter = 'all';
+let _excludeRules = normalizeComeviewExclude(null);
 /** @type {Set<string>} NG 中ユーザーキー(高速判定用)。 */
 let _ngKeys = new Set();
 /** @type {Record<string,{nickname:string,label:string,memo:string,at:number}>} ユーザーノート。 */
@@ -1253,7 +1263,10 @@ const _livePush = createComeviewLivePushClient({
     if (_paused || !rows.length) return;
     const profiled = Object.keys(_profileCache).length ? applyUserCommentProfileMapToEntries(rows, _profileCache).next : rows;
     const items = buildAllComeviewTimeline(profiled, []).filter((it) => it.kind === 'comment');
-    enqueueLiveVoiceItems(filterVisibleComeviewTimeline(items, _ngKeys, _hiddenSigs));
+    enqueueLiveVoiceItems(excludeComeviewItems(
+      filterVisibleComeviewTimeline(items, _ngKeys, _hiddenSigs),
+      _excludeRules
+    ));
   }
 });
 
@@ -1976,14 +1989,16 @@ function rebuildFullTimeline(listEl, timeline, forceBottom) {
   }
 }
 
-function appendTimelineItems(items) {
+function appendTimelineItems(items, voiceItems = items) {
   const listEl = document.getElementById('cvList');
-  if (!listEl || !items.length) return;
+  const speak = Array.isArray(voiceItems) ? voiceItems : items;
+  if (!listEl || (!items.length && !speak.length)) return;
   const shouldFollow = isComeviewNearBottom({
     scrollTop: listEl.scrollTop,
     clientHeight: listEl.clientHeight,
     scrollHeight: listEl.scrollHeight
   });
+  if (items.length) {
   const empty = listEl.querySelector('.nl-support-timeline__empty, #cvEmpty');
   if (empty) empty.remove();
 
@@ -1998,7 +2013,6 @@ function appendTimelineItems(items) {
   }
   listEl.appendChild(fragment);
   upgradeAnonymousAvatarImages(listEl);
-  enqueueLiveVoiceItems(items);
 
   let rows = listEl.querySelectorAll('[data-cv-key]');
   while (rows.length > TIMELINE_LIMIT) {
@@ -2008,6 +2022,8 @@ function appendTimelineItems(items) {
     rows = listEl.querySelectorAll('[data-cv-key]');
   }
   if (shouldFollow) listEl.scrollTop = listEl.scrollHeight;
+  }
+  enqueueLiveVoiceItems(speak);
 }
 
 function normalizePin(raw) {
@@ -2144,18 +2160,22 @@ async function performFullRefresh(forceBottom) {
   if (Object.keys(_profileCache).length) {
     comments = applyUserCommentProfileMapToEntries(comments, _profileCache).next;
   }
-  const timeline = keepLatestComeviewTimelineItems(
+  const spokenTimeline = excludeComeviewItems(
     filterVisibleComeviewTimeline(
       buildAllComeviewTimeline(comments, _giftRows),
       _ngKeys,
       _hiddenSigs
     ),
+    _excludeRules
+  );
+  const timeline = keepLatestComeviewTimelineItems(
+    filterComeviewGiftView(spokenTimeline, _giftFilter),
     TIMELINE_LIMIT
   );
   _commentCount = comments.length;
   // v0.1.1804: 初回以外は、この全量描画で初めて出る新しいコメントも読む(下の既出登録より先に拾う)。
   const refreshVoiceItems = _initialVoicesPrimed
-    ? pickRefreshVoiceItems(timeline, _seenCommentNos, Date.now(), VOICE_STALE_MS_NORMAL)
+    ? pickRefreshVoiceItems(spokenTimeline, _seenCommentNos, Date.now(), VOICE_STALE_MS_NORMAL)
     : [];
   renderFullTimeline(timeline, forceBottom);
   // v0.1.679: 全量描画した行の識別子を「既出」に登録(以後の hot append が二重に足さない)。
@@ -2243,9 +2263,11 @@ function processHotSnapshots(nextTail, nextGifts) {
   );
   const unseen = pickNewComeviewTimelineItems(appended, _renderedKeys);
   _commentCount += unseen.filter((item) => item.kind === 'comment').length;
-  appendTimelineItems(
-    filterVisibleComeviewTimeline(unseen, _ngKeys, _hiddenSigs)
+  const spoken = excludeComeviewItems(
+    filterVisibleComeviewTimeline(unseen, _ngKeys, _hiddenSigs),
+    _excludeRules
   );
+  appendTimelineItems(filterComeviewGiftView(spoken, _giftFilter), spoken);
   updateCommentCount();
 }
 
@@ -2611,6 +2633,32 @@ function wireButtons() {
   }
   const btnNg = document.getElementById('cvBtnNg');
   if (btnNg) btnNg.addEventListener('click', () => showNgPanel());
+  const giftFilter = document.getElementById('cvGiftFilter');
+  if (giftFilter instanceof HTMLSelectElement) {
+    giftFilter.addEventListener('change', () => {
+      _giftFilter = normalizeGiftFilter(giftFilter.value);
+      void chrome.storage.local.set({ [COMEVIEW_GIFT_FILTER_KEY]: _giftFilter });
+      void requestFullRefresh();
+    });
+  }
+  document.getElementById('cvExcludeSave')?.addEventListener('click', () => {
+    const names = document.getElementById('cvExcludeNames');
+    const ids = document.getElementById('cvExcludeIds');
+    _excludeRules = normalizeComeviewExclude({
+      names: names instanceof HTMLTextAreaElement ? names.value : '',
+      ids: ids instanceof HTMLTextAreaElement ? ids.value : ''
+    });
+    void chrome.storage.local.set({ [COMEVIEW_EXCLUDE_KEY]: _excludeRules }).then(() => requestFullRefresh());
+  });
+  void chrome.storage.local.get([COMEVIEW_GIFT_FILTER_KEY, COMEVIEW_EXCLUDE_KEY]).then((bag) => {
+    _giftFilter = normalizeGiftFilter(bag?.[COMEVIEW_GIFT_FILTER_KEY]);
+    _excludeRules = normalizeComeviewExclude(bag?.[COMEVIEW_EXCLUDE_KEY]);
+    if (giftFilter instanceof HTMLSelectElement) giftFilter.value = _giftFilter;
+    const names = document.getElementById('cvExcludeNames');
+    const ids = document.getElementById('cvExcludeIds');
+    if (names instanceof HTMLTextAreaElement) names.value = _excludeRules.names.join('\n');
+    if (ids instanceof HTMLTextAreaElement) ids.value = _excludeRules.ids.join('\n');
+  }).catch(() => {});
   const btnPanelClose = document.getElementById('cvPanelClose');
   if (btnPanelClose) btnPanelClose.addEventListener('click', () => closePanel());
 
