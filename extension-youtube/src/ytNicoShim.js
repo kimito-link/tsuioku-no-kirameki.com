@@ -13,7 +13,7 @@
 //      それ以外のキー(設定など)は本物の storage にそのまま読み書きする=ニコ生版の設定スイッチがそのまま動く。
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
-import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
+import { computePseudoLvForVideoId, isYtPseudoLvShape } from '../../src/lib/youtube/ytPseudoLv.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
@@ -1385,7 +1385,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   realLocal.set = (/** @type {any} */ items, /** @type {any} */ cb) => {
     // ★v0.1.1974: 疑似 lv のコメントの控え(全件 約5.5MB)は書かない。正本は IndexedDB で、読み出しはここが IndexedDB から組む
     {
-      const d = dropPseudoLvCommentWrites(items, (lv) => !!videoIdForPseudoLv(lv));
+      // 逆引き表が空の画面(横の欄の別フレーム)でも、疑似 lv の形なら全件(最大数十MB)は書かない。
+      const d = dropPseudoLvCommentWrites(items, (lv) => !!videoIdForPseudoLv(lv) || isYtPseudoLvShape(lv));
       if (d.dropped) {
         shimDiag.commentWritesDropped += d.dropped;
         shimDiag.commentRowsWriteDropped += d.droppedBytesApprox;

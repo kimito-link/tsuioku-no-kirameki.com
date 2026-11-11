@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  STORAGE_CHURN_WORKLOAD,
   YT_STORAGE_WRITE_MAX_BYTES,
   changedVoicePersonWrites,
+  estimateChromeStorageBytes,
   rowsMadeWithinAdded,
   slimSummaryForStorage,
   storageJsonBytes,
@@ -88,5 +90,29 @@ describe('書き込みは人数や配信数で大きくならない', () => {
     const slim = slimSummaryForStorage({ ...summary(1), broadcasterIconUrl: `data:image/png;base64,${'A'.repeat(80_000)}` });
     expect(String(slim?.broadcasterIconUrl || '')).toBe('');
     expect(storageJsonBytes(slim)).toBeLessThanOrEqual(YT_STORAGE_WRITE_MAX_BYTES);
+  });
+});
+
+describe('1日の chrome.storage 書き込み見積もり(同じ4時間の配信)', () => {
+  const slimBytes = storageJsonBytes(slimSummaryForStorage(summary(1)));
+
+  it('11/09 の全件書き直しより、いまの書き方は配信の件数に比例しない', () => {
+    const before = estimateChromeStorageBytes(STORAGE_CHURN_WORKLOAD, 'before');
+    const broken = estimateChromeStorageBytes(STORAGE_CHURN_WORKLOAD, 'before-broken-gate');
+    const after = estimateChromeStorageBytes(STORAGE_CHURN_WORKLOAD, 'after', { slimSummaryBytes: slimBytes });
+    expect(before.voiceWrites).toBe(480);
+    expect(before.summaryWrites).toBe(36001);
+    expect(before.commentWrites).toBe(6240);
+    expect(before.voice).toBe(480 * 1789993);
+    expect(before.summary).toBe(36001 * 70000);
+    expect(before.comments).toBe(6240 * 5500000);
+    expect(broken.voiceWrites).toBeGreaterThan(before.voiceWrites);
+    expect(after.voice).toBe(0);
+    expect(after.comments).toBe(0);
+    expect(after.commentsAtLargestKey).toBe(0);
+    expect(after.summaryWrites).toBeLessThan(before.summaryWrites / 2);
+    expect(after.summary).toBe(after.summaryWrites * slimBytes);
+    expect(after.total).toBeLessThan(before.total / 1000);
+    expect(slimBytes).toBeLessThanOrEqual(YT_STORAGE_WRITE_MAX_BYTES);
   });
 });

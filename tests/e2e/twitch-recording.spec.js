@@ -7,6 +7,7 @@
 //     routeWebSocket では捕まらないので、Chromium の名前解決を 127.0.0.1 に向け、手元の TLS の WebSocket で
 //     Twitch の IRC の役をする(行の形は Twitch 公式の IRC の説明どおり)。
 import { test as base, chromium, expect } from '@playwright/test';
+import { readStreamSummary } from './readStreamSummary.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -252,7 +253,7 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
     .toEqual({ gifts: 5, subs: 1, late: LATE_ICON });
 
   // 配信のまとめ(配信者・同接・開始時刻)
-  const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  const sum = await readStreamSummary(sw, KEY);
   // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
   await expect
     .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })

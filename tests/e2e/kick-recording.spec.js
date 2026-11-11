@@ -8,6 +8,7 @@
 //     127.0.0.1 に向け、手元の TLS の WebSocket で役をする(twitch-recording.spec.js と同じ作り。
 //     イベントの形は 2026-11-08 の PC 実測で本物から写した)。
 import { test as base, chromium, expect } from '@playwright/test';
+import { readStreamSummary } from './readStreamSummary.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -297,7 +298,7 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   ]);
 
   // 配信のまとめ(配信者・同接・開始時刻)
-  const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  const sum = await readStreamSummary(sw, KEY);
   // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
   await expect
     .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })

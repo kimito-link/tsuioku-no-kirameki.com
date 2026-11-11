@@ -7,6 +7,7 @@
 //   - webcast-ws.tiktok.com のソケット → Chromium の名前解決を 127.0.0.1 に向け、手元の TLS の WebSocket で役をする
 //   形(PushFrame・gzip・番号)は 2026-11-09 の PC 実測(本物・ログイン済み・値抜き)から写した(値は作りもの)。
 import { test as base, chromium, expect } from '@playwright/test';
+import { readStreamSummary } from './readStreamSummary.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -290,9 +291,9 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
 
   // 配信のまとめ(題・配信者・開始時刻・視聴数はソケットの値)
   await expect
-    .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.concurrentViewers, { timeout: 40_000 })
+    .poll(async () => (await readStreamSummary(sw, KEY))?.concurrentViewers, { timeout: 40_000 })
     .toBe(77);
-  const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  const sum = await readStreamSummary(sw, KEY);
   // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
   await expect
     .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })
@@ -320,7 +321,7 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
   // 配信が終わったら(status 4)終わった時刻を送る
   live = false;
   await expect
-    .poll(async () => Number((await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.endedAt || 0), { timeout: 45_000 })
+    .poll(async () => Number((await readStreamSummary(sw, KEY))?.endedAt || 0), { timeout: 45_000 })
     .toBeGreaterThan(0);
   // 配信が終わったページを開いたままでも、毎秒は読みに行かない(2026-11-09 PC 実測: 1 秒おきに読み 403 になった)
   const callsAtEnd = infoCalls[UNIQUE] || 0;

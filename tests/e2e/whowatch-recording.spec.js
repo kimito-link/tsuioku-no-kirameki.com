@@ -5,6 +5,7 @@
 //   - whowatch.tv のページ・api.whowatch.tv/lives/<番号> の応答 → Playwright の route で差し替え
 //   ★応答の形は 2018〜2025 の非公式資料による推定。PC 実測で本物の形が分かったら、ここも本物に合わせる。
 import { test as base, chromium, expect } from '@playwright/test';
+import { readStreamSummary } from './readStreamSummary.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -140,7 +141,7 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
     .toEqual({ via: 'page', streamKey: KEY, dropped: 2, paid: 1, paidItems: 2, newestFirst: true, isLive: true, hasItemShape: true });
 
   // 配信のまとめ(配信者・同接・開始時刻)
-  const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  const sum = await readStreamSummary(sw, KEY);
   // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
   await expect
     .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })
@@ -184,7 +185,7 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   // 配信が終わったと分かったら、終わった時刻を送って読むのをやめる
   ended = true;
   await expect
-    .poll(async () => Number((await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.endedAt || 0), { timeout: 20_000 })
+    .poll(async () => Number((await readStreamSummary(sw, KEY))?.endedAt || 0), { timeout: 20_000 })
     .toBeGreaterThan(0);
   const n = asked.length;
   await page.waitForTimeout(4000);

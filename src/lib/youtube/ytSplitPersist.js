@@ -170,3 +170,71 @@ export function rowsMadeWithinAdded(n) {
   if (added === 0) return made === 0;
   return made >= 0 && made <= added;
 }
+
+/**
+ * 11/09 の書き方と、いまの書き方を同じ負荷で比べるための入力。
+ * 配信4時間・それ以外の時間はこれらの鍵を書かない。大きさは PC 実測。
+ * voiceBytes: 声の割り当て全体 1,789,993 バイト(21,897人)。
+ * summaryBytes: 配信のまとめ全体 約70KB。
+ * commentBytes: 2026-11-09 の実測(1回 約5.5MB・90秒に39回)。
+ * largestCommentBytes: いま残っている最大の鍵 24.6MB を、同じ回数で書いた場合。
+ */
+export const STORAGE_CHURN_WORKLOAD = Object.freeze({
+  streamMs: 4 * 60 * 60 * 1000,
+  voiceBytes: 1789993,
+  voiceEveryMs: 30000,
+  voiceBrokenEveryMs: 240000 / 46,
+  summaryBytes: 70000,
+  flushEveryMs: 400,
+  summaryMinGapMs: YT_SUMMARY_CHROME_MIN_GAP_MS,
+  commentBytes: 5500000,
+  commentEveryMs: 90000 / 39,
+  largestCommentBytes: 24600000,
+});
+
+/**
+ * @param {typeof STORAGE_CHURN_WORKLOAD} workload
+ * @param {'before' | 'before-broken-gate' | 'after'} policy
+ * @param {{ slimSummaryBytes?: number }} [opt]
+ * @returns {{ voice: number, summary: number, comments: number, commentsAtLargestKey: number, total: number, totalAtLargestKey: number, voiceWrites: number, summaryWrites: number, commentWrites: number }}
+ */
+export function estimateChromeStorageBytes(workload, policy, opt = {}) {
+  const streamMs = Number(workload?.streamMs) || 0;
+  const voiceEvery = policy === 'before-broken-gate'
+    ? Number(workload.voiceBrokenEveryMs) || 1
+    : Number(workload.voiceEveryMs) || 1;
+  const flushEvery = Number(workload.flushEveryMs) || 1;
+  const commentEvery = Number(workload.commentEveryMs) || 1;
+  const voiceWrites = policy === 'after' ? 0 : Math.floor(streamMs / voiceEvery);
+  const commentWrites = policy === 'after' ? 0 : Math.floor(streamMs / commentEvery);
+  let summaryWrites = 0;
+  if (policy === 'after') {
+    const gap = Number(workload.summaryMinGapMs) || YT_SUMMARY_CHROME_MIN_GAP_MS;
+    let last = -gap;
+    for (let t = 0; t <= streamMs; t += flushEvery) {
+      if (summaryChromeWriteDue(last, t, gap)) {
+        summaryWrites += 1;
+        last = t;
+      }
+    }
+  } else {
+    summaryWrites = Math.floor(streamMs / flushEvery) + 1;
+  }
+  const voice = voiceWrites * (Number(workload.voiceBytes) || 0);
+  const summary = summaryWrites * (policy === 'after'
+    ? (Number(opt.slimSummaryBytes) || 0)
+    : (Number(workload.summaryBytes) || 0));
+  const comments = commentWrites * (Number(workload.commentBytes) || 0);
+  const commentsAtLargestKey = commentWrites * (Number(workload.largestCommentBytes) || 0);
+  return {
+    voice,
+    summary,
+    comments,
+    commentsAtLargestKey,
+    total: voice + summary + comments,
+    totalAtLargestKey: voice + summary + commentsAtLargestKey,
+    voiceWrites,
+    summaryWrites,
+    commentWrites,
+  };
+}
