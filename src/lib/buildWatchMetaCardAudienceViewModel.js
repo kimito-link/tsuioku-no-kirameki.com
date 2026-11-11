@@ -35,7 +35,8 @@ import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
  *   text: string,
  *   isPlaceholder: boolean,
  *   numericVisitorCount: number|null,
- *   charReactionDelta: number|null
+ *   charReactionDelta: number|null,
+ *   hidden?: boolean
  * }} WatchMetaVisitorVm
  */
 
@@ -101,6 +102,9 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
   const prev = opts?.prevForReactions && typeof opts.prevForReactions === 'object'
     ? opts.prevForReactions
     : { viewerCount: null, concurrentEstimated: null };
+  const metrics = snapshot.serviceMetrics && typeof snapshot.serviceMetrics === 'object'
+    ? /** @type {{ visitors?: boolean, estimateConcurrent?: boolean }} */ (snapshot.serviceMetrics)
+    : null;
 
   const vc = snapshot.viewerCountFromDom;
   const recentActive =
@@ -146,6 +150,12 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
   ) {
     visitor.charReactionDelta = numericVisitor - prev.viewerCount;
   }
+  if (metrics && metrics.visitors === false) {
+    visitor.text = '';
+    visitor.isPlaceholder = true;
+    visitor.hidden = true;
+    visitor.charReactionDelta = null;
+  }
 
   /** @type {WatchMetaConcurrentVm} */
   let concurrent;
@@ -165,11 +175,12 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       ? snapshot.officialViewerCount
       : null;
 
-  // 番組の視聴数は同時接続ではない。数があるときは、同じカードに見出し「視聴数」で出す。
-  if (slotViews != null && officialConcurrent == null) {
+  const viewText = typeof snapshot.slotViewText === 'string' ? snapshot.slotViewText.trim() : '';
+  const hideEstimate = !!(metrics && metrics.estimateConcurrent === false);
+  const viewCard = () => {
     concurrent = {
       phase: 'ready',
-      estText: slotViews.toLocaleString('ja-JP'),
+      estText: viewText || slotViews.toLocaleString('ja-JP'),
       estIsPlaceholder: false,
       estTitle: '番組詳細に出ている視聴数です。同時に見ている人数ではありません。',
       subText: '',
@@ -181,6 +192,30 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       charReactionDelta: null
     };
     nextConcurrentEstimated = slotViews;
+  };
+
+  // 番組の視聴数は同時接続ではない。数があるときは、同じカードに見出し「視聴数」で出す。
+  // 推定を出さないサービスは、数が無いあいだカード自体を隠す。
+  if (hideEstimate) {
+    if (slotViews != null) viewCard();
+    else {
+      concurrent = {
+        phase: 'hidden',
+        estText: '',
+        estIsPlaceholder: true,
+        estTitle: null,
+        subText: '',
+        labelText: '視聴数',
+        cardHidden: true,
+        concurrentLoadingHidden: true,
+        concurrentReadyHidden: true,
+        ariaBusy: false,
+        numericEstimated: null,
+        charReactionDelta: null
+      };
+    }
+  } else if (slotViews != null && officialConcurrent == null) {
+    viewCard();
   } else if (showConcurrent) {
     const streamAge =
       typeof snapshot.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0

@@ -28,6 +28,7 @@ import {
   abCompactCount,
   abPreferViewCount,
   abCounterValue,
+  abReadProgramDetailAudience,
   abChannelNameText,
   abChannelNameFromTitle,
   pickAbBroadcasterImage,
@@ -398,6 +399,31 @@ describe('ABEMA の番組情報と URL', () => {
     expect(safeAbImageUrl('http://hayabusa.io/a.jpg')).toBe('');
     expect(safeAbImageUrl('https://evil.example/a.jpg')).toBe('');
     expect(safeAbImageUrl('https://image.abema.io/a.jpg')).toContain('abema.io');
+  });
+});
+
+describe('番組詳細の「詳細情報をみる」の上の数', () => {
+  it('クラス名が無くても 👁 1.6万 と 💬 1,339 を読み、後のおすすめの 9.9万 は読まない', async () => {
+    const { Window } = await import('happy-dom');
+    const window = new Window();
+    window.document.body.innerHTML = `
+      <section>
+        <p>11/11(水) 18:00 〜 19:00</p>
+        <span>無料</span>
+        <div><span>👁</span><span>1.6万</span></div>
+        <div><span>💬</span><span>1,339</span></div>
+        <button type="button">詳細情報をみる</button>
+      </section>
+      <section>
+        <span>9.9万</span>
+        <a href="/video">詳細情報をみる</a>
+      </section>
+    `;
+    const got = abReadProgramDetailAudience(window.document);
+    expect(got.views).toBe(16000);
+    expect(got.viewText).toBe('1.6万');
+    expect(got.comments).toBe(1339);
+    await window.happyDOM?.close?.();
   });
 });
 

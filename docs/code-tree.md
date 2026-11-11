@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1239 件
+## ⚠️ 役割コメントが無いソース 10 / 1241 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -41,34 +41,6 @@
 
 ## 全ファイルツリー
 
-- 📁 **"src/** (17)
-  - 📁 **images/** (17)
-    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png"`
-          - `logo_funlink_black_RGB_link_black.png"`
-          - `logo_funlink_black_RGB_maru_black.png"`
-      - 📁 **color/** (8)
-        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
-          - `logo_funlink_RGB_color.png"`
-          - `logo_funlink_RGB_ginga_color.png"`
-          - `logo_funlink_RGB_hoshi.png"`
-          - `logo_funlink_RGB_link_hoshi.png"`
-          - `logo_funlink_RGB_link_orange.png"`
-          - `logo_funlink_RGB_maru_blue.png"`
-          - `logo_funlink_RGB_maru_ginga.png"`
-          - `logo_funlink_RGB_maru_orange.png"`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png"`
-        - `logo_funlink_white_RGB_link_black.png"`
-        - `logo_funlink_white_RGB_maru_black.png"`
-    - 📁 **logo/** (3)
-      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg"`
-        - `251016_logo_guide_kimitolink_ol.ai"`
-        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -1189,7 +1161,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2425)
+- 📁 **src/** (2445)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1226,8 +1198,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
-    - 📁 **popup/** (18)
+  - 📁 **extension/** (114)
+    - 📁 **popup/** (20)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1240,6 +1212,8 @@
       - `attachAiDiagButtonHandler.test.js`
       - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
       - `renderAcquisitionDashboard.test.js`
+      - `serviceStatLanes.js` — いま描いている配信の公開数字。レーンを出すかはこの印だけを見る。
+      - `serviceStatLanes.test.js`
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
       - `wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
@@ -1345,7 +1319,7 @@
     - `voiceTogglePanel.wiring.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (117)
+  - 📁 **images/** (134)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1445,7 +1419,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (10)
+    - 📁 **logo/** (13)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1455,6 +1429,11 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
+      - 📁 **データ一式/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg`
+        - `251016_logo_guide_kimitolink_ol.ai`
+        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1495,8 +1474,28 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
+    - 📁 **データ出力/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png`
+          - `logo_funlink_black_RGB_link_black.png`
+          - `logo_funlink_black_RGB_maru_black.png`
+      - 📁 **color/** (8)
+        - 📁 **RGB_データ用/** (8)
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_hoshi.png`
+          - `logo_funlink_RGB_link_hoshi.png`
+          - `logo_funlink_RGB_link_orange.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_ginga.png`
+          - `logo_funlink_RGB_maru_orange.png`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png`
+        - `logo_funlink_white_RGB_link_black.png`
+        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2142)
+  - 📁 **lib/** (2143)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -3057,6 +3056,7 @@
     - `selfWrittenCoversNonCommentTriggers.test.js`
     - `selfWrittenStorageKeys.js` — refresh() 自身が書くキー(=再描画を誘発してはいけないキー)の判定。
     - `selfWrittenStorageKeys.test.js`
+    - `serviceStatPolicy.js` — 配信サービスが公開している数字だけを出す。印が無い配信（ニコ生・YouTube）は今までどおり。
     - `sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
     - `sessionCommentCache.test.js`
     - `sessionCommentPersistWiring.wiring.test.js`

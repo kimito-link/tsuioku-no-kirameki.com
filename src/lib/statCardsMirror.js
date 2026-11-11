@@ -15,13 +15,15 @@
  *   recordsOfficialLine: string,
  *   recordsBreakdownLine: string,
  *   recordsIngestLine: string,
- *   concurrent: { estText: string, estIsPlaceholder: boolean, subText: string },
+ *   omit?: string[],
+ *   concurrent: { estText: string, estIsPlaceholder: boolean, subText: string, label?: string },
  *   visitor: { text: string, isPlaceholder: boolean },
  *   official: null | {
  *     summaryText: string,
  *     viewers: StatChip, comments: StatChip, streamAge: StatChip,
  *     adPts: StatChip, giftPts: StatChip, eventGiftPts: StatChip,
- *     eventRank: StatChip, eventTitle: StatChip
+ *     eventRank: StatChip, eventTitle: StatChip,
+ *     commentsLabel?: string
  *   }
  * }} StatCardsMirrorSnapshot
  */
@@ -40,8 +42,9 @@ function chip(v) {
  *   liveId?: unknown,
  *   recordsText?: unknown, recordsIsPlaceholder?: unknown,
  *   recordsOfficialLine?: unknown, recordsBreakdownLine?: unknown, recordsIngestLine?: unknown,
- *   concurrent?: { estText?: unknown, estIsPlaceholder?: unknown, subText?: unknown },
+ *   concurrent?: { estText?: unknown, estIsPlaceholder?: unknown, subText?: unknown, label?: unknown },
  *   visitor?: { text?: unknown, isPlaceholder?: unknown },
+ *   omit?: unknown,
  *   snapshotForOfficial?: unknown
  * }} input
  * @param {{ nowMs?: number }} [opts]
@@ -57,6 +60,13 @@ export function buildStatCardsMirrorSnapshot(input, opts = {}) {
   let official = null;
   const digest = buildOfficialNicoStatsStripDigest(input?.snapshotForOfficial);
   if (digest) {
+    const src = input?.snapshotForOfficial && typeof input.snapshotForOfficial === 'object'
+      ? /** @type {{ serviceMetrics?: { commentLabel?: unknown }, slotCommentCount?: unknown }} */ (input.snapshotForOfficial)
+      : null;
+    const commentLabel = src?.serviceMetrics && typeof src.serviceMetrics.commentLabel === 'string'
+      && typeof src.slotCommentCount === 'number' && src.slotCommentCount > 0
+      ? src.serviceMetrics.commentLabel
+      : '';
     official = {
       summaryText: String(digest.summaryText || ''),
       viewers: chip(digest.viewers),
@@ -66,9 +76,11 @@ export function buildStatCardsMirrorSnapshot(input, opts = {}) {
       giftPts: chip(digest.giftPts),
       eventGiftPts: chip(digest.eventGiftPts),
       eventRank: chip(digest.eventRank),
-      eventTitle: chip(digest.eventTitle)
+      eventTitle: chip(digest.eventTitle),
+      ...(commentLabel ? { commentsLabel: commentLabel } : {})
     };
   }
+  const omit = Array.isArray(input?.omit) ? input.omit.map((k) => String(k || '')).filter(Boolean) : [];
 
   return {
     liveId,
@@ -78,10 +90,12 @@ export function buildStatCardsMirrorSnapshot(input, opts = {}) {
     recordsOfficialLine: String(input?.recordsOfficialLine || ''),
     recordsBreakdownLine: String(input?.recordsBreakdownLine || ''),
     recordsIngestLine: String(input?.recordsIngestLine || ''),
+    ...(omit.length ? { omit } : {}),
     concurrent: {
       estText: String(conc.estText || ''),
       estIsPlaceholder: conc.estIsPlaceholder === true,
-      subText: String(conc.subText || '')
+      subText: String(conc.subText || ''),
+      ...(conc.label ? { label: String(conc.label) } : {})
     },
     visitor: {
       text: String(vis.text || ''),

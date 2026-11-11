@@ -38,6 +38,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   concurrentViewers?: number | null,
  *   slotViewCount?: number | null,
  *   slotCommentCount?: number | null,
+ *   slotViewText?: string | null,
  *   chatFilterLabel?: string,
  *   itemCount?: number,
  *   startedAt?: number | null,
@@ -94,11 +95,13 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
       ? Math.floor(prev.slotViewCount)
       : null;
   // ページに出ているコメント数（ABEMA の下のバー）。記録の件数とは別。無い配信の要約には欄を足さない。
-  const slotCommentCount = plausible(patch?.slotCommentCount)
+  const commentOk = (/** @type {unknown} */ v) => plausible(v) && /** @type {number} */ (v) > 0;
+  const slotCommentCount = commentOk(patch?.slotCommentCount)
     ? Math.floor(/** @type {number} */ (patch.slotCommentCount))
-    : plausible(prev.slotCommentCount)
+    : commentOk(prev.slotCommentCount)
       ? Math.floor(prev.slotCommentCount)
       : null;
+  const slotViewText = String(patch?.slotViewText || prev.slotViewText || '').trim().slice(0, 16);
   const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || '').trim();
   const itemCount =
     typeof patch?.itemCount === 'number' && Number.isFinite(patch.itemCount) && patch.itemCount >= 0
@@ -148,6 +151,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     peakConcurrentViewers,
     ...(slotViewCount != null ? { slotViewCount } : {}),
     ...(slotCommentCount != null ? { slotCommentCount } : {}),
+    ...(slotViewText ? { slotViewText } : {}),
     chatFilterLabel,
     itemCount,
     startedAt,

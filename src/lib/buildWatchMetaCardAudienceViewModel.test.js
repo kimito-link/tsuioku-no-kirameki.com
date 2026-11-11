@@ -125,6 +125,44 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.estTitle).toContain('同時に見ている人数ではありません');
   });
 
+  it('画面の「1.6万」を視聴数として出し、推定は出さない', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        slotViewCount: 16000,
+        slotViewText: '1.6万',
+        serviceMetrics: { visitors: false, estimateConcurrent: false, programViews: true }
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('1.6万');
+    expect(vm.concurrent.labelText).toBe('視聴数');
+    expect(vm.concurrent.estText).not.toContain('推定');
+    expect(vm.concurrent.subText).not.toBe('材料待ち');
+    expect(vm.visitor.hidden).toBe(true);
+    expect(vm.visitor.text).not.toContain('数字非公開');
+  });
+
+  it('推定を出さないサービスは、視聴数が無いあいだカードを隠す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 3,
+        officialViewerCount: null,
+        serviceMetrics: { estimateConcurrent: false, visitors: false }
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.cardHidden).toBe(true);
+    expect(vm.concurrent.phase).toBe('hidden');
+    expect(vm.concurrent.estText).toBe('');
+    expect(String(vm.concurrent.estText)).not.toContain('推定中');
+  });
+
   it('視聴数が無いときもカードは隠さない（他の配信と同じ）', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {

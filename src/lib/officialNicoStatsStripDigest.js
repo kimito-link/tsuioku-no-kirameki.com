@@ -100,6 +100,7 @@ function pickViewerCountForOfficialStrip(snap) {
  *   officialViewerCount?: number|null,
  *   viewerCountFromDom?: number|null,
  *   officialCommentCount?: number|null,
+ *   slotCommentCount?: number|null,
  *   streamAgeMin?: number|null,
  *   officialAdPoints?: number|null,
  *   officialAdPointsNdgr?: number|null,
@@ -133,7 +134,12 @@ export function buildOfficialNicoStatsStripDigest(snap) {
   };
 
   const viewers = chipNumber(pickViewerCountForOfficialStrip(snap));
-  const comments = chipNumber(snap?.officialCommentCount);
+  const pageComments = snap?.slotCommentCount;
+  const comments = chipNumber(
+    typeof snap?.officialCommentCount === 'number' && Number.isFinite(snap.officialCommentCount)
+      ? snap.officialCommentCount
+      : (typeof pageComments === 'number' && pageComments > 0 ? pageComments : null)
+  );
   const streamAge = chipStreamAge(snap?.streamAgeMin);
   const adPts = chipNumber(pickNum(snap?.officialAdPointsNdgr, snap?.officialAdPoints));
   const giftPts = chipNumber(pickNum(snap?.officialGiftPointsNdgr, snap?.officialGiftPoints));

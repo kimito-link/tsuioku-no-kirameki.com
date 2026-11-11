@@ -10,6 +10,8 @@ import '../lib/bootTimelineBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
+import { omittedOfficialStatKeys } from '../lib/serviceStatPolicy.js';
+import { applyUnpublishedStatChips, rememberServiceStatSnapshot, setNorthStarLaneHidden } from './popup/serviceStatLanes.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
 import {
   buildYukkuriImageDataUrlMap,
@@ -9508,6 +9510,7 @@ function paintOfficialNicoStatsStrip(snapshot) {
     applyChip(RATE_ID, RATE_PH);
     _officialCommentRate.reset();
     _officialCommentRateLid = '';
+    applyUnpublishedStatChips(snapshot);
     return;
   }
   const rateLid = String(snapshot.liveId || '').trim().toLowerCase();
@@ -9541,6 +9544,7 @@ function paintOfficialNicoStatsStrip(snapshot) {
   if (!digest) {
     for (const id of ids) applyChip(id, PH);
     applyChip(RATE_ID, RATE_PH);
+    applyUnpublishedStatChips(snapshot);
     return;
   }
   applyChip('officialStatNicoViewers', digest.viewers);
@@ -9561,6 +9565,7 @@ function paintOfficialNicoStatsStrip(snapshot) {
     ndgrValue: snapshot?.officialAdPointsNdgr
   });
   trackAdPointsForCelebration(adPtsNum);
+  applyUnpublishedStatChips(snapshot);
 }
 
 /**
@@ -9837,6 +9842,7 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
 
   // 来場・同接・記録者集計の表示は buildWatchMetaCardAudienceViewModel に集約（0.1.278+）。
   // 状態文言は watchMetaCardStateGate / popupWatchMetaConcurrentGate を VM 内で参照。
+  rememberServiceStatSnapshot(snapshot);
   const audienceVm = buildWatchMetaCardAudienceViewModel(
     /** @type {Record<string, unknown>} */ (snapshot),
     {
@@ -9856,6 +9862,8 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
   if (viewerDomEl) {
     viewerDomEl.textContent = audienceVm.visitor.text;
     viewerDomEl.classList.toggle('is-placeholder', audienceVm.visitor.isPlaceholder);
+    const visitorsCard = viewerDomEl.closest('.nl-live-stat-card');
+    if (visitorsCard instanceof HTMLElement) visitorsCard.hidden = audienceVm.visitor.hidden === true;
   }
   if (audienceVm.visitor.charReactionDelta != null && viewerDomEl) {
     const visitorsCard = viewerDomEl.closest('.nl-live-stat-card');
@@ -9949,10 +9957,12 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       recordsOfficialLine: String($('liveStatCommentsOfficial')?.textContent || ''),
       recordsBreakdownLine: String($('liveStatCommentsBreakdown')?.textContent || ''),
       recordsIngestLine: String($('liveStatCommentsIngest')?.textContent || ''),
+      omit: omittedOfficialStatKeys(snapshot),
       concurrent: {
         estText: String(audienceVm?.concurrent?.estText || ''),
         estIsPlaceholder: audienceVm?.concurrent?.estIsPlaceholder === true,
-        subText: String(audienceVm?.concurrent?.subText || '')
+        subText: String(audienceVm?.concurrent?.subText || ''),
+        label: String(audienceVm?.concurrent?.labelText || '')
       },
       visitor: {
         text: String(audienceVm?.visitor?.text || ''),
@@ -12365,23 +12375,6 @@ function decorateEventVotingSupporterAccountBadges(body, rows) {
         : 'color:#5b6470;background:#e7e9ec;');
     nameEl.appendChild(badge);
   }
-}
-
-/**
- * 北極星レーンの枠（`.nl-north-star-lane[data-lane=<laneId>]`）の表示/非表示を切替える。
- * 空データのイベント系レーンを丸ごと隠して縦スペースを食わせない用途。
- * `hidden` 属性は CSS `.nl-north-star-lane[hidden]{display:none!important}` で確実に
- * 効く（specificity 負け対策＝[[reference_north_star_lane_hidden_css_specificity]]）。
- * @param {string} laneId
- * @param {boolean} hidden
- */
-function setNorthStarLaneHidden(laneId, hidden) {
-  const lane = document.querySelector(
-    '.nl-north-star-lane[data-lane="' + String(laneId || '').replace(/"/g, '') + '"]'
-  );
-  if (!(lane instanceof HTMLElement)) return;
-  if (hidden) lane.setAttribute('hidden', '');
-  else lane.removeAttribute('hidden');
 }
 
 /**

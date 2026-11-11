@@ -19,6 +19,7 @@ import {
   abCounterValue,
   abChannelNameText,
   abChannelNameFromTitle,
+  abReadProgramDetailAudience,
 } from '../../src/lib/abema/abParse.js';
 import {
   AB_OPEN_COMMENT_KEY,
@@ -134,10 +135,23 @@ function domSlotViews() {
  */
 let lastDomViews = /** @type {number|null} */ (null);
 let lastDomComments = /** @type {number|null} */ (null);
+let lastDomViewText = '';
+
+/** 「詳細情報をみる」の上に出ている 👁 1.6万 / 💬 1,339。クラス名が無くても読む。 */
+function domDetailAudience() {
+  try {
+    return abReadProgramDetailAudience(document);
+  } catch {
+    return { views: /** @type {number|null} */ (null), comments: /** @type {number|null} */ (null), viewText: '' };
+  }
+}
+
 function noteDomCounts() {
   if (!pageLogin) return;
-  const v = domSlotViews();
-  const c = domSlotComments();
+  const detail = domDetailAudience();
+  const v = domSlotViews() ?? (detail.views != null && detail.views > 0 ? detail.views : null);
+  const rawComments = domSlotComments() ?? detail.comments;
+  const c = rawComments != null && rawComments > 0 ? rawComments : null;
   let changed = false;
   if (v != null && v !== lastDomViews) {
     changed = lastDomViews == null;
@@ -146,6 +160,10 @@ function noteDomCounts() {
   if (c != null && c !== lastDomComments) {
     changed = changed || lastDomComments == null;
     lastDomComments = c;
+  }
+  if (detail.viewText && detail.viewText !== lastDomViewText) {
+    changed = changed || !lastDomViewText;
+    lastDomViewText = detail.viewText;
   }
   // 初めて読めたときだけすぐ送る。あとは今までの間隔(sendMeta の呼び出し)で送る。
   if (changed && streamKey) sendMeta();
@@ -300,7 +318,8 @@ function sendMeta(forceClaim) {
   const views = domSlotViews() ?? lastDomViews ?? (Number(program.views) > 0 ? abPreferViewCount(program.views, null) : null);
   if (views != null && views > 0) payload.slotViewCount = views;
   const comments = domSlotComments() ?? lastDomComments ?? program.comments;
-  if (comments != null) payload.slotCommentCount = comments;
+  if (comments != null && comments > 0) payload.slotCommentCount = comments;
+  if (lastDomViewText) payload.slotViewText = lastDomViewText;
   if (program.concurrent != null && program.concurrent >= 0) payload.concurrentViewers = program.concurrent;
   if (program.startedAtMs) {
     payload.startedAt = program.startedAtMs;
@@ -537,6 +556,7 @@ function syncPage() {
   program = { title: '', startedAtMs: null, views: null, comments: null, concurrent: null, imageUrl: '', channelId: '' };
   lastDomViews = null;
   lastDomComments = null;
+  lastDomViewText = '';
   seen = new Set();
   pending = [];
   panel.reset();

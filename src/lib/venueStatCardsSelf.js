@@ -20,6 +20,7 @@
  */
 import { buildWatchMetaCardAudienceViewModel } from './buildWatchMetaCardAudienceViewModel.js';
 import { buildStatCardsMirrorSnapshot } from './statCardsMirror.js';
+import { omittedOfficialStatKeys } from './serviceStatPolicy.js';
 import { ageMsOf } from './timeAuthority.js';
 
 /** 自分で作り直す間隔[ms]。同接・経過は分単位でしか変わらないので 15秒で足りる。 */
@@ -62,9 +63,11 @@ export function buildStatCardsFromWatchSnapshot(source, opts = {}) {
       concurrent: {
         estText: vm.concurrent.estText,
         estIsPlaceholder: vm.concurrent.estIsPlaceholder,
-        subText: vm.concurrent.subText
+        subText: vm.concurrent.subText,
+        label: vm.concurrent.labelText || ''
       },
       visitor: { text: vm.visitor.text, isPlaceholder: vm.visitor.isPlaceholder },
+      omit: omittedOfficialStatKeys(snapshot),
       snapshotForOfficial: snapshot
     },
     { nowMs }

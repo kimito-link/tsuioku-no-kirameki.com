@@ -417,9 +417,13 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       ? Math.floor(sum.slotViewCount)
       : null,
     // ページに出ているコメント数（ABEMA の下のバー）。記録の件数ではない。
-    slotCommentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 && sum.slotCommentCount <= 50_000_000
+    slotCommentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount > 0 && sum.slotCommentCount <= 50_000_000
       ? Math.floor(sum.slotCommentCount)
       : null,
+    ...(typeof sum?.slotViewText === 'string' && sum.slotViewText.trim()
+      ? { slotViewText: sum.slotViewText.trim().slice(0, 16) }
+      : {}),
+    ...(plat?.metrics ? { serviceMetrics: plat.metrics } : {}),
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める

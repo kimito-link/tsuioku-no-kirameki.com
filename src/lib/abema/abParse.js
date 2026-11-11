@@ -420,6 +420,141 @@ export function abPreferViewCount(jsonCount, domCount) {
   return j;
 }
 
+/** 番組詳細の「詳細情報をみる」の直前にある、視聴数とコメント数の塊。クラス名が変わってもこの文言で探す。 */
+export const AB_DETAIL_ANCHOR_RE = /詳細情報をみる/;
+
+/**
+ * 番組詳細の短い文字を、視聴数かコメント数かに分ける。絵文字が付いていても読む。
+ * 目印の無い整数は、時刻や別の数と紛れるので使わない。
+ * @param {unknown} text
+ * @param {unknown} [label]
+ * @returns {{ kind: 'views' | 'comments', n: number, viewText: string } | null}
+ */
+export function abClassifyDetailPiece(text, label) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw || raw.length > 40 || /\d{1,2}:\d{2}/.test(raw)) return null;
+  const ctx = `${raw} ${String(label || '')}`;
+  const body = raw.replace(/^[^\d]+/u, '').trim();
+  const compact = abCompactCount(body) ?? abCompactCount(raw);
+  const eye = /👁|視聴/.test(ctx);
+  const bubble = /💬|💭|コメント|comment/i.test(ctx);
+  if (compact != null && compact > 0 && !bubble) {
+    const found = raw.match(/(\d+(?:\.\d+)?\s*[万億])/);
+    const viewText = found ? found[1].replace(/\s+/g, '') : '';
+    return { kind: 'views', n: compact, viewText };
+  }
+  if (bubble && compact == null) {
+    const n = abViewCounterText(body) ?? abViewCounterText(raw);
+    if (n != null && n > 0) return { kind: 'comments', n, viewText: '' };
+  }
+  if (eye && !bubble) {
+    const n = compact ?? abViewCounterText(body);
+    if (n != null && n > 0) {
+      const found = raw.match(/(\d+(?:\.\d+)?\s*[万億])/);
+      return { kind: 'views', n, viewText: found ? found[1].replace(/\s+/g, '') : '' };
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {ReadonlyArray<{ text?: string, label?: string }> | null | undefined} pieces
+ * @returns {{ views: number | null, comments: number | null, viewText: string }}
+ */
+export function abDetailAudienceFromPieces(pieces) {
+  let views = /** @type {number | null} */ (null);
+  let comments = /** @type {number | null} */ (null);
+  let viewText = '';
+  for (const p of Array.isArray(pieces) ? pieces : []) {
+    const hit = abClassifyDetailPiece(p?.text, p?.label);
+    if (!hit) continue;
+    if (hit.kind === 'views' && views == null) {
+      views = hit.n;
+      viewText = hit.viewText;
+    }
+    if (hit.kind === 'comments' && comments == null) comments = hit.n;
+  }
+  return { views, comments, viewText };
+}
+
+/**
+ * 画面の番組詳細から視聴数とコメント数を読む。
+ * 「詳細情報をみる」の直前の塊を優先し、古い `.com-tv-FeedProgramDetailViewCounter` も残す。
+ * おすすめ欄の別番組の「万」は、そのボタンより上の塊には入らない。
+ * @param {{ querySelector?: (s: string) => any, querySelectorAll?: (s: string) => Iterable<any> } | null | undefined} doc
+ * @returns {{ views: number | null, comments: number | null, viewText: string }}
+ */
+export function abReadProgramDetailAudience(doc) {
+  const empty = { views: /** @type {number | null} */ (null), comments: /** @type {number | null} */ (null), viewText: '' };
+  if (!doc || typeof doc.querySelectorAll !== 'function') return empty;
+  /** @type {{ text: string, label: string }[]} */
+  const pieces = [];
+  /** @param {any} el */
+  const take = (el) => {
+    if (!el || el.nodeType !== 1) return;
+    const text = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!text || text.length > 40) return;
+    if (el.children && el.children.length > 2) return;
+    const parent = el.parentElement || null;
+    const parentText = parent ? String(parent.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    const mixedParent = /👁|視聴/.test(parentText) && /💬|💭|コメント/.test(parentText);
+    let prevText = '';
+    const prevEl = el.previousElementSibling;
+    if (prevEl) prevText = String(prevEl.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    else if (el.previousSibling && el.previousSibling.nodeType === 3) {
+      prevText = String(el.previousSibling.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    }
+    const label = [
+      el.getAttribute?.('aria-label') || '',
+      el.getAttribute?.('title') || '',
+      String(el.className || '').slice(0, 120),
+      prevText,
+      mixedParent || parentText.length > 48 ? '' : parentText,
+      parent ? String(parent.className || '').slice(0, 120) : '',
+    ].join(' ');
+    pieces.push({ text, label });
+  };
+  /** @type {any | null} */
+  let box = null;
+  /** @type {any[]} */
+  let anchors = [];
+  try {
+    anchors = [...doc.querySelectorAll('button, a, [role="button"]')];
+  } catch {
+    anchors = [];
+  }
+  for (const el of anchors) {
+    const label = `${el.getAttribute?.('aria-label') || ''} ${el.textContent || ''}`;
+    if (!AB_DETAIL_ANCHOR_RE.test(label)) continue;
+    let parent = el.parentElement || null;
+    for (let i = 0; parent && i < 8; i += 1) {
+      const t = String(parent.textContent || '');
+      if (t.length > 2500) break;
+      const hasCounter = typeof parent.querySelector === 'function' && !!parent.querySelector('.com-tv-FeedProgramDetailViewCounter');
+      if (/[万億]/.test(t) || hasCounter) {
+        box = parent;
+        break;
+      }
+      parent = parent.parentElement || null;
+    }
+    if (box) break;
+  }
+  if (box && typeof box.querySelectorAll === 'function') {
+    try {
+      for (const el of box.querySelectorAll('span, div, p, dd, button, a, b, strong, em')) take(el);
+    } catch {
+      /* 詳細の形が違っても、下のカウンタに任せる */
+    }
+  }
+  try {
+    const counter = typeof doc.querySelector === 'function' ? doc.querySelector('.com-tv-FeedProgramDetailViewCounter') : null;
+    if (counter) pieces.push({ text: String(counter.textContent || '').replace(/\s+/g, ' ').trim(), label: '視聴数' });
+  } catch {
+    /* クラスが無くても、上の塊で足りる */
+  }
+  return pieces.length ? abDetailAudienceFromPieces(pieces) : empty;
+}
+
 /**
  * ページが受け取る視聴数。`stats.view` は番組の視聴数（3.7万の元）で、同時接続ではない。
  * `concurrentViewers` と `audienceCount` だけを同時接続にする。コメントの icon は見ない。

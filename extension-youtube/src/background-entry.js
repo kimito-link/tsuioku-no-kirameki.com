@@ -845,7 +845,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           concurrentViewers:
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
           slotViewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : undefined,
-          slotCommentCount: typeof payload.slotCommentCount === 'number' ? payload.slotCommentCount : undefined,
+          slotCommentCount: typeof payload.slotCommentCount === 'number' && payload.slotCommentCount > 0 ? payload.slotCommentCount : undefined,
+          slotViewText: typeof payload.slotViewText === 'string' ? payload.slotViewText : undefined,
           // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
           startedAt:
             typeof payload.startedAt === 'number' &&

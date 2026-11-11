@@ -341,7 +341,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 301</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -375,6 +375,7 @@
 - `src/extension/comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
 - `src/extension/comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
+- `src/extension/popup/serviceStatLanes.js` — いま描いている配信の公開数字。レーンを出すかはこの印だけを見る。
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -1133,7 +1134,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 336</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 337</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1398,6 +1399,7 @@
 - `src/lib/safeStorageLocal.js` — v0.1.1080: 拡張リロード後の古いタブ(stale content script / iframe)が
 - `src/lib/scoreAnnounce.js` — 配信採点「結果発表シーケンス」の純関数プランナー(council/broadcast-scoring-SYNTHESIS.md
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
+- `src/lib/serviceStatPolicy.js` — 配信サービスが公開している数字だけを出す。印が無い配信（ニコ生・YouTube）は今までどおり。
 - `src/lib/shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/shortLivedMemo.js` — 0.1.1961: 同じ問い合わせを短い間だけ使い回す(答えを待っている間の重複もまとめる)。
 - `src/lib/sidepanelCloakDuration.js` — 幕(cloak)が「いつ外れたか / まだ残っているか」を要約する純関数。
@@ -1478,7 +1480,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🏟 会場・席 (5版)
+### 🏟 会場・席 (6版)
+- `v0.1.2062` 2026-11-11 — 番組詳細の1.6万とコメント
 - `v0.1.2061` 2026-11-11 — ABEMAで会場が1回で開く
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
@@ -1489,15 +1492,15 @@
 - `v0.1.2045` 2026-11-11 — ABEMAのPICK UPを同じ大きさに
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
 
-### 🎁 ギフト (1版)
+### 🎁 ギフト (2版)
+- `v0.1.2062` 2026-11-11 — 番組詳細の1.6万とコメント
 - `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
 
-### 🔊 読み上げ (5版)
+### 🔊 読み上げ (4版)
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
-- `v0.1.2032` 2026-11-10 — ビルドの札を詳しい状況の先頭へ移した
 
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた

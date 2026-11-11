@@ -33,7 +33,7 @@ export const VENUE_STAT_STRIP_STALE_TITLE =
 
 /**
  * @typedef {'records'|'concurrent'|'visitor'|'viewers'|'comments'|'streamAge'|'adPts'|'giftPts'} VenueStatKey
- * @typedef {{ key: VenueStatKey, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu' }} VenueStatItem
+ * @typedef {{ key: VenueStatKey, label: string, text: string, unit: string, isPlaceholder: boolean, hidden?: boolean, face: ''|'link'|'konta'|'tanu' }} VenueStatItem
  * @typedef {{ source: 'mirror'|'self'|'fallback'|'none', stale: boolean, ageMs: number|null, items: VenueStatItem[] }} VenueStatStripModel
  */
 
@@ -125,17 +125,20 @@ export function buildVenueStatStripModel(snap, opts = {}) {
 
   const unitOf = (/** @type {{ text: string, isPlaceholder: boolean }} */ c, /** @type {string} */ u) => (c.isPlaceholder || c.text === PH ? '' : u);
   const concUnit = str(conc.subText).trim() || '人';
+  const omit = new Set(Array.isArray(s?.omit) ? s.omit.map((/** @type {unknown} */ k) => String(k || '')) : []);
+  const commentLabel = str(off?.commentsLabel).trim();
+  const concLabel = str(conc.label).trim();
 
   /** @type {VenueStatItem[]} */
   const items = [
     { key: 'records', label: '記録', ...records, unit: unitOf(records, '件'), face: 'link' },
-    { key: 'concurrent', label: '推定同時接続', ...concurrent, unit: unitOf(concurrent, concUnit), face: 'konta' },
-    { key: 'visitor', label: '来場者数', ...visitor, unit: unitOf(visitor, '人'), face: 'tanu' },
-    { key: 'viewers', label: '来場', ...viewers, unit: '', face: '' },
-    { key: 'comments', label: '本家コメ', ...comments, unit: '', face: '' },
+    { key: 'concurrent', label: concLabel || '推定同時接続', ...concurrent, unit: unitOf(concurrent, concUnit), face: 'konta', hidden: omit.has('concurrent') },
+    { key: 'visitor', label: '来場者数', ...visitor, unit: unitOf(visitor, '人'), face: 'tanu', hidden: omit.has('visitor') },
+    { key: 'viewers', label: '来場', ...viewers, unit: '', face: '', hidden: omit.has('viewers') },
+    { key: 'comments', label: commentLabel || '本家コメ', ...comments, unit: '', face: '', hidden: omit.has('comments') },
     { key: 'streamAge', label: '経過', ...streamAge, unit: '', face: '' },
-    { key: 'adPts', label: '広告pt', ...adPts, unit: '', face: '' },
-    { key: 'giftPts', label: 'ギフトpt', ...giftPts, unit: '', face: '' }
+    { key: 'adPts', label: '広告pt', ...adPts, unit: '', face: '', hidden: omit.has('adPts') },
+    { key: 'giftPts', label: 'ギフトpt', ...giftPts, unit: '', face: '', hidden: omit.has('giftPts') }
   ];
 
   /** @type {'mirror'|'self'|'fallback'|'none'} */
@@ -149,7 +152,7 @@ export function buildVenueStatStripModel(snap, opts = {}) {
  */
 export function venueStatStripSignature(model) {
   if (!model) return '';
-  return `${model.source}|${model.stale ? 1 : 0}|${model.items.map((i) => `${i.text}${i.unit}${i.isPlaceholder ? '~' : ''}`).join(',')}`;
+  return `${model.source}|${model.stale ? 1 : 0}|${model.items.map((i) => `${i.hidden ? 0 : 1}${i.label}:${i.text}${i.unit}${i.isPlaceholder ? '~' : ''}`).join(',')}`;
 }
 
 /**
@@ -169,7 +172,7 @@ export function createVenueStatStrip(doc, opts = {}) {
   el.dataset.source = 'none';
   el.dataset.stale = '0';
 
-  /** @type {Map<string, { cell: HTMLElement, val: HTMLElement, unit: HTMLElement }>} */
+  /** @type {Map<string, { cell: HTMLElement, val: HTMLElement, unit: HTMLElement, label: HTMLElement }>} */
   const cells = new Map();
   const initial = buildVenueStatStripModel(null, {});
   for (const it of initial.items) {
@@ -199,7 +202,7 @@ export function createVenueStatStrip(doc, opts = {}) {
     unit.className = 'nlsb-stat__unit';
     cell.append(label, val, unit);
     el.appendChild(cell);
-    cells.set(it.key, { cell, val, unit });
+    cells.set(it.key, { cell, val, unit, label });
   }
 
   let sig = '';
@@ -219,6 +222,8 @@ export function createVenueStatStrip(doc, opts = {}) {
       for (const it of model.items) {
         const c = cells.get(it.key);
         if (!c) continue;
+        c.cell.hidden = it.hidden === true;
+        if (c.label.textContent !== it.label) c.label.textContent = it.label;
         if (c.val.textContent !== it.text) c.val.textContent = it.text;
         c.val.classList.toggle('is-placeholder', it.isPlaceholder || it.text === PH);
         if (c.unit.textContent !== it.unit) c.unit.textContent = it.unit;
@@ -243,6 +248,7 @@ export const VENUE_STAT_STRIP_CSS = `
     color: #e8eef6;
   }
   .nlsb-stat-strip.is-stale .nlsb-stat:not(.nlsb-stat--records) { opacity: 0.55; }
+  .nlsb-stat[hidden] { display: none !important; }
   .nlsb-stat {
     display: inline-flex;
     align-items: baseline;

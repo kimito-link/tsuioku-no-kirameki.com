@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2032',
+    date: '2026-11-10',
+    summary: 'ビルドの札を詳しい状況の先頭へ移した',
+    items: Object.freeze([
+      '画面の上に出ていた「ビルド」の札を、「詳しい状況（開発・切り分け用）」を開いた中のいちばん上へ移しました。普段は閉じています。',
+      '札の中身（版とビルド時刻）の更新はそのままです。記録・送信・読み上げは変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2031',
     date: '2026-11-10',
     summary: 'ギフトランキング取得の説明文が読めるように',
