@@ -9540,6 +9540,18 @@ function paintOfficialNicoStatsStrip(snapshot) {
     applyChip(RATE_ID, RATE_PH);
     return;
   }
+  const foreignPlatform = String(snapshot?.platform || '').trim().toLowerCase();
+  const foreignStats = foreignPlatform && foreignPlatform !== 'niconico';
+  applyChip('officialStatNicoStreamAge', digest.streamAge);
+  if (foreignStats) {
+    // ニコ生の来場・本家コメ・広告pt・ギフトpt は、他のサービスの数字で埋めない。
+    applyChip('officialStatNicoViewers', PH);
+    applyChip('officialStatNicoComments', PH);
+    applyChip(RATE_ID, RATE_PH);
+    applyChip('officialStatNicoAdPts', PH);
+    applyChip('officialStatNicoGiftPts', PH);
+    return;
+  }
   applyChip('officialStatNicoViewers', digest.viewers);
   applyChip('officialStatNicoComments', digest.comments);
   // v0.1.1567: 本家コメの速さ「+66/分」。標本は【値が変わったときだけ】(同値の再描画では積まない)。出せない間は空。
@@ -9548,7 +9560,6 @@ function paintOfficialNicoStatsStrip(snapshot) {
   }
   const rateText = digest.comments.isPlaceholder ? '' : formatCommentRate(_officialCommentRate.ratePerMin(Date.now()));
   applyChip(RATE_ID, { text: rateText, isPlaceholder: rateText === '' });
-  applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
 

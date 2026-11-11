@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1237 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1159,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2440)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1491,7 +1491,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2140)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1518,13 +1518,17 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (10)
+    - 📁 **platform/** (14)
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `fetchTimeout.test.js`
       - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
       - `infoPollGate.test.js`
+      - `platformMetricChrome.js` — 横の欄の数字を、配信サービスに合わせて出し分ける。
+      - `platformMetricChrome.test.js`
+      - `platformMetrics.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `platformMetrics.test.js`
       - `streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
       - `streamEmotes.test.js`
       - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick)の違いを1か所にまとめた表(純関数)

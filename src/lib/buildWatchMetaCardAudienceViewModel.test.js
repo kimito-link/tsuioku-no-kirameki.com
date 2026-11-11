@@ -106,6 +106,40 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.subText).toContain('5分内 0人');
   });
 
+  it('公式の視聴者数しか出さないサービスでは、推定を出さず — にする', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: 723,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        streamAgeMin: 420,
+        officialViewersOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('—');
+    expect(vm.concurrent.estTitle).toBe('公式の視聴者数はまだ取れていません');
+    expect(vm.concurrent.subText).toBe('');
+    expect(vm.concurrent.numericEstimated).toBe(null);
+  });
+
+  it('公式の視聴者数があるときは、公式の視聴者数しか出さないサービスでもその数を出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 777,
+        officialStatsUpdatedAt: nowMs - 5_000,
+        officialViewersOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('777');
+    expect(vm.concurrent.subText).toBe('直接値');
+  });
+
   it('公式同接が新鮮なら直接値（~ なし）・sub は直接値', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {

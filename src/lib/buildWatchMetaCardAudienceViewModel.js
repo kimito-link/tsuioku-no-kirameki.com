@@ -232,7 +232,22 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
         resolved.method === 'fallback' &&
         resolved.estimated <= 0 &&
         resolved.base.method === 'none');
-    if (unresolvedFallback) {
+    // 公式の視聴者数しか出さないサービスでは、ニコ生の推定を公式の数として出さない。
+    if (snapshot.officialViewersOnly === true && !directLike) {
+      concurrent = {
+        phase: 'ready',
+        estText: '—',
+        estIsPlaceholder: true,
+        estTitle: '公式の視聴者数はまだ取れていません',
+        subText: '',
+        concurrentLoadingHidden: true,
+        concurrentReadyHidden: false,
+        ariaBusy: false,
+        numericEstimated: null,
+        charReactionDelta: null
+      };
+      nextConcurrentEstimated = prev.concurrentEstimated;
+    } else if (unresolvedFallback) {
       concurrent = {
         phase: 'loading',
         estText: '推定中',

@@ -23,6 +23,7 @@
  */
 
 import { ageMsOf } from './timeAuthority.js';
+import { venueItemsForPlatform } from './platform/platformMetrics.js';
 
 /** 鏡がこれより古ければ「パネルが閉じている」とみなす[ms](鏡は中身が同じでも15秒ごとに書き直される)。 */
 export const VENUE_STAT_STRIP_STALE_MS = 60_000;
@@ -67,7 +68,7 @@ function formatCount(n) {
  * 鏡(と記録件数の正本)から、帯に出す8つの数字を決める純関数。
  *
  * @param {any} snap KEY_STAT_CARDS_MIRROR の中身(StatCardsMirrorSnapshot)。null 可
- * @param {{ liveId?: string, nowMs?: number, recordedCount?: number|null, staleMs?: number, selfSnap?: any, mirrorLive?: boolean }} [opts]
+ * @param {{ liveId?: string, nowMs?: number, recordedCount?: number|null, staleMs?: number, selfSnap?: any, mirrorLive?: boolean, platform?: string }} [opts]
  *   recordedCount: panel_summary の recordedCount(selectDisplayRecordedCount 済み)。パネルが閉じていても動く記録件数
  *   selfSnap: 会場が自分で作った写し(同じ形)。鏡が無い/古く、これが同じ配信で新しいときだけ使う
  * @returns {VenueStatStripModel}
@@ -125,18 +126,32 @@ export function buildVenueStatStripModel(snap, opts = {}) {
 
   const unitOf = (/** @type {{ text: string, isPlaceholder: boolean }} */ c, /** @type {string} */ u) => (c.isPlaceholder || c.text === PH ? '' : u);
   const concUnit = str(conc.subText).trim() || '人';
+  const platformId = str((usable && s && s.platform) || opts.platform || '').trim().toLowerCase();
 
-  /** @type {VenueStatItem[]} */
-  const items = [
-    { key: 'records', label: '記録', ...records, unit: unitOf(records, '件'), face: 'link' },
-    { key: 'concurrent', label: '推定同時接続', ...concurrent, unit: unitOf(concurrent, concUnit), face: 'konta' },
-    { key: 'visitor', label: '来場者数', ...visitor, unit: unitOf(visitor, '人'), face: 'tanu' },
-    { key: 'viewers', label: '来場', ...viewers, unit: '', face: '' },
-    { key: 'comments', label: '本家コメ', ...comments, unit: '', face: '' },
-    { key: 'streamAge', label: '経過', ...streamAge, unit: '', face: '' },
-    { key: 'adPts', label: '広告pt', ...adPts, unit: '', face: '' },
-    { key: 'giftPts', label: 'ギフトpt', ...giftPts, unit: '', face: '' }
-  ];
+  /** @type {Array<VenueStatItem & { title?: string }>} */
+  let items;
+  const foreign = platformId && platformId !== 'niconico'
+    ? venueItemsForPlatform(platformId, {
+        records,
+        concurrent,
+        streamAge,
+        facts: usable && s ? s.platformFacts : null,
+      })
+    : null;
+  if (foreign) {
+    items = foreign;
+  } else {
+    items = [
+      { key: 'records', label: '記録', ...records, unit: unitOf(records, '件'), face: 'link' },
+      { key: 'concurrent', label: '推定同時接続', ...concurrent, unit: unitOf(concurrent, concUnit), face: 'konta' },
+      { key: 'visitor', label: '来場者数', ...visitor, unit: unitOf(visitor, '人'), face: 'tanu' },
+      { key: 'viewers', label: '来場', ...viewers, unit: '', face: '' },
+      { key: 'comments', label: '本家コメ', ...comments, unit: '', face: '' },
+      { key: 'streamAge', label: '経過', ...streamAge, unit: '', face: '' },
+      { key: 'adPts', label: '広告pt', ...adPts, unit: '', face: '' },
+      { key: 'giftPts', label: 'ギフトpt', ...giftPts, unit: '', face: '' }
+    ];
+  }
 
   /** @type {'mirror'|'self'|'fallback'|'none'} */
   const source = usable && !stale ? (useSelf ? 'self' : 'mirror') : fallbackRecords || usable ? 'fallback' : 'none';
@@ -149,7 +164,7 @@ export function buildVenueStatStripModel(snap, opts = {}) {
  */
 export function venueStatStripSignature(model) {
   if (!model) return '';
-  return `${model.source}|${model.stale ? 1 : 0}|${model.items.map((i) => `${i.text}${i.unit}${i.isPlaceholder ? '~' : ''}`).join(',')}`;
+  return `${model.source}|${model.stale ? 1 : 0}|${model.items.map((i) => `${i.key}:${i.label}:${i.text}${i.unit}${i.isPlaceholder ? '~' : ''}`).join(',')}`;
 }
 
 /**
@@ -169,38 +184,43 @@ export function createVenueStatStrip(doc, opts = {}) {
   el.dataset.source = 'none';
   el.dataset.stale = '0';
 
-  /** @type {Map<string, { cell: HTMLElement, val: HTMLElement, unit: HTMLElement }>} */
+  /** @type {Map<string, { cell: HTMLElement, val: HTMLElement, unit: HTMLElement, label: HTMLElement }>} */
   const cells = new Map();
-  const initial = buildVenueStatStripModel(null, {});
-  for (const it of initial.items) {
-    const cell = doc.createElement('span');
-    cell.className = `nlsb-stat nlsb-stat--${it.key}${it.face ? ' nlsb-stat--card' : ''}`;
-    cell.dataset.stat = it.key;
-    const src = it.face ? faces[it.face] : '';
-    if (src) {
-      const img = doc.createElement('img');
-      img.className = 'nlsb-stat__face';
-      img.alt = '';
-      img.decoding = 'async';
-      img.width = 18;
-      img.height = 18;
-      img.src = src;
-      // 画像が読めなくても数字は出す(顔だけ消す・AGENTS.md §3.6)。
-      img.addEventListener('error', () => { img.hidden = true; }, { once: true });
-      cell.appendChild(img);
+  /** @param {Array<{ key: string, label: string, face?: string, title?: string }>} list */
+  const mountCells = (list) => {
+    cells.clear();
+    el.replaceChildren();
+    for (const it of list) {
+      const cell = doc.createElement('span');
+      cell.className = `nlsb-stat nlsb-stat--${it.key}${it.face ? ' nlsb-stat--card' : ''}`;
+      cell.dataset.stat = it.key;
+      const src = it.face ? faces[it.face] : '';
+      if (src) {
+        const img = doc.createElement('img');
+        img.className = 'nlsb-stat__face';
+        img.alt = '';
+        img.decoding = 'async';
+        img.width = 18;
+        img.height = 18;
+        img.src = src;
+        // 画像が読めなくても数字は出す(顔だけ消す・AGENTS.md §3.6)。
+        img.addEventListener('error', () => { img.hidden = true; }, { once: true });
+        cell.appendChild(img);
+      }
+      const label = doc.createElement('span');
+      label.className = 'nlsb-stat__label';
+      label.textContent = it.label;
+      const val = doc.createElement('span');
+      val.className = 'nlsb-stat__val is-placeholder';
+      val.textContent = PH;
+      const unit = doc.createElement('span');
+      unit.className = 'nlsb-stat__unit';
+      cell.append(label, val, unit);
+      el.appendChild(cell);
+      cells.set(it.key, { cell, val, unit, label });
     }
-    const label = doc.createElement('span');
-    label.className = 'nlsb-stat__label';
-    label.textContent = it.label;
-    const val = doc.createElement('span');
-    val.className = 'nlsb-stat__val is-placeholder';
-    val.textContent = PH;
-    const unit = doc.createElement('span');
-    unit.className = 'nlsb-stat__unit';
-    cell.append(label, val, unit);
-    el.appendChild(cell);
-    cells.set(it.key, { cell, val, unit });
-  }
+  };
+  mountCells(buildVenueStatStripModel(null, { platform: opts.platform }).items);
 
   let sig = '';
   return {
@@ -216,12 +236,19 @@ export function createVenueStatStrip(doc, opts = {}) {
       el.classList.toggle('is-stale', model.stale);
       if (model.stale) el.title = VENUE_STAT_STRIP_STALE_TITLE;
       else el.removeAttribute('title');
+      const shape = model.items.map((i) => i.key).join(',');
+      const have = [...cells.keys()].join(',');
+      if (shape !== have) mountCells(model.items);
       for (const it of model.items) {
         const c = cells.get(it.key);
         if (!c) continue;
+        if (c.label.textContent !== it.label) c.label.textContent = it.label;
         if (c.val.textContent !== it.text) c.val.textContent = it.text;
         c.val.classList.toggle('is-placeholder', it.isPlaceholder || it.text === PH);
         if (c.unit.textContent !== it.unit) c.unit.textContent = it.unit;
+        const title = String(/** @type {{ title?: string }} */ (it).title || '');
+        if (title) c.cell.title = title;
+        else c.cell.removeAttribute('title');
       }
       return true;
     }
