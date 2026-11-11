@@ -86,6 +86,7 @@ export function normalizeSongSetlist(raw) {
     if (songs.length >= SONG_MAX) break;
   }
   const ids = new Set(songs.map((s) => s.id));
+  /** @type {string[]} */
   const order = [];
   for (const id of Array.isArray(/** @type {any} */ (src).order) ? /** @type {any} */ (src).order : []) {
     const key = String(id || '').trim();
@@ -109,6 +110,7 @@ export function normalizeSongSetlist(raw) {
       status
     });
   }
+  /** @type {string[]} */
   const seenKeys = [];
   for (const key of Array.isArray(/** @type {any} */ (src).seenKeys) ? /** @type {any} */ (src).seenKeys : []) {
     const k = String(key || '').trim().slice(0, 120);
