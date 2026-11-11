@@ -23,6 +23,8 @@ import {
   isAbBroadcastJsonUrl,
   abPayloadNotices,
   abAudienceFromPayload,
+  abOnAirSlotStats,
+  abViewCounterText,
   abCompactCount,
   abViewsFromSnippets,
   abPreferViewCount,
@@ -193,6 +195,27 @@ describe('ABEMA のコメント JSON', () => {
     expect(abPreferViewCount(37821, 37000)).toBe(37821);
     expect(abPreferViewCount(500, 37000)).toBe(37000);
     expect(isAbBroadcastJsonUrl('https://api.p-c3-e.abema-tv.com/v1/broadcast/slots/abc/stats')).toBe(true);
+    expect(abViewCounterText('48,027')).toBe(48027);
+    expect(abViewCounterText('4.8万')).toBe(48000);
+    expect(abViewCounterText('コメント 865')).toBe(null);
+  });
+  it('番組表では放送中の枠の視聴数を使い、次の枠の空の stats は使わない', () => {
+    const now = Date.now();
+    const start = Math.floor(now / 1000) - 120;
+    const end = Math.floor(now / 1000) + 3600;
+    const raw = {
+      slots: [
+        { id: 'next', channelId: 'shogi', startAt: end, endAt: end + 3600, stats: {} },
+        { id: 'now', channelId: 'shogi', startAt: start, endAt: end, stats: { view: 48027, comment: 4920 } },
+        { id: 'other', channelId: 'drama-2', startAt: start, endAt: end, stats: { view: 695, comment: 2 } },
+      ],
+    };
+    const rows = abOnAirSlotStats(raw, now);
+    expect(rows.find((r) => r.channelId === 'shogi')?.views).toBe(48027);
+    expect(rows.find((r) => r.channelId === 'drama-2')?.views).toBe(695);
+    const notice = abPayloadNotices(raw);
+    expect(notice?.meta?.views).toBe(null);
+    expect(notice?.meta?.slotRows?.find((r) => r.channelId === 'shogi')?.views).toBe(48027);
   });
   it('hello までの控えは、番組情報で最初のコメント一覧を押し出さない', () => {
     let q = [];

@@ -17,6 +17,7 @@ import {
   abUrlsFromSrcset,
   abViewsFromSnippets,
   abPreferViewCount,
+  abViewCounterText,
 } from '../../src/lib/abema/abParse.js';
 import {
   AB_OPEN_COMMENT_KEY,
@@ -98,6 +99,15 @@ let program = { title: '', startedAtMs: null, views: null, concurrent: null, ima
 
 /** 番組詳細に出ている「3.7万」だけを拾う。コメント件数の 3,662 は万が付かないので入れない。 */
 function domSlotViews() {
+  try {
+    const counter = document.querySelector('.com-tv-FeedProgramDetailViewCounter');
+    if (counter instanceof HTMLElement) {
+      const n = abViewCounterText(counter.textContent);
+      if (n != null) return n;
+    }
+  } catch {
+    /* ページの形が違っても記録は続ける */
+  }
   /** @type {{ text: string, label: string }[]} */
   const snippets = [];
   try {
@@ -432,8 +442,11 @@ window.addEventListener('message', (ev) => {
   if (data.t === 'batch') onBatch(data.body, data.sinceMs, data.untilMs);
   else if (data.t === 'meta' && data.meta) {
     const expectId = abLinearChannelId(pageLogin);
+    const rows = Array.isArray(data.meta.slotRows) ? data.meta.slotRows : [];
+    const mine = rows.find((r) => expectId && String(r?.channelId || '').toLowerCase() === expectId);
+    if (mine && Number(mine.views) > 0) program.views = Math.floor(Number(mine.views));
     const incomingId = String(data.meta.channelId || '').toLowerCase();
-    if (expectId && incomingId && incomingId !== expectId) return;
+    if (!rows.length && expectId && incomingId && incomingId !== expectId) return;
     const title = String(data.meta.title || '').slice(0, 200);
     if (title) program.title = title;
     if (Number(data.meta.startedAtMs) > 0) program.startedAtMs = Number(data.meta.startedAtMs);

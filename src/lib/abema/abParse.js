@@ -361,6 +361,23 @@ export function abCompactCount(text) {
 }
 
 /**
+ * 番組詳細の視聴数カウンタ（.com-tv-FeedProgramDetailViewCounter）の文字。
+ * 「4.8万」も「48,027」も数にする。単位の無い整数は、このカウンタ以外では使わない。
+ * @param {unknown} text
+ * @returns {number|null}
+ */
+export function abViewCounterText(text) {
+  const raw = String(text || '').replace(/\s+/g, '');
+  const compact = abCompactCount(raw);
+  if (compact != null) return compact;
+  const s = raw.replace(/視聴|再生|回/g, '').replace(/,/g, '');
+  if (!/^\d{1,8}$/.test(s)) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n <= 0 || n > 50_000_000) return null;
+  return n;
+}
+
+/**
  * 画面の短い文字から視聴数を1つ。近くに「視聴」とあればそれを、無ければ「万」「億」が1つだけのとき。
  * @param {ReadonlyArray<{ text?: string, label?: string }>} snippets
  * @returns {number|null}
@@ -441,10 +458,42 @@ export function abAudienceFromPayload(raw) {
 }
 
 /**
+ * 番組表 `{ slots: [...] }` のうち、いま放送中の枠の視聴数。
+ * 一覧には次の枠（stats が空）と、いまの枠（stats.view）が同居する。
+ * チャンネルごとに、放送中で視聴数がある枠を1つ返す。
+ * @param {unknown} raw
+ * @param {number} [nowMs]
+ * @returns {Array<{ channelId: string, views: number|null, comments: number|null }>}
+ */
+export function abOnAirSlotStats(raw, nowMs = Date.now()) {
+  const root = unwrap(raw);
+  const slots = root && Array.isArray(root.slots) ? root.slots : [];
+  const nowSec = Number(nowMs) / 1000;
+  /** @type {Map<string, { channelId: string, views: number|null, comments: number|null }>} */
+  const byChannel = new Map();
+  for (const slot of slots) {
+    const o = obj(slot);
+    if (!o) continue;
+    const channelId = abLinearChannelId(o.channelId);
+    if (!channelId) continue;
+    const start = Number(o.startAt);
+    const end = Number(o.endAt);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > nowSec || nowSec >= end) continue;
+    const stats = obj(o.stats) || {};
+    const views = pickCount(stats, ['view', 'views', 'viewCount']);
+    const comments = pickCount(stats, ['comment', 'comments', 'commentCount']);
+    const prev = byChannel.get(channelId);
+    if (prev && prev.views != null && views == null) continue;
+    byChannel.set(channelId, { channelId, views, comments });
+  }
+  return [...byChannel.values()];
+}
+
+/**
  * ページの応答を、コメントの束と番組情報に分ける。
  * コメントの束にチャンネルロゴが同居していても、ロゴは meta に残す（コメントの icon には入れない）。
  * @param {unknown} raw
- * @returns {{ batch: { chatId: string, isPolling: boolean | null, pollingIntervalSec: number | null, messages: any[] } | null, meta: { title: string, startedAtMs: number | null, viewers: number | null, views: number | null, concurrent: number | null, comments: number | null, imageUrl: string, channelId: string } | null } | null}
+ * @returns {{ batch: { chatId: string, isPolling: boolean | null, pollingIntervalSec: number | null, messages: any[] } | null, meta: { title: string, startedAtMs: number | null, viewers: number | null, views: number | null, concurrent: number | null, comments: number | null, imageUrl: string, channelId: string, slotRows?: Array<{ channelId: string, views: number|null, comments: number|null }> } | null } | null}
  */
 export function abPayloadNotices(raw) {
   const shrunk = shrinkAbPayload(raw);
@@ -461,8 +510,9 @@ export function abPayloadNotices(raw) {
         messages: shrunk.messages,
       }
     : null;
+  const slotRows = abOnAirSlotStats(raw);
   const hasAudience = audience.views != null || audience.concurrent != null || audience.comments != null;
-  const meta = metaBase || imageUrl || channelId || hasAudience
+  const meta = metaBase || imageUrl || channelId || hasAudience || slotRows.length
     ? {
         title: metaBase ? metaBase.title : '',
         startedAtMs: metaBase ? metaBase.startedAtMs : null,
@@ -472,6 +522,7 @@ export function abPayloadNotices(raw) {
         comments: audience.comments,
         imageUrl,
         channelId,
+        ...(slotRows.length ? { slotRows } : {}),
       }
     : null;
   if (!batch && !meta) return null;

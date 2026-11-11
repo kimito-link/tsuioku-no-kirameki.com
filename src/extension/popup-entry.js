@@ -10095,7 +10095,7 @@ function topSupportRankStripCasterTileHtml() {
       : `配信者 ${nameWithLv}（クリックでユーザーページ）`;
   const face = anonymousIdenticonDataUrl(target.name || '配信', 64);
   const iconHtml =
-    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl || face)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(target.name || '配信')}"${/abema\.tv/i.test(target.pageUrl) ? ' data-reject-blank="1"' : ''} />`;
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl || face)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(target.name || '配信')}"${/abema\.tv/i.test(target.pageUrl) ? ' data-reject-blank="1"' : ''}${/\/channels\/[^/?#]+\/logo/i.test(String(target.iconUrl || '')) ? ' data-fit="contain"' : ''} />`;
   return (
     `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
     `<span class="nl-top-support-rank__caster-label">配信者</span>` +

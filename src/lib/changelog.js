@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2051',
+    date: '2026-11-11',
+    summary: 'ABEMAのロゴ全体と視聴数',
+    items: Object.freeze([
+      'チャンネルロゴは横長です。円で中央だけ切ると白い文字が円いっぱいになり、空の白い丸に見えていました。ロゴ全体が円の中に入るようにしました。',
+      '番組表の応答にある、いま放送中の枠の視聴数を「視聴数」として出します。次の枠の空の数では置き換えません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2046',
     date: '2026-11-11',
     summary: 'ABEMAの配信者ロゴをサイドパネルへ',
@@ -203,14 +212,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'YouTube の「ギフト」(ジュエルのスタンプ)やメンバーシップギフトは金額が出ないため、ギフト履歴で「0pt」と出ていました。何を送ったか(例「ハイ」)を出し、ホバーで中身が分かるようにしました。',
       '同じ人がりんく段とギフト列の両方に居るとき、ギフト列のアイコンにホバー・クリックしても何も出なかったのを直しました。',
       '日本語の @ハンドルの人もクリックで YouTube のチャンネルを開けるようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1918',
-    date: '2026-11-07',
-    summary: 'Twitch の未ログインの見分けを直す',
-    items: Object.freeze([
-      'Twitch にログインしていないのにコメントを打ってしまうことがあったのを直しました(ログインしていなくてもあるメニューのボタンを、ログインの印と見ていました)。'
     ])
   })
 ]);

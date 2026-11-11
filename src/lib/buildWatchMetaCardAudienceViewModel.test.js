@@ -121,7 +121,7 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.estText).toBe('37,000');
     expect(vm.concurrent.estText).not.toBe('推定中');
     expect(vm.concurrent.subText).not.toBe('材料待ち');
-    expect(vm.concurrent.labelText).toBe('公式の視聴数');
+    expect(vm.concurrent.labelText).toBe('視聴数');
     expect(vm.concurrent.estTitle).toContain('同時に見ている人数ではありません');
   });
 
@@ -157,7 +157,7 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     );
     expect(vm.concurrent.cardHidden).toBeUndefined();
     expect(vm.concurrent.estText).toBe('37,000');
-    expect(vm.concurrent.labelText).toBe('公式の視聴数');
+    expect(vm.concurrent.labelText).toBe('視聴数');
   });
 
   it('公式の同時接続があるときは視聴数で置き換えない', () => {

@@ -566,7 +566,7 @@ TikTok の配信のページ(/@<名前>/live)で、ページ自身の世界の�
 - [`council/tiktok-support-PLAN.md`](../council/tiktok-support-PLAN.md)
 
 ### ABEMA の配信を記録(本体に同梱)  〔ABEMA / 記録 / 他プラットフォーム〕
-ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が画面に出ている分を全部 YouTube 版と同じ記録へ渡す。読み上げは新しい端の約20秒だけ。番組詳細が開いていてもコメントのタブや吹き出しを、コメントが届くまで押す。チャンネルを切り替えたらやり直す。PICK UP はニコ生・YouTube と同じ幅（320〜860）で、ABEMA の欄やページの CSS では縮めない。画面上の最新コメントは欄の幅。サイドパネルの配信者カードは、保存欄が空でも公開のチャンネルロゴ（image.p-c2-x.abema-tv.com の logo.png）を出す。読めなければ代わりの顔。白い丸にはしない。番組詳細の視聴数は「公式の視聴数」。公式の数が無いときは推定同時接続のカードを隠す。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
+ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が画面に出ている分を全部 YouTube 版と同じ記録へ渡す。読み上げは新しい端の約20秒だけ。番組詳細が開いていてもコメントのタブや吹き出しを、コメントが届くまで押す。チャンネルを切り替えたらやり直す。PICK UP はニコ生・YouTube と同じ幅（320〜860）で、ABEMA の欄やページの CSS では縮めない。画面上の最新コメントは欄の幅。サイドパネルの配信者カードは、保存欄が空でも公開のチャンネルロゴ（image.p-c2-x.abema-tv.com の logo.png）を出す。横長ロゴは円の中央で切らず、全体を収める。読めなければ代わりの顔。番組表の放送中の枠の視聴数は「視聴数」。数が無いときは推定同時接続のカードを隠す。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
 
 - [`extension-youtube/src/ab-main-entry.js`](../extension-youtube/src/ab-main-entry.js)
 - [`extension-youtube/src/ab-content-entry.js`](../extension-youtube/src/ab-content-entry.js)

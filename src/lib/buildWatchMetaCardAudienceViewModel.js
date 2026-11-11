@@ -174,7 +174,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       estIsPlaceholder: false,
       estTitle: '番組詳細に出ている視聴数です。同時に見ている人数ではありません。',
       subText: '',
-      labelText: '公式の視聴数',
+      labelText: '視聴数',
       concurrentLoadingHidden: true,
       concurrentReadyHidden: false,
       ariaBusy: false,
