@@ -106,6 +106,7 @@ import {
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
+import { startComeviewMerge } from './comeviewMergeHost.js';
 import { publishVoiceNowPlaying } from './venuePickupVoice.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
@@ -211,6 +212,11 @@ const VOICE_ASSIGNMENTS_KEY = KEY_VOICE_ASSIGNMENTS;
 const VOICE_READ_NAME_KEY = KEY_VOICE_READ_NAME_ENABLED;
 
 let _liveId = '';
+/** 開いている配信を1つのコメビュへまとめているあいだ。0〜1件の選択では null 相当で今までどおり。 */
+let _comeviewMerge = null;
+function mergeViewActive() {
+  return _comeviewMerge?.isActive() === true;
+}
 /** v0.1.1861: 配信者(混雑時でも読む)。content が書く nls_live_broadcaster_ctx_v1 の写し。 */
 let _broadcasterCtx = normalizeBroadcasterCtx(null);
 /** v0.1.1861: 「その配信で初めてのコメント」を覚える(会場 VoicePlayer と同じ部品)。 */
@@ -472,6 +478,8 @@ async function switchToLiveId(nextLiveId) {
   const lv = String(nextLiveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lv) || lv === _liveId) return;
   _liveId = lv;
+  // まとめて表示中は、前面の1配信へ描き戻さない。やめたときにその lv を出す。
+  if (mergeViewActive()) return;
   const meta = document.getElementById('cvLiveMeta');
   if (meta) meta.textContent = _liveId;
   // 前配信の表示・既読・読み上げキューをリセットして新配信を一から読む。
@@ -1254,6 +1262,10 @@ const _livePush = createComeviewLivePushClient({
   isActive: () => _voiceReadingEnabled && !isObsMode(),
   getLiveId: () => _liveId,
   onRows: (_lv, rows) => {
+    if (mergeViewActive()) {
+      _comeviewMerge.ingestNico(_lv, rows);
+      return;
+    }
     if (_paused || !rows.length) return;
     const profiled = Object.keys(_profileCache).length ? applyUserCommentProfileMapToEntries(rows, _profileCache).next : rows;
     const items = buildAllComeviewTimeline(profiled, []).filter((it) => it.kind === 'comment');
@@ -1263,6 +1275,7 @@ const _livePush = createComeviewLivePushClient({
 
 /** 本物のコメントを読む列へ(もう片方のページが同じ配信を読んでいれば読まない)。 */
 function enqueueLiveVoiceItems(items) {
+  if (mergeViewActive()) return;
   if (!_voiceReadingEnabled || !Array.isArray(items) || !items.length) return;
   items = takeUnreadVoiceItems(items, _voiceReadNos, commentNoOfComeviewRow); // P5b: 近道で読んだ分を storage 経由で二度読まない
   if (!items.length) return;
@@ -1316,7 +1329,7 @@ function enqueueVoiceTimelineItems(items) {
       userId: item.userId,
       isModerator: item.isModerator,
       broadcasterUid: broadcasterUidForVoice(),
-      firstInLive: noteVoiceSpeakerInLive(_voiceFirstSpeakerState, _liveId, userKey)
+      firstInLive: noteVoiceSpeakerInLive(_voiceFirstSpeakerState, item.voiceLiveId || _liveId, userKey)
     });
     if (shouldSkipVoiceWhenBusy({ queueLength: _voiceQueue.length, importance })) {
       _voiceDiag.busySkipTotal = (Number(_voiceDiag.busySkipTotal) || 0) + 1;
@@ -1342,7 +1355,7 @@ function enqueueVoiceTimelineItems(items) {
         name: String(item.nickname || ''),
         userId: String(item.userId || ''),
         key: String(item.key || item.commentNo || '')
-      }, _liveId)
+      }, item.voiceLiveId || _liveId)
     };
     _voiceDiag.voiceEnqueuedTotal = (Number(_voiceDiag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
@@ -2100,6 +2113,7 @@ function savePin(row) {
 }
 
 async function performFullRefresh(forceBottom) {
+  if (mergeViewActive()) return;
   if (!_liveId) return;
   const lv = _liveId;
   const tKey = tailStorageKey(lv);
@@ -2217,6 +2231,7 @@ function requestFullRefresh(forceBottom = false) {
 }
 
 function processHotSnapshots(nextTail, nextGifts) {
+  if (mergeViewActive()) return;
   const tail = Array.isArray(nextTail) ? nextTail : [];
   const gifts = Array.isArray(nextGifts) ? nextGifts : [];
   if (_paused || document.hidden || _fullRefreshRunning) {
@@ -2269,6 +2284,7 @@ async function flushDeferredHotSnapshots() {
 }
 
 async function pollHotSnapshots() {
+  if (mergeViewActive()) return;
   if (_paused || document.hidden || !_liveId || _fullRefreshRunning) return;
   const tKey = tailStorageKey(_liveId);
   const giftKey = `nls_gift_events_${_liveId}`;
@@ -2284,6 +2300,7 @@ async function pollHotSnapshots() {
 }
 
 async function timerTick() {
+  if (mergeViewActive()) return;
   if (_paused || document.hidden) return;
   if (Date.now() - _lastReconcileAt >= RECONCILE_INTERVAL_MS) {
     await requestFullRefresh();
@@ -2312,9 +2329,14 @@ function hideHoverBar() {
 }
 
 function actionDataForTimelineRow(element, item) {
-  const name =
-    element.querySelector('.nl-tl-row__name, .nl-tl-gift__name')?.textContent?.trim() ||
-    String(item?.nickname || '').trim();
+  const nameEl = element.querySelector('.nl-tl-row__name, .nl-tl-gift__name');
+  let name = '';
+  if (nameEl) {
+    const clone = nameEl.cloneNode(true);
+    clone.querySelectorAll('.nl-tl-src').forEach((node) => node.remove());
+    name = clone.textContent?.trim() || '';
+  }
+  name = name || String(item?.nickname || '').trim();
   const userId =
     element.getAttribute('data-nl-uid') || String(item?.userId || '').trim();
   let text = '';
@@ -2610,6 +2632,10 @@ function wireButtons() {
       _paused = !_paused;
       btnPause.textContent = _paused ? '再開' : '一時停止';
       if (!_paused) {
+        if (mergeViewActive()) {
+          _comeviewMerge.nudge();
+          return;
+        }
         if (Date.now() - _lastReconcileAt >= RECONCILE_INTERVAL_MS) {
           void requestFullRefresh();
         } else {
@@ -2743,6 +2769,28 @@ async function main() {
   void loadBroadcasterCtxForVoice();
   void loadNgList();
   await requestFullRefresh(true);
+  _comeviewMerge = startComeviewMerge({
+    render: (timeline) => renderFullTimeline(timeline, false),
+    enqueueVoice: (items) => enqueueVoiceTimelineItems(items),
+    setMeta: (text) => {
+      const el = document.getElementById('cvLiveMeta');
+      if (el) el.textContent = text;
+    },
+    setCount: (n) => {
+      _commentCount = n;
+      updateCommentCount();
+    },
+    isPaused: () => _paused || document.hidden,
+    voiceOn: () => _voiceReadingEnabled && !isObsMode(),
+    primaryLiveId: () => _liveId,
+    onActiveChange: (active) => {
+      if (active) return;
+      const el = document.getElementById('cvLiveMeta');
+      if (el) el.textContent = _liveId || '配信を探しています…';
+      void requestFullRefresh(true);
+    },
+    lease: _voiceReaderLease
+  });
   // パネルのタイムライン行クリックから ?user= 付きで開かれたら、詳細を自動で開く。
   const detailReq = resolveDetailRequestFromUrl();
   if (detailReq) {
@@ -2762,6 +2810,7 @@ async function main() {
     if (document.hidden) stopTimer();
     else {
       startTimer();
+      if (mergeViewActive()) return;
       if (Date.now() - _lastReconcileAt >= RECONCILE_INTERVAL_MS) {
         void requestFullRefresh();
       } else {

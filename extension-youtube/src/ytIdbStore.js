@@ -272,6 +272,48 @@ export async function countYtStreamComments(videoId) {
 }
 
 /**
+ * その配信の新しい方から最大 limit 件だけ取る(まとめてコメビュ用)。
+ *   全件 getAll はしない。複合索引を新しい順に limit 歩だけ進める。
+ * @param {string} videoId
+ * @param {number} [limit]
+ * @returns {Promise<any[]>} 古い→新しい
+ */
+export async function getYtStreamCommentsTail(videoId, limit = 40) {
+  const vid = String(videoId || '').trim();
+  const n = Math.max(1, Math.min(80, Math.floor(Number(limit) || 40)));
+  if (!vid) return [];
+  const db = await openYtCommentsDb();
+  return new Promise((resolve, reject) => {
+    let store;
+    try {
+      store = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS);
+    } catch (err) {
+      reject(err);
+      return;
+    }
+    if (!store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT)) {
+      resolve([]);
+      return;
+    }
+    const index = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
+    const range = IDBKeyRange.bound([vid, 0], [vid, Number.MAX_SAFE_INTEGER]);
+    const req = index.openCursor(range, 'prev');
+    /** @type {any[]} */
+    const out = [];
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur || out.length >= n) {
+        resolve(out.reverse());
+        return;
+      }
+      out.push(cur.value);
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error || new Error('idb_tail_failed'));
+  });
+}
+
+/**
  * 指定された配信（`videoId`）について、`afterRecordedAt` 以降に記録された新着コメントだけを
  * 複合インデックス `by_videoId_recordedAt` で差分取得する（storage 変化のたびに全件 getAll しない）。
  *

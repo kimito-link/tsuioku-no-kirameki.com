@@ -125,11 +125,10 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 74</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 73</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
-- `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
@@ -656,13 +655,12 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
 - `extension-youtube/background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
 - `extension-youtube/offscreen.js` — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル
-- `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 - `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
@@ -727,7 +725,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 53</summary>
 
 - `api/billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
@@ -777,7 +775,6 @@
 - `src/lib/reportThumbedUsersSectionHtml.js` — HTML レポートの「サムネ付きユーザー一覧」セクションを純粋に組み立てる。
 - `src/lib/reportUserRoomTableHtml.js` — v0.1.636: HTML レポートの「ユーザー別集計テーブル」行ビルダ（純ロジック）。
 - `src/lib/roomCardInnerHtml.js` — 応援ルームカード（renderUserRooms の各 <li class="room-card">）の inner HTML を組む純関数。
-- `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
 - `src/lib/viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
 - `src/lib/youtube/ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
@@ -968,6 +965,13 @@
   - `src/lib/youtube/ytPanelStreamDiag.js`
   - `tests/e2e/sidepanel-stream-follow.spec.js`
   - `council/panel-stream-selection-SPEC.md`
+- **コメビュの複数配信まとめ** — 今開いている配信タブを選ぶと、ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok のコメントを1つのコメビュへ時刻順で出す。各コメントにどの配信かの小さな札が付く。開いていない配信は読まない。読み上げは選んだ配信の読み手を引き取って1回だけ読む
+  - `src/lib/mergedComeview.js`
+  - `src/extension/comeviewMergeHost.js`
+  - `src/extension/comeview-entry.js`
+  - `extension-youtube/src/ytIdbStore.js`
+  - `extension-youtube/src/background-entry.js`
+  - `src/lib/supportTimelineHtml.js`
 - **応援レーンタイル→発言一覧(comeview 詳細)** — popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)
   - `src/lib/comeviewUserDetailLink.js`
   - `src/extension/popup/wireLaneUserDetailOpen.js`
@@ -1474,14 +1478,14 @@
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 
-### 📥 コメント取得 (5版)
+### 📥 コメント取得 (4版)
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 - `v0.1.1915` 2026-11-07 — YouTube の過去ログ取り込みでも混ざりを直す
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### 🏟 会場・席 (10版)
+- `v0.1.2039` 2026-11-11 — 開いている配信を1つのコメビュへ
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
@@ -1491,11 +1495,9 @@
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🎈 吹き出し (2版)
+### 🎈 吹き出し (1版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### 🎁 ギフト (6版)
 - `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
@@ -1505,7 +1507,8 @@
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🔊 読み上げ (7版)
+### 🔊 読み上げ (8版)
+- `v0.1.2039` 2026-11-11 — 開いている配信を1つのコメビュへ
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
@@ -1517,9 +1520,8 @@
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🩺 診断・状態速報 (2版)
+### 🩺 診断・状態速報 (1版)
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### その他 (3版)
 - `v0.1.2033` 2026-11-10 — パネル位置の文字は食い違うときだけ

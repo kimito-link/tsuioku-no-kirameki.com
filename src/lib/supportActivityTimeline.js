@@ -28,7 +28,9 @@
  *   text: string,
  *   commentNo: string,
  *   avatarUrl: string,
- *   selfPosted: boolean
+ *   selfPosted: boolean,
+ *   sourceBadge?: string,
+ *   sourceTitle?: string
  * }} TimelineCommentItem
  *
  * @typedef {{
@@ -40,7 +42,9 @@
  *   itemName: string,
  *   point: number,
  *   message: string,
- *   avatarUrl: string
+ *   avatarUrl: string,
+ *   sourceBadge?: string,
+ *   sourceTitle?: string
  * }} TimelineGiftItem
  *
  * @typedef {TimelineCommentItem | TimelineGiftItem} TimelineItem

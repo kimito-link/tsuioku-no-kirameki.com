@@ -16,8 +16,8 @@ function setup() {
   const table = createVoiceReaderLeaseTable();
   /** @param {any} msg */
   const send = (msg) => {
-    if (msg.type === VOICE_READER_CLAIM) return Promise.resolve(table.claim(msg.liveId, msg.holder, t));
-    if (msg.type === VOICE_READER_RELEASE) { table.release(msg.holder); return Promise.resolve({ ok: true }); }
+    if (msg.type === VOICE_READER_CLAIM) return Promise.resolve(table.claim(msg.liveId, msg.holder, t, msg.force === true));
+    if (msg.type === VOICE_READER_RELEASE) { table.release(msg.holder, msg.liveIds); return Promise.resolve({ ok: true }); }
     return Promise.resolve(null);
   };
   const venue = createVoiceReaderLeaseLink(send, { now, holder: 'venue' });
@@ -104,5 +104,17 @@ describe('voiceReaderLease (v0.1.1794)', () => {
     await venue.whenMine('lv1', () => log.push('v3'));
     expect(log.filter((x) => x.startsWith('v'))).toEqual(['v1', 'v2', 'v3']);
     expect(log.filter((x) => x.startsWith('c'))).toEqual(['c1-yield', 'c2-yield']);
+  });
+  it('まとめて読みは選んだ配信の読み手を引き取り、やめた配信だけを返す', async () => {
+    const { venue, comeview } = setup();
+    await venue.beat('lv1');
+    await venue.beat('lv2');
+    await comeview.hold(['lv1', 'LV2', 'lv1']);
+    expect(await venue.check('lv1')).toBe(false);
+    expect(await venue.check('lv2')).toBe(false);
+    comeview.releaseLives(['lv2']);
+    await venue.beat('lv2');
+    expect(await venue.check('lv2')).toBe(true);
+    expect(await venue.check('lv1')).toBe(false);
   });
 });

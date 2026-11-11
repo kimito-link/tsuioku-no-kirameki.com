@@ -122,6 +122,44 @@
         border-color: var(--cv-accent);
       }
       .cv-toolbar .cv-spacer { flex: 1 1 auto; }
+      .cv-merge {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--cv-border);
+        background: var(--cv-row);
+        font-size: 12.5px;
+      }
+      .cv-merge-note {
+        flex: 1 1 100%;
+        margin: 0;
+        color: var(--cv-sub);
+        line-height: 1.4;
+      }
+      .cv-merge label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        max-width: 100%;
+        padding: 4px 8px;
+        border: 1px solid var(--cv-border);
+        border-radius: 999px;
+        background: var(--cv-bg, transparent);
+      }
+      .cv-merge-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      body.is-obs .cv-merge { display: none; }
+      @media (max-width: 480px) {
+        .nl-tl-src { max-width: 6.5em; }
+        .cv-merge label { flex: 1 1 100%; }
+      }
       .cv-count { font-variant-numeric: tabular-nums; }
       .cv-voice-controls {
         display: inline-flex;
@@ -466,6 +504,21 @@
         background: #fff;
         border: 1px solid color-mix(in srgb, var(--nl-border) 60%, transparent);
       }
+      .nl-tl-src {
+        display: inline-block;
+        max-width: 9em;
+        margin-right: 6px;
+        padding: 0 6px;
+        border-radius: 999px;
+        font-size: 11px;
+        line-height: 1.45;
+        vertical-align: 1px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--cv-accent);
+        background: color-mix(in srgb, var(--cv-accent) 16%, transparent);
+      }
       .nl-tl-row__name {
         grid-area: name;
         min-width: 0;
@@ -706,8 +759,10 @@
       <button id="cvBtnNg" type="button" title="非表示にした人を管理" style="display: none;">NG 0</button>
       <button id="cvBtnWindow" type="button" title="別ウィンドウで開く">⧉ 別窓</button>
       <button id="cvBtnObs" type="button" title="OBS用の透過表示に切替">OBS透過</button>
+      <button id="cvBtnMerge" type="button" aria-expanded="false" aria-controls="cvMerge" title="今開いている配信タブを選んで、このコメビュ1つに時刻順でまとめます">まとめる</button>
       <button id="cvBtnPause" type="button">一時停止</button>
     </div>
+    <div class="cv-merge" id="cvMerge" hidden></div>
     <div class="cv-pinbar" id="cvPinBar" style="display: none;"></div>
     <div class="cv-list" id="cvList">
       <div class="cv-empty" id="cvEmpty">コメントを待っています…</div>

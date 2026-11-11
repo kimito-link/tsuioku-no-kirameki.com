@@ -36,6 +36,7 @@ test.describe('panel vanish debounce', () => {
     await enableInlinePanelAutoshow(context);
 
     const page = await context.newPage();
+    await page.bringToFront();
     await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
     // パネルが出るまで待つ
     await expect
@@ -59,6 +60,8 @@ test.describe('panel vanish debounce', () => {
     expect(await hostDisplay(page)).toBe('block');
 
     // --- 持続離脱: 非 watch に >20s 滞在 → デバウンス閾値を超えて hide ---
+    // 背面だと 4秒点検が3回に1回しか走らず、30秒では5回に届かない。
+    await page.bringToFront();
     await page.evaluate(() => {
       globalThis.history.pushState({}, '', '/leave-watch-for-good');
       globalThis.dispatchEvent(new Event('popstate'));

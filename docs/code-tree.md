@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1237 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1159,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2440)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1196,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (113)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1232,6 +1232,7 @@
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
     - `comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
     - `comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
+    - `comeviewMergeHost.js` — コメビュで、開いている配信タブを選んで1本の時系列にする。
     - `commentTickerStarvation.wiring.test.js`
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
@@ -1491,7 +1492,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2139)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1891,6 +1892,7 @@
     - `comeviewInstantRender.test.js`
     - `comeviewLivePush.js` — コメビュ(別窓)の読み上げへ、届いたコメントを storage を待たずに渡す(P5b・2026-10-29)。
     - `comeviewLivePush.test.js`
+    - `comeviewMergeWire.wiring.test.js`
     - `comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
     - `comeviewRows.test.js`
     - `comeviewTimelineDiff.js` — コメビュの「整合(reconcile)」を差分で描くための純関数。
@@ -2616,6 +2618,8 @@
     - `mergeProgramStatsWatchIntoWatchMetaSnapshot.test.js`
     - `mergeTailRowsIntoDisplay.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `mergeTailRowsIntoDisplay.test.js`
+    - `mergedComeview.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `mergedComeview.test.js`
     - `metricConfidence.js` — 診断の各数値に「どういう意味か・どれだけ信頼できるか」の短い注釈を付ける純関数(v0.1.861)。
     - `metricConfidence.test.js`
     - `migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
