@@ -111,13 +111,29 @@ describe('applyPlatformMetricChrome', () => {
     const root = mount();
     const stop = watchPlatformMetricChrome(root, () => ({ platform: 'twitch', facts: { support: null } }));
     await new Promise((r) => requestAnimationFrame(() => r()));
-    expect(root.querySelector('[data-lane="adRanking"]').hidden).toBe(true);
+    // Twitch は広告ランキングの欄に公式のギフトサブ順位を出す=隠さない(中身が無ければニコ生版の部品が隠す)
+    expect(root.querySelector('[data-lane="adRanking"]').dataset.nlPlatformHide).toBeUndefined();
     root.querySelector('#giftRankingFetchPrompt').hidden = false;
     await new Promise((r) => requestAnimationFrame(() => r()));
     await new Promise((r) => requestAnimationFrame(() => r()));
     expect(root.querySelector('#giftRankingFetchPrompt').hidden).toBe(true);
     expect(root.querySelector('[data-nl-metric="superchat"]')).toBeNull();
     stop();
+  });
+
+  it('2つめの公式ランキングがあるサービスだけ広告ランキングの欄を使い、前の配信で隠した印を外す', () => {
+    const root = mount();
+    applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
+    expect(root.querySelector('[data-lane="adRanking"]').hidden).toBe(true);
+    expect(document.documentElement.classList.contains('nl-cap-subboard')).toBe(false);
+    applyPlatformMetricChrome(root, { platform: 'kick', facts: {} });
+    expect(root.querySelector('[data-lane="adRanking"]').hidden).toBe(false);
+    expect(document.documentElement.classList.contains('nl-cap-subboard')).toBe(true);
+    const css = document.getElementById('nl-platform-capability-style')?.textContent || '';
+    expect(css).toContain('html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"]');
+    expect(css).toContain('[data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}');
+    applyPlatformMetricChrome(root, { platform: 'abema', facts: {} });
+    expect(document.documentElement.classList.contains('nl-cap-subboard')).toBe(false);
   });
 
   it('ニコ生の状態では何も隠さない', () => {

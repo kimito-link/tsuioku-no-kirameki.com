@@ -249,6 +249,14 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   await routeRealtimeApi(context, 'centrifugo', asked);
   await context.route('https://kick.com/**', async (route) => {
     const url = new URL(route.request().url());
+    // 公式のギフトサブの順位(チャット欄の順位表の「サブ」・gifts=通算/gifts_week/gifts_month)
+    if (url.pathname === `/api/v2/channels/${SLUG}/leaderboards`) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ gifts: [{ user_id: 1001, username: 'SubKing', quantity: 40 }, { user_id: 9, username: '', quantity: 1 }], gifts_week: [{ user_id: 2, username: 'WeekOnly', quantity: 3 }], gifts_month: [] }),
+      });
+    }
     const m = url.pathname.match(/^\/api\/v2\/channels\/([^/]+)$/);
     if (!m) return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: PAGE_HTML });
     const slug = m[1];
@@ -349,6 +357,19 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   expect(all).not.toContain('このPCの記録から数えます');
   expect(all).toContain('Kick 公式の Kicks ランキング');
   expect(all).toContain('「歴代トップKICKユーザー」と同じ値です');
+  // 2つめの公式ランキング(ギフトサブ・通算)は「広告ランキング」の欄に Kick の言葉で出る(platformSubBoard.js)
+  const adLane = () =>
+    ext.evaluate(() => {
+      const lane = /** @type {HTMLElement | null} */ (document.querySelector('[data-lane="adRanking"]'));
+      return lane && !lane.hidden ? String(lane.innerText || '').replace(/\s+/g, ' ') : '';
+    });
+  await expect.poll(adLane, { timeout: 30_000 }).toContain('SubKing');
+  const lane = await adLane();
+  expect(lane).toContain('Kick 公式のギフトサブ ランキング（累計）');
+  expect(lane).toContain('40 サブ');
+  expect(lane).not.toContain('WeekOnly');
+  expect(lane).not.toMatch(/広告|ニコニ|貢/);
+  expect((await sw.evaluate(async () => chrome.storage.local.get('yt_diag_kk_chat'))).yt_diag_kk_chat).toMatchObject({ subBoardRows: 1, subBoardFrom: 'api' });
   // ニコ生だけの部品(なふだ)は見せない・ランキング欄の補足(title・aria-label)にも「ニコ生」「放送者」を残さない
   const left = await ext.evaluate(() => {
     const vis = document.body.innerText.split('\n').filter((l) => /ニコ生|放送者/.test(l));

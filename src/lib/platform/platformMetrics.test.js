@@ -63,12 +63,26 @@ describe('platformSectionPlan', () => {
     for (const id of ['youtube', 'twitch', 'kick', 'showroom']) {
       const p = platformSectionPlan(id);
       expect(p.visitorCard).toBe(false);
-      expect(p.hide).toEqual(expect.arrayContaining(['adRanking', 'programPoints', 'eventRank', 'giftRankingFetch']));
+      expect(p.hide).toEqual(expect.arrayContaining(['programPoints', 'eventRank', 'giftRankingFetch']));
+    }
+    // 広告ランキングの欄は、2つめの公式ランキング(ギフトサブの順位)があるサービスだけ使う(platformSubBoard.js)
+    for (const id of ['youtube', 'abema', 'mixch', 'whowatch']) {
+      expect(platformSectionPlan(id).hide).toContain('adRanking');
+      expect(platformSectionPlan(id).subBoard).toBe(false);
+    }
+    for (const id of ['twitch', 'kick', 'showroom']) {
+      expect(platformSectionPlan(id).hide).not.toContain('adRanking');
+      expect(platformSectionPlan(id).subBoard).toBe(true);
+      expect(platformSectionPlan(id).sections.adRanking).toEqual({ show: true });
     }
     expect(platformSectionPlan('youtube').concurrentLabel).toBe('同時視聴者数');
     expect(platformSectionPlan('youtube').sections.contributionRanking.label).toBe('スパチャの合計順');
     expect(platformSectionPlan('youtube').sections.giftHistory.label).toBe('スーパーチャット・ギフト');
     expect(platformSectionPlan('twitch').sections.contributionRanking.label).toBe('Bits・ギフトサブの合計順');
+    // 公式の順位表を入れているときは見出しも公式の名前(中身と見出しを食い違わせない)
+    expect(platformSectionPlan('twitch', { officialBoard: true }).sections.contributionRanking.label).toBe('Twitch 公式の Bits ランキング');
+    expect(platformSectionPlan('kick', { officialBoard: true }).sections.contributionRanking.label).toBe('Kick 公式の Kicks ランキング');
+    expect(platformSectionPlan('youtube', { officialBoard: true }).sections.contributionRanking.label).toBe('トップファン');
     expect(platformSectionPlan('kick').sections.giftHistory.label).toBe('ギフトサブ');
     expect(platformSectionPlan('kick').sections.contributionRanking.sub).toBeUndefined();
   });
@@ -156,8 +170,45 @@ describe('venueItemsForPlatform', () => {
     expect(panelExtraChips('abema', { commentCount: null }).find((c) => c.key === 'comments').text).toBe('読み込み中');
   });
 
-  it('SHOWROOM などは視聴者数と経過だけ(ニコ生の広告は出さない)', () => {
+  it('SHOWROOM などは公式の特有の数が来るまで視聴者数と経過だけ(ニコ生の広告は出さない)', () => {
     const labels = venueItemsForPlatform('showroom', bag({ viewers: 4 })).map((i) => i.label);
     expect(labels).toEqual(['記録', '視聴者数', '経過']);
+  });
+
+  it('SHOWROOM はイベント順位・イベントpt・目標Lv をページの値のまま出す', () => {
+    const official = { eventName: '春のイベント', eventRank: 3, eventPoint: 123456, eventGap: 5000, questLevel: 4, questPoint: 900, questGoal: 1500 };
+    const items = venueItemsForPlatform('showroom', bag({ viewers: 4, official }));
+    expect(items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過', 'イベント順位', 'イベントpt', '目標']);
+    const rank = items.find((i) => i.key === 'eventRank');
+    expect(rank.text).toBe('3位');
+    expect(rank.title).toContain('春のイベント');
+    expect(rank.title).toContain('5,000');
+    expect(items.find((i) => i.key === 'eventPoint').text).toBe('123,456pt');
+    expect(items.find((i) => i.key === 'quest').text).toBe('Lv4');
+    expect(items.find((i) => i.key === 'quest').title).toContain('900 / 1,500');
+    expect(items.some((i) => /推定/.test(`${i.label}${i.title}`))).toBe(false);
+  });
+
+  it('ミクチャはレベル・ファン・スーパーファン・ライバーランク。来ていない数は枠ごと出さない', () => {
+    const chips = panelExtraChips('mixch', { official: { eventRank: 3, level: 12, fans: 34567, superfans: 210, liverRankScore: 45678, superfanBonus: 15 } });
+    expect(chips.map((c) => c.label)).toEqual(['レベル', 'ファン', 'スーパーファン', 'ライバーランク', 'イベント順位']);
+    expect(chips[0].text).toBe('Lv12');
+    expect(chips.find((c) => c.key === 'liverRank').title).toContain('15%');
+    expect(panelExtraChips('mixch', { official: { fans: 5 } }).map((c) => c.key)).toEqual(['fans']);
+    expect(panelExtraChips('mixch', {})).toEqual([]);
+  });
+
+  it('ふわっちはイベント順位(複数は title に並べる)と累計視聴', () => {
+    const chips = panelExtraChips('whowatch', {
+      official: { eventRank: 2, eventName: 'A', events: [{ name: 'A', group: '新人', rank: 2 }, { name: 'B', group: '', rank: 9 }], totalViews: 1200 },
+    });
+    expect(chips.map((c) => c.label)).toEqual(['イベント順位', '累計視聴']);
+    expect(chips[0].title).toContain('A(新人) 2位');
+    expect(chips[0].title).toContain('B 9位');
+  });
+
+  it('ほかのサービスの欄の数は、能力表に無いサービスには出さない', () => {
+    expect(panelExtraChips('youtube', { official: { eventRank: 1, level: 3 } })).toEqual([]);
+    expect(panelExtraChips('niconico', { official: { eventRank: 1 } })).toEqual([]);
   });
 });

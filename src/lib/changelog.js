@@ -18,6 +18,26 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2081',
+    date: '2026-11-11',
+    summary: 'SHOWROOM等のイベント順位を出す',
+    items: Object.freeze([
+      'SHOWROOM の配信では、部屋の画面と同じイベント順位・イベントpt・目標レベルを数字の欄に出し、イベントの「貢献ユーザー」の順位を横の欄に出します。',
+      'ミクチャの配信では、名前の下に出ているレベル・ファン・スーパーファン・ライバーランク(イベントに出ているときはイベント順位とpt)を出します。',
+      'ふわっちの配信では、イベント順位(いくつかのイベントに出ているときは一番良い順位。ほかはカーソルを当てると出ます)と累計視聴を出します。',
+      'どの数もそのサービスのページが出している値そのままです。イベントに出ていない配信では、その欄は出しません。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.2080',
+    date: '2026-11-11',
+    summary: 'Twitch・Kick のギフトサブ順位も出す',
+    items: Object.freeze([
+      'Twitch と Kick の配信では、横の欄にそのサービス公式の「ギフトサブ ランキング」を出します。Bits・Kicks の順位とは別の欄で、Twitch はチャット欄の順位表と同じ期間、Kick は通算です。',
+      '順位と数は Twitch・Kick が出している値そのままです。ギフトサブの順位が空の配信では欄を出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2070',
     date: '2026-11-11',
     summary: 'ABEMAの会場の数字がすぐ新しくなる',

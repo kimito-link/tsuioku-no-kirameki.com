@@ -75,13 +75,42 @@ export function parseKickKicksLeaderboard(json) {
   const o = obj(json);
   const d = obj(o?.data) || o;
   const list = d?.gifts_lifetime ?? d?.kicks_gifts_lifetime ?? obj(d?.leaderboard)?.gifts_lifetime;
+  return kickBoardRows(list);
+}
+
+/**
+ * Kick 公式のギフトサブの順位(kick.com のチャット欄の順位表の「サブ」・通算)→ 順位表の行。
+ *   API(kick.com/api/v2/channels/<slug>/leaderboards)は gifts(通算)/gifts_week/gifts_month(2026-11-09 PC 実測)、
+ *   ソケットの GiftsLeaderboardUpdated は Kicks と同じく gifts_lifetime の形と見て両方読む。形が違えば []。
+ * @param {unknown} json
+ * @returns {Array<{ rank: number, name: string, xp: number, iconUrl: string }>}
+ */
+export function parseKickSubsLeaderboard(json) {
+  const o = obj(json);
+  const d = obj(o?.data) || o;
+  const list = d?.gifts_lifetime ?? d?.gifts ?? obj(d?.leaderboard)?.gifts_lifetime ?? obj(d?.leaderboard)?.gifts;
+  return kickBoardRows(list);
+}
+
+/** @param {string} slug */
+export function kickSubsLeaderboardUrl(slug) {
+  const s = String(slug ?? '').trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{1,24}$/.test(s) ? `https://kick.com/api/v2/channels/${s}/leaderboards` : '';
+}
+
+/**
+ * 順位表の一覧 → 行(壊れた1行だけ捨てる)
+ * @param {unknown} list
+ * @returns {Array<{ rank: number, name: string, xp: number, iconUrl: string }>}
+ */
+function kickBoardRows(list) {
   if (!Array.isArray(list)) return [];
   /** @type {Array<{ rank: number, name: string, xp: number, iconUrl: string }>} */
   const out = [];
   for (const r0 of list.slice(0, 50)) {
     const r = obj(r0);
-    const name = String(r?.username || '').trim().slice(0, 60);
-    const xp = Math.floor(Number(r?.quantity) || 0);
+    const name = String(r?.username || obj(r?.user)?.username || '').trim().slice(0, 60);
+    const xp = Math.floor(Number(r?.quantity ?? r?.count) || 0);
     if (!name || xp <= 0) continue; // 壊れた1行だけ捨てる
     out.push({ rank: out.length + 1, name, xp, iconUrl: '' });
   }

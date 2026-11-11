@@ -3,6 +3,7 @@
 
 import { assignYtCommentLane } from './ytLaneAssign.js';
 import { ytHandleLivePath } from './ytPageMeta.js';
+import { normalizePlatformStats } from '../platform/platformStats.js';
 import {
   createYtSupportRankingAccumulator,
   applyYtSupportRankingDelta,
@@ -45,7 +46,8 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   itemCount?: number,
  *   startedAt?: number | null,
  *   startedAtApprox?: boolean,
- *   endedAt?: number | null
+ *   endedAt?: number | null,
+ *   platformStats?: Record<string, any> | null
  * }} patch
  * @param {number} [nowMs]
  * @returns {{
@@ -60,6 +62,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   chatFilterLabel: string,
  *   itemCount: number,
  *   startedAt: number | null,
+ *   platformStats?: Record<string, any>,
  *   createdAt: number,
  *   updatedAt: number
  * }}
@@ -155,6 +158,11 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
       ? Math.floor(prev.endedAt)
       : null;
 
+  // そのサービス特有の公式の数字(SHOWROOM のイベント順位など・src/lib/platform/platformStats.js)。
+  //   入口が platformStats を付けて来たらそれに置き換える(null = イベントが終わった等で、もう無い)。付けて来なければ前のまま。
+  const hasStatsPatch = !!patch && Object.prototype.hasOwnProperty.call(patch, 'platformStats') && patch.platformStats !== undefined;
+  const platformStats = hasStatsPatch ? normalizePlatformStats(patch.platformStats) : normalizePlatformStats(prev.platformStats);
+
   const createdAt =
     typeof prev.createdAt === 'number' && Number.isFinite(prev.createdAt) && prev.createdAt > 0
       ? prev.createdAt
@@ -174,6 +182,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     peakConcurrentViewers,
     ...(slotViewCount != null ? { slotViewCount } : {}),
     ...(slotCommentCount != null ? { slotCommentCount } : {}),
+    ...(platformStats ? { platformStats } : {}),
     chatFilterLabel,
     itemCount,
     startedAt,

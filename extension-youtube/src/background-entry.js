@@ -41,10 +41,13 @@ import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
+import { normalizeSubBoardPayload, subBoardSig, SUB_BOARD_KEY_PREFIX } from '../../src/lib/platform/platformSubBoard.js';
 import { ytVoiceAssignPersistDecision, YT_VOICE_ASSIGN_PERSIST_MS } from '../../src/lib/youtube/ytVoiceAssignPersist.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
+/** @type {Map<string, string>} 配信キー → 前に置いた2つめの順位表の印 */
+const lastSubBoardSig = new Map();
 
 const mxGiftImages = createMxGiftImageResolver({
   fetchJson: async (url) => {
@@ -846,6 +849,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
           slotViewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : undefined,
           slotCommentCount: typeof payload.slotCommentCount === 'number' ? payload.slotCommentCount : undefined,
+          // そのサービス特有の公式の数字(イベント順位など)。付いていないときは前のまま(src/lib/platform/platformStats.js)
+          ...(Object.prototype.hasOwnProperty.call(payload, 'platformStats') ? { platformStats: payload.platformStats ?? null } : {}),
           viewersRead: payload.viewersRead === false ? false : undefined,
           sourceUrl: payload.sourceUrl ? String(payload.sourceUrl) : undefined,
           // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
@@ -885,6 +890,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // YouTube の「トップファン」の順位。配信ごとに最新の1つだけ置く(ニコ生版の「ギフト貢献度」の欄に出す)
     const payload = message.payload || {};
     const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || '').trim();
+    // そのサービスの2つめの公式ランキング(Twitch・Kick のギフトサブの順位など)は別のキーへ(src/lib/platform/platformSubBoard.js)
+    if (payload.slot === 'sub') {
+      const b = normalizeSubBoardPayload(payload);
+      if (!videoId || !b) return false;
+      const subSig = subBoardSig(b);
+      if (lastSubBoardSig.get(videoId) === subSig) return false;
+      lastSubBoardSig.set(videoId, subSig);
+      if (lastSubBoardSig.size > 200) lastSubBoardSig.delete(lastSubBoardSig.keys().next().value);
+      void chrome.storage.local
+        .set({ [`${SUB_BOARD_KEY_PREFIX}${videoId}`]: { videoId, capturedAt: Date.now(), ...b } })
+        .catch(() => lastSubBoardSig.delete(videoId));
+      return false;
+    }
     const rows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
     if (!videoId || !rows.length) return false;
     // Twitch の公式ランキングは期間がチャンネルごとに違う(累計・今月・今週・今日)。見出しに出すので一緒に置く

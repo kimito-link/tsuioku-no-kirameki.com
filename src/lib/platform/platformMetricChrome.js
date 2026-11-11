@@ -68,7 +68,9 @@ const FOREIGN_STYLE = [
   'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),',
   'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),',
   'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}',
-  'html.nl-cap-foreign [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],',
+  // 「広告ランキング」の欄は、2つめの公式ランキングがあるサービス(nl-cap-subboard)では使う。ニコ生だけの「watch の広告pt」の行は出さない
+  'html.nl-cap-foreign [data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}',
+  'html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],',
   'html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],',
   'html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,',
   'html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,',
@@ -83,12 +85,13 @@ const FOREIGN_STYLE = [
   'html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label::after{content:"視聴数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
 ].join('');
 
-/** @param {ParentNode} root @param {string} platformId */
-function markCapability(root, platformId) {
+/** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス */
+function markCapability(root, platformId, subBoard) {
   const doc = root.ownerDocument || (root.nodeType === 9 ? /** @type {Document} */ (root) : null);
   const html = doc && doc.documentElement;
   if (!html || !html.classList) return;
   html.classList.add('nl-cap-foreign');
+  html.classList.toggle('nl-cap-subboard', subBoard === true);
   const id = String(platformId || '');
   if (id) html.classList.add(`nl-cap-${id}`);
   if (doc.getElementById(FOREIGN_STYLE_ID)) return;
@@ -100,13 +103,13 @@ function markCapability(root, platformId) {
 
 /**
  * @param {ParentNode} root
- * @param {{ platform?: string, facts?: any }} state
+ * @param {{ platform?: string, facts?: any, officialBoard?: boolean }} state
  */
 export function applyPlatformMetricChrome(root, state) {
   if (!root || typeof root.querySelector !== 'function') return;
-  const plan = platformSectionPlan(String(state?.platform || ''));
+  const plan = platformSectionPlan(String(state?.platform || ''), { officialBoard: state?.officialBoard === true });
   if (plan.native) return;
-  markCapability(root, plan.id);
+  markCapability(root, plan.id, plan.subBoard === true);
   const facts = state?.facts && typeof state.facts === 'object' ? state.facts : {};
 
   const vis = root.querySelector('.nl-live-stat-card--visitors');
