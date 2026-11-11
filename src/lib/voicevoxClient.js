@@ -68,13 +68,6 @@ function isExtensionPage() {
   }
 }
 
-/**
- * Background から届いた {text, status} を Response にする(v0.1.1778)。
- *   204 などの「中身なし」の状態で本文つき Response を作ると例外になり、約束が決着せず打ち切りまで待っていた
- *   (/initialize_speaker は 204 を返す=会場の裏読み込みが毎回15秒止まっていた・PC 実測)。
- * @param {{ text?: unknown, status?: unknown }} res
- * @returns {Response}
- */
 /** content script から合成を止めるときの裏方への合図(background.js と同じ文字列)。 */
 export const VOICEVOX_PROXY_ABORT_TYPE = 'NLS_FETCH_PROXY_ABORT';
 
@@ -84,7 +77,7 @@ let _proxySeq = 0;
  * sendMessage は AbortSignal を運べない。合図が来たら裏方の fetch を止める id を付ける。
  * @param {RequestInit|undefined} init
  * @param {(err: Error) => void} reject
- * @returns {{ safeInit: RequestInit, id: string }}
+ * @returns {{ safeInit: RequestInit, id: string, skip: boolean }}
  */
 function proxyInitAndAbort(init, reject) {
   const safeInit = { ...(init || {}) };
@@ -123,6 +116,13 @@ function linkExternalAbort(controller, external) {
   return () => { try { external.removeEventListener('abort', onAbort); } catch { /* no-op */ } };
 }
 
+/**
+ * Background から届いた {text, status} を Response にする(v0.1.1778)。
+ *   204 などの「中身なし」の状態で本文つき Response を作ると例外になり、約束が決着せず打ち切りまで待っていた
+ *   (/initialize_speaker は 204 を返す=会場の裏読み込みが毎回15秒止まっていた・PC 実測)。
+ * @param {{ text?: unknown, status?: unknown }} res
+ * @returns {Response}
+ */
 export function proxyTextResponse(res) {
   const raw = Number(res && res.status);
   const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
@@ -584,7 +584,7 @@ const STREAM_FALLBACK = Symbol('stream_fallback');
  * @param {string} url
  * @param {object} audioQuery
  * @param {number} styleId
- * @param {{ streamFetchFn?: Function, synthesisTimeoutMs?: number }} opts
+ * @param {{ streamFetchFn?: Function, synthesisTimeoutMs?: number, signal?: AbortSignal }} opts
  * @param {(info: any) => void} notifyFailure
  * @returns {Promise<StreamedVoice|null|typeof STREAM_FALLBACK>}
  */
@@ -702,7 +702,7 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
  * @param {string} url
  * @param {object} audioQuery
  * @param {number} styleId
- * @param {{ streamFetchFn?: Function, synthesisTimeoutMs?: number }} opts
+ * @param {{ streamFetchFn?: Function, synthesisTimeoutMs?: number, signal?: AbortSignal }} opts
  * @param {(info: any) => void} notifyFailure
  * @returns {Promise<ArrayBuffer|null|typeof STREAM_FALLBACK>}
  */
@@ -785,7 +785,8 @@ async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailur
  *   onTiming?: (t: { queryMs: number, synthMs: number, streamed?: boolean }) => void,
  *   stream?: boolean,
  *   wholeViaStream?: boolean,
- *   streamFetchFn?: Function
+ *   streamFetchFn?: Function,
+ *   signal?: AbortSignal
  * }} [opts]
  *   v0.1.1796: stream が無くてもエンジンが少しずつ受け取りに対応していれば、それで最後まで受け取って丸ごと返す
  *   (wholeViaStream: false で今までどおり /synthesis)。

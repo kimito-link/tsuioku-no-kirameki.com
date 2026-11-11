@@ -8,6 +8,7 @@ import { KEY_VOICE_READING_ENABLED } from '../../lib/voiceKeys.js';
  * @param {(id: string) => HTMLElement|null} $
  */
 export function wirePanelVoiceReadingButton($) {
+  /** @param {boolean} on */
   const paint = (on) => {
     const btn = $('openComeviewVoiceBtn');
     if (!btn) return;
@@ -19,6 +20,7 @@ export function wirePanelVoiceReadingButton($) {
     btn.title = label;
     btn.setAttribute('aria-label', label);
   };
+  /** @param {(on: boolean) => void} cb */
   const read = (cb) => {
     try {
       chrome.storage.local.get(KEY_VOICE_READING_ENABLED, (bag) => {
@@ -28,7 +30,7 @@ export function wirePanelVoiceReadingButton($) {
     } catch { /* 拡張の外では何もしない */ }
   };
   $('openComeviewVoiceBtn')?.addEventListener('click', () => {
-    read((on) => {
+    read((/** @type {boolean} */ on) => {
       const next = !on;
       try {
         chrome.storage.local.set({ [KEY_VOICE_READING_ENABLED]: next }, () => {
