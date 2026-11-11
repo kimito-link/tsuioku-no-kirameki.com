@@ -9,7 +9,7 @@ import {
   safeKickRealtimeUrl,
 } from './kickRealtime.js';
 import { parseKickEvent } from './kickChatParse.js';
-import { parseKickKicksLeaderboard, kickKicksLeaderboardUrl } from './kickApi.js';
+import { parseKickKicksLeaderboard, kickKicksLeaderboardUrl, parseKickSubsLeaderboard, kickSubsLeaderboardUrl } from './kickApi.js';
 
 const NOW = Date.parse('2026-11-08T10:00:00Z');
 
@@ -124,5 +124,17 @@ describe('Kick 公式の Kicks ランキング', () => {
     expect(parseKickKicksLeaderboard(null)).toEqual([]);
     expect(kickKicksLeaderboardUrl('55')).toBe('https://web.kick.com/api/v1/kicks/55/leaderboard');
     expect(kickKicksLeaderboardUrl('x')).toBe('');
+  });
+});
+
+describe('Kick 公式のギフトサブの順位(2つめの公式ランキング)', () => {
+  it('API(v2 leaderboards の gifts=通算)とソケット(gifts_lifetime)のどちらも読む', () => {
+    expect(parseKickSubsLeaderboard({ gifts: [{ user_id: 1, username: 'a', quantity: 20 }, { username: 'x', quantity: 0 }], gifts_week: [{ username: 'w', quantity: 1 }] })).toEqual([
+      { rank: 1, name: 'a', xp: 20, iconUrl: '' },
+    ]);
+    expect(parseKickSubsLeaderboard({ data: { gifts_lifetime: [{ username: 'b', quantity: 3 }] } })).toEqual([{ rank: 1, name: 'b', xp: 3, iconUrl: '' }]);
+    expect(parseKickSubsLeaderboard({ gifts: 'x' })).toEqual([]);
+    expect(kickSubsLeaderboardUrl('Some_one')).toBe('https://kick.com/api/v2/channels/some_one/leaderboards');
+    expect(kickSubsLeaderboardUrl('../x')).toBe('');
   });
 });

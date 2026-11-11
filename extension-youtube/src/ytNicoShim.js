@@ -40,6 +40,7 @@ import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWr
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
 import { tallySupportItems } from '../../src/lib/platform/platformMetrics.js';
 import { watchPlatformMetricChrome } from '../../src/lib/platform/platformMetricChrome.js';
+import { SUB_BOARD_KEY_PREFIX, subBoardToNicoadApiValue, subBoardLaneWording, subBoardCelebrationWording } from '../../src/lib/platform/platformSubBoard.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -1131,6 +1132,10 @@ let kokenIsTopFans = true;
 // Twitch/Kick の配信で「ギフト貢献度」の欄にそのサービスの公式ランキング(Kick の Kicks ランキング等)が入っているか。
 //   入っていなければ記録から数えた合計の順位(既定)。言葉の直しを切り替える
 let platformOfficial = false;
+/** 「広告ランキング」の欄に出している、そのサービスの2つめの公式ランキング(無ければ null) @type {null | { vid: string, title: string, unit: string, period: string }} */
+let subBoardShown = null;
+let lastOfficialSig = '';
+const NICOAD_API_PREFIX = 'nls_nicoad_api_ranking_';
 /** Twitch の公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・Kick は累計なので空) */
 let platformBoardPeriod = '';
 function registerBroadcastersFromSummaries() {
@@ -1274,6 +1279,26 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           }
           continue;
         }
+        // そのサービスの2つめの公式ランキング(Twitch・Kick のギフトサブ順位など)を「広告ランキング」の欄に出す
+        //   (src/lib/platform/platformSubBoard.js)。欄が自分だけで読むとき(キー1つ)だけ答える。応援レーンの広告列や
+        //   まとめの読み(他のキーと一緒)には渡さない=広告主として人のタイルが増えない。
+        if (k.startsWith(NICOAD_API_PREFIX)) {
+          const lv = k.slice(NICOAD_API_PREFIX.length).toLowerCase();
+          const vid = videoIdForPseudoLv(lv);
+          if (!vid || isProbe || !list || list.length !== 1) continue;
+          const sk = `${SUB_BOARD_KEY_PREFIX}${vid}`;
+          const sb = /** @type {Record<string, any>} */ (await realGet(sk))?.[sk];
+          let iconOf = /** @type {((name: string) => string) | undefined} */ (undefined);
+          if (sb && Array.isArray(sb.rows) && sb.rows.some((/** @type {any} */ r) => !r?.iconUrl)) {
+            const byName = ytNameIndexOf((await buildCommentsForLv(lv)) || []);
+            iconOf = (name) => byName.get(normName(name))?.icon || '';
+          }
+          const v = sb ? subBoardToNicoadApiValue(sb, lv, iconOf) : null;
+          subBoardShown = v ? { vid, title: String(sb.title || ''), unit: String(sb.unit || ''), period: String(sb.period || '') } : null;
+          setTimeout(rewordSubBoardLane, 0);
+          if (v) bag[k] = v;
+          continue;
+        }
         const g = GIFT_KEY_PREFIXES.find(([pre]) => k.startsWith(pre));
         if (!g) continue;
         const lv = k.slice(g[0].length).toLowerCase();
@@ -1317,6 +1342,12 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           if (v != null) {
             const wasTopFans = kokenIsTopFans;
             kokenIsTopFans = !!fromBoard;
+            // 見出し(公式の順位表 / 記録から数えた合計順)を直す。変わったときだけ
+            const offSig = `${kokenIsTopFans}|${platformOfficial}`;
+            if (offSig !== lastOfficialSig) {
+              lastOfficialSig = offSig;
+              schedulePlatformChrome();
+            }
             if (wasTopFans && !kokenIsTopFans) rewordTopFanHeadings(ytWordingTopFanToSuperChatRank);
             if (!wasTopFans && kokenIsTopFans) rewordTopFanHeadings(ytWordingSuperChatRankToTopFan);
           }
@@ -1644,6 +1675,20 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         lastNotified.delete(lastAskedLv);
         void notifyLv(lastAskedLv, undefined);
       }
+      // 2つめの公式ランキングが届いたら、欄に読み直してもらう(欄は nls_nicoad_api_ranking_ の変化で読み直す)
+      for (const ck of Object.keys(changes)) {
+        if (!ck.startsWith(SUB_BOARD_KEY_PREFIX)) continue;
+        const vid = ck.slice(SUB_BOARD_KEY_PREFIX.length);
+        const lv = pseudoLvForVideoId(vid);
+        const synth = { [`${NICOAD_API_PREFIX}${lv}`]: { newValue: subBoardToNicoadApiValue(changes[ck].newValue, lv) } };
+        for (const fn of listeners) {
+          try {
+            fn(synth, 'local');
+          } catch {
+            /* no-op */
+          }
+        }
+      }
       for (const ck of Object.keys(changes)) {
         if (!ck.startsWith('yt_leaderboard_')) continue;
         const vid = ck.slice('yt_leaderboard_'.length);
@@ -1956,8 +2001,22 @@ function fixTextNode(node) {
       }
     }
   }
+  // 「広告ランキング」の欄に2つめの公式ランキングを出しているときは、欄の中の文字をその順位表の言葉にする
+  if (subBoardShown && node.parentElement?.closest('[data-lane="adRanking"]')) {
+    const p = screenPlatformBase();
+    if (p) {
+      // 別の配信(別のサービス)の順位表へ移っても直せるよう、書き換える前の文から作る
+      const rec = subLaneOrig.get(node);
+      const base = rec && rec.out === v ? rec.orig : v;
+      const w = subBoardLaneWording(base, p, subBoardShown);
+      if (w !== v) node.nodeValue = w;
+      subLaneOrig.set(node, { orig: base, out: w });
+      return;
+    }
+  }
   let next = screenWording(v); // ニコニコの言葉 → YouTube(Twitch・Kick)の言葉(決まった文言だけ)
   if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
+  if (subBoardShown) next = subBoardCelebrationWording(next, subBoardShown);
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
   if (next !== v) node.nodeValue = next;
@@ -1990,7 +2049,8 @@ function installPlatformMetricChromeOnce() {
       const facts = sum
         ? ytSummaryToNicoSnapshot(sum, vid, '', knownSummaries).platformFacts
         : { viewers: null, support: vid ? supportTallyByVid.get(vid) || null : null };
-      return { platform: id, facts };
+      // ギフト貢献度の欄に公式の順位表(トップファン・Bits/Kicks ランキング)を入れているか=見出しを「公式の〜」にする
+      return { platform: id, facts, officialBoard: base ? platformOfficial : kokenIsTopFans };
     });
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
@@ -2030,7 +2090,8 @@ function fixTitleAttr(el) {
   for (const name of ['title', 'aria-label']) {
     const t = el.getAttribute(name);
     if (!t) continue;
-    let next = screenWording(t);
+    const subP = subBoardShown && el.closest('[data-lane="adRanking"]') ? screenPlatformBase() : null;
+    let next = subP && subBoardShown ? subBoardLaneWording(t, subP, subBoardShown) : screenWording(t);
     if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
     if (next !== t) el.setAttribute(name, next);
@@ -2056,6 +2117,22 @@ const SC_BUBBLE_BG =
 // ギフト貢献度の欄がスパチャの合計の順位だと分かった時点で、もう「トップファン」と直して出した文字を戻す
 // (逆に、アーカイブのあとでトップファンの順位表がある配信へ移ったら、トップファンの言葉に戻す)
 /** @param {(s: string) => string} reword */
+/** @type {WeakMap<Text, { orig: string, out: string }>} 「広告ランキング」の欄の文字 → 書き換える前の文 */
+const subLaneOrig = new WeakMap();
+let subLaneSig = '';
+/** 2つめの公式ランキングが変わったら、欄の見出し(最初から HTML にある文字)も言葉を直す */
+function rewordSubBoardLane() {
+  const sig = subBoardShown ? `${subBoardShown.vid}|${subBoardShown.title}|${subBoardShown.period}|${subBoardShown.unit}` : '';
+  if (sig === subLaneSig || typeof document === 'undefined') return;
+  subLaneSig = sig;
+  if (!subBoardShown) return;
+  const lane = document.querySelector('[data-lane="adRanking"]');
+  if (!lane) return;
+  const walker = document.createTreeWalker(lane, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode())) fixTextNode(/** @type {Text} */ (n));
+}
+
 function rewordTopFanHeadings(reword) {
   if (typeof document === 'undefined' || !document.body) return;
   // 視聴ページの中では会場の中だけ(YouTube のページの文字は触らない)

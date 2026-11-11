@@ -63,12 +63,26 @@ describe('platformSectionPlan', () => {
     for (const id of ['youtube', 'twitch', 'kick', 'showroom']) {
       const p = platformSectionPlan(id);
       expect(p.visitorCard).toBe(false);
-      expect(p.hide).toEqual(expect.arrayContaining(['adRanking', 'programPoints', 'eventRank', 'giftRankingFetch']));
+      expect(p.hide).toEqual(expect.arrayContaining(['programPoints', 'eventRank', 'giftRankingFetch']));
+    }
+    // 広告ランキングの欄は、2つめの公式ランキング(ギフトサブの順位)があるサービスだけ使う(platformSubBoard.js)
+    for (const id of ['youtube', 'showroom', 'abema']) {
+      expect(platformSectionPlan(id).hide).toContain('adRanking');
+      expect(platformSectionPlan(id).subBoard).toBe(false);
+    }
+    for (const id of ['twitch', 'kick']) {
+      expect(platformSectionPlan(id).hide).not.toContain('adRanking');
+      expect(platformSectionPlan(id).subBoard).toBe(true);
+      expect(platformSectionPlan(id).sections.adRanking).toEqual({ show: true });
     }
     expect(platformSectionPlan('youtube').concurrentLabel).toBe('同時視聴者数');
     expect(platformSectionPlan('youtube').sections.contributionRanking.label).toBe('スパチャの合計順');
     expect(platformSectionPlan('youtube').sections.giftHistory.label).toBe('スーパーチャット・ギフト');
     expect(platformSectionPlan('twitch').sections.contributionRanking.label).toBe('Bits・ギフトサブの合計順');
+    // 公式の順位表を入れているときは見出しも公式の名前(中身と見出しを食い違わせない)
+    expect(platformSectionPlan('twitch', { officialBoard: true }).sections.contributionRanking.label).toBe('Twitch 公式の Bits ランキング');
+    expect(platformSectionPlan('kick', { officialBoard: true }).sections.contributionRanking.label).toBe('Kick 公式の Kicks ランキング');
+    expect(platformSectionPlan('youtube', { officialBoard: true }).sections.contributionRanking.label).toBe('トップファン');
     expect(platformSectionPlan('kick').sections.giftHistory.label).toBe('ギフトサブ');
     expect(platformSectionPlan('kick').sections.contributionRanking.sub).toBeUndefined();
   });

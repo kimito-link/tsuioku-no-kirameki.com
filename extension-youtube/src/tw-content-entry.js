@@ -69,6 +69,7 @@ const diag = {
   gqlFail: 0,
   /** 公式の応援ランキング: 行数・どこから(gql:persisted / gql:query)・期間・読めなかった回数 */
   boardRows: 0,
+  subBoardRows: 0,
   boardFrom: '',
   boardPeriod: '',
   boardFail: 0,
@@ -507,19 +508,29 @@ async function sendTwBoard(login, userId, key) {
       /* 読めない */
     }
   }
-  if (!board || !board.bits.length) {
+  if (!board || (!board.bits.length && !board.subGift.length)) {
     diag.boardFail += 1;
     saveDiagSoon();
     return;
   }
   // 順位表には顔が無いので、チャットと同じ方法で顔を聞く(待ちすぎない)
-  const logins = board.bits.map((r) => r.login).filter((l) => !iconByLogin.has(l));
+  const logins = [...board.bits, ...board.subGift].map((r) => r.login).filter((l) => !iconByLogin.has(l));
   if (logins.length) await Promise.race([lookupIcons(logins), new Promise((r) => setTimeout(r, 3000))]);
-  const rows = board.bits.map((r) => ({ rank: r.rank, name: r.name, xp: r.xp, iconUrl: iconByLogin.get(r.login) || '' }));
+  const toRows = (/** @type {typeof board.bits} */ list) => list.map((r) => ({ rank: r.rank, name: r.name, xp: r.xp, iconUrl: iconByLogin.get(r.login) || '' }));
+  const rows = toRows(board.bits);
   diag.boardRows = rows.length;
   diag.boardFrom = from;
   diag.boardPeriod = board.period;
-  safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows, period: board.period } });
+  if (rows.length) safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows, period: board.period } });
+  // 2つめの公式ランキング = twitch.tv のチャット欄の順位表の「ギフトサブ」(同じ応答に入っている・期間も同じ)
+  const subRows = toRows(board.subGift);
+  diag.subBoardRows = subRows.length;
+  if (subRows.length) {
+    safeSendMessage({
+      type: 'YT_LEADERBOARD',
+      payload: { videoId: key, slot: 'sub', title: 'ギフトサブ ランキング', unit: 'サブ', period: board.period, rows: subRows },
+    });
+  }
   saveDiagSoon();
 }
 

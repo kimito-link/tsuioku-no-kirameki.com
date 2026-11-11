@@ -174,7 +174,7 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
     const json = body.includes('ChannelLeaderboards')
       ? [{ data: { user: { channel: { leaderboardTimePeriod: 'MONTH', leaderboardSet: {
           bits: { items: { edges: [node(1, 123456, 'big_cheer', 'ビッグチア'), node(2, 500, 'bitter', 'Bitter')] } },
-          subGift: { items: { edges: [] } },
+          subGift: { items: { edges: [node(1, 25, 'sub_gifter', 'サブギフター')] } },
         } } } } }]
       : body.includes('users(logins')
       ? {
@@ -306,7 +306,26 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   expect(all).not.toContain('このPCの記録から数えます');
   expect(gqlBodies.some((b) => b.includes('"operationName":"ChannelLeaderboards"') && b.includes('"channelID":"99"'))).toBe(true);
   const d = (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_tw_chat'))).yt_diag_tw_chat;
-  expect(d).toMatchObject({ boardRows: 2, boardFrom: 'gql:persisted', boardPeriod: 'MONTH' });
+  expect(d).toMatchObject({ boardRows: 2, boardFrom: 'gql:persisted', boardPeriod: 'MONTH', subBoardRows: 1 });
+  // 2つめの公式ランキング(ギフトサブ)は「広告ランキング」の欄に Twitch の言葉で出る(platformSubBoard.js)
+  const adLane = () =>
+    ext.evaluate(() => {
+      const lane = /** @type {HTMLElement | null} */ (document.querySelector('[data-lane="adRanking"]'));
+      return lane && !lane.hidden ? String(lane.innerText || '').replace(/\s+/g, ' ') : '';
+    });
+  await expect.poll(adLane, { timeout: 30_000 }).toContain('サブギフター');
+  const lane = await adLane();
+  expect(lane).toContain('ギフトサブ ランキング');
+  expect(lane).toContain('Twitch 公式のギフトサブ ランキング');
+  expect(lane).toContain('25 サブ');
+  expect(lane).not.toMatch(/広告|ニコニ|貢/);
+  // ギフトサブの人は応援レーンの広告列に入らない(欄だけ)
+  expect(await ext.evaluate(() => String(document.getElementById('sceneStoryUserLaneAd')?.textContent || ''))).not.toContain('サブギフター');
+  await ext.locator('[data-lane="adRanking"]').screenshot({ path: 'test-results/twitch-sub-board.png' });
+  // 「ギフト貢献度」の欄の見出しも中身(公式の Bits ランキング)と同じ名前(記録から数えた「合計順」と書かない)
+  await expect
+    .poll(() => ext.evaluate(() => String(document.querySelector('[data-lane="contributionRanking"] .nl-north-star-lane__label')?.textContent || '').trim()), { timeout: 10_000 })
+    .toBe('Twitch 公式の Bits ランキング');
 
   // 絵文字(Kappa)は名前 → 画像の対応を覚え、コメントの一覧では画像で見せる。文字は消さない(textContent はそのまま)
   await expect

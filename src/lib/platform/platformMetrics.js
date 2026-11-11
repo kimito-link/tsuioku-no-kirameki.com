@@ -19,6 +19,9 @@ export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch
  * それ以外は chips に無いカードを描かない（「—」の枠も出さない）。
  * ABEMA はここに1行足せば、横の欄と会場が同じ隠し方に乗る。
  * superchatWhenPositive: 記録に金額があるときだけスパチャを出す。
+ * officialSubBoard: そのサービスの2つめの公式ランキング(ギフトサブの順位など)を「広告ランキング」の欄に出す
+ *   (src/lib/platform/platformSubBoard.js・2026-11-11 りんく「各サービス特有のランキングを」)。欄の中身が無い配信では
+ *   ニコ生版の部品が欄を出さないので、ここでは隠さないだけにする。
  */
 export const PLATFORM_CAPABILITIES = Object.freeze({
   niconico: Object.freeze({
@@ -39,12 +42,14 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'bits', 'subs', 'gifts', 'raids']),
+    officialSubBoard: true,
   }),
   kick: Object.freeze({
     native: false,
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
+    officialSubBoard: true,
   }),
   abema: Object.freeze({
     native: false,
@@ -182,10 +187,22 @@ export function resolvePlatformId(input) {
 }
 
 /**
- * @param {string} platformId
+ * 「ギフト貢献度」の欄に、そのサービス公式の順位表(トップファン・Bits/Kicks ランキング)を入れているときの見出し。
+ *   入れていないとき(アーカイブ等)は、このPCの記録から数えた「合計順」の見出しのまま。
  */
-export function platformSectionPlan(platformId) {
+const OFFICIAL_MAIN_LABEL = Object.freeze({
+  youtube: 'トップファン',
+  twitch: 'Twitch 公式の Bits ランキング',
+  kick: 'Kick 公式の Kicks ランキング',
+});
+
+/**
+ * @param {string} platformId
+ * @param {{ officialBoard?: boolean }} [opts] officialBoard: ギフト貢献度の欄に公式の順位表を入れている
+ */
+export function platformSectionPlan(platformId, opts) {
   const id = resolvePlatformId(platformId);
+  const official = opts?.officialBoard === true;
   const cap = platformCapability(id);
   if (id === 'niconico') {
     return {
@@ -193,6 +210,7 @@ export function platformSectionPlan(platformId) {
       native: true,
       visitorCard: true,
       concurrentLabel: '推定同時接続',
+      subBoard: false,
       hide: /** @type {string[]} */ ([]),
       note: '',
       trio: /** @type {{ rink: string, konta: string, tanu: string }|null} */ (null),
@@ -208,12 +226,15 @@ export function platformSectionPlan(platformId) {
   let trio = { rink: 'りんく', konta: 'こん太', tanu: 'たぬ姉' };
   const concurrentLabel = cap.concurrentLabel || '視聴者数';
   let note = '公式の数は、配信ページが出しているものだけです。合計は、このPCの記録から数えています。';
-  const hide = [...NICONICO_ONLY_SECTIONS];
+  const subBoard = 'officialSubBoard' in cap && cap.officialSubBoard === true;
+  const hide = NICONICO_ONLY_SECTIONS.filter((s) => !(subBoard && s === 'adRanking'));
+  // 2つめの公式ランキングの欄: 前の配信で隠した印だけ外す(中身の有無で出すかはニコ生版の部品が決める)
+  if (subBoard) sections.adRanking = { show: true };
   // 合計順の説明文は言葉の置き換え（公式ランキングの文）に任せる。ここで上書きすると消える。
   if (id === 'youtube') {
     sections.contributionRanking = {
       show: true,
-      label: 'スパチャの合計順',
+      label: official ? OFFICIAL_MAIN_LABEL.youtube : 'スパチャの合計順',
     };
     sections.giftHistory = {
       show: true,
@@ -224,7 +245,7 @@ export function platformSectionPlan(platformId) {
   } else if (id === 'twitch') {
     sections.contributionRanking = {
       show: true,
-      label: 'Bits・ギフトサブの合計順',
+      label: official ? OFFICIAL_MAIN_LABEL.twitch : 'Bits・ギフトサブの合計順',
     };
     sections.giftHistory = {
       show: true,
@@ -235,7 +256,7 @@ export function platformSectionPlan(platformId) {
   } else if (id === 'kick') {
     sections.contributionRanking = {
       show: true,
-      label: 'Kicks・ギフトサブの合計順',
+      label: official ? OFFICIAL_MAIN_LABEL.kick : 'Kicks・ギフトサブの合計順',
     };
     sections.giftHistory = {
       show: true,
@@ -255,6 +276,7 @@ export function platformSectionPlan(platformId) {
     native: false,
     visitorCard: cap.visitorCard === true,
     concurrentLabel,
+    subBoard,
     hide,
     note,
     trio,
