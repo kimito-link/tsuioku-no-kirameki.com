@@ -163,6 +163,7 @@ test.describe('パネルの部品はブラウザ既定の見た目のまま出�
         'captureScreenshot',
         'reloadWatchTabBtn',
         'openComeviewBtn',
+        'openWordEffectBtn',
         'openComeviewVoiceBtn'
       ]);
       const rows = [...new Set(rects.map((r) => r.top))];
@@ -180,6 +181,7 @@ test.describe('パネルの部品はブラウザ既定の見た目のまま出�
   for (const pagePath of [
     'status.html',
     'comeview.html',
+    'word-effect.html',
     'venue.html?lv=lv888888888',
     'marketing-export.html',
     'live-view.html'

@@ -21134,6 +21134,14 @@ async function initPopup() {
     }
   };
   $('openComeviewBtn')?.addEventListener('click', () => openComeviewWindow(false));
+  $('openWordEffectBtn')?.addEventListener('click', () => {
+    const url = chrome.runtime.getURL('word-effect.html');
+    try {
+      chrome.windows.create({ url, type: 'popup', width: 440, height: 760 });
+    } catch {
+      window.open(url, '_blank', 'width=440,height=760');
+    }
+  });
   wirePanelVoiceReadingButton($);
 
   // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。

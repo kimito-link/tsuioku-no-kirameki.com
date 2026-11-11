@@ -3934,6 +3934,17 @@ function setupPatrolButtons() {
       }
     });
   }
+  const btnWordEffect = document.getElementById('btnWordEffect');
+  if (btnWordEffect) {
+    btnWordEffect.addEventListener('click', () => {
+      const url = chrome.runtime.getURL('word-effect.html');
+      try {
+        chrome.windows.create({ url, type: 'popup', width: 440, height: 760 });
+      } catch {
+        window.open(url, '_blank', 'width=440,height=760');
+      }
+    });
+  }
   // 🗺️ コードの地図を開く: 公開リポの code-tree.html を htmlpreview 経由で図として別タブに。
   //   code-tree.html は拡張に同梱していない(リポの docs/ にある静的コード地図)ため、
   //   GitHub raw を htmlpreview.github.io で描画して開く(配信していなくても・AI にも渡せる URL)。

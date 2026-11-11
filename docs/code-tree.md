@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1238 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -617,7 +617,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (143)
+- 📁 **extension/** (144)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -770,6 +770,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
+  - `word-effect.html`
   - `yt-comeview.html`
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
@@ -1159,7 +1160,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2441)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1197,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (114)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1313,6 +1314,8 @@
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
+    - `word-effect-entry.js` — 言葉の演出の設定と、OBS 用の透明な別窓。
+    - `wordEffectOverlay.js` — 言葉の演出を透明な層に出す。
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
   - 📁 **images/** (134)
@@ -1491,7 +1494,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2139)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3633,6 +3636,9 @@
     - `watchTabPrioritize.test.js`
     - `watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
     - `watchUrlFreshness.test.js`
+    - `wordEffect.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `wordEffect.test.js`
+    - `wordEffectOverlay.wiring.test.js`
     - `xIntentUrl.js` — X（旧 Twitter）の Web Intent（投稿画面）URL を組み立てる純関数。
     - `xIntentUrl.test.js`
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
