@@ -16,6 +16,12 @@ import {
   wantedWritePlan
 } from '../lib/obsBrowserSource.js';
 import {
+  OBS_SERVICE_COMEVIEW_PAGE,
+  OBS_YT_LAST_STREAM_URL_KEY,
+  pickObsComeviewWatch
+} from '../lib/obsComeviewPage.js';
+import {
+  KEY_LAST_WATCH_URL,
   KEY_LIVE_EVENTS_SENDER_BEAT,
   KEY_OBS_BROWSER_SOURCE,
   KEY_STATUS_DEVICE_CRED,
@@ -111,10 +117,33 @@ function stop() {
   }
 }
 
+/** いま見ているのが YouTube などのコメビュなら、ニコ生の視聴ページからは送らない。 */
+async function watchingServiceComeview() {
+  try {
+    if (typeof chrome.tabs?.query !== 'function') return false;
+    const [tabs, bag] = await Promise.all([
+      chrome.tabs.query({}),
+      chrome.storage.local.get([KEY_LAST_WATCH_URL, OBS_YT_LAST_STREAM_URL_KEY])
+    ]);
+    return pickObsComeviewWatch({
+      tabs,
+      nicoWatchUrl: bag?.[KEY_LAST_WATCH_URL],
+      ytLast: bag?.[OBS_YT_LAST_STREAM_URL_KEY]
+    }).page === OBS_SERVICE_COMEVIEW_PAGE;
+  } catch {
+    return false;
+  }
+}
+
 async function presence() {
   if (!enabled || !holding) return;
   const nowMs = Date.now();
   try {
+    if (await watchingServiceComeview()) {
+      stopSending();
+      await releaseWanted();
+      return;
+    }
     const bag = await chrome.storage.local.get([
       KEY_STATUS_DEVICE_CRED,
       KEY_STATUS_UPLOAD_CONFIG,

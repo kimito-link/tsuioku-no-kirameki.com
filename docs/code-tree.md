@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1250 件
+## ⚠️ 役割コメントが無いソース 10 / 1242 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -236,7 +236,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (377)
+- 📁 **docs/** (369)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -579,10 +579,6 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.md`
-  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
@@ -616,10 +612,6 @@
   - `reference_deterministic_backfill.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.md`
-  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
@@ -629,7 +621,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (146)
+- 📁 **extension/** (144)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -770,8 +762,6 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
   - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
@@ -1033,7 +1023,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (113)
+- 📁 **scripts/** (111)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1130,8 +1120,6 @@
   - `pick-live-for-check.mjs` — 検証に使う実配信を【自動で1つ選ぶ】。
   - `record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
   - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
-  - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
-  - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
   - `resize-marketing-html-avatars.ps1`
   - `run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
   - `run-verify-cc.mjs` — Claude Code 向け verify ランナー。
@@ -1176,7 +1164,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2449)
+- 📁 **src/** (2445)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1213,7 +1201,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (117)
+  - 📁 **extension/** (115)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1272,8 +1260,6 @@
     - `ndgrStatisticsPointsSanityGuard.wiring.test.js`
     - `ndgrViewBasePick.wiring.test.js`
     - `noSpeechNote.wiring.test.js`
-    - `obs-style-entry.js` — OBS透過コメントの表示を、見本を見ながら変える画面。
-    - `obs-style-entry.js` — OBS透過コメントの表示を、見本を見ながら変える画面。
     - `obs-style-entry.js` — OBS透過コメントの表示を、見本を見ながら変える画面。
     - `obsBrowserSourceBoot.js` — 「OBSのブラウザへ送る」がオンのあいだだけ、視聴ページから新着を中継する。
     - `obsOverlayApply.js` — OBS透過コメントの表示へ、決めた見た目を載せる。
@@ -1513,7 +1499,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2144)
+  - 📁 **lib/** (2142)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1860,8 +1846,6 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`

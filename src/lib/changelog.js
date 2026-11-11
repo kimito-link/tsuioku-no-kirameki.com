@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2042',
+    date: '2026-11-11',
+    summary: 'YouTubeなどもOBSの透過へ送る',
+    items: Object.freeze([
+      '「OBSのブラウザへ送る」がオンのとき、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の新しいコメントも、いま見ている配信なら同じ透過ページへ届きます。',
+      'いま見ている配信がニコ生以外のときは、開いたままのニコ生の画面からは送りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2041',
     date: '2026-11-11',
     summary: 'OBSにURLを貼るとコメントが出る',
@@ -201,17 +210,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Twitch にログインしていないときは、コメントを打たずに「ログインしていない」と理由を出すようにしました(Twitch は未ログインでも入力欄を出すため)。',
       '記録のときに顔の取得が間に合わなかった人も、あとで分かった顔を画面に出すようにしました。',
       '計器のギフトサブの数が常に 0 だったのを、贈った件数で数えるように直しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1916',
-    date: '2026-11-07',
-    summary: 'Twitch の配信も記録できるように(試作)',
-    items: Object.freeze([
-      'Twitch の配信ページ(twitch.tv/チャンネル名)を開くと、チャットを記録するようにしました。ニコ生・YouTube と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
-      'チャットは Twitch 公式の読み取り専用の接続で読みます(ログインは要りません)。Bits・サブスク・ギフトサブ・レイドも記録し、Bits は応援の合計(pt)に入ります。',
-      'サイドパネルと会場からのコメント送信は、Twitch の画面の入力欄に書いて送ります(Twitch にログインしているときだけ送れます)。',
-      '記録は YouTube と同じくこの PC の中にだけ置き、外へは送りません。'
     ])
   })
 ]);

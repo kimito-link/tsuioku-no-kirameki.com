@@ -3454,6 +3454,18 @@
       ]
     },
     {
+      "file": "src/lib/kick/kickChatParse.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
       "file": "src/lib/kokenGiftHistoryApi.js",
       "featureCount": 2,
       "features": [
@@ -3646,6 +3658,18 @@
       ]
     },
     {
+      "file": "src/lib/mixch/mxParse.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
       "file": "src/lib/monotonicCommentCount.js",
       "featureCount": 2,
       "features": [
@@ -3778,6 +3802,18 @@
       ]
     },
     {
+      "file": "src/lib/obsComeviewPage.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
       "file": "src/lib/officialContributionRankingResolver.js",
       "featureCount": 2,
       "features": [
@@ -3895,6 +3931,30 @@
       "labels": [
         "Web版 追憶のきらめき ランキング(/live/)",
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/platform/streamEmotes.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
+      "file": "src/lib/platform/streamPlatform.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
       ]
     },
     {
@@ -4030,6 +4090,18 @@
       ]
     },
     {
+      "file": "src/lib/showroom/srParse.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
       "file": "src/lib/speechEvidence.js",
       "featureCount": 2,
       "features": [
@@ -4159,6 +4231,54 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/tiktok/ttParse.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
+      "file": "src/lib/tiktok/ttProto.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
+      "file": "src/lib/twitch/twIrcParse.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
+      "file": "src/lib/twitch/twStreamKey.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
       ]
     },
     {
@@ -4723,6 +4843,30 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/whowatch/wwParse.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
+      ]
+    },
+    {
+      "file": "src/lib/youtube/ytPageMeta.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "obs-style"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目"
       ]
     },
     {

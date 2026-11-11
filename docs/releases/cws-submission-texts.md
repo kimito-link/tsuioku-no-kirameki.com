@@ -20,7 +20,7 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
 
 > 本拡張機能の単一用途は、ライブ配信 (ニコニコ生放送、YouTube Live、Twitch、Kick、ふわっち、SHOWROOM、ミクチャ、TikTok LIVE) の配信ページで流れる応援コメント・ギフトと視聴者の行動情報を、利用者本人の PC (chrome.storage.local) に記録し、放送後に「誰がどのように応援してくれたか」を 3 つのレーン表示 (りんく／こん太／たぬ姉) と活発度の色分けで振り返れるようにすることです。どの配信でも同じ画面・同じ使い方です。
 >
-> 記録データは既定では PC の中だけに保存され、開発者にも第三者にも送信されません。例外はニコニコ生放送の画面で利用者が「📱 スマホで見る」を自分で ON にした場合だけで、表示中の 1 配信分のコピーを当プロジェクトのサーバーへ送り本人のスマホで見られるようにします (最新 1 件・24 時間で消え、OFF で削除)。同じく本人が ON にした場合に限り、スマホからのコメント投稿 (最長 1 分経由)、読み上げ音声をスマホで聞く (最新 20 件・2 分)、読むだけのファン用 URL があります。いずれも既定 OFF です。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の記録は送りません。
+> 記録データは既定では PC の中だけに保存され、開発者にも第三者にも送信されません。例外はニコニコ生放送の画面で利用者が「📱 スマホで見る」を自分で ON にした場合だけで、表示中の 1 配信分のコピーを当プロジェクトのサーバーへ送り本人のスマホで見られるようにします (最新 1 件・24 時間で消え、OFF で削除)。同じく本人が ON にした場合に限り、スマホからのコメント投稿 (最長 1 分経由)、読み上げ音声をスマホで聞く (最新 20 件・2 分)、読むだけのファン用 URL があります。いずれも既定 OFF です。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の記録は、「スマホで見る」では送りません。本人が「OBSのブラウザへ送る」をONにしたときだけ、いま見ている配信の新しいコメントを中継します。
 >
 > マーケティング分析レポート (マーケ HTML) だけは有料のサポーター向け (初回 14 日は無料) で、支払いは Stripe の外部ページで行います。契約の確認ではサポーターのコードと PC ごとのランダムな識別子だけを当プロジェクトのサーバーへ送ります。
 >
@@ -124,23 +124,23 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
 
 > ・https://*.nicovideo.jp/* : ニコ生の視聴ページのコメントを本人のPCに記録します。
 >
-> ・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live のチャットとアイコンをPCに記録します。外へは送りません。
+> ・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live のチャットとアイコンをPCに記録します。
 >
-> ・https://www.twitch.tv/* : Twitch のチャットを本人のPCに記録します。外へは送りません。
+> ・https://www.twitch.tv/* : Twitch のチャットを本人のPCに記録します。
 >
-> ・https://kick.com/* : Kick のチャットを本人のPCに記録します。外へは送りません。
+> ・https://kick.com/* : Kick のチャットを本人のPCに記録します。
 >
-> ・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっちのコメントとアイテムを本人のPCに記録します。外へは送りません。
+> ・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっちのコメントとアイテムを本人のPCに記録します。
 >
-> ・https://www.showroom-live.com/* : SHOWROOM のコメントとギフトを本人のPCに記録します。外へは送りません。
+> ・https://www.showroom-live.com/* : SHOWROOM のコメントとギフトを本人のPCに記録します。
 >
-> ・https://mixch.tv/* と https://d2uqarpmf42qy0.cloudfront.net/* : ミクチャのコメントとギフトを記録し、ギフトの絵を表示します。外へは送りません。
+> ・https://mixch.tv/* と https://d2uqarpmf42qy0.cloudfront.net/* : ミクチャのコメントとギフトを記録し、ギフトの絵を表示します。
 >
-> ・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトを本人のPCに記録します。外へは送りません。
+> ・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトを本人のPCに記録します。
 >
 > ・http://127.0.0.1:50021/* : 読み上げONのときだけ、このPCのVOICEVOXへ音声合成を頼みます。
 >
-> ・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」または「OBSのブラウザへ送る」を自分でONにしたときだけニコ生の画面を送ります(初期OFF)。契約確認はコードとPCごとの識別子だけです。上の他サービスの記録は送りません。
+> ・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」はニコ生の画面だけ(初期OFF)。「OBSのブラウザへ送る」を自分でONにしたときだけ、いま見ている配信の新しいコメント(ニコ生と上の各サービス)を送ります。契約確認はコードとPCごとの識別子だけです。
 >
 > ・https://suggestqueries.google.com/* : 入力した配信者名の検索候補だけを取得します。
 >
