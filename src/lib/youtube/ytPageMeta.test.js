@@ -22,6 +22,10 @@ describe('isYtWatchLikeUrl', () => {
     expect(isYtWatchLikeUrl('https://www.youtube.com/live/abcdefghijk')).toBe(true);
     expect(isYtWatchLikeUrl('https://www.youtube.com/live_chat?v=abcdefghijk')).toBe(false);
     expect(isYtWatchLikeUrl('https://www.youtube.com/')).toBe(false);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/live')).toBe(true);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/live/')).toBe(true);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan')).toBe(false);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/videos')).toBe(false);
   });
 });
 

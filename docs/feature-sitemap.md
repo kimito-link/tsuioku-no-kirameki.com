@@ -212,7 +212,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 104</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 105</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -316,6 +316,7 @@
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
 - `src/lib/watchTabPrioritize.js` — watch タブ候補リストを「対象 watch URL に最も近い」順に並べ替える純粋関数。
 - `src/lib/youtube/ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
+- `src/lib/youtube/ytConcurrentViewers.js` — YouTube の同時視聴者数を、ページの埋め込みと updated_metadata から読む（純関数）
 - `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
 
@@ -1129,7 +1130,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 336</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 338</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1141,6 +1142,7 @@
 - `app/live-view.js` — global NL_BUILD_ID
 - `app/supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - `extension-youtube/content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
+- `extension-youtube/src/content-chat-main-entry.js` — ページ自身の世界に入る束の入口。
 - `extension-youtube/src/sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
 - `extension-youtube/src/sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
 - `extension-youtube/src/sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
@@ -1448,6 +1450,7 @@
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
+- `src/lib/youtube/ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
 - `src/lib/youtube/ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
@@ -1482,7 +1485,7 @@
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 
-### 🏟 会場・席 (10版)
+### 🏟 会場・席 (9版)
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 - `v0.1.2044` 2026-11-11 — 各配信の数字だけを出す
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
@@ -1492,9 +1495,8 @@
 - `v0.1.2005` 2026-11-10 — 会場の数字が開いた直後の値で止まらない
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🎁 ギフト (8版)
+### 🎁 ギフト (7版)
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 - `v0.1.2044` 2026-11-11 — 各配信の数字だけを出す
 - `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
@@ -1502,23 +1504,19 @@
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
 - `v0.1.1920` 2026-11-08 — YouTube の金額の出ないギフトを分かりやすく
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🔊 読み上げ (6版)
+### 🔊 読み上げ (5版)
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
 - `v0.1.2032` 2026-11-10 — ビルドの札を詳しい状況の先頭へ移した
 - `v0.1.2021` 2026-11-10 — 横の欄のボタンの見た目をそろえた
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
-
-### 🪟 応援レーン・タイル (1版)
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
 
-### その他 (4版)
+### その他 (5版)
+- `v0.1.2055` 2026-11-11 — YouTubeの同時視聴者数をページから読む
 - `v0.1.2047` 2026-11-11 — 公式ランキングの説明を残す
 - `v0.1.2033` 2026-11-10 — パネル位置の文字は食い違うときだけ
 - `v0.1.2030` 2026-11-10 — 状態ページのボタンの見た目をそろえた

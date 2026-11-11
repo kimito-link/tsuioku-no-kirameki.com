@@ -232,13 +232,40 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
         resolved.method === 'fallback' &&
         resolved.estimated <= 0 &&
         resolved.base.method === 'none');
+    const ytStaleCount =
+      snapshot.platform === 'youtube' &&
+      snapshot.officialViewerStale === true &&
+      typeof snapshot.officialViewerCount === 'number' &&
+      Number.isFinite(snapshot.officialViewerCount) &&
+      snapshot.officialViewerCount > 0
+        ? Math.floor(snapshot.officialViewerCount)
+        : 0;
     // 公式の視聴者数しか出さないサービスでは、ニコ生の推定を公式の数として出さない。
-    if (snapshot.officialViewersOnly === true && !directLike) {
+    // YouTube で一度読めた数が次に読めないときは、最後の数と「N分前」を出す。
+    if (ytStaleCount > 0) {
+      const readAt = Number(snapshot.officialViewerReadAt || 0);
+      const mins = readAt > 0 ? Math.max(0, Math.floor((nowMs - readAt) / 60000)) : 0;
       concurrent = {
         phase: 'ready',
-        estText: '—',
+        estText: ytStaleCount.toLocaleString('ja-JP'),
+        estIsPlaceholder: false,
+        estTitle: `最後に読めた同時視聴者数です（${mins}分前）`,
+        subText: `${mins}分前`,
+        concurrentLoadingHidden: true,
+        concurrentReadyHidden: false,
+        ariaBusy: false,
+        numericEstimated: ytStaleCount,
+        charReactionDelta: null
+      };
+      nextConcurrentEstimated = ytStaleCount;
+    } else if (snapshot.officialViewersOnly === true && !directLike) {
+      // YouTube には推定の材料が無いので、最初の数が来るまでは「読み込み中」と出す。
+      const ytLoading = snapshot.platform === 'youtube';
+      concurrent = {
+        phase: 'ready',
+        estText: ytLoading ? '読み込み中' : '—',
         estIsPlaceholder: true,
-        estTitle: '公式の視聴者数はまだ取れていません',
+        estTitle: ytLoading ? '同時視聴者数を読み込んでいます' : '公式の視聴者数はまだ取れていません',
         subText: '',
         concurrentLoadingHidden: true,
         concurrentReadyHidden: false,

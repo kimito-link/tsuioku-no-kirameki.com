@@ -182,10 +182,46 @@ function newestKeyForChannel(keyHead, login) {
   return best;
 }
 
+/**
+ * /@名前/live は URL に動画 id が無い。まとめに残した sourceUrl のパスが一致する配信を返す。
+ * @param {string} url
+ * @param {Record<string, any> | null | undefined} summaries
+ * @returns {string}
+ */
+export function videoIdForYtHandleLive(url, summaries) {
+  let path = '';
+  try {
+    const u = new URL(String(url || ''), 'https://www.youtube.com');
+    path = u.pathname.replace(/\/$/, '');
+    if (!/^\/@[^/]+\/live$/.test(path)) return '';
+  } catch {
+    return '';
+  }
+  let best = '';
+  let bestAt = -1;
+  const bag = summaries && typeof summaries === 'object' ? summaries : {};
+  for (const [key, sum] of Object.entries(bag)) {
+    if (!/^[A-Za-z0-9_-]{11}$/.test(key)) continue;
+    let stored = '';
+    try {
+      stored = new URL(String(sum?.sourceUrl || ''), 'https://www.youtube.com').pathname.replace(/\/$/, '');
+    } catch {
+      continue;
+    }
+    if (stored !== path) continue;
+    const at = Number(sum?.viewersReadAt || sum?.updatedAt || 0);
+    if (at >= bestAt) {
+      bestAt = at;
+      best = key;
+    }
+  }
+  return best;
+}
+
 /** 視聴タブの URL → 配信キー(YouTube は videoId・Twitch/Kick は記録のある配信キー)。分からなければ '' @param {string} url */
 export function streamKeyForWatchUrl(url) {
   const u = String(url || '');
-  if (isYtWatchLikeUrl(u)) return parseYtVideoIdFromUrl(u);
+  if (isYtWatchLikeUrl(u)) return parseYtVideoIdFromUrl(u) || videoIdForYtHandleLive(u, knownSummaries);
   const ch = platformChannelOfUrl(u);
   if (!ch) return '';
   // 0.1.1947: 記録の無いチャンネル(配信前の部屋など)は仮のキー '<頭><login>.00000' で「記録 0」を見せる。
@@ -413,6 +449,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     recordedCountHint: typeof sum?.itemCount === 'number' ? sum.itemCount : null, // 同じく、記録件数(まとめの itemCount)
     viewerCountSource: 'dom',
     officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null, // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
+    officialViewerStale: Number.isFinite(viewers) && viewers > 0 && sum?.viewersStale === true,
+    officialViewerReadAt: Number(sum?.viewersReadAt || 0) || null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める

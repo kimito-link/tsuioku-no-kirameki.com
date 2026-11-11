@@ -29,6 +29,21 @@ export function parseYtVideoIdFromUrl(rawUrl) {
 }
 
 /**
+ * /@名前/live の URL を、比較用のパス（`/@名前/live`）にする。それ以外は ''。
+ * @param {string} rawUrl
+ * @returns {string}
+ */
+export function ytHandleLivePath(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || ''), 'https://www.youtube.com');
+    const path = u.pathname.replace(/\/$/, '');
+    return /^\/@[^/]+\/live$/.test(path) ? path : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
  * URL が「1本の動画/配信を見ているページ」か。
  * @param {string} rawUrl
  */
@@ -37,7 +52,8 @@ export function isYtWatchLikeUrl(rawUrl) {
     const u = new URL(rawUrl, 'https://www.youtube.com');
     const p = u.pathname;
     if (p.startsWith('/live_chat')) return false;
-    return p === '/watch' || p.startsWith('/live/');
+    // /@名前/live は動画 id が URL に無い。id は canonical か ytInitialData から取る。
+    return p === '/watch' || p.startsWith('/live/') || /^\/@[^/]+\/live\/?$/.test(p);
   } catch {
     return false;
   }

@@ -54,11 +54,33 @@ function chatFrameOwnVideoId() {
   return frameVidCached;
 }
 
+function publishedVideoId() {
+  try {
+    const id = String(document.documentElement?.getAttribute('data-nl-yt-video-id') || '');
+    if (/^[A-Za-z0-9_-]{11}$/.test(id)) return id;
+  } catch {
+    /* 属性が読めなければ URL に戻る */
+  }
+  return '';
+}
+
+function canonicalVideoId() {
+  try {
+    return parseYtVideoIdFromUrl(String(document.querySelector('link[rel="canonical"]')?.getAttribute('href') || ''));
+  } catch {
+    return '';
+  }
+}
+
 function resolveCurrentVideoId() {
   const frameVid = chatFrameOwnVideoId();
   if (frameVid) return frameVid;
   const own = parseYtVideoIdFromUrl(String(window.location.href || ''));
   if (own) return own;
+  const canon = canonicalVideoId();
+  if (canon) return canon;
+  const published = publishedVideoId();
+  if (published) return published;
   try {
     if (window.top && window.top !== window) {
       const top = parseYtVideoIdFromUrl(String(window.top.location.href || ''));
@@ -245,7 +267,32 @@ function isInOtherVideos(n) {
   }
 }
 
+function isInSkippedText(n) {
+  const el = n && n.nodeType === 1 ? /** @type {Element} */ (n) : n?.parentElement || null;
+  try {
+    return Boolean(el && el.closest('script, style, noscript'));
+  } catch {
+    return false;
+  }
+}
+
+function readPublishedViewers() {
+  try {
+    const root = document.documentElement;
+    const id = String(root?.getAttribute('data-nl-yt-video-id') || '');
+    const pageId = resolveCurrentVideoId();
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id) || (pageId && id !== pageId)) return null;
+    const n = Number(root.getAttribute('data-nl-yt-viewers') || '');
+    if (!Number.isFinite(n) || n < 0 || n > 50_000_000) return null;
+    return Math.floor(n);
+  } catch {
+    return null;
+  }
+}
+
 function readConcurrentViewers() {
+  const published = readPublishedViewers();
+  if (published !== null) return published;
   const selectors = [
     'ytd-watch-metadata #description #info',
     'ytd-watch-metadata #info-container',
@@ -318,7 +365,7 @@ function readViewersFromSameLine() {
       while ((node = walker.nextNode())) {
         const v = String(node.nodeValue || '');
         if (!/視聴中|watching/i.test(v)) continue;
-        if (isInOtherVideos(node)) continue;
+        if (isInOtherVideos(node) || isInSkippedText(node)) continue;
         const ref = rectOf(node);
         if (ref.height <= 0) continue;
         // 同じ行の文字を集める範囲: 4 つ上の親まで
@@ -330,6 +377,7 @@ function readViewersFromSameLine() {
         let line = '';
         while ((t = w2.nextNode())) {
           const tv = String(t.nodeValue || '');
+          if (isInSkippedText(t)) continue;
           if (!tv.trim()) {
             line += tv;
             continue;
@@ -441,7 +489,7 @@ function saveViewerProbe() {
     while ((node = walker.nextNode()) && found.length < 8) {
       const v = String(node.nodeValue || '');
       if (!/視聴中|watching/i.test(v)) continue;
-      if (isInOtherVideos(node)) continue;
+      if (isInOtherVideos(node) || isInSkippedText(node)) continue;
       let box = node.parentElement;
       const path = [];
       for (let k = 0; k < 5 && box; k += 1) {
@@ -567,6 +615,8 @@ function setupWatchPageMetaObserver() {
         broadcasterHandle,
         broadcasterIconUrl: readBroadcasterIconUrl(),
         concurrentViewers: viewers,
+        ...(viewers === null ? { viewersRead: false } : {}),
+        sourceUrl: String(location.href || ''),
         ...startedAtFields(videoId),
         ...endedAtFields(videoId),
       },

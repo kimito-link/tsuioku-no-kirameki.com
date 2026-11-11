@@ -124,6 +124,42 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.numericEstimated).toBe(null);
   });
 
+  it('YouTube は推定の材料が無いので、最初の数が来るまでは読み込み中と出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'youtube',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        officialViewersOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('読み込み中');
+    expect(vm.concurrent.estTitle).toBe('同時視聴者数を読み込んでいます');
+    expect(vm.concurrent.subText).toBe('');
+    expect(vm.concurrent.estText).not.toBe('推定中');
+  });
+
+  it('YouTube で一度読めた数が次に読めないときは、最後の数と何分前かを出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'youtube',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 4321,
+        officialViewersOnly: true,
+        officialViewerStale: true,
+        officialViewerReadAt: nowMs - 3 * 60_000
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('4,321');
+    expect(vm.concurrent.subText).toBe('3分前');
+  });
+
   it('公式の視聴者数があるときは、公式の視聴者数しか出さないサービスでもその数を出す', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {
