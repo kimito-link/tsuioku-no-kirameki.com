@@ -15,7 +15,10 @@ import {
   abMessagesNearPlayhead,
   abCommentRow,
   shrinkAbPayload,
+  abChannelLogoUrl,
+  pickAbBroadcasterImage,
 } from './abParse.js';
+import { ytIconForNumericUid, ytSummaryToNicoSnapshot } from '../../../extension-youtube/src/ytNicoShim.js';
 import { platformOfStreamKey, platformChannelOfUrl, platformOfHostname, placeholderStreamKeyForChannel, STREAM_PLATFORMS } from '../platform/streamPlatform.js';
 
 /** 2025-07 公開観測の chats/messages(値は合成)。表示名は応答に無いことがある */
@@ -183,6 +186,58 @@ describe('ABEMA の番組情報と URL', () => {
     expect(buildAbStreamKey('n-abema-news', { chatId: 'abm1.chat.chat.program1' })).toBe('ab.n-abema-news.program1');
     expect(isAbStreamKey('ab.n-abema-news.00000')).toBe(true);
     expect(abLoginOfStreamKey('ab.n-abema-news.program1')).toBe('n-abema-news');
+  });
+  it('配信者カードはチャンネル画像。コメントの顔は空のまま', () => {
+    const logo = 'https://hayabusa.io/abema/channels/logo/abema-news.w340.png';
+    const og = 'https://image.p-c2-x.abema-tv.com/image/programs/p1/thumb001.png';
+    expect(pickAbBroadcasterImage({
+      login: 'n-abema-news',
+      images: [og, logo],
+      metas: [{ property: 'og:image', content: og }],
+    })).toBe(logo);
+    expect(pickAbBroadcasterImage({
+      login: 'e-event1',
+      metas: [{ property: 'og:image', content: og }],
+    })).toBe(og);
+    expect(pickAbBroadcasterImage({
+      login: 'e-event1',
+      metas: [{ property: 'og:image', content: 'https://evil.example/a.jpg' }],
+    })).toBe('');
+    expect(pickAbBroadcasterImage({ login: 'n-abema-news' })).toBe(logo);
+    expect(abChannelLogoUrl('e-event1')).toBe('');
+    expect(abChannelLogoUrl('s-abema-news__slot1')).toBe(logo);
+
+    const meta = parseAbProgramMeta({
+      slot: {
+        title: '朝のニュース',
+        channel: { id: 'abema-news' },
+        thumbComponent: { urlPrefix: 'https://hayabusa.io/abema/programs/p1', filename: 'thumb001.png' },
+      },
+    });
+    expect(meta.channelId).toBe('abema-news');
+    expect(meta.imageUrl).toBe('https://hayabusa.io/abema/programs/p1/thumb001.png');
+    expect(pickAbBroadcasterImage({ channelId: meta.channelId, apiImage: meta.imageUrl })).toBe(meta.imageUrl);
+    expect(parseAbProgramMeta({
+      slot: { title: '朝のニュース', channel: { id: 'abema-news', logoUrl: logo } },
+    }).imageUrl).toBe(logo);
+
+    const shrunk = shrinkAbPayload({
+      comments: [{ id: 'abm1.chat.chat.x.ulid01', message: 'ウホ。', createdAtMs: 1794364815754, userId: 'A2AmVn58ed3nrb' }],
+      channel: { id: 'abema-news', logoUrl: logo },
+    });
+    expect(shrunk.messages[0].iconUrl).toBe('');
+    expect(JSON.stringify(shrunk)).not.toContain('hayabusa');
+
+    const snap = ytSummaryToNicoSnapshot({
+      title: 'ABEMA NEWSチャンネル',
+      broadcasterName: 'ABEMA NEWSチャンネル',
+      broadcasterChannelId: 'ab:@n-abema-news',
+      broadcasterHandle: 'n-abema-news',
+      broadcasterIconUrl: logo,
+    }, 'ab.n-abema-news.program1', '');
+    expect(snap.broadcasterIconUrl).toBe(logo);
+    expect(snap.broadcasterUserId).toMatch(/^8\d{9}$/);
+    expect(ytIconForNumericUid(snap.broadcasterUserId)).toBe(logo);
   });
   it('画像は https の ABEMA の置き場だけ', () => {
     expect(safeAbImageUrl('http://hayabusa.io/a.jpg')).toBe('');

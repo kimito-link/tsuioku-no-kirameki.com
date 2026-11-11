@@ -11,6 +11,7 @@ import {
   buildAbStreamKey,
   abMessagesNearPlayhead,
   abCommentRow,
+  pickAbBroadcasterImage,
 } from '../../src/lib/abema/abParse.js';
 import {
   AB_COMMENT_AREA_SEL,
@@ -88,8 +89,39 @@ let seen = new Set();
 let pending = [];
 let flushTimer = 0;
 let metaAt = 0;
-/** @type {{ title: string, startedAtMs: number | null, viewers: number | null }} */
-let program = { title: '', startedAtMs: null, viewers: null };
+/** @type {{ title: string, startedAtMs: number | null, viewers: number | null, imageUrl: string, channelId: string }} */
+let program = { title: '', startedAtMs: null, viewers: null, imageUrl: '', channelId: '' };
+let sentIcon = '';
+
+/** ページに出ているチャンネル画像か番組画像。コメントした人の顔は集めない。 */
+function currentBroadcasterImage() {
+  /** @type {{ property: string, name: string, content: string }[]} */
+  const metas = [];
+  /** @type {string[]} */
+  const images = [];
+  try {
+    for (const el of document.querySelectorAll('meta[property], meta[name]')) {
+      const property = el.getAttribute('property') || '';
+      const name = el.getAttribute('name') || '';
+      if (!/^(?:og:image|twitter:image)/i.test(property || name)) continue;
+      metas.push({ property, name, content: el.getAttribute('content') || '' });
+    }
+    for (const img of document.querySelectorAll('img')) {
+      if (images.length >= 30) break;
+      const src = img instanceof HTMLImageElement ? img.currentSrc || img.getAttribute('src') || '' : '';
+      if (/hayabusa\.io|abema(?:-tv)?\.(?:com|tv|io)/i.test(src)) images.push(src);
+    }
+  } catch {
+    /* ページの形が違っても記録は続ける */
+  }
+  return pickAbBroadcasterImage({
+    login: pageLogin,
+    channelId: program.channelId,
+    apiImage: program.imageUrl,
+    metas,
+    images,
+  });
+}
 
 function pageTitle() {
   const t = String(document.title || '').replace(/\s*[|｜]\s*ABEMA\s*$/i, '').trim();
@@ -115,8 +147,12 @@ function sendMeta() {
     broadcasterName: title || 'ABEMAの配信',
     broadcasterChannelId: `ab:@${pageLogin}`,
     broadcasterHandle: pageLogin,
-    broadcasterIconUrl: '',
   };
+  const icon = currentBroadcasterImage();
+  if (icon) {
+    payload.broadcasterIconUrl = icon;
+    sentIcon = icon;
+  }
   if (program.viewers != null && program.viewers >= 0) payload.concurrentViewers = program.viewers;
   if (program.startedAtMs) {
     payload.startedAt = program.startedAtMs;
@@ -331,7 +367,8 @@ function syncPage() {
   const login = parseAbLoginFromUrl(location.href);
   if (login === pageLogin) {
     maybeNote();
-    if (streamKey && Date.now() - metaAt > 30_000) sendMeta();
+    const icon = pageLogin ? currentBroadcasterImage() : '';
+    if (streamKey && ((icon && icon !== sentIcon) || Date.now() - metaAt > 30_000)) sendMeta();
     return;
   }
   endStream();
@@ -341,7 +378,8 @@ function syncPage() {
   denied = false;
   dismissed = false;
   watchStartedAt = login ? Date.now() : 0;
-  program = { title: '', startedAtMs: null, viewers: null };
+  sentIcon = '';
+  program = { title: '', startedAtMs: null, viewers: null, imageUrl: '', channelId: '' };
   seen = new Set();
   pending = [];
   panel.reset();
@@ -361,11 +399,12 @@ window.addEventListener('message', (ev) => {
   if (!data || data.source !== IN) return;
   if (data.t === 'batch') onBatch(data.body, data.sinceMs, data.untilMs);
   else if (data.t === 'meta' && data.meta) {
-    program = {
-      title: String(data.meta.title || '').slice(0, 200),
-      startedAtMs: Number(data.meta.startedAtMs) > 0 ? Number(data.meta.startedAtMs) : null,
-      viewers: data.meta.viewers == null ? null : Number(data.meta.viewers),
-    };
+    const title = String(data.meta.title || '').slice(0, 200);
+    if (title) program.title = title;
+    if (Number(data.meta.startedAtMs) > 0) program.startedAtMs = Number(data.meta.startedAtMs);
+    if (data.meta.viewers != null && Number.isFinite(Number(data.meta.viewers))) program.viewers = Number(data.meta.viewers);
+    if (data.meta.imageUrl) program.imageUrl = String(data.meta.imageUrl);
+    if (data.meta.channelId) program.channelId = String(data.meta.channelId);
     if (streamKey) sendMeta();
   } else if (data.t === 'denied') {
     denied = true;

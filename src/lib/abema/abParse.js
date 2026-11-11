@@ -132,6 +132,94 @@ export function safeAbImageUrl(url) {
   return s.length <= 2000 ? s : '';
 }
 
+const CHANNEL_ID_RE = /^[a-z0-9][a-z0-9_-]{0,40}$/;
+
+/** ロゴの URL か（チャンネル画像。番組の横長サムネとは分ける） @param {string} url */
+function isAbLogoUrl(url) {
+  return /\/channels\/logo\/|\/channels\/[^/?#]+\/logo/i.test(url);
+}
+
+/**
+ * リニア放送の login（n- / s-）かチャンネル id から、公開されているチャンネルロゴ。
+ * 放送ページに画像がまだ無いときの最後の候補。イベントやエピソードの id からは作らない。
+ * @param {unknown} loginOrChannelId
+ */
+export function abChannelLogoUrl(loginOrChannelId) {
+  const raw = String(loginOrChannelId || '').trim().toLowerCase();
+  let id = '';
+  if (raw.startsWith('n-') && isAbLogin(raw)) id = raw.slice(2);
+  else if (raw.startsWith('s-') && isAbLogin(raw)) {
+    const rest = raw.slice(2);
+    const cut = rest.indexOf('__');
+    id = cut > 0 ? rest.slice(0, cut) : '';
+  } else if (!/^[neps]-/.test(raw) && CHANNEL_ID_RE.test(raw)) id = raw;
+  if (!CHANNEL_ID_RE.test(id)) return '';
+  return safeAbImageUrl(`https://hayabusa.io/abema/channels/logo/${id}.w340.png`);
+}
+
+/** @param {unknown} v */
+function explicitImage(v) {
+  if (typeof v === 'string') return safeAbImageUrl(v);
+  const o = obj(v);
+  return o ? safeAbImageUrl(o.url || o.href || o.imageUrl) : '';
+}
+
+/** @param {Record<string, any>} node */
+function joinedThumb(node) {
+  const thumb = obj(node.thumbComponent) || obj(node.thumbnailComponent) || obj(node.sceneThumbComponent);
+  if (!thumb) return '';
+  const direct = explicitImage(thumb.url || thumb.imageUrl || thumb);
+  if (direct) return direct;
+  const prefix = str(thumb.urlPrefix).replace(/\/+$/, '');
+  const file = str(thumb.filename || thumb.name).replace(/^\/+/, '');
+  if (!prefix || !file || /^(?:https?:)?\/\//i.test(file)) return '';
+  return safeAbImageUrl(`${prefix}/${file}`);
+}
+
+/**
+ * 番組 JSON から、配信者カード用の画像とチャンネル id。
+ * コメントした人の icon は見ない。
+ * @param {Record<string, any>} node
+ * @returns {{ imageUrl: string, channelId: string }}
+ */
+function programImage(node) {
+  const ch = obj(node.channel) || obj(node.channelInfo);
+  const rawId = str(ch?.id || node.channelId).toLowerCase();
+  const channelId = CHANNEL_ID_RE.test(rawId) && !/^[neps]-/.test(rawId) ? rawId : '';
+  const logo = explicitImage(ch?.logoUrl || ch?.logo || ch?.thumbnailUrl || ch?.thumbnail || ch?.image || node.logoUrl || node.channelLogo);
+  const thumb = joinedThumb(node)
+    || explicitImage(node.thumbnailUrl || node.thumbUrl || node.imageUrl || node.image || node.thumbnail);
+  return { imageUrl: logo || thumb, channelId };
+}
+
+/**
+ * 配信者カードに出す 1 枚。ページに出ているチャンネルロゴ、番組の og:image、
+ * ページ自身の応答に入っていた画像、最後にリニアの公開ロゴ、の順。
+ * コメントした人の顔はここでは選ばない（ABEMA のコメントに絵は無く、描画側の生成顔のまま）。
+ * @param {{ login?: string, channelId?: string, apiImage?: string, metas?: Array<{ property?: string, name?: string, content?: string }>, images?: string[] }} [src]
+ */
+export function pickAbBroadcasterImage(src = {}) {
+  const images = (Array.isArray(src.images) ? src.images : []).map((u) => safeAbImageUrl(u)).filter(Boolean);
+  const api = safeAbImageUrl(src.apiImage);
+  let og = '';
+  for (const m of Array.isArray(src.metas) ? src.metas : []) {
+    const key = str(m?.property || m?.name).toLowerCase();
+    if (key !== 'og:image' && key !== 'og:image:secure_url' && key !== 'twitter:image') continue;
+    const u = safeAbImageUrl(m?.content);
+    if (u) {
+      og = u;
+      break;
+    }
+  }
+  const logo = images.find((u) => isAbLogoUrl(u)) || (api && isAbLogoUrl(api) ? api : '');
+  if (logo) return logo;
+  if (og) return og;
+  if (api) return api;
+  const thumb = images.find((u) => /\/programs\/|thumb/i.test(u));
+  if (thumb) return thumb;
+  return abChannelLogoUrl(src.channelId) || abChannelLogoUrl(src.login);
+}
+
 /**
  * コメント取得の URL か(ページ自身が開く口)。放送ページそのものは含めない。
  * @param {unknown} url
@@ -283,7 +371,7 @@ export function parseAbCommentBatch(raw) {
 /**
  * 番組情報。コメントの束は番組情報にしない。
  * @param {unknown} raw
- * @returns {{ title: string, startedAtMs: number | null, viewers: number | null } | null}
+ * @returns {{ title: string, startedAtMs: number | null, viewers: number | null, imageUrl: string, channelId: string } | null}
  */
 export function parseAbProgramMeta(raw) {
   const root = unwrap(raw);
@@ -295,8 +383,12 @@ export function parseAbProgramMeta(raw) {
   const cleanTitle = title && title !== 'ABEMA' && title !== 'エラー' ? title : '';
   const startedAtMs = clockMs(src.startAt ?? src.startedAt ?? src.startTime ?? root.startAt);
   const viewers = viewersOf(src.realtime) ?? viewersOf(src.playback) ?? viewersOf(src) ?? viewersOf(root);
-  if (!cleanTitle && !startedAtMs && viewers == null) return null;
-  return { title: cleanTitle, startedAtMs, viewers };
+  const pic = programImage(src);
+  const rootPic = src === root ? pic : programImage(root);
+  const imageUrl = pic.imageUrl || rootPic.imageUrl;
+  const channelId = pic.channelId || rootPic.channelId;
+  if (!cleanTitle && !startedAtMs && viewers == null && !imageUrl && !channelId) return null;
+  return { title: cleanTitle, startedAtMs, viewers, imageUrl, channelId };
 }
 
 /** @param {unknown} v */
@@ -387,6 +479,7 @@ export function abCommentRow(msg, ctx) {
     channelId: `ab:${msg.userId}`,
     name: String(msg.name || msg.userId).slice(0, 40),
     login: '',
+    // コメント応答に絵は無い。チャンネル画像をここへ入れない（描画側の生成顔のまま）。
     iconUrl: safeAbImageUrl(msg.iconUrl),
     badges: /** @type {string[]} */ ([]),
     ts: '',

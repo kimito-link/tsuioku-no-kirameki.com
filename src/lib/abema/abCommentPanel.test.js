@@ -98,5 +98,7 @@ describe('ABEMA のコメント欄を一度だけ開く', () => {
     expect(src).toContain('stepAbCommentPanel');
     expect(src).toContain('AB_PANEL_NOTE');
     expect(src).toContain('panel.reset()');
+    expect(src).toContain('pickAbBroadcasterImage');
+    expect(src).not.toContain("broadcasterIconUrl: ''");
   });
 });
