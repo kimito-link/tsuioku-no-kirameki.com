@@ -921,9 +921,8 @@ import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS }
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
 import { wireVoiceVolumeSlider } from './popup/wireVoiceVolumeSlider.js';
-import { wireVoiceGpuTip } from './popup/wireVoiceGpuTip.js';
 import { wireVoiceNarrowSelect } from './popup/wireVoiceNarrowSelect.js';
-import { wireVoiceQualitySelect } from './popup/wireVoiceQualitySelect.js';
+import { wireVoiceQualitySelect } from './popup/wireVoiceQualitySelect.js'; import { wireVoiceEngineMode } from './popup/wireVoiceEngineMode.js';
 import {
   applyPopupFrameFallback,
   loadPopupFrameSettings,
@@ -19969,12 +19968,8 @@ async function initPopup() {
   });
 
   wireVoiceVolumeSlider(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P2: 読み上げ音量
-  wireVoiceGpuTip(document, {
-    get: safeStorageLocalGet,
-    onChanged: (fn) => chrome.storage?.onChanged?.addListener((changes, area) => { if (area === 'local') fn(changes); })
-  }); // 2026-11-03: 遅い PC なら GPU の案内
   wireVoiceNarrowSelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P3: 声の絞り込み
-  wireVoiceQualitySelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // 声の音質(既定16kHz)
+  wireVoiceQualitySelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); wireVoiceEngineMode(document); // 声の音質(既定16kHz)と、接続中の計算モード
   const effectSoundToggle = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));
   effectSoundToggle?.addEventListener('change', async () => {
     try {

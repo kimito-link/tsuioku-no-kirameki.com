@@ -27,6 +27,7 @@ import {
 } from '../lib/storageKeys.js';
 import {
   KEY_VOICE_ASSIGNMENTS,
+  KEY_VOICE_ENGINE_PREF,
   KEY_VOICE_READ_NAME_ENABLED,
   KEY_VOICE_READING_ENABLED
 } from '../lib/voiceKeys.js';
@@ -96,7 +97,7 @@ import {
   listVoicevoxStyleIds,
   probeVoicevoxAlive,
   probeVoicevoxStreaming,
-  probeVoicevoxGpuCapable,
+  probeVoiceEngineDevices,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
@@ -131,7 +132,9 @@ import {
   recordVoiceSynthStage,
   resetVoiceWarmMeasure
 } from '../lib/voiceStageTiming.js';
-import { decideVoiceGpuTip, decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
+import { decideVoiceLagNotice } from '../lib/voiceLagNotice.js';
+import { mountVoiceEnginePref } from './voiceEnginePrefControl.js';
+import { voiceEngineConnectionText, normalizeVoiceEnginePref } from '../lib/voiceEnginePref.js';
 import {
   KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, prepareVoiceStyleIds, rememberWeakVoicePc, isWeakVoicePc,
   forgetWeakVoicePcIfFast
@@ -167,7 +170,8 @@ import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
-  voiceEngineDeviceNote,
+  voiceEngineModeFromProbe,
+  voiceGpuCapableFromProbe,
   VOICE_LOADING_FLICKER_GUARD_MS
 } from '../lib/voiceLoadingState.js';
 import { isYtGiftOnlyCommentRow } from '../lib/youtube/ytGiftOnlyRow.js';
@@ -322,6 +326,25 @@ let _voiceStopCurrent = null;
 let _voiceStreamSupported = false;
 /** エンジンが GPU を使えるか(遅れの一言の GPU 案内用・null=分からない)。 */
 let _voiceGpuCapable = /** @type {boolean|null} */ (null);
+let _voiceEngineMode = /** @type {'cpu'|'gpu'|'unknown'|null} */ (null);
+let _voiceEnginePref = /** @type {'cpu'|'gpu'} */ ('cpu');
+let _voiceEngineCpuOnly = false;
+/** @type {ReturnType<typeof mountVoiceEnginePref>|null} */
+let _voicePrefUi = null;
+function voicePrefUi() {
+  if (_voicePrefUi) return _voicePrefUi;
+  _voicePrefUi = mountVoiceEnginePref(document);
+  const status = document.getElementById('cvVoiceStatus');
+  if (status) status.after(_voicePrefUi.label);
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes?.[KEY_VOICE_ENGINE_PREF]) return;
+      _voiceEnginePref = changes[KEY_VOICE_ENGINE_PREF].newValue === 'gpu' ? 'gpu' : 'cpu';
+      showVoiceDeviceNote();
+    });
+  } catch { /* 次に開いたときに読み直す */ }
+  return _voicePrefUi;
+}
 /** 遅い PC と分かったら、この ON の間は覚えておく(会場の VoicePlayer と同じ)。 */
 let _voiceSlowEngine = false;
 let _voiceSkipTimer = null;
@@ -615,18 +638,6 @@ function updateVoiceLagNotice() {
   _voiceLagNoticeShown = r.shown;
   const el = document.getElementById('cvVoiceLag');
   if (el) el.textContent = r.text;
-  updateVoiceGpuTip();
-}
-
-/** 2026-11-01: GPU の案内(遅れの一言とは別の行・会場と同じ判定=voiceLagNotice.decideVoiceGpuTip)。 */
-function updateVoiceGpuTip() {
-  const el = document.getElementById('cvVoiceGpuTip');
-  if (!el) return;
-  const text = _voiceReadingEnabled ? decideVoiceGpuTip(_voiceDiag, _voiceGpuCapable) : '';
-  if (el.textContent === text) return;
-  el.textContent = text;
-  el.title = text;
-  el.hidden = !text;
 }
 
 function disableVoiceReading({ persist = true } = {}) {
@@ -640,6 +651,7 @@ function disableVoiceReading({ persist = true } = {}) {
   _voiceToggleBusy = false;
   _livePush.close();
   stopVoicePlayback();
+  voicePrefUi().noteDisabled();
   driveCvVoiceLoading('idle');
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(false);
@@ -656,7 +668,7 @@ function scheduleVoiceEngineRetry(serial) {
 
 function showVoiceDeviceNote() {
   if (!_voiceReadingEnabled || !_voiceReadingWanted) return;
-  const text = voiceEngineDeviceNote(_voiceGpuCapable);
+  const text = voiceEngineConnectionText({ pref: _voiceEnginePref, actual: _voiceEngineMode, cpuOnly: _voiceEngineCpuOnly });
   if (!text) return;
   const status = document.getElementById('cvVoiceStatus');
   if (!status) return;
@@ -689,6 +701,7 @@ async function enableVoiceReading({ persist = true } = {}) {
   if (isObsMode()) return;
   const serial = _voiceEnableSerial;
   _voiceReadingWanted = true;
+  void voicePrefUi().noteEnabled();
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(true);
   await connectVoiceReading(serial, persist);
@@ -742,10 +755,24 @@ async function connectVoiceReading(serial, persist) {
     _voiceStreamSupported = false;
     void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
     _voiceGpuCapable = null;
-    void probeVoicevoxGpuCapable().then((ok) => {
-      _voiceGpuCapable = typeof ok === 'boolean' ? ok : null;
+    _voiceEngineMode = null;
+    _voiceEngineCpuOnly = false;
+    try {
+      const bag = await chrome.storage.local.get(KEY_VOICE_ENGINE_PREF);
+      const saved = normalizeVoiceEnginePref(bag?.[KEY_VOICE_ENGINE_PREF]);
+      _voiceEnginePref = saved || 'cpu';
+      if (!saved) void chrome.storage.local.set({ [KEY_VOICE_ENGINE_PREF]: 'cpu' });
+    } catch { _voiceEnginePref = 'cpu'; }
+    void probeVoiceEngineDevices().then((info) => {
+      const reported = info && typeof info === 'object' ? info.mode : null;
+      _voiceEngineCpuOnly = reported === 'cpu';
+      _voiceEngineMode = voiceEngineModeFromProbe(info);
+      _voiceGpuCapable = voiceGpuCapableFromProbe(info);
       showVoiceDeviceNote();
-    }, () => {});
+    }, () => {
+      _voiceEngineMode = 'unknown';
+      showVoiceDeviceNote();
+    });
     _voiceStyleIds = (await prepareVoiceStyleIds(allStyleIds, {
       readSettings: async () => {
         const b = await chrome.storage.local.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]);

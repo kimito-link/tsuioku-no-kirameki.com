@@ -105,14 +105,55 @@ export function resolveVoiceLoadingView(state, surface, reason) {
 }
 
 /**
- * エンジン API が教えられる範囲の中立な一行。
- *   /supported_devices は「GPU を使えるか」だけを返す。「今 CPU か GPU か」は返さない。
- *   null は未接続・読めない=この行は出さない(つながっていない案内と混ぜない)。
- * @param {boolean|null|undefined} gpuCapable probeVoicevoxGpuCapable の戻り
+ * VOICEVOX 0.26 の GET /supported_devices から、今の計算モードとして言い切れる範囲。
+ * この API は版が cpu / cuda / dml を「使えるか」だけ返す。プロセスが --use_gpu
+ * （または環境変数 VV_USE_GPU）で起動しているかは返さない。/version・/engine_manifest・
+ * /setting にもその項目は無い。
+ * - cuda と dml がどちらも明示の false → GPU を使えない版なので、動いているのは CPU。
+ * - どちらかが true → 使えるだけで、今 CPU か GPU かは不明。true を GPU 動作中とは読まない。
+ * - 項目が欠けている、形が違う → null。欠けを false と扱って CPU とは言わない。
+ * @param {unknown} body
+ * @returns {'cpu'|'unknown'|null}
+ */
+export function voiceEngineModeFromSupportedDevices(body) {
+  if (!body || typeof body !== 'object') return null;
+  const cuda = /** @type {{ cuda?: unknown, dml?: unknown }} */ (body).cuda;
+  const dml = /** @type {{ cuda?: unknown, dml?: unknown }} */ (body).dml;
+  if (cuda === true || dml === true) return 'unknown';
+  if (cuda === false && dml === false) return 'cpu';
+  return null;
+}
+
+/**
+ * 接続済みのときに出すモード。cpu / gpu / unknown 以外（読めない）は unknown。
+ * 未接続の文言はここでは出さない。この関数は gpu を受け取れるが、0.26 の API は gpu を返さない。
+ * @param {unknown} info
+ * @returns {'cpu'|'gpu'|'unknown'}
+ */
+export function voiceEngineModeFromProbe(info) {
+  const mode = info && typeof info === 'object' ? /** @type {{ mode?: unknown }} */ (info).mode : null;
+  if (mode === 'cpu' || mode === 'gpu' || mode === 'unknown') return mode;
+  return 'unknown';
+}
+
+/**
+ * 遅れの案内が使う「GPU を使えるか」。モードの表示とは別。
+ * @param {unknown} info
+ * @returns {boolean|null}
+ */
+export function voiceGpuCapableFromProbe(info) {
+  const v = info && typeof info === 'object' ? /** @type {{ gpuCapable?: unknown }} */ (info).gpuCapable : null;
+  return v === true || v === false ? v : null;
+}
+
+/**
+ * 接続中の計算モードの一行。色や勧めは付けない。空は「まだ出さない」。
+ * @param {'cpu'|'gpu'|'unknown'|null|undefined} mode
  * @returns {string}
  */
-export function voiceEngineDeviceNote(gpuCapable) {
-  if (gpuCapable === true) return 'VOICEVOX: GPUに対応しています（今の計算モードは分かりません）';
-  if (gpuCapable === false) return 'VOICEVOX: GPU非対応のエンジンです';
+export function voiceEngineModeLabel(mode) {
+  if (mode === 'cpu') return 'VOICEVOX：CPUで接続中';
+  if (mode === 'gpu') return 'VOICEVOX：GPUで接続中';
+  if (mode === 'unknown') return 'VOICEVOX：不明';
   return '';
 }

@@ -919,4 +919,40 @@ describe('VoicePlayer', () => {
       expect(player.readingWanted).toBe(true);
     });
   });
+
+  describe('計算モード', () => {
+    it('接続時に1回だけ聞いて CPU と出し、合成では聞かない', async () => {
+      const probeVoiceMode = vi.fn().mockResolvedValue({ mode: 'cpu', gpuCapable: false });
+      const statuses = [];
+      player.probeVoiceMode = probeVoiceMode;
+      player.onStatus = (t) => statuses.push(t);
+      await player.enable({ persist: false });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(probeVoiceMode).toHaveBeenCalledTimes(1);
+      expect(statuses).toContain('VOICEVOX：CPUで接続中');
+      player.enqueue([{ kind: 'comment', text: 'こんにちは', userKey: 'u1' }]);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(probeVoiceMode).toHaveBeenCalledTimes(1);
+    });
+
+    it('使えるだけの応答は不明。つながっていないときはモードを聞かない', async () => {
+      const statuses = [];
+      player.probeVoiceMode = vi.fn().mockResolvedValue({ mode: 'unknown', gpuCapable: true });
+      player.onStatus = (t) => statuses.push(t);
+      await player.enable({ persist: false });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(statuses).toContain('VOICEVOX：CPUを選択中（今のモードは不明）');
+      expect(statuses.some((t) => String(t).includes('GPUで接続中'))).toBe(false);
+
+      await player.disable({ persist: false });
+      player.engineRetryMs = 0;
+      player.fetchVoicevoxAlive = vi.fn().mockResolvedValue(false);
+      const states = [];
+      player.onLoadingState = (s) => states.push(s);
+      player.probeVoiceMode = vi.fn();
+      await player.enable({ persist: false });
+      expect(states).toContain('notfound');
+      expect(player.probeVoiceMode).not.toHaveBeenCalled();
+    });
+  });
 });

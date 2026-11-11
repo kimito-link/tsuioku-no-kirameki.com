@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
-  voiceEngineDeviceNote,
+  voiceEngineModeFromProbe,
+  voiceEngineModeFromSupportedDevices,
+  voiceEngineModeLabel,
   VOICE_LOADING_FLICKER_GUARD_MS
 } from './voiceLoadingState.js';
 
@@ -106,17 +108,29 @@ describe('resolveVoiceLoadingView (文言の出し分け)', () => {
   });
 });
 
-describe('voiceEngineDeviceNote', () => {
-  it('GPU 対応は中立に言い、今の計算モードとは言わない', () => {
-    const t = voiceEngineDeviceNote(true);
-    expect(t).toContain('GPUに対応');
-    expect(t).not.toContain('動作中');
-    expect(t).not.toContain('切り替');
+describe('voiceEngineMode', () => {
+  const errorLike = /見つかりません|ブロック|つながっていません|動作中|切り替|おすすめ/;
+  it('GPU を使えない版だけ CPU と言い切る', () => {
+    expect(voiceEngineModeFromSupportedDevices({ cpu: true, cuda: false, dml: false })).toBe('cpu');
+    expect(voiceEngineModeLabel('cpu')).toBe('VOICEVOX：CPUで接続中');
+    expect(errorLike.test(voiceEngineModeLabel('cpu'))).toBe(false);
   });
-  it('GPU 非対応も中立。分からないときは空', () => {
-    expect(voiceEngineDeviceNote(false)).toContain('GPU非対応');
-    expect(voiceEngineDeviceNote(false)).not.toContain('動作中');
-    expect(voiceEngineDeviceNote(null)).toBe('');
-    expect(voiceEngineDeviceNote(undefined)).toBe('');
+  it('使えるだけでは GPU とは言わず不明', () => {
+    expect(voiceEngineModeFromSupportedDevices({ cpu: true, cuda: true, dml: false })).toBe('unknown');
+    expect(voiceEngineModeFromSupportedDevices({ cpu: true, cuda: false, dml: true })).toBe('unknown');
+    expect(voiceEngineModeLabel('unknown')).toBe('VOICEVOX：不明');
+    expect(voiceEngineModeLabel('unknown')).not.toContain('GPUで接続中');
+  });
+  it('項目が欠けていたら CPU と決めない。形が違えば null', () => {
+    expect(voiceEngineModeFromSupportedDevices({ cpu: true, cuda: false })).toBe(null);
+    expect(voiceEngineModeFromSupportedDevices({ cpu: true })).toBe(null);
+    expect(voiceEngineModeFromSupportedDevices(null)).toBe(null);
+    expect(voiceEngineModeFromProbe({ mode: null })).toBe('unknown');
+    expect(voiceEngineModeLabel(null)).toBe('');
+  });
+  it('明示の gpu は受け取れるが、対応可否からは作らない', () => {
+    expect(voiceEngineModeLabel('gpu')).toBe('VOICEVOX：GPUで接続中');
+    expect(errorLike.test(voiceEngineModeLabel('gpu'))).toBe(false);
+    expect(voiceEngineModeFromSupportedDevices({ cpu: true, cuda: true, dml: true })).not.toBe('gpu');
   });
 });

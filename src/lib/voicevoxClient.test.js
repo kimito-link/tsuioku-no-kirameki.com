@@ -11,6 +11,7 @@ import {
   probeVoicevoxAlive,
   isWhisperStyleName,
   listVoicevoxStyleIds,
+  probeVoiceEngineDevices,
   probeVoicevoxGpuCapable,
   synthesizeVoice,
   warmupVoicevoxQuery
@@ -488,5 +489,25 @@ describe('probeVoicevoxGpuCapable', () => {
     await probeVoicevoxGpuCapable({ fetchFn, baseUrl: 'http://x:1/' });
     expect(fetchFn.mock.calls[0][0]).toBe('http://x:1/supported_devices');
     expect(fetchFn.mock.calls[0][1]?.method).toBe('GET');
+  });
+});
+
+describe('probeVoiceEngineDevices', () => {
+  const ok = (body) => async () => ({ ok: true, json: async () => body });
+  it('GPU を使えない版は CPU。使える版は不明で、GPU とは返さない', async () => {
+    const cpu = await probeVoiceEngineDevices({ fetchFn: ok({ cpu: true, cuda: false, dml: false }) });
+    expect(cpu).toEqual({ mode: 'cpu', gpuCapable: false });
+    const gpuEdition = await probeVoiceEngineDevices({ fetchFn: ok({ cpu: true, cuda: true, dml: false }) });
+    expect(gpuEdition.mode).toBe('unknown');
+    expect(gpuEdition.mode).not.toBe('gpu');
+    expect(gpuEdition.gpuCapable).toBe(true);
+  });
+  it('項目が欠けているときは mode を null のままにする', async () => {
+    const info = await probeVoiceEngineDevices({ fetchFn: ok({ cpu: true, cuda: false }) });
+    expect(info.mode).toBe(null);
+    expect(info.gpuCapable).toBe(false);
+  });
+  it('失敗したときは両方 null', async () => {
+    expect(await probeVoiceEngineDevices({ fetchFn: async () => { throw new Error('down'); } })).toEqual({ mode: null, gpuCapable: null });
   });
 });
