@@ -2611,6 +2611,12 @@ function wireButtons() {
   }
   const btnNg = document.getElementById('cvBtnNg');
   if (btnNg) btnNg.addEventListener('click', () => showNgPanel());
+  const btnSetlist = document.getElementById('cvBtnSetlist');
+  if (btnSetlist && !isObsMode()) {
+    btnSetlist.addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('setlist.html') });
+    });
+  }
   const btnPanelClose = document.getElementById('cvPanelClose');
   if (btnPanelClose) btnPanelClose.addEventListener('click', () => closePanel());
 
