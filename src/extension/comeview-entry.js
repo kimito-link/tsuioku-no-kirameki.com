@@ -28,7 +28,8 @@ import {
 import {
   KEY_VOICE_ASSIGNMENTS,
   KEY_VOICE_READ_NAME_ENABLED,
-  KEY_VOICE_READING_ENABLED
+  KEY_VOICE_READING_ENABLED,
+  KEY_VOICE_READING_SCRIPT
 } from '../lib/voiceKeys.js';
 import {
   buildComeviewWindowOptions,
@@ -91,8 +92,15 @@ import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { createComeviewLivePushClient } from './comeviewLivePushClient.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
+  buildVoiceQueueSpeech,
+  compileVoiceReadingScript,
+  composeVoiceReading,
+  EMPTY_VOICE_READING_SCRIPT,
+  isVoiceReadingExcluded
+} from '../lib/voiceReadingScript.js';
+import { mountVoiceReadingSettingsButton } from './voiceReadingSettingsPanel.js';
+import {
   buildMergedVoiceText,
-  buildVoiceReadingText,
   listVoicevoxStyleIds,
   probeVoicevoxAlive,
   probeVoicevoxStreaming,
@@ -307,6 +315,8 @@ const _voiceReaderLease = startVoiceReaderLease(() => _voiceReadingEnabled && !i
 let _voiceToggleBusy = false;
 /** v0.1.699: 名前読み(既定OFF=本文だけ)。 */
 let _voiceReadNameEnabled = false;
+/** 読み上げ辞書と型。設定が変わったときだけ組み直す。 */
+let _voiceReadingScript = EMPTY_VOICE_READING_SCRIPT;
 let _voiceStyleIds = [];
 let _voiceAssignments = {};
 let _voiceQueue = [];
@@ -894,7 +904,7 @@ function ensureVoicePrefetch(item, generation) {
   );
   const boostAtSynth = comeviewSpeedBoost(congestion.speedBoost);
   // v0.1.1799: コメビュには速さに合わせた本文の上限(会場の capVoiceMaxCharsByBoost)が無かったのでそろえる。
-  const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars) });
+  const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars), script: _voiceReadingScript });
   // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(会場の VoicePlayer と同じ判定)。
   if (!_voiceSlowEngine && isWeakVoicePc(_voiceDiag)) _voiceSlowEngine = true;
   const stream = shouldStreamVoice({
@@ -1043,7 +1053,7 @@ async function drainVoiceQueue() {
       const wav = prefetch
         ? await prefetch.promise
         : await synthesizeVoiceTracked(
-            buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars) }),
+            buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(boostAtSynth, congestion.maxChars), script: _voiceReadingScript }),
             {
               ...assigned,
               speedOffset: assigned.speedOffset + boostAtSynth
@@ -1285,20 +1295,13 @@ function enqueueVoiceTimelineItems(items) {
   let droppedCount = 0;
   for (const item of items) {
     if (!item || (item.kind !== 'comment' && item.kind !== 'gift')) continue;
+    if (isVoiceReadingExcluded(item, _voiceReadingScript)) { notifyVoiceItemDropped(item); continue; }
     // v0.1.699: 名前読みは既定OFF(本文だけ)。ONのときだけ「名前、本文」。
-    const name = _voiceReadNameEnabled
-      ? String(item.nickname || '').trim()
-      : '';
-    let body = '';
-    if (item.kind === 'gift') {
-      const count = item.gift?.count > 1 ? `を${item.gift.count}個` : 'を';
-      body = `ギフト、${item.gift?.name || 'アイテム'}${count}贈りました。${item.gift?.message || ''}`.trim();
-    } else {
-      body = String(item.text || '').trim();
-    }
+    const speech = buildVoiceQueueSpeech(item, _voiceReadNameEnabled);
+    const { name, body, reading } = speech;
 
     // v0.1.1811: 読む文字が無いときも「鳴らない」と知らせる(会場 VoicePlayer と同じ)。
-    if (!buildVoiceReadingText({ name, text: body })) { notifyVoiceItemDropped(item); continue; }
+    if (!composeVoiceReading(reading, { script: _voiceReadingScript })) { notifyVoiceItemDropped(item); continue; }
     // 2026-10-22計器(P1): 受信(item.at=capturedAt)→キュー投入。
     const _upstreamMs = measureVoiceGapMs(item.at, Date.now());
     if (_upstreamMs >= 0) {
@@ -1337,6 +1340,7 @@ function enqueueVoiceTimelineItems(items) {
       onAudioStart: item.onAudioStart,
       onAudioEnd: item.onAudioEnd,
       onDropped: item.onDropped,
+      reading,
       onAudible: () => publishVoiceNowPlaying(typeof chrome !== 'undefined' ? chrome.storage : null, {
         text: item.kind === 'gift' ? body : String(item.text || body),
         name: String(item.nickname || ''),
@@ -1389,7 +1393,8 @@ async function initializeVoiceReading() {
           VOICE_READING_ENABLED_KEY,
           VOICE_ASSIGNMENTS_KEY,
           VOICE_READ_NAME_KEY,
-          KEY_VOICE_VOLUME_PERCENT
+          KEY_VOICE_VOLUME_PERCENT,
+          KEY_VOICE_READING_SCRIPT
         ]),
       COMEVIEW_BOOT_READ_TIMEOUT_MS
     );
@@ -1400,6 +1405,7 @@ async function initializeVoiceReading() {
   _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
   _voiceReadNameEnabled = bag[VOICE_READ_NAME_KEY] === true;
   _voiceVolumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
+  _voiceReadingScript = compileVoiceReadingScript(bag[KEY_VOICE_READING_SCRIPT]);
   updateVoiceToggle();
   // ?voice=1 で起動された(パネルの「読み上げ」ボタン経由)場合は、保存状態に関わらず読み上げON。
   let forceVoiceOn = false;
@@ -2509,6 +2515,9 @@ function wireStorageChanges() {
     if (changes[KEY_VOICE_VOLUME_PERCENT]) {
       _voiceVolumePercent = normalizeVoiceVolumePercent(changes[KEY_VOICE_VOLUME_PERCENT].newValue);
     }
+    if (changes[KEY_VOICE_READING_SCRIPT]) {
+      _voiceReadingScript = compileVoiceReadingScript(changes[KEY_VOICE_READING_SCRIPT].newValue);
+    }
     if (!isObsMode() && changes[VOICE_ASSIGNMENTS_KEY]) {
       _voiceAssignments = normalizeVoiceAssignments(
         changes[VOICE_ASSIGNMENTS_KEY].newValue
@@ -2544,6 +2553,7 @@ function wireStorageChanges() {
 function wireButtons() {
   const btnVoice = document.getElementById('cvBtnVoice');
   if (btnVoice && !isObsMode()) {
+    mountVoiceReadingSettingsButton({ anchor: btnVoice, storage: chrome.storage });
     btnVoice.addEventListener('click', () => {
       if (_voiceReadingWanted) {
         disableVoiceReading();

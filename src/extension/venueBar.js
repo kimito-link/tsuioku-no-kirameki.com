@@ -10,6 +10,7 @@ import {
 } from '../lib/venuePickupBanner.js';
 import { attachVenuePickupDrag } from './venuePickupDrag.js';
 import { createVenuePickupVoiceLink } from './venuePickupVoice.js';
+import { mountVoiceReadingSettingsButton } from './voiceReadingSettingsPanel.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
   buildVenueSeating,
@@ -2868,6 +2869,7 @@ export function mountVenueBarButton(options = {}) {
   } else {
     headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
   }
+  mountVoiceReadingSettingsButton({ anchor: voiceBtn, buttonClass: 'nlsb-comeview-btn', storage: chrome.storage });
   // 2026-11-09: パネルの数字カードと同じ数字の帯(ヘッダーの2行目・値は数字カードの鏡をそのまま出す=lib の venueStatStrip.js)。
   const statStrip = createVenueStatStrip(document, {
     faces: {
