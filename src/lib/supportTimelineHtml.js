@@ -58,7 +58,7 @@ function escapeAttr(s) {
 
 /**
  * まとめてコメビュの小さな札。無いときは空(1配信の行は今までと同じ HTML)。
- * @param {{ sourceBadge?: unknown, sourceTitle?: unknown }|null|undefined} item
+ * @param {import('./supportActivityTimeline.js').TimelineItem|null|undefined} item
  */
 function sourceBadgeHtml(item) {
   const badge = String(item && item.sourceBadge || '').trim();

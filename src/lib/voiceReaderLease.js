@@ -156,12 +156,18 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
         if (ids.length >= 8) break;
       }
       if (!ids.length) return Promise.resolve();
-      return Promise.all(ids.map((lv) => Promise.resolve(sendMessage({
-        type: VOICE_READER_CLAIM,
-        liveId: lv,
-        holder,
-        force: true
-      })).catch(() => null))).then(() => {});
+      return (async () => {
+        for (const lv of ids) {
+          try {
+            await sendMessage({
+              type: VOICE_READER_CLAIM,
+              liveId: lv,
+              holder,
+              force: true
+            });
+          } catch { /* 1配信の名乗りが失敗しても、残りは引き取る */ }
+        }
+      })();
     },
     /**
      * 指定した配信だけ手放す(まとめて読みをやめたとき、前面の1配信は残す)。

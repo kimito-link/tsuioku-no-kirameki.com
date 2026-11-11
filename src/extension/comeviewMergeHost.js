@@ -1,3 +1,4 @@
+// @ts-nocheck — chrome のタブと storage を触る橋。判定は mergedComeview.js。
 // comeviewMergeHost.js — コメビュで、開いている配信タブを選んで1本の時系列にする。
 //   判定は src/lib/mergedComeview.js。ここはタブ一覧・保存・末尾の読み・描画と読み上げへの橋だけ。
 //   開いていない配信の記録は読まない。全件の IndexedDB も読まない。
