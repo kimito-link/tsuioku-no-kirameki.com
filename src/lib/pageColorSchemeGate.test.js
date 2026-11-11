@@ -27,7 +27,7 @@ const EXT_DIR = join(process.cwd(), 'extension');
  *   offscreen は画面に出ない(音声処理用)。
  */
 //   yt-comeview.html は同梱した YouTube 版のコメビュ(comeview.html の完全コピー・scripts/youtube-build.mjs)。
-const NO_BACKGROUND = new Set(['comeview.html', 'offscreen.html', 'yt-comeview.html']);
+const NO_BACKGROUND = new Set(['comeview.html', 'offscreen.html', 'yt-comeview.html', 'participation-queue.html', 'yt-participation-queue.html']);
 
 /** 画面に出ないページ(色の宣言そのものが不要)。 */
 const NOT_VISIBLE = new Set(['offscreen.html']);

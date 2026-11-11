@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1239 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -617,7 +617,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (143)
+- 📁 **extension/** (145)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -765,6 +765,7 @@
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
   - `offscreen.html`
+  - `participation-queue.html`
   - `popup.html`
   - `sidepanel.html`
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -772,6 +773,7 @@
   - `venue.html`
   - `yt-comeview.html`
   - `yt-marketing-export.html`
+  - `yt-participation-queue.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
 - 📁 **extension-youtube/** (157)
@@ -1159,7 +1161,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2441)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1198,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (114)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1259,6 +1261,8 @@
     - `orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
+    - `participation-queue-entry.js` — OBS に重ねる参加の順番。文字だけを出す。画像も定期読み直しも無い。
+    - `participationQueuePanel.js` — コメビュの「参加の順番」。保存の読み書きと、順番の操作だけを持つ。
     - `phoneDemoFeed.test.js`
     - `phoneFit.wiring.test.js`
     - `phoneLiveRanking.test.js`
@@ -1491,7 +1495,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2139)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2811,6 +2815,9 @@
     - `parseGiftComment.test.js`
     - `parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
     - `parseInterestArrivalComment.test.js`
+    - `participationQueue.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `participationQueue.test.js`
+    - `participationQueueProfile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `passiveMirrorLiveIdGuard.js` — 受動ビュー(status 埋め込み / live-view)が「別配信の古い鏡」を貼らないための判定。
     - `passiveMirrorLiveIdGuard.test.js`
     - `perfDiag.js` — 複数タブ paint 負荷の診断スナップショット。

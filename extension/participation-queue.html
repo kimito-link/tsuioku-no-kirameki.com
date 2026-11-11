@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="ja" style="color-scheme: light">
+  <head>
+    <!--
+      参加の順番を OBS に重ねる透過の画面。背景は塗らない。
+      color-scheme だけを light に固定し、暗色環境で地が黒く塗られるのを防ぐ。
+    -->
+    <meta name="color-scheme" content="light" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>参加の順番</title>
+    <style>
+      [hidden] { display: none !important; }
+      html, body { margin: 0; background: transparent; }
+      body { padding: clamp(8px, 2vw, 16px); pointer-events: none; }
+      #pqText {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #fff;
+        font: 700 clamp(18px, 4.2vw, 40px)/1.35 "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+        text-shadow: 0 1px 2px #000, 0 0 6px #000;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="pqText"></pre>
+    <script src="dist/participation-queue.js"></script>
+  </body>
+</html>

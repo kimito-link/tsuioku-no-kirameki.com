@@ -166,6 +166,9 @@ export function ytBuildTargets({ merged, define }) {
   ];
   // チャット欄のページ自身の世界で動く小さな手伝い(単体版は手書きのファイルをそのまま使う。本体向けは指紋に入るよう束ねて置く)
   if (merged) {
+    // 参加の順番の透過画面。コメビュと同じ保存の仕切りを入れる(書かない。読むだけ)。
+    list.push({ entryPoints: [resolve(root, 'src/extension/participation-queue-entry.js')], outfile: out('participation-queue.js'), target: 'chrome100', define: def, ...page,
+      banner: { js: '// participation-queue.js — 参加の順番の透過表示(YouTube 版は保存の仕切りつき)\n/* eslint-disable */' } });
     // Twitch の視聴ページの入口(council/twitch-support-PLAN.md)。記録は YouTube 版と同じ口へ送る=本体向けだけに置く
     list.push({ entryPoints: [src('tw-content-entry.js')], outfile: out('tw-content.js'), target: 'chrome114', define: def, ...page,
       banner: { js: '// tw-content.js — Twitch の視聴ページでチャット(公式の読み取り専用 IRC)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
@@ -206,6 +209,7 @@ export function writeYtMergedHtml() {
     ['popup.html', 'yt-sidepanel.html', 'dist/popup.js', 'dist/yt-sidepanel.js'],
     ['marketing-export.html', 'yt-marketing-export.html', 'dist/marketing-export.js', 'dist/yt-marketing-export.js'],
     ['comeview.html', 'yt-comeview.html', 'dist/comeview.js', 'dist/yt-comeview.js'],
+    ['participation-queue.html', 'yt-participation-queue.html', 'dist/participation-queue.js', 'dist/yt-participation-queue.js'],
     ['venue.html', 'yt-venue.html', 'dist/venue.js', 'dist/yt-venue.js'],
   ];
   const ytCv = readFileSync(resolve(root, 'extension-youtube/comeview.html'), 'utf8');
