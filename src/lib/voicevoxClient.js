@@ -75,6 +75,54 @@ function isExtensionPage() {
  * @param {{ text?: unknown, status?: unknown }} res
  * @returns {Response}
  */
+/** content script から合成を止めるときの裏方への合図(background.js と同じ文字列)。 */
+export const VOICEVOX_PROXY_ABORT_TYPE = 'NLS_FETCH_PROXY_ABORT';
+
+let _proxySeq = 0;
+
+/**
+ * sendMessage は AbortSignal を運べない。合図が来たら裏方の fetch を止める id を付ける。
+ * @param {RequestInit|undefined} init
+ * @param {(err: Error) => void} reject
+ * @returns {{ safeInit: RequestInit, id: string }}
+ */
+function proxyInitAndAbort(init, reject) {
+  const safeInit = { ...(init || {}) };
+  const signal = safeInit.signal;
+  if ('signal' in safeInit) delete safeInit.signal;
+  if (!signal) return { safeInit, id: '', skip: false };
+  const id = String(++_proxySeq);
+  const fire = () => {
+    try {
+      chrome.runtime.sendMessage({ type: VOICEVOX_PROXY_ABORT_TYPE, id });
+    } catch { /* 裏方がいなくても、こちらは待たない */ }
+    reject(new Error('voicevox_cancelled'));
+  };
+  if (signal.aborted) {
+    reject(new Error('voicevox_cancelled'));
+    return { safeInit, id: '', skip: true };
+  }
+  signal.addEventListener('abort', fire, { once: true });
+  return { safeInit, id, skip: false };
+}
+
+/**
+ * 外部の AbortSignal が止まったら、この fetch 用の controller も止める。
+ * @param {AbortController} controller
+ * @param {AbortSignal|undefined|null} external
+ * @returns {() => void}
+ */
+function linkExternalAbort(controller, external) {
+  if (!external || typeof external.addEventListener !== 'function') return () => {};
+  const onAbort = () => { try { controller.abort(); } catch { /* no-op */ } };
+  if (external.aborted) {
+    onAbort();
+    return () => {};
+  }
+  external.addEventListener('abort', onAbort, { once: true });
+  return () => { try { external.removeEventListener('abort', onAbort); } catch { /* no-op */ } };
+}
+
 export function proxyTextResponse(res) {
   const raw = Number(res && res.status);
   const status = Number.isInteger(raw) && raw >= 200 && raw <= 599 ? raw : 502;
@@ -96,10 +144,10 @@ async function proxyFetchFn(url, init) {
   }
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
     return new Promise((resolve, reject) => {
-      const safeInit = { ...init };
-      if ('signal' in safeInit) delete safeInit.signal;
+      const { safeInit, id, skip } = proxyInitAndAbort(init, reject);
+      if (skip) return;
       chrome.runtime.sendMessage(
-        { type: 'NLS_FETCH_PROXY', url: url.toString(), init: safeInit, wantBuffer: false },
+        { type: 'NLS_FETCH_PROXY', url: url.toString(), init: safeInit, wantBuffer: false, id },
         (res) => {
           if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
           if (!res || res.error) return reject(new Error(res?.error || 'Proxy fetch failed'));
@@ -125,10 +173,10 @@ async function proxyFetchBufferFn(url, init) {
   }
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
     return new Promise((resolve, reject) => {
-      const safeInit = { ...init };
-      if ('signal' in safeInit) delete safeInit.signal;
+      const { safeInit, id, skip } = proxyInitAndAbort(init, reject);
+      if (skip) return;
       chrome.runtime.sendMessage(
-        { type: 'NLS_FETCH_PROXY', url: url.toString(), init: safeInit, wantBuffer: true },
+        { type: 'NLS_FETCH_PROXY', url: url.toString(), init: safeInit, wantBuffer: true, id },
         (res) => {
           if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
           if (!res || res.error) return reject(new Error(res?.error || 'Proxy fetch failed'));
@@ -209,6 +257,8 @@ export const VOICEVOX_STREAM_PORT = 'NLS_VOICEVOX_STREAM';
  */
 async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
   const controller = new AbortController();
+  const external = init?.signal;
+  const unlink = linkExternalAbort(controller, external);
   let timer = 0;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => {
@@ -225,8 +275,12 @@ async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
         timeout
       ])
     );
+  } catch (err) {
+    if (external?.aborted) throw new Error('voicevox_cancelled');
+    throw err;
   } finally {
     clearTimeout(timer);
+    unlink();
   }
 }
 
@@ -538,6 +592,7 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
   const streamFetchFn = typeof opts.streamFetchFn === 'function' ? opts.streamFetchFn : proxyStreamFetchFn;
   const firstAudioMs = positiveTimeout(opts.synthesisTimeoutMs, 8000);
   const controller = new AbortController();
+  const unlinkExternal = linkExternalAbort(controller, opts.signal);
   /** @type {any} */
   let res;
   let timer = /** @type {any} */ (0);
@@ -553,10 +608,18 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
         timer = setTimeout(() => { controller.abort(); reject(new Error('voicevox_timeout')); }, firstAudioMs);
       })
     ]);
+  } catch (err) {
+    unlinkExternal();
+    throw err;
   } finally {
     clearTimeout(timer);
   }
+  if (opts.signal?.aborted) {
+    unlinkExternal();
+    return null;
+  }
   if (!res || res.ok === false) {
+    unlinkExternal();
     const status = Number(res?.status) || 0;
     // 古いエンジン(無い)/この声は少しずつに対応していない → 今までのやり方で作り直す。
     if (status === 404 || status === 405 || status === 501) { _streamSupport = 'no'; return STREAM_FALLBACK; }
@@ -565,7 +628,10 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
     return null;
   }
   const reader = res.body && typeof res.body.getReader === 'function' ? res.body.getReader() : null;
-  if (!reader) return STREAM_FALLBACK;
+  if (!reader) {
+    unlinkExternal();
+    return STREAM_FALLBACK;
+  }
   const parser = createWavStreamParser();
   /** @type {StreamedVoice|null} */
   let voice = null;
@@ -574,6 +640,7 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
     const settle = (/** @type {StreamedVoice|null} */ v) => {
       if (settled) return;
       settled = true;
+      unlinkExternal();
       clearTimeout(firstTimer);
       resolve(v);
     };
@@ -611,6 +678,7 @@ async function streamSynthesis(url, audioQuery, styleId, opts, notifyFailure) {
         }
       } catch (err) {
         try { void reader.cancel().catch(() => {}); } catch { /* no-op */ }
+        if (opts.signal?.aborted) { settle(null); return; }
         if (voice && voice.totalSamples > 0) {
           // 途中で途切れた: 届いた分だけ読んで終える。
           voice.fail();
@@ -642,6 +710,7 @@ async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailur
   const streamFetchFn = typeof opts.streamFetchFn === 'function' ? opts.streamFetchFn : proxyStreamFetchFn;
   const totalMs = positiveTimeout(opts.synthesisTimeoutMs, 8000);
   const controller = new AbortController();
+  const unlinkExternal = linkExternalAbort(controller, opts.signal);
   /** @type {any} */
   let reader = null;
   let timer = /** @type {any} */ (0);
@@ -695,10 +764,12 @@ async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailur
       return wav.buffer;
     })()]);
   } catch (err) {
+    if (opts.signal?.aborted || String(err && err.message || '') === 'voicevox_cancelled') return null;
     notifyFailure({ stage: 'synth', error: err });
     return null;
   } finally {
     clearTimeout(timer);
+    unlinkExternal();
   }
 }
 
@@ -763,7 +834,7 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     const queryResponse = await fetchWithTimeout(
       fetchFn,
       `${baseUrl}/audio_query?${query}`,
-      { method: 'POST' },
+      { method: 'POST', signal: opts.signal },
       positiveTimeout(opts.audioQueryTimeoutMs, 3000)
     );
     if (!queryResponse || queryResponse.ok === false) {
@@ -830,7 +901,8 @@ export async function synthesizeVoice(text, voice, opts = {}) {
           'Content-Type': 'application/json',
           Accept: 'audio/wav'
         },
-        body: JSON.stringify(audioQuery)
+        body: JSON.stringify(audioQuery),
+        signal: opts.signal
       },
       positiveTimeout(opts.synthesisTimeoutMs, 8000)
     );
@@ -849,6 +921,8 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     } catch { /* 計器の失敗は読み上げを止めない */ }
     return wav;
   } catch (err) {
+    // OFF で止めた合成は失敗として数えない(時間切れと混ざると「エンジンが混雑」と誤診する)。
+    if (opts.signal?.aborted || String(err && err.message || '') === 'voicevox_cancelled') return null;
     // v0.1.1224: ここは「接続不能(VOICEVOX未起動)」と「時間切れ」と「本文読み取り失敗」が
     //   全部落ちてくる。error をそのまま渡し、分類は純関数(voiceSynthFailureReason)に任せる。
     notifyFailure({ stage, error: err });

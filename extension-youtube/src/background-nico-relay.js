@@ -165,6 +165,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
+// v0.1.2037: 読み上げ OFF で、content script 経由の合成 fetch を止める。
+const voicevoxProxyInflight = new Map();
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (YT_MERGED) return undefined;
+  if (!msg || msg.type !== 'NLS_FETCH_PROXY_ABORT') return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  const ctl = voicevoxProxyInflight.get(String(msg.id || ''));
+  if (ctl) {
+    try { ctl.abort(); } catch { /* no-op */ }
+  }
+  sendResponse({ ok: true });
+  return false;
+});
+
 // v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (YT_MERGED) return undefined;
@@ -187,7 +201,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ error: 'URL not allowed' });
     return true;
   }
-  fetch(msg.url, msg.init)
+  const controller = new AbortController();
+  const proxyId = String(msg.id || '');
+  if (proxyId) voicevoxProxyInflight.set(proxyId, controller);
+  const init = { ...(msg.init || {}), signal: controller.signal };
+  fetch(msg.url, init)
+    .finally(() => { if (proxyId) voicevoxProxyInflight.delete(proxyId); })
     .then(res => {
       if (msg.wantBuffer) {
         return res.arrayBuffer().then(buf => ({

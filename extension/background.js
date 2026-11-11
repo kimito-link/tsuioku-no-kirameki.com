@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: fcd1b5a4040b
+// nls-sw-fingerprint: ee7a84305fa1
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -3776,6 +3776,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
+// v0.1.2037: 読み上げ OFF で、content script 経由の合成 fetch を止める(signal は sendMessage で運べない)。
+const voicevoxProxyInflight = new Map();
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== 'NLS_FETCH_PROXY_ABORT') return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  const ctl = voicevoxProxyInflight.get(String(msg.id || ''));
+  if (ctl) {
+    try { ctl.abort(); } catch { /* no-op */ }
+  }
+  sendResponse({ ok: true });
+  return false;
+});
+
 // v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== 'NLS_FETCH_PROXY') return undefined;
@@ -3797,7 +3810,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ error: 'URL not allowed' });
     return true;
   }
-  fetch(msg.url, msg.init)
+  const controller = new AbortController();
+  const proxyId = String(msg.id || '');
+  if (proxyId) voicevoxProxyInflight.set(proxyId, controller);
+  const init = { ...(msg.init || {}), signal: controller.signal };
+  fetch(msg.url, init)
+    .finally(() => { if (proxyId) voicevoxProxyInflight.delete(proxyId); })
     .then(res => {
       if (msg.wantBuffer) {
         return res.arrayBuffer().then(buf => ({

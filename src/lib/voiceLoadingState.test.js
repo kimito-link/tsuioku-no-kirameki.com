@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
+  voiceEngineDeviceNote,
   VOICE_LOADING_FLICKER_GUARD_MS
 } from './voiceLoadingState.js';
 
@@ -60,9 +61,10 @@ describe('resolveVoiceLoadingView (文言の出し分け)', () => {
     expect(v.text).not.toContain('見つかりません');
   });
 
-  it('refused は従来どおり「見つかりません(起動して押し直す)」', () => {
+  it('refused は「つながっていません」(ボタンは押したままなので押し直しとは言わない)', () => {
     const v = resolveVoiceLoadingView('notfound', 'venue', 'refused');
-    expect(v.text).toContain('VOICEVOXが見つかりません');
+    expect(v.text).toBe('VOICEVOXにつながっていません');
+    expect(v.text).not.toContain('押し直');
   });
 
   it('http-error はバージョン確認を促す', () => {
@@ -101,5 +103,20 @@ describe('resolveVoiceLoadingView (文言の出し分け)', () => {
   it('connecting は両画面とも loading 種別', () => {
     expect(resolveVoiceLoadingView('connecting', 'venue').kind).toBe('loading');
     expect(resolveVoiceLoadingView('connecting', 'comeview').kind).toBe('loading');
+  });
+});
+
+describe('voiceEngineDeviceNote', () => {
+  it('GPU 対応は中立に言い、今の計算モードとは言わない', () => {
+    const t = voiceEngineDeviceNote(true);
+    expect(t).toContain('GPUに対応');
+    expect(t).not.toContain('動作中');
+    expect(t).not.toContain('切り替');
+  });
+  it('GPU 非対応も中立。分からないときは空', () => {
+    expect(voiceEngineDeviceNote(false)).toContain('GPU非対応');
+    expect(voiceEngineDeviceNote(false)).not.toContain('動作中');
+    expect(voiceEngineDeviceNote(null)).toBe('');
+    expect(voiceEngineDeviceNote(undefined)).toBe('');
   });
 });

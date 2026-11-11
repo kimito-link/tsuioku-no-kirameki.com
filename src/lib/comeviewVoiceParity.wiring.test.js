@@ -35,17 +35,18 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
    *   実際に変異テストで素通りして発覚した。判定は該当分岐に限定する。
    */
   const probeFailBranch = (() => {
-    const enableAt = cv.indexOf('async function enableVoiceReading');
-    const disableAt = cv.indexOf('disableVoiceReading({ persist: false })', enableAt);
-    const i = cv.lastIndexOf('if (!probe.ok) {', disableAt);
-    if (enableAt < 0 || disableAt < 0 || i < enableAt) return '';
-    return cv.slice(i, disableAt + 120);
+    const enableAt = cv.indexOf('async function connectVoiceReading');
+    const notfoundAt = cv.indexOf("driveCvVoiceLoading('notfound'", enableAt);
+    const i = cv.lastIndexOf('if (!probe.ok) {', notfoundAt);
+    if (enableAt < 0 || notfoundAt < 0 || i < enableAt) return '';
+    return cv.slice(i, notfoundAt + 80);
   })();
 
-  it('★コメビュ: 生存確認の失敗分岐で OFF を永続保存しない', () => {
-    expect(probeFailBranch).not.toBe(''); // 分岐が見つからない=構造が変わった
-    expect(probeFailBranch).toMatch(/disableVoiceReading\(\s*\{\s*persist:\s*false\s*\}\s*\)/);
-    expect(probeFailBranch).not.toMatch(/disableVoiceReading\(\s*\{\s*persist:\s*true\s*\}\s*\)/);
+  it('★コメビュ: 生存確認に失敗してもボタンを OFF に戻さず、OFF も保存しない', () => {
+    expect(probeFailBranch).not.toBe('');
+    expect(probeFailBranch).toMatch(/driveCvVoiceLoading\('notfound'/);
+    expect(probeFailBranch).not.toMatch(/disableVoiceReading/);
+    expect(probeFailBranch).not.toMatch(/persistVoiceReadingEnabled\(false\)/);
   });
 
   it('★両実装が同じ再試行バックオフ定数を使う(片方だけ1回のまま にしない)', () => {
@@ -117,15 +118,16 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     );
     const failTotalAt = enableBranch.indexOf('_voiceDiag.enableFailTotal =', failReasonAt);
     const failPublishAt = enableBranch.indexOf('publishVoiceDiag()', failTotalAt);
-    const disableAt = enableBranch.indexOf('disableVoiceReading({ persist: false })', failPublishAt);
+    const notfoundAt = enableBranch.indexOf("driveCvVoiceLoading('notfound'", failPublishAt);
     expect(failReasonAt).toBeGreaterThan(-1);
     expect(failTotalAt).toBeGreaterThan(failReasonAt);
     expect(failPublishAt).toBeGreaterThan(failTotalAt);
-    expect(disableAt).toBeGreaterThan(failPublishAt);
+    expect(notfoundAt).toBeGreaterThan(failPublishAt);
+    expect(enableBranch).not.toMatch(/disableVoiceReading\(\s*\{\s*persist:\s*false\s*\}\s*\)/);
 
     const successClearAt = enableBranch.indexOf("_voiceDiag.lastEnableFailReason = ''");
     const successPublishAt = enableBranch.indexOf('publishVoiceDiag()', successClearAt);
-    expect(successClearAt).toBeGreaterThan(disableAt);
+    expect(successClearAt).toBeGreaterThan(notfoundAt);
     expect(successPublishAt).toBeGreaterThan(successClearAt);
   });
 
