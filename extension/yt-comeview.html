@@ -122,6 +122,15 @@
         border-color: var(--cv-accent);
       }
       .cv-toolbar .cv-spacer { flex: 1 1 auto; }
+      .nl-tl-tr {
+        grid-column: 1 / -1;
+        color: var(--cv-sub);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      @media (max-width: 640px) {
+        .cv-toolbar button { padding: 6px 8px; }
+      }
       .cv-count { font-variant-numeric: tabular-nums; }
       .cv-voice-controls {
         display: inline-flex;
@@ -703,6 +712,9 @@
         <span class="cv-voice-skip" id="cvVoiceLag" aria-live="polite"></span>
         <span class="cv-voice-gpu-tip" id="cvVoiceGpuTip" role="note" hidden></span>
       </span>
+      <button id="cvBtnAutoTr" type="button" aria-pressed="false" title="新しいコメントを1件ずつ訳す。最初はオフ">自動翻訳: OFF</button>
+      <button id="cvBtnTrModel" type="button" hidden title="このPCに翻訳モデルを保存する">モデルを用意</button>
+      <span class="cv-voice-status" id="cvTranslateStatus" role="status"></span>
       <button id="cvBtnNg" type="button" title="非表示にした人を管理" style="display: none;">NG 0</button>
       <button id="cvBtnWindow" type="button" title="別ウィンドウで開く">⧉ 別窓</button>
       <button id="cvBtnObs" type="button" title="OBS用の透過表示に切替">OBS透過</button>

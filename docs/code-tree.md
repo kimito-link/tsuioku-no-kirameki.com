@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1233 件
+## ⚠️ 役割コメントが無いソース 10 / 1235 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1159,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2433)
+- 📁 **src/** (2436)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1196,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (111)
+  - 📁 **extension/** (112)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1233,6 +1233,7 @@
     - `comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
     - `comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
     - `commentTickerStarvation.wiring.test.js`
+    - `commentTranslateHost.js` — Chrome 内蔵の Translator / LanguageDetector だけを呼ぶ。
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
     - `embeddedProgramElapsed.wiring.test.js`
@@ -1490,7 +1491,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2134)
+  - 📁 **lib/** (2136)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1979,6 +1980,8 @@
     - `commentTimelineMirrorLazy.test.js`
     - `commentTimelineReport.js` — 状態速報に「応援コメント(最新N件・本文)」を出す整形 lib。
     - `commentTimelineReport.test.js`
+    - `commentTranslate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `commentTranslate.test.js`
     - `commentVelocityTimeline.js` — コメントの時系列粒度集計と「笑い密度（L4 笑いの瞬間検出）」を純粋関数で計算する。
     - `commentVelocityTimeline.test.js`
     - `commentVelocityWindow.js` — 直近ウィンドウ内のコメント件数と「件/分」換算（純関数）

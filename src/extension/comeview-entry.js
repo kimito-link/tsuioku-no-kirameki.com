@@ -36,6 +36,17 @@ import {
 } from '../lib/comeviewWindowGeometry.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { checkCreditBadge } from '../lib/supporterAccess.js';
+import {
+  COMMENT_TRANSLATE_KEY,
+  normalizeCommentTranslateSettings,
+  planCommentTranslate,
+  translationLine
+} from '../lib/commentTranslate.js';
+import {
+  queryTranslatorAvailability,
+  readChromeTranslatorApis,
+  translateWithChrome
+} from './commentTranslateHost.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
 import {
   isCommentDbAvailable,
@@ -286,6 +297,11 @@ function trimSeenGiftSigs() {
 const _timelineItemsByKey = new Map();
 let _commentCount = 0;
 let _hoverBar = null;
+/** 行ごとの訳文（この画面を開いているあいだだけ。記録には残さない）。 */
+const _translations = new Map();
+let _translateSettings = normalizeCommentTranslateSettings(null);
+let _translateBusy = false;
+let _translateModelOk = false;
 let _hoverRow = null;
 let _voiceReadingEnabled = false;
 /** ボタンに出す意思。エンジンが居なくても ON のまま。 */
@@ -1841,6 +1857,7 @@ function rememberTimelineElement(element, item, animate) {
   if (animate) element.classList.add('cv-row-in');
   _renderedKeys.add(item.key);
   _timelineItemsByKey.set(item.key, item);
+  paintTranslation(element, _translations.get(item.key) || '');
 }
 
 function forgetTimelineElement(element) {
@@ -2008,6 +2025,7 @@ function appendTimelineItems(items) {
     rows = listEl.querySelectorAll('[data-cv-key]');
   }
   if (shouldFollow) listEl.scrollTop = listEl.scrollHeight;
+  considerAutoTranslate(items);
 }
 
 function normalizePin(raw) {
@@ -2352,7 +2370,9 @@ function showHoverBar(row) {
   const userId = String(item.userId || '').trim();
   for (const button of _hoverBar.querySelectorAll('button[data-cv-action]')) {
     const action = button.dataset.cvAction;
-    button.disabled = (action === 'block' || action === 'person') && !userId;
+    button.disabled =
+      ((action === 'block' || action === 'person') && !userId) ||
+      (action === 'translate' && item.kind !== 'comment');
   }
   _hoverBar.style.display = 'flex';
   _hoverBar.classList.add('is-visible');
@@ -2370,7 +2390,8 @@ function createHoverBar() {
     ['block', 'この人を非表示'],
     ['person', 'この人の詳細'],
     ['copy', '名前と本文をコピー'],
-    ['pin', 'コメピタ']
+    ['pin', 'コメピタ'],
+    ['translate', 'この行を訳す']
   ];
   for (const [action, label] of actions) {
     const button = document.createElement('button');
@@ -2378,7 +2399,11 @@ function createHoverBar() {
     button.dataset.cvAction = action;
     button.title = label;
     button.setAttribute('aria-label', label);
-    button.innerHTML = CV_ACTION_ICONS[action];
+    if (action === 'translate') {
+      button.textContent = '訳';
+    } else {
+      button.innerHTML = CV_ACTION_ICONS[action];
+    }
     bar.appendChild(button);
   }
   bar.addEventListener('mouseenter', () => {
@@ -2416,6 +2441,9 @@ function createHoverBar() {
         hideHoverBar();
         break;
       }
+      case 'translate':
+        void runLineTranslate(item, 'manual');
+        break;
       case 'block':
         addNg(row);
         hideHoverBar();
@@ -2531,6 +2559,137 @@ function wireStorageChanges() {
   });
 }
 
+function paintTranslation(element, text) {
+  if (!(element instanceof HTMLElement)) return;
+  const line = String(text || '');
+  let slot = element.querySelector(':scope > .nl-tl-tr');
+  if (!line) {
+    if (slot) slot.remove();
+    return;
+  }
+  if (!slot) {
+    slot = document.createElement('span');
+    slot.className = 'nl-tl-tr';
+    element.appendChild(slot);
+  }
+  if (slot.textContent !== line) slot.textContent = line;
+}
+
+function setTranslateStatus(text) {
+  const el = document.getElementById('cvTranslateStatus');
+  if (el) el.textContent = String(text || '');
+}
+
+function updateAutoTranslateButton() {
+  const btn = document.getElementById('cvBtnAutoTr');
+  if (!btn) return;
+  const on = _translateSettings.auto === true;
+  btn.textContent = on ? '自動翻訳: ON' : '自動翻訳: OFF';
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.classList.toggle('is-on', on);
+}
+
+const TRANSLATE_STATUS = {
+  empty: '',
+  'auto-off': '',
+  busy: '前の翻訳が終わってからにします',
+  'already-target': 'この文は訳し先の言語です',
+  'unknown-language': '言語が分からないので訳しません',
+  unavailable: 'このブラウザの翻訳は使えません。外へは送りません',
+  'needs-download': '翻訳モデルがありません。「モデルを用意」でこのPCに保存できます',
+  'model-not-ready': '翻訳モデルがまだないので、自動では訳しません',
+  'empty-result': '訳文が空でした',
+  failed: '翻訳できませんでした。外へは送っていません'
+};
+
+async function runLineTranslate(item, mode) {
+  if (!item || item.kind !== 'comment' || isObsMode()) return;
+  const apis = readChromeTranslatorApis(globalThis);
+  const scriptPlan = planCommentTranslate({
+    text: item.text,
+    settings: _translateSettings,
+    mode,
+    availability: 'available',
+    busy: _translateBusy
+  });
+  if (!scriptPlan.go) {
+    if (mode === 'manual' && scriptPlan.reason !== 'auto-off') {
+      setTranslateStatus(TRANSLATE_STATUS[scriptPlan.reason] || '');
+    }
+    return;
+  }
+  if (!apis.translator) {
+    setTranslateStatus(TRANSLATE_STATUS.unavailable);
+    return;
+  }
+  _translateBusy = true;
+  if (mode === 'manual') setTranslateStatus('翻訳しています');
+  try {
+    const availability = await queryTranslatorAvailability(
+      apis.translator,
+      scriptPlan.sourceLanguage || 'en',
+      scriptPlan.targetLanguage || 'ja'
+    );
+    const plan = planCommentTranslate({
+      text: item.text,
+      settings: _translateSettings,
+      mode,
+      availability: _translateModelOk ? 'available' : availability,
+      busy: false
+    });
+    if (!plan.go) {
+      const modelBtn = document.getElementById('cvBtnTrModel');
+      if (modelBtn) modelBtn.hidden = plan.reason !== 'needs-download';
+      if (mode === 'manual' || plan.reason === 'model-not-ready') {
+        setTranslateStatus(TRANSLATE_STATUS[plan.reason] || '');
+      }
+      return;
+    }
+    const out = await translateWithChrome(apis.translator, plan);
+    const line = out.ok ? translationLine(out.text, plan.text) : '';
+    if (line && item.key) {
+      _translations.set(item.key, line);
+      const row = document.querySelector(`[data-cv-key="${CSS.escape(item.key)}"]`);
+      if (row) paintTranslation(row, line);
+      setTranslateStatus('');
+    } else {
+      setTranslateStatus(TRANSLATE_STATUS[out.reason] || TRANSLATE_STATUS.failed);
+    }
+  } finally {
+    _translateBusy = false;
+  }
+}
+
+function considerAutoTranslate(items) {
+  if (!_translateSettings.auto || _translateBusy || isObsMode()) return;
+  const list = Array.isArray(items) ? items : [];
+  const item = list.find((it) => it && it.kind === 'comment' && it.key && !_translations.has(it.key));
+  if (!item) return;
+  void runLineTranslate(item, 'auto');
+}
+
+async function prepareTranslateModel() {
+  const apis = readChromeTranslatorApis(globalThis);
+  if (!apis.translator) {
+    setTranslateStatus(TRANSLATE_STATUS.unavailable);
+    return;
+  }
+  setTranslateStatus('翻訳モデルをこのPCに保存しています');
+  const out = await translateWithChrome(apis.translator, {
+    text: 'hello',
+    sourceLanguage: 'en',
+    targetLanguage: _translateSettings.targetLanguage || 'ja'
+  });
+  if (out.ok) {
+    _translateModelOk = true;
+    const modelBtn = document.getElementById('cvBtnTrModel');
+    if (modelBtn) modelBtn.hidden = true;
+    setTranslateStatus('翻訳モデルを用意しました');
+  } else {
+    setTranslateStatus(TRANSLATE_STATUS.failed);
+  }
+}
+
 function wireButtons() {
   const btnVoice = document.getElementById('cvBtnVoice');
   if (btnVoice && !isObsMode()) {
@@ -2608,6 +2767,36 @@ function wireButtons() {
         }
       }
     });
+  }
+  const btnAutoTr = document.getElementById('cvBtnAutoTr');
+  if (btnAutoTr && !isObsMode()) {
+    btnAutoTr.addEventListener('click', () => {
+      _translateSettings = normalizeCommentTranslateSettings({
+        ..._translateSettings,
+        auto: !_translateSettings.auto
+      });
+      updateAutoTranslateButton();
+      setTranslateStatus(_translateSettings.auto ? '新しいコメントを1件ずつ訳します' : '');
+      try {
+        void chrome.storage.local.set({ [COMMENT_TRANSLATE_KEY]: _translateSettings });
+      } catch {
+        /* 保存できなくても、この画面のスイッチは動く */
+      }
+    });
+  }
+  const btnTrModel = document.getElementById('cvBtnTrModel');
+  if (btnTrModel && !isObsMode()) {
+    btnTrModel.addEventListener('click', () => {
+      void prepareTranslateModel();
+    });
+  }
+  try {
+    void chrome.storage.local.get(COMMENT_TRANSLATE_KEY).then((bag) => {
+      _translateSettings = normalizeCommentTranslateSettings(bag?.[COMMENT_TRANSLATE_KEY]);
+      updateAutoTranslateButton();
+    });
+  } catch {
+    updateAutoTranslateButton();
   }
   const btnNg = document.getElementById('cvBtnNg');
   if (btnNg) btnNg.addEventListener('click', () => showNgPanel());
