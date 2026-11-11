@@ -174,6 +174,11 @@ const targets = [
     target: 'chrome100'
   },
   {
+    entryPoints: ['src/extension/comment-json-entry.js'],
+    outfile: 'extension/dist/comment-json.js',
+    target: 'chrome100'
+  },
+  {
     entryPoints: ['src/extension/venue-entry.js'],
     outfile: 'extension/dist/venue.js',
     target: 'chrome100'

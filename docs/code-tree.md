@@ -27,11 +27,12 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1233 件
+## ⚠️ 役割コメントが無いソース 11 / 1235 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
 - `scripts/build.mjs`
+- `src/extension/comment-json-entry.js`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
 - `src/lib/mediaKitExport.js`
@@ -617,7 +618,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (143)
+- 📁 **extension/** (144)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -760,6 +761,7 @@
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
   - `comeview.html`
+  - `comment-json.html`
   - `live-view.html`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
@@ -1159,7 +1161,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2433)
+- 📁 **src/** (2436)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1198,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (111)
+  - 📁 **extension/** (112)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1232,6 +1234,7 @@
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
     - `comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
     - `comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
+    - `comment-json-entry.js` — ⚠️ 役割コメント無し
     - `commentTickerStarvation.wiring.test.js`
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
@@ -1490,7 +1493,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2134)
+  - 📁 **lib/** (2136)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2554,6 +2557,8 @@
     - `liveviewSnapshotFreshness.test.js`
     - `loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
     - `loadLastBroadcastSummary.test.js`
+    - `localCommentJson.js` — 外部ツール向けの読み取り専用スナップショット。
+    - `localCommentJson.test.js`
     - `longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
     - `longTaskTracker.test.js`
     - `lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
