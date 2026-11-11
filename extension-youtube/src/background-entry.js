@@ -43,6 +43,7 @@ import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
 import { ytVoiceAssignPersistDecision, YT_VOICE_ASSIGN_PERSIST_MS } from '../../src/lib/youtube/ytVoiceAssignPersist.js';
+import { decideActiveVideoIdWrite } from '../../src/lib/youtube/ytActiveVideoId.js';
 import {
   changedVoicePersonWrites,
   slimSummaryForStorage,
@@ -195,6 +196,55 @@ let summaryRetireStarted = false;
 const summaryChromeAt = new Map();
 /** @type {Record<string, string>} userKey → 最後に書いた JSON */
 const voiceSavedJson = {};
+let activeVideoMem = '';
+let activeVideoSetAt = 0;
+
+/**
+ * 前面または見えているタブだけが、いま見ている配信の印を付ける。
+ * 印だけを書き、配信のまとめ全体は書かない。
+ * @param {any} sender
+ * @param {string} videoId
+ */
+async function claimActiveVideo(sender, videoId) {
+  const nextId = String(videoId || '').trim();
+  if (!nextId || nextId === 'live_default') return false;
+  const tab = sender?.tab;
+  const tabActive = tab?.active === true && typeof tab.id === 'number';
+  /** @type {boolean | null} */
+  let windowFocused = null;
+  if (tabActive) {
+    try {
+      const focused = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      windowFocused = focused.some((t) => t.id === tab.id);
+    } catch {
+      windowFocused = null;
+    }
+  } else {
+    windowFocused = false;
+  }
+  if (!activeVideoMem) {
+    try {
+      const bag = await chrome.storage.local.get(STORAGE_KEYS.ACTIVE_VIDEO_ID);
+      activeVideoMem = String(bag?.[STORAGE_KEYS.ACTIVE_VIDEO_ID] || '');
+    } catch {
+      activeVideoMem = activeVideoMem || '';
+    }
+  }
+  const now = Date.now();
+  const decision = decideActiveVideoIdWrite({
+    tabActive,
+    windowFocused,
+    currentId: activeVideoMem,
+    nextId,
+    lastSetAt: activeVideoSetAt,
+    now,
+  });
+  if (!decision.write) return false;
+  activeVideoMem = nextId;
+  activeVideoSetAt = now;
+  await chrome.storage.local.set({ [STORAGE_KEYS.ACTIVE_VIDEO_ID]: nextId });
+  return true;
+}
 /** @type {{ t: number, key: string, bytes: number, ms: number }[]} */
 const storageWriteRing = [];
 /** @type {Record<string, { t: number, dur: number, file: string, domain: string, section: string }[]>} */
@@ -365,7 +415,7 @@ async function retireVerifiedPseudoCommentKeys(keys) {
 /**
  * コメントの束ごとに配信一覧を書き直すと、画面側が全件を組み立て直して固まる。
  * 最初の1回はすぐ書き、そのあとは間隔を空けてまとめる。書く直前に一覧を読み直す。
- * @type {Map<string, { chatFilterLabel: string, itemCount: number, setActive: boolean, voiceQueue: any[] | null, voiceState: any | null, assignments: any | null }>}
+ * @type {Map<string, { chatFilterLabel: string, itemCount: number, voiceQueue: any[] | null, voiceState: any | null, assignments: any | null }>}
  */
 const pendingChatFlush = new Map();
 /** @type {ReturnType<typeof setTimeout> | 0} */
@@ -373,14 +423,13 @@ let chatFlushTimer = 0;
 let chatFlushNotBefore = 0;
 
 /**
- * @param {{ videoId: string, chatFilterLabel?: string, itemCount: number, setActive: boolean, voiceQueue: any[] | null, voiceState: any | null, assignments: any | null }} patch
+ * @param {{ videoId: string, chatFilterLabel?: string, itemCount: number, voiceQueue: any[] | null, voiceState: any | null, assignments: any | null }} patch
  */
 function scheduleYtChatSummaryFlush(patch) {
   const prev = pendingChatFlush.get(patch.videoId);
   pendingChatFlush.set(patch.videoId, {
     chatFilterLabel: patch.chatFilterLabel || prev?.chatFilterLabel || '',
     itemCount: patch.itemCount,
-    setActive: patch.setActive || !!prev?.setActive,
     voiceQueue: patch.voiceQueue || prev?.voiceQueue || null,
     voiceState: patch.voiceState || prev?.voiceState || null,
     assignments: patch.assignments || prev?.assignments || null,
@@ -397,7 +446,6 @@ function scheduleYtChatSummaryFlush(patch) {
       const summaries = await ensureSummaryMem();
       /** @type {Record<string, any>} */
       const updates = {};
-      let activeId = '';
       for (const [videoId, row] of batch) {
         summaries[videoId] = mergeYtStreamSummary(
           summaries[videoId],
@@ -412,9 +460,7 @@ function scheduleYtChatSummaryFlush(patch) {
         if (row.voiceQueue) updates[STORAGE_KEYS.VOICE_QUEUE] = row.voiceQueue;
         if (row.voiceState) updates[STORAGE_KEYS.VOICE_STATE] = row.voiceState;
         if (row.assignments) await persistChangedVoices(row.assignments);
-        if (row.setActive) activeId = videoId;
       }
-      if (activeId) updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = activeId;
       if (Object.keys(updates).length) await chrome.storage.local.set(updates);
     });
   }, wait);
@@ -1139,7 +1185,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       );
 
       await publishOneSummary(videoId, summaries[videoId]);
-      await chrome.storage.local.set({ [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId });
+      await claimActiveVideo(sender, videoId);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
       return { ok: true, videoId };
     })
@@ -1445,11 +1491,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       // コメント本文は IndexedDB に全件残す。配信一覧の要約は束ごとに書かず、間隔を空けてまとめる。
       // 読み上げが止まっているときは、声の列を毎回書き直さない(書くたびに画面が組み立て直される)。
+      await claimActiveVideo(sender, videoId);
       scheduleYtChatSummaryFlush({
         videoId,
         chatFilterLabel,
         itemCount: idbResult.totalCount,
-        setActive: videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID],
         voiceQueue: BACKGROUND_READER_ENABLED ? voiceQueue : null,
         voiceState: BACKGROUND_READER_ENABLED ? voiceState : null,
         assignments: assignNow,

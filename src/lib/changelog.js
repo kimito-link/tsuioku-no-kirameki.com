@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2054',
+    date: '2026-11-11',
+    summary: '見ている配信は前面のタブだけ',
+    items: Object.freeze([
+      '裏で開いている配信タブが「いま見ている配信」を取り替えることはありません。印が変わっても、配信のまとめ全体は書き直しません。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2053',
     date: '2026-11-11',
     summary: '保存の書き直しを小さくした',
@@ -198,17 +206,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Twitch にログインしていないときは、コメントを打たずに「ログインしていない」と理由を出すようにしました(Twitch は未ログインでも入力欄を出すため)。',
       '記録のときに顔の取得が間に合わなかった人も、あとで分かった顔を画面に出すようにしました。',
       '計器のギフトサブの数が常に 0 だったのを、贈った件数で数えるように直しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1916',
-    date: '2026-11-07',
-    summary: 'Twitch の配信も記録できるように(試作)',
-    items: Object.freeze([
-      'Twitch の配信ページ(twitch.tv/チャンネル名)を開くと、チャットを記録するようにしました。ニコ生・YouTube と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
-      'チャットは Twitch 公式の読み取り専用の接続で読みます(ログインは要りません)。Bits・サブスク・ギフトサブ・レイドも記録し、Bits は応援の合計(pt)に入ります。',
-      'サイドパネルと会場からのコメント送信は、Twitch の画面の入力欄に書いて送ります(Twitch にログインしているときだけ送れます)。',
-      '記録は YouTube と同じくこの PC の中にだけ置き、外へは送りません。'
     ])
   })
 ]);

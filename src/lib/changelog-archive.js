@@ -24,6 +24,17 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1916',
+    date: '2026-11-07',
+    summary: 'Twitch の配信も記録できるように(試作)',
+    items: Object.freeze([
+      'Twitch の配信ページ(twitch.tv/チャンネル名)を開くと、チャットを記録するようにしました。ニコ生・YouTube と同じ画面(応援レーン・ギフト・会場・コメビュ・読み上げ)で見られます。',
+      'チャットは Twitch 公式の読み取り専用の接続で読みます(ログインは要りません)。Bits・サブスク・ギフトサブ・レイドも記録し、Bits は応援の合計(pt)に入ります。',
+      'サイドパネルと会場からのコメント送信は、Twitch の画面の入力欄に書いて送ります(Twitch にログインしているときだけ送れます)。',
+      '記録は YouTube と同じくこの PC の中にだけ置き、外へは送りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1915',
     date: '2026-11-07',
     summary: 'YouTube の過去ログ取り込みでも混ざりを直す',
