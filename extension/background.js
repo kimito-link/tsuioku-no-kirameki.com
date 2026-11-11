@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: 663a07f7138c
+// nls-sw-fingerprint: ceba9fd168c3
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -380,47 +380,13 @@ function readAllCommentsForLiveDb(db, liveId) {
   });
 }
 
-function countCommentsInDb(db, lid) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(COMMENT_DB_STORE, 'readonly');
-    const req = tx.objectStore(COMMENT_DB_STORE).index(COMMENT_DB_INDEX_BY_LIVE).count(IDBKeyRange.only(lid));
-    req.onsuccess = () => resolve(Number(req.result) || 0);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-// IndexedDB の件数が、本文のある行以上だと読み戻せたときだけ、chrome.storage の大きい鍵を消す。
-async function retireNicoCommentKeysIfVerified(lid) {
-  const rows = await readAllCommentsForLiveLocal(lid);
-  const valid = rows.filter((r) => r && String(r.text ?? '').trim()).length;
-  if (!valid) return;
-  const db = await openCommentDb();
-  let idbCount = 0;
-  try {
-    idbCount = await countCommentsInDb(db, lid);
-  } finally {
-    try { db.close(); } catch { /* no-op */ }
-  }
-  if (idbCount < valid) return;
-  const keys = [commentsStorageKey(lid), tailStorageKeyLocal(lid), chunkIndexKeyLocal(lid)];
-  const idxBag = await chrome.storage.local.get(chunkIndexKeyLocal(lid));
-  const index = idxBag[chunkIndexKeyLocal(lid)];
-  if (isChunkIndexLocal(index, lid)) {
-    for (const seq of index.seqs) keys.push(chunkStorageKeyLocal(lid, seq));
-  }
-  await chrome.storage.local.remove(keys);
-}
-
 // 既存 chrome.storage.local（main/chunk/tail）→ IDB の初回移行（live ごと 1 回）。
 async function ensureLiveMigratedToDb(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return;
   const mkey = commentDbMigratedKeyLocal(lid);
   const bag = await chrome.storage.local.get(mkey);
-  if (bag[mkey] === true) {
-    try { await retireNicoCommentKeysIfVerified(lid); } catch { /* 読み戻せなければ鍵は残す */ }
-    return;
-  }
+  if (bag[mkey] === true) return;
   let existing = [];
   try {
     existing = await readAllCommentsForLiveLocal(lid);
@@ -442,7 +408,6 @@ async function ensureLiveMigratedToDb(liveId) {
     }
   }
   await chrome.storage.local.set({ [mkey]: true });
-  try { await retireNicoCommentKeysIfVerified(lid); } catch { /* 読み戻せなければ鍵は残す */ }
 }
 
 // 与えられた total/recent から summary（chrome.storage）+ auto-backup 状態を書く。

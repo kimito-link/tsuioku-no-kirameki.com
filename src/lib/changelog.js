@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2085',
+    date: '2026-11-11',
+    summary: 'ニコ生の記録の控えを消さない',
+    items: Object.freeze([
+      'ニコ生のコメントの記録は、IndexedDB に写したあとも、これまでどおり元の置き場にも残します(このPRの途中版では写し終えたら消していました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2084',
     date: '2026-11-11',
     summary: '固まりの計器が保存を書き直しすぎるのを直す',
@@ -199,16 +207,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'サイドパネルの配信者カードに、将棋チャンネルなどの公開ロゴを出します。記録に画像が無くても、ニコニコの白い丸は使いません。',
       'ロゴが読めないときは、空の円ではなく顔を出します。',
       '公式の視聴数があるときは「公式の視聴数」と出します。無いときは「推定中」のカードを隠します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2045',
-    date: '2026-11-11',
-    summary: 'ニコ生以外の広告ptを出さない',
-    items: Object.freeze([
-      'ニコニコ以外の配信では、来場者数・本家コメ・広告pt・ギフトpt を出さないままにしました。YouTube・Twitch・Kick は、それぞれの視聴者数と、このPCの記録にある応援だけを出します。',
-      'ABEMA の PICK UP を、ニコ生・YouTube と同じ大きさで出します。コメント欄が開いていても、欄の幅には縮めません。',
-      '放送ページの CSS で吹き出しが潰れないよう、幅と文字の折り返しを固定しています。'
     ])
   })
 ]);
