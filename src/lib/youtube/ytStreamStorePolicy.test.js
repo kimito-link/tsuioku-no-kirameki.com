@@ -78,8 +78,8 @@ describe('mergeYtStreamSummary', () => {
       { videoId: 'ab.n-shogi.live1', title: '将棋チャンネル', broadcasterName: '将棋チャンネル' },
       t0,
     );
-    expect(shogi.broadcasterIconUrl).toContain('/channels/shogi/logo.png');
-    expect(shogi.broadcasterIconUrl).not.toContain('nimg.jp');
+    // 保存欄は届いた絵だけ。サービスの公開ロゴで埋めるのは表示側(ytSummaryToNicoSnapshot)。
+    expect(shogi.broadcasterIconUrl).toBe('');
     expect(updated.itemCount).toBe(5000);
     expect(updated.createdAt).toBe(t0);
     expect(updated.updatedAt).toBe(t1);

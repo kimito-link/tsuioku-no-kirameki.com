@@ -84,19 +84,30 @@ export function resolveBroadcasterFollowTarget(snapshot) {
   const level = Number.isFinite(lvNum) && lvNum > 0 ? lvNum : null;
 
   // 1. 数値 uid → user 経路。ニコニコの人は従来どおり CDN の usericon。
-  //    ABEMA は合成した数値 uid を持つ。ニコニコ以外の https 画像があればそれを出す。
-  //    無いときに CDN の既定アイコンへ落とすと、読める白い丸のまま残るので顔は空にしてタイル側へ任せる。
+  //    他のサービス(数値 uid は合成)は、配信者のページがそのサービスの URL で来る。
+  //    そのときはそのページと、ニコニコ以外の絵を出す。絵が無いときに CDN の既定アイコンへ落とすと、
+  //    読める白い丸のまま残るので、顔は空にしてタイル側へ任せる。
   if (/^\d+$/.test(uid)) {
-    const iconFromCdn = buildNiconicoDefaultUserIconUrl(uid);
-    const foreignIcon = /^https:\/\//i.test(iconUrlRaw) && !/nicovideo\.jp|nimg\.jp|nico\.ms/i.test(iconUrlRaw);
-    const abemaPage = /^https:\/\/(?:www\.)?abema\.tv\//i.test(pageUrlRaw);
+    const isNicoUrl = (/** @type {string} */ u) => /nicovideo\.jp|nimg\.jp|nico\.ms/i.test(u);
+    const foreignPage = /^https:\/\//i.test(pageUrlRaw) && !isNicoUrl(pageUrlRaw);
+    const foreignIcon = /^https:\/\//i.test(iconUrlRaw) && !isNicoUrl(iconUrlRaw);
+    if (foreignPage) {
+      return {
+        kind: 'user',
+        name,
+        level,
+        pageUrl: pageUrlRaw,
+        iconUrl: foreignIcon ? iconUrlRaw : '',
+        followLabel: 'チャンネルを見る'
+      };
+    }
     return {
       kind: 'user',
       name,
       level,
-      pageUrl: abemaPage ? pageUrlRaw : `https://www.nicovideo.jp/user/${uid}`,
-      iconUrl: foreignIcon ? iconUrlRaw : (abemaPage ? '' : iconFromCdn),
-      followLabel: abemaPage ? '番組を見る' : 'フォロー'
+      pageUrl: `https://www.nicovideo.jp/user/${uid}`,
+      iconUrl: foreignIcon ? iconUrlRaw : buildNiconicoDefaultUserIconUrl(uid),
+      followLabel: 'フォロー'
     };
   }
 

@@ -47,7 +47,7 @@ test('配信者カードにチャンネル画像が出る', async ({ page }) => 
     <img class="nl-top-support-rank__caster-thumb" alt="" data-on-error-fallback="face" data-fallback-name="将棋チャンネル" />
     <span class="nl-top-support-rank__caster-name">将棋チャンネル</span>
   </a>
-  <a class="nl-top-support-rank__caster-follow" href="https://abema.tv/now-on-air/shogi">番組を見る</a>
+  <a class="nl-top-support-rank__caster-follow" href="https://abema.tv/now-on-air/shogi">チャンネルを見る</a>
 </div>`);
   await page.locator('.nl-top-support-rank__caster-thumb').evaluate((img, src) => {
     img.src = src;
@@ -118,6 +118,6 @@ test('配信者カードにチャンネル画像が出る', async ({ page }) => 
   await expect(name).toHaveText('将棋チャンネル');
   const nameBox = await name.boundingBox();
   expect(nameBox.width).toBeGreaterThan(40);
-  await expect(page.locator('.nl-top-support-rank__caster-follow')).toHaveText('番組を見る');
+  await expect(page.locator('.nl-top-support-rank__caster-follow')).toHaveText('チャンネルを見る');
   await page.locator('.nl-top-support-rank__caster').screenshot({ path: 'test-results/abema-caster-thumb.png' });
 });

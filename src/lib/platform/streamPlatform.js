@@ -49,6 +49,7 @@ function kickSlugOfStreamKey(key) {
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
+ *   casterIconUrl?: (login: string) => string,
  *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean, boardUnit?: string,
  * }} StreamPlatform
  */
@@ -215,6 +216,8 @@ export const STREAM_PLATFORMS = Object.freeze({
     isLogin: (/** @type {unknown} */ l) => isAbLogin(l),
     channelUrl: abPageUrl,
     thumbUrl: (/** @type {string} */ l) => abChannelLogoUrl(l),
+    // 配信者の絵が記録に無いときの絵(公開のチャンネルロゴ)。持つサービスだけが書く。
+    casterIconUrl: (/** @type {string} */ l) => abChannelLogoUrl(l),
     buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildAbStreamKey(a, opts),
   }),
 });

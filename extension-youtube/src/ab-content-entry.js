@@ -15,9 +15,10 @@ import {
   abLinearChannelId,
   abUrlsFromCss,
   abUrlsFromSrcset,
-  abViewsFromSnippets,
   abPreferViewCount,
-  abViewCounterText,
+  abCounterValue,
+  abChannelNameText,
+  abChannelNameFromTitle,
 } from '../../src/lib/abema/abParse.js';
 import {
   AB_OPEN_COMMENT_KEY,
@@ -96,38 +97,67 @@ let seen = new Set();
 let pending = [];
 let flushTimer = 0;
 let metaAt = 0;
-/** @type {{ title: string, startedAtMs: number | null, views: number | null, concurrent: number | null, imageUrl: string, channelId: string }} */
-let program = { title: '', startedAtMs: null, views: null, concurrent: null, imageUrl: '', channelId: '' };
+/** @type {{ title: string, startedAtMs: number | null, views: number | null, comments: number | null, concurrent: number | null, imageUrl: string, channelId: string }} */
+let program = { title: '', startedAtMs: null, views: null, comments: null, concurrent: null, imageUrl: '', channelId: '' };
 
-/** 番組詳細に出ている「3.7万」だけを拾う。コメント件数の 3,662 は万が付かないので入れない。 */
-function domSlotViews() {
-  try {
-    const counter = document.querySelector('.com-tv-FeedProgramDetailViewCounter');
-    if (counter instanceof HTMLElement) {
-      const n = abViewCounterText(counter.textContent);
+/**
+ * ページに出ている数（abbr.com-a-Counter）。title の正確な数を先に使う。
+ * 2026-11-11 PC 実測（将棋チャンネル）: 視聴数は番組情報欄の
+ * .com-tv-FeedProgramDetailViewCounter（表示「2.1 万」・title="21139」）。コメント欄を開くと番組情報欄は DOM から消える。
+ * コメント数は下のバーの .com-tv-LinearFooterCommentButton__text（title="1707"）にどちらの状態でも残る。
+ * @param {string[]} selectors
+ */
+function domCounter(selectors) {
+  for (const sel of selectors) {
+    try {
+      const el = document.querySelector(sel);
+      if (!(el instanceof HTMLElement)) continue;
+      const abbr = el.matches('abbr') ? el : el.querySelector('abbr') || el;
+      const n = abCounterValue(abbr.getAttribute('title'), abbr.textContent);
       if (n != null) return n;
+    } catch {
+      /* ページの形が違っても記録は続ける */
     }
-  } catch {
-    /* ページの形が違っても記録は続ける */
   }
-  /** @type {{ text: string, label: string }[]} */
-  const snippets = [];
-  try {
-    const nodes = document.querySelectorAll('span, button, a, p, dd');
-    for (let i = 0; i < nodes.length && snippets.length < 12; i += 1) {
-      const el = nodes[i];
-      if (!(el instanceof HTMLElement) || el.childElementCount > 1) continue;
-      const text = (el.textContent || '').trim();
-      if (!text || text.length > 12 || !/[万億]/.test(text)) continue;
-      const parent = el.parentElement;
-      const label = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${parent?.getAttribute('aria-label') || ''} ${String(parent?.className || '')}`;
-      snippets.push({ text, label });
-    }
-  } catch {
-    /* ページの形が違っても記録は続ける */
-  }
-  return abViewsFromSnippets(snippets);
+  return null;
 }
+
+/** 番組情報欄の視聴数（欄が開いているときだけ出ている）。おすすめ欄の別番組の数は拾わない。 */
+function domSlotViews() {
+  return domCounter(['.com-tv-FeedProgramDetailViewCounter abbr.com-a-Counter', '.com-tv-FeedProgramDetailViewCounter']);
+}
+
+/** コメント数（下のバーのコメントボタン、無ければ番組情報欄）。入力欄の残り文字数（com-o-CommentForm__count）は数えない。 */
+function domSlotComments() {
+  return domCounter([
+    '.com-tv-LinearFooterCommentButton__text abbr.com-a-Counter',
+    '.com-tv-FeedProgramDetailCommentCounter abbr.com-a-Counter',
+    '.com-tv-FeedProgramDetailCommentCounter',
+  ]);
+}
+
+/**
+ * チャンネル名（「将棋チャンネル」）。文字として出ている所は無く、ロゴの alt と document.title の頭だけ。
+ * ロゴは見ているチャンネルのもの（/channels/<id>/）に絞る。チャンネル一覧には全チャンネル分のロゴがある。
+ */
+function domChannelName() {
+  const want = abLinearChannelId(pageLogin);
+  const sels = ['h1.com-tv-LinearFooter__logo img[alt]', '.com-tv-TVScreenPoster__channel-logo-wrapper img[alt]'];
+  for (const sel of sels) {
+    try {
+      for (const img of document.querySelectorAll(sel)) {
+        const src = img.getAttribute('src') || '';
+        if (want && !src.includes(`/channels/${want}/`)) continue;
+        const alt = abChannelNameText(img.getAttribute('alt'));
+        if (alt) return alt;
+      }
+    } catch {
+      /* ページの形が違っても記録は続ける */
+    }
+  }
+  return abChannelNameFromTitle(document.title);
+}
+
 let sentIcon = '';
 let imageScanAt = 0;
 let cachedIcon = '';
@@ -226,11 +256,13 @@ function sendMeta(forceClaim) {
   if (!streamKey) return;
   const title = program.title || pageTitle();
   diag.title = title;
+  // 配信者の名前はチャンネル名（「将棋チャンネル」）。番組名やページタイトル全体は入れない。
+  const channelName = domChannelName();
   /** @type {Record<string, unknown>} */
   const payload = {
     videoId: streamKey,
-    title: title || 'ABEMAの配信',
-    broadcasterName: title || 'ABEMAの配信',
+    title: title || channelName || 'ABEMAの配信',
+    broadcasterName: channelName || 'ABEMA',
     broadcasterChannelId: `ab:@${pageLogin}`,
     broadcasterHandle: pageLogin,
     claimActive: claimActiveNow(streamKey, !!forceClaim),
@@ -240,8 +272,11 @@ function sendMeta(forceClaim) {
     payload.broadcasterIconUrl = icon;
     sentIcon = icon;
   }
-  const views = abPreferViewCount(program.views, domSlotViews());
+  // 画面に出ている数（title の正確な数）を先に使う。欄が閉じているあいだはページ自身の応答の数。
+  const views = domSlotViews() ?? abPreferViewCount(program.views, null);
   if (views != null) payload.slotViewCount = views;
+  const comments = domSlotComments() ?? program.comments;
+  if (comments != null) payload.slotCommentCount = comments;
   if (program.concurrent != null && program.concurrent >= 0) payload.concurrentViewers = program.concurrent;
   if (program.startedAtMs) {
     payload.startedAt = program.startedAtMs;
@@ -475,7 +510,7 @@ function syncPage() {
   sentIcon = '';
   imageScanAt = 0;
   cachedIcon = '';
-  program = { title: '', startedAtMs: null, views: null, concurrent: null, imageUrl: '', channelId: '' };
+  program = { title: '', startedAtMs: null, views: null, comments: null, concurrent: null, imageUrl: '', channelId: '' };
   seen = new Set();
   pending = [];
   panel.reset();
@@ -499,6 +534,7 @@ window.addEventListener('message', (ev) => {
     const rows = Array.isArray(data.meta.slotRows) ? data.meta.slotRows : [];
     const mine = rows.find((r) => expectId && String(r?.channelId || '').toLowerCase() === expectId);
     if (mine && Number(mine.views) > 0) program.views = Math.floor(Number(mine.views));
+    if (mine && Number(mine.comments) >= 0 && mine.comments != null) program.comments = Math.floor(Number(mine.comments));
     if (mine && Number(mine.startedAtMs) > 0) program.startedAtMs = Math.floor(Number(mine.startedAtMs));
     const incomingId = String(data.meta.channelId || '').toLowerCase();
     if (!rows.length && expectId && incomingId && incomingId !== expectId) return;
@@ -506,6 +542,7 @@ window.addEventListener('message', (ev) => {
     if (title) program.title = title;
     if (Number(data.meta.startedAtMs) > 0) program.startedAtMs = Number(data.meta.startedAtMs);
     if (data.meta.views != null && Number.isFinite(Number(data.meta.views))) program.views = Number(data.meta.views);
+    if (data.meta.comments != null && Number.isFinite(Number(data.meta.comments))) program.comments = Number(data.meta.comments);
     if (data.meta.concurrent != null && Number.isFinite(Number(data.meta.concurrent))) program.concurrent = Number(data.meta.concurrent);
     if (data.meta.imageUrl) program.imageUrl = String(data.meta.imageUrl);
     if (incomingId) program.channelId = incomingId;

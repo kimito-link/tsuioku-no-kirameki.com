@@ -1610,6 +1610,20 @@
       ]
     },
     {
+      "file": "src/extension/venuePickupVoice.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/extension/voiceStreamAudio.js",
       "featureCount": 3,
       "features": [
@@ -2446,6 +2460,20 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venuePickupPlayback.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
       ]
     },
@@ -4885,6 +4913,16 @@
     },
     {
       "file": "src/extension/popup/wireLaneUserDetailOpen.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/wirePanelVoiceReadingButton.js",
       "featureCount": 1,
       "features": [
         "popup"

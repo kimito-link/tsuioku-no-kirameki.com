@@ -184,20 +184,6 @@ export function abChannelLogoUrl(loginOrChannelId) {
   );
 }
 
-/**
- * 配信者カードに残す画像。リニアの ABEMA は、記録が空でも公開のチャンネルロゴにする。
- * ニコニコの既定アイコンは使わない（白い丸のまま残るため）。
- * @param {unknown} videoId
- * @param {unknown} given
- */
-export function abBroadcasterIconForStream(videoId, given) {
-  const raw = String(given || '').trim();
-  const logo = abChannelLogoUrl(abLoginOfStreamKey(videoId));
-  if (!logo) return raw;
-  if (safeAbImageUrl(raw) && /\/channels\/[^/?#]+\/logo/i.test(raw)) return raw;
-  return logo;
-}
-
 /** srcset の中から使ってよい ABEMA の画像だけ @param {unknown} raw */
 export function abUrlsFromSrcset(raw) {
   /** @type {string[]} */
@@ -378,26 +364,40 @@ export function abViewCounterText(text) {
 }
 
 /**
- * 画面の短い文字から視聴数を1つ。近くに「視聴」とあればそれを、無ければ「万」「億」が1つだけのとき。
- * @param {ReadonlyArray<{ text?: string, label?: string }>} snippets
+ * ABEMA の数の表示（abbr.com-a-Counter）。表示は「2.1 万」でも、title に正確な数（"21139"）が入っている。
+ * title の数を先に使い、無ければ表示の文字を読む。
+ * @param {unknown} title
+ * @param {unknown} text
  * @returns {number|null}
  */
-export function abViewsFromSnippets(snippets) {
-  /** @type {number|null} */
-  let labeled = null;
-  /** @type {number[]} */
-  const compact = [];
-  for (const s of Array.isArray(snippets) ? snippets : []) {
-    const n = abCompactCount(s?.text);
-    if (n == null) continue;
-    if (/視聴/.test(String(s?.label || ''))) {
-      labeled = n;
-      break;
-    }
-    compact.push(n);
+export function abCounterValue(title, text) {
+  const t = String(title || '').replace(/[,\s]/g, '');
+  if (/^\d{1,9}$/.test(t)) {
+    const n = Number(t);
+    if (n >= 0 && n <= 50_000_000) return n;
   }
-  if (labeled != null) return labeled;
-  return compact.length === 1 ? compact[0] : null;
+  return abViewCounterText(text);
+}
+
+/**
+ * チャンネル名として使える短い文字（ロゴの alt など）。空・「ABEMA」だけ・長すぎるものは使わない。
+ * @param {unknown} raw
+ */
+export function abChannelNameText(raw) {
+  const t = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 40 || /^ABEMA$/i.test(t) || t === 'エラー') return '';
+  return t;
+}
+
+/**
+ * ページタイトル（「将棋チャンネル | 速報や中継を無料で生放送中 | ABEMA」）の頭の区切りだけ。
+ * 区切りが無いタイトルは、チャンネル名か分からないので使わない。
+ * @param {unknown} title
+ */
+export function abChannelNameFromTitle(title) {
+  const parts = String(title || '').split(/\s*[|｜]\s*/);
+  if (parts.length < 3 || !/^ABEMA$/i.test(parts[parts.length - 1].trim())) return '';
+  return abChannelNameText(parts[0]);
 }
 
 /**

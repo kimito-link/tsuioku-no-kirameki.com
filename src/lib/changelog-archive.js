@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2030',
+    date: '2026-11-10',
+    summary: '状態ページのボタンの見た目をそろえた',
+    items: Object.freeze([
+      '状態ページで、効果音の「▶」試聴ボタンや評判チェックの「チェック」ボタンなど38個が灰色の素のボタンのまま出ていました。ほかのボタンと同じ見た目にしました。',
+      '働きは変えていません。見た目だけの変更です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2021',
     date: '2026-11-10',
     summary: '横の欄のボタンの見た目をそろえた',

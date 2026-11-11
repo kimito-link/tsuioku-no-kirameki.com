@@ -26,8 +26,10 @@ import {
   abOnAirSlotStats,
   abViewCounterText,
   abCompactCount,
-  abViewsFromSnippets,
   abPreferViewCount,
+  abCounterValue,
+  abChannelNameText,
+  abChannelNameFromTitle,
   pickAbBroadcasterImage,
 } from './abParse.js';
 import { ytIconForNumericUid, ytSummaryToNicoSnapshot } from '../../../extension-youtube/src/ytNicoShim.js';
@@ -196,14 +198,27 @@ describe('ABEMA のコメント JSON', () => {
     expect(abAudienceFromPayload({ concurrentViewers: 40, viewCount: 37000 }).views).toBe(37000);
     expect(abCompactCount('3.7万')).toBe(37000);
     expect(abCompactCount('3,662')).toBe(null);
-    expect(abViewsFromSnippets([{ text: '3.7万', label: '' }])).toBe(37000);
-    expect(abViewsFromSnippets([{ text: '1.2万', label: '' }, { text: '3.7万', label: '視聴数' }])).toBe(37000);
     expect(abPreferViewCount(37821, 37000)).toBe(37821);
     expect(abPreferViewCount(500, 37000)).toBe(37000);
     expect(isAbBroadcastJsonUrl('https://api.p-c3-e.abema-tv.com/v1/broadcast/slots/abc/stats')).toBe(true);
     expect(abViewCounterText('48,027')).toBe(48027);
     expect(abViewCounterText('4.8万')).toBe(48000);
     expect(abViewCounterText('コメント 865')).toBe(null);
+  });
+  it('画面の数は title の正確な数を使う（2026-11-11 PC 実測: 表示「2.1 万」・title="21139"）', () => {
+    expect(abCounterValue('21139', '2.1 万')).toBe(21139);
+    expect(abCounterValue('1707', '1,707')).toBe(1707);
+    expect(abCounterValue('', '2.1 万')).toBe(21000);
+    expect(abCounterValue(null, '')).toBe(null);
+    expect(abCounterValue('abc', 'コメント')).toBe(null);
+  });
+  it('チャンネル名はロゴの alt かページタイトルの頭（番組名やタイトル全体にしない）', () => {
+    expect(abChannelNameText('将棋チャンネル')).toBe('将棋チャンネル');
+    expect(abChannelNameText('ABEMA')).toBe('');
+    expect(abChannelNameText('')).toBe('');
+    expect(abChannelNameFromTitle('将棋チャンネル | 速報や中継を無料で生放送中 | ABEMA')).toBe('将棋チャンネル');
+    expect(abChannelNameFromTitle('【再】ヒューリック杯棋聖戦 | ABEMA')).toBe('');
+    expect(abChannelNameFromTitle('ABEMA')).toBe('');
   });
   it('番組表では放送中の枠の視聴数を使い、次の枠の空の stats は使わない', () => {
     const now = Date.now();
@@ -353,7 +368,7 @@ describe('ABEMA の番組情報と URL', () => {
     expect(card.iconUrl).toBe(logo);
     expect(card.iconUrl).not.toContain('nimg.jp');
     expect(card.pageUrl).toBe('https://abema.tv/now-on-air/abema-news');
-    expect(card.followLabel).toBe('番組を見る');
+    expect(card.followLabel).toBe('チャンネルを見る');
     expect(snap.thumbnailUrl).toContain('/channels/abema-news/logo.png');
     expect(snap.officialAudienceOnly).toBeUndefined();
 

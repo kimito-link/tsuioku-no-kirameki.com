@@ -174,6 +174,7 @@
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_VOICE_NARROW_MODE` | — | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
 | `KEY_VOICE_QUALITY` | — | extension/voiceQualitySetting.js |
+| `KEY_VOICE_READING_ENABLED` | extension/popup/wirePanelVoiceReadingButton.js | extension/popup/wirePanelVoiceReadingButton.js |
 | `KEY_VOICE_READ_NAME_ENABLED` | — | extension/phoneVoicePublisher.js |
 | `KEY_VOICE_VOLUME_PERCENT` | — | extension/comeview-entry.js |
 | `KEY_VOICE_WEAK_PC` | extension/comeview-entry.js | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
