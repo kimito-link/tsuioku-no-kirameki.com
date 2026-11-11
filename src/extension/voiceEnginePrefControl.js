@@ -1,6 +1,7 @@
 /**
- * 会場とコメビュの、初めて読み上げを ON にしたときだけの計算モード選択。
- * CPU がはじめから選ばれている。選んだあとはポップアップの設定で変えられる。
+ * 会場とコメビュの計算モード選択。希望がまだ無いあいだ、読み上げ ON で出す。
+ * CPU がはじめから選ばれている。保存するのは利用者が選んだときだけ。
+ * 選んだあとはポップアップの設定で変えられる。
  */
 import { KEY_VOICE_ENGINE_PREF } from '../lib/voiceKeys.js';
 import { normalizeVoiceEnginePref, voiceEnginePrefOrDefault } from '../lib/voiceEnginePref.js';
@@ -46,19 +47,17 @@ export function mountVoiceEnginePref(doc, storage) {
   return {
     label,
     async noteEnabled() {
-      let first = false;
+      let unset = false;
       try {
         const bag = /** @type {Record<string, unknown>|null|undefined} */ (await store.get?.([KEY_VOICE_ENGINE_PREF]));
         const cur = normalizeVoiceEnginePref(bag?.[KEY_VOICE_ENGINE_PREF]);
-        if (!cur) {
-          first = true;
-          await store.set?.({ [KEY_VOICE_ENGINE_PREF]: 'cpu' });
-        }
+        unset = !cur;
         paint(cur || 'cpu');
       } catch {
+        unset = true;
         paint('cpu');
       }
-      if (first) revealed = true;
+      if (unset) revealed = true;
       label.hidden = !revealed;
     },
     noteDisabled() {

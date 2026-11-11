@@ -1,5 +1,6 @@
 /**
- * ポップアップの読み上げ設定。計算モードの希望（CPU が既定）と、接続中に分かる実モード。
+ * ポップアップの読み上げ設定。計算モードの希望（画面の既定は CPU）と、接続中に分かる実モード。
+ * 希望は利用者が選んだときだけ保存する。読み上げが ON なだけでは書かない。
  * エンジンへ聞くのは、読み上げ ON のときと、つながっていなくて再試行が成功したときだけ。
  */
 import { KEY_VOICE_ENGINE_PREF, KEY_VOICE_READING_ENABLED } from '../../lib/voiceKeys.js';
@@ -80,11 +81,10 @@ export function wireVoiceEngineMode(root, deps = {}) {
     if (result === true) return true;
     return !!(result && typeof result === 'object' && /** @type {{ ok?: boolean }} */ (result).ok === true);
   };
-  const applyPref = (/** @type {unknown} */ value, /** @type {boolean} */ writeDefault) => {
+  const applyPref = (/** @type {unknown} */ value) => {
     const saved = normalizeVoiceEnginePref(value);
     pref = saved || 'cpu';
     if (select) select.value = pref;
-    if (!saved && writeDefault) void setPref('cpu');
   };
 
   if (select && select.dataset.nlWired !== '1') {
@@ -95,7 +95,7 @@ export function wireVoiceEngineMode(root, deps = {}) {
       if (connected) paintMode();
     });
   }
-  void Promise.resolve(getPref()).then((value) => applyPref(value, false), () => applyPref('cpu', false));
+  void Promise.resolve(getPref()).then((value) => applyPref(value), () => applyPref('cpu'));
 
   /** @param {boolean} [wanted] */
   const run = (wanted) => {
@@ -110,7 +110,7 @@ export function wireVoiceEngineMode(root, deps = {}) {
       }
       void Promise.resolve(getPref()).then((value) => {
         if (mine !== serial) return;
-        applyPref(value, true);
+        applyPref(value);
         return Promise.resolve(probeAlive());
       }).then((result) => {
         if (mine !== serial || result === undefined) return null;

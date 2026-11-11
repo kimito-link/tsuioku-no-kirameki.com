@@ -761,7 +761,6 @@ async function connectVoiceReading(serial, persist) {
       const bag = await chrome.storage.local.get(KEY_VOICE_ENGINE_PREF);
       const saved = normalizeVoiceEnginePref(bag?.[KEY_VOICE_ENGINE_PREF]);
       _voiceEnginePref = saved || 'cpu';
-      if (!saved) void chrome.storage.local.set({ [KEY_VOICE_ENGINE_PREF]: 'cpu' });
     } catch { _voiceEnginePref = 'cpu'; }
     void probeVoiceEngineDevices().then((info) => {
       const reported = info && typeof info === 'object' ? info.mode : null;

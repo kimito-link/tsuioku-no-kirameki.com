@@ -113,9 +113,12 @@ describe('wireVoiceEngineMode', () => {
     expect(el.style.color).toBe('#7a828e');
   });
 
-  it('OFF にしたら接続中の表示を消す。未保存で ON なら CPU を保存する', async () => {
-    const { el, root } = fakeRoot();
+  it('OFF にしたら接続中の表示を消す。未保存の ON では CPU を保存しない', async () => {
+    const { el, select, root } = fakeRoot();
     let onChanged = () => {};
+    /** @type {(event: string, fn: () => void) => void} */
+    let onSelect = () => {};
+    select.addEventListener = (event, fn) => { onSelect = fn; };
     const setPref = vi.fn();
     wireVoiceEngineMode(root, {
       isReadingOn: async () => true,
@@ -129,7 +132,12 @@ describe('wireVoiceEngineMode', () => {
     await tick();
     await tick();
     expect(el.textContent).toBe('VOICEVOX：CPUで接続中');
-    expect(setPref).toHaveBeenCalledWith('cpu');
+    expect(select.value).toBe('cpu');
+    expect(setPref).not.toHaveBeenCalled();
+    select.value = 'gpu';
+    onSelect();
+    expect(setPref).toHaveBeenCalledTimes(1);
+    expect(setPref).toHaveBeenCalledWith('gpu');
     onChanged(false);
     expect(el.hidden).toBe(true);
     expect(el.textContent).toBe('');

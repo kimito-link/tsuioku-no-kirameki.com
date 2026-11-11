@@ -637,8 +637,8 @@ export class VoicePlayer {
         readSettings: async () => {
           const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, KEY_VOICE_ENGINE_PREF]) : {};
           const savedPref = normalizeVoiceEnginePref(b[KEY_VOICE_ENGINE_PREF]);
+          // 未保存でも表示は CPU。保存するのは利用者が選んだときだけ（選ぶ前に書くと選択が出ない）。
           this._enginePref = savedPref || 'cpu';
-          if (!savedPref && this.storage) this.storage.set({ [KEY_VOICE_ENGINE_PREF]: 'cpu' }).catch(() => {});
           this._slowEngine = b[KEY_VOICE_WEAK_PC] === true;
           return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
         },

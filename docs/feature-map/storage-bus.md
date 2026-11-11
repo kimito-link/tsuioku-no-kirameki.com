@@ -171,7 +171,7 @@
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_ASSIGNMENTS` | — | extension/phoneVoicePublisher.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
-| `KEY_VOICE_ENGINE_PREF` | extension/comeview-entry.js<br>extension/popup/wireVoiceEngineMode.js | extension/comeview-entry.js<br>extension/popup/wireVoiceEngineMode.js |
+| `KEY_VOICE_ENGINE_PREF` | extension/popup/wireVoiceEngineMode.js | extension/comeview-entry.js<br>extension/popup/wireVoiceEngineMode.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_VOICE_NARROW_MODE` | — | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
 | `KEY_VOICE_QUALITY` | — | extension/voiceQualitySetting.js |

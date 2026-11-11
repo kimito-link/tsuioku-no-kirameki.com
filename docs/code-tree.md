@@ -1159,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2439)
+- 📁 **src/** (2440)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1196,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (113)
+  - 📁 **extension/** (114)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1213,7 +1213,7 @@
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
       - `wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
-      - `wireVoiceEngineMode.js` — ポップアップの読み上げ設定。計算モードの希望（CPU が既定）と、接続中に分かる実モード。
+      - `wireVoiceEngineMode.js` — ポップアップの読み上げ設定。計算モードの希望（画面の既定は CPU）と、接続中に分かる実モード。
       - `wireVoiceEngineMode.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
       - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
@@ -1308,7 +1308,8 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
-    - `voiceEnginePrefControl.js` — 会場とコメビュの、初めて読み上げを ON にしたときだけの計算モード選択。
+    - `voiceEnginePrefControl.js` — 会場とコメビュの計算モード選択。希望がまだ無いあいだ、読み上げ ON で出す。
+    - `voiceEnginePrefFreshProfile.test.js`
     - `voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
     - `voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。

@@ -259,6 +259,8 @@ describe('VoicePlayer', () => {
     expect(player.enabled).toBe(true);
     // forceOn は persist:true なので storage に ON を残す(以後も復元される)。
     expect(mockStorage.set).toHaveBeenCalledWith({ 'nls_voice_reading_enabled_v1': true });
+    const wrotePref = mockStorage.set.mock.calls.some((c) => c[0] && 'nls_voice_engine_pref_v1' in c[0]);
+    expect(wrotePref).toBe(false);
   });
 
   it('forceOn でも OBS モードなら自動 ON しない(無音オーバーレイ維持)', async () => {
