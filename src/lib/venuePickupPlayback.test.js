@@ -82,6 +82,7 @@ describe('PICK UP は声が鳴り始めたコメントだけに切り替わる',
       storage: { onChanged: { addListener: (fn) => { listener = fn; } } },
       now: () => 8000
     });
+    expect(link.follows()).toBe(false);
     listener({
       [KEY_VOICE_NOW_PLAYING]: { newValue: buildVoiceNowPlaying({ text: '聞こえる', name: 'E', userId: '5' }, 'lv9', 8000) }
     }, 'local');
