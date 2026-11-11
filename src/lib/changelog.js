@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2082',
+    version: '0.1.2085',
     date: '2026-11-11',
     summary: 'ミクチャの数字をページの言葉に',
     items: Object.freeze([
