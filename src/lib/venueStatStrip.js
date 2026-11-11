@@ -33,8 +33,7 @@ export const VENUE_STAT_STRIP_STALE_TITLE =
   '横の欄(パネル)が閉じているため、記録以外の数字の更新が止まっています。パネルを開くとまた動きます';
 
 /**
- * @typedef {'records'|'concurrent'|'visitor'|'viewers'|'comments'|'streamAge'|'adPts'|'giftPts'} VenueStatKey
- * @typedef {{ key: VenueStatKey, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu' }} VenueStatItem
+ * @typedef {{ key: string, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu', title?: string }} VenueStatItem
  * @typedef {{ source: 'mirror'|'self'|'fallback'|'none', stale: boolean, ageMs: number|null, items: VenueStatItem[] }} VenueStatStripModel
  */
 
@@ -171,7 +170,7 @@ export function venueStatStripSignature(model) {
  * 帯の DOM を作る。値は paint で入れる(枠は最初から全部作る=数字が入っても行の高さが変わらない)。
  *
  * @param {Document} doc
- * @param {{ faces?: { link?: string, konta?: string, tanu?: string } }} [opts]
+ * @param {{ platform?: string, faces?: { link?: string, konta?: string, tanu?: string } }} [opts]
  * @returns {{ el: HTMLElement, paint: (model: VenueStatStripModel) => boolean }}
  *   paint は実際に描き直したら true(署名が同じなら false)
  */
@@ -194,7 +193,8 @@ export function createVenueStatStrip(doc, opts = {}) {
       const cell = doc.createElement('span');
       cell.className = `nlsb-stat nlsb-stat--${it.key}${it.face ? ' nlsb-stat--card' : ''}`;
       cell.dataset.stat = it.key;
-      const src = it.face ? faces[it.face] : '';
+      const faceKey = it.face === 'link' || it.face === 'konta' || it.face === 'tanu' ? it.face : '';
+      const src = faceKey ? faces[faceKey] : '';
       if (src) {
         const img = doc.createElement('img');
         img.className = 'nlsb-stat__face';

@@ -72,6 +72,7 @@ export function buildStatCardsMirrorSnapshot(input, opts = {}) {
     };
   }
 
+  /** @type {StatCardsMirrorSnapshot} */
   const snap = {
     liveId,
     capturedAt: nowMs,
