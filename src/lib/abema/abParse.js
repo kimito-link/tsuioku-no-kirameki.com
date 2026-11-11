@@ -463,13 +463,13 @@ export function abAudienceFromPayload(raw) {
  * チャンネルごとに、放送中で視聴数がある枠を1つ返す。
  * @param {unknown} raw
  * @param {number} [nowMs]
- * @returns {Array<{ channelId: string, views: number|null, comments: number|null }>}
+ * @returns {Array<{ channelId: string, views: number|null, comments: number|null, startedAtMs: number|null }>}
  */
 export function abOnAirSlotStats(raw, nowMs = Date.now()) {
   const root = unwrap(raw);
   const slots = root && Array.isArray(root.slots) ? root.slots : [];
   const nowSec = Number(nowMs) / 1000;
-  /** @type {Map<string, { channelId: string, views: number|null, comments: number|null }>} */
+  /** @type {Map<string, { channelId: string, views: number|null, comments: number|null, startedAtMs: number|null }>} */
   const byChannel = new Map();
   for (const slot of slots) {
     const o = obj(slot);
@@ -484,7 +484,7 @@ export function abOnAirSlotStats(raw, nowMs = Date.now()) {
     const comments = pickCount(stats, ['comment', 'comments', 'commentCount']);
     const prev = byChannel.get(channelId);
     if (prev && prev.views != null && views == null) continue;
-    byChannel.set(channelId, { channelId, views, comments });
+    byChannel.set(channelId, { channelId, views, comments, startedAtMs: clockMs(start) });
   }
   return [...byChannel.values()];
 }
@@ -493,7 +493,7 @@ export function abOnAirSlotStats(raw, nowMs = Date.now()) {
  * ページの応答を、コメントの束と番組情報に分ける。
  * コメントの束にチャンネルロゴが同居していても、ロゴは meta に残す（コメントの icon には入れない）。
  * @param {unknown} raw
- * @returns {{ batch: { chatId: string, isPolling: boolean | null, pollingIntervalSec: number | null, messages: any[] } | null, meta: { title: string, startedAtMs: number | null, viewers: number | null, views: number | null, concurrent: number | null, comments: number | null, imageUrl: string, channelId: string, slotRows?: Array<{ channelId: string, views: number|null, comments: number|null }> } | null } | null}
+ * @returns {{ batch: { chatId: string, isPolling: boolean | null, pollingIntervalSec: number | null, messages: any[] } | null, meta: { title: string, startedAtMs: number | null, viewers: number | null, views: number | null, concurrent: number | null, comments: number | null, imageUrl: string, channelId: string, slotRows?: Array<{ channelId: string, views: number|null, comments: number|null, startedAtMs: number|null }> } | null } | null}
  */
 export function abPayloadNotices(raw) {
   const shrunk = shrinkAbPayload(raw);
@@ -621,7 +621,7 @@ function messageKey(m, userId, elapsed, text) {
 function normalizeMessage(raw) {
   const m = obj(raw);
   if (!m) return null;
-  const text = str(m.body ?? m.message ?? m.text ?? m.comment).replace(/\s+/g, ' ').trim().slice(0, 500);
+  const text = str(m.body ?? m.message ?? m.text ?? m.comment).trim().slice(0, 500);
   if (!text) return null;
   const user = obj(m.user);
   const userId = str(m.userId || user?.id || user?.userId);

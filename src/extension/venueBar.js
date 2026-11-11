@@ -3,7 +3,6 @@
 //   純関数(comeview と同じ正本)。会場の発言パネルがテールを読むために使う。
 import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/comeviewRows.js';
 import {
-  applyVenuePickupBox,
   applyVenuePickupView,
   buildVenuePickupView,
   createVenuePickupBanner,
@@ -2959,10 +2958,9 @@ export function mountVenueBarButton(options = {}) {
     if (pickupEls.root.hasAttribute('data-empty')) return;
     const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
     const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
-    const layoutRect = stageLayout.getBoundingClientRect();
-    // 本編映像の上端中央。約250pxの欄や小さい video では幅も位置も合わせない（閾値は venuePickupBanner）。
-    const at = venuePickupPlacement(video, layoutRect);
-    applyVenuePickupBox(pickupEls.root, window.innerWidth, video ? video.width : 0);
+    const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
+    if (at) pickupEls.root.style.setProperty('width', `${at.width}px`, 'important');
+    else pickupEls.root.style.removeProperty('width');
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
   const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)

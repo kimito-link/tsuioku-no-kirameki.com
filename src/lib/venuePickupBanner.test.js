@@ -138,33 +138,25 @@ describe('applyVenuePickupView — diff-skip', () => {
   });
 });
 
-describe('venuePickupReadableBox(細い親でも読める幅)', () => {
-  it('窓が広ければニコ生・YouTube と同じ上限 860。映像が狭ければ映像に合わせ、320 より細くしない', async () => {
-    const { venuePickupReadableBox } = await import('./venuePickupBanner.js');
-    expect(venuePickupReadableBox(1400, 960)).toEqual({ width: 860, minWidth: 320, maxWidth: 860 });
-    expect(venuePickupReadableBox(1400, 600).width).toBe(576);
-    expect(venuePickupReadableBox(1400, 0)).toEqual({ width: 860, minWidth: 320, maxWidth: 860 });
-    expect(venuePickupReadableBox(1280, 40).width).toBeGreaterThanOrEqual(320);
-    // コメント欄や小さい video（約250px）では縮めない。窓の幅のまま。
-    expect(venuePickupReadableBox(1400, 274)).toEqual({ width: 860, minWidth: 320, maxWidth: 860 });
-    expect(venuePickupReadableBox(1280, 250).width).toBe(860);
-  });
-  it('見た目は親の 100% ではなく窓の幅。欄の幅へ縮める経路は会場に無い', async () => {
+describe('PICK UP の見た目は1つ', () => {
+  it('幅は窓。欄へ縮める関数も配信ごとの分岐も無い', async () => {
     const { readFileSync } = await import('node:fs');
     const { VENUE_PICKUP_CSS } = await import('./venuePickupBanner.js');
     const bar = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8');
-    expect(VENUE_PICKUP_CSS).toContain('white-space: nowrap !important');
+    const banner = readFileSync(new URL('./venuePickupBanner.js', import.meta.url), 'utf8');
+    expect(VENUE_PICKUP_CSS).toContain('white-space: nowrap');
     expect(VENUE_PICKUP_CSS).not.toContain('line-clamp');
     expect(VENUE_PICKUP_CSS).toContain('100vw');
-    expect(VENUE_PICKUP_CSS).toContain('min-width: min(320px, calc(100vw - 32px)) !important');
-    expect(VENUE_PICKUP_CSS).toContain('zoom: 1 !important');
     expect(VENUE_PICKUP_CSS).not.toContain('is-fit-column');
     expect(VENUE_PICKUP_CSS).not.toContain('100% - 180px');
-    expect(bar).toContain('VENUE_PICKUP_CSS');
-    expect(bar).toContain('applyVenuePickupBox');
+    expect(banner).not.toContain('applyVenuePickupBox');
+    expect(banner).not.toContain('function venuePickupReadableBox');
+    expect(bar).toContain('venuePickupPlacement');
+    expect(bar).toContain("pickupEls.root.style.setProperty('width', `${at.width}px`, 'important')");
+    expect(bar).toContain('pickupEls.root.style.removeProperty(\'width\')');
+    expect(bar).not.toContain('applyVenuePickupBox');
     expect(bar).not.toContain('venuePickupColumnPlacement');
     expect(bar).not.toContain('abemaCommentColumnRect');
-    expect(bar).not.toContain('100% - 180px');
   });
 });
 
@@ -177,24 +169,6 @@ describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
     expect(venuePickupPlacement({ left: 0, top: 200, width: 600, height: 338 }, { left: 0, top: 56, width: 1000 })).toEqual({ left: 300, top: 152, width: 576 });
     // 約250pxの欄は本編映像ではない。位置も合わせない（CSS の中央のまま）
     expect(venuePickupPlacement({ left: 900, top: 80, width: 274, height: 640 }, { left: 0, top: 0, width: 1400 })).toBeNull();
-  });
-  it('コメント欄の幅を渡してもニコ生・YouTube と同じ幅を important で付ける', async () => {
-    const { applyVenuePickupBox } = await import('./venuePickupBanner.js');
-    /** @type {Array<[string, string, string]>} */
-    const props = [];
-    /** @type {string[]} */
-    const removed = [];
-    applyVenuePickupBox({
-      style: { setProperty: (k, v, p) => { props.push([k, v, p]); } },
-      classList: { remove: (name) => { removed.push(name); } }
-    }, 1280, 274);
-    expect(props).toContainEqual(['width', '860px', 'important']);
-    expect(props).toContainEqual(['min-width', '320px', 'important']);
-    expect(props).toContainEqual(['max-width', '860px', 'important']);
-    expect(props).toContainEqual(['zoom', '1', 'important']);
-    expect(props).toContainEqual(['transform', 'translateX(-50%)', 'important']);
-    expect(props).toContainEqual(['word-break', 'normal', 'important']);
-    expect(removed).toContain('is-fit-column');
   });
   it('映像が見つからない・小さすぎるときは null(CSS の既定のまま)', async () => {
     const { venuePickupPlacement } = await import('./venuePickupBanner.js');

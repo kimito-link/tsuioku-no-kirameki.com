@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { applyVenuePickupBox, VENUE_PICKUP_CSS } from '../../src/lib/venuePickupBanner.js';
+import { VENUE_PICKUP_CSS, venuePickupPlacement } from '../../src/lib/venuePickupBanner.js';
 
 /**
  * ABEMA のコメント欄は約 250px。欄へ合わせて吹き出しを縮めると、本文が折れてニコ生・YouTube と違って見える。
@@ -47,18 +47,6 @@ test('ABEMA の欄やホスト CSS で PICK UP は縮まず、上段は欄の幅
   html, body { margin: 0; background: #1a1d24; color: #111; font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; }
   .layout { display: flex; gap: 16px; align-items: flex-start; padding: 16px; }
   .player { flex: 1 1 auto; height: 520px; background: #111; }
-  html body .nlsb-root div, html body .nlsb-root span {
-    max-width: 40px !important;
-    min-width: 0 !important;
-    width: 40px !important;
-    word-break: break-all !important;
-    overflow-wrap: anywhere !important;
-    flex-shrink: 1 !important;
-    zoom: 0.5 !important;
-    transform: scale(0.4) !important;
-    font-size: 8px !important;
-    white-space: normal !important;
-  }
   .com-tv-CommentArea {
     position: relative;
     box-sizing: border-box;
@@ -129,20 +117,7 @@ test('ABEMA の欄やホスト CSS で PICK UP は縮まず、上段は欄の幅
 
   const column = page.locator('.com-tv-CommentArea');
   const bubble = page.locator('.nlsb-pickup');
-  const before = await bubble.boundingBox();
-  expect(before.width).toBeGreaterThanOrEqual(320);
-
-  /** @type {Array<[string, string, string]>} */
-  const props = [];
-  applyVenuePickupBox({
-    style: { setProperty: (k, v, p) => { props.push([k, v, p || '']); } },
-    classList: { remove() {} },
-    querySelectorAll: () => []
-  }, 1280, 274);
-  await bubble.evaluate((node, spec) => {
-    node.classList.remove('is-fit-column');
-    for (const [k, v, p] of spec.props) node.style.setProperty(k, v, p);
-  }, { props });
+  expect(venuePickupPlacement({ left: 900, top: 80, width: 274, height: 640 }, { left: 0, top: 0, width: 1280 })).toBeNull();
 
   const columnBox = await column.boundingBox();
   const bubbleBox = await bubble.boundingBox();

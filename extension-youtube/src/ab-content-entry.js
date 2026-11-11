@@ -445,6 +445,7 @@ window.addEventListener('message', (ev) => {
     const rows = Array.isArray(data.meta.slotRows) ? data.meta.slotRows : [];
     const mine = rows.find((r) => expectId && String(r?.channelId || '').toLowerCase() === expectId);
     if (mine && Number(mine.views) > 0) program.views = Math.floor(Number(mine.views));
+    if (mine && Number(mine.startedAtMs) > 0) program.startedAtMs = Math.floor(Number(mine.startedAtMs));
     const incomingId = String(data.meta.channelId || '').toLowerCase();
     if (!rows.length && expectId && incomingId && incomingId !== expectId) return;
     const title = String(data.meta.title || '').slice(0, 200);

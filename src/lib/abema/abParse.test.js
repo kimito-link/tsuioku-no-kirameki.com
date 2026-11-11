@@ -88,6 +88,12 @@ describe('ABEMA のコメント JSON', () => {
     expect(batch?.messages[1].name).toBe('視聴サンプル');
     expect(batch?.messages[1].iconUrl).toContain('hayabusa.io');
   });
+  it('本文へ空白は足さない。届いた字のまま残す', () => {
+    const plain = parseAbCommentBatch({ messages: [{ userId: 'abcd1234', message: '無敵の笑顔で荒らす' }] });
+    expect(plain?.messages[0].text).toBe('無敵の笑顔で荒らす');
+    const spaced = parseAbCommentBatch({ messages: [{ userId: 'abcd1234', message: '無 敵の笑 顔で' }] });
+    expect(spaced?.messages[0].text).toBe('無 敵の笑 顔で');
+  });
   it('comments の形も読む', () => {
     const batch = parseAbCommentBatch(FIXTURE_SLOT_COMMENTS);
     expect(batch?.messages).toHaveLength(1);
@@ -212,6 +218,7 @@ describe('ABEMA のコメント JSON', () => {
     };
     const rows = abOnAirSlotStats(raw, now);
     expect(rows.find((r) => r.channelId === 'shogi')?.views).toBe(48027);
+    expect(rows.find((r) => r.channelId === 'shogi')?.startedAtMs).toBe(start * 1000);
     expect(rows.find((r) => r.channelId === 'drama-2')?.views).toBe(695);
     const notice = abPayloadNotices(raw);
     expect(notice?.meta?.views).toBe(null);
@@ -361,6 +368,16 @@ describe('ABEMA の番組情報と URL', () => {
     const bareCard = resolveBroadcasterFollowTarget(bare);
     expect(bareCard.iconUrl).toContain('/channels/shogi/logo.png');
     expect(bareCard.pageUrl).toBe('https://abema.tv/now-on-air/shogi');
+    const started = Date.now() - 90 * 60 * 1000;
+    const aged = ytSummaryToNicoSnapshot({
+      title: '将棋チャンネル',
+      broadcasterName: '将棋チャンネル',
+      broadcasterChannelId: 'ab:@n-shogi',
+      broadcasterHandle: 'n-shogi',
+      startedAt: started,
+    }, 'ab.n-shogi.live1', '');
+    expect(aged.streamAgeMin).toBeGreaterThanOrEqual(89);
+    expect(aged.streamAgeMin).toBeLessThanOrEqual(91);
   });
   it('画像は https の ABEMA の置き場だけ', () => {
     expect(safeAbImageUrl('http://hayabusa.io/a.jpg')).toBe('');
