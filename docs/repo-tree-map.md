@@ -171,11 +171,13 @@ graph LR
   f15 --> f15_2["extension/comeview-entry.js"]
   HUB --> f16["OBS透過コメントの見た目"]
   f16 --> f16_0["lib/obsOverlayStyle.js"]
-  f16 --> f16_1["extension/obsOverlayApply.js"]
-  f16 --> f16_2["extension/obs-style-entry.js"]
-  f16 --> f16_3["obs-style.html"]
-  f16 --> f16_4["comeview.html"]
-  f16 --> f16_5["extension/comeview-entry.js"]
+  f16 --> f16_1["lib/obsComeviewPage.js"]
+  f16 --> f16_2["extension/obsOverlayApply.js"]
+  f16 --> f16_3["extension/obs-style-entry.js"]
+  f16 --> f16_4["obs-style.html"]
+  f16 --> f16_5["comeview.html"]
+  f16 --> f16_6["yt-comeview.html"]
+  f16 --> f16_7["extension/comeview-entry.js"]
   HUB --> f17["会場の席割り"]
   f17 --> f17_0["lib/venueSeats.js"]
   HUB --> f18["背景群衆(来場者数の表現)"]
@@ -626,13 +628,15 @@ popup の応援レーンのタイルを素クリックすると、その人の�
 - [`src/extension/comeview-entry.js`](../src/extension/comeview-entry.js)
 
 ### OBS透過コメントの見た目  〔コメビュ / 表示 / OBS〕
-配信者が色・文字の大きさ・一度に出す数・アイコンと名前の表示・型を、見本を見ながら選ぶ。動きは既定オフ。保存は版付き記録(v が 1 のときだけ読む)。透過窓は comeview.html?obs=1。コピーする URL は Chrome で開く用。OBS のブラウザソースは拡張のページを開けないので、開いた窓をウィンドウキャプチャする
+配信者が色・文字の大きさ・一度に出す数・アイコンと名前の表示・型を、見本を見ながら選ぶ。動きは既定オフ。保存は版付き記録(v が 1 のときだけ読む)。透過窓は、いま見ている配信のコメビュ(ニコ生は comeview.html、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok は yt-comeview.html)に ?obs=1 を付けて開く。コピーする URL は Chrome で開く用。OBS のブラウザソースは拡張のページを開けないので、開いた窓をウィンドウキャプチャする
 
 - [`src/lib/obsOverlayStyle.js`](../src/lib/obsOverlayStyle.js)
+- `src/lib/obsComeviewPage.js` ⚠️ **見つからない（消失/リネーム）**
 - [`src/extension/obsOverlayApply.js`](../src/extension/obsOverlayApply.js)
 - [`src/extension/obs-style-entry.js`](../src/extension/obs-style-entry.js)
 - [`extension/obs-style.html`](../extension/obs-style.html)
 - [`extension/comeview.html`](../extension/comeview.html)
+- [`extension/yt-comeview.html`](../extension/yt-comeview.html)
 - [`src/extension/comeview-entry.js`](../src/extension/comeview-entry.js)
 
 ### 会場の席割り  〔会場 / 席〕

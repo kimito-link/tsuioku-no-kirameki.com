@@ -16,6 +16,11 @@ import {
   toStorageRecord
 } from '../lib/obsOverlayStyle.js';
 import {
+  OBS_NICO_COMEVIEW_PAGE,
+  OBS_YT_LAST_STREAM_URL_KEY,
+  pickObsComeviewWatch
+} from '../lib/obsComeviewPage.js';
+import {
   KEY_COMEVIEW_WINDOW_GEOMETRY,
   KEY_LAST_WATCH_URL,
   KEY_OBS_OVERLAY_STYLE
@@ -141,22 +146,65 @@ function paintPreview(style) {
 
 /** @type {string} */
 let currentLiveId = '';
+/** @type {ReturnType<typeof pickObsComeviewWatch>} */
+let currentWatch = pickObsComeviewWatch({});
+
+/** @param {string} page */
+function pageUrlFor(page) {
+  const file = page === 'yt-comeview.html' ? 'yt-comeview.html' : 'comeview.html';
+  const c = extensionChrome();
+  return c ? c.runtime.getURL(file) : `chrome-extension://拡張のID/${file}`;
+}
+
+function watchCaption() {
+  if (currentWatch.page === 'yt-comeview.html') {
+    return `いまの配信: ${currentWatch.serviceName}。この配信のコメビュを開きます。`;
+  }
+  return currentLiveId
+    ? `いまの配信: ${currentLiveId}`
+    : '配信番号はまだありません。透過窓は、あとから開いた放送に追従します。';
+}
+
+async function refreshWatch() {
+  /** @type {Array<{ url?: string, lastAccessed?: number }>} */
+  let tabs = [];
+  try {
+    if (typeof chrome.tabs?.query === 'function') tabs = await chrome.tabs.query({});
+  } catch {
+    tabs = [];
+  }
+  let nicoWatchUrl = '';
+  /** @type {unknown} */
+  let ytLast = null;
+  try {
+    const bag = await chrome.storage.local.get([KEY_LAST_WATCH_URL, OBS_YT_LAST_STREAM_URL_KEY]);
+    nicoWatchUrl = String(bag?.[KEY_LAST_WATCH_URL] || '');
+    ytLast = bag?.[OBS_YT_LAST_STREAM_URL_KEY] ?? null;
+  } catch {
+    nicoWatchUrl = '';
+    ytLast = null;
+  }
+  currentWatch = pickObsComeviewWatch({ tabs, nicoWatchUrl, ytLast });
+  currentLiveId = currentWatch.page === OBS_NICO_COMEVIEW_PAGE ? liveIdFromWatchUrl(currentWatch.url || nicoWatchUrl) : '';
+  const liveMeta = document.getElementById('liveMeta');
+  if (liveMeta) liveMeta.textContent = watchCaption();
+}
+
+/** @param {import('../lib/obsOverlayStyle.js').ObsOverlayStyle} style @param {boolean} embedStyle */
+function comeviewUrl(style, embedStyle) {
+  const nico = currentWatch.page === OBS_NICO_COMEVIEW_PAGE;
+  return buildObsComeviewUrl({
+    pageUrl: pageUrlFor(currentWatch.page),
+    liveId: nico ? currentLiveId : '',
+    includeLiveId: nico && field('lockLive').checked,
+    embedStyle,
+    style
+  });
+}
 
 /** @param {import('../lib/obsOverlayStyle.js').ObsOverlayStyle} style */
 function updateUrl(style) {
-  const c = extensionChrome();
-  const pageUrl = c
-    ? c.runtime.getURL('comeview.html')
-    : 'chrome-extension://拡張のID/comeview.html';
-  const includeLiveId = field('lockLive').checked;
-  const url = buildObsComeviewUrl({
-    pageUrl,
-    liveId: currentLiveId,
-    includeLiveId,
-    embedStyle: true,
-    style
-  });
-  field('obsUrl').value = url;
+  field('obsUrl').value = comeviewUrl(style, true);
 }
 
 /** @type {number} */
@@ -228,14 +276,8 @@ async function loadStored() {
     return;
   }
   try {
-    const bag = await chrome.storage.local.get([KEY_OBS_OVERLAY_STYLE, KEY_LAST_WATCH_URL]);
-    currentLiveId = liveIdFromWatchUrl(bag?.[KEY_LAST_WATCH_URL]);
-    const liveMeta = document.getElementById('liveMeta');
-    if (liveMeta) {
-      liveMeta.textContent = currentLiveId
-        ? `いまの配信: ${currentLiveId}`
-        : '配信番号はまだありません。透過窓は、あとから開いた放送に追従します。';
-    }
+    await refreshWatch();
+    const bag = await chrome.storage.local.get(KEY_OBS_OVERLAY_STYLE);
     const resolved = resolveObsOverlayStyle({
       queryParam: '',
       stored: bag?.[KEY_OBS_OVERLAY_STYLE]
@@ -258,6 +300,8 @@ async function loadStored() {
 }
 
 async function copyUrl() {
+  await refreshWatch();
+  updateUrl(readForm());
   const url = field('obsUrl').value;
   statusEpoch += 1;
   try {
@@ -282,13 +326,8 @@ async function openWindow() {
   } catch {
     /* 保存に失敗しても、既にある見た目で開く */
   }
-  const url = buildObsComeviewUrl({
-    pageUrl: chrome.runtime.getURL('comeview.html'),
-    liveId: currentLiveId,
-    includeLiveId: field('lockLive').checked,
-    embedStyle: false,
-    style
-  });
+  await refreshWatch();
+  const url = comeviewUrl(style, false);
   let saved = null;
   try {
     const bag = await chrome.storage.local.get(KEY_COMEVIEW_WINDOW_GEOMETRY);
