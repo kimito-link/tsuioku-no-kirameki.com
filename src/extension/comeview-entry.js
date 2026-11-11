@@ -106,6 +106,7 @@ import {
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
+import { publishVoiceNowPlaying } from './venuePickupVoice.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, VOICE_ENGINE_RETRY_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
@@ -1153,6 +1154,9 @@ async function drainVoiceQueue() {
           audio.addEventListener('ended', finish, { once: true });
           audio.addEventListener('error', finish, { once: true });
           audio.addEventListener('loadedmetadata', onMeta, { once: true });
+          audio.addEventListener('playing', () => {
+            try { if (typeof item.onAudible === 'function') item.onAudible(); } catch { /* 枠の失敗で再生を止めない */ }
+          }, { once: true });
           armWatchdog(VOICE_PLAYBACK_HARD_CAP_MS); // 先に固定上限で必ず張る(メタ未取得でも固着しない)。
           try {
             const playResult = audio.play();
@@ -1332,7 +1336,13 @@ function enqueueVoiceTimelineItems(items) {
       // v0.1.1799: 鳴り始め・鳴り終わり・捨てた時の知らせ(試験の1件ごとの記録用・会場 VoicePlayer と同じ名前)。
       onAudioStart: item.onAudioStart,
       onAudioEnd: item.onAudioEnd,
-      onDropped: item.onDropped
+      onDropped: item.onDropped,
+      onAudible: () => publishVoiceNowPlaying(typeof chrome !== 'undefined' ? chrome.storage : null, {
+        text: item.kind === 'gift' ? body : String(item.text || body),
+        name: String(item.nickname || ''),
+        userId: String(item.userId || ''),
+        key: String(item.key || item.commentNo || '')
+      }, _liveId)
     };
     _voiceDiag.voiceEnqueuedTotal = (Number(_voiceDiag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);

@@ -341,7 +341,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 299</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -607,6 +607,7 @@
 - `src/lib/venueOpenCache.js` — 「会場モードが開いているか」を安く保持する。
 - `src/lib/venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
 - `src/lib/venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
+- `src/lib/venuePickupPlayback.js` — 会場の PICK UP を「声が鳴り始めたコメント」に合わせる判定(純粋)。
 - `src/lib/venuePickupRing.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/venuePresenceNote.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
@@ -655,7 +656,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -669,6 +670,7 @@
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
 - `src/extension/popup/wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
+- `src/extension/venuePickupVoice.js` — 会場の PICK UP を、声が鳴り始めたコメントへ切り替える配線。
 - `src/extension/voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
 - `src/extension/voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
 - `src/extension/voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
@@ -1480,6 +1482,7 @@
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### 🏟 会場・席 (10版)
+- `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
 - `v0.1.2021` 2026-11-10 — 横の欄のボタンの見た目をそろえた
@@ -1489,7 +1492,6 @@
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 - `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
-- `v0.1.1912` 2026-11-06 — YouTube でログイン中なのに送れない表示を直す
 
 ### 🎈 吹き出し (2版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
@@ -1503,7 +1505,8 @@
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🔊 読み上げ (6版)
+### 🔊 読み上げ (7版)
+- `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
 - `v0.1.2032` 2026-11-10 — ビルドの札を詳しい状況の先頭へ移した

@@ -496,8 +496,9 @@ export default [
     // v0.1.1980: 吹き出しを待たせる計器に「待たせている間に声の側で外された件」を足す=+1(PC 実測で held 491 のうち 377 件の行き先が数えられていなかった)。
     // v0.1.1995: パネルを開かなくても数字の帯が出る(りんく「POPをひらかなくても数字がつくように」)の配線=+9(import 1行・自分で作る写しの置き場と見回り役 8行)。作り方は lib の venueStatCardsSelf.js。
     // v0.1.2005: 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない(PC 実測: ニコ生で最初の約1分、古い数字で止まる)の配線=+2。判定は lib の venueStatCardsSelf.js(createStatMirrorLiveness)。
+    // v0.1.2038: 読み上げ ON の PICK UP を、声が鳴り始めた瞬間に合わせる配線=+13。中身は venuePickupVoice.js と lib の venuePickupPlayback.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7531, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7544, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

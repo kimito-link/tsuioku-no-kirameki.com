@@ -9,6 +9,7 @@ import {
   venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { attachVenuePickupDrag } from './venuePickupDrag.js';
+import { createVenuePickupVoiceLink } from './venuePickupVoice.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
   buildVenueSeating,
@@ -3015,8 +3016,11 @@ export function mountVenueBarButton(options = {}) {
    *   以前は commitDisplay の表示行から選んでいたため、発言を行へ混ぜた直後の1回しか本文が乗らず枠が案内文のままだった(実機+headlessで再現)。正本=venuePickupRing.js。
    */
   let pickupRing = /** @type {Array<any>} */ ([]);
+  /** 読み上げ ON のあいだは、届いた順では枠を変えない。声が鳴り始めた件だけ変える。 */
+  let pickupVoice = { follows: () => false, noteWanted(/** @type {boolean} */ _wanted) {}, onSpoken(/** @type {any} */ _speech) {} };
   /** @param {ReadonlyArray<any>|null} fallbackRows リングが空のときの従来入力(表示行) */
   const updatePickupBanner = (fallbackRows) => {
+    if (pickupVoice.follows()) return;
     try {
       const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
       const picked = pickTickerHighlightEntry(rows, Date.now());
@@ -3034,6 +3038,12 @@ export function mountVenueBarButton(options = {}) {
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
   const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)
+  pickupVoice = createVenuePickupVoiceLink({
+    getLiveId: liveIdFromPathname,
+    resolveSpeaker: (sp) => resolvePickupSpeaker(sp, { profileAvatarUrl: profileAvatarMap && profileAvatarMap[String(sp?.userId || '')]?.avatarUrl, profileNickname: profileAvatarMap && profileAvatarMap[String(sp?.userId || '')]?.nickname }),
+    apply: (picked) => { applyVenuePickupView(pickupEls, buildVenuePickupView(picked)); placePickup(); },
+    storage: typeof chrome !== 'undefined' ? chrome.storage : null
+  });
   // seating は下端のひな壇だけ(header + seats)。PICK UP は映像の上端の吹き出し(v0.1.1869・stageLayout へ)。
   seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
@@ -3419,6 +3429,8 @@ export function mountVenueBarButton(options = {}) {
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
     onDiag: publishVenueVoiceDiag,
     onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
+      pickupVoice.noteWanted(enabled);
+      if (!enabled) updatePickupBanner(null);
       voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
@@ -6903,6 +6915,7 @@ export function mountVenueBarButton(options = {}) {
           //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
           //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
           //   発火する曖昧信号)に乗せると、鳴っていないのに頷く事故になる。
+          onAudible: () => pickupVoice.onSpoken(speech),
           onAudioStart: () => {
             _lastVoiceAudioStartAt = Date.now();
             if (!bubbleRevealed) _bubbleVoiceHoldDiag.shownWithVoice += 1;
