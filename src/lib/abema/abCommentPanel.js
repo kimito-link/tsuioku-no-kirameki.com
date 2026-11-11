@@ -21,7 +21,9 @@ export const AB_IMAGE_REFRESH_MS = 30_000;
 export const AB_OPEN_COMMENT_KEY = 'yt_ab_open_comment';
 export const AB_PANEL_NOTE = 'ABEMAのコメント欄（画面右下の吹き出しボタン）を開くと記録が始まります';
 
-const OWN_UI = '#nl-ab-open, #nl-ab-note';
+// 拡張自身の画面(会場・案内)。会場の「✍ しまう」は title に「コメント」を含むので、除かないと
+// コメント欄のボタンと取り違えて押し、会場が最初から畳まれていた(2026-11-11 PC 実測)。
+const OWN_UI = '#nl-ab-open, #nl-ab-note, #nlsb-venue-root, .nlsb-root';
 
 /** @param {unknown} stored */
 export function abOpenCommentEnabled(stored) {

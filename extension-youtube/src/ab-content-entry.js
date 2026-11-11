@@ -124,7 +124,31 @@ function domCounter(selectors) {
 
 /** 番組情報欄の視聴数（欄が開いているときだけ出ている）。おすすめ欄の別番組の数は拾わない。 */
 function domSlotViews() {
-  return domCounter(['.com-tv-FeedProgramDetailViewCounter abbr.com-a-Counter', '.com-tv-FeedProgramDetailViewCounter']);
+  const n = domCounter(['.com-tv-FeedProgramDetailViewCounter abbr.com-a-Counter', '.com-tv-FeedProgramDetailViewCounter']);
+  return n != null && n > 0 ? n : null;
+}
+
+/**
+ * 最後に画面で読めた視聴数とコメント数。コメント欄を開くと番組情報欄は DOM から消える
+ * (2026-11-11 PC 実測: 開いてから 2〜7 秒だけ出ていた)ので、見えているあいだに毎秒読んで残す。
+ */
+let lastDomViews = /** @type {number|null} */ (null);
+let lastDomComments = /** @type {number|null} */ (null);
+function noteDomCounts() {
+  if (!pageLogin) return;
+  const v = domSlotViews();
+  const c = domSlotComments();
+  let changed = false;
+  if (v != null && v !== lastDomViews) {
+    changed = lastDomViews == null;
+    lastDomViews = v;
+  }
+  if (c != null && c !== lastDomComments) {
+    changed = changed || lastDomComments == null;
+    lastDomComments = c;
+  }
+  // 初めて読めたときだけすぐ送る。あとは今までの間隔(sendMeta の呼び出し)で送る。
+  if (changed && streamKey) sendMeta();
 }
 
 /** コメント数（下のバーのコメントボタン、無ければ番組情報欄）。入力欄の残り文字数（com-o-CommentForm__count）は数えない。 */
@@ -273,9 +297,9 @@ function sendMeta(forceClaim) {
     sentIcon = icon;
   }
   // 画面に出ている数（title の正確な数）を先に使う。欄が閉じているあいだはページ自身の応答の数。
-  const views = domSlotViews() ?? abPreferViewCount(program.views, null);
-  if (views != null) payload.slotViewCount = views;
-  const comments = domSlotComments() ?? program.comments;
+  const views = domSlotViews() ?? lastDomViews ?? (Number(program.views) > 0 ? abPreferViewCount(program.views, null) : null);
+  if (views != null && views > 0) payload.slotViewCount = views;
+  const comments = domSlotComments() ?? lastDomComments ?? program.comments;
   if (comments != null) payload.slotCommentCount = comments;
   if (program.concurrent != null && program.concurrent >= 0) payload.concurrentViewers = program.concurrent;
   if (program.startedAtMs) {
@@ -511,6 +535,8 @@ function syncPage() {
   imageScanAt = 0;
   cachedIcon = '';
   program = { title: '', startedAtMs: null, views: null, comments: null, concurrent: null, imageUrl: '', channelId: '' };
+  lastDomViews = null;
+  lastDomComments = null;
   seen = new Set();
   pending = [];
   panel.reset();
@@ -685,6 +711,7 @@ syncPage();
 watchSpaNavigation();
 setInterval(() => {
   syncPage();
+  noteDomCounts();
   pollPanel(false);
   maybeNote();
   syncSettingChip();

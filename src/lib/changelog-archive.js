@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2031',
+    date: '2026-11-10',
+    summary: 'ギフトランキング取得の説明文が読めるように',
+    items: Object.freeze([
+      '横の欄の「ギフトランキング取得を開始(β)」ボタンの上にある説明文が、白い字のままで明るい背景では読めませんでした(ボタンだけが見えていました)。読める色に直しました。',
+      '暗い配色でも読めます。働きは変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2030',
     date: '2026-11-10',
     summary: '状態ページのボタンの見た目をそろえた',

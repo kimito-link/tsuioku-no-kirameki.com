@@ -86,9 +86,11 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   const peakConcurrentViewers =
     concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
   // ABEMA の番組詳細の視聴数（同時接続ではない）。無い配信の要約には欄を足さない。
-  const slotViewCount = plausible(patch?.slotViewCount)
+  // 0 は「まだ読めていない」。視聴数 0 として残さない(2026-11-11 PC: 0 のまま残って「材料待ち」)。
+  const viewOk = (/** @type {unknown} */ v) => plausible(v) && /** @type {number} */ (v) > 0;
+  const slotViewCount = viewOk(patch?.slotViewCount)
     ? Math.floor(/** @type {number} */ (patch.slotViewCount))
-    : plausible(prev.slotViewCount)
+    : viewOk(prev.slotViewCount)
       ? Math.floor(prev.slotViewCount)
       : null;
   // ページに出ているコメント数（ABEMA の下のバー）。記録の件数とは別。無い配信の要約には欄を足さない。

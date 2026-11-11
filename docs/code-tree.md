@@ -1189,7 +1189,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2424)
+- 📁 **src/** (2425)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1496,10 +1496,11 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2141)
-    - 📁 **abema/** (4)
+  - 📁 **lib/** (2142)
+    - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
+      - `abCommentPanelOwnUi.test.js`
       - `abParse.js` — ABEMA の放送ページが受け取ったコメント JSON を、YouTube 版の記録と同じ形にする(純関数)
       - `abParse.test.js`
     - 📁 **fixtures/** (2)
