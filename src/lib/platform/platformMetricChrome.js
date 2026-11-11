@@ -6,7 +6,10 @@
  * DOM は引数の root だけを触る。src/lib 直下の純粋性検査の対象外(platform/)。
  */
 
-import { panelExtraChips, platformSectionPlan, streamAgeTitle } from './platformMetrics.js';
+import { panelExtraChips, platformSectionPlan, streamAgeTitle, LOADING } from './platformMetrics.js';
+
+/** 数でない値の札。ニコ生の「（接続中…）」「（取得不可）」「推定中」「計測中…」や最初の「—」は、ほかのサービスでは「読み込み中」にする。 */
+const NOT_A_COUNT = /^(?:—|-|（接続中…）|（取得不可）|（数字非公開）|推定中|計測中…|)$/u;
 
 /** @param {Element|null|undefined} el */
 function hideEl(el) {
@@ -115,6 +118,18 @@ export function applyPlatformMetricChrome(root, state) {
     concIcon.setAttribute('title', plan.concurrentLabel);
     concIcon.setAttribute('aria-label', plan.concurrentLabel);
   }
+  // 数が来る前の札(開いた直後の「—」・ニコ生の「（接続中…）」等)を「読み込み中」に。数そのものと「N分前」は触らない。
+  const est = root.querySelector('#watchConcurrentEst');
+  if (est) {
+    const t = String(est.textContent || '').trim();
+    if (NOT_A_COUNT.test(t) || t.startsWith('~')) {
+      if (est.textContent !== LOADING) est.textContent = LOADING;
+      est.classList.add('is-placeholder');
+      est.removeAttribute('title');
+      const sub = root.querySelector('#watchConcurrentSub');
+      if (sub && sub.textContent !== '') sub.textContent = '';
+    }
+  }
   const loading = root.querySelector('#watchConcurrentLoading');
   if (loading) loading.setAttribute('aria-label', `${plan.concurrentLabel}を読み込み中`);
 
@@ -202,6 +217,9 @@ export function applyPlatformMetricChrome(root, state) {
       if (el && el.getAttribute('title') !== title) el.setAttribute('title', title);
     }
   }
+  // 見出しと欄をこのサービスのものにした印(yt-sidepanel.html の最初の描画の隠しを外す・scripts/youtube-build.mjs)
+  const html = /** @type {Document} */ (root).documentElement || root.ownerDocument?.documentElement;
+  if (html && html.getAttribute('data-nl-platform-ready') !== '1') html.setAttribute('data-nl-platform-ready', '1');
   const banner = root.querySelector('#watchOfficialEventBannerCard');
   if (banner) hideEl(banner);
   const ndgr = root.querySelector('#watchOfficialNdgrCard');
@@ -247,6 +265,7 @@ export function watchPlatformMetricChrome(root, getState) {
     const row = root.querySelector('.nl-official-nico-stats__row');
     if (row) obs.observe(row, { childList: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
     for (const sel of [
+      '#watchConcurrentEst',
       '#watchConcurrentCard .nl-live-stat-label',
       '[data-lane="contributionRanking"] .nl-north-star-lane__label',
       '[data-lane="giftHistory"] .nl-north-star-lane__label',
@@ -256,5 +275,8 @@ export function watchPlatformMetricChrome(root, getState) {
     }
   }
   schedule();
+  // 何かの理由でサービスが決まらなくても、隠した見出しを出したままにしない(3秒で外す)
+  const htmlEl = /** @type {Document} */ (root).documentElement || root.ownerDocument?.documentElement;
+  if (htmlEl) setTimeout(() => htmlEl.setAttribute('data-nl-platform-ready', '1'), 3000);
   return schedule;
 }

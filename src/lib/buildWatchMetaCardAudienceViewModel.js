@@ -232,40 +232,48 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
         resolved.method === 'fallback' &&
         resolved.estimated <= 0 &&
         resolved.base.method === 'none');
-    const ytStaleCount =
-      snapshot.platform === 'youtube' &&
-      snapshot.officialViewerStale === true &&
+    // ページに数が出ているサービス(YouTube・Twitch・Kick・ABEMA など)は、その数をそのまま出す。推定はしない・「推定」とも書かない
+    //   (2026-11-11 りんく「推定という表現もおかしい」「もとからでているところはそれにならって」)。
+    //   ニコ生の推定の式(resolveConcurrentViewers)の答えは使わない: 公式の数の更新が少し遅れただけで「推定中・材料待ち」に落ちていた。
+    const officialOnly = snapshot.officialViewersOnly === true;
+    const factsViewCount = /** @type {{ viewCount?: unknown }|null|undefined} */ (snapshot.platformFacts)?.viewCount;
+    const pageCountRaw =
       typeof snapshot.officialViewerCount === 'number' &&
       Number.isFinite(snapshot.officialViewerCount) &&
       snapshot.officialViewerCount > 0
-        ? Math.floor(snapshot.officialViewerCount)
-        : 0;
-    // 公式の視聴者数しか出さないサービスでは、ニコ生の推定を公式の数として出さない。
-    // YouTube で一度読めた数が次に読めないときは、最後の数と「N分前」を出す。
-    if (ytStaleCount > 0) {
+        ? snapshot.officialViewerCount
+        : typeof factsViewCount === 'number' && Number.isFinite(factsViewCount) && factsViewCount >= 0
+          ? factsViewCount
+          : null;
+    const pageCount = officialOnly && pageCountRaw != null ? Math.floor(pageCountRaw) : null;
+    if (officialOnly && pageCount != null) {
+      // 一度読めた数が次に読めないときは、最後の数と「N分前」を出す。
+      const stale = snapshot.officialViewerStale === true;
       const readAt = Number(snapshot.officialViewerReadAt || 0);
       const mins = readAt > 0 ? Math.max(0, Math.floor((nowMs - readAt) / 60000)) : 0;
       concurrent = {
         phase: 'ready',
-        estText: ytStaleCount.toLocaleString('ja-JP'),
+        estText: pageCount.toLocaleString('ja-JP'),
         estIsPlaceholder: false,
-        estTitle: `最後に読めた同時視聴者数です（${mins}分前）`,
-        subText: `${mins}分前`,
+        estTitle: stale ? `最後に読めた数です（${mins}分前）` : '配信ページに出ている数です',
+        subText: stale ? `${mins}分前` : '人',
         concurrentLoadingHidden: true,
         concurrentReadyHidden: false,
         ariaBusy: false,
-        numericEstimated: ytStaleCount,
-        charReactionDelta: null
+        numericEstimated: pageCount,
+        charReactionDelta:
+          prev.concurrentEstimated != null && pageCount !== prev.concurrentEstimated
+            ? Math.abs(pageCount - prev.concurrentEstimated)
+            : null
       };
-      nextConcurrentEstimated = ytStaleCount;
-    } else if (snapshot.officialViewersOnly === true && !directLike) {
-      // YouTube には推定の材料が無いので、最初の数が来るまでは「読み込み中」と出す。
-      const ytLoading = snapshot.platform === 'youtube';
+      nextConcurrentEstimated = pageCount;
+    } else if (officialOnly) {
+      // 最初の数が来るまでは「読み込み中」。「—」「推定中」「材料待ち」は出さない。
       concurrent = {
         phase: 'ready',
-        estText: ytLoading ? '読み込み中' : '—',
+        estText: '読み込み中',
         estIsPlaceholder: true,
-        estTitle: ytLoading ? '同時視聴者数を読み込んでいます' : '公式の視聴者数はまだ取れていません',
+        estTitle: '配信ページの数を読み込んでいます',
         subText: '',
         concurrentLoadingHidden: true,
         concurrentReadyHidden: false,

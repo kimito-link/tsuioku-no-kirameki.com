@@ -28,102 +28,77 @@ export function parseYtVideoIdFromUrl(rawUrl) {
   return '';
 }
 
-/** /名前/live をチャンネルの配信と見なさない、YouTube 自身の区画。 */
-const YT_NOT_CHANNEL = new Set([
-  'account', 'ads', 'analytics', 'api', 'attribution_link', 'c', 'channel', 'clip',
-  'comment', 'copyright', 'create', 'creator', 'dashboard', 'embed', 'feed',
-  'features', 'gaming', 'hashtag', 'howyoutubeworks', 'iframe_api', 'intl', 'kids',
-  'live', 'live_chat', 'live_chat_replay', 'logout', 'music', 'new', 'oops', 'playlist',
-  'post', 'premium', 'redirect', 'reporthistory', 'results', 'shorts', 'signin',
-  'source', 'studio', 'supported_browsers', 't', 'trends', 'tv', 'upload', 'user', 'watch',
+// チャンネルの「いま配信中」ページの形。YouTube は /@名前/live を古い形(/名前/live 等)へ送り直すことがある
+//   (2026-11-11 実機: /@weathernews/live → /weathernews/live で「watch ページが見つかりません」)。どの形でも同じに扱う。
+//   /<名前>/live の <名前> が YouTube 自身のページ(/feed/… 等)のときは配信ページではない。
+const YT_RESERVED_TOP = new Set([
+  'watch', 'live', 'live_chat', 'live_chat_replay', 'shorts', 'feed', 'results', 'playlist', 'embed', 'hashtag',
+  'gaming', 'music', 'premium', 'kids', 'account', 'signin', 'logout', 'redirect', 'post', 'source', 'podcasts',
+  'sports', 'news', 'learning', 'fashion', 'courses', 'trending', 'upload', 'studio', 'about', 't', 's', 'yt',
+  'api', 'youtubei', 'storefront', 'movies', 'channel', 'c', 'user', 'attribution_link', 'howyoutubeworks', 'ads',
+  'creators', 'img', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'robots.txt',
 ]);
 
 /**
- * @param {string} hostname
- */
-function isYoutubeHost(hostname) {
-  const host = String(hostname || '').toLowerCase();
-  return host === 'youtube.com' || host.endsWith('.youtube.com');
-}
-
-/**
- * /@名前/live を、まとめが出来る前の仮の配信キーにする。YouTube 以外は ''。
- * 仮のキーがあると横の欄はすぐ YouTube の「読み込み中」になる。
- * `/名前/live`・`/c/名前/live`・`/channel/番号/live`・`/user/名前/live` も同じ。
- * @param {string} rawUrl
- * @returns {string}
- */
-export function ytHandleLivePendingKey(rawUrl) {
-  const path = ytHandleLivePath(rawUrl);
-  if (!path) return '';
-  let body = path.slice(1, path.length - '/live'.length).replace(/\/$/, '');
-  try {
-    body = body.split('/').map((part) => decodeURIComponent(part)).join('/');
-  } catch {
-    /* 名前はそのまま */
-  }
-  return body ? `ytlive:${body}` : '';
-}
-
-/**
- * 仮の配信キーから、画面に出す名前を取り出す。仮のキーでなければ ''。
- * @param {unknown} key
- */
-export function ytHandleOfPendingKey(key) {
-  const m = String(key || '').match(/^ytlive:(.+)$/);
-  if (!m) return '';
-  const rest = m[1];
-  const slash = rest.lastIndexOf('/');
-  return slash >= 0 ? rest.slice(slash + 1) : rest;
-}
-
-/**
- * 仮の配信キーから、チャンネルのページ URL を作る。
- * @param {unknown} key
- * @returns {string}
- */
-export function ytPendingChannelPageUrl(key) {
-  const m = String(key || '').match(/^ytlive:(.+)$/);
-  if (!m) return '';
-  return `https://www.youtube.com/${encodeURI(m[1])}`;
-}
-
-/**
- * チャンネルの配信 URL を、比較用のパスにする。それ以外は ''。
- * `/@名前/live` に加え、`/@名前/live` が飛んだ先の `/名前/live`・`/c/名前/live`・
- * `/channel/番号/live`・`/user/名前/live` も同じ配信ページとして扱う。
+ * チャンネルの「いま配信中」ページ(/@名前/live・/名前/live・/c/名前/live・/user/名前/live・/channel/UC…/live)の
+ * URL を、比較用のパス(末尾の / なし)にする。それ以外は ''。YouTube 以外(TikTok の /@名前/live 等)も ''。
  * @param {string} rawUrl
  * @returns {string}
  */
 export function ytHandleLivePath(rawUrl) {
   try {
     const u = new URL(String(rawUrl || ''), 'https://www.youtube.com');
-    if (!isYoutubeHost(u.hostname)) return '';
-    const parts = u.pathname.replace(/\/$/, '').split('/').filter(Boolean);
-    if (parts.length === 2 && parts[0].startsWith('@') && parts[0].length > 1 && parts[1] === 'live') {
-      return `/${parts[0]}/live`;
-    }
-    if (
-      parts.length === 3 &&
-      parts[2] === 'live' &&
-      (parts[0] === 'c' || parts[0] === 'channel' || parts[0] === 'user') &&
-      parts[1]
-    ) {
-      return `/${parts[0]}/${parts[1]}/live`;
-    }
-    if (
-      parts.length === 2 &&
-      parts[1] === 'live' &&
-      parts[0] &&
-      !parts[0].startsWith('@') &&
-      !YT_NOT_CHANNEL.has(parts[0].toLowerCase())
-    ) {
-      return `/${parts[0]}/live`;
-    }
+    const host = u.hostname.toLowerCase();
+    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return '';
+    const path = u.pathname.replace(/\/$/, '');
+    if (/^\/@[^/]+\/live$/.test(path)) return path;
+    if (/^\/(?:c|user)\/[^/]+\/live$/.test(path)) return path;
+    if (/^\/channel\/UC[A-Za-z0-9_-]{22}\/live$/.test(path)) return path;
+    const m = path.match(/^\/([^/@]+)\/live$/);
+    if (m && !YT_RESERVED_TOP.has(m[1].toLowerCase())) return path;
     return '';
   } catch {
     return '';
   }
+}
+
+/**
+ * チャンネルの「いま配信中」ページを、まとめが出来る前の仮の配信キーにする。YouTube 以外は ''。
+ * 仮のキーがあると横の欄はすぐ YouTube の「読み込み中」になる。
+ * 例: /@名前/live → ytlive:@名前 ・ /名前/live → ytlive:名前 ・ /channel/UC…/live → ytlive:channel/UC…
+ * @param {string} rawUrl
+ * @returns {string}
+ */
+export function ytHandleLivePendingKey(rawUrl) {
+  const path = ytHandleLivePath(rawUrl);
+  if (!path) return '';
+  let part = path.slice(1, path.length - '/live'.length);
+  try {
+    part = decodeURIComponent(part);
+  } catch {
+    /* 名前はそのまま */
+  }
+  return part ? `ytlive:${part}` : '';
+}
+
+/**
+ * 仮の配信キーから、画面に出すチャンネルの呼び名を取り出す(@名前 / 名前)。
+ * /channel/UC… の形は名前が分からないので ''。仮のキーでなければ ''。
+ * @param {unknown} key
+ */
+export function ytHandleOfPendingKey(key) {
+  const m = String(key || '').match(/^ytlive:(.+)$/);
+  if (!m) return '';
+  const part = m[1];
+  if (part.startsWith('@')) return part;
+  if (/^channel\//.test(part)) return '';
+  return part.replace(/^(?:c|user)\//, '');
+}
+
+/** 仮の配信キー → そのチャンネルのページ。仮のキーでなければ ''。 @param {unknown} key */
+export function ytChannelUrlOfPendingKey(key) {
+  const m = String(key || '').match(/^ytlive:(.+)$/);
+  return m ? `https://www.youtube.com/${encodeURI(m[1])}` : '';
 }
 
 /**
@@ -135,8 +110,8 @@ export function isYtWatchLikeUrl(rawUrl) {
     const u = new URL(rawUrl, 'https://www.youtube.com');
     const p = u.pathname;
     if (p.startsWith('/live_chat')) return false;
-    // /@名前/live と、そこから飛んだ /名前/live などは YouTube だけ。TikTok も同じ形を使う。
-    if (ytHandleLivePath(rawUrl)) return true;
+    // チャンネルの「いま配信中」ページは YouTube だけ。TikTok も /@名前/live の形を使う。
+    if (/\/live\/?$/.test(p) && !p.startsWith('/live/')) return Boolean(ytHandleLivePath(rawUrl));
     return p === '/watch' || p.startsWith('/live/');
   } catch {
     return false;

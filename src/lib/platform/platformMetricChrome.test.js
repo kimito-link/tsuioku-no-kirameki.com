@@ -46,6 +46,19 @@ function mount() {
 }
 
 describe('applyPlatformMetricChrome', () => {
+  it('数が来る前のニコ生の札(（接続中…）・推定中・—)は、ほかのサービスでは読み込み中にする', () => {
+    for (const t of ['（接続中…）', '（取得不可）', '推定中', '—', '~120']) {
+      const root = mount();
+      root.querySelector('#watchConcurrentEst').textContent = t;
+      applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
+      expect(root.querySelector('#watchConcurrentEst').textContent).toBe('読み込み中');
+    }
+    const root = mount();
+    root.querySelector('#watchConcurrentEst').textContent = '8,664';
+    applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
+    expect(root.querySelector('#watchConcurrentEst').textContent).toBe('8,664');
+  });
+
   it('YouTube ではニコ生のチップを隠し、このPCの合計を足す', () => {
     const root = mount();
     applyPlatformMetricChrome(root, {

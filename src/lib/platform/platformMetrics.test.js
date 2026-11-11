@@ -102,7 +102,7 @@ describe('venueItemsForPlatform', () => {
 
   it('公式の視聴者数が無いとき、推定の ~ は出さない', () => {
     const items = venueItemsForPlatform('youtube', bag({ viewers: null }));
-    expect(items.find((i) => i.key === 'concurrent').text).toBe('—');
+    expect(items.find((i) => i.key === 'concurrent').text).toBe('読み込み中');
   });
 
   it('YouTube の合計は円を先に出し、ドルは換算せず title に残す', () => {
@@ -153,7 +153,7 @@ describe('venueItemsForPlatform', () => {
     expect(items.map((i) => i.label)).toEqual(['記録', '視聴数', '経過', 'コメント']);
     expect(items.find((i) => i.key === 'concurrent').text).toBe('1,000');
     expect(items.find((i) => i.key === 'comments').text).toBe('45');
-    expect(panelExtraChips('abema', { commentCount: null }).find((c) => c.key === 'comments').text).toBe('—');
+    expect(panelExtraChips('abema', { commentCount: null }).find((c) => c.key === 'comments').text).toBe('読み込み中');
   });
 
   it('SHOWROOM などは視聴者数と経過だけ(ニコ生の広告は出さない)', () => {

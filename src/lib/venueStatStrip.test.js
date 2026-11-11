@@ -177,7 +177,8 @@ describe('パネルを開かなくても数字が付く(会場が自分で作っ
   it('ページのサービスが分かっているときは、鏡が来る前からニコ生のチップを出さない', () => {
     const m = buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, platform: 'twitch' });
     expect(m.items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過']);
-    expect(m.items.every((i) => i.text === '—')).toBe(true);
+    // 視聴者数は最初から「読み込み中」(「—」「推定中」にしない)
+    expect(m.items.map((i) => i.text)).toEqual(['—', '読み込み中', '—']);
   });
 
   it('★記録件数が分からない(null)とき「0件」と出さない(2026-11-10 実機: パネル未起動で「記録 0件」)', () => {

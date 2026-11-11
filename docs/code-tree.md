@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1242 件
+## ⚠️ 役割コメントが無いソース 10 / 1252 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -234,7 +234,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (367)
+- 📁 **docs/** (379)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -553,6 +553,10 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.md`
+  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -575,6 +579,10 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
+  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
@@ -608,6 +616,10 @@
   - `reference_deterministic_backfill.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.md`
+  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
@@ -617,7 +629,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (144)
+- 📁 **extension/** (148)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -759,8 +771,12 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
+  - `manifest.json`
+  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -775,7 +791,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (158)
+- 📁 **extension-youtube/** (162)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -899,10 +915,12 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (29)
+  - 📁 **src/** (33)
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
+    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
+    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `content-chat-main-entry.js` — ページ自身の世界に入る束の入口。
     - `kick-content-entry.js` — Kick の視聴ページ(kick.com/<チャンネル>)で、チャットを読んで記録に渡す入口。
@@ -927,6 +945,8 @@
     - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
     - `ytLocalAssetUrls.js` — YouTube の視聴ページの中の会場(content script)で、拡張の中の画像・音を
     - `ytMergedIsolationBoot.js` — 本体に同梱した YouTube 版の画面・視聴ページの入口で、いちばん先に動く仕切り。
+    - `ytNicoShim.js` — ニコ生版のサイドパネル(本物の popup-entry.js)を、YouTube の記録で動かすための「入口の差し替え」。
+    - `ytNicoShim.js` — ニコ生版のサイドパネル(本物の popup-entry.js)を、YouTube の記録で動かすための「入口の差し替え」。
     - `ytNicoShim.js` — ニコ生版のサイドパネル(本物の popup-entry.js)を、YouTube の記録で動かすための「入口の差し替え」。
     - `ytVenueOverlayPrep.js` — 会場(venue.html)を YouTube の視聴ページの上に重ねて開くときの下ごしらえ。
   - `background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
@@ -1161,7 +1181,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2445)
+- 📁 **src/** (2453)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1493,7 +1513,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2145)
+  - 📁 **lib/** (2153)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1556,7 +1576,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (84)
+    - 📁 **youtube/** (88)
       - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -1593,6 +1613,10 @@
       - `ytNicoShimHandleUrl.test.js`
       - `ytNicoShimPlaceholder.test.js`
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
+      - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
+      - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
+      - `ytPageMeta.test.js`
+      - `ytPageMeta.test.js`
       - `ytPageMeta.test.js`
       - `ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
       - `ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
@@ -1826,6 +1850,8 @@
     - `buildNorthStarAdRankingStatsHtml.test.js`
     - `buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
     - `buildWatchMetaCardAudienceViewModel.test.js`
+    - `buildWatchMetaCardAudienceViewModel.test.js`
+    - `buildWatchMetaCardAudienceViewModel.test.js`
     - `bundleBuildId.js` — dist バンドル本文から NL_BUILD_ID(JST, MMDD-HHmmss)の焼き込み値を
     - `bundleBuildId.test.js`
     - `bundleFixesPresent.test.js`
@@ -1849,6 +1875,8 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -3791,7 +3819,7 @@
   - `gen-og-live-ranking.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (70)
+- 📁 **tsuioku-no-kirameki/** (72)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -3868,6 +3896,8 @@
   - `.htaccess`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
+  - `index.html`
+  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`

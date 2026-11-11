@@ -10794,7 +10794,12 @@
         必ず別ファイル(=self)にすること。中身は src/extension/cloak-failsafe-entry.js。
     -->
     <script src="dist/cloak-failsafe.js"></script>
-  </head>
+  <style>/* YouTube 版: サービスの見出しが付くまでニコ生の見出しと欄を出さない(scripts/youtube-build.mjs) */
+html:not([data-nl-platform-ready]) #watchConcurrentCard .nl-live-stat-label,
+html:not([data-nl-platform-ready]) .nl-official-nico-stats__row { visibility: hidden; }
+html:not([data-nl-platform-ready]) .nl-live-stat-card--visitors { display: none !important; }
+</style>
+</head>
   <body>
     <!--
       初回ロード中のシェード。Chrome が popup.html を開いた瞬間に、
@@ -11232,7 +11237,7 @@
           <div class="nl-live-stat-label">推定同時接続</div>
           <div class="nl-concurrent-body">
             <div id="watchConcurrentReady" class="nl-concurrent-ready">
-              <div class="nl-live-stat-value" id="watchConcurrentEst">—</div>
+              <div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">読み込み中</div>
               <div class="nl-live-stat-unit" id="watchConcurrentSub">人</div>
             </div>
             <div
