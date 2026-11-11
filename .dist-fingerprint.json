@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "8c5029496e31eca58b19718dde4ef952c0e41e785de321adc248ec983474a4ff",
+  "fingerprint": "142cf65b25a36965a76864051fd5bdd96a80d4a42cd7fca402cd45fc166a9b8c",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -1036,8 +1036,8 @@
     "extension/dist/live-view.js": "7c612731b84957eb78840a75296498a1222711a4aa7e858e0b04ff664cbad8c4",
     "extension/dist/marketing-export.js": "115bcd482ba1fb93ae6da93472f9c00035c36259b4d0335ef74d4b491481343c",
     "extension/dist/comeview.js": "1bb6603cfa056a21c8d582ccaa68591ec91eca8b695b3a5e096e979ec6f6d41b",
-    "extension/dist/setlist.js": "3b09b59eaa26022850ecbb2f9705170a5a644f4ada8b3c683593e8bdd713d982",
-    "extension/dist/setlist-obs.js": "3b09b59eaa26022850ecbb2f9705170a5a644f4ada8b3c683593e8bdd713d982",
+    "extension/dist/setlist.js": "b84e70e2310132323e1dbc710202fad7e0a44bb2026ae59c5dc5ce6740e17c8e",
+    "extension/dist/setlist-obs.js": "b84e70e2310132323e1dbc710202fad7e0a44bb2026ae59c5dc5ce6740e17c8e",
     "extension/dist/venue.js": "c35a7564bf8b9fac1acdbbac16c2b899ba7f0a46759dbfa44d23858f71371e14",
     "extension/dist/sidepanel.js": "1cf62ff501fc0694d46a522cbfd43182243d9b1ab0368ee3a09ae0e49673f935",
     "extension/dist/sidepanel-iframe-boot.js": "d7e2330a4a6541bfb4647a246a954a59fd01f5f884d682ece8c24df8137e89f1",

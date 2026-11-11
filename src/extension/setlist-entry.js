@@ -110,7 +110,7 @@ function renderEditor() {
     for (const req of open) {
       const li = document.createElement('li');
       const who = document.createElement('span');
-      who.textContent = `${req.title}　${req.name || '名前なし'}`;
+      who.textContent = `${req.title} ${req.name || '名前なし'}`;
       if (req.userId && /^\d{1,18}$/.test(req.userId)) {
         const a = document.createElement('a');
         a.href = `https://www.nicovideo.jp/user/${req.userId}`;
