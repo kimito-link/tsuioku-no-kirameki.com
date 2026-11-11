@@ -130,11 +130,21 @@
         border: 1px solid var(--cv-border);
         border-radius: 8px;
       }
-      .cv-exclude { flex: 1 1 220px; max-width: 320px; }
-      .cv-exclude textarea { width: 100%; box-sizing: border-box; min-height: 64px; }
-      .cv-exclude p { margin: 6px 0; }
+      .cv-exclude {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 12px;
+        padding: 8px 12px 10px;
+        border-bottom: 1px solid var(--cv-border);
+        background: var(--cv-bg, transparent);
+      }
+      .cv-exclude h2 { margin: 0; font-size: 13px; grid-column: 1 / -1; }
+      .cv-exclude textarea { width: 100%; box-sizing: border-box; min-height: 52px; }
+      .cv-exclude p { margin: 0; grid-column: 1 / -1; }
+      .cv-exclude button { justify-self: start; padding: 4px 10px; cursor: pointer; }
+      body.is-obs .cv-exclude { display: none; }
       @media (max-width: 640px) {
-        .cv-exclude { flex-basis: 100%; max-width: none; }
+        .cv-exclude { grid-template-columns: 1fr; }
       }
       .cv-count { font-variant-numeric: tabular-nums; }
       .cv-voice-controls {
@@ -275,6 +285,11 @@
         border-radius: 7px;
         color: var(--cv-sub);
         cursor: pointer;
+      }
+      .cv-hover-actions button[data-cv-action="exclude"] {
+        width: auto;
+        padding: 0 8px;
+        font-size: 12px;
       }
       .cv-hover-actions button svg {
         width: 16px;
@@ -724,18 +739,18 @@
           <option value="free">ポイントなし</option>
         </select>
       </label>
-      <details class="cv-exclude">
-        <summary>外す</summary>
-        <label>名前<textarea id="cvExcludeNames" rows="3" aria-label="表示と読み上げから外す名前"></textarea></label>
-        <label>ユーザーID<textarea id="cvExcludeIds" rows="3" aria-label="表示と読み上げから外すユーザーID"></textarea></label>
-        <p>1行に1つ。名前のアスタリスクは1つだけ使えます。IDは完全一致です。表示と読み上げから外れます。記録の件数は変わりません。ポイントなしは、届いたポイントが0のギフトです。</p>
-        <button id="cvExcludeSave" type="button">この条件を保存</button>
-      </details>
       <button id="cvBtnNg" type="button" title="非表示にした人を管理" style="display: none;">NG 0</button>
       <button id="cvBtnWindow" type="button" title="別ウィンドウで開く">⧉ 別窓</button>
       <button id="cvBtnObs" type="button" title="OBS用の透過表示に切替">OBS透過</button>
       <button id="cvBtnPause" type="button">一時停止</button>
     </div>
+    <section class="cv-exclude" aria-label="外す">
+      <h2>外す</h2>
+      <label>画面の名前<textarea id="cvExcludeNames" rows="3" aria-label="表示と読み上げから外す名前"></textarea></label>
+      <label>ユーザーID<textarea id="cvExcludeIds" rows="3" aria-label="表示と読み上げから外すユーザーID"></textarea></label>
+      <p>1行に1つ。画面の「匿名12」も、その行の「外す」も使えます。ただの「匿名」では全員は外れません。名前のアスタリスクは1つだけ使えます。IDは完全一致です。表示と読み上げから外れます。記録の件数は変わりません。</p>
+      <button id="cvExcludeSave" type="button">この条件を保存</button>
+    </section>
     <div class="cv-pinbar" id="cvPinBar" style="display: none;"></div>
     <div class="cv-list" id="cvList">
       <div class="cv-empty" id="cvEmpty">コメントを待っています…</div>

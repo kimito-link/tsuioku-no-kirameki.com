@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { comeviewAnonLabel } from './comeviewUserNotes.js';
 import {
+  addComeviewExclude,
   classifyGiftPoints,
+  isDisplayExcluded,
   excludeComeviewItems,
   filterComeviewGiftView,
   namePatternMatches,
@@ -40,6 +43,25 @@ describe('ギフトの表示と外す人', () => {
     const rules = normalizeComeviewExclude({ names: ['花*', '花**'], ids: ['12', '1*'] });
     const hidden = excludeComeviewItems([comment, paid, free], rules).map((row) => row.userId);
     expect(hidden).toEqual(['11']);
+  });
+
+  it('画面の匿名番号とユーザーIDで外せる。ただの「匿名」では全員を外さない', () => {
+    const row = { kind: 'comment', userId: 'a:99999456', nickname: '匿名', name: '匿名' };
+    const label = comeviewAnonLabel(row.userId);
+    expect(label).toMatch(/^匿名\d{1,3}$/);
+    expect(label).not.toBe('匿名');
+    expect(isDisplayExcluded(row, { names: ['匿名'] })).toBe(false);
+    expect(isDisplayExcluded(row, { names: [label] })).toBe(true);
+    expect(isDisplayExcluded(row, { names: ['匿名*'] })).toBe(true);
+    expect(isDisplayExcluded(row, { ids: [row.userId] })).toBe(true);
+    const added = addComeviewExclude(null, { userId: row.userId, name: label });
+    expect(added.ids).toEqual([row.userId]);
+    expect(added.names).toEqual([label]);
+    expect(isDisplayExcluded(row, added)).toBe(true);
+    const generic = addComeviewExclude(null, { userId: row.userId, name: '匿名' });
+    expect(generic.names).toEqual([]);
+    expect(generic.ids).toEqual([row.userId]);
+    expect(isDisplayExcluded(comment, { names: ['花子'] })).toBe(true);
   });
 
   it('行数の上限を超えない', () => {

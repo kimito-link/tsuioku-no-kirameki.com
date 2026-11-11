@@ -90,6 +90,7 @@ import { takeUnreadVoiceItems } from '../lib/comeviewLivePush.js';
 import {
   COMEVIEW_EXCLUDE_KEY,
   COMEVIEW_GIFT_FILTER_KEY,
+  addComeviewExclude,
   excludeComeviewItems,
   filterComeviewGiftView,
   normalizeComeviewExclude,
@@ -2388,6 +2389,7 @@ function createHoverBar() {
   bar.setAttribute('role', 'toolbar');
   bar.setAttribute('aria-label', 'コメント操作');
   const actions = [
+    ['exclude', 'この人を外す'],
     ['trash', 'この行を隠す'],
     ['block', 'この人を非表示'],
     ['person', 'この人の詳細'],
@@ -2400,7 +2402,8 @@ function createHoverBar() {
     button.dataset.cvAction = action;
     button.title = label;
     button.setAttribute('aria-label', label);
-    button.innerHTML = CV_ACTION_ICONS[action];
+    if (action === 'exclude') button.textContent = '外す';
+    else button.innerHTML = CV_ACTION_ICONS[action];
     bar.appendChild(button);
   }
   bar.addEventListener('mouseenter', () => {
@@ -2438,6 +2441,17 @@ function createHoverBar() {
         hideHoverBar();
         break;
       }
+      case 'exclude':
+        _excludeRules = addComeviewExclude(_excludeRules, row);
+        {
+          const names = document.getElementById('cvExcludeNames');
+          const ids = document.getElementById('cvExcludeIds');
+          if (names instanceof HTMLTextAreaElement) names.value = _excludeRules.names.join('\n');
+          if (ids instanceof HTMLTextAreaElement) ids.value = _excludeRules.ids.join('\n');
+        }
+        void chrome.storage.local.set({ [COMEVIEW_EXCLUDE_KEY]: _excludeRules }).then(() => requestFullRefresh());
+        hideHoverBar();
+        break;
       case 'block':
         addNg(row);
         hideHoverBar();

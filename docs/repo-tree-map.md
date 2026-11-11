@@ -640,7 +640,7 @@ popup の応援レーンのタイルを素クリックすると、その人の�
 - [`src/lib/voiceAgeGate.js`](../src/lib/voiceAgeGate.js)
 
 ### ギフト表示と外す人  〔コメント / ギフト / 読み上げ〕
-コメビュでギフトだけ、ポイントあり、ポイントなしを表示する。名前とIDは表示と読み上げから外す。記録と件数は残す
+コメビュでギフトだけ、ポイントあり、ポイントなしを表示する。画面の匿名番号と行の「外す」、名前とIDで表示と読み上げから外す。記録と件数は残す
 
 - [`src/lib/comeviewGiftFilter.js`](../src/lib/comeviewGiftFilter.js)
 - [`src/extension/comeview-entry.js`](../src/extension/comeview-entry.js)

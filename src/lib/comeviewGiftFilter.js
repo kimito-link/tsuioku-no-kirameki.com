@@ -1,7 +1,10 @@
 /**
  * comeviewGiftFilter.js — ギフトの表示と、表示・読み上げから外す人。
  * 記録そのものは消さない。件数の正本も変えない。
+ * 匿名は保存名の「匿名」ではなく、画面の「匿名12」とユーザーIDで外す。
  */
+import { isGenericComeviewName } from './comeviewRows.js';
+import { comeviewAnonLabel } from './comeviewUserNotes.js';
 export const COMEVIEW_EXCLUDE_KEY = 'nls_comeview_exclude_v1';
 export const COMEVIEW_GIFT_FILTER_KEY = 'nls_comeview_gift_filter_v1';
 export const GIFT_FILTERS = Object.freeze(['all', 'gifts', 'paid', 'free']);
@@ -89,6 +92,25 @@ export function namePatternMatches(pattern, name) {
 }
 
 /**
+ * 照合に使う名前。汎用の「匿名」は入れない（入れると匿名が全員外れる）。
+ * 画面と同じ匿名番号は入れる。
+ * @param {any} src
+ * @returns {string[]}
+ */
+function namesForExclude(src) {
+  /** @type {string[]} */
+  const names = [];
+  for (const raw of [src.name, src.nickname, src.userName]) {
+    const name = String(raw || '').trim();
+    if (!name || isGenericComeviewName(name) || names.includes(name)) continue;
+    names.push(name);
+  }
+  const anon = comeviewAnonLabel(src.userId);
+  if (anon && !names.includes(anon)) names.push(anon);
+  return names;
+}
+
+/**
  * @param {unknown} item
  * @param {unknown} rules
  * @returns {boolean}
@@ -98,8 +120,24 @@ export function isDisplayExcluded(item, rules) {
   const exclude = normalizeComeviewExclude(rules);
   const userId = String(src.userId || '').trim();
   if (userId && exclude.ids.includes(userId)) return true;
-  const names = [src.name, src.nickname, src.userName].map((value) => String(value || '').trim()).filter(Boolean);
+  const names = namesForExclude(src);
   return exclude.names.some((pattern) => names.some((name) => namePatternMatches(pattern, name)));
+}
+
+/**
+ * 行の「外す」から、見えている名前とユーザーIDを足す。
+ * @param {unknown} rules
+ * @param {{ userId?: unknown, name?: unknown }} input
+ * @returns {{ formatVersion: number, names: string[], ids: string[] }}
+ */
+export function addComeviewExclude(rules, input) {
+  const cur = normalizeComeviewExclude(rules);
+  const userId = String(input?.userId || '').trim();
+  const seen = String(input?.name || '').trim();
+  const ids = userId && !cur.ids.includes(userId) ? [...cur.ids, userId] : cur.ids.slice();
+  const keepName = Boolean(seen) && !isGenericComeviewName(seen);
+  const names = keepName && !cur.names.includes(seen) ? [...cur.names, seen] : cur.names.slice();
+  return normalizeComeviewExclude({ names, ids });
 }
 
 /**
