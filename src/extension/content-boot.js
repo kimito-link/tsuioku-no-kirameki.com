@@ -2,7 +2,7 @@
 // トップや広告の iframe で解析すると、低スペックの PC で Chrome が固まる。
 import { needsNicoEngineFrame, shouldPollNicoEngine } from '../lib/nicoEngineBoot.js';
 
-const root = typeof globalThis !== 'undefined' ? globalThis : window;
+const root = /** @type {any} */ (typeof globalThis !== 'undefined' ? globalThis : window);
 if (!root.__NLS_BOOT_ASKED__) {
   const hasPanel = () => {
     try {

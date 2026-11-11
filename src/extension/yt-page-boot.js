@@ -2,7 +2,7 @@
 // ホームや検索で解析すると、タブが多い低スペックの PC でインストール直後に固まる。
 import { needsYtVenue, shouldPollYtVenue } from '../lib/youtube/ytVenueBoot.js';
 
-const root = typeof globalThis !== 'undefined' ? globalThis : window;
+const root = /** @type {any} */ (typeof globalThis !== 'undefined' ? globalThis : window);
 if (!root.__NLS_YT_VENUE_BOOT_ASKED__) {
   const ask = () => {
     if (root.__NLS_YT_VENUE_BOOT_ASKED__) return;
