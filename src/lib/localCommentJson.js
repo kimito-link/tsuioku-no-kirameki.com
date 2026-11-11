@@ -29,6 +29,7 @@ export function buildLocalCommentSnapshot(rows, generatedAt, liveId) {
       text
     });
   }
+  comments.sort((a, b) => a.at - b.at);
   return {
     formatVersion: LOCAL_COMMENT_JSON_FORMAT,
     kind: LOCAL_COMMENT_JSON_KIND,

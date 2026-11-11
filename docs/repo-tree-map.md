@@ -179,8 +179,9 @@ graph LR
   f18 --> f18_2["lib/voiceAgeGate.js"]
   HUB --> f19["手元のコメントJSON"]
   f19 --> f19_0["lib/localCommentJson.js"]
-  f19 --> f19_1["extension/comment-json-entry.js"]
-  f19 --> f19_2["comment-json.html"]
+  f19 --> f19_1["lib/activeLivePick.js"]
+  f19 --> f19_2["extension/comment-json-entry.js"]
+  f19 --> f19_3["comment-json.html"]
   HUB --> f20["会場読み上げ診断(遅延の切り分け)"]
   f20 --> f20_0["lib/voiceDiag.js"]
   f20 --> f20_1["lib/voiceDiagKey.js"]
@@ -461,14 +462,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2436 件</sub>
+<sub>ファイル 2438 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（112 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（2136 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（2138 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（16 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -640,9 +641,10 @@ popup の応援レーンのタイルを素クリックすると、その人の�
 - [`src/lib/voiceAgeGate.js`](../src/lib/voiceAgeGate.js)
 
 ### 手元のコメントJSON  〔コメント / JSON〕
-直近コメントを読み取り専用のJSONで出す。待受の口は開けない。この画面を開いているあいだだけ、同じファイルを更新できる
+直近最大80件を、記録の本体から読み取り専用のJSONで出す。ニコ生と、最後に見ていた他サービスの配信。待受の口は開けない
 
 - [`src/lib/localCommentJson.js`](../src/lib/localCommentJson.js)
+- [`src/lib/activeLivePick.js`](../src/lib/activeLivePick.js)
 - [`src/extension/comment-json-entry.js`](../src/extension/comment-json-entry.js)
 - [`extension/comment-json.html`](../extension/comment-json.html)
 

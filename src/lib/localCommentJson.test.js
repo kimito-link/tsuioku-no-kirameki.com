@@ -15,6 +15,9 @@ describe('手元のコメントJSON', () => {
     const snapshot = /** @type {any} */ (buildLocalCommentSnapshot(rows, 50, 'lv1'));
     expect(snapshot.comments).toHaveLength(80);
     expect(snapshot.comments[0].no).toBe('11');
+    const shuffled = [rows[89], rows[0], rows[50]];
+    const latest = /** @type {any} */ (buildLocalCommentSnapshot(shuffled, 1, 'lv1'));
+    expect(latest.comments.map((row) => row.no)).toEqual(['1', '51', '90']);
     expect(snapshot.comments.at(-1).text).toHaveLength(200);
     expect(snapshot.comments[0].avatarUrl).toBeUndefined();
     expect(snapshot.limits.listen).toBe(false);
