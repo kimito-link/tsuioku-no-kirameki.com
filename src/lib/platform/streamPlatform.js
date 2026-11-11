@@ -51,7 +51,7 @@ function kickSlugOfStreamKey(key) {
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
  *   casterIconUrl?: (login: string) => string,
- *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean, boardUnit?: string, boardName?: string, boardPlace?: string,
+ *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean, boardUnit?: string, giftUnit?: string, boardName?: string, boardPlace?: string,
  * }} StreamPlatform
  */
 
@@ -214,6 +214,8 @@ export const STREAM_PLATFORMS = Object.freeze({
     boardName: 'サポーターランキング',
     boardPlace: '配信者のページのサポーターランキング',
     boardUnit: 'スコア',
+    // ギフト履歴の欄の単位(🍡スコア)。無いサービスは pt のまま
+    giftUnit: 'スコア',
     noSubs: true,
     isStreamKey: isTcStreamKey,
     loginOfStreamKey: tcUserOfStreamKey,

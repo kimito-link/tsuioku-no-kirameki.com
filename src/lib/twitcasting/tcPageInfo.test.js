@@ -63,6 +63,8 @@ const SUPPORTER = `<div class="tw-supporter-ranking-summary-title">現在のレ�
   <div class="tw-top-supporter" data-rank="1"><a class="tw-user-name-icon" data-user-id="c:first"><img src="https://imagegw02.twitcasting.tv/image3s/a_64.jpg"></a>
     <a class="tw-supporter-user-name" href="/c:first"><span>いちばん</span></a>
     <div class="tw-supporter-point-stat"><span class="tw-supporter-point-stat-current">100400</span><span class="tw-supporter-point-stat-total">142030</span></div></div>
+  <div class="tw-top-supporter" data-rank="3" data-is-empty="true"><a class="tw-supporter-user-name"><span>-</span></a>
+    <div class="tw-supporter-point-stat"><span class="tw-supporter-point-stat-current">0</span><span class="tw-supporter-point-stat-total">0</span></div></div>
 </section>
 <section class="tw-supporter-ranking" data-max-digits="2">
   <div class="tw-supporter-row" data-is-you="false"><span class="tw-supporter-number">4</span><a class="tw-user-name-icon" data-user-id="fourth"><img src="https://evil.example/x.jpg"></a>
@@ -78,7 +80,7 @@ describe('サポーターランキング', () => {
     expect(r.rows).toEqual([
       { rank: 1, name: 'いちばん', xp: 100400, total: 142030, iconUrl: 'https://imagegw02.twitcasting.tv/image3s/a_64.jpg', login: 'c:first' },
       { rank: 2, name: 'にばんめ', xp: 98275, total: 229435, iconUrl: 'https://imagegw02.twitcasting.tv/image3s/b_64.jpg', login: 'g:1234' },
-      // よその画像は使わない・数の無い行は捨てる
+      // 3位の空き枠(data-is-empty)は並べない。よその画像は使わない・数の無い行は捨てる
       { rank: 4, name: 'よんばん', xp: 56000, total: 56000, iconUrl: '', login: 'fourth' },
     ]);
   });

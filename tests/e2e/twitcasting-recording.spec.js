@@ -216,7 +216,7 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
 
   // 送信: ログイン中は入力欄に書いて送る
   const ext = await context.newPage();
-  await ext.goto(`${sw.url().replace(/\/[^/]*$/, '')}/yt-sidepanel.html`);
+  await ext.goto(`${sw.url().replace(/\/[^/]*$/, '')}/yt-sidepanel.html?inline=1&dock=sidepanel&stream=${encodeURIComponent("twitcasting:c:hostuser")}`); // 実際のサイドパネルと同じ src(ytPanelRoute)
   const res = await ext.evaluate((key) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: key, text: 'こんにちは ツイキャス' }), KEY);
   expect(res).toMatchObject({ ok: true });
   expect(await page.evaluate(() => /** @type {any} */ (window).__sent)).toEqual(['こんにちは ツイキャス']);
@@ -243,6 +243,15 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   // 段の案内・「該当者なし」にニコ生の数値ID・匿名(a:)の話を残さない(2026-11-12 実ページで発見)
   expect(await bodyText()).not.toMatch(/数値ユーザーID|数値ID|匿名（a:）/);
   expect(await chip('commentTotal')).toContain('890');
+  // ギフト履歴の送り主: 値段の出ない有料ギフト(✨)だけの人も並ぶ(数は作らずギフトの名前)。単位は公式と同じ「スコア」(2026-11-12 実配信で発見)
+  const giftLane = () => ext.evaluate(() => {
+    const body = document.getElementById('northStarLaneBody-giftHistory');
+    return [...(body?.querySelectorAll('[role="listitem"]') || [])].map((li) => String(li.textContent || '').replace(/\s+/g, ' ').trim());
+  });
+  await expect.poll(async () => (await giftLane()).join(' / '), { timeout: 30_000 }).toMatch(/お茶爆100 @fan_a ファンA/);
+  const laneText = (await giftLane()).join(' / ');
+  expect(laneText).toMatch(/90 スコア/);
+  expect(laneText).not.toMatch(/\d\s*pt\b/);
   expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
   await ext.locator('[data-nl-metric="totalViews"]').locator('xpath=..').screenshot({ path: 'test-results/twitcasting-official-chips.png' });
   await ext.screenshot({ path: 'test-results/twitcasting-sidepanel.png', fullPage: true });

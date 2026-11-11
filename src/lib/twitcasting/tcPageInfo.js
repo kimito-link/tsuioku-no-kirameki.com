@@ -91,11 +91,13 @@ export function parseTcSupporterDoc(doc) {
   };
   const cells = [...all('section.tw-top-supporters .tw-top-supporter'), ...all('.tw-supporter-ranking .tw-supporter-row')];
   for (const el of cells) {
+    // 空き枠(サポーターが3人未満のとき公式ページは data-is-empty="true" の「0・-」の枠を出す)は人ではないので並べない(2026-11-12 PC 実測)
+    if (el.getAttribute('data-is-empty') === 'true' || el.querySelector('[data-is-empty="true"]')) continue;
     const rank = tcIntOf(el.getAttribute('data-rank') || el.querySelector('.tw-supporter-number')?.textContent);
     const name = String(el.querySelector('.tw-supporter-user-name span, .tw-supporter-user-name')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
     const xp = tcIntOf(el.querySelector('.tw-supporter-point-stat-current')?.textContent);
     // 1件の形が違っても、その行だけ捨てる(AGENTS.md §3.6)
-    if (rank == null || rank < 1 || !name || xp == null) continue;
+    if (rank == null || rank < 1 || !name || name === '-' || xp == null) continue;
     const link = el.querySelector('a.tw-user-name-icon[data-user-id]') || el.querySelector('[data-user-id]');
     const login = String(link?.getAttribute('data-user-id') || '').trim().slice(0, 60);
     const img = String(el.querySelector('a.tw-user-name-icon img, img.tw-user-name-icon, img')?.getAttribute('src') || '');

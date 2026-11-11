@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2089',
+    date: '2026-11-12',
+    summary: 'ツイキャスの有料ギフトの人も欄に並べる',
+    items: Object.freeze([
+      'ツイキャスの有料ギフト（お茶爆など）は画面に数が出ない（✨）ため、投げた人がギフト履歴の送り主の欄から消えていました。数は作らず、ギフトの名前で並べるようにしました。',
+      'ツイキャスのギフト履歴の単位を、公式のサポーターランキングと同じ「スコア」にそろえました。',
+      'ツイキャス公式のサポーターランキングの空き枠（0・-）は並べないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2088',
     date: '2026-11-12',
     summary: '他の配信の段の案内をニコ生の言葉から直す',
@@ -205,16 +215,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '公式ランキングの説明を残す',
     items: Object.freeze([
       'YouTube・Twitch・Kick の公式ランキングの説明を、このPCの記録の文で消さないようにしました。Kick では「歴代トップKICKユーザー」と同じ値、と出ます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2046',
-    date: '2026-11-11',
-    summary: 'ABEMAの配信者ロゴをサイドパネルへ',
-    items: Object.freeze([
-      'サイドパネルの配信者カードに、将棋チャンネルなどの公開ロゴを出します。記録に画像が無くても、ニコニコの白い丸は使いません。',
-      'ロゴが読めないときは、空の円ではなく顔を出します。',
-      '公式の視聴数があるときは「公式の視聴数」と出します。無いときは「推定中」のカードを隠します。'
     ])
   })
 ]);

@@ -231,6 +231,9 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
           liveId: lv,
           capturedAt: now,
           source: String(paid.find((e) => e?.ytPlatform)?.ytPlatform || 'youtube'),
+          // ツイキャスの有料アイテム(お茶爆など)はスコアが「✨」で数が出ない=0。いちばん高いギフトの送り主が欄から消えないよう、
+          //   0 の人も送り主として並べる(カードの「0pt」は shim がギフトの名前に直す・ytZeroPtGiftLabel.js)。2026-11-12 PC 実配信で発見
+          keepZeroPointSenders: paid.some((e) => e?.ytPlatform === 'twitcasting'),
           history,
           totalCounts: [...byItem.values()].sort((a, b) => b.count - a.count),
           officialTotalPoint: totalPoints,

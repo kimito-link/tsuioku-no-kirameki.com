@@ -52,7 +52,7 @@ export function buildZeroPtSenderLabels(history) {
   return out;
 }
 
-/** カードの数の欄が「0pt」か(「0 pt」「0pt」どちらも) @param {unknown} text */
+/** カードの数の欄が「0pt」か(「0 pt」「0pt」どちらも・ツイキャスは単位を直した「0 スコア」) @param {unknown} text */
 export function isZeroPtCountText(text) {
-  return /^0\s*pt$/i.test(String(text ?? '').trim());
+  return /^0\s*(?:pt|スコア)$/i.test(String(text ?? '').trim());
 }

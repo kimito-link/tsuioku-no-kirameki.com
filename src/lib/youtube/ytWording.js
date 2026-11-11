@@ -290,3 +290,20 @@ export function ytWordingTwitchFixed(text) {
 export function ytWordingForTwitch(text) {
   return ytWordingForPlatform(text, TWITCH_WORDING);
 }
+
+/**
+ * 「この番組へのギフト履歴」の欄の pt を、そのサービスのギフトの単位にする(ツイキャスはページに「+🍡90」と出る🍡スコア)。
+ *   欄の中の文字にだけ使う(コメント本文には使わない)。数だけの文字「61pt」「60 pt」と、欄の決まった文の「累計pt」だけを直す。
+ * @param {string} text
+ * @param {string} unit 例: 'スコア'
+ */
+export function ytGiftUnitWording(text, unit) {
+  const v = String(text ?? '');
+  const u = String(unit || '');
+  if (!u || !/pt|ポイント/.test(v)) return v;
+  return v
+    .replace(/^(\s*[\d,]+)\s*pt(\s*)$/, `$1 ${u}$2`)
+    .replace(/^(\s*)pt(\s*)$/, `$1${u}$2`)
+    .replace(/累計\s?pt/g, `累計${u}`)
+    .replace(/累計ポイント/g, `累計${u}`);
+}

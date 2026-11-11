@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2046',
+    date: '2026-11-11',
+    summary: 'ABEMAの配信者ロゴをサイドパネルへ',
+    items: Object.freeze([
+      'サイドパネルの配信者カードに、将棋チャンネルなどの公開ロゴを出します。記録に画像が無くても、ニコニコの白い丸は使いません。',
+      'ロゴが読めないときは、空の円ではなく顔を出します。',
+      '公式の視聴数があるときは「公式の視聴数」と出します。無いときは「推定中」のカードを隠します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2045',
     date: '2026-11-11',
     summary: 'ニコ生以外の広告ptを出さない',

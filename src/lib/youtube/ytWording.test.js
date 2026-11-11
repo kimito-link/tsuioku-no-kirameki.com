@@ -207,3 +207,17 @@ describe('3段の案内と「該当者なし」の文にニコ生の数値ID・�
     expect(ytWording('数値が大きいね a:）')).toBe('数値が大きいね a:）');
   });
 });
+
+describe('ギフト履歴の欄の単位(ツイキャスは🍡スコア)', async () => {
+  const { ytGiftUnitWording } = await import('./ytWording.js');
+  it('数だけの pt と決まった文の累計pt を直す', () => {
+    expect(ytGiftUnitWording('61pt', 'スコア')).toBe('61 スコア');
+    expect(ytGiftUnitWording('1,200 pt', 'スコア')).toBe('1,200 スコア');
+    expect(ytGiftUnitWording('pt', 'スコア')).toBe('スコア');
+    expect(ytGiftUnitWording('ライブ受信したギフトの送り主別 累計pt順。送り主2名', 'スコア')).toBe('ライブ受信したギフトの送り主別 累計スコア順。送り主2名');
+  });
+  it('単位の無いサービス・ほかの文は変えない', () => {
+    expect(ytGiftUnitWording('61pt', '')).toBe('61pt');
+    expect(ytGiftUnitWording('広告pt が多い', 'スコア')).toBe('広告pt が多い');
+  });
+});
