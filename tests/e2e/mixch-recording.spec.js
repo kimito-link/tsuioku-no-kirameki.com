@@ -254,11 +254,13 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   }, k);
   await expect.poll(() => chip('level'), { timeout: 45_000 }).toContain('Lv27');
   expect(await chip('fans')).toContain('123,456人');
+  expect(await chip('superfans')).toContain('ガチファン');
   expect(await chip('superfans')).toContain('321人');
   expect(await chip('liverRank')).toContain('45,678');
   expect(await chip('liverRank')).toContain('12%');
   expect(await chip('eventRank')).toContain('7位');
-  expect(await chip('eventPoint')).toContain('8,888pt');
+  expect(await chip('liverRank')).toContain('ライバーランクpt');
+  expect(await chip('eventPoint')).toBe('');
   expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
   await ext.locator('[data-nl-metric="level"]').locator('xpath=..').screenshot({ path: 'test-results/mixch-official-chips.png' });
 
