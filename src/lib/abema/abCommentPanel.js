@@ -238,12 +238,6 @@ function pressControl(el) {
 }
 
 /**
- * 番組詳細が開いていても、コメントのタブや吹き出しをコメントが届くまで押す。
- * @param {ReturnType<typeof createAbPanelController>} ctrl
- * @param {{ querySelector?: (sel: string) => any, querySelectorAll?: (sel: string) => Iterable<any> }} doc
- * @param {{ enabled?: boolean, now: number, arrived?: boolean }} opts
- */
-/**
  * ボタンの位置と文字を見るか。開いたあと・諦めたあと・届いたあとは見ない。
  * @param {{ sawArea?: boolean, gaveUp?: boolean, userClosed?: boolean, startedAt?: number }} status
  * @param {{ open?: boolean, arrived?: boolean, enabled?: boolean, now?: number }} opts
@@ -288,10 +282,18 @@ export function abImageScanDue(lastScanAt, hasImage, now) {
   return (Number(now) || 0) - last >= wait;
 }
 
+/**
+ * 番組詳細が開いていても、コメントのタブや吹き出しをコメントが届くまで押す。
+ * 開いたあと・諦めたあとはボタンの位置と文字を見ない。
+ * @param {ReturnType<typeof createAbPanelController>} ctrl
+ * @param {{ querySelector?: (sel: string) => any, querySelectorAll?: (sel: string) => Iterable<any> }} doc
+ * @param {{ enabled?: boolean, now: number, arrived?: boolean }} opts
+ */
 export function stepAbCommentPanel(ctrl, doc, opts) {
   const prior = ctrl.status();
   const open = abCommentsLookOpen(doc);
   const arrived = !!opts.arrived;
+  /** @type {Array<{ key: string, rank: number, kind: string, el: any }>} */
   let candidates = [];
   if (abPanelShouldScanButtons(prior, { open, arrived, enabled: opts.enabled !== false, now: opts.now })) {
     candidates = listAbCommentControls(doc);
