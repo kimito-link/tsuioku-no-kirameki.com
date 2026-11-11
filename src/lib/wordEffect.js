@@ -8,6 +8,7 @@
  * wordEffect.js — 登録した言葉(またはギフト)に合わせて、絵を1つ出すか少し落とすかの判定。
  * 物理演算はしない。同時数・言葉ごとの間隔・一気に届いた古い分の見送りもここで決める。
  */
+import { toEpochMs } from './timeAuthority.js';
 
 /** chrome.storage.local のキー。版を上げるときはキーの末尾を変えて旧値を残す。 */
 export const KEY_WORD_EFFECT = 'nls_word_effect_v1';
@@ -393,7 +394,7 @@ export function hashWordEffectKey(key) {
 function commentEffectKey(row) {
   const no = String(row.commentNo ?? '').trim().slice(0, 24);
   const text = clampChars(row.text, 40);
-  const at = Number(row.capturedAt) || 0;
+  const at = toEpochMs(row.capturedAt);
   return no ? `c:${no}:${text}` : `c:${at}:${text}`;
 }
 
@@ -402,7 +403,7 @@ function commentEffectKey(row) {
  * @returns {string}
  */
 function giftEffectKey(row) {
-  const at = Number(row.capturedAt) || 0;
+  const at = toEpochMs(row.capturedAt);
   const item = clampChars(row.itemId || row.itemName, 40);
   const pt = Number(row.point) || 0;
   return `g:${at}:${item}:${pt}`;

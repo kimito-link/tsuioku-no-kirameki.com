@@ -2,6 +2,7 @@
  * word-effect-entry.js — 言葉の演出の設定と、OBS 用の透明な別窓。
  * ?obs=1 のときは操作欄を隠して背景を透かす(ウィンドウキャプチャ向け)。
  */
+import '../lib/extDocBusyCensusBoot.js';
 import { mountWordEffectOverlay } from './wordEffectOverlay.js';
 import {
   KEY_WORD_EFFECT,
