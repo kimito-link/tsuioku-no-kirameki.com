@@ -246,12 +246,23 @@ function paintBrowserUrl(style) {
   box.value = buildObsBrowserSourceUrl({ origin: browserOrigin, token: browserToken, style });
 }
 
+/**
+ * @param {unknown} raw
+ * @returns {{ appOrigin: string, ingestKey?: string, viewToken?: string }}
+ */
+function readUploadConfig(raw) {
+  const o = raw && typeof raw === 'object' ? /** @type {Record<string, unknown>} */ (raw) : {};
+  return {
+    appOrigin: typeof o.appOrigin === 'string' && o.appOrigin ? o.appOrigin : OBS_APP_ORIGIN,
+    ingestKey: typeof o.ingestKey === 'string' ? o.ingestKey : undefined,
+    viewToken: typeof o.viewToken === 'string' ? o.viewToken : undefined
+  };
+}
+
 async function loadBrowserSend() {
   const bag = await chrome.storage.local.get([KEY_OBS_BROWSER_SOURCE, KEY_STATUS_UPLOAD_CONFIG]);
-  const upload = bag?.[KEY_STATUS_UPLOAD_CONFIG] && typeof bag[KEY_STATUS_UPLOAD_CONFIG] === 'object'
-    ? bag[KEY_STATUS_UPLOAD_CONFIG]
-    : { appOrigin: OBS_APP_ORIGIN };
-  browserOrigin = String(upload.appOrigin || OBS_APP_ORIGIN);
+  const upload = readUploadConfig(bag?.[KEY_STATUS_UPLOAD_CONFIG]);
+  browserOrigin = upload.appOrigin;
   await refreshDeviceCredCache(browserOrigin);
   const creds = getPublishCredentials(upload);
   browserToken = creds?.viewToken || '';
@@ -264,6 +275,7 @@ async function loadBrowserSend() {
   }
 }
 
+/** @param {boolean} on */
 async function setBrowserSend(on) {
   const epoch = ++browserEpoch;
   const c = extensionChrome();
@@ -286,10 +298,7 @@ async function setBrowserSend(on) {
   setBrowserStatus('準備しています。');
   try {
     const bag = await chrome.storage.local.get(KEY_STATUS_UPLOAD_CONFIG);
-    const upload = bag?.[KEY_STATUS_UPLOAD_CONFIG] && typeof bag[KEY_STATUS_UPLOAD_CONFIG] === 'object'
-      ? { ...bag[KEY_STATUS_UPLOAD_CONFIG] }
-      : { appOrigin: OBS_APP_ORIGIN };
-    if (!upload.appOrigin) upload.appOrigin = OBS_APP_ORIGIN;
+    const upload = readUploadConfig(bag?.[KEY_STATUS_UPLOAD_CONFIG]);
     await refreshDeviceCredCache(upload.appOrigin);
     const pending = maybeRegisterDevice({ optedIn: true, uploadCfg: upload });
     if (pending) await pending;

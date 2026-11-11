@@ -122,10 +122,14 @@ async function presence() {
       KEY_LIVE_EVENTS_SENDER_BEAT,
       KEY_LIVE_EVENTS_TAIL
     ]);
-    const upload = bag?.[KEY_STATUS_UPLOAD_CONFIG] && typeof bag[KEY_STATUS_UPLOAD_CONFIG] === 'object'
-      ? bag[KEY_STATUS_UPLOAD_CONFIG]
-      : { appOrigin: OBS_APP_ORIGIN };
-    const origin = String(upload.appOrigin || OBS_APP_ORIGIN);
+    const stored = bag?.[KEY_STATUS_UPLOAD_CONFIG];
+    const uploadRaw = stored && typeof stored === 'object' ? /** @type {Record<string, unknown>} */ (stored) : {};
+    const upload = {
+      appOrigin: typeof uploadRaw.appOrigin === 'string' && uploadRaw.appOrigin ? uploadRaw.appOrigin : OBS_APP_ORIGIN,
+      ingestKey: typeof uploadRaw.ingestKey === 'string' ? uploadRaw.ingestKey : undefined,
+      viewToken: typeof uploadRaw.viewToken === 'string' ? uploadRaw.viewToken : undefined
+    };
+    const origin = upload.appOrigin;
     creds = resolvePublishCredentials(upload, parseDeviceCred(bag?.[KEY_STATUS_DEVICE_CRED], origin));
     const beat = Number(bag?.[KEY_LIVE_EVENTS_SENDER_BEAT]) || 0;
     const publisherAlive = beat > 0 && nowMs - beat < OBS_PUBLISHER_BEAT_STALE_MS;
@@ -190,7 +194,7 @@ function ensure() {
     }
     holding = true;
     begin();
-    return new Promise((release) => { stopLock = release; });
+    return new Promise((release) => { stopLock = () => { release(undefined); }; });
   }).catch(() => {
     if (!holding && enabled) {
       holding = true;

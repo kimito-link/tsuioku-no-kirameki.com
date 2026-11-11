@@ -45,6 +45,7 @@ export function createPcLiveEvents(getTarget) {
     if (timer) return;
     let obsOn = false;
     let beatAt = 0;
+    /** @param {unknown} raw */
     const readObs = (raw) => { obsOn = obsBrowserSourceOrDefault(raw).enabled; };
     try {
       void chrome.storage.local.get(KEY_OBS_BROWSER_SOURCE).then((b) => readObs(b?.[KEY_OBS_BROWSER_SOURCE])).catch(() => {});
