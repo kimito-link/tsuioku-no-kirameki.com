@@ -1,17 +1,21 @@
 // @ts-nocheck — chrome のタブと storage を触る橋。判定は mergedComeview.js。
 // comeviewMergeHost.js — コメビュで、開いている配信タブを選んで1本の時系列にする。
-//   判定は src/lib/mergedComeview.js。ここはタブ一覧・保存・末尾の読み・描画と読み上げへの橋だけ。
-//   開いていない配信の記録は読まない。全件の IndexedDB も読まない。
+//   判定は src/lib/mergedComeview.js。ここはタブ一覧・保存・ニコ生の保存済み読み・描画と読み上げへの橋だけ。
+//   開いていない配信の記録は読まない。全件の IndexedDB も、古いチャンクも読まない。
 
+import { chunkIndexKey, chunkStorageKey, isChunkIndex } from '../lib/commentChunkStore.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
+import { commentsStorageKey } from '../lib/storageKeys.js';
 import {
   COMEVIEW_MERGE_STORAGE_KEY,
   MERGED_RECENT_COMMENTS_MESSAGE,
   MERGE_MAX_STREAMS,
   MERGE_PER_STREAM_CAP,
+  assembleNicoRecentRows,
   buildMergedTimeline,
   describeOpenStreams,
   leaseIdForStream,
+  nextNicoChunkSeq,
   resolveMergeTargets,
   takeMergedVoiceItems,
   takeRecentComments
@@ -201,6 +205,39 @@ export function startComeviewMerge(api) {
     ]);
   }
 
+  async function readNicoRecent(liveId) {
+    const lv = String(liveId || '').trim().toLowerCase();
+    const bag = /** @type {Record<string, unknown>} */ (await storageGet([
+      chunkIndexKey(lv),
+      commentsStorageKey(lv),
+      tailStorageKey(lv)
+    ]));
+    const tail = bag[tailStorageKey(lv)];
+    const index = bag[chunkIndexKey(lv)];
+    if (isChunkIndex(index, lv)) {
+      /** @type {unknown[][]} */
+      const chunks = [];
+      /** @type {number[]} */
+      const loaded = [];
+      let count = Array.isArray(tail) ? tail.length : 0;
+      for (let step = 0; step < MERGE_PER_STREAM_CAP; step += 1) {
+        const seq = nextNicoChunkSeq(index, loaded, count, MERGE_PER_STREAM_CAP);
+        if (seq == null) break;
+        const key = chunkStorageKey(lv, seq);
+        const partBag = /** @type {Record<string, unknown>} */ (await storageGet([key]));
+        const part = Array.isArray(partBag[key]) ? partBag[key] : [];
+        chunks.unshift(part);
+        loaded.push(seq);
+        count += part.length;
+      }
+      return assembleNicoRecentRows({ chunks, tail }, MERGE_PER_STREAM_CAP);
+    }
+    return assembleNicoRecentRows({
+      main: bag[commentsStorageKey(lv)],
+      tail
+    }, MERGE_PER_STREAM_CAP);
+  }
+
   async function refresh(fromUser) {
     if (!active) return;
     if (api.isPaused()) return;
@@ -212,13 +249,8 @@ export function startComeviewMerge(api) {
     try {
       if (fromUser) await reloadTabs();
       const nico = chosen.filter((s) => s.read.kind === 'nico');
-      if (nico.length) {
-        const keys = nico.map((s) => tailStorageKey(s.read.liveId));
-        const bag = /** @type {Record<string, unknown>} */ (await storageGet(keys));
-        for (const stream of nico) {
-          const key = tailStorageKey(stream.read.liveId);
-          buffers.set(stream.id, takeRecentComments(bag[key], MERGE_PER_STREAM_CAP));
-        }
+      for (const stream of nico) {
+        buffers.set(stream.id, await readNicoRecent(stream.read.liveId));
       }
       const yt = chosen.filter((s) => s.read.kind === 'yt');
       if (yt.length) {
@@ -331,7 +363,11 @@ export function startComeviewMerge(api) {
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local' || !active) return;
-      const hit = chosen.some((s) => s.read.kind === 'nico' && changes[tailStorageKey(s.read.liveId)]);
+      const hit = chosen.some((s) => {
+        if (s.read.kind !== 'nico') return false;
+        const lv = s.read.liveId;
+        return changes[tailStorageKey(lv)] || changes[chunkIndexKey(lv)] || changes[commentsStorageKey(lv)];
+      });
       if (hit) void refresh(false);
     });
   } catch { /* storage が無ければ末尾の定期読みに任せる */ }

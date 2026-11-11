@@ -9,6 +9,7 @@
  *   開いていない配信は候補にしない(裏で取りにいかない)。読み上げは配信をまたいだ同一キーで1回だけ。
  */
 
+import { combineCanonicalComeviewRows } from './comeviewRows.js';
 import { platformChannelOfUrl } from './platform/streamPlatform.js';
 import { toEpochMs } from './timeAuthority.js';
 import { isYtWatchLikeUrl, parseYtVideoIdFromUrl } from './youtube/ytPageMeta.js';
@@ -222,6 +223,53 @@ export function takeRecentComments(rows, limit = MERGE_PER_STREAM_CAP) {
   const list = Array.isArray(rows) ? rows : [];
   const bounded = list.length > 2000 ? list.slice(-2000) : list;
   return bounded.length > cap ? bounded.slice(-cap) : bounded.slice();
+}
+
+/**
+ * ニコ生の保存は末尾をすぐチャンクへ流す。新しい側から、件数が揃うまで次に読む seq を返す。
+ * 足りていれば null。全チャンクは返さない。
+ * @param {{ seqs?: unknown }|null|undefined} index
+ * @param {readonly number[]} loadedSeqs
+ * @param {number} loadedCount
+ * @param {number} limit
+ * @returns {number|null}
+ */
+export function nextNicoChunkSeq(index, loadedSeqs, loadedCount, limit) {
+  const need = Math.max(1, Math.min(200, Math.floor(Number(limit) || 1)));
+  if ((Number(loadedCount) || 0) >= need) return null;
+  if (!index || typeof index !== 'object' || !Array.isArray(index.seqs)) return null;
+  const loaded = new Set(
+    (Array.isArray(loadedSeqs) ? loadedSeqs : []).map((n) => Math.floor(Number(n)))
+  );
+  const seqs = index.seqs
+    .map((n) => Math.floor(Number(n)))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  for (let i = seqs.length - 1; i >= 0; i -= 1) {
+    if (!loaded.has(seqs[i])) return seqs[i];
+  }
+  return null;
+}
+
+/**
+ * チャンク(古い順)か本体配列と、まだ流していない末尾を足して、新しい側だけ残す。
+ * chunks が配列のときは本体配列を使わない(空の末尾でもチャンク側が正本)。
+ * @param {{ chunks?: unknown[]|null, main?: unknown, tail?: unknown }} parts
+ * @param {number} [limit]
+ */
+export function assembleNicoRecentRows(parts, limit = MERGE_PER_STREAM_CAP) {
+  const bag = parts && typeof parts === 'object' ? parts : {};
+  /** @type {unknown[]} */
+  let base = [];
+  if (Array.isArray(bag.chunks)) {
+    for (const part of bag.chunks) {
+      if (Array.isArray(part)) base = base.concat(part);
+    }
+  } else if (Array.isArray(bag.main)) {
+    base = bag.main;
+  }
+  const tail = Array.isArray(bag.tail) ? bag.tail : [];
+  return takeRecentComments(combineCanonicalComeviewRows(base, tail), limit);
 }
 
 /**

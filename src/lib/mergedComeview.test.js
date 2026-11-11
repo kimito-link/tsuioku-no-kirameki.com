@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { isChunkIndex } from './commentChunkStore.js';
 import {
   MERGE_MAX_STREAMS,
+  assembleNicoRecentRows,
   buildMergedTimeline,
   describeOpenStreams,
   leaseIdForStream,
   newestSummaryKey,
+  nextNicoChunkSeq,
   resolveMergeTargets,
   sanitizeRecentVideoIds,
   tabPageUrl,
@@ -188,6 +191,55 @@ describe('補助', () => {
   it('末尾だけ残す', () => {
     expect(takeRecentComments([1, 2, 3, 4], 2)).toEqual([3, 4]);
     expect(takeRecentComments(null, 2)).toEqual([]);
+  });
+
+  it('末尾が空でも、流し込み済みのチャンクから新しい順に出す', () => {
+    const index = { v: 1, liveId: 'lv351771428', seqs: [0, 1, 2], total: 2394, maxPerChunk: 1000 };
+    expect(isChunkIndex(index, 'lv351771428')).toBe(true);
+    expect(nextNicoChunkSeq(index, [], 0, 40)).toBe(2);
+    const newest = Array.from({ length: 50 }, (_, i) => ({
+      text: `応援 ${i + 1}`,
+      commentNo: String(2300 + i),
+      capturedAt: 1_700_000_000_000 + i * 1000
+    }));
+    expect(nextNicoChunkSeq(index, [2], newest.length, 40)).toBe(null);
+    const rows = assembleNicoRecentRows({ chunks: [newest], tail: [] }, 40);
+    expect(rows).toHaveLength(40);
+    expect(rows[0].text).toBe('応援 11');
+    expect(rows[39].text).toBe('応援 50');
+  });
+
+  it('新しいチャンクが少ないときは、その前のチャンクだけ足す', () => {
+    const index = { v: 1, liveId: 'lv1', seqs: [0, 1, 2], total: 40, maxPerChunk: 1000 };
+    expect(nextNicoChunkSeq(index, [2], 1, 40)).toBe(1);
+    expect(nextNicoChunkSeq(index, [2, 1], 40, 40)).toBe(null);
+    const prev = Array.from({ length: 39 }, (_, i) => ({
+      text: `前 ${i}`,
+      commentNo: String(i + 1),
+      capturedAt: 1000 + i
+    }));
+    const rows = assembleNicoRecentRows({
+      chunks: [prev, [{ text: '新しい', commentNo: '40', capturedAt: 3000 }]],
+      tail: []
+    }, 40);
+    expect(rows).toHaveLength(40);
+    expect(rows.at(-1)?.text).toBe('新しい');
+    expect(rows.some((row) => row.commentNo === '0')).toBe(false);
+  });
+
+  it('チャンクが無いときは本体配列の新しい側を使い、末尾の新しい行も足す', () => {
+    const main = [
+      { text: '古い', commentNo: '1', capturedAt: 1 },
+      { text: '保存', commentNo: '2', capturedAt: 2 }
+    ];
+    expect(assembleNicoRecentRows({ main, tail: [] }, 40).map((row) => row.text)).toEqual(['古い', '保存']);
+    expect(assembleNicoRecentRows({
+      chunks: [[{ text: '保存', commentNo: '1', capturedAt: 1 }]],
+      main,
+      tail: [{ text: '未圧縮', commentNo: '9', capturedAt: 9 }]
+    }, 40).map((row) => row.text)).toEqual(['保存', '未圧縮']);
+    expect(assembleNicoRecentRows({ chunks: [], main, tail: [] }, 40)).toEqual([]);
+    expect(nextNicoChunkSeq(null, [], 0, 40)).toBe(null);
   });
 
   it('末尾読みの id は仮キーと余分を落とす', () => {
