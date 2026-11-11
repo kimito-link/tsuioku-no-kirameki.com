@@ -348,7 +348,7 @@ describe('ABEMA の番組情報と URL', () => {
     expect(card.pageUrl).toBe('https://abema.tv/now-on-air/abema-news');
     expect(card.followLabel).toBe('番組を見る');
     expect(snap.thumbnailUrl).toContain('/channels/abema-news/logo.png');
-    expect(snap.officialAudienceOnly).toBe(true);
+    expect(snap.officialAudienceOnly).toBeUndefined();
 
     const bare = ytSummaryToNicoSnapshot({
       title: '将棋チャンネル',

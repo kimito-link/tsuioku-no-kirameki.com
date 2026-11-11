@@ -29,11 +29,8 @@ test('配信者カードにチャンネル画像が出る', async ({ page }) => 
   .nl-top-support-rank__caster-label { font-size: 9px; font-weight: 700; letter-spacing: 0.04em; }
   .nl-top-support-rank__caster-link { display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: inherit; min-width: 0; max-width: 100%; }
   .nl-top-support-rank__caster-thumb {
-    width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
-    background: var(--nl-surface); border: 2px solid color-mix(in srgb, var(--nl-accent) 30%, transparent);
-  }
-  .nl-top-support-rank__caster-thumb[data-fit="contain"] {
-    object-fit: contain; object-position: center; background: #101418; padding: 2px; box-sizing: border-box;
+    width: 26px; height: 26px; border-radius: 50%; object-fit: contain; object-position: center;
+    background: #101418; border: 2px solid color-mix(in srgb, var(--nl-accent) 30%, transparent);
   }
   .nl-top-support-rank__caster-name {
     font-size: 9px; font-weight: 600; max-width: 100%; overflow: hidden;
@@ -47,7 +44,7 @@ test('配信者カードにチャンネル画像が出る', async ({ page }) => 
 <div class="nl-top-support-rank__caster" role="listitem">
   <span class="nl-top-support-rank__caster-label">配信者</span>
   <a class="nl-top-support-rank__caster-link" href="https://abema.tv/now-on-air/shogi">
-    <img class="nl-top-support-rank__caster-thumb" alt="" data-fit="contain" data-on-error-fallback="face" data-fallback-name="将棋チャンネル" />
+    <img class="nl-top-support-rank__caster-thumb" alt="" data-on-error-fallback="face" data-fallback-name="将棋チャンネル" />
     <span class="nl-top-support-rank__caster-name">将棋チャンネル</span>
   </a>
   <a class="nl-top-support-rank__caster-follow" href="https://abema.tv/now-on-air/shogi">番組を見る</a>

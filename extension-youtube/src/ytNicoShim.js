@@ -406,8 +406,6 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
         ? `https://www.youtube.com/${encodeURI(handle)}`
         : '',
     broadcasterIconUrl: bIcon,
-    // ABEMA は公式の視聴数か同時接続だけ出す。推定の「推定中」は出さない。
-    ...(plat?.id === 'abema' ? { officialAudienceOnly: true } : {}),
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
     viewerCountFromDom: null,

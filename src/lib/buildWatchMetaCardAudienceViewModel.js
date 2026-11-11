@@ -165,8 +165,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       ? snapshot.officialViewerCount
       : null;
 
-  // 番組の視聴数（ABEMA の 3.7万）は同時接続ではない。推定が作れないあいだは、その数を見出し付きで出す。
-  // 公式の数が無い ABEMA は「推定中」を出さず、カード自体を隠す。
+  // 番組の視聴数は同時接続ではない。数があるときは、同じカードに見出し「視聴数」で出す。
   if (slotViews != null && officialConcurrent == null) {
     concurrent = {
       phase: 'ready',
@@ -182,22 +181,6 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       charReactionDelta: null
     };
     nextConcurrentEstimated = slotViews;
-  } else if (snapshot.officialAudienceOnly === true && officialConcurrent == null) {
-    concurrent = {
-      phase: 'hidden',
-      estText: '',
-      estIsPlaceholder: true,
-      estTitle: null,
-      subText: '',
-      labelText: '',
-      cardHidden: true,
-      concurrentLoadingHidden: true,
-      concurrentReadyHidden: true,
-      ariaBusy: false,
-      numericEstimated: null,
-      charReactionDelta: null
-    };
-    nextConcurrentEstimated = prev.concurrentEstimated;
   } else if (showConcurrent) {
     const streamAge =
       typeof snapshot.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0

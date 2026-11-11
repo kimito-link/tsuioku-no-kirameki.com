@@ -125,7 +125,7 @@ export function buildYtCasterTileHtml(input) {
   const usable = /^https:\/\//i.test(iconUrl) || /^data:image\//i.test(iconUrl);
   const src = usable ? iconUrl : anonymousIdenticonDataUrl(name, 64);
   const iconHtml =
-    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(src)}" alt="${escapeAttr(name)}" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(name)}"${/\/channels\/[^/?#]+\/logo/i.test(src) ? ' data-fit="contain"' : ''} />`;
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(src)}" alt="${escapeAttr(name)}" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(name)}" />`;
   const title = pageUrl ? `配信者 ${name}（クリックでチャンネルページ）` : `配信者 ${name}`;
   const nameBlock = pageUrl
     ? `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(pageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +
