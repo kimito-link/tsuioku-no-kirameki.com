@@ -24,14 +24,36 @@ function sameRowObjects(a, b) {
 }
 
 /**
+ * 新しい配列が、前の配列のうしろに行を足しただけか。
+ * 途中の行が別の物なら false(そのときは全部数え直す)。
+ * @param {readonly unknown[]} prev
+ * @param {readonly unknown[]} list
+ * @returns {boolean}
+ */
+function isPrefixExtension(prev, list) {
+  const n = prev.length;
+  if (!n || list.length <= n) return false;
+  if (list[0] !== prev[0] || list[n - 1] !== prev[n - 1]) return false;
+  for (let i = 1; i < n - 1; i += 1) {
+    if (list[i] !== prev[i]) return false;
+  }
+  return true;
+}
+
+/**
  * @template T
- * @param {{ compute: (rows: readonly unknown[], liveId: string, opts: { broadcasterUid?: string, broadcasterIconUrl?: string, requireText?: boolean }) => T, minRows: number }} deps
+ * @param {{
+ *   compute: (rows: readonly unknown[], liveId: string, opts: { broadcasterUid?: string, broadcasterIconUrl?: string, requireText?: boolean }) => T,
+ *   fold?: (prev: T, suffix: readonly unknown[], liveId: string, opts: { broadcasterUid?: string, broadcasterIconUrl?: string, requireText?: boolean }) => T,
+ *   minRows: number
+ * }} deps
+ *   fold があるとき、うしろに足された行だけを足す(全部数え直さない)。無いときは今までどおり全部数える。
  */
 export function createLaneAggregatesMemo(deps) {
   const minRows = Math.max(0, Number(deps.minRows) || 0);
   /** @type {{ rows: readonly unknown[], sig: string, out: T } | null} 行は写しで持つ(元の配列があとで書き換わっても比べられるように) */
   let last = null;
-  const diag = { hits: 0, misses: 0, bypassed: 0, missBySig: 0, missByLen: 0, missByRow: 0 };
+  const diag = { hits: 0, misses: 0, bypassed: 0, folded: 0, missBySig: 0, missByLen: 0, missByRow: 0 };
   return {
     diag,
     /**
@@ -51,6 +73,13 @@ export function createLaneAggregatesMemo(deps) {
       if (last && last.sig === sig && sameRowObjects(last.rows, list)) {
         diag.hits += 1;
         return last.out;
+      }
+      if (last && last.sig === sig && typeof deps.fold === 'function' && isPrefixExtension(last.rows, list)) {
+        const suffix = list.slice(last.rows.length);
+        const out = deps.fold(last.out, suffix, liveId, opts);
+        last = { rows: list.slice(), sig, out };
+        diag.folded += 1;
+        return out;
       }
       diag.misses += 1;
       // v0.1.2023 計器: 何が違って数え直したか(配信・配信者の情報 / 行数 / 行そのもの)

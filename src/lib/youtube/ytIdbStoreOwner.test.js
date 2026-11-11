@@ -18,6 +18,15 @@ describe('appendYtStreamCommentsIdb の rejectOwnedElsewhere', () => {
     globalThis.indexedDB = new IDBFactory();
   });
 
+  it('100件でも届いた順に newlyAdded を返す', async () => {
+    const s = await freshStore();
+    const rows = Array.from({ length: 100 }, (_, i) => row(`n${String(i).padStart(3, '0')}`));
+    const res = await s.appendYtStreamCommentsIdb('vid100', rows, { rejectOwnedElsewhere: true });
+    expect(res.newlyAdded.map((r) => r.id)).toEqual(rows.map((r) => r.id));
+    expect(res.totalCount).toBe(100);
+    expect((await s.getYtStreamCommentsByVideoId('vid100')).map((r) => r.id)).toEqual(rows.map((r) => r.id));
+  });
+
   it('前の配信に記録済みのコメントが別の配信として来ても入れない', async () => {
     const s = await freshStore();
     await s.appendYtStreamCommentsIdb('rykn3opnCyQ', [row('m1'), row('m2')], { rejectOwnedElsewhere: true });

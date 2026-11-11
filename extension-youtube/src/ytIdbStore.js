@@ -3,6 +3,7 @@
 
 import { prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
 import { readYtRowsInChunks } from '../../src/lib/youtube/ytChunkedRead.js';
+import { YT_IDB_APPEND_CHUNK } from '../../src/lib/youtube/ytLiveRowOrder.js';
 
 const DB_NAME = 'yt_kirameki_db';
 const DB_VERSION = 3;
@@ -116,96 +117,134 @@ export function openYtCommentsDb() {
  * @param {{ rejectOwnedElsewhere?: boolean, claimFromOthers?: boolean }} [opts]
  * @returns {Promise<{ newlyAdded: any[], totalCount: number, rejected: Array<{ id: string, owner: string }>, reclaimed: Array<{ id: string, from: string, row: any }> }>}
  */
-export async function appendYtStreamCommentsIdb(videoId, incomingItems, opts = {}) {
-  const vid = String(videoId || '').trim();
-  const records = prepareYtCommentsForIdb(vid, incomingItems);
-  const db = await openYtCommentsDb();
-
+/**
+ * 1回のトランザクションで、届いた順を崩さずに書く。
+ * 読み出しは同じターンにまとめて出す(途中で手を返すとトランザクションが閉じる)。
+ * @param {any} db
+ * @param {string} vid
+ * @param {any[]} records
+ * @param {{ rejectOwnedElsewhere?: boolean, claimFromOthers?: boolean }} opts
+ * @param {boolean} countAtEnd
+ */
+function appendYtChunkTx(db, vid, records, opts, countAtEnd) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_COMMENTS], 'readwrite');
     const store = tx.objectStore(STORE_COMMENTS);
     const index = store.index(INDEX_BY_VIDEO_ID);
-
     /** @type {any[]} */
-    const newlyAdded = [];
-    /** @type {Array<{ id: string, owner: string }>} */
-    const rejected = [];
+    const slots = new Array(records.length);
+    /** @type {Array<{ id: string, owner: string } | undefined>} */
+    const rejectedSlots = new Array(records.length);
+    /** @type {Array<Array<{ id: string, from: string, row: any }>>} */
+    const reclaimedSlots = new Array(records.length);
     let totalCount = 0;
-    /** @type {Array<{ id: string, from: string, row: any }>} */
-    const reclaimed = [];
+    let pending = records.length;
     const wantOwnerCheck = Boolean(opts.rejectOwnedElsewhere || opts.claimFromOthers);
     const byId = wantOwnerCheck && store.indexNames.contains(INDEX_BY_ID) ? store.index(INDEX_BY_ID) : null;
 
-    let idx = 0;
-    const processNext = () => {
-      if (idx >= records.length) {
-        const countReq = index.count(IDBKeyRange.only(vid));
-        countReq.onsuccess = () => {
-          totalCount = Number(countReq.result || 0);
-        };
-        return;
-      }
-
-      const rec = records[idx];
-      idx += 1;
-      if (byId && rec.id) {
-        const ownReq = byId.getAll(IDBKeyRange.only(rec.id), 4);
-        ownReq.onsuccess = () => {
-          const rows = Array.isArray(ownReq.result) ? ownReq.result : [];
-          if (opts.claimFromOthers) {
-            // アーカイブ(その配信自身のリプレイ)から来た分は本物。別の配信に紛れ込んでいた同じコメントを消して取り戻す。
-            for (const r of rows) {
-              if (!r || !r.videoId || r.videoId === vid || !r.pk) continue;
-              store.delete(r.pk);
-              reclaimed.push({ id: String(rec.id), from: String(r.videoId), row: r });
-            }
-            putOne(rec);
-            return;
-          }
-          const other = rows.find((r) => r && r.videoId && r.videoId !== vid);
-          if (other) {
-            rejected.push({ id: String(rec.id), owner: String(other.videoId) });
-            processNext();
-            return;
-          }
-          putOne(rec);
-        };
-        ownReq.onerror = () => putOne(rec); // 索引が読めなくても記録は止めない
-        return;
-      }
-      putOne(rec);
+    const finishOne = () => {
+      pending -= 1;
+      if (pending > 0 || !countAtEnd) return;
+      const countReq = index.count(IDBKeyRange.only(vid));
+      countReq.onsuccess = () => {
+        totalCount = Number(countReq.result || 0);
+      };
     };
 
-    /** @param {any} rec */
-    const putOne = (rec) => {
+    /** @param {any} rec @param {number} i */
+    const putOne = (rec, i) => {
       const getReq = store.get(rec.pk);
       getReq.onsuccess = () => {
         const existing = getReq.result;
         if (!existing) {
           store.put(rec);
-          newlyAdded.push(rec);
+          slots[i] = rec;
         } else if (rec.iconUrl && !existing.iconUrl) {
-          store.put({
-            ...existing,
-            iconUrl: rec.iconUrl,
-          });
+          store.put({ ...existing, iconUrl: rec.iconUrl });
         }
-        processNext();
+        finishOne();
       };
-      getReq.onerror = () => {
-        processNext();
-      };
+      getReq.onerror = () => finishOne();
     };
 
-    processNext();
+    if (!records.length) {
+      if (countAtEnd) {
+        const countReq = index.count(IDBKeyRange.only(vid));
+        countReq.onsuccess = () => {
+          totalCount = Number(countReq.result || 0);
+        };
+      }
+    } else {
+      records.forEach((rec, i) => {
+        if (byId && rec.id) {
+          const ownReq = byId.getAll(IDBKeyRange.only(rec.id), 4);
+          ownReq.onsuccess = () => {
+            const rows = Array.isArray(ownReq.result) ? ownReq.result : [];
+            if (opts.claimFromOthers) {
+              for (const r of rows) {
+                if (!r || !r.videoId || r.videoId === vid || !r.pk) continue;
+                store.delete(r.pk);
+                (reclaimedSlots[i] || (reclaimedSlots[i] = [])).push({ id: String(rec.id), from: String(r.videoId), row: r });
+              }
+              putOne(rec, i);
+              return;
+            }
+            const other = rows.find((r) => r && r.videoId && r.videoId !== vid);
+            if (other) {
+              rejectedSlots[i] = { id: String(rec.id), owner: String(other.videoId) };
+              finishOne();
+              return;
+            }
+            putOne(rec, i);
+          };
+          ownReq.onerror = () => putOne(rec, i);
+          return;
+        }
+        putOne(rec, i);
+      });
+    }
 
     tx.oncomplete = () => {
+      /** @type {any[]} */
+      const newlyAdded = [];
+      for (const rec of slots) if (rec) newlyAdded.push(rec);
+      /** @type {Array<{ id: string, owner: string }>} */
+      const rejected = [];
+      for (const row of rejectedSlots) if (row) rejected.push(row);
+      /** @type {Array<{ id: string, from: string, row: any }>} */
+      const reclaimed = [];
+      for (const part of reclaimedSlots) if (part) reclaimed.push(...part);
       resolve({ newlyAdded, totalCount, rejected, reclaimed });
     };
     tx.onerror = () => {
       reject(tx.error || new Error('idb_append_failed'));
     };
   });
+}
+
+export async function appendYtStreamCommentsIdb(videoId, incomingItems, opts = {}) {
+  const vid = String(videoId || '').trim();
+  const records = prepareYtCommentsForIdb(vid, incomingItems);
+  const db = await openYtCommentsDb();
+  if (!records.length) return appendYtChunkTx(db, vid, [], opts, true);
+
+  /** @type {any[]} */
+  const newlyAdded = [];
+  /** @type {Array<{ id: string, owner: string }>} */
+  const rejected = [];
+  /** @type {Array<{ id: string, from: string, row: any }>} */
+  const reclaimed = [];
+  let totalCount = 0;
+  for (let i = 0; i < records.length; i += YT_IDB_APPEND_CHUNK) {
+    const last = i + YT_IDB_APPEND_CHUNK >= records.length;
+    const part = await appendYtChunkTx(db, vid, records.slice(i, i + YT_IDB_APPEND_CHUNK), opts, last);
+    newlyAdded.push(...part.newlyAdded);
+    rejected.push(...part.rejected);
+    reclaimed.push(...part.reclaimed);
+    if (last) totalCount = part.totalCount;
+    if (!last) await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return { newlyAdded, totalCount, rejected, reclaimed };
 }
 
 /**
@@ -227,10 +266,20 @@ export async function getYtStreamCommentsByVideoId(videoId) {
       //   読む行と順番は同じ(src/lib/youtube/ytChunkedRead.js)。区切りごとに別の transaction を開く。
       readYtRowsInChunks({
         readChunk: (lower, count) => new Promise((res, rej) => {
+          const t0 = performance.now();
           const req = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS)
             .index(INDEX_BY_VIDEO_ID_RECORDED_AT)
             .getAll(IDBKeyRange.bound([vid, lower], [vid, Number.MAX_SAFE_INTEGER]), count);
-          req.onsuccess = () => res(Array.isArray(req.result) ? req.result : []);
+          req.onsuccess = () => {
+            const d = performance.now() - t0;
+            try {
+              const g = /** @type {any} */ (globalThis);
+              if (d > (Number(g.__nlIdbChunkMs) || 0)) g.__nlIdbChunkMs = Math.round(d);
+              g.__nlIdbChunkN = (Number(g.__nlIdbChunkN) || 0) + 1;
+              g.__nlIdbChunkRows = Array.isArray(req.result) ? req.result.length : 0;
+            } catch { /* 計器 */ }
+            res(Array.isArray(req.result) ? req.result : []);
+          };
           req.onerror = () => rej(req.error || new Error('idb_get_failed'));
         })
       }).then(resolve, reject);
@@ -288,19 +337,42 @@ export async function getYtStreamCommentsSince(videoId, afterRecordedAt = 0) {
       : 0;
 
   const db = await openYtCommentsDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_COMMENTS], 'readonly');
-    const store = tx.objectStore(STORE_COMMENTS);
-    const index = store.index(INDEX_BY_VIDEO_ID_RECORDED_AT);
-    const range = IDBKeyRange.bound([vid, lower], [vid, Number.MAX_SAFE_INTEGER]);
-    const req = index.getAll(range);
-
-    req.onsuccess = () => {
-      resolve(Array.isArray(req.result) ? req.result : []);
-    };
-    req.onerror = () => {
-      reject(req.error || new Error('idb_get_since_failed'));
-    };
+  const hasRecordedAt = await new Promise((resolve) => {
+    const store = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS);
+    resolve(store.indexNames.contains(INDEX_BY_VIDEO_ID_RECORDED_AT));
+  });
+  if (!hasRecordedAt) {
+    return new Promise((resolve, reject) => {
+      const index = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS).index(INDEX_BY_VIDEO_ID);
+      const req = index.getAll(IDBKeyRange.only(vid));
+      req.onsuccess = () => {
+        const list = Array.isArray(req.result) ? req.result : [];
+        list.sort((a, b) => Number(a.recordedAt || 0) - Number(b.recordedAt || 0));
+        resolve(lower > 0 ? list.filter((r) => Number(r?.recordedAt || 0) >= lower) : list);
+      };
+      req.onerror = () => reject(req.error || new Error('idb_get_since_failed'));
+    });
+  }
+  // ★v0.1.2050: 新着のつもりが全件返っても、200行ずつ手を放す(1回の getAll が約1秒画面を止めていた)。
+  return readYtRowsInChunks({
+    startAt: lower,
+    readChunk: (from, count) => new Promise((res, rej) => {
+      const t0 = performance.now();
+      const req = db.transaction([STORE_COMMENTS], 'readonly').objectStore(STORE_COMMENTS)
+        .index(INDEX_BY_VIDEO_ID_RECORDED_AT)
+        .getAll(IDBKeyRange.bound([vid, from], [vid, Number.MAX_SAFE_INTEGER]), count);
+      req.onsuccess = () => {
+        const d = performance.now() - t0;
+        try {
+          const g = /** @type {any} */ (globalThis);
+          if (d > (Number(g.__nlIdbChunkMs) || 0)) g.__nlIdbChunkMs = Math.round(d);
+          g.__nlIdbChunkN = (Number(g.__nlIdbChunkN) || 0) + 1;
+          g.__nlIdbChunkRows = Array.isArray(req.result) ? req.result.length : 0;
+        } catch { /* 計器 */ }
+        res(Array.isArray(req.result) ? req.result : []);
+      };
+      req.onerror = () => rej(req.error || new Error('idb_get_since_failed'));
+    })
   });
 }
 

@@ -28,7 +28,7 @@ import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 import { ytTailAfterFull } from '../../src/lib/youtube/ytTailAfterFull.js';
-import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
+import { ytImportantVoiceReason, ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
@@ -38,6 +38,13 @@ import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js'
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
+import {
+  mergeLiveRowsByRecordedAt,
+  shouldYieldYtBuild,
+  ytLiveRowMateriallyChanged,
+  YT_BUILD_YIELD_ROWS,
+  YT_NOTIFY_MIN_GAP_MS,
+} from '../../src/lib/youtube/ytLiveRowOrder.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -457,13 +464,8 @@ function ytUsableIcon(url) {
 export function buildYtPersonResolver(items) {
   /** @type {Map<string, string>} 名前 → UC… */
   const ucByName = new Map();
-  for (const r of items) {
-    const ch = String(r?.channelId || '').trim();
-    if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
-    const n = normName(r?.name);
-    if (n && !ucByName.has(n)) ucByName.set(n, ch);
-    if (n) ucByNameHint.set(n, ch);
-  }
+  /** @type {Map<string, string>} 人の鍵 → 最後に見えたアイコン */
+  const iconByKey = new Map();
   /** @param {any} r */
   const keyOf = (r) => {
     const ch = String(r?.channelId || '').trim();
@@ -474,15 +476,28 @@ export function buildYtPersonResolver(items) {
     if (ch) return ch;
     return n ? `name:${n}` : '';
   };
-  /** @type {Map<string, string>} 人の鍵 → 最後に見えたアイコン */
-  const iconByKey = new Map();
-  for (const r of items) {
-    const icon = ytUsableIcon(r?.iconUrl);
-    if (!icon) continue;
-    const k = keyOf(r);
-    if (k) iconByKey.set(k, icon);
-  }
-  return { keyOf, iconOf: (key) => iconByKey.get(key) || '' };
+  /**
+   * 新しい行だけ足す。全件を毎回歩き直さない。
+   * @param {any[] | null | undefined} rows
+   */
+  const add = (rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+    for (const r of list) {
+      const ch = String(r?.channelId || '').trim();
+      if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
+      const n = normName(r?.name);
+      if (n && !ucByName.has(n)) ucByName.set(n, ch);
+      if (n) ucByNameHint.set(n, ch);
+    }
+    for (const r of list) {
+      const icon = ytUsableIcon(r?.iconUrl);
+      if (!icon) continue;
+      const k = keyOf(r);
+      if (k) iconByKey.set(k, icon);
+    }
+  };
+  add(items);
+  return { keyOf, iconOf: (key) => iconByKey.get(key) || '', add };
 }
 
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined>, done?: boolean }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む(組み立て中は重ねない) */
@@ -783,18 +798,25 @@ export function ytOwnerRowsLast(list, sum) {
 /**
  * 視聴ページの中の会場の記録の控え(配信ごと)。初回とときどき(行数に応じて30秒〜5分ごと・v0.1.1969)は全件、あいだは新しく記録された分だけを background にもらう
  * (3秒ごとに全件を受け取り直すと、長い配信でメッセージが大きくなり、失敗すると空の会場になる・Grok の点検 2026-11-04)。
- * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number, ver?: number, sorted?: any[], sortedVer?: number }>}
+ * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number, ver?: number, sorted?: any[], sortedVer?: number, pending?: any[], replaced?: boolean }>}
  */
 const inPageCommentCache = new Map();
 /**
  * ★v0.1.1981: 控えの行を受け取った時刻順に並べた配列。控えが変わっていなければ(ver が同じ)前に並べたものを返す
  *   (8万行を、聞かれるたびに並べ直していた)。
- * @param {{ byPk: Map<string, any>, ver?: number, sorted?: any[], sortedVer?: number }} c
+ * ★v0.1.2050: 増えた行が末尾なら、その分だけ足す。全件の並べ直しは、途中の時刻や置き換えのときだけ。
+ * @param {{ byPk: Map<string, any>, ver?: number, sorted?: any[], sortedVer?: number, pending?: any[], replaced?: boolean }} c
  */
 function sortedRowsOfCache(c) {
   const ver = Number(c.ver) || 0;
   if (c.sorted && c.sortedVer === ver) return c.sorted;
-  c.sorted = [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+  if (c.sorted && Array.isArray(c.pending) && c.pending.length) {
+    c.sorted = mergeLiveRowsByRecordedAt(c.sorted, c.pending, !!c.replaced);
+  } else {
+    c.sorted = [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+  }
+  c.pending = [];
+  c.replaced = false;
   c.sortedVer = ver;
   return c.sorted;
 }
@@ -837,18 +859,32 @@ async function getCommentsViaBackground(vid) {
     // ★v0.1.1981: 控えが本当に変わったときだけ番号を進める。「新しい分だけ」の読み出しは最後の1行をもう一度返すので、
     //   受け取った行があるだけでは変わったことにならない(中身が同じ行は数えない)。
     let changed = false;
+    /** @type {any[]} */
+    const pendingAdd = [];
+    let replaced = false;
     for (const r of items) {
       const k = String(r?.pk || r?.id || '');
       if (!k) continue;
-      if (!changed) {
-        const old = full ? undefined : next.byPk.get(k);
-        if (!old || JSON.stringify(old) !== JSON.stringify(r)) changed = true;
+      const old = full ? undefined : next.byPk.get(k);
+      if (!old) {
+        changed = true;
+        if (!full) pendingAdd.push(r);
+      } else if (ytLiveRowMateriallyChanged(old, r)) {
+        changed = true;
+        replaced = true;
+        pendingAdd.push(r);
       }
       next.byPk.set(k, r);
       const at = Number(r?.recordedAt || 0);
       if (at > next.lastRecordedAt) next.lastRecordedAt = at;
     }
-    if (changed) next.ver = (Number(next.ver) || 0) + 1;
+    if (changed) {
+      next.ver = (Number(next.ver) || 0) + 1;
+      if (!full && pendingAdd.length) {
+        next.pending = (next.pending || []).concat(pendingAdd);
+        next.replaced = !!next.replaced || replaced;
+      }
+    }
     inPageCommentCache.set(vid, next);
   } catch {
     // 受け取れなかったときは空にせず、前の控えをそのまま使う(誰もいない会場にしない)
@@ -890,7 +926,7 @@ function recordBuildPhases(ph) {
  * ★v0.1.1981: 前に組み立てた結果の控え(配信ごと)。記録の行も、顔の控え(順位表・@名前・後から引いた顔)も、配信者の情報も
  *   変わっていなければ、同じ結果をそのまま返す。横の欄は3秒ごとに全件を聞いてくるので、8万行の配信では
  *   何も変わっていなくても毎回 8万行を組み立て直していた(手元の計測・CPU 4倍遅く: 420秒で 105回・合計 59秒)。
- * @type {Map<string, { cache: any, ver: number, epoch: number, sumSig: string, out: any[] }>}
+ * @type {Map<string, { cache: any, ver: number, epoch: number, sumSig: string, out: any[], rawLen: number, lastRaw: any, who: any, seenPersons: Set<string> }>}
  */
 const builtMemo = new Map();
 /**
@@ -949,8 +985,9 @@ async function buildCommentsForLvUncached(lv) {
   const memoVer = memoCache ? Number(memoCache.ver) || 0 : -1;
   const memoEpoch = buildSideEpoch;
   // ★v0.1.1997: 数万行の記録では、読み出しの続きで組み立てまで一気に走らせない(src/lib/bigRecordYield.js)。
-  //   拡張の画面(横の欄・コメビュ)だけ。視聴ページの中(会場)は今までと同じ。
-  const yieldBig = !YT_SHIM_IN_PAGE && shouldYieldForBigRecord(Array.isArray(items) ? items.length : 0);
+  // ★v0.1.2050: 視聴ページの中(会場)も同じ。8,000行を超えたら区切って画面へ手を返す。
+  const rowCount = Array.isArray(items) ? items.length : 0;
+  const yieldBig = shouldYieldForBigRecord(rowCount) || shouldYieldYtBuild(rowCount);
   if (yieldBig) await yieldToMainThread();
   const [lb, handleIconsRaw, lateIconsRaw] = await sidePromise;
   const tSideDone = Date.now();
@@ -974,9 +1011,30 @@ async function buildCommentsForLvUncached(lv) {
   const twLateIcons = vidPlat && lateIconsRaw && typeof lateIconsRaw === 'object' ? lateIconsRaw : {};
   /** @type {Set<string>} 顔を引きに行く @名前 */
   const wantHandles = new Set();
-  const who = buildYtPersonResolver(list);
+  const canExtend =
+    !!memo &&
+    memo.who &&
+    memo.seenPersons &&
+    memo.rawLen > 0 &&
+    list.length > memo.rawLen &&
+    list[memo.rawLen - 1] === memo.lastRaw &&
+    !replayVideoIds.has(vid);
+  const who = canExtend ? memo.who : buildYtPersonResolver([]);
+  if (!canExtend) {
+    for (let i = 0; i < list.length; i += YT_BUILD_YIELD_ROWS) {
+      if (yieldBig && i > 0) await yieldToMainThread();
+      who.add(list.slice(i, i + YT_BUILD_YIELD_ROWS));
+    }
+  } else {
+    who.add(list.slice(memo.rawLen));
+  }
+  const seenPersons = canExtend ? memo.seenPersons : new Set();
   // 会場の読み上げ: 混んでいるときは大事なコメントだけ読む(りんく決定 2026-11-04)。どれが大事かの印をここで付ける
-  const important = IS_VENUE_CONTEXT ? ytImportantVoiceReasons(list, (r) => who.keyOf(r)) : null;
+  const important = !IS_VENUE_CONTEXT
+    ? null
+    : canExtend
+      ? null
+      : ytImportantVoiceReasons(list, (r) => who.keyOf(r));
   let streamStartedAt = 0;
   if (list.some((r) => r?.replay)) {
     replayVideoIds.add(vid);
@@ -989,7 +1047,12 @@ async function buildCommentsForLvUncached(lv) {
     }
   }
   let rowsMade = 0;
-  const out = list.map((r, i) => {
+  /**
+   * @param {any} r
+   * @param {number} i
+   * @param {string} [reason]
+   */
+  const oneEntry = (r, i, reason) => {
     const key = who.keyOf(r);
     // スパチャの欄の顔は読み込み前の仮の絵(data: など)のことがある。https の顔だけ使い、無ければ同じ人の別の記録の顔を使う。
     const nm = String(r?.name || '').trim();
@@ -1013,13 +1076,49 @@ async function buildCommentsForLvUncached(lv) {
       rowsMade += 1;
     }
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
-    if (important?.[i]) ytVoiceImportantKeys.set(`no:${e.commentNo}`, important[i]);
+    const why = reason || important?.[i] || '';
+    if (why) ytVoiceImportantKeys.set(`no:${e.commentNo}`, why);
     return e;
-  });
+  };
+  /** @type {any[]} */
+  const out = canExtend ? memo.out.slice() : [];
+  const mapFrom = canExtend ? memo.rawLen : 0;
+  for (let start = mapFrom; start < list.length; start += YT_BUILD_YIELD_ROWS) {
+    const end = Math.min(list.length, start + YT_BUILD_YIELD_ROWS);
+    if (yieldBig && start > mapFrom) await yieldToMainThread();
+    for (let i = start; i < end; i += 1) {
+      let reason = '';
+      if (IS_VENUE_CONTEXT && canExtend) {
+        const person = String(who.keyOf(list[i]) || '');
+        const first = !!person && !seenPersons.has(person);
+        if (person) seenPersons.add(person);
+        reason = ytImportantVoiceReason(list[i], first);
+      }
+      out.push(oneEntry(list[i], i, reason));
+    }
+  }
+  if (IS_VENUE_CONTEXT && !canExtend) {
+    for (const r of list) {
+      const person = String(who.keyOf(r) || '');
+      if (person) seenPersons.add(person);
+    }
+  }
   if (yieldBig) await yieldToMainThread();
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
   registerBroadcastersFromSummaries();
-  if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) builtMemo.set(lv, { cache: memoCache, ver: memoVer, epoch: memoEpoch, sumSig: memoSumSig, out });
+  if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) {
+    builtMemo.set(lv, {
+      cache: memoCache,
+      ver: memoVer,
+      epoch: memoEpoch,
+      sumSig: memoSumSig,
+      out,
+      rawLen: list.length,
+      lastRaw: list[list.length - 1],
+      who,
+      seenPersons,
+    });
+  }
   else builtMemo.delete(lv);
   shimDiag.rowsMadeLast = rowsMade;
   shimDiag.rowsReusedLast = out.length - rowsMade;
@@ -1498,6 +1597,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           do {
             st.again = false;
             await notifyLvOnce(lv, st.summary);
+            // コメントが続くあいだ、組み立て直しを隙間なく重ねるとメインスレッドが固まる。
+            if (st.again) await new Promise((resolve) => setTimeout(resolve, YT_NOTIFY_MIN_GAP_MS));
           } while (st.again);
         } finally {
           notifyRunning.delete(lv);
@@ -1635,10 +1736,12 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const cur = inPageCommentCache.get(vid);
         if (!cur) return; // まだ会場がこの配信を読んでいない(最初の全件で入る)
         let added = 0;
+        if (!cur.pending) cur.pending = [];
         for (const r of msg.items) {
           const k = String(r?.pk || r?.id || '');
           if (!k || cur.byPk.has(k)) continue;
           cur.byPk.set(k, r);
+          cur.pending.push(r);
           added += 1;
         }
         if (!added) return;

@@ -17,6 +17,7 @@ import {
   enqueueYtVoiceItem,
 } from '../../src/lib/youtube/ytVoiceQueue.js';
 import { mergeYtStreamSummary, prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
+import { YT_CHAT_STORAGE_FLUSH_MS } from '../../src/lib/youtube/ytLiveRowOrder.js';
 import {
   appendYtStreamCommentsIdb,
   resetYtCommentsDb,
@@ -170,6 +171,64 @@ let creatingOffscreenPromise = null;
  * @param {() => Promise<T>} fn
  * @returns {Promise<T>}
  */
+/**
+ * コメントの束ごとに配信一覧を書き直すと、画面側が全件を組み立て直して固まる。
+ * 最初の1回はすぐ書き、そのあとは間隔を空けてまとめる。書く直前に一覧を読み直す。
+ * @type {Map<string, { chatFilterLabel: string, itemCount: number, setActive: boolean, voiceQueue: any[] | null, voiceState: any | null, assignments: any | null }>}
+ */
+const pendingChatFlush = new Map();
+/** @type {ReturnType<typeof setTimeout> | 0} */
+let chatFlushTimer = 0;
+let chatFlushNotBefore = 0;
+
+/**
+ * @param {{ videoId: string, chatFilterLabel?: string, itemCount: number, setActive: boolean, voiceQueue: any[] | null, voiceState: any | null, assignments: any | null }} patch
+ */
+function scheduleYtChatSummaryFlush(patch) {
+  const prev = pendingChatFlush.get(patch.videoId);
+  pendingChatFlush.set(patch.videoId, {
+    chatFilterLabel: patch.chatFilterLabel || prev?.chatFilterLabel || '',
+    itemCount: patch.itemCount,
+    setActive: patch.setActive || !!prev?.setActive,
+    voiceQueue: patch.voiceQueue || prev?.voiceQueue || null,
+    voiceState: patch.voiceState || prev?.voiceState || null,
+    assignments: patch.assignments || prev?.assignments || null,
+  });
+  if (chatFlushTimer) return;
+  const wait = Math.max(0, chatFlushNotBefore - Date.now());
+  chatFlushTimer = setTimeout(() => {
+    chatFlushTimer = 0;
+    chatFlushNotBefore = Date.now() + YT_CHAT_STORAGE_FLUSH_MS;
+    const batch = [...pendingChatFlush.entries()];
+    pendingChatFlush.clear();
+    void runSerialized(async () => {
+      if (!batch.length) return;
+      const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
+      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      /** @type {Record<string, any>} */
+      const updates = { [STORAGE_KEYS.STREAM_SUMMARIES]: summaries };
+      let activeId = '';
+      for (const [videoId, row] of batch) {
+        summaries[videoId] = mergeYtStreamSummary(
+          summaries[videoId],
+          {
+            videoId,
+            chatFilterLabel: row.chatFilterLabel || undefined,
+            itemCount: row.itemCount,
+          },
+          Date.now(),
+        );
+        if (row.voiceQueue) updates[STORAGE_KEYS.VOICE_QUEUE] = row.voiceQueue;
+        if (row.voiceState) updates[STORAGE_KEYS.VOICE_STATE] = row.voiceState;
+        if (row.assignments) updates[STORAGE_KEYS.VOICE_ASSIGNMENTS] = row.assignments;
+        if (row.setActive) activeId = videoId;
+      }
+      if (activeId) updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = activeId;
+      await chrome.storage.local.set(updates);
+    });
+  }, wait);
+}
+
 function runSerialized(fn) {
   // 1つの仕事が返ってこなくても(保存の待ちが固まる等)、後ろの仕事を止めない。20秒で次へ進む。
   const guarded = () =>
@@ -1019,12 +1078,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const chatFilterLabel = String(payload.chatFilterLabel || '').trim();
 
       const data = await chrome.storage.local.get([
-        STORAGE_KEYS.STREAM_SUMMARIES,
+        ...(BACKGROUND_READER_ENABLED ? [STORAGE_KEYS.STREAM_SUMMARIES] : []),
         STORAGE_KEYS.ACTIVE_VIDEO_ID,
         STORAGE_KEYS.VOICE_SETTINGS,
         ...(voiceAssignMem ? [] : [STORAGE_KEYS.VOICE_ASSIGNMENTS]),
-        STORAGE_KEYS.VOICE_QUEUE,
-        STORAGE_KEYS.VOICE_STATE,
+        ...(BACKGROUND_READER_ENABLED ? [STORAGE_KEYS.VOICE_QUEUE, STORAGE_KEYS.VOICE_STATE] : []),
       ]);
 
       const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
@@ -1126,28 +1184,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
 
-      // chrome.storage.local にはコメント配列を置かず、配信一覧の要約だけを保存する
-      summaries[videoId] = mergeYtStreamSummary(
-        prevSummary,
-        {
-          videoId,
-          chatFilterLabel: chatFilterLabel || undefined,
-          itemCount: idbResult.totalCount,
-        },
-        Date.now(),
-      );
-
-      const updates = {
-        [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
-        [STORAGE_KEYS.VOICE_QUEUE]: voiceQueue,
-        [STORAGE_KEYS.VOICE_STATE]: voiceState,
-      };
       // 声の割り当ては控えを正にし、変わったときだけ最短30秒に1回書く(v0.1.1968)
       voiceAssignMem = assignments;
       if (assignments !== assignmentsAtStart) voiceAssignDirty = true;
       const assignWrite = ytVoiceAssignPersistDecision({ dirty: voiceAssignDirty, lastWrittenAt: voiceAssignWrittenAt, now: Date.now() });
+      /** @type {any | null} */
+      let assignNow = null;
       if (assignWrite === 'now') {
-        updates[STORAGE_KEYS.VOICE_ASSIGNMENTS] = assignments;
+        assignNow = assignments;
         voiceAssignDirty = false;
         voiceAssignDiag.now++;
         if (voiceAssignWrittenAt) voiceAssignDiag.gaps = [...voiceAssignDiag.gaps.slice(-19), Date.now() - voiceAssignWrittenAt];
@@ -1156,11 +1200,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         voiceAssignDiag.later++;
         scheduleVoiceAssignFlush();
       }
-      if (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID]) {
-        updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
-      }
-
-      await chrome.storage.local.set(updates);
+      // コメント本文は IndexedDB に全件残す。配信一覧の要約は束ごとに書かず、間隔を空けてまとめる。
+      // 読み上げが止まっているときは、声の列を毎回書き直さない(書くたびに画面が組み立て直される)。
+      scheduleYtChatSummaryFlush({
+        videoId,
+        chatFilterLabel,
+        itemCount: idbResult.totalCount,
+        setActive: videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID],
+        voiceQueue: BACKGROUND_READER_ENABLED ? voiceQueue : null,
+        voiceState: BACKGROUND_READER_ENABLED ? voiceState : null,
+        assignments: assignNow,
+      });
       if (BACKGROUND_READER_ENABLED && settings.enabled && (enqueuedAny || voiceQueue.length > 0)) {
         nudgeOffscreenDrain();
       }

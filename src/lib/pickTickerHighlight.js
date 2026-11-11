@@ -166,14 +166,22 @@ export function pickTickerHighlightEntry(list, nowMs, opts = {}) {
   const windowTo = bucketAt + TICKER_BUCKET_MS;
   /** @type {TickerCandidate[]} */
   const inWindow = [];
-  for (const row of rows) {
-    // ★v0.1.1981: 先に時刻だけ見る。窓(直近の数十秒)の外の行まで本文を整えていた(8万行で毎回8万回の正規表現)。
+  // 時刻の新しい順に見て、古い方へきれいに並んでいるあいだは窓の外に出た時点でやめる。
+  // 並びが崩れていたら最後まで見る(結果は全件走査と同じ)。
+  let prevTs = Infinity;
+  let ordered = true;
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = rows[i];
     const ts = candidateTs(row);
+    if (ordered && ts > prevTs) ordered = false;
+    prevTs = ts;
+    if (ordered && ts <= windowFrom) break;
     if (ts <= windowFrom || ts > windowTo) continue;
     const c = toCandidate(row);
     if (!c) continue;
     inWindow.push(c);
   }
+  inWindow.reverse();
   if (!inWindow.length) return fallback();
 
   // 窓内の同一本文の出現数(合唱の検出)。

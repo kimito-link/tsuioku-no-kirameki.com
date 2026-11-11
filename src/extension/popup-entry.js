@@ -565,6 +565,7 @@ import {
 } from '../lib/pickTickerHighlight.js';
 import {
   aggregateCommentsByUser,
+  createAggregateCommentsFolder,
   displayUserLabel,
   UNKNOWN_USER_KEY
 } from '../lib/userRooms.js';
@@ -787,6 +788,7 @@ import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.
 import {
   normalizeLv,
   userLaneCandidatesFromStorage,
+  createUserLaneCandidateFolder,
   enrichUserLaneAggregatesWithProfileAndDisplay
 } from '../lib/userLaneCandidatesFromStorage.js';
 import { buildGiftThrowerLaneEntries } from '../lib/userLaneMergeGiftThrowers.js';
@@ -6665,6 +6667,13 @@ function renderStoryUserLane() {
     totalCandidates: rosteredCandidates.length
   });
   if (laneSig === storyUserLaneLastRenderSig) {
+    try {
+      const g = /** @type {any} */ (globalThis);
+      g.__nlLaneSkip = (Number(g.__nlLaneSkip) || 0) + 1;
+      const dt = performance.now() - _laneRenderT0;
+      g.__nlLaneFnMsLast = Math.round(dt);
+      g.__nlLaneFnMsMax = Math.max(Number(g.__nlLaneFnMsMax) || 0, dt);
+    } catch { /* 計器 */ }
     // 自己診断: 内容に変化なし＝再 paint しないが、DOM は前回の描画済み状態（=完了扱い・現 DOM 件数を記録）。
     //   ここで done を記録しないと、skip のたびに「started>completed」になり誤って未完走に見える。
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
@@ -6764,6 +6773,13 @@ function renderStoryUserLane() {
       ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _laneRenderT0) * 10
     ) / 10
   });
+  try {
+    const g = /** @type {any} */ (globalThis);
+    g.__nlLanePaint = (Number(g.__nlLanePaint) || 0) + 1;
+    const dt = performance.now() - _laneRenderT0;
+    g.__nlLaneFnMsLast = Math.round(dt);
+    g.__nlLaneFnMsMax = Math.max(Number(g.__nlLaneFnMsMax) || 0, dt);
+  } catch { /* 計器 */ }
   /*
    * ★v0.1.1281: ここにあった publishLaneMirror は【描画より前】へ移した(上部を参照)。
    *   理由: 描かない経路(sig一致/縮小ガード/空ガード)の early return が publish まで
@@ -7745,11 +7761,18 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
       ? popupUserCommentProfileMap
       : {};
   if (lid && STORY_SOURCE_STATE.laneAggregates.length) {
+    const _enT = performance.now();
     STORY_SOURCE_STATE.laneAggregates = enrichUserLaneAggregatesWithProfileAndDisplay(
       STORY_SOURCE_STATE.laneAggregates,
       displayEntries,
       profileMap
     );
+    try {
+      const g = /** @type {any} */ (globalThis);
+      const dt = performance.now() - _enT;
+      g.__nlEnrichMsLast = Math.round(dt);
+      g.__nlEnrichMsMax = Math.max(Number(g.__nlEnrichMsMax) || 0, dt);
+    } catch { /* 計器 */ }
   }
 
   // v0.1.976: 「見せる人」を重い storage read の後ろで餓死させない。コメント由来レーンは
@@ -7869,7 +7892,25 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
 const _giftAdPicksCarry = createGiftAdPicksCarry();
 const _giftAdPicksCarryDiag = { restored: 0, cleared: 0, keptGift: 0, keptAd: 0 };
 // ★v0.1.2007: 数万行の記録で、同じ記録を描画のたびに人ごとに数え直さない(lib/laneAggregatesMemo.js)
-const _laneAggregatesMemo = createLaneAggregatesMemo({ compute: (rows, lid, o) => userLaneCandidatesFromStorage(rows, lid, o), minRows: BIG_RECORD_YIELD_MIN_ROWS });
+// ★v0.1.2050: うしろに足されたコメントだけを足す。8,000件の配信でも毎回全件を数え直さない。
+let _laneCandidateFolder = /** @type {ReturnType<typeof createUserLaneCandidateFolder> | null} */ (null);
+const _laneAggregatesMemo = createLaneAggregatesMemo({
+  minRows: 400,
+  compute: (rows, lid, o) => {
+    const t0 = performance.now();
+    _laneCandidateFolder = createUserLaneCandidateFolder(lid, o, true);
+    const out = _laneCandidateFolder.add(rows);
+    const dt = performance.now() - t0;
+    try {
+      const g = /** @type {any} */ (globalThis);
+      g.__nlLaneAggMsLast = Math.round(dt);
+      g.__nlLaneAggMsMax = Math.max(Number(g.__nlLaneAggMsMax) || 0, dt);
+      g.__nlLaneAggN = (Number(g.__nlLaneAggN) || 0) + 1;
+    } catch { /* 計器 */ }
+    return out;
+  },
+  fold: (_prev, suffix) => (_laneCandidateFolder ? _laneCandidateFolder.add(suffix) : _prev)
+});
 try { /** @type {any} */ (globalThis).__laneAggregatesMemoDiag = _laneAggregatesMemo.diag; } catch { /* 計器だけ */ }
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
@@ -8193,8 +8234,10 @@ function renderStoryCommentDetailPanelImpl() {
  * @param {PopupCommentEntry[]} entries
  */
 function storyAvatarFingerprint(entries) {
+  // グリッドは先頭360件だけなので、それより後ろの顔は見ない(全件だとコメントのたびに数千行走査していた)。
+  const n = Math.min(entries.length, STORY_GROWTH_MAX_CELLS);
   let h = 0;
-  for (let i = 0; i < entries.length; i++) {
+  for (let i = 0; i < n; i++) {
     const u = entries[i]?.avatarUrl;
     if (!u || typeof u !== 'string') continue;
     h = (h * 33 + u.length + i) | 0;
@@ -8971,10 +9014,15 @@ function syncStoryGrowth(liveId, count, root) {
     nextSig !== STORY_GROWTH_STATE.sourceSig;
   STORY_GROWTH_STATE.sourceSig = nextSig;
   if (needSourceSync) {
-    // 0.1.87: avatar URL の遅延補完（cache hydration 等）で signature が変わるだけの
-    //   再同期では pulse しない。pulseLast=true は新コメ追加（rnd < tgt）の経路のみ
-    //   に限定し、グリッドが「コメ無くても動いて見える」のを防ぐ。
-    patchStoryGrowthIconsFromSource(root, { pulseLast: false });
+    const shown = Math.min(STORY_GROWTH_STATE.renderedCount, STORY_GROWTH_MAX_CELLS);
+    const head = STORY_SOURCE_STATE.entries[STORY_GROWTH_STATE.sourceOffset || 0];
+    const edge = STORY_SOURCE_STATE.entries[(STORY_GROWTH_STATE.sourceOffset || 0) + Math.max(0, shown - 1)];
+    const visibleKey = `${STORY_GROWTH_STATE.sourceOffset}|${shown}|${head?.id || ''}|${edge?.id || ''}|${storyAvatarFingerprint(STORY_SOURCE_STATE.entries)}`;
+    // 先頭の名簿が同じなら、うしろに増えたコメントのために360枚を書き換えない。
+    if (visibleKey !== STORY_GROWTH_STATE.visibleKey) {
+      STORY_GROWTH_STATE.visibleKey = visibleKey;
+      patchStoryGrowthIconsFromSource(root, { pulseLast: false });
+    }
   }
 
   if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
@@ -13223,6 +13271,35 @@ async function refreshGiftRankStrip(liveId) {
 }
 
 /**
+ * 応援件数の集計。コメントがうしろに足されただけなら、足された分だけ数える。
+ * @type {{ ref: readonly unknown[] | null, folder: ReturnType<typeof createAggregateCommentsFolder> | null }}
+ */
+let _roomAggPaint = { ref: null, folder: null };
+/**
+ * @param {readonly unknown[]} list
+ */
+function aggregateRoomsForPaint(list) {
+  const rows = Array.isArray(list) ? list : [];
+  const prev = _roomAggPaint;
+  const n = prev.ref ? prev.ref.length : 0;
+  let prefix = !!(prev.folder && prev.ref && rows.length > n && n > 0 && rows[0] === prev.ref[0] && rows[n - 1] === prev.ref[n - 1]);
+  if (prefix && prev.ref) {
+    for (let i = 1; i < n - 1; i += 1) {
+      if (rows[i] !== prev.ref[i]) { prefix = false; break; }
+    }
+  }
+  if (prefix && prev.folder && prev.ref) {
+    const out = prev.folder.add(rows.slice(n));
+    prev.ref = rows;
+    return out;
+  }
+  const folder = createAggregateCommentsFolder({ requireText: true });
+  const out = folder.add(rows);
+  _roomAggPaint = { ref: rows, folder };
+  return out;
+}
+
+/**
  * @param {PopupCommentEntry[]} entries
  * @param {string} [liveId] ランキングストリップの再描画キー用
  * @param {{ rankingProvisional?: boolean }} [renderOpts]
@@ -13424,7 +13501,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   // 事象を防ぐため、ranking 表示からは UNKNOWN_USER_KEY を除外する。
   // HTML レポート側（L8782 等）の集計はそのまま維持。
   const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(
-    aggregateCommentsByUser(list, { requireText: true }),
+    aggregateRoomsForPaint(list),
     {
       broadcasterUid: inferredBroadcasterUid,
       broadcasterIconUrl
@@ -15968,10 +16045,24 @@ async function refresh() {
     try {
       paintWatchPopupUiBody();
     } finally {
-      coalescedRefreshScheduler.notePaintCost(performance.now() - _paintT0);
+      const paintMs = performance.now() - _paintT0;
+      coalescedRefreshScheduler.notePaintCost(paintMs);
+      try {
+        const g = /** @type {any} */ (globalThis);
+        g.__nlPaintMsLast = Math.round(paintMs);
+        g.__nlPaintMsMax = Math.max(Number(g.__nlPaintMsMax) || 0, paintMs);
+        g.__nlPaintCount = (Number(g.__nlPaintCount) || 0) + 1;
+      } catch {
+        /* 計器 */
+      }
     }
   }
   function paintWatchPopupUiBody() {
+    const _phaseT = [];
+    const _markPhase = (name) => {
+      _phaseT.push([name, performance.now()]);
+    };
+    _markPhase('start');
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
     // total(=arr.length・O(1))は常時表示「記録している応援コメント N 件です」
     //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
@@ -16057,6 +16148,7 @@ async function refresh() {
       };
     }
     const displayEntries = displayEntriesBase;
+    _markPhase('display');
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
     // v0.1.596: chunk/IDB 移行済みでは main 配列が古い退避データのことがある。
     // index/summary total が取れている場合は、それを件数カードの正本として扱う。
@@ -16120,7 +16212,9 @@ async function refresh() {
       heavySettled: watchPopupHeavyCommentsSettled
     });
     void updateIngestHeartbeatDisplay(lv);
+    _markPhase('breakdown');
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
+    _markPhase('ticker');
     // 純Webで「コメントが進む」ため鏡に publish。v0.1.1018: 多タブ飽和のサマリ30件は provisional で全件鏡を潰さない。
     //   ③応援タイムライン丸写し(第1号・A1-4): 直近 read 済みのギフト配列(liveId一致時のみ)を相乗り=③でもギフト行が出る。
     const _giftsForMirror = _lastGiftEventsForMirror.liveId === String(lv || '').trim().toLowerCase()
@@ -16164,10 +16258,12 @@ async function refresh() {
     // ★heavyRace再発の即効対策(HANDOFF-heavyrace A-2): heavy未settleなら supply は暫定。
     //   laneFeedPick.provisional 単独では穴(provisionalLaneCommentRows.js: merged≦primary で heavy未settleでも false)
     //   →!watchPopupHeavyCommentsSettled を OR で必ず併記。settled なら false=完全描画として単調性ガードを通す。
+    _markPhase('laneFilter');
     syncStorySourceEntries(lv, displayEntries, laneFeedPick.entries, {
       provisional: laneFeedPick.provisional === true || !watchPopupHeavyCommentsSettled,
       origin: LANE_SUPPLY_ORIGIN.HEAVY
     });
+    _markPhase('story');
     markWatchPopupLoadPhase(
       laneFeedPick.provisional ? 'ranking_paint' : 'ranking_full',
       {
@@ -16216,6 +16312,22 @@ async function refresh() {
     }
     // v0.1.813: renderWatchMetaCard も 1万件 O(N) 集計の重い描画。スクロール中/裏タブ(描画済)は見送る。
     if (!_perfDeferActive) renderWatchMetaCard(snapForCards, arr);
+    _markPhase('rooms');
+    try {
+      /** @type {Record<string, number>} */
+      const phases = {};
+      for (let i = 1; i < _phaseT.length; i += 1) {
+        phases[_phaseT[i][0]] = Math.round(_phaseT[i][1] - _phaseT[i - 1][1]);
+      }
+      const g = /** @type {any} */ (globalThis);
+      g.__nlPaintPhasesLast = phases;
+      const max = g.__nlPaintPhasesMax || (g.__nlPaintPhasesMax = {});
+      for (const [k, v] of Object.entries(phases)) {
+        if (v > (Number(max[k]) || 0)) max[k] = v;
+      }
+    } catch {
+      /* 計器 */
+    }
     // 白フラッシュ見える化: paint 区間の所要 ms を nls_perf_diag_<lv> に間引き保存。
     {
       const _perfPaintT1 = typeof performance !== 'undefined' ? performance.now() : Date.now();

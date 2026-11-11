@@ -61,6 +61,64 @@ function sampleEntriesEvenly(list, sampleMax) {
  * @param {{ requireText?: boolean, sampleMaxEntries?: number, trackCharTotals?: boolean, maxRooms?: number, sortByCount?: boolean }} [options]
  * @returns {{ userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string, totalChars?: number }[]}
  */
+/**
+ * コメントを人ごとに足していく。add には前回の続きだけを渡す。
+ * 1回で全件を渡したときの結果は aggregateCommentsByUser（間引き・人数上限なし）と同じ。
+ * @param {{ requireText?: boolean, trackCharTotals?: boolean, sortByCount?: boolean }} [options]
+ */
+export function createAggregateCommentsFolder(options) {
+  const requireText = !!options?.requireText;
+  const trackCharTotals = options?.trackCharTotals === true;
+  const sortByCount = options?.sortByCount === true;
+  /** @type {Map<string, { userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string, totalChars: number }>} */
+  const map = new Map();
+  return {
+    /**
+     * @param {readonly { userId?: string|null, nickname?: string, text?: string, capturedAt?: number, avatarUrl?: string|null }[]} entries
+     */
+    add(entries) {
+      const list = Array.isArray(entries) ? entries : [];
+      for (const e of list) {
+        const uid = e?.userId ? String(e.userId).trim() : '';
+        const userKey = uid || UNKNOWN_USER_KEY;
+        const capturedAt = Number(e?.capturedAt || 0);
+        const text = String(e?.text || '').trim();
+        if (requireText && !text) continue;
+        if (requireText && isRecommendedUserChipPollutionRow(e)) continue;
+        const nickname = String(e?.nickname || '').trim();
+        const rawAv = String(e?.avatarUrl || '').trim();
+        const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : '';
+        let row = map.get(userKey);
+        if (!row) {
+          row = { userKey, nickname: '', count: 0, lastAt: 0, lastText: '', avatarUrl: '', totalChars: 0 };
+          map.set(userKey, row);
+        }
+        row.count += 1;
+        if (trackCharTotals) row.totalChars += text.length;
+        if (nickname) {
+          if (!row.nickname) row.nickname = nickname;
+          else if (nickname.length > row.nickname.length) row.nickname = nickname;
+        }
+        if (capturedAt >= row.lastAt) {
+          row.lastAt = capturedAt;
+          row.lastText = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+          if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
+        }
+      }
+      let rows = [...map.values()];
+      if (sortByCount) rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
+      else rows.sort((a, b) => b.lastAt - a.lastAt);
+      if (!trackCharTotals) return rows.map(({ totalChars: _tc, ...rest }) => rest);
+      return rows;
+    }
+  };
+}
+
+/**
+ * @param {{ userId?: string|null, nickname?: string, text?: string, capturedAt?: number, avatarUrl?: string|null }[]} entries
+ * @param {{ requireText?: boolean, sampleMaxEntries?: number, trackCharTotals?: boolean, maxRooms?: number, sortByCount?: boolean }} [options]
+ * @returns {{ userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string, totalChars?: number }[]}
+ */
 export function aggregateCommentsByUser(entries, options) {
   let list = Array.isArray(entries) ? entries : [];
   const sampleMax =
@@ -70,63 +128,11 @@ export function aggregateCommentsByUser(entries, options) {
   if (sampleMax > 0 && list.length > sampleMax) {
     list = sampleEntriesEvenly(list, sampleMax);
   }
-  const requireText = !!options?.requireText;
-  const trackCharTotals = options?.trackCharTotals === true;
   const maxRooms =
     typeof options?.maxRooms === 'number' && options.maxRooms > 0
       ? Math.floor(options.maxRooms)
       : 0;
-  const sortByCount = options?.sortByCount === true;
-  /** @type {Map<string, { userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string, totalChars: number }>} */
-  const map = new Map();
-
-  for (const e of list) {
-    const uid = e?.userId ? String(e.userId).trim() : '';
-    const userKey = uid || UNKNOWN_USER_KEY;
-    const capturedAt = Number(e?.capturedAt || 0);
-    const text = String(e?.text || '').trim();
-    if (requireText && !text) continue;
-    if (requireText && isRecommendedUserChipPollutionRow(e)) continue;
-    const nickname = String(e?.nickname || '').trim();
-    const rawAv = String(e?.avatarUrl || '').trim();
-    const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : '';
-
-    if (!map.has(userKey)) {
-      map.set(userKey, {
-        userKey,
-        nickname: '',
-        count: 0,
-        lastAt: 0,
-        lastText: '',
-        avatarUrl: '',
-        totalChars: 0
-      });
-    }
-    const row = map.get(userKey);
-    row.count += 1;
-    if (trackCharTotals) row.totalChars += text.length;
-    if (nickname) {
-      if (!row.nickname) row.nickname = nickname;
-      else if (nickname.length > row.nickname.length) row.nickname = nickname;
-    }
-    if (capturedAt >= row.lastAt) {
-      row.lastAt = capturedAt;
-      row.lastText = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-      if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
-    }
-  }
-
-  let rows = [...map.values()];
-  if (sortByCount) {
-    rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
-  } else {
-    rows.sort((a, b) => b.lastAt - a.lastAt);
-  }
-  if (maxRooms > 0 && rows.length > maxRooms) {
-    rows = rows.slice(0, maxRooms);
-  }
-  if (!trackCharTotals) {
-    return rows.map(({ totalChars: _tc, ...rest }) => rest);
-  }
+  let rows = createAggregateCommentsFolder(options).add(list);
+  if (maxRooms > 0 && rows.length > maxRooms) rows = rows.slice(0, maxRooms);
   return rows;
 }

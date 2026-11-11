@@ -127,6 +127,18 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // 配信の視聴フレームだけ content.js を載せる薄い入口。トップや広告の iframe では解析しない。
+    entryPoints: ['src/extension/content-boot.js'],
+    outfile: 'extension/dist/content-boot.js',
+    target: 'chrome100'
+  },
+  {
+    // 配信の視聴ページだけ yt-venue-inline.js を載せる薄い入口。
+    entryPoints: ['src/extension/yt-page-boot.js'],
+    outfile: 'extension/dist/yt-page-boot.js',
+    target: 'chrome100'
+  },
+  {
     entryPoints: ['src/extension/popup-entry.js'],
     outfile: 'extension/dist/popup.js',
     target: 'chrome100',

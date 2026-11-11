@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1241 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1018,7 +1018,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (111)
+- 📁 **scripts/** (112)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1105,6 +1105,7 @@
   - `loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
   - `loop-glossary-status-live.test.js`
   - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
+  - `measure-comment-flood.mjs` — コメントが続くときに、画面のメインスレッドがどれだけ止まるかを測る。
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
   - `measure-ndgr-crawls.mjs` — 拡張の NDGR 巡回(前方向の立て直し・過去埋め)を本物の配信に当てて数える。
@@ -1159,7 +1160,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2444)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1197,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (114)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1233,6 +1234,7 @@
     - `comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
     - `comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
     - `commentTickerStarvation.wiring.test.js`
+    - `content-boot.js` — 記録エンジン(content.js・約1.5MB)を、配信の視聴フレームだけに載せる。
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
     - `embeddedProgramElapsed.wiring.test.js`
@@ -1313,6 +1315,7 @@
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
+    - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
   - 📁 **images/** (134)
@@ -1491,7 +1494,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2142)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1550,7 +1553,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (79)
+    - 📁 **youtube/** (82)
       - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -1578,6 +1581,8 @@
       - `ytLaneAssign.test.js`
       - `ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
       - `ytLeaderboardSig.test.js`
+      - `ytLiveRowOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytLiveRowOrder.test.js`
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
       - `ytMergedIsolation.test.js`
       - `ytNicoShim.test.js`
@@ -1618,6 +1623,7 @@
       - `ytTailAfterFull.test.js`
       - `ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
       - `ytUserLaneTiers.test.js`
+      - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
       - `ytViewerSampler.test.js`
       - `ytVoiceAssignPersist.js` — YouTube 系(YouTube・Twitch・Kick ほか)の「人ごとの声の割り当て」(yt_voice_assignments)を
@@ -2674,6 +2680,8 @@
     - `nicoAnonymousDisplay.test.js`
     - `nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
     - `nicoCommentPanelAssetLauncher.test.js`
+    - `nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `nicoEngineBoot.test.js`
     - `nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
     - `nicoUserFollowingApi.test.js`
     - `nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
@@ -3342,6 +3350,7 @@
     - `userEntryAvatarResolve.test.js`
     - `userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
     - `userIdPreference.test.js`
+    - `userLaneCandidateFolder.test.js`
     - `userLaneCandidatesFromStorage.js` — 応援ユーザーレーン用: nls_comments 相当の StoredComment 配列から userId 単位に集約した候補。
     - `userLaneCandidatesFromStorage.test.js`
     - `userLaneCandidatesFromStorageEquivalence.test.js`

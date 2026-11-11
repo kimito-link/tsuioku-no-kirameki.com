@@ -111,105 +111,58 @@ function newestFirstFromChronological(chronological) {
  *     (v0.1.793) が再発する。DOM から直接取る案は standalone(venue.html) で content が動かず使えない。
  * @returns {readonly Readonly<UserLaneCandidateFromStorage>[]}
  */
-export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
-  const filterByLive =
-    arguments.length >= 2 && liveId != null && String(liveId).trim() !== '';
-  const lidNorm = filterByLive ? String(liveId).trim() : '';
-  const targetNorm = filterByLive ? normalizeLv(lidNorm) : '';
+/**
+ * 同じ人のコメントを、うしろに足された分だけ数え直す。
+ * 1回で全件を渡したときの結果は userLaneCandidatesFromStorage と同じ。
+ * @param {string|null|undefined} liveId
+ * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string, requireText?: boolean }} [opts]
+ * @param {boolean} [filterByLive] 省略時は liveId が空でなければその放送だけ
+ */
+export function createUserLaneCandidateFolder(liveId, opts, filterByLive) {
+  const filter =
+    filterByLive == null
+      ? liveId != null && String(liveId).trim() !== ''
+      : filterByLive === true;
+  const lidNorm = filter ? String(liveId).trim() : '';
+  const targetNorm = filter ? normalizeLv(lidNorm) : '';
   const broadcasterUid = String(opts?.broadcasterUid ?? '').trim();
   const broadcasterIconUrl = String(opts?.broadcasterIconUrl ?? '').trim();
   const broadcasterGuardEnabled = Boolean(broadcasterUid && broadcasterIconUrl);
   const requireText = opts?.requireText === true;
 
-  const allRows = Array.isArray(storedComments) ? storedComments : [];
-  // ★v0.1.1815: 視聴ページに隠れて入っている popup が、新着1件ごとに全件(3万行級)でこの関数を回していた。
-  //   出力は1文字も変えずに、1行ごとの文字列の作り直しを減らす(結果の同一性は Equivalence テストが固定)。
-  //   - 配信IDの正規化は「同じ生の値なら同じ結果」なので値ごとに1回だけ
-  //   - 本文の空判定は trim() の新しい文字列を作らず /\S/ で見る(trim と同じ空白の定義)
-  /** @type {Map<unknown, string>} */
-  const lvNormMemo = new Map();
-  const normLvMemo = (/** @type {unknown} */ v) => {
-    let n = lvNormMemo.get(v);
-    if (n === undefined) {
-      n = normalizeLv(v);
-      lvNormMemo.set(v, n);
-    }
-    return n;
-  };
-  const rows = [];
-  for (const e of allRows) {
-    if (filterByLive) {
-      const o = /** @type {{ liveId?: unknown, lvId?: unknown }} */ (e);
-      const a = normLvMemo(o?.liveId);
-      const b = a && a === targetNorm ? a : normLvMemo(o?.lvId);
-      if (!((Boolean(a) && a === targetNorm) || (Boolean(b) && b === targetNorm))) continue;
-    }
-    if (requireText && !NON_SPACE_RE.test(String(/** @type {{ text?: unknown }} */ (e)?.text ?? ''))) continue;
-    rows.push(e);
-  }
-  // v0.1.373: 当ライブ一致 0 件のときに「全ライブ混在フォールバック」すると、
-  //   別放送やおすすめ列由来で蓄積した別ユーザが「この配信の応援」と誤認されやすい。
-  //   UI は空のままで正しく、ユーザーに誤情報を見せない（契約より UX を優先）。
-  const useLidForOutput = filterByLive;
-
   /** @type {Map<string, unknown[]>} */
   const byUid = new Map();
-  for (const row of rows) {
-    const uid = String(/** @type {{ userId?: unknown }} */ (row)?.userId ?? '').trim();
-    if (!uid) continue;
-    const g = byUid.get(uid);
-    if (g) g.push(row);
-    else byUid.set(uid, [row]);
-  }
+  /** @type {Map<string, UserLaneCandidateFromStorage>} */
+  const builtByUid = new Map();
 
-  /** @type {UserLaneCandidateFromStorage[]} */
-  const built = [];
-  for (const [userId, group] of byUid) {
-    // v0.1.901: 配信者本人(放送主)は「応援者(viewer)」ではないので席/レーンから除外する。
-    //   実機(lv350805294 peropanda)で本人が会場席に座っていた=既存 guard は「配信者アイコンが
-    //   他人に化けるのを剥がす」だけで【本人の候補そのものを落としていなかった】(真因)。
-    //   本人除外は uid 一致だけで判定できる(iconUrl は不要=アイコン化け防止用)ので、
-    //   broadcasterUid が取れていれば iconUrl の有無によらず本人を弾く。
+  /**
+   * @param {string} userId
+   * @param {unknown[]} group
+   * @returns {UserLaneCandidateFromStorage}
+   */
+  const buildOne = (userId, group) => {
     if (broadcasterUid && userId === broadcasterUid) {
-      continue;
+      return /** @type {UserLaneCandidateFromStorage} */ (/** @type {unknown} */ (null));
     }
-    // 保存順=時刻順のことがほとんどなので、既に並んでいれば並べ替えを省く(安定ソートの結果と同じ並び)。
     const chronological = isSortedByCapturedAt(group)
       ? group
       : [...group].sort((a, b) => rowCapturedAt(a) - rowCapturedAt(b));
     let observed = false;
     /** @type {string[]} */
     const urls = [];
-    // 0.1.79: viewer uid が broadcaster 本人でない場合、broadcaster icon と
-    // 一致する URL は除外する（ギフト演出 DOM 観測の取り違え後方互換補正）。
-    const isBroadcasterHere =
-      broadcasterGuardEnabled && userId === broadcasterUid;
-    // 同じ URL の2回目以降は判定も候補追加も省く。pickStrongestAvatarUrlForUser は「最初に最高点だった URL」を
-    //   選ぶので、重複を落としても選ばれる URL は同じ(判定はこの人・この配信者情報について URL だけで決まる)。
+    const isBroadcasterHere = broadcasterGuardEnabled && userId === broadcasterUid;
     /** @type {Set<string>} */
     const seenUrls = new Set();
     for (const g of chronological) {
-      if (/** @type {{ avatarObserved?: boolean }} */ (g).avatarObserved === true) {
-        observed = true;
-      }
+      if (/** @type {{ avatarObserved?: boolean }} */ (g).avatarObserved === true) observed = true;
       const u = String(/** @type {{ avatarUrl?: unknown }} */ (g).avatarUrl ?? '').trim();
-      if (!u) continue;
-      if (seenUrls.has(u)) continue;
+      if (!u || seenUrls.has(u)) continue;
       seenUrls.add(u);
-      // 0.1.83: 普遍ルール — URL の埋め込み uid とエントリ uid の不一致は弾く
-      //   broadcaster 情報が無くても効く最強のガード（過去の汚染データも全て掃除）
       if (!isAvatarUrlForUserId(u, userId)) continue;
-      if (
-        broadcasterGuardEnabled &&
-        !isBroadcasterHere &&
-        isSameAvatarUrl(u, broadcasterIconUrl)
-      ) {
-        continue;
-      }
+      if (broadcasterGuardEnabled && !isBroadcasterHere && isSameAvatarUrl(u, broadcasterIconUrl)) continue;
       urls.push(u);
     }
     const avatarUrl = pickStrongestAvatarUrlForUser(userId, urls);
-
     const newestFirst = newestFirstFromChronological(chronological);
     let nickname = '';
     for (const g of chronological) {
@@ -217,43 +170,26 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       if (!n) continue;
       nickname = pickBetterInterceptNickname(userId, nickname, n);
     }
-
-    // 時刻の昇順に並んでいるので最大は末尾(rowCapturedAt は 0 以上=Math.max(0, ...全件) と同じ値)。
-    //   全件の spread は大量コメントの人で引数上限に近づくのも避けられる。
-    const lastCapturedAt = chronological.length
-      ? rowCapturedAt(chronological[chronological.length - 1])
-      : 0;
-
-    // 会場 VIP常連光らせ(v0.1.734)用: このユーザーの実発言数とギフト回数を持たせる。
-    //   これが無いと venue 側で全員 count=1 扱いになりスコアが閾値に届かず誰も光らない。
+    const lastCapturedAt = chronological.length ? rowCapturedAt(chronological[chronological.length - 1]) : 0;
     const commentCount = chronological.length;
     let giftCount = 0;
     for (const g of chronological) {
       const gg = /** @type {{ isGift?: unknown, gift?: unknown, kind?: unknown }} */ (g);
       if (gg.isGift === true || gg.gift != null || gg.kind === 'gift') giftCount += 1;
     }
-
-    const outLiveId = useLidForOutput
+    const outLiveId = filter
       ? lidNorm
       : rowLiveId(newestFirst[0] || chronological[chronological.length - 1] || {});
-
-    // v0.1.1219: 会場ホバーカードで「この人が何を言っていたか」を数件読めるようにする。
-    //   newestFirst は上で作った既存配列なので追加の走査はほぼゼロ(先頭N件だけ見る)。
-    //   ★storage の追加読みもゼロ。ホバーのたびに読むと会場が重くなる(クリックパネルが
-    //     「常時readを増やさない」と明記している方針と揃える)。
     /** @type {string[]} */
     const recentTexts = [];
     for (const g of newestFirst) {
       if (recentTexts.length >= RECENT_TEXT_KEEP) break;
-      const t = String(/** @type {{ text?: unknown }} */ (g).text ?? '')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const t = String(/** @type {{ text?: unknown }} */ (g).text ?? '').replace(/\s+/g, ' ').trim();
       if (!t) continue;
-      if (recentTexts[recentTexts.length - 1] === t) continue; // 直前と同一の連投は畳む
+      if (recentTexts[recentTexts.length - 1] === t) continue;
       recentTexts.push(t);
     }
-
-    built.push({
+    return {
       userId,
       nickname,
       avatarUrl,
@@ -263,14 +199,18 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       giftCount,
       recentTexts,
       _laneSortAt: lastCapturedAt
-    });
-  }
+    };
+  };
 
-  built.sort((a, b) => (b._laneSortAt || 0) - (a._laneSortAt || 0));
-
-  const frozen = Object.freeze(
-    built.map((row) =>
-      Object.freeze({
+  const freezeOut = () => {
+    /** @type {UserLaneCandidateFromStorage[]} */
+    const built = [];
+    for (const row of builtByUid.values()) {
+      if (row) built.push(row);
+    }
+    built.sort((a, b) => (b._laneSortAt || 0) - (a._laneSortAt || 0));
+    return /** @type {readonly Readonly<UserLaneCandidateFromStorage>[]} */ (Object.freeze(
+      built.map((row) => Object.freeze({
         userId: row.userId,
         nickname: row.nickname,
         avatarUrl: row.avatarUrl,
@@ -278,14 +218,64 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
         liveId: row.liveId,
         commentCount: row.commentCount,
         giftCount: row.giftCount,
-        // v0.1.1219: ここはフィールドを個別に列挙する造りなので、足し忘れると
-        //   上で作った値が黙って消える(実際に踏んだ)。新フィールドは必ずここにも足す。
         recentTexts: Object.freeze(row.recentTexts || []),
         _laneSortAt: row._laneSortAt
-      })
-    )
-  );
-  return /** @type {readonly Readonly<UserLaneCandidateFromStorage>[]} */ (frozen);
+      }))
+    ));
+  };
+
+  return {
+    /**
+     * @param {readonly unknown[]|null|undefined} storedComments 前回までに渡した行の続きだけ
+     * @returns {readonly Readonly<UserLaneCandidateFromStorage>[]}
+     */
+    add(storedComments) {
+      const allRows = Array.isArray(storedComments) ? storedComments : [];
+      /** @type {Map<unknown, string>} */
+      const lvNormMemo = new Map();
+      const normLvMemo = (/** @type {unknown} */ v) => {
+        let n = lvNormMemo.get(v);
+        if (n === undefined) {
+          n = normalizeLv(v);
+          lvNormMemo.set(v, n);
+        }
+        return n;
+      };
+      /** @type {Set<string>} */
+      const touched = new Set();
+      for (const e of allRows) {
+        if (filter) {
+          const o = /** @type {{ liveId?: unknown, lvId?: unknown }} */ (e);
+          const a = normLvMemo(o?.liveId);
+          const b = a && a === targetNorm ? a : normLvMemo(o?.lvId);
+          if (!((Boolean(a) && a === targetNorm) || (Boolean(b) && b === targetNorm))) continue;
+        }
+        if (requireText && !NON_SPACE_RE.test(String(/** @type {{ text?: unknown }} */ (e)?.text ?? ''))) continue;
+        const uid = String(/** @type {{ userId?: unknown }} */ (e)?.userId ?? '').trim();
+        if (!uid || (broadcasterUid && uid === broadcasterUid)) continue;
+        const g = byUid.get(uid);
+        if (g) g.push(e);
+        else byUid.set(uid, [e]);
+        touched.add(uid);
+      }
+      for (const uid of touched) {
+        const row = buildOne(uid, byUid.get(uid) || []);
+        if (row) builtByUid.set(uid, row);
+      }
+      return freezeOut();
+    }
+  };
+}
+
+/**
+ * @param {readonly unknown[]|null|undefined} storedComments
+ * @param {string|null|undefined} [liveId] 省略時は全 live を対象。非空のときは当該放送のみ。
+ * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string, requireText?: boolean }} [opts]
+ * @returns {readonly Readonly<UserLaneCandidateFromStorage>[]}
+ */
+export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
+  const filterByLive = arguments.length >= 2 && liveId != null && String(liveId).trim() !== '';
+  return createUserLaneCandidateFolder(liveId, opts, filterByLive).add(storedComments);
 }
 
 /**

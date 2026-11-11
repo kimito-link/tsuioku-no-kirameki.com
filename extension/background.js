@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: 1402323599c4
+// nls-sw-fingerprint: ec68b75c2626
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -780,10 +780,64 @@ async function queryTargetTabs() {
   }
 }
 
+/** 配信の視聴以外(トップ・動画ページ)には、1.5MB の記録エンジンを入れない。 */
+function isNicoWatchUrl(url) {
+  try {
+    const u = new URL(String(url || ''));
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname || '';
+    if ((host === '127.0.0.1' || host === 'localhost') && u.port === '3456') return /\/watch\//.test(path);
+    if (host === 'koken.nicovideo.jp' || host === 'audition.nicovideo.jp') return true;
+    if (host === 'nicoad.nicovideo.jp') return /\/live\/publish\/lv\d+/i.test(path);
+    if (host === 'live.nicovideo.jp' || host === 'sp.live.nicovideo.jp') return /\/watch\//.test(path) || /\/embed\//.test(path);
+    return /\/watch\/(lv|ch)\d+/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+const NLS_BOOT_FILES = new Set(['dist/content.js', 'dist/yt-venue-inline.js']);
+/** @type {Set<string>} */
+const nlsBootedFrames = new Set();
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== 'NLS_BOOT_ENGINE') return;
+  const file = String(msg.file || '');
+  const tabId = sender?.tab?.id;
+  const frameId = typeof sender?.frameId === 'number' ? sender.frameId : 0;
+  if (!NLS_BOOT_FILES.has(file) || typeof tabId !== 'number') {
+    sendResponse({ ok: false });
+    return;
+  }
+  const key = `${tabId}:${frameId}:${file}`;
+  if (nlsBootedFrames.has(key)) {
+    sendResponse({ ok: true, already: true });
+    return;
+  }
+  nlsBootedFrames.add(key);
+  chrome.scripting.executeScript({ target: { tabId, frameIds: [frameId] }, files: [file] })
+    .then(() => sendResponse({ ok: true }))
+    .catch(() => {
+      nlsBootedFrames.delete(key);
+      sendResponse({ ok: false });
+    });
+  return true;
+});
+
+try {
+  chrome.webNavigation.onCommitted.addListener((details) => {
+    nlsBootedFrames.delete(`${details.tabId}:${details.frameId}:dist/content.js`);
+    nlsBootedFrames.delete(`${details.tabId}:${details.frameId}:dist/yt-venue-inline.js`);
+  });
+} catch {
+  /* 権限が無くても、ページを開いたときの入口スクリプトが頼み直す */
+}
+
 async function injectIntoExistingTabs() {
   const tabs = await queryTargetTabs();
   for (const tab of tabs) {
     if (!tab.id || tab.id === chrome.tabs.TAB_ID_NONE) continue;
+    if (!isNicoWatchUrl(tab.url || tab.pendingUrl || '')) continue;
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -796,7 +850,7 @@ async function injectIntoExistingTabs() {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ['dist/content.js']
+        files: ['dist/content-boot.js']
       });
     } catch {
       // no-op

@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 74</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 75</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -133,6 +133,7 @@
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
+- `src/extension/content-boot.js` — 記録エンジン(content.js・約1.5MB)を、配信の視聴フレームだけに載せる。
 - `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
 - `src/extension/liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
 - `src/lib/appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
@@ -341,7 +342,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 302</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -380,6 +381,7 @@
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
 - `src/extension/venueBubblePlacer.js` — 会場(PC)の吹き出しを DOM の実寸から置く薄い層。
 - `src/extension/venuePickupDrag.js` — v0.1.1899 PICK UP の吹き出しをドラッグで動かし、位置を覚える(りんく「ドラッグでうごかせるようにしておきたい」)。
+- `src/extension/yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
 - `src/lib/adLanePicksFromRooms.js` — 広告ランキング行(officialDomRankingRowsToStripRooms の room)を、popup/会場の人物タイル
 - `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
 - `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
@@ -637,6 +639,7 @@
 - `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
 - `src/lib/youtube/ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
 - `src/lib/youtube/ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
+- `src/lib/youtube/ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytZeroPtGiftLabel.js` — 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援しかしていない人の「0pt」を
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
@@ -1125,7 +1128,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 336</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 339</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1212,6 +1215,7 @@
 - `scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
 - `scripts/lib/today-jst.mjs` — 運用日（JST）を返す唯一の正本。
 - `scripts/lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
+- `scripts/measure-comment-flood.mjs` — コメントが続くときに、画面のメインスレッドがどれだけ止まるかを測る。
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/measure-phone-direct.mjs` — 「iPhone アプリが自分でニコ生のコメントを取る」(拡張なし 第3段)の前に測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
@@ -1327,6 +1331,7 @@
 - `src/lib/moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
 - `src/lib/nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
+- `src/lib/nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
 - `src/lib/northStarMirror.js` — 北極星レーン鏡(公式値レーン)のスナップショット純関数。
@@ -1442,6 +1447,7 @@
 - `src/lib/youtube/ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
 - `src/lib/youtube/ytChatInputBlock.js` — YouTube のチャット欄に入力欄が無いとき、その理由を見分ける(content-chat-entry の「ここから発言」用)。
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
+- `src/lib/youtube/ytLiveRowOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
@@ -1474,14 +1480,13 @@
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 
-### 📥 コメント取得 (5版)
+### 📥 コメント取得 (4版)
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 - `v0.1.1915` 2026-11-07 — YouTube の過去ログ取り込みでも混ざりを直す
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🏟 会場・席 (10版)
+### 🏟 会場・席 (9版)
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
@@ -1491,11 +1496,9 @@
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🎈 吹き出し (2版)
+### 🎈 吹き出し (1版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### 🎁 ギフト (6版)
 - `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
@@ -1517,11 +1520,11 @@
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🩺 診断・状態速報 (2版)
+### 🩺 診断・状態速報 (1版)
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### その他 (3版)
+### その他 (4版)
+- `v0.1.2050` 2026-11-11 — コメントが続いても画面が固まらない
 - `v0.1.2033` 2026-11-10 — パネル位置の文字は食い違うときだけ
 - `v0.1.2030` 2026-11-10 — 状態ページのボタンの見た目をそろえた
 - `v0.1.1918` 2026-11-07 — Twitch の未ログインの見分けを直す
