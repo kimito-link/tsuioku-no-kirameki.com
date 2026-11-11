@@ -756,7 +756,27 @@
       .cv-pq-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
       .cv-pq-id { color: var(--cv-sub); font-size: 11px; }
       .cv-pq-row-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-      .cv-pq button, .cv-pq input { font: inherit; }
+      .cv-pq button {
+        background: var(--cv-row);
+        color: var(--cv-text);
+        border: 1px solid var(--cv-border);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font: inherit;
+        font-size: 12.5px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .cv-pq button:hover { border-color: var(--cv-accent); }
+      .cv-pq button:disabled { opacity: 0.45; cursor: default; }
+      .cv-pq input {
+        font: inherit;
+        color: var(--cv-text);
+        background: var(--cv-row);
+        border: 1px solid var(--cv-border);
+        border-radius: 8px;
+        padding: 4px 8px;
+      }
       @media (max-width: 520px) {
         .cv-pq-row-actions { flex: 1 1 100%; }
       }
