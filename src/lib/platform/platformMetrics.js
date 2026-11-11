@@ -15,6 +15,8 @@ import { platformOfStreamKey } from './streamPlatform.js';
 export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema']);
 
 const OFFICIAL = '配信ページが出している公式の数です。';
+/** ページの数がまだ来ていないときの文言(ニコ生以外)。「—」「推定中」は出さない。 */
+export const LOADING = '読み込み中';
 const RECORDED = 'このPCの記録から数えた数です。公式の累計ではありません。';
 
 /** ニコニコの画面にだけ出す欄。他のサービスでは隠す。 */
@@ -290,7 +292,7 @@ export function panelExtraChips(platformId, facts) {
     chips.push({
       key: 'comments',
       label: 'コメント',
-      text: n == null ? '—' : formatInt(n),
+      text: n == null ? LOADING : formatInt(n),
       unit: '',
       placeholder: n == null,
       title: OFFICIAL,
@@ -319,10 +321,11 @@ export function venueItemsForPlatform(platformId, bag) {
   const facts = bag?.facts && typeof bag.facts === 'object' ? bag.facts : {};
   const fromFacts = id === 'abema' ? (num(facts.viewCount) ?? num(facts.viewers)) : num(facts.viewers);
   const concText = String(bag?.concurrent?.text || '').trim();
-  const concIsEstimate = !concText || concText === '—' || concText.startsWith('~') || concText.includes('推定');
+  // ページに出ている数だけを出す。数でない文字(—・推定中・接続中・読み込み中 等)や推定(~)は「読み込み中」にまとめる。
+  const concIsCount = /^[\d,]+$/.test(concText) && bag?.concurrent?.isPlaceholder !== true;
   const viewer = fromFacts != null
     ? { text: formatInt(fromFacts), isPlaceholder: false }
-    : (concIsEstimate ? { text: '—', isPlaceholder: true } : { text: concText, isPlaceholder: bag.concurrent.isPlaceholder === true });
+    : (concIsCount ? { text: concText, isPlaceholder: false } : { text: LOADING, isPlaceholder: true });
   const age = bag.streamAge || { text: '—', isPlaceholder: true };
   /** @type {Array<{ key: string, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu', title: string }>} */
   const items = [

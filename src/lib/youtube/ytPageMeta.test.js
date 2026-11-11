@@ -30,6 +30,16 @@ describe('isYtWatchLikeUrl', () => {
     expect(ytHandleLivePendingKey('https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93/live')).toBe('ytlive:@あのちゃんこ');
     expect(ytHandleLivePendingKey('https://www.tiktok.com/@some.one/live')).toBe('');
     expect(ytHandleOfPendingKey('ytlive:@hotspanishvlogs')).toBe('@hotspanishvlogs');
+    // YouTube が /@名前/live を古い形へ送り直す(2026-11-11 実機: /@weathernews/live → /weathernews/live)
+    expect(isYtWatchLikeUrl('https://www.youtube.com/weathernews/live')).toBe(true);
+    expect(ytHandleLivePendingKey('https://www.youtube.com/weathernews/live')).toBe('ytlive:weathernews');
+    expect(ytHandleOfPendingKey('ytlive:weathernews')).toBe('weathernews');
+    expect(isYtWatchLikeUrl('https://www.youtube.com/c/someone/live')).toBe(true);
+    expect(ytHandleOfPendingKey(ytHandleLivePendingKey('https://www.youtube.com/user/someone/live/'))).toBe('someone');
+    expect(ytHandleLivePendingKey('https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv/live')).toBe('ytlive:channel/UCabcdefghijklmnopqrstuv');
+    expect(ytHandleOfPendingKey('ytlive:channel/UCabcdefghijklmnopqrstuv')).toBe('');
+    expect(isYtWatchLikeUrl('https://www.youtube.com/feed/live')).toBe(false);
+    expect(isYtWatchLikeUrl('https://www.youtube.com/gaming/live')).toBe(false);
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/videos')).toBe(false);
   });
 });

@@ -21,7 +21,7 @@ import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytP
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytHandleLivePath, ytChannelUrlOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
@@ -189,16 +189,9 @@ function newestKeyForChannel(keyHead, login) {
  * @returns {string}
  */
 export function videoIdForYtHandleLive(url, summaries) {
-  let path = '';
-  try {
-    const u = new URL(String(url || ''), 'https://www.youtube.com');
-    const host = u.hostname.toLowerCase();
-    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return '';
-    path = u.pathname.replace(/\/$/, '');
-    if (!/^\/@[^/]+\/live$/.test(path)) return '';
-  } catch {
-    return '';
-  }
+  // /@名前/live・/名前/live・/c/名前/live・/channel/UC…/live のどれでも(YouTube が古い形へ送り直すことがある)
+  const path = ytHandleLivePath(String(url || ''));
+  if (!path) return '';
   let best = '';
   let bestAt = -1;
   const bag = summaries && typeof summaries === 'object' ? summaries : {};
@@ -416,7 +409,10 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。分からないときだけ、記録を始めた時刻で代わりにする。
   const trustedStart = ytTrustedStartedAt(sum, videoId, all);
-  const startedAt = trustedStart || Number(sum?.createdAt || 0);
+  const plat0 = platformOfStreamKey(videoId);
+  // YouTube は記録を始めた時刻で代わりにしない: 長く続いている配信を開いた直後に「経過 0分」と出ていた(2026-11-11 実機)。
+  //   本当の開始時刻はページから取れる(content-chat-entry.js の startedAtFields)ので、それまでは出さない。
+  const startedAt = trustedStart || (plat0 ? Number(sum?.createdAt || 0) : 0);
   const ucId = String(sum?.broadcasterChannelId || '');
   const handle = String(sum?.broadcasterHandle || '');
   // UC… が分からない配信は、記録の中の同じ名前の人(配信者がチャットに書いていれば UC… が分かる)→ @名前 の順で決める
@@ -439,7 +435,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     broadcasterName: String(sum?.broadcasterName || '') || (plat && isPlaceholderStreamKey(videoId) ? plat.loginOfStreamKey(videoId) : '') || pendingHandle,
     thumbnailUrl: plat
       ? plat.thumbUrl(plat.loginOfStreamKey(videoId))
-      : pendingHandle
+      : ytChannelUrlOfPendingKey(videoId)
         ? ''
         : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     tags: [],
@@ -453,8 +449,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       ? plat.channelUrl(plat.loginOfStreamKey(videoId))
       : chId
       ? `https://www.youtube.com/channel/${chId}`
-      : pendingHandle
-        ? `https://www.youtube.com/${encodeURI(pendingHandle)}`
+      : ytChannelUrlOfPendingKey(videoId)
+        ? ytChannelUrlOfPendingKey(videoId)
         : handle
           ? `https://www.youtube.com/${encodeURI(handle)}`
           : '',
@@ -482,6 +478,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       viewers: Number.isFinite(viewers) && viewers > 0 ? viewers : null,
       streamAgeProvenance: trustedStart > 0 ? 'official' : (startedAt > 0 ? 'recorded' : ''),
       support: supportTallyByVid.get(String(videoId || '')) || null,
+      // ABEMA は番組情報欄の「視聴数」「コメント数」(ページに出ている数そのもの・#608 がまとめに入れる)
+      viewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null,
+      commentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null,
     },
   };
 }

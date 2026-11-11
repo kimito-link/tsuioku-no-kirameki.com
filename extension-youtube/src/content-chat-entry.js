@@ -554,13 +554,18 @@ function endedAtFields(videoId) {
  * 開始時刻: ページの欄(正確)→取り寄せた視聴ページ(正確)→「N 時間前にライブ配信開始」(目安・approx)。
  * @param {string} videoId
  */
-function startedAtFields(videoId) {
+function startedAtFields(videoId, isLive = false) {
   const exact = readStreamStartedAt(videoId);
   if (exact) return { startedAt: exact };
   const fetched = fetchedStartedAt.get(videoId);
   if (fetched) return { startedAt: fetched };
   const approx = readRelativeStartedAt();
-  if (!approx) return {};
+  if (!approx) {
+    // 長く続いている配信は「2026/11/10 にライブ配信開始」のように日付で書かれ、上の目安が取れない
+    //   (開始時刻が無いまま「経過 0分」になっていた・2026-11-11 実機)。配信中と分かっていれば正確な時刻を取り寄せる。
+    if (isLive) fetchExactStartedAt(videoId);
+    return {};
+  }
   fetchExactStartedAt(videoId); // 生配信中だと分かったときだけ取り寄せる
   return { startedAt: approx, startedAtApprox: true };
 }
@@ -617,7 +622,7 @@ function setupWatchPageMetaObserver() {
         concurrentViewers: viewers,
         ...(viewers === null ? { viewersRead: false } : {}),
         sourceUrl: String(location.href || ''),
-        ...startedAtFields(videoId),
+        ...startedAtFields(videoId, viewers !== null),
         ...endedAtFields(videoId),
       },
     });
