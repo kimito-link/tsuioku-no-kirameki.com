@@ -207,6 +207,14 @@ export function applyPlatformMetricChrome(root, state) {
     if (spec.label) setLaneLabel(root, name, spec.label);
     if (spec.sub) setLaneSub(root, name, spec.sub);
   }
+  // このPCの記録にスパチャ・ギフト等が1件も無いうちは、中身の無い欄(見出しと空の枠)を出さない(2026-11-11 PC 計測)
+  const sup = facts && facts.support;
+  if (sup && sup.ready === true && plan.sections?.giftHistory?.show !== false) {
+    const n = (Number(sup.superchatCount) || 0) + (Number(sup.stickerCount) || 0)
+      + (Number(sup.membershipCount) || 0) + (Number(sup.membershipGiftCount) || 0);
+    const gh = laneEl(root, 'giftHistory');
+    if (gh && n === 0) hideEl(gh);
+  }
   const pt = root.querySelector('#giftHistoryProgramPt');
   if (pt) hideEl(pt);
   const summaryNote = root.querySelector('#northStarLaneGadgetSummary-giftHistory .nl-north-star-lane__summary-note');

@@ -88,6 +88,14 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('#watchConcurrentCard .nl-live-stat-icon').getAttribute('title')).not.toContain('広告');
   });
 
+  it('記録にスパチャが1件も無いうちはギフト欄を出さず、来たら出す', () => {
+    const root = mount();
+    applyPlatformMetricChrome(root, { platform: 'youtube', facts: { support: tallySupportItems([]) } });
+    expect(root.querySelector('[data-lane="giftHistory"]').hidden).toBe(true);
+    applyPlatformMetricChrome(root, { platform: 'youtube', facts: { support: tallySupportItems([{ kind: 'superchat', amount: 500, currency: 'JPY' }]) } });
+    expect(root.querySelector('[data-lane="giftHistory"]').hidden).toBe(false);
+  });
+
   it('ニコ生以外では、中身の無いギフト欄の点線の枠を出さない', () => {
     const root = mount();
     applyPlatformMetricChrome(root, { platform: 'abema', facts: {} });
