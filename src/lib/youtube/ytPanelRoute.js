@@ -10,7 +10,7 @@ export const YT_PANEL_SRC = 'yt-sidepanel.html?inline=1&dock=sidepanel';
 export function isYtPanelTabUrl(url) {
   // YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA)のタブは同じ画面(YouTube 版=ニコ生版の完全コピー)で見せる。
   //   ホストだけで決める(どの配信かは ytPanelStreamKeyOfUrl・council/panel-stream-selection-SPEC.md)
-  return /^https:\/\/(?:www\.(?:youtube\.com|twitch\.tv)|(?:www\.)?(?:kick\.com|whowatch\.tv|showroom-live\.com|mixch\.tv|tiktok\.com|abema\.tv))\//.test(String(url || ''));
+  return /^https:\/\/(?:www\.(?:youtube\.com|twitch\.tv)|(?:www\.)?(?:kick\.com|whowatch\.tv|showroom-live\.com|mixch\.tv|tiktok\.com|abema\.tv|twitcasting\.tv))\//.test(String(url || ''));
 }
 
 /** いま iframe が YouTube 版を見せているか @param {unknown} src */

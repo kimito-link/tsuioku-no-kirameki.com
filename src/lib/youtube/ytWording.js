@@ -37,6 +37,15 @@ const RULES = [
   // 折りたたみの中の説明(2026-11-08 Twitch 実測で残りを発見)。なふだはニコ生だけの部品(隠している)
   ['ニコ生のページが読み取る通信から', '配信のページが読み取る通信から'],
   ['ニコの匿名ID（a: 形式）はここには載せず、りんく条件を満たすときだけりんく、それ以外はたぬ姉側だよ。', ''],
+  // 3段の案内と「該当者なし」の文(ニコ生の数値ID・匿名 a: の話)。どのサービスにも数値IDや a: は無い(2026-11-12 ツイキャス実ページで残りを発見)
+  ['りんく: 数値ユーザーID＋個人サムネが揃った応援だけ、この列に載せるよ。匿名（a:）はカスタム表示名やサムネが見えていても上には出さず、下の段に流す設計だよ。', 'りんく: ID・表示名・アイコンがそろった応援だけ、この列に載せるよ。匿名の応援は下の段に流すよ。'],
+  ['ギフト列: この放送でギフトを投げた人を、数値ユーザーIDで記録できた順に並べるよ。個人サムネが取れている人はその画像、まだの人はゆっくり画像で表示するよ。', 'ギフト列: この配信でギフトを投げた人を、記録できた順に並べるよ。アイコンが取れている人はその画像、まだの人はゆっくり画像で表示するよ。'],
+  ['2番目の優先として、数値IDのアカウントで表示名か個人サムネのどちらかまで取れた人は、その次の段として並びやすいよ。', '2番目の優先として、表示名かアイコンのどちらかまで取れた人は、その次の段として並びやすいよ。'],
+  ['たぬ姉: 匿名（a:）の応援、表示名やサムネが揃わない応援、ID 不明はぜんぶこの段に集めるよ。', 'たぬ姉: 匿名の応援や、表示名・アイコンが揃わない応援はぜんぶこの段に集めるよ。'],
+  ['この段は「数値ユーザーID＋個人サムネがそろった応援」だけが並ぶよ。', 'この段は「ID・表示名・アイコンがそろった応援」だけが並ぶよ。'],
+  ['この段は「数値IDで、表示名か個人サムネのどちらかまで取れた応援」だけが並ぶよ。', 'この段は「表示名かアイコンのどちらかまで取れた応援」だけが並ぶよ。'],
+  ['この段は「匿名（a:）や表示名・サムネが揃わない応援、ID 不明」だけが並ぶよ。', 'この段は「匿名や、表示名・アイコンが揃わない応援」だけが並ぶよ。'],
+  ['ギフトが届くと、送り主の数値IDが取れた人から自動で増えます。', 'ギフトが届くと、送り主が分かった人から自動で増えます。'],
   ['詳細設定（記録のON/OFF・なふだ・取り込み・', '詳細設定（記録のON/OFF・取り込み・'],
   ['「詳細設定（なふだ・取り込み・', '「詳細設定（取り込み・'],
   ['ニコ生の応援コメントを、このPCで見える化', 'YouTube の応援コメントを、このPCで見える化'],
@@ -68,7 +77,7 @@ const RULES = [
 ];
 
 /** 置き換えが起こりうる文字か(速く素通しするため) */
-const QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした|なふだ/;
+const QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした|なふだ|数値|a:）/;
 
 /**
  * @param {string} text
@@ -136,10 +145,12 @@ function swapOnce(text, fromRules, toRules) {
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean, boardUnit?: string }} WordingPlatform
+ * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean, boardUnit?: string, boardName?: string, boardPlace?: string }} WordingPlatform
+ *   boardName: 公式ランキングの名前(無ければ「<paid> ランキング」・ツイキャスは「サポーターランキング」)
+ *   boardPlace: 公式ランキングがある場所(無ければ「チャット欄のランキング」)
  *   name: 'Twitch' / 'Kick'、paid: 'Bits' / 'Kicks'(src/lib/platform/streamPlatform.js の表)
  *   officialBoard: そのサービスの画面での公式ランキングの名前(例: Kick の「歴代トップKICKユーザー」)
- *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・無ければ累計)。Twitch はチャンネルごとに違う
+ *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY' / 'LEVEL'・無ければ累計)。Twitch はチャンネルごとに違う
  *   boardUnit: 公式ランキングの数の単位(無ければ paid。SHOWROOM・ミクチャは paid が「ギフト」なので「6,430 ギフト」にならないよう pt)
  */
 
@@ -179,6 +190,8 @@ const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
   MONTH: ['今月', '今月'],
   WEEK: ['今週', '今週'],
   DAY: ['今日', '今日'],
+  // ツイキャスのサポーターランキング: 配信者の今のサポーターレベルでのアイテムスコアの順(期間の切り替えは無い・2026-11-12 PC 実測)
+  LEVEL: ['現在のレベルのアイテムスコア', '現在のレベル'],
 });
 
 /**
@@ -187,11 +200,12 @@ const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
  */
 export function officialWords(p) {
   const [inSentence, inHeading] = BOARD_PERIOD_WORDS[String(p.boardPeriod || 'ALLTIME')] || BOARD_PERIOD_WORDS.ALLTIME;
+  const board = p.boardName || `${p.paid} ランキング`;
   return {
     // Kick のチャット欄のランキングは6つあり、最初に見えるのは週間のサブ。どれと同じかを名前で書く(2026-11-08 PC 実測)
-    sentence: `${p.name} 公式の ${p.paid} ランキング（${inSentence}・上位）を表示します。${p.name} のチャット欄のランキング${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
-    heading: `${p.name} 公式の ${p.paid} ランキング（${inHeading}）`,
-    word: `${p.paid} ランキング`,
+    sentence: `${p.name} 公式の ${board}（${inSentence}・上位）を表示します。${p.name} の${p.boardPlace || 'チャット欄のランキング'}${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
+    heading: `${p.name} 公式の ${board}（${inHeading}）`,
+    word: board,
   };
 }
 
@@ -199,7 +213,7 @@ export function officialWords(p) {
 const officialRulesCache = new Map();
 /** @param {WordingPlatform} p */
 function officialRules(p) {
-  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.boardUnit || ''}`;
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.boardUnit || ''}|${p.boardName || ''}|${p.boardPlace || ''}`;
   const hit = officialRulesCache.get(k);
   if (hit) return hit;
   const off = officialWords(p);
@@ -275,4 +289,21 @@ export function ytWordingTwitchFixed(text) {
 /** @param {string} text ytWording の結果 */
 export function ytWordingForTwitch(text) {
   return ytWordingForPlatform(text, TWITCH_WORDING);
+}
+
+/**
+ * 「この番組へのギフト履歴」の欄の pt を、そのサービスのギフトの単位にする(ツイキャスはページに「+🍡90」と出る🍡スコア)。
+ *   欄の中の文字にだけ使う(コメント本文には使わない)。数だけの文字「61pt」「60 pt」と、欄の決まった文の「累計pt」だけを直す。
+ * @param {string} text
+ * @param {string} unit 例: 'スコア'
+ */
+export function ytGiftUnitWording(text, unit) {
+  const v = String(text ?? '');
+  const u = String(unit || '');
+  if (!u || !/pt|ポイント/.test(v)) return v;
+  return v
+    .replace(/^(\s*[\d,]+)\s*pt(\s*)$/, `$1 ${u}$2`)
+    .replace(/^(\s*)pt(\s*)$/, `$1${u}$2`)
+    .replace(/累計\s?pt/g, `累計${u}`)
+    .replace(/累計ポイント/g, `累計${u}`);
 }

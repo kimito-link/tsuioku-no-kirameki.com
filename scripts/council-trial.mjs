@@ -67,9 +67,11 @@ async function catalog() {
       .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
       .map((m) => String(m.name).replace(/^models\//, '')).filter((id) => /^gemini-([3-9]|\d\d)/.test(id)) : []),
     // NIM の /v1/models は「呼べる一覧」ではない（council-lineup.mjs の注記）。新しい系統だけ明示で試す。
-    safe('nvidia', async () => ['mistralai/mistral-large-4-1t-a52b', 'moonshotai/kimi-k2.6', 'z-ai/glm-5.3-flash', 'stepfun-ai/step-5-preview',
-      'minimaxai/minimax-m3.1-flash', 'nvidia/nemotron-3.5-super-vl-120b-a12b', 'nvidia/nemotron-3.5-lightning-30b-a3b', 'meta/muse-glimmer-30b',
-      'nvidia/nemotron-3-super-120b-a12b', 'poolside/laguna-xs-2.1']),
+    // 2026-11-11: 404 になった kimi-k2.6・nemotron-3-super を外し、/v1/models で見つけた新顔を足した。
+    //  /v1/models の created は全件同じ固定値（1993-04-26）で公開日では絞れない＝この一覧は名前を見て手で足す。
+    safe('nvidia', async () => ['mistralai/mistral-large-4-1t-a52b', 'z-ai/glm-5.3-flash', 'stepfun-ai/step-5-preview',
+      'minimaxai/minimax-m3.1-flash', 'meta/muse-glimmer-30b', 'poolside/laguna-xs-2.1',
+      'nvidia/nemotron-3.5-bolt-e4b', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', 'google/gemma-4-31b-it', 'moonshotai/kimi-k3.1-pro']),
     // OpenRouter は :free だけを信頼する（pricing=0 表示は課金された実例あり）。
     safe('openrouter', async () => ((await j('https://openrouter.ai/api/v1/models')).body.data || []).map((m) => m.id).filter((id) => /:free$/.test(id))),
     safe('cloudflare', async () => {

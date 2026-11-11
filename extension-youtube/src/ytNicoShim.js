@@ -21,7 +21,7 @@ import { videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersi
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
-import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
+import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial, ytGiftUnitWording } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytHandleLivePath, ytChannelUrlOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
@@ -2204,6 +2204,11 @@ function fixTextNode(node) {
   if (subBoardShown) next = subBoardCelebrationWording(next, subBoardShown);
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
+  // ギフト履歴の欄の pt を、そのサービスのギフトの単位に(ツイキャスは🍡スコア。公式ランキングの「スコア」とそろえる)
+  if (/pt|ポイント/.test(next) && node.parentElement?.closest('[data-lane="giftHistory"]')) {
+    const gu = screenPlatformBase()?.giftUnit;
+    if (gu) next = ytGiftUnitWording(next, gu);
+  }
   if (next !== v) node.nodeValue = next;
 }
 

@@ -12,7 +12,7 @@
 import { platformOfStreamKey } from './streamPlatform.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
-export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch']);
+export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting']);
 
 /**
  * パネルと会場が同じ表を見る。native のサービスは今までの画面のまま。
@@ -74,6 +74,14 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'totalViews']),
+  }),
+  // ツイキャス: 配信ページの「現在/累計」の累計とコメント数(#viewer-counter・#comment-count に出ている数そのまま)。
+  //   視聴者数は同じ欄の左(現在)。公式の応援ランキングは配信者ページのサポーターランキング(2つめの欄)。
+  twitcasting: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
   }),
   abema: Object.freeze({
     native: false,
@@ -196,7 +204,7 @@ export function resolvePlatformId(input) {
   const src = typeof input === 'string' ? { platform: input } : (input || {});
   const explicit = String(src.platform || src.id || '').trim().toLowerCase();
   if (explicit === 'niconico' || explicit === 'youtube' || explicit === 'twitch' || explicit === 'kick' || explicit === 'abema'
-    || explicit === 'whowatch' || explicit === 'showroom' || explicit === 'mixch' || explicit === 'tiktok') {
+    || explicit === 'whowatch' || explicit === 'showroom' || explicit === 'mixch' || explicit === 'tiktok' || explicit === 'twitcasting') {
     return explicit;
   }
   const key = String(src.streamKey || src.videoId || '');
@@ -409,6 +417,7 @@ function officialChips(id, official) {
   const bonus = num(o.superfanBonus);
   add('liverRank', 'ライバーランクpt', num(o.liverRankScore), '', `ランクの記号(B1 など)の横に出ているポイントです。${bonus != null ? `ガチファンボーナス ${formatInt(bonus)}%。` : ''}`);
   add('totalViews', '累計視聴', num(o.totalViews), '');
+  add('commentTotal', 'コメント', num(o.commentTotal), '');
   // 並びは能力表の順(そのサービスの画面で目に入る順)
   const order = [...want];
   return out.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));

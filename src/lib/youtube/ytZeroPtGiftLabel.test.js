@@ -44,3 +44,11 @@ describe('isZeroPtCountText', () => {
     expect(isZeroPtCountText('ハイ')).toBe(false);
   });
 });
+
+describe('isZeroPtCountText(単位を直したあと)', () => {
+  it('「0 スコア」も 0pt として扱う', async () => {
+    const { isZeroPtCountText } = await import('./ytZeroPtGiftLabel.js');
+    expect(isZeroPtCountText('0 スコア')).toBe(true);
+    expect(isZeroPtCountText('10 スコア')).toBe(false);
+  });
+});

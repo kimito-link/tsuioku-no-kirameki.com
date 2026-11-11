@@ -7,7 +7,7 @@
     var head = stream.split(':')[0];
     var cap = head === 'yt' ? 'youtube'
       : (head === 'ab' ? 'abema' : head);
-    var known = { youtube: 1, twitch: 1, kick: 1, abema: 1, showroom: 1, whowatch: 1, mixch: 1, tiktok: 1 };
+    var known = { youtube: 1, twitch: 1, kick: 1, abema: 1, showroom: 1, whowatch: 1, mixch: 1, tiktok: 1, twitcasting: 1 };
     if (!known[cap]) return;
     var root = document.documentElement;
     root.classList.add('nl-cap-foreign');
