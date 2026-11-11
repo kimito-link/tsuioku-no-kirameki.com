@@ -53,7 +53,7 @@ function kickSlugOfStreamKey(key) {
  * }} StreamPlatform
  */
 
-/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok', StreamPlatform>} */
+/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok' | 'abema', StreamPlatform>} */
 export const STREAM_PLATFORMS = Object.freeze({
   twitch: Object.freeze({
     id: /** @type {'twitch'} */ ('twitch'),

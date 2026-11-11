@@ -52,6 +52,7 @@ export function parseAbLoginFromUrl(url) {
   }
   if (!/^(?:www\.)?abema\.tv$/i.test(u.hostname)) return '';
   const path = u.pathname.replace(/\/+$/, '') || '/';
+  /** @type {Array<[RegExp, string]>} */
   const rules = [
     [/^\/now-on-air\/([a-z0-9][a-z0-9_-]{0,40})$/i, 'n'],
     [/^\/live-event\/([a-z0-9][a-z0-9_-]{0,40})$/i, 'e'],
@@ -369,7 +370,7 @@ export function abCommentRow(msg, ctx) {
     name: String(msg.name || msg.userId).slice(0, 40),
     login: '',
     iconUrl: safeAbImageUrl(msg.iconUrl),
-    badges: [],
+    badges: /** @type {string[]} */ ([]),
     ts: '',
     postedAtMs: now,
     channel: String(ctx.pageLogin || ''),
