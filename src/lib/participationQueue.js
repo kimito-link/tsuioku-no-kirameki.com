@@ -101,24 +101,27 @@ export function participationQueueStorageKey(liveId) {
  * @param {unknown} raw
  * @returns {string}
  */
+/** 制御文字を落とす。正規表現に制御文字を書かない。 */
+function stripControls(raw) {
+  let out = '';
+  const s = String(raw ?? '');
+  for (const ch of s) {
+    const c = ch.codePointAt(0) || 0;
+    if (c <= 0x1f || c === 0x7f) continue;
+    out += ch;
+  }
+  return out;
+}
+
 export function cleanParticipationWord(raw) {
-  let s = String(raw ?? '')
-    .normalize('NFKC')
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ');
+  let s = stripControls(String(raw ?? '').normalize('NFKC')).trim().replace(/\s+/g, ' ');
   if (s.length > PARTICIPATION_WORD_MAX) s = s.slice(0, PARTICIPATION_WORD_MAX);
   return s;
 }
 
 /** 比較用。英字の大小は区別しない。コメント本文は切らない。 */
 function foldForMatch(raw) {
-  return String(raw ?? '')
-    .normalize('NFKC')
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
+  return stripControls(String(raw ?? '').normalize('NFKC')).trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 /**
