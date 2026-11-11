@@ -15,7 +15,7 @@ import {
   pickGiftRankDisplayNicknameWithUidFallback
 } from './giftDisplayNickname.js';
 import { isAvatarObservedInCommentProfileMap } from './popupAvatarResolver.js';
-import { commentRowsAppendIndex, createLaneAggregatesMemo } from './laneAggregatesMemo.js';
+import { createLaneAggregatesMemo } from './laneAggregatesMemo.js';
 
 /**
  * @typedef {{
