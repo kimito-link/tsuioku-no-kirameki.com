@@ -53,6 +53,8 @@
 | `data-nl-lane-user-detail-wired` | extension/popup/wireLaneUserDetailOpen.js | extension/popup/wireLaneUserDetailOpen.js |
 | `data-nl-metric` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-on-error-bound` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-orig-label` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
+| `data-nl-orig-sub` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-page-count-only` | — | extension/popup-entry.js |
 | `data-nl-pickup-avatar` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
 | `data-nl-pickup-key` | lib/venuePickupBanner.js | lib/venuePickupBanner.js |
@@ -65,6 +67,8 @@
 | `data-nl-recording` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-score-final` | lib/broadcastScoreHtml.js | — |
 | `data-nl-scroll-perf-bound` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-set-label` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
+| `data-nl-set-sub` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-src` | — | extension/sidepanel-iframe-boot-entry.js |
 | `data-nl-state` | extension/popup-entry.js | — |
 | `data-nl-status-publisher` | extension/statusPublisherHost.js | extension/statusPublisherHost.js |

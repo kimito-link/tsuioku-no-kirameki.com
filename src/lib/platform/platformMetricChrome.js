@@ -37,11 +37,23 @@ function laneEl(root, lane) {
 /** @param {ParentNode} root @param {string} lane @param {string} text */
 function setLaneLabel(root, lane, text) {
   const p = root.querySelector(`[data-lane="${lane}"] .nl-north-star-lane__label`);
-  if (!p || !text) return;
+  if (!p) return;
   let textNode = null;
   for (const n of p.childNodes) {
     if (n.nodeType === 3 && String(n.nodeValue || '').trim()) { textNode = n; break; }
   }
+  const el = /** @type {HTMLElement} */ (p);
+  // 0.1.2083: 前の配信(別のサービス)で付けた見出しを、見出しを持たないサービスでは元に戻す。
+  //   元の見出しは最初に書き換える前に覚えておく(ミクチャで YouTube の「スーパーチャット・ギフト」が残っていた)
+  if (!text) {
+    // 戻すのは、いま出ているのが自分の付けた見出しのときだけ(ニコ生版の描画が書いた見出しは触らない)
+    const orig = el.dataset?.nlOrigLabel;
+    if (orig == null || !textNode || textNode.nodeValue !== el.dataset.nlSetLabel) return;
+    textNode.nodeValue = orig;
+    return;
+  }
+  if (el.dataset && el.dataset.nlOrigLabel == null) el.dataset.nlOrigLabel = textNode ? String(textNode.nodeValue || '') : '';
+  if (el.dataset) el.dataset.nlSetLabel = text;
   if (!textNode) {
     p.insertBefore(p.ownerDocument.createTextNode(text), p.firstChild);
     return;
@@ -52,7 +64,15 @@ function setLaneLabel(root, lane, text) {
 /** @param {ParentNode} root @param {string} lane @param {string} text */
 function setLaneSub(root, lane, text) {
   const p = root.querySelector(`[data-lane="${lane}"] .nl-north-star-lane__sublabel`);
-  if (!p || !text) return;
+  if (!p) return;
+  const el = /** @type {HTMLElement} */ (p);
+  if (!text) {
+    const orig = el.dataset?.nlOrigSub;
+    if (orig != null && p.textContent === el.dataset.nlSetSub) p.textContent = orig;
+    return;
+  }
+  if (el.dataset && el.dataset.nlOrigSub == null) el.dataset.nlOrigSub = String(p.textContent || '');
+  if (el.dataset) el.dataset.nlSetSub = text;
   if (p.textContent !== text) p.textContent = text;
 }
 
@@ -208,8 +228,8 @@ export function applyPlatformMetricChrome(root, state) {
     if (!el) continue;
     if (spec.show === false) hideEl(el);
     else unhideIfOurs(/** @type {HTMLElement} */ (el));
-    if (spec.label) setLaneLabel(root, name, spec.label);
-    if (spec.sub) setLaneSub(root, name, spec.sub);
+    setLaneLabel(root, name, spec.label || '');
+    setLaneSub(root, name, spec.sub || '');
   }
   // このPCの記録にスパチャ・ギフト等が1件も無いうちは、中身の無い欄(見出しと空の枠)を出さない(2026-11-11 PC 計測)。
   //   ニコ生の描画が欄を出し直すたびに一瞬見えないよう、欄の hidden ではなく <html> の印と CSS で決める。

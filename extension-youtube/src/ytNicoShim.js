@@ -537,6 +537,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
 const supportTallyByVid = new Map();
 /** @type {() => void} */
 let schedulePlatformChrome = () => {};
+/** 配信のまとめ(knownSummaries)を読み終えたか。読む前は「どのサービスの配信か」が分からない(0.1.2083) */
+let knownSummariesLoaded = false;
 /** 記録の控えが変わったときだけ数え直す。まだ読んでいなければチップ自体を出さない。 */
 function noteSupportTally(vid) {
   const cache = inPageCommentCache.get(vid);
@@ -1314,7 +1316,12 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       for (const vid of Object.keys(knownSummaries)) pseudoLvForVideoId(vid);
       registerBroadcastersFromSummaries();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      // 読み終えたら、横の欄の見出しをその配信のサービスに合わせ直す(0.1.2083)
+      knownSummariesLoaded = true;
+      schedulePlatformChrome();
+    });
   /**
    * 配信のまとめの一覧を { yt_stream_summaries: {...} } の形で返す。
    * 0.1.2057: 裏方は一覧を丸ごと書かなくなった(配信ごとの小さい鍵 ytm:sum:v1:<id> と IndexedDB)。
@@ -2221,6 +2228,9 @@ function installPlatformMetricChromeOnce() {
     if (!document.getElementById('watchConcurrentCard') && !document.getElementById('officialStatNicoAdPts')) return;
     schedulePlatformChrome = watchPlatformMetricChrome(document, () => {
       const base = screenPlatformBase();
+      // まだどの配信か分からない(まとめを読む前)うちは YouTube の見出しを付けない。
+      //   付けると、ミクチャ等の見出しを持たないサービスで「スーパーチャット・ギフト」が残っていた(0.1.2083・e2e)
+      if (!base && !lastAskedLv && !PANEL_STREAM_KEY && !knownSummariesLoaded) return null;
       const id = base?.id || 'youtube';
       const vid = lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : '';
       const sum = vid ? knownSummaries?.[vid] : null;
@@ -2230,6 +2240,12 @@ function installPlatformMetricChromeOnce() {
       // ギフト貢献度の欄に公式の順位表(トップファン・Bits/Kicks ランキング)を入れているか=見出しを「公式の〜」にする
       return { platform: id, facts, officialBoard: base ? platformOfficial : kokenIsTopFans };
     });
+    // まとめを読む道が無い画面でも、3秒で「分からない=YouTube」として見出しを付ける(付かないままにしない)
+    setTimeout(() => {
+      if (knownSummariesLoaded) return;
+      knownSummariesLoaded = true;
+      schedulePlatformChrome();
+    }, 3000);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();

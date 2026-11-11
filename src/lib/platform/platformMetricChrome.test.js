@@ -136,6 +136,27 @@ describe('applyPlatformMetricChrome', () => {
     expect(document.documentElement.classList.contains('nl-cap-subboard')).toBe(false);
   });
 
+  it('見出しを持たないサービスに移ったら、前のサービスで付けた見出しを元に戻す(ミクチャに YouTube の見出しが残らない)', () => {
+    const root = mount();
+    const label = () => root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label').firstChild.nodeValue;
+    const sub = () => root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__sublabel').textContent;
+    applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
+    expect(label()).toBe('スーパーチャット・ギフト');
+    applyPlatformMetricChrome(root, { platform: 'mixch', facts: {} });
+    expect(label()).toBe('この番組へのギフト履歴');
+    expect(sub()).toBe('履歴');
+    expect(root.querySelector('#giftHistoryProgramPt')).not.toBeNull();
+  });
+
+  it('ニコ生版の描画が書き直した見出しは、元に戻す対象にしない', () => {
+    const root = mount();
+    const p = root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label');
+    applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
+    p.firstChild.nodeValue = 'ギフト履歴(書き直し)';
+    applyPlatformMetricChrome(root, { platform: 'mixch', facts: {} });
+    expect(p.firstChild.nodeValue).toBe('ギフト履歴(書き直し)');
+  });
+
   it('ニコ生の状態では何も隠さない', () => {
     const root = mount();
     applyPlatformMetricChrome(root, { platform: 'niconico', facts: {} });

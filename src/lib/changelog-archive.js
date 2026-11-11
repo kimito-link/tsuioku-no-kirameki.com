@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2043',
+    date: '2026-11-11',
+    summary: 'ABEMAの配信者にチャンネルの画像',
+    items: Object.freeze([
+      'ABEMA の配信者カードに、放送ページのチャンネル画像を出します。ページに出ているロゴ、番組の画像、公開されているチャンネルロゴの順で選びます。',
+      '画像が取れないときや、読み込みに失敗したときは、白い丸ではなく代わりの顔を出します。コメントした人の絵は、いままでどおり一人ずつの代わりの顔です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2039',
     date: '2026-11-11',
     summary: 'ABEMAのコメントを同じ画面で記録',
