@@ -201,6 +201,26 @@ export function ytBuildTargets({ merged, define }) {
  *   (画像・音は本体と同じものを使う=同じ場所に同じファイルがある)。コメビュだけ単体版と同じ CSS を1つ足す。
  * ★先に scripts/build-youtube-sidepanel-html.mjs が単体版の画面を作っているので、コメビュの CSS はそこから取る。
  */
+/**
+ * 横の欄(yt-sidepanel.html)の最初の描画。プログラムが読み込まれるまでの 0.2〜0.3 秒、ニコ生版の HTML の
+ * 「推定同時接続 —」と来場者数・広告pt 等が見えていた(2026-11-11 PC 計測)。値は最初から「読み込み中」にし、
+ * サービスごとの見出しが付くまで(platformMetricChrome.js が html に data-nl-platform-ready を付ける)ニコ生の見出しと欄を隠す。
+ * @param {string} html
+ */
+function ytPanelPrePaint(html) {
+  const est = '<div class="nl-live-stat-value" id="watchConcurrentEst">—</div>';
+  if (html.split(est).length !== 2) throw new Error('popup.html の #watchConcurrentEst の形が変わった(ytPanelPrePaint)');
+  const css =
+    '<style>/* YouTube 版: サービスの見出しが付くまでニコ生の見出しと欄を出さない(scripts/youtube-build.mjs) */\n' +
+    'html:not([data-nl-platform-ready]) #watchConcurrentCard .nl-live-stat-label,\n' +
+    'html:not([data-nl-platform-ready]) .nl-official-nico-stats__row { visibility: hidden; }\n' +
+    'html:not([data-nl-platform-ready]) .nl-live-stat-card--visitors { display: none !important; }\n' +
+    '</style>\n';
+  return html
+    .replace(est, '<div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">読み込み中</div>')
+    .replace('</head>', `${css}</head>`);
+}
+
 export function writeYtMergedHtml() {
   const pages = [
     ['popup.html', 'yt-sidepanel.html', 'dist/popup.js', 'dist/yt-sidepanel.js'],
@@ -217,6 +237,7 @@ export function writeYtMergedHtml() {
     if (src.split(tag).length !== 2) throw new Error(`${from} に ${tag} が1つではありません(ニコ生版の形が変わった?)`);
     let out = src.replace(tag, `<script src="${ytJs}"></script>`);
     if (from === 'comeview.html') out = out.replace('</head>', `${cssM[0]}</head>`);
+    if (from === 'popup.html') out = ytPanelPrePaint(out);
     out = out.replace(
       '</html>',
       `<!-- このファイルは scripts/youtube-build.mjs の生成物です(本体に同梱する YouTube 版・ニコ生版 extension/${from} の完全コピー)。直接直さないでください。 -->\n</html>`,

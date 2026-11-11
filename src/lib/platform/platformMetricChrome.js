@@ -177,6 +177,9 @@ export function applyPlatformMetricChrome(root, state) {
       if (el && el.getAttribute('title') !== title) el.setAttribute('title', title);
     }
   }
+  // 見出しと欄をこのサービスのものにした印(yt-sidepanel.html の最初の描画の隠しを外す・scripts/youtube-build.mjs)
+  const html = /** @type {Document} */ (root).documentElement || root.ownerDocument?.documentElement;
+  if (html && html.getAttribute('data-nl-platform-ready') !== '1') html.setAttribute('data-nl-platform-ready', '1');
   const banner = root.querySelector('#watchOfficialEventBannerCard');
   if (banner) hideEl(banner);
   const ndgr = root.querySelector('#watchOfficialNdgrCard');
@@ -232,5 +235,8 @@ export function watchPlatformMetricChrome(root, getState) {
     }
   }
   schedule();
+  // 何かの理由でサービスが決まらなくても、隠した見出しを出したままにしない(3秒で外す)
+  const htmlEl = /** @type {Document} */ (root).documentElement || root.ownerDocument?.documentElement;
+  if (htmlEl) setTimeout(() => htmlEl.setAttribute('data-nl-platform-ready', '1'), 3000);
   return schedule;
 }
