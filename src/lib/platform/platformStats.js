@@ -53,6 +53,8 @@ const COUNT_KEYS = Object.freeze([
   'liverRankScore',
   'superfanBonus',
   'totalViews',
+  // ツイキャスの画面のコメント数(#comment-count・配信全体の公式の数)
+  'commentTotal',
 ]);
 /** 順位の欄 */
 const RANK_KEYS = Object.freeze(['eventRank']);

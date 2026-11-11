@@ -18,11 +18,12 @@ describe('拡張の入れ替え時に読み込み直すタブ(YouTube 以外)', 
     expect(isStreamTabToReload('https://example.com/r/some_room')).toBe(false);
     expect(isStreamTabToReload(undefined)).toBe(false);
   });
-  it('探す URL の形は7サービスぶん', () => {
+  it('探す URL の形は8サービスぶん', () => {
     expect(STREAM_PLATFORM_TAB_URLS).toContain('https://www.showroom-live.com/*');
     expect(STREAM_PLATFORM_TAB_URLS).toContain('https://www.tiktok.com/*');
     expect(STREAM_PLATFORM_TAB_URLS).toContain('https://abema.tv/*');
-    expect(STREAM_PLATFORM_TAB_URLS.length).toBe(7);
+    expect(STREAM_PLATFORM_TAB_URLS).toContain('https://twitcasting.tv/*');
+    expect(STREAM_PLATFORM_TAB_URLS.length).toBe(8);
   });
 });
 

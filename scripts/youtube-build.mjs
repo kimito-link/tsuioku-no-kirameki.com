@@ -181,6 +181,9 @@ export function ytBuildTargets({ merged, define }) {
     // ミクチャの配信ページの入口(council/mixch-support-PLAN.md)。本体向けだけ
     list.push({ entryPoints: [src('mx-content-entry.js')], outfile: out('mx-content.js'), target: 'chrome114', define: def, ...page,
       banner: { js: '// mx-content.js — ミクチャの配信ページでコメントとギフト(ページ自身が使うソケット)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // ツイキャスの配信ページの入口(council/twitcasting-support-PLAN.md)。本体向けだけ
+    list.push({ entryPoints: [src('tc-content-entry.js')], outfile: out('tc-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// tc-content.js — ツイキャスの配信ページでコメントとギフト(ページ自身が使うソケット)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
     // TikTok LIVE の配信ページの入口(council/tiktok-support-PLAN.md)。ページ自身の世界の写し役と、記録へ渡す入口の2つ。本体向けだけ
     list.push({ entryPoints: [src('tt-main-entry.js')], outfile: out('tt-main.js'), target: 'chrome114', define: def,
       banner: { js: '// tt-main.js — TikTok の配信ページ自身の世界で、ページのソケットの受信と gift/list を写して入口へ渡すバンドル\n/* eslint-disable */' } });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "君斗りんくの追憶のきらめき",
-  "version": "0.1.2086",
+  "version": "0.1.2087",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy2D/OmG4MwfDWDpw0lQ0BuMFStFPcDuuAHvQ5RB/TF2jzUKYjIFNqi+QDrnLEdFz7zNe3Wo6t8TzTeMJmTAguvlHM9hLHsF4jkwWL/lWz0x3DWZqTnw+lCh418eCFbjO+MkjDyDIOwIAO1gV2q+8wJ0HwSfGO8jcToBilHAP4kaxJSpC+MZftfbhngPI7TFrZY0j2BTpkp2HHG5ocXzsqhSD+Z2VU/xHvRNm9o823Bcfn8p3QIrRBu2w2iOlSuVl2j2b4nNR59GLis20aorT6HS5Jr8AYp/raftka/uiS0FWcJFpp3jshxpOqQ7OmPaAIoTcpshBTC+o6krbW9x0lwIDAQAB",
   "description": "ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます（開発識別子: nicolivelog）。",
   "icons": {
@@ -39,6 +39,7 @@
     "https://mixch.tv/*",
     "https://www.tiktok.com/*",
     "https://abema.tv/*",
+    "https://twitcasting.tv/*",
     "https://d2uqarpmf42qy0.cloudfront.net/*",
     "http://127.0.0.1:50021/*",
     "http://127.0.0.1:3456/*",
@@ -178,6 +179,17 @@
     },
     {
       "matches": [
+        "https://twitcasting.tv/*"
+      ],
+      "js": [
+        "dist/yt-tc-content.js",
+        "dist/yt-venue-inline.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
         "https://www.tiktok.com/*"
       ],
       "js": [
@@ -279,7 +291,8 @@
         "https://www.showroom-live.com/*",
         "https://mixch.tv/*",
         "https://www.tiktok.com/*",
-        "https://abema.tv/*"
+        "https://abema.tv/*",
+        "https://twitcasting.tv/*"
       ]
     }
   ]

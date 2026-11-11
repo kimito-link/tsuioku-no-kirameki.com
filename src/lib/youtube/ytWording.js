@@ -136,10 +136,12 @@ function swapOnce(text, fromRules, toRules) {
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean, boardUnit?: string }} WordingPlatform
+ * @typedef {{ name: string, paid: string, rankSentence: string, officialBoard?: string, boardPeriod?: string, noSubs?: boolean, boardUnit?: string, boardName?: string, boardPlace?: string }} WordingPlatform
+ *   boardName: 公式ランキングの名前(無ければ「<paid> ランキング」・ツイキャスは「サポーターランキング」)
+ *   boardPlace: 公式ランキングがある場所(無ければ「チャット欄のランキング」)
  *   name: 'Twitch' / 'Kick'、paid: 'Bits' / 'Kicks'(src/lib/platform/streamPlatform.js の表)
  *   officialBoard: そのサービスの画面での公式ランキングの名前(例: Kick の「歴代トップKICKユーザー」)
- *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY'・無ければ累計)。Twitch はチャンネルごとに違う
+ *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY' / 'LEVEL'・無ければ累計)。Twitch はチャンネルごとに違う
  *   boardUnit: 公式ランキングの数の単位(無ければ paid。SHOWROOM・ミクチャは paid が「ギフト」なので「6,430 ギフト」にならないよう pt)
  */
 
@@ -179,6 +181,8 @@ const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
   MONTH: ['今月', '今月'],
   WEEK: ['今週', '今週'],
   DAY: ['今日', '今日'],
+  // ツイキャスのサポーターランキング: 配信者の今のサポーターレベルでのアイテムスコアの順(期間の切り替えは無い・2026-11-12 PC 実測)
+  LEVEL: ['現在のレベルのアイテムスコア', '現在のレベル'],
 });
 
 /**
@@ -187,11 +191,12 @@ const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
  */
 export function officialWords(p) {
   const [inSentence, inHeading] = BOARD_PERIOD_WORDS[String(p.boardPeriod || 'ALLTIME')] || BOARD_PERIOD_WORDS.ALLTIME;
+  const board = p.boardName || `${p.paid} ランキング`;
   return {
     // Kick のチャット欄のランキングは6つあり、最初に見えるのは週間のサブ。どれと同じかを名前で書く(2026-11-08 PC 実測)
-    sentence: `${p.name} 公式の ${p.paid} ランキング（${inSentence}・上位）を表示します。${p.name} のチャット欄のランキング${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
-    heading: `${p.name} 公式の ${p.paid} ランキング（${inHeading}）`,
-    word: `${p.paid} ランキング`,
+    sentence: `${p.name} 公式の ${board}（${inSentence}・上位）を表示します。${p.name} の${p.boardPlace || 'チャット欄のランキング'}${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
+    heading: `${p.name} 公式の ${board}（${inHeading}）`,
+    word: board,
   };
 }
 
@@ -199,7 +204,7 @@ export function officialWords(p) {
 const officialRulesCache = new Map();
 /** @param {WordingPlatform} p */
 function officialRules(p) {
-  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.boardUnit || ''}`;
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.boardUnit || ''}|${p.boardName || ''}|${p.boardPlace || ''}`;
   const hit = officialRulesCache.get(k);
   if (hit) return hit;
   const off = officialWords(p);

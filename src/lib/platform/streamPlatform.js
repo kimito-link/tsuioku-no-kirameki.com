@@ -1,4 +1,4 @@
-// streamPlatform.js — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick)の違いを1か所にまとめた表(純関数)
+// streamPlatform.js — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick・ツイキャス など)の違いを1か所にまとめた表(純関数)
 // @layer L0 — 純粋計算
 //
 // ★council/kick-support-PLAN.md。記録・集計・画面は YouTube 版の作りを全サービスで共用する。サービスで違うのは
@@ -12,6 +12,7 @@ import { isSrStreamKey, srRoomKeyOfStreamKey, parseSrRoomKeyFromUrl, isSrRoomKey
 import { isMxStreamKey, mxUserIdOfStreamKey, parseMxUserIdFromUrl, isMxUserId, mxLiveUrl, buildMxStreamKey } from '../mixch/mxParse.js';
 import { isTtStreamKey, ttUniqueIdOfStreamKey, parseTtUniqueIdFromUrl, isTtUniqueId, ttLiveUrl, buildTtStreamKey } from '../tiktok/ttParse.js';
 import { isWwStreamKey, wwLiveIdOfStreamKey, parseWwLiveIdFromUrl, isWwLiveId, isWwUserPath, wwPageUrl, buildWwStreamKey } from '../whowatch/wwParse.js';
+import { isTcStreamKey, tcUserOfStreamKey, parseTcUserFromUrl, isTcUser, tcUserUrl, buildTcStreamKey } from '../twitcasting/tcParse.js';
 import { isAbStreamKey, abLoginOfStreamKey, parseAbLoginFromUrl, isAbLogin, abPageUrl, buildAbStreamKey, abChannelLogoUrl } from '../abema/abParse.js';
 
 export const KK_STREAM_KEY_PREFIX = 'kk.';
@@ -45,16 +46,16 @@ function kickSlugOfStreamKey(key) {
 
 /**
  * @typedef {{
- *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok' | 'abema', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
+ *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok' | 'abema' | 'twitcasting', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
  *   casterIconUrl?: (login: string) => string,
- *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean, boardUnit?: string,
+ *   buildStreamKey: (login: string, opts?: any, now?: number) => string, noSubs?: boolean, boardUnit?: string, boardName?: string, boardPlace?: string,
  * }} StreamPlatform
  */
 
-/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok' | 'abema', StreamPlatform>} */
+/** @type {Record<'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok' | 'abema' | 'twitcasting', StreamPlatform>} */
 export const STREAM_PLATFORMS = Object.freeze({
   twitch: Object.freeze({
     id: /** @type {'twitch'} */ ('twitch'),
@@ -196,6 +197,32 @@ export const STREAM_PLATFORMS = Object.freeze({
     thumbUrl: () => '',
     buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildTtStreamKey(a, opts),
   }),
+  // ツイキャス(council/twitcasting-support-PLAN.md)。配信のページ /<user>(c:xxx 等の頭つきもある)。login の位置に user(小文字)を置く
+  twitcasting: Object.freeze({
+    id: /** @type {'twitcasting'} */ ('twitcasting'),
+    name: 'ツイキャス',
+    keyHead: 'tc.',
+    personHead: 'tc:',
+    paid: 'ギフト',
+    paidCurrency: 'TCSCORE',
+    tabUrl: 'https://twitcasting.tv/*',
+    sendType: 'TC_SEND_COMMENT',
+    lateIconsKey: 'yt_tc_icons',
+    emotesKey: '',
+    rankSentence: 'ギフトの🍡（スコア）の合計の順位（上位）を表示します。このPCの記録から数えます。',
+    // 配信者のページのサポーターランキング(/<user>/supporter)。数は「現在のレベルのアイテムスコア」
+    boardName: 'サポーターランキング',
+    boardPlace: '配信者のページのサポーターランキング',
+    boardUnit: 'スコア',
+    noSubs: true,
+    isStreamKey: isTcStreamKey,
+    loginOfStreamKey: tcUserOfStreamKey,
+    channelFromUrl: parseTcUserFromUrl,
+    isLogin: (/** @type {unknown} */ l) => isTcUser(l),
+    channelUrl: tcUserUrl,
+    thumbUrl: () => '',
+    buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildTcStreamKey(a, opts),
+  }),
   // ABEMA(abema.tv)。login はページ種別の接頭辞つき(n- 放送中 / e- イベント / p- エピソード / s- スロット)
   abema: Object.freeze({
     id: /** @type {'abema'} */ ('abema'),
@@ -222,7 +249,7 @@ export const STREAM_PLATFORMS = Object.freeze({
   }),
 });
 
-const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom, STREAM_PLATFORMS.mixch, STREAM_PLATFORMS.tiktok, STREAM_PLATFORMS.abema];
+const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom, STREAM_PLATFORMS.mixch, STREAM_PLATFORMS.tiktok, STREAM_PLATFORMS.abema, STREAM_PLATFORMS.twitcasting];
 
 /** 配信キー → サービス(YouTube なら null) @param {unknown} key */
 export function platformOfStreamKey(key) {
@@ -287,5 +314,6 @@ export function platformOfHostname(hostname) {
   if (/^(?:www\.)?mixch\.tv$/.test(h)) return STREAM_PLATFORMS.mixch;
   if (/^(?:www\.)?tiktok\.com$/.test(h)) return STREAM_PLATFORMS.tiktok;
   if (/^(?:www\.)?abema\.tv$/.test(h)) return STREAM_PLATFORMS.abema;
+  if (/^(?:www\.)?twitcasting\.tv$/.test(h)) return STREAM_PLATFORMS.twitcasting;
   return null;
 }
