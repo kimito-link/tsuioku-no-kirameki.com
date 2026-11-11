@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2060',
+    date: '2026-11-11',
+    summary: 'YouTubeは自分の数字だけ出す',
+    items: Object.freeze([
+      'YouTube の横の欄と会場から、来場・本家コメ・広告pt・ギフトpt・来場者数を出さないようにしました。数字は同時視聴者数・経過・記録と、記録にあるスパチャだけです。同時視聴者数を「推定同時接続」とは書きません。',
+      '/@名前/live が /名前/live や /c/名前/live、/channel/番号/live に移っても、開いた直後から同時視聴者数を「読み込み中」と出します。「—」「（接続中…）」「（取得不可）」や「watch ページが見つかりません」は出しません。',
+      '配信の開始時刻が分かるまでは、経過を「0分」にしません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2056',
     date: '2026-11-11',
     summary: 'YouTubeの@配信はすぐ読み込み中',
@@ -194,14 +204,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'YouTube の「ギフト」(ジュエルのスタンプ)やメンバーシップギフトは金額が出ないため、ギフト履歴で「0pt」と出ていました。何を送ったか(例「ハイ」)を出し、ホバーで中身が分かるようにしました。',
       '同じ人がりんく段とギフト列の両方に居るとき、ギフト列のアイコンにホバー・クリックしても何も出なかったのを直しました。',
       '日本語の @ハンドルの人もクリックで YouTube のチャンネルを開けるようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1918',
-    date: '2026-11-07',
-    summary: 'Twitch の未ログインの見分けを直す',
-    items: Object.freeze([
-      'Twitch にログインしていないのにコメントを打ってしまうことがあったのを直しました(ログインしていなくてもあるメニューのボタンを、ログインの印と見ていました)。'
     ])
   })
 ]);

@@ -57,10 +57,46 @@ function setLaneSub(root, lane, text) {
  * @param {ParentNode} root
  * @param {{ platform?: string, facts?: any }} state
  */
+const FOREIGN_STYLE_ID = 'nl-platform-capability-style';
+const FOREIGN_STYLE = [
+  'html.nl-cap-foreign .nl-live-stat-card--visitors{display:none!important;}',
+  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoViewers),',
+  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoComments),',
+  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),',
+  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),',
+  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}',
+  'html.nl-cap-foreign [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],',
+  'html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],',
+  'html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,',
+  'html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,',
+  'html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}',
+  'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label,',
+  'html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label,html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}',
+  'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label::after{content:"同時視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
+  'html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label::after,html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
+  'html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label::after{content:"視聴数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
+].join('');
+
+/** @param {ParentNode} root @param {string} platformId */
+function markCapability(root, platformId) {
+  const doc = root.ownerDocument || (root.nodeType === 9 ? /** @type {Document} */ (root) : null);
+  const html = doc && doc.documentElement;
+  if (!html || !html.classList) return;
+  html.classList.add('nl-cap-foreign');
+  const id = String(platformId || '');
+  if (id) html.classList.add(`nl-cap-${id}`);
+  if (doc.getElementById(FOREIGN_STYLE_ID)) return;
+  const style = doc.createElement('style');
+  style.id = FOREIGN_STYLE_ID;
+  style.textContent = FOREIGN_STYLE;
+  (doc.head || html).appendChild(style);
+}
+
 export function applyPlatformMetricChrome(root, state) {
   if (!root || typeof root.querySelector !== 'function') return;
   const plan = platformSectionPlan(String(state?.platform || ''));
   if (plan.native) return;
+  markCapability(root, plan.id);
   const facts = state?.facts && typeof state.facts === 'object' ? state.facts : {};
 
   const vis = root.querySelector('.nl-live-stat-card--visitors');

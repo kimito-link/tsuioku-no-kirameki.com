@@ -216,6 +216,11 @@ export function writeYtMergedHtml() {
     const tag = `<script src="${js}"></script>`;
     if (src.split(tag).length !== 2) throw new Error(`${from} に ${tag} が1つではありません(ニコ生版の形が変わった?)`);
     let out = src.replace(tag, `<script src="${ytJs}"></script>`);
+    if (to === 'yt-sidepanel.html') {
+      // inline script は拡張の CSP で動かない。head の外部スクリプトだけが、最初の描画より先に走る。
+      if (!out.includes('<head>')) throw new Error('popup.html に <head> がありません');
+      out = out.replace('<head>', '<head>\n  <script src="yt-loading-boot.js"></script>');
+    }
     if (from === 'comeview.html') out = out.replace('</head>', `${cssM[0]}</head>`);
     out = out.replace(
       '</html>',

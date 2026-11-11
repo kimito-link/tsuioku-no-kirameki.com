@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, pickYtBroadcasterIconUrl } from './ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytPendingChannelPageUrl, pickYtBroadcasterIconUrl } from './ytPageMeta.js';
 
 describe('parseYtVideoIdFromUrl', () => {
   it('watch / live / live_chat / youtu.be を読める', () => {
@@ -30,6 +30,19 @@ describe('isYtWatchLikeUrl', () => {
     expect(ytHandleLivePendingKey('https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93/live')).toBe('ytlive:@あのちゃんこ');
     expect(ytHandleLivePendingKey('https://www.tiktok.com/@some.one/live')).toBe('');
     expect(ytHandleOfPendingKey('ytlive:@hotspanishvlogs')).toBe('@hotspanishvlogs');
+    expect(isYtWatchLikeUrl('https://www.youtube.com/weathernews/live')).toBe(true);
+    expect(ytHandleLivePendingKey('https://www.youtube.com/weathernews/live')).toBe('ytlive:weathernews');
+    expect(ytHandleOfPendingKey('ytlive:weathernews')).toBe('weathernews');
+    expect(ytPendingChannelPageUrl('ytlive:weathernews')).toBe('https://www.youtube.com/weathernews');
+    expect(isYtWatchLikeUrl('https://www.youtube.com/c/Weathernews/live')).toBe(true);
+    expect(ytHandleLivePendingKey('https://www.youtube.com/c/Weathernews/live')).toBe('ytlive:c/Weathernews');
+    expect(ytHandleOfPendingKey('ytlive:c/Weathernews')).toBe('Weathernews');
+    expect(isYtWatchLikeUrl('https://www.youtube.com/channel/UC1234567890123456789012/live')).toBe(true);
+    expect(ytHandleLivePendingKey('https://www.youtube.com/channel/UC1234567890123456789012/live')).toBe('ytlive:channel/UC1234567890123456789012');
+    expect(isYtWatchLikeUrl('https://www.youtube.com/user/weathernews/live')).toBe(true);
+    expect(ytHandleLivePendingKey('https://www.youtube.com/feed/live')).toBe('');
+    expect(isYtWatchLikeUrl('https://www.youtube.com/feed/live')).toBe(false);
+    expect(isYtWatchLikeUrl('https://www.tiktok.com/weathernews/live')).toBe(false);
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/videos')).toBe(false);
   });
 });

@@ -21,7 +21,7 @@ import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytP
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePath, ytHandleLivePendingKey, ytHandleOfPendingKey, ytPendingChannelPageUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
@@ -189,28 +189,15 @@ function newestKeyForChannel(keyHead, login) {
  * @returns {string}
  */
 export function videoIdForYtHandleLive(url, summaries) {
-  let path = '';
-  try {
-    const u = new URL(String(url || ''), 'https://www.youtube.com');
-    const host = u.hostname.toLowerCase();
-    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return '';
-    path = u.pathname.replace(/\/$/, '');
-    if (!/^\/@[^/]+\/live$/.test(path)) return '';
-  } catch {
-    return '';
-  }
+  const path = ytHandleLivePath(url);
+  if (!path) return '';
   let best = '';
   let bestAt = -1;
   const bag = summaries && typeof summaries === 'object' ? summaries : {};
   for (const [key, sum] of Object.entries(bag)) {
     if (!/^[A-Za-z0-9_-]{11}$/.test(key)) continue;
-    let stored = '';
-    try {
-      stored = new URL(String(sum?.sourceUrl || ''), 'https://www.youtube.com').pathname.replace(/\/$/, '');
-    } catch {
-      continue;
-    }
-    if (stored !== path) continue;
+    const stored = ytHandleLivePath(sum?.sourceUrl);
+    if (!stored || stored !== path) continue;
     const at = Number(sum?.viewersReadAt || sum?.updatedAt || 0);
     if (at >= bestAt) {
       bestAt = at;
@@ -414,9 +401,10 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
-  // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。分からないときだけ、記録を始めた時刻で代わりにする。
+  // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。記録を始めた時刻で代わりにすると、
+  // 長い配信を開いた直後に「経過 0分」になる。分からないあいだは出さない。
   const trustedStart = ytTrustedStartedAt(sum, videoId, all);
-  const startedAt = trustedStart || Number(sum?.createdAt || 0);
+  const startedAt = trustedStart;
   const ucId = String(sum?.broadcasterChannelId || '');
   const handle = String(sum?.broadcasterHandle || '');
   // UC… が分からない配信は、記録の中の同じ名前の人(配信者がチャットに書いていれば UC… が分かる)→ @名前 の順で決める
@@ -454,7 +442,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       : chId
       ? `https://www.youtube.com/channel/${chId}`
       : pendingHandle
-        ? `https://www.youtube.com/${encodeURI(pendingHandle)}`
+        ? ytPendingChannelPageUrl(videoId)
         : handle
           ? `https://www.youtube.com/${encodeURI(handle)}`
           : '',
@@ -480,7 +468,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     officialViewersOnly: true,
     platformFacts: {
       viewers: Number.isFinite(viewers) && viewers > 0 ? viewers : null,
-      streamAgeProvenance: trustedStart > 0 ? 'official' : (startedAt > 0 ? 'recorded' : ''),
+      streamAgeProvenance: trustedStart > 0 ? 'official' : '',
       support: supportTallyByVid.get(String(videoId || '')) || null,
     },
   };

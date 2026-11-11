@@ -360,7 +360,8 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
     /** @type {string} */
     let subText;
     if (resolved.method === 'official') {
-      subText = '直接値';
+      // ニコ生以外の公式の人数は「人」。ニコ生の同接だけ「直接値」のまま。
+      subText = snapshot.officialViewersOnly === true ? '人' : '直接値';
     } else if (resolved.method === 'nowcast') {
       subText =
         resolved.freshnessMs != null

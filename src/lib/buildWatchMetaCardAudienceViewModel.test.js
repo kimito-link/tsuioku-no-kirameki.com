@@ -173,7 +173,7 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
       { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
     );
     expect(vm.concurrent.estText).toBe('777');
-    expect(vm.concurrent.subText).toBe('直接値');
+    expect(vm.concurrent.subText).toBe('人');
   });
 
   it('公式同接が新鮮なら直接値（~ なし）・sub は直接値', () => {

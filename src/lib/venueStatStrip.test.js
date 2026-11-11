@@ -168,6 +168,12 @@ describe('パネルを開かなくても数字が付く(会場が自分で作っ
     expect(strip.el.querySelectorAll('.nlsb-stat')).toHaveLength(8);
   });
 
+  it('YouTube の会場は、ニコ生の形の鏡が同じ配信でも来場や広告ptを出さない', () => {
+    const m = buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW, platform: 'youtube' });
+    expect(m.items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過']);
+    expect(m.items.some((i) => i.label === '来場' || i.label === '広告pt' || i.label === '来場者数')).toBe(false);
+  });
+
   it('ページのサービスが分かっているときは、鏡が来る前からニコ生のチップを出さない', () => {
     const m = buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, platform: 'twitch' });
     expect(m.items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過']);

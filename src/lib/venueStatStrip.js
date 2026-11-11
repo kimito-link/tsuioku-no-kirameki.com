@@ -125,7 +125,10 @@ export function buildVenueStatStripModel(snap, opts = {}) {
 
   const unitOf = (/** @type {{ text: string, isPlaceholder: boolean }} */ c, /** @type {string} */ u) => (c.isPlaceholder || c.text === PH ? '' : u);
   const concUnit = str(conc.subText).trim() || '人';
-  const platformId = str((usable && s && s.platform) || opts.platform || '').trim().toLowerCase();
+  // 会場を開いたページのサービスを先に使う。鏡がニコ生の形のままでも、YouTube の会場に来場や広告ptは出さない。
+  const pagePlatform = str(opts.platform || '').trim().toLowerCase();
+  const mirrorPlatform = str(usable && s ? s.platform : '').trim().toLowerCase();
+  const platformId = (pagePlatform && pagePlatform !== 'niconico') ? pagePlatform : (mirrorPlatform || pagePlatform);
 
   /** @type {Array<VenueStatItem & { title?: string }>} */
   let items;

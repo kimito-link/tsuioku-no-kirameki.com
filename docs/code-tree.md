@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1240 件
+## ⚠️ 役割コメントが無いソース 10 / 1242 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -617,7 +617,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (143)
+- 📁 **extension/** (144)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -771,6 +771,7 @@
   - `status.html`
   - `venue.html`
   - `yt-comeview.html`
+  - `yt-loading-boot.js` — 横の欄の最初の描画。拡張の CSP は inline script を止めるので、このファイルを <head> で読む。
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
@@ -1160,7 +1161,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2443)
+- 📁 **src/** (2445)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1492,7 +1493,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2143)
+  - 📁 **lib/** (2145)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1555,7 +1556,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (82)
+    - 📁 **youtube/** (84)
       - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -1614,6 +1615,8 @@
       - `ytStageSubmission.test.js`
       - `ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
       - `ytStaleFrameHold.test.js`
+      - `ytStreamStart.js` — 配信ページの「いつ始まったか」を時刻にする純粋関数。
+      - `ytStreamStart.test.js`
       - `ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
       - `ytStreamStorePolicy.test.js`
       - `ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。

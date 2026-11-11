@@ -342,7 +342,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 299</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -355,6 +355,7 @@
 - `extension-youtube/src/ytVenueOverlayPrep.js` — 会場(venue.html)を YouTube の視聴ページの上に重ねて開くときの下ごしらえ。
 - `extension-youtube/venue-inline.js` — ニコ生版の視聴ページの会場モード(venueBar.js 本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/venue.js` — ニコ生版 venue-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+- `extension/yt-loading-boot.js` — 横の欄の最初の描画。拡張の CSP は inline script を止めるので、このファイルを <head> で読む。
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
@@ -1130,7 +1131,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 338</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 339</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1455,6 +1456,7 @@
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
 - `src/lib/youtube/ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
 - `src/lib/youtube/ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
+- `src/lib/youtube/ytStreamStart.js` — 配信ページの「いつ始まったか」を時刻にする純粋関数。
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
@@ -1480,10 +1482,12 @@
 ### 💾 記録件数 (1版)
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 
-### 📥 コメント取得 (1版)
+### 📥 コメント取得 (2版)
+- `v0.1.2060` 2026-11-11 — YouTubeは自分の数字だけ出す
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 
-### 🏟 会場・席 (9版)
+### 🏟 会場・席 (10版)
+- `v0.1.2060` 2026-11-11 — YouTubeは自分の数字だけ出す
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 - `v0.1.2044` 2026-11-11 — 各配信の数字だけを出す
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
@@ -1494,7 +1498,8 @@
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
 
-### 🎁 ギフト (6版)
+### 🎁 ギフト (7版)
+- `v0.1.2060` 2026-11-11 — YouTubeは自分の数字だけ出す
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 - `v0.1.2044` 2026-11-11 — 各配信の数字だけを出す
 - `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
@@ -1512,10 +1517,9 @@
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
 
-### その他 (6版)
+### その他 (5版)
 - `v0.1.2056` 2026-11-11 — YouTubeの@配信はすぐ読み込み中
 - `v0.1.2055` 2026-11-11 — YouTubeの同時視聴者数をページから読む
 - `v0.1.2047` 2026-11-11 — 公式ランキングの説明を残す
 - `v0.1.2033` 2026-11-10 — パネル位置の文字は食い違うときだけ
 - `v0.1.2030` 2026-11-10 — 状態ページのボタンの見た目をそろえた
-- `v0.1.1918` 2026-11-07 — Twitch の未ログインの見分けを直す

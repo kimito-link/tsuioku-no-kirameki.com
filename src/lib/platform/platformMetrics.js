@@ -14,6 +14,58 @@ import { platformOfStreamKey } from './streamPlatform.js';
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
 export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema']);
 
+/**
+ * パネルと会場が同じ表を見る。native のサービスは今までの画面のまま。
+ * それ以外は chips に無いカードを描かない（「—」の枠も出さない）。
+ * ABEMA はここに1行足せば、横の欄と会場が同じ隠し方に乗る。
+ * superchatWhenPositive: 記録に金額があるときだけスパチャを出す。
+ */
+export const PLATFORM_CAPABILITIES = Object.freeze({
+  niconico: Object.freeze({
+    native: true,
+    concurrentLabel: '推定同時接続',
+    visitorCard: true,
+    chips: Object.freeze(['viewers', 'comments', 'streamAge', 'adPts', 'giftPts']),
+  }),
+  youtube: Object.freeze({
+    native: false,
+    concurrentLabel: '同時視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'superchat']),
+    superchatWhenPositive: true,
+  }),
+  twitch: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'bits', 'subs', 'gifts', 'raids']),
+  }),
+  kick: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
+  }),
+  abema: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'comments']),
+    hideSections: Object.freeze(['contributionRanking', 'giftHistory']),
+  }),
+});
+
+/** @param {string} platformId */
+export function platformCapability(platformId) {
+  const id = resolvePlatformId(platformId);
+  return PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)] || Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge']),
+  });
+}
+
 const OFFICIAL = '配信ページが出している公式の数です。';
 const RECORDED = 'このPCの記録から数えた数です。公式の累計ではありません。';
 
@@ -132,6 +184,7 @@ export function resolvePlatformId(input) {
  */
 export function platformSectionPlan(platformId) {
   const id = resolvePlatformId(platformId);
+  const cap = platformCapability(id);
   if (id === 'niconico') {
     return {
       id,
@@ -151,12 +204,11 @@ export function platformSectionPlan(platformId) {
   };
   /** @type {{ rink: string, konta: string, tanu: string }|null} */
   let trio = { rink: 'りんく', konta: 'こん太', tanu: 'たぬ姉' };
-  let concurrentLabel = '視聴者数';
+  let concurrentLabel = cap.concurrentLabel || '視聴者数';
   let note = '公式の数は、配信ページが出しているものだけです。合計は、このPCの記録から数えています。';
   const hide = [...NICONICO_ONLY_SECTIONS];
   // 合計順の説明文は言葉の置き換え（公式ランキングの文）に任せる。ここで上書きすると消える。
   if (id === 'youtube') {
-    concurrentLabel = '同時視聴者数';
     sections.contributionRanking = {
       show: true,
       label: 'スパチャの合計順',
@@ -190,7 +242,6 @@ export function platformSectionPlan(platformId) {
     };
     trio = { rink: 'りんく（Kicks・ギフトサブ）', konta: 'こん太（サブスク）', tanu: 'たぬ姉（ギフトサブ）' };
   } else if (id === 'abema') {
-    concurrentLabel = '視聴数';
     note = '公式の視聴数とコメント数だけを出します。';
     sections.contributionRanking = { show: false };
     sections.giftHistory = { show: false };
@@ -200,7 +251,7 @@ export function platformSectionPlan(platformId) {
   return {
     id,
     native: false,
-    visitorCard: false,
+    visitorCard: cap.visitorCard === true,
     concurrentLabel,
     hide,
     note,
@@ -231,22 +282,16 @@ function supportChips(id, support) {
   const chip = (key, label, text, unit, title) => ({ key, label, text, unit, placeholder: false, title });
   if (id === 'youtube') {
     const paid = money('', '');
-    const members = num(support.membershipCount) || 0;
-    const gifted = num(support.membershipGiftCount) || 0;
+    const count = (num(support.superchatCount) || 0) + (num(support.stickerCount) || 0);
+    const cap = platformCapability(id);
+    if (cap.superchatWhenPositive && paid.text === '0' && count === 0) return [];
     return [
       chip(
         'superchat',
-        'スパチャ・ステッカー',
+        'スパチャ',
         paid.text,
         paid.unit,
         `${RECORDED}スーパーチャット ${formatInt(support.superchatCount || 0)}・スーパーステッカー ${formatInt(support.stickerCount || 0)}。${paid.extra}`.trim(),
-      ),
-      chip(
-        'members',
-        'メンバー加入',
-        formatInt(members + gifted),
-        '人',
-        `${RECORDED}加入 ${formatInt(members)}・ギフト ${formatInt(gifted)}。`,
       ),
     ];
   }

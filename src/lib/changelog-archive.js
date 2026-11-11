@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1918',
+    date: '2026-11-07',
+    summary: 'Twitch の未ログインの見分けを直す',
+    items: Object.freeze([
+      'Twitch にログインしていないのにコメントを打ってしまうことがあったのを直しました(ログインしていなくてもあるメニューのボタンを、ログインの印と見ていました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1917',
     date: '2026-11-07',
     summary: 'Twitch の画面の言葉・顔・送信の直し',
