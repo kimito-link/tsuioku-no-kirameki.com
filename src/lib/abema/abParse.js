@@ -139,6 +139,20 @@ function isAbLogoUrl(url) {
   return /\/channels\/logo\/|\/channels\/[^/?#]+\/logo/i.test(url);
 }
 
+/** ロゴ URL にチャンネル id が入っていればそれ、無ければ '' @param {string} url */
+function logoChannelId(url) {
+  const m = String(url || '').match(/\/channels\/([^/?#]+)\/logo/i);
+  return m ? m[1].toLowerCase() : '';
+}
+
+/** 今のチャンネルのロゴか。別チャンネルのロゴは使わない @param {string} url @param {string} want */
+function logoMatches(url, want) {
+  if (!isAbLogoUrl(url)) return false;
+  if (!want) return true;
+  const id = logoChannelId(url);
+  return !id || id === want;
+}
+
 /**
  * リニア放送の login（n- / s-）かチャンネル id から、チャンネル id だけ取り出す。
  * イベント（e-）やエピソード（p-）からは作らない。
@@ -168,6 +182,20 @@ export function abChannelLogoUrl(loginOrChannelId) {
   return safeAbImageUrl(
     `https://image.p-c2-x.abema-tv.com/image/channels/${id}/logo.png?format=png&width=320&height=320`
   );
+}
+
+/**
+ * 配信者カードに残す画像。リニアの ABEMA は、記録が空でも公開のチャンネルロゴにする。
+ * ニコニコの既定アイコンは使わない（白い丸のまま残るため）。
+ * @param {unknown} videoId
+ * @param {unknown} given
+ */
+export function abBroadcasterIconForStream(videoId, given) {
+  const raw = String(given || '').trim();
+  const logo = abChannelLogoUrl(abLoginOfStreamKey(videoId));
+  if (!logo) return raw;
+  if (safeAbImageUrl(raw) && /\/channels\/[^/?#]+\/logo/i.test(raw)) return raw;
+  return logo;
 }
 
 /** srcset の中から使ってよい ABEMA の画像だけ @param {unknown} raw */
@@ -249,7 +277,8 @@ export function pickAbBroadcasterImage(src = {}) {
       break;
     }
   }
-  const logo = images.find((u) => isAbLogoUrl(u)) || (api && isAbLogoUrl(api) ? api : '');
+  const want = abLinearChannelId(src.channelId) || abLinearChannelId(src.login);
+  const logo = images.find((u) => logoMatches(u, want)) || (api && logoMatches(api, want) ? api : '');
   if (logo) return logo;
   // リニアは番組の横長サムネより、公開されているチャンネルロゴを先に出す。
   const built = abChannelLogoUrl(src.channelId) || abChannelLogoUrl(src.login);

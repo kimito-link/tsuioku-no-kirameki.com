@@ -9117,7 +9117,10 @@ function clearWatchMetaCard(opts = {}) {
   }
   if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
   if (concurrentReadyEl) concurrentReadyEl.hidden = false;
-  if (concurrentCard) concurrentCard.removeAttribute('aria-busy');
+  if (concurrentCard) {
+    concurrentCard.hidden = false;
+    concurrentCard.removeAttribute('aria-busy');
+  }
   const casterBanner = $('casterBanner');
   if (casterBanner) casterBanner.hidden = true;
   wrap.hidden = true;
@@ -9884,6 +9887,7 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       concurrentReadyEl.hidden = audienceVm.concurrent.concurrentReadyHidden;
     }
     if (concurrentCard) {
+      concurrentCard.hidden = audienceVm.concurrent.cardHidden === true;
       const concurrentLabel = concurrentCard.querySelector(':scope > .nl-live-stat-label');
       if (concurrentLabel) concurrentLabel.textContent = audienceVm.concurrent.labelText || '推定同時接続';
       if (audienceVm.concurrent.ariaBusy) {
@@ -10040,12 +10044,8 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
  * @returns {string}
  */
 /**
- * 0.1.12 (E): innerHTML で流し込んだ HTML 文字列の中に `data-on-error-hide="1"`
- * 付きの <img> がある場合、画像読み込み失敗時に該当要素を visibility:hidden に
- * する。MV3 strict CSP で `onerror="this.style.visibility='hidden'"` のような
- * インライン属性ハンドラは実行できず CSP 違反ログが毎回発生していたので、
- * 同等の挙動をプログラム的に再現する。
- *
+ * innerHTML の img はインライン onerror が CSP で動かないので、流し込み後に失敗を拾う。
+ * 失敗が先に済んでいても、白い既定アイコンのまま残さない。
  * @param {ParentNode | null | undefined} root
  */
 function bindOnErrorHandlersWithin(root) {
@@ -10058,12 +10058,15 @@ function bindOnErrorHandlersWithin(root) {
     node.dataset.nlOnErrorBound = '1';
 
     if (node.dataset.onErrorFallback === 'face') {
-      node.addEventListener('error', () => {
+      const applyFace = () => {
         try {
           const face = identiconFallbackForAvatarUrl(node.currentSrc || node.src) || anonymousIdenticonDataUrl(node.dataset.fallbackName || '配信', 64);
           if (face && node.src !== face) node.src = face;
-        } catch { /* 顔も作れないときだけ空のまま */ }
-      }, { once: true });
+        } catch { /* ignore */ }
+      };
+      node.addEventListener('error', applyFace, { once: true });
+      const srcNow = node.currentSrc || node.src;
+      if (node.complete && (node.naturalWidth === 0 || (node.dataset.rejectBlank === '1' && /blank\.jpg/i.test(srcNow)))) applyFace();
     } else if (node.dataset.onErrorHide === '1') {
       node.addEventListener('error', () => {
         try { node.style.visibility = 'hidden'; } catch { /* ignore */ }
@@ -10092,14 +10095,11 @@ function topSupportRankStripCasterTileHtml() {
       : `配信者 ${nameWithLv}（クリックでユーザーページ）`;
   const face = anonymousIdenticonDataUrl(target.name || '配信', 64);
   const iconHtml =
-    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl || face)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(target.name || '配信')}" />`;
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl || face)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(target.name || '配信')}"${/abema\.tv/i.test(target.pageUrl) ? ' data-reject-blank="1"' : ''} />`;
   return (
     `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
     `<span class="nl-top-support-rank__caster-label">配信者</span>` +
     `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(target.pageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +
-    // 0.1.12 (E): MV3 strict CSP は onerror="..." 等のインライン属性ハンドラを実行できない。
-    // 代わりに data-on-error-hide マーカーを付けて、innerHTML 流し込み直後に
-    // addEventListener('error') で同等の挙動を貼り直す（renderTopSupportRankStrip 内）。
     iconHtml +
     `<span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span>` +
     `</a>` +

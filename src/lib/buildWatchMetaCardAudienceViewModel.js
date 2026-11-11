@@ -41,12 +41,13 @@ import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
 
 /**
  * @typedef {{
- *   phase: 'loading'|'ready',
+ *   phase: 'loading'|'ready'|'hidden',
  *   estText: string,
  *   estIsPlaceholder: boolean,
  *   estTitle: string|null,
  *   subText: string,
  *   labelText?: string,
+ *   cardHidden?: boolean,
  *   concurrentLoadingHidden: boolean,
  *   concurrentReadyHidden: boolean,
  *   ariaBusy: boolean,
@@ -165,6 +166,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       : null;
 
   // 番組の視聴数（ABEMA の 3.7万）は同時接続ではない。推定が作れないあいだは、その数を見出し付きで出す。
+  // 公式の数が無い ABEMA は「推定中」を出さず、カード自体を隠す。
   if (slotViews != null && officialConcurrent == null) {
     concurrent = {
       phase: 'ready',
@@ -180,6 +182,22 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       charReactionDelta: null
     };
     nextConcurrentEstimated = slotViews;
+  } else if (snapshot.officialAudienceOnly === true && officialConcurrent == null) {
+    concurrent = {
+      phase: 'hidden',
+      estText: '',
+      estIsPlaceholder: true,
+      estTitle: null,
+      subText: '',
+      labelText: '',
+      cardHidden: true,
+      concurrentLoadingHidden: true,
+      concurrentReadyHidden: true,
+      ariaBusy: false,
+      numericEstimated: null,
+      charReactionDelta: null
+    };
+    nextConcurrentEstimated = prev.concurrentEstimated;
   } else if (showConcurrent) {
     const streamAge =
       typeof snapshot.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0

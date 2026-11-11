@@ -84,18 +84,19 @@ export function resolveBroadcasterFollowTarget(snapshot) {
   const level = Number.isFinite(lvNum) && lvNum > 0 ? lvNum : null;
 
   // 1. 数値 uid → user 経路。ニコニコの人は従来どおり CDN の usericon。
-  //    ABEMA などは合成した数値 uid を持つが、スナップショットにニコニコ以外の
-  //    https 画像（チャンネルロゴ）があればそちらを出す。無いときだけ CDN。
+  //    ABEMA は合成した数値 uid を持つ。ニコニコ以外の https 画像があればそれを出す。
+  //    無いときに CDN の既定アイコンへ落とすと、読める白い丸のまま残るので顔は空にしてタイル側へ任せる。
   if (/^\d+$/.test(uid)) {
     const iconFromCdn = buildNiconicoDefaultUserIconUrl(uid);
     const foreignIcon = /^https:\/\//i.test(iconUrlRaw) && !/nicovideo\.jp|nimg\.jp|nico\.ms/i.test(iconUrlRaw);
+    const abemaPage = /^https:\/\/(?:www\.)?abema\.tv\//i.test(pageUrlRaw);
     return {
       kind: 'user',
       name,
       level,
-      pageUrl: `https://www.nicovideo.jp/user/${uid}`,
-      iconUrl: foreignIcon ? iconUrlRaw : iconFromCdn,
-      followLabel: 'フォロー'
+      pageUrl: abemaPage ? pageUrlRaw : `https://www.nicovideo.jp/user/${uid}`,
+      iconUrl: foreignIcon ? iconUrlRaw : (abemaPage ? '' : iconFromCdn),
+      followLabel: abemaPage ? '番組を見る' : 'フォロー'
     };
   }
 

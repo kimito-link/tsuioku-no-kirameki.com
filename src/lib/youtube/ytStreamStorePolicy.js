@@ -1,6 +1,7 @@
 // ytStreamStorePolicy.js — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
 // @layer L0 — 純粋計算（副作用・ブラウザ API なし）
 
+import { abBroadcasterIconForStream } from '../abema/abParse.js';
 import { assignYtCommentLane } from './ytLaneAssign.js';
 import {
   createYtSupportRankingAccumulator,
@@ -70,9 +71,10 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   ).trim();
   // チャンネルの @名前(UC… の ID がページに無い配信もある・2026-11-03 実機: ホロライブ)
   const broadcasterHandle = String(patch?.broadcasterHandle || prev.broadcasterHandle || '').trim();
-  const broadcasterIconUrl = String(
-    patch?.broadcasterIconUrl || prev.broadcasterIconUrl || '',
-  ).trim();
+  const broadcasterIconUrl = abBroadcasterIconForStream(
+    videoId,
+    String(patch?.broadcasterIconUrl || prev.broadcasterIconUrl || '').trim(),
+  );
   // 50,000,000 を超える数は読み違い(2026-11-03 実機で桁が連なった数が入った)。古い記録に残っていても捨てる。
   const plausible = (/** @type {unknown} */ v) =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 50_000_000;

@@ -12,7 +12,7 @@ import { isSrStreamKey, srRoomKeyOfStreamKey, parseSrRoomKeyFromUrl, isSrRoomKey
 import { isMxStreamKey, mxUserIdOfStreamKey, parseMxUserIdFromUrl, isMxUserId, mxLiveUrl, buildMxStreamKey } from '../mixch/mxParse.js';
 import { isTtStreamKey, ttUniqueIdOfStreamKey, parseTtUniqueIdFromUrl, isTtUniqueId, ttLiveUrl, buildTtStreamKey } from '../tiktok/ttParse.js';
 import { isWwStreamKey, wwLiveIdOfStreamKey, parseWwLiveIdFromUrl, isWwLiveId, isWwUserPath, wwPageUrl, buildWwStreamKey } from '../whowatch/wwParse.js';
-import { isAbStreamKey, abLoginOfStreamKey, parseAbLoginFromUrl, isAbLogin, abPageUrl, buildAbStreamKey } from '../abema/abParse.js';
+import { isAbStreamKey, abLoginOfStreamKey, parseAbLoginFromUrl, isAbLogin, abPageUrl, buildAbStreamKey, abChannelLogoUrl } from '../abema/abParse.js';
 
 export const KK_STREAM_KEY_PREFIX = 'kk.';
 
@@ -214,7 +214,7 @@ export const STREAM_PLATFORMS = Object.freeze({
     channelFromUrl: parseAbLoginFromUrl,
     isLogin: (/** @type {unknown} */ l) => isAbLogin(l),
     channelUrl: abPageUrl,
-    thumbUrl: () => '',
+    thumbUrl: (/** @type {string} */ l) => abChannelLogoUrl(l),
     buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildAbStreamKey(a, opts),
   }),
 });

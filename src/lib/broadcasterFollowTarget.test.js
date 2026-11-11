@@ -178,6 +178,18 @@ describe('resolveBroadcasterFollowTarget - 他サービスの画像', () => {
     expect(r.followLabel).toBe('フォロー');
   });
 
+  it('ABEMA で画像が空のときはニコニコの白い既定アイコンを出さない', () => {
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: '将棋チャンネル',
+      broadcasterUserId: '8123456789',
+      broadcasterPageUrl: 'https://abema.tv/now-on-air/shogi'
+    });
+    expect(r.iconUrl).toBe('');
+    expect(r.pageUrl).toBe('https://abema.tv/now-on-air/shogi');
+    expect(r.iconUrl).not.toContain('nimg.jp');
+    expect(r.followLabel).toBe('番組を見る');
+  });
+
   it('数値 uid のニコニコ画像は差し替えない', () => {
     const r = resolveBroadcasterFollowTarget({
       broadcasterName: 'foo',

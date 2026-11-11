@@ -24,6 +24,17 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1917',
+    date: '2026-11-07',
+    summary: 'Twitch の画面の言葉・顔・送信の直し',
+    items: Object.freeze([
+      'Twitch の配信の画面に残っていた YouTube の言葉(スパチャの合計順・トップファン)を、Bits・ギフトサブの合計の順位に直しました。',
+      'Twitch にログインしていないときは、コメントを打たずに「ログインしていない」と理由を出すようにしました(Twitch は未ログインでも入力欄を出すため)。',
+      '記録のときに顔の取得が間に合わなかった人も、あとで分かった顔を画面に出すようにしました。',
+      '計器のギフトサブの数が常に 0 だったのを、贈った件数で数えるように直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1916',
     date: '2026-11-07',
     summary: 'Twitch の配信も記録できるように(試作)',

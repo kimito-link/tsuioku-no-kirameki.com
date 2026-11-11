@@ -1,11 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * ABEMA 実機: 配信者カードの丸い画像が空で、名前だけ「ABEMA NEWSチャンネル |...」と
- * フォローボタンが出ていた。チャンネル画像を渡すと 26px の円に絵が入り、
- * 名前とフォローはそのまま読める。
+ * サイドパネルの配信者カードは 26px の円。将棋チャンネルの公開ロゴ
+ * （image.p-c2-x.abema-tv.com の logo.png・2026-11 に 200 の不透明 PNG）を
+ * その円へ入れると、中央は白くない。読めない URL は顔に落ち、白い既定アイコンは残さない。
  */
+const SHOGI_LOGO = 'https://image.p-c2-x.abema-tv.com/image/channels/shogi/logo.png?format=png&width=320&height=320';
+
 test('配信者カードにチャンネル画像が出る', async ({ page }) => {
+  const logo = await page.request.get(SHOGI_LOGO);
+  expect(logo.status()).toBe(200);
+  expect(String(logo.headers()['content-type'] || '')).toContain('image/png');
+  const dataUrl = `data:image/png;base64,${(await logo.body()).toString('base64')}`;
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.setContent(`<!doctype html>
 <meta charset="utf-8">
@@ -37,25 +43,15 @@ test('配信者カードにチャンネル画像が出る', async ({ page }) => 
 </style>
 <div class="nl-top-support-rank__caster" role="listitem">
   <span class="nl-top-support-rank__caster-label">配信者</span>
-  <a class="nl-top-support-rank__caster-link" href="https://abema.tv/now-on-air/abema-news">
-    <img class="nl-top-support-rank__caster-thumb" alt="" />
-    <span class="nl-top-support-rank__caster-name">ABEMA NEWSチャンネル</span>
+  <a class="nl-top-support-rank__caster-link" href="https://abema.tv/now-on-air/shogi">
+    <img class="nl-top-support-rank__caster-thumb" alt="" data-on-error-fallback="face" data-fallback-name="将棋チャンネル" />
+    <span class="nl-top-support-rank__caster-name">将棋チャンネル</span>
   </a>
-  <a class="nl-top-support-rank__caster-follow" href="https://abema.tv/now-on-air/abema-news">フォロー</a>
-</div>
-<script>
-  const c = document.createElement('canvas');
-  c.width = 128; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#e60012';
-  g.fillRect(0, 0, 128, 128);
-  g.fillStyle = '#fff';
-  g.font = 'bold 42px sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText('NEWS', 64, 68);
-  document.querySelector('.nl-top-support-rank__caster-thumb').src = c.toDataURL('image/png');
-</script>`);
+  <a class="nl-top-support-rank__caster-follow" href="https://abema.tv/now-on-air/shogi">番組を見る</a>
+</div>`);
+  await page.locator('.nl-top-support-rank__caster-thumb').evaluate((img, src) => {
+    img.src = src;
+  }, dataUrl);
   const thumb = page.locator('.nl-top-support-rank__caster-thumb');
   await expect(thumb).toBeVisible();
   await page.waitForFunction(() => {
@@ -65,10 +61,32 @@ test('配信者カードにチャンネル画像が出る', async ({ page }) => 
   const box = await thumb.boundingBox();
   expect(box.width).toBeGreaterThanOrEqual(24);
   expect(box.height).toBeGreaterThanOrEqual(24);
+  const painted = await page.evaluate(() => {
+    const img = document.querySelector('.nl-top-support-rank__caster-thumb');
+    if (!(img instanceof HTMLImageElement)) return null;
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    if (!g) return null;
+    g.drawImage(img, 0, 0);
+    const data = g.getImageData(0, 0, c.width, c.height).data;
+    let white = 0;
+    let n = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      n += 1;
+      if (data[i] > 220 && data[i + 1] > 220 && data[i + 2] > 220) white += 1;
+    }
+    return { w: img.naturalWidth, h: img.naturalHeight, white, n };
+  });
+  expect(painted).toBeTruthy();
+  expect(painted.w).toBeGreaterThan(100);
+  expect(painted.h).toBeGreaterThan(40);
+  expect(painted.white / painted.n).toBeLessThan(0.5);
   const name = page.locator('.nl-top-support-rank__caster-name');
-  await expect(name).toHaveText('ABEMA NEWSチャンネル');
+  await expect(name).toHaveText('将棋チャンネル');
   const nameBox = await name.boundingBox();
   expect(nameBox.width).toBeGreaterThan(40);
-  await expect(page.locator('.nl-top-support-rank__caster-follow')).toHaveText('フォロー');
+  await expect(page.locator('.nl-top-support-rank__caster-follow')).toHaveText('番組を見る');
   await page.locator('.nl-top-support-rank__caster').screenshot({ path: 'test-results/abema-caster-thumb.png' });
 });

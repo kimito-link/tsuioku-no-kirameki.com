@@ -23,6 +23,7 @@ import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopF
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
+import { abBroadcasterIconForStream } from '../../src/lib/abema/abParse.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
@@ -376,7 +377,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const plat = platformOfStreamKey(videoId);
   if (plat && chId.startsWith(plat.personHead) && handle) loginByPersonKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
-  const bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
+  let bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
+  // サイドパネルは保存欄が空だとニコニコの白い既定アイコンを出す。リニアは公開ロゴで埋める。
+  if (plat?.id === 'abema') bIcon = abBroadcasterIconForStream(videoId, bIcon);
   if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
   return {
     title: tabTitle || String(sum?.title || ''),
@@ -403,6 +406,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
         ? `https://www.youtube.com/${encodeURI(handle)}`
         : '',
     broadcasterIconUrl: bIcon,
+    // ABEMA は公式の視聴数か同時接続だけ出す。推定の「推定中」は出さない。
+    ...(plat?.id === 'abema' ? { officialAudienceOnly: true } : {}),
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。
     viewerCountFromDom: null,

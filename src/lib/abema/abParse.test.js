@@ -287,6 +287,10 @@ describe('ABEMA の番組情報と URL', () => {
     expect(meta.imageUrl).toBe('https://hayabusa.io/abema/programs/p1/thumb001.png');
     expect(pickAbBroadcasterImage({ apiImage: meta.imageUrl })).toBe(meta.imageUrl);
     expect(pickAbBroadcasterImage({ channelId: meta.channelId, apiImage: meta.imageUrl })).toBe(logo);
+    expect(pickAbBroadcasterImage({
+      login: 'n-shogi',
+      images: ['https://image.p-c2-x.abema-tv.com/image/channels/abema-news/logo.png'],
+    })).toContain('/channels/shogi/logo.png');
     expect(parseAbProgramMeta({
       slot: { title: '朝のニュース', channel: { id: 'abema-news', logoUrl: logo } },
     }).imageUrl).toBe(logo);
@@ -318,7 +322,22 @@ describe('ABEMA の番組情報と URL', () => {
     const card = resolveBroadcasterFollowTarget(snap);
     expect(card.iconUrl).toBe(logo);
     expect(card.iconUrl).not.toContain('nimg.jp');
-    expect(card.followLabel).toBe('フォロー');
+    expect(card.pageUrl).toBe('https://abema.tv/now-on-air/abema-news');
+    expect(card.followLabel).toBe('番組を見る');
+    expect(snap.thumbnailUrl).toContain('/channels/abema-news/logo.png');
+    expect(snap.officialAudienceOnly).toBe(true);
+
+    const bare = ytSummaryToNicoSnapshot({
+      title: '将棋チャンネル',
+      broadcasterName: '将棋チャンネル',
+      broadcasterChannelId: 'ab:@n-shogi',
+      broadcasterHandle: 'n-shogi',
+    }, 'ab.n-shogi.live1', '');
+    expect(bare.broadcasterIconUrl).toContain('/channels/shogi/logo.png');
+    expect(bare.broadcasterIconUrl).not.toContain('nimg.jp');
+    const bareCard = resolveBroadcasterFollowTarget(bare);
+    expect(bareCard.iconUrl).toContain('/channels/shogi/logo.png');
+    expect(bareCard.pageUrl).toBe('https://abema.tv/now-on-air/shogi');
   });
   it('画像は https の ABEMA の置き場だけ', () => {
     expect(safeAbImageUrl('http://hayabusa.io/a.jpg')).toBe('');

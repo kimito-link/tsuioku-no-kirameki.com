@@ -125,6 +125,41 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.estTitle).toContain('同時に見ている人数ではありません');
   });
 
+  it('ABEMA で公式の視聴数も同時接続も無いときは推定中を出さずカードを隠す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        noVisitorTotal: true,
+        officialAudienceOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.cardHidden).toBe(true);
+    expect(vm.concurrent.phase).toBe('hidden');
+    expect(vm.concurrent.estText).toBe('');
+    expect(vm.concurrent.estText).not.toBe('推定中');
+  });
+
+  it('ABEMA でも公式の視聴数があればカードは出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        slotViewCount: 37000,
+        officialAudienceOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.cardHidden).toBeUndefined();
+    expect(vm.concurrent.estText).toBe('37,000');
+    expect(vm.concurrent.labelText).toBe('公式の視聴数');
+  });
+
   it('公式の同時接続があるときは視聴数で置き換えない', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {

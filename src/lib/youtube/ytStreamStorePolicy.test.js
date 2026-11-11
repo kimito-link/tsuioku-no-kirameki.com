@@ -73,6 +73,13 @@ describe('mergeYtStreamSummary', () => {
     const broken = mergeYtStreamSummary({ ...later, concurrentViewers: 1.2e28, peakConcurrentViewers: 1.2e28 }, { videoId: 'vid-1', concurrentViewers: 1.2e28 }, t1 + 2);
     expect(broken.concurrentViewers).toBe(null);
     expect(broken.peakConcurrentViewers).toBe(null);
+    const shogi = mergeYtStreamSummary(
+      null,
+      { videoId: 'ab.n-shogi.live1', title: '将棋チャンネル', broadcasterName: '将棋チャンネル' },
+      t0,
+    );
+    expect(shogi.broadcasterIconUrl).toContain('/channels/shogi/logo.png');
+    expect(shogi.broadcasterIconUrl).not.toContain('nimg.jp');
     expect(updated.itemCount).toBe(5000);
     expect(updated.createdAt).toBe(t0);
     expect(updated.updatedAt).toBe(t1);
