@@ -2,6 +2,7 @@
  * OBS に重ねる参加の順番。文字だけを出す。画像も定期読み直しも無い。
  */
 
+import '../lib/extDocBusyCensusBoot.js';
 import {
   formatParticipationObsText,
   normalizeParticipationQueue,

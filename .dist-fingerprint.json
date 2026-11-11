@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "41ef9b396b6d413fc16c2215e574efdd7ae822bb2342c637d47be4a8353dab61",
+  "fingerprint": "db3339d7be247dad9e688661f1330cd3bc453898a99e4172fdc9942dfd938535",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -1039,7 +1039,7 @@
     "extension/dist/live-view.js": "7c612731b84957eb78840a75296498a1222711a4aa7e858e0b04ff664cbad8c4",
     "extension/dist/marketing-export.js": "115bcd482ba1fb93ae6da93472f9c00035c36259b4d0335ef74d4b491481343c",
     "extension/dist/comeview.js": "f22f13ee35896cdae493b3bb21cb3a27a6f086d8c8d0d2aef639dfb4ecad50ef",
-    "extension/dist/participation-queue.js": "7b17df670e25da47fe9b67a2d20c3edcf37368dc1c92b44616b98cd4156b0562",
+    "extension/dist/participation-queue.js": "b79ea338ffdb9d6c266cb55bde84899f11962bc45fc8857581be1eca35c02fee",
     "extension/dist/venue.js": "01ae63d79f65dc28179a0469b844f490ac910e6d2dd729412852e42179e8af57",
     "extension/dist/sidepanel.js": "1cf62ff501fc0694d46a522cbfd43182243d9b1ab0368ee3a09ae0e49673f935",
     "extension/dist/sidepanel-iframe-boot.js": "d7e2330a4a6541bfb4647a246a954a59fd01f5f884d682ece8c24df8137e89f1",
@@ -1056,7 +1056,7 @@
     "extension/dist/yt-comeview.js": "d6f60f8a83035ae50566c1126803267b0c15ce4200a8f750b7e69adb1f85ae83",
     "extension/dist/yt-venue.js": "33ec33c93ff612c10fab6934b30aa78a6d93d9b7c5427f57190309c3444d0370",
     "extension/dist/yt-venue-inline.js": "afaca68efedfff23d0eb9c35b33fd026ee39af3eac84463c792ff592a71ca2a4",
-    "extension/dist/yt-participation-queue.js": "88fa4bd7890d0438b93c374dd5ffe3c165f27e89ccf77e884deb33a25170ce39",
+    "extension/dist/yt-participation-queue.js": "d7bd225db7f654ccdd0eefa62361eb76ae0fc79770136f926912f0736111b47c",
     "extension/dist/yt-tw-content.js": "0670d30c0bd87724bc78aefde8c1153c8c3e06277c5e0b83ccdf4b7d1529b6d2",
     "extension/dist/yt-kick-content.js": "16076fa0dabd9c5df08255b4464a5ea54b8167083542e70e1e56558c89e915e9",
     "extension/dist/yt-ww-content.js": "1fe42df671ee0754f71355d3142560109874cfba4afad8484213c5413b121522",
