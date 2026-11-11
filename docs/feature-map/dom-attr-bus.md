@@ -47,6 +47,7 @@
 | `data-nl-click-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-concurrent-chara-jump-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-detail-hover-bound` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-gift-has` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-gift-rank-metric` | lib/paintTopSupportRankStyleIntoElement.js | extension/popup-entry.js<br>lib/paintTopSupportRankStyleIntoElement.js |
 | `data-nl-hoisted` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-lane-user-detail-wired` | extension/popup/wireLaneUserDetailOpen.js | extension/popup/wireLaneUserDetailOpen.js |

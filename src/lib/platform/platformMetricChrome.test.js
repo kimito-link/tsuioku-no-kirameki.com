@@ -91,9 +91,13 @@ describe('applyPlatformMetricChrome', () => {
   it('記録にスパチャが1件も無いうちはギフト欄を出さず、来たら出す', () => {
     const root = mount();
     applyPlatformMetricChrome(root, { platform: 'youtube', facts: { support: tallySupportItems([]) } });
-    expect(root.querySelector('[data-lane="giftHistory"]').hidden).toBe(true);
+    expect(document.documentElement.hasAttribute('data-nl-gift-has')).toBe(false);
     applyPlatformMetricChrome(root, { platform: 'youtube', facts: { support: tallySupportItems([{ kind: 'superchat', amount: 500, currency: 'JPY' }]) } });
-    expect(root.querySelector('[data-lane="giftHistory"]').hidden).toBe(false);
+    expect(document.documentElement.getAttribute('data-nl-gift-has')).toBe('1');
+    applyPlatformMetricChrome(root, { platform: 'youtube', facts: { support: null } });
+    expect(document.documentElement.getAttribute('data-nl-gift-has')).toBe('1');
+    const css = document.getElementById('nl-platform-capability-style')?.textContent || '';
+    expect(css).toContain('html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}');
   });
 
   it('ニコ生以外では、中身の無いギフト欄の点線の枠を出さない', () => {

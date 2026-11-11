@@ -75,6 +75,7 @@ const FOREIGN_STYLE = [
   'html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}',
   // ギフト欄の点線の枠: 中のギフト履歴が出ていない時は枠ごと出さない(番組累計ptは上で常に隠れる)
   'html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden]))){display:none!important;}',
+  'html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}',
   'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label,',
   'html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label,html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}',
   'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label::after{content:"同時視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
@@ -207,13 +208,16 @@ export function applyPlatformMetricChrome(root, state) {
     if (spec.label) setLaneLabel(root, name, spec.label);
     if (spec.sub) setLaneSub(root, name, spec.sub);
   }
-  // このPCの記録にスパチャ・ギフト等が1件も無いうちは、中身の無い欄(見出しと空の枠)を出さない(2026-11-11 PC 計測)
+  // このPCの記録にスパチャ・ギフト等が1件も無いうちは、中身の無い欄(見出しと空の枠)を出さない(2026-11-11 PC 計測)。
+  //   ニコ生の描画が欄を出し直すたびに一瞬見えないよう、欄の hidden ではなく <html> の印と CSS で決める。
+  //   印は「1件以上ある」と分かった時だけ付ける。集計が来ていない回は印を変えない(外すと一瞬出る/付けないと最初に空枠が出る)。
   const sup = facts && facts.support;
-  if (sup && sup.ready === true && plan.sections?.giftHistory?.show !== false) {
-    const n = (Number(sup.superchatCount) || 0) + (Number(sup.stickerCount) || 0)
-      + (Number(sup.membershipCount) || 0) + (Number(sup.membershipGiftCount) || 0);
-    const gh = laneEl(root, 'giftHistory');
-    if (gh && n === 0) hideEl(gh);
+  const rootHtml = /** @type {Document} */ (root).documentElement || root.ownerDocument?.documentElement;
+  if (rootHtml && sup && sup.ready === true) {
+    const has = (Number(sup.superchatCount) || 0) + (Number(sup.stickerCount) || 0)
+        + (Number(sup.membershipCount) || 0) + (Number(sup.membershipGiftCount) || 0) > 0;
+    if (has && rootHtml.getAttribute('data-nl-gift-has') !== '1') rootHtml.setAttribute('data-nl-gift-has', '1');
+    else if (!has && rootHtml.hasAttribute('data-nl-gift-has')) rootHtml.removeAttribute('data-nl-gift-has');
   }
   const pt = root.querySelector('#giftHistoryProgramPt');
   if (pt) hideEl(pt);
