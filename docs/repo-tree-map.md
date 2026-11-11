@@ -143,7 +143,9 @@ graph LR
   f6 --> f6_1["src/ab-content-entry.js"]
   f6 --> f6_2["lib/abema/abParse.js"]
   f6 --> f6_3["lib/abema/abParse.test.js"]
-  f6 --> f6_4["lib/platform/streamPlatform.js"]
+  f6 --> f6_4["lib/abema/abCommentPanel.js"]
+  f6 --> f6_5["lib/abema/abCommentPanel.test.js"]
+  f6 --> f6_6["lib/platform/streamPlatform.js"]
   HUB --> f7["横の欄の配信選び(YouTube 系)"]
   f7 --> f7_0["extension/sidepanel-iframe-boot-entry.js"]
   f7 --> f7_1["lib/youtube/ytPanelRoute.js"]
@@ -463,14 +465,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2438 件</sub>
+<sub>ファイル 2440 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（112 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（2138 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（2140 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（16 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -564,12 +566,14 @@ TikTok の配信のページ(/@<名前>/live)で、ページ自身の世界の�
 - [`council/tiktok-support-PLAN.md`](../council/tiktok-support-PLAN.md)
 
 ### ABEMA の配信を記録(本体に同梱)  〔ABEMA / 記録 / 他プラットフォーム〕
-ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が再生位置の近くだけ YouTube 版と同じ記録へ渡す。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
+ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が再生位置の近くだけ YouTube 版と同じ記録へ渡す。コメント欄が閉じているときは吹き出しを一度だけ開く。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
 
 - [`extension-youtube/src/ab-main-entry.js`](../extension-youtube/src/ab-main-entry.js)
 - [`extension-youtube/src/ab-content-entry.js`](../extension-youtube/src/ab-content-entry.js)
 - [`src/lib/abema/abParse.js`](../src/lib/abema/abParse.js)
 - [`src/lib/abema/abParse.test.js`](../src/lib/abema/abParse.test.js)
+- [`src/lib/abema/abCommentPanel.js`](../src/lib/abema/abCommentPanel.js)
+- [`src/lib/abema/abCommentPanel.test.js`](../src/lib/abema/abCommentPanel.test.js)
 - [`src/lib/platform/streamPlatform.js`](../src/lib/platform/streamPlatform.js)
 
 ### 横の欄の配信選び(YouTube 系)  〔横の欄 / コメビュ / 他プラットフォーム〕

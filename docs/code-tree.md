@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1238 件
+## ⚠️ 役割コメントが無いソース 10 / 1239 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1161,7 +1161,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2438)
+- 📁 **src/** (2440)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1493,8 +1493,10 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2138)
-    - 📁 **abema/** (2)
+  - 📁 **lib/** (2140)
+    - 📁 **abema/** (4)
+      - `abCommentPanel.js` — ABEMA のコメント欄は、開いているときだけ本文の取得が始まる。閉じたままでは件数だけが来る。
+      - `abCommentPanel.test.js`
       - `abParse.js` — ABEMA の放送ページが受け取ったコメント JSON を、YouTube 版の記録と同じ形にする(純関数)
       - `abParse.test.js`
     - 📁 **fixtures/** (2)

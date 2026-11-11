@@ -171,12 +171,13 @@ export function abChatIdFromUrl(url) {
   } catch {
     return '';
   }
-  const m = /\/v1\/chats\/([^/]+)\/messages/.exec(u.pathname);
-  if (!m) return '';
+  const m = /\/v1\/chats\/([^/]+)\/messages|\/v1\/slots\/([^/]+)\/comments/.exec(u.pathname);
+  const raw = m ? (m[1] || m[2] || '') : '';
+  if (!raw) return '';
   try {
-    return abSessionOfChatId(decodeURIComponent(m[1]));
+    return abSessionOfChatId(decodeURIComponent(raw));
   } catch {
-    return abSessionOfChatId(m[1]);
+    return abSessionOfChatId(raw);
   }
 }
 
@@ -208,9 +209,9 @@ function pickIcon(m) {
 function messageKey(m, userId, elapsed, text) {
   const chat = str(m.chatArin || m.chatId);
   const arin = str(m.arin);
-  if (arin && arin !== chat && /^[A-Za-z0-9_.:-]{4,120}$/.test(arin)) return arin;
+  if (arin && arin !== chat && /^[A-Za-z0-9_.:-]{4,200}$/.test(arin)) return arin;
   const id = str(m.id || m.key);
-  if (id && /^[A-Za-z0-9_.:-]{4,120}$/.test(id)) return id;
+  if (id && /^[A-Za-z0-9_.:-]{4,200}$/.test(id)) return id;
   const head = text.slice(0, 40);
   if (!head) return '';
   return `${userId}:${elapsed == null ? 'x' : Math.floor(elapsed)}:${head}`;
@@ -218,7 +219,7 @@ function messageKey(m, userId, elapsed, text) {
 
 /**
  * @param {unknown} raw
- * @returns {{ key: string, userId: string, name: string, iconUrl: string, text: string, elapsedMs: number | null, chatId: string } | null}
+ * @returns {{ key: string, userId: string, name: string, iconUrl: string, text: string, elapsedMs: number | null, createdAtMs: number | null, chatId: string } | null}
  */
 function normalizeMessage(raw) {
   const m = obj(raw);
@@ -238,6 +239,7 @@ function normalizeMessage(raw) {
     iconUrl: safeAbImageUrl(pickIcon(m)),
     text,
     elapsedMs: elapsed != null && elapsed < 1e12 ? elapsed : null,
+    createdAtMs: clockMs(m.createdAtMs),
     chatId: abSessionOfChatId(m.chatArin || m.chatId),
   };
 }
@@ -319,38 +321,54 @@ function viewersOf(v) {
 }
 
 /**
- * 再生位置の近くだけ残す。時刻が無いコメントは残す(いま届いたものとして扱う)。
- * @param {ReadonlyArray<{ elapsedMs: number | null }>} messages
+ * 再生位置の近くだけ残す。時刻は createdAtMs（壁時計）を優先し、無ければ elapsedMs。
+ * 新しい順でも古い順でも時刻で並べ、新しい端から 20 秒だけ残す。
+ * 最初の limit=100（since なし）は過去分が混ざるので、その新しい端だけを残し、読み上げに流さない。
+ * since が壁時計なら createdAtMs と、番組内の経過なら elapsedMs と比べる。
+ * 時刻が無い束は、ABEMA の新しい順に合わせて先頭 20 件まで。
+ * @param {ReadonlyArray<{ elapsedMs?: number | null, createdAtMs?: number | null }>} messages
  * @param {{ sinceMs?: number | null, untilMs?: number | null }} [win]
  */
 export function abMessagesNearPlayhead(messages, win = {}) {
   const list = Array.isArray(messages) ? messages.slice() : [];
-  const bounds = [numOrNull(win.sinceMs), numOrNull(win.untilMs)].filter((n) => n != null);
-  const elapsed = list.map((m) => m.elapsedMs).filter((n) => n != null);
-  const msgMax = elapsed.length ? Math.max(...elapsed) : null;
-  const msgMin = elapsed.length ? Math.min(...elapsed) : null;
-  let head = /** @type {number | null} */ (null);
-  let span = /** @type {number | null} */ (null);
+  const axis = list.some((m) => m && m.createdAtMs != null) ? 'created' : 'elapsed';
+  /** @param {any} m */
+  const atOf = (m) => {
+    if (!m) return null;
+    return axis === 'created' ? numOrNull(m.createdAtMs) : numOrNull(m.elapsedMs);
+  };
+  const known = list.filter((m) => atOf(m) != null);
+  if (!known.length) return list.length > 20 ? list.slice(0, 20) : list.slice();
+  /** @type {number[]} */
+  const times = known.map((m) => /** @type {number} */ (atOf(m)));
+  const newest = Math.max(...times);
+  const oldest = Math.min(...times);
+  const epoch = newest > 1e12;
+  /** @type {number[]} */
+  const bounds = [numOrNull(win.sinceMs), numOrNull(win.untilMs)].filter((n) => n != null && (epoch ? n > 1e12 : n <= 1e12));
+  let head = newest;
+  let span = newest - oldest;
   if (bounds.length >= 2) {
-    head = Math.max(...bounds);
-    span = head - Math.min(...bounds);
+    head = Math.max(bounds[0], bounds[1]);
+    span = Math.abs(bounds[0] - bounds[1]);
   } else if (bounds.length === 1) {
-    const b = bounds[0];
-    if (msgMax != null && msgMax > b + AB_PLAYHEAD_KEEP_MS) {
-      head = msgMax;
-      span = msgMax - Math.min(b, msgMin ?? b);
+    const edge = bounds[0];
+    if (newest > edge + AB_PLAYHEAD_KEEP_MS) {
+      head = newest;
+      span = newest - Math.min(edge, oldest);
     } else {
-      head = Math.max(b, msgMax ?? b);
+      head = Math.max(edge, newest);
+      span = head - Math.min(edge, oldest);
     }
-  } else if (msgMax != null) {
-    head = msgMax;
-    span = msgMin == null ? null : msgMax - msgMin;
   }
-  if (head == null) return list.length > 20 ? list.slice(-20) : list;
-  if (span != null && span <= AB_TIGHT_WINDOW_MS) return list;
+  const ordered = known.slice().sort((a, b) => /** @type {number} */ (atOf(a)) - /** @type {number} */ (atOf(b)));
+  if (span <= AB_TIGHT_WINDOW_MS) return ordered;
   const lo = head - AB_PLAYHEAD_KEEP_MS;
   const hi = head + 5000;
-  return list.filter((m) => m.elapsedMs == null || (m.elapsedMs >= lo && m.elapsedMs <= hi));
+  return ordered.filter((m) => {
+    const at = atOf(m);
+    return at != null && at >= lo && at <= hi;
+  });
 }
 
 /**
@@ -400,6 +418,7 @@ export function shrinkAbPayload(raw) {
         iconUrl: m.iconUrl,
         text: m.text,
         elapsedMs: m.elapsedMs,
+        createdAtMs: m.createdAtMs,
         chatId: m.chatId,
       })),
     };

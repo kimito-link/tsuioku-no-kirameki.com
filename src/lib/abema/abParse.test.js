@@ -9,6 +9,7 @@ import {
   safeAbImageUrl,
   isAbCommentUrl,
   abCommentWindowFromUrl,
+  abChatIdFromUrl,
   parseAbCommentBatch,
   parseAbProgramMeta,
   abMessagesNearPlayhead,
@@ -91,9 +92,9 @@ describe('ABEMA のコメント JSON', () => {
     const tight = abMessagesNearPlayhead(batch.messages, { sinceMs: 12_000, untilMs: 0 });
     expect(tight).toHaveLength(3);
   });
-  it('時刻の無い束は末尾 20 件まで残す', () => {
-    const messages = Array.from({ length: 30 }, (_, i) => ({ elapsedMs: null, text: String(i) }));
-    expect(abMessagesNearPlayhead(messages).map((m) => m.text)).toEqual(messages.slice(-20).map((m) => m.text));
+  it('時刻の無い新しい順の束は先頭 20 件まで残す', () => {
+    const messages = Array.from({ length: 30 }, (_, i) => ({ elapsedMs: null, createdAtMs: null, text: String(i) }));
+    expect(abMessagesNearPlayhead(messages).map((m) => m.text)).toEqual(messages.slice(0, 20).map((m) => m.text));
     expect(abMessagesNearPlayhead(messages.slice(0, 5))).toHaveLength(5);
   });
   it('since だけが古い端のときは、届いた中の新しい端に合わせる', () => {
@@ -109,6 +110,45 @@ describe('ABEMA のコメント JSON', () => {
     expect(row.kind).toBe('text');
     expect(row.postedAtMs).toBe(1_700_000_000_000);
     expect(row.id.startsWith('ab-')).toBe(true);
+  });
+  it('実測の comments は新しい順。過去の 100 件は新しい端だけ残す', () => {
+    const newest = 1_794_364_815_754;
+    const id = 'abm1.chat.chat.11111111-1111-4111-8111-111111111111.01ARZ3NDEKTSV4RRFFQ69G5FAV';
+    const comments = [
+      { id, message: 'いま', createdAtMs: newest, userId: 'A2AmVn58ed3nrb' },
+      { id: `${id}b`, message: '20秒前', createdAtMs: newest - 15_000, userId: 'B3BmWn69fe4osc' },
+      { id: `${id}c`, message: '2分前', createdAtMs: newest - 120_000, userId: 'C4CnXo70gf5ptd' },
+    ];
+    for (let i = 0; i < 97; i += 1) {
+      comments.push({
+        id: `${id}${i}`,
+        message: `むかし${i}`,
+        createdAtMs: newest - 180_000 - i * 1000,
+        userId: 'D5DoYp81hg6que',
+      });
+    }
+    const batch = parseAbCommentBatch({ comments });
+    expect(batch?.messages[0].name).toBe('A2AmVn58ed3nrb');
+    expect(batch?.messages[0].iconUrl).toBe('');
+    expect(batch?.messages[0].createdAtMs).toBe(newest);
+    expect(batch?.messages[0].key).toBe(id);
+    const first = abMessagesNearPlayhead(batch?.messages, {});
+    expect(first.map((m) => m.text)).toEqual(['20秒前', 'いま']);
+    const live = abMessagesNearPlayhead(batch?.messages, { sinceMs: newest });
+    expect(live.map((m) => m.text)).toEqual(['20秒前', 'いま']);
+    const next = parseAbCommentBatch({
+      comments: [{ id: `${id}n`, message: 'つぎ', createdAtMs: newest + 4_000, userId: 'A2AmVn58ed3nrb' }],
+    });
+    expect(abMessagesNearPlayhead(next?.messages, { sinceMs: newest }).map((m) => m.text)).toEqual(['つぎ']);
+    const shrunk = shrinkAbPayload({ comments });
+    expect(shrunk.messages[0].createdAtMs).toBe(newest);
+    expect(JSON.stringify(shrunk)).not.toContain('A2AmVn58ed3nrb-secret');
+  });
+  it('視聴数だけの応答はコメントにしない', () => {
+    const stats = { stats: { view: 11580, comment: 580 } };
+    expect(parseAbCommentBatch(stats)).toBe(null);
+    expect(parseAbProgramMeta(stats)).toBe(null);
+    expect(shrinkAbPayload(stats)).toBe(null);
   });
   it('縮めた JSON に認可や知らない欄は残さない', () => {
     const shrunk = shrinkAbPayload({ ...FIXTURE_CHAT_MESSAGES, authorization: 'secret', token: 'nope' });
@@ -138,6 +178,8 @@ describe('ABEMA の番組情報と URL', () => {
   });
   it('チャット id の末尾がセッションになる', () => {
     expect(abSessionOfChatId('abm1.chat.chat.program1')).toBe('program1');
+    expect(abChatIdFromUrl('https://api.p-c3-e.abema-tv.com/v1/slots/E8tvAnMJ7a9a5d/comments?limit=100')).toBe('e8tvanmj7a9a5d');
+    expect(abChatIdFromUrl('https://api.p-c3-e.abema-tv.com/v1/slots/E8tvAnMJ7a9a5d/comments?since=1794364815754&limit=100')).toBe('e8tvanmj7a9a5d');
     expect(buildAbStreamKey('n-abema-news', { chatId: 'abm1.chat.chat.program1' })).toBe('ab.n-abema-news.program1');
     expect(isAbStreamKey('ab.n-abema-news.00000')).toBe(true);
     expect(abLoginOfStreamKey('ab.n-abema-news.program1')).toBe('n-abema-news');

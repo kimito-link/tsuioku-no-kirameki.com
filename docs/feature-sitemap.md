@@ -960,11 +960,13 @@
   - `src/lib/platform/streamPlatform.js`
   - `tests/e2e/tiktok-recording.spec.js`
   - `council/tiktok-support-PLAN.md`
-- **ABEMA の配信を記録(本体に同梱)** — ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が再生位置の近くだけ YouTube 版と同じ記録へ渡す。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
+- **ABEMA の配信を記録(本体に同梱)** — ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が再生位置の近くだけ YouTube 版と同じ記録へ渡す。コメント欄が閉じているときは吹き出しを一度だけ開く。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
   - `extension-youtube/src/ab-main-entry.js`
   - `extension-youtube/src/ab-content-entry.js`
   - `src/lib/abema/abParse.js`
   - `src/lib/abema/abParse.test.js`
+  - `src/lib/abema/abCommentPanel.js`
+  - `src/lib/abema/abCommentPanel.test.js`
   - `src/lib/platform/streamPlatform.js`
 - **横の欄の配信選び(YouTube 系)** — 横の欄・コメビュが YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA のどの配信を出すかをニコ生版と同じ3層で決める。外枠は前面タブの配信キーを iframe の src(&stream=)に焼いて配信が変わったら読み込み直す・配信ページが「最後に見た配信」(yt_last_stream_url)を自分で書く・shim がそれを疑似 lv に翻訳して渡す・探り読み(2配信以上の comments)には答えない。記録の無い部屋は仮の配信キー。計器 yt_diag_panel_stream_<画面>
   - `src/extension/sidepanel-iframe-boot-entry.js`
@@ -1498,7 +1500,8 @@
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 
-### 🎈 吹き出し (1版)
+### 🎈 吹き出し (2版)
+- `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
 
 ### 🎁 ギフト (6版)

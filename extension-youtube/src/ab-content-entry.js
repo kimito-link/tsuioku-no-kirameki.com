@@ -12,6 +12,16 @@ import {
   abMessagesNearPlayhead,
   abCommentRow,
 } from '../../src/lib/abema/abParse.js';
+import {
+  AB_COMMENT_AREA_SEL,
+  AB_OPEN_COMMENT_KEY,
+  AB_PANEL_NOTE,
+  AB_PANEL_POLL_MS,
+  AB_PANEL_WAIT_MS,
+  abOpenCommentEnabled,
+  createAbPanelController,
+  stepAbCommentPanel,
+} from '../../src/lib/abema/abCommentPanel.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 
 const OUT = 'nl-ab-iso';
@@ -178,6 +188,89 @@ function hideNote() {
   document.getElementById(NOTE_ID)?.remove();
 }
 
+const panel = createAbPanelController();
+let autoOpen = true;
+let settingReady = false;
+let lastPanelAt = 0;
+
+function loadAutoOpen() {
+  try {
+    chrome.storage.local.get(AB_OPEN_COMMENT_KEY, (bag) => {
+      autoOpen = abOpenCommentEnabled(bag?.[AB_OPEN_COMMENT_KEY]);
+      settingReady = true;
+      syncSettingChip();
+      pollPanel(true);
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes?.[AB_OPEN_COMMENT_KEY]) return;
+      autoOpen = abOpenCommentEnabled(changes[AB_OPEN_COMMENT_KEY].newValue);
+      syncSettingChip();
+    });
+  } catch {
+    settingReady = true;
+  }
+}
+
+function syncSettingChip() {
+  if (!pageLogin || !document.body) {
+    document.getElementById('nl-ab-open')?.remove();
+    return;
+  }
+  let box = document.getElementById('nl-ab-open');
+  if (!box) {
+    box = document.createElement('label');
+    box.id = 'nl-ab-open';
+    box.style.cssText = [
+      'position:fixed',
+      'left:12px',
+      'bottom:12px',
+      'z-index:2147483646',
+      'display:flex',
+      'align-items:center',
+      'gap:6px',
+      'max-width:min(280px,calc(100vw - 24px))',
+      'padding:8px 10px',
+      'border-radius:10px',
+      'background:rgba(20,20,28,.92)',
+      'color:#fff',
+      'font:12px/1.4 system-ui,sans-serif',
+    ].join(';');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = autoOpen;
+    input.addEventListener('change', () => {
+      autoOpen = input.checked;
+      try {
+        chrome.storage.local.set({ [AB_OPEN_COMMENT_KEY]: input.checked });
+      } catch {
+        /* 拡張が入れ替わった直後 */
+      }
+    });
+    const span = document.createElement('span');
+    span.textContent = 'コメント欄を自動で開く';
+    box.append(input, span);
+    document.body.appendChild(box);
+  }
+  const input = box.querySelector('input');
+  if (input instanceof HTMLInputElement && input.checked !== autoOpen) input.checked = autoOpen;
+}
+
+/** @param {boolean} [force] */
+function pollPanel(force) {
+  if (!pageLogin || !settingReady) return;
+  const now = Date.now();
+  if (!force && now - lastPanelAt < AB_PANEL_POLL_MS) return;
+  lastPanelAt = now;
+  stepAbCommentPanel(panel, document, { enabled: autoOpen, now });
+}
+
+function panelNeedsHand() {
+  if (document.querySelector(AB_COMMENT_AREA_SEL)) return false;
+  const st = panel.status();
+  if (st.sawArea || !autoOpen || st.clicked) return true;
+  return !!(st.startedAt && Date.now() - st.startedAt > AB_PANEL_WAIT_MS);
+}
+
 function maybeNote() {
   if (!pageLogin || sawPayload || dismissed) {
     if (sawPayload) hideNote();
@@ -185,6 +278,10 @@ function maybeNote() {
   }
   if (denied) {
     showNote('追憶のきらめき: コメントを読めませんでした。ログインが必要な配信かもしれません。');
+    return;
+  }
+  if (panelNeedsHand()) {
+    showNote(`追憶のきらめき: ${AB_PANEL_NOTE}`);
     return;
   }
   if (watchStartedAt && Date.now() - watchStartedAt >= WAIT_MS) {
@@ -247,6 +344,8 @@ function syncPage() {
   program = { title: '', startedAtMs: null, viewers: null };
   seen = new Set();
   pending = [];
+  panel.reset();
+  lastPanelAt = 0;
   diag.pageLogin = login;
   diag.chatId = '';
   diag.denied = false;
@@ -360,9 +459,12 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
+loadAutoOpen();
 syncPage();
 setInterval(() => {
   syncPage();
+  pollPanel(false);
   maybeNote();
+  syncSettingChip();
 }, 1000);
 window.addEventListener('pagehide', () => endStream());
