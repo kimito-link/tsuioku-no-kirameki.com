@@ -40,13 +40,18 @@ async function readRaw(local) {
 }
 
 /**
- * @param {ReturnType<typeof storageLocal>} local
- * @param {unknown} plain
+ * @param {unknown} payload
+ * @returns {Promise<void>}
  */
 function persistVoiceReadingScript(payload) {
   return chrome.storage.local.set({ [KEY_VOICE_READING_SCRIPT]: payload });
 }
 
+/**
+ * @param {ReturnType<typeof storageLocal>} local
+ * @param {unknown} plain
+ * @returns {Promise<void>}
+ */
 async function writeRaw(local, plain) {
   const payload = voiceReadingScriptToStorage(plain);
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local && local === chrome.storage.local) {
@@ -57,18 +62,26 @@ async function writeRaw(local, plain) {
 }
 
 /**
+ * @template {keyof HTMLElementTagNameMap} T
  * @param {ParentNode} root
- * @param {string} tag
+ * @param {T} tag
  * @param {string} text
  * @param {string} [className]
+ * @returns {HTMLElementTagNameMap[T]}
  */
 function el(root, tag, text, className) {
   const node = root.ownerDocument.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
-  return node;
+  return /** @type {HTMLElementTagNameMap[T]} */ (node);
 }
 
+/**
+ * @param {Document} doc
+ * @param {string} labelText
+ * @param {HTMLElement} control
+ * @returns {HTMLLabelElement}
+ */
 function field(doc, labelText, control) {
   const wrap = doc.createElement('label');
   wrap.className = 'nl-vrs__field';
@@ -221,6 +234,7 @@ function openPanel(doc, local, anchor) {
   backdrop.append(panel);
   shadow.append(backdrop);
 
+  /** @param {KeyboardEvent} event */
   const onKey = (event) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -236,6 +250,11 @@ function openPanel(doc, local, anchor) {
     if (anchor instanceof HTMLElement) anchor.focus();
   }
 
+  /**
+   * @param {unknown} [next]
+   * @param {boolean} [quiet]
+   * @returns {Promise<boolean>}
+   */
   async function persist(next, quiet) {
     current = compileVoiceReadingScript(next || collect());
     try {
@@ -271,6 +290,7 @@ function openPanel(doc, local, anchor) {
     };
   }
 
+  /** @param {string} text */
   function setStatus(text) {
     const node = panel.querySelector('[data-status]');
     if (node) node.textContent = text;
@@ -294,6 +314,7 @@ function openPanel(doc, local, anchor) {
     node.append(el(node, 'div', '見本の名前を入れています。名前が空のときは、先頭の「さん」や読点は読みません。'));
   }
 
+  /** @param {ReturnType<typeof compileVoiceReadingScript>} script */
   function render(script) {
     current = script;
     panel.textContent = '';
@@ -412,7 +433,7 @@ function openPanel(doc, local, anchor) {
       const reader = new FileReader();
       reader.onload = () => {
         const parsed = parseVoiceReadingImport(String(reader.result || ''));
-        if (!parsed.ok) {
+        if (parsed.ok === false) {
           setStatus(IMPORT_NOTE[parsed.reason] || '読み取れませんでした');
           return;
         }
@@ -428,7 +449,7 @@ function openPanel(doc, local, anchor) {
     actions.append(exportBtn, importBtn, file);
     dictSec.append(actions, el(dictSec, 'div', '', 'preview'));
     const preview = dictSec.querySelector('.preview');
-    if (preview) preview.dataset.preview = '1';
+    if (preview instanceof HTMLElement) preview.dataset.preview = '1';
 
     const typeSec = doc.createElement('section');
     typeSec.className = 'section';
@@ -510,7 +531,7 @@ function openPanel(doc, local, anchor) {
 
     panel.append(dictSec, typeSec, exSec, el(panel, 'p', '', 'status'));
     const status = panel.querySelector('.status');
-    if (status) status.dataset.status = '1';
+    if (status instanceof HTMLElement) status.dataset.status = '1';
     paintPreview();
     if (!host.dataset.ready) {
       host.dataset.ready = '1';

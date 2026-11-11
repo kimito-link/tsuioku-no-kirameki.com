@@ -64,6 +64,8 @@ function escapeRegExp(word) {
 
 /**
  * @param {unknown} raw
+ * @param {string} fallback
+ * @param {readonly string[] | null | undefined} required
  * @returns {string}
  */
 function cleanTemplate(raw, fallback, required) {
@@ -137,6 +139,7 @@ export function compileReadingDictionary(dictionary) {
     .sort((a, b) => b.word.length - a.word.length || a.i - b.i);
   const re = new RegExp(sorted.map((e) => escapeRegExp(e.word)).join('|'), 'g');
   const map = new Map(sorted.map((e) => [e.word, e.reading]));
+  /** @param {string} text */
   const apply = (text) => {
     const s = String(text ?? '');
     if (!s) return '';
@@ -225,7 +228,23 @@ export function compileVoiceReadingScript(raw) {
 export const EMPTY_VOICE_READING_SCRIPT = compileVoiceReadingScript(null);
 
 /**
- * @param {ReturnType<typeof compileVoiceReadingScript>} script
+ * @typedef {ReturnType<typeof compileVoiceReadingScript>} CompiledVoiceReadingScript
+ */
+
+/**
+ * 声の文を組み立てる材料。コメントは text、ギフトは gift / count / message。
+ * @typedef {{
+ *   kind?: unknown,
+ *   name?: unknown,
+ *   text?: unknown,
+ *   gift?: unknown,
+ *   count?: unknown,
+ *   message?: unknown
+ * }} VoiceReadingParts
+ */
+
+/**
+ * @param {unknown} script
  */
 export function voiceReadingScriptToStorage(script) {
   const n = normalizeVoiceReadingScript(script);
@@ -408,7 +427,9 @@ function prepareField(text, applyDict, limit) {
  */
 export function composeVoiceReading(reading, opts = {}) {
   const script = opts.script || EMPTY_VOICE_READING_SCRIPT;
-  const applyDict = typeof script.applyDict === 'function' ? script.applyDict : (s) => String(s ?? '');
+  const applyDict = typeof script.applyDict === 'function'
+    ? script.applyDict
+    : /** @param {string} s */ (s) => String(s ?? '');
   const limit = resolveVoiceMaxChars(opts.maxChars);
   const name = normalizeVoiceReadingBody(applyDict(String(reading?.name || '').trim()));
 

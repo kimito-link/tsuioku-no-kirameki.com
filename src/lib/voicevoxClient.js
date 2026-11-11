@@ -934,7 +934,7 @@ export async function synthesizeVoice(text, voice, opts = {}) {
  * 名前とコメント本文から読み上げ文字列を作る。
  * 辞書と読み方の型が無いときは、これまでどおり「名前、本文」(名前が空なら本文だけ)。
  * @param {{ name?: unknown, text?: unknown }|null|undefined} row
- * @param {{ maxChars?: unknown, script?: object }} [opts]
+ * @param {{ maxChars?: unknown, script?: import('./voiceReadingScript.js').CompiledVoiceReadingScript | null }} [opts]
  * @returns {string}
  */
 export function buildVoiceReadingText(row, { maxChars = 60, script } = {}) {
@@ -949,8 +949,8 @@ export function buildVoiceReadingText(row, { maxChars = 60, script } = {}) {
 
 /**
  * 集約件数を含む読み上げ文字列を作る。
- * @param {{ name?: unknown, body?: unknown, count?: unknown }|null|undefined} item
- * @param {{ maxChars?: unknown }} [opts]
+ * @param {{ name?: unknown, body?: unknown, count?: unknown, reading?: import('./voiceReadingScript.js').VoiceReadingParts }|null|undefined} item
+ * @param {{ maxChars?: unknown, script?: import('./voiceReadingScript.js').CompiledVoiceReadingScript | null }} [opts]
  * @returns {string}
  */
 export function buildMergedVoiceText(item, { maxChars, script } = {}) {
