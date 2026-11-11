@@ -83,16 +83,30 @@ export function resolveBroadcasterFollowTarget(snapshot) {
   const lvNum = Number(snapshot.broadcasterLevel);
   const level = Number.isFinite(lvNum) && lvNum > 0 ? lvNum : null;
 
-  // 1. 数値 uid → user 経路（既存挙動）。アイコン URL は reportUserThumb の
-  //    `buildNiconicoDefaultUserIconUrl` と完全に揃える（5〜14 桁の数値以外は空）。
+  // 1. 数値 uid → user 経路。ニコニコの人は従来どおり CDN の usericon。
+  //    他のサービス(数値 uid は合成)は、配信者のページがそのサービスの URL で来る。
+  //    そのときはそのページと、ニコニコ以外の絵を出す。絵が無いときに CDN の既定アイコンへ落とすと、
+  //    読める白い丸のまま残るので、顔は空にしてタイル側へ任せる。
   if (/^\d+$/.test(uid)) {
-    const iconFromCdn = buildNiconicoDefaultUserIconUrl(uid);
+    const isNicoUrl = (/** @type {string} */ u) => /nicovideo\.jp|nimg\.jp|nico\.ms/i.test(u);
+    const foreignPage = /^https:\/\//i.test(pageUrlRaw) && !isNicoUrl(pageUrlRaw);
+    const foreignIcon = /^https:\/\//i.test(iconUrlRaw) && !isNicoUrl(iconUrlRaw);
+    if (foreignPage) {
+      return {
+        kind: 'user',
+        name,
+        level,
+        pageUrl: pageUrlRaw,
+        iconUrl: foreignIcon ? iconUrlRaw : '',
+        followLabel: 'チャンネルを見る'
+      };
+    }
     return {
       kind: 'user',
       name,
       level,
       pageUrl: `https://www.nicovideo.jp/user/${uid}`,
-      iconUrl: iconFromCdn,
+      iconUrl: foreignIcon ? iconUrlRaw : buildNiconicoDefaultUserIconUrl(uid),
       followLabel: 'フォロー'
     };
   }

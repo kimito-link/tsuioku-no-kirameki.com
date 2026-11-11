@@ -418,7 +418,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const plat = platformOfStreamKey(videoId);
   if (plat && chId.startsWith(plat.personHead) && handle) loginByPersonKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
-  const bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
+  let bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
+  // 絵が無いと、サイドパネルはニコニコの白い既定アイコンを出す。サービスが配信者の絵(公開ロゴなど)を持つなら、それで埋める。
+  if (plat?.casterIconUrl && (!bIcon || /nicovideo\.jp|nimg\.jp/i.test(bIcon))) bIcon = plat.casterIconUrl(plat.loginOfStreamKey(videoId)) || bIcon;
   if (bUid && bIcon) ytIconByNumericUid.set(bUid, bIcon);
   return {
     title: tabTitle || String(sum?.title || ''),
@@ -456,6 +458,14 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     recordedCountHint: typeof sum?.itemCount === 'number' ? sum.itemCount : null, // 同じく、記録件数(まとめの itemCount)
     viewerCountSource: 'dom',
     officialViewerCount: Number.isFinite(viewers) && viewers > 0 ? viewers : null, // 0 は「まだ読めていない」(開始時の0人で平均が下がっていた)
+    // ABEMA の番組詳細の視聴数。同時接続の欄には入れない（見出しは「公式の視聴数」）。
+    slotViewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount > 0 && sum.slotViewCount <= 50_000_000
+      ? Math.floor(sum.slotViewCount)
+      : null,
+    // ページに出ているコメント数（ABEMA の下のバー）。記録の件数ではない。
+    slotCommentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 && sum.slotCommentCount <= 50_000_000
+      ? Math.floor(sum.slotCommentCount)
+      : null,
     officialViewerStale: Number.isFinite(viewers) && viewers > 0 && sum?.viewersStale === true,
     officialViewerReadAt: Number(sum?.viewersReadAt || 0) || null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
@@ -1788,6 +1798,19 @@ function ytLabelForUid(uid) {
   return key.length <= 18 ? key : `${key.slice(0, 8)}…${key.slice(-6)}`;
 }
 
+/**
+ * 「名前 ・ ID:疑似ID」で、その人に見せられる ID が無いとき(ID を持たないサービスの人など)は、
+ * 空の「・ ID:」を残さず、区切りごと消す。見せられる ID があればそれに置き換える。
+ * @param {string} text
+ */
+export function ytDropEmptyIdTag(text) {
+  return String(text).replace(/(\s*・\s*)?ID[:：]\s?(8\d{9})(?!\d)/g, (all, sep, uid) => {
+    if (!ytKeyForNumericUid(uid)) return all;
+    const label = ytLabelForUid(uid);
+    return label ? `${sep || ''}ID:${label}` : '';
+  });
+}
+
 // 疑似 lv(lv9…)の放送 URL・番号は YouTube の動画に戻す(分かる配信だけ)。
 const PSEUDO_WATCH_URL_RE = /https?:\/\/live\.nicovideo\.jp\/watch\/(lv9\d{11})/g;
 const PSEUDO_LV_RE = /\blv9\d{11}\b/g;
@@ -1934,6 +1957,7 @@ function fixTextNode(node) {
     }
   }
   let next = screenWording(v); // ニコニコの言葉 → YouTube(Twitch・Kick)の言葉(決まった文言だけ)
+  if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
   if (/lv9\d{11}/.test(next)) next = ytFixPseudoLvText(next);
   if (next !== v) node.nodeValue = next;
@@ -2007,6 +2031,7 @@ function fixTitleAttr(el) {
     const t = el.getAttribute(name);
     if (!t) continue;
     let next = screenWording(t);
+    if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
     if (next !== t) el.setAttribute(name, next);
   }

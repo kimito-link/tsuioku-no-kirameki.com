@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1242 件
+## ⚠️ 役割コメントが無いソース 10 / 1246 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -803,7 +803,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (158)
+- 📁 **extension-youtube/** (160)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -927,7 +927,9 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (29)
+  - 📁 **src/** (31)
+    - `ab-content-entry.js` — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
+    - `ab-main-entry.js` — ABEMA のページ自身の世界(MAIN)で動く小さな写し役。
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
@@ -938,7 +940,7 @@
     - `mx-content-entry.js` — ミクチャの配信ページ(mixch.tv/u/<番号>/live)で、コメントとギフトを読んで記録に渡す入口。
     - `offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
     - `pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
-    - `pfLastStreamUrl.js` — YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページが、
+    - `pfLastStreamUrl.js` — YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA)の配信ページが、
     - `sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
     - `sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
     - `sidepanel-yt-parts.html`
@@ -1189,7 +1191,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2428)
+- 📁 **src/** (2434)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1496,7 +1498,13 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2145)
+  - 📁 **lib/** (2151)
+    - 📁 **abema/** (5)
+      - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
+      - `abCommentPanel.test.js`
+      - `abCommentPanelOwnUi.test.js`
+      - `abParse.js` — ABEMA の放送ページが受け取ったコメント JSON を、YouTube 版の記録と同じ形にする(純関数)
+      - `abParse.test.js`
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1559,7 +1567,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (84)
+    - 📁 **youtube/** (85)
       - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -1592,6 +1600,7 @@
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
       - `ytMergedIsolation.test.js`
       - `ytNicoShim.test.js`
+      - `ytNicoShimEmptyIdTag.test.js`
       - `ytNicoShimHandleFirst.test.js`
       - `ytNicoShimHandleUrl.test.js`
       - `ytNicoShimPlaceholder.test.js`
@@ -3684,17 +3693,19 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (94)
+- 📁 **tests/** (98)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (87)
+  - 📁 **e2e/** (91)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
           - `index.html`
+    - `abema-caster-thumb.spec.js`
+    - `abema-column-pickup.spec.js`
     - `acquisition-dashboard-render.spec.js`
     - `ad-ranking-card-no-clip.spec.js`
     - `avatar-load-diag.spec.js`
@@ -3777,6 +3788,8 @@
     - `twitch-recording.spec.js`
     - `venue-entry-effect.spec.js`
     - `venue-pickup-drag.spec.js`
+    - `venue-pickup-resize.spec.js`
+    - `venue-pickup-width.spec.js`
     - `venue-stat-strip.spec.js`
     - `watch-messaging.spec.js`
     - `whowatch-recording.spec.js`

@@ -1,4 +1,4 @@
-// pfLastStreamUrl.js — YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページが、
+// pfLastStreamUrl.js — YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA)の配信ページが、
 //   「最後に見た配信」を自分で記録する部品(0.1.1948・council/panel-stream-selection-SPEC.md §4-C1)。
 //
 // ★ニコ生版の content-entry.js `rememberWatchPageUrl` の完全コピー(同じ決まり):

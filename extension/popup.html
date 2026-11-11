@@ -6095,8 +6095,9 @@
         width: 26px;
         height: 26px;
         border-radius: 50%;
-        object-fit: cover;
-        background: var(--nl-surface);
+        object-fit: contain;
+        object-position: center;
+        background: #101418;
         border: 2px solid color-mix(in srgb, var(--nl-accent, #3b82f6) 30%, transparent);
         flex-shrink: 0;
       }
@@ -6301,8 +6302,11 @@
 
       .nl-comment-ticker {
         flex: 1 1 160px;
-        min-width: min(100%, 140px);
+        min-width: min(20em, 100%);
         max-width: 100%;
+        width: 100%;
+        container-type: inline-size;
+        container-name: nl-ticker;
       }
 
       .nl-comment-ticker__viewport {
@@ -6319,7 +6323,8 @@
          *   ★アニメーションは translateX(横流れ)なので、縦に伸ばしても壊れない
          *     (批判役は translateY と述べたが実コードは translateX = 裏取りで否定)。
          */
-        height: calc(clamp(32px, 9vw, 44px) * var(--nl-band-scale, 1.6));
+        height: auto;
+        min-height: calc(clamp(32px, 9vw, 44px) * var(--nl-band-scale, 1.6));
         border-radius: 10px;
         background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
         border: 1px solid #93c5fd;
@@ -6406,16 +6411,22 @@
 
       .nl-ticker-latest {
         display: block;
+        width: 100%;
         max-width: 100%;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: normal;
       }
 
       .nl-ticker-latest__row {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
-        gap: 6px;
+        column-gap: 6px;
+        row-gap: 2px;
+        width: 100%;
+        max-width: 100%;
         min-width: 0;
       }
 
@@ -6431,12 +6442,11 @@
       }
 
       .nl-ticker-latest__name {
-        flex: 0 1 auto;
         min-width: 0;
-        max-width: 11em;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        word-break: normal;
       }
 
       /* 数値 ID ユーザーの場合、ティッカーの行全体を niconico ユーザーページへの
@@ -6470,11 +6480,16 @@
       }
 
       .nl-ticker-latest__text {
-        flex: 1 1 0;
-        min-width: 3em;
+        grid-column: 1 / -1;
+        min-width: 0;
+        max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        word-break: normal;
+        overflow-wrap: normal;
+        /* 欄の幅で約20文字。広い画面は帯の大きな文字(1em)のまま。 */
+        font-size: clamp(12px, calc(100cqi / 20), 1em);
       }
 
       .nl-ticker-sep {
@@ -6783,12 +6798,18 @@
       }
 
       .nl-stats-bar .nl-comment-ticker {
-        grid-column: 2;
+        grid-column: 1 / -1;
+        grid-row: 2;
         position: relative;
         z-index: 0;
-        min-width: 0;
+        min-width: min(20em, 100%);
         width: 100%;
         max-width: 100%;
+      }
+
+      .nl-stats-bar .nl-support-timeline {
+        grid-column: 1 / -1;
+        grid-row: 3;
       }
 
       /* 応援ビジュアル折りたたみ: 開閉・storage は popup-entry（wireSupportVisualUi）。白フラッシュ緩和は __body の背景と keyframes。 */

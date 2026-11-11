@@ -19,6 +19,7 @@
 - 🟠 **data-nl-support-wired** — 書く人だけ: extension/popup-entry.js
 - 🟠 **data-nl-toolbar-only** — 書く人だけ: extension/popup-entry.js
 - 🟠 **data-nl-usage-terms-ack** — 書く人だけ: extension/popup-entry.js, lib/cloakNotForSidePanel.js
+- 🟠 **data-nl-yt-viewers-at** ★新規 — 書く人だけ: lib/youtube/ytPageViewerReader.js
 - 🟠 **data-nls-backfill** — 書く人だけ: extension/content-entry.js
 - 🟠 **data-nls-backfill-diag** — 書く人だけ: extension/content-entry.js
 - 🟠 **data-nls-heat** — 書く人だけ: extension/venueBar.js
@@ -30,8 +31,9 @@
 - 🟠 **data-nls-page-intercept-referrer** — 書く人だけ: extension/page-intercept-entry.js
 - 🟠 **data-nls-warmup-state** — 書く人だけ: extension/content-entry.js
 - 🔵 **data-nl-author-photo** — 読む人だけ: lib/youtube/ytChatParse.js
+- 🔵 **data-nl-page-count-only** ★新規 — 読む人だけ: extension/popup-entry.js
 - 🔵 **data-nl-src** — 読む人だけ: extension/sidepanel-iframe-boot-entry.js
-- 🔵 **data-nl-trio-slot** — 読む人だけ: extension/popup-entry.js
+- 🔵 **data-nl-trio-slot** — 読む人だけ: extension/popup-entry.js, lib/platform/platformMetricChrome.js
 
 ## 全属性
 
@@ -45,14 +47,19 @@
 | `data-nl-click-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-concurrent-chara-jump-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-detail-hover-bound` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-gift-has` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-gift-rank-metric` | lib/paintTopSupportRankStyleIntoElement.js | extension/popup-entry.js<br>lib/paintTopSupportRankStyleIntoElement.js |
 | `data-nl-hoisted` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-lane-user-detail-wired` | extension/popup/wireLaneUserDetailOpen.js | extension/popup/wireLaneUserDetailOpen.js |
+| `data-nl-metric` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-on-error-bound` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-page-count-only` | — | extension/popup-entry.js |
 | `data-nl-pickup-avatar` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
 | `data-nl-pickup-key` | lib/venuePickupBanner.js | lib/venuePickupBanner.js |
 | `data-nl-pickup-name` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
 | `data-nl-pickup-uid` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
+| `data-nl-platform-hide` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
+| `data-nl-platform-ready` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-popup-content-painted` | extension/popup-entry.js | — |
 | `data-nl-popup-primary-cloak` | lib/cloakNotForSidePanel.js | extension/sidepanel-entry.js |
 | `data-nl-recording` | extension/popup-entry.js | extension/popup-entry.js |
@@ -67,12 +74,16 @@
 | `data-nl-timeline-docked` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-toolbar-only` | extension/popup-entry.js | — |
 | `data-nl-trio-overall` | extension/popup-entry.js | extension/popup-entry.js |
-| `data-nl-trio-slot` | — | extension/popup-entry.js |
+| `data-nl-trio-slot` | — | extension/popup-entry.js<br>lib/platform/platformMetricChrome.js |
 | `data-nl-uid` | lib/supportTimelineHtml.js | extension/comeview-entry.js<br>extension/popup-entry.js |
 | `data-nl-uname` | lib/supportTimelineHtml.js | extension/comeview-entry.js<br>extension/popup-entry.js |
 | `data-nl-usage-terms-ack` | extension/popup-entry.js<br>lib/cloakNotForSidePanel.js | — |
 | `data-nl-user-detail-wired` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-wired` | extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js |
+| `data-nl-yt-video-id` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
+| `data-nl-yt-viewers` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
+| `data-nl-yt-viewers-at` | lib/youtube/ytPageViewerReader.js | — |
+| `data-nl-yt-viewers-hook` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
 | `data-nls-active` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-audition-fetch` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-auto-open` | extension/content-entry.js | extension/content-entry.js |

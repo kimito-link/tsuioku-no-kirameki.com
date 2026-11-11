@@ -424,7 +424,7 @@ async function reloadExistingYtWatchTabs(reason) {
   } catch {
     return;
   }
-  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページも同じく止まる
+  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA)の配信ページも同じく止まる
   //   (2026-11-09 実機: 更新前から開いていた SHOWROOM のタブが記録 0 のまま)。配信ページの形の URL だけ読み込み直す
   try {
     const others = await chrome.tabs.query({ url: [...STREAM_PLATFORM_TAB_URLS] });
@@ -844,6 +844,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           broadcasterHandle: payload.broadcasterHandle ? String(payload.broadcasterHandle) : undefined,
           concurrentViewers:
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
+          slotViewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : undefined,
+          slotCommentCount: typeof payload.slotCommentCount === 'number' ? payload.slotCommentCount : undefined,
           viewersRead: payload.viewersRead === false ? false : undefined,
           sourceUrl: payload.sourceUrl ? String(payload.sourceUrl) : undefined,
           // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
@@ -858,10 +860,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         Date.now(),
       );
 
-      await chrome.storage.local.set({
-        [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
-        [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId,
-      });
+      const metaUpdates = { [STORAGE_KEYS.STREAM_SUMMARIES]: summaries };
+      // 裏の ABEMA タブは claimActive:false。要約は更新し、いま見ている配信は奪わない。
+      if (payload.claimActive !== false) metaUpdates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
+      await chrome.storage.local.set(metaUpdates);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
       return { ok: true, videoId };
     })
@@ -1158,7 +1160,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         voiceAssignDiag.later++;
         scheduleVoiceAssignFlush();
       }
-      if (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID]) {
+      if (payload.claimActive !== false && (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID])) {
         updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
       }
 

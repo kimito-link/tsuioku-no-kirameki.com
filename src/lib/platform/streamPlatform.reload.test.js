@@ -8,25 +8,29 @@ describe('拡張の入れ替え時に読み込み直すタブ(YouTube 以外)', 
     expect(isStreamTabToReload('https://mixch.tv/u/12345678/live')).toBe(true);
     expect(isStreamTabToReload('https://kick.com/somechannel')).toBe(true);
     expect(isStreamTabToReload('https://www.twitch.tv/somechannel')).toBe(true);
+    expect(isStreamTabToReload('https://abema.tv/now-on-air/abema-news')).toBe(true);
   });
   it('トップ・一覧・別のサイトは読み込み直さない', () => {
     expect(isStreamTabToReload('https://www.showroom-live.com/')).toBe(false);
     expect(isStreamTabToReload('https://www.tiktok.com/foryou')).toBe(false);
+    expect(isStreamTabToReload('https://abema.tv/')).toBe(false);
+    expect(isStreamTabToReload('https://abema.tv/timetable')).toBe(false);
     expect(isStreamTabToReload('https://example.com/r/some_room')).toBe(false);
     expect(isStreamTabToReload(undefined)).toBe(false);
   });
-  it('探す URL の形は6サービスぶん', () => {
+  it('探す URL の形は7サービスぶん', () => {
     expect(STREAM_PLATFORM_TAB_URLS).toContain('https://www.showroom-live.com/*');
     expect(STREAM_PLATFORM_TAB_URLS).toContain('https://www.tiktok.com/*');
-    expect(STREAM_PLATFORM_TAB_URLS.length).toBe(6);
+    expect(STREAM_PLATFORM_TAB_URLS).toContain('https://abema.tv/*');
+    expect(STREAM_PLATFORM_TAB_URLS.length).toBe(7);
   });
 });
 
 import { placeholderStreamKeyForChannel, isPlaceholderStreamKey, STREAM_PLATFORMS, platformOfStreamKey } from './streamPlatform.js';
 
 describe('記録の無いチャンネルの仮の配信キー', () => {
-  it('6サービスとも、そのサービスの配信キーとして読める', () => {
-    const logins = { twitch: 'somechannel', kick: 'somechannel', whowatch: '12345', showroom: '62f_room', mixch: '12345678', tiktok: 'some.user' };
+  it('7サービスとも、そのサービスの配信キーとして読める', () => {
+    const logins = { twitch: 'somechannel', kick: 'somechannel', whowatch: '12345', showroom: '62f_room', mixch: '12345678', tiktok: 'some.user', abema: 'n-abema-news' };
     for (const [id, login] of Object.entries(logins)) {
       const p = STREAM_PLATFORMS[/** @type {keyof typeof STREAM_PLATFORMS} */ (id)];
       const key = placeholderStreamKeyForChannel(p, login);

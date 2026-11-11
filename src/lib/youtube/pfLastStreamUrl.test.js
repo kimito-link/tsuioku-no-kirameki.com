@@ -88,9 +88,9 @@ describe('配線: shim は「最後に見た配信」を翻訳するだけ(SPEC 
   it('popup の疑似 lv の書き込みを yt_last_stream_url へ向け直す', () => {
     expect(shim).toContain('items[YT_LAST_STREAM_URL_KEY] = lastStreamValue');
   });
-  it('7サービスの配信ページすべてに書き手(venue-inline)が入っている', () => {
+  it('8サービスの配信ページすべてに書き手(venue-inline)が入っている', () => {
     expect(venue).toContain('installLastStreamUrlRemember(');
-    const hosts = ['www.youtube.com', 'www.twitch.tv', 'kick.com', 'whowatch.tv', 'www.showroom-live.com', 'mixch.tv', 'www.tiktok.com'];
+    const hosts = ['www.youtube.com', 'www.twitch.tv', 'kick.com', 'whowatch.tv', 'www.showroom-live.com', 'mixch.tv', 'www.tiktok.com', 'abema.tv'];
     for (const h of hosts) {
       const cs = manifest.content_scripts.find((/** @type {any} */ c) => c.matches.some((/** @type {string} */ m) => m.includes(`//${h}/`)) && c.js.includes('dist/yt-venue-inline.js'));
       expect(cs, h).toBeTruthy();

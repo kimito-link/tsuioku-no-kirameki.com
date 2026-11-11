@@ -73,6 +73,13 @@ describe('mergeYtStreamSummary', () => {
     const broken = mergeYtStreamSummary({ ...later, concurrentViewers: 1.2e28, peakConcurrentViewers: 1.2e28 }, { videoId: 'vid-1', concurrentViewers: 1.2e28 }, t1 + 2);
     expect(broken.concurrentViewers).toBe(null);
     expect(broken.peakConcurrentViewers).toBe(null);
+    const shogi = mergeYtStreamSummary(
+      null,
+      { videoId: 'ab.n-shogi.live1', title: '将棋チャンネル', broadcasterName: '将棋チャンネル' },
+      t0,
+    );
+    // 保存欄は届いた絵だけ。サービスの公開ロゴで埋めるのは表示側(ytSummaryToNicoSnapshot)。
+    expect(shogi.broadcasterIconUrl).toBe('');
     expect(updated.itemCount).toBe(5000);
     expect(updated.createdAt).toBe(t0);
     expect(updated.updatedAt).toBe(t1);
