@@ -67,6 +67,7 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('[data-lane="adRanking"]').hidden).toBe(true);
     expect(root.querySelector('#giftRankingFetchPrompt').hidden).toBe(true);
     expect(root.querySelector('[data-lane="contributionRanking"] .nl-north-star-lane__label').textContent).toContain('スパチャの合計順');
+    expect(root.querySelector('[data-lane="contributionRanking"] .nl-north-star-lane__sublabel').textContent).toBe('ニコニコ公式');
     expect(root.querySelector('#giftHistoryProgramPt').hidden).toBe(true);
     expect(root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label').textContent).toContain('スーパーチャット・ギフト');
     expect(root.querySelector('[data-nl-trio-slot="konta"]').getAttribute('title')).not.toContain('広告');

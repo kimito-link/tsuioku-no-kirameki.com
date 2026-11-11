@@ -70,6 +70,7 @@ describe('platformSectionPlan', () => {
     expect(platformSectionPlan('youtube').sections.giftHistory.label).toBe('スーパーチャット・ギフト');
     expect(platformSectionPlan('twitch').sections.contributionRanking.label).toBe('Bits・ギフトサブの合計順');
     expect(platformSectionPlan('kick').sections.giftHistory.label).toBe('ギフトサブ');
+    expect(platformSectionPlan('kick').sections.contributionRanking.sub).toBeUndefined();
   });
 
   it('ABEMA は視聴数とコメントだけで、ギフト欄は出さない', () => {

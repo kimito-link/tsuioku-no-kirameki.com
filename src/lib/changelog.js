@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2047',
+    date: '2026-11-11',
+    summary: '公式ランキングの説明を残す',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick の公式ランキングの説明を、このPCの記録の文で消さないようにしました。Kick では「歴代トップKICKユーザー」と同じ値、と出ます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2045',
     date: '2026-11-11',
     summary: 'ニコ生以外の広告ptを出さない',
@@ -200,15 +208,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'チャットは Twitch 公式の読み取り専用の接続で読みます(ログインは要りません)。Bits・サブスク・ギフトサブ・レイドも記録し、Bits は応援の合計(pt)に入ります。',
       'サイドパネルと会場からのコメント送信は、Twitch の画面の入力欄に書いて送ります(Twitch にログインしているときだけ送れます)。',
       '記録は YouTube と同じくこの PC の中にだけ置き、外へは送りません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1915',
-    date: '2026-11-07',
-    summary: 'YouTube の過去ログ取り込みでも混ざりを直す',
-    items: Object.freeze([
-      '配信が終わったあとにアーカイブからコメントを埋める処理で、同じコメントが別の配信の記録にも残ったままになることがありました(実データで83件)。アーカイブはその配信自身のチャットなので本物として扱い、別の配信に紛れ込んでいた同じコメントは消して取り戻すようにしました(消した分は控えに残します)。',
-      '片付けの決め方を直し、アーカイブから埋めたコメントを本物として残すようにしました。前の片付けでは「先に記録した方」を残したため、本物の配信の側を消したことがありました。更新後にもう1回だけ片付けます。'
     ])
   })
 ]);
