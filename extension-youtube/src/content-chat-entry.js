@@ -290,9 +290,18 @@ function readPublishedViewers() {
   }
 }
 
+/**
+ * 同時視聴者数。ページに描かれている「N 人が視聴中」を先に読む(利用者が見ている数そのもの)。
+ * ページの世界が ytInitialData から読んだ数(readPublishedViewers)は、画面に数が描かれる前の最初の数にだけ使う:
+ * ytInitialData は開いた時のままなので、こちらを先にすると画面の数が 37→27 と動いても 32 のまま止まっていた(2026-11-11 PC 計測)。
+ */
 function readConcurrentViewers() {
-  const published = readPublishedViewers();
-  if (published !== null) return published;
+  const onScreen = readOnScreenViewers();
+  if (onScreen !== null) return onScreen;
+  return readPublishedViewers();
+}
+
+function readOnScreenViewers() {
   const selectors = [
     'ytd-watch-metadata #description #info',
     'ytd-watch-metadata #info-container',
