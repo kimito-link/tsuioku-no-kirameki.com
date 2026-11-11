@@ -37,6 +37,7 @@ import './background-nico-relay.js';
 let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, isStreamTabToReload, STREAM_PLATFORM_TAB_URLS } from '../../src/lib/platform/streamPlatform.js';
+import { publishWordEffectIngest } from '../../src/extension/wordEffectIngestHost.js';
 import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
@@ -1006,6 +1007,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
         if (recs.length) {
           void Promise.resolve(chrome.tabs.sendMessage(tabId, { type: 'YT_LIVE_ROWS', videoId: vidNow, items: recs }, { frameId: 0 })).catch(() => {});
+          let pageHost = '';
+          try { pageHost = new URL(String(sender?.tab?.url || '')).hostname; } catch { /* ホストが取れなくても配信キーでサービスは決まる */ }
+          const effectMsg = publishWordEffectIngest(vidNow, recs, { source: 'live', pageHost });
+          if (effectMsg) {
+            void Promise.resolve(chrome.tabs.sendMessage(tabId, effectMsg, { frameId: 0 })).catch(() => {});
+          }
         }
       }
     } catch {

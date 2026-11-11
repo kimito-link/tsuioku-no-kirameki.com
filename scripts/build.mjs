@@ -174,6 +174,12 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // 言葉の演出。設定と OBS 用の透明な別窓。会場は venueBar が同じ層を載せる。
+    entryPoints: ['src/extension/word-effect-entry.js'],
+    outfile: 'extension/dist/word-effect.js',
+    target: 'chrome100'
+  },
+  {
     entryPoints: ['src/extension/venue-entry.js'],
     outfile: 'extension/dist/venue.js',
     target: 'chrome100'

@@ -9,6 +9,7 @@ import {
   venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { attachVenuePickupDrag } from './venuePickupDrag.js';
+import { mountWordEffectOverlay } from './wordEffectOverlay.js';
 import { createVenuePickupVoiceLink } from './venuePickupVoice.js';
 import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
 import {
@@ -3373,6 +3374,13 @@ export function mountVenueBarButton(options = {}) {
 
   root.append(toggle, stage);
   parent.appendChild(root);
+  try {
+    mountWordEffectOverlay(root, {
+      canPaint: () => root.classList.contains('nlsb-is-open')
+    });
+  } catch {
+    /* 演出が失敗しても会場は開く */
+  }
 
   let open = false;
   // 別窓化リファクタで参照側が外れ書込専用に(復活に備え代入は残す)。

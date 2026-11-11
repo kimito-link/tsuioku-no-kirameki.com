@@ -24,10 +24,11 @@ const EXT_DIR = join(process.cwd(), 'extension');
 /**
  * ★背景を塗ってはいけないページ。
  *   comeview は OBS 透過用なので不透明にすると配信の合成が壊れる。
+ *   word-effect も同じ別窓を OBS のウィンドウキャプチャに使うので地は塗らない。
  *   offscreen は画面に出ない(音声処理用)。
  */
 //   yt-comeview.html は同梱した YouTube 版のコメビュ(comeview.html の完全コピー・scripts/youtube-build.mjs)。
-const NO_BACKGROUND = new Set(['comeview.html', 'offscreen.html', 'yt-comeview.html']);
+const NO_BACKGROUND = new Set(['comeview.html', 'offscreen.html', 'yt-comeview.html', 'word-effect.html']);
 
 /** 画面に出ないページ(色の宣言そのものが不要)。 */
 const NOT_VISIBLE = new Set(['offscreen.html']);

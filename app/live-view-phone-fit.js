@@ -22,6 +22,7 @@ export const PHONE_HIDDEN_SELECTORS = Object.freeze([
   '#captureScreenshot', // 📷 スクショ(PC の放送タブを撮る)
   '#reloadWatchTabBtn', // ↻ 再読み込み(PC の放送タブ)
   '#openComeviewBtn', // 💬 コメビュ(拡張の別窓)
+  '#openWordEffectBtn', // ✨ 演出(拡張の別窓)
   '#nlPlacementQuickbar', // パネル位置(PC の放送ページ上のパネル)
   '#nlPlacementQuickHint',
   '#nlPopupSettings', // 詳細設定(PC の拡張の設定=スマホで変えても届かない)

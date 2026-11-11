@@ -423,7 +423,8 @@ export default [
     // v0.1.1997: 大きな記録で合間に画面へ手を返す配線(+15: import・応援マスを次の仕事へ回す8行・正規化のあと2行・読み出しの続き4行)。決まりは lib の bigRecordYield.js。
     // v0.1.2007: 応援マスの集計の控えの配線(+4: import・控えの生成と計器の公開3行)。仕組みは lib の laneAggregatesMemo.js。
     // v0.1.2008: 応援マスを分けて足し終えたときに実DOMを測り直す配線(+6)。分け方は lib の laneProgressiveFill.js と story/renderStoryUserLaneDom.js。
-    rules: { 'max-lines': ['error', { max: 21915, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2039: 言葉の演出の別窓を開くボタンの配線(+7)。画面と判定は word-effect.html / lib の wordEffect.js。
+    rules: { 'max-lines': ['error', { max: 21922, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
@@ -456,7 +457,8 @@ export default [
     // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
     // v0.1.1874: ギフトの子の窓で番組ギフトのタブへ切り替える合図の受け手(起動1行)=+1。中身は lib の venueComposeBox.js。
     // v0.1.1875: 会場のギフトのアイテムの帯(import 1行)=+1。読む・置く・押すは lib の giftItemsMirror.js。
-    rules: { 'max-lines': ['error', { max: 19580, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2039: 言葉の演出を、届いたコメントの取り込み口から渡す(+2: import と呼び出し)。中身は wordEffectIngestHost.js。
+    rules: { 'max-lines': ['error', { max: 19582, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -497,8 +499,9 @@ export default [
     // v0.1.1995: パネルを開かなくても数字の帯が出る(りんく「POPをひらかなくても数字がつくように」)の配線=+9(import 1行・自分で作る写しの置き場と見回り役 8行)。作り方は lib の venueStatCardsSelf.js。
     // v0.1.2005: 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない(PC 実測: ニコ生で最初の約1分、古い数字で止まる)の配線=+2。判定は lib の venueStatCardsSelf.js(createStatMirrorLiveness)。
     // v0.1.2038: 読み上げ ON の PICK UP を、声が鳴り始めた瞬間に合わせる配線=+13。中身は venuePickupVoice.js と lib の venuePickupPlayback.js。
+    // v0.1.2039: 言葉の演出を会場が開いているときだけ載せる配線(+8)。中身は wordEffectOverlay.js。失敗しても会場は開く。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7544, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7552, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
@@ -518,7 +521,8 @@ export default [
     // v0.1.1740: スマホの読み上げ(返事の voiceWanted で声を作って送る・+6行)。判定と順番は lib(phoneVoiceSender.js)、配線は phoneVoicePublisher.js。
     // v0.1.1757: スマホへ新着を3秒ごとに送る係の配線(+4行: import・生成・返事を渡す・統計)。本体は liveEventsPublisher.js / lib の liveEventSender.js。
     // v0.1.1823: 「👥 ファンにも公開」の配線(+3行: import・スイッチに渡す・同意 OFF で止める)。本体は fanLinkClient.js / statusSmartphoneCard.js。
-    rules: { 'max-lines': ['error', { max: 4607, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2039: 言葉の演出の別窓を開くボタンの配線(+11)。画面は word-effect.html。
+    rules: { 'max-lines': ['error', { max: 4618, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

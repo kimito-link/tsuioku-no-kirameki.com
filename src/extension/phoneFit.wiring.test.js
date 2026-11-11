@@ -10,7 +10,7 @@ describe('配線: スマホで働かないボタンの片付け(v0.1.1741)', () 
     expect(liveView).toContain('try { mountPhoneFit(); } catch');
   });
   it('★実機で無反応だった拡張専用のボタンを隠す・スマホで働くもの(送信・読み上げ)は隠さない', () => {
-    for (const id of ['#exportJson', '#captureScreenshot', '#reloadWatchTabBtn', '#openComeviewBtn', '#nlPlacementQuickbar', '#nlPopupSettings']) {
+    for (const id of ['#exportJson', '#captureScreenshot', '#reloadWatchTabBtn', '#openComeviewBtn', '#openWordEffectBtn', '#nlPlacementQuickbar', '#nlPopupSettings']) {
       expect(PHONE_HIDDEN_SELECTORS).toContain(id);
     }
     expect(PHONE_HIDDEN_SELECTORS).not.toContain('#postCommentBtn');

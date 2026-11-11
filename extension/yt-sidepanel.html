@@ -8583,7 +8583,8 @@
       .nl-compose-quick-toolbar #captureScreenshot,
       .nl-compose-quick-toolbar #reloadWatchTabBtn,
       .nl-compose-quick-toolbar #openComeviewBtn,
-      .nl-compose-quick-toolbar #openComeviewVoiceBtn {
+      .nl-compose-quick-toolbar #openComeviewVoiceBtn,
+      .nl-compose-quick-toolbar #openWordEffectBtn {
         width: auto;
         flex: 1 1 92px;
         min-width: min(100%, 84px);
@@ -8842,7 +8843,8 @@
 
       #reloadWatchTabBtn,
       #openComeviewBtn,
-      #openComeviewVoiceBtn {
+      #openComeviewVoiceBtn,
+      #openWordEffectBtn {
         border: 1px solid var(--nl-border);
         border-radius: 10px;
         background: var(--nl-bg-soft);
@@ -8858,21 +8860,24 @@
 
       #reloadWatchTabBtn:hover:not(:disabled),
       #openComeviewBtn:hover:not(:disabled),
-      #openComeviewVoiceBtn:hover:not(:disabled) {
+      #openComeviewVoiceBtn:hover:not(:disabled),
+      #openWordEffectBtn:hover:not(:disabled) {
         border-color: var(--nl-accent);
         color: var(--nl-accent);
       }
 
       #reloadWatchTabBtn:focus-visible,
       #openComeviewBtn:focus-visible,
-      #openComeviewVoiceBtn:focus-visible {
+      #openComeviewVoiceBtn:focus-visible,
+      #openWordEffectBtn:focus-visible {
         outline: 2px solid var(--nl-accent);
         outline-offset: 2px;
       }
 
       #reloadWatchTabBtn:disabled,
       #openComeviewBtn:disabled,
-      #openComeviewVoiceBtn:disabled {
+      #openComeviewVoiceBtn:disabled,
+      #openWordEffectBtn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
@@ -12436,6 +12441,17 @@
                 <span class="nl-compose-qbtn__row">
                   <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
                   <span class="nl-compose-qbtn__word">コメビュ</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="openWordEffectBtn"
+                title="言葉の演出を開く。コメントの言葉やギフトで、絵を少し動かします。"
+                aria-label="言葉の演出を開く。コメントの言葉やギフトで、絵を少し動かします。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">✨</span>
+                  <span class="nl-compose-qbtn__word">演出</span>
                 </span>
               </button>
               <button
