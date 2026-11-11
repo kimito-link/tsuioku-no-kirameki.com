@@ -88,6 +88,13 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('#watchConcurrentCard .nl-live-stat-icon').getAttribute('title')).not.toContain('広告');
   });
 
+  it('ニコ生以外では、中身の無いギフト欄の点線の枠を出さない', () => {
+    const root = mount();
+    applyPlatformMetricChrome(root, { platform: 'abema', facts: {} });
+    const css = document.getElementById('nl-platform-capability-style')?.textContent || '';
+    expect(css).toContain('html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden])))');
+  });
+
   it('欄を出し直しても、次の適用でまた隠す', async () => {
     const root = mount();
     const stop = watchPlatformMetricChrome(root, () => ({ platform: 'twitch', facts: { support: null } }));
