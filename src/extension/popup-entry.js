@@ -924,6 +924,7 @@ import { wireVoiceVolumeSlider } from './popup/wireVoiceVolumeSlider.js';
 import { wireVoiceGpuTip } from './popup/wireVoiceGpuTip.js';
 import { wireVoiceNarrowSelect } from './popup/wireVoiceNarrowSelect.js';
 import { wireVoiceQualitySelect } from './popup/wireVoiceQualitySelect.js';
+import { wireSpeechEngineSelect } from './popup/wireSpeechEngineSelect.js';
 import {
   applyPopupFrameFallback,
   loadPopupFrameSettings,
@@ -19975,6 +19976,7 @@ async function initPopup() {
   }); // 2026-11-03: 遅い PC なら GPU の案内
   wireVoiceNarrowSelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // P3: 声の絞り込み
   wireVoiceQualitySelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // 声の音質(既定16kHz)
+  wireSpeechEngineSelect(document, { get: safeStorageLocalGet, set: safeStorageLocalSet }); // 読み上げエンジン（会場とコメビュと同じ保存）
   const effectSoundToggle = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));
   effectSoundToggle?.addEventListener('change', async () => {
     try {

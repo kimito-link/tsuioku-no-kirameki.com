@@ -67,6 +67,12 @@ describe('resolveVoiceLoadingView (文言の出し分け)', () => {
     expect(v.text).not.toContain('押し直');
   });
 
+  it('エンジン名を渡すと、その名前で「つながっていません」と出す', () => {
+    const v = resolveVoiceLoadingView('notfound', 'venue', 'refused', '棒読みちゃん');
+    expect(v.text).toBe('棒読みちゃんにつながっていません');
+    expect(v.text).not.toContain('押し直');
+  });
+
   it('http-error はバージョン確認を促す', () => {
     expect(resolveVoiceLoadingView('notfound', 'venue', 'http-error').text)
       .toContain('エラーでした');

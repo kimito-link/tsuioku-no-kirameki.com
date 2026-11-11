@@ -12,6 +12,7 @@ import {
 import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import { startVoiceWarmup } from './voiceWarmup.js';
 import { isStreamedVoice, shouldStreamVoice } from './voiceStream.js';
+import { isDelegatedSpeech } from './delegatedSpeech.js';
 import { isWeakVoicePc } from './voiceNarrowing.js';
 import {
   createVoiceOverloadState,
@@ -106,6 +107,10 @@ export class VoicePlayer {
     this.onLagNotice = deps.onLagNotice || (() => {});
     /** 2026-11-01: GPU の案内(遅れの一言とは別の行・voiceLagNotice.decideVoiceGpuTip)。 */
     this.onGpuTip = deps.onGpuTip || (() => {});
+    /** 代わりに PC の声で読んでいるときの一行。空なら出さない。 */
+    this.engineStatusNote = deps.engineStatusNote || null;
+    /** false のときだけ声の先読み（initialize_speaker）をしない。未配線は今までどおり温める。 */
+    this.shouldWarmVoices = deps.shouldWarmVoices || null;
     this._gpuTipText = '';
     this._lagNoticeShown = false;
     this.isObsMode = deps.isObsMode || (() => false);
@@ -480,6 +485,29 @@ export class VoicePlayer {
     try { this.onStatus(text); } catch { /* 表示の失敗は読み上げに影響させない */ }
   }
 
+  _emitEngineStatusNote() {
+    if (!this.enabled || !this.readingWanted || typeof this.engineStatusNote !== 'function') return;
+    let text = '';
+    try { text = String(this.engineStatusNote() || ''); } catch { text = ''; }
+    if (!text) return;
+    try { this.onStatus(text); } catch { /* 表示の失敗は読み上げに影響させない */ }
+  }
+
+  /**
+   * 読み上げの選択が変わったとき、OFF は保存せずにつなぎ直す。
+   */
+  async rebindEngine() {
+    if (!this.readingWanted) return;
+    this._intentSerial += 1;
+    const serial = this._intentSerial;
+    this.stop();
+    this.enabled = false;
+    this.styleIds = [];
+    this._gpuCapable = null;
+    this._deviceNote = '';
+    await this._connect(serial);
+  }
+
   /**
    * ★v0.1.1327: クリックの「ユーザー操作」を【その場で】使って音声を解錠する。
    *
@@ -582,7 +610,11 @@ export class VoicePlayer {
 
       const allStyleIds = await this.fetchVoiceStyleIds();
       if (aborted()) return;
-      startVoiceWarmup(this.voiceWarmup, allStyleIds);
+      if (typeof this.shouldWarmVoices === 'function' && this.shouldWarmVoices() === false) {
+        try { this.voiceWarmup?.reset?.(); } catch { /* 温めが無くても読み上げは続ける */ }
+      } else {
+        startVoiceWarmup(this.voiceWarmup, allStyleIds);
+      }
       this._synthTracker.reset();
       resetVoiceWarmMeasure(this.diag);
       this._streamSupported = false;
@@ -618,6 +650,7 @@ export class VoicePlayer {
       this._emitDiag();
       this.onLoadingState('ready');
       this._emitDeviceNote();
+      this._emitEngineStatusNote();
       this._emitToggle();
     } finally {
       this._connectInFlight = false;
@@ -732,6 +765,7 @@ export class VoicePlayer {
           if (reason === 'timeout' || reason === 'query_timeout') timedOut = true;
         },
         onTiming: (t) => { timing = t || {}; },
+        volumePercent: this.volumePercent,
         ...(extra.stream === true ? { stream: true } : {}),
         ...(extra.signal ? { signal: extra.signal } : {})
       });
@@ -950,6 +984,43 @@ export class VoicePlayer {
   }
 
   /**
+   * WAV を返さない読み上げ（棒読みちゃん・ゆかコネ・PCの声）。speak は再生の段で1回だけ。
+   * @param {any} item
+   * @param {{ speak: Function, cancel?: Function }} handle
+   * @param {number} generation
+   */
+  async _playDelegated(item, handle, generation) {
+    let started = false;
+    this.stopCurrent = () => { try { handle.cancel?.(); } catch { /* no-op */ } };
+    try {
+      started = await handle.speak({
+        onStart: () => {
+          if (typeof item.onAudioStart === 'function') item.onAudioStart();
+          try { if (typeof item.onAudible === 'function') item.onAudible(); } catch { /* 枠の失敗で再生を止めない */ }
+        }
+      });
+    } catch { started = false; }
+    this.stopCurrent = null;
+    if (started && typeof item.onAudioEnd === 'function') {
+      try { item.onAudioEnd(); } catch { /* no-op */ }
+    }
+    if (typeof item.onPlayStart === 'function') {
+      try { item.onPlayStart(); } catch { /* no-op */ }
+    }
+    if (!started || generation !== this.generation) {
+      this._notifyDropped(item);
+      return;
+    }
+    this.diag.spokenTotal += 1;
+    this.diag.lastSpokenBase = Date.now();
+    const denom = this.diag.spokenTotal + this.diag.staleDropTotal;
+    this.diag.voicedRatio = denom > 0 ? this.diag.spokenTotal / denom : -1;
+    this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
+    this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+    this._emitDiag();
+  }
+
+  /**
    * 2026-11-09: 軽い声の失敗理由を計器に残し、Chrome に止められたら(not-allowed)画面で案内する。
    * @param {boolean} started
    * @param {any} speaker
@@ -1118,6 +1189,7 @@ export class VoicePlayer {
 
         if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
           if (isStreamedVoice(wav)) wav.cancel(); // 鳴らさないので受け取りもやめる
+          if (isDelegatedSpeech(wav)) { try { wav.cancel(); } catch { /* まだ話していなければ何もしない */ } }
           // v0.1.1213: 合成が null で返った件を数える。ここは以前どのカウンタも増やさずに
           //   捨てており、実配信で「需要52.2/分・読めた6件・間引き12件」=約34件が
           //   どの計器にも乗らない穴になっていた(=なぜ読まれないか答えられない)。
@@ -1134,6 +1206,11 @@ export class VoicePlayer {
 
         // 再生開始の直前にもう一段、先の合成を深める(消化が進んだぶん次を貯める)。
         this._startPrefetch(generation);
+
+        if (isDelegatedSpeech(wav)) {
+          await this._playDelegated(item, wav, generation);
+          continue;
+        }
 
         let objectUrl = '';
         try {

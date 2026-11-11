@@ -379,11 +379,20 @@ export function createVoiceWarmup(deps) {
   return api;
 }
 
-/** 会場・コメビュ共通: 本物の VOICEVOX につないだ warmup。読み込みの打ち切りは 15秒(実測 3.5秒)。 */
-export function createVoicevoxWarmup() {
+/**
+ * 会場・コメビュ共通: WAV の読み上げへつなぐ warmup。読み込みの打ち切りは 15秒(実測 3.5秒)。
+ * baseUrlOf が空のときは今までどおり VOICEVOX の既定ポート。AivisSpeech のときはそのポート。
+ * @param {{ baseUrl?: string, baseUrlOf?: () => string }} [opts]
+ */
+export function createVoicevoxWarmup(opts = {}) {
+  const baseUrlOf = typeof opts.baseUrlOf === 'function' ? opts.baseUrlOf : () => opts.baseUrl || '';
+  const baseOpts = () => {
+    const baseUrl = String(baseUrlOf() || '');
+    return baseUrl ? { baseUrl } : {};
+  };
   return createVoiceWarmup({
-    initSpeaker: (id) => initializeVoicevoxSpeaker(id, { timeoutMs: 15000 }),
-    warmQuery: (id) => warmupVoicevoxQuery(id)
+    initSpeaker: (id) => initializeVoicevoxSpeaker(id, { timeoutMs: 15000, ...baseOpts() }),
+    warmQuery: (id) => warmupVoicevoxQuery(id, baseOpts())
   });
 }
 

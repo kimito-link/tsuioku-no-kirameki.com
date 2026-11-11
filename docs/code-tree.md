@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1244 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1159,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2450)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,8 +1196,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
-    - 📁 **popup/** (18)
+  - 📁 **extension/** (114)
+    - 📁 **popup/** (19)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1213,6 +1213,7 @@
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
       - `wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
+      - `wireSpeechEngineSelect.js` — ポップアップとコメビュの「読み上げエンジン」の配線。
       - `wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
       - `wireVoiceGpuTip.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
@@ -1284,6 +1285,7 @@
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
     - `smartphoneFreshness.wiring.test.js`
+    - `speechEngineBinding.js` — 保存した読み上げの選択を、会場とコメビュの同じ口へ渡す。
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
     - `statusCopyFreshness.wiring.test.js`
     - `statusDeviceCred.js` — スマホ版の「利用者ごとの鍵」を拡張側で持つ部品(v0.1.1731・スマホ化 利用者ごとの鍵 第b段)。
@@ -1491,7 +1493,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2148)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1768,6 +1770,8 @@
     - `bootTimeline.test.js`
     - `bootTimelineBoot.js` — 【層】L2 配線層(副作用あり・サイドパネルの popup から import するだけで起動する)
     - `bootTimelineWiring.wiring.test.js`
+    - `bouyomiClient.js` — 棒読みちゃん HTTP 連携（既定ポート 50080）。
+    - `bouyomiClient.test.js`
     - `broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
     - `broadcastContext.test.js`
     - `broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
@@ -1883,6 +1887,8 @@
     - `cloakSkippedOnSidePanel.wiring.test.js`
     - `coalescedRepaintScheduler.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存。yieldToBrowserPaint のみ依存)
     - `coalescedRepaintScheduler.test.js`
+    - `coeiroinkClient.js` — COEIROINK（既定ポート 50032）。
+    - `coeiroinkClient.test.js`
     - `colorSchemeMetaPresent.test.js`
     - `comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
     - `comeviewActions.test.js`
@@ -2038,6 +2044,7 @@
     - `deepExportPolicy.test.js`
     - `deepHarvestReason.js` — 深掘り収穫(deep harvest)の発動理由(起動/記録ON/配信切替/タブ可視)の定義と判定。
     - `deepHarvestReason.test.js`
+    - `delegatedSpeech.js` — WAV を返さない読み上げ（棒読みちゃん・ゆかコネ・PCの声）の印。
     - `deriveAvatarUrlFromUid.equivalence.test.js`
     - `deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
     - `deriveAvatarUrlFromUid.test.js`
@@ -3108,8 +3115,13 @@
     - `sourceProvenance.test.js`
     - `specializedCells.wiring.test.js`
     - `specializedCellsInputs.wiring.test.js`
+    - `speechEngineCatalog.js` — 読み上げエンジンの一覧（会場とコメビュの共通の正本）。
+    - `speechEngineCatalog.test.js`
+    - `speechEngineRouter.js` — 選んだ読み上げと、落ちたときの PC の声への切り替え。
+    - `speechEngineRouter.test.js`
     - `speechEvidence.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `speechEvidence.test.js`
+    - `speechLocalHttp.js` — 注入した fetch でローカル読み上げへ聞くときの期限と失敗分類。
     - `standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
     - `standalonePopupClose.test.js`
     - `statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
@@ -3636,6 +3648,8 @@
     - `xIntentUrl.js` — X（旧 Twitter）の Web Intent（投稿画面）URL を組み立てる純関数。
     - `xIntentUrl.test.js`
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
+    - `yukariClient.js` — ゆかりねっとコネクターNEO の HTTP 読み上げ（Plugin_PlayVoice）。
+    - `yukariClient.test.js`
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
   - 📁 **server/** (16)

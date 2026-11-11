@@ -54,9 +54,12 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     expect(cv).toMatch(/VOICE_ALIVE_RETRY_BACKOFF_MS/);
   });
 
-  it('★両実装が理由付きの生存確認(probeVoicevoxAlive)を使う', () => {
-    expect(cv).toMatch(/probeVoicevoxAlive/);
+  it('★両実装が同じ生存確認の口を使う', () => {
+    expect(cv).toMatch(/probeActiveSpeechEngine\(/);
     expect(vp).toMatch(/probeVoicevoxAlive/);
+    const venue = readFileSync(join(HERE, '..', 'extension', 'venueBar.js'), 'utf8');
+    expect(venue).toMatch(/probeVoicevoxAlive:\s*probeActiveSpeechEngine/);
+    expect(venue).toMatch(/fetchSynthesizeVoice:\s*synthesizeActiveSpeech/);
   });
 
   it('★両実装が解錠(無音WAV)を行う', () => {
@@ -143,7 +146,8 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     expect((synthBranch.match(/(?<!function )synthesizeVoiceTracked\(/g) || []).length).toBe(2);
     // 2026-10-26: 素の synthesizeVoice は声の温め(withVoiceWarmup)で包んだ1つだけを呼ぶ。
     expect((synthBranch.match(/(?<!function )synthesizeVoiceWarm\(/g) || []).length).toBe(1);
-    expect(cv).toMatch(/const synthesizeVoiceWarm = withVoiceWarmup\(_voiceWarmup, synthesizeVoice\);/);
+    expect(cv).toMatch(/const synthesizeVoiceWarm = synthesizeActiveSpeech;/);
+    expect(cv).toMatch(/attachSpeechWarmup\(_voiceWarmup\)/);
     expect((synthBranch.match(/onFailure:\s*\(info\)\s*=>\s*recordVoiceSynthFailureReason\(info\)/g) || []).length).toBe(1);
     // 理由bagは初期化を含む2参照、null累計は1つの失敗分岐だけに限定する。
     expect((synthBranch.match(/_voiceDiag\.synthFailReasons/g) || []).length).toBe(2);

@@ -125,8 +125,18 @@
       .cv-count { font-variant-numeric: tabular-nums; }
       .cv-voice-controls {
         display: inline-flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 6px;
+        max-width: 100%;
+      }
+      .cv-speech-engine {
+        max-width: min(100%, 12rem);
+        font: inherit;
+      }
+      @media (max-width: 640px) {
+        .cv-voice-controls { flex-basis: 100%; }
+        .cv-speech-engine { max-width: 100%; }
       }
       .cv-voice-status {
         max-width: 220px;
@@ -695,6 +705,18 @@
       <span class="cv-spacer"></span>
       <span class="cv-count" id="cvCount">0 件</span>
       <span class="cv-voice-controls">
+        <select id="speechEngineSelect" class="cv-speech-engine" aria-label="読み上げ">
+          <option value="voicevox">VOICEVOX</option>
+          <option value="aivis">AivisSpeech</option>
+          <option value="coeiroink">COEIROINK</option>
+          <option value="bouyomi">棒読みちゃん</option>
+          <option value="yukari">ゆかりねっとコネクターNEO</option>
+          <option value="os">PCの声</option>
+        </select>
+        <label for="speechEngineFallback" style="display:inline-flex;align-items:center;gap:4px;max-width:100%;">
+          <input id="speechEngineFallback" type="checkbox" checked />
+          PCの声に切替
+        </label>
         <button id="cvBtnVoice" type="button" aria-pressed="false">🔊 読み上げ OFF</button>
         <button id="cvBtnVoiceName" type="button" aria-pressed="false" hidden>名前読み OFF</button>
         <span class="cv-voice-status" id="cvVoiceStatus" role="status"></span>

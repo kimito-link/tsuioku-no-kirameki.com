@@ -50,11 +50,12 @@ def build_submission_manifest(dev_manifest: dict, version: str) -> dict:
     # description: 開発識別子サフィックスを落とす（CWS 掲載名は短い方で統一）
     m['description'] = 'ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます。'
     # hosts: dev サーバ(localhost/127.0.0.1:3456)は外す。
-    #   v0.1.698: VOICEVOX 連携(http://127.0.0.1:50021)はユーザー向け機能なので提出物にも残す
-    #   (ローカル音声合成エンジン連携・理由書 cws-submission-texts.md に記載)。
+    #   読み上げの localhost は提出物に残す（speechEngineCatalog.js のポートと同じ）。
+    #   50021 VOICEVOX / 10101 AivisSpeech / 50032 COEIROINK / 50080 棒読みちゃん / 11900 ゆかコネNEO
+    _SPEECH_PORTS = (':50021', ':10101', ':50032', ':50080', ':11900')
     m['host_permissions'] = [h for h in m['host_permissions']
                              if ('localhost' not in h and '127.0.0.1' not in h)
-                             or ':50021' in h]
+                             or any(port in h for port in _SPEECH_PORTS)]
     for cs in m.get('content_scripts', []):
         cs['matches'] = [x for x in cs['matches']
                           if 'localhost' not in x and '127.0.0.1' not in x]

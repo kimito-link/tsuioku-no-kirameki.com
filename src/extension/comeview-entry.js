@@ -92,14 +92,25 @@ import { createComeviewLivePushClient } from './comeviewLivePushClient.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
-  buildVoiceReadingText,
-  listVoicevoxStyleIds,
-  probeVoicevoxAlive,
-  probeVoicevoxStreaming,
-  probeVoicevoxGpuCapable,
-  synthesizeVoice
+  buildVoiceReadingText
 } from '../lib/voicevoxClient.js';
 import { isStreamedVoice, shouldStreamVoice } from '../lib/voiceStream.js';
+import { isDelegatedSpeech } from '../lib/delegatedSpeech.js';
+import {
+  attachSpeechWarmup,
+  listActiveSpeechStyles,
+  noteSpeechReadingWanted,
+  onSpeechEngineChanged,
+  probeActiveSpeechEngine,
+  probeActiveSpeechGpu,
+  probeActiveSpeechStreaming,
+  speechEngineLabel,
+  speechEngineStatusNote,
+  speechEngineWarmBaseUrl,
+  speechEngineWarmupAllowed,
+  synthesizeActiveSpeech
+} from './speechEngineBinding.js';
+import { wireSpeechEngineSelect } from './popup/wireSpeechEngineSelect.js';
 import {
   computeBacklogCatchUpBoost, mergeVoiceSpeedBoost,
   createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor, foldVoiceArrivalWindow, resetVoicePaceArrival
@@ -107,7 +118,7 @@ import {
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { publishVoiceNowPlaying } from './venuePickupVoice.js';
-import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
 import { VOICE_ALIVE_RETRY_BACKOFF_MS, VOICE_ENGINE_RETRY_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
@@ -511,6 +522,7 @@ function updateVoiceToggle() {
   button.classList.toggle('is-on', _voiceReadingWanted);
   button.setAttribute('aria-pressed', String(_voiceReadingWanted));
   button.textContent = _voiceReadingWanted ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
+  noteSpeechReadingWanted(_voiceReadingWanted);
   // v0.1.699: 名前読みトグル(読み上げON時だけ表示)。
   const nameBtn = document.getElementById('cvBtnVoiceName');
   if (nameBtn) {
@@ -537,7 +549,7 @@ function renderCvVoiceLoading(state, reason) {
   const status = document.getElementById('cvVoiceStatus');
   if (!status) return;
   // ★v0.1.1329: 失敗理由で文言を出し分ける(timeout を「見つかりません」と言わない)。
-  const view = resolveVoiceLoadingView(state, 'comeview', reason);
+  const view = resolveVoiceLoadingView(state, 'comeview', reason, speechEngineLabel());
   status.classList.toggle('is-loading', view.kind === 'loading');
   status.classList.toggle('is-error', view.kind === 'error');
   status.textContent = view.text;
@@ -710,14 +722,14 @@ async function connectVoiceReading(serial, persist) {
     await primeCvAudioUnlock();
     if (aborted()) return;
     driveCvVoiceLoading('checking');
-    let probe = await probeVoicevoxAlive();
+    let probe = await probeActiveSpeechEngine();
     if (!probe.ok && !aborted()) {
       driveCvVoiceLoading('connecting');
       for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
         if (aborted()) return;
         if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
         if (aborted()) return;
-        probe = await probeVoicevoxAlive();
+        probe = await probeActiveSpeechEngine();
         if (probe.ok) break;
       }
     }
@@ -734,15 +746,16 @@ async function connectVoiceReading(serial, persist) {
       return;
     }
 
-    const allStyleIds = await listVoicevoxStyleIds();
+    const allStyleIds = await listActiveSpeechStyles();
     if (aborted()) return;
-    startVoiceWarmup(_voiceWarmup, allStyleIds);
+    if (speechEngineWarmupAllowed()) startVoiceWarmup(_voiceWarmup, allStyleIds);
+    else _voiceWarmup.reset();
     _voiceSynthTracker.reset();
     resetVoiceWarmMeasure(_voiceDiag);
     _voiceStreamSupported = false;
-    void probeVoicevoxStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
+    void probeActiveSpeechStreaming().then((ok) => { _voiceStreamSupported = ok === true; }, () => {});
     _voiceGpuCapable = null;
-    void probeVoicevoxGpuCapable().then((ok) => {
+    void probeActiveSpeechGpu().then((ok) => {
       _voiceGpuCapable = typeof ok === 'boolean' ? ok : null;
       showVoiceDeviceNote();
     }, () => {});
@@ -752,7 +765,7 @@ async function connectVoiceReading(serial, persist) {
         _voiceSlowEngine = b[KEY_VOICE_WEAK_PC] === true;
         return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
       },
-      initSpeaker: (id) => _voiceWarmup.ensureWhenIdle(id)
+      initSpeaker: (id) => (speechEngineWarmupAllowed() ? _voiceWarmup.ensureWhenIdle(id) : undefined)
     })).styleIds;
     if (aborted()) return;
     _voiceGeneration += 1;
@@ -762,6 +775,8 @@ async function connectVoiceReading(serial, persist) {
     publishVoiceDiag();
     driveCvVoiceLoading('ready');
     showVoiceDeviceNote();
+    const engineNote = speechEngineStatusNote();
+    if (engineNote) setVoiceStatus(engineNote);
     updateVoiceToggle();
     if (persist) persistVoiceReadingEnabled(true);
     void _livePush.ensure();
@@ -777,6 +792,18 @@ async function connectVoiceReading(serial, persist) {
       try { wake(); } catch { /* no-op */ }
     }
   }
+}
+
+/** 読み上げの選択が変わったとき。OFF は保存せず、今の声を止めてつなぎ直す。 */
+async function rebindComeviewSpeechEngine() {
+  if (!_voiceReadingWanted) return;
+  _voiceEnableSerial += 1;
+  const serial = _voiceEnableSerial;
+  stopVoicePlayback();
+  _voiceReadingEnabled = false;
+  _voiceStyleIds = [];
+  _voiceGpuCapable = null;
+  await connectVoiceReading(serial, false);
 }
 
 function voiceUserKeyForItem(item) {
@@ -798,9 +825,10 @@ let _voiceVolumePercent = VOICE_VOLUME_DEFAULT;
 /** 2026-10-22計器(P1・会場 VoicePlayer と同じ物差し): エンジン待ち・初めての声を測る。 */
 const _voiceSynthTracker = createVoiceSynthTracker();
 
-/** 2026-10-26: 初めての声を合成の前に読み込む(会場と同じ voiceWarmup.js)。 */
-const _voiceWarmup = createVoicevoxWarmup();
-const synthesizeVoiceWarm = withVoiceWarmup(_voiceWarmup, synthesizeVoice);
+/** 2026-10-26: 初めての声を合成の前に読み込む(会場と同じ voiceWarmup.js)。宛先は今のエンジン。 */
+const _voiceWarmup = createVoicevoxWarmup({ baseUrlOf: speechEngineWarmBaseUrl });
+attachSpeechWarmup(_voiceWarmup);
+const synthesizeVoiceWarm = synthesizeActiveSpeech;
 wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
 // v0.1.1777: 裏の声の読み込みは、鳴らしても待たせてもいない時だけ(次のコメントを待たせない)。
 wireVoiceWarmupHooks(_voiceWarmup, () => !_voicePlaying && _voiceQueue.length === 0, () => _voiceDiag, chromeVoiceEngineLink());
@@ -822,6 +850,7 @@ function synthesizeVoiceTracked(text, voice, extra = {}) {
   return synthesizeVoiceWarm(text, voice, {
     onFailure: (info) => recordVoiceSynthFailureReason(info),
     onTiming: (t) => { timing = t || {}; },
+    volumePercent: _voiceVolumePercent,
     ...(extra.stream === true ? { stream: true } : {}),
     ...(extra.signal ? { signal: extra.signal } : {})
   }).then(
@@ -1065,10 +1094,38 @@ async function drainVoiceQueue() {
         markVoicePhase('skip_after_synth'); // v0.1.895: 世代変更/無効化等で読まずにスキップした。
         notifyVoiceItemDropped(item);
         if (isStreamedVoice(wav)) wav.cancel(); // 鳴らさないので受け取りもやめる
+        if (isDelegatedSpeech(wav)) { try { wav.cancel(); } catch { /* まだ話していなければ何もしない */ } }
         continue;
       }
 
       startVoicePrefetch(generation);
+      if (isDelegatedSpeech(wav)) {
+        let started = false;
+        _voiceStopCurrent = () => { try { wav.cancel(); } catch { /* no-op */ } };
+        try {
+          started = await wav.speak({
+            onStart: () => {
+              if (typeof item.onAudioStart === 'function') { try { item.onAudioStart(); } catch { /* no-op */ } }
+              try { if (typeof item.onAudible === 'function') item.onAudible(); } catch { /* 枠の失敗で再生を止めない */ }
+            }
+          });
+        } catch { started = false; }
+        _voiceStopCurrent = null;
+        if (started && typeof item.onAudioEnd === 'function') {
+          try { item.onAudioEnd(); } catch { /* no-op */ }
+        }
+        if (!started || generation !== _voiceGeneration) {
+          notifyVoiceItemDropped(item);
+          continue;
+        }
+        _voiceDiag.spokenTotal += 1;
+        _voiceDiag.lastSpokenBase = Date.now();
+        _voiceDiag.queueNow = _voiceQueue.length;
+        _voiceDiag.enabled = _voiceReadingEnabled;
+        markVoicePhase('spoke_done');
+        armDrainWatchdog();
+        continue;
+      }
       let objectUrl = '';
       try {
         markVoicePhase('await_playback'); // v0.1.895: 再生待ちに入る(watchdog 付き)。
@@ -1379,6 +1436,13 @@ function enqueueVoiceTimelineItems(items) {
 
 async function initializeVoiceReading() {
   if (isObsMode()) return;
+  wireSpeechEngineSelect(document, {
+    get: (key) => chrome.storage.local.get(key),
+    set: (items) => chrome.storage.local.set(items)
+  });
+  onSpeechEngineChanged(() => {
+    if (_voiceReadingWanted) void rebindComeviewSpeechEngine();
+  });
   let bag = {};
   try {
     // ★v0.1.1321: 有界化(起動経路)。読み上げ設定が取れなくても画面は出す。

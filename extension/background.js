@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: 1402323599c4
+// nls-sw-fingerprint: ac2cf41f41d9
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -3718,7 +3718,8 @@ chrome.runtime.onConnect.addListener((port) => {
     if (!msg || msg.type !== 'start') return;
     let targetUrl;
     try { targetUrl = new URL(String(msg.url || '')); } catch { send({ type: 'error', error: 'Invalid URL' }); return; }
-    if (!(targetUrl.hostname === '127.0.0.1' && targetUrl.port === '50021' && targetUrl.pathname === '/streaming_synthesis')) {
+    const streamPort = targetUrl.port === '50021' || targetUrl.port === '10101';
+    if (!(targetUrl.hostname === '127.0.0.1' && streamPort && targetUrl.pathname === '/streaming_synthesis')) {
       send({ type: 'error', error: 'URL not allowed' });
       return;
     }
@@ -3802,8 +3803,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ error: 'Invalid URL' });
     return true;
   }
+  const speechPort = targetUrl.port === '50021'
+    || targetUrl.port === '10101'
+    || targetUrl.port === '50032'
+    || targetUrl.port === '50080'
+    || targetUrl.port === '11900';
   const allowed =
-    (targetUrl.hostname === '127.0.0.1' && targetUrl.port === '50021') ||
+    (targetUrl.hostname === '127.0.0.1' && speechPort) ||
     (targetUrl.hostname === '127.0.0.1' && targetUrl.port === '3456') ||
     (targetUrl.hostname === 'localhost' && targetUrl.port === '3456');
   if (!allowed) {
