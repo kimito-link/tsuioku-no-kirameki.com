@@ -632,11 +632,11 @@ function disableVoiceReading({ persist = true } = {}) {
   _voiceEnableSerial += 1;
   _voiceReadingWanted = false;
   _voiceReadingEnabled = false;
-  _voiceToggleBusy = false;
   if (_voiceEngineRetryTimer) {
     clearTimeout(_voiceEngineRetryTimer);
     _voiceEngineRetryTimer = 0;
   }
+  _voiceToggleBusy = false;
   _livePush.close();
   stopVoicePlayback();
   driveCvVoiceLoading('idle');
@@ -689,11 +689,11 @@ async function enableVoiceReading({ persist = true } = {}) {
   const serial = _voiceEnableSerial;
   _voiceReadingWanted = true;
   updateVoiceToggle();
-  if (persist && serial === _voiceEnableSerial && _voiceReadingWanted) persistVoiceReadingEnabled(true);
-  await connectVoiceReading(serial);
+  if (persist) persistVoiceReadingEnabled(true);
+  await connectVoiceReading(serial, persist);
 }
 
-async function connectVoiceReading(serial) {
+async function connectVoiceReading(serial, persist) {
   if (serial !== _voiceEnableSerial || !_voiceReadingWanted) return;
   if (_voiceReadingEnabled) return;
   if (_voiceConnectInFlight) {
@@ -762,6 +762,7 @@ async function connectVoiceReading(serial) {
     driveCvVoiceLoading('ready');
     showVoiceDeviceNote();
     updateVoiceToggle();
+    if (persist) persistVoiceReadingEnabled(true);
     void _livePush.ensure();
   } finally {
     _voiceConnectInFlight = false;

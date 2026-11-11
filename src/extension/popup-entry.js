@@ -19336,6 +19336,49 @@ function bridgeToolbarPopupToInlinePanel() {
   }, 0);
 }
 
+/** パネルの「読み上げ」を会場と同じ ON/OFF にする。initPopup の外に置く(関数の行数を増やさない)。 */
+function wirePanelVoiceReadingButton($) {
+  const paintVoiceReadingButton = (on) => {
+    const btn = $('openComeviewVoiceBtn');
+    if (!btn) return;
+    const word = btn.querySelector('.nl-compose-qbtn__word');
+    if (word) word.textContent = on ? '読み上げON' : '読み上げOFF';
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const label = on ? '読み上げを止めます' : '読み上げを始めます。VOICEVOX が必要です。';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  };
+  const syncVoiceReadingButton = () => {
+    try {
+      chrome.storage.local.get(KEY_VOICE_READING_ENABLED, (bag) => {
+        try { void chrome.runtime.lastError; } catch { /* no-op */ }
+        paintVoiceReadingButton(bag && bag[KEY_VOICE_READING_ENABLED] === true);
+      });
+    } catch { /* 拡張の外では何もしない */ }
+  };
+  $('openComeviewVoiceBtn')?.addEventListener('click', () => {
+    try {
+      chrome.storage.local.get(KEY_VOICE_READING_ENABLED, (bag) => {
+        try { void chrome.runtime.lastError; } catch { /* no-op */ }
+        const next = !(bag && bag[KEY_VOICE_READING_ENABLED] === true);
+        chrome.storage.local.set({ [KEY_VOICE_READING_ENABLED]: next }, () => {
+          try { void chrome.runtime.lastError; } catch { /* no-op */ }
+          paintVoiceReadingButton(next);
+        });
+      });
+    } catch { /* no-op */ }
+  });
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area && area !== 'local') return;
+      const c = changes && changes[KEY_VOICE_READING_ENABLED];
+      if (c) paintVoiceReadingButton(c.newValue === true);
+    });
+  } catch { /* no-op */ }
+  syncVoiceReadingButton();
+}
+
 async function initPopup() {
   // v0.1.1691: 前回までの合成済みの顔を、最初の描きより前に(非同期で)メモリへ先読みする=応援マス/レーンが最初から本顔で出る。
   void hydrateRecentAnonymousFaces();
@@ -21135,46 +21178,7 @@ async function initPopup() {
     }
   };
   $('openComeviewBtn')?.addEventListener('click', () => openComeviewWindow(false));
-  // 会場の読み上げと同じキー。Kick などでは保存の仕切りが付くので、会場とこのボタンは同じ ON/OFF になる。
-  const paintVoiceReadingButton = (on) => {
-    const btn = $('openComeviewVoiceBtn');
-    if (!btn) return;
-    const word = btn.querySelector('.nl-compose-qbtn__word');
-    if (word) word.textContent = on ? '読み上げON' : '読み上げOFF';
-    btn.classList.toggle('is-on', on);
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    const label = on ? '読み上げを止めます' : '読み上げを始めます。VOICEVOX が必要です。';
-    btn.title = label;
-    btn.setAttribute('aria-label', label);
-  };
-  const syncVoiceReadingButton = () => {
-    try {
-      chrome.storage.local.get(KEY_VOICE_READING_ENABLED, (bag) => {
-        try { void chrome.runtime.lastError; } catch { /* no-op */ }
-        paintVoiceReadingButton(bag && bag[KEY_VOICE_READING_ENABLED] === true);
-      });
-    } catch { /* 拡張の外では何もしない */ }
-  };
-  $('openComeviewVoiceBtn')?.addEventListener('click', () => {
-    try {
-      chrome.storage.local.get(KEY_VOICE_READING_ENABLED, (bag) => {
-        try { void chrome.runtime.lastError; } catch { /* no-op */ }
-        const next = !(bag && bag[KEY_VOICE_READING_ENABLED] === true);
-        chrome.storage.local.set({ [KEY_VOICE_READING_ENABLED]: next }, () => {
-          try { void chrome.runtime.lastError; } catch { /* no-op */ }
-          paintVoiceReadingButton(next);
-        });
-      });
-    } catch { /* no-op */ }
-  });
-  try {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area && area !== 'local') return;
-      const c = changes && changes[KEY_VOICE_READING_ENABLED];
-      if (c) paintVoiceReadingButton(c.newValue === true);
-    });
-  } catch { /* no-op */ }
-  syncVoiceReadingButton();
+  wirePanelVoiceReadingButton($);
 
   // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。
   // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。
