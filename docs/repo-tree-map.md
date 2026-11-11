@@ -179,10 +179,11 @@ graph LR
   f18 --> f18_2["lib/voiceAgeGate.js"]
   HUB --> f19["歌枠の曲順とリクエスト"]
   f19 --> f19_0["lib/songSetlist.js"]
-  f19 --> f19_1["extension/setlist-entry.js"]
-  f19 --> f19_2["extension/setlist-obs-entry.js"]
-  f19 --> f19_3["setlist.html"]
-  f19 --> f19_4["setlist-obs.html"]
+  f19 --> f19_1["lib/activeLivePick.js"]
+  f19 --> f19_2["extension/setlist-entry.js"]
+  f19 --> f19_3["extension/setlist-obs-entry.js"]
+  f19 --> f19_4["setlist.html"]
+  f19 --> f19_5["setlist-obs.html"]
   HUB --> f20["会場読み上げ診断(遅延の切り分け)"]
   f20 --> f20_0["lib/voiceDiag.js"]
   f20 --> f20_1["lib/voiceDiagKey.js"]
@@ -463,14 +464,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2437 件</sub>
+<sub>ファイル 2439 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（113 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（2136 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（2138 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（16 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -642,9 +643,10 @@ popup の応援レーンのタイルを素クリックすると、その人の�
 - [`src/lib/voiceAgeGate.js`](../src/lib/voiceAgeGate.js)
 
 ### 歌枠の曲順とリクエスト  〔歌枠 / コメント / OBS〕
-リクエスト言葉が先頭にあるコメントだけを曲の希望として残し、曲順をプレーンテキストで出す。OBSは文字だけの画面をウィンドウキャプチャする。ランキングは作らない。取り込みはこの画面を開いているあいだだけ
+リクエスト言葉が先頭にあるコメントだけを、記録の本体から曲の希望として残し、曲順をプレーンテキストで出す。ニコ生と、最後に見ていた他サービスの配信。OBSは文字だけの画面をウィンドウキャプチャする。ランキングは作らない
 
 - [`src/lib/songSetlist.js`](../src/lib/songSetlist.js)
+- [`src/lib/activeLivePick.js`](../src/lib/activeLivePick.js)
 - [`src/extension/setlist-entry.js`](../src/extension/setlist-entry.js)
 - [`src/extension/setlist-obs-entry.js`](../src/extension/setlist-obs-entry.js)
 - [`extension/setlist.html`](../extension/setlist.html)

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 11 / 1236 件
+## ⚠️ 役割コメントが無いソース 11 / 1237 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1162,7 +1162,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2437)
+- 📁 **src/** (2439)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1495,7 +1495,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2138)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1639,6 +1639,8 @@
     - `aboutBlankGapVerdict.test.js`
     - `acquisitionDashboardChart.js` — 「データ取得率」ダッシュボードのチャート計算（純関数）。
     - `acquisitionDashboardChart.test.js`
+    - `activeLivePick.js` — いま見ている配信の lv を、ニコ生と他サービスの記録から選ぶ。
+    - `activeLivePick.test.js`
     - `adLaneAvatarParity.test.js`
     - `adLaneMirrorPublishNotSkipped.wiring.test.js`
     - `adLaneMirrorShippedBundle.probe.test.js`

@@ -4,10 +4,16 @@
  * コメントの取り込みはこの画面を開いているあいだだけ（配信ページには足さない）。
  */
 import '../lib/extDocBusyCensusBoot.js';
+import { pickActiveLiveId, YT_LAST_STREAM_URL_KEY } from '../lib/activeLivePick.js';
 import { extractLiveIdFromUrl } from '../lib/broadcastUrl.js';
+import { isCommentDbAvailable, openCommentDb, readAllCommentsForLive as readDbComments } from '../lib/commentDb.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
+import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
+import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
+import { normalizeTailRowsForDisplay, readAllCommentsForLive } from '../lib/readAllCommentsForLive.js';
 import { KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
 import {
+  SEEN_KEY_MAX,
   SONG_SETLIST_KEY,
   addSongToSetlist,
   advanceSetlist,
@@ -22,7 +28,13 @@ import {
 } from '../lib/songSetlist.js';
 
 const POLL_MS = 4000;
+const FULL_READ_MS = 30000;
 const obsMode = document.body.dataset.mode === 'obs';
+let cacheLv = '';
+/** @type {unknown[]} */
+let cacheRows = [];
+let cacheTailLen = -1;
+let cacheAt = 0;
 
 /** @type {ReturnType<typeof emptySongSetlist>} */
 let state = emptySongSetlist();
@@ -148,18 +160,79 @@ function commentForSetlist(row) {
   };
 }
 
+async function readDb(lv) {
+  if (!isCommentDbAvailable()) return null;
+  let db = null;
+  try {
+    db = await openCommentDb();
+    const rows = await readDbComments(db, lv);
+    return Array.isArray(rows) && rows.length ? rows : null;
+  } catch {
+    return null;
+  } finally {
+    try {
+      if (db) db.close();
+    } catch {
+      /* 閉じられなくても次の読みは別の接続 */
+    }
+  }
+}
+
+async function resolveLiveId(store) {
+  const explicit = String(new URLSearchParams(location.search).get('lv') || '').trim().toLowerCase();
+  if (/^(lv|ch)\d{1,15}$/.test(explicit)) return explicit;
+  const bag = await store.get([KEY_LAST_WATCH_URL, YT_LAST_STREAM_URL_KEY]);
+  const nicoUrl = bag?.[KEY_LAST_WATCH_URL];
+  const stream = bag?.[YT_LAST_STREAM_URL_KEY];
+  const nicoLv = extractLiveIdFromUrl(String(nicoUrl || '')) || '';
+  let nicoAt = 0;
+  if (nicoLv) {
+    const sumKey = panelSummaryStorageKey(nicoLv);
+    const sumBag = await store.get(sumKey);
+    nicoAt = Number(sumBag?.[sumKey]?.updatedAt) || 0;
+  }
+  return pickActiveLiveId({
+    nicoUrl,
+    streamKey: stream && typeof stream === 'object' ? stream.key : '',
+    streamAt: stream && typeof stream === 'object' ? stream.at : 0,
+    nicoAt
+  });
+}
+
+async function loadRows(store, liveId) {
+  const tKey = tailStorageKey(liveId);
+  const tailBag = await store.get(tKey);
+  const tailRaw = Array.isArray(tailBag?.[tKey]) ? tailBag[tKey] : [];
+  const now = Date.now();
+  const needFull = cacheLv !== liveId || cacheTailLen < 0 || tailRaw.length < cacheTailLen || now - cacheAt >= FULL_READ_MS;
+  if (!needFull) {
+    const tail = normalizeTailRowsForDisplay(tailRaw, liveId, now);
+    cacheRows = mergeTailRowsIntoDisplay(cacheRows, tail, { liveId });
+    cacheTailLen = tailRaw.length;
+    return cacheRows;
+  }
+  const rows = await readAllCommentsForLive(liveId, {
+    readAllFromCommentDb: readDb,
+    getMany: (keys) => store.get(keys),
+    nowMs: now
+  });
+  cacheLv = liveId;
+  cacheRows = Array.isArray(rows) ? rows : [];
+  cacheTailLen = tailRaw.length;
+  cacheAt = now;
+  return cacheRows;
+}
+
 async function pollComments() {
   if (document.hidden || !state.requestWords.length) return;
   const store = storage();
   if (!store) return;
   try {
-    const watch = await store.get(KEY_LAST_WATCH_URL);
-    const liveId = extractLiveIdFromUrl(String(watch?.[KEY_LAST_WATCH_URL] || ''));
+    const liveId = await resolveLiveId(store);
     if (!liveId) return;
-    const key = tailStorageKey(liveId);
-    const bag = await store.get(key);
-    const rows = Array.isArray(bag?.[key]) ? bag[key] : [];
-    const result = ingestSongRequests(state, rows.map(commentForSetlist));
+    const rows = await loadRows(store, liveId);
+    const recent = rows.slice(-SEEN_KEY_MAX);
+    const result = ingestSongRequests(state, recent.map(commentForSetlist));
     if (result.added > 0) {
       state = result.state;
       await saveState(state);
