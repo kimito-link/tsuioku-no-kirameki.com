@@ -216,7 +216,15 @@ function ytPanelPrePaint(html) {
     'html:not([data-nl-platform-ready]) .nl-official-nico-stats__row { visibility: hidden; }\n' +
     'html:not([data-nl-platform-ready]) .nl-live-stat-card--visitors { display: none !important; }\n' +
     '</style>\n';
+  const label = '<div class="nl-live-stat-label">推定同時接続</div>';
+  if (html.split(label).length !== 2) throw new Error('popup.html の同時接続の見出しの形が変わった(ytPanelPrePaint)');
+  const htmlTag = '<!DOCTYPE html><html lang="ja"';
+  if (!html.startsWith(htmlTag)) throw new Error('popup.html の1行目の形が変わった(ytPanelPrePaint)');
   return html
+    // ページに数が出るサービスの画面の印(popup-entry.js の clearWatchMetaCard が「（接続中…）」でなく「読み込み中」と出す)
+    .replace(htmlTag, `${htmlTag} data-nl-page-count-only="1"`)
+    // 見出しはサービスが分かってから付ける(ニコ生の「推定同時接続」を一瞬も出さない)
+    .replace(label, '<div class="nl-live-stat-label"></div>')
     .replace(est, '<div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">読み込み中</div>')
     .replace('</head>', `${css}</head>`);
 }

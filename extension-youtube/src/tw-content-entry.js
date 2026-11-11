@@ -691,3 +691,22 @@ setInterval(() => {
   void check();
 }, 1000);
 window.addEventListener('pagehide', () => current?.stop());
+
+// ---- 視聴者数はページに出ている数を10秒おきに写す(保存の書き込みを増やしすぎないよう10秒・変わったときだけ) ----
+// 配信の情報(GQL)は30秒おきなので、ページの数が 10,533→10,583 と動いても欄が古い数のままだった(2026-11-11 PC 計測)。
+//   ページの「N 人視聴中」の数字(data-a-target="animated-channel-viewers-count")が変わったときだけ送る。読めなければ何もしない。
+let lastDomViewers = -1;
+setInterval(() => {
+  if (!current) return;
+  try {
+    const el = document.querySelector('[data-a-target="animated-channel-viewers-count"]');
+    const digits = String(el?.textContent || '').replace(/[^\d]/g, '');
+    if (!digits || digits.length > 9) return;
+    const n = Number(digits);
+    if (!Number.isFinite(n) || n === lastDomViewers) return;
+    lastDomViewers = n;
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, concurrentViewers: n } });
+  } catch {
+    /* 読めなければ30秒おきの数のまま */
+  }
+}, 10_000);

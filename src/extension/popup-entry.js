@@ -9133,11 +9133,10 @@ function clearWatchMetaCard(opts = {}) {
       : Boolean(watchMetaCache.fetchInflight);
   const error =
     typeof opts.error === 'string' ? opts.error : String(watchMetaCache.fetchError || '');
-  const gate = resolveWatchMetaCardState({
-    snapshot: null,
-    snapshotFetchInflight: inflight,
-    snapshotFetchError: error
-  });
+  const gate0 = resolveWatchMetaCardState({ snapshot: null, snapshotFetchInflight: inflight, snapshotFetchError: error });
+  // ページに数が出るサービスの画面(yt-sidepanel.html の data-nl-page-count-only)は「（接続中…）」等でなく「読み込み中」
+  const gate = document.documentElement?.getAttribute('data-nl-page-count-only') === '1'
+    ? { ...gate0, viewerLabel: '読み込み中', concurrentLabel: '読み込み中' } : gate0;
   if (viewerDomEl) {
     viewerDomEl.textContent = gate.viewerLabel;
     viewerDomEl.classList.toggle(
