@@ -3,9 +3,11 @@
 //   純関数(comeview と同じ正本)。会場の発言パネルがテールを読むために使う。
 import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/comeviewRows.js';
 import {
+  applyVenuePickupBox,
   applyVenuePickupView,
   buildVenuePickupView,
   createVenuePickupBanner,
+  VENUE_PICKUP_CSS,
   venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { attachVenuePickupDrag } from './venuePickupDrag.js';
@@ -648,84 +650,8 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
   }
-  /* v0.1.1230 ピックアップ枠(BSP風)。v0.1.1869 りんく「上にもってきたほうがみやすい」(Canva の見本=映像の上に大きな白い吹き出し):
-     ひな壇の一番下にあった帯を、映像の上端中央の大きな吹き出しにした。stageLayout 直下に絶対配置するので
-     出たり消えたりしても席の段は動かない。空のときは出さない(案内文の大きな白い枠で映像をふさがない)。
-     ★下地は不透明(v0.1.1337: 半透明だと後ろのページの文字と重なって読めなかった)。 */
-  .nlsb-pickup {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    z-index: 7;
-    transform: translateX(-50%);
-    width: min(860px, calc(100% - 180px));
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 64px;
-    padding: 10px 22px;
-    border-radius: 28px;
-    border: 2px solid rgba(255, 176, 62, 0.9);
-    background: #fffdf8;
-    color: #1f2328;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-    font-size: 18px;
-    line-height: 1.4;
-    pointer-events: auto;
-  }
-  /* 吹き出しの尻尾(左下)。枠線色の三角の上に地の色の三角を重ねる。 */
-  .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
-  .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
-  .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
-  .nlsb-pickup[data-empty='1'] { display: none; }
-  .nlsb-pickup__badge {
-    flex: 0 0 auto;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 2px 6px;
-    border-radius: 999px;
-    background: rgba(255, 152, 0, 0.9);
-    color: #fff;
-  }
-  .nlsb-pickup__face {
-    flex: 0 0 auto;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: rgba(0, 0, 0, 0.06);
-    box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
-  }
-  .nlsb-pickup__face[hidden] { display: none; }
-  .nlsb-pickup__main {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .nlsb-pickup__body {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; /* 長文は2行まで */
-    overflow-wrap: anywhere;
-    font-weight: 700;
-  }
-  .nlsb-pickup__meta {
-    flex: 0 0 auto;
-    font-size: 12px;
-    opacity: 0.75;
-    color: inherit;
-    text-decoration: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .nlsb-pickup__meta:empty { display: none; }
-  a.nlsb-pickup__meta[href] { text-decoration: underline; text-underline-offset: 2px; }
+  /* v0.1.1230 ピックアップ枠。中身は VENUE_PICKUP_CSS(親の 100% ではなく窓の幅)。 */
+  ${VENUE_PICKUP_CSS}
   .nlsb-stage {
     position: fixed;
     inset: 0;
@@ -3034,7 +2960,7 @@ export function mountVenueBarButton(options = {}) {
     const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
     const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
     const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
-    pickupEls.root.style.width = at ? `${at.width}px` : '';
+    applyVenuePickupBox(pickupEls.root, window.innerWidth, video ? video.width : 0);
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
   const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)

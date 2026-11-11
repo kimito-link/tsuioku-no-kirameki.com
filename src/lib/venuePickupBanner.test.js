@@ -132,6 +132,27 @@ describe('applyVenuePickupView — diff-skip', () => {
   });
 });
 
+describe('venuePickupReadableBox(細い親でも読める幅)', () => {
+  it('窓が広ければニコ生・YouTube と同じ上限 860。映像が狭ければ映像に合わせ、320 より細くしない', async () => {
+    const { venuePickupReadableBox } = await import('./venuePickupBanner.js');
+    expect(venuePickupReadableBox(1400, 960)).toEqual({ width: 860, minWidth: 320, maxWidth: 860 });
+    expect(venuePickupReadableBox(1400, 600).width).toBe(576);
+    expect(venuePickupReadableBox(1400, 0)).toEqual({ width: 860, minWidth: 320, maxWidth: 860 });
+    expect(venuePickupReadableBox(1280, 40).width).toBeGreaterThanOrEqual(320);
+  });
+  it('見た目は親の 100% ではなく窓の幅', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { VENUE_PICKUP_CSS } = await import('./venuePickupBanner.js');
+    const bar = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8');
+    expect(VENUE_PICKUP_CSS).toContain('100vw');
+    expect(VENUE_PICKUP_CSS).toContain('min-width: min(320px, calc(100vw - 32px))');
+    expect(VENUE_PICKUP_CSS).not.toContain('100% - 180px');
+    expect(bar).toContain('VENUE_PICKUP_CSS');
+    expect(bar).toContain('applyVenuePickupBox');
+    expect(bar).not.toContain('100% - 180px');
+  });
+});
+
 describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
   it('映像の中心に合わせ、幅は映像から余白を引いた分まで', async () => {
     const { venuePickupPlacement } = await import('./venuePickupBanner.js');

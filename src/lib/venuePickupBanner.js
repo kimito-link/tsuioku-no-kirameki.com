@@ -19,8 +19,145 @@
  * @module venuePickupBanner
  */
 
-/** 枠のCSSクラス(スタイルは venueBar 側の CSS 文字列に置く)。 */
+/** 枠のCSSクラス。見た目は VENUE_PICKUP_CSS(会場の CSS へ差し込む)。 */
 export const VENUE_PICKUP_CLASS = 'nlsb-pickup';
+
+/** 吹き出しの上限・下限。親要素の幅ではなく窓(vw)で決める。 */
+export const VENUE_PICKUP_MAX_PX = 860;
+export const VENUE_PICKUP_MIN_PX = 320;
+export const VENUE_PICKUP_VW_GUTTER = 32;
+
+/**
+ * 吹き出しの幅。放送ページの flex や max-width:100% で親が細くても、1文字幅に潰れない。
+ * 映像が十分大きいときは映像の幅に合わせる(ニコ生・YouTube と同じ)。小さい・無いときは窓の幅。
+ * @param {number} viewportWidth
+ * @param {number} [videoWidth]
+ * @returns {{ width: number, minWidth: number, maxWidth: number }}
+ */
+export function venuePickupReadableBox(viewportWidth, videoWidth = 0) {
+  const vw = Math.max(0, Number(viewportWidth) || 0);
+  const maxWidth = Math.max(160, Math.min(VENUE_PICKUP_MAX_PX, Math.max(160, vw - VENUE_PICKUP_VW_GUTTER)));
+  const minWidth = Math.min(VENUE_PICKUP_MIN_PX, maxWidth);
+  let width = maxWidth;
+  const video = Number(videoWidth);
+  if (Number.isFinite(video) && video >= 240) {
+    width = Math.max(minWidth, Math.min(maxWidth, video - 24));
+  }
+  return { width: Math.round(width), minWidth: Math.round(minWidth), maxWidth: Math.round(maxWidth) };
+}
+
+/**
+ * ホストページの CSS(div の max-width や writing-mode)より強いインライン指定。
+ * @param {HTMLElement | { style?: Record<string, string> } | null | undefined} el
+ * @param {number} viewportWidth
+ * @param {number} [videoWidth]
+ */
+export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0) {
+  const box = venuePickupReadableBox(viewportWidth, videoWidth);
+  if (el && el.style) {
+    el.style.boxSizing = 'border-box';
+    el.style.flexShrink = '0';
+    el.style.writingMode = 'horizontal-tb';
+    el.style.wordBreak = 'normal';
+    el.style.width = `${box.width}px`;
+    el.style.minWidth = `${box.minWidth}px`;
+    el.style.maxWidth = `${box.maxWidth}px`;
+  }
+  return box;
+}
+
+/**
+ * 会場 CSS に差し込む PICK UP の見た目。幅は 100vw。親の 100% だと ABEMA の細い枠で
+ * calc(100% - 180px) が 1 文字幅になり、本文が 1 字ずつ折れる。
+ */
+export const VENUE_PICKUP_CSS = `
+  html .nlsb-root .nlsb-pickup,
+  html .nlsb-root .nlsb-pickup * {
+    writing-mode: horizontal-tb;
+    word-break: normal;
+  }
+  .nlsb-pickup {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    z-index: 7;
+    transform: translateX(-50%);
+    box-sizing: border-box;
+    width: min(860px, calc(100vw - 32px));
+    min-width: min(320px, calc(100vw - 32px));
+    max-width: min(860px, calc(100vw - 32px));
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 10px 22px;
+    border-radius: 28px;
+    border: 2px solid rgba(255, 176, 62, 0.9);
+    background: #fffdf8;
+    color: #1f2328;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    font-size: 18px;
+    line-height: 1.4;
+    pointer-events: auto;
+    white-space: normal;
+  }
+  .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
+  .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
+  .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
+  .nlsb-pickup[data-empty='1'] { display: none; }
+  .nlsb-pickup__badge {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 152, 0, 0.9);
+    color: #fff;
+    white-space: nowrap;
+  }
+  .nlsb-pickup__face {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
+  }
+  .nlsb-pickup__face[hidden] { display: none; }
+  .nlsb-pickup__main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .nlsb-pickup__body {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow-wrap: break-word;
+    white-space: normal;
+    font-weight: 700;
+  }
+  .nlsb-pickup__meta {
+    flex: 0 0 auto;
+    font-size: 12px;
+    opacity: 0.75;
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .nlsb-pickup__meta:empty { display: none; }
+  a.nlsb-pickup__meta[href] { text-decoration: underline; text-underline-offset: 2px; }
+`;
 
 /**
  * ピックアップ枠のDOMを作る(1回だけ呼ぶ)。
