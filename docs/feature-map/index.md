@@ -9,6 +9,7 @@
 - [ポップアップ(応援レーン)](popup.md) — `src/extension/popup-entry.js`
 - [会場モード(standalone)](venue.md) — `src/extension/venue-entry.js`
 - [コメビュ(別窓)](comeview.md) — `src/extension/comeview-entry.js`
+- [OBS透過の見た目](obs-style.md) — `src/extension/obs-style-entry.js`
 - [状態速報ページ](status.md) — `src/extension/status-entry.js`
 - [コメント IDB 書き手](offscreen.md) — `src/extension/offscreen-entry.js`
 - [バックフィル SW](backfill-sw.md) — `src/extension/backfill-sw-entry.js`
@@ -18,5 +19,5 @@
 
 ## データの流れ・影響範囲
 
-- [storage データバス図](storage-bus.md) — 全 111 キーの producer/consumer と断線検出
+- [storage データバス図](storage-bus.md) — 全 113 キーの producer/consumer と断線検出
 - [影響範囲マップ](impact-map.md) — このファイルを変えたら何が壊れるか(波及機能の逆引き)

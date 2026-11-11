@@ -50,7 +50,7 @@
 - 🔵 **KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_INLINE_PANEL_WIDTH_MODE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_LANE_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js, src/lib/venueOpenLatency.js
-- 🔵 **KEY_LAST_WATCH_URL** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/popup-entry.js, src/extension/status-entry.js
+- 🔵 **KEY_LAST_WATCH_URL** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/obs-style-entry.js, src/extension/popup-entry.js, src/extension/status-entry.js
 - 🔵 **KEY_LIVEVIEW_PUBLISH_OUTCOME** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_MARKETING_EXPORT_MASK_LABELS** — 読む人だけ（書く経路が無い疑い）: src/extension/marketing-export-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_NDGR_DETERMINISTIC_BACKFILL** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
@@ -96,7 +96,7 @@
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
 | `KEY_CDB_OFFSCREEN_ENABLED` | — | extension/content-entry.js |
 | `KEY_CHEER_RECENT_V1` | extension/popup-entry.js | extension/popup-entry.js |
-| `KEY_COMEVIEW_WINDOW_GEOMETRY` | extension/comeview-entry.js | extension/comeview-entry.js |
+| `KEY_COMEVIEW_WINDOW_GEOMETRY` | extension/comeview-entry.js | extension/comeview-entry.js<br>extension/obs-style-entry.js |
 | `KEY_COMMENTER_FOLLOWING_LIST_CACHE` | — | extension/content-entry.js |
 | `KEY_COMMENTER_FOLLOW_CACHE` | extension/popup/report/htmlReportDocument.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_COMMENT_IDB_ENABLED` | — | extension/content-entry.js |
@@ -125,7 +125,7 @@
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_LANE_MIRROR` | — | extension/status-entry.js<br>lib/venueOpenLatency.js |
-| `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/obs-style-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_OUTCOME` | — | extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | extension/status-entry.js | extension/live-view-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/comeview-entry.js<br>extension/venueBar.js |
@@ -136,6 +136,7 @@
 | `KEY_NDGR_DETERMINISTIC_BACKFILL` | — | extension/content-entry.js |
 | `KEY_NDGR_FORWARD_ENABLED` | — | extension/content-entry.js |
 | `KEY_NORTH_STAR_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_OBS_OVERLAY_STYLE` | extension/obs-style-entry.js | extension/comeview-entry.js<br>extension/obs-style-entry.js |
 | `KEY_OP_SOUND_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_OP_SOUND_ENABLED` | — | extension/popup-entry.js |
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
@@ -174,6 +175,7 @@
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_VOICE_NARROW_MODE` | — | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
 | `KEY_VOICE_QUALITY` | — | extension/voiceQualitySetting.js |
+| `KEY_VOICE_READING_ENABLED` | extension/popup/wirePanelVoiceReadingButton.js | extension/popup/wirePanelVoiceReadingButton.js |
 | `KEY_VOICE_READ_NAME_ENABLED` | — | extension/phoneVoicePublisher.js |
 | `KEY_VOICE_VOLUME_PERCENT` | — | extension/comeview-entry.js |
 | `KEY_VOICE_WEAK_PC` | extension/comeview-entry.js | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |

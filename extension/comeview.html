@@ -587,6 +587,10 @@
         margin: 4px;
       }
       body.is-obs .nl-tl-row__name { color: #8fd6ff; }
+      /* 動きは既定で出さない。オンは「OBSの見た目」が obs-animate を付け、注入 CSS が上書きする。 */
+      body.is-obs .nl-tl-row.cv-row-in,
+      body.is-obs .nl-tl-gift.cv-row-in { animation: none; }
+      body.is-obs .cv-list { scroll-behavior: auto; }
       body.is-obs .nl-tl-gift__pt { color: #ffd479; }
       /* OBS オーバーレイでは生ID・時刻は出さない(画面を汚さない・本文最優先)。 */
       body.is-obs .nl-tl-row[data-nl-uid]::after,
@@ -705,6 +709,7 @@
       <button id="cvBtnNg" type="button" title="非表示にした人を管理" style="display: none;">NG 0</button>
       <button id="cvBtnWindow" type="button" title="別ウィンドウで開く">⧉ 別窓</button>
       <button id="cvBtnObs" type="button" title="OBS用の透過表示に切替">OBS透過</button>
+      <button id="cvBtnObsStyle" type="button" title="色や文字の大きさを変える">OBSの見た目</button>
       <button id="cvBtnPause" type="button">一時停止</button>
     </div>
     <div class="cv-pinbar" id="cvPinBar" style="display: none;"></div>

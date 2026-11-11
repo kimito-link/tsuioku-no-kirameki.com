@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1238 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -234,7 +234,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (367)
+- 📁 **docs/** (368)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -330,7 +330,7 @@
   - 📁 **article-drafts/** (2)
     - `hasanmap-osint-20260611-copy.txt`
     - `hasanmap-osint-20260611.md`
-  - 📁 **feature-map/** (15)
+  - 📁 **feature-map/** (16)
     - `backfill-sw.md`
     - `comeview.md`
     - `content.md`
@@ -339,6 +339,7 @@
     - `impact-map.md`
     - `index.md`
     - `live-ranking.md`
+    - `obs-style.md`
     - `offscreen.md`
     - `page-intercept.md`
     - `popup.md`
@@ -617,7 +618,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (143)
+- 📁 **extension/** (144)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -764,6 +765,7 @@
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
+  - `obs-style.html`
   - `offscreen.html`
   - `popup.html`
   - `sidepanel.html`
@@ -1159,7 +1161,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2440)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1198,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (114)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1255,6 +1257,8 @@
     - `ndgrStatisticsPointsSanityGuard.wiring.test.js`
     - `ndgrViewBasePick.wiring.test.js`
     - `noSpeechNote.wiring.test.js`
+    - `obs-style-entry.js` — OBS透過コメントの表示を、見本を見ながら変える画面。
+    - `obsOverlayApply.js` — OBS透過コメントの表示へ、決めた見た目を載せる。
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
@@ -1491,7 +1495,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2138)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2735,6 +2739,8 @@
     - `numberConsistency.test.js`
     - `objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
     - `objectUrlRevokeQueue.test.js`
+    - `obsOverlayStyle.js` — OBS透過コメントの表示の見た目（色・大きさ・行数）を正規化し、安全な CSS にする。
+    - `obsOverlayStyle.test.js`
     - `observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
     - `observerTarget.test.js`
     - `officialCommentRate.js` — 公式「本家コメ」の件数から、いまの速さ(件/分)を出す(葉モジュール・依存ゼロ)。

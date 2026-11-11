@@ -52,6 +52,30 @@
       ]
     },
     {
+      "file": "src/lib/storageKeys.js",
+      "featureCount": 8,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "content",
+        "obs-style",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目",
+        "コメント IDB 書き手",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/supportGrowthTileSrc.js",
       "featureCount": 8,
       "features": [
@@ -98,12 +122,12 @@
       ]
     },
     {
-      "file": "src/lib/storageKeys.js",
+      "file": "src/lib/extDocBusyCensus.js",
       "featureCount": 7,
       "features": [
         "backfill-sw",
         "comeview",
-        "content",
+        "obs-style",
         "offscreen",
         "popup",
         "status",
@@ -112,7 +136,51 @@
       "labels": [
         "バックフィル SW",
         "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
+        "OBS透過の見た目",
+        "コメント IDB 書き手",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/extProcessCensusKey.js",
+      "featureCount": 7,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "obs-style",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "OBS透過の見た目",
+        "コメント IDB 書き手",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/storageRefreshTriggerKey.js",
+      "featureCount": 7,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "obs-style",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "OBS透過の見た目",
         "コメント IDB 書き手",
         "ポップアップ(応援レーン)",
         "状態速報ページ",
@@ -204,39 +272,19 @@
       ]
     },
     {
-      "file": "src/lib/extDocBusyCensus.js",
+      "file": "src/lib/extDocBusyCensusBoot.js",
       "featureCount": 6,
       "features": [
-        "backfill-sw",
         "comeview",
+        "obs-style",
         "offscreen",
         "popup",
         "status",
         "venue"
       ],
       "labels": [
-        "バックフィル SW",
         "コメビュ(別窓)",
-        "コメント IDB 書き手",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/extProcessCensusKey.js",
-      "featureCount": 6,
-      "features": [
-        "backfill-sw",
-        "comeview",
-        "offscreen",
-        "popup",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "バックフィル SW",
-        "コメビュ(別窓)",
+        "OBS透過の見た目",
         "コメント IDB 書き手",
         "ポップアップ(応援レーン)",
         "状態速報ページ",
@@ -280,26 +328,6 @@
         "記録エンジン(watchページ常駐)",
         "ページ傍受",
         "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/storageRefreshTriggerKey.js",
-      "featureCount": 6,
-      "features": [
-        "backfill-sw",
-        "comeview",
-        "offscreen",
-        "popup",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "バックフィル SW",
-        "コメビュ(別窓)",
-        "コメント IDB 書き手",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
@@ -424,24 +452,6 @@
       "labels": [
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/extDocBusyCensusBoot.js",
-      "featureCount": 5,
-      "features": [
-        "comeview",
-        "offscreen",
-        "popup",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "コメント IDB 書き手",
         "ポップアップ(応援レーン)",
         "状態速報ページ",
         "会場モード(standalone)"
@@ -1610,6 +1620,20 @@
       ]
     },
     {
+      "file": "src/extension/venuePickupVoice.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/extension/voiceStreamAudio.js",
       "featureCount": 3,
       "features": [
@@ -2450,6 +2474,20 @@
       ]
     },
     {
+      "file": "src/lib/venuePickupPlayback.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueSeatsDiagKey.js",
       "featureCount": 3,
       "features": [
@@ -2699,6 +2737,18 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/extension/obsOverlayApply.js",
+      "featureCount": 2,
+      "features": [
+        "comeview",
+        "obs-style"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "OBS透過の見た目"
       ]
     },
     {
@@ -2987,6 +3037,18 @@
       "labels": [
         "コメビュ(別窓)",
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/comeviewWindowGeometry.js",
+      "featureCount": 2,
+      "features": [
+        "comeview",
+        "obs-style"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "OBS透過の見た目"
       ]
     },
     {
@@ -3623,6 +3685,18 @@
       "labels": [
         "ポップアップ(応援レーン)",
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/obsOverlayStyle.js",
+      "featureCount": 2,
+      "features": [
+        "comeview",
+        "obs-style"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "OBS透過の見た目"
       ]
     },
     {
@@ -4774,6 +4848,16 @@
       ]
     },
     {
+      "file": "src/extension/obs-style-entry.js",
+      "featureCount": 1,
+      "features": [
+        "obs-style"
+      ],
+      "labels": [
+        "OBS透過の見た目"
+      ]
+    },
+    {
       "file": "src/extension/offscreen-entry.js",
       "featureCount": 1,
       "features": [
@@ -4885,6 +4969,16 @@
     },
     {
       "file": "src/extension/popup/wireLaneUserDetailOpen.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/wirePanelVoiceReadingButton.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -5625,16 +5719,6 @@
     },
     {
       "file": "src/lib/comeviewTimelineDiff.js",
-      "featureCount": 1,
-      "features": [
-        "comeview"
-      ],
-      "labels": [
-        "コメビュ(別窓)"
-      ]
-    },
-    {
-      "file": "src/lib/comeviewWindowGeometry.js",
       "featureCount": 1,
       "features": [
         "comeview"
