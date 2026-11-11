@@ -185,3 +185,25 @@ describe('ミクチャ・SHOWROOM の公式ランキングの単位と期間(202
     expect(officialWords(mx).sentence).toContain('今月・上位');
   });
 });
+
+describe('3段の案内と「該当者なし」の文にニコ生の数値ID・匿名(a:)の話を残さない(2026-11-12 ツイキャス実ページ)', async () => {
+  const g = await import('../storyUserLaneGuideHtml.js');
+  const htmls = [
+    g.buildStoryUserLaneGuideTopHtml('x.png', 1),
+    g.buildStoryUserLaneGuideGiftHtml('x.png', 1),
+    g.buildStoryUserLaneGuideKontaHtml('x.png', 1),
+    g.buildStoryUserLaneGuideTanuHtml('x.png', 1),
+    g.buildStoryUserLaneEmptyNoteLinkHtml(),
+    g.buildStoryUserLaneEmptyNoteGiftHtml(),
+    g.buildStoryUserLaneEmptyNoteKontaHtml(),
+    g.buildStoryUserLaneEmptyNoteTanuHtml(),
+  ];
+  it.each(htmls.map((h, i) => [i, h]))('文 %i', (_i, h) => {
+    const out = ytWording(String(h));
+    expect(out).not.toMatch(/数値|a:）|a: 形式|ニコ/);
+    expect(out).toMatch(/段|列/);
+  });
+  it('コメント本文の「数値」は変えない', () => {
+    expect(ytWording('数値が大きいね a:）')).toBe('数値が大きいね a:）');
+  });
+});

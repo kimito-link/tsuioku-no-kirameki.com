@@ -240,6 +240,8 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   await expect.poll(bodyText, { timeout: 30_000 }).toContain('90,815 スコア');
   expect(await bodyText()).toContain('ツイキャス 公式の サポーターランキング（現在のレベル）');
   expect(await bodyText()).not.toContain('チャット欄');
+  // 段の案内・「該当者なし」にニコ生の数値ID・匿名(a:)の話を残さない(2026-11-12 実ページで発見)
+  expect(await bodyText()).not.toMatch(/数値ユーザーID|数値ID|匿名（a:）/);
   expect(await chip('commentTotal')).toContain('890');
   expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
   await ext.locator('[data-nl-metric="totalViews"]').locator('xpath=..').screenshot({ path: 'test-results/twitcasting-official-chips.png' });

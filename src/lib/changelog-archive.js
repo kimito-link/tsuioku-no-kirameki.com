@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2045',
+    date: '2026-11-11',
+    summary: 'ニコ生以外の広告ptを出さない',
+    items: Object.freeze([
+      'ニコニコ以外の配信では、来場者数・本家コメ・広告pt・ギフトpt を出さないままにしました。YouTube・Twitch・Kick は、それぞれの視聴者数と、このPCの記録にある応援だけを出します。',
+      'ABEMA の PICK UP を、ニコ生・YouTube と同じ大きさで出します。コメント欄が開いていても、欄の幅には縮めません。',
+      '放送ページの CSS で吹き出しが潰れないよう、幅と文字の折り返しを固定しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2044',
     date: '2026-11-11',
     summary: '各配信の数字だけを出す・ABEMAの視聴数をカードに出す',
