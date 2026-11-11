@@ -14,6 +14,7 @@
 graph LR
   n_comeview["コメビュ(別窓)"]
   n_comeview --> n_src_extension_comeviewLivePushClient_js["extension/comeviewLivePushClient.js"]
+  n_comeview --> n_src_extension_venuePickupVoice_js["extension/venuePickupVoice.js"]:::shared
   n_comeview --> n_src_extension_voiceQualitySetting_js["extension/voiceQualitySetting.js"]:::shared
   n_comeview --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
   n_comeview --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_comeview --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_comeview --> n_src_lib_storageRefreshTriggerKey_js["lib/storageRefreshTriggerKey.js"]:::shared
   n_comeview --> n_src_lib_supportActivityTimeline_js["lib/supportActivityTimeline.js"]:::shared
-  n_comeview --> n_src_lib_supportGridDisplayTier_js["lib/supportGridDisplayTier.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 42 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 44 ファイル省略（全件は storage-bus.md / metafile 参照）。

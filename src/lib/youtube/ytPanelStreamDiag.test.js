@@ -235,7 +235,7 @@ describe('0.1.1958: 切り替わる直前の古い横の欄は、次の配信を
 describe('0.1.1962: 1回の読みでギフトのキーを5つ聞かれても、重い読みと組み立ては1回', () => {
   const shim = readFileSync(new URL('../../../extension-youtube/src/ytNicoShim.js', import.meta.url), 'utf8');
   it('配信の一覧は1回の読みにつき1回だけ読む', () => {
-    expect(shim).toContain('if (!sumsOnce) sumsOnce = Promise.resolve(realGet(KEY_YT_SUMMARIES));');
+    expect(shim).toContain('if (!sumsOnce) sumsOnce = summariesBag();');
   });
   it('同じ組み立て結果・同じ開始時刻ならギフトの袋を使い回す', () => {
     expect(shim).toContain('const giftBagsMemo = new WeakMap();');

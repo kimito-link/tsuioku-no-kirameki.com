@@ -934,6 +934,22 @@
       ]
     },
     {
+      "file": "src/lib/laneAggregatesMemo.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/laneMirrorKey.js",
       "featureCount": 4,
       "features": [
@@ -1606,6 +1622,20 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/extension/venuePickupVoice.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
       ]
     },
@@ -2446,6 +2476,20 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venuePickupPlayback.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
       ]
     },
@@ -4894,6 +4938,16 @@
       ]
     },
     {
+      "file": "src/extension/popup/wirePanelVoiceReadingButton.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/extension/popup/wireVoiceGpuTip.js",
       "featureCount": 1,
       "features": [
@@ -7224,16 +7278,6 @@
       ]
     },
     {
-      "file": "src/lib/laneAggregatesMemo.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/laneCountOrder.js",
       "featureCount": 1,
       "features": [
@@ -9305,6 +9349,16 @@
     },
     {
       "file": "src/lib/sourceProvenance.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/stallTrace.js",
       "featureCount": 1,
       "features": [
         "status"

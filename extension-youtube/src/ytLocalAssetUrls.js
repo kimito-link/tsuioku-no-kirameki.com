@@ -27,6 +27,14 @@ function mimeOf(rel) {
   );
 }
 
+/** @param {string} b64 @param {string} mime */
+function b64ToBlobUrl(b64, mime) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+}
+
 /**
  * @param {string} rel 拡張ルートからの相対パス
  * @returns {Promise<string>} blob: (失敗なら '')
@@ -40,10 +48,9 @@ export function ytLoadLocalAsset(rel) {
   if (p) return p;
   const job = (async () => {
     try {
-      const res = await fetch(chrome.runtime.getURL(key));
-      if (!res.ok) return '';
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: mimeOf(key) }));
+      const res = await chrome.runtime.sendMessage({ type: 'YT_GET_EXT_ASSET', path: key });
+      if (!res || !res.ok || typeof res.b64 !== 'string' || !res.b64) return '';
+      const url = b64ToBlobUrl(res.b64, String(res.mime || mimeOf(key)));
       ready.set(key, url);
       return url;
     } catch {

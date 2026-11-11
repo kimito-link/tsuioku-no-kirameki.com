@@ -1072,9 +1072,13 @@ async function buildCommentsForLvUncached(lv) {
   if (list.some((r) => r?.replay)) {
     replayVideoIds.add(vid);
     try {
-      const bag = await real.storage.local.get(KEY_YT_SUMMARIES);
-      const sum = bag?.[KEY_YT_SUMMARIES]?.[vid];
-      streamStartedAt = ytTrustedStartedAt(sum, vid, bag?.[KEY_YT_SUMMARIES]);
+      // 0.1.2057: 配信のまとめは配信ごとの鍵に移った。手元の一覧(knownSummaries)を先に使う
+      const all =
+        knownSummaries && Object.keys(knownSummaries).length
+          ? knownSummaries
+          : (await real.storage.local.get(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
+      const sum = all?.[vid];
+      streamStartedAt = ytTrustedStartedAt(sum, vid, all);
     } catch {
       /* 分からなければ受け取った時刻 */
     }
@@ -1216,6 +1220,18 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       registerBroadcastersFromSummaries();
     })
     .catch(() => {});
+  /**
+   * 配信のまとめの一覧を { yt_stream_summaries: {...} } の形で返す。
+   * 0.1.2057: 裏方は一覧を丸ごと書かなくなった(配信ごとの小さい鍵 ytm:sum:v1:<id> と IndexedDB)。
+   *   shim の中で realGet('yt_stream_summaries') を直接読むと空になり、配信者名などが消えていた(e2e 6本が赤)。
+   *   起動時に裏方から受け取り、配信ごとの鍵の変化で更新している knownSummaries を正本にする。
+   * @returns {Promise<Record<string, any>>}
+   */
+  const summariesBag = async () => {
+    await knownVideosReady;
+    if (knownSummaries && Object.keys(knownSummaries).length) return { [KEY_YT_SUMMARIES]: knownSummaries };
+    return /** @type {Record<string, any>} */ ((await realGet(KEY_YT_SUMMARIES)) || {});
+  };
 
   // ---- 「最後に見た配信」(0.1.1948・council/panel-stream-selection-SPEC.md §4-C2) ----
   //   正本は配信ページ自身が書く yt_last_stream_url(pfLastStreamUrl.js・ニコ生版 rememberWatchPageUrl の写し)。
@@ -1236,8 +1252,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       return `https://live.nicovideo.jp/watch/${lv}`;
     }
     // まだどのページも書いていない(入れたばかり)ときだけ、最近更新された配信を使う(計器 source:'newest' に出る)
-    const stored = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
-    const sums = knownSummaries && Object.keys(knownSummaries).length ? knownSummaries : stored;
+    const sums = /** @type {Record<string, any>} */ (await summariesBag())?.[KEY_YT_SUMMARIES];
     const vid = newestVideoIdOf(sums);
     panelDiag.lastWatch(vid ? 'newest' : 'none', vid ? pseudoLvForVideoId(vid) : '');
     return vid ? `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(vid)}` : '';
@@ -1333,7 +1348,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (!vid) continue;
         if (await staleFrameHold.wait(isOtherServiceThanPanel(lv))) shimDiag.staleFrameHeld = staleFrameHold.heldCount();
         // 0.1.1962: 1回の読みでギフトのキーを5つ聞かれても、配信の一覧(yt_stream_summaries)を読むのは1回だけ
-        if (!sumsOnce) sumsOnce = Promise.resolve(realGet(KEY_YT_SUMMARIES));
+        if (!sumsOnce) sumsOnce = summariesBag();
         const sums = /** @type {Record<string, any>} */ (await sumsOnce);
         const gifts = /** @type {Record<string, any> | undefined} */ (
           await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
@@ -1512,7 +1527,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const url = String(tab?.url || '');
         const vid = streamKeyForWatchUrl(url);
         if (!vid) return { ok: false, error: 'not_youtube' };
-        const bag = await realGet(KEY_YT_SUMMARIES);
+        const bag = await summariesBag();
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
         // 先に記録を読む(アーカイブかどうか・配信者の UC… が記録から分かるため)
         const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
@@ -1840,7 +1855,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (!lv) return;
         const vid = videoIdForPseudoLv(lv);
         if (!vid) return;
-        void Promise.resolve(realGet(KEY_YT_SUMMARIES))
+        void summariesBag()
           .then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid]))
           .catch(() => {});
       } catch {

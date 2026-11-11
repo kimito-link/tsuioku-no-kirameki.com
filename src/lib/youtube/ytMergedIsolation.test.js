@@ -67,6 +67,9 @@ describe('ytMergedIsolation の決まり', () => {
     expect(ytMergedOutgoingMessage({ type: 'NLS_OPEN_COMEVIEW', liveId: 'lv9' })).toEqual({ type: 'YT_OPEN_COMEVIEW', liveId: 'lv9' });
     expect(ytMergedOutgoingMessage({ type: 'NLS_OPEN_VENUE' })).toEqual({ type: 'YT_OPEN_VENUE' });
     expect(ytMergedOutgoingMessage({ type: 'NLS_FETCH_PROXY', url: 'u' })?.type).toBe('NLS_FETCH_PROXY');
+    // 会場の遅延読み込みと計器は、仕切りの付いた配信ページ(Twitch・Kick 等)からも裏方へ届く
+    expect(ytMergedOutgoingMessage({ type: 'NLS_BOOT_ENGINE', file: 'dist/yt-venue-inline.js' })?.type).toBe('NLS_BOOT_ENGINE');
+    expect(ytMergedOutgoingMessage({ type: 'NLS_STALL_SUMMARY' })?.type).toBe('NLS_STALL_SUMMARY');
     expect(ytMergedOutgoingMessage({ type: 'NLS_FETCH_PROXY_ABORT', id: '1' })?.type).toBe('NLS_FETCH_PROXY_ABORT');
     expect(ytMergedOutgoingMessage({ type: 'NLS_VOICE_READER_CLAIM' })?.type).toBe('NLS_VOICE_READER_CLAIM');
     // ニコ生版の記録・取得はさせない(疑似の配信番号で本体の記録を汚す)

@@ -41,6 +41,34 @@
 
 ## 全ファイルツリー
 
+- 📁 **"src/** (17)
+  - 📁 **images/** (17)
+    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png"`
+          - `logo_funlink_black_RGB_link_black.png"`
+          - `logo_funlink_black_RGB_maru_black.png"`
+      - 📁 **color/** (8)
+        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
+          - `logo_funlink_RGB_color.png"`
+          - `logo_funlink_RGB_ginga_color.png"`
+          - `logo_funlink_RGB_hoshi.png"`
+          - `logo_funlink_RGB_link_hoshi.png"`
+          - `logo_funlink_RGB_link_orange.png"`
+          - `logo_funlink_RGB_maru_blue.png"`
+          - `logo_funlink_RGB_maru_ginga.png"`
+          - `logo_funlink_RGB_maru_orange.png"`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png"`
+        - `logo_funlink_white_RGB_link_black.png"`
+        - `logo_funlink_white_RGB_maru_black.png"`
+    - 📁 **logo/** (3)
+      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg"`
+        - `251016_logo_guide_kimitolink_ol.ai"`
+        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -1160,7 +1188,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2452)
+- 📁 **src/** (2435)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1318,7 +1346,7 @@
     - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (134)
+  - 📁 **images/** (117)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1418,7 +1446,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (13)
+    - 📁 **logo/** (10)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1428,11 +1456,6 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
-      - 📁 **データ一式/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg`
-        - `251016_logo_guide_kimitolink_ol.ai`
-        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1473,26 +1496,6 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
-    - 📁 **データ出力/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png`
-          - `logo_funlink_black_RGB_link_black.png`
-          - `logo_funlink_black_RGB_maru_black.png`
-      - 📁 **color/** (8)
-        - 📁 **RGB_データ用/** (8)
-          - `logo_funlink_RGB_color.png`
-          - `logo_funlink_RGB_ginga_color.png`
-          - `logo_funlink_RGB_hoshi.png`
-          - `logo_funlink_RGB_link_hoshi.png`
-          - `logo_funlink_RGB_link_orange.png`
-          - `logo_funlink_RGB_maru_blue.png`
-          - `logo_funlink_RGB_maru_ginga.png`
-          - `logo_funlink_RGB_maru_orange.png`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png`
-        - `logo_funlink_white_RGB_link_black.png`
-        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
   - 📁 **lib/** (2150)
     - 📁 **fixtures/** (2)

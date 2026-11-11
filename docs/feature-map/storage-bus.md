@@ -76,6 +76,7 @@
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
 - 🔵 **nls_last_auto_tab_reload** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/init/devMonitorExport.js
+- 🔵 **nls_stall_summary_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 
 ## 全 storage キー
 
@@ -174,6 +175,7 @@
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_VOICE_NARROW_MODE` | — | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
 | `KEY_VOICE_QUALITY` | — | extension/voiceQualitySetting.js |
+| `KEY_VOICE_READING_ENABLED` | extension/popup/wirePanelVoiceReadingButton.js | extension/popup/wirePanelVoiceReadingButton.js |
 | `KEY_VOICE_READ_NAME_ENABLED` | — | extension/phoneVoicePublisher.js |
 | `KEY_VOICE_VOLUME_PERCENT` | — | extension/comeview-entry.js |
 | `KEY_VOICE_WEAK_PC` | extension/comeview-entry.js | extension/comeview-entry.js<br>extension/phoneVoicePublisher.js |
@@ -192,3 +194,4 @@
 | `fn:watchSnapshotStorageKey` | — | extension/popup/report/htmlReportDocument.js |
 | `nls_last_auto_tab_reload` | — | extension/status-entry.js |
 | `nls_mcp_live_latest_v1` | — | extension/popup/init/devMonitorExport.js |
+| `nls_stall_summary_v1` | — | extension/status-entry.js |

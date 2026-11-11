@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2057',
+    date: '2026-11-11',
+    summary: 'Twitch 等の会場が出ない・固まるのを直す',
+    items: Object.freeze([
+      'Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の配信ページで、会場が呼ばれず出なかったのを直しました。',
+      '会場のキャラ画像を読むたびに自分を呼び続け、配信ページが固まることがあったのを直しました。',
+      '横の欄で配信者の名前などが出なかったのを直しました(配信のまとめの置き場の変更に合わせました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2055',
     date: '2026-11-11',
     summary: '大きなコメント控えを書き直さない',
@@ -195,14 +205,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'YouTube の「ギフト」(ジュエルのスタンプ)やメンバーシップギフトは金額が出ないため、ギフト履歴で「0pt」と出ていました。何を送ったか(例「ハイ」)を出し、ホバーで中身が分かるようにしました。',
       '同じ人がりんく段とギフト列の両方に居るとき、ギフト列のアイコンにホバー・クリックしても何も出なかったのを直しました。',
       '日本語の @ハンドルの人もクリックで YouTube のチャンネルを開けるようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1918',
-    date: '2026-11-07',
-    summary: 'Twitch の未ログインの見分けを直す',
-    items: Object.freeze([
-      'Twitch にログインしていないのにコメントを打ってしまうことがあったのを直しました(ログインしていなくてもあるメニューのボタンを、ログインの印と見ていました)。'
     ])
   })
 ]);
