@@ -22,6 +22,7 @@ import {
   resetYtCommentsDb,
   getYtStreamCommentsByVideoId,
   getYtStreamCommentsSince,
+  getYtStreamCommentsTail,
   deleteYtCommentsByPks,
   readAllYtCommentKeys,
   deleteYtCommentPksAcrossVideos,
@@ -36,6 +37,7 @@ import './background-nico-relay.js';
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { MERGED_RECENT_COMMENTS_MESSAGE, sanitizeRecentVideoIds } from '../../src/lib/mergedComeview.js';
 import { platformOfStreamKey, isStreamTabToReload, STREAM_PLATFORM_TAB_URLS } from '../../src/lib/platform/streamPlatform.js';
 import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
@@ -691,6 +693,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (after > 0 ? getYtStreamCommentsSince(vid, after) : getYtStreamCommentsByVideoId(vid))
       .then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] }))
       .catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
+    return true;
+  }
+
+  // コメビュのまとめて読み。頼まれた配信の末尾だけを、1本ずつ読む。全件も、頼まれていない配信も読まない。
+  if (message.type === MERGED_RECENT_COMMENTS_MESSAGE) {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    const ids = sanitizeRecentVideoIds(message.videoIds);
+    const limit = Math.max(1, Math.min(40, Math.floor(Number(message.limit) || 40)));
+    (async () => {
+      /** @type {Record<string, any[]>} */
+      const byVideoId = {};
+      for (const id of ids) {
+        try {
+          const rows = await getYtStreamCommentsTail(id, limit);
+          byVideoId[id] = Array.isArray(rows) ? rows : [];
+        } catch {
+          byVideoId[id] = [];
+        }
+      }
+      return { ok: true, byVideoId };
+    })()
+      .then(sendResponse)
+      .catch((err) => sendResponse({ ok: false, byVideoId: {}, error: String(err && err.message || err) }));
     return true;
   }
 

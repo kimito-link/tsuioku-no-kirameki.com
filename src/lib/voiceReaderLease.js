@@ -26,23 +26,34 @@ export function createVoiceReaderLeaseTable(opts = {}) {
      * @param {unknown} liveId
      * @param {unknown} holder
      * @param {number} now
+     * @param {boolean} [force] まとめて読みのコメビュが、開いている各配信の読み手を引き取る
      * @returns {{ granted: boolean }}
      */
-    claim(liveId, holder, now) {
+    claim(liveId, holder, now, force = false) {
       const lv = String(liveId || '').trim().toLowerCase();
       const h = String(holder || '');
       if (!lv || !h) return { granted: true };
       const cur = byLive.get(lv);
-      if (!cur || cur.holder === h || now - cur.at > ttl) {
+      if (!cur || cur.holder === h || now - cur.at > ttl || force === true) {
         byLive.set(lv, { holder: h, at: now });
         return { granted: true };
       }
       return { granted: false };
     },
-    /** @param {unknown} holder */
-    release(holder) {
+    /**
+     * @param {unknown} holder
+     * @param {readonly unknown[]|null|undefined} [liveIds] 指定した配信だけ手放す。省略時は全部
+     */
+    release(holder, liveIds) {
       const h = String(holder || '');
-      for (const [lv, cur] of byLive) if (cur.holder === h) byLive.delete(lv);
+      const only = Array.isArray(liveIds)
+        ? new Set(liveIds.map((id) => String(id || '').trim().toLowerCase()).filter(Boolean))
+        : null;
+      for (const [lv, cur] of byLive) {
+        if (cur.holder !== h) continue;
+        if (only && !only.has(lv)) continue;
+        byLive.delete(lv);
+      }
     }
   };
 }
@@ -129,6 +140,47 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
         .then((ok) => (ok ? onMine() : onYield?.()))
         .catch(() => {});
       return chain;
+    },
+    /**
+     * まとめて読みが、選んだ配信の読み手を引き取る(会場側は譲る)。1配信の beat の記憶は触らない。
+     * @param {readonly unknown[]} liveIds
+     */
+    hold(liveIds) {
+      const ids = [];
+      const seen = new Set();
+      for (const raw of Array.isArray(liveIds) ? liveIds : []) {
+        const lv = norm(raw);
+        if (!lv || seen.has(lv)) continue;
+        seen.add(lv);
+        ids.push(lv);
+        if (ids.length >= 8) break;
+      }
+      if (!ids.length) return Promise.resolve();
+      return Promise.all(ids.map((lv) => Promise.resolve(sendMessage({
+        type: VOICE_READER_CLAIM,
+        liveId: lv,
+        holder,
+        force: true
+      })).catch(() => null))).then(() => {});
+    },
+    /**
+     * 指定した配信だけ手放す(まとめて読みをやめたとき、前面の1配信は残す)。
+     * @param {readonly unknown[]} liveIds
+     */
+    releaseLives(liveIds) {
+      const ids = [];
+      const seen = new Set();
+      for (const raw of Array.isArray(liveIds) ? liveIds : []) {
+        const lv = norm(raw);
+        if (!lv || seen.has(lv)) continue;
+        seen.add(lv);
+        ids.push(lv);
+      }
+      if (!ids.length) return;
+      try {
+        const r = sendMessage({ type: VOICE_READER_RELEASE, holder, liveIds: ids });
+        if (r && typeof (/** @type {any} */ (r).catch) === 'function') /** @type {Promise<unknown>} */ (r).catch(() => {});
+      } catch { /* no-op */ }
     },
     /** もう読まない(窓を閉じる・読み上げを切った)。 */
     release() {

@@ -149,7 +149,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!sender || sender.id !== chrome.runtime.id) return undefined;
   const holder = String(msg.holder || '');
   if (msg.type === 'NLS_VOICE_READER_RELEASE') {
-    for (const [lv, cur] of voiceReaderByLive) if (cur.holder === holder) voiceReaderByLive.delete(lv);
+    const only = Array.isArray(msg.liveIds)
+      ? new Set(msg.liveIds.map((id) => String(id || '').trim().toLowerCase()).filter(Boolean))
+      : null;
+    for (const [lv, cur] of voiceReaderByLive) {
+      if (cur.holder !== holder) continue;
+      if (only && !only.has(lv)) continue;
+      voiceReaderByLive.delete(lv);
+    }
     sendResponse({ ok: true });
     return false;
   }
@@ -158,7 +165,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const cur = voiceReaderByLive.get(lv);
   let granted = true;
   if (lv && holder) {
-    if (!cur || cur.holder === holder || now - cur.at > VOICE_READER_LEASE_TTL_MS) voiceReaderByLive.set(lv, { holder, at: now });
+    // force はコメビュのまとめて読みだけが付ける。選んだ配信の会場は譲り、声が二重にならない。
+    if (!cur || cur.holder === holder || now - cur.at > VOICE_READER_LEASE_TTL_MS || msg.force === true) voiceReaderByLive.set(lv, { holder, at: now });
     else granted = false;
   }
   sendResponse({ granted });

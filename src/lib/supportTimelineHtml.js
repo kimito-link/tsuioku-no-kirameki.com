@@ -56,6 +56,17 @@ function escapeAttr(s) {
   return escapeHtml(s);
 }
 
+/**
+ * まとめてコメビュの小さな札。無いときは空(1配信の行は今までと同じ HTML)。
+ * @param {{ sourceBadge?: unknown, sourceTitle?: unknown }|null|undefined} item
+ */
+function sourceBadgeHtml(item) {
+  const badge = String(item && item.sourceBadge || '').trim();
+  if (!badge) return '';
+  const title = String(item && item.sourceTitle || badge).trim() || badge;
+  return `<span class="nl-tl-src" title="${escapeAttr(title)}">${escapeHtml(badge)}</span>`;
+}
+
 /** 数値 uid（記名）か。匿名（a:xxx / 合成キー）は false。 @param {unknown} uid */
 function isNumericUid(uid) {
   const s = String(uid == null ? '' : uid).trim();
@@ -125,7 +136,7 @@ export function buildTimelineRowHtml(item, opts) {
       : `<span class="nl-tl-gift__icon" aria-hidden="true">🎁</span>`;
     const inner =
       avatarBlock +
-      `<span class="nl-tl-gift__name">${name}</span>` +
+      `<span class="nl-tl-gift__name">${sourceBadgeHtml(item)}${name}</span>` +
       `<span class="nl-tl-gift__item">${itemName}</span>` +
       ptBlock +
       agoBlock;
@@ -153,7 +164,7 @@ export function buildTimelineRowHtml(item, opts) {
   const selfCls = item.selfPosted ? ' nl-tl-row--self' : '';
   const inner =
     avBlock +
-    `<span class="nl-tl-row__name">${name}</span>` +
+    `<span class="nl-tl-row__name">${sourceBadgeHtml(item)}${name}</span>` +
     `<span class="nl-tl-row__text">${text}</span>` +
     agoBlock;
   const title = escapeAttr(

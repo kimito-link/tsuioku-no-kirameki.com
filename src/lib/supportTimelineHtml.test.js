@@ -113,6 +113,20 @@ describe('buildTimelineRowHtml', () => {
     expect(html).toContain('&lt;b&gt;悪');
   });
 
+  it('まとめて表示の札は名前の中に出し、本文はエスケープする', () => {
+    const html = buildTimelineRowHtml({
+      ...cItem({ userId: 'a:x', nickname: '視聴者' }),
+      sourceBadge: 'Twitch <枠>',
+      sourceTitle: 'Twitch "枠"'
+    });
+    expect(html).toContain('class="nl-tl-src"');
+    expect(html).toContain('Twitch &lt;枠&gt;');
+    expect(html).toContain('title="Twitch &quot;枠&quot;"');
+    expect(html).not.toContain('Twitch <枠>');
+    const plain = buildTimelineRowHtml(cItem({ userId: 'a:x' }));
+    expect(plain).not.toContain('nl-tl-src');
+  });
+
   it('selfPosted コメントに self クラス', () => {
     const html = buildTimelineRowHtml(cItem({ userId: 'a:x', selfPosted: true }));
     expect(html).toContain('nl-tl-row--self');
