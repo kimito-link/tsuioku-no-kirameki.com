@@ -9,7 +9,7 @@
  *   開いていない配信は候補にしない(裏で取りにいかない)。読み上げは配信をまたいだ同一キーで1回だけ。
  */
 
-import { platformChannelOfUrl, placeholderStreamKeyForChannel } from './platform/streamPlatform.js';
+import { platformChannelOfUrl } from './platform/streamPlatform.js';
 import { toEpochMs } from './timeAuthority.js';
 import { isYtWatchLikeUrl, parseYtVideoIdFromUrl } from './youtube/ytPageMeta.js';
 import { computePseudoLvForVideoId } from './youtube/ytPseudoLv.js';
@@ -147,7 +147,6 @@ export function describeOpenStreams(tabs, summaries) {
       const ch = platformChannelOfUrl(url);
       if (ch) {
         const newest = newestSummaryKey(summaries, ch.platform.keyHead, ch.login);
-        const videoId = newest || placeholderStreamKeyForChannel(ch.platform, ch.login);
         const read = newest ? { kind: /** @type {'yt'} */ ('yt'), videoId: newest } : { kind: /** @type {'none'} */ ('none') };
         described = streamOf(
           ch.platform.id,
