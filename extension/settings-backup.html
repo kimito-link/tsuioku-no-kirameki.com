@@ -39,11 +39,12 @@
       <p class="row">
         <button id="saveNow" type="button">今すぐ控えを残す</button>
         <button id="exportFile" type="button">ファイルに書き出す</button>
-        <label>ファイルから読み戻す <input id="importFile" type="file" accept="application/json,.json" /></label>
+        <button id="pickFile" type="button">ファイルから読み戻す</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden />
       </p>
       <p id="status" role="status"></p>
       <h2>このPCの中の控え</h2>
-      <ul id="ring"></ul>
+      <ul id="ring"><li>まだ控えはありません</li></ul>
     </main>
     <script src="dist/settings-backup.js"></script>
   </body>

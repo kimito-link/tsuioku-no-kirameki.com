@@ -140,6 +140,9 @@ function bind() {
   });
   document.getElementById('exportFile')?.addEventListener('click', exportFile);
   const input = document.getElementById('importFile');
+  document.getElementById('pickFile')?.addEventListener('click', () => {
+    input?.click();
+  });
   input?.addEventListener('change', () => {
     const file = input.files && input.files[0];
     if (!file) return;
