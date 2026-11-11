@@ -108,12 +108,16 @@ describe('venueItemsForPlatform', () => {
   it('YouTube の合計は円を先に出し、ドルは換算せず title に残す', () => {
     const items = venueItemsForPlatform('youtube', bag({ support: ytSupport() }));
     const paid = items.find((i) => i.key === 'superchat');
-    const members = items.find((i) => i.key === 'members');
+    expect(paid.label).toBe('スパチャ');
     expect(paid.text).toBe('¥1,200');
     expect(paid.title).toContain('USD 5');
     expect(paid.title).toContain('このPCの記録');
-    expect(members.text).toBe('5');
-    expect(members.unit).toBe('人');
+    expect(items.some((i) => i.key === 'members' || i.label === 'メンバー加入')).toBe(false);
+  });
+
+  it('スパチャが無い YouTube は、0円の枠を出さない', () => {
+    const items = venueItemsForPlatform('youtube', bag({ support: tallySupportItems([]) }));
+    expect(items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過']);
   });
 
   it('Twitch は Bits・サブスク・ギフトサブ・レイド', () => {

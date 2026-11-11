@@ -76,7 +76,8 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('#officialStatNicoGiftPts').parentElement.hidden).toBe(true);
     expect(root.querySelector('#officialStatNicoStreamAge').parentElement.hidden).toBe(false);
     expect(root.querySelector('[data-nl-metric="superchat"] .nl-official-nico-stats__val').textContent).toBe('¥500');
-    expect(root.querySelector('[data-nl-metric="members"]').textContent).toContain('メンバー加入');
+    expect(root.querySelector('[data-nl-metric="members"]')).toBeNull();
+    expect(root.documentElement.classList.contains('nl-cap-youtube')).toBe(true);
     expect(root.querySelector('[data-lane="adRanking"]').hidden).toBe(true);
     expect(root.querySelector('#giftRankingFetchPrompt').hidden).toBe(true);
     expect(root.querySelector('[data-lane="contributionRanking"] .nl-north-star-lane__label').textContent).toContain('スパチャの合計順');

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, pickYtBroadcasterIconUrl } from './ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytChannelUrlOfPendingKey, pickYtBroadcasterIconUrl } from './ytPageMeta.js';
 
 describe('parseYtVideoIdFromUrl', () => {
   it('watch / live / live_chat / youtu.be を読める', () => {
@@ -30,6 +30,7 @@ describe('isYtWatchLikeUrl', () => {
     expect(ytHandleLivePendingKey('https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93/live')).toBe('ytlive:@あのちゃんこ');
     expect(ytHandleLivePendingKey('https://www.tiktok.com/@some.one/live')).toBe('');
     expect(ytHandleOfPendingKey('ytlive:@hotspanishvlogs')).toBe('@hotspanishvlogs');
+    expect(ytChannelUrlOfPendingKey('ytlive:weathernews')).toBe('https://www.youtube.com/weathernews');
     // YouTube が /@名前/live を古い形へ送り直す(2026-11-11 実機: /@weathernews/live → /weathernews/live)
     expect(isYtWatchLikeUrl('https://www.youtube.com/weathernews/live')).toBe(true);
     expect(ytHandleLivePendingKey('https://www.youtube.com/weathernews/live')).toBe('ytlive:weathernews');
@@ -40,6 +41,7 @@ describe('isYtWatchLikeUrl', () => {
     expect(ytHandleOfPendingKey('ytlive:channel/UCabcdefghijklmnopqrstuv')).toBe('');
     expect(isYtWatchLikeUrl('https://www.youtube.com/feed/live')).toBe(false);
     expect(isYtWatchLikeUrl('https://www.youtube.com/gaming/live')).toBe(false);
+    expect(isYtWatchLikeUrl('https://www.tiktok.com/weathernews/live')).toBe(false);
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/videos')).toBe(false);
   });
 });

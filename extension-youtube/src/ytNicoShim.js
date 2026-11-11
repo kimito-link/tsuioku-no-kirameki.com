@@ -197,13 +197,8 @@ export function videoIdForYtHandleLive(url, summaries) {
   const bag = summaries && typeof summaries === 'object' ? summaries : {};
   for (const [key, sum] of Object.entries(bag)) {
     if (!/^[A-Za-z0-9_-]{11}$/.test(key)) continue;
-    let stored = '';
-    try {
-      stored = new URL(String(sum?.sourceUrl || ''), 'https://www.youtube.com').pathname.replace(/\/$/, '');
-    } catch {
-      continue;
-    }
-    if (stored !== path) continue;
+    const stored = ytHandleLivePath(sum?.sourceUrl);
+    if (!stored || stored !== path) continue;
     const at = Number(sum?.viewersReadAt || sum?.updatedAt || 0);
     if (at >= bestAt) {
       bestAt = at;
@@ -407,12 +402,11 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
   const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
-  // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。分からないときだけ、記録を始めた時刻で代わりにする。
+  // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。記録を始めた時刻で代わりにすると、
+  // 長い配信を開いた直後に「経過 0分」になる。分からないあいだは出さない。
   const trustedStart = ytTrustedStartedAt(sum, videoId, all);
-  const plat0 = platformOfStreamKey(videoId);
-  // YouTube は記録を始めた時刻で代わりにしない: 長く続いている配信を開いた直後に「経過 0分」と出ていた(2026-11-11 実機)。
-  //   本当の開始時刻はページから取れる(content-chat-entry.js の startedAtFields)ので、それまでは出さない。
-  const startedAt = trustedStart || (plat0 ? Number(sum?.createdAt || 0) : 0);
+  // 記録を始めた時刻で代わりにしない。長い配信を開いた直後に「経過 0分」になっていた。
+  const startedAt = trustedStart;
   const ucId = String(sum?.broadcasterChannelId || '');
   const handle = String(sum?.broadcasterHandle || '');
   // UC… が分からない配信は、記録の中の同じ名前の人(配信者がチャットに書いていれば UC… が分かる)→ @名前 の順で決める
@@ -476,7 +470,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     officialViewersOnly: true,
     platformFacts: {
       viewers: Number.isFinite(viewers) && viewers > 0 ? viewers : null,
-      streamAgeProvenance: trustedStart > 0 ? 'official' : (startedAt > 0 ? 'recorded' : ''),
+      streamAgeProvenance: trustedStart > 0 ? 'official' : '',
       support: supportTallyByVid.get(String(videoId || '')) || null,
       // ABEMA は番組情報欄の「視聴数」「コメント数」(ページに出ている数そのもの・#608 がまとめに入れる)
       viewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null,

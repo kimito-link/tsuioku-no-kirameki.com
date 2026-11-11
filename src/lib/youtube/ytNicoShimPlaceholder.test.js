@@ -37,6 +37,21 @@ describe('記録の無いチャンネルは仮のキーで「記録 0」', () =>
     expect(vm.concurrent.estText).not.toBe('（接続中…）');
   });
 
+  it('/名前/live は @ が無くても仮キーになり、開始時刻が無い経過は出さない', () => {
+    expect(streamKeyForWatchUrl('https://www.youtube.com/weathernews/live')).toBe('ytlive:weathernews');
+    expect(resolveYtWatchStreamKey('https://www.youtube.com/weathernews/live', {
+      abcdefghijk: { sourceUrl: 'https://www.youtube.com/weathernews/live' },
+    })).toBe('abcdefghijk');
+    const fresh = /** @type {any} */ (ytSummaryToNicoSnapshot({ createdAt: Date.now() }, 'abcdefghijk', '長い配信'));
+    expect(fresh.streamAgeMin).toBe(null);
+    const known = /** @type {any} */ (ytSummaryToNicoSnapshot({
+      createdAt: Date.now(),
+      startedAt: Date.now() - 5 * 60 * 60 * 1000,
+    }, 'abcdefghijk', '長い配信'));
+    expect(known.streamAgeMin).toBeGreaterThanOrEqual(299);
+    expect(known.streamAgeMin).toBeLessThanOrEqual(301);
+  });
+
   it('/@名前/live は、まとめに残した同じパスの動画 id に写る', () => {
     const summaries = {
       abcdefghijk: { sourceUrl: 'https://www.youtube.com/@testchan/live', viewersReadAt: 10, concurrentViewers: 4321 },

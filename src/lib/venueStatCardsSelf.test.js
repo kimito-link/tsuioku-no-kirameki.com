@@ -19,6 +19,8 @@ const nicoSnap = (over = {}) => ({
 /** YouTube 等(ytNicoShim の ytSummaryToNicoSnapshot と同じ形: 同接は公式の直接値・延べの来場は無い) */
 const ytSnap = (over = {}) => ({
   liveId: 'lv900000001',
+  platform: 'youtube',
+  officialViewersOnly: true,
   viewerCountFromDom: null,
   noVisitorTotal: true,
   recordedCountHint: 6352,
@@ -49,7 +51,7 @@ describe('buildStatCardsFromWatchSnapshot', () => {
     const snap = buildStatCardsFromWatchSnapshot({ snapshot: ytSnap() }, { liveId: 'lv900000001', nowMs: NOW });
     expect(snap.recordsText).toBe('6,352');
     expect(snap.concurrent.estText).toBe('83,448');
-    expect(snap.concurrent.subText).toBe('直接値');
+    expect(snap.concurrent.subText).toBe('人');
     expect(snap.official.viewers.text).toBe('—');
     expect(snap.official.streamAge.isPlaceholder).toBe(false);
   });

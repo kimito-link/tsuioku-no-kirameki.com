@@ -14,6 +14,7 @@ import {
   pickYtBroadcasterIconUrl,
 } from '../../src/lib/youtube/ytPageMeta.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
+import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
 
 /** チャットを自動で「すべて」に切り替えるか（サイドパネルの設定・既定オン） */
 const AUTO_ALL_CHAT_KEY = 'yt_auto_all_chat_v1';
@@ -466,19 +467,31 @@ function fetchExactStartedAt(videoId) {
 function readRelativeStartedAt() {
   try {
     const box = document.querySelector('ytd-watch-metadata #info-container, ytd-watch-info-text, ytd-watch-metadata #description');
-    const text = String(box?.textContent || '').replace(/\s+/g, ' ');
-    const unitMs = { 分: 60000, 時間: 3600000, 日: 86400000, minute: 60000, hour: 3600000, day: 86400000 };
-    let m = text.match(/(\d+)\s*(分|時間|日)前にライブ配信開始/);
-    if (!m) m = text.match(/Started streaming (\d+) (minute|hour|day)s? ago/i);
-    if (!m) return null;
-    const n = Number(m[1]);
-    const unit = /** @type {number} */ (unitMs[/** @type {keyof typeof unitMs} */ (m[2].toLowerCase())] || 0);
-    if (!Number.isFinite(n) || n < 0 || !unit) return null;
-    // 分の単位にそろえる(5秒ごとに値が揺れないように)
-    return Math.floor((Date.now() - n * unit) / 60000) * 60000;
+    return relativeStreamStartedAtMs(String(box?.textContent || ''), Date.now());
   } catch {
     return null;
   }
+}
+
+/** ページに埋まった startTimestamp。見つかるまで毎回探す。 @type {number | null} */
+let scriptStartedAt = null;
+function readStartFromScripts() {
+  if (scriptStartedAt) return scriptStartedAt;
+  try {
+    const nodes = document.querySelectorAll('script');
+    for (let i = 0; i < nodes.length; i += 1) {
+      const text = String(nodes[i].textContent || '');
+      if (!text.includes('startTimestamp')) continue;
+      const ms = startMsFromTimestampBlob(text, Date.now());
+      if (ms) {
+        scriptStartedAt = ms;
+        return ms;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -564,7 +577,7 @@ function endedAtFields(videoId) {
  * @param {string} videoId
  */
 function startedAtFields(videoId, isLive = false) {
-  const exact = readStreamStartedAt(videoId);
+  const exact = readStreamStartedAt(videoId) || readStartFromScripts();
   if (exact) return { startedAt: exact };
   const fetched = fetchedStartedAt.get(videoId);
   if (fetched) return { startedAt: fetched };
@@ -575,7 +588,7 @@ function startedAtFields(videoId, isLive = false) {
     if (isLive) fetchExactStartedAt(videoId);
     return {};
   }
-  fetchExactStartedAt(videoId); // 生配信中だと分かったときだけ取り寄せる
+  fetchExactStartedAt(videoId);
   return { startedAt: approx, startedAtApprox: true };
 }
 
