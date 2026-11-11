@@ -234,13 +234,14 @@ describe('配線(会場・コメビュ・ポップアップ)', () => {
       expect(src).toMatch(/rememberWeakVoicePc\(/);
     }
     expect(vb).toMatch(/initVoiceSpeaker:\s*\(/);
-    // 2026-10-26: 先読みは voiceWarmup の1本の列を通す(合成前の読み込みと重ならないように)。
-    expect(cv).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*_voiceWarmup\.ensureWhenIdle\(id\)/);
-    expect(vb).toMatch(/initVoiceSpeaker:[^\n]*venueVoiceWarmup\.ensureWhenIdle\(id\)/);
+    // 先読みは voiceWarmup の1本の列。WAV 以外のエンジンでは温めない（50021 を叩かない）。
+    expect(cv).toMatch(/speechEngineWarmupAllowed\(\) \? _voiceWarmup\.ensureWhenIdle\(id\)/);
+    expect(vb).toMatch(/speechEngineWarmupAllowed\(\) \? venueVoiceWarmup\.ensureWhenIdle\(id\)/);
     for (const src of [vb, cv]) {
-      expect(src).toMatch(/createVoicevoxWarmup\(\)/);
-      expect(src).toMatch(/withVoiceWarmup\(/);
+      expect(src).toMatch(/createVoicevoxWarmup\(\{ baseUrlOf: speechEngineWarmBaseUrl \}\)/);
+      expect(src).toMatch(/attachSpeechWarmup\(/);
     }
+    expect(read('..', 'extension', 'speechEngineBinding.js')).toMatch(/withVoiceWarmup\(/);
     expect(read('voiceWarmup.js')).toMatch(/initSpeaker:\s*\(id\)\s*=>\s*initializeVoicevoxSpeaker\(id/);
     expect(cv).toMatch(/startVoiceWarmup\(_voiceWarmup,/);
     expect(vp).toMatch(/startVoiceWarmup\(this\.voiceWarmup,/);
