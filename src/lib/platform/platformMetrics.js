@@ -193,8 +193,8 @@ export function platformSectionPlan(platformId) {
       concurrentLabel: '推定同時接続',
       hide: /** @type {string[]} */ ([]),
       note: '',
-      trio: null,
-      sections: {},
+      trio: /** @type {{ rink: string, konta: string, tanu: string }|null} */ (null),
+      sections: /** @type {Record<string, { show: boolean, label?: string, sub?: string }>} */ ({}),
     };
   }
   /** @type {Record<string, { show: boolean, label?: string, sub?: string }>} */
@@ -284,7 +284,7 @@ function supportChips(id, support) {
     const paid = money('', '');
     const count = (num(support.superchatCount) || 0) + (num(support.stickerCount) || 0);
     const cap = platformCapability(id);
-    if (cap.superchatWhenPositive && paid.text === '0' && count === 0) return [];
+    if ('superchatWhenPositive' in cap && cap.superchatWhenPositive && paid.text === '0' && count === 0) return [];
     return [
       chip(
         'superchat',

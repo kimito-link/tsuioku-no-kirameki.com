@@ -92,6 +92,10 @@ function markCapability(root, platformId) {
   (doc.head || html).appendChild(style);
 }
 
+/**
+ * @param {ParentNode} root
+ * @param {{ platform?: string, facts?: any }} state
+ */
 export function applyPlatformMetricChrome(root, state) {
   if (!root || typeof root.querySelector !== 'function') return;
   const plan = platformSectionPlan(String(state?.platform || ''));
