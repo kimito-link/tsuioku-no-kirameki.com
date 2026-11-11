@@ -1,5 +1,5 @@
 // ab-main-entry.js — ABEMA のページ自身の世界(MAIN)で動く小さな写し役。
-/* global window, location, WebSocket, XMLHttpRequest */
+/* global window, location, XMLHttpRequest */
 //
 // ★コメント用の別ホストへ取りに行かない。ページが自分で受け取った JSON だけを縮めて、
 //   隔離された世界(ab-content-entry.js)へ渡す。送ったり、ページの受信を止めたりはしない。

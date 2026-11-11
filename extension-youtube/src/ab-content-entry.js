@@ -1,5 +1,5 @@
 // ab-content-entry.js — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
-/* global chrome, location, setTimeout, clearTimeout, setInterval, window, document, KeyboardEvent, InputEvent */
+/* global chrome, location, setTimeout, setInterval, window, document, KeyboardEvent, InputEvent */
 //
 // ★写し役(ab-main-entry.js)の postMessage だけを読む。別ホストへ取りに行かない。
 //   記録は YT_STREAM_META / YT_CHAT_ITEMS。読み上げと会場の PICK UP は、この口に載ったコメントを
