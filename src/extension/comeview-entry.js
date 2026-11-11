@@ -2599,7 +2599,8 @@ const TRANSLATE_STATUS = {
   'needs-download': '翻訳モデルがありません。「モデルを用意」でこのPCに保存できます',
   'model-not-ready': '翻訳モデルがまだないので、自動では訳しません',
   'empty-result': '訳文が空でした',
-  failed: '翻訳できませんでした。外へは送っていません'
+  failed: '翻訳できませんでした。外へは送っていません',
+  timeout: '翻訳の準備が終わりませんでした。この行はそのままです。外へは送っていません'
 };
 
 async function runLineTranslate(item, mode) {
@@ -2630,6 +2631,10 @@ async function runLineTranslate(item, mode) {
       scriptPlan.sourceLanguage || 'en',
       scriptPlan.targetLanguage || 'ja'
     );
+    if (availability === 'timeout') {
+      setTranslateStatus(TRANSLATE_STATUS.timeout);
+      return;
+    }
     const plan = planCommentTranslate({
       text: item.text,
       settings: _translateSettings,
@@ -2686,7 +2691,7 @@ async function prepareTranslateModel() {
     if (modelBtn) modelBtn.hidden = true;
     setTranslateStatus('翻訳モデルを用意しました');
   } else {
-    setTranslateStatus(TRANSLATE_STATUS.failed);
+    setTranslateStatus(TRANSLATE_STATUS[out.reason] || TRANSLATE_STATUS.failed);
   }
 }
 
