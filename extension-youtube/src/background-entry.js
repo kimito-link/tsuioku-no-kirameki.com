@@ -857,10 +857,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         Date.now(),
       );
 
-      await chrome.storage.local.set({
-        [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
-        [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId,
-      });
+      const metaUpdates = { [STORAGE_KEYS.STREAM_SUMMARIES]: summaries };
+      // 裏の ABEMA タブは claimActive:false。要約は更新し、いま見ている配信は奪わない。
+      if (payload.claimActive !== false) metaUpdates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
+      await chrome.storage.local.set(metaUpdates);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
       return { ok: true, videoId };
     })
@@ -1157,7 +1157,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         voiceAssignDiag.later++;
         scheduleVoiceAssignFlush();
       }
-      if (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID]) {
+      if (payload.claimActive !== false && (videoId !== 'live_default' || !data[STORAGE_KEYS.ACTIVE_VIDEO_ID])) {
         updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = videoId;
       }
 

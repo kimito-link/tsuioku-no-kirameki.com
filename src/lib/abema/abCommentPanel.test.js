@@ -1,11 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
+  AB_ACTIVE_CLAIM_DEBOUNCE_MS,
   AB_COMMENT_AREA_SEL,
   AB_COMMENT_BUTTON_SEL,
+  AB_IMAGE_REFRESH_MS,
+  AB_IMAGE_RETRY_MS,
   AB_PANEL_NOTE,
   AB_PANEL_WAIT_MS,
+  abImageScanDue,
   abOpenCommentEnabled,
+  abPanelShouldScanButtons,
+  abShouldClaimActiveVideo,
   createAbPanelController,
   rankAbCommentControl,
   stepAbCommentPanel,
@@ -217,8 +223,85 @@ describe('ABEMA のコメント欄を一度だけ開く', () => {
     expect(rankAbCommentControl({ label: '3662', inCommentChrome: true }).rank).toBe(5);
   });
 
+  it('開いたあとと、諦めたあとは、ボタンの位置も文字も見ない', () => {
+    let scans = 0;
+    let open = false;
+    const tab = control({
+      text: 'コメント',
+      attrs: { role: 'tab' },
+      onClick() {
+        open = true;
+      },
+    });
+    const doc = {
+      querySelector(sel) {
+        if (String(sel).includes('CommentArea') || String(sel).includes('CommentBlock')) return open ? { id: 'area' } : null;
+        return null;
+      },
+      querySelectorAll(sel) {
+        if (String(sel).includes('textarea')) return [];
+        scans += 1;
+        return [tab];
+      },
+    };
+    const ctrl = createAbPanelController();
+    stepAbCommentPanel(ctrl, doc, { now: 1_000 });
+    expect(scans).toBe(1);
+    expect(open).toBe(true);
+    stepAbCommentPanel(ctrl, doc, { now: 4_000 });
+    stepAbCommentPanel(ctrl, doc, { now: 8_000 });
+    expect(scans).toBe(1);
+    expect(abPanelShouldScanButtons(ctrl.status(), { open: true, now: 8_000 })).toBe(false);
+    expect(abPanelShouldScanButtons({ gaveUp: true }, { now: 8_000 })).toBe(false);
+    expect(abPanelShouldScanButtons({ startedAt: 1_000 }, { now: 1_000 + AB_PANEL_WAIT_MS + 1 })).toBe(false);
+    const late = page({ hasButton: false });
+    let lateScans = 0;
+    late.querySelectorAll = (sel) => {
+      if (!String(sel).includes('textarea')) lateScans += 1;
+      return [];
+    };
+    const slow = createAbPanelController();
+    stepAbCommentPanel(slow, late, { now: 1_000 });
+    const before = lateScans;
+    stepAbCommentPanel(slow, late, { now: 1_000 + AB_PANEL_WAIT_MS + 1_000 });
+    expect(lateScans).toBe(before);
+  });
+
+  it('見えているタブか操作中のタブだけが、間を空けていまの配信を書く', () => {
+    expect(abShouldClaimActiveVideo({ visible: false, focused: false, videoId: 'ab.n-shogi.live', now: 10_000 })).toBe(false);
+    expect(abShouldClaimActiveVideo({ visible: true, focused: false, videoId: 'ab.n-shogi.live', now: 10_000 })).toBe(true);
+    expect(abShouldClaimActiveVideo({ visible: false, focused: true, videoId: 'ab.n-shogi.live', now: 10_000 })).toBe(true);
+    expect(abShouldClaimActiveVideo({
+      visible: true,
+      videoId: 'ab.n-shogi.live',
+      lastVideoId: 'ab.n-shogi.live',
+      lastClaimAt: 10_000,
+      now: 10_000 + AB_ACTIVE_CLAIM_DEBOUNCE_MS - 1,
+    })).toBe(false);
+    expect(abShouldClaimActiveVideo({
+      visible: true,
+      videoId: 'ab.n-anime.live',
+      lastVideoId: 'ab.n-shogi.live',
+      lastClaimAt: 10_000,
+      now: 10_500,
+    })).toBe(true);
+    expect(abShouldClaimActiveVideo({
+      visible: true,
+      videoId: 'ab.n-shogi.live',
+      lastVideoId: 'ab.n-shogi.live',
+      lastClaimAt: 10_000,
+      now: 10_400,
+      force: true,
+    })).toBe(true);
+    expect(abImageScanDue(0, false, 1_000)).toBe(true);
+    expect(abImageScanDue(1_000, false, 1_000 + AB_IMAGE_RETRY_MS - 1)).toBe(false);
+    expect(abImageScanDue(1_000, true, 1_000 + AB_IMAGE_REFRESH_MS - 1)).toBe(false);
+    expect(abImageScanDue(1_000, true, 1_000 + AB_IMAGE_REFRESH_MS)).toBe(true);
+  });
+
   it('入口は同じ判定と案内文を使う', () => {
     const src = readFileSync(new URL('../../../extension-youtube/src/ab-content-entry.js', import.meta.url), 'utf8');
+    const bg = readFileSync(new URL('../../../extension-youtube/src/background-entry.js', import.meta.url), 'utf8');
     expect(AB_PANEL_NOTE).toBe('ABEMAのコメント欄（画面右下の吹き出しボタン）を開くと記録が始まります');
     expect(src).toContain('stepAbCommentPanel');
     expect(src).toContain('AB_PANEL_NOTE');
@@ -226,6 +309,12 @@ describe('ABEMA のコメント欄を一度だけ開く', () => {
     expect(src).toContain('arrived: sawPayload');
     expect(src).toContain('pushState');
     expect(src).toContain('pickAbBroadcasterImage');
+    expect(src).toContain('abShouldClaimActiveVideo');
+    expect(src).toContain('abImageScanDue');
+    expect(src).toContain('st.sawArea || st.gaveUp || st.userClosed');
+    expect(src).toContain('claimActive: claimActiveNow(streamKey)');
     expect(src).not.toContain("broadcasterIconUrl: ''");
+    expect(src).not.toContain("querySelectorAll('img, [style*=\"abema\"], [style*=\"hayabusa\"]')");
+    expect(bg.split('payload.claimActive !== false').length - 1).toBe(2);
   });
 });

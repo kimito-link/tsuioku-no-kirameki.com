@@ -24,6 +24,8 @@ import {
   AB_PANEL_NOTE,
   AB_PANEL_POLL_MS,
   abOpenCommentEnabled,
+  abImageScanDue,
+  abShouldClaimActiveVideo,
   createAbPanelController,
   stepAbCommentPanel,
   abCommentsLookOpen,
@@ -127,22 +129,31 @@ function domSlotViews() {
   return abViewsFromSnippets(snippets);
 }
 let sentIcon = '';
+let imageScanAt = 0;
+let cachedIcon = '';
+let lastClaimAt = 0;
+let lastClaimId = '';
 
-/** ページに出ているチャンネル画像か番組画像。コメントした人の顔は集めない。 */
+/** ページに出ているチャンネル画像か番組画像。コメントした人の顔は集めない。毎秒は見ない。 */
 function currentBroadcasterImage() {
+  const now = Date.now();
+  if (!abImageScanDue(imageScanAt, !!cachedIcon, now)) return cachedIcon;
+  imageScanAt = now;
   /** @type {{ property: string, name: string, content: string }[]} */
   const metas = [];
   /** @type {string[]} */
   const images = [];
   try {
-    for (const el of document.querySelectorAll('meta[property], meta[name]')) {
-      const property = el.getAttribute('property') || '';
-      const name = el.getAttribute('name') || '';
-      if (!/^(?:og:image|twitter:image)/i.test(property || name)) continue;
-      metas.push({ property, name, content: el.getAttribute('content') || '' });
+    for (const el of document.querySelectorAll('meta[property="og:image"], meta[name="twitter:image"], meta[property="og:image:url"]')) {
+      metas.push({
+        property: el.getAttribute('property') || '',
+        name: el.getAttribute('name') || '',
+        content: el.getAttribute('content') || '',
+      });
     }
-    for (const el of document.querySelectorAll('img, [style*="abema"], [style*="hayabusa"]')) {
-      if (images.length >= 30) break;
+    const nodes = document.querySelectorAll('img[src*="hayabusa"], img[src*="abema"], img[srcset*="hayabusa"], img[srcset*="abema"], [style*="hayabusa"], [style*="abema"]');
+    for (let i = 0; i < nodes.length && images.length < 8; i += 1) {
+      const el = nodes[i];
       if (el instanceof HTMLImageElement) {
         const src = el.currentSrc || el.getAttribute('src') || '';
         if (/hayabusa\.io|abema(?:-tv)?\.(?:com|tv|io)/i.test(src)) images.push(src);
@@ -153,13 +164,45 @@ function currentBroadcasterImage() {
   } catch {
     /* ページの形が違っても記録は続ける */
   }
-  return pickAbBroadcasterImage({
+  cachedIcon = pickAbBroadcasterImage({
     login: pageLogin,
     channelId: program.channelId,
     apiImage: program.imageUrl,
     metas,
     images,
+  }) || '';
+  return cachedIcon;
+}
+
+function tabForeground() {
+  let visible = false;
+  let focused = false;
+  try {
+    visible = document.visibilityState === 'visible';
+    focused = typeof document.hasFocus === 'function' && document.hasFocus();
+  } catch {
+    /* 読めないタブは「いまの配信」を書かない */
+  }
+  return { visible, focused };
+}
+
+/** 見えているタブか操作中のタブだけ true。同じ配信の連打は間引く。前面に出たときは force。 */
+function claimActiveNow(videoId, force) {
+  const fg = tabForeground();
+  const now = Date.now();
+  const ok = abShouldClaimActiveVideo({
+    visible: fg.visible,
+    focused: fg.focused,
+    videoId,
+    lastVideoId: lastClaimId,
+    now,
+    lastClaimAt,
+    force: !!force,
   });
+  if (!ok) return false;
+  lastClaimAt = now;
+  lastClaimId = String(videoId || '');
+  return true;
 }
 
 function pageTitle() {
@@ -172,10 +215,14 @@ function endStream() {
   const ended = streamKey;
   streamKey = '';
   diag.streamKey = '';
-  safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: ended, endedAt: Date.now() } });
+  safeSendMessage({
+    type: 'YT_STREAM_META',
+    payload: { videoId: ended, endedAt: Date.now(), claimActive: claimActiveNow(ended) },
+  });
 }
 
-function sendMeta() {
+/** @param {boolean} [forceClaim] 前面に出たときだけ、間引きを飛ばして「いまの配信」を書く */
+function sendMeta(forceClaim) {
   if (!streamKey) return;
   const title = program.title || pageTitle();
   diag.title = title;
@@ -186,6 +233,7 @@ function sendMeta() {
     broadcasterName: title || 'ABEMAの配信',
     broadcasterChannelId: `ab:@${pageLogin}`,
     broadcasterHandle: pageLogin,
+    claimActive: claimActiveNow(streamKey, !!forceClaim),
   };
   const icon = currentBroadcasterImage();
   if (icon) {
@@ -213,7 +261,10 @@ function flush() {
   const rows = pending;
   pending = [];
   diag.items += rows.length;
-  safeSendMessage({ type: 'YT_CHAT_ITEMS', payload: { videoId: streamKey, chatFilterLabel: '', items: rows } });
+  safeSendMessage({
+    type: 'YT_CHAT_ITEMS',
+    payload: { videoId: streamKey, chatFilterLabel: '', items: rows, claimActive: claimActiveNow(streamKey) },
+  });
   saveDiagSoon();
 }
 
@@ -332,9 +383,11 @@ function syncSettingChip() {
   if (input instanceof HTMLInputElement && input.checked !== autoOpen) input.checked = autoOpen;
 }
 
-/** @param {boolean} [force] */
+/** @param {boolean} [force] ページの移動で、見つけたあともう一度だけ探す */
 function pollPanel(force) {
   if (!pageLogin || !settingReady) return;
+  const st = panel.status();
+  if (!force && (st.sawArea || st.gaveUp || st.userClosed)) return;
   const now = Date.now();
   if (!force && now - lastPanelAt < AB_PANEL_POLL_MS) return;
   lastPanelAt = now;
@@ -409,8 +462,7 @@ function syncPage() {
   const login = parseAbLoginFromUrl(location.href);
   if (login === pageLogin) {
     maybeNote();
-    const icon = pageLogin ? currentBroadcasterImage() : '';
-    if (streamKey && ((icon && icon !== sentIcon) || Date.now() - metaAt > 30_000)) sendMeta();
+    if (streamKey && (Date.now() - metaAt > 30_000 || (!sentIcon && abImageScanDue(imageScanAt, false, Date.now())))) sendMeta();
     return;
   }
   endStream();
@@ -421,6 +473,8 @@ function syncPage() {
   dismissed = false;
   watchStartedAt = login ? Date.now() : 0;
   sentIcon = '';
+  imageScanAt = 0;
+  cachedIcon = '';
   program = { title: '', startedAtMs: null, views: null, concurrent: null, imageUrl: '', channelId: '' };
   seen = new Set();
   pending = [];
@@ -549,8 +603,17 @@ try {
 }
 
 function watchSpaNavigation() {
+  let path = location.pathname;
   const fire = () => {
+    const next = location.pathname;
+    const moved = next !== path;
+    path = next;
     syncPage();
+    if (!moved) return;
+    panel.reset();
+    lastPanelAt = 0;
+    imageScanAt = 0;
+    cachedIcon = '';
     pollPanel(true);
   };
   window.addEventListener('popstate', fire);
@@ -589,4 +652,18 @@ setInterval(() => {
   maybeNote();
   syncSettingChip();
 }, 1000);
+let foregroundTimer = 0;
+function claimWhenForeground() {
+  if (foregroundTimer || !streamKey) return;
+  foregroundTimer = setTimeout(() => {
+    foregroundTimer = 0;
+    const fg = tabForeground();
+    if (!streamKey || (!fg.visible && !fg.focused)) return;
+    sendMeta(true);
+  }, 400);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') claimWhenForeground();
+});
+window.addEventListener('focus', claimWhenForeground);
 window.addEventListener('pagehide', () => endStream());

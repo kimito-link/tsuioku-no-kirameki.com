@@ -566,7 +566,7 @@ TikTok の配信のページ(/@<名前>/live)で、ページ自身の世界の�
 - [`council/tiktok-support-PLAN.md`](../council/tiktok-support-PLAN.md)
 
 ### ABEMA の配信を記録(本体に同梱)  〔ABEMA / 記録 / 他プラットフォーム〕
-ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が画面に出ている分を全部 YouTube 版と同じ記録へ渡す。読み上げは新しい端の約20秒だけ。番組詳細が開いていてもコメントのタブや吹き出しを、コメントが届くまで押す。チャンネルを切り替えたらやり直す。PICK UP はニコ生と同じ venuePickupPlacement と venuePickupDisplayWidth だけ（配信ごとの幅の分岐は無い）。窓が細くなっても広がっても幅を計算し直す。名前は本文の上、本文は1行。経過は番組表の放送中の枠の開始時刻。コメント本文へ空白は足さない。サイドパネルの配信者カードは、他の配信と同じ保存欄 broadcasterIconUrl に公開のチャンネルロゴ（image.p-c2-x.abema-tv.com の logo.png）を入れ、同じ円（画像全体を収める）で出す。番組表の放送中の枠の視聴数は、同じカードに「視聴数」として出す。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
+ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が画面に出ている分を全部 YouTube 版と同じ記録へ渡す。読み上げは新しい端の約20秒だけ。番組詳細が開いていてもコメントのタブや吹き出しを、コメントが届くまで押す。チャンネルを切り替えたらやり直す。PICK UP はニコ生と同じ venuePickupPlacement と venuePickupDisplayWidth だけ（配信ごとの幅の分岐は無い）。窓が細くなっても広がっても幅を計算し直す。コメント欄を見つけたか諦めたあとはボタンを見ず、ページの移動かチャンネルの切り替えのときだけ探す。見えているタブだけがいまの配信を書く。名前は本文の上、本文は1行。経過は番組表の放送中の枠の開始時刻。コメント本文へ空白は足さない。サイドパネルの配信者カードは、他の配信と同じ保存欄 broadcasterIconUrl に公開のチャンネルロゴ（image.p-c2-x.abema-tv.com の logo.png）を入れ、同じ円（画像全体を収める）で出す。番組表の放送中の枠の視聴数は、同じカードに「視聴数」として出す。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
 
 - [`extension-youtube/src/ab-main-entry.js`](../extension-youtube/src/ab-main-entry.js)
 - [`extension-youtube/src/ab-content-entry.js`](../extension-youtube/src/ab-content-entry.js)

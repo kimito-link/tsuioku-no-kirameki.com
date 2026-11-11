@@ -11,6 +11,12 @@ export const AB_PANEL_RETRY_MS = 3500;
 export const AB_PANEL_TOGGLE_MS = 8000;
 /** このあいだ押し続けてコメントが届かなければ、手で開く案内に切り替える */
 export const AB_PANEL_WAIT_MS = 90_000;
+/** 同じ配信を「いま見ている」と書き直す最短間隔。裏タブとの入れ替わりを止める */
+export const AB_ACTIVE_CLAIM_DEBOUNCE_MS = 8_000;
+/** 配信画像がまだ無いときの再確認。毎秒は見ない */
+export const AB_IMAGE_RETRY_MS = 8_000;
+/** 配信画像が取れたあとの再確認 */
+export const AB_IMAGE_REFRESH_MS = 30_000;
 /** 未設定はオン。false のときだけ自動で開かない */
 export const AB_OPEN_COMMENT_KEY = 'yt_ab_open_comment';
 export const AB_PANEL_NOTE = 'ABEMAのコメント欄（画面右下の吹き出しボタン）を開くと記録が始まります';
@@ -237,15 +243,65 @@ function pressControl(el) {
  * @param {{ querySelector?: (sel: string) => any, querySelectorAll?: (sel: string) => Iterable<any> }} doc
  * @param {{ enabled?: boolean, now: number, arrived?: boolean }} opts
  */
+/**
+ * ボタンの位置と文字を見るか。開いたあと・諦めたあと・届いたあとは見ない。
+ * @param {{ sawArea?: boolean, gaveUp?: boolean, userClosed?: boolean, startedAt?: number }} status
+ * @param {{ open?: boolean, arrived?: boolean, enabled?: boolean, now?: number }} opts
+ */
+export function abPanelShouldScanButtons(status, opts) {
+  if (opts?.enabled === false) return false;
+  if (opts?.open || opts?.arrived) return false;
+  if (status?.sawArea || status?.gaveUp || status?.userClosed) return false;
+  const started = Number(status?.startedAt) || 0;
+  const now = Number(opts?.now) || 0;
+  if (started > 0 && now - started > AB_PANEL_WAIT_MS) return false;
+  return true;
+}
+
+/**
+ * 見えているタブか、操作中のタブだけが「いまの配信」を書いてよい。
+ * 同じ配信は debounce のあいだ書き直さない。配信が変わった直後と、前面に出たときは書く。
+ * @param {{ visible?: boolean, focused?: boolean, videoId?: string, lastVideoId?: string, now?: number, lastClaimAt?: number, debounceMs?: number, force?: boolean }} s
+ */
+export function abShouldClaimActiveVideo(s = {}) {
+  if (s.visible !== true && s.focused !== true) return false;
+  const videoId = String(s.videoId || '');
+  if (!videoId) return false;
+  if (s.force === true) return true;
+  const now = Number(s.now) || 0;
+  const lastAt = Number(s.lastClaimAt) || 0;
+  const wait = Number(s.debounceMs) > 0 ? Number(s.debounceMs) : AB_ACTIVE_CLAIM_DEBOUNCE_MS;
+  if (videoId === String(s.lastVideoId || '') && lastAt > 0 && now - lastAt < wait) return false;
+  return true;
+}
+
+/**
+ * 配信画像の DOM を見にいくか。無いときは短く、有るときは長く空ける。
+ * @param {number} lastScanAt
+ * @param {boolean} hasImage
+ * @param {number} now
+ */
+export function abImageScanDue(lastScanAt, hasImage, now) {
+  const last = Number(lastScanAt) || 0;
+  if (!(last > 0)) return true;
+  const wait = hasImage ? AB_IMAGE_REFRESH_MS : AB_IMAGE_RETRY_MS;
+  return (Number(now) || 0) - last >= wait;
+}
+
 export function stepAbCommentPanel(ctrl, doc, opts) {
+  const prior = ctrl.status();
   const open = abCommentsLookOpen(doc);
-  let candidates = listAbCommentControls(doc);
-  if (!candidates.length && doc && typeof doc.querySelector === 'function') {
-    const button = doc.querySelector(AB_COMMENT_BUTTON_SEL);
-    if (button) {
-      const info = describeAbCommentControl(button);
-      const ranked = rankAbCommentControl({ ...info, className: info.className || 'com-tv-LinearFooterCommentButton' });
-      if (ranked.rank) candidates = [{ key: 'legacy-footer', rank: ranked.rank, kind: ranked.kind || 'footer', el: button }];
+  const arrived = !!opts.arrived;
+  let candidates = [];
+  if (abPanelShouldScanButtons(prior, { open, arrived, enabled: opts.enabled !== false, now: opts.now })) {
+    candidates = listAbCommentControls(doc);
+    if (!candidates.length && doc && typeof doc.querySelector === 'function') {
+      const button = doc.querySelector(AB_COMMENT_BUTTON_SEL);
+      if (button) {
+        const info = describeAbCommentControl(button);
+        const ranked = rankAbCommentControl({ ...info, className: info.className || 'com-tv-LinearFooterCommentButton' });
+        if (ranked.rank) candidates = [{ key: 'legacy-footer', rank: ranked.rank, kind: ranked.kind || 'footer', el: button }];
+      }
     }
   }
   const action = ctrl.tick({
