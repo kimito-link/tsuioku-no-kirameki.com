@@ -10,6 +10,7 @@
  */
 
 import { platformChannelOfUrl, placeholderStreamKeyForChannel } from './platform/streamPlatform.js';
+import { toEpochMs } from './timeAuthority.js';
 import { isYtWatchLikeUrl, parseYtVideoIdFromUrl } from './youtube/ytPageMeta.js';
 import { computePseudoLvForVideoId } from './youtube/ytPseudoLv.js';
 
@@ -209,8 +210,7 @@ export function sanitizeRecentVideoIds(raw, max = MERGE_MAX_STREAMS) {
 function rowTime(raw) {
   if (!raw || typeof raw !== 'object') return 0;
   const r = /** @type {Record<string, unknown>} */ (raw);
-  const n = Number(r.capturedAt ?? r.postedAtMs ?? r.recordedAt ?? r.at);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return toEpochMs(r.capturedAt ?? r.postedAtMs ?? r.recordedAt ?? r.at);
 }
 
 /**
