@@ -920,7 +920,10 @@ export class VoicePlayer {
       this.stopCurrent = () => speaker.cancel();
       try {
         started = await speaker.speak(text, tone, {
-          onStart: () => { if (typeof item.onAudioStart === 'function') item.onAudioStart(); }
+          onStart: () => {
+            if (typeof item.onAudioStart === 'function') item.onAudioStart();
+            try { if (typeof item.onAudible === 'function') item.onAudible(); } catch { /* 枠の失敗で再生を止めない */ }
+          }
         });
       } catch { started = false; }
       this.stopCurrent = null;
@@ -1183,8 +1186,15 @@ export class VoicePlayer {
           //   ライフサイクル(resolve/再生制御)には一切介入しない(地雷G-2)。
           const _prepStart = Date.now();
           let _playbackStartAt = -1;
+          let _audibleSent = false;
+          const notifyAudible = () => {
+            if (_audibleSent) return;
+            _audibleSent = true;
+            try { if (typeof item.onAudible === 'function') item.onAudible(); } catch { /* 枠の失敗で再生を止めない */ }
+          };
           try {
             audio.addEventListener('playing', () => {
+              notifyAudible();
               try {
                 const prepMs = Math.max(0, Date.now() - _prepStart);
                 this._playPrepEmaMs = updateVoiceServiceTimeEma(this._playPrepEmaMs, prepMs);
@@ -1424,6 +1434,8 @@ export class VoicePlayer {
         //   onAudioStart は audio.play() が実際に走ったときだけ・onAudioEnd は再生終了(ended/error/stop)時。
         onAudioStart: item.onAudioStart,
         onAudioEnd: item.onAudioEnd,
+        // 音が実際に出た瞬間(audio の playing / 少しずつ鳴らす開始 / PC の声の onstart)。play() を呼んだ瞬間ではない。
+        onAudible: item.onAudible,
         // v0.1.799: 鳴らず破棄された時だけ発火する drop 専用シグナル(再生では呼ばれない)。
         onDropped: item.onDropped
       };

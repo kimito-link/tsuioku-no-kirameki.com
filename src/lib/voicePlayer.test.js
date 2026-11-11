@@ -297,6 +297,66 @@ describe('VoicePlayer', () => {
     expect(onAudioEnd).toHaveBeenCalledTimes(1); // mockAudio が ended を即発火
   });
 
+  it('遅い合成のあいだは onAudible を呼ばず、playing でそのコメントの合図を出す', async () => {
+    await player.enable({ persist: false });
+    /** @type {Function|null} */
+    let onPlaying = null;
+    /** @type {Function|null} */
+    let onEnded = null;
+    const audio = {
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      addEventListener: vi.fn((ev, cb) => {
+        if (ev === 'playing') onPlaying = cb;
+        if (ev === 'ended') onEnded = cb;
+      }),
+      removeEventListener: vi.fn()
+    };
+    player.audioConstructor = function () { return audio; };
+    /** @type {(v: ArrayBuffer) => void} */
+    let resolveSynth = () => {};
+    player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+    const first = vi.fn();
+    const started = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u', nickname: 'なな', text: 'いま読んで', onAudible: first, onAudioStart: started }]);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(first).not.toHaveBeenCalled();
+    expect(started).not.toHaveBeenCalled();
+    resolveSynth(new ArrayBuffer(8));
+    await new Promise((r) => setTimeout(r, 40));
+    expect(audio.play).toHaveBeenCalled();
+    expect(started).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    expect(typeof onPlaying).toBe('function');
+    onPlaying();
+    expect(first).toHaveBeenCalledTimes(1);
+    /** @type {(v: ArrayBuffer) => void} */
+    let resolveNext = () => {};
+    player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveNext = r; }));
+    const second = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u2', nickname: 'はち', text: 'つぎのコメント', onAudible: second }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(second).not.toHaveBeenCalled();
+    if (onEnded) onEnded();
+    resolveNext(new ArrayBuffer(8));
+    await new Promise((r) => setTimeout(r, 40));
+    expect(second).not.toHaveBeenCalled();
+    expect(typeof onPlaying).toBe('function');
+    onPlaying();
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledTimes(1);
+    if (onEnded) onEnded();
+  });
+
+  it('合成できず鳴らないコメントは onAudible を呼ばない', async () => {
+    player.fetchSynthesizeVoice = vi.fn().mockResolvedValue(null);
+    await player.enable({ persist: false });
+    const onAudible = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u', nickname: 'なな', text: '捨てる', onAudible }]);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(onAudible).not.toHaveBeenCalled();
+  });
+
   it('v0.1.771: 合成に失敗して鳴らなかった item は onAudioStart を呼ばない(resolved のみ)', async () => {
     // 合成が null を返す(=WAV が得られず再生に到達しない)。
     player.fetchSynthesizeVoice = vi.fn().mockResolvedValue(null);

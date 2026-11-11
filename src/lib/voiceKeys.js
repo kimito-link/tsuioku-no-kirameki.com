@@ -38,3 +38,5 @@ export const KEY_VOICE_NARROW_MODE = 'nls_voice_narrow_mode_v1';
 export const KEY_VOICE_WEAK_PC = 'nls_voice_weak_pc_v1';
 /** 声の音質('standard' 既定=16kHz | 'high'=24kHz)。2026-10-29。正規化は voiceQuality.js。 */
 export const KEY_VOICE_QUALITY = 'nls_voice_quality_v1';
+/** 今鳴っているコメント(会場の PICK UP を再生開始に合わせる)。配信 id つき。 */
+export const KEY_VOICE_NOW_PLAYING = 'nls_voice_now_playing_v1';

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1233 件
+## ⚠️ 役割コメントが無いソース 10 / 1235 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1159,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2433)
+- 📁 **src/** (2436)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1196,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (111)
+  - 📁 **extension/** (112)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1304,6 +1304,7 @@
     - `venueBubblePlacer.js` — 会場(PC)の吹き出しを DOM の実寸から置く薄い層。
     - `venueLaneEmptyKeep.wiring.test.js`
     - `venuePickupDrag.js` — v0.1.1899 PICK UP の吹き出しをドラッグで動かし、位置を覚える(りんく「ドラッグでうごかせるようにしておきたい」)。
+    - `venuePickupVoice.js` — 会場の PICK UP を、声が鳴り始めたコメントへ切り替える配線。
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
@@ -1490,7 +1491,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2134)
+  - 📁 **lib/** (2136)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3451,6 +3452,8 @@
     - `venuePanelLifecycle.wiring.test.js`
     - `venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
     - `venuePickupBanner.test.js`
+    - `venuePickupPlayback.js` — 会場の PICK UP を「声が鳴り始めたコメント」に合わせる判定(純粋)。
+    - `venuePickupPlayback.test.js`
     - `venuePickupRing.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `venuePickupRing.test.js`
     - `venuePickupSpeaker.js` — 【層】L0 判定層(純粋関数・I/O禁止)
