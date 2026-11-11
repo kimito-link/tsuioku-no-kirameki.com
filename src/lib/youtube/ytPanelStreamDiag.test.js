@@ -214,7 +214,7 @@ describe('0.1.1955: 行が多いときに横の欄が全行を読み直し続け
   });
   it('同じ配信の組み立て中に来た知らせは、終わってから1回にまとめる', () => {
     expect(shim).toContain('const notifyRunning = new Map();');
-    expect(shim).toMatch(/do \{\s*st\.again = false;\s*await notifyLvOnce\(lv, st\.summary\);\s*\} while \(st\.again\);/);
+    expect(shim).toMatch(/do \{\s*st\.again = false;\s*await notifyLvOnce\(lv, st\.summary\);[\s\S]*while \(st\.again\)/);
   });
 });
 

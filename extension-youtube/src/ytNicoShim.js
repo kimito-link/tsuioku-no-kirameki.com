@@ -878,12 +878,10 @@ async function getCommentsViaBackground(vid) {
       const at = Number(r?.recordedAt || 0);
       if (at > next.lastRecordedAt) next.lastRecordedAt = at;
     }
-    if (changed) {
-      next.ver = (Number(next.ver) || 0) + 1;
-      if (!full && pendingAdd.length) {
-        next.pending = (next.pending || []).concat(pendingAdd);
-        next.replaced = !!next.replaced || replaced;
-      }
+    if (changed) next.ver = (Number(next.ver) || 0) + 1;
+    if (changed && !full && pendingAdd.length) {
+      next.pending = (next.pending || []).concat(pendingAdd);
+      next.replaced = !!next.replaced || replaced;
     }
     inPageCommentCache.set(vid, next);
   } catch {
@@ -1106,8 +1104,7 @@ async function buildCommentsForLvUncached(lv) {
   if (yieldBig) await yieldToMainThread();
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
   registerBroadcastersFromSummaries();
-  if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) {
-    builtMemo.set(lv, {
+  if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) builtMemo.set(lv, {
       cache: memoCache,
       ver: memoVer,
       epoch: memoEpoch,
@@ -1118,7 +1115,6 @@ async function buildCommentsForLvUncached(lv) {
       who,
       seenPersons,
     });
-  }
   else builtMemo.delete(lv);
   shimDiag.rowsMadeLast = rowsMade;
   shimDiag.rowsReusedLast = out.length - rowsMade;

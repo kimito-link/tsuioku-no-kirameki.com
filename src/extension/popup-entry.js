@@ -16045,24 +16045,10 @@ async function refresh() {
     try {
       paintWatchPopupUiBody();
     } finally {
-      const paintMs = performance.now() - _paintT0;
-      coalescedRefreshScheduler.notePaintCost(paintMs);
-      try {
-        const g = /** @type {any} */ (globalThis);
-        g.__nlPaintMsLast = Math.round(paintMs);
-        g.__nlPaintMsMax = Math.max(Number(g.__nlPaintMsMax) || 0, paintMs);
-        g.__nlPaintCount = (Number(g.__nlPaintCount) || 0) + 1;
-      } catch {
-        /* 計器 */
-      }
+      coalescedRefreshScheduler.notePaintCost(performance.now() - _paintT0);
     }
   }
   function paintWatchPopupUiBody() {
-    const _phaseT = [];
-    const _markPhase = (name) => {
-      _phaseT.push([name, performance.now()]);
-    };
-    _markPhase('start');
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
     // total(=arr.length・O(1))は常時表示「記録している応援コメント N 件です」
     //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
@@ -16148,7 +16134,6 @@ async function refresh() {
       };
     }
     const displayEntries = displayEntriesBase;
-    _markPhase('display');
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
     // v0.1.596: chunk/IDB 移行済みでは main 配列が古い退避データのことがある。
     // index/summary total が取れている場合は、それを件数カードの正本として扱う。
@@ -16212,9 +16197,7 @@ async function refresh() {
       heavySettled: watchPopupHeavyCommentsSettled
     });
     void updateIngestHeartbeatDisplay(lv);
-    _markPhase('breakdown');
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
-    _markPhase('ticker');
     // 純Webで「コメントが進む」ため鏡に publish。v0.1.1018: 多タブ飽和のサマリ30件は provisional で全件鏡を潰さない。
     //   ③応援タイムライン丸写し(第1号・A1-4): 直近 read 済みのギフト配列(liveId一致時のみ)を相乗り=③でもギフト行が出る。
     const _giftsForMirror = _lastGiftEventsForMirror.liveId === String(lv || '').trim().toLowerCase()
@@ -16258,12 +16241,10 @@ async function refresh() {
     // ★heavyRace再発の即効対策(HANDOFF-heavyrace A-2): heavy未settleなら supply は暫定。
     //   laneFeedPick.provisional 単独では穴(provisionalLaneCommentRows.js: merged≦primary で heavy未settleでも false)
     //   →!watchPopupHeavyCommentsSettled を OR で必ず併記。settled なら false=完全描画として単調性ガードを通す。
-    _markPhase('laneFilter');
     syncStorySourceEntries(lv, displayEntries, laneFeedPick.entries, {
       provisional: laneFeedPick.provisional === true || !watchPopupHeavyCommentsSettled,
       origin: LANE_SUPPLY_ORIGIN.HEAVY
     });
-    _markPhase('story');
     markWatchPopupLoadPhase(
       laneFeedPick.provisional ? 'ranking_paint' : 'ranking_full',
       {
@@ -16312,22 +16293,6 @@ async function refresh() {
     }
     // v0.1.813: renderWatchMetaCard も 1万件 O(N) 集計の重い描画。スクロール中/裏タブ(描画済)は見送る。
     if (!_perfDeferActive) renderWatchMetaCard(snapForCards, arr);
-    _markPhase('rooms');
-    try {
-      /** @type {Record<string, number>} */
-      const phases = {};
-      for (let i = 1; i < _phaseT.length; i += 1) {
-        phases[_phaseT[i][0]] = Math.round(_phaseT[i][1] - _phaseT[i - 1][1]);
-      }
-      const g = /** @type {any} */ (globalThis);
-      g.__nlPaintPhasesLast = phases;
-      const max = g.__nlPaintPhasesMax || (g.__nlPaintPhasesMax = {});
-      for (const [k, v] of Object.entries(phases)) {
-        if (v > (Number(max[k]) || 0)) max[k] = v;
-      }
-    } catch {
-      /* 計器 */
-    }
     // 白フラッシュ見える化: paint 区間の所要 ms を nls_perf_diag_<lv> に間引き保存。
     {
       const _perfPaintT1 = typeof performance !== 'undefined' ? performance.now() : Date.now();

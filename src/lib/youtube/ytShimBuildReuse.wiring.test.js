@@ -11,8 +11,8 @@ describe('ytNicoShim: 組み立て結果の使い回し', () => {
   });
   it('記録が増えたら番号が進む(新しい分を受け取ったとき・全件を読み直したとき・直接届いた行)', () => {
     expect(shim).toContain('if (changed) next.ver = (Number(next.ver) || 0) + 1;');
-    // 「新しい分だけ」の読み出しが返す最後の1行(中身が同じ)では進めない
-    expect(shim).toContain('if (!old || JSON.stringify(old) !== JSON.stringify(r)) changed = true;');
+    // 中身が同じ行では番号を進めない(JSON.stringify は行が大きいほどメインスレッドを止めるので使わない)
+    expect(shim).toContain('else if (ytLiveRowMateriallyChanged(old, r))');
     expect(shim).toContain('fullAt: now, ver: 0 }');
     expect(shim).toContain('cur.ver = (Number(cur.ver) || 0) + 1;');
   });
