@@ -15,6 +15,9 @@ import {
   moveParticipation,
   normalizeParticipationQueue,
   normalizeParticipationWords,
+  openParticipationQueue,
+  participationCommentAt,
+  participationCommentBeforeAccept,
   participationCommentKey,
   participationDisplayName,
   participationQueueDemoState,
@@ -252,9 +255,10 @@ async function reload(g) {
   const id = liveId;
   const key = participationQueueStorageKey(id);
   const store = storageApi();
+  const openedAt = Date.now();
   if (!key || !store) {
     ready = true;
-    render(normalizeParticipationQueue(null));
+    render(openParticipationQueue(normalizeParticipationQueue(null), openedAt));
     return;
   }
   try {
@@ -262,13 +266,21 @@ async function reload(g) {
     if (g !== generation) return;
     let state = normalizeParticipationQueue(bag[key]);
     if (!state.opaque) state = inheritParticipationWords(state, bag[PARTICIPATION_WORDS_KEY]);
+    const opened = openParticipationQueue(state, openedAt);
+    if (opened !== state) {
+      const payload = participationQueueToStorage(opened);
+      if (payload) await store.set({ [key]: payload });
+      state = opened;
+    }
+    if (g !== generation) return;
     ready = true;
     render(state);
-    if (recent.length) noteParticipationComments(recent.slice());
+    const liveRows = rowsOnOrAfter(recent, state.acceptAfter);
+    if (liveRows.length) noteParticipationComments(liveRows);
   } catch {
     if (g !== generation) return;
     ready = true;
-    render(normalizeParticipationQueue(null));
+    render(openParticipationQueue(normalizeParticipationQueue(null), openedAt));
   }
 }
 
@@ -278,6 +290,24 @@ function rememberHand(id) {
   if (handed.size <= HANDED_MAX) return;
   const oldest = handed.values().next().value;
   if (oldest) handed.delete(oldest);
+}
+
+/**
+ * 手元に残っているコメントのうち、区切りの時刻以降だけを返す。
+ * 時刻の無い行は、言葉を決める前の溜まりなので渡さない。
+ * @param {any[]} rows
+ * @param {number} acceptAfter
+ * @returns {any[]}
+ */
+function rowsOnOrAfter(rows, acceptAfter) {
+  const cutoff = Number(acceptAfter) || 0;
+  if (!cutoff) return [];
+  const out = [];
+  for (const row of rows) {
+    const at = participationCommentAt(row);
+    if (at >= cutoff) out.push(row);
+  }
+  return out;
 }
 
 /** @param {any} row */
@@ -290,19 +320,29 @@ function mightMatch(row) {
 
 /**
  * コメビュが受け取ったコメントを順番へ渡す。待たない。
+ * retry は、言葉を保存した直後だけ。その瞬間に届いたコメントを、一度見送っていても見返す。
  * @param {unknown} rows
+ * @param {{ retry?: boolean }} [opts]
  */
-export function noteParticipationComments(rows) {
+export function noteParticipationComments(rows, opts) {
   if (!liveId || !Array.isArray(rows) || rows.length === 0) return;
-  recent = recent.concat(rows).slice(-PARTICIPATION_BOOTSTRAP_ROWS);
+  const retry = !!(opts && opts.retry);
+  if (!retry) recent = recent.concat(rows).slice(-PARTICIPATION_BOOTSTRAP_ROWS);
   if (!ready || !shown) return;
   /** @type {any[]} */
   const fresh = [];
   for (const row of rows) {
     const id = participationCommentKey(row);
-    if (!id || handed.has(id)) continue;
+    if (!id || (!retry && handed.has(id))) continue;
+    if (participationCommentBeforeAccept(row, shown.acceptAfter)) {
+      rememberHand(id);
+      continue;
+    }
+    if (!mightMatch(row)) {
+      if (shown.wordsSet && shown.acceptAfter) rememberHand(id);
+      continue;
+    }
     rememberHand(id);
-    if (!mightMatch(row)) continue;
     fresh.push(row);
   }
   if (fresh.length) void mutate((state) => applyParticipationComments(state, fresh, Date.now()));
@@ -328,10 +368,11 @@ function scheduleWords() {
     if (!view) return;
     const joinWord = view.joinInput.value;
     const cancelWord = view.cancelInput.value;
-    handed.clear();
-    void mutate((state) => setParticipationWords(state, { joinWord, cancelWord }, Date.now()), { saveWords: true })
+    const now = Date.now();
+    void mutate((state) => setParticipationWords(state, { joinWord, cancelWord }, now), { saveWords: true })
       .then(() => {
-        if (recent.length) noteParticipationComments(recent.slice());
+        const liveRows = rowsOnOrAfter(recent, now);
+        if (liveRows.length) noteParticipationComments(liveRows, { retry: true });
       });
   }, WORD_SAVE_MS);
 }

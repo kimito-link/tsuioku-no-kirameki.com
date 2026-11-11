@@ -12,6 +12,8 @@ import {
   markParticipationDone,
   moveParticipation,
   normalizeParticipationQueue,
+  openParticipationQueue,
+  participationCommentBeforeAccept,
   participationCommentKey,
   participationQueueDemoState,
   participationQueueStorageKey,
@@ -38,7 +40,9 @@ function row(over) {
     selfPosted: over.selfPosted === true,
     avatarUrl: over.avatarUrl || '',
     ytChannelId: over.ytChannelId || '',
-    login: over.login || ''
+    login: over.login || '',
+    ...(over.capturedAt ? { capturedAt: over.capturedAt } : {}),
+    ...(over.ytPostedAt ? { ytPostedAt: over.ytPostedAt } : {})
   };
 }
 
@@ -146,6 +150,44 @@ describe('参加の順番', () => {
     expect(s.seen).toHaveLength(PARTICIPATION_QUEUE_MAX + 2);
     const again = applyParticipationComment(s, rows[0], 2);
     expect(again).toBe(s);
+  });
+
+  it('言葉を決める前、待ちを開く前、空にする前のコメントは並ばない', () => {
+    const before = row({ no: 1, text: '参加', userId: '11', name: 'りんく', capturedAt: 100 });
+    const afterWord = row({ no: 2, text: '参加', userId: '22', name: 'こん太', capturedAt: 250 });
+    let s = setParticipationWords(emptyParticipationQueue(), { joinWord: '参加', cancelWord: '辞退' }, 200);
+    expect(participationCommentBeforeAccept(before, s.acceptAfter)).toBe(true);
+    s = applyParticipationComments(s, [before, afterWord], 260);
+    expect(s.order.map((p) => p.name)).toEqual(['こん太']);
+    expect(s.seen).toEqual(['no:2']);
+
+    const duringOpen = row({ no: 3, text: '参加', userId: '33', name: 'たぬ姉', capturedAt: 280 });
+    const afterOpen = row({ no: 4, text: '参加', userId: '44', name: '次の人', capturedAt: 320 });
+    s = openParticipationQueue(s, 300);
+    s = applyParticipationComments(s, [duringOpen, afterOpen], 330);
+    expect(s.order.map((p) => p.name)).toEqual(['こん太', '次の人']);
+
+    const staleCancel = row({ no: 5, text: '辞退', userId: '22', name: 'こん太', capturedAt: 350 });
+    const rejoin = row({ no: 6, text: '参加', userId: '22', name: 'こん太', capturedAt: 410 });
+    s = resetParticipationOrder(s, 400);
+    s = applyParticipationComments(s, [staleCancel, rejoin, before], 420);
+    expect(s.order.map((p) => p.name)).toEqual(['こん太']);
+  });
+
+  it('受け取った時刻が新しくても、書かれた時刻が言葉の前なら並ばない', () => {
+    let s = setParticipationWords(emptyParticipationQueue(), { joinWord: '参加', cancelWord: '辞退' }, 5000);
+    const backlog = row({
+      no: 1,
+      text: '参加',
+      userId: '11',
+      name: 'りんく',
+      capturedAt: 6000,
+      ytPostedAt: 1000
+    });
+    const live = row({ no: 2, text: '参加', userId: '22', name: 'こん太', capturedAt: 6100 });
+    s = applyParticipationComments(s, [backlog, live], 6200);
+    expect(s.order.map((p) => p.name)).toEqual(['こん太']);
+    expect(s.seen).toEqual(['no:2']);
   });
 
   it('言葉が空、または参加と辞退が同じときは動かない', () => {

@@ -29,7 +29,7 @@ export const PARTICIPATION_COUNT_MAX = 500;
 /** OBS の透過画面に出す行数。残りは人数だけ。 */
 export const PARTICIPATION_OBS_LINES = 30;
 
-/** コメビュが開いたときに遡る直近コメント数(全件は走査しない)。 */
+/** 言葉を決めた直後に見返す、手元に残している直近コメント数。これより前は走査しない。 */
 export const PARTICIPATION_BOOTSTRAP_ROWS = 200;
 
 /** 言葉の最大文字数。 */
@@ -63,6 +63,7 @@ export const PARTICIPATION_WORDS_KEY = 'nls_pq_words_v1';
  *   wordsSet: boolean,
  *   joinWord: string,
  *   cancelWord: string,
+ *   acceptAfter: number,
  *   order: ParticipationPerson[],
  *   counts: Record<string, number>,
  *   seen: string[],
@@ -78,6 +79,7 @@ export function emptyParticipationQueue() {
     wordsSet: false,
     joinWord: '',
     cancelWord: '',
+    acceptAfter: 0,
     order: [],
     counts: {},
     seen: [],
@@ -145,6 +147,35 @@ export function commentMatchesWord(text, word) {
 }
 
 /**
+ * コメントが届いた時刻。書かれた時刻があるときは、受け取った時刻より前ならそちらを使う
+ * (開いたときにチャット欄へ残っていた分は、受け取った時刻がまとめて新しくなる)。
+ * @param {any} row
+ * @returns {number}
+ */
+export function participationCommentAt(row) {
+  if (!row || typeof row !== 'object') return 0;
+  const captured = finiteAt(row.capturedAt);
+  const posted = finiteAt(row.ytPostedAt != null ? row.ytPostedAt : row.postedAtMs);
+  if (captured && posted) return Math.min(captured, posted);
+  return captured || posted || 0;
+}
+
+/**
+ * 参加の言葉を決めた時刻・待ちを開いた時刻・空にした時刻より前なら、並ばない。
+ * 時刻の無い行は、ここでは落とさない(画面側が古い溜まりを渡さない)。
+ * @param {any} row
+ * @param {unknown} acceptAfter
+ * @returns {boolean}
+ */
+export function participationCommentBeforeAccept(row, acceptAfter) {
+  const cutoff = finiteAt(acceptAfter);
+  if (!cutoff) return false;
+  const at = participationCommentAt(row);
+  if (!at) return false;
+  return at < cutoff;
+}
+
+/**
  * @param {unknown} raw
  * @returns {{ v: number, joinWord: string, cancelWord: string }}
  */
@@ -174,6 +205,7 @@ export function normalizeParticipationQueue(raw) {
       wordsSet: false,
       joinWord: '',
       cancelWord: '',
+      acceptAfter: 0,
       order: [],
       counts: {},
       seen: [],
@@ -231,6 +263,7 @@ export function normalizeParticipationQueue(raw) {
     wordsSet: rec.wordsSet === true,
     joinWord: cleanParticipationWord(rec.joinWord),
     cancelWord: cleanParticipationWord(rec.cancelWord),
+    acceptAfter: finiteAt(rec.acceptAfter),
     order,
     counts,
     seen,
@@ -366,6 +399,7 @@ export function applyParticipationComment(state, row, nowMs = 0) {
   if (!state || state.opaque) return state;
   if (participationWordsConflict(state)) return state;
   if (!state.joinWord && !state.cancelWord) return state;
+  if (participationCommentBeforeAccept(row, state.acceptAfter)) return state;
   const id = participationCommentKey(row);
   if (!id) return state;
   if (state.seen.includes(id)) return state;
@@ -509,7 +543,26 @@ export function shuffleParticipation(state, rng = Math.random, nowMs = 0) {
  */
 export function resetParticipationOrder(state, nowMs = 0) {
   if (!state || state.opaque || state.order.length === 0) return state;
-  return { ...state, order: [], updatedAt: finiteAt(nowMs) || state.updatedAt };
+  const at = finiteAt(nowMs);
+  return {
+    ...state,
+    order: [],
+    acceptAfter: Math.max(state.acceptAfter || 0, at),
+    updatedAt: at || state.updatedAt
+  };
+}
+
+/**
+ * 待ちを開いた時刻を上げる。これより前に届いていたコメントは、開いた瞬間に並ばない。
+ * @param {ParticipationQueueState} state
+ * @param {number} [nowMs]
+ * @returns {ParticipationQueueState}
+ */
+export function openParticipationQueue(state, nowMs = 0) {
+  if (!state || state.opaque) return state;
+  const at = finiteAt(nowMs);
+  if (!at || at <= (state.acceptAfter || 0)) return state;
+  return { ...state, acceptAfter: at, updatedAt: at };
 }
 
 /**
@@ -523,12 +576,14 @@ export function setParticipationWords(state, words, nowMs = 0) {
   const joinWord = cleanParticipationWord(words?.joinWord);
   const cancelWord = cleanParticipationWord(words?.cancelWord);
   if (state.wordsSet && state.joinWord === joinWord && state.cancelWord === cancelWord) return state;
+  const at = finiteAt(nowMs);
   return {
     ...state,
     wordsSet: true,
     joinWord,
     cancelWord,
-    updatedAt: finiteAt(nowMs) || state.updatedAt
+    acceptAfter: Math.max(state.acceptAfter || 0, at),
+    updatedAt: at || state.updatedAt
   };
 }
 
@@ -604,6 +659,7 @@ export function participationQueueToStorage(state) {
     wordsSet: state.wordsSet === true,
     joinWord: state.joinWord,
     cancelWord: state.cancelWord,
+    acceptAfter: finiteAt(state.acceptAfter),
     order: state.order.map((p) => ({
       key: p.key,
       userId: p.userId,

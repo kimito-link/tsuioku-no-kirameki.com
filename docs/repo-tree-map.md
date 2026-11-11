@@ -507,7 +507,7 @@ graph LR
 > 新しい機能を足すときは、実際に grep して司っているファイルを確かめてから `FEATURES` に1行足す。
 
 ### 参加の順番待ち  〔コメビュ / OBS / 順番〕
-コメビュで参加の言葉と辞退の言葉を決めると、同じ全文のコメントを先着順に並べる(同じ人は二重にしない)。済・上下・外す・シャッフル・待ちを空にする。済の回数を人ごとに残す。OBS 用の透過画面は今の順番を文字だけで出す。ニコ生も YouTube 系(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)もコメビュが開いているあいだ同じ保存を読む
+コメビュで参加の言葉と辞退の言葉を決めると、同じ全文のコメントを先着順に並べる(同じ人は二重にしない)。言葉を決めたあと、コメビュを開いたあと、待ちを空にしたあとに届いたコメントだけを数える。済・上下・外す・シャッフル・待ちを空にする。済の回数を人ごとに残す。OBS 用の透過画面は今の順番を文字だけで出す。ニコ生も YouTube 系(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)もコメビュが開いているあいだ同じ保存を読む
 
 - [`src/lib/participationQueue.js`](../src/lib/participationQueue.js)
 - [`src/lib/participationQueueProfile.js`](../src/lib/participationQueueProfile.js)
