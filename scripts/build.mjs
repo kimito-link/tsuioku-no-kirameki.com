@@ -174,6 +174,16 @@ const targets = [
     target: 'chrome100'
   },
   {
+    entryPoints: ['src/extension/settings-backup-entry.js'],
+    outfile: 'extension/dist/settings-backup.js',
+    target: 'chrome100'
+  },
+  {
+    entryPoints: ['src/extension/settings-backup-sw-entry.js'],
+    outfile: 'extension/dist/settings-backup-sw.js',
+    target: 'chrome100'
+  },
+  {
     entryPoints: ['src/extension/venue-entry.js'],
     outfile: 'extension/dist/venue.js',
     target: 'chrome100'

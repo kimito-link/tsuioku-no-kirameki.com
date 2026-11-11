@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background: #fffaf2">
+  <head>
+    <meta name="color-scheme" content="light" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>設定とメモの控え</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+        line-height: 1.5;
+        background: #fffaf2;
+        color: #1f2933;
+      }
+      main { max-width: 720px; margin: 0 auto; padding: 16px; }
+      h1 { font-size: 1.25rem; margin: 0 0 8px; }
+      p { margin: 0 0 12px; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      button, input {
+        font: inherit;
+        border-radius: 8px;
+        border: 1px solid #64748b;
+      }
+      button { padding: 8px 12px; background: #fff; color: #1f2933; cursor: pointer; }
+      input { max-width: 100%; }
+      li { margin: 0 0 8px; }
+      li button { margin-left: 8px; }
+      #status { min-height: 1.5em; font-weight: 700; }
+      @media (max-width: 640px) {
+        li button { display: block; margin: 6px 0 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>設定とメモの控え</h1>
+      <p>設定と、コメビュのニックネーム・ラベル・メモを残します。コメント本文は入れません。戻す前に中身を確かめ、書き戻したあとにもう一度読みます。違っていたら元に戻します。</p>
+      <p>このPCの中の自動の控えは、新しい5つだけ残します。約6時間に1回です。ファイルに書き出した控えは消しません。知らない新しい形は戻しません。</p>
+      <p class="row">
+        <button id="saveNow" type="button">今すぐ控えを残す</button>
+        <button id="exportFile" type="button">ファイルに書き出す</button>
+        <label>ファイルから読み戻す <input id="importFile" type="file" accept="application/json,.json" /></label>
+      </p>
+      <p id="status" role="status"></p>
+      <h2>このPCの中の控え</h2>
+      <ul id="ring"></ul>
+    </main>
+    <script src="dist/settings-backup.js"></script>
+  </body>
+</html>

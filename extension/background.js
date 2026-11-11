@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: 48c5a29dfb7c
+// nls-sw-fingerprint: 4af71a6b58ed
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -12,6 +12,8 @@ try { importScripts('dist/backfill-sw.js'); } catch (e) { console.warn('[NLS] ba
 // v0.1.1802: 開発版(展開して読み込み)が、拡張のフォルダの新しい版に自分で入れ替わる(キット extension-self-update)。
 //   ストア版(manifest に update_url)では何もしない。
 try { importScripts('dist/self-update-sw.js'); } catch (e) { console.warn('[NLS] self-update load failed', e); } // eslint-disable-line no-undef
+// 設定とメモの定期控え。コメント本文の自動控え（nls_auto_backup_every_5m）とは別。
+try { importScripts('dist/settings-backup-sw.js'); } catch (e) { console.warn('[NLS] settings-backup load failed', e); } // eslint-disable-line no-undef
 // 2026-11-05 りんく「メインに統合したい」: YouTube Live 版を同梱(記録・会場・コメビュの受け口は YT_… の名前だけで答える)。
 //   中身は extension-youtube/src/background-entry.js(scripts/youtube-build.mjs が本体向けに束ねる)。
 try { importScripts('dist/yt-background.js'); } catch (e) { console.warn('[NLS] youtube load failed', e); } // eslint-disable-line no-undef
@@ -19,6 +21,10 @@ try { importScripts('dist/yt-background.js'); } catch (e) { console.warn('[NLS] 
 /** 2分おきの見回りを予約する(self-update-sw.js が読めなかった時は何もしない)。 */
 function ensureSelfUpdateAlarm() {
   try { globalThis.__nlsSelfUpdate?.scheduleSelfUpdateCheck(); } catch { /* no-op */ }
+}
+
+function ensureSettingsBackupAlarm() {
+  try { globalThis.__nlsSettingsBackup?.schedule(); } catch { /* no-op */ }
 }
 
 const MATCH_PATTERNS = [
@@ -1006,6 +1012,7 @@ async function migrateClearStaleSelfPostedOnce(previousVersion) {
 chrome.runtime.onInstalled.addListener((details) => {
   ensureToolbarOpensPopupNotSidePanel();
   ensureSelfUpdateAlarm();
+  ensureSettingsBackupAlarm();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
@@ -1081,6 +1088,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onStartup.addListener(() => {
   ensureToolbarOpensPopupNotSidePanel();
   ensureSelfUpdateAlarm();
+  ensureSettingsBackupAlarm();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
@@ -1122,6 +1130,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   const selfUpdate = globalThis.__nlsSelfUpdate;
   if (selfUpdate && alarm?.name === selfUpdate.SELF_UPDATE_ALARM) {
     void selfUpdate.checkForNewVersion().catch((e) => console.warn('[self-update]', String(e?.message || e)));
+    return;
+  }
+  const settingsBackup = globalThis.__nlsSettingsBackup;
+  if (settingsBackup && alarm?.name === settingsBackup.SETTINGS_BACKUP_ALARM) {
+    void settingsBackup.tick().catch((e) => console.warn('[settings-backup]', String(e?.message || e)));
     return;
   }
   if (alarm?.name === AUTO_BACKUP_ALARM) {

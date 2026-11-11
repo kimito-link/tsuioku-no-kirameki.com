@@ -27,11 +27,13 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1233 件
+## ⚠️ 役割コメントが無いソース 12 / 1236 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
 - `scripts/build.mjs`
+- `src/extension/settings-backup-entry.js`
+- `src/extension/settings-backup-sw-entry.js`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
 - `src/lib/mediaKitExport.js`
@@ -617,7 +619,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (143)
+- 📁 **extension/** (144)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -766,6 +768,7 @@
   - `marketing-export.html`
   - `offscreen.html`
   - `popup.html`
+  - `settings-backup.html`
   - `sidepanel.html`
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
@@ -1159,7 +1162,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2433)
+- 📁 **src/** (2437)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1199,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (111)
+  - 📁 **extension/** (113)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1281,6 +1284,8 @@
     - `self-update.js` — 開発中（展開して読み込んだ）拡張が、作業フォルダの新しい版に自分で入れ替わる。
     - `self-update.kit-test.mjs` — self-update.test.mjs — self-update.js の試験。拡張へ写すときは import 先のパスだけ直す。
     - `self-update.test.js`
+    - `settings-backup-entry.js` — ⚠️ 役割コメント無し
+    - `settings-backup-sw-entry.js` — ⚠️ 役割コメント無し
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `sidepanel-iframe-boot-entry.js` — サイドパネルの iframe(中の popup)を「親の最初の描画のあと」に読み込ませ、見せる配信を決める【極小エントリ】。v0.1.1693 / v0.1.1696
     - `smartphoneFreshness.wiring.test.js`
@@ -1490,7 +1495,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2134)
+  - 📁 **lib/** (2136)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3052,6 +3057,8 @@
     - `sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
     - `sessionSummaryMirror.test.js`
     - `sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
+    - `settingsBackup.js` — 設定とリスナーメモの控え。
+    - `settingsBackup.test.js`
     - `shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `shareKeysFile.test.js`
     - `shortLivedMemo.js` — 0.1.1961: 同じ問い合わせを短い間だけ使い回す(答えを待っている間の重複もまとめる)。
