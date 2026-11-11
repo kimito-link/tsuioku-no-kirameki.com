@@ -17,9 +17,9 @@
 
 ・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトを本人のPCに記録します。外へは送りません。
 
-・http://127.0.0.1:50021/* : 読み上げONのときだけ、このPCのVOICEVOXへ音声合成を頼みます。
+・http://127.0.0.1:50021/* :10101/* :50032/* :50080/* :11900/* : 読み上げONのときPC内で合成。外へ出ません。
 
-・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」を自分でONにしたときだけニコ生の画面を送ります(最新1件・24時間で消え、OFFで削除)。契約確認はコードとPCごとの識別子だけです。上の他サービスの記録は送りません。
+・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」を自分でONにしたときだけニコ生の画面を送ります(最新1件・24時間で消え、OFFで削除)。契約確認はコードと識別子だけです。他の記録は送りません。
 
 ・https://suggestqueries.google.com/* : 入力した配信者名の検索候補だけを取得します。
 
@@ -93,7 +93,7 @@
 2. ✅ 「データ使用 → 個人を特定できる情報」にチェックが入っているか
    （`privacy.html` §2 のユーザー ID 保存と整合）
 3. ✅ scripting / downloads / alarms / tabs / webNavigation / sidePanel / offscreen / tts / declarativeNetRequestWithHostAccess と、ホスト権限
-   （nicovideo.jp / YouTube 4 つ / app.tsuioku-no-kirameki.com / suggestqueries.google.com / 127.0.0.1:50021）の理由欄が空欄でないか
+   （nicovideo.jp / YouTube 4 つ / app.tsuioku-no-kirameki.com / suggestqueries.google.com / 127.0.0.1 の 50021・10101・50032・50080・11900）の理由欄が空欄でないか
 4. ✅ アップロード ZIP は `python scripts/stage-submission.py <version>` で生成した
    `build/tsuioku-no-kirameki-X.X.X.zip` で、master の version と一致しているか
 5. ✅ 「審査の合格後に自動的に公開する」が意図通りか（再確認）

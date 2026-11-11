@@ -50,10 +50,12 @@ export function shouldRenderLoading(state, elapsedMs) {
  * @param {'venue'|'comeview'} surface
  * @param {'timeout'|'refused'|'http-error'|'no-fetch'|''} [reason]
  *   ★v0.1.1326: 失敗理由(probeVoicevoxAlive の戻り)。省略時は従来文言=後方互換。
+ * @param {string} [engineLabel] 画面に出す読み上げの名前。省略時は VOICEVOX（既存の文言）。
  * @returns {{ kind: 'hidden'|'loading'|'error', text: string }}
  *   kind=hidden: 何も出さない(空) / loading: 楽しい演出 / error: 起動案内
  */
-export function resolveVoiceLoadingView(state, surface, reason) {
+export function resolveVoiceLoadingView(state, surface, reason, engineLabel = 'VOICEVOX') {
+  const engineName = String(engineLabel || 'VOICEVOX');
   if (state === 'ready' || state === 'idle') return { kind: 'hidden', text: '' };
 
   if (state === 'notfound') {
@@ -67,13 +69,13 @@ export function resolveVoiceLoadingView(state, surface, reason) {
     if (reason === 'timeout') {
       return {
         kind: 'error',
-        text: 'VOICEVOXは起動していますが応答がありません(重い処理中かもしれません)'
+        text: `${engineName}は起動していますが応答がありません(重い処理中かもしれません)`
       };
     }
     if (reason === 'http-error') {
       return {
         kind: 'error',
-        text: 'VOICEVOXが応答しましたがエラーでした(バージョンを確認してください)'
+        text: `${engineName}が応答しましたがエラーでした(バージョンを確認してください)`
       };
     }
     if (reason === 'no-fetch') {
@@ -85,7 +87,7 @@ export function resolveVoiceLoadingView(state, surface, reason) {
     // refused / 不明 = エンジンに届いていない。ボタンは押したままなので「押し直して」とは言わない。
     return {
       kind: 'error',
-      text: 'VOICEVOXにつながっていません'
+        text: `${engineName}につながっていません`
     };
   }
 

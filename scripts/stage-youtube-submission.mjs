@@ -78,9 +78,10 @@ export function buildYoutubeSubmissionManifest(devManifest, versionOverride) {
   }
   delete m.key;
 
+  const speechHostPorts = [':50021', ':10101', ':50032', ':50080', ':11900'];
   if (Array.isArray(m.host_permissions)) {
     m.host_permissions = m.host_permissions.filter(
-      (h) => (!h.includes('localhost') && !h.includes('127.0.0.1')) || h.includes(':50021'),
+      (h) => (!h.includes('localhost') && !h.includes('127.0.0.1')) || speechHostPorts.some((port) => h.includes(port)),
     );
   }
   if (Array.isArray(m.content_scripts)) {

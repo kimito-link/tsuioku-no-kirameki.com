@@ -247,6 +247,47 @@ describe('VoicePlayer', () => {
     });
   });
 
+  it('委譲した声は再生のときに話し、OFF で止める', async () => {
+    let spoken = 0;
+    let cancelled = 0;
+    const onAudible = vi.fn();
+    player.fetchSynthesizeVoice = vi.fn(async () => {
+      let resolveSpeak = (_ok) => {};
+      return {
+        delegated: true,
+        speak: (hooks) => new Promise((resolve) => {
+          spoken += 1;
+          try { hooks?.onStart?.(); } catch { /* no-op */ }
+          resolveSpeak = resolve;
+        }),
+        cancel: () => { cancelled += 1; resolveSpeak(false); }
+      };
+    });
+    await player.enable({ persist: false });
+    player.enqueue([
+      { kind: 'comment', userId: 'u', nickname: 'なな', text: 'いま', onAudible },
+      { kind: 'comment', userId: 'u2', nickname: 'はち', text: 'つぎ' }
+    ]);
+    await vi.waitFor(() => expect(spoken).toBe(1));
+    expect(onAudible).toHaveBeenCalledTimes(1);
+    expect(player.fetchSynthesizeVoice.mock.calls.length).toBeGreaterThanOrEqual(1);
+    player.disable({ persist: false });
+    expect(cancelled).toBeGreaterThan(0);
+    expect(player.readingWanted).toBe(false);
+  });
+
+  it('rebindEngine は OFF を保存せずにつなぎ直す', async () => {
+    await player.enable({ persist: false });
+    mockStorage.set.mockClear();
+    const before = player._intentSerial;
+    await player.rebindEngine();
+    expect(player._intentSerial).toBeGreaterThan(before);
+    expect(player.readingWanted).toBe(true);
+    expect(player.enabled).toBe(true);
+    const wroteOff = mockStorage.set.mock.calls.some((call) => call[0] && call[0].nls_voice_reading_enabled_v1 === false);
+    expect(wroteOff).toBe(false);
+  });
+
   it('initializes disabled by default', async () => {
     await player.initialize();
     expect(player.enabled).toBe(false);

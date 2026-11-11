@@ -369,14 +369,24 @@ import {
   makeInitialGiftDeltaState
 } from '../lib/giftDeltaFallback.js';
 import {
-  isVoicevoxAlive,
-  probeVoicevoxAlive,
-  listVoicevoxStyleIds,
-  synthesizeVoice,
-  probeVoicevoxStreaming, probeVoicevoxGpuCapable
+  isVoicevoxAlive
 } from '../lib/voicevoxClient.js';
 import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
-import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
+import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks } from '../lib/voiceWarmup.js';
+import {
+  attachSpeechWarmup,
+  listActiveSpeechStyles,
+  noteSpeechReadingWanted,
+  onSpeechEngineChanged,
+  probeActiveSpeechEngine,
+  probeActiveSpeechGpu,
+  probeActiveSpeechStreaming,
+  speechEngineLabel,
+  speechEngineStatusNote,
+  speechEngineWarmBaseUrl,
+  speechEngineWarmupAllowed,
+  synthesizeActiveSpeech
+} from './speechEngineBinding.js';
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } from '../lib/venueComposeBox.js';
@@ -3388,7 +3398,7 @@ export function mountVenueBarButton(options = {}) {
     /** @type {string} */ state,
     /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason
   ) => {
-    const view = resolveVoiceLoadingView(state, 'venue', reason);
+    const view = resolveVoiceLoadingView(state, 'venue', reason, speechEngineLabel());
     voiceStatus.classList.toggle('is-loading', view.kind === 'loading');
     voiceStatus.classList.toggle('is-error', view.kind === 'error');
     voiceStatus.textContent = view.text;
@@ -3422,13 +3432,15 @@ export function mountVenueBarButton(options = {}) {
   }, 3000);
   const publishVenueVoiceDiag = (/** @type {import('../lib/voiceDiag.js').VoiceDiagState} */ diag) => { _venueVoiceDiagLatest = diag; venueVoiceDiagPublisher.request(); };
 
-  const venueVoiceWarmup = createVoicevoxWarmup(); // 初めての声を合成前に読み込む(voiceWarmup.js)
+  const venueVoiceWarmup = createVoicevoxWarmup({ baseUrlOf: speechEngineWarmBaseUrl }); // 温め先は今のエンジン（VOICEVOX 以外を 50021 へ送らない）
+  attachSpeechWarmup(venueVoiceWarmup);
   wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
     onDiag: publishVenueVoiceDiag,
     onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
+      noteSpeechReadingWanted(enabled);
       pickupVoice.noteWanted(enabled);
       if (!enabled) updatePickupBanner(null);
       voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
@@ -3459,13 +3471,18 @@ export function mountVenueBarButton(options = {}) {
     fetchVoicevoxAlive: isVoicevoxAlive,
     // ★v0.1.1326: 理由付きの生存確認を配線(未配線だと reason が常に 'refused' になり、
     //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
-    probeVoicevoxAlive,
-    fetchVoiceStyleIds: listVoicevoxStyleIds,
-    initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensureWhenIdle(id), // P3 の先読みは合成の合間に裏で
+    probeVoicevoxAlive: probeActiveSpeechEngine,
+    fetchVoiceStyleIds: listActiveSpeechStyles,
+    initVoiceSpeaker: (/** @type {number} */ id) => (speechEngineWarmupAllowed() ? venueVoiceWarmup.ensureWhenIdle(id) : undefined),
     voiceWarmup: venueVoiceWarmup,
-    probeVoiceStreaming: probeVoicevoxStreaming, probeVoiceGpu: probeVoicevoxGpuCapable, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
-    fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
+    shouldWarmVoices: speechEngineWarmupAllowed,
+    engineStatusNote: speechEngineStatusNote,
+    probeVoiceStreaming: probeActiveSpeechStreaming, probeVoiceGpu: probeActiveSpeechGpu, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)。GPU は VOICEVOX のときだけ
+    fetchSynthesizeVoice: synthesizeActiveSpeech, // 初めての声の温めは WAV のエンジンだけ
     resolveVoice: resolveVoiceForUser
+  });
+  onSpeechEngineChanged(() => {
+    if (voicePlayer.readingWanted) void voicePlayer.rebindEngine();
   });
   wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)

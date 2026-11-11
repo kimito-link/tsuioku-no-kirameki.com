@@ -656,7 +656,14 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
+- **読み上げエンジンの選択** — VOICEVOXに加えAivisSpeech・COEIROINK・棒読みちゃん・ゆかりねっとコネクターNEO・PCの声を同じ経路で読む。落ちたときはPCの声へ切り替え、約8秒ごとに選び直す
+  - `src/lib/speechEngineCatalog.js`
+  - `src/lib/speechEngineRouter.js`
+  - `src/extension/speechEngineBinding.js`
+  - `src/lib/bouyomiClient.js`
+  - `src/lib/coeiroinkClient.js`
+  - `src/lib/yukariClient.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -666,6 +673,7 @@
 - `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
+- `src/extension/popup/wireSpeechEngineSelect.js` — ポップアップとコメビュの「読み上げエンジン」の配線。
 - `src/extension/popup/wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
@@ -674,10 +682,12 @@
 - `src/extension/voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
 - `src/extension/voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
 - `src/extension/voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
+- `src/lib/delegatedSpeech.js` — WAV を返さない読み上げ（棒読みちゃん・ゆかコネ・PCの声）の印。
 - `src/lib/phoneVoice.js` — v0.1.1740: スマホの読み上げ(PC の VOICEVOX の声を届ける)の決まりごと(純関数)。
 - `src/lib/phoneVoiceEncode.js` — v0.1.1740: PC の VOICEVOX の声(WAV)を、スマホへ送る小さな Ogg Opus にする。
 - `src/lib/phoneVoiceSender.js` — v0.1.1740: PC 側の「スマホへ声を送る係」。status.html?publisher=1 の送信の返事が voiceWanted:true の間だけ動く。
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
+- `src/lib/speechLocalHttp.js` — 注入した fetch でローカル読み上げへ聞くときの期限と失敗分類。
 - `src/lib/venueBubbleVoiceHold.js` — 会場の吹き出しを「声が始まる時」に出すかどうか(v0.1.1979・2026-11-10 りんく決定「声と一緒に出す」)。
 - `src/lib/venuePickupSpeaker.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
@@ -1474,14 +1484,14 @@
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 
-### 📥 コメント取得 (5版)
+### 📥 コメント取得 (4版)
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 - `v0.1.1915` 2026-11-07 — YouTube の過去ログ取り込みでも混ざりを直す
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### 🏟 会場・席 (10版)
+- `v0.1.2039` 2026-11-11 — 読み上げエンジンを選べるようにした
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
@@ -1491,11 +1501,9 @@
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
-### 🎈 吹き出し (2版)
+### 🎈 吹き出し (1版)
 - `v0.1.1914` 2026-11-06 — 昔のコメントが会場で一気に出ないように
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### 🎁 ギフト (6版)
 - `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
@@ -1505,7 +1513,8 @@
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🔊 読み上げ (7版)
+### 🔊 読み上げ (8版)
+- `v0.1.2039` 2026-11-11 — 読み上げエンジンを選べるようにした
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
@@ -1517,9 +1526,8 @@
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🩺 診断・状態速報 (2版)
+### 🩺 診断・状態速報 (1版)
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
-- `v0.1.1913` 2026-11-06 — 吹き出しの一気出しを数える計器
 
 ### その他 (3版)
 - `v0.1.2033` 2026-11-10 — パネル位置の文字は食い違うときだけ

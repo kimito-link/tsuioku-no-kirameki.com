@@ -11920,6 +11920,26 @@
           <!-- 2026-10-24(P3・ユーザー条件「絞るのは弱いPCだけ・絞り方は固定」): 読み上げの声の種類を絞るか。
                既定は「遅いPCと分かったら」(v0.1.1768・グラボ無しの実測で準備待ちの飛ばしが多かったため)。配線は popup/wireVoiceNarrowSelect.js、判定は lib の voiceNarrowing.js。 -->
           <div class="nl-record-sub">
+            <label for="speechEngineSelect" class="nl-record-sub__label">
+              <span>
+                読み上げ
+                <select id="speechEngineSelect" aria-label="読み上げ">
+                  <option value="voicevox">VOICEVOX</option>
+                  <option value="aivis">AivisSpeech</option>
+                  <option value="coeiroink">COEIROINK</option>
+                  <option value="bouyomi">棒読みちゃん</option>
+                  <option value="yukari">ゆかりねっとコネクターNEO</option>
+                  <option value="os">PCの声</option>
+                </select>
+                <span id="speechEngineHint" class="nl-record-sub__hint">このPCの中で読みます。声は外へ出ません。</span>
+              </span>
+            </label>
+            <label class="nl-record-sub__hint" for="speechEngineFallback" style="display:flex;align-items:flex-start;gap:6px;max-width:100%;margin-top:4px;">
+              <input id="speechEngineFallback" type="checkbox" checked style="margin-top:2px;flex:0 0 auto;" />
+              <span>つながらないときはPCの声で読む</span>
+            </label>
+          </div>
+          <div class="nl-record-sub">
             <label for="voiceNarrowSelect" class="nl-record-sub__label">
               <span>
                 読み上げの声を絞る
@@ -12441,8 +12461,8 @@
               <button
                 type="button"
                 id="openComeviewVoiceBtn"
-                title="読み上げを始めます。VOICEVOX が必要です。"
-                aria-label="読み上げを始めます。VOICEVOX が必要です。"
+                title="読み上げを始めます。選んだ読み上げか、PCの声を使います。"
+                aria-label="読み上げを始めます。選んだ読み上げか、PCの声を使います。"
                 aria-pressed="false"
               >
                 <span class="nl-compose-qbtn__row">

@@ -61,6 +61,7 @@ export function createLightSpeaker(deps = {}) {
         u.lang = u.voice?.lang || 'ja-JP';
         u.pitch = tone.pitch;
         u.rate = tone.rate;
+        if (Number.isFinite(tone.volume)) u.volume = Math.min(1, Math.max(0, tone.volume));
         u.onstart = () => { started = true; try { hooks.onStart?.(); } catch { /* 吹き出し側の失敗で読みを止めない */ } };
         u.onend = finish;
         u.onerror = (/** @type {any} */ ev) => {

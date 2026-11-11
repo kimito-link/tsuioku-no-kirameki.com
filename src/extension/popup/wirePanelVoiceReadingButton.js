@@ -16,7 +16,7 @@ export function wirePanelVoiceReadingButton($) {
     if (word) word.textContent = on ? '読み上げON' : '読み上げOFF';
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    const label = on ? '読み上げを止めます' : '読み上げを始めます。VOICEVOX が必要です。';
+    const label = on ? '読み上げを止めます' : '読み上げを始めます。選んだ読み上げか、PCの声を使います。';
     btn.title = label;
     btn.setAttribute('aria-label', label);
   };

@@ -38,5 +38,9 @@ export const KEY_VOICE_NARROW_MODE = 'nls_voice_narrow_mode_v1';
 export const KEY_VOICE_WEAK_PC = 'nls_voice_weak_pc_v1';
 /** 声の音質('standard' 既定=16kHz | 'high'=24kHz)。2026-10-29。正規化は voiceQuality.js。 */
 export const KEY_VOICE_QUALITY = 'nls_voice_quality_v1';
+/** 読み上げエンジン。値は speechEngineCatalog の id。未保存は VOICEVOX。 */
+export const KEY_SPEECH_ENGINE = 'nls_speech_engine_v1';
+/** 選んだエンジンが落ちたとき。'os'（未保存もこちら）か 'off'。 */
+export const KEY_SPEECH_ENGINE_FALLBACK = 'nls_speech_engine_fallback_v1';
 /** 今鳴っているコメント(会場の PICK UP を再生開始に合わせる)。配信 id つき。 */
 export const KEY_VOICE_NOW_PLAYING = 'nls_voice_now_playing_v1';

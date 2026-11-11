@@ -190,6 +190,24 @@ async function proxyFetchBufferFn(url, init) {
 }
 
 /**
+ * 会場（content script）から 127.0.0.1 の読み上げへ聞く共通の口。
+ * 拡張ページは直接、配信ページは service worker 経由（voicevox と同じ）。
+ * @param {string|URL} url
+ * @param {RequestInit} [init]
+ */
+export function localSpeechFetch(url, init) {
+  return proxyFetchFn(url, init);
+}
+
+/**
+ * @param {string|URL} url
+ * @param {RequestInit} [init]
+ */
+export function localSpeechFetchBuffer(url, init) {
+  return proxyFetchBufferFn(url, init);
+}
+
+/**
  * 2026-10-26: 声を少しずつ受け取るための fetch。返り値は { ok, status, body: ReadableStream }。
  *   拡張ページは直接 fetch。content script は Background とポートでつなぎ、届いた分ずつ受け取る
  *   (sendMessage は1往復で丸ごとしか返せないため)。

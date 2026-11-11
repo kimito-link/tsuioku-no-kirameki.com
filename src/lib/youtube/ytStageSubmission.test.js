@@ -39,6 +39,27 @@ describe('stage-youtube-submission pure helpers', () => {
     expect(out.content_scripts[0].matches).toEqual(['https://www.youtube.com/live_chat*']);
   });
 
+  it('読み上げの localhost ポートは残し、開発用 3456 は落とす', () => {
+    const out = buildYoutubeSubmissionManifest({
+      version: '0.1.0',
+      host_permissions: [
+        'http://127.0.0.1:50021/*',
+        'http://127.0.0.1:10101/*',
+        'http://127.0.0.1:50032/*',
+        'http://127.0.0.1:50080/*',
+        'http://127.0.0.1:11900/*',
+        'http://127.0.0.1:3456/*'
+      ]
+    });
+    expect(out.host_permissions).toEqual([
+      'http://127.0.0.1:50021/*',
+      'http://127.0.0.1:10101/*',
+      'http://127.0.0.1:50032/*',
+      'http://127.0.0.1:50080/*',
+      'http://127.0.0.1:11900/*'
+    ]);
+  });
+
   it('isExcludedSubmissionPath excludes src/ and map/test/dot files', () => {
     expect(isExcludedSubmissionPath('src/background-entry.js')).toBe(true);
     expect(isExcludedSubmissionPath('sidepanel.js.map')).toBe(true);
