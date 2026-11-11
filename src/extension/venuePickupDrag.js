@@ -23,7 +23,7 @@ import { safeStorageLocalGet, safeStorageLocalSet } from '../lib/safeStorageLoca
  * @param {(who: { uid: string, displayName: string, avatarSrc: string, fallbackTexts: string[] }) => void} [openWho]
  *   v0.1.1900 りんく「PICKUP がどんな人か知りたい場合すぐ ACCESS できるようにしたい・ドラッグと両立」:
  *   顔か名前をクリックしたら、その人の発言パネル(席のアイコンクリックと同じ)を開く。ドラッグした直後のクリックは開かない。
- * @returns {{ place: (at: { left:number, top:number } | null) => void, dragging: () => boolean, later: (fn: () => void, ms?: number) => void }}
+ * @returns {{ place: (at: { left:number, top:number } | null) => void, watch: (el: Element | null | undefined) => void, dragging: () => boolean, later: (fn: () => void, ms?: number) => void }}
  */
 export function attachVenuePickupDrag(root, layoutEl, replace, openWho) {
   /** @type {{ cx:number, top:number } | null} */
@@ -37,13 +37,30 @@ export function attachVenuePickupDrag(root, layoutEl, replace, openWho) {
   let justDragged = false;
   let laterTimer = 0;
   const relayout = () => { try { replace(); } catch { /* 位置合わせの失敗は無視 */ } };
+  // サイドパネルの開閉は窓の幅を変える。resize が1回で終わることがあり、細く書いた幅が残る。
+  // 窓・visualViewport・html・今の映像を見て、細くなったときも広がったときも placePickup をやり直す。
+  let relayoutRaf = 0;
+  const relayoutSoon = () => {
+    relayout();
+    if (typeof requestAnimationFrame !== 'function') return;
+    if (relayoutRaf) return;
+    relayoutRaf = requestAnimationFrame(() => { relayoutRaf = 0; relayout(); });
+  };
   const viewportBounds = (/** @type {DOMRect} */ L) => venuePickupViewportBounds(L, { width: window.innerWidth, height: window.innerHeight });
   void safeStorageLocalGet(KEY_VENUE_PICKUP_POS).then((bag) => {
     learned = !!bag && Object.prototype.hasOwnProperty.call(bag, KEY_VENUE_PICKUP_POS);
     savedPos = normalizeVenuePickupSavedPos(bag?.[KEY_VENUE_PICKUP_POS]);
     relayout();
   }).catch(() => {});
-  window.addEventListener('resize', relayout);
+  window.addEventListener('resize', relayoutSoon);
+  window.visualViewport?.addEventListener('resize', relayoutSoon);
+  /** @type {Element | null} */
+  let watched = null;
+  const boxObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => relayoutSoon()) : null;
+  if (boxObserver) {
+    if (root.ownerDocument?.documentElement) boxObserver.observe(root.ownerDocument.documentElement);
+    boxObserver.observe(layoutEl);
+  }
 
   // ★りんく「ドラッグでうごかせますとユーザーがわかるようにしてほしい」: つまみ(⠿)を常に出し、
   //   上に「ドラッグで動かせます」の札を、触れたとき・まだ動かしたことのない人には初めて出たときに数秒出す。
@@ -161,6 +178,13 @@ export function attachVenuePickupDrag(root, layoutEl, replace, openWho) {
     relayout();
   });
   return {
+    /** 映像（別窓は中央の枠）の大きさが変わったら幅を計算し直す。同じ要素は一度だけ見る。 */
+    watch(el) {
+      if (!boxObserver || !el || el === watched) return;
+      if (watched) boxObserver.unobserve(watched);
+      watched = el;
+      boxObserver.observe(el);
+    },
     /** 置く: ドラッグ中は触らない・保存位置があればそこ(窓の内側に締める)・無ければ自動位置 at(null=CSS の既定)。 */
     place(at) {
       if (drag) return;

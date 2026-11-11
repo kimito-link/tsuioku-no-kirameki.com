@@ -298,6 +298,24 @@ export function venuePickupPlacement(video, layout, opts = {}) {
 }
 
 /**
+ * 今の窓と映像から、吹き出しに書く幅。細くも太くも、呼ぶたびに今の大きさだけを返す。
+ * 前に書いた px は見ない。サイドパネルを開いて窓が細くなったあと、閉じたときに窓が広がれば元の幅へ戻る。
+ * 480px 未満の video（コメント欄）は使わない。本編映像が窓より細いときだけ、映像の幅までにする。
+ * @param {number} videoWidth
+ * @param {number} viewportWidth
+ * @returns {number} 0 は書けない（CSS の既定に任せる）
+ */
+export function venuePickupDisplayWidth(videoWidth, viewportWidth) {
+  const vw = Math.max(0, Number(viewportWidth) || 0);
+  if (!(vw > 0)) return 0;
+  const fit = Math.round(Math.min(VENUE_PICKUP_MAX_PX, Math.max(160, vw - VENUE_PICKUP_VW_GUTTER)));
+  const video = Number(videoWidth);
+  if (!(Number.isFinite(video) && video >= VENUE_PICKUP_MAIN_VIDEO_MIN_PX)) return fit;
+  const fromVideo = Math.round(Math.max(200, Math.min(VENUE_PICKUP_MAX_PX, video - 24)));
+  return Math.min(fit, fromVideo);
+}
+
+/**
  * v0.1.1899 PICK UP の吹き出しをドラッグで好きな位置へ(りんく「ドラッグでうごかせるようにしておきたい」)。
  *   位置は会場(stageLayout)に対する割合で覚える=窓の大きさが変わっても同じあたりに出る。
  *   置ける範囲は画面(窓)の内側(吹き出しが丸ごと見える範囲に締める・画面の外へ失くさない)。

@@ -152,8 +152,13 @@ describe('PICK UP の見た目は1つ', () => {
     expect(banner).not.toContain('applyVenuePickupBox');
     expect(banner).not.toContain('function venuePickupReadableBox');
     expect(bar).toContain('venuePickupPlacement');
-    expect(bar).toContain("pickupEls.root.style.setProperty('width', `${at.width}px`, 'important')");
+    expect(bar).toContain('venuePickupDisplayWidth');
+    expect(bar).toContain("pickupEls.root.style.setProperty('width', `${width}px`, 'important')");
     expect(bar).toContain('pickupEls.root.style.removeProperty(\'width\')');
+    const drag = readFileSync(new URL('../extension/venuePickupDrag.js', import.meta.url), 'utf8');
+    expect(drag).toContain('new ResizeObserver');
+    expect(drag).toContain("window.addEventListener('resize', relayoutSoon)");
+    expect(drag).toContain('visualViewport');
     expect(bar).not.toContain('applyVenuePickupBox');
     expect(bar).not.toContain('venuePickupColumnPlacement');
     expect(bar).not.toContain('abemaCommentColumnRect');
@@ -169,6 +174,15 @@ describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
     expect(venuePickupPlacement({ left: 0, top: 200, width: 600, height: 338 }, { left: 0, top: 56, width: 1000 })).toEqual({ left: 300, top: 152, width: 576 });
     // 約250pxの欄は本編映像ではない。位置も合わせない（CSS の中央のまま）
     expect(venuePickupPlacement({ left: 900, top: 80, width: 274, height: 640 }, { left: 0, top: 0, width: 1400 })).toBeNull();
+  });
+  it('窓が細くなっても、広がれば同じ幅に戻る', async () => {
+    const { venuePickupDisplayWidth } = await import('./venuePickupBanner.js');
+    expect(venuePickupDisplayWidth(960, 1400)).toBe(860);
+    expect(venuePickupDisplayWidth(640, 900)).toBe(616);
+    expect(venuePickupDisplayWidth(960, 500)).toBe(468);
+    expect(venuePickupDisplayWidth(274, 1400)).toBe(860);
+    expect(venuePickupDisplayWidth(960, 1400)).toBe(860);
+    expect(venuePickupDisplayWidth(0, 0)).toBe(0);
   });
   it('映像が見つからない・小さすぎるときは null(CSS の既定のまま)', async () => {
     const { venuePickupPlacement } = await import('./venuePickupBanner.js');

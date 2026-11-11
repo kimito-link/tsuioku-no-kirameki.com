@@ -7,6 +7,7 @@ import {
   buildVenuePickupView,
   createVenuePickupBanner,
   VENUE_PICKUP_CSS,
+  venuePickupDisplayWidth,
   venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { attachVenuePickupDrag } from './venuePickupDrag.js';
@@ -2956,11 +2957,14 @@ export function mountVenueBarButton(options = {}) {
   /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
   function placePickup() {
     if (pickupEls.root.hasAttribute('data-empty')) return;
-    const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
-    const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    const nodes = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
+    const videoEl = nodes.filter((v) => { const r = v.getBoundingClientRect(); return r.width > 0 && r.bottom > 0; }).sort((a, b) => { const ra = a.getBoundingClientRect(); const rb = b.getBoundingClientRect(); return rb.width * rb.height - ra.width * ra.height; })[0];
+    const video = videoEl ? videoEl.getBoundingClientRect() : null;
     const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
-    if (at) pickupEls.root.style.setProperty('width', `${at.width}px`, 'important');
+    const width = venuePickupDisplayWidth(video ? video.width : 0, window.innerWidth);
+    if (width > 0) pickupEls.root.style.setProperty('width', `${width}px`, 'important');
     else pickupEls.root.style.removeProperty('width');
+    pickupDrag.watch(videoEl);
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
   const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)
