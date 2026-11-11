@@ -151,6 +151,36 @@ describe('パネルを開かなくても数字が付く(会場が自分で作っ
     expect(old.source).toBe('none');
   });
 
+  it('YouTube の鏡では来場者数・来場・本家コメ・広告pt・ギフトpt を出さない', () => {
+    const snap = mirror();
+    snap.platform = 'youtube';
+    snap.platformFacts = { viewers: 80, streamAgeProvenance: 'official', support: null };
+    const m = buildVenueStatStripModel(snap, { liveId: 'lv123', nowMs: NOW });
+    expect(m.items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過']);
+    expect(byKey(m).concurrent.text).toBe('80');
+    expect(byKey(m).concurrent.unit).toBe('人');
+    const strip = createVenueStatStrip(document);
+    expect(strip.paint(m)).toBe(true);
+    expect(strip.el.querySelector('[data-stat="visitor"]')).toBeNull();
+    expect(strip.el.querySelector('[data-stat="adPts"]')).toBeNull();
+    expect(strip.el.querySelector('[data-stat="concurrent"] .nlsb-stat__label').textContent).toBe('同時視聴者数');
+    expect(strip.paint(buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW }))).toBe(true);
+    expect(strip.el.querySelectorAll('.nlsb-stat')).toHaveLength(8);
+  });
+
+  it('YouTube の会場は、ニコ生の形の鏡が同じ配信でも来場や広告ptを出さない', () => {
+    const m = buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW, platform: 'youtube' });
+    expect(m.items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過']);
+    expect(m.items.some((i) => i.label === '来場' || i.label === '広告pt' || i.label === '来場者数')).toBe(false);
+  });
+
+  it('ページのサービスが分かっているときは、鏡が来る前からニコ生のチップを出さない', () => {
+    const m = buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, platform: 'twitch' });
+    expect(m.items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過']);
+    // 視聴者数は最初から「読み込み中」(「—」「推定中」にしない)
+    expect(m.items.map((i) => i.text)).toEqual(['—', '読み込み中', '—']);
+  });
+
   it('★記録件数が分からない(null)とき「0件」と出さない(2026-11-10 実機: パネル未起動で「記録 0件」)', () => {
     const k = byKey(buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW, recordedCount: null }));
     expect(k.records.text).toBe('—');

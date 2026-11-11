@@ -27,7 +27,8 @@ import {
 } from '../../src/lib/kick/kickRealtime.js';
 import { createEmoteSaver } from './pfEmoteStore.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
-const META_EVERY_MS = 30_000;
+// 視聴者数をページに合わせるため 10 秒おき(30 秒だとページの数から遅れていた・2026-11-11 PC 計測の Twitch と同じ)
+const META_EVERY_MS = 10_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
 // 顔は1人ずつ・間をあけて聞く。混んだ配信で毎秒聞いて Kick に 429(多すぎ)を返され、

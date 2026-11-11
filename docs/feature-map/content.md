@@ -30,6 +30,7 @@ graph LR
   n_content --> n_src_extension_voiceQualitySetting_js["extension/voiceQualitySetting.js"]:::shared
   n_content --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
   n_content --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
+  n_content --> n_src_lib_abema_abParse_js["lib/abema/abParse.js"]:::shared
   n_content --> n_src_lib_adObservationLog_js["lib/adObservationLog.js"]:::shared
   n_content --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_content --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_content --> n_src_lib_backfillRetryBackoff_js["lib/backfillRetryBackoff.js"]:::shared
   n_content --> n_src_lib_backfillRotationGate_js["lib/backfillRotationGate.js"]
   n_content --> n_src_lib_backfillSlotAutoThrottle_js["lib/backfillSlotAutoThrottle.js"]
-  n_content --> n_src_lib_backfillSlotPool_js["lib/backfillSlotPool.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 364 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 376 ファイル省略（全件は storage-bus.md / metafile 参照）。

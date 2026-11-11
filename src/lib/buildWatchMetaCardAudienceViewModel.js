@@ -41,13 +41,11 @@ import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
 
 /**
  * @typedef {{
- *   phase: 'loading'|'ready'|'hidden',
+ *   phase: 'loading'|'ready',
  *   estText: string,
  *   estIsPlaceholder: boolean,
  *   estTitle: string|null,
  *   subText: string,
- *   labelText?: string,
- *   cardHidden?: boolean,
  *   concurrentLoadingHidden: boolean,
  *   concurrentReadyHidden: boolean,
  *   ariaBusy: boolean,
@@ -152,36 +150,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
   /** @type {number|null} */
   let nextConcurrentEstimated = prev.concurrentEstimated;
 
-  const slotViews =
-    typeof snapshot.slotViewCount === 'number' &&
-    Number.isFinite(snapshot.slotViewCount) &&
-    snapshot.slotViewCount > 0
-      ? Math.floor(snapshot.slotViewCount)
-      : null;
-  const officialConcurrent =
-    typeof snapshot.officialViewerCount === 'number' &&
-    Number.isFinite(snapshot.officialViewerCount) &&
-    snapshot.officialViewerCount > 0
-      ? snapshot.officialViewerCount
-      : null;
-
-  // 番組の視聴数は同時接続ではない。数があるときは、同じカードに見出し「視聴数」で出す。
-  if (slotViews != null && officialConcurrent == null) {
-    concurrent = {
-      phase: 'ready',
-      estText: slotViews.toLocaleString('ja-JP'),
-      estIsPlaceholder: false,
-      estTitle: '番組詳細に出ている視聴数です。同時に見ている人数ではありません。',
-      subText: '',
-      labelText: '視聴数',
-      concurrentLoadingHidden: true,
-      concurrentReadyHidden: false,
-      ariaBusy: false,
-      numericEstimated: slotViews,
-      charReactionDelta: null
-    };
-    nextConcurrentEstimated = slotViews;
-  } else if (showConcurrent) {
+  if (showConcurrent) {
     const streamAge =
       typeof snapshot.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0
         ? snapshot.streamAgeMin
@@ -263,7 +232,57 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
         resolved.method === 'fallback' &&
         resolved.estimated <= 0 &&
         resolved.base.method === 'none');
-    if (unresolvedFallback) {
+    // ページに数が出ているサービス(YouTube・Twitch・Kick・ABEMA など)は、その数をそのまま出す。推定はしない・「推定」とも書かない
+    //   (2026-11-11 りんく「推定という表現もおかしい」「もとからでているところはそれにならって」)。
+    //   ニコ生の推定の式(resolveConcurrentViewers)の答えは使わない: 公式の数の更新が少し遅れただけで「推定中・材料待ち」に落ちていた。
+    const officialOnly = snapshot.officialViewersOnly === true;
+    const factsViewCount = /** @type {{ viewCount?: unknown }|null|undefined} */ (snapshot.platformFacts)?.viewCount;
+    const pageCountRaw =
+      typeof snapshot.officialViewerCount === 'number' &&
+      Number.isFinite(snapshot.officialViewerCount) &&
+      snapshot.officialViewerCount > 0
+        ? snapshot.officialViewerCount
+        : typeof factsViewCount === 'number' && Number.isFinite(factsViewCount) && factsViewCount >= 0
+          ? factsViewCount
+          : null;
+    const pageCount = officialOnly && pageCountRaw != null ? Math.floor(pageCountRaw) : null;
+    if (officialOnly && pageCount != null) {
+      // 一度読めた数が次に読めないときは、最後の数と「N分前」を出す。
+      const stale = snapshot.officialViewerStale === true;
+      const readAt = Number(snapshot.officialViewerReadAt || 0);
+      const mins = readAt > 0 ? Math.max(0, Math.floor((nowMs - readAt) / 60000)) : 0;
+      concurrent = {
+        phase: 'ready',
+        estText: pageCount.toLocaleString('ja-JP'),
+        estIsPlaceholder: false,
+        estTitle: stale ? `最後に読めた数です（${mins}分前）` : '配信ページに出ている数です',
+        subText: stale ? `${mins}分前` : '人',
+        concurrentLoadingHidden: true,
+        concurrentReadyHidden: false,
+        ariaBusy: false,
+        numericEstimated: pageCount,
+        charReactionDelta:
+          prev.concurrentEstimated != null && pageCount !== prev.concurrentEstimated
+            ? Math.abs(pageCount - prev.concurrentEstimated)
+            : null
+      };
+      nextConcurrentEstimated = pageCount;
+    } else if (officialOnly) {
+      // 最初の数が来るまでは「読み込み中」。「—」「推定中」「材料待ち」は出さない。
+      concurrent = {
+        phase: 'ready',
+        estText: '読み込み中',
+        estIsPlaceholder: true,
+        estTitle: '配信ページの数を読み込んでいます',
+        subText: '',
+        concurrentLoadingHidden: true,
+        concurrentReadyHidden: false,
+        ariaBusy: false,
+        numericEstimated: null,
+        charReactionDelta: null
+      };
+      nextConcurrentEstimated = prev.concurrentEstimated;
+    } else if (unresolvedFallback) {
       concurrent = {
         phase: 'loading',
         estText: '推定中',
@@ -349,7 +368,8 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
     /** @type {string} */
     let subText;
     if (resolved.method === 'official') {
-      subText = '直接値';
+      // ニコ生以外の公式の人数は「人」。ニコ生の同接だけ「直接値」のまま。
+      subText = snapshot.officialViewersOnly === true ? '人' : '直接値';
     } else if (resolved.method === 'nowcast') {
       subText =
         resolved.freshnessMs != null

@@ -212,7 +212,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 104</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 105</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -316,6 +316,7 @@
 - `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
 - `src/lib/watchTabPrioritize.js` — watch タブ候補リストを「対象 watch URL に最も近い」順に並べ替える純粋関数。
 - `src/lib/youtube/ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
+- `src/lib/youtube/ytConcurrentViewers.js` — YouTube の同時視聴者数を、ページの埋め込みと updated_metadata から読む（純関数）
 - `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
 
@@ -354,6 +355,7 @@
 - `extension-youtube/src/ytVenueOverlayPrep.js` — 会場(venue.html)を YouTube の視聴ページの上に重ねて開くときの下ごしらえ。
 - `extension-youtube/venue-inline.js` — ニコ生版の視聴ページの会場モード(venueBar.js 本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/venue.js` — ニコ生版 venue-entry.js(本物)+ YouTube の記録を読む入口のバンドル
+- `extension/yt-loading-boot.js` — 横の欄の最初の描画。拡張の CSP は inline script を止めるので、このファイルを <head> で読む。
 - `scripts/audit/runtime-venue-audit.mjs` — 会場モード(src/extension/venueBar.js)の【実ブラウザ・ランタイム監査】。
 - `scripts/avatar-face-parity.mjs` — scripts/avatar-face-parity.mjs — 匿名の顔の Worker 合成が、メインスレッド合成と【画素まで同じ】であることを確かめる(v0.1.1681)。
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
@@ -621,7 +623,6 @@
 - `src/lib/venueSpeechStats.js` — 会場の発言パネルに出す「この人の応援(ギフト・広告)」の一行(純関数・DOM 非依存)。v0.1.1658。
 - `src/lib/venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
 - `src/lib/venueStatCardsSelf.js` — 会場が自分で作る「数字カードの写し」(2026-11-10 りんく「POPをひらかなくても数字がつくようにしてほしい」)。
-- `src/lib/venueStatStrip.js` — 会場モードの「数字の帯」(2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」)。
 - `src/lib/venueTileCountCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
 - `src/lib/venueYukkuriNamedCensus.js` — 「名前ありゆっくり顔」実害確定計器(診断先行アプローチ)。
@@ -968,6 +969,11 @@
   - `src/lib/abema/abCommentPanel.js`
   - `src/lib/abema/abCommentPanel.test.js`
   - `src/lib/platform/streamPlatform.js`
+- **配信ごとの数字(会場と横の欄)** — ニコ生の来場者数・本家コメ・広告pt・ギフトpt と広告・番組の欄はニコ生だけ。YouTube は同時視聴者数と、このPCの記録のスーパーチャット・メンバー加入。Twitch は視聴者数・Bits・サブスク・ギフトサブ・レイド。Kick は視聴者数・Kicks・サブスク・ギフトサブ。ABEMA は公式の視聴数とコメント数の枠だけ。無い数字は作らない
+  - `src/lib/platform/platformMetrics.js`
+  - `src/lib/platform/platformMetricChrome.js`
+  - `src/lib/venueStatStrip.js`
+  - `extension-youtube/src/ytNicoShim.js`
 - **横の欄の配信選び(YouTube 系)** — 横の欄・コメビュが YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA のどの配信を出すかをニコ生版と同じ3層で決める。外枠は前面タブの配信キーを iframe の src(&stream=)に焼いて配信が変わったら読み込み直す・配信ページが「最後に見た配信」(yt_last_stream_url)を自分で書く・shim がそれを疑似 lv に翻訳して渡す・探り読み(2配信以上の comments)には答えない。記録の無い部屋は仮の配信キー。計器 yt_diag_panel_stream_<画面>
   - `src/extension/sidepanel-iframe-boot-entry.js`
   - `src/lib/youtube/ytPanelRoute.js`
@@ -1133,7 +1139,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 336</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 339</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1145,6 +1151,7 @@
 - `app/live-view.js` — global NL_BUILD_ID
 - `app/supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - `extension-youtube/content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
+- `extension-youtube/src/content-chat-main-entry.js` — ページ自身の世界に入る束の入口。
 - `extension-youtube/src/sidepanel-entry.js` — ニコ生版（extension/popup.html）と同一構成の YouTube Live サイドパネル UI（差分更新対応）
 - `extension-youtube/src/sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
 - `extension-youtube/src/sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
@@ -1452,10 +1459,12 @@
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
+- `src/lib/youtube/ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
 - `src/lib/youtube/ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
 - `src/lib/youtube/ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
+- `src/lib/youtube/ytStreamStart.js` — 配信ページの「いつ始まったか」を時刻にする純粋関数。
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
@@ -1476,41 +1485,38 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 17 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 🏟 会場・席 (5版)
+### 🏟 会場・席 (6版)
+- `v0.1.2068` 2026-11-11 — ABEMAは視聴数とコメント数だけ
+- `v0.1.2067` 2026-11-11 — ページの視聴者数をそのまま出す
 - `v0.1.2061` 2026-11-11 — ABEMAで会場が1回で開く
+- `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
+- `v0.1.2044` 2026-11-11 — 各配信の数字だけを出す・ABEMAの視聴数をカードに出す
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
-- `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
-- `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
-- `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
 
 ### 🎈 吹き出し (2版)
-- `v0.1.2045` 2026-11-11 — ABEMAのPICK UPを同じ大きさに
+- `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
 
-### 🎁 ギフト (1版)
-- `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
+### 🎁 ギフト (4版)
+- `v0.1.2068` 2026-11-11 — ABEMAは視聴数とコメント数だけ
+- `v0.1.2067` 2026-11-11 — ページの視聴者数をそのまま出す
+- `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
+- `v0.1.2044` 2026-11-11 — 各配信の数字だけを出す・ABEMAの視聴数をカードに出す
 
-### 🔊 読み上げ (5版)
+### 🔊 読み上げ (1版)
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
-- `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
-- `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
-- `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
-- `v0.1.2032` 2026-11-10 — ビルドの札を詳しい状況の先頭へ移した
-
-### 🩺 診断・状態速報 (1版)
-- `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
 
 ### その他 (11版)
 - `v0.1.2059` 2026-11-11 — ABEMAの視聴数とチャンネル名
 - `v0.1.2058` 2026-11-11 — コメント欄の定期確認を止める
-- `v0.1.2055` 2026-11-11 — PICK UPは窓の変化で幅が戻る
+- `v0.1.2056` 2026-11-11 — YouTubeの@配信はすぐ読み込み中
+- `v0.1.2055` 2026-11-11 — YouTubeの同時視聴者数をページから読む
 - `v0.1.2054` 2026-11-11 — PICK UPと経過を同じ部品へ
 - `v0.1.2053` 2026-11-11 — 配信者画像と視聴数を同じ部品へ
 - `v0.1.2052` 2026-11-11 — PICK UPをニコ生と同じ幅と並び
 - `v0.1.2051` 2026-11-11 — ABEMAのロゴ全体と視聴数
+- `v0.1.2047` 2026-11-11 — 公式ランキングの説明を残す
 - `v0.1.2046` 2026-11-11 — ABEMAの配信者ロゴをサイドパネルへ
-- `v0.1.2044` 2026-11-11 — ABEMAの視聴数をカードに出す
 - `v0.1.2043` 2026-11-11 — ABEMAの配信者にチャンネルの画像
-- `v0.1.2033` 2026-11-10 — パネル位置の文字は食い違うときだけ

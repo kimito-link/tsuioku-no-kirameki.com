@@ -110,6 +110,18 @@ describe('resolveBroadcasterFollowTarget - none（タイル非表示）', () => 
     expect(r.kind).toBe('none');
   });
 
+  it('YouTube のチャンネル URL なら、数値 id が無くても名前を出す', () => {
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: '@あのちゃんこ',
+      broadcasterUserId: '',
+      broadcasterPageUrl: 'https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93'
+    });
+    expect(r.kind).toBe('channel');
+    expect(r.name).toBe('@あのちゃんこ');
+    expect(r.pageUrl).toBe('https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93');
+    expect(r.followLabel).toBe('チャンネルを見る');
+  });
+
   it('uid 非数値 + pageUrl も channel ではなく user 形式で uid 抽出失敗 → none', () => {
     const r = resolveBroadcasterFollowTarget({
       broadcasterName: 'foo',

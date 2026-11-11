@@ -47,6 +47,25 @@ describe('buildStatCardsMirrorSnapshot', () => {
     expect(snap.official).not.toBeNull();
     expect(snap.official.comments.text).toContain('9');
     expect(snap.official.adPts.isPlaceholder).toBe(false);
+    expect(snap.platform).toBeUndefined();
+  });
+
+  it('ニコ生以外の視聴スナップショットは platform と platformFacts を写す', () => {
+    const snap = buildStatCardsMirrorSnapshot({
+      liveId: 'lv9',
+      recordsText: '4',
+      concurrent: { estText: '12', subText: '直接値' },
+      visitor: { text: '—', isPlaceholder: true },
+      snapshotForOfficial: {
+        liveId: 'lv9',
+        platform: 'kick',
+        platformFacts: { viewers: 12, support: { ready: true, amounts: { KICKS: 3 } } },
+        streamAgeMin: 5
+      }
+    }, { nowMs: 2 });
+    expect(snap.platform).toBe('kick');
+    expect(snap.platformFacts.viewers).toBe(12);
+    expect(snap.platformFacts.support.amounts.KICKS).toBe(3);
   });
 
   it('壊れ入力でも例外を投げず既定値を返す', () => {

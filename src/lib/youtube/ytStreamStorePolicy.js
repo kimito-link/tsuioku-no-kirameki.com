@@ -2,6 +2,7 @@
 // @layer L0 — 純粋計算（副作用・ブラウザ API なし）
 
 import { assignYtCommentLane } from './ytLaneAssign.js';
+import { ytHandleLivePath } from './ytPageMeta.js';
 import {
   createYtSupportRankingAccumulator,
   applyYtSupportRankingDelta,
@@ -38,6 +39,8 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   concurrentViewers?: number | null,
  *   slotViewCount?: number | null,
  *   slotCommentCount?: number | null,
+ *   viewersRead?: boolean,
+ *   sourceUrl?: string,
  *   chatFilterLabel?: string,
  *   itemCount?: number,
  *   startedAt?: number | null,
@@ -77,11 +80,31 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   // 50,000,000 を超える数は読み違い(2026-11-03 実機で桁が連なった数が入った)。古い記録に残っていても捨てる。
   const plausible = (/** @type {unknown} */ v) =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 50_000_000;
-  const concurrentViewers = plausible(patch?.concurrentViewers)
+  const gotCount = plausible(patch?.concurrentViewers);
+  const concurrentViewers = gotCount
     ? Math.floor(/** @type {number} */ (patch.concurrentViewers))
     : plausible(prev.concurrentViewers)
       ? Math.floor(prev.concurrentViewers)
       : null;
+  // 読めた時刻は、数が取れたときだけ進める。コメント件数だけの更新では古くしない。
+  // viewersRead:false は「今の読みは失敗」。前の数は残し、画面は「N分前」と出す。
+  const readFailed = patch?.viewersRead === false && !gotCount;
+  let viewersReadAt =
+    typeof prev.viewersReadAt === 'number' && Number.isFinite(prev.viewersReadAt) && prev.viewersReadAt > 0
+      ? Math.floor(prev.viewersReadAt)
+      : 0;
+  let viewersStale = prev.viewersStale === true && concurrentViewers !== null;
+  if (gotCount) {
+    viewersReadAt = nowMs;
+    viewersStale = false;
+  } else if (readFailed && concurrentViewers !== null) {
+    viewersStale = true;
+  }
+  const sourceUrl = ytHandleLivePath(patch?.sourceUrl)
+    ? `https://www.youtube.com${ytHandleLivePath(patch.sourceUrl)}`
+    : ytHandleLivePath(prev.sourceUrl)
+      ? `https://www.youtube.com${ytHandleLivePath(prev.sourceUrl)}`
+      : '';
   const prevPeak = plausible(prev.peakConcurrentViewers) ? Math.floor(prev.peakConcurrentViewers) : null;
   const peakConcurrentViewers =
     concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
@@ -145,6 +168,9 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     broadcasterHandle,
     broadcasterIconUrl,
     concurrentViewers,
+    ...(viewersReadAt ? { viewersReadAt } : {}),
+    ...(viewersStale ? { viewersStale: true } : {}),
+    ...(sourceUrl ? { sourceUrl } : {}),
     peakConcurrentViewers,
     ...(slotViewCount != null ? { slotViewCount } : {}),
     ...(slotCommentCount != null ? { slotCommentCount } : {}),
