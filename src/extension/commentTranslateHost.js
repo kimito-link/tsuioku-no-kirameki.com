@@ -7,8 +7,8 @@
 const pairCache = new Map();
 
 /**
- * @param {object} [scope]
- * @returns {{ translator: object|null, detector: object|null }}
+ * @param {any} [scope]
+ * @returns {{ translator: any, detector: any }}
  */
 export function readChromeTranslatorApis(scope) {
   const g = scope && typeof scope === 'object' ? scope : {};
@@ -19,7 +19,7 @@ export function readChromeTranslatorApis(scope) {
 }
 
 /**
- * @param {object|null} api
+ * @param {any} api
  * @param {string} sourceLanguage
  * @param {string} targetLanguage
  * @returns {Promise<string>}
@@ -40,7 +40,7 @@ export async function queryTranslatorAvailability(api, sourceLanguage, targetLan
 
 /**
  * 言語の組ごとに1つだけ作って使い回す（件ごとに作り直すと弱いPCで重くなる）。
- * @param {object|null} api
+ * @param {any} api
  * @param {{ text: string, sourceLanguage: string, targetLanguage: string }} req
  * @returns {Promise<{ ok: boolean, text: string, reason: string }>}
  */
