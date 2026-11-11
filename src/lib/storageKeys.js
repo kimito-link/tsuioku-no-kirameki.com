@@ -624,6 +624,13 @@ export const KEY_OP_SOUND_ENABLED = 'nls_op_sound_enabled_v1';
  */
 export const KEY_COMEVIEW_WINDOW_GEOMETRY = 'nls_comeview_window_geometry_v1';
 
+/**
+ * OBS透過コメントの見た目（v0.1.2039）。
+ * 値は `{ v: 1, ... }`。v が 1 でない記録は読まない。
+ * 正規化は src/lib/obsOverlayStyle.js。キャッシュクリアでは消さない。
+ */
+export const KEY_OBS_OVERLAY_STYLE = 'nls_obs_overlay_style_v1';
+
 /** @param {unknown} raw */
 export function isOpSoundEnabled(raw) {
   return raw !== false; // 既定ON

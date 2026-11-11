@@ -23,6 +23,7 @@ import {
   commentsStorageKey,
   KEY_COMEVIEW_WINDOW_GEOMETRY,
   KEY_LAST_WATCH_URL,
+  KEY_OBS_OVERLAY_STYLE,
   KEY_USER_COMMENT_PROFILE_CACHE
 } from '../lib/storageKeys.js';
 import {
@@ -34,6 +35,8 @@ import {
   buildComeviewWindowOptions,
   pickComeviewGeometryToSave
 } from '../lib/comeviewWindowGeometry.js';
+import { resolveObsOverlayStyle } from '../lib/obsOverlayStyle.js';
+import { applyObsRowVisibility, mountObsOverlayStyle } from './obsOverlayApply.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { checkCreditBadge } from '../lib/supporterAccess.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
@@ -501,6 +504,50 @@ function isObsMode() {
   } catch {
     return false;
   }
+}
+
+/** URL に見た目が入っている窓は、その URL の見た目で固定する。 */
+let _obsStyleLocked = false;
+let _obsMaxLines = 8;
+
+function syncObsRowLimit() {
+  if (!isObsMode()) return;
+  applyObsRowVisibility(document.getElementById('cvList'), _obsMaxLines);
+}
+
+function applyObsLook(style) {
+  const normalized = mountObsOverlayStyle(document.body, style, 'body.is-obs');
+  _obsMaxLines = normalized.maxLines;
+  syncObsRowLimit();
+}
+
+function bootObsLook() {
+  if (!isObsMode()) return;
+  let query = '';
+  try {
+    query = new URLSearchParams(window.location.search).get('s') || '';
+  } catch {
+    query = '';
+  }
+  const fromUrl = resolveObsOverlayStyle({ queryParam: query, stored: null });
+  if (fromUrl.source === 'url') {
+    _obsStyleLocked = true;
+    applyObsLook(fromUrl.style);
+    return;
+  }
+  void (async () => {
+    try {
+      const bag = await chrome.storage.local.get(KEY_OBS_OVERLAY_STYLE);
+      if (_obsStyleLocked || !isObsMode()) return;
+      const next = resolveObsOverlayStyle({
+        queryParam: '',
+        stored: bag?.[KEY_OBS_OVERLAY_STYLE]
+      });
+      applyObsLook(next.style);
+    } catch {
+      /* 既定の透過のまま */
+    }
+  })();
 }
 
 function updateVoiceToggle() {
@@ -1941,6 +1988,7 @@ function renderFullTimeline(timeline, forceBottom = false) {
         listEl.scrollHeight - listEl.clientHeight - bottomGapD
       );
     }
+    syncObsRowLimit();
     return;
   }
 
@@ -1984,6 +2032,7 @@ function rebuildFullTimeline(listEl, timeline, forceBottom) {
       listEl.scrollHeight - listEl.clientHeight - bottomGap
     );
   }
+  syncObsRowLimit();
 }
 
 function appendTimelineItems(items) {
@@ -2018,6 +2067,7 @@ function appendTimelineItems(items) {
     rows = listEl.querySelectorAll('[data-cv-key]');
   }
   if (shouldFollow) listEl.scrollTop = listEl.scrollHeight;
+  syncObsRowLimit();
 }
 
 function normalizePin(raw) {
@@ -2481,6 +2531,13 @@ function wireStorageChanges() {
       const m = url.toLowerCase().match(/lv\d{1,15}/);
       if (m && m[0] !== _liveId) void switchToLiveId(m[0]);
     }
+    if (isObsMode() && !_obsStyleLocked && changes[KEY_OBS_OVERLAY_STYLE]) {
+      const next = resolveObsOverlayStyle({
+        queryParam: '',
+        stored: changes[KEY_OBS_OVERLAY_STYLE].newValue
+      });
+      applyObsLook(next.style);
+    }
     if (changes[KEY_LIVE_BROADCASTER_CTX]) {
       _broadcasterCtx = normalizeBroadcasterCtx(changes[KEY_LIVE_BROADCASTER_CTX].newValue);
     }
@@ -2604,6 +2661,17 @@ function wireButtons() {
       );
     });
   }
+  const btnObsStyle = document.getElementById('cvBtnObsStyle');
+  if (btnObsStyle) {
+    btnObsStyle.addEventListener('click', () => {
+      const url = chrome.runtime.getURL('obs-style.html');
+      try {
+        chrome.tabs.create({ url });
+      } catch {
+        window.open(url, '_blank');
+      }
+    });
+  }
   const btnPause = document.getElementById('cvBtnPause');
   if (btnPause) {
     btnPause.addEventListener('click', () => {
@@ -2708,6 +2776,7 @@ function applyCreditBadge() {
 
 async function main() {
   if (isObsMode()) document.body.classList.add('is-obs');
+  bootObsLook();
   applyCreditBadge();
   const urlLiveId = resolveLiveIdFromUrl();
   _explicitLiveId = !!urlLiveId; // ?lv= 明示窓は配信切替に追従しない(固定窓)

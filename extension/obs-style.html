@@ -1,0 +1,226 @@
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background: #f4f7fb">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OBSの見た目 — 追憶のきらめき</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1f2937;
+        --sub: #4b5563;
+        --line: #d5e3f5;
+        --paper: #f4f7fb;
+        --card: #ffffff;
+        --accent: #0f6f9e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+      .wrap {
+        width: min(1100px, calc(100% - 24px));
+        margin: 0 auto;
+        padding: 20px 0 40px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+        line-height: 1.3;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 1.05rem;
+      }
+      .lead, .note, #liveMeta, #copyStatus {
+        margin: 0;
+        color: var(--sub);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-top: 16px;
+      }
+      @media (min-width: 840px) {
+        .layout {
+          grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+          align-items: start;
+        }
+      }
+      form, .urlbox, .stage-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+      }
+      fieldset {
+        margin: 0 0 14px;
+        padding: 0;
+        border: 0;
+      }
+      legend {
+        padding: 0;
+        margin-bottom: 8px;
+        font-weight: 700;
+      }
+      .presets, .checks, .urlrow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      button, input[type='color'], input[type='text'] {
+        font: inherit;
+      }
+      button {
+        min-height: 44px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+      }
+      button[aria-pressed='true'], .urlrow button {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      button:focus-visible, input:focus-visible {
+        outline: 3px solid #0f6f9e;
+        outline-offset: 2px;
+      }
+      label.row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+        margin: 0 0 10px;
+      }
+      label.row input[type='range'] {
+        grid-column: 1 / -1;
+        width: 100%;
+      }
+      .colors {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      @media (min-width: 420px) {
+        .colors { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      }
+      label.color {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.92rem;
+      }
+      input[type='color'] {
+        width: 100%;
+        height: 44px;
+        padding: 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+      .checks label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+      }
+      .stage {
+        background: linear-gradient(160deg, #243044, #1a120c 42%, #3d2b24);
+        border-radius: 14px;
+        min-height: 280px;
+        padding: 12px;
+      }
+      #obsPreview { background: transparent; }
+      .urlbox { margin-top: 16px; }
+      .urlbox .note { margin: 8px 0 12px; }
+      #obsUrl {
+        flex: 1 1 280px;
+        min-width: 0;
+        min-height: 44px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        color: var(--ink);
+        background: #f8fbff;
+      }
+      .urlrow button { flex: 0 1 auto; }
+      #copyStatus { min-height: 1.5em; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>OBSの見た目</h1>
+      <p class="lead">配信に重ねるコメントの色や大きさを、見本を見ながら選べます。CSS は要りません。</p>
+      <div class="layout">
+        <form id="obsForm">
+          <fieldset>
+            <legend>見本の型</legend>
+            <div class="presets" id="presets"></div>
+          </fieldset>
+          <fieldset>
+            <legend>色</legend>
+            <div class="colors">
+              <label class="color">文字の色<input id="textColor" type="color" value="#ffffff" /></label>
+              <label class="color">名前の色<input id="nameColor" type="color" value="#8fd6ff" /></label>
+              <label class="color">カードの色<input id="cardColor" type="color" value="#000000" /></label>
+            </div>
+          </fieldset>
+          <label class="row">カードの濃さ <span id="cardOpacityOut">38%</span>
+            <input id="cardOpacity" type="range" min="15" max="100" value="38" />
+          </label>
+          <label class="row">文字の大きさ <span id="fontSizeOut">15px</span>
+            <input id="fontSize" type="range" min="12" max="32" value="15" />
+          </label>
+          <label class="row">一度に出す数 <span id="maxLinesOut">8</span>
+            <input id="maxLines" type="range" min="1" max="24" value="8" />
+          </label>
+          <div class="checks">
+            <label><input id="showIcons" type="checkbox" checked /> アイコンを出す</label>
+            <label><input id="showNames" type="checkbox" checked /> 名前を出す</label>
+            <label><input id="animate" type="checkbox" /> 新しいコメントを動かして出す</label>
+          </div>
+          <p class="note">動きは最初からオフです。性能の低いパソコンでも重くなりにくいようにしてあります。</p>
+        </form>
+        <section class="stage-card">
+          <h2>見本</h2>
+          <p class="note">配信画面の上に重なるときの見え方です。</p>
+          <div class="stage">
+            <div id="obsPreview">
+              <div id="obsPreviewList" class="cv-list"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <section class="urlbox">
+        <h2>Chrome で開く URL</h2>
+        <p class="note">
+          この URL は、拡張が入っている Chrome で透過のコメント窓を開くためのものです。
+          OBS の「ブラウザ」ソースには貼れません。OBS の中のブラウザには拡張が入っておらず、
+          拡張のページも、このパソコンの中のコメントも読めません。
+          OBS では「ウィンドウキャプチャ」で、開いた透過窓を選んでください。
+          開くページは、いま見ている配信に合わせます。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok は、そのコメントが入っているコメビュです。
+        </p>
+        <p id="liveMeta"></p>
+        <label class="checks"><input id="lockLive" type="checkbox" /> URL に今の配信番号を入れる</label>
+        <div class="urlrow">
+          <input id="obsUrl" type="text" readonly value="" aria-label="Chrome で開く URL" />
+          <button id="copyBtn" type="button">URLをコピー</button>
+          <button id="openBtn" type="button">透過窓を開く</button>
+        </div>
+        <p id="copyStatus" role="status"></p>
+        <p class="note">コピーした URL は、コピーしたときの見た目で固定されます。透過窓を開くボタンの窓は、この画面の変更に追従します。</p>
+      </section>
+    </div>
+    <script src="dist/obs-style.js"></script>
+  </body>
+</html>

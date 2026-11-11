@@ -174,6 +174,12 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // OBS透過の見た目を、見本を見ながら変える画面(obs-style.html)。
+    entryPoints: ['src/extension/obs-style-entry.js'],
+    outfile: 'extension/dist/obs-style.js',
+    target: 'chrome100'
+  },
+  {
     entryPoints: ['src/extension/venue-entry.js'],
     outfile: 'extension/dist/venue.js',
     target: 'chrome100'
