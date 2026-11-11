@@ -3,7 +3,8 @@ import {
   STORY_GROWTH_MAX_CELLS,
   buildStoryGrowthGaugeLabel,
   buildSupportSameUserBlurb,
-  resolveStoryGrowthWindowOffset
+  resolveStoryGrowthWindowOffset,
+  takeStoryGrowthVisibleKey
 } from './storyGrowthLimits.js';
 
 /**
@@ -171,5 +172,15 @@ describe('buildSupportSameUserBlurb', () => {
     // 実配信で起こりうる大きめの値でも、注記が肥大しないことを契約として固定する。
     const s = buildSupportSameUserBlurb({ ordinal: 120, total: 360, windowed: true });
     expect(s.length).toBeLessThanOrEqual(60);
+  });
+});
+
+describe('takeStoryGrowthVisibleKey', () => {
+  it('うしろに増えても先頭の名簿が同じなら描き直さない', () => {
+    const state = { sourceOffset: 0, renderedCount: 2, visibleKey: '' };
+    const head = [{ id: 'a' }, { id: 'b' }];
+    expect(takeStoryGrowthVisibleKey(state, head, 7)).toBe(true);
+    expect(takeStoryGrowthVisibleKey(state, head.concat([{ id: 'c' }]), 7)).toBe(false);
+    expect(takeStoryGrowthVisibleKey(state, [{ id: 'a' }, { id: 'z' }], 7)).toBe(true);
   });
 });

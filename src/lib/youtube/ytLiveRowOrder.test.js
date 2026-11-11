@@ -31,22 +31,17 @@ describe('mergeLiveRowsByRecordedAt', () => {
     expect(next.map((r) => r.text)).toEqual(['new', 'b']);
   });
 
-  it('4万件の末尾追加は全件ソートより短い', () => {
+  it('4万件の末尾追加は50ms未満で、先頭の行はそのまま', () => {
     const n = 40000;
     const base = new Array(n);
     for (let i = 0; i < n; i += 1) base[i] = row(`i${i}`, i);
     const pending = [row('new', n + 1)];
     const t0 = performance.now();
     const next = mergeLiveRowsByRecordedAt(base, pending);
-    const appendMs = performance.now() - t0;
-    const t1 = performance.now();
-    const copied = base.concat(pending).sort((a, b) => a.recordedAt - b.recordedAt);
-    const sortMs = performance.now() - t1;
     expect(next).toHaveLength(n + 1);
     expect(next[n].id).toBe('new');
     expect(next[0]).toBe(base[0]);
-    expect(copied[n].id).toBe('new');
-    expect(appendMs).toBeLessThan(50);
+    expect(performance.now() - t0).toBeLessThan(50);
   });
 });
 

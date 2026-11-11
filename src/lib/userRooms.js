@@ -105,7 +105,7 @@ export function createAggregateCommentsFolder(options) {
           if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
         }
       }
-      let rows = [...map.values()];
+      const rows = [...map.values()];
       if (sortByCount) rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
       else rows.sort((a, b) => b.lastAt - a.lastAt);
       if (!trackCharTotals) return rows.map(({ totalChars: _tc, ...rest }) => rest);

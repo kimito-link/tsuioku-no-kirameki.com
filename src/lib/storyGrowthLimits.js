@@ -118,3 +118,23 @@ export function buildSupportSameUserBlurb({ ordinal, total, windowed } = {}) {
   // 切り捨てが起きているときだけ、数えた範囲が「枠内」であることを明示する。
   return `同一ユーザー${nth}件目、表示中の枠内で計${n}件（枠外にもある場合あり）。`;
 }
+
+/**
+ * 先頭の名簿（枠・端の id・顔の指紋）が前回と同じなら false。
+ * うしろに増えたコメントだけでは 360 枚を書き換えない。
+ * @param {{ sourceOffset?: number, renderedCount?: number, visibleKey?: string }} state
+ * @param {readonly { id?: string }[]} entries
+ * @param {number} avatarHash
+ * @returns {boolean} 名簿が変わった（描き直す）
+ */
+export function takeStoryGrowthVisibleKey(state, entries, avatarHash) {
+  const shown = Math.min(Number(state?.renderedCount) || 0, STORY_GROWTH_MAX_CELLS);
+  const offset = Number(state?.sourceOffset) || 0;
+  const list = Array.isArray(entries) ? entries : [];
+  const head = list[offset];
+  const edge = list[offset + Math.max(0, shown - 1)];
+  const key = `${offset}|${shown}|${head?.id || ''}|${edge?.id || ''}|${avatarHash}`;
+  if (key === state.visibleKey) return false;
+  state.visibleKey = key;
+  return true;
+}
