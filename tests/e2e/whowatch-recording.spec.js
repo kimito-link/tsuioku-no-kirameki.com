@@ -193,7 +193,7 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
 
   // ふわっち特有: イベント順位(いちばん良い順位・ほかは title)と累計視聴を、値のまま
   await expect
-    .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.platformStats || null, { timeout: 45_000 })
+    .poll(async () => (await readStreamSummary(sw, KEY))?.platformStats || null, { timeout: 45_000 })
     .toEqual({
       totalViews: 4567,
       eventRank: 2,

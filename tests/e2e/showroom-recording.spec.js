@@ -257,7 +257,7 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
 
   // SHOWROOM 特有: イベントの数字はまとめに値のまま、貢献ランキングは2つめの欄(広告ランキングの欄)に SHOWROOM の言葉で
   await expect
-    .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.platformStats || null, { timeout: 45_000 })
+    .poll(async () => (await readStreamSummary(sw, KEY))?.platformStats || null, { timeout: 45_000 })
     .toEqual({ eventName: 'テストのイベント', eventRank: 4, eventPoint: 123456, eventGap: 5000, questLevel: 3, questPoint: 900, questGoal: 1500 });
   const lane = ext.locator('[data-lane="adRanking"]');
   await expect.poll(async () => (await lane.count()) ? lane.first().innerText() : '', { timeout: 30_000 }).toContain('イベント応援さん');
