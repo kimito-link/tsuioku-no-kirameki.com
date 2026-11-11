@@ -139,16 +139,20 @@ function noteDomCounts() {
   const v = domSlotViews();
   const c = domSlotComments();
   let changed = false;
+  let countsMoved = false;
   if (v != null && v !== lastDomViews) {
     changed = lastDomViews == null;
+    countsMoved = true;
     lastDomViews = v;
   }
   if (c != null && c !== lastDomComments) {
     changed = changed || lastDomComments == null;
+    countsMoved = true;
     lastDomComments = c;
   }
-  // 初めて読めたときだけすぐ送る。あとは今までの間隔(sendMeta の呼び出し)で送る。
-  if (changed && streamKey) sendMeta();
+  // 初めて読めたときはすぐ送る。数が変わったときは 10 秒に1回まで送る(会場の帯が古い数のまま残らないように)。
+  const now = Date.now();
+  if (streamKey && (changed || (countsMoved && now - metaAt >= 10_000))) sendMeta();
 }
 
 /** コメント数（下のバーのコメントボタン、無ければ番組情報欄）。入力欄の残り文字数（com-o-CommentForm__count）は数えない。 */

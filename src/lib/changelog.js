@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2070',
+    date: '2026-11-11',
+    summary: 'ABEMAの会場の数字がすぐ新しくなる',
+    items: Object.freeze([
+      'ABEMA の配信で、ページの視聴数やコメント数が増えたら、会場の帯にも10秒ほどで新しい数を出します(今までは開いたときの数が長く残ることがありました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2069',
     date: '2026-11-11',
     summary: 'ABEMAは視聴数とコメント数だけ',
