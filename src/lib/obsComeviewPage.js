@@ -9,7 +9,7 @@
  */
 
 import { platformChannelOfUrl } from './platform/streamPlatform.js';
-import { isYtWatchLikeUrl } from './youtube/ytPageMeta.js';
+import { isYtWatchLikeUrl, parseYtVideoIdFromUrl } from './youtube/ytPageMeta.js';
 
 export const OBS_NICO_COMEVIEW_PAGE = 'comeview.html';
 /** YouTube 版の画面。上のサービスはこの1枚を共用する。 */
@@ -67,4 +67,20 @@ export function pickObsComeviewWatch(input) {
   const fromYt = obsComeviewTargetForWatchUrl(yt?.url);
   if (fromYt) return { ...fromYt, at: Number(yt?.at) || 0 };
   return { page: OBS_NICO_COMEVIEW_PAGE, serviceId: 'niconico', serviceName: 'ニコ生', url: '', at: 0 };
+}
+
+/**
+ * 届いた配信キーが、いま開いている視聴ページのものか。
+ * YouTube は動画ID。ほかのサービスは「サービスの頭 + チャンネル名.」で始まる。
+ * @param {unknown} streamKey
+ * @param {unknown} watchUrl
+ */
+export function serviceStreamMatchesWatch(streamKey, watchUrl) {
+  const key = String(streamKey || '');
+  const url = String(watchUrl || '');
+  if (!key || !url) return false;
+  if (isYtWatchLikeUrl(url)) return parseYtVideoIdFromUrl(url) === key;
+  const ch = platformChannelOfUrl(url);
+  if (!ch) return false;
+  return key.startsWith(`${ch.platform.keyHead}${ch.login}.`);
 }

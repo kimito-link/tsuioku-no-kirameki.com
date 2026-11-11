@@ -36,6 +36,11 @@
       "destination": "/app/phone.html"
     },
     {
+      "source": "/obs",
+      "has": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/app/obs.html"
+    },
+    {
       "source": "/supporter",
       "has": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
       "destination": "/app/supporter.html"

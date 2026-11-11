@@ -10,8 +10,8 @@
  * 保存の版: `{ v: 1, ... }`。v が 1 でない記録は読まない（既定に倒す）。
  * 未知の版を半分だけ適用しない。書くときは必ず v: 1。余分なフィールドは落とす。
  *
- * OBS のブラウザソース（OBS 内蔵の Chromium）は chrome-extension:// を開けない。
- * この URL は、拡張が入っている Chrome で透過窓を開くためのもの。
+ * comeview の URL は chrome-extension:// で、OBS のブラウザソースには貼れない（ウィンドウキャプチャ用）。
+ * OBS に貼る https の URL は obsBrowserSource.js。利用者が「OBSのブラウザへ送る」をオンにしたときだけ。
  */
 
 export const OBS_OVERLAY_STYLE_VERSION = 1;

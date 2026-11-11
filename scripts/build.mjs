@@ -244,6 +244,13 @@ const targets = [
     format: 'esm'
   },
   {
+    // OBSのブラウザソース(app.tsuioku-no-kirameki.com/obs)。透過ページ。拡張の storage は読まない。
+    entryPoints: ['app/obs-overlay.js'],
+    outfile: 'app/dist/obs-overlay.js',
+    target: 'es2020',
+    format: 'esm'
+  },
+  {
     // 2026-09-14 /live/「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)。
     //   純Web(拡張非依存)。ページ内 inline JS をやめ、src/lib の共有部品(htmlText / liveRankingView /
     //   koken・nicoad の正規化 / concurrentEstimate)を import する形にした(コンポーネント化)。

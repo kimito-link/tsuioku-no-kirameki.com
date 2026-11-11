@@ -3,23 +3,23 @@
 --- 統合欄に貼る本文 ---
 ・https://*.nicovideo.jp/* : ニコ生の視聴ページのコメントを本人のPCに記録します。
 
-・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live のチャットとアイコンをPCに記録します。外へは送りません。
+・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live のチャットとアイコンをPCに記録します。
 
-・https://www.twitch.tv/* : Twitch のチャットを本人のPCに記録します。外へは送りません。
+・https://www.twitch.tv/* : Twitch のチャットを本人のPCに記録します。
 
-・https://kick.com/* : Kick のチャットを本人のPCに記録します。外へは送りません。
+・https://kick.com/* : Kick のチャットを本人のPCに記録します。
 
-・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっちのコメントとアイテムを本人のPCに記録します。外へは送りません。
+・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっちのコメントとアイテムを本人のPCに記録します。
 
-・https://www.showroom-live.com/* : SHOWROOM のコメントとギフトを本人のPCに記録します。外へは送りません。
+・https://www.showroom-live.com/* : SHOWROOM のコメントとギフトを本人のPCに記録します。
 
-・https://mixch.tv/* と https://d2uqarpmf42qy0.cloudfront.net/* : ミクチャのコメントとギフトを記録し、ギフトの絵を表示します。外へは送りません。
+・https://mixch.tv/* と https://d2uqarpmf42qy0.cloudfront.net/* : ミクチャのコメントとギフトを記録し、ギフトの絵を表示します。
 
-・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトを本人のPCに記録します。外へは送りません。
+・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトを本人のPCに記録します。
 
 ・http://127.0.0.1:50021/* : 読み上げONのときだけ、このPCのVOICEVOXへ音声合成を頼みます。
 
-・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」を自分でONにしたときだけニコ生の画面を送ります(最新1件・24時間で消え、OFFで削除)。契約確認はコードとPCごとの識別子だけです。上の他サービスの記録は送りません。
+・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」はニコ生の画面だけ(初期OFF)。「OBSのブラウザへ送る」を自分でONにしたときだけ、いま見ている配信の新しいコメント(ニコ生と上の各サービス)を送ります。契約確認はコードとPCごとの識別子だけです。
 
 ・https://suggestqueries.google.com/* : 入力した配信者名の検索候補だけを取得します。
 
@@ -112,4 +112,4 @@
 
 更新時は **AGENTS.md §2 の CWS ステータス節にリンクを残す** こと。
 
-記録は既定で利用者の PC の中だけです。「スマホで見る」で当プロジェクトのサーバーへ送るのはニコニコ生放送の画面だけです。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の記録は送りません。運営者は株式会社ベストトラストです。
+記録は既定で利用者の PC の中だけです。「スマホで見る」で当プロジェクトのサーバーへ送るのはニコニコ生放送の画面だけです。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の記録は、「スマホで見る」では送りません。本人が「OBSのブラウザへ送る」をONにしたときだけ、いま見ている配信の新しいコメントを中継します。運営者は株式会社ベストトラストです。

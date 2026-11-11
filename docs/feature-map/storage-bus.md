@@ -15,7 +15,6 @@
 > 1件ずつ実コードで確認すること(将来は `verify:map` で機械判定する=会議 Q4)。
 
 - 🟠 **KEY_COMMENT_WRITE_MODE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
-- 🟠 **KEY_LIVE_EVENTS_TAIL** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_PANEL_WAKE_CURTAIN_DIAG** — 書く人だけ（読む経路が無い疑い）: src/lib/panelWakeCurtainDom.js
 - 🟠 **KEY_SCORE_ANNOUNCE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
@@ -50,7 +49,7 @@
 - 🔵 **KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_INLINE_PANEL_WIDTH_MODE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_LANE_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js, src/lib/venueOpenLatency.js
-- 🔵 **KEY_LAST_WATCH_URL** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/obs-style-entry.js, src/extension/popup-entry.js, src/extension/status-entry.js
+- 🔵 **KEY_LAST_WATCH_URL** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/obs-style-entry.js, src/extension/obsBrowserSourceBoot.js, src/extension/obsServiceRelay.js, src/extension/popup-entry.js, src/extension/status-entry.js
 - 🔵 **KEY_LIVEVIEW_PUBLISH_OUTCOME** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_MARKETING_EXPORT_MASK_LABELS** — 読む人だけ（書く経路が無い疑い）: src/extension/marketing-export-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_NDGR_DETERMINISTIC_BACKFILL** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
@@ -125,17 +124,19 @@
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_LANE_MIRROR` | — | extension/status-entry.js<br>lib/venueOpenLatency.js |
-| `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/obs-style-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/obs-style-entry.js<br>extension/obsBrowserSourceBoot.js<br>extension/obsServiceRelay.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_OUTCOME` | — | extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | extension/status-entry.js | extension/live-view-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/comeview-entry.js<br>extension/venueBar.js |
-| `KEY_LIVE_EVENTS_TAIL` | extension/content-entry.js | — |
-| `KEY_LIVE_EVENTS_WANTED` | extension/liveEventsPublisher.js | extension/content-entry.js |
+| `KEY_LIVE_EVENTS_SENDER_BEAT` | extension/liveEventsPublisher.js | extension/obsBrowserSourceBoot.js<br>extension/obsServiceRelay.js |
+| `KEY_LIVE_EVENTS_TAIL` | extension/content-entry.js | extension/obsBrowserSourceBoot.js |
+| `KEY_LIVE_EVENTS_WANTED` | extension/liveEventsPublisher.js<br>extension/obsBrowserSourceBoot.js | extension/content-entry.js<br>extension/obsBrowserSourceBoot.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/marketing-export-entry.js<br>extension/popup-entry.js |
 | `KEY_MILESTONE_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_NDGR_DETERMINISTIC_BACKFILL` | — | extension/content-entry.js |
 | `KEY_NDGR_FORWARD_ENABLED` | — | extension/content-entry.js |
 | `KEY_NORTH_STAR_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_OBS_BROWSER_SOURCE` | extension/obs-style-entry.js | extension/liveEventsPublisher.js<br>extension/obs-style-entry.js<br>extension/obsBrowserSourceBoot.js<br>extension/obsServiceRelay.js |
 | `KEY_OBS_OVERLAY_STYLE` | extension/obs-style-entry.js | extension/comeview-entry.js<br>extension/obs-style-entry.js |
 | `KEY_OP_SOUND_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_OP_SOUND_ENABLED` | — | extension/popup-entry.js |
@@ -153,10 +154,10 @@
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_SHARE_KEYS_SEEDED` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_SOURCE_PROVENANCE` | extension/status-entry.js | extension/status-entry.js |
-| `KEY_STATUS_DEVICE_CRED` | extension/statusDeviceCred.js | extension/statusDeviceCred.js |
+| `KEY_STATUS_DEVICE_CRED` | extension/statusDeviceCred.js | extension/obsBrowserSourceBoot.js<br>extension/obsServiceRelay.js<br>extension/statusDeviceCred.js |
 | `KEY_STATUS_FAST_DIAG_LITE` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
-| `KEY_STATUS_UPLOAD_CONFIG` | extension/status-entry.js | extension/status-entry.js |
+| `KEY_STATUS_UPLOAD_CONFIG` | extension/status-entry.js | extension/obs-style-entry.js<br>extension/obsBrowserSourceBoot.js<br>extension/obsServiceRelay.js<br>extension/status-entry.js |
 | `KEY_STAT_CARDS_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_STORY_GROWTH_COLLAPSED` | — | extension/popup-entry.js |

@@ -6,7 +6,8 @@ import {
   OBS_SERVICE_COMEVIEW_PAGE,
   OBS_YT_LAST_STREAM_URL_KEY,
   obsComeviewTargetForWatchUrl,
-  pickObsComeviewWatch
+  pickObsComeviewWatch,
+  serviceStreamMatchesWatch
 } from './obsComeviewPage.js';
 
 describe('OBS透過窓のコメビュ', () => {
@@ -53,6 +54,15 @@ describe('OBS透過窓のコメビュ', () => {
       ytLast: { url: 'https://kick.com/example', key: 'kk.example.1', at: 9 }
     })).toMatchObject({ page: 'yt-comeview.html', serviceId: 'kick' });
     expect(pickObsComeviewWatch({}).page).toBe('comeview.html');
+  });
+
+  it('配信キーは、開いている視聴ページと合うときだけ送る', () => {
+    expect(serviceStreamMatchesWatch('abcdefghijk', 'https://www.youtube.com/watch?v=abcdefghijk')).toBe(true);
+    expect(serviceStreamMatchesWatch('otherid1234', 'https://www.youtube.com/watch?v=abcdefghijk')).toBe(false);
+    expect(serviceStreamMatchesWatch('tw.examplechan.42', 'https://www.twitch.tv/examplechan')).toBe(true);
+    expect(serviceStreamMatchesWatch('kk.example.9', 'https://kick.com/example')).toBe(true);
+    expect(serviceStreamMatchesWatch('tw.examplechan.42', 'https://kick.com/example')).toBe(false);
+    expect(serviceStreamMatchesWatch('lv1', 'https://live.nicovideo.jp/watch/lv1')).toBe(false);
   });
 
   it('最後に見た配信のキー名は、配信ページが書くキーと同じ', () => {

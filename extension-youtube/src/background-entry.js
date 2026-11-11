@@ -36,6 +36,7 @@ import './background-nico-relay.js';
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
 import { parseYtVideoIdFromUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { relayObsServiceComments } from '../../src/extension/obsServiceRelay.js';
 import { platformOfStreamKey, isStreamTabToReload, STREAM_PLATFORM_TAB_URLS } from '../../src/lib/platform/streamPlatform.js';
 import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
@@ -1010,6 +1011,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     } catch {
       /* 直接届けられなくても、保存からいつもどおり届く */
+    }
+    try {
+      const payload = message.payload || {};
+      const streamKey = String(payload.videoId || extractVideoIdFromSender(sender) || '').trim();
+      const incoming = Array.isArray(payload.items) ? payload.items : [];
+      if (streamKey && incoming.length) void relayObsServiceComments(streamKey, incoming).catch(() => {});
+    } catch {
+      /* 中継できなくても、記録はそのまま残す */
     }
     runSerialized(async () => {
       const payload = message.payload || {};

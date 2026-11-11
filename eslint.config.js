@@ -456,7 +456,8 @@ export default [
     // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
     // v0.1.1874: ギフトの子の窓で番組ギフトのタブへ切り替える合図の受け手(起動1行)=+1。中身は lib の venueComposeBox.js。
     // v0.1.1875: 会場のギフトのアイテムの帯(import 1行)=+1。読む・置く・押すは lib の giftItemsMirror.js。
-    rules: { 'max-lines': ['error', { max: 19580, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2040: OBSのブラウザへ送る係の起動(import 1行+呼び出し1行)。中身は obsBrowserSourceBoot.js。
+    rules: { 'max-lines': ['error', { max: 19582, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

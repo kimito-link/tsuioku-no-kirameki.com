@@ -342,6 +342,16 @@
   - `extension/comeview.html`
   - `extension/yt-comeview.html`
   - `src/extension/comeview-entry.js`
+- **OBSのブラウザソース** — スイッチ「OBSのブラウザへ送る」を自分でオンにしたときだけ、新しいコメントを既存の中継（app.tsuioku-no-kirameki.com と Ably）へ送り、https://app.tsuioku-no-kirameki.com/obs?t=…&s=… をOBSのブラウザに貼れる。ニコ生に加え、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok も、いま見ている配信のときだけ送る。既定オフ。URLの作り直しで古いトークンは無効。見た目は s。localhost の受け口はこの版では出さない
+  - `src/lib/obsBrowserSource.js`
+  - `src/lib/obsServiceComments.js`
+  - `src/extension/obsBrowserSourceBoot.js`
+  - `src/extension/obsServiceRelay.js`
+  - `extension-youtube/src/background-entry.js`
+  - `app/obs.html`
+  - `app/obs-overlay.js`
+  - `api/status.js`
+  - `vercel.json`
 - **会場の席割り** — 150席上限+入れ替えで席を割り当てる。席資格(venueParticipantKey)もここ
   - `src/lib/venueSeats.js`
 - **背景群衆(来場者数の表現)** — 席に出せない来場者数(PV)を背景群衆 Canvas の密度で描く
@@ -665,13 +675,12 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
 - `extension-youtube/background.js` — YouTube Live コメントのローカル記録・読み上げキュー管理バンドル
 - `extension-youtube/offscreen.js` — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル
-- `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 - `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
@@ -1483,12 +1492,11 @@
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
 
-### 📥 コメント取得 (3版)
+### 📥 コメント取得 (2版)
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
-- `v0.1.1915` 2026-11-07 — YouTube の過去ログ取り込みでも混ざりを直す
 
-### 🏟 会場・席 (8版)
+### 🏟 会場・席 (7版)
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
@@ -1496,31 +1504,27 @@
 - `v0.1.2005` 2026-11-10 — 会場の数字が開いた直後の値で止まらない
 - `v0.1.1995` 2026-11-10 — 横の欄を開かなくても会場に数字が出る
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🎁 ギフト (6版)
+### 🎁 ギフト (5版)
 - `v0.1.2036` 2026-11-10 — Kickなどでも記録し、大きな配信を軽く
 - `v0.1.2031` 2026-11-10 — ギフトランキング取得の説明文が読めるように
 - `v0.1.1960` 2026-11-09 — 会場モードにも記録や同時接続の数字を出す
 - `v0.1.1920` 2026-11-08 — YouTube の金額の出ないギフトを分かりやすく
 - `v0.1.1917` 2026-11-07 — Twitch の画面の言葉・顔・送信の直し
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
-### 🔊 読み上げ (6版)
+### 🔊 読み上げ (5版)
 - `v0.1.2038` 2026-11-11 — 読み上げとピックアップが同時に出る
 - `v0.1.2037` 2026-11-11 — 読み上げのONとOFFがすぐ切り替わる
 - `v0.1.2034` 2026-11-10 — 見出しを「公式の数字」に変えた
 - `v0.1.2032` 2026-11-10 — ビルドの札を詳しい状況の先頭へ移した
 - `v0.1.2021` 2026-11-10 — 横の欄のボタンの見た目をそろえた
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
-
-### 🪟 応援レーン・タイル (1版)
-- `v0.1.1916` 2026-11-07 — Twitch の配信も記録できるように(試作)
 
 ### 🩺 診断・状態速報 (1版)
 - `v0.1.2035` 2026-11-10 — 会場の診断の箱を暗い色に合わせた
 
-### その他 (5版)
+### その他 (7版)
+- `v0.1.2042` 2026-11-11 — YouTubeなどもOBSの透過へ送る
+- `v0.1.2041` 2026-11-11 — OBSにURLを貼るとコメントが出る
 - `v0.1.2040` 2026-11-11 — 透過窓が今の配信のコメビュを開く
 - `v0.1.2039` 2026-11-11 — OBSコメントの見た目を画面で調整
 - `v0.1.2033` 2026-11-10 — パネル位置の文字は食い違うときだけ

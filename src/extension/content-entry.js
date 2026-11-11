@@ -7,6 +7,7 @@ import {
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
 import { mountVenueBarButton } from './venueBar.js';
+import { startObsBrowserSource } from './obsBrowserSourceBoot.js';
 import { openOfficialGiftPanel, GIFT_ITEMS_TAB_REQ_KEY, startGiftItemsTabResponder } from '../lib/venueComposeBox.js';
 import { startGiftPanelRecorder } from '../lib/giftPanelShape.js';
 import { startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, chromeGiftStore, waitGiftPressResult, giftPressOutcome } from '../lib/giftItemsMirror.js';
@@ -14512,6 +14513,7 @@ async function start() {
   } catch { /* no-op */ }
 
   void chrome.storage.local.get(KEY_LIVE_EVENTS_WANTED).then((b) => { _liveEventsWantedUntil = Number(b?.[KEY_LIVE_EVENTS_WANTED]) || 0; }).catch(() => {});
+  startObsBrowserSource();
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!hasExtensionContext()) return;
     if (area !== 'local') return;

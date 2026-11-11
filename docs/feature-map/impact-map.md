@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・174 ファイル）
+## ⚠️ 影響大（3機能以上に波及・181 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -24,6 +24,7 @@
 - `src/lib/extDocBusyCensusBoot.js` → **6 機能**: コメビュ(別窓) / OBS透過の見た目 / コメント IDB 書き手 / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/nicoUserPage.js` → **6 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/parseGiftComment.js` → **6 機能**: バックフィル SW / コメビュ(別窓) / 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/timeAuthority.js` → **6 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / OBSのブラウザソース / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/domain/user/identity.js` → **5 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/avatarComposeDiagLine.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/avatarFaceStore.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -33,8 +34,9 @@
 - `src/lib/comeviewRows.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/giftDisplayNickname.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/htmlText.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/obsOverlayStyle.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / OBSのブラウザソース / OBS透過の見た目 / 状態速報ページ
+- `src/lib/storageOpTimeout.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / OBS透過の見た目 / 状態速報ページ / 会場モード(standalone)
 - `src/lib/supportGridDisplayTier.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
-- `src/lib/timeAuthority.js` → **5 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceAssignment.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceDiagKey.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceKeys.js` → **5 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -53,6 +55,8 @@
 - `src/lib/commentTailBuffer.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/concurrentEstimate.js` → **4 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/customSoundStore.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/deviceAuth.js` → **4 機能**: 記録エンジン(watchページ常駐) / OBS透過の見た目 / ポップアップ(応援レーン) / 状態速報ページ
+- `src/lib/devicePublishCredentials.js` → **4 機能**: 記録エンジン(watchページ常駐) / OBS透過の見た目 / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/effectSoundPlayer.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/giftDeltaFallback.js` → **4 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/giftEffectDiag.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -63,7 +67,9 @@
 - `src/lib/laneMirrorKey.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/lengthDelimitedStream.js` → **4 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ページ傍受
 - `src/lib/liveGiftPulse.js` → **4 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/liveviewCurrentLive.js` → **4 機能**: 記録エンジン(watchページ常駐) / OBS透過の見た目 / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/ndgrDecode.js` → **4 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ページ傍受
+- `src/lib/obsBrowserSource.js` → **4 機能**: 記録エンジン(watchページ常駐) / OBSのブラウザソース / OBS透過の見た目 / 状態速報ページ
 - `src/lib/panelLiveSummary.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/personTileDom.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/protobufVarint.js` → **4 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ページ傍受
@@ -71,7 +77,6 @@
 - `src/lib/reportSilentError.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/safeStorageLocal.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/statCardsMirrorKey.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
-- `src/lib/storageOpTimeout.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/storageWriteLedger.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/storyAvatarDiagLine.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/storyAvatarTvFallbackClass.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -101,6 +106,7 @@
 - `src/domain/lane/columns/linkPolicy.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/domain/lane/columns/tanuPolicy.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/domain/lane/tier.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/extension/obsOverlayApply.js` → **3 機能**: コメビュ(別窓) / OBSのブラウザソース / OBS透過の見た目
 - `src/extension/story/laneContentLod.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/extension/story/renderStoryUserLaneDom.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/extension/venuePickupVoice.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
@@ -131,6 +137,7 @@
 - `src/lib/laneTileStats.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/laneWindowVerdict.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/liveCommenterStats.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/liveEvents.js` → **3 機能**: 記録エンジン(watchページ常駐) / OBSのブラウザソース / 状態速報ページ
 - `src/lib/ndgrChatRows.js` → **3 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受
 - `src/lib/nicoadContributionRankingApi.js` → **3 機能**: 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン)
 - `src/lib/nlsInterceptAuth.js` → **3 機能**: 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン)
@@ -203,6 +210,7 @@
 | `src/lib/extDocBusyCensusBoot.js` | 6 | コメビュ(別窓) / OBS透過の見た目 / コメント IDB 書き手 / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/nicoUserPage.js` | 6 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/parseGiftComment.js` | 6 | バックフィル SW / コメビュ(別窓) / 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/timeAuthority.js` | 6 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / OBSのブラウザソース / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/domain/user/identity.js` | 5 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/avatarComposeDiagLine.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/avatarFaceStore.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -212,8 +220,9 @@
 | `src/lib/comeviewRows.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/giftDisplayNickname.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/htmlText.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/obsOverlayStyle.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / OBSのブラウザソース / OBS透過の見た目 / 状態速報ページ |
+| `src/lib/storageOpTimeout.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / OBS透過の見た目 / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/supportGridDisplayTier.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
-| `src/lib/timeAuthority.js` | 5 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceAssignment.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceDiagKey.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceKeys.js` | 5 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -232,6 +241,8 @@
 | `src/lib/commentTailBuffer.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/concurrentEstimate.js` | 4 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/customSoundStore.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/deviceAuth.js` | 4 | 記録エンジン(watchページ常駐) / OBS透過の見た目 / ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/devicePublishCredentials.js` | 4 | 記録エンジン(watchページ常駐) / OBS透過の見た目 / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/effectSoundPlayer.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/giftDeltaFallback.js` | 4 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/giftEffectDiag.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -242,7 +253,9 @@
 | `src/lib/laneMirrorKey.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/lengthDelimitedStream.js` | 4 | バックフィル SW / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ページ傍受 |
 | `src/lib/liveGiftPulse.js` | 4 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/liveviewCurrentLive.js` | 4 | 記録エンジン(watchページ常駐) / OBS透過の見た目 / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/ndgrDecode.js` | 4 | バックフィル SW / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ページ傍受 |
+| `src/lib/obsBrowserSource.js` | 4 | 記録エンジン(watchページ常駐) / OBSのブラウザソース / OBS透過の見た目 / 状態速報ページ |
 | `src/lib/panelLiveSummary.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/personTileDom.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/protobufVarint.js` | 4 | バックフィル SW / 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ページ傍受 |
@@ -250,7 +263,6 @@
 | `src/lib/reportSilentError.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/safeStorageLocal.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/statCardsMirrorKey.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
-| `src/lib/storageOpTimeout.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/storageWriteLedger.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/storyAvatarDiagLine.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/storyAvatarTvFallbackClass.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -280,6 +292,7 @@
 | `src/domain/lane/columns/linkPolicy.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/domain/lane/columns/tanuPolicy.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/domain/lane/tier.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/extension/obsOverlayApply.js` | 3 | コメビュ(別窓) / OBSのブラウザソース / OBS透過の見た目 |
 | `src/extension/story/laneContentLod.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/extension/story/renderStoryUserLaneDom.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/extension/venuePickupVoice.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -310,6 +323,7 @@
 | `src/lib/laneTileStats.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/laneWindowVerdict.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/liveCommenterStats.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/liveEvents.js` | 3 | 記録エンジン(watchページ常駐) / OBSのブラウザソース / 状態速報ページ |
 | `src/lib/ndgrChatRows.js` | 3 | バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受 |
 | `src/lib/nicoadContributionRankingApi.js` | 3 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/nlsInterceptAuth.js` | 3 | 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン) |
@@ -362,7 +376,7 @@
 | `src/lib/watchMetaCardStateGate.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/yukkuriBroadcastSummary.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/shared/niconico/liveId.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
-| `src/extension/obsOverlayApply.js` | 2 | コメビュ(別窓) / OBS透過の見た目 |
+| `src/extension/statusDeviceCred.js` | 2 | OBS透過の見た目 / 状態速報ページ |
 | `src/extension/venueBar.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/extension/venueBubblePlacer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/extension/venuePickupDrag.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -398,8 +412,6 @@
 | `src/lib/concurrentCalibrationLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/consoleErrorBuffer.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/crowdRasterizer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
-| `src/lib/deviceAuth.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
-| `src/lib/devicePublishCredentials.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/diagFlushThrottle.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/diagSchemaCopy.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/embeddedDataExtract.js` | 2 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) |
@@ -414,6 +426,7 @@
 | `src/lib/globalBackfillQueue.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/inlinePanelLayout.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/instantCommentPush.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/kick/kickChatParse.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
 | `src/lib/kokenGiftHistoryApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/kokenGiftHistoryFetchClient.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/laneDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -422,14 +435,15 @@
 | `src/lib/liveAudienceDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveChannelSwitch.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveEndedFlag.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
-| `src/lib/liveEvents.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
+| `src/lib/liveEventBatch.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
+| `src/lib/liveEventSender.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/liveLaneBuckets.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
 | `src/lib/liveRankingView.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / ポップアップ(応援レーン) |
-| `src/lib/liveviewCurrentLive.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/memoryPressureProbe.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/metricConfidence.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/milestoneEffectDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/milestoneEffectDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/mixch/mxParse.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
 | `src/lib/monotonicCommentCount.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/ndgrBackfillCrawl.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrLiveFollow.js` | 2 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) |
@@ -441,7 +455,7 @@
 | `src/lib/northStarLaneResult.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/northStarMirror.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/northStarMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
-| `src/lib/obsOverlayStyle.js` | 2 | コメビュ(別窓) / OBS透過の見た目 |
+| `src/lib/obsComeviewPage.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
 | `src/lib/officialContributionRankingResolver.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/officialEventBannerDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/opSoundEffectDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -452,6 +466,8 @@
 | `src/lib/parityVerdict.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/parseArrivalComment.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/phoneVoice.js` | 2 | Web版 追憶のきらめき ランキング(/live/) / 状態速報ページ |
+| `src/lib/platform/streamEmotes.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
+| `src/lib/platform/streamPlatform.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
 | `src/lib/previewRenderAckKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/reportPreview.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/reportPreviewKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -463,6 +479,7 @@
 | `src/lib/selfActionCelebration.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfPostedMatcher.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/sessionSummaryMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/showroom/srParse.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
 | `src/lib/speechEvidence.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/statusFastDiagLite.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/statusFormat.js` | 2 | 状態速報ページ / Web版 状態(スマホ) |
@@ -474,6 +491,10 @@
 | `src/lib/supportTimelineHtml.js` | 2 | コメビュ(別窓) / ポップアップ(応援レーン) |
 | `src/lib/swBackfillStaging.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
 | `src/lib/thumbSettings.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/tiktok/ttParse.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
+| `src/lib/tiktok/ttProto.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
+| `src/lib/twitch/twIrcParse.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
+| `src/lib/twitch/twStreamKey.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
 | `src/lib/venueAvatar.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueAvatarDiagLine.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueBubbleBurst.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -521,9 +542,13 @@
 | `src/lib/viewerCelebrationMatch.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/voiceInputDevices.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/watchCelebrationOverlay.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/whowatch/wwParse.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
+| `src/lib/youtube/ytPageMeta.js` | 2 | 記録エンジン(watchページ常駐) / OBS透過の見た目 |
 | `app/app.js` | 1 | Web版 状態(スマホ) |
 | `app/live-view-block.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `app/live-view-native-voice.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
+| `app/live-view-realtime.js` | 1 | OBSのブラウザソース |
+| `app/obs-overlay.js` | 1 | OBSのブラウザソース |
 | `src/data/acquirers/laneFromStorage.js` | 1 | ポップアップ(応援レーン) |
 | `src/data/sources/laneFromStoredComments.js` | 1 | ポップアップ(応援レーン) |
 | `src/data/store/laneStore.js` | 1 | ポップアップ(応援レーン) |
@@ -542,6 +567,7 @@
 | `src/extension/liveDirectComments.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/extension/liveEventsPublisher.js` | 1 | 状態速報ページ |
 | `src/extension/obs-style-entry.js` | 1 | OBS透過の見た目 |
+| `src/extension/obsBrowserSourceBoot.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/offscreen-entry.js` | 1 | コメント IDB 書き手 |
 | `src/extension/orphanTabAutoReloadHost.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/extension/page-intercept-entry.js` | 1 | ページ傍受 |
@@ -560,7 +586,6 @@
 | `src/extension/popup/wireVoiceQualitySelect.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/wireVoiceVolumeSlider.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/status-entry.js` | 1 | 状態速報ページ |
-| `src/extension/statusDeviceCred.js` | 1 | 状態速報ページ |
 | `src/extension/statusPublisherHost.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/statusSmartphoneCard.js` | 1 | 状態速報ページ |
 | `src/extension/venue-entry.js` | 1 | 会場モード(standalone) |
@@ -810,8 +835,6 @@
 | `src/lib/lightSupplyOverwriteGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveCommentTally.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveElapsedExtrapolate.js` | 1 | Web版 状態(スマホ) |
-| `src/lib/liveEventBatch.js` | 1 | 状態速報ページ |
-| `src/lib/liveEventSender.js` | 1 | 状態速報ページ |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/liveMotion.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |

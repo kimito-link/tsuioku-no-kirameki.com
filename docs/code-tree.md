@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1238 件
+## ⚠️ 役割コメントが無いソース 10 / 1242 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -67,7 +67,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (122)
+- 📁 **app/** (124)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -202,6 +202,8 @@
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
   - `live.html`
+  - `obs-overlay.js` — OBSのブラウザソースに貼る透過ページ（app.tsuioku-no-kirameki.com/obs）。
+  - `obs.html`
   - `phone.html`
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
   - `supporter.html`
@@ -234,7 +236,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (368)
+- 📁 **docs/** (369)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -330,7 +332,7 @@
   - 📁 **article-drafts/** (2)
     - `hasanmap-osint-20260611-copy.txt`
     - `hasanmap-osint-20260611.md`
-  - 📁 **feature-map/** (16)
+  - 📁 **feature-map/** (17)
     - `backfill-sw.md`
     - `comeview.md`
     - `content.md`
@@ -339,6 +341,7 @@
     - `impact-map.md`
     - `index.md`
     - `live-ranking.md`
+    - `obs-browser.md`
     - `obs-style.md`
     - `offscreen.md`
     - `page-intercept.md`
@@ -1161,7 +1164,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2440)
+- 📁 **src/** (2445)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1198,7 +1201,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (114)
+  - 📁 **extension/** (115)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1258,6 +1261,7 @@
     - `ndgrViewBasePick.wiring.test.js`
     - `noSpeechNote.wiring.test.js`
     - `obs-style-entry.js` — OBS透過コメントの表示を、見本を見ながら変える画面。
+    - `obsBrowserSourceBoot.js` — 「OBSのブラウザへ送る」がオンのあいだだけ、視聴ページから新着を中継する。
     - `obsOverlayApply.js` — OBS透過コメントの表示へ、決めた見た目を載せる。
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
@@ -1495,7 +1499,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2138)
+  - 📁 **lib/** (2142)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2739,6 +2743,10 @@
     - `numberConsistency.test.js`
     - `objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
     - `objectUrlRevokeQueue.test.js`
+    - `obsBrowserSource.js` — OBSのブラウザソース（https の透過ページ）へ、コメントを送ってよいかの判定。表示の色は obsOverlayStyle.js。
+    - `obsBrowserSource.test.js`
+    - `obsComeviewPage.js` — OBSの透過窓が開くコメビュを、いま見ている配信から決める。
+    - `obsComeviewPage.test.js`
     - `obsOverlayStyle.js` — OBS透過コメントの表示の見た目（色・大きさ・行数）を正規化し、安全な CSS にする。
     - `obsOverlayStyle.test.js`
     - `observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）

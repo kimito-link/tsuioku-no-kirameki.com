@@ -63,6 +63,7 @@ const FEATURES = [
   { entry: 'src/extension/venue-entry.js', feature: 'venue', label: '会場モード(standalone)' },
   { entry: 'src/extension/comeview-entry.js', feature: 'comeview', label: 'コメビュ(別窓)' },
   { entry: 'src/extension/obs-style-entry.js', feature: 'obs-style', label: 'OBS透過の見た目' },
+  { entry: 'app/obs-overlay.js', feature: 'obs-browser', label: 'OBSのブラウザソース' },
   { entry: 'src/extension/status-entry.js', feature: 'status', label: '状態速報ページ' },
   { entry: 'src/extension/offscreen-entry.js', feature: 'offscreen', label: 'コメント IDB 書き手' },
   { entry: 'src/extension/backfill-sw-entry.js', feature: 'backfill-sw', label: 'バックフィル SW' },

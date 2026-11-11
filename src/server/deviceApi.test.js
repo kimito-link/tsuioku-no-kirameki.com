@@ -173,4 +173,16 @@ describe('api/device + api/status: 利用者ごとの鍵(v0.1.1730)', () => {
     expect(ttl.get(`status:viewing:${c.viewToken}`)).toBe(30);
     expect((await postAs(c, { a: 2 })).body).toEqual({ ok: true, viewerActive: true, gzipOk: true, voiceWanted: false, realtime: false });
   });
+
+  it('★OBSの在席確認は画面全体を保存しない。鍵が無ければ 401', async () => {
+    const c = (await register()).body;
+    const absent = await call(statusHandler, { method: 'GET', query: { action: 'viewer' }, headers: auth(c) });
+    expect(absent.code).toBe(200);
+    expect(absent.body).toEqual({ ok: true, viewerActive: false, realtime: false });
+    expect(store.has(`status:latest:${c.viewToken}`)).toBe(false);
+    await view(c.viewToken);
+    const present = await call(statusHandler, { method: 'GET', query: { action: 'viewer' }, headers: auth(c) });
+    expect(present.body.viewerActive).toBe(true);
+    expect((await call(statusHandler, { method: 'GET', query: { action: 'viewer' } })).code).toBe(401);
+  });
 });

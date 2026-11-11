@@ -143,7 +143,7 @@
       #obsPreview { background: transparent; }
       .urlbox { margin-top: 16px; }
       .urlbox .note { margin: 8px 0 12px; }
-      #obsUrl {
+      #obsUrl, #obsBrowserUrl {
         flex: 1 1 280px;
         min-width: 0;
         min-height: 44px;
@@ -154,7 +154,7 @@
         background: #f8fbff;
       }
       .urlrow button { flex: 0 1 auto; }
-      #copyStatus { min-height: 1.5em; margin-top: 8px; }
+      #copyStatus, #obsBrowserStatus { min-height: 1.5em; margin-top: 8px; }
     </style>
   </head>
   <body>
@@ -202,11 +202,32 @@
         </section>
       </div>
       <section class="urlbox">
-        <h2>Chrome で開く URL</h2>
+        <h2>OBSのブラウザに貼るURL</h2>
+        <p class="note">
+          スイッチは最初からオフです。オンにすると、新しいコメントだけを
+          app.tsuioku-no-kirameki.com へ送り、そこから OBS のブラウザへ届けます。
+          送るのは、OBS がその URL を開いているあいだだけです。オフに戻すと、このパソコンからは送りません。
+          URL は推測しにくい文字列です。「URLを作り直す」で古い URL は使えなくなります。
+          動きは見た目の設定どおり、最初はオフです。
+        </p>
+        <p class="note">
+          コメントをこのパソコンの外に出したくないときは、スイッチをオフのままにして、下の透過窓を
+          OBS のウィンドウキャプチャで使ってください。拡張だけでは localhost の受け口を開けません。
+          この版では、パソコンの中だけで完結するブラウザソースの URL は出せません。
+        </p>
+        <label class="checks"><input id="obsSend" type="checkbox" /> OBSのブラウザへ送る</label>
+        <div class="urlrow">
+          <input id="obsBrowserUrl" type="text" readonly value="" placeholder="オンにするとURLが出ます" aria-label="OBSのブラウザに貼るURL" />
+          <button id="obsBrowserCopy" type="button">URLをコピー</button>
+          <button id="obsRotate" type="button">URLを作り直す</button>
+        </div>
+        <p id="obsBrowserStatus" role="status"></p>
+      </section>
+      <section class="urlbox">
+        <h2>パソコンの中だけで使う URL</h2>
         <p class="note">
           この URL は、拡張が入っている Chrome で透過のコメント窓を開くためのものです。
-          OBS の「ブラウザ」ソースには貼れません。OBS の中のブラウザには拡張が入っておらず、
-          拡張のページも、このパソコンの中のコメントも読めません。
+          コメントはこのパソコンの中に残ります。OBS の「ブラウザ」ソースには貼れません。
           OBS では「ウィンドウキャプチャ」で、開いた透過窓を選んでください。
           開くページは、いま見ている配信に合わせます。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok は、そのコメントが入っているコメビュです。
         </p>
