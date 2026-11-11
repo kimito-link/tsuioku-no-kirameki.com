@@ -212,7 +212,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 105</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 106</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -290,6 +290,7 @@
 - `src/lib/officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、
 - `src/lib/personProfiles.js` — 人物プロファイル畳み込み（person-tile-unify 第1コミット・2026-06-17）。
 - `src/lib/pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
+- `src/lib/platform/platformSubBoard.js` — 各サービスの「2つめの公式ランキング」(Twitch・Kick のギフトサブの順位など)を、
 - `src/lib/popupConcurrentEstimateGate.js` — ポップアップ「推定同時接続」カードでローディングを解除するかどうか。
 - `src/lib/popupWatchMetaConcurrentGate.js` — popup の同時視聴者数推定を「出してよいか」判定するゲート(DOM/公式値/直近アクティブから)。
 - `src/lib/popupWatchUrlResolveMultiTab.js` — popup が参照する watch URL を「複数の候補ソース」から決める純粋関数。
@@ -1139,7 +1140,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 339</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 340</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1375,6 +1376,7 @@
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/platform/fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
+- `src/lib/platform/platformStats.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -1485,7 +1487,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 18 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 🏟 会場・席 (7版)
 - `v0.1.2070` 2026-11-11 — ABEMAの会場の数字がすぐ新しくなる
@@ -1500,7 +1502,8 @@
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
 
-### 🎁 ギフト (4版)
+### 🎁 ギフト (5版)
+- `v0.1.2080` 2026-11-11 — Twitch・Kick のギフトサブ順位も出す
 - `v0.1.2069` 2026-11-11 — ABEMAは視聴数とコメント数だけ
 - `v0.1.2068` 2026-11-11 — ページの視聴者数をそのまま出す
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
@@ -1509,7 +1512,8 @@
 ### 🔊 読み上げ (1版)
 - `v0.1.2039` 2026-11-11 — ABEMAのコメントを同じ画面で記録
 
-### その他 (11版)
+### その他 (12版)
+- `v0.1.2081` 2026-11-11 — SHOWROOM等のイベント順位を出す
 - `v0.1.2059` 2026-11-11 — ABEMAの視聴数とチャンネル名
 - `v0.1.2058` 2026-11-11 — コメント欄の定期確認を止める
 - `v0.1.2056` 2026-11-11 — YouTubeの@配信はすぐ読み込み中

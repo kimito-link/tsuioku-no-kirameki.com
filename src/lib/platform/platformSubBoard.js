@@ -16,7 +16,7 @@
  */
 
 export const SUB_BOARD_KEY_PREFIX = 'yt_board_sub_';
-const PERIODS = new Set(['ALLTIME', 'MONTH', 'WEEK', 'DAY', 'STREAM']);
+const PERIODS = new Set(['ALLTIME', 'MONTH', 'WEEK', 'DAY', 'STREAM', 'EVENT']);
 
 /** 期間の言葉 [文の中・見出し] */
 const PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
@@ -25,6 +25,7 @@ const PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
   WEEK: ['今週', '今週'],
   DAY: ['今日', '今日'],
   STREAM: ['この配信', 'この配信'],
+  EVENT: ['いま出ているイベントの期間', 'イベント期間'],
 });
 
 /** @param {unknown} s @param {number} max */

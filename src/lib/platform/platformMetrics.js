@@ -12,7 +12,7 @@
 import { platformOfStreamKey } from './streamPlatform.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
-export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema']);
+export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch']);
 
 /**
  * パネルと会場が同じ表を見る。native のサービスは今までの画面のまま。
@@ -50,6 +50,28 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
     officialSubBoard: true,
+  }),
+  // SHOWROOM: イベントの貢献ランキング(部屋の画面の「貢献ユーザー」)を2つめの欄に、イベント順位・pt・目標Lv をチップに。
+  showroom: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'eventRank', 'eventPoint', 'quest']),
+    officialSubBoard: true,
+  }),
+  // ミクチャ: 名前の下のレベル・ファン・スーパーファン・ライバーランク(と、出ているときのイベント順位・pt)
+  mixch: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'level', 'fans', 'superfans', 'liverRank', 'eventRank', 'eventPoint']),
+  }),
+  // ふわっち: イベント順位(同時に出ているイベントは title に並べる)・累計視聴
+  whowatch: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge', 'eventRank', 'totalViews']),
   }),
   abema: Object.freeze({
     native: false,
@@ -346,6 +368,50 @@ function supportChips(id, support) {
 }
 
 /**
+ * そのサービス特有の公式の数字(facts.official = platformStats.js が拾った値)のチップ。
+ *   能力表の chips にある欄で、値が来ているものだけ出す(無い数字は枠ごと出さない・「推定」と書かない)。
+ * @param {string} id
+ * @param {any} official
+ */
+function officialChips(id, official) {
+  const o = official && typeof official === 'object' ? official : null;
+  if (!o) return [];
+  const cap = platformCapability(id);
+  const want = new Set(cap.chips || []);
+  /** @type {Array<{ key: string, label: string, text: string, unit: string, placeholder: boolean, title: string }>} */
+  const out = [];
+  /** @param {string} key @param {string} label @param {number|null} n @param {string} unit @param {string} [extra] @param {string} [textOverride] */
+  const add = (key, label, n, unit, extra = '', textOverride = '') => {
+    if (!want.has(key) || n == null) return;
+    // 単位は数のすぐ後ろに付ける(別の行に落ちると「4」「位」と2行に割れて読みにくい・2026-11-11 スクショで確認)
+    out.push({ key, label, text: textOverride || `${formatInt(n)}${unit}`, unit: '', placeholder: false, title: `${OFFICIAL}${extra}`.trim() });
+  };
+  const eventName = typeof o.eventName === 'string' ? o.eventName : '';
+  const events = Array.isArray(o.events) ? o.events : [];
+  const eventsTitle = events.length > 1
+    ? `出ているイベント: ${events.map((/** @type {any} */ e) => `${e.name}${e.group ? `(${e.group})` : ''} ${formatInt(Number(e.rank))}位`).join(' / ')}`
+    : (eventName ? `イベント: ${eventName}` : '');
+  const gap = num(o.eventGap);
+  add('eventRank', 'イベント順位', num(o.eventRank), '位', `${eventsTitle}${gap != null && id === 'showroom' ? ` 上の順位まで ${formatInt(gap)} pt。` : ''}`);
+  add('eventPoint', 'イベントpt', num(o.eventPoint), 'pt', eventName ? `イベント: ${eventName}` : '');
+  const qLv = num(o.questLevel);
+  if (qLv != null) {
+    const cur = num(o.questPoint);
+    const goal = num(o.questGoal);
+    add('quest', '目標', qLv, '', cur != null && goal != null ? `目標レベルまでの支援pt ${formatInt(cur)} / ${formatInt(goal)}。` : '', `Lv${formatInt(qLv)}`);
+  }
+  add('level', 'レベル', num(o.level), '', '', num(o.level) != null ? `Lv${formatInt(Number(o.level))}` : '');
+  add('fans', 'ファン', num(o.fans), '人');
+  add('superfans', 'スーパーファン', num(o.superfans), '人');
+  const bonus = num(o.superfanBonus);
+  add('liverRank', 'ライバーランク', num(o.liverRankScore), '', bonus != null ? `スーパーファンボーナス ${formatInt(bonus)}%。` : '');
+  add('totalViews', '累計視聴', num(o.totalViews), '');
+  // 並びは能力表の順(そのサービスの画面で目に入る順)
+  const order = [...want];
+  return out.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+}
+
+/**
  * 公式の小さいチップ(経過以外)。ABEMA のコメント数は公式の数があるときだけ。
  * @param {string} platformId
  * @param {any} facts
@@ -353,7 +419,7 @@ function supportChips(id, support) {
 export function panelExtraChips(platformId, facts) {
   const id = resolvePlatformId(platformId);
   if (id === 'niconico') return [];
-  const chips = supportChips(id, facts?.support);
+  const chips = [...officialChips(id, facts?.official), ...supportChips(id, facts?.support)];
   if (id === 'abema') {
     const n = num(facts?.commentCount);
     chips.push({

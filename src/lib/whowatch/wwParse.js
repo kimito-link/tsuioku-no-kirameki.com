@@ -52,7 +52,10 @@ export function wwLiveApiUrl(liveId, lastUpdatedAt = 0) {
 
 /** API の URL として通してよいか(バックグラウンドが代わりに読むとき) @param {unknown} url */
 export function isWwApiUrl(url) {
-  return /^https:\/\/api\.whowatch\.tv\/lives\/\d{1,20}(?:\/play)?(?:\?last_updated_at=\d{1,16})?$/.test(String(url || ''));
+  const u = String(url || '');
+  // 配信の情報とコメント、イベントの順位(events/event_info・ログイン不要・2026-11-11 実測)だけ
+  return /^https:\/\/api\.whowatch\.tv\/lives\/\d{1,20}(?:\/play)?(?:\?last_updated_at=\d{1,16})?$/.test(u)
+    || /^https:\/\/api\.whowatch\.tv\/events\/event_info\?live_id=\d{1,20}$/.test(u);
 }
 
 /** 秒でも ms でも ms にする(読めなければ 0) @param {unknown} v */

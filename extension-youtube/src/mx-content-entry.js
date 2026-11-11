@@ -27,6 +27,7 @@ import {
   buildMxStreamKey,
 } from '../../src/lib/mixch/mxParse.js';
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
+import { parseMxLiveStats } from '../../src/lib/platform/platformStats.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 
@@ -391,7 +392,8 @@ async function check() {
   if (!infoGate.due(userId, Date.now())) return;
   checking = true;
   try {
-    const info = parseMxLive(await tryJson(mxLiveInfoUrl(userId)), userId);
+    const liveJson = await tryJson(mxLiveInfoUrl(userId));
+    const info = parseMxLive(liveJson, userId);
     infoGate.done(userId, !info ? 'fail' : info.isLive ? 'live' : 'idle', Date.now());
     diag.userId = userId;
     if (!info) return saveDiagSoon();
@@ -431,6 +433,8 @@ async function check() {
         broadcasterIconUrl: info.iconUrl || '',
         concurrentViewers: viewers != null && viewers >= 0 ? viewers : undefined,
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+        // 名前の下のレベル・ファン・スーパーファン・ライバーランク(と、出ているときのイベント順位・pt)。同じ応答の値そのまま
+        platformStats: parseMxLiveStats(liveJson),
       },
     });
     saveDiagSoon();
