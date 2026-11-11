@@ -28,13 +28,29 @@ export const VENUE_PICKUP_MIN_PX = 320;
 export const VENUE_PICKUP_VW_GUTTER = 32;
 
 /**
+ * ABEMA のコメント欄など、吹き出しを収める列の幅。列が無い・全画面に近いときは 0
+ * (そのときは窓と映像の幅を使う)。
+ * @param {number} columnWidth
+ * @returns {number}
+ */
+export function venuePickupColumnWidth(columnWidth) {
+  const column = Number(columnWidth);
+  if (!Number.isFinite(column) || column < 180 || column > 560) return 0;
+  return Math.round(Math.min(VENUE_PICKUP_MAX_PX, Math.max(160, column - 12)));
+}
+
+/**
  * 吹き出しの幅。放送ページの flex や max-width:100% で親が細くても、1文字幅に潰れない。
  * 映像が十分大きいときは映像の幅に合わせる(ニコ生・YouTube と同じ)。小さい・無いときは窓の幅。
+ * コメント欄の幅が渡されたときは、その欄が上限(欄より広くして外へ出さない)。
  * @param {number} viewportWidth
  * @param {number} [videoWidth]
+ * @param {number} [columnWidth]
  * @returns {{ width: number, minWidth: number, maxWidth: number }}
  */
-export function venuePickupReadableBox(viewportWidth, videoWidth = 0) {
+export function venuePickupReadableBox(viewportWidth, videoWidth = 0, columnWidth = 0) {
+  const fitted = venuePickupColumnWidth(columnWidth);
+  if (fitted > 0) return { width: fitted, minWidth: fitted, maxWidth: fitted };
   const vw = Math.max(0, Number(viewportWidth) || 0);
   const maxWidth = Math.max(160, Math.min(VENUE_PICKUP_MAX_PX, Math.max(160, vw - VENUE_PICKUP_VW_GUTTER)));
   const minWidth = Math.min(VENUE_PICKUP_MIN_PX, maxWidth);
@@ -48,13 +64,25 @@ export function venuePickupReadableBox(viewportWidth, videoWidth = 0) {
 
 /**
  * ホストページの CSS(div の max-width や writing-mode)より強いインライン指定。
- * @param {HTMLElement | { style?: Record<string, string> } | null | undefined} el
+ * @param {HTMLElement | { style?: { setProperty?: Function, boxSizing?: string, flexShrink?: string, writingMode?: string, wordBreak?: string, width?: string, minWidth?: string, maxWidth?: string }, classList?: { toggle?: Function } } | null | undefined} el
  * @param {number} viewportWidth
  * @param {number} [videoWidth]
+ * @param {number} [columnWidth]
  */
-export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0) {
-  const box = venuePickupReadableBox(viewportWidth, videoWidth);
-  if (el && el.style) {
+export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0, columnWidth = 0) {
+  const box = venuePickupReadableBox(viewportWidth, videoWidth, columnWidth);
+  const fitColumn = venuePickupColumnWidth(columnWidth) > 0;
+  if (el && el.style && typeof el.style.setProperty === 'function') {
+    const set = (/** @type {string} */ key, /** @type {string} */ value) => el.style.setProperty(key, value, 'important');
+    set('box-sizing', 'border-box');
+    set('flex-shrink', '0');
+    set('writing-mode', 'horizontal-tb');
+    set('word-break', 'normal');
+    set('overflow-wrap', 'break-word');
+    set('width', `${box.width}px`);
+    set('min-width', `${box.minWidth}px`);
+    set('max-width', `${box.maxWidth}px`);
+  } else if (el && el.style) {
     el.style.boxSizing = 'border-box';
     el.style.flexShrink = '0';
     el.style.writingMode = 'horizontal-tb';
@@ -62,6 +90,9 @@ export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0) {
     el.style.width = `${box.width}px`;
     el.style.minWidth = `${box.minWidth}px`;
     el.style.maxWidth = `${box.maxWidth}px`;
+  }
+  if (el && el.classList && typeof el.classList.toggle === 'function') {
+    el.classList.toggle('is-fit-column', fitColumn);
   }
   return box;
 }
@@ -157,6 +188,39 @@ export const VENUE_PICKUP_CSS = `
   }
   .nlsb-pickup__meta:empty { display: none; }
   a.nlsb-pickup__meta[href] { text-decoration: underline; text-underline-offset: 2px; }
+  /*
+   * コメント欄(ABEMA は約 250px)の上に出すとき。欄の幅が上限。本文は次の行で欄いっぱい。
+   * ホストの word-break:break-all !important より強い指定でないと、また 1 文字幅に戻る。
+   */
+  html .nlsb-root .nlsb-pickup.is-fit-column,
+  html .nlsb-root .nlsb-pickup.is-fit-column * {
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+  }
+  .nlsb-pickup.is-fit-column {
+    container-type: inline-size;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    padding: 8px 10px;
+    min-height: 52px;
+    font-size: 15px;
+  }
+  .nlsb-pickup.is-fit-column .nlsb-pickup__face { width: 28px; height: 28px; }
+  .nlsb-pickup.is-fit-column .nlsb-pickup__main { display: contents; }
+  .nlsb-pickup.is-fit-column .nlsb-pickup__badge { order: 1; }
+  .nlsb-pickup.is-fit-column .nlsb-pickup__face { order: 2; }
+  .nlsb-pickup.is-fit-column .nlsb-pickup__meta { order: 3; flex: 1 1 auto; min-width: 4em; max-width: 100%; }
+  .nlsb-pickup.is-fit-column .nlsb-pickup__grip { order: 4; }
+  .nlsb-pickup.is-fit-column .nlsb-pickup__body {
+    order: 5;
+    flex: 1 0 100%;
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    font-size: clamp(12px, calc(100cqi / 20), 16px);
+    white-space: normal !important;
+  }
 `;
 
 /**
@@ -301,6 +365,34 @@ export function applyVenuePickupView(els, view) {
  * @param {{ maxWidth?: number, minTop?: number, margin?: number }} [opts]
  * @returns {{ left:number, top:number, width:number } | null} 親の中での中心 x・上端・幅(映像が分からなければ null=CSS の既定)
  */
+/**
+ * コメント欄が見えているときの矩形。細すぎ・画面そのものに近い幅は欄ではない。
+ * @param {{ getBoundingClientRect?: () => { left?: number, top?: number, width?: number, height?: number } } | null | undefined} el
+ * @returns {{ left: number, top: number, width: number, height: number } | null}
+ */
+export function abemaCommentColumnRect(el) {
+  if (!el || typeof el.getBoundingClientRect !== 'function') return null;
+  const r = el.getBoundingClientRect();
+  const width = Number(r && r.width);
+  const height = Number(r && r.height);
+  if (!(width >= 180 && width <= 560 && height >= 80)) return null;
+  return { left: Number(r.left) || 0, top: Number(r.top) || 0, width, height };
+}
+
+/**
+ * PICK UP をコメント欄の上端中央へ。幅は欄の内側。
+ * @param {{ left: number, top: number, width: number } | null | undefined} column
+ * @param {{ left: number, top: number } | null | undefined} layout
+ * @returns {{ left: number, top: number, width: number } | null}
+ */
+export function venuePickupColumnPlacement(column, layout) {
+  const width = venuePickupColumnWidth(column && column.width);
+  if (!width || !column || !layout) return null;
+  const left = Math.round((Number(column.left) || 0) - (Number(layout.left) || 0) + (Number(column.width) || 0) / 2);
+  const top = Math.round(Math.max(8, (Number(column.top) || 0) - (Number(layout.top) || 0) + 8));
+  return { left, top, width };
+}
+
 export function venuePickupPlacement(video, layout, opts = {}) {
   if (!video || !layout || !(video.width >= 240) || !(video.height >= 120)) return null;
   const maxWidth = opts.maxWidth ?? 860;

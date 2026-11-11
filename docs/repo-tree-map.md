@@ -478,10 +478,10 @@ graph LR
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
 ## `tests/` — E2E / contract テスト(layer 依存・描画 spec 等)  〔テスト〕
-<sub>ファイル 95 件</sub>
+<sub>ファイル 96 件</sub>
 
 - `contract/`（4 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
-- `e2e/`（88 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
+- `e2e/`（89 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
 - `helpers/`（3 件） — テスト共有ヘルパ(配線テストのソース走査等)  〔テスト / 共有〕
 
 ## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ・OG カード画像合成 等)  〔ツール〕
@@ -566,7 +566,7 @@ TikTok の配信のページ(/@<名前>/live)で、ページ自身の世界の�
 - [`council/tiktok-support-PLAN.md`](../council/tiktok-support-PLAN.md)
 
 ### ABEMA の配信を記録(本体に同梱)  〔ABEMA / 記録 / 他プラットフォーム〕
-ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が再生位置の近くだけ YouTube 版と同じ記録へ渡す。コメント欄が閉じているときは吹き出しを一度だけ開く。配信者カードの画像はページのチャンネルロゴか番組画像。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
+ABEMA の放送ページ(now-on-air / live-event / video/episode / channels/slots)で、ページ自身の世界の写し役(ab-main)がページの受け取ったコメント JSON を縮めて渡し、入口(ab-content)が再生位置の近くだけ YouTube 版と同じ記録へ渡す。コメント欄が閉じているときは吹き出しを一度だけ開く。コメント欄が約250pxのときは PICK UP も画面上の最新コメントも欄の幅で約20文字。配信者カードの画像はページのチャンネルロゴか番組画像。コメントした人の絵は応答に無いので生成の顔のまま。配信キー ab.<login>.<チャット>・計器 yt_diag_ab_chat。別のコメント用ホストは宣言しない
 
 - [`extension-youtube/src/ab-main-entry.js`](../extension-youtube/src/ab-main-entry.js)
 - [`extension-youtube/src/ab-content-entry.js`](../extension-youtube/src/ab-content-entry.js)

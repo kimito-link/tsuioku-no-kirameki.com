@@ -3,11 +3,13 @@
 //   純関数(comeview と同じ正本)。会場の発言パネルがテールを読むために使う。
 import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/comeviewRows.js';
 import {
+  abemaCommentColumnRect,
   applyVenuePickupBox,
   applyVenuePickupView,
   buildVenuePickupView,
   createVenuePickupBanner,
   VENUE_PICKUP_CSS,
+  venuePickupColumnPlacement,
   venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { attachVenuePickupDrag } from './venuePickupDrag.js';
@@ -2959,8 +2961,11 @@ export function mountVenueBarButton(options = {}) {
     if (pickupEls.root.hasAttribute('data-empty')) return;
     const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
     const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
-    const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
-    applyVenuePickupBox(pickupEls.root, window.innerWidth, video ? video.width : 0);
+    const layoutRect = stageLayout.getBoundingClientRect();
+    // ABEMA のコメント欄(約 250px)があるときは、その欄の上端に収める。欄が無い放送は映像の上端中央のまま。
+    const column = abemaCommentColumnRect(document.querySelector('.com-tv-CommentArea'));
+    const at = column ? venuePickupColumnPlacement(column, layoutRect) : venuePickupPlacement(video, layoutRect);
+    applyVenuePickupBox(pickupEls.root, window.innerWidth, video ? video.width : 0, column ? column.width : 0);
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
   const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)

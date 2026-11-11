@@ -139,6 +139,9 @@ describe('venuePickupReadableBox(細い親でも読める幅)', () => {
     expect(venuePickupReadableBox(1400, 600).width).toBe(576);
     expect(venuePickupReadableBox(1400, 0)).toEqual({ width: 860, minWidth: 320, maxWidth: 860 });
     expect(venuePickupReadableBox(1280, 40).width).toBeGreaterThanOrEqual(320);
+    // コメント欄が約 250px のときは欄が上限。320px で欄の外へ出さない。
+    expect(venuePickupReadableBox(1400, 960, 250)).toEqual({ width: 238, minWidth: 238, maxWidth: 238 });
+    expect(venuePickupReadableBox(1400, 960, 80)).toEqual({ width: 860, minWidth: 320, maxWidth: 860 });
   });
   it('見た目は親の 100% ではなく窓の幅', async () => {
     const { readFileSync } = await import('node:fs');
@@ -149,6 +152,8 @@ describe('venuePickupReadableBox(細い親でも読める幅)', () => {
     expect(VENUE_PICKUP_CSS).not.toContain('100% - 180px');
     expect(bar).toContain('VENUE_PICKUP_CSS');
     expect(bar).toContain('applyVenuePickupBox');
+    expect(bar).toContain('.com-tv-CommentArea');
+    expect(bar).toContain('venuePickupColumnPlacement');
     expect(bar).not.toContain('100% - 180px');
   });
 });
@@ -160,6 +165,29 @@ describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
     expect(venuePickupPlacement({ left: 16, top: 68, width: 960, height: 540 }, { left: 0, top: 56, width: 1400 })).toEqual({ left: 496, top: 20, width: 860 });
     // 映像が狭いと映像の幅に収める
     expect(venuePickupPlacement({ left: 0, top: 200, width: 600, height: 338 }, { left: 0, top: 56, width: 1000 })).toEqual({ left: 300, top: 152, width: 576 });
+  });
+  it('コメント欄があるときは欄の上端中央・幅は欄の内側', async () => {
+    const { abemaCommentColumnRect, venuePickupColumnPlacement } = await import('./venuePickupBanner.js');
+    const column = { left: 900, top: 80, width: 250, height: 500 };
+    expect(venuePickupColumnPlacement(column, { left: 0, top: 0 })).toEqual({ left: 1025, top: 88, width: 238 });
+    expect(abemaCommentColumnRect({ getBoundingClientRect: () => column })).toEqual(column);
+    expect(abemaCommentColumnRect({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 40, height: 400 }) })).toBeNull();
+    expect(abemaCommentColumnRect(null)).toBeNull();
+  });
+  it('欄の上ではホストの max-width より強い幅をインラインで付ける', async () => {
+    const { applyVenuePickupBox } = await import('./venuePickupBanner.js');
+    /** @type {Array<[string, string, string]>} */
+    const props = [];
+    /** @type {Record<string, boolean>} */
+    const flags = {};
+    applyVenuePickupBox({
+      style: { setProperty: (k, v, p) => { props.push([k, v, p]); } },
+      classList: { toggle: (name, on) => { flags[name] = !!on; } }
+    }, 1280, 960, 250);
+    expect(props).toContainEqual(['width', '238px', 'important']);
+    expect(props).toContainEqual(['max-width', '238px', 'important']);
+    expect(props).toContainEqual(['word-break', 'normal', 'important']);
+    expect(flags['is-fit-column']).toBe(true);
   });
   it('映像が見つからない・小さすぎるときは null(CSS の既定のまま)', async () => {
     const { venuePickupPlacement } = await import('./venuePickupBanner.js');
