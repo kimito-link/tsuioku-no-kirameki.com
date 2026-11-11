@@ -1,5 +1,6 @@
 // voicevoxClient.js — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 import { normalizeVoiceReadingBody } from './voiceReadingNormalize.js';
+import { voiceEngineModeFromSupportedDevices } from './voiceLoadingState.js';
 import { shortenLongCommentForVoice } from './voiceLongCommentShorten.js';
 import {
   StreamedVoice,
@@ -554,6 +555,32 @@ export async function probeVoicevoxStreaming(opts = {}) {
 }
 
 /**
+ * 接続時に1回だけ、/supported_devices を読む。
+ * mode は voiceEngineModeFromSupportedDevices（CPU と言い切れるときだけ cpu。GPU 動作中とは返さない）。
+ * gpuCapable は「使えるか」だけ。遅れの案内用で、接続表示には使わない。
+ * @param {{ fetchFn?: FetchFn, baseUrl?: string, timeoutMs?: number }} [opts]
+ * @returns {Promise<{ mode: 'cpu'|'unknown'|null, gpuCapable: boolean|null }>}
+ */
+export async function probeVoiceEngineDevices(opts = {}) {
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  const empty = { mode: /** @type {null} */ (null), gpuCapable: /** @type {null} */ (null) };
+  if (typeof fetchFn !== 'function') return empty;
+  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  try {
+    const res = await fetchWithTimeout(fetchFn, `${baseUrl}/supported_devices`, { method: 'GET' }, positiveTimeout(opts.timeoutMs, 5000));
+    if (!res || res.ok === false || typeof (/** @type {any} */ (res)).json !== 'function') return empty;
+    const devices = await (/** @type {any} */ (res)).json();
+    if (!devices || typeof devices !== 'object') return empty;
+    return {
+      mode: voiceEngineModeFromSupportedDevices(devices),
+      gpuCapable: devices.cuda === true || devices.dml === true
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/**
  * 2026-10-28: このエンジンが GPU を使えるか(/supported_devices の cuda か dml が true)。
  *   ★「今 GPU で動いているか」ではない(それを返す API は無い)。使えるかどうかだけ。
  *   読めないとき・古いエンジンは null(分からない=案内を出さない)。
@@ -561,18 +588,8 @@ export async function probeVoicevoxStreaming(opts = {}) {
  * @returns {Promise<boolean|null>}
  */
 export async function probeVoicevoxGpuCapable(opts = {}) {
-  const fetchFn = opts.fetchFn || proxyFetchFn;
-  if (typeof fetchFn !== 'function') return null;
-  const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
-  try {
-    const res = await fetchWithTimeout(fetchFn, `${baseUrl}/supported_devices`, { method: 'GET' }, positiveTimeout(opts.timeoutMs, 5000));
-    if (!res || res.ok === false || typeof (/** @type {any} */ (res)).json !== 'function') return null;
-    const devices = await (/** @type {any} */ (res)).json();
-    if (!devices || typeof devices !== 'object') return null;
-    return devices.cuda === true || devices.dml === true;
-  } catch {
-    return null;
-  }
+  const info = await probeVoiceEngineDevices(opts);
+  return info.gpuCapable;
 }
 
 /** 少しずつ受け取りを諦めて /synthesis に戻す合図。 */

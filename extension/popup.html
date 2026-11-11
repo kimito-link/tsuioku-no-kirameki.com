@@ -11933,10 +11933,20 @@
               </span>
             </label>
           </div>
-          <!-- 2026-11-03(りんく「POP とか会場モードに記載すべき」): 読み上げが遅い PC だと記録されているときだけ、
-               VOICEVOX を GPU にする案内を出す。配線は popup/wireVoiceGpuTip.js、文言は lib の voiceLagNotice.js。 -->
-          <p id="voiceGpuTip" class="nl-record-sub__hint" hidden
-            style="color:#b45309;font-weight:600;background:#fff7e6;border-radius:8px;padding:6px 8px;margin:4px 0;"></p>
+          <!-- 2026-11-11: 計算モードは利用者が選ぶ。CPU が既定。エンジンの実モードは接続時だけ調べる。 -->
+          <div class="nl-record-sub">
+            <label for="voiceEnginePref" class="nl-record-sub__label">
+              <span>
+                読み上げの計算モード
+                <select id="voiceEnginePref" aria-label="読み上げの計算モード">
+                  <option value="cpu" selected>CPU</option>
+                  <option value="gpu">GPU</option>
+                </select>
+              </span>
+            </label>
+          </div>
+          <p id="voiceEngineMode" class="nl-record-sub__hint" hidden
+            style="color:#7a828e;font-weight:400;margin:4px 0;"></p>
           <!-- 2026-10-29: 読み上げの声の音質(出力サンプリングレート)。既定は今までどおり標準(16kHz・v0.1.1063 で合成が約30%速いため)。
                高音質(24kHz)は自分で選んだ人だけ。配線は popup/wireVoiceQualitySelect.js、値は lib の voiceQuality.js。 -->
           <div class="nl-record-sub">

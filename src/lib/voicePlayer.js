@@ -1,11 +1,13 @@
 // @ts-nocheck — VoicePlayer は依存注入(deps)クラス。型は呼び出し側の配線で担保。
 //   comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
-import { voiceEngineDeviceNote } from './voiceLoadingState.js';
+import { voiceEngineModeFromProbe, voiceGpuCapableFromProbe } from './voiceLoadingState.js';
+import { voiceEngineConnectionText, voiceEnginePrefOrDefault, normalizeVoiceEnginePref } from './voiceEnginePref.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
 import {
   KEY_VOICE_ASSIGNMENTS,
+  KEY_VOICE_ENGINE_PREF,
   KEY_VOICE_READ_NAME_ENABLED,
   KEY_VOICE_READING_ENABLED
 } from './voiceKeys.js';
@@ -58,7 +60,7 @@ import {
 import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, measureVoiceWavLevel, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT, voiceTargetPeak
 } from './voiceVolume.js';
-import { decideVoiceGpuTip, decideVoiceLagNotice } from './voiceLagNotice.js';
+import { decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
   classifyVoiceImportance,
   createVoiceFirstSpeakerState,
@@ -104,9 +106,6 @@ export class VoicePlayer {
     this.onSkip = deps.onSkip || (() => {});
     /** P5: 遅れが大きいときの一言(空文字=消す)。判定は voiceLagNotice.js。 */
     this.onLagNotice = deps.onLagNotice || (() => {});
-    /** 2026-11-01: GPU の案内(遅れの一言とは別の行・voiceLagNotice.decideVoiceGpuTip)。 */
-    this.onGpuTip = deps.onGpuTip || (() => {});
-    this._gpuTipText = '';
     this._lagNoticeShown = false;
     this.isObsMode = deps.isObsMode || (() => false);
     this.audioConstructor = deps.audioConstructor;
@@ -147,8 +146,16 @@ export class VoicePlayer {
     this.probeVoiceStreaming = deps.probeVoiceStreaming || null;
     /** エンジンが GPU を使えるか(遅れの一言に GPU の案内を添えるため・voiceLagNotice.js)。 */
     this.probeVoiceGpu = deps.probeVoiceGpu || null;
+    /** 接続時に1回だけ /supported_devices を読む。合成のたびには呼ばない。 */
+    this.probeVoiceMode = deps.probeVoiceMode || null;
     /** @type {boolean|null} */
     this._gpuCapable = null;
+    /** @type {'cpu'|'gpu'|'unknown'|null} */
+    this._engineMode = null;
+    /** @type {'cpu'|'gpu'} */
+    this._enginePref = 'cpu';
+    /** /supported_devices で GPU を使えないと分かったときだけ true。 */
+    this._engineCpuOnly = false;
     this.createStreamedAudio = deps.createStreamedAudio || null;
     this._streamSupported = false;
     /** 遅い PC と分かったら、この ON の間は覚えておく(少しずつ読むと合成の計器が速く見えるため)。 */
@@ -348,6 +355,11 @@ export class VoicePlayer {
         if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
         const ng = changes && changes[COMEVIEW_NG_STORAGE_KEY];
         if (ng) this.ngKeys = voiceNgKeySet(ng.newValue);
+        const pref = changes && changes[KEY_VOICE_ENGINE_PREF];
+        if (pref) {
+          this._enginePref = voiceEnginePrefOrDefault(pref.newValue);
+          this._emitDeviceNote();
+        }
         const en = changes && changes[KEY_VOICE_READING_ENABLED];
         if (!en) return;
         const next = en.newValue === true;
@@ -474,7 +486,11 @@ export class VoicePlayer {
 
   _emitDeviceNote() {
     if (!this.enabled || !this.readingWanted) return;
-    const text = voiceEngineDeviceNote(this._gpuCapable);
+    const text = voiceEngineConnectionText({
+      pref: this._enginePref,
+      actual: this._engineMode,
+      cpuOnly: this._engineCpuOnly
+    });
     if (!text || text === this._deviceNote) return;
     this._deviceNote = text;
     try { this.onStatus(text); } catch { /* 表示の失敗は読み上げに影響させない */ }
@@ -592,18 +608,37 @@ export class VoicePlayer {
           .then((ok) => { this._streamSupported = ok === true; }, () => {});
       }
       this._gpuCapable = null;
+      this._engineMode = null;
       this._deviceNote = '';
-      if (this.probeVoiceGpu) {
+      if (this.probeVoiceMode) {
+        const mine = serial;
+        void Promise.resolve()
+          .then(() => this.probeVoiceMode())
+          .then((info) => {
+            if (mine !== this._intentSerial || !this.readingWanted) return;
+            const reported = info && typeof info === 'object' ? /** @type {{ mode?: unknown }} */ (info).mode : null;
+            this._engineCpuOnly = reported === 'cpu';
+            this._engineMode = voiceEngineModeFromProbe(info);
+            this._gpuCapable = voiceGpuCapableFromProbe(info);
+            this._emitDeviceNote();
+          }, () => {
+            if (mine !== this._intentSerial || !this.readingWanted) return;
+            this._engineMode = 'unknown';
+            this._emitDeviceNote();
+          });
+      } else if (this.probeVoiceGpu) {
         void Promise.resolve()
           .then(() => this.probeVoiceGpu())
           .then((ok) => {
             this._gpuCapable = typeof ok === 'boolean' ? ok : null;
-            this._emitDeviceNote();
           }, () => {});
       }
       const prepared = await prepareVoiceStyleIds(allStyleIds, {
         readSettings: async () => {
-          const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC]) : {};
+          const b = this.storage ? await this.storage.get([KEY_VOICE_NARROW_MODE, KEY_VOICE_WEAK_PC, KEY_VOICE_ENGINE_PREF]) : {};
+          const savedPref = normalizeVoiceEnginePref(b[KEY_VOICE_ENGINE_PREF]);
+          // 未保存でも表示は CPU。保存するのは利用者が選んだときだけ（選ぶ前に書くと選択が出ない）。
+          this._enginePref = savedPref || 'cpu';
           this._slowEngine = b[KEY_VOICE_WEAK_PC] === true;
           return { mode: b[KEY_VOICE_NARROW_MODE], weak: b[KEY_VOICE_WEAK_PC] };
         },
@@ -1346,19 +1381,10 @@ export class VoicePlayer {
 
   /** P5: 遅れの一言を出す/消す(状態が変わったときだけ通知)。 */
   _updateLagNotice() {
-    this._updateGpuTip();
     const r = decideVoiceLagNotice(this._lagNoticeShown, { ...this.diag, queueNow: this.queue.length }, { gpuCapable: this._gpuCapable });
     if (r.shown === this._lagNoticeShown && !r.shown) return;
     this._lagNoticeShown = r.shown;
     try { this.onLagNotice(r.text); } catch { /* no-op: 表示の失敗は読み上げに影響させない */ }
-  }
-
-  /** 2026-11-01: GPU の案内を出す/消す(文言が変わったときだけ通知)。 */
-  _updateGpuTip() {
-    const text = this.enabled ? decideVoiceGpuTip(this.diag, this._gpuCapable) : '';
-    if (text === this._gpuTipText) return;
-    this._gpuTipText = text;
-    try { this.onGpuTip(text); } catch { /* no-op: 表示の失敗は読み上げに影響させない */ }
   }
 
   enqueue(items) {

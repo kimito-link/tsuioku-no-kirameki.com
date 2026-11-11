@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1235 件
+## ⚠️ 役割コメントが無いソース 10 / 1237 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1159,7 +1159,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2436)
+- 📁 **src/** (2440)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1196,7 +1196,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (114)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1213,8 +1213,8 @@
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
       - `wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
-      - `wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
-      - `wireVoiceGpuTip.test.js`
+      - `wireVoiceEngineMode.js` — ポップアップの読み上げ設定。計算モードの希望（画面の既定は CPU）と、接続中に分かる実モード。
+      - `wireVoiceEngineMode.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
       - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
@@ -1308,6 +1308,8 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
+    - `voiceEnginePrefControl.js` — 会場とコメビュの計算モード選択。希望がまだ無いあいだ、読み上げ ON で出す。
+    - `voiceEnginePrefFreshProfile.test.js`
     - `voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
     - `voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
@@ -1491,7 +1493,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2136)
+  - 📁 **lib/** (2138)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3537,6 +3539,8 @@
     - `voiceEngineActivity.test.js`
     - `voiceEngineOverload.js` — VOICEVOX が混みすぎて合成が時間切れを続けるときの切り替え(純関数)。
     - `voiceEngineOverload.test.js`
+    - `voiceEnginePref.js` — 読み上げの計算モード。拡張が保存するのは利用者の希望だけ。
+    - `voiceEnginePref.test.js`
     - `voiceFailureTaxonomy.contract.test.js`
     - `voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
     - `voiceInputDevices.js` — マイク確認でサンプルする時間（ms）

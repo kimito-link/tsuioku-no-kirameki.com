@@ -40,3 +40,5 @@ export const KEY_VOICE_WEAK_PC = 'nls_voice_weak_pc_v1';
 export const KEY_VOICE_QUALITY = 'nls_voice_quality_v1';
 /** 今鳴っているコメント(会場の PICK UP を再生開始に合わせる)。配信 id つき。 */
 export const KEY_VOICE_NOW_PLAYING = 'nls_voice_now_playing_v1';
+/** 読み上げの計算モードの希望('cpu' 既定 | 'gpu')。エンジン自体のモードは変えない。 */
+export const KEY_VOICE_ENGINE_PREF = 'nls_voice_engine_pref_v1';

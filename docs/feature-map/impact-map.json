@@ -304,6 +304,26 @@
       ]
     },
     {
+      "file": "src/lib/voiceReadingNormalize.js",
+      "featureCount": 6,
+      "features": [
+        "comeview",
+        "content",
+        "live-ranking",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/domain/user/identity.js",
       "featureCount": 5,
       "features": [
@@ -574,6 +594,42 @@
       ]
     },
     {
+      "file": "src/lib/voiceLoadingState.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceLongCommentShorten.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceNarrowing.js",
       "featureCount": 5,
       "features": [
@@ -610,25 +666,61 @@
       ]
     },
     {
-      "file": "src/lib/voiceReadingNormalize.js",
+      "file": "src/lib/voiceStream.js",
       "featureCount": 5,
       "features": [
         "comeview",
         "content",
-        "live-ranking",
+        "popup",
         "status",
         "venue"
       ],
       "labels": [
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
-        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceStyleLevelTable.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
         "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
     {
       "file": "src/lib/voiceVolume.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voicevoxClient.js",
       "featureCount": 5,
       "features": [
         "comeview",
@@ -1270,22 +1362,6 @@
       ]
     },
     {
-      "file": "src/lib/voiceAgeGate.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/voiceDiag.js",
       "featureCount": 4,
       "features": [
@@ -1298,6 +1374,22 @@
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
         "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceEnginePref.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
         "会場モード(standalone)"
       ]
     },
@@ -1319,38 +1411,6 @@
     },
     {
       "file": "src/lib/voiceLagBudget.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceLagNotice.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceLongCommentShorten.js",
       "featureCount": 4,
       "features": [
         "comeview",
@@ -1414,38 +1474,6 @@
       ]
     },
     {
-      "file": "src/lib/voiceStream.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceStyleLevelTable.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/voiceSynthFailure.js",
       "featureCount": 4,
       "features": [
@@ -1463,22 +1491,6 @@
     },
     {
       "file": "src/lib/voiceSynthFailureReason.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voicevoxClient.js",
       "featureCount": 4,
       "features": [
         "comeview",
@@ -1606,6 +1618,34 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/extension/venuePickupVoice.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/extension/voiceEnginePrefControl.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
       ]
     },
@@ -2450,6 +2490,20 @@
       ]
     },
     {
+      "file": "src/lib/venuePickupPlayback.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueSeatsDiagKey.js",
       "featureCount": 3,
       "features": [
@@ -2474,6 +2528,20 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceAgeGate.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
       ]
     },
@@ -2520,6 +2588,20 @@
       ]
     },
     {
+      "file": "src/lib/voiceLagNotice.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceLightFallback.js",
       "featureCount": 3,
       "features": [
@@ -2535,20 +2617,6 @@
     },
     {
       "file": "src/lib/voiceLightSpeaker.js",
-      "featureCount": 3,
-      "features": [
-        "comeview",
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceLoadingState.js",
       "featureCount": 3,
       "features": [
         "comeview",
@@ -4894,7 +4962,17 @@
       ]
     },
     {
-      "file": "src/extension/popup/wireVoiceGpuTip.js",
+      "file": "src/extension/popup/wirePanelVoiceReadingButton.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/wireVoiceEngineMode.js",
       "featureCount": 1,
       "features": [
         "popup"

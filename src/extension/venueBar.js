@@ -308,6 +308,7 @@ import {
   heatLevelToLabel
 } from '../lib/venueHeat.js';
 import { VoicePlayer } from '../lib/voicePlayer.js';
+import { mountVoiceEnginePref } from './voiceEnginePrefControl.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
 import { createTrailingPublisher } from '../lib/trailingPublisher.js';
@@ -373,7 +374,7 @@ import {
   probeVoicevoxAlive,
   listVoicevoxStyleIds,
   synthesizeVoice,
-  probeVoicevoxStreaming, probeVoicevoxGpuCapable
+  probeVoicevoxStreaming, probeVoiceEngineDevices
 } from '../lib/voicevoxClient.js';
 import { wireVoiceQualitySetting } from './voiceQualitySetting.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
@@ -2811,16 +2812,9 @@ export function mountVenueBarButton(options = {}) {
   voiceStatus.style.color = '#7a828e';
   const voiceLag = /** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()); // P5: 読み上げの遅れの一言(文言と判定は lib の voiceLagNotice.js)
   voiceLag.className = 'nlsb-voice-lag';
-  // 2026-11-01: GPU の案内(遅れの一言とは別の行・文言と判定は voiceLagNotice.decideVoiceGpuTip)。出すときだけ見える。
-  const voiceGpuTip = Object.assign(/** @type {HTMLSpanElement} */ (voiceStatus.cloneNode()), { className: 'nlsb-voice-gpu-tip', hidden: true });
-  voiceGpuTip.style.cssText += 'color:#b45309;font-weight:600;';
-  // 2026-11-03 りんく: 会場の帯は半透明で、後ろのニコ生のコメント入力欄と文字が重なって読めなかった。
-  //   遅れの一言と GPU の案内だけ、不透明な下地を敷いて何の上でも読めるようにする。
   voiceLag.hidden = true;
-  for (const el of [voiceLag, voiceGpuTip]) {
-    el.style.cssText += 'background:rgba(255,255,255,0.96);padding:2px 8px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.18);';
-  }
-  voiceGpuTip.style.background = '#fff7e6';
+  voiceLag.style.cssText += 'background:rgba(255,255,255,0.96);padding:2px 8px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.18);';
+  const voicePref = mountVoiceEnginePref(document);
 
   let venueWindowBtn = null;
   if (!isStandalone) {
@@ -2864,9 +2858,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, venueWindowBtn, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voicePref.label, venueWindowBtn, note, close);
   } else {
-    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voiceGpuTip, note, close);
+    headerRight.append(...(giftStrip ? [giftStrip] : []), ...(giftBtn ? [giftBtn] : []), ...(tuckBtn ? [tuckBtn] : []), rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, voiceLag, voicePref.label, note, close);
   }
   // 2026-11-09: パネルの数字カードと同じ数字の帯(ヘッダーの2行目・値は数字カードの鏡をそのまま出す=lib の venueStatStrip.js)。
   const statStrip = createVenueStatStrip(document, {
@@ -3434,6 +3428,7 @@ export function mountVenueBarButton(options = {}) {
       voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
+      if (enabled) void voicePref.noteEnabled(); else voicePref.noteDisabled();
     },
     // onStatus は読み上げブロック警告(audio NotAllowedError)等の臨時メッセージ用に温存。
     //   起動待ちの状態表示は onLoadingState(driveVoiceLoading)が所有する。
@@ -3449,7 +3444,6 @@ export function mountVenueBarButton(options = {}) {
     ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
     onLagNotice: (/** @type {string} */ text) => { voiceLag.textContent = text; voiceLag.hidden = !text; },
-    onGpuTip: (/** @type {string} */ text) => { voiceGpuTip.textContent = text; voiceGpuTip.title = text; voiceGpuTip.hidden = !text; },
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
     },
@@ -3463,7 +3457,7 @@ export function mountVenueBarButton(options = {}) {
     fetchVoiceStyleIds: listVoicevoxStyleIds,
     initVoiceSpeaker: (/** @type {number} */ id) => venueVoiceWarmup.ensureWhenIdle(id), // P3 の先読みは合成の合間に裏で
     voiceWarmup: venueVoiceWarmup,
-    probeVoiceStreaming: probeVoicevoxStreaming, probeVoiceGpu: probeVoicevoxGpuCapable, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
+    probeVoiceStreaming: probeVoicevoxStreaming, probeVoiceMode: probeVoiceEngineDevices, createStreamedAudio: createBrowserStreamedAudio, // 声を少しずつ(voiceStream.js)
     fetchSynthesizeVoice: withVoiceWarmup(venueVoiceWarmup, synthesizeVoice), // 初めての声は合成の前に読み込む
     resolveVoice: resolveVoiceForUser
   });

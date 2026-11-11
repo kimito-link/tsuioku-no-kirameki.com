@@ -26,6 +26,8 @@ graph LR
   n_content --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_content --> n_src_extension_venueBubblePlacer_js["extension/venueBubblePlacer.js"]:::shared
   n_content --> n_src_extension_venuePickupDrag_js["extension/venuePickupDrag.js"]:::shared
+  n_content --> n_src_extension_venuePickupVoice_js["extension/venuePickupVoice.js"]:::shared
+  n_content --> n_src_extension_voiceEnginePrefControl_js["extension/voiceEnginePrefControl.js"]:::shared
   n_content --> n_src_extension_voiceQualitySetting_js["extension/voiceQualitySetting.js"]:::shared
   n_content --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
   n_content --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_content --> n_src_lib_backfillRetryBackoff_js["lib/backfillRetryBackoff.js"]:::shared
   n_content --> n_src_lib_backfillRotationGate_js["lib/backfillRotationGate.js"]
   n_content --> n_src_lib_backfillSlotAutoThrottle_js["lib/backfillSlotAutoThrottle.js"]
-  n_content --> n_src_lib_backfillSlotPool_js["lib/backfillSlotPool.js"]:::shared
-  n_content --> n_src_lib_backfillTransientRetry_js["lib/backfillTransientRetry.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 362 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 366 ファイル省略（全件は storage-bus.md / metafile 参照）。
