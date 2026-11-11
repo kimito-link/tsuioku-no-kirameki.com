@@ -10,10 +10,10 @@ const src = fs.readFileSync(path.resolve('src/lib/voicePlayer.js'), 'utf8').spli
 
 describe('voicePlayer: 本文上限は実効ブーストで短くする(2経路とも)', () => {
   it('★先読み(_ensurePrefetch)', () => {
-    expect(src).toMatch(/buildMergedVoiceText\(item, \{ maxChars: capVoiceMaxCharsByBoost\(effBoost, congestion\.maxChars\) \}\)/);
+    expect(src).toMatch(/buildMergedVoiceText\(item, \{ maxChars: capVoiceMaxCharsByBoost\(effBoost, congestion\.maxChars\), script: this\.readingScript \}\)/);
   });
   it('★その場合成(再生ループ)', () => {
-    expect(src).toMatch(/buildMergedVoiceText\(item, \{ maxChars: capVoiceMaxCharsByBoost\(effBoostNow, congestion\.maxChars\) \}\)/);
+    expect(src).toMatch(/buildMergedVoiceText\(item, \{ maxChars: capVoiceMaxCharsByBoost\(effBoostNow, congestion\.maxChars\), script: this\.readingScript \}\)/);
   });
   it('★上限を素の congestion.maxChars のまま渡す経路が残っていない', () => {
     expect(src).not.toMatch(/buildMergedVoiceText\(item, \{ maxChars: congestion\.maxChars \}\)/);

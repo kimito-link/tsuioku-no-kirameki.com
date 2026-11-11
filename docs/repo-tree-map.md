@@ -177,6 +177,8 @@ graph LR
   f18 --> f18_0["lib/voicePlayer.js"]
   f18 --> f18_1["lib/voiceReadQueue.js"]
   f18 --> f18_2["lib/voiceAgeGate.js"]
+  f18 --> f18_3["lib/voiceReadingScript.js"]
+  f18 --> f18_4["extension/voiceReadingSettingsPanel.js"]
   HUB --> f19["会場読み上げ診断(遅延の切り分け)"]
   f19 --> f19_0["lib/voiceDiag.js"]
   f19 --> f19_1["lib/voiceDiagKey.js"]
@@ -629,11 +631,13 @@ popup の応援レーンのタイルを素クリックすると、その人の�
 - [`src/lib/crowdRasterizer.js`](../src/lib/crowdRasterizer.js)
 
 ### 読み上げ(再生/キュー/年齢ゲート)  〔読み上げ / 音声〕
-コメント読み上げの再生・キュー上限・年齢ゲート・ロード状態
+コメント読み上げの再生・キュー上限・年齢ゲート・ロード状態。辞書と読み方の型は声を作る直前に、設定が変わったときだけ組んだ置換で当てる
 
 - [`src/lib/voicePlayer.js`](../src/lib/voicePlayer.js)
 - [`src/lib/voiceReadQueue.js`](../src/lib/voiceReadQueue.js)
 - [`src/lib/voiceAgeGate.js`](../src/lib/voiceAgeGate.js)
+- `src/lib/voiceReadingScript.js` ⚠️ **見つからない（消失/リネーム）**
+- `src/extension/voiceReadingSettingsPanel.js` ⚠️ **見つからない（消失/リネーム）**
 
 ### 会場読み上げ診断(遅延の切り分け)  〔読み上げ / 診断 / 集約〕
 会場モード(comeview)の読み上げ待機件数/間引き/最終発話/合成msを観測し KEY_VOICE_DIAG 経由で status 速報へ集約。「たまに遅れる」の真因(キュー詰まり/合成遅延)を F12 不要で割る純観測

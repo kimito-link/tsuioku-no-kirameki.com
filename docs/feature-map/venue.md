@@ -5,7 +5,7 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_GIFT_EFFECT_DIAG`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_PICKUP_POS`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`
+- 書くキー: `KEY_GIFT_EFFECT_DIAG`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_PICKUP_POS`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_READING_SCRIPT`
 - 読むキー: `KEY_EFFECT_SOUND_ENABLED`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`, `KEY_VENUE_PICKUP_POS`, `KEY_VOICE_QUALITY`
 
 ## 構成ファイル（import 到達・最大40件表示）
@@ -24,7 +24,9 @@ graph LR
   n_venue --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_venue --> n_src_extension_venueBubblePlacer_js["extension/venueBubblePlacer.js"]:::shared
   n_venue --> n_src_extension_venuePickupDrag_js["extension/venuePickupDrag.js"]:::shared
+  n_venue --> n_src_extension_venuePickupVoice_js["extension/venuePickupVoice.js"]:::shared
   n_venue --> n_src_extension_voiceQualitySetting_js["extension/voiceQualitySetting.js"]:::shared
+  n_venue --> n_src_extension_voiceReadingSettingsPanel_js["extension/voiceReadingSettingsPanel.js"]:::shared
   n_venue --> n_src_extension_voiceStreamAudio_js["extension/voiceStreamAudio.js"]:::shared
   n_venue --> n_src_extension_voiceTestHook_js["extension/voiceTestHook.js"]:::shared
   n_venue --> n_src_lib_adObservationLog_js["lib/adObservationLog.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_venue --> n_src_lib_charaLiveState_js["lib/charaLiveState.js"]:::shared
   n_venue --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
   n_venue --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
-  n_venue --> n_src_lib_commentChunkStore_js["lib/commentChunkStore.js"]:::shared
-  n_venue --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 170 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 174 ファイル省略（全件は storage-bus.md / metafile 参照）。

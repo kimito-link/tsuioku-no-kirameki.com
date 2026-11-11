@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1913',
+    date: '2026-11-06',
+    summary: '吹き出しの一気出しを数える計器',
+    items: Object.freeze([
+      '会場で吹き出しが一度にたくさん出たとき、それが「本当にコメントが一気に来た」のか、「過去ログの取り込みで昔のコメントがまとめて流れた」のか、「書き込み待ちで溜まった分がまとめて届いた」のかを数えて、状態速報に1行で出すようにしました。見た目や動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1912',
     date: '2026-11-06',
     summary: 'YouTube でログイン中なのに送れない表示を直す',

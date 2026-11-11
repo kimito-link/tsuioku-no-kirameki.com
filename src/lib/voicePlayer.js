@@ -1,14 +1,22 @@
 // @ts-nocheck — VoicePlayer は依存注入(deps)クラス。型は呼び出し側の配線で担保。
 //   comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
-import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
+import { buildMergedVoiceText } from './voicevoxClient.js';
 import { voiceEngineDeviceNote } from './voiceLoadingState.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
 import {
   KEY_VOICE_ASSIGNMENTS,
   KEY_VOICE_READ_NAME_ENABLED,
-  KEY_VOICE_READING_ENABLED
+  KEY_VOICE_READING_ENABLED,
+  KEY_VOICE_READING_SCRIPT
 } from './voiceKeys.js';
+import {
+  buildVoiceQueueSpeech,
+  compileVoiceReadingScript,
+  composeVoiceReading,
+  EMPTY_VOICE_READING_SCRIPT,
+  isVoiceReadingExcluded
+} from './voiceReadingScript.js';
 import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import { startVoiceWarmup } from './voiceWarmup.js';
 import { isStreamedVoice, shouldStreamVoice } from './voiceStream.js';
@@ -194,6 +202,8 @@ export class VoicePlayer {
     this.readNameEnabled = false;
     /** v0.1.1812: コメビュで NG にした人(読まない)。 */
     this.ngKeys = new Set();
+    /** 読み上げ辞書と型。設定が変わったときだけ組み直す。 */
+    this.readingScript = EMPTY_VOICE_READING_SCRIPT;
     this.toggleBusy = false;
     this.styleIds = [];
     this.assignments = {};
@@ -314,6 +324,7 @@ export class VoicePlayer {
           this.VOICE_ASSIGNMENTS_KEY,
           this.VOICE_READ_NAME_KEY,
           KEY_VOICE_VOLUME_PERCENT,
+          KEY_VOICE_READING_SCRIPT,
           COMEVIEW_NG_STORAGE_KEY
         ]);
       }
@@ -325,6 +336,7 @@ export class VoicePlayer {
     this.readNameEnabled = bag[this.VOICE_READ_NAME_KEY] === true;
     this.volumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
     this.ngKeys = voiceNgKeySet(bag[COMEVIEW_NG_STORAGE_KEY]);
+    this.readingScript = compileVoiceReadingScript(bag[KEY_VOICE_READING_SCRIPT]);
     this._watchVolumeSetting();
 
     this._emitToggle();
@@ -348,6 +360,8 @@ export class VoicePlayer {
         if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
         const ng = changes && changes[COMEVIEW_NG_STORAGE_KEY];
         if (ng) this.ngKeys = voiceNgKeySet(ng.newValue);
+        const script = changes && changes[KEY_VOICE_READING_SCRIPT];
+        if (script) this.readingScript = compileVoiceReadingScript(script.newValue);
         const en = changes && changes[KEY_VOICE_READING_ENABLED];
         if (!en) return;
         const next = en.newValue === true;
@@ -649,7 +663,7 @@ export class VoicePlayer {
   _resolveQueueMaxByChars(candidate) {
     try {
       const maxChars = computeVoiceCongestion(this.queue.length + 1).maxChars;
-      const counts = [...this.queue, candidate].map((it) => buildMergedVoiceText(it, { maxChars }).length);
+      const counts = [...this.queue, candidate].map((it) => buildMergedVoiceText(it, { maxChars, script: this.readingScript }).length);
       // v0.1.1801: 声を作る速さ(合成時間÷声の長さ)が3件以上測れていれば、作る時間も数える。
       const rtfSamples = Number(this.diag.warmRtfSamples) || 0;
       const rtfPermille = Number(this.diag.warmSynthRtfPermille);
@@ -673,7 +687,7 @@ export class VoicePlayer {
     //   pressure(需要/供給比)由来のブーストで埋める。上げるだけ・落ち着いていれば0。
     const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
     const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
-    const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) });
+    const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars), script: this.readingScript });
     // 2026-10-26: 待ちが無く何も鳴っていない時だけ、少しずつ受け取る(合成の待ちがそのまま声の遅れになる時)。
     if (!this._slowEngine && isWeakVoicePc(this.diag)) this._slowEngine = true;
     const stream = shouldStreamVoice({
@@ -912,7 +926,7 @@ export class VoicePlayer {
    */
   async _playLight(item, generation) {
     this._maybeProbeVoicevox();
-    const text = buildMergedVoiceText(item, { maxChars: LIGHT_VOICE_MAX_CHARS });
+    const text = buildMergedVoiceText(item, { maxChars: LIGHT_VOICE_MAX_CHARS, script: this.readingScript });
     const speaker = this.lightSpeaker;
     let started = false;
     if (text && speaker) {
@@ -1093,7 +1107,7 @@ export class VoicePlayer {
         // v0.1.1089(Phase 2): 先読み済みWAVは pf.boostAtSynth の速度で焼き固まっている。
         //   先読み無し(その場で合成)なら今の実効ブーストがそのまま合成速度=補正不要(等速)。
         const boostAtSynth = pf ? pf.boostAtSynth : effBoostNow;
-        const inlineText = pf ? '' : buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) });
+        const inlineText = pf ? '' : buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars), script: this.readingScript });
         // v0.1.1800: 読んだ文字数(1文字あたりの長さを覚えて、件数の上限を文字数から見積もるため)。
         const spokenChars = pf ? Number(pf.textLength) || 0 : inlineText.length;
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
@@ -1373,17 +1387,15 @@ export class VoicePlayer {
         continue;
       }
 
-      const name = this.readNameEnabled ? String(item.nickname || '').trim() : '';
-      let body = '';
-      if (item.kind === 'gift') {
-        const count = item.gift?.count > 1 ? `を${item.gift.count}個` : 'を';
-        body = `ギフト、${item.gift?.name || 'アイテム'}${count}贈りました。${item.gift?.message || ''}`.trim();
-      } else {
-        body = String(item.text || '').trim();
+      if (isVoiceReadingExcluded(item, this.readingScript)) {
+        this._notifyDropped(item);
+        continue;
       }
+      const speech = buildVoiceQueueSpeech(item, this.readNameEnabled);
+      const { name, body, reading } = speech;
 
       // v0.1.1811: 読む文字が無い(絵文字・記号だけ)ときも「鳴らない」と知らせる(吹き出しを合成待ちのまま8秒残さない)。
-      if (!buildVoiceReadingText({ name, text: body })) { this._notifyDropped(item); continue; }
+      if (!composeVoiceReading(reading, { script: this.readingScript })) { this._notifyDropped(item); continue; }
 
       // 2026-10-22計器(P1): 受信→キュー投入。保存のまとめ書き(最大1.5秒)等の上流の遅れ。
       //   receivedAt は呼び出し側(会場)が渡す受信時刻(無ければ計測しない)。
@@ -1437,7 +1449,8 @@ export class VoicePlayer {
         // 音が実際に出た瞬間(audio の playing / 少しずつ鳴らす開始 / PC の声の onstart)。play() を呼んだ瞬間ではない。
         onAudible: item.onAudible,
         // v0.1.799: 鳴らず破棄された時だけ発火する drop 専用シグナル(再生では呼ばれない)。
-        onDropped: item.onDropped
+        onDropped: item.onDropped,
+        reading
       };
 
       this.diag.voiceEnqueuedTotal = (Number(this.diag.voiceEnqueuedTotal) || 0) + 1; // v0.1.1776計器: 読む列に来た件数
