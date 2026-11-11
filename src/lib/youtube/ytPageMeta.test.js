@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, pickYtBroadcasterIconUrl } from './ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, pickYtBroadcasterIconUrl } from './ytPageMeta.js';
 
 describe('parseYtVideoIdFromUrl', () => {
   it('watch / live / live_chat / youtu.be を読める', () => {
@@ -26,6 +26,10 @@ describe('isYtWatchLikeUrl', () => {
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/live/')).toBe(true);
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan')).toBe(false);
     expect(isYtWatchLikeUrl('https://www.tiktok.com/@some.one/live')).toBe(false);
+    expect(ytHandleLivePendingKey('https://www.youtube.com/@hotspanishvlogs/live')).toBe('ytlive:@hotspanishvlogs');
+    expect(ytHandleLivePendingKey('https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93/live')).toBe('ytlive:@あのちゃんこ');
+    expect(ytHandleLivePendingKey('https://www.tiktok.com/@some.one/live')).toBe('');
+    expect(ytHandleOfPendingKey('ytlive:@hotspanishvlogs')).toBe('@hotspanishvlogs');
     expect(isYtWatchLikeUrl('https://www.youtube.com/@testchan/videos')).toBe(false);
   });
 });

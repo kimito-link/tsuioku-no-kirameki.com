@@ -21,7 +21,7 @@ import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytP
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from '../../src/lib/youtube/ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
@@ -220,10 +220,20 @@ export function videoIdForYtHandleLive(url, summaries) {
   return best;
 }
 
+/**
+ * YouTube の視聴 URL → 配信キー。/@名前/live は、まとめが無くても仮のキーを返す。
+ * @param {string} url
+ * @param {Record<string, any> | null | undefined} summaries
+ */
+export function resolveYtWatchStreamKey(url, summaries) {
+  if (!isYtWatchLikeUrl(url)) return '';
+  return parseYtVideoIdFromUrl(url) || videoIdForYtHandleLive(url, summaries) || ytHandleLivePendingKey(url);
+}
+
 /** 視聴タブの URL → 配信キー(YouTube は videoId・Twitch/Kick は記録のある配信キー)。分からなければ '' @param {string} url */
 export function streamKeyForWatchUrl(url) {
   const u = String(url || '');
-  if (isYtWatchLikeUrl(u)) return parseYtVideoIdFromUrl(u) || videoIdForYtHandleLive(u, knownSummaries);
+  if (isYtWatchLikeUrl(u)) return resolveYtWatchStreamKey(u, knownSummaries);
   const ch = platformChannelOfUrl(u);
   if (!ch) return '';
   // 0.1.1947: 記録の無いチャンネル(配信前の部屋など)は仮のキー '<頭><login>.00000' で「記録 0」を見せる。
@@ -414,6 +424,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const chId = ucId || ucFromRecords;
   const bKey = chId || (handle ? `handle:${handle}` : '');
   const bUid = bKey ? numericUidForYtKey(bKey) : '';
+  const pendingHandle = ytHandleOfPendingKey(videoId);
   const plat = platformOfStreamKey(videoId);
   if (plat && chId.startsWith(plat.personHead) && handle) loginByPersonKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
@@ -425,10 +436,12 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     liveId: lv,
     broadcastTitle: String(sum?.title || ''),
     // 仮キー(記録の無い部屋)は記録に名前が無いので、URL のチャンネル名を出す(別の配信の名前に倒さない)
-    broadcasterName: String(sum?.broadcasterName || '') || (plat && isPlaceholderStreamKey(videoId) ? plat.loginOfStreamKey(videoId) : ''),
+    broadcasterName: String(sum?.broadcasterName || '') || (plat && isPlaceholderStreamKey(videoId) ? plat.loginOfStreamKey(videoId) : '') || pendingHandle,
     thumbnailUrl: plat
       ? plat.thumbUrl(plat.loginOfStreamKey(videoId))
-      : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      : pendingHandle
+        ? ''
+        : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     tags: [],
     startAtText: '',
     links: [],
@@ -440,9 +453,11 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       ? plat.channelUrl(plat.loginOfStreamKey(videoId))
       : chId
       ? `https://www.youtube.com/channel/${chId}`
-      : handle
-        ? `https://www.youtube.com/${encodeURI(handle)}`
-        : '',
+      : pendingHandle
+        ? `https://www.youtube.com/${encodeURI(pendingHandle)}`
+        : handle
+          ? `https://www.youtube.com/${encodeURI(handle)}`
+          : '',
     broadcasterIconUrl: bIcon,
     // YouTube の「N 人が視聴中」は同時接続そのもの。ニコ生版の「公式の同接」の欄に入れる(推定でなく直接値として出る)。
     // YouTube には延べの来場者数が無いので、来場は空のまま(ニコ生版は「(取得不可)」と出す)。

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { streamKeyForWatchUrl, videoIdForYtHandleLive, ytSummaryToNicoSnapshot, isWatchLikeTabUrl } from '../../../extension-youtube/src/ytNicoShim.js';
+import { streamKeyForWatchUrl, resolveYtWatchStreamKey, videoIdForYtHandleLive, ytSummaryToNicoSnapshot, isWatchLikeTabUrl } from '../../../extension-youtube/src/ytNicoShim.js';
+import { buildWatchMetaCardAudienceViewModel } from '../buildWatchMetaCardAudienceViewModel.js';
 
 // 0.1.1947: 記録の無いチャンネル(配信前の部屋)を前面にしても、前に見ていた別の配信を出さない(council/panel-stream-selection-SPEC.md §3-d)
 describe('記録の無いチャンネルは仮のキーで「記録 0」', () => {
@@ -13,6 +14,27 @@ describe('記録の無いチャンネルは仮のキーで「記録 0」', () =>
 
   it('配信のページでなければ写さない(今までどおり)', () => {
     expect(streamKeyForWatchUrl('https://example.com/')).toBe('');
+  });
+
+  it('/@名前/live は、まとめが無くても YouTube の仮キーになり、読み込み中のスナップショットを返す', () => {
+    const url = 'https://www.youtube.com/@hotspanishvlogs/live';
+    expect(streamKeyForWatchUrl(url)).toBe('ytlive:@hotspanishvlogs');
+    expect(resolveYtWatchStreamKey(url, {
+      abcdefghijk: { sourceUrl: url, viewersReadAt: 10 },
+    })).toBe('abcdefghijk');
+    const snap = /** @type {any} */ (ytSummaryToNicoSnapshot(undefined, 'ytlive:@hotspanishvlogs', '配信タイトル'));
+    expect(snap.platform).toBe('youtube');
+    expect(snap.officialViewersOnly).toBe(true);
+    expect(snap.officialViewerCount).toBe(null);
+    expect(snap.broadcasterName).toBe('@hotspanishvlogs');
+    expect(snap.thumbnailUrl).toBe('');
+    const vm = buildWatchMetaCardAudienceViewModel(snap, {
+      nowMs: 1_700_000_000_000,
+      prevForReactions: { viewerCount: null, concurrentEstimated: null },
+    });
+    expect(vm.concurrent.estText).toBe('読み込み中');
+    expect(vm.concurrent.estText).not.toBe('（取得不可）');
+    expect(vm.concurrent.estText).not.toBe('（接続中…）');
   });
 
   it('/@名前/live は、まとめに残した同じパスの動画 id に写る', () => {

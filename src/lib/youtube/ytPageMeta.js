@@ -29,6 +29,30 @@ export function parseYtVideoIdFromUrl(rawUrl) {
 }
 
 /**
+ * /@名前/live を、まとめが出来る前の仮の配信キーにする。YouTube 以外は ''。
+ * 仮のキーがあると横の欄はすぐ YouTube の「読み込み中」になる。
+ * @param {string} rawUrl
+ * @returns {string}
+ */
+export function ytHandleLivePendingKey(rawUrl) {
+  const path = ytHandleLivePath(rawUrl);
+  if (!path) return '';
+  let handle = path.slice(1, path.length - '/live'.length);
+  try {
+    handle = decodeURIComponent(handle);
+  } catch {
+    /* 名前はそのまま */
+  }
+  return handle.startsWith('@') && handle.length > 1 ? `ytlive:${handle}` : '';
+}
+
+/** 仮の配信キーから @名前 を取り出す。仮のキーでなければ ''。 @param {unknown} key */
+export function ytHandleOfPendingKey(key) {
+  const m = String(key || '').match(/^ytlive:(@.+)$/);
+  return m ? m[1] : '';
+}
+
+/**
  * /@名前/live の URL を、比較用のパス（`/@名前/live`）にする。それ以外は ''。
  * @param {string} rawUrl
  * @returns {string}

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2056',
+    date: '2026-11-11',
+    summary: 'YouTubeの@配信はすぐ読み込み中',
+    items: Object.freeze([
+      '/@名前/live を開いた直後から、YouTubeの同時視聴者数を「読み込み中」と出します。動画の番号が分かる前でも、別の配信や「watch ページが見つかりません」にはしません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2055',
     date: '2026-11-11',
     summary: 'YouTubeの同時視聴者数をページから読む',
@@ -194,17 +202,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'Twitch の未ログインの見分けを直す',
     items: Object.freeze([
       'Twitch にログインしていないのにコメントを打ってしまうことがあったのを直しました(ログインしていなくてもあるメニューのボタンを、ログインの印と見ていました)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1917',
-    date: '2026-11-07',
-    summary: 'Twitch の画面の言葉・顔・送信の直し',
-    items: Object.freeze([
-      'Twitch の配信の画面に残っていた YouTube の言葉(スパチャの合計順・トップファン)を、Bits・ギフトサブの合計の順位に直しました。',
-      'Twitch にログインしていないときは、コメントを打たずに「ログインしていない」と理由を出すようにしました(Twitch は未ログインでも入力欄を出すため)。',
-      '記録のときに顔の取得が間に合わなかった人も、あとで分かった顔を画面に出すようにしました。',
-      '計器のギフトサブの数が常に 0 だったのを、贈った件数で数えるように直しました。'
     ])
   })
 ]);
