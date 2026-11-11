@@ -45,6 +45,11 @@ export function decideSpeechRoute(input) {
   return { active: id, viaFallback: false, down: true };
 }
 
+/**
+ * @param {number} n
+ * @param {number} min
+ * @param {number} max
+ */
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
@@ -59,7 +64,7 @@ function osSpeakerOf(opts) {
 
 /**
  * @param {unknown} id
- * @param {{ fetchFn?: Function, timeoutMs?: number, speaker?: any }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, timeoutMs?: number, speaker?: any }} [opts]
  */
 export async function probeSpeechEngine(id, opts = {}) {
   const engine = speechEngineById(normalizeSpeechEngineId(id));
@@ -81,7 +86,7 @@ export async function probeSpeechEngine(id, opts = {}) {
 
 /**
  * @param {unknown} id
- * @param {{ fetchFn?: Function, speaker?: any }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, speaker?: any }} [opts]
  * @returns {Promise<number[]>}
  */
 export async function listSpeechEngineStyles(id, opts = {}) {
@@ -106,7 +111,7 @@ export async function listSpeechEngineStyles(id, opts = {}) {
  * @param {unknown} id
  * @param {string} text
  * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
- * @param {Record<string, any>} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, speaker?: any, volumePercent?: number, signal?: AbortSignal, [key: string]: any }} [opts]
  */
 export function synthesizeSpeechEngine(id, text, voice, opts = {}) {
   const engine = speechEngineById(id);
@@ -148,7 +153,7 @@ function synthesizeOs(text, voice, opts) {
 /**
  * GPU の案内は VOICEVOX だけ。他のエンジンでは調べない（null）。
  * @param {unknown} id
- * @param {{ fetchFn?: Function }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch }} [opts]
  */
 export function probeSpeechEngineGpu(id, opts = {}) {
   if (id !== 'voicevox' || !speechEngineAllowsGpuProbe('voicevox')) return Promise.resolve(null);
@@ -157,7 +162,7 @@ export function probeSpeechEngineGpu(id, opts = {}) {
 
 /**
  * @param {unknown} id
- * @param {{ fetchFn?: Function }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch }} [opts]
  */
 export function probeSpeechEngineStreaming(id, opts = {}) {
   const engine = speechEngineById(id);

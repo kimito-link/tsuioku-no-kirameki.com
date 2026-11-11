@@ -55,7 +55,7 @@ export function bouyomiVolume(volumePercent) {
 }
 
 /**
- * @param {{ fetchFn?: Function, timeoutMs?: number, baseUrl?: string }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, timeoutMs?: number, baseUrl?: string }} [opts]
  */
 export async function probeBouyomi(opts = {}) {
   const fetchFn = opts.fetchFn;
@@ -81,7 +81,7 @@ export function listBouyomiStyleIds() {
 /**
  * @param {string} text
  * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
- * @param {{ fetchFn?: Function, baseUrl?: string, volumePercent?: number, signal?: AbortSignal }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, baseUrl?: string, volumePercent?: number, signal?: AbortSignal }} [opts]
  */
 export function synthesizeBouyomi(text, voice, opts = {}) {
   const fetchFn = opts.fetchFn;

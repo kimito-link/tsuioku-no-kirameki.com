@@ -62,7 +62,7 @@ export function parseYukariVoices(body) {
 }
 
 /**
- * @param {{ fetchFn?: Function, timeoutMs?: number, baseUrl?: string }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, timeoutMs?: number, baseUrl?: string }} [opts]
  */
 export async function probeYukari(opts = {}) {
   const fetchFn = opts.fetchFn;
@@ -80,7 +80,7 @@ export async function probeYukari(opts = {}) {
 }
 
 /**
- * @param {{ fetchFn?: Function, timeoutMs?: number, baseUrl?: string }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, timeoutMs?: number, baseUrl?: string }} [opts]
  * @returns {Promise<number[]>}
  */
 export async function listYukariStyleIds(opts = {}) {
@@ -101,7 +101,7 @@ export async function listYukariStyleIds(opts = {}) {
 /**
  * @param {string} text
  * @param {{ styleId?: number, speedOffset?: number }} voice
- * @param {{ fetchFn?: Function, baseUrl?: string, signal?: AbortSignal }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, baseUrl?: string, signal?: AbortSignal }} [opts]
  */
 export function synthesizeYukari(text, voice, opts = {}) {
   const reading = String(text || '').trim().slice(0, 180);
@@ -110,6 +110,7 @@ export function synthesizeYukari(text, voice, opts = {}) {
   const base = String(opts.baseUrl || YUKARI_BASE_URL).replace(/\/+$/, '');
   const row = cachedStyles.find((item) => item.token === Number(voice?.styleId)) || cachedStyles[0];
   const speed = Math.min(300, Math.max(50, Math.round(100 * (1 + (Number(voice?.speedOffset) || 0)))));
+  /** @type {Record<string, string>} */
   const extra = { Text: reading };
   if (row?.name) extra.Engine = row.name;
   const talkUrl = buildYukariCommandUrl(base, 'speech', extra);

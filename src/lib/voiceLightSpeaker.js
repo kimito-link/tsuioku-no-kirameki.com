@@ -19,7 +19,7 @@ const WATCHDOG_EXTRA_MS = 5000;
  * @returns {null | {
  *   available: () => boolean,
  *   voices: () => any[],
- *   speak: (text: string, tone: { voiceIndex: number, pitch: number, rate: number }, hooks?: { onStart?: () => void }) => Promise<boolean>,
+ *   speak: (text: string, tone: { voiceIndex: number, pitch: number, rate: number, volume?: number }, hooks?: { onStart?: () => void }) => Promise<boolean>,
  *   cancel: () => void,
  *   lastError: () => string
  * }}
@@ -47,7 +47,7 @@ export function createLightSpeaker(deps = {}) {
     voices: () => cached,
     cancel: () => { try { synth.cancel(); } catch { /* no-op */ } },
     lastError: () => lastError,
-    speak(text, tone, hooks = {}) {
+    speak(text, /** @type {{ voiceIndex: number, pitch: number, rate: number, volume?: number }} */ tone, hooks = {}) {
       return new Promise((resolve) => {
         if (!cached.length) refresh();
         const t = String(text || '');

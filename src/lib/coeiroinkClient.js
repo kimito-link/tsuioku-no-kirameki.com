@@ -20,7 +20,7 @@ const OUTPUT_RATE = 24000;
 /** @type {CoeiroStyle[]} */
 let cachedStyles = [];
 
-function isWhisperName(name) {
+function isWhisperName(/** @type {unknown} */ name) {
   return /ささやき|囁き|ウィスパ|whisper/i.test(String(name || ''));
 }
 
@@ -51,7 +51,7 @@ export function parseCoeiroSpeakers(body) {
 }
 
 /**
- * @param {{ fetchFn?: Function, timeoutMs?: number, baseUrl?: string }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, timeoutMs?: number, baseUrl?: string }} [opts]
  */
 export async function probeCoeiroink(opts = {}) {
   const fetchFn = opts.fetchFn;
@@ -71,7 +71,7 @@ export async function probeCoeiroink(opts = {}) {
 }
 
 /**
- * @param {{ fetchFn?: Function, timeoutMs?: number, baseUrl?: string }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, timeoutMs?: number, baseUrl?: string }} [opts]
  * @returns {Promise<number[]>}
  */
 export async function listCoeiroStyleIds(opts = {}) {
@@ -97,7 +97,7 @@ export async function listCoeiroStyleIds(opts = {}) {
 /**
  * @param {string} text
  * @param {{ styleId?: number, pitchOffset?: number, speedOffset?: number }} voice
- * @param {{ fetchFn?: Function, baseUrl?: string, volumePercent?: number, signal?: AbortSignal, onFailure?: Function }} [opts]
+ * @param {{ fetchFn?: import('./speechLocalHttp.js').SpeechFetch, baseUrl?: string, volumePercent?: number, signal?: AbortSignal, onFailure?: (info: { stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }) => void }} [opts]
  */
 export async function synthesizeCoeiroink(text, voice, opts = {}) {
   const reading = String(text || '').trim();

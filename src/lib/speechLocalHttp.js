@@ -6,7 +6,12 @@
  */
 
 /**
- * @param {(url: string, init?: RequestInit) => Promise<any>} fetchFn
+ * ローカル読み上げへ聞く fetch。戻りは Response でも、テストの簡易オブジェクトでもよい。
+ * @typedef {(input: RequestInfo | URL, init?: RequestInit) => Promise<any>} SpeechFetch
+ */
+
+/**
+ * @param {SpeechFetch} fetchFn
  * @param {string} url
  * @param {RequestInit} [init]
  * @param {number} [timeoutMs]
