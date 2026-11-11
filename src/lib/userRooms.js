@@ -5,6 +5,7 @@
 import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import { isRecommendedUserChipPollutionRow } from './backfillRemoveRecommendedLivePollution.js';
+import { commentRowsAppendIndex } from './laneAggregatesMemo.js';
 
 export const UNKNOWN_USER_KEY = '__unknown__';
 
@@ -135,4 +136,39 @@ export function aggregateCommentsByUser(entries, options) {
   let rows = createAggregateCommentsFolder(options).add(list);
   if (maxRooms > 0 && rows.length > maxRooms) rows = rows.slice(0, maxRooms);
   return rows;
+}
+
+/**
+ * 応援件数の集計を、うしろに足されたコメントだけ足す。
+ * 全件の数え直しは 4倍・6倍に遅くした条件で 100ms を超えていた。
+ * 間引き(sampleMax)はしない。記録は減らない。
+ * @param {{ requireText?: boolean, trackCharTotals?: boolean, sortByCount?: boolean }} [options]
+ */
+export function createLiveAggregateComments(options) {
+  let folder = /** @type {ReturnType<typeof createAggregateCommentsFolder> | null} */ (null);
+  /** @type {{ rows: readonly unknown[] } | null} */
+  let meta = null;
+  /** @type {ReturnType<ReturnType<typeof createAggregateCommentsFolder>['add']>} */
+  let out = [];
+  const diag = { folded: 0, rebuilt: 0 };
+  /**
+   * @param {readonly { userId?: string|null, nickname?: string, text?: string, capturedAt?: number, avatarUrl?: string|null, id?: unknown, commentNo?: unknown, pk?: unknown }[]} entries
+   */
+  const live = (entries) => {
+    const rows = Array.isArray(entries) ? entries : [];
+    const appendAt = folder && meta ? commentRowsAppendIndex(meta.rows, rows) : -1;
+    if (folder && appendAt >= 0) {
+      out = folder.add(rows.slice(appendAt));
+      meta = { rows: rows.slice() };
+      diag.folded += 1;
+      return out;
+    }
+    folder = createAggregateCommentsFolder(options);
+    out = folder.add(rows);
+    meta = rows.length ? { rows: rows.slice() } : null;
+    diag.rebuilt += 1;
+    return out;
+  };
+  live.diag = diag;
+  return live;
 }

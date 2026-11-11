@@ -43,6 +43,23 @@ import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
 import { ytVoiceAssignPersistDecision, YT_VOICE_ASSIGN_PERSIST_MS } from '../../src/lib/youtube/ytVoiceAssignPersist.js';
+import {
+  changedVoicePersonWrites,
+  slimSummaryForStorage,
+  storageJsonBytes,
+  summaryChromeWriteDue,
+  summaryStorageKey,
+  verifiedBeforeRetire,
+} from '../../src/lib/youtube/ytSplitPersist.js';
+import { capStallPage } from '../../src/lib/stallTrace.js';
+import {
+  appendStallRows,
+  putSummary,
+  putVoicePeople,
+  readAllSummaries,
+  readAllVoices,
+} from '../../src/lib/youtube/ytSplitPersistStore.js';
+import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
@@ -153,7 +170,7 @@ function scheduleVoiceAssignFlush() {
       voiceAssignDiag.flush++;
       if (voiceAssignWrittenAt) voiceAssignDiag.gaps = [...voiceAssignDiag.gaps.slice(-19), Date.now() - voiceAssignWrittenAt];
       voiceAssignWrittenAt = Date.now();
-      await chrome.storage.local.set({ [STORAGE_KEYS.VOICE_ASSIGNMENTS]: voiceAssignMem });
+      await persistChangedVoices(voiceAssignMem);
     }).catch(() => {
       voiceAssignDirty = true;
     });
@@ -171,6 +188,180 @@ let creatingOffscreenPromise = null;
  * @param {() => Promise<T>} fn
  * @returns {Promise<T>}
  */
+/** @type {Record<string, any> | null} */
+let summaryMem = null;
+let summaryRetireStarted = false;
+/** @type {Map<string, number>} */
+const summaryChromeAt = new Map();
+/** @type {Record<string, string>} userKey → 最後に書いた JSON */
+const voiceSavedJson = {};
+/** @type {{ t: number, key: string, bytes: number, ms: number }[]} */
+const storageWriteRing = [];
+/** @type {Record<string, { t: number, dur: number, file: string, domain: string, section: string }[]>} */
+const stallByPage = {};
+
+function noteStorageWrite(key, value, ms) {
+  storageWriteRing.push({
+    t: Date.now(),
+    key: String(key || '').slice(0, 80),
+    bytes: storageJsonBytes(value),
+    ms: Math.max(0, Math.round(Number(ms) || 0)),
+  });
+  if (storageWriteRing.length > 50) storageWriteRing.splice(0, storageWriteRing.length - 50);
+}
+
+try {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    const origSet = chrome.storage.local.set.bind(chrome.storage.local);
+    chrome.storage.local.set = (/** @type {any} */ items, /** @type {any} */ cb) => {
+      const t0 = Date.now();
+      const p = Promise.resolve(origSet(items)).then((res) => {
+        const ms = Date.now() - t0;
+        if (items && typeof items === 'object') {
+          for (const [k, v] of Object.entries(items)) noteStorageWrite(k, v, ms);
+        }
+        return res;
+      });
+      if (typeof cb === 'function') {
+        p.then((res) => cb(res), () => cb());
+        return undefined;
+      }
+      return p;
+    };
+  }
+} catch {
+  /* 計器が包めなくても記録は続ける */
+}
+
+/**
+ * @param {Record<string, any>} assignments
+ */
+async function persistChangedVoices(assignments) {
+  const next = assignments && typeof assignments === 'object' ? assignments : {};
+  /** @type {Record<string, unknown>} */
+  const prev = {};
+  for (const [k, json] of Object.entries(voiceSavedJson)) {
+    try { prev[k] = JSON.parse(json); } catch { /* 壊れた1人は比べない */ }
+  }
+  const changed = changedVoicePersonWrites(prev, next);
+  if (!changed.length) return;
+  /** @type {Record<string, unknown>} */
+  const batch = {};
+  for (const row of changed) batch[row.userKey] = row.body;
+  const res = await putVoicePeople(batch);
+  if (!verifiedBeforeRetire(res)) return;
+  for (const row of changed) voiceSavedJson[row.userKey] = JSON.stringify(row.body);
+}
+
+async function ensureSummaryMem() {
+  if (summaryMem) return summaryMem;
+  summaryMem = {};
+  try {
+    const fromDb = await readAllSummaries();
+    if (fromDb && typeof fromDb === 'object') summaryMem = fromDb;
+  } catch {
+    summaryMem = summaryMem || {};
+  }
+  try {
+    const bag = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
+    const old = bag?.[STORAGE_KEYS.STREAM_SUMMARIES];
+    if (old && typeof old === 'object') {
+      let stored = 0;
+      let readBack = 0;
+      for (const [vid, sum] of Object.entries(old)) {
+        if (!sum || typeof sum !== 'object') continue;
+        if (summaryMem[vid]) {
+          stored += 1;
+          readBack += 1;
+          continue;
+        }
+        const res = await putSummary(vid, /** @type {any} */ (sum));
+        stored += res.stored;
+        readBack += res.readBack;
+        if (res.readBack >= res.stored && res.stored === 1) summaryMem[vid] = sum;
+      }
+      if (verifiedBeforeRetire({ stored, readBack }) && stored > 0) {
+        await chrome.storage.local.remove(STORAGE_KEYS.STREAM_SUMMARIES);
+      }
+    }
+  } catch {
+    /* 古い一覧が読めなくても、配信ごとの正本は残す */
+  }
+  if (!summaryRetireStarted) {
+    summaryRetireStarted = true;
+    setTimeout(() => {
+      void (async () => {
+        try {
+          if (typeof chrome.storage.local.getKeys !== 'function') return;
+          const keys = await chrome.storage.local.getKeys();
+          const hit = (Array.isArray(keys) ? keys : []).filter((k) => /nls_comments_lv/.test(String(k))).slice(0, 3);
+          await retireVerifiedPseudoCommentKeys(hit);
+        } catch {
+          /* 消せなくても記録は残る */
+        }
+      })();
+    }, 5000);
+  }
+  return summaryMem;
+}
+
+/**
+ * @param {string} videoId
+ * @param {any} summary
+ */
+async function publishOneSummary(videoId, summary) {
+  const id = String(videoId || '').trim();
+  if (!id || !summary) return;
+  const mem = await ensureSummaryMem();
+  mem[id] = summary;
+  try {
+    await putSummary(id, summary);
+  } catch {
+    /* IndexedDB が書けなくても、画面への小さい知らせは続ける */
+  }
+  const now = Date.now();
+  if (!summaryChromeWriteDue(summaryChromeAt.get(id) || 0, now)) return;
+  const slim = slimSummaryForStorage(summary);
+  const key = summaryStorageKey(id);
+  if (!slim || !key) return;
+  summaryChromeAt.set(id, now);
+  await chrome.storage.local.set({ [key]: slim });
+}
+
+/**
+ * 疑似 lv の巨大なコメント鍵は、IndexedDB の件数を読み戻してから消す。
+ * @param {string[]} keys
+ */
+async function retireVerifiedPseudoCommentKeys(keys) {
+  const list = Array.isArray(keys) ? keys : [];
+  for (const key of list) {
+    const m = /(?:^|:)nls_comments_(lv\d+)/.exec(String(key || ''));
+    if (!m) continue;
+    const lv = m[1];
+    let matched = '';
+    const mem = summaryMem || {};
+    for (const vid of Object.keys(mem)) {
+      if (computePseudoLvForVideoId(vid) === lv) {
+        matched = vid;
+        break;
+      }
+    }
+    if (!matched) continue;
+    const bag = await chrome.storage.local.get(key);
+    const rows = bag?.[key];
+    const storageCount = Array.isArray(rows) ? rows.length : 0;
+    let idbCount = 0;
+    try {
+      const items = await getYtStreamCommentsByVideoId(matched);
+      idbCount = Array.isArray(items) ? items.length : 0;
+    } catch {
+      continue;
+    }
+    if (!verifiedBeforeRetire({ stored: storageCount, readBack: idbCount })) continue;
+    await chrome.storage.local.remove(key);
+  }
+}
+
 /**
  * コメントの束ごとに配信一覧を書き直すと、画面側が全件を組み立て直して固まる。
  * 最初の1回はすぐ書き、そのあとは間隔を空けてまとめる。書く直前に一覧を読み直す。
@@ -203,10 +394,9 @@ function scheduleYtChatSummaryFlush(patch) {
     pendingChatFlush.clear();
     void runSerialized(async () => {
       if (!batch.length) return;
-      const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
-      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      const summaries = await ensureSummaryMem();
       /** @type {Record<string, any>} */
-      const updates = { [STORAGE_KEYS.STREAM_SUMMARIES]: summaries };
+      const updates = {};
       let activeId = '';
       for (const [videoId, row] of batch) {
         summaries[videoId] = mergeYtStreamSummary(
@@ -218,13 +408,14 @@ function scheduleYtChatSummaryFlush(patch) {
           },
           Date.now(),
         );
+        await publishOneSummary(videoId, summaries[videoId]);
         if (row.voiceQueue) updates[STORAGE_KEYS.VOICE_QUEUE] = row.voiceQueue;
         if (row.voiceState) updates[STORAGE_KEYS.VOICE_STATE] = row.voiceState;
-        if (row.assignments) updates[STORAGE_KEYS.VOICE_ASSIGNMENTS] = row.assignments;
+        if (row.assignments) await persistChangedVoices(row.assignments);
         if (row.setActive) activeId = videoId;
       }
       if (activeId) updates[STORAGE_KEYS.ACTIVE_VIDEO_ID] = activeId;
-      await chrome.storage.local.set(updates);
+      if (Object.keys(updates).length) await chrome.storage.local.set(updates);
     });
   }, wait);
 }
@@ -633,11 +824,10 @@ async function runSwitchLeakCleanups() {
       if (!target.length || !prev.length) continue; // 記録が無い PC では何もしない(印も付けない)
       const pks = pickSwitchLeakPks(target, prev);
       const total = pks.length ? await deleteYtCommentsByPks(job.target, pks) : target.length;
-      const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
-      const summaries = (data && data[STORAGE_KEYS.STREAM_SUMMARIES]) || {};
+      const summaries = await ensureSummaryMem();
       if (summaries[job.target]) {
         summaries[job.target] = { ...summaries[job.target], itemCount: total };
-        await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
+        await publishOneSummary(job.target, summaries[job.target]);
       }
       await chrome.storage.local.set({ [job.key]: { at: Date.now(), removed: pks.length, total } });
     } catch {
@@ -679,15 +869,12 @@ async function runCrossVideoCleanupOnce() {
       const { totals, removed } = await deleteYtCommentPksAcrossVideos(pick.deletePks, vids);
       removedCount = removed.length;
       await runSerialized(async () => {
-        const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
-        const summaries = (data && data[STORAGE_KEYS.STREAM_SUMMARIES]) || {};
-        let changed = false;
+        const summaries = await ensureSummaryMem();
         for (const [vid, total] of Object.entries(totals)) {
           if (!summaries[vid]) continue;
           summaries[vid] = { ...summaries[vid], itemCount: total };
-          changed = true;
+          await publishOneSummary(vid, summaries[vid]);
         }
-        if (changed) await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
       });
     }
     await chrome.storage.local.set({
@@ -741,6 +928,46 @@ async function resolveHandleIcons(handles) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
+
+  if (message.type === 'YT_GET_STREAM_SUMMARIES') {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    ensureSummaryMem()
+      .then((summaries) => sendResponse({ ok: true, summaries }))
+      .catch(() => sendResponse({ ok: false, summaries: {} }));
+    return true;
+  }
+
+  if (message.type === 'NLS_STALL_SUMMARY') {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    const page = String(message.page || 'page').slice(0, 80);
+    const rows = Array.isArray(message.events) ? message.events.slice(-50) : [];
+    stallByPage[page] = capStallPage(stallByPage[page] || [], rows);
+    const sum = message.summary && typeof message.summary === 'object' ? message.summary : {};
+    void appendStallRows(page, rows).catch(() => {});
+    const minuteAgo = Date.now() - 60_000;
+    const recent = storageWriteRing.filter((w) => w.t >= minuteAgo);
+    const bytes = recent.reduce((n, w) => n + (Number(w.bytes) || 0), 0);
+    const maxWrite = storageWriteRing.reduce((m, w) => (w.bytes > m.bytes ? w : m), { bytes: 0, key: '' });
+    void chrome.storage.local.set({
+      nls_stall_summary_v1: {
+        v: 1,
+        at: Date.now(),
+        page,
+        n: Number(sum.n) || 0,
+        max: Number(sum.max) || 0,
+        over100: Number(sum.over100) || 0,
+        over50: Number(sum.over50) || 0,
+        lastFile: String(sum.lastFile || '').slice(0, 80),
+        lastDomain: String(sum.lastDomain || '').slice(0, 80),
+        lastSection: String(sum.lastSection || '').slice(0, 40),
+        writeN: recent.length,
+        writeBytesPerMin: bytes,
+        writeMaxBytes: Number(maxWrite.bytes) || 0,
+        writeMaxKey: String(maxWrite.key || '').slice(0, 80),
+      },
+    }).catch(() => {});
+    return false;
+  }
 
   // 視聴ページの中の会場(venue-inline.js)は拡張の IndexedDB を読めないので、ここで読んで渡す
   if (message.type === 'YT_GET_STREAM_COMMENTS') {
@@ -883,11 +1110,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || '').trim();
       if (!videoId) return { ok: false };
 
-      const data = await chrome.storage.local.get([
-        STORAGE_KEYS.STREAM_SUMMARIES,
-        STORAGE_KEYS.ACTIVE_VIDEO_ID,
-      ]);
-      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      const summaries = await ensureSummaryMem();
       summaries[videoId] = mergeYtStreamSummary(
         summaries[videoId],
         {
@@ -915,10 +1138,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         Date.now(),
       );
 
-      await chrome.storage.local.set({
-        [STORAGE_KEYS.STREAM_SUMMARIES]: summaries,
-        [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId,
-      });
+      await publishOneSummary(videoId, summaries[videoId]);
+      await chrome.storage.local.set({ [STORAGE_KEYS.ACTIVE_VIDEO_ID]: videoId });
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
       return { ok: true, videoId };
     })
@@ -960,8 +1181,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   //   終わるとアーカイブのチャット(リプレイ)に全部残るので、YouTube のタブ(content)が裏で読んで送ってくる。
   if (message.type === 'YT_BACKFILL_NEXT') {
     runSerialized(async () => {
-      const data = await chrome.storage.local.get([STORAGE_KEYS.STREAM_SUMMARIES, KEY_BACKFILL_STATE]);
-      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
+      const data = await chrome.storage.local.get(KEY_BACKFILL_STATE);
+      const summaries = await ensureSummaryMem();
       const state = data[KEY_BACKFILL_STATE] || {};
       const now = Date.now();
       const vid = pickBackfillVideo(summaries, state, now);
@@ -1008,19 +1229,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           .set({ yt_diag_backfill_reclaim: { at: Date.now(), to: videoId, n: reclaimed.length, from: fromVids.slice(0, 5) } })
           .catch(() => {});
       }
-      const data = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
-      const summaries = data[STORAGE_KEYS.STREAM_SUMMARIES] || {};
-      let changed = false;
+      const summaries = await ensureSummaryMem();
       if (summaries[videoId] && res.newlyAdded.length) {
         summaries[videoId] = mergeYtStreamSummary(summaries[videoId], { videoId, itemCount: res.totalCount }, Date.now());
-        changed = true;
+        await publishOneSummary(videoId, summaries[videoId]);
       }
       for (const [v, total] of Object.entries(otherTotals)) {
         if (!summaries[v]) continue;
         summaries[v] = { ...summaries[v], itemCount: total };
-        changed = true;
+        await publishOneSummary(v, summaries[v]);
       }
-      if (changed) await chrome.storage.local.set({ [STORAGE_KEYS.STREAM_SUMMARIES]: summaries });
       return { added: res.newlyAdded.length, total: res.totalCount };
     })
       .then((res) => sendResponse(res))
@@ -1077,6 +1295,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const incoming = Array.isArray(payload.items) ? payload.items : [];
       const chatFilterLabel = String(payload.chatFilterLabel || '').trim();
 
+      if (!voiceAssignMem) {
+        try {
+          const fromDb = await readAllVoices();
+          if (fromDb && Object.keys(fromDb).length) {
+            voiceAssignMem = fromDb;
+            for (const [k, body] of Object.entries(fromDb)) voiceSavedJson[k] = JSON.stringify(body);
+            if (!voiceAssignWrittenAt) voiceAssignWrittenAt = Date.now();
+          }
+        } catch {
+          /* 読めなければ、下の古い塊から読む */
+        }
+      }
+
       const data = await chrome.storage.local.get([
         ...(BACKGROUND_READER_ENABLED ? [STORAGE_KEYS.STREAM_SUMMARIES] : []),
         STORAGE_KEYS.ACTIVE_VIDEO_ID,
@@ -1099,6 +1330,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!voiceAssignWrittenAt) voiceAssignWrittenAt = Date.now();
       }
       const assignmentsAtStart = voiceAssignMem || data[STORAGE_KEYS.VOICE_ASSIGNMENTS] || {};
+      if (!voiceAssignMem && data[STORAGE_KEYS.VOICE_ASSIGNMENTS]) {
+        voiceAssignMem = data[STORAGE_KEYS.VOICE_ASSIGNMENTS];
+        try {
+          const migrated = await putVoicePeople(voiceAssignMem);
+          if (verifiedBeforeRetire(migrated)) {
+            for (const [k, body] of Object.entries(voiceAssignMem)) voiceSavedJson[k] = JSON.stringify(body);
+            await chrome.storage.local.remove(STORAGE_KEYS.VOICE_ASSIGNMENTS);
+          }
+        } catch {
+          /* 読み戻せなければ古い塊は残す */
+        }
+      }
       let assignments = assignmentsAtStart;
       let voiceQueue = Array.isArray(data[STORAGE_KEYS.VOICE_QUEUE])
         ? data[STORAGE_KEYS.VOICE_QUEUE]

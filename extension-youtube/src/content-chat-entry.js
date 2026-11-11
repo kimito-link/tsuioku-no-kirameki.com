@@ -14,6 +14,18 @@ import {
   pickYtBroadcasterIconUrl,
 } from '../../src/lib/youtube/ytPageMeta.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
+import { startPageStallWatch } from '../../src/lib/stallTrace.js';
+try {
+  const stallRoot = /** @type {any} */ (globalThis);
+  if (!stallRoot.__nlStallWatch && isYtWatchLikeUrl(String(location.href || ''))) {
+    stallRoot.__nlStallWatch = startPageStallWatch({
+      file: 'content-chat-entry.js',
+      send: (summary) => {
+        try { chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: stallRoot.__nlStallWatch.ring.events.slice(-50) }); } catch { /* 計器 */ }
+      },
+    });
+  }
+} catch { /* 計器 */ }
 
 /** チャットを自動で「すべて」に切り替えるか（サイドパネルの設定・既定オン） */
 const AUTO_ALL_CHAT_KEY = 'yt_auto_all_chat_v1';

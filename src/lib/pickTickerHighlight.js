@@ -39,6 +39,12 @@ export const TICKER_BUCKET_MS = 7000;
 export const TICKER_LOOKBACK_MS = 8000;
 
 /**
+ * 末尾から見る行数の上限。8,000件を毎回採点すると、4倍・6倍に遅くした条件で 100ms を超える。
+ * 秒あたり百件でも、この件数は遡り幅(8秒)を覆う。
+ */
+export const TICKER_SCAN_MAX = 1200;
+
+/**
  * これ未満の本文はスパム扱いで候補外(「w」「88」等)。ギフトは免除。
  *
  * ★v0.1.1337: 4 → 3 に緩めた(実機で拾えなさすぎた)。
@@ -170,7 +176,10 @@ export function pickTickerHighlightEntry(list, nowMs, opts = {}) {
   // 並びが崩れていたら最後まで見る(結果は全件走査と同じ)。
   let prevTs = Infinity;
   let ordered = true;
+  let scanned = 0;
   for (let i = rows.length - 1; i >= 0; i -= 1) {
+    scanned += 1;
+    if (scanned > TICKER_SCAN_MAX) break;
     const row = rows[i];
     const ts = candidateTs(row);
     if (ordered && ts > prevTs) ordered = false;

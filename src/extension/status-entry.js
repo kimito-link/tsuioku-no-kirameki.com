@@ -27,6 +27,7 @@
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
 import '../lib/extDocBusyCensusBoot.js';
 import { detectVersionMismatch } from '../lib/versionMismatch.js';
+import { stallOverviewLine } from '../lib/stallTrace.js';
 // 拡張リロード後も残る status.html からの storage 操作を安全な helper に集約する。
 import {
   safeStorageLocalGet,
@@ -392,6 +393,7 @@ const _coreReadAt = Object.create(null);
  * @type {{ at?: number, reason?: string, tabCount?: number, reloaded?: number }|null}
  */
 let _autoTabReloadRec = null;
+let _stallSummaryRec = null;
 /**
  * ★v0.1.1412: 取得経路の履歴(storage 由来)。
  *   「先週は embedded-data で取れていた」を覚えていないと降格を判定できない。
@@ -996,11 +998,12 @@ async function refresh(opts = {}) {
       step = 'smallKeysBatch';
       {
         const _small = await runStorageOpWithTimeout(
-          () => chrome.storage.local.get(['nls_last_auto_tab_reload', KEY_SOURCE_PROVENANCE]),
+          () => chrome.storage.local.get(['nls_last_auto_tab_reload', 'nls_stall_summary_v1', KEY_SOURCE_PROVENANCE]),
           _slice()
         ).catch(() => null);
         if (_small) {
           _autoTabReloadRec = _small.nls_last_auto_tab_reload || null;
+          _stallSummaryRec = _small.nls_stall_summary_v1 || null;
           _sourceProvenanceStored = _small[KEY_SOURCE_PROVENANCE] || null;
         }
       }
@@ -1934,13 +1937,8 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     channelSwitchLine = sLines.length ? `\n${sLines.join('\n')}` : '';
   });
   /*
-   * ★v0.1.1384: 拡張更新時に watch タブが【自動リロードされたか】を出す。
-   *
-   * ■ なぜ(2026-08-13 ユーザーの困りごと)
-   *   ユーザーは更新のたび「🔄 → watch タブ F5」を手作業でやっていた(1日11版=11回)。
-   *   しかし background.js の reloadExistingWatchTabs() が効いているなら **F5 は不要**。
-   *   ★「効いているか」を誰も測っていなかったため、私(司令塔)は毎回 F5 を依頼し続けた。
-   *   この行が出れば、次からその依頼を**やめられる**。
+   * ★v0.1.1384: 拡張更新時に watch タブが自動リロードされたかを出す。
+   *   効いていれば手動の F5 は不要。固まり計器の1行もここへ足す。
    */
   let autoTabReloadLine = '';
   safeSection('自動タブリロード計器', () => {
@@ -1954,6 +1952,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
       `\n拡張更新時の自動タブリロード: ${reloaded > 0 ? '✅' : '⚠'}${reloaded}枚を再読込` +
       `(${agoSec}秒前・経路=${String(rec.reason || '?')})` +
       (reloaded > 0 ? ' ★手動F5は不要です' : ' ★対象タブが無かった(watchを開く前の更新)');
+    autoTabReloadLine += stallOverviewLine(_stallSummaryRec);
   });
   // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出の
   //   件数/最終記録ago/上位ラベル)を概要に併記(台帳が空の配信なら空=ノイズにしない)。

@@ -28,6 +28,9 @@ describe('ytNicoShim: 組み立て結果の使い回し', () => {
   it('並べ直しも、控えが変わったときだけ', () => {
     expect(shim).toContain('if (c.sorted && c.sortedVer === ver) return c.sorted;');
   });
+  it('同じ読み直しでは新しく作る行は 0', () => {
+    expect(shim).toContain('shimDiag.rowsMadeLast = 0;');
+  });
 });
 
 describe('popup: 顔の数え上げは同じ人・同じ顔URL・自分の投稿かどうかごとに1回', () => {

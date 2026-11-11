@@ -41,6 +41,50 @@ function isPrefixExtension(prev, list) {
 }
 
 /**
+ * うしろに足されただけなら、足し始める位置。id が1つでも違えば -1（全部数え直す）。
+ * @param {readonly unknown[]} prev
+ * @param {readonly unknown[]} list
+ * @returns {number}
+ */
+export function commentRowsAppendIndex(prev, list) {
+  const n = prev.length;
+  if (!n || !list || list.length <= n) return -1;
+  if (rowStableId(prev[n - 1]) !== rowStableId(list[n - 1])) return -1;
+  if (rowStableId(prev[0]) !== rowStableId(list[0])) return -1;
+  for (let i = 1; i < n - 1; i += 1) {
+    if (rowStableId(prev[i]) !== rowStableId(list[i])) return -1;
+  }
+  return n;
+}
+
+/**
+ * 同じ長さで、id が全部同じか。オブジェクトが作り直されていても、中身が同じなら数え直さない。
+ * @param {readonly unknown[]} prev
+ * @param {readonly unknown[]} list
+ * @returns {boolean}
+ */
+export function commentRowsSameIds(prev, list) {
+  if (!prev || !list || prev.length !== list.length || !prev.length) return false;
+  for (let i = 0; i < prev.length; i += 1) {
+    const id = rowStableId(prev[i]);
+    if (!id || id !== rowStableId(list[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * @param {unknown} row
+ * @returns {string}
+ */
+function rowStableId(row) {
+  if (!row || typeof row !== 'object') return '';
+  const id = /** @type {{ id?: unknown, commentNo?: unknown, pk?: unknown }} */ (row).id
+    ?? /** @type {{ commentNo?: unknown }} */ (row).commentNo
+    ?? /** @type {{ pk?: unknown }} */ (row).pk;
+  return id == null || id === '' ? '' : String(id);
+}
+
+/**
  * @template T
  * @param {{
  *   compute: (rows: readonly unknown[], liveId: string, opts: { broadcasterUid?: string, broadcasterIconUrl?: string, requireText?: boolean }) => T,
@@ -53,7 +97,7 @@ export function createLaneAggregatesMemo(deps) {
   const minRows = Math.max(0, Number(deps.minRows) || 0);
   /** @type {{ rows: readonly unknown[], sig: string, out: T } | null} 行は写しで持つ(元の配列があとで書き換わっても比べられるように) */
   let last = null;
-  const diag = { hits: 0, misses: 0, bypassed: 0, folded: 0, missBySig: 0, missByLen: 0, missByRow: 0 };
+  const diag = { hits: 0, misses: 0, bypassed: 0, folded: 0, missBySig: 0, missByLen: 0, missByRow: 0, idFailFirst: 0, idFailBoundary: 0, idFailMid: 0 };
   return {
     diag,
     /**
@@ -70,12 +114,15 @@ export function createLaneAggregatesMemo(deps) {
         return deps.compute(list, liveId, opts);
       }
       const sig = `${String(liveId || '')}\u0000${String(opts?.broadcasterUid ?? '')}\u0000${String(opts?.broadcasterIconUrl ?? '')}\u0000${opts?.requireText === true ? 1 : 0}`;
-      if (last && last.sig === sig && sameRowObjects(last.rows, list)) {
+      if (last && last.sig === sig && (sameRowObjects(last.rows, list) || commentRowsSameIds(last.rows, list))) {
         diag.hits += 1;
         return last.out;
       }
-      if (last && last.sig === sig && typeof deps.fold === 'function' && isPrefixExtension(last.rows, list)) {
-        const suffix = list.slice(last.rows.length);
+      const appendAt = last && last.sig === sig && typeof deps.fold === 'function'
+        ? (isPrefixExtension(last.rows, list) ? last.rows.length : commentRowsAppendIndex(last.rows, list))
+        : -1;
+      if (appendAt >= 0 && last) {
+        const suffix = list.slice(appendAt);
         const out = deps.fold(last.out, suffix, liveId, opts);
         last = { rows: list.slice(), sig, out };
         diag.folded += 1;
@@ -85,8 +132,15 @@ export function createLaneAggregatesMemo(deps) {
       // v0.1.2023 計器: 何が違って数え直したか(配信・配信者の情報 / 行数 / 行そのもの)
       if (last) {
         if (last.sig !== sig) diag.missBySig += 1;
-        else if (last.rows.length !== list.length) diag.missByLen += 1;
-        else diag.missByRow += 1;
+        else if (last.rows.length !== list.length) {
+          diag.missByLen += 1;
+          const n = last.rows.length;
+          if (n > 0 && list.length > n) {
+            if (rowStableId(last.rows[0]) !== rowStableId(list[0])) diag.idFailFirst += 1;
+            else if (rowStableId(last.rows[n - 1]) !== rowStableId(list[n - 1])) diag.idFailBoundary += 1;
+            else diag.idFailMid += 1;
+          }
+        } else diag.missByRow += 1;
       }
       const out = deps.compute(list, liveId, opts);
       last = { rows: list.slice(), sig, out };

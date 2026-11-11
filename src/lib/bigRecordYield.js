@@ -36,6 +36,9 @@ export function shouldDeferLanePaintForBigRecord(people) {
  * @returns {Promise<void>}
  */
 export function yieldToMainThread() {
+  const host = typeof globalThis !== 'undefined' ? globalThis : undefined;
+  const sched = host && /** @type {{ scheduler?: { yield?: () => Promise<void> } }} */ (host).scheduler;
+  if (sched && typeof sched.yield === 'function') return sched.yield();
   return new Promise((resolve) => {
     setTimeout(resolve, 0);
   });

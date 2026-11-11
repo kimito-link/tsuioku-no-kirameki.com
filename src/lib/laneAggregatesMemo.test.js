@@ -73,6 +73,21 @@ describe('laneAggregatesMemo', () => {
     expect(calls).toBe(1);
     expect(memo.diag.folded).toBe(1);
   });
+  it('行オブジェクトが作り直されても、id がうしろに伸びただけなら足された分だけ数える', () => {
+    let calls = 0;
+    const memo = createLaneAggregatesMemo({
+      compute: (rows) => { calls += 1; return rows.map((r) => r.id); },
+      fold: (prev, suffix) => prev.concat(suffix.map((r) => r.id)),
+      minRows: 2
+    });
+    const o = { broadcasterUid: 'b', broadcasterIconUrl: 'i', requireText: true };
+    const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    expect(memo.get(rows, 'lv1', o)).toEqual(['a', 'b', 'c']);
+    const more = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+    expect(memo.get(more, 'lv1', o)).toEqual(['a', 'b', 'c', 'd']);
+    expect(calls).toBe(1);
+    expect(memo.diag.folded).toBe(1);
+  });
   it('配線: 横の欄の応援マスの集計が控えを通る', () => {
     const popup = readFileSync(new URL('../extension/popup-entry.js', import.meta.url), 'utf8');
     expect(popup).toContain('_laneAggregatesMemo.get(');

@@ -25,6 +25,18 @@ import {
   parseSrRanking,
   buildSrStreamKey,
 } from '../../src/lib/showroom/srParse.js';
+import { startPageStallWatch } from '../../src/lib/stallTrace.js';
+try {
+  const stallRoot = /** @type {any} */ (globalThis);
+  if (!stallRoot.__nlStallWatch) {
+    stallRoot.__nlStallWatch = startPageStallWatch({
+      file: 'sr-content-entry.js',
+      send: (summary) => {
+        try { chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: stallRoot.__nlStallWatch.ring.events.slice(-50) }); } catch { /* 計器 */ }
+      },
+    });
+  }
+} catch { /* 計器 */ }
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';

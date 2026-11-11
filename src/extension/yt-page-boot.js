@@ -1,6 +1,7 @@
 // yt-page-boot.js — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
 // ホームや検索で解析すると、タブが多い低スペックの PC でインストール直後に固まる。
 import { needsYtVenue, shouldPollYtVenue } from '../lib/youtube/ytVenueBoot.js';
+import { startPageStallWatch } from '../lib/stallTrace.js';
 
 const root = /** @type {any} */ (typeof globalThis !== 'undefined' ? globalThis : window);
 if (!root.__NLS_YT_VENUE_BOOT_ASKED__) {
@@ -8,6 +9,16 @@ if (!root.__NLS_YT_VENUE_BOOT_ASKED__) {
     if (root.__NLS_YT_VENUE_BOOT_ASKED__) return;
     if (!needsYtVenue(String(location.href || ''))) return;
     root.__NLS_YT_VENUE_BOOT_ASKED__ = true;
+    if (!root.__nlStallWatch) {
+      root.__nlStallWatch = startPageStallWatch({
+        file: 'yt-page-boot.js',
+        send: (summary) => {
+          try {
+            chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: root.__nlStallWatch.ring.events.slice(-50) });
+          } catch { /* 計器 */ }
+        },
+      });
+    }
     try {
       chrome.runtime.sendMessage({ type: 'NLS_BOOT_ENGINE', file: 'dist/yt-venue-inline.js' }, (res) => {
         if (!res || res.ok !== true) root.__NLS_YT_VENUE_BOOT_ASKED__ = false;

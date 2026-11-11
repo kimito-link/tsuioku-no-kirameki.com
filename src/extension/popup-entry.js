@@ -74,7 +74,6 @@ import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoale
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
 import { shouldSkipLaneSecondRender } from '../lib/laneSecondRenderPolicy.js';
 import { shouldDeferLanePaintForBigRecord, shouldYieldForBigRecord, yieldToMainThread } from '../lib/bigRecordYield.js';
-import { createLaneAggregatesMemo } from '../lib/laneAggregatesMemo.js';
 import { canAppendStoryGrowthCells, canTrimStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
@@ -564,7 +563,7 @@ import {
   tickerHighlightKey
 } from '../lib/pickTickerHighlight.js';
 import {
-  aggregateCommentsByUser,
+  createLiveAggregateComments,
   displayUserLabel,
   UNKNOWN_USER_KEY
 } from '../lib/userRooms.js';
@@ -787,6 +786,7 @@ import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.
 import {
   normalizeLv,
   userLaneCandidatesFromStorage,
+  createLiveLaneAggregatesMemo,
   enrichUserLaneAggregatesWithProfileAndDisplay
 } from '../lib/userLaneCandidatesFromStorage.js';
 import { buildGiftThrowerLaneEntries } from '../lib/userLaneMergeGiftThrowers.js';
@@ -7869,8 +7869,8 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
 /** v0.1.1617: gift/ad picks の持ち越し台帳と計器(同じ配信へ戻ったとき restored / 別の配信へ替わったとき cleared)。 */
 const _giftAdPicksCarry = createGiftAdPicksCarry();
 const _giftAdPicksCarryDiag = { restored: 0, cleared: 0, keptGift: 0, keptAd: 0 };
-// ★v0.1.2007: 数万行の記録で、同じ記録を描画のたびに人ごとに数え直さない(lib/laneAggregatesMemo.js)。v0.1.2050 から 400 件以上で控えを使う。
-const _laneAggregatesMemo = createLaneAggregatesMemo({ compute: (rows, lid, o) => userLaneCandidatesFromStorage(rows, lid, o), minRows: 400 });
+// ★v0.1.2007: 数万行の記録で、同じ記録を描画のたびに人ごとに数え直さない。v0.1.2052 からは id が増えた分だけ足す。
+const _laneAggregatesMemo = createLiveLaneAggregatesMemo(400);
 try { /** @type {any} */ (globalThis).__laneAggregatesMemoDiag = _laneAggregatesMemo.diag; } catch { /* 計器だけ */ }
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
@@ -13220,6 +13220,9 @@ async function refreshGiftRankStrip(liveId) {
   });
 }
 
+const aggregateRoomsForPaint = createLiveAggregateComments({ requireText: true });
+try { /** @type {any} */ (globalThis).__nlRoomsDiag = aggregateRoomsForPaint.diag; } catch { /* 計器 */ }
+
 /**
  * @param {PopupCommentEntry[]} entries
  * @param {string} [liveId] ランキングストリップの再描画キー用
@@ -13422,7 +13425,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   // 事象を防ぐため、ranking 表示からは UNKNOWN_USER_KEY を除外する。
   // HTML レポート側（L8782 等）の集計はそのまま維持。
   const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(
-    aggregateCommentsByUser(list, { requireText: true }),
+    aggregateRoomsForPaint(list),
     {
       broadcasterUid: inferredBroadcasterUid,
       broadcasterIconUrl

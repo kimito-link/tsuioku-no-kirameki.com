@@ -9,8 +9,8 @@
  * メインスレッドが 100ms を超えて画面が固まる。新しい行は末尾に足す。
  */
 
-/** 組み立てをこの行数ごとに画面へ返す。6倍遅くした条件で 2,000行が約0.6秒だったので 250行にする。 */
-export const YT_BUILD_YIELD_ROWS = 250;
+/** 組み立てをこの行数ごとに画面へ返す。6倍遅くしても 1 区切りが 16ms を超えない行数。 */
+export const YT_BUILD_YIELD_ROWS = 40;
 
 /** この行数以上の組み立ては、区切って画面へ手を返す */
 export const YT_BUILD_YIELD_MIN_ROWS = 1000;
@@ -21,8 +21,8 @@ export const YT_CHAT_STORAGE_FLUSH_MS = 400;
 /** 画面の組み立て直しは、この間隔より細かく重ねない */
 export const YT_NOTIFY_MIN_GAP_MS = 250;
 
-/** IndexedDB へ書くときの1回の件数。超えたらトランザクションを閉じて手を返す */
-export const YT_IDB_APPEND_CHUNK = 40;
+/** IndexedDB へ書くときの1回の件数。40件だと 4倍遅くした条件で 1 回が 100ms を超えた。 */
+export const YT_IDB_APPEND_CHUNK = 8;
 
 /**
  * @param {unknown} rows

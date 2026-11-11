@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1241 件
+## ⚠️ 役割コメントが無いソース 10 / 1244 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1160,7 +1160,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2444)
+- 📁 **src/** (2450)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1494,7 +1494,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2142)
+  - 📁 **lib/** (2148)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1553,7 +1553,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (82)
+    - 📁 **youtube/** (85)
       - `pfLastStreamUrl.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
@@ -1608,6 +1608,9 @@
       - `ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
       - `ytShimCommentWrites.test.js`
       - `ytShimSummaryAnswer.wiring.test.js`
+      - `ytSplitPersist.js` — 声の割り当てと配信のまとめを、人数や配信の数に比例して大きくなる1個の値で書き直さない。
+      - `ytSplitPersist.test.js`
+      - `ytSplitPersistStore.js` — 声の割り当て(人ごと)と配信のまとめ(配信ごと)の IndexedDB。
       - `ytStageSubmission.test.js`
       - `ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
       - `ytStaleFrameHold.test.js`
@@ -3118,6 +3121,9 @@
     - `specializedCellsInputs.wiring.test.js`
     - `speechEvidence.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `speechEvidence.test.js`
+    - `stallTrace.js` — 画面が止まったときの記録。時刻・長さ・拡張のファイル名とドメインだけ。
+    - `stallTrace.test.js`
+    - `stallTrace.wiring.test.js`
     - `standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
     - `standalonePopupClose.test.js`
     - `statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と

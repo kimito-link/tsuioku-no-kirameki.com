@@ -17,6 +17,8 @@ import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
+import { videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersist.js';
+import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
@@ -53,6 +55,37 @@ const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 //   ・画面の直しは会場の中だけ(YouTube のページ自体の文字は触らない)
 //   ・chrome.tabs は無い(タブの写しはしない)
 export const YT_SHIM_IN_PAGE = typeof location !== 'undefined' && location.protocol !== 'chrome-extension:';
+try {
+  const stallRoot = /** @type {any} */ (typeof globalThis !== 'undefined' ? globalThis : window);
+  if (!stallRoot.__nlStallWatch) {
+    const stallWatch = startPageStallWatch({
+      file: 'ytNicoShim.js',
+      section: () => {
+        try {
+          const el = document.querySelector('[data-nl-panel], section[id]');
+          return el ? (el.getAttribute('data-nl-panel') || el.id || '') : '';
+        } catch {
+          return '';
+        }
+      },
+      send: (summary) => {
+        try {
+          chrome.runtime.sendMessage({
+            type: 'NLS_STALL_SUMMARY',
+            page: location.protocol === 'chrome-extension:' ? 'extension' : (location.hostname || 'page'),
+            summary,
+            events: stallWatch.ring.events.slice(-50),
+          });
+        } catch {
+          /* 計器は本体を止めない */
+        }
+      },
+    });
+    stallRoot.__nlStallWatch = stallWatch;
+  }
+} catch {
+  /* 計器が始まらなくても画面は出す */
+}
 const COMMENTS_PREFIX = 'nls_comments_';
 // ニコ生版の「テール」(まだ本体に畳み込んでいない新着)。ニコ生版の popup は、本体の全件を一度読んだら
 // 同じ配信のあいだはその控えを使い回し、新着はテールから足す。YouTube 版は本体とテールを分けて持たないので、
@@ -978,6 +1011,8 @@ async function buildCommentsForLvUncached(lv) {
   if (memo && memoCache && memo.cache === memoCache && memo.ver === (Number(memoCache.ver) || 0) && memo.epoch === buildSideEpoch && memo.sumSig === memoSumSig) {
     await sidePromise.catch(() => undefined);
     shimDiag.buildReused = (Number(shimDiag.buildReused) || 0) + 1;
+    shimDiag.rowsMadeLast = 0;
+    shimDiag.rowsReusedLast = Array.isArray(memo.out) ? memo.out.length : 0;
     return memo.out;
   }
   const memoVer = memoCache ? Number(memoCache.ver) || 0 : -1;
@@ -1168,8 +1203,14 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   const realGet = realLocal.get.bind(realLocal);
   // 前に開いた配信の疑似 lv(nls_last_watch_url 等に残る)も引けるよう、記録のある配信を先に全部登録しておく
   const knownVideosReady = Promise.resolve(realGet([KEY_YT_SUMMARIES, YT_LAST_STREAM_URL_KEY]))
-    .then((bag) => {
-      knownSummaries = (bag && bag[KEY_YT_SUMMARIES]) || {};
+    .then(async (bag) => {
+      let fromSw = null;
+      try {
+        fromSw = await real?.runtime?.sendMessage?.({ type: 'YT_GET_STREAM_SUMMARIES' });
+      } catch {
+        fromSw = null;
+      }
+      knownSummaries = (fromSw && fromSw.ok && fromSw.summaries) || (bag && bag[KEY_YT_SUMMARIES]) || {};
       lastStreamValue = (bag && bag[YT_LAST_STREAM_URL_KEY]) || null;
       for (const vid of Object.keys(knownSummaries)) pseudoLvForVideoId(vid);
       registerBroadcastersFromSummaries();
@@ -1195,7 +1236,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       return `https://live.nicovideo.jp/watch/${lv}`;
     }
     // まだどのページも書いていない(入れたばかり)ときだけ、最近更新された配信を使う(計器 source:'newest' に出る)
-    const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
+    const stored = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
+    const sums = knownSummaries && Object.keys(knownSummaries).length ? knownSummaries : stored;
     const vid = newestVideoIdOf(sums);
     panelDiag.lastWatch(vid ? 'newest' : 'none', vid ? pseudoLvForVideoId(vid) : '');
     return vid ? `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(vid)}` : '';
@@ -1210,6 +1252,9 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     const list =
       keys == null ? null : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
     const bag = /** @type {Record<string, any>} */ (await realGet(keys));
+    if ((!list || list.includes(KEY_YT_SUMMARIES)) && knownSummaries && Object.keys(knownSummaries).length) {
+      bag[KEY_YT_SUMMARIES] = knownSummaries;
+    }
     if (list) for (const k of list) if (/^nls_/.test(k) && !shimDiag.keysAsked.includes(k.replace(/lv\d+/, 'LV'))) shimDiag.keysAsked.push(k.replace(/lv\d+/, 'LV'));
     // 計器: 1回の読みでコメントを2配信以上聞く = popup の探り読み(collectDataBackedWatchLvs)
     const askedCommentLvs = new Set(
@@ -1611,6 +1656,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       commentsCache.delete(lv);
       const arr = await buildCommentsForLv(lv).catch(() => undefined);
       if (!arr) return;
+      // 組み立ての最後と描画を同じ仕事に載せると、4倍遅くした条件で 100ms を超える。
+      if (arr.length >= 1000) await yieldToMainThread();
       const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ''}`;
       if (lastNotified.get(lv) === sig) return;
       lastNotified.set(lv, sig);
@@ -1674,6 +1721,20 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       if (changes[YT_LAST_STREAM_URL_KEY]) {
         lastStreamValue = changes[YT_LAST_STREAM_URL_KEY].newValue || null;
         announceLastWatch(lvOfLastStream(lastStreamValue), 'page');
+      }
+      for (const [ckey, change] of Object.entries(changes)) {
+        const vid = videoIdFromSummaryStorageKey(ckey);
+        if (!vid || !change) continue;
+        const one = change.newValue;
+        if (one && typeof one === 'object') knownSummaries[vid] = one;
+        const lvOf = pseudoLvForVideoId(vid);
+        if (!lastAnnouncedLv && !lvOfLastStream(lastStreamValue)) announceLastWatch(lvOf, 'newest');
+        if (!isWatchedByThisScreen(lvOf)) {
+          panelDiag.notify(false);
+          continue;
+        }
+        panelDiag.notify(true);
+        void notifyLv(lvOf, one);
       }
       if (!changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};

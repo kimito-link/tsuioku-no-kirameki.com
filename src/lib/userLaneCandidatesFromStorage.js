@@ -15,6 +15,7 @@ import {
   pickGiftRankDisplayNicknameWithUidFallback
 } from './giftDisplayNickname.js';
 import { isAvatarObservedInCommentProfileMap } from './popupAvatarResolver.js';
+import { commentRowsAppendIndex, createLaneAggregatesMemo } from './laneAggregatesMemo.js';
 
 /**
  * @typedef {{
@@ -394,4 +395,23 @@ export function enrichUserLaneAggregatesWithProfileAndDisplay(
   return /** @type {readonly Readonly<UserLaneCandidateFromStorage>[]} */ (
     Object.freeze(built)
   );
+}
+
+/**
+ * 応援マスの集計。行オブジェクトが作り直されても、id の並びがうしろに伸びただけなら足された分だけ数える。
+ * @param {number} [minRows]
+ */
+export function createLiveLaneAggregatesMemo(minRows = 400) {
+  /** @type {ReturnType<typeof createUserLaneCandidateFolder> | null} */
+  let folder = null;
+  return createLaneAggregatesMemo({
+    minRows,
+    compute(rows, lid, o) {
+      folder = createUserLaneCandidateFolder(lid, o, true);
+      return folder.add(rows);
+    },
+    fold(_prev, suffix) {
+      return folder ? folder.add(suffix) : _prev;
+    }
+  });
 }

@@ -35,7 +35,9 @@ describe('★popup の応援ランキング: 全件で数え、並びを安定�
   });
 
   it('ユーザー別件数は list(全件)から数える', () => {
-    expect(body).toContain('aggregateCommentsByUser(list, { requireText: true })');
+    expect(body).toContain('aggregateRoomsForPaint(list)');
+    expect(src).toContain('createLiveAggregateComments({ requireText: true })');
+    expect(src).not.toContain('sampleMaxEntries');
   });
 
   it('並びは orderRankedRooms(同数は前回順位を保つ)で決める。時間で動く値(サムネ評価)で並べ替えない', () => {
