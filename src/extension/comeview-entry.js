@@ -73,6 +73,12 @@ import {
   COMEVIEW_USER_NOTES_KEY
 } from '../lib/comeviewUserNotes.js';
 import {
+  mountParticipationQueuePanel,
+  noteParticipationComments,
+  setParticipationQueueLive
+} from './participationQueuePanel.js';
+import { recentRowsForParticipation } from '../lib/participationQueue.js';
+import {
   comeviewTimelineItemSignature,
   filterVisibleComeviewTimeline,
   keepLatestComeviewTimelineItems,
@@ -472,6 +478,7 @@ async function switchToLiveId(nextLiveId) {
   const lv = String(nextLiveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lv) || lv === _liveId) return;
   _liveId = lv;
+  setParticipationQueueLive(lv);
   const meta = document.getElementById('cvLiveMeta');
   if (meta) meta.textContent = _liveId;
   // 前配信の表示・既読・読み上げキューをリセットして新配信を一から読む。
@@ -2154,6 +2161,7 @@ async function performFullRefresh(forceBottom) {
   if (Object.keys(_profileCache).length) {
     comments = applyUserCommentProfileMapToEntries(comments, _profileCache).next;
   }
+  noteParticipationComments(recentRowsForParticipation(comments));
   const timeline = keepLatestComeviewTimelineItems(
     filterVisibleComeviewTimeline(
       buildAllComeviewTimeline(comments, _giftRows),
@@ -2219,6 +2227,7 @@ function requestFullRefresh(forceBottom = false) {
 function processHotSnapshots(nextTail, nextGifts) {
   const tail = Array.isArray(nextTail) ? nextTail : [];
   const gifts = Array.isArray(nextGifts) ? nextGifts : [];
+  noteParticipationComments(pickAppendedComeviewSnapshotRows(_tailRows, tail, 'comment'));
   if (_paused || document.hidden || _fullRefreshRunning) {
     _deferredTailRows = tail;
     _deferredGiftRows = gifts;
@@ -2731,7 +2740,9 @@ async function main() {
    */
   wireButtons();
   wireStorageChanges();
+  mountParticipationQueuePanel({ root: document.getElementById('cvPq') });
   _liveId = urlLiveId || (await resolveLiveIdFromStorage());
+  if (_liveId) setParticipationQueueLive(_liveId);
   const meta = document.getElementById('cvLiveMeta');
   if (meta) {
     // ★liveId が取れないのは「無い」ではなく「まだ来ていない」ことがある(storage混雑)。

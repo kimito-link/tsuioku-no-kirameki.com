@@ -8,8 +8,8 @@
 //   1. 保存(chrome.storage.local): YouTube 版自身の記録(yt_…)以外のキーは頭に「ytm:」を付けた別のキーへ。
 //      ニコ生版のキーの変化は YouTube 版の画面に知らせない(逆も同じ)。=別の拡張だったときと同じ。
 //   2. IndexedDB: YouTube の記録(yt_kirameki_db)以外は「ytm:」付きの別の DB を開く。
-//   3. 画面の名前: sidepanel.html / comeview.html / venue.html / marketing-export.html / offscreen.html は
-//      本体ではニコ生版の画面なので、YouTube 版の写し(yt-….html)へ振り替える。
+//   3. 画面の名前: sidepanel.html / comeview.html / venue.html / marketing-export.html / offscreen.html /
+//      participation-queue.html は本体ではニコ生版の画面なので、YouTube 版の写し(yt-….html)へ振り替える。
 //   4. 裏方への頼み(runtime.sendMessage): 別の拡張だったときに YouTube 版の裏方が答えていたものだけ通す。
 //      ニコ生版の裏方だけが答えるもの(コメント DB への書き込み・ニコニコの API 取得など)は、疑似の配信番号で
 //      ニコ生版の記録を汚すので送らない(返事なし=別の拡張だったときと同じ)。会場・コメビュを開く頼みは
@@ -27,6 +27,7 @@ export const YT_MERGED_PAGES = Object.freeze({
   'venue.html': 'yt-venue.html',
   'marketing-export.html': 'yt-marketing-export.html',
   'offscreen.html': 'yt-offscreen.html',
+  'participation-queue.html': 'yt-participation-queue.html',
 });
 
 /** 別の拡張だったときに YouTube 版の裏方が答えていた頼み(ニコ生版と同じ受け口の写し) */

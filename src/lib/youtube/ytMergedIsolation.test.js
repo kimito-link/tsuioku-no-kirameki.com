@@ -55,6 +55,7 @@ describe('ytMergedIsolation の決まり', () => {
   });
   it('画面の名前だけ YouTube 版の写しへ(画像・音・ほかの画面はそのまま)', () => {
     expect(ytMergedPagePath('comeview.html?lv=lv912345678901')).toBe('yt-comeview.html?lv=lv912345678901');
+    expect(ytMergedPagePath('participation-queue.html?lv=lv912345678901')).toBe('yt-participation-queue.html?lv=lv912345678901');
     expect(ytMergedPagePath('/venue.html')).toBe('/yt-venue.html');
     expect(ytMergedPagePath('marketing-export.html*')).toBe('yt-marketing-export.html*');
     expect(ytMergedPagePath('sidepanel.html')).toBe('yt-sidepanel.html');
@@ -123,6 +124,7 @@ describe('installYtMergedIsolation', () => {
     const { chrome, sent } = fakeChrome();
     installYtMergedIsolation({ chrome });
     expect(chrome.runtime.getURL('comeview.html')).toBe('chrome-extension://x/yt-comeview.html');
+    expect(chrome.runtime.getURL('participation-queue.html?lv=lv1')).toBe('chrome-extension://x/yt-participation-queue.html?lv=lv1');
     expect(chrome.runtime.getURL('images/a.png')).toBe('chrome-extension://x/images/a.png');
     expect(await chrome.runtime.sendMessage({ type: 'NLS_OPEN_VENUE', liveId: 'lv9' })).toEqual({ ok: true });
     expect(await chrome.runtime.sendMessage({ type: 'NLS_CDB_APPEND' })).toBe(undefined);

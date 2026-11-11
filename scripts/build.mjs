@@ -174,6 +174,12 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // 参加の順番を OBS に重ねる透過の文字一覧。コメビュが書いた保存を読むだけ。
+    entryPoints: ['src/extension/participation-queue-entry.js'],
+    outfile: 'extension/dist/participation-queue.js',
+    target: 'chrome100'
+  },
+  {
     entryPoints: ['src/extension/venue-entry.js'],
     outfile: 'extension/dist/venue.js',
     target: 'chrome100'

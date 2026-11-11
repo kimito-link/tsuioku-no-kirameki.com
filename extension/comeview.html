@@ -66,6 +66,7 @@
         background: transparent;
       }
       body.is-obs .cv-toolbar { display: none; }
+      body.is-obs .cv-pq { display: none; }
       /* v0.1.1894: 無料の人の OBS 画面の隅の印。OBS 透過のときだけ見える。 */
       .cv-credit {
         position: fixed;
@@ -686,6 +687,79 @@
         font-size: 11px;
         font-variant-numeric: tabular-nums;
       }
+      .cv-pq {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--cv-border, rgba(0, 0, 0, 0.12));
+        background: var(--cv-row);
+        max-height: min(46vh, 340px);
+      }
+      .cv-pq-head, .cv-pq-words, .cv-pq-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      .cv-pq-title { font-weight: 700; }
+      .cv-pq-meta, .cv-pq-note, .cv-pq-warn, .cv-pq-empty {
+        margin: 0;
+        color: var(--cv-sub);
+        font-size: 12px;
+      }
+      .cv-pq-warn { color: #8a3b12; }
+      .cv-pq-words label {
+        display: flex;
+        flex: 1 1 220px;
+        min-width: 0;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+      }
+      .cv-pq-words label span { flex: 0 0 auto; white-space: nowrap; }
+      .cv-pq-words input {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto;
+      }
+      .cv-pq-list {
+        overflow: auto;
+        max-height: min(40vh, 280px);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .cv-pq-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        padding: 4px 0;
+      }
+      .cv-pq-who {
+        display: flex;
+        flex: 1 1 160px;
+        min-width: 0;
+        gap: 6px;
+        align-items: center;
+      }
+      .cv-pq-who img {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex: 0 0 auto;
+        background: rgba(0, 0, 0, 0.06);
+      }
+      .cv-pq-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .cv-pq-id { color: var(--cv-sub); font-size: 11px; }
+      .cv-pq-row-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+      .cv-pq button, .cv-pq input { font: inherit; }
+      @media (max-width: 520px) {
+        .cv-pq-row-actions { flex: 1 1 100%; }
+      }
     </style>
   </head>
   <body>
@@ -707,6 +781,25 @@
       <button id="cvBtnObs" type="button" title="OBS用の透過表示に切替">OBS透過</button>
       <button id="cvBtnPause" type="button">一時停止</button>
     </div>
+    <section class="cv-pq" id="cvPq" aria-label="参加の順番">
+      <div class="cv-pq-head">
+        <span class="cv-pq-title">参加の順番</span>
+        <span class="cv-pq-meta" id="cvPqMeta">参加の言葉を入れると並びます</span>
+      </div>
+      <div class="cv-pq-words">
+        <label><span>参加の言葉</span><input id="cvPqJoin" type="text" maxlength="40" placeholder="参加" autocomplete="off"></label>
+        <label><span>辞退の言葉</span><input id="cvPqCancel" type="text" maxlength="40" placeholder="辞退" autocomplete="off"></label>
+      </div>
+      <p class="cv-pq-note">コメントの全文が、この言葉と同じときに並びます。コメビュを開いたままだと、順番が動きます。</p>
+      <p class="cv-pq-warn" id="cvPqWarn" hidden>参加と辞退は、違う言葉にしてください</p>
+      <div class="cv-pq-actions">
+        <button id="cvPqNext" type="button">次へ</button>
+        <button id="cvPqShuffle" type="button">シャッフル</button>
+        <button id="cvPqReset" type="button">待ちを空にする</button>
+        <button id="cvPqObs" type="button" title="透過の文字一覧を別窓で開く">OBSに出す</button>
+      </div>
+      <ol class="cv-pq-list" id="cvPqList"></ol>
+    </section>
     <div class="cv-pinbar" id="cvPinBar" style="display: none;"></div>
     <div class="cv-list" id="cvList">
       <div class="cv-empty" id="cvEmpty">コメントを待っています…</div>
