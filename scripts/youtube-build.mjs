@@ -186,6 +186,11 @@ export function ytBuildTargets({ merged, define }) {
       banner: { js: '// tt-main.js — TikTok の配信ページ自身の世界で、ページのソケットの受信と gift/list を写して入口へ渡すバンドル\n/* eslint-disable */' } });
     list.push({ entryPoints: [src('tt-content-entry.js')], outfile: out('tt-content.js'), target: 'chrome114', define: def, ...page,
       banner: { js: '// tt-content.js — TikTok の配信ページでコメントとギフト(ページ自身のソケットの写し)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    // ABEMA の放送ページの入口。ページ自身の世界の写し役と、記録へ渡す入口の2つ。本体向けだけ
+    list.push({ entryPoints: [src('ab-main-entry.js')], outfile: out('ab-main.js'), target: 'chrome114', define: def,
+      banner: { js: '// ab-main.js — ABEMA の放送ページ自身の世界で、ページが受け取ったコメントの JSON を写して入口へ渡すバンドル\n/* eslint-disable */' } });
+    list.push({ entryPoints: [src('ab-content-entry.js')], outfile: out('ab-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// ab-content.js — ABEMA の放送ページでコメント(ページ自身の応答の写し)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
     list.push({ entryPoints: [resolve(root, 'extension-youtube/content-chat-main.js')], outfile: out('content-chat-main.js'), target: 'chrome114', define: def });
   }
   // offscreen は1つしか持てないので、本体向けには作らない(本体の offscreen を使う・YouTube の読み上げはコメビュ)

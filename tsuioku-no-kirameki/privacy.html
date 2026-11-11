@@ -400,7 +400,7 @@
         <div class="meta">
           <span>発行者: <strong>株式会社ベストトラスト</strong></span>
           <span>施行日: <strong>2026年4月19日</strong></span>
-          <span>最終更新: <strong>2026年11月10日</strong></span>
+          <span>最終更新: <strong>2026年11月11日</strong></span>
         </div>
       </div>
     </header>
@@ -450,6 +450,7 @@
             <li>YouTube Live の記録は端末の中だけに保存し、共有機能（スマホで見る等）でも送信しません。</li>
             <li>Twitch（twitch.tv）の配信ページでも同じようにチャットを読み取り、端末の中だけに記録します（詳しくは 4-1c）。</li>
             <li>Kick（kick.com）・ふわっち（whowatch.tv）・SHOWROOM（showroom-live.com）・ミクチャ（mixch.tv）・TikTok LIVE（tiktok.com）でも、開いている配信のコメントと応援を読み取り、端末の中だけに記録します（詳しくは 4-1d〜4-1h）。これらの記録は外へ送りません。</li>
+            <li>ABEMA（abema.tv）でも、開いている放送ページが受け取っているコメントを読み取り、端末の中だけに記録します（詳しくは 4-1i）。外へは送りません。</li>
             <li>保存データはいつでも拡張の UI からクリア／書き出し／アンインストールで削除できます。</li>
           </ul>
         </aside>
@@ -484,7 +485,7 @@
               ニコ生の応援コメントは、放送が終わるとスクロールの彼方に流れてしまいがち。それを <b>自分のパソコンの中だけで</b> 拾って育てていける形にまとめ直したのが、この拡張だよ。
             </div>
           </div>
-          <p>本拡張は、ニコニコ生放送における応援コメント・参加者情報を、利用者自身の端末上で可視化・記録することを目的としたブラウザ拡張機能です。2026年11月から、同じ仕組みで <strong>YouTube Live</strong>（<code>www.youtube.com</code>）のライブチャット・スーパーチャット、<strong>Twitch</strong>・<strong>Kick</strong>・<strong>ふわっち</strong>・<strong>SHOWROOM</strong>・<strong>ミクチャ</strong>・<strong>TikTok LIVE</strong> のコメントと応援（ギフト・アイテム）も記録・可視化できます。どの配信でも同じ画面です。第三者への情報集約や広告配信を目的としていません。</p>
+          <p>本拡張は、ニコニコ生放送における応援コメント・参加者情報を、利用者自身の端末上で可視化・記録することを目的としたブラウザ拡張機能です。2026年11月から、同じ仕組みで <strong>YouTube Live</strong>（<code>www.youtube.com</code>）のライブチャット・スーパーチャット、<strong>Twitch</strong>・<strong>Kick</strong>・<strong>ふわっち</strong>・<strong>SHOWROOM</strong>・<strong>ミクチャ</strong>・<strong>TikTok LIVE</strong> のコメントと応援（ギフト・アイテム）、<strong>ABEMA</strong>（<code>abema.tv</code>）の放送ページが受け取っているコメントも記録・可視化できます。どの配信でも同じ画面です。第三者への情報集約や広告配信を目的としていません。</p>
         </section>
 
         <section class="box" id="s2">
@@ -518,12 +519,12 @@
           <ul>
             <li>記録 ON/OFF、ポップアップ着せ替え、音声入力デバイス、匿名 Identicon の有無、各種 UI の開閉状態、など</li>
           </ul>
-          <h3>2-5. 他の配信ページ（YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok）</h3>
+          <h3>2-5. 他の配信ページ（YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA）</h3>
           <ul>
             <li>利用者が開いている配信ページに表示されているコメント本文、投稿者の表示名、そのサービスの公開の利用者 ID、アイコン画像の URL、ギフトやアイテムの情報</li>
             <li>配信の題・配信者名・同時視聴者数など、そのページが公開している番組の情報</li>
           </ul>
-          <p>いずれもその配信ページに出ている公開情報で、端末の中だけに保存します。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の記録は、「📱 スマホで見る」では送信しません（共有はニコニコ生放送の画面のみ）。</p>
+          <p>いずれもその配信ページに出ている公開情報で、端末の中だけに保存します。ABEMA では、開いているページが受け取っているコメントを読みます。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA の記録は、「📱 スマホで見る」では送信しません（共有はニコニコ生放送の画面のみ）。</p>
         </section>
 
         <section class="box" id="s3">
@@ -624,6 +625,13 @@
             <li>TikTok の記録は端末の中だけに保存します。<strong>共有機能でも送信しません</strong>（共有はニコニコ生放送の画面のみ）</li>
             <li>利用者の TikTok の認証情報を、当プロジェクトが取得・保持することはありません</li>
           </ul>
+          <h3>4-1i. ABEMA（<code>abema.tv</code>）</h3>
+          <ul>
+            <li>利用者が開いている ABEMA の放送ページ（<code>abema.tv/now-on-air/</code>、<code>abema.tv/live-event/</code>、<code>abema.tv/video/episode/</code>、<code>abema.tv/channels/…/slots/</code>）で、そのページが受け取っているコメントを読み取ります。コメント用の別のホストは宣言しません</li>
+            <li>再生位置の近くのコメントを、端末の中だけに記録します。<strong>共有機能でも送信しません</strong>（共有はニコニコ生放送の画面のみ）</li>
+            <li>コメントの出ないページや、ログインや地域の制限でページ自身がコメントを受け取れない放送では、記録できないことがあります</li>
+            <li>利用者の ABEMA の認証情報を、当プロジェクトが取得・保持することはありません</li>
+          </ul>
           <h3>4-2. 読み上げ音声（<code>127.0.0.1:50021</code>）</h3>
           <ul>
             <li>利用者自身の端末で VOICEVOX を起動している場合にのみ、読み上げ音声の合成のため<strong>同一端末内（ローカル）へ</strong>リクエストします。インターネットには出ません</li>
@@ -680,7 +688,7 @@
             <li>チャットのリプレイ（アーカイブのチャット）を YouTube から取り寄せた内容</li>
             <li>投稿者のチャンネル ID・表示名（@ハンドル）・アイコン画像 URL</li>
           </ul>
-          <p>Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok LIVE については、次のホストを宣言しています。</p>
+          <p>Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok LIVE・ABEMA については、次のホストを宣言しています。</p>
           <ul>
             <li><code>https://www.twitch.tv/*</code>（4-1c）</li>
             <li><code>https://kick.com/*</code>（4-1d）</li>
@@ -688,6 +696,7 @@
             <li><code>https://www.showroom-live.com/*</code>（4-1f）</li>
             <li><code>https://mixch.tv/*</code> とギフトの絵の <code>https://d2uqarpmf42qy0.cloudfront.net/*</code>（4-1g）</li>
             <li><code>https://www.tiktok.com/*</code>（4-1h）</li>
+            <li><code>https://abema.tv/*</code>（4-1i）</li>
           </ul>
           <p>読むのは、利用者が開いているその配信のコメント・応援・番組情報と、表示に必要な公開画像です。記録は端末の中だけに保存し、これらの配信の記録を当プロジェクトのサーバーへ送ることはありません。</p>
           <p>これらはいずれも、利用者が自身のブラウザでニコニコ生放送・YouTube Live・上の各配信を視聴する過程で既に受信している公開情報、もしくは利用者自身のブラウザセッションで正規に取得可能な情報に限られます。</p>

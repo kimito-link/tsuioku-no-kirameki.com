@@ -424,7 +424,7 @@ async function reloadExistingYtWatchTabs(reason) {
   } catch {
     return;
   }
-  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページも同じく止まる
+  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA)の配信ページも同じく止まる
   //   (2026-11-09 実機: 更新前から開いていた SHOWROOM のタブが記録 0 のまま)。配信ページの形の URL だけ読み込み直す
   try {
     const others = await chrome.tabs.query({ url: [...STREAM_PLATFORM_TAB_URLS] });

@@ -3,23 +3,25 @@
 --- 統合欄に貼る本文 ---
 ・https://*.nicovideo.jp/* : ニコ生の視聴ページのコメントを本人のPCに記録します。
 
-・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live のチャットとアイコンをPCに記録します。外へは送りません。
+・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live のチャットとアイコンをPCに記録します。外へ送りません。
 
-・https://www.twitch.tv/* : Twitch のチャットを本人のPCに記録します。外へは送りません。
+・https://www.twitch.tv/* : Twitch のチャットをPCに記録します。外へ送りません。
 
-・https://kick.com/* : Kick のチャットを本人のPCに記録します。外へは送りません。
+・https://kick.com/* : Kick のチャットをPCに記録します。外へ送りません。
 
-・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっちのコメントとアイテムを本人のPCに記録します。外へは送りません。
+・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっちのコメントとアイテムをPCに記録します。外へ送りません。
 
-・https://www.showroom-live.com/* : SHOWROOM のコメントとギフトを本人のPCに記録します。外へは送りません。
+・https://www.showroom-live.com/* : SHOWROOM のコメントとギフトをPCに記録します。外へ送りません。
 
-・https://mixch.tv/* と https://d2uqarpmf42qy0.cloudfront.net/* : ミクチャのコメントとギフトを記録し、ギフトの絵を表示します。外へは送りません。
+・https://mixch.tv/* と https://d2uqarpmf42qy0.cloudfront.net/* : ミクチャのコメントとギフトを記録し、ギフトの絵を表示します。外へ送りません。
 
-・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトを本人のPCに記録します。外へは送りません。
+・https://www.tiktok.com/* : TikTok LIVE のコメントとギフトをPCに記録します。外へ送りません。
+
+・https://abema.tv/* : ABEMAの放送ページのコメントをPCに記録します。外へ送りません。
 
 ・http://127.0.0.1:50021/* : 読み上げONのときだけ、このPCのVOICEVOXへ音声合成を頼みます。
 
-・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」を自分でONにしたときだけニコ生の画面を送ります(最新1件・24時間で消え、OFFで削除)。契約確認はコードとPCごとの識別子だけです。上の他サービスの記録は送りません。
+・https://app.tsuioku-no-kirameki.com/* : 「スマホで見る」を自分でONにしたときだけニコ生の画面を送ります(最新1件・24時間で消え、OFFで削除)。他サービスの記録は送りません。
 
 ・https://suggestqueries.google.com/* : 入力した配信者名の検索候補だけを取得します。
 
@@ -51,19 +53,23 @@
 
 > 単一用途そのものです。利用者が開いている TikTok LIVE の配信ページからコメントとギフトを読み取り、本人の PC に記録します。ログインしていないとコメントは届かず、その理由を配信ページに出します。TikTok の記録を外へ送ることはありません。利用者の認証情報は取得しません。privacy.html §4-1h。
 
+### 2-9i. ホスト権限 ABEMA (`https://abema.tv/*`) が必要な理由(0.1.2039)
+
+> 単一用途そのものです。利用者が開いている ABEMA の放送ページ（abema.tv）で、そのページが受け取っているコメントを読み取り、本人の PC に記録します。コメント用の別ホストは宣言しません。ABEMA の記録を外へ送ることはありません。利用者の認証情報は取得しません。privacy.html §4-1i。
+
 ---
 
 ## 3. データ使用 (Data Usage)
 
 | 項目 | チェック | 理由 |
 |------|----------|------|
-| 個人を特定できる情報 | ✅ | ニコ生の数値ユーザー ID、YouTube のチャンネル ID、Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の公開の利用者 ID を、開いている配信の記録として端末内に保存。privacy.html §2・§5 と整合 |
+| 個人を特定できる情報 | ✅ | ニコ生の数値ユーザー ID、YouTube のチャンネル ID、Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA の公開の利用者 ID を、開いている配信の記録として端末内に保存。privacy.html §2・§5 と整合 |
 | 健康に関する情報 | ❌ | 該当なし |
 | 財務状況や支払い | ❌ | 支払いは Stripe の外部ページで完結し、拡張は支払い情報に触れない |
 | 認証に関する情報 | ✅ | 有料のサポーターのコード(契約確認用の合言葉)を保存し、契約確認時にサーバーへ送る。privacy.html §4-3「サポーター」と整合 |
 | 個人的コミュニケーション | ❌ | ニコ生コメントは公開放送でありプライベート通信ではない |
 | 位置情報 | ❌ | 該当なし |
-| ウェブ履歴 | ❌ | 宣言した配信ページ（ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok）以外の閲覧履歴は触らない |
+| ウェブ履歴 | ❌ | 宣言した配信ページ（ニコ生・YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA）以外の閲覧履歴は触らない |
 | ユーザーのアクティビティ | ✅ | 視聴者の出入り・コメント時刻等の行動情報を保存 |
 | ウェブサイトのコンテンツ | ✅ | コメント本文・アバター URL を保存 |
 
@@ -112,4 +118,4 @@
 
 更新時は **AGENTS.md §2 の CWS ステータス節にリンクを残す** こと。
 
-記録は既定で利用者の PC の中だけです。「スマホで見る」で当プロジェクトのサーバーへ送るのはニコニコ生放送の画面だけです。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok の記録は送りません。運営者は株式会社ベストトラストです。
+記録は既定で利用者の PC の中だけです。「スマホで見る」で当プロジェクトのサーバーへ送るのはニコニコ生放送の画面だけです。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA の記録は送りません。運営者は株式会社ベストトラストです。

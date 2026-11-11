@@ -12,6 +12,7 @@ import { isSrStreamKey, srRoomKeyOfStreamKey, parseSrRoomKeyFromUrl, isSrRoomKey
 import { isMxStreamKey, mxUserIdOfStreamKey, parseMxUserIdFromUrl, isMxUserId, mxLiveUrl, buildMxStreamKey } from '../mixch/mxParse.js';
 import { isTtStreamKey, ttUniqueIdOfStreamKey, parseTtUniqueIdFromUrl, isTtUniqueId, ttLiveUrl, buildTtStreamKey } from '../tiktok/ttParse.js';
 import { isWwStreamKey, wwLiveIdOfStreamKey, parseWwLiveIdFromUrl, isWwLiveId, isWwUserPath, wwPageUrl, buildWwStreamKey } from '../whowatch/wwParse.js';
+import { isAbStreamKey, abLoginOfStreamKey, parseAbLoginFromUrl, isAbLogin, abPageUrl, buildAbStreamKey } from '../abema/abParse.js';
 
 export const KK_STREAM_KEY_PREFIX = 'kk.';
 
@@ -44,7 +45,7 @@ function kickSlugOfStreamKey(key) {
 
 /**
  * @typedef {{
- *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
+ *   id: 'twitch' | 'kick' | 'whowatch' | 'showroom' | 'mixch' | 'tiktok' | 'abema', name: string, keyHead: string, personHead: string, paid: string, paidCurrency: string,
  *   tabUrl: string, sendType: string, lateIconsKey: string, emotesKey: string, rankSentence: string, officialBoard?: string,
  *   isStreamKey: (k: unknown) => boolean, loginOfStreamKey: (k: unknown) => string, channelFromUrl: (u: unknown) => string,
  *   isLogin: (l: unknown) => boolean, channelUrl: (login: string) => string, thumbUrl: (login: string) => string,
@@ -194,9 +195,31 @@ export const STREAM_PLATFORMS = Object.freeze({
     thumbUrl: () => '',
     buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildTtStreamKey(a, opts),
   }),
+  // ABEMA(abema.tv)。login はページ種別の接頭辞つき(n- 放送中 / e- イベント / p- エピソード / s- スロット)
+  abema: Object.freeze({
+    id: /** @type {'abema'} */ ('abema'),
+    name: 'ABEMA',
+    keyHead: 'ab.',
+    personHead: 'ab:',
+    paid: 'ギフト',
+    paidCurrency: '',
+    tabUrl: 'https://abema.tv/*',
+    sendType: 'AB_SEND_COMMENT',
+    lateIconsKey: 'yt_ab_icons',
+    emotesKey: '',
+    rankSentence: 'このPCに記録したコメントから数えます。',
+    noSubs: true,
+    isStreamKey: isAbStreamKey,
+    loginOfStreamKey: abLoginOfStreamKey,
+    channelFromUrl: parseAbLoginFromUrl,
+    isLogin: (/** @type {unknown} */ l) => isAbLogin(l),
+    channelUrl: abPageUrl,
+    thumbUrl: () => '',
+    buildStreamKey: (/** @type {string} */ a, /** @type {any} */ opts) => buildAbStreamKey(a, opts),
+  }),
 });
 
-const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom, STREAM_PLATFORMS.mixch, STREAM_PLATFORMS.tiktok];
+const LIST = [STREAM_PLATFORMS.twitch, STREAM_PLATFORMS.kick, STREAM_PLATFORMS.whowatch, STREAM_PLATFORMS.showroom, STREAM_PLATFORMS.mixch, STREAM_PLATFORMS.tiktok, STREAM_PLATFORMS.abema];
 
 /** 配信キー → サービス(YouTube なら null) @param {unknown} key */
 export function platformOfStreamKey(key) {
@@ -260,5 +283,6 @@ export function platformOfHostname(hostname) {
   if (/^(?:www\.)?showroom-live\.com$/.test(h)) return STREAM_PLATFORMS.showroom;
   if (/^(?:www\.)?mixch\.tv$/.test(h)) return STREAM_PLATFORMS.mixch;
   if (/^(?:www\.)?tiktok\.com$/.test(h)) return STREAM_PLATFORMS.tiktok;
+  if (/^(?:www\.)?abema\.tv$/.test(h)) return STREAM_PLATFORMS.abema;
   return null;
 }
