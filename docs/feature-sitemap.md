@@ -339,8 +339,9 @@
   - `src/lib/crowdRasterizer.js`
 - **ギフト投擲演出** — 会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群
   - `src/lib/giftThrowProjectile.js`
-- **言葉の演出** — 登録した言葉かギフトで、絵文字か画像を1つ出すか少し落とす。同時数・言葉ごとの間隔・過去ログの塊は出さない。動きは CSS の変形だけ。既定オフ。設定は nls_word_effect_v1（schemaVersion）。会場が開いているときと、word-effect.html?obs=1 の透明な別窓（OBS のウィンドウキャプチャ）で出す
+- **言葉の演出** — 登録した言葉かギフトで、絵文字か画像を1つ出すか少し落とす。ニコニコは届いたコメントの取り込み口から、YouTube・Twitch・Kick・ABEMA は各サービスの新しいコメントから出す。一時的なコメントの控えには頼らない。同時数・言葉ごとの間隔・過去ログの塊は出さない。動きは CSS の変形だけ。既定オフ。設定は nls_word_effect_v1（schemaVersion）。会場が開いているときと、word-effect.html?obs=1 の透明な別窓（OBS のウィンドウキャプチャ）で出す
   - `src/lib/wordEffect.js`
+  - `src/extension/wordEffectIngestHost.js`
   - `src/extension/wordEffectOverlay.js`
   - `src/extension/word-effect-entry.js`
   - `extension/word-effect.html`

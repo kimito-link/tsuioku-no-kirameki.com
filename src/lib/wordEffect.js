@@ -7,8 +7,10 @@
  *
  * wordEffect.js — 登録した言葉(またはギフト)に合わせて、絵を1つ出すか少し落とすかの判定。
  * 物理演算はしない。同時数・言葉ごとの間隔・一気に届いた古い分の見送りもここで決める。
+ * コメントはテール(nls_ctail_)を見ない。届いた分だけを取り込み口から受け取る。
  */
 import { toEpochMs } from './timeAuthority.js';
+import { isPlaceholderStreamKey, platformOfStreamKey } from './platform/streamPlatform.js';
 
 /** chrome.storage.local のキー。版を上げるときはキーの末尾を変えて旧値を残す。 */
 export const KEY_WORD_EFFECT = 'nls_word_effect_v1';
@@ -46,6 +48,8 @@ export const WORD_EFFECT_SEEN_CAP = 240;
 /** CSS アニメの長さ(ms)。JS はタイマーの後始末にだけ使う。 */
 export const WORD_EFFECT_POP_MS = 1100;
 export const WORD_EFFECT_FALL_MS = 1600;
+/** 取り込み口から届いた新しいコメントを、別窓と会場へ渡すメッセージ。 */
+export const WORD_EFFECT_INGEST_TYPE = 'nls_word_effect_ingest';
 
 /**
  * @typedef {'word'|'gift'} WordEffectTrigger
@@ -210,12 +214,12 @@ export function sanitizeWordEffectImageUrl(raw) {
 }
 
 /**
- * `nls_ctail_<id>` と `nls_gift_events_<id>` から配信 id を取る。違うキーは空。
+ * ギフトの保存キーから配信 id を取る。コメントのテールキーは対象にしない。
  * @param {unknown} key
  * @returns {string}
  */
 export function liveIdFromWordEffectStorageKey(key) {
-  const m = /^nls_(?:ctail|gift_events)_(.+)$/.exec(String(key || ''));
+  const m = /^nls_gift_events_(.+)$/.exec(String(key || ''));
   return m && m[1] ? m[1] : '';
 }
 
@@ -224,10 +228,149 @@ export function liveIdFromWordEffectStorageKey(key) {
  * @returns {'comment'|'gift'|''}
  */
 export function wordEffectKindFromStorageKey(key) {
-  const text = String(key || '');
-  if (text.startsWith('nls_ctail_')) return 'comment';
-  if (text.startsWith('nls_gift_events_')) return 'gift';
+  return String(key || '').startsWith('nls_gift_events_') ? 'gift' : '';
+}
+
+/**
+ * 配信 id と、開いているページのホストからサービス名を決める。
+ * ABEMA は YouTube のチャットを使うが、ページのホストが abema なら abema とする。
+ * @param {unknown} liveId
+ * @param {unknown} [pageHost]
+ * @returns {'niconico'|'youtube'|'twitch'|'kick'|'abema'|string}
+ */
+export function wordEffectServiceOf(liveId, pageHost = '') {
+  const host = String(pageHost || '').toLowerCase().replace(/^www\./, '');
+  if (host === 'abema.tv' || host.endsWith('.abema.tv') || host === 'abema.jp' || host.endsWith('.abema.jp')) return 'abema';
+  const id = String(liveId || '').trim();
+  const plat = platformOfStreamKey(id);
+  if (plat) return plat.id;
+  if (/^lv9\d{11}$/i.test(id)) return 'youtube';
+  if (/^lv\d{1,15}$/i.test(id)) return 'niconico';
+  if (id) return 'youtube';
   return '';
+}
+
+/**
+ * @param {unknown} liveId
+ * @returns {string}
+ */
+function normalizeIngestLiveId(liveId) {
+  const id = String(liveId || '').trim();
+  return /^lv\d{1,15}$/i.test(id) ? id.toLowerCase() : id;
+}
+
+/**
+ * 取り込み口の1行を演出の入力にする。本文の無い行は捨てる。
+ * @param {unknown} row
+ * @param {'comment'|'gift'} kind
+ * @returns {WordEffectEvent|null}
+ */
+function eventFromIngestRow(row, kind) {
+  if (!row || typeof row !== 'object') return null;
+  const rec = /** @type {Record<string, unknown>} */ (row);
+  const id = String(rec.commentNo || rec.id || rec.pk || '').trim().slice(0, 48);
+  if (kind === 'gift') {
+    const itemName = clampChars(rec.itemName || rec.ytGiftName, WORD_EFFECT_TEXT_MAX);
+    if (!itemName && !id) return null;
+    return {
+      key: `g:${id}:${itemName}:${Number(rec.point) || 0}`,
+      text: '',
+      itemName
+    };
+  }
+  const text = clampChars(rec.text || rec.message, WORD_EFFECT_TEXT_MAX);
+  if (!text) return null;
+  const at = toEpochMs(rec.capturedAt || rec.recordedAt || rec.postedAtMs);
+  return { key: id ? `i:${id}` : `i:${at}:${clampChars(text, 40)}`, text, itemName: '' };
+}
+
+/**
+ * 届いたばかりのコメントから、別窓へ渡すメッセージを作る。
+ * 過去ログ・8件以上の塊・空は null(出さない)。
+ * @param {unknown} liveId
+ * @param {unknown} rows
+ * @param {'comment'|'gift'} [kind]
+ * @param {unknown} [source]
+ * @param {unknown} [pageHost]
+ * @returns {{ type: string, liveId: string, service: string, kind: 'comment'|'gift', events: WordEffectEvent[] }|null}
+ */
+export function buildWordEffectIngestMessage(liveId, rows, kind = 'comment', source = '', pageHost = '') {
+  const id = normalizeIngestLiveId(liveId);
+  if (!id || isPlaceholderStreamKey(id)) return null;
+  if (/backfill|deep|replay|archive/i.test(String(source || ''))) return null;
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length >= WORD_EFFECT_BURST_SKIP) return null;
+  const useKind = kind === 'gift' ? 'gift' : 'comment';
+  /** @type {WordEffectEvent[]} */
+  const events = [];
+  for (const row of rows) {
+    const ev = eventFromIngestRow(row, useKind);
+    if (ev) events.push(ev);
+  }
+  if (events.length === 0) return null;
+  return {
+    type: WORD_EFFECT_INGEST_TYPE,
+    liveId: id,
+    service: wordEffectServiceOf(id, pageHost),
+    kind: useKind,
+    events
+  };
+}
+
+/**
+ * @param {unknown} message
+ * @returns {{ liveId: string, service: string, kind: 'comment'|'gift', events: WordEffectEvent[] }|null}
+ */
+export function parseWordEffectIngestMessage(message) {
+  const msg = /** @type {Record<string, unknown>} */ (message);
+  if (!msg || msg.type !== WORD_EFFECT_INGEST_TYPE) return null;
+  const liveId = normalizeIngestLiveId(msg.liveId);
+  if (!liveId || !Array.isArray(msg.events) || msg.events.length === 0 || msg.events.length >= WORD_EFFECT_BURST_SKIP) return null;
+  /** @type {WordEffectEvent[]} */
+  const events = [];
+  for (const raw of msg.events) {
+    if (!raw || typeof raw !== 'object') continue;
+    const rec = /** @type {Record<string, unknown>} */ (raw);
+    const key = String(rec.key || '').slice(0, 80);
+    if (!key) continue;
+    events.push({
+      key,
+      text: clampChars(rec.text, WORD_EFFECT_TEXT_MAX),
+      itemName: clampChars(rec.itemName, WORD_EFFECT_TEXT_MAX)
+    });
+  }
+  if (events.length === 0) return null;
+  return {
+    liveId,
+    service: String(msg.service || wordEffectServiceOf(liveId)),
+    kind: msg.kind === 'gift' ? 'gift' : 'comment',
+    events
+  };
+}
+
+/**
+ * 取り込み口のメッセージを、出してよい絵に変える。最初の1件でも出す(テールの初回読み飛ばしはしない)。
+ * @param {WordEffectSettings|null|undefined} settings
+ * @param {unknown} message
+ * @param {WordEffectWatchState|null|undefined} state
+ * @param {number} nowMs
+ * @param {number} spawnBudget
+ * @returns {{ state: WordEffectWatchState, fires: WordEffectSprite[][], service: string }}
+ */
+export function applyWordEffectIngest(settings, message, state, nowMs, spawnBudget) {
+  const parsed = parseWordEffectIngestMessage(message);
+  const base = state && typeof state === 'object' ? state : createWordEffectWatchState();
+  if (!parsed) return { state: base, fires: [], service: '' };
+  const next = advanceWordEffectWatch(
+    settings,
+    parsed.events,
+    parsed.kind,
+    base,
+    nowMs,
+    spawnBudget,
+    parsed.liveId,
+    true
+  );
+  return { ...next, service: parsed.service };
 }
 
 /**
@@ -321,9 +464,10 @@ export function buildWordEffectSprites(rule, seed) {
  * @param {number} nowMs
  * @param {number} spawnBudget
  * @param {string} [liveId]
+ * @param {boolean} [freshOnly] 取り込み口の新しい行。初回でも出す
  * @returns {{ state: WordEffectWatchState, fires: WordEffectSprite[][] }}
  */
-export function advanceWordEffectWatch(settings, events, kind, state, nowMs, spawnBudget, liveId) {
+export function advanceWordEffectWatch(settings, events, kind, state, nowMs, spawnBudget, liveId, freshOnly = false) {
   const prev = state && typeof state === 'object' ? state : createWordEffectWatchState();
   const incomingLive = String(liveId || '');
   const switched = incomingLive !== '' && incomingLive !== prev.activeLiveId;
@@ -331,7 +475,7 @@ export function advanceWordEffectWatch(settings, events, kind, state, nowMs, spa
   const seen = switched || !Array.isArray(prev.seen) ? [] : prev.seen.slice();
   /** @type {Record<string, number>} */
   const lastFired = { ...(prev.lastFired || {}) };
-  const primed = switched ? false : prev.primed === true;
+  const primed = freshOnly ? true : (switched ? false : prev.primed === true);
   const activeLiveId = incomingLive || String(prev.activeLiveId || '');
   const list = Array.isArray(events) ? events : [];
 

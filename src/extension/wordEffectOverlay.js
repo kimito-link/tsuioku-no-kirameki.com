@@ -6,8 +6,10 @@
 import {
   KEY_WORD_EFFECT,
   WORD_EFFECT_FALL_MS,
+  WORD_EFFECT_INGEST_TYPE,
   WORD_EFFECT_POP_MS,
   advanceWordEffectWatch,
+  applyWordEffectIngest,
   createWordEffectWatchState,
   liveIdFromWordEffectStorageKey,
   normalizeWordEffectSettings,
@@ -15,6 +17,7 @@ import {
   wordEffectEventsFromRows,
   wordEffectKindFromStorageKey
 } from '../lib/wordEffect.js';
+import { subscribeWordEffectIngest } from './wordEffectIngestHost.js';
 
 const STYLE_ID = 'nl-word-effect-style';
 
@@ -171,8 +174,26 @@ export function mountWordEffectOverlay(parent, opts = {}) {
   let state = createWordEffectWatchState();
   /** @type {((changes: Record<string, { newValue?: unknown }>, area: string) => void) | null} */
   let onChanged = null;
+  /** @type {((message: unknown) => void) | null} */
+  let onIngestMessage = null;
+  /** @type {(() => void) | null} */
+  let unsubscribeIngest = null;
 
   const canPaint = () => (typeof opts.canPaint === 'function' ? opts.canPaint() !== false : true);
+
+  /**
+   * 取り込み口から届いた新しいコメント。テールの中身には頼らない。
+   * @param {unknown} message
+   */
+  const takeIngest = (message) => {
+    const budget = canPaint() ? Math.max(0, settings.maxConcurrent - layer.childElementCount) : 0;
+    const next = applyWordEffectIngest(settings, message, state, Date.now(), budget);
+    state = next.state;
+    if (!canPaint()) return;
+    for (const sprites of next.fires) {
+      spawnWordEffectSprites(layer, sprites, settings.maxConcurrent, false);
+    }
+  };
 
   /**
    * @param {string} key
@@ -223,6 +244,16 @@ export function mountWordEffectOverlay(parent, opts = {}) {
     });
   }
 
+  unsubscribeIngest = subscribeWordEffectIngest(takeIngest);
+  onIngestMessage = (message) => {
+    const msg = /** @type {{ type?: string }} */ (message);
+    if (!msg || msg.type !== WORD_EFFECT_INGEST_TYPE) return;
+    takeIngest(message);
+  };
+  try {
+    chrome.runtime.onMessage.addListener(onIngestMessage);
+  } catch { /* 拡張の外のプレビュー */ }
+
   return {
     /**
      * 保存しなくても、その場で1回出す(設定画面の「試す」)。
@@ -255,6 +286,10 @@ export function mountWordEffectOverlay(parent, opts = {}) {
     },
     destroy() {
       if (storage && onChanged) storage.onChanged.removeListener(onChanged);
+      if (unsubscribeIngest) unsubscribeIngest();
+      try {
+        if (onIngestMessage) chrome.runtime.onMessage.removeListener(onIngestMessage);
+      } catch { /* 拡張の外 */ }
       if (layer !== parent) layer.remove();
       delete parent.dataset.nlWordEffect;
     }

@@ -13,6 +13,9 @@ describe('言葉の演出の配線', () => {
   const venue = read('src/extension/venueBar.js');
   const html = read('extension/word-effect.html');
   const manifest = read('extension/manifest.json');
+  const host = read('src/extension/wordEffectIngestHost.js');
+  const content = read('src/extension/content-entry.js');
+  const ytBg = read('extension-youtube/src/background-entry.js');
 
   it('会場が透明な層を載せ、物理演算と毎フレーム計算をしない', () => {
     expect(venue).toContain("from './wordEffectOverlay.js'");
@@ -30,5 +33,30 @@ describe('言葉の演出の配線', () => {
     expect(lib).toContain("export const KEY_WORD_EFFECT = 'nls_word_effect_v1'");
     expect(overlay).toContain('KEY_WORD_EFFECT');
     expect(manifest).toContain('word-effect.html');
+  });
+
+  it('コメントは取り込み口から渡し、テールキーには頼らない', () => {
+    expect(host).toContain('buildWordEffectIngestMessage');
+    expect(host).not.toContain('tailStorageKey');
+    expect(content).toContain('publishWordEffectIngest(liveId || \'\', filtered, { source: sourceKey })');
+    expect(overlay).toContain('WORD_EFFECT_INGEST_TYPE');
+    expect(overlay).toContain('applyWordEffectIngest');
+    const chatAt = ytBg.indexOf("message.type === 'YT_CHAT_ITEMS'");
+    const backfillAt = ytBg.indexOf("message.type === 'YT_BACKFILL_ITEMS'");
+    const publishAt = ytBg.indexOf('publishWordEffectIngest(', chatAt);
+    expect(backfillAt).toBeGreaterThan(-1);
+    expect(publishAt).toBeGreaterThan(chatAt);
+    expect(ytBg.slice(backfillAt, chatAt)).not.toContain('publishWordEffectIngest');
+    for (const rel of [
+      'extension-youtube/src/content-chat-entry.js',
+      'extension-youtube/src/tw-content-entry.js',
+      'extension-youtube/src/kick-content-entry.js',
+      'extension-youtube/src/ww-content-entry.js',
+      'extension-youtube/src/sr-content-entry.js',
+      'extension-youtube/src/mx-content-entry.js',
+      'extension-youtube/src/tt-content-entry.js'
+    ]) {
+      expect(read(rel), rel).toContain("type: 'YT_CHAT_ITEMS'");
+    }
   });
 });

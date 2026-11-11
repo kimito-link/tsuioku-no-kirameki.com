@@ -657,6 +657,7 @@ import {
   normalizeCommentPanelAutoRestoreEnabled
 } from '../lib/commentPanelHealthProbe.js';
 import { pushLiveCommentsToComeview } from './comeviewLivePushHost.js';
+import { publishWordEffectIngest } from './wordEffectIngestHost.js';
 import { startOrphanTabAutoReloadInPage } from './orphanTabAutoReloadHost.js';
 
 /**
@@ -12236,6 +12237,7 @@ function persistCommentRows(rows, opts = {}) {
   }
   // P5b(2026-10-29): コメビュの読み上げへも storage を待たずに流す(コメビュが port を開いている時だけ・費用ゼロ)。
   try { pushLiveCommentsToComeview(liveId || '', filtered); } catch { /* no-op: 記録に影響させない */ }
+  try { publishWordEffectIngest(liveId || '', filtered, { source: sourceKey }); } catch { /* 演出の失敗は記録に影響させない */ }
 }
 
 /** v0.1.795: SW staging 畳み込みの最終チェック時刻(過剰な storage 読みを抑制)。 */

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1238 件
+## ⚠️ 役割コメントが無いソース 10 / 1239 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1160,7 +1160,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2441)
+- 📁 **src/** (2442)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1197,7 +1197,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (114)
+  - 📁 **extension/** (115)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1315,6 +1315,7 @@
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
     - `word-effect-entry.js` — 言葉の演出の設定と、OBS 用の透明な別窓。
+    - `wordEffectIngestHost.js` — 届いたコメントを、同じ画面と別窓の演出へ渡す。
     - `wordEffectOverlay.js` — 言葉の演出を透明な層に出す。
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`

@@ -5,6 +5,8 @@ import {
   WORD_EFFECT_MAX_CONCURRENT,
   WORD_EFFECT_SCHEMA_VERSION,
   advanceWordEffectWatch,
+  applyWordEffectIngest,
+  buildWordEffectIngestMessage,
   createWordEffectWatchState,
   defaultWordEffectSettings,
   liveIdFromWordEffectStorageKey,
@@ -14,6 +16,7 @@ import {
   sanitizeWordEffectImageUrl,
   wordEffectEventsFromRows,
   wordEffectKindFromStorageKey,
+  wordEffectServiceOf,
   writeWordEffectSettings
 } from './wordEffect.js';
 
@@ -297,10 +300,70 @@ describe('wordEffect の発火', () => {
   });
 
   it('保存キーから配信と種類を分ける', () => {
-    expect(liveIdFromWordEffectStorageKey('nls_ctail_lv12')).toBe('lv12');
-    expect(wordEffectKindFromStorageKey('nls_ctail_lv12')).toBe('comment');
+    expect(liveIdFromWordEffectStorageKey('nls_ctail_lv12')).toBe('');
+    expect(wordEffectKindFromStorageKey('nls_ctail_lv12')).toBe('');
     expect(liveIdFromWordEffectStorageKey('nls_gift_events_lv12')).toBe('lv12');
     expect(wordEffectKindFromStorageKey('nls_gift_events_lv12')).toBe('gift');
     expect(liveIdFromWordEffectStorageKey('nls_comments_lv12')).toBe('');
+  });
+});
+
+describe('言葉の演出は各サービスの取り込み口から出す', () => {
+  const rule = {
+    id: 'place',
+    trigger: 'word',
+    word: '長野どうですか',
+    effect: 'pop',
+    emoji: '✨',
+    imageUrl: '',
+    count: 1,
+    cooldownMs: 1500
+  };
+  const enabled = { schemaVersion: 1, enabled: true, maxConcurrent: 4, rules: [rule] };
+  /** @type {Array<[string, string, Record<string, string>, string]>} */
+  const services = [
+    ['niconico', 'lv351100897', { commentNo: '9001', text: '長野どうですか' }, ''],
+    ['youtube', 'dQw4w9WgXcQ', { id: 'yt-1', text: '長野どうですか' }, 'www.youtube.com'],
+    ['twitch', 'tw.streamer.99', { id: 'tw-1', text: '長野どうですか' }, 'www.twitch.tv'],
+    ['kick', 'kk.streamer.99', { id: 'kk-1', text: '長野どうですか' }, 'kick.com'],
+    ['abema', 'AbCdEfGhIjK', { id: 'ab-1', text: '長野どうですか' }, 'abema.tv'],
+    ['whowatch', 'ww.12345.678', { id: 'ww-1', text: '長野どうですか' }, 'whowatch.tv'],
+    ['showroom', 'sr.room1.99', { id: 'sr-1', text: '長野どうですか' }, 'www.showroom-live.com'],
+    ['mixch', 'mx.42.99', { id: 'mx-1', text: '長野どうですか' }, 'mixch.tv'],
+    ['tiktok', 'tt.liveuser.12345', { id: 'tt-1', text: '長野どうですか' }, 'www.tiktok.com']
+  ];
+  for (const [service, liveId, row, host] of services) {
+    it(`${service} の新しいコメントで出る。テールキーは要らない`, () => {
+      expect(wordEffectServiceOf(liveId, host)).toBe(service);
+      const msg = buildWordEffectIngestMessage(liveId, [row], 'comment', 'live', host);
+      expect(msg).not.toBeNull();
+      expect(JSON.stringify(msg)).not.toContain('nls_ctail_');
+      const fired = applyWordEffectIngest(enabled, msg, createWordEffectWatchState(), 1000, 4);
+      expect(fired.service).toBe(service);
+      expect(fired.fires).toHaveLength(1);
+      expect(fired.fires[0][0].emoji).toBe('✨');
+      const again = applyWordEffectIngest(enabled, msg, fired.state, 5000, 4);
+      expect(again.fires).toEqual([]);
+    });
+  }
+
+  it('過去ログと、8件以上の塊は出さない', () => {
+    const row = { id: 'x', text: '長野どうですか' };
+    expect(buildWordEffectIngestMessage('dQw4w9WgXcQ', [row], 'comment', 'backfill')).toBeNull();
+    expect(buildWordEffectIngestMessage('lv1', [row], 'comment', 'deep')).toBeNull();
+    const many = Array.from({ length: WORD_EFFECT_BURST_SKIP }, (_, i) => ({ id: `n${i}`, text: '長野どうですか' }));
+    expect(buildWordEffectIngestMessage('lv1', many, 'comment', 'live')).toBeNull();
+  });
+
+  it('オフのあいだは出さない', () => {
+    const msg = buildWordEffectIngestMessage('lv1', [{ commentNo: '1', text: '長野どうですか' }], 'comment', 'ndgr');
+    const off = applyWordEffectIngest(
+      { schemaVersion: 1, enabled: false, maxConcurrent: 4, rules: [rule] },
+      msg,
+      createWordEffectWatchState(),
+      1000,
+      4
+    );
+    expect(off.fires).toEqual([]);
   });
 });

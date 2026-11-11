@@ -190,9 +190,10 @@ graph LR
   f21 --> f21_0["lib/giftThrowProjectile.js"]
   HUB --> f22["言葉の演出"]
   f22 --> f22_0["lib/wordEffect.js"]
-  f22 --> f22_1["extension/wordEffectOverlay.js"]
-  f22 --> f22_2["extension/word-effect-entry.js"]
-  f22 --> f22_3["word-effect.html"]
+  f22 --> f22_1["extension/wordEffectIngestHost.js"]
+  f22 --> f22_2["extension/wordEffectOverlay.js"]
+  f22 --> f22_3["extension/word-effect-entry.js"]
+  f22 --> f22_4["word-effect.html"]
   HUB --> f23["吹き出し寿命管理"]
   f23 --> f23_0["lib/venueBubbleLifecycle.js"]
   HUB --> f24["HTMLレポート生成"]
@@ -462,11 +463,11 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2441 件</sub>
+<sub>ファイル 2442 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（114 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（115 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
 - `lib/`（2139 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
@@ -661,9 +662,10 @@ popup/埋め込みパネルの paint 所要ms・描画見送り・【パネル�
 - [`src/lib/giftThrowProjectile.js`](../src/lib/giftThrowProjectile.js)
 
 ### 言葉の演出  〔演出 / 会場 / OBS〕
-登録した言葉かギフトで、絵文字か画像を1つ出すか少し落とす。同時数・言葉ごとの間隔・過去ログの塊は出さない。動きは CSS の変形だけ。既定オフ。設定は nls_word_effect_v1（schemaVersion）。会場が開いているときと、word-effect.html?obs=1 の透明な別窓（OBS のウィンドウキャプチャ）で出す
+登録した言葉かギフトで、絵文字か画像を1つ出すか少し落とす。ニコニコは届いたコメントの取り込み口から、YouTube・Twitch・Kick・ABEMA は各サービスの新しいコメントから出す。一時的なコメントの控えには頼らない。同時数・言葉ごとの間隔・過去ログの塊は出さない。動きは CSS の変形だけ。既定オフ。設定は nls_word_effect_v1（schemaVersion）。会場が開いているときと、word-effect.html?obs=1 の透明な別窓（OBS のウィンドウキャプチャ）で出す
 
 - [`src/lib/wordEffect.js`](../src/lib/wordEffect.js)
+- [`src/extension/wordEffectIngestHost.js`](../src/extension/wordEffectIngestHost.js)
 - [`src/extension/wordEffectOverlay.js`](../src/extension/wordEffectOverlay.js)
 - [`src/extension/word-effect-entry.js`](../src/extension/word-effect-entry.js)
 - [`extension/word-effect.html`](../extension/word-effect.html)

@@ -457,7 +457,8 @@ export default [
     // v0.1.1871: 公式ギフト欄の作りを読み取りだけで記録する計器(import 1行+起動1行)=+2。中身は lib の giftPanelShape.js。
     // v0.1.1874: ギフトの子の窓で番組ギフトのタブへ切り替える合図の受け手(起動1行)=+1。中身は lib の venueComposeBox.js。
     // v0.1.1875: 会場のギフトのアイテムの帯(import 1行)=+1。読む・置く・押すは lib の giftItemsMirror.js。
-    rules: { 'max-lines': ['error', { max: 19580, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2039: 言葉の演出を、届いたコメントの取り込み口から渡す(+2: import と呼び出し)。中身は wordEffectIngestHost.js。
+    rules: { 'max-lines': ['error', { max: 19582, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
