@@ -189,12 +189,13 @@ describe('venueItemsForPlatform', () => {
     expect(items.some((i) => /推定/.test(`${i.label}${i.title}`))).toBe(false);
   });
 
-  it('ミクチャはレベル・ファン・スーパーファン・ライバーランク。来ていない数は枠ごと出さない', () => {
+  it('ミクチャはレベル・ファン・ガチファン・ライバーランクpt(画面の言葉)。イベントpt は出さない。来ていない数は枠ごと出さない', () => {
     const chips = panelExtraChips('mixch', { official: { eventRank: 3, level: 12, fans: 34567, superfans: 210, liverRankScore: 45678, superfanBonus: 15 } });
-    expect(chips.map((c) => c.label)).toEqual(['レベル', 'ファン', 'スーパーファン', 'ライバーランク', 'イベント順位']);
+    expect(chips.map((c) => c.label)).toEqual(['レベル', 'ファン', 'ガチファン', 'ライバーランクpt', 'イベント順位']);
     expect(chips[0].text).toBe('Lv12');
     expect(chips.find((c) => c.key === 'liverRank').title).toContain('15%');
     expect(panelExtraChips('mixch', { official: { fans: 5 } }).map((c) => c.key)).toEqual(['fans']);
+    expect(panelExtraChips('mixch', { official: { eventPoint: 0, eventRank: 23 } }).map((c) => c.key)).toEqual(['eventRank']);
     expect(panelExtraChips('mixch', {})).toEqual([]);
   });
 

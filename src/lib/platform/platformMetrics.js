@@ -64,7 +64,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     native: false,
     concurrentLabel: '視聴者数',
     visitorCard: false,
-    chips: Object.freeze(['streamAge', 'level', 'fans', 'superfans', 'liverRank', 'eventRank', 'eventPoint']),
+    // eventInfo.point は 2026-11-11 の実ページで 0 なのに画面には別の数が出ていた(どの値か未確定)→ イベントpt は出さない。
+    //   「スーパーファン」は画面の言葉「ガチファン」、streamerRank.score はランク記号(B1 等)の横のポイント。
+    chips: Object.freeze(['streamAge', 'level', 'fans', 'superfans', 'liverRank', 'eventRank']),
   }),
   // ふわっち: イベント順位(同時に出ているイベントは title に並べる)・累計視聴
   whowatch: Object.freeze({
@@ -402,9 +404,10 @@ function officialChips(id, official) {
   }
   add('level', 'レベル', num(o.level), '', '', num(o.level) != null ? `Lv${formatInt(Number(o.level))}` : '');
   add('fans', 'ファン', num(o.fans), '人');
-  add('superfans', 'スーパーファン', num(o.superfans), '人');
+  // ミクチャの画面の言葉(2026-11-11 実ページ): スーパーファン=「ガチファン」、ランクは記号(B1 等)でその横がポイント
+  add('superfans', 'ガチファン', num(o.superfans), '人');
   const bonus = num(o.superfanBonus);
-  add('liverRank', 'ライバーランク', num(o.liverRankScore), '', bonus != null ? `スーパーファンボーナス ${formatInt(bonus)}%。` : '');
+  add('liverRank', 'ライバーランクpt', num(o.liverRankScore), '', `ランクの記号(B1 など)の横に出ているポイントです。${bonus != null ? `ガチファンボーナス ${formatInt(bonus)}%。` : ''}`);
   add('totalViews', '累計視聴', num(o.totalViews), '');
   // 並びは能力表の順(そのサービスの画面で目に入る順)
   const order = [...want];
