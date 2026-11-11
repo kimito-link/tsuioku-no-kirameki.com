@@ -13,6 +13,7 @@ import { comeviewUserKeyForRow } from './comeviewActions.js';
 import { isGenericComeviewName } from './comeviewRows.js';
 import { comeviewAnonLabel } from './comeviewUserNotes.js';
 import { safeHttpUrl } from './htmlText.js';
+import { toEpochMs } from './timeAuthority.js';
 
 /** 保存形の版。これより新しい v は読まず、上書きもしない。 */
 export const PARTICIPATION_QUEUE_VERSION = 1;
@@ -154,8 +155,8 @@ export function commentMatchesWord(text, word) {
  */
 export function participationCommentAt(row) {
   if (!row || typeof row !== 'object') return 0;
-  const captured = finiteAt(row.capturedAt);
-  const posted = finiteAt(row.ytPostedAt != null ? row.ytPostedAt : row.postedAtMs);
+  const captured = toEpochMs(row.capturedAt);
+  const posted = toEpochMs(row.ytPostedAt != null ? row.ytPostedAt : row.postedAtMs);
   if (captured && posted) return Math.min(captured, posted);
   return captured || posted || 0;
 }
