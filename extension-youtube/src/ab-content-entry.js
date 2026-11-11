@@ -14,14 +14,13 @@ import {
   pickAbBroadcasterImage,
 } from '../../src/lib/abema/abParse.js';
 import {
-  AB_COMMENT_AREA_SEL,
   AB_OPEN_COMMENT_KEY,
   AB_PANEL_NOTE,
   AB_PANEL_POLL_MS,
-  AB_PANEL_WAIT_MS,
   abOpenCommentEnabled,
   createAbPanelController,
   stepAbCommentPanel,
+  abCommentsLookOpen,
 } from '../../src/lib/abema/abCommentPanel.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 
@@ -297,14 +296,13 @@ function pollPanel(force) {
   const now = Date.now();
   if (!force && now - lastPanelAt < AB_PANEL_POLL_MS) return;
   lastPanelAt = now;
-  stepAbCommentPanel(panel, document, { enabled: autoOpen, now });
+  stepAbCommentPanel(panel, document, { enabled: autoOpen, now, arrived: sawPayload });
 }
 
 function panelNeedsHand() {
-  if (document.querySelector(AB_COMMENT_AREA_SEL)) return false;
+  if (sawPayload || abCommentsLookOpen(document)) return false;
   const st = panel.status();
-  if (st.sawArea || !autoOpen || st.clicked) return true;
-  return !!(st.startedAt && Date.now() - st.startedAt > AB_PANEL_WAIT_MS);
+  return !!(st.userClosed || st.gaveUp);
 }
 
 function maybeNote() {
@@ -320,6 +318,8 @@ function maybeNote() {
     showNote(`追憶のきらめき: ${AB_PANEL_NOTE}`);
     return;
   }
+  const opening = panel.status();
+  if (autoOpen && !opening.gaveUp && !opening.userClosed && !abCommentsLookOpen(document)) return;
   if (watchStartedAt && Date.now() - watchStartedAt >= WAIT_MS) {
     showNote('追憶のきらめき: このページのコメントはまだ届いていません。コメントが出る配信で、再生が進むと記録します。');
   }
@@ -498,8 +498,41 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
+function watchSpaNavigation() {
+  const fire = () => {
+    syncPage();
+    pollPanel(true);
+  };
+  window.addEventListener('popstate', fire);
+  /** @param {'pushState' | 'replaceState'} name */
+  const wrap = (name) => {
+    const hist = history;
+    const orig = hist[name];
+    if (typeof orig !== 'function') return;
+    const mark = `__nlAb${name}`;
+    if (/** @type {any} */ (hist)[mark]) return;
+    /** @type {any} */ (hist)[mark] = true;
+    hist[name] = function abHistory(...args) {
+      const ret = orig.apply(this, args);
+      try {
+        fire();
+      } catch {
+        /* ページの遷移は止めない */
+      }
+      return ret;
+    };
+  };
+  try {
+    wrap('pushState');
+    wrap('replaceState');
+  } catch {
+    /* 履歴を包めなくても、1秒ごとの確認でチャンネル切り替えに追いつく */
+  }
+}
+
 loadAutoOpen();
 syncPage();
+watchSpaNavigation();
 setInterval(() => {
   syncPage();
   pollPanel(false);

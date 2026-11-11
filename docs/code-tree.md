@@ -1495,7 +1495,7 @@
     - `hero-connect-hub.svg`
   - 📁 **lib/** (2140)
     - 📁 **abema/** (4)
-      - `abCommentPanel.js` — ABEMA のコメント欄は、開いているときだけ本文の取得が始まる。閉じたままでは件数だけが来る。
+      - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
       - `abParse.js` — ABEMA の放送ページが受け取ったコメント JSON を、YouTube 版の記録と同じ形にする(純関数)
       - `abParse.test.js`
