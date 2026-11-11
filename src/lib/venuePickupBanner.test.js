@@ -44,6 +44,12 @@ describe('createVenuePickupBanner', () => {
     expect(els.root.attrs.role).toBe('status');
     expect(els.root.attrs['aria-live']).toBe('polite');
   });
+
+  it('名前の行が本文の上（ニコ生・YouTube・ABEMA で同じ並び）', () => {
+    const els = createVenuePickupBanner(/** @type {any} */ (makeDocStub()));
+    expect(els.main.children[0]).toBe(els.meta);
+    expect(els.main.children[1]).toBe(els.body);
+  });
 });
 
 describe('buildVenuePickupView', () => {
@@ -132,6 +138,33 @@ describe('applyVenuePickupView — diff-skip', () => {
   });
 });
 
+describe('PICK UP の見た目は1つ', () => {
+  it('幅は窓。欄へ縮める関数も配信ごとの分岐も無い', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { VENUE_PICKUP_CSS } = await import('./venuePickupBanner.js');
+    const bar = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8');
+    const banner = readFileSync(new URL('./venuePickupBanner.js', import.meta.url), 'utf8');
+    expect(VENUE_PICKUP_CSS).toContain('white-space: nowrap');
+    expect(VENUE_PICKUP_CSS).not.toContain('line-clamp');
+    expect(VENUE_PICKUP_CSS).toContain('100vw');
+    expect(VENUE_PICKUP_CSS).not.toContain('is-fit-column');
+    expect(VENUE_PICKUP_CSS).not.toContain('100% - 180px');
+    expect(banner).not.toContain('applyVenuePickupBox');
+    expect(banner).not.toContain('function venuePickupReadableBox');
+    expect(bar).toContain('venuePickupPlacement');
+    expect(bar).toContain('venuePickupDisplayWidth');
+    expect(bar).toContain("pickupEls.root.style.setProperty('width', `${width}px`, 'important')");
+    expect(bar).toContain('pickupEls.root.style.removeProperty(\'width\')');
+    const drag = readFileSync(new URL('../extension/venuePickupDrag.js', import.meta.url), 'utf8');
+    expect(drag).toContain('new ResizeObserver');
+    expect(drag).toContain("window.addEventListener('resize', relayoutSoon)");
+    expect(drag).toContain('visualViewport');
+    expect(bar).not.toContain('applyVenuePickupBox');
+    expect(bar).not.toContain('venuePickupColumnPlacement');
+    expect(bar).not.toContain('abemaCommentColumnRect');
+  });
+});
+
 describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
   it('映像の中心に合わせ、幅は映像から余白を引いた分まで', async () => {
     const { venuePickupPlacement } = await import('./venuePickupBanner.js');
@@ -139,6 +172,17 @@ describe('venuePickupPlacement(PICK UP を映像の上端中央へ)', () => {
     expect(venuePickupPlacement({ left: 16, top: 68, width: 960, height: 540 }, { left: 0, top: 56, width: 1400 })).toEqual({ left: 496, top: 20, width: 860 });
     // 映像が狭いと映像の幅に収める
     expect(venuePickupPlacement({ left: 0, top: 200, width: 600, height: 338 }, { left: 0, top: 56, width: 1000 })).toEqual({ left: 300, top: 152, width: 576 });
+    // 約250pxの欄は本編映像ではない。位置も合わせない（CSS の中央のまま）
+    expect(venuePickupPlacement({ left: 900, top: 80, width: 274, height: 640 }, { left: 0, top: 0, width: 1400 })).toBeNull();
+  });
+  it('窓が細くなっても、広がれば同じ幅に戻る', async () => {
+    const { venuePickupDisplayWidth } = await import('./venuePickupBanner.js');
+    expect(venuePickupDisplayWidth(960, 1400)).toBe(860);
+    expect(venuePickupDisplayWidth(640, 900)).toBe(616);
+    expect(venuePickupDisplayWidth(960, 500)).toBe(468);
+    expect(venuePickupDisplayWidth(274, 1400)).toBe(860);
+    expect(venuePickupDisplayWidth(960, 1400)).toBe(860);
+    expect(venuePickupDisplayWidth(0, 0)).toBe(0);
   });
   it('映像が見つからない・小さすぎるときは null(CSS の既定のまま)', async () => {
     const { venuePickupPlacement } = await import('./venuePickupBanner.js');

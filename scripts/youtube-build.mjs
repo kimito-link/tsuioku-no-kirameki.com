@@ -186,7 +186,12 @@ export function ytBuildTargets({ merged, define }) {
       banner: { js: '// tt-main.js — TikTok の配信ページ自身の世界で、ページのソケットの受信と gift/list を写して入口へ渡すバンドル\n/* eslint-disable */' } });
     list.push({ entryPoints: [src('tt-content-entry.js')], outfile: out('tt-content.js'), target: 'chrome114', define: def, ...page,
       banner: { js: '// tt-content.js — TikTok の配信ページでコメントとギフト(ページ自身のソケットの写し)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
-    list.push({ entryPoints: [resolve(root, 'extension-youtube/content-chat-main.js')], outfile: out('content-chat-main.js'), target: 'chrome114', define: def });
+    // ABEMA の放送ページの入口。ページ自身の世界の写し役と、記録へ渡す入口の2つ。本体向けだけ
+    list.push({ entryPoints: [src('ab-main-entry.js')], outfile: out('ab-main.js'), target: 'chrome114', define: def,
+      banner: { js: '// ab-main.js — ABEMA の放送ページ自身の世界で、ページが受け取ったコメントの JSON を写して入口へ渡すバンドル\n/* eslint-disable */' } });
+    list.push({ entryPoints: [src('ab-content-entry.js')], outfile: out('ab-content.js'), target: 'chrome114', define: def, ...page,
+      banner: { js: '// ab-content.js — ABEMA の放送ページでコメント(ページ自身の応答の写し)を読み、記録へ渡すバンドル\n/* eslint-disable */' } });
+    list.push({ entryPoints: [src('content-chat-main-entry.js')], outfile: out('content-chat-main.js'), target: 'chrome114', define: def });
   }
   // offscreen は1つしか持てないので、本体向けには作らない(本体の offscreen を使う・YouTube の読み上げはコメビュ)
   if (!merged) {
@@ -201,6 +206,34 @@ export function ytBuildTargets({ merged, define }) {
  *   (画像・音は本体と同じものを使う=同じ場所に同じファイルがある)。コメビュだけ単体版と同じ CSS を1つ足す。
  * ★先に scripts/build-youtube-sidepanel-html.mjs が単体版の画面を作っているので、コメビュの CSS はそこから取る。
  */
+/**
+ * 横の欄(yt-sidepanel.html)の最初の描画。プログラムが読み込まれるまでの 0.2〜0.3 秒、ニコ生版の HTML の
+ * 「推定同時接続 —」と来場者数・広告pt 等が見えていた(2026-11-11 PC 計測)。値は最初から「読み込み中」にし、
+ * サービスごとの見出しが付くまで(platformMetricChrome.js が html に data-nl-platform-ready を付ける)ニコ生の見出しと欄を隠す。
+ * @param {string} html
+ */
+function ytPanelPrePaint(html) {
+  const est = '<div class="nl-live-stat-value" id="watchConcurrentEst">—</div>';
+  if (html.split(est).length !== 2) throw new Error('popup.html の #watchConcurrentEst の形が変わった(ytPanelPrePaint)');
+  const css =
+    '<style>/* YouTube 版: サービスの見出しが付くまでニコ生の見出しと欄を出さない(scripts/youtube-build.mjs) */\n' +
+    'html:not([data-nl-platform-ready]) #watchConcurrentCard .nl-live-stat-label,\n' +
+    'html:not([data-nl-platform-ready]) .nl-official-nico-stats__row { visibility: hidden; }\n' +
+    'html:not([data-nl-platform-ready]) .nl-live-stat-card--visitors { display: none !important; }\n' +
+    '</style>\n';
+  const label = '<div class="nl-live-stat-label">推定同時接続</div>';
+  if (html.split(label).length !== 2) throw new Error('popup.html の同時接続の見出しの形が変わった(ytPanelPrePaint)');
+  const htmlTag = '<!DOCTYPE html><html lang="ja"';
+  if (!html.startsWith(htmlTag)) throw new Error('popup.html の1行目の形が変わった(ytPanelPrePaint)');
+  return html
+    // ページに数が出るサービスの画面の印(popup-entry.js の clearWatchMetaCard が「（接続中…）」でなく「読み込み中」と出す)
+    .replace(htmlTag, `${htmlTag} data-nl-page-count-only="1"`)
+    // 見出しはサービスが分かってから付ける(ニコ生の「推定同時接続」を一瞬も出さない)
+    .replace(label, '<div class="nl-live-stat-label"></div>')
+    .replace(est, '<div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">読み込み中</div>')
+    .replace('</head>', `${css}</head>`);
+}
+
 export function writeYtMergedHtml() {
   const pages = [
     ['popup.html', 'yt-sidepanel.html', 'dist/popup.js', 'dist/yt-sidepanel.js'],
@@ -216,7 +249,13 @@ export function writeYtMergedHtml() {
     const tag = `<script src="${js}"></script>`;
     if (src.split(tag).length !== 2) throw new Error(`${from} に ${tag} が1つではありません(ニコ生版の形が変わった?)`);
     let out = src.replace(tag, `<script src="${ytJs}"></script>`);
+    if (to === 'yt-sidepanel.html') {
+      // inline script は拡張の CSP で動かない。head の外部スクリプトだけが、最初の描画より先に走る。
+      if (!out.includes('<head>')) throw new Error('popup.html に <head> がありません');
+      out = out.replace('<head>', '<head>\n  <script src="yt-loading-boot.js"></script>');
+    }
     if (from === 'comeview.html') out = out.replace('</head>', `${cssM[0]}</head>`);
+    if (from === 'popup.html') out = ytPanelPrePaint(out);
     out = out.replace(
       '</html>',
       `<!-- このファイルは scripts/youtube-build.mjs の生成物です(本体に同梱する YouTube 版・ニコ生版 extension/${from} の完全コピー)。直接直さないでください。 -->\n</html>`,

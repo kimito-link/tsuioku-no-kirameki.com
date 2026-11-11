@@ -6,6 +6,8 @@ import {
   applyVenuePickupView,
   buildVenuePickupView,
   createVenuePickupBanner,
+  VENUE_PICKUP_CSS,
+  venuePickupDisplayWidth,
   venuePickupPlacement
 } from '../lib/venuePickupBanner.js';
 import { attachVenuePickupDrag } from './venuePickupDrag.js';
@@ -648,84 +650,8 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
   }
-  /* v0.1.1230 ピックアップ枠(BSP風)。v0.1.1869 りんく「上にもってきたほうがみやすい」(Canva の見本=映像の上に大きな白い吹き出し):
-     ひな壇の一番下にあった帯を、映像の上端中央の大きな吹き出しにした。stageLayout 直下に絶対配置するので
-     出たり消えたりしても席の段は動かない。空のときは出さない(案内文の大きな白い枠で映像をふさがない)。
-     ★下地は不透明(v0.1.1337: 半透明だと後ろのページの文字と重なって読めなかった)。 */
-  .nlsb-pickup {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    z-index: 7;
-    transform: translateX(-50%);
-    width: min(860px, calc(100% - 180px));
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 64px;
-    padding: 10px 22px;
-    border-radius: 28px;
-    border: 2px solid rgba(255, 176, 62, 0.9);
-    background: #fffdf8;
-    color: #1f2328;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-    font-size: 18px;
-    line-height: 1.4;
-    pointer-events: auto;
-  }
-  /* 吹き出しの尻尾(左下)。枠線色の三角の上に地の色の三角を重ねる。 */
-  .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
-  .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
-  .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
-  .nlsb-pickup[data-empty='1'] { display: none; }
-  .nlsb-pickup__badge {
-    flex: 0 0 auto;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 2px 6px;
-    border-radius: 999px;
-    background: rgba(255, 152, 0, 0.9);
-    color: #fff;
-  }
-  .nlsb-pickup__face {
-    flex: 0 0 auto;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: rgba(0, 0, 0, 0.06);
-    box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
-  }
-  .nlsb-pickup__face[hidden] { display: none; }
-  .nlsb-pickup__main {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .nlsb-pickup__body {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; /* 長文は2行まで */
-    overflow-wrap: anywhere;
-    font-weight: 700;
-  }
-  .nlsb-pickup__meta {
-    flex: 0 0 auto;
-    font-size: 12px;
-    opacity: 0.75;
-    color: inherit;
-    text-decoration: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .nlsb-pickup__meta:empty { display: none; }
-  a.nlsb-pickup__meta[href] { text-decoration: underline; text-underline-offset: 2px; }
+  /* v0.1.1230 ピックアップ枠。中身は VENUE_PICKUP_CSS(親の 100% ではなく窓の幅)。 */
+  ${VENUE_PICKUP_CSS}
   .nlsb-stage {
     position: fixed;
     inset: 0;
@@ -2641,7 +2567,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any }, getStatCardsSource?: () => any }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any }, getStatCardsSource?: () => any, statPlatform?: string }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -2870,6 +2796,7 @@ export function mountVenueBarButton(options = {}) {
   }
   // 2026-11-09: パネルの数字カードと同じ数字の帯(ヘッダーの2行目・値は数字カードの鏡をそのまま出す=lib の venueStatStrip.js)。
   const statStrip = createVenueStatStrip(document, {
+    platform: options.statPlatform,
     faces: {
       link: resolveVenueAssetUrl('images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png'),
       konta: resolveVenueAssetUrl('images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png'),
@@ -3031,10 +2958,14 @@ export function mountVenueBarButton(options = {}) {
   /** v0.1.1869: PICK UP を映像の上端中央へ(別窓は中央の埋め込み・放送ページは一番大きい video)。位置の計算は lib の venuePickupPlacement。 */
   function placePickup() {
     if (pickupEls.root.hasAttribute('data-empty')) return;
-    const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
-    const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    const nodes = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
+    const videoEl = nodes.filter((v) => { const r = v.getBoundingClientRect(); return r.width > 0 && r.bottom > 0; }).sort((a, b) => { const ra = a.getBoundingClientRect(); const rb = b.getBoundingClientRect(); return rb.width * rb.height - ra.width * ra.height; })[0];
+    const video = videoEl ? videoEl.getBoundingClientRect() : null;
     const at = venuePickupPlacement(video, stageLayout.getBoundingClientRect());
-    pickupEls.root.style.width = at ? `${at.width}px` : '';
+    const width = venuePickupDisplayWidth(video ? video.width : 0, window.innerWidth);
+    if (width > 0) pickupEls.root.style.setProperty('width', `${width}px`, 'important');
+    else pickupEls.root.style.removeProperty('width');
+    pickupDrag.watch(videoEl);
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)
   }
   const pickupDrag = attachVenuePickupDrag(pickupEls.root, stageLayout, placePickup, (who) => { if (!speechPanel.hidden) closeSpeechPanel(); void openSpeechPanelFor(who); }); // ドラッグで動かし位置を覚える・resize で置き直す・顔/名前クリックでその人の発言パネル(v0.1.1900)
@@ -3750,7 +3681,7 @@ export function mountVenueBarButton(options = {}) {
       const liveId = String(activeLiveId || liveIdFromPathname() || '');
       const recordedCount = panelSummarySnap ? selectDisplayRecordedCount(panelSummarySnap) : null;
       statMirrorLiveness.observe(statCardsMirrorSnap); // 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない
-      const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId) });
+      const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId), platform: options.statPlatform });
       statStrip.paint(model);
       if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror' && statMirrorLiveness.isLive(Date.now(), liveId), recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }

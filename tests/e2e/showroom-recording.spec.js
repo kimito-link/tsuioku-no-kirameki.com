@@ -177,6 +177,21 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
         return json({ ranking: [{ user_id: 13, name: 'ギフトさん', point: 7000, rank: 1, order: 1, avatar_url: '' }, { user_id: 11, name: 'ファンA', point: 300, rank: 2, order: 2 }] });
       case '/api/live/stage_user_list':
         return json({ stage_user_list: [] });
+      case '/api/room/event_and_support':
+        // 2026-11-11 PC 実測の形(値は作り物)。部屋の画面の「現在のランキング・支援pt」「目標Lv」「貢献ユーザー」
+        return json({
+          event: {
+            event_name: 'テストのイベント',
+            ranking: { rank: 4, point: 123456, gap: 5000, lower_gap: 200 },
+            quest: { support: { current_point: 900, goal_point: 1500, next_level: 3 } },
+            contribution_ranking: [
+              { rank: 1, point: 8800, user_id: 13, name: 'イベント応援さん', avatar_url: '' },
+              { rank: 2, point: 1200, user_id: 11, name: 'ファンA', avatar_url: '' },
+            ],
+          },
+          regular_event: null,
+          support: null,
+        });
       case '/api/live/polling':
         return json({ online_user_num: 77, is_login: signedIn });
       case '/api/current_user':
@@ -239,6 +254,26 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   }
   const text = await bodyText();
   expect(text).not.toMatch(/sr:\d|スパチャ|スーパーチャット|トップファン|ギフトサブ/);
+
+  // SHOWROOM 特有: イベントの数字はまとめに値のまま、貢献ランキングは2つめの欄(広告ランキングの欄)に SHOWROOM の言葉で
+  await expect
+    .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.platformStats || null, { timeout: 45_000 })
+    .toEqual({ eventName: 'テストのイベント', eventRank: 4, eventPoint: 123456, eventGap: 5000, questLevel: 3, questPoint: 900, questGoal: 1500 });
+  const lane = ext.locator('[data-lane="adRanking"]');
+  await expect.poll(async () => (await lane.count()) ? lane.first().innerText() : '', { timeout: 30_000 }).toContain('イベント応援さん');
+  const laneText = await lane.first().innerText();
+  expect(laneText).toContain('イベント貢献ランキング');
+  expect(laneText).toContain('SHOWROOM 公式のイベント貢献ランキング');
+  expect(laneText).toContain('8,800 pt');
+  expect(laneText).not.toMatch(/広告|ニコニ|貢(?!献)/);
+  const chipText = (/** @type {string} */ k) => ext.evaluate((key) => document.querySelector(`[data-nl-metric="${key}"]`)?.textContent || '', k);
+  await expect.poll(() => chipText('eventRank'), { timeout: 30_000 }).toContain('4位');
+  expect(await chipText('eventRank')).toContain('イベント順位');
+  expect(await chipText('eventPoint')).toContain('123,456pt');
+  expect(await chipText('quest')).toContain('Lv3');
+  expect(await bodyText()).not.toMatch(/推定/);
+  await lane.first().screenshot({ path: 'test-results/showroom-event-board.png' });
+  await ext.locator('[data-nl-metric="eventRank"]').locator('xpath=..').screenshot({ path: 'test-results/showroom-event-chips.png' });
 
   // 配信が終わったら(is_live=false)終わった時刻を送る
   live = false;

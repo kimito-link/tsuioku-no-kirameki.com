@@ -17,6 +17,8 @@
  *   recordsIngestLine: string,
  *   concurrent: { estText: string, estIsPlaceholder: boolean, subText: string },
  *   visitor: { text: string, isPlaceholder: boolean },
+ *   platform?: string,
+ *   platformFacts?: Record<string, unknown>|null,
  *   official: null | {
  *     summaryText: string,
  *     viewers: StatChip, comments: StatChip, streamAge: StatChip,
@@ -70,7 +72,8 @@ export function buildStatCardsMirrorSnapshot(input, opts = {}) {
     };
   }
 
-  return {
+  /** @type {StatCardsMirrorSnapshot} */
+  const snap = {
     liveId,
     capturedAt: nowMs,
     recordsText: String(input?.recordsText || ''),
@@ -89,6 +92,23 @@ export function buildStatCardsMirrorSnapshot(input, opts = {}) {
     },
     official
   };
+  // 会場がニコ生以外の数字を隠すために、視聴スナップショットのサービス名と公式の数だけを写す。
+  const src = input?.snapshotForOfficial && typeof input.snapshotForOfficial === 'object'
+    ? /** @type {{ platform?: unknown, platformFacts?: unknown }} */ (input.snapshotForOfficial)
+    : null;
+  const platform = String(src?.platform || '').trim().toLowerCase();
+  if (platform && platform !== 'niconico') {
+    snap.platform = platform;
+    const facts = src.platformFacts;
+    if (facts && typeof facts === 'object') {
+      try {
+        snap.platformFacts = JSON.parse(JSON.stringify(facts));
+      } catch {
+        snap.platformFacts = null;
+      }
+    }
+  }
+  return snap;
 }
 
 /**
@@ -106,6 +126,7 @@ export function buildStatCardsMirrorSignature(snap) {
     o.recordsText || '',
     o.concurrent?.estText || '',
     o.visitor?.text || '',
-    off ? [off.viewers.text, off.comments.text, off.streamAge.text, off.adPts.text, off.giftPts.text].join(',') : 'no-official'
+    off ? [off.viewers.text, off.comments.text, off.streamAge.text, off.adPts.text, off.giftPts.text].join(',') : 'no-official',
+    o.platform || ''
   ].join('|');
 }

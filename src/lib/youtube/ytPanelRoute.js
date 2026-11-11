@@ -1,16 +1,16 @@
 // ytPanelRoute.js — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
 //   パネルはタブ専用にしない(タブを移るたびに隠れて再表示=縞・v0.1.1696)。中の iframe の src だけを付け替える
 //   (sidepanel-iframe-boot-entry.js)。0.1.1949〜 src に配信キー(&stream=)を焼き、配信が変われば読み込み直す。YouTube 版の画面 yt-sidepanel.html は scripts/youtube-build.mjs の生成物。
-import { parseYtVideoIdFromUrl, isYtWatchLikeUrl } from './ytPageMeta.js';
+import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey } from './ytPageMeta.js';
 import { platformChannelOfUrl } from '../platform/streamPlatform.js';
 
 export const YT_PANEL_SRC = 'yt-sidepanel.html?inline=1&dock=sidepanel';
 
 /** @param {unknown} url */
 export function isYtPanelTabUrl(url) {
-  // YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)のタブは同じ画面(YouTube 版=ニコ生版の完全コピー)で見せる。
+  // YouTube 系(YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA)のタブは同じ画面(YouTube 版=ニコ生版の完全コピー)で見せる。
   //   ホストだけで決める(どの配信かは ytPanelStreamKeyOfUrl・council/panel-stream-selection-SPEC.md)
-  return /^https:\/\/(?:www\.(?:youtube\.com|twitch\.tv)|(?:www\.)?(?:kick\.com|whowatch\.tv|showroom-live\.com|mixch\.tv|tiktok\.com))\//.test(String(url || ''));
+  return /^https:\/\/(?:www\.(?:youtube\.com|twitch\.tv)|(?:www\.)?(?:kick\.com|whowatch\.tv|showroom-live\.com|mixch\.tv|tiktok\.com|abema\.tv))\//.test(String(url || ''));
 }
 
 /** いま iframe が YouTube 版を見せているか @param {unknown} src */
@@ -32,7 +32,10 @@ export function ytPanelStreamKeyOfUrl(url) {
   if (!isYtPanelTabUrl(u)) return '';
   if (isYtWatchLikeUrl(u)) {
     const vid = parseYtVideoIdFromUrl(u);
-    return vid ? `yt:${vid}` : '';
+    if (vid) return `yt:${vid}`;
+    // /@名前/live は動画 id が後から分かる。まとめを待たず、YouTube の読み込み中として開く。
+    const pending = ytHandleLivePendingKey(u);
+    return pending ? `yt:${pending}` : '';
   }
   const ch = platformChannelOfUrl(u);
   return ch ? `${ch.platform.id}:${ch.login}` : '';

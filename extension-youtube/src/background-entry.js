@@ -42,6 +42,7 @@ import { isWwApiUrl } from '../../src/lib/whowatch/wwParse.js';
 import { createMxGiftImageResolver } from '../../src/lib/mixch/mxGiftImages.js';
 import { pickJapaneseVoices, lightVoiceToneFor } from '../../src/lib/voiceLightFallback.js';
 import { ytLeaderboardSig } from '../../src/lib/youtube/ytLeaderboardSig.js';
+import { normalizeSubBoardPayload, subBoardSig, SUB_BOARD_KEY_PREFIX } from '../../src/lib/platform/platformSubBoard.js';
 import { ytVoiceAssignPersistDecision, YT_VOICE_ASSIGN_PERSIST_MS } from '../../src/lib/youtube/ytVoiceAssignPersist.js';
 import { decideActiveVideoIdWrite } from '../../src/lib/youtube/ytActiveVideoId.js';
 import {
@@ -64,6 +65,8 @@ import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
+/** @type {Map<string, string>} 配信キー → 前に置いた2つめの順位表の印 */
+const lastSubBoardSig = new Map();
 
 const mxGiftImages = createMxGiftImageResolver({
   fetchJson: async (url) => {
@@ -720,7 +723,7 @@ async function reloadExistingYtWatchTabs(reason) {
   } catch {
     return;
   }
-  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok)の配信ページも同じく止まる
+  // 他のサービス(Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA)の配信ページも同じく止まる
   //   (2026-11-09 実機: 更新前から開いていた SHOWROOM のタブが記録 0 のまま)。配信ページの形の URL だけ読み込み直す
   try {
     const others = await chrome.tabs.query({ url: [...STREAM_PLATFORM_TAB_URLS] });
@@ -1172,6 +1175,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           broadcasterHandle: payload.broadcasterHandle ? String(payload.broadcasterHandle) : undefined,
           concurrentViewers:
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
+          slotViewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : undefined,
+          slotCommentCount: typeof payload.slotCommentCount === 'number' ? payload.slotCommentCount : undefined,
+          // そのサービス特有の公式の数字(イベント順位など)。付いていないときは前のまま(src/lib/platform/platformStats.js)
+          ...(Object.prototype.hasOwnProperty.call(payload, 'platformStats') ? { platformStats: payload.platformStats ?? null } : {}),
+          viewersRead: payload.viewersRead === false ? false : undefined,
+          sourceUrl: payload.sourceUrl ? String(payload.sourceUrl) : undefined,
           // 別の動画と同じ開始時刻は、ページ内の移動で前の動画の欄を読んだもの→使わない
           startedAt:
             typeof payload.startedAt === 'number' &&
@@ -1185,7 +1194,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       );
 
       await publishOneSummary(videoId, summaries[videoId]);
-      await claimActiveVideo(sender, videoId);
+      // 裏の ABEMA タブは claimActive:false(#608)。要約は更新し、いま見ている配信は奪わない。
+      if (payload.claimActive !== false) await claimActiveVideo(sender, videoId);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
       return { ok: true, videoId };
     })
@@ -1207,6 +1217,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // YouTube の「トップファン」の順位。配信ごとに最新の1つだけ置く(ニコ生版の「ギフト貢献度」の欄に出す)
     const payload = message.payload || {};
     const videoId = String(payload.videoId || extractVideoIdFromSender(sender) || '').trim();
+    // そのサービスの2つめの公式ランキング(Twitch・Kick のギフトサブの順位など)は別のキーへ(src/lib/platform/platformSubBoard.js)
+    if (payload.slot === 'sub') {
+      const b = normalizeSubBoardPayload(payload);
+      if (!videoId || !b) return false;
+      const subSig = subBoardSig(b);
+      if (lastSubBoardSig.get(videoId) === subSig) return false;
+      lastSubBoardSig.set(videoId, subSig);
+      if (lastSubBoardSig.size > 200) lastSubBoardSig.delete(lastSubBoardSig.keys().next().value);
+      void chrome.storage.local
+        .set({ [`${SUB_BOARD_KEY_PREFIX}${videoId}`]: { videoId, capturedAt: Date.now(), ...b } })
+        .catch(() => lastSubBoardSig.delete(videoId));
+      return false;
+    }
     const rows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
     if (!videoId || !rows.length) return false;
     // Twitch の公式ランキングは期間がチャンネルごとに違う(累計・今月・今週・今日)。見出しに出すので一緒に置く
@@ -1491,7 +1514,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       // コメント本文は IndexedDB に全件残す。配信一覧の要約は束ごとに書かず、間隔を空けてまとめる。
       // 読み上げが止まっているときは、声の列を毎回書き直さない(書くたびに画面が組み立て直される)。
-      await claimActiveVideo(sender, videoId);
+      if (payload.claimActive !== false) await claimActiveVideo(sender, videoId);
       scheduleYtChatSummaryFlush({
         videoId,
         chatFilterLabel,

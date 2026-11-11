@@ -62,6 +62,7 @@ const LIVE = (status) => ({
   user: user(HOST_ID, 'テストはいしん', { icon_url: 'https://img.whowatch.tv/u/42.jpg' }),
   started_at: Date.parse('2026-11-08T09:00:00Z'),
   view_count: 33,
+  total_view_count: 4567,
   live_status: status,
 });
 // 新しい順で届く
@@ -115,6 +116,14 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
     const cors = { 'Access-Control-Allow-Origin': 'https://whowatch.tv' };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
     const u = new URL(req.url());
+    // イベントの順位(ログイン不要・2026-11-11 PC 実測の形・値は作り物)。1つの配信が複数のイベントに出ている
+    if (u.pathname === '/events/event_info' && u.searchParams.get('live_id') === LIVE_ID) {
+      const ev = [
+        { event_key: 'b', event_name: 'テストイベントB', group_name: '', rank: 12 },
+        { event_key: 'a', event_name: 'テストイベントA', group_name: '新人部門', rank: 2 },
+      ];
+      return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(ev) });
+    }
     if (u.pathname !== `/lives/${LIVE_ID}`) return route.fulfill({ status: 404, headers: cors, body: '' });
     const since = Number(u.searchParams.get('last_updated_at') || 0);
     asked.push(String(since));
@@ -181,6 +190,24 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   const text = await bodyText();
   expect(text).not.toMatch(/ww:\d|ww:n:|<b>|&lt;/);
   expect(text).not.toMatch(/スパチャ|スーパーチャット|トップファン|ギフトサブ/);
+
+  // ふわっち特有: イベント順位(いちばん良い順位・ほかは title)と累計視聴を、値のまま
+  await expect
+    .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.platformStats || null, { timeout: 45_000 })
+    .toEqual({
+      totalViews: 4567,
+      eventRank: 2,
+      eventName: 'テストイベントA',
+      events: [{ name: 'テストイベントA', group: '新人部門', rank: 2 }, { name: 'テストイベントB', group: '', rank: 12 }],
+    });
+  const chip = (/** @type {string} */ k) => ext.evaluate((key) => {
+    const el = document.querySelector(`[data-nl-metric="${key}"]`);
+    return el ? `${el.textContent}|${el.getAttribute('title') || ''}` : '';
+  }, k);
+  await expect.poll(() => chip('eventRank'), { timeout: 30_000 }).toContain('2位');
+  expect(await chip('eventRank')).toContain('テストイベントB 12位');
+  expect(await chip('totalViews')).toContain('4,567');
+  expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
 
   // 配信が終わったと分かったら、終わった時刻を送って読むのをやめる
   ended = true;

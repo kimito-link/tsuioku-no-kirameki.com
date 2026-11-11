@@ -56,7 +56,11 @@ describe('ytRankLinesHtml', () => {
     });
     expect(html).toContain('nl-top-support-rank__caster-label">配信者');
     expect(html).toContain('nl-top-support-rank__caster-follow');
-    expect(html).toContain('data-on-error-hide="1"');
+    expect(html).toContain('https://yt3.ggpht.com/a=s176');
+    expect(html).not.toContain('data-on-error-hide="1"');
+    const noIcon = buildYtCasterTileHtml({ name: '将棋チャンネル' });
+    expect(noIcon).toContain('data:image/svg+xml');
+    expect(noIcon).not.toContain('aria-hidden="true"></span>');
   });
 
   it('人の鍵はチャンネルID優先、無ければ名前から', () => {

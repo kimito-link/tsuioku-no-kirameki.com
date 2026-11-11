@@ -9,6 +9,8 @@
  * ホームや検索でも解析すると、タブが多い低スペックの PC でインストール直後に固まる。
  */
 
+import { parseAbLoginFromUrl } from '../abema/abParse.js';
+
 /**
  * @param {string} href
  * @returns {boolean}
@@ -39,6 +41,8 @@ export function needsYtVenue(href) {
   if (host === 'www.showroom-live.com') return /\/r\//.test(path);
   if (host === 'mixch.tv') return /\/live/.test(path);
   if (host === 'www.tiktok.com' || host === 'tiktok.com') return /\/live(\/|$)/.test(path);
+  // ABEMA(#608): 放送中のチャンネル・ライブイベント・見逃しの番組の視聴ページだけ
+  if (host === 'abema.tv' || host === 'www.abema.tv') return !!parseAbLoginFromUrl(url.href);
   return false;
 }
 
@@ -63,6 +67,8 @@ export function shouldPollYtVenue(href) {
     host === 'www.showroom-live.com' ||
     host === 'mixch.tv' ||
     host === 'www.tiktok.com' ||
-    host === 'tiktok.com'
+    host === 'tiktok.com' ||
+    host === 'abema.tv' ||
+    host === 'www.abema.tv'
   );
 }

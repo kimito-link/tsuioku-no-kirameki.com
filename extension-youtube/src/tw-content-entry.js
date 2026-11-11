@@ -81,6 +81,7 @@ const diag = {
   gqlFail: 0,
   /** 公式の応援ランキング: 行数・どこから(gql:persisted / gql:query)・期間・読めなかった回数 */
   boardRows: 0,
+  subBoardRows: 0,
   boardFrom: '',
   boardPeriod: '',
   boardFail: 0,
@@ -519,19 +520,29 @@ async function sendTwBoard(login, userId, key) {
       /* 読めない */
     }
   }
-  if (!board || !board.bits.length) {
+  if (!board || (!board.bits.length && !board.subGift.length)) {
     diag.boardFail += 1;
     saveDiagSoon();
     return;
   }
   // 順位表には顔が無いので、チャットと同じ方法で顔を聞く(待ちすぎない)
-  const logins = board.bits.map((r) => r.login).filter((l) => !iconByLogin.has(l));
+  const logins = [...board.bits, ...board.subGift].map((r) => r.login).filter((l) => !iconByLogin.has(l));
   if (logins.length) await Promise.race([lookupIcons(logins), new Promise((r) => setTimeout(r, 3000))]);
-  const rows = board.bits.map((r) => ({ rank: r.rank, name: r.name, xp: r.xp, iconUrl: iconByLogin.get(r.login) || '' }));
+  const toRows = (/** @type {typeof board.bits} */ list) => list.map((r) => ({ rank: r.rank, name: r.name, xp: r.xp, iconUrl: iconByLogin.get(r.login) || '' }));
+  const rows = toRows(board.bits);
   diag.boardRows = rows.length;
   diag.boardFrom = from;
   diag.boardPeriod = board.period;
-  safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows, period: board.period } });
+  if (rows.length) safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows, period: board.period } });
+  // 2つめの公式ランキング = twitch.tv のチャット欄の順位表の「ギフトサブ」(同じ応答に入っている・期間も同じ)
+  const subRows = toRows(board.subGift);
+  diag.subBoardRows = subRows.length;
+  if (subRows.length) {
+    safeSendMessage({
+      type: 'YT_LEADERBOARD',
+      payload: { videoId: key, slot: 'sub', title: 'ギフトサブ ランキング', unit: 'サブ', period: board.period, rows: subRows },
+    });
+  }
   saveDiagSoon();
 }
 
@@ -583,7 +594,8 @@ async function check() {
         broadcasterChannelId: info?.userId ? `tw:${info.userId}` : `tw:@${login}`,
         broadcasterHandle: login,
         broadcasterIconUrl: info?.iconUrl || '',
-        concurrentViewers: typeof info?.viewers === 'number' ? info.viewers : undefined,
+        // ページに数が出ていればそれを使う。GQL の数はページより古いことがある(30秒おきにページに無い数へ跳んだ・2026-11-11 PC 計測)
+        concurrentViewers: readTwPageViewers() ?? (typeof info?.viewers === 'number' ? info.viewers : undefined),
         ...(info?.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
       },
     });
@@ -703,3 +715,31 @@ setInterval(() => {
   void check();
 }, 1000);
 window.addEventListener('pagehide', () => current?.stop());
+
+// ---- 視聴者数はページに出ている数を10秒おきに写す(保存の書き込みを増やしすぎないよう10秒・変わったときだけ) ----
+// 配信の情報(GQL)は30秒おきなので、ページの数が 10,533→10,583 と動いても欄が古い数のままだった(2026-11-11 PC 計測)。
+//   ページの「N 人視聴中」の数字(data-a-target="animated-channel-viewers-count")が変わったときだけ送る。読めなければ何もしない。
+/** ページの「N 人視聴中」の数。読めなければ null。 @returns {number|null} */
+function readTwPageViewers() {
+  try {
+    const el = document.querySelector('[data-a-target="animated-channel-viewers-count"]');
+    const digits = String(el?.textContent || '').replace(/[^\d]/g, '');
+    if (!digits || digits.length > 9) return null;
+    const n = Number(digits);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+let lastDomViewers = -1;
+setInterval(() => {
+  if (!current) return;
+  try {
+    const n = readTwPageViewers();
+    if (n === null || n === lastDomViewers) return;
+    lastDomViewers = n;
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, concurrentViewers: n } });
+  } catch {
+    /* 読めなければ30秒おきの数のまま */
+  }
+}, 10_000);

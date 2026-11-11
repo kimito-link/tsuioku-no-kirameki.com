@@ -38,7 +38,11 @@ const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>ミ�
 
 const LIVE = {
   liveInfo: { id: A, chat: `wss://${WS_HOST}/torte/room/${A}`, live_session_id: SESSION, title: 'ざつだん配信', viewer: 42, visitor: 300, created: T0, name: 'はいしんしゃ' },
-  broadcasterInfo: { id: A, name: 'はいしんしゃ', profile_image_url: ICON, live_status: 1 },
+  broadcasterInfo: { id: A, name: 'はいしんしゃ', profile_image_url: ICON, live_status: 1, fan: 123456, superfan: 321 },
+  // 名前の下のレベル・ライバーランク(2026-11-11 PC 実測で画面の数字と照合した欄・値は作り物)
+  broadcasterLevel: { level: 27, level_exp: 10, level_goal: 20 },
+  streamerRank: { available: true, rank: 5, star_group: 2, score: 45678, superfan_bonus: 12 },
+  eventInfo: { id: 9, rank: 7, point: 8888, title: 'テストのイベント', active: true },
   displayPoint: 1000,
   loginInfo: null,
 };
@@ -242,6 +246,21 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   }
   const text = await bodyText();
   expect(text).not.toMatch(/mx:\d|mx\.\d|スパチャ|スーパーチャット|トップファン|ギフトサブ/);
+
+  // ミクチャ特有: レベル・ファン・スーパーファン・ライバーランク・イベント順位を、値のまま
+  const chip = (/** @type {string} */ k) => ext.evaluate((key) => {
+    const el = document.querySelector(`[data-nl-metric="${key}"]`);
+    return el ? `${el.textContent}|${el.getAttribute('title') || ''}` : '';
+  }, k);
+  await expect.poll(() => chip('level'), { timeout: 45_000 }).toContain('Lv27');
+  expect(await chip('fans')).toContain('123,456人');
+  expect(await chip('superfans')).toContain('321人');
+  expect(await chip('liverRank')).toContain('45,678');
+  expect(await chip('liverRank')).toContain('12%');
+  expect(await chip('eventRank')).toContain('7位');
+  expect(await chip('eventPoint')).toContain('8,888pt');
+  expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
+  await ext.locator('[data-nl-metric="level"]').locator('xpath=..').screenshot({ path: 'test-results/mixch-official-chips.png' });
 
   // コメビュ: ギフトはカードだけ(「ギフト」だけの行とカードの2行にしない・2026-11-08 PC 実測)
   const cv = await context.newPage();

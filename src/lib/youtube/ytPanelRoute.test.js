@@ -17,6 +17,8 @@ describe('ytPanelRoute', () => {
     expect(isYtPanelTabUrl('https://kick.com.evil.example/')).toBe(false);
     expect(isYtPanelTabUrl('https://whowatch.tv/viewer/123')).toBe(true);
     expect(isYtPanelTabUrl('https://whowatch.tv.evil.example/')).toBe(false);
+    expect(isYtPanelTabUrl('https://abema.tv/now-on-air/abema-news')).toBe(true);
+    expect(isYtPanelTabUrl('https://abema.tv.evil.example/')).toBe(false);
   });
   it('いま YouTube 版を見せているか', () => {
     expect(isYtPanelSrc(YT_PANEL_SRC)).toBe(true);
@@ -34,12 +36,15 @@ describe('ytPanelRoute', () => {
   });
   it('0.1.1949: 配信ページ → チャンネル単位の配信キー(配信ページでなければ空)', () => {
     expect(ytPanelStreamKeyOfUrl('https://www.youtube.com/watch?v=abcdefghijk')).toBe('yt:abcdefghijk');
+    expect(ytPanelStreamKeyOfUrl('https://www.youtube.com/@hotspanishvlogs/live')).toBe('yt:ytlive:@hotspanishvlogs');
+    expect(ytPanelStreamKeyOfUrl('https://www.youtube.com/weathernews/live')).toBe('yt:ytlive:weathernews');
     expect(ytPanelStreamKeyOfUrl('https://www.youtube.com/')).toBe('');
     expect(ytPanelStreamKeyOfUrl('https://www.twitch.tv/kimito_link')).toBe('twitch:kimito_link');
     expect(ytPanelStreamKeyOfUrl('https://kick.com/kimito-link')).toBe('kick:kimito-link');
     expect(ytPanelStreamKeyOfUrl('https://www.showroom-live.com/r/some_room')).toMatch(/^showroom:/);
     expect(ytPanelStreamKeyOfUrl('https://www.tiktok.com/@some.one/live')).toMatch(/^tiktok:/);
     expect(ytPanelStreamKeyOfUrl('https://whowatch.tv/viewer/123')).toMatch(/^whowatch:/);
+    expect(ytPanelStreamKeyOfUrl('https://abema.tv/now-on-air/abema-news')).toBe('abema:n-abema-news');
     expect(ytPanelStreamKeyOfUrl('https://live.nicovideo.jp/watch/lv1')).toBe('');
     expect(ytPanelStreamKeyOfUrl('https://kick.com.evil.example/x')).toBe('');
   });

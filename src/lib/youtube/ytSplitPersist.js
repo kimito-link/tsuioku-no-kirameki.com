@@ -94,6 +94,18 @@ export function slimSummaryForStorage(summary) {
     createdAt: num(summary.createdAt),
     updatedAt: num(summary.updatedAt),
   };
+  // 0.1.2082: master の #623・#627 で増えた項目(同接を読んだ時刻・枠の視聴数とコメント数・サービス特有の公式の数字)。
+  //   落とすと画面の正本(knownSummaries)から消え、ABEMA の視聴数や公式ランキングの数字が出なくなる。
+  const vra = num(summary.viewersReadAt);
+  if (vra != null) slim.viewersReadAt = vra;
+  if (summary.viewersStale === true) slim.viewersStale = true;
+  const src = clip(summary.sourceUrl, 500);
+  if (src) slim.sourceUrl = src;
+  const svc = num(summary.slotViewCount);
+  if (svc != null) slim.slotViewCount = svc;
+  const scc = num(summary.slotCommentCount);
+  if (scc != null) slim.slotCommentCount = scc;
+  if (summary.platformStats && typeof summary.platformStats === 'object') slim.platformStats = summary.platformStats;
   if (storageJsonBytes(slim) > YT_STORAGE_WRITE_MAX_BYTES) return null;
   return slim;
 }

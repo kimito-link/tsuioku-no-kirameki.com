@@ -9131,11 +9131,10 @@ function clearWatchMetaCard(opts = {}) {
       : Boolean(watchMetaCache.fetchInflight);
   const error =
     typeof opts.error === 'string' ? opts.error : String(watchMetaCache.fetchError || '');
-  const gate = resolveWatchMetaCardState({
-    snapshot: null,
-    snapshotFetchInflight: inflight,
-    snapshotFetchError: error
-  });
+  const gate0 = resolveWatchMetaCardState({ snapshot: null, snapshotFetchInflight: inflight, snapshotFetchError: error });
+  // ページに数が出るサービスの画面(yt-sidepanel.html の data-nl-page-count-only)は「（接続中…）」等でなく「読み込み中」
+  const gate = document.documentElement?.getAttribute('data-nl-page-count-only') === '1'
+    ? { ...gate0, viewerLabel: '読み込み中', concurrentLabel: '読み込み中' } : gate0;
   if (viewerDomEl) {
     viewerDomEl.textContent = gate.viewerLabel;
     viewerDomEl.classList.toggle(
@@ -9538,6 +9537,18 @@ function paintOfficialNicoStatsStrip(snapshot) {
     applyChip(RATE_ID, RATE_PH);
     return;
   }
+  const foreignPlatform = String(snapshot?.platform || '').trim().toLowerCase();
+  const foreignStats = foreignPlatform && foreignPlatform !== 'niconico';
+  applyChip('officialStatNicoStreamAge', digest.streamAge);
+  if (foreignStats) {
+    // ニコ生の来場・本家コメ・広告pt・ギフトpt は、他のサービスの数字で埋めない。
+    applyChip('officialStatNicoViewers', PH);
+    applyChip('officialStatNicoComments', PH);
+    applyChip(RATE_ID, RATE_PH);
+    applyChip('officialStatNicoAdPts', PH);
+    applyChip('officialStatNicoGiftPts', PH);
+    return;
+  }
   applyChip('officialStatNicoViewers', digest.viewers);
   applyChip('officialStatNicoComments', digest.comments);
   // v0.1.1567: 本家コメの速さ「+66/分」。標本は【値が変わったときだけ】(同値の再描画では積まない)。出せない間は空。
@@ -9546,7 +9557,6 @@ function paintOfficialNicoStatsStrip(snapshot) {
   }
   const rateText = digest.comments.isPlaceholder ? '' : formatCommentRate(_officialCommentRate.ratePerMin(Date.now()));
   applyChip(RATE_ID, { text: rateText, isPlaceholder: rateText === '' });
-  applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
 
@@ -9819,18 +9829,11 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       casterFollow.textContent = followTarget.followLabel;
     }
     if (casterIcon) {
-      if (followTarget.iconUrl) {
-        casterIcon.src = followTarget.iconUrl;
-        casterIcon.alt = followTarget.name;
-        casterIcon.style.display = '';
-        casterIcon.onerror = () => { casterIcon.style.display = 'none'; };
-      } else {
-        // チャンネル放送で icon が取れていない場合は非表示にして
-        // 名前 + 「チャンネルを見る」だけを残す
-        casterIcon.removeAttribute('src');
-        casterIcon.alt = '';
-        casterIcon.style.display = 'none';
-      }
+      const face = anonymousIdenticonDataUrl(followTarget.name || '配信', 64);
+      casterIcon.src = followTarget.iconUrl || face;
+      casterIcon.alt = followTarget.name;
+      casterIcon.style.display = '';
+      casterIcon.onerror = () => { const next = identiconFallbackForAvatarUrl(casterIcon.src) || face; if (next && casterIcon.src !== next) casterIcon.src = next; };
     }
     casterBanner.hidden = false;
   } else if (casterBanner) {
@@ -10043,24 +10046,30 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
  * @returns {string}
  */
 /**
- * 0.1.12 (E): innerHTML で流し込んだ HTML 文字列の中に `data-on-error-hide="1"`
- * 付きの <img> がある場合、画像読み込み失敗時に該当要素を visibility:hidden に
- * する。MV3 strict CSP で `onerror="this.style.visibility='hidden'"` のような
- * インライン属性ハンドラは実行できず CSP 違反ログが毎回発生していたので、
- * 同等の挙動をプログラム的に再現する。
- *
+ * innerHTML の img はインライン onerror が CSP で動かないので、流し込み後に失敗を拾う。
+ * 失敗が先に済んでいても、白い既定アイコンのまま残さない。
  * @param {ParentNode | null | undefined} root
  */
 function bindOnErrorHandlersWithin(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
-  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"]');
+  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"], img[data-on-error-fallback="face"]');
   imgs.forEach((node) => {
     if (!(node instanceof HTMLImageElement)) return;
     // 二重バインド防止（再描画でも一度だけ）
     if (node.dataset.nlOnErrorBound === '1') return;
     node.dataset.nlOnErrorBound = '1';
 
-    if (node.dataset.onErrorHide === '1') {
+    if (node.dataset.onErrorFallback === 'face') {
+      const applyFace = () => {
+        try {
+          const face = identiconFallbackForAvatarUrl(node.currentSrc || node.src) || anonymousIdenticonDataUrl(node.dataset.fallbackName || '配信', 64);
+          if (face && node.src !== face) node.src = face;
+        } catch { /* ignore */ }
+      };
+      node.addEventListener('error', applyFace, { once: true });
+      const srcNow = node.currentSrc || node.src;
+      if (node.complete && (node.naturalWidth === 0 || (node.dataset.rejectBlank === '1' && /blank\.jpg/i.test(srcNow)))) applyFace();
+    } else if (node.dataset.onErrorHide === '1') {
       node.addEventListener('error', () => {
         try { node.style.visibility = 'hidden'; } catch { /* ignore */ }
       }, { once: true });
@@ -10086,17 +10095,13 @@ function topSupportRankStripCasterTileHtml() {
     target.kind === 'channel'
       ? `配信者 ${nameWithLv}（クリックでチャンネルページ）`
       : `配信者 ${nameWithLv}（クリックでユーザーページ）`;
-  const iconHtml = target.iconUrl
-    ? `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />`
-    // チャンネル放送で icon が無い時はスペーサーを置いて高さを揃える
-    : `<span class="nl-top-support-rank__caster-thumb" aria-hidden="true"></span>`;
+  const face = anonymousIdenticonDataUrl(target.name || '配信', 64);
+  const iconHtml =
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl || face)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(target.name || '配信')}" />`;
   return (
     `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
     `<span class="nl-top-support-rank__caster-label">配信者</span>` +
     `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(target.pageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +
-    // 0.1.12 (E): MV3 strict CSP は onerror="..." 等のインライン属性ハンドラを実行できない。
-    // 代わりに data-on-error-hide マーカーを付けて、innerHTML 流し込み直後に
-    // addEventListener('error') で同等の挙動を貼り直す（renderTopSupportRankStrip 内）。
     iconHtml +
     `<span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span>` +
     `</a>` +

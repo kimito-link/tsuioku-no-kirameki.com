@@ -2,6 +2,8 @@
 // @layer L0 — 純粋計算（副作用・ブラウザ API なし）
 
 import { assignYtCommentLane } from './ytLaneAssign.js';
+import { ytHandleLivePath } from './ytPageMeta.js';
+import { normalizePlatformStats } from '../platform/platformStats.js';
 import {
   createYtSupportRankingAccumulator,
   applyYtSupportRankingDelta,
@@ -36,11 +38,16 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   broadcasterHandle?: string,
  *   broadcasterIconUrl?: string,
  *   concurrentViewers?: number | null,
+ *   slotViewCount?: number | null,
+ *   slotCommentCount?: number | null,
+ *   viewersRead?: boolean,
+ *   sourceUrl?: string,
  *   chatFilterLabel?: string,
  *   itemCount?: number,
  *   startedAt?: number | null,
  *   startedAtApprox?: boolean,
- *   endedAt?: number | null
+ *   endedAt?: number | null,
+ *   platformStats?: Record<string, any> | null
  * }} patch
  * @param {number} [nowMs]
  * @returns {{
@@ -55,6 +62,7 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   chatFilterLabel: string,
  *   itemCount: number,
  *   startedAt: number | null,
+ *   platformStats?: Record<string, any>,
  *   createdAt: number,
  *   updatedAt: number
  * }}
@@ -75,14 +83,48 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   // 50,000,000 を超える数は読み違い(2026-11-03 実機で桁が連なった数が入った)。古い記録に残っていても捨てる。
   const plausible = (/** @type {unknown} */ v) =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 50_000_000;
-  const concurrentViewers = plausible(patch?.concurrentViewers)
+  const gotCount = plausible(patch?.concurrentViewers);
+  const concurrentViewers = gotCount
     ? Math.floor(/** @type {number} */ (patch.concurrentViewers))
     : plausible(prev.concurrentViewers)
       ? Math.floor(prev.concurrentViewers)
       : null;
+  // 読めた時刻は、数が取れたときだけ進める。コメント件数だけの更新では古くしない。
+  // viewersRead:false は「今の読みは失敗」。前の数は残し、画面は「N分前」と出す。
+  const readFailed = patch?.viewersRead === false && !gotCount;
+  let viewersReadAt =
+    typeof prev.viewersReadAt === 'number' && Number.isFinite(prev.viewersReadAt) && prev.viewersReadAt > 0
+      ? Math.floor(prev.viewersReadAt)
+      : 0;
+  let viewersStale = prev.viewersStale === true && concurrentViewers !== null;
+  if (gotCount) {
+    viewersReadAt = nowMs;
+    viewersStale = false;
+  } else if (readFailed && concurrentViewers !== null) {
+    viewersStale = true;
+  }
+  const sourceUrl = ytHandleLivePath(patch?.sourceUrl)
+    ? `https://www.youtube.com${ytHandleLivePath(patch.sourceUrl)}`
+    : ytHandleLivePath(prev.sourceUrl)
+      ? `https://www.youtube.com${ytHandleLivePath(prev.sourceUrl)}`
+      : '';
   const prevPeak = plausible(prev.peakConcurrentViewers) ? Math.floor(prev.peakConcurrentViewers) : null;
   const peakConcurrentViewers =
     concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
+  // ABEMA の番組詳細の視聴数（同時接続ではない）。無い配信の要約には欄を足さない。
+  // 0 は「まだ読めていない」。視聴数 0 として残さない(2026-11-11 PC: 0 のまま残って「材料待ち」)。
+  const viewOk = (/** @type {unknown} */ v) => plausible(v) && /** @type {number} */ (v) > 0;
+  const slotViewCount = viewOk(patch?.slotViewCount)
+    ? Math.floor(/** @type {number} */ (patch.slotViewCount))
+    : viewOk(prev.slotViewCount)
+      ? Math.floor(prev.slotViewCount)
+      : null;
+  // ページに出ているコメント数（ABEMA の下のバー）。記録の件数とは別。無い配信の要約には欄を足さない。
+  const slotCommentCount = plausible(patch?.slotCommentCount)
+    ? Math.floor(/** @type {number} */ (patch.slotCommentCount))
+    : plausible(prev.slotCommentCount)
+      ? Math.floor(prev.slotCommentCount)
+      : null;
   const chatFilterLabel = String(patch?.chatFilterLabel || prev.chatFilterLabel || '').trim();
   const itemCount =
     typeof patch?.itemCount === 'number' && Number.isFinite(patch.itemCount) && patch.itemCount >= 0
@@ -116,6 +158,11 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
       ? Math.floor(prev.endedAt)
       : null;
 
+  // そのサービス特有の公式の数字(SHOWROOM のイベント順位など・src/lib/platform/platformStats.js)。
+  //   入口が platformStats を付けて来たらそれに置き換える(null = イベントが終わった等で、もう無い)。付けて来なければ前のまま。
+  const hasStatsPatch = !!patch && Object.prototype.hasOwnProperty.call(patch, 'platformStats') && patch.platformStats !== undefined;
+  const platformStats = hasStatsPatch ? normalizePlatformStats(patch.platformStats) : normalizePlatformStats(prev.platformStats);
+
   const createdAt =
     typeof prev.createdAt === 'number' && Number.isFinite(prev.createdAt) && prev.createdAt > 0
       ? prev.createdAt
@@ -129,7 +176,13 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     broadcasterHandle,
     broadcasterIconUrl,
     concurrentViewers,
+    ...(viewersReadAt ? { viewersReadAt } : {}),
+    ...(viewersStale ? { viewersStale: true } : {}),
+    ...(sourceUrl ? { sourceUrl } : {}),
     peakConcurrentViewers,
+    ...(slotViewCount != null ? { slotViewCount } : {}),
+    ...(slotCommentCount != null ? { slotCommentCount } : {}),
+    ...(platformStats ? { platformStats } : {}),
     chatFilterLabel,
     itemCount,
     startedAt,

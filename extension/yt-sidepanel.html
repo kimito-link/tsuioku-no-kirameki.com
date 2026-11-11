@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja" data-nl-usage-terms-ack="1" data-nl-recording="on" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
+<!DOCTYPE html><html lang="ja" data-nl-page-count-only="1" data-nl-usage-terms-ack="1" data-nl-recording="on" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
 <!--
   ★v0.1.1299(6度目): <html> を【1行目・DOCTYPE の直後】へ移した。
   従来はこの下に約1,233バイトのコメントがあり、ブラウザがそれを読み終わるまで
@@ -23,6 +23,7 @@
     ★変更するときは【4箇所とも】直すこと。
 -->
   <head>
+  <script src="yt-loading-boot.js"></script>
     <meta charset="UTF-8" />
     <!--
       ★v0.1.1316: color-scheme を【meta でも】宣言する(sidepanel.html と対)。
@@ -6095,8 +6096,9 @@
         width: 26px;
         height: 26px;
         border-radius: 50%;
-        object-fit: cover;
-        background: var(--nl-surface);
+        object-fit: contain;
+        object-position: center;
+        background: #101418;
         border: 2px solid color-mix(in srgb, var(--nl-accent, #3b82f6) 30%, transparent);
         flex-shrink: 0;
       }
@@ -6301,8 +6303,11 @@
 
       .nl-comment-ticker {
         flex: 1 1 160px;
-        min-width: min(100%, 140px);
+        min-width: min(20em, 100%);
         max-width: 100%;
+        width: 100%;
+        container-type: inline-size;
+        container-name: nl-ticker;
       }
 
       .nl-comment-ticker__viewport {
@@ -6319,7 +6324,8 @@
          *   ★アニメーションは translateX(横流れ)なので、縦に伸ばしても壊れない
          *     (批判役は translateY と述べたが実コードは translateX = 裏取りで否定)。
          */
-        height: calc(clamp(32px, 9vw, 44px) * var(--nl-band-scale, 1.6));
+        height: auto;
+        min-height: calc(clamp(32px, 9vw, 44px) * var(--nl-band-scale, 1.6));
         border-radius: 10px;
         background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
         border: 1px solid #93c5fd;
@@ -6406,16 +6412,22 @@
 
       .nl-ticker-latest {
         display: block;
+        width: 100%;
         max-width: 100%;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: normal;
       }
 
       .nl-ticker-latest__row {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
-        gap: 6px;
+        column-gap: 6px;
+        row-gap: 2px;
+        width: 100%;
+        max-width: 100%;
         min-width: 0;
       }
 
@@ -6431,12 +6443,11 @@
       }
 
       .nl-ticker-latest__name {
-        flex: 0 1 auto;
         min-width: 0;
-        max-width: 11em;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        word-break: normal;
       }
 
       /* 数値 ID ユーザーの場合、ティッカーの行全体を niconico ユーザーページへの
@@ -6470,11 +6481,16 @@
       }
 
       .nl-ticker-latest__text {
-        flex: 1 1 0;
-        min-width: 3em;
+        grid-column: 1 / -1;
+        min-width: 0;
+        max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        word-break: normal;
+        overflow-wrap: normal;
+        /* 欄の幅で約20文字。広い画面は帯の大きな文字(1em)のまま。 */
+        font-size: clamp(12px, calc(100cqi / 20), 1em);
       }
 
       .nl-ticker-sep {
@@ -6783,12 +6799,18 @@
       }
 
       .nl-stats-bar .nl-comment-ticker {
-        grid-column: 2;
+        grid-column: 1 / -1;
+        grid-row: 2;
         position: relative;
         z-index: 0;
-        min-width: 0;
+        min-width: min(20em, 100%);
         width: 100%;
         max-width: 100%;
+      }
+
+      .nl-stats-bar .nl-support-timeline {
+        grid-column: 1 / -1;
+        grid-row: 3;
       }
 
       /* 応援ビジュアル折りたたみ: 開閉・storage は popup-entry（wireSupportVisualUi）。白フラッシュ緩和は __body の背景と keyframes。 */
@@ -10793,7 +10815,12 @@
         必ず別ファイル(=self)にすること。中身は src/extension/cloak-failsafe-entry.js。
     -->
     <script src="dist/cloak-failsafe.js"></script>
-  </head>
+  <style>/* YouTube 版: サービスの見出しが付くまでニコ生の見出しと欄を出さない(scripts/youtube-build.mjs) */
+html:not([data-nl-platform-ready]) #watchConcurrentCard .nl-live-stat-label,
+html:not([data-nl-platform-ready]) .nl-official-nico-stats__row { visibility: hidden; }
+html:not([data-nl-platform-ready]) .nl-live-stat-card--visitors { display: none !important; }
+</style>
+</head>
   <body>
     <!--
       初回ロード中のシェード。Chrome が popup.html を開いた瞬間に、
@@ -11228,10 +11255,10 @@
             title="広告ランキングのレーンへ移動（非表示のときは貢献度またはギフト履歴へスクロールします）"
             aria-label="広告ランキングへスクロール（表示がないときはコア情報へ）"
           />
-          <div class="nl-live-stat-label">推定同時接続</div>
+          <div class="nl-live-stat-label"></div>
           <div class="nl-concurrent-body">
             <div id="watchConcurrentReady" class="nl-concurrent-ready">
-              <div class="nl-live-stat-value" id="watchConcurrentEst">—</div>
+              <div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">読み込み中</div>
               <div class="nl-live-stat-unit" id="watchConcurrentSub">人</div>
             </div>
             <div

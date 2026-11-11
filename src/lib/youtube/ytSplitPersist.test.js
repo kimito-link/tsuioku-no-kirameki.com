@@ -116,3 +116,30 @@ describe('1日の chrome.storage 書き込み見積もり(同じ4時間の配信
     expect(slimBytes).toBeLessThanOrEqual(YT_STORAGE_WRITE_MAX_BYTES);
   });
 });
+
+describe('slimSummaryForStorage: master で増えた項目も残す(0.1.2082)', () => {
+  it('同接を読んだ時刻・枠の数・公式の数字・元の URL を落とさない', () => {
+    const slim = slimSummaryForStorage({
+      videoId: 'ab.n-shogi.x',
+      viewersReadAt: 1000,
+      viewersStale: true,
+      sourceUrl: 'https://abema.tv/now-on-air/shogi',
+      slotViewCount: 16000,
+      slotCommentCount: 1339,
+      platformStats: { eventRank: 3 },
+    });
+    expect(slim).toMatchObject({
+      viewersReadAt: 1000,
+      viewersStale: true,
+      sourceUrl: 'https://abema.tv/now-on-air/shogi',
+      slotViewCount: 16000,
+      slotCommentCount: 1339,
+      platformStats: { eventRank: 3 },
+    });
+  });
+  it('無い項目は付けない', () => {
+    const slim = slimSummaryForStorage({ videoId: 'v1' });
+    expect(slim && 'platformStats' in slim).toBe(false);
+    expect(slim && 'slotViewCount' in slim).toBe(false);
+  });
+});

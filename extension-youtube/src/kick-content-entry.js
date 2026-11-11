@@ -23,7 +23,7 @@ try {
     });
   }
 } catch { /* 計器 */ }
-import { kickChannelApiUrl, parseKickChannel, parseKickUserIcon, parseKickKicksLeaderboard, kickKicksLeaderboardUrl } from '../../src/lib/kick/kickApi.js';
+import { kickChannelApiUrl, parseKickChannel, parseKickUserIcon, parseKickKicksLeaderboard, kickKicksLeaderboardUrl, parseKickSubsLeaderboard, kickSubsLeaderboardUrl } from '../../src/lib/kick/kickApi.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
   KICK_REALTIME_CONNECTION_URL,
@@ -39,7 +39,8 @@ import {
 } from '../../src/lib/kick/kickRealtime.js';
 import { createEmoteSaver } from './pfEmoteStore.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
-const META_EVERY_MS = 30_000;
+// 視聴者数をページに合わせるため 10 秒おき(30 秒だとページの数から遅れていた・2026-11-11 PC 計測の Twitch と同じ)
+const META_EVERY_MS = 10_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
 // 顔は1人ずつ・間をあけて聞く。混んだ配信で毎秒聞いて Kick に 429(多すぎ)を返され、
@@ -75,6 +76,9 @@ const diag = {
   rewards: 0,
   /** 公式の Kicks ランキング(行数・どこから・どの id で取れたか) */
   boardRows: 0,
+  subBoardRows: 0,
+  subBoardFrom: '',
+  subBoardFail: 0,
   boardFrom: '',
   boardFail: 0,
   subscribed: 0,
@@ -333,6 +337,7 @@ function startReader(slug, key, ids) {
     const evName = f.event.replace(/^App\\Events\\/, '').slice(0, 60);
     diag.events[evName] = (diag.events[evName] || 0) + 1;
     if (evName === 'KicksLeaderboardUpdated') return sendBoard(parseKickKicksLeaderboard(f.data), 'socket');
+    if (evName === 'GiftsLeaderboardUpdated') return sendSubBoard(parseKickSubsLeaderboard(f.data), 'socket');
     const del = parseKickDeleted(f);
     if (del) {
       diag.deleted += 1;
@@ -390,12 +395,43 @@ function startReader(slug, key, ids) {
     diag.boardFail += 1;
     saveDiagSoon();
   };
+  /**
+   * 2つめの公式ランキング = kick.com のチャット欄の順位表の「サブ」(ギフトサブ・通算)。
+   *   Kicks の順位表(歴代)と並べるので期間は通算にそろえる。数は Kick の値そのまま。
+   * @param {any} rows @param {string} from
+   */
+  let subBoardAt = 0;
+  const sendSubBoard = (rows, from) => {
+    if (!Array.isArray(rows) || !rows.length) return;
+    subBoardAt = Date.now();
+    diag.subBoardRows = rows.length;
+    diag.subBoardFrom = from;
+    safeSendMessage({
+      type: 'YT_LEADERBOARD',
+      payload: { videoId: key, slot: 'sub', title: 'ギフトサブ ランキング', unit: 'サブ', period: 'ALLTIME', rows },
+    });
+    saveDiagSoon();
+  };
+  const fetchSubBoard = async () => {
+    const url = kickSubsLeaderboardUrl(slug);
+    if (!url || stopped) return;
+    try {
+      const rows = parseKickSubsLeaderboard(await getJson(url));
+      if (rows.length) return sendSubBoard(rows, 'api');
+    } catch {
+      /* 下で数える */
+    }
+    diag.subBoardFail += 1;
+    saveDiagSoon();
+  };
   // 開いた時点で1回。以後はソケットの KicksLeaderboardUpdated で届くが、Kicks が来ない配信では
   //   「最終更新: 7分前（少し前の値）」と古く見えた(値は正しい)ので、5分届かなければ API で読み直す
   void fetchBoard();
+  void fetchSubBoard();
   const boardTimer = setInterval(() => {
     if (stopped) return clearInterval(boardTimer);
     if (Date.now() - boardAt >= BOARD_REFRESH_MS) void fetchBoard();
+    if (Date.now() - subBoardAt >= BOARD_REFRESH_MS) void fetchSubBoard();
   }, 60_000);
 
   /** Pusher の1通 @param {string} raw */

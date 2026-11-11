@@ -14,6 +14,7 @@ import {
   pickYtBroadcasterIconUrl,
 } from '../../src/lib/youtube/ytPageMeta.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
+import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
@@ -66,11 +67,33 @@ function chatFrameOwnVideoId() {
   return frameVidCached;
 }
 
+function publishedVideoId() {
+  try {
+    const id = String(document.documentElement?.getAttribute('data-nl-yt-video-id') || '');
+    if (/^[A-Za-z0-9_-]{11}$/.test(id)) return id;
+  } catch {
+    /* 属性が読めなければ URL に戻る */
+  }
+  return '';
+}
+
+function canonicalVideoId() {
+  try {
+    return parseYtVideoIdFromUrl(String(document.querySelector('link[rel="canonical"]')?.getAttribute('href') || ''));
+  } catch {
+    return '';
+  }
+}
+
 function resolveCurrentVideoId() {
   const frameVid = chatFrameOwnVideoId();
   if (frameVid) return frameVid;
   const own = parseYtVideoIdFromUrl(String(window.location.href || ''));
   if (own) return own;
+  const canon = canonicalVideoId();
+  if (canon) return canon;
+  const published = publishedVideoId();
+  if (published) return published;
   try {
     if (window.top && window.top !== window) {
       const top = parseYtVideoIdFromUrl(String(window.top.location.href || ''));
@@ -257,7 +280,41 @@ function isInOtherVideos(n) {
   }
 }
 
+function isInSkippedText(n) {
+  const el = n && n.nodeType === 1 ? /** @type {Element} */ (n) : n?.parentElement || null;
+  try {
+    return Boolean(el && el.closest('script, style, noscript'));
+  } catch {
+    return false;
+  }
+}
+
+function readPublishedViewers() {
+  try {
+    const root = document.documentElement;
+    const id = String(root?.getAttribute('data-nl-yt-video-id') || '');
+    const pageId = resolveCurrentVideoId();
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id) || (pageId && id !== pageId)) return null;
+    const n = Number(root.getAttribute('data-nl-yt-viewers') || '');
+    if (!Number.isFinite(n) || n < 0 || n > 50_000_000) return null;
+    return Math.floor(n);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 同時視聴者数。ページに描かれている「N 人が視聴中」を先に読む(利用者が見ている数そのもの)。
+ * ページの世界が ytInitialData から読んだ数(readPublishedViewers)は、画面に数が描かれる前の最初の数にだけ使う:
+ * ytInitialData は開いた時のままなので、こちらを先にすると画面の数が 37→27 と動いても 32 のまま止まっていた(2026-11-11 PC 計測)。
+ */
 function readConcurrentViewers() {
+  const onScreen = readOnScreenViewers();
+  if (onScreen !== null) return onScreen;
+  return readPublishedViewers();
+}
+
+function readOnScreenViewers() {
   const selectors = [
     'ytd-watch-metadata #description #info',
     'ytd-watch-metadata #info-container',
@@ -330,7 +387,7 @@ function readViewersFromSameLine() {
       while ((node = walker.nextNode())) {
         const v = String(node.nodeValue || '');
         if (!/視聴中|watching/i.test(v)) continue;
-        if (isInOtherVideos(node)) continue;
+        if (isInOtherVideos(node) || isInSkippedText(node)) continue;
         const ref = rectOf(node);
         if (ref.height <= 0) continue;
         // 同じ行の文字を集める範囲: 4 つ上の親まで
@@ -342,6 +399,7 @@ function readViewersFromSameLine() {
         let line = '';
         while ((t = w2.nextNode())) {
           const tv = String(t.nodeValue || '');
+          if (isInSkippedText(t)) continue;
           if (!tv.trim()) {
             line += tv;
             continue;
@@ -421,19 +479,31 @@ function fetchExactStartedAt(videoId) {
 function readRelativeStartedAt() {
   try {
     const box = document.querySelector('ytd-watch-metadata #info-container, ytd-watch-info-text, ytd-watch-metadata #description');
-    const text = String(box?.textContent || '').replace(/\s+/g, ' ');
-    const unitMs = { 分: 60000, 時間: 3600000, 日: 86400000, minute: 60000, hour: 3600000, day: 86400000 };
-    let m = text.match(/(\d+)\s*(分|時間|日)前にライブ配信開始/);
-    if (!m) m = text.match(/Started streaming (\d+) (minute|hour|day)s? ago/i);
-    if (!m) return null;
-    const n = Number(m[1]);
-    const unit = /** @type {number} */ (unitMs[/** @type {keyof typeof unitMs} */ (m[2].toLowerCase())] || 0);
-    if (!Number.isFinite(n) || n < 0 || !unit) return null;
-    // 分の単位にそろえる(5秒ごとに値が揺れないように)
-    return Math.floor((Date.now() - n * unit) / 60000) * 60000;
+    return relativeStreamStartedAtMs(String(box?.textContent || ''), Date.now());
   } catch {
     return null;
   }
+}
+
+/** ページに埋まった startTimestamp。見つかるまで毎回探す。 @type {number | null} */
+let scriptStartedAt = null;
+function readStartFromScripts() {
+  if (scriptStartedAt) return scriptStartedAt;
+  try {
+    const nodes = document.querySelectorAll('script');
+    for (let i = 0; i < nodes.length; i += 1) {
+      const text = String(nodes[i].textContent || '');
+      if (!text.includes('startTimestamp')) continue;
+      const ms = startMsFromTimestampBlob(text, Date.now());
+      if (ms) {
+        scriptStartedAt = ms;
+        return ms;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -453,7 +523,7 @@ function saveViewerProbe() {
     while ((node = walker.nextNode()) && found.length < 8) {
       const v = String(node.nodeValue || '');
       if (!/視聴中|watching/i.test(v)) continue;
-      if (isInOtherVideos(node)) continue;
+      if (isInOtherVideos(node) || isInSkippedText(node)) continue;
       let box = node.parentElement;
       const path = [];
       for (let k = 0; k < 5 && box; k += 1) {
@@ -518,14 +588,19 @@ function endedAtFields(videoId) {
  * 開始時刻: ページの欄(正確)→取り寄せた視聴ページ(正確)→「N 時間前にライブ配信開始」(目安・approx)。
  * @param {string} videoId
  */
-function startedAtFields(videoId) {
-  const exact = readStreamStartedAt(videoId);
+function startedAtFields(videoId, isLive = false) {
+  const exact = readStreamStartedAt(videoId) || readStartFromScripts();
   if (exact) return { startedAt: exact };
   const fetched = fetchedStartedAt.get(videoId);
   if (fetched) return { startedAt: fetched };
   const approx = readRelativeStartedAt();
-  if (!approx) return {};
-  fetchExactStartedAt(videoId); // 生配信中だと分かったときだけ取り寄せる
+  if (!approx) {
+    // 長く続いている配信は「2026/11/10 にライブ配信開始」のように日付で書かれ、上の目安が取れない
+    //   (開始時刻が無いまま「経過 0分」になっていた・2026-11-11 実機)。配信中と分かっていれば正確な時刻を取り寄せる。
+    if (isLive) fetchExactStartedAt(videoId);
+    return {};
+  }
+  fetchExactStartedAt(videoId);
   return { startedAt: approx, startedAtApprox: true };
 }
 
@@ -579,7 +654,9 @@ function setupWatchPageMetaObserver() {
         broadcasterHandle,
         broadcasterIconUrl: readBroadcasterIconUrl(),
         concurrentViewers: viewers,
-        ...startedAtFields(videoId),
+        ...(viewers === null ? { viewersRead: false } : {}),
+        sourceUrl: String(location.href || ''),
+        ...startedAtFields(videoId, viewers !== null),
         ...endedAtFields(videoId),
       },
     });

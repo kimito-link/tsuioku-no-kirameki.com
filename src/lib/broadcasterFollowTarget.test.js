@@ -110,6 +110,18 @@ describe('resolveBroadcasterFollowTarget - none（タイル非表示）', () => 
     expect(r.kind).toBe('none');
   });
 
+  it('YouTube のチャンネル URL なら、数値 id が無くても名前を出す', () => {
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: '@あのちゃんこ',
+      broadcasterUserId: '',
+      broadcasterPageUrl: 'https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93'
+    });
+    expect(r.kind).toBe('channel');
+    expect(r.name).toBe('@あのちゃんこ');
+    expect(r.pageUrl).toBe('https://www.youtube.com/@%E3%81%82%E3%81%AE%E3%81%A1%E3%82%83%E3%82%93%E3%81%93');
+    expect(r.followLabel).toBe('チャンネルを見る');
+  });
+
   it('uid 非数値 + pageUrl も channel ではなく user 形式で uid 抽出失敗 → none', () => {
     const r = resolveBroadcasterFollowTarget({
       broadcasterName: 'foo',
@@ -162,6 +174,43 @@ describe('resolveBroadcasterFollowTarget - URL の安全性', () => {
     });
     expect(r.kind).toBe('user');
     expect(r.pageUrl).toBe('https://www.nicovideo.jp/user/12345');
+  });
+});
+
+describe('resolveBroadcasterFollowTarget - 他サービスの画像', () => {
+  it('数値 uid でも、ニコニコ以外の https 画像があればそれを出す', () => {
+    const logo = 'https://image.p-c2-x.abema-tv.com/image/channels/shogi/logo.png?format=png&width=320&height=320';
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: '将棋チャンネル',
+      broadcasterUserId: '8123456789',
+      broadcasterIconUrl: logo
+    });
+    expect(r.kind).toBe('user');
+    expect(r.iconUrl).toBe(logo);
+    expect(r.followLabel).toBe('フォロー');
+  });
+
+  it('他サービスの配信者ページで画像が空のときはニコニコの白い既定アイコンを出さない', () => {
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: '将棋チャンネル',
+      broadcasterUserId: '8123456789',
+      broadcasterPageUrl: 'https://abema.tv/now-on-air/shogi'
+    });
+    expect(r.iconUrl).toBe('');
+    expect(r.pageUrl).toBe('https://abema.tv/now-on-air/shogi');
+    expect(r.iconUrl).not.toContain('nimg.jp');
+    expect(r.followLabel).toBe('チャンネルを見る');
+  });
+
+  it('数値 uid のニコニコ画像は差し替えない', () => {
+    const r = resolveBroadcasterFollowTarget({
+      broadcasterName: 'foo',
+      broadcasterUserId: '12345',
+      broadcasterIconUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/999.jpg'
+    });
+    expect(r.iconUrl).toContain('/usericon/');
+    expect(r.iconUrl).toContain('12345.jpg');
+    expect(r.iconUrl).not.toContain('999.jpg');
   });
 });
 

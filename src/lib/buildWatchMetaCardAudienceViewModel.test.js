@@ -106,6 +106,111 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.subText).toContain('5分内 0人');
   });
 
+  it('公式の視聴者数しか出さないサービスでは、推定を出さず読み込み中にする', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: 723,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        streamAgeMin: 420,
+        officialViewersOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('読み込み中');
+    expect(vm.concurrent.estTitle).not.toMatch(/推定/u);
+    expect(vm.concurrent.subText).toBe('');
+    expect(vm.concurrent.numericEstimated).toBe(null);
+  });
+
+  it('YouTube は推定の材料が無いので、最初の数が来るまでは読み込み中と出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'youtube',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        officialViewersOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('読み込み中');
+    expect(vm.concurrent.estTitle).toBe('配信ページの数を読み込んでいます');
+    expect(vm.concurrent.subText).toBe('');
+    expect(vm.concurrent.estText).not.toBe('推定中');
+  });
+
+  it('YouTube で一度読めた数が次に読めないときは、最後の数と何分前かを出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'youtube',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 4321,
+        officialViewersOnly: true,
+        officialViewerStale: true,
+        officialViewerReadAt: nowMs - 3 * 60_000
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('4,321');
+    expect(vm.concurrent.subText).toBe('3分前');
+  });
+
+  it('公式の視聴者数があるときは、公式の視聴者数しか出さないサービスでもその数を出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 777,
+        officialStatsUpdatedAt: nowMs - 5_000,
+        officialViewersOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('777');
+    expect(vm.concurrent.subText).toBe('人');
+    expect(vm.concurrent.estTitle).toBe('配信ページに出ている数です');
+  });
+
+  it('ページの数が少し古くても、推定中・材料待ちに落とさずその数を出す(2026-11-11 実機)', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'youtube',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 8664,
+        officialStatsUpdatedAt: nowMs - 10 * 60_000,
+        streamAgeMin: 76,
+        officialViewersOnly: true
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('8,664');
+    expect(`${vm.concurrent.estText}${vm.concurrent.subText}${vm.concurrent.estTitle}`).not.toMatch(/推定|材料待ち|~/u);
+  });
+
+  it('ABEMA はページの視聴数(platformFacts.viewCount)を出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'abema',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        officialViewersOnly: true,
+        platformFacts: { viewCount: 16000 }
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('16,000');
+  });
+
   it('公式同接が新鮮なら直接値（~ なし）・sub は直接値', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {

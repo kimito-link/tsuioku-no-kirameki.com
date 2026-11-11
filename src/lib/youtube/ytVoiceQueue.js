@@ -98,6 +98,8 @@ export function resolveYtVoiceForChannel(channelId, opts = {}) {
  */
 export function shouldReadYtComment(item, opts = {}) {
   if (!item || typeof item !== 'object') return false;
+  // 画面に出ていた過去分（ABEMA の最初の一覧など）。記録はするが読まない。
+  if (item.skipVoice === true) return false;
   const kind = String(item.kind || 'text').toLowerCase();
   const text = String(item.text || '').trim();
   const isSupportEvent =

@@ -9,6 +9,7 @@
 //   - 配信が終わったと分かったら(live_status 等)、終わった時刻を送って読むのをやめる。
 
 import { parseWwLiveIdFromUrl, wwLiveApiUrl, parseWwLive, parseWwComment, buildWwStreamKey } from '../../src/lib/whowatch/wwParse.js';
+import { wwEventInfoUrl, parseWwEventInfo, parseWwLiveStats, mergePlatformStats } from '../../src/lib/platform/platformStats.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
@@ -37,6 +38,8 @@ const diag = {
   via: '',
   polls: 0,
   pollFail: 0,
+  /** いちばん良いイベント順位(0 = 出ていない・読めていない) */
+  eventRank: 0,
   lastError: '',
   status: '',
   isLive: /** @type {boolean | null} */ (null),
@@ -142,6 +145,23 @@ function startReader(liveId) {
   let metaAt = 0;
   /** @type {Set<string>} */
   const seen = new Set();
+  // ふわっち特有の公式の数字: 累計視聴(配信の応答)・イベント順位(events/event_info を1分おき)
+  /** @type {Record<string, any> | null} */
+  let liveStats = null;
+  /** @type {Record<string, any> | null | undefined} undefined = まだ読んでいない */
+  let eventStats;
+  let eventAt = 0;
+  let statsRead = false;
+  const loadEvents = async () => {
+    eventAt = Date.now();
+    try {
+      eventStats = parseWwEventInfo(await getJson(wwEventInfoUrl(liveId)));
+      statsRead = true;
+      diag.eventRank = eventStats?.eventRank ?? 0;
+    } catch {
+      /* 読めなければ前の値のまま */
+    }
+  };
 
   /** @param {NonNullable<ReturnType<typeof parseWwLive>>} info */
   const sendMeta = (info) => {
@@ -160,6 +180,7 @@ function startReader(liveId) {
         broadcasterIconUrl: u?.iconUrl || '',
         concurrentViewers: typeof info.viewers === 'number' ? info.viewers : undefined,
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+        ...(statsRead ? { platformStats: mergePlatformStats(liveStats, eventStats) } : {}),
       },
     });
   };
@@ -183,6 +204,13 @@ function startReader(liveId) {
     noteShape('live', json?.live);
     noteShape('liveUser', json?.live?.user);
     const info = parseWwLive(json, liveId);
+    const ls = parseWwLiveStats(json);
+    if (ls) {
+      liveStats = ls;
+      statsRead = true;
+    }
+    if (Date.now() - eventAt >= 60_000) await loadEvents();
+    if (stopped) return;
     if (!info) {
       diag.pollFail += 1;
       diag.lastError = 'shape';

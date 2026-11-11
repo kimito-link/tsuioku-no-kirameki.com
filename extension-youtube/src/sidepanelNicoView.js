@@ -104,7 +104,7 @@ function bindImageFallbacks(root) {
     node.addEventListener(
       'error',
       () => {
-        if (node.dataset.onErrorHide === '1') {
+        if (node.dataset.onErrorHide === '1' && !node.classList.contains('nl-top-support-rank__caster-thumb')) {
           node.style.visibility = 'hidden';
           return;
         }

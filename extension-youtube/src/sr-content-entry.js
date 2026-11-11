@@ -38,6 +38,7 @@ try {
   }
 } catch { /* 計器 */ }
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
+import { srEventAndSupportUrl, parseSrEventStats, parseSrEventBoard } from '../../src/lib/platform/platformStats.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 
@@ -70,6 +71,9 @@ const diag = {
   giftList: 0,
   boardRows: 0,
   boardFrom: '',
+  /** イベントの数字(event_and_support)。'' = まだ読んでいない・'none' = イベントに出ていない */
+  eventStats: '',
+  subBoardRows: 0,
   apiFail: 0,
   lastError: '',
   updatedAt: 0,
@@ -130,6 +134,8 @@ async function tryJson(url) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { roomKey: string, key: string, stop: () => void }} */ (null);
+/** いまの配信のイベントの数字(読めたあとだけ YT_STREAM_META に付ける) */
+let srStats = /** @type {null | { key: string, stats: Record<string, any> | null }} */ (null);
 
 /**
  * @param {string} roomId
@@ -189,8 +195,24 @@ function startReader(roomId, key, bc) {
   };
 
   const loadBoard = async () => {
-    const [summary, stage] = await Promise.all([tryJson(srLiveApiUrl('summary_ranking', roomId)), tryJson(srLiveApiUrl('stage_user_list', roomId))]);
+    const [summary, stage, eventJson] = await Promise.all([
+      tryJson(srLiveApiUrl('summary_ranking', roomId)),
+      tryJson(srLiveApiUrl('stage_user_list', roomId)),
+      tryJson(srEventAndSupportUrl(roomId)),
+    ]);
     if (stopped) return;
+    // イベントの数字(部屋の画面の「現在のランキング・支援pt」「目標Lv」)と貢献ランキング(「貢献ユーザー」)。
+    //   読めなかったとき(null)は前の値のまま。読めてイベントが無ければ消す。
+    if (eventJson) {
+      const stats = parseSrEventStats(eventJson);
+      srStats = { key, stats };
+      diag.eventStats = stats ? `rank${stats.eventRank ?? '-'}` : 'none';
+      // 次の部屋の読み(30秒)を待たずにまとめへ(いま見ている配信は奪わない)
+      safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: key, platformStats: stats, claimActive: false } });
+      const sub = parseSrEventBoard(eventJson);
+      diag.subBoardRows = sub ? sub.rows.length : 0;
+      if (sub) safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, ...sub } });
+    }
     const rows = parseSrRanking(summary, stage);
     boardAt = Date.now();
     if (!rows.length) return;
@@ -365,6 +387,7 @@ async function check() {
         broadcasterIconUrl: st.iconUrl || '',
         concurrentViewers: Number.isFinite(viewers) && viewers >= 0 ? viewers : undefined,
         ...(st.startedAtMs ? { startedAt: st.startedAtMs, startedAtApprox: false } : {}),
+        ...(srStats && srStats.key === key ? { platformStats: srStats.stats } : {}),
       },
     });
     saveDiagSoon();

@@ -73,10 +73,40 @@ describe('mergeYtStreamSummary', () => {
     const broken = mergeYtStreamSummary({ ...later, concurrentViewers: 1.2e28, peakConcurrentViewers: 1.2e28 }, { videoId: 'vid-1', concurrentViewers: 1.2e28 }, t1 + 2);
     expect(broken.concurrentViewers).toBe(null);
     expect(broken.peakConcurrentViewers).toBe(null);
+    const shogi = mergeYtStreamSummary(
+      null,
+      { videoId: 'ab.n-shogi.live1', title: '将棋チャンネル', broadcasterName: '将棋チャンネル' },
+      t0,
+    );
+    // 保存欄は届いた絵だけ。サービスの公開ロゴで埋めるのは表示側(ytSummaryToNicoSnapshot)。
+    expect(shogi.broadcasterIconUrl).toBe('');
     expect(updated.itemCount).toBe(5000);
     expect(updated.createdAt).toBe(t0);
     expect(updated.updatedAt).toBe(t1);
     expect('items' in updated).toBe(false);
+  });
+
+  it('読みに失敗しても前の同時視聴者数を残し、古くなった印だけ付ける。件数だけの更新では古くしない', () => {
+    const t0 = 1_700_000_000_000;
+    const saved = mergeYtStreamSummary(
+      null,
+      { videoId: 'vid-1', concurrentViewers: 4321, sourceUrl: 'https://www.youtube.com/@testchan/live' },
+      t0,
+    );
+    expect(saved.concurrentViewers).toBe(4321);
+    expect(saved.viewersReadAt).toBe(t0);
+    expect(saved.viewersStale).toBeUndefined();
+    expect(saved.sourceUrl).toBe('https://www.youtube.com/@testchan/live');
+
+    const failed = mergeYtStreamSummary(saved, { videoId: 'vid-1', viewersRead: false }, t0 + 120_000);
+    expect(failed.concurrentViewers).toBe(4321);
+    expect(failed.viewersReadAt).toBe(t0);
+    expect(failed.viewersStale).toBe(true);
+
+    const counted = mergeYtStreamSummary(saved, { videoId: 'vid-1', itemCount: 9 }, t0 + 10_000);
+    expect(counted.concurrentViewers).toBe(4321);
+    expect(counted.viewersReadAt).toBe(t0);
+    expect(counted.viewersStale).toBeUndefined();
   });
 });
 

@@ -19,8 +19,130 @@
  * @module venuePickupBanner
  */
 
-/** 枠のCSSクラス(スタイルは venueBar 側の CSS 文字列に置く)。 */
+/** 枠のCSSクラス。見た目は VENUE_PICKUP_CSS(会場の CSS へ差し込む)。 */
 export const VENUE_PICKUP_CLASS = 'nlsb-pickup';
+
+/** 吹き出しの上限・下限。親要素の幅ではなく窓(vw)で決める。ニコ生・YouTube・ABEMA で同じ。 */
+export const VENUE_PICKUP_MAX_PX = 860;
+export const VENUE_PICKUP_MIN_PX = 320;
+export const VENUE_PICKUP_VW_GUTTER = 32;
+/**
+ * これより細い video はコメント欄や小さい要素。幅も位置もそれに合わせない。
+ * ニコ生・YouTube の本編映像（おおよそ 600px 以上）だけ、映像の幅に合わせる。
+ */
+export const VENUE_PICKUP_MAIN_VIDEO_MIN_PX = 480;
+
+/**
+ * 会場 CSS に差し込む PICK UP の見た目。ニコ生も他の配信もこの1つ。
+ * 幅は窓（100vw）。親の 100% だと細い枠で calc(100% - 180px) が約250pxになり、本文が2行になる。
+ * 広い窓では上限 860px で、ニコ生の本編映像に合わせたときと同じ大きさ。
+ */
+export const VENUE_PICKUP_CSS = `
+  html .nlsb-root .nlsb-pickup {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    z-index: 7;
+    transform: translateX(-50%) !important;
+    zoom: 1 !important;
+    box-sizing: border-box;
+    flex-shrink: 0 !important;
+    width: min(${VENUE_PICKUP_MAX_PX}px, calc(100vw - ${VENUE_PICKUP_VW_GUTTER}px)) !important;
+    min-width: min(${VENUE_PICKUP_MIN_PX}px, calc(100vw - ${VENUE_PICKUP_VW_GUTTER}px)) !important;
+    max-width: min(${VENUE_PICKUP_MAX_PX}px, calc(100vw - ${VENUE_PICKUP_VW_GUTTER}px)) !important;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 10px 22px;
+    border-radius: 28px;
+    border: 2px solid rgba(255, 176, 62, 0.9);
+    background: #fffdf8;
+    color: #1f2328;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    font-size: 18px;
+    line-height: 1.4;
+    pointer-events: auto;
+  }
+  .nlsb-pickup::before, .nlsb-pickup::after { content: ''; position: absolute; left: 48px; width: 0; height: 0; border-style: solid; }
+  .nlsb-pickup::before { bottom: -20px; border-width: 20px 14px 0 0; border-color: rgba(255, 176, 62, 0.9) transparent transparent transparent; }
+  .nlsb-pickup::after { bottom: -15px; left: 50px; border-width: 16px 11px 0 0; border-color: #fffdf8 transparent transparent transparent; }
+  html .nlsb-root .nlsb-pickup[data-empty='1'] { display: none; }
+  .nlsb-pickup__badge {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 152, 0, 0.9);
+    color: #fff;
+    white-space: nowrap;
+  }
+  .nlsb-pickup__face {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 2px rgba(255, 176, 62, 0.7);
+  }
+  .nlsb-pickup__face[hidden] { display: none; }
+  .nlsb-pickup__main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__main,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__body,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__meta,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__badge,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__face {
+    zoom: 1 !important;
+    transform: none !important;
+    word-break: normal !important;
+    white-space: nowrap !important;
+  }
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__main,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__body,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__meta,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__badge {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__face {
+    width: 44px !important;
+    height: 44px !important;
+    max-width: 44px !important;
+  }
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__grip,
+  html .nlsb-root .nlsb-pickup .nlsb-pickup__hint {
+    zoom: 1 !important;
+    transform: none !important;
+  }
+  .nlsb-pickup__body {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 700;
+  }
+  .nlsb-pickup__meta {
+    flex: 0 0 auto;
+    font-size: 12px;
+    opacity: 0.75;
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nlsb-pickup__meta:empty { display: none; }
+  a.nlsb-pickup__meta[href] { text-decoration: underline; text-underline-offset: 2px; }
+`;
 
 /**
  * ピックアップ枠のDOMを作る(1回だけ呼ぶ)。
@@ -45,14 +167,14 @@ export function createVenuePickupBanner(doc) {
   face.setAttribute('alt', '');
   face.setAttribute('hidden', '');
 
-  // 本文の下に『ハンドル名 ・ ID:数値』の小さな行。数値IDはユーザーページへのリンク(a)、匿名はリンクなし。
+  // 名前の行を本文の上に置く（ニコ生・YouTube・ABEMA で同じ）。数値IDはユーザーページへのリンク(a)、匿名はリンクなし。
   const main = doc.createElement('span');
   main.className = 'nlsb-pickup__main';
   const body = doc.createElement('span');
   body.className = 'nlsb-pickup__body';
   const meta = doc.createElement('a');
   meta.className = 'nlsb-pickup__meta';
-  main.append(body, meta);
+  main.append(meta, body);
 
   root.append(badge, face, main);
   return { root, body, meta, face, main };
@@ -165,7 +287,7 @@ export function applyVenuePickupView(els, view) {
  * @returns {{ left:number, top:number, width:number } | null} 親の中での中心 x・上端・幅(映像が分からなければ null=CSS の既定)
  */
 export function venuePickupPlacement(video, layout, opts = {}) {
-  if (!video || !layout || !(video.width >= 240) || !(video.height >= 120)) return null;
+  if (!video || !layout || !(video.width >= VENUE_PICKUP_MAIN_VIDEO_MIN_PX) || !(video.height >= 120)) return null;
   const maxWidth = opts.maxWidth ?? 860;
   const minTop = opts.minTop ?? 20;
   const margin = opts.margin ?? 12;
@@ -173,6 +295,24 @@ export function venuePickupPlacement(video, layout, opts = {}) {
   const left = Math.round(video.left - layout.left + video.width / 2);
   const top = Math.round(Math.max(minTop, video.top - layout.top + 8));
   return { left, top, width };
+}
+
+/**
+ * 今の窓と映像から、吹き出しに書く幅。細くも太くも、呼ぶたびに今の大きさだけを返す。
+ * 前に書いた px は見ない。サイドパネルを開いて窓が細くなったあと、閉じたときに窓が広がれば元の幅へ戻る。
+ * 480px 未満の video（コメント欄）は使わない。本編映像が窓より細いときだけ、映像の幅までにする。
+ * @param {number} videoWidth
+ * @param {number} viewportWidth
+ * @returns {number} 0 は書けない（CSS の既定に任せる）
+ */
+export function venuePickupDisplayWidth(videoWidth, viewportWidth) {
+  const vw = Math.max(0, Number(viewportWidth) || 0);
+  if (!(vw > 0)) return 0;
+  const fit = Math.round(Math.min(VENUE_PICKUP_MAX_PX, Math.max(160, vw - VENUE_PICKUP_VW_GUTTER)));
+  const video = Number(videoWidth);
+  if (!(Number.isFinite(video) && video >= VENUE_PICKUP_MAIN_VIDEO_MIN_PX)) return fit;
+  const fromVideo = Math.round(Math.max(200, Math.min(VENUE_PICKUP_MAX_PX, video - 24)));
+  return Math.min(fit, fromVideo);
 }
 
 /**
