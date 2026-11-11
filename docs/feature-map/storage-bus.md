@@ -76,6 +76,7 @@
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
 - 🔵 **nls_last_auto_tab_reload** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/init/devMonitorExport.js
+- 🔵 **nls_stall_summary_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 
 ## 全 storage キー
 
@@ -193,3 +194,4 @@
 | `fn:watchSnapshotStorageKey` | — | extension/popup/report/htmlReportDocument.js |
 | `nls_last_auto_tab_reload` | — | extension/status-entry.js |
 | `nls_mcp_live_latest_v1` | — | extension/popup/init/devMonitorExport.js |
+| `nls_stall_summary_v1` | — | extension/status-entry.js |

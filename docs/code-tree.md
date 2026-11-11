@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1248 件
+## ⚠️ 役割コメントが無いソース 10 / 1259 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1050,7 +1050,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (111)
+- 📁 **scripts/** (112)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1137,6 +1137,7 @@
   - `loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
   - `loop-glossary-status-live.test.js`
   - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
+  - `measure-comment-flood.mjs` — コメントが続くときに、画面のメインスレッドがどれだけ止まるかを測る。
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
   - `measure-ndgr-crawls.mjs` — 拡張の NDGR 巡回(前方向の立て直し・過去埋め)を本物の配信に当てて数える。
@@ -1191,7 +1192,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2438)
+- 📁 **src/** (2455)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1228,7 +1229,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (112)
+  - 📁 **extension/** (114)
     - 📁 **popup/** (18)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1265,6 +1266,7 @@
     - `comeviewLivePushClient.js` — コメビュ側: 読み上げ中だけ watch タブへ port を開き、新着コメントを storage を待たずに受け取る(P5b・2026-10-29)。
     - `comeviewLivePushHost.js` — watch タブ(content script)側: コメビュが開いた port へ、新着コメントを storage を待たずに流す(P5b・2026-10-29)。
     - `commentTickerStarvation.wiring.test.js`
+    - `content-boot.js` — 記録エンジン(content.js・約1.5MB)を、配信の視聴フレームだけに載せる。
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
     - `embeddedProgramElapsed.wiring.test.js`
@@ -1345,6 +1347,7 @@
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
+    - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
   - 📁 **images/** (117)
@@ -1498,7 +1501,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2155)
+  - 📁 **lib/** (2170)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1571,8 +1574,10 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (85)
+    - 📁 **youtube/** (94)
       - `pfLastStreamUrl.test.js`
+      - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
+      - `ytActiveVideoId.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
       - `ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
@@ -1601,6 +1606,8 @@
       - `ytLaneAssign.test.js`
       - `ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
       - `ytLeaderboardSig.test.js`
+      - `ytLiveRowOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytLiveRowOrder.test.js`
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
       - `ytMergedIsolation.test.js`
       - `ytNicoShim.test.js`
@@ -1628,6 +1635,9 @@
       - `ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
       - `ytShimCommentWrites.test.js`
       - `ytShimSummaryAnswer.wiring.test.js`
+      - `ytSplitPersist.js` — 声の割り当てと配信のまとめを、人数や配信の数に比例して大きくなる1個の値で書き直さない。
+      - `ytSplitPersist.test.js`
+      - `ytSplitPersistStore.js` — 声の割り当て(人ごと)と配信のまとめ(配信ごと)の IndexedDB。
       - `ytStageSubmission.test.js`
       - `ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
       - `ytStaleFrameHold.test.js`
@@ -1645,6 +1655,8 @@
       - `ytTailAfterFull.test.js`
       - `ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
       - `ytUserLaneTiers.test.js`
+      - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytVenueBoot.test.js`
       - `ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
       - `ytViewerSampler.test.js`
       - `ytVoiceAssignPersist.js` — YouTube 系(YouTube・Twitch・Kick ほか)の「人ごとの声の割り当て」(yt_voice_assignments)を
@@ -2701,6 +2713,8 @@
     - `nicoAnonymousDisplay.test.js`
     - `nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
     - `nicoCommentPanelAssetLauncher.test.js`
+    - `nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `nicoEngineBoot.test.js`
     - `nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
     - `nicoUserFollowingApi.test.js`
     - `nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
@@ -3137,6 +3151,9 @@
     - `specializedCellsInputs.wiring.test.js`
     - `speechEvidence.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `speechEvidence.test.js`
+    - `stallTrace.js` — 画面が止まったときの記録。時刻・長さ・拡張のファイル名とドメインだけ。
+    - `stallTrace.test.js`
+    - `stallTrace.wiring.test.js`
     - `standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
     - `standalonePopupClose.test.js`
     - `statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
@@ -3369,6 +3386,7 @@
     - `userEntryAvatarResolve.test.js`
     - `userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
     - `userIdPreference.test.js`
+    - `userLaneCandidateFolder.test.js`
     - `userLaneCandidatesFromStorage.js` — 応援ユーザーレーン用: nls_comments 相当の StoredComment 配列から userId 単位に集約した候補。
     - `userLaneCandidatesFromStorage.test.js`
     - `userLaneCandidatesFromStorageEquivalence.test.js`
@@ -3697,13 +3715,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (98)
+- 📁 **tests/** (99)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (91)
+  - 📁 **e2e/** (92)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3771,6 +3789,7 @@
     - `popup-settings-details.spec.js`
     - `popup-window-empty-history-real.spec.js`
     - `popup-window-empty-history-whitespace.spec.js`
+    - `readStreamSummary.js` — 配信のまとめは配信ごとの小さい鍵(ytm:sum:v1:)に書く。
     - `refresh-storage-hang-resilient.spec.js`
     - `save-ctx-invalidated-recovery.spec.js`
     - `showroom-recording.spec.js`

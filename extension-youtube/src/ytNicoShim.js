@@ -13,10 +13,12 @@
 //      それ以外のキー(設定など)は本物の storage にそのまま読み書きする=ニコ生版の設定スイッチがそのまま動く。
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
-import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
+import { computePseudoLvForVideoId, isYtPseudoLvShape } from '../../src/lib/youtube/ytPseudoLv.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
+import { videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersist.js';
+import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial } from '../../src/lib/youtube/ytWording.js';
@@ -28,7 +30,7 @@ import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 import { TAIL_MAX_ROWS } from '../../src/lib/commentTailBuffer.js';
 import { ytTailAfterFull } from '../../src/lib/youtube/ytTailAfterFull.js';
-import { ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
+import { ytImportantVoiceReason, ytImportantVoiceReasons } from '../../src/lib/youtube/ytVoicePriority.js';
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
@@ -38,6 +40,13 @@ import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js'
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
+import {
+  mergeLiveRowsByRecordedAt,
+  shouldYieldYtBuild,
+  ytLiveRowMateriallyChanged,
+  YT_BUILD_YIELD_ROWS,
+  YT_NOTIFY_MIN_GAP_MS,
+} from '../../src/lib/youtube/ytLiveRowOrder.js';
 import { tallySupportItems } from '../../src/lib/platform/platformMetrics.js';
 import { watchPlatformMetricChrome } from '../../src/lib/platform/platformMetricChrome.js';
 import { SUB_BOARD_KEY_PREFIX, subBoardToNicoadApiValue, subBoardLaneWording, subBoardCelebrationWording } from '../../src/lib/platform/platformSubBoard.js';
@@ -49,6 +58,37 @@ const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 //   ・画面の直しは会場の中だけ(YouTube のページ自体の文字は触らない)
 //   ・chrome.tabs は無い(タブの写しはしない)
 export const YT_SHIM_IN_PAGE = typeof location !== 'undefined' && location.protocol !== 'chrome-extension:';
+try {
+  const stallRoot = /** @type {any} */ (typeof globalThis !== 'undefined' ? globalThis : window);
+  if (!stallRoot.__nlStallWatch) {
+    const stallWatch = startPageStallWatch({
+      file: 'ytNicoShim.js',
+      section: () => {
+        try {
+          const el = document.querySelector('[data-nl-panel], section[id]');
+          return el ? (el.getAttribute('data-nl-panel') || el.id || '') : '';
+        } catch {
+          return '';
+        }
+      },
+      send: (summary) => {
+        try {
+          chrome.runtime.sendMessage({
+            type: 'NLS_STALL_SUMMARY',
+            page: location.protocol === 'chrome-extension:' ? 'extension' : (location.hostname || 'page'),
+            summary,
+            events: stallWatch.takeFresh(),
+          });
+        } catch {
+          /* 計器は本体を止めない */
+        }
+      },
+    });
+    stallRoot.__nlStallWatch = stallWatch;
+  }
+} catch {
+  /* 計器が始まらなくても画面は出す */
+}
 const COMMENTS_PREFIX = 'nls_comments_';
 // ニコ生版の「テール」(まだ本体に畳み込んでいない新着)。ニコ生版の popup は、本体の全件を一度読んだら
 // 同じ配信のあいだはその控えを使い回し、新着はテールから足す。YouTube 版は本体とテールを分けて持たないので、
@@ -497,6 +537,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
 const supportTallyByVid = new Map();
 /** @type {() => void} */
 let schedulePlatformChrome = () => {};
+/** 配信のまとめ(knownSummaries)を読み終えたか。読む前は「どのサービスの配信か」が分からない(0.1.2083) */
+let knownSummariesLoaded = false;
 /** 記録の控えが変わったときだけ数え直す。まだ読んでいなければチップ自体を出さない。 */
 function noteSupportTally(vid) {
   const cache = inPageCommentCache.get(vid);
@@ -547,13 +589,8 @@ function ytUsableIcon(url) {
 export function buildYtPersonResolver(items) {
   /** @type {Map<string, string>} 名前 → UC… */
   const ucByName = new Map();
-  for (const r of items) {
-    const ch = String(r?.channelId || '').trim();
-    if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
-    const n = normName(r?.name);
-    if (n && !ucByName.has(n)) ucByName.set(n, ch);
-    if (n) ucByNameHint.set(n, ch);
-  }
+  /** @type {Map<string, string>} 人の鍵 → 最後に見えたアイコン */
+  const iconByKey = new Map();
   /** @param {any} r */
   const keyOf = (r) => {
     const ch = String(r?.channelId || '').trim();
@@ -564,15 +601,28 @@ export function buildYtPersonResolver(items) {
     if (ch) return ch;
     return n ? `name:${n}` : '';
   };
-  /** @type {Map<string, string>} 人の鍵 → 最後に見えたアイコン */
-  const iconByKey = new Map();
-  for (const r of items) {
-    const icon = ytUsableIcon(r?.iconUrl);
-    if (!icon) continue;
-    const k = keyOf(r);
-    if (k) iconByKey.set(k, icon);
-  }
-  return { keyOf, iconOf: (key) => iconByKey.get(key) || '' };
+  /**
+   * 新しい行だけ足す。全件を毎回歩き直さない。
+   * @param {any[] | null | undefined} rows
+   */
+  const add = (rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+    for (const r of list) {
+      const ch = String(r?.channelId || '').trim();
+      if (!/^UC[A-Za-z0-9_-]{22}$/.test(ch)) continue;
+      const n = normName(r?.name);
+      if (n && !ucByName.has(n)) ucByName.set(n, ch);
+      if (n) ucByNameHint.set(n, ch);
+    }
+    for (const r of list) {
+      const icon = ytUsableIcon(r?.iconUrl);
+      if (!icon) continue;
+      const k = keyOf(r);
+      if (k) iconByKey.set(k, icon);
+    }
+  };
+  add(items);
+  return { keyOf, iconOf: (key) => iconByKey.get(key) || '', add };
 }
 
 /** @type {Map<string, { at: number, p: Promise<any[] | undefined>, done?: boolean }>} 同じ瞬間に何本も聞かれても IndexedDB は1回だけ読む(組み立て中は重ねない) */
@@ -873,18 +923,25 @@ export function ytOwnerRowsLast(list, sum) {
 /**
  * 視聴ページの中の会場の記録の控え(配信ごと)。初回とときどき(行数に応じて30秒〜5分ごと・v0.1.1969)は全件、あいだは新しく記録された分だけを background にもらう
  * (3秒ごとに全件を受け取り直すと、長い配信でメッセージが大きくなり、失敗すると空の会場になる・Grok の点検 2026-11-04)。
- * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number, ver?: number, sorted?: any[], sortedVer?: number }>}
+ * @type {Map<string, { byPk: Map<string, any>, lastRecordedAt: number, fullAt: number, ver?: number, sorted?: any[], sortedVer?: number, pending?: any[], replaced?: boolean }>}
  */
 const inPageCommentCache = new Map();
 /**
  * ★v0.1.1981: 控えの行を受け取った時刻順に並べた配列。控えが変わっていなければ(ver が同じ)前に並べたものを返す
  *   (8万行を、聞かれるたびに並べ直していた)。
- * @param {{ byPk: Map<string, any>, ver?: number, sorted?: any[], sortedVer?: number }} c
+ * ★v0.1.2050: 増えた行が末尾なら、その分だけ足す。全件の並べ直しは、途中の時刻や置き換えのときだけ。
+ * @param {{ byPk: Map<string, any>, ver?: number, sorted?: any[], sortedVer?: number, pending?: any[], replaced?: boolean }} c
  */
 function sortedRowsOfCache(c) {
   const ver = Number(c.ver) || 0;
   if (c.sorted && c.sortedVer === ver) return c.sorted;
-  c.sorted = [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+  if (c.sorted && Array.isArray(c.pending) && c.pending.length) {
+    c.sorted = mergeLiveRowsByRecordedAt(c.sorted, c.pending, !!c.replaced);
+  } else {
+    c.sorted = [...c.byPk.values()].sort((a, b) => Number(a?.recordedAt || 0) - Number(b?.recordedAt || 0));
+  }
+  c.pending = [];
+  c.replaced = false;
   c.sortedVer = ver;
   return c.sorted;
 }
@@ -927,18 +984,30 @@ async function getCommentsViaBackground(vid) {
     // ★v0.1.1981: 控えが本当に変わったときだけ番号を進める。「新しい分だけ」の読み出しは最後の1行をもう一度返すので、
     //   受け取った行があるだけでは変わったことにならない(中身が同じ行は数えない)。
     let changed = false;
+    /** @type {any[]} */
+    const pendingAdd = [];
+    let replaced = false;
     for (const r of items) {
       const k = String(r?.pk || r?.id || '');
       if (!k) continue;
-      if (!changed) {
-        const old = full ? undefined : next.byPk.get(k);
-        if (!old || JSON.stringify(old) !== JSON.stringify(r)) changed = true;
+      const old = full ? undefined : next.byPk.get(k);
+      if (!old) {
+        changed = true;
+        if (!full) pendingAdd.push(r);
+      } else if (ytLiveRowMateriallyChanged(old, r)) {
+        changed = true;
+        replaced = true;
+        pendingAdd.push(r);
       }
       next.byPk.set(k, r);
       const at = Number(r?.recordedAt || 0);
       if (at > next.lastRecordedAt) next.lastRecordedAt = at;
     }
     if (changed) next.ver = (Number(next.ver) || 0) + 1;
+    if (changed && !full && pendingAdd.length) {
+      next.pending = (next.pending || []).concat(pendingAdd);
+      next.replaced = !!next.replaced || replaced;
+    }
     inPageCommentCache.set(vid, next);
   } catch {
     // 受け取れなかったときは空にせず、前の控えをそのまま使う(誰もいない会場にしない)
@@ -980,7 +1049,7 @@ function recordBuildPhases(ph) {
  * ★v0.1.1981: 前に組み立てた結果の控え(配信ごと)。記録の行も、顔の控え(順位表・@名前・後から引いた顔)も、配信者の情報も
  *   変わっていなければ、同じ結果をそのまま返す。横の欄は3秒ごとに全件を聞いてくるので、8万行の配信では
  *   何も変わっていなくても毎回 8万行を組み立て直していた(手元の計測・CPU 4倍遅く: 420秒で 105回・合計 59秒)。
- * @type {Map<string, { cache: any, ver: number, epoch: number, sumSig: string, out: any[] }>}
+ * @type {Map<string, { cache: any, ver: number, epoch: number, sumSig: string, out: any[], rawLen: number, lastRaw: any, who: any, seenPersons: Set<string> }>}
  */
 const builtMemo = new Map();
 /**
@@ -1035,13 +1104,16 @@ async function buildCommentsForLvUncached(lv) {
   if (memo && memoCache && memo.cache === memoCache && memo.ver === (Number(memoCache.ver) || 0) && memo.epoch === buildSideEpoch && memo.sumSig === memoSumSig) {
     await sidePromise.catch(() => undefined);
     shimDiag.buildReused = (Number(shimDiag.buildReused) || 0) + 1;
+    shimDiag.rowsMadeLast = 0;
+    shimDiag.rowsReusedLast = Array.isArray(memo.out) ? memo.out.length : 0;
     return memo.out;
   }
   const memoVer = memoCache ? Number(memoCache.ver) || 0 : -1;
   const memoEpoch = buildSideEpoch;
   // ★v0.1.1997: 数万行の記録では、読み出しの続きで組み立てまで一気に走らせない(src/lib/bigRecordYield.js)。
-  //   拡張の画面(横の欄・コメビュ)だけ。視聴ページの中(会場)は今までと同じ。
-  const yieldBig = !YT_SHIM_IN_PAGE && shouldYieldForBigRecord(Array.isArray(items) ? items.length : 0);
+  // ★v0.1.2050: 視聴ページの中(会場)も同じ。8,000行を超えたら区切って画面へ手を返す。
+  const rowCount = Array.isArray(items) ? items.length : 0;
+  const yieldBig = shouldYieldForBigRecord(rowCount) || shouldYieldYtBuild(rowCount);
   if (yieldBig) await yieldToMainThread();
   const [lb, handleIconsRaw, lateIconsRaw] = await sidePromise;
   const tSideDone = Date.now();
@@ -1065,22 +1137,52 @@ async function buildCommentsForLvUncached(lv) {
   const twLateIcons = vidPlat && lateIconsRaw && typeof lateIconsRaw === 'object' ? lateIconsRaw : {};
   /** @type {Set<string>} 顔を引きに行く @名前 */
   const wantHandles = new Set();
-  const who = buildYtPersonResolver(list);
+  const canExtend =
+    !!memo &&
+    memo.who &&
+    memo.seenPersons &&
+    memo.rawLen > 0 &&
+    list.length > memo.rawLen &&
+    list[memo.rawLen - 1] === memo.lastRaw &&
+    !replayVideoIds.has(vid);
+  const who = canExtend ? memo.who : buildYtPersonResolver([]);
+  if (!canExtend) {
+    for (let i = 0; i < list.length; i += YT_BUILD_YIELD_ROWS) {
+      if (yieldBig && i > 0) await yieldToMainThread();
+      who.add(list.slice(i, i + YT_BUILD_YIELD_ROWS));
+    }
+  } else {
+    who.add(list.slice(memo.rawLen));
+  }
+  const seenPersons = canExtend ? memo.seenPersons : new Set();
   // 会場の読み上げ: 混んでいるときは大事なコメントだけ読む(りんく決定 2026-11-04)。どれが大事かの印をここで付ける
-  const important = IS_VENUE_CONTEXT ? ytImportantVoiceReasons(list, (r) => who.keyOf(r)) : null;
+  const important = !IS_VENUE_CONTEXT
+    ? null
+    : canExtend
+      ? null
+      : ytImportantVoiceReasons(list, (r) => who.keyOf(r));
   let streamStartedAt = 0;
   if (list.some((r) => r?.replay)) {
     replayVideoIds.add(vid);
     try {
-      const bag = await real.storage.local.get(KEY_YT_SUMMARIES);
-      const sum = bag?.[KEY_YT_SUMMARIES]?.[vid];
-      streamStartedAt = ytTrustedStartedAt(sum, vid, bag?.[KEY_YT_SUMMARIES]);
+      // 0.1.2057: 配信のまとめは配信ごとの鍵に移った。手元の一覧(knownSummaries)を先に使う
+      const all =
+        knownSummaries && Object.keys(knownSummaries).length
+          ? knownSummaries
+          : (await real.storage.local.get(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
+      const sum = all?.[vid];
+      streamStartedAt = ytTrustedStartedAt(sum, vid, all);
     } catch {
       /* 分からなければ受け取った時刻 */
     }
   }
   let rowsMade = 0;
-  const out = list.map((r, i) => {
+  /**
+   * @param {any} r
+   * @param {number} i
+   * @param {string} [reason]
+   */
+  const oneEntry = (r, i, reason) => {
     const key = who.keyOf(r);
     // スパチャの欄の顔は読み込み前の仮の絵(data: など)のことがある。https の顔だけ使い、無ければ同じ人の別の記録の顔を使う。
     const nm = String(r?.name || '').trim();
@@ -1104,13 +1206,47 @@ async function buildCommentsForLvUncached(lv) {
       rowsMade += 1;
     }
     if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);
-    if (important?.[i]) ytVoiceImportantKeys.set(`no:${e.commentNo}`, important[i]);
+    const why = reason || important?.[i] || '';
+    if (why) ytVoiceImportantKeys.set(`no:${e.commentNo}`, why);
     return e;
-  });
+  };
+  /** @type {any[]} */
+  const out = canExtend ? memo.out.slice() : [];
+  const mapFrom = canExtend ? memo.rawLen : 0;
+  for (let start = mapFrom; start < list.length; start += YT_BUILD_YIELD_ROWS) {
+    const end = Math.min(list.length, start + YT_BUILD_YIELD_ROWS);
+    if (yieldBig && start > mapFrom) await yieldToMainThread();
+    for (let i = start; i < end; i += 1) {
+      let reason = '';
+      if (IS_VENUE_CONTEXT && canExtend) {
+        const person = String(who.keyOf(list[i]) || '');
+        const first = !!person && !seenPersons.has(person);
+        if (person) seenPersons.add(person);
+        reason = ytImportantVoiceReason(list[i], first);
+      }
+      out.push(oneEntry(list[i], i, reason));
+    }
+  }
+  if (IS_VENUE_CONTEXT && !canExtend) {
+    for (const r of list) {
+      const person = String(who.keyOf(r) || '');
+      if (person) seenPersons.add(person);
+    }
+  }
   if (yieldBig) await yieldToMainThread();
   // 記録から配信者の UC… が分かることがあるので、配信者の登録をやり直す
   registerBroadcastersFromSummaries();
-  if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) builtMemo.set(lv, { cache: memoCache, ver: memoVer, epoch: memoEpoch, sumSig: memoSumSig, out });
+  if (memoCache && memoVer >= 0 && !replayVideoIds.has(vid)) builtMemo.set(lv, {
+      cache: memoCache,
+      ver: memoVer,
+      epoch: memoEpoch,
+      sumSig: memoSumSig,
+      out,
+      rawLen: list.length,
+      lastRaw: list[list.length - 1],
+      who,
+      seenPersons,
+    });
   else builtMemo.delete(lv);
   shimDiag.rowsMadeLast = rowsMade;
   shimDiag.rowsReusedLast = out.length - rowsMade;
@@ -1168,13 +1304,36 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   const realGet = realLocal.get.bind(realLocal);
   // 前に開いた配信の疑似 lv(nls_last_watch_url 等に残る)も引けるよう、記録のある配信を先に全部登録しておく
   const knownVideosReady = Promise.resolve(realGet([KEY_YT_SUMMARIES, YT_LAST_STREAM_URL_KEY]))
-    .then((bag) => {
-      knownSummaries = (bag && bag[KEY_YT_SUMMARIES]) || {};
+    .then(async (bag) => {
+      let fromSw = null;
+      try {
+        fromSw = await real?.runtime?.sendMessage?.({ type: 'YT_GET_STREAM_SUMMARIES' });
+      } catch {
+        fromSw = null;
+      }
+      knownSummaries = (fromSw && fromSw.ok && fromSw.summaries) || (bag && bag[KEY_YT_SUMMARIES]) || {};
       lastStreamValue = (bag && bag[YT_LAST_STREAM_URL_KEY]) || null;
       for (const vid of Object.keys(knownSummaries)) pseudoLvForVideoId(vid);
       registerBroadcastersFromSummaries();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      // 読み終えたら、横の欄の見出しをその配信のサービスに合わせ直す(0.1.2083)
+      knownSummariesLoaded = true;
+      schedulePlatformChrome();
+    });
+  /**
+   * 配信のまとめの一覧を { yt_stream_summaries: {...} } の形で返す。
+   * 0.1.2057: 裏方は一覧を丸ごと書かなくなった(配信ごとの小さい鍵 ytm:sum:v1:<id> と IndexedDB)。
+   *   shim の中で realGet('yt_stream_summaries') を直接読むと空になり、配信者名などが消えていた(e2e 6本が赤)。
+   *   起動時に裏方から受け取り、配信ごとの鍵の変化で更新している knownSummaries を正本にする。
+   * @returns {Promise<Record<string, any>>}
+   */
+  const summariesBag = async () => {
+    await knownVideosReady;
+    if (knownSummaries && Object.keys(knownSummaries).length) return { [KEY_YT_SUMMARIES]: knownSummaries };
+    return /** @type {Record<string, any>} */ ((await realGet(KEY_YT_SUMMARIES)) || {});
+  };
 
   // ---- 「最後に見た配信」(0.1.1948・council/panel-stream-selection-SPEC.md §4-C2) ----
   //   正本は配信ページ自身が書く yt_last_stream_url(pfLastStreamUrl.js・ニコ生版 rememberWatchPageUrl の写し)。
@@ -1195,7 +1354,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       return `https://live.nicovideo.jp/watch/${lv}`;
     }
     // まだどのページも書いていない(入れたばかり)ときだけ、最近更新された配信を使う(計器 source:'newest' に出る)
-    const sums = /** @type {Record<string, any>} */ (await realGet(KEY_YT_SUMMARIES))?.[KEY_YT_SUMMARIES];
+    const sums = /** @type {Record<string, any>} */ (await summariesBag())?.[KEY_YT_SUMMARIES];
     const vid = newestVideoIdOf(sums);
     panelDiag.lastWatch(vid ? 'newest' : 'none', vid ? pseudoLvForVideoId(vid) : '');
     return vid ? `https://live.nicovideo.jp/watch/${pseudoLvForVideoId(vid)}` : '';
@@ -1210,6 +1369,9 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     const list =
       keys == null ? null : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
     const bag = /** @type {Record<string, any>} */ (await realGet(keys));
+    if ((!list || list.includes(KEY_YT_SUMMARIES)) && knownSummaries && Object.keys(knownSummaries).length) {
+      bag[KEY_YT_SUMMARIES] = knownSummaries;
+    }
     if (list) for (const k of list) if (/^nls_/.test(k) && !shimDiag.keysAsked.includes(k.replace(/lv\d+/, 'LV'))) shimDiag.keysAsked.push(k.replace(/lv\d+/, 'LV'));
     // 計器: 1回の読みでコメントを2配信以上聞く = popup の探り読み(collectDataBackedWatchLvs)
     const askedCommentLvs = new Set(
@@ -1308,7 +1470,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (!vid) continue;
         if (await staleFrameHold.wait(isOtherServiceThanPanel(lv))) shimDiag.staleFrameHeld = staleFrameHold.heldCount();
         // 0.1.1962: 1回の読みでギフトのキーを5つ聞かれても、配信の一覧(yt_stream_summaries)を読むのは1回だけ
-        if (!sumsOnce) sumsOnce = Promise.resolve(realGet(KEY_YT_SUMMARIES));
+        if (!sumsOnce) sumsOnce = summariesBag();
         const sums = /** @type {Record<string, any>} */ (await sumsOnce);
         const gifts = /** @type {Record<string, any> | undefined} */ (
           await buildGiftBagsForLv(lv, sums?.[KEY_YT_SUMMARIES]?.[vid])
@@ -1366,7 +1528,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   realLocal.set = (/** @type {any} */ items, /** @type {any} */ cb) => {
     // ★v0.1.1974: 疑似 lv のコメントの控え(全件 約5.5MB)は書かない。正本は IndexedDB で、読み出しはここが IndexedDB から組む
     {
-      const d = dropPseudoLvCommentWrites(items, (lv) => !!videoIdForPseudoLv(lv));
+      // 逆引き表が空の画面(横の欄の別フレーム)でも、疑似 lv の形なら全件(最大数十MB)は書かない。
+      const d = dropPseudoLvCommentWrites(items, (lv) => !!videoIdForPseudoLv(lv) || isYtPseudoLvShape(lv));
       if (d.dropped) {
         shimDiag.commentWritesDropped += d.dropped;
         shimDiag.commentRowsWriteDropped += d.droppedBytesApprox;
@@ -1492,7 +1655,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const url = String(tab?.url || '');
         const vid = streamKeyForWatchUrl(url);
         if (!vid) return { ok: false, error: 'not_youtube' };
-        const bag = await realGet(KEY_YT_SUMMARIES);
+        const bag = await summariesBag();
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
         // 先に記録を読む(アーカイブかどうか・配信者の UC… が記録から分かるため)
         const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
@@ -1619,6 +1782,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
           do {
             st.again = false;
             await notifyLvOnce(lv, st.summary);
+            // コメントが続くあいだ、組み立て直しを隙間なく重ねるとメインスレッドが固まる。
+            if (st.again) await new Promise((resolve) => setTimeout(resolve, YT_NOTIFY_MIN_GAP_MS));
           } while (st.again);
         } finally {
           notifyRunning.delete(lv);
@@ -1635,6 +1800,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       commentsCache.delete(lv);
       const arr = await buildCommentsForLv(lv).catch(() => undefined);
       if (!arr) return;
+      // 組み立ての最後と描画を同じ仕事に載せると、4倍遅くした条件で 100ms を超える。
+      if (arr.length >= 1000) await yieldToMainThread();
       const sig = `${arr.length}:${arr.length ? arr[arr.length - 1].id : ''}`;
       if (lastNotified.get(lv) === sig) return;
       lastNotified.set(lv, sig);
@@ -1713,6 +1880,20 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         lastStreamValue = changes[YT_LAST_STREAM_URL_KEY].newValue || null;
         announceLastWatch(lvOfLastStream(lastStreamValue), 'page');
       }
+      for (const [ckey, change] of Object.entries(changes)) {
+        const vid = videoIdFromSummaryStorageKey(ckey);
+        if (!vid || !change) continue;
+        const one = change.newValue;
+        if (one && typeof one === 'object') knownSummaries[vid] = one;
+        const lvOf = pseudoLvForVideoId(vid);
+        if (!lastAnnouncedLv && !lvOfLastStream(lastStreamValue)) announceLastWatch(lvOf, 'newest');
+        if (!isWatchedByThisScreen(lvOf)) {
+          panelDiag.notify(false);
+          continue;
+        }
+        panelDiag.notify(true);
+        void notifyLv(lvOf, one);
+      }
       if (!changes[KEY_YT_SUMMARIES]) return;
       const next = changes[KEY_YT_SUMMARIES].newValue || {};
       knownSummaries = next; // Twitch/Kick のタブ → 配信キーの引き当て(newestKeyForChannel)が新しい配信を知るため
@@ -1770,10 +1951,12 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         const cur = inPageCommentCache.get(vid);
         if (!cur) return; // まだ会場がこの配信を読んでいない(最初の全件で入る)
         let added = 0;
+        if (!cur.pending) cur.pending = [];
         for (const r of msg.items) {
           const k = String(r?.pk || r?.id || '');
           if (!k || cur.byPk.has(k)) continue;
           cur.byPk.set(k, r);
+          cur.pending.push(r);
           added += 1;
         }
         if (!added) return;
@@ -1814,7 +1997,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (!lv) return;
         const vid = videoIdForPseudoLv(lv);
         if (!vid) return;
-        void Promise.resolve(realGet(KEY_YT_SUMMARIES))
+        void summariesBag()
           .then((bag) => notifyLv(lv, bag?.[KEY_YT_SUMMARIES]?.[vid]))
           .catch(() => {});
       } catch {
@@ -2045,6 +2228,9 @@ function installPlatformMetricChromeOnce() {
     if (!document.getElementById('watchConcurrentCard') && !document.getElementById('officialStatNicoAdPts')) return;
     schedulePlatformChrome = watchPlatformMetricChrome(document, () => {
       const base = screenPlatformBase();
+      // まだどの配信か分からない(まとめを読む前)うちは YouTube の見出しを付けない。
+      //   付けると、ミクチャ等の見出しを持たないサービスで「スーパーチャット・ギフト」が残っていた(0.1.2083・e2e)
+      if (!base && !lastAskedLv && !PANEL_STREAM_KEY && !knownSummariesLoaded) return null;
       const id = base?.id || 'youtube';
       const vid = lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : '';
       const sum = vid ? knownSummaries?.[vid] : null;
@@ -2054,6 +2240,12 @@ function installPlatformMetricChromeOnce() {
       // ギフト貢献度の欄に公式の順位表(トップファン・Bits/Kicks ランキング)を入れているか=見出しを「公式の〜」にする
       return { platform: id, facts, officialBoard: base ? platformOfficial : kokenIsTopFans };
     });
+    // まとめを読む道が無い画面でも、3秒で「分からない=YouTube」として見出しを付ける(付かないままにしない)
+    setTimeout(() => {
+      if (knownSummariesLoaded) return;
+      knownSummariesLoaded = true;
+      schedulePlatformChrome();
+    }, 3000);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();

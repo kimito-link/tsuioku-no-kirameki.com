@@ -68,6 +68,7 @@ describe('shim: 組み立てで、材料が同じ行は前に作った行を使�
     const at = shim.indexOf('rowsMade += 1;');
     const tail = shim.slice(at, at + 400);
     expect(tail).toContain('if (icon && e.userId) ytIconByNumericUid.set(e.userId, icon);');
-    expect(tail).toContain('if (important?.[i]) ytVoiceImportantKeys.set(');
+    expect(shim).toContain('const why = reason || important?.[i] || ');
+    expect(shim).toContain('if (why) ytVoiceImportantKeys.set(`no:${e.commentNo}`, why);');
   });
 });

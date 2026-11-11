@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dropPseudoLvCommentWrites } from './ytShimCommentWrites.js';
+import { isYtPseudoLvShape } from './ytPseudoLv.js';
 
 const isPseudo = (lv) => lv === 'lv900000001';
 
@@ -28,5 +29,17 @@ describe('配線(ytNicoShim.js)', () => {
     const i = src.indexOf('realLocal.set = (');
     expect(i).toBeGreaterThan(0);
     expect(src.slice(i, i + 1200)).toContain('dropPseudoLvCommentWrites(items');
+    expect(src.slice(i, i + 1200)).toContain('isYtPseudoLvShape(lv)');
+  });
+  it('逆引きが空でも、疑似 lv の形(lv9+11桁)の控えは捨てる', () => {
+    const lv = 'lv988799733173';
+    expect(isYtPseudoLvShape(lv)).toBe(true);
+    expect(isYtPseudoLvShape('lv348012345')).toBe(false);
+    const r = dropPseudoLvCommentWrites(
+      { [`nls_comments_${lv}`]: [1, 2], [`ytm:nls_ctail_${lv}`]: [2], nls_comments_lv348012345: [9] },
+      (id) => isYtPseudoLvShape(id),
+    );
+    expect(r.dropped).toBe(2);
+    expect(r.items).toEqual({ nls_comments_lv348012345: [9] });
   });
 });

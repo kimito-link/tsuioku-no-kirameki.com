@@ -3,7 +3,8 @@ import {
   UNKNOWN_USER_KEY,
   displayUserLabel,
   shortUserKeyDisplay,
-  aggregateCommentsByUser
+  aggregateCommentsByUser,
+  createLiveAggregateComments
 } from './userRooms.js';
 
 describe('shortUserKeyDisplay', () => {
@@ -215,5 +216,29 @@ describe('aggregateCommentsByUser', () => {
     ]);
     expect(rowsDefault.length).toBe(1);
     expect(rowsDefault[0].userKey).toBe('gift_only');
+  });
+});
+
+describe('createLiveAggregateComments', () => {
+  const row = (id, userId, text) => ({ id, userId, text, capturedAt: 1 });
+
+  it('全件を1回で数えた結果と、うしろに足した結果は同じ', () => {
+    const live = createLiveAggregateComments({ requireText: true });
+    const head = [row('a', 'u1', 'aa'), row('b', 'u2', 'bb')];
+    live(head);
+    const all = head.concat([row('c', 'u1', 'cc')]);
+    const folded = live(all);
+    const once = aggregateCommentsByUser(all, { requireText: true });
+    expect(folded.map((r) => [r.userKey, r.count])).toEqual(once.map((r) => [r.userKey, r.count]));
+    expect(live.diag.folded).toBe(1);
+    expect(live.diag.rebuilt).toBe(1);
+  });
+
+  it('行オブジェクトが替わっても id が同じなら足された分だけ数える', () => {
+    const live = createLiveAggregateComments({ requireText: true });
+    live([row('a', 'u1', 'aa'), row('b', 'u2', 'bb')]);
+    live([row('a', 'u1', 'aa'), row('b', 'u2', 'bb'), row('c', 'u1', 'cc')]);
+    expect(live.diag.folded).toBe(1);
+    expect(live.diag.rebuilt).toBe(1);
   });
 });

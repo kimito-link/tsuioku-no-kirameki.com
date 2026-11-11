@@ -23,13 +23,13 @@ describe('shouldReuseStoryDiagCounts', () => {
     expect(shouldReuseStoryDiagCounts(st, { lv: 'lv2', len: 81111, nowMs: 3000 })).toBe(false);
     expect(shouldReuseStoryDiagCounts(st, { lv: 'lv2', len: 81111, nowMs: 4000 })).toBe(true);
   });
-  it('生放送の途中: 少し増えただけ(数えたときから 2% まで)なら前の値を使う(v0.1.1985)', () => {
+  it('生放送の途中: 行数が増えても1分までは前の値を使う', () => {
     const st = createStoryDiagCountsPaceState();
     shouldReuseStoryDiagCounts(st, { lv: 'lv1', len: 81110, nowMs: 1000 });
     expect(shouldReuseStoryDiagCounts(st, { lv: 'lv1', len: 81111, nowMs: 2000 })).toBe(true);
     expect(shouldReuseStoryDiagCounts(st, { lv: 'lv1', len: 81110 + 1622, nowMs: 3000 })).toBe(true);
-    // 2% を超えて増えたら数え直す(基準はそのときの行数に替わる)
-    expect(shouldReuseStoryDiagCounts(st, { lv: 'lv1', len: 81110 + 1623, nowMs: 4000 })).toBe(false);
+    // 2% を超えても、1分が来るまでは数え直さない(全件の数え直しが 100ms を超えていた)。
+    expect(shouldReuseStoryDiagCounts(st, { lv: 'lv1', len: 81110 + 1623, nowMs: 4000 })).toBe(true);
     expect(shouldReuseStoryDiagCounts(st, { lv: 'lv1', len: 81110 + 1700, nowMs: 5000 })).toBe(true);
   });
   it('行数が減ったらすぐ数え直す', () => {

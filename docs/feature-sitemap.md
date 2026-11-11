@@ -125,7 +125,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 74</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 78</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -133,6 +133,7 @@
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
+- `src/extension/content-boot.js` — 記録エンジン(content.js・約1.5MB)を、配信の視聴フレームだけに載せる。
 - `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
 - `src/extension/liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
 - `src/lib/appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
@@ -182,6 +183,7 @@
 - `src/lib/sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
 - `src/lib/sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
 - `src/lib/sourceProvenance.js` — 値を「**どの経路で取れたか**」で記録し、経路の劣化を検出する(純関数)。
+- `src/lib/stallTrace.js` — 画面が止まったときの記録。時刻・長さ・拡張のファイル名とドメインだけ。
 - `src/lib/statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
 - `src/lib/statCardsMirrorDom.js` — 数字カード鏡(記録/推定同時接続/来場者数+公式統計チップ)の【値セット部分】を、
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
@@ -198,6 +200,8 @@
 - `src/lib/youtube/ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
 - `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
 - `src/lib/youtube/ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
+- `src/lib/youtube/ytSplitPersist.js` — 声の割り当てと配信のまとめを、人数や配信の数に比例して大きくなる1個の値で書き直さない。
+- `src/lib/youtube/ytSplitPersistStore.js` — 声の割り当て(人ごと)と配信のまとめ(配信ごと)の IndexedDB。
 - `src/lib/youtube/ytStreamStorePolicy.js` — YouTube Live 配信コメントの保存要約・IndexedDB レコード正規化・差分更新状態計算（純関数）
 - `src/lib/youtube/ytTailAfterFull.js` — v0.1.1983: 全件を一度渡したあとのテール(新着の差分)を、短くして渡す。
 - `src/lib/youtube/ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
@@ -343,7 +347,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 300</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 302</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -383,6 +387,7 @@
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
 - `src/extension/venueBubblePlacer.js` — 会場(PC)の吹き出しを DOM の実寸から置く薄い層。
 - `src/extension/venuePickupDrag.js` — v0.1.1899 PICK UP の吹き出しをドラッグで動かし、位置を覚える(りんく「ドラッグでうごかせるようにしておきたい」)。
+- `src/extension/yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
 - `src/lib/adLanePicksFromRooms.js` — 広告ランキング行(officialDomRankingRowsToStripRooms の room)を、popup/会場の人物タイル
 - `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
 - `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
@@ -639,6 +644,7 @@
 - `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
 - `src/lib/youtube/ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
 - `src/lib/youtube/ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
+- `src/lib/youtube/ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytZeroPtGiftLabel.js` — 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援しかしていない人の「0pt」を
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
@@ -1140,7 +1146,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 340</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 345</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1228,6 +1234,7 @@
 - `scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
 - `scripts/lib/today-jst.mjs` — 運用日（JST）を返す唯一の正本。
 - `scripts/lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
+- `scripts/measure-comment-flood.mjs` — コメントが続くときに、画面のメインスレッドがどれだけ止まるかを測る。
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/measure-phone-direct.mjs` — 「iPhone アプリが自分でニコ生のコメントを取る」(拡張なし 第3段)の前に測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
@@ -1343,6 +1350,7 @@
 - `src/lib/moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
 - `src/lib/nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
+- `src/lib/nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
 - `src/lib/northStarMirror.js` — 北極星レーン鏡(公式値レーン)のスナップショット純関数。
@@ -1456,9 +1464,11 @@
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
+- `src/lib/youtube/ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
 - `src/lib/youtube/ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
 - `src/lib/youtube/ytChatInputBlock.js` — YouTube のチャット欄に入力欄が無いとき、その理由を見分ける(content-chat-entry の「ここから発言」用)。
 - `src/lib/youtube/ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
+- `src/lib/youtube/ytLiveRowOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
 - `src/lib/youtube/ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
@@ -1478,6 +1488,7 @@
 - `tests/e2e/fixtures.js` — e2e テスト共通の土台(拡張をロードした Chromium 起動・test/expect の再エクスポート)。
 - `tests/e2e/global-setup.js` — ローカル（CI 以外）でモック watch 用の静的サーバが未起動のとき、
 - `tests/e2e/global-teardown.js` — global-setup が起動した serve の PID を片付ける（ローカル専用）。
+- `tests/e2e/readStreamSummary.js` — 配信のまとめは配信ごとの小さい鍵(ytm:sum:v1:)に書く。
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
@@ -1488,6 +1499,9 @@
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+
+### 💾 記録件数 (1版)
+- `v0.1.2086` 2026-11-11 — 保存の書き込みを小さくして固まりにくく
 
 ### 🏟 会場・席 (6版)
 - `v0.1.2070` 2026-11-11 — ABEMAの会場の数字がすぐ新しくなる
@@ -1500,14 +1514,15 @@
 ### 🎈 吹き出し (1版)
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 
-### 🎁 ギフト (5版)
+### 🎁 ギフト (6版)
+- `v0.1.2086` 2026-11-11 — 保存の書き込みを小さくして固まりにくく
 - `v0.1.2080` 2026-11-11 — Twitch・Kick のギフトサブ順位も出す
 - `v0.1.2069` 2026-11-11 — ABEMAは視聴数とコメント数だけ
 - `v0.1.2068` 2026-11-11 — ページの視聴者数をそのまま出す
 - `v0.1.2045` 2026-11-11 — ニコ生以外の広告ptを出さない
 - `v0.1.2044` 2026-11-11 — 各配信の数字だけを出す・ABEMAの視聴数をカードに出す
 
-### その他 (13版)
+### その他 (12版)
 - `v0.1.2085` 2026-11-11 — ミクチャの数字をページの言葉に
 - `v0.1.2081` 2026-11-11 — SHOWROOM等のイベント順位を出す
 - `v0.1.2059` 2026-11-11 — ABEMAの視聴数とチャンネル名
@@ -1520,4 +1535,3 @@
 - `v0.1.2051` 2026-11-11 — ABEMAのロゴ全体と視聴数
 - `v0.1.2047` 2026-11-11 — 公式ランキングの説明を残す
 - `v0.1.2046` 2026-11-11 — ABEMAの配信者ロゴをサイドパネルへ
-- `v0.1.2043` 2026-11-11 — ABEMAの配信者にチャンネルの画像

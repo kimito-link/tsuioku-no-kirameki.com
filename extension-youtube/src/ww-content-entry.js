@@ -10,6 +10,18 @@
 
 import { parseWwLiveIdFromUrl, wwLiveApiUrl, parseWwLive, parseWwComment, buildWwStreamKey } from '../../src/lib/whowatch/wwParse.js';
 import { wwEventInfoUrl, parseWwEventInfo, parseWwLiveStats, mergePlatformStats } from '../../src/lib/platform/platformStats.js';
+import { startPageStallWatch } from '../../src/lib/stallTrace.js';
+try {
+  const stallRoot = /** @type {any} */ (globalThis);
+  if (!stallRoot.__nlStallWatch) {
+    stallRoot.__nlStallWatch = startPageStallWatch({
+      file: 'ww-content-entry.js',
+      send: (summary) => {
+        try { chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: stallRoot.__nlStallWatch.takeFresh() }); } catch { /* 計器 */ }
+      },
+    });
+  }
+} catch { /* 計器 */ }
 
 // ページ自身は10秒おき(polling_interval)。3秒で取りこぼし0・遅れ中央値1.6秒だった(2026-11-08 PC 実測)ので、間を取って5秒
 const POLL_MS = 5000;

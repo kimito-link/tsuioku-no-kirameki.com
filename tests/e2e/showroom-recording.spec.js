@@ -6,6 +6,7 @@
 //   - online.showroom-live.com のソケット → Chromium の名前解決を 127.0.0.1 に向け、手元の TLS の WebSocket で役をする
 //   形は 2026-11-08 の PC 実測(本物・値抜き)から写した(値は作りもの)。
 import { test as base, chromium, expect } from '@playwright/test';
+import { readStreamSummary } from './readStreamSummary.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -224,7 +225,7 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   ]);
 
   // 配信のまとめ(部屋の名前・視聴数・開始時刻)
-  const sum = await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY);
+  const sum = await readStreamSummary(sw, KEY);
   // 0.1.1948: 配信ページが「最後に見た配信」を自分で記録する(pfLastStreamUrl.js・SPEC §4-C1)。キーはこのチャンネルのもの
   await expect
     .poll(async () => String((await sw.evaluate(async () => (await chrome.storage.local.get('yt_last_stream_url')).yt_last_stream_url))?.key || ''), { timeout: 10_000 })
@@ -256,7 +257,7 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
 
   // SHOWROOM 特有: イベントの数字はまとめに値のまま、貢献ランキングは2つめの欄(広告ランキングの欄)に SHOWROOM の言葉で
   await expect
-    .poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.platformStats || null, { timeout: 45_000 })
+    .poll(async () => (await readStreamSummary(sw, KEY))?.platformStats || null, { timeout: 45_000 })
     .toEqual({ eventName: 'テストのイベント', eventRank: 4, eventPoint: 123456, eventGap: 5000, questLevel: 3, questPoint: 900, questGoal: 1500 });
   const lane = ext.locator('[data-lane="adRanking"]');
   await expect.poll(async () => (await lane.count()) ? lane.first().innerText() : '', { timeout: 30_000 }).toContain('イベント応援さん');
@@ -277,6 +278,6 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   // 配信が終わったら(is_live=false)終わった時刻を送る
   live = false;
   await expect
-    .poll(async () => Number((await sw.evaluate(async (key) => (await chrome.storage.local.get('yt_stream_summaries')).yt_stream_summaries?.[key], KEY))?.endedAt || 0), { timeout: 45_000 })
+    .poll(async () => Number((await readStreamSummary(sw, KEY))?.endedAt || 0), { timeout: 45_000 })
     .toBeGreaterThan(0);
 });

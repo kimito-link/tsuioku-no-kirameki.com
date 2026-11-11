@@ -11,6 +11,18 @@
 //   - Pusher のイベント名・項目名は公式の文書が無い。計器(yt_diag_kk_chat)で PC 実測して確かめる。
 
 import { parseKickChannelFromUrl, parsePusherFrame, parseKickEvent, parseKickDeleted } from '../../src/lib/kick/kickChatParse.js';
+import { startPageStallWatch } from '../../src/lib/stallTrace.js';
+try {
+  const stallRoot = /** @type {any} */ (globalThis);
+  if (!stallRoot.__nlStallWatch) {
+    stallRoot.__nlStallWatch = startPageStallWatch({
+      file: 'kick-content-entry.js',
+      send: (summary) => {
+        try { chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: stallRoot.__nlStallWatch.takeFresh() }); } catch { /* 計器 */ }
+      },
+    });
+  }
+} catch { /* 計器 */ }
 import { kickChannelApiUrl, parseKickChannel, parseKickUserIcon, parseKickKicksLeaderboard, kickKicksLeaderboardUrl, parseKickSubsLeaderboard, kickSubsLeaderboardUrl } from '../../src/lib/kick/kickApi.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {

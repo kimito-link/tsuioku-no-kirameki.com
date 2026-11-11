@@ -16,3 +16,13 @@ export function computePseudoLvForVideoId(videoId) {
   const n = ((h1 % 1000000) * 1000000 + (h2 % 1000000)) % 1000000000000;
   return `lv${String(9 * 100000000000 + (n % 100000000000))}`;
 }
+
+/**
+ * YouTube 系の疑似 lv の形か。逆引き表が空でも、この形のコメント控えは書かない。
+ * ニコ生の本物の lv は桁が違い、ここでは捨てない。
+ * @param {unknown} lv
+ * @returns {boolean}
+ */
+export function isYtPseudoLvShape(lv) {
+  return /^lv9\d{11}$/i.test(String(lv || ''));
+}

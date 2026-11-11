@@ -37,6 +37,11 @@ const PASS_MESSAGE_TYPES = new Set([
   'NLS_VOICE_READER_RELEASE',
   'NLS_FETCH_PROXY',
   'NLS_FETCH_PROXY_ABORT',
+  // 会場(yt-venue-inline.js)を配信ページだけに載せる頼み(yt-page-boot.js)。
+  //   Twitch・Kick 等は先に入る記録係がこの仕切りを付けるので、通さないと会場が起動しない(0.1.2057)
+  'NLS_BOOT_ENGINE',
+  // 長い処理の計器(stallTrace.js)。同じく仕切りで捨てられていた
+  'NLS_STALL_SUMMARY',
 ]);
 /** 名前を変えて YouTube 版の裏方へ */
 export const YT_MERGED_RENAMED_MESSAGES = Object.freeze({

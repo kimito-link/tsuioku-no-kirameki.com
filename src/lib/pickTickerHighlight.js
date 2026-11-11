@@ -39,6 +39,12 @@ export const TICKER_BUCKET_MS = 7000;
 export const TICKER_LOOKBACK_MS = 8000;
 
 /**
+ * 末尾から見る行数の上限。8,000件を毎回採点すると、4倍・6倍に遅くした条件で 100ms を超える。
+ * 秒あたり百件でも、この件数は遡り幅(8秒)を覆う。
+ */
+export const TICKER_SCAN_MAX = 1200;
+
+/**
  * これ未満の本文はスパム扱いで候補外(「w」「88」等)。ギフトは免除。
  *
  * ★v0.1.1337: 4 → 3 に緩めた(実機で拾えなさすぎた)。
@@ -166,14 +172,25 @@ export function pickTickerHighlightEntry(list, nowMs, opts = {}) {
   const windowTo = bucketAt + TICKER_BUCKET_MS;
   /** @type {TickerCandidate[]} */
   const inWindow = [];
-  for (const row of rows) {
-    // ★v0.1.1981: 先に時刻だけ見る。窓(直近の数十秒)の外の行まで本文を整えていた(8万行で毎回8万回の正規表現)。
+  // 時刻の新しい順に見て、古い方へきれいに並んでいるあいだは窓の外に出た時点でやめる。
+  // 並びが崩れていたら最後まで見る(結果は全件走査と同じ)。
+  let prevTs = Infinity;
+  let ordered = true;
+  let scanned = 0;
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    scanned += 1;
+    if (scanned > TICKER_SCAN_MAX) break;
+    const row = rows[i];
     const ts = candidateTs(row);
+    if (ordered && ts > prevTs) ordered = false;
+    prevTs = ts;
+    if (ordered && ts <= windowFrom) break;
     if (ts <= windowFrom || ts > windowTo) continue;
     const c = toCandidate(row);
     if (!c) continue;
     inWindow.push(c);
   }
+  inWindow.reverse();
   if (!inWindow.length) return fallback();
 
   // 窓内の同一本文の出現数(合唱の検出)。

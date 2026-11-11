@@ -9,6 +9,18 @@
 //   - 配信していないチャンネルのページでは記録しない(つながない)。
 
 import { parseTwChatLine, parseTwChannelFromUrl } from '../../src/lib/twitch/twIrcParse.js';
+import { startPageStallWatch } from '../../src/lib/stallTrace.js';
+try {
+  const stallRoot = /** @type {any} */ (globalThis);
+  if (!stallRoot.__nlStallWatch) {
+    stallRoot.__nlStallWatch = startPageStallWatch({
+      file: 'tw-content-entry.js',
+      send: (summary) => {
+        try { chrome.runtime.sendMessage({ type: 'NLS_STALL_SUMMARY', page: location.hostname, summary, events: stallRoot.__nlStallWatch.takeFresh() }); } catch { /* 計器 */ }
+      },
+    });
+  }
+} catch { /* 計器 */ }
 import { buildTwStreamKey } from '../../src/lib/twitch/twStreamKey.js';
 import {
   TW_GQL_URL,

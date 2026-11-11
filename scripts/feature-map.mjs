@@ -139,6 +139,8 @@ const DOM_ATTR_DISCONNECT_BASELINE = new Set([
 ]);
 
 const STORAGE_DISCONNECT_BASELINE = new Set([
+  // 0.1.2057: 書き手は background-entry.js の set({ nls_stall_summary_v1: ... })(連想配列の鍵なので走査が拾えない)・読み手は status-entry.js
+  'nls_stall_summary_v1',
   'KEY_ANONYMOUS_IDENTICON_ENABLED', 'KEY_AUTOPATROL_ENABLED', 'KEY_AUTOPATROL_STATE',
   'KEY_BACKFILL_AUTO_DISABLED', 'KEY_BACKFILL_BG_KICK_ENABLED', 'KEY_BACKFILL_SW_MODE',
   'KEY_CALM_PANEL_MOTION', 'KEY_CDB_OFFSCREEN_ENABLED', 'KEY_COMMENTER_FOLLOWING_LIST_CACHE',

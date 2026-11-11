@@ -73,8 +73,7 @@ import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { createRefreshCoalescer } from '../lib/refreshCoalescer.js';
 import { shouldSkipLaneSecondRender } from '../lib/laneSecondRenderPolicy.js';
-import { BIG_RECORD_YIELD_MIN_ROWS, shouldDeferLanePaintForBigRecord, shouldYieldForBigRecord, yieldToMainThread } from '../lib/bigRecordYield.js';
-import { createLaneAggregatesMemo } from '../lib/laneAggregatesMemo.js';
+import { shouldDeferLanePaintForBigRecord, shouldYieldForBigRecord, yieldToMainThread } from '../lib/bigRecordYield.js';
 import { canAppendStoryGrowthCells, canTrimStoryGrowthCells } from '../lib/storyGrowthAppendPlan.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
@@ -564,7 +563,7 @@ import {
   tickerHighlightKey
 } from '../lib/pickTickerHighlight.js';
 import {
-  aggregateCommentsByUser,
+  createLiveAggregateComments,
   displayUserLabel,
   UNKNOWN_USER_KEY
 } from '../lib/userRooms.js';
@@ -787,6 +786,7 @@ import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.
 import {
   normalizeLv,
   userLaneCandidatesFromStorage,
+  createLiveLaneAggregatesMemo,
   enrichUserLaneAggregatesWithProfileAndDisplay
 } from '../lib/userLaneCandidatesFromStorage.js';
 import { buildGiftThrowerLaneEntries } from '../lib/userLaneMergeGiftThrowers.js';
@@ -840,7 +840,8 @@ import {
   STORY_GROWTH_MAX_CELLS,
   buildStoryGrowthGaugeLabel,
   buildSupportSameUserBlurb,
-  resolveStoryGrowthWindowOffset
+  resolveStoryGrowthWindowOffset,
+  takeStoryGrowthVisibleKey
 } from '../lib/storyGrowthLimits.js';
 import {
   createStoryGrowthChurnState,
@@ -7868,8 +7869,8 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
 /** v0.1.1617: gift/ad picks の持ち越し台帳と計器(同じ配信へ戻ったとき restored / 別の配信へ替わったとき cleared)。 */
 const _giftAdPicksCarry = createGiftAdPicksCarry();
 const _giftAdPicksCarryDiag = { restored: 0, cleared: 0, keptGift: 0, keptAd: 0 };
-// ★v0.1.2007: 数万行の記録で、同じ記録を描画のたびに人ごとに数え直さない(lib/laneAggregatesMemo.js)
-const _laneAggregatesMemo = createLaneAggregatesMemo({ compute: (rows, lid, o) => userLaneCandidatesFromStorage(rows, lid, o), minRows: BIG_RECORD_YIELD_MIN_ROWS });
+// ★v0.1.2007: 数万行の記録で、同じ記録を描画のたびに人ごとに数え直さない。v0.1.2052 からは id が増えた分だけ足す。
+const _laneAggregatesMemo = createLiveLaneAggregatesMemo(400);
 try { /** @type {any} */ (globalThis).__laneAggregatesMemoDiag = _laneAggregatesMemo.diag; } catch { /* 計器だけ */ }
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
@@ -8194,7 +8195,7 @@ function renderStoryCommentDetailPanelImpl() {
  */
 function storyAvatarFingerprint(entries) {
   let h = 0;
-  for (let i = 0; i < entries.length; i++) {
+  for (let i = 0; i < entries.length && i < STORY_GROWTH_MAX_CELLS; i++) {
     const u = entries[i]?.avatarUrl;
     if (!u || typeof u !== 'string') continue;
     h = (h * 33 + u.length + i) | 0;
@@ -8970,10 +8971,7 @@ function syncStoryGrowth(liveId, count, root) {
     STORY_GROWTH_STATE.renderedCount === STORY_GROWTH_STATE.targetCount &&
     nextSig !== STORY_GROWTH_STATE.sourceSig;
   STORY_GROWTH_STATE.sourceSig = nextSig;
-  if (needSourceSync) {
-    // 0.1.87: avatar URL の遅延補完（cache hydration 等）で signature が変わるだけの
-    //   再同期では pulse しない。pulseLast=true は新コメ追加（rnd < tgt）の経路のみ
-    //   に限定し、グリッドが「コメ無くても動いて見える」のを防ぐ。
+  if (needSourceSync && takeStoryGrowthVisibleKey(STORY_GROWTH_STATE, STORY_SOURCE_STATE.entries, storyAvatarFingerprint(STORY_SOURCE_STATE.entries))) {
     patchStoryGrowthIconsFromSource(root, { pulseLast: false });
   }
 
@@ -13227,6 +13225,9 @@ async function refreshGiftRankStrip(liveId) {
   });
 }
 
+const aggregateRoomsForPaint = createLiveAggregateComments({ requireText: true });
+try { /** @type {any} */ (globalThis).__nlRoomsDiag = aggregateRoomsForPaint.diag; } catch { /* 計器 */ }
+
 /**
  * @param {PopupCommentEntry[]} entries
  * @param {string} [liveId] ランキングストリップの再描画キー用
@@ -13429,7 +13430,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   // 事象を防ぐため、ranking 表示からは UNKNOWN_USER_KEY を除外する。
   // HTML レポート側（L8782 等）の集計はそのまま維持。
   const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(
-    aggregateCommentsByUser(list, { requireText: true }),
+    aggregateRoomsForPaint(list),
     {
       broadcasterUid: inferredBroadcasterUid,
       broadcasterIconUrl
