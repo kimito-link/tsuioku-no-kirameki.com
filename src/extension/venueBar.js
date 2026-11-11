@@ -2960,7 +2960,7 @@ export function mountVenueBarButton(options = {}) {
     const vids = isStandalone ? [safeArea] : Array.from(document.querySelectorAll('video'));
     const video = vids.map((v) => v.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
     const layoutRect = stageLayout.getBoundingClientRect();
-    // ABEMA のコメント欄が開いていても、吹き出しはニコ生・YouTube と同じ大きさで映像の上端中央。欄の幅へ縮めない。
+    // 本編映像の上端中央。約250pxの欄や小さい video では幅も位置も合わせない（閾値は venuePickupBanner）。
     const at = venuePickupPlacement(video, layoutRect);
     applyVenuePickupBox(pickupEls.root, window.innerWidth, video ? video.width : 0);
     pickupDrag.place(at); // v0.1.1899 ドラッグで置いた位置があればそこ・無ければ自動位置(venuePickupDrag.js)

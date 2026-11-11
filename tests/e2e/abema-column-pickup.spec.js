@@ -93,8 +93,8 @@ test('ABEMA の欄やホスト CSS で PICK UP は縮まず、上段は欄の幅
         <span class="nlsb-pickup__badge">PICK UP</span>
         <span class="nlsb-pickup__face" role="img" aria-label=""></span>
         <span class="nlsb-pickup__main">
-          <span class="nlsb-pickup__body">${COMMENT}</span>
           <span class="nlsb-pickup__meta">${NAME}</span>
+          <span class="nlsb-pickup__body">${COMMENT}</span>
         </span>
       </div>
     </div>
@@ -138,7 +138,7 @@ test('ABEMA の欄やホスト CSS で PICK UP は縮まず、上段は欄の幅
     style: { setProperty: (k, v, p) => { props.push([k, v, p || '']); } },
     classList: { remove() {} },
     querySelectorAll: () => []
-  }, 1280, 960);
+  }, 1280, 274);
   await bubble.evaluate((node, spec) => {
     node.classList.remove('is-fit-column');
     for (const [k, v, p] of spec.props) node.style.setProperty(k, v, p);
@@ -163,14 +163,16 @@ test('ABEMA の欄やホスト CSS で PICK UP は縮まず、上段は欄の幅
       cap: body.getBoundingClientRect().width / font,
       lines,
       metaW: meta.getBoundingClientRect().width,
-      meta: meta.textContent
+      meta: meta.textContent,
+      metaTop: meta.getBoundingClientRect().top,
+      bodyTop: body.getBoundingClientRect().top
     };
   });
   expect(pickup.font).toBeGreaterThanOrEqual(16);
   expect(pickup.face).toBeGreaterThanOrEqual(40);
   expect(pickup.cap, `本文の幅 ${pickup.bodyW}px / ${pickup.font}px`).toBeGreaterThanOrEqual(16);
-  expect(pickup.lines.length).toBeGreaterThanOrEqual(1);
-  expect(pickup.lines.length).toBeLessThanOrEqual(2);
+  expect(pickup.lines.length).toBe(1);
+  expect(pickup.metaTop).toBeLessThan(pickup.bodyTop);
   for (const w of pickup.lines) expect(w).toBeGreaterThan(120);
   expect(pickup.metaW).toBeGreaterThan(48);
   expect(pickup.meta).toBe(NAME);

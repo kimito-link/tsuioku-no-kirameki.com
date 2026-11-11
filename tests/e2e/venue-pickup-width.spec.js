@@ -31,8 +31,8 @@ test('PICK UP は細い親とホスト CSS の中でも読める幅', async ({ p
     <div class="nlsb-pickup">
       <span class="nlsb-pickup__badge">PICK UP</span>
       <span class="nlsb-pickup__main">
-        <span class="nlsb-pickup__body">ウホ。今日も配信ありがとう</span>
         <span class="nlsb-pickup__meta">A2AmVn58ed3nrb</span>
+        <span class="nlsb-pickup__body">ウホ。今日も配信ありがとう</span>
       </span>
     </div>
   </div>

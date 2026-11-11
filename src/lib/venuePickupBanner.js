@@ -26,11 +26,16 @@ export const VENUE_PICKUP_CLASS = 'nlsb-pickup';
 export const VENUE_PICKUP_MAX_PX = 860;
 export const VENUE_PICKUP_MIN_PX = 320;
 export const VENUE_PICKUP_VW_GUTTER = 32;
+/**
+ * これより細い video はコメント欄や小さい要素。幅も位置もそれに合わせない。
+ * ニコ生・YouTube の本編映像（おおよそ 600px 以上）だけ、映像の幅に合わせる。
+ */
+export const VENUE_PICKUP_MAIN_VIDEO_MIN_PX = 480;
 
 /**
  * 吹き出しの幅。放送ページの flex や max-width:100% で親が細くても、1文字幅に潰れない。
- * 映像が十分大きいときは映像の幅に合わせる。小さい・無いときは窓の幅。
- * ABEMA のコメント欄が開いていても、欄の幅では縮めない(ニコ生・YouTube と同じ大きさ)。
+ * 本編の映像が十分大きいときだけ映像の幅に合わせる。約250pxの欄や小さい video は無視して窓の幅。
+ * ABEMA もニコ生・YouTube も同じ決まり。
  * @param {number} viewportWidth
  * @param {number} [videoWidth]
  * @returns {{ width: number, minWidth: number, maxWidth: number }}
@@ -41,7 +46,7 @@ export function venuePickupReadableBox(viewportWidth, videoWidth = 0) {
   const minWidth = Math.min(VENUE_PICKUP_MIN_PX, maxWidth);
   let width = maxWidth;
   const video = Number(videoWidth);
-  if (Number.isFinite(video) && video >= 240) {
+  if (Number.isFinite(video) && video >= VENUE_PICKUP_MAIN_VIDEO_MIN_PX) {
     width = Math.max(minWidth, Math.min(maxWidth, video - 24));
   }
   return { width: Math.round(width), minWidth: Math.round(minWidth), maxWidth: Math.round(maxWidth) };
@@ -99,7 +104,9 @@ export function applyVenuePickupBox(el, viewportWidth, videoWidth = 0) {
       if (cls.includes('nlsb-pickup__badge') || cls.includes('nlsb-pickup__meta') || cls.includes('nlsb-pickup__grip')) {
         pairs.push(['white-space', 'nowrap'], ['flex-shrink', '0']);
       }
-      if (cls.includes('nlsb-pickup__body')) pairs.push(['font-size', '18px'], ['white-space', 'normal']);
+      if (cls.includes('nlsb-pickup__body')) {
+        pairs.push(['font-size', '18px'], ['white-space', 'nowrap'], ['text-overflow', 'ellipsis'], ['overflow', 'hidden'], ['display', 'block']);
+      }
       setOn(node, pairs);
     }
   }
@@ -193,9 +200,10 @@ export const VENUE_PICKUP_CSS = `
     width: auto !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-    overflow-wrap: break-word;
-    white-space: normal !important;
+    display: block !important;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+    white-space: nowrap !important;
     font-size: 18px !important;
     font-weight: 700;
   }
@@ -245,14 +253,14 @@ export function createVenuePickupBanner(doc) {
   face.setAttribute('alt', '');
   face.setAttribute('hidden', '');
 
-  // 本文の下に『ハンドル名 ・ ID:数値』の小さな行。数値IDはユーザーページへのリンク(a)、匿名はリンクなし。
+  // 名前の行を本文の上に置く（ニコ生・YouTube・ABEMA で同じ）。数値IDはユーザーページへのリンク(a)、匿名はリンクなし。
   const main = doc.createElement('span');
   main.className = 'nlsb-pickup__main';
   const body = doc.createElement('span');
   body.className = 'nlsb-pickup__body';
   const meta = doc.createElement('a');
   meta.className = 'nlsb-pickup__meta';
-  main.append(body, meta);
+  main.append(meta, body);
 
   root.append(badge, face, main);
   return { root, body, meta, face, main };
@@ -365,7 +373,7 @@ export function applyVenuePickupView(els, view) {
  * @returns {{ left:number, top:number, width:number } | null} 親の中での中心 x・上端・幅(映像が分からなければ null=CSS の既定)
  */
 export function venuePickupPlacement(video, layout, opts = {}) {
-  if (!video || !layout || !(video.width >= 240) || !(video.height >= 120)) return null;
+  if (!video || !layout || !(video.width >= VENUE_PICKUP_MAIN_VIDEO_MIN_PX) || !(video.height >= 120)) return null;
   const maxWidth = opts.maxWidth ?? 860;
   const minTop = opts.minTop ?? 20;
   const margin = opts.margin ?? 12;
