@@ -323,6 +323,30 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (req.method === 'GET' && req.query?.action === 'viewer') {
+      // 画面全体は送らず、「いま開いているか」と「中継できるか」だけ返す。OBSのスイッチがオンのとき、拡張がこれを見る。
+      let token = '';
+      if (req.headers?.['x-device-id']) {
+        const auth = await authenticateDevice(req.headers);
+        if (!auth) {
+          res.status(401).json({ ok: false, error: 'unauthorized' });
+          return;
+        }
+        token = auth.record.v;
+      } else if (process.env.STATUS_INGEST_KEY && req.headers?.['x-share-key'] === process.env.STATUS_INGEST_KEY) {
+        token = String(req.query?.v || '');
+        if (!VIEW_TOKEN_RE.test(token)) {
+          res.status(400).json({ ok: false, error: 'bad view token' });
+          return;
+        }
+      } else {
+        res.status(401).json({ ok: false, error: 'unauthorized' });
+        return;
+      }
+      res.status(200).json({ ok: true, viewerActive: await isViewerActive(token), realtime: isRealtimeEnabled() });
+      return;
+    }
+
     if (req.method === 'GET') {
       let token = String(req.query?.v || '');
       if (!VIEW_TOKEN_RE.test(token)) {

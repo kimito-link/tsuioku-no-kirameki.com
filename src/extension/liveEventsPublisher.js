@@ -6,6 +6,8 @@
  */
 import { createLiveEventSender } from '../lib/liveEventSender.js';
 import { KEY_LIVE_EVENTS_TAIL, KEY_LIVE_EVENTS_WANTED } from '../lib/liveEvents.js';
+import { obsBrowserSourceOrDefault } from '../lib/obsBrowserSource.js';
+import { KEY_LIVE_EVENTS_SENDER_BEAT, KEY_OBS_BROWSER_SOURCE } from '../lib/storageKeys.js';
 
 const TICK_MS = 1000;
 /** 期限のキーを書き直すのは、前に書いた値から30秒以上ずれたときだけ(全画面に配られる書き込みを減らす)。 */
@@ -41,10 +43,26 @@ export function createPcLiveEvents(getTarget) {
 
   function start() {
     if (timer) return;
+    let obsOn = false;
+    let beatAt = 0;
+    const readObs = (raw) => { obsOn = obsBrowserSourceOrDefault(raw).enabled; };
+    try {
+      void chrome.storage.local.get(KEY_OBS_BROWSER_SOURCE).then((b) => readObs(b?.[KEY_OBS_BROWSER_SOURCE])).catch(() => {});
+    } catch { /* 読めなければ印は置かない */ }
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes[KEY_LIVE_EVENTS_TAIL]) sender.ingest(changes[KEY_LIVE_EVENTS_TAIL].newValue);
+      if (area !== 'local') return;
+      if (changes[KEY_LIVE_EVENTS_TAIL]) sender.ingest(changes[KEY_LIVE_EVENTS_TAIL].newValue);
+      if (changes[KEY_OBS_BROWSER_SOURCE]) readObs(changes[KEY_OBS_BROWSER_SOURCE].newValue);
     });
-    timer = setInterval(() => { void sender.tick({ enabled: Date.now() < wantedUntilMs, nowMs: Date.now() }); }, TICK_MS);
+    timer = setInterval(() => {
+      const nowMs = Date.now();
+      // OBSへ送るスイッチがオンのあいだだけ印を置く。視聴ページの中継は、この印が新しいと送らない。
+      if (obsOn && nowMs - beatAt >= 5_000) {
+        beatAt = nowMs;
+        try { void chrome.storage.local.set({ [KEY_LIVE_EVENTS_SENDER_BEAT]: nowMs }).catch(() => {}); } catch { /* 印が無くても状態の送信は続ける */ }
+      }
+      void sender.tick({ enabled: Date.now() < wantedUntilMs, nowMs: Date.now() });
+    }, TICK_MS);
   }
 
   /**

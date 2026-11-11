@@ -163,6 +163,12 @@ Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリ�
 　　自分のスマホで画面を見る・読み上げを聞く・スマホからコメントする、の
 　　中継に使います。送るのはニコニコ生放送の画面だけです。サーバーに残るのは
 　　最新の1件だけで24時間で消え、OFFにするとサーバー上の内容も削除します。
+　… 「OBSのブラウザへ送る」を自分でONにしたときだけ、新しいコメント
+　　（表示名・アイコンのURL・本文・コメント番号・ユーザーID）を、OBSがその
+　　URLを開いているあいだだけ同じサーバーと中継（Ably）へ送ります。初期状態は
+　　OFFです。OFFにすると送信は止まります。URLを作り直すと古いURLは使えなく
+　　なります。過去のコメントは送りません。画面全体は送りません。パソコンの外に
+　　出したくないときは、透過窓のウィンドウキャプチャを使います。
 　　サポーターの契約の確認にも使います（サポーターのコードと、PCごとの
 　　ランダムな識別子だけを送ります）。
 ・検索補助（suggestqueries.google.com）
@@ -180,8 +186,8 @@ Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリ�
 ・offscreen … 大量コメントを安定して保存（ローカル保存の集約）
 ・host_permissions（*.nicovideo.jp、YouTube、Twitch、Kick、ふわっち、SHOWROOM、ミクチャ、TikTok）
 　… 開いている配信のコメントを読むため。記録はこのPCの中だけです（スマホで見るで送るのはニコ生の画面だけ）
-・host_permissions（app.tsuioku-no-kirameki.com） … 「📱 スマホで見る」をONにしたときの
-　送信先（初期状態はOFF）
+・host_permissions（app.tsuioku-no-kirameki.com） … 「📱 スマホで見る」または
+　「OBSのブラウザへ送る」をONにしたときの送信先（どちらも初期状態はOFF）
 ・host_permissions（suggestqueries.google.com） … 入力補助の候補取得
 ・host_permissions（127.0.0.1:50021） … 読み上げ ON 時のみ、このPC内の
 　VOICEVOX に音声合成を依頼（外部ネットワークへは出ません）

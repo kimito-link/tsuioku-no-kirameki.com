@@ -21,9 +21,23 @@ import {
   pickObsComeviewWatch
 } from '../lib/obsComeviewPage.js';
 import {
+  OBS_APP_ORIGIN,
+  buildObsBrowserSourceUrl,
+  obsBrowserSourceOrDefault,
+  toObsBrowserSourceRecord
+} from '../lib/obsBrowserSource.js';
+import {
+  getPublishCredentials,
+  maybeRegisterDevice,
+  refreshDeviceCredCache,
+  rotateDeviceViewToken
+} from './statusDeviceCred.js';
+import {
   KEY_COMEVIEW_WINDOW_GEOMETRY,
   KEY_LAST_WATCH_URL,
-  KEY_OBS_OVERLAY_STYLE
+  KEY_OBS_BROWSER_SOURCE,
+  KEY_OBS_OVERLAY_STYLE,
+  KEY_STATUS_UPLOAD_CONFIG
 } from '../lib/storageKeys.js';
 import { applyObsRowVisibility, mountObsOverlayStyle } from './obsOverlayApply.js';
 
@@ -205,6 +219,143 @@ function comeviewUrl(style, embedStyle) {
 /** @param {import('../lib/obsOverlayStyle.js').ObsOverlayStyle} style */
 function updateUrl(style) {
   field('obsUrl').value = comeviewUrl(style, true);
+  paintBrowserUrl(style);
+}
+
+/** @type {string} */
+let browserToken = '';
+/** @type {string} */
+let browserOrigin = OBS_APP_ORIGIN;
+/** あとから終わった準備が、オフを上書きしないようにする。 */
+let browserEpoch = 0;
+
+/** @param {string} text */
+function setBrowserStatus(text) {
+  const el = document.getElementById('obsBrowserStatus');
+  if (el) el.textContent = text;
+}
+
+/** @param {import('../lib/obsOverlayStyle.js').ObsOverlayStyle} style */
+function paintBrowserUrl(style) {
+  const box = document.getElementById('obsBrowserUrl');
+  if (!(box instanceof HTMLInputElement)) return;
+  if (!field('obsSend').checked || !browserToken) {
+    box.value = '';
+    return;
+  }
+  box.value = buildObsBrowserSourceUrl({ origin: browserOrigin, token: browserToken, style });
+}
+
+async function loadBrowserSend() {
+  const bag = await chrome.storage.local.get([KEY_OBS_BROWSER_SOURCE, KEY_STATUS_UPLOAD_CONFIG]);
+  const upload = bag?.[KEY_STATUS_UPLOAD_CONFIG] && typeof bag[KEY_STATUS_UPLOAD_CONFIG] === 'object'
+    ? bag[KEY_STATUS_UPLOAD_CONFIG]
+    : { appOrigin: OBS_APP_ORIGIN };
+  browserOrigin = String(upload.appOrigin || OBS_APP_ORIGIN);
+  await refreshDeviceCredCache(browserOrigin);
+  const creds = getPublishCredentials(upload);
+  browserToken = creds?.viewToken || '';
+  if (creds?.appOrigin) browserOrigin = creds.appOrigin;
+  const on = obsBrowserSourceOrDefault(bag?.[KEY_OBS_BROWSER_SOURCE]).enabled && Boolean(browserToken);
+  field('obsSend').checked = on;
+  paintBrowserUrl(readForm());
+  if (obsBrowserSourceOrDefault(bag?.[KEY_OBS_BROWSER_SOURCE]).enabled && !browserToken) {
+    setBrowserStatus('URLがまだありません。スイッチをもう一度オンにしてください。');
+  }
+}
+
+async function setBrowserSend(on) {
+  const epoch = ++browserEpoch;
+  const c = extensionChrome();
+  if (!c) {
+    field('obsSend').checked = false;
+    setBrowserStatus('このスイッチは、拡張を入れた Chrome で使います。');
+    return;
+  }
+  if (!on) {
+    try {
+      await chrome.storage.local.set({ [KEY_OBS_BROWSER_SOURCE]: toObsBrowserSourceRecord(false) });
+    } catch {
+      setBrowserStatus('オフにできませんでした。');
+      return;
+    }
+    paintBrowserUrl(readForm());
+    setBrowserStatus('送りません。OBSに貼ったURLがあっても、このパソコンからはコメントを出しません。');
+    return;
+  }
+  setBrowserStatus('準備しています。');
+  try {
+    const bag = await chrome.storage.local.get(KEY_STATUS_UPLOAD_CONFIG);
+    const upload = bag?.[KEY_STATUS_UPLOAD_CONFIG] && typeof bag[KEY_STATUS_UPLOAD_CONFIG] === 'object'
+      ? { ...bag[KEY_STATUS_UPLOAD_CONFIG] }
+      : { appOrigin: OBS_APP_ORIGIN };
+    if (!upload.appOrigin) upload.appOrigin = OBS_APP_ORIGIN;
+    await refreshDeviceCredCache(upload.appOrigin);
+    const pending = maybeRegisterDevice({ optedIn: true, uploadCfg: upload });
+    if (pending) await pending;
+    await refreshDeviceCredCache(upload.appOrigin);
+    const creds = getPublishCredentials(upload);
+    if (epoch !== browserEpoch) return;
+    if (!creds?.viewToken) {
+      field('obsSend').checked = false;
+      await chrome.storage.local.set({ [KEY_OBS_BROWSER_SOURCE]: toObsBrowserSourceRecord(false) });
+      setBrowserStatus('URLを用意できませんでした。通信を確かめて、もう一度オンにしてください。');
+      return;
+    }
+    browserToken = creds.viewToken;
+    browserOrigin = creds.appOrigin || upload.appOrigin;
+    if (epoch !== browserEpoch) return;
+    await chrome.storage.local.set({ [KEY_OBS_BROWSER_SOURCE]: toObsBrowserSourceRecord(true) });
+    if (epoch !== browserEpoch) {
+      await chrome.storage.local.set({ [KEY_OBS_BROWSER_SOURCE]: toObsBrowserSourceRecord(false) });
+      return;
+    }
+    field('obsSend').checked = true;
+    paintBrowserUrl(readForm());
+    setBrowserStatus('オンです。このURLをOBSのブラウザに貼ると、これから先のコメントが届きます。過去のコメントは送りません。');
+  } catch {
+    field('obsSend').checked = false;
+    setBrowserStatus('URLを用意できませんでした。通信を確かめて、もう一度オンにしてください。');
+  }
+}
+
+async function copyBrowserUrl() {
+  const url = field('obsBrowserUrl').value;
+  if (!url) {
+    setBrowserStatus('先に「OBSのブラウザへ送る」をオンにしてください。');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    setBrowserStatus('URLをコピーしました。OBSのブラウザソースに貼ってください。');
+  } catch {
+    field('obsBrowserUrl').focus();
+    field('obsBrowserUrl').select();
+    setBrowserStatus('コピーできませんでした。URLを選択してコピーしてください。');
+  }
+}
+
+async function rotateBrowserUrl() {
+  const c = extensionChrome();
+  if (!c) {
+    setBrowserStatus('URLの作り直しは、拡張を入れた Chrome で行います。');
+    return;
+  }
+  try {
+    await refreshDeviceCredCache(browserOrigin);
+    const next = await rotateDeviceViewToken();
+    if (!next) {
+      setBrowserStatus('URLを作り直せませんでした。');
+      return;
+    }
+    browserToken = next;
+    paintBrowserUrl(readForm());
+    setBrowserStatus(field('obsSend').checked
+      ? '新しいURLです。古いURLは使えなくなりました。'
+      : '古いURLは使えなくなりました。送るにはスイッチをオンにしてください。');
+  } catch {
+    setBrowserStatus('URLを作り直せませんでした。');
+  }
 }
 
 /** @type {number} */
@@ -283,6 +434,7 @@ async function loadStored() {
       stored: bag?.[KEY_OBS_OVERLAY_STYLE]
     });
     applyStyle(resolved.style, false);
+    await loadBrowserSend();
   } catch {
     setStatus('保存を読めませんでした。見本は既定の見た目です。');
   }
@@ -376,6 +528,15 @@ function main() {
   });
   document.getElementById('openBtn')?.addEventListener('click', () => {
     void openWindow();
+  });
+  document.getElementById('obsSend')?.addEventListener('change', () => {
+    void setBrowserSend(field('obsSend').checked);
+  });
+  document.getElementById('obsBrowserCopy')?.addEventListener('click', () => {
+    void copyBrowserUrl();
+  });
+  document.getElementById('obsRotate')?.addEventListener('click', () => {
+    void rotateBrowserUrl();
   });
   void loadStored();
 }

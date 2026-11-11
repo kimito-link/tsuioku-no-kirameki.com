@@ -631,6 +631,20 @@ export const KEY_COMEVIEW_WINDOW_GEOMETRY = 'nls_comeview_window_geometry_v1';
  */
 export const KEY_OBS_OVERLAY_STYLE = 'nls_obs_overlay_style_v1';
 
+/**
+ * 「OBSのブラウザへ送る」（v0.1.2040）。
+ * 値は `{ v: 1, enabled }`。v が 1 でない記録は読まない（オフに倒す）。
+ * 既定はオフ。オンのあいだだけ、OBSがそのURLを開いているとき新しいコメントを中継する。
+ * 正規化は src/lib/obsBrowserSource.js。
+ */
+export const KEY_OBS_BROWSER_SOURCE = 'nls_obs_browser_source_v1';
+
+/**
+ * 状態速報の送信担当が生きている印（epoch ms）。
+ * 「OBSのブラウザへ送る」がオンのときだけ送り手が書き、視聴ページの中継は新しい印があるあいだ送らない。
+ */
+export const KEY_LIVE_EVENTS_SENDER_BEAT = 'nls_live_events_sender_beat_v1';
+
 /** @param {unknown} raw */
 export function isOpSoundEnabled(raw) {
   return raw !== false; // 既定ON
