@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2091',
+    version: '0.1.2092',
     date: '2026-11-12',
     summary: '開いた直後と遅いPCで吹き出しが先に出ないように',
     items: Object.freeze([
