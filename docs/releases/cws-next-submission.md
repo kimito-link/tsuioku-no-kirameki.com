@@ -1,6 +1,12 @@
+# ★今回出す版(0.1.2101〜): ABEMA(`https://abema.tv/*`)とツイキャス(`https://twitcasting.tv/*`)を含め、0.1.1901 から Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA・ツイキャスのホスト権限が増える
+
+- 権限が増えるので、ダッシュボードの「パッケージ」から ZIP を手でアップロードする(AGENTS §2。API だと新しい権限の理由欄が出ない)。
+- 貼り直す欄: 単一用途(§1・758字)・ホスト権限の統合欄(§2-8z・925字)・「詳細な説明」(cws-store-listing.md の本文=description-ja.txt)。正本は [cws-submission-texts.md](cws-submission-texts.md)。個別の理由は §2-9c〜§2-9j。
+- `privacy.html` は §4-1c〜§4-1j と §5 に記載済み(最終更新 2026-11-12)。
+
 # ★0.1.2087〜: ツイキャス(`https://twitcasting.tv/*`)のホスト権限が増える
 
-- 提出時は単一用途(§1)とホスト権限の統合欄(§2-8z)にツイキャスを足し、個別の理由を [cws-submission-texts.md](cws-submission-texts.md) に1つ足すこと(まだ書いていない)。
+- 提出時は単一用途(§1)とホスト権限の統合欄(§2-8z)にツイキャスを足し、個別の理由を [cws-submission-texts.md](cws-submission-texts.md) に1つ足すこと(0.1.2101 で書いた)。
 - `privacy.html` は §4-1j と §5 に記載済み(2026-11-12)。読むのは配信ページと同じ口(streamserver.php・eventpubsuburl.php・ソケット)と、公開のサポーターランキング(/<user>/supporter)だけ。
 
 ---
