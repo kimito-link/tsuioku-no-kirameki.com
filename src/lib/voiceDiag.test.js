@@ -573,3 +573,20 @@ describe('resetVoiceDiagForNewLive(2026-10-28・コメビュの配信切替)', (
     expect(b.synthFailReasons).toEqual({});
   });
 });
+
+describe('buildVoiceDiagSnapshot(混雑時の読み上げの計器・0.1.2114)', () => {
+  it('つくり置き・合唱・選び方の数を状態の保存先へ写す(無ければ 0)', async () => {
+    const { buildVoiceDiagSnapshot } = await import('./voiceDiag.js');
+    const snap = buildVoiceDiagSnapshot({
+      clipHitTotal: 3, clipBusyKeepTotal: 1, clipStoreTotal: 7, clipKeys: 5, clipBytes: 1234,
+      chorusJoinTotal: 4, chorusPlayTotal: 2, chorusOverlayTotal: 3, chorusLearnTotal: 1, busyScoreKeepTotal: 6
+    }, 1000, 'lv1');
+    expect(snap).toMatchObject({
+      clipHitTotal: 3, clipBusyKeepTotal: 1, clipStoreTotal: 7, clipKeys: 5, clipBytes: 1234,
+      chorusJoinTotal: 4, chorusPlayTotal: 2, chorusOverlayTotal: 3, chorusLearnTotal: 1, busyScoreKeepTotal: 6
+    });
+    const empty = buildVoiceDiagSnapshot({}, 1000, 'lv1');
+    expect(empty.chorusJoinTotal).toBe(0);
+    expect(empty.clipHitTotal).toBe(0);
+  });
+});
