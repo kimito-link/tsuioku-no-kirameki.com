@@ -87,6 +87,16 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   ngMutedTotal: number,        // v0.1.1812: コメビュで NG にした人なので読まなかったコメント数(会場)
  *   busySkipTotal: number,       // v0.1.1861: 混雑(待ち2件以上)で大事でないので読まなかったコメント数(吹き出しだけ)
  *   busyImportantTotal: number,  // v0.1.1861: 混雑中でも大事なもの(ギフト・広告・配信者・初コメ)として読む列に入れた数
+ *   clipHitTotal: number,        // 0.1.2114: 覚えた声(voiceClipCache)で合成せずに鳴らす準備をした件数
+ *   clipBusyKeepTotal: number,   // 同上: 混雑中でも覚えた声があるので読んだ件数
+ *   clipStoreTotal: number,      // 同上: 声を覚えた件数
+ *   clipKeys: number,            // 同上: 今覚えている文の数(直近値)
+ *   clipBytes: number,           // 同上: 今覚えている声のバイト数(直近値)
+ *   chorusJoinTotal: number,     // 0.1.2114: 合唱(voiceChorus.js)に加わった件数
+ *   chorusPlayTotal: number,     // 同上: 声を重ねて鳴らした回数
+ *   chorusOverlayTotal: number,  // 同上: 重ねた声の数
+ *   chorusLearnTotal: number,    // 同上: 空いている時に作っておいた声の数
+ *   busyScoreKeepTotal: number,  // 0.1.2114: 混雑中に「質問」「まだ読まれていない人」の点で読んだ件数
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
  *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数
@@ -200,6 +210,16 @@ export function makeInitialVoiceDiag() {
     ngMutedTotal: 0,
     busySkipTotal: 0,
     busyImportantTotal: 0,
+    clipHitTotal: 0,
+    clipBusyKeepTotal: 0,
+    clipStoreTotal: 0,
+    clipKeys: 0,
+    clipBytes: 0,
+    chorusJoinTotal: 0,
+    chorusPlayTotal: 0,
+    chorusOverlayTotal: 0,
+    chorusLearnTotal: 0,
+    busyScoreKeepTotal: 0,
     refreshVoicedTotal: 0,
     backlogSkipTotal: 0,
     bigBatchTotal: 0,
@@ -352,6 +372,16 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     ngMutedTotal: num(d.ngMutedTotal, base.ngMutedTotal),
     busySkipTotal: num(d.busySkipTotal, base.busySkipTotal),
     busyImportantTotal: num(d.busyImportantTotal, base.busyImportantTotal),
+    clipHitTotal: num(d.clipHitTotal, base.clipHitTotal),
+    clipBusyKeepTotal: num(d.clipBusyKeepTotal, base.clipBusyKeepTotal),
+    clipStoreTotal: num(d.clipStoreTotal, base.clipStoreTotal),
+    clipKeys: num(d.clipKeys, base.clipKeys),
+    clipBytes: num(d.clipBytes, base.clipBytes),
+    chorusJoinTotal: num(d.chorusJoinTotal, base.chorusJoinTotal),
+    chorusPlayTotal: num(d.chorusPlayTotal, base.chorusPlayTotal),
+    chorusOverlayTotal: num(d.chorusOverlayTotal, base.chorusOverlayTotal),
+    chorusLearnTotal: num(d.chorusLearnTotal, base.chorusLearnTotal),
+    busyScoreKeepTotal: num(d.busyScoreKeepTotal, base.busyScoreKeepTotal),
     refreshVoicedTotal: num(d.refreshVoicedTotal, base.refreshVoicedTotal),
     backlogSkipTotal: num(d.backlogSkipTotal, base.backlogSkipTotal),
     bigBatchTotal: num(d.bigBatchTotal, base.bigBatchTotal),
