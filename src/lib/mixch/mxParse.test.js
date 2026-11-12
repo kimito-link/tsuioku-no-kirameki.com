@@ -3,6 +3,8 @@ import {
   parseMxUserIdFromUrl,
   mxIconFromRaw,
   mxIconsFromRanking,
+  mxProfileUrl,
+  parseMxProfileIcon,
   mxLiveInfoUrl,
   mxMessagesUrl,
   mxItemsUrls,
@@ -165,5 +167,19 @@ describe('mxIconFromRaw / mxIconsFromRanking(コメントにはアイコンが�
     const m = mxIconsFromRanking({ superfans: [{ id: 7, name: 'りんく', profile_image_url: ICON, score: 10 }, { id: 8, name: 'x', profile_image_url: '' }, null] });
     expect([...m]).toEqual([['7', ICON]]);
     expect(mxIconsFromRanking(null).size).toBe(0);
+  });
+});
+
+describe('mxProfileUrl / parseMxProfileIcon(ギフトもランキングも無い人のアイコン・2026-11-12 PC 実測)', () => {
+  const ICON = 'https://d2jtsb989t238a.cloudfront.net/p/18027637/1700000000/small';
+  it('口は /api-web/users/<id>/profile・番号でなければ空', () => {
+    expect(mxProfileUrl('18027637')).toBe('https://mixch.tv/api-web/users/18027637/profile');
+    expect(mxProfileUrl('abc')).toBe('');
+  });
+  it('実測の形 {id, name, profile_image_url} から画像を取る・別の人の応答や空は使わない', () => {
+    expect(parseMxProfileIcon({ id: 18027637, name: 'x', profile_image_url: ICON }, '18027637')).toBe(ICON);
+    expect(parseMxProfileIcon({ id: 1, name: 'x', profile_image_url: ICON }, '18027637')).toBe('');
+    expect(parseMxProfileIcon({ id: 18027637, name: 'x', profile_image_url: '' }, '18027637')).toBe('');
+    expect(parseMxProfileIcon(null, '18027637')).toBe('');
   });
 });

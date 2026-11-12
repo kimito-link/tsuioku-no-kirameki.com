@@ -302,6 +302,26 @@ export function mxIconFromRaw(raw) {
 }
 
 /**
+ * 人のプロフィール(アイコンだけの小さな口・ログイン不要・約120バイト・2026-11-12 PC 実測)。
+ *   ギフトもランキングも無い人のアイコンはここでしか分からない。画像 URL は /p/<id>/<変わる番号>/small なので id から作れない。
+ * @param {string} uid
+ */
+export function mxProfileUrl(uid) {
+  return isMxUserId(uid) ? `${MX_ORIGIN}/api-web/users/${uid}/profile` : '';
+}
+
+/**
+ * /api-web/users/<id>/profile → 画像 URL(無い・形が違う・別の人の応答なら '')
+ * @param {unknown} json
+ * @param {string} uid
+ */
+export function parseMxProfileIcon(json, uid) {
+  const o = obj(json);
+  if (!o || str(o.id) !== String(uid)) return '';
+  return safeMxImageUrl(o.profile_image_url);
+}
+
+/**
  * 今月のファンランキング → user_id → 画像 URL(人の番号のキーは id)
  * @param {unknown} json
  * @returns {Map<string, string>}

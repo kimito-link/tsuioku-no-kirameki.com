@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2080',
+    date: '2026-11-11',
+    summary: 'Twitch・Kick のギフトサブ順位も出す',
+    items: Object.freeze([
+      'Twitch と Kick の配信では、横の欄にそのサービス公式の「ギフトサブ ランキング」を出します。Bits・Kicks の順位とは別の欄で、Twitch はチャット欄の順位表と同じ期間、Kick は通算です。',
+      '順位と数は Twitch・Kick が出している値そのままです。ギフトサブの順位が空の配信では欄を出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2070',
     date: '2026-11-11',
     summary: 'ABEMAの会場の数字がすぐ新しくなる',

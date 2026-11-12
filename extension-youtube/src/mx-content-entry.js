@@ -27,6 +27,8 @@ import {
   buildMxStreamKey,
   mxIconFromRaw,
   mxIconsFromRanking,
+  mxProfileUrl,
+  parseMxProfileIcon,
 } from '../../src/lib/mixch/mxParse.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 try {
@@ -86,8 +88,13 @@ const diag = {
   /** ページがログイン画面へ移ったあとも記録を続けた回数・最後の時刻(0.1.2094〜・ソケットは追憶自身のものなので止める理由が無い) */
   loginPageKept: 0,
   loginPageAt: 0,
-  /** 0.1.2107: アイコンの無いコメントに、ギフトの行・ファンランキングで覚えた本人のアイコンを付けた数 */
+  /** 0.1.2108: アイコンの無いコメントに、ギフトの行・ファンランキング・プロフィールで分かった本人のアイコンを付けた数 */
   iconFilled: 0,
+  /** プロフィールを聞いた人数・アイコンが分かった人数・失敗/待ちきれなかった数 */
+  profileAsked: 0,
+  profileFound: 0,
+  profileFail: 0,
+  profileLate: 0,
   /**
    * 0.1.2106: 名前つきなのにアイコンが無い行の内わけ(りんく「自分でコメントうったけどゆっくり顔」・真因を記録で確かめる)。
    *   keyMissing=profile_image_url が無い / empty=空 / badHost=許していない置き場(hosts に置き場の名前だけ・URL は残さない)
@@ -258,7 +265,56 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     }
   };
   /** @param {any} raw @param {boolean} [again] 絵を待ったあと */
-  const take = (raw, again = false) => {
+  // ギフトもランキングも無い人は、コメントを最大1.5秒だけ待たせて本人のプロフィール(/api-web/users/<id>/profile)を1回聞く。
+  //   1配信で1人1回(分からなかった人も聞き直さない)・同時に聞くのは4人まで・1配信で最大1500人。
+  /** @type {Set<string>} */
+  const profileDone = new Set();
+  /** @type {Map<string, any[]>} */
+  const profileWait = new Map();
+  let profileInFlight = 0;
+  const PROFILE_WAIT_MS = 1500;
+  const releaseProfile = (/** @type {string} */ uid) => {
+    const list = profileWait.get(uid);
+    if (!list) return;
+    profileWait.delete(uid);
+    for (const raw of list) take(raw, true, true);
+  };
+  /** @returns {boolean} 待たせたら true */
+  const holdForProfile = (/** @type {string} */ uid, /** @type {any} */ raw) => {
+    const waiting = profileWait.get(uid);
+    if (waiting) {
+      waiting.push(raw);
+      return true;
+    }
+    if (profileInFlight >= 4 || diag.profileAsked >= 1500) return false;
+    profileWait.set(uid, [raw]);
+    profileInFlight += 1;
+    diag.profileAsked += 1;
+    const timer = setTimeout(() => {
+      if (profileWait.has(uid)) diag.profileLate += 1;
+      releaseProfile(uid);
+    }, PROFILE_WAIT_MS);
+    void getJson(mxProfileUrl(uid))
+      .then((json) => {
+        const url = parseMxProfileIcon(json, uid);
+        if (url) {
+          learnIcon(uid, url);
+          diag.profileFound += 1;
+        }
+      })
+      .catch(() => {
+        diag.profileFail += 1;
+      })
+      .finally(() => {
+        profileInFlight -= 1;
+        profileDone.add(uid);
+        clearTimeout(timer);
+        releaseProfile(uid);
+      });
+    return true;
+  };
+
+  const take = (raw, again = false, iconAsked = false) => {
     if (!again && raw?.item_id != null) {
       const it = items.get(String(raw.item_id));
       if (it && it.resourceId && !it.imageUrl && !it.imageTried) {
@@ -273,6 +329,10 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     if (kind === 10 && Number.isFinite(Number(raw?.viewer))) onViewers(Math.max(0, Math.floor(Number(raw.viewer))));
     const learned = mxIconFromRaw(raw);
     if (learned) learnIcon(learned[0], learned[1]);
+    if (!iconAsked && kind === 0 && Number(raw?.anonymous) !== 1) {
+      const cuid = String(raw?.user_id ?? '');
+      if (/^\d{1,15}$/.test(cuid) && !iconBook.has(cuid) && !profileDone.has(cuid) && !seen.has(`mx-${String(raw?.message_id ?? '')}`) && holdForProfile(cuid, raw)) return;
+    }
     const r = parseMxMessage(raw, { userId, items });
     if (r && !r.iconUrl && r.channelId.startsWith('mx:') && r.channelId !== 'mx:n:匿名') {
       const known = iconBook.get(r.channelId.slice(3));
