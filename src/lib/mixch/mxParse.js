@@ -286,6 +286,39 @@ export function parseMxRanking(json) {
   return out;
 }
 
+/**
+ * 人のアイコンの帳面に足す1件(ギフトの行など profile_image_url を持つ行から)。
+ *   ★コメント(kind 0)にはアイコンの項目が無い(2026-11-12 PC 実測: ソケット 13 件・messages 54 件とも profile_image_url のキー自体が無い)。
+ *   アイコンが来るのはギフトの行と今月のファンランキング(superfans[].id)だけなので、そこで覚えた人のアイコンをコメントに付ける。
+ * @param {unknown} raw
+ * @returns {[string, string] | null} [user_id, 画像 URL]
+ */
+export function mxIconFromRaw(raw) {
+  const c = obj(raw);
+  if (!c || Number(c.anonymous) === 1) return null;
+  const uid = str(c.user_id);
+  const url = safeMxImageUrl(c.profile_image_url);
+  return /^\d{1,15}$/.test(uid) && url ? [uid, url] : null;
+}
+
+/**
+ * 今月のファンランキング → user_id → 画像 URL(人の番号のキーは id)
+ * @param {unknown} json
+ * @returns {Map<string, string>}
+ */
+export function mxIconsFromRanking(json) {
+  const out = new Map();
+  const list = obj(json)?.superfans;
+  for (const r of Array.isArray(list) ? list : []) {
+    const row = obj(r);
+    const uid = str(row?.id);
+    const url = safeMxImageUrl(row?.profile_image_url);
+    if (/^\d{1,15}$/.test(uid) && url) out.set(uid, url);
+    if (out.size >= 500) break;
+  }
+  return out;
+}
+
 /** 配信キー: mx.<配信者の番号>.<live_session_id> @param {string} a @param {{ sessionId?: string | number | null }} [opts] */
 export function buildMxStreamKey(a, opts = {}) {
   const sid = String(opts.sessionId ?? '');

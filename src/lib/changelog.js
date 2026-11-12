@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2108',
+    date: '2026-11-12',
+    summary: 'ミクチャのコメントに本人のアイコン',
+    items: Object.freeze([
+      'ミクチャでコメントした人が、アイコンを持っていてもゆっくり顔で出ていました。ミクチャから届くコメントにはアイコンの項目が無く(ギフトとファンランキングにだけある)、それを使っていなかったためです。ギフトの行と今月のファンランキングで分かった本人のアイコンを、その人のコメントにも付けるようにしました。ギフトもランキング入りもしていない人は、これまでどおりゆっくり顔です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2106',
     date: '2026-11-12',
     summary: 'ミクチャの会場から送れない件',
@@ -197,14 +205,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Twitch と Kick の配信では、横の欄にそのサービス公式の「ギフトサブ ランキング」を出します。Bits・Kicks の順位とは別の欄で、Twitch はチャット欄の順位表と同じ期間、Kick は通算です。',
       '順位と数は Twitch・Kick が出している値そのままです。ギフトサブの順位が空の配信では欄を出しません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2070',
-    date: '2026-11-11',
-    summary: 'ABEMAの会場の数字がすぐ新しくなる',
-    items: Object.freeze([
-      'ABEMA の配信で、ページの視聴数やコメント数が増えたら、会場の帯にも10秒ほどで新しい数を出します(今までは開いたときの数が長く残ることがありました)。'
     ])
   })
 ]);

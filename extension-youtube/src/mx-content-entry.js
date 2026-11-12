@@ -25,6 +25,8 @@ import {
   parseMxMessage,
   parseMxRanking,
   buildMxStreamKey,
+  mxIconFromRaw,
+  mxIconsFromRanking,
 } from '../../src/lib/mixch/mxParse.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 try {
@@ -84,6 +86,8 @@ const diag = {
   /** ページがログイン画面へ移ったあとも記録を続けた回数・最後の時刻(0.1.2094〜・ソケットは追憶自身のものなので止める理由が無い) */
   loginPageKept: 0,
   loginPageAt: 0,
+  /** 0.1.2107: アイコンの無いコメントに、ギフトの行・ファンランキングで覚えた本人のアイコンを付けた数 */
+  iconFilled: 0,
   /**
    * 0.1.2106: 名前つきなのにアイコンが無い行の内わけ(りんく「自分でコメントうったけどゆっくり顔」・真因を記録で確かめる)。
    *   keyMissing=profile_image_url が無い / empty=空 / badHost=許していない置き場(hosts に置き場の名前だけ・URL は残さない)
@@ -190,6 +194,13 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
   let pending = [];
   /** @type {Set<string>} */
   const seen = new Set();
+  // 人のアイコンの帳面(コメントにはアイコンが来ないので、ギフトの行と今月のファンランキングで覚えた分を付ける・mxIconFromRaw)
+  /** @type {Map<string, string>} */
+  const iconBook = new Map();
+  const learnIcon = (/** @type {string} */ uid, /** @type {string} */ url) => {
+    if (iconBook.size >= 3000 && !iconBook.has(uid)) iconBook.delete(/** @type {string} */ (iconBook.keys().next().value));
+    iconBook.set(uid, url);
+  };
   /** @type {Map<string, import('../../src/lib/mixch/mxParse.js').MxItem>} */
   let items = new Map();
 
@@ -260,7 +271,16 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     if (stopped) return;
     const kind = mxKindOf(raw);
     if (kind === 10 && Number.isFinite(Number(raw?.viewer))) onViewers(Math.max(0, Math.floor(Number(raw.viewer))));
+    const learned = mxIconFromRaw(raw);
+    if (learned) learnIcon(learned[0], learned[1]);
     const r = parseMxMessage(raw, { userId, items });
+    if (r && !r.iconUrl && r.channelId.startsWith('mx:') && r.channelId !== 'mx:n:匿名') {
+      const known = iconBook.get(r.channelId.slice(3));
+      if (known) {
+        r.iconUrl = known;
+        diag.iconFilled += 1;
+      }
+    }
     if (!r) {
       if (kind === 0 || raw?.item_id != null) diag.dropped += 1;
       return;
@@ -295,7 +315,9 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
   };
 
   const loadBoard = async () => {
-    const rows = parseMxRanking(await tryJson(mxRankingUrl(userId)));
+    const json = await tryJson(mxRankingUrl(userId));
+    for (const [uid, url] of mxIconsFromRanking(json)) learnIcon(uid, url);
+    const rows = parseMxRanking(json);
     boardAt = Date.now();
     if (stopped || !rows.length) return;
     diag.boardRows = rows.length;
@@ -308,6 +330,11 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     const rows = mxMessageRows(await tryJson(mxMessagesUrl(userId)));
     if (stopped) return;
     diag.backlog += rows.length;
+    // 先に全行からアイコンを覚える(ギフトより前に書かれたコメントにも付くように)
+    for (const r of rows) {
+      const learned = mxIconFromRaw(r);
+      if (learned) learnIcon(learned[0], learned[1]);
+    }
     rows.forEach((r) => take(r));
   };
 
@@ -365,9 +392,12 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
   void (async () => {
     await loadItems();
     if (stopped) return;
+    // ファンランキングを先に読む(コメントにはアイコンが来ないので、開いた時点の分にもランキングのアイコンを付けるため)。
+    //   読めなくても待ちすぎない(読み込みは fetchTimeout で打ち切られる)
+    await loadBoard().catch(() => {});
+    if (stopped) return;
     connect();
     void loadBacklog();
-    void loadBoard();
   })();
 
   return () => {
