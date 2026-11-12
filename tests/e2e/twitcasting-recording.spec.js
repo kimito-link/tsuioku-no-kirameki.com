@@ -238,7 +238,7 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   await expect.poll(() => chip('totalViews'), { timeout: 45_000 }).toContain('4,567');
   // ギフト貢献度の欄はツイキャス公式のサポーターランキング(スコア)
   await expect.poll(bodyText, { timeout: 30_000 }).toContain('90,815 スコア');
-  expect(await bodyText()).toContain('ツイキャス 公式の サポーターランキング（現在のレベル）');
+  expect(await bodyText()).toContain('ツイキャス 公式のサポーターランキング（現在のレベル）');
   expect(await bodyText()).not.toContain('チャット欄');
   // 段の案内・「該当者なし」にニコ生の数値ID・匿名(a:)の話を残さない(2026-11-12 実ページで発見)
   expect(await bodyText()).not.toMatch(/数値ユーザーID|数値ID|匿名（a:）/);

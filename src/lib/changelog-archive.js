@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2085',
+    date: '2026-11-11',
+    summary: 'ミクチャの数字をページの言葉に',
+    items: Object.freeze([
+      'ミクチャの配信で「スーパーファン」を、ページと同じ「ガチファン」と書くようにしました。ライバーランクの欄は、ランクの記号の横に出ているポイントなので「ライバーランクpt」にしました。',
+      'ミクチャのイベントptは、ページに出ている数とそろわないことがあったので出さないようにしました(イベント順位は出します)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2081',
     date: '2026-11-11',
     summary: 'SHOWROOM等のイベント順位を出す',

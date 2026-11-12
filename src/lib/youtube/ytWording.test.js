@@ -151,6 +151,22 @@ describe('公式ランキングの期間・名前・数の区切り(2026-11-08 P
     expect(officialWords({ ...tw, boardPeriod: 'WEEK' }).heading).toBe('Twitch 公式の Bits ランキング（今週）');
     expect(officialWords({ ...tw, boardPeriod: '' }).heading).toBe('Twitch 公式の Bits ランキング（累計）');
   });
+  it('TikTok は「この配信」の視聴者ランキング(ギフトの累計ではない・日本語の名前の前に空白を入れない)', async () => {
+    const { officialWords, ytWordingPlatformFixed } = await import('./ytWording.js');
+    const { STREAM_PLATFORMS } = await import('../platform/streamPlatform.js');
+    const tt = { ...STREAM_PLATFORMS.tiktok, boardPeriod: 'STREAM' };
+    const off = officialWords(tt);
+    expect(off.heading).toBe('TikTok 公式の視聴者ランキング（この配信）');
+    expect(off.sentence).toContain('（この配信・上位）');
+    expect(off.sentence).not.toContain('累計');
+    expect(ytWordingPlatformFixed(off.heading, tt)).not.toContain('公式の視聴者ランキング');
+  });
+  it('ギフト履歴のレーンにニコ生の言葉(番組・投げ回数)を残さない', () => {
+    expect(ytWording('この番組へのギフト履歴')).toBe('この配信へのギフト履歴');
+    expect(ytWording('ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。')).toBe(
+      'ユーザー別（多い順・最大10）。このPCで記録したギフトから数えます。',
+    );
+  });
 });
 
 describe('折りたたみの中のニコ生だけの説明(2026-11-08 Twitch 実測)', () => {
@@ -181,7 +197,7 @@ describe('ミクチャ・SHOWROOM の公式ランキングの単位と期間(202
     const mx = { ...STREAM_PLATFORMS.mixch, boardPeriod: 'MONTH' };
     expect(ytWordingPlatformOfficial(ytWording('6,430貢', { topFans: true }), mx)).toBe('6,430 pt');
     expect(ytWordingPlatformOfficial(ytWording('6430貢', { topFans: true }), STREAM_PLATFORMS.showroom)).toBe('6,430 pt');
-    expect(officialWords(mx).heading).toBe('ミクチャ 公式の ギフト ランキング（今月）');
+    expect(officialWords(mx).heading).toBe('ミクチャ 公式のギフトランキング（今月）');
     expect(officialWords(mx).sentence).toContain('今月・上位');
   });
 });
