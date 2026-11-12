@@ -5220,6 +5220,9 @@ export function mountVenueBarButton(options = {}) {
     hasRenderedNonEmpty = false;
     liveRoster.clear(); // v0.1.754: 在席も持ち越さない(再オープンで storage から再 hydrate)
     pickupRing = []; // ピックアップ枠の入力も前配信から持ち越さない
+    // 枠の表示も空に戻す。読み上げ ON の間は updatePickupBanner が声を待って何もしないため、
+    //   移った先でコメントが来ないと前の配信の PICK UP が出たままだった(2026-11-12 TikTok でページ内の配信移動)
+    try { applyVenuePickupView(pickupEls, buildVenuePickupView(null)); } catch { /* 枠の失敗で切替を止めない */ }
     cheerPrevCount = null; // お祝いの基準も取り直す(前配信の件数を持ち越して祝わない)
     clearBubbles();
   };
