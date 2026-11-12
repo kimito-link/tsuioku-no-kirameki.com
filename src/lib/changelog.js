@@ -18,13 +18,22 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2093',
+    version: '0.1.2097',
     date: '2026-11-12',
     summary: 'YouTube などの会場でギフト音を確実に鳴らす',
     items: Object.freeze([
       'YouTube の会場で、ギフト・広告・順位の効果音が「Unsafe attempt to load URL」で読み込めないことがありました。会場を出した後に効果音を裏で1本ずつ先読みし、最初の1回目からページの中だけで鳴らすようにしました（キャラの絵と同じやり方）。',
       'Twitch・Kick・ツイキャスなど、同じ会場を使うほかのサービスにも同じ直しが入ります。'
     ])
+  }),
+  Object.freeze({
+    version: '0.1.2095',
+    date: '2026-11-12',
+    summary: 'Kick・ふわっちのコメントを早く記録',
+    items: Object.freeze([
+      'Kick の配信を開いたとき、チャット欄にすでに出ているコメント(過去ログ)も記録に入れるようにしました。今までは開いた後に来たコメントだけだったので、コメントがゆっくりの配信では開いた直後に「記録 0」のまま見えていました。つながりが切れてつなぎ直したときも、その間のコメントを過去ログから拾います。',
+      'ふわっちのコメントを読む間隔を5秒から2秒にしました。コメントが記録に入るまでの遅れが約半分になります。',
+    ]),
   }),
   Object.freeze({
     version: '0.1.2089',
@@ -207,15 +216,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ABEMA の PICK UP が細い枠のままだと本文が2行になり、名前が下で省略されていました。ニコ生・YouTube と同じく、窓と大きな映像の幅（最大860px）で出します。コメント欄や小さい映像の幅には合わせません。',
       '名前を本文の上の行に出し、本文は1行にします。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2051',
-    date: '2026-11-11',
-    summary: 'ABEMAのロゴ全体と視聴数',
-    items: Object.freeze([
-      'チャンネルロゴは横長です。円で中央だけ切ると白い文字が円いっぱいになり、空の白い丸に見えていました。ロゴ全体が円の中に入るようにしました。',
-      '番組表の応答にある、いま放送中の枠の視聴数を「視聴数」として出します。次の枠の空の数では置き換えません。'
     ])
   })
 ]);

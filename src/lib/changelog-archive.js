@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2051',
+    date: '2026-11-11',
+    summary: 'ABEMAのロゴ全体と視聴数',
+    items: Object.freeze([
+      'チャンネルロゴは横長です。円で中央だけ切ると白い文字が円いっぱいになり、空の白い丸に見えていました。ロゴ全体が円の中に入るようにしました。',
+      '番組表の応答にある、いま放送中の枠の視聴数を「視聴数」として出します。次の枠の空の数では置き換えません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2047',
     date: '2026-11-11',
     summary: '公式ランキングの説明を残す',
