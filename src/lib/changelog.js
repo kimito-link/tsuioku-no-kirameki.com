@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2095',
+    date: '2026-11-12',
+    summary: 'Kick・ふわっちのコメントを早く記録',
+    items: Object.freeze([
+      'Kick の配信を開いたとき、チャット欄にすでに出ているコメント(過去ログ)も記録に入れるようにしました。今までは開いた後に来たコメントだけだったので、コメントがゆっくりの配信では開いた直後に「記録 0」のまま見えていました。つながりが切れてつなぎ直したときも、その間のコメントを過去ログから拾います。',
+      'ふわっちのコメントを読む間隔を5秒から2秒にしました。コメントが記録に入るまでの遅れが約半分になります。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2089',
     date: '2026-11-12',
     summary: 'ツイキャスの有料ギフトの人も欄に並べる',
@@ -207,14 +216,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'チャンネルロゴは横長です。円で中央だけ切ると白い文字が円いっぱいになり、空の白い丸に見えていました。ロゴ全体が円の中に入るようにしました。',
       '番組表の応答にある、いま放送中の枠の視聴数を「視聴数」として出します。次の枠の空の数では置き換えません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2047',
-    date: '2026-11-11',
-    summary: '公式ランキングの説明を残す',
-    items: Object.freeze([
-      'YouTube・Twitch・Kick の公式ランキングの説明を、このPCの記録の文で消さないようにしました。Kick では「歴代トップKICKユーザー」と同じ値、と出ます。'
     ])
   })
 ]);
