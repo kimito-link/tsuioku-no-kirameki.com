@@ -50,14 +50,102 @@ export function classifyVoiceImportance(input) {
 }
 
 /**
+ * 2026-11-12(会議の第3段): 混雑中の「大事でない」コメントの点数。
+ *   視聴者委員の決まり: 課金・ランキング・常連は足さない(ギフトは既に必ず読むので二重の優遇になる)。
+ *   上げるのは「配信者への質問」と「この配信でまだ一度も声で読まれていない人」だけ。
+ * @param {{ text?: unknown, neverVoiced?: boolean }} input
+ * @returns {number}
+ */
+export function scoreVoiceWhenBusy(input) {
+  let score = 0;
+  if (isVoiceQuestionText(input?.text)) score += VOICE_BUSY_SCORE_QUESTION;
+  if (input?.neverVoiced === true) score += VOICE_BUSY_SCORE_NEVER_VOICED;
+  return score;
+}
+
+/** 質問の点。 */
+export const VOICE_BUSY_SCORE_QUESTION = 2;
+/** まだ一度も読まれていない人の点。 */
+export const VOICE_BUSY_SCORE_NEVER_VOICED = 2;
+/** 待ちがこの件数以上なら、両方そろった件(4点)だけ読む。それ未満の混雑なら2点で読む。 */
+export const VOICE_BUSY_DEEP_QUEUE_MIN = 4;
+
+/**
+ * 配信者に聞いている文か(？で終わる・「〜ですか」等で終わる)。
+ * @param {unknown} text
+ * @returns {boolean}
+ */
+export function isVoiceQuestionText(text) {
+  if (typeof text !== 'string') return false;
+  const t = text.trim().replace(/[\s\u3000!！。、…~〜wｗ笑]+$/u, '');
+  if (!t) return false;
+  if (/[?？]$/u.test(text.trim().replace(/[\s\u3000]+$/u, ''))) return true;
+  return /(ですか|ますか|でしょうか|ません?か|かな|なに|何|なんで|どこ|いつ|だれ|誰|どう|どれ)$/u.test(t);
+}
+
+/**
  * 混雑していて、かつ大事でないなら読まない。
- * @param {{ queueLength?: unknown, importance?: VoiceImportance }} input
+ *   2026-11-12: score(scoreVoiceWhenBusy)を渡すと、混雑が浅い間(待ち2〜3件)は2点以上、
+ *   深い間(待ち4件以上)は4点以上の件も読む。score を渡さなければ従来どおり。読む順番は変えない。
+ * @param {{ queueLength?: unknown, importance?: VoiceImportance, score?: unknown }} input
  * @returns {boolean} true=読まない(吹き出しだけ)
  */
 export function shouldSkipVoiceWhenBusy(input) {
   const n = Number(input?.queueLength);
   const busy = Number.isFinite(n) && n >= VOICE_BUSY_QUEUE_MIN;
-  return busy && !input?.importance;
+  if (!busy || input?.importance) return false;
+  const score = Number(input?.score);
+  if (!Number.isFinite(score) || score <= 0) return true;
+  const need = n >= VOICE_BUSY_DEEP_QUEUE_MIN
+    ? VOICE_BUSY_SCORE_QUESTION + VOICE_BUSY_SCORE_NEVER_VOICED
+    : Math.min(VOICE_BUSY_SCORE_QUESTION, VOICE_BUSY_SCORE_NEVER_VOICED);
+  return score < need;
+}
+
+/** @returns {{ liveId: string, voiced: Set<string> }} */
+export function createVoiceVoicedState() {
+  return { liveId: '', voiced: new Set() };
+}
+
+/**
+ * この配信で声で読まれた人を覚える(配信が変わったら数え直す・人数は有界)。
+ * @param {{ liveId: string, voiced: Set<string> }} state
+ * @param {unknown} liveId
+ * @param {unknown} userKey
+ */
+export function noteVoiceVoiced(state, liveId, userKey) {
+  if (!state || !(state.voiced instanceof Set)) return;
+  syncVoicedLive(state, liveId);
+  const key = String(userKey ?? '').trim();
+  if (!key || state.voiced.has(key)) return;
+  if (state.voiced.size >= VOICE_FIRST_SPEAKER_CAP) {
+    const oldest = state.voiced.values().next().value;
+    if (oldest !== undefined) state.voiced.delete(oldest);
+  }
+  state.voiced.add(key);
+}
+
+/**
+ * この配信でまだ一度も声で読まれていない人か。
+ * @param {{ liveId: string, voiced: Set<string> }} state
+ * @param {unknown} liveId
+ * @param {unknown} userKey
+ * @returns {boolean}
+ */
+export function isVoiceNeverVoiced(state, liveId, userKey) {
+  if (!state || !(state.voiced instanceof Set)) return false;
+  syncVoicedLive(state, liveId);
+  const key = String(userKey ?? '').trim();
+  return !!key && !state.voiced.has(key);
+}
+
+/** @param {{ liveId: string, voiced: Set<string> }} state @param {unknown} liveId */
+function syncVoicedLive(state, liveId) {
+  const lv = String(liveId ?? '').trim().toLowerCase();
+  if (lv && lv !== state.liveId) {
+    state.liveId = lv;
+    state.voiced.clear();
+  }
 }
 
 /**

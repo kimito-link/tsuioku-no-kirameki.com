@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  scoreVoiceWhenBusy,
+  isVoiceQuestionText,
+  createVoiceVoicedState,
+  noteVoiceVoiced,
+  isVoiceNeverVoiced,
   classifyVoiceImportance,
   createVoiceFirstSpeakerState,
   noteVoiceSpeakerInLive,
@@ -77,5 +82,50 @@ describe('noteVoiceSpeakerInLive', () => {
     expect(st.seen.size).toBe(VOICE_FIRST_SPEAKER_CAP);
     expect(st.seen.has('u:0')).toBe(false);
     expect(st.seen.has(`u:${VOICE_FIRST_SPEAKER_CAP + 4}`)).toBe(true);
+  });
+});
+
+// 2026-11-12(会議の第3段): 混雑中の選び方を点数で。
+
+describe('isVoiceQuestionText', () => {
+  it('配信者への質問を見分ける', () => {
+    for (const t of ['今日何時まで？', '元気ですか', 'それって何?', '次なにやるんですか！', 'どこ', '晩ごはん何']) {
+      expect(isVoiceQuestionText(t)).toBe(true);
+    }
+    for (const t of ['888', 'かわいいw', 'ありがとう!', 'まじか', '', null]) {
+      expect(isVoiceQuestionText(t)).toBe(false);
+    }
+  });
+});
+
+describe('scoreVoiceWhenBusy / shouldSkipVoiceWhenBusy(点数つき)', () => {
+  it('質問・まだ読まれていない人に点を付ける(課金や常連は数えない)', () => {
+    expect(scoreVoiceWhenBusy({ text: '何時まで？', neverVoiced: false })).toBe(2);
+    expect(scoreVoiceWhenBusy({ text: 'こんばんは', neverVoiced: true })).toBe(2);
+    expect(scoreVoiceWhenBusy({ text: '何時まで？', neverVoiced: true })).toBe(4);
+    expect(scoreVoiceWhenBusy({ text: '888', neverVoiced: false })).toBe(0);
+  });
+  it('浅い混雑(待ち2〜3件)は2点で読み、深い混雑(4件以上)は4点だけ読む', () => {
+    expect(shouldSkipVoiceWhenBusy({ queueLength: 2, importance: '', score: 2 })).toBe(false);
+    expect(shouldSkipVoiceWhenBusy({ queueLength: 3, importance: '', score: 0 })).toBe(true);
+    expect(shouldSkipVoiceWhenBusy({ queueLength: 4, importance: '', score: 2 })).toBe(true);
+    expect(shouldSkipVoiceWhenBusy({ queueLength: 6, importance: '', score: 4 })).toBe(false);
+  });
+  it('点を渡さなければ従来どおり・混んでいなければ読む・大事なものは読む', () => {
+    expect(shouldSkipVoiceWhenBusy({ queueLength: 2, importance: '' })).toBe(true);
+    expect(shouldSkipVoiceWhenBusy({ queueLength: 1, importance: '', score: 0 })).toBe(false);
+    expect(shouldSkipVoiceWhenBusy({ queueLength: 8, importance: 'gift', score: 0 })).toBe(false);
+  });
+});
+
+describe('noteVoiceVoiced / isVoiceNeverVoiced', () => {
+  it('読まれた人を配信ごとに覚え、配信が変わったら数え直す', () => {
+    const st = createVoiceVoicedState();
+    expect(isVoiceNeverVoiced(st, 'lv1', 'a')).toBe(true);
+    noteVoiceVoiced(st, 'lv1', 'a');
+    expect(isVoiceNeverVoiced(st, 'lv1', 'a')).toBe(false);
+    expect(isVoiceNeverVoiced(st, 'lv1', 'b')).toBe(true);
+    expect(isVoiceNeverVoiced(st, 'lv2', 'a')).toBe(true);
+    expect(isVoiceNeverVoiced(st, 'lv2', '')).toBe(false);
   });
 });

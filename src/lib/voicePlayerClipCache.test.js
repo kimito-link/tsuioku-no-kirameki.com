@@ -95,7 +95,9 @@ describe('VoicePlayer 声のつくり置き', () => {
     expect(onDropped).not.toHaveBeenCalled();
     expect(player.diag.clipBusyKeepTotal).toBe(1);
     expect(player.queue.some((q) => q.userKey === 'aa')).toBe(true);
-    // 覚えていない2回目のふつうのコメントは今までどおり読まない。
+    // 覚えていない2回目のふつうのコメント(一度読まれた人)は今までどおり読まない。
+    player._voicedState.liveId = 'lv1';
+    player._voicedState.voiced.add('x1');
     const onDropped2 = vi.fn();
     player.enqueue([{ kind: 'comment', userId: 'x1', nickname: 'X', text: 'まだ覚えてない', liveId: 'lv1', onDropped: onDropped2 }]);
     expect(onDropped2).toHaveBeenCalledTimes(1);

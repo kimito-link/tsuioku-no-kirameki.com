@@ -66,6 +66,9 @@ describe('VoicePlayer 混雑時は大事なものだけ読む', () => {
     await fillQueueWithTwoWaiting();
     expect(player.queue.length).toBeGreaterThanOrEqual(2);
     const before = player.queue.length;
+    // 2026-11-12: まだ一度も読まれていない人は点で読むので、a は読まれたことにしておく。
+    player._voicedState.liveId = 'lv1';
+    player._voicedState.voiced.add('a');
     const onDropped = vi.fn();
     player.enqueue([{ kind: 'comment', userId: 'a', nickname: 'A', text: 'また来た', liveId: 'lv1', onDropped }]);
     expect(onDropped).toHaveBeenCalledTimes(1);
@@ -97,5 +100,59 @@ describe('VoicePlayer 混雑時は大事なものだけ読む', () => {
     player.enqueue([{ kind: 'comment', userId: 'a', nickname: 'A', text: 'いち', liveId: 'lv1' }]);
     player.enqueue([{ kind: 'comment', userId: 'a', nickname: 'A', text: 'に', liveId: 'lv1' }]);
     expect(player.diag.busySkipTotal || 0).toBe(0);
+  });
+});
+
+describe('VoicePlayer 混雑中の選び方(点数・2026-11-12)', () => {
+  function makePlayer() {
+    return new VoicePlayer({
+      storage: { get: vi.fn().mockResolvedValue({}), set: vi.fn().mockResolvedValue() },
+      isObsMode: () => false,
+      audioConstructor: function () {
+        return { addEventListener: vi.fn(), removeEventListener: vi.fn(), play: vi.fn().mockResolvedValue(), pause: vi.fn() };
+      },
+      createObjectURL: vi.fn().mockReturnValue('blob:test'),
+      revokeObjectURL: vi.fn(),
+      fetchVoicevoxAlive: vi.fn().mockResolvedValue(true),
+      fetchVoiceStyleIds: vi.fn().mockResolvedValue([1, 2, 3]),
+      fetchSynthesizeVoice: vi.fn(() => new Promise(() => {})),
+      resolveVoice: vi.fn().mockReturnValue({ speaker: 1, speedOffset: 0 })
+    });
+  }
+
+  it('まだ一度も声で読まれていない人の2回目は、浅い混雑なら読む。質問も読む', async () => {
+    const player = makePlayer();
+    await player.enable({ persist: false });
+    player.enqueue([
+      { kind: 'comment', userId: 'a', nickname: 'A', text: 'いち', liveId: 'lv1' },
+      { kind: 'comment', userId: 'b', nickname: 'B', text: 'に', liveId: 'lv1' },
+      { kind: 'comment', userId: 'c', nickname: 'C', text: 'さん', liveId: 'lv1' }
+    ]);
+    await new Promise((r) => setTimeout(r, 5));
+    const before = player.queue.length;
+    expect(before).toBeGreaterThanOrEqual(2);
+    expect(before).toBeLessThan(4);
+    // b はまだ声で読まれていない(合成が終わらない)=2点で浅い混雑なら読む
+    player.enqueue([{ kind: 'comment', userId: 'b', nickname: 'B', text: 'またきた', liveId: 'lv1' }]);
+    expect(player.diag.busyScoreKeepTotal).toBe(1);
+    expect(player.diag.busySkipTotal || 0).toBe(0);
+  });
+
+  it('一度読まれた人のふつうの2回目は、混雑中は読まない(従来どおり)', async () => {
+    const player = makePlayer();
+    await player.enable({ persist: false });
+    player.enqueue([
+      { kind: 'comment', userId: 'a', nickname: 'A', text: 'いち', liveId: 'lv1' },
+      { kind: 'comment', userId: 'b', nickname: 'B', text: 'に', liveId: 'lv1' },
+      { kind: 'comment', userId: 'c', nickname: 'C', text: 'さん', liveId: 'lv1' }
+    ]);
+    await new Promise((r) => setTimeout(r, 5));
+    player._voicedState.liveId = 'lv1';
+    player._voicedState.voiced.add('b');
+    player.enqueue([{ kind: 'comment', userId: 'b', nickname: 'B', text: 'またきた', liveId: 'lv1' }]);
+    expect(player.diag.busySkipTotal).toBe(1);
+    // ただし質問なら読む
+    player.enqueue([{ kind: 'comment', userId: 'b', nickname: 'B', text: '今日は何時まで？', liveId: 'lv1' }]);
+    expect(player.diag.busyScoreKeepTotal).toBe(1);
   });
 });

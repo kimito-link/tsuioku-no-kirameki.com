@@ -70,7 +70,11 @@ import { decideVoiceGpuTip, decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
   classifyVoiceImportance,
   createVoiceFirstSpeakerState,
+  createVoiceVoicedState,
+  isVoiceNeverVoiced,
   noteVoiceSpeakerInLive,
+  noteVoiceVoiced,
+  scoreVoiceWhenBusy,
   shouldSkipVoiceWhenBusy,
   VOICE_BUSY_QUEUE_MIN,
   voicePriorityForImportance
@@ -248,6 +252,8 @@ export class VoicePlayer {
     this._arrivalWindowState = null;
     // v0.1.1861: 「その配信で初めてのコメント」を覚える(混雑時は大事なものだけ読む)。
     this._firstSpeakerState = createVoiceFirstSpeakerState();
+    // 2026-11-12(会議の第3段): この配信で声で読まれた人(まだ一度も読まれていない人を混雑中も読むため)。
+    this._voicedState = createVoiceVoicedState();
     this._dropCountGateTotal = 0;
     this._dropHeadStaleTotal = 0;
     this._dropSweepStaleTotal = 0;
@@ -270,6 +276,8 @@ export class VoicePlayer {
       // 2026-11-12計器(合唱): chorusJoinTotal=合唱に加わった件数、chorusPlayTotal=声を重ねて鳴らした回数、
       //   chorusOverlayTotal=重ねた声の数、chorusLearnTotal=空いている時に作っておいた声の数。
       chorusJoinTotal: 0, chorusPlayTotal: 0, chorusOverlayTotal: 0, chorusLearnTotal: 0,
+      // 2026-11-12計器(選び方): busyScoreKeepTotal=混雑中に「質問」「まだ読まれていない人」の点で読んだ件数。
+      busyScoreKeepTotal: 0,
       // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
       //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
       //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
@@ -803,6 +811,7 @@ export class VoicePlayer {
       return hit ? hit.wav : null;
     });
     if (overlays.length === 0) return;
+    for (const o of overlays) { try { noteVoiceVoiced(this._voicedState, item.liveId, o.userKey); } catch { /* no-op */ } }
     this.diag.chorusPlayTotal = (Number(this.diag.chorusPlayTotal) || 0) + 1;
     this.diag.chorusOverlayTotal = (Number(this.diag.chorusOverlayTotal) || 0) + overlays.length;
     const generation = this.generation;
@@ -1581,6 +1590,10 @@ export class VoicePlayer {
               // v0.1.771: 実際に再生が始まった瞬間だけ通知(drop/merge/失敗では呼ばれない)。
               //   吹き出しはここで speaking になり、onAudioEnd まで消えない。
               if (typeof item.onAudioStart === 'function') item.onAudioStart();
+              // 2026-11-12: 声で読まれた人を覚える(合唱で声が重なった仲間は _playChorusOverlays で数える)。
+              try {
+                noteVoiceVoiced(this._voicedState, item.liveId, item.userKey);
+              } catch { /* no-op */ }
               // 2026-11-12(合唱): 仲間の声を重ねる(覚えた声がある人だけ・合成しない)。
               try { this._playChorusOverlays(item, boostAtSynth, playbackRate); } catch { /* 合唱の失敗は主役の声に影響させない */ }
               if (playResult && typeof playResult.catch === 'function') {
@@ -1745,7 +1758,16 @@ export class VoicePlayer {
       }
 
       // 2026-11-12: 覚えた声がある短文は合成ゼロで鳴らせるので、混雑中でも読む(1人1声のまま)。
-      const busySkip = shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance });
+      // 2026-11-12(会議の第3段): 大事でない件も、配信者への質問・この配信でまだ一度も読まれていない人は
+      //   点を付けて混雑中でも読む(浅い混雑は片方・深い混雑は両方)。読む順番は変えない。
+      const busyScore = scoreVoiceWhenBusy({
+        text: item.kind === 'gift' ? '' : body,
+        neverVoiced: isVoiceNeverVoiced(this._voicedState, item.liveId, userKey)
+      });
+      const busySkip = shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance, score: busyScore });
+      if (!busySkip && !importance && busyScore > 0 && this.queue.length >= VOICE_BUSY_QUEUE_MIN) {
+        this.diag.busyScoreKeepTotal = (Number(this.diag.busyScoreKeepTotal) || 0) + 1;
+      }
       const clipReady = busySkip && this._clipCache.has(this._clipKeyFor({ userKey, name, body, count: 1 }));
       if (clipReady) this.diag.clipBusyKeepTotal = (Number(this.diag.clipBusyKeepTotal) || 0) + 1;
       if (busySkip && !clipReady) {
@@ -1767,6 +1789,8 @@ export class VoicePlayer {
         priority: voicePriorityForImportance(importance),
         /** 2026-11-12: 大事なもの(配信者・初コメも)。会場が「見込みが長いので読まない」から外す。 */
         importance,
+        /** 2026-11-12: 読まれた人を配信ごとに覚えるため。 */
+        liveId: item.liveId,
         // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
         onPlayStart: item.onPlayStart,
         // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。
