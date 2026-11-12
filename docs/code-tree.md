@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1264 件
+## ⚠️ 役割コメントが無いソース 10 / 1265 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1195,7 +1195,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2464)
+- 📁 **src/** (2466)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1504,7 +1504,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2179)
+  - 📁 **lib/** (2181)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1583,7 +1583,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (94)
+    - 📁 **youtube/** (96)
       - `pfLastStreamUrl.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
       - `ytActiveVideoId.test.js`
@@ -1674,6 +1674,8 @@
       - `ytVoicePriority.test.js`
       - `ytVoiceQueue.js` — YouTube Live コメント読み上げキュー・選んで読む自動切替・声割り当て（純関数）
       - `ytVoiceQueue.test.js`
+      - `ytVoiceReadLog.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytVoiceReadLog.test.js`
       - `ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
       - `ytWording.test.js`
       - `ytZeroPtGiftLabel.js` — 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援しかしていない人の「0pt」を

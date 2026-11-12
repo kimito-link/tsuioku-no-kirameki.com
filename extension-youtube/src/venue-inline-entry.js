@@ -11,6 +11,7 @@ import { VENUE_STAT_STRIP_FACE_PATHS } from '../../src/lib/venueStatStrip.js';
 import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
 import { ytShouldVoiceWhenCrowded, ytCrowdSpeedBoost, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
+import { createYtVoiceReadLog } from '../../src/lib/youtube/ytVoiceReadLog.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
 // @ts-ignore ビルド時に venueBar.js の末尾へ足す(scripts/build-youtube-ext.mjs の ytVenueLiveIdPlugin)
 import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/venueBar.js';
@@ -241,6 +242,21 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
       return Math.max(base, extra);
     };
   }
+  // 2026-11-12 りんく「最新を読まず過去の発言を何回も読む」: 一時プロファイルでは再現しないので、普段の状態で
+  //   「同じコメントをもう一度読んだ」「古いコメントを読んだ」を残す(観測のみ・yt_diag_voice_reads・ytVoiceReadLog.js)。
+  const readLog = createYtVoiceReadLog();
+  let readLogTimer = 0;
+  const saveReadLogSoon = () => {
+    if (readLogTimer) return;
+    readLogTimer = window.setTimeout(() => {
+      readLogTimer = 0;
+      try {
+        if (isExtensionContextAlive()) void chrome.storage.local.set({ yt_diag_voice_reads: { ...readLog.snapshot(), videoId: mountedVid } }).catch(() => {});
+      } catch {
+        /* 計器は読み上げを止めない */
+      }
+    }, 3000);
+  };
   proto.enqueue = function (/** @type {any[]} */ items) {
     if (!Array.isArray(items)) return realEnqueue.call(this, items);
     /** @type {any[]} */
@@ -268,7 +284,26 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
         d.ytReason = d.ytReason || {};
         d.ytReason[reason] = (Number(d.ytReason[reason]) || 0) + 1;
       }
-      if (!ytShouldVoiceWhenCrowded({ important, queueLength })) {
+      const skip = !ytShouldVoiceWhenCrowded({ important, queueLength });
+      try {
+        readLog.noteQueued({ key: it.key, text: it.text, receivedAt: it.receivedAt, skipped: skip });
+        if (!skip) {
+          const realStart = it.onAudioStart;
+          it.onAudioStart = (/** @type {any[]} */ ...a) => {
+            try {
+              readLog.notePlayed({ key: it.key, text: it.text, receivedAt: it.receivedAt });
+              saveReadLogSoon();
+            } catch {
+              /* 計器は読み上げを止めない */
+            }
+            return typeof realStart === 'function' ? realStart.apply(it, a) : undefined;
+          };
+        }
+        saveReadLogSoon();
+      } catch {
+        /* 計器は読み上げを止めない */
+      }
+      if (skip) {
         this.diag.ytCrowdSkipTotal = (Number(this.diag.ytCrowdSkipTotal) || 0) + 1;
         try {
           it.onDropped?.();

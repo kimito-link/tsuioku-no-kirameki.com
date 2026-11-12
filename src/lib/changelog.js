@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2100',
+    date: '2026-11-12',
+    summary: 'YouTube の読み上げの読み直しを記録する計器',
+    items: Object.freeze([
+      'YouTube の会場の読み上げで、同じコメントをもう一度読んだときや、届いてから1分以上たったコメントを読んだときを、このPCの中に記録するようにしました。読み上げの動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2099',
     date: '2026-11-12',
     summary: 'YouTube などの会場でキャラの顔も弾かれないように',
@@ -208,15 +216,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'YouTubeの@配信はすぐ読み込み中',
     items: Object.freeze([
       '/@名前/live を開いた直後から、YouTubeの同時視聴者数を「読み込み中」と出します。動画の番号が分かる前でも、別の配信や「watch ページが見つかりません」にはしません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2055',
-    date: '2026-11-11',
-    summary: 'YouTubeの同時視聴者数をページから読む',
-    items: Object.freeze([
-      'YouTubeの同時視聴者数を、画面に出る前でもページの情報から読むようにしました。出るまでは「読み込み中」、直前の数が読めなくなったときは最後の数と何分前かを出します。',
-      'サイドパネルを開いて窓が細くなると PICK UP も細くなり、閉じても元の幅に戻らないことがありました。窓の変化のたびに、ニコ生と同じ置き方で幅を計算し直します。窓が広がれば元の幅に戻ります。'
     ])
   })
 ]);

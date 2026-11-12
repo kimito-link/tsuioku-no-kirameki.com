@@ -213,7 +213,7 @@ while (Date.now() < end) {
 let diag = {};
 try {
   const sw = ctx.serviceWorkers().find((w) => w.url().includes('background')) || ctx.serviceWorkers()[0];
-  diag = await sw.evaluate(() => chrome.storage.local.get(['yt_diag_voice_crowd', 'yt_diag_live_rows', 'yt_diag_echo_drop', 'yt_ingest_diag', 'yt_diag_chat_frame_vid']));
+  diag = await sw.evaluate(() => chrome.storage.local.get(['yt_diag_voice_crowd', 'yt_diag_live_rows', 'yt_diag_echo_drop', 'yt_ingest_diag', 'yt_diag_chat_frame_vid', 'yt_diag_voice_reads']));
 } catch (e) {
   diag = { error: String(e) };
 }
