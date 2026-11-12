@@ -49,7 +49,9 @@ export function createVenueBubbleVoiceSyncState() {
       /** 3秒を超えて声を待ち続け、声と一緒に出せた数 */
       heldPastHold: 0,
       /** 上限まで待っても鳴らず、吹き出しだけ出した数 */
-      capRevealed: 0
+      capRevealed: 0,
+      /** 吹き出しを先に出した件の声を、後から鳴ってずれないよう読まなかった数(開いた直後のまとめ届き等) */
+      skippedShown: 0
     },
     /** @type {Array<{ arrivedAt: number, revealedAt: number, audioAt: number }>} 直近の見本 */
     samples: []
@@ -220,6 +222,12 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
     sample();
   };
   const voiceIt = () => {
+    // 開いた瞬間の直近3件(primeEmit)は開く前のコメント。吹き出しはすぐ出し、声は読まない(後から鳴るとずれる・PC 実測 2026-11-12)。
+    if (ctx.primeBurst) {
+      diag.skippedShown += 1;
+      onDropped();
+      return;
+    }
     vp.enqueue([{
       ...(ctx.itemFields || {}),
       kind: 'comment',
@@ -248,7 +256,16 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
       },
       onDropped
     }]);
-    if (!holdForVoice || revealedAt) return;
+    if (!holdForVoice) {
+      // 吹き出しをもう出した件(開いた直後のまとめ届き・声が鳴らないのが続いて待たせない時)は、声が後から鳴るとずれる。
+      //   前に読む件がある(すぐ鳴らない)なら読まない。
+      const e = typeof vp.estimateStartDelayMs === 'function' ? vp.estimateStartDelayMs(onDropped) : null;
+      if (e && e.ahead > 0 && !e.important) {
+        if (vp.dropQueuedUnstarted(onDropped) === 'dropped') diag.skippedShown = (diag.skippedShown || 0) + 1;
+      }
+      return;
+    }
+    if (revealedAt) return;
     // 列に入れた瞬間の見込み: 3秒を超えるなら待たせず、読まずに吹き出しだけ出す(テンポ)。
     const est = typeof vp.estimateStartDelayMs === 'function' ? vp.estimateStartDelayMs(onDropped) : null;
     if (est && shouldSkipVoiceAsLate({ estimateMs: est.ms, important: est.important, aheadCount: est.ahead })) {
@@ -275,7 +292,8 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
         if (revealedAt) return;
         holding = false;
         diag.capRevealed += 1;
-        state.failStreak += 1;
+        // 「声が鳴らない」と数えるのは、待っている間に1件も声が鳴らなかったときだけ(声づくりが遅いだけなら数えない)。
+        if (!(state.lastAudioStartAt >= arrivedAt)) state.failStreak += 1;
         // 上限まで鳴らなかった: 声はもう読まない(後から鳴るとずれる)。吹き出しだけ出す。
         const gone = typeof vp.dropQueuedAny === 'function' ? vp.dropQueuedAny(onDropped) : 'not-queued';
         if (gone !== 'dropped') reveal();

@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2091',
+    date: '2026-11-12',
+    summary: '開いた直後と遅いPCで吹き出しが先に出ないように',
+    items: Object.freeze([
+      '会場を開いた瞬間にまとめて届く3件は、吹き出しだけ出して読み上げません(後から声だけ遅れて鳴っていたのを直しました)。',
+      '読み上げが混んでいて待たずに出した吹き出しは、後から声だけ鳴らないようにしました。',
+      'PC の実ページと本物の VOICEVOX で測って見つかった「吹き出しが声より先に出る」件を直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2090',
     date: '2026-11-12',
     summary: '吹き出しと読み上げの声をぴったり同時に',
@@ -210,15 +220,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ABEMA の PICK UP が細い枠のままだと本文が2行になり、名前が下で省略されていました。ニコ生・YouTube と同じく、窓と大きな映像の幅（最大860px）で出します。コメント欄や小さい映像の幅には合わせません。',
       '名前を本文の上の行に出し、本文は1行にします。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2051',
-    date: '2026-11-11',
-    summary: 'ABEMAのロゴ全体と視聴数',
-    items: Object.freeze([
-      'チャンネルロゴは横長です。円で中央だけ切ると白い文字が円いっぱいになり、空の白い丸に見えていました。ロゴ全体が円の中に入るようにしました。',
-      '番組表の応答にある、いま放送中の枠の視聴数を「視聴数」として出します。次の枠の空の数では置き換えません。'
     ])
   })
 ]);

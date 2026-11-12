@@ -174,6 +174,17 @@ async function runScenario(plat, pc, legacy, seed = 7, warm = true) {
       else startVenueSpeechBubbleVoice(state, a.speech, ctx);
     }
   };
+  // 開いた瞬間の直近3件(primeEmit・開く前のコメント)。PC 実測 2026-11-12 で、この3件の声が吹き出しの約10秒後に鳴っていた。
+  for (let i = 0; i < 3; i++) {
+    const sp = { key: `prime${i}`, userId: `p${i}`, name: `p${i}`, text: TEXTS[i + 5] };
+    const ctx = {
+      voicePlayer: vp, primeBurst: true, arrivedAt: Date.now(), isOpen: () => true,
+      showBubble: () => ({}), onSpeaking() {}, onDone() {}, onResolved() {},
+      itemFields: { liveId: 'lv1', broadcasterUid: '' }
+    };
+    if (legacy) startLegacy(state, sp, ctx);
+    else startVenueSpeechBubbleVoice(state, sp, ctx);
+  }
   const step = plat.chunkMs > 0 ? plat.chunkMs : 50;
   for (let now = 0; now < DURATION; now += step) {
     deliver(now);
@@ -188,8 +199,8 @@ async function runScenario(plat, pc, legacy, seed = 7, warm = true) {
 const PCS = [
   { name: 'GPU', rtf: 0.05 },
   { name: 'CPU', rtf: 1.2 },
-  // 低スペック(声づくりが声の2.5倍かかる): 待ちの上限と「1件も鳴らなくならない」の確かめ
-  { name: '遅いPC', rtf: 2.5 }
+  // 低スペック(声づくりが声の3倍かかる・PC 実測 2026-11-12 の CPU は 1.9〜3.1 倍): 待ちの上限と「1件も鳴らなくならない」の確かめ
+  { name: '遅いPC', rtf: 3.0 }
 ];
 
 describe('吹き出しと声の同期(作り物の VOICEVOX で全サービスの来方を再現)', () => {
@@ -233,7 +244,8 @@ describe('吹き出しと声の同期(作り物の VOICEVOX で全サービス�
       // eslint-disable-next-line no-console
       if (process.env.NLS_SYNC_SIM_PRINT) console.log(`${pc.name} 静か 前: 先出し${before.early}/${before.voiced} 最大${before.gapMax}ms → 後: 先出し${after.early}/${after.voiced} 最大${after.gapMax}ms テンポ95%${after.tempoP95}ms`);
       expect(before.early, `${pc.name} 直す前は先出しがあった`).toBeGreaterThan(0);
-      expect(after.voiced, pc.name).toBe(after.n);
+      // 開いた瞬間の3件(開く前のコメント)は読まない
+      expect(after.voiced, pc.name).toBe(after.n - 3);
       expect(after.early, pc.name).toBe(0);
       expect(after.gapMax, pc.name).toBeLessThanOrEqual(300);
     }

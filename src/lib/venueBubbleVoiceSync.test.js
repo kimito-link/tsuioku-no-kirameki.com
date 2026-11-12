@@ -115,3 +115,24 @@ describe('VoicePlayer.dropQueuedAny / estimateStartDelayMs', () => {
     expect(p.estimateStartDelayMs(() => {})).toBe(null);
   });
 });
+
+describe('startVenueSpeechBubbleVoice: 開いた瞬間の3件と声が鳴らない数え方(PC 実測 2026-11-12)', () => {
+  const mkVp = () => {
+    /** @type {any[]} */
+    const enq = [];
+    return { enq, enabled: true, enqueue: (/** @type {any[]} */ items) => enq.push(...items), dropQueuedUnstarted: () => 'not-queued', dropQueuedAny: () => 'not-queued', estimateStartDelayMs: () => null };
+  };
+  it('開いた瞬間のまとめ届き(primeBurst)は吹き出しをすぐ出し、声は読まない', async () => {
+    const { startVenueSpeechBubbleVoice } = await import('./venueBubbleVoiceSync.js');
+    const st = createVenueBubbleVoiceSyncState();
+    const vp = mkVp();
+    let shown = 0;
+    startVenueSpeechBubbleVoice(st, { key: 'a', text: 'こんにちは' }, {
+      voicePlayer: vp, primeBurst: true, arrivedAt: Date.now(), isOpen: () => true,
+      showBubble: () => { shown += 1; return {}; }, onSpeaking() {}, onDone() {}, onResolved() {}
+    });
+    expect(shown).toBe(1);
+    expect(vp.enq.length).toBe(0);
+    expect(st.diag.skippedShown).toBe(1);
+  });
+});
