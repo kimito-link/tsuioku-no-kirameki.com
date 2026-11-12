@@ -452,6 +452,17 @@ export function ttUniqueIdOfStreamKey(key) {
   return m && isTtUniqueId(m[1]) ? m[1] : '';
 }
 
+/**
+ * メッセージの中身の共通の部分(field 1)にある部屋の番号(1.3)。無ければ ''。
+ *   ★ページのソケットは配信を移っても使い回される(URL が ws_reuse_supplement・room_id は最初の部屋のまま)。
+ *   どの部屋のメッセージかは URL ではなくこれで見分ける(2026-11-12 りんくの PC: 移った先で記録0件・「ログインしていない」の誤表示)。
+ * @param {Uint8Array | null | undefined} payload
+ */
+export function ttMessageRoomId(payload) {
+  const r = new PbMsg(payload).msg(1).idStr(3);
+  return /^\d{5,20}$/.test(r) ? r : '';
+}
+
 /** ソケットの URL から room_id(webcast-ws の口でなければ '') @param {unknown} url */
 export function ttRoomIdOfSocketUrl(url) {
   let u;

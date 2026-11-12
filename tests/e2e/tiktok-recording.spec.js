@@ -25,6 +25,10 @@ const ROOM = '7571234567890123456';
 const KEY = `tt.${UNIQUE}.${ROOM}`;
 const OTHER = 'quiet.user';
 const OTHER_ROOM = '7579999999999999999';
+// ページ内で別の配信へ移った先(ページはソケットを開き直さず使い回す=URL の room_id は前の配信 ROOM のまま・2026-11-12 PC)
+const MOVED = 'moved.user';
+const MOVED_ROOM = '7578888888888888888';
+const MOVED_KEY = `tt.${MOVED}.${MOVED_ROOM}`;
 const WS_HOST = 'webcast-ws.tiktok.com';
 const T0 = Date.now();
 const AV = 'https://p16-sign-sg.tiktokcdn.com/aweme/100x100/a.webp';
@@ -76,6 +80,15 @@ const frame = (msgs) => {
   const body = msgs.flatMap(([type, payload, id]) => fb(1, [...fb(1, type), ...fb(2, payload), ...fv(3, id)]));
   return Buffer.from([...fv(1, 1), ...fv(2, 99), ...fb(6, 'pb'), ...fb(7, 'msg'), ...fb(8, zlib.gzipSync(Buffer.from(body)))]);
 };
+/** 部屋の番号(common 1.3)つきのコメント */
+const roomChat = (/** @type {string} */ room, /** @type {string} */ uid, /** @type {string} */ nick, /** @type {string} */ text, /** @type {number} */ ms) => [...fb(1, [...fv(3, BigInt(room)), ...fv(4, ms)]), ...fb(2, user(uid, nick, `u${uid}`)), ...fb(3, text)];
+const MOVED_FRAMES = [
+  frame([
+    ['WebcastChatMessage', roomChat(MOVED_ROOM, '51', 'うつったひと', 'こっちの配信', T0 + 6000), 6001],
+    // 前の配信の残り(中身の部屋が ROOM)は移った先の記録に入れない
+    ['WebcastChatMessage', roomChat(ROOM, '52', 'まえのひと', 'まえの配信', T0 + 6100), 6002],
+  ]),
+];
 const FRAMES = [
   frame([
     ['WebcastChatMessage', chat('11', 'ファンA', 'わこつ', T0 + 1000), 1001],
@@ -115,8 +128,8 @@ const WANT_ROWS = [
   'text:tt:13:ファンC:[スタンプ]:0::face',
 ];
 
-/** @param {boolean} socket ログイン済み(ページがコメントのソケットを開く) @param {string} room */
-const pageHtml = (socket, room) => `<!doctype html><html><head><meta charset="utf-8"><title>TikTok LIVE</title></head><body>
+/** @param {boolean} socket ログイン済み(ページがコメントのソケットを開く) @param {string} room ソケットの URL の room_id @param {string} [extra] */
+const pageHtml = (socket, room, extra = '') => `<!doctype html><html><head><meta charset="utf-8"><title>TikTok LIVE</title></head><body>
 <div data-e2e="live-chat-input-container"><div data-e2e="room-chat-input-field" contenteditable="plaintext-only" placeholder="${socket ? '入力...' : 'コメントをオフにする'}"></div>
 <div data-e2e="room-chat-send-btn" id="send">送信</div></div>
 <script>
@@ -129,7 +142,7 @@ const pageHtml = (socket, room) => `<!doctype html><html><head><meta charset="ut
   ${socket ? `fetch('https://webcast.tiktok.com/webcast/gift/list/?aid=1988&room_id=${room}&X-Bogus=x', { credentials: 'include' })
     .then((r) => r.json())
     .then(() => {
-      const ws = new WebSocket('wss://${WS_HOST}/webcast/im/ws_proxy/ws_reuse_supplement/?aid=1988&room_id=${room}&X-Bogus=x');
+      const ws = new WebSocket('wss://${WS_HOST}/webcast/im/ws_proxy/ws_reuse_supplement/?aid=1988&room_id=${room}${extra}&X-Bogus=x');
       ws.binaryType = 'arraybuffer';
       ws.onmessage = () => { window.__pageGot = (window.__pageGot || 0) + 1; };
     });` : ''}
@@ -147,7 +160,7 @@ function startFakeSocket() {
   wss.on('connection', (ws, req) => {
     paths.push(String(req.url));
     // 拡張の入口(document_idle)より先に届く分も出るよう、すぐ送り始める
-    FRAMES.forEach((f, i) => setTimeout(() => ws.send(f), 200 + i * 150));
+    (String(req.url).includes('moved=1') ? MOVED_FRAMES : FRAMES).forEach((f, i) => setTimeout(() => ws.send(f), 200 + i * 150));
     // ハートビート(hb)は読まない
     setTimeout(() => ws.send(Buffer.from([...fb(6, 'pb'), ...fb(7, 'hb'), ...fb(8, [1])])), 100);
   });
@@ -202,7 +215,7 @@ async function extWorker(context) {
 }
 
 /** @param {any} sw */
-const readRows = (sw) =>
+const readRows = (sw, key = KEY) =>
   sw.evaluate(
     (/** @type {string} */ key) =>
       new Promise((resolve) => {
@@ -216,7 +229,7 @@ const readRows = (sw) =>
         };
         req.onerror = () => resolve([]);
       }),
-    KEY,
+    key,
   );
 
 test('TikTok のコメント・ギフト・配信中の順位を記録し、送信も届く・未ログインは理由を出す', async ({ context, sock }) => {
@@ -236,8 +249,8 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
     if (u.pathname === '/api-live/user/room/') {
       const who = String(u.searchParams.get('uniqueId') || '');
       infoCalls[who] = (infoCalls[who] || 0) + 1;
-      const room = who === OTHER ? OTHER_ROOM : ROOM;
-      const on = who === OTHER || live;
+      const room = who === OTHER ? OTHER_ROOM : who === MOVED ? MOVED_ROOM : ROOM;
+      const on = who === OTHER || who === MOVED || live;
       return json({
         data: {
           liveRoom: { status: on ? 2 : 4, title: who === OTHER ? 'しずかな配信' : 'ざつだん配信', startTime: Math.floor(T0 / 1000) - 60, liveRoomStats: { userCount: 50, enterCount: 300 } },
@@ -247,6 +260,7 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
       });
     }
     if (u.pathname.startsWith('/api-live/')) return route.fulfill({ status: 404, body: '' });
+    if (u.pathname.startsWith(`/@${MOVED}/`)) return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: pageHtml(true, ROOM, '&moved=1') });
     const signedIn = u.pathname.startsWith(`/@${UNIQUE}/`);
     return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: pageHtml(signedIn, signedIn ? ROOM : OTHER_ROOM) });
   });
@@ -335,4 +349,15 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
   const res2 = await ext.evaluate((key) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: key, text: 'みえないはず' }), `tt.${OTHER}.${OTHER_ROOM}`);
   expect(res2).toMatchObject({ ok: false, reason: 'not-signed-in' });
   expect(await page.evaluate(() => /** @type {any} */ (window).__sent)).toEqual([]);
+
+  // ページ内で配信を移った(ソケットの URL は前の配信 ROOM のまま)= 中身の部屋の番号で見分けて記録する・ログインの知らせは出さない
+  await page.goto(`https://www.tiktok.com/@${MOVED}/live`);
+  const readMoved = () => readRows(sw, MOVED_KEY);
+  await expect.poll(readMoved, { timeout: 40_000 }).toEqual(['text:tt:51:うつったひと:こっちの配信:0::face']);
+  await expect
+    .poll(async () => { const d = await ttDiag(); return `${d.streamKey}|${d.stopReason}|${d.reusedSocketMsgs}|${d.otherRoomMsgs}`; }, { timeout: 30_000 })
+    .toBe(`${MOVED_KEY}||1|1`);
+  await page.waitForTimeout(22_000);
+  expect((await ttDiag()).stopReason).toBe('');
+  await expect(page.locator('#nl-tt-login-note')).toHaveCount(0);
 });

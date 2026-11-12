@@ -25,6 +25,7 @@ import {
   parseTtRoomUserSeq,
   parseTtMemberViewers,
   buildTtStreamKey,
+  ttMessageRoomId,
 } from '../../src/lib/tiktok/ttParse.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 try {
@@ -62,8 +63,12 @@ const diag = {
   wsState: 'idle',
   wsOpens: 0,
   frames: 0,
-  /** よその部屋の受信(別の配信に移った直後など) */
+  /** ソケットの URL の部屋が今の配信と違う受信(ページはソケットを配信をまたいで使い回す=中身で見分ける) */
   otherRoomFrames: 0,
+  /** 中身の部屋の番号が今の配信と違って捨てたメッセージ */
+  otherRoomMsgs: 0,
+  /** URL の部屋は違うが、中身が今の配信だったので読んだメッセージ(使い回しのソケット) */
+  reusedSocketMsgs: 0,
   gzipFail: 0,
   /** @type {Record<string, number>} 型ごとの数(知らない型に気づくため) */
   types: {},
@@ -153,12 +158,12 @@ let giftInfo = new Map();
 const openRooms = new Set();
 /** @type {Set<string>} 一度でも開いた部屋 */
 const seenRooms = new Set();
-/** @type {{ roomId: string, buf: ArrayBuffer }[]} 配信の情報より先に来た受信 */
+/** @type {{ roomId: string, buf: ArrayBuffer }[]} 配信の情報より先に来た受信(roomId はソケットの URL の部屋) */
 let early = [];
 
 // ---- 1配信ぶんの読み取り ----
 /**
- * @typedef {{ uniqueId: string, roomId: string, key: string, startedAt: number, onFrame: (buf: ArrayBuffer) => void, stop: () => void }} Reader
+ * @typedef {{ uniqueId: string, roomId: string, key: string, startedAt: number, onFrame: (buf: ArrayBuffer, socketRoomId: string) => void, stop: () => void }} Reader
  */
 let current = /** @type {null | Reader} */ (null);
 /** ソケットから来た視聴数(次の配信情報の送信で使う) */
@@ -246,8 +251,8 @@ function startReader(uniqueId, roomId, key) {
     }
   };
 
-  /** @param {ArrayBuffer} buf */
-  const onFrame = (buf) => {
+  /** @param {ArrayBuffer} buf @param {string} socketRoomId ソケットの URL の部屋(使い回しのときは前の配信のまま) */
+  const onFrame = (buf, socketRoomId) => {
     chain = chain.then(async () => {
       if (stopped) return;
       diag.frames += 1;
@@ -262,7 +267,23 @@ function startReader(uniqueId, roomId, key) {
           return;
         }
       }
+      let keptForNext = false;
       for (const m of parseTtResponse(body)) {
+        // どの部屋のメッセージかは中身(common の部屋の番号)で見分ける。中身に無いときだけ URL の部屋で
+        const msgRoom = ttMessageRoomId(m.payload);
+        if (msgRoom ? msgRoom !== roomId : socketRoomId !== roomId) {
+          diag.otherRoomMsgs += 1;
+          // 別の配信へ移った直後(配信の情報を読む前)の分かもしれないので、次の読み取りのためにためる
+          if (msgRoom && !keptForNext) {
+            keptForNext = true;
+            early.push({ roomId: socketRoomId, buf });
+            if (early.length > 400) early.shift();
+          }
+          continue;
+        }
+        if (msgRoom && socketRoomId !== roomId) diag.reusedSocketMsgs += 1;
+        // この配信のメッセージが届いた=ソケットはこの配信を運んでいる(ログインの知らせを出さない)
+        seenRooms.add(roomId);
         try {
           onMessage(m);
         } catch {
@@ -380,10 +401,13 @@ window.addEventListener('message', (ev) => {
       saveDiagSoon();
     }
   } else if (d.t === 'frame' && d.buf instanceof ArrayBuffer) {
-    if (current && current.roomId === roomId) current.onFrame(d.buf);
-    else {
-      // 配信の情報より先に来た分(別の配信へ移った直後も)は、その部屋の読み取りが始まるまでためる
-      if (current) diag.otherRoomFrames += 1;
+    // ★ページはソケットを配信をまたいで使い回す(URL の room_id は最初の配信のまま・2026-11-12 PC)。
+    //   URL の部屋では振り分けず、今の配信の読み取りに渡して中身の部屋の番号で見分ける
+    if (current) {
+      if (current.roomId !== roomId) diag.otherRoomFrames += 1;
+      current.onFrame(d.buf, roomId);
+    } else {
+      // 配信の情報より先に来た分は、読み取りが始まるまでためる
       early.push({ roomId, buf: d.buf });
       if (early.length > 400) early.shift();
     }
@@ -442,10 +466,10 @@ async function check() {
       diag.roomId = info.roomId;
       diag.stopReason = '';
       diag.stoppedAt = 0;
-      // 先に来ていたこの部屋の受信を渡す
+      // 先に来ていた受信を渡す(どの部屋かは中身で見分ける)
       const list = early;
       early = [];
-      for (const e of list) if (e.roomId === info.roomId) current.onFrame(e.buf);
+      for (const e of list) current.onFrame(e.buf, e.roomId);
     }
     const viewers = latestViewers ?? info.viewers;
     safeSendMessage({

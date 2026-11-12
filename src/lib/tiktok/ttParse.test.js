@@ -18,6 +18,7 @@ import {
   ttRoomIdOfSocketUrl,
   safeTtImageUrl,
   ttChatDropReason,
+  ttMessageRoomId,
 } from './ttParse.js';
 
 // 小さな書き手(試験用・番号は 2026-11-09 PC 実測の形)
@@ -110,6 +111,18 @@ describe('ソケットの受信', () => {
     const list = parseTtResponse(body);
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ type: 'WebcastChatMessage', msgId: '7571000000000000001' });
+  });
+});
+
+describe('メッセージの部屋(common 1.3)', () => {
+  it('中身の部屋の番号を読む(ソケットの URL は使い回しで前の配信のままのことがある)', () => {
+    const p = new Uint8Array([...fb(1, [...fb(1, 'WebcastChatMessage'), ...fv(2, 7571000000000000001n), ...fv(3, 7579999999999999999n), ...fv(4, 1762640001234)]), ...fb(3, 'x')]);
+    expect(ttMessageRoomId(p)).toBe('7579999999999999999');
+  });
+  it('部屋の番号が無い・おかしいときは空', () => {
+    expect(ttMessageRoomId(new Uint8Array([...common(1762640001234), ...fb(3, 'x')]))).toBe('');
+    expect(ttMessageRoomId(new Uint8Array([...fb(1, fv(3, 12))]))).toBe('');
+    expect(ttMessageRoomId(null)).toBe('');
   });
 });
 

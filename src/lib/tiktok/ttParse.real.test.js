@@ -2,7 +2,7 @@
 //   <hh*n> は同じバイト hh の n 回の繰り返し(展開すると元の長さに戻る)。
 import { describe, it, expect } from "vitest";
 import { PbMsg } from "./ttProto.js";
-import { parseTtChat, parseTtGift, parseTtRoomUserSeq, createTtComboTracker } from "./ttParse.js";
+import { parseTtChat, parseTtGift, parseTtRoomUserSeq, createTtComboTracker, ttMessageRoomId } from "./ttParse.js";
 
 const FRAMES = {
   "chat": "0a6f0a12<2a*18>10<81*8>0118<81*8>01208181818181013001480250026222<2a*34>7a032a2a2ab00103b80102c00102c80181818181810112fd1e08<81*8>011a33<2a*51>4ae90c0a8602<2a*262>0a8802<2a*264>0a8402<2a*260>0a8702<2a*263>0a8702<2a*263>0a8702<2a*263>122e<2a*46>b2010808923e10d7151801ba0100820200b2020c<2a*12>f2024c<2a*76>8204a60408041014180820015246<2a*70>5801624f0a012a1213<2a*19>1a012a222e<2a*47>022a2aba01ff02080412b4020a5d<2a*93>0a5d<2a*93>122c<2a*44>3a46<2a*70>22022a2a2a0608011002182032003a061a02120022005a0f0a001209<2a*10>00620f0a001209<2a*10>00780e80010fa201060801100118208204b20c0804101e180a20015801624f0a012a1213<2a*19>1a012a222e<2a*47>022a2aba01d30b080412dc010a57<2a*87>0a57<2a*87>1226<2a*38>2013220c<2a*13>0a0801100520022803400132003a061a02120022005ad9040a001209<2a*9>1a09<2a*9>22a2020a99020a6c<2a*108>0a6c<2a*108>123b<2a*59>12042a2a2a2a2a99020a6c<2a*108>0a6c<2a*108>123b<2a*59>62d9040a001209<2a*9>1a09<2a*9>22a2020a99020a6c<2a*108>0a6c<2a*108>123b<2a*59>12042a2a2a2a2a99020a6c<2a*108>0a6c<2a*108>123b<2a*59>68017001780e80010fa2010a08011005200228034001a244001a33<2a*51>72022a2a9201060801100120019a01140a0e<2a*14>10e0a7129a01180a11<2a*17>10fbd2b4019a011a0a0e<2a*14>10<81*8>019a01120a072a2a2a2a2a2a2a1081818181818181019a01100a0b<2a*11>10904e9a01110a062a2a2a2a2a2a1081818181818181019a011a0a0f<2a*15>1081818181818181019a011a0a0e<2a*14>10<81*8>019a01350a<2a*43>1081818181818181019a013a0a2f<2a*47>1081818181818181019a011a0a0f<2a*15>1081818181818181019a01160a0b<2a*11>1081818181818181019a01180a0d<2a*13>1081818181818181019a01170a0c<2a*12>108181818181818101a201012aaa010432003a00ba0120<2a*32>c201022a2a",
@@ -43,6 +43,12 @@ describe('本物の枠(伏せ字)', () => {
     expect(t.push(/** @type {any} */ (mid), 0)).toEqual([]);
     expect(t.push(/** @type {any} */ (end), 10)).toHaveLength(1);
     expect(t.size).toBe(0);
+  });
+  it('本物の枠にも common 1.3(部屋の番号)がある=使い回しのソケットでも中身で見分けられる', () => {
+    for (const k of /** @type {const} */ (['chat', 'gift-end', 'gift-mid', 'seq'])) {
+      expect(new PbMsg(bytes(k)).msg(1).has(3)).toBe(true);
+      expect(ttMessageRoomId(bytes(k))).toMatch(/^\d{5,20}$/);
+    }
   });
   it('視聴数 334 と順位 1〜5(score の大きい順)', () => {
     const r = parseTtRoomUserSeq(bytes('seq'));
