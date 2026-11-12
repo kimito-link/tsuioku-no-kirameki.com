@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2052',
+    date: '2026-11-11',
+    summary: 'PICK UPをニコ生と同じ幅と並び',
+    items: Object.freeze([
+      'ABEMA の PICK UP が細い枠のままだと本文が2行になり、名前が下で省略されていました。ニコ生・YouTube と同じく、窓と大きな映像の幅（最大860px）で出します。コメント欄や小さい映像の幅には合わせません。',
+      '名前を本文の上の行に出し、本文は1行にします。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2051',
     date: '2026-11-11',
     summary: 'ABEMAのロゴ全体と視聴数',

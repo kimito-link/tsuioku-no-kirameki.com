@@ -650,7 +650,8 @@ async function runRound(members, taskText, extraContextFor = null) {
  *  鎖の順序は「軽い順・別プロバイダを跨ぐ順」——1語のJSONを返すだけの仕事に重い主力の
  *  レート枠を使わないという当初の意図を、専任枠ではなく順序で表現する。 */
 async function classify(taskText) {
-  const order = ['gemini-2.5-flash', 'groq/gpt-oss-20b', 'groq/gpt-oss-120b', 'local/qwen3.5:9b'];
+  // 2026-11-12: gemini-3.5-flash-lite を2番目に足した（速い・11/12 実測で 3/3 OK。12/1 に 2.5-flash の転送先になる）。
+  const order = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'groq/gpt-oss-20b', 'groq/gpt-oss-120b', 'local/qwen3.5:9b'];
   const cands = order.map(l => allMembers.find(m => m.label === l)).filter(Boolean);
   if (!cands.length && allMembers.length) cands.push(allMembers[0]);
   // ★この行は現行経路では到達しない（上の行が allMembers から必ず1体入れるため、
@@ -976,7 +977,10 @@ async function council(members, label, key) {
       // 2026-10-28: 2番手を cloudflare/nemotron-120b → gemini-2.5-flash に入れ替え。全員召集(digest 11510字)で
       //  groq が後ろへ回ると nemotron が先頭になるが、max_tokens 3000 でも推論9145字で上限を使い切り本文なしだった。
       //  gemini-2.5-flash は同じ入力で2770字・24秒・4見出しを書き切った（実測・りんくのPC）。nemotron は最後の砦として残す。
-      priority = ['groq/gpt-oss-120b', 'gemini-2.5-flash', 'cloudflare/nemotron-120b'];
+      // 2026-11-12: 3番手に gemini-3.5-flash-lite を足した。12/1 から gemini-2.5-flash は Google 側でこのモデルへ転送される。
+      //  統合の実測（digest 10790字）で 2/2 合格・4秒前後。混雑(503)が続く gemini-3.8/3.6-flash より確実なので、
+      //  2.5-flash が落ちた日に nemotron（推論で上限を使い切る実績あり）へ行く前の受け皿にする。
+      priority = ['groq/gpt-oss-120b', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'cloudflare/nemotron-120b'];
       synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
         || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
       if (synth) console.error(`[${label}] ②統合役(能力優先): ${synth.label}`);
