@@ -1194,7 +1194,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2462)
+- 📁 **src/** (2463)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1503,7 +1503,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2177)
+  - 📁 **lib/** (2178)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1513,8 +1513,9 @@
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
-    - 📁 **kick/** (5)
+    - 📁 **kick/** (6)
       - `kickApi.js` — kick.com のページ自身が使う API(/api/v2/channels/<slug>)の応答を、形を確かめて読む(純関数)
+      - `kickChatHistory.test.js`
       - `kickChatParse.js` — Kick のチャット(ページ自身が使う Pusher)の1件を、YouTube 版の記録と同じ形にする(純関数)
       - `kickChatParse.test.js`
       - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)

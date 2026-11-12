@@ -26,8 +26,10 @@ export const VENUE_BUBBLE_VOICE_HOLD_MAX_MS = 6000;
 export const VENUE_BUBBLE_VOICE_LATE_MS = 2000;
 /** 「ぴったり」とみなすずれ(ms)。これより吹き出しが先に出たら「先出し」と数える。 */
 export const VENUE_BUBBLE_VOICE_SYNC_OK_MS = 300;
-/** 声を待たせた件が上限まで鳴らなかった回数がこれに達したら、声が鳴るまで待たせない。 */
+/** 声を待たせた件が上限まで鳴らなかった回数がこれに達したら、声が鳴るまで待たせない(読まずに吹き出しだけ)。 */
 export const VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX = 2;
+/** 鳴らないのが続いている間も、この間隔で1件だけ声を待たせて試す(鳴れば元に戻る)(ms)。 */
+export const VENUE_BUBBLE_VOICE_PROBE_MS = 10000;
 /** 計器の見本の数(直近だけ) */
 const SAMPLE_MAX = 200;
 
@@ -38,6 +40,8 @@ export function createVenueBubbleVoiceSyncState() {
   return {
     lastAudioStartAt: 0,
     failStreak: 0,
+    /** 鳴らないのが続いている間に、最後に1件だけ待たせて試した時刻 */
+    lastProbeAt: 0,
     diag: {
       held: 0,
       shownWithVoice: 0,
@@ -121,11 +125,12 @@ export function summarizeBubbleVoiceSync(state) {
  *   コメントは吹き出しが先に出て声が後から鳴っていた。待ちには上限(VENUE_BUBBLE_VOICE_HOLD_MAX_MS)があり、
  *   上限まで鳴らなかったことが続けば待たせない(failStreak)ので、「声が鳴った実績」を条件にしなくても
  *   VOICEVOX が止まったときに吹き出しが出なくなることはない(v0.1.757 の約束)。
- * @param {{ voiceEnabled: boolean, primeBurst?: boolean, failStreak?: number }} s
+ *   鳴らないのが続いている間も probeDue のときは1件だけ待たせて試す(鳴れば failStreak が0に戻る)。
+ * @param {{ voiceEnabled: boolean, primeBurst?: boolean, failStreak?: number, probeDue?: boolean }} s
  */
 export function shouldHoldBubbleForVoiceSync(s) {
   if (s?.voiceEnabled !== true || s?.primeBurst === true) return false;
-  return (Number(s?.failStreak) || 0) < VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX;
+  return (Number(s?.failStreak) || 0) < VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX || s?.probeDue === true;
 }
 
 /**
@@ -183,7 +188,10 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
   const vp = ctx.voicePlayer;
   const diag = state.diag;
   const arrivedAt = Number(ctx.arrivedAt) || now();
-  const holdForVoice = shouldHoldBubbleForVoiceSync({ voiceEnabled: !!vp?.enabled, primeBurst: ctx.primeBurst, failStreak: state.failStreak });
+  const failing = (Number(state.failStreak) || 0) >= VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX;
+  const probeDue = failing && now() - (Number(state.lastProbeAt) || 0) >= VENUE_BUBBLE_VOICE_PROBE_MS;
+  const holdForVoice = shouldHoldBubbleForVoiceSync({ voiceEnabled: !!vp?.enabled, primeBurst: ctx.primeBurst, failStreak: state.failStreak, probeDue });
+  if (holdForVoice && probeDue) state.lastProbeAt = now();
   let bubble = holdForVoice ? null : ctx.showBubble(speech);
   const shown = !!bubble || holdForVoice;
   let revealedAt = holdForVoice ? 0 : now();
@@ -223,7 +231,9 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
   };
   const voiceIt = () => {
     // 開いた瞬間の直近3件(primeEmit)は開く前のコメント。吹き出しはすぐ出し、声は読まない(後から鳴るとずれる・PC 実測 2026-11-12)。
-    if (ctx.primeBurst) {
+    // 吹き出しを待たせない件(開いた直後・鳴らないのが続いている時)は読まない。後から声だけ鳴ると必ずずれる
+    //   (ABEMA の PC 実測 2026-11-12: 待ちの上限に2回届いた後、作りかけの声が5.8秒遅れて鳴った)。
+    if (!holdForVoice) {
       diag.skippedShown += 1;
       onDropped();
       return;
@@ -256,15 +266,6 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
       },
       onDropped
     }]);
-    if (!holdForVoice) {
-      // 吹き出しをもう出した件(開いた直後のまとめ届き・声が鳴らないのが続いて待たせない時)は、声が後から鳴るとずれる。
-      //   前に読む件がある(すぐ鳴らない)なら読まない。
-      const e = typeof vp.estimateStartDelayMs === 'function' ? vp.estimateStartDelayMs(onDropped) : null;
-      if (e && e.ahead > 0 && !e.important) {
-        if (vp.dropQueuedUnstarted(onDropped) === 'dropped') diag.skippedShown = (diag.skippedShown || 0) + 1;
-      }
-      return;
-    }
     if (revealedAt) return;
     // 列に入れた瞬間の見込み: 3秒を超えるなら待たせず、読まずに吹き出しだけ出す(テンポ)。
     const est = typeof vp.estimateStartDelayMs === 'function' ? vp.estimateStartDelayMs(onDropped) : null;
