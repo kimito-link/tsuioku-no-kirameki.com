@@ -24,6 +24,23 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2056',
+    date: '2026-11-11',
+    summary: 'YouTubeの@配信はすぐ読み込み中',
+    items: Object.freeze([
+      '/@名前/live を開いた直後から、YouTubeの同時視聴者数を「読み込み中」と出します。動画の番号が分かる前でも、別の配信や「watch ページが見つかりません」にはしません。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.2055',
+    date: '2026-11-11',
+    summary: 'YouTubeの同時視聴者数をページから読む',
+    items: Object.freeze([
+      'YouTubeの同時視聴者数を、画面に出る前でもページの情報から読むようにしました。出るまでは「読み込み中」、直前の数が読めなくなったときは最後の数と何分前かを出します。',
+      'サイドパネルを開いて窓が細くなると PICK UP も細くなり、閉じても元の幅に戻らないことがありました。窓の変化のたびに、ニコ生と同じ置き方で幅を計算し直します。窓が広がれば元の幅に戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2054',
     date: '2026-11-11',
     summary: 'PICK UPと経過を同じ部品へ',
