@@ -12,7 +12,7 @@
 import { createSidepanelIframeLoader, IFRAME_START_MAX_WAIT_MS } from '../lib/sidepanelIframeLoader.js';
 import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
 import { SIDE_PANEL_WATCH_TAB_QUERY, lvFromWatchUrl, pickPanelLv } from '../lib/sidePanelLvFromTabs.js';
-import { isYtPanelSrc, isYtPanelTabUrl, ytPanelStreamKeyOfUrl, buildYtPanelSrc, readYtPanelStreamKey } from '../lib/youtube/ytPanelRoute.js';
+import { isYtPanelSrc, isYtPanelTabUrl, ytPanelStreamKeyOfUrl, ytPanelSiteOfUrl, buildYtPanelSrc, readYtPanelStreamKey } from '../lib/youtube/ytPanelRoute.js';
 
 /** 親の最初の描画(first-paint)が出るか、上限の時間が来たら解決する関門。タイマーで見る(rAF は隠れた文書で止まるので使わない)。 */
 function firstPaintOrTimeout() {
@@ -63,7 +63,7 @@ try {
         // 2026-11-05 同梱した YouTube 版: YouTube のタブで開いたら中身は YouTube 版(ytPanelRoute.js)
         //   0.1.1949: どの配信かを src に焼く(&stream=)。配信ページでなければ配信なしの YouTube 版
         const activeUrl = activeTabs && activeTabs[0] && activeTabs[0].url;
-        if (isYtPanelTabUrl(activeUrl)) return buildYtPanelSrc(ytPanelStreamKeyOfUrl(activeUrl));
+        if (isYtPanelTabUrl(activeUrl)) return buildYtPanelSrc(ytPanelStreamKeyOfUrl(activeUrl), ytPanelSiteOfUrl(activeUrl));
         const picked = pickPanelLv({ activeUrl: activeTabs && activeTabs[0] && activeTabs[0].url, currentLv: shownLv(), watchTabs });
         return picked.lv ? buildSidePanelIframeSrc(base, `?lv=${picked.lv}`) : '';
       },
@@ -87,7 +87,7 @@ try {
             //   (ニコ生版の lv と同じ。配信ページでない=トップ等では今の配信を保つ)
             const k = ytPanelStreamKeyOfUrl(tab.url);
             const cur = ifr.getAttribute('src');
-            if (!isYtPanelSrc(cur) || (k && k !== readYtPanelStreamKey(cur))) loader.update(buildYtPanelSrc(k));
+            if (!isYtPanelSrc(cur) || (k && k !== readYtPanelStreamKey(cur))) loader.update(buildYtPanelSrc(k, ytPanelSiteOfUrl(tab.url)));
             return;
           }
           const lv = lvFromWatchUrl(tab.url);

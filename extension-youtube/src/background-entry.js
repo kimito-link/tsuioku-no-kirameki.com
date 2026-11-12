@@ -306,14 +306,29 @@ async function persistChangedVoices(assignments) {
   for (const row of changed) voiceSavedJson[row.userKey] = JSON.stringify(row.body);
 }
 
+/** 読み込み中のまとめ(同時に呼ばれても1回だけ読み、全員が同じ入れ物を受け取る) @type {Promise<Record<string, any>> | null} */
+let summaryMemLoading = null;
 async function ensureSummaryMem() {
   if (summaryMem) return summaryMem;
-  summaryMem = {};
+  // 0.1.2104: 読み込みの途中で呼ばれた人に仮の空の入れ物を渡していた。そこへ書いた配信の情報(題・配信者・同接)は、
+  //   読み終えた入れ物に差し替わった時点で消え、次の書き込みで保存からも消えていた(ふわっち e2e が時々30秒待つ・2026-11-12)。
+  //   読み込みは1本にまとめ、読み終えるまで全員待たせる。
+  if (!summaryMemLoading) {
+    summaryMemLoading = loadSummaryMem().finally(() => {
+      summaryMemLoading = null;
+    });
+  }
+  return summaryMemLoading;
+}
+
+async function loadSummaryMem() {
+  /** @type {Record<string, any>} */
+  let mem = {};
   try {
     const fromDb = await readAllSummaries();
-    if (fromDb && typeof fromDb === 'object') summaryMem = fromDb;
+    if (fromDb && typeof fromDb === 'object') mem = fromDb;
   } catch {
-    summaryMem = summaryMem || {};
+    mem = {};
   }
   try {
     const bag = await chrome.storage.local.get(STORAGE_KEYS.STREAM_SUMMARIES);
@@ -323,7 +338,7 @@ async function ensureSummaryMem() {
       let readBack = 0;
       for (const [vid, sum] of Object.entries(old)) {
         if (!sum || typeof sum !== 'object') continue;
-        if (summaryMem[vid]) {
+        if (mem[vid]) {
           stored += 1;
           readBack += 1;
           continue;
@@ -331,7 +346,7 @@ async function ensureSummaryMem() {
         const res = await putSummary(vid, /** @type {any} */ (sum));
         stored += res.stored;
         readBack += res.readBack;
-        if (res.readBack >= res.stored && res.stored === 1) summaryMem[vid] = sum;
+        if (res.readBack >= res.stored && res.stored === 1) mem[vid] = sum;
       }
       if (verifiedBeforeRetire({ stored, readBack }) && stored > 0) {
         await chrome.storage.local.remove(STORAGE_KEYS.STREAM_SUMMARIES);
@@ -355,6 +370,7 @@ async function ensureSummaryMem() {
       })();
     }, 5000);
   }
+  summaryMem = mem;
   return summaryMem;
 }
 

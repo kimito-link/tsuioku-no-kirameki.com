@@ -2,7 +2,7 @@
 //   パネルはタブ専用にしない(タブを移るたびに隠れて再表示=縞・v0.1.1696)。中の iframe の src だけを付け替える
 //   (sidepanel-iframe-boot-entry.js)。0.1.1949〜 src に配信キー(&stream=)を焼き、配信が変われば読み込み直す。YouTube 版の画面 yt-sidepanel.html は scripts/youtube-build.mjs の生成物。
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey } from './ytPageMeta.js';
-import { platformChannelOfUrl } from '../platform/streamPlatform.js';
+import { platformChannelOfUrl, platformOfHostname } from '../platform/streamPlatform.js';
 
 export const YT_PANEL_SRC = 'yt-sidepanel.html?inline=1&dock=sidepanel';
 
@@ -41,10 +41,46 @@ export function ytPanelStreamKeyOfUrl(url) {
   return ch ? `${ch.platform.id}:${ch.login}` : '';
 }
 
-/** @param {string} key ytPanelStreamKeyOfUrl の値 */
-export function buildYtPanelSrc(key) {
+/**
+ * タブがどのサービスのページか('youtube' か streamPlatform.js の id)。YouTube 系のタブでなければ ''。
+ *   配信ページでない(TikTok の /live・ツイキャスのトップ等)ときも分かる。配信が無いときの案内の言葉に使う(0.1.2102)。
+ * @param {unknown} url
+ */
+export function ytPanelSiteOfUrl(url) {
+  const u = String(url || '');
+  if (!isYtPanelTabUrl(u)) return '';
+  let host = '';
+  try {
+    host = new URL(u).hostname;
+  } catch {
+    return '';
+  }
+  if (/(^|\.)youtube\.com$/i.test(host)) return 'youtube';
+  const p = platformOfHostname(host);
+  return p ? p.id : '';
+}
+
+/**
+ * @param {string} key ytPanelStreamKeyOfUrl の値
+ * @param {string} [site] ytPanelSiteOfUrl の値(配信が無いときの案内に使う)
+ */
+export function buildYtPanelSrc(key, site) {
   const k = String(key || '');
-  return k ? `${YT_PANEL_SRC}&stream=${encodeURIComponent(k)}` : YT_PANEL_SRC;
+  const st = String(site || '');
+  let src = k ? `${YT_PANEL_SRC}&stream=${encodeURIComponent(k)}` : YT_PANEL_SRC;
+  if (st) src += `&site=${encodeURIComponent(st)}`;
+  return src;
+}
+
+/** iframe の src(または location.search)からサービスを読む @param {unknown} src */
+export function readYtPanelSite(src) {
+  try {
+    const s = String(src || '');
+    const q = s.includes('?') ? s.slice(s.indexOf('?')) : s;
+    return String(new URLSearchParams(q).get('site') || '');
+  } catch {
+    return '';
+  }
 }
 
 /** iframe の src(または location.search)から配信キーを読む @param {unknown} src */
