@@ -43,7 +43,9 @@ describe('venueLaneEmptyKeep.wiring（会場の空keepガード配線）', () =>
   });
 
   it('配信切替(activeLiveId !== liveId)のリセットで lastTiled をクリアする', () => {
-    const idx = venueSrc.indexOf('if (activeLiveId !== liveId) {');
+    // 0.1.2110〜 リセットは resetVenueForLive に切り出し(集計と配信の移動検知の両方から呼ぶ)
+    expect(venueSrc).toMatch(/if \(activeLiveId !== liveId\) resetVenueForLive\(liveId\);/);
+    const idx = venueSrc.indexOf('const resetVenueForLive = (liveId) => {');
     expect(idx).toBeGreaterThan(-1);
     const block = venueSrc.slice(idx, idx + 1200);
     expect(block).toMatch(/_venueStoryUserLaneLastTiledLid\s*=\s*''\s*;/);

@@ -185,6 +185,8 @@ export const STREAM_PLATFORMS = Object.freeze({
     lateIconsKey: 'yt_tt_icons',
     emotesKey: '',
     rankSentence: 'ギフトのコインの合計の順位（上位）を表示します。このPCの記録から数えます。',
+    // 公式の順位はギフトのランキングではなく「配信中の視聴者ランキング」(この配信で贈ったコインの順・期間は STREAM)
+    boardName: '視聴者ランキング',
     officialBoard: '「配信中の視聴者ランキング」',
     // 視聴者ランキングの score(この配信で贈ったコインとみている・未確認)
     boardUnit: 'コイン',

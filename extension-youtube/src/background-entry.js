@@ -1265,7 +1265,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const rows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
     if (!videoId || !rows.length) return false;
     // Twitch の公式ランキングは期間がチャンネルごとに違う(累計・今月・今週・今日)。見出しに出すので一緒に置く
-    const period = ['ALLTIME', 'MONTH', 'WEEK', 'DAY', 'LEVEL'].includes(String(payload.period || '')) ? String(payload.period) : '';
+    const period = ['ALLTIME', 'MONTH', 'WEEK', 'DAY', 'LEVEL', 'STREAM'].includes(String(payload.period || '')) ? String(payload.period) : '';
     // 0.1.1959: 中身が前回と同じなら書かない(TikTok・SHOWROOM は同じ表を決まった間隔で送ってくる。書くたびに横の欄が描き直していた)
     const sig = ytLeaderboardSig(rows, period);
     if (lastLeaderboardSig.get(videoId) === sig) return false;

@@ -76,10 +76,14 @@ const RULES = [
   ['来場者数が未取得のため、来場とコメントの変換率は判定できません。', 'YouTube には来場者数がないため、来場とコメントの変換率は出しません。'],
   // 「ページの通信から人の情報をもらう」取り込みは YouTube では使わない(記録に名前と顔が入っている)。0件は正常
   ['取り込みは成功しましたが0件でした。watchを開いたままポップアップを更新するか、ページを再読み込みしてください。', 'YouTube 版では使いません（記録に名前と顔が入っているため・正常）。'],
+  // ギフト履歴の欄(ニコ生の「番組」・コメント観測の「投げ回数」はニコ生だけの言葉。他のサービスはこのPCで記録したギフトから数える・2026-11-12 TikTok 実ページで残りを発見)
+  //   ★最後に置く: 上の「ニコ生の「この番組へのギフト履歴」に近い形で」の長い文を先に変えるため
+  ['ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。', 'ユーザー別（多い順・最大10）。このPCで記録したギフトから数えます。'],
+  ['この番組へのギフト履歴', 'この配信へのギフト履歴'],
 ];
 
 /** 置き換えが起こりうる文字か(速く素通しするため) */
-const QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした|なふだ|数値|a:）|サイドバー/;
+const QUICK = /貢|ニコ|niconico|来場|取得できます|広告ランキング|0件でした|なふだ|数値|a:）|サイドバー|番組へのギフト履歴|投げ回数/;
 
 /**
  * @param {string} text
@@ -152,7 +156,7 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  *   boardPlace: 公式ランキングがある場所(無ければ「チャット欄のランキング」)
  *   name: 'Twitch' / 'Kick'、paid: 'Bits' / 'Kicks'(src/lib/platform/streamPlatform.js の表)
  *   officialBoard: そのサービスの画面での公式ランキングの名前(例: Kick の「歴代トップKICKユーザー」)
- *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY' / 'LEVEL'・無ければ累計)。Twitch はチャンネルごとに違う
+ *   boardPeriod: 公式ランキングの期間('ALLTIME' / 'MONTH' / 'WEEK' / 'DAY' / 'LEVEL' / 'STREAM'・無ければ累計)。Twitch はチャンネルごとに違う
  *   boardUnit: 公式ランキングの数の単位(無ければ paid。SHOWROOM・ミクチャは paid が「ギフト」なので「6,430 ギフト」にならないよう pt)
  */
 
@@ -160,7 +164,7 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const fixedRulesCache = new Map();
 /** @param {WordingPlatform} p */
 function fixedRules(p) {
-  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.noSubs ? 1 : 0}`;
+  const k = `${p.name}|${p.paid}|${p.boardPeriod || ''}|${p.boardName || ''}|${p.noSubs ? 1 : 0}`;
   const hit = fixedRulesCache.get(k);
   if (hit) return hit;
   const svc = `(?:YouTube|${esc(p.name)})`;
@@ -194,6 +198,8 @@ const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
   DAY: ['今日', '今日'],
   // ツイキャスのサポーターランキング: 配信者の今のサポーターレベルでのアイテムスコアの順(期間の切り替えは無い・2026-11-12 PC 実測)
   LEVEL: ['現在のレベルのアイテムスコア', '現在のレベル'],
+  // TikTok の配信中の視聴者ランキング: この配信で贈ったコインの順(配信が変われば数え直し・累計ではない)
+  STREAM: ['この配信', 'この配信'],
 });
 
 /**
@@ -202,11 +208,13 @@ const BOARD_PERIOD_WORDS = /** @type {Record<string, [string, string]>} */ ({
  */
 export function officialWords(p) {
   const [inSentence, inHeading] = BOARD_PERIOD_WORDS[String(p.boardPeriod || 'ALLTIME')] || BOARD_PERIOD_WORDS.ALLTIME;
-  const board = p.boardName || `${p.paid} ランキング`;
+  // 英字の名前(Kicks・Bits)の前後だけ空ける。「公式の 視聴者ランキング」「ギフト ランキング」のような日本語の間の空白は出さない
+  const board = p.boardName || `${p.paid}${/[A-Za-z0-9]$/.test(p.paid) ? ' ' : ''}ランキング`;
+  const sp = /^[A-Za-z0-9]/.test(board) ? ' ' : '';
   return {
     // Kick のチャット欄のランキングは6つあり、最初に見えるのは週間のサブ。どれと同じかを名前で書く(2026-11-08 PC 実測)
-    sentence: `${p.name} 公式の ${board}（${inSentence}・上位）を表示します。${p.name} の${p.boardPlace || 'チャット欄のランキング'}${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
-    heading: `${p.name} 公式の ${board}（${inHeading}）`,
+    sentence: `${p.name} 公式の${sp}${board}（${inSentence}・上位）を表示します。${p.name} の${p.boardPlace || 'チャット欄のランキング'}${p.officialBoard ? `の${p.officialBoard}` : ''}と同じ値です。`,
+    heading: `${p.name} 公式の${sp}${board}（${inHeading}）`,
     word: board,
   };
 }
@@ -256,7 +264,7 @@ export function ytWordingPlatformOfficial(text, p) {
  */
 export function ytWordingPlatformFixed(text, p) {
   let out = String(text ?? '');
-  if (!/トップファン|スパチャ|スーパーチャット/.test(out) && !out.includes(p.paid)) return out;
+  if (!/トップファン|スパチャ|スーパーチャット/.test(out) && !out.includes(p.paid) && !(p.boardName && out.includes(p.boardName))) return out;
   for (const [from, to] of fixedRules(p)) out = out.replace(from, to);
   return out;
 }

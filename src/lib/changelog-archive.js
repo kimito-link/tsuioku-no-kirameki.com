@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2088',
+    date: '2026-11-12',
+    summary: '他の配信の段の案内をニコ生の言葉から直す',
+    items: Object.freeze([
+      'ツイキャスなど他の配信で、りんく・こん太・たぬ姉の段の案内に残っていたニコ生だけの言葉（「数値ユーザーID」「匿名（a:）」）を、どの配信にも当てはまる言葉に直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2087',
     date: '2026-11-12',
     summary: 'ツイキャスの配信も同じ画面で記録',
