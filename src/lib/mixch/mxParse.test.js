@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseMxUserIdFromUrl,
+  mxIconFromRaw,
+  mxIconsFromRanking,
+  mxProfileUrl,
+  parseMxProfileIcon,
   mxLiveInfoUrl,
   mxMessagesUrl,
   mxItemsUrls,
@@ -143,5 +147,39 @@ describe('ギフトの絵(資源の index.json → file → preview・2026-11-08
     expect(mxResourcePreviewUrl({ preview: '//evil.example/a.png' })).toBe('');
     expect(mxResourcePreviewUrl({ preview: '/a/../b.png' })).toBe('');
     expect(mxResourcePreviewUrl({})).toBe('');
+  });
+});
+
+describe('mxIconFromRaw / mxIconsFromRanking(コメントにはアイコンが来ない・2026-11-12 PC 実測)', () => {
+  const ICON = 'https://d2jtsb989t238a.cloudfront.net/u/7.jpg';
+  it('コメント(kind 0)の実測の形にはアイコンが無い→帳面には何も足さない', () => {
+    const comment = { body: 'こんばんわ', created: 1762950000, kind: 0, level: 3, message_id: 'abc', name: 'りんく', superfan_rank: 0, user_id: 7, vip_rank: { rank: 0, rank_group: 0 } };
+    expect(mxIconFromRaw(comment)).toBeNull();
+    expect(parseMxMessage(comment, { userId: '5' })?.iconUrl).toBe('');
+  });
+  it('ギフトの行からは user_id とアイコンを覚える・匿名と許していない置き場は覚えない', () => {
+    expect(mxIconFromRaw({ kind: 45, user_id: 7, profile_image_url: ICON, anonymous: 0 })).toEqual(['7', ICON]);
+    expect(mxIconFromRaw({ kind: 45, user_id: 7, profile_image_url: ICON, anonymous: 1 })).toBeNull();
+    expect(mxIconFromRaw({ kind: 45, user_id: 7, profile_image_url: 'https://evil.example/x.jpg' })).toBeNull();
+    expect(mxIconFromRaw({ kind: 45, user_id: 7, profile_image_url: '' })).toBeNull();
+  });
+  it('ファンランキングは人の番号が id(user_id ではない)', () => {
+    const m = mxIconsFromRanking({ superfans: [{ id: 7, name: 'りんく', profile_image_url: ICON, score: 10 }, { id: 8, name: 'x', profile_image_url: '' }, null] });
+    expect([...m]).toEqual([['7', ICON]]);
+    expect(mxIconsFromRanking(null).size).toBe(0);
+  });
+});
+
+describe('mxProfileUrl / parseMxProfileIcon(ギフトもランキングも無い人のアイコン・2026-11-12 PC 実測)', () => {
+  const ICON = 'https://d2jtsb989t238a.cloudfront.net/p/18027637/1700000000/small';
+  it('口は /api-web/users/<id>/profile・番号でなければ空', () => {
+    expect(mxProfileUrl('18027637')).toBe('https://mixch.tv/api-web/users/18027637/profile');
+    expect(mxProfileUrl('abc')).toBe('');
+  });
+  it('実測の形 {id, name, profile_image_url} から画像を取る・別の人の応答や空は使わない', () => {
+    expect(parseMxProfileIcon({ id: 18027637, name: 'x', profile_image_url: ICON }, '18027637')).toBe(ICON);
+    expect(parseMxProfileIcon({ id: 1, name: 'x', profile_image_url: ICON }, '18027637')).toBe('');
+    expect(parseMxProfileIcon({ id: 18027637, name: 'x', profile_image_url: '' }, '18027637')).toBe('');
+    expect(parseMxProfileIcon(null, '18027637')).toBe('');
   });
 });
