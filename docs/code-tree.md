@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1262 件
+## ⚠️ 役割コメントが無いソース 10 / 1263 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1194,7 +1194,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2459)
+- 📁 **src/** (2464)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1503,7 +1503,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2174)
+  - 📁 **lib/** (2179)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1513,8 +1513,9 @@
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
-    - 📁 **kick/** (5)
+    - 📁 **kick/** (6)
       - `kickApi.js` — kick.com のページ自身が使う API(/api/v2/channels/<slug>)の応答を、形を確かめて読む(純関数)
+      - `kickChatHistory.test.js`
       - `kickChatParse.js` — Kick のチャット(ページ自身が使う Pusher)の1件を、YouTube 版の記録と同じ形にする(純関数)
       - `kickChatParse.test.js`
       - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
@@ -2151,6 +2152,7 @@
     - `effectDirector.test.js`
     - `effectSoundPlayer.js` — ギフト/広告/応援者ランキング順位変動に鳴らす短い効果音の再生ロジック(純関数+再生本体)。
     - `effectSoundPlayer.test.js`
+    - `effectSoundPrefetch.test.js`
     - `embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
     - `embeddedDataExtract.test.js`
     - `enrichUserLaneAggregatesEquivalence.test.js`
@@ -3428,6 +3430,9 @@
     - `venueBubbleLifecycle.test.js`
     - `venueBubbleVoiceHold.js` — 会場の吹き出しを「声が始まる時」に出すかどうか(v0.1.1979・2026-11-10 りんく決定「声と一緒に出す」)。
     - `venueBubbleVoiceHold.test.js`
+    - `venueBubbleVoiceSync.js` — 会場の吹き出しと読み上げの声を「ぴったり・テンポよく」合わせる(2026-11-12 りんく「全部のプラットフォーム
+    - `venueBubbleVoiceSync.sim.test.js`
+    - `venueBubbleVoiceSync.test.js`
     - `venueButtonVisible.wiring.test.js`
     - `venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
     - `venueCharacterFrame.test.js`

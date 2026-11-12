@@ -486,3 +486,31 @@ export function mergeVoiceSpeedBoost(congestionBoost, sustainedBoost) {
   // 下げない(max)。既存の挙動を悪化させないことを型で保証する。
   return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(base, extra));
 }
+
+/**
+ * 2026-11-12: 列に入れた1件の声が鳴り始めるまでの見込み(ms)。会場の吹き出しを声に合わせて待たせるか
+ *   (venueBubbleVoiceSync.js)に使う。件数の上限と同じ物差し(1文字の長さ・合成の比)で数える。
+ *   = 今の件の残り + 前に待つ件それぞれ(max(声の長さ, 固定費+声の長さ×比)) + 自分の声づくりが前の声からはみ出す分。
+ * @param {{ currentRemainingMs?: number, aheadChars?: number[], selfChars?: number }} q
+ * @param {ReturnType<typeof createVoicePaceState> | null | undefined} paceState
+ * @param {number} [synthRtf] 合成時間÷声の長さ(分からなければ 0)
+ * @returns {number}
+ */
+export function estimateVoiceStartDelayMs(q, paceState, synthRtf = 0) {
+  const learned = Number(paceState?.charMsEma);
+  const perChar = learned > 0 ? learned : VOICE_CHAR_MS_DEFAULT;
+  const rtf = Number(synthRtf) > 0 ? Number(synthRtf) : 0;
+  const natural = (/** @type {unknown} */ n) => Math.max(VOICE_ITEM_MIN_MS, Math.max(0, Math.floor(Number(n) || 0)) * perChar);
+  const cost = (/** @type {number} */ nat) => (rtf > 0 ? Math.max(nat, VOICE_SYNTH_FIXED_MS + nat * rtf) : nat);
+  let total = Math.max(0, Number(q?.currentRemainingMs) || 0);
+  let prevPlay = total;
+  for (const n of Array.isArray(q?.aheadChars) ? q.aheadChars : []) {
+    const nat = natural(n);
+    total += cost(nat);
+    prevPlay = nat;
+  }
+  // 自分の声づくりは前の件の声が鳴っている間に進む(先読み1件)。間に合わない分だけ遅れる。
+  const selfSynth = rtf > 0 ? VOICE_SYNTH_FIXED_MS + natural(q?.selfChars) * rtf : VOICE_SYNTH_FIXED_MS;
+  total += Math.max(0, selfSynth - prevPlay);
+  return Math.round(total);
+}

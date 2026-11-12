@@ -455,6 +455,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    // 2026-11-12 計器: 吹き出しと声のずれ・届いてから吹き出しまで(venueBubbleVoiceSync.js)。
+    try {
+      const bvLine = String(/** @type {any} */ (venueSeatsDiag)?.bubbleVoiceSync?.line || '');
+      if (bvLine) lines.push(bvLine);
+    } catch {
+      /* no-op */
+    }
     // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断(使用時のみ)。「ちゃんと飛ぶか・音が出るか」を共有に載せる。
     try {
       const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now(), (Array.isArray(livesData) ? livesData : []).map((/** @type {any} */ l) => l?.lv));

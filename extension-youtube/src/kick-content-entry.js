@@ -23,7 +23,7 @@ try {
     });
   }
 } catch { /* 計器 */ }
-import { kickChannelApiUrl, parseKickChannel, parseKickUserIcon, parseKickKicksLeaderboard, kickKicksLeaderboardUrl, parseKickSubsLeaderboard, kickSubsLeaderboardUrl } from '../../src/lib/kick/kickApi.js';
+import { kickChatHistoryUrl, parseKickChatHistory, kickChannelApiUrl, parseKickChannel, parseKickUserIcon, parseKickKicksLeaderboard, kickKicksLeaderboardUrl, parseKickSubsLeaderboard, kickSubsLeaderboardUrl } from '../../src/lib/kick/kickApi.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
   KICK_REALTIME_CONNECTION_URL,
@@ -86,6 +86,9 @@ const diag = {
   /** @type {Record<string, number>} 来たイベント名ごとの数(名前が変わったら気づくため) */
   events: {},
   items: 0,
+  /** 開いた時点(とつなぎ直し)の過去ログから入れた数・読めなかった回数 */
+  historyItems: 0,
+  historyFail: 0,
   kicks: 0,
   subs: 0,
   gifts: 0,
@@ -434,6 +437,24 @@ function startReader(slug, key, ids) {
     if (Date.now() - subBoardAt >= BOARD_REFRESH_MS) void fetchSubBoard();
   }, 60_000);
 
+  // 開いた時点でチャット欄に出ている過去ログを記録に入れる(つないだ後に来た分しか記録せず、開いた直後は「記録 0」に見えた・
+  //   2026-11-12 PC 実測: kuru96 で過去ログ25行中1行しか記録されず、YouTube は 73行全部)。
+  //   つなぎ直したときも読む(切れていた間の分を拾う)。同じ id は seen と保存側の pk で1件になる。
+  const fetchHistory = async () => {
+    const url = kickChatHistoryUrl(ids.channelId);
+    if (!url || stopped) return;
+    try {
+      const frames = parseKickChatHistory(await getJson(url));
+      if (stopped) return;
+      const before = diag.items + pending.length;
+      for (const f of frames) onEvent(f);
+      diag.historyItems += Math.max(0, diag.items + pending.length - before);
+    } catch {
+      diag.historyFail += 1;
+    }
+    saveDiagSoon();
+  };
+
   /** Pusher の1通 @param {string} raw */
   const onPusherFrame = (raw) => {
     const f = parsePusherFrame(raw);
@@ -444,6 +465,7 @@ function startReader(slug, key, ids) {
       diag.wsState = 'open';
       backoff = 1000;
       for (const channel of chans) send({ event: 'pusher:subscribe', data: { auth: '', channel } });
+      void fetchHistory();
       saveDiagSoon();
       return;
     }
@@ -472,6 +494,7 @@ function startReader(slug, key, ids) {
           diag.wsState = 'open';
           backoff = 1000;
           chans.forEach((channel, i) => send(centrifugoSubscribeMsg(channel, i + 2)));
+          void fetchHistory();
           saveDiagSoon();
         } else if (m.id >= 2 && m.ok) diag.subscribed += 1;
         else if (!m.ok) diag.wsLastErrorAt = Date.now();

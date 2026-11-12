@@ -5,7 +5,8 @@
 //   会場の作り・見た目・席・吹き出し・読み上げはニコ生版の venueBar.js のまま(手を加えない)。
 //   ★2026-11-04 りんく「このかたちがいい」(ニコ生版の視聴ページのボタン)・「画面をくろくおおわないで」(0.1.69 の重ね窓は撤去)。
 import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey, streamKeyForWatchUrl, ytSummaryToNicoSnapshot } from './ytNicoShim.js';
-import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets } from './ytLocalAssetUrls.js';
+import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets, ytPrefetchLocalAssetsInOrder } from './ytLocalAssetUrls.js';
+import { listBundledEffectSoundPaths } from '../../src/lib/effectSoundPlayer.js';
 import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
 import { ytShouldVoiceWhenCrowded, ytCrowdSpeedBoost, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
@@ -129,6 +130,9 @@ const PREFETCH = [
 void ytPrefetchLocalAssets(PREFETCH).then(() => {
   setInterval(sync, 1000);
   sync();
+  // ギフト・広告・順位の効果音も blob: にしておく(会場を出した後に裏で1本ずつ)。
+  //   chrome-extension:// の mp3 をページの中で直接読むと YouTube の見張りに弾かれ、最初の1回が鳴らなかった。
+  void ytPrefetchLocalAssetsInOrder(listBundledEffectSoundPaths());
 });
 
 if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

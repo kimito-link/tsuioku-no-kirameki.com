@@ -382,7 +382,7 @@ import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, with
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } from '../lib/venueComposeBox.js';
-import { shouldHoldBubbleForVoice, VENUE_BUBBLE_VOICE_HOLD_MS } from '../lib/venueBubbleVoiceHold.js';
+import { createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync } from '../lib/venueBubbleVoiceSync.js';
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
@@ -3720,6 +3720,9 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-21 応援TOP吹き出しchurn計器(診断先行アプローチ): 生成頻度・寿命分布・強制退去を
   //   累積で数える(観測のみ・修正はしない)。
   const _bubbleChurn = createVenueBubbleChurnState();
+  // v0.1.1979: 吹き出しを声に合わせる / 2026-11-12: ぴったり・テンポよく(中身と計器は lib の venueBubbleVoiceSync.js)。
+  const _bubbleVoiceSync = createVenueBubbleVoiceSyncState();
+  try { /** @type {any} */ (globalThis).__venueBubbleVoiceHoldDiag = _bubbleVoiceSync.diag; } catch { /* 計器の公開に失敗しても会場は止めない */ }
   const _bubbleBurst = createVenueBubbleBurstState();
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
@@ -6189,6 +6192,8 @@ export function mountVenueBarButton(options = {}) {
       bubbleChurn: toVenueBubbleChurnDiag(_bubbleChurn),
       // 2026-11-04 計器: 吹き出しが一気に出た束(過去ログ/まとめ届き/本当に一気)。★ここに載せないと状態速報に出ない。
       bubbleBurst: toVenueBubbleBurstDiag(_bubbleBurst, Date.now()),
+      // 2026-11-12 計器: 吹き出しと声のずれ・届いてから吹き出しまで(venueBubbleVoiceSync.js)。★ここに載せないと状態速報に出ない。
+      bubbleVoiceSync: summarizeBubbleVoiceSync(_bubbleVoiceSync),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now()),
       // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。ユーザー報告
       //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため。
@@ -6710,10 +6715,6 @@ export function mountVenueBarButton(options = {}) {
     }, AGGREGATE_INTERVAL_MS);
   };
 
-  // v0.1.1979: 吹き出しを声に合わせる。最後に声が本当に鳴り始めた時刻と、待たせた結果の数(計器・観測のみ)。
-  let _lastVoiceAudioStartAt = 0;
-  const _bubbleVoiceHoldDiag = { held: 0, shownWithVoice: 0, droppedWhileHeld: 0, timedOutDropped: 0, timedOutKeptVoice: 0 };
-  try { /** @type {any} */ (globalThis).__venueBubbleVoiceHoldDiag = _bubbleVoiceHoldDiag; } catch { /* 計器の公開に失敗しても会場は止めない */ }
   // v0.1.752: storage poll とリアルタイム live feed の両方が通る共通処理。引数 rows から
   //   新着発言を抽出(pickNewVenueSpeech)→席へマージ→吹き出し+読み上げ。両経路が同じ
   //   speechState.seenKeys を共有するので、同じコメントが poll と live で来ても1回だけ吹く。
@@ -6794,88 +6795,34 @@ export function mountVenueBarButton(options = {}) {
     }
     let _burstShown = 0;
     for (const speech of result.speeches) {
-      // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
-      //   旧実装は読み上げON時に onPlayStart(声の再生開始)で吹き出していたが、VOICEVOXが
-      //   無い/起動していないと声が鳴らず onPlayStart が呼ばれない→吹き出しが永久に出ない
-      //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
-      //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
-      // ★v0.1.1979(りんく決定「声と一緒に出す」): 声が最近ちゃんと鳴っているときは、読むコメントの吹き出しを
-      //   声が鳴り始める時まで待たせる(最大3秒)。声が無い・止まっているときは上のとおり今すぐ出す(venueBubbleVoiceHold.js)。
-      const holdForVoice = shouldHoldBubbleForVoice({
-        voiceEnabled: voicePlayer.enabled, lastAudioStartAt: _lastVoiceAudioStartAt, now: Date.now(), primeBurst
+      // 吹き出しは声(VOICEVOX)に頼らせない(v0.1.757): 声が無い・止まっているときはしゃべった瞬間に出す。
+      // ★v0.1.1979(りんく決定「声と一緒に出す」)/2026-11-12(「テンポよくドンピシャ」): 声が鳴っているときは、読むコメントの
+      //   吹き出しを声が鳴り始める瞬間に出す。見込みが3秒を超える件は待たせず読まずに出す(lib の venueBubbleVoiceSync.js)。
+      const shownNow = startVenueSpeechBubbleVoice(_bubbleVoiceSync, speech, {
+        voicePlayer, primeBurst, arrivedAt: speechReceivedAt,
+        isOpen: () => open,
+        showBubble: showSpeechBubble,
+        onSpeaking: markBubbleSpeaking,
+        onDone: markBubbleDone,
+        onResolved: markBubbleResolved,
+        // ★キャラの相槌は onAudioStart(本当に audio.play() が走った時だけ)に乗せる(2026-08-25)。
+        onCharaSpoken: () => charaLive.onCommentSpoken({ commentKey: speech.key, text: speech.text }),
+        onCharaEnd: () => charaLive.onCommentSpokenEnd(),
+        onAudible: () => pickupVoice.onSpoken(speech),
+        itemFields: {
+          // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
+          receivedAt: primeBurst ? undefined : speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
+          liveId: liveIdFromPathname(), broadcasterUid: _lastBroadcasterUid // v0.1.1861: 混雑時に配信者・初コメを読む判定
+        },
+        // v0.1.1794: コメビュが同じ配信を読んでいれば鳴らさない(吹き出しは声なしの寿命へ)。
+        lease: venueReaderLease ? { whenMine: (lid, mine, other) => venueReaderLease.whenMine(lid, mine, other), liveId: liveIdFromPathname() } : null,
+        onReaderYield: () => { voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1; }
       });
-      let bubble = holdForVoice ? null : showSpeechBubble(speech);
-      if (bubble || holdForVoice) _burstShown += 1;
-      let bubbleRevealed = !holdForVoice;
-      let bubbleHoldTimer = 0;
-      const revealBubble = () => {
-        if (bubbleRevealed) return;
-        bubbleRevealed = true;
-        if (bubbleHoldTimer) { clearTimeout(bubbleHoldTimer); bubbleHoldTimer = 0; }
-        if (open) bubble = showSpeechBubble(speech);
-      };
-      if (holdForVoice) _bubbleVoiceHoldDiag.held += 1;
+      if (shownNow) _burstShown += 1;
       // v0.1.778: ギフト/広告コメントなら投げ主のサムネから中央映像へアイテムを投げる。
       maybeThrowGiftFromSpeech(speech);
       // 2026-07-06: 来場システムメッセージならパチンコ入賞演出(保留玉が入る)として投げる。
       maybeThrowArrivalFromSpeech(speech);
-      if (voicePlayer.enabled) {
-        // v0.1.771: 吹き出しを読み上げに連動。実際に鳴り始めたら speaking(消さない)、鳴り終えたら done。
-        // v0.1.799「読み上げとコメントがずれる」根治: 床を鮮度ゲート(8秒)に合わせたので、鳴らずに
-        //   捨てられた吹き出しが pending のまま8秒残らないよう、onDropped(再生では発火しない drop 専用
-        //   シグナル)で resolved を通知し unvoiced(流速寿命)へ落とす。再生時は onAudioStart→speaking。
-        //   onPlayStart(再生/破棄の両方で発火する曖昧信号)は配線しない(取りこぼし回避・従来どおり)。
-        //   bubble が無い(空テキスト等で出なかった)場合は no-op で安全。
-        // 鳴らずに捨てられた時: 待たせていた吹き出しを出し、相槌を畳む(声が無いのに頷いたまま残さない)。
-        const onVoiceDropped = () => {
-          if (!bubbleRevealed && bubbleHoldTimer) _bubbleVoiceHoldDiag.droppedWhileHeld += 1; // v0.1.1980: 待たせている間に声の側で外された件(3秒の見切りとは別に数える)
-          revealBubble();
-          if (bubble) markBubbleResolved(bubble);
-          charaLive.onCommentSpokenEnd();
-        };
-        const voiceIt = () => voicePlayer.enqueue([{
-          kind: 'comment',
-          userId: speech.userId,
-          nickname: speech.name,
-          key: speech.key,
-          text: speech.text,
-          // 2026-10-22計器(P1): 受信時刻。読み上げの「受信→キュー」の遅れを測る。
-          receivedAt: primeBurst ? undefined : speech.capturedAt > 0 ? speech.capturedAt : speechReceivedAt,
-          liveId: liveIdFromPathname(), broadcasterUid: _lastBroadcasterUid, // v0.1.1861: 混雑時に配信者・初コメを読む判定
-          // ★キャラライブの相槌はここに乗せる(2026-08-25)。
-          //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
-          //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
-          //   発火する曖昧信号)に乗せると、鳴っていないのに頷く事故になる。
-          onAudible: () => pickupVoice.onSpoken(speech),
-          onAudioStart: () => {
-            _lastVoiceAudioStartAt = Date.now();
-            if (!bubbleRevealed) _bubbleVoiceHoldDiag.shownWithVoice += 1;
-            revealBubble();
-            if (bubble) markBubbleSpeaking(bubble);
-            charaLive.onCommentSpoken({ commentKey: speech.key, text: speech.text });
-          },
-          onAudioEnd: () => {
-            if (bubble) markBubbleDone(bubble);
-            charaLive.onCommentSpokenEnd();
-          },
-          onDropped: onVoiceDropped
-        }]);
-        if (holdForVoice) {
-          bubbleHoldTimer = window.setTimeout(() => {
-            bubbleHoldTimer = 0;
-            if (bubbleRevealed) return;
-            // 3秒待っても声が始まらない: まだ声づくりを頼んでいない件は読まずに外す(onVoiceDropped が吹き出しを出す)。
-            //   声づくりの途中なら捨てず、吹き出しだけ先に出して声を待つ(遅い PC で1件も鳴らなくなるのを防ぐ)。
-            const r = voicePlayer.dropQueuedUnstarted(onVoiceDropped);
-            if (r === 'dropped') _bubbleVoiceHoldDiag.timedOutDropped += 1;
-            else _bubbleVoiceHoldDiag.timedOutKeptVoice += 1;
-            revealBubble();
-          }, VENUE_BUBBLE_VOICE_HOLD_MS);
-        }
-        // v0.1.1794: コメビュが同じ配信を読んでいれば鳴らさない(吹き出しは声なしの寿命へ)。届いた順に答える。
-        if (!venueReaderLease) voiceIt();
-        else venueReaderLease.whenMine(liveIdFromPathname(), voiceIt, () => { revealBubble(); if (bubble) markBubbleResolved(bubble); voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1; });
-      }
     }
     // 2026-11-04 計器(観測のみ): この束で何件吹いたか・経路・取り込み元・その時の配信の流量。
     try {

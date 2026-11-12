@@ -122,3 +122,44 @@ export function kickKicksLeaderboardUrl(id) {
   const s = String(id ?? '').trim();
   return /^\d{1,20}$/.test(s) ? `https://web.kick.com/api/v1/kicks/${s}/leaderboard` : '';
 }
+
+/**
+ * 開いた時点の過去ログ(kick.com のチャット欄が最初に出す分)。番号はチャンネル id(chatroom id ではない)。
+ *   2026-11-12 PC 実測: GET web.kick.com/api/v1/chat/<channel.id>/history → 24件・新しい順・クッキー無しでも 200。
+ * @param {string | number} channelId
+ */
+export function kickChatHistoryUrl(channelId) {
+  const s = String(channelId ?? '').trim();
+  return /^\d{1,20}$/.test(s) ? `https://web.kick.com/api/v1/chat/${s}/history` : '';
+}
+
+/**
+ * 過去ログの応答 → チャットのイベント(リアルタイムの ChatMessageEvent と同じ形)の配列・古い順。
+ *   形は {data:{messages:[{id, content, type, created_at, sender{...}, metadata(JSON 文字列)}], cursor}}(2026-11-12 PC 実測)。
+ *   形が違えば []・壊れた1件だけ捨てる(AGENTS.md §3.6)。
+ * @param {unknown} json
+ * @returns {Array<{ event: string, channel: string, data: Record<string, any> }>}
+ */
+export function parseKickChatHistory(json) {
+  const o = obj(json);
+  const d = obj(o?.data) || o;
+  const list = Array.isArray(d?.messages) ? d.messages : [];
+  /** @type {Array<{ event: string, channel: string, data: Record<string, any> }>} */
+  const out = [];
+  for (const m0 of list.slice(0, 200)) {
+    const m = obj(m0);
+    if (!m || !String(m.id ?? '').trim() || !obj(m.sender)) continue;
+    let metadata = m.metadata;
+    if (typeof metadata === 'string') {
+      try {
+        metadata = JSON.parse(metadata);
+      } catch {
+        metadata = null;
+      }
+    }
+    out.push({ event: 'ChatMessageEvent', channel: 'history', data: { ...m, metadata: obj(metadata) } });
+  }
+  // 新しい順で来るので、古い順に並べ直す(記録の順番をチャット欄と同じにする)
+  out.sort((a, b) => parseKickTime(a.data.created_at) - parseKickTime(b.data.created_at));
+  return out;
+}

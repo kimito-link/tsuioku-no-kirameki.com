@@ -11,7 +11,8 @@
 // 仕組み: chrome.runtime.getURL(rel) を、読み済みなら blob: を返すように包む(ニコ生版の venueBar.js は
 //   画像を出す直前に毎回 getURL を呼ぶので、そのまま効く)。まだなら元の URL を返し、裏で読み込む。
 
-const ASSET_RE = /^(?:images|sound)\/[\w\-./]+\.(?:png|jpe?g|gif|webp|svg|mp3|ogg|wav)$/i;
+/** blob: に読み替えられる拡張の中のファイル(画像・音)。 */
+export const YT_LOCAL_ASSET_RE = /^(?:images|sound)\/[\w\-./]+\.(?:png|jpe?g|gif|webp|svg|mp3|ogg|wav)$/i;
 
 /** @type {Map<string, string>} rel → blob: */
 const ready = new Map();
@@ -41,7 +42,7 @@ function b64ToBlobUrl(b64, mime) {
  */
 export function ytLoadLocalAsset(rel) {
   const key = String(rel || '').replace(/^\/+/, '');
-  if (!ASSET_RE.test(key) || key.includes('..')) return Promise.resolve('');
+  if (!YT_LOCAL_ASSET_RE.test(key) || key.includes('..')) return Promise.resolve('');
   const hit = ready.get(key);
   if (hit) return Promise.resolve(hit);
   const p = loading.get(key);
@@ -102,7 +103,7 @@ export function ytInstallLocalAssetUrls() {
     const wrapped = (p) => {
       const url = orig(p);
       const key = String(p || '').replace(/^\/+/, '');
-      if (!ASSET_RE.test(key)) return url;
+      if (!YT_LOCAL_ASSET_RE.test(key)) return url;
       const hit = ready.get(key);
       if (hit) return hit;
       void ytLoadLocalAsset(key);
@@ -127,4 +128,27 @@ export function ytInstallLocalAssetUrls() {
 export function ytPrefetchLocalAssets(rels, timeoutMs = 2500) {
   const all = Promise.all(rels.map((r) => ytLoadLocalAsset(r)));
   return Promise.race([all, new Promise((r) => setTimeout(r, timeoutMs))]);
+}
+
+/**
+ * 音など、会場を出すのを待たせなくてよいものを裏で1本ずつ読む(遅い PC で一度に詰め込まない)。
+ *   ギフト音は最初の1回目から blob: で鳴らすため(2026-11-12: YouTube の会場でギフト音が
+ *   「Unsafe attempt to load URL chrome-extension://…/sound/tiers/gift-*.mp3」で6回弾かれていた)。
+ * @param {string[]} rels
+ * @param {{ load?: (rel: string) => Promise<string>, gapMs?: number }} [deps]
+ * @returns {Promise<number>} blob: にできた本数
+ */
+export async function ytPrefetchLocalAssetsInOrder(rels, deps = {}) {
+  const load = deps.load || ytLoadLocalAsset;
+  const gapMs = typeof deps.gapMs === 'number' ? deps.gapMs : 50;
+  let ok = 0;
+  for (const rel of rels) {
+    try {
+      if (await load(rel)) ok++;
+    } catch {
+      /* 1本読めなくても残りは読む */
+    }
+    if (gapMs > 0) await new Promise((r) => setTimeout(r, gapMs));
+  }
+  return ok;
 }

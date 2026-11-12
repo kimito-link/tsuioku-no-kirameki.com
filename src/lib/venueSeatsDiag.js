@@ -42,6 +42,8 @@
  *   bubbleBurst: { line: string, bursts: number, maxShown: number, capDropped: number,
  *     sameTextRepeat: number, noCommentNo: number, skippedOld: number, peakRatePerSec: number,
  *     burstByKind: Record<string, number>, burstBySource: Record<string, number> }|null,
+ *   bubbleVoiceSync: { line: string, n: number, voiced: number, gapP50: number, gapP95: number, gapMax: number,
+ *     early: number, late: number, tempoP50: number, tempoP95: number, diag: Record<string, number> }|null,
  *   mirrorIntakeLine: string,
  *   mirrorIntake: { changedEvents:number, keyMatched:number, keyMissed:number, accepted:number,
  *     rejectedByGate:number, lastMissedKeys:string[], lastExpectedKey:string,
@@ -93,6 +95,7 @@ export function makeInitialVenueSeatsDiag() {
     //   (bubbleChurn は 2026-07-21 から速報側が読んでいたが、ここで落ちていて一度も届いていなかった)。
     bubbleChurn: /** @type {VenueSeatsDiagState['bubbleChurn']} */ (null),
     bubbleBurst: /** @type {VenueSeatsDiagState['bubbleBurst']} */ (null),
+    bubbleVoiceSync: /** @type {VenueSeatsDiagState['bubbleVoiceSync']} */ (null),
     // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
     mirrorIntakeLine: '',
     /*
@@ -331,6 +334,23 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         burstBySource: countDict(bbIn.burstBySource)
       }
     : null;
+  // 2026-11-12: 吹き出しと声のずれ(venueBubbleVoiceSync.js の summarizeBubbleVoiceSync)。数だけ通す。
+  const bvIn = /** @type {any} */ (d.bubbleVoiceSync && typeof d.bubbleVoiceSync === 'object' ? d.bubbleVoiceSync : null);
+  const bubbleVoiceSync = bvIn
+    ? {
+        line: String(bvIn.line || ''),
+        n: Math.max(0, Math.floor(num(bvIn.n, 0))),
+        voiced: Math.max(0, Math.floor(num(bvIn.voiced, 0))),
+        gapP50: Math.floor(num(bvIn.gapP50, -1)),
+        gapP95: Math.floor(num(bvIn.gapP95, -1)),
+        gapMax: Math.floor(num(bvIn.gapMax, -1)),
+        early: Math.max(0, Math.floor(num(bvIn.early, 0))),
+        late: Math.max(0, Math.floor(num(bvIn.late, 0))),
+        tempoP50: Math.floor(num(bvIn.tempoP50, -1)),
+        tempoP95: Math.floor(num(bvIn.tempoP95, -1)),
+        diag: countDict(bvIn.diag)
+      }
+    : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -357,6 +377,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     tileCountCensus,
     bubbleChurn,
     bubbleBurst,
+    bubbleVoiceSync,
     /*
      * ★v0.1.1317: 会場が鏡を受け取れているかの1行(会場が完全一致しない件の切り分け)。
      *   文字列1本だけ通す(未知の巨大オブジェクトを写さない=このファイルの既存方針)。
