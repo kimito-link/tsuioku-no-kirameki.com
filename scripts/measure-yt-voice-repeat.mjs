@@ -204,11 +204,32 @@ const readChat = async () => {
     chat.set(r.id, { ...r, firstSeen: Date.now(), order: chat.size });
   }
 };
+// 拡張の中の計器(yt_diag_voice_reads)から「実際に鳴った件」を集める。
+//   VOICEVOX が遅いと PC の声(speechSynthesis)に切り替わり、偽のエンジンには「てすと」しか来なくなる。
+//   PC の声で鳴った件は合成の依頼に出てこないので、計器の recent(40件の輪)を2秒ごとに読んで貯める。
+/** @type {Map<string, { at: number, key: string, text: string, ageMs: number, voice: string, flags: string[] }>} */
+const plays = new Map();
+const readPlays = async () => {
+  try {
+    const sw = ctx.serviceWorkers().find((w) => w.url().includes('background')) || ctx.serviceWorkers()[0];
+    if (!sw) return;
+    const got = await sw.evaluate(() => chrome.storage.local.get('yt_diag_voice_reads'));
+    for (const ev of got?.yt_diag_voice_reads?.recent || []) {
+      if (ev?.ev !== 'play') continue;
+      const id = `${ev.at}|${ev.key}`;
+      if (!plays.has(id)) plays.set(id, ev);
+    }
+  } catch { /* 読めなくても測り続ける */ }
+};
 const end = Date.now() + DUR_S * 1000;
+let lastPlaysRead = 0;
 while (Date.now() < end) {
   await readChat();
+  if (Date.now() - lastPlaysRead >= 2000) { lastPlaysRead = Date.now(); await readPlays(); }
   await page.waitForTimeout(1000);
 }
+await page.waitForTimeout(3500); // 計器の書き込み(3秒おき)を待つ
+await readPlays();
 
 let diag = {};
 try {
@@ -237,7 +258,8 @@ const matchChat = (text, at = Infinity) => {
   }
   return best;
 };
-const reqs = synthLog.filter((s) => s.text !== 'あ'); // 起動時の温め
+const reqs = synthLog.filter((s) => s.text !== 'あ' && s.text !== 'てすと'); // 起動時の温め・PC の声の間の速さ確かめ
+const probes = synthLog.filter((s) => s.text === 'てすと').length;
 const counts = new Map();
 for (const s of reqs) counts.set(s.text, (counts.get(s.text) || 0) + 1);
 const repeated = [...counts.entries()].filter(([, c]) => c > 1).map(([text, c]) => ({ text, times: c }));
@@ -252,6 +274,29 @@ const timeline = reqs.map((s) => {
     ageSec: hit ? Math.round((s.t - hit.firstSeen) / 100) / 10 : null,
   };
 });
+// 実際に鳴った件(PC の声を含む)での読み直し
+const playList = [...plays.values()].sort((a, b) => a.at - b.at);
+const playByText = new Map();
+const playByKey = new Map();
+for (const p of playList) {
+  playByText.set(p.text, (playByText.get(p.text) || 0) + 1);
+  if (p.key) playByKey.set(p.key, (playByKey.get(p.key) || 0) + 1);
+}
+const playedTwiceText = [...playByText.entries()].filter(([, c]) => c > 1).map(([text, times]) => ({ text, times }));
+const playedTwiceKey = [...playByKey.entries()].filter(([, c]) => c > 1).map(([key, times]) => ({ key, times }));
+const playTimeline = playList.map((p) => {
+  const hit = matchChat(p.text, p.at);
+  const newestOrder = chatRows.filter((r) => r.firstSeen <= p.at).reduce((m, r) => Math.max(m, r.order), -1);
+  return {
+    t: sec(p.at),
+    voice: p.voice || '',
+    key: p.key,
+    text: p.text,
+    flags: p.flags,
+    ageSec: p.ageMs >= 0 ? Math.round(p.ageMs / 100) / 10 : null,
+    behind: hit && newestOrder >= 0 ? newestOrder - hit.order : null,
+  };
+});
 const out = {
   at: new Date().toISOString(),
   mode: FAKE ? 'fake' : 'real',
@@ -260,8 +305,14 @@ const out = {
   venueOpened: opened,
   chatSeen: chatRows.length,
   synthRequests: reqs.length,
+  probes,
   repeated,
   timeline,
+  played: playList.length,
+  playedLight: playList.filter((p) => p.voice === 'light').length,
+  playedTwiceText,
+  playedTwiceKey,
+  playTimeline,
   diag,
 };
 const dir = path.join(root, '.artifacts', 'yt-voice-repeat');
@@ -277,4 +328,10 @@ if (behind.length) {
 }
 const unmatched = timeline.filter((x) => x.chatOrder == null).length;
 console.log(`チャット欄に見つからない読み上げ: ${unmatched} 件`);
+console.log(`速さ確かめの「てすと」: ${probes} 回(多ければ PC の声で読んでいた)`);
+console.log(`実際に鳴った件(計器): ${playList.length} 件(うち PC の声 ${out.playedLight} 件)`);
+console.log(`同じ文が2回以上鳴った: ${playedTwiceText.length} 種類 ${JSON.stringify(playedTwiceText.slice(0, 10))}`);
+console.log(`同じコメント(番号)が2回以上鳴った: ${playedTwiceKey.length} 件 ${JSON.stringify(playedTwiceKey.slice(0, 10))}`);
+const oldPlays = playTimeline.filter((x) => x.ageSec != null && x.ageSec >= 60).length;
+console.log(`受け取ってから1分以上たって鳴った: ${oldPlays} 件`);
 console.log(`結果: ${path.relative(root, file)}`);

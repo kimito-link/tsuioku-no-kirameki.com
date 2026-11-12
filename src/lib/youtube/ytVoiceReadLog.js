@@ -28,7 +28,7 @@ export function createYtVoiceReadLog(deps = {}) {
   const playedKeys = new Map();
   /** @type {Map<string, { at: number, key: string }>} 文 → 最後に鳴った時刻とキー */
   const playedText = new Map();
-  const c = { queued: 0, skipped: 0, played: 0, sameKeyQueued: 0, sameKeyPlayed: 0, sameTextPlayed: 0, oldQueued: 0, oldPlayed: 0, maxAgeMs: 0 };
+  const c = { queued: 0, skipped: 0, played: 0, playedLight: 0, sameKeyQueued: 0, sameKeyPlayed: 0, sameTextPlayed: 0, oldQueued: 0, oldPlayed: 0, maxAgeMs: 0 };
   /** @type {any[]} */
   let recent = [];
   /** @type {any[]} */
@@ -76,7 +76,8 @@ export function createYtVoiceReadLog(deps = {}) {
     },
     /**
      * 声が実際に鳴り始めた1件。
-     * @param {{ key?: unknown, text?: unknown, receivedAt?: unknown }} it
+     * @param {{ key?: unknown, text?: unknown, receivedAt?: unknown, voice?: unknown }} it
+     *   voice: 'voicevox' か 'light'(PC の声)。
      */
     notePlayed(it) {
       const at = now();
@@ -87,6 +88,8 @@ export function createYtVoiceReadLog(deps = {}) {
       /** @type {string[]} */
       const flags = [];
       c.played += 1;
+      const voice = String(it?.voice ?? '');
+      if (voice === 'light') c.playedLight += 1;
       if (key) {
         const n = playedKeys.get(key) || 0;
         if (n > 0) { c.sameKeyPlayed += 1; flags.push('sameKey'); }
@@ -105,7 +108,7 @@ export function createYtVoiceReadLog(deps = {}) {
         trim(playedText);
       }
       if (ageMs >= YT_VOICE_OLD_MS) { c.oldPlayed += 1; flags.push('old'); }
-      push({ at, ev: 'play', key, text, ageMs, flags });
+      push({ at, ev: 'play', key, text, ageMs, voice, flags });
       return flags;
     },
     snapshot() {

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2056',
+    date: '2026-11-11',
+    summary: 'YouTubeの@配信はすぐ読み込み中',
+    items: Object.freeze([
+      '/@名前/live を開いた直後から、YouTubeの同時視聴者数を「読み込み中」と出します。動画の番号が分かる前でも、別の配信や「watch ページが見つかりません」にはしません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2055',
     date: '2026-11-11',
     summary: 'YouTubeの同時視聴者数をページから読む',

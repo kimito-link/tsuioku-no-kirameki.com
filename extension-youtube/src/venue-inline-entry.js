@@ -289,9 +289,12 @@ if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionConte
         readLog.noteQueued({ key: it.key, text: it.text, receivedAt: it.receivedAt, skipped: skip });
         if (!skip) {
           const realStart = it.onAudioStart;
+          const player = this;
           it.onAudioStart = (/** @type {any[]} */ ...a) => {
             try {
-              readLog.notePlayed({ key: it.key, text: it.text, receivedAt: it.receivedAt });
+              // どちらの声で鳴ったか(VOICEVOX が遅い PC では PC の声に切り替わる・voiceLightFallback.js)
+              const light = !!(/** @type {any} */ (player).diag?.lightVoiceActive);
+              readLog.notePlayed({ key: it.key, text: it.text, receivedAt: it.receivedAt, voice: light ? 'light' : 'voicevox' });
               saveReadLogSoon();
             } catch {
               /* 計器は読み上げを止めない */

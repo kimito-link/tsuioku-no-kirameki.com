@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2101',
+    date: '2026-11-12',
+    summary: '読み上げの計器に PC の声で鳴った件も残す',
+    items: Object.freeze([
+      'YouTube の会場の読み上げの記録に、VOICEVOX と PC の声のどちらで鳴ったかを残すようにしました。読み上げの動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2100',
     date: '2026-11-12',
     summary: 'YouTube の読み上げの読み直しを記録する計器',
@@ -208,14 +216,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'コメント欄が開いたあと、または開くのを諦めたあとは、ボタンの位置と文字を繰り返し見ません。ページの移動かチャンネルの切り替えのときだけ、もう一度探します。',
       '配信の画像は、毎秒ぜんぶ見にいくのをやめました。まだ無いときと、時間がたったときだけ見ます。',
       'ABEMA を2つ開いていても、見えているタブか操作中のタブだけが「いまの配信」を書きます。同じ配信は短い間隔で書き直しません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2056',
-    date: '2026-11-11',
-    summary: 'YouTubeの@配信はすぐ読み込み中',
-    items: Object.freeze([
-      '/@名前/live を開いた直後から、YouTubeの同時視聴者数を「読み込み中」と出します。動画の番号が分かる前でも、別の配信や「watch ページが見つかりません」にはしません。'
     ])
   })
 ]);

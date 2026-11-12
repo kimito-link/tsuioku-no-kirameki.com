@@ -55,6 +55,15 @@ describe('ytVoiceReadLog', () => {
     expect(log.snapshot()).toMatchObject({ skipped: 1, queued: 0 });
   });
 
+  it('PC の声で鳴った件は playedLight に数え、どちらの声かを残す', () => {
+    const log = createYtVoiceReadLog();
+    log.notePlayed({ key: 'no:1', text: 'a', voice: 'light' });
+    log.notePlayed({ key: 'no:2', text: 'b', voice: 'voicevox' });
+    const s = log.snapshot();
+    expect(s).toMatchObject({ played: 2, playedLight: 1 });
+    expect(s.recent.map((e) => e.voice)).toEqual(['light', 'voicevox']);
+  });
+
   it('最近の出来事は40件まで', () => {
     const log = createYtVoiceReadLog();
     for (let i = 0; i < 100; i += 1) log.noteQueued({ key: `no:${i}`, text: String(i) });
