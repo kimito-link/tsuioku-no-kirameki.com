@@ -91,7 +91,9 @@ function startFakeSocket() {
     server.listen(0, '127.0.0.1', () => {
       const port = /** @type {any} */ (server.address()).port;
       const spki = execFileSync('sh', ['-c', `openssl x509 -in '${cert}' -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64`]).toString().trim();
-      resolve({ port, spki, paths, close: () => new Promise((r) => { wss.close(); server.close(() => r(undefined)); }) });
+      // あとから流す1件(ログイン画面へ移ったあとも記録が続くかを見る)
+      const broadcast = (/** @type {any} */ m) => wss.clients.forEach((c) => c.send(JSON.stringify(m)));
+      resolve({ port, spki, paths, broadcast, close: () => new Promise((r) => { wss.close(); server.close(() => r(undefined)); }) });
     });
   });
 }
@@ -277,15 +279,33 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   await cv.close();
   await page.bringToFront();
 
-  // 未ログインだとミクチャはページを読み直さずに /login へ移す。止まった理由が計器に残り、上書きで消えない
+  // 未ログインだとミクチャは約5分でページを読み直さずに /login へ移す(2026-11-08 PC 実測)。
+  //   0.1.2094〜: 記録中の配信は止めずに続ける(ソケットは追憶自身のもの・ログインなしで読める)
   await page.evaluate(() => history.pushState(null, '', '/login'));
   const mxDiag = async () => (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_mx_chat'))).yt_diag_mx_chat || {};
-  await expect.poll(async () => (await mxDiag()).stopReason, { timeout: 15_000 }).toBe('login-redirect');
+  await expect.poll(async () => (await mxDiag()).loginPageKept, { timeout: 15_000 }).toBe(1);
+  /** @type {any} */ (sock).broadcast({ kind: 0, message_id: 'm-c-after-login', user_id: 18, name: 'ファンD', body: 'ログイン画面のあと', created: T0 + 400 });
+  await expect.poll(async () => (await readRows(sw)).includes('text:mx:18:ファンD:ログイン画面のあと:0::-'), { timeout: 15_000 }).toBe(true);
   await page.waitForTimeout(3000);
-  expect(await mxDiag()).toMatchObject({ stopReason: 'login-redirect', live: null });
+  expect(await mxDiag()).toMatchObject({ streamKey: KEY, stopReason: '', wsState: 'open', live: true, loginPageKept: 1 });
+  // ログインして配信ページへ戻ると、同じ配信の記録がそのまま続く(ソケットをつなぎ直さない)
+  const connectsBefore = (await mxDiag()).wsConnects;
+  await page.evaluate((a) => history.pushState(null, '', `/u/${a}/live`), A);
+  await page.waitForTimeout(3000);
+  expect(await mxDiag()).toMatchObject({ streamKey: KEY, stopReason: '', wsConnects: connectsBefore });
+  // ログイン画面以外へ移ったら、これまでどおり止める
+  await page.evaluate(() => history.pushState(null, '', '/'));
+  await expect.poll(async () => (await mxDiag()).wsState, { timeout: 15_000 }).not.toBe('open');
+  /** @type {any} */ (sock).broadcast({ kind: 0, message_id: 'm-c-after-leave', user_id: 19, name: 'ファンE', body: '別のページのあと', created: T0 + 500 });
+  await page.waitForTimeout(3000);
+  expect((await readRows(sw)).some((r) => r.includes('ファンE'))).toBe(false);
+  // 開き直すと記録が戻る
+  //   (前のページの計器にも streamKey が残っているので、新しいページの印に替わってソケットが開くまで待つ)
+  const oldTab = (await mxDiag()).tab;
   await page.goto(`https://mixch.tv/u/${A}/live`);
-  // 開き直すと記録が戻り、理由は消える
-  await expect.poll(async () => { const d = await mxDiag(); return `${d.streamKey}|${d.stopReason}`; }, { timeout: 30_000 }).toBe(`${KEY}|`);
+  await expect
+    .poll(async () => { const d = await mxDiag(); return `${d.tab !== oldTab}|${d.streamKey}|${d.stopReason}|${d.wsState}`; }, { timeout: 30_000 })
+    .toBe(`true|${KEY}||open`);
 
   // 配信が終わったら(配信の情報が消えたら)終わった時刻を送る
   live = false;
