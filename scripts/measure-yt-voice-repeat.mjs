@@ -225,17 +225,24 @@ engine.close();
 const chatRows = [...chat.values()];
 const norm = (s) => String(s || '').replace(/\s+/g, '').replace(/、ほか\d+件$/, '');
 /** 読み上げの文 → チャット欄の行(文の先頭が一致する最初の行) */
-const matchChat = (text) => {
+// 同じ文は何人も書く(「こんにちは」等)。依頼の時点までに見えた行のうち、いちばん新しい行に当てる(古い行に当てると遅れを大きく見誤る)。
+const matchChat = (text, at = Infinity) => {
   const t = norm(text);
   if (!t) return null;
-  return chatRows.find((r) => { const c = norm(r.text); return c && (c === t || c.startsWith(t) || t.startsWith(c.slice(0, Math.max(6, t.length - 2)))); }) || null;
+  let best = null;
+  for (const r of chatRows) {
+    if (r.firstSeen > at + 1500) continue;
+    const c = norm(r.text);
+    if (c && (c === t || c.startsWith(t) || t.startsWith(c.slice(0, Math.max(6, t.length - 2))))) best = r;
+  }
+  return best;
 };
 const reqs = synthLog.filter((s) => s.text !== 'あ'); // 起動時の温め
 const counts = new Map();
 for (const s of reqs) counts.set(s.text, (counts.get(s.text) || 0) + 1);
 const repeated = [...counts.entries()].filter(([, c]) => c > 1).map(([text, c]) => ({ text, times: c }));
 const timeline = reqs.map((s) => {
-  const hit = matchChat(s.text);
+  const hit = matchChat(s.text, s.t);
   const newestOrder = chatRows.filter((r) => r.firstSeen <= s.t).reduce((m, r) => Math.max(m, r.order), -1);
   return {
     t: sec(s.t),
