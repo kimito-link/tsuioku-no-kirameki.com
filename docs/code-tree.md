@@ -1194,7 +1194,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2463)
+- 📁 **src/** (2464)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1503,7 +1503,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2178)
+  - 📁 **lib/** (2179)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -2152,6 +2152,7 @@
     - `effectDirector.test.js`
     - `effectSoundPlayer.js` — ギフト/広告/応援者ランキング順位変動に鳴らす短い効果音の再生ロジック(純関数+再生本体)。
     - `effectSoundPlayer.test.js`
+    - `effectSoundPrefetch.test.js`
     - `embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
     - `embeddedDataExtract.test.js`
     - `enrichUserLaneAggregatesEquivalence.test.js`

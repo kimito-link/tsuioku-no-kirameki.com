@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2097',
+    date: '2026-11-12',
+    summary: 'YouTube などの会場でギフト音を確実に鳴らす',
+    items: Object.freeze([
+      'YouTube の会場で、ギフト・広告・順位の効果音が「Unsafe attempt to load URL」で読み込めないことがありました。会場を出した後に効果音を裏で1本ずつ先読みし、最初の1回目からページの中だけで鳴らすようにしました（キャラの絵と同じやり方）。',
+      'Twitch・Kick・ツイキャスなど、同じ会場を使うほかのサービスにも同じ直しが入ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2096',
     date: '2026-11-12',
     summary: '吹き出しと読み上げの声をぴったり同時に',
@@ -211,15 +220,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       '配信者カードの円は、どの配信でも画像全体を収めます。チャンネルロゴを中央だけで切って、白い丸にしないようにしました。画像はこれまでどおり配信の保存欄に入れます。',
       '番組の視聴数は、同じカードに「視聴数」として出します。数が無いからそのカードを隠すことはしません。',
       'PICK UP はニコ生と同じ部品です。細い映像の幅には合わせず、名前は本文の上、本文は1行です。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2052',
-    date: '2026-11-11',
-    summary: 'PICK UPをニコ生と同じ幅と並び',
-    items: Object.freeze([
-      'ABEMA の PICK UP が細い枠のままだと本文が2行になり、名前が下で省略されていました。ニコ生・YouTube と同じく、窓と大きな映像の幅（最大860px）で出します。コメント欄や小さい映像の幅には合わせません。',
-      '名前を本文の上の行に出し、本文は1行にします。'
     ])
   })
 ]);
