@@ -240,7 +240,7 @@ function startReader(uniqueId, roomId, key) {
         boardAt = now;
         diag.boardRows = s.rows.length;
         // 配信中の視聴者の順位(この配信の分・score つき)
-        safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows: s.rows } });
+        safeSendMessage({ type: 'YT_LEADERBOARD', payload: { videoId: key, rows: s.rows, period: 'STREAM' } });
       }
     } else if (m.type === 'WebcastMemberMessage') {
       const v = parseTtMemberViewers(m.payload);

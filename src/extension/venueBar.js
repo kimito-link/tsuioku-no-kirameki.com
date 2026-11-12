@@ -3416,6 +3416,9 @@ export function mountVenueBarButton(options = {}) {
   void voicePlayer.initialize({ forceOn: true });
   let aggregateTimer = 0;
   let aggregateInFlight = false;
+  /** 走っている集計の終わり(配信を移った直後の取り直しが、前の配信の集計に弾かれないよう待つ) */
+  /** @type {Promise<void> | null} */
+  let aggregateInFlightDone = null;
   let speechTimer = 0;
   let speechInFlight = false;
   let speechGeneration = 0;
@@ -6383,7 +6386,58 @@ export function mountVenueBarButton(options = {}) {
       typeof requestAnimationFrame === 'function' ? requestAnimationFrame(run) : (run(), 0);
   };
 
+  /**
+   * 配信が替わった: 前の配信の席・順位・集計・在席・鏡を持ち越さない(意図的な空表示)。
+   * @param {string} liveId
+   */
+  const resetVenueForLive = (liveId) => {
+    activeLiveId = liveId;
+    baseRows = [];
+    seatByKey = new Map();
+    // 2026-07-30(venue-ranking-churn-SPEC.md §4.3): 応援者ランキング安定化状態も
+    //   seatByKeyと同じ場所でリセット(前配信の現職を持ち越さない)。
+    supporterOrderKeys = [];
+    _supporterRankDrops = 0;
+    _supporterRankOvertakes = 0;
+    spokenUserIds.clear(); // 別配信の昇格匿名を持ち越さない
+    aggregatedChunkSeqs = []; // v0.1.754: 別配信の集約状態を持ち越さない
+    aggregatedCandidates = [];
+    liveRoster.clear(); // v0.1.754: 別配信の在席を持ち越さない
+    // v0.1.1111: 別配信の鏡/暫定(X層)を持ち越さない(鏡はliveId不一致でも弾かれるが明示クリア)。
+    laneMirrorPaintSnap = null;
+    // ★v0.1.1534: 空keepガードの基準 lid もクリア(前配信のタイルを新配信で残さない)。
+    _venueStoryUserLaneLastTiledLid = '';
+    venueTransientFirstSeen.clear();
+    // 配信切替は意図的な空表示(前配信を持ち越さない)。clearDisplay で lastGood も破棄。
+    clearDisplay();
+  };
+  /**
+   * 会場を開いたまま、ページの中で別の配信へ移った(YouTube・TikTok などは移ってもページを読み込み直さない)。
+   *   以前は席の集計を開いたとき1回しかしないため activeLiveId が前の配信のまま残り、参加者の列・数字の帯(記録件数)が
+   *   しばらく前の配信のまま出ていた(2026-11-12 TikTok の PC 実測: 移って2〜30秒以上)。ここで前の配信の材料を捨て、
+   *   新しい配信で開いた直後と同じ取り直し(鏡の catch-up・席の集計・在席の hydrate)をやり直す。
+   * @param {string} liveId
+   */
+  const switchVenueLive = (liveId) => {
+    resetVenueForLive(liveId);
+    panelSummarySnap = null;
+    statCardsSelfSnap = null;
+    laneMirrorSnap = null;
+    _laneReceiptFromPopup = null;
+    cheerPrevCount = null;
+    if (open) {
+      stopAggregation();
+      startAggregation();
+    }
+    paintStatStrip();
+  };
+
   const aggregateParticipants = async () => {
+    // 前の配信の集計がまだ走っている間に配信を移ったら、終わるのを待ってから新しい配信で集計する
+    //   (待たずに抜けると、開いたとき1回きりの取り直しが空振りして席の catch-up が抜ける)。
+    if (aggregateInFlight && aggregateInFlightDone && activeLiveId !== liveIdFromPathname()) {
+      try { await aggregateInFlightDone; } catch { /* no-op */ }
+    }
     if (!open || aggregateInFlight) return;
     // v0.1.753: 拡張更新後の古いタブは chrome.* が全失敗する。storage を叩く前に先回りで検知し、
     //   無限リトライを止めて再読み込み案内を出す(黙って凍結しない)。
@@ -6391,28 +6445,11 @@ export function mountVenueBarButton(options = {}) {
     const liveId = liveIdFromPathname();
     if (!liveId) return;
     aggregateInFlight = true;
+    /** @type {() => void} */
+    let _aggregateDone = () => {};
+    aggregateInFlightDone = new Promise((resolve) => { _aggregateDone = resolve; });
     try {
-      if (activeLiveId !== liveId) {
-        activeLiveId = liveId;
-        baseRows = [];
-        seatByKey = new Map();
-        // 2026-07-30(venue-ranking-churn-SPEC.md §4.3): 応援者ランキング安定化状態も
-        //   seatByKeyと同じ場所でリセット(前配信の現職を持ち越さない)。
-        supporterOrderKeys = [];
-        _supporterRankDrops = 0;
-        _supporterRankOvertakes = 0;
-        spokenUserIds.clear(); // 別配信の昇格匿名を持ち越さない
-        aggregatedChunkSeqs = []; // v0.1.754: 別配信の集約状態を持ち越さない
-        aggregatedCandidates = [];
-        liveRoster.clear(); // v0.1.754: 別配信の在席を持ち越さない
-        // v0.1.1111: 別配信の鏡/暫定(X層)を持ち越さない(鏡はliveId不一致でも弾かれるが明示クリア)。
-        laneMirrorPaintSnap = null;
-        // ★v0.1.1534: 空keepガードの基準 lid もクリア(前配信のタイルを新配信で残さない)。
-        _venueStoryUserLaneLastTiledLid = '';
-        venueTransientFirstSeen.clear();
-        // 配信切替は意図的な空表示(前配信を持ち越さない)。clearDisplay で lastGood も破棄。
-        clearDisplay();
-      }
+      if (activeLiveId !== liveId) resetVenueForLive(liveId);
       // v0.1.754 3時間安定化: まず安いインデックス1キーだけ読む。チャンク化済みなら【新規 seq の
       //   チャンクだけ】読んで差分集約→既存集約へマージ(O(新規分))。全件再読み(O(N)・数万件で
       //   メインスレッド圧迫・8秒timeout超で会場停止)をやめる。チャンクは append-only なので等価。
@@ -6539,6 +6576,8 @@ export function mountVenueBarButton(options = {}) {
       }
     } finally {
       aggregateInFlight = false;
+      aggregateInFlightDone = null;
+      _aggregateDone();
     }
   };
 
@@ -6890,6 +6929,8 @@ export function mountVenueBarButton(options = {}) {
     if (!hasVenueExtensionContext()) { markContextInvalidated(); return; }
     const liveId = liveIdFromPathname();
     if (!liveId) return;
+    // ページの中で別の配信へ移った(会場は開いたまま)。席・数字を前の配信のまま残さない
+    if (activeLiveId && activeLiveId !== liveId) switchVenueLive(liveId);
     paintStatStrip(); // 鏡の古さ(パネルが閉じた)を見回る。署名が同じなら DOM を触らない=read も描き直しも増えない
     if (speechLiveId !== liveId) resetSpeechTracking(liveId);
     const generation = speechGeneration;
