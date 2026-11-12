@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2047',
+    date: '2026-11-11',
+    summary: '公式ランキングの説明を残す',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick の公式ランキングの説明を、このPCの記録の文で消さないようにしました。Kick では「歴代トップKICKユーザー」と同じ値、と出ます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2046',
     date: '2026-11-11',
     summary: 'ABEMAの配信者ロゴをサイドパネルへ',
