@@ -80,6 +80,9 @@ const diag = {
   /** 記録が止まった理由('login-redirect' = 未ログインでミクチャにログイン画面へ飛ばされた) */
   stopReason: '',
   stoppedAt: 0,
+  /** ページがログイン画面へ移ったあとも記録を続けた回数・最後の時刻(0.1.2094〜・ソケットは追憶自身のものなので止める理由が無い) */
+  loginPageKept: 0,
+  loginPageAt: 0,
   updatedAt: 0,
 };
 
@@ -360,11 +363,12 @@ let checking = false;
 /** ソケットの kind 10 から来た視聴数(次の配信情報の送信で使う) */
 let latestViewers = /** @type {number | null} */ (null);
 
-// 未ログインで配信を開くと、約5分(302秒)でミクチャがログイン画面(/login)へ飛ばす(2026-11-08 PC 実測)。
-//   ページが変わるので記録はそこで止まる。止まった理由を計器に残す(前のページの計器は live=true のまま残っていた)
+// 未ログインで配信を開くと、約5分(302秒)でミクチャがログイン画面(/login)へ飛ばす(2026-11-08 PC 実測・ログイン中は飛ばされない)。
+//   記録中なら 0.1.2094〜は止めずに続ける(下の check)。記録していなかったとき(配信の情報がまだ無い等)だけ
+//   止まった理由を計器に残す(前のページの計器は live=true のまま残っていた)
 let loginNoted = false;
 function noteLoginRedirect() {
-  if (loginNoted || !/^\/login\b/.test(String(location.pathname || ''))) return;
+  if (loginNoted || !onLoginPage()) return;
   loginNoted = true;
   // ミクチャはページを読み直さずに /login へ移る(同じ計器がメモリに残る)。メモリの計器に書かないと、
   //   次の saveDiagSoon が live=true のまま上書きして理由が消えた(2026-11-08 PC 実測・1〜2秒後)
@@ -389,9 +393,31 @@ function noteLoginRedirect() {
   }
 }
 
+/** ミクチャのログイン画面(/login)にいるか */
+function onLoginPage() {
+  return /^\/login\b/.test(String(location.pathname || ''));
+}
+
+// 未ログインの5分でページが /login へ移っても、ページは読み直されず、この入口もソケットも生きている。
+//   ソケット(wss://chat.mixch.tv/torte/room/<番号>)と配信の情報はログインなしで読める口なので、
+//   記録中だった配信はそのまま続ける(2026-11-12・前は URL から番号が消えた時点で自分で止めていた)。
+//   /login 以外のページへ移ったときは、これまでどおり止める。
+let loginKeptNoted = false;
+function noteLoginKept() {
+  if (loginKeptNoted) return;
+  loginKeptNoted = true;
+  diag.loginPageKept += 1;
+  diag.loginPageAt = Date.now();
+  saveDiagSoon();
+}
+
 async function check() {
   if (checking) return;
-  const userId = parseMxUserIdFromUrl(location.href);
+  let userId = parseMxUserIdFromUrl(location.href);
+  if (!userId && current && onLoginPage()) {
+    userId = current.userId;
+    noteLoginKept();
+  } else if (userId) loginKeptNoted = false;
   if (!userId) {
     if (current) {
       current.stop();
