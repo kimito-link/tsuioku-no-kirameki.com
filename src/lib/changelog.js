@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2093',
+    date: '2026-11-12',
+    summary: 'YouTube などの会場でギフト音を確実に鳴らす',
+    items: Object.freeze([
+      'YouTube の会場で、ギフト・広告・順位の効果音が「Unsafe attempt to load URL」で読み込めないことがありました。会場を出した後に効果音を裏で1本ずつ先読みし、最初の1回目からページの中だけで鳴らすようにしました（キャラの絵と同じやり方）。',
+      'Twitch・Kick・ツイキャスなど、同じ会場を使うほかのサービスにも同じ直しが入ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2089',
     date: '2026-11-12',
     summary: 'ツイキャスの有料ギフトの人も欄に並べる',
@@ -207,14 +216,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'チャンネルロゴは横長です。円で中央だけ切ると白い文字が円いっぱいになり、空の白い丸に見えていました。ロゴ全体が円の中に入るようにしました。',
       '番組表の応答にある、いま放送中の枠の視聴数を「視聴数」として出します。次の枠の空の数では置き換えません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2047',
-    date: '2026-11-11',
-    summary: '公式ランキングの説明を残す',
-    items: Object.freeze([
-      'YouTube・Twitch・Kick の公式ランキングの説明を、このPCの記録の文で消さないようにしました。Kick では「歴代トップKICKユーザー」と同じ値、と出ます。'
     ])
   })
 ]);

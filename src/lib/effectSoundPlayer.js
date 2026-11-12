@@ -74,6 +74,20 @@ export const EFFECT_SOUND_VARIANT_PATHS = Object.freeze({
 });
 
 /**
+ * 同梱の効果音ファイルを重複なしで全部並べる(先読み用)。
+ *   YouTube などの視聴ページの中の会場は、chrome-extension:// の音を直接読むとページの見張りに
+ *   「Unsafe attempt to load URL」で弾かれる。先に blob: へ読み替えておくために使う(ytLocalAssetUrls.js)。
+ * @returns {string[]}
+ */
+export function listBundledEffectSoundPaths() {
+  /** @type {Set<string>} */
+  const out = new Set();
+  for (const list of Object.values(EFFECT_SOUND_VARIANT_PATHS)) for (const p of list) out.add(p);
+  for (const p of Object.values(EFFECT_SOUND_PATHS)) out.add(p);
+  return [...out];
+}
+
+/**
  * v0.1.1059: ギフトの金額帯(giftThrowProjectile.js の tier)を、対応する効果音バリエーション
  *   カテゴリのキーに変換する純関数。tier が不明/未対応なら既定の 'gift'(単一ファイル)を返す。
  * @param {string|undefined|null} tier 'small'|'medium'|'large'|'mega'
