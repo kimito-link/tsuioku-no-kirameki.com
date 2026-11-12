@@ -34,7 +34,8 @@ import { ytImportantVoiceReason, ytImportantVoiceReasons } from '../../src/lib/y
 import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
-import { readYtPanelStreamKey } from '../../src/lib/youtube/ytPanelRoute.js';
+import { readYtPanelStreamKey, readYtPanelSite } from '../../src/lib/youtube/ytPanelRoute.js';
+import { noWatchHintFor } from '../../src/lib/platform/noWatchHint.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
@@ -2256,6 +2257,46 @@ function installPlatformMetricChromeOnce() {
   else boot();
 }
 installPlatformMetricChromeOnce();
+
+/**
+ * 配信ページが開いていないときの「配信を探す」案内(ニコ生版の #noWatchRankingHint)を、タブのサービスの言葉と行き先にする(0.1.2102)。
+ *   ニコ生版のままだと、文字だけ「YouTube トップ」に直って行き先はニコ生・ちくらんのままだった(TikTok・ツイキャスで見えた)。
+ *   どのサービスかは外枠が src に焼いた site(配信ページでないタブでも分かる)→ 配信キー → 分からなければ YouTube。
+ *   いまあるリンクの href と文字を書き換え、余ったリンクは隠す(リンクに付いた popup 側の処理はそのまま残す)。
+ */
+function applyNoWatchHintOnce() {
+  if (YT_SHIM_IN_PAGE || typeof document === 'undefined') return;
+  const run = () => {
+    const sec = document.getElementById('noWatchRankingHint');
+    if (!sec) return;
+    let site = '';
+    try {
+      site = readYtPanelSite(location.search);
+    } catch {
+      site = '';
+    }
+    if (!site && PANEL_STREAM_KEY) site = platformOfPanelStreamKey(PANEL_STREAM_KEY)?.id || 'youtube';
+    const hint = noWatchHintFor(site);
+    sec.setAttribute('aria-label', hint.label);
+    const lead = sec.querySelector('.nl-no-watch-hint__lead');
+    if (lead) lead.textContent = hint.lead;
+    const items = [...sec.querySelectorAll('.nl-no-watch-hint__links > li')];
+    items.forEach((li, i) => {
+      const link = hint.links[i];
+      const a = li.querySelector('a');
+      if (!link || !a) {
+        li.setAttribute('hidden', '');
+        li.style.display = 'none';
+        return;
+      }
+      a.setAttribute('href', link.href);
+      a.textContent = link.text;
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
+  else run();
+}
+applyNoWatchHintOnce();
 
 /** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t */
 function screenWording(t) {

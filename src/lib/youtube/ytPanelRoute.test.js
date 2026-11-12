@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { YT_PANEL_SRC, isYtPanelSrc, isYtPanelTabUrl, ytPanelStreamKeyOfUrl, buildYtPanelSrc, readYtPanelStreamKey } from './ytPanelRoute.js';
+import { YT_PANEL_SRC, isYtPanelSrc, isYtPanelTabUrl, ytPanelStreamKeyOfUrl, ytPanelSiteOfUrl, buildYtPanelSrc, readYtPanelStreamKey, readYtPanelSite } from './ytPanelRoute.js';
 
 describe('ytPanelRoute', () => {
   it('YouTube のタブだけ YouTube 版', () => {
@@ -30,10 +30,10 @@ describe('ytPanelRoute', () => {
   });
   it('★配線: パネルはタブ専用にせず、中の iframe だけ付け替える(sidepanel-iframe-boot-entry)', () => {
     const boot = readFileSync('src/extension/sidepanel-iframe-boot-entry.js', 'utf8');
-    expect(boot).toContain('if (isYtPanelTabUrl(activeUrl)) return buildYtPanelSrc(ytPanelStreamKeyOfUrl(activeUrl));');
+    expect(boot).toContain('if (isYtPanelTabUrl(activeUrl)) return buildYtPanelSrc(ytPanelStreamKeyOfUrl(activeUrl), ytPanelSiteOfUrl(activeUrl));');
     // 0.1.1949: YouTube 系どうしでも別の配信になったら読み込み直す(配信キーで比べる)
     expect(boot).toContain('k !== readYtPanelStreamKey(cur)');
-    expect(boot).toContain('loader.update(buildYtPanelSrc(k))');
+    expect(boot).toContain('loader.update(buildYtPanelSrc(k, ytPanelSiteOfUrl(tab.url)))');
     const sw = readFileSync('extension/background.js', 'utf8');
     expect(sw).toContain("importScripts('dist/yt-background.js')");
   });
@@ -62,5 +62,21 @@ describe('ytPanelRoute', () => {
     expect(buildYtPanelSrc('')).toBe(YT_PANEL_SRC);
     expect(readYtPanelStreamKey(YT_PANEL_SRC)).toBe('');
     expect(readYtPanelStreamKey(null)).toBe('');
+  });
+  it('0.1.2102: タブのサービスを src に焼く(配信ページでなくても分かる・配信が無いときの案内に使う)', () => {
+    expect(ytPanelSiteOfUrl('https://www.youtube.com/')).toBe('youtube');
+    expect(ytPanelSiteOfUrl('https://www.tiktok.com/live')).toBe('tiktok');
+    expect(ytPanelSiteOfUrl('https://twitcasting.tv/')).toBe('twitcasting');
+    expect(ytPanelSiteOfUrl('https://abema.tv/now-on-air/abema-news')).toBe('abema');
+    expect(ytPanelSiteOfUrl('https://live.nicovideo.jp/watch/lv1')).toBe('');
+    expect(ytPanelSiteOfUrl('https://kick.com.evil.example/x')).toBe('');
+    const src = buildYtPanelSrc('', 'tiktok');
+    expect(isYtPanelSrc(src)).toBe(true);
+    expect(readYtPanelSite(src)).toBe('tiktok');
+    expect(readYtPanelStreamKey(src)).toBe('');
+    const src2 = buildYtPanelSrc('kick:a-b', 'kick');
+    expect(readYtPanelStreamKey(src2)).toBe('kick:a-b');
+    expect(readYtPanelSite(src2)).toBe('kick');
+    expect(readYtPanelSite(YT_PANEL_SRC)).toBe('');
   });
 });

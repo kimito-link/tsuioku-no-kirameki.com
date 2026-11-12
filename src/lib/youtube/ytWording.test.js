@@ -221,3 +221,11 @@ describe('ギフト履歴の欄の単位(ツイキャスは🍡スコア)', asyn
     expect(ytGiftUnitWording('広告pt が多い', 'スコア')).toBe('広告pt が多い');
   });
 });
+
+describe('0.1.2102 ギフトサイドバー(ニコ生だけの部品)の言葉', () => {
+  it('「ギフトサイドバー履歴」をサービス共通の言葉にする', async () => {
+    const { ytWording } = await import('./ytWording.js');
+    expect(ytWording('ギフトサイドバー履歴（未取得）')).toBe('ギフトの履歴（未取得）');
+    expect(ytWording('ギフトサイドバー履歴（12件・3種類）')).toBe('ギフトの履歴（12件・3種類）');
+  });
+});
