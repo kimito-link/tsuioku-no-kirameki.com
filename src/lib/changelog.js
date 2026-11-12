@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2106',
+    date: '2026-11-12',
+    summary: 'ミクチャの会場から送れない件',
+    items: Object.freeze([
+      'ミクチャで会場モードを開いて「ここから発言」から送ると、送れないことがありました。窓が狭くてミクチャのコメント欄が隠れているとき、追憶が会場自身の「送信」ボタンをミクチャのボタンと取り違えていたためです。会場の部品は探す対象から外しました(ABEMA・ふわっちの送り口も同じ直し)。',
+      '入力欄が見つからないときの案内に「窓が狭くてコメント欄が隠れている」を足しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2105',
     date: '2026-11-12',
     summary: '拡張の説明文に対応サービスを全部',
@@ -196,14 +205,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'ABEMAの会場の数字がすぐ新しくなる',
     items: Object.freeze([
       'ABEMA の配信で、ページの視聴数やコメント数が増えたら、会場の帯にも10秒ほどで新しい数を出します(今までは開いたときの数が長く残ることがありました)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2069',
-    date: '2026-11-11',
-    summary: 'ABEMAは視聴数とコメント数だけ',
-    items: Object.freeze([
-      'ABEMA の配信では、横の欄と会場の帯に、ページに出ている視聴数とコメント数だけを出します。ニコニコの来場者数・本家コメ・広告pt・ギフトpt は出しません。「推定」とも書きません。'
     ])
   })
 ]);

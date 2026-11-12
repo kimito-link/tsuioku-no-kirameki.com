@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2069',
+    date: '2026-11-11',
+    summary: 'ABEMAは視聴数とコメント数だけ',
+    items: Object.freeze([
+      'ABEMA の配信では、横の欄と会場の帯に、ページに出ている視聴数とコメント数だけを出します。ニコニコの来場者数・本家コメ・広告pt・ギフトpt は出しません。「推定」とも書きません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2068',
     date: '2026-11-11',
     summary: 'ページの視聴者数をそのまま出す',

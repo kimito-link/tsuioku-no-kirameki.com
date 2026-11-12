@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1266 件
+## ⚠️ 役割コメントが無いソース 10 / 1268 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1051,7 +1051,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (114)
+- 📁 **scripts/** (115)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1139,6 +1139,7 @@
   - `loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
   - `loop-glossary-status-live.test.js`
   - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
+  - `measure-chat-input-widths.mjs` — 窓の幅で、各サービスの公式のコメント入力欄・送信ボタンが DOM にあるか/見えているかを測る計器。
   - `measure-comment-flood.mjs` — コメントが続くときに、画面のメインスレッドがどれだけ止まるかを測る。
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
@@ -1195,7 +1196,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2468)
+- 📁 **src/** (2470)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1504,7 +1505,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2183)
+  - 📁 **lib/** (2185)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1538,7 +1539,7 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (20)
+    - 📁 **platform/** (22)
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1547,6 +1548,8 @@
       - `infoPollGate.test.js`
       - `noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
       - `noWatchHint.test.js`
+      - `pageControlPick.js` — 配信ページの「公式の」入力欄・送信ボタンを探す(追憶が自分でページに置いた部品を除く)。
+      - `pageControlPick.test.js`
       - `platformMetricChrome.js` — 横の欄の数字を、配信サービスに合わせて出し分ける。
       - `platformMetricChrome.test.js`
       - `platformMetrics.js` — 【層】L0 判定層(純粋関数・I/O禁止)
