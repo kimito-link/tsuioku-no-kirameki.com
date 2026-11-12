@@ -32,6 +32,7 @@ import {
   abCommentsLookOpen,
 } from '../../src/lib/abema/abCommentPanel.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
+import { findPageButton, isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 
 const OUT = 'nl-ab-iso';
 const IN = 'nl-ab-main';
@@ -605,7 +606,7 @@ function noteSendFail(reason) {
 function findComposer() {
   const nodes = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
   for (const el of nodes) {
-    if (!(el instanceof HTMLElement) || !el.getClientRects().length) continue;
+    if (!(el instanceof HTMLElement) || !el.getClientRects().length || isOwnExtensionUi(el)) continue;
     const ph = `${el.getAttribute('placeholder') || ''} ${el.getAttribute('aria-label') || ''} ${el.getAttribute('data-placeholder') || ''}`;
     if (/コメント/.test(ph)) return el;
   }
@@ -646,7 +647,8 @@ try {
         }
       }
       await sleep(150);
-      const btn = [...document.querySelectorAll('button')].find((b) => /送信/.test(`${b.getAttribute('aria-label') || ''} ${b.textContent || ''}`));
+      // 会場の「ここから発言」の送信ボタン(追憶自身の部品)は拾わない(pageControlPick.js・2026-11-12 ミクチャで実害)
+      const btn = findPageButton(document, /送信/, input);
       if (btn instanceof HTMLElement) btn.click();
       else {
         const opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };

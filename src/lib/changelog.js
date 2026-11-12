@@ -27,6 +27,15 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     ])
   }),
   Object.freeze({
+    version: '0.1.2106',
+    date: '2026-11-12',
+    summary: 'ミクチャの会場から送れない件',
+    items: Object.freeze([
+      'ミクチャで会場モードを開いて「ここから発言」から送ると、送れないことがありました。窓が狭くてミクチャのコメント欄が隠れているとき、追憶が会場自身の「送信」ボタンをミクチャのボタンと取り違えていたためです。会場の部品は探す対象から外しました(ABEMA・ふわっちの送り口も同じ直し)。',
+      '入力欄が見つからないときの案内に「窓が狭くてコメント欄が隠れている」を足しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2105',
     date: '2026-11-12',
     summary: '拡張の説明文に対応サービスを全部',
@@ -197,14 +206,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Twitch と Kick の配信では、横の欄にそのサービス公式の「ギフトサブ ランキング」を出します。Bits・Kicks の順位とは別の欄で、Twitch はチャット欄の順位表と同じ期間、Kick は通算です。',
       '順位と数は Twitch・Kick が出している値そのままです。ギフトサブの順位が空の配信では欄を出しません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2070',
-    date: '2026-11-11',
-    summary: 'ABEMAの会場の数字がすぐ新しくなる',
-    items: Object.freeze([
-      'ABEMA の配信で、ページの視聴数やコメント数が増えたら、会場の帯にも10秒ほどで新しい数を出します(今までは開いたときの数が長く残ることがありました)。'
     ])
   })
 ]);

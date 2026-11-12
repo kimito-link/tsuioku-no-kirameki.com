@@ -42,6 +42,7 @@ import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { parseMxLiveStats } from '../../src/lib/platform/platformStats.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
+import { findPageButton, queryPageControl } from '../../src/lib/platform/pageControlPick.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 120_000;
@@ -83,8 +84,36 @@ const diag = {
   /** ページがログイン画面へ移ったあとも記録を続けた回数・最後の時刻(0.1.2094〜・ソケットは追憶自身のものなので止める理由が無い) */
   loginPageKept: 0,
   loginPageAt: 0,
+  /**
+   * 0.1.2106: 名前つきなのにアイコンが無い行の内わけ(りんく「自分でコメントうったけどゆっくり顔」・真因を記録で確かめる)。
+   *   keyMissing=profile_image_url が無い / empty=空 / badHost=許していない置き場(hosts に置き場の名前だけ・URL は残さない)
+   * @type {{ keyMissing: number, empty: number, badHost: number, hosts: Record<string, number> }}
+   */
+  noIcon: { keyMissing: 0, empty: 0, badHost: 0, hosts: {} },
   updatedAt: 0,
 };
+
+/** アイコンが空になった訳を数える(記録の形は変えない) @param {any} raw */
+function noteNoIcon(raw) {
+  if (!raw || typeof raw !== 'object' || Number(raw.anonymous) === 1) return;
+  if (!Object.prototype.hasOwnProperty.call(raw, 'profile_image_url')) {
+    diag.noIcon.keyMissing += 1;
+    return;
+  }
+  const v = String(raw.profile_image_url ?? '').trim();
+  if (!v) {
+    diag.noIcon.empty += 1;
+    return;
+  }
+  diag.noIcon.badHost += 1;
+  let host = '(URL でない)';
+  try {
+    host = new URL(v).hostname.slice(0, 60) || host;
+  } catch {
+    /* URL でない */
+  }
+  if (Object.keys(diag.noIcon.hosts).length < 8 || host in diag.noIcon.hosts) diag.noIcon.hosts[host] = (diag.noIcon.hosts[host] || 0) + 1;
+}
 
 function safeSendMessage(/** @type {any} */ msg) {
   try {
@@ -244,6 +273,7 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
       diag.giftCoin += r.amount;
       if (!r.amount) diag.unknownGifts += 1;
     } else diag.comments += 1;
+    if (!r.iconUrl) noteNoIcon(raw);
     pending.push(r);
     if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);
   };
@@ -499,12 +529,9 @@ async function mxSignedOut() {
   }
 }
 
-/** 「送信する」ボタン(文字で探す) */
-function findSendButton() {
-  for (const b of Array.from(document.querySelectorAll('button'))) {
-    if (/送信/.test(String(b.textContent || ''))) return /** @type {HTMLButtonElement} */ (b);
-  }
-  return null;
+/** 「送信する」ボタン(文字で探す・入力欄と同じ form を先に・会場の「ここから発言」の送信ボタンは拾わない) @param {Element | null} near */
+function findSendButton(near) {
+  return findPageButton(document, /送信/, near);
 }
 
 /** @param {string} reason */
@@ -526,23 +553,25 @@ try {
         noteSendFail('not-signed-in');
         return { ok: false, reason: 'not-signed-in' };
       }
-      let input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.querySelector(MX_INPUT_SEL));
+      let input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (queryPageControl(document, MX_INPUT_SEL));
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
-        input = /** @type {any} */ (document.querySelector(MX_INPUT_SEL));
+        input = /** @type {any} */ (queryPageControl(document, MX_INPUT_SEL));
       }
       if (!input) {
         noteSendFail('no-input');
         return { ok: false, reason: 'no-input' };
       }
+      // 窓が狭いとミクチャがコメント欄を隠す(りんく「広くするとコメントうてるっぽい」)。隠れていても入れて押してみて、見えていたかを記録に残す
+      const inputShown = input.getClientRects().length > 0;
       input.focus();
       const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
       Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, text);
       input.dispatchEvent(new Event('input', { bubbles: true }));
       await sleep(150);
-      const btn = findSendButton();
+      const btn = findSendButton(input);
       if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
-        noteSendFail('send-disabled');
+        noteSendFail(`send-disabled${inputShown ? '' : ':hidden'}`);
         return { ok: false, reason: 'send-disabled' };
       }
       if (btn) btn.click();
@@ -554,11 +583,11 @@ try {
       await sleep(400);
       const ok = String(input.value || '').trim() !== text;
       try {
-        void chrome.storage.local.set({ yt_diag_mx_send_last: { at: Date.now(), ok, len: text.length, userId: diag.userId, via: btn ? 'button' : 'enter' } });
+        void chrome.storage.local.set({ yt_diag_mx_send_last: { at: Date.now(), ok, len: text.length, userId: diag.userId, via: btn ? 'button' : 'enter', inputShown } });
       } catch {
         /* no-op */
       }
-      if (!ok) noteSendFail('still-in-box');
+      if (!ok) noteSendFail(`still-in-box${inputShown ? '' : ':hidden'}`);
       return { ok, reason: ok ? '' : 'still-in-box' };
     })()
       .then((r) => sendResponse(r))
