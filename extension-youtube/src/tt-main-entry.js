@@ -34,22 +34,26 @@
     }
   };
 
-  /** @param {unknown} url */
+  /**
+   * コメントのソケットなら URL の room_id(無ければ '')、そうでなければ null。
+   *   ★ページはこのソケットを配信をまたいで使い回す(room_id は最初の配信のまま)。どの配信の受信かは入口が中身で見分ける
+   * @param {unknown} url
+   */
   const roomIdOf = (url) => {
     try {
       const u = new URL(String(url || ''), location.href);
-      if (u.protocol !== 'wss:' || !/^webcast[^.]*\.(?:[a-z0-9-]+\.)*tiktok\.com$/i.test(u.hostname)) return '';
+      if (u.protocol !== 'wss:' || !/^webcast[^.]*\.(?:[a-z0-9-]+\.)*tiktok\.com$/i.test(u.hostname)) return null;
       const r = String(u.searchParams.get('room_id') || '');
       return /^\d{5,20}$/.test(r) ? r : '';
     } catch {
-      return '';
+      return null;
     }
   };
 
   /** @param {WebSocket} ws @param {unknown} url */
   const watch = (ws, url) => {
     const roomId = roomIdOf(url);
-    if (!roomId) return;
+    if (roomId == null) return;
     open.set(ws, roomId);
     post({ t: 'open', roomId, at: Date.now() });
     ws.addEventListener('message', (ev) => {

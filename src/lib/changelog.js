@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2107',
+    date: '2026-11-12',
+    summary: 'TikTok で配信を移ると記録0件になる件',
+    items: Object.freeze([
+      'TikTok で画面の中のリンクから別の配信へ移ると、コメントが1件も記録されず、ログインしているのに「ログインしていない」と出ていました。TikTok は配信を移ってもコメントの通り道を使い回すため、どの配信のコメントかを中身で見分けるようにしました。',
+      '配信を移ったとき、前の配信の PICK UP が残ったままになっていたのを消すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2106',
     date: '2026-11-12',
     summary: 'ミクチャの会場から送れない件',
@@ -197,14 +206,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Twitch と Kick の配信では、横の欄にそのサービス公式の「ギフトサブ ランキング」を出します。Bits・Kicks の順位とは別の欄で、Twitch はチャット欄の順位表と同じ期間、Kick は通算です。',
       '順位と数は Twitch・Kick が出している値そのままです。ギフトサブの順位が空の配信では欄を出しません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2070',
-    date: '2026-11-11',
-    summary: 'ABEMAの会場の数字がすぐ新しくなる',
-    items: Object.freeze([
-      'ABEMA の配信で、ページの視聴数やコメント数が増えたら、会場の帯にも10秒ほどで新しい数を出します(今までは開いたときの数が長く残ることがありました)。'
     ])
   })
 ]);
