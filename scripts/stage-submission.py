@@ -48,7 +48,8 @@ def build_submission_manifest(dev_manifest: dict, version: str) -> dict:
     #   (v0.1.1529: 開発版のリロード固着根治で key を導入した際の対策・下の verify_no_secrets が二重に検査)
     m.pop('key', None)
     # description: 開発識別子サフィックスを落とす（CWS 掲載名は短い方で統一）
-    m['description'] = 'ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます。'
+    #   (0.1.2105: 文を二重に持たない。dev manifest の文からサフィックスだけを落とす)
+    m['description'] = m['description'].replace('（開発識別子: nicolivelog）', '')
     # hosts: dev サーバ(localhost/127.0.0.1:3456)は外す。
     #   v0.1.698: VOICEVOX 連携(http://127.0.0.1:50021)はユーザー向け機能なので提出物にも残す
     #   (ローカル音声合成エンジン連携・理由書 cws-submission-texts.md に記載)。
