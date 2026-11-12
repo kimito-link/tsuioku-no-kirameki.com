@@ -54,8 +54,8 @@ function setupYtBusyPatch(b) {
   b.onLoad({ filter: /src[\\/]lib[\\/]voiceBusyPriority\.js$/ }, (args) => ({
     contents: replaceOnce(
       readFileSync(args.path, 'utf8'),
-      '  return busy && !input?.importance;',
-      '  return busy && !input?.importance && false; // YouTube 版は自前の選び方(ytVoicePriority.js)',
+      '  if (!busy || input?.importance) return false;',
+      '  if (!busy || input?.importance || true) return false; // YouTube 版は自前の選び方(ytVoicePriority.js)',
       'ニコ生版の混雑時の絞り込みを使わない'
     ),
     loader: 'js',

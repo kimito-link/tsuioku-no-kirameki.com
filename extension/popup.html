@@ -11973,6 +11973,23 @@
               </span>
             </label>
           </div>
+          <!-- 2026-11-12: 合唱(同じ言葉が何人からも来たら、覚えた声を重ねて1回で鳴らす)。既定 ON。
+               配線は popup/wireVoiceChorusToggle.js、決め方は lib の voiceChorus.js。 -->
+          <div class="nl-record-sub">
+            <label for="voiceChorusToggle" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="voiceChorusToggle"
+                checked
+                aria-label="同じ言葉が続いたら声を重ねて読む(合唱)"
+              />
+              <span>
+                同じ言葉が続いたら声を重ねて読む(合唱)
+                <span class="nl-record-sub__hint"
+                  >わこつ・888 などを何人もが書いたとき、1回にまとめて、その人たちの声を重ねて鳴らします(最大5人)。</span>
+              </span>
+            </label>
+          </div>
           <!-- v0.1.1271(ユーザー要望): 視聴ページに「🏟 会場モード」ボタンを出すか（既定 ON＝出す）。
                「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、会場の画面ではなく
                ボタンが常時表示されていることだった。会場を使わない人は隠せるようにする。 -->

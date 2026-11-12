@@ -28,6 +28,14 @@ import {
   shouldUseLightVoice
 } from './voiceLightFallback.js';
 import { createLightSpeaker } from './voiceLightSpeaker.js';
+import { createVoiceClipCache, voiceClipKey } from './voiceClipCache.js';
+import {
+  findVoiceChorusHost,
+  isVoiceChorusEnabled,
+  joinVoiceChorus,
+  KEY_VOICE_CHORUS_ENABLED,
+  planVoiceChorusOverlays
+} from './voiceChorus.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
   capVoiceMaxCharsByBoost,
@@ -62,7 +70,11 @@ import { decideVoiceGpuTip, decideVoiceLagNotice } from './voiceLagNotice.js';
 import {
   classifyVoiceImportance,
   createVoiceFirstSpeakerState,
+  createVoiceVoicedState,
+  isVoiceNeverVoiced,
   noteVoiceSpeakerInLive,
+  noteVoiceVoiced,
+  scoreVoiceWhenBusy,
   shouldSkipVoiceWhenBusy,
   VOICE_BUSY_QUEUE_MIN,
   voicePriorityForImportance
@@ -202,6 +214,17 @@ export class VoicePlayer {
     //   item オブジェクトをキーに「合成中の WAV Promise」を持つ Map に拡張。
     //   再生中に N+1 だけでなく N+2/N+3 も先行合成し、フラッド時に合成を遊ばせない。
     this.prefetches = new Map();
+    // 2026-11-12: 声のつくり置き(voiceClipCache.js)。短い文はその人の声で一度作ったら覚え、
+    //   次からは合成せずに鳴らす(混雑中も「大事でない」短文を読める)。
+    this._clipCache = deps.clipCache || createVoiceClipCache();
+    // 2026-11-12: 合唱(voiceChorus.js)。同じ言葉が何人からも来たら、覚えた声を重ねて1回で鳴らす(既定 ON)。
+    this.chorusEnabled = true;
+    /** @type {Set<any>} */
+    this._chorusAudios = new Set();
+    /** @type {Set<any>} */
+    this._chorusTimers = new Set();
+    /** 合唱で重ねられなかった(声を覚えていない)仲間。空いた時に1人ずつ作る。 @type {Array<{ key: string, text: string, voice: any }>} */
+    this._chorusPending = [];
     this.playing = false;
     this.generation = 0;
     this.stopCurrent = null;
@@ -229,6 +252,8 @@ export class VoicePlayer {
     this._arrivalWindowState = null;
     // v0.1.1861: 「その配信で初めてのコメント」を覚える(混雑時は大事なものだけ読む)。
     this._firstSpeakerState = createVoiceFirstSpeakerState();
+    // 2026-11-12(会議の第3段): この配信で声で読まれた人(まだ一度も読まれていない人を混雑中も読むため)。
+    this._voicedState = createVoiceVoicedState();
     this._dropCountGateTotal = 0;
     this._dropHeadStaleTotal = 0;
     this._dropSweepStaleTotal = 0;
@@ -244,6 +269,15 @@ export class VoicePlayer {
       //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
       //   mergeTotal=mergeRepeatedVoiceItem で吸収した累計(統合が効いているかの計器)。
       lastE2eMs: -1, e2eAvgMs: -1, mergeTotal: 0,
+      // 2026-11-12計器(声のつくり置き): clipHitTotal=合成せずに覚えた声で鳴らす準備をした件数、
+      //   clipBusyKeepTotal=混雑で読まない所を覚えた声があるので読んだ件数、clipStoreTotal=覚えた件数、
+      //   clipBytes/clipKeys=今覚えている量(上限 8MB)。
+      clipHitTotal: 0, clipBusyKeepTotal: 0, clipStoreTotal: 0, clipBytes: 0, clipKeys: 0,
+      // 2026-11-12計器(合唱): chorusJoinTotal=合唱に加わった件数、chorusPlayTotal=声を重ねて鳴らした回数、
+      //   chorusOverlayTotal=重ねた声の数、chorusLearnTotal=空いている時に作っておいた声の数。
+      chorusJoinTotal: 0, chorusPlayTotal: 0, chorusOverlayTotal: 0, chorusLearnTotal: 0,
+      // 2026-11-12計器(選び方): busyScoreKeepTotal=混雑中に「質問」「まだ読まれていない人」の点で読んだ件数。
+      busyScoreKeepTotal: 0,
       // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
       //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
       //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
@@ -316,7 +350,8 @@ export class VoicePlayer {
           this.VOICE_ASSIGNMENTS_KEY,
           this.VOICE_READ_NAME_KEY,
           KEY_VOICE_VOLUME_PERCENT,
-          COMEVIEW_NG_STORAGE_KEY
+          COMEVIEW_NG_STORAGE_KEY,
+          KEY_VOICE_CHORUS_ENABLED
         ]);
       }
     } catch {
@@ -327,6 +362,7 @@ export class VoicePlayer {
     this.readNameEnabled = bag[this.VOICE_READ_NAME_KEY] === true;
     this.volumePercent = normalizeVoiceVolumePercent(bag[KEY_VOICE_VOLUME_PERCENT]);
     this.ngKeys = voiceNgKeySet(bag[COMEVIEW_NG_STORAGE_KEY]);
+    this.chorusEnabled = isVoiceChorusEnabled(bag[KEY_VOICE_CHORUS_ENABLED]);
     this._watchVolumeSetting();
 
     this._emitToggle();
@@ -350,6 +386,8 @@ export class VoicePlayer {
         if (c) this.volumePercent = normalizeVoiceVolumePercent(c.newValue);
         const ng = changes && changes[COMEVIEW_NG_STORAGE_KEY];
         if (ng) this.ngKeys = voiceNgKeySet(ng.newValue);
+        const ch = changes && changes[KEY_VOICE_CHORUS_ENABLED];
+        if (ch) this.chorusEnabled = isVoiceChorusEnabled(ch.newValue);
         const en = changes && changes[KEY_VOICE_READING_ENABLED];
         if (!en) return;
         const next = en.newValue === true;
@@ -400,10 +438,12 @@ export class VoicePlayer {
       try { entry.abort?.abort(); } catch { /* no-op */ }
     }
     this.prefetches.clear();
+    this._chorusPending = [];
     // v0.1.799: 破棄した待機 item の吹き出しを unvoiced へ(pending のまま床いっぱい残さない)。
     for (const item of dropped) this._notifyDropped(item);
     if (typeof this.stopCurrent === 'function') this.stopCurrent();
     this.stopCurrent = null;
+    this._stopChorus();
     try { this.lightSpeaker?.cancel?.(); } catch { /* 軽い声が無くても止めは失敗しない */ }
     this._updateLagNotice(); // 止めたら遅れの一言も消す(待ちは空)。
   }
@@ -485,10 +525,14 @@ export class VoicePlayer {
           ? cur.expectedMs - (now - cur.playAt)
           : estimateVoiceStartDelayMs({ aheadChars: [cur.chars] }, this._paceState, rtf) - (now - cur.shiftAt);
       }
+      // 2026-11-12: 覚えた声で鳴らす件は声づくりの時間を数えない(待たせても間に合う)。
+      const cached = (/** @type {any} */ it) => this._isClipReady(it);
       const ms = estimateVoiceStartDelayMs({
         currentRemainingMs: Math.max(0, currentRemainingMs),
         aheadChars: this.queue.slice(0, i).map(chars),
-        selfChars: chars(item)
+        aheadCached: this.queue.slice(0, i).map(cached),
+        selfChars: chars(item),
+        selfCached: cached(item)
       }, this._paceState, rtf);
       return { ms, ahead: i + (cur ? 1 : 0), important: item.priority === 'high' || !!item.importance };
     } catch {
@@ -732,11 +776,201 @@ export class VoicePlayer {
     }
   }
 
+  /**
+   * 2026-11-12(合唱): 重ねる声の文(名前を付けない本文だけ・人によらず同じ文)。
+   * @param {any} item
+   */
+  _chorusText(item) {
+    try {
+      return buildVoiceReadingText({ name: '', text: item?.body }, { maxChars: computeVoiceCongestion(this.queue.length).maxChars });
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * 2026-11-12(合唱): 主役の声が鳴り始めたら、覚えた声がある仲間の声を少しずつずらして重ねる。
+   * @param {any} item
+   * @param {number} boost 主役の声を作った時の早口(近い早口の声を選ぶ)
+   * @param {number} playbackRate 主役と同じ再生速度
+   */
+  _playChorusOverlays(item, boost, playbackRate) {
+    if (!this.chorusEnabled || !Array.isArray(item?.chorus) || item.chorus.length === 0) return;
+    const text = this._chorusText(item);
+    if (!text) return;
+    // 覚えていない仲間は、空いた時に作る候補へ(同じ声は1回・最大16人)。
+    for (const who of item.chorus) {
+      const voice = this.resolveVoice(who, this.assignments, this.styleIds);
+      const key = voiceClipKey(voice, text);
+      if (!key || this._clipCache.has(key) || this._chorusPending.some((p) => p.key === key)) continue;
+      if (this._chorusPending.length >= 16) this._chorusPending.shift();
+      this._chorusPending.push({ key, text, voice });
+    }
+    const overlays = planVoiceChorusOverlays(item.chorus, (who) => {
+      const hit = this._clipCache.get(voiceClipKey(this.resolveVoice(who, this.assignments, this.styleIds), text), boost);
+      return hit ? hit.wav : null;
+    });
+    if (overlays.length === 0) return;
+    for (const o of overlays) { try { noteVoiceVoiced(this._voicedState, item.liveId, o.userKey); } catch { /* no-op */ } }
+    this.diag.chorusPlayTotal = (Number(this.diag.chorusPlayTotal) || 0) + 1;
+    this.diag.chorusOverlayTotal = (Number(this.diag.chorusOverlayTotal) || 0) + overlays.length;
+    const generation = this.generation;
+    for (const o of overlays) {
+      const timer = setTimeout(() => {
+        this._chorusTimers.delete(timer);
+        if (generation !== this.generation || !this.enabled) return;
+        let url = '';
+        try {
+          const loud = applyVoiceVolumeToWav(o.clip, (this.volumePercent * o.gainPercent) / 100);
+          url = this.createObjectURL(new Blob([loud], { type: 'audio/wav' }));
+          const AudioCtor = this.audioConstructor;
+          const audio = new AudioCtor(url);
+          if (playbackRate !== 1.0) {
+            audio.preservesPitch = true;
+            audio.playbackRate = playbackRate;
+          }
+          let done = false;
+          const cleanup = () => {
+            if (done) return;
+            done = true;
+            clearTimeout(guard);
+            this._chorusAudios.delete(audio);
+            try { this.revokeObjectURL(url); } catch { /* no-op */ }
+          };
+          // ended が来ない時の後始末(短い声なので10秒で十分)。
+          const guard = setTimeout(cleanup, 10000);
+          audio._nlChorusCleanup = cleanup;
+          audio.addEventListener('ended', cleanup, { once: true });
+          audio.addEventListener('error', cleanup, { once: true });
+          this._chorusAudios.add(audio);
+          const p = audio.play();
+          if (p && typeof p.catch === 'function') p.catch(cleanup);
+        } catch {
+          if (url) { try { this.revokeObjectURL(url); } catch { /* no-op */ } }
+        }
+      }, o.delayMs);
+      this._chorusTimers.add(timer);
+    }
+  }
+
+  /** 2026-11-12(合唱): 重ねている声と、これから重ねる予定を止める。 */
+  _stopChorus() {
+    for (const t of this._chorusTimers) clearTimeout(t);
+    this._chorusTimers.clear();
+    for (const a of [...this._chorusAudios]) {
+      try { a.pause(); } catch { /* no-op */ }
+      try { a._nlChorusCleanup?.(); } catch { /* no-op */ }
+    }
+    this._chorusAudios.clear();
+  }
+
+  /**
+   * 2026-11-12(合唱): 読み上げ待ちが空いている時だけ、合唱で重ねられなかった仲間の声を1人ぶん作っておく
+   *   (次に同じ言葉が来た時から重なる)。待ちがある間は作らない=読み上げの合成を奪わない。
+   */
+  _learnChorusMember() {
+    if (!this.chorusEnabled || this._chorusPending.length === 0) return;
+    if (!this.enabled || this.queue.length > 0 || this._synthInFlight > 0 || this._useLightVoice()) return;
+    while (this._chorusPending.length > 0) {
+      const next = this._chorusPending.shift();
+      if (!next || this._clipCache.has(next.key)) continue;
+      const abort = new AbortController();
+      this._synthAborts.add(abort);
+      const promise = this._synthesizeTracked(next.text, next.voice, { signal: abort.signal })
+        .catch(() => null)
+        .finally(() => { this._synthAborts.delete(abort); });
+      this.diag.chorusLearnTotal = (Number(this.diag.chorusLearnTotal) || 0) + 1;
+      this._rememberClip(next.key, 0, promise);
+      return; // 1回に1人だけ
+    }
+  }
+
+  /**
+   * 2026-11-12: 声のつくり置きの鍵(この人の声+読む文)。覚えない文なら ''。
+   * @param {any} item
+   * @param {string} [text] 読む文(省略時は今の混雑の上限で作る)
+   */
+  _clipKeyFor(item, text) {
+    try {
+      const t = typeof text === 'string'
+        ? text
+        : buildMergedVoiceText(item, { maxChars: computeVoiceCongestion(this.queue.length).maxChars });
+      return voiceClipKey(this.resolveVoice(item.userKey, this.assignments, this.styleIds), t);
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * 2026-11-12: この件を覚えた声で鳴らせるか(合成済みの先読みがある件も含む)。
+   * @param {any} item
+   */
+  _isClipReady(item) {
+    if (!item) return false;
+    const pf = this.prefetches.get(item);
+    if (pf && pf.cached) return true;
+    return this._clipCache.has(this._clipKeyFor(item));
+  }
+
+  /**
+   * 2026-11-12: 覚えた声があれば、合成せずに「先読み済み」として置く。置けたら true。
+   * @param {any} item
+   * @param {number} generation
+   */
+  _attachCachedClip(item, generation) {
+    if (!item || generation !== this.generation) return false;
+    const existing = this.prefetches.get(item);
+    if (existing && existing.generation === generation) return !!existing.cached;
+    const congestion = computeVoiceCongestion(this.queue.length);
+    const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
+    const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) });
+    const key = this._clipKeyFor(item, text);
+    const hit = key ? this._clipCache.get(key, effBoost) : null;
+    if (!hit) return false;
+    this.prefetches.set(item, {
+      generation,
+      promise: Promise.resolve(hit.wav),
+      boostAtSynth: hit.boost,
+      textLength: text.length,
+      abort: null,
+      cached: true
+    });
+    this.diag.clipHitTotal = (Number(this.diag.clipHitTotal) || 0) + 1;
+    return true;
+  }
+
+  /**
+   * 2026-11-12: できあがった声を覚える(短い文だけ・少しずつ届いた声は届き終わってから)。
+   * @param {string} key
+   * @param {number} boost 合成した時の早口
+   * @param {Promise<any>} wavPromise
+   */
+  _rememberClip(key, boost, wavPromise) {
+    if (!key) return;
+    Promise.resolve(wavPromise).then(async (wav) => {
+      if (!wav) return;
+      let whole = wav;
+      if (isStreamedVoice(wav)) {
+        const ok = await wav.whenDone;
+        if (!ok) return;
+        whole = wav.toWav();
+      }
+      if (this._clipCache.put(key, boost, whole)) {
+        this.diag.clipStoreTotal = (Number(this.diag.clipStoreTotal) || 0) + 1;
+        const st = this._clipCache.stats();
+        this.diag.clipBytes = st.bytes;
+        this.diag.clipKeys = st.keys;
+      }
+    }).catch(() => { /* 覚えられなくても読み上げは止めない */ });
+  }
+
   /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ）。 */
   _ensurePrefetch(item, generation) {
     if (!item || generation !== this.generation) return null;
     const existing = this.prefetches.get(item);
     if (existing && existing.generation === generation) return existing.promise;
+    // 2026-11-12: 覚えた声があれば合成しない。
+    if (this._attachCachedClip(item, generation)) return this.prefetches.get(item).promise;
     const congestion = computeVoiceCongestion(this.queue.length);
     // v0.1.1222: 実効上限が絞られるとキューが5件に届かず congestion の上位段が発火しない構造穴を
     //   pressure(需要/供給比)由来のブーストで埋める。上げるだけ・落ち着いていれば0。
@@ -766,6 +1000,7 @@ export class VoicePlayer {
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
     //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
     this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length, abort });
+    this._rememberClip(voiceClipKey(assigned, text), effBoost, promise);
     return promise;
   }
 
@@ -911,6 +1146,11 @@ export class VoicePlayer {
       this.prefetches.clear();
       return;
     }
+    // 2026-11-12: 覚えた声がある件は、合成を待たずに(軽い声の間でも)その人の声で鳴らせるよう置いておく。
+    const cachedReady = new Set();
+    for (const item of this.queue) {
+      if (item && this._attachCachedClip(item, generation)) cachedReady.add(item);
+    }
     // 2026-11-03: 軽い声で読んでいる間は VOICEVOX に読み上げを頼まない(速さの確かめだけ)。
     if (this._useLightVoice()) {
       this._maybeProbeVoicevox();
@@ -924,7 +1164,7 @@ export class VoicePlayer {
     // v0.1.1088計器(設計書§2): diag.lastDepth は宣言のみでどこからも代入されていなかった
     //   化石計器。ここで実値を代入して修理する(先読み深さの実測)。
     this.diag.lastDepth = depth;
-    const wanted = new Set();
+    const wanted = new Set(cachedReady);
     for (let i = 0; i < depth && i < this.queue.length; i++) {
       const item = this.queue[i];
       if (!item) continue;
@@ -1172,16 +1412,19 @@ export class VoicePlayer {
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const inlineAbort = pf ? null : new AbortController();
         if (inlineAbort) this._synthAborts.add(inlineAbort);
-        const wav = pf
-          ? await pf.promise
-          : await this._synthesizeTracked(
-              inlineText,
-              {
-                ...assigned,
-                speedOffset: assigned.speedOffset + effBoostNow
-              },
-              { signal: inlineAbort.signal }
-            ).finally(() => { this._synthAborts.delete(inlineAbort); });
+        let inlinePromise = null;
+        if (!pf) {
+          inlinePromise = this._synthesizeTracked(
+            inlineText,
+            {
+              ...assigned,
+              speedOffset: assigned.speedOffset + effBoostNow
+            },
+            { signal: inlineAbort.signal }
+          ).finally(() => { this._synthAborts.delete(inlineAbort); });
+          this._rememberClip(voiceClipKey(assigned, inlineText), effBoostNow, inlinePromise.catch(() => null));
+        }
+        const wav = pf ? await pf.promise : await inlinePromise;
         this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
         this.diag.lastSpeedBoost = effBoostNow;
         // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-1): 合成待ち時間の
@@ -1347,6 +1590,12 @@ export class VoicePlayer {
               // v0.1.771: 実際に再生が始まった瞬間だけ通知(drop/merge/失敗では呼ばれない)。
               //   吹き出しはここで speaking になり、onAudioEnd まで消えない。
               if (typeof item.onAudioStart === 'function') item.onAudioStart();
+              // 2026-11-12: 声で読まれた人を覚える(合唱で声が重なった仲間は _playChorusOverlays で数える)。
+              try {
+                noteVoiceVoiced(this._voicedState, item.liveId, item.userKey);
+              } catch { /* no-op */ }
+              // 2026-11-12(合唱): 仲間の声を重ねる(覚えた声がある人だけ・合成しない)。
+              try { this._playChorusOverlays(item, boostAtSynth, playbackRate); } catch { /* 合唱の失敗は主役の声に影響させない */ }
               if (playResult && typeof playResult.catch === 'function') {
                 playResult.catch((err) => {
                   if (err && err.name === 'NotAllowedError') {
@@ -1377,6 +1626,8 @@ export class VoicePlayer {
           this._notifyDropped(item);
           if (objectUrl) this.revokeObjectURL(objectUrl);
         }
+        // 2026-11-12(合唱): 待ちが空いたら、まだ覚えていない仲間の声を1人ぶん作っておく。
+        try { this._learnChorusMember(); } catch { /* no-op */ }
         // v0.1.1065計器: 1件完了(comeviewと同じくcatch経路も含む)。
         this.diag.spokenTotal += 1;
         this.diag.lastSpokenBase = Date.now();
@@ -1494,7 +1745,32 @@ export class VoicePlayer {
         broadcasterUid: item.broadcasterUid,
         firstInLive: noteVoiceSpeakerInLive(this._firstSpeakerState, item.liveId, userKey)
       });
-      if (shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance })) {
+      // 2026-11-12(合唱): 待っている件と同じ言葉を別の人が書いたら、その件の合唱に加える
+      //   (別の1件として読まない=読み上げの待ちを増やさない)。大事なものは合唱にせず1件で読む。
+      if (this.chorusEnabled) {
+        const hostIdx = findVoiceChorusHost(this.queue, { body, userKey, importance });
+        if (hostIdx >= 0 && joinVoiceChorus(this.queue[hostIdx], userKey) !== 'dup') {
+          this.diag.chorusJoinTotal = (Number(this.diag.chorusJoinTotal) || 0) + 1;
+          if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }
+          this._notifyDropped(item);
+          continue;
+        }
+      }
+
+      // 2026-11-12: 覚えた声がある短文は合成ゼロで鳴らせるので、混雑中でも読む(1人1声のまま)。
+      // 2026-11-12(会議の第3段): 大事でない件も、配信者への質問・この配信でまだ一度も読まれていない人は
+      //   点を付けて混雑中でも読む(浅い混雑は片方・深い混雑は両方)。読む順番は変えない。
+      const busyScore = scoreVoiceWhenBusy({
+        text: item.kind === 'gift' ? '' : body,
+        neverVoiced: isVoiceNeverVoiced(this._voicedState, item.liveId, userKey)
+      });
+      const busySkip = shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance, score: busyScore });
+      if (!busySkip && !importance && busyScore > 0 && this.queue.length >= VOICE_BUSY_QUEUE_MIN) {
+        this.diag.busyScoreKeepTotal = (Number(this.diag.busyScoreKeepTotal) || 0) + 1;
+      }
+      const clipReady = busySkip && this._clipCache.has(this._clipKeyFor({ userKey, name, body, count: 1 }));
+      if (clipReady) this.diag.clipBusyKeepTotal = (Number(this.diag.clipBusyKeepTotal) || 0) + 1;
+      if (busySkip && !clipReady) {
         this.diag.busySkipTotal = (Number(this.diag.busySkipTotal) || 0) + 1;
         if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }
         this._notifyDropped(item);
@@ -1513,6 +1789,8 @@ export class VoicePlayer {
         priority: voicePriorityForImportance(importance),
         /** 2026-11-12: 大事なもの(配信者・初コメも)。会場が「見込みが長いので読まない」から外す。 */
         importance,
+        /** 2026-11-12: 読まれた人を配信ごとに覚えるため。 */
+        liveId: item.liveId,
         // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
         onPlayStart: item.onPlayStart,
         // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。

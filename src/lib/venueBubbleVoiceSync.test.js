@@ -59,6 +59,12 @@ describe('estimateVoiceStartDelayMs', () => {
   it('短い文にも下限の長さ', () => {
     expect(estimateVoiceStartDelayMs({ aheadChars: [1] }, pace, 0)).toBe(VOICE_ITEM_MIN_MS);
   });
+  it('2026-11-12: 覚えた声で鳴らす件は声づくりの時間を数えない', () => {
+    // 前の件 10字(覚えた声)=1000ms のみ / 自分 20字(覚えた声)=0
+    expect(estimateVoiceStartDelayMs({ aheadChars: [10], aheadCached: [true], selfChars: 20, selfCached: true }, pace, 1.5)).toBe(1000);
+    // 覚えていない前の件はこれまでどおり作る時間で数える
+    expect(estimateVoiceStartDelayMs({ aheadChars: [10], aheadCached: [false], selfChars: 20, selfCached: true }, pace, 1.5)).toBe(1750);
+  });
 });
 
 describe('summarizeBubbleVoiceSync', () => {
