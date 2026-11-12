@@ -385,7 +385,7 @@ import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } fr
 import { createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync } from '../lib/venueBubbleVoiceSync.js';
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
-import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
+import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS } from '../lib/venueStatStrip.js';
 import { createVenueStatSelfPoller, createStatMirrorLiveness, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -2798,9 +2798,9 @@ export function mountVenueBarButton(options = {}) {
   const statStrip = createVenueStatStrip(document, {
     platform: options.statPlatform,
     faces: {
-      link: resolveVenueAssetUrl('images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png'),
-      konta: resolveVenueAssetUrl('images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png'),
-      tanu: resolveVenueAssetUrl('images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png')
+      link: resolveVenueAssetUrl(VENUE_STAT_STRIP_FACE_PATHS.link),
+      konta: resolveVenueAssetUrl(VENUE_STAT_STRIP_FACE_PATHS.konta),
+      tanu: resolveVenueAssetUrl(VENUE_STAT_STRIP_FACE_PATHS.tanu)
     }
   });
   header.append(title, ...(composeBox ? [composeBox] : []), headerRight, statStrip.el); // v0.1.1868 発言欄は中央

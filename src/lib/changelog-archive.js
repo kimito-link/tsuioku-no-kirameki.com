@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2054',
+    date: '2026-11-11',
+    summary: 'PICK UPと経過を同じ部品へ',
+    items: Object.freeze([
+      'PICK UP は、ニコ生と同じ置き方だけを使います。細い枠の幅は書きません。名前は本文の上、本文は1行です。',
+      '配信者カードの円は、どの配信でも画像全体を収めます。チャンネルロゴは配信の保存欄に入れます。',
+      '経過は、番組の開始時刻から数えます。コメントの本文へ空白は足しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2053',
     date: '2026-11-11',
     summary: '配信者画像と視聴数を同じ部品へ',

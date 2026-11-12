@@ -7,6 +7,7 @@
 import { pseudoLvForVideoId, ytImportantVoiceReasonOfKey, streamKeyForWatchUrl, ytSummaryToNicoSnapshot } from './ytNicoShim.js';
 import { ytInstallLocalAssetUrls, ytPrefetchLocalAssets, ytPrefetchLocalAssetsInOrder } from './ytLocalAssetUrls.js';
 import { listBundledEffectSoundPaths } from '../../src/lib/effectSoundPlayer.js';
+import { VENUE_STAT_STRIP_FACE_PATHS } from '../../src/lib/venueStatStrip.js';
 import { listCharaLiveImagePaths } from '../../src/lib/charaLiveStage.js';
 import { VoicePlayer } from '../../src/lib/voicePlayer.js';
 import { ytShouldVoiceWhenCrowded, ytCrowdSpeedBoost, YT_VOICE_CROWD_QUEUE } from '../../src/lib/youtube/ytVoicePriority.js';
@@ -120,6 +121,8 @@ function sync() {
 ytInstallLocalAssetUrls();
 const PREFETCH = [
   ...listCharaLiveImagePaths(),
+  // 会場の数字の帯の3キャラの顔(会場を作った瞬間に読む・2026-11-12 実配信で chrome-extension:// のまま読まれ Unsafe で弾かれていた)
+  ...Object.values(VENUE_STAT_STRIP_FACE_PATHS),
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png',
   'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
   'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png',

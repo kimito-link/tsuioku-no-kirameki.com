@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2099',
+    date: '2026-11-12',
+    summary: 'YouTube などの会場でキャラの顔も弾かれないように',
+    items: Object.freeze([
+      'YouTube の会場で、数字の帯に出る3キャラの顔の画像が「Unsafe attempt to load URL」で弾かれていました。ギフト音と同じく、会場を出す前にページの中へ先読みするようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2098',
     date: '2026-11-12',
     summary: 'ミクチャでログイン画面に移っても記録を続ける',
@@ -210,18 +218,7 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'YouTubeの同時視聴者数を、画面に出る前でもページの情報から読むようにしました。出るまでは「読み込み中」、直前の数が読めなくなったときは最後の数と何分前かを出します。',
       'サイドパネルを開いて窓が細くなると PICK UP も細くなり、閉じても元の幅に戻らないことがありました。窓の変化のたびに、ニコ生と同じ置き方で幅を計算し直します。窓が広がれば元の幅に戻ります。'
     ])
-  }),
-  Object.freeze({
-    version: '0.1.2054',
-    date: '2026-11-11',
-    summary: 'PICK UPと経過を同じ部品へ',
-    items: Object.freeze([
-      'PICK UP は、ニコ生と同じ置き方だけを使います。細い枠の幅は書きません。名前は本文の上、本文は1行です。',
-      '配信者カードの円は、どの配信でも画像全体を収めます。チャンネルロゴは配信の保存欄に入れます。',
-      '経過は、番組の開始時刻から数えます。コメントの本文へ空白は足しません。'
-    ])
   })
-
 ]);
 
 
