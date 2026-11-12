@@ -83,7 +83,7 @@
 | `data-nl-uname` | lib/supportTimelineHtml.js | extension/comeview-entry.js<br>extension/popup-entry.js |
 | `data-nl-usage-terms-ack` | extension/popup-entry.js<br>lib/cloakNotForSidePanel.js | — |
 | `data-nl-user-detail-wired` | extension/popup-entry.js | extension/popup-entry.js |
-| `data-nl-wired` | extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js |
+| `data-nl-wired` | extension/popup/wireVoiceChorusToggle.js<br>extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceChorusToggle.js<br>extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js |
 | `data-nl-yt-video-id` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
 | `data-nl-yt-viewers` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
 | `data-nl-yt-viewers-at` | lib/youtube/ytPageViewerReader.js | — |

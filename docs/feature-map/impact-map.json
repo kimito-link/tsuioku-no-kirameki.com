@@ -1302,6 +1302,22 @@
       ]
     },
     {
+      "file": "src/lib/voiceChorus.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceDiag.js",
       "featureCount": 4,
       "features": [
@@ -5121,6 +5137,16 @@
     },
     {
       "file": "src/extension/popup/wirePanelVoiceReadingButton.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/wireVoiceChorusToggle.js",
       "featureCount": 1,
       "features": [
         "popup"

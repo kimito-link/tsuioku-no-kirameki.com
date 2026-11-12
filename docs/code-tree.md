@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1269 件
+## ⚠️ 役割コメントが無いソース 10 / 1271 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1196,7 +1196,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2473)
+- 📁 **src/** (2477)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1233,8 +1233,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (114)
-    - 📁 **popup/** (18)
+  - 📁 **extension/** (115)
+    - 📁 **popup/** (19)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1250,6 +1250,7 @@
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
       - `wireLaneUserDetailOpen.test.js`
       - `wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
+      - `wireVoiceChorusToggle.js` — ポップアップの「合唱」の配線(2026-11-12)。
       - `wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
       - `wireVoiceGpuTip.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
@@ -1505,7 +1506,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2188)
+  - 📁 **lib/** (2191)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -3591,6 +3592,8 @@
     - `voiceBubbleRealtimeParity.test.js`
     - `voiceBusyPriority.js` — v0.1.1861: 読み上げが混んでいる時は「大事なもの」だけ読む(ニコ生版・会場とコメビュで共用)。
     - `voiceBusyPriority.test.js`
+    - `voiceChorus.js` — 2026-11-12: 合唱(混雑配信の読み上げ・会議の第2段)。
+    - `voiceChorus.test.js`
     - `voiceClipCache.js` — 2026-11-12: 声のつくり置き(混雑配信の読み上げ・会議の第1段)。
     - `voiceClipCache.test.js`
     - `voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
@@ -3630,6 +3633,7 @@
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
     - `voicePlayerBusyPriority.test.js`
+    - `voicePlayerChorus.test.js`
     - `voicePlayerClipCache.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
     - `voicePlayerOverloadKeep.test.js`

@@ -666,7 +666,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 64</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -677,6 +677,7 @@
 - `scripts/measure-yt-voice-repeat.mjs` — YouTube の会場の読み上げが「最新を読まず、過去の発言を何度も読む」かを計器で確かめる。
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
+- `src/extension/popup/wireVoiceChorusToggle.js` — ポップアップの「合唱」の配線(2026-11-12)。
 - `src/extension/popup/wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
 - `src/extension/popup/wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
 - `src/extension/popup/wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
@@ -695,6 +696,7 @@
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
 - `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
 - `src/lib/voiceBusyPriority.js` — v0.1.1861: 読み上げが混んでいる時は「大事なもの」だけ読む(ニコ生版・会場とコメビュで共用)。
+- `src/lib/voiceChorus.js` — 2026-11-12: 合唱(混雑配信の読み上げ・会議の第2段)。
 - `src/lib/voiceClipCache.js` — 2026-11-12: 声のつくり置き(混雑配信の読み上げ・会議の第1段)。
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
 - `src/lib/voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
@@ -1514,9 +1516,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (2版)
+### 💾 記録件数 (1版)
 - `v0.1.2107` 2026-11-12 — TikTok で配信を移ると記録0件になる件
-- `v0.1.2086` 2026-11-11 — 保存の書き込みを小さくして固まりにくく
 
 ### 📥 コメント取得 (1版)
 - `v0.1.2095` 2026-11-12 — Kick・ふわっちのコメントを早く記録
@@ -1537,7 +1538,7 @@
 ### 🎈 吹き出し (1版)
 - `v0.1.2096` 2026-11-12 — 吹き出しと読み上げの声をぴったり同時に
 
-### 🎁 ギフト (10版)
+### 🎁 ギフト (9版)
 - `v0.1.2109` 2026-11-12 — ミクチャのアイコンをプロフィールから
 - `v0.1.2108` 2026-11-12 — ミクチャのコメントに本人のアイコン
 - `v0.1.2102` 2026-11-12 — 配信が無いときの案内をサービスの言葉に
@@ -1547,9 +1548,9 @@
 - `v0.1.2096` 2026-11-12 — 吹き出しと読み上げの声をぴったり同時に
 - `v0.1.2089` 2026-11-12 — ツイキャスの有料ギフトの人も欄に並べる
 - `v0.1.2087` 2026-11-12 — ツイキャスの配信も同じ画面で記録
-- `v0.1.2086` 2026-11-11 — 保存の書き込みを小さくして固まりにくく
 
-### 🔊 読み上げ (4版)
+### 🔊 読み上げ (5版)
+- `v0.1.2112` 2026-11-12 — 同じ言葉は声を重ねて合唱に
 - `v0.1.2101` 2026-11-12 — 読み上げの計器に PC の声で鳴った件も残す
 - `v0.1.2100` 2026-11-12 — YouTube の読み上げの読み直しを記録する計器
 - `v0.1.2096` 2026-11-12 — 吹き出しと読み上げの声をぴったり同時に
