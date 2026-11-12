@@ -155,6 +155,20 @@ function platformOfPanelStreamKey(key) {
   return id && id !== 'yt' ? LIST_PLATFORMS.find((p) => p.id === id) || null : null;
 }
 const LIST_PLATFORMS = Object.values(STREAM_PLATFORMS);
+/**
+ * パネルを開いたタブのサービス(YouTube なら null)。外枠が src に焼いた配信キー → 無ければタブのサービス(&site=・0.1.2102)。
+ *   配信ページでないタブ(TikTok の /live 等)や記録の無い配信でも、そのサービスの言葉で描くために使う。
+ */
+const PANEL_TAB_PLATFORM = (() => {
+  if (PANEL_STREAM_KEY) return platformOfPanelStreamKey(PANEL_STREAM_KEY);
+  try {
+    if (!/\/(?:yt-)?sidepanel\.html$/.test(String(location.pathname || ''))) return null;
+    const site = readYtPanelSite(location.search);
+    return site && site !== 'youtube' ? LIST_PLATFORMS.find((p) => p.id === site) || null : null;
+  } catch {
+    return null;
+  }
+})();
 
 // ---- 2. videoId ⇔ 疑似 lv ----
 /** @type {Map<string, string>} lv → videoId */
@@ -2221,9 +2235,16 @@ function screenPlatform() {
 /** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
 function screenPlatformBase() {
   if (YT_SHIM_IN_PAGE) return platformOfHostname(location.hostname);
-  if (lastAskedLv) return platformOfStreamKey(videoIdForPseudoLv(lastAskedLv));
-  // 画面がまだコメントを聞いてくる前(最初の描画)は、外枠が src に焼いた配信のサービス(0.1.1949)。無ければ最近記録が増えた配信
-  if (PANEL_STREAM_KEY) return platformOfPanelStreamKey(PANEL_STREAM_KEY);
+  if (lastAskedLv) {
+    const vid = videoIdForPseudoLv(lastAskedLv);
+    // 0.1.2103: 聞いてきた配信が分からない(記録の無い配信)ときは、外枠が焼いたタブのサービス。
+    //   null(=YouTube)のままだと、ツイキャスの配信外ページでも「YouTube のトップファン」の説明が出ていた(2026-11-12 PC 実測)。
+    //   配信が分かっているときはその配信のサービス(前に記録した YouTube の配信を見せているなら YouTube の言葉のまま)
+    return vid ? platformOfStreamKey(vid) : PANEL_TAB_PLATFORM;
+  }
+  // 画面がまだコメントを聞いてくる前(最初の描画)は、外枠が src に焼いた配信のサービス(0.1.1949)→ タブのサービス(0.1.2103)。
+  //   無ければ最近記録が増えた配信
+  if (PANEL_STREAM_KEY || PANEL_TAB_PLATFORM) return PANEL_TAB_PLATFORM;
   return platformOfStreamKey(newestVideoIdOf(knownSummaries));
 }
 

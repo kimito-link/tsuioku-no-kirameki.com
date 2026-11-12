@@ -79,4 +79,10 @@ describe('ytPanelRoute', () => {
     expect(readYtPanelSite(src2)).toBe('kick');
     expect(readYtPanelSite(YT_PANEL_SRC)).toBe('');
   });
+  it('0.1.2103: 記録の無い配信・配信外のタブは、タブのサービスの言葉で描く(shim の配線)', () => {
+    const shim = readFileSync('extension-youtube/src/ytNicoShim.js', 'utf8');
+    expect(shim).toContain('const PANEL_TAB_PLATFORM = (() => {');
+    expect(shim).toContain('return vid ? platformOfStreamKey(vid) : PANEL_TAB_PLATFORM;');
+    expect(shim).toContain('if (PANEL_STREAM_KEY || PANEL_TAB_PLATFORM) return PANEL_TAB_PLATFORM;');
+  });
 });
