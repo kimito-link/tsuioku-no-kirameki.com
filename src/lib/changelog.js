@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2099',
+    date: '2026-11-12',
+    summary: 'YouTube などの会場でキャラの顔も弾かれないように',
+    items: Object.freeze([
+      'YouTube の会場で、数字の帯に出る3キャラの顔の画像が「Unsafe attempt to load URL」で弾かれていました。ギフト音と同じく、会場を出す前にページの中へ先読みするようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2097',
     date: '2026-11-12',
     summary: 'YouTube などの会場でギフト音を確実に鳴らす',
@@ -210,16 +218,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'PICK UP は、ニコ生と同じ置き方だけを使います。細い枠の幅は書きません。名前は本文の上、本文は1行です。',
       '配信者カードの円は、どの配信でも画像全体を収めます。チャンネルロゴは配信の保存欄に入れます。',
       '経過は、番組の開始時刻から数えます。コメントの本文へ空白は足しません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2053',
-    date: '2026-11-11',
-    summary: '配信者画像と視聴数を同じ部品へ',
-    items: Object.freeze([
-      '配信者カードの円は、どの配信でも画像全体を収めます。チャンネルロゴを中央だけで切って、白い丸にしないようにしました。画像はこれまでどおり配信の保存欄に入れます。',
-      '番組の視聴数は、同じカードに「視聴数」として出します。数が無いからそのカードを隠すことはしません。',
-      'PICK UP はニコ生と同じ部品です。細い映像の幅には合わせず、名前は本文の上、本文は1行です。'
     ])
   })
 ]);

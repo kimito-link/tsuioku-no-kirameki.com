@@ -64,3 +64,13 @@ describe('会場の入口の配線', () => {
     expect(src).toMatch(/ytPrefetchLocalAssetsInOrder\(listBundledEffectSoundPaths\(\)\)/);
   });
 });
+
+describe('会場の数字の帯の顔', () => {
+  it('入口の先読みに入っていて、venueBar も同じ定数を使う', () => {
+    const entry = readFileSync(resolve(root, 'extension-youtube/src/venue-inline-entry.js'), 'utf8');
+    expect(entry).toMatch(/\.\.\.Object\.values\(VENUE_STAT_STRIP_FACE_PATHS\)/);
+    const bar = readFileSync(resolve(root, 'src/extension/venueBar.js'), 'utf8');
+    expect(bar).toMatch(/resolveVenueAssetUrl\(VENUE_STAT_STRIP_FACE_PATHS\.link\)/);
+    expect(bar).not.toMatch(/resolveVenueAssetUrl\('images\/yukkuri-charactore-english\/[^']*smile-mouth-open\.png'\)/);
+  });
+});

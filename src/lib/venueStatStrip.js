@@ -26,6 +26,13 @@ import { ageMsOf } from './timeAuthority.js';
 import { venueItemsForPlatform } from './platform/platformMetrics.js';
 
 /** 鏡がこれより古ければ「パネルが閉じている」とみなす[ms](鏡は中身が同じでも15秒ごとに書き直される)。 */
+/** 数字の帯に出す3キャラの顔(拡張の中の画像)。視聴ページの中の会場はこれを先に blob: へ読んでおく(venue-inline-entry.js)。 */
+export const VENUE_STAT_STRIP_FACE_PATHS = Object.freeze({
+  link: 'images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png',
+  konta: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png',
+  tanu: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png'
+});
+
 export const VENUE_STAT_STRIP_STALE_MS = 60_000;
 
 /** 古いときの説明(title)。 */
