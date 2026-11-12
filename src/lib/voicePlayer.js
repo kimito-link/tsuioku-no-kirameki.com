@@ -28,6 +28,7 @@ import {
   shouldUseLightVoice
 } from './voiceLightFallback.js';
 import { createLightSpeaker } from './voiceLightSpeaker.js';
+import { createVoiceClipCache, voiceClipKey } from './voiceClipCache.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
   capVoiceMaxCharsByBoost,
@@ -202,6 +203,9 @@ export class VoicePlayer {
     //   item オブジェクトをキーに「合成中の WAV Promise」を持つ Map に拡張。
     //   再生中に N+1 だけでなく N+2/N+3 も先行合成し、フラッド時に合成を遊ばせない。
     this.prefetches = new Map();
+    // 2026-11-12: 声のつくり置き(voiceClipCache.js)。短い文はその人の声で一度作ったら覚え、
+    //   次からは合成せずに鳴らす(混雑中も「大事でない」短文を読める)。
+    this._clipCache = deps.clipCache || createVoiceClipCache();
     this.playing = false;
     this.generation = 0;
     this.stopCurrent = null;
@@ -244,6 +248,10 @@ export class VoicePlayer {
       //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
       //   mergeTotal=mergeRepeatedVoiceItem で吸収した累計(統合が効いているかの計器)。
       lastE2eMs: -1, e2eAvgMs: -1, mergeTotal: 0,
+      // 2026-11-12計器(声のつくり置き): clipHitTotal=合成せずに覚えた声で鳴らす準備をした件数、
+      //   clipBusyKeepTotal=混雑で読まない所を覚えた声があるので読んだ件数、clipStoreTotal=覚えた件数、
+      //   clipBytes/clipKeys=今覚えている量(上限 8MB)。
+      clipHitTotal: 0, clipBusyKeepTotal: 0, clipStoreTotal: 0, clipBytes: 0, clipKeys: 0,
       // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
       //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
       //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
@@ -485,10 +493,14 @@ export class VoicePlayer {
           ? cur.expectedMs - (now - cur.playAt)
           : estimateVoiceStartDelayMs({ aheadChars: [cur.chars] }, this._paceState, rtf) - (now - cur.shiftAt);
       }
+      // 2026-11-12: 覚えた声で鳴らす件は声づくりの時間を数えない(待たせても間に合う)。
+      const cached = (/** @type {any} */ it) => this._isClipReady(it);
       const ms = estimateVoiceStartDelayMs({
         currentRemainingMs: Math.max(0, currentRemainingMs),
         aheadChars: this.queue.slice(0, i).map(chars),
-        selfChars: chars(item)
+        aheadCached: this.queue.slice(0, i).map(cached),
+        selfChars: chars(item),
+        selfCached: cached(item)
       }, this._paceState, rtf);
       return { ms, ahead: i + (cur ? 1 : 0), important: item.priority === 'high' || !!item.importance };
     } catch {
@@ -732,11 +744,92 @@ export class VoicePlayer {
     }
   }
 
+  /**
+   * 2026-11-12: 声のつくり置きの鍵(この人の声+読む文)。覚えない文なら ''。
+   * @param {any} item
+   * @param {string} [text] 読む文(省略時は今の混雑の上限で作る)
+   */
+  _clipKeyFor(item, text) {
+    try {
+      const t = typeof text === 'string'
+        ? text
+        : buildMergedVoiceText(item, { maxChars: computeVoiceCongestion(this.queue.length).maxChars });
+      return voiceClipKey(this.resolveVoice(item.userKey, this.assignments, this.styleIds), t);
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * 2026-11-12: この件を覚えた声で鳴らせるか(合成済みの先読みがある件も含む)。
+   * @param {any} item
+   */
+  _isClipReady(item) {
+    if (!item) return false;
+    const pf = this.prefetches.get(item);
+    if (pf && pf.cached) return true;
+    return this._clipCache.has(this._clipKeyFor(item));
+  }
+
+  /**
+   * 2026-11-12: 覚えた声があれば、合成せずに「先読み済み」として置く。置けたら true。
+   * @param {any} item
+   * @param {number} generation
+   */
+  _attachCachedClip(item, generation) {
+    if (!item || generation !== this.generation) return false;
+    const existing = this.prefetches.get(item);
+    if (existing && existing.generation === generation) return !!existing.cached;
+    const congestion = computeVoiceCongestion(this.queue.length);
+    const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
+    const text = buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) });
+    const key = this._clipKeyFor(item, text);
+    const hit = key ? this._clipCache.get(key, effBoost) : null;
+    if (!hit) return false;
+    this.prefetches.set(item, {
+      generation,
+      promise: Promise.resolve(hit.wav),
+      boostAtSynth: hit.boost,
+      textLength: text.length,
+      abort: null,
+      cached: true
+    });
+    this.diag.clipHitTotal = (Number(this.diag.clipHitTotal) || 0) + 1;
+    return true;
+  }
+
+  /**
+   * 2026-11-12: できあがった声を覚える(短い文だけ・少しずつ届いた声は届き終わってから)。
+   * @param {string} key
+   * @param {number} boost 合成した時の早口
+   * @param {Promise<any>} wavPromise
+   */
+  _rememberClip(key, boost, wavPromise) {
+    if (!key) return;
+    Promise.resolve(wavPromise).then(async (wav) => {
+      if (!wav) return;
+      let whole = wav;
+      if (isStreamedVoice(wav)) {
+        const ok = await wav.whenDone;
+        if (!ok) return;
+        whole = wav.toWav();
+      }
+      if (this._clipCache.put(key, boost, whole)) {
+        this.diag.clipStoreTotal = (Number(this.diag.clipStoreTotal) || 0) + 1;
+        const st = this._clipCache.stats();
+        this.diag.clipBytes = st.bytes;
+        this.diag.clipKeys = st.keys;
+      }
+    }).catch(() => { /* 覚えられなくても読み上げは止めない */ });
+  }
+
   /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ）。 */
   _ensurePrefetch(item, generation) {
     if (!item || generation !== this.generation) return null;
     const existing = this.prefetches.get(item);
     if (existing && existing.generation === generation) return existing.promise;
+    // 2026-11-12: 覚えた声があれば合成しない。
+    if (this._attachCachedClip(item, generation)) return this.prefetches.get(item).promise;
     const congestion = computeVoiceCongestion(this.queue.length);
     // v0.1.1222: 実効上限が絞られるとキューが5件に届かず congestion の上位段が発火しない構造穴を
     //   pressure(需要/供給比)由来のブーストで埋める。上げるだけ・落ち着いていれば0。
@@ -766,6 +859,7 @@ export class VoicePlayer {
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
     //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
     this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length, abort });
+    this._rememberClip(voiceClipKey(assigned, text), effBoost, promise);
     return promise;
   }
 
@@ -911,6 +1005,11 @@ export class VoicePlayer {
       this.prefetches.clear();
       return;
     }
+    // 2026-11-12: 覚えた声がある件は、合成を待たずに(軽い声の間でも)その人の声で鳴らせるよう置いておく。
+    const cachedReady = new Set();
+    for (const item of this.queue) {
+      if (item && this._attachCachedClip(item, generation)) cachedReady.add(item);
+    }
     // 2026-11-03: 軽い声で読んでいる間は VOICEVOX に読み上げを頼まない(速さの確かめだけ)。
     if (this._useLightVoice()) {
       this._maybeProbeVoicevox();
@@ -924,7 +1023,7 @@ export class VoicePlayer {
     // v0.1.1088計器(設計書§2): diag.lastDepth は宣言のみでどこからも代入されていなかった
     //   化石計器。ここで実値を代入して修理する(先読み深さの実測)。
     this.diag.lastDepth = depth;
-    const wanted = new Set();
+    const wanted = new Set(cachedReady);
     for (let i = 0; i < depth && i < this.queue.length; i++) {
       const item = this.queue[i];
       if (!item) continue;
@@ -1172,16 +1271,19 @@ export class VoicePlayer {
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const inlineAbort = pf ? null : new AbortController();
         if (inlineAbort) this._synthAborts.add(inlineAbort);
-        const wav = pf
-          ? await pf.promise
-          : await this._synthesizeTracked(
-              inlineText,
-              {
-                ...assigned,
-                speedOffset: assigned.speedOffset + effBoostNow
-              },
-              { signal: inlineAbort.signal }
-            ).finally(() => { this._synthAborts.delete(inlineAbort); });
+        let inlinePromise = null;
+        if (!pf) {
+          inlinePromise = this._synthesizeTracked(
+            inlineText,
+            {
+              ...assigned,
+              speedOffset: assigned.speedOffset + effBoostNow
+            },
+            { signal: inlineAbort.signal }
+          ).finally(() => { this._synthAborts.delete(inlineAbort); });
+          this._rememberClip(voiceClipKey(assigned, inlineText), effBoostNow, inlinePromise.catch(() => null));
+        }
+        const wav = pf ? await pf.promise : await inlinePromise;
         this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
         this.diag.lastSpeedBoost = effBoostNow;
         // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-1): 合成待ち時間の
@@ -1494,7 +1596,11 @@ export class VoicePlayer {
         broadcasterUid: item.broadcasterUid,
         firstInLive: noteVoiceSpeakerInLive(this._firstSpeakerState, item.liveId, userKey)
       });
-      if (shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance })) {
+      // 2026-11-12: 覚えた声がある短文は合成ゼロで鳴らせるので、混雑中でも読む(1人1声のまま)。
+      const busySkip = shouldSkipVoiceWhenBusy({ queueLength: this.queue.length, importance });
+      const clipReady = busySkip && this._clipCache.has(this._clipKeyFor({ userKey, name, body, count: 1 }));
+      if (clipReady) this.diag.clipBusyKeepTotal = (Number(this.diag.clipBusyKeepTotal) || 0) + 1;
+      if (busySkip && !clipReady) {
         this.diag.busySkipTotal = (Number(this.diag.busySkipTotal) || 0) + 1;
         if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }
         this._notifyDropped(item);

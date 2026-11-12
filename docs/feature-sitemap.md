@@ -666,7 +666,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -695,6 +695,7 @@
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
 - `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
 - `src/lib/voiceBusyPriority.js` — v0.1.1861: 読み上げが混んでいる時は「大事なもの」だけ読む(ニコ生版・会場とコメビュで共用)。
+- `src/lib/voiceClipCache.js` — 2026-11-12: 声のつくり置き(混雑配信の読み上げ・会議の第1段)。
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
 - `src/lib/voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/voiceEngineActivity.js` — 会場とコメビュで「VOICEVOX がいま使われているか」を分け合う(v0.1.1781)。
@@ -1559,7 +1560,7 @@
 - `v0.1.2108` 2026-11-12 — ミクチャのコメントに本人のアイコン
 
 ### その他 (4版)
+- `v0.1.2111` 2026-11-12 — 混雑中も覚えた短い声は読む
 - `v0.1.2105` 2026-11-12 — 拡張の説明文に対応サービスを全部
 - `v0.1.2104` 2026-11-12 — 開いた直後に配信の題や配信者が消える件
 - `v0.1.2103` 2026-11-12 — 配信の無い画面でも開いているサービスの言葉に
-- `v0.1.2085` 2026-11-11 — ミクチャの数字をページの言葉に
