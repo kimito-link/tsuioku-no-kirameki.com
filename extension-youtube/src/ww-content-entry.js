@@ -11,6 +11,7 @@
 import { parseWwLiveIdFromUrl, wwLiveApiUrl, parseWwLive, parseWwComment, buildWwStreamKey } from '../../src/lib/whowatch/wwParse.js';
 import { wwEventInfoUrl, parseWwEventInfo, parseWwLiveStats, mergePlatformStats } from '../../src/lib/platform/platformStats.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
+import { isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
   if (!stallRoot.__nlStallWatch) {
@@ -368,7 +369,7 @@ try {
       const form = input.closest('form');
       const btn = /** @type {HTMLButtonElement | null} */ (
         form?.querySelector('button[type="submit"], button:not([type])') ||
-          [...document.querySelectorAll('button')].find((b) => /^(?:送信|コメント)$/.test(String(b.textContent || '').trim())) ||
+          [...document.querySelectorAll('button')].find((b) => !isOwnExtensionUi(b) && /^(?:送信|コメント)$/.test(String(b.textContent || '').trim())) ||
           null
       );
       if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
