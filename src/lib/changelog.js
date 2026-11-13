@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2118',
+    date: '2026-11-13',
+    summary: '混んでも合唱が途中で消えにくく',
+    items: Object.freeze([
+      '読み上げの待ちがあふれた時、何人もの声をまとめた合唱の件は、ふつうの件より後に捨てるようにしました。合唱に加わった人の声ごと消えることが減ります。',
+      '合唱で重ねる声を、まったく同じ文だけでなく同じ言葉(www に w・草 の声など)からも探すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2117',
     date: '2026-11-13',
     summary: '書き方が違う笑いや拍手も合唱に',
@@ -178,15 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'YouTube などの会場でキャラの顔も弾かれないように',
     items: Object.freeze([
       'YouTube の会場で、数字の帯に出る3キャラの顔の画像が「Unsafe attempt to load URL」で弾かれていました。ギフト音と同じく、会場を出す前にページの中へ先読みするようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2098',
-    date: '2026-11-12',
-    summary: 'ミクチャでログイン画面に移っても記録を続ける',
-    items: Object.freeze([
-      'ミクチャはログインしていないと、配信を開いて約5分でページがログイン画面へ移ります。これまではそこで記録も止まっていましたが、記録中の配信はそのままコメントとギフトを記録し続けるようにしました。',
-      'ログインして配信ページへ戻っても、同じ配信の記録が途切れずに続きます。ログイン画面以外のページへ移ったときは、これまでどおり止まります。'
     ])
   })
 ]);

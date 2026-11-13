@@ -6,10 +6,13 @@
  * 2026-11-03: keep(x) が true の件(VOICEVOX が合成している最中の件)は捨てず、その次に古い件から捨てる。
  *   合成に十数秒かかる PC では、毎回いちばん古い=合成中の件を捨てて新しい件の合成を頼み直し、
  *   1件も鳴らないうえに VOICEVOX 側に捨てた依頼が積み上がっていた(実配信: 毎分156件・読めた2件)。
- * @param {{ max?: number, keep?: (x: T) => boolean }} [opts]
+ * 2026-11-13: prefer(x) が true の件(合唱=何人もの声をまとめた件)は、ふつうの件の中で最後に捨てる。
+ *   上限は守る(keep と違って上限を超えて残さない)。YouTube 実測で、合唱の主役が溢れて捨てられ、
+ *   加わった人たちの声ごと消えていた(合唱に加わった17件のうち鳴ったのは10件ぶん)。
+ * @param {{ max?: number, keep?: (x: T) => boolean, prefer?: (x: T) => boolean }} [opts]
  * @returns {{ queue: T[], dropped: T[] }}
  */
-export function pushVoiceQueue(queue, item, { max = 5, keep } = {}) {
+export function pushVoiceQueue(queue, item, { max = 5, keep, prefer } = {}) {
   const current = Array.isArray(queue) ? [...queue] : [];
   if (item && typeof item === 'object' && /** @type {{priority?: string}} */ (item).priority === 'high') {
     // PR-V3: ギフト等優先アイテムは通常アイテムの前に割り込む
@@ -33,10 +36,16 @@ export function pushVoiceQueue(queue, item, { max = 5, keep } = {}) {
   /** @param {unknown} x */
   const isHigh = (x) => !!x && typeof x === 'object' && /** @type {{priority?: string}} */ (x).priority === 'high';
   const hasKeep = typeof keep === 'function';
+  /** @param {T} x */
+  const isPreferred = (x) => {
+    if (typeof prefer !== 'function') return false;
+    try { return !!prefer(x); } catch { return false; }
+  };
   /** @type {Set<T>} */
   const dropSet = new Set();
   const passes = [
-    (/** @type {T} */ x) => x !== item && !isHigh(x),
+    (/** @type {T} */ x) => x !== item && !isHigh(x) && !isPreferred(x),
+    (/** @type {T} */ x) => x !== item && !isHigh(x) && isPreferred(x),
     (/** @type {T} */ x) => x !== item && isHigh(x),
     (/** @type {T} */ x) => !hasKeep && x === item
   ];

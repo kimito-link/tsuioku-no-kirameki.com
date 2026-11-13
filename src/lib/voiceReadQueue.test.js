@@ -416,3 +416,27 @@ describe('pushVoiceQueue keep(2026-11-03: 合成中の件は捨てない)', () =
     expect(r3.dropped).toEqual([g1]);
   });
 });
+
+describe('pushVoiceQueue prefer(2026-11-13 合唱の主役は後に捨てる)', () => {
+  it('溢れたら、合唱でないふつうの件から先に捨てる(上限は守る)', () => {
+    const host = { id: 'host', chorusCount: 3 };
+    const a = { id: 'a' };
+    const b = { id: 'b' };
+    const out = pushVoiceQueue([host, a], b, { max: 2, prefer: (x) => Number(x.chorusCount) > 0 });
+    expect(out.queue.map((x) => x.id)).toEqual(['host', 'b']);
+    expect(out.dropped.map((x) => x.id)).toEqual(['a']);
+  });
+  it('ふつうの件が無ければ合唱の主役も捨てる(上限を超えて残さない)', () => {
+    const h1 = { id: 'h1', chorusCount: 1 };
+    const h2 = { id: 'h2', chorusCount: 2 };
+    const c = { id: 'c' };
+    const out = pushVoiceQueue([h1, h2], c, { max: 2, prefer: (x) => Number(x.chorusCount) > 0 });
+    expect(out.queue.map((x) => x.id)).toEqual(['h2', 'c']);
+    expect(out.dropped.map((x) => x.id)).toEqual(['h1']);
+  });
+  it('prefer が無ければ今までどおり古い順', () => {
+    const out = pushVoiceQueue([{ id: 'h', chorusCount: 3 }, { id: 'a' }], { id: 'b' }, { max: 2 });
+    expect(out.dropped.map((x) => x.id)).toEqual(['h']);
+  });
+});
+

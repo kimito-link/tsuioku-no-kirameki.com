@@ -37,7 +37,8 @@ import {
   joinVoiceChorus,
   KEY_VOICE_CHORUS_ENABLED,
   planVoiceChorusOverlays,
-  VOICE_CHORUS_MAX_MEMBERS
+  VOICE_CHORUS_MAX_MEMBERS,
+  voiceChorusMatchKey
 } from './voiceChorus.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
@@ -219,7 +220,8 @@ export class VoicePlayer {
     this.prefetches = new Map();
     // 2026-11-12: 声のつくり置き(voiceClipCache.js)。短い文はその人の声で一度作ったら覚え、
     //   次からは合成せずに鳴らす(混雑中も「大事でない」短文を読める)。
-    this._clipCache = deps.clipCache || createVoiceClipCache();
+    // 2026-11-13: 合唱で重ねる別の声は「同じ言葉」(w・ｗｗｗ・草…)でも探す。
+    this._clipCache = deps.clipCache || createVoiceClipCache({ textKey: voiceChorusMatchKey });
     // 2026-11-12: 合唱(voiceChorus.js)。同じ言葉が何人からも来たら、覚えた声を重ねて1回で鳴らす(既定 ON)。
     this.chorusEnabled = true;
     /** @type {Set<any>} */
@@ -1866,7 +1868,12 @@ export class VoicePlayer {
       // v0.1.1800: 待っている件の文字数から上限を見積もる(長い声の直後に平均が膨らんで、続く短い
       //   コメントまで飛ばしていた)。見積もれなければ従来の this._effectiveQueueMax。
       const queueMax = this._resolveQueueMaxByChars(candidate);
-      const pushed = pushVoiceQueue(this.queue, candidate, { max: queueMax, keep: this._inflightKeeper() });
+      // 2026-11-13: 合唱の主役(何人もの声をまとめた件)は、溢れた時にふつうの件より後に捨てる。
+      const pushed = pushVoiceQueue(this.queue, candidate, {
+        max: queueMax,
+        keep: this._inflightKeeper(),
+        prefer: (x) => Number(x?.chorusCount) > 0
+      });
       this.queue = pushed.queue;
       noteVoicePaceArrival(this._paceState, candidate.enqueuedAt);
       

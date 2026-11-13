@@ -64,7 +64,8 @@ function boostKey(boost) {
 
 /**
  * 声のつくり置きを作る。
- * @param {{ maxBytes?: number }} [opts]
+ * @param {{ maxBytes?: number, textKey?: (text: string) => string }} [opts]
+ *   textKey: 2026-11-13 合唱で「同じ言葉」とみなす形(w・ｗｗｗ・草を1つにする等)。省略時は文そのもの。
  */
 export function createVoiceClipCache(opts = {}) {
   const maxBytes = Number.isFinite(Number(opts.maxBytes)) && Number(opts.maxBytes) > 0
@@ -75,11 +76,16 @@ export function createVoiceClipCache(opts = {}) {
   /** 2026-11-13: 文 → その文を覚えた鍵(合唱で「同じ言葉を言った別の声」を探す)。 @type {Map<string, Set<string>>} */
   const byText = new Map();
   let bytes = 0;
+  /** @param {string} t */
+  const sameWord = (t) => {
+    if (typeof opts.textKey !== 'function') return t;
+    try { return String(opts.textKey(t) || ''); } catch { return t; }
+  };
 
   /** @param {string} key */
   function textOf(key) {
     const parts = key.split('|');
-    return parts.length >= 4 ? parts.slice(3).join('|') : '';
+    return parts.length >= 4 ? sameWord(parts.slice(3).join('|')) : '';
   }
   /** @param {string} key */
   function indexAdd(key) {
@@ -171,7 +177,7 @@ export function createVoiceClipCache(opts = {}) {
       return { wav, boost: pick };
     },
     /**
-     * 2026-11-13(合唱): 同じ文を覚えた「別の声」を、最近使った順に最大 limit 件。
+     * 2026-11-13(合唱): 同じ文(textKey で同じ言葉とみなす文)を覚えた「別の声」を、最近使った順に最大 limit 件。
      * @param {string} text voiceClipKey に渡した文
      * @param {unknown} boostNow
      * @param {ReadonlyArray<string>} excludeKeys 主役・仲間の鍵(同じ声を重ねない)
@@ -179,10 +185,13 @@ export function createVoiceClipCache(opts = {}) {
      * @returns {ArrayBuffer[]}
      */
     othersSaying(text, boostNow, excludeKeys, limit) {
-      const set = typeof text === 'string' ? byText.get(text) : undefined;
+      const set = typeof text === 'string' ? byText.get(sameWord(text)) : undefined;
       if (!set || !(limit > 0)) return [];
       const skip = new Set(Array.isArray(excludeKeys) ? excludeKeys : []);
-      const keys = [...set].filter((k) => !skip.has(k)).reverse();
+      const recent = [...set].filter((k) => !skip.has(k)).reverse();
+      // まったく同じ文の声を先に、次に同じ言葉とみなした声(「www」に「w」の声など)。
+      const exact = (/** @type {string} */ k) => k.split('|').slice(3).join('|') === text;
+      const keys = [...recent.filter(exact), ...recent.filter((k) => !exact(k))];
       /** @type {ArrayBuffer[]} */
       const out = [];
       for (const k of keys) {

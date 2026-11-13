@@ -143,4 +143,33 @@ describe('VoicePlayer 合唱', () => {
     expect(player.diag.chorusCrowdTotal).toBe(2); // 覚えていた別の声 x・yy の2つ
     expect(player.diag.chorusOverlayTotal).toBe(2);
   });
+
+  it('2026-11-13: 「www」の合唱に、前に「w」「草」と言った別の声も重なる', async () => {
+    const audios = [];
+    let hold = null;
+    const synth = vi.fn((text) => {
+      if (text === 'まって') return new Promise((r) => { hold = () => r(new ArrayBuffer(400)); });
+      return Promise.resolve(new ArrayBuffer(400));
+    });
+    const player = makePlayer({ synth, audios });
+    await player.enable({ persist: false });
+    // 前に別の2人(声 1・2)が「w」「草」と言って覚えている(文は「わら」「草」で、主役の「わらわら」とは違う)。
+    player.enqueue([{ kind: 'comment', userId: 'x', nickname: 'X', text: 'w', liveId: 'lv1' }]);
+    await tick(60);
+    player.enqueue([{ kind: 'comment', userId: 'yy', nickname: 'Y', text: '草', liveId: 'lv1' }]);
+    await tick(60);
+    player.enqueue([{ kind: 'comment', userId: 'a', nickname: 'A', text: 'まって', liveId: 'lv1' }]);
+    await tick(5);
+    player.enqueue([{ kind: 'comment', userId: 'bbb', nickname: 'B', text: 'www', liveId: 'lv1' }]);
+    player.enqueue([{ kind: 'comment', userId: 'zzzz', nickname: 'Z', text: 'やあ', liveId: 'lv1' }]);
+    for (const u of ['n0000', 'n10000']) {
+      player.enqueue([{ kind: 'comment', userId: u, nickname: u, text: 'ｗｗｗ', liveId: 'lv1' }]);
+    }
+    expect(player.diag.chorusJoinTotal).toBe(2);
+    hold();
+    await tick(900);
+    expect(player.diag.chorusPlayTotal).toBe(1);
+    expect(player.diag.chorusCrowdTotal).toBe(2);
+  });
 });
+
