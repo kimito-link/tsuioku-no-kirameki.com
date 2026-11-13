@@ -17,7 +17,9 @@ import {
   createVoiceOverloadState,
   noteVoiceSynthOutcome,
   resolveVoiceOverloadTimeouts,
-  capVoiceSynthDepthForOverload
+  capVoiceSynthDepthForOverload,
+  retryVoiceEngineAfterLongOverload,
+  VOICE_OVERLOAD_FAST_MS
 } from './voiceEngineOverload.js';
 import { observeVoicePlayback } from './voicePlaybackQuality.js';
 import {
@@ -278,6 +280,10 @@ export class VoicePlayer {
       chorusJoinTotal: 0, chorusPlayTotal: 0, chorusOverlayTotal: 0, chorusLearnTotal: 0,
       // 2026-11-12計器(選び方): busyScoreKeepTotal=混雑中に「質問」「まだ読まれていない人」の点で読んだ件数。
       busyScoreKeepTotal: 0,
+      // 2026-11-13計器(軽い声から戻らない件): lightProbeTotal=VOICEVOX を確かめた回数、lightProbeFastTotal=3秒未満だった回数、
+      //   lightProbeLastMs=直近の確かめの ms(失敗 -1)、lightProbeBusySkipTotal=ほかの合成が終わらず確かめられなかった回数、
+      //   voiceOverloadRetryTotal=混雑のまま2分経って VOICEVOX を一度試した回数。
+      lightProbeTotal: 0, lightProbeFastTotal: 0, lightProbeLastMs: -1, lightProbeBusySkipTotal: 0, voiceOverloadRetryTotal: 0,
       // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
       //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
       //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
@@ -1196,6 +1202,13 @@ export class VoicePlayer {
 
   /** 2026-11-03: 今、軽い声で読むか(VOICEVOX が混雑中で、軽い声が使えるときだけ)。 */
   _useLightVoice() {
+    // 2026-11-13: 混雑のまま2分経ったら一度 VOICEVOX を試す(Windows の声に落ちたまま戻らない、を起こさない)。
+    try {
+      if (retryVoiceEngineAfterLongOverload(this._overload, Date.now())) {
+        this.diag.voiceOverloaded = false;
+        this.diag.voiceOverloadRetryTotal = (Number(this.diag.voiceOverloadRetryTotal) || 0) + 1;
+      }
+    } catch { /* 計器・切り替えの失敗は読み上げを止めない */ }
     let available = false;
     try { available = !!this.lightSpeaker && this._lightFailStreak < 3 && this.lightSpeaker.available(); } catch { available = false; }
     const on = shouldUseLightVoice({ overloaded: this._overload.overloaded, available, setting: this.lightVoiceSetting });
@@ -1206,11 +1219,23 @@ export class VoicePlayer {
   /** 軽い声で読んでいる間、ときどき VOICEVOX に短い文を頼んで速さを確かめる(速ければ混雑が解けて戻る)。 */
   _maybeProbeVoicevox() {
     const nowMs = Date.now();
-    if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) return;
+    if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) {
+      // 2026-11-13計器: 確かめの時刻なのに、ほかの合成が終わらず確かめられなかった回数。
+      if (this._synthInFlight > 0 && shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: 0 })) {
+        this.diag.lightProbeBusySkipTotal = (Number(this.diag.lightProbeBusySkipTotal) || 0) + 1;
+      }
+      return;
+    }
     this._lightProbeAt = nowMs;
     try {
       const voice = this.resolveVoice('', this.assignments, this.styleIds);
-      void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).catch(() => null);
+      // 2026-11-13計器: 確かめた回数・3秒未満だった回数・直近の ms(戻らない理由を名指しする)。
+      this.diag.lightProbeTotal = (Number(this.diag.lightProbeTotal) || 0) + 1;
+      void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).then((wav) => {
+        const ms = Date.now() - nowMs;
+        this.diag.lightProbeLastMs = wav ? ms : -1;
+        if (wav && ms < VOICE_OVERLOAD_FAST_MS) this.diag.lightProbeFastTotal = (Number(this.diag.lightProbeFastTotal) || 0) + 1;
+      }, () => { this.diag.lightProbeLastMs = -1; });
     } catch { /* 確かめられなくても軽い声で読み続ける */ }
   }
 

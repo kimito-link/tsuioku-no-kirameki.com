@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2115',
+    date: '2026-11-13',
+    summary: 'PC の声のまま戻らない時も VOICEVOX へ',
+    items: Object.freeze([
+      'VOICEVOX が混んで PC の声(Windows の声)で読んでいるとき、2分たっても戻らなければ一度 VOICEVOX で読んでみるようにしました。まだ混んでいれば、また PC の声に切り替えます。',
+      'PC の声から戻れなかった理由を、読み上げの状態に残すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2114',
     date: '2026-11-12',
     summary: '混雑時の読み上げの効き目を測る',
@@ -184,15 +193,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'ニコ生・YouTube・Twitch・Kick・ABEMA・ふわっち・SHOWROOM・ミクチャ・TikTok・ツイキャスの会場すべてに効きます。',
       '状態のページに「吹き出しと声」のずれと、コメントが届いてから吹き出しが出るまでの時間を出すようにしました。'
     ])
-  }),
-  Object.freeze({
-    version: '0.1.2095',
-    date: '2026-11-12',
-    summary: 'Kick・ふわっちのコメントを早く記録',
-    items: Object.freeze([
-      'Kick の配信を開いたとき、チャット欄にすでに出ているコメント(過去ログ)も記録に入れるようにしました。今までは開いた後に来たコメントだけだったので、コメントがゆっくりの配信では開いた直後に「記録 0」のまま見えていました。つながりが切れてつなぎ直したときも、その間のコメントを過去ログから拾います。',
-      'ふわっちのコメントを読む間隔を5秒から2秒にしました。コメントが記録に入るまでの遅れが約半分になります。',
-    ]),
   })
 ]);
 

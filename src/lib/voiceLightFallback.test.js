@@ -123,6 +123,24 @@ describe('VoicePlayer: VOICEVOX が混雑中は軽い声で読む', () => {
     expect(p.diag.lightVoiceActive).toBe(true);
   });
 
+  it('2026-11-13: 混雑のまま2分経ったら一度 VOICEVOX に戻し、確かめの数を計器に残す', async () => {
+    const synth = fakeSynth();
+    const fetchSynthesizeVoice = vi.fn(() => new Promise(() => {}));
+    const p = makePlayer(createLightSpeaker({ synth, Utterance: FakeUtterance }), fetchSynthesizeVoice);
+    await p.enable({ persist: false });
+    p._overload.overloaded = true;
+    p._overload.overloadedAt = Date.now() - 60_000;
+    p.enqueue([{ kind: 'comment', userId: 'u1', nickname: 'A', text: 'やっほー' }]);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(p.diag.lightSpokenTotal).toBe(1); // 1分ならまだ軽い声
+    expect(p.diag.lightProbeTotal).toBe(1);
+    expect(p.diag.voiceOverloadRetryTotal).toBe(0);
+    p._overload.overloadedAt = Date.now() - 121_000;
+    expect(p._useLightVoice()).toBe(false); // 2分を超えたら VOICEVOX を試す
+    expect(p._overload.overloaded).toBe(false);
+    expect(p.diag.voiceOverloadRetryTotal).toBe(1);
+  });
+
   it('混雑していなければ軽い声は使わない', async () => {
     const synth = fakeSynth();
     const p = makePlayer(createLightSpeaker({ synth, Utterance: FakeUtterance }), vi.fn().mockResolvedValue(new ArrayBuffer(8)));
