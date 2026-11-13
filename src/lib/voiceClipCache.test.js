@@ -126,4 +126,16 @@ describe('othersSaying(2026-11-13 合唱の別の声)', () => {
     c.clear();
     expect(c.othersSaying('わこつ', 0, [], 4)).toEqual([]);
   });
+
+  it('textKey を渡すと、同じ言葉とみなす文の声も返す(同じ文の声が先)', () => {
+    const c = createVoiceClipCache({ textKey: (t) => (/^(?:わら)+$|^草+$/u.test(t) ? 'わら' : t) });
+    const kSame = voiceClipKey({ styleId: 1 }, 'わらわら');
+    const kShort = voiceClipKey({ styleId: 2 }, 'わら');
+    const kKusa = voiceClipKey({ styleId: 3 }, '草');
+    const wSame = wav(100); const wShort = wav(101); const wKusa = wav(102);
+    c.put(kSame, 0, wSame); c.put(kShort, 0, wShort); c.put(kKusa, 0, wKusa);
+    expect(c.othersSaying('わらわら', 0, [], 4)).toEqual([wSame, wKusa, wShort]);
+    expect(c.othersSaying('わら', 0, [kShort], 4)).toEqual([wKusa, wSame]);
+    expect(c.othersSaying('わこつ', 0, [], 4)).toEqual([]);
+  });
 });
