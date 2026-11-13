@@ -31,6 +31,23 @@ export function isVoiceChorusEnabled(raw) {
 }
 
 /**
+ * 2026-11-13: 合唱で「同じ言葉」とみなすための形。笑い(w・ｗ・www・草・笑・わら)は1つ、拍手(888…)は1つ、
+ *   語尾の伸ばし・！？・句読点は無視する。YouTube 実測(毎分85〜140件・10分)で多かったのは
+ *   「www・草・w・ｗ・笑笑」で、文字が少しずつ違うため合唱に加われたのは9件だけだった。
+ * @param {unknown} body
+ * @returns {string} 比べられない時は ''
+ */
+export function voiceChorusMatchKey(body) {
+  if (typeof body !== 'string') return '';
+  let t = body.normalize('NFKC').trim().toLowerCase();
+  if (!t) return '';
+  if (/^(?:w+|草+|笑+|(?:わら)+)$/u.test(t)) return 'わら';
+  if (/^8{3,}$/.test(t)) return '888';
+  t = t.replace(/[ー〜~!?！？。、.,…]+$/u, '');
+  return t;
+}
+
+/**
  * 待ち行列の中から、同じ言葉で合唱に加われる件を探す。
  *   - 同じ本文(読む前の文)・別の人・まだ鳴っていない件。
  *   - 加わる人が大事なもの(ギフト・広告・配信者・モデレーター)なら合唱にしない(その人の声で1件として読む)。
@@ -45,13 +62,13 @@ export function isVoiceChorusEnabled(raw) {
 export function findVoiceChorusHost(queue, candidate) {
   if (!Array.isArray(queue) || !candidate) return -1;
   if (candidate.importance && !(candidate.importance === 'first' && candidate.busy === true)) return -1;
-  const body = typeof candidate.body === 'string' ? candidate.body.trim() : '';
+  const body = voiceChorusMatchKey(candidate.body);
   const who = String(candidate.userKey ?? '');
   if (!body || !who) return -1;
   for (let i = 0; i < queue.length; i += 1) {
     const q = queue[i];
     if (!q || typeof q !== 'object') continue;
-    if (typeof q.body !== 'string' || q.body.trim() !== body) continue;
+    if (voiceChorusMatchKey(q.body) !== body) continue;
     if (String(q.userKey ?? '') === who) continue;
     return i;
   }

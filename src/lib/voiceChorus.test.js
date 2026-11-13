@@ -4,6 +4,7 @@ import {
   isVoiceChorusEnabled,
   joinVoiceChorus,
   planVoiceChorusOverlays,
+  voiceChorusMatchKey,
   VOICE_CHORUS_MAX_MEMBERS,
   VOICE_CHORUS_OFFSETS_MS
 } from './voiceChorus.js';
@@ -87,5 +88,22 @@ describe('2026-11-13 混雑中の初コメ・同じ言葉の別の声', () => {
     const out = planVoiceChorusOverlays(['x', 'y'], (w) => (w === 'x' ? own : null), [crowd]);
     expect(out.map((o) => o.clip)).toEqual([own, crowd]);
     expect(out[0].userKey).toBe('x');
+  });
+});
+
+describe('voiceChorusMatchKey(2026-11-13)', () => {
+  it('笑い・拍手の書き方の違いと語尾は同じ言葉とみなす', () => {
+    for (const t of ['www', 'w', 'ｗｗｗ', 'W', '草', '草草', '笑', '笑笑', 'わらわら']) expect(voiceChorusMatchKey(t)).toBe('わら');
+    for (const t of ['888', '８８８８', '88888']) expect(voiceChorusMatchKey(t)).toBe('888');
+    expect(voiceChorusMatchKey('わこつー')).toBe('わこつ');
+    expect(voiceChorusMatchKey('えぇ！？')).toBe('えぇ');
+    expect(voiceChorusMatchKey('いいね!!')).toBe('いいね');
+    expect(voiceChorusMatchKey('88')).toBe('88');
+    expect(voiceChorusMatchKey('  ')).toBe('');
+    expect(voiceChorusMatchKey(null)).toBe('');
+  });
+  it('違う書き方の笑いでも合唱に加われる', () => {
+    expect(findVoiceChorusHost([{ userKey: 'a', body: 'www' }], { userKey: 'b', body: '草' })).toBe(0);
+    expect(findVoiceChorusHost([{ userKey: 'a', body: 'わこつ' }], { userKey: 'b', body: 'わこつー！' })).toBe(0);
   });
 });

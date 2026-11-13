@@ -281,6 +281,8 @@ export class VoicePlayer {
       chorusJoinTotal: 0, chorusPlayTotal: 0, chorusOverlayTotal: 0, chorusLearnTotal: 0,
       // 2026-11-13計器: chorusCrowdTotal=仲間の声を覚えておらず、同じ言葉を前に言った別の声で埋めた数。
       chorusCrowdTotal: 0,
+      // chorusNoVoiceTotal=主役が鳴った時、仲間はいたが重ねる声が1つも無かった回数。
+      chorusNoVoiceTotal: 0,
       // 2026-11-12計器(選び方): busyScoreKeepTotal=混雑中に「質問」「まだ読まれていない人」の点で読んだ件数。
       busyScoreKeepTotal: 0,
       // 2026-11-13計器(軽い声から戻らない件): lightProbeTotal=VOICEVOX を確かめた回数、lightProbeFastTotal=3秒未満だった回数、
@@ -824,7 +826,11 @@ export class VoicePlayer {
       const hit = this._clipCache.get(voiceClipKey(this.resolveVoice(who, this.assignments, this.styleIds), text), boost);
       return hit ? hit.wav : null;
     }, crowd);
-    if (overlays.length === 0) return;
+    if (overlays.length === 0) {
+      // 2026-11-13計器: 仲間がいたのに重ねる声が1つも無かった回数(本人の声も同じ言葉の別の声も無い)。
+      this.diag.chorusNoVoiceTotal = (Number(this.diag.chorusNoVoiceTotal) || 0) + 1;
+      return;
+    }
     for (const o of overlays) {
       if (!o.userKey) { this.diag.chorusCrowdTotal = (Number(this.diag.chorusCrowdTotal) || 0) + 1; continue; }
       try { noteVoiceVoiced(this._voicedState, item.liveId, o.userKey); } catch { /* no-op */ }

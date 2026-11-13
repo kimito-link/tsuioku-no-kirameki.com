@@ -96,6 +96,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   chorusPlayTotal: number,     // 同上: 声を重ねて鳴らした回数
  *   chorusOverlayTotal: number,  // 同上: 重ねた声の数
  *   chorusLearnTotal: number,    // 同上: 空いている時に作っておいた声の数
+ *   chorusNoVoiceTotal: number,  // 0.1.2117: 主役が鳴った時、仲間はいたが重ねる声が1つも無かった回数
  *   chorusCrowdTotal: number,    // 0.1.2116: 仲間の声の代わりに、同じ言葉を前に言った別の声で埋めた数
  *   busyScoreKeepTotal: number,  // 0.1.2114: 混雑中に「質問」「まだ読まれていない人」の点で読んだ件数
  *   lightProbeTotal: number,     // 0.1.2115: 軽い声の間に VOICEVOX を確かめた回数
@@ -226,6 +227,7 @@ export function makeInitialVoiceDiag() {
     chorusOverlayTotal: 0,
     chorusLearnTotal: 0,
     chorusCrowdTotal: 0,
+    chorusNoVoiceTotal: 0,
     busyScoreKeepTotal: 0,
     lightProbeTotal: 0,
     lightProbeFastTotal: 0,
@@ -394,6 +396,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     chorusOverlayTotal: num(d.chorusOverlayTotal, base.chorusOverlayTotal),
     chorusLearnTotal: num(d.chorusLearnTotal, base.chorusLearnTotal),
     chorusCrowdTotal: num(d.chorusCrowdTotal, base.chorusCrowdTotal),
+    chorusNoVoiceTotal: num(d.chorusNoVoiceTotal, base.chorusNoVoiceTotal),
     busyScoreKeepTotal: num(d.busyScoreKeepTotal, base.busyScoreKeepTotal),
     lightProbeTotal: num(d.lightProbeTotal, base.lightProbeTotal),
     lightProbeFastTotal: num(d.lightProbeFastTotal, base.lightProbeFastTotal),

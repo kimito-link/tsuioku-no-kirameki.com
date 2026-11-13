@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2117',
+    date: '2026-11-13',
+    summary: '書き方が違う笑いや拍手も合唱に',
+    items: Object.freeze([
+      'w・www・草・笑笑のような書き方の違う笑いや、888 と 8888 のような拍手を、合唱では同じ言葉として扱うようにしました。「わこつー！」のような語尾の違いも同じ言葉にします。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2116',
     date: '2026-11-13',
     summary: '混んだ配信でも合唱が鳴るように',
@@ -179,15 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ミクチャはログインしていないと、配信を開いて約5分でページがログイン画面へ移ります。これまではそこで記録も止まっていましたが、記録中の配信はそのままコメントとギフトを記録し続けるようにしました。',
       'ログインして配信ページへ戻っても、同じ配信の記録が途切れずに続きます。ログイン画面以外のページへ移ったときは、これまでどおり止まります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2097',
-    date: '2026-11-12',
-    summary: 'YouTube などの会場でギフト音を確実に鳴らす',
-    items: Object.freeze([
-      'YouTube の会場で、ギフト・広告・順位の効果音が「Unsafe attempt to load URL」で読み込めないことがありました。会場を出した後に効果音を裏で1本ずつ先読みし、最初の1回目からページの中だけで鳴らすようにしました（キャラの絵と同じやり方）。',
-      'Twitch・Kick・ツイキャスなど、同じ会場を使うほかのサービスにも同じ直しが入ります。'
     ])
   })
 ]);

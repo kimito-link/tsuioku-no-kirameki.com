@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2097',
+    date: '2026-11-12',
+    summary: 'YouTube などの会場でギフト音を確実に鳴らす',
+    items: Object.freeze([
+      'YouTube の会場で、ギフト・広告・順位の効果音が「Unsafe attempt to load URL」で読み込めないことがありました。会場を出した後に効果音を裏で1本ずつ先読みし、最初の1回目からページの中だけで鳴らすようにしました（キャラの絵と同じやり方）。',
+      'Twitch・Kick・ツイキャスなど、同じ会場を使うほかのサービスにも同じ直しが入ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2096',
     date: '2026-11-12',
     summary: '吹き出しと読み上げの声をぴったり同時に',
