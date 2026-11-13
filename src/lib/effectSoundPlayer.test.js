@@ -196,3 +196,31 @@ describe('v0.1.1061: 種類別の既定音量と正直な戻り値', () => {
     expect(playEffectSound(EFFECT_SOUND_KINDS.GIFT, { audioFactory, nowMs: 1000 })).toBe('error');
   });
 });
+
+describe('playEffectSound: 視聴ページの中の会場で blob: に読み替えてから鳴らす(2026-11-13)', () => {
+  it('chrome-extension:// のままなら、読み替えを待ってから blob: で鳴らす', async () => {
+    _resetEffectSoundGuardForTest();
+    const made = [];
+    const audioFactory = (url) => { const a = { url, volume: 1, play: vi.fn(() => Promise.resolve()) }; made.push(a); return a; };
+    const loadLocalAsset = vi.fn(() => Promise.resolve('blob:abc'));
+    const r = playEffectSound(EFFECT_SOUND_KINDS.GIFT, {
+      nowMs: 1000, audioFactory, getUrl: (p) => `chrome-extension://id/${p}`, loadLocalAsset
+    });
+    expect(r).toBe('played');
+    expect(made).toHaveLength(0); // 見張りに弾かれる URL では鳴らさない
+    await Promise.resolve(); await Promise.resolve();
+    expect(loadLocalAsset).toHaveBeenCalledWith(EFFECT_SOUND_PATHS[EFFECT_SOUND_KINDS.GIFT]);
+    expect(made.map((a) => a.url)).toEqual(['blob:abc']);
+  });
+
+  it('読み替え済み(blob:)ならそのまま鳴らす・読めなければ鳴らさない', async () => {
+    _resetEffectSoundGuardForTest();
+    const made = [];
+    const audioFactory = (url) => { const a = { url, volume: 1, play: vi.fn(() => Promise.resolve()) }; made.push(a); return a; };
+    playEffectSound(EFFECT_SOUND_KINDS.AD, { nowMs: 1000, audioFactory, getUrl: () => 'blob:ready', loadLocalAsset: vi.fn(), rng: () => 0 });
+    expect(made.map((a) => a.url)).toEqual(['blob:ready']);
+    playEffectSound(EFFECT_SOUND_KINDS.GIFT, { nowMs: 9000, audioFactory, getUrl: (p) => `chrome-extension://id/${p}`, loadLocalAsset: () => Promise.resolve('') });
+    await Promise.resolve(); await Promise.resolve();
+    expect(made).toHaveLength(1);
+  });
+});

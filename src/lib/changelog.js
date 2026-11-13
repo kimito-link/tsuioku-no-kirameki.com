@@ -18,6 +18,38 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2122',
+    date: '2026-11-13',
+    summary: '拡張の短い説明文を見直した',
+    items: Object.freeze([
+      'Chrome ウェブストアに出る拡張の短い説明を「ライブ配信の応援コメントをこのPCの中だけに記録し、配信後に3つのレーンで振り返れます」にしました。使い方や動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.2121',
+    date: '2026-11-13',
+    summary: '文字にくっついたスタンプ名も読まない',
+    items: Object.freeze([
+      '文字のすぐ後ろに YouTube のスタンプが続くと(例「fraudface-blue-smiling」)、スタンプの名前を英語のまま読んでいました。くっついていても名前は読まないようにしました。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.2120',
+    date: '2026-11-13',
+    summary: 'スタンプの名前を読み上げない',
+    items: Object.freeze([
+      'YouTube のスタンプ(face-fuchsia-tongue-out や :_xxx: のような名前)を、英語の名前のまま読み上げていました。スタンプの名前は読まないようにしました(画面の表示は今までどおりです)。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.2119',
+    date: '2026-11-13',
+    summary: 'YouTube の会場で最初のギフト音も鳴る',
+    items: Object.freeze([
+      'YouTube などの会場で、効果音の読み込みが終わる前に来たギフトや広告の音が、ページに止められて鳴らないことがありました。読み込みが終わるのを待ってから鳴らすようにしました。拡張のエラー一覧に「Unsafe attempt to load URL」が積もることも減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2118',
     date: '2026-11-13',
     summary: '混んでも合唱が途中で消えにくく',
@@ -154,39 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '配信の無い画面でも開いているサービスの言葉に',
     items: Object.freeze([
       'ツイキャスの配信外ページや TikTok の LIVE 一覧でパネルを開いたとき、ランキングの説明が「YouTube のトップファン」のままでした。開いているサービスの言葉で出すようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2102',
-    date: '2026-11-12',
-    summary: '配信が無いときの案内をサービスの言葉に',
-    items: Object.freeze([
-      'TikTok・ツイキャスなどで配信ページが開いていないとき、パネルの「配信を探す」案内がニコ生向け(生放送ランキング・ちくらん)のままでした。開いているサービスの言葉と行き先にしました。',
-      'ふわっち等の画面に出ていた「ギフトサイドバー履歴」(ニコ生だけの部品の名前)を「ギフトの履歴」にしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2101',
-    date: '2026-11-12',
-    summary: '読み上げの計器に PC の声で鳴った件も残す',
-    items: Object.freeze([
-      'YouTube の会場の読み上げの記録に、VOICEVOX と PC の声のどちらで鳴ったかを残すようにしました。読み上げの動きは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2100',
-    date: '2026-11-12',
-    summary: 'YouTube の読み上げの読み直しを記録する計器',
-    items: Object.freeze([
-      'YouTube の会場の読み上げで、同じコメントをもう一度読んだときや、届いてから1分以上たったコメントを読んだときを、このPCの中に記録するようにしました。読み上げの動きは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2099',
-    date: '2026-11-12',
-    summary: 'YouTube などの会場でキャラの顔も弾かれないように',
-    items: Object.freeze([
-      'YouTube の会場で、数字の帯に出る3キャラの顔の画像が「Unsafe attempt to load URL」で弾かれていました。ギフト音と同じく、会場を出す前にページの中へ先読みするようにしました。'
     ])
   })
 ]);

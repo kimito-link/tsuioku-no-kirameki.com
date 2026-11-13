@@ -165,6 +165,22 @@ export function shouldSkipEffectSoundForVenuePresence(venuePresenceAtMs, nowMs, 
   return now - at < freshMs;
 }
 
+/**
+ * 2026-11-13: 視聴ページの中の会場で、拡張の中の音を blob: に読み替える関数(無ければ null)。
+ *   YouTube 版は chrome.runtime.getURL を包み、その関数に __ytLoadAsync を付けている(ytLocalAssetUrls.js)。
+ * @param {{ loadLocalAsset?: (path: string) => Promise<string> }} deps
+ * @returns {((path: string) => Promise<string>) | null}
+ */
+function resolveLocalAssetLoader(deps) {
+  if (typeof deps.loadLocalAsset === 'function') return deps.loadLocalAsset;
+  try {
+    const fn = typeof chrome !== 'undefined' ? /** @type {any} */ (chrome.runtime?.getURL)?.__ytLoadAsync : null;
+    return typeof fn === 'function' ? fn : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 種類ごとの最終再生時刻(モジュールスコープ・呼び出し元1個につき1インスタンスの前提)。 */
 const _lastPlayedAt = Object.create(null);
 
@@ -200,7 +216,8 @@ function cachedAudioFactory(url) {
  *   guardMs?: number,
  *   paths?: Record<string, string>,
  *   variantPaths?: Record<string, string[]>,
- *   rng?: () => number
+ *   rng?: () => number,
+ *   loadLocalAsset?: (path: string) => Promise<string>
  * }} [deps] テスト用に時刻・Audio 生成・URL 解決・ファイルパス・乱数を差し替え可能(既定は実環境)。
  * @returns {'played'|'guarded'|'no-path'|'error'} 実際に鳴らしたか(v0.1.1061: 呼び出し元が
  *   「試みた」でなく「鳴らした」を数えられるように=診断が嘘をつかないための戻り値)。
@@ -230,10 +247,24 @@ export function playEffectSound(kind, deps = {}) {
         ? Math.max(0, Math.min(1, deps.volume))
         : defaultVolumeForEffectSoundKind(kind);
 
-    const audio = audioFactory(getUrl(path));
-    if (audio && typeof audio.volume === 'number') audio.volume = volume;
-    const p = audio.play && audio.play();
-    if (p && typeof p.catch === 'function') p.catch(() => { /* 再生失敗は静かに諦める */ });
+    const play = (/** @type {string} */ url) => {
+      const audio = audioFactory(url);
+      if (audio && typeof audio.volume === 'number') audio.volume = volume;
+      const p = audio.play && audio.play();
+      if (p && typeof p.catch === 'function') p.catch(() => { /* 再生失敗は静かに諦める */ });
+    };
+    const url = getUrl(path);
+    // 2026-11-13: YouTube などの視聴ページの中の会場では、まだ blob: に読み替えていない音を
+    //   chrome-extension:// のまま鳴らすと、ページの見張りに「Unsafe attempt to load URL」で弾かれて鳴らない
+    //   (PC 実測: 4分ごとに1〜5回、gift-mega-*.mp3)。読み替えの途中なら、読み終わるのを待ってから鳴らす。
+    const loadAsync = resolveLocalAssetLoader(deps);
+    if (loadAsync && /^chrome-extension:\/\//.test(url)) {
+      Promise.resolve(loadAsync(path))
+        .then((blobUrl) => { if (typeof blobUrl === 'string' && blobUrl) play(blobUrl); })
+        .catch(() => { /* 読めなければ鳴らさない(見張りに弾かれる URL は使わない) */ });
+      return 'played';
+    }
+    play(url);
     return 'played';
   } catch {
     /* 音は出なくても本来の機能(ギフト演出/ランキング表示)には一切影響させない */

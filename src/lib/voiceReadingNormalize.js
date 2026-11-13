@@ -19,6 +19,16 @@ const LAUGH_W_TAIL_RE = /(?<=[\u3040-\u30ff\u3400-\u9fff\uff01-\uff9f])[wWｗＷ
 /** 拍手の 8(3 文字以上)。前後が数字・単位・小数点でないときだけ。 */
 const CLAP_8_RE = /(?<![0-9０-９.,，．])[8８]{3,}(?![0-9０-９.,，．円万億人位点個回件年月日時分秒%％ptPT])/g;
 
+/**
+ * 2026-11-13: YouTube のスタンプ(絵文字)の名前。画面では絵なので、名前を読み上げない。
+ *   - メンバー限定・ショートカットの形「:_ksnLaugh:」「:folded_hands:」
+ *   - YouTube 共通スタンプの名前「face-fuchsia-tongue-out」「hand-pink-waving」(PC 実測で英語のまま読んでいた)
+ *   - 0.1.2121: 文字のすぐ後ろ「fraudface-blue-smiling」・名前同士の連結「…-outface-…」にも当てる(PC 実測で3/166件残っていた)。
+ *     前後の英数字の条件は外す(ハイフン区切り3語以上の名前だけを消すので、「hand-made」等の普通の言葉は残る)。
+ */
+const YT_EMOJI_SHORTCUT_RE = /:[A-Za-z_][A-Za-z0-9_-]*:/g;
+const YT_EMOJI_NAME_RE = /(?:face|hand|hands|eyes|person|text|body|heart|cat|dog|ghost|fish)(?:-[a-z]+){2,}-?/g;
+
 /** スマホの読み上げ(live-view-native-voice.js)と同じ言い方: 3つ以上は「わらわら」・1〜2つは「わら」。 */
 const laughWord = (/** @type {string} */ m) => (Array.from(m).length >= 3 ? 'わらわら' : 'わら');
 
@@ -31,6 +41,7 @@ export function normalizeVoiceReadingBody(text, opts = {}) {
   let s = String(text ?? '');
   if (!s) return '';
   s = s.replace(/(?:https?:\/\/|www\.)[^\s]+/gi, typeof opts.urlWord === 'string' ? opts.urlWord : 'URL省略');
+  s = s.replace(YT_EMOJI_SHORTCUT_RE, ' ').replace(YT_EMOJI_NAME_RE, ' ');
   s = s.replace(LAUGH_W_RE, laughWord).replace(LAUGH_W_TAIL_RE, 'わら');
   // 2026-10-28: コメント全体が w 1文字なら笑い(VOICEVOX は全角「ｗ」を「ダブリュウ」と読む・PC 実測)。
   if (/^\s*[wWｗＷ]\s*$/.test(s)) s = 'わら';

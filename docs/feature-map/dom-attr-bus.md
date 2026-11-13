@@ -19,7 +19,6 @@
 - 🟠 **data-nl-support-wired** — 書く人だけ: extension/popup-entry.js
 - 🟠 **data-nl-toolbar-only** — 書く人だけ: extension/popup-entry.js
 - 🟠 **data-nl-usage-terms-ack** — 書く人だけ: extension/popup-entry.js, lib/cloakNotForSidePanel.js
-- 🟠 **data-nl-yt-viewers-at** ★新規 — 書く人だけ: lib/youtube/ytPageViewerReader.js
 - 🟠 **data-nls-backfill** — 書く人だけ: extension/content-entry.js
 - 🟠 **data-nls-backfill-diag** — 書く人だけ: extension/content-entry.js
 - 🟠 **data-nls-heat** — 書く人だけ: extension/venueBar.js
@@ -31,7 +30,7 @@
 - 🟠 **data-nls-page-intercept-referrer** — 書く人だけ: extension/page-intercept-entry.js
 - 🟠 **data-nls-warmup-state** — 書く人だけ: extension/content-entry.js
 - 🔵 **data-nl-author-photo** — 読む人だけ: lib/youtube/ytChatParse.js
-- 🔵 **data-nl-page-count-only** ★新規 — 読む人だけ: extension/popup-entry.js
+- 🔵 **data-nl-page-count-only** — 読む人だけ: extension/popup-entry.js
 - 🔵 **data-nl-src** — 読む人だけ: extension/sidepanel-iframe-boot-entry.js
 - 🔵 **data-nl-trio-slot** — 読む人だけ: extension/popup-entry.js, lib/platform/platformMetricChrome.js
 
@@ -86,7 +85,6 @@
 | `data-nl-wired` | extension/popup/wireVoiceChorusToggle.js<br>extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js | extension/popup/wireVoiceChorusToggle.js<br>extension/popup/wireVoiceGpuTip.js<br>extension/popup/wireVoiceNarrowSelect.js<br>extension/popup/wireVoiceQualitySelect.js<br>extension/popup/wireVoiceVolumeSlider.js |
 | `data-nl-yt-video-id` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
 | `data-nl-yt-viewers` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
-| `data-nl-yt-viewers-at` | lib/youtube/ytPageViewerReader.js | — |
 | `data-nl-yt-viewers-hook` | lib/youtube/ytPageViewerReader.js | lib/youtube/ytPageViewerReader.js |
 | `data-nls-active` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-audition-fetch` | extension/content-entry.js | extension/content-entry.js |
