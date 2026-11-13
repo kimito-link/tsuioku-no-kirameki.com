@@ -55,7 +55,7 @@ describe('VoicePlayer 合唱', () => {
     expect(onDropped).toHaveBeenCalledTimes(1); // 吹き出しは声なしで出す
   });
 
-  it('初コメ(大事なもの)は合唱にせず、その人の声で1件として読む', async () => {
+  it('空いている時の初コメは合唱にせず、その人の声で1件として読む', async () => {
     const synth = vi.fn(() => new Promise(() => {}));
     const player = makePlayer({ synth, audios: [] });
     await player.enable({ persist: false });
@@ -112,5 +112,35 @@ describe('VoicePlayer 合唱', () => {
     const learned = synth.mock.calls.slice(synthBefore).filter((c) => c[0] === 'パチパチ').map((c) => c[1].styleId);
     expect(learned).toContain(4); // dddd の声
     expect(learned).not.toContain(3); // ccc は覚えた声を使った
+  });
+
+  it('2026-11-13: 混雑中は初コメも合唱に加わり、仲間の声が無ければ同じ言葉の別の声で重ねる', async () => {
+    const audios = [];
+    let hold = null;
+    const synth = vi.fn((text) => {
+      if (text === 'まって') return new Promise((r) => { hold = () => r(new ArrayBuffer(400)); });
+      return Promise.resolve(new ArrayBuffer(400));
+    });
+    const player = makePlayer({ synth, audios });
+    await player.enable({ persist: false });
+    // 前に別の2人(声 1・2)が 888 と言って覚えている。
+    player.enqueue([{ kind: 'comment', userId: 'x', nickname: 'X', text: '888', liveId: 'lv1' }]);
+    await tick(60);
+    player.enqueue([{ kind: 'comment', userId: 'yy', nickname: 'Y', text: '888', liveId: 'lv1' }]);
+    await tick(60);
+    // 混雑: 主役 bbb の 888 の後ろに、初コメの5人(声 5〜9)が 888 で加わる。
+    player.enqueue([{ kind: 'comment', userId: 'a', nickname: 'A', text: 'まって', liveId: 'lv1' }]);
+    await tick(5);
+    player.enqueue([{ kind: 'comment', userId: 'bbb', nickname: 'B', text: '888', liveId: 'lv1' }]);
+    player.enqueue([{ kind: 'comment', userId: 'zzzz', nickname: 'Z', text: 'やあ', liveId: 'lv1' }]);
+    for (const u of ['n0000', 'n10000', 'n200000', 'n3000000', 'n40000000']) {
+      player.enqueue([{ kind: 'comment', userId: u, nickname: u, text: '888', liveId: 'lv1' }]);
+    }
+    expect(player.diag.chorusJoinTotal).toBe(5);
+    hold();
+    await tick(900);
+    expect(player.diag.chorusPlayTotal).toBe(1);
+    expect(player.diag.chorusCrowdTotal).toBe(2); // 覚えていた別の声 x・yy の2つ
+    expect(player.diag.chorusOverlayTotal).toBe(2);
   });
 });

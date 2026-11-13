@@ -33,14 +33,18 @@ export function isVoiceChorusEnabled(raw) {
 /**
  * 待ち行列の中から、同じ言葉で合唱に加われる件を探す。
  *   - 同じ本文(読む前の文)・別の人・まだ鳴っていない件。
- *   - 加わる人が大事なもの(ギフト・初コメ等)なら合唱にしない(その人の声で1件として読む)。
+ *   - 加わる人が大事なもの(ギフト・広告・配信者・モデレーター)なら合唱にしない(その人の声で1件として読む)。
+ *   - 2026-11-13: 初コメ('first')は、混んでいる時(busy)だけ合唱に加える。
+ *     YouTube 実測(2.3万人・毎分60〜260件・12分)で、混雑中の538件がほぼ全部「初コメ」扱いで合唱に入れず、
+ *     合唱は1回も鳴らなかった。混雑中の初コメは1件ずつ並べても古くなって捨てられる(同じ12分で164件)ので、
+ *     合唱に入れて「自分の言葉が鳴った」にする方が本人にも配信者にもよい。空いている時は今までどおり1件で読む。
  * @param {ReadonlyArray<any>} queue
- * @param {{ body?: unknown, userKey?: unknown, importance?: unknown }} candidate
+ * @param {{ body?: unknown, userKey?: unknown, importance?: unknown, busy?: boolean }} candidate
  * @returns {number} 見つからなければ -1
  */
 export function findVoiceChorusHost(queue, candidate) {
   if (!Array.isArray(queue) || !candidate) return -1;
-  if (candidate.importance) return -1;
+  if (candidate.importance && !(candidate.importance === 'first' && candidate.busy === true)) return -1;
   const body = typeof candidate.body === 'string' ? candidate.body.trim() : '';
   const who = String(candidate.userKey ?? '');
   if (!body || !who) return -1;
@@ -73,12 +77,16 @@ export function joinVoiceChorus(host, userKey) {
 
 /**
  * 鳴らす直前に、重ねる声を決める。覚えた声がある人だけ・最大4人・ずれと音量つき。
+ *   2026-11-13: 加わった人の声をまだ覚えていない時は、同じ言葉を前に言った別の声(crowd)で数を埋める
+ *   (加わった人数まで・最大4)。混む配信では新しい人ばかりで本人の声はほぼ覚えていない(YouTube 実測:
+ *   覚えた175件のうち本人の声が使えたのは0回)。主役の1件は今までどおりその人の声=1人1声は崩さない。
  * @template T
  * @param {ReadonlyArray<string> | null | undefined} members
  * @param {(userKey: string) => T | null | undefined} lookup 覚えた声(無ければ null)
+ * @param {ReadonlyArray<T>} [crowd] 同じ言葉の別の声(主役・仲間の声と重ならないもの)
  * @returns {Array<{ userKey: string, clip: T, delayMs: number, gainPercent: number }>}
  */
-export function planVoiceChorusOverlays(members, lookup) {
+export function planVoiceChorusOverlays(members, lookup, crowd = []) {
   /** @type {Array<{ userKey: string, clip: any, delayMs: number, gainPercent: number }>} */
   const out = [];
   if (!Array.isArray(members) || typeof lookup !== 'function') return out;
@@ -93,6 +101,19 @@ export function planVoiceChorusOverlays(members, lookup) {
       delayMs: VOICE_CHORUS_OFFSETS_MS[out.length] ?? VOICE_CHORUS_OFFSETS_MS[VOICE_CHORUS_OFFSETS_MS.length - 1],
       gainPercent: VOICE_CHORUS_GAIN_PERCENT
     });
+  }
+  const want = Math.min(VOICE_CHORUS_MAX_MEMBERS, members.length);
+  if (Array.isArray(crowd)) {
+    for (const clip of crowd) {
+      if (out.length >= want) break;
+      if (!clip || out.some((o) => o.clip === clip)) continue;
+      out.push({
+        userKey: '',
+        clip,
+        delayMs: VOICE_CHORUS_OFFSETS_MS[out.length] ?? VOICE_CHORUS_OFFSETS_MS[VOICE_CHORUS_OFFSETS_MS.length - 1],
+        gainPercent: VOICE_CHORUS_GAIN_PERCENT
+      });
+    }
   }
   return out;
 }

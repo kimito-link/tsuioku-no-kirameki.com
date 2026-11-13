@@ -36,7 +36,8 @@ import {
   isVoiceChorusEnabled,
   joinVoiceChorus,
   KEY_VOICE_CHORUS_ENABLED,
-  planVoiceChorusOverlays
+  planVoiceChorusOverlays,
+  VOICE_CHORUS_MAX_MEMBERS
 } from './voiceChorus.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
@@ -278,6 +279,8 @@ export class VoicePlayer {
       // 2026-11-12計器(合唱): chorusJoinTotal=合唱に加わった件数、chorusPlayTotal=声を重ねて鳴らした回数、
       //   chorusOverlayTotal=重ねた声の数、chorusLearnTotal=空いている時に作っておいた声の数。
       chorusJoinTotal: 0, chorusPlayTotal: 0, chorusOverlayTotal: 0, chorusLearnTotal: 0,
+      // 2026-11-13計器: chorusCrowdTotal=仲間の声を覚えておらず、同じ言葉を前に言った別の声で埋めた数。
+      chorusCrowdTotal: 0,
       // 2026-11-12計器(選び方): busyScoreKeepTotal=混雑中に「質問」「まだ読まれていない人」の点で読んだ件数。
       busyScoreKeepTotal: 0,
       // 2026-11-13計器(軽い声から戻らない件): lightProbeTotal=VOICEVOX を確かめた回数、lightProbeFastTotal=3秒未満だった回数、
@@ -812,12 +815,20 @@ export class VoicePlayer {
       if (this._chorusPending.length >= 16) this._chorusPending.shift();
       this._chorusPending.push({ key, text, voice });
     }
+    const memberKeys = item.chorus.map((who) => voiceClipKey(this.resolveVoice(who, this.assignments, this.styleIds), text));
+    const hostKey = voiceClipKey(this.resolveVoice(item.userKey, this.assignments, this.styleIds), text);
+    // 2026-11-13: 仲間の声を覚えていなければ、同じ言葉を前に言った別の声で数を埋める(主役・仲間と同じ声は使わない)。
+    let crowd = [];
+    try { crowd = this._clipCache.othersSaying(text, boost, [hostKey, ...memberKeys], VOICE_CHORUS_MAX_MEMBERS); } catch { crowd = []; }
     const overlays = planVoiceChorusOverlays(item.chorus, (who) => {
       const hit = this._clipCache.get(voiceClipKey(this.resolveVoice(who, this.assignments, this.styleIds), text), boost);
       return hit ? hit.wav : null;
-    });
+    }, crowd);
     if (overlays.length === 0) return;
-    for (const o of overlays) { try { noteVoiceVoiced(this._voicedState, item.liveId, o.userKey); } catch { /* no-op */ } }
+    for (const o of overlays) {
+      if (!o.userKey) { this.diag.chorusCrowdTotal = (Number(this.diag.chorusCrowdTotal) || 0) + 1; continue; }
+      try { noteVoiceVoiced(this._voicedState, item.liveId, o.userKey); } catch { /* no-op */ }
+    }
     this.diag.chorusPlayTotal = (Number(this.diag.chorusPlayTotal) || 0) + 1;
     this.diag.chorusOverlayTotal = (Number(this.diag.chorusOverlayTotal) || 0) + overlays.length;
     const generation = this.generation;
@@ -1773,7 +1784,7 @@ export class VoicePlayer {
       // 2026-11-12(合唱): 待っている件と同じ言葉を別の人が書いたら、その件の合唱に加える
       //   (別の1件として読まない=読み上げの待ちを増やさない)。大事なものは合唱にせず1件で読む。
       if (this.chorusEnabled) {
-        const hostIdx = findVoiceChorusHost(this.queue, { body, userKey, importance });
+        const hostIdx = findVoiceChorusHost(this.queue, { body, userKey, importance, busy: this.queue.length >= VOICE_BUSY_QUEUE_MIN });
         if (hostIdx >= 0 && joinVoiceChorus(this.queue[hostIdx], userKey) !== 'dup') {
           this.diag.chorusJoinTotal = (Number(this.diag.chorusJoinTotal) || 0) + 1;
           if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }

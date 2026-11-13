@@ -59,3 +59,33 @@ describe('planVoiceChorusOverlays', () => {
     expect(planVoiceChorusOverlays(null, () => 'A')).toEqual([]);
   });
 });
+
+describe('2026-11-13 混雑中の初コメ・同じ言葉の別の声', () => {
+  const queue = [{ userKey: 'a', body: 'わこつ' }];
+  it('初コメは混んでいる時だけ合唱に加わる(ギフト等は混んでいても加えない)', () => {
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'first', busy: true })).toBe(0);
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'first', busy: false })).toBe(-1);
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'gift', busy: true })).toBe(-1);
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'moderator', busy: true })).toBe(-1);
+  });
+
+  it('仲間の声を覚えていなければ、同じ言葉の別の声で加わった人数まで埋める(最大4・同じ声は1回)', () => {
+    const c1 = { id: 1 };
+    const c2 = { id: 2 };
+    const out = planVoiceChorusOverlays(['x', 'y', 'z'], () => null, [c1, c1, c2]);
+    expect(out.map((o) => o.clip)).toEqual([c1, c2]);
+    expect(out.every((o) => o.userKey === '')).toBe(true);
+    const few = planVoiceChorusOverlays(['x'], () => null, [c1, c2]);
+    expect(few.length).toBe(1);
+    const many = planVoiceChorusOverlays(['p', 'q', 'r', 's', 't', 'u'], () => null, [{}, {}, {}, {}, {}, {}]);
+    expect(many.length).toBe(VOICE_CHORUS_MAX_MEMBERS);
+  });
+
+  it('仲間本人の声があればそちらを先に使う', () => {
+    const own = { id: 'own' };
+    const crowd = { id: 'crowd' };
+    const out = planVoiceChorusOverlays(['x', 'y'], (w) => (w === 'x' ? own : null), [crowd]);
+    expect(out.map((o) => o.clip)).toEqual([own, crowd]);
+    expect(out[0].userKey).toBe('x');
+  });
+});

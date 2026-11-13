@@ -99,3 +99,31 @@ describe('createVoiceClipCache', () => {
     expect(c.stats()).toEqual({ keys: 0, bytes: 0 });
   });
 });
+
+describe('othersSaying(2026-11-13 合唱の別の声)', () => {
+  const wav = (n) => new ArrayBuffer(n);
+  it('同じ文を覚えた別の声を、除く鍵を外して最近の順に返す', () => {
+    const c = createVoiceClipCache();
+    const k1 = voiceClipKey({ styleId: 1 }, 'わこつ');
+    const k2 = voiceClipKey({ styleId: 2 }, 'わこつ');
+    const k3 = voiceClipKey({ styleId: 3 }, 'わこつ');
+    const other = voiceClipKey({ styleId: 4 }, '888');
+    const w1 = wav(100); const w2 = wav(101); const w3 = wav(102);
+    c.put(k1, 0, w1); c.put(k2, 0, w2); c.put(k3, 0, w3); c.put(other, 0, wav(103));
+    expect(c.othersSaying('わこつ', 0, [k2], 4)).toEqual([w3, w1]);
+    expect(c.othersSaying('わこつ', 0, [], 1)).toEqual([w3]);
+    expect(c.othersSaying('なし', 0, [], 4)).toEqual([]);
+  });
+
+  it('捨てた声は探す先からも消える', () => {
+    const c = createVoiceClipCache({ maxBytes: 250 });
+    const k1 = voiceClipKey({ styleId: 1 }, 'わこつ');
+    const k2 = voiceClipKey({ styleId: 2 }, 'わこつ');
+    c.put(k1, 0, wav(150));
+    c.put(k2, 0, wav(150)); // 上限を超えて k1 が捨てられる
+    expect(c.has(k1)).toBe(false);
+    expect(c.othersSaying('わこつ', 0, [], 4).length).toBe(1);
+    c.clear();
+    expect(c.othersSaying('わこつ', 0, [], 4)).toEqual([]);
+  });
+});
