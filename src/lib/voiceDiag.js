@@ -96,7 +96,14 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   chorusPlayTotal: number,     // 同上: 声を重ねて鳴らした回数
  *   chorusOverlayTotal: number,  // 同上: 重ねた声の数
  *   chorusLearnTotal: number,    // 同上: 空いている時に作っておいた声の数
+ *   chorusNoVoiceTotal: number,  // 0.1.2117: 主役が鳴った時、仲間はいたが重ねる声が1つも無かった回数
+ *   chorusCrowdTotal: number,    // 0.1.2116: 仲間の声の代わりに、同じ言葉を前に言った別の声で埋めた数
  *   busyScoreKeepTotal: number,  // 0.1.2114: 混雑中に「質問」「まだ読まれていない人」の点で読んだ件数
+ *   lightProbeTotal: number,     // 0.1.2115: 軽い声の間に VOICEVOX を確かめた回数
+ *   lightProbeFastTotal: number, // 同上: 3秒未満だった回数(5回続くと VOICEVOX に戻る)
+ *   lightProbeLastMs: number,    // 同上: 直近の確かめの ms(失敗 -1)
+ *   lightProbeBusySkipTotal: number, // 同上: ほかの合成が終わらず確かめられなかった回数
+ *   voiceOverloadRetryTotal: number, // 0.1.2115: 混雑のまま2分経って VOICEVOX を一度試した回数
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
  *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数
@@ -219,7 +226,14 @@ export function makeInitialVoiceDiag() {
     chorusPlayTotal: 0,
     chorusOverlayTotal: 0,
     chorusLearnTotal: 0,
+    chorusCrowdTotal: 0,
+    chorusNoVoiceTotal: 0,
     busyScoreKeepTotal: 0,
+    lightProbeTotal: 0,
+    lightProbeFastTotal: 0,
+    lightProbeLastMs: -1,
+    lightProbeBusySkipTotal: 0,
+    voiceOverloadRetryTotal: 0,
     refreshVoicedTotal: 0,
     backlogSkipTotal: 0,
     bigBatchTotal: 0,
@@ -381,7 +395,14 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     chorusPlayTotal: num(d.chorusPlayTotal, base.chorusPlayTotal),
     chorusOverlayTotal: num(d.chorusOverlayTotal, base.chorusOverlayTotal),
     chorusLearnTotal: num(d.chorusLearnTotal, base.chorusLearnTotal),
+    chorusCrowdTotal: num(d.chorusCrowdTotal, base.chorusCrowdTotal),
+    chorusNoVoiceTotal: num(d.chorusNoVoiceTotal, base.chorusNoVoiceTotal),
     busyScoreKeepTotal: num(d.busyScoreKeepTotal, base.busyScoreKeepTotal),
+    lightProbeTotal: num(d.lightProbeTotal, base.lightProbeTotal),
+    lightProbeFastTotal: num(d.lightProbeFastTotal, base.lightProbeFastTotal),
+    lightProbeLastMs: num(d.lightProbeLastMs, base.lightProbeLastMs),
+    lightProbeBusySkipTotal: num(d.lightProbeBusySkipTotal, base.lightProbeBusySkipTotal),
+    voiceOverloadRetryTotal: num(d.voiceOverloadRetryTotal, base.voiceOverloadRetryTotal),
     refreshVoicedTotal: num(d.refreshVoicedTotal, base.refreshVoicedTotal),
     backlogSkipTotal: num(d.backlogSkipTotal, base.backlogSkipTotal),
     bigBatchTotal: num(d.bigBatchTotal, base.bigBatchTotal),

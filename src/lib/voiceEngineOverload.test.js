@@ -4,6 +4,8 @@ import {
   noteVoiceSynthOutcome,
   resolveVoiceOverloadTimeouts,
   capVoiceSynthDepthForOverload,
+  retryVoiceEngineAfterLongOverload,
+  VOICE_OVERLOAD_MAX_STUCK_MS,
   VOICE_OVERLOAD_RECOVER_STREAK,
   VOICE_OVERLOAD_QUERY_TIMEOUT_MS,
   VOICE_OVERLOAD_SYNTH_TIMEOUT_MS
@@ -12,6 +14,29 @@ import { VoicePlayer } from './voicePlayer.js';
 import { decideVoiceLagNotice, decideVoiceGpuTip, VOICE_GPU_TIP_TEXT, VOICE_WARMING_TEXT } from './voiceLagNotice.js';
 
 describe('voiceEngineOverload(純関数)', () => {
+  it('2026-11-13: 混雑中になった時刻を覚え、2分経ったら一度だけ解く(また時間切れが2回で混雑中へ)', () => {
+    const s = createVoiceOverloadState();
+    noteVoiceSynthOutcome(s, { timedOut: true }, 1000);
+    noteVoiceSynthOutcome(s, { timedOut: true }, 2000);
+    expect(s.overloaded).toBe(true);
+    expect(s.overloadedAt).toBe(2000);
+    noteVoiceSynthOutcome(s, { timedOut: true }, 9000); // 混雑中の時間切れで時刻は動かさない
+    expect(s.overloadedAt).toBe(2000);
+    expect(retryVoiceEngineAfterLongOverload(s, 2000 + VOICE_OVERLOAD_MAX_STUCK_MS - 1)).toBe(false);
+    expect(retryVoiceEngineAfterLongOverload(s, 2000 + VOICE_OVERLOAD_MAX_STUCK_MS)).toBe(true);
+    expect(s.overloaded).toBe(false);
+    expect(retryVoiceEngineAfterLongOverload(s, 999999)).toBe(false);
+    noteVoiceSynthOutcome(s, { timedOut: true }, 500000);
+    expect(noteVoiceSynthOutcome(s, { timedOut: true }, 501000)).toBe(true);
+    expect(s.overloadedAt).toBe(501000);
+  });
+
+  it('時刻が分からない混雑中(古い状態)は時間では解かない', () => {
+    const s = createVoiceOverloadState();
+    s.overloaded = true;
+    expect(retryVoiceEngineAfterLongOverload(s, 10 ** 12)).toBe(false);
+  });
+
   it('時間切れが1回だけなら混雑中にしない・2回続いたら混雑中', () => {
     const s = createVoiceOverloadState();
     expect(noteVoiceSynthOutcome(s, { timedOut: true })).toBe(false);

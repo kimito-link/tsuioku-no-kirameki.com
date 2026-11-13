@@ -17,7 +17,9 @@ import {
   createVoiceOverloadState,
   noteVoiceSynthOutcome,
   resolveVoiceOverloadTimeouts,
-  capVoiceSynthDepthForOverload
+  capVoiceSynthDepthForOverload,
+  retryVoiceEngineAfterLongOverload,
+  VOICE_OVERLOAD_FAST_MS
 } from './voiceEngineOverload.js';
 import { observeVoicePlayback } from './voicePlaybackQuality.js';
 import {
@@ -34,7 +36,8 @@ import {
   isVoiceChorusEnabled,
   joinVoiceChorus,
   KEY_VOICE_CHORUS_ENABLED,
-  planVoiceChorusOverlays
+  planVoiceChorusOverlays,
+  VOICE_CHORUS_MAX_MEMBERS
 } from './voiceChorus.js';
 import { COMEVIEW_NG_STORAGE_KEY, isVoiceItemNgMuted, voiceNgKeySet } from './voiceNgMute.js';
 import {
@@ -276,8 +279,16 @@ export class VoicePlayer {
       // 2026-11-12計器(合唱): chorusJoinTotal=合唱に加わった件数、chorusPlayTotal=声を重ねて鳴らした回数、
       //   chorusOverlayTotal=重ねた声の数、chorusLearnTotal=空いている時に作っておいた声の数。
       chorusJoinTotal: 0, chorusPlayTotal: 0, chorusOverlayTotal: 0, chorusLearnTotal: 0,
+      // 2026-11-13計器: chorusCrowdTotal=仲間の声を覚えておらず、同じ言葉を前に言った別の声で埋めた数。
+      chorusCrowdTotal: 0,
+      // chorusNoVoiceTotal=主役が鳴った時、仲間はいたが重ねる声が1つも無かった回数。
+      chorusNoVoiceTotal: 0,
       // 2026-11-12計器(選び方): busyScoreKeepTotal=混雑中に「質問」「まだ読まれていない人」の点で読んだ件数。
       busyScoreKeepTotal: 0,
+      // 2026-11-13計器(軽い声から戻らない件): lightProbeTotal=VOICEVOX を確かめた回数、lightProbeFastTotal=3秒未満だった回数、
+      //   lightProbeLastMs=直近の確かめの ms(失敗 -1)、lightProbeBusySkipTotal=ほかの合成が終わらず確かめられなかった回数、
+      //   voiceOverloadRetryTotal=混雑のまま2分経って VOICEVOX を一度試した回数。
+      lightProbeTotal: 0, lightProbeFastTotal: 0, lightProbeLastMs: -1, lightProbeBusySkipTotal: 0, voiceOverloadRetryTotal: 0,
       // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
       //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
       //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
@@ -806,12 +817,24 @@ export class VoicePlayer {
       if (this._chorusPending.length >= 16) this._chorusPending.shift();
       this._chorusPending.push({ key, text, voice });
     }
+    const memberKeys = item.chorus.map((who) => voiceClipKey(this.resolveVoice(who, this.assignments, this.styleIds), text));
+    const hostKey = voiceClipKey(this.resolveVoice(item.userKey, this.assignments, this.styleIds), text);
+    // 2026-11-13: 仲間の声を覚えていなければ、同じ言葉を前に言った別の声で数を埋める(主役・仲間と同じ声は使わない)。
+    let crowd = [];
+    try { crowd = this._clipCache.othersSaying(text, boost, [hostKey, ...memberKeys], VOICE_CHORUS_MAX_MEMBERS); } catch { crowd = []; }
     const overlays = planVoiceChorusOverlays(item.chorus, (who) => {
       const hit = this._clipCache.get(voiceClipKey(this.resolveVoice(who, this.assignments, this.styleIds), text), boost);
       return hit ? hit.wav : null;
-    });
-    if (overlays.length === 0) return;
-    for (const o of overlays) { try { noteVoiceVoiced(this._voicedState, item.liveId, o.userKey); } catch { /* no-op */ } }
+    }, crowd);
+    if (overlays.length === 0) {
+      // 2026-11-13計器: 仲間がいたのに重ねる声が1つも無かった回数(本人の声も同じ言葉の別の声も無い)。
+      this.diag.chorusNoVoiceTotal = (Number(this.diag.chorusNoVoiceTotal) || 0) + 1;
+      return;
+    }
+    for (const o of overlays) {
+      if (!o.userKey) { this.diag.chorusCrowdTotal = (Number(this.diag.chorusCrowdTotal) || 0) + 1; continue; }
+      try { noteVoiceVoiced(this._voicedState, item.liveId, o.userKey); } catch { /* no-op */ }
+    }
     this.diag.chorusPlayTotal = (Number(this.diag.chorusPlayTotal) || 0) + 1;
     this.diag.chorusOverlayTotal = (Number(this.diag.chorusOverlayTotal) || 0) + overlays.length;
     const generation = this.generation;
@@ -1196,6 +1219,13 @@ export class VoicePlayer {
 
   /** 2026-11-03: 今、軽い声で読むか(VOICEVOX が混雑中で、軽い声が使えるときだけ)。 */
   _useLightVoice() {
+    // 2026-11-13: 混雑のまま2分経ったら一度 VOICEVOX を試す(Windows の声に落ちたまま戻らない、を起こさない)。
+    try {
+      if (retryVoiceEngineAfterLongOverload(this._overload, Date.now())) {
+        this.diag.voiceOverloaded = false;
+        this.diag.voiceOverloadRetryTotal = (Number(this.diag.voiceOverloadRetryTotal) || 0) + 1;
+      }
+    } catch { /* 計器・切り替えの失敗は読み上げを止めない */ }
     let available = false;
     try { available = !!this.lightSpeaker && this._lightFailStreak < 3 && this.lightSpeaker.available(); } catch { available = false; }
     const on = shouldUseLightVoice({ overloaded: this._overload.overloaded, available, setting: this.lightVoiceSetting });
@@ -1206,11 +1236,23 @@ export class VoicePlayer {
   /** 軽い声で読んでいる間、ときどき VOICEVOX に短い文を頼んで速さを確かめる(速ければ混雑が解けて戻る)。 */
   _maybeProbeVoicevox() {
     const nowMs = Date.now();
-    if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) return;
+    if (!shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: this._synthInFlight })) {
+      // 2026-11-13計器: 確かめの時刻なのに、ほかの合成が終わらず確かめられなかった回数。
+      if (this._synthInFlight > 0 && shouldProbeVoicevox({ nowMs, lastProbeAt: this._lightProbeAt, inFlight: 0 })) {
+        this.diag.lightProbeBusySkipTotal = (Number(this.diag.lightProbeBusySkipTotal) || 0) + 1;
+      }
+      return;
+    }
     this._lightProbeAt = nowMs;
     try {
       const voice = this.resolveVoice('', this.assignments, this.styleIds);
-      void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).catch(() => null);
+      // 2026-11-13計器: 確かめた回数・3秒未満だった回数・直近の ms(戻らない理由を名指しする)。
+      this.diag.lightProbeTotal = (Number(this.diag.lightProbeTotal) || 0) + 1;
+      void Promise.resolve(this._synthesizeTracked(LIGHT_VOICE_PROBE_TEXT, voice)).then((wav) => {
+        const ms = Date.now() - nowMs;
+        this.diag.lightProbeLastMs = wav ? ms : -1;
+        if (wav && ms < VOICE_OVERLOAD_FAST_MS) this.diag.lightProbeFastTotal = (Number(this.diag.lightProbeFastTotal) || 0) + 1;
+      }, () => { this.diag.lightProbeLastMs = -1; });
     } catch { /* 確かめられなくても軽い声で読み続ける */ }
   }
 
@@ -1748,7 +1790,7 @@ export class VoicePlayer {
       // 2026-11-12(合唱): 待っている件と同じ言葉を別の人が書いたら、その件の合唱に加える
       //   (別の1件として読まない=読み上げの待ちを増やさない)。大事なものは合唱にせず1件で読む。
       if (this.chorusEnabled) {
-        const hostIdx = findVoiceChorusHost(this.queue, { body, userKey, importance });
+        const hostIdx = findVoiceChorusHost(this.queue, { body, userKey, importance, busy: this.queue.length >= VOICE_BUSY_QUEUE_MIN });
         if (hostIdx >= 0 && joinVoiceChorus(this.queue[hostIdx], userKey) !== 'dup') {
           this.diag.chorusJoinTotal = (Number(this.diag.chorusJoinTotal) || 0) + 1;
           if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }

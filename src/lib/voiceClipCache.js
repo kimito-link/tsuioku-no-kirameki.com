@@ -72,7 +72,31 @@ export function createVoiceClipCache(opts = {}) {
     : VOICE_CLIP_CACHE_MAX_BYTES;
   /** 鍵 → (早口 → 声)。Map は入れた順=使ったら入れ直して「最近使った」を後ろへ。 @type {Map<string, Map<number, ArrayBuffer>>} */
   const entries = new Map();
+  /** 2026-11-13: 文 → その文を覚えた鍵(合唱で「同じ言葉を言った別の声」を探す)。 @type {Map<string, Set<string>>} */
+  const byText = new Map();
   let bytes = 0;
+
+  /** @param {string} key */
+  function textOf(key) {
+    const parts = key.split('|');
+    return parts.length >= 4 ? parts.slice(3).join('|') : '';
+  }
+  /** @param {string} key */
+  function indexAdd(key) {
+    const t = textOf(key);
+    if (!t) return;
+    let set = byText.get(t);
+    if (!set) { set = new Set(); byText.set(t, set); }
+    set.add(key);
+  }
+  /** @param {string} key */
+  function indexRemove(key) {
+    const t = textOf(key);
+    const set = byText.get(t);
+    if (!set) return;
+    set.delete(key);
+    if (set.size === 0) byText.delete(t);
+  }
 
   /** @param {string} key */
   function touch(key) {
@@ -88,6 +112,7 @@ export function createVoiceClipCache(opts = {}) {
       if (oldestKey === undefined) break;
       const byBoost = entries.get(oldestKey);
       entries.delete(oldestKey);
+      indexRemove(oldestKey);
       if (byBoost) for (const wav of byBoost.values()) bytes -= wav.byteLength;
     }
     if (bytes < 0) bytes = 0;
@@ -108,6 +133,7 @@ export function createVoiceClipCache(opts = {}) {
       if (!byBoost) {
         byBoost = new Map();
         entries.set(key, byBoost);
+        indexAdd(key);
       } else {
         touch(key);
       }
@@ -144,12 +170,35 @@ export function createVoiceClipCache(opts = {}) {
       touch(key);
       return { wav, boost: pick };
     },
+    /**
+     * 2026-11-13(合唱): 同じ文を覚えた「別の声」を、最近使った順に最大 limit 件。
+     * @param {string} text voiceClipKey に渡した文
+     * @param {unknown} boostNow
+     * @param {ReadonlyArray<string>} excludeKeys 主役・仲間の鍵(同じ声を重ねない)
+     * @param {number} limit
+     * @returns {ArrayBuffer[]}
+     */
+    othersSaying(text, boostNow, excludeKeys, limit) {
+      const set = typeof text === 'string' ? byText.get(text) : undefined;
+      if (!set || !(limit > 0)) return [];
+      const skip = new Set(Array.isArray(excludeKeys) ? excludeKeys : []);
+      const keys = [...set].filter((k) => !skip.has(k)).reverse();
+      /** @type {ArrayBuffer[]} */
+      const out = [];
+      for (const k of keys) {
+        if (out.length >= limit) break;
+        const hit = this.get(k, boostNow);
+        if (hit) out.push(hit.wav);
+      }
+      return out;
+    },
     /** @param {string} key */
     has(key) {
       return !!key && entries.has(key);
     },
     clear() {
       entries.clear();
+      byText.clear();
       bytes = 0;
     },
     stats() {

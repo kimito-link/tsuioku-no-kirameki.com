@@ -4,6 +4,7 @@ import {
   isVoiceChorusEnabled,
   joinVoiceChorus,
   planVoiceChorusOverlays,
+  voiceChorusMatchKey,
   VOICE_CHORUS_MAX_MEMBERS,
   VOICE_CHORUS_OFFSETS_MS
 } from './voiceChorus.js';
@@ -57,5 +58,52 @@ describe('planVoiceChorusOverlays', () => {
   it('探す関数が壊れても止まらない・空なら空', () => {
     expect(planVoiceChorusOverlays(['a'], () => { throw new Error('x'); })).toEqual([]);
     expect(planVoiceChorusOverlays(null, () => 'A')).toEqual([]);
+  });
+});
+
+describe('2026-11-13 混雑中の初コメ・同じ言葉の別の声', () => {
+  const queue = [{ userKey: 'a', body: 'わこつ' }];
+  it('初コメは混んでいる時だけ合唱に加わる(ギフト等は混んでいても加えない)', () => {
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'first', busy: true })).toBe(0);
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'first', busy: false })).toBe(-1);
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'gift', busy: true })).toBe(-1);
+    expect(findVoiceChorusHost(queue, { userKey: 'b', body: 'わこつ', importance: 'moderator', busy: true })).toBe(-1);
+  });
+
+  it('仲間の声を覚えていなければ、同じ言葉の別の声で加わった人数まで埋める(最大4・同じ声は1回)', () => {
+    const c1 = { id: 1 };
+    const c2 = { id: 2 };
+    const out = planVoiceChorusOverlays(['x', 'y', 'z'], () => null, [c1, c1, c2]);
+    expect(out.map((o) => o.clip)).toEqual([c1, c2]);
+    expect(out.every((o) => o.userKey === '')).toBe(true);
+    const few = planVoiceChorusOverlays(['x'], () => null, [c1, c2]);
+    expect(few.length).toBe(1);
+    const many = planVoiceChorusOverlays(['p', 'q', 'r', 's', 't', 'u'], () => null, [{}, {}, {}, {}, {}, {}]);
+    expect(many.length).toBe(VOICE_CHORUS_MAX_MEMBERS);
+  });
+
+  it('仲間本人の声があればそちらを先に使う', () => {
+    const own = { id: 'own' };
+    const crowd = { id: 'crowd' };
+    const out = planVoiceChorusOverlays(['x', 'y'], (w) => (w === 'x' ? own : null), [crowd]);
+    expect(out.map((o) => o.clip)).toEqual([own, crowd]);
+    expect(out[0].userKey).toBe('x');
+  });
+});
+
+describe('voiceChorusMatchKey(2026-11-13)', () => {
+  it('笑い・拍手の書き方の違いと語尾は同じ言葉とみなす', () => {
+    for (const t of ['www', 'w', 'ｗｗｗ', 'W', '草', '草草', '笑', '笑笑', 'わらわら']) expect(voiceChorusMatchKey(t)).toBe('わら');
+    for (const t of ['888', '８８８８', '88888']) expect(voiceChorusMatchKey(t)).toBe('888');
+    expect(voiceChorusMatchKey('わこつー')).toBe('わこつ');
+    expect(voiceChorusMatchKey('えぇ！？')).toBe('えぇ');
+    expect(voiceChorusMatchKey('いいね!!')).toBe('いいね');
+    expect(voiceChorusMatchKey('88')).toBe('88');
+    expect(voiceChorusMatchKey('  ')).toBe('');
+    expect(voiceChorusMatchKey(null)).toBe('');
+  });
+  it('違う書き方の笑いでも合唱に加われる', () => {
+    expect(findVoiceChorusHost([{ userKey: 'a', body: 'www' }], { userKey: 'b', body: '草' })).toBe(0);
+    expect(findVoiceChorusHost([{ userKey: 'a', body: 'わこつ' }], { userKey: 'b', body: 'わこつー！' })).toBe(0);
   });
 });
