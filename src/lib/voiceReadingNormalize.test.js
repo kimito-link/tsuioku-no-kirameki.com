@@ -47,3 +47,18 @@ describe('normalizeVoiceReadingBody', () => {
     expect(normalizeVoiceReadingBody('  a   b  ')).toBe('a b');
   });
 });
+
+describe('YouTube のスタンプの名前は読まない(2026-11-13)', () => {
+  it('共通スタンプの名前とショートカットを消す', () => {
+    expect(normalizeVoiceReadingBody('face-fuchsia-tongue-out')).toBe('');
+    expect(normalizeVoiceReadingBody('nice face-red-droopy-eyes face-blue-smiling')).toBe('nice');
+    expect(normalizeVoiceReadingBody('草 :_ksnLaugh::_ksnLaugh:')).toBe('草');
+    expect(normalizeVoiceReadingBody('おはよう:folded_hands:')).toBe('おはよう');
+  });
+  it('ふつうの英語やハイフンの言葉は残す', () => {
+    expect(normalizeVoiceReadingBody('face to face')).toBe('face to face');
+    expect(normalizeVoiceReadingBody('hand-made')).toBe('hand-made');
+    expect(normalizeVoiceReadingBody('時刻 12:30:45')).toBe('時刻 12:30:45');
+  });
+});
+

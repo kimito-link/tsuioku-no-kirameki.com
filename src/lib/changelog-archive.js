@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2100',
+    date: '2026-11-12',
+    summary: 'YouTube の読み上げの読み直しを記録する計器',
+    items: Object.freeze([
+      'YouTube の会場の読み上げで、同じコメントをもう一度読んだときや、届いてから1分以上たったコメントを読んだときを、このPCの中に記録するようにしました。読み上げの動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2099',
     date: '2026-11-12',
     summary: 'YouTube などの会場でキャラの顔も弾かれないように',

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2120',
+    date: '2026-11-13',
+    summary: 'スタンプの名前を読み上げない',
+    items: Object.freeze([
+      'YouTube のスタンプ(face-fuchsia-tongue-out や :_xxx: のような名前)を、英語の名前のまま読み上げていました。スタンプの名前は読まないようにしました(画面の表示は今までどおりです)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2119',
     date: '2026-11-13',
     summary: 'YouTube の会場で最初のギフト音も鳴る',
@@ -179,14 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '読み上げの計器に PC の声で鳴った件も残す',
     items: Object.freeze([
       'YouTube の会場の読み上げの記録に、VOICEVOX と PC の声のどちらで鳴ったかを残すようにしました。読み上げの動きは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2100',
-    date: '2026-11-12',
-    summary: 'YouTube の読み上げの読み直しを記録する計器',
-    items: Object.freeze([
-      'YouTube の会場の読み上げで、同じコメントをもう一度読んだときや、届いてから1分以上たったコメントを読んだときを、このPCの中に記録するようにしました。読み上げの動きは変わりません。'
     ])
   })
 ]);
