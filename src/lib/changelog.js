@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2122',
+    date: '2026-11-13',
+    summary: '拡張の短い説明文を見直した',
+    items: Object.freeze([
+      'Chrome ウェブストアに出る拡張の短い説明を「ライブ配信の応援コメントをこのPCの中だけに記録し、配信後に3つのレーンで振り返れます」にしました。使い方や動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2121',
     date: '2026-11-13',
     summary: '文字にくっついたスタンプ名も読まない',
@@ -178,15 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '配信の無い画面でも開いているサービスの言葉に',
     items: Object.freeze([
       'ツイキャスの配信外ページや TikTok の LIVE 一覧でパネルを開いたとき、ランキングの説明が「YouTube のトップファン」のままでした。開いているサービスの言葉で出すようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2102',
-    date: '2026-11-12',
-    summary: '配信が無いときの案内をサービスの言葉に',
-    items: Object.freeze([
-      'TikTok・ツイキャスなどで配信ページが開いていないとき、パネルの「配信を探す」案内がニコ生向け(生放送ランキング・ちくらん)のままでした。開いているサービスの言葉と行き先にしました。',
-      'ふわっち等の画面に出ていた「ギフトサイドバー履歴」(ニコ生だけの部品の名前)を「ギフトの履歴」にしました。'
     ])
   })
 ]);

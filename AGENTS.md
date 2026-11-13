@@ -25,7 +25,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **拡張 ID（開発版/unpacked・恒久固定）**: `ohifblceplfkfajfecaoaclmkiahfflm`
   （v0.1.1529 で manifest に `key` を追加して固定。以前はフォルダパス由来で不安定（旧 `edpellgokebgpjboflekdmmlnjgajnfn`）＝リロード固着の一因だった。`key` の公開鍵は秘密でないので git 管理。CRX秘密鍵 `dev-extension.pem` は gitignore 済＝コミットしない。提出版には `stage-submission.py` が `key` を落とす。`scripts/check-chrome-load-path.mjs` がこの恒久IDを参照する）
 - **公開中**: **0.1.1901**（2026-11-06 提出→通過・公開。YouTube Live 同梱＋サポーター課金。権限が増えた=`tts`・`declarativeNetRequestWithHostAccess`・YouTube の4ホスト。ZIP 17,864,064 bytes・150 ファイル）
-- **審査中**: 0.1.2105（2026-11-12 提出・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA・ツイキャスを追加。ホスト権限が増えた。ZIP 18,295,916 bytes・163 ファイル。ダッシュボードで手アップロード。「パッケージの概要」= manifest の description は全サービスの文に）
+- **却下**: 0.1.2105（2026-11-12 提出→同日却下「キーワード スパム(Yellow Argon)」= manifest の description と「詳細な説明」に並べたサービス名の羅列。0.1.2122 で羅列をやめ、サービス名は「拡張が通信する先」の1か所だけにした。★説明文にサービス名を並べない。元の記録: 提出・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA・ツイキャスを追加。ホスト権限が増えた。ZIP 18,295,916 bytes・163 ファイル。ダッシュボードで手アップロード。「パッケージの概要」= manifest の description は全サービスの文に）
   - ★**権限が増える版は API アップロードだと「プライバシー」に新しい権限の理由欄が出ない**（再読み込みしても出ず、送信時に「理由が必要」で止まる）。ダッシュボードの「パッケージ」から同じ ZIP を**手で**アップロードし直すと欄が出た。今後、権限が増える版は最初からダッシュボードで手アップロードする
   - 貼り直した欄: 単一用途(§1)・ホスト権限(§2-8z)・tts(§2-8f)・declarativeNetRequestWithHostAccess(§2-8g)・データ使用「認証に関する情報」✅・「詳細な説明」。送信はダッシュボードの「審査のため送信」（自動公開 ON）
 - **前回公開**: 0.1.1848（2026-11-03）
