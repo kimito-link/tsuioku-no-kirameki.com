@@ -55,6 +55,11 @@ describe('YouTube のスタンプの名前は読まない(2026-11-13)', () => {
     expect(normalizeVoiceReadingBody('草 :_ksnLaugh::_ksnLaugh:')).toBe('草');
     expect(normalizeVoiceReadingBody('おはよう:folded_hands:')).toBe('おはよう');
   });
+  it('文字にくっついた名前・名前同士の連結も消す(0.1.2121・PC 実測の3件)', () => {
+    expect(normalizeVoiceReadingBody('Insurance fraudface-blue-smiling')).toBe('Insurance fraud');
+    expect(normalizeVoiceReadingBody('RUUUUNface-fuchsia-tongue-outface-fuchsia-tongue-out')).toBe('RUUUUN');
+    expect(normalizeVoiceReadingBody('no lizard was harmed on this streamface-red-heart-shape')).toBe('no lizard was harmed on this stream');
+  });
   it('ふつうの英語やハイフンの言葉は残す', () => {
     expect(normalizeVoiceReadingBody('face to face')).toBe('face to face');
     expect(normalizeVoiceReadingBody('hand-made')).toBe('hand-made');

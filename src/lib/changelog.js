@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2121',
+    date: '2026-11-13',
+    summary: '文字にくっついたスタンプ名も読まない',
+    items: Object.freeze([
+      '文字のすぐ後ろに YouTube のスタンプが続くと(例「fraudface-blue-smiling」)、スタンプの名前を英語のまま読んでいました。くっついていても名前は読まないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2120',
     date: '2026-11-13',
     summary: 'スタンプの名前を読み上げない',
@@ -179,14 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'TikTok・ツイキャスなどで配信ページが開いていないとき、パネルの「配信を探す」案内がニコ生向け(生放送ランキング・ちくらん)のままでした。開いているサービスの言葉と行き先にしました。',
       'ふわっち等の画面に出ていた「ギフトサイドバー履歴」(ニコ生だけの部品の名前)を「ギフトの履歴」にしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2101',
-    date: '2026-11-12',
-    summary: '読み上げの計器に PC の声で鳴った件も残す',
-    items: Object.freeze([
-      'YouTube の会場の読み上げの記録に、VOICEVOX と PC の声のどちらで鳴ったかを残すようにしました。読み上げの動きは変わりません。'
     ])
   })
 ]);

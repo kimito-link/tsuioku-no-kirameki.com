@@ -23,9 +23,11 @@ const CLAP_8_RE = /(?<![0-9０-９.,，．])[8８]{3,}(?![0-9０-９.,，．円�
  * 2026-11-13: YouTube のスタンプ(絵文字)の名前。画面では絵なので、名前を読み上げない。
  *   - メンバー限定・ショートカットの形「:_ksnLaugh:」「:folded_hands:」
  *   - YouTube 共通スタンプの名前「face-fuchsia-tongue-out」「hand-pink-waving」(PC 実測で英語のまま読んでいた)
+ *   - 0.1.2121: 文字のすぐ後ろ「fraudface-blue-smiling」・名前同士の連結「…-outface-…」にも当てる(PC 実測で3/166件残っていた)。
+ *     前後の英数字の条件は外す(ハイフン区切り3語以上の名前だけを消すので、「hand-made」等の普通の言葉は残る)。
  */
 const YT_EMOJI_SHORTCUT_RE = /:[A-Za-z_][A-Za-z0-9_-]*:/g;
-const YT_EMOJI_NAME_RE = /(?<![A-Za-z0-9-])(?:face|hand|hands|eyes|person|text|body|heart|cat|dog|ghost|fish)(?:-[a-z]+){2,}(?![A-Za-z0-9-])/g;
+const YT_EMOJI_NAME_RE = /(?:face|hand|hands|eyes|person|text|body|heart|cat|dog|ghost|fish)(?:-[a-z]+){2,}-?/g;
 
 /** スマホの読み上げ(live-view-native-voice.js)と同じ言い方: 3つ以上は「わらわら」・1〜2つは「わら」。 */
 const laughWord = (/** @type {string} */ m) => (Array.from(m).length >= 3 ? 'わらわら' : 'わら');

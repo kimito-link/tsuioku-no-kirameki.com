@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2101',
+    date: '2026-11-12',
+    summary: '読み上げの計器に PC の声で鳴った件も残す',
+    items: Object.freeze([
+      'YouTube の会場の読み上げの記録に、VOICEVOX と PC の声のどちらで鳴ったかを残すようにしました。読み上げの動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2100',
     date: '2026-11-12',
     summary: 'YouTube の読み上げの読み直しを記録する計器',

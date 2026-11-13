@@ -4985,5 +4985,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2120', metric: 'cross-checked-claims', value: 10,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の決まった言い回し(実測で確認・測り直 等)を数える値。11/12〜13 の読み上げ改善は PC 実測と模擬配信で確かめたが、本文を「PC 実測」と書いたため数に入っていない'
+  }),
+  Object.freeze({
+    version: '0.1.2121', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2120 と同じ(読み上げ文の正規表現を1つ直しただけ)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
+  }),
+  Object.freeze({
+    version: '0.1.2121', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2121', metric: 'cross-checked-claims', value: 10,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '0.1.2120 の注記と同じ理由(言い回しを数える値)。この版はPCの実ページで見つかった3件をテストに入れて確かめた'
   })
 ]);
