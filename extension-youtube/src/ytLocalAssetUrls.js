@@ -110,6 +110,8 @@ export function ytInstallLocalAssetUrls() {
       return url;
     };
     wrapped.__ytLocalAsset = true;
+    // 2026-11-13: 効果音を鳴らす側が「読み終わるまで待ってから鳴らす」ために使う(effectSoundPlayer.js)。
+    wrapped.__ytLoadAsync = ytLoadLocalAsset;
     try {
       rt.getURL = wrapped;
     } catch {

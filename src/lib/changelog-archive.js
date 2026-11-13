@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2099',
+    date: '2026-11-12',
+    summary: 'YouTube などの会場でキャラの顔も弾かれないように',
+    items: Object.freeze([
+      'YouTube の会場で、数字の帯に出る3キャラの顔の画像が「Unsafe attempt to load URL」で弾かれていました。ギフト音と同じく、会場を出す前にページの中へ先読みするようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2098',
     date: '2026-11-12',
     summary: 'ミクチャでログイン画面に移っても記録を続ける',

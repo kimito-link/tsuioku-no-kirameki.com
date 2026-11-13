@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2119',
+    date: '2026-11-13',
+    summary: 'YouTube の会場で最初のギフト音も鳴る',
+    items: Object.freeze([
+      'YouTube などの会場で、効果音の読み込みが終わる前に来たギフトや広告の音が、ページに止められて鳴らないことがありました。読み込みが終わるのを待ってから鳴らすようにしました。拡張のエラー一覧に「Unsafe attempt to load URL」が積もることも減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2118',
     date: '2026-11-13',
     summary: '混んでも合唱が途中で消えにくく',
@@ -179,14 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'YouTube の読み上げの読み直しを記録する計器',
     items: Object.freeze([
       'YouTube の会場の読み上げで、同じコメントをもう一度読んだときや、届いてから1分以上たったコメントを読んだときを、このPCの中に記録するようにしました。読み上げの動きは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2099',
-    date: '2026-11-12',
-    summary: 'YouTube などの会場でキャラの顔も弾かれないように',
-    items: Object.freeze([
-      'YouTube の会場で、数字の帯に出る3キャラの顔の画像が「Unsafe attempt to load URL」で弾かれていました。ギフト音と同じく、会場を出す前にページの中へ先読みするようにしました。'
     ])
   })
 ]);

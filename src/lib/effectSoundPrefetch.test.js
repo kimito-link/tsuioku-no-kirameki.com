@@ -2,9 +2,9 @@
 //   2026-11-12: YouTube の会場で sound/tiers/gift-*.mp3 が「Unsafe attempt to load URL」で弾かれていた。
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { EFFECT_SOUND_PATHS, EFFECT_SOUND_VARIANT_PATHS, listBundledEffectSoundPaths } from './effectSoundPlayer.js';
-import { YT_LOCAL_ASSET_RE, ytPrefetchLocalAssetsInOrder } from '../../extension-youtube/src/ytLocalAssetUrls.js';
+import { describe, expect, it, vi } from 'vitest';
+import { EFFECT_SOUND_PATHS, EFFECT_SOUND_VARIANT_PATHS, listBundledEffectSoundPaths, playEffectSound, _resetEffectSoundGuardForTest } from './effectSoundPlayer.js';
+import { YT_LOCAL_ASSET_RE, ytInstallLocalAssetUrls, ytPrefetchLocalAssetsInOrder } from '../../extension-youtube/src/ytLocalAssetUrls.js';
 
 const root = resolve(__dirname, '../..');
 
@@ -74,3 +74,29 @@ describe('会場の数字の帯の顔', () => {
     expect(bar).not.toMatch(/resolveVenueAssetUrl\('images\/yukkuri-charactore-english\/[^']*smile-mouth-open\.png'\)/);
   });
 });
+
+describe('先読みが終わる前のギフト音(2026-11-13)', () => {
+  it('包んだ getURL 経由で、読み終わってから blob: で鳴らす(chrome-extension:// では鳴らさない)', async () => {
+    const prev = globalThis.chrome;
+    const prevURL = globalThis.URL.createObjectURL;
+    globalThis.URL.createObjectURL = () => 'blob:gift';
+    const sendMessage = vi.fn(() => Promise.resolve({ ok: true, b64: 'AAAA', mime: 'audio/mpeg' }));
+    globalThis.chrome = { runtime: { getURL: (p) => `chrome-extension://id/${p}`, sendMessage } };
+    try {
+      ytInstallLocalAssetUrls();
+      expect(typeof globalThis.chrome.runtime.getURL.__ytLoadAsync).toBe('function');
+      _resetEffectSoundGuardForTest();
+      const made = [];
+      const audioFactory = (url) => { const a = { url, volume: 1, play: () => Promise.resolve() }; made.push(a); return a; };
+      playEffectSound('gift', { nowMs: 1000, audioFactory });
+      expect(made).toHaveLength(0);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(sendMessage).toHaveBeenCalledWith({ type: 'YT_GET_EXT_ASSET', path: EFFECT_SOUND_PATHS.gift });
+      expect(made.map((a) => a.url)).toEqual(['blob:gift']);
+    } finally {
+      globalThis.chrome = prev;
+      globalThis.URL.createObjectURL = prevURL;
+    }
+  });
+});
+
