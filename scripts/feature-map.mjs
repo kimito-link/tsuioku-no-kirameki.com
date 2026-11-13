@@ -118,6 +118,8 @@ const DOM_ATTR_DISCONNECT_BASELINE = new Set([
   'data-nl-score-final',
   // v0.1.1693: 書き手は静的 HTML(extension/sidepanel.html の iframe)・読み手は src/extension/sidepanel-iframe-boot-entry.js。この解析は .js しか読まないので片側に見える偽陽性。
   'data-nl-src',
+  // 2026-11-13: 書き手は scripts/youtube-build.mjs が yt-sidepanel.html の <html> に足す属性・読み手は src/extension/popup-entry.js。この解析は .js の setAttribute しか見ないので片側に見える偽陽性。
+  'data-nl-page-count-only',
 
   /* ── 🟠 書き手だけ: 本当に読み手が居ない(★書きっぱなし＝消す候補) ──
    * ★これは偽陽性ではなく**実際の借金**。第2版以降で消す。

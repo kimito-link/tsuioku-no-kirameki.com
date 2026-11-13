@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "2822c52ddae66947a8864518ac3fa44341e4d086a90c71b89ce19c452f8c4941",
+  "fingerprint": "5115ba09e5397e9d5e00a715c4961b424c9364f305a29c1cc62c47b2860b33f2",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -1094,6 +1094,6 @@
     "extension/dist/yt-tt-content.js": "12f34ca2dab83a2e0f88a424c9b36994dbbad333308093aaf39360512bfa8c1b",
     "extension/dist/yt-ab-main.js": "f972329318c2d75c5a7af101cf8ad5374ee411f77451ad5ccaada7286e21688b",
     "extension/dist/yt-ab-content.js": "902d393b4097612f800ce7fed2376d47eca22dd0d33fdc26d914f882ac22921c",
-    "extension/dist/yt-content-chat-main.js": "8f924eaca8a13a524f1c2d8265902c9836f8dfa4dba61a9f8a9ff176615d1dff"
+    "extension/dist/yt-content-chat-main.js": "8b22889aab846c9c2f3617990a8fed50a185c832ba072565531d3bb129e0c058"
   }
 }

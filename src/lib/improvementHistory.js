@@ -4947,7 +4947,8 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   }),
   Object.freeze({
     version: '0.1.1920', metric: 'bundle-kb', value: 1421,
-    source: '[auto] extension/dist/popup.js のファイルサイズ'
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'YouTube Live を本体に同梱した(0.1.1890〜)ので popup.js が大きくなった(2026-11-13 に理由を追記)'
   }),
   Object.freeze({
     version: '0.1.1920', metric: 'gate-selftest', value: 4,
@@ -4955,7 +4956,8 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   }),
   Object.freeze({
     version: '0.1.1920', metric: 'cross-checked-claims', value: 12,
-    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値で、この時期は書き方が少なかった。0.1.2036 で 56 に戻っている(2026-11-13 に理由を追記)'
   }),
   Object.freeze({
     version: '0.1.2036', metric: 'bundle-kb', value: 1441,
@@ -4969,5 +4971,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.2036', metric: 'cross-checked-claims', value: 56,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.2120', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA・ツイキャスの記録を同梱したので popup.js が大きくなった(0.1.2036 の 1441 からはほぼ横ばい)'
+  }),
+  Object.freeze({
+    version: '0.1.2120', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2120', metric: 'cross-checked-claims', value: 10,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の決まった言い回し(実測で確認・測り直 等)を数える値。11/12〜13 の読み上げ改善は PC 実測と模擬配信で確かめたが、本文を「PC 実測」と書いたため数に入っていない'
   })
 ]);

@@ -68,7 +68,6 @@ export function startYtPageViewerReader() {
     if (pageId && pageId !== videoId) return;
     root.setAttribute('data-nl-yt-video-id', videoId);
     root.setAttribute('data-nl-yt-viewers', String(Math.floor(count)));
-    root.setAttribute('data-nl-yt-viewers-at', String(Date.now()));
   };
 
   const flushPending = () => {
@@ -206,7 +205,6 @@ export function startYtPageViewerReader() {
     const root = document.documentElement;
     root?.removeAttribute('data-nl-yt-viewers');
     root?.removeAttribute('data-nl-yt-video-id');
-    root?.removeAttribute('data-nl-yt-viewers-at');
     setTimeout(arm, 0);
   });
 }
