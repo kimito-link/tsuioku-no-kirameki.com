@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2123',
+    date: '2026-11-14',
+    summary: '混んだ配信でも読み上げが止まらない',
+    items: Object.freeze([
+      '読み上げが ON なら、会場を閉じていても新しいコメントを読み続けるようにしました。画面を開き直したり ON/OFF したりする必要はありません。',
+      'コメントが届いているのに声が長く止まったときは、詰まった処理を自動で片付け、PC の軽い声へ切り替えて大事なコメントを読み続けます。落ち着けば人ごとの VOICEVOX の声へ戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2122',
     date: '2026-11-13',
     summary: '拡張の短い説明文を見直した',
@@ -178,14 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '開いた直後に配信の題や配信者が消える件',
     items: Object.freeze([
       'YouTube 以外の配信(ふわっち・Kick など)を開いた直後に、配信の題・配信者・同時視聴者数が記録から消え、30秒ほど空のままになることがありました。拡張の裏方が起きた直後の読み込みの取り合いが原因で、読み終えるまで待つようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2103',
-    date: '2026-11-12',
-    summary: '配信の無い画面でも開いているサービスの言葉に',
-    items: Object.freeze([
-      'ツイキャスの配信外ページや TikTok の LIVE 一覧でパネルを開いたとき、ランキングの説明が「YouTube のトップファン」のままでした。開いているサービスの言葉で出すようにしました。'
     ])
   })
 ]);

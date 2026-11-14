@@ -5013,5 +5013,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2122', metric: 'cross-checked-claims', value: 10,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '0.1.2120 の注記と同じ理由(言い回しを数える値)'
+  }),
+  Object.freeze({
+    version: '0.1.2123', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版0.1.2122と同じ1446KB。過去最良1360KBより大きい点は維持されるが、既存の複数サービスと計器を削って値だけ戻す変更はしない。音声品質の改善をこのサイズから推定しない。'
+  }),
+  Object.freeze({
+    version: '0.1.2123', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2123', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'このcloneの直近30日のコミット本文を実測して52件。過去最良56件より4件少ないが、期間と本文の言い回しに依存する指標であり音声性能を表さない。今回の独立レビュー・回帰試験・実AudioとPC音声の確認は別の証拠として報告書に記録する。'
   })
 ]);

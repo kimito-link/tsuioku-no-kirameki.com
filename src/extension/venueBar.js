@@ -61,6 +61,8 @@ import {
   formatVenueHoverRelativeTime
 } from '../lib/venueHoverCard.js';
 import { escapeHtml } from '../lib/htmlText.js';
+import { createVenueLiveCommentHandler } from '../lib/venueLiveCommentRoute.js';
+import { buildVenueHeadlessVoiceItem } from '../lib/venueHeadlessVoiceItem.js';
 
 /**
  * 会場の参加者ソース切替。
@@ -3361,6 +3363,7 @@ export function mountVenueBarButton(options = {}) {
     onDiag: publishVenueVoiceDiag,
     onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
       pickupVoice.noteWanted(enabled);
+      if (!open) voicePlayer.diag.venueGate = enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed');
       if (!enabled) updatePickupBanner(null);
       voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
@@ -3401,7 +3404,7 @@ export function mountVenueBarButton(options = {}) {
   wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
   // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(開いて ON の間だけ名乗る・voiceReaderLease.js)。
-  const venueReaderLease = startVoiceReaderLease(() => open && voicePlayer.enabled, liveIdFromPathname, { onPageHide: (fn) => window.addEventListener('pagehide', fn) });
+  const venueReaderLease = startVoiceReaderLease(() => voicePlayer.enabled, liveIdFromPathname, { onPageHide: (fn) => window.addEventListener('pagehide', fn) });
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.readingWanted) {
       voicePlayer.disable();
@@ -3766,14 +3769,30 @@ export function mountVenueBarButton(options = {}) {
   let _lastBroadcasterUid = '';
   let _venueSeatsDiagLastWriteAt = 0;
 
+  // 読み上げは会場を開かなくても動くため、配信者ctxも描画集計とは独立に購読する。
+  const adoptVoiceBroadcasterCtx = (/** @type {unknown} */ raw) => {
+    const ctx = normalizeBroadcasterCtx(raw);
+    const cur = String(liveIdFromPathname() || '').trim().toLowerCase();
+    const own = String(ctx.liveId || '').trim().toLowerCase();
+    _lastBroadcasterUid = ctx.uid && !(cur && own && cur !== own) ? ctx.uid : '';
+  };
+  void chrome.storage.local.get(KEY_LIVE_BROADCASTER_CTX).then((bag) => {
+    adoptVoiceBroadcasterCtx(bag?.[KEY_LIVE_BROADCASTER_CTX]);
+  }).catch(() => {});
+
   // v0.1.1053: ギフト/広告の効果音 ON/OFF(既定 true)。popup と同じ設定キーを共有する。
   let _effectSoundEnabledCache = true;
   void chrome.storage.local.get(KEY_EFFECT_SOUND_ENABLED).then((bag) => {
     _effectSoundEnabledCache = isEffectSoundEnabled(bag?.[KEY_EFFECT_SOUND_ENABLED]);
   }).catch(() => {});
   chrome.storage.onChanged?.addListener?.((changes, area) => {
-    if (area !== 'local' || !changes[KEY_EFFECT_SOUND_ENABLED]) return;
-    _effectSoundEnabledCache = isEffectSoundEnabled(changes[KEY_EFFECT_SOUND_ENABLED].newValue);
+    if (area !== 'local') return;
+    if (changes[KEY_EFFECT_SOUND_ENABLED]) {
+      _effectSoundEnabledCache = isEffectSoundEnabled(changes[KEY_EFFECT_SOUND_ENABLED].newValue);
+    }
+    if (changes[KEY_LIVE_BROADCASTER_CTX]) {
+      adoptVoiceBroadcasterCtx(changes[KEY_LIVE_BROADCASTER_CTX].newValue);
+    }
   });
 
   // Phase A(2026-07-05): マイ効果音(IndexedDB取込+割当)。起動時+customSoundRev変化時に
@@ -6766,10 +6785,6 @@ export function mountVenueBarButton(options = {}) {
    * @param {string} [source] 計器用: 取り込み元(ndgr/ndgr_forward/backfill/deep…・live 経路のみ)
    */
   const processSpeechRows = (rows, path = 'unknown', source = '') => {
-    // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
-    applyVenueHeat(rows);
-    // 「会話の連鎖」: 発言が途切れた人のストリークを掃除(席のグローが自然に消える)。
-    pruneSpeechStreaks(speechStreaks, Date.now());
     // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
     //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
     // v0.1.755 リアルタイム完璧化: maxEmit 8→24。洪水時に「9件目以降の新着を取りこぼす」のを防ぐ
@@ -6785,6 +6800,33 @@ export function mountVenueBarButton(options = {}) {
       primed: result.primed,
       hiNo: Number(result.hiNo) || 0
     };
+    // 会場を閉じても「読み上げ ON」は実際に読み続ける。描画・席・吹き出しは一切起こさず、
+    // 同じ新着/dedup経路から音声だけを渡す(閉じた会場のCPU負荷を復活させない)。
+    if (!open) {
+      voicePlayer.diag.venueGate = voicePlayer.enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed');
+      const liveId = liveIdFromPathname();
+      const receivedAt = Date.now();
+      for (const speech of result.speeches) {
+        const voiceIt = () => voicePlayer.enqueue([buildVenueHeadlessVoiceItem(speech, {
+          receivedAt, liveId, broadcasterUid: _lastBroadcasterUid
+        })]);
+        if (!venueReaderLease) voiceIt();
+        else venueReaderLease.whenMine(liveId, voiceIt, () => {
+          voicePlayer.diag.readerYieldTotal = (Number(voicePlayer.diag.readerYieldTotal) || 0) + 1;
+        });
+      }
+      try {
+        observeVenueSpeechBatch(_bubbleBurst, {
+          at: Date.now(), path: `${path}:headless`, source, rows, speeches: result.speeches,
+          fresh: Number(result.freshCount) || 0, shown: 0, skippedOld: Number(result.skippedOld) || 0
+        });
+      } catch { /* 計器失敗は読み上げを止めない */ }
+      return;
+    }
+    // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
+    applyVenueHeat(rows);
+    // 「会話の連鎖」: 発言が途切れた人のストリークを掃除(席のグローが自然に消える)。
+    pruneSpeechStreaks(speechStreaks, Date.now());
     // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
     if (result.speeches.length > 0) voicePlayer.diag.venueGate = voicePlayer.enabled ? 'ok' : 'voice-off';
     if (result.speeches.length > 0) {
@@ -6907,21 +6949,18 @@ export function mountVenueBarButton(options = {}) {
    * @param {ReadonlyArray<Record<string, unknown>>} rows
    * @param {string} [source] 計器用: 取り込み元(persistCommentRows の source)
    */
-  const onLiveComments = (incomingLiveId, rows, source = '') => {
-    if (!open) return; // 閉じている間は何もしない(開いた時に pollSpeech が storage から再シード)
-    const cur = liveIdFromPathname();
-    if (!cur || cur !== incomingLiveId) return; // 配信切替中の遅延コールバックは捨てる
-    if (speechLiveId !== cur) resetSpeechTracking(cur); // pollSpeech と同じ追従
-    const feedRows = liveFeedSpeechRows(rows);
-    if (feedRows.length === 0) return;
-    processSpeechRows(feedRows, 'live', String(source || '')); // 吹き出し/読み上げ(従来どおり)
-    // v0.1.754: 在席は「通過した瞬間に touch」。storage 集計を待たない=3時間でも O(席数)。
-    //   touchRoster が requireText/userId を内部で守る(匿名/本文空は席に入れない・v0.1.740)。
-    if (!rosterDriven) return;
-    const now = Date.now();
-    for (const r of feedRows) touchRoster(liveRoster, r, now);
-    scheduleRosterCommit();
-  };
+  const onLiveComments = createVenueLiveCommentHandler({
+    currentLiveId: liveIdFromPathname,
+    speechLiveId: () => speechLiveId,
+    resetSpeechTracking,
+    liveFeedRows: liveFeedSpeechRows,
+    processSpeechRows,
+    isOpen: () => open,
+    rosterDriven: () => rosterDriven,
+    now: Date.now,
+    touchRoster: (/** @type {Record<string, any>} */ row, /** @type {number} */ now) => touchRoster(liveRoster, row, now),
+    scheduleRosterCommit
+  });
 
   const pollSpeech = async () => {
     if (!open || speechInFlight) return;
@@ -7302,7 +7341,9 @@ export function mountVenueBarButton(options = {}) {
    */
   const setOpen = (nextOpen, persist) => {
     open = nextOpen === true;
-    voicePlayer.diag.venueGate = open ? 'no-input' : 'panel-closed';
+    voicePlayer.diag.venueGate = open
+      ? 'no-input'
+      : (voicePlayer.enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed'));
     root.classList.toggle('nlsb-is-open', open);
     // v0.1.1115 ①POP遮蔽: 会場open中だけ document ルートに印を付け、CSS(VENUE_CSS末尾)が
     //   ①POPホスト(#nls-inline-popup-host)を visibility:hidden にする。open→close 往復で

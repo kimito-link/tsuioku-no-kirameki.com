@@ -80,7 +80,7 @@ export function wireVoiceTestHook(o) {
  * @param {any} voicePlayer VoicePlayer
  */
 export function wireVenueVoiceTestHook(voicePlayer) {
-  voicePlayer.diag.venueGate = 'panel-closed'; // 会場の画面を開くまでは読まない作り
+  voicePlayer.diag.venueGate = 'panel-closed'; // mount直後だけ。読み上げONなら閉会場でも venueBar が headless に更新する
   wireVoiceTestHook({
     target: 'venue',
     enqueue: (items) => voicePlayer.enqueue(items),

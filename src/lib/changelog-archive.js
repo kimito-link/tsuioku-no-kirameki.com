@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2103',
+    date: '2026-11-12',
+    summary: '配信の無い画面でも開いているサービスの言葉に',
+    items: Object.freeze([
+      'ツイキャスの配信外ページや TikTok の LIVE 一覧でパネルを開いたとき、ランキングの説明が「YouTube のトップファン」のままでした。開いているサービスの言葉で出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2102',
     date: '2026-11-12',
     summary: '配信が無いときの案内をサービスの言葉に',

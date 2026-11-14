@@ -126,11 +126,11 @@ export function summarizeBubbleVoiceSync(state) {
  *   上限まで鳴らなかったことが続けば待たせない(failStreak)ので、「声が鳴った実績」を条件にしなくても
  *   VOICEVOX が止まったときに吹き出しが出なくなることはない(v0.1.757 の約束)。
  *   鳴らないのが続いている間も probeDue のときは1件だけ待たせて試す(鳴れば failStreak が0に戻る)。
- * @param {{ voiceEnabled: boolean, primeBurst?: boolean, failStreak?: number, probeDue?: boolean }} s
+ * @param {{ voiceEnabled: boolean, primeBurst?: boolean, failStreak?: number, probeDue?: boolean, important?: boolean }} s
  */
 export function shouldHoldBubbleForVoiceSync(s) {
   if (s?.voiceEnabled !== true || s?.primeBurst === true) return false;
-  return (Number(s?.failStreak) || 0) < VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX || s?.probeDue === true;
+  return s?.important === true || (Number(s?.failStreak) || 0) < VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX || s?.probeDue === true;
 }
 
 /**
@@ -190,7 +190,11 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
   const arrivedAt = Number(ctx.arrivedAt) || now();
   const failing = (Number(state.failStreak) || 0) >= VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX;
   const probeDue = failing && now() - (Number(state.lastProbeAt) || 0) >= VENUE_BUBBLE_VOICE_PROBE_MS;
-  const holdForVoice = shouldHoldBubbleForVoiceSync({ voiceEnabled: !!vp?.enabled, primeBurst: ctx.primeBurst, failStreak: state.failStreak, probeDue });
+  const itemBase = {
+    ...(ctx.itemFields || {}), kind: 'comment', userId: speech.userId, nickname: speech.name, key: speech.key, text: speech.text
+  };
+  const important = typeof vp?.previewImportant === 'function' && vp.previewImportant(itemBase) === true;
+  const holdForVoice = shouldHoldBubbleForVoiceSync({ voiceEnabled: !!vp?.enabled, primeBurst: ctx.primeBurst, failStreak: state.failStreak, probeDue, important });
   if (holdForVoice && probeDue) state.lastProbeAt = now();
   let bubble = holdForVoice ? null : ctx.showBubble(speech);
   const shown = !!bubble || holdForVoice;
@@ -239,12 +243,7 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
       return;
     }
     vp.enqueue([{
-      ...(ctx.itemFields || {}),
-      kind: 'comment',
-      userId: speech.userId,
-      nickname: speech.name,
-      key: speech.key,
-      text: speech.text,
+      ...itemBase,
       onAudible: ctx.onAudible,
       onAudioStart: () => {
         state.lastAudioStartAt = now();

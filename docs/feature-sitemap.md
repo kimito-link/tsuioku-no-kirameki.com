@@ -349,7 +349,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 302</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 303</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -609,6 +609,7 @@
 - `src/lib/venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueHoverFacts.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
+- `src/lib/venueLiveCommentRoute.js` — 【層】L0 判定層(ブラウザI/Oは呼び出し側へ委譲)
 - `src/lib/venueLiveOpenFlag.js` — 「会場モードがいま開いているか」を鏡の供給側へ伝える値。
 - `src/lib/venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
 - `src/lib/venueMirrorAvatarEnrich.js` — 会場行の avatar を「①の実描画鏡(laneMirror)が解決済みの顔URL」で
@@ -666,7 +667,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 64</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 69</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -674,7 +675,10 @@
 - `extension-youtube/offscreen.js` — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル
 - `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 - `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
+- `scripts/measure-voice-silent-busy.mjs` — 混雑した会場の「読み上げONなのに無音」を、偽VOICEVOX(50121)と新しいPlaywright contextで実測する。
 - `scripts/measure-yt-voice-repeat.mjs` — YouTube の会場の読み上げが「最新を読まず、過去の発言を何度も読む」かを計器で確かめる。
+- `scripts/probe-browser-voice-audio.mjs` — 新規Playwrightプロファイルで非ゼロWAVの実再生とPC音声の開始/終了を確認する。
+- `scripts/verify-voice-isolated-extension.mjs` — 偽エンジンだけを向く拡張の一時コピーで、既存のverify:extensionを実行する。
 - `src/extension/phoneVoicePublisher.js` — v0.1.1740: status.html?publisher=1 の「スマホへ声を送る係」の配線(本物の VOICEVOX・WebCodecs・chrome.storage・fetch)。
 - `src/extension/popup/wirePanelVoiceReadingButton.js` — パネルの「読み上げ」を会場と同じ ON/OFF にする。
 - `src/extension/popup/wireVoiceChorusToggle.js` — ポップアップの「合唱」の配線(2026-11-12)。
@@ -692,6 +696,7 @@
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/venueBubbleVoiceHold.js` — 会場の吹き出しを「声が始まる時」に出すかどうか(v0.1.1979・2026-11-10 りんく決定「声と一緒に出す」)。
 - `src/lib/venueBubbleVoiceSync.js` — 会場の吹き出しと読み上げの声を「ぴったり・テンポよく」合わせる(2026-11-12 りんく「全部のプラットフォーム
+- `src/lib/venueHeadlessVoiceItem.js` — 【層】L0 判定層(ブラウザI/Oは呼び出し側へ委譲)
 - `src/lib/venuePickupSpeaker.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
 - `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
@@ -718,6 +723,7 @@
 - `src/lib/voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
 - `src/lib/voiceReaderLease.js` — 同じ配信を会場とコメビュの両方で開いた時、読み上げるのは片方だけにする(v0.1.1794)。
 - `src/lib/voiceReadingNormalize.js` — 読み上げる本文を「耳で聞いて自然」に整える純関数(会場・コメビュ・スマホ共通)。
+- `src/lib/voiceSilenceRecovery.js` — 【層】L0 判定層(ブラウザI/Oは呼び出し側へ委譲)
 - `src/lib/voiceStageTiming.js` — 読み上げの遅れを「段階ごと」に測る計器(印字専用・読み上げの挙動には一切介入しない)。
 - `src/lib/voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。
 - `src/lib/voiceStyleLevelTable.js` — VOICEVOX の声(styleId)ごとの素の大きさの表(v0.1.1788)。
@@ -1519,7 +1525,8 @@
 ### 💾 記録件数 (1版)
 - `v0.1.2107` 2026-11-12 — TikTok で配信を移ると記録0件になる件
 
-### 🏟 会場・席 (3版)
+### 🏟 会場・席 (4版)
+- `v0.1.2123` 2026-11-14 — 混んだ配信でも読み上げが止まらない
 - `v0.1.2119` 2026-11-13 — YouTube の会場で最初のギフト音も鳴る
 - `v0.1.2110` 2026-11-12 — TikTok で配信を移った直後の会場と言葉を直す
 - `v0.1.2106` 2026-11-12 — ミクチャの会場から送れない件
@@ -1531,7 +1538,8 @@
 - `v0.1.2109` 2026-11-12 — ミクチャのアイコンをプロフィールから
 - `v0.1.2108` 2026-11-12 — ミクチャのコメントに本人のアイコン
 
-### 🔊 読み上げ (5版)
+### 🔊 読み上げ (6版)
+- `v0.1.2123` 2026-11-14 — 混んだ配信でも読み上げが止まらない
 - `v0.1.2120` 2026-11-13 — スタンプの名前を読み上げない
 - `v0.1.2118` 2026-11-13 — 混んでも合唱が途中で消えにくく
 - `v0.1.2115` 2026-11-13 — PC の声のまま戻らない時も VOICEVOX へ
@@ -1543,11 +1551,10 @@
 - `v0.1.2109` 2026-11-12 — ミクチャのアイコンをプロフィールから
 - `v0.1.2108` 2026-11-12 — ミクチャのコメントに本人のアイコン
 
-### その他 (7版)
+### その他 (6版)
 - `v0.1.2121` 2026-11-13 — 文字にくっついたスタンプ名も読まない
 - `v0.1.2117` 2026-11-13 — 書き方が違う笑いや拍手も合唱に
 - `v0.1.2116` 2026-11-13 — 混んだ配信でも合唱が鳴るように
 - `v0.1.2111` 2026-11-12 — 混雑中も覚えた短い声は読む
 - `v0.1.2105` 2026-11-12 — 拡張の説明文に対応サービスを全部
 - `v0.1.2104` 2026-11-12 — 開いた直後に配信の題や配信者が消える件
-- `v0.1.2103` 2026-11-12 — 配信の無い画面でも開いているサービスの言葉に

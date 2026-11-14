@@ -19,6 +19,9 @@ describe('shouldHoldBubbleForVoiceSync', () => {
   it('鳴らないのが続いていても、試す時期なら1件だけ待たせる', () => {
     expect(shouldHoldBubbleForVoiceSync({ voiceEnabled: true, failStreak: VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX, probeDue: true })).toBe(true);
   });
+  it('鳴らないのが続いていても大事なコメントはprobe時刻を待たせない', () => {
+    expect(shouldHoldBubbleForVoiceSync({ voiceEnabled: true, failStreak: VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX, probeDue: false, important: true })).toBe(true);
+  });
   it('待ちの上限は読み上げの鮮度(8秒)より短い', () => {
     expect(VENUE_BUBBLE_VOICE_HOLD_MAX_MS).toBeLessThan(8000);
   });
@@ -143,6 +146,59 @@ describe('startVenueSpeechBubbleVoice: 開いた瞬間の3件と声が鳴らな�
     expect(shown).toBe(1);
     expect(vp.enq.length).toBe(0);
     expect(st.diag.skippedShown).toBe(1);
+  });
+  it('failStreak中でも大事な質問を実際の音声経路へ通し、開始すれば復旧する', async () => {
+    const { startVenueSpeechBubbleVoice } = await import('./venueBubbleVoiceSync.js');
+    const st = createVenueBubbleVoiceSyncState();
+    st.failStreak = VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX;
+    st.lastProbeAt = 100000;
+    let t = 100001;
+    const vp = mkVp();
+    vp.previewImportant = () => true;
+    const timers = [];
+    startVenueSpeechBubbleVoice(st, { key: 'important', userId: 'u1', text: '配信者さん、次は何ですか？' }, {
+      voicePlayer: vp, primeBurst: false, arrivedAt: t, isOpen: () => true, now: () => t,
+      setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimer: () => {},
+      showBubble: () => ({}), onSpeaking() {}, onDone() {}, onResolved() {}
+    });
+    expect(vp.enq).toHaveLength(1);
+    expect(st.lastProbeAt).toBe(100000); // 10秒probeを消費せず、大事判定で通った
+    t += 20;
+    vp.enq[0].onAudioStart();
+    expect(st.failStreak).toBe(0);
+  });
+
+  it('6秒capで失敗を数え、10秒ごとのprobeだけ再試行する', async () => {
+    const { startVenueSpeechBubbleVoice, VENUE_BUBBLE_VOICE_PROBE_MS } = await import('./venueBubbleVoiceSync.js');
+    const st = createVenueBubbleVoiceSyncState();
+    st.failStreak = VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX - 1;
+    let t = 200000;
+    const vp = mkVp();
+    vp.previewImportant = () => false;
+    vp.dropQueuedUnstarted = () => 'inflight';
+    vp.dropQueuedAny = () => 'cancelled';
+    const timers = [];
+    const ctx = () => ({
+      voicePlayer: vp, primeBurst: false, arrivedAt: t, isOpen: () => true, now: () => t,
+      setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimer: () => {},
+      showBubble: () => ({}), onSpeaking() {}, onDone() {}, onResolved() {}
+    });
+    startVenueSpeechBubbleVoice(st, { key: 'cap', userId: 'u1', text: '通常コメント' }, ctx());
+    const first = timers.shift(); t += first.ms; first.fn();
+    const cap = timers.shift(); t += cap.ms; cap.fn();
+    expect(st.failStreak).toBe(VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX);
+    expect(st.diag.capRevealed).toBe(1);
+
+    const before = vp.enq.length;
+    startVenueSpeechBubbleVoice(st, { key: 'probe1', userId: 'u1', text: '通常1' }, ctx());
+    expect(vp.enq.length).toBe(before + 1); // 初回probe
+    const probeAt = st.lastProbeAt;
+    t += 1;
+    startVenueSpeechBubbleVoice(st, { key: 'skip', userId: 'u1', text: '通常2' }, ctx());
+    expect(vp.enq.length).toBe(before + 1);
+    t = probeAt + VENUE_BUBBLE_VOICE_PROBE_MS;
+    startVenueSpeechBubbleVoice(st, { key: 'probe2', userId: 'u1', text: '通常3' }, ctx());
+    expect(vp.enq.length).toBe(before + 2);
   });
   it('鳴らないのが続いている間は吹き出しだけすぐ出して読まない(後から声だけ鳴らない)・10秒ごとに1件だけ待たせて試す(ABEMA の PC 実測)', async () => {
     const { startVenueSpeechBubbleVoice, VENUE_BUBBLE_VOICE_PROBE_MS } = await import('./venueBubbleVoiceSync.js');
