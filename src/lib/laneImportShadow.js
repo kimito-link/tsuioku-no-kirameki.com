@@ -162,14 +162,14 @@ export function compareImportedToMirror(imported, mirror) {
 
 /**
  * @typedef {{
- *   calls: number, skipped: number, lastMs: number, maxMs: number, lastAtMs: number,
+ *   calls: number, skipped: number, lastMs: number, maxMs: number, lastAtMs: number, firstSeenAtMs: number,
  *   last: ReturnType<typeof compareImportedToMirror>|null, comments: number
  * }} LaneImportShadowState
  */
 
 /** @returns {LaneImportShadowState} */
 export function createLaneImportShadowState() {
-  return { calls: 0, skipped: 0, lastMs: 0, maxMs: 0, lastAtMs: 0, last: null, comments: 0 };
+  return { calls: 0, skipped: 0, lastMs: 0, maxMs: 0, lastAtMs: 0, firstSeenAtMs: 0, last: null, comments: 0 };
 }
 
 /**
@@ -184,7 +184,14 @@ export function observeLaneImportShadow(state, input, clock) {
     if (!state || typeof state !== 'object') return false;
     const nowMs = Number(clock?.nowMs) || 0;
     const rowCount = Array.isArray(/** @type {any} */ (input)?.comments) ? /** @type {any} */ (input).comments.length : 0;
+    if (!(state.firstSeenAtMs > 0)) state.firstSeenAtMs = nowMs;
     if (state.lastAtMs > 0 && nowMs - state.lastAtMs < laneImportShadowGapMs(rowCount)) {
+      state.skipped += 1;
+      return false;
+    }
+    // ★0.1.2127: 大きな記録は1回目も「最初に見てから2分後」まで待つ。開いた直後はいちばん混む時で、
+    //   観測だけの計器(8万行で4倍遅い PC 1.6秒)が件数・マスの表示より先に手を奪っていた。表示は変わらない。
+    if (!(state.lastAtMs > 0) && rowCount >= LANE_IMPORT_SHADOW_BIG_ROWS && nowMs - state.firstSeenAtMs < LANE_IMPORT_SHADOW_BIG_GAP_MS) {
       state.skipped += 1;
       return false;
     }

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2105',
+    date: '2026-11-12',
+    summary: '拡張の説明文に対応サービスを全部',
+    items: Object.freeze([
+      'Chrome ウェブストアや拡張の一覧に出る短い説明文が、ニコニコ生放送のことだけになっていました。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA・ツイキャスも書きました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2104',
     date: '2026-11-12',
     summary: '開いた直後に配信の題や配信者が消える件',

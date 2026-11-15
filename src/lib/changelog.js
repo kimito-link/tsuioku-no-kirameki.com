@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2127',
+    date: '2026-11-15',
+    summary: '大きな記録で開いた直後の固まりを減らした',
+    items: Object.freeze([
+      '記録が2万件を超える配信で横の欄を開いたとき、裏で確かめるだけの集計(画面には出ない)が開いた直後に走って、件数や応援マスの表示を遅らせていました。この集計を開いてから2分後に回し、開いた直後の固まりを減らしました。見た目は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2126',
     date: '2026-11-15',
     summary: 'ニコ生以外の横の欄が裏で回り続けるのを止めた',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ミクチャで会場モードを開いて「ここから発言」から送ると、送れないことがありました。窓が狭くてミクチャのコメント欄が隠れているとき、追憶が会場自身の「送信」ボタンをミクチャのボタンと取り違えていたためです。会場の部品は探す対象から外しました(ABEMA・ふわっちの送り口も同じ直し)。',
       '入力欄が見つからないときの案内に「窓が狭くてコメント欄が隠れている」を足しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2105',
-    date: '2026-11-12',
-    summary: '拡張の説明文に対応サービスを全部',
-    items: Object.freeze([
-      'Chrome ウェブストアや拡張の一覧に出る短い説明文が、ニコニコ生放送のことだけになっていました。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA・ツイキャスも書きました。'
     ])
   })
 ]);
