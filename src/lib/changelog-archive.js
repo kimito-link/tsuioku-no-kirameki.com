@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2104',
+    date: '2026-11-12',
+    summary: '開いた直後に配信の題や配信者が消える件',
+    items: Object.freeze([
+      'YouTube 以外の配信(ふわっち・Kick など)を開いた直後に、配信の題・配信者・同時視聴者数が記録から消え、30秒ほど空のままになることがありました。拡張の裏方が起きた直後の読み込みの取り合いが原因で、読み終えるまで待つようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2103',
     date: '2026-11-12',
     summary: '配信の無い画面でも開いているサービスの言葉に',

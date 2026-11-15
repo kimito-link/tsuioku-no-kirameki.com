@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2126',
+    date: '2026-11-15',
+    summary: 'ニコ生以外の横の欄が裏で回り続けるのを止めた',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などニコ生以外の配信で横の欄を開いていると、数字のチップを整える処理が自分の書き換えに反応して1秒に60回動き続けていたのを直しました。何もしていない間の画面の書き換えが約20分の1になり、遅いPCでも軽くなります。見た目は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2125',
     date: '2026-11-15',
     summary: '人が少ない順位のカードが横に伸びない',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '拡張の説明文に対応サービスを全部',
     items: Object.freeze([
       'Chrome ウェブストアや拡張の一覧に出る短い説明文が、ニコニコ生放送のことだけになっていました。YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok・ABEMA・ツイキャスも書きました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2104',
-    date: '2026-11-12',
-    summary: '開いた直後に配信の題や配信者が消える件',
-    items: Object.freeze([
-      'YouTube 以外の配信(ふわっち・Kick など)を開いた直後に、配信の題・配信者・同時視聴者数が記録から消え、30秒ほど空のままになることがありました。拡張の裏方が起きた直後の読み込みの取り合いが原因で、読み終えるまで待つようにしました。'
     ])
   })
 ]);
