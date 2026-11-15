@@ -851,6 +851,24 @@ export const LINEUP = [
   //  旧: { label: 'gemini-3.7-flash', rawId/apiModel: 'gemini-3.7-flash' }（2026-09-07採用）
   { label: 'gemini-3.8-flash', provider: 'gemini', rawId: 'gemini-3.8-flash', apiModel: 'gemini-3.8-flash', opts: {}, requires: ['E'] },
 
+  // ★2026-11-15 追加（lead の予備 weight3）: Google Gemini 4 Hydrogen（無料枠で呼べる Gemini 4 世代。有料価格は $1.50/$7.50 の pro 級）。
+  //  役割は lead（総合・統括）にした: council-roles.mjs の roleOf は "gemini"→generalist だが、generalist には既に gemini が3体
+  //  （2.5-flash w1・3.5-flash-lite w3・3.8-flash w3）居る＝4体目を積むと恒久ルール5（同役割の予備に同一プロバイダを重ねない）に反する。
+  //  lead は nemotron-3-ultra の2経路（nvidia w2・openrouter w3）だけで系譜が1つ、しかも 11/05 の実会議で lead 0/3 と弱い。
+  //  pro 級のモデルを別系譜の lead 予備として置く。weightOf は "gemini-4"→3（恒久ルール3・新顔は予備から）。
+  //  実測（りんくのPC・11/15。生データは同PCの一時フォルダの council-trial-2026-11-15-*.json / hydrogen-variants-2026-11-15.json）:
+  //   - 課金の確認: 同じキーで gemini-4-argon（有料専用）は 429＝キーの project は無料枠のまま。Hydrogen は課金なしで 200。
+  //   - council-trial（本番と同じ maxOutputTokens 8192 / temperature 0.6）3回: 503 / 200・63.8秒 / 200・88.7秒（どれも STOP・700字台）。
+  //   - 本番条件で2並列: 200×2・56.7秒/58.1秒・STOP・733/760字・思考トークン 1.7k〜2.3k。結論→理由→懸念の形で (1)(2)(3) すべてに答えた。
+  //   - 503（high demand）は10本中2〜3本。同じ時間帯の gemini-3.8-flash も同じ割合＝容量の混雑で、このモデル固有の死ではない。
+  //   - temperature を外すと遅くなった（83〜90秒）ので geminiChat の既定（0.6）のまま。
+  //   - thinkingLevel "low" は 35秒・思考 466 トークンまで縮んだが、成功が1回だけなので採らない（geminiChat は全 gemini 共通のため触らない）。
+  //   - GET /models/gemini-4-hydrogen: inputTokenLimit 1,048,576 / outputTokenLimit 65,536 / thinking true。
+  //  timeoutMs 150000: 本番条件で57〜89秒かかる。geminiChat の既定 90秒だと答えが届く前に打ち切る日が出る（deepseek-v4.1-flash の 11/09 と同じ判断）。
+  //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。
+  //  撤去条件: 402/403（課金の要求）か、Gemini の一覧から消えたとき。503 だけなら容量の混雑なので撤去しない（ただし日報に記録する）。
+  { label: 'gemini-4-hydrogen', provider: 'gemini', rawId: 'gemini-4-hydrogen', apiModel: 'gemini-4-hydrogen', opts: {}, timeoutMs: 150000, requires: ['E'] },
+
   // 2026-06-?? 追加 → 2026-07-31 撤去（openrouter/gpt-oss-120b）:
   //   本改修でrawIdを空('')から'openai/gpt-oss-120b:free'に埋めた直後の初回実行で
   //   カタログ不在を検知（adoptedHealthにmissingStreak=1として記録）。実機で直接叩いて
