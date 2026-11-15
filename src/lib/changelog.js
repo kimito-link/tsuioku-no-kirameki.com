@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2125',
+    date: '2026-11-15',
+    summary: '人が少ない順位のカードが横に伸びない',
+    items: Object.freeze([
+      '公式ランキングなどの順位カードが1〜4人しかいないとき、広い画面でカードが画面いっぱいに横へ伸びていたのを直しました。カード1枚の幅を300pxまでにして、まん中に並べます。細い横パネルでの見え方は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2122',
     date: '2026-11-13',
     summary: '拡張の短い説明文を見直した',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '開いた直後に配信の題や配信者が消える件',
     items: Object.freeze([
       'YouTube 以外の配信(ふわっち・Kick など)を開いた直後に、配信の題・配信者・同時視聴者数が記録から消え、30秒ほど空のままになることがありました。拡張の裏方が起きた直後の読み込みの取り合いが原因で、読み終えるまで待つようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2103',
-    date: '2026-11-12',
-    summary: '配信の無い画面でも開いているサービスの言葉に',
-    items: Object.freeze([
-      'ツイキャスの配信外ページや TikTok の LIVE 一覧でパネルを開いたとき、ランキングの説明が「YouTube のトップファン」のままでした。開いているサービスの言葉で出すようにしました。'
     ])
   })
 ]);

@@ -5840,6 +5840,29 @@
         padding: 4px 2px 8px;
         border-top: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
       }
+      /* v0.1.2123: 人数が少ない(1〜4人)のに画面が広いと、1枚のカードが画面いっぱいに横へ
+         伸びていた(Twitch のギフトサブ 1人で幅 1100px 超・別窓や広いパネル)。
+         カード1枚あたりの幅を --nl-rank-card-max までにして、まとまりを中央に寄せる。
+         細い横パネル(幅 300px 前後)では上限に届かないので、これまでどおり全幅で分け合う。 */
+      .nl-top-support-rank--below-cards {
+        --nl-rank-card-max: 300px;
+      }
+      .nl-top-support-rank--below-cards .nl-top-support-rank__list:has(> .nl-top-support-rank__line:nth-child(1):last-child) {
+        max-width: calc(var(--nl-rank-card-max) * 1 + 4px);
+        margin-inline: auto;
+      }
+      .nl-top-support-rank--below-cards .nl-top-support-rank__list:has(> .nl-top-support-rank__line:nth-child(2):last-child) {
+        max-width: calc(var(--nl-rank-card-max) * 2 + 6px * 1 + 4px);
+        margin-inline: auto;
+      }
+      .nl-top-support-rank--below-cards .nl-top-support-rank__list:has(> .nl-top-support-rank__line:nth-child(3):last-child) {
+        max-width: calc(var(--nl-rank-card-max) * 3 + 6px * 2 + 4px);
+        margin-inline: auto;
+      }
+      .nl-top-support-rank--below-cards .nl-top-support-rank__list:has(> .nl-top-support-rank__line:nth-child(4):last-child) {
+        max-width: calc(var(--nl-rank-card-max) * 4 + 6px * 3 + 4px);
+        margin-inline: auto;
+      }
 
       .nl-top-support-rank--below-cards .nl-top-support-rank__line {
         display: grid;

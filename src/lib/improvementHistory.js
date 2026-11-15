@@ -5013,5 +5013,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2122', metric: 'cross-checked-claims', value: 10,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '0.1.2120 の注記と同じ理由(言い回しを数える値)'
+  }),
+  Object.freeze({
+    version: '0.1.2125', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2122 と同じ(変えたのは popup.html の CSS だけで popup.js は増えていない)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
+  }),
+  Object.freeze({
+    version: '0.1.2125', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2125', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。この版は CSS だけの変更で、e2e で広い画面と細いパネルの両方のカード幅を測って確かめた'
   })
 ]);
