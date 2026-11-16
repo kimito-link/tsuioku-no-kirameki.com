@@ -590,3 +590,27 @@ describe('buildVoiceDiagSnapshot(混雑時の読み上げの計器・0.1.2114)',
     expect(empty.clipHitTotal).toBe(0);
   });
 });
+
+describe('無音の自己復旧計器(0.1.2123)', () => {
+  it('会場を閉じても読む状態を日本語で示す', () => {
+    const line = buildVoiceDiagLine({ enabled: true, venueGate: 'headless' }, 1000);
+    expect(line).toContain('会場の読み上げ=閉じても稼働');
+  });
+
+  it('許可リストを通して理由とdrop内訳を保存し、状態速報だけで分かる文にする', () => {
+    const snap = buildVoiceDiagSnapshot({
+      enabled: true,
+      silenceTotal: 2,
+      silenceMaxMs: 18600,
+      silenceRecoveryTotal: 2,
+      silenceRecoveryLastReason: 'synth-stall',
+      silenceRecoveryReasons: { 'synth-stall': 2 },
+      silenceLastDropReasons: { countGate: 4, staleHead: 1, staleSweep: 2, busy: 9, synthNull: 3, playbackTimeout: 0 }
+    }, 20000, 'lv1');
+    expect(snap.silenceRecoveryReasons).toEqual({ 'synth-stall': 2 });
+    expect(snap.silenceLastDropReasons).toMatchObject({ countGate: 4, busy: 9, synthNull: 3 });
+    const line = buildVoiceDiagLine(snap, 20000);
+    expect(line).toContain('無音2回/最長19秒/立て直し2回(合成待ち)');
+    expect(line).toContain('無音直前drop(件数4/鮮度3/混雑9/合成3/再生0)');
+  });
+});

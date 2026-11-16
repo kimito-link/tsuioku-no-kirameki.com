@@ -2678,6 +2678,20 @@
       ]
     },
     {
+      "file": "src/lib/voiceSilenceRecovery.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceTestRun.js",
       "featureCount": 3,
       "features": [
@@ -4396,6 +4410,18 @@
       ]
     },
     {
+      "file": "src/lib/venueHeadlessVoiceItem.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueHeat.js",
       "featureCount": 2,
       "features": [
@@ -4469,6 +4495,18 @@
     },
     {
       "file": "src/lib/venueLaneMirrorSupply.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueLiveCommentRoute.js",
       "featureCount": 2,
       "features": [
         "content",

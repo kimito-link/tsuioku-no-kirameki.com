@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2107',
+    date: '2026-11-12',
+    summary: 'TikTok で配信を移ると記録0件になる件',
+    items: Object.freeze([
+      'TikTok で画面の中のリンクから別の配信へ移ると、コメントが1件も記録されず、ログインしているのに「ログインしていない」と出ていました。TikTok は配信を移ってもコメントの通り道を使い回すため、どの配信のコメントかを中身で見分けるようにしました。',
+      '配信を移ったとき、前の配信の PICK UP が残ったままになっていたのを消すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2106',
     date: '2026-11-12',
     summary: 'ミクチャの会場から送れない件',
