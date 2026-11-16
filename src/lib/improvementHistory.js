@@ -5195,5 +5195,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2138', metric: 'cross-checked-claims', value: 5,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを直近30日で数える値(0.1.2120 の注記と同じ理由)で、性能は表さない。この版の確かめは council/history-backfill-REPORT.md の実配信(Kick・ABEMA・Twitch)での読み足し実測に残した'
+  }),
+  Object.freeze({
+    version: '0.1.2139', metric: 'bundle-kb', value: 1448,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '直前の版と同じ 1448KB。この版は会場の吹き出し選び(venueSpeech.js)と他サービスの行の変換(ytNicoShim.js)に数行足しただけで popup.js は膨らませていない'
+  }),
+  Object.freeze({
+    version: '0.1.2139', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2139', metric: 'cross-checked-claims', value: 5,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを直近30日で数える値(0.1.2120 の注記と同じ理由)で性能は表さない。この版の不具合は PC の実配信(Twitch・Kick)で吹き出しの発言者と本文を記録と照合して見つけた'
   })
 ]);

@@ -259,3 +259,18 @@ describe('クロスソース dedup 不変条件(リアルタイム経路→stora
     expect(venueSpeechKey({ no: 42 })).toBe('no:42');
   });
 });
+
+describe('pickNewVenueSpeech: さかのぼって読み足した過去分(skipVoice)', () => {
+  it('開いた瞬間の直近3件にも、その後の新着にも出さない(番号が新しくても)', () => {
+    const rows = [
+      { commentNo: 1, userId: '1', name: 'A', text: 'いま' },
+      { commentNo: 2, userId: '2', name: 'B', text: '昔1', skipVoice: true },
+      { commentNo: 3, userId: '3', name: 'C', text: '昔2', skipVoice: true },
+    ];
+    const r1 = pickNewVenueSpeech(rows, {}, { maxEmit: 24, primeEmit: 3, oldNoGap: 0 });
+    expect(r1.speeches.map((s) => s.text)).toEqual(['いま']);
+    const more = [...rows, { commentNo: 4, userId: '4', name: 'D', text: '昔3', skipVoice: true }, { commentNo: 5, userId: '5', name: 'E', text: '新着' }];
+    const r2 = pickNewVenueSpeech(more, { seenKeys: r1.seenKeys, primed: r1.primed, hiNo: r1.hiNo }, { maxEmit: 24, primeEmit: 3, oldNoGap: 0 });
+    expect(r2.speeches.map((s) => s.text)).toEqual(['新着']);
+  });
+});
