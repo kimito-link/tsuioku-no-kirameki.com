@@ -17,7 +17,12 @@ function hideEl(el) {
   const node = /** @type {HTMLElement} */ (el);
   if (!node.hidden) node.hidden = true;
   if (node.getAttribute('aria-hidden') !== 'true') node.setAttribute('aria-hidden', 'true');
-  if (node.dataset) node.dataset.nlPlatformHide = '1';
+  if (node.dataset && node.dataset.nlPlatformHide !== '1') node.dataset.nlPlatformHide = '1';
+}
+
+/** 同じ値の setAttribute も変化の記録になるので、違う時だけ書く。 @param {Element} el @param {string} name @param {string} value */
+function setAttrIfDiff(el, name, value) {
+  if (el.getAttribute(name) !== value) el.setAttribute(name, value);
 }
 
 /** @param {HTMLElement} el */
@@ -110,10 +115,12 @@ function markCapability(root, platformId, subBoard) {
   const doc = root.ownerDocument || (root.nodeType === 9 ? /** @type {Document} */ (root) : null);
   const html = doc && doc.documentElement;
   if (!html || !html.classList) return;
-  html.classList.add('nl-cap-foreign');
-  html.classList.toggle('nl-cap-subboard', subBoard === true);
+  // classList.add/toggle は同じ値でも class 属性を書き直す(変化の記録が出る)ので、変わる時だけ触る。
+  const cl = html.classList;
+  if (!cl.contains('nl-cap-foreign')) cl.add('nl-cap-foreign');
+  if (cl.contains('nl-cap-subboard') !== (subBoard === true)) cl.toggle('nl-cap-subboard', subBoard === true);
   const id = String(platformId || '');
-  if (id) html.classList.add(`nl-cap-${id}`);
+  if (id && !cl.contains(`nl-cap-${id}`)) cl.add(`nl-cap-${id}`);
   if (doc.getElementById(FOREIGN_STYLE_ID)) return;
   const style = doc.createElement('style');
   style.id = FOREIGN_STYLE_ID;
@@ -138,11 +145,11 @@ export function applyPlatformMetricChrome(root, state) {
   const concLabel = root.querySelector('#watchConcurrentCard .nl-live-stat-label');
   if (concLabel && concLabel.textContent !== plan.concurrentLabel) concLabel.textContent = plan.concurrentLabel;
   const concCard = root.querySelector('#watchConcurrentCard');
-  if (concCard) concCard.setAttribute('title', '配信ページが出している公式の数です。');
+  if (concCard) setAttrIfDiff(concCard, 'title', '配信ページが出している公式の数です。');
   const concIcon = root.querySelector('#watchConcurrentCard .nl-live-stat-icon');
   if (concIcon) {
-    concIcon.setAttribute('title', plan.concurrentLabel);
-    concIcon.setAttribute('aria-label', plan.concurrentLabel);
+    setAttrIfDiff(concIcon, 'title', plan.concurrentLabel);
+    setAttrIfDiff(concIcon, 'aria-label', plan.concurrentLabel);
   }
   // 数が来る前の札(開いた直後の「—」・ニコ生の「（接続中…）」等)を「読み込み中」に。数そのものと「N分前」は触らない。
   const est = root.querySelector('#watchConcurrentEst');
@@ -150,14 +157,14 @@ export function applyPlatformMetricChrome(root, state) {
     const t = String(est.textContent || '').trim();
     if (NOT_A_COUNT.test(t) || t.startsWith('~')) {
       if (est.textContent !== LOADING) est.textContent = LOADING;
-      est.classList.add('is-placeholder');
-      est.removeAttribute('title');
+      if (!est.classList.contains('is-placeholder')) est.classList.add('is-placeholder');
+      if (est.hasAttribute('title')) est.removeAttribute('title');
       const sub = root.querySelector('#watchConcurrentSub');
       if (sub && sub.textContent !== '') sub.textContent = '';
     }
   }
   const loading = root.querySelector('#watchConcurrentLoading');
-  if (loading) loading.setAttribute('aria-label', `${plan.concurrentLabel}を読み込み中`);
+  if (loading) setAttrIfDiff(loading, 'aria-label', `${plan.concurrentLabel}を読み込み中`);
 
   for (const id of ['officialStatNicoViewers', 'officialStatNicoComments', 'officialStatNicoAdPts', 'officialStatNicoGiftPts']) {
     const val = root.querySelector(`#${id}`);
@@ -169,7 +176,7 @@ export function applyPlatformMetricChrome(root, state) {
 
   const row = root.querySelector('.nl-official-nico-stats__row');
   if (row) {
-    row.setAttribute('aria-label', 'この配信の数字');
+    setAttrIfDiff(row, 'aria-label', 'この配信の数字');
     const ageVal = root.querySelector('#officialStatNicoStreamAge');
     const ageChip = ageVal && ageVal.parentElement;
     if (ageChip) {
@@ -207,7 +214,8 @@ export function applyPlatformMetricChrome(root, state) {
       if (label && label.textContent !== chip.label) label.textContent = chip.label;
       if (val) {
         if (val.textContent !== chip.text) val.textContent = chip.text;
-        val.classList.toggle('is-placeholder', chip.placeholder === true || chip.text === '—');
+        const ph = chip.placeholder === true || chip.text === '—';
+        if (val.classList.contains('is-placeholder') !== ph) val.classList.toggle('is-placeholder', ph);
       }
       let unitEl = el.querySelector('.nl-official-nico-stats__unit');
       if (chip.unit) {

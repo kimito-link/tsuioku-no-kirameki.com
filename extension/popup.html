@@ -11996,7 +11996,7 @@
               </span>
             </label>
           </div>
-          <!-- 0.1.2131: 補助アプリ(native/voice-bridge)は未配布。配布するまで「ローカル補助アプリを使う」は隠す(既定OFFのまま・配線は wireVoiceNativeToggle.js)。配布したら hidden と display:none を外す。 -->
+          <!-- 0.1.2131: 補助アプリ(native/voice-bridge)は未配布。配布するまで「ローカル補助アプリを使う」は隠し、popup-entry.js からの配線もしない(既定OFFのまま)。配布時は hidden と display:none を外し、popup-entry.js で wireVoiceNativeToggle(popup/wireVoiceNativeToggle.js)を呼ぶ。 -->
           <div class="nl-record-sub" id="voiceNativeRow" hidden style="display:none">
             <label class="nl-record-sub__label" for="voiceNativeToggle">
               <input type="checkbox" id="voiceNativeToggle">

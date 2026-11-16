@@ -59,7 +59,7 @@
 | `data-nl-pickup-key` | lib/venuePickupBanner.js | lib/venuePickupBanner.js |
 | `data-nl-pickup-name` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
 | `data-nl-pickup-uid` | lib/venuePickupBanner.js | extension/venuePickupDrag.js<br>lib/venuePickupBanner.js |
-| `data-nl-platform-hide` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
+| `data-nl-platform-hide` | lib/platform/platformMetricChrome.js | extension/popup-entry.js<br>lib/platform/platformMetricChrome.js |
 | `data-nl-platform-ready` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-popup-content-painted` | extension/popup-entry.js | — |
 | `data-nl-popup-primary-cloak` | lib/cloakNotForSidePanel.js | extension/sidepanel-entry.js |

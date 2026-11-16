@@ -35,7 +35,6 @@ graph LR
   n_popup --> n_src_extension_popup_wireVoiceChorusToggle_js["extension/popup/wireVoiceChorusToggle.js"]
   n_popup --> n_src_extension_popup_wireVoiceGpuTip_js["extension/popup/wireVoiceGpuTip.js"]
   n_popup --> n_src_extension_popup_wireVoiceNarrowSelect_js["extension/popup/wireVoiceNarrowSelect.js"]
-  n_popup --> n_src_extension_popup_wireVoiceNativeToggle_js["extension/popup/wireVoiceNativeToggle.js"]
   n_popup --> n_src_extension_popup_wireVoiceQualitySelect_js["extension/popup/wireVoiceQualitySelect.js"]
   n_popup --> n_src_extension_popup_wireVoiceVolumeSlider_js["extension/popup/wireVoiceVolumeSlider.js"]
   n_popup --> n_src_extension_statusPublisherHost_js["extension/statusPublisherHost.js"]
@@ -53,7 +52,8 @@ graph LR
   n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_popup --> n_src_lib_appliedEntriesMemo_js["lib/appliedEntriesMemo.js"]
   n_popup --> n_src_lib_audienceEngagementGap_js["lib/audienceEngagementGap.js"]
+  n_popup --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 494 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 492 ファイル省略（全件は storage-bus.md / metafile 参照）。

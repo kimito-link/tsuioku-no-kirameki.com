@@ -171,11 +171,15 @@ export function tallySupportItems(items) {
     membershipGiftCount: 0,
     raidCount: 0,
     raidViewers: 0,
+    /** このPCで記録を始めた時刻(ms)。これより前の分は、過去を出さないサービスでは数えられない。0 = 分からない */
+    firstRecordedAt: 0,
     amounts,
   };
   if (!Array.isArray(items)) return t;
   for (const item of items) {
     if (!item || typeof item !== 'object') continue;
+    const at = Number(/** @type {{ recordedAt?: unknown }} */ (item).recordedAt);
+    if (Number.isFinite(at) && at > 0 && (t.firstRecordedAt === 0 || at < t.firstRecordedAt)) t.firstRecordedAt = at;
     const kind = String(/** @type {{ kind?: unknown }} */ (item).kind || '');
     const amount = Number(/** @type {{ amount?: unknown }} */ (item).amount);
     const currency = String(/** @type {{ currency?: unknown }} */ (item).currency || '').trim().toUpperCase();
@@ -317,6 +321,37 @@ export function platformSectionPlan(platformId, opts) {
 }
 
 /**
+ * 過去の分を取り出す口が公開されていないサービス(開いた後に来た分しか数えられない)。
+ *   2026-11-16 りんく「開く前の3時間ぶんもカウントできますか」→ Twitch のチャット接続・Kick のリアルタイム・
+ *   YouTube のライブチャットは、つないだ後の分しか流さない。数をさかのぼれないので、数え始めた時刻を見える所に出す
+ *   (どこからの正確な数かが分かれば、数字そのものは正確)。SHOWROOM・ミクチャは開いた時に過去分を取りに行っている。
+ */
+const SERVICE_NAME = Object.freeze({ twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube' });
+
+/**
+ * 数え始めた時刻のチップ(例「13:02〜」)。時刻が分からなければ出さない(空の配列)。
+ * @param {string} id
+ * @param {any} support
+ * @returns {Array<{ key: string, label: string, text: string, unit: string, placeholder: boolean, title: string }>}
+ */
+function countSinceChip(id, support) {
+  const at = num(support?.firstRecordedAt);
+  if (at == null || at <= 0) return [];
+  const d = new Date(at);
+  const hm = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const day = `${d.getMonth() + 1}月${d.getDate()}日`;
+  const svc = SERVICE_NAME[/** @type {keyof typeof SERVICE_NAME} */ (id)] || 'この配信サービス';
+  return [{
+    key: 'countSince',
+    label: '数え始め',
+    text: `${hm}〜`,
+    unit: '',
+    placeholder: false,
+    title: `${day} ${hm} にこのPCで記録を始めました。横の数字はこの時刻から後に来た分です。それより前の分は、${svc} が過去の分を出していないため数えられません。`,
+  }];
+}
+
+/**
  * 数えた合計のチップ。まだ数えていなければ出さない(0 と「まだ数えていない」を混ぜない)。
  * @param {string} id
  * @param {any} support
@@ -349,7 +384,7 @@ function supportChips(id, support) {
         paid.unit,
         `${RECORDED}スーパーチャット ${formatInt(support.superchatCount || 0)}・スーパーステッカー ${formatInt(support.stickerCount || 0)}。${paid.extra}`.trim(),
       ),
-    ];
+    ].concat(countSinceChip(id, support));
   }
   if (id === 'twitch') {
     const bits = money('BITS', 'Bits');
@@ -364,7 +399,7 @@ function supportChips(id, support) {
         '回',
         `${RECORDED}届いた人数の合計 ${formatInt(num(support.raidViewers) || 0)} 人。`,
       ),
-    ];
+    ].concat(countSinceChip(id, support));
   }
   if (id === 'kick') {
     const kicks = money('KICKS', 'Kicks');
@@ -372,7 +407,7 @@ function supportChips(id, support) {
       chip('kicks', 'Kicks', kicks.text, '', `${RECORDED}${kicks.extra}`.trim()),
       chip('subs', 'サブスク', formatInt(num(support.membershipCount) || 0), '人', RECORDED),
       chip('gifts', 'ギフトサブ', formatInt(num(support.membershipGiftCount) || 0), '人', RECORDED),
-    ];
+    ].concat(countSinceChip(id, support));
   }
   return [];
 }

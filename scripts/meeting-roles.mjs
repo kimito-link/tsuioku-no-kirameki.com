@@ -110,7 +110,8 @@ const OR = 'https://openrouter.ai/api/v1/chat/completions';
 if (G) members.push({ label: 'groq/gpt-oss-120b', run: () => openaiChat('groq/gpt-oss-120b', GROQ, G, 'openai/gpt-oss-120b', { reasoning_effort: 'low' }) });
 if (G) members.push({ label: 'groq/llama-3.3-70b', run: () => openaiChat('groq/llama-3.3-70b', GROQ, G, 'llama-3.3-70b-versatile') });
 if (N) members.push({ label: 'nvidia/qwen3.5-122b', run: () => openaiChat('nvidia/qwen3.5-122b', NV, N, 'qwen/qwen3.5-122b-a10b', { chat_template_kwargs: { thinking: false } }) });
-if (E) members.push({ label: 'gemini-2.5-flash', run: () => geminiChat('gemini-2.5-flash', 'gemini-2.5-flash') });
+// 2026-11-16: gemini-2.5-flash → gemini-3.5-flash-lite（12/1 に 2.5-flash は lite へ自動転送される。名簿 council-lineup.mjs と同じ交代）。
+if (E) members.push({ label: 'gemini-3.5-flash-lite', run: () => geminiChat('gemini-3.5-flash-lite', 'gemini-3.5-flash-lite') });
 if (O) members.push({ label: 'openrouter/gpt-oss-120b', run: () => openaiChat('openrouter/gpt-oss-120b', OR, O, 'openai/gpt-oss-120b:free', { reasoning_effort: 'low' }) });
 
 const LOCAL_DEFAULT = ['gpt-oss:20b', 'qwen3.5:9b', 'qwen3:14b', 'deepseek-r1:14b', 'gemma4:31b', 'qwen2.5:14b', 'hermes3:8b'];
