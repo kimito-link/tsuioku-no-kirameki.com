@@ -5055,5 +5055,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2127', metric: 'cross-checked-claims', value: 52,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。この版は単体テスト(直す前は赤)と、8万行の記録を入れた横の欄を CPU 4倍遅くで直す前と後を交互に3回ずつ測って確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2128', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2127 と同じ(直したのは pickLatestComment.js の関数1つ)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
+  }),
+  Object.freeze({
+    version: '0.1.2128', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2128', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。この版は書き直す前の選び方との答え合わせ2,000通りと、8万行の記録を CPU 4倍遅くで前後交互に2回ずつ CPU 記録を取って確かめた'
   })
 ]);
