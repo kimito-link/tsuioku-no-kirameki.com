@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2137',
+    date: '2026-11-16',
+    summary: 'ツイキャスで開く前のコメントをさかのぼって記録',
+    items: Object.freeze([
+      'ツイキャスで配信を途中から開いても、それまでのコメントをツイキャスのコメント一覧からさかのぼって記録に入れるようにしました(1ページずつ間をあけて読むので、千件ほどで1分ほどかかります)。ツイキャスがログインなしで見せているのは直近の約1000件までで、コメントがとても多い配信では直近の約20件しか見せていないことがあります。そのぶんは取れません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2136',
     date: '2026-11-16',
     summary: '使わない権限を拡張から外した',
@@ -174,14 +182,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'VOICEVOX が混んで PC の声(Windows の声)で読んでいるとき、2分たっても戻らなければ一度 VOICEVOX で読んでみるようにしました。まだ混んでいれば、また PC の声に切り替えます。',
       'PC の声から戻れなかった理由を、読み上げの状態に残すようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2114',
-    date: '2026-11-12',
-    summary: '混雑時の読み上げの効き目を測る',
-    items: Object.freeze([
-      '声のつくり置き・合唱・混雑中の選び方が、本物の配信でどれだけ効いたかを読み上げの状態に残すようにしました(見た目と読み方は変わりません)。'
     ])
   })
 ]);

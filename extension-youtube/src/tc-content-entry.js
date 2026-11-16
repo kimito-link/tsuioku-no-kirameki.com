@@ -22,7 +22,7 @@ import {
   parseTcEvent,
   buildTcStreamKey,
 } from '../../src/lib/twitcasting/tcParse.js';
-import { readTcPageInfo, parseTcSupporterDoc, tcSupporterUrl } from '../../src/lib/twitcasting/tcPageInfo.js';
+import { readTcPageInfo, parseTcSupporterDoc, tcSupporterUrl, tcMovieCommentUrl, parseTcMovieCommentDoc } from '../../src/lib/twitcasting/tcPageInfo.js';
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
@@ -41,6 +41,9 @@ const BOARD_EVERY_MS = 5 * 60_000;
  */
 const BACKFILL_PAGE = 100;
 const BACKFILL_MAX_PAGES = 30;
+/** 放送開始からのコメント一覧(1ページ20件)を読む間隔と上限。ツイキャスに負担をかけないよう1ページずつ間をあける */
+const HISTORY_GAP_MS = 300;
+const HISTORY_MAX_PAGES = 2000;
 
 /** 計器(状態速報と同じく storage に置く) */
 const diag = {
@@ -63,6 +66,11 @@ const diag = {
   backfills: 0,
   backfillRows: 0,
   backfillFail: 0,
+  /** 放送開始からのコメント一覧を読んだページ数・入った件数・失敗・最後まで読めたか */
+  historyPages: 0,
+  historyRows: 0,
+  historyFail: 0,
+  historyDone: false,
   /** @type {Record<string, number>} type ごとの数(知らない type に気づくため) */
   types: {},
   comments: 0,
@@ -229,6 +237,42 @@ function startReader(user, movieId, key) {
     }
   };
 
+  // 放送開始からのコメント一覧を古い方へたどる(listall は直近約24件しか返さない・2026-11-16 実測)。
+  //   このタブで初めては最後のページまで、つなぎ直しのときは新しい件が無いページで止める。
+  let walking = false;
+  let walkedAll = false;
+  const historyWalk = async () => {
+    if (walking || stopped) return;
+    walking = true;
+    const full = !walkedAll;
+    try {
+      for (let page = 0; page < HISTORY_MAX_PAGES && !stopped; page += 1) {
+        const res = await fetch(tcMovieCommentUrl(user, movieId, page), { credentials: 'include', signal: platformFetchTimeoutSignal() });
+        if (!res.ok) throw new Error(`tc_history_${res.status}`);
+        const { rows } = parseTcMovieCommentDoc(new DOMParser().parseFromString(await res.text(), 'text/html'));
+        if (stopped) return;
+        diag.historyPages += 1;
+        if (!rows.length) {
+          walkedAll = true;
+          diag.historyDone = true;
+          break;
+        }
+        let fresh = 0;
+        for (const raw of rows) if (take(raw, true)) fresh += 1;
+        diag.historyRows += fresh;
+        if (!full && !fresh) break;
+        saveDiagSoon();
+        await new Promise((r) => setTimeout(r, HISTORY_GAP_MS));
+      }
+    } catch (e) {
+      diag.historyFail += 1;
+      diag.lastError = String(/** @type {any} */ (e)?.message || e).slice(0, 80);
+    } finally {
+      walking = false;
+      saveDiagSoon();
+    }
+  };
+
   /** @param {string} raw */
   const onFrame = (raw) => {
     diag.frames += 1;
@@ -261,8 +305,8 @@ function startReader(user, movieId, key) {
       diag.wsState = 'open';
       backoff = 1000;
       saveDiagSoon();
-      // つないだ直後に読み足す(初回=開く前の分・2回目以降=切れていた間の分)
-      void backfill();
+      // つないだ直後に読み足す(初回=開く前の分・2回目以降=切れていた間の分)。直近は listall、それより前はコメント一覧をたどる
+      void backfill().then(() => historyWalk());
     };
     ws.onmessage = (ev) => onFrame(typeof ev.data === 'string' ? ev.data : '');
     ws.onclose = () => {
