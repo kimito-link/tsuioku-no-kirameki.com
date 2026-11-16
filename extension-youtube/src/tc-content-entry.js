@@ -16,6 +16,8 @@ import {
   parseTcStreamServer,
   parseTcPubSubUrl,
   parseTcSocketFrame,
+  tcCommentListUrl,
+  parseTcCommentList,
   tcTypeOf,
   parseTcEvent,
   buildTcStreamKey,
@@ -32,6 +34,13 @@ const MAX_SEEN = 8000;
 const SILENCE_MS = 40_000;
 /** 公式のサポーターランキング(約125KB の HTML)を読み直す間隔。重いので5分おき */
 const BOARD_EVERY_MS = 5 * 60_000;
+/**
+ * 開く前のコメントを読む1回の件数・さかのぼる回数の上限。
+ *   ★ツイキャスが出すのは直近の約24件だけ(n=100 でも24件・f>=24 は空。2026-11-16 配信中25件で実測)。
+ *   さかのぼりは将来ツイキャスが増やしたとき用で、今は1回で終わる。
+ */
+const BACKFILL_PAGE = 100;
+const BACKFILL_MAX_PAGES = 30;
 
 /** 計器(状態速報と同じく storage に置く) */
 const diag = {
@@ -50,6 +59,10 @@ const diag = {
   frames: 0,
   keepAlive: 0,
   silenceReconnects: 0,
+  /** 開く前・つなぎ直しの間のコメントを読み足した回数・入った件数・失敗 */
+  backfills: 0,
+  backfillRows: 0,
+  backfillFail: 0,
   /** @type {Record<string, number>} type ごとの数(知らない type に気づくため) */
   types: {},
   comments: 0,
@@ -85,6 +98,7 @@ function saveDiagSoon() {
   if (diagTimer) return;
   diagTimer = setTimeout(() => {
     diagTimer = 0;
+    if (contextGone()) return;
     diag.updatedAt = Date.now();
     const snap = { ...diag, tab: TAB_TOKEN, types: { ...diag.types }, pageStats: [...diag.pageStats] };
     try {
@@ -164,16 +178,16 @@ function startReader(user, movieId, key) {
     saveDiagSoon();
   };
 
-  /** @param {any} raw */
-  const take = (raw) => {
+  /** @param {any} raw @param {boolean} [fromList] 開く前のコメント(listall)から来たか @returns {boolean} 新しく入ったか */
+  const take = (raw, fromList = false) => {
     const type = tcTypeOf(raw) || '?';
-    diag.types[type] = (diag.types[type] || 0) + 1;
+    if (!fromList) diag.types[type] = (diag.types[type] || 0) + 1;
     const r = parseTcEvent(raw, { user });
     if (!r) {
       if (type === 'comment' || type === 'gift') diag.dropped += 1;
-      return;
+      return false;
     }
-    if (seen.has(r.id)) return;
+    if (seen.has(r.id)) return false;
     seen.add(r.id);
     if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
     if (r.giftName) {
@@ -183,6 +197,36 @@ function startReader(user, movieId, key) {
     if (r.iconUrl) diag.withIcon += 1;
     pending.push(r);
     if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);
+    return true;
+  };
+
+  // 開く前・つなぎ直しの間のコメントを、ページ自身と同じ口(listall)で読み足す。
+  //   ソケットは開いた後に届いた分しか来ない(2026-11-16: 18件の配信を3分目に開いて3件しか入らなかった)。
+  //   新しい方から100件ずつさかのぼり、もう持っている件に当たったら止める(今のツイキャスは直近約24件しか返さない)。
+  let backfilling = false;
+  const backfill = async () => {
+    if (backfilling || stopped) return;
+    backfilling = true;
+    diag.backfills += 1;
+    try {
+      for (let page = 0; page < BACKFILL_MAX_PAGES && !stopped; page += 1) {
+        const url = tcCommentListUrl(user, movieId, { n: BACKFILL_PAGE, f: page * BACKFILL_PAGE });
+        const res = await fetch(url, { credentials: 'include', signal: platformFetchTimeoutSignal(), headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`tc_list_${res.status}`);
+        const rows = parseTcCommentList(await res.json());
+        if (stopped) return;
+        let fresh = 0;
+        for (const raw of rows) if (take(raw, true)) fresh += 1;
+        diag.backfillRows += fresh;
+        if (rows.length < BACKFILL_PAGE || fresh < rows.length) break;
+      }
+    } catch (e) {
+      diag.backfillFail += 1;
+      diag.lastError = String(/** @type {any} */ (e)?.message || e).slice(0, 80);
+    } finally {
+      backfilling = false;
+      saveDiagSoon();
+    }
   };
 
   /** @param {string} raw */
@@ -191,7 +235,7 @@ function startReader(user, movieId, key) {
     lastFrameAt = Date.now();
     const rows = parseTcSocketFrame(raw);
     if (!rows.length) diag.keepAlive += 1;
-    rows.forEach(take);
+    rows.forEach((row) => take(row));
     saveDiagSoon();
   };
 
@@ -217,6 +261,8 @@ function startReader(user, movieId, key) {
       diag.wsState = 'open';
       backoff = 1000;
       saveDiagSoon();
+      // つないだ直後に読み足す(初回=開く前の分・2回目以降=切れていた間の分)
+      void backfill();
     };
     ws.onmessage = (ev) => onFrame(typeof ev.data === 'string' ? ev.data : '');
     ws.onclose = () => {
@@ -460,8 +506,27 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
+/** 拡張が入れ替わった後も古いタブに残った読み取りか(この後は chrome.* を呼ぶと「Extension context invalidated」になる) */
+function contextGone() {
+  try {
+    return !chrome?.runtime?.id;
+  } catch {
+    return true;
+  }
+}
+
 let lastHref = '';
-setInterval(() => {
+const mainTimer = setInterval(() => {
+  // 拡張が入れ替わったら、古いタブの読み取りは黙って止まる(2026-11-16 ツイキャスのタブで Uncaught Error が出た)。
+  //   新しい版はタブの読み直しで入る(background の reloadExistingWatchTabs)
+  if (contextGone()) {
+    clearInterval(mainTimer);
+    if (diagTimer) clearTimeout(diagTimer);
+    diagTimer = 0;
+    current?.stop();
+    current = null;
+    return;
+  }
   if (location.href !== lastHref) {
     lastHref = location.href;
     infoGate.reset();

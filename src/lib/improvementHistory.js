@@ -5141,9 +5141,23 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: 'コミット本文の言い回しを直近30日で数える値(期間依存)。この版の確かめは verify:cc の再実行と疑似VOICEVOXでの10分比較で、PR #659 本文に記録した。'
   }),
   Object.freeze({
-    version: '0.1.2136', metric: 'bundle-kb', value: 1447,
+    version: '0.1.2135', metric: 'bundle-kb', value: 1448,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '前版0.1.2134と同じ1447KB。今回は権限と未使用の配線を外しただけ。過去最良1360KBより大きい状態は前版から続いている。'
+    note: '直前の版と同じ。この版はツイキャスの content script(yt-tc-content.js)だけを変え、popup.js は変えていない'
+  }),
+  Object.freeze({
+    version: '0.1.2135', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2135', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて減っただけで性能は表さない。この版は本物のツイキャスの口(listall)を curl で叩いて形と件数を確かめ、e2e で読み足しを外すと赤になることも確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2136', metric: 'bundle-kb', value: 1448,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '権限と未使用の配線を外しただけで、読み上げの中身は前版と同じ。過去最良1360KBより大きい状態は前版から続いている。'
   }),
   Object.freeze({
     version: '0.1.2136', metric: 'gate-selftest', value: 5,
@@ -5152,6 +5166,6 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.2136', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: 'コミット本文の言い回しを直近30日で数える値(期間依存)。この版の判断根拠は本物のVOICEVOX 0.25.2での補助アプリあり/なし実測(PR本文に記録)。'
+    note: 'コミット本文の言い回しを直近30日で数える値(期間依存)。この版の判断根拠は本物のVOICEVOX 0.25.2での補助アプリあり/なし実測(PR #660 本文)。'
   })
 ]);
