@@ -23,7 +23,19 @@ try {
     });
   }
 } catch { /* 計器 */ }
-import { kickChatHistoryUrl, parseKickChatHistory, kickChannelApiUrl, parseKickChannel, parseKickUserIcon, parseKickKicksLeaderboard, kickKicksLeaderboardUrl, parseKickSubsLeaderboard, kickSubsLeaderboardUrl } from '../../src/lib/kick/kickApi.js';
+import {
+  kickChatHistoryUrl,
+  parseKickChatHistoryPage,
+  shouldStopKickBackfill,
+  kickChannelApiUrl,
+  parseKickChannel,
+  parseKickUserIcon,
+  parseKickKicksLeaderboard,
+  kickKicksLeaderboardUrl,
+  parseKickSubsLeaderboard,
+  kickSubsLeaderboardUrl,
+} from '../../src/lib/kick/kickApi.js';
+import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
   KICK_REALTIME_CONNECTION_URL,
@@ -54,7 +66,7 @@ const ICON_PAUSE_MIN_MS = 30_000;
 const ICON_PAUSE_MAX_MS = 300_000;
 /** 取れなかった人は、しばらく聞き直さない */
 const ICON_RETRY_AFTER_MS = 10 * 60_000;
-const MAX_SEEN = 5000;
+const MAX_SEEN = 25000;
 
 /** 計器(状態速報と同じく storage に置く・りんくに聞かずに数で確かめる) */
 const diag = {
@@ -86,8 +98,10 @@ const diag = {
   /** @type {Record<string, number>} 来たイベント名ごとの数(名前が変わったら気づくため) */
   events: {},
   items: 0,
-  /** 開いた時点(とつなぎ直し)の過去ログから入れた数・読めなかった回数 */
+  /** 開いた時点(とつなぎ直し)の過去ログから入れた数・ページ数・止まった理由・読めなかった回数 */
   historyItems: 0,
+  historyPages: 0,
+  historyStopReason: '',
   historyFail: 0,
   kicks: 0,
   subs: 0,
@@ -290,7 +304,7 @@ let current = /** @type {null | { slug: string, key: string, stop: () => void }}
 /**
  * @param {string} slug
  * @param {string} key
- * @param {{ chatroomId: string, channelId: string, userId?: string }} ids
+ * @param {{ chatroomId: string, channelId: string, userId?: string, startedAtMs?: number }} ids
  */
 function startReader(slug, key, ids) {
   let stopped = false;
@@ -335,8 +349,8 @@ function startReader(slug, key, ids) {
   /** 名前(小文字)→ チャットで見た本物の user id と slug @type {Map<string, { id: string, slug: string }>} */
   const whoByName = new Map();
 
-  /** 1件のイベント(Centrifugo / Pusher 共通の形)@param {{ event: string, channel: string, data: Record<string, any> | null }} f */
-  const onEvent = (f) => {
+  /** 1件のイベント(Centrifugo / Pusher 共通の形)@param {{ event: string, channel: string, data: Record<string, any> | null }} f @param {{ skipVoice?: boolean }} [opts] */
+  const onEvent = (f, opts = {}) => {
     const evName = f.event.replace(/^App\\Events\\/, '').slice(0, 60);
     diag.events[evName] = (diag.events[evName] || 0) + 1;
     if (evName === 'KicksLeaderboardUpdated') return sendBoard(parseKickKicksLeaderboard(f.data), 'socket');
@@ -367,7 +381,7 @@ function startReader(slug, key, ids) {
     else if (r.kind === 'membership_gift') diag.gifts += Math.max(1, Number(r.giftCount) || 1);
     else if (r.kind === 'kk_host') diag.hosts += 1;
     else if (r.kind === 'kk_reward') diag.rewards += 1;
-    pending.push(r);
+    pending.push(opts.skipVoice ? { ...r, skipVoice: true } : r);
     if (!flushTimer) flushTimer = setTimeout(() => void flush(), FLUSH_MS);
   };
 
@@ -440,19 +454,64 @@ function startReader(slug, key, ids) {
   // 開いた時点でチャット欄に出ている過去ログを記録に入れる(つないだ後に来た分しか記録せず、開いた直後は「記録 0」に見えた・
   //   2026-11-12 PC 実測: kuru96 で過去ログ25行中1行しか記録されず、YouTube は 73行全部)。
   //   つなぎ直したときも読む(切れていた間の分を拾う)。同じ id は seen と保存側の pk で1件になる。
+  let backfilled = false;
+  let backfilling = false;
   const fetchHistory = async () => {
-    const url = kickChatHistoryUrl(ids.channelId);
-    if (!url || stopped) return;
+    if (backfilling || stopped || !kickChatHistoryUrl(ids.channelId)) return;
+    backfilling = true;
     try {
-      const frames = parseKickChatHistory(await getJson(url));
-      if (stopped) return;
-      const before = diag.items + pending.length;
-      for (const f of frames) onEvent(f);
-      diag.historyItems += Math.max(0, diag.items + pending.length - before);
-    } catch {
-      diag.historyFail += 1;
+      const seenCursors = new Set();
+      const full = !backfilled;
+      const res = await runBackfillLoop({
+        initialCursor: '',
+        isStopped: () => stopped,
+        maxPages: full ? undefined : 1,
+        fetchPage: async (cursor) => {
+          const url = kickChatHistoryUrl(ids.channelId, cursor);
+          if (!url) return { ok: false, retryable: false, reason: 'bad-url' };
+          try {
+            const r = await fetch(url, { credentials: 'include', signal: platformFetchTimeoutSignal(), headers: { Accept: 'application/json' } });
+            if (r.status === 429 || r.status >= 500) {
+              return { ok: false, retryable: true, status: r.status, retryAfter: r.headers?.get?.('Retry-After') };
+            }
+            if (!r.ok) return { ok: false, retryable: false, status: r.status, reason: `http_${r.status}` };
+            const page = parseKickChatHistoryPage(await r.json());
+            const stopReason = full
+              ? shouldStopKickBackfill({
+                  eventsCount: page.events.length,
+                  nextCursor: page.cursor,
+                  prevCursor: cursor,
+                  seenCursors,
+                  oldestMs: page.oldestMs,
+                  startedAtMs: Number(ids.startedAtMs) || 0,
+                })
+              : 'reconnect-1page';
+            if (cursor) seenCursors.add(cursor);
+            return { ok: true, items: page.events, nextCursor: page.cursor, stopReason };
+          } catch {
+            return { ok: false, retryable: true, reason: 'network' };
+          }
+        },
+        onItems: (events) => {
+          if (stopped) return 0;
+          const before = diag.items + pending.length;
+          for (const f of events) onEvent(f, { skipVoice: true });
+          const added = Math.max(0, diag.items + pending.length - before);
+          if (full) diag.historyPages += 1;
+          diag.historyItems += added;
+          saveDiagSoon();
+          return added;
+        },
+      });
+      if (full) {
+        backfilled = true;
+        diag.historyStopReason = res.stopReason;
+      }
+      diag.historyFail += res.fails;
+      saveDiagSoon();
+    } finally {
+      backfilling = false;
     }
-    saveDiagSoon();
   };
 
   /** Pusher の1通 @param {string} raw */
@@ -643,7 +702,7 @@ async function check() {
     if (!key) return;
     if (!current || current.key !== key) {
       current?.stop();
-      current = { slug, key, stop: startReader(slug, key, { chatroomId: info.chatroomId, channelId: info.channelId, userId: info.userId }) };
+      current = { slug, key, stop: startReader(slug, key, { chatroomId: info.chatroomId, channelId: info.channelId, userId: info.userId, startedAtMs: info.startedAtMs }) };
       diag.streamKey = key;
     }
     if (info.iconUrl) iconBySlug.set(slug, info.iconUrl);

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2114',
+    date: '2026-11-12',
+    summary: '混雑時の読み上げの効き目を測る',
+    items: Object.freeze([
+      '声のつくり置き・合唱・混雑中の選び方が、本物の配信でどれだけ効いたかを読み上げの状態に残すようにしました(見た目と読み方は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2113',
     date: '2026-11-12',
     summary: '混雑中も質問と初めての声を読む',

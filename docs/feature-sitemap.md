@@ -46,7 +46,7 @@
   - `src/lib/ndgrViewBasePick.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 66</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 67</summary>
 
 - `extension-youtube/content-chat.js` — YouTube Live チャット欄 DOM の監視・コメント取得バンドル
 - `extension-youtube/src/background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
@@ -101,6 +101,7 @@
 - `src/lib/nicoUserProfileApi.js` — ニコニコのユーザープロフィール取得用メッセージ型と uid 妥当性判定(background と文字列同期)。
 - `src/lib/nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
 - `src/lib/northStarAcquisitionGauge.js` — 北極星レーン左ガジェット「取得率」メーター用の純関数。
+- `src/lib/platform/historyBackfill.js` — 配信中コメントの過去分さかのぼり(ページ送り・リトライ・上限判定)の共通純粋ロジック
 - `src/lib/popupFrameCodec.js` — popup の配色フレーム「共有コード」の エンコード／デコード。
 - `src/lib/probeRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページ内「おすすめ生放送」セクションの観測純関数。
 - `src/lib/probeWatchPageDomStructure.js` — v0.1.201: ニコ生 watch ページ主要 DOM の存在を観測する純関数。
@@ -1537,6 +1538,9 @@
 - `v0.1.2134` 2026-11-16 — 混んだ配信でも指定の声で読みやすく
 - `v0.1.2127` 2026-11-15 — 大きな記録で開いた直後の固まりを減らした
 
+### 📥 コメント取得 (1版)
+- `v0.1.2137` 2026-11-16 — Kick・ABEMA・Twitch等で開始からの過去コメントも記録
+
 ### 🏟 会場・席 (3版)
 - `v0.1.2133` 2026-11-16 — Twitch などで数え始めた時刻を出す
 - `v0.1.2130` 2026-11-16 — 混んだ配信でも読み上げが止まらない
@@ -1548,13 +1552,13 @@
 - `v0.1.2119` 2026-11-13 — YouTube の会場で最初のギフト音も鳴る
 
 ### 🔊 読み上げ (7版)
+- `v0.1.2137` 2026-11-16 — Kick・ABEMA・Twitch等で開始からの過去コメントも記録
 - `v0.1.2136` 2026-11-16 — 使わない権限を拡張から外した
 - `v0.1.2134` 2026-11-16 — 混んだ配信でも指定の声で読みやすく
 - `v0.1.2130` 2026-11-16 — 混んだ配信でも読み上げが止まらない
 - `v0.1.2120` 2026-11-13 — スタンプの名前を読み上げない
 - `v0.1.2118` 2026-11-13 — 混んでも合唱が途中で消えにくく
 - `v0.1.2115` 2026-11-13 — PC の声のまま戻らない時も VOICEVOX へ
-- `v0.1.2114` 2026-11-12 — 混雑時の読み上げの効き目を測る
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.2122` 2026-11-13 — 拡張の短い説明文を見直した

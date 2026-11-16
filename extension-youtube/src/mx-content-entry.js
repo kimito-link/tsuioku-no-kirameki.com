@@ -72,6 +72,9 @@ const diag = {
   giftCoin: 0,
   unknownGifts: 0,
   backlog: 0,
+  historyItems: 0,
+  historyPages: 0,
+  historyStopReason: '',
   items: 0,
   dropped: 0,
   itemList: 0,
@@ -354,7 +357,7 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
       if (!r.amount) diag.unknownGifts += 1;
     } else diag.comments += 1;
     if (!r.iconUrl) noteNoIcon(raw);
-    pending.push(r);
+    pending.push(raw?.__nlSkipVoice ? { ...r, skipVoice: true } : r);
     if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);
   };
 
@@ -390,12 +393,16 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     const rows = mxMessageRows(await tryJson(mxMessagesUrl(userId)));
     if (stopped) return;
     diag.backlog += rows.length;
+    diag.historyPages += 1;
     // 先に全行からアイコンを覚える(ギフトより前に書かれたコメントにも付くように)
     for (const r of rows) {
       const learned = mxIconFromRaw(r);
       if (learned) learnIcon(learned[0], learned[1]);
     }
-    rows.forEach((r) => take(r));
+    const before = diag.items + pending.length;
+    rows.forEach((r) => take({ ...r, __nlSkipVoice: true }));
+    diag.historyItems += Math.max(0, diag.items + pending.length - before);
+    diag.historyStopReason = rows.length >= 50 ? 'cap-55' : 'done';
   };
 
   /** @param {string} raw */

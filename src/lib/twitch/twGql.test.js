@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { parseTwStreamInfo, parseTwUsersIcons, safeTwImageUrl, buildTwUsersIconQuery, buildTwStreamInfoQuery } from './twGql.js';
+import {
+  parseTwStreamInfo,
+  parseTwUsersIcons,
+  safeTwImageUrl,
+  buildTwUsersIconQuery,
+  buildTwStreamInfoQuery,
+  buildTwLiveVodQuery,
+  parseTwLiveVod,
+  buildTwVodCommentsQuery,
+  parseTwVodComments,
+  shouldStopTwVodBackfill,
+} from './twGql.js';
 import { buildTwStreamKey, isTwStreamKey, twLoginOfStreamKey, twChannelUrlOfStreamKey } from './twStreamKey.js';
 
 describe('twGql', () => {
@@ -90,5 +101,58 @@ describe('Twitch 公式の応援ランキング(ChannelLeaderboards・2026-11-08
     expect(buildTwLeaderboardsQuery('713936733')).toMatchObject({ operationName: 'ChannelLeaderboards', variables: { first: 10, channelID: '713936733' } });
     expect(buildTwLeaderboardsQuery('x')).toBeNull();
     expect(buildTwLeaderboardsFallbackQuery('a"){x}')?.query).toContain('user(login:"ax")');
+  });
+
+  it('配信中 VOD の特定とコメント解析・停止判定', () => {
+    expect(buildTwLiveVodQuery('stylishnoob4')?.query).toContain('videos(first:1,type:ARCHIVE)');
+    const vod = parseTwLiveVod({
+      data: {
+        user: {
+          stream: { id: '3167', createdAt: '2026-11-16T08:08:46Z' },
+          videos: { edges: [{ node: { id: '2930', createdAt: '2026-11-16T08:08:52Z', lengthSeconds: 6500 } }] },
+        },
+      },
+    }, { streamId: '3167' });
+    expect(vod).toEqual({ vodId: '2930', lengthSeconds: 6500, createdAtMs: Date.parse('2026-11-16T08:08:52Z') });
+
+    expect(parseTwLiveVod({
+      data: {
+        user: {
+          stream: { id: '3167', createdAt: '2026-11-16T08:08:46Z' },
+          videos: { edges: [{ node: { id: '1111', createdAt: '2026-11-15T08:08:46Z', lengthSeconds: 100 } }] },
+        },
+      },
+    })).toBeNull();
+
+    expect(buildTwVodCommentsQuery('2930', 42)?.variables).toEqual({ videoID: '2930', contentOffsetSeconds: 42 });
+    const parsed = parseTwVodComments({
+      data: {
+        video: {
+          comments: {
+            pageInfo: { hasNextPage: true },
+            edges: [{
+              node: {
+                id: 'uuid-1',
+                contentOffsetSeconds: 15,
+                createdAt: '2026-11-16T08:09:01Z',
+                commenter: { id: '99', login: 'fan1', displayName: 'Fan1' },
+                message: { fragments: [{ text: 'hello ' }, { text: 'world' }], userBadges: [{ setID: 'subscriber' }], userColor: '#FF0000' },
+              },
+            }],
+          },
+        },
+      },
+    }, 'stylishnoob4');
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]).toMatchObject({
+      id: 'uuid-1', channelId: 'tw:99', login: 'fan1', text: 'hello world', skipVoice: true, badges: ['subscriber'],
+    });
+    expect(parsed.nextOffsetSeconds).toBe(16);
+    expect(shouldStopTwVodBackfill({
+      count: 1, nextOffsetSeconds: 16, prevOffsetSeconds: 0, lastCreatedAtMs: 1000, cutoffMs: 2000, lengthSeconds: 6500,
+    })).toBe('');
+    expect(shouldStopTwVodBackfill({
+      count: 1, nextOffsetSeconds: 16, prevOffsetSeconds: 0, lastCreatedAtMs: 2500, cutoffMs: 2000, lengthSeconds: 6500,
+    })).toBe('reached-irc');
   });
 });

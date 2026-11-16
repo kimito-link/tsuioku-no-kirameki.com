@@ -30,8 +30,10 @@ describe('ふわっちの URL', () => {
   it('API の URL', () => {
     expect(wwLiveApiUrl('99')).toBe('https://api.whowatch.tv/lives/99?last_updated_at=0');
     expect(wwLiveApiUrl('99', 1700000000123)).toBe('https://api.whowatch.tv/lives/99?last_updated_at=1700000000123');
+    expect(wwLiveApiUrl('99', 0, 500)).toBe('https://api.whowatch.tv/lives/99?last_updated_at=0&limit=500');
     expect(wwLiveApiUrl('x')).toBe('');
     expect(isWwApiUrl(wwLiveApiUrl('99', 5))).toBe(true);
+    expect(isWwApiUrl(wwLiveApiUrl('99', 0, 500))).toBe(true);
     expect(isWwApiUrl('https://api.whowatch.tv/users/1')).toBe(false);
     expect(isWwApiUrl('https://api.whowatch.tv.evil.com/lives/1')).toBe(false);
   });

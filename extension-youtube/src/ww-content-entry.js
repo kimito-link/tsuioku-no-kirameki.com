@@ -52,6 +52,9 @@ const diag = {
   rawComments: 0,
   dropped: 0,
   items: 0,
+  historyItems: 0,
+  historyPages: 0,
+  historyStopReason: '',
   paid: 0,
   paidItems: 0,
   withIcon: 0,
@@ -142,6 +145,7 @@ function startReader(liveId) {
   let stopped = false;
   let timer = 0;
   let lastUpdatedAt = 0;
+  let initialHistoryDone = false;
   let finalPollDone = false;
   let wait = POLL_MS;
   let key = '';
@@ -192,9 +196,10 @@ function startReader(liveId) {
     timer = 0;
     if (stopped) return;
     diag.polls += 1;
+    const isInitialHistory = lastUpdatedAt === 0 && !initialHistoryDone;
     let json;
     try {
-      json = await getJson(wwLiveApiUrl(liveId, lastUpdatedAt));
+      json = await getJson(isInitialHistory ? wwLiveApiUrl(liveId, 0, 500) : wwLiveApiUrl(liveId, lastUpdatedAt));
     } catch (e) {
       diag.pollFail += 1;
       diag.lastError = String(/** @type {any} */ (e)?.message || e).slice(0, 80);
@@ -257,7 +262,13 @@ function startReader(liveId) {
         diag.paidItems += r.amount;
       }
       if (r.iconUrl) diag.withIcon += 1;
-      items.push(r);
+      items.push(isInitialHistory ? { ...r, skipVoice: true } : r);
+    }
+    if (isInitialHistory) {
+      initialHistoryDone = true;
+      diag.historyPages += 1;
+      diag.historyItems += items.length;
+      diag.historyStopReason = raw.length >= 300 ? 'cap-301' : 'done';
     }
     if (diag.newestFirst === null && items.length >= 2 && items[0].postedAtMs !== items[1].postedAtMs) {
       diag.newestFirst = items[0].postedAtMs > items[1].postedAtMs;

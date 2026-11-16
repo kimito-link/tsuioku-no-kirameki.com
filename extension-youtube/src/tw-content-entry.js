@@ -33,7 +33,13 @@ import {
   parseTwStreamInfo,
   parseTwUsersIcons,
   parseTwLeaderboards,
+  buildTwLiveVodQuery,
+  parseTwLiveVod,
+  buildTwVodCommentsQuery,
+  parseTwVodComments,
+  shouldStopTwVodBackfill,
 } from '../../src/lib/twitch/twGql.js';
+import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import {
   twHermesUrl,
   twRewardTopic,
@@ -52,7 +58,7 @@ const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 150;
 const ICON_WAIT_MS = 400;
-const MAX_SEEN = 5000;
+const MAX_SEEN = 25000;
 /** 公式の応援ランキングを読み直す間(ページのチャット欄の順位表も数分おきにしか変わらない) */
 const BOARD_EVERY_MS = 2 * 60_000;
 
@@ -69,6 +75,10 @@ const diag = {
   ircLastErrorAt: 0,
   lines: 0,
   items: 0,
+  historyItems: 0,
+  historyPages: 0,
+  historyFail: 0,
+  historyStopReason: '',
   bits: 0,
   subs: 0,
   gifts: 0,
@@ -231,8 +241,8 @@ const broadcasterName = () => lastBroadcasterName;
  * @param {string} login
  * @param {string} key
  */
-/** @param {string} login @param {string} key @param {string} [channelId] 数字の id(Hermes の購読に使う) */
-function startReader(login, key, channelId = '') {
+/** @param {string} login @param {string} key @param {string} [channelId] 数字の id(Hermes の購読に使う) @param {{ streamId?: string, startedAtMs?: number }} [streamMeta] */
+function startReader(login, key, channelId = '', streamMeta = {}) {
   let stopped = false;
   /** Hermes でリワードの交換を受けられているか(受けられている間は IRC の本文つきの交換を捨てる=二重に数えない) */
   let hermesRewardsOk = false;
@@ -319,6 +329,77 @@ function startReader(login, key, channelId = '') {
       scheduleReconnect();
       return;
     }
+    let vodBackfillStarted = false;
+    const runVodBackfill = async (cutoffMs) => {
+      if (vodBackfillStarted || stopped) return;
+      vodBackfillStarted = true;
+      const vodQ = buildTwLiveVodQuery(login);
+      if (!vodQ) return;
+      let vod = null;
+      try {
+        vod = parseTwLiveVod(await gql(vodQ), { streamId: streamMeta.streamId, startedAtMs: streamMeta.startedAtMs });
+      } catch {
+        diag.historyFail += 1;
+        diag.historyStopReason = 'vod-query-fail';
+        saveDiagSoon();
+        return;
+      }
+      if (!vod || stopped) {
+        diag.historyStopReason = 'no-vod';
+        saveDiagSoon();
+        return;
+      }
+      const res = await runBackfillLoop({
+        initialCursor: 0,
+        isStopped: () => stopped,
+        fetchPage: async (offsetSeconds) => {
+          const q = buildTwVodCommentsQuery(vod.vodId, offsetSeconds);
+          if (!q) return { ok: false, retryable: false, reason: 'bad-query' };
+          try {
+            const r = await fetch(TW_GQL_URL, {
+              method: 'POST',
+              headers: { 'Client-Id': TW_WEB_CLIENT_ID, 'Content-Type': 'text/plain;charset=UTF-8' },
+              body: JSON.stringify(q),
+              credentials: 'omit',
+              signal: platformFetchTimeoutSignal(),
+            });
+            if (r.status === 429 || r.status >= 500) {
+              return { ok: false, retryable: true, status: r.status, retryAfter: r.headers?.get?.('Retry-After') };
+            }
+            if (!r.ok) return { ok: false, retryable: false, status: r.status, reason: `http_${r.status}` };
+            const parsed = parseTwVodComments(await r.json(), login);
+            const stopReason = shouldStopTwVodBackfill({
+              count: parsed.items.length,
+              nextOffsetSeconds: parsed.nextOffsetSeconds,
+              prevOffsetSeconds: offsetSeconds,
+              lastCreatedAtMs: parsed.lastCreatedAtMs,
+              cutoffMs,
+              lengthSeconds: vod.lengthSeconds,
+            });
+            return { ok: true, items: parsed.items, nextCursor: parsed.nextOffsetSeconds, stopReason };
+          } catch {
+            return { ok: false, retryable: true, reason: 'network' };
+          }
+        },
+        onItems: (items) => {
+          if (stopped) return 0;
+          let added = 0;
+          for (const item of items) {
+            if (cutoffMs > 0 && item.postedAtMs > 0 && item.postedAtMs >= cutoffMs) continue;
+            if (!seen.has(item.id)) added += 1;
+            push(item);
+          }
+          diag.historyPages += 1;
+          diag.historyItems += added;
+          saveDiagSoon();
+          return added;
+        },
+      });
+      diag.historyFail += res.fails;
+      diag.historyStopReason = res.stopReason;
+      saveDiagSoon();
+    };
+
     ws.onopen = () => {
       backoff = 1000;
       diag.ircState = 'open';
@@ -327,6 +408,7 @@ function startReader(login, key, channelId = '') {
       ws?.send('PASS SCHMOOPIIE');
       ws?.send(`NICK ${nick}`);
       ws?.send(`JOIN #${login}`);
+      void runVodBackfill(Date.now());
       saveDiagSoon();
     };
     ws.onmessage = (ev) => {
@@ -582,7 +664,7 @@ async function check() {
     if (!key) return;
     if (!current || current.key !== key) {
       current?.stop();
-      current = { login, key, stop: startReader(login, key, info?.userId || '') };
+      current = { login, key, stop: startReader(login, key, info?.userId || '', { streamId: info?.streamId, startedAtMs: info?.startedAtMs }) };
       diag.streamKey = key;
     }
     safeSendMessage({

@@ -19,6 +19,7 @@ import {
   abCounterValue,
   abChannelNameText,
   abChannelNameFromTitle,
+  abNextBackfillUntilMs,
 } from '../../src/lib/abema/abParse.js';
 import {
   AB_OPEN_COMMENT_KEY,
@@ -38,7 +39,7 @@ const OUT = 'nl-ab-iso';
 const IN = 'nl-ab-main';
 const NOTE_ID = 'nl-ab-note';
 const WAIT_MS = 25_000;
-const MAX_SEEN = 4000;
+const MAX_SEEN = 25000;
 
 const diag = {
   updatedAt: 0,
@@ -47,6 +48,10 @@ const diag = {
   chatId: '',
   batches: 0,
   items: 0,
+  backfillItems: 0,
+  backfillPages: 0,
+  backfillFail: 0,
+  backfillStopReason: '',
   dropped: 0,
   denied: false,
   sawPayload: false,
@@ -484,8 +489,10 @@ function maybeNote() {
   }
 }
 
-/** @param {any} body @param {number | null} sinceMs @param {number | null} untilMs */
-function onBatch(body, sinceMs, untilMs) {
+let backfillRequestedChat = '';
+
+/** @param {any} body @param {number | null} sinceMs @param {number | null} untilMs @param {boolean} [isBackfill] */
+function onBatch(body, sinceMs, untilMs, isBackfill = false) {
   if (!pageLogin || !body || !Array.isArray(body.messages)) return;
   sawPayload = true;
   diag.sawPayload = true;
@@ -506,8 +513,11 @@ function onBatch(body, sinceMs, untilMs) {
     diag.streamKey = key;
     sendMeta();
   }
-  const near = abMessagesNearPlayhead(body.messages, { sinceMs, untilMs });
+  const near = isBackfill
+    ? body.messages.slice().reverse().map((m) => ({ ...m, speak: false }))
+    : abMessagesNearPlayhead(body.messages, { sinceMs, untilMs });
   const now = Date.now();
+  let addedBackfill = 0;
   for (const msg of near) {
     const row = abCommentRow(msg, { pageLogin, nowMs: now });
     if (!row || seen.has(row.id)) {
@@ -516,7 +526,23 @@ function onBatch(body, sinceMs, untilMs) {
     }
     seen.add(row.id);
     if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
+    if (isBackfill) addedBackfill += 1;
     pending.push(row);
+  }
+  if (addedBackfill > 0) diag.backfillItems += addedBackfill;
+  if (!isBackfill && chatId && chatId !== 'live' && chatId !== backfillRequestedChat) {
+    const nextUntil = abNextBackfillUntilMs(body.messages);
+    if (nextUntil) {
+      backfillRequestedChat = chatId;
+      try {
+        window.postMessage(
+          { source: OUT, t: 'backfill', slotId: chatId, untilMs: nextUntil, startedAtMs: program.startedAtMs || 0 },
+          location.origin,
+        );
+      } catch {
+        /* ページの世界へ送れない */
+      }
+    }
   }
   if (pending.length) scheduleFlush();
   else saveDiagSoon();
@@ -544,6 +570,7 @@ function syncPage() {
   lastDomComments = null;
   seen = new Set();
   pending = [];
+  backfillRequestedChat = '';
   panel.reset();
   lastPanelAt = 0;
   diag.pageLogin = login;
@@ -559,8 +586,13 @@ window.addEventListener('message', (ev) => {
   if (ev.source !== window || ev.origin !== location.origin) return;
   const data = ev.data;
   if (!data || data.source !== IN) return;
-  if (data.t === 'batch') onBatch(data.body, data.sinceMs, data.untilMs);
-  else if (data.t === 'meta' && data.meta) {
+  if (data.t === 'batch') onBatch(data.body, data.sinceMs, data.untilMs, !!data.backfill);
+  else if (data.t === 'backfillDone') {
+    diag.backfillPages += Number(data.pages) || 0;
+    diag.backfillFail += Number(data.fails) || 0;
+    diag.backfillStopReason = String(data.stopReason || '');
+    saveDiagSoon();
+  } else if (data.t === 'meta' && data.meta) {
     const expectId = abLinearChannelId(pageLogin);
     const rows = Array.isArray(data.meta.slotRows) ? data.meta.slotRows : [];
     const mine = rows.find((r) => expectId && String(r?.channelId || '').toLowerCase() === expectId);

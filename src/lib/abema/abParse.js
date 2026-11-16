@@ -490,6 +490,96 @@ export function abOnAirSlotStats(raw, nowMs = Date.now()) {
 }
 
 /**
+ * slots/<slotId>/comments の URL か判定し、クエリ無し baseUrl と slotId を返す。
+ * @param {unknown} url
+ * @returns {{ baseUrl: string, slotId: string } | null}
+ */
+export function isAbSlotCommentsUrl(url) {
+  let u;
+  try {
+    u = new URL(String(url || ''), AB_ORIGIN);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:') return null;
+  if (!/(^|\.)abema\.tv$|(^|\.)abema-tv\.com$|(^|\.)abema\.io$/i.test(u.hostname)) return null;
+  const m = /^\/v1\/slots\/([A-Za-z0-9_-]{4,64})\/comments\/?$/.exec(u.pathname);
+  if (!m) return null;
+  return { baseUrl: `${u.origin}${u.pathname}`, slotId: m[1] };
+}
+
+/**
+ * ABEMA 過去コメント取得用 URL を組み立てる。
+ * @param {string} baseUrl
+ * @param {number} untilMs
+ * @param {number} [limit]
+ */
+export function abSlotCommentsBackfillUrl(baseUrl, untilMs, limit = 100) {
+  const parsed = isAbSlotCommentsUrl(baseUrl);
+  if (!parsed) return '';
+  const u = Math.floor(Number(untilMs));
+  if (!Number.isFinite(u) || u <= 0) return '';
+  const lim = Math.max(1, Math.min(100, Math.floor(Number(limit) || 100)));
+  return `${parsed.baseUrl}?until=${u}&limit=${lim}`;
+}
+
+/**
+ * 応答のメッセージ配列から次のページ送り用 untilMs (最古 createdAtMs - 1) を求める。進まなければ null。
+ * @param {ReadonlyArray<{ createdAtMs?: number | null }>} messages
+ * @param {number} [currentUntilMs]
+ * @returns {number | null}
+ */
+export function abNextBackfillUntilMs(messages, currentUntilMs = 0) {
+  if (!Array.isArray(messages) || !messages.length) return null;
+  let minMs = 0;
+  for (const m of messages) {
+    const t = clockMs(m?.createdAtMs);
+    if (t != null && (minMs === 0 || t < minMs)) minMs = t;
+  }
+  if (minMs <= 1) return null;
+  const next = minMs - 1;
+  if (currentUntilMs > 0 && next >= currentUntilMs) return null;
+  return next;
+}
+
+/**
+ * ABEMA 過去コメント取得の停止条件。続行なら ''。
+ * @param {{ count: number, nextUntilMs: number | null, startedAtMs?: number | null }} ctx
+ */
+export function shouldStopAbBackfill(ctx) {
+  if (!ctx || ctx.count <= 0) return 'empty';
+  if (ctx.nextUntilMs == null || ctx.nextUntilMs <= 0) return 'no-cursor';
+  const start = Number(ctx.startedAtMs) || 0;
+  if (start > 0 && ctx.nextUntilMs < start) return 'reached-start';
+  return '';
+}
+
+/**
+ * fetch の Request / RequestInit から Authorization ヘッダを取り出す。
+ * @param {any} input
+ * @param {any} [init]
+ * @returns {string}
+ */
+export function extractAbAuthHeader(input, init) {
+  /** @param {any} h */
+  const readHeaders = (h) => {
+    if (!h) return '';
+    if (typeof h.get === 'function') return str(h.get('authorization') || h.get('Authorization'));
+    if (Array.isArray(h)) {
+      const hit = h.find((p) => Array.isArray(p) && String(p[0] || '').toLowerCase() === 'authorization');
+      return hit ? str(hit[1]) : '';
+    }
+    if (typeof h === 'object') {
+      for (const k of Object.keys(h)) {
+        if (k.toLowerCase() === 'authorization') return str(h[k]);
+      }
+    }
+    return '';
+  };
+  return readHeaders(init?.headers) || readHeaders(input?.headers) || '';
+}
+
+/**
  * ページの応答を、コメントの束と番組情報に分ける。
  * コメントの束にチャンネルロゴが同居していても、ロゴは meta に残す（コメントの icon には入れない）。
  * @param {unknown} raw

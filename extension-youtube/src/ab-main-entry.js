@@ -5,7 +5,20 @@
 //   隔離された世界(ab-content-entry.js)へ渡す。送ったり、ページの受信を止めたりはしない。
 //   認可ヘッダや URL のクエリは渡さない。入口が「hello」と言うまで最大 40 件ためておく。
 
-import { isAbCommentUrl, isAbBroadcastJsonUrl, abCommentWindowFromUrl, abChatIdFromUrl, abPayloadNotices, enqueueAbMainBacklog } from '../../src/lib/abema/abParse.js';
+import {
+  isAbCommentUrl,
+  isAbBroadcastJsonUrl,
+  abCommentWindowFromUrl,
+  abChatIdFromUrl,
+  abPayloadNotices,
+  enqueueAbMainBacklog,
+  isAbSlotCommentsUrl,
+  abSlotCommentsBackfillUrl,
+  abNextBackfillUntilMs,
+  shouldStopAbBackfill,
+  extractAbAuthHeader,
+} from '../../src/lib/abema/abParse.js';
+import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 
 (() => {
   if (window.__nlAbMain) return;
@@ -15,6 +28,17 @@ import { isAbCommentUrl, isAbBroadcastJsonUrl, abCommentWindowFromUrl, abChatIdF
   /** @type {any[]} */
   let backlog = [];
   let ready = false;
+  /** @type {Map<string, { baseUrl: string, auth: string }>} */
+  const slotRoutes = new Map();
+  /** @type {Set<string>} */
+  const backfillStarted = new Set();
+  const noteSlotRoute = (url, auth) => {
+    const info = isAbSlotCommentsUrl(url);
+    if (!info) return;
+    const key = info.slotId.toLowerCase();
+    const prev = slotRoutes.get(key);
+    slotRoutes.set(key, { baseUrl: info.baseUrl, auth: auth || prev?.auth || '' });
+  };
 
   /** @param {any} msg */
   const post = (msg) => {
@@ -81,6 +105,7 @@ import { isAbCommentUrl, isAbBroadcastJsonUrl, abCommentWindowFromUrl, abChatIdF
         url = '';
       }
       if (!matched(url) && !isAbBroadcastJsonUrl(url)) return ret;
+      noteSlotRoute(url, extractAbAuthHeader(input, args[1]));
       ret.then((res) => {
         try {
           if ((res.status === 401 || res.status === 403) && matched(url)) post({ t: 'denied' });
@@ -94,17 +119,28 @@ import { isAbCommentUrl, isAbBroadcastJsonUrl, abCommentWindowFromUrl, abChatIdF
   }
 
   const xhrOpen = XMLHttpRequest.prototype.open;
+  const xhrSetHeader = XMLHttpRequest.prototype.setRequestHeader;
   const xhrSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function abOpen(method, url, ...rest) {
     try {
       this.__nlAbUrl = String(url || '');
+      this.__nlAbAuth = '';
     } catch {
       this.__nlAbUrl = '';
     }
     return xhrOpen.call(this, method, url, ...rest);
   };
+  XMLHttpRequest.prototype.setRequestHeader = function abSetHeader(name, value) {
+    try {
+      if (String(name || '').toLowerCase() === 'authorization') this.__nlAbAuth = String(value || '');
+    } catch {
+      /* no-op */
+    }
+    return xhrSetHeader.call(this, name, value);
+  };
   XMLHttpRequest.prototype.send = function abSend(...args) {
     if (matched(this.__nlAbUrl) || isAbBroadcastJsonUrl(this.__nlAbUrl)) {
+      noteSlotRoute(this.__nlAbUrl, this.__nlAbAuth);
       this.addEventListener('load', () => {
         try {
           if ((this.status === 401 || this.status === 403) && matched(this.__nlAbUrl)) post({ t: 'denied' });
@@ -151,10 +187,57 @@ import { isAbCommentUrl, isAbBroadcastJsonUrl, abCommentWindowFromUrl, abChatIdF
     });
   }
 
+  const runAbBackfill = async ({ slotId, untilMs, startedAtMs }) => {
+    const id = String(slotId || '').trim().toLowerCase();
+    if (!id || backfillStarted.has(id) || typeof nativeFetch !== 'function') return;
+    const route = slotRoutes.get(id);
+    if (!route || !route.baseUrl) return;
+    const startUntil = Math.floor(Number(untilMs) || 0);
+    if (startUntil <= 0) return;
+    backfillStarted.add(id);
+    const res = await runBackfillLoop({
+      initialCursor: startUntil,
+      fetchPage: async (cursor) => {
+        const url = abSlotCommentsBackfillUrl(route.baseUrl, cursor, 100);
+        if (!url) return { ok: false, retryable: false, reason: 'bad-url' };
+        try {
+          const headers = route.auth ? { Authorization: route.auth } : undefined;
+          const r = await nativeFetch.call(window, url, headers ? { headers } : undefined);
+          if (r.status === 429 || r.status >= 500) {
+            return { ok: false, retryable: true, status: r.status, retryAfter: r.headers?.get?.('Retry-After') };
+          }
+          if (!r.ok) return { ok: false, retryable: false, status: r.status, reason: `http_${r.status}` };
+          const json = await r.json();
+          const notice = abPayloadNotices(json);
+          const msgs = notice?.batch?.messages || [];
+          const nextUntil = abNextBackfillUntilMs(msgs, cursor);
+          const stopReason = shouldStopAbBackfill({ count: msgs.length, nextUntilMs: nextUntil, startedAtMs });
+          return { ok: true, items: notice?.batch ? [notice.batch] : [], nextCursor: nextUntil || 0, stopReason };
+        } catch {
+          return { ok: false, retryable: true, reason: 'network' };
+        }
+      },
+      onItems: (batches) => {
+        let count = 0;
+        for (const batch of batches) {
+          count += Array.isArray(batch.messages) ? batch.messages.length : 0;
+          post({ t: 'batch', backfill: true, sinceMs: null, untilMs: null, body: { ...batch, chatId: batch.chatId || id } });
+        }
+        return count;
+      },
+    });
+    post({ t: 'backfillDone', chatId: id, pages: res.pages, items: res.items, fails: res.fails, stopReason: res.stopReason });
+  };
+
   window.addEventListener('message', (ev) => {
     if (ev.source !== window || ev.origin !== location.origin) return;
     const data = ev.data;
-    if (!data || data.source !== IN || data.t !== 'hello') return;
+    if (!data || data.source !== IN) return;
+    if (data.t === 'backfill') {
+      void runAbBackfill(data);
+      return;
+    }
+    if (data.t !== 'hello') return;
     ready = true;
     const queued = backlog;
     backlog = [];

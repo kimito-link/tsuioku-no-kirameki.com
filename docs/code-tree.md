@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1288 件
+## ⚠️ 役割コメントが無いソース 13 / 1289 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1189,7 +1189,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2517)
+- 📁 **src/** (2519)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1528,7 +1528,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2210)
+  - 📁 **lib/** (2212)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1562,11 +1562,13 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (22)
+    - 📁 **platform/** (24)
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `fetchTimeout.test.js`
+      - `historyBackfill.js` — 配信中コメントの過去分さかのぼり(ページ送り・リトライ・上限判定)の共通純粋ロジック
+      - `historyBackfill.test.js`
       - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
       - `infoPollGate.test.js`
       - `noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。

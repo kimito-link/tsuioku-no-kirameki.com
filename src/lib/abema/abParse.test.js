@@ -31,6 +31,11 @@ import {
   abChannelNameText,
   abChannelNameFromTitle,
   pickAbBroadcasterImage,
+  isAbSlotCommentsUrl,
+  abSlotCommentsBackfillUrl,
+  abNextBackfillUntilMs,
+  shouldStopAbBackfill,
+  extractAbAuthHeader,
 } from './abParse.js';
 import { ytIconForNumericUid, ytSummaryToNicoSnapshot } from '../../../extension-youtube/src/ytNicoShim.js';
 import { resolveBroadcasterFollowTarget } from '../broadcasterFollowTarget.js';
@@ -411,5 +416,24 @@ describe('ABEMA は配信サービスの表に入る', () => {
     const placeholder = placeholderStreamKeyForChannel(STREAM_PLATFORMS.abema, 'n-abema-news');
     expect(placeholder).toBe('ab.n-abema-news.00000');
     expect(platformOfStreamKey(placeholder)).toBe(STREAM_PLATFORMS.abema);
+  });
+
+  it('slots/comments バックフィル URL・untilMs 計算・停止判定・Auth 抽出', () => {
+    const info = isAbSlotCommentsUrl('https://api.p-c3-e.abema-tv.com/v1/slots/CHWBFqEHifQBsm/comments?limit=100');
+    expect(info).toEqual({
+      baseUrl: 'https://api.p-c3-e.abema-tv.com/v1/slots/CHWBFqEHifQBsm/comments',
+      slotId: 'CHWBFqEHifQBsm',
+    });
+    expect(isAbSlotCommentsUrl('https://evil.example/v1/slots/abc123/comments')).toBeNull();
+    expect(abSlotCommentsBackfillUrl(info.baseUrl, 1794823280037, 100)).toBe(
+      'https://api.p-c3-e.abema-tv.com/v1/slots/CHWBFqEHifQBsm/comments?until=1794823280037&limit=100',
+    );
+    expect(abNextBackfillUntilMs([{ createdAtMs: 1794823295000 }, { createdAtMs: 1794823280037 }])).toBe(1794823280036);
+    expect(abNextBackfillUntilMs([{ createdAtMs: 1794823280037 }], 1794823280000)).toBeNull();
+    expect(shouldStopAbBackfill({ count: 0, nextUntilMs: 1794823280000 })).toBe('empty');
+    expect(shouldStopAbBackfill({ count: 10, nextUntilMs: 1794823200000, startedAtMs: 1794823250000 })).toBe('reached-start');
+    expect(shouldStopAbBackfill({ count: 10, nextUntilMs: 1794823260000, startedAtMs: 1794823250000 })).toBe('');
+    expect(extractAbAuthHeader(null, { headers: { Authorization: 'Bearer tok1' } })).toBe('Bearer tok1');
+    expect(extractAbAuthHeader(null, { headers: [['authorization', 'Bearer tok2']] })).toBe('Bearer tok2');
   });
 });

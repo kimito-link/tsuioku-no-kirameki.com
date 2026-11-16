@@ -126,11 +126,62 @@ export function kickKicksLeaderboardUrl(id) {
 /**
  * 開いた時点の過去ログ(kick.com のチャット欄が最初に出す分)。番号はチャンネル id(chatroom id ではない)。
  *   2026-11-12 PC 実測: GET web.kick.com/api/v1/chat/<channel.id>/history → 24件・新しい順・クッキー無しでも 200。
+ *   2026-11-16 実測: ?cursor=<data.cursor> で 1 ページ約 25 件ずつ開始前までさかのぼり可能。
  * @param {string | number} channelId
+ * @param {string | number} [cursor]
  */
-export function kickChatHistoryUrl(channelId) {
+export function kickChatHistoryUrl(channelId, cursor = '') {
   const s = String(channelId ?? '').trim();
-  return /^\d{1,20}$/.test(s) ? `https://web.kick.com/api/v1/chat/${s}/history` : '';
+  if (!/^\d{1,20}$/.test(s)) return '';
+  const c = String(cursor ?? '').trim();
+  if (!c) return `https://web.kick.com/api/v1/chat/${s}/history`;
+  if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(c)) return '';
+  return `https://web.kick.com/api/v1/chat/${s}/history?cursor=${encodeURIComponent(c)}`;
+}
+
+/**
+ * 過去ログの応答(1ページ) → イベント配列・次の cursor・最古時刻(ms)。形が違えば events: []。
+ * @param {unknown} json
+ * @returns {{ events: ReturnType<typeof parseKickChatHistory>, cursor: string, oldestMs: number }}
+ */
+export function parseKickChatHistoryPage(json) {
+  const o = obj(json);
+  const d = obj(o?.data) || o;
+  const events = parseKickChatHistory(json);
+  const rawCursor = d?.cursor;
+  const cursor = (typeof rawCursor === 'string' || typeof rawCursor === 'number')
+    ? String(rawCursor).trim()
+    : '';
+  let oldestMs = 0;
+  for (const e of events) {
+    const t = parseKickTime(e.data.created_at);
+    if (t > 0 && (!oldestMs || t < oldestMs)) oldestMs = t;
+  }
+  return {
+    events,
+    cursor: /^[A-Za-z0-9_.:-]{1,128}$/.test(cursor) ? cursor : '',
+    oldestMs,
+  };
+}
+
+/**
+ * Kick 過去ログページ送りの停止条件を判定する。続行なら ''。
+ * @param {{
+ *   eventsCount: number,
+ *   nextCursor: string,
+ *   prevCursor: string,
+ *   seenCursors?: Set<string>,
+ *   oldestMs: number,
+ *   startedAtMs: number,
+ * }} ctx
+ * @returns {string}
+ */
+export function shouldStopKickBackfill(ctx) {
+  if (!ctx || ctx.eventsCount <= 0) return 'empty';
+  if (!ctx.nextCursor) return 'no-cursor';
+  if (ctx.nextCursor === ctx.prevCursor || ctx.seenCursors?.has(ctx.nextCursor)) return 'loop';
+  if (ctx.startedAtMs > 0 && ctx.oldestMs > 0 && ctx.oldestMs < ctx.startedAtMs) return 'reached-start';
+  return '';
 }
 
 /**

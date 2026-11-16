@@ -66,6 +66,9 @@ const diag = {
   unknownGifts: 0,
   giftPt: 0,
   backlog: 0,
+  historyItems: 0,
+  historyPages: 0,
+  historyStopReason: '',
   items: 0,
   dropped: 0,
   giftList: 0,
@@ -225,12 +228,20 @@ function startReader(roomId, key, bc) {
   const loadBacklog = async () => {
     const [cl, gl] = await Promise.all([tryJson(srLiveApiUrl('comment_log', roomId)), tryJson(srLiveApiUrl('gift_log', roomId))]);
     if (stopped) return;
+    const commentRows = srLogRows(cl, 'comment_log');
     const rows = [
-      ...srLogRows(cl, 'comment_log').map((c) => parseSrComment(c, { roomId })),
+      ...commentRows.map((c) => parseSrComment(c, { roomId })),
       ...srLogRows(gl, 'gift_log').map((g) => parseSrGift(g, { roomId, gifts })),
     ];
     diag.backlog += rows.length;
-    rows.forEach(push);
+    diag.historyPages += 1;
+    let added = 0;
+    for (const r of rows) {
+      if (r && !r.free && !seen.has(r.id)) added += 1;
+      push(r ? { ...r, skipVoice: true } : r);
+    }
+    diag.historyItems += added;
+    diag.historyStopReason = commentRows.length >= 100 ? 'cap-101' : 'done';
   };
 
   /** @param {string} raw */

@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2137',
+    date: '2026-11-16',
+    summary: 'Kick・ABEMA・Twitch等で開始からの過去コメントも記録',
+    items: Object.freeze([
+      'Kick・ABEMA・Twitch(配信中VOD公開時)で、配信の途中から開いても配信開始からのコメントをさかのぼって記録に読み足すようにしました。',
+      'ふわっち・SHOWROOM・ミクチャでも開いた直後に取得可能な上限まで過去分を読み足し、読み足した過去分は読み上げ・PICK UPに流れないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2136',
     date: '2026-11-16',
     summary: '使わない権限を拡張から外した',
@@ -174,14 +183,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'VOICEVOX が混んで PC の声(Windows の声)で読んでいるとき、2分たっても戻らなければ一度 VOICEVOX で読んでみるようにしました。まだ混んでいれば、また PC の声に切り替えます。',
       'PC の声から戻れなかった理由を、読み上げの状態に残すようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2114',
-    date: '2026-11-12',
-    summary: '混雑時の読み上げの効き目を測る',
-    items: Object.freeze([
-      '声のつくり置き・合唱・混雑中の選び方が、本物の配信でどれだけ効いたかを読み上げの状態に残すようにしました(見た目と読み方は変わりません)。'
     ])
   })
 ]);

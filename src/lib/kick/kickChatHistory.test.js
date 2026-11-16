@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kickChatHistoryUrl, parseKickChatHistory } from './kickApi.js';
+import { kickChatHistoryUrl, parseKickChatHistory, parseKickChatHistoryPage, shouldStopKickBackfill } from './kickApi.js';
 import { parseKickEvent } from './kickChatParse.js';
 
 // 2026-11-12 PC 実測の形(web.kick.com/api/v1/chat/<channel.id>/history・新しい順・metadata は JSON 文字列)
@@ -50,5 +50,25 @@ describe('Kick の過去ログ', () => {
     expect(parseKickChatHistory(null)).toEqual([]);
     expect(parseKickChatHistory({ data: { messages: 'x' } })).toEqual([]);
     expect(parseKickChatHistory({ error: 'x' })).toEqual([]);
+  });
+
+  it('cursor 付き URL と 1 ページ解析・停止判定', () => {
+    expect(kickChatHistoryUrl('97542698', '1794822519')).toBe('https://web.kick.com/api/v1/chat/97542698/history?cursor=1794822519');
+    expect(kickChatHistoryUrl('97542698', 'bad cursor!')).toBe('');
+    const page = parseKickChatHistoryPage(sample);
+    expect(page.cursor).toBe('123');
+    expect(page.oldestMs).toBe(Date.parse('2026-11-12T08:00:01Z'));
+    expect(shouldStopKickBackfill({
+      eventsCount: 3, nextCursor: '123', prevCursor: '', oldestMs: page.oldestMs, startedAtMs: Date.parse('2026-11-12T07:55:00Z'),
+    })).toBe('');
+    expect(shouldStopKickBackfill({
+      eventsCount: 3, nextCursor: '123', prevCursor: '', oldestMs: page.oldestMs, startedAtMs: Date.parse('2026-11-12T08:05:00Z'),
+    })).toBe('reached-start');
+    expect(shouldStopKickBackfill({
+      eventsCount: 0, nextCursor: '123', prevCursor: '', oldestMs: 0, startedAtMs: 0,
+    })).toBe('empty');
+    expect(shouldStopKickBackfill({
+      eventsCount: 3, nextCursor: '123', prevCursor: '123', oldestMs: page.oldestMs, startedAtMs: 0,
+    })).toBe('loop');
   });
 });

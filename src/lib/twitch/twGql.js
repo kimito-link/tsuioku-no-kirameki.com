@@ -143,3 +143,127 @@ export function parseTwLeaderboards(json) {
     subGift: twBoardRows(set.subGift?.items?.edges),
   };
 }
+
+// ---- 配信中 VOD の過去コメント取得(2026-11-16 実測) ----
+const TW_VOD_COMMENTS_HASH = 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a';
+const TW_VOD_MATCH_WINDOW_MS = 10 * 60_000;
+
+/** @param {string} login */
+export function buildTwLiveVodQuery(login) {
+  const l = String(login || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (!l) return null;
+  return {
+    query: `query{user(login:"${l}"){id stream{id createdAt} videos(first:1,type:ARCHIVE){edges{node{id createdAt lengthSeconds}}}}}`,
+  };
+}
+
+/**
+ * 配信中の VOD を特定する。現在の配信と開始時刻が大きくずれる過去の VOD は使わない。
+ * @param {any} json
+ * @param {{ streamId?: string, startedAtMs?: number }} [ctx]
+ * @returns {null | { vodId: string, lengthSeconds: number, createdAtMs: number }}
+ */
+export function parseTwLiveVod(json, ctx = {}) {
+  const user = json?.data?.user;
+  const stream = user?.stream;
+  if (!user || !stream || !stream.id) return null;
+  if (ctx.streamId && String(stream.id) !== String(ctx.streamId)) return null;
+  const vod = user?.videos?.edges?.[0]?.node;
+  const vodId = String(vod?.id || '').trim();
+  if (!/^\d{1,20}$/.test(vodId)) return null;
+  const vodCreatedAtMs = vod?.createdAt ? Date.parse(String(vod.createdAt)) : NaN;
+  const streamStartedMs = Number(ctx.startedAtMs) || (stream.createdAt ? Date.parse(String(stream.createdAt)) : NaN);
+  if (!Number.isFinite(vodCreatedAtMs) || !Number.isFinite(streamStartedMs)) return null;
+  if (Math.abs(vodCreatedAtMs - streamStartedMs) > TW_VOD_MATCH_WINDOW_MS) return null;
+  return {
+    vodId,
+    lengthSeconds: Math.max(0, Math.floor(Number(vod?.lengthSeconds) || 0)),
+    createdAtMs: vodCreatedAtMs,
+  };
+}
+
+/**
+ * @param {string} vodId
+ * @param {number} offsetSeconds
+ */
+export function buildTwVodCommentsQuery(vodId, offsetSeconds = 0) {
+  const id = String(vodId || '').trim();
+  if (!/^\d{1,20}$/.test(id)) return null;
+  return {
+    operationName: 'VideoCommentsByOffsetOrCursor',
+    variables: { videoID: id, contentOffsetSeconds: Math.max(0, Math.floor(Number(offsetSeconds) || 0)) },
+    extensions: { persistedQuery: { version: 1, sha256Hash: TW_VOD_COMMENTS_HASH } },
+  };
+}
+
+/**
+ * VideoCommentsByOffsetOrCursor の応答 → チャットレコード配列(skipVoice: true)と次の offset。
+ * @param {any} json
+ * @param {string} channelLogin
+ */
+export function parseTwVodComments(json, channelLogin) {
+  const comments = json?.data?.video?.comments;
+  const edges = Array.isArray(comments?.edges) ? comments.edges : null;
+  if (!edges) return { items: [], nextOffsetSeconds: 0, lastCreatedAtMs: 0, hasNextPage: false };
+  const channel = String(channelLogin || '').toLowerCase();
+  /** @type {any[]} */
+  const items = [];
+  let maxOffset = -1;
+  let lastCreatedAtMs = 0;
+  for (const edge of edges) {
+    const node = edge?.node;
+    if (!node || typeof node !== 'object') continue;
+    const off = Number(node.contentOffsetSeconds);
+    if (Number.isFinite(off) && off > maxOffset) maxOffset = Math.floor(off);
+    const createdAtMs = node.createdAt ? Date.parse(String(node.createdAt)) : NaN;
+    if (Number.isFinite(createdAtMs) && createdAtMs > lastCreatedAtMs) lastCreatedAtMs = createdAtMs;
+    const id = String(node.id || '').trim();
+    const fragments = Array.isArray(node.message?.fragments) ? node.message.fragments : [];
+    const text = fragments.map((/** @type {any} */ f) => String(f?.text || '')).join('').trim();
+    if (!id || !text) continue;
+    const c = node.commenter && typeof node.commenter === 'object' ? node.commenter : null;
+    const uLogin = String(c?.login || '').toLowerCase();
+    const uid = String(c?.id || '').trim();
+    const name = String(c?.displayName || uLogin || '').trim();
+    if (!uid && !uLogin) continue;
+    const badges = Array.isArray(node.message?.userBadges)
+      ? node.message.userBadges.map((/** @type {any} */ b) => String(b?.setID || '').trim()).filter(Boolean)
+      : [];
+    items.push({
+      id,
+      channelId: uid ? `tw:${uid}` : `tw:@${uLogin}`,
+      name,
+      login: uLogin,
+      iconUrl: '',
+      badges,
+      ts: '',
+      postedAtMs: Number.isFinite(createdAtMs) ? createdAtMs : 0,
+      channel,
+      roomId: '',
+      color: String(node.message?.userColor || ''),
+      text: text.slice(0, 500),
+      kind: 'text',
+      amount: 0,
+      currency: '',
+      skipVoice: true,
+    });
+  }
+  return {
+    items,
+    nextOffsetSeconds: maxOffset >= 0 ? maxOffset + 1 : 0,
+    lastCreatedAtMs,
+    hasNextPage: Boolean(comments?.pageInfo?.hasNextPage),
+  };
+}
+
+/**
+ * Twitch VOD バックフィルの停止判定。続行なら ''。
+ * @param {{ count: number, nextOffsetSeconds: number, prevOffsetSeconds: number, lastCreatedAtMs: number, cutoffMs: number, lengthSeconds?: number }} ctx
+ */
+export function shouldStopTwVodBackfill(ctx) {
+  if (!ctx || ctx.count <= 0) return 'empty';
+  if (ctx.cutoffMs > 0 && ctx.lastCreatedAtMs > 0 && ctx.lastCreatedAtMs >= ctx.cutoffMs) return 'reached-irc';
+  if (ctx.lengthSeconds && ctx.nextOffsetSeconds > ctx.lengthSeconds + 5) return 'reached-end';
+  if (ctx.nextOffsetSeconds <= ctx.prevOffsetSeconds) return 'loop';
+  return '';
+}

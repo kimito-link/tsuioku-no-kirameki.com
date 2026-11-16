@@ -43,18 +43,20 @@ export function parseWwLiveIdFromUrl(url) {
   return m ? m[1] : '';
 }
 
-/** @param {string} liveId @param {number} [lastUpdatedAt] */
-export function wwLiveApiUrl(liveId, lastUpdatedAt = 0) {
+/** @param {string} liveId @param {number} [lastUpdatedAt] @param {number} [limit] */
+export function wwLiveApiUrl(liveId, lastUpdatedAt = 0, limit = 0) {
   if (!isWwLiveId(liveId)) return '';
   const n = Number(lastUpdatedAt);
-  return `${WW_API_ORIGIN}/lives/${liveId}?last_updated_at=${Number.isFinite(n) && n > 0 ? Math.floor(n) : 0}`;
+  const lim = Math.floor(Number(limit) || 0);
+  const base = `${WW_API_ORIGIN}/lives/${liveId}?last_updated_at=${Number.isFinite(n) && n > 0 ? Math.floor(n) : 0}`;
+  return lim > 0 ? `${base}&limit=${Math.min(500, lim)}` : base;
 }
 
 /** API の URL として通してよいか(バックグラウンドが代わりに読むとき) @param {unknown} url */
 export function isWwApiUrl(url) {
   const u = String(url || '');
   // 配信の情報とコメント、イベントの順位(events/event_info・ログイン不要・2026-11-11 実測)だけ
-  return /^https:\/\/api\.whowatch\.tv\/lives\/\d{1,20}(?:\/play)?(?:\?last_updated_at=\d{1,16})?$/.test(u)
+  return /^https:\/\/api\.whowatch\.tv\/lives\/\d{1,20}(?:\/play)?(?:\?last_updated_at=\d{1,16}(?:&limit=\d{1,4})?)?$/.test(u)
     || /^https:\/\/api\.whowatch\.tv\/events\/event_info\?live_id=\d{1,20}$/.test(u);
 }
 
