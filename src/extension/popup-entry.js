@@ -693,7 +693,7 @@ import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
 import { cachedAnonymousFace, getAvatarComposeStats, hydrateRecentAnonymousFaces, isAnonymousFaceShown, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
-import { noteHtmlWrittenElsewhere, removeAttrIfPresent, removeStylePropIfSet, setAttrIfChanged, setClassFlag, setInnerHtmlIfChanged } from '../lib/domWriteIfChanged.js';
+import { noteHtmlWrittenElsewhere, removeAttrIfPresent, removeStylePropIfSet, setAttrFromSourceIfChanged, setAttrIfChanged, setClassFlag, setInnerHtmlIfChanged } from '../lib/domWriteIfChanged.js';
 import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import {
   createExportStageProfiler,
@@ -8660,14 +8660,15 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
         windowed: (STORY_GROWTH_STATE.sourceOffset || 0) > 0
       })
     : '';
-  setAttrIfChanged(
+  // ★0.1.2129: 元の値で比べる(ニコ生以外は書いた後に言い換えが入る=今の値で比べると毎回書き直して取り合いになる)
+  setAttrFromSourceIfChanged(
     img,
     'aria-label',
     entry
       ? `${index + 1}件目 ${userLabel} ${text || 'コメント'}。${sameUserBlurb}${hoverHint}Enter または Space で詳細の固定・解除`
       : `${index + 1}件目のコメント`
   );
-  setAttrIfChanged(
+  setAttrFromSourceIfChanged(
     img,
     'title',
     entry

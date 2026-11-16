@@ -5015,17 +5015,101 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '0.1.2120 の注記と同じ理由(言い回しを数える値)'
   }),
   Object.freeze({
-    version: '0.1.2123', metric: 'bundle-kb', value: 1446,
+    version: '0.1.2125', metric: 'bundle-kb', value: 1446,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '前版0.1.2122と同じ1446KB。過去最良1360KBより大きい点は維持されるが、既存の複数サービスと計器を削って値だけ戻す変更はしない。音声品質の改善をこのサイズから推定しない。'
+    note: '0.1.2122 と同じ(変えたのは popup.html の CSS だけで popup.js は増えていない)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
   }),
   Object.freeze({
-    version: '0.1.2123', metric: 'gate-selftest', value: 5,
+    version: '0.1.2125', metric: 'gate-selftest', value: 5,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.2123', metric: 'cross-checked-claims', value: 52,
+    version: '0.1.2125', metric: 'cross-checked-claims', value: 52,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: 'このcloneの直近30日のコミット本文を実測して52件。過去最良56件より4件少ないが、期間と本文の言い回しに依存する指標であり音声性能を表さない。今回の独立レビュー・回帰試験・実AudioとPC音声の確認は別の証拠として報告書に記録する。'
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。この版は CSS だけの変更で、e2e で広い画面と細いパネルの両方のカード幅を測って確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2126', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2125 と同じ(直したのは platformMetricChrome.js の数行で popup.js の大きさは変わらない)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
+  }),
+  Object.freeze({
+    version: '0.1.2126', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2126', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。この版は単体テスト(直す前は赤)と、8万行の記録を入れた横の欄を CPU 4倍遅くで直す前と後を交互に2回ずつ測って確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2127', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2126 と同じ(直したのは laneImportShadow.js の数行)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
+  }),
+  Object.freeze({
+    version: '0.1.2127', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2127', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。この版は単体テスト(直す前は赤)と、8万行の記録を入れた横の欄を CPU 4倍遅くで直す前と後を交互に3回ずつ測って確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2128', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2127 と同じ(直したのは pickLatestComment.js の関数1つ)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
+  }),
+  Object.freeze({
+    version: '0.1.2128', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2128', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。この版は書き直す前の選び方との答え合わせ2,000通りと、8万行の記録を CPU 4倍遅くで前後交互に2回ずつ CPU 記録を取って確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2129', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2128 と同じ(足したのは属性を書く小さな部品1つ)。8サービス同梱で大きくなった分は 0.1.2120 の注記のとおり'
+  }),
+  Object.freeze({
+    version: '0.1.2129', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2129', metric: 'cross-checked-claims', value: 51,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓が日付で動いて 52→51(この版のコミット前の値)。この版は PC の実機(Kick)で見つけた書き換えの多さを手元で再現し、単体テスト(直す前は赤)と前後交互2回の書き換え数・できあがった説明文の一致で確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2130', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版と同じ1446KB(読み上げの修正は popup.js をほぼ増やしていない)。過去最良1360KBより大きいのは複数サービス対応と計器のためで、この版で悪化したわけではない'
+  }),
+  Object.freeze({
+    version: '0.1.2130', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2130', metric: 'cross-checked-claims', value: 49,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて減っただけで性能は表さない。この版は偽エンジンの10分試験と実 Audio・PC の声の再生確認で別に確かめた(council/codex-report-voice-silent-busy.md)'
+  }),
+  Object.freeze({
+    version: '0.1.2131', metric: 'bundle-kb', value: 1449,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版0.1.2130の1446KBから+3KB。任意のローカル補助アプリの設定スイッチ(wireVoiceNativeToggle)をpopupへ足した分。過去最良1360KBより大きい状態は前版から続いており、今回はそれを削って戻す変更ではない。'
+  }),
+  Object.freeze({
+    version: '0.1.2131', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2131', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを直近30日で数える値で、期間がずれて47件。この版の確かめは verify:cc の再実行と疑似VOICEVOXでの10分比較で、PR本文に記録する。'
   })
 ]);

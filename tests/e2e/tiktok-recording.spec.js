@@ -157,8 +157,11 @@ function startFakeSocket() {
   const wss = new WebSocketServer({ server });
   /** @type {string[]} */
   const paths = [];
+  /** @type {import('ws').WebSocket[]} */
+  const sockets = [];
   wss.on('connection', (ws, req) => {
     paths.push(String(req.url));
+    sockets.push(ws);
     // 拡張の入口(document_idle)より先に届く分も出るよう、すぐ送り始める
     (String(req.url).includes('moved=1') ? MOVED_FRAMES : FRAMES).forEach((f, i) => setTimeout(() => ws.send(f), 200 + i * 150));
     // ハートビート(hb)は読まない
@@ -168,7 +171,7 @@ function startFakeSocket() {
     server.listen(0, '127.0.0.1', () => {
       const port = /** @type {any} */ (server.address()).port;
       const spki = execFileSync('sh', ['-c', `openssl x509 -in '${cert}' -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64`]).toString().trim();
-      resolve({ port, spki, paths, close: () => new Promise((r) => { wss.close(); server.close(() => r(undefined)); }) });
+      resolve({ port, spki, paths, sockets, close: () => new Promise((r) => { wss.close(); server.close(() => r(undefined)); }) });
     });
   });
 }
@@ -275,13 +278,54 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
   // ページ自身の受信は止めていない(写すだけ)
   expect(await page.evaluate(() => /** @type {any} */ (window).__pageGot)).toBe(FRAMES.length + 1);
 
+  // 計器: ソケットにコメントが届いてから記録(IndexedDB)に入るまでの時間。
+  //   拡張の側でかかる分だけを測る(TikTok のサーバーから届くまでは含まない)。
+  //   受け口は 200ms ごとにまとめて送る(FLUSH_MS)ので、その分+保存の時間が目安。2026-11-15 に足した。
+  const ws = /** @type {any} */ (sock).sockets.find((/** @type {any} */ w) => w.readyState === 1);
+  /** @type {number[]} */
+  const lagMs = [];
+  for (let i = 0; i < 8; i += 1) {
+    const text = `はかる${i}`;
+    const sentAt = Date.now();
+    ws.send(frame([['WebcastChatMessage', chat(String(70 + i), `はかる人${i}`, text, sentAt), 7001 + i]]));
+    const seenAt = await sw.evaluate(
+      async (/** @type {{ key: string, text: string }} */ a) => {
+        const has = () =>
+          new Promise((resolve) => {
+            const req = indexedDB.open('yt_kirameki_db');
+            req.onsuccess = () => {
+              const all = req.result.transaction('comments').objectStore('comments').index('by_videoId').getAll(IDBKeyRange.only(a.key));
+              all.onsuccess = () => resolve(all.result.some((/** @type {any} */ r) => r.text === a.text));
+              all.onerror = () => resolve(false);
+            };
+            req.onerror = () => resolve(false);
+          });
+        const until = Date.now() + 10_000;
+        while (Date.now() < until) {
+          if (await has()) return Date.now();
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        return 0;
+      },
+      { key: KEY, text },
+    );
+    expect(seenAt).toBeGreaterThan(0);
+    lagMs.push(seenAt - sentAt);
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  lagMs.sort((x, y) => x - y);
+  const median = lagMs[Math.floor(lagMs.length / 2)];
+  console.log(`[tiktok] ソケット→記録 ${lagMs.join(',')}ms 中央 ${median}ms`);
+  // ほかのサービス(2026-11-12 PC 実測で中央 0.2 秒前後)と同じくらいに収まる
+  expect(median).toBeLessThan(1000);
+
   const ttDiag = async () => (await sw.evaluate(async () => chrome.storage.local.get('yt_diag_tt_chat'))).yt_diag_tt_chat || {};
   await expect
     .poll(async () => {
       const d = await ttDiag();
       return { wsState: d.wsState, giftCoin: d.giftCoin, giftList: d.giftList, boardRows: d.boardRows, comboTimeouts: d.comboTimeouts, gzipFail: d.gzipFail, stopReason: d.stopReason, chats: d.types?.WebcastChatMessage, noText: d.dropReasons?.['chat:no-text'] || 0 };
     }, { timeout: 15_000 })
-    .toEqual({ wsState: 'open', giftCoin: 513, giftList: 2, boardRows: 2, comboTimeouts: 1, gzipFail: 0, stopReason: '', chats: 4, noText: 0 });
+    .toEqual({ wsState: 'open', giftCoin: 513, giftList: 2, boardRows: 2, comboTimeouts: 1, gzipFail: 0, stopReason: '', chats: 4 + 8, noText: 0 });
 
   // 配信中の視聴者の順位(score つき)が YouTube のトップファンと同じ置き場に入る
   const board = await sw.evaluate(async (key) => (await chrome.storage.local.get(`yt_leaderboard_${key}`))[`yt_leaderboard_${key}`], KEY);

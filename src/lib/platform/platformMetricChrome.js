@@ -173,12 +173,16 @@ export function applyPlatformMetricChrome(root, state) {
     const ageVal = root.querySelector('#officialStatNicoStreamAge');
     const ageChip = ageVal && ageVal.parentElement;
     if (ageChip) {
-      ageChip.hidden = false;
-      ageChip.removeAttribute('aria-hidden');
+      if (ageChip.hidden) ageChip.hidden = false;
+      if (ageChip.hasAttribute('aria-hidden')) ageChip.removeAttribute('aria-hidden');
       const title = streamAgeTitle(facts);
-      if (title) ageChip.setAttribute('title', title);
-      else ageChip.removeAttribute('title');
-      row.appendChild(ageChip);
+      if (title) {
+        if (ageChip.getAttribute('title') !== title) ageChip.setAttribute('title', title);
+      } else if (ageChip.hasAttribute('title')) ageChip.removeAttribute('title');
+      // ★0.1.2126: 既に末尾なら動かさない。毎回 appendChild すると row の childList が変わったことになり、
+      //   下の watchPlatformMetricChrome の見張りがそれを拾って次のフレームでまた適用する=毎フレーム(1秒に60回)
+      //   回り続けていた(手元計測: 何もしていない5秒で 299回・DOM の変化 8,045件・ニコ生以外の全サービス)。
+      if (row.lastElementChild !== ageChip) row.appendChild(ageChip);
     }
     const extras = panelExtraChips(plan.id, facts);
     const want = new Set(extras.map((c) => c.key));
@@ -214,8 +218,9 @@ export function applyPlatformMetricChrome(root, state) {
         }
         if (unitEl.textContent !== chip.unit) unitEl.textContent = chip.unit;
       } else if (unitEl) unitEl.remove();
-      if (chip.title) el.setAttribute('title', chip.title);
-      else el.removeAttribute('title');
+      if (chip.title) {
+        if (el.getAttribute('title') !== chip.title) el.setAttribute('title', chip.title);
+      } else if (el.hasAttribute('title')) el.removeAttribute('title');
     }
   }
 

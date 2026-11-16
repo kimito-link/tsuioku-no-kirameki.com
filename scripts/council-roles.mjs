@@ -165,6 +165,9 @@ export function roleOf(name) {
   // llama-4(scout/maverick) は軽快な新顔 → 速い視点。汎用 llama-3.3 と同枠。
   if (n.includes("llama-4") || n.includes("scout") || n.includes("maverick")) return "fast";
   if (n.includes("groq") || n.includes("llama-3.3")) return "fast";
+  // ★2026-11-15: Gemini 4 Hydrogen（pro 級）は lead の予備。generalist には gemini が既に3体居るので4体目を積まない
+  //  （恒久ルール5）。lead は nemotron-3-ultra の1系譜だけなので別系譜を足す。下の "gemini"→generalist より前に置くこと。
+  if (n.includes("gemini-4-hydrogen")) return "lead";
   if (n.includes("gemini")) return "generalist";
   return "generalist";
 }
@@ -441,6 +444,8 @@ export function weightOf(label) {
     //    memory/council-llm-lineup-upgrade-2026-07-03.md 参照）。"gemini-3" は "gemini-2.5" に
     //    非一致（先頭一致ではなく部分一致だが "gemini-2.5-flash" に "gemini-3" は含まれない）。
     if (n.includes("gpt-oss-20b") || n.includes("gemini-3")) return 3;
+    // ★2026-11-15: Gemini 4 世代も新顔なので予備(3)から（恒久ルール3）。この行が無いと末尾の既定 1（主力）に落ちる。
+    if (n.includes("gemini-4")) return 3;
     // openrouter は無料枠で429が出やすい実績→予備(weight3)。
     if (n.includes("openrouter")) return 3;
     // 2026-07-31 追加: SambaNova(新規プロバイダ)は並列実負荷実績が無く、無料枠が規約上

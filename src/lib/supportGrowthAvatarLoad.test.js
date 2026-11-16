@@ -345,6 +345,24 @@ describe('createSupportAvatarLoadGuard', () => {
       expect(img.dataset.nlsbAvatarRetrySrc).toBe(REMOTE);
     });
 
+    it('失敗済みの顔を描き直しのたびに渡しても、同じ刻印を書き直さない(0.1.2129)', async () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK, timeoutMs: 3000 });
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001);
+      expect(img.dataset.nlsbAvatarRetrySrc).toBe(REMOTE);
+      const recs = [];
+      const mo = new MutationObserver((l) => { for (const m of l) if (m.attributeName === 'data-nlsb-avatar-retry-src') recs.push(m); });
+      mo.observe(img, { attributes: true });
+      for (let i = 0; i < 5; i += 1) g.noteRemoteAttempt(img, REMOTE);
+      await Promise.resolve();
+      mo.disconnect();
+      expect(recs.length).toBe(0);
+      expect(img.dataset.nlsbAvatarRetrySrc).toBe(REMOTE);
+    });
+
     it('プローブ成功時、img.dataset.nlsbAvatarRetrySrcが削除される', () => {
       vi.useFakeTimers();
       const g = createSupportAvatarLoadGuard({
