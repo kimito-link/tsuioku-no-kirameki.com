@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2109',
+    date: '2026-11-12',
+    summary: 'ミクチャのアイコンをプロフィールから',
+    items: Object.freeze([
+      'ミクチャでギフトもファンランキング入りもしていない人のコメントにも、本人のアイコンを付けるようにしました。初めてコメントしたときにミクチャのプロフィールを1回だけ読みます(最大1.5秒待ってから記録します)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2108',
     date: '2026-11-12',
     summary: 'ミクチャのコメントに本人のアイコン',

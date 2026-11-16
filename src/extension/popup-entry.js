@@ -190,6 +190,7 @@ import {
 } from '../lib/northStarLaneWaitingUi.js';
 import {
   acquisitionPctFromNorthStarLaneState,
+  acquisitionPctTitle,
   acquisitionTierFromPct
 } from '../lib/northStarAcquisitionGauge.js';
 import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
@@ -3092,15 +3093,19 @@ function renderCommentTickerImpl(comments) {
   const placeholder =
     '<span class="nl-ticker-item nl-ticker-latest">まだ応援コメントがないのだ… 記録ONでたまるよ</span>';
 
-  scroll.classList.add('is-paused', 'is-latest-only');
-  segB.innerHTML = '';
+  // 0.1.2131: 同じ値の classList.add/innerHTML='' も変化の記録になるので、変わる時だけ書く。
+  setClassFlag(scroll, 'is-paused', true); setClassFlag(scroll, 'is-latest-only', true);
+  if (segB.firstChild) segB.innerHTML = '';
 
   if (!latest) {
-    segA.innerHTML = placeholder;
-    if (viewport) viewport.classList.add('is-empty');
+    if (segA.innerHTML !== placeholder) {
+      segA.innerHTML = placeholder;
+      delete segA.dataset.nlTickerKey;
+    }
+    setClassFlag(viewport, 'is-empty', true);
     return;
   }
-  if (viewport) viewport.classList.remove('is-empty');
+  setClassFlag(viewport, 'is-empty', false);
 
   const liveId = String(latest.liveId || STORY_SOURCE_STATE.liveId || '');
   const label = commentTickerDisplayLabel(latest, liveId, list);
@@ -7097,9 +7102,9 @@ async function applyCommentTimelineMirrorForPassive() {
   const scroll = /** @type {HTMLElement|null} */ ($('commentTickerScroll'));
   const viewport = /** @type {HTMLElement|null} */ ($('commentTickerViewport'));
   try {
-    if (scroll) scroll.classList.add('is-paused', 'is-latest-only');
-    if (segB) segB.innerHTML = '';
-    if (viewport) viewport.classList.remove('is-empty');
+    setClassFlag(scroll, 'is-paused', true); setClassFlag(scroll, 'is-latest-only', true);
+    if (segB && segB.firstChild) segB.innerHTML = '';
+    setClassFlag(viewport, 'is-empty', false);
     // 数値 ID のユーザーは niconico ユーザーページへリンク(匿名/ハッシュ風は '' で span のまま)。
     segA.innerHTML = buildCommentTickerLatestHtml(
       tickerArgsFromMirrorRow(latest, buildCommentTickerNameHref(latest.userId))
@@ -10127,26 +10132,22 @@ function renderTopSupportRankStrip(stripRooms) {
      * 配信者タイルすら作れない（uid 未取得）ときのみストリップごと隠す。
      */
     if (!casterTileHtml) {
-      strip.hidden = true;
-      strip.innerHTML = '';
-      strip.setAttribute('aria-hidden', 'true');
+      if (!strip.hidden) strip.hidden = true;
+      if (strip.firstChild) { strip.innerHTML = ''; noteHtmlWrittenElsewhere(strip); }
+      setAttrIfChanged(strip, 'aria-hidden', 'true');
       return;
     }
-    strip.hidden = false;
-    strip.removeAttribute('aria-hidden');
-    strip.setAttribute('aria-label', '配信者情報');
-    strip.innerHTML =
-      `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のフォローから。</p>` +
-      `<div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
-    bindOnErrorHandlersWithin(strip);
+    if (strip.hidden) strip.hidden = false;
+    removeAttrIfPresent(strip, 'aria-hidden');
+    setAttrFromSourceIfChanged(strip, 'aria-label', '配信者情報');
+    const emptyHtml = `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のフォローから。</p><div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
+    if (setInnerHtmlIfChanged(strip, emptyHtml)) bindOnErrorHandlersWithin(strip);
     return;
   }
-  strip.hidden = false;
-  strip.removeAttribute('aria-hidden');
-  strip.setAttribute(
-    'aria-label',
-    '記録した応援コメントをユーザー別に数えた件数の多い順'
-  );
+  // 0.1.2131: 同じ値・同じ中身なら書かない。言い換えが入る aria-label は元の値で比べる。
+  if (strip.hidden) strip.hidden = false;
+  removeAttrIfPresent(strip, 'aria-hidden');
+  setAttrFromSourceIfChanged(strip, 'aria-label', '記録した応援コメントをユーザー別に数えた件数の多い順');
   const rankScheme = getStoryColorScheme();
   const models = topSupportRankLineModels(stripRooms, {
     defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
@@ -10167,7 +10168,7 @@ function renderTopSupportRankStrip(stripRooms) {
    * (nl-top-support-rank__caster-thumb) なので、下の thumbs[i]↔models[i] 対応は崩れない。
    */
   const listInner = `${casterTileHtml}${html}`;
-  strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
+  if (!setInnerHtmlIfChanged(strip, `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`)) return;
   bindOnErrorHandlersWithin(strip);
   const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
   models.forEach((m, i) => {
@@ -10845,9 +10846,10 @@ function resolveNorthStarLaneAsideEl(body) {
 function clearNorthStarVerticalRailForBody(body) {
   const rail = resolveNorthStarLaneAsideEl(body);
   if (!rail) return;
-  rail.innerHTML = '';
-  rail.hidden = true;
-  rail.setAttribute('aria-hidden', 'true');
+  // 0.1.2131: 同じ値なら書かない(書いた印が見張りを起こし、描き直しのたびに同じ値を書き直していた)
+  if (rail.firstChild) rail.innerHTML = '';
+  if (!rail.hidden) rail.hidden = true;
+  setAttrIfChanged(rail, 'aria-hidden', 'true');
 }
 
 /**
@@ -10870,9 +10872,12 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
     const laneStateForVis =
       String(body.getAttribute('data-lane-state') || '').trim() || 'missing';
     const showLane = shouldShowNorthStarLane(laneId, laneStateForVis);
-    laneRoot.hidden = !showLane;
-    if (showLane) laneRoot.removeAttribute('aria-hidden');
-    else laneRoot.setAttribute('aria-hidden', 'true');
+    // 0.1.2131: サービスに合わせて隠した欄(platformMetricChrome の印)は出し直さない(出す→隠すの繰り返し)。同じ値なら書かない。
+    if (laneRoot.dataset.nlPlatformHide !== '1') {
+      if (laneRoot.hidden !== !showLane) laneRoot.hidden = !showLane;
+      if (showLane) removeAttrIfPresent(laneRoot, 'aria-hidden');
+      else setAttrIfChanged(laneRoot, 'aria-hidden', 'true');
+    }
   }
   const gadget = laneRoot?.querySelector?.('.nl-north-star-lane__gadget');
   if (!(gadget instanceof HTMLElement)) return;
@@ -10880,45 +10885,30 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
   const pct = acquisitionPctFromNorthStarLaneState(state);
   const tier = acquisitionTierFromPct(pct);
   if (pct == null) {
-    gadget.dataset.nlAcqMode = 'indeterminate';
-    gadget.style.removeProperty('--nl-acq-pct');
+    if (gadget.dataset.nlAcqMode !== 'indeterminate') gadget.dataset.nlAcqMode = 'indeterminate';
+    removeStylePropIfSet(gadget, '--nl-acq-pct');
   } else {
-    gadget.dataset.nlAcqMode = 'determinate';
-    gadget.style.setProperty('--nl-acq-pct', String(Math.max(0, Math.min(100, pct))));
+    if (gadget.dataset.nlAcqMode !== 'determinate') gadget.dataset.nlAcqMode = 'determinate';
+    const v = String(Math.max(0, Math.min(100, pct)));
+    if (gadget.style.getPropertyValue('--nl-acq-pct') !== v) gadget.style.setProperty('--nl-acq-pct', v);
   }
   const giftRankMetric = String(body.dataset.nlGiftRankMetric || '').trim();
   const acqTitle = gadget.querySelector('.nl-north-star-lane__acq-title');
   if (acqTitle instanceof HTMLElement) {
-    if (laneId === 'giftHistory' && giftRankMetric === 'throws' && pct != null) {
-      acqTitle.textContent = 'コメント由来';
-    } else {
-      acqTitle.textContent = pct == null ? '公式DOM待ち' : '現在の取得率';
-    }
+    const t = laneId === 'giftHistory' && giftRankMetric === 'throws' && pct != null
+      ? 'コメント由来'
+      : (pct == null ? '公式DOM待ち' : '現在の取得率');
+    if (acqTitle.textContent !== t) acqTitle.textContent = t;
   }
   const pctNum = gadget.querySelector('.nl-north-star-lane__acq-pct-num');
   if (pctNum instanceof HTMLElement) {
-    pctNum.textContent = pct == null ? '—' : `${Math.round(pct)}%`;
-    if (pct == null) {
-      pctNum.title =
-        'パーセントではありません。ニコ生側の一覧がDOMに出るまでの待機表示です。';
-    } else if (pct >= 100) {
-      let fullTitle =
-        'この「%」はレーンの公式DOM鏡像の成立度（成立時は設計上ここが100%）です。番組累計ポイントの増え方やギフト履歴の行数とは別の指標です。';
-      if (laneId === 'giftHistory' && giftRankMetric === 'throws') {
-        fullTitle =
-          '一覧の数字は「投げた回数」です（pt ではありません）。公式のギフト履歴合計ptや、レーン「番組累計ポイント」（ティッカーのギフトpt累計）とは別指標です。';
-      } else if (laneId === 'giftHistory' && giftRankMetric === 'points') {
-        fullTitle =
-          '公式履歴タブ由来のユーザー別「履歴上の合計pt」です。レーン「番組累計ポイント」（番組全体のギフトpt累計）とは別物です。';
-      }
-      pctNum.title = fullTitle;
-    } else {
-      pctNum.title =
-        'レーン単位の取得失敗・未取得を示します。ギフト履歴の「取り逃し率」ではありません。';
-    }
+    const pctText = pct == null ? '—' : `${Math.round(pct)}%`;
+    if (pctNum.textContent !== pctText) pctNum.textContent = pctText;
+    // 0.1.2131: 元の値で比べる(ニコ生以外は書いた後に言い換えが入り、毎回書き直して取り合っていた)
+    setAttrFromSourceIfChanged(pctNum, 'title', acquisitionPctTitle(laneId, giftRankMetric, pct));
   }
   const wrap = gadget.querySelector('.nl-north-star-lane__chara-wrap');
-  if (wrap instanceof HTMLElement) wrap.dataset.nlAcqTier = tier;
+  if (wrap instanceof HTMLElement && wrap.dataset.nlAcqTier !== String(tier)) wrap.dataset.nlAcqTier = String(tier);
   const img = gadget.querySelector('img.nl-north-star-lane__chara');
   if (img instanceof HTMLImageElement) {
     const rel = northStarLaneGadgetCharaPathByTier(laneId, tier);
@@ -10928,14 +10918,14 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
     } catch {
       img.removeAttribute('src');
     }
-    img.alt = '';
+    setAttrIfChanged(img, 'alt', '');
   }
   if (laneId === 'giftHistory') {
     const summary = document.getElementById('northStarLaneGadgetSummary-giftHistory');
     if (summary instanceof HTMLElement) {
       if (state !== 'ok') {
-        summary.hidden = true;
-        summary.setAttribute('aria-hidden', 'true');
+        if (!summary.hidden) summary.hidden = true;
+        setAttrIfChanged(summary, 'aria-hidden', 'true');
       }
     }
   }
@@ -10969,30 +10959,35 @@ function syncNorthStarCharaTrioSlotFromState(laneId, tier, pct) {
     `.nl-north-star-chara-trio__slot[data-nl-trio-slot="${slotInfo.slotId}"]`
   );
   if (!(slotEl instanceof HTMLElement)) return;
-  slotEl.dataset.nlAcqTier = String(tier || 'wait');
+  // 0.1.2131: 値が同じなら書かない(待機中も描き直しのたびに同じ値を書き直していた)
+  if (slotEl.dataset.nlAcqTier !== String(tier || 'wait')) slotEl.dataset.nlAcqTier = String(tier || 'wait');
   const img = slotEl.querySelector('img.nl-north-star-chara-trio__chara');
   if (img instanceof HTMLImageElement) {
     const rel = tierToTrioCharaSrc(slotInfo.slotId, tier);
     if (rel) {
       try {
-        img.src = chrome.runtime.getURL(rel);
+        const u = chrome.runtime.getURL(rel);
+        if (img.getAttribute('src') !== u) img.src = u;
       } catch {
         img.removeAttribute('src');
       }
     }
-    img.alt = '';
+    setAttrIfChanged(img, 'alt', '');
   }
   const pctNum = slotEl.querySelector('.nl-north-star-chara-trio__pct-num');
   if (pctNum instanceof HTMLElement) {
-    pctNum.textContent = pct == null ? '—' : `${Math.round(pct)}%`;
+    const pctText = pct == null ? '—' : `${Math.round(pct)}%`;
+    if (pctNum.textContent !== pctText) pctNum.textContent = pctText;
   }
   // v0.1.293: SR・hover 用の動的 title を 純関数化したラベルで埋める。
   // tier ラベル（取得率 高 / 完全取得 等）を含むので、視覚での金/銀/銅 tier
   // 装飾とテキストが補完し合う＝SR ユーザーにも演出意図が伝わる。
-  slotEl.title = buildCharaTrioSlotTitle(slotInfo, tier, pct);
+  // 0.1.2131: ニコ生以外は title が言い換えられるので元の値で比べる。aria-label も元の文から作る。
+  const slotTitle = buildCharaTrioSlotTitle(slotInfo, tier, pct);
+  setAttrFromSourceIfChanged(slotEl, 'title', slotTitle);
   // aria-label も同じテキストで上書き（HTML 初期の "りんく（貢献度ランキング）"
   // は static、tier / pct の現状値はここで動的に反映）。
-  slotEl.setAttribute('aria-label', slotEl.title);
+  setAttrFromSourceIfChanged(slotEl, 'aria-label', slotTitle);
   // v0.1.295: 3 slot 全員 full なら trio パネル全体に祝福演出 attribute を立てる。
   // 「物語の到達感」演出＝[[reference_ai_generic_rules_master]] tkjp 哲学「想いが
   // 強いほど届く」と整合。判定は DOM 直接読みで副作用ゼロ（純関数化は YAGNI 回避
@@ -11126,14 +11121,10 @@ function teardownNorthStarLaneWaitingUi(body) {
   const bid = body.id || '';
   if (bid.startsWith('northStarLaneBody-')) {
     clearNorthStarVerticalRailForBody(body);
-    body.classList.remove(
-      'nl-top-support-rank',
-      'nl-top-support-rank--below-cards',
-      'nl-top-support-rank--span-cards',
-      'nl-gift-rank-strip'
-    );
+    // 0.1.2131: classList.remove は付いていない class でも書き直す(変化の記録が出る)ので、付いている時だけ外す。
+    for (const c of ['nl-top-support-rank', 'nl-top-support-rank--below-cards', 'nl-top-support-rank--span-cards', 'nl-gift-rank-strip']) setClassFlag(body, c, false);
     try {
-      delete body.dataset.nlGiftRankMetric;
+      if ('nlGiftRankMetric' in body.dataset) delete body.dataset.nlGiftRankMetric;
     } catch {
       // no-op
     }
@@ -11380,9 +11371,12 @@ function applyNorthStarLaneWaitingOrHide(body, laneId, state) {
   //   data-lane-state へ保持。引数 state は未使用になったが API 互換のため受ける。
   void state;
   teardownNorthStarLaneWaitingUi(body);
-  body.innerHTML = '';
+  if (body.firstChild) body.innerHTML = '';
   clearNorthStarVerticalRailForBody(body);
-  setNorthStarLaneHidden(laneId, true);
+  // 0.1.2131: 隠す→直後の sync が常設の欄を出し直す、を毎回していた。最後に出すなら隠さない。
+  const laneEl = body.closest('.nl-north-star-lane');
+  const st = String(body.getAttribute('data-lane-state') || '').trim() || 'missing';
+  if (!(laneEl instanceof HTMLElement && laneEl.dataset.nlPlatformHide !== '1' && shouldShowNorthStarLane(laneId, st))) setNorthStarLaneHidden(laneId, true);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
 
@@ -11402,14 +11396,14 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
   if (!raw) {
     const st =
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
-    body.setAttribute('data-lane-state', st);
+    setAttrIfChanged(body, 'data-lane-state', st);
     if (isNorthStarLaneWaitingState(st) || NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(String(laneId || ''))) {
       // waiting state (not_yet/iframe_unrendered) も、API直叩き系(fetch_error/no_program_gift等)も
       // 同じ hide パスを通す。fetch_error は WAITING_STATES 外なので従来は else 側に落ちて
       // 待機UIが残っていた (v0.1.620 修正)。
       applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
-      body.innerHTML = '';
+      if (body.firstChild) body.innerHTML = '';
       clearNorthStarVerticalRailForBody(body);
       syncNorthStarLaneGadgetFromBodyState(body);
     }
@@ -11420,11 +11414,11 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
   if (!sanitized) {
     const st =
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
-    body.setAttribute('data-lane-state', st);
+    setAttrIfChanged(body, 'data-lane-state', st);
     if (isNorthStarLaneWaitingState(st) || NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(String(laneId || ''))) {
       applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
-      body.innerHTML = '';
+      if (body.firstChild) body.innerHTML = '';
       clearNorthStarVerticalRailForBody(body);
       syncNorthStarLaneGadgetFromBodyState(body);
     }
@@ -11438,7 +11432,7 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
     body.innerHTML = sanitized;
     _renderLaneLastMirrorHtmlByBody.set(body, sanitized);
   }
-  body.setAttribute('data-lane-state', 'ok');
+  setAttrIfChanged(body, 'data-lane-state', 'ok');
   // v0.1.619: rows/mirror が来たら hidden を外して必ず表示(畳みから復帰)。
   setNorthStarLaneHidden(String(laneId || ''), false);
   clearNorthStarVerticalRailForBody(body);
@@ -12113,7 +12107,7 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
     _kokenRowsAllForTileStats = { liveId: String(liveId || '').trim().toLowerCase(), rows: ranking }; // v0.1.1655: タイルの 🎁pt 用(全行)
     const rooms = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'contrib' });
     // 縦リスト専用 host class が前回付いていたら剥がしてから横カードへ切替。
-    body.classList.remove('nl-contrib-ranking-list-host');
+    setClassFlag(body, 'nl-contrib-ranking-list-host', false);
     // v0.1.393: 鮮度表示。koken API は 30 秒間隔で自動更新されるので autoRefreshing。
     const kokenCapturedAt = await readCardCapturedAtMs(kokenContribStorageKey(String(liveId || '').trim().toLowerCase()));
     _kokenRowsCapturedAtMs = Number(kokenCapturedAt) || 0; // v0.1.1565: ギフト増分の標本時刻(以降 publish まで同期処理)
@@ -12130,7 +12124,7 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
     return;
   }
   // ranking 取れない時は既存 host class を付け直して reason 経由 placeholder へ。
-  body.classList.remove('nl-contrib-ranking-list-host');
+  setClassFlag(body, 'nl-contrib-ranking-list-host', false);
   // ★v0.1.1339: kokenApiRows を渡す(giftHistory と同じ片肺がここにもあった)。
   const kokenApiRows = Array.isArray(ranking) && ranking.length > 0 ? ranking : null;
   const state = determineNorthStarLaneState('contributionRanking', { bundle, snap, kokenApiRows, contribResult: _kokenLaneResult });
@@ -12384,8 +12378,9 @@ function setNorthStarLaneHidden(laneId, hidden) {
     '.nl-north-star-lane[data-lane="' + String(laneId || '').replace(/"/g, '') + '"]'
   );
   if (!(lane instanceof HTMLElement)) return;
-  if (hidden) lane.setAttribute('hidden', '');
-  else lane.removeAttribute('hidden');
+  // 0.1.2131: 同じ状態なら書かない。ニコ生以外でサービスに合わせて隠した欄(platformMetricChrome の印)は出し直さない。
+  if (hidden) { if (!lane.hasAttribute('hidden')) lane.setAttribute('hidden', ''); }
+  else if (lane.dataset.nlPlatformHide !== '1') removeAttrIfPresent(lane, 'hidden');
 }
 
 /**
@@ -12409,7 +12404,7 @@ function hideAndClearNorthStarEventLane(laneId, body) {
     if (body.querySelector('[data-north-star-wait="1"]')) {
       body.innerHTML = '';
     }
-    body.setAttribute('data-lane-state', 'no_event');
+    setAttrIfChanged(body, 'data-lane-state', 'no_event');
   }
 }
 
@@ -12714,7 +12709,7 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
     body.innerHTML = html;
     _eventLaneLastHtmlByBody.set(body, html);
   }
-  body.setAttribute('data-lane-state', 'ok');
+  setAttrIfChanged(body, 'data-lane-state', 'ok');
   setNorthStarLaneHidden('eventRank', false);
   clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
@@ -13235,6 +13230,8 @@ try { /** @type {any} */ (globalThis).__nlRoomsDiag = aggregateRoomsForPaint.dia
  * @param {string} [liveId] ランキングストリップの再描画キー用
  * @param {{ rankingProvisional?: boolean }} [renderOpts]
  */
+/** 0.1.2131: ルーム一覧の前回の中身(カード HTML・サムネ・「ほか N」)。同じなら作り直さない。 @type {WeakMap<Element, string>} */
+const _userRoomsKeyByUl = new WeakMap();
 function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   const ul = /** @type {HTMLUListElement} */ ($('userRoomList'));
   if (!ul) return;
@@ -13252,10 +13249,9 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     ul.parentElement.insertBefore(provisionalNoteEl, ul);
   }
   if (provisionalNoteEl) {
-    provisionalNoteEl.hidden = !rankingProvisional;
-    provisionalNoteEl.textContent = rankingProvisional
-      ? '直近コメントからの暫定ランキングです。全件読み込み後に更新されます。'
-      : '';
+    if (provisionalNoteEl.hidden !== !rankingProvisional) provisionalNoteEl.hidden = !rankingProvisional; // 0.1.2131: 同じ値なら書かない
+    const provText = rankingProvisional ? '直近コメントからの暫定ランキングです。全件読み込み後に更新されます。' : '';
+    if (provisionalNoteEl.textContent !== provText) provisionalNoteEl.textContent = provText;
   }
   const lvPrimed = String(liveId || '').trim().toLowerCase();
   // 同一 lv のコメント更新のたびに 6 レーンをローディングへ戻すと、データ⇔待機が点滅する。
@@ -13448,15 +13444,12 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     }
   }
   const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, inferredBroadcasterUid);
-  ul.innerHTML = '';
 
   if (!rooms.length) {
     _lastTopSupportRankStripStableKey = null;
     renderTopSupportRankStrip([]);
-    const li = document.createElement('li');
-    li.className = 'empty-hint';
-    li.textContent = 'まだコメントがありません';
-    ul.appendChild(li);
+    _userRoomsKeyByUl.delete(ul); // 0.1.2131: 中身が同じなら作り直さない(描き直しのたびに一覧を丸ごと作り直していた)
+    setInnerHtmlIfChanged(ul, '<li class="empty-hint">まだコメントがありません</li>');
     return;
   }
 
@@ -13527,9 +13520,8 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   const maxTotal = Math.max(1, ...visibleRooms.map((v) => v.count));
   const maxRecent = Math.max(1, ...visibleRooms.map((v) => v.recentCount));
 
-  for (const r of visibleRooms) {
-    const li = document.createElement('li');
-    li.classList.add('room-card');
+  // 0.1.2131: カードの中身(HTML・サムネ)と「ほか N ユーザー」が前回と同じなら一覧を作り直さない。
+  const roomCards = visibleRooms.map((r) => {
     const label = displayUserLabel(r.userKey, r.nickname);
     const isUnknown = r.userKey === UNKNOWN_USER_KEY;
     const uidForThumb = isUnknown ? '' : r.userKey;
@@ -13537,7 +13529,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(thumbSrc);
     // C-7 pure refactor: 「確定値 → カード inner HTML」部分は roomCardInnerHtml.js に抽出（挙動不変・test 済）。
     //   サムネ解決(pickSupportGrowthTileForStory / load guard)と生成後の DOM 配線は popup に残す。
-    li.innerHTML = buildRoomCardInnerHtml({
+    const html = buildRoomCardInnerHtml({
       userKey: r.userKey,
       label,
       displayThumb,
@@ -13549,19 +13541,28 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
       maxRecent,
       compactRooms
     });
+    return { html, thumbSrc, uidForThumb };
+  });
+  const restText = rankedRooms.length > visibleRooms.length ? `ほか ${rankedRooms.length - visibleRooms.length} ユーザー（上位のみ表示）` : '';
+  const roomsKey = JSON.stringify([roomCards.map((c) => [c.html, c.thumbSrc]), restText]);
+  if (_userRoomsKeyByUl.get(ul) === roomsKey && ul.childElementCount === roomCards.length + (restText ? 1 : 0)) return;
+  _userRoomsKeyByUl.set(ul, roomsKey);
+  noteHtmlWrittenElsewhere(ul);
+  ul.innerHTML = '';
+  for (const c of roomCards) {
+    const li = document.createElement('li');
+    li.className = 'room-card';
+    li.innerHTML = c.html;
     ul.appendChild(li);
     const avImg = li.querySelector('img.room-card__avatar');
-    if (avImg instanceof HTMLImageElement && isHttpOrHttpsUrl(thumbSrc)) {
-      storyAvatarLoadGuard.noteRemoteAttempt(avImg, thumbSrc);
-    }
-    if (avImg instanceof HTMLImageElement) upgradeAnonymousAvatarImageFromFallback(avImg, uidForThumb, thumbSrc, 64);
+    if (!(avImg instanceof HTMLImageElement)) continue;
+    if (isHttpOrHttpsUrl(c.thumbSrc)) storyAvatarLoadGuard.noteRemoteAttempt(avImg, c.thumbSrc);
+    upgradeAnonymousAvatarImageFromFallback(avImg, c.uidForThumb, c.thumbSrc, 64);
   }
-
-  if (rankedRooms.length > visibleRooms.length) {
-    const rest = rankedRooms.length - visibleRooms.length;
+  if (restText) {
     const li = document.createElement('li');
     li.className = 'empty-hint';
-    li.textContent = `ほか ${rest} ユーザー（上位のみ表示）`;
+    li.textContent = restText;
     ul.appendChild(li);
   }
 }
