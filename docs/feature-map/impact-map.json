@@ -602,24 +602,6 @@
       ]
     },
     {
-      "file": "src/lib/voiceNativeProtocol.js",
-      "featureCount": 5,
-      "features": [
-        "comeview",
-        "content",
-        "native-voice-sw",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "任意のローカル音声補助 SW",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/voiceQuality.js",
       "featureCount": 5,
       "features": [
@@ -1411,22 +1393,6 @@
     },
     {
       "file": "src/lib/voiceLongCommentShorten.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceNativeClient.js",
       "featureCount": 4,
       "features": [
         "comeview",
@@ -10453,6 +10419,16 @@
     },
     {
       "file": "src/lib/voiceNativeBroker.js",
+      "featureCount": 1,
+      "features": [
+        "native-voice-sw"
+      ],
+      "labels": [
+        "任意のローカル音声補助 SW"
+      ]
+    },
+    {
+      "file": "src/lib/voiceNativeProtocol.js",
       "featureCount": 1,
       "features": [
         "native-voice-sw"

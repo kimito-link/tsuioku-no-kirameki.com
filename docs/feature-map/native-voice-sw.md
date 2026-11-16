@@ -15,6 +15,6 @@ graph LR
   n_native_voice_sw["任意のローカル音声補助 SW"]
   n_native_voice_sw --> n_src_lib_voiceKeys_js["lib/voiceKeys.js"]:::shared
   n_native_voice_sw --> n_src_lib_voiceNativeBroker_js["lib/voiceNativeBroker.js"]
-  n_native_voice_sw --> n_src_lib_voiceNativeProtocol_js["lib/voiceNativeProtocol.js"]:::shared
+  n_native_voice_sw --> n_src_lib_voiceNativeProtocol_js["lib/voiceNativeProtocol.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```

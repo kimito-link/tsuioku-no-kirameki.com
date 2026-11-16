@@ -11996,17 +11996,6 @@
               </span>
             </label>
           </div>
-          <!-- 0.1.2131: 補助アプリ(native/voice-bridge)は未配布。配布するまで「ローカル補助アプリを使う」は隠し、popup-entry.js からの配線もしない(既定OFFのまま)。配布時は hidden と display:none を外し、popup-entry.js で wireVoiceNativeToggle(popup/wireVoiceNativeToggle.js)を呼ぶ。 -->
-          <div class="nl-record-sub" id="voiceNativeRow" hidden style="display:none">
-            <label class="nl-record-sub__label" for="voiceNativeToggle">
-              <input type="checkbox" id="voiceNativeToggle">
-              <span>ローカル補助アプリを使う（任意）
-                <span class="nl-record-sub__hint">コメントをこのPC内の補助アプリへ渡して読み上げます。初回だけWindows用アプリの導入が必要です。</span>
-              </span>
-            </label>
-            <p id="voiceNativeStatus" class="nl-record-sub__hint" role="status" aria-live="polite"></p>
-            <a href="voice-native-guide.html" target="_blank" rel="noopener">導入・解除の方法</a>
-          </div>
           <!-- 2026-11-12: 合唱(同じ言葉が何人からも来たら、覚えた声を重ねて1回で鳴らす)。既定 ON。
                配線は popup/wireVoiceChorusToggle.js、決め方は lib の voiceChorus.js。 -->
           <div class="nl-record-sub">
