@@ -11979,6 +11979,16 @@ html:not([data-nl-platform-ready]) .nl-live-stat-card--visitors { display: none 
               </span>
             </label>
           </div>
+          <div class="nl-record-sub">
+            <label class="nl-record-sub__label" for="voiceNativeToggle">
+              <input type="checkbox" id="voiceNativeToggle">
+              <span>ローカル補助アプリを使う（任意）
+                <span class="nl-record-sub__hint">コメントをこのPC内の補助アプリへ渡して読み上げます。初回だけWindows用アプリの導入が必要です。</span>
+              </span>
+            </label>
+            <p id="voiceNativeStatus" class="nl-record-sub__hint" role="status" aria-live="polite"></p>
+            <a href="voice-native-guide.html" target="_blank" rel="noopener">導入・解除の方法</a>
+          </div>
           <!-- 2026-11-12: 合唱(同じ言葉が何人からも来たら、覚えた声を重ねて1回で鳴らす)。既定 ON。
                配線は popup/wireVoiceChorusToggle.js、決め方は lib の voiceChorus.js。 -->
           <div class="nl-record-sub">

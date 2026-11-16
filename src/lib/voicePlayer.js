@@ -1,6 +1,7 @@
 // @ts-nocheck — VoicePlayer は依存注入(deps)クラス。型は呼び出し側の配線で担保。
 //   comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
+import { createVoicePipelineState, setVoicePipelineCapacity, noteVoicePipelineStart, noteVoicePipelineResult, voicePipelinePendingLimit, VOICE_PIPELINE_MAX_AGE_MS, VOICE_PIPELINE_FILL_WAIT_MS } from './voiceSynthPipeline.js';
 import { voiceEngineDeviceNote } from './voiceLoadingState.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
@@ -17,7 +18,6 @@ import {
   createVoiceOverloadState,
   noteVoiceSynthOutcome,
   resolveVoiceOverloadTimeouts,
-  capVoiceSynthDepthForOverload,
   retryVoiceEngineAfterLongOverload,
   VOICE_OVERLOAD_FAST_MS
 } from './voiceEngineOverload.js';
@@ -48,7 +48,6 @@ import {
   computeVoicePlaybackRate,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
-  resolveVoiceSynthDepth,
   VOICE_PLAYBACK_RATE_MAX
 } from './voiceReadQueue.js';
 // 2026-07-24(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md): 件数
@@ -176,6 +175,9 @@ export class VoicePlayer {
     this._overload = createVoiceOverloadState();
     /** 2026-11-03: VOICEVOX に頼んでまだ返ってきていない合成の数(混雑中は1件ずつ頼むため)。 */
     this._synthInFlight = 0;
+    this._pipeline = createVoicePipelineState();
+    this._pipelineWaiters = new Set();
+    this._engineJobs = new Set();
     /**
      * 2026-11-03: VOICEVOX が追いつかない間だけ使う軽い声(voiceLightFallback.js)。
      *   既定はブラウザの読み上げ(Windows の声)。無い環境では null=VOICEVOX だけで読む。
@@ -539,6 +541,10 @@ export class VoicePlayer {
   }
 
   stop() {
+    // HTTP中断はエンジン内の計算停止を意味しない。直後の再依頼を抑制する。
+    for (const job of this._engineJobs) if (!(job.until > 0)) job.until = Date.now() + 75000;
+    this._refreshEngineBlock();
+    this._signalPipeline();
     this._abortSynthControllers();
     const dropped = this.queue;
     this.queue = [];
@@ -589,10 +595,7 @@ export class VoicePlayer {
     if (i >= 0) {
       const [item] = this.queue.splice(i, 1);
       const pf = this.prefetches.get(item);
-      if (pf) {
-        try { pf.abort?.abort(); } catch { /* no-op */ }
-        this.prefetches.delete(item);
-      }
+      if (pf?.settled) this.prefetches.delete(item);
       if (typeof item.onPlayStart === 'function') item.onPlayStart();
       this._notifyDropped(item);
       this._updateLagNotice();
@@ -786,14 +789,20 @@ export class VoicePlayer {
       await this.primeAudioUnlock();
       if (aborted()) return;
       this.onLoadingState('checking');
-      let probe = await this.probeVoicevoxAlive();
+      const probeAlive = async () => {
+        try {
+          const result = await this.probeVoicevoxAlive();
+          return result && typeof result.ok === 'boolean' ? result : { ok: false, reason: 'unknown' };
+        } catch { return { ok: false, reason: 'network' }; }
+      };
+      let probe = await probeAlive();
       if (!probe.ok && !aborted()) {
         this.onLoadingState('connecting');
         for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
           if (aborted()) return;
           if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
           if (aborted()) return;
-          probe = await this.probeVoicevoxAlive();
+          probe = await probeAlive();
           if (probe.ok) break;
         }
       }
@@ -1051,7 +1060,7 @@ export class VoicePlayer {
   _isClipReady(item) {
     if (!item) return false;
     const pf = this.prefetches.get(item);
-    if (pf && pf.cached) return true;
+    if (pf && (pf.cached || pf.ready)) return true;
     return this._clipCache.has(this._clipKeyFor(item));
   }
 
@@ -1076,7 +1085,7 @@ export class VoicePlayer {
       boostAtSynth: hit.boost,
       textLength: text.length,
       abort: null,
-      cached: true
+      cached: true, ready: true, settled: true
     });
     this.diag.clipHitTotal = (Number(this.diag.clipHitTotal) || 0) + 1;
     return true;
@@ -1142,7 +1151,15 @@ export class VoicePlayer {
     // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
     //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
-    this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost, textLength: text.length, abort });
+    const entry = { generation, promise, boostAtSynth: effBoost, textLength: text.length, abort, ready: false, settled: false };
+    this.prefetches.set(item, entry);
+    void promise.then((wav) => {
+      entry.settled = true;
+      entry.ready = !!wav;
+      if (generation !== this.generation) return;
+      this._signalPipeline();
+      this._startPrefetch(generation);
+    });
     this._rememberClip(voiceClipKey(assigned, text), effBoost, promise);
     return promise;
   }
@@ -1164,17 +1181,30 @@ export class VoicePlayer {
     let timing = {};
     /** この1件が時間切れで終わったか(混雑の判定に使う)。 */
     let timedOut = false;
+    let uncertainFailure = false;
+    let knownResponse = false;
     const startedAt = Date.now();
+    const synthGeneration = this.generation;
+    const pipelineLimit = noteVoicePipelineStart(this._pipeline, startedAt);
     const overloadTimeouts = resolveVoiceOverloadTimeouts(this._overload.overloaded);
     this._synthInFlight += 1;
     let settled = false;
     const settle = () => { if (!settled) { settled = true; this._synthInFlight = Math.max(0, this._synthInFlight - 1); } };
+    const engineJob = { until: 0, settled: false };
+    this._engineJobs.add(engineJob);
     // 同期で呼ぶ(enqueue 直後に合成が起動していることを既存テストが固定している=v0.1.800)。
     let started;
     try {
       started = this.fetchSynthesizeVoice(text, voice, {
         ...overloadTimeouts,
+        onCapacity: (cap) => { if(synthGeneration===this.generation)setVoicePipelineCapacity(this._pipeline,cap); },
+        // 遅いが正常なquery(最大7秒)を3秒で全捨てしない。品質の設定は変えない。
+        audioQueryTimeoutMs: 15000,
+        synthesisTimeoutMs: 20000,
         onFailure: (info) => {
+          if (info?.uncertain === true) uncertainFailure = true;
+          if (Number(info?.httpStatus) > 0 || info?.bodyInvalid) knownResponse = true;
+          if(extra.signal?.aborted)return;
           const reason = this._recordSynthFailureReason(info);
           if (reason === 'timeout' || reason === 'query_timeout') timedOut = true;
         },
@@ -1185,6 +1215,29 @@ export class VoicePlayer {
     } catch (err) {
       started = Promise.reject(err);
     }
+    // ローカルraceとは別に実依頼の完了を観測。正常応答が返れば停止後の待機を早く解除できる。
+    void Promise.resolve(started).then(async (wav) => {
+      if (isStreamedVoice(wav)) {
+        let ok = false;
+        try { ok = await wav.whenDone; } catch { /* 完了不明 */ }
+        engineJob.settled = true;
+        engineJob.until = ok ? 0 : engineJob.until || Date.now() + 75000;
+        this._refreshEngineBlock();
+        this._signalPipeline();
+        if (synthGeneration === this.generation) this._startPrefetch(synthGeneration);
+        return;
+      }
+      engineJob.settled = true;
+      engineJob.until = wav || knownResponse || (!extra.signal?.aborted && !timedOut && !uncertainFailure)
+        ? 0 : engineJob.until || Date.now() + 75000;
+      this._refreshEngineBlock();
+      this._signalPipeline();
+    }, () => {
+      engineJob.settled = true;
+      engineJob.until = engineJob.until || Date.now() + 75000;
+      this._refreshEngineBlock();
+      this._signalPipeline();
+    });
     // 依存先が AbortSignal を無視して Promise を永久に解決しない場合でも、世代を捨てれば
     // VoicePlayer 自身は待ち続けない。元Promiseには race が rejection handler を付けるため後発例外も漏れない。
     let removeAbort = () => {};
@@ -1205,7 +1258,17 @@ export class VoicePlayer {
           /** @type {any} */
           let r = null;
           try { r = track.end({ ...timing, audioMs: measureWavAudioMs(wav) }, !!wav); recordVoiceSynthStage(this.diag, r); } catch { /* 計器は本体を止めない */ }
-          this._noteOverload({ timedOut, ok: !!wav, totalMs: Date.now() - startedAt });
+          if (synthGeneration === this.generation && !extra.signal?.aborted) {
+            this._noteOverload({ timedOut, ok: !!wav, totalMs: Date.now() - startedAt });
+            const recordPipeline = (ok) => {
+              if (synthGeneration !== this.generation || extra.signal?.aborted) return;
+              noteVoicePipelineResult(this._pipeline, { ok, uncertain: uncertainFailure || timedOut || !ok && isStreamedVoice(wav), totalMs: Date.now() - startedAt, limit: pipelineLimit, nowMs: Date.now(), arrivalPerMin: this.diag.arrivalPerMin });
+              this.diag.pipelineLimit = this._pipeline.limit;
+              this.diag.pipelineBlockedUntil = this._pipeline.blockedUntil;
+            };
+            if (isStreamedVoice(wav)) void wav.whenDone.then(ok => recordPipeline(ok === true), () => recordPipeline(false));
+            else recordPipeline(!!wav);
+          }
           const judge = () => {
             // P3: 遅いPCと分かったら一度だけ記録('auto' のとき次の読み上げ ON から絞る)。
             if (this.storage) rememberWeakVoicePc(this.diag, this._weakPcState, () => this.storage.set({ [KEY_VOICE_WEAK_PC]: true }));
@@ -1226,7 +1289,10 @@ export class VoicePlayer {
           removeAbort();
           settle();
           try { track.end(timing, false); } catch { /* no-op */ }
-          this._noteOverload({ timedOut, ok: false });
+          if (synthGeneration === this.generation && !extra.signal?.aborted) {
+            this._noteOverload({ timedOut, ok: false });
+            noteVoicePipelineResult(this._pipeline, { ok: false, uncertain: true, limit: pipelineLimit, nowMs: Date.now() });
+          }
           throw err;
         }
       );
@@ -1234,7 +1300,8 @@ export class VoicePlayer {
 
   _recordSynthFailureReason(info) {
     try {
-      const reason = classifyVoiceSynthFailureReason(info);
+      const reason = typeof info?.nativeCode === 'string' && /^[a-z-]{1,40}$/.test(info.nativeCode) && info.nativeCode !== 'timeout'
+        ? `native_${info.nativeCode}` : classifyVoiceSynthFailureReason(info);
       const bag = this.diag.synthFailReasons || (this.diag.synthFailReasons = {});
       bag[reason] = (Number(bag[reason]) || 0) + 1;
       return reason;
@@ -1286,7 +1353,8 @@ export class VoicePlayer {
       this.diag.sustainedBoostTotal = (Number(this.diag.sustainedBoostTotal) || 0) + 1;
     }
     this.diag.lastSustainedBoost = sustained;
-    return merged;
+    // 合成中の件数を再生の混雑と取り違えて、補助経路だけ過度に早口にしない。
+    return this._pipeline.maxInflight > 6 ? Math.min(0.3, merged) : merged;
   }
 
   /**
@@ -1308,37 +1376,80 @@ export class VoicePlayer {
     for (const item of this.queue) {
       if (item && this._attachCachedClip(item, generation)) cachedReady.add(item);
     }
-    // 2026-11-03: 軽い声で読んでいる間は VOICEVOX に読み上げを頼まない(速さの確かめだけ)。
-    if (this._useLightVoice()) {
-      this._maybeProbeVoicevox();
-      return;
-    }
-    // 同時に頼むのは常に1件。遅い CPU では並行の合成が全部を遅くする(時間切れが積もる)。
-    //   今の1件が終わってから次を頼む。再生とその次の合成は重なってよい。
-    const depth = Math.min(1, capVoiceSynthDepthForOverload(resolveVoiceSynthDepth(this.queue.length, {
-      pending: this.queue.length
-    }), this._overload.overloaded));
-    // v0.1.1088計器(設計書§2): diag.lastDepth は宣言のみでどこからも代入されていなかった
-    //   化石計器。ここで実値を代入して修理する(先読み深さの実測)。
-    this.diag.lastDepth = depth;
-    const wanted = new Set(cachedReady);
-    for (let i = 0; i < depth && i < this.queue.length; i++) {
-      const item = this.queue[i];
-      if (!item) continue;
-      // 2026-11-03: 混雑中は、VOICEVOX がまだ前の合成をしている間は次を頼まない。
-      //   拡張が諦めた依頼も VOICEVOX は最後まで計算するので、重ねて頼むほど全部が遅れる
-      //   (実測: CPU 100%・時間切れ1,940件)。頼まなかった件は順番が来たときに頼む。
-      if (this._synthInFlight > 0 && !this.prefetches.has(item)) continue;
-      wanted.add(item);
+    // 完成した声は待機中でも利用し、PC音声の間も実コメントを先読みする。
+    this.diag.lastDepth = this._pipeline.limit;
+    this.diag.pipelineLimit = this._pipeline.limit;
+    this._refreshEngineBlock();
+    if (Date.now() < this._pipeline.blockedUntil) return;
+    const pending = [...this.queue].sort((a, b) => {
+      const high = Number(b.priority === 'high') - Number(a.priority === 'high');
+      const important = Number(!!b.importance) - Number(!!a.importance);
+      const score = (Number(b.busyScore) || 0) - (Number(a.busyScore) || 0);
+      return high || important || score || (a.priority === 'high' || a.importance || this._pipeline.limit === 1 ? a.enqueuedAt - b.enqueuedAt : b.enqueuedAt - a.enqueuedAt);
+    });
+    for (const item of pending) {
+      if (!item || this.prefetches.has(item)) continue;
+      const expected = Math.max(6000, this._pipeline.synthMs * 1.3);
+      // 最後の1件は捨て尽くさない。後続がある時だけ完成見込みで選別する。
+      if (this.queue.length > 1 && Date.now() - item.enqueuedAt + expected > VOICE_PIPELINE_MAX_AGE_MS) {
+        this.queue = this.queue.filter(q => q !== item);
+        this._notifyDropped(item);
+        this.diag.staleDropTotal += 1;
+        continue;
+      }
+      if (Math.max(this._synthInFlight, this._engineJobs.size) >= this._pipeline.limit) break;
       this._ensurePrefetch(item, generation);
     }
-    // キューから消えた item の先読みは破棄(取りこぼした WAV は GC される=メモリ有界)。
-    for (const [key, entry] of this.prefetches) {
-      if (!wanted.has(key)) {
-        try { entry.abort?.abort(); } catch { /* no-op */ }
-        this.prefetches.delete(key);
-      }
+    // 読まれなくなった依頼も、完了まで枠を使う。HTTPを切ってCPU枠が空いたことにはしない。
+    for (const [item, entry] of this.prefetches) {
+      if (!this.queue.includes(item) && entry.settled) this.prefetches.delete(item);
     }
+  }
+
+  _refreshEngineBlock() {
+    let until = 0;
+    for (const job of this._engineJobs) {
+      if ((job.settled || job.until > 0) && job.until <= Date.now()) this._engineJobs.delete(job);
+      else until = Math.max(until, job.until);
+    }
+    this._pipeline.blockedUntil = until;
+    this.diag.pipelineBlockedUntil = until;
+  }
+
+  _signalPipeline() {
+    for (const done of this._pipelineWaiters) done();
+    this._pipelineWaiters.clear();
+  }
+
+  _waitPipeline(ms) {
+    return new Promise((resolve) => {
+      const finish = () => { clearTimeout(timer); this._pipelineWaiters.delete(finish); resolve(); };
+      const timer = setTimeout(finish, ms);
+      this._pipelineWaiters.add(finish);
+    });
+  }
+
+  voiceHoldBudgetMs() { return VOICE_PIPELINE_MAX_AGE_MS; }
+
+  _lightAvailable() {
+    try { return this.lightVoiceSetting !== 'off' && this._lightFailStreak < 3 && !!this.lightSpeaker?.available(); }
+    catch { return false; }
+  }
+
+  /** 完成順を利用するが、完成した大事な件の優先と各件の声・通知の対応は保つ。 */
+  _readyVoiceIndex() {
+    const ready = (q) => this.prefetches.get(q)?.ready === true;
+    const high = this.queue.findIndex(q => q.priority === 'high' && ready(q));
+    const important = high >= 0 ? high : this.queue.findIndex(q => !!q.importance && ready(q));
+    if (important >= 0) return important;
+    let index = this.queue.findIndex(ready);
+    // 合成は終わっているのに古い通常コメントの後ろで待たせない。
+    // 空いている時と1件ずつの合成では従来の順序を保つ。
+    if (index < 0 || this._pipeline.limit <= 1 || !(Date.now() - this.queue[index].enqueuedAt >= 2000)) return index;
+    for (let i = index + 1; i < this.queue.length; i++) {
+      if (ready(this.queue[i]) && this.queue[i].enqueuedAt > this.queue[index].enqueuedAt) index = i;
+    }
+    return index;
   }
 
   /**
@@ -1347,8 +1458,7 @@ export class VoicePlayer {
    * @returns {((x: any) => boolean) | null}
    */
   _inflightKeeper() {
-    if (!this._overload.overloaded) return null;
-    return (x) => this.prefetches.has(x);
+    return (x) => { const entry = this.prefetches.get(x); return !!entry && !entry.cached && !entry.settled; };
   }
 
   /** 2026-11-03: 今、軽い声で読むか(VOICEVOX が混雑中で、軽い声が使えるときだけ)。 */
@@ -1396,7 +1506,6 @@ export class VoicePlayer {
    * @param {number} generation
    */
   async _playLight(item, generation) {
-    this._maybeProbeVoicevox();
     const text = buildMergedVoiceText(item, { maxChars: LIGHT_VOICE_MAX_CHARS });
     const speaker = this.lightSpeaker;
     let started = false;
@@ -1506,7 +1615,7 @@ export class VoicePlayer {
         const now = Date.now();
         let allStale = true;
         for (const qItem of this.queue) {
-          if (!isVoiceItemStale(qItem.enqueuedAt, now, this.queue.length, qItem.priority === 'high').stale) {
+          if ((this.prefetches.has(qItem) && now - qItem.enqueuedAt <= VOICE_PIPELINE_MAX_AGE_MS) || !isVoiceItemStale(qItem.enqueuedAt, now, this.queue.length, qItem.priority === 'high').stale) {
             allStale = false;
             break;
           }
@@ -1546,8 +1655,24 @@ export class VoicePlayer {
         // v0.1.768: 先頭から深さ分(最大3)を【先に】合成起動してから先頭を取り出す。
         //   こうすると N の再生でブロックしている間に N+1/N+2/N+3 の合成が並走する。
         this._startPrefetch(generation);
-
-        const item = this.queue.shift();
+        let readyIndex = this._readyVoiceIndex();
+        const canUseLight = this._lightAvailable();
+        if (readyIndex < 0 && this._synthInFlight > 0 && !this._overload.overloaded) {
+          // 開始間隔を有界にしつつ、準備済みの指定声を取りこぼさない。
+          const since = this._lastAudibleAt > 0 ? Date.now() - this._lastAudibleAt : 0;
+          const until = Date.now() + Math.max(0, VOICE_PIPELINE_FILL_WAIT_MS - since);
+          while (this.enabled && generation === this.generation && this._readyVoiceIndex() < 0 && Date.now() < until && this._synthInFlight > 0) {
+            await this._waitPipeline(Math.max(1, until - Date.now()));
+          }
+          if (!this.enabled || generation !== this.generation) break;
+          readyIndex = this._readyVoiceIndex();
+        }
+        const forceLight = readyIndex < 0 && canUseLight;
+        if (readyIndex < 0 && !canUseLight) {
+          readyIndex = this.queue.findIndex(q => this.prefetches.has(q));
+          if (readyIndex < 0) { await this._waitPipeline(250); continue; }
+        }
+        const [item] = this.queue.splice(Math.max(0, readyIndex), 1);
         if (!item) continue;
         // 2026-11-12: 今の件(声が始まるまでの見込み・待ちの上限で鳴らさない印)。
         this._current = { item, shiftAt: Date.now(), playAt: 0, expectedMs: 0, chars: 0, audioStarted: false, cancelled: false };
@@ -1561,8 +1686,9 @@ export class VoicePlayer {
         // 2026-11-03: 混雑中は、合成を頼み済みの件と、後ろにもう新しい件が無い件は古くても読む
         //   (遅い PC ではどの件も8秒を超えるので、ここで捨てると1件も鳴らない)。
         const keepInflight = this._inflightKeeper();
-        const keepAnyway = !!keepInflight && (keepInflight(item) || this.queue.length === 0);
-        if (ageCheck.stale && !keepAnyway) {
+        const keepAnyway = !!keepInflight && (keepInflight(item) || this.queue.length === 0) && Date.now() - item.enqueuedAt <= VOICE_PIPELINE_MAX_AGE_MS;
+        const pipelineFresh = this.prefetches.has(item) && Date.now() - item.enqueuedAt <= VOICE_PIPELINE_MAX_AGE_MS;
+        if (ageCheck.stale && queueLength > 1 && !keepAnyway && !pipelineFresh) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
           this._notifyDropped(item); // v0.1.799: stale で鳴らず破棄→吹き出しを unvoiced へ
           this._showSkipped(1);
@@ -1578,11 +1704,13 @@ export class VoicePlayer {
         }
 
         // 2026-11-03: VOICEVOX が追いつかない間は軽い声で読む(すでに合成を頼んだ件はそれを待つ)。
-        if (this._useLightVoice() && !this.prefetches.has(item)) {
+        if (forceLight) {
+          this.diag.lightVoiceActive = true;
           await this._playLight(item, generation);
           continue;
         }
 
+        this.diag.lightVoiceActive = false;
         const congestion = computeVoiceCongestion(queueLength);
         // v0.1.1222: 先読み側と同じ実効ブーストを使う(2経路で速度が食い違わないようにする)。
         const effBoostNow = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
@@ -1972,7 +2100,9 @@ export class VoicePlayer {
       // 2026-11-12(合唱): 待っている件と同じ言葉を別の人が書いたら、その件の合唱に加える
       //   (別の1件として読まない=読み上げの待ちを増やさない)。大事なものは合唱にせず1件で読む。
       if (this.chorusEnabled) {
-        const hostIdx = findVoiceChorusHost(this.queue, { body, userKey, importance, busy: this.queue.length >= VOICE_BUSY_QUEUE_MIN });
+        // 完成待ちの1件をqueueに残す方式でも、従来の「待ち件数」で合唱を判定する。
+        const waitingCount = this.queue.length - (this.playing && !this._current && this._synthInFlight > 0 ? 1 : 0);
+        const hostIdx = findVoiceChorusHost(this.queue, { body, userKey, importance, busy: waitingCount >= VOICE_BUSY_QUEUE_MIN });
         if (hostIdx >= 0 && joinVoiceChorus(this.queue[hostIdx], userKey) !== 'dup') {
           this.diag.chorusJoinTotal = (Number(this.diag.chorusJoinTotal) || 0) + 1;
           if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }
@@ -1994,7 +2124,8 @@ export class VoicePlayer {
       }
       const clipReady = busySkip && this._clipCache.has(this._clipKeyFor({ userKey, name, body, count: 1 }));
       if (clipReady) this.diag.clipBusyKeepTotal = (Number(this.diag.clipBusyKeepTotal) || 0) + 1;
-      if (busySkip && !clipReady) {
+      const pipelineRoom = this._pipeline.limit > 1 && this.queue.length < voicePipelinePendingLimit(this._pipeline);
+      if (busySkip && !clipReady && !pipelineRoom) {
         this.diag.busySkipTotal = (Number(this.diag.busySkipTotal) || 0) + 1;
         if (typeof item.onPlayStart === 'function') { try { item.onPlayStart(); } catch { /* no-op */ } }
         this._notifyDropped(item);
@@ -2047,7 +2178,8 @@ export class VoicePlayer {
       //   ラグ上界が安全網(8000ms)を超えるのを、実効上限の動的縮小で構造的に防ぐ。
       // v0.1.1800: 待っている件の文字数から上限を見積もる(長い声の直後に平均が膨らんで、続く短い
       //   コメントまで飛ばしていた)。見積もれなければ従来の this._effectiveQueueMax。
-      const queueMax = this._resolveQueueMaxByChars(candidate);
+      const byChars = this._resolveQueueMaxByChars(candidate);
+      const queueMax = this._pipeline.limit > 1 ? Math.max(byChars, voicePipelinePendingLimit(this._pipeline)) : byChars;
       // 2026-11-13: 合唱の主役(何人もの声をまとめた件)は、溢れた時にふつうの件より後に捨てる。
       const pushed = pushVoiceQueue(this.queue, candidate, {
         max: queueMax,

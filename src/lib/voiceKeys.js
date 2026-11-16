@@ -40,3 +40,6 @@ export const KEY_VOICE_WEAK_PC = 'nls_voice_weak_pc_v1';
 export const KEY_VOICE_QUALITY = 'nls_voice_quality_v1';
 /** 今鳴っているコメント(会場の PICK UP を再生開始に合わせる)。配信 id つき。 */
 export const KEY_VOICE_NOW_PLAYING = 'nls_voice_now_playing_v1';
+
+/** ローカル補助アプリの明示同意。未保存はOFF。 */
+export const KEY_VOICE_NATIVE_ENABLED = 'nls_voice_native_enabled_v1';

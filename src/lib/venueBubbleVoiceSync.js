@@ -187,6 +187,10 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
   const clearTimer = ctx.clearTimer || ((t) => clearTimeout(t));
   const vp = ctx.voicePlayer;
   const diag = state.diag;
+  const requestedBudget = Number(vp?.voiceHoldBudgetMs?.());
+  const holdMaxMs = Number.isFinite(requestedBudget)
+    ? Math.min(20000, Math.max(VENUE_BUBBLE_VOICE_HOLD_MAX_MS, requestedBudget))
+    : VENUE_BUBBLE_VOICE_HOLD_MAX_MS;
   const arrivedAt = Number(ctx.arrivedAt) || now();
   const failing = (Number(state.failStreak) || 0) >= VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX;
   const probeDue = failing && now() - (Number(state.lastProbeAt) || 0) >= VENUE_BUBBLE_VOICE_PROBE_MS;
@@ -298,7 +302,7 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
         const gone = typeof vp.dropQueuedAny === 'function' ? vp.dropQueuedAny(onDropped) : 'not-queued';
         if (gone !== 'dropped') reveal();
         sample();
-      }, Math.max(0, VENUE_BUBBLE_VOICE_HOLD_MAX_MS - (now() - arrivedAt)));
+      }, Math.max(0, holdMaxMs - (now() - arrivedAt)));
     }, VENUE_BUBBLE_VOICE_HOLD_MS);
   }
   // v0.1.1794: コメビュが同じ配信を読んでいれば鳴らさない(吹き出しは声なしの寿命へ)。

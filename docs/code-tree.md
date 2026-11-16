@@ -27,11 +27,14 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1277 件
+## ⚠️ 役割コメントが無いソース 13 / 1288 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
+- `native/voice-bridge/fixture-sources.mjs`
 - `scripts/build.mjs`
+- `src/extension/native-voice-sw-entry.js`
+- `src/extension/voice-native-guide-entry.js`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
 - `src/lib/mediaKitExport.js`
@@ -234,7 +237,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (367)
+- 📁 **docs/** (370)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -330,7 +333,7 @@
   - 📁 **article-drafts/** (2)
     - `hasanmap-osint-20260611-copy.txt`
     - `hasanmap-osint-20260611.md`
-  - 📁 **feature-map/** (15)
+  - 📁 **feature-map/** (17)
     - `backfill-sw.md`
     - `comeview.md`
     - `content.md`
@@ -339,12 +342,14 @@
     - `impact-map.md`
     - `index.md`
     - `live-ranking.md`
+    - `native-voice-sw.md`
     - `offscreen.md`
     - `page-intercept.md`
     - `popup.md`
     - `status.md`
     - `storage-bus.md`
     - `venue.md`
+    - `voice-native-guide.md`
     - `web-status.md`
   - 📁 **handoff/** (179)
     - 📁 **bench/** (2)
@@ -617,7 +622,8 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (144)
+  - `voice-quality-pipeline-flow.html`
+- 📁 **extension/** (145)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -770,6 +776,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
+  - `voice-native-guide.html`
   - `yt-comeview.html`
   - `yt-loading-boot.js` — 横の欄の最初の描画。拡張の CSP は inline script を止めるので、このファイルを <head> で読む。
   - `yt-marketing-export.html`
@@ -1023,6 +1030,17 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
+- 📁 **native/** (9)
+  - 📁 **voice-bridge/** (9)
+    - `README.md`
+    - `VoiceBridge.cs`
+    - `VoiceBridgeSetup.cs`
+    - `build.ps1`
+    - `fixture-sources.mjs` — ⚠️ 役割コメント無し
+    - `measure-comparison.mjs` — global process, Buffer, setTimeout, clearTimeout, fetch, AbortSignal, WebSocket, URL, window, chrome, speech…
+    - `verify-extension.mjs` — global Buffer, URL, chrome, console
+    - `verify-host.mjs` — global process, Buffer, setTimeout, clearTimeout, URL, console
+    - `verify-setup.ps1`
 - 📁 **scripts/** (118)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
@@ -1171,7 +1189,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2502)
+- 📁 **src/** (2517)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1208,8 +1226,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (115)
-    - 📁 **popup/** (19)
+  - 📁 **extension/** (119)
+    - 📁 **popup/** (21)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1229,6 +1247,8 @@
       - `wireVoiceGpuTip.js` — ポップアップの読み上げ欄に出す「VOICEVOX を GPU にすると速くなる」案内の配線(2026-11-03 りんく「POP とか会場モードに記載すべき」)。
       - `wireVoiceGpuTip.test.js`
       - `wireVoiceNarrowSelect.js` — ポップアップの「読み上げの声を絞る」の配線(2026-10-24 P3)。
+      - `wireVoiceNativeToggle.js` — 任意の補助アプリは利用者のクリック時だけ許可を求める。
+      - `wireVoiceNativeToggle.test.js`
       - `wireVoiceQualitySelect.js` — ポップアップの「読み上げの音質」の配線(2026-10-29)。
       - `wireVoiceVolumeSlider.js` — ポップアップの「読み上げ音量」スライダーの配線(2026-10-22 P2・りんく要望「ボリューム調整を POP から」)。
     - 📁 **story/** (7)
@@ -1265,6 +1285,7 @@
     - `liveEventsPhone.test.js`
     - `liveEventsPublisher.js` — v0.1.1757: status.html?publisher=1 の「スマホへ新着をすぐ届ける係」の配線(chrome.storage・fetch・タイマー)。
     - `marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
+    - `native-voice-sw-entry.js` — ⚠️ 役割コメント無し
     - `ndgrHiddenFlush.wiring.test.js`
     - `ndgrStatisticsPointsSanityGuard.wiring.test.js`
     - `ndgrViewBasePick.wiring.test.js`
@@ -1322,6 +1343,7 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
+    - `voice-native-guide-entry.js` — ⚠️ 役割コメント無し
     - `voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
     - `voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
@@ -1506,7 +1528,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2199)
+  - 📁 **lib/** (2210)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -3630,6 +3652,13 @@
     - `voiceLongCommentShorten.test.js`
     - `voiceNarrowing.js` — 弱いPCで読み上げの声の種類を絞る(P3 下準備・2026-10-22)。DOM も chrome API も触らない純関数。
     - `voiceNarrowing.test.js`
+    - `voiceNativeBroker.js` — 【層】L2 実行層
+    - `voiceNativeBroker.test.js`
+    - `voiceNativeClient.js` — 【層】L2 実行層
+    - `voiceNativeClient.test.js`
+    - `voiceNativeProtocol.js` — 【層】L0 判定層
+    - `voiceNativeProtocol.test.js`
+    - `voiceNativeRouting.test.js`
     - `voiceNgMute.js` — v0.1.1812: コメビュで NG にした人のコメントは、会場の読み上げとスマホへ送る声でも読まない。
     - `voiceNgMute.test.js`
     - `voicePlaybackQuality.js` — 読み上げの「聞こえ方」を数える計器(2026-10-26・印字専用・再生には介入しない)。
@@ -3642,6 +3671,8 @@
     - `voicePlayerClipCache.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
     - `voicePlayerOverloadKeep.test.js`
+    - `voicePlayerPipeline.sim.test.js`
+    - `voicePlayerPipeline.test.js`
     - `voicePlayerSilenceRecovery.test.js`
     - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
     - `voiceQuality.test.js`
@@ -3669,6 +3700,8 @@
     - `voiceSynthFailureReason.integration.test.js`
     - `voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
     - `voiceSynthFailureReason.test.js`
+    - `voiceSynthPipeline.js` — 【層】L0 判定層
+    - `voiceSynthPipeline.test.js`
     - `voiceTestRun.js` — 読み上げを「決まった形のコメント」で流して測る試験(開発版だけ・2026-10-26)。
     - `voiceTestRun.test.js`
     - `voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。

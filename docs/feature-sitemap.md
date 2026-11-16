@@ -667,7 +667,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 69</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 73</summary>
 
 - `app/live-view-native-voice.js` — v0.1.1763: iPhone アプリ(mobile/・Capacitor)の中だけで使う、iPhone 内蔵の声の読み上げ(🗣)。
 - `app/live-view-voice.js` — v0.1.1740: スマホの WEB版で、PC の VOICEVOX の声でコメントを読み上げる。
@@ -675,6 +675,9 @@
 - `extension-youtube/offscreen.js` — YouTube Live VOICEVOX 読み上げ常駐再生 Offscreen Document バンドル
 - `extension-youtube/src/background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
 - `extension-youtube/src/offscreen-entry.js` — サイドパネルを閉じていても VOICEVOX 読み上げを継続する Offscreen Document プレイヤー
+- `native/voice-bridge/measure-comparison.mjs` — global process, Buffer, setTimeout, clearTimeout, fetch, AbortSignal, WebSocket, URL, window, chrome, speech…
+- `native/voice-bridge/verify-extension.mjs` — global Buffer, URL, chrome, console
+- `native/voice-bridge/verify-host.mjs` — global process, Buffer, setTimeout, clearTimeout, URL, console
 - `scripts/measure-voice-silent-busy.mjs` — 混雑した会場の「読み上げONなのに無音」を、偽VOICEVOX(50121)と新しいPlaywright contextで実測する。
 - `scripts/measure-yt-voice-repeat.mjs` — YouTube の会場の読み上げが「最新を読まず、過去の発言を何度も読む」かを計器で確かめる。
 - `scripts/probe-browser-voice-audio.mjs` — 新規Playwrightプロファイルで非ゼロWAVの実再生とPC音声の開始/終了を確認する。
@@ -729,6 +732,7 @@
 - `src/lib/voiceStyleLevelTable.js` — VOICEVOX の声(styleId)ごとの素の大きさの表(v0.1.1788)。
 - `src/lib/voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
 - `src/lib/voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
+- `src/lib/voiceSynthPipeline.js` — 【層】L0 判定層
 - `src/lib/voiceTestRun.js` — 読み上げを「決まった形のコメント」で流して測る試験(開発版だけ・2026-10-26)。
 - `src/lib/voiceVolume.js` — 読み上げの音量(ピーク正規化 + 利用者の音量設定)。DOM も chrome API も触らない純関数。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
@@ -940,6 +944,13 @@
 > 🦊こん太: 見つけたら分類してあげるのだ。
 > 🦝たぬ姉: FEATURE_CATEGORY に1行足すだけなのだ。
 
+- **任意のローカル音声補助** — 明示同意・任意権限の下で指定声を同一PC内で合成。完了不明時の二重投入を防ぐ
+  - `src/lib/voiceNativeProtocol.js`
+  - `src/lib/voiceNativeBroker.js`
+  - `src/lib/voiceNativeClient.js`
+  - `src/extension/native-voice-sw-entry.js`
+  - `src/extension/popup/wireVoiceNativeToggle.js`
+  - `native/voice-bridge/VoiceBridge.cs`
 - **Twitch の配信を記録(本体に同梱)** — Twitch の視聴ページで公式の読み取り専用 IRC を読み、YouTube 版と同じ記録(yt_kirameki_db・配信キー tw.<login>.<配信番号>)へ渡す。画面は YouTube 版(=ニコ生版の完全コピー)をそのまま使い、リンク・言葉・送信先だけ Twitch にする。計器 yt_diag_tw_chat
   - `extension-youtube/src/tw-content-entry.js`
   - `src/lib/twitch/twIrcParse.js`

@@ -65,7 +65,7 @@ describe('VoicePlayer 混雑中は合成中の件を守る', () => {
     const onDropped = vi.fn();
     const onAudioStart = vi.fn();
     p.enqueue([comment(1, { onDropped, onAudioStart })]); // 前の合成が終わってから頼まれる
-    p.queue[0].enqueuedAt = Date.now() - 30000; // 前の件の合成が長く、8秒を大きく過ぎた
+    p.queue[0].enqueuedAt = Date.now() - 15000; // 前の件の合成が長く、8秒を大きく過ぎた
     for (let round = 0; round < 5; round++) {
       resolvers.splice(0).forEach((r) => r(new ArrayBuffer(8)));
       await new Promise((r) => setTimeout(r, 10));

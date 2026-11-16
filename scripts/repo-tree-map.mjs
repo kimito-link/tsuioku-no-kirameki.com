@@ -41,6 +41,8 @@ const MAX_DEPTH = 2; // トップ + 2 階層まで(src/lib/... は src/lib で�
  * @type {Record<string, { role: string, tags?: string[] }>}
  */
 const ROLES = {
+  'native': { role: '任意のローカル補助アプリ。拡張とは別配布', tags: ['音声', 'ローカル'] },
+  'native/voice-bridge': { role: 'Native音声ホスト・ユーザー単位setup・専用環境検証', tags: ['読み上げ', 'Native Messaging', '検証'] },
   'extension': { role: '拡張本体の配布版ソース(ここを編集)。manifest/background/各 html', tags: ['配布', 'manifest'] },
   'extension/images': { role: 'アイコン・ロゴのマスター画像', tags: ['画像'] },
   'extension/dist': { role: 'ビルド成果物(content/popup/status 等の bundle)。build が生成', tags: ['ビルド成果物'] },
@@ -138,6 +140,7 @@ const ROLES = {
  * @type {{ feature: string, desc: string, paths: string[], tags?: string[] }[]}
  */
 const FEATURES = [
+  { feature: '任意のローカル音声補助', desc: '明示同意・任意権限の下で指定声を同一PC内で合成。完了不明時の二重投入を防ぐ', paths: ['src/lib/voiceNativeProtocol.js', 'src/lib/voiceNativeBroker.js', 'src/lib/voiceNativeClient.js', 'src/extension/native-voice-sw-entry.js', 'src/extension/popup/wireVoiceNativeToggle.js', 'native/voice-bridge/VoiceBridge.cs'], tags: ['読み上げ', 'ローカル', '検証'] },
   { feature: 'Twitch の配信を記録(本体に同梱)', desc: 'Twitch の視聴ページで公式の読み取り専用 IRC を読み、YouTube 版と同じ記録(yt_kirameki_db・配信キー tw.<login>.<配信番号>)へ渡す。画面は YouTube 版(=ニコ生版の完全コピー)をそのまま使い、リンク・言葉・送信先だけ Twitch にする。計器 yt_diag_tw_chat', paths: ['extension-youtube/src/tw-content-entry.js', 'src/lib/twitch/twIrcParse.js', 'src/lib/twitch/twStreamKey.js', 'src/lib/twitch/twGql.js', 'extension-youtube/src/ytNicoShim.js', 'tests/e2e/twitch-recording.spec.js', 'council/twitch-support-PLAN.md'], tags: ['Twitch', '記録', '他プラットフォーム'] },
   { feature: 'Kick の配信を記録(本体に同梱)', desc: 'Kick の視聴ページで、ページ自身が使うリアルタイムの接続(つなぎ先は毎回 Kick の API に聞く・第一候補 Centrifugo・予備は API が返す Pusher の鍵・ログイン不要)を読み、Twitch と同じ口で YouTube 版の記録(配信キー kk.<slug>.<配信番号>)へ渡す。Twitch・Kick の違い(リンク・言葉・送信先・顔の置き場)は streamPlatform.js の表で引く。計器 yt_diag_kk_chat', paths: ['extension-youtube/src/kick-content-entry.js', 'src/lib/kick/kickChatParse.js', 'src/lib/kick/kickApi.js', 'src/lib/kick/kickRealtime.js', 'src/lib/platform/streamPlatform.js', 'tests/e2e/kick-recording.spec.js', 'council/kick-support-PLAN.md'], tags: ['Kick', '記録', '他プラットフォーム'] },
   { feature: 'ふわっちの配信を記録(本体に同梱・試作)', desc: 'ふわっちの視聴ページ(whowatch.tv/viewer/<番号>)で、ページ自身が使う API(api.whowatch.tv/lives/<番号>?last_updated_at=…)を3秒おきに読み、Kick と同じ口で YouTube 版の記録(配信キー ww.<番号>.<配信者 id>)へ渡す。アイテムは superchat(pt・名前と絵つき)。ページから読めなければバックグラウンドが代わりに読む(YT_WW_API_GET)。形は非公式資料による推定で、届いた項目の名前を計器 yt_diag_ww_chat に残して PC で確かめる', paths: ['extension-youtube/src/ww-content-entry.js', 'src/lib/whowatch/wwParse.js', 'src/lib/platform/streamPlatform.js', 'tests/e2e/whowatch-recording.spec.js', 'council/whowatch-support-PLAN.md'], tags: ['ふわっち', '記録', '他プラットフォーム'] },

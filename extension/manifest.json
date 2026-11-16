@@ -295,5 +295,8 @@
         "https://twitcasting.tv/*"
       ]
     }
+  ],
+  "optional_permissions": [
+    "nativeMessaging"
   ]
 }

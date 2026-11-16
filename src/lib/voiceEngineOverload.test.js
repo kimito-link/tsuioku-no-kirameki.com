@@ -95,16 +95,16 @@ describe('★本物の VoicePlayer 経由で効く(2026-10-31 りんくの PC �
     return { player, calls };
   }
 
-  it('時間切れが続くと、次の合成から打ち切りが延び、混雑中が計器に出る', async () => {
+  it('時間切れは計器に残し、問い合わせと合成の期限を有界に保つ', async () => {
     const { player, calls } = makePlayer();
     await player._synthesizeTracked('a', { styleId: 3 });
     await player._synthesizeTracked('b', { styleId: 3 });
     expect(player.diag.voiceOverloaded).toBe(true);
     expect(player.diag.voiceOverloadTotal).toBe(1);
-    expect(calls[0].synthesisTimeoutMs).toBeUndefined();
+    expect(calls[0].synthesisTimeoutMs).toBe(20000);
     await player._synthesizeTracked('c', { styleId: 3 });
-    expect(calls[2].audioQueryTimeoutMs).toBe(VOICE_OVERLOAD_QUERY_TIMEOUT_MS);
-    expect(calls[2].synthesisTimeoutMs).toBe(VOICE_OVERLOAD_SYNTH_TIMEOUT_MS);
+    expect(calls[2].audioQueryTimeoutMs).toBe(15000);
+    expect(calls[2].synthesisTimeoutMs).toBe(20000);
   });
 
   it('混雑中は待ちが5件あっても先読みは1件だけ', () => {

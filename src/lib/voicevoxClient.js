@@ -1,3 +1,4 @@
+import { tryNativeVoiceSynthesis } from './voiceNativeClient.js';
 // voicevoxClient.js — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 import { normalizeVoiceReadingBody } from './voiceReadingNormalize.js';
 import { shortenLongCommentForVoice } from './voiceLongCommentShorten.js';
@@ -786,6 +787,8 @@ async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailur
  *   stream?: boolean,
  *   wholeViaStream?: boolean,
  *   streamFetchFn?: Function,
+ *   nativeSendMessage?: (message: any) => Promise<any>,
+ *   onCapacity?: (cap: number) => void,
  *   signal?: AbortSignal
  * }} [opts]
  *   v0.1.1796: stream が無くてもエンジンが少しずつ受け取りに対応していれば、それで最後まで受け取って丸ごと返す
@@ -800,6 +803,15 @@ async function streamSynthesisWhole(url, audioQuery, styleId, opts, notifyFailur
  */
 export async function synthesizeVoice(text, voice, opts = {}) {
   const readingText = String(text || '').trim();
+  if (!readingText) return null;
+  // Native v1 is a whole-WAV transport for the default local engine only.
+  if(opts.stream !== true && !opts.baseUrl && (!opts.fetchFn || opts.nativeSendMessage)){
+    const runtime=globalThis.chrome?.runtime;
+    const sendMessage=opts.nativeSendMessage || (runtime?.sendMessage ? message=>runtime.sendMessage(message):undefined);
+    const native=await tryNativeVoiceSynthesis(readingText,voice,{...opts,sampleRate:_outputSamplingRate,sendMessage});
+    if(native.available)return native.wav;
+  }
+  try{opts.onCapacity?.(6);}catch{/* observation only */}
   const fetchFn = opts.fetchFn || proxyFetchFn;
   const fetchBufferFn = opts.fetchFn ? opts.fetchFn : proxyFetchBufferFn;
   /** 失敗理由の通知(計器が壊れても本処理は止めない)。 */

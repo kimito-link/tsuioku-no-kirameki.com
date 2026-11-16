@@ -36,6 +36,8 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   silenceLastDropReasons: Record<string, number>, // 同上: 直前までのdrop理由内訳
  *   lastSpokenBase: number,      // 最後に発話した時刻(epoch ms・0=未発話)
  *   lastSynthMs: number,         // 直近の合成所要 ms(-1=未計測)
+ *   pipelineLimit: number,       // 能力に応じた合成の同時数上限
+ *   pipelineBlockedUntil: number, // 完了不明依頼を重ねない期限
  *   lastDepth: number,           // 直近の先読み深さ
  *   lastSpeedBoost: number,      // 直近の速度ブースト
  *   lastPhase: string,           // v0.1.895: drainVoiceQueue が最後に到達したフェーズ(固着位置の計器)
@@ -168,6 +170,8 @@ export function makeInitialVoiceDiag() {
     lastSpokenBase: 0,
     lastSynthMs: -1,
     lastDepth: 0,
+    pipelineLimit: 1,
+    pipelineBlockedUntil: 0,
     lastSpeedBoost: 0,
     lastPhase: '',
     lastPhaseAt: 0,
@@ -352,6 +356,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     lastSpokenBase: num(d.lastSpokenBase, base.lastSpokenBase),
     lastSynthMs: num(d.lastSynthMs, base.lastSynthMs),
     lastDepth: num(d.lastDepth, base.lastDepth),
+    pipelineLimit: num(d.pipelineLimit, base.pipelineLimit),
+    pipelineBlockedUntil: num(d.pipelineBlockedUntil, base.pipelineBlockedUntil),
     lastSpeedBoost: num(d.lastSpeedBoost, base.lastSpeedBoost),
     lastPhase: String(d.lastPhase || base.lastPhase),
     lastPhaseAt: num(d.lastPhaseAt, base.lastPhaseAt),
