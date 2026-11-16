@@ -78,12 +78,26 @@ const LISTALL = {
   ],
 };
 
+// 放送開始からのコメント一覧(1ページ目に開く前の古い1件・2ページ目は空)
+const HISTORY_PAGE0 = `<!doctype html><html><body><div class="tw-comment-history">
+<div class="tw-comment-history-item" data-comment-id="33979474700"><div class="tw-comment-history-item__content__text"> さいしょから </div>
+<div class="tw-comment-history-item__info__user"><a href="/fan_d"><img src="${ICON}" class="tw-comment-history-item__user__icon"></a>
+<a class="tw-comment-history-item__details__user-link" href="/fan_d"> ファンD </a></div>
+<time datetime="${new Date(T0 + 100).toUTCString()}"></time></div>
+<div class="tw-comment-history-item" data-comment-id="33979474800"><div class="tw-comment-history-item__content__text"> まえから </div>
+<div class="tw-comment-history-item__info__user"><a href="/fan_c"><img src="${ICON}" class="tw-comment-history-item__user__icon"></a>
+<a class="tw-comment-history-item__details__user-link" href="/fan_c"> ファンC </a></div>
+<time datetime="${new Date(T0 + 500).toUTCString()}"></time></div>
+</div></body></html>`;
+const HISTORY_EMPTY = `<!doctype html><html><body><div class="tw-comment-history"><div class="tw-empty-state"><div class="tw-empty-state-title">Comments are not available for this video</div></div></div></body></html>`;
+
 const WANT_ROWS = [
   'superchat:tc:fan_a:ファンA:お茶爆100:0:TCSCORE:face',
   'superchat:tc:g:1181112:おうえん:がんばれ:90:TCSCORE:face',
   'superchat:tc:n:匿名:匿名さん:お茶ｘ10:20:TCSCORE:-',
   'text:tc:fan_a:ファンA:わこつ:0::face',
   'text:tc:fan_c:ファンC:まえから:0::face',
+  'text:tc:fan_d:ファンD:さいしょから:0::face',
   'text:tc:n:匿名:匿名コメント:こんばんは:0::-',
 ];
 
@@ -192,6 +206,8 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
       if (u.searchParams.get('m') !== String(MOVIE)) return json({ comments: [] });
       return json(u.searchParams.get('f') === '0' ? LISTALL : { comments: [] });
     }
+    if (u.pathname === `/${USER}/moviecomment/${MOVIE}-0`) return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HISTORY_PAGE0 });
+    if (u.pathname.startsWith(`/${USER}/moviecomment/`)) return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HISTORY_EMPTY });
     if (u.pathname === `/${USER}/supporter`) return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: SUPPORTER_HTML });
     if (u.pathname.startsWith('/img/')) return route.fulfill({ status: 404, body: '' });
     return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: pageHtml(state) });
@@ -211,9 +227,9 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   await expect
     .poll(async () => {
       const d = await tcDiag();
-      return { wsState: d.wsState, giftParam: d.giftParam, comments: d.comments, gifts: d.gifts, keepAlive: d.keepAlive >= 1, raid: d.types?.raid, tab: /^[a-z0-9]{4,}$/.test(String(d.tab || '')), backfill: d.backfills >= 1 && d.backfillFail === 0 };
+      return { wsState: d.wsState, giftParam: d.giftParam, comments: d.comments, gifts: d.gifts, keepAlive: d.keepAlive >= 1, raid: d.types?.raid, tab: /^[a-z0-9]{4,}$/.test(String(d.tab || '')), backfill: d.backfills >= 1 && d.backfillFail === 0, history: d.historyDone === true && d.historyFail === 0 };
     }, { timeout: 15_000 })
-    .toEqual({ wsState: 'open', giftParam: true, comments: 3, gifts: 3, keepAlive: true, raid: 1, tab: true, backfill: true });
+    .toEqual({ wsState: 'open', giftParam: true, comments: 4, gifts: 3, keepAlive: true, raid: 1, tab: true, backfill: true, history: true });
 
   // 公式のサポーターランキング(現在のレベルのアイテムスコアの順)が、他サービスの公式ランキングと同じ置き場に入る
   await expect.poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get(`yt_leaderboard_${key}`))[`yt_leaderboard_${key}`], KEY))?.rows?.length || 0, { timeout: 15_000 }).toBe(2);

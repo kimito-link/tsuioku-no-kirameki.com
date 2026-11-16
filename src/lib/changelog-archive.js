@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2115',
+    date: '2026-11-13',
+    summary: 'PC の声のまま戻らない時も VOICEVOX へ',
+    items: Object.freeze([
+      'VOICEVOX が混んで PC の声(Windows の声)で読んでいるとき、2分たっても戻らなければ一度 VOICEVOX で読んでみるようにしました。まだ混んでいれば、また PC の声に切り替えます。',
+      'PC の声から戻れなかった理由を、読み上げの状態に残すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2114',
     date: '2026-11-12',
     summary: '混雑時の読み上げの効き目を測る',

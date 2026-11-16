@@ -5171,7 +5171,7 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.2137', metric: 'bundle-kb', value: 1448,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
-    note: '直前の版と同じ 1448KB。この版は配信サイトの content script 側(Kick・ABEMA・Twitch・ふわっち・SHOWROOM・ミクチャ)と src/lib のみ変更しており popup.js は膨らませていない。'
+    note: '直前の版と同じ。この版はツイキャスの content script(yt-tc-content.js)だけを変え、popup.js は変えていない'
   }),
   Object.freeze({
     version: '0.1.2137', metric: 'gate-selftest', value: 5,
@@ -5180,6 +5180,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.2137', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
-    note: 'コミット本文の言い回しを直近30日で数える値(期間依存)。この版は8サービスの調査と試験用ブラウザでの実配信(Kick・ABEMA・Twitch)での読み足し実測を council/history-backfill-survey.md と REPORT.md に記録した。'
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて減っただけで性能は表さない。この版は本物のコメント一覧ページを curl で読んで形とページ送りを確かめ、e2e でさかのぼりを外すと赤になることも確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2138', metric: 'bundle-kb', value: 1448,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '直前の版と同じ 1448KB。この版は各配信サイトの content script(Kick・ABEMA・Twitch・ふわっち・SHOWROOM・ミクチャ)と src/lib だけを変え、popup.js は膨らませていない'
+  }),
+  Object.freeze({
+    version: '0.1.2138', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2138', metric: 'cross-checked-claims', value: 5,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを直近30日で数える値(0.1.2120 の注記と同じ理由)で、性能は表さない。この版の確かめは council/history-backfill-REPORT.md の実配信(Kick・ABEMA・Twitch)での読み足し実測に残した'
   })
 ]);
