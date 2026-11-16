@@ -5099,16 +5099,16 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて減っただけで性能は表さない。この版は偽エンジンの10分試験と実 Audio・PC の声の再生確認で別に確かめた(council/codex-report-voice-silent-busy.md)'
   }),
   Object.freeze({
-    version: '0.1.2131', metric: 'bundle-kb', value: 1448,
+    version: '0.1.2132', metric: 'bundle-kb', value: 1448,
     source: '[auto] extension/dist/popup.js のファイルサイズ',
     note: '0.1.2130 から +2KB。同じ値なら書かない比べ(属性・class・中身)を横の欄の描き直しに足した分'
   }),
   Object.freeze({
-    version: '0.1.2131', metric: 'gate-selftest', value: 5,
+    version: '0.1.2132', metric: 'gate-selftest', value: 5,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   }),
   Object.freeze({
-    version: '0.1.2131', metric: 'cross-checked-claims', value: 43,
+    version: '0.1.2132', metric: 'cross-checked-claims', value: 43,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて 49→43(この版のコミット前の値)で性能は表さない。この版は手元で Kick 形の記録にコメントを流し、5秒の DOM 変化を 0.1.2130 と数え比べて確かめた'
   })

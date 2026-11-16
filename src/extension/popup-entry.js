@@ -3093,7 +3093,7 @@ function renderCommentTickerImpl(comments) {
   const placeholder =
     '<span class="nl-ticker-item nl-ticker-latest">まだ応援コメントがないのだ… 記録ONでたまるよ</span>';
 
-  // 0.1.2131: 同じ値の classList.add/innerHTML='' も変化の記録になるので、変わる時だけ書く。
+  // 0.1.2132: 同じ値の classList.add/innerHTML='' も変化の記録になるので、変わる時だけ書く。
   setClassFlag(scroll, 'is-paused', true); setClassFlag(scroll, 'is-latest-only', true);
   if (segB.firstChild) segB.innerHTML = '';
 
@@ -10144,7 +10144,7 @@ function renderTopSupportRankStrip(stripRooms) {
     if (setInnerHtmlIfChanged(strip, emptyHtml)) bindOnErrorHandlersWithin(strip);
     return;
   }
-  // 0.1.2131: 同じ値・同じ中身なら書かない。言い換えが入る aria-label は元の値で比べる。
+  // 0.1.2132: 同じ値・同じ中身なら書かない。言い換えが入る aria-label は元の値で比べる。
   if (strip.hidden) strip.hidden = false;
   removeAttrIfPresent(strip, 'aria-hidden');
   setAttrFromSourceIfChanged(strip, 'aria-label', '記録した応援コメントをユーザー別に数えた件数の多い順');
@@ -10846,7 +10846,7 @@ function resolveNorthStarLaneAsideEl(body) {
 function clearNorthStarVerticalRailForBody(body) {
   const rail = resolveNorthStarLaneAsideEl(body);
   if (!rail) return;
-  // 0.1.2131: 同じ値なら書かない(書いた印が見張りを起こし、描き直しのたびに同じ値を書き直していた)
+  // 0.1.2132: 同じ値なら書かない(書いた印が見張りを起こし、描き直しのたびに同じ値を書き直していた)
   if (rail.firstChild) rail.innerHTML = '';
   if (!rail.hidden) rail.hidden = true;
   setAttrIfChanged(rail, 'aria-hidden', 'true');
@@ -10872,7 +10872,7 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
     const laneStateForVis =
       String(body.getAttribute('data-lane-state') || '').trim() || 'missing';
     const showLane = shouldShowNorthStarLane(laneId, laneStateForVis);
-    // 0.1.2131: サービスに合わせて隠した欄(platformMetricChrome の印)は出し直さない(出す→隠すの繰り返し)。同じ値なら書かない。
+    // 0.1.2132: サービスに合わせて隠した欄(platformMetricChrome の印)は出し直さない(出す→隠すの繰り返し)。同じ値なら書かない。
     if (laneRoot.dataset.nlPlatformHide !== '1') {
       if (laneRoot.hidden !== !showLane) laneRoot.hidden = !showLane;
       if (showLane) removeAttrIfPresent(laneRoot, 'aria-hidden');
@@ -10904,7 +10904,7 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
   if (pctNum instanceof HTMLElement) {
     const pctText = pct == null ? '—' : `${Math.round(pct)}%`;
     if (pctNum.textContent !== pctText) pctNum.textContent = pctText;
-    // 0.1.2131: 元の値で比べる(ニコ生以外は書いた後に言い換えが入り、毎回書き直して取り合っていた)
+    // 0.1.2132: 元の値で比べる(ニコ生以外は書いた後に言い換えが入り、毎回書き直して取り合っていた)
     setAttrFromSourceIfChanged(pctNum, 'title', acquisitionPctTitle(laneId, giftRankMetric, pct));
   }
   const wrap = gadget.querySelector('.nl-north-star-lane__chara-wrap');
@@ -10959,7 +10959,7 @@ function syncNorthStarCharaTrioSlotFromState(laneId, tier, pct) {
     `.nl-north-star-chara-trio__slot[data-nl-trio-slot="${slotInfo.slotId}"]`
   );
   if (!(slotEl instanceof HTMLElement)) return;
-  // 0.1.2131: 値が同じなら書かない(待機中も描き直しのたびに同じ値を書き直していた)
+  // 0.1.2132: 値が同じなら書かない(待機中も描き直しのたびに同じ値を書き直していた)
   if (slotEl.dataset.nlAcqTier !== String(tier || 'wait')) slotEl.dataset.nlAcqTier = String(tier || 'wait');
   const img = slotEl.querySelector('img.nl-north-star-chara-trio__chara');
   if (img instanceof HTMLImageElement) {
@@ -10982,7 +10982,7 @@ function syncNorthStarCharaTrioSlotFromState(laneId, tier, pct) {
   // v0.1.293: SR・hover 用の動的 title を 純関数化したラベルで埋める。
   // tier ラベル（取得率 高 / 完全取得 等）を含むので、視覚での金/銀/銅 tier
   // 装飾とテキストが補完し合う＝SR ユーザーにも演出意図が伝わる。
-  // 0.1.2131: ニコ生以外は title が言い換えられるので元の値で比べる。aria-label も元の文から作る。
+  // 0.1.2132: ニコ生以外は title が言い換えられるので元の値で比べる。aria-label も元の文から作る。
   const slotTitle = buildCharaTrioSlotTitle(slotInfo, tier, pct);
   setAttrFromSourceIfChanged(slotEl, 'title', slotTitle);
   // aria-label も同じテキストで上書き（HTML 初期の "りんく（貢献度ランキング）"
@@ -11121,7 +11121,7 @@ function teardownNorthStarLaneWaitingUi(body) {
   const bid = body.id || '';
   if (bid.startsWith('northStarLaneBody-')) {
     clearNorthStarVerticalRailForBody(body);
-    // 0.1.2131: classList.remove は付いていない class でも書き直す(変化の記録が出る)ので、付いている時だけ外す。
+    // 0.1.2132: classList.remove は付いていない class でも書き直す(変化の記録が出る)ので、付いている時だけ外す。
     for (const c of ['nl-top-support-rank', 'nl-top-support-rank--below-cards', 'nl-top-support-rank--span-cards', 'nl-gift-rank-strip']) setClassFlag(body, c, false);
     try {
       if ('nlGiftRankMetric' in body.dataset) delete body.dataset.nlGiftRankMetric;
@@ -11373,7 +11373,7 @@ function applyNorthStarLaneWaitingOrHide(body, laneId, state) {
   teardownNorthStarLaneWaitingUi(body);
   if (body.firstChild) body.innerHTML = '';
   clearNorthStarVerticalRailForBody(body);
-  // 0.1.2131: 隠す→直後の sync が常設の欄を出し直す、を毎回していた。最後に出すなら隠さない。
+  // 0.1.2132: 隠す→直後の sync が常設の欄を出し直す、を毎回していた。最後に出すなら隠さない。
   const laneEl = body.closest('.nl-north-star-lane');
   const st = String(body.getAttribute('data-lane-state') || '').trim() || 'missing';
   if (!(laneEl instanceof HTMLElement && laneEl.dataset.nlPlatformHide !== '1' && shouldShowNorthStarLane(laneId, st))) setNorthStarLaneHidden(laneId, true);
@@ -12378,7 +12378,7 @@ function setNorthStarLaneHidden(laneId, hidden) {
     '.nl-north-star-lane[data-lane="' + String(laneId || '').replace(/"/g, '') + '"]'
   );
   if (!(lane instanceof HTMLElement)) return;
-  // 0.1.2131: 同じ状態なら書かない。ニコ生以外でサービスに合わせて隠した欄(platformMetricChrome の印)は出し直さない。
+  // 0.1.2132: 同じ状態なら書かない。ニコ生以外でサービスに合わせて隠した欄(platformMetricChrome の印)は出し直さない。
   if (hidden) { if (!lane.hasAttribute('hidden')) lane.setAttribute('hidden', ''); }
   else if (lane.dataset.nlPlatformHide !== '1') removeAttrIfPresent(lane, 'hidden');
 }
@@ -13230,7 +13230,7 @@ try { /** @type {any} */ (globalThis).__nlRoomsDiag = aggregateRoomsForPaint.dia
  * @param {string} [liveId] ランキングストリップの再描画キー用
  * @param {{ rankingProvisional?: boolean }} [renderOpts]
  */
-/** 0.1.2131: ルーム一覧の前回の中身(カード HTML・サムネ・「ほか N」)。同じなら作り直さない。 @type {WeakMap<Element, string>} */
+/** 0.1.2132: ルーム一覧の前回の中身(カード HTML・サムネ・「ほか N」)。同じなら作り直さない。 @type {WeakMap<Element, string>} */
 const _userRoomsKeyByUl = new WeakMap();
 function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   const ul = /** @type {HTMLUListElement} */ ($('userRoomList'));
@@ -13249,7 +13249,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     ul.parentElement.insertBefore(provisionalNoteEl, ul);
   }
   if (provisionalNoteEl) {
-    if (provisionalNoteEl.hidden !== !rankingProvisional) provisionalNoteEl.hidden = !rankingProvisional; // 0.1.2131: 同じ値なら書かない
+    if (provisionalNoteEl.hidden !== !rankingProvisional) provisionalNoteEl.hidden = !rankingProvisional; // 0.1.2132: 同じ値なら書かない
     const provText = rankingProvisional ? '直近コメントからの暫定ランキングです。全件読み込み後に更新されます。' : '';
     if (provisionalNoteEl.textContent !== provText) provisionalNoteEl.textContent = provText;
   }
@@ -13448,7 +13448,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   if (!rooms.length) {
     _lastTopSupportRankStripStableKey = null;
     renderTopSupportRankStrip([]);
-    _userRoomsKeyByUl.delete(ul); // 0.1.2131: 中身が同じなら作り直さない(描き直しのたびに一覧を丸ごと作り直していた)
+    _userRoomsKeyByUl.delete(ul); // 0.1.2132: 中身が同じなら作り直さない(描き直しのたびに一覧を丸ごと作り直していた)
     setInnerHtmlIfChanged(ul, '<li class="empty-hint">まだコメントがありません</li>');
     return;
   }
@@ -13520,7 +13520,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   const maxTotal = Math.max(1, ...visibleRooms.map((v) => v.count));
   const maxRecent = Math.max(1, ...visibleRooms.map((v) => v.recentCount));
 
-  // 0.1.2131: カードの中身(HTML・サムネ)と「ほか N ユーザー」が前回と同じなら一覧を作り直さない。
+  // 0.1.2132: カードの中身(HTML・サムネ)と「ほか N ユーザー」が前回と同じなら一覧を作り直さない。
   const roomCards = visibleRooms.map((r) => {
     const label = displayUserLabel(r.userKey, r.nickname);
     const isUnknown = r.userKey === UNKNOWN_USER_KEY;

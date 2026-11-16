@@ -26,7 +26,7 @@ describe('northStarAcquisitionGauge', () => {
   });
 });
 
-describe('acquisitionPctTitle(0.1.2131 で popup-entry から外出し)', () => {
+describe('acquisitionPctTitle(0.1.2132 で popup-entry から外出し)', () => {
   /** 外出し前の popup-entry の分岐をそのまま写したもの(答え合わせ用) */
   const before = (laneId, metric, pct) => {
     if (pct == null) return 'パーセントではありません。ニコ生側の一覧がDOMに出るまでの待機表示です。';

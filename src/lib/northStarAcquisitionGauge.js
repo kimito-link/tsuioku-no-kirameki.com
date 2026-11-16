@@ -30,7 +30,7 @@ export function acquisitionTierFromPct(pct) {
 }
 
 /**
- * 北極星レーンの「%」に付ける説明(title)。0.1.2131 で popup-entry から外出し(文言は同じ)。
+ * 北極星レーンの「%」に付ける説明(title)。0.1.2132 で popup-entry から外出し(文言は同じ)。
  * @param {string} laneId
  * @param {string} giftRankMetric 'throws' | 'points' | ''
  * @param {number|null} pct

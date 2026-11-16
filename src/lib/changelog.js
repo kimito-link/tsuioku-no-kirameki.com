@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2131',
+    version: '0.1.2132',
     date: '2026-11-16',
     summary: 'ニコ生以外で横の欄がさらに軽くなる',
     items: Object.freeze([
