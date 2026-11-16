@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2136',
+    date: '2026-11-16',
+    summary: '使わない権限を拡張から外した',
+    items: Object.freeze([
+      '準備していた「ローカル補助アプリ」との連携をやめ、そのための追加の権限(nativeMessaging)を拡張から外しました。本物の VOICEVOX で試したところ、補助アプリを使っても読み上げは速くならなかったためです。読み上げの動きは今までどおりです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2135',
     date: '2026-11-16',
     summary: 'ツイキャスで開く前のコメントも記録',
@@ -174,15 +182,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '混雑時の読み上げの効き目を測る',
     items: Object.freeze([
       '声のつくり置き・合唱・混雑中の選び方が、本物の配信でどれだけ効いたかを読み上げの状態に残すようにしました(見た目と読み方は変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2113',
-    date: '2026-11-12',
-    summary: '混雑中も質問と初めての声を読む',
-    items: Object.freeze([
-      'コメントが多くて「大事なものだけ読む」状態のときも、配信者への質問(？で終わる・「〜ですか」など)と、この配信でまだ一度も声で読まれていない人のコメントは読むようにしました。',
-      'とても混んでいるときは、その両方にあてはまるコメントだけを読みます。読む順番は変えません。ギフトや応援ランキングで優先することはしません。'
     ])
   })
 ]);
