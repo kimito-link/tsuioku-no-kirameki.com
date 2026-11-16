@@ -148,6 +148,28 @@ describe('venueItemsForPlatform', () => {
     expect(items.find((i) => i.key === 'raids').title).toContain('40');
   });
 
+  it('Twitch は数え始めた時刻を出す(開く前の分はさかのぼれないので、どこからの数かを見せる)', () => {
+    const t0 = new Date(2026, 10, 16, 13, 2).getTime();
+    const support = tallySupportItems([
+      { kind: 'text', recordedAt: t0 + 60_000 },
+      { kind: 'membership', recordedAt: t0 },
+      { kind: 'text', recordedAt: 0 },
+    ]);
+    expect(support.firstRecordedAt).toBe(t0);
+    const items = venueItemsForPlatform('twitch', bag({ viewers: 10, support }));
+    const since = items.find((i) => i.key === 'countSince');
+    expect(since.label).toBe('数え始め');
+    expect(since.text).toBe('13:02〜');
+    expect(since.title).toContain('Twitch が過去の分を出していない');
+    expect(items.map((i) => i.label).at(-1)).toBe('数え始め');
+  });
+
+  it('記録の時刻が無ければ数え始めは出さない', () => {
+    const support = tallySupportItems([{ kind: 'membership' }]);
+    expect(support.firstRecordedAt).toBe(0);
+    expect(panelExtraChips('kick', { support }).some((c) => c.key === 'countSince')).toBe(false);
+  });
+
   it('Kick は Kicks・サブスク・ギフトサブ', () => {
     const support = tallySupportItems([
       { kind: 'superchat', amount: 7, currency: 'KICKS' },

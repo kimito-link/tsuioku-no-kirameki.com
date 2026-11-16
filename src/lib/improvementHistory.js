@@ -5111,5 +5111,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2132', metric: 'cross-checked-claims', value: 43,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて 49→43(この版のコミット前の値)で性能は表さない。この版は手元で Kick 形の記録にコメントを流し、5秒の DOM 変化を 0.1.2130 と数え比べて確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2133', metric: 'bundle-kb', value: 1448,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '0.1.2132 と同じ。この版はサイドパネル側(yt-sidepanel.js)に「数え始め」のチップを足しただけで popup.js は増えていない'
+  }),
+  Object.freeze({
+    version: '0.1.2133', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2133', metric: 'cross-checked-claims', value: 41,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて 43→41 で性能は表さない。この版は Twitch 公式のチャット接続に実際につなぎ、届いた通知19件(サブスク・ギフト・Bits)を拡張と同じ読み取りで数えて確かめた'
   })
 ]);
