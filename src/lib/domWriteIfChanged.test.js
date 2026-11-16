@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { noteHtmlWrittenElsewhere, removeAttrIfPresent, removeStylePropIfSet, setAttrIfChanged, setClassFlag, setInnerHtmlIfChanged } from './domWriteIfChanged.js';
+import { noteHtmlWrittenElsewhere, removeAttrIfPresent, removeStylePropIfSet, setAttrFromSourceIfChanged, setAttrIfChanged, setClassFlag, setInnerHtmlIfChanged } from './domWriteIfChanged.js';
 
 /** vitest は node 環境(jsdom なし)なので、使う面だけの最小スタブ。書き込み回数を数える。 */
 function stubEl() {
@@ -105,5 +105,37 @@ describe('setInnerHtmlIfChanged', () => {
     setInnerHtmlIfChanged(el, '<p>a</p>');
     el.innerHTML = '';
     expect(setInnerHtmlIfChanged(el, '<p>a</p>')).toBe(true);
+  });
+});
+
+describe('setAttrFromSourceIfChanged(書いた後に言い換えが入っても取り合わない・0.1.2129)', () => {
+  /** ytNicoShim の fixTitleAttr の代わり: 書かれたら言い換える */
+  const rewrite = (el) => { const t = el.getAttribute('title'); if (t && t.includes('ニコ生')) el.setAttribute('title', t.replace('ニコ生', 'Kick')); };
+  it('言い換え後の値を元の値で上書きし直さない', () => {
+    const el = stubEl();
+    expect(setAttrFromSourceIfChanged(el, 'title', 'ニコ生の応援')).toBe(true);
+    rewrite(el);
+    expect(el.getAttribute('title')).toBe('Kickの応援');
+    const before = el.w.attr;
+    for (let i = 0; i < 5; i += 1) { setAttrFromSourceIfChanged(el, 'title', 'ニコ生の応援'); rewrite(el); }
+    expect(el.w.attr).toBe(before);
+    expect(el.getAttribute('title')).toBe('Kickの応援');
+  });
+  it('今の比べ方(setAttrIfChanged)だと毎回取り合う(直す前の形)', () => {
+    const el = stubEl();
+    setAttrIfChanged(el, 'title', 'ニコ生の応援');
+    rewrite(el);
+    const before = el.w.attr;
+    for (let i = 0; i < 5; i += 1) { setAttrIfChanged(el, 'title', 'ニコ生の応援'); rewrite(el); }
+    expect(el.w.attr - before).toBe(10);
+  });
+  it('元の値が変わったら書く・属性が消えていたら書き直す', () => {
+    const el = stubEl();
+    setAttrFromSourceIfChanged(el, 'aria-label', 'a');
+    expect(setAttrFromSourceIfChanged(el, 'aria-label', 'b')).toBe(true);
+    expect(el.getAttribute('aria-label')).toBe('b');
+    el.removeAttribute('aria-label');
+    expect(setAttrFromSourceIfChanged(el, 'aria-label', 'b')).toBe(true);
+    expect(el.getAttribute('aria-label')).toBe('b');
   });
 });

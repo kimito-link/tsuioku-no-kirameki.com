@@ -19,6 +19,31 @@ export function setAttrIfChanged(el, name, value) {
   return true;
 }
 
+/** @type {WeakMap<Element, Map<string, string>>} */
+const lastSourceAttr = new WeakMap();
+
+/**
+ * 属性を「こちらが渡した元の値」が前回と同じなら書かない(0.1.2129)。
+ * ★なぜ setAttrIfChanged では足りないか: ニコ生以外の横の欄では、書いた後に言い換え(ytNicoShim の fixTitleAttr)が
+ *   title / aria-label を各サービスの言葉へ直す。次の描き直しで「今の値(言い換え後) ≠ 渡す値(言い換え前)」となり、
+ *   元の値を書く→また言い換え…が応援マス全員分で毎回起きていた(Kick 実機: コメントが流れる間 5秒で約2万回)。
+ *   元の値で比べれば、言い換え後の値はそのまま残る。属性が消えていたら書き直す。
+ * @param {Element|null|undefined} el @param {string} name @param {string} value @returns {boolean} 書いたら true
+ */
+export function setAttrFromSourceIfChanged(el, name, value) {
+  if (!el) return false;
+  let m = lastSourceAttr.get(el);
+  if (!m) {
+    m = new Map();
+    lastSourceAttr.set(el, m);
+  }
+  if (m.get(name) === value && el.hasAttribute(name)) return false;
+  m.set(name, value);
+  if (el.getAttribute(name) === value) return false;
+  el.setAttribute(name, value);
+  return true;
+}
+
 /** @param {Element|null|undefined} el @param {string} name @returns {boolean} 外したら true */
 export function removeAttrIfPresent(el, name) {
   if (!el || !el.hasAttribute(name)) return false;
