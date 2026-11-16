@@ -374,6 +374,8 @@ export const ROLE_FALLBACK = {
   // 全滅した最悪日でも、別プロバイダの generalist(gemini-2.5-flash) が代行する。
   // 2026-08-18: fast主力がlocal/qwen3.5:9bへ移設され（クラウドfastは全廃）、この代打の
   // 発動条件は実質「Ollama停止時」になった。generalist=gemini-2.5-flash(weight1)が代行する。
+  // 2026-11-16: 汎用の主力(weight1)は gemini-3.5-flash-lite に交代（2.5-flash は 12/1 に lite へ自動転送されるため）。
+  //  代行するのは gemini-3.5-flash-lite（weightOf の同日の行を参照）。
   fast: ["generalist"],
 };
 
@@ -443,6 +445,11 @@ export function weightOf(label) {
     //    安定を確認したが、preview/新顔ゆえ即正規化はせず予備に留める（昇格・降格基準は
     //    memory/council-llm-lineup-upgrade-2026-07-03.md 参照）。"gemini-3" は "gemini-2.5" に
     //    非一致（先頭一致ではなく部分一致だが "gemini-2.5-flash" に "gemini-3" は含まれない）。
+    // ★2026-11-16: gemini-3.5-flash-lite を汎用の主力(1)にする。下の "gemini-3"→3 より【前】に置くこと（if は先勝ち）。
+    //  gemini-2.5-flash が 12/1 に Google 側でこのモデルへ自動転送されるため、名簿の主力を先に実物へ合わせた
+    //  （恒久ルール3「新顔は予備から」の例外。経緯と実測は council-lineup.mjs の同日の注記）。
+    //  狭く指定する: 3.8-flash など他の gemini-3 系は予備(3)のまま。
+    if (n.includes("gemini-3.5-flash-lite")) return 1;
     if (n.includes("gpt-oss-20b") || n.includes("gemini-3")) return 3;
     // ★2026-11-15: Gemini 4 世代も新顔なので予備(3)から（恒久ルール3）。この行が無いと末尾の既定 1（主力）に落ちる。
     if (n.includes("gemini-4")) return 3;
