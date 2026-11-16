@@ -115,6 +115,8 @@ const targets = [
     outfile: 'extension/dist/backfill-sw.js',
     target: 'chrome111'
   },
+  { entryPoints: ['src/extension/native-voice-sw-entry.js'], outfile: 'extension/dist/native-voice-sw.js', target: 'chrome111' },
+  { entryPoints: ['src/extension/voice-native-guide-entry.js'], outfile: 'extension/dist/voice-native-guide.js', target: 'chrome111' },
   {
     // v0.1.1802: 開発版が新しい版に自分で入れ替わる(キット extension-self-update)。background.js が importScripts で読む。
     entryPoints: ['src/extension/self-update-sw-entry.js'],

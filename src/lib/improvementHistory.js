@@ -5125,5 +5125,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2133', metric: 'cross-checked-claims', value: 41,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて 43→41 で性能は表さない。この版は Twitch 公式のチャット接続に実際につなぎ、届いた通知19件(サブスク・ギフト・Bits)を拡張と同じ読み取りで数えて確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2134', metric: 'bundle-kb', value: 1447,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版0.1.2133の1448KBから-1KB(読み上げ部の整理分)。未配布の補助アプリのスイッチは隠し、popupへの配線もしていない。過去最良1360KBより大きい状態は前版から続いており、今回はそれを削って戻す変更ではない。'
+  }),
+  Object.freeze({
+    version: '0.1.2134', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2134', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを直近30日で数える値(期間依存)。この版の確かめは verify:cc の再実行と疑似VOICEVOXでの10分比較で、PR #659 本文に記録した。'
   })
 ]);

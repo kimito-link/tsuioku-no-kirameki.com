@@ -100,9 +100,9 @@ describe('VoicePlayer.dropQueuedAny / estimateStartDelayMs', () => {
     p.prefetches.set(item, { generation: 0, promise: Promise.resolve(null), abort: { abort: () => { aborted += 1; } } });
     expect(p.dropQueuedAny(onDropped)).toBe('dropped');
     expect(p.queue.length).toBe(0);
-    expect(p.prefetches.size).toBe(0);
+    expect(p.prefetches.size).toBe(1); // 計算の完了までは枠を占有する
     expect(dropped).toBe(1);
-    expect(aborted).toBe(1);
+    expect(aborted).toBe(0);
   });
   it('取り出されて声づくり中の件は鳴らさない印、鳴り始めた件・知らない件は触らない', () => {
     const p = new VoicePlayer({});

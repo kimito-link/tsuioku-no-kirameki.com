@@ -5,6 +5,8 @@
 
 ## 機能ごとのマップ
 
+- [任意のローカル音声補助 SW](native-voice-sw.md) — `src/extension/native-voice-sw-entry.js`
+- [ローカル音声補助の導入案内](voice-native-guide.md) — `src/extension/voice-native-guide-entry.js`
 - [記録エンジン(watchページ常駐)](content.md) — `src/extension/content-entry.js`
 - [ポップアップ(応援レーン)](popup.md) — `src/extension/popup-entry.js`
 - [会場モード(standalone)](venue.md) — `src/extension/venue-entry.js`
@@ -18,5 +20,5 @@
 
 ## データの流れ・影響範囲
 
-- [storage データバス図](storage-bus.md) — 全 113 キーの producer/consumer と断線検出
+- [storage データバス図](storage-bus.md) — 全 114 キーの producer/consumer と断線検出
 - [影響範囲マップ](impact-map.md) — このファイルを変えたら何が壊れるか(波及機能の逆引き)

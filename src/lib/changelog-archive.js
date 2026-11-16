@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2111',
+    date: '2026-11-12',
+    summary: '混雑中も覚えた短い声は読む',
+    items: Object.freeze([
+      'わこつ・888・草のような短いコメントは、一度その人の声で作ったら覚えておき、次からは作り直さずにすぐ鳴らすようにしました(1人1声のまま)。',
+      'コメントが多くて「大事なものだけ読む」状態のときも、覚えた声がある短いコメントは読みます。覚えておく量は最大8MBです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2110',
     date: '2026-11-12',
     summary: 'TikTok で配信を移った直後の会場と言葉を直す',

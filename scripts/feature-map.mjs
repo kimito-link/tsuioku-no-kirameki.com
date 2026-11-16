@@ -58,6 +58,8 @@ function emit(filename, content) {
  * @type {{ entry: string, feature: string, label: string }[]}
  */
 const FEATURES = [
+  { entry: 'src/extension/native-voice-sw-entry.js', feature: 'native-voice-sw', label: '任意のローカル音声補助 SW' },
+  { entry: 'src/extension/voice-native-guide-entry.js', feature: 'voice-native-guide', label: 'ローカル音声補助の導入案内' },
   { entry: 'src/extension/content-entry.js', feature: 'content', label: '記録エンジン(watchページ常駐)' },
   { entry: 'src/extension/popup-entry.js', feature: 'popup', label: 'ポップアップ(応援レーン)' },
   { entry: 'src/extension/venue-entry.js', feature: 'venue', label: '会場モード(standalone)' },
@@ -248,6 +250,10 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   // 2026-10-29 読み上げの音質: popup/wireVoiceQualitySelect.js が storage.set({[KEY_VOICE_QUALITY]:...}) で書き、
   //   voiceQualitySetting.js が読む(上の声の絞り込みと同じ形)=静的解析が取りこぼす偽陽性。
   'KEY_VOICE_QUALITY',
+  // 2026-11-16: producerはpopup/wireVoiceNativeToggle.jsのDI storage.set。
+  // popup-entry.jsがsafeStorageLocalSetを渡し、native-voice-sw-entry.jsが同じキーを読む。
+  // Chrome API直接呼出しだけを拾う解析の偽陽性。wireVoiceNativeToggle.test.jsで保存と取消を検証済み。
+  'KEY_VOICE_NATIVE_ENABLED',
   // 結果発表シーケンス計器(2026-07-06・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1):
   //   producer は popup-entry.js:publishScoreAnnounceDiag が safeStorageLocalSet({[KEY]:...})で
   //   書く(検出対象・実際に見えている)。consumer は status-entry.js が直接 safeStorageLocalGet(KEY)

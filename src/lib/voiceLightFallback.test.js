@@ -105,7 +105,7 @@ describe('VoicePlayer: VOICEVOX が混雑中は軽い声で読む', () => {
     });
   }
 
-  it('混雑中は軽い声で読み、VOICEVOX には速さの確かめしか頼まない', async () => {
+  it('混雑中は軽い声を読みながら、実コメントの指定声を作り続ける', async () => {
     const synth = fakeSynth();
     const fetchSynthesizeVoice = vi.fn(() => new Promise(() => {}));
     const p = makePlayer(createLightSpeaker({ synth, Utterance: FakeUtterance }), fetchSynthesizeVoice);
@@ -118,7 +118,7 @@ describe('VoicePlayer: VOICEVOX が混雑中は軽い声で読む', () => {
     expect(synth.spoken.map((u) => u.text).join('|')).toContain('やっほー');
     expect(synth.spoken.length).toBe(2);
     expect(onAudioStart).toHaveBeenCalled();
-    expect(fetchSynthesizeVoice).toHaveBeenCalledTimes(1); // 速さの確かめ1回だけ
+    expect(fetchSynthesizeVoice).toHaveBeenCalledTimes(1); // 実コメントの合成1回。中断して次を重ねない
     expect(p.diag.lightSpokenTotal).toBe(2);
     expect(p.diag.lightVoiceActive).toBe(true);
   });
@@ -133,7 +133,7 @@ describe('VoicePlayer: VOICEVOX が混雑中は軽い声で読む', () => {
     p.enqueue([{ kind: 'comment', userId: 'u1', nickname: 'A', text: 'やっほー' }]);
     await new Promise((r) => setTimeout(r, 30));
     expect(p.diag.lightSpokenTotal).toBe(1); // 1分ならまだ軽い声
-    expect(p.diag.lightProbeTotal).toBe(1);
+    expect(p.diag.lightProbeTotal).toBe(0); // 試験文ではなく実コメントを合成
     expect(p.diag.voiceOverloadRetryTotal).toBe(0);
     p._overload.overloadedAt = Date.now() - 121_000;
     expect(p._useLightVoice()).toBe(false); // 2分を超えたら VOICEVOX を試す

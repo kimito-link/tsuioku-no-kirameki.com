@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>指定声を保つ読上げの検証フロー</title>
+<style>body{font:16px/1.7 system-ui;margin:2rem auto;max-width:900px;padding:0 1rem;background:#111827;color:#e5e7eb}a{color:#93c5fd}.phase{padding:1rem;margin:1rem 0;border:2px solid;border-radius:8px}.ok{border-color:#34d399}.wait{border-color:#fbbf24}.stop{border-color:#fb7185}.human{border-color:#c084fc}.arrow{text-align:center}</style>
+<h1>指定声を保つ読上げの検証フロー</h1><p>更新:2026-11-15。正本:<a href="../council/voice-quality-pipeline-SYNTHESIS.md">承認済み設計と制約</a>。関連:<a href="MAP.md">全体マップ</a>。</p>
+<div class="phase ok">フェーズ0 ✅ 原因を確認：常時1件の合成、PC音声中の通常合成停止、会場側6秒取消。単体テスト813件まで確認。</div><div class="arrow">↓ 実装と独立レビューの指摘を解消してから</div>
+<div class="phase wait">フェーズ1 ⚙️ 能力適応：ブラウザHTTPは最大6件、任意のNative補助は最大24件。1件から完了速度を観測し、増枠しても改善しなければ減らす。完成した指定声を優先し、PC音声中も合成を続ける。確定失敗と完了不明の中断を区別する。</div><div class="arrow">↓ 通常・遅延・共有CPU・無応答・旧世代・キャッシュ上限を確認してから</div>
+<div class="phase stop">フェーズ2 🟥 比較の目標は未達：6枠×600秒÷最短6秒でも659件には届かない。独立遅延の模擬エンジンにおけるOneCommeとの総合優越は保証しない。CPU競合を再現しない測定を実PC性能と呼ばない。</div><div class="arrow">↓ 必要な構成変更とユーザー負担を具体化して判断</div>
+<div class="phase human">フェーズ3 🙋 ユーザー確認：任意権限・ローカル補助アプリを含む実装と検証まで承認済み。push・本番導入前に結果を見る。100年保証やCVR/LTV/CPAの未測定向上を表示しない。</div></html>

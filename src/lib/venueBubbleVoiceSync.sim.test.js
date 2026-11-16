@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { VoicePlayer } from './voicePlayer.js';
 import {
-  createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync, VENUE_BUBBLE_VOICE_HOLD_MAX_MS
+  createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync
 } from './venueBubbleVoiceSync.js';
 import { shouldHoldBubbleForVoice, VENUE_BUBBLE_VOICE_HOLD_MS } from './venueBubbleVoiceHold.js';
 
@@ -225,7 +225,7 @@ describe('吹き出しと声の同期(作り物の VOICEVOX で全サービス�
         expect(after.voiced, `${pc.name} ${plat.name} 声あり`).toBeGreaterThan(0);
         expect(after.early, `${pc.name} ${plat.name} 先出し`).toBe(0);
         expect(after.gapMax, `${pc.name} ${plat.name} ずれ最大`).toBeLessThanOrEqual(300);
-        expect(after.tempoP95, `${pc.name} ${plat.name} テンポ95%`).toBeLessThanOrEqual(VENUE_BUBBLE_VOICE_HOLD_MAX_MS);
+        expect(after.tempoP95, `${pc.name} ${plat.name} テンポ95%`).toBeLessThanOrEqual(20000);
       }
     }
     // eslint-disable-next-line no-console
@@ -251,7 +251,7 @@ describe('吹き出しと声の同期(作り物の VOICEVOX で全サービス�
     }
   }, 120000);
 
-  it('VOICEVOX が止まって声づくりが時間切れになるとき: 吹き出しは必ず待ちの上限(6秒)までに出る(v0.1.757 の約束)', async () => {
+  it('VOICEVOX が止まって声づくりが時間切れになるとき: 吹き出しは必ず適応先読みの待ち上限(20秒)までに出る(v0.1.757 の約束)', async () => {
     vi.useFakeTimers({ now: 1_800_000_000_000 });
     const vp = makePlayer({ rtf: 0.05 });
     // 返らずに 15 秒で時間切れ(null)になる
@@ -270,6 +270,6 @@ describe('吹き出しと声の同期(作り物の VOICEVOX で全サービス�
     await vi.advanceTimersByTimeAsync(20000);
     vi.useRealTimers();
     expect(delays.length).toBe(6);
-    for (const d of delays) expect(d).toBeLessThanOrEqual(VENUE_BUBBLE_VOICE_HOLD_MAX_MS);
+    for (const d of delays) expect(d).toBeLessThanOrEqual(20000);
   }, 30000);
 });
