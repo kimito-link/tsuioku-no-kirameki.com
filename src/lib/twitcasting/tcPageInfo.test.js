@@ -1,6 +1,7 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect } from 'vitest';
-import { readTcPageInfo, tcFractionOf, tcIntOf, parseTcSupporterDoc, tcSupporterUrl } from './tcPageInfo.js';
+import { readTcPageInfo, tcFractionOf, tcIntOf, parseTcSupporterDoc, tcSupporterUrl, tcMovieCommentUrl, parseTcMovieCommentDoc } from './tcPageInfo.js';
+import { parseTcEvent } from './tcParse.js';
 
 // 2026-11-12 の PC 実測の形(値は差し替え)
 const PAGE = `
@@ -90,5 +91,53 @@ describe('サポーターランキング', () => {
   it('URL', () => {
     expect(tcSupporterUrl('C:Abc')).toBe('https://twitcasting.tv/c:abc/supporter');
     expect(tcSupporterUrl('../x')).toBe('');
+  });
+});
+
+// 2026-11-16 PC 実測の形(名前ありの1件は実物そのまま・匿名は形だけ)
+const MOVIE_COMMENTS = `<div class="tw-comment-history">
+<div class="tw-comment-history-item" data-comment-id="33994278190">
+  <div class="tw-comment-history-item__content"><div class="tw-comment-history-item__content__text"> もう依存やん </div></div>
+  <div class="tw-comment-history-item__info"><div class="tw-comment-history-item__info__user">
+    <a href="/___a01desu" data-show-inspector="true"><img src="https://imagegw02.twitcasting.tv/image3s/pbs.twimg.com/profile_images/2108300423996256256/IXlWsKzf_bigger.jpg" class="tw-comment-history-item__user__icon"></a>
+    <div class="tw-comment-history-item__details"><div class="tw-comment-history-item__details__user">
+      <a class="tw-comment-history-item__details__user-link" href="/___a01desu" data-show-inspector="true"> ﾆｼ </a></div></div></div>
+    <div><a href="/a_k285285/comment/843023782-33994278190"><time class="tw-comment-history-item__info__date" datetime="Mon, 16 Nov 2026 18:46:03 +0900">2026/11/16 18:46</time></a></div>
+  </div></div>
+<div class="tw-comment-history-item" data-comment-id="33994154292">
+  <div class="tw-comment-history-item__content"><div class="tw-comment-history-item__content__text"> なんでキャス </div></div>
+  <div class="tw-comment-history-item__info"><div class="tw-comment-history-item__info__user">
+    <a href="/c:tw1"><img src="//s01.twitcasting.tv/img/twitcas_guest1_64.jpg" class="tw-comment-history-item__user__icon"></a>
+    <div class="tw-comment-history-item__details"><div class="tw-comment-history-item__details__user">
+      <a class="tw-comment-history-item__details__user-link" href="/c:tw1"> 匿名コメント </a></div></div></div>
+    <div><a href="/x/comment/1-33994154292"><time datetime="Mon, 16 Nov 2026 17:27:27 +0900">2026/11/16 17:27</time></a></div>
+  </div></div>
+<div class="tw-comment-history-item" data-comment-id="abc"><div class="tw-comment-history-item__content__text">こわれた</div></div>
+<div class="tw-comment-history-item" data-comment-id="33994154000"><div class="tw-comment-history-item__content__text"> </div></div>
+</div>`;
+
+describe('ツイキャスの放送開始からのコメント一覧', () => {
+  it('URL(page は 0 以上の整数)', () => {
+    expect(tcMovieCommentUrl('A_k285285', '843023782', 3)).toBe('https://twitcasting.tv/a_k285285/moviecomment/843023782-3');
+    expect(tcMovieCommentUrl('c:abc', '1', 0)).toBe('https://twitcasting.tv/c:abc/moviecomment/1-0');
+    expect(tcMovieCommentUrl('a', 'x', 0)).toBe('');
+    expect(tcMovieCommentUrl('a_b', '1', -1)).toBe('');
+    expect(tcMovieCommentUrl('a_b', '1', 1.5)).toBe('');
+  });
+  it('1件ずつソケットと同じ形にする・壊れた件だけ捨てる・記録の1件になる', () => {
+    const doc = new DOMParser().parseFromString(MOVIE_COMMENTS, 'text/html');
+    const { rows, empty } = parseTcMovieCommentDoc(doc);
+    expect(empty).toBe(false);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ type: 'comment', id: 33994278190, message: 'もう依存やん', createdAt: Date.parse('2026-11-16T18:46:03+09:00'), isAnonymous: false, author: { screenName: '___a01desu', name: 'ﾆｼ' } });
+    const a = parseTcEvent(rows[0], { user: 'a_k285285' });
+    expect(a).toMatchObject({ id: 'tc-33994278190', channelId: 'tc:___a01desu', name: 'ﾆｼ', text: 'もう依存やん', kind: 'text' });
+    expect(a?.iconUrl).toContain('imagegw02.twitcasting.tv');
+    const b = parseTcEvent(rows[1], { user: 'a_k285285' });
+    expect(b).toMatchObject({ id: 'tc-33994154292', channelId: 'tc:n:匿名', badges: ['anonymous'] });
+  });
+  it('読めない配信・範囲外のページは empty', () => {
+    const doc = new DOMParser().parseFromString('<div class="tw-comment-history"><div class="tw-empty-state"><div class="tw-empty-state-title">Comments are not available for this video</div></div></div>', 'text/html');
+    expect(parseTcMovieCommentDoc(doc)).toEqual({ rows: [], empty: true });
   });
 });

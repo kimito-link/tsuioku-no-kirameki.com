@@ -113,3 +113,68 @@ export function parseTcSupporterDoc(doc) {
 export function tcSupporterUrl(user) {
   return /^(?:[a-z]{1,3}:)?[a-z0-9_]{1,40}$/i.test(String(user || '')) ? `https://twitcasting.tv/${String(user).toLowerCase()}/supporter` : '';
 }
+
+/**
+ * 放送開始からのコメント一覧(配信中でも読める・ログイン不要・2026-11-16 PC 実測):
+ *   GET /<user>/moviecomment/<movieId>-<page>(page 0 が最新・1ページ20件・古い方へ進む)。
+ *   範囲外・読めない配信は .tw-empty-state(「Comments are not available for this video」)でコメント0件。
+ *   ★ログインなしで読めるのは最新から51ページ(約1020件)まで。コメントが数千件の配信では page 1 以降が読めず page 0 だけのこともある
+ *   (1,147件・1,882件の配信は51ページまで、4,109件・9,364件の配信は page 0 だけ・2026-11-16 実測。ログイン中に増えるかは未確認)。
+ * @param {string} user @param {string} movieId @param {number} page
+ */
+export function tcMovieCommentUrl(user, movieId, page) {
+  const u = String(user || '').toLowerCase();
+  const p = Number(page);
+  if (!/^(?:[a-z]{1,3}:)?[a-z0-9_]{1,40}$/.test(u) || !/^\d{1,20}$/.test(String(movieId || '')) || !Number.isInteger(p) || p < 0) return '';
+  return `https://twitcasting.tv/${u}/moviecomment/${movieId}-${p}`;
+}
+
+/**
+ * コメント一覧のページ → ソケットと同じ形の生データ(parseTcEvent にそのまま渡せる)。壊れた1件だけ捨てる。
+ *   1件: .tw-comment-history-item[data-comment-id] > __content__text(本文)・__details__user-link(href=/<screen>・名前)・
+ *        img.tw-comment-history-item__user__icon・time[datetime]。匿名は href=/c:tw1〜3。
+ * @param {Document} doc
+ * @returns {{ rows: Record<string, any>[], empty: boolean }}
+ */
+export function parseTcMovieCommentDoc(doc) {
+  /** @type {Record<string, any>[]} */
+  const rows = [];
+  /** @type {Element[]} */
+  let items = [];
+  try {
+    items = Array.from(doc.querySelectorAll('.tw-comment-history-item[data-comment-id]'));
+  } catch {
+    items = [];
+  }
+  for (const el of items) {
+    const id = String(el.getAttribute('data-comment-id') || '');
+    if (!/^\d{1,20}$/.test(id)) continue;
+    const message = String(el.querySelector('.tw-comment-history-item__content__text')?.textContent || '').replace(/\s+/g, ' ').trim();
+    const link = el.querySelector('.tw-comment-history-item__details__user-link') || el.querySelector('.tw-comment-history-item__info__user a[href]');
+    let screen = String(link?.getAttribute('href') || '').replace(/^\/+/, '').split(/[/?#]/)[0];
+    try {
+      screen = decodeURIComponent(screen);
+    } catch {
+      screen = '';
+    }
+    if (!message || !/^(?:[a-z]{1,3}:)?[A-Za-z0-9_]{1,40}$/.test(screen)) continue;
+    const name = String(link?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    const img = String(el.querySelector('img.tw-comment-history-item__user__icon')?.getAttribute('src') || '');
+    const createdAt = Date.parse(String(el.querySelector('time[datetime]')?.getAttribute('datetime') || ''));
+    rows.push({
+      type: 'comment',
+      id: Number(id),
+      message,
+      createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+      author: { id: screen, name: name || screen, screenName: screen, profileImage: img },
+      isAnonymous: /^c:tw\d{1,3}$/i.test(screen),
+    });
+  }
+  let empty = false;
+  try {
+    empty = !!doc.querySelector('.tw-empty-state');
+  } catch {
+    empty = false;
+  }
+  return { rows, empty };
+}

@@ -5167,5 +5167,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2136', metric: 'cross-checked-claims', value: 38,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを直近30日で数える値(期間依存)。この版の判断根拠は本物のVOICEVOX 0.25.2での補助アプリあり/なし実測(PR #660 本文)。'
+  }),
+  Object.freeze({
+    version: '0.1.2137', metric: 'bundle-kb', value: 1448,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '直前の版と同じ。この版はツイキャスの content script(yt-tc-content.js)だけを変え、popup.js は変えていない'
+  }),
+  Object.freeze({
+    version: '0.1.2137', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2137', metric: 'cross-checked-claims', value: 38,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて減っただけで性能は表さない。この版は本物のコメント一覧ページを curl で読んで形とページ送りを確かめ、e2e でさかのぼりを外すと赤になることも確かめた'
   })
 ]);
