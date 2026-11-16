@@ -800,8 +800,14 @@ export const LINEUP = [
   //  この枠は generalist の主力(w1)で、統合の2番手（meeting.mjs）でもある。12/1 より前に後継を決めて入れ替えること。
   //  候補（11/11 の council-trial で3/3 OK）: gemini-3.8-flash（名簿に予備として居る）・gemini-3.6-flash・gemini-3.5-flash-lite。
   //  統合の2番手は長い入力で4見出しを書き切れるかが要るので、実会議の統合で試してから決める。
-  { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
-  // ★2026-11-12 追加（gemini-2.5-flash の 12/1 転送に備えた後継・generalist の予備 w3 ＋ 統合の3番手）:
+  // ★2026-11-16 決定（gemini-2.5-flash → gemini-3.5-flash-lite に交代）: 12/1 の自動転送に先立ち、3.5-flash-lite を汎用の主力(w1)へ。
+  //  12/1 以降は 2.5-flash を呼んでも中身は lite になる＝選べるのは「名前を先に実物へ合わせるか」だけ。
+  //  lite は 11/12 に普段 3/3・統合 2/2（手順(1)〜(4)と4見出しそろう）で、上の「統合で試してから決める」条件は済んでいる。
+  //  3.8-flash・3.6-flash は 503（混雑）が多く、主力・統合の一発工程には不適（下の lite 行の注記）。
+  //  ★恒久ルール3（新顔は予備から・7日以上空けた実会議2回で昇格）の例外: 転送で中身が強制的に入れ替わるため。
+  //  役の引き継ぎ: 汎用の主力 w1（council-roles.mjs weightOf）・統合の2番手・分類器の1番目（meeting.mjs）。
+  //  旧: { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] }
+  // ★2026-11-12 追加（gemini-2.5-flash の 12/1 転送に備えた後継・generalist の予備 w3 ＋ 統合の3番手）→ 2026-11-16 汎用の主力(w1)・統合の2番手・分類器の1番目へ:
   //  12/1 から gemini-2.5-flash の中身はこのモデルになる（Google 公式）。先に名簿へ入れて、実会議で慣らしておく。
   //  実測（りんくのPC・11/12 10時台）:
   //   普段の答え(council-trial・3回): 3/3 OK・平均2.7秒・985字（2.5-flash は 3/3・12.7秒・1736字）。
@@ -809,6 +815,8 @@ export const LINEUP = [
   //  比べて落としたもの（同じ日・同じ条件）: gemini-3.8-flash 普段0/3・統合4回中1回（167秒＝本番の90秒では時間切れ）、
   //   gemini-3.6-flash 統合2/2だが普段1/3（503）。どちらも混雑で、統合の一発工程を預けられない。
   //  字数は 2.5-flash の約6割＝中身は薄くなる見込み。12/1 以降に 2.5-flash の枠をどうするかは、実会議の統合を見て決める。
+  //  → 2026-11-16 決定: 2.5-flash の枠ごとこのモデルが継いだ（上の 2.5-flash 撤去の注記）。昇格の例外扱いなので、
+  //   実会議で FAILED（503・途中切れ）が続いたら日報で拾い、主力から外すかを決め直す。
   { label: 'gemini-3.5-flash-lite', provider: 'gemini', rawId: 'gemini-3.5-flash-lite', apiModel: 'gemini-3.5-flash-lite', opts: {}, requires: ['E'] },
 
   // 2026-07-04 追加: 2026-06-25には429/503で常用不可だったが、今回の再検証で単発・4並列とも
