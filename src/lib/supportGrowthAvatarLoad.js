@@ -162,7 +162,7 @@ export function createSupportAvatarLoadGuard(options) {
       //   再プローブを続行する(拒否せず下へ進む)。ineligibleなら従来どおり拒否。
       //   どちらの経路でも再試行対象の刻印を刻む(retrySweepが後で拾えるように)。
       const eligible = isProbeRetryEligible(failedKeys.get(key), Date.now(), retryPolicy);
-      try { img.dataset.nlsbAvatarRetrySrc = req; } catch { /* no-op: 非DOM環境等 */ }
+      try { if (img.dataset.nlsbAvatarRetrySrc !== req) img.dataset.nlsbAvatarRetrySrc = req; } catch { /* no-op: 非DOM環境等 */ } // 0.1.2129: 同じ値なら書かない(描き直しのたびに全員分の変更記録が出ていた)
       if (!eligible) return null;
       retriedTotal += 1;
     }
@@ -207,7 +207,7 @@ export function createSupportAvatarLoadGuard(options) {
       // venue-avatar-stale-mirror-DESIGN.md §C-1b: 初回失敗時点で再試行対象の刻印を刻む
       //   (retrySweepが後で拾えるように)。retryPolicy未指定の呼び出し元でも刻印自体は無害
       //   (retrySweepはretryPolicy無しならno-opで一切参照しない)。
-      try { img.dataset.nlsbAvatarRetrySrc = req; } catch { /* no-op: 非DOM環境等 */ }
+      try { if (img.dataset.nlsbAvatarRetrySrc !== req) img.dataset.nlsbAvatarRetrySrc = req; } catch { /* no-op: 非DOM環境等 */ } // 0.1.2129: 同じ値なら書かない(描き直しのたびに全員分の変更記録が出ていた)
       /*
        * ★v0.1.1318: 失敗が確定したら【その場で代替顔へ差し替える】。
        *   従来は onFallbackApplied(クラス付与)だけで src を触っておらず、
