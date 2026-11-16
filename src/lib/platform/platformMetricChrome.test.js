@@ -121,6 +121,31 @@ describe('applyPlatformMetricChrome', () => {
     stop();
   });
 
+  it('適用し終えたら止まる(自分の書き換えで次の適用を呼び続けない・0.1.2126)', async () => {
+    const root = mount();
+    let runs = 0;
+    const facts = { viewers: 12, support: tallySupportItems([{ kind: 'superchat', amount: 100, currency: 'BITS' }]) };
+    const stop = watchPlatformMetricChrome(root, () => {
+      runs += 1;
+      return { platform: 'twitch', facts };
+    });
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    for (let i = 0; i < 4; i += 1) await frame();
+    const settled = runs;
+    for (let i = 0; i < 10; i += 1) await frame();
+    // 何も変わっていない10フレームのあいだは1回も適用し直さない(前は毎フレーム回っていた)
+    expect(runs).toBe(settled);
+    // 経過のチップは末尾のまま
+    expect(root.querySelector('.nl-official-nico-stats__row').lastElementChild?.querySelector('#officialStatNicoStreamAge')).not.toBeNull();
+    // ニコ生版の描画が欄を出し直したら、また適用して隠す(見張りは生きている)
+    root.querySelector('#giftRankingFetchPrompt').hidden = false;
+    await frame();
+    await frame();
+    expect(runs).toBeGreaterThan(settled);
+    expect(root.querySelector('#giftRankingFetchPrompt').hidden).toBe(true);
+    stop();
+  });
+
   it('2つめの公式ランキングがあるサービスだけ広告ランキングの欄を使い、前の配信で隠した印を外す', () => {
     const root = mount();
     applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });

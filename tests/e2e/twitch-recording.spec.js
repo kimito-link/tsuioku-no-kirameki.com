@@ -323,6 +323,20 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   // ギフトサブの人は応援レーンの広告列に入らない(欄だけ)
   expect(await ext.evaluate(() => String(document.getElementById('sceneStoryUserLaneAd')?.textContent || ''))).not.toContain('サブギフター');
   await ext.locator('[data-lane="adRanking"]').screenshot({ path: 'test-results/twitch-sub-board.png' });
+  // 1人だけのカードが広い画面いっぱいに横へ伸びない(上限 300px・細いパネルでは従来どおり全幅)
+  const oneCardWidth = () =>
+    ext.evaluate(() => {
+      const line = document.querySelector('[data-lane="adRanking"] .nl-top-support-rank__line');
+      return line ? Math.round(line.getBoundingClientRect().width) : -1;
+    });
+  expect(await oneCardWidth()).toBeGreaterThan(100);
+  expect(await oneCardWidth()).toBeLessThanOrEqual(300);
+  const wide = ext.viewportSize();
+  await ext.setViewportSize({ width: 360, height: wide?.height || 800 });
+  const listWidth = await ext.evaluate(() => Math.round(document.querySelector('[data-lane="adRanking"] .nl-top-support-rank__list')?.getBoundingClientRect().width || -1));
+  expect(Math.abs((await oneCardWidth()) - listWidth)).toBeLessThanOrEqual(12);
+  await ext.locator('[data-lane="adRanking"]').screenshot({ path: 'test-results/twitch-sub-board-narrow.png' });
+  if (wide) await ext.setViewportSize(wide);
   // 「ギフト貢献度」の欄の見出しも中身(公式の Bits ランキング)と同じ名前(記録から数えた「合計順」と書かない)
   await expect
     .poll(() => ext.evaluate(() => String(document.querySelector('[data-lane="contributionRanking"] .nl-north-star-lane__label')?.textContent || '').trim()), { timeout: 10_000 })
