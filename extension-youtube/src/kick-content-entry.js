@@ -10,7 +10,7 @@
 //     (形を確かめ、取れなければ代わりの値)。配信していないチャンネルのページでは記録しない(つながない)。
 //   - Pusher のイベント名・項目名は公式の文書が無い。計器(yt_diag_kk_chat)で PC 実測して確かめる。
 
-import { parseKickChannelFromUrl, parsePusherFrame, parseKickEvent, parseKickDeleted } from '../../src/lib/kick/kickChatParse.js';
+import { parseKickChannelFromUrl, parsePusherFrame, parseKickEvent, parseKickDeleted, parseKickTime } from '../../src/lib/kick/kickChatParse.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
@@ -495,7 +495,13 @@ function startReader(slug, key, ids) {
         onItems: (events) => {
           if (stopped) return 0;
           const before = diag.items + pending.length;
-          for (const f of events) onEvent(f, { skipVoice: true });
+          const startMs = Number(ids.startedAtMs) || 0;
+          for (const f of events) {
+            // 最後のページには配信開始より前(前の配信)のコメントも混ざる=この配信の記録に入れない
+            const t = parseKickTime(f?.data?.created_at);
+            if (startMs > 0 && t > 0 && t < startMs) continue;
+            onEvent(f, { skipVoice: true });
+          }
           const added = Math.max(0, diag.items + pending.length - before);
           if (full) diag.historyPages += 1;
           diag.historyItems += added;

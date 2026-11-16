@@ -319,6 +319,8 @@ function startReader(login, key, channelId = '', streamMeta = {}) {
     if (!flushTimer) flushTimer = setTimeout(() => void flush(), FLUSH_MS);
   };
 
+  // つなぎ直しのたびに最初から読み直さない(1配信1回)
+  let vodBackfillStarted = false;
   const connect = () => {
     if (stopped) return;
     diag.ircState = 'connecting';
@@ -329,7 +331,6 @@ function startReader(login, key, channelId = '', streamMeta = {}) {
       scheduleReconnect();
       return;
     }
-    let vodBackfillStarted = false;
     const runVodBackfill = async (cutoffMs) => {
       if (vodBackfillStarted || stopped) return;
       vodBackfillStarted = true;
