@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2116',
+    date: '2026-11-13',
+    summary: '混んだ配信でも合唱が鳴るように',
+    items: Object.freeze([
+      'コメントが多い配信では、その配信で初めてのコメントも、同じ言葉なら合唱に加わるようにしました。空いているときは今までどおり、その人の声で1件ずつ読みます。',
+      '加わった人の声をまだ作っていないときは、同じ言葉を前に言った別の人の声を重ねます。主役のコメントは今までどおり、その人の声で読みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2115',
     date: '2026-11-13',
     summary: 'PC の声のまま戻らない時も VOICEVOX へ',

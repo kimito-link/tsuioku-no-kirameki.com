@@ -116,6 +116,8 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
   }
   /** @param {Record<string, unknown>} r */
   const isOldRow = (r) => {
+    // 配信の最初からさかのぼって読み足した過去分(他サービス・skipVoice)は番号が新しくても「今しゃべった」ではない
+    if (r?.skipVoice === true) return true;
     if (oldNoGap <= 0 || hiNo <= 0) return false;
     const n = Number(r?.commentNo ?? r?.no);
     return Number.isFinite(n) && n > 0 && n < hiNo - oldNoGap;
@@ -138,7 +140,7 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
   let primeSet = null;
   if (!wasPrimed) {
     // 開いた瞬間の「直近 N 件」も過去の番号は選ばない(過去ログが末尾に付いた束で古い発言を出さない)。
-    const primeable = oldNoGap > 0 ? speakable.filter((s) => !isOldRow(s.row)) : speakable;
+    const primeable = speakable.filter((s) => !isOldRow(s.row));
     primeSet = new Set(
       primeable.slice(Math.max(0, primeable.length - primeEmit)).map((s) => s.key)
     );

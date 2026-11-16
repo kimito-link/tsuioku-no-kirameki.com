@@ -394,7 +394,11 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
   // マーケHTML の時間の分析は capturedAt(記録した時刻)で並べる。アーカイブは開いた時・見た時に記録するので
   // 動画の中の時刻と関係なく偏る→マーケ画面でだけ、アーカイブの行は「動画の中で書かれた時刻」を記録時刻として渡す。
   // (サイドパネル・コメビュは「いま来た」の判定に capturedAt を使うので変えない)
-  const capturedAt = r?.replay && IS_MARKETING_PAGE && postedAt > 0 ? postedAt : at;
+  // 開いたあとに配信の最初からさかのぼって読み足した過去分(skipVoice)は、受け取った時刻ではなく書かれた時刻を
+  //   記録時刻にする。受け取った時刻のままだと会場・コメビュが「いま来たコメント」と見て、何十分も前の発言を
+  //   吹き出し・読み上げに出していた(0.1.2138 PC 実測: Twitch で吹き出し12個すべてが約3時間前の発言)。
+  const backfilled = r?.skipVoice === true;
+  const capturedAt = (r?.replay && IS_MARKETING_PAGE && postedAt > 0) || (backfilled && postedAt > 0 && postedAt < at) ? postedAt : at;
   return {
     id: String(r?.id || r?.pk || `yt${i}`),
     liveId: lv,
@@ -421,6 +425,7 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
     ytAmount: Number(r?.amount || 0),
     ytCurrency: String(r?.currency || ''),
+    ...(backfilled ? { skipVoice: true } : {}),
   };
 }
 

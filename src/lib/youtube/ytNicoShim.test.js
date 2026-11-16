@@ -115,3 +115,19 @@ describe('ytNameIndexOf(名前から人を引く表を、同じ記録では作�
     expect(k1.rows[0].thumbnailUrl).toBe('https://yt3.ggpht.com/a');
   });
 });
+
+describe('さかのぼって読み足した過去分(skipVoice)', () => {
+  it('記録時刻を書かれた時刻にし、skipVoice を会場へ渡す(いま来たコメント扱いにしない)', () => {
+    const now = Date.now();
+    const posted = now - 3 * 3600_000;
+    const e = ytRecordToNicoEntry({ id: 'a', channelId: 'tw:1', name: 'A', text: 'x', recordedAt: now, postedAtMs: posted, skipVoice: true }, 0, 'lv900000000001', 'tw:1');
+    expect(e.capturedAt).toBe(posted);
+    expect(e.skipVoice).toBe(true);
+  });
+  it('ふつうの新着は今まで通り受け取った時刻で、skipVoice は付かない', () => {
+    const now = Date.now();
+    const e = ytRecordToNicoEntry({ id: 'b', channelId: 'tw:1', name: 'A', text: 'x', recordedAt: now, postedAtMs: now - 2000 }, 0, 'lv900000000001', 'tw:1');
+    expect(e.capturedAt).toBe(now);
+    expect(e.skipVoice).toBeUndefined();
+  });
+});

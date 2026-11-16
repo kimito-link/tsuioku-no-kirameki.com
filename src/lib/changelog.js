@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2139',
+    date: '2026-11-16',
+    summary: '読み足した過去コメントを吹き出しに出さない',
+    items: Object.freeze([
+      'Kick・Twitch などで配信の最初からさかのぼって読み足した過去コメントが、会場の吹き出し(と読み上げ)に「いま来たコメント」として出ていたのを直しました。読み足した分は記録にだけ入れ、吹き出し・読み上げには新しく来たコメントだけを出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2138',
     date: '2026-11-16',
     summary: 'Kick・ABEMA・Twitch等で開始からの過去コメントも記録',
@@ -173,15 +181,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '書き方が違う笑いや拍手も合唱に',
     items: Object.freeze([
       'w・www・草・笑笑のような書き方の違う笑いや、888 と 8888 のような拍手を、合唱では同じ言葉として扱うようにしました。「わこつー！」のような語尾の違いも同じ言葉にします。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2116',
-    date: '2026-11-13',
-    summary: '混んだ配信でも合唱が鳴るように',
-    items: Object.freeze([
-      'コメントが多い配信では、その配信で初めてのコメントも、同じ言葉なら合唱に加わるようにしました。空いているときは今までどおり、その人の声で1件ずつ読みます。',
-      '加わった人の声をまだ作っていないときは、同じ言葉を前に言った別の人の声を重ねます。主役のコメントは今までどおり、その人の声で読みます。'
     ])
   })
 ]);
