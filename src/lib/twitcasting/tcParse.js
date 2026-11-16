@@ -143,6 +143,26 @@ export function parseTcPubSubUrl(json) {
   return u.href;
 }
 
+/**
+ * 開く前のコメント(ページ自身が最初に読む口): GET /<user>/userajax.php?c=listall&m=<movie>&n=<件数>&f=<新しい方から飛ばす数>&k=0&format=json
+ *   → { comments: [ソケットと同じ形の comment, …] }(新しい n 件を古い順に)。ログイン不要(2026-11-16 PC 実測)。
+ *   ソケットは開いた後に届いた分しか来ないので、これが無いと開く前のコメントが記録に入らない。
+ *   ★返るのは直近の約24件まで(n を大きくしても f>=24 は空・2026-11-16 配信中25件で実測)。それより前はページにも出ていない。
+ * @param {string} user @param {string} movieId @param {{ n?: number, f?: number, nowMs?: number }} [opts]
+ */
+export function tcCommentListUrl(user, movieId, opts = {}) {
+  if (!isTcUser(user) || !/^\d{1,20}$/.test(String(movieId || ''))) return '';
+  const n = Math.max(1, Math.min(100, Math.floor(Number(opts.n) || 100)));
+  const f = Math.max(0, Math.floor(Number(opts.f) || 0));
+  return `${TC_ORIGIN}/${encodeURIComponent(user).replace(/%3A/gi, ':')}/userajax.php?c=listall&m=${movieId}&n=${n}&f=${f}&k=0&format=json&__n=${Number(opts.nowMs) || Date.now()}`;
+}
+
+/** listall の応答 → 行の配列(形が違えば空) @param {unknown} json @returns {Record<string, any>[]} */
+export function parseTcCommentList(json) {
+  const list = obj(json)?.comments;
+  return Array.isArray(list) ? /** @type {Record<string, any>[]} */ (list.map(obj).filter(Boolean)) : [];
+}
+
 /** ソケットの1通 → 行の配列(読めなければ空・[] は生きている印) @param {unknown} raw @returns {Record<string, any>[]} */
 export function parseTcSocketFrame(raw) {
   const s = String(raw ?? '').trim();

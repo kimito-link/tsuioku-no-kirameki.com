@@ -8,6 +8,8 @@ import {
   parseTcStreamServer,
   parseTcPubSubUrl,
   parseTcSocketFrame,
+  tcCommentListUrl,
+  parseTcCommentList,
   parseTcEvent,
   tcGiftCountOfName,
   tcGiftScore,
@@ -217,5 +219,45 @@ describe('配信キーとサービスの表', () => {
     expect(placeholderStreamKeyForChannel(STREAM_PLATFORMS.twitcasting, 'c:abc')).toBe('tc.c:abc.00000');
     // ほかのサービスのキーと取り違えない
     expect(platformOfStreamKey('tw.abc.123')?.id).toBe('twitch');
+  });
+});
+
+describe('ツイキャスの開く前のコメント(listall)', () => {
+  it('ページ自身と同じ口の URL を作る(件数は1〜100・飛ばす数は0以上)', () => {
+    expect(tcCommentListUrl('sktk_xx', '842879584', { n: 100, f: 200, nowMs: 5 })).toBe(
+      'https://twitcasting.tv/sktk_xx/userajax.php?c=listall&m=842879584&n=100&f=200&k=0&format=json&__n=5',
+    );
+    expect(tcCommentListUrl('c:abzou_sub', '1', { n: 999, f: -3, nowMs: 5 })).toBe(
+      'https://twitcasting.tv/c:abzou_sub/userajax.php?c=listall&m=1&n=100&f=0&k=0&format=json&__n=5',
+    );
+    expect(tcCommentListUrl('help', '1')).toBe('');
+    expect(tcCommentListUrl('sktk_xx', 'abc')).toBe('');
+  });
+  it('応答の comments を取り出し、ソケットと同じ形として記録に変えられる(2026-11-16 実測の形)', () => {
+    const json = {
+      comments: [
+        {
+          type: 'comment',
+          id: 33980687816,
+          message: '何日働いた？',
+          createdAt: 1794483729000,
+          author: { id: 'c:tw2', name: '匿名コメント', screenName: 'c:tw2', profileImage: 'https://s01.twitcasting.tv/img/twitcas_guest2_64.jpg', grade: 0 },
+          isAnonymous: true,
+        },
+        null,
+        'x',
+      ],
+    };
+    const rows = parseTcCommentList(json);
+    expect(rows).toHaveLength(1);
+    const r = parseTcEvent(rows[0], { user: 'sktk_xx' });
+    expect(r?.id).toBe('tc-33980687816');
+    expect(r?.text).toBe('何日働いた？');
+    expect(r?.postedAtMs).toBe(1794483729000);
+  });
+  it('形が違えば空', () => {
+    expect(parseTcCommentList(null)).toEqual([]);
+    expect(parseTcCommentList({ comments: 'x' })).toEqual([]);
+    expect(parseTcCommentList([])).toEqual([]);
   });
 });

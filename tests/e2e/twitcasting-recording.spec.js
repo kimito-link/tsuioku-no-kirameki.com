@@ -70,11 +70,20 @@ const FRAMES = [
   [{ type: 'raid', id: '842841215::1', mode: 'push', movieId: MOVIE, broadcaster: { id: USER }, createdAt: T0 + 7000 }],
 ];
 
+// 開く前のコメント(ページ自身が最初に読む listall)。ソケットにも来る1件は重ねて記録しない
+const LISTALL = {
+  comments: [
+    { type: 'comment', id: 33979474800, message: 'まえから', createdAt: T0 + 500, author: { id: 'fan_c', name: 'ファンC', screenName: 'fan_c', profileImage: ICON, grade: 1 } },
+    { type: 'comment', id: 33979474901, message: 'わこつ', createdAt: T0 + 1000, author: { id: 'fan_a', name: 'ファンA', screenName: 'fan_a', profileImage: ICON, grade: 1 } },
+  ],
+};
+
 const WANT_ROWS = [
   'superchat:tc:fan_a:ファンA:お茶爆100:0:TCSCORE:face',
   'superchat:tc:g:1181112:おうえん:がんばれ:90:TCSCORE:face',
   'superchat:tc:n:匿名:匿名さん:お茶ｘ10:20:TCSCORE:-',
   'text:tc:fan_a:ファンA:わこつ:0::face',
+  'text:tc:fan_c:ファンC:まえから:0::face',
   'text:tc:n:匿名:匿名コメント:こんばんは:0::-',
 ];
 
@@ -179,6 +188,10 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
       pubsubBodies.push(String(req.postData() || ''));
       return json({ url: `wss://${WS_HOST}/event.pubsub/v1/streams/${MOVIE}/events?token=abc:::1794400000:xyz&n=0.12` });
     }
+    if (u.pathname === `/${USER}/userajax.php` && u.searchParams.get('c') === 'listall') {
+      if (u.searchParams.get('m') !== String(MOVIE)) return json({ comments: [] });
+      return json(u.searchParams.get('f') === '0' ? LISTALL : { comments: [] });
+    }
     if (u.pathname === `/${USER}/supporter`) return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: SUPPORTER_HTML });
     if (u.pathname.startsWith('/img/')) return route.fulfill({ status: 404, body: '' });
     return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: pageHtml(state) });
@@ -198,9 +211,9 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   await expect
     .poll(async () => {
       const d = await tcDiag();
-      return { wsState: d.wsState, giftParam: d.giftParam, comments: d.comments, gifts: d.gifts, keepAlive: d.keepAlive >= 1, raid: d.types?.raid, tab: /^[a-z0-9]{4,}$/.test(String(d.tab || '')) };
+      return { wsState: d.wsState, giftParam: d.giftParam, comments: d.comments, gifts: d.gifts, keepAlive: d.keepAlive >= 1, raid: d.types?.raid, tab: /^[a-z0-9]{4,}$/.test(String(d.tab || '')), backfill: d.backfills >= 1 && d.backfillFail === 0 };
     }, { timeout: 15_000 })
-    .toEqual({ wsState: 'open', giftParam: true, comments: 2, gifts: 3, keepAlive: true, raid: 1, tab: true });
+    .toEqual({ wsState: 'open', giftParam: true, comments: 3, gifts: 3, keepAlive: true, raid: 1, tab: true, backfill: true });
 
   // 公式のサポーターランキング(現在のレベルのアイテムスコアの順)が、他サービスの公式ランキングと同じ置き場に入る
   await expect.poll(async () => (await sw.evaluate(async (key) => (await chrome.storage.local.get(`yt_leaderboard_${key}`))[`yt_leaderboard_${key}`], KEY))?.rows?.length || 0, { timeout: 15_000 }).toBe(2);
