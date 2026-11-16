@@ -28,6 +28,12 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   spokenTotal: number,         // 発話完了数
  *   staleDropTotal: number,      // 鮮度切れで捨てた件数(リアルタイム維持のための間引き)
  *   playbackTimeoutTotal: number,// 再生 watchdog 発火数(ended/error が来ず安全網で打ち切った=異常)
+ *   silenceTotal: number,        // 0.1.2123: コメント到着中に無音が続いた回数
+ *   silenceMaxMs: number,        // 同上: 最長無音ms
+ *   silenceRecoveryTotal: number,// 同上: 自動で立て直した回数
+ *   silenceRecoveryLastReason: string, // 同上: 直近の立て直し理由
+ *   silenceRecoveryReasons: Record<string, number>, // 同上: 理由別の回数
+ *   silenceLastDropReasons: Record<string, number>, // 同上: 直前までのdrop理由内訳
  *   lastSpokenBase: number,      // 最後に発話した時刻(epoch ms・0=未発話)
  *   lastSynthMs: number,         // 直近の合成所要 ms(-1=未計測)
  *   lastDepth: number,           // 直近の先読み深さ
@@ -153,6 +159,12 @@ export function makeInitialVoiceDiag() {
     spokenTotal: 0,
     staleDropTotal: 0,
     playbackTimeoutTotal: 0,
+    silenceTotal: 0,
+    silenceMaxMs: 0,
+    silenceRecoveryTotal: 0,
+    silenceRecoveryLastReason: '',
+    silenceRecoveryReasons: {},
+    silenceLastDropReasons: {},
     lastSpokenBase: 0,
     lastSynthMs: -1,
     lastDepth: 0,
@@ -325,6 +337,18 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     spokenTotal: num(d.spokenTotal, base.spokenTotal),
     staleDropTotal: num(d.staleDropTotal, base.staleDropTotal),
     playbackTimeoutTotal: num(d.playbackTimeoutTotal, base.playbackTimeoutTotal),
+    silenceTotal: num(d.silenceTotal, base.silenceTotal),
+    silenceMaxMs: num(d.silenceMaxMs, base.silenceMaxMs),
+    silenceRecoveryTotal: num(d.silenceRecoveryTotal, base.silenceRecoveryTotal),
+    silenceRecoveryLastReason: String(d.silenceRecoveryLastReason || base.silenceRecoveryLastReason),
+    silenceRecoveryReasons:
+      d.silenceRecoveryReasons && typeof d.silenceRecoveryReasons === 'object' && !Array.isArray(d.silenceRecoveryReasons)
+        ? { ...d.silenceRecoveryReasons }
+        : base.silenceRecoveryReasons,
+    silenceLastDropReasons:
+      d.silenceLastDropReasons && typeof d.silenceLastDropReasons === 'object' && !Array.isArray(d.silenceLastDropReasons)
+        ? { ...d.silenceLastDropReasons }
+        : base.silenceLastDropReasons,
     lastSpokenBase: num(d.lastSpokenBase, base.lastSpokenBase),
     lastSynthMs: num(d.lastSynthMs, base.lastSynthMs),
     lastDepth: num(d.lastDepth, base.lastDepth),
@@ -608,7 +632,34 @@ export function buildVoiceDiagLine(snap, nowMs) {
   // 2026-10-26計器: 聞こえ方(途切れ・つっかえ・音割れ・小さすぎ・声ごとの差)。
   const qualityLine = formatVoicePlaybackQuality(snap);
   if (qualityLine) parts.push(qualityLine);
-  if (snap.venueGate && snap.venueGate !== 'ok') parts.push(`会場の読み上げ=${snap.venueGate}`);
+  if (snap.venueGate && snap.venueGate !== 'ok') {
+    const venueGateText = snap.venueGate === 'headless'
+      ? '閉じても稼働'
+      : snap.venueGate === 'headless-waiting-engine'
+        ? '閉じても待機中(エンジン待ち)'
+        : snap.venueGate;
+    parts.push(`会場の読み上げ=${venueGateText}`);
+  }
+  const silenceTotal = Number(snap.silenceTotal) || 0;
+  const silenceRecoveries = Number(snap.silenceRecoveryTotal) || 0;
+  const silenceMaxMs = Number(snap.silenceMaxMs) || 0;
+  if (silenceTotal > 0 || silenceRecoveries > 0 || silenceMaxMs > 0) {
+    /** @type {Record<string, string>} */
+    const reasonNames = {
+      'synth-stall': '合成待ち',
+      'playback-stall': '再生待ち',
+      'queue-stall': '列詰まり',
+      'silent-input': '入力あり無音'
+    };
+    const reason = String(snap.silenceRecoveryLastReason || '');
+    const drops = snap.silenceLastDropReasons && typeof snap.silenceLastDropReasons === 'object'
+      ? snap.silenceLastDropReasons
+      : {};
+    parts.push(`無音${silenceTotal}回/最長${Math.round(silenceMaxMs / 1000)}秒/立て直し${silenceRecoveries}回${reason ? `(${reasonNames[reason] || reason})` : ''}`);
+    if (Object.keys(drops).length > 0) {
+      parts.push(`無音直前drop(件数${Number(drops.countGate) || 0}/鮮度${(Number(drops.staleHead) || 0) + (Number(drops.staleSweep) || 0)}/混雑${Number(drops.busy) || 0}/合成${Number(drops.synthNull) || 0}/再生${Number(drops.playbackTimeout) || 0})`);
+    }
+  }
   // 需要(到着レート)vs供給(1/serviceTime)。どちらも計測済みのときだけ出す。
   const arrivalPerMin = Number(snap.arrivalPerMin);
   if (Number.isFinite(arrivalPerMin) && arrivalPerMin >= 0 && Number.isFinite(serviceTimeEma) && serviceTimeEma > 0) {

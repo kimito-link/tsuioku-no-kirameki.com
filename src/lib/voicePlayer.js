@@ -71,6 +71,7 @@ import {
   applyVoiceVolumeToWav, KEY_VOICE_VOLUME_PERCENT, measureVoiceWavLevel, normalizeVoiceVolumePercent, VOICE_VOLUME_DEFAULT, voiceTargetPeak
 } from './voiceVolume.js';
 import { decideVoiceGpuTip, decideVoiceLagNotice } from './voiceLagNotice.js';
+import { planVoiceSilenceRecovery, VOICE_SILENCE_RECOVERY_MS } from './voiceSilenceRecovery.js';
 import {
   classifyVoiceImportance,
   createVoiceFirstSpeakerState,
@@ -78,6 +79,7 @@ import {
   isVoiceNeverVoiced,
   noteVoiceSpeakerInLive,
   noteVoiceVoiced,
+  isVoiceQuestionText,
   scoreVoiceWhenBusy,
   shouldSkipVoiceWhenBusy,
   VOICE_BUSY_QUEUE_MIN,
@@ -233,8 +235,17 @@ export class VoicePlayer {
     this.playing = false;
     this.generation = 0;
     this.stopCurrent = null;
-    /** @type {{ item: any, shiftAt: number, playAt: number, expectedMs: number, chars: number, audioStarted: boolean, cancelled: boolean } | null} */
+    /** @type {{ item: any, shiftAt: number, playAt: number, expectedMs: number, chars: number, audioStarted: boolean, cancelled: boolean, audioCurrentTime?: number } | null} */
     this._current = null;
+    /** 読み上げ対象が届き続けているのに無音、を検知する自己復旧用の時刻。 */
+    this._lastVoiceInputAt = 0;
+    this._silenceStartedAt = 0;
+    this._lastAudibleAt = 0;
+    this._lastSilenceRecoveryAt = 0;
+    this._silenceTimer = 0;
+    this._silenceDropBaseline = {
+      countGate: 0, staleHead: 0, staleSweep: 0, busy: 0, synthNull: 0, playbackTimeout: 0
+    };
     this.skipTimer = null;
     // v0.1.1065: 会場読み上げの計器。comeview(KEY_VOICE_DIAG)と同形のカウンタを持ち、
     //   onDiag(注入)経由で呼び出し元がstorageへ書く。従来この経路は完全に無計器で、
@@ -269,6 +280,8 @@ export class VoicePlayer {
     this.diag = {
       enabled: false, queueNow: 0, queueMax: 0, spokenTotal: 0, staleDropTotal: 0,
       playbackTimeoutTotal: 0, lastSpokenBase: 0, lastSynthMs: -1, lastDepth: 0,
+      silenceTotal: 0, silenceMaxMs: 0, silenceRecoveryTotal: 0,
+      silenceRecoveryLastReason: '', silenceRecoveryReasons: {}, silenceLastDropReasons: {},
       lastSpeedBoost: 0, lastPhase: '', lastPhaseAt: 0,
       // v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 「到着→発声」の体感遅延。
       //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
@@ -339,6 +352,89 @@ export class VoicePlayer {
     this.diag.queueNow = this.queue.length;
     if (this.queue.length > this.diag.queueMax) this.diag.queueMax = this.queue.length;
     try { this.onDiag(this.diag); } catch { /* 計器は本体の再生を妨げない */ }
+  }
+
+  /** 実際に音が始まった時だけ、無音区間を閉じる。 */
+  _noteAudibleNow(nowMs = Date.now()) {
+    const now = Number(nowMs) || Date.now();
+    if (this._silenceStartedAt > 0) {
+      this.diag.silenceMaxMs = Math.max(Number(this.diag.silenceMaxMs) || 0, now - this._silenceStartedAt);
+    }
+    this._lastAudibleAt = now;
+    this._silenceStartedAt = 0;
+    this._silenceDropBaseline = this._silenceDropCounters();
+    if (this._silenceTimer) { clearTimeout(this._silenceTimer); this._silenceTimer = 0; }
+  }
+
+  _silenceDropCounters() {
+    return {
+      countGate: Number(this.diag.dropCountGateTotal) || 0,
+      staleHead: Number(this.diag.dropHeadStaleTotal) || 0,
+      staleSweep: Number(this.diag.dropSweepStaleTotal) || 0,
+      busy: Number(this.diag.busySkipTotal) || 0,
+      synthNull: Number(this.diag.synthNullTotal) || 0,
+      playbackTimeout: Number(this.diag.playbackTimeoutTotal) || 0
+    };
+  }
+
+  _armSilenceWatchdog() {
+    if (this._silenceTimer) clearTimeout(this._silenceTimer);
+    this._silenceTimer = 0;
+    const base = Math.max(this._lastAudibleAt, this._lastSilenceRecoveryAt);
+    // 復旧以前の入力しか無ければ監視対象は無い。ここを再予約すると elapsed 済みのため1msループになる。
+    if (!this.enabled || !(this._silenceStartedAt > 0) || !(this._lastVoiceInputAt > base)) return;
+    const wait = Math.max(1, VOICE_SILENCE_RECOVERY_MS - (Date.now() - this._silenceStartedAt));
+    this._silenceTimer = setTimeout(() => {
+      this._silenceTimer = 0;
+      this._noteVoiceInputAndRecover(Date.now(), false);
+    }, wait);
+    try { this._silenceTimer.unref?.(); } catch { /* browser timer */ }
+  }
+
+  /** 読み上げ対象の到着を記録し、20秒無音なら何度でも自己復旧する。 */
+  _noteVoiceInputAndRecover(nowMs = Date.now(), noteInput = true) {
+    const now = Number(nowMs) || Date.now();
+    if (noteInput) {
+      this._lastVoiceInputAt = now;
+      if (!(this._silenceStartedAt > 0)) this._silenceStartedAt = now;
+    }
+    const decision = planVoiceSilenceRecovery({
+      enabled: this.enabled,
+      nowMs: now,
+      lastInputAt: this._lastVoiceInputAt,
+      silenceStartedAt: this._silenceStartedAt,
+      lastAudibleAt: this._lastAudibleAt,
+      lastRecoveryAt: this._lastSilenceRecoveryAt,
+      playing: this.playing,
+      audioStarted: this._current?.audioStarted === true,
+      synthInFlight: this._synthInFlight,
+      queueLength: this.queue.length
+    });
+    this.diag.silenceMaxMs = Math.max(Number(this.diag.silenceMaxMs) || 0, decision.silentMs || 0);
+    if (!decision.recover) { this._armSilenceWatchdog(); return false; }
+    this.diag.silenceTotal = (Number(this.diag.silenceTotal) || 0) + 1;
+    this.diag.silenceRecoveryTotal = (Number(this.diag.silenceRecoveryTotal) || 0) + 1;
+    this.diag.silenceRecoveryLastReason = decision.reason;
+    const reasons = this.diag.silenceRecoveryReasons || (this.diag.silenceRecoveryReasons = {});
+    reasons[decision.reason] = (Number(reasons[decision.reason]) || 0) + 1;
+    const currentDrops = this._silenceDropCounters();
+    this.diag.silenceLastDropReasons = Object.fromEntries(
+      Object.entries(currentDrops).map(([key, value]) => [key, Math.max(0, value - (Number(this._silenceDropBaseline?.[key]) || 0))])
+    );
+    this._silenceDropBaseline = currentDrops;
+    this._lastSilenceRecoveryAt = now;
+    // 次の新着が来るまで新しい無音区間は始めない(復旧済みの入力で1ms再起動しない)。
+    this._silenceStartedAt = 0;
+    if (this._silenceTimer) { clearTimeout(this._silenceTimer); this._silenceTimer = 0; }
+    // 詰まった Promise/再生/待機列を世代ごと捨て、次の新着を新しい世代で処理する。
+    this.stop();
+    // VOICEVOX を直ちに重ねず、利用できれば PC の軽い声へ。2分後の再試行は既存ロジックが担う。
+    this._overload.overloaded = true;
+    this._overload.overloadedAt = now;
+    this._overload.timeoutStreak = Math.max(2, Number(this._overload.timeoutStreak) || 0);
+    this.diag.voiceOverloaded = true;
+    this._emitDiag();
+    return true;
   }
 
   // ★v0.1.1506: キー文字列の正本は voiceKeys.js。getter の【形は残し】戻り値だけ委譲する
@@ -583,6 +679,11 @@ export class VoicePlayer {
     }
     this._deviceNote = '';
     this.stop();
+    this._lastVoiceInputAt = 0;
+    this._silenceStartedAt = 0;
+    this._lastAudibleAt = 0;
+    this._lastSilenceRecoveryAt = 0;
+    if (this._silenceTimer) { clearTimeout(this._silenceTimer); this._silenceTimer = 0; }
     this.onLoadingState('idle');
     this._emitToggle();
     if (persist && this.storage) {
@@ -767,6 +868,23 @@ export class VoicePlayer {
     const name = String(item?.nickname || '').trim();
     const key = String(item?.userKey || item?.key || '').trim();
     return userId || key || name || 'anon';
+  }
+
+  /** 会場が failStreak 中でも大事な1件を10秒probe待ちに巻き込まないための副作用なし判定。 */
+  previewImportant(item) {
+    const userKey = this._voiceUserKeyForItem(item);
+    const liveId = String(item?.liveId || '').trim().toLowerCase();
+    const firstInLive = !!userKey && (
+      liveId !== this._firstSpeakerState.liveId || !this._firstSpeakerState.seen.has(userKey)
+    );
+    return !!classifyVoiceImportance({
+      kind: item?.kind,
+      text: item?.text,
+      userId: item?.userId,
+      isModerator: item?.isModerator,
+      broadcasterUid: item?.broadcasterUid,
+      firstInLive
+    }) || isVoiceQuestionText(item?.text);
   }
 
   /**
@@ -1067,9 +1185,22 @@ export class VoicePlayer {
     } catch (err) {
       started = Promise.reject(err);
     }
-    return Promise.resolve(started)
+    // 依存先が AbortSignal を無視して Promise を永久に解決しない場合でも、世代を捨てれば
+    // VoicePlayer 自身は待ち続けない。元Promiseには race が rejection handler を付けるため後発例外も漏れない。
+    let removeAbort = () => {};
+    const cancellable = extra.signal
+      ? new Promise((resolve) => {
+          const onAbort = () => resolve(null);
+          if (extra.signal.aborted) { resolve(null); return; }
+          extra.signal.addEventListener('abort', onAbort, { once: true });
+          removeAbort = () => extra.signal.removeEventListener('abort', onAbort);
+        })
+      : null;
+    const awaited = cancellable ? Promise.race([Promise.resolve(started), cancellable]) : Promise.resolve(started);
+    return awaited
       .then(
         (wav) => {
+          removeAbort();
           settle();
           /** @type {any} */
           let r = null;
@@ -1092,6 +1223,7 @@ export class VoicePlayer {
           return wav;
         },
         (err) => {
+          removeAbort();
           settle();
           try { track.end(timing, false); } catch { /* no-op */ }
           this._noteOverload({ timedOut, ok: false });
@@ -1270,17 +1402,30 @@ export class VoicePlayer {
     let started = false;
     if (text && speaker) {
       const tone = lightVoiceToneFor(String(item.userKey || ''), speaker.voices().length);
-      this.stopCurrent = () => speaker.cancel();
+      let active = true;
+      let release = /** @type {(value: boolean) => void} */ (() => {});
+      const cancelled = new Promise((resolve) => { release = resolve; });
+      const stopLight = () => {
+        active = false;
+        try { speaker.cancel(); } catch { /* cancel 自体の失敗でも待ちを解放する */ }
+        release(false);
+      };
+      const watchdog = setTimeout(stopLight, 20000);
+      this.stopCurrent = stopLight;
       try {
-        started = await speaker.speak(text, tone, {
+        started = await Promise.race([Promise.resolve(speaker.speak(text, tone, {
           onStart: () => {
+            if (!active || generation !== this.generation) return;
+            this._noteAudibleNow();
             if (this._current && this._current.item === item) this._current.audioStarted = true;
             if (typeof item.onAudioStart === 'function') item.onAudioStart();
             try { if (typeof item.onAudible === 'function') item.onAudible(); } catch { /* 枠の失敗で再生を止めない */ }
           }
-        });
+        })), cancelled]);
       } catch { started = false; }
-      this.stopCurrent = null;
+      active = false;
+      clearTimeout(watchdog);
+      if (this.stopCurrent === stopLight) this.stopCurrent = null;
     }
     if (started && typeof item.onAudioEnd === 'function') item.onAudioEnd();
     if (typeof item.onPlayStart === 'function') item.onPlayStart();
@@ -1510,7 +1655,27 @@ export class VoicePlayer {
           /** @type {{ peak: number, rms: number } | null} */
           let wholeLevel = null;
           if (!audio) {
-            const whole = isStreamedVoice(wav) ? (await wav.whenDone, wav.toWav()) : wav;
+            let whole = wav;
+            if (isStreamedVoice(wav)) {
+              let release = /** @type {(value: boolean) => void} */ (() => {});
+              const cancelled = new Promise((resolve) => { release = resolve; });
+              const watchdog = setTimeout(() => release(false), 20000);
+              const stopStreamWait = () => {
+                try { wav.cancel(); } catch { /* 受信停止失敗でも待ちを解放する */ }
+                release(false);
+              };
+              this.stopCurrent = stopStreamWait;
+              const done = await Promise.race([Promise.resolve(wav.whenDone).catch(() => false), cancelled]);
+              clearTimeout(watchdog);
+              if (this.stopCurrent === stopStreamWait) this.stopCurrent = null;
+              if (done !== true || generation !== this.generation || !this.enabled) {
+                try { wav.cancel(); } catch { /* no-op */ }
+                if (typeof item.onPlayStart === 'function') item.onPlayStart();
+                this._notifyDropped(item);
+                continue;
+              }
+              whole = wav.toWav();
+            }
             const loud = applyVoiceVolumeToWav(whole, this.volumePercent);
             wholeLevel = measureVoiceWavLevel(loud);
             const blob = new Blob([loud], { type: 'audio/wav' });
@@ -1550,6 +1715,15 @@ export class VoicePlayer {
           const _prepStart = Date.now();
           let _playbackStartAt = -1;
           let _audibleSent = false;
+          const notePlaybackProgress = () => {
+            const cur = this._current;
+            if (!cur || cur.item !== item || generation !== this.generation) return;
+            const currentTime = Number(audio.currentTime);
+            if (!Number.isFinite(currentTime) || currentTime <= (Number(cur.audioCurrentTime) || 0) + 0.01) return;
+            cur.audioCurrentTime = currentTime;
+            // timeupdate はデコード済み音声の再生位置が実際に進んだ証拠。長い正常音声をstall扱いしない。
+            this._noteAudibleNow();
+          };
           const notifyAudible = () => {
             if (_audibleSent) return;
             _audibleSent = true;
@@ -1557,6 +1731,7 @@ export class VoicePlayer {
           };
           try {
             audio.addEventListener('playing', () => {
+              this._noteAudibleNow();
               notifyAudible();
               try {
                 const prepMs = Math.max(0, Date.now() - _prepStart);
@@ -1565,6 +1740,7 @@ export class VoicePlayer {
                 _playbackStartAt = Date.now();
                 const durationSec = Number(audio.duration);
                 if (this._current && this._current.item === item) this._current.playAt = _playbackStartAt;
+                if (this._current && this._current.item === item) this._current.audioCurrentTime = Number(audio.currentTime) || 0;
                 if (Number.isFinite(durationSec) && durationSec > 0) {
                   const expectedMs = (durationSec * 1000) / (Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1);
                   if (this._current && this._current.item === item) this._current.expectedMs = expectedMs;
@@ -1573,6 +1749,7 @@ export class VoicePlayer {
                 }
               } catch { /* 計測失敗は本体の再生に影響させない */ }
             }, { once: true });
+            audio.addEventListener('timeupdate', notePlaybackProgress);
           } catch { /* addEventListener自体が無いFakeAudio等でも壊れない */ }
 
           await new Promise((resolve) => {
@@ -1590,6 +1767,7 @@ export class VoicePlayer {
               clearTimeout(_watchdog);
               audio.removeEventListener('ended', finish);
               audio.removeEventListener('error', finish);
+              audio.removeEventListener('timeupdate', notePlaybackProgress);
               if (objectUrl) this.revokeObjectURL(objectUrl);
               objectUrl = '';
               this.stopCurrent = null;
@@ -1762,6 +1940,8 @@ export class VoicePlayer {
 
       // v0.1.1811: 読む文字が無い(絵文字・記号だけ)ときも「鳴らない」と知らせる(吹き出しを合成待ちのまま8秒残さない)。
       if (!buildVoiceReadingText({ name, text: body })) { this._notifyDropped(item); continue; }
+
+      this._noteVoiceInputAndRecover();
 
       // 2026-10-22計器(P1): 受信→キュー投入。保存のまとめ書き(最大1.5秒)等の上流の遅れ。
       //   receivedAt は呼び出し側(会場)が渡す受信時刻(無ければ計測しない)。

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 10 / 1271 件
+## ⚠️ 役割コメントが無いソース 10 / 1277 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1051,7 +1051,7 @@
   - `capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
   - `package.json`
   - `pnpm-lock.yaml`
-- 📁 **scripts/** (115)
+- 📁 **scripts/** (118)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1145,11 +1145,13 @@
   - `measure-flash-frames.test.js`
   - `measure-ndgr-crawls.mjs` — 拡張の NDGR 巡回(前方向の立て直し・過去埋め)を本物の配信に当てて数える。
   - `measure-phone-direct.mjs` — 「iPhone アプリが自分でニコ生のコメントを取る」(拡張なし 第3段)の前に測る。
+  - `measure-voice-silent-busy.mjs` — 混雑した会場の「読み上げONなのに無音」を、偽VOICEVOX(50121)と新しいPlaywright contextで実測する。
   - `measure-yt-voice-repeat.mjs` — YouTube の会場の読み上げが「最新を読まず、過去の発言を何度も読む」かを計器で確かめる。
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
   - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
   - `migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
   - `pick-live-for-check.mjs` — 検証に使う実配信を【自動で1つ選ぶ】。
+  - `probe-browser-voice-audio.mjs` — 新規Playwrightプロファイルで非ゼロWAVの実再生とPC音声の開始/終了を確認する。
   - `record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
   - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
   - `resize-marketing-html-avatars.ps1`
@@ -1169,6 +1171,7 @@
   - `vercel-ignore-build.sh`
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
+  - `verify-voice-isolated-extension.mjs` — 偽エンジンだけを向く拡張の一時コピーで、既存のverify:extensionを実行する。
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
   - `youtube-build.mjs` — YouTube 版の束ね方(esbuild の書き換えと入口の一覧)。2 か所から使う:
 - 📁 **sound-src/** (23)
@@ -1196,7 +1199,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2477)
+- 📁 **src/** (2485)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1506,7 +1509,7 @@
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2191)
+  - 📁 **lib/** (2199)
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -3470,6 +3473,9 @@
     - `venueGiftThrowsForUser.test.js`
     - `venueGiftThrowsWiring.test.js`
     - `venueHeaderWrap.wiring.test.js`
+    - `venueHeadlessVoice.wiring.test.js`
+    - `venueHeadlessVoiceItem.js` — 【層】L0 判定層(ブラウザI/Oは呼び出し側へ委譲)
+    - `venueHeadlessVoiceItem.test.js`
     - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
     - `venueHeat.test.js`
     - `venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
@@ -3494,6 +3500,8 @@
     - `venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
     - `venueLaneParity.test.js`
     - `venueLaneParity.wiring.test.js`
+    - `venueLiveCommentRoute.js` — 【層】L0 判定層(ブラウザI/Oは呼び出し側へ委譲)
+    - `venueLiveCommentRoute.test.js`
     - `venueLiveOpenFlag.js` — 「会場モードがいま開いているか」を鏡の供給側へ伝える値。
     - `venueLiveOpenFlag.test.js`
     - `venueLiveOpenWiring.wiring.test.js`
@@ -3637,6 +3645,7 @@
     - `voicePlayerClipCache.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
     - `voicePlayerOverloadKeep.test.js`
+    - `voicePlayerSilenceRecovery.test.js`
     - `voiceQuality.js` — 読み上げの声の音質(出力サンプリングレート)の設定。DOM も chrome API も触らない純関数。
     - `voiceQuality.test.js`
     - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
@@ -3648,6 +3657,8 @@
     - `voiceReaderLease.test.js`
     - `voiceReadingNormalize.js` — 読み上げる本文を「耳で聞いて自然」に整える純関数(会場・コメビュ・スマホ共通)。
     - `voiceReadingNormalize.test.js`
+    - `voiceSilenceRecovery.js` — 【層】L0 判定層(ブラウザI/Oは呼び出し側へ委譲)
+    - `voiceSilenceRecovery.test.js`
     - `voiceStageTiming.js` — 読み上げの遅れを「段階ごと」に測る計器(印字専用・読み上げの挙動には一切介入しない)。
     - `voiceStageTiming.test.js`
     - `voiceStream.js` — VOICEVOX の声を「できた分から少しずつ」受け取って鳴らす(ストリーミング・2026-10-26)。

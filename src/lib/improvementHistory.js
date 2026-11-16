@@ -5083,5 +5083,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2129', metric: 'cross-checked-claims', value: 51,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓が日付で動いて 52→51(この版のコミット前の値)。この版は PC の実機(Kick)で見つけた書き換えの多さを手元で再現し、単体テスト(直す前は赤)と前後交互2回の書き換え数・できあがった説明文の一致で確かめた'
+  }),
+  Object.freeze({
+    version: '0.1.2130', metric: 'bundle-kb', value: 1446,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版と同じ1446KB(読み上げの修正は popup.js をほぼ増やしていない)。過去最良1360KBより大きいのは複数サービス対応と計器のためで、この版で悪化したわけではない'
+  }),
+  Object.freeze({
+    version: '0.1.2130', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2130', metric: 'cross-checked-claims', value: 49,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを数える値(0.1.2120 の注記と同じ理由)。30日の窓から古いコミットが外れて減っただけで性能は表さない。この版は偽エンジンの10分試験と実 Audio・PC の声の再生確認で別に確かめた(council/codex-report-voice-silent-busy.md)'
   })
 ]);
