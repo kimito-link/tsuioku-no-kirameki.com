@@ -380,7 +380,7 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   });
   expect(left).toEqual({ vis: [], attrs: [] });
 
-  // 絵文字(KEKW)は名前 → 画像の対応を覚え、コメントの一覧では画像で見せる(文字は残す)
+  // 絵文字(KEKW)は名前 → 画像の対応を覚え、一覧では画像だけにする。印の名前は文字に残さない。
   expect((await sw.evaluate(async () => chrome.storage.local.get('yt_kk_emotes'))).yt_kk_emotes).toEqual({
     KEKW: 'https://files.kick.com/emotes/1/fullsize',
   });
@@ -394,9 +394,10 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
   await expect
     .poll(() => ext.evaluate(() => {
       const e = document.querySelector('.nl-tl-row__text .nl-emote');
-      return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${e.closest('.nl-tl-row__text')?.textContent}` : '';
+      const row = (e?.closest('.nl-tl-row__text')?.textContent || '').replace(/\s+/g, ' ').trim();
+      return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${row}` : '';
     }), { timeout: 20_000 })
-    .toBe('KEKW|true|わこつ KEKW');
+    .toBe('|true|わこつ');
 });
 
 test('Centrifugo が使えないときは、API が返す Pusher の鍵で読む', async ({ context, rt }) => {
