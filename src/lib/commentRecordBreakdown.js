@@ -9,7 +9,7 @@
  *     記録には含まれない。よって本関数の対象は「保存された後の rows」のみ。
  *   - 内訳カテゴリ:
  *       normal           - 通常コメント(一般人 + 配信者本人含む応援系)
- *       interestArrival  - 「○○が好きなN人が来場しました」
+ *       interestArrival  - ニコ生の来場通知（好きなタグ・大百科・放送者の好み）
  *       followNotice     - フォロー通知(Phase B で parser 追加・現状 0)
  *       otherSystem      - その他システムメッセージ(運営アナウンス等)
  *   - 「ギフト・広告は別カウント」をユーザーに明示するため、合計テキスト表示側で
@@ -18,7 +18,7 @@
  * @module commentRecordBreakdown
  */
 
-import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /**
  * @typedef {{
@@ -48,7 +48,8 @@ export function summarizeCommentRecordBreakdown(comments) {
   for (const c of comments) {
     if (!c || typeof c !== 'object') continue;
     const text = String(/** @type {any} */ (c).text ?? '');
-    if (parseInterestArrivalComment(text)) {
+    const plat = String(/** @type {any} */ (c).ytPlatform || '').trim();
+    if ((!plat || plat === 'niconico') && parseArrivalCommentText(text)) {
       interestArrival += 1;
       continue;
     }

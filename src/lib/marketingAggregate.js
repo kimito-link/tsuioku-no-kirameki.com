@@ -5,7 +5,7 @@
 import { normalizeLv } from '../shared/niconico/liveId.js';
 import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuard.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
-import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /**
  * @typedef {{
@@ -126,7 +126,10 @@ import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
  *   totalArrivals: number,
  *   uniqueTags: number,
  *   messageCount: number,
- *   topTags: { tag: string, arrivals: number, messageCount: number }[]
+ *   topTags: { tag: string, arrivals: number, messageCount: number }[],
+ *   routes?: { id: string, label: string, arrivals: number, messageCount: number }[],
+ *   buckets?: { offsetMin: number, arrivals: number, comments: number }[],
+ *   bucketTotal?: number
  * }} MarketingInterestArrivalSummary
  */
 
@@ -217,13 +220,13 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   for (const c of filtered) {
     if (isMarketingSupportRow(c)) {
       supportRows.push(c);
-    } else if (parseInterestArrivalComment(String(c.text || ''))) {
+    } else if (isNiconicoArrivalRow(c) && parseArrivalCommentText(String(c.text || ''))) {
       interestArrivalComments.push(c);
     } else {
       engagementComments.push(c);
     }
   }
-  const interestArrivalSummary = computeInterestArrivalSummary(interestArrivalComments);
+  const interestArrivalSummary = computeInterestArrivalSummary(interestArrivalComments, engagementComments);
 
   /** @type {Map<string, UserCommentProfile>} */
   const userMap = new Map();
@@ -407,23 +410,67 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   return report;
 }
 
-/** @param {StoredComment[]} interestArrivalComments */
-function computeInterestArrivalSummary(interestArrivalComments) {
+const ARRIVAL_FIVE_MS = 5 * 60_000;
+const ARRIVAL_BUCKET_CAP = 36;
+
+/** @type {Readonly<Record<string, string>>} */
+const ARRIVAL_ROUTE_LABEL = Object.freeze({
+  like: '好きなタグ',
+  dictionary: '大百科',
+  interest: '放送者の好み',
+});
+
+const ARRIVAL_ROUTE_ORDER = Object.freeze(['like', 'dictionary', 'interest']);
+
+/**
+ * ニコ生の来場通知だけを来場に数える。他サービスの行はコメントのまま。
+ * @param {StoredComment} c
+ */
+function isNiconicoArrivalRow(c) {
+  const plat = String(/** @type {{ ytPlatform?: unknown }} */ (c).ytPlatform || '').trim();
+  return !plat || plat === 'niconico';
+}
+
+/**
+ * 来場の公式通知。人数は parseArrivalCommentText の entries を1回だけ足す。
+ * 通知が0件のときは、これまでの4フィールドだけを返す（埋め込み JSON の形を変えない）。
+ * @param {StoredComment[]} interestArrivalComments
+ * @param {StoredComment[]} engagementComments
+ */
+function computeInterestArrivalSummary(interestArrivalComments, engagementComments) {
   /** @type {Map<string, { arrivals: number, messageCount: number }>} */
   const tagMap = new Map();
+  /** @type {Record<string, number>} */
+  const routeArrivals = { like: 0, dictionary: 0, interest: 0 };
+  /** @type {Record<string, number>} */
+  const routeMessages = { like: 0, dictionary: 0, interest: 0 };
   let totalArrivals = 0;
   let messageCount = 0;
+  /** @type {Array<{ at: number, people: number }>} */
+  const timed = [];
 
   for (const c of interestArrivalComments) {
-    const parsed = parseInterestArrivalComment(String(c.text || ''));
+    const parsed = parseArrivalCommentText(String(c.text || ''));
     if (!parsed) continue;
     messageCount += 1;
-    totalArrivals += parsed.count;
-    const prev = tagMap.get(parsed.tag) || { arrivals: 0, messageCount: 0 };
-    tagMap.set(parsed.tag, {
-      arrivals: prev.arrivals + parsed.count,
-      messageCount: prev.messageCount + 1
-    });
+    totalArrivals += parsed.totalCount;
+    /** @type {Set<string>} */
+    const sources = new Set();
+    for (const entry of parsed.entries) {
+      const source = entry.source;
+      if (Object.prototype.hasOwnProperty.call(routeArrivals, source)) {
+        routeArrivals[source] += entry.count;
+        sources.add(source);
+      }
+      const prev = tagMap.get(entry.keyword) || { arrivals: 0, messageCount: 0 };
+      tagMap.set(entry.keyword, {
+        arrivals: prev.arrivals + entry.count,
+        messageCount: prev.messageCount + 1
+      });
+    }
+    for (const source of sources) routeMessages[source] += 1;
+    const at = Number(c.capturedAt) || 0;
+    if (at > 0) timed.push({ at, people: parsed.totalCount });
   }
 
   const topTags = [...tagMap.entries()]
@@ -439,11 +486,63 @@ function computeInterestArrivalSummary(interestArrivalComments) {
         a.tag.localeCompare(b.tag, 'ja')
     );
 
+  if (messageCount === 0) {
+    return { totalArrivals: 0, uniqueTags: 0, messageCount: 0, topTags };
+  }
+
+  const routes = ARRIVAL_ROUTE_ORDER
+    .filter((id) => routeArrivals[id] > 0)
+    .map((id) => ({
+      id,
+      label: ARRIVAL_ROUTE_LABEL[id],
+      arrivals: routeArrivals[id],
+      messageCount: routeMessages[id]
+    }));
+
+  let origin = 0;
+  for (const ev of timed) {
+    if (!origin || ev.at < origin) origin = ev.at;
+  }
+  for (const c of engagementComments) {
+    const at = Number(c.capturedAt) || 0;
+    if (at > 0 && (!origin || at < origin)) origin = at;
+  }
+  /** @type {Map<number, { arrivals: number, comments: number }>} */
+  const bucketMap = new Map();
+  if (origin > 0 && timed.length) {
+    for (const ev of timed) {
+      const key = Math.floor((ev.at - origin) / ARRIVAL_FIVE_MS);
+      const cell = bucketMap.get(key) || { arrivals: 0, comments: 0 };
+      cell.arrivals += ev.people;
+      bucketMap.set(key, cell);
+    }
+    for (const c of engagementComments) {
+      const at = Number(c.capturedAt) || 0;
+      if (!(at > 0)) continue;
+      const key = Math.floor((at - origin) / ARRIVAL_FIVE_MS);
+      const cell = bucketMap.get(key);
+      if (!cell) continue;
+      cell.comments += 1;
+    }
+  }
+  const bucketTotal = bucketMap.size;
+  const buckets = [...bucketMap.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .slice(0, ARRIVAL_BUCKET_CAP)
+    .map(([key, cell]) => ({
+      offsetMin: key * 5,
+      arrivals: cell.arrivals,
+      comments: cell.comments
+    }));
+
   return {
     totalArrivals,
     uniqueTags: tagMap.size,
     messageCount,
-    topTags
+    topTags,
+    routes,
+    buckets,
+    bucketTotal
   };
 }
 

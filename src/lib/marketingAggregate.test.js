@@ -13,7 +13,8 @@ function c(no, uid, text, offsetMs = 0, extra = {}) {
     nickname: extra.nickname || '',
     avatarUrl: extra.avatarUrl || '',
     selfPosted: false,
-    capturedAt: BASE + offsetMs
+    capturedAt: BASE + offsetMs,
+    ...extra
   };
 }
 
@@ -311,7 +312,41 @@ describe('aggregateMarketingReport - liveId 表記 / avatar 補正', () => {
       topTags: [
         { tag: '料理', arrivals: 3, messageCount: 2 },
         { tag: '雑談', arrivals: 1, messageCount: 1 }
-      ]
+      ],
+      routes: [{ id: 'like', label: '好きなタグ', arrivals: 4, messageCount: 3 }],
+      buckets: [{ offsetMin: 0, arrivals: 4, comments: 1 }],
+      bucketTotal: 1
     });
+  });
+
+  it('来場の4形式と全角空白を人数どおり足し、コメント数には入れない', () => {
+    const fw = '\u3000';
+    const comments = [
+      c(1, 'u1', 'hello', 0),
+      c(2, null, `${fw}「VOCALOID」が好きな3人が来場しました${fw}`, 1000),
+      c(3, null, `「A」が好きな2人、${fw}「B」が好きな1人が来場しました`, 6 * 60_000),
+      c(4, null, `${fw}大百科記事「X」から4人が来場しました${fw}`, 11 * 60_000),
+      c(5, null, `大百科記事「P」から1人、${fw}「Q」から2人が来場しました`, 12 * 60_000),
+      c(6, null, `${fw}放送者の好み「夜」に興味のある5人が来場しました${fw}`, 20 * 60_000),
+      c(7, 'u2', 'あとから', 21 * 60_000),
+      c(8, 'yt', '「VOCALOID」が好きな9人が来場しました', 1000, { ytPlatform: 'youtube' })
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    expect(r.totalComments).toBe(3);
+    const s = r.interestArrivalSummary;
+    expect(s.messageCount).toBe(5);
+    expect(s.totalArrivals).toBe(3 + 3 + 4 + 3 + 5);
+    expect(s.topTags.map((row) => row.arrivals).reduce((a, b) => a + b, 0)).toBe(s.totalArrivals);
+    expect(s.routes).toEqual([
+      { id: 'like', label: '好きなタグ', arrivals: 6, messageCount: 2 },
+      { id: 'dictionary', label: '大百科', arrivals: 7, messageCount: 2 },
+      { id: 'interest', label: '放送者の好み', arrivals: 5, messageCount: 1 }
+    ]);
+    const vocaloid = s.topTags.find((row) => row.tag === 'VOCALOID');
+    expect(vocaloid).toEqual({ tag: 'VOCALOID', arrivals: 3, messageCount: 1 });
+    expect(s.buckets.map((b) => b.arrivals)).toEqual([3, 3, 7, 5]);
+    const later = s.buckets.find((b) => b.offsetMin === 20);
+    expect(later.comments).toBe(1);
+    expect(s.buckets.find((b) => b.offsetMin === 0).comments).toBe(2);
   });
 });

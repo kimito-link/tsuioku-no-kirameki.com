@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2144',
+    date: '2026-11-17',
+    summary: '来場の通知を4種類とも集計',
+    items: Object.freeze([
+      'ニコ生の来場通知（好きなタグ、大百科、放送者の好み）を、分析レポートの来場の章に出すようにしました。個人は特定できません。',
+      '5分ごとの来場人数と、同じ5分のコメント件数を並べます。来た人がコメントしたかは出していません。記録の内訳では来場として数え、コメント数には入れません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2143',
     date: '2026-11-17',
     summary: '配信の山が来た時刻を出す',
@@ -176,14 +185,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '拡張の短い説明文を見直した',
     items: Object.freeze([
       'Chrome ウェブストアに出る拡張の短い説明を「ライブ配信の応援コメントをこのPCの中だけに記録し、配信後に3つのレーンで振り返れます」にしました。使い方や動きは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2121',
-    date: '2026-11-13',
-    summary: '文字にくっついたスタンプ名も読まない',
-    items: Object.freeze([
-      '文字のすぐ後ろに YouTube のスタンプが続くと(例「fraudface-blue-smiling」)、スタンプの名前を英語のまま読んでいました。くっついていても名前は読まないようにしました。'
     ])
   }),
 ]);

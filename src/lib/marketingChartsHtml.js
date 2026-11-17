@@ -4650,9 +4650,9 @@ export function sectionInterestArrival(r) {
       hint: '各通知の人数を合算'
     },
     {
-      label: '興味タグ種類',
+      label: '言葉の種類',
       value: `${formatEventRankingNumber(summary.uniqueTags)}種`,
-      hint: 'ユニークタグ数'
+      hint: '通知に出た言葉'
     },
     {
       label: '通知回数',
@@ -4682,16 +4682,53 @@ export function sectionInterestArrival(r) {
     })
     .join('');
 
+  const routes = Array.isArray(summary.routes) ? summary.routes : [];
+  const routeHtml = routes.length
+    ? `<div class="mkt-ia-stats">${routes
+      .map(
+        (route) =>
+          `<div class="mkt-ia-stat"><span>${escapeHtml(route.label)}</span><strong>${formatEventRankingNumber(route.arrivals)}人</strong><small>通知 ${formatEventRankingNumber(route.messageCount)}回</small></div>`
+      )
+      .join('')}</div>`
+    : '';
+  const buckets = Array.isArray(summary.buckets) ? summary.buckets : [];
+  const bucketRows = buckets
+    .map(
+      (bucket) => `<tr>
+<td>開始から ${formatEventRankingNumber(bucket.offsetMin)}分</td>
+<td>${formatEventRankingNumber(bucket.arrivals)}人</td>
+<td>${formatEventRankingNumber(bucket.comments)}件</td>
+</tr>`
+    )
+    .join('');
+  const bucketMore =
+    Number(summary.bucketTotal) > buckets.length
+      ? `<p class="mkt-note">表示は ${formatEventRankingNumber(buckets.length)} 枠までです（記録 ${formatEventRankingNumber(summary.bucketTotal)} 枠）。</p>`
+      : '';
+  const series = bucketRows
+    ? `<h3 class="mkt-subhead">5分ごとの来場</h3>
+<p class="mkt-note">同じ5分にあるコメントの件数です。来た人が書いたかは記録にありません。</p>
+<div class="mkt-ia-table-wrap">
+<table class="mkt-ia-table">
+<thead><tr><th>時刻</th><th>来場人数</th><th>同じ5分のコメント</th></tr></thead>
+<tbody>${bucketRows}</tbody>
+</table>
+</div>
+${bucketMore}`
+    : '';
+
   return `<section class="mkt-section mkt-section--interest-arrival" id="mkt-interest-arrival">
 <h2>興味タグ別来場（公式システムコメ）</h2>
-<p class="mkt-note">ニコ公式の集計通知です。視聴者プロフィールの「好きなタグ」に基づく来場人数のお知らせで、個人は特定できません。</p>
+<p class="mkt-note">ニコニコの公式がまとめて出した来場の通知です。好きなタグ、大百科、放送者の好みの人数で、個人は特定できません。</p>
+${routeHtml}
 <div class="mkt-ia-stats">${stats}</div>
 <div class="mkt-ia-table-wrap">
 <table class="mkt-ia-table">
-<thead><tr><th>#</th><th>タグ</th><th>来場人数</th><th>通知回数</th><th>人数シェア</th></tr></thead>
+<thead><tr><th>#</th><th>言葉</th><th>来場人数</th><th>通知回数</th><th>人数シェア</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </div>
+${series}
 </section>`;
 }
 

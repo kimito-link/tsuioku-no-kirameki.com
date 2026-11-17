@@ -1161,7 +1161,10 @@ describe('buildMarketingDashboardHtml', () => {
     const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
     expect(html).toContain('id="mkt-interest-arrival"');
     expect(html).toContain('興味タグ別来場（公式システムコメ）');
-    expect(html).toContain('ニコ公式の集計通知');
+    expect(html).toContain('個人は特定できません');
+    expect(html).toContain('好きなタグ');
+    expect(html).toContain('同じ5分のコメント');
+    expect(html).toContain('来た人が書いたかは記録にありません');
     expect(html).toContain('料理');
     expect(html).toContain('雑談');
     expect(html).toContain('来場人数（合算）');
