@@ -262,6 +262,194 @@ ${estimate}${unitNote}
 </section>`;
 }
 
+const MOMENT_LIST_CAP = 6;
+const RAID_CAP = 3;
+const RAID_WINDOW_MS = 15 * 60_000;
+
+/**
+ * @param {readonly unknown[]} rows
+ * @returns {Array<{ at: number, value: number, estimated: boolean }>}
+ */
+function momentSamples(rows) {
+  /** @type {Array<{ at: number, value: number, estimated: boolean }>} */
+  const out = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const rec = /** @type {{ capturedAt?: unknown, officialViewerCount?: unknown, peakConcurrentEstimate?: unknown }} */ (row);
+    const at = Number(rec.capturedAt);
+    if (!(at > 0)) continue;
+    const official = Number(rec.officialViewerCount);
+    const estimated = Number(rec.peakConcurrentEstimate);
+    if (Number.isFinite(official) && official >= 0) out.push({ at, value: official, estimated: false });
+    else if (Number.isFinite(estimated) && estimated >= 0) out.push({ at, value: estimated, estimated: true });
+  }
+  out.sort((a, b) => a.at - b.at);
+  return out;
+}
+
+/**
+ * @param {Array<{ at: number, value: number, estimated: boolean }>} samples
+ * @param {number} at
+ * @param {boolean} before
+ */
+function sampleNear(samples, at, before) {
+  let found = null;
+  for (const s of samples) {
+    if (before) {
+      if (s.at > at) break;
+      if (at - s.at <= RAID_WINDOW_MS) found = s;
+    } else if (s.at >= at && s.at - at <= RAID_WINDOW_MS) {
+      return s;
+    }
+  }
+  return found;
+}
+
+/**
+ * 記録の時刻から、そのサービスの山を1回の走査で出す。無い列は作らない。
+ * @param {Array<Record<string, unknown>>} comments
+ * @param {{ moments?: {
+ *   title: string,
+ *   besideSpeech?: boolean,
+ *   speech?: boolean,
+ *   pageCountAside?: boolean,
+ *   raidKind?: string,
+ *   tracks: readonly { kinds: readonly string[], mode: 'amount' | 'times' | 'text', label: string, currency?: string }[]
+ * } | null } | null} view
+ * @param {readonly unknown[]} sessionRows
+ * @param {number} pageCount
+ */
+export function sectionStreamerMomentsHtml(comments, view, sessionRows, pageCount) {
+  const plan = view && view.moments;
+  if (!plan) return '';
+  const rows = Array.isArray(comments) ? comments : [];
+  /** @type {Map<number, number>} */
+  const speech = new Map();
+  /** @type {Array<{ at: number, viewers: number }>} */
+  const raids = [];
+  const tracks = plan.tracks.map(() => ({
+    /** @type {Map<string, Map<number, { sum: number, n: number }>>} */
+    byCur: new Map(),
+    /** @type {Array<{ at: number, tag: string }>} */
+    times: [],
+    /** @type {Array<{ at: number, text: string }>} */
+    texts: [],
+  }));
+  for (const c of rows) {
+    if (!c) continue;
+    const at = Number(c.capturedAt) || 0;
+    if (!(at > 0)) continue;
+    const minute = Math.floor(at / 60_000) * 60_000;
+    const support = isMarketingSupportRow(c);
+    if ((plan.speech || plan.besideSpeech) && !support) {
+      speech.set(minute, (speech.get(minute) || 0) + 1);
+    }
+    if (!support) continue;
+    const kind = String(c.ytKind || '');
+    if (plan.raidKind && kind === plan.raidKind && raids.length < RAID_CAP) {
+      const viewers = Math.floor(Number(c.ytAmount) || 0);
+      raids.push({ at, viewers: viewers > 0 ? viewers : 0 });
+    }
+    for (let i = 0; i < plan.tracks.length; i += 1) {
+      const spec = plan.tracks[i];
+      if (!spec.kinds.includes(kind)) continue;
+      const cur = spec.currency || String(c.ytCurrency || '').trim().toUpperCase();
+      if (spec.currency && cur !== spec.currency) continue;
+      const slot = tracks[i];
+      if (spec.mode === 'amount') {
+        let bucket = slot.byCur.get(cur);
+        if (!bucket) {
+          bucket = new Map();
+          slot.byCur.set(cur, bucket);
+        }
+        const prev = bucket.get(minute) || { sum: 0, n: 0 };
+        const amt = Number(c.ytAmount);
+        if (Number.isFinite(amt) && amt > 0) prev.sum += amt;
+        prev.n += 1;
+        bucket.set(minute, prev);
+      } else if (spec.mode === 'times' && slot.times.length < MOMENT_LIST_CAP) {
+        let tag = spec.label;
+        if (c.subEvent === 'sub') tag = '新しいサブスク';
+        else if (c.subEvent === 'resub') tag = '継続のサブスク';
+        slot.times.push({ at, tag });
+      } else if (spec.mode === 'text' && slot.texts.length < 4) {
+        const text = String(c.text || '').trim().slice(0, 40);
+        if (text) slot.texts.push({ at, text });
+      }
+    }
+  }
+  /** @type {string[]} */
+  const lines = [];
+  if (plan.speech) {
+    let bestMin = 0;
+    let bestN = 0;
+    for (const [minute, n] of speech) {
+      if (n > bestN) {
+        bestN = n;
+        bestMin = minute;
+      }
+    }
+    if (bestN > 0) lines.push(`${clock(bestMin)} にコメント ${bestN}件（この分の記録）`);
+    if (plan.pageCountAside && pageCount > 0) {
+      lines.push(`ページの視聴数は ${pageCount.toLocaleString('ja-JP')}（この配信で見えていた数）。配信中の増え方は記録に無いので、コメントの波とは別の数です。`);
+    }
+  }
+  for (let i = 0; i < plan.tracks.length; i += 1) {
+    const spec = plan.tracks[i];
+    const slot = tracks[i];
+    if (spec.mode === 'amount') {
+      for (const [cur, bucket] of slot.byCur) {
+        let bestMin = 0;
+        let bestSum = 0;
+        let bestN = 0;
+        for (const [minute, cell] of bucket) {
+          const score = cell.sum > 0 ? cell.sum : cell.n;
+          const best = bestSum > 0 ? bestSum : bestN;
+          if (score > best) {
+            bestMin = minute;
+            bestSum = cell.sum;
+            bestN = cell.n;
+          }
+        }
+        if (!(bestSum > 0) && !(bestN > 0)) continue;
+        const unit = spec.currency || !cur ? spec.label : `${spec.label} ${cur}`;
+        const body = bestSum > 0
+          ? `${clock(bestMin)} に ${unit} ${bestSum}（この分の記録）`
+          : `${clock(bestMin)} に ${unit} ${bestN}件（金額は記録にありません）`;
+        const near = plan.besideSpeech ? speech.get(bestMin) || 0 : 0;
+        const aside = near > 0 ? ` 推定（同じ分のコメント ${near}件・原因とは限らない）` : '';
+        lines.push(body + aside);
+      }
+    }
+    for (const ev of slot.times) lines.push(`${clock(ev.at)} ${ev.tag}（記録）`);
+    for (const ev of slot.texts) lines.push(`${clock(ev.at)} ${ev.text}`);
+  }
+  if (raids.length) {
+    const samples = momentSamples(sessionRows);
+    for (const raid of raids) {
+      const who = raid.viewers > 0 ? ` ${raid.viewers}人` : '';
+      const before = sampleNear(samples, raid.at, true);
+      const after = sampleNear(samples, raid.at, false);
+      /** @param {{ estimated: boolean, value: number } | null} s */
+      const side = (s) => (s ? `${s.estimated ? '推定の視聴者数' : '視聴者数'} ${s.value}人` : '');
+      const around = [before ? `直前の${side(before)}` : '', after && after !== before ? `その後の${side(after)}` : '']
+        .filter(Boolean)
+        .join('、');
+      const guess = around
+        ? `。${around}。推定（同じ時間の視聴者数。レイドで来た人の残りは記録にありません）`
+        : '。その前後の視聴者数はこの記録にありません';
+      lines.push(`${clock(raid.at)} レイド${who}（記録）${guess}`);
+    }
+  }
+  if (!lines.length) return '';
+  const items = lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+  return `<section class="mkt-section" id="mkt-streamer-moments">
+<h2>${escapeHtml(plan.title)}</h2>
+<p class="mkt-note">このPCの記録にある時刻だけです。</p>
+<ul class="mkt-mini-stats">${items}</ul>
+</section>`;
+}
+
 /**
  * 来場・広告の枠を出さない参加の章。ページの累計があるときだけその数を出す。
  * @param {{ totalComments: number, identifiedUsers?: number, uniqueUsers: number }} report

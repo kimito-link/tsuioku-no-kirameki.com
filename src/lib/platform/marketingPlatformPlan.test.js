@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { aggregateMarketingReport, isMarketingSupportRow, speechCommentsForMarketing } from '../marketingAggregate.js';
 import { marketingViewFor } from './marketingPlatformPlan.js';
 import { platformCapability } from './platformMetrics.js';
-import { sectionPlatformDedicatedHtml } from './marketingPlatformChapters.js';
+import { sectionPlatformDedicatedHtml, sectionStreamerMomentsHtml } from './marketingPlatformChapters.js';
 
 describe('marketingViewFor', () => {
   it('ニコ生と未指定は null', () => {
@@ -138,5 +138,100 @@ describe('サービスごとの記録の章', () => {
     expect(ab).toContain('視聴数（ページの数）');
     expect(ab).toContain('ページのコメント');
     expect(ab).not.toContain('ギフト');
+  });
+});
+
+describe('配信の山', () => {
+  const T0 = Date.parse('2026-03-01T03:00:00.000Z');
+
+  it('ニコ生の view が無いときは空', () => {
+    expect(sectionStreamerMomentsHtml([], /** @type {never} */ (null), [], 0)).toBe('');
+  });
+
+  it('記録の時刻と、レイド前後の視聴者数だけ出す', () => {
+    const view = /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('twitch'));
+    const html = sectionStreamerMomentsHtml([
+      { ytKind: 'superchat', ytCurrency: 'BITS', ytAmount: 10, capturedAt: T0 },
+      { ytKind: 'superchat', ytCurrency: 'BITS', ytAmount: 50, capturedAt: T0 + 5 * 60_000 },
+      { ytKind: 'membership', subEvent: 'resub', capturedAt: T0 + 6 * 60_000 },
+      { ytKind: 'tw_hype', text: 'ハイプトレインがレベル2になりました', capturedAt: T0 + 7 * 60_000 },
+      { ytKind: 'tw_raid', ytAmount: 42, capturedAt: T0 + 8 * 60_000 },
+    ], view, [
+      { capturedAt: T0, officialViewerCount: 40 },
+      { capturedAt: T0 + 20 * 60_000, officialViewerCount: 55 },
+    ], 0);
+    expect(html).toContain('Bits 50（この分の記録）');
+    expect(html).toContain('継続のサブスク（記録）');
+    expect(html).toContain('ハイプトレインがレベル2になりました');
+    expect(html).toContain('レイド 42人（記録）');
+    expect(html).toContain('直前の視聴者数 40人');
+    expect(html).toContain('その後の視聴者数 55人');
+    expect(html).toContain('推定（同じ時間の視聴者数。レイドで来た人の残りは記録にありません）');
+  });
+
+  it('通貨が違うスーパーチャットは足さない', () => {
+    const view = /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('youtube'));
+    const html = sectionStreamerMomentsHtml([
+      { ytKind: 'text', text: 'わこつ', capturedAt: T0 + 5 * 60_000 },
+      { ytKind: 'superchat', ytCurrency: 'USD', ytAmount: 5, capturedAt: T0 + 5 * 60_000 },
+      { ytKind: 'superchat', ytCurrency: 'JPY', ytAmount: 100, capturedAt: T0 },
+      { ytKind: 'membership', capturedAt: T0 + 2 * 60_000 },
+    ], view, [], 0);
+    expect(html).toContain('スーパーチャット USD 5（この分の記録）');
+    expect(html).toContain('スーパーチャット JPY 100（この分の記録）');
+    expect(html).not.toContain('105');
+    expect(html).toContain('メンバー（記録）');
+    expect(html).toContain('推定（同じ分のコメント 1件・原因とは限らない）');
+  });
+
+  it('SHOWROOM はギフトptの山だけで、順位の増え方は出さない', () => {
+    const view = /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('showroom'));
+    const html = sectionStreamerMomentsHtml([
+      { ytKind: 'superchat', ytCurrency: 'SRPT', ytAmount: 30, capturedAt: T0 },
+      { ytKind: 'superchat', ytCurrency: 'SRPT', ytAmount: 90, capturedAt: T0 + 60_000 },
+    ], view, [], 0);
+    expect(html).toContain('ギフトpt 90（この分の記録）');
+    expect(html).not.toContain('順位');
+    expect(html).not.toContain('推移');
+  });
+
+  it('ABEMA はコメントの山と、ページの視聴数を別の数として出す', () => {
+    const view = /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('abema'));
+    const html = sectionStreamerMomentsHtml([
+      { ytKind: 'text', capturedAt: T0 },
+      { ytKind: 'text', capturedAt: T0 + 60_000 },
+      { ytKind: 'text', capturedAt: T0 + 60_000 },
+    ], view, [], 1200);
+    expect(html).toContain('コメント 2件（この分の記録）');
+    expect(html).toContain('ページの視聴数は 1,200');
+    expect(html).toContain('別の数です');
+    expect(html).not.toContain('ギフト');
+  });
+
+  it('ふわっち・Kick・mixch・TikTok・ツイキャスは記録の山だけ', () => {
+    const ww = sectionStreamerMomentsHtml([
+      { ytKind: 'superchat', ytCurrency: 'WWITEM', ytAmount: 1, capturedAt: T0 },
+      { ytKind: 'superchat', ytCurrency: 'WWITEM', ytAmount: 4, capturedAt: T0 + 60_000 },
+    ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('whowatch')), [], 0);
+    expect(ww).toContain('アイテム 4（この分の記録）');
+    const kick = sectionStreamerMomentsHtml([
+      { ytKind: 'superchat', ytCurrency: 'KICKS', ytAmount: 20, capturedAt: T0 },
+      { ytKind: 'membership_gift', capturedAt: T0 + 60_000 },
+    ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('kick')), [], 0);
+    expect(kick).toContain('Kicks 20（この分の記録）');
+    expect(kick).toContain('サブスク（記録）');
+    const mx = sectionStreamerMomentsHtml([
+      { ytKind: 'mx_fan', capturedAt: T0 },
+    ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('mixch')), [], 0);
+    expect(mx).toContain('ファン登録（記録）');
+    const tt = sectionStreamerMomentsHtml([
+      { ytKind: 'superchat', ytCurrency: 'TTCOIN', ytAmount: 7, capturedAt: T0 },
+    ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('tiktok')), [], 0);
+    expect(tt).toContain('コイン 7（この分の記録）');
+    expect(tt).not.toContain('フォロー');
+    const tc = sectionStreamerMomentsHtml([
+      { ytKind: 'superchat', ytCurrency: 'TCSCORE', ytAmount: 0, capturedAt: T0 },
+    ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('twitcasting')), [], 0);
+    expect(tc).toContain('金額は記録にありません');
   });
 });

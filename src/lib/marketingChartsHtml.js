@@ -16,6 +16,7 @@ import {
   sectionParticipationForPlatform,
   sectionPlatformDedicatedHtml,
   sectionPlatformSummaryHtml,
+  sectionStreamerMomentsHtml,
   sectionSupportFlowHtml,
 } from './platform/marketingPlatformChapters.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
@@ -3442,7 +3443,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-hour', label: '時間帯ヒートマップ' },
     { id: 'mkt-json', label: '表計算・ツール向け JSON' },
     { id: 'mkt-support-flow', label: '登録・応援してくれた人の流れ' },
-    { id: 'mkt-platform-dedicated', label: 'この配信の記録' }
+    { id: 'mkt-platform-dedicated', label: 'この配信の記録' },
+    { id: 'mkt-streamer-moments', label: 'この配信の山' }
   ];
   if (view) {
     const concurrentItem = allTocItems.find((t) => t.id === 'mkt-concurrent');
@@ -3479,7 +3481,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   //   (このページでできること/りんく達から/分析スキル/ハーネス/作戦会議・応援が増えそうな時間・初見さん・切り抜き・お返し・お願い・注意/
   //   ファネル優先度・層別の使い方/各グラフ後の助言カード)は出さない。数字の章を「要点→視聴維持→流れ→応援者→ギフト→過去比較→記録」の順に並べる。
   const bodyHtml = `__NL_TOC_PLACEHOLDER__
-${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts) : '')}
+${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts) + sectionStreamerMomentsHtml(commentsRaw, view, sessionSummaryRows, pageCount) : '')}
 ${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap))}
 ${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
 ${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}

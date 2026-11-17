@@ -89,6 +89,82 @@ const SERVICE_PAGE = Object.freeze({
 const ANON_LABEL = new Set(['kick', 'whowatch', 'mixch', 'twitcasting']);
 
 /**
+ * 配信者が知りたい時刻。kinds はパーサが記録している ytKind だけ。
+ * amount は ytAmount、times は capturedAt、text は記録の本文。
+ * @type {Readonly<Record<string, {
+ *   title: string,
+ *   besideSpeech?: boolean,
+ *   speech?: boolean,
+ *   pageCountAside?: boolean,
+ *   raidKind?: string,
+ *   tracks: readonly { kinds: readonly string[], mode: 'amount' | 'times' | 'text', label: string, currency?: string }[]
+ * }>>}
+ */
+const MOMENTS = Object.freeze({
+  youtube: Object.freeze({
+    title: 'スーパーチャットとメンバーの時刻',
+    besideSpeech: true,
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'スーパーチャット' }),
+      Object.freeze({ kinds: Object.freeze(['membership', 'membership_gift']), mode: 'times', label: 'メンバー' }),
+    ]),
+  }),
+  twitch: Object.freeze({
+    title: 'Bits・サブスク・レイドの時刻',
+    raidKind: 'tw_raid',
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'Bits', currency: 'BITS' }),
+      Object.freeze({ kinds: Object.freeze(['membership']), mode: 'times', label: 'サブスク' }),
+      Object.freeze({ kinds: Object.freeze(['tw_hype']), mode: 'text', label: 'ハイプトレイン' }),
+    ]),
+  }),
+  kick: Object.freeze({
+    title: 'Kicks とサブスクの時刻',
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'Kicks', currency: 'KICKS' }),
+      Object.freeze({ kinds: Object.freeze(['membership', 'membership_gift']), mode: 'times', label: 'サブスク' }),
+    ]),
+  }),
+  whowatch: Object.freeze({
+    title: 'アイテムの多い時刻',
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'アイテム', currency: 'WWITEM' }),
+    ]),
+  }),
+  showroom: Object.freeze({
+    title: 'ギフトptの多い時刻',
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'ギフトpt', currency: 'SRPT' }),
+    ]),
+  }),
+  mixch: Object.freeze({
+    title: 'ファン登録とコインの時刻',
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['mx_fan']), mode: 'times', label: 'ファン登録' }),
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'コイン', currency: 'MXCOIN' }),
+    ]),
+  }),
+  tiktok: Object.freeze({
+    title: 'コインの多い時刻',
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'コイン', currency: 'TTCOIN' }),
+    ]),
+  }),
+  twitcasting: Object.freeze({
+    title: 'スコアとギフトの時刻',
+    tracks: Object.freeze([
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'スコア', currency: 'TCSCORE' }),
+    ]),
+  }),
+  abema: Object.freeze({
+    title: 'コメントの多い時刻',
+    speech: true,
+    pageCountAside: true,
+    tracks: Object.freeze([]),
+  }),
+});
+
+/**
  * @param {unknown} platformId
  * @returns {null | {
  *   id: string,
@@ -106,6 +182,7 @@ const ANON_LABEL = new Set(['kick', 'whowatch', 'mixch', 'twitcasting']);
  *   hideGift: boolean,
  *   mixchUnitNote: boolean,
  *   hide: Set<string>,
+ *   moments: (typeof MOMENTS)[string] | null,
  * }}
  */
 export function marketingViewFor(platformId) {
@@ -141,5 +218,6 @@ export function marketingViewFor(platformId) {
     hideGift: id === 'abema',
     mixchUnitNote: id === 'mixch',
     hide,
+    moments: MOMENTS[id] || null,
   };
 }

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2120',
+    date: '2026-11-13',
+    summary: 'スタンプの名前を読み上げない',
+    items: Object.freeze([
+      'YouTube のスタンプ(face-fuchsia-tongue-out や :_xxx: のような名前)を、英語の名前のまま読み上げていました。スタンプの名前は読まないようにしました(画面の表示は今までどおりです)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2119',
     date: '2026-11-13',
     summary: 'YouTube の会場で最初のギフト音も鳴る',
