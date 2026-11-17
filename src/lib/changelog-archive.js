@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2125',
+    date: '2026-11-15',
+    summary: '人が少ない順位のカードが横に伸びない',
+    items: Object.freeze([
+      '公式ランキングなどの順位カードが1〜4人しかいないとき、広い画面でカードが画面いっぱいに横へ伸びていたのを直しました。カード1枚の幅を300pxまでにして、まん中に並べます。細い横パネルでの見え方は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2122',
     date: '2026-11-13',
     summary: '拡張の短い説明文を見直した',

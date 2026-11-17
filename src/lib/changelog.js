@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2151',
+    date: '2026-11-17',
+    summary: '記録テストは絵文字の名前を見ない',
+    items: Object.freeze([
+      'Kick と Twitch の記録テストは、画像になった絵文字の名前が画面の文字として残ることを見なくなりました。使い方は 0.1.2149 と同じです。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2149',
     date: '2026-11-17',
     summary: '絵文字の名前を吹き出しに残さない',
@@ -180,14 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'ニコ生以外の横の欄が裏で回り続けるのを止めた',
     items: Object.freeze([
       'YouTube・Twitch・Kick などニコ生以外の配信で横の欄を開いていると、数字のチップを整える処理が自分の書き換えに反応して1秒に60回動き続けていたのを直しました。何もしていない間の画面の書き換えが約20分の1になり、遅いPCでも軽くなります。見た目は変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2125',
-    date: '2026-11-15',
-    summary: '人が少ない順位のカードが横に伸びない',
-    items: Object.freeze([
-      '公式ランキングなどの順位カードが1〜4人しかいないとき、広い画面でカードが画面いっぱいに横へ伸びていたのを直しました。カード1枚の幅を300pxまでにして、まん中に並べます。細い横パネルでの見え方は変わりません。'
     ])
   }),
 ]);
