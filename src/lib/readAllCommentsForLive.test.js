@@ -20,7 +20,7 @@ describe('normalizeTailRowsForDisplay', () => {
     expect(out[1]).toMatchObject({ text: 'b', capturedAt: 5 });
   });
 
-  it('時刻の無い来場文には取り込み直しの印を付け、通常コメントには付けない', () => {
+  it('時刻の無い来場文には今を打たず、放送の番号は付ける', () => {
     const out = normalizeTailRowsForDisplay(
       [
         { text: '「サッカー」が好きな1人が来場しました' },
@@ -30,10 +30,9 @@ describe('normalizeTailRowsForDisplay', () => {
       LV,
       NOW
     );
-    expect(out[0].arrivalUnstamped).toBe(true);
+    expect(out[0].capturedAt).toBeUndefined();
     expect(out[0].liveId).toBe(LV);
-    expect(out[1].arrivalUnstamped).toBeUndefined();
-    expect(out[2].arrivalUnstamped).toBeUndefined();
+    expect(out[1].capturedAt).toBe(NOW);
     expect(out[2].capturedAt).toBe(50);
   });
 

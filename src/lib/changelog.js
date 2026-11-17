@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2150',
+    date: '2026-11-17',
+    summary: '来場は時刻で区別し、二重だけ畳む',
+    items: Object.freeze([
+      '来場の通知に、届いた時刻を記録します。同じ文面でも時間が違えば、それぞれ数えます。',
+      '公式と画面から約2秒以内に届いた同じ通知だけ、1回に数えます。横の内訳と分析レポートは、未保存の末尾も含めて同じ行を数えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2146',
     date: '2026-11-17',
     summary: 'サポーター来場を数え、内訳を揃える',
@@ -179,14 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '大きな記録で開いた直後の固まりを減らした',
     items: Object.freeze([
       '記録が2万件を超える配信で横の欄を開いたとき、裏で確かめるだけの集計(画面には出ない)が開いた直後に走って、件数や応援マスの表示を遅らせていました。この集計を開いてから2分後に回し、開いた直後の固まりを減らしました。見た目は変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2126',
-    date: '2026-11-15',
-    summary: 'ニコ生以外の横の欄が裏で回り続けるのを止めた',
-    items: Object.freeze([
-      'YouTube・Twitch・Kick などニコ生以外の配信で横の欄を開いていると、数字のチップを整える処理が自分の書き換えに反応して1秒に60回動き続けていたのを直しました。何もしていない間の画面の書き換えが約20分の1になり、遅いPCでも軽くなります。見た目は変わりません。'
     ])
   }),
 ]);

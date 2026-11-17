@@ -10,7 +10,7 @@
  *   - 内訳カテゴリ:
  *       normal           - 通常コメント(一般人 + 配信者本人含む応援系)
  *       interestArrival  - ニコ生の来場通知（好きなタグ・大百科・放送者の好み・放送者のサポーター）。
- *                          取り込み時刻の無い同じ文面は1回（分析レポートと同じ）
+ *                          約2秒以内の同じ通知は1回。時刻が違う同じ文面はそれぞれ数える。
  *       followNotice     - フォロー通知(Phase B で parser 追加・現状 0)
  *       otherSystem      - その他システムメッセージ(運営アナウンス等)
  *   - 「ギフト・広告は別カウント」をユーザーに明示するため、合計テキスト表示側で
@@ -19,7 +19,7 @@
  * @module commentRecordBreakdown
  */
 
-import { classifyArrivalNotice } from './arrivalNoticeRows.js';
+import { createArrivalNoticeGate } from './arrivalNoticeRows.js';
 
 /**
  * @typedef {{
@@ -46,11 +46,10 @@ export function summarizeCommentRecordBreakdown(comments) {
   if (!total) {
     return { total: 0, normal: 0, interestArrival: 0, followNotice: 0, otherSystem: 0 };
   }
-  /** @type {Set<string>} */
-  const seenArrivalSentences = new Set();
+  const arrivalGate = createArrivalNoticeGate();
   for (const c of comments) {
     if (!c || typeof c !== 'object') continue;
-    const arrival = classifyArrivalNotice(c, seenArrivalSentences);
+    const arrival = arrivalGate.accept(c);
     if (arrival === 'count') {
       interestArrival += 1;
       continue;

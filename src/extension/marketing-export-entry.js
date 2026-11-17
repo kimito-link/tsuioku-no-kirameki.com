@@ -172,22 +172,27 @@ async function readAllCommentsFromCommentDb(lv) {
  */
 async function readAllCommentsForLive(lv) {
   const fromDb = await readAllCommentsFromCommentDb(lv);
-  if (Array.isArray(fromDb) && fromDb.length) return fromDb;
   const mainKey = commentsStorageKey(lv);
   /** @type {import('../lib/commentRecord.js').StoredComment[]} */
   let rows = [];
-  try {
-    const res = await readChunkedComments(lv, mainKey, (keys) =>
-      readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
-        attempts: 3,
-        delaysMs: [0, 80, 200],
-        perAttemptTimeoutMs: 1200
-      })
-    );
-    rows = Array.isArray(res.rows) ? res.rows : [];
-  } catch {
-    rows = [];
+  if (Array.isArray(fromDb) && fromDb.length) {
+    rows = fromDb;
+  } else {
+    try {
+      const res = await readChunkedComments(lv, mainKey, (keys) =>
+        readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+          attempts: 3,
+          delaysMs: [0, 80, 200],
+          perAttemptTimeoutMs: 1200
+        })
+      );
+      rows = Array.isArray(res.rows) ? res.rows : [];
+    } catch {
+      rows = [];
+    }
   }
+  // 未保存の末尾も、この放送の番号を付けて本体と同じ行として数える。
+  // 本体が IDB にあっても末尾は別なので、ここで必ず足す。
   try {
     const tKey = tailStorageKey(lv);
     const tailBag = await readStorageBagWithRetry(() => chrome.storage.local.get([tKey]), {

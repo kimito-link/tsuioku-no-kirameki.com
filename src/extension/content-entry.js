@@ -1910,9 +1910,17 @@ async function flushNdgrChatRowsBatch(batch) {
     const uid = String(r.userId || '').trim();
     // v0.1.836 匿名(184)救済: 本文必須は維持しつつ、番号無しでも識別子(userId)があれば通す。
     //   重複排除キーは行種で分岐(番号あり=従来と同値・番号無し=識別子+本文+位置)。
-    //   識別不能(番号も識別子も無い)行はキー null=受理しない。設計=council/anon-comment-rescue-SYNTHESIS.md。
+    //   識別不能(番号も識別子も無い)行はキー null=受理しない。来場通知だけ本文と時刻で受理する。
     if (!text) continue;
-    const k = ndgrFlushDedupKey({ commentNo: no, text, userId: uid, vpos: r.vpos });
+    const capNum = Number(r.capturedAt);
+    const hasCap = Number.isFinite(capNum) && capNum > 0;
+    const k = ndgrFlushDedupKey({
+      commentNo: no,
+      text,
+      userId: uid,
+      vpos: r.vpos,
+      capturedAt: hasCap ? capNum : undefined
+    });
     if (!k) continue;
     const nick = String(r.nickname || '').trim();
     const prev = byKey.get(k);
@@ -1922,18 +1930,22 @@ async function flushNdgrChatRowsBatch(batch) {
         text,
         userId: uid || null,
         ...(nick ? { nickname: nick } : {}),
-        ...(r.vpos != null ? { vpos: r.vpos } : {})
+        ...(r.vpos != null ? { vpos: r.vpos } : {}),
+        ...(hasCap ? { capturedAt: capNum } : {})
       });
       continue;
     }
     const mUid = uid || String(prev.userId || '').trim();
     const mNick = nick || String(prev.nickname || '').trim();
+    const prevCap = Number(prev.capturedAt);
+    const keepCap = Number.isFinite(prevCap) && prevCap > 0 ? prevCap : (hasCap ? capNum : 0);
     byKey.set(k, {
       commentNo: no,
       text,
       userId: mUid || null,
       ...(mNick ? { nickname: mNick } : {}),
-      ...(prev.vpos != null ? { vpos: prev.vpos } : r.vpos != null ? { vpos: r.vpos } : {})
+      ...(prev.vpos != null ? { vpos: prev.vpos } : r.vpos != null ? { vpos: r.vpos } : {}),
+      ...(keepCap > 0 ? { capturedAt: keepCap } : {})
     });
   }
   const merged = [...byKey.values()].map((r) => {

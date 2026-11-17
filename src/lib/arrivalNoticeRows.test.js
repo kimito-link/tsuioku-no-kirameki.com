@@ -1,6 +1,6 @@
 /**
- * lv351831423 のずれ: 内訳「興味来場 31」とレポート「通知 5回 / 17人」。
- * 保存済み5文面は両方で5回・17人。時刻の無い末尾の同じ文面は足さない。
+ * 同じ来場の文面でも、時刻が違えば別件数。約2秒以内の同じ通知だけ1回。
+ * 内訳とレポートは同じ行を数える。
  */
 import { describe, it, expect } from 'vitest';
 import { aggregateMarketingReport } from './marketingAggregate.js';
@@ -9,73 +9,69 @@ import { normalizeTailRowsForDisplay } from './readAllCommentsForLive.js';
 
 const LV = 'lv351831423';
 const BASE = 1_700_000_000_000;
-const COUNTS = [1, 2, 3, 5, 6];
+const TEXT = '「サッカー」が好きな1人が来場しました';
 
-function stored(n, i) {
+function row(id, capturedAt) {
   return {
-    id: `stored-${i}`,
+    id,
     liveId: LV,
     commentNo: '',
-    text: `「サッカー」が好きな${n}人が来場しました`,
+    text: TEXT,
     userId: null,
-    capturedAt: BASE + i * 60_000
+    capturedAt
   };
 }
 
-describe('来場の内訳とレポートは同じ文面を数える', () => {
-  it('保存済み5回・17人に、末尾の同じ文面26件を足しても両方5回・17人', () => {
-    const main = COUNTS.map((n, i) => stored(n, i));
-    const tail = normalizeTailRowsForDisplay(
-      Array.from({ length: 26 }, (_, i) => ({
-        text: main[i % main.length].text
-      })),
-      LV,
-      BASE + 30 * 60_000
-    );
-    const normal = {
-      id: 'n1',
-      liveId: LV,
-      commentNo: '1',
-      text: 'やあ',
-      userId: 'u1',
-      capturedAt: BASE
-    };
-    const rows = [normal, ...main, ...tail];
-    const panel = summarizeCommentRecordBreakdown(rows);
-    const report = aggregateMarketingReport(rows, LV);
-    expect(tail.every((row) => row.arrivalUnstamped === true)).toBe(true);
-    expect(panel.interestArrival).toBe(5);
-    expect(panel.normal).toBe(1);
-    expect(panel.total).toBe(1 + 5 + 26);
-    expect(report.totalComments).toBe(1);
-    expect(report.interestArrivalSummary.messageCount).toBe(5);
-    expect(report.interestArrivalSummary.totalArrivals).toBe(17);
-    expect(report.interestArrivalSummary.topTags[0]).toEqual({
-      tag: 'サッカー',
-      arrivals: 17,
-      messageCount: 5
-    });
+function counts(rows) {
+  const panel = summarizeCommentRecordBreakdown(rows);
+  const report = aggregateMarketingReport(rows, LV);
+  return {
+    panel: panel.interestArrival,
+    report: report.interestArrivalSummary.messageCount,
+    people: report.interestArrivalSummary.totalArrivals
+  };
+}
+
+describe('来場は時刻で区別し、二重取り込みだけ畳む', () => {
+  it('同じ文面が時刻違いで3件なら、内訳もレポートも3', () => {
+    const rows = [0, 10_000, 20_000].map((dt, i) => row(`a${i}`, BASE + dt));
+    const got = counts(rows);
+    expect(got).toEqual({ panel: 3, report: 3, people: 3 });
   });
 
-  it('末尾にしか無い文面は、内訳とレポートの両方に1回入る', () => {
-    const onlyTail = normalizeTailRowsForDisplay(
-      [{ text: '放送者のサポーターが1人来場しました' }, { text: '放送者のサポーターが1人来場しました' }],
+  it('公式と画面が1秒以内に同じ通知を取り込んだら1回', () => {
+    const rows = [row('ndgr', BASE), row('dom', BASE + 1000)];
+    const got = counts(rows);
+    expect(got).toEqual({ panel: 1, report: 1, people: 1 });
+  });
+
+  it('未保存の末尾も放送の番号を付けて、内訳とレポートが一致する', () => {
+    const displayNow = BASE + 999_999;
+    const tail = normalizeTailRowsForDisplay(
+      [
+        { text: TEXT, capturedAt: BASE },
+        { text: TEXT, capturedAt: BASE + 10_000 },
+        { text: TEXT, capturedAt: BASE + 20_000 }
+      ],
+      LV,
+      displayNow
+    );
+    expect(tail.map((r) => r.liveId)).toEqual([LV, LV, LV]);
+    expect(tail.map((r) => r.capturedAt)).toEqual([BASE, BASE + 10_000, BASE + 20_000]);
+    const got = counts(tail);
+    expect(got.panel).toBe(got.report);
+    expect(got).toEqual({ panel: 3, report: 3, people: 3 });
+  });
+
+  it('時刻が無い行は、同じ文面でも落とさない', () => {
+    const tail = normalizeTailRowsForDisplay(
+      [{ text: TEXT }, { text: TEXT }],
       LV,
       BASE
     );
-    const panel = summarizeCommentRecordBreakdown(onlyTail);
-    const report = aggregateMarketingReport(onlyTail, LV);
-    expect(panel.interestArrival).toBe(1);
-    expect(report.interestArrivalSummary.messageCount).toBe(1);
-    expect(report.interestArrivalSummary.totalArrivals).toBe(1);
-    expect(report.totalComments).toBe(0);
-  });
-
-  it('保存済みの同じ文面が時刻違いで2行なら、両方2回のまま', () => {
-    const rows = [stored(1, 0), stored(1, 1)];
-    expect(summarizeCommentRecordBreakdown(rows).interestArrival).toBe(2);
-    const report = aggregateMarketingReport(rows, LV);
-    expect(report.interestArrivalSummary.messageCount).toBe(2);
-    expect(report.interestArrivalSummary.totalArrivals).toBe(2);
+    expect(tail[0].capturedAt).toBeUndefined();
+    expect(tail[1].capturedAt).toBeUndefined();
+    const got = counts(tail);
+    expect(got).toEqual({ panel: 2, report: 2, people: 2 });
   });
 });

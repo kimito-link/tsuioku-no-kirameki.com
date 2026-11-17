@@ -23,14 +23,15 @@ function ndgrChatUserId(chat) {
 }
 
 /**
- * @typedef {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} NdgrMergeRow
+ * @typedef {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }} NdgrMergeRow
  */
 
 /**
  * @param {import('./ndgrDecode.js').NdgrChat[]} chats
+ * @param {number} [nowMs] メッセージ時刻が無い来場を、受信時刻で残すときだけ渡す
  * @returns {NdgrMergeRow[]}
  */
-export function ndgrChatsToMergeRows(chats) {
+export function ndgrChatsToMergeRows(chats, nowMs) {
   if (!Array.isArray(chats) || !chats.length) return [];
   /** @type {NdgrMergeRow[]} */
   const out = [];
@@ -59,6 +60,12 @@ export function ndgrChatsToMergeRows(chats) {
     if (chat.vpos != null) row.vpos = chat.vpos;
     if (chat.accountStatus != null) row.accountStatus = chat.accountStatus;
     if (chat.is184) row.is184 = true;
+    if (arrivalNotice) {
+      const at = Number(chat.atMs);
+      const now = Number(nowMs);
+      const cap = Number.isFinite(at) && at > 0 ? at : (Number.isFinite(now) && now > 0 ? now : 0);
+      if (cap > 0) row.capturedAt = cap;
+    }
     out.push(row);
   }
   return out;

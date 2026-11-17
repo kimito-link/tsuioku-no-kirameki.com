@@ -6,10 +6,10 @@ import { parseArrivalCommentText } from './parseArrivalComment.js';
  * content-entry.js L935-957 から抽出。
  *
  * @param {unknown[]} raw
- * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]}
+ * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }[]}
  */
 export function cleanNdgrChatRows(raw) {
-  /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]} */
+  /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }[]} */
   const cleaned = [];
   for (const x of raw) {
     if (!x || typeof x !== 'object') continue;
@@ -33,10 +33,12 @@ export function cleanNdgrChatRows(raw) {
     //   v0.1.172 で `requireText: true` を入れたが、これらの行は text 非空のため
     //   素通りしていたので、parseGiftCommentText で確定排除する。
     if (parseGiftCommentText(text)) continue;
-    /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} */
+    /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }} */
     const row = { commentNo, text, userId: uid || null };
     const nick = String(/** @type {any} */ (x).nickname ?? '').trim();
     if (nick) row.nickname = nick;
+    const cap = Number(/** @type {any} */ (x).capturedAt);
+    if (Number.isFinite(cap) && cap > 0) row.capturedAt = cap;
     if (/** @type {any} */ (x).vpos != null) row.vpos = /** @type {any} */ (x).vpos;
     if (/** @type {any} */ (x).accountStatus != null) row.accountStatus = /** @type {any} */ (x).accountStatus;
     if (/** @type {any} */ (x).is184) row.is184 = true;

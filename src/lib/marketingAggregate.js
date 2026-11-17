@@ -6,7 +6,7 @@ import { normalizeLv } from '../shared/niconico/liveId.js';
 import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuard.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
 import { parseArrivalCommentText } from './parseArrivalComment.js';
-import { classifyArrivalNotice } from './arrivalNoticeRows.js';
+import { createArrivalNoticeGate } from './arrivalNoticeRows.js';
 
 /**
  * @typedef {{
@@ -218,14 +218,13 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   const interestArrivalComments = [];
   /** @type {StoredComment[]} */
   const supportRows = [];
-  /** @type {Set<string>} */
-  const seenArrivalSentences = new Set();
+  const arrivalGate = createArrivalNoticeGate();
   for (const c of filtered) {
     if (isMarketingSupportRow(c)) {
       supportRows.push(c);
       continue;
     }
-    const arrival = classifyArrivalNotice(c, seenArrivalSentences);
+    const arrival = arrivalGate.accept(c);
     if (arrival === 'count') interestArrivalComments.push(c);
     else if (arrival === 'no') engagementComments.push(c);
   }

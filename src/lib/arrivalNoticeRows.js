@@ -1,16 +1,16 @@
 /**
  * 来場通知を、サイドパネルの内訳と分析レポートで同じ行として数える。
  *
- * 来場の公式文は commentNo が空で、大きな配信ではテール（未畳み込みの末尾）に
- * 同じ文が残る。内訳は末尾を足した表示行を1行ずつ数え、書き出しは liveId の無い
- * 末尾行を落としていた。実配信では内訳 31・レポート 5 に割れた。
- *
- * 保存済みの行は今までどおり1行ずつ数える。取り込み時刻の無い末尾の同じ文面だけ、
- * すでに数えた文面なら足さない。
+ * 同じ文面でも、時刻が違えば別の来場である。畳むのは同じ通知の二重取り込みだけ
+ * （同じ時刻、または約2秒以内）。時刻が無い行は、同じだと証明できないので残す。
  */
 
 import { parseArrivalCommentText } from './parseArrivalComment.js';
 import { normalizeCommentText } from './commentRecord.js';
+import { toEpochMs } from './timeAuthority.js';
+
+/** 公式の通知と画面の取り込みが同じ通知とみなせる幅。 */
+export const ARRIVAL_NOTICE_WINDOW_MS = 2000;
 
 /**
  * ニコ生の来場文なら、空白を揃えた全文。来場でなければ空。
@@ -27,15 +27,24 @@ export function niconicoArrivalSentence(row) {
 }
 
 /**
- * @param {object} row
- * @param {Set<string>} seenSentences
- * @returns {'no'|'count'|'dup'}
+ * 内訳とレポートが共有する門。同じ文面でも窓の外は別件数。
+ * @returns {{ accept: (row: object) => 'no'|'count'|'dup' }}
  */
-export function classifyArrivalNotice(row, seenSentences) {
-  const sentence = niconicoArrivalSentence(row);
-  if (!sentence) return 'no';
-  const unstamped = /** @type {{ arrivalUnstamped?: unknown }} */ (row).arrivalUnstamped === true;
-  if (unstamped && seenSentences.has(sentence)) return 'dup';
-  seenSentences.add(sentence);
-  return 'count';
+export function createArrivalNoticeGate() {
+  /** @type {Map<string, number[]>} */
+  const timesBySentence = new Map();
+  return {
+    accept(row) {
+      const sentence = niconicoArrivalSentence(row);
+      if (!sentence) return 'no';
+      const cap = toEpochMs(/** @type {{ capturedAt?: unknown }} */ (row).capturedAt);
+      if (cap > 0) {
+        const prev = timesBySentence.get(sentence) || [];
+        if (prev.some((t) => Math.abs(t - cap) <= ARRIVAL_NOTICE_WINDOW_MS)) return 'dup';
+        prev.push(cap);
+        timesBySentence.set(sentence, prev);
+      }
+      return 'count';
+    }
+  };
 }

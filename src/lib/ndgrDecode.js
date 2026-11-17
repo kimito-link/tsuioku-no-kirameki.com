@@ -255,7 +255,7 @@ export function decodeStatistics(buf, start, end) {
 }
 
 /**
- * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean }} NdgrChat
+ * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean, atMs?: number }} NdgrChat
  *
  * @typedef {{
  *   itemId: string,
@@ -761,6 +761,36 @@ function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e, propsKey
 }
 
 /**
+ * ChunkedMessage の meta.at（field 1 → field 2 の Timestamp）を ms にする。
+ * field 1 がメッセージ本体のときは varint の秒が無いので 0。
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ * @returns {number}
+ */
+function chunkMetaAtMs(buf, start, end) {
+  let at = 0;
+  pbForEach(buf, start, end, (fn, wt, _v, s, e) => {
+    if (fn !== 1 || wt !== 2) return;
+    pbForEach(buf, s, e, (gn, gw, _gv, gs, ge) => {
+      if (gn !== 2 || gw !== 2) return;
+      let sec = 0;
+      let ns = 0;
+      pbForEach(buf, gs, ge, (tn, tw, val) => {
+        if (tw !== 0) return;
+        if (tn === 1) sec = Number(val) || 0;
+        if (tn === 2) ns = Number(val) || 0;
+      });
+      // 2001年より前の小さい数は、メッセージ本体の別フィールドの誤読なので捨てる。
+      if (sec < 1_000_000_000) return;
+      const ms = sec * 1000 + Math.floor(ns / 1e6);
+      if (ms > 0) at = ms;
+    });
+  });
+  return at;
+}
+
+/**
  * 1件の ChunkedMessage をデコードして統計情報とチャットを返す
  * @param {Uint8Array} buf
  * @param {number} [start]
@@ -770,6 +800,7 @@ function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e, propsKey
 export function decodeChunkedMessage(buf, start, end) {
   const s0 = start ?? 0;
   const e0 = end ?? buf.length;
+  const metaAtMs = chunkMetaAtMs(buf, s0, e0);
   /** @type {NdgrStatistics|null} */
   let stats = null;
   /** @type {NdgrChat[]} */
@@ -843,7 +874,8 @@ export function decodeChunkedMessage(buf, start, end) {
               content: notice,
               vpos: null,
               accountStatus: null,
-              is184: false
+              is184: false,
+              ...(metaAtMs > 0 ? { atMs: metaAtMs } : {})
             });
             return;
           }

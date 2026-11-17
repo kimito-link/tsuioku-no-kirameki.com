@@ -25,6 +25,7 @@
  */
 
 import { buildDedupeKey } from './commentRecord.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /** テール畳み込みの件数しきい値（これ以上テールに溜まったら畳み込む） */
 export const TAIL_COMPACT_COUNT = 200;
@@ -154,8 +155,14 @@ export function selectNewTailRows(liveId, candidates, knownKeys, nowMs = Date.no
       fresh.push(stamped);
       keys.push(key);
     } else {
-      // commentNo 欠落: cheap dedupe せず、capturedAt も触らずそのまま追記する。
-      fresh.push(raw);
+      // commentNo 欠落: cheap dedupe しない（匿名の連投をここで畳まない）。
+      // 来場文だけ、時刻が無ければ受信時刻を残す。表示のときに「今」を打たないため。
+      const cap = Number(raw?.capturedAt);
+      if (!(Number.isFinite(cap) && cap > 0) && parseArrivalCommentText(text)) {
+        fresh.push({ ...raw, capturedAt: nowMs });
+      } else {
+        fresh.push(raw);
+      }
     }
   }
   return { fresh, keys };

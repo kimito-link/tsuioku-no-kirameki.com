@@ -716,6 +716,24 @@ describe('decodeChunkedMessage', () => {
     expect(report.interestArrivalSummary.topTags[0].tag).toBe('猫');
   });
 
+  it('来場の V2 は ChunkedMessage の meta.at を atMs に残す', () => {
+    const text = '「サッカー」が好きな1人が来場しました';
+    const seconds = 1_700_000_000;
+    const ts = new Uint8Array(varintField(1, seconds));
+    const meta = new Uint8Array(lenDelimited(2, [...ts]));
+    const v2 = new Uint8Array([...varintField(1, 6), ...strField(2, text)]);
+    const chunked = new Uint8Array([
+      ...lenDelimited(1, [...meta]),
+      ...lenDelimited(2, [...lenDelimited(23, [...v2])])
+    ]);
+    const decoded = decodeChunkedMessage(chunked);
+    expect(decoded.chats).toHaveLength(1);
+    expect(decoded.chats[0].content).toBe(text);
+    expect(decoded.chats[0].atMs).toBe(seconds * 1000);
+    const stored = cleanNdgrChatRows(ndgrChatsToMergeRows(decoded.chats, seconds * 1000 + 5000));
+    expect(stored[0].capturedAt).toBe(seconds * 1000);
+  });
+
   it('放送者のサポーターの V2 も来場の chat になる', () => {
     const text = '放送者のサポーターが1人来場しました';
     const v2 = new Uint8Array([...varintField(1, 6), ...strField(2, text)]);

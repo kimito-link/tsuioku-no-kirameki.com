@@ -4657,7 +4657,7 @@ export function sectionInterestArrival(r) {
     {
       label: '通知回数',
       value: `${formatEventRankingNumber(summary.messageCount)}回`,
-      hint: '取り込み直しは除く'
+      hint: '約2秒以内の二重取り込みは除く'
     }
   ]
     .map(
@@ -4719,7 +4719,7 @@ ${bucketMore}`
 
   return `<section class="mkt-section mkt-section--interest-arrival" id="mkt-interest-arrival">
 <h2>興味タグ別来場（公式システムコメ）</h2>
-<p class="mkt-note">ニコニコの公式がまとめて出した来場の通知です。好きなタグ、大百科、放送者の好み、放送者のサポーターの人数で、個人は特定できません。同じ文面を繰り返し取り込んだ分は、記録の内訳でもこの章でも1回だけ数えます。</p>
+<p class="mkt-note">ニコニコの公式がまとめて出した来場の通知です。好きなタグ、大百科、放送者の好み、放送者のサポーターの人数で、個人は特定できません。同じ文面でも時刻が違えばそれぞれ数えます。公式と画面から約2秒以内に入った同じ通知だけ、記録の内訳でもこの章でも1回です。</p>
 ${routeHtml}
 <div class="mkt-ia-stats">${stats}</div>
 <div class="mkt-ia-table-wrap">

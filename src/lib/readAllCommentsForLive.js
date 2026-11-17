@@ -36,18 +36,18 @@ export function normalizeTailRowsForDisplay(rows, lv, nowMs) {
     if (!text) continue;
     const cap = Number(r.capturedAt);
     const hasCap = Number.isFinite(cap) && cap > 0;
-    // 来場文は commentNo が空で、大きな配信の末尾に同じ文が残る。
-    // 取り込み時刻が無い行へ「今」を打つと、保存済みの同じ文面と別物に見える。
-    // 印を付け、内訳とレポートが保存済みの行だけを残して重ねない。
-    const arrivalUnstamped = !hasCap && parseArrivalCommentText(text) != null;
-    out.push({
+    // 来場文の時刻は取り込み時に入っている。表示のときに「今」を打つと、
+    // 別の時刻の本物の来場が同じ瞬間に見え、件数を落とす。
+    /** @type {Record<string, unknown>} */
+    const row = {
       ...r,
       id: String(r.id || `nls_tail_${lid}_${i}`),
       liveId: lid,
-      text,
-      capturedAt: hasCap ? cap : nowMs,
-      ...(arrivalUnstamped ? { arrivalUnstamped: true } : {})
-    });
+      text
+    };
+    if (hasCap) row.capturedAt = cap;
+    else if (!parseArrivalCommentText(text)) row.capturedAt = nowMs;
+    out.push(row);
   }
   return out;
 }
