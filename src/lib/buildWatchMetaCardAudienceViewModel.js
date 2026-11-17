@@ -18,6 +18,7 @@ import {
   SPARSE_CONCURRENT_ESTIMATE_NOTE
 } from './watchConcurrentEstimateUiCopy.js';
 import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
+import { platformCapability } from './platform/platformMetrics.js';
 
 /**
  * @typedef {Record<string, unknown>} WatchMetaSnapshotMerged
@@ -237,10 +238,17 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
     //   ニコ生の推定の式(resolveConcurrentViewers)の答えは使わない: 公式の数の更新が少し遅れただけで「推定中・材料待ち」に落ちていた。
     const officialOnly = snapshot.officialViewersOnly === true;
     const factsViewCount = /** @type {{ viewCount?: unknown }|null|undefined} */ (snapshot.platformFacts)?.viewCount;
-    const pageCountRaw =
-      typeof snapshot.officialViewerCount === 'number' &&
-      Number.isFinite(snapshot.officialViewerCount) &&
-      snapshot.officialViewerCount > 0
+    const cap = platformCapability(String(snapshot.platform || ''));
+    const usePageViews = 'headlineCount' in cap && cap.headlineCount === 'views';
+    const pageViews =
+      typeof factsViewCount === 'number' && Number.isFinite(factsViewCount) && factsViewCount > 0
+        ? Math.floor(factsViewCount)
+        : null;
+    const pageCountRaw = usePageViews
+      ? pageViews
+      : typeof snapshot.officialViewerCount === 'number' &&
+          Number.isFinite(snapshot.officialViewerCount) &&
+          snapshot.officialViewerCount > 0
         ? snapshot.officialViewerCount
         : typeof factsViewCount === 'number' && Number.isFinite(factsViewCount) && factsViewCount >= 0
           ? factsViewCount
@@ -256,7 +264,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
         estText: pageCount.toLocaleString('ja-JP'),
         estIsPlaceholder: false,
         estTitle: stale ? `最後に読めた数です（${mins}分前）` : '配信ページに出ている数です',
-        subText: stale ? `${mins}分前` : '人',
+        subText: stale ? `${mins}分前` : ('countUnit' in cap ? cap.countUnit : '人'),
         concurrentLoadingHidden: true,
         concurrentReadyHidden: false,
         ariaBusy: false,

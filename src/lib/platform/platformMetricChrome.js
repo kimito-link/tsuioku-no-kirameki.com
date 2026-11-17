@@ -6,7 +6,7 @@
  * DOM は引数の root だけを触る。src/lib 直下の純粋性検査の対象外(platform/)。
  */
 
-import { panelExtraChips, platformSectionPlan, streamAgeTitle, LOADING } from './platformMetrics.js';
+import { panelExtraChips, platformSectionPlan, streamAgeTitle, LOADING, PLATFORM_CAPABILITIES } from './platformMetrics.js';
 
 /** 数でない値の札。ニコ生の「（接続中…）」「（取得不可）」「推定中」「計測中…」や最初の「—」は、ほかのサービスでは「読み込み中」にする。 */
 const NOT_A_COUNT = /^(?:—|-|（接続中…）|（取得不可）|（数字非公開）|推定中|計測中…|)$/u;
@@ -86,29 +86,46 @@ function setLaneSub(root, lane, text) {
  * @param {{ platform?: string, facts?: any }} state
  */
 const FOREIGN_STYLE_ID = 'nl-platform-capability-style';
-const FOREIGN_STYLE = [
-  'html.nl-cap-foreign .nl-live-stat-card--visitors{display:none!important;}',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoViewers),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoComments),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}',
-  // 「広告ランキング」の欄は、2つめの公式ランキングがあるサービス(nl-cap-subboard)では使う。ニコ生だけの「watch の広告pt」の行は出さない
-  'html.nl-cap-foreign [data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}',
-  'html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],',
-  'html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],',
-  'html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,',
-  'html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,',
-  'html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}',
-  // ギフト欄の点線の枠: 中のギフト履歴が出ていない時は枠ごと出さない(番組累計ptは上で常に隠れる)
-  'html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden]))){display:none!important;}',
-  'html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}',
-  'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label,',
-  'html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label,html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}',
-  'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label::after{content:"同時視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
-  'html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label::after,html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
-  'html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label::after{content:"視聴数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
-].join('');
+
+/**
+ * 開いた瞬間用と、描画のあとの両方で同じ見た目にする。見出しは能力表の言葉。
+ * 2つめの公式ランキングがあるサービス（nl-cap-subboard）の欄は隠さない。
+ * @returns {string}
+ */
+export function buildForeignCapabilityCss() {
+  const ids = Object.keys(PLATFORM_CAPABILITIES).filter((id) => {
+    const cap = PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)];
+    return cap.native !== true;
+  });
+  const labelSel = ids.map((id) => `html.nl-cap-${id} #watchConcurrentCard .nl-live-stat-label`).join(',');
+  const afters = ids.map((id) => {
+    const cap = PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)];
+    const label = String(cap.concurrentLabel || '視聴者数').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `html.nl-cap-${id} #watchConcurrentCard .nl-live-stat-label::after{content:"${label}";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}`;
+  }).join('');
+  return [
+    'html.nl-cap-foreign .nl-live-stat-card--visitors{display:none!important;}',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoViewers),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoComments),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}',
+    // ニコ生だけの「watch の広告pt」の行は出さない。欄そのものは 2つめの公式ランキングがあるときだけ残す
+    'html.nl-cap-foreign [data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}',
+    'html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],',
+    'html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],',
+    'html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,',
+    'html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,',
+    'html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}',
+    'html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden]))){display:none!important;}',
+    'html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}',
+    'html.nl-cap-foreign:not([data-nl-platform-ready]) #noWatchRankingHint{visibility:hidden;}',
+    `${labelSel}{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}`,
+    afters,
+    // 数が来る前の「人」「直接値」を出さない（YouTube だけだった隠しを全サービスへ）
+    'html.nl-cap-foreign.nl-count-loading #watchConcurrentSub{font-size:0!important;color:transparent!important;}',
+  ].join('');
+}
 
 /** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス */
 function markCapability(root, platformId, subBoard) {
@@ -121,11 +138,14 @@ function markCapability(root, platformId, subBoard) {
   if (cl.contains('nl-cap-subboard') !== (subBoard === true)) cl.toggle('nl-cap-subboard', subBoard === true);
   const id = String(platformId || '');
   if (id && !cl.contains(`nl-cap-${id}`)) cl.add(`nl-cap-${id}`);
-  if (doc.getElementById(FOREIGN_STYLE_ID)) return;
-  const style = doc.createElement('style');
-  style.id = FOREIGN_STYLE_ID;
-  style.textContent = FOREIGN_STYLE;
-  (doc.head || html).appendChild(style);
+  const css = buildForeignCapabilityCss();
+  let style = doc.getElementById(FOREIGN_STYLE_ID);
+  if (!style) {
+    style = doc.createElement('style');
+    style.id = FOREIGN_STYLE_ID;
+    (doc.head || html).appendChild(style);
+  }
+  if (style.textContent !== css) style.textContent = css;
 }
 
 /**
@@ -153,15 +173,20 @@ export function applyPlatformMetricChrome(root, state) {
   }
   // 数が来る前の札(開いた直後の「—」・ニコ生の「（接続中…）」等)を「読み込み中」に。数そのものと「N分前」は触らない。
   const est = root.querySelector('#watchConcurrentEst');
+  const sub = root.querySelector('#watchConcurrentSub');
   if (est) {
     const t = String(est.textContent || '').trim();
-    if (NOT_A_COUNT.test(t) || t.startsWith('~')) {
+    if (NOT_A_COUNT.test(t) || t.startsWith('~') || t === '推定中' || t.includes('接続中')) {
       if (est.textContent !== LOADING) est.textContent = LOADING;
       if (!est.classList.contains('is-placeholder')) est.classList.add('is-placeholder');
       if (est.hasAttribute('title')) est.removeAttribute('title');
-      const sub = root.querySelector('#watchConcurrentSub');
       if (sub && sub.textContent !== '') sub.textContent = '';
     }
+  }
+  if (sub) {
+    const st = String(sub.textContent || '').trim();
+    // ニコ生の同接の説明（直接値・推定）を、他のサービスの人数の横に残さない
+    if (st === '直接値' || st === '材料待ち' || st.includes('推定')) sub.textContent = '';
   }
   const loading = root.querySelector('#watchConcurrentLoading');
   if (loading) setAttrIfDiff(loading, 'aria-label', `${plan.concurrentLabel}を読み込み中`);

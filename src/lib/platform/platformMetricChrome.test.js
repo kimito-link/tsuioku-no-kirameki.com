@@ -1,7 +1,9 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it } from 'vitest';
-import { applyPlatformMetricChrome, watchPlatformMetricChrome } from './platformMetricChrome.js';
-import { tallySupportItems } from './platformMetrics.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { applyPlatformMetricChrome, buildForeignCapabilityCss, watchPlatformMetricChrome } from './platformMetricChrome.js';
+import { PLATFORM_CAPABILITIES, bootSubBoardIds, tallySupportItems } from './platformMetrics.js';
 
 function mount() {
   document.body.innerHTML = `
@@ -161,24 +163,24 @@ describe('applyPlatformMetricChrome', () => {
     expect(document.documentElement.classList.contains('nl-cap-subboard')).toBe(false);
   });
 
-  it('見出しを持たないサービスに移ったら、前のサービスで付けた見出しを元に戻す(ミクチャに YouTube の見出しが残らない)', () => {
+  it('ミクチャへ移ると YouTube の見出しは残さず、ギフトの見出しにする', () => {
     const root = mount();
     const label = () => root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label').firstChild.nodeValue;
     const sub = () => root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__sublabel').textContent;
     applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
     expect(label()).toBe('スーパーチャット・ギフト');
     applyPlatformMetricChrome(root, { platform: 'mixch', facts: {} });
-    expect(label()).toBe('この番組へのギフト履歴');
-    expect(sub()).toBe('履歴');
+    expect(label()).toBe('ギフト');
+    expect(sub()).toBe('このPCの記録です。');
     expect(root.querySelector('#giftHistoryProgramPt')).not.toBeNull();
   });
 
-  it('ニコ生版の描画が書き直した見出しは、元に戻す対象にしない', () => {
+  it('見出しを持たないサービスでは、ニコ生版の描画が書き直した見出しを戻さない', () => {
     const root = mount();
     const p = root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label');
     applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
     p.firstChild.nodeValue = 'ギフト履歴(書き直し)';
-    applyPlatformMetricChrome(root, { platform: 'mixch', facts: {} });
+    applyPlatformMetricChrome(root, { platform: 'other', facts: {} });
     expect(p.firstChild.nodeValue).toBe('ギフト履歴(書き直し)');
   });
 
@@ -188,5 +190,35 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('.nl-live-stat-card--visitors').hidden).toBe(false);
     expect(root.querySelector('#officialStatNicoAdPts').parentElement.hidden).toBe(false);
     expect(root.querySelector('#watchConcurrentCard .nl-live-stat-label').textContent).toBe('推定同時接続');
+  });
+
+  it('SHOWROOM の見出しを出し、ニコ生の「直接値」は消す', () => {
+    const root = mount();
+    const est = root.querySelector('#watchConcurrentEst');
+    const sub = root.createElement('div');
+    sub.id = 'watchConcurrentSub';
+    sub.textContent = '直接値';
+    est.after(sub);
+    applyPlatformMetricChrome(root, { platform: 'showroom', facts: {} });
+    expect(root.querySelector('#watchConcurrentCard .nl-live-stat-label').textContent).toBe('視聴者数');
+    expect(sub.textContent).toBe('');
+    const css = root.querySelector('#nl-platform-capability-style').textContent;
+    expect(css).toContain('html.nl-cap-showroom #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数"');
+    expect(css).not.toContain('[data-lane="adRanking"]{display:none');
+    expect(css).toContain('html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"]');
+  });
+});
+
+describe('開いた瞬間の CSS', () => {
+  it('boot は能力表と同じ文字列と、全サービスの見出しを持つ', () => {
+    const boot = readFileSync(join(process.cwd(), 'extension/yt-loading-boot.js'), 'utf8');
+    expect(boot).toContain(buildForeignCapabilityCss());
+    expect(boot).toContain('nl-count-loading');
+    expect(boot).toContain("q.get('site')");
+    for (const id of bootSubBoardIds()) expect(boot).toContain(`${id}: 1`);
+    for (const [id, cap] of Object.entries(PLATFORM_CAPABILITIES)) {
+      if (cap.native === true) continue;
+      expect(boot).toContain(`${id}: '${cap.concurrentLabel}'`);
+    }
   });
 });

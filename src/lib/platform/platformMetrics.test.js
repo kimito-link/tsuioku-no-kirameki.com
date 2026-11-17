@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bootPlatformId,
+  bootSubBoardIds,
   panelExtraChips,
   platformSectionPlan,
   resolvePlatformId,
@@ -233,5 +235,51 @@ describe('venueItemsForPlatform', () => {
   it('ほかのサービスの欄の数は、能力表に無いサービスには出さない', () => {
     expect(panelExtraChips('youtube', { official: { eventRank: 1, level: 3 } })).toEqual([]);
     expect(panelExtraChips('niconico', { official: { eventRank: 1 } })).toEqual([]);
+  });
+
+  it('ABEMA は同時接続や経過 0分で視聴数を埋めない', () => {
+    const items = venueItemsForPlatform('abema', {
+      records: { text: '3', isPlaceholder: false },
+      concurrent: { text: '40', isPlaceholder: false },
+      streamAge: { text: '0分', isPlaceholder: false },
+      facts: { viewers: 40 },
+    });
+    expect(items.find((i) => i.key === 'concurrent').text).toBe('読み込み中');
+    expect(items.find((i) => i.key === 'concurrent').unit).toBe('');
+    expect(items.find((i) => i.key === 'streamAge').text).toBe('読み込み中');
+  });
+
+  it('公式の開始時刻があるときの 0分は残す', () => {
+    const items = venueItemsForPlatform('showroom', {
+      records: { text: '1', isPlaceholder: false },
+      concurrent: { text: '4', isPlaceholder: false },
+      streamAge: { text: '0分', isPlaceholder: false },
+      facts: { viewers: 4, streamAgeProvenance: 'official' },
+    });
+    expect(items.find((i) => i.key === 'streamAge').text).toBe('0分');
+  });
+});
+
+describe('bootPlatformId', () => {
+  it('stream と site と記録キーからサービスを決める', () => {
+    expect(bootPlatformId('yt:abcdefghijk', '')).toBe('youtube');
+    expect(bootPlatformId('twitch:demo', '')).toBe('twitch');
+    expect(bootPlatformId('sr.roomkey.00000', '')).toBe('showroom');
+    expect(bootPlatformId('', 'tiktok')).toBe('tiktok');
+    expect(bootPlatformId('', 'abema')).toBe('abema');
+    expect(bootPlatformId('', '')).toBe('');
+    expect(bootSubBoardIds()).toEqual(['twitch', 'kick', 'showroom']);
+  });
+});
+
+describe('他サービスの欄の見出し', () => {
+  it('公式の順位表があるときはその名前、無いときは合計順', () => {
+    expect(platformSectionPlan('showroom').sections.contributionRanking.label).toBe('ギフトの合計順');
+    expect(platformSectionPlan('showroom', { officialBoard: true }).sections.contributionRanking.label).toBe('貢献ランキング');
+    expect(platformSectionPlan('mixch', { officialBoard: true }).sections.contributionRanking.label).toBe('今月のファンランキング');
+    expect(platformSectionPlan('tiktok', { officialBoard: true }).sections.contributionRanking.label).toBe('視聴者ランキング');
+    expect(platformSectionPlan('twitcasting', { officialBoard: true }).sections.contributionRanking.label).toBe('サポーターランキング');
+    expect(platformSectionPlan('whowatch').sections.giftHistory.label).toBe('アイテム');
+    expect(platformSectionPlan('niconico').sections).toEqual({});
   });
 });

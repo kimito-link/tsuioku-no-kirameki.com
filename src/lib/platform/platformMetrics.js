@@ -12,7 +12,7 @@
 import { platformOfStreamKey } from './streamPlatform.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
-export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting']);
+export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting', 'tiktok']);
 
 /**
  * パネルと会場が同じ表を見る。native のサービスは今までの画面のまま。
@@ -75,6 +75,14 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'totalViews']),
   }),
+  // TikTok LIVE: 同時視聴は WebcastRoomUserSeqMessage（tt-content-entry.js の parseTtRoomUserSeq）。
+  //   配信中の視聴者ランキングはギフト欄の見出し側。いいね数などはページから取っていないので出さない。
+  tiktok: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge']),
+  }),
   // ツイキャス: 配信ページの「現在/累計」の累計とコメント数(#viewer-counter・#comment-count に出ている数そのまま)。
   //   視聴者数は同じ欄の左(現在)。公式の応援ランキングは配信者ページのサポーターランキング(2つめの欄)。
   twitcasting: Object.freeze({
@@ -83,14 +91,45 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
   }),
+  // headlineCount:views = 大きな数字はページの視聴数（同時接続では埋めない）。countUnit 空 = 「人」と書かない。
+  // 出典: src/lib/abema/abParse.js の abAudienceFromPayload（stats.view は視聴数、concurrentViewers は別）。
   abema: Object.freeze({
     native: false,
     concurrentLabel: '視聴数',
+    headlineCount: 'views',
+    countUnit: '',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'comments']),
     hideSections: Object.freeze(['contributionRanking', 'giftHistory']),
   }),
 });
+
+/**
+ * 横の欄を開いた瞬間のサービス。外枠が焼く stream（`yt:` / `twitch:` / 記録キー `sr.` など）と、
+ * 配信ページでないときの `site=` の両方を見る。分からなければ ''（ニコ生の見出しは付けない）。
+ * @param {unknown} stream
+ * @param {unknown} site
+ */
+export function bootPlatformId(stream, site) {
+  const s = String(stream || '').trim();
+  if (/^yt:/i.test(s)) return 'youtube';
+  const head = s.split(':')[0].toLowerCase();
+  if (head && head !== 'niconico' && Object.prototype.hasOwnProperty.call(PLATFORM_CAPABILITIES, head)) return head;
+  const byKey = platformOfStreamKey(s);
+  if (byKey) return byKey.id;
+  const siteId = String(site || '').trim().toLowerCase();
+  if (siteId === 'youtube') return 'youtube';
+  if (siteId && siteId !== 'niconico' && Object.prototype.hasOwnProperty.call(PLATFORM_CAPABILITIES, siteId)) return siteId;
+  return '';
+}
+
+/** 2つめの公式ランキング欄を最初の描画から使うサービス @returns {string[]} */
+export function bootSubBoardIds() {
+  return Object.keys(PLATFORM_CAPABILITIES).filter((id) => {
+    const cap = PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)];
+    return 'officialSubBoard' in cap && cap.officialSubBoard === true;
+  });
+}
 
 /** @param {string} platformId */
 export function platformCapability(platformId) {
@@ -233,6 +272,20 @@ const OFFICIAL_MAIN_LABEL = Object.freeze({
 });
 
 /**
+ * ニコ生以外で、ギフト欄の見出し。rankOfficial は公式の順位表を入れているときだけ。
+ * 出典: extension-youtube/src の sr/mx/tt/tc-content-entry.js が YT_LEADERBOARD に渡す名前
+ * （SHOWROOM 貢献ランキング、ミクチャ今月のファンランキング、TikTok 視聴者ランキング、ツイキャス サポーターランキング）。
+ * ふわっちのギフトはアイテム（streamPlatform.js の paid）。
+ */
+const FOREIGN_LANES = Object.freeze({
+  showroom: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: '貢献ランキング', gift: 'ギフト' }),
+  mixch: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: '今月のファンランキング', gift: 'ギフト' }),
+  tiktok: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: '視聴者ランキング', gift: 'ギフト' }),
+  twitcasting: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: 'サポーターランキング', gift: 'ギフト' }),
+  whowatch: Object.freeze({ rank: 'アイテムの合計順', gift: 'アイテム' }),
+});
+
+/**
  * @param {string} platformId
  * @param {{ officialBoard?: boolean }} [opts] officialBoard: ギフト貢献度の欄に公式の順位表を入れている
  */
@@ -306,6 +359,13 @@ export function platformSectionPlan(platformId, opts) {
     sections.giftHistory = { show: false };
     hide.push('contributionRanking', 'giftHistory');
     trio = { rink: 'りんく', konta: 'こん太', tanu: 'たぬ姉' };
+  } else if (Object.prototype.hasOwnProperty.call(FOREIGN_LANES, id)) {
+    // 見出しだけそのサービスの順位表の名前にする（欄の部品はニコ生版のまま。数は作らない）。
+    const lane = FOREIGN_LANES[/** @type {keyof typeof FOREIGN_LANES} */ (id)];
+    const rankOfficial = 'rankOfficial' in lane ? lane.rankOfficial : '';
+    const rankLabel = official && rankOfficial ? rankOfficial : lane.rank;
+    sections.contributionRanking = { show: true, label: rankLabel };
+    sections.giftHistory = { show: true, label: lane.gift, sub: 'このPCの記録です。' };
   }
   return {
     id,
@@ -499,14 +559,24 @@ export function venueItemsForPlatform(platformId, bag) {
   if (id === 'niconico') return null;
   const plan = platformSectionPlan(id);
   const facts = bag?.facts && typeof bag.facts === 'object' ? bag.facts : {};
-  const fromFacts = id === 'abema' ? (num(facts.viewCount) ?? num(facts.viewers)) : num(facts.viewers);
+  const cap = platformCapability(id);
+  // 視聴数のサービスは、同時接続(viewers)で視聴数の欄を埋めない。
+  const pageViews = 'headlineCount' in cap && cap.headlineCount === 'views';
+  const fromFacts = pageViews ? num(facts.viewCount) : num(facts.viewers);
   const concText = String(bag?.concurrent?.text || '').trim();
   // ページに出ている数だけを出す。数でない文字(—・推定中・接続中・読み込み中 等)や推定(~)は「読み込み中」にまとめる。
-  const concIsCount = /^[\d,]+$/.test(concText) && bag?.concurrent?.isPlaceholder !== true;
+  // 視聴数の欄は、同時接続の文字でも埋めない（別の数を視聴数と書かない）。
+  const concIsCount = pageViews
+    ? false
+    : (/^[\d,]+$/.test(concText) && bag?.concurrent?.isPlaceholder !== true);
   const viewer = fromFacts != null
     ? { text: formatInt(fromFacts), isPlaceholder: false }
     : (concIsCount ? { text: concText, isPlaceholder: false } : { text: LOADING, isPlaceholder: true });
-  const age = bag.streamAge || { text: '—', isPlaceholder: true };
+  const rawAge = bag.streamAge || { text: LOADING, isPlaceholder: true };
+  // 開始時刻が無いのに「0分」になるのを、公式の開始時刻があるとき以外は出さない。
+  const age = rawAge.text === '0分' && facts.streamAgeProvenance !== 'official'
+    ? { text: LOADING, isPlaceholder: true }
+    : rawAge;
   /** @type {Array<{ key: string, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu', title: string }>} */
   const items = [
     {
@@ -522,7 +592,7 @@ export function venueItemsForPlatform(platformId, bag) {
       key: 'concurrent',
       label: plan.concurrentLabel,
       text: viewer.text,
-      unit: viewer.isPlaceholder ? '' : '人',
+      unit: viewer.isPlaceholder ? '' : ('countUnit' in cap ? cap.countUnit : '人'),
       isPlaceholder: viewer.isPlaceholder,
       face: 'konta',
       title: OFFICIAL,
