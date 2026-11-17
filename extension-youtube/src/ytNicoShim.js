@@ -35,6 +35,7 @@ import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey, readYtPanelSite } from '../../src/lib/youtube/ytPanelRoute.js';
+import { noWatchHintFor } from '../../src/lib/platform/noWatchHint.js';
 import { rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';

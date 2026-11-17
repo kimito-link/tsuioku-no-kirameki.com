@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2147',
+    date: '2026-11-17',
+    summary: '配信を探す案内の読み込みを直す',
+    items: Object.freeze([
+      'ニコニコ生放送以外で、配信ページが見つからないときの案内が読み込まれず出なくなるのを直しました。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2146',
     date: '2026-11-17',
     summary: '配信ページの言い方にそろえる',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '文字にくっついたスタンプ名も読まない',
     items: Object.freeze([
       '文字のすぐ後ろに YouTube のスタンプが続くと(例「fraudface-blue-smiling」)、スタンプの名前を英語のまま読んでいました。くっついていても名前は読まないようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2120',
-    date: '2026-11-13',
-    summary: 'スタンプの名前を読み上げない',
-    items: Object.freeze([
-      'YouTube のスタンプ(face-fuchsia-tongue-out や :_xxx: のような名前)を、英語の名前のまま読み上げていました。スタンプの名前は読まないようにしました(画面の表示は今までどおりです)。'
     ])
   }),
 ]);
