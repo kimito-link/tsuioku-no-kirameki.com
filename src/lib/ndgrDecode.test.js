@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { aggregateMarketingReport } from './marketingAggregate.js';
+import { cleanNdgrChatRows } from './cleanNdgrChatRows.js';
+import { ndgrChatsToMergeRows } from './ndgrChatRows.js';
 import {
   pbVarint,
   pbForEach,
@@ -672,6 +675,52 @@ describe('decodeChunkedMessage', () => {
     expect(r.gifts[0].advertiserName).toBe('ギフト送り主');
     expect(r.gifts[0].contributionRank).toBe(1);
     expect(r.tagHistogram.top['1']).toBe(2);
+  });
+
+  it('SimpleNotificationV2 VISITED（field 23, type 6）の来場文を chat に残す', () => {
+    const text = '「猫」が好きな1人が来場しました';
+    const v2 = new Uint8Array([...varintField(1, 6), ...strField(2, text)]);
+    const chunked = new Uint8Array(lenDelimited(1, [...lenDelimited(23, [...v2])]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats).toHaveLength(1);
+    expect(r.chats[0].content).toBe(text);
+    expect(r.chats[0].no).toBeNull();
+    expect(r.chats[0].rawUserId).toBeNull();
+  });
+
+  it('旧 SimpleNotification.visited（field 7 の field 7）の来場文を chat に残す', () => {
+    const text = '「猫」が好きな1人が来場しました';
+    const note = new Uint8Array(strField(7, text));
+    const chunked = new Uint8Array(lenDelimited(1, [...lenDelimited(7, [...note])]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats.map((c) => c.content)).toEqual([text]);
+  });
+
+  it('来場の V2 は保存行になり、コメント数には入らず来場だけ増える', () => {
+    const text = '「猫」が好きな1人が来場しました';
+    const v2 = new Uint8Array([...varintField(1, 6), ...strField(2, text)]);
+    const chunked = new Uint8Array(lenDelimited(1, [...lenDelimited(23, [...v2])]));
+    const decoded = decodeChunkedMessage(chunked);
+    const stored = cleanNdgrChatRows(ndgrChatsToMergeRows(decoded.chats));
+    expect(stored).toEqual([{ commentNo: '', text, userId: null }]);
+    const report = aggregateMarketingReport(
+      [
+        { id: 'c1', liveId: 'lv1', commentNo: '1', text: 'こんにちは', userId: 'u1', capturedAt: 1_700_000_000_000 },
+        { ...stored[0], id: 'a1', liveId: 'lv1', capturedAt: 1_700_000_060_000 }
+      ],
+      'lv1'
+    );
+    expect(report.totalComments).toBe(1);
+    expect(report.interestArrivalSummary.totalArrivals).toBe(1);
+    expect(report.interestArrivalSummary.messageCount).toBe(1);
+    expect(report.interestArrivalSummary.topTags[0].tag).toBe('猫');
+  });
+
+  it('VISITED 以外の SimpleNotificationV2 はコメントにしない', () => {
+    const v2 = new Uint8Array([...varintField(1, 2), ...strField(2, '感情の通知')]);
+    const chunked = new Uint8Array(lenDelimited(1, [...lenDelimited(23, [...v2])]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats).toHaveLength(0);
   });
 });
 

@@ -113,6 +113,8 @@ describe('マーケ HTML のスナップショット', () => {
   it('ニコ生（platform なし）の HTML を固定する', async () => {
     const html = nicoFixture();
     expect(html).toContain('公式来場者数');
+    expect(html).toContain('ニコ既定アイコン');
+    expect(html).toContain('好きな人が来場しました');
     expect(html).toContain('koken 公式 API');
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-niconico.html'));
   });
@@ -123,6 +125,8 @@ describe('マーケ HTML のスナップショット', () => {
     expect(html).not.toContain('広告pt');
     expect(html).not.toContain('koken');
     expect(html).not.toContain('匿名184');
+    expect(html).not.toContain('ニコ既定アイコン');
+    expect(html).not.toContain('好きな人が来場しました');
     expect(html).toContain('同時視聴者数');
     expect(html).toContain('推定');
     expect(html).toContain('USD');

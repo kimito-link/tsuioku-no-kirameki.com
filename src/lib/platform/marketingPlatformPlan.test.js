@@ -33,6 +33,19 @@ describe('marketingViewFor', () => {
     expect(marketingViewFor('youtube')?.pointColumn).toBe('円換算（推定）');
     expect(marketingViewFor('youtube')?.pointEstimate).toBe(true);
   });
+
+  it('ニコ生以外は来場者数もニコ生の言い回しも持たない', () => {
+    const yt = marketingViewFor('youtube');
+    expect(yt?.visitorCard).toBe(false);
+    expect(yt?.thumbIdHeading).not.toContain('ニコ');
+    expect(yt?.thumbIconNote).not.toContain('ニコ');
+    expect(yt?.awardAllDescription).toContain('スーパーチャット・メンバー');
+    expect(yt?.awardAllDescription).not.toContain('広告');
+    expect(yt?.retentionExcludeNote).not.toContain('来場');
+    const abema = marketingViewFor('abema');
+    expect(abema?.awardAllDescription).toContain('コメント—どんな形でも');
+    expect(abema?.awardAllDescription).not.toContain('ギフト');
+  });
 });
 
 describe('応援の行', () => {

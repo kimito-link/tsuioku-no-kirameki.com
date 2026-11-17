@@ -60,6 +60,7 @@ export const MEDIA_KIT_SUPPORTER_SCAN_TIMEOUT_MS = 15_000;
  *   withTimeout: <T>(p: Promise<T>, ms: number, code: string) => Promise<T>,
  *   resolveProfileMap: () => Promise<Record<string, any>>,
  *   maskSupporters?: boolean,
+ *   omitVisitorTotal?: boolean,
  *   broadcasterUserId?: string,
  *   currentLiveId?: string,
  *   openDb?: () => Promise<IDBDatabase>,
@@ -181,7 +182,8 @@ export async function buildMediaKitDocument(deps) {
     generatedAtMs: nowMs,
     sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
     sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT,
-    maskSupporters: deps.maskSupporters === true
+    maskSupporters: deps.maskSupporters === true,
+    omitVisitorTotal: deps.omitVisitorTotal === true
   });
   const date = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Tokyo',

@@ -3486,7 +3486,7 @@ ${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap))}
 ${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
 ${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
 ${view && view.hide.has('mkt-audience-gap') ? '' : sectionAudienceEngagementGap(audienceGap, r)}
-${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver })}
+${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver, retentionExcludeNote: view ? view.retentionExcludeNote : '' })}
 ${sectionSurvivalCurve(survivalCurve)}
 ${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
 ${newVsRepeatBasis.ok ? sectionNewVsRepeat(newVsRepeat) : sectionNewVsRepeatUnavailable(newVsRepeatBasis.note)}
@@ -3705,7 +3705,7 @@ ${followHtml}
 
   const numericBlock =
     numericIdUsers.length > 0
-      ? `<h3 class="mkt-thumb-grid__heading">数値 ID（個人サムネ・ニコ既定アイコン）<span class="mkt-thumb-grid__heading-count">${numericIdUsers.length}名</span></h3>
+      ? `<h3 class="mkt-thumb-grid__heading">${view ? escapeHtml(view.thumbIdHeading) : '数値 ID（個人サムネ・ニコ既定アイコン）'}<span class="mkt-thumb-grid__heading-count">${numericIdUsers.length}名</span></h3>
 <ol class="mkt-thumb-grid">${numericIdUsers.map(cellHtml).join('')}</ol>`
       : '';
 
@@ -3728,7 +3728,7 @@ ${followHtml}
 
   return `<section class="mkt-section mkt-section--thumb-grid" aria-label="サムネ付きユーザー一覧">
 <h2>サムネ付きユーザー一覧</h2>
-<p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順、種別ごとに並べました（各カテゴリ最大 60 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。</p>
+<p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順、種別ごとに並べました（各カテゴリ最大 60 名）。${view ? escapeHtml(view.thumbIconNote) : 'アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。'}</p>
 ${searchBoxHtml}
 <p class="mkt-spec-note">${view ? (view.servicePage ? `※ 表示名はコメ記録時点のもの（仕様）。名前が変わった場合、${escapeHtml(view.servicePage)}の最新と異なることがあります。` : '※ 表示名はコメ記録時点のもの（仕様）。') : '※ 表示名はコメ記録時点のもの（仕様）。配信者がニコニコでハンドル名を変更した場合、ここの表示と niconico の最新表示が異なることがあります。リアルタイム取得は行っていないため（API 連発によるレート制限を避けるため）、最新名は ID クリック先のユーザーページで確認できます。'}</p>
 ${numericBlock}

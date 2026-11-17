@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2145',
+    date: '2026-11-17',
+    summary: '来場通知を記録し、他サービスの文言を直す',
+    items: Object.freeze([
+      'ニコ生の「好きな人が来場しました」を、公式の通知からも記録するようにしました。コメント数には入れず、来場として数えます。',
+      'YouTube などの分析レポートでは、ニコ生だけの言い回し（既定アイコン、来場者数、来場の通知）を出さないようにしました。ニコ生の文面は変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2144',
     date: '2026-11-17',
     summary: '来場の通知を4種類とも集計',
@@ -177,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '人が少ない順位のカードが横に伸びない',
     items: Object.freeze([
       '公式ランキングなどの順位カードが1〜4人しかいないとき、広い画面でカードが画面いっぱいに横へ伸びていたのを直しました。カード1枚の幅を300pxまでにして、まん中に並べます。細い横パネルでの見え方は変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2122',
-    date: '2026-11-13',
-    summary: '拡張の短い説明文を見直した',
-    items: Object.freeze([
-      'Chrome ウェブストアに出る拡張の短い説明を「ライブ配信の応援コメントをこのPCの中だけに記録し、配信後に3つのレーンで振り返れます」にしました。使い方や動きは変わりません。'
     ])
   }),
 ]);

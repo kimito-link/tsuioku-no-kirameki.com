@@ -26,6 +26,21 @@ const room = (overrides = {}) => ({
 });
 
 describe('buildKiramekiAwardsSectionHtml', () => {
+  it('descriptionByAwardId があるときだけ、その賞の説明を差し替える', () => {
+    const html = buildKiramekiAwardsSectionHtml(
+      [{ id: 'tomoshibi', name: 'ともしびのきらめき', emoji: '🕯️', category: 'all', description: 'コメント・ギフト・広告—どんな形でも、あなたの灯りが届いていました。', userKeys: [] }],
+      [],
+      {
+        resolveAvatarSrc: () => '',
+        escapeHtml: (v) => String(v ?? ''),
+        escapeAttr: (v) => String(v ?? ''),
+        descriptionByAwardId: { tomoshibi: 'この配信に参加してくれたすべての人へ。コメントやスーパーチャット・メンバー—どんな形でも、あなたの灯りが届いていました。' }
+      }
+    );
+    expect(html).toContain('スーパーチャット・メンバー');
+    expect(html).not.toContain('ギフト・広告');
+  });
+
   it('受賞者ありのとき賞名・絵文字・説明が含まれる', () => {
     const html = buildKiramekiAwardsSectionHtml(
       [award()],

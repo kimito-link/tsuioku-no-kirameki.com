@@ -1,4 +1,5 @@
 import { parseGiftCommentText } from './parseGiftComment.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /**
  * NDGR チャット行の正規化純関数。
@@ -23,7 +24,8 @@ export function cleanNdgrChatRows(raw) {
     //   識別子は ndgrChatRows.js で userId=rawUserId||hashedUserId に解決済(匿名は hashedUserId)。
     //   設計正本=council/anon-comment-rescue-SYNTHESIS.md。
     if (!commentNo) {
-      if (!text.trim() || !uid) continue; // 番号無しは「本文+識別子」を必須にする。
+      // 来場通知は公式の人数まとめなので userId が無い。本文が来場の文なら残す。
+      if (!text.trim() || (!uid && !parseArrivalCommentText(text))) continue;
     }
     // v0.1.195: ギフトシステムメッセージは「ユーザーが投げたコメント」ではないので
     //   nls_comments_<lv> に persist しない。content/userId はギフト送信者のもので、

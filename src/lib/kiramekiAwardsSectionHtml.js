@@ -170,23 +170,30 @@ function buildAwardCardHtml(award, roomByUserKey, deps) {
  * @param {{
  *   resolveAvatarSrc: (room?: Record<string, unknown>, userKey?: string) => unknown,
  *   escapeHtml: (value: unknown) => string,
- *   escapeAttr: (value: unknown) => string
+ *   escapeAttr: (value: unknown) => string,
+ *   descriptionByAwardId?: Record<string, string>
  * }} deps
  * @returns {string}
  */
 export function buildKiramekiAwardsSectionHtml(
   awards,
   aggregatedRooms,
-  { resolveAvatarSrc, escapeHtml, escapeAttr }
+  { resolveAvatarSrc, escapeHtml, escapeAttr, descriptionByAwardId }
 ) {
   const safeAwards = Array.isArray(awards) ? awards : [];
   const roomByUserKey = buildRoomByUserKey(aggregatedRooms);
-  const renderCard = (/** @type {unknown} */ award) =>
-    buildAwardCardHtml(award, roomByUserKey, {
+  const renderCard = (/** @type {unknown} */ award) => {
+    const id = String(/** @type {any} */ (award)?.id || '');
+    const override = descriptionByAwardId && descriptionByAwardId[id];
+    const shown = override
+      ? { .../** @type {any} */ (award), description: override }
+      : award;
+    return buildAwardCardHtml(shown, roomByUserKey, {
       resolveAvatarSrc,
       escapeHtml,
       escapeAttr
     });
+  };
   const allCards = safeAwards
     .filter((award) => /** @type {any} */ (award)?.category === 'all')
     .map(renderCard)

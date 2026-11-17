@@ -742,6 +742,7 @@ async function runExport(lid) {
             return normalizeUserCommentProfileMap(bag?.[KEY_USER_COMMENT_PROFILE_CACHE]);
           },
           maskSupporters: maskShareLabels,
+          omitVisitorTotal: marketingView ? marketingView.visitorCard !== true : false,
           // v0.1.1857: 記録は見た配信全部なので、この配信の配信者の配信だけで集計する(他の配信者の数字を混ぜない)。
           broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
           currentLiveId: lid

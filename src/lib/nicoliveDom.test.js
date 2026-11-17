@@ -283,12 +283,36 @@ describe('parseNicoLiveTableRow', () => {
     expect(parseNicoLiveTableRow(bad.querySelector('.table-row'))).toBeNull();
   });
 
-  it('generalSystemMessage でも comment-number が空なら null', () => {
+  it('generalSystemMessage は番号が空でも来場の本文なら残す', () => {
     const wrap = document.createElement('div');
     wrap.innerHTML = `
       <div class="table-row" data-comment-type="generalSystemMessage">
         <span class="comment-number"></span>
-        <span class="comment-text">「雑談」が好きな1人が来場しました</span>
+        <span class="comment-text">「猫」が好きな1人が来場しました</span>
+      </div>`;
+    expect(parseNicoLiveTableRow(wrap.querySelector('.table-row'))).toEqual({
+      commentNo: '',
+      text: '「猫」が好きな1人が来場しました',
+      userId: null
+    });
+    const harvested = extractCommentsFromNode(wrap);
+    expect(harvested.map((row) => row.text)).toEqual(['「猫」が好きな1人が来場しました']);
+    const bare = document.createElement('div');
+    bare.innerHTML = `
+      <div class="table-row" data-comment-type="generalSystemMessage">
+        <span class="comment-text">「猫」が好きな1人が来場しました</span>
+      </div>`;
+    expect(extractCommentsFromNode(bare).map((row) => row.text)).toEqual([
+      '「猫」が好きな1人が来場しました'
+    ]);
+  });
+
+  it('generalSystemMessage でも来場でない本文は番号が空なら null', () => {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="table-row" data-comment-type="generalSystemMessage">
+        <span class="comment-number"></span>
+        <span class="comment-text">運営からのお知らせ</span>
       </div>`;
     expect(parseNicoLiveTableRow(wrap.querySelector('.table-row'))).toBeNull();
   });
@@ -354,6 +378,14 @@ describe('isHarvestableNicoCommentRow（受理門の正本・第1コミット）
         <span class="comment-text">本文</span>
       </div>`);
     expect(isHarvestableNicoCommentRow(row)).toBe(true);
+    expect(isHarvestableNicoCommentRow(row, { requireNumber: true })).toBe(true);
+  });
+
+  it('requireNumber:true: generalSystemMessage は番号セルが無くても受理する', () => {
+    const row = rowFrom(`
+      <div class="table-row" data-comment-type="generalSystemMessage">
+        <span class="comment-text">「猫」が好きな1人が来場しました</span>
+      </div>`);
     expect(isHarvestableNicoCommentRow(row, { requireNumber: true })).toBe(true);
   });
 

@@ -283,7 +283,8 @@ export function dedupeSameWindows(windows) {
  *   broadcasterIconDataUrl?: string,
  *   sourceLiveLimit?: number,
  *   sourceLiveLimitReached?: boolean,
- *   maskSupporters?: boolean
+ *   maskSupporters?: boolean,
+ *   omitVisitorTotal?: boolean
  * }} [options]
  * @returns {string}
  */
@@ -301,6 +302,7 @@ export function buildMediaKitHtml(stats, options = {}) {
       : Date.now();
   const sourceLiveLimit = Math.max(1, Math.floor(finiteNumber(options.sourceLiveLimit) || 60));
   const sourceLiveLimitReached = options.sourceLiveLimitReached === true;
+  const omitVisitorTotal = options.omitVisitorTotal === true;
 
   /** @type {Array<[string, (window: Record<string, unknown>) => string]>} */
   const metricSpecs = [
@@ -308,7 +310,11 @@ export function buildMediaKitHtml(stats, options = {}) {
     ['獲得フォロワー数', (window) => formatSignedInteger(window.followersGained)],
     ['平均同時視聴者数', (window) => formatDecimal(window.avgConcurrent)],
     ['最大同時視聴者数', (window) => formatInteger(window.maxConcurrent)],
-    ['来場者数', (window) => formatVisitors(window.visitors)],
+    ...(omitVisitorTotal
+      ? []
+      : /** @type {Array<[string, (window: Record<string, unknown>) => string]>} */ ([
+          ['来場者数', (window) => formatVisitors(window.visitors)]
+        ])),
     ['コメント数（累計）', (window) => formatInteger(window.comments)],
     ['チャット率', (window) => formatChatRate(window.chatRatePerMin)],
     ['応援者数（ユニーク目安）', (window) => formatPeople(window.uniqueSupporters)],
@@ -510,7 +516,7 @@ export function buildMediaKitHtml(stats, options = {}) {
         <p><strong>以下の統計データは、追憶のきらめきが配信中にこのPCへ記録した公式値・実測値です。</strong></p>
         <ul>
           <li>フォロワー数は、ニコニコの公開プロフィールから配信時に取得したスナップショットです。</li>
-          <li>来場者数とコメント数は公式表示値を優先し、未取得時のみこのPCの実測値で補います。</li>
+          <li>${omitVisitorTotal ? 'コメント数は公式表示値を優先し、未取得時のみこのPCの実測値で補います。' : '来場者数とコメント数は公式表示値を優先し、未取得時のみこのPCの実測値で補います。'}</li>
           <li>同時視聴者数は配信中サンプルの推定値です。公式の同時接続数ではありません。</li>
           <li>チャット率は記録できたコメント数と、最初・最後のサンプル間の推定配信時間から算出します。</li>
           <li>応援者数は各配信で確認できた既知コメント投稿者数の最大値で、期間全体の厳密なユニーク人数ではありません。</li>

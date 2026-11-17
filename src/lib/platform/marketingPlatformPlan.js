@@ -165,6 +165,16 @@ const MOMENTS = Object.freeze({
 });
 
 /**
+ * ともしびの説明。ニコ生の文は呼び出し側が view=null のときそのまま出す。
+ * @param {string} giftWord
+ * @param {boolean} hideGift
+ */
+function awardAllDescriptionFor(giftWord, hideGift) {
+  const how = hideGift || !giftWord ? 'コメント' : `コメントや${giftWord}`;
+  return `この配信に参加してくれたすべての人へ。${how}—どんな形でも、あなたの灯りが届いていました。`;
+}
+
+/**
  * @param {unknown} platformId
  * @returns {null | {
  *   id: string,
@@ -181,6 +191,11 @@ const MOMENTS = Object.freeze({
  *   showMember: boolean,
  *   hideGift: boolean,
  *   mixchUnitNote: boolean,
+ *   visitorCard: boolean,
+ *   thumbIdHeading: string,
+ *   thumbIconNote: string,
+ *   awardAllDescription: string,
+ *   retentionExcludeNote: string,
  *   hide: Set<string>,
  *   moments: (typeof MOMENTS)[string] | null,
  * }}
@@ -202,11 +217,13 @@ export function marketingViewFor(platformId) {
     hide.add('mkt-event-ranking');
   }
   const concurrentLabel = id === 'abema' ? '視聴数' : (cap.concurrentLabel || '視聴者数');
+  const hideGift = id === 'abema';
+  const giftWord = hideGift ? '' : (GIFT_WORD[id] || 'ギフト');
   return {
     id,
     concurrentLabel,
     concurrentHeading: id === 'abema' ? '視聴数の推移' : `${concurrentLabel}の推移`,
-    giftWord: GIFT_WORD[id] || 'ギフト',
+    giftWord: giftWord || 'ギフト',
     pointColumn: POINT_COLUMN[id] || '',
     pointEstimate: id === 'youtube',
     programWord: PROGRAM_WORD[id] || '配信',
@@ -215,8 +232,13 @@ export function marketingViewFor(platformId) {
     servicePage: SERVICE_PAGE[id] || '',
     anonLabel: ANON_LABEL.has(id) ? '匿名' : '',
     showMember: id === 'youtube',
-    hideGift: id === 'abema',
+    hideGift,
     mixchUnitNote: id === 'mixch',
+    visitorCard: cap.visitorCard === true,
+    thumbIdHeading: 'ID（アイコン）',
+    thumbIconNote: 'アイコンは ① 個人サムネ ② 識別子から生成した identicon の優先順で選びます。',
+    awardAllDescription: awardAllDescriptionFor(giftWord, hideGift),
+    retentionExcludeNote: '配信者本人は除いています。',
     hide,
     moments: MOMENTS[id] || null,
   };
