@@ -50,7 +50,8 @@ describe('Pusher の1件', () => {
   });
   it('消されたメッセージ・絵文字・時刻', () => {
     expect(parseKickDeleted(frame('App\\Events\\MessageDeletedEvent', { id: 'd', message: { id: 'abc-1' } }))).toBe('kk-abc-1');
-    expect(stripKickEmotes('[emote:1:Hi] [emoji:ok]')).toBe('Hi ok');
+    expect(stripKickEmotes('[emote:1:Hi] [emoji:ok]')).toBe('Hi');
+    expect(stripKickEmotes('[emote:9:collectiblesFloridaCat:0]')).toBe('collectiblesFloridaCat');
     expect(stripKickEmotes('[emote:1:westcolBLESSED][emote:1:westcolBLESSED]')).toBe('westcolBLESSED westcolBLESSED');
     expect(parseKickTime('2026-11-08 09:00:00')).toBe(Date.parse('2026-11-08T09:00:00Z'));
     expect(parseKickTime('')).toBe(0);

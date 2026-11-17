@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2122',
+    date: '2026-11-13',
+    summary: '拡張の短い説明文を見直した',
+    items: Object.freeze([
+      'Chrome ウェブストアに出る拡張の短い説明を「ライブ配信の応援コメントをこのPCの中だけに記録し、配信後に3つのレーンで振り返れます」にしました。使い方や動きは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2121',
     date: '2026-11-13',
     summary: '文字にくっついたスタンプ名も読まない',

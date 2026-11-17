@@ -15,6 +15,26 @@
 import { bubbleEmotePlan } from './platform/streamEmotes.js';
 
 /**
+ * 行に付いた絵文字と、覚えてある名前→画像を合わせる。
+ * 記録から emotes を落としたあとも、同じ名前は文字に戻さない。
+ * @param {unknown} rowEmotes
+ * @param {string} text
+ * @param {unknown} dict
+ */
+function emotesForSpeech(rowEmotes, text, dict) {
+  const list = Array.isArray(rowEmotes) ? [...rowEmotes] : [];
+  if (!dict || typeof dict !== 'object') return list;
+  const have = new Set(list.map((e) => String(e && typeof e === 'object' ? /** @type {{ name?: unknown }} */ (e).name || '' : '')));
+  for (const [name, url] of Object.entries(/** @type {Record<string, unknown>} */ (dict))) {
+    if (!name || have.has(name) || typeof url !== 'string' || !url) continue;
+    if (!text.includes(name)) continue;
+    have.add(name);
+    list.push({ name, url });
+  }
+  return list;
+}
+
+/**
  * コメント行の一意キー(時系列で単調増加するもの優先)。commentNo があればそれ、
  * 無ければ id、無ければ userId+text+capturedAt の合成。venueSeats の normalizeComeviewRow と同思想。
  *
@@ -81,7 +101,7 @@ export function liveFeedSpeechRows(rows) {
  * @param {{ seenKeys?: Set<string>|null, primed?: boolean, hiNo?: number }} state
  *   hiNo=これまでに見た最大の commentNo(過去のコメントを見分ける基準・無ければ 0)
  *   seenKeys=既に処理済みのコメントキー集合 / primed=初回シード済みか(false なら初回=吹き出さない)
- * @param {{ maxEmit?: number, primeEmit?: number, oldNoGap?: number }} [opts] maxEmit=1回の抽出で返す最大件数(同時多発の洪水を防ぐ・既定8)/ primeEmit=初回に出す直近件数(既定0=初回無音)
+ * @param {{ maxEmit?: number, primeEmit?: number, oldNoGap?: number, emoteDict?: Record<string, string> }} [opts] maxEmit=1回の抽出で返す最大件数(同時多発の洪水を防ぐ・既定8)/ primeEmit=初回に出す直近件数(既定0=初回無音)。emoteDict=覚えた絵文字(名前を文字に戻さない)
  * @returns {{
  *   speeches: Array<{ key: string, speakerKey: string, userId: string, name: string, text: string, voiceText: string, segments: unknown, capturedAt: number }>,
  *   seenKeys: Set<string>,
@@ -134,7 +154,7 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
     if (!text) continue;
     const key = venueSpeechKey(r);
     if (!key) continue;
-    const plan = bubbleEmotePlan(text, r.emotes);
+    const plan = bubbleEmotePlan(text, emotesForSpeech(r.emotes, text, opts.emoteDict));
     if (plan.drop) {
       seen.add(key);
       continue;

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   twEmotesFromTag,
   kickEmotesFromContent,
+  kickEmotesFromNodes,
+  REMEMBERED_EMOTE_KEYS,
   mergeEmoteDict,
   splitTextByEmotes,
   bubbleEmotePlan,
@@ -10,6 +12,7 @@ import {
 } from './streamEmotes.js';
 import { parseTwChatLine } from '../twitch/twIrcParse.js';
 import { parseKickEvent } from '../kick/kickChatParse.js';
+import { STREAM_PLATFORMS } from './streamPlatform.js';
 
 describe('twEmotesFromTag', () => {
   it('IRC の emotes タグから名前と画像を取る(同じ絵文字は1つ)', () => {
@@ -32,6 +35,16 @@ describe('twEmotesFromTag', () => {
       { name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/26/default/dark/2.0' },
     ]);
   });
+  it('最初の範囲が壊れても、後ろの範囲の id は残す', () => {
+    expect(twEmotesFromTag('25:0-99,0-4', 'Kappa')).toEqual([
+      { name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' },
+    ]);
+  });
+  it('文字で名前にならなければ、UTF-8 のバイト位置で切る', () => {
+    expect(twEmotesFromTag('25:4-8', 'あ Kappa')).toEqual([
+      { name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' },
+    ]);
+  });
 });
 
 describe('kickEmotesFromContent', () => {
@@ -40,6 +53,19 @@ describe('kickEmotesFromContent', () => {
       { name: 'KEKW', url: 'https://files.kick.com/emotes/37226/fullsize' },
     ]);
     expect(kickEmotesFromContent('なし')).toEqual([]);
+    expect(kickEmotesFromContent('[emote:9:collectiblesFloridaCat:0]')).toEqual([
+      { name: 'collectiblesFloridaCat', url: 'https://files.kick.com/emotes/9/fullsize' },
+    ]);
+  });
+  it('本文が名前だけのときも、横の emote_id から画像の URL を作る', () => {
+    expect(kickEmotesFromNodes('westcolQUESO', [{ emote_id: '42', positions: [{ s: 0, e: 11 }] }])).toEqual([
+      { name: 'westcolQUESO', url: 'https://files.kick.com/emotes/42/fullsize' },
+    ]);
+  });
+  it('会場が読む保存キーは、サービスの emotesKey と同じ', () => {
+    expect([...REMEMBERED_EMOTE_KEYS].sort()).toEqual(
+      Object.values(STREAM_PLATFORMS).map((p) => p.emotesKey).filter(Boolean).sort(),
+    );
   });
 });
 
@@ -128,7 +154,11 @@ describe('bubbleEmotePlan', () => {
   });
   it('URL が無い絵文字だけと、YouTube の :shortcut: だけは出さない', () => {
     expect(bubbleEmotePlan('HYPERCLAP', [{ name: 'HYPERCLAP', url: '' }]).drop).toBe(true);
-    expect(bubbleEmotePlan('[emote:1:emojiBubbly]', []).drop).toBe(true);
+    const fromTag = bubbleEmotePlan('[emote:1:emojiBubbly]', []);
+    expect(fromTag.drop).toBe(false);
+    expect(fromTag.voiceText).toBe('');
+    expect(fromTag.segments?.[0]).toMatchObject({ t: 'emote', url: 'https://files.kick.com/emotes/1/fullsize' });
+    expect(bubbleEmotePlan('[emoji:ok]', []).drop).toBe(true);
     expect(bubbleEmotePlan(':folded_hands:', []).drop).toBe(true);
     expect(bubbleEmotePlan('🙏', []).drop).toBe(false);
     expect(bubbleEmotePlan('🙏', []).text).toBe('🙏');

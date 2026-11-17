@@ -172,6 +172,20 @@ export function bootSubBoardIds() {
   });
 }
 
+/**
+ * 会場の詳しい状況に、ニコ生だけの「user 英数字」注記を足すか。
+ * 能力表で native でないサービス（Twitch・Kick など）では出さない。
+ * 配信キーからサービスが分からないときは、ニコ生の文を残す。
+ * @param {unknown} liveId
+ */
+export function includeNiconicoUserAliasNote(liveId) {
+  const raw = String(liveId || '').trim();
+  const plat = platformOfStreamKey(raw);
+  if (plat) return platformCapability(plat.id).native === true;
+  if (/^yt:/i.test(raw)) return false;
+  return true;
+}
+
 /** @param {string} platformId */
 export function platformCapability(platformId) {
   const id = resolvePlatformId(platformId);

@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2149',
+    date: '2026-11-17',
+    summary: '絵文字の名前を吹き出しに残さない',
+    items: Object.freeze([
+      'Kick と Twitch の会場では、絵文字の印が付いた語は画像にします。画像のアドレスが無いときは、その語を吹き出しにも読み上げにも残しません。',
+      '会場の詳しい状況では、ニコニコ生放送以外に「user 英数字」の注記を出さないようにしました。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2148',
     date: '2026-11-17',
     summary: '空の順位表と絵文字コードを出さない',
@@ -179,14 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '人が少ない順位のカードが横に伸びない',
     items: Object.freeze([
       '公式ランキングなどの順位カードが1〜4人しかいないとき、広い画面でカードが画面いっぱいに横へ伸びていたのを直しました。カード1枚の幅を300pxまでにして、まん中に並べます。細い横パネルでの見え方は変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2122',
-    date: '2026-11-13',
-    summary: '拡張の短い説明文を見直した',
-    items: Object.freeze([
-      'Chrome ウェブストアに出る拡張の短い説明を「ライブ配信の応援コメントをこのPCの中だけに記録し、配信後に3つのレーンで振り返れます」にしました。使い方や動きは変わりません。'
     ])
   }),
 ]);

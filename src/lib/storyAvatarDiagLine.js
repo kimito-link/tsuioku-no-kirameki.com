@@ -125,9 +125,11 @@ export function formatStoryAvatarDiagLine(s) {
 /**
  * 件数の細かい内訳（ポーリングで数字が変わりやすい）—「詳しい状況」内に出す HTML。
  * @param {StoryAvatarDiagSnapshot} s
+ * @param {{ includeUserAliasNote?: boolean }} [opts] false のとき、ニコ生だけの「user 英数字」注記を出さない
  * @returns {string} 常に1ブロックの HTML（0件も明示）
  */
-export function buildStoryAvatarDiagVerboseHtml(s) {
+export function buildStoryAvatarDiagVerboseHtml(s, opts = {}) {
+  const includeUserAliasNote = opts.includeUserAliasNote !== false;
   const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
   const withUidRaw = Math.max(0, Math.floor(Number(s?.withUid) || 0));
   const resolvedRaw = Math.max(0, Math.floor(Number(s?.resolvedAvatar) || 0));
@@ -168,8 +170,9 @@ export function buildStoryAvatarDiagVerboseHtml(s) {
     const t1 = Math.max(0, Math.floor(Number(s.userLaneTier1) || 0));
     const sn = Math.max(0, Math.floor(Number(s.userLaneStrongNick) || 0));
     const th = Math.max(0, Math.floor(Number(s.userLanePersonalThumb) || 0));
+    const aliasNote = includeUserAliasNote ? '（ニコの「user 英数字」仮名は強い表示名に入りません）' : '';
     leadParts.push(
-      `ユーザーレーンの候補（重複のない利用者）<strong>${ulDed}</strong> 件のうち、りんく列相当 <strong>${t3}</strong>・こん太 <strong>${t2}</strong>・たぬ姉 <strong>${t1}</strong>。強い表示名として扱えたのは <strong>${sn}</strong> 件、個人サムネありは <strong>${th}</strong> 件です（ニコの「user 英数字」仮名は強い表示名に入りません）。`
+      `ユーザーレーンの候補（重複のない利用者）<strong>${ulDed}</strong> 件のうち、りんく列相当 <strong>${t3}</strong>・こん太 <strong>${t2}</strong>・たぬ姉 <strong>${t1}</strong>。強い表示名として扱えたのは <strong>${sn}</strong> 件、個人サムネありは <strong>${th}</strong> 件です${aliasNote}。`
     );
   }
 

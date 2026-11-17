@@ -2825,8 +2825,7 @@ function hideNicoOnlyParts() {
 }
 // ---- Twitch・Kick の絵文字を画像で見せる(0.1.1928) ----
 // 記録の本文は絵文字の名前(Kappa・KEKW)のまま。コメントの本文が出る所だけ、名前と同じ語を画像に見せる。
-//   ★文字は消さない(画像は背景にして文字を透明にする)= textContent を読む部品(PICK UP のドラッグ・
-//   吹き出しの書き直し判定など)はそのまま動く。画像が読めなければ文字のまま(§3.6)。
+//   印から来た名前は文字に戻さない。画像が読めなければその語だけ消す(空の吹き出しも残さない)。
 /** コメントの本文が出る所(コメビュの一覧・会場の吹き出し・ピン・PICK UP・人の詳細・ホバーの最後の一言) */
 const EMOTE_HOST_SEL =
   '.nl-tl-row__text, .nlsb-bubble-text, .cv-panel-text, .cv-pin-text, .nlsb-hover-card__last-text, .nlsb-pickup__body';
@@ -2914,12 +2913,25 @@ function loadEmoteImg(url) {
   return p;
 }
 
+/** 画像が無く、周りも空なら吹き出しごと消す @param {HTMLElement} span */
+function dropBrokenEmote(span) {
+  const host = span.parentElement;
+  span.remove();
+  if (!host || !host.classList.contains('nlsb-bubble-text')) return;
+  if ((host.textContent || '').trim()) return;
+  if (host.querySelector('.nl-emote')) return;
+  const bubble = host.closest('.nlsb-bubble');
+  if (bubble) bubble.remove();
+}
+
 /** @param {HTMLElement} span @param {string} url */
 function showEmoteImg(span, url) {
+  span.textContent = '';
+  span.title = '';
   void loadEmoteImg(url).then((ok) => {
-    if (!ok || !span.isConnected) return;
-    if (!ok || !span.isConnected) {
-      if (span.isConnected) span.remove();
+    if (!span.isConnected) return;
+    if (!ok) {
+      dropBrokenEmote(span);
       return;
     }
     span.style.backgroundImage = `url("${url}")`;
@@ -2948,8 +2960,9 @@ function decorateEmotes(node) {
       }
       const span = document.createElement('span');
       span.className = 'nl-emote';
-      span.textContent = sg.name;
-      span.title = sg.name;
+      span.textContent = '';
+      span.title = '';
+      span.setAttribute('role', 'img');
       frag.appendChild(span);
       showEmoteImg(span, sg.url);
     }

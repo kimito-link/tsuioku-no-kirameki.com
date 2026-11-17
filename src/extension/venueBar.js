@@ -63,6 +63,7 @@ import {
 import { escapeHtml } from '../lib/htmlText.js';
 import { createVenueLiveCommentHandler } from '../lib/venueLiveCommentRoute.js';
 import { buildVenueHeadlessVoiceItem } from '../lib/venueHeadlessVoiceItem.js';
+import { REMEMBERED_EMOTE_KEYS, rememberedEmoteChanges, rememberedEmoteDict } from '../lib/platform/streamEmotes.js';
 
 /**
  * 会場の参加者ソース切替。
@@ -3428,6 +3429,15 @@ export function mountVenueBarButton(options = {}) {
   let speechLiveId = '';
   /** @type {{ seenKeys: Set<string>|null, primed: boolean, hiNo: number }} */
   let speechState = { seenKeys: null, primed: false, hiNo: 0 };
+  // Kick / Twitch で覚えた絵文字。記録の本文は名前のままなので、吹き出しはここで画像に戻す。
+  /** @type {Record<string, Record<string, string>>} */
+  const venueEmoteByKey = {};
+  /** @type {Record<string, string>} */
+  let venueEmoteDict = {};
+  const adoptVenueEmoteBag = (/** @type {unknown} */ bag) => {
+    if (!bag) return;
+    venueEmoteDict = rememberedEmoteDict(venueEmoteByKey, bag);
+  };
   // 「会話の連鎖」(v0.1.743+): 発言者キー→{連続数,最終発言時刻}。連続発言で席が継続的に輝く。
   /** @type {Map<string, { count: number, lastAt: number }>} */
   const speechStreaks = new Map();
@@ -3785,6 +3795,9 @@ export function mountVenueBarButton(options = {}) {
   void chrome.storage.local.get(KEY_EFFECT_SOUND_ENABLED).then((bag) => {
     _effectSoundEnabledCache = isEffectSoundEnabled(bag?.[KEY_EFFECT_SOUND_ENABLED]);
   }).catch(() => {});
+  void chrome.storage.local.get([...REMEMBERED_EMOTE_KEYS]).then((bag) => {
+    adoptVenueEmoteBag(bag);
+  }).catch(() => {});
   chrome.storage.onChanged?.addListener?.((changes, area) => {
     if (area !== 'local') return;
     if (changes[KEY_EFFECT_SOUND_ENABLED]) {
@@ -3793,6 +3806,7 @@ export function mountVenueBarButton(options = {}) {
     if (changes[KEY_LIVE_BROADCASTER_CTX]) {
       adoptVoiceBroadcasterCtx(changes[KEY_LIVE_BROADCASTER_CTX].newValue);
     }
+    adoptVenueEmoteBag(rememberedEmoteChanges(changes));
   });
 
   // Phase A(2026-07-05): マイ効果音(IndexedDB取込+割当)。起動時+customSoundRev変化時に
@@ -6816,7 +6830,7 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1866: 開いた瞬間の直近3件(primeEmit)は開く前に届いた発言なので「受信→キュー」の遅れに数えない(数えると過疎配信で何分も「遅れ」が残った)。
     const primeBurst = !(speechState && speechState.primed === true);
     // v0.1.1914: oldNoGap=過去ログ取り込みの古い番号は吹き出さない(既読にだけする・lib の venueSpeech.js)。
-    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3, oldNoGap: VENUE_OLD_SPEECH_NO_GAP });
+    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3, oldNoGap: VENUE_OLD_SPEECH_NO_GAP, emoteDict: venueEmoteDict });
     speechState = {
       seenKeys: result.seenKeys,
       primed: result.primed,

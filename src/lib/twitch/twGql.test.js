@@ -147,6 +147,33 @@ describe('Twitch 公式の応援ランキング(ChannelLeaderboards・2026-11-08
     expect(parsed.items[0]).toMatchObject({
       id: 'uuid-1', channelId: 'tw:99', login: 'fan1', text: 'hello world', skipVoice: true, badges: ['subscriber'],
     });
+    expect(parsed.items[0].emotes).toBeUndefined();
+    const withEmote = parseTwVodComments({
+      data: {
+        video: {
+          comments: {
+            edges: [{
+              node: {
+                id: 'uuid-2',
+                contentOffsetSeconds: 16,
+                createdAt: '2026-11-16T08:09:02Z',
+                commenter: { id: '99', login: 'fan1', displayName: 'Fan1' },
+                message: {
+                  fragments: [
+                    { text: 'unkochanPower', emote: { emoteID: '99' } },
+                    { text: ' hello' },
+                  ],
+                },
+              },
+            }],
+          },
+        },
+      },
+    }, 'stylishnoob4');
+    expect(withEmote.items[0].text).toBe('unkochanPower hello');
+    expect(withEmote.items[0].emotes).toEqual([
+      { name: 'unkochanPower', url: 'https://static-cdn.jtvnw.net/emoticons/v2/99/default/dark/2.0' },
+    ]);
     expect(parsed.nextOffsetSeconds).toBe(16);
     expect(shouldStopTwVodBackfill({
       count: 1, nextOffsetSeconds: 16, prevOffsetSeconds: 0, lastCreatedAtMs: 1000, cutoffMs: 2000, lengthSeconds: 6500,

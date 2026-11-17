@@ -121,6 +121,20 @@ describe('pickNewVenueSpeech', () => {
     expect(again.speeches).toHaveLength(0);
   });
 
+  it('覚えたチャンネル絵文字は、行に emotes が無くても文字に戻さない', () => {
+    const url = 'https://static-cdn.jtvnw.net/emoticons/v2/99/default/dark/2.0';
+    const s1 = pickNewVenueSpeech([{ commentNo: 1, userId: 'a', name: 'A', text: 'x' }], { primed: false });
+    const s2 = pickNewVenueSpeech(
+      [{ commentNo: 2, userId: 'a', name: 'A', text: 'unkochanPower unkochanPower' }],
+      s1,
+      { emoteDict: { unkochanPower: url } },
+    );
+    expect(s2.speeches).toHaveLength(1);
+    expect(s2.speeches[0].voiceText).toBe('');
+    expect(s2.speeches[0].segments).toHaveLength(3);
+    expect(s2.speeches[0].segments?.filter((p) => p.t === 'emote')).toHaveLength(2);
+  });
+
   it('テキストの無い行は吹き出さない', () => {
     const s1 = pickNewVenueSpeech([{ commentNo: 1, userId: 'a', name: 'A', text: 'x' }], { primed: false });
     const s2 = pickNewVenueSpeech(
