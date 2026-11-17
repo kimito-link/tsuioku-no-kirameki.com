@@ -15,6 +15,7 @@ import { readChunkedComments } from './commentChunkStore.js';
 import { commentsStorageKey } from './storageKeys.js';
 import { tailStorageKey } from './commentTailBuffer.js';
 import { mergeTailRowsIntoDisplay } from './mergeTailRowsIntoDisplay.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /**
  * テール行を表示用に正規化(text 空除去・id/liveId/capturedAt 補完)。popup の同名ヘルパと同一。
@@ -34,12 +35,18 @@ export function normalizeTailRowsForDisplay(rows, lv, nowMs) {
     const text = String(r.text ?? '').trim();
     if (!text) continue;
     const cap = Number(r.capturedAt);
+    const hasCap = Number.isFinite(cap) && cap > 0;
+    // 来場文は commentNo が空で、大きな配信の末尾に同じ文が残る。
+    // 取り込み時刻が無い行へ「今」を打つと、保存済みの同じ文面と別物に見える。
+    // 印を付け、内訳とレポートが保存済みの行だけを残して重ねない。
+    const arrivalUnstamped = !hasCap && parseArrivalCommentText(text) != null;
     out.push({
       ...r,
       id: String(r.id || `nls_tail_${lid}_${i}`),
       liveId: lid,
       text,
-      capturedAt: Number.isFinite(cap) && cap > 0 ? cap : nowMs
+      capturedAt: hasCap ? cap : nowMs,
+      ...(arrivalUnstamped ? { arrivalUnstamped: true } : {})
     });
   }
   return out;

@@ -716,6 +716,22 @@ describe('decodeChunkedMessage', () => {
     expect(report.interestArrivalSummary.topTags[0].tag).toBe('猫');
   });
 
+  it('放送者のサポーターの V2 も来場の chat になる', () => {
+    const text = '放送者のサポーターが1人来場しました';
+    const v2 = new Uint8Array([...varintField(1, 6), ...strField(2, text)]);
+    const chunked = new Uint8Array(lenDelimited(1, [...lenDelimited(23, [...v2])]));
+    const decoded = decodeChunkedMessage(chunked);
+    expect(decoded.chats.map((c) => c.content)).toEqual([text]);
+    const stored = cleanNdgrChatRows(ndgrChatsToMergeRows(decoded.chats));
+    const report = aggregateMarketingReport(
+      [{ ...stored[0], id: 's1', liveId: 'lv351831367', capturedAt: 1_700_000_000_000 }],
+      'lv351831367'
+    );
+    expect(report.interestArrivalSummary.routes).toEqual([
+      { id: 'supporter', label: '放送者のサポーター', arrivals: 1, messageCount: 1 }
+    ]);
+  });
+
   it('VISITED 以外の SimpleNotificationV2 はコメントにしない', () => {
     const v2 = new Uint8Array([...varintField(1, 2), ...strField(2, '感情の通知')]);
     const chunked = new Uint8Array(lenDelimited(1, [...lenDelimited(23, [...v2])]));

@@ -64,6 +64,15 @@ describe('summarizeCommentRecordBreakdown', () => {
     expect(r.otherSystem).toBe(0);
   });
 
+  it('放送者のサポーターも来場に数える', () => {
+    const r = summarizeCommentRecordBreakdown([
+      { text: 'こんばんは' },
+      { text: '放送者のサポーターが1人来場しました' }
+    ]);
+    expect(r.interestArrival).toBe(1);
+    expect(r.normal).toBe(1);
+  });
+
   it('commentType=generalSystemMessage を otherSystem にカウント', () => {
     const r = summarizeCommentRecordBreakdown([
       { text: '普通コメ' },

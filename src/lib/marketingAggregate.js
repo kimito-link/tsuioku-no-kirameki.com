@@ -6,6 +6,7 @@ import { normalizeLv } from '../shared/niconico/liveId.js';
 import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuard.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
 import { parseArrivalCommentText } from './parseArrivalComment.js';
+import { classifyArrivalNotice } from './arrivalNoticeRows.js';
 
 /**
  * @typedef {{
@@ -217,14 +218,16 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   const interestArrivalComments = [];
   /** @type {StoredComment[]} */
   const supportRows = [];
+  /** @type {Set<string>} */
+  const seenArrivalSentences = new Set();
   for (const c of filtered) {
     if (isMarketingSupportRow(c)) {
       supportRows.push(c);
-    } else if (isNiconicoArrivalRow(c) && parseArrivalCommentText(String(c.text || ''))) {
-      interestArrivalComments.push(c);
-    } else {
-      engagementComments.push(c);
+      continue;
     }
+    const arrival = classifyArrivalNotice(c, seenArrivalSentences);
+    if (arrival === 'count') interestArrivalComments.push(c);
+    else if (arrival === 'no') engagementComments.push(c);
   }
   const interestArrivalSummary = computeInterestArrivalSummary(interestArrivalComments, engagementComments);
 
@@ -418,18 +421,10 @@ const ARRIVAL_ROUTE_LABEL = Object.freeze({
   like: '好きなタグ',
   dictionary: '大百科',
   interest: '放送者の好み',
+  supporter: '放送者のサポーター',
 });
 
-const ARRIVAL_ROUTE_ORDER = Object.freeze(['like', 'dictionary', 'interest']);
-
-/**
- * ニコ生の来場通知だけを来場に数える。他サービスの行はコメントのまま。
- * @param {StoredComment} c
- */
-function isNiconicoArrivalRow(c) {
-  const plat = String(/** @type {{ ytPlatform?: unknown }} */ (c).ytPlatform || '').trim();
-  return !plat || plat === 'niconico';
-}
+const ARRIVAL_ROUTE_ORDER = Object.freeze(['like', 'dictionary', 'interest', 'supporter']);
 
 /**
  * 来場の公式通知。人数は parseArrivalCommentText の entries を1回だけ足す。
@@ -441,9 +436,9 @@ function computeInterestArrivalSummary(interestArrivalComments, engagementCommen
   /** @type {Map<string, { arrivals: number, messageCount: number }>} */
   const tagMap = new Map();
   /** @type {Record<string, number>} */
-  const routeArrivals = { like: 0, dictionary: 0, interest: 0 };
+  const routeArrivals = { like: 0, dictionary: 0, interest: 0, supporter: 0 };
   /** @type {Record<string, number>} */
-  const routeMessages = { like: 0, dictionary: 0, interest: 0 };
+  const routeMessages = { like: 0, dictionary: 0, interest: 0, supporter: 0 };
   let totalArrivals = 0;
   let messageCount = 0;
   /** @type {Array<{ at: number, people: number }>} */

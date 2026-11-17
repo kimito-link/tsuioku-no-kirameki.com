@@ -1162,6 +1162,9 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('id="mkt-interest-arrival"');
     expect(html).toContain('興味タグ別来場（公式システムコメ）');
     expect(html).toContain('個人は特定できません');
+    expect(html).toContain('放送者のサポーター');
+    expect(html).toContain('繰り返し取り込んだ分は');
+    expect(html).toContain('取り込み直しは除く');
     expect(html).toContain('好きなタグ');
     expect(html).toContain('同じ5分のコメント');
     expect(html).toContain('来た人が書いたかは記録にありません');

@@ -80,6 +80,7 @@ import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
+import { normalizeTailRowsForDisplay } from '../lib/readAllCommentsForLive.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 
 /**
@@ -194,8 +195,12 @@ async function readAllCommentsForLive(lv) {
       delaysMs: [0, 120],
       perAttemptTimeoutMs: 900
     });
-    const tail = /** @type {Record<string, unknown>} */ (tailBag)[tKey];
-    if (Array.isArray(tail) && tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
+    const tail = normalizeTailRowsForDisplay(
+      /** @type {Record<string, unknown>} */ (tailBag)[tKey],
+      lv,
+      Date.now()
+    );
+    if (tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
   } catch {
     /* テールは任意 */
   }

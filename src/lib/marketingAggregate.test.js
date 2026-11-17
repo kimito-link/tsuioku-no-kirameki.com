@@ -349,4 +349,23 @@ describe('aggregateMarketingReport - liveId 表記 / avatar 補正', () => {
     expect(later.comments).toBe(1);
     expect(s.buckets.find((b) => b.offsetMin === 0).comments).toBe(2);
   });
+
+  it('放送者のサポーターは自分の経路になり、コメント数には入らない', () => {
+    const comments = [
+      c(1, 'u1', 'hello', 0),
+      c(2, null, '放送者のサポーターが1人来場しました', 1000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    expect(r.totalComments).toBe(1);
+    expect(r.interestArrivalSummary.messageCount).toBe(1);
+    expect(r.interestArrivalSummary.totalArrivals).toBe(1);
+    expect(r.interestArrivalSummary.routes).toEqual([
+      { id: 'supporter', label: '放送者のサポーター', arrivals: 1, messageCount: 1 }
+    ]);
+    expect(r.interestArrivalSummary.topTags[0]).toEqual({
+      tag: 'サポーター',
+      arrivals: 1,
+      messageCount: 1
+    });
+  });
 });

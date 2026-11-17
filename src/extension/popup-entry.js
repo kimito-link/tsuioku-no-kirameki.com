@@ -512,6 +512,7 @@ import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgram
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
 import { createAppliedEntriesMemo } from '../lib/appliedEntriesMemo.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
+import { normalizeTailRowsForDisplay as normalizeTailRowsForDisplayShared } from '../lib/readAllCommentsForLive.js';
 import {
   formatAiShareDiagnosticsMarkdown,
   romiDebugDataChecklist
@@ -8297,27 +8298,9 @@ function storyDetailRecentEntries(entries, focusEntry, liveId, opts = {}) {
  * @returns {PopupCommentEntry[]}
  */
 function normalizeTailRowsForDisplay(rows, lv) {
-  if (!Array.isArray(rows) || rows.length === 0) return [];
-  const lid = String(lv || '').trim().toLowerCase();
-  /** @type {PopupCommentEntry[]} */
-  const out = [];
-  for (let i = 0; i < rows.length; i += 1) {
-    const r = /** @type {Record<string, unknown>} */ (rows[i]);
-    if (!r || typeof r !== 'object') continue;
-    const text = String(r.text ?? '').trim();
-    if (!text) continue;
-    const cap = Number(r.capturedAt);
-    out.push(
-      /** @type {PopupCommentEntry} */ ({
-        ...r,
-        id: String(r.id || `nls_tail_${lid}_${i}`),
-        liveId: lid,
-        text,
-        capturedAt: Number.isFinite(cap) && cap > 0 ? cap : Date.now()
-      })
-    );
-  }
-  return out;
+  return /** @type {PopupCommentEntry[]} */ (
+    normalizeTailRowsForDisplayShared(rows, lv, Date.now())
+  );
 }
 
 /**
