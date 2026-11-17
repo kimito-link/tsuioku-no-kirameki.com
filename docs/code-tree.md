@@ -265,7 +265,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (370)
+- 📁 **docs/** (371)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -564,7 +564,8 @@
     - `x-article-live-ranking-2026-09-14.md`
   - 📁 **patent-unique-voice-reading-filing-final/** (1)
     - `MOVED.md`
-  - 📁 **policies/** (1)
+  - 📁 **policies/** (2)
+    - `MONETIZATION.md`
     - `STATS_FAILURE_MODES.md`
   - 📁 **releases/** (8)
     - `0.1.7-x-article.md`

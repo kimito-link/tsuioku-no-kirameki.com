@@ -5,7 +5,7 @@
 > 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
 > **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
-ルート直下の設定ファイル: 57 件（package.json / *.config.js / AGENTS.md 等）
+ルート直下の設定ファイル: 58 件（package.json / *.config.js / AGENTS.md 等）
 
 ## マインドマップ（自動生成・GitHub で図として表示）
 
@@ -393,6 +393,15 @@ graph LR
   f63 --> f63_4["extension/live-ranking-entry.js"]
   f63 --> f63_5["live/index.html"]
   f63 --> f63_6["workflows/live-ranking.yml"]
+  HUB --> f64["サポーター課金(マーケ HTML だけ有料)"]
+  f64 --> f64_0["policies/MONETIZATION.md"]
+  f64 --> f64_1["lib/supporterLicense.js"]
+  f64 --> f64_2["lib/supporterAccess.js"]
+  f64 --> f64_3["extension/marketing-export-entry.js"]
+  f64 --> f64_4["server/billingApi.js"]
+  f64 --> f64_5["billing.js"]
+  f64 --> f64_6["supporter.html"]
+  f64 --> f64_7["tokushoho.html"]
 ```
 
 ---
@@ -435,7 +444,7 @@ graph LR
 - `briefs/`（26 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 370 件</sub>
+<sub>ファイル 371 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — 公開前の記事下書き(防御的公開の草稿)  〔記事 / 下書き〕
@@ -443,7 +452,7 @@ graph LR
 - `handoff/`（179 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — 読み上げ手法の出願関連(現在は MOVED=移設済みの残置)  〔特許 / 履歴〕
-- `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
+- `policies/`（2 件） — 運用方針メモ(★課金の方針の正本 MONETIZATION.md・統計の失敗モード等)  〔方針〕
 - `releases/`（8 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
 - `research/`（2 件） — ディープリサーチ成果(ギフトランキング等の調査)  〔調査 / レポート〕
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
@@ -1022,6 +1031,18 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 - [`.github/workflows/live-ranking.yml`](../.github/workflows/live-ranking.yml)
+
+### サポーター課金(マーケ HTML だけ有料)  〔課金 / マーケ / レポート〕
+有料はマーケ分析レポート(マーケ HTML)だけ=レポート全体に関所1つ(全サービス共通)。それ以外は無料。方針の正本は docs/policies/MONETIZATION.md(価格・お試し14日・1コード1台・猶予7日・やらないこと)。関所は marketing-export-entry.js の passSupporterGate→supporterAccess.checkMarketingAccess→supporterLicense.decideFeatureAccess。証明書は Ed25519・サーバーは api/billing.js(Stripe・Upstash)
+
+- [`docs/policies/MONETIZATION.md`](../docs/policies/MONETIZATION.md)
+- [`src/lib/supporterLicense.js`](../src/lib/supporterLicense.js)
+- [`src/lib/supporterAccess.js`](../src/lib/supporterAccess.js)
+- [`src/extension/marketing-export-entry.js`](../src/extension/marketing-export-entry.js)
+- [`src/server/billingApi.js`](../src/server/billingApi.js)
+- [`api/billing.js`](../api/billing.js)
+- [`app/supporter.html`](../app/supporter.html)
+- [`tsuioku-no-kirameki/tokushoho.html`](../tsuioku-no-kirameki/tokushoho.html)
 
 ---
 

@@ -82,7 +82,7 @@ const ROLES = {
   'docs/article-assets': { role: '記事用の画像・動画・音声アセット', tags: ['記事', '画像'] },
   'docs/marketing': { role: '発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない', tags: ['マーケ', '原稿'] },
   'docs/handoff': { role: 'セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約', tags: ['引継ぎ', '設計'] },
-  'docs/policies': { role: '運用方針メモ(統計の失敗モード等)', tags: ['方針'] },
+  'docs/policies': { role: '運用方針メモ(★課金の方針の正本 MONETIZATION.md・統計の失敗モード等)', tags: ['方針'] },
   'docs/releases': { role: 'リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)', tags: ['リリース'] },
   'docs/research': { role: 'ディープリサーチ成果(ギフトランキング等の調査)', tags: ['調査', 'レポート'] },
   'docs/workflows': { role: '開発ワークフロー設計(TDD/UI-UX ロードマップ等)', tags: ['ワークフロー'] },
@@ -204,6 +204,7 @@ const FEATURES = [
   { feature: '横断応援者ランキング(デバイス内・段B)', desc: '過去N配信+今回を横断して「少数固定・複数配信を横断して応援してくれている人」をコメント数順に可視化。indexPastUsers(横断集計)→buildSupporterRanking(既存の単一配信専用ランキング関数・無改変)を呼び、broadcastCount(横断配信数)を外側で合成。marketing-export.html側(heavyMktガード配下・明示トリガー時のみ)に新規セクションとして描画し、応援レーン描画経路(renderStoryUserLane等)や自律tick(popup-entry.js:15762)は一切通さない。公開・集約はせずこのPC内で完結(上位計画 elegant-crunching-quokka.md 段B・2026-09-22)', paths: ['src/lib/crossSupporterRanking.js', 'src/lib/commenterHistoricalAnalytics.js', 'src/lib/supporterRanking.js', 'src/lib/marketingChartsHtml.js'], tags: ['応援', 'ランキング', 'マーケ'] },
   { feature: '/live/ コメント速度演出・応援者チップ・熱いチップ', desc: '配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。レーンには既存の応援者一覧(commentRows/supporterRows)から名前・丸サムネ・種別(💬/🎁/📣)だけを巡回キューで流す(本文は一切含めない・AGENTS.md §3.3・council-fable 2026-09-30で本文表示は却下)。直近実測2点間でコメント件数が増えた人は「熱いチップ」(+N件バッジ・拡大表示)として優先的に流れる(既存のギフト増分差分器createGiftPulseRegistryをtierFor引数で再利用)。個人別順位・コメント本文・細かい時刻データは補間・保存しない', paths: ['src/lib/liveMotion.js', 'src/lib/liveGiftPulse.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html'], tags: ['LP', '公開', 'ランキング', 'コメント', '表示'] },
   { feature: '/live/ Kick セクション(ほかの配信サービス)', desc: 'ニコ生とは別セクション・別データ(/api/live-platforms・Redis live:kick:latest)で、Kick 公式 API(App Access Token)の日本語配信を同時視聴数の多い順に最大20件。値は Kick が返したものをそのまま表示し推定・増分・順位推移は作らない(YouTube を同じ枠に乗せるため・規約)。収集は Actions の kick ジョブ(リポジトリ変数 KICK_COLLECT=1 で有効)だけで、閲覧者の操作では Kick へ問い合わせない。成人向けは既定で非表示(件数は表示)。live:platforms:off で再デプロイなしに停止', paths: ['api/live-platforms.js', 'src/server/kickApi.js', 'src/lib/kickLivestreams.js', 'src/lib/livePlatformsHtml.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html', '.github/workflows/live-ranking.yml'], tags: ['LP', '公開', 'ランキング', 'Kick'] },
+  { feature: 'サポーター課金(マーケ HTML だけ有料)', desc: '有料はマーケ分析レポート(マーケ HTML)だけ=レポート全体に関所1つ(全サービス共通)。それ以外は無料。方針の正本は docs/policies/MONETIZATION.md(価格・お試し14日・1コード1台・猶予7日・やらないこと)。関所は marketing-export-entry.js の passSupporterGate→supporterAccess.checkMarketingAccess→supporterLicense.decideFeatureAccess。証明書は Ed25519・サーバーは api/billing.js(Stripe・Upstash)', paths: ['docs/policies/MONETIZATION.md', 'src/lib/supporterLicense.js', 'src/lib/supporterAccess.js', 'src/extension/marketing-export-entry.js', 'src/server/billingApi.js', 'api/billing.js', 'app/supporter.html', 'tsuioku-no-kirameki/tokushoho.html'], tags: ['課金', 'マーケ', 'レポート'] },
 ];
 
 /**
@@ -230,6 +231,7 @@ const FEATURE_CATEGORY = {
   '読み上げ(再生/キュー/年齢ゲート)': '🔊 読み上げ',
   'popup スクロール(要素を見せる)': '🪟 表示・演出',
   'HTMLレポート生成': '📊 レポート',
+  'サポーター課金(マーケ HTML だけ有料)': '📊 レポート',
   '状態速報の整形': '🩺 診断・地図',
   'AI診断の状態速報集約': '🩺 診断・地図',
   '状態速報の全体マインドマップ': '🩺 診断・地図',
