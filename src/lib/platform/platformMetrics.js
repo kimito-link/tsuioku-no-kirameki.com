@@ -28,6 +28,10 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     native: true,
     concurrentLabel: '推定同時接続',
     visitorCard: true,
+    // なふだはニコ生の公式コメント欄だけの設定。他のサービスには無い。
+    nameplate: true,
+    // コメント送信は各サービスの content 入口(sendType)がある。ニコ生は NLS_POST_COMMENT。
+    commentPost: true,
     chips: Object.freeze(['viewers', 'comments', 'streamAge', 'adPts', 'giftPts']),
   }),
   youtube: Object.freeze({
@@ -137,6 +141,8 @@ export function platformCapability(platformId) {
   return PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)] || Object.freeze({
     native: false,
     concurrentLabel: '視聴者数',
+    nameplate: false,
+    commentPost: false,
     visitorCard: false,
     chips: Object.freeze(['streamAge']),
   });
@@ -299,6 +305,8 @@ export function platformSectionPlan(platformId, opts) {
       native: true,
       visitorCard: true,
       concurrentLabel: '推定同時接続',
+      nameplate: true,
+      commentPost: true,
       subBoard: false,
       hide: /** @type {string[]} */ ([]),
       note: '',
@@ -367,10 +375,14 @@ export function platformSectionPlan(platformId, opts) {
     sections.contributionRanking = { show: true, label: rankLabel };
     sections.giftHistory = { show: true, label: lane.gift, sub: 'このPCの記録です。' };
   }
+  const known = Object.prototype.hasOwnProperty.call(PLATFORM_CAPABILITIES, id);
   return {
     id,
     native: false,
     visitorCard: cap.visitorCard === true,
+    // なふだは能力表で true のサービスだけ。コメント欄は、送信口があるサービスだけ残す。
+    nameplate: 'nameplate' in cap && cap.nameplate === true,
+    commentPost: known && (!('commentPost' in cap) || cap.commentPost === true),
     concurrentLabel,
     subBoard,
     hide,

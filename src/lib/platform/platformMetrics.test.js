@@ -282,4 +282,16 @@ describe('他サービスの欄の見出し', () => {
     expect(platformSectionPlan('whowatch').sections.giftHistory.label).toBe('アイテム');
     expect(platformSectionPlan('niconico').sections).toEqual({});
   });
+
+  it('なふだはニコ生だけ。コメント欄は送信できるサービスに残す', () => {
+    expect(platformSectionPlan('niconico').nameplate).toBe(true);
+    expect(platformSectionPlan('niconico').commentPost).toBe(true);
+    for (const id of ['youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'tiktok', 'twitcasting']) {
+      const p = platformSectionPlan(id);
+      expect(p.nameplate, id).toBe(false);
+      expect(p.commentPost, id).toBe(true);
+    }
+    expect(platformSectionPlan('other').commentPost).toBe(false);
+    expect(platformSectionPlan('other').nameplate).toBe(false);
+  });
 });

@@ -209,6 +209,35 @@ describe('applyPlatformMetricChrome', () => {
   });
 });
 
+  it('SHOWROOM ではなふだと空の公式の数字を出さず、コメント欄は残す', () => {
+    const root = mount();
+    const inline = root.createElement('div');
+    inline.className = 'nl-nameplate-inline';
+    inline.textContent = 'これはニコ生そのものの設定';
+    const details = root.createElement('details');
+    details.id = 'nlPopupSettings';
+    const summary = root.createElement('summary');
+    summary.textContent = '詳細設定（記録のON/OFF・なふだ・取り込み・パネル位置・動き・表示トラブル）';
+    details.append(summary);
+    const lanes = root.createElement('section');
+    lanes.id = 'northStarLanes';
+    const lane = root.createElement('div');
+    lane.dataset.lane = 'adRanking';
+    lane.hidden = true;
+    lanes.append(lane);
+    const compose = root.createElement('section');
+    compose.className = 'nl-comment-compose';
+    root.body.append(inline, details, lanes, compose);
+    applyPlatformMetricChrome(root, { platform: 'showroom', facts: {} });
+    expect(inline.hidden).toBe(true);
+    expect(summary.textContent).toBe('詳細設定（記録のON/OFF・取り込み・パネル位置・動き・表示トラブル）');
+    expect(compose.hidden).toBe(false);
+    const css = root.getElementById('nl-platform-capability-style').textContent;
+    expect(css).toContain('html.nl-cap-foreign .nl-nameplate-inline{display:none!important;}');
+    expect(css).toContain('#northStarLanes:not(:has([data-lane]:not([hidden])))');
+    expect(css).not.toContain('html.nl-cap-foreign .nl-comment-compose');
+  });
+
 describe('開いた瞬間の CSS', () => {
   it('boot は能力表と同じ文字列と、全サービスの見出しを持つ', () => {
     const boot = readFileSync(join(process.cwd(), 'extension/yt-loading-boot.js'), 'utf8');

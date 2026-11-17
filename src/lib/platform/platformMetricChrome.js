@@ -124,11 +124,18 @@ export function buildForeignCapabilityCss() {
     afters,
     // 数が来る前の「人」「直接値」を出さない（YouTube だけだった隠しを全サービスへ）
     'html.nl-cap-foreign.nl-count-loading #watchConcurrentSub{font-size:0!important;color:transparent!important;}',
+    // なふだはニコ生の公式設定。他のサービスでは説明もボタンも出さない。
+    'html.nl-cap-foreign .nl-nameplate-inline{display:none!important;}',
+    'html.nl-cap-foreign .nl-record-sub:has(#nameplateOnBtn){display:none!important;}',
+    // 中身のレーンが全部隠れた「公式の数字」の枠は出さない。レーンが開いたときだけ出す。
+    'html.nl-cap-foreign #northStarLanes:not(:has([data-lane]:not([hidden]))){display:none!important;}',
+    // 送信口が能力表に無いサービスだけ、コメントを書く欄を出さない。
+    'html.nl-cap-no-post .nl-comment-compose{display:none!important;}',
   ].join('');
 }
 
-/** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス */
-function markCapability(root, platformId, subBoard) {
+/** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス @param {boolean} [commentPost] コメントを書けるサービス */
+function markCapability(root, platformId, subBoard, commentPost) {
   const doc = root.ownerDocument || (root.nodeType === 9 ? /** @type {Document} */ (root) : null);
   const html = doc && doc.documentElement;
   if (!html || !html.classList) return;
@@ -136,6 +143,8 @@ function markCapability(root, platformId, subBoard) {
   const cl = html.classList;
   if (!cl.contains('nl-cap-foreign')) cl.add('nl-cap-foreign');
   if (cl.contains('nl-cap-subboard') !== (subBoard === true)) cl.toggle('nl-cap-subboard', subBoard === true);
+  const noPost = commentPost === false;
+  if (cl.contains('nl-cap-no-post') !== noPost) cl.toggle('nl-cap-no-post', noPost);
   const id = String(platformId || '');
   if (id && !cl.contains(`nl-cap-${id}`)) cl.add(`nl-cap-${id}`);
   const css = buildForeignCapabilityCss();
@@ -148,6 +157,39 @@ function markCapability(root, platformId, subBoard) {
   if (style.textContent !== css) style.textContent = css;
 }
 
+/** 詳細設定の見出しなどから、ニコ生だけの「なふだ」を外す。 @param {string} text */
+function dropNafuda(text) {
+  return String(text || '').replace(/・なふだ/g, '').replace(/なふだ・/g, '');
+}
+
+/**
+ * なふだの説明と、空でも残るニコ生の見出しを、他のサービスでは出さない。
+ * コメントを書く欄は、送信できるサービスでは残す（SHOWROOM は SR_SEND_COMMENT）。
+ * @param {ParentNode} root
+ */
+function rewriteForeignPanelWords(root) {
+  const inline = root.querySelector('.nl-nameplate-inline');
+  if (inline) hideEl(/** @type {HTMLElement} */ (inline));
+  const nameBtn = root.querySelector('#nameplateOnBtn');
+  const block = nameBtn && typeof nameBtn.closest === 'function' ? nameBtn.closest('.nl-record-sub') : null;
+  if (block) hideEl(/** @type {HTMLElement} */ (block));
+  const summary = root.querySelector('#nlPopupSettings > summary');
+  if (summary) {
+    const next = dropNafuda(summary.textContent || '');
+    if (summary.textContent !== next) summary.textContent = next;
+  }
+  const hint = root.querySelector('#exportToolbarHint');
+  if (hint) {
+    const next = dropNafuda(hint.textContent || '');
+    if (hint.textContent !== next) hint.textContent = next;
+  }
+  const venue = root.querySelector('#venueButtonVisibleToggle');
+  const venueHint = venue && venue.parentElement ? venue.parentElement.querySelector('.nl-record-sub__hint') : null;
+  if (venueHint && String(venueHint.textContent || '').includes('ニコ生')) {
+    venueHint.textContent = '視聴ページの右下に出る「会場モード」ボタンです。使わない場合はオフにすると出なくなります（反映には視聴ページの再読み込みが必要です）。';
+  }
+}
+
 /**
  * @param {ParentNode} root
  * @param {{ platform?: string, facts?: any, officialBoard?: boolean }} state
@@ -156,7 +198,8 @@ export function applyPlatformMetricChrome(root, state) {
   if (!root || typeof root.querySelector !== 'function') return;
   const plan = platformSectionPlan(String(state?.platform || ''), { officialBoard: state?.officialBoard === true });
   if (plan.native) return;
-  markCapability(root, plan.id, plan.subBoard === true);
+  markCapability(root, plan.id, plan.subBoard === true, plan.commentPost === true);
+  if (plan.nameplate !== true) rewriteForeignPanelWords(root);
   const facts = state?.facts && typeof state.facts === 'object' ? state.facts : {};
 
   const vis = root.querySelector('.nl-live-stat-card--visitors');
