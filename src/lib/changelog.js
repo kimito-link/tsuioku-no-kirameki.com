@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2140',
+    date: '2026-11-17',
+    summary: '分析レポートの見た目は今までどおり',
+    items: Object.freeze([
+      'ニコ生の分析レポートの見た目は、この更新では変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2139',
     date: '2026-11-16',
     summary: '読み足した過去コメントを吹き出しに出さない',
@@ -173,14 +181,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '読み上げの待ちがあふれた時、何人もの声をまとめた合唱の件は、ふつうの件より後に捨てるようにしました。合唱に加わった人の声ごと消えることが減ります。',
       '合唱で重ねる声を、まったく同じ文だけでなく同じ言葉(www に w・草 の声など)からも探すようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2117',
-    date: '2026-11-13',
-    summary: '書き方が違う笑いや拍手も合唱に',
-    items: Object.freeze([
-      'w・www・草・笑笑のような書き方の違う笑いや、888 と 8888 のような拍手を、合唱では同じ言葉として扱うようにしました。「わこつー！」のような語尾の違いも同じ言葉にします。'
     ])
   })
 ]);

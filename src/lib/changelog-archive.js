@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2117',
+    date: '2026-11-13',
+    summary: '書き方が違う笑いや拍手も合唱に',
+    items: Object.freeze([
+      'w・www・草・笑笑のような書き方の違う笑いや、888 と 8888 のような拍手を、合唱では同じ言葉として扱うようにしました。「わこつー！」のような語尾の違いも同じ言葉にします。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2116',
     date: '2026-11-13',
     summary: '混んだ配信でも合唱が鳴るように',
