@@ -6,7 +6,7 @@
  * DOM は引数の root だけを触る。src/lib 直下の純粋性検査の対象外(platform/)。
  */
 
-import { panelExtraChips, platformSectionPlan, streamAgeTitle, LOADING, PLATFORM_CAPABILITIES } from './platformMetrics.js';
+import { panelExtraChips, platformSectionPlan, foreignPanelCopy, streamAgeTitle, LOADING, PLATFORM_CAPABILITIES } from './platformMetrics.js';
 
 /** 数でない値の札。ニコ生の「（接続中…）」「（取得不可）」「推定中」「計測中…」や最初の「—」は、ほかのサービスでは「読み込み中」にする。 */
 const NOT_A_COUNT = /^(?:—|-|（接続中…）|（取得不可）|（数字非公開）|推定中|計測中…|)$/u;
@@ -131,11 +131,19 @@ export function buildForeignCapabilityCss() {
     'html.nl-cap-foreign #northStarLanes:not(:has([data-lane]:not([hidden]))){display:none!important;}',
     // 送信口が能力表に無いサービスだけ、コメントを書く欄を出さない。
     'html.nl-cap-no-post .nl-comment-compose{display:none!important;}',
+    // ギフトサイドバー履歴と a: の匿名（184）はニコ生だけ。広告を投げた人の段も出さない。
+    'html.nl-cap-foreign details:has(#giftSubAppHistorySummary){display:none!important;}',
+    'html.nl-cap-foreign .nl-anonymous-identicon-opt,html.nl-cap-foreign #anonymousIdenticonHint,html.nl-cap-foreign #foldAnonymousInRankStripHint{display:none!important;}',
+    'html.nl-cap-foreign #sceneStoryUserLaneAdWrap{display:none!important;}',
+    'html.nl-cap-foreign #devMonitorForceRefetchCommenterFollowBtn{display:none!important;}',
+    // ギフトが無いサービス（ABEMA）は、ギフトのユーザー欄とギフトの段を出さない。
+    'html.nl-cap-no-paid details:has(#giftQuickStatsMount){display:none!important;}',
+    'html.nl-cap-no-paid #sceneStoryUserLaneGiftWrap{display:none!important;}',
   ].join('');
 }
 
-/** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス @param {boolean} [commentPost] コメントを書けるサービス */
-function markCapability(root, platformId, subBoard, commentPost) {
+/** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス @param {boolean} [commentPost] コメントを書けるサービス @param {boolean} [noPaid] ギフトの無いサービス */
+function markCapability(root, platformId, subBoard, commentPost, noPaid) {
   const doc = root.ownerDocument || (root.nodeType === 9 ? /** @type {Document} */ (root) : null);
   const html = doc && doc.documentElement;
   if (!html || !html.classList) return;
@@ -145,6 +153,8 @@ function markCapability(root, platformId, subBoard, commentPost) {
   if (cl.contains('nl-cap-subboard') !== (subBoard === true)) cl.toggle('nl-cap-subboard', subBoard === true);
   const noPost = commentPost === false;
   if (cl.contains('nl-cap-no-post') !== noPost) cl.toggle('nl-cap-no-post', noPost);
+  const unpaid = noPaid === true;
+  if (cl.contains('nl-cap-no-paid') !== unpaid) cl.toggle('nl-cap-no-paid', unpaid);
   const id = String(platformId || '');
   if (id && !cl.contains(`nl-cap-${id}`)) cl.add(`nl-cap-${id}`);
   const css = buildForeignCapabilityCss();
@@ -162,12 +172,41 @@ function dropNafuda(text) {
   return String(text || '').replace(/・なふだ/g, '').replace(/なふだ・/g, '');
 }
 
+/** 最初の文の節だけ差し替える（中のヒントは残す）。 @param {Element|null|undefined} el @param {string} text */
+function setLeadText(el, text) {
+  if (!el) return;
+  let textNode = null;
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3 && String(n.nodeValue || '').trim()) { textNode = n; break; }
+  }
+  if (!textNode) {
+    el.insertBefore(el.ownerDocument.createTextNode(text), el.firstChild);
+    return;
+  }
+  if (String(textNode.nodeValue || '').trim() !== text) textNode.nodeValue = text;
+}
+
+/** @param {ParentNode} root @param {string} from @param {string} to */
+function replaceText(root, from, to) {
+  if (!root || typeof root.ownerDocument === 'undefined' && !('createTreeWalker' in root)) return;
+  const doc = root.nodeType === 9 ? /** @type {Document} */ (root) : root.ownerDocument;
+  if (!doc || typeof doc.createTreeWalker !== 'function') return;
+  const walker = doc.createTreeWalker(/** @type {Node} */ (root), 4);
+  let n = walker.nextNode();
+  while (n) {
+    if (n.nodeValue && n.nodeValue.includes(from)) n.nodeValue = n.nodeValue.split(from).join(to);
+    n = walker.nextNode();
+  }
+}
+
 /**
  * なふだの説明と、空でも残るニコ生の見出しを、他のサービスでは出さない。
  * コメントを書く欄は、送信できるサービスでは残す（SHOWROOM は SR_SEND_COMMENT）。
+ * 下の折りたたみも、能力表の言葉に合わせる（広告・サイドバー履歴・a: の匿名は出さない）。
  * @param {ParentNode} root
+ * @param {ReturnType<typeof foreignPanelCopy>} copy
  */
-function rewriteForeignPanelWords(root) {
+function rewriteForeignPanelWords(root, copy) {
   const inline = root.querySelector('.nl-nameplate-inline');
   if (inline) hideEl(/** @type {HTMLElement} */ (inline));
   const nameBtn = root.querySelector('#nameplateOnBtn');
@@ -188,6 +227,55 @@ function rewriteForeignPanelWords(root) {
   if (venueHint && String(venueHint.textContent || '').includes('ニコ生')) {
     venueHint.textContent = '視聴ページの右下に出る「会場モード」ボタンです。使わない場合はオフにすると出なくなります（反映には視聴ページの再読み込みが必要です）。';
   }
+  if (!copy) return;
+  const header = root.querySelector('.nl-header .nl-sub');
+  if (header && String(header.textContent || '').includes('ニコ生')) header.textContent = copy.header;
+  const timeline = root.querySelector('.nl-support-timeline__summary-label');
+  if (timeline && timeline.textContent !== copy.timelineLabel) timeline.textContent = copy.timelineLabel;
+  const timelineBody = root.querySelector('#supportTimelineBody');
+  if (timelineBody) setAttrIfDiff(timelineBody, 'aria-label', copy.timelineAria);
+  const usersMount = root.querySelector('#giftQuickStatsMount');
+  const usersDetails = usersMount && typeof usersMount.closest === 'function' ? usersMount.closest('details') : null;
+  if (usersDetails) {
+    if (!copy.showGiftUsers) hideEl(/** @type {HTMLElement} */ (usersDetails));
+    else {
+      const usersSummary = usersDetails.querySelector('summary');
+      if (usersSummary && usersSummary.textContent !== copy.giftUsersLabel) usersSummary.textContent = copy.giftUsersLabel;
+    }
+  }
+  const side = root.querySelector('#giftSubAppHistorySummary');
+  const sideDetails = side && typeof side.closest === 'function' ? side.closest('details') : null;
+  if (sideDetails) hideEl(/** @type {HTMLElement} */ (sideDetails));
+  for (const sel of ['.nl-anonymous-identicon-opt', '#anonymousIdenticonHint', '#foldAnonymousInRankStripHint', '#sceneStoryUserLaneAdWrap', '#devMonitorForceRefetchCommenterFollowBtn']) {
+    const el = root.querySelector(sel);
+    if (el) hideEl(/** @type {HTMLElement} */ (el));
+  }
+  const giftWrap = root.querySelector('#sceneStoryUserLaneGiftWrap');
+  if (giftWrap && !copy.showGiftUsers) hideEl(/** @type {HTMLElement} */ (giftWrap));
+  const giftLane = root.querySelector('#sceneStoryUserLaneGift');
+  if (giftLane && copy.showGiftUsers) setAttrIfDiff(giftLane, 'aria-label', `${copy.paidLabel}を贈った人`);
+  const effect = root.querySelector('label[for="effectSoundToggle"] > span');
+  setLeadText(effect, copy.effectLabel);
+  const effectHint = effect ? effect.querySelector('.nl-record-sub__hint') : null;
+  if (effectHint && effectHint.textContent !== copy.effectHint) effectHint.textContent = copy.effectHint;
+  const calm = root.querySelector('label[for="calmPanelMotion"] > span');
+  if (calm && calm.textContent !== copy.calm) calm.textContent = copy.calm;
+  const concept = root.querySelector('.nl-project-concept-body');
+  if (concept) replaceText(concept, 'ニコ生の', '');
+  const harvest = root.querySelector('#commentHarvestBanner');
+  if (harvest) replaceText(harvest, 'ニコ生の画面改修', '配信ページの画面の変化');
+  const gate = root.querySelector('#usageTermsGate');
+  if (gate) {
+    replaceText(gate, 'ニコニコの利用条件ページの写しではありません', 'その配信サービスの利用条件ページの写しではありません');
+    replaceText(gate, 'ニコニコのサーバーから読み込まれる', 'その配信サービスのサーバーから読み込まれる');
+    const link = gate.querySelector('a[href*="nicovideo.jp"]');
+    const row = link && typeof link.closest === 'function' ? link.closest('tr') : null;
+    if (row) hideEl(/** @type {HTMLElement} */ (row));
+  }
+  const shade = root.querySelector('.nl-init-shade__submsg');
+  if (shade && String(shade.textContent || '').includes('ギフト履歴')) {
+    shade.textContent = 'コメントの記録は、配信ページを開くと取り込めます。';
+  }
 }
 
 /**
@@ -198,8 +286,9 @@ export function applyPlatformMetricChrome(root, state) {
   if (!root || typeof root.querySelector !== 'function') return;
   const plan = platformSectionPlan(String(state?.platform || ''), { officialBoard: state?.officialBoard === true });
   if (plan.native) return;
-  markCapability(root, plan.id, plan.subBoard === true, plan.commentPost === true);
-  if (plan.nameplate !== true) rewriteForeignPanelWords(root);
+  const copy = foreignPanelCopy(plan.id);
+  markCapability(root, plan.id, plan.subBoard === true, plan.commentPost === true, copy ? copy.showGiftUsers !== true : false);
+  if (plan.nameplate !== true) rewriteForeignPanelWords(root, copy);
   const facts = state?.facts && typeof state.facts === 'object' ? state.facts : {};
 
   const vis = root.querySelector('.nl-live-stat-card--visitors');

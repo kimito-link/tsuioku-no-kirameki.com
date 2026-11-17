@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2118',
+    date: '2026-11-13',
+    summary: '混んでも合唱が途中で消えにくく',
+    items: Object.freeze([
+      '読み上げの待ちがあふれた時、何人もの声をまとめた合唱の件は、ふつうの件より後に捨てるようにしました。合唱に加わった人の声ごと消えることが減ります。',
+      '合唱で重ねる声を、まったく同じ文だけでなく同じ言葉(www に w・草 の声など)からも探すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2117',
     date: '2026-11-13',
     summary: '書き方が違う笑いや拍手も合唱に',

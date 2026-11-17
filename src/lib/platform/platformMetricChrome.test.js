@@ -236,6 +236,64 @@ describe('applyPlatformMetricChrome', () => {
     expect(css).toContain('html.nl-cap-foreign .nl-nameplate-inline{display:none!important;}');
     expect(css).toContain('#northStarLanes:not(:has([data-lane]:not([hidden])))');
     expect(css).not.toContain('html.nl-cap-foreign .nl-comment-compose');
+    expect(css).toContain('details:has(#giftSubAppHistorySummary)');
+    expect(css).toContain('html.nl-cap-no-paid details:has(#giftQuickStatsMount)');
+  });
+
+  it('SHOWROOM はギフトの見出しに直し、広告とサイドバーと a: を出さない', () => {
+    const root = mount();
+    const header = root.createElement('p');
+    header.className = 'nl-sub';
+    const brand = root.createElement('div');
+    brand.className = 'nl-header';
+    brand.append(header);
+    header.textContent = 'ニコ生の応援コメントを、このPCで見える化（記録は自分でON）';
+    const tl = root.createElement('span');
+    tl.className = 'nl-support-timeline__summary-label';
+    tl.textContent = '応援タイムライン（コメント＋ギフト）';
+    const users = root.createElement('details');
+    const usersSummary = root.createElement('summary');
+    usersSummary.textContent = 'ギフト・広告ユーザー（簡易）';
+    const mountEl = root.createElement('div');
+    mountEl.id = 'giftQuickStatsMount';
+    users.append(usersSummary, mountEl);
+    const side = root.createElement('details');
+    const sideSummary = root.createElement('summary');
+    sideSummary.id = 'giftSubAppHistorySummary';
+    sideSummary.textContent = 'ギフトサイドバー履歴（未取得）';
+    side.append(sideSummary);
+    const anon = root.createElement('label');
+    anon.className = 'nl-anonymous-identicon-opt';
+    anon.textContent = 'a:xxxxx';
+    const concept = root.createElement('div');
+    concept.className = 'nl-project-concept-body';
+    concept.textContent = 'ニコ生の応援コメントをこのPCに記録';
+    root.body.append(brand, tl, users, side, anon, concept);
+    applyPlatformMetricChrome(root, { platform: 'showroom', facts: {} });
+    expect(header.textContent).toBe('応援コメントを、このPCで見える化（記録は自分でON）');
+    expect(tl.textContent).toBe('応援タイムライン（コメント＋ギフト）');
+    expect(usersSummary.textContent).toBe('ギフトユーザー（簡易）');
+    expect(users.hidden).toBe(false);
+    expect(side.hidden).toBe(true);
+    expect(anon.hidden).toBe(true);
+    expect(concept.textContent).toBe('応援コメントをこのPCに記録');
+    expect(root.documentElement.classList.contains('nl-cap-no-paid')).toBe(false);
+  });
+
+  it('ABEMA はギフトの欄を出さず、タイムラインはコメントだけ', () => {
+    const root = mount();
+    const tl = root.createElement('span');
+    tl.className = 'nl-support-timeline__summary-label';
+    tl.textContent = '応援タイムライン（コメント＋ギフト）';
+    const users = root.createElement('details');
+    const mountEl = root.createElement('div');
+    mountEl.id = 'giftQuickStatsMount';
+    users.append(root.createElement('summary'), mountEl);
+    root.body.append(tl, users);
+    applyPlatformMetricChrome(root, { platform: 'abema', facts: {} });
+    expect(tl.textContent).toBe('応援タイムライン（コメント）');
+    expect(users.hidden).toBe(true);
+    expect(root.documentElement.classList.contains('nl-cap-no-paid')).toBe(true);
   });
 
 describe('開いた瞬間の CSS', () => {

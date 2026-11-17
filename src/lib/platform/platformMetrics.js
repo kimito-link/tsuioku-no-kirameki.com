@@ -40,6 +40,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'superchat']),
     superchatWhenPositive: true,
+    paidLabel: 'スーパーチャット',
+    timelineLabel: '応援タイムライン（コメント＋スーパーチャット）',
+    giftUsersLabel: 'スーパーチャット・ギフトのユーザー（簡易）',
   }),
   twitch: Object.freeze({
     native: false,
@@ -47,6 +50,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'bits', 'subs', 'gifts', 'raids']),
     officialSubBoard: true,
+    paidLabel: 'Bits',
+    timelineLabel: '応援タイムライン（コメント＋Bits・ギフトサブ）',
+    giftUsersLabel: 'Bits・ギフトサブのユーザー（簡易）',
   }),
   kick: Object.freeze({
     native: false,
@@ -54,6 +60,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
     officialSubBoard: true,
+    paidLabel: 'Kicks',
+    timelineLabel: '応援タイムライン（コメント＋Kicks・ギフトサブ）',
+    giftUsersLabel: 'Kicks・ギフトサブのユーザー（簡易）',
   }),
   // SHOWROOM: イベントの貢献ランキング(部屋の画面の「貢献ユーザー」)を2つめの欄に、イベント順位・pt・目標Lv をチップに。
   showroom: Object.freeze({
@@ -62,6 +71,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'eventPoint', 'quest']),
     officialSubBoard: true,
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
   }),
   // ミクチャ: 名前の下のレベル・ファン・スーパーファン・ライバーランク(と、出ているときのイベント順位・pt)
   mixch: Object.freeze({
@@ -71,6 +83,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     // eventInfo.point は 2026-11-11 の実ページで 0 なのに画面には別の数が出ていた(どの値か未確定)→ イベントpt は出さない。
     //   「スーパーファン」は画面の言葉「ガチファン」、streamerRank.score はランク記号(B1 等)の横のポイント。
     chips: Object.freeze(['streamAge', 'level', 'fans', 'superfans', 'liverRank', 'eventRank']),
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
   }),
   // ふわっち: イベント順位(同時に出ているイベントは title に並べる)・累計視聴
   whowatch: Object.freeze({
@@ -78,6 +93,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'totalViews']),
+    paidLabel: 'アイテム',
+    timelineLabel: '応援タイムライン（コメント＋アイテム）',
+    giftUsersLabel: 'アイテムユーザー（簡易）',
   }),
   // TikTok LIVE: 同時視聴は WebcastRoomUserSeqMessage（tt-content-entry.js の parseTtRoomUserSeq）。
   //   配信中の視聴者ランキングはギフト欄の見出し側。いいね数などはページから取っていないので出さない。
@@ -86,6 +104,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge']),
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
   }),
   // ツイキャス: 配信ページの「現在/累計」の累計とコメント数(#viewer-counter・#comment-count に出ている数そのまま)。
   //   視聴者数は同じ欄の左(現在)。公式の応援ランキングは配信者ページのサポーターランキング(2つめの欄)。
@@ -94,6 +115,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
   }),
   // headlineCount:views = 大きな数字はページの視聴数（同時接続では埋めない）。countUnit 空 = 「人」と書かない。
   // 出典: src/lib/abema/abParse.js の abAudienceFromPayload（stats.view は視聴数、concurrentViewers は別）。
@@ -105,6 +129,10 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'comments']),
     hideSections: Object.freeze(['contributionRanking', 'giftHistory']),
+    // ABEMA のページにギフトは出さない（視聴数とコメント数だけ。streamPlatform の paid は使わない）。
+    paidLabel: '',
+    timelineLabel: '応援タイムライン（コメント）',
+    giftUsersLabel: '',
   }),
 });
 
@@ -146,6 +174,43 @@ export function platformCapability(platformId) {
     visitorCard: false,
     chips: Object.freeze(['streamAge']),
   });
+}
+
+/**
+ * 横の欄の下の見出し。広告・ギフトサイドバー・a: の匿名はニコ生だけなので、ここには入れない。
+ * paidLabel が空のサービス（ABEMA）はギフトの欄を出さない。
+ * @param {string} platformId
+ * @returns {null | {
+ *   id: string, paidLabel: string, timelineLabel: string, giftUsersLabel: string,
+ *   showGiftUsers: boolean, effectLabel: string, effectHint: string,
+ *   header: string, calm: string, timelineAria: string
+ * }}
+ */
+export function foreignPanelCopy(platformId) {
+  const id = resolvePlatformId(platformId);
+  if (id === 'niconico') return null;
+  const cap = platformCapability(id);
+  const paidLabel = 'paidLabel' in cap ? String(cap.paidLabel) : '';
+  const timelineLabel = 'timelineLabel' in cap && cap.timelineLabel
+    ? String(cap.timelineLabel)
+    : (paidLabel ? `応援タイムライン（コメント＋${paidLabel}）` : '応援タイムライン（コメント）');
+  const giftUsersLabel = 'giftUsersLabel' in cap ? String(cap.giftUsersLabel || '') : '';
+  const effectLabel = paidLabel ? `${paidLabel}の効果音を鳴らす` : 'コメントが増えたときの効果音を鳴らす';
+  const effectHint = paidLabel
+    ? `${paidLabel}が来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。`
+    : 'コメントが増えたときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。';
+  return {
+    id,
+    paidLabel,
+    timelineLabel,
+    giftUsersLabel,
+    showGiftUsers: giftUsersLabel !== '',
+    effectLabel,
+    effectHint,
+    header: '応援コメントを、このPCで見える化（記録は自分でON）',
+    calm: 'パネル内の動きを抑える（ループアニメ・帯など。節目の演出は出ます）',
+    timelineAria: paidLabel ? `コメントと${paidLabel}の時系列` : 'コメントの時系列',
+  };
 }
 
 const OFFICIAL = '配信ページが出している公式の数です。';

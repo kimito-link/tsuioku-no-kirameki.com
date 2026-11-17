@@ -29,6 +29,18 @@
       twitcasting: { rank: 'ギフトの合計順', gift: 'ギフト' },
       whowatch: { rank: 'アイテムの合計順', gift: 'アイテム' }
     };
+    // foreignPanelCopy（platformMetrics.js）と同じ見出し。テストが突き合わせる。
+    var COPY = {
+      youtube: { timeline: '応援タイムライン（コメント＋スーパーチャット）', users: 'スーパーチャット・ギフトのユーザー（簡易）', paid: 'スーパーチャット', effect: 'スーパーチャットの効果音を鳴らす', hint: 'スーパーチャットが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      twitch: { timeline: '応援タイムライン（コメント＋Bits・ギフトサブ）', users: 'Bits・ギフトサブのユーザー（簡易）', paid: 'Bits', effect: 'Bitsの効果音を鳴らす', hint: 'Bitsが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      kick: { timeline: '応援タイムライン（コメント＋Kicks・ギフトサブ）', users: 'Kicks・ギフトサブのユーザー（簡易）', paid: 'Kicks', effect: 'Kicksの効果音を鳴らす', hint: 'Kicksが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      showroom: { timeline: '応援タイムライン（コメント＋ギフト）', users: 'ギフトユーザー（簡易）', paid: 'ギフト', effect: 'ギフトの効果音を鳴らす', hint: 'ギフトが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      mixch: { timeline: '応援タイムライン（コメント＋ギフト）', users: 'ギフトユーザー（簡易）', paid: 'ギフト', effect: 'ギフトの効果音を鳴らす', hint: 'ギフトが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      whowatch: { timeline: '応援タイムライン（コメント＋アイテム）', users: 'アイテムユーザー（簡易）', paid: 'アイテム', effect: 'アイテムの効果音を鳴らす', hint: 'アイテムが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      tiktok: { timeline: '応援タイムライン（コメント＋ギフト）', users: 'ギフトユーザー（簡易）', paid: 'ギフト', effect: 'ギフトの効果音を鳴らす', hint: 'ギフトが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      twitcasting: { timeline: '応援タイムライン（コメント＋ギフト）', users: 'ギフトユーザー（簡易）', paid: 'ギフト', effect: 'ギフトの効果音を鳴らす', hint: 'ギフトが来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' },
+      abema: { timeline: '応援タイムライン（コメント）', users: '', paid: '', effect: 'コメントが増えたときの効果音を鳴らす', hint: 'コメントが増えたときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。' }
+    };
     function idOf(raw) {
       var s = String(raw || '');
       var head = s.split(':')[0];
@@ -51,9 +63,10 @@
     root.classList.add('nl-cap-' + cap);
     root.classList.add('nl-count-loading');
     if (SUB[cap]) root.classList.add('nl-cap-subboard');
+    if (COPY[cap] && !COPY[cap].users) root.classList.add('nl-cap-no-paid');
     var style = document.createElement('style');
     style.id = 'nl-platform-capability-style';
-    style.textContent = 'html.nl-cap-foreign .nl-live-stat-card--visitors{display:none!important;}html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoViewers),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoComments),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}html.nl-cap-foreign [data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden]))){display:none!important;}html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}html.nl-cap-foreign:not([data-nl-platform-ready]) #noWatchRankingHint{visibility:hidden;}html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label,html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label,html.nl-cap-showroom #watchConcurrentCard .nl-live-stat-label,html.nl-cap-mixch #watchConcurrentCard .nl-live-stat-label,html.nl-cap-whowatch #watchConcurrentCard .nl-live-stat-label,html.nl-cap-tiktok #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitcasting #watchConcurrentCard .nl-live-stat-label,html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label::after{content:"同時視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-showroom #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-mixch #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-whowatch #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-tiktok #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-twitcasting #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label::after{content:"視聴数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-foreign.nl-count-loading #watchConcurrentSub{font-size:0!important;color:transparent!important;}html.nl-cap-foreign .nl-nameplate-inline{display:none!important;}html.nl-cap-foreign .nl-record-sub:has(#nameplateOnBtn){display:none!important;}html.nl-cap-foreign #northStarLanes:not(:has([data-lane]:not([hidden]))){display:none!important;}html.nl-cap-no-post .nl-comment-compose{display:none!important;}';
+    style.textContent = 'html.nl-cap-foreign .nl-live-stat-card--visitors{display:none!important;}html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoViewers),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoComments),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}html.nl-cap-foreign [data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden]))){display:none!important;}html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}html.nl-cap-foreign:not([data-nl-platform-ready]) #noWatchRankingHint{visibility:hidden;}html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label,html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label,html.nl-cap-showroom #watchConcurrentCard .nl-live-stat-label,html.nl-cap-mixch #watchConcurrentCard .nl-live-stat-label,html.nl-cap-whowatch #watchConcurrentCard .nl-live-stat-label,html.nl-cap-tiktok #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitcasting #watchConcurrentCard .nl-live-stat-label,html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label::after{content:"同時視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-showroom #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-mixch #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-whowatch #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-tiktok #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-twitcasting #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label::after{content:"視聴数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}html.nl-cap-foreign.nl-count-loading #watchConcurrentSub{font-size:0!important;color:transparent!important;}html.nl-cap-foreign .nl-nameplate-inline{display:none!important;}html.nl-cap-foreign .nl-record-sub:has(#nameplateOnBtn){display:none!important;}html.nl-cap-foreign #northStarLanes:not(:has([data-lane]:not([hidden]))){display:none!important;}html.nl-cap-no-post .nl-comment-compose{display:none!important;}html.nl-cap-foreign details:has(#giftSubAppHistorySummary){display:none!important;}html.nl-cap-foreign .nl-anonymous-identicon-opt,html.nl-cap-foreign #anonymousIdenticonHint,html.nl-cap-foreign #foldAnonymousInRankStripHint{display:none!important;}html.nl-cap-foreign #sceneStoryUserLaneAdWrap{display:none!important;}html.nl-cap-foreign #devMonitorForceRefetchCommenterFollowBtn{display:none!important;}html.nl-cap-no-paid details:has(#giftQuickStatsMount){display:none!important;}html.nl-cap-no-paid #sceneStoryUserLaneGiftWrap{display:none!important;}';
     root.appendChild(style);
 
     function arm() {
@@ -93,6 +106,60 @@
       var venueHint = venueToggle && venueToggle.parentElement && venueToggle.parentElement.querySelector('.nl-record-sub__hint');
       if (venueHint && String(venueHint.textContent || '').indexOf('ニコ生') >= 0) {
         venueHint.textContent = '視聴ページの右下に出る「会場モード」ボタンです。使わない場合はオフにすると出なくなります（反映には視聴ページの再読み込みが必要です）。';
+      }
+      var copy = COPY[cap];
+      if (copy) {
+        var tl = document.querySelector('.nl-support-timeline__summary-label');
+        if (tl) tl.textContent = copy.timeline;
+        var tb = document.getElementById('supportTimelineBody');
+        if (tb) tb.setAttribute('aria-label', copy.paid ? ('コメントと' + copy.paid + 'の時系列') : 'コメントの時系列');
+        var users = document.getElementById('giftQuickStatsMount');
+        var usersDetails = users && users.closest('details');
+        if (usersDetails) {
+          if (!copy.users) usersDetails.hidden = true;
+          else {
+            var us = usersDetails.querySelector('summary');
+            if (us) us.textContent = copy.users;
+          }
+        }
+        var side = document.getElementById('giftSubAppHistorySummary');
+        var sideDetails = side && side.closest('details');
+        if (sideDetails) sideDetails.hidden = true;
+        var hideSel = ['.nl-anonymous-identicon-opt', '#anonymousIdenticonHint', '#foldAnonymousInRankStripHint', '#sceneStoryUserLaneAdWrap', '#devMonitorForceRefetchCommenterFollowBtn'];
+        for (var hi = 0; hi < hideSel.length; hi++) {
+          var nodes = document.querySelectorAll(hideSel[hi]);
+          for (var hj = 0; hj < nodes.length; hj++) nodes[hj].hidden = true;
+        }
+        if (!copy.users) {
+          var gw = document.getElementById('sceneStoryUserLaneGiftWrap');
+          if (gw) gw.hidden = true;
+        }
+        var effect = document.querySelector('label[for="effectSoundToggle"] > span');
+        if (effect && effect.firstChild && effect.firstChild.nodeType === 3) effect.firstChild.nodeValue = copy.effect;
+        var effectHint = effect && effect.querySelector('.nl-record-sub__hint');
+        if (effectHint) effectHint.textContent = copy.hint;
+        var calm = document.querySelector('label[for="calmPanelMotion"] > span');
+        if (calm) calm.textContent = 'パネル内の動きを抑える（ループアニメ・帯など。節目の演出は出ます）';
+        var headerSub = document.querySelector('.nl-header .nl-sub');
+        if (headerSub && String(headerSub.textContent || '').indexOf('ニコ生') >= 0) headerSub.textContent = '応援コメントを、このPCで見える化（記録は自分でON）';
+        function swapText(el, from, to) {
+          if (!el) return;
+          var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          var node;
+          while ((node = w.nextNode())) {
+            if (node.nodeValue && node.nodeValue.indexOf(from) >= 0) node.nodeValue = node.nodeValue.split(from).join(to);
+          }
+        }
+        swapText(document.querySelector('.nl-project-concept-body'), 'ニコ生の', '');
+        swapText(document.getElementById('commentHarvestBanner'), 'ニコ生の画面改修', '配信ページの画面の変化');
+        var gate = document.getElementById('usageTermsGate');
+        swapText(gate, 'ニコニコの利用条件ページの写しではありません', 'その配信サービスの利用条件ページの写しではありません');
+        swapText(gate, 'ニコニコのサーバーから読み込まれる', 'その配信サービスのサーバーから読み込まれる');
+        var nicoLink = gate && gate.querySelector('a[href*="nicovideo.jp"]');
+        var nicoRow = nicoLink && nicoLink.closest('tr');
+        if (nicoRow) nicoRow.hidden = true;
+        var shadeMsg = document.querySelector('.nl-init-shade__submsg');
+        if (shadeMsg && String(shadeMsg.textContent || '').indexOf('ギフト履歴') >= 0) shadeMsg.textContent = 'コメントの記録は、配信ページを開くと取り込めます。';
       }
       if (!est) return;
       var last = '';

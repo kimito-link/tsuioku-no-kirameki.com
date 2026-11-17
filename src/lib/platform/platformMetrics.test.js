@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bootPlatformId,
   bootSubBoardIds,
+  foreignPanelCopy,
   panelExtraChips,
   platformSectionPlan,
   resolvePlatformId,
@@ -293,5 +294,20 @@ describe('他サービスの欄の見出し', () => {
     }
     expect(platformSectionPlan('other').commentPost).toBe(false);
     expect(platformSectionPlan('other').nameplate).toBe(false);
+  });
+
+  it('下の折りたたみは能力表の言葉。広告と a: はニコ生だけ', () => {
+    expect(foreignPanelCopy('niconico')).toBeNull();
+    const showroom = foreignPanelCopy('showroom');
+    expect(showroom.giftUsersLabel).toBe('ギフトユーザー（簡易）');
+    expect(showroom.giftUsersLabel).not.toContain('広告');
+    expect(showroom.timelineLabel).toBe('応援タイムライン（コメント＋ギフト）');
+    expect(showroom.showGiftUsers).toBe(true);
+    const abema = foreignPanelCopy('abema');
+    expect(abema.showGiftUsers).toBe(false);
+    expect(abema.timelineLabel).toBe('応援タイムライン（コメント）');
+    expect(foreignPanelCopy('whowatch').timelineLabel).toContain('アイテム');
+    expect(foreignPanelCopy('youtube').giftUsersLabel).toContain('スーパーチャット');
+    expect(foreignPanelCopy('youtube').giftUsersLabel).not.toContain('広告');
   });
 });
