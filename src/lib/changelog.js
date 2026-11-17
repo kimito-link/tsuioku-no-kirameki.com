@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2142',
+    date: '2026-11-17',
+    summary: '各サービスの記録を章に出す',
+    items: Object.freeze([
+      '分析レポートに、その配信の記録にあるギフトの名前、サブスクの段階、連続視聴、リワード、ファン登録、ページの順位を、数があるときだけ出すようにしました。',
+      '記録に無いフォローやレイドは足していません。ニコ生の分析レポートの見た目は変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2141',
     date: '2026-11-17',
     summary: '分析を各配信サービス向けにした',
@@ -176,14 +185,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'YouTube のスタンプ(face-fuchsia-tongue-out や :_xxx: のような名前)を、英語の名前のまま読み上げていました。スタンプの名前は読まないようにしました(画面の表示は今までどおりです)。'
     ])
   }),
-  Object.freeze({
-    version: '0.1.2119',
-    date: '2026-11-13',
-    summary: 'YouTube の会場で最初のギフト音も鳴る',
-    items: Object.freeze([
-      'YouTube などの会場で、効果音の読み込みが終わる前に来たギフトや広告の音が、ページに止められて鳴らないことがありました。読み込みが終わるのを待ってから鳴らすようにしました。拡張のエラー一覧に「Unsafe attempt to load URL」が積もることも減ります。'
-    ])
-  })
 ]);
 
 

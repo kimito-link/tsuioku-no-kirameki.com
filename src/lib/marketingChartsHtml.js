@@ -3033,7 +3033,8 @@ function buildSectionRevealScriptHtml() {
  *   programStartAtMs?: number,
  *   slimForHeavyExport?: boolean,
  *   platform?: string,
- *   pageCount?: number
+ *   pageCount?: number,
+ *   pageFacts?: object | null
  * }} [opts]
  * @returns {string}
  */
@@ -3042,6 +3043,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // ニコ生（platform 無し）は null。null の間は下の文言も計算も今までどおり。
   const view = marketingViewFor(opts.platform);
   const pageCount = view && Number(opts.pageCount) > 0 ? Math.floor(Number(opts.pageCount)) : 0;
+  const pageFacts = view && opts.pageFacts && typeof opts.pageFacts === 'object' ? opts.pageFacts : null;
   // 0.1.12 (F1/F3): 匿名 a:... に identicon SVG data URL を当てるための resolver。
   // popup-entry 側で事前計算したマップを引いてもらう（ここからは識別の責務は持たない）。
   const identiconResolver =
@@ -3477,7 +3479,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   //   (このページでできること/りんく達から/分析スキル/ハーネス/作戦会議・応援が増えそうな時間・初見さん・切り抜き・お返し・お願い・注意/
   //   ファネル優先度・層別の使い方/各グラフ後の助言カード)は出さない。数字の章を「要点→視聴維持→流れ→応援者→ギフト→過去比較→記録」の順に並べる。
   const bodyHtml = `__NL_TOC_PLACEHOLDER__
-${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount) : '')}
+${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts) : '')}
 ${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap))}
 ${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
 ${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}

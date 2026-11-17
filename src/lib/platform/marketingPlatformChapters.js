@@ -6,6 +6,7 @@
 import { escapeHtml } from '../htmlEscape.js';
 import { isMarketingSupportRow } from '../marketingAggregate.js';
 import { GIFT_MOMENT_FORBIDDEN_WORDS } from '../giftMomentAnalytics.js';
+import { panelExtraChips } from './platformMetrics.js';
 
 const FLOW_CAP = 24;
 const WORD_CONTEXT_MAX_COMMENTS = 4000;
@@ -94,16 +95,53 @@ ${more}
 </section>`;
 }
 
+/** パーサが kind として残しているものだけ。無い kind は数えない。 */
+/** @type {Readonly<Record<string, string>>} */
+const EXTRA_KIND_LABEL = Object.freeze({
+  yt_gift: '新しいギフト',
+  sticker: 'ステッカー',
+  tw_milestone: '連続視聴の記念',
+  tw_reward: 'ポイント交換',
+  tw_hype: 'ハイプトレイン',
+  kk_reward: 'リワード',
+  mx_fan: 'ファン登録',
+});
+
+/** 記録の通貨コードを、そのサービスの単位の名前にする。知らないコードはそのまま出す。 */
+/** @type {Readonly<Record<string, string>>} */
+const CURRENCY_LABEL = Object.freeze({
+  JPY: '円の合計（記録）',
+  USD: 'USD の合計（記録）',
+  BITS: 'Bits の合計（記録）',
+  KICKS: 'Kicks の合計（記録）',
+  WWITEM: 'アイテム（個・記録）',
+  SRPT: 'ギフトpt（記録）',
+  MXCOIN: 'コイン（記録）',
+  TTCOIN: 'コイン（記録）',
+  TCSCORE: 'スコア（記録）',
+});
+
 /**
  * @param {Array<Record<string, unknown>>} comments
- * @param {{ id: string, pageCountLabel: string, showMember: boolean, hideGift: boolean, pointEstimate: boolean }} view
+ * @param {{ id: string, pageCountLabel: string, showMember: boolean, hideGift: boolean, pointEstimate: boolean, mixchUnitNote?: boolean }} view
  * @param {number} pageCount
+ * @param {object | null} [pageFacts]
  */
-export function sectionPlatformDedicatedHtml(comments, view, pageCount) {
+export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFacts = null) {
   if (!view) return '';
   const rows = Array.isArray(comments) ? comments : [];
   /** @type {Map<string, number>} */
   const byCur = new Map();
+  /** @type {Map<string, number>} */
+  const extraKinds = new Map();
+  /** @type {Map<string, number>} */
+  const giftNames = new Map();
+  /** @type {Map<string, number>} */
+  const commentTypes = new Map();
+  /** @type {Set<string>} */
+  const tiers = new Set();
+  /** @type {string[]} */
+  const recipients = [];
   let raids = 0;
   let raidViewers = 0;
   let hosts = 0;
@@ -111,18 +149,30 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount) {
   let subs = 0;
   let resubs = 0;
   let giftSubs = 0;
+  let giftPieces = 0;
   let memberBadges = 0;
+  let milestoneMax = 0;
   /** @type {number[]} */
   const months = [];
   for (const c of rows) {
     if (!isMarketingSupportRow(c)) {
       if (view.showMember && Array.isArray(c?.badges) && c.badges.includes('member')) memberBadges += 1;
+      if (view.id === 'whowatch' && Array.isArray(c?.badges)) {
+        for (const b of c.badges) {
+          const name = String(b || '').trim();
+          if (name) commentTypes.set(name, (commentTypes.get(name) || 0) + 1);
+        }
+      }
       continue;
     }
     const kind = String(c.ytKind || '');
     const cur = String(c.ytCurrency || '').trim().toUpperCase();
     const amt = Number(c.ytAmount);
     if (cur && Number.isFinite(amt) && amt > 0) byCur.set(cur, (byCur.get(cur) || 0) + amt);
+    const giftName = String(c.ytGiftName || '').trim();
+    if (giftName) giftNames.set(giftName, (giftNames.get(giftName) || 0) + 1);
+    if (EXTRA_KIND_LABEL[kind]) extraKinds.set(kind, (extraKinds.get(kind) || 0) + 1);
+    if (kind === 'tw_milestone' && Number.isFinite(amt) && amt > 0) milestoneMax = Math.max(milestoneMax, Math.floor(amt));
     if (kind === 'tw_raid') {
       raids += 1;
       if (Number.isFinite(amt) && amt > 0) raidViewers += Math.floor(amt);
@@ -136,26 +186,67 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount) {
       else if (c.subEvent === 'sub') subs += 1;
       const m = Number(c.subMonths);
       if (m > 0) months.push(Math.floor(m));
+      const tier = String(c.subTier || '').trim();
+      if (tier) tiers.add(tier);
     }
-    if (kind === 'membership_gift') giftSubs += 1;
+    if (kind === 'membership_gift') {
+      giftSubs += 1;
+      const pieces = Number(c.ytGiftCount);
+      if (pieces > 0) giftPieces += Math.floor(pieces);
+      const tier = String(c.subTier || '').trim();
+      if (tier) tiers.add(tier);
+      if (Array.isArray(c.giftRecipients)) {
+        for (const name of c.giftRecipients) {
+          const s = String(name || '').trim();
+          if (s && recipients.length < 8) recipients.push(s);
+        }
+      }
+    }
     if (view.showMember && Array.isArray(c.badges) && c.badges.includes('member')) memberBadges += 1;
   }
   /** @type {Array<[string, string]>} */
   const cards = [];
   if (view.pageCountLabel && pageCount > 0) cards.push([view.pageCountLabel, `${pageCount.toLocaleString('ja-JP')}`]);
   for (const [cur, sum] of byCur) {
-    cards.push([`${cur} の合計（記録）`, String(sum)]);
+    cards.push([CURRENCY_LABEL[cur] || `${cur} の合計（記録）`, String(sum)]);
   }
   if (subs > 0) cards.push(['新しいサブスク', `${subs}件`]);
   if (resubs > 0) cards.push(['継続のサブスク', `${resubs}件`]);
   if (giftSubs > 0) cards.push(['ギフトサブ', `${giftSubs}件`]);
+  if (giftPieces > 0 && giftPieces !== giftSubs) cards.push(['贈った件数（記録）', `${giftPieces}件`]);
   if (months.length) cards.push(['サブスク月数（記録にあるもの）', months.join('、')]);
+  if (tiers.size) cards.push(['段階（記録）', [...tiers].join('、')]);
+  if (recipients.length) cards.push(['受け取った人（記録にある名前）', recipients.join('、')]);
   if (raids > 0) cards.push(['レイド', raidViewers > 0 ? `${raids}回 / ${raidViewers}人` : `${raids}回`]);
   if (hosts > 0) cards.push(['ホスト', hostViewers > 0 ? `${hosts}回 / ${hostViewers}人` : `${hosts}回`]);
+  for (const [kind, n] of extraKinds) {
+    const label = EXTRA_KIND_LABEL[kind];
+    if (!label || !(n > 0)) continue;
+    const value = kind === 'tw_milestone' && milestoneMax > 0 ? `${n}件（${milestoneMax}回）` : `${n}件`;
+    cards.push([label, value]);
+  }
+  if (giftNames.size) {
+    const names = [...giftNames.entries()].slice(0, 6).map(([name, n]) => `${name} ×${n}`);
+    cards.push(['出ていた名前（記録）', names.join('、')]);
+  }
+  if (commentTypes.size) {
+    const types = [...commentTypes.entries()].slice(0, 6).map(([name, n]) => `${name} ×${n}`);
+    cards.push(['コメントの種類（記録）', types.join('、')]);
+  }
   if (view.showMember && memberBadges > 0) cards.push(['メンバーの印', `${memberBadges}件`]);
+  if (pageFacts) {
+    for (const chip of panelExtraChips(view.id, pageFacts)) {
+      if (chip.placeholder) continue;
+      if (chip.key === 'totalViews' && pageCount > 0) continue;
+      cards.push([`ページの${chip.label}`, chip.text]);
+    }
+  }
   if (!cards.length) return '';
   const estimate = view.pointEstimate
     ? '<p class="mkt-note">通貨ごとの合計は、チャットに書いてあった金額です。円への換算はしていません。円換算の列がある表は推定です。</p>'
+    : '';
+  const unitNote = view.mixchUnitNote && byCur.has('MXCOIN')
+    ? '<p class="mkt-note">コインの単位は未確認です。</p>'
     : '';
   const inner = cards
     .map(
@@ -166,7 +257,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount) {
   return `<section class="mkt-section" id="mkt-platform-dedicated">
 <h2>この配信の記録</h2>
 <p class="mkt-note">このPCの記録に残っている数だけです。ページに無い数は出していません。</p>
-${estimate}
+${estimate}${unitNote}
 <div class="mkt-kpi-grid">${inner}</div>
 </section>`;
 }

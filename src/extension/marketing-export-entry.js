@@ -95,7 +95,7 @@ import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/m
  *   programStartAtMs?: number,
  *   platform?: string,
  *   slotViewCount?: number,
- *   platformFacts?: { viewCount?: number, official?: { totalViews?: number } }
+ *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown> }
  * }} WatchMetaSnapshot
  */
 
@@ -615,6 +615,10 @@ async function runExport(lid) {
     const marketingView = marketingViewFor(snapshot?.platform);
     const pageCountRaw = Number(snapshot?.slotViewCount ?? snapshot?.platformFacts?.viewCount ?? snapshot?.platformFacts?.official?.totalViews);
     const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : 0;
+    const facts = snapshot?.platformFacts;
+    const marketingPageFacts = marketingView && facts && typeof facts === 'object'
+      ? { official: facts.official, commentCount: facts.commentCount }
+      : null;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
     await yieldToBrowserPaint();
     const report = aggregateMarketingReport(comments, lid, { broadcasterUserId: reportBroadcasterUid });
@@ -776,7 +780,7 @@ async function runExport(lid) {
     }
     mktProf.mark('html_report');
     const html = buildMarketingDashboardHtml(report, {
-      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount } : {}),
+      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : {}),
       mediaKitHtml,
       htmlReportHtml,
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
