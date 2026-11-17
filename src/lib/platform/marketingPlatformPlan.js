@@ -18,6 +18,7 @@ const HIDE_ON_OTHERS = Object.freeze([
   'mkt-vpos',
 ]);
 
+/** @type {Readonly<Record<string, string>>} */
 const GIFT_WORD = Object.freeze({
   youtube: 'スーパーチャット・メンバー',
   twitch: 'Bits・サブスク',
@@ -31,6 +32,7 @@ const GIFT_WORD = Object.freeze({
 });
 
 /** 台帳の金額列。円にそろえた合計は推定と書く。 */
+/** @type {Readonly<Record<string, string>>} */
 const POINT_COLUMN = Object.freeze({
   youtube: '円換算（推定）',
   twitch: 'Bits',
@@ -43,18 +45,21 @@ const POINT_COLUMN = Object.freeze({
   abema: '',
 });
 
+/** @type {Readonly<Record<string, string>>} */
 const PROGRAM_WORD = Object.freeze({
   tiktok: 'LIVE',
   abema: '番組',
 });
 
 /** ページに累計の数があるサービスだけ。同時接続の数は入れない。 */
+/** @type {Readonly<Record<string, string>>} */
 const PAGE_COUNT_LABEL = Object.freeze({
   whowatch: '累計視聴（ページの数）',
   twitcasting: '累計（ページの数）',
   abema: '視聴数（ページの数）',
 });
 
+/** @type {Readonly<Record<string, string>>} */
 const SEARCH_PLACEHOLDER = Object.freeze({
   youtube: '例: @ハンドル',
   twitch: '例: login',
@@ -67,6 +72,7 @@ const SEARCH_PLACEHOLDER = Object.freeze({
   abema: '例: 名前',
 });
 
+/** @type {Readonly<Record<string, string>>} */
 const SERVICE_PAGE = Object.freeze({
   youtube: 'YouTube のチャンネル',
   twitch: 'Twitch のチャンネル',

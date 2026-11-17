@@ -92,7 +92,10 @@ import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/m
  *   noopenerLinks?: Array<{ text?: string, href?: string }>,
  *   streamAgeMin?: number,
  *   startAtMs?: number,
- *   programStartAtMs?: number
+ *   programStartAtMs?: number,
+ *   platform?: string,
+ *   slotViewCount?: number,
+ *   platformFacts?: { viewCount?: number, official?: { totalViews?: number } }
  * }} WatchMetaSnapshot
  */
 

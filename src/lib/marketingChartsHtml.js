@@ -422,6 +422,7 @@ function sectionToc(items) {
  *
  * @param {import('./concurrentTimelineSeries.js').ConcurrentTimelineSeries} series
  * @param {import('./concurrentPeakAnalysis.js').ConcurrentPeakAnalysis} peak
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionConcurrentTimeline(series, peak, view = null) {
   // v0.1.1854: 線を引けない（同接サンプル2点未満）ときは章ごと出さない（空の章を並べない）。
@@ -562,6 +563,7 @@ ${yLabels}
  * 定量化する。在籍時間（各人の初コメからの経過分）ごとの 1 人あたりコメ数と残存率の 2 本の
  * 折れ線 + 個人ペース鈍化の KPI。userId が取れる行のみ対象。
  * @param {import('./commentFatigue.js').CommentFatigueReport} fatigue
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionCommentFatigue(fatigue, view = null) {
   if (!fatigue || !Array.isArray(fatigue.tenureBuckets) || fatigue.tenureBuckets.length < 2) {
@@ -808,6 +810,7 @@ ${dots}
  * @param {ReturnType<typeof findDepartedHeavyCommenters>} departed
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionDepartedHeavy(departed, maskShare, identiconResolver, view = null) {
   if (!Array.isArray(departed) || departed.length === 0) return '';
@@ -859,6 +862,7 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver, view = nul
  * @param {ReturnType<typeof buildCommenterAttendanceMatrix>} matrix
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionAttendanceMatrix(matrix, maskShare, identiconResolver, view = null) {
   if (!matrix || matrix.users.length === 0 || matrix.broadcasts.length < 2) return '';
@@ -1296,6 +1300,7 @@ function sectionUniqueWordSuggestions(suggestions) {
 /**
  * 0.1.25 (Z): リーチ係数（L15）。
  * @param {ReturnType<typeof computeReachCoefficient>} reach
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionReachCoefficient(reach, view = null) {
   if (!reach || reach.coefficient == null) return '';
@@ -1718,6 +1723,7 @@ function giftLedgerUserIdentityCells(identity, maskShare, identiconResolver = un
  * @param {import('./marketingGiftThrowLedger.js').MarketingGiftThrowLedger} ledger
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} [identiconResolver]
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined, view = null) {
   const unit = view && view.pointColumn ? view.pointColumn : 'pt';
@@ -2588,6 +2594,7 @@ function supporterChikuranAvatarHtml(row, rank, maskShare, identiconResolver) {
 /**
  * @param {import('./supporterChikuranScore.js').SupporterChikuranRow[]} rows
  * @param {boolean} maskShare
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function supporterChikuranSummaryLine(rows, maskShare, view = null) {
   const top = rows[0];
@@ -2622,6 +2629,7 @@ function supporterChikuranSummaryLine(rows, maskShare, view = null) {
  * @param {ReturnType<typeof buildSupporterChikuranRows>} analysis
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver, view = null) {
   if (!analysis || !Array.isArray(analysis.rows) || analysis.rows.length === 0) return '';
@@ -3057,8 +3065,9 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     const aliases = [];
     const seenUid = new Set();
     for (const c of raw) {
-      const serviceId = String(c?.ytChannelId || '').trim();
-      const userId = String(c?.userId || '').trim();
+      const row = /** @type {{ ytChannelId?: string, userId?: string }} */ (c);
+      const serviceId = String(row.ytChannelId || '').trim();
+      const userId = String(row.userId || '').trim();
       if (!serviceId || !userId || seenUid.has(userId)) continue;
       seenUid.add(userId);
       aliases.push({ userId, serviceId });
@@ -3642,6 +3651,7 @@ function idWrap(id, html) {
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
  * @param {string} [broadcasterUserId]
+ * @param {ReturnType<typeof marketingViewFor>} [view]
  */
 function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId, view = null) {
   if (maskShare) return '';

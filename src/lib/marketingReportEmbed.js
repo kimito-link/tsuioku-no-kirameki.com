@@ -84,6 +84,7 @@ export function buildMarketingEmbedScriptInnerText(report, opts = {}) {
     });
   }
   const safeReport = cloneReportForJsonEmbed(baseReport, maskShareLabels);
+  /** @type {{ schemaVersion: number, exportedAt: string, maskShareLabels: boolean, slimForHeavyExport: boolean, liveId: string, report: MarketingReport, platform?: string, idAliases?: Array<{ userId: string, serviceId: string }> }} */
   const payload = {
     schemaVersion: 1,
     exportedAt,
