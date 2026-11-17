@@ -129,6 +129,10 @@ export function buildForeignCapabilityCss() {
     'html.nl-cap-foreign .nl-record-sub:has(#nameplateOnBtn){display:none!important;}',
     // 中身のレーンが全部隠れた「公式の数字」の枠は出さない。レーンが開いたときだけ出す。
     'html.nl-cap-foreign #northStarLanes:not(:has([data-lane]:not([hidden]))){display:none!important;}',
+    // 行の無いトップファン（見出しと「このPCの記録です。」だけ）は出さない。行が付いたら出す。
+    // どのサービスも、順位の行が1つも無い「公式の数字」は枠ごと出さない。
+    'html.nl-cap-foreign [data-lane="contributionRanking"]:not(:has([role="listitem"])){display:none!important;}',
+    'html.nl-cap-foreign #northStarLanes:not(:has([role="listitem"])){display:none!important;}',
     // 送信口が能力表に無いサービスだけ、コメントを書く欄を出さない。
     'html.nl-cap-no-post .nl-comment-compose{display:none!important;}',
     // ギフトサイドバー履歴と a: の匿名（184）はニコ生だけ。広告を投げた人の段も出さない。

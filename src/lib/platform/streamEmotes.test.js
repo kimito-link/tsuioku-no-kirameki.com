@@ -4,6 +4,7 @@ import {
   kickEmotesFromContent,
   mergeEmoteDict,
   splitTextByEmotes,
+  bubbleEmotePlan,
   isSafeEmoteUrl,
   EMOTE_DICT_MAX,
 } from './streamEmotes.js';
@@ -95,6 +96,55 @@ describe('splitTextByEmotes', () => {
     ]);
     expect(splitTextByEmotes('KEKWx kekw', dict)).toBeNull();
     expect(splitTextByEmotes('x', new Map())).toBeNull();
+  });
+  it('空白が無く名前が続いても、全体が絵文字なら分ける', () => {
+    const glued = new Map([
+      ['westcolBLESSED', 'https://files.kick.com/emotes/9/fullsize'],
+      ['collectiblesW', 'https://files.kick.com/emotes/8/fullsize'],
+    ]);
+    expect(splitTextByEmotes('westcolBLESSEDwestcolBLESSED', glued)).toEqual([
+      { t: 'emote', name: 'westcolBLESSED', url: 'https://files.kick.com/emotes/9/fullsize' },
+      { t: 'emote', name: 'westcolBLESSED', url: 'https://files.kick.com/emotes/9/fullsize' },
+    ]);
+    expect(splitTextByEmotes('helloKEKW', dict)).toBeNull();
+  });
+});
+
+describe('bubbleEmotePlan', () => {
+  const kick = { name: 'KEKW', url: 'https://files.kick.com/emotes/37226/fullsize' };
+  const tw = { name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0' };
+  it('URL がある絵文字だけは画像にし、読み上げからは名前を外す', () => {
+    const kickPlan = bubbleEmotePlan('わこつ KEKW', [kick]);
+    expect(kickPlan.drop).toBe(false);
+    expect(kickPlan.voiceText).toBe('わこつ');
+    expect(kickPlan.segments?.some((s) => s.t === 'emote' && s.name === 'KEKW')).toBe(true);
+    const only = bubbleEmotePlan('KEKWKEKW', [kick]);
+    expect(only.drop).toBe(false);
+    expect(only.voiceText).toBe('');
+    expect(only.segments).toHaveLength(2);
+    const twitch = bubbleEmotePlan('Kappa', [tw]);
+    expect(twitch.voiceText).toBe('');
+    expect(twitch.segments?.[0]).toMatchObject({ t: 'emote', name: 'Kappa' });
+  });
+  it('URL が無い絵文字だけと、YouTube の :shortcut: だけは出さない', () => {
+    expect(bubbleEmotePlan('HYPERCLAP', [{ name: 'HYPERCLAP', url: '' }]).drop).toBe(true);
+    expect(bubbleEmotePlan('[emote:1:emojiBubbly]', []).drop).toBe(true);
+    expect(bubbleEmotePlan(':folded_hands:', []).drop).toBe(true);
+    expect(bubbleEmotePlan('🙏', []).drop).toBe(false);
+    expect(bubbleEmotePlan('🙏', []).text).toBe('🙏');
+    const mixed = bubbleEmotePlan('おはよう :heart:', []);
+    expect(mixed.drop).toBe(false);
+    expect(mixed.text).toBe('おはよう');
+    expect(mixed.voiceText).toBe('おはよう');
+  });
+  it('くっついた Kick の絵文字も、URL があれば画像の部品になる', () => {
+    const plan = bubbleEmotePlan('westcolBLESSDwestcolBLESSD', [
+      { name: 'westcolBLESSD', url: 'https://files.kick.com/emotes/3/fullsize' },
+    ]);
+    expect(plan.drop).toBe(false);
+    expect(plan.voiceText).toBe('');
+    expect(plan.segments).toHaveLength(2);
+    expect(plan.text.includes('[emote:')).toBe(false);
   });
   it('URL の形を確かめる', () => {
     expect(isSafeEmoteUrl('https://files.kick.com/emotes/1/fullsize')).toBe(true);

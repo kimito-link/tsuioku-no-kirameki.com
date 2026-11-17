@@ -4473,7 +4473,7 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
-   * @param {{ speakerKey: string, text: string, userId?: string, name?: string }} speech
+   * @param {{ speakerKey: string, text: string, userId?: string, name?: string, voiceText?: string, segments?: unknown }} speech
    */
   const showSpeechBubble = (speech) => {
     const seatIndex = seatByKey.get(speech.speakerKey);
@@ -4499,7 +4499,12 @@ export function mountVenueBarButton(options = {}) {
     }
 
     const text = truncateBubbleText(speech.text);
-    if (!text) return;
+    const segments = Array.isArray(speech.segments) ? speech.segments : null;
+    const hasEmote = !!(segments && segments.some((sg) => {
+      const part = /** @type {{ t?: string, url?: string }} */ (sg);
+      return part && part.t === 'emote' && part.url;
+    }));
+    if (!text && !hasEmote) return;
     // 吹き出しのキー: 席があれば seatIndex(number)、無ければ speakerKey 由来(席番号と衝突しない string)。
     const bubbleKey = seatUsable ? seatIndex : `nf:${speech.speakerKey}`;
     const previous = bubbleBySeat.get(bubbleKey);
@@ -4526,7 +4531,24 @@ export function mountVenueBarButton(options = {}) {
       (whoName && !isGenericComeviewName(whoName) ? whoName : '') || anonymousDisplayLabel(whoUid || speech.speakerKey);
     const textSpan = document.createElement('span');
     textSpan.className = 'nlsb-bubble-text';
-    textSpan.textContent = text;
+    if (hasEmote && segments) {
+      for (const raw of segments) {
+        const sg = /** @type {{ t?: string, v?: string, url?: string }} */ (raw);
+        if (!sg || sg.t === 'text') {
+          if (sg && sg.v) textSpan.append(document.createTextNode(String(sg.v)));
+          continue;
+        }
+        const em = document.createElement('span');
+        em.className = 'nl-emote is-ready';
+        em.title = '';
+        em.setAttribute('role', 'img');
+        em.style.cssText = 'display:inline-block;width:1.6em;height:1.6em;vertical-align:middle;overflow:hidden;color:transparent;background:center/contain no-repeat;';
+        em.style.backgroundImage = `url("${String(sg.url)}")`;
+        textSpan.append(em);
+      }
+    } else {
+      textSpan.textContent = text;
+    }
     element.append(whoSpan, textSpan);
 
     element.setAttribute('aria-hidden', 'true');
@@ -6807,6 +6829,7 @@ export function mountVenueBarButton(options = {}) {
       const liveId = liveIdFromPathname();
       const receivedAt = Date.now();
       for (const speech of result.speeches) {
+        if (typeof speech.voiceText === 'string' && !speech.voiceText.trim()) continue;
         const voiceIt = () => voicePlayer.enqueue([buildVenueHeadlessVoiceItem(speech, {
           receivedAt, liveId, broadcasterUid: _lastBroadcasterUid
         })]);

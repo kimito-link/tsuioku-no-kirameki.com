@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2148',
+    date: '2026-11-17',
+    summary: '空の順位表と絵文字コードを出さない',
+    items: Object.freeze([
+      'ニコニコ生放送以外の「公式の数字」は、トップファンなどの順位の行が1つも無いときは欄ごと出さないようにしました。行が付くと、また出ます。',
+      'Kick・Twitch・YouTube の会場の吹き出しでは、絵文字だけのコメントをコードのまま出さないようにしました。画像のアドレスがあるときは絵にし、無いときは吹き出しと読み上げから外します。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2147',
     date: '2026-11-17',
     summary: '配信を探す案内の読み込みを直す',
@@ -178,14 +187,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '拡張の短い説明文を見直した',
     items: Object.freeze([
       'Chrome ウェブストアに出る拡張の短い説明を「ライブ配信の応援コメントをこのPCの中だけに記録し、配信後に3つのレーンで振り返れます」にしました。使い方や動きは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2121',
-    date: '2026-11-13',
-    summary: '文字にくっついたスタンプ名も読まない',
-    items: Object.freeze([
-      '文字のすぐ後ろに YouTube のスタンプが続くと(例「fraudface-blue-smiling」)、スタンプの名前を英語のまま読んでいました。くっついていても名前は読まないようにしました。'
     ])
   }),
 ]);

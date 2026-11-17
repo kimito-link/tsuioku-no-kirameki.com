@@ -98,6 +98,29 @@ describe('pickNewVenueSpeech', () => {
     expect(s3.speeches).toHaveLength(0);
   });
 
+  it('絵文字だけのコメントは、画像が無いとき吹き出しにも読み上げにも出さない', () => {
+    const s1 = pickNewVenueSpeech([{ commentNo: 1, userId: 'a', name: 'A', text: 'x' }], { primed: false });
+    const kickUrl = 'https://files.kick.com/emotes/37226/fullsize';
+    const s2 = pickNewVenueSpeech(
+      [
+        { commentNo: 2, userId: 'a', name: 'A', text: 'わこつ KEKW', emotes: [{ name: 'KEKW', url: kickUrl }] },
+        { commentNo: 3, userId: 'a', name: 'A', text: 'HYPERCLAP', emotes: [{ name: 'HYPERCLAP', url: '' }] },
+        { commentNo: 4, userId: 'b', name: 'B', text: 'Kappa', emotes: [{ name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0' }] },
+        { commentNo: 5, userId: 'c', name: 'C', text: ':folded_hands:' },
+      ],
+      s1
+    );
+    expect(s2.speeches.map((s) => s.text)).toEqual(['わこつ KEKW', 'Kappa']);
+    expect(s2.speeches[0].voiceText).toBe('わこつ');
+    expect(s2.speeches[0].segments?.some((p) => p.t === 'emote')).toBe(true);
+    expect(s2.speeches[1].voiceText).toBe('');
+    const again = pickNewVenueSpeech(
+      [{ commentNo: 3, userId: 'a', name: 'A', text: 'HYPERCLAP', emotes: [{ name: 'HYPERCLAP', url: '' }] }],
+      s2
+    );
+    expect(again.speeches).toHaveLength(0);
+  });
+
   it('テキストの無い行は吹き出さない', () => {
     const s1 = pickNewVenueSpeech([{ commentNo: 1, userId: 'a', name: 'A', text: 'x' }], { primed: false });
     const s2 = pickNewVenueSpeech(

@@ -66,7 +66,11 @@ function emotesOf(content) {
 
 /** 本文の絵文字 [emote:123:KEKW] → KEKW(読み上げ・表示で数字を出さない) @param {unknown} text */
 export function stripKickEmotes(text) {
-  return String(text ?? '').replace(/\[emote:\d+:([^\]\s]{1,64})\]/g, '$1').replace(/\[emoji:([^\]\s]{1,64})\]/g, '$1');
+  return String(text ?? '')
+    .replace(/\[emote:\d+:([^\]\s]{1,64})\]/g, ' $1 ')
+    .replace(/\[emoji:([^\]\s]{1,64})\]/g, ' $1 ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
 /** Kick の時刻(ISO・または "2025-01-01 12:00:00" の UTC)→ ms。読めなければ 0 @param {unknown} s */

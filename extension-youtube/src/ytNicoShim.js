@@ -2801,6 +2801,7 @@ function startDomFixer() {
       setTimeout(startDomFixer, onWatch ? 500 : 3000);
       return;
     }
+    startEmotes();
     startDomFixerOn(root, true);
     return;
   }
@@ -2888,9 +2889,9 @@ function startEmotes() {
     const st = document.createElement('style');
     st.id = 'yt-emote-style';
     st.textContent =
-      '.nl-emote.is-ready{display:inline-block;width:1.6em;height:1.6em;vertical-align:middle;overflow:hidden;' +
-      'white-space:nowrap;color:transparent !important;-webkit-text-fill-color:transparent;text-shadow:none !important;' +
-      'background:center/contain no-repeat;margin:0 .08em;line-height:1.6em;font-size:inherit}';
+      '.nl-emote{display:inline-block;width:1.6em;height:1.6em;vertical-align:middle;overflow:hidden;' +
+      'white-space:nowrap;color:transparent !important;-webkit-text-fill-color:transparent;text-shadow:none !important;margin:0 .08em;line-height:1.6em;font-size:inherit}' +
+      '.nl-emote.is-ready{background:center/contain no-repeat;}';
     (document.head || document.documentElement).appendChild(st);
   }
 }
@@ -2917,6 +2918,10 @@ function loadEmoteImg(url) {
 function showEmoteImg(span, url) {
   void loadEmoteImg(url).then((ok) => {
     if (!ok || !span.isConnected) return;
+    if (!ok || !span.isConnected) {
+      if (span.isConnected) span.remove();
+      return;
+    }
     span.style.backgroundImage = `url("${url}")`;
     span.classList.add('is-ready');
   });

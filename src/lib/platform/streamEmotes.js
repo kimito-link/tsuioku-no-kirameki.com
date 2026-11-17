@@ -1,7 +1,8 @@
 /**
  * Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
  *
- * 記録の本文は今までどおり絵文字の名前(Kappa・KEKW)のまま持つ(読み上げ・検索・マーケHTML はそのまま)。
+ * 記録の本文は今までどおり絵文字の名前(Kappa・KEKW)のまま持つ(検索・マーケHTML はそのまま)。
+ * 吹き出しと読み上げだけ、URL があるときは画像にし、絵文字だけのコードは出さない・読まない。
  * 名前 → 画像の URL の対応だけを配信のサービスごとに覚えておき、画面の本文で名前と同じ語を画像に見せる。
  *
  * - Twitch: IRC の emotes タグ「25:0-4,12-16/1902:6-10」(位置は文字単位)→ static-cdn.jtvnw.net
@@ -147,7 +148,94 @@ export function splitTextByEmotes(text, dict) {
       hit = true;
     } else buf += p;
   }
+  if (!hit) return coverWithEmoteNames(s, dict);
+  if (buf) out.push({ t: 'text', v: buf });
+  return out;
+}
+
+/**
+ * 空白が無い並びでも、本文全体が覚えている絵文字の名前だけでできていれば分ける。
+ * 途中に名前でない文字が残るときは null（単語の一部は絵文字にしない）。
+ * @param {string} s
+ * @param {Map<string, string>} dict
+ * @returns {null | ({ t: 'text', v: string } | { t: 'emote', name: string, url: string })[]}
+ */
+function coverWithEmoteNames(s, dict) {
+  const names = [...dict.keys()].sort((a, b) => b.length - a.length);
+  if (!names.length) return null;
+  /** @type {({ t: 'text', v: string } | { t: 'emote', name: string, url: string })[]} */
+  const out = [];
+  let buf = '';
+  let i = 0;
+  let hit = false;
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n') {
+      buf += ch;
+      i += 1;
+      continue;
+    }
+    let name = '';
+    for (const n of names) {
+      if (s.startsWith(n, i)) { name = n; break; }
+    }
+    if (!name) return null;
+    if (buf) { out.push({ t: 'text', v: buf }); buf = ''; }
+    out.push({ t: 'emote', name, url: /** @type {string} */ (dict.get(name)) });
+    hit = true;
+    i += name.length;
+  }
   if (!hit) return null;
   if (buf) out.push({ t: 'text', v: buf });
   return out;
+}
+
+/**
+ * 読み上げから絵文字の名前を外す。名前が無いときは空白を整えるだけ。
+ * @param {unknown} text
+ * @param {ReadonlyArray<string>} names
+ * @returns {string}
+ */
+export function textWithoutEmoteNames(text, names) {
+  let s = String(text ?? '');
+  const list = [...new Set((names || []).filter((n) => isEmoteName(n)))].sort((a, b) => b.length - a.length);
+  for (const n of list) s = s.split(n).join(' ');
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * 吹き出しに出す本文。URL がある絵文字は画像の部品にする。
+ * 絵文字だけなのに URL が無いとき、または :shortcut: だけのときは drop（コードを出さない・読まない）。
+ * @param {unknown} text
+ * @param {unknown} emotes
+ * @returns {{ drop: boolean, text: string, voiceText: string, segments: null | ({ t: 'text', v: string } | { t: 'emote', name: string, url: string })[] }}
+ */
+export function bubbleEmotePlan(text, emotes) {
+  const src = String(text ?? '');
+  /** @type {string[]} */
+  const tagNames = [];
+  const raw = src
+    .replace(/\[emote:\d+:([^\]\s]+)\]/g, (_m, n) => { tagNames.push(String(n)); return ` ${n} `; })
+    .replace(/\[emoji:([^\]\s]+)\]/g, (_m, n) => { tagNames.push(String(n)); return ` ${n} `; });
+  const shortcutOnly = raw.trim() !== '' && raw.replace(/:[A-Za-z_][A-Za-z0-9_-]*:/g, '').trim() === '';
+  const display = raw.replace(/:[A-Za-z_][A-Za-z0-9_-]*:/g, ' ').replace(/\s+/g, ' ').trim();
+  const list = Array.isArray(emotes) ? emotes : [];
+  /** @type {string[]} */
+  const names = [];
+  /** @type {Map<string, string>} */
+  const dict = new Map();
+  for (const e of list) {
+    const name = String(e && typeof e === 'object' ? /** @type {{ name?: unknown }} */ (e).name || '' : '');
+    const url = String(e && typeof e === 'object' ? /** @type {{ url?: unknown }} */ (e).url || '' : '');
+    if (!isEmoteName(name)) continue;
+    names.push(name);
+    if (isSafeEmoteUrl(url)) dict.set(name, url);
+  }
+  for (const n of tagNames) if (isEmoteName(n) && !names.includes(n)) names.push(n);
+  const voiceText = textWithoutEmoteNames(display, names);
+  const segments = dict.size ? splitTextByEmotes(display, dict) : null;
+  const emoteOnly = (names.length > 0 && voiceText === '') || shortcutOnly || (display === '' && src.trim() !== '');
+  if (emoteOnly && !segments) return { drop: true, text: '', voiceText: '', segments: null };
+  if (segments) return { drop: false, text: display, voiceText, segments };
+  return { drop: false, text: names.length ? voiceText : display, voiceText, segments: null };
 }

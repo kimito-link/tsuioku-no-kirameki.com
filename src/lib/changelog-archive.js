@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2121',
+    date: '2026-11-13',
+    summary: '文字にくっついたスタンプ名も読まない',
+    items: Object.freeze([
+      '文字のすぐ後ろに YouTube のスタンプが続くと(例「fraudface-blue-smiling」)、スタンプの名前を英語のまま読んでいました。くっついていても名前は読まないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2120',
     date: '2026-11-13',
     summary: 'スタンプの名前を読み上げない',
