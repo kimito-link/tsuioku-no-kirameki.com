@@ -156,6 +156,31 @@ function scrubMarketingTopUserAvatars(users, ctx) {
 }
 
 /**
+ * レイド・加入・ギフトなど、発言ではない行。ニコ生のコメントには ytKind が無いので false。
+ * @param {unknown} c
+ */
+export function isMarketingSupportRow(c) {
+  if (!c || typeof c !== 'object') return false;
+  const k = /** @type {{ ytKind?: unknown }} */ (c).ytKind;
+  if (k == null || k === '') return false;
+  return String(k) !== 'text';
+}
+
+/**
+ * 応援の行が1件も無ければ、渡された配列そのものを返す（ニコ生は追加のコピーをしない）。
+ * @param {unknown[]} comments
+ */
+export function speechCommentsForMarketing(comments) {
+  if (!Array.isArray(comments) || comments.length === 0) return comments;
+  for (let i = 0; i < comments.length; i += 1) {
+    if (isMarketingSupportRow(comments[i])) {
+      return comments.filter((c) => !isMarketingSupportRow(c));
+    }
+  }
+  return comments;
+}
+
+/**
  * StoredComment の配列からマーケティング分析用の集計を行う。
  *
  * 0.1.46 (AB): 配信者本人を KPI / CPM / uniqueUsers / timeline / segment /
@@ -187,8 +212,12 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   const engagementComments = [];
   /** @type {StoredComment[]} */
   const interestArrivalComments = [];
+  /** @type {StoredComment[]} */
+  const supportRows = [];
   for (const c of filtered) {
-    if (parseInterestArrivalComment(String(c.text || ''))) {
+    if (isMarketingSupportRow(c)) {
+      supportRows.push(c);
+    } else if (parseInterestArrivalComment(String(c.text || ''))) {
       interestArrivalComments.push(c);
     } else {
       engagementComments.push(c);
@@ -333,7 +362,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     else unattributedComments += 1;
   }
 
-  return {
+  const report = {
     liveId,
     totalComments: engagementComments.length,
     uniqueUsers: users.length,
@@ -372,6 +401,10 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     quarterEngagement,
     interestArrivalSummary
   };
+  if (supportRows.length) {
+    /** @type {MarketingReport & { supportRows?: StoredComment[] }} */ (report).supportRows = supportRows;
+  }
+  return report;
 }
 
 /** @param {StoredComment[]} interestArrivalComments */

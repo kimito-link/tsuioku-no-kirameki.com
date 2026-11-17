@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2141',
+    date: '2026-11-17',
+    summary: '分析を各配信サービス向けにした',
+    items: Object.freeze([
+      'ニコ生以外の分析レポートでは、そのサービスに無い数（広告・来場・184）を出さないようにしました。同時に見ている人数は、そのサービスの呼び方で出します。',
+      'レイド・加入のようなシステムの行を、コメントの件数に数えないようにしました。',
+      'ミクチャのファン登録を記録するようにしました。円に換算した合計は「推定」と書きます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2140',
     date: '2026-11-17',
     summary: '分析レポートの見た目は今までどおり',
@@ -172,15 +182,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'YouTube の会場で最初のギフト音も鳴る',
     items: Object.freeze([
       'YouTube などの会場で、効果音の読み込みが終わる前に来たギフトや広告の音が、ページに止められて鳴らないことがありました。読み込みが終わるのを待ってから鳴らすようにしました。拡張のエラー一覧に「Unsafe attempt to load URL」が積もることも減ります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2118',
-    date: '2026-11-13',
-    summary: '混んでも合唱が途中で消えにくく',
-    items: Object.freeze([
-      '読み上げの待ちがあふれた時、何人もの声をまとめた合唱の件は、ふつうの件より後に捨てるようにしました。合唱に加わった人の声ごと消えることが減ります。',
-      '合唱で重ねる声を、まったく同じ文だけでなく同じ言葉(www に w・草 の声など)からも探すようにしました。'
     ])
   })
 ]);

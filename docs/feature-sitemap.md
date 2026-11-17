@@ -754,7 +754,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
 
 - `api/billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
@@ -793,6 +793,8 @@
 - `src/lib/newVsRepeatBasis.js` — マーケレポートの「新規 vs 常連」を出してよいか判定する純関数(2026-10-20)。
 - `src/lib/northStarFallbackHtml.js` — v0.1.241: 北極星「鏡のように貼り付け」レーンの fallback HTML 生成。
 - `src/lib/panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
+- `src/lib/platform/marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
+- `src/lib/platform/marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。
 - `src/lib/reportCommentsTableSection.js` — HTML レポート「保存コメント一覧」セクション。
 - `src/lib/reportFriendlyMetaRowsHtml.js` — v0.1.635: HTML レポートの「やさしいメタ情報」テーブル行ビルダ + ラベル変換（純ロジック）。
@@ -807,6 +809,7 @@
 - `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
 - `src/lib/viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
+- `src/lib/youtube/ytLvKeyBridge.js` — 疑似 lv → 配信キー。マーケの過去比較が他サービスの配信を混ぜないために使う。
 - `src/lib/youtube/ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
 - `src/lib/youtube/ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
 - `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
@@ -1534,11 +1537,16 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (2版)
+### 💾 記録件数 (3版)
+- `v0.1.2141` 2026-11-17 — 分析を各配信サービス向けにした
 - `v0.1.2134` 2026-11-16 — 混んだ配信でも指定の声で読みやすく
 - `v0.1.2127` 2026-11-15 — 大きな記録で開いた直後の固まりを減らした
 
-### 🏟 会場・席 (4版)
+### 🙂 匿名(184) (1版)
+- `v0.1.2141` 2026-11-17 — 分析を各配信サービス向けにした
+
+### 🏟 会場・席 (5版)
+- `v0.1.2141` 2026-11-17 — 分析を各配信サービス向けにした
 - `v0.1.2139` 2026-11-16 — 読み足した過去コメントを吹き出しに出さない
 - `v0.1.2133` 2026-11-16 — Twitch などで数え始めた時刻を出す
 - `v0.1.2130` 2026-11-16 — 混んだ配信でも読み上げが止まらない
@@ -1552,14 +1560,13 @@
 - `v0.1.2133` 2026-11-16 — Twitch などで数え始めた時刻を出す
 - `v0.1.2119` 2026-11-13 — YouTube の会場で最初のギフト音も鳴る
 
-### 🔊 読み上げ (7版)
+### 🔊 読み上げ (6版)
 - `v0.1.2139` 2026-11-16 — 読み足した過去コメントを吹き出しに出さない
 - `v0.1.2138` 2026-11-16 — Kick・ABEMA・Twitch等で開始からの過去コメントも記録
 - `v0.1.2136` 2026-11-16 — 使わない権限を拡張から外した
 - `v0.1.2134` 2026-11-16 — 混んだ配信でも指定の声で読みやすく
 - `v0.1.2130` 2026-11-16 — 混んだ配信でも読み上げが止まらない
 - `v0.1.2120` 2026-11-13 — スタンプの名前を読み上げない
-- `v0.1.2118` 2026-11-13 — 混んでも合唱が途中で消えにくく
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.2122` 2026-11-13 — 拡張の短い説明文を見直した

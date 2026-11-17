@@ -58,6 +58,8 @@ import { fetchKokenGiftHistoryViaExtension } from '../lib/kokenGiftHistoryFetchC
 import { HTML_REPORT_HEAVY_COMMENT_THRESHOLD } from '../lib/reportCommentsTableSection.js';
 import { openBroadcastSessionSummaryDb, listBroadcastSessionSummaryForLive } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
+import { marketingViewFor } from '../lib/platform/marketingPlatformPlan.js';
+import { ytLvMetaForLv } from '../lib/youtube/ytLvKeyBridge.js';
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
 import { normalizeBroadcasterProfileModel } from '../lib/broadcasterProfileCard.js';
@@ -607,6 +609,9 @@ async function runExport(lid) {
     mktProf.mark('read');
     const heavyMkt = comments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
     const reportBroadcasterUid = String(snapshot?.broadcasterUserId || '').trim();
+    const marketingView = marketingViewFor(snapshot?.platform);
+    const pageCountRaw = Number(snapshot?.slotViewCount ?? snapshot?.platformFacts?.viewCount ?? snapshot?.platformFacts?.official?.totalViews);
+    const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : 0;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
     await yieldToBrowserPaint();
     const report = aggregateMarketingReport(comments, lid, { broadcasterUserId: reportBroadcasterUid });
@@ -636,9 +641,21 @@ async function runExport(lid) {
         try {
           const sumDb = await openBroadcastSessionSummaryDb();
           const pastLimit = comments.length > 8000 ? 4 : 8;
+          const currentMeta = marketingView ? ytLvMetaForLv(lid) : null;
           const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
             limit: pastLimit,
-            excludeLiveId: lid
+            excludeLiveId: lid,
+            // ニコ生は絞らない。他サービスは、配信キーが分かって同じサービスのときだけ混ぜる。
+            ...(marketingView
+              ? {
+                  acceptLiveId: (id) => {
+                    const meta = ytLvMetaForLv(id);
+                    if (!meta || meta.platform !== marketingView.id) return false;
+                    if (currentMeta?.channelId && meta.channelId && currentMeta.channelId !== meta.channelId) return false;
+                    return true;
+                  },
+                }
+              : {}),
           });
           if (!recentLiveIds.length) return [];
           const pastArrays = await Promise.all(recentLiveIds.map((id) => readAllCommentsForLive(id)));
@@ -756,6 +773,7 @@ async function runExport(lid) {
     }
     mktProf.mark('html_report');
     const html = buildMarketingDashboardHtml(report, {
+      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount } : {}),
       mediaKitHtml,
       htmlReportHtml,
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,

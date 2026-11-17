@@ -214,6 +214,7 @@ export function parseTwChatLine(line) {
       currency: '',
       subMonths: Number(tags['msg-param-cumulative-months'] || 0) || 0,
       subTier: twSubTierLabel(plan),
+      subEvent: msgId,
     };
   }
   if (msgId === 'subgift' || msgId === 'submysterygift' || msgId === 'anonsubgift' || msgId === 'anonsubmysterygift') {

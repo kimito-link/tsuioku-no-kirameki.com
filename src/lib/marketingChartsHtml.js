@@ -10,6 +10,14 @@ import { maskLabelForShare } from './privacyDisplay.js';
 import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
 import { mangaBroadcastSummaryEmbeddedCss } from './mangaBroadcastSummary.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
+import { speechCommentsForMarketing } from './marketingAggregate.js';
+import { marketingViewFor } from './platform/marketingPlatformPlan.js';
+import {
+  sectionParticipationForPlatform,
+  sectionPlatformDedicatedHtml,
+  sectionPlatformSummaryHtml,
+  sectionSupportFlowHtml,
+} from './platform/marketingPlatformChapters.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import {
@@ -101,8 +109,8 @@ function formatSilenceMs(ms) {
   return rem ? `${m}分${rem}秒` : `${m}分`;
 }
 
-/** @param {MarketingReport} r */
-function sectionContentShape(r) {
+/** @param {MarketingReport} r @param {ReturnType<typeof marketingViewFor>} [view] */
+function sectionContentShape(r, view = null) {
   if (r.totalComments <= 0) return '';
   const ts = r.textStats;
   const i = r.is184;
@@ -156,14 +164,17 @@ function sectionContentShape(r) {
       icon: '⏸️'
     }
   ];
-  const inner = cards
+  const shown = view
+    ? cards.filter((c) => c.label !== '184（既知のみ）' && c.label !== 'プレミアム会員（既知のみ）')
+    : cards;
+  const inner = shown
     .map(
       (c) =>
         `<div class="mkt-kpi mkt-kpi--compact"><span class="mkt-kpi__icon">${c.icon}</span><span class="mkt-kpi__val">${escapeHtml(c.value)}</span><span class="mkt-kpi__label">${escapeHtml(c.label)}</span></div>`
     )
     .join('');
   return `<section class="mkt-section"><h2>コメント本文・属性の傾向</h2>
-<p class="mkt-note">記録された本文のみを対象。184・プレミアム会員は、その属性が記録に付いている行だけ（既知のみ）で割合を計算します。一般/プレミアムが取れるのは主に NDGR 取り込み行で、DOM のみの行は母数から除外されます。</p>
+<p class="mkt-note">${view ? '記録された本文のみを対象。' : '記録された本文のみを対象。184・プレミアム会員は、その属性が記録に付いている行だけ（既知のみ）で割合を計算します。一般/プレミアムが取れるのは主に NDGR 取り込み行で、DOM のみの行は母数から除外されます。'}</p>
 <div class="mkt-kpi-grid">${inner}</div></section>`;
 }
 
@@ -412,7 +423,7 @@ function sectionToc(items) {
  * @param {import('./concurrentTimelineSeries.js').ConcurrentTimelineSeries} series
  * @param {import('./concurrentPeakAnalysis.js').ConcurrentPeakAnalysis} peak
  */
-function sectionConcurrentTimeline(series, peak) {
+function sectionConcurrentTimeline(series, peak, view = null) {
   // v0.1.1854: 線を引けない（同接サンプル2点未満）ときは章ごと出さない（空の章を並べない）。
   if (!series || series.points.length < 2) return '';
   const W = 900;
@@ -472,8 +483,9 @@ function sectionConcurrentTimeline(series, peak) {
         })()
       : '';
   // 0.1.47 (AC): hybrid モード（official+estimated 混在）でも適切に表示
-  const sourceLabel =
-    series.source === 'official'
+  const sourceLabel = view
+    ? view.concurrentLabel
+    : series.source === 'official'
       ? '公式来場者数'
       : series.source === 'mixed'
         ? '公式来場者数 + 同接推定値（取れた方を採用）'
@@ -488,7 +500,7 @@ function sectionConcurrentTimeline(series, peak) {
 </ul>`
     : '';
   return `<section class="mkt-section" id="mkt-concurrent">
-<h2>同接推移カーブ <span class="mkt-pro-tag">PRO</span></h2>
+<h2>${view ? escapeHtml(view.concurrentHeading) : '同接推移カーブ'} <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">${escapeHtml(sourceLabel)}を時系列で表示。黄丸＝ピーク / 赤丸＝半減点。${lastMin}分間で ${n} サンプル。</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
@@ -551,7 +563,7 @@ ${yLabels}
  * 折れ線 + 個人ペース鈍化の KPI。userId が取れる行のみ対象。
  * @param {import('./commentFatigue.js').CommentFatigueReport} fatigue
  */
-function sectionCommentFatigue(fatigue) {
+function sectionCommentFatigue(fatigue, view = null) {
   if (!fatigue || !Array.isArray(fatigue.tenureBuckets) || fatigue.tenureBuckets.length < 2) {
     return '';
   }
@@ -610,7 +622,7 @@ function sectionCommentFatigue(fatigue) {
 
   return `<section class="mkt-section" id="mkt-fatigue">
 <h2>コメント疲労カーブ（在籍時間別）<span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">「短い時間でコメントを打つと疲れて失速する」を可視化。横軸＝各コメンターが<strong>初コメしてからの経過分</strong>。水色＝1人あたりコメ数（右肩下がりなら発話量が減衰）、黄＝残存率（初コメ直後を100%として何%が発話を続けているか）。userId が取れる行のみ対象（匿名184は同一人物として追跡不可のため除外）。</p>
+<p class="mkt-note">${view ? '「短い時間でコメントを打つと疲れて失速する」を可視化。横軸＝各コメンターが<strong>初コメしてからの経過分</strong>。水色＝1人あたりコメ数（右肩下がりなら発話量が減衰）、黄＝残存率（初コメ直後を100%として何%が発話を続けているか）。userId が取れる行のみ対象（userId が取れない行は同一人物として追跡できないため除外）。' : '「短い時間でコメントを打つと疲れて失速する」を可視化。横軸＝各コメンターが<strong>初コメしてからの経過分</strong>。水色＝1人あたりコメ数（右肩下がりなら発話量が減衰）、黄＝残存率（初コメ直後を100%として何%が発話を続けているか）。userId が取れる行のみ対象（匿名184は同一人物として追跡不可のため除外）。'}</p>
 <div class="mkt-kpi-grid">${kpiHtml}</div>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg" role="img" aria-label="在籍時間別のコメント疲労カーブ">
@@ -797,7 +809,7 @@ ${dots}
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
  */
-function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
+function sectionDepartedHeavy(departed, maskShare, identiconResolver, view = null) {
   if (!Array.isArray(departed) || departed.length === 0) return '';
   if (maskShare) return ''; // 個人特定リストなので共有モードでは出さない
   const rows = departed
@@ -834,7 +846,7 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
   return `<section class="mkt-section" id="mkt-departed">
 <h2>離反コメンター TOP <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">過去の配信で 5+ コメだったが、今回は記録に居ないユーザー（ラテラル分析 L8）。引き留め / 復帰アプローチの候補。</p>
-<p class="mkt-spec-note">※ 表示名・サムネはコメ記録時点のもの（仕様）。配信者がハンドルを変えた場合、niconico 側の最新と異なることがあります。ID クリックで現在のユーザーページに移動します。</p>
+<p class="mkt-spec-note">${view ? (view.servicePage ? `※ 表示名・サムネはコメ記録時点のもの（仕様）。名前が変わった場合、${escapeHtml(view.servicePage)}の最新と異なることがあります。` : '※ 表示名・サムネはコメ記録時点のもの（仕様）。') : '※ 表示名・サムネはコメ記録時点のもの（仕様）。配信者がハンドルを変えた場合、niconico 側の最新と異なることがあります。ID クリックで現在のユーザーページに移動します。'}</p>
 <table class="mkt-rank">
 <thead><tr><th>#</th><th>サムネ</th><th>ユーザー</th><th>ID</th><th>過去累計コメ</th><th>過去参加放送数</th></tr></thead>
 <tbody>${rows}</tbody>
@@ -848,7 +860,7 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
  */
-function sectionAttendanceMatrix(matrix, maskShare, identiconResolver) {
+function sectionAttendanceMatrix(matrix, maskShare, identiconResolver, view = null) {
   if (!matrix || matrix.users.length === 0 || matrix.broadcasts.length < 2) return '';
   if (maskShare) return '';
   const headCols = matrix.broadcasts
@@ -891,7 +903,7 @@ ${cells}
   return `<section class="mkt-section" id="mkt-attendance">
 <h2>常連出席カレンダー <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">直近 ${matrix.broadcasts.length} 配信 × TOP ${matrix.users.length} コメンター（ラテラル分析 L9）。● = 出席 / · = 不参加。各列の横軸は左→右が古→新。</p>
-<p class="mkt-spec-note">※ 表示名・サムネはコメ記録時点のもの（仕様）。配信者がハンドルを変えた場合、niconico 側の最新と異なることがあります。</p>
+<p class="mkt-spec-note">${view ? (view.servicePage ? `※ 表示名・サムネはコメ記録時点のもの（仕様）。名前が変わった場合、${escapeHtml(view.servicePage)}の最新と異なることがあります。` : '※ 表示名・サムネはコメ記録時点のもの（仕様）。') : '※ 表示名・サムネはコメ記録時点のもの（仕様）。配信者がハンドルを変えた場合、niconico 側の最新と異なることがあります。'}</p>
 <div class="mkt-chart-wrap">
 <table class="mkt-rank mkt-attendance">
 <thead><tr><th>サムネ</th><th>ユーザー</th>${headCols}<th>累計</th></tr></thead>
@@ -1285,11 +1297,11 @@ function sectionUniqueWordSuggestions(suggestions) {
  * 0.1.25 (Z): リーチ係数（L15）。
  * @param {ReturnType<typeof computeReachCoefficient>} reach
  */
-function sectionReachCoefficient(reach) {
+function sectionReachCoefficient(reach, view = null) {
   if (!reach || reach.coefficient == null) return '';
   return `<section class="mkt-section" id="mkt-reach">
-<h2>リーチ係数（同接 / コメンター比）<span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">「現在の同接 ÷ 直近 5 分のユニークコメンター数」= 1 コメンターあたりの観戦者比率（ラテラル分析 L15）。</p>
+<h2>リーチ係数（${view ? escapeHtml(view.concurrentLabel) : '同接'} / コメンター比）<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">「現在の${view ? escapeHtml(view.concurrentLabel) : '同接'} ÷ 直近 5 分のユニークコメンター数」= 1 コメンターあたりの観戦者比率（ラテラル分析 L15）。</p>
 <div class="mkt-kpi-grid"><div class="mkt-kpi"><span class="mkt-kpi__icon">📡</span><span class="mkt-kpi__val">${reach.coefficient.toFixed(2)}</span><span class="mkt-kpi__label">リーチ係数</span></div></div>
 </section>`;
 }
@@ -1707,17 +1719,18 @@ function giftLedgerUserIdentityCells(identity, maskShare, identiconResolver = un
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} [identiconResolver]
  */
-function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined) {
+function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined, view = null) {
+  const unit = view && view.pointColumn ? view.pointColumn : 'pt';
   if (!ledger || (!ledger.rows.length && !ledger.itemAggregates.length)) {
     return `<section class="mkt-section mkt-section--gift-ledger" id="mkt-gift-ledger">
-<h2>ギフト投げ履歴（誰が・何を・いくら）</h2>
-<p class="mkt-note">${escapeHtml(ledger?.sourceNotes?.[0] || 'ギフト履歴がありません。マーケ DL 時に koken 公式 API で一括取得します（「履歴」タブを開かなくても可）。配信ページを開いた状態で再 DL してください。')}</p>
+<h2>${view && view.giftWord ? escapeHtml(`${view.giftWord}の履歴`) : 'ギフト投げ履歴（誰が・何を・いくら）'}</h2>
+<p class="mkt-note">${escapeHtml(view ? (view.hideGift ? '' : `このPCの記録に、${view.giftWord}はまだありません。`) : (ledger?.sourceNotes?.[0] || 'ギフト履歴がありません。マーケ DL 時に koken 公式 API で一括取得します（「履歴」タブを開かなくても可）。配信ページを開いた状態で再 DL してください。'))}</p>
 </section>`;
   }
 
   const summaryBits = [
     ledger.totalThrows > 0 ? `投げ ${formatEventRankingNumber(ledger.totalThrows)} 件` : '',
-    ledger.totalPoints > 0 ? `合計 ${formatEventRankingNumber(ledger.totalPoints)} pt` : '',
+    ledger.totalPoints > 0 ? `合計 ${formatEventRankingNumber(ledger.totalPoints)}${unit === 'pt' ? ' pt' : ` ${unit}`}` : '',
     ledger.uniqueSenders > 0
       ? `送り主 ${formatEventRankingNumber(ledger.uniqueSenders)} 名`
       : ''
@@ -1736,7 +1749,7 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
       const itemsHtml = (row.items || [])
         .map((it) => {
           const itemThumb = giftLedgerItemThumbHtml(it.thumbnailUrl, maskShare, 24);
-          return `<li class="mkt-gift-sender-item">${itemThumb}<span class="mkt-gift-sender-item__name">${escapeHtml(it.itemName)}</span> <strong>×${it.throwCount}</strong> <span class="mkt-gift-sender-item__pt">${escapeHtml(formatEventRankingNumber(it.totalPoints))} pt</span></li>`;
+          return `<li class="mkt-gift-sender-item">${itemThumb}<span class="mkt-gift-sender-item__name">${escapeHtml(it.itemName)}</span> <strong>×${it.throwCount}</strong> <span class="mkt-gift-sender-item__pt">${escapeHtml(formatEventRankingNumber(it.totalPoints))}${unit === 'pt' ? ' pt' : escapeHtml(` ${unit}`)}</span></li>`;
         })
         .join('');
       return `<tr>
@@ -1746,7 +1759,7 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
 <td data-label="ID">${idCells.idHtml}</td>
 <td data-label="投げたアイテム"><ul class="mkt-gift-sender-items">${itemsHtml}</ul></td>
 <td data-label="回数" class="mkt-num">${escapeHtml(formatEventRankingNumber(row.throwCount))}</td>
-<td data-label="合計pt" class="mkt-num">${escapeHtml(formatEventRankingNumber(row.totalPoints))} pt</td>
+<td data-label="合計${unit === 'pt' ? 'pt' : escapeHtml(unit)}" class="mkt-num">${escapeHtml(formatEventRankingNumber(row.totalPoints))}${unit === 'pt' ? ' pt' : escapeHtml(` ${unit}`)}</td>
 </tr>`;
     })
     .join('');
@@ -1754,10 +1767,10 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
   const senderSection =
     senderRows.length > 0
       ? `<h3 class="mkt-subhead">送り主別（誰が・何を・合計いくら）</h3>
-<p class="mkt-note">送り主ごとに、よく投げたアイテムと回数・pt をまとめています。ニコ生の匿名ギフトは「名無し」にまとまることがあります。</p>
+<p class="mkt-note">${view ? escapeHtml(`送り主ごとに、よく投げた${view.giftWord}と回数・${unit}をまとめています。${view.anonLabel ? `${view.anonLabel}のギフトは「名無し」にまとまることがあります。` : ''}`) : '送り主ごとに、よく投げたアイテムと回数・pt をまとめています。ニコ生の匿名ギフトは「名無し」にまとまることがあります。'}</p>
 <p class="mkt-spec-note">※ 表示名・サムネは取得時点のもの。数値 ID はクリックでユーザーページへ移動します。</p>
 <div class="mkt-table-scroll"><table class="mkt-rank mkt-gift-sender-table">
-<thead><tr><th>#</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>投げたアイテム</th><th>回数</th><th>合計pt</th></tr></thead>
+<thead><tr><th>#</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>投げたアイテム</th><th>回数</th><th>合計${unit === 'pt' ? 'pt' : escapeHtml(unit)}</th></tr></thead>
 <tbody>${senderRows}</tbody>
 </table></div>`
       : '';
@@ -1769,7 +1782,7 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
             ? `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(row.thumbnailUrl)}" alt="" width="32" height="32" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
             : '<span class="mkt-gift-ledger-item__thumb mkt-gift-ledger-item__thumb--empty"></span>';
           const ptNote =
-            row.points > 0 ? ` / ${escapeHtml(formatEventRankingNumber(row.points))}pt` : '';
+            row.points > 0 ? ` / ${escapeHtml(formatEventRankingNumber(row.points))}${unit === 'pt' ? 'pt' : escapeHtml(unit)}` : '';
           return `<span class="mkt-gift-ledger-item">${thumb}<span class="mkt-gift-ledger-item__name">${escapeHtml(row.itemName)}</span><strong>×${row.count}</strong>${ptNote}</span>`;
         })
         .join('')}</div>`
@@ -1782,7 +1795,7 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
       const itemThumbInner = itemThumbSrc
         ? `<img class="mkt-gift-ledger-row__thumb" src="${escapeHtml(itemThumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
         : '<span class="mkt-gift-ledger-row__thumb mkt-gift-ledger-row__thumb--empty"></span>';
-      const points = `${formatEventRankingNumber(row.points)} pt`;
+      const points = `${formatEventRankingNumber(row.points)}${unit === 'pt' ? ' pt' : ` ${unit}`}`;
       return `<tr>
 <td data-label="#">${i + 1}</td>
 <td data-label="時刻" class="mkt-gift-ledger-time">${escapeHtml(row.timeLabel)}</td>
@@ -1790,7 +1803,7 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
 <td data-label="サムネ">${idCells.thumbCell}</td>
 <td data-label="アカウント" class="mkt-gift-sender">${idCells.accountHtml}</td>
 <td data-label="ID">${idCells.idHtml}</td>
-<td data-label="pt" class="mkt-num">${escapeHtml(points)}</td>
+<td data-label="${unit === 'pt' ? 'pt' : escapeHtml(unit)}" class="mkt-num">${escapeHtml(points)}</td>
 <td data-label="出典" class="mkt-gift-evidence">${escapeHtml(row.source)}</td>
 </tr>`;
     })
@@ -1806,14 +1819,14 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
   const chartsBlock =
     senderChartHtml || itemChartHtml
       ? `<div class="mkt-gift-ledger-charts">
-${senderChartHtml ? `<h3 class="mkt-subhead">送り主別 pt（グラフ）</h3>${senderChartHtml}` : ''}
-${itemChartHtml ? `<h3 class="mkt-subhead">アイテム別 pt（グラフ）</h3>${itemChartHtml}` : ''}
+${senderChartHtml ? `<h3 class="mkt-subhead">送り主別 ${unit === 'pt' ? 'pt' : escapeHtml(unit)}（グラフ）</h3>${senderChartHtml}` : ''}
+${itemChartHtml ? `<h3 class="mkt-subhead">アイテム別 ${unit === 'pt' ? 'pt' : escapeHtml(unit)}（グラフ）</h3>${itemChartHtml}` : ''}
 </div>`
       : '';
 
   return `<section class="mkt-section mkt-section--gift-ledger" id="mkt-gift-ledger">
-<h2>ギフト投げ履歴（誰が・何を・いくら）</h2>
-<p class="mkt-note">ニコ生の「この番組へのギフト履歴」に近い形で、送り主・アイテム・pt・時刻を一覧します。マーケ DL 時に <strong>koken 公式 API で一括取得</strong>し、サイドバー「履歴」タブの DOM 取得とマージします。${summaryBits.length ? ` <strong>${escapeHtml(summaryBits.join(' / '))}</strong>` : ''}</p>
+<h2>${view && view.giftWord ? escapeHtml(`${view.giftWord}の履歴`) : 'ギフト投げ履歴（誰が・何を・いくら）'}</h2>
+<p class="mkt-note">${view ? `${escapeHtml(`このPCの記録から、${view.giftWord}の送り主・内容・${unit}・時刻を一覧します。`)}${view.pointEstimate ? ' 円にそろえた列は推定です。' : ''}${view.mixchUnitNote ? ' コインの単位は未確認です。' : ''}` : 'ニコ生の「この番組へのギフト履歴」に近い形で、送り主・アイテム・pt・時刻を一覧します。マーケ DL 時に <strong>koken 公式 API で一括取得</strong>し、サイドバー「履歴」タブの DOM 取得とマージします。'}${summaryBits.length ? ` <strong>${escapeHtml(summaryBits.join(' / '))}</strong>` : ''}</p>
 <p class="mkt-spec-note">${escapeHtml(MARKETING_GIFT_LEDGER_DISPLAY_RULE_NOTE)} 台帳の投げ件数は <code>history</code> 行数が正本です（<code>totalCounts</code> はアイテム別回数の表示にのみ使用し、二重加算しません）。</p>
 ${chartsBlock}
 ${senderSection}
@@ -1821,7 +1834,7 @@ ${itemChips ? `<h3 class="mkt-subhead">アイテム別の投げ数</h3>${itemChi
 <h3 class="mkt-subhead">投げ一覧（新しい順）</h3>
 ${truncateNote}
 <div class="mkt-table-scroll"><table class="mkt-rank mkt-gift-ledger-table">
-<thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th><th>出典</th></tr></thead>
+<thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>${unit === 'pt' ? 'pt' : escapeHtml(unit)}</th><th>出典</th></tr></thead>
 <tbody>${tableRows}</tbody>
 </table></div>
 ${notes}
@@ -2576,14 +2589,20 @@ function supporterChikuranAvatarHtml(row, rank, maskShare, identiconResolver) {
  * @param {import('./supporterChikuranScore.js').SupporterChikuranRow[]} rows
  * @param {boolean} maskShare
  */
-function supporterChikuranSummaryLine(rows, maskShare) {
+function supporterChikuranSummaryLine(rows, maskShare, view = null) {
   const top = rows[0];
   if (!top) return '手元データから見える応援者の勢いはまだ薄めです。';
   const signals = [];
   if (top.commentCount > 0) signals.push(`コメント${top.commentCount}件`);
   if (top.giftThrowCount > 0) signals.push(`ギフト${top.giftThrowCount}投`);
-  if (top.giftPointTotal > 0) signals.push(`${formatEventRankingNumber(top.giftPointTotal)}pt`);
-  if (top.adPointTotal > 0) signals.push(`広告${formatEventRankingNumber(top.adPointTotal)}pt`);
+  if (top.giftPointTotal > 0) {
+    signals.push(
+      view && view.pointColumn && view.pointColumn !== 'pt'
+        ? `${formatEventRankingNumber(top.giftPointTotal)} ${view.pointColumn}`
+        : `${formatEventRankingNumber(top.giftPointTotal)}pt`
+    );
+  }
+  if (top.adPointTotal > 0 && !view) signals.push(`広告${formatEventRankingNumber(top.adPointTotal)}pt`);
   const detail = signals.length ? `（${signals.join(' / ')}）` : '';
   const rawName = top.isAnonymousAggregate
     ? '匿名応援'
@@ -2604,7 +2623,7 @@ function supporterChikuranSummaryLine(rows, maskShare) {
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
  */
-function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
+function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver, view = null) {
   if (!analysis || !Array.isArray(analysis.rows) || analysis.rows.length === 0) return '';
   const rows = analysis.rows.slice(0, 15);
   const maxScore = Math.max(1, ...rows.map((row) => row.totalScore || 0));
@@ -2617,7 +2636,7 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
     {
       label: '応援者候補',
       value: `${analysis.totals.supporterCount}名`,
-      hint: 'コメント・ギフト・広告を合算'
+      hint: view ? 'コメントとギフトを合算' : 'コメント・ギフト・広告を合算'
     },
     {
       label: '直近15分で反応',
@@ -2635,7 +2654,8 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
       hint: '広告ptと匿名応援の有無'
     }
   ];
-  const cardHtml = cards
+  const shownCards = view ? cards.filter((c) => c.label !== '広告/匿名') : cards;
+  const cardHtml = shownCards
     .map(
       (c) => `<div class="mkt-supporter-card">
 <span class="mkt-supporter-card__label">${escapeHtml(c.label)}</span>
@@ -2651,7 +2671,9 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
       const giftLabel =
         row.giftThrowCount > 0 || row.giftPointTotal > 0
           ? `${row.giftThrowCount || 0}投 / ${
-              row.giftPointTotal > 0 ? `${formatEventRankingNumber(row.giftPointTotal)}pt` : 'pt未取得'
+              row.giftPointTotal > 0
+                ? `${formatEventRankingNumber(row.giftPointTotal)}${view && view.pointColumn && view.pointColumn !== 'pt' ? ` ${view.pointColumn}` : 'pt'}`
+                : (view && view.pointColumn && view.pointColumn !== 'pt' ? `${view.pointColumn}未取得` : 'pt未取得')
             }`
           : '—';
       const adLabel = row.adPointTotal > 0 ? `${formatEventRankingNumber(row.adPointTotal)}pt` : '—';
@@ -2671,18 +2693,18 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
 <td data-label="コメ" class="mkt-num">${row.commentCount}</td>
 <td data-label="直近15分" class="mkt-num">${row.recent15mCommentCount || '—'}</td>
 <td data-label="ギフト">${escapeHtml(giftLabel)}</td>
-<td data-label="広告pt">${escapeHtml(adLabel)}</td>
+${view ? '' : `<td data-label="広告pt">${escapeHtml(adLabel)}</td>`}
 <td data-label="根拠" class="mkt-supporter-sources">${sources}</td>
 </tr>`;
     })
     .join('');
   return `<section class="mkt-section mkt-section--supporter-chikuran" id="mkt-supporter-chikuran">
 <h2>応援者ちくらん β（ローカル）</h2>
-<p class="mkt-note">このPCに残ったコメント・ギフト・広告・貢献度だけで見た<strong>応援する人が主役</strong>の勢いです。公式順位ではありません。</p>
+<p class="mkt-note">${view ? 'このPCに残ったコメントとギフトだけで見た<strong>応援する人が主役</strong>の勢いです。公式順位ではありません。' : 'このPCに残ったコメント・ギフト・広告・貢献度だけで見た<strong>応援する人が主役</strong>の勢いです。公式順位ではありません。'}</p>
 <div class="mkt-supporter-card-grid">${cardHtml}</div>
-<p class="mkt-supporter-summary">${supporterChikuranSummaryLine(rows, maskShare)}</p>
+<p class="mkt-supporter-summary">${supporterChikuranSummaryLine(rows, maskShare, view)}</p>
 <div class="mkt-table-scroll"><table class="mkt-rank mkt-supporter-table">
-<thead><tr><th>#</th><th>応援者</th><th>ローカル勢い</th><th>コメ</th><th>直近15分</th><th>ギフト</th><th>広告pt</th><th>根拠</th></tr></thead>
+<thead><tr><th>#</th><th>応援者</th><th>ローカル勢い</th><th>コメ</th><th>直近15分</th><th>ギフト</th>${view ? '' : '<th>広告pt</th>'}<th>根拠</th></tr></thead>
 <tbody>${rowHtml}</tbody>
 </table></div>
 </section>`;
@@ -3001,12 +3023,17 @@ function buildSectionRevealScriptHtml() {
  *   mediaKitHtml?: string,
  *   htmlReportHtml?: string,
  *   programStartAtMs?: number,
- *   slimForHeavyExport?: boolean
+ *   slimForHeavyExport?: boolean,
+ *   platform?: string,
+ *   pageCount?: number
  * }} [opts]
  * @returns {string}
  */
 export function buildMarketingDashboardHtml(r, opts = {}) {
   const maskShare = opts.maskShareLabels === true;
+  // ニコ生（platform 無し）は null。null の間は下の文言も計算も今までどおり。
+  const view = marketingViewFor(opts.platform);
+  const pageCount = view && Number(opts.pageCount) > 0 ? Math.floor(Number(opts.pageCount)) : 0;
   // 0.1.12 (F1/F3): 匿名 a:... に identicon SVG data URL を当てるための resolver。
   // popup-entry 側で事前計算したマップを引いてもらう（ここからは識別の責務は持たない）。
   const identiconResolver =
@@ -3022,10 +3049,28 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     ? opts.sessionSummaryRows
     : [];
   const exportedAtIso = new Date().toISOString();
+  /** @type {Array<{ userId: string, serviceId: string }> | undefined} */
+  let idAliases;
+  if (view) {
+    const raw = Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : [];
+    /** @type {Array<{ userId: string, serviceId: string }>} */
+    const aliases = [];
+    const seenUid = new Set();
+    for (const c of raw) {
+      const serviceId = String(c?.ytChannelId || '').trim();
+      const userId = String(c?.userId || '').trim();
+      if (!serviceId || !userId || seenUid.has(userId)) continue;
+      seenUid.add(userId);
+      aliases.push({ userId, serviceId });
+      if (aliases.length >= 20) break;
+    }
+    if (aliases.length) idAliases = aliases;
+  }
   const embedJson = buildMarketingEmbedScriptInnerText(r, {
     maskShareLabels: maskShare,
     exportedAt: exportedAtIso,
-    slimForHeavyExport: opts.slimForHeavyExport === true
+    slimForHeavyExport: opts.slimForHeavyExport === true,
+    ...(view ? { platform: view.id, ...(idAliases ? { idAliases } : {}) } : {})
   });
   const subSuffix = maskShare ? ' · 共有向けに表示名を伏せた出力' : '';
 
@@ -3035,9 +3080,11 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // velocity / silence / laughter は MarketingReport には乗っていないので、
   // r 経由で comments 全件は取れない。代わりに r.timeline の 1 分 bucket を流用するか、
   // opts.commentsForTimeline を別経路で受ける。今回は opts.commentsForAnalytics を採用。
-  const commentsForAnalytics = Array.isArray(opts.commentsForAnalytics)
+  const commentsRaw = Array.isArray(opts.commentsForAnalytics)
     ? opts.commentsForAnalytics
     : [];
+  // ニコ生は配列をコピーしない。他サービスで応援の行があるときだけ、発言だけを分析に渡す。
+  const commentsForAnalytics = view ? speechCommentsForMarketing(commentsRaw) : commentsRaw;
   const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
     bucketMs: 60_000,
     rollingWindowMin: 5
@@ -3175,11 +3222,9 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     bucketMs: 60_000
   });
   // 自コメ抜粋: selfPosted=true のもの
-  const selfComments = Array.isArray(opts.commentsForAnalytics)
-    ? opts.commentsForAnalytics.filter((c) =>
-        Boolean(/** @type {{ selfPosted?: any }} */ (c)?.selfPosted)
-      )
-    : [];
+  const selfComments = commentsForAnalytics.filter((c) =>
+    Boolean(/** @type {{ selfPosted?: any }} */ (c)?.selfPosted)
+  );
   const uniqueWords = suggestUniqueWords({
     allComments: currentCommentsForLayer,
     selfComments,
@@ -3260,7 +3305,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     broadcasterUserId
   });
   // v0.1.1672: ギフトの瞬間(公式の公開時刻×このPCのコメント時刻)。入力は既に手元にある=書き出し側は無変更。
-  const giftMomentsAnalysis = analyzeGiftMoments({
+  const giftMomentsAnalysis = view && view.hide.has('mkt-gift-moments') ? null : analyzeGiftMoments({
     history: Array.isArray(opts.giftSubAppHistory?.history) ? opts.giftSubAppHistory.history : [],
     comments: currentCommentsForLayer,
     concurrentPoints: concurrentSeries.points,
@@ -3268,8 +3313,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     officialRemaining: /** @type {any} */ (opts.giftSubAppHistory)?.officialRemaining ?? 0,
     sampled: opts.slimForHeavyExport === true
   });
-  const giftMomentNextLines = giftMomentsAnalysis.axisOk ? buildGiftMomentNextActions(giftMomentsAnalysis.summary) : [];
-  const adObservedHtml = sectionAdObserved(
+  const giftMomentNextLines = giftMomentsAnalysis && giftMomentsAnalysis.axisOk ? buildGiftMomentNextActions(giftMomentsAnalysis.summary) : [];
+  const adObservedHtml = view && view.hide.has('mkt-ad-observed') ? '' : sectionAdObserved(
     opts.adObservations,
     adContributionRankingForAnalytics,
     maskShare,
@@ -3290,7 +3335,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     excludeUserIds: broadcasterUserId ? [broadcasterUserId] : [],
     maxRows: 15
   });
-  const audienceGap = analyzeAudienceEngagementGap({
+  const audienceGap = view && view.hide.has('mkt-audience-gap') ? null : analyzeAudienceEngagementGap({
     liveId: r.liveId,
     comments: currentCommentsForLayer,
     samples: sessionSummaryRows,
@@ -3310,7 +3355,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     ...supportParticipationBase,
     ...supportParticipationPctAgainstVisitors(audienceGap, supportParticipationBase)
   };
-  const marketingDataSummary = buildMarketingDataSummary({
+  const marketingDataSummary = view ? null : buildMarketingDataSummary({
     report: r,
     audienceGap,
     giftMomentum,
@@ -3384,15 +3429,27 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-thumb-grid', label: 'サムネ付きユーザー一覧' },
     { id: 'mkt-vpos', label: 'vpos 三分割（再生位置）' },
     { id: 'mkt-hour', label: '時間帯ヒートマップ' },
-    { id: 'mkt-json', label: '表計算・ツール向け JSON' }
+    { id: 'mkt-json', label: '表計算・ツール向け JSON' },
+    { id: 'mkt-support-flow', label: '登録・応援してくれた人の流れ' },
+    { id: 'mkt-platform-dedicated', label: 'この配信の記録' }
   ];
+  if (view) {
+    const concurrentItem = allTocItems.find((t) => t.id === 'mkt-concurrent');
+    if (concurrentItem) concurrentItem.label = view.concurrentHeading;
+    const leadItem = allTocItems.find((t) => t.id === 'mkt-participation-lead');
+    if (leadItem) leadItem.label = 'コメント参加';
+    const summaryItem = allTocItems.find((t) => t.id === 'mkt-data-summary');
+    if (summaryItem) summaryItem.label = '配信の記録サマリ';
+    const giftItem = allTocItems.find((t) => t.id === 'mkt-gift-ledger');
+    if (giftItem && view.giftWord) giftItem.label = `${view.giftWord}の履歴`;
+  }
 
   // v0.1.613: フォロー×コメント分析と応援者パワー診断は同じ buildCommenterFollowAnalytics を
   //   別々に呼んでおり(従来は同一 HTML 内で 2 回)、数千コメンターでは重複計算が DL 遅延の原因
   //   だった。ここで includeSupporterPower=true 込みで 1 回だけ計算し、両セクションに共有する。
   //   結果は従来 (sectionCommenterFollowAnalytics) の出力 fields の厳密な superset なので互換。
   //   precomputed を渡さない呼び出し(他テスト等)では各セクションが従来通り内部計算する。
-  const cfaAnalyticsShared = (() => {
+  const cfaAnalyticsShared = view && view.hide.has('mkt-commenter-follow-analytics') ? null : (() => {
     const ac = Array.isArray(r.allNumericCommenters) ? r.allNumericCommenters : [];
     if (!ac.length) return null;
     return buildCommenterFollowAnalytics(ac, {
@@ -3411,59 +3468,59 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   //   (このページでできること/りんく達から/分析スキル/ハーネス/作戦会議・応援が増えそうな時間・初見さん・切り抜き・お返し・お願い・注意/
   //   ファネル優先度・層別の使い方/各グラフ後の助言カード)は出さない。数字の章を「要点→視聴維持→流れ→応援者→ギフト→過去比較→記録」の順に並べる。
   const bodyHtml = `__NL_TOC_PLACEHOLDER__
-${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, audienceGap)}
-${idWrap('mkt-kpi', sectionKpi(r, audienceGap))}
-${sectionMarketingDataSummary(marketingDataSummary)}
-${sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
-${sectionAudienceEngagementGap(audienceGap, r)}
+${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount) : '')}
+${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap))}
+${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
+${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
+${view && view.hide.has('mkt-audience-gap') ? '' : sectionAudienceEngagementGap(audienceGap, r)}
 ${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver })}
 ${sectionSurvivalCurve(survivalCurve)}
 ${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
 ${newVsRepeatBasis.ok ? sectionNewVsRepeat(newVsRepeat) : sectionNewVsRepeatUnavailable(newVsRepeatBasis.note)}
-${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
-${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
+${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver, view)}
+${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver, view)}
 ${idWrap('mkt-narrative', sectionBroadcastNarrative(broadcastNarrative, maskShare))}
 ${idWrap('mkt-timeline', sectionTimeline(r))}
 ${sectionCommentVelocityCurve(velocityTimeline)}
-${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
+${sectionConcurrentTimeline(concurrentSeries, concurrentPeak, view)}
 ${sectionSilenceZones(silenceZones)}
 ${sectionLaughterDensity(laughterDensity)}
 ${sectionSentimentCurve(sentimentCurve)}
-${sectionCommentFatigue(commentFatigue)}
+${sectionCommentFatigue(commentFatigue, view)}
 ${idWrap('mkt-derived', sectionDerivedTimeline(r))}
-${idWrap('mkt-content', sectionContentShape(r))}
+${idWrap('mkt-content', sectionContentShape(r, view))}
 ${sectionUniqueWordSuggestions(uniqueWords)}
 ${sectionEchoBursts(echoPropagation, echoSync)}
 ${sectionTalentPeak(talentPeaks)}
 ${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap('mkt-segment', sectionSegment(r))}
-${sectionSupporterChikuranBeta(supporterChikuran, maskShare, identiconResolver)}
+${sectionSupporterChikuranBeta(supporterChikuran, maskShare, identiconResolver, view)}
 ${sectionCrossSupporterRanking(crossSupporterRanking, pastBroadcastsForLayer.length)}
 ${sectionFirstSecondLatency(firstSecondLatency)}
 ${sectionKeyboardTypes(keyboardTypes)}
-${idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
-${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared })}
-${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared }, identiconResolver)}
-${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
-${idWrap('mkt-gift-moments', sectionGiftMoments(giftMomentsAnalysis, giftMomentNextLines, maskShare, identiconResolver))}
-${sectionGiftMomentum(giftMomentum, maskShare, identiconResolver)}
-${sectionGiftThrowLedger(giftThrowLedger, maskShare, identiconResolver)}
-${sectionSupportersGiftsHtml(supportersGiftsRows, {
+${view && view.hide.has('mkt-commenter-follow') ? '' : idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
+${view && view.hide.has('mkt-commenter-follow-analytics') ? '' : sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared })}
+${view && view.hide.has('mkt-supporter-power') ? '' : sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared }, identiconResolver)}
+${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId, view))}
+${view && view.hide.has('mkt-gift-moments') ? '' : idWrap('mkt-gift-moments', sectionGiftMoments(giftMomentsAnalysis, giftMomentNextLines, maskShare, identiconResolver))}
+${view && view.hide.has('mkt-gift-deep') ? '' : sectionGiftMomentum(giftMomentum, maskShare, identiconResolver)}
+${view && view.hide.has('mkt-gift-ledger') ? '' : sectionGiftThrowLedger(giftThrowLedger, maskShare, identiconResolver, view)}
+${view && view.hide.has('mkt-supporters-gifts') ? '' : sectionSupportersGiftsHtml(supportersGiftsRows, {
   maskShare,
   renderIdentity: (row) => giftLedgerUserIdentityCells({ userId: row.userId, senderLabel: row.label, senderAvatarUrl: row.avatarUrl }, maskShare, identiconResolver)
 })}
-${idWrap('mkt-ad-observed', adObservedHtml)}
-${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
+${view && view.hide.has('mkt-ad-observed') ? '' : idWrap('mkt-ad-observed', adObservedHtml)}
+${view && view.hide.has('mkt-event-ranking') ? '' : idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
 ${sectionRecentComparison(recentComparison)}
 ${sectionGrowthMeter(growth, '今回の総コメ数')}
 ${sectionOpeningFivePrediction(openingFivePts)}
 ${sectionWaveformSimilarity(similarBroadcasts)}
-${sectionReachCoefficient(reach)}
+${view && view.hide.has('mkt-reach') ? '' : sectionReachCoefficient(reach, view)}
 ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
-${sectionInterestArrival(r)}
-${idWrap('mkt-vpos', sectionVposThirds(r))}
+${view && view.hide.has('mkt-interest-arrival') ? '' : sectionInterestArrival(r)}
+${view && view.hide.has('mkt-vpos') ? '' : idWrap('mkt-vpos', sectionVposThirds(r))}
 ${idWrap('mkt-hour', sectionHourHeatmap(r))}
-${idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
+${view && view.hide.has('mkt-ext-links') ? '' : idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
 ${typeof opts.mediaKitHtml === 'string' ? sectionMediaKitHtml(opts.mediaKitHtml) : ''}
 ${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlReportHtml) : ''}`;
   const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
@@ -3586,7 +3643,7 @@ function idWrap(id, html) {
  * @param {((uid: string) => string) | undefined} identiconResolver
  * @param {string} [broadcasterUserId]
  */
-function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId) {
+function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId, view = null) {
   if (maskShare) return '';
   if (!Array.isArray(r.topUsers) || r.topUsers.length === 0) return '';
 
@@ -3651,7 +3708,7 @@ ${followHtml}
   //     のか「上限で切られた」のか区別できないと誤解を生むので、その旨を結果欄に明記する。
   const searchBoxHtml = `<div class="mkt-thumb-grid__search">
 <label class="mkt-thumb-grid__search-label" for="mktThumbGridSearch">名前・ID で絞り込む</label>
-<input id="mktThumbGridSearch" class="mkt-thumb-grid__search-input" type="search" placeholder="例: あやりん / 78759947" autocomplete="off">
+<input id="mktThumbGridSearch" class="mkt-thumb-grid__search-input" type="search" placeholder="${view ? escapeAttr(view.searchPlaceholder) : '例: あやりん / 78759947'}" autocomplete="off">
 <div id="mktThumbGridSearchResult" class="mkt-note mkt-thumb-grid__search-result" role="status" aria-live="polite"></div>
 </div>`;
 
@@ -3659,7 +3716,7 @@ ${followHtml}
 <h2>サムネ付きユーザー一覧</h2>
 <p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順、種別ごとに並べました（各カテゴリ最大 60 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。</p>
 ${searchBoxHtml}
-<p class="mkt-spec-note">※ 表示名はコメ記録時点のもの（仕様）。配信者がニコニコでハンドル名を変更した場合、ここの表示と niconico の最新表示が異なることがあります。リアルタイム取得は行っていないため（API 連発によるレート制限を避けるため）、最新名は ID クリック先のユーザーページで確認できます。</p>
+<p class="mkt-spec-note">${view ? (view.servicePage ? `※ 表示名はコメ記録時点のもの（仕様）。名前が変わった場合、${escapeHtml(view.servicePage)}の最新と異なることがあります。` : '※ 表示名はコメ記録時点のもの（仕様）。') : '※ 表示名はコメ記録時点のもの（仕様）。配信者がニコニコでハンドル名を変更した場合、ここの表示と niconico の最新表示が異なることがあります。リアルタイム取得は行っていないため（API 連発によるレート制限を避けるため）、最新名は ID クリック先のユーザーページで確認できます。'}</p>
 ${numericBlock}
 ${anonymousBlock}
 <script>

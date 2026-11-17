@@ -221,7 +221,8 @@ export function parseMxMessage(raw, ctx) {
   if (!c) return null;
   const kind = mxKindOf(c);
   const isGift = GIFT_KINDS.has(kind) || (kind !== 0 && c.item_id != null);
-  if (kind !== 0 && !isGift) return null;
+  const isFan = kind === 62 && !isGift;
+  if (kind !== 0 && !isGift && !isFan) return null;
   const mid = str(c.message_id);
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(mid)) return null;
   const uid = str(c.user_id);
@@ -243,9 +244,12 @@ export function parseMxMessage(raw, ctx) {
     color: '',
   };
   if (!isGift) {
-    const text = str(c.body).replace(/\s+/g, ' ').slice(0, 500);
-    if (!text) return null;
-    return { ...base, text, kind: 'text', amount: 0, currency: '' };
+    const body = str(c.body).replace(/\s+/g, ' ').slice(0, 500);
+    if (isFan) {
+      return { ...base, text: body || 'ファン登録', kind: 'mx_fan', amount: 0, currency: '' };
+    }
+    if (!body) return null;
+    return { ...base, text: body, kind: 'text', amount: 0, currency: '' };
   }
   const itemId = str(c.item_id);
   if (!/^\d{1,12}$/.test(itemId)) return null;

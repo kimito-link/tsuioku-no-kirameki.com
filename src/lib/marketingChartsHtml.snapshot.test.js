@@ -72,24 +72,26 @@ function nicoFixture() {
   });
 }
 
-/** 他サービスは「今の出力」を後の差分用に残す。ニコ生の固定ファイルとは別に更新してよい。 */
-function otherFixture(kind) {
+/** 他サービスは platform を渡した出力を固定する。ニコ生のファイルは変えない。 */
+function otherFixture(kind, platform) {
   const comments = [0, 1, 2, 3, 4, 5].map((i) => ({
     id: `o${i}`,
     liveId: 'lv900000000001',
     commentNo: String(i + 1),
-    text: i === 5 ? 'レイドで来ました' : `hello ${i}`,
+    text: i === 5 ? (kind === 'superchat' ? 'スーパーチャット' : 'レイドで来ました') : `hello ${i}`,
     userId: String(8000000000 + (i % 3)),
     nickname: `viewer-${i % 3}`,
     avatarUrl: '',
     capturedAt: T0 + i * MIN,
     ytKind: i === 5 ? kind : 'text',
-    ytPlatform: kind === 'tw_raid' ? 'twitch' : kind === 'text' ? 'abema' : 'youtube',
-    ytAmount: i === 4 ? 5 : 0,
-    ytCurrency: i === 4 ? 'USD' : '',
+    ytPlatform: platform,
+    ytAmount: i === 5 ? (kind === 'superchat' ? 5 : kind === 'tw_raid' ? 42 : 0) : 0,
+    ytCurrency: i === 5 && kind === 'superchat' ? 'USD' : '',
+    ...(i === 5 ? { ytChannelId: platform === 'twitch' ? 'tw:viewer' : 'UCsample0001' } : {}),
   }));
   const report = aggregateMarketingReport(comments, 'lv900000000001');
   return buildMarketingDashboardHtml(report, {
+    platform,
     commentsForAnalytics: comments,
     sessionSummaryRows: [
       { liveId: 'lv900000000001', capturedAt: T0, officialViewerCount: 40, source: 'official' },
@@ -115,17 +117,29 @@ describe('マーケ HTML のスナップショット', () => {
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-niconico.html'));
   });
 
-  it('YouTube 相当の疑似入力（直し前の出力）', async () => {
-    const html = otherFixture('superchat');
+  it('YouTube はニコ生の言葉を出さない', async () => {
+    const html = otherFixture('superchat', 'youtube');
+    expect(html).not.toContain('公式来場者数');
+    expect(html).not.toContain('広告pt');
+    expect(html).not.toContain('koken');
+    expect(html).not.toContain('匿名184');
+    expect(html).toContain('同時視聴者数');
+    expect(html).toContain('推定');
+    expect(html).toContain('USD');
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-youtube-baseline.html'));
   });
 
-  it('Twitch 相当の疑似入力（レイド行を含む直し前）', async () => {
-    const html = otherFixture('tw_raid');
+  it('Twitch はレイドをコメントに数えない', async () => {
+    const html = otherFixture('tw_raid', 'twitch');
+    expect(html).not.toContain('公式来場者数');
+    expect(html).not.toContain('広告pt');
+    expect(html).toContain('視聴者数');
+    expect(html).toContain('レイド');
+    expect(html).toContain('推定（同じ時間に起きたこと・原因とは限らない）');
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-twitch-baseline.html'));
   });
 
-  it('ABEMA 相当の疑似入力（直し前）', async () => {
+  it('ABEMA はギフトと来場の枠を出さない', async () => {
     const comments = [0, 1, 2, 3].map((i) => ({
       id: `a${i}`,
       liveId: 'lv900000000002',
@@ -140,8 +154,14 @@ describe('マーケ HTML のスナップショット', () => {
     }));
     const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv900000000002'), {
       platform: 'abema',
+      pageCount: 1200,
       commentsForAnalytics: comments,
     });
+    expect(html).not.toContain('公式来場者数');
+    expect(html).not.toContain('広告pt');
+    expect(html).not.toContain('ギフト投げ履歴');
+    expect(html).toContain('視聴数');
+    expect(html).toContain('1200');
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-abema-baseline.html'));
   });
 });

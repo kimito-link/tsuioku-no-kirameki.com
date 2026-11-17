@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1289 件
+## ⚠️ 役割コメントが無いソース 13 / 1292 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1189,7 +1189,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2524)
+- 📁 **src/** (2528)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1528,7 +1528,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2217)
+  - 📁 **lib/** (2221)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1567,7 +1567,7 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (24)
+    - 📁 **platform/** (27)
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1576,6 +1576,9 @@
       - `historyBackfill.test.js`
       - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
       - `infoPollGate.test.js`
+      - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
+      - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `marketingPlatformPlan.test.js`
       - `noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
       - `noWatchHint.test.js`
       - `pageControlPick.js` — 配信ページの「公式の」入力欄・送信ボタンを探す(追憶が自分でページに置いた部品を除く)。
@@ -1618,7 +1621,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (96)
+    - 📁 **youtube/** (97)
       - `pfLastStreamUrl.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
       - `ytActiveVideoId.test.js`
@@ -1652,6 +1655,7 @@
       - `ytLeaderboardSig.test.js`
       - `ytLiveRowOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytLiveRowOrder.test.js`
+      - `ytLvKeyBridge.js` — 疑似 lv → 配信キー。マーケの過去比較が他サービスの配信を混ぜないために使う。
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
       - `ytMergedIsolation.test.js`
       - `ytNicoShim.test.js`

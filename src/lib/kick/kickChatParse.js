@@ -234,6 +234,14 @@ export function parseKickEvent(frame, ctx = {}) {
       text: `ギフトサブを${count}件贈りました`,
       kind: 'membership_gift',
       giftCount: count,
+      ...(list.length
+        ? {
+            giftRecipients: list
+              .map((name) => String(name || '').trim())
+              .filter(Boolean)
+              .slice(0, 20),
+          }
+        : {}),
       postedAtMs: now,
     };
   }
@@ -254,6 +262,7 @@ export function parseKickEvent(frame, ctx = {}) {
       login: slug,
       text: `${viewers}人でホストしてきました${msg ? `「${msg}」` : ''}`,
       kind: 'kk_host',
+      amount: viewers,
       postedAtMs: now,
     };
   }
