@@ -36,6 +36,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   }),
   youtube: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '同時視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'superchat']),
@@ -46,6 +47,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   }),
   twitch: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'bits', 'subs', 'gifts', 'raids']),
@@ -56,6 +58,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   }),
   kick: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
@@ -67,6 +70,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   // SHOWROOM: イベントの貢献ランキング(部屋の画面の「貢献ユーザー」)を2つめの欄に、イベント順位・pt・目標Lv をチップに。
   showroom: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'eventPoint', 'quest']),
@@ -78,6 +82,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   // ミクチャ: 名前の下のレベル・ファン・スーパーファン・ライバーランク(と、出ているときのイベント順位・pt)
   mixch: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     // eventInfo.point は 2026-11-11 の実ページで 0 なのに画面には別の数が出ていた(どの値か未確定)→ イベントpt は出さない。
@@ -90,6 +95,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   // ふわっち: イベント順位(同時に出ているイベントは title に並べる)・累計視聴
   whowatch: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'totalViews']),
@@ -101,6 +107,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   //   配信中の視聴者ランキングはギフト欄の見出し側。いいね数などはページから取っていないので出さない。
   tiktok: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge']),
@@ -112,6 +119,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   //   視聴者数は同じ欄の左(現在)。公式の応援ランキングは配信者ページのサポーターランキング(2つめの欄)。
   twitcasting: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
@@ -123,6 +131,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   // 出典: src/lib/abema/abParse.js の abAudienceFromPayload（stats.view は視聴数、concurrentViewers は別）。
   abema: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴数',
     headlineCount: 'views',
     countUnit: '',
@@ -211,6 +220,51 @@ export function foreignPanelCopy(platformId) {
     calm: 'パネル内の動きを抑える（ループアニメ・帯など。節目の演出は出ます）',
     timelineAria: paidLabel ? `コメントと${paidLabel}の時系列` : 'コメントの時系列',
   };
+}
+
+/**
+ * ニコ生以外で「watch」の代わりに出すページの呼び方。能力表の pageNoun。
+ * ニコ生は空（文面を変えない）。
+ * @param {string} platformId
+ * @returns {string}
+ */
+export function foreignPageNoun(platformId) {
+  const id = resolvePlatformId(platformId);
+  if (!id || id === 'niconico') return '';
+  const cap = platformCapability(id);
+  if (cap.native === true) return '';
+  return 'pageNoun' in cap && cap.pageNoun ? String(cap.pageNoun) : '配信ページ';
+}
+
+/**
+ * ニコ生の URL の「watch」と、開発用のファイル名だけを、能力表のページの呼び方に変える。
+ * ニコ生（pageNoun が空）はそのまま返す。英単語の途中（watchConcurrent など）は変えない。
+ * 「ニコ生」「ニコニコ」の決まった文は ytWording がサービスの名前に変えるので、ここでは触らない。
+ * @param {unknown} text
+ * @param {string} [platformId]
+ * @returns {string}
+ */
+export function rewriteForeignWording(text, platformId) {
+  const raw = String(text ?? '');
+  const page = foreignPageNoun(platformId || 'youtube');
+  if (!page || !raw) return raw;
+  if (!/watch|nicolivelog|生放送/i.test(raw)) return raw;
+  let s = raw;
+  s = s.replace(/\s*watch\s*ページ/g, page);
+  s = s.replace(/\s*watch\s*タブ/g, '配信タブ');
+  s = s.replace(/（watch）/g, `（${page}）`);
+  s = s.replace(/\s*watch\s*を/g, `${page}を`);
+  s = s.replace(/\s*watch\s*の/g, `${page}の`);
+  if (s.trim() === 'watch') s = page;
+  const pairs = [
+    ['Downloads/nicolivelog-mcp/', 'ダウンロードフォルダ'],
+    ['nicolivelog', '開発用の名前'],
+    ['別々の生放送', '別々の配信'],
+  ];
+  for (const [from, to] of pairs) {
+    if (s.includes(from)) s = s.split(from).join(to);
+  }
+  return s;
 }
 
 const OFFICIAL = '配信ページが出している公式の数です。';

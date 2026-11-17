@@ -6,7 +6,7 @@
  * DOM は引数の root だけを触る。src/lib 直下の純粋性検査の対象外(platform/)。
  */
 
-import { panelExtraChips, platformSectionPlan, foreignPanelCopy, streamAgeTitle, LOADING, PLATFORM_CAPABILITIES } from './platformMetrics.js';
+import { panelExtraChips, platformSectionPlan, foreignPanelCopy, rewriteForeignWording, streamAgeTitle, LOADING, PLATFORM_CAPABILITIES } from './platformMetrics.js';
 
 /** 数でない値の札。ニコ生の「（接続中…）」「（取得不可）」「推定中」「計測中…」や最初の「—」は、ほかのサービスでは「読み込み中」にする。 */
 const NOT_A_COUNT = /^(?:—|-|（接続中…）|（取得不可）|（数字非公開）|推定中|計測中…|)$/u;
@@ -199,6 +199,44 @@ function replaceText(root, from, to) {
   }
 }
 
+/** 最初の1回だけ、画面の文と title / aria-label を能力表の呼び方にする。 @param {ParentNode} root @param {string} platformId */
+function applyForeignWordingOnce(root, platformId) {
+  const doc = root.nodeType === 9 ? /** @type {Document} */ (root) : root.ownerDocument;
+  const html = doc && doc.documentElement;
+  if (!html || html.dataset.nlForeignWording === '1') return;
+  const skip = '#supportTimelineBody,#commentTickerViewport,#commentInput,#userRoomList,#changelogList';
+  const inSkip = (/** @type {Node} */ node) => {
+    const el = node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement;
+    return !!(el && typeof el.closest === 'function' && el.closest(skip));
+  };
+  if (doc && typeof doc.createTreeWalker === 'function') {
+    const walker = doc.createTreeWalker(/** @type {Node} */ (root), 4);
+    let n = walker.nextNode();
+    while (n) {
+      const parent = n.parentElement;
+      const tag = parent && parent.tagName;
+      if (n.nodeValue && tag !== 'SCRIPT' && tag !== 'STYLE' && !inSkip(n)) {
+        const next = rewriteForeignWording(n.nodeValue, platformId);
+        if (next !== n.nodeValue) n.nodeValue = next;
+      }
+      n = walker.nextNode();
+    }
+  }
+  const scope = root.nodeType === 9 ? /** @type {Document} */ (root) : root;
+  if (typeof scope.querySelectorAll === 'function') {
+    for (const el of scope.querySelectorAll('[title],[aria-label],[placeholder]')) {
+      if (inSkip(el)) continue;
+      for (const name of ['title', 'aria-label', 'placeholder']) {
+        const cur = el.getAttribute(name);
+        if (!cur) continue;
+        const next = rewriteForeignWording(cur, platformId);
+        if (next !== cur) el.setAttribute(name, next);
+      }
+    }
+  }
+  html.dataset.nlForeignWording = '1';
+}
+
 /**
  * なふだの説明と、空でも残るニコ生の見出しを、他のサービスでは出さない。
  * コメントを書く欄は、送信できるサービスでは残す（SHOWROOM は SR_SEND_COMMENT）。
@@ -276,6 +314,7 @@ function rewriteForeignPanelWords(root, copy) {
   if (shade && String(shade.textContent || '').includes('ギフト履歴')) {
     shade.textContent = 'コメントの記録は、配信ページを開くと取り込めます。';
   }
+  applyForeignWordingOnce(root, copy.id);
 }
 
 /**

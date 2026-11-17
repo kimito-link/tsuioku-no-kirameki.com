@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyPlatformMetricChrome, buildForeignCapabilityCss, watchPlatformMetricChrome } from './platformMetricChrome.js';
-import { PLATFORM_CAPABILITIES, bootSubBoardIds, tallySupportItems } from './platformMetrics.js';
+import { PLATFORM_CAPABILITIES, bootSubBoardIds, rewriteForeignWording, tallySupportItems } from './platformMetrics.js';
 
 function mount() {
   document.body.innerHTML = `
@@ -296,6 +296,41 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.documentElement.classList.contains('nl-cap-no-paid')).toBe(true);
   });
 
+  it('watch と nicolivelog を1回だけ配信ページの言い方にする。コメント本文は残す', () => {
+    document.documentElement.removeAttribute('data-nl-foreign-wording');
+    const root = mount();
+    const legend = root.createElement('span');
+    legend.id = 'inlinePanelWidthLegend';
+    legend.textContent = 'ページ内パネルの位置・幅（watch）';
+    const reload = root.createElement('button');
+    reload.id = 'reloadWatchTabPanelBtn';
+    reload.textContent = 'watch を再読み込み';
+    reload.title = '対象の watch タブを再読み込みします（F5 と同じ）';
+    const about = root.createElement('p');
+    about.className = 'nl-project-concept';
+    about.textContent = '開発識別子として nicolivelog が含まれることがあります。';
+    const box = root.createElement('textarea');
+    box.id = 'commentInput';
+    box.textContent = 'watch を見てね';
+    root.body.append(legend, reload, about, box);
+    applyPlatformMetricChrome(root, { platform: 'twitch', facts: {} });
+    expect(legend.textContent).toBe('ページ内パネルの位置・幅（配信ページ）');
+    expect(reload.textContent).toBe('配信ページを再読み込み');
+    expect(reload.getAttribute('title')).toBe('対象の配信タブを再読み込みします（F5 と同じ）');
+    expect(about.textContent).toBe('開発識別子として 開発用の名前 が含まれることがあります。');
+    expect(box.textContent).toBe('watch を見てね');
+    legend.textContent = 'ページ内パネルの位置・幅（watch）';
+    applyPlatformMetricChrome(root, { platform: 'twitch', facts: {} });
+    expect(legend.textContent).toBe('ページ内パネルの位置・幅（watch）');
+    document.documentElement.removeAttribute('data-nl-foreign-wording');
+    const nico = mount();
+    const nicoLegend = nico.createElement('span');
+    nicoLegend.textContent = 'ページ内パネルの位置・幅（watch）';
+    nico.body.append(nicoLegend);
+    applyPlatformMetricChrome(nico, { platform: 'niconico', facts: {} });
+    expect(nicoLegend.textContent).toBe('ページ内パネルの位置・幅（watch）');
+  });
+
 describe('開いた瞬間の CSS', () => {
   it('boot は能力表と同じ文字列と、全サービスの見出しを持つ', () => {
     const boot = readFileSync(join(process.cwd(), 'extension/yt-loading-boot.js'), 'utf8');
@@ -307,5 +342,10 @@ describe('開いた瞬間の CSS', () => {
       if (cap.native === true) continue;
       expect(boot).toContain(`${id}: '${cap.concurrentLabel}'`);
     }
+    const start = boot.indexOf('function foreignWords');
+    const end = boot.indexOf('function applyForeignWords');
+    const foreignWords = new Function(`${boot.slice(start, end)}\nreturn foreignWords;`)();
+    const sample = 'watch を再読み込み。開発識別子として nicolivelog。別々の生放送。';
+    expect(foreignWords(sample)).toBe(rewriteForeignWording(sample, 'showroom'));
   });
 });

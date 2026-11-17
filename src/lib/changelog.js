@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2146',
+    date: '2026-11-17',
+    summary: '配信ページの言い方にそろえる',
+    items: Object.freeze([
+      'ニコニコ生放送以外の横の欄では、「watch」というニコ生のページの呼び方を「配信ページ」にしました。開発用のファイル名も、この拡張についての説明では出さないようにしました。ニコニコ生放送の画面の文はそのままです。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2145',
     date: '2026-11-17',
     summary: '横の欄からニコ生だけの項目を外す',
@@ -178,14 +186,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'スタンプの名前を読み上げない',
     items: Object.freeze([
       'YouTube のスタンプ(face-fuchsia-tongue-out や :_xxx: のような名前)を、英語の名前のまま読み上げていました。スタンプの名前は読まないようにしました(画面の表示は今までどおりです)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2119',
-    date: '2026-11-13',
-    summary: 'YouTube の会場で最初のギフト音も鳴る',
-    items: Object.freeze([
-      'YouTube などの会場で、効果音の読み込みが終わる前に来たギフトや広告の音が、ページに止められて鳴らないことがありました。読み込みが終わるのを待ってから鳴らすようにしました。拡張のエラー一覧に「Unsafe attempt to load URL」が積もることも減ります。'
     ])
   }),
 ]);

@@ -35,7 +35,7 @@ import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey, readYtPanelSite } from '../../src/lib/youtube/ytPanelRoute.js';
-import { noWatchHintFor } from '../../src/lib/platform/noWatchHint.js';
+import { rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
@@ -2219,7 +2219,7 @@ function fixTextNode(node) {
       return;
     }
   }
-  let next = screenWording(v); // ニコニコの言葉 → YouTube(Twitch・Kick)の言葉(決まった文言だけ)
+  let next = screenWording(v, { rewrite: !inRecordedText(node) }); // ニコニコの言葉 → YouTube(Twitch・Kick)の言葉(決まった文言だけ)
   if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
   if (subBoardShown) next = subBoardCelebrationWording(next, subBoardShown);
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
@@ -2324,19 +2324,35 @@ function applyNoWatchHintOnce() {
 }
 applyNoWatchHintOnce();
 
-/** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t */
-function screenWording(t) {
+/** 記録したコメント本文・更新履歴は、配信ページの言い方に書き換えない @param {Node|Element|null} node */
+function inRecordedText(node) {
+  const el = node && (node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement);
+  return !!(el && typeof el.closest === 'function' && el.closest('#supportTimelineBody,#commentTickerViewport,#commentInput,#userRoomList,#changelogList'));
+}
+
+/** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t @param {{ rewrite?: boolean }} [opt] */
+function screenWording(t, opt) {
   // Twitch にはトップファンの順位表が無い=ランキング欄は最初から「合計の順位」の言葉で描く
   const p = screenPlatform();
-  if (!p) return ytWording(t, { topFans: kokenIsTopFans });
-  if (platformOfficial) {
+  let out;
+  if (!p) out = ytWording(t, { topFans: kokenIsTopFans });
+  else if (platformOfficial) {
     // 公式ランキングの言葉(Kick 公式の Kicks ランキング)。YouTube の言葉にした所はそのサービスの言葉に
     const w1 = ytWording(t, { topFans: true });
     const o = ytWordingPlatformOfficial(w1, p);
-    return w1 !== t ? o.split('スーパーチャット').join(p.paid).split('スパチャ').join(p.paid).split('YouTube').join(p.name) : o;
+    out = w1 !== t ? o.split('スーパーチャット').join(p.paid).split('スパチャ').join(p.paid).split('YouTube').join(p.name) : o;
+  } else {
+    const w = ytWording(t, { topFans: false });
+    out = w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
   }
-  const w = ytWording(t, { topFans: false });
-  return w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
+  if (opt && opt.rewrite === false) return out;
+  // 有料のマーケティングレポートは、ニコ生の分析語（184・プレミアム）を残す
+  try {
+    if (/marketing-export\.html$/.test(String(location.pathname || ''))) return out;
+  } catch { /* location が無い実行ではパネルと同じ置き換えにする */ }
+  // watch はニコ生の URL の言い方。他のサービスは能力表のページ名にする（ニコ生の画面はこの関数を通らない）
+  const id = (p && p.id) || (screenPlatformBase() && screenPlatformBase().id) || 'youtube';
+  return rewriteForeignWording(out, id);
 }
 
 // ニコ生版のコメビュは名前の横に data-nl-uid(数字ID)を CSS で「(数字)」と出す。疑似IDなので、
@@ -2357,7 +2373,7 @@ function fixTitleAttr(el) {
     const t = el.getAttribute(name);
     if (!t) continue;
     const subP = subBoardShown && el.closest('[data-lane="adRanking"]') ? screenPlatformBase() : null;
-    let next = subP && subBoardShown ? subBoardLaneWording(t, subP, subBoardShown) : screenWording(t);
+    let next = subP && subBoardShown ? subBoardLaneWording(t, subP, subBoardShown) : screenWording(t, { rewrite: !inRecordedText(el) });
     if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
     if (next !== t) el.setAttribute(name, next);

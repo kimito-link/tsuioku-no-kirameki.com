@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   bootPlatformId,
   bootSubBoardIds,
+  foreignPageNoun,
   foreignPanelCopy,
   panelExtraChips,
   platformSectionPlan,
   resolvePlatformId,
+  rewriteForeignWording,
   tallySupportItems,
   venueItemsForPlatform,
 } from './platformMetrics.js';
@@ -309,5 +311,48 @@ describe('他サービスの欄の見出し', () => {
     expect(foreignPanelCopy('whowatch').timelineLabel).toContain('アイテム');
     expect(foreignPanelCopy('youtube').giftUsersLabel).toContain('スーパーチャット');
     expect(foreignPanelCopy('youtube').giftUsersLabel).not.toContain('広告');
+  });
+});
+
+describe('rewriteForeignWording', () => {
+  const services = ['youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'tiktok', 'twitcasting'];
+
+  it('ニコ生以外のページの呼び方は能力表の pageNoun', () => {
+    for (const id of services) {
+      expect(foreignPageNoun(id), id).toBe('配信ページ');
+    }
+    expect(foreignPageNoun('niconico')).toBe('');
+  });
+
+  it('watch は配信ページ。ニコ生の文と 184・プレミアムはそのまま', () => {
+    const samples = [
+      ['watch を再読み込み', '配信ページを再読み込み'],
+      ['ページ内パネルの位置・幅（watch）', 'ページ内パネルの位置・幅（配信ページ）'],
+      ['watchページを再読み込み', '配信ページを再読み込み'],
+      ['対象のwatchタブ', '対象の配信タブ'],
+      ['定期サムネは watch\nページの表示', '定期サムネは配信ページの表示'],
+      ['次に手前のタブで watch を開いたとき', '次に手前のタブで配信ページを開いたとき'],
+      ['開発識別子として nicolivelog が含まれることがあります。', '開発識別子として 開発用の名前 が含まれることがあります。'],
+      ['Downloads/nicolivelog-mcp/ に保存します', 'ダウンロードフォルダ に保存します'],
+      ['別々の生放送を同時に見ても使えます', '別々の配信を同時に見ても使えます'],
+    ];
+    for (const id of services) {
+      for (const [from, to] of samples) {
+        expect(rewriteForeignWording(from, id), `${id} ${from}`).toBe(to);
+        expect(rewriteForeignWording(to, id), id).toBe(to);
+      }
+    }
+    const keep = [
+      'watch を再読み込み',
+      'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。',
+      'プレミアム会員（184）',
+      'watchConcurrent',
+      '本家コメ',
+    ];
+    for (const s of keep) expect(rewriteForeignWording(s, 'niconico')).toBe(s);
+    expect(rewriteForeignWording('ニコニコ公式のギフト貢献度ランキング（上位）を表示します。', 'youtube')).toBe('ニコニコ公式のギフト貢献度ランキング（上位）を表示します。');
+    expect(rewriteForeignWording('プレミアム会員（184）', 'abema')).toBe('プレミアム会員（184）');
+    expect(rewriteForeignWording('watchConcurrent', 'twitch')).toBe('watchConcurrent');
+    expect(rewriteForeignWording('本家コメ', 'showroom')).toBe('本家コメ');
   });
 });

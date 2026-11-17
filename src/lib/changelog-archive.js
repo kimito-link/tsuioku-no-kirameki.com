@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2119',
+    date: '2026-11-13',
+    summary: 'YouTube の会場で最初のギフト音も鳴る',
+    items: Object.freeze([
+      'YouTube などの会場で、効果音の読み込みが終わる前に来たギフトや広告の音が、ページに止められて鳴らないことがありました。読み込みが終わるのを待ってから鳴らすようにしました。拡張のエラー一覧に「Unsafe attempt to load URL」が積もることも減ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2118',
     date: '2026-11-13',
     summary: '混んでも合唱が途中で消えにくく',
