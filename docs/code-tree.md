@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1292 件
+## ⚠️ 役割コメントが無いソース 13 / 1293 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1189,7 +1189,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2528)
+- 📁 **src/** (2530)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1528,7 +1528,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2221)
+  - 📁 **lib/** (2223)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1758,6 +1758,8 @@
     - `appliedEntriesMemo.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
     - `arrivalEffect.test.js`
+    - `arrivalNoticeRows.js` — 来場通知を、サイドパネルの内訳と分析レポートで同じ行として数える。
+    - `arrivalNoticeRows.test.js`
     - `audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
     - `audienceEngagementGap.test.js`
     - `auditionEventRankingApi.js` — audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
