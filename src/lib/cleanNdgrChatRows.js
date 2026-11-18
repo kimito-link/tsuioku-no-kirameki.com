@@ -1,5 +1,6 @@
 import { parseGiftCommentText } from './parseGiftComment.js';
 import { parseArrivalCommentText } from './parseArrivalComment.js';
+import { toEpochMs } from './timeAuthority.js';
 
 /**
  * NDGR チャット行の正規化純関数。
@@ -37,8 +38,8 @@ export function cleanNdgrChatRows(raw) {
     const row = { commentNo, text, userId: uid || null };
     const nick = String(/** @type {any} */ (x).nickname ?? '').trim();
     if (nick) row.nickname = nick;
-    const cap = Number(/** @type {any} */ (x).capturedAt);
-    if (Number.isFinite(cap) && cap > 0) row.capturedAt = cap;
+    const cap = toEpochMs(/** @type {any} */ (x).capturedAt);
+    if (cap > 0) row.capturedAt = cap;
     if (/** @type {any} */ (x).vpos != null) row.vpos = /** @type {any} */ (x).vpos;
     if (/** @type {any} */ (x).accountStatus != null) row.accountStatus = /** @type {any} */ (x).accountStatus;
     if (/** @type {any} */ (x).is184) row.is184 = true;

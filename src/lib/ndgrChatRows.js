@@ -7,6 +7,7 @@ import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import { parseGiftCommentText } from './parseGiftComment.js';
 import { parseArrivalCommentText } from './parseArrivalComment.js';
 import { shouldAcceptNdgrChatAsComment } from './ndgrDecode.js';
+import { toEpochMs } from './timeAuthority.js';
 
 /**
  * @param {import('./ndgrDecode.js').NdgrChat} chat
@@ -61,9 +62,9 @@ export function ndgrChatsToMergeRows(chats, nowMs) {
     if (chat.accountStatus != null) row.accountStatus = chat.accountStatus;
     if (chat.is184) row.is184 = true;
     if (arrivalNotice) {
-      const at = Number(chat.atMs);
-      const now = Number(nowMs);
-      const cap = Number.isFinite(at) && at > 0 ? at : (Number.isFinite(now) && now > 0 ? now : 0);
+      const at = toEpochMs(chat.atMs);
+      const now = toEpochMs(nowMs);
+      const cap = at > 0 ? at : now;
       if (cap > 0) row.capturedAt = cap;
     }
     out.push(row);

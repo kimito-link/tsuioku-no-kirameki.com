@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "d95b850cb4f302cacc029afabf51b968e054a1f4999685a27f7ac83f7230d2d0",
+  "fingerprint": "f120e945c6b72c05134ce26b07145c247fdac3cbb657b07f69c11bdae6fcacc2",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -1069,12 +1069,12 @@
     "tsconfig.json"
   ],
   "outputs": {
-    "extension/dist/page-intercept.js": "ebdff4987f06e88afac17d7ca91494ffda818866e38672b760071489f0ee5e19",
-    "extension/dist/backfill-sw.js": "f25e40c92b1afa56656fedc20e9a0582d99f30e09ce8da9f0fbd2fee309ddebe",
+    "extension/dist/page-intercept.js": "3a519509e2729e427928d98d0ab3f119573726e4587281a5a4993cefc9bf8e76",
+    "extension/dist/backfill-sw.js": "28c62b81c112708e10d81f132e32bdac701054240000b236c8066f21403b2e63",
     "extension/dist/native-voice-sw.js": "720be33b83c5a139ef8fa4a9c5768c1cb73fe3a6c55d2d140269164945abec2e",
     "extension/dist/voice-native-guide.js": "5bad74efc1c6dff0619ca81fc1d796befbc83ae8ed3129fcfa1b62ea964227a5",
     "extension/dist/self-update-sw.js": "dea5ff6a1a74ddd763e44766de0a78f9dcb68d6fbe37edde3f9bc6b931a5f74e",
-    "extension/dist/content.js": "145ba68be6219560015bfc28243c3271a4f8ac7e0f30c0b597da62f66f61b976",
+    "extension/dist/content.js": "3d29b83169c56f43ce6e8e894c37c89b700a49d868b64a150ab37f641b457d64",
     "extension/dist/content-boot.js": "ce9c4d3f140673dbc3d872f8f7ac2f803ff10e378ebb976d796650c792cc05e8",
     "extension/dist/yt-page-boot.js": "0a575254f4c2dbdcbf37ad18d98ed3de7b8e481ae13e992ce7c75f5eb9c8fb15",
     "extension/dist/popup.js": "9f9b366c376a3de1b11384731c10c645874e1935c6cd41eda07631ddb98b6ab8",

@@ -1,4 +1,5 @@
 import { parseArrivalCommentText } from './parseArrivalComment.js';
+import { toEpochMs } from './timeAuthority.js';
 
 /**
  * ndgrFlushDedupKey.js — NDGR フラッシュ時の重複排除キーを作る純関数(v0.1.836)。
@@ -29,8 +30,8 @@ export function ndgrFlushDedupKey(row) {
   const uid = String(row.userId ?? '').trim();
   if (!uid) {
     if (!parseArrivalCommentText(text)) return null;
-    const cap = Number(row.capturedAt);
-    if (Number.isFinite(cap) && cap > 0) return `v:${text}\t${cap}`;
+    const cap = toEpochMs(row.capturedAt);
+    if (cap > 0) return `v:${text}\t${cap}`;
     return `v:${text}\t0`;
   }
   const vpos =
