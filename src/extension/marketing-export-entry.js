@@ -77,6 +77,8 @@ import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
 import { EXPORT_COMMENT_READ_TIMEOUT_MS, readCommentsForExport } from '../lib/readAllCommentsForLive.js';
+import { isYtPseudoLvShape } from '../lib/youtube/ytPseudoLv.js';
+import { readStoredExportComments } from '../lib/youtube/exportStoredComments.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/platform/followerSampleStore.js';
 
@@ -600,11 +602,21 @@ async function runExport(lid) {
     const adObsKey = adObservationStorageKey(lid);
     // ギフトの鍵はコメントと別の待ち。こちらが遅くても、コメントが読めていれば報告は出す。
     // 人数の取得はこの待ちに入れない（followerSamplesForExport が短い時間で空に戻す）。
-    const commentsRaw = await withTimeout(
-      resolveCommentsForHtmlExport(lid),
-      30_000,
-      'marketing_storage_timeout'
-    );
+    // 疑似 lv（Twitch など）は、視聴タブが開いていても画面用の組み立てを待たない。
+    // その組み立てはコメントが多いと30秒の打ち切りに届かず、報告ごと消える。
+    // 保存層の行をそのまま写す。登録が無い・空でない失敗のときだけ、従来の30秒読みに戻す。
+    let commentsRaw = null;
+    if (isYtPseudoLvShape(lid)) {
+      const stored = await readStoredExportComments(lid);
+      if (Array.isArray(stored)) commentsRaw = stored;
+    }
+    if (!Array.isArray(commentsRaw)) {
+      commentsRaw = await withTimeout(
+        resolveCommentsForHtmlExport(lid),
+        30_000,
+        'marketing_storage_timeout'
+      );
+    }
     /** @type {Record<string, any>} */
     let data = {};
     try {

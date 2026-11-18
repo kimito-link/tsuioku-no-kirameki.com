@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2167',
+    date: '2026-11-18',
+    summary: '開いたままの書き出しと概数',
+    items: Object.freeze([
+      '配信ページを開いたまま書き出しても、保存したコメントをそのまま読みます。コメントが多くても、画面用の組み立てを待たずに最後まで出します。',
+      'YouTube のチャンネル登録者数は、ページの概数（8.43万人など）をそのまま出します。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2166',
     date: '2026-11-18',
     summary: 'メディアキットのサービス名',
@@ -186,14 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ニコニコ生放送以外の「公式の数字」は、トップファンなどの順位の行が1つも無いときは欄ごと出さないようにしました。行が付くと、また出ます。',
       'Kick・Twitch・YouTube の会場の吹き出しでは、絵文字だけのコメントをコードのまま出さないようにしました。画像のアドレスがあるときは絵にし、無いときは吹き出しと読み上げから外します。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2147',
-    date: '2026-11-17',
-    summary: '配信を探す案内の読み込みを直す',
-    items: Object.freeze([
-      'ニコニコ生放送以外で、配信ページが見つからないときの案内が読み込まれず出なくなるのを直しました。',
     ])
   }),
 ]);

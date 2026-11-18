@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2147',
+    date: '2026-11-17',
+    summary: '配信を探す案内の読み込みを直す',
+    items: Object.freeze([
+      'ニコニコ生放送以外で、配信ページが見つからないときの案内が読み込まれず出なくなるのを直しました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2146',
     date: '2026-11-17',
     summary: '配信ページの言い方と来場の内訳',

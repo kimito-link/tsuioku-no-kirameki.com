@@ -67,7 +67,8 @@ describe('Twitch の書き出し', () => {
     expect(fn).not.toContain(', 800,');
     expect(fn).not.toContain('yt_stream_summaries');
     expect(fn).not.toContain('fetch(');
-    const block = src.slice(src.indexOf('const commentsRaw'), src.indexOf('gift_storage_timeout'));
+    const block = src.slice(src.indexOf('let commentsRaw'), src.indexOf('gift_storage_timeout'));
+    expect(block).toContain('readStoredExportComments');
     expect(block).toContain('marketing_storage_timeout');
     expect(block).not.toContain('followerSamplesForExport');
     expect(src).toContain('gift_storage_timeout');

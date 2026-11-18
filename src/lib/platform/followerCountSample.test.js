@@ -14,6 +14,9 @@ import {
   followerSampleFromTikTokRoom,
   followerSampleFromWhowatch,
   followerSampleFromWhowatchProfile,
+  formatFollowerSampleText,
+  followerKpiTexts,
+  getFollowerSeries,
   parseFollowerCountText,
 } from './followerCountSample.js';
 import { sectionSupportArrivalHtml } from './marketingPlatformChapters.js';
@@ -163,7 +166,7 @@ describe('増えた時間', () => {
       { at: T0 + 180_000, count: 13000, rounded: true, source: 'rounded', raw: '1.3万' },
     ]);
     expect(onlyRounded?.roundedOnly).toBe(true);
-    expect(onlyRounded?.label).toContain('1.2万 → 1.3万');
+    expect(onlyRounded?.label).toContain('1.2万人 → 1.3万人');
     expect(onlyRounded?.label).toContain('概数');
     expect(onlyRounded?.label).not.toContain('＋');
     const mixed = analyzeFollowerGrowth([
@@ -171,7 +174,7 @@ describe('増えた時間', () => {
       { at: T0 + 180_000, count: 139, rounded: false, source: 'page-count' },
     ]);
     expect(mixed?.roundedOnly).toBe(true);
-    expect(mixed?.label).toContain('139K');
+    expect(mixed?.label).toContain('13.9万');
     expect(mixed?.label).toContain('概数');
     expect(mixed?.label).not.toContain('139人');
   });
@@ -193,6 +196,59 @@ describe('増えた時間', () => {
     expect(g).toMatchObject({ startCount: 1000, endCount: 1009, net: 9 });
     expect(g?.windows[0]).toMatchObject({ delta: 8, supportCount: 2, commentCount: 2 });
     expect(g?.windows[1]).toMatchObject({ delta: 1, supportCount: 0, commentCount: 1 });
+  });
+});
+
+describe('公式の概数表記は丸め直さない', () => {
+  const pages = [
+    ['チャンネル登録者数 1.23万人', 12300, true, '1.23万', '1.23万人'],
+    ['チャンネル登録者数 12.3万人', 123000, true, '12.3万', '12.3万人'],
+    ['チャンネル登録者数 123万人', 1230000, true, '123万', '123万人'],
+    ['チャンネル登録者数 1,234人', 1234, false, undefined, '1,234人'],
+    ['チャンネル登録者数 1.23億人', 123000000, true, '1.23億', '1.23億人'],
+    ['チャンネル登録者数 8.43万人', 84300, true, '8.43万', '8.43万人'],
+  ];
+  it.each(pages)('%s は公式表示のまま KPI と章に出る', (page, count, rounded, raw, shown) => {
+    const parsed = parseFollowerCountText(page);
+    expect(parsed).toMatchObject({ count, rounded });
+    if (raw) expect(parsed?.raw).toBe(raw);
+    const sample = {
+      at: T0,
+      count: parsed.count,
+      rounded: parsed.rounded,
+      raw: parsed.raw,
+      noun: 'チャンネル登録者',
+      source: 'page-count',
+    };
+    expect(formatFollowerSampleText(sample, rounded ? 'ja-compact' : 'exact')).toBe(shown);
+    const series = getFollowerSeries([sample, { ...sample, at: T0 + 60_000 }], { notation: 'ja-compact', noun: 'チャンネル登録者' });
+    expect(series?.start.text).toBe(shown);
+    expect(series?.end.text).toBe(shown);
+    const kpi = followerKpiTexts(series);
+    expect(kpi.countText.startsWith(shown)).toBe(true);
+    if (rounded) expect(kpi.countText).toContain('（概数）');
+    const html = sectionSupportArrivalHtml({
+      platformId: 'youtube',
+      comments: [{ capturedAt: T0 + 10_000, text: 'こんにちは', ytKind: 'text' }],
+      followerSamples: [sample, { ...sample, at: T0 + 60_000 }],
+    });
+    expect(html).toContain(shown);
+    if (page.includes('8.43')) expect(html).not.toMatch(/8\.4万人/);
+    if (page.includes('1.23億')) expect(html).not.toMatch(/1\.2億人/);
+  });
+
+  it('短い aria や概数属性より、見えている桁の多い表記を残す', () => {
+    document.body.innerHTML = '<div id="owner"><span aria-label="チャンネル登録者数 8.4万人">チャンネル登録者数 8.43万人</span></div>';
+    document.documentElement.setAttribute('data-nl-yt-subscribers', 'チャンネル登録者数 8.4万人');
+    const sample = followerSampleFromDom(document, 'youtube');
+    expect(sample).toMatchObject({ count: 84300, rounded: true, raw: '8.43万' });
+    expect(formatFollowerSampleText(sample, 'ja-compact')).toBe('8.43万人');
+  });
+
+  it('保存した整数が 84300 なら、短い raw の 8.4万 では出さない', () => {
+    expect(formatFollowerSampleText({ count: 84300, rounded: true, raw: '8.4万' }, 'ja-compact')).toBe('8.43万人');
+    expect(formatFollowerSampleText({ count: 84300, rounded: true, raw: '' }, 'ja-compact')).toBe('8.43万人');
+    expect(formatFollowerSampleText({ count: 84000, rounded: true, raw: '8.4万' }, 'ja-compact')).toBe('8.4万人');
   });
 });
 

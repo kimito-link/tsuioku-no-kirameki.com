@@ -100,15 +100,18 @@ export function parseFollowerCountText(raw) {
   const viewerish = /視聴|コメント|comment|viewer/i.test(text);
   const followerish = /フォロワー|登録者|ファン|サポーター|follower|subscriber/i.test(text);
   if (viewerish && !followerish) return null;
-  const compact = /([\d]+(?:[.,]\d+)?)\s*(億|万|千|[kKmM])(?![a-zA-Z])/u.exec(text);
-  if (compact) {
+  const compactRe = /([\d]+(?:[.,]\d+)?)\s*(億|万|千|[kKmM])(?![a-zA-Z])/gu;
+  /** @type {{ count: number, rounded: boolean, raw?: string } | null} */
+  let bestCompact = null;
+  for (const compact of text.matchAll(compactRe)) {
     const n = Number(compact[1].replace(',', '.'));
     const unit = compact[2];
     const mul = unit === '億' ? 100000000 : unit === '万' ? 10000 : unit === '千' ? 1000 : unit.toLowerCase() === 'k' ? 1000 : 1000000;
     const count = Math.round(n * mul);
-    if (!Number.isFinite(n) || count < 0 || count > COUNT_MAX) return null;
-    return { count, rounded: true, raw: `${compact[1]}${unit}` };
+    if (!Number.isFinite(n) || count < 0 || count > COUNT_MAX) continue;
+    bestCompact = preferPreciseCompact(bestCompact, { count, rounded: true, raw: `${compact[1]}${unit}` });
   }
+  if (bestCompact) return bestCompact;
   const nums = text.match(/[\d,，]+/g);
   if (!nums || nums.length !== 1) return null;
   const count = exactInt(nums[0].replace(/[,，]/g, ''));
@@ -160,13 +163,15 @@ function parseFollowerElement(el) {
     if (text && text.length <= 80) bits.push(text);
     node = node.parentElement;
   }
+  /** @type {{ count: number, rounded: boolean, raw?: string } | null} */
+  let rounded = null;
   for (const bit of bits) {
     const parsed = parseFollowerCountText(bit);
     if (!parsed) continue;
-    if (parsed.rounded) return parsed;
-    if (!exact) exact = parsed;
+    if (parsed.rounded) rounded = preferPreciseCompact(rounded, parsed);
+    else if (!exact) exact = parsed;
   }
-  return exact;
+  return rounded || exact;
 }
 
 /**
@@ -374,6 +379,10 @@ export function followerSampleFromDom(doc, platformId) {
  */
 function youtubeOwnerFollowerSample(doc, noun) {
   if (!doc || typeof doc.querySelectorAll !== 'function') return null;
+  /** @type {{ count: number, rounded: boolean, raw?: string } | null} */
+  let bestRounded = null;
+  /** @type {{ count: number, rounded: boolean, raw?: string } | null} */
+  let exact = null;
   /** @type {ParentNode[]} */
   const roots = [];
   try {
@@ -393,29 +402,23 @@ function youtubeOwnerFollowerSample(doc, noun) {
     } catch {
       continue;
     }
-    /** @type {{ count: number, rounded: boolean, raw?: string } | null} */
-    let exact = null;
     for (const el of nodes) {
       const text = String(el.textContent || '').replace(/\s+/g, ' ').trim();
       if (!text || text.length > 40 || !/登録者|subscriber/i.test(text)) continue;
       const parsed = parseFollowerElement(el);
       if (!parsed) continue;
-      if (parsed.rounded) return sampleOf(parsed, noun, 'page-count');
-      if (!exact) exact = parsed;
-    }
-    if (exact) {
-      const rootEl = /** @type {{ documentElement?: Element, getAttribute?: (n: string) => string | null }} */ (doc);
-      const published = String(rootEl.documentElement?.getAttribute?.('data-nl-yt-subscribers') || rootEl.getAttribute?.('data-nl-yt-subscribers') || '');
-      const fromAttr = parseFollowerCountText(published);
-      if (fromAttr?.rounded && isMisparsedExactCount([fromAttr], exact.count, false)) {
-        return sampleOf(fromAttr, noun, 'page-count');
-      }
-      return sampleOf(exact, noun, 'page-count');
+      if (parsed.rounded) bestRounded = preferPreciseCompact(bestRounded, parsed);
+      else if (!exact) exact = parsed;
     }
   }
   const rootEl = /** @type {{ documentElement?: Element, getAttribute?: (n: string) => string | null }} */ (doc);
   const published = String(rootEl.documentElement?.getAttribute?.('data-nl-yt-subscribers') || rootEl.getAttribute?.('data-nl-yt-subscribers') || '');
   const fromAttr = parseFollowerCountText(published);
+  if (fromAttr?.rounded) bestRounded = preferPreciseCompact(bestRounded, fromAttr);
+  if (exact && !(bestRounded && isMisparsedExactCount([bestRounded], exact.count, false))) {
+    return sampleOf(exact, noun, 'page-count');
+  }
+  if (bestRounded) return sampleOf(bestRounded, noun, 'page-count');
   return fromAttr ? sampleOf(fromAttr, noun, 'page-count') : null;
 }
 
@@ -477,7 +480,7 @@ export function analyzeFollowerGrowth(samples, opts = {}) {
   if (usable.length < 2) {
     const rounded = list.filter((s) => s.rounded);
     if (!rounded.length) return null;
-    const shown = (/** @type {typeof rounded[number]} */ s) => s.raw || s.count.toLocaleString('ja-JP');
+    const shown = (/** @type {typeof rounded[number]} */ s) => formatFollowerSampleText(s, 'ja-compact') || s.raw || s.count.toLocaleString('ja-JP');
     const start = rounded[0];
     const end = rounded[rounded.length - 1];
     const span = rounded.length === 1 ? shown(end) : `${shown(start)} → ${shown(end)}`;
@@ -538,29 +541,100 @@ export function followerCountForDisplay(samples) {
  */
 export function formatFollowerSampleText(sample, notation) {
   const count = Math.floor(Number(sample?.count));
-  const raw = String(sample?.raw || '').replace(/\s+/g, '');
+  const safe = Number.isFinite(count) ? count : 0;
   if (notation === 'ja-compact' && sample?.rounded) {
-    const ja = raw.match(/[\d.,]+(?:億|万)人?/);
-    if (ja) return ja[0].endsWith('人') ? ja[0] : `${ja[0]}人`;
-    return `${formatJaCompactCount(count)}人`;
+    const token = officialCompactToken(sample?.raw);
+    const fromCount = formatJaCompactCount(safe);
+    const shown = chooseOfficialCompact(token, fromCount, safe);
+    return shown ? `${shown.replace(/人$/, '')}人` : '';
   }
   if (!Number.isFinite(count)) return '';
   return `${count.toLocaleString('ja-JP')}人`;
 }
 
 /**
+ * 概数の小数桁。末尾の 0 は桁に数えない（8.40 と 8.4 は同じ）。
+ * @param {unknown} raw
+ */
+function compactPrecision(raw) {
+  const m = String(raw || '').match(/[.,](\d+)/);
+  if (!m) return 0;
+  return m[1].replace(/0+$/, '').length;
+}
+
+/**
+ * 同じ文に短い概数と長い概数があるとき、ページが見せている長い方を残す。
+ * @param {{ count: number, rounded: boolean, raw?: string } | null} current
+ * @param {{ count: number, rounded: boolean, raw?: string } | null} next
+ */
+function preferPreciseCompact(current, next) {
+  if (!next) return current;
+  if (!current) return next;
+  return compactPrecision(next.raw) > compactPrecision(current.raw) ? next : current;
+}
+
+/**
+ * ページに書いてあった万・億・千の表記。K/M はここでは拾わない（日本語のページでは人数から戻す）。
+ * @param {unknown} raw
+ */
+function officialCompactToken(raw) {
+  const m = String(raw || '').replace(/\s+/g, '').match(/([\d]+(?:[.,]\d+)?)(億|万|千)/);
+  if (!m) return '';
+  return `${m[1].replace(',', '.')}${m[2]}`;
+}
+
+/**
+ * @param {string} token
+ * @returns {number | null}
+ */
+function tokenToCount(token) {
+  const m = String(token || '').match(/^([\d.]+)(億|万|千)$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  const unit = m[2] === '億' ? 100000000 : m[2] === '万' ? 10000 : 1000;
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n * unit);
+}
+
+/**
+ * ページの表記と、保存した整数から戻した表記。ページの方が短いときだけ、整数側の桁を使う。
+ * @param {string} token
+ * @param {string} fromCount
+ * @param {number} count
+ */
+function chooseOfficialCompact(token, fromCount, count) {
+  if (!token) return fromCount;
+  if (!fromCount) return token;
+  const tokenCount = tokenToCount(token);
+  if (tokenCount == null || tokenCount === count) return token;
+  if (compactPrecision(fromCount) > compactPrecision(token)) return fromCount;
+  return token;
+}
+
+/**
+ * 整数を、ページの概数と同じ桁（小数は2桁まで、末尾の0は落とす）にする。
+ * 8.43万を 8.4万 に丸めない。
  * @param {number} count
  */
 function formatJaCompactCount(count) {
-  if (count >= 100000000) {
-    const v = Math.round((count / 100000000) * 10) / 10;
-    return `${Number.isInteger(v) ? String(v) : String(v)}億`;
-  }
-  if (count >= 10000) {
-    const v = Math.round((count / 10000) * 10) / 10;
-    return `${Number.isInteger(v) ? String(Math.round(v)) : String(v)}万`;
-  }
-  return count.toLocaleString('ja-JP');
+  if (!Number.isFinite(count) || count < 0) return '';
+  if (count >= 100000000) return scaleCompact(count, 100000000, '億');
+  if (count >= 10000) return scaleCompact(count, 10000, '万');
+  return Math.floor(count).toLocaleString('ja-JP');
+}
+
+/**
+ * @param {number} count
+ * @param {number} unit
+ * @param {string} name
+ */
+function scaleCompact(count, unit, name) {
+  const hundredths = Math.round(count / (unit / 100));
+  const whole = Math.floor(hundredths / 100);
+  const frac = hundredths % 100;
+  if (frac <= 0) return `${whole}${name}`;
+  if (frac % 10 === 0) return `${whole}.${frac / 10}${name}`;
+  return `${whole}.${String(frac).padStart(2, '0')}${name}`;
 }
 
 /** @param {number} ms */

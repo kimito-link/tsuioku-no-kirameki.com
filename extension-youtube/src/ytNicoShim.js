@@ -18,6 +18,7 @@ import { setYtLvMetaResolver } from '../../src/lib/youtube/ytLvKeyBridge.js';
 import { marketingViewFor } from '../../src/lib/platform/marketingPlatformPlan.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
+import { exportCommentsFromStoredRows, setStoredExportCommentReader } from '../../src/lib/youtube/exportStoredComments.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
 import { videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersist.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
@@ -1378,6 +1379,15 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       knownSummariesLoaded = true;
       schedulePlatformChrome();
     });
+  // 書き出しは、視聴タブが開いていても画面用の組み立て(人物・アイコン)を待たない。
+  // 保存した行をそのまま写す。組み立てはコメントが多いと30秒で打ち切られ、報告が出なかった。
+  setStoredExportCommentReader(async (lv) => {
+    await knownVideosReady;
+    const vid = videoIdForPseudoLv(lv);
+    if (!vid) return null;
+    const raw = await getYtStreamCommentsByVideoId(vid);
+    return exportCommentsFromStoredRows(Array.isArray(raw) ? raw : [], String(lv || ''));
+  });
   /**
    * 配信のまとめの一覧を { yt_stream_summaries: {...} } の形で返す。
    * 0.1.2057: 裏方は一覧を丸ごと書かなくなった(配信ごとの小さい鍵 ytm:sum:v1:<id> と IndexedDB)。
