@@ -15293,8 +15293,11 @@ async function refresh() {
   if (treatAsNoActiveWatch) {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');
-    if (liveEl) liveEl.textContent = '（ニコ生watchを開いてください）';
+    const pinnedStream = new URLSearchParams(location.search).get('stream') || '';
+    if (liveEl) liveEl.textContent = pinnedStream ? 'この配信の記録がありません' : '（ニコ生watchを開いてください）';
+    if (pinnedStream) { const trend = $('devMonitorExportTrendStatus'); if (trend) trend.textContent = 'この配信の記録がありません'; }
     setCountDisplay('（この配信は未取得）');
+    exportBtn.dataset.liveId = '';
     renderCommentTicker([]);
     exportBtn.disabled = true;
     exportBtn.dataset.watchUrl = '';

@@ -188,6 +188,36 @@ function requestWwFollowers(userId, videoKey, opts = {}) {
     }
   })();
 }
+
+/** 終わりの人数は裏方が読む。ページが閉じる fetch は移動で消える。 */
+let wwEndArmKey = '';
+let wwEndArmAt = 0;
+/** @param {string} userId @param {string} videoKey @param {string} livePageId */
+function armWwFollowerEnd(userId, videoKey, livePageId) {
+  const now = Date.now();
+  if (!videoKey || !userId || !livePageId || (wwEndArmKey === videoKey && now - wwEndArmAt < 60_000)) return;
+  wwEndArmKey = videoKey;
+  wwEndArmAt = now;
+  safeSendMessage({
+    type: 'YT_FOLLOWER_END_ARM',
+    platform: 'whowatch',
+    videoKey,
+    userId,
+    livePageId,
+  });
+}
+/** @param {string} userId @param {string} videoKey @param {string} livePageId */
+function askWwFollowerEnd(userId, videoKey, livePageId) {
+  wwEndArmAt = 0;
+  armWwFollowerEnd(userId, videoKey, livePageId);
+  safeSendMessage({
+    type: 'YT_FOLLOWER_END_NOW',
+    platform: 'whowatch',
+    videoKey,
+    userId,
+    livePageId,
+  });
+}
 /** 終わったと分かった配信(同じページにいる間は読み直さない) */
 const endedLives = new Set();
 
@@ -292,6 +322,7 @@ function startReader(liveId) {
     const wwFollow = followerSampleFromWhowatch(json) || followerSampleFromDom(document, 'whowatch');
     if (info.user?.id && key) {
       lastWwUserId = info.user.id;
+      armWwFollowerEnd(info.user.id, key, liveId);
       requestWwFollowers(info.user.id, key);
     }
     if (Date.now() - metaAt >= META_EVERY_MS) sendMeta(info, wwFollow);
@@ -352,7 +383,7 @@ function startReader(liveId) {
       }
       endedLives.add(liveId);
       if (key) {
-        if (info.user?.id) requestWwFollowers(info.user.id, key, { force: true });
+        if (info.user?.id) askWwFollowerEnd(info.user.id, key, liveId);
         safeSendMessage({
           type: 'YT_STREAM_META',
           payload: { videoId: key, endedAt: Date.now() },
@@ -380,6 +411,7 @@ function check() {
   const liveId = parseWwLiveIdFromUrl(location.href);
   if (!liveId || endedLives.has(liveId)) {
     if (current && current.liveId !== liveId) {
+      if (!liveId && lastWwKey && lastWwUserId) askWwFollowerEnd(lastWwUserId, String(lastWwKey), current.liveId);
       current.stop();
       current = null;
     }
@@ -481,6 +513,5 @@ try {
 setInterval(check, 1000);
 check();
 window.addEventListener('pagehide', () => {
-  if (lastWwKey && lastWwUserId) requestWwFollowers(lastWwUserId, lastWwKey, { force: true });
   current?.stop();
 });

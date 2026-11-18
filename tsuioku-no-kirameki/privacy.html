@@ -400,7 +400,7 @@
         <div class="meta">
           <span>発行者: <strong>株式会社ベストトラスト</strong></span>
           <span>施行日: <strong>2026年4月19日</strong></span>
-          <span>最終更新: <strong>2026年11月12日</strong></span>
+          <span>最終更新: <strong>2026年11月18日</strong></span>
         </div>
       </div>
     </header>
@@ -586,7 +586,7 @@
           <h3>4-1c. Twitch（<code>www.twitch.tv</code>）</h3>
           <ul>
             <li>利用者が開いている Twitch の配信ページで、その配信のチャット（コメント・ビッツ・サブスク・ギフト・レイド）を、Twitch 公式の読み取り専用のチャットサーバー（<code>irc-ws.chat.twitch.tv</code>）から<strong>ログインなし</strong>で受け取ります。配信していないチャンネルのページでは接続しません</li>
-            <li>配信名・開始時刻・同時視聴者数・投稿者のアイコン画像の場所は、Twitch のページ自身が使っている公開の窓口（<code>gql.twitch.tv</code>）から、<strong>ログイン情報を付けずに</strong>取得します。アイコン画像は Twitch の公開画像サーバーから表示します</li>
+            <li>配信名・開始時刻・同時視聴者数・投稿者のアイコン画像の場所は、Twitch のページ自身が使っている公開の窓口（<code>gql.twitch.tv</code>）から、<strong>ログイン情報を付けずに</strong>取得します。記録を終えたあとのフォロワー数も、同じ窓口を拡張の裏方からログインなしで1回読みます。アイコン画像は Twitch の公開画像サーバーから表示します</li>
             <li>拡張の画面からコメントを送るときは、開いている Twitch のページの入力欄に書き込んで送信ボタンを押すだけです。送れるかどうか（ログイン・制限）は Twitch 本体が決めます</li>
             <li>Twitch の記録は端末の中（<code>chrome.storage.local</code> / IndexedDB）にだけ保存します。<strong>「📱 スマホで見る」などの共有機能でも Twitch の記録は送信しません</strong>（共有はニコニコ生放送の画面のみ）</li>
             <li>利用者自身の Twitch アカウントの認証情報は、ブラウザが保持する Cookie により Twitch 側に直接送信されるものであり、当プロジェクトがこれを取得・保持することはありません</li>
@@ -700,7 +700,7 @@
           </ul>
           <p>Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・TikTok LIVE・ABEMA については、次のホストを宣言しています。</p>
           <ul>
-            <li><code>https://www.twitch.tv/*</code>（4-1c）</li>
+            <li><code>https://www.twitch.tv/*</code> と <code>https://gql.twitch.tv/*</code>（4-1c。フォロワー数の公開の窓口）</li>
             <li><code>https://kick.com/*</code>（4-1d）</li>
             <li><code>https://whowatch.tv/*</code> と <code>https://api.whowatch.tv/*</code>（4-1e）</li>
             <li><code>https://www.showroom-live.com/*</code>（4-1f）</li>

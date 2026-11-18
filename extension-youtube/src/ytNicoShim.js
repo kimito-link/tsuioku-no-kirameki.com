@@ -37,6 +37,7 @@ import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey, readYtPanelSite } from '../../src/lib/youtube/ytPanelRoute.js';
+import { recordingKeyForPanelStream, streamKeyMatchesPanel } from '../../src/lib/youtube/ytPanelExportTarget.js';
 import { noWatchHintFor } from '../../src/lib/platform/noWatchHint.js';
 import { rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
@@ -218,6 +219,8 @@ function mapTab(tab) {
     panelDiag.unmappedWatchTab(url); // 計器: 配信のページなのに写せない(記録の無い部屋など)
     return tab;
   }
+  // 横の欄は一つの配信を焼いて開く。別のサービスのタブをニコ生の視聴タブに見せると、書き出しがそちらになる。
+  if (PANEL_STREAM_KEY && !streamKeyMatchesPanel(PANEL_STREAM_KEY, vid)) return tab;
   const lv = pseudoLvForVideoId(vid);
   return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: undefined, __ytUrl: url };
 }
@@ -1400,6 +1403,13 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   };
   const lastWatchUrl = async () => {
     await knownVideosReady;
+    // 焼いた配信がある欄は、その記録だけ。最後に更新された別のサービスや、閉じたあとの全局の「最後に見た配信」は使わない。
+    if (PANEL_STREAM_KEY) {
+      const vid = recordingKeyForPanelStream(PANEL_STREAM_KEY, knownSummaries);
+      const pinnedLv = vid ? pseudoLvForVideoId(vid) : '';
+      panelDiag.lastWatch(vid ? 'panel' : 'none', pinnedLv);
+      return pinnedLv ? `https://live.nicovideo.jp/watch/${pinnedLv}` : '';
+    }
     const lv = lvOfLastStream(lastStreamValue);
     if (lv) {
       panelDiag.lastWatch('page', lv);

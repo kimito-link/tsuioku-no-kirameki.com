@@ -125,7 +125,7 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
 > 次の配信ページで、開いている配信のコメント・応援を本人のPCに記録します。外へは送りません。
 > ・https://*.nicovideo.jp/* : ニコニコ生放送
 > ・https://www.youtube.com/* と https://yt3.ggpht.com/* ・https://yt4.ggpht.com/* ・https://yt3.googleusercontent.com/* : YouTube Live(チャットとアイコン)
-> ・https://www.twitch.tv/* : Twitch
+> ・https://www.twitch.tv/* と https://gql.twitch.tv/* : Twitch（gql はログインなしの公開の人数）
 > ・https://kick.com/* : Kick
 > ・https://whowatch.tv/* と https://api.whowatch.tv/* : ふわっち
 > ・https://www.showroom-live.com/* : SHOWROOM
@@ -184,7 +184,7 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
 
 ★2026-11-10: 統合欄 §2-8z（995字）と単一用途 §1 に Twitch を入れた。privacy.html §4-1c。
 
-> 単一用途そのものです。利用者が開いている Twitch の配信ページ (www.twitch.tv) に content script を入れ、その配信のチャット (コメント・ビッツ・サブスク・ギフト・レイド) と配信名・同時視聴者数を読み取り、本人の PC (chrome.storage.local / IndexedDB) に記録します。チャットは Twitch 公式の読み取り専用チャットサーバーからログインなしで受け取ります。拡張の画面からコメントを送るときは、Twitch のページの入力欄に書き込んで送信ボタンを押すだけです。Twitch の記録を外へ送ることはありません。利用者の Twitch アカウントの認証情報は取得しません。
+> 単一用途そのものです。利用者が開いている Twitch の配信ページ (www.twitch.tv) に content script を入れ、その配信のチャット (コメント・ビッツ・サブスク・ギフト・レイド) と配信名・同時視聴者数を読み取り、本人の PC (chrome.storage.local / IndexedDB) に記録します。チャットは Twitch 公式の読み取り専用チャットサーバーからログインなしで受け取ります。記録を終えるときのフォロワー数は、同じ公開の窓口 (gql.twitch.tv) を拡張の裏方からログインなしで1回読みます。拡張の画面からコメントを送るときは、Twitch のページの入力欄に書き込んで送信ボタンを押すだけです。Twitch の記録を外へ送ることはありません。利用者の Twitch アカウントの認証情報は取得しません。
 
 ### 2-9. ホスト権限 `https://*.nicovideo.jp/*` が必要な理由
 

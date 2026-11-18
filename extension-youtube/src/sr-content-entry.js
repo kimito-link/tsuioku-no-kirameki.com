@@ -185,6 +185,36 @@ function requestSrFollowers(roomId, videoKey, opts = {}) {
     }
   })();
 }
+
+/** 終わりの人数は裏方が読む。ページが閉じる fetch は移動で消える。 */
+let srEndArmKey = '';
+let srEndArmAt = 0;
+/** @param {string} roomId @param {string} roomKey @param {string} videoKey */
+function armSrFollowerEnd(roomId, roomKey, videoKey) {
+  const now = Date.now();
+  if (!videoKey || !roomId || (srEndArmKey === videoKey && now - srEndArmAt < 60_000)) return;
+  srEndArmKey = videoKey;
+  srEndArmAt = now;
+  safeSendMessage({
+    type: 'YT_FOLLOWER_END_ARM',
+    platform: 'showroom',
+    videoKey,
+    roomKey,
+    roomId,
+  });
+}
+/** @param {string} roomId @param {string} roomKey @param {string} videoKey */
+function askSrFollowerEnd(roomId, roomKey, videoKey) {
+  srEndArmAt = 0;
+  armSrFollowerEnd(roomId, roomKey, videoKey);
+  safeSendMessage({
+    type: 'YT_FOLLOWER_END_NOW',
+    platform: 'showroom',
+    videoKey,
+    roomKey,
+    roomId,
+  });
+}
 /** いまの配信のイベントの数字(読めたあとだけ YT_STREAM_META に付ける) */
 let srStats = /** @type {null | { key: string, stats: Record<string, any> | null }} */ (null);
 
@@ -390,11 +420,15 @@ let endHintAt = 0;
 let checking = false;
 
 async function check() {
-  if (current?.key && diag.roomId) requestSrFollowers(diag.roomId, current.key);
+  if (current?.key && diag.roomId) {
+    armSrFollowerEnd(diag.roomId, current.roomKey, current.key);
+    requestSrFollowers(diag.roomId, current.key);
+  }
   if (checking) return;
   const roomKey = parseSrRoomKeyFromUrl(location.href);
   if (!roomKey) {
     if (current) {
+      askSrFollowerEnd(diag.roomId, current.roomKey, current.key);
       current.stop();
       current = null;
     }
@@ -416,7 +450,7 @@ async function check() {
     if (!st.isLive) {
       if (current) {
         const endedKey = current.key;
-        requestSrFollowers(st.roomId, endedKey, { force: true });
+        askSrFollowerEnd(st.roomId, current.roomKey, endedKey);
         current.stop();
         current = null;
         safeSendMessage({
@@ -434,11 +468,13 @@ async function check() {
     const key = buildSrStreamKey(roomKey, { liveId });
     if (!key) return saveDiagSoon();
     if (!current || current.key !== key) {
+      if (current?.key && current.key !== key) askSrFollowerEnd(diag.roomId, current.roomKey, current.key);
       current?.stop();
       const bc = li ? { bcsvrHost: li.bcsvrHost, bcsvrKey: li.bcsvrKey } : { bcsvrHost: st.bcsvrHost, bcsvrKey: st.bcsvrKey };
       current = { roomKey, key, stop: startReader(st.roomId, key, bc) };
       diag.streamKey = key;
     }
+    armSrFollowerEnd(st.roomId, roomKey, key);
     // 視聴数は polling の online_user_num
     const poll = await tryJson(srLiveApiUrl('polling', st.roomId));
     const viewers = Number(poll?.online_user_num);
@@ -557,6 +593,5 @@ setInterval(() => {
   void check();
 }, 1000);
 window.addEventListener('pagehide', () => {
-  if (current?.key && diag.roomId) requestSrFollowers(diag.roomId, current.key, { force: true });
   current?.stop();
 });

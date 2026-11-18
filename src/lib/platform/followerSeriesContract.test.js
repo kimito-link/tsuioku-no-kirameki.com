@@ -88,12 +88,17 @@ describe('人数の正本は能力表の一つ', () => {
     expect(chapter).not.toContain('>-<');
   });
 
-  it('Twitch・SHOWROOM・ふわっちは、記録の終わりに1回読み、古い人数の時刻を書き換えない', () => {
+  it('Twitch・SHOWROOM・ふわっちは、記録の終わりを裏方で1回読み、古い人数の時刻を書き換えない', () => {
+    const bg = readFileSync(new URL('../../../extension-youtube/src/background-entry.js', import.meta.url), 'utf8');
+    expect(bg).toContain('chrome.tabs.onRemoved');
+    expect(bg).toContain('chrome.tabs.onUpdated');
+    expect(bg).toContain('fetchFollowerEndSample');
     for (const file of ['tw', 'sr', 'ww']) {
       const src = readFileSync(new URL(`../../../extension-youtube/src/${file}-content-entry.js`, import.meta.url), 'utf8');
       const hide = src.slice(src.lastIndexOf("addEventListener('pagehide'"));
-      expect(hide, file).toContain('force: true');
       expect(hide, file).not.toContain('followerSample:');
+      expect(hide, file).not.toMatch(/request(Tw|Sr|Ww)Followers/);
+      expect(src, file).toContain('YT_FOLLOWER_END_NOW');
       expect(src, file).toContain('keepalive: true');
       expect(src, file).toContain('signal: platformFetchTimeoutSignal()');
       expect(src, file).not.toContain('lastTwFollow ?');

@@ -63,6 +63,11 @@ import {
 } from '../../src/lib/youtube/ytSplitPersistStore.js';
 import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { followerSamplesExportEntry } from '../../src/lib/platform/followerSampleStore.js';
+import {
+  fetchFollowerEndSample,
+  followerEndReadForEvent,
+  normalizeFollowerEndArm,
+} from '../../src/lib/platform/followerEndRead.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
@@ -1036,6 +1041,74 @@ async function resolveHandleIcons(handles) {
   }
 }
 
+/** 記録の終わりの人数。ページが閉じる fetch は消えるので、裏方がタブの閉じ・移動・配信の終わりで1回読む。 */
+const FOLLOWER_END_SESSION_KEY = 'nls_follower_end_watch';
+/** @type {Map<number, import('../../src/lib/platform/followerEndRead.js').FollowerEndArm>} */
+const followerEndArms = new Map();
+/** @type {Set<string>} */
+const followerEndDone = new Set();
+/** @type {Promise<void> | null} */
+let followerEndLoaded = null;
+
+function loadFollowerEndWatch() {
+  if (!followerEndLoaded) {
+    followerEndLoaded = (async () => {
+      try {
+        const bag = await chrome.storage.session.get(FOLLOWER_END_SESSION_KEY);
+        const saved = bag?.[FOLLOWER_END_SESSION_KEY];
+        const arms = saved && typeof saved === 'object' ? saved.arms : null;
+        if (arms && typeof arms === 'object') {
+          for (const [id, arm] of Object.entries(arms)) {
+            const n = normalizeFollowerEndArm(arm, Number(id));
+            if (n) followerEndArms.set(n.tabId, n);
+          }
+        }
+        const done = saved && typeof saved === 'object' ? saved.done : null;
+        if (Array.isArray(done)) for (const key of done) followerEndDone.add(String(key));
+      } catch {
+        /* session が無ければ、この起動の間だけ覚える */
+      }
+    })();
+  }
+  return followerEndLoaded;
+}
+
+async function persistFollowerEndWatch() {
+  /** @type {Record<string, unknown>} */
+  const arms = {};
+  for (const [id, arm] of followerEndArms) arms[String(id)] = arm;
+  try {
+    await chrome.storage.session.set({
+      [FOLLOWER_END_SESSION_KEY]: { arms, done: [...followerEndDone] },
+    });
+  } catch {
+    /* 覚えられなくても、この起動の間は読む */
+  }
+}
+
+/**
+ * @param {{ type: 'removed' | 'url' | 'stream-end', tabId?: number, url?: string, videoKey?: string }} event
+ */
+async function onFollowerEndTabEvent(event) {
+  await loadFollowerEndWatch();
+  const arm = followerEndReadForEvent([...followerEndArms.values()], followerEndDone, event);
+  if (!arm) return;
+  followerEndDone.add(arm.videoKey);
+  if (event.type !== 'stream-end') followerEndArms.delete(arm.tabId);
+  const sample = await fetchFollowerEndSample(arm, { fetch: globalThis.fetch.bind(globalThis), now: () => Date.now() });
+  await persistFollowerEndWatch();
+  if (!sample) return;
+  await runSerialized(async () => {
+    const summaries = await ensureSummaryMem();
+    summaries[arm.videoKey] = mergeYtStreamSummary(
+      summaries[arm.videoKey],
+      { videoId: arm.videoKey, followerSample: sample },
+      sample.at,
+    );
+    await rememberFollowerSamplesForExport(arm.videoKey, summaries[arm.videoKey]);
+  });
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
 
@@ -1878,5 +1951,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'YT_FOLLOWER_END_ARM' || message.type === 'YT_FOLLOWER_END_NOW') {
+    const arm = normalizeFollowerEndArm(message, sender?.tab?.id);
+    if (!arm) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    void (async () => {
+      await loadFollowerEndWatch();
+      followerEndArms.set(arm.tabId, arm);
+      if (message.type === 'YT_FOLLOWER_END_NOW') {
+        await onFollowerEndTabEvent({ type: 'stream-end', tabId: arm.tabId, videoKey: arm.videoKey });
+      } else {
+        await persistFollowerEndWatch();
+      }
+      sendResponse({ ok: true });
+    })().catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
   return false;
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void onFollowerEndTabEvent({ type: 'removed', tabId });
+});
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (typeof info.url !== 'string' || !info.url) return;
+  void onFollowerEndTabEvent({ type: 'url', tabId, url: info.url });
 });
