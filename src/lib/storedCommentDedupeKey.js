@@ -36,7 +36,7 @@ export const DEDUPE_TIME_BUCKET_MS = 10 * 60 * 1000;
 /**
  * 保存済みコメント1行の重複判定キーを返す。
  *
- * @param {{ commentNo?: unknown, liveId?: unknown, userId?: unknown, text?: unknown, capturedAt?: unknown }} entry
+ * @param {{ commentNo?: unknown, liveId?: unknown, userId?: unknown, text?: unknown, capturedAt?: unknown, id?: unknown }} entry
  * @param {{ bucketMs?: number }} [opts]
  * @returns {string}
  */
@@ -57,7 +57,7 @@ export function storedCommentDedupeKey(entry, opts) {
   // ★時点の解釈は timeAuthority.toEpochMs に委ねる(取れなければ 0)。独自の数値判定を書かない。
   const cap = toEpochMs(e.capturedAt);
   // 来場は同じ文面が何度も本物として来る。10分バケットで畳むと別の来場が消える。
-  // 同じ時刻の二重だけをここであり、約2秒の窓は件数側(arrivalNoticeRows)で畳む。
+  // 同じ時刻の二重だけをここで消し、約2秒の窓は件数側(arrivalNoticeRows)で畳む。
   if (parseArrivalCommentText(text)) {
     if (!(cap > 0)) return `arrival:${liveId}|${text}|untimed|${String(e.id ?? '')}`;
     return `arrival:${liveId}|${text}|${cap}`;
