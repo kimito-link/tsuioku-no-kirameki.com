@@ -9,7 +9,8 @@
  * 無い数字は作らない。公式の数と、このPCの記録の数をラベルで分ける。
  */
 
-import { platformOfStreamKey } from './streamPlatform.js';
+import { platformOfStreamKey, STREAM_PLATFORMS } from './streamPlatform.js';
+import { FOLLOWER_NOUN, followerKpiLabels } from './followerCountSample.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
 export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting', 'tiktok']);
@@ -296,6 +297,80 @@ export function platformCapability(platformId) {
     visitorCard: false,
     chips: Object.freeze(['streamAge']),
   });
+}
+
+const MEDIA_KIT_SERVICE_NAME = Object.freeze({
+  niconico: 'ニコニコ',
+  youtube: 'YouTube',
+});
+
+/**
+ * メディアキットに出すサービス名。能力表の id から、配信キーの表にある名前を使う。
+ * @param {string} platformId
+ * @returns {string}
+ */
+export function mediaKitServiceName(platformId) {
+  const id = resolvePlatformId(platformId);
+  if (Object.prototype.hasOwnProperty.call(MEDIA_KIT_SERVICE_NAME, id)) {
+    return MEDIA_KIT_SERVICE_NAME[/** @type {'niconico' | 'youtube'} */ (id)];
+  }
+  if (Object.prototype.hasOwnProperty.call(STREAM_PLATFORMS, id)) {
+    return STREAM_PLATFORMS[/** @type {keyof typeof STREAM_PLATFORMS} */ (id)].name;
+  }
+  return '';
+}
+
+/**
+ * メディアキットのサービス名・応援の種類・人数の呼び方。
+ * 書き出す配信のサービスだけから作る。最後に記録した別のサービスは見ない。
+ * 人数を出さないサービス（ABEMA）は、出所の文を空にする。
+ * @param {string} platformId
+ */
+export function mediaKitServiceCopy(platformId) {
+  const id = resolvePlatformId(platformId);
+  const name = mediaKitServiceName(id);
+  const cap = platformCapability(id);
+  const paid = cap && 'paidLabel' in cap ? String(cap.paidLabel || '') : '';
+  const notation = followerNotationOf(id);
+  const noun = /** @type {Record<string, string>} */ (FOLLOWER_NOUN)[id] || '';
+  const countLabel = noun ? followerKpiLabels(noun).countLabel : '';
+  const native = id === 'niconico';
+  const supportKind = paid ? `コメント・${paid}` : 'コメント';
+  const where = native ? 'ニコニコの公開プロフィール' : `${name} の公開ページ`;
+  return {
+    id,
+    name,
+    paid,
+    countLabel,
+    channelPrefix: native ? 'ニコニコユーザーID: ' : `${name} チャンネル: `,
+    supportLead: native
+      ? 'ニコ生上で公開されている応援(コメント・ギフト)の記録から表彰します。'
+      : `${name} 上で公開されている応援(${supportKind})の記録から表彰します。`,
+    awardSource: native
+      ? 'ニコ生上で公開されているコメント・ギフト情報(オープンデータ)'
+      : `${name} 上で公開されている${paid ? `コメント・${paid}` : 'コメント'}情報(オープンデータ)`,
+    followerSource: notation && countLabel ? `${countLabel}は、${where}から配信時に取得したスナップショットです。` : '',
+  };
+}
+
+/**
+ * メディアキットの言葉を直すサービス。
+ * 書き出す配信の lv が分かっているときは、その配信のキーだけを見る。
+ * 最後にコメントを読んだ配信や、最近増えた別の配信は引数に無く、見ない。
+ * キーがまだ無いときは ''（別サービスの名前で埋めない）。
+ * 配信キーの表に無いキーは YouTube（YouTube の動画IDは接頭辞を持たない）。
+ * @param {{ exportLv?: unknown, videoIdForLv?: (lv: string) => unknown, platformOfKey?: (key: string) => { id?: string } | null }} [args]
+ * @returns {string}
+ */
+export function mediaKitWordingPlatformId(args) {
+  const lv = String(args?.exportLv || '').trim().toLowerCase();
+  if (!lv) return '';
+  const vid = typeof args?.videoIdForLv === 'function' ? String(args.videoIdForLv(lv) || '') : '';
+  if (!vid) return '';
+  if (typeof args?.platformOfKey !== 'function') return '';
+  const plat = args.platformOfKey(vid);
+  if (plat && plat.id) return String(plat.id);
+  return 'youtube';
 }
 
 /**

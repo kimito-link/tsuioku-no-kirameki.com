@@ -39,7 +39,7 @@ import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey, readYtPanelSite } from '../../src/lib/youtube/ytPanelRoute.js';
 import { recordingKeyForPanelStream, streamKeyMatchesPanel } from '../../src/lib/youtube/ytPanelExportTarget.js';
 import { noWatchHintFor } from '../../src/lib/platform/noWatchHint.js';
-import { rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
+import { mediaKitWordingPlatformId, rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
@@ -2280,9 +2280,42 @@ function screenPlatform() {
   const p = screenPlatformBase();
   return p && platformBoardPeriod ? { ...p, boardPeriod: platformBoardPeriod } : p;
 }
+
+/** 分析レポートの URL に焼かれた lv。最後にコメントを読んだ別の配信は使わない。 */
+function marketingExportLv() {
+  try {
+    return new URLSearchParams(String(location.search || '')).get('lv') || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 分析レポートの言葉。書き出す配信のサービスだけ。
+ * hold は、配信キーがまだ無いので別サービスの名前へ直さない印。
+ * @returns {{ hold: true } | { hold: false, id: string, platform: (typeof STREAM_PLATFORMS)[keyof typeof STREAM_PLATFORMS] | null }}
+ */
+function marketingWordingPick() {
+  const id = mediaKitWordingPlatformId({
+    exportLv: marketingExportLv(),
+    videoIdForLv: (lv) => videoIdForPseudoLv(lv),
+    platformOfKey: (key) => platformOfStreamKey(key),
+  });
+  if (!id) return { hold: true };
+  if (id === 'youtube' || id === 'niconico') return { hold: false, id, platform: null };
+  if (Object.prototype.hasOwnProperty.call(STREAM_PLATFORMS, id)) {
+    return { hold: false, id, platform: STREAM_PLATFORMS[/** @type {keyof typeof STREAM_PLATFORMS} */ (id)] };
+  }
+  return { hold: true };
+}
+
 /** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
 function screenPlatformBase() {
   if (YT_SHIM_IN_PAGE) return platformOfHostname(location.hostname);
+  if (IS_MARKETING_PAGE) {
+    const picked = marketingWordingPick();
+    return picked.hold ? null : picked.platform;
+  }
   if (lastAskedLv) {
     const vid = videoIdForPseudoLv(lastAskedLv);
     // 0.1.2103: 聞いてきた配信が分からない(記録の無い配信)ときは、外枠が焼いたタブのサービス。
@@ -2375,6 +2408,15 @@ function inRecordedText(node) {
 
 /** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t @param {{ rewrite?: boolean }} [opt] */
 function screenWording(t, opt) {
+  // 分析レポートは、書き出す配信のサービスだけ。最後に読んだ別の配信の名前へ直さない。
+  if (IS_MARKETING_PAGE) {
+    const picked = marketingWordingPick();
+    if (picked.hold || picked.id === 'niconico') return t;
+    const p = picked.platform;
+    if (!p) return ytWording(t, { topFans: false });
+    const w = ytWording(t, { topFans: false });
+    return w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
+  }
   // Twitch にはトップファンの順位表が無い=ランキング欄は最初から「合計の順位」の言葉で描く
   const p = screenPlatform();
   let out;

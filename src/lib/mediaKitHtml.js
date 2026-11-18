@@ -6,6 +6,7 @@
 import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
 import { comeviewAnonLabel } from './comeviewUserNotes.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
+import { mediaKitServiceCopy } from './platform/platformMetrics.js';
 
 const RASTER_DATA_URL_RE = /^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i;
 
@@ -209,8 +210,9 @@ function supporterListHtml(entries, valueLabel, masked = false) {
  * 「この配信を支えた応援者たち」セクション(表彰トーン)。supporters が無ければ空文字。
  * @param {unknown} supportersRaw
  * @param {boolean} [masked]
+ * @param {string} [supportLead]
  */
-function supportersSectionHtml(supportersRaw, masked = false) {
+function supportersSectionHtml(supportersRaw, masked = false, supportLead = '') {
   if (!supportersRaw || typeof supportersRaw !== 'object') return '';
   const supporters = /** @type {{ giftTop?: unknown, commentTop?: unknown, regulars?: unknown }} */ (
     supportersRaw
@@ -237,7 +239,7 @@ function supportersSectionHtml(supportersRaw, masked = false) {
   return `
       <section class="supporters">
         <h2>この配信を支えた応援者たち</h2>
-        <p class="s-lead">配信の熱量をつくっているのは応援者のみなさんです。ニコ生上で公開されている応援(コメント・ギフト)の記録から表彰します。</p>
+        <p class="s-lead">配信の熱量をつくっているのは応援者のみなさんです。${escapeHtml(supportLead)}</p>
         <div class="s-grid">
           <div class="s-col">
             <h3>🎁 ギフト応援</h3>
@@ -289,7 +291,8 @@ export function dedupeSameWindows(windows) {
  *   sourceLiveLimit?: number,
  *   sourceLiveLimitReached?: boolean,
  *   maskSupporters?: boolean,
- *   omitVisitorTotal?: boolean
+ *   omitVisitorTotal?: boolean,
+ *   platformId?: string
  * }} [options]
  * @returns {string}
  */
@@ -308,6 +311,7 @@ export function buildMediaKitHtml(stats, options = {}) {
   const sourceLiveLimit = Math.max(1, Math.floor(finiteNumber(options.sourceLiveLimit) || 60));
   const sourceLiveLimitReached = options.sourceLiveLimitReached === true;
   const omitVisitorTotal = options.omitVisitorTotal === true;
+  const serviceCopy = mediaKitServiceCopy(options.platformId || 'niconico');
 
   const followerLabels =
     stats && typeof stats === 'object' && /** @type {{ followerLabels?: { countLabel?: string, gainLabel?: string } }} */ (stats).followerLabels;
@@ -492,10 +496,10 @@ export function buildMediaKitHtml(stats, options = {}) {
         <h1>${escapeHtml(broadcasterName)}</h1>
         <p class="identity">${
           broadcasterUserId
-            ? nicoUserPageUrl(broadcasterUserId)
-              ? `ニコニコユーザーID: <a href="${escapeAttr(nicoUserPageUrl(broadcasterUserId))}" rel="noopener noreferrer">${escapeHtml(broadcasterUserId)}</a>`
-              : `ニコニコユーザーID: ${escapeHtml(broadcasterUserId)}`
-            : 'ニコニコユーザーID: -'
+            ? serviceCopy.id === 'niconico' && nicoUserPageUrl(broadcasterUserId)
+              ? `${escapeHtml(serviceCopy.channelPrefix)}<a href="${escapeAttr(nicoUserPageUrl(broadcasterUserId))}" rel="noopener noreferrer">${escapeHtml(broadcasterUserId)}</a>`
+              : `${escapeHtml(serviceCopy.channelPrefix)}${escapeHtml(broadcasterUserId)}`
+            : `${escapeHtml(serviceCopy.channelPrefix)}-`
         }</p>
         <span class="badge" aria-label="追憶のきらめきが記録した実測統計">✓ 追憶のきらめき 実測統計</span>
       </div>
@@ -519,19 +523,19 @@ export function buildMediaKitHtml(stats, options = {}) {
           </tbody>
         </table>
       </div>
-      ${supportersSectionHtml(/** @type {any} */ (stats)?.supporters, options.maskSupporters === true)}
+      ${supportersSectionHtml(/** @type {any} */ (stats)?.supporters, options.maskSupporters === true, serviceCopy.supportLead)}
       <aside class="sources">
         <h2>データの出所</h2>
         <p><strong>以下の統計データは、追憶のきらめきが配信中にこのPCへ記録した公式値・実測値です。</strong></p>
         <ul>
-          <li>フォロワー数は、ニコニコの公開プロフィールから配信時に取得したスナップショットです。</li>
+          ${serviceCopy.followerSource ? `<li>${escapeHtml(serviceCopy.followerSource)}</li>` : ''}
           <li>${omitVisitorTotal ? 'コメント数は公式表示値を優先し、未取得時のみこのPCの実測値で補います。' : '来場者数とコメント数は公式表示値を優先し、未取得時のみこのPCの実測値で補います。'}</li>
           <li>同時視聴者数は配信中サンプルの推定値です。公式の同時接続数ではありません。</li>
           <li>チャット率は記録できたコメント数と、最初・最後のサンプル間の推定配信時間から算出します。</li>
           <li>応援者数は各配信で確認できた既知コメント投稿者数の最大値で、期間全体の厳密なユニーク人数ではありません。</li>
           <li>ギフトはこのPCに保存されたギフトイベントのポイント合計と件数です。</li>
           <li>${escapeHtml(limitNote)}</li>
-          <li>応援者の表彰は、ニコ生上で公開されているコメント・ギフト情報(オープンデータ)の集計です。コメント応援と常連の集計は処理負荷を抑えるため直近の配信に限っています。</li>
+          <li>応援者の表彰は、${escapeHtml(serviceCopy.awardSource)}の集計です。コメント応援と常連の集計は処理負荷を抑えるため直近の配信に限っています。</li>
         </ul>
       </aside>
       <p class="generated">生成日時: ${escapeHtml(formatGeneratedAt(generatedAtMs))}（日本時間）</p>

@@ -187,7 +187,8 @@ export async function buildMediaKitDocument(deps) {
     sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
     sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT,
     maskSupporters: deps.maskSupporters === true,
-    omitVisitorTotal: deps.omitVisitorTotal === true
+    omitVisitorTotal: deps.omitVisitorTotal === true,
+    platformId: deps.platformId
   });
   const date = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Tokyo',
