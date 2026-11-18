@@ -338,8 +338,6 @@ export function applyYtStreamIncrementalItems(state, incomingItems, opts = {}) {
       buildYtCommentPrimaryKey(state.videoId || item.videoId, item.id);
     if (!pk || state.seenPks.has(pk)) continue;
     state.seenPks.add(pk);
-    unseen.push(item);
-
     const recAt = Number(item.recordedAt || 0);
     if (Number.isFinite(recAt) && recAt > 0) {
       if (state.firstRecordedAt === 0 || recAt < state.firstRecordedAt) {
@@ -349,6 +347,9 @@ export function applyYtStreamIncrementalItems(state, incomingItems, opts = {}) {
         state.lastRecordedAt = recAt;
       }
     }
+    // フォロー通知は記録に残すが、コメントの件数・レーンには入れない。
+    if (String(item.kind || '') === 'follow' || item.commentType === 'followNotice') continue;
+    unseen.push(item);
   }
 
   if (unseen.length === 0) {

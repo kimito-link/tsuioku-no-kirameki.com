@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildYtPersonResolver, ytRecordToNicoEntry } from '../../../extension-youtube/src/ytNicoShim.js';
+import { buildYtPersonResolver, ytRecordToNicoEntry, ytSummaryToNicoSnapshot } from '../../../extension-youtube/src/ytNicoShim.js';
 
 const UC = 'UCz6LkxZaaaaaaaaaaximANA';
 
@@ -132,6 +132,18 @@ describe('さかのぼって読み足した過去分(skipVoice)', () => {
     }, 0, 'lv900000000001', 'kk:1');
     expect(e.emotes).toEqual([{ name: 'collectiblesLMAO', url }]);
     expect(e.text).toBe('collectiblesLMAO');
+  });
+  it('フォローはシステム行のまま会場へ渡す', () => {
+    const e = ytRecordToNicoEntry({
+      id: 'f', channelId: 'tt:9', name: 'ファン', text: 'フォローしました', kind: 'follow',
+      isSystem: true, commentType: 'followNotice', skipVoice: true, recordedAt: 50, postedAtMs: 40,
+    }, 0, 'lv900000000001', 'tt:9');
+    expect(e).toMatchObject({ ytKind: 'follow', isSystem: true, commentType: 'followNotice', skipVoice: true, text: 'フォローしました' });
+  });
+  it('開始時刻が目安のときはレポートの起点にしない', () => {
+    const start = 1_700_000_000_000;
+    expect(ytSummaryToNicoSnapshot({ startedAt: start, createdAt: start }, 'abcdefghijk', '', {}).programStartAtMs).toBe(start);
+    expect(ytSummaryToNicoSnapshot({ startedAt: start, startedAtApprox: true, createdAt: start }, 'abcdefghijk', '', {}).programStartAtMs).toBeUndefined();
   });
   it('ふつうの新着は今まで通り受け取った時刻で、skipVoice は付かない', () => {
     const now = Date.now();

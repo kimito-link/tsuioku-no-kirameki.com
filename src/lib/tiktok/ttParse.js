@@ -13,7 +13,7 @@
 //   - ログインしていないとコメントのソケット自体が開かない(映像だけ流れる)。
 //   形が違う・欠けている1件は null を返して捨てる(AGENTS.md §3.6)。
 
-import { PbMsg, isGzip } from './ttProto.js';
+import { PbMsg, isGzip, pbFields, utf8 } from './ttProto.js';
 
 export const TT_ORIGIN = 'https://www.tiktok.com';
 /** ギフトのコイン(diamondCount × 個数)。数のまま数える */
@@ -231,6 +231,55 @@ export function withTtStamps(text, stamps) {
   if (!stamps) return text;
   const tail = TT_STAMP_TEXT.repeat(stamps);
   return text ? `${text} ${tail}` : tail;
+}
+
+const TT_FOLLOW_PHRASE = 'フォローしました';
+
+/**
+ * 共通(field 1)と人(field 2)以外の短い文字列に、ページが出したフォローの文言があるか。
+ * 人の名前の中の同じ文字ではフォローにしない。
+ * @param {Uint8Array} buf
+ * @param {number} depth
+ * @param {boolean} skipUserAndCommon
+ */
+function bytesHaveFollowPhrase(buf, depth, skipUserAndCommon) {
+  if (depth > 4 || !(buf instanceof Uint8Array) || buf.length === 0 || buf.length > 8000) return false;
+  for (const f of pbFields(buf)) {
+    if (skipUserAndCommon && (f.no === 1 || f.no === 2)) continue;
+    if (!(f.bytes instanceof Uint8Array) || f.bytes.length === 0 || f.bytes.length > 200) continue;
+    const text = utf8(f.bytes).replace(/\s+/g, ' ').trim();
+    if (text.length > 0 && text.length <= 80 && text.includes(TT_FOLLOW_PHRASE)) return true;
+    if (depth < 4 && pbFields(f.bytes).length > 0 && bytesHaveFollowPhrase(f.bytes, depth + 1, false)) return true;
+  }
+  return false;
+}
+
+/**
+ * WebcastSocialMessage のうち、ページが「フォローしました」と出しているものだけ。
+ * チャット本文や入室(Member)はここでは見ない。
+ * @param {Uint8Array} payload
+ * @param {{ msgId?: string, uniqueId?: string, nowMs?: number }} ctx
+ */
+export function parseTtSocialFollow(payload, ctx = {}) {
+  if (!(payload instanceof Uint8Array)) return null;
+  const m = new PbMsg(payload);
+  const u = parseTtUser(m.msg(2));
+  if (!u) return null;
+  const mid = String(ctx.msgId || '');
+  if (!/^\d{1,20}$/.test(mid) || mid === '0') return null;
+  if (!bytesHaveFollowPhrase(payload, 0, true)) return null;
+  const postedAtMs = commonTimeMs(m, Number(ctx.nowMs) || Date.now());
+  return {
+    id: `tt-f-${mid}`,
+    ...baseRow(u, postedAtMs, ctx.uniqueId || ''),
+    text: TT_FOLLOW_PHRASE,
+    kind: 'follow',
+    amount: 0,
+    currency: '',
+    isSystem: true,
+    commentType: 'followNotice',
+    skipVoice: true,
+  };
 }
 
 /**

@@ -4,9 +4,11 @@
  */
 
 import { escapeHtml } from '../htmlEscape.js';
+import { maskLabelForShare } from '../privacyDisplay.js';
 import { isMarketingSupportRow } from '../marketingAggregate.js';
 import { GIFT_MOMENT_FORBIDDEN_WORDS } from '../giftMomentAnalytics.js';
 import { panelExtraChips } from './platformMetrics.js';
+import { analyzeSupportArrivals } from './supportArrival.js';
 
 const FLOW_CAP = 24;
 const WORD_CONTEXT_MAX_COMMENTS = 4000;
@@ -529,5 +531,80 @@ export function sectionPlatformSummaryHtml(report, view, series, peak, pageCount
 <h2>配信の記録サマリ</h2>
 <p class="mkt-note">このPCの記録と、ページに出ていた数だけをまとめています。</p>
 <div class="mkt-data-card-grid">${inner}</div>
+</section>`;
+}
+
+/**
+ * @param {number} ms
+ */
+function offsetLabel(ms) {
+  if (!(ms >= 0)) return '';
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+/**
+ * 応援が届いた瞬間。記録が0件なら空（章を出さない）。
+ * @param {{ platformId: string, comments?: unknown[], giftEvents?: unknown[] | null, startedAtMs?: number, maskShare?: boolean, cap?: number }} input
+ */
+export function sectionSupportArrivalHtml(input) {
+  const analysis = analyzeSupportArrivals({
+    platformId: input?.platformId || 'niconico',
+    comments: input?.comments,
+    giftEvents: input?.giftEvents || [],
+    startedAtMs: input?.startedAtMs,
+    cap: input?.cap,
+  });
+  if (!analysis) return '';
+  const mask = input?.maskShare === true;
+  const whoOf = (/** @type {string} */ name) => escapeHtml(mask ? maskLabelForShare(name) : name);
+  const counts = analysis.counts
+    .map((c) => `${escapeHtml(c.label)} ${c.count.toLocaleString('ja-JP')}件`)
+    .join('、');
+  const windows = analysis.windows
+    .map((w) => `${escapeHtml(clock(w.startAt) || '—')} からの5分に ${w.count.toLocaleString('ja-JP')}件`)
+    .join('、');
+  const rows = analysis.rows.map((row) => {
+    const when = clock(row.at);
+    const offset = row.offsetMs == null ? '' : `（開始から ${offsetLabel(row.offsetMs)}）`;
+    const kind = row.itemName ? `${row.kindLabel}（${row.itemName}）` : row.kindLabel;
+    const meta = [when ? `${when}${offset}` : offset, kind, row.amountText].filter(Boolean);
+    let trigger = `推定: 直前60秒のコメント ${row.commentCount.toLocaleString('ja-JP')}件`;
+    if (!mask && row.excerpts.length) {
+      trigger += row.excerpts.map((t) => `「${t}」`).join('');
+    }
+    if (row.contextCount > 0) {
+      trigger += `。同じ1分の通知 ${row.contextCount.toLocaleString('ja-JP')}件`;
+      if (!mask && row.contexts.length) trigger += `（${row.contexts.join('、')}）`;
+    }
+    if (mask && (row.excerpts.length || row.contexts.length)) trigger += '。共有用に本文は出していません';
+    return `<li class="mkt-arrival-row"><p class="mkt-arrival-row__meta">${meta.map((part) => escapeHtml(part)).join('<span class="mkt-arrival-row__dot"> · </span>')} · ${whoOf(row.who)}</p><p class="mkt-arrival-row__trigger">${escapeHtml(trigger)}</p></li>`;
+  });
+  const more = analysis.total > analysis.rows.length
+    ? `<p class="mkt-note">表示は ${analysis.rows.length.toLocaleString('ja-JP')} 件まで（記録 ${analysis.total.toLocaleString('ja-JP')} 件）。新しい方から出しています。</p>`
+    : '';
+  const note = '推定（同じ時間に起きたこと・原因とは限らない）。';
+  for (const word of GIFT_MOMENT_FORBIDDEN_WORDS) {
+    if (note.includes(word)) return '';
+  }
+  return `<section class="mkt-section" id="mkt-support-arrival">
+<style>
+.mkt-arrival-summary{margin:.2rem 0 .7rem;color:#e2e8f0;font-size:.92rem;line-height:1.5}
+.mkt-arrival-list{list-style:none;margin:.4rem 0 0;padding:0;display:flex;flex-direction:column;gap:.55rem}
+.mkt-arrival-row{background:#0f172a;border:1px solid #334155;border-radius:.7rem;padding:.65rem .8rem}
+.mkt-arrival-row__meta{margin:0;color:#e2e8f0;font-size:.9rem;line-height:1.45}
+.mkt-arrival-row__dot{color:#94a3b8}
+.mkt-arrival-row__trigger{margin:.25rem 0 0;color:#fde68a;font-size:.82rem;line-height:1.45}
+</style>
+<h2>応援が届いた瞬間</h2>
+<p class="mkt-arrival-summary">${counts}</p>
+<p class="mkt-note">5分で多かった時間: ${windows}</p>
+<ol class="mkt-arrival-list">${rows.join('')}</ol>
+${more}
+<p class="mkt-note">${escapeHtml(note)}</p>
 </section>`;
 }

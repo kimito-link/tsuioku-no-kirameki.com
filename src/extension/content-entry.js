@@ -9586,6 +9586,7 @@ function collectWatchPageSnapshot() {
       officialNdgrStatsUpdatedAt
     }),
     totalComments: wsCommentCount,
+    programStartAtMs: (programBeginAtMs > 0 ? programBeginAtMs : null) || ((() => { const b = embeddedProps ? pickProgramBeginAt(embeddedProps) : null; return b > 0 ? b : null; })()),
     streamAgeMin: (() => {
       // v0.1.1557: 終了済み枠(タイムシフト)は「開始〜終了」で固定。null は「—」(endTime 欠落)。
       const ended = describeEmbeddedProgramElapsed(embeddedProps);

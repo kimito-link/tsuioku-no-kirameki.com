@@ -17,6 +17,7 @@ import {
   parseTtPushFrame,
   parseTtResponse,
   parseTtChat,
+  parseTtSocialFollow,
   ttChatDropReason,
   parseTtGift,
   parseTtGiftList,
@@ -73,6 +74,8 @@ const diag = {
   /** @type {Record<string, number>} 型ごとの数(知らない型に気づくため) */
   types: {},
   comments: 0,
+  /** ページが「フォローしました」と出した分。コメント件数には入れない */
+  follows: 0,
   gifts: 0,
   giftCoin: 0,
   /** 連打の終わりの印が来ずに、待ってから数えた数 */
@@ -201,7 +204,8 @@ function startReader(uniqueId, roomId, key) {
     if (!r || seen.has(r.id)) return;
     seen.add(r.id);
     if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
-    if (r.giftName) {
+    if (r.kind === 'follow') diag.follows += 1;
+    else if (r.giftName) {
       diag.gifts += 1;
       diag.giftCoin += r.amount;
       if (r.giftName === 'ギフト' || /^[\x20-\x7e]+$/.test(r.giftName)) diag.unknownGiftNames += 1;
@@ -226,6 +230,9 @@ function startReader(uniqueId, roomId, key) {
         const why = `chat:${ttChatDropReason(m.payload, m.msgId)}`;
         diag.dropReasons[why] = (diag.dropReasons[why] || 0) + 1;
       }
+    } else if (m.type === 'WebcastSocialMessage') {
+      const r = parseTtSocialFollow(m.payload, { msgId: m.msgId, uniqueId, nowMs: now });
+      if (r) add(r);
     } else if (m.type === 'WebcastGiftMessage') {
       const g = parseTtGift(m.payload, { gifts: giftInfo, nowMs: now });
       if (g) addGifts(combo.push(g, now));

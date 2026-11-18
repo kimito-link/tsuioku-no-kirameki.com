@@ -23,6 +23,32 @@ export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch
  *   (src/lib/platform/platformSubBoard.js・2026-11-11 りんく「各サービス特有のランキングを」)。欄の中身が無い配信では
  *   ニコ生版の部品が欄を出さないので、ここでは隠さないだけにする。
  */
+/**
+ * 分析レポート「応援が届いた瞬間」の1種類。kinds は記録の ytKind。
+ * 通貨・subEvent が書いてある種類は、記録がその値のときだけ出す。
+ * amount は記録の数の出し方。none は数を出さない。
+ * @typedef {{
+ *   id: string,
+ *   label: string,
+ *   kinds: readonly string[],
+ *   currency?: string,
+ *   subEvent?: string,
+ *   amount: 'money' | 'point' | 'count' | 'viewers' | 'pieces' | 'none'
+ * }} SupportArrivalSpec
+ */
+
+/** @param {readonly string[]} kinds @param {string} label @param {SupportArrivalSpec['amount']} amount @param {{ currency?: string, subEvent?: string }} [extra] @returns {SupportArrivalSpec} */
+function arrivalSpec(id, kinds, label, amount, extra) {
+  return Object.freeze({
+    id,
+    label,
+    kinds: Object.freeze(kinds),
+    amount,
+    ...(extra?.currency ? { currency: extra.currency } : {}),
+    ...(extra?.subEvent ? { subEvent: extra.subEvent } : {}),
+  });
+}
+
 export const PLATFORM_CAPABILITIES = Object.freeze({
   niconico: Object.freeze({
     native: true,
@@ -33,6 +59,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     // コメント送信は各サービスの content 入口(sendType)がある。ニコ生は NLS_POST_COMMENT。
     commentPost: true,
     chips: Object.freeze(['viewers', 'comments', 'streamAge', 'adPts', 'giftPts']),
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['niconico_gift'], 'ギフト', 'point'),
+    ]),
   }),
   youtube: Object.freeze({
     native: false,
@@ -44,6 +73,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'スーパーチャット',
     timelineLabel: '応援タイムライン（コメント＋スーパーチャット）',
     giftUsersLabel: 'スーパーチャット・ギフトのユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('superchat', ['superchat'], 'スーパーチャット', 'money'),
+      arrivalSpec('member', ['membership'], 'メンバー加入', 'none'),
+      arrivalSpec('member_gift', ['membership_gift'], 'メンバーギフト', 'pieces'),
+    ]),
   }),
   twitch: Object.freeze({
     native: false,
@@ -55,6 +89,13 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'Bits',
     timelineLabel: '応援タイムライン（コメント＋Bits・ギフトサブ）',
     giftUsersLabel: 'Bits・ギフトサブのユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('bits', ['superchat'], 'Bits', 'money', { currency: 'BITS' }),
+      arrivalSpec('sub', ['membership'], 'サブスク', 'none', { subEvent: 'sub' }),
+      arrivalSpec('resub', ['membership'], '再サブ', 'none', { subEvent: 'resub' }),
+      arrivalSpec('gift', ['membership_gift'], 'ギフトサブ', 'pieces'),
+      arrivalSpec('raid', ['tw_raid'], 'レイド', 'viewers'),
+    ]),
   }),
   kick: Object.freeze({
     native: false,
@@ -66,6 +107,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'Kicks',
     timelineLabel: '応援タイムライン（コメント＋Kicks・ギフトサブ）',
     giftUsersLabel: 'Kicks・ギフトサブのユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('kicks', ['superchat'], 'Kicks', 'money', { currency: 'KICKS' }),
+      arrivalSpec('sub', ['membership'], 'サブスク', 'none'),
+      arrivalSpec('gift', ['membership_gift'], 'ギフトサブ', 'pieces'),
+    ]),
   }),
   // SHOWROOM: イベントの貢献ランキング(部屋の画面の「貢献ユーザー」)を2つめの欄に、イベント順位・pt・目標Lv をチップに。
   showroom: Object.freeze({
@@ -78,6 +124,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'ギフト',
     timelineLabel: '応援タイムライン（コメント＋ギフト）',
     giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'point', { currency: 'SRPT' }),
+    ]),
   }),
   // ミクチャ: 名前の下のレベル・ファン・スーパーファン・ライバーランク(と、出ているときのイベント順位・pt)
   mixch: Object.freeze({
@@ -91,6 +140,10 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'ギフト',
     timelineLabel: '応援タイムライン（コメント＋ギフト）',
     giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'money', { currency: 'MXCOIN' }),
+      arrivalSpec('fan', ['mx_fan'], 'ファン登録', 'none'),
+    ]),
   }),
   // ふわっち: イベント順位(同時に出ているイベントは title に並べる)・累計視聴
   whowatch: Object.freeze({
@@ -102,6 +155,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'アイテム',
     timelineLabel: '応援タイムライン（コメント＋アイテム）',
     giftUsersLabel: 'アイテムユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('item', ['superchat'], 'アイテム', 'count', { currency: 'WWITEM' }),
+    ]),
   }),
   // TikTok LIVE: 同時視聴は WebcastRoomUserSeqMessage（tt-content-entry.js の parseTtRoomUserSeq）。
   //   配信中の視聴者ランキングはギフト欄の見出し側。いいね数などはページから取っていないので出さない。
@@ -114,6 +170,10 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'ギフト',
     timelineLabel: '応援タイムライン（コメント＋ギフト）',
     giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'money', { currency: 'TTCOIN' }),
+      arrivalSpec('follow', ['follow'], 'フォロー', 'none'),
+    ]),
   }),
   // ツイキャス: 配信ページの「現在/累計」の累計とコメント数(#viewer-counter・#comment-count に出ている数そのまま)。
   //   視聴者数は同じ欄の左(現在)。公式の応援ランキングは配信者ページのサポーターランキング(2つめの欄)。
@@ -126,6 +186,9 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     paidLabel: 'ギフト',
     timelineLabel: '応援タイムライン（コメント＋ギフト）',
     giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'point', { currency: 'TCSCORE' }),
+    ]),
   }),
   // headlineCount:views = 大きな数字はページの視聴数（同時接続では埋めない）。countUnit 空 = 「人」と書かない。
   // 出典: src/lib/abema/abParse.js の abAudienceFromPayload（stats.view は視聴数、concurrentViewers は別）。

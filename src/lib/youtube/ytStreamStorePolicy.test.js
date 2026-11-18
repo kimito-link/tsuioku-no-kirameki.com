@@ -260,6 +260,21 @@ describe('applyYtStreamIncrementalItems（1万件配信対応の差分更新）'
   });
 });
 
+describe('フォロー通知はコメント件数に入れない', () => {
+  it('記録の印は進めるが、レーンと合計には足さない', () => {
+    const state = createYtStreamIncrementalState('tt.room');
+    const applied = applyYtStreamIncrementalItems(state, [
+      { id: 'c1', pk: 'tt.room::c1', videoId: 'tt.room', channelId: 'tt:1', name: 'A', text: 'こんにちは', kind: 'text', recordedAt: 100 },
+      { id: 'f1', pk: 'tt.room::f1', videoId: 'tt.room', channelId: 'tt:2', name: 'B', text: 'フォローしました', kind: 'follow', commentType: 'followNotice', recordedAt: 200 },
+    ]);
+    expect(applied.totalCount).toBe(1);
+    expect(applied.addedCount).toBe(1);
+    expect(state.laneCounts.rinku + state.laneCounts.konta + state.laneCounts.tanunee).toBe(1);
+    expect(state.lastRecordedAt).toBe(200);
+    expect(applied.ranking.commenters.find((c) => c.name === 'B')).toBeUndefined();
+  });
+});
+
 describe('mergeYtStreamSummary の配信開始時刻', () => {
   it('ページの開始時刻を覚え、次に来なくても前の値を残す', async () => {
     const { mergeYtStreamSummary } = await import('./ytStreamStorePolicy.js');

@@ -442,6 +442,8 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
       : {}),
     ...(Number(r?.postedAtMs) > 0 ? { ytPostedAtSource: 'service' } : {}),
     ...(backfilled ? { skipVoice: true } : {}),
+    ...(r?.isSystem === true ? { isSystem: true } : {}),
+    ...(r?.commentType === 'followNotice' ? { commentType: 'followNotice' } : {}),
     // 絵文字の名前→画像。落とすと吹き出しは名前の文字だけになる（一覧を覚える前の1回目）。
     ...(emotes.length ? { emotes } : {}),
   };
@@ -548,6 +550,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     officialViewerStale: Number.isFinite(viewers) && viewers > 0 && sum?.viewersStale === true,
     officialViewerReadAt: Number(sum?.viewersReadAt || 0) || null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
+    // ページの開始時刻が目安(「3時間前」など)のときは、レポートの「開始から」を出さない。
+    ...(startedAt > 0 && sum?.startedAtApprox !== true ? { programStartAtMs: startedAt } : {}),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める
     streamAgeMin:
