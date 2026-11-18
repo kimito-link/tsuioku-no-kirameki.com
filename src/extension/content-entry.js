@@ -357,6 +357,7 @@ import {
   //   詳細は inlineHostRecovery.wiring.test.js の冒頭コメント。
   shouldHideInlineHostOnMissingPanel
 } from '../lib/inlineHostRecoveryGate.js';
+import { createInlineHostLeaveClock } from '../lib/inlineHostLeave.js';
 // ★v0.1.1255(Phase A): 「見せる/消す」1回分の値の組を決める純関数。
 //   会議の結論=ディレクトリ移動より先に副作用を正本化する、の最初の対象。
 import {
@@ -1238,25 +1239,38 @@ const interceptedNicknames = new Map();
 let _liveIdChangedNonSwitchCount = 0;
 
 /**
- * v0.1.311: パネル消失バグ対策（会議室確定）。
- *
- * `syncLiveIdFromLocation` は PAGE_FRAME_LOOP_MS(=360ms) ごとに走り、従来は
- * 「watch URL でない & コメントパネル DOM 未検出」を **1 tick** 検出しただけで
- * `hidePageFrameOverlay()` + liveId=null 等の破壊的 cleanup を即実行していた。
- * niconico の SPA 遷移トランジェント・DOM 一時未検出でパネルが点滅消失する
- * （複数タブ環境で顕著）。
- *
- * 対策: 非 watch を **連続 NON_WATCH_HIDE_TICK_THRESHOLD 回**観測してから初めて
- * hide / cleanup する。watch（または有効なコメントパネル）が見えたら即 0 に戻す。
- * in-memory カウンタのみ・await I/O なし（描画 hot path に I/O を足さない＝
- * 北極星ピボット regression を繰り返さない）。
- *
- * 360ms × 5 ≒ 1.8s 連続で非 watch のときだけ消える。単一タブの通常離脱は
- * その後正しく hide される（挙動維持）。
- * @type {number}
+ * v0.1.311: 非 watch を 1 tick で消すと、短い移動で欄が消える。
+ * v0.1.2164: 離れ始めて 20 秒（5×4秒）で閉じる。時刻で測るので、
+ * 裏タブの間引きでも再描画でも、この待ちは縮みも伸びもしない。
  */
-let _nonWatchTickCount = 0;
 const NON_WATCH_HIDE_TICK_THRESHOLD = 5;
+const inlineHostLeave = createInlineHostLeaveClock({
+  waitMs: NON_WATCH_HIDE_TICK_THRESHOLD * LIVE_POLL_MS,
+  isKeepLocation() {
+    const href = window.location.href;
+    if (isNicoLiveWatchUrl(href)) return true;
+    let isTop = true;
+    try { isTop = window.self === window.top; } catch { isTop = true; }
+    return hasWatchCommentPanel() && (!isTop || isNicoVideoJpHost(href));
+  },
+  onFirstCommit() {
+    liveId = null;
+    ndgrLastReceivedAt = 0;
+    cancelPendingDeepHarvest();
+    void clearCommentHarvestPanelDiagnostic();
+    clearNdgrChatRowsPending();
+    clearInterceptReconcilePending();
+    endedBulkHarvestTriggeredLiveId = '';
+    endedBulkHarvestLastCheckedAt = 0;
+    lastOfficialGapDeepHarvestAt = 0;
+    clearThumbTimer();
+    reconnectMutationObserver();
+  },
+  hide(reason) {
+    if (reason === 'not_watch_url') hidePageFrameOverlay('not_watch_url');
+    else hidePageFrameOverlay('left_watch_page');
+  }
+});
 
 /**
  * ランキング/ギフトコメント観測の lifetime カウンタ（診断用・globalThis 保持で SPA でも累積）。
@@ -4289,6 +4303,7 @@ function clearInlineHostFloatingLayout(host) {
  * 角は `inlineFloatingAnchor`（storage: nls_inline_floating_anchor）。
  */
 function renderInlinePanelFloatingHost() {
+  if (inlineHostLeave.blockShow()) return;
   const host = ensureInlinePopupHost();
   // 前モード（below/beside/dock_bottom）の残留スタイル・クラスを先に完全リセット。
   // これを飛ばすと marginLeft / width などが前モードの値のまま上書きされ、
@@ -4409,6 +4424,7 @@ function ensureInlinePanelCloseButton(host) {
  *   `ensureInlineHostReflowListener` の resize listener で再呼び出しして追従する。
  */
 function renderInlinePanelDockBottomHost() {
+  if (inlineHostLeave.blockShow()) return;
   const host = ensureInlinePopupHost();
   clearInlineHostFloatingLayout(host);
   host.classList.remove('nls-inline-host--floating');
@@ -5399,6 +5415,7 @@ function maybePassFirstPaintGateForBeside(video) {
  * 幅はモードに応じて視聴行または video のみ。DOM 上はプレイヤー列（findFrameInsertAnchorFromVideo）の直後に置く。
  */
 function renderInlineHostAnchoredToVideo(video) {
+  if (inlineHostLeave.blockShow()) return;
   clearInlineHostFloatingLayout(ensureInlinePopupHost());
   const placement = getEffectiveInlinePanelPlacement();
   if (placement === INLINE_PANEL_PLACEMENT_FLOATING) {
@@ -6552,7 +6569,7 @@ function buildGiftDiagnosticsBundle() {
       liveIdChangedNonSwitchCount: _liveIdChangedNonSwitchCount,
       // v0.1.311: 非 watch 連続観測カウンタ（hide デバウンス）。閾値到達で hide。
       //   高止まりせず 0〜閾値内を推移していれば、トランジェント誤 hide を抑止できている。
-      nonWatchTickCount: _nonWatchTickCount,
+      nonWatchTickCount: inlineHostLeave.tickCount,
       nonWatchHideTickThreshold: NON_WATCH_HIDE_TICK_THRESHOLD
     },
     // 0.1.179: 「サムネあり・ID 空（匿名扱い）」事象の真因切り分け。
@@ -7699,8 +7716,7 @@ function renderPageFrameOverlay() {
     maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
-  if (!isNicoLiveWatchUrl(window.location.href)) {
-    hidePageFrameOverlay('not_watch_url');
+  if (inlineHostLeave.blockShow()) {
     maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
@@ -8042,6 +8058,8 @@ function startPageFrameLoop() {
 
   function tickPageFrameLayoutFromInterval() {
     if (!hasExtensionContext()) return;
+    if (inlineHostLeave.blockShow()) return;
+    inlineHostLeave.clear();
     /*
      * バックグラウンド（非可視）タブではインライン host のレイアウトは不要なのに
      * 毎 tick で renderPageFrameOverlay（動画探索・ターゲット走査）が走り、
@@ -12979,7 +12997,7 @@ function syncLiveIdFromLocation() {
       }
     }
     // watch ページを確認＝非 watch デバウンスを解除。
-    _nonWatchTickCount = 0;
+    inlineHostLeave.clear();
     /*
      * ★v0.1.1250: ここは 4秒(LIVE_POLL_MS)ごとに呼ばれる。旧実装は【無条件】に
      *   renderPageFrameOverlay() を呼んでいたため、画面が完全に静止していても
@@ -13085,7 +13103,7 @@ function syncLiveIdFromLocation() {
       }
     }
     // 有効なコメントパネルを確認＝非 watch デバウンスを解除。
-    _nonWatchTickCount = 0;
+    inlineHostLeave.clear();
     {
       /*
        * ★v0.1.1273: ここも v0.1.1250 のゲートを撤去し、v0.1.1248 と同じ
@@ -13100,44 +13118,22 @@ function syncLiveIdFromLocation() {
     return;
   }
 
-  // v0.1.311: 非 watch を 1 tick 観測しただけで即 hide/cleanup すると、niconico の
-  //   SPA 遷移トランジェントや DOM 一時未検出でパネルが点滅消失する（複数タブで顕著）。
-  //   連続 NON_WATCH_HIDE_TICK_THRESHOLD 回観測してから初めて hide / 破壊的 cleanup する。
-  //   閾値未満の間は何もせず return（liveId 等の状態を温存）＝await I/O なし・追加のみ。
-  _nonWatchTickCount += 1;
-  /*
-   * ★v0.1.1254(消しすぎの是正): 旧実装は「コメントパネルが見つからない」が
-   *   NON_WATCH_HIDE_TICK_THRESHOLD 回続いたら無条件に hidePageFrameOverlay() まで走った。
-   *   だが hasWatchCommentPanel() は .ga-ns-comment-panel / .comment-panel を
-   *   querySelector するだけで、ニコ生側の SPA 再描画で一時的に false になりうる。
-   *   = 視聴を続けているのにパネルが消える(2026-08-04 実機の引き金)。
-   *   「コメント欄が見つからない」と「視聴ページを離れた」は別の事象なので分ける。
-   *   ★閾値を上げる対処にはしない(遅れて消えるだけで本質が変わらないため)。
-   */
+  // 1 tick では消さない。5回続くか、離れ始めて 20 秒たったら閉じる。視聴中の一時的な DOM 消失では消さない。
+  const missTicks = inlineHostLeave.bump();
   {
     const verdict = shouldHideInlineHostOnMissingPanel({
       stillOnWatchUrl: isNicoLiveWatchUrl(href),
-      missTicks: _nonWatchTickCount,
+      missTicks,
       threshold: NON_WATCH_HIDE_TICK_THRESHOLD
     });
-    if (!verdict.hide) {
-      if (verdict.reason === 'keep-on-watch') _inlineHostRecoveryDiag.keptOnWatchCount += 1;
+    if (verdict.reason === 'keep-on-watch') {
+      _inlineHostRecoveryDiag.keptOnWatchCount += 1;
+      inlineHostLeave.clear();
       return;
     }
+    if (!inlineHostLeave.due() && !verdict.hide) return;
   }
-
-  liveId = null;
-  ndgrLastReceivedAt = 0;
-  cancelPendingDeepHarvest();
-  void clearCommentHarvestPanelDiagnostic();
-  clearNdgrChatRowsPending();
-  clearInterceptReconcilePending();
-  endedBulkHarvestTriggeredLiveId = '';
-  endedBulkHarvestLastCheckedAt = 0;
-  lastOfficialGapDeepHarvestAt = 0;
-  clearThumbTimer();
-  reconnectMutationObserver();
-  hidePageFrameOverlay('left_watch_page');
+  inlineHostLeave.commit('left_watch_page');
 }
 
 /** @param {Node|null|undefined} node */
@@ -14912,7 +14908,8 @@ async function start() {
         if (stopContentIntervalsIfContextInvalidated()) return;
         if (
           typeof document !== 'undefined' &&
-          document.visibilityState === 'hidden'
+          document.visibilityState === 'hidden' &&
+          isNicoLiveWatchUrl(window.location.href)
         ) {
           hiddenLiveIdPollPhase =
             (hiddenLiveIdPollPhase + 1) % HIDDEN_LIVE_PANEL_SCAN_STRIDE;

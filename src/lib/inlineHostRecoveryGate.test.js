@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   shouldRenderInlineHostOnPoll,
+  shouldHideAfterWatchLeave,
   shouldHideInlineHostOnMissingPanel,
   formatInlineHostRecoveryLine
 } from './inlineHostRecoveryGate.js';
+import { createInlineHostLeaveClock } from './inlineHostLeave.js';
 
 describe('shouldRenderInlineHostOnPoll — 2026-08-04 実機の再現', () => {
   it('★真因の再現: 消えたままなのに描かれなかった状態を「描く」に変える', () => {
@@ -113,6 +115,55 @@ describe('shouldHideInlineHostOnMissingPanel — 消しすぎを止める', () =
   it('閾値の既定は5(既存 NON_WATCH_HIDE_TICK_THRESHOLD と一致)', () => {
     expect(shouldHideInlineHostOnMissingPanel({ stillOnWatchUrl: false, missTicks: 5 }).hide).toBe(true);
     expect(shouldHideInlineHostOnMissingPanel({ stillOnWatchUrl: false, missTicks: 4 }).hide).toBe(false);
+  });
+});
+
+describe('shouldHideAfterWatchLeave — 離れた時間で消す', () => {
+  it('短い移動では消さない', () => {
+    expect(shouldHideAfterWatchLeave({ sinceMs: 1000, nowMs: 4000, waitMs: 20000 })).toMatchObject({
+      hide: false,
+      reason: 'debouncing'
+    });
+  });
+
+  it('待ち時間を超えたら消す', () => {
+    expect(shouldHideAfterWatchLeave({ sinceMs: 1000, nowMs: 21000, waitMs: 20000 })).toMatchObject({
+      hide: true,
+      reason: 'left-page'
+    });
+  });
+
+  it('測り始める前は消さない', () => {
+    expect(shouldHideAfterWatchLeave({ sinceMs: 0, nowMs: 99999, waitMs: 20000 }).hide).toBe(false);
+  });
+});
+
+describe('createInlineHostLeaveClock — 開き直しにもう一度閉じる', () => {
+  it('短いあいだは閉じず、待ちのあと閉じ、開き直されてもまた閉じる', () => {
+    /** @type {string[]} */
+    const hides = [];
+    let cleanups = 0;
+    let onWatch = false;
+    const clock = createInlineHostLeaveClock({
+      waitMs: 20_000,
+      isKeepLocation: () => onWatch,
+      onFirstCommit: () => { cleanups += 1; },
+      hide: (reason) => { hides.push(reason); }
+    });
+    expect(clock.blockShow()).toBe(true);
+    expect(hides).toEqual([]);
+    expect(clock.due(Date.now() + 20_000)).toBe(true);
+    clock.commit('left_watch_page');
+    clock.commit('not_watch_url');
+    expect(cleanups).toBe(1);
+    expect(hides).toEqual(['left_watch_page', 'not_watch_url']);
+    onWatch = true;
+    expect(clock.blockShow()).toBe(false);
+    clock.clear();
+    onWatch = false;
+    expect(clock.blockShow()).toBe(true);
+    expect(cleanups).toBe(1);
+    expect(hides).toEqual(['left_watch_page', 'not_watch_url']);
   });
 });
 
