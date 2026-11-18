@@ -1914,37 +1914,21 @@ async function flushNdgrChatRowsBatch(batch) {
     if (!text) continue;
     const capNum = Number(r.capturedAt);
     const hasCap = Number.isFinite(capNum) && capNum > 0;
-    const k = ndgrFlushDedupKey({
-      commentNo: no,
-      text,
-      userId: uid,
-      vpos: r.vpos,
-      capturedAt: hasCap ? capNum : undefined
-    });
+    const k = ndgrFlushDedupKey({ commentNo: no, text, userId: uid, vpos: r.vpos, capturedAt: hasCap ? capNum : undefined });
     if (!k) continue;
     const nick = String(r.nickname || '').trim();
     const prev = byKey.get(k);
-    if (!prev) {
-      byKey.set(k, {
-        commentNo: no,
-        text,
-        userId: uid || null,
-        ...(nick ? { nickname: nick } : {}),
-        ...(r.vpos != null ? { vpos: r.vpos } : {}),
-        ...(hasCap ? { capturedAt: capNum } : {})
-      });
-      continue;
-    }
-    const mUid = uid || String(prev.userId || '').trim();
-    const mNick = nick || String(prev.nickname || '').trim();
-    const prevCap = Number(prev.capturedAt);
+    const mUid = uid || String(prev?.userId || '').trim();
+    const mNick = nick || String(prev?.nickname || '').trim();
+    const vpos = prev && prev.vpos != null ? prev.vpos : r.vpos;
+    const prevCap = Number(prev?.capturedAt);
     const keepCap = Number.isFinite(prevCap) && prevCap > 0 ? prevCap : (hasCap ? capNum : 0);
     byKey.set(k, {
       commentNo: no,
       text,
       userId: mUid || null,
       ...(mNick ? { nickname: mNick } : {}),
-      ...(prev.vpos != null ? { vpos: prev.vpos } : r.vpos != null ? { vpos: r.vpos } : {}),
+      ...(vpos != null ? { vpos } : {}),
       ...(keepCap > 0 ? { capturedAt: keepCap } : {})
     });
   }
