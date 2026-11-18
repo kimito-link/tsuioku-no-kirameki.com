@@ -3,6 +3,9 @@ import {
   twEmotesFromTag,
   kickEmotesFromContent,
   kickEmotesFromNodes,
+  kickEmotesFromCatalog,
+  kickEmotesFromDom,
+  kickTextFromDom,
   REMEMBERED_EMOTE_KEYS,
   mergeEmoteDict,
   splitTextByEmotes,
@@ -175,6 +178,67 @@ describe('bubbleEmotePlan', () => {
     expect(plan.voiceText).toBe('');
     expect(plan.segments).toHaveLength(2);
     expect(plan.text.includes('[emote:')).toBe(false);
+  });
+  it('実況で文字のまま出た名前は、覚えていれば画像にする。知らない語は残す', () => {
+    const known = [
+      ['collectibles5Head', 'https://files.kick.com/emotes/1/fullsize'],
+      ['collectiblesClueless', 'https://files.kick.com/emotes/2/fullsize'],
+      ['collectiblesglorp', 'https://files.kick.com/emotes/3/fullsize'],
+      ['collectiblesHOLY', 'https://files.kick.com/emotes/4/fullsize'],
+      ['westcolSobelo', 'https://files.kick.com/emotes/2249483/fullsize'],
+      ['collectiblespepoHmm', 'https://files.kick.com/emotes/5/fullsize'],
+      ['collectiblesLMAO', 'https://files.kick.com/emotes/6/fullsize'],
+      ['collectiblesmonkaEyes', 'https://files.kick.com/emotes/7/fullsize'],
+      ['shoulderRoll', 'https://files.kick.com/emotes/5380973/fullsize'],
+    ];
+    const list = known.map(([name, url]) => ({ name, url }));
+    for (const text of [
+      'collectibles5Head collectiblesClueless collectiblesglorp collectiblesHOLY',
+      'westcolSobelo westcolSobelo',
+      'collectiblespepoHmm',
+      'collectiblesLMAO',
+      'collectiblesmonkaEyes',
+      'shoulderRoll',
+    ]) {
+      const plan = bubbleEmotePlan(text, list);
+      expect(plan.drop).toBe(false);
+      expect(plan.voiceText).toBe('');
+      expect(plan.segments?.filter((s) => s.t === 'text' && String(s.v).trim()).length).toBe(0);
+      expect(plan.segments?.some((s) => s.t === 'emote')).toBe(true);
+    }
+    const mixed = bubbleEmotePlan('hello shoulderRoll', list);
+    expect(mixed.drop).toBe(false);
+    expect(mixed.voiceText).toBe('hello');
+    expect(mixed.text).toContain('hello');
+    expect(mixed.segments?.some((s) => s.t === 'emote' && s.name === 'shoulderRoll')).toBe(true);
+  });
+  it('公開一覧と画面の画像から名前を覚える。alt は本文にしない', () => {
+    expect(kickEmotesFromCatalog([
+      { id: 669746, slug: 'westcol', emotes: [{ id: 2249483, name: 'westcolSobelo', subscribers_only: false }] },
+      { id: 'Global', emotes: [{ id: 5380973, name: 'shoulderRoll' }, { id: 'x', name: 'bad' }] },
+    ])).toEqual([
+      { name: 'westcolSobelo', url: 'https://files.kick.com/emotes/2249483/fullsize' },
+      { name: 'shoulderRoll', url: 'https://files.kick.com/emotes/5380973/fullsize' },
+    ]);
+    expect(kickEmotesFromCatalog(null)).toEqual([]);
+    const img = {
+      tagName: 'IMG',
+      getAttribute: (n) => ({ 'data-emote-id': '6', 'data-emote-name': 'collectiblesLMAO', alt: 'collectiblesLMAO', src: 'https://files.kick.com/emotes/6/fullsize' })[n] || '',
+      querySelector: () => null,
+    };
+    const root = {
+      nodeType: 1,
+      getAttribute: () => null,
+      childNodes: [
+        { nodeType: 3, nodeValue: 'hello ' },
+        { nodeType: 1, getAttribute: (n) => (n === 'data-emote-id' ? '6' : null), childNodes: [img], querySelector: () => img, querySelectorAll: () => [img] },
+      ],
+      querySelectorAll: () => [img],
+    };
+    expect(kickTextFromDom(root)).toBe('hello');
+    expect(kickEmotesFromDom(root)).toEqual([
+      { name: 'collectiblesLMAO', url: 'https://files.kick.com/emotes/6/fullsize' },
+    ]);
   });
   it('URL の形を確かめる', () => {
     expect(isSafeEmoteUrl('https://files.kick.com/emotes/1/fullsize')).toBe(true);

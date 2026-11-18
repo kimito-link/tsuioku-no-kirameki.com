@@ -53,6 +53,16 @@ describe('Pusher の1件', () => {
     expect(stripKickEmotes('[emote:1:Hi] [emoji:ok]')).toBe('Hi');
     expect(stripKickEmotes('[emote:9:collectiblesFloridaCat:0]')).toBe('collectiblesFloridaCat');
     expect(stripKickEmotes('[emote:1:westcolBLESSED][emote:1:westcolBLESSED]')).toBe('westcolBLESSED westcolBLESSED');
+    const bare = parseKickEvent(frame('ChatMessageEvent', {
+      id: 'em1', chatroom_id: 77, created_at: '2026-11-18T00:00:00Z',
+      content: '[emote:1:collectibles5Head][emote:2:collectiblesClueless][emote:3:collectiblesglorp][emote:4:collectiblesHOLY] [emote:2249483:westcolSobelo][emote:2249483:westcolSobelo] [emote:5:collectiblespepoHmm] [emote:6:collectiblesLMAO] [emote:7:collectiblesmonkaEyes] [emote:5380973:shoulderRoll]',
+      sender: { id: 1, username: 'a1', slug: 'a1' },
+    }), { chatroomId: '77' });
+    expect(bare?.text).toBe('collectibles5Head collectiblesClueless collectiblesglorp collectiblesHOLY westcolSobelo westcolSobelo collectiblespepoHmm collectiblesLMAO collectiblesmonkaEyes shoulderRoll');
+    expect(bare?.emotes?.map((e) => e.name)).toEqual([
+      'collectibles5Head', 'collectiblesClueless', 'collectiblesglorp', 'collectiblesHOLY',
+      'westcolSobelo', 'collectiblespepoHmm', 'collectiblesLMAO', 'collectiblesmonkaEyes', 'shoulderRoll',
+    ]);
     expect(parseKickTime('2026-11-08 09:00:00')).toBe(Date.parse('2026-11-08T09:00:00Z'));
     expect(parseKickTime('')).toBe(0);
   });

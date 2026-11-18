@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2153',
+    date: '2026-11-18',
+    summary: 'Kickの絵文字を名前のまま出さない',
+    items: Object.freeze([
+      'Kick の会場では、印が付いた絵文字を吹き出しの文字にせず画像のまま出します。チャンネルと全体の絵文字一覧、画面に出ている画像からも同じ名前を覚えます。知らない言葉は文字のままです。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2151',
     date: '2026-11-17',
     summary: '記録テストは絵文字の名前を見ない',
@@ -180,14 +188,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '大きな記録で開いた直後の固まりを減らした',
     items: Object.freeze([
       '記録が2万件を超える配信で横の欄を開いたとき、裏で確かめるだけの集計(画面には出ない)が開いた直後に走って、件数や応援マスの表示を遅らせていました。この集計を開いてから2分後に回し、開いた直後の固まりを減らしました。見た目は変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2126',
-    date: '2026-11-15',
-    summary: 'ニコ生以外の横の欄が裏で回り続けるのを止めた',
-    items: Object.freeze([
-      'YouTube・Twitch・Kick などニコ生以外の配信で横の欄を開いていると、数字のチップを整える処理が自分の書き換えに反応して1秒に60回動き続けていたのを直しました。何もしていない間の画面の書き換えが約20分の1になり、遅いPCでも軽くなります。見た目は変わりません。'
     ])
   }),
 ]);

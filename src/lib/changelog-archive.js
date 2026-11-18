@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2126',
+    date: '2026-11-15',
+    summary: 'ニコ生以外の横の欄が裏で回り続けるのを止めた',
+    items: Object.freeze([
+      'YouTube・Twitch・Kick などニコ生以外の配信で横の欄を開いていると、数字のチップを整える処理が自分の書き換えに反応して1秒に60回動き続けていたのを直しました。何もしていない間の画面の書き換えが約20分の1になり、遅いPCでも軽くなります。見た目は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2125',
     date: '2026-11-15',
     summary: '人が少ない順位のカードが横に伸びない',

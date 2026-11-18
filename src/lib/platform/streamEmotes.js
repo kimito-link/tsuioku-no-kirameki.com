@@ -237,6 +237,93 @@ export function kickEmotesFromNodes(content, nodes) {
 }
 
 /**
+ * Kick の公開一覧（GET https://kick.com/emotes/<slug>・認証なし）。
+ * チャンネル・Global・Emoji の各グループの emotes[{id, name}] を画像の URL にする。
+ * 形が違えば []。壊れた1件だけ捨てる。
+ * @param {unknown} json
+ * @returns {{ name: string, url: string }[]}
+ */
+export function kickEmotesFromCatalog(json) {
+  const groups = Array.isArray(json) ? json : [];
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  for (const group of groups) {
+    if (!group || typeof group !== 'object') continue;
+    const list = /** @type {{ emotes?: unknown }} */ (group).emotes;
+    if (!Array.isArray(list)) continue;
+    for (const row of list) {
+      if (!row || typeof row !== 'object') continue;
+      const rec = /** @type {{ id?: unknown, name?: unknown }} */ (row);
+      const name = String(rec.name ?? '');
+      const url = kickEmoteUrl(String(rec.id ?? ''));
+      if (!isEmoteName(name) || !url || out.has(name)) continue;
+      out.set(name, url);
+      if (out.size >= 400) break;
+    }
+    if (out.size >= 400) break;
+  }
+  return [...out].map(([name, url]) => ({ name, url }));
+}
+
+/**
+ * チャット行の中の絵文字画像。alt は本文にしない。
+ * data-emote-id と、安全な img src から画像の URL を作る。名前は data-emote-name。
+ * @param {unknown} root
+ * @returns {{ name: string, url: string }[]}
+ */
+export function kickEmotesFromDom(root) {
+  const el = /** @type {{ getAttribute?: (n: string) => string | null, querySelector?: (s: string) => any, querySelectorAll?: (s: string) => Iterable<any>, tagName?: string } | null} */ (root);
+  if (!el || typeof el.querySelectorAll !== 'function') return [];
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  /** @param {any} node */
+  const take = (node) => {
+    if (!node || typeof node.getAttribute !== 'function') return;
+    const id = String(node.getAttribute('data-emote-id') || '');
+    const named = String(node.getAttribute('data-emote-name') || '');
+    const img = String(node.tagName || '').toUpperCase() === 'IMG' ? node : (typeof node.querySelector === 'function' ? node.querySelector('img') : null);
+    const src = img && typeof img.getAttribute === 'function' ? String(img.getAttribute('src') || '') : '';
+    const url = isSafeEmoteUrl(src) ? src : kickEmoteUrl(id);
+    const alt = img && typeof img.getAttribute === 'function' ? String(img.getAttribute('alt') || '') : '';
+    const name = isEmoteName(named) ? named : (isEmoteName(alt) ? alt : '');
+    if (!name || !url || out.has(name)) return;
+    out.set(name, url);
+  };
+  if (typeof el.getAttribute === 'function' && el.getAttribute('data-emote-id')) take(el);
+  for (const node of el.querySelectorAll('[data-emote-id]')) {
+    take(node);
+    if (out.size >= 40) break;
+  }
+  return [...out].map(([name, url]) => ({ name, url }));
+}
+
+/**
+ * チャット行の文字。絵文字の枠（data-emote-id）は飛ばすので、alt は本文に入らない。
+ * @param {unknown} root
+ * @returns {string}
+ */
+export function kickTextFromDom(root) {
+  const el = /** @type {{ nodeType?: number, nodeValue?: string, getAttribute?: (n: string) => string | null, childNodes?: Iterable<any> } | null} */ (root);
+  if (!el) return '';
+  /** @type {string[]} */
+  const parts = [];
+  /** @param {any} node */
+  const walk = (node) => {
+    if (!node) return;
+    if (node.nodeType === 3) {
+      parts.push(String(node.nodeValue || ''));
+      return;
+    }
+    if (typeof node.getAttribute === 'function' && node.getAttribute('data-emote-id')) return;
+    const kids = node.childNodes;
+    if (!kids) return;
+    for (const kid of kids) walk(kid);
+  };
+  walk(el);
+  return parts.join('').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+/**
  * 覚えている対応に足す(新しいものを後ろへ・上限を超えたら古いものから捨てる)。
  * 変わらなければ同じオブジェクトを返す(保存を省くため)。
  * @param {unknown} dict 名前 → URL

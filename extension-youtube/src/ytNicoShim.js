@@ -400,6 +400,9 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
   //   吹き出し・読み上げに出していた(0.1.2138 PC 実測: Twitch で吹き出し12個すべてが約3時間前の発言)。
   const backfilled = r?.skipVoice === true;
   const capturedAt = (r?.replay && IS_MARKETING_PAGE && postedAt > 0) || (backfilled && postedAt > 0 && postedAt < at) ? postedAt : at;
+  const emotes = Array.isArray(r?.emotes)
+    ? r.emotes.filter((e) => e && isEmoteName(e.name) && isSafeEmoteUrl(e.url)).slice(0, 40)
+    : [];
   return {
     id: String(r?.id || r?.pk || `yt${i}`),
     liveId: lv,
@@ -427,6 +430,8 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     ytAmount: Number(r?.amount || 0),
     ytCurrency: String(r?.currency || ''),
     ...(backfilled ? { skipVoice: true } : {}),
+    // 絵文字の名前→画像。落とすと吹き出しは名前の文字だけになる（一覧を覚える前の1回目）。
+    ...(emotes.length ? { emotes } : {}),
   };
 }
 
@@ -2855,10 +2860,14 @@ function setEmoteDict(key, raw) {
       if (isEmoteName(k) && isSafeEmoteUrl(v)) m.set(k, String(v));
     }
   }
-  const had = emoteDicts.get(p.id)?.size || 0;
+  const prev = emoteDicts.get(p.id);
+  let grew = !prev || m.size !== prev.size;
+  if (!grew && prev) {
+    for (const k of m.keys()) if (!prev.has(k)) { grew = true; break; }
+  }
   emoteDicts.set(p.id, m);
   // 新しく覚えた絵文字は、もう出ている本文にも当てる
-  if (m.size > had && document.body) {
+  if (grew && m.size && document.body) {
     for (const el of document.querySelectorAll(EMOTE_HOST_SEL)) {
       const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       /** @type {Text[]} */
