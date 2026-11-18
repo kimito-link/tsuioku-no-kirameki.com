@@ -129,6 +129,7 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
   }),
   // headlineCount:views = 大きな数字はページの視聴数（同時接続では埋めない）。countUnit 空 = 「人」と書かない。
   // 出典: src/lib/abema/abParse.js の abAudienceFromPayload（stats.view は視聴数、concurrentViewers は別）。
+  // TikTok の「視聴者数」は上の定義（pageNoun とギフトの見出し付き）を使う。同じキーを後ろで重ねない。
   abema: Object.freeze({
     native: false,
     pageNoun: '配信ページ',

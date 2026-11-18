@@ -86,6 +86,22 @@ describe('selectNewTailRows', () => {
     expect(fresh).toHaveLength(1);
   });
 
+  it('来場文だけ、時刻が無ければ受信時刻を残す', () => {
+    const { fresh } = selectNewTailRows(
+      'lv1',
+      [
+        { text: '「サッカー」が好きな1人が来場しました' },
+        { text: '草', userId: 'u' },
+        { text: '「サッカー」が好きな1人が来場しました', capturedAt: 50 }
+      ],
+      new Set(),
+      1234
+    );
+    expect(fresh[0].capturedAt).toBe(1234);
+    expect(fresh[1].capturedAt).toBeUndefined();
+    expect(fresh[2].capturedAt).toBe(50);
+  });
+
   it('commentNo 欠落行: cheap dedupe せず全て残し、capturedAt も触らない', () => {
     const cands = [
       { text: '草', userId: 'u' },

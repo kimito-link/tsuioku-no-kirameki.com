@@ -8,6 +8,22 @@ import { describe, it, expect } from 'vitest';
 import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 describe('parseArrivalCommentText', () => {
+  it('形式5: 放送者のサポーター(supporter)をパースできる', () => {
+    expect(parseArrivalCommentText('放送者のサポーターが1人来場しました')).toEqual({
+      entries: [{ keyword: 'サポーター', count: 1, source: 'supporter' }],
+      totalCount: 1
+    });
+    expect(parseArrivalCommentText('\u3000放送者のサポーターが12人来場しました\u3000')).toEqual({
+      entries: [{ keyword: 'サポーター', count: 12, source: 'supporter' }],
+      totalCount: 12
+    });
+  });
+
+  it('サポーターに似た別の文は null', () => {
+    expect(parseArrivalCommentText('放送者のサポーターになりました')).toBeNull();
+    expect(parseArrivalCommentText('放送者のサポーターが1人来場しました！')).toBeNull();
+  });
+
   it('形式1: 放送者の好み(interest)をパースできる', () => {
     expect(
       parseArrivalCommentText('放送者の好み「真夏の夜の淫夢」に興味のある1人が来場しました')

@@ -703,7 +703,7 @@ import {
     }
     // v0.1.239: dedupe を decode 直後に適用（post 前で drop）
     const dedupedChats = applyNdgrDedupe(result.chats);
-    scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(dedupedChats));
+    scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(dedupedChats, Date.now()));
     publishNdgrDedupeDiag();
   }
 

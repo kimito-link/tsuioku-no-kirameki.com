@@ -323,4 +323,22 @@ describe('ndgrChatsToMergeRows: a: 無し hashed 匿名 (v0.1.1558)', () => {
       { commentNo: '635', text: 'のうや', userId: 'sIEHqCaHKR_Pe1v1ZU61TnVABv8', nickname: '匿名' }
     ]);
   });
+
+  it('来場はメッセージ時刻を残し、無ければ受信時刻を残す', () => {
+    const text = '「サッカー」が好きな1人が来場しました';
+    const chat = {
+      no: null,
+      rawUserId: null,
+      hashedUserId: '',
+      name: '',
+      content: text,
+      atMs: 1_700_000_000_000
+    };
+    expect(ndgrChatsToMergeRows([chat], 1_700_000_009_000)).toEqual([
+      { commentNo: '', text, userId: null, capturedAt: 1_700_000_000_000, arrivalCapture: 'ndgr' }
+    ]);
+    const withoutAt = { ...chat };
+    delete withoutAt.atMs;
+    expect(ndgrChatsToMergeRows([withoutAt], 1_700_000_009_000)[0].capturedAt).toBe(1_700_000_009_000);
+  });
 });

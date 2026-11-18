@@ -15,6 +15,7 @@ import { readChunkedComments } from './commentChunkStore.js';
 import { commentsStorageKey } from './storageKeys.js';
 import { tailStorageKey } from './commentTailBuffer.js';
 import { mergeTailRowsIntoDisplay } from './mergeTailRowsIntoDisplay.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /**
  * テール行を表示用に正規化(text 空除去・id/liveId/capturedAt 補完)。popup の同名ヘルパと同一。
@@ -34,13 +35,19 @@ export function normalizeTailRowsForDisplay(rows, lv, nowMs) {
     const text = String(r.text ?? '').trim();
     if (!text) continue;
     const cap = Number(r.capturedAt);
-    out.push({
+    const hasCap = Number.isFinite(cap) && cap > 0;
+    // 来場文の時刻は取り込み時に入っている。表示のときに「今」を打つと、
+    // 別の時刻の本物の来場が同じ瞬間に見え、件数を落とす。
+    /** @type {Record<string, unknown>} */
+    const row = {
       ...r,
       id: String(r.id || `nls_tail_${lid}_${i}`),
       liveId: lid,
-      text,
-      capturedAt: Number.isFinite(cap) && cap > 0 ? cap : nowMs
-    });
+      text
+    };
+    if (hasCap) row.capturedAt = cap;
+    else if (!parseArrivalCommentText(text)) row.capturedAt = nowMs;
+    out.push(row);
   }
   return out;
 }

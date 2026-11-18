@@ -76,11 +76,21 @@ describe('buildMediaKitHtml', () => {
     expect(headers).toEqual(['指標', '過去30日', '過去60日', '過去90日']);
     expect(rowLabels).toContain('フォロワー数');
     expect(rowLabels).toContain('平均同時視聴者数');
+    expect(rowLabels).toContain('来場者数');
     expect(rowLabels).toContain('ギフト（累計）');
     expect(doc.body.textContent).toContain('累計 4,500 / 配信平均 1,500');
     expect(doc.body.textContent).toContain('18,000 pt / 44 件');
     expect(doc.body.textContent).toContain('公開されているコメント・ギフト情報');
     expect(doc.body.textContent).toContain('最大60枠');
+  });
+
+  it('来場者数が無いサービスでは来場者数の行を出さない', () => {
+    const html = buildMediaKitHtml(BASE_STATS, { omitVisitorTotal: true });
+    const doc = parse(html);
+    const rowLabels = [...doc.querySelectorAll('tbody th')].map((node) => node.textContent);
+    expect(rowLabels).not.toContain('来場者数');
+    expect(doc.body.textContent).not.toContain('来場者数とコメント数');
+    expect(doc.body.textContent).toContain('コメント数は公式表示値を優先');
   });
 
   it('欠損値はすべてハイフン表示にし、0と区別する', () => {

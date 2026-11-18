@@ -152,7 +152,7 @@ export function twSubTierLabel(plan) {
  *   id: string, channelId: string, name: string, login: string, iconUrl: string, text: string,
  *   kind: 'text' | 'superchat' | 'membership' | 'membership_gift' | 'tw_raid' | 'tw_reward' | 'tw_milestone',
  *   amount: number, currency: string, badges: string[], ts: string, postedAtMs: number,
- *   channel: string, roomId: string, color: string, subTier?: string, subMonths?: number, giftCount?: number, giftPartOf?: string, rewardId?: string, emotes?: { name: string, url: string }[]
+ *   channel: string, roomId: string, color: string, subTier?: string, subMonths?: number, subEvent?: 'sub' | 'resub', giftCount?: number, giftPartOf?: string, rewardId?: string, emotes?: { name: string, url: string }[]
  * }}
  */
 export function parseTwChatLine(line) {
@@ -214,6 +214,7 @@ export function parseTwChatLine(line) {
       currency: '',
       subMonths: Number(tags['msg-param-cumulative-months'] || 0) || 0,
       subTier: twSubTierLabel(plan),
+      subEvent: msgId,
     };
   }
   if (msgId === 'subgift' || msgId === 'submysterygift' || msgId === 'anonsubgift' || msgId === 'anonsubmysterygift') {

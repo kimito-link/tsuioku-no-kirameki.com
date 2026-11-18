@@ -44,7 +44,9 @@ function userIdFromNicoUserIconHttpUrl(url) {
  *   capturedAt?: number,
  *   vpos?: number|null,
  *   accountStatus?: number|null,
- *   is184?: boolean
+ *   is184?: boolean,
+ *   arrivalCapture?: 'ndgr'|'dom',
+ *   ndgrMessageId?: string
  * }} StoredComment
  */
 
@@ -88,7 +90,7 @@ function randomId() {
 }
 
 /**
- * @param {{ liveId: string, commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }} p
+ * @param {{ liveId: string, commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }} p
  */
 export function createCommentEntry(p) {
   // v0.1.697: 呼び出し元が実時刻(backfillの配信開始+vpos由来等)を持っていればそれを保存する。
@@ -123,7 +125,9 @@ export function createCommentEntry(p) {
     ...(p.vpos != null ? { vpos: p.vpos } : {}),
     ...(p.accountStatus != null ? { accountStatus: p.accountStatus } : {}),
     ...(p.is184 ? { is184: true } : {}),
-    capturedAt
+    capturedAt,
+    ...(p.arrivalCapture === 'ndgr' || p.arrivalCapture === 'dom' ? { arrivalCapture: p.arrivalCapture } : {}),
+    ...(String(p.ndgrMessageId ?? '').trim() ? { ndgrMessageId: String(p.ndgrMessageId).trim() } : {})
   };
   return entry;
 }
@@ -330,7 +334,7 @@ export function patchExistingComment(existing, incoming) {
 /**
  * @param {string} liveId
  * @param {StoredComment[]} existing
- * @param {{ commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }[]} incoming
+ * @param {{ commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }[]} incoming
  * @returns {{ next: StoredComment[], added: StoredComment[], storageTouched: boolean }}
  */
 export function mergeNewComments(liveId, existing, incoming) {
@@ -413,7 +417,9 @@ export function mergeNewComments(liveId, existing, incoming) {
       vpos: row.vpos,
       accountStatus: row.accountStatus,
       is184: row.is184,
-      capturedAt: row.capturedAt // v0.1.697: 実時刻を素通し(無効なら entry 側で now)
+      capturedAt: row.capturedAt, // v0.1.697: 実時刻を素通し(無効なら entry 側で now)
+      arrivalCapture: row.arrivalCapture,
+      ndgrMessageId: row.ndgrMessageId
     });
     added.push(entry);
     next.push(entry);
@@ -481,7 +487,7 @@ export function buildCommentDedupeState(liveId, existing) {
  *
  * @param {string} liveId
  * @param {{ keySet: Set<string>, loneDedupe: ReturnType<typeof createLoneDedupeIndex> }} state
- * @param {Array<{ commentNo?: string, text?: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }>} incoming
+ * @param {Array<{ commentNo?: string, text?: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }>} incoming
  * @returns {{ added: StoredComment[], undo: () => void }}
  */
 export function mergeNewCommentsIncremental(liveId, state, incoming) {
@@ -527,7 +533,9 @@ export function mergeNewCommentsIncremental(liveId, state, incoming) {
       vpos: row.vpos,
       accountStatus: row.accountStatus,
       is184: row.is184,
-      capturedAt: row.capturedAt // v0.1.697: 実時刻を素通し(無効なら entry 側で now)
+      capturedAt: row.capturedAt, // v0.1.697: 実時刻を素通し(無効なら entry 側で now)
+      arrivalCapture: row.arrivalCapture,
+      ndgrMessageId: row.ndgrMessageId
     });
     added.push(entry);
     if (!commentNo) {

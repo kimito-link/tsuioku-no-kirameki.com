@@ -14,6 +14,8 @@
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
 import { computePseudoLvForVideoId, isYtPseudoLvShape } from '../../src/lib/youtube/ytPseudoLv.js';
+import { setYtLvMetaResolver } from '../../src/lib/youtube/ytLvKeyBridge.js';
+import { marketingViewFor } from '../../src/lib/platform/marketingPlatformPlan.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
@@ -429,6 +431,16 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
     ytAmount: Number(r?.amount || 0),
     ytCurrency: String(r?.currency || ''),
+    ...(Number(r?.subMonths) > 0 ? { subMonths: Math.floor(Number(r.subMonths)) } : {}),
+    ...(r?.subTier ? { subTier: String(r.subTier) } : {}),
+    ...(r?.subEvent === 'sub' || r?.subEvent === 'resub' ? { subEvent: r.subEvent } : {}),
+    ...(Array.isArray(r?.badges) && r.badges.length
+      ? { badges: r.badges.filter((b) => typeof b === 'string' && b).slice(0, 8) }
+      : {}),
+    ...(Array.isArray(r?.giftRecipients) && r.giftRecipients.length
+      ? { giftRecipients: r.giftRecipients.map((name) => String(name || '').trim()).filter(Boolean).slice(0, 20) }
+      : {}),
+    ...(Number(r?.postedAtMs) > 0 ? { ytPostedAtSource: 'service' } : {}),
     ...(backfilled ? { skipVoice: true } : {}),
     // 絵文字の名前→画像。落とすと吹き出しは名前の文字だけになる（一覧を覚える前の1回目）。
     ...(emotes.length ? { emotes } : {}),
@@ -1291,6 +1303,16 @@ async function buildCommentsForLvUncached(lv) {
 // 配信者の数字ID → YouTube の対応が分からないまま(ニコニコのリンク・ID のまま)になる。記録のある配信の配信者を先に登録する。
 /** @type {Record<string, any>} */
 let knownSummaries = {};
+setYtLvMetaResolver((lv) => {
+  const key = videoIdForPseudoLv(lv);
+  if (!key) return null;
+  const plat = platformOfStreamKey(key);
+  const sum = knownSummaries[key];
+  return {
+    platform: plat?.id || 'youtube',
+    channelId: String(sum?.broadcasterChannelId || ''),
+  };
+});
 // 「ギフト貢献度」の欄に入れたのが YouTube のトップファン(XP)か、スパチャの合計の順位(pt)か。言葉の直しを切り替える。
 let kokenIsTopFans = true;
 // Twitch/Kick の配信で「ギフト貢献度」の欄にそのサービスの公式ランキング(Kick の Kicks ランキング等)が入っているか。
@@ -2497,14 +2519,7 @@ function fixSubtree(root) {
  * @param {Document} doc
  */
 function ytTrimMarketingDoc(doc) {
-  for (const id of ['mkt-commenter-follow', 'mkt-commenter-follow-analytics']) {
-    doc.getElementById(id)?.remove();
-    doc.querySelectorAll(`a[href="#${id}"]`).forEach((a) => (a.closest('li') || a).remove());
-  }
-  // 来場者数のカードの「未取得」は故障に見えるので「—」(YouTube には来場者数がない)
-  doc.querySelectorAll('#mkt-participation-lead *').forEach((el) => {
-    if (el.children.length === 0 && String(el.textContent || '').trim() === '未取得') el.textContent = '—';
-  });
+  // フォローの章と「未取得」は、描く側で出さない（ここでもう一度 DOM を歩かない）。
   // ギフトの章では名前の後ろの「（UC…）」を外す(ID の列があるので二重になって長い)
   const ledger = doc.getElementById('mkt-gift-ledger');
   if (ledger) {
@@ -2672,7 +2687,8 @@ function ytRebuildMarketingLedger(doc) {
     head.textContent = '投げ一覧（新しい順）';
     const wrap = doc.createElement('div');
     wrap.className = 'mkt-table-scroll';
-    wrap.innerHTML = '<table class="mkt-rank mkt-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th><th>出典</th></tr></thead><tbody></tbody></table>';
+    const pointHead = marketingViewFor(screenPlatform()?.id || 'youtube')?.pointColumn || 'pt';
+    wrap.innerHTML = `<table class="mkt-rank mkt-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>${pointHead}</th><th>出典</th></tr></thead><tbody></tbody></table>`;
     section.append(head, wrap);
     table = wrap.querySelector('table');
   }

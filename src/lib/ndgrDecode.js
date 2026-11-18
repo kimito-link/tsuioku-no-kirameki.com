@@ -13,7 +13,14 @@
  * イベント系（累計スコア・順位・タイトル候補）をベストエフォートで拾う。
  * Chat fields: content(1), name(2), vpos(3), account_status(4),
  *              raw_user_id(5), hashed_user_id(6), modifier(7), no(8)
+ *
+ * 来場の公式通知は chat ではない（n-air-app/nicolive-comment-protobuf）:
+ *   NicoliveMessage.simple_notification = 7 → SimpleNotification.visited = 7（文字列）
+ *   NicoliveMessage.simple_notification_v2 = 23 → type=6（VISITED）+ message=2
+ * 2025-10 以降は V2 が本線。どちらもコメント番号も userId も無い。
  */
+
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /**
  * @param {Uint8Array} buf
@@ -248,7 +255,7 @@ export function decodeStatistics(buf, start, end) {
 }
 
 /**
- * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean }} NdgrChat
+ * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean, atMs?: number, messageId?: string }} NdgrChat
  *
  * @typedef {{
  *   itemId: string,
@@ -308,6 +315,50 @@ export function decodeChat(buf, start, end) {
     }
   });
   return { no, rawUserId, hashedUserId, name, content, vpos, accountStatus, is184 };
+}
+
+/** SimpleNotificationV2.NotificationType.VISITED（来場の人数通知） */
+const SIMPLE_NOTIFICATION_V2_VISITED = 6;
+
+/**
+ * 旧 SimpleNotification の visited（field 7）だけを取る。他の種別は来場ではない。
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ * @returns {string}
+ */
+function decodeSimpleNotificationVisited(buf, start, end) {
+  let visited = '';
+  pbForEach(buf, start, end, (fn, wt, _v, s, e) => {
+    if (fn === 7 && wt === 2 && !visited) visited = decodeStr(buf, s, e);
+  });
+  return visited.trim();
+}
+
+/**
+ * SimpleNotificationV2 の message。type が VISITED のときだけ返す。
+ * type が無く本文が来場の文なら、列挙のずれでも本文を返す。
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ * @returns {string}
+ */
+function decodeSimpleNotificationV2Message(buf, start, end) {
+  let type = 0;
+  let message = '';
+  let sawType = false;
+  pbForEach(buf, start, end, (fn, wt, val, s, e) => {
+    if (fn === 1 && wt === 0 && val != null) {
+      type = val;
+      sawType = true;
+    } else if (fn === 2 && wt === 2 && !message) {
+      message = decodeStr(buf, s, e);
+    }
+  });
+  const text = message.trim();
+  if (!text) return '';
+  if (!sawType || type === SIMPLE_NOTIFICATION_V2_VISITED) return text;
+  return parseArrivalCommentText(text) ? text : '';
 }
 
 /** 匿名(184)コメントの hashedUserId が満たす ID 形式。gift の item_name(日本語)を弾く。 */
@@ -710,6 +761,45 @@ function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e, propsKey
 }
 
 /**
+ * ChunkedMessage の meta（field 1）。at は field 2 の Timestamp、id は field 1 の文字列。
+ * 時刻が取れないときはメッセージ本体なので、id も採らない。
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ * @returns {{ atMs: number, messageId: string }}
+ */
+function chunkMeta(buf, start, end) {
+  let at = 0;
+  let id = '';
+  pbForEach(buf, start, end, (fn, wt, _v, s, e) => {
+    if (fn !== 1 || wt !== 2) return;
+    let sec = 0;
+    let ns = 0;
+    let cand = '';
+    pbForEach(buf, s, e, (gn, gw, _gv, gs, ge) => {
+      if (gn === 1 && gw === 2 && !cand) {
+        const str = decodeStr(buf, gs, ge).trim();
+        if (str && str.length <= 80 && !/来場しました$/.test(str)) cand = str;
+      } else if (gn === 2 && gw === 2) {
+        pbForEach(buf, gs, ge, (tn, tw, val) => {
+          if (tw !== 0) return;
+          if (tn === 1) sec = Number(val) || 0;
+          if (tn === 2) ns = Number(val) || 0;
+        });
+      }
+    });
+    // 2001年より前の小さい数は、メッセージ本体の別フィールドの誤読なので捨てる。
+    if (sec < 1_000_000_000) return;
+    const ms = sec * 1000 + Math.floor(ns / 1e6);
+    if (ms > 0) {
+      at = ms;
+      if (cand) id = cand;
+    }
+  });
+  return { atMs: at, messageId: id };
+}
+
+/**
  * 1件の ChunkedMessage をデコードして統計情報とチャットを返す
  * @param {Uint8Array} buf
  * @param {number} [start]
@@ -719,6 +809,7 @@ function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e, propsKey
 export function decodeChunkedMessage(buf, start, end) {
   const s0 = start ?? 0;
   const e0 = end ?? buf.length;
+  const meta = chunkMeta(buf, s0, e0);
   /** @type {NdgrStatistics|null} */
   let stats = null;
   /** @type {NdgrChat[]} */
@@ -776,6 +867,29 @@ export function decodeChunkedMessage(buf, start, end) {
         if (mwt !== 2) return;
         const msgKey = String(mfn);
         tagHistogram.msg[msgKey] = (tagHistogram.msg[msgKey] || 0) + 1;
+
+        // 来場通知は chat ではない。本文が来場の文のときだけコメント行として残す。
+        if (mfn === 7 || mfn === 23) {
+          const notice =
+            mfn === 7
+              ? decodeSimpleNotificationVisited(buf, ms, me)
+              : decodeSimpleNotificationV2Message(buf, ms, me);
+          if (notice && parseArrivalCommentText(notice)) {
+            chats.push({
+              no: null,
+              rawUserId: null,
+              hashedUserId: '',
+              name: '',
+              content: notice,
+              vpos: null,
+              accountStatus: null,
+              is184: false,
+              ...(meta.atMs > 0 ? { atMs: meta.atMs } : {}),
+              ...(meta.messageId ? { messageId: meta.messageId } : {})
+            });
+            return;
+          }
+        }
 
         // v0.1.209: msg レベルで未知 field が来た場合に中身を sample 保存
         if (!NDGR_KNOWN_MSG_FN.has(mfn)) {

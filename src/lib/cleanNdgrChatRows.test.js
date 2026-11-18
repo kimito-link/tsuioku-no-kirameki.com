@@ -24,6 +24,23 @@ describe('cleanNdgrChatRows', () => {
     expect(cleanNdgrChatRows(rows)).toHaveLength(0);
   });
 
+  it('番号も userId も無い来場通知は残す', () => {
+    const rows = [{ commentNo: '', text: '「猫」が好きな1人が来場しました', userId: '' }];
+    expect(cleanNdgrChatRows(rows)).toEqual([
+      { commentNo: '', text: '「猫」が好きな1人が来場しました', userId: null }
+    ]);
+  });
+
+  it('来場の取り込み時刻は残す', () => {
+    const rows = [{
+      commentNo: '',
+      text: '「猫」が好きな1人が来場しました',
+      userId: '',
+      capturedAt: 1_700_000_000_000
+    }];
+    expect(cleanNdgrChatRows(rows)[0].capturedAt).toBe(1_700_000_000_000);
+  });
+
   it('commentNo 無し + 識別子あり + 本文空 → 捨てる(本文必須)', () => {
     const rows = [{ commentNo: '', text: '   ', userId: 'a:hashed1' }];
     expect(cleanNdgrChatRows(rows)).toHaveLength(0);

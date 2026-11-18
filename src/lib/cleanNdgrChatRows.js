@@ -1,14 +1,16 @@
 import { parseGiftCommentText } from './parseGiftComment.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
+import { toEpochMs } from './timeAuthority.js';
 
 /**
  * NDGR チャット行の正規化純関数。
  * content-entry.js L935-957 から抽出。
  *
  * @param {unknown[]} raw
- * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]}
+ * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }[]}
  */
 export function cleanNdgrChatRows(raw) {
-  /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]} */
+  /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }[]} */
   const cleaned = [];
   for (const x of raw) {
     if (!x || typeof x !== 'object') continue;
@@ -23,7 +25,8 @@ export function cleanNdgrChatRows(raw) {
     //   識別子は ndgrChatRows.js で userId=rawUserId||hashedUserId に解決済(匿名は hashedUserId)。
     //   設計正本=council/anon-comment-rescue-SYNTHESIS.md。
     if (!commentNo) {
-      if (!text.trim() || !uid) continue; // 番号無しは「本文+識別子」を必須にする。
+      // 来場通知は公式の人数まとめなので userId が無い。本文が来場の文なら残す。
+      if (!text.trim() || (!uid && !parseArrivalCommentText(text))) continue;
     }
     // v0.1.195: ギフトシステムメッセージは「ユーザーが投げたコメント」ではないので
     //   nls_comments_<lv> に persist しない。content/userId はギフト送信者のもので、
@@ -31,10 +34,16 @@ export function cleanNdgrChatRows(raw) {
     //   v0.1.172 で `requireText: true` を入れたが、これらの行は text 非空のため
     //   素通りしていたので、parseGiftCommentText で確定排除する。
     if (parseGiftCommentText(text)) continue;
-    /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} */
+    /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }} */
     const row = { commentNo, text, userId: uid || null };
     const nick = String(/** @type {any} */ (x).nickname ?? '').trim();
     if (nick) row.nickname = nick;
+    const cap = toEpochMs(/** @type {any} */ (x).capturedAt);
+    if (cap > 0) row.capturedAt = cap;
+    const capture = /** @type {any} */ (x).arrivalCapture;
+    if (capture === 'ndgr' || capture === 'dom') row.arrivalCapture = capture;
+    const mid = String(/** @type {any} */ (x).ndgrMessageId ?? '').trim();
+    if (mid) row.ndgrMessageId = mid;
     if (/** @type {any} */ (x).vpos != null) row.vpos = /** @type {any} */ (x).vpos;
     if (/** @type {any} */ (x).accountStatus != null) row.accountStatus = /** @type {any} */ (x).accountStatus;
     if (/** @type {any} */ (x).is184) row.is184 = true;
