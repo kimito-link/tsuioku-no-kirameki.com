@@ -91,7 +91,13 @@ describe('メッセージ', () => {
   it('匿名のギフトは1つの席にまとめる', () => {
     expect(parseMxMessage({ kind: 42, message_id: 'g-4', user_id: 13, name: '本名', anonymous: 1, item_id: 501 }, { userId: '5', items })).toMatchObject({ channelId: 'mx:n:匿名', name: '匿名', iconUrl: '' });
   });
-  it('入室・状態は記録しない', () => {
+  it('ファン登録は記録する。入室・状態は記録しない', () => {
+    expect(parseMxMessage({ kind: 62, message_id: 'f-1', user_id: 11, name: 'ファンA', created: 1700000001 }, { userId: '5' })).toMatchObject({
+      kind: 'mx_fan', text: 'ファン登録', channelId: 'mx:11',
+    });
+    expect(parseMxMessage({ kind: 62, message_id: 'f-2', user_id: 11, name: 'ファンA', body: '登録した', created: 1700000001 }, { userId: '5' })).toMatchObject({
+      kind: 'mx_fan', text: '登録した',
+    });
     expect(parseMxMessage({ kind: 61, message_id: 'e', user_id: 1, body: '入室' }, { userId: '5' })).toBe(null);
     expect(parseMxMessage({ kind: 10, viewer: 3 }, { userId: '5' })).toBe(null);
   });

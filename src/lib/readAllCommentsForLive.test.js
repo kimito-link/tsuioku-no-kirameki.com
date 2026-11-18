@@ -20,6 +20,22 @@ describe('normalizeTailRowsForDisplay', () => {
     expect(out[1]).toMatchObject({ text: 'b', capturedAt: 5 });
   });
 
+  it('時刻の無い来場文には今を打たず、放送の番号は付ける', () => {
+    const out = normalizeTailRowsForDisplay(
+      [
+        { text: '「サッカー」が好きな1人が来場しました' },
+        { text: 'やあ' },
+        { text: '「サッカー」が好きな2人が来場しました', capturedAt: 50 }
+      ],
+      LV,
+      NOW
+    );
+    expect(out[0].capturedAt).toBeUndefined();
+    expect(out[0].liveId).toBe(LV);
+    expect(out[1].capturedAt).toBe(NOW);
+    expect(out[2].capturedAt).toBe(50);
+  });
+
   it('配列でない/空なら空配列', () => {
     expect(normalizeTailRowsForDisplay(null, LV, NOW)).toEqual([]);
     expect(normalizeTailRowsForDisplay([], LV, NOW)).toEqual([]);

@@ -41,6 +41,16 @@ describe('ndgrFlushDedupKey', () => {
     expect(ndgrFlushDedupKey({ commentNo: '', text: 'ww' })).toBeNull();
   });
 
+  it('来場は本文と時刻が同じときだけ同じキー', () => {
+    const text = '「サッカー」が好きな1人が来場しました';
+    const a = ndgrFlushDedupKey({ commentNo: '', text, userId: '', capturedAt: 1000 });
+    const b = ndgrFlushDedupKey({ commentNo: '', text, userId: '', capturedAt: 1000 });
+    const c = ndgrFlushDedupKey({ commentNo: '', text, userId: '', capturedAt: 20_000 });
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+    expect(a).not.toBeNull();
+  });
+
   it('番号無し + vpos 無し → a:userId\\ttext\\t(末尾空)', () => {
     expect(ndgrFlushDedupKey({ commentNo: '', text: 'ww', userId: 'a:h1' })).toBe('a:a:h1\tww\t');
   });

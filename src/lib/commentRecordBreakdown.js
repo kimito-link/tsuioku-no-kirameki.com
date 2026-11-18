@@ -9,7 +9,8 @@
  *     記録には含まれない。よって本関数の対象は「保存された後の rows」のみ。
  *   - 内訳カテゴリ:
  *       normal           - 通常コメント(一般人 + 配信者本人含む応援系)
- *       interestArrival  - 「○○が好きなN人が来場しました」
+ *       interestArrival  - ニコ生の来場通知（好きなタグ・大百科・放送者の好み・放送者のサポーター）。
+ *                          公式どうしは時刻が違えばそれぞれ。約2秒で1回なのは公式と画面の二重だけ。
  *       followNotice     - フォロー通知(Phase B で parser 追加・現状 0)
  *       otherSystem      - その他システムメッセージ(運営アナウンス等)
  *   - 「ギフト・広告は別カウント」をユーザーに明示するため、合計テキスト表示側で
@@ -18,7 +19,7 @@
  * @module commentRecordBreakdown
  */
 
-import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
+import { createArrivalNoticeGate } from './arrivalNoticeRows.js';
 
 /**
  * @typedef {{
@@ -45,13 +46,15 @@ export function summarizeCommentRecordBreakdown(comments) {
   if (!total) {
     return { total: 0, normal: 0, interestArrival: 0, followNotice: 0, otherSystem: 0 };
   }
+  const arrivalGate = createArrivalNoticeGate();
   for (const c of comments) {
     if (!c || typeof c !== 'object') continue;
-    const text = String(/** @type {any} */ (c).text ?? '');
-    if (parseInterestArrivalComment(text)) {
+    const arrival = arrivalGate.accept(c);
+    if (arrival === 'count') {
       interestArrival += 1;
       continue;
     }
+    if (arrival === 'dup') continue;
     // Phase B 用 placeholder: parseFollowNoticeComment 実装後にここで分岐追加。
     const commentType = /** @type {any} */ (c).commentType;
     const isSystem = /** @type {any} */ (c).isSystem === true;

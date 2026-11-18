@@ -6,6 +6,7 @@
 import { isInsideRecommendedLiveSection } from './isInsideRecommendedLiveSection.js';
 import { isInsideRecommendedUserSection } from './isInsideRecommendedUserSection.js';
 import { isRecommendedUserChipPollutionRow } from './backfillRemoveRecommendedLivePollution.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 
 /** 行頭: コメント番号 + 空白 + 本文（table-row 側と桁を揃え長時間配信でも落とさない） */
 const LINE_HEAD = /^(\d{1,12})\s+([\s\S]+)$/;
@@ -836,7 +837,16 @@ export function isHarvestableNicoCommentRow(row, opts = {}) {
   }
   if (!row.querySelector?.('.comment-text')) return false;
   const hasNumber = Boolean(row.querySelector?.('.comment-number'));
-  if (requireNumber) return hasNumber;
+  if (requireNumber) {
+    if (hasNumber) return true;
+    // 来場の公式通知だけ、番号セルが無くても収穫する。他の system 行は従来どおり落とす。
+    if (String(row.getAttribute?.('data-comment-type') || '') !== 'generalSystemMessage') return false;
+    const notice = String(row.querySelector?.('.comment-text')?.textContent || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return Boolean(parseArrivalCommentText(notice));
+  }
   // requireNumber:false — 番号セルが無くても、niconico 供給の構造ラベル
   //   data-comment-type を持つ行なら本物のコメント行として受理（おすすめカードには無い）。
   if (hasNumber) return true;
@@ -869,6 +879,25 @@ export function parseNicoLiveTableRow(el) {
   if (!row) return null;
   if (isInsideRecommendedLiveSection(row)) return null;
   if (isInsideRecommendedUserSection(row)) return null;
+
+  // 来場の公式通知は番号セルが無いことがある。本文が来場の文のときだけ、番号なしでも残す。
+  const arrivalType = String(row.getAttribute?.('data-comment-type') || '');
+  if (arrivalType === 'generalSystemMessage') {
+    const arrivalText = String(row.querySelector?.('.comment-text')?.textContent || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (parseArrivalCommentText(arrivalText)) {
+      const arrivalNo = String(row.querySelector?.('.comment-number')?.textContent || '')
+        .replace(/\s+/g, '')
+        .trim();
+      return {
+        commentNo: /^\d{1,18}$/.test(arrivalNo) ? arrivalNo : '',
+        text: arrivalText,
+        userId: null
+      };
+    }
+  }
 
   // 受理門（構造）は isHarvestableNicoCommentRow に正本化（第 1 コミット＝従来と同値）。
   if (!isHarvestableNicoCommentRow(row, { requireNumber: true })) return null;

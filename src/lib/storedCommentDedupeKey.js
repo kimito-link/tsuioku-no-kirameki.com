@@ -22,6 +22,7 @@
  */
 
 import { normalizeCommentText } from './commentRecord.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 // ★時点の解釈は timeAuthority に一本化する(v0.1.1304 の判定1本化。独自実装を増やさない)。
 import { toEpochMs } from './timeAuthority.js';
 
@@ -35,7 +36,7 @@ export const DEDUPE_TIME_BUCKET_MS = 10 * 60 * 1000;
 /**
  * 保存済みコメント1行の重複判定キーを返す。
  *
- * @param {{ commentNo?: unknown, liveId?: unknown, userId?: unknown, text?: unknown, capturedAt?: unknown }} entry
+ * @param {{ commentNo?: unknown, liveId?: unknown, userId?: unknown, text?: unknown, capturedAt?: unknown, id?: unknown }} entry
  * @param {{ bucketMs?: number }} [opts]
  * @returns {string}
  */
@@ -55,6 +56,12 @@ export function storedCommentDedupeKey(entry, opts) {
       : DEDUPE_TIME_BUCKET_MS;
   // ★時点の解釈は timeAuthority.toEpochMs に委ねる(取れなければ 0)。独自の数値判定を書かない。
   const cap = toEpochMs(e.capturedAt);
+  // 来場は同じ文面が何度も本物として来る。10分バケットで畳むと別の来場が消える。
+  // 同じ時刻の二重だけをここで消し、約2秒の窓は件数側(arrivalNoticeRows)で畳む。
+  if (parseArrivalCommentText(text)) {
+    if (!(cap > 0)) return `arrival:${liveId}|${text}|untimed|${String(e.id ?? '')}`;
+    return `arrival:${liveId}|${text}|${cap}`;
+  }
   // ★capturedAt をそのまま入れない(読み直しで変わるため)。バケットに丸める。
   const bucket = cap > 0 ? Math.floor(cap / bucketMs) : 0;
 

@@ -58,6 +58,8 @@ import { fetchKokenGiftHistoryViaExtension } from '../lib/kokenGiftHistoryFetchC
 import { HTML_REPORT_HEAVY_COMMENT_THRESHOLD } from '../lib/reportCommentsTableSection.js';
 import { openBroadcastSessionSummaryDb, listBroadcastSessionSummaryForLive } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
+import { marketingViewFor } from '../lib/platform/marketingPlatformPlan.js';
+import { ytLvMetaForLv } from '../lib/youtube/ytLvKeyBridge.js';
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
 import { normalizeBroadcasterProfileModel } from '../lib/broadcasterProfileCard.js';
@@ -78,6 +80,7 @@ import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
+import { normalizeTailRowsForDisplay } from '../lib/readAllCommentsForLive.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 
 /**
@@ -90,7 +93,10 @@ import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/m
  *   noopenerLinks?: Array<{ text?: string, href?: string }>,
  *   streamAgeMin?: number,
  *   startAtMs?: number,
- *   programStartAtMs?: number
+ *   programStartAtMs?: number,
+ *   platform?: string,
+ *   slotViewCount?: number,
+ *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown> }
  * }} WatchMetaSnapshot
  */
 
@@ -166,22 +172,27 @@ async function readAllCommentsFromCommentDb(lv) {
  */
 async function readAllCommentsForLive(lv) {
   const fromDb = await readAllCommentsFromCommentDb(lv);
-  if (Array.isArray(fromDb) && fromDb.length) return fromDb;
   const mainKey = commentsStorageKey(lv);
   /** @type {import('../lib/commentRecord.js').StoredComment[]} */
   let rows = [];
-  try {
-    const res = await readChunkedComments(lv, mainKey, (keys) =>
-      readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
-        attempts: 3,
-        delaysMs: [0, 80, 200],
-        perAttemptTimeoutMs: 1200
-      })
-    );
-    rows = Array.isArray(res.rows) ? res.rows : [];
-  } catch {
-    rows = [];
+  if (Array.isArray(fromDb) && fromDb.length) {
+    rows = fromDb;
+  } else {
+    try {
+      const res = await readChunkedComments(lv, mainKey, (keys) =>
+        readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+          attempts: 3,
+          delaysMs: [0, 80, 200],
+          perAttemptTimeoutMs: 1200
+        })
+      );
+      rows = Array.isArray(res.rows) ? res.rows : [];
+    } catch {
+      rows = [];
+    }
   }
+  // 未保存の末尾も、この放送の番号を付けて本体と同じ行として数える。
+  // 本体が IDB にあっても末尾は別なので、ここで必ず足す。
   try {
     const tKey = tailStorageKey(lv);
     const tailBag = await readStorageBagWithRetry(() => chrome.storage.local.get([tKey]), {
@@ -189,8 +200,12 @@ async function readAllCommentsForLive(lv) {
       delaysMs: [0, 120],
       perAttemptTimeoutMs: 900
     });
-    const tail = /** @type {Record<string, unknown>} */ (tailBag)[tKey];
-    if (Array.isArray(tail) && tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
+    const tail = normalizeTailRowsForDisplay(
+      /** @type {Record<string, unknown>} */ (tailBag)[tKey],
+      lv,
+      Date.now()
+    );
+    if (tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
   } catch {
     /* テールは任意 */
   }
@@ -607,6 +622,13 @@ async function runExport(lid) {
     mktProf.mark('read');
     const heavyMkt = comments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
     const reportBroadcasterUid = String(snapshot?.broadcasterUserId || '').trim();
+    const marketingView = marketingViewFor(snapshot?.platform);
+    const pageCountRaw = Number(snapshot?.slotViewCount ?? snapshot?.platformFacts?.viewCount ?? snapshot?.platformFacts?.official?.totalViews);
+    const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : 0;
+    const facts = snapshot?.platformFacts;
+    const marketingPageFacts = marketingView && facts && typeof facts === 'object'
+      ? { official: facts.official, commentCount: facts.commentCount }
+      : null;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
     await yieldToBrowserPaint();
     const report = aggregateMarketingReport(comments, lid, { broadcasterUserId: reportBroadcasterUid });
@@ -636,9 +658,21 @@ async function runExport(lid) {
         try {
           const sumDb = await openBroadcastSessionSummaryDb();
           const pastLimit = comments.length > 8000 ? 4 : 8;
+          const currentMeta = marketingView ? ytLvMetaForLv(lid) : null;
           const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
             limit: pastLimit,
-            excludeLiveId: lid
+            excludeLiveId: lid,
+            // ニコ生は絞らない。他サービスは、配信キーが分かって同じサービスのときだけ混ぜる。
+            ...(marketingView
+              ? {
+                  acceptLiveId: (id) => {
+                    const meta = ytLvMetaForLv(id);
+                    if (!meta || meta.platform !== marketingView.id) return false;
+                    if (currentMeta?.channelId && meta.channelId && currentMeta.channelId !== meta.channelId) return false;
+                    return true;
+                  },
+                }
+              : {}),
           });
           if (!recentLiveIds.length) return [];
           const pastArrays = await Promise.all(recentLiveIds.map((id) => readAllCommentsForLive(id)));
@@ -718,6 +752,7 @@ async function runExport(lid) {
             return normalizeUserCommentProfileMap(bag?.[KEY_USER_COMMENT_PROFILE_CACHE]);
           },
           maskSupporters: maskShareLabels,
+          omitVisitorTotal: marketingView ? marketingView.visitorCard !== true : false,
           // v0.1.1857: 記録は見た配信全部なので、この配信の配信者の配信だけで集計する(他の配信者の数字を混ぜない)。
           broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
           currentLiveId: lid
@@ -756,6 +791,7 @@ async function runExport(lid) {
     }
     mktProf.mark('html_report');
     const html = buildMarketingDashboardHtml(report, {
+      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : {}),
       mediaKitHtml,
       htmlReportHtml,
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,

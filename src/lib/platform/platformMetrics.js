@@ -12,7 +12,7 @@
 import { platformOfStreamKey } from './streamPlatform.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
-export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting']);
+export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting', 'tiktok']);
 
 /**
  * パネルと会場が同じ表を見る。native のサービスは今までの画面のまま。
@@ -82,6 +82,13 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
+  }),
+  // TikTok: 同時接続の名前は他サービスと同じ「視聴者数」。ギフトのコインは記録の金額があるときだけ（0 は出さない）。
+  tiktok: Object.freeze({
+    native: false,
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge']),
   }),
   abema: Object.freeze({
     native: false,

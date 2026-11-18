@@ -19,13 +19,14 @@ import { BROADCAST_SUMMARY_STORE } from './broadcastSessionSummaryDb.js';
 
 /**
  * @param {IDBDatabase} db
- * @param {{ limit?: number, excludeLiveId?: string }} [opts]
+ * @param {{ limit?: number, excludeLiveId?: string, acceptLiveId?: (liveId: string) => boolean }} [opts]
  * @returns {Promise<string[]>}
  */
 export async function listRecentUniqueBroadcastLiveIds(db, opts = {}) {
   const limit =
     typeof opts.limit === 'number' && opts.limit > 0 ? Math.floor(opts.limit) : 10;
   const exclude = String(opts.excludeLiveId || '').trim().toLowerCase();
+  const accept = typeof opts.acceptLiveId === 'function' ? opts.acceptLiveId : null;
   if (!db) return [];
   return new Promise((resolve, reject) => {
     let tx;
@@ -50,7 +51,7 @@ export async function listRecentUniqueBroadcastLiveIds(db, opts = {}) {
         return;
       }
       const lid = String(cur.value?.liveId || '').trim().toLowerCase();
-      if (lid && lid !== exclude && !seen.has(lid)) {
+      if (lid && lid !== exclude && !seen.has(lid) && (!accept || accept(lid))) {
         seen.add(lid);
         out.push(lid);
       }

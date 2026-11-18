@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1289 件
+## ⚠️ 役割コメントが無いソース 13 / 1293 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -44,34 +44,6 @@
 
 ## 全ファイルツリー
 
-- 📁 **"src/** (17)
-  - 📁 **images/** (17)
-    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png"`
-          - `logo_funlink_black_RGB_link_black.png"`
-          - `logo_funlink_black_RGB_maru_black.png"`
-      - 📁 **color/** (8)
-        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
-          - `logo_funlink_RGB_color.png"`
-          - `logo_funlink_RGB_ginga_color.png"`
-          - `logo_funlink_RGB_hoshi.png"`
-          - `logo_funlink_RGB_link_hoshi.png"`
-          - `logo_funlink_RGB_link_orange.png"`
-          - `logo_funlink_RGB_maru_blue.png"`
-          - `logo_funlink_RGB_maru_ginga.png"`
-          - `logo_funlink_RGB_maru_orange.png"`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png"`
-        - `logo_funlink_white_RGB_link_black.png"`
-        - `logo_funlink_white_RGB_maru_black.png"`
-    - 📁 **logo/** (3)
-      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg"`
-        - `251016_logo_guide_kimitolink_ol.ai"`
-        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -1217,7 +1189,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2502)
+- 📁 **src/** (2530)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1380,7 +1352,7 @@
     - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (117)
+  - 📁 **images/** (134)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1480,7 +1452,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (10)
+    - 📁 **logo/** (13)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1490,6 +1462,11 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
+      - 📁 **データ一式/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg`
+        - `251016_logo_guide_kimitolink_ol.ai`
+        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1530,8 +1507,33 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
+    - 📁 **データ出力/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png`
+          - `logo_funlink_black_RGB_link_black.png`
+          - `logo_funlink_black_RGB_maru_black.png`
+      - 📁 **color/** (8)
+        - 📁 **RGB_データ用/** (8)
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_hoshi.png`
+          - `logo_funlink_RGB_link_hoshi.png`
+          - `logo_funlink_RGB_link_orange.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_ginga.png`
+          - `logo_funlink_RGB_maru_orange.png`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png`
+        - `logo_funlink_white_RGB_link_black.png`
+        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2212)
+  - 📁 **lib/** (2223)
+    - 📁 **__snapshots__/** (4)
+      - `marketing-abema-baseline.html`
+      - `marketing-niconico.html`
+      - `marketing-twitch-baseline.html`
+      - `marketing-youtube-baseline.html`
     - 📁 **abema/** (5)
       - `abCommentPanel.js` — ABEMA のコメント本文は、コメント欄が開いているときだけ届く。
       - `abCommentPanel.test.js`
@@ -1565,7 +1567,7 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (24)
+    - 📁 **platform/** (27)
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1574,6 +1576,9 @@
       - `historyBackfill.test.js`
       - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
       - `infoPollGate.test.js`
+      - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
+      - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `marketingPlatformPlan.test.js`
       - `noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
       - `noWatchHint.test.js`
       - `pageControlPick.js` — 配信ページの「公式の」入力欄・送信ボタンを探す(追憶が自分でページに置いた部品を除く)。
@@ -1616,7 +1621,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (96)
+    - 📁 **youtube/** (97)
       - `pfLastStreamUrl.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
       - `ytActiveVideoId.test.js`
@@ -1650,6 +1655,7 @@
       - `ytLeaderboardSig.test.js`
       - `ytLiveRowOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytLiveRowOrder.test.js`
+      - `ytLvKeyBridge.js` — 疑似 lv → 配信キー。マーケの過去比較が他サービスの配信を混ぜないために使う。
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
       - `ytMergedIsolation.test.js`
       - `ytNicoShim.test.js`
@@ -1752,6 +1758,8 @@
     - `appliedEntriesMemo.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
     - `arrivalEffect.test.js`
+    - `arrivalNoticeRows.js` — 来場通知を、サイドパネルの内訳と分析レポートで同じ行として数える。
+    - `arrivalNoticeRows.test.js`
     - `audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
     - `audienceEngagementGap.test.js`
     - `auditionEventRankingApi.js` — audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
@@ -2667,6 +2675,7 @@
     - `marketingAggregate.js` — userId: string,
     - `marketingAggregate.test.js`
     - `marketingChartsHtml.js` — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
+    - `marketingChartsHtml.snapshot.test.js`
     - `marketingChartsHtml.test.js`
     - `marketingChartsHtmlAnalyticsDedup.test.js`
     - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す

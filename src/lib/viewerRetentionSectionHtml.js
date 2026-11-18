@@ -25,28 +25,33 @@ function minLabel(ms) {
 
 /**
  * @param {import('./viewerRetentionEstimate.js').ViewerRetentionEstimate} est
+ * @param {{ retentionExcludeNote?: string }} [opts]
  * @returns {string}
  */
-export function viewerRetentionBasisHtml(est) {
+export function viewerRetentionBasisHtml(est, opts = {}) {
   const startText =
     est.startSource === 'program' ? '番組の開始時刻' : '最初に記録したコメントの時刻（番組の開始時刻が取れなかったため）';
   const edge = minLabel(est.edgeWindowMs);
+  const platformNote = String(opts.retentionExcludeNote || '').trim();
+  const excludeNote = platformNote
+    || '配信者本人と「〇〇が好きな人が来場しました」の通知は除いています。';
+  const who = platformNote ? 'この配信' : 'ニコ生';
   return `<details class="mkt-vr__basis" open>
 <summary>この数字の出し方（推定の根拠）</summary>
 <ul>
-<li>ニコ生は「誰がいつ入って、いつ出たか」を公開していません。そこで<strong>コメントした時刻</strong>から在席を推し量っています。見ているだけでコメントしなかった人は数に入りません。</li>
+<li>${who}は「誰がいつ入って、いつ出たか」を公開していません。そこで<strong>コメントした時刻</strong>から在席を推し量っています。見ているだけでコメントしなかった人は数に入りません。</li>
 <li>配信の始まり = ${escapeHtml(startText)}。配信の終わり = 最後に記録したコメントの時刻（配信中に保存したときは、その時点まで）。</li>
 <li><strong>最後まで見た</strong> = その人の最後のコメントが、終わりの${escapeHtml(edge)}以内にある。${escapeHtml(edge)}は配信の長さの10%（3分〜10分）です。</li>
 <li><strong>一人ずつの視聴維持率</strong> = 推定視聴時間 ÷ 配信の長さ。最初のコメントから最後のコメントまではずっと見ていたとみなします。始まりから${escapeHtml(edge)}以内にコメントした人は始まりから、最後まで見た人は終わりまで見たとみなします。</li>
 <li><strong>全体の視聴維持率</strong> = 最後まで見た人 ÷ コメントした人。</li>
-<li>コメントが1回だけの人は、その1回の時刻だけで決まるので判定が粗くなります（表に「1回」と出ます）。配信者本人と「〇〇が好きな人が来場しました」の通知は除いています。</li>
+<li>コメントが1回だけの人は、その1回の時刻だけで決まるので判定が粗くなります（表に「1回」と出ます）。${escapeHtml(excludeNote)}</li>
 </ul>
 </details>`;
 }
 
 /**
  * @param {import('./viewerRetentionEstimate.js').ViewerRetentionEstimate} est
- * @param {{ maskShare?: boolean, identiconResolver?: (uid: string) => string }} [opts]
+ * @param {{ maskShare?: boolean, identiconResolver?: (uid: string) => string, retentionExcludeNote?: string }} [opts]
  * @returns {string}
  */
 export function buildViewerRetentionSectionHtml(est, opts = {}) {
@@ -136,7 +141,7 @@ export function buildViewerRetentionSectionHtml(est, opts = {}) {
 </style>
 <p class="mkt-note">コメントした人ひとりずつについて、配信の最後まで見ていたかを<strong>コメントの時刻から推定</strong>しました。</p>
 <div class="mkt-vr__cards">${cards}</div>
-${viewerRetentionBasisHtml(est)}
+${viewerRetentionBasisHtml(est, { retentionExcludeNote: opts.retentionExcludeNote })}
 ${maskNote}
 <div class="mkt-vr__table-wrap"><table>
 ${thead}
