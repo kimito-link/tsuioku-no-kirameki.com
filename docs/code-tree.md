@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1296 件
+## ⚠️ 役割コメントが無いソース 13 / 1301 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1189,7 +1189,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2535)
+- 📁 **src/** (2548)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1528,7 +1528,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2228)
+  - 📁 **lib/** (2241)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1567,21 +1567,27 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (32)
+    - 📁 **platform/** (40)
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `fetchTimeout.test.js`
       - `followerCountSample.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `followerCountSample.test.js`
+      - `followerEndRead.js` — 【層】L0 判定層(純粋関数)と、裏方の1回読み
+      - `followerEndRead.test.js`
+      - `followerNoticeExport.test.js`
       - `followerSampleStore.js` — ニコ生の配信者プロフィール（すでに取っている nvapi）と、そのフォロワー数の標本を一緒に書く。
+      - `followerSeriesContract.test.js`
       - `historyBackfill.js` — 配信中コメントの過去分さかのぼり(ページ送り・リトライ・上限判定)の共通純粋ロジック
       - `historyBackfill.test.js`
       - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
       - `infoPollGate.test.js`
+      - `marketingExportBudget.test.js`
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
       - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `marketingPlatformPlan.test.js`
+      - `mediaKitServiceCopy.test.js`
       - `noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
       - `noWatchHint.test.js`
       - `pageControlPick.js` — 配信ページの「公式の」入力欄・送信ボタンを探す(追憶が自分でページに置いた部品を除く)。
@@ -1594,6 +1600,8 @@
       - `platformStats.test.js`
       - `platformSubBoard.js` — 各サービスの「2つめの公式ランキング」(Twitch・Kick のギフトサブの順位など)を、
       - `platformSubBoard.test.js`
+      - `slowFollowerFetch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `slowFollowerFetch.test.js`
       - `streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
       - `streamEmotes.test.js`
       - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick・ツイキャス など)の違いを1か所にまとめた表(純関数)
@@ -1626,7 +1634,8 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (97)
+    - 📁 **youtube/** (100)
+      - `exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
       - `pfLastStreamUrl.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
       - `ytActiveVideoId.test.js`
@@ -1671,6 +1680,8 @@
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
       - `ytPageMeta.test.js`
       - `ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
+      - `ytPanelExportTarget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytPanelExportTarget.test.js`
       - `ytPanelRoute.js` — 本体のサイドパネル(グローバル・1枚)の中身を、YouTube のタブでは YouTube 版に切り替える決まり(2026-11-05 本体統合)。
       - `ytPanelRoute.test.js`
       - `ytPanelStreamDiag.js` — 横の欄(サイドパネル)・コメビュが「どの配信を出したか」を数える計器(0.1.1946)。
@@ -2418,6 +2429,7 @@
     - `inlineHostHiddenAttr.wiring.test.js`
     - `inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
     - `inlineHostLayoutReset.test.js`
+    - `inlineHostLeave.js` — 視聴ページを離れた時刻と、欄を閉じる操作。
     - `inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
     - `inlineHostMoveProbe.test.js`
     - `inlineHostRecovery.wiring.test.js`
@@ -2676,6 +2688,7 @@
     - `mainThreadBlockerCensus.test.js`
     - `mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
     - `mangaBroadcastSummary.test.js`
+    - `manifestHostPermissions.test.js`
     - `manifestKnownKeys.test.js`
     - `marketingAggregate.js` — userId: string,
     - `marketingAggregate.test.js`
