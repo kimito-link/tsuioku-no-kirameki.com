@@ -576,7 +576,8 @@ import {
   isExtensionContextAlive
 } from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
-import { ndgrFlushDedupKey } from '../lib/ndgrFlushDedupKey.js';
+import { arrivalCaptureExtras, ndgrFlushDedupKey } from '../lib/ndgrFlushDedupKey.js';
+import { stampArrivalCapture } from '../lib/arrivalNoticeRows.js';
 import {
   parseGiftCommentText,
   parseNicoadCommentText,
@@ -1929,7 +1930,8 @@ async function flushNdgrChatRowsBatch(batch) {
       userId: mUid || null,
       ...(mNick ? { nickname: mNick } : {}),
       ...(vpos != null ? { vpos } : {}),
-      ...(keepCap > 0 ? { capturedAt: keepCap } : {})
+      ...(keepCap > 0 ? { capturedAt: keepCap } : {}),
+      ...arrivalCaptureExtras(r, prev)
     });
   }
   const merged = [...byKey.values()].map((r) => {
@@ -12213,6 +12215,7 @@ function persistCommentRows(rows, opts = {}) {
   } else {
     _commentIngestSourceCounters.unknown += incBy;
   }
+  stampArrivalCapture(filtered, sourceKey);
   persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (filtered));
   // v0.1.752 会場リアルタイム化: 会場(同一 content script)へ新着を in-memory で即流す。
   //   storage 往復(persistCoalescer ~1.5秒)を待たず吹き出す。会場側が commentNo 持ち行に絞り、

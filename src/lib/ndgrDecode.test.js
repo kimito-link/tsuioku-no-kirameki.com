@@ -702,7 +702,7 @@ describe('decodeChunkedMessage', () => {
     const chunked = new Uint8Array(lenDelimited(1, [...lenDelimited(23, [...v2])]));
     const decoded = decodeChunkedMessage(chunked);
     const stored = cleanNdgrChatRows(ndgrChatsToMergeRows(decoded.chats));
-    expect(stored).toEqual([{ commentNo: '', text, userId: null }]);
+    expect(stored).toEqual([{ commentNo: '', text, userId: null, arrivalCapture: 'ndgr' }]);
     const report = aggregateMarketingReport(
       [
         { id: 'c1', liveId: 'lv1', commentNo: '1', text: 'こんにちは', userId: 'u1', capturedAt: 1_700_000_000_000 },
@@ -720,7 +720,7 @@ describe('decodeChunkedMessage', () => {
     const text = '「サッカー」が好きな1人が来場しました';
     const seconds = 1_700_000_000;
     const ts = new Uint8Array(varintField(1, seconds));
-    const meta = new Uint8Array(lenDelimited(2, [...ts]));
+    const meta = new Uint8Array([...strField(1, 'm-soccer-1'), ...lenDelimited(2, [...ts])]);
     const v2 = new Uint8Array([...varintField(1, 6), ...strField(2, text)]);
     const chunked = new Uint8Array([
       ...lenDelimited(1, [...meta]),
@@ -730,8 +730,11 @@ describe('decodeChunkedMessage', () => {
     expect(decoded.chats).toHaveLength(1);
     expect(decoded.chats[0].content).toBe(text);
     expect(decoded.chats[0].atMs).toBe(seconds * 1000);
+    expect(decoded.chats[0].messageId).toBe('m-soccer-1');
     const stored = cleanNdgrChatRows(ndgrChatsToMergeRows(decoded.chats, seconds * 1000 + 5000));
     expect(stored[0].capturedAt).toBe(seconds * 1000);
+    expect(stored[0].arrivalCapture).toBe('ndgr');
+    expect(stored[0].ndgrMessageId).toBe('m-soccer-1');
   });
 
   it('放送者のサポーターの V2 も来場の chat になる', () => {

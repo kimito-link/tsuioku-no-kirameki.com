@@ -7,10 +7,10 @@ import { toEpochMs } from './timeAuthority.js';
  * content-entry.js L935-957 から抽出。
  *
  * @param {unknown[]} raw
- * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }[]}
+ * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }[]}
  */
 export function cleanNdgrChatRows(raw) {
-  /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }[]} */
+  /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }[]} */
   const cleaned = [];
   for (const x of raw) {
     if (!x || typeof x !== 'object') continue;
@@ -34,12 +34,16 @@ export function cleanNdgrChatRows(raw) {
     //   v0.1.172 で `requireText: true` を入れたが、これらの行は text 非空のため
     //   素通りしていたので、parseGiftCommentText で確定排除する。
     if (parseGiftCommentText(text)) continue;
-    /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }} */
+    /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }} */
     const row = { commentNo, text, userId: uid || null };
     const nick = String(/** @type {any} */ (x).nickname ?? '').trim();
     if (nick) row.nickname = nick;
     const cap = toEpochMs(/** @type {any} */ (x).capturedAt);
     if (cap > 0) row.capturedAt = cap;
+    const capture = /** @type {any} */ (x).arrivalCapture;
+    if (capture === 'ndgr' || capture === 'dom') row.arrivalCapture = capture;
+    const mid = String(/** @type {any} */ (x).ndgrMessageId ?? '').trim();
+    if (mid) row.ndgrMessageId = mid;
     if (/** @type {any} */ (x).vpos != null) row.vpos = /** @type {any} */ (x).vpos;
     if (/** @type {any} */ (x).accountStatus != null) row.accountStatus = /** @type {any} */ (x).accountStatus;
     if (/** @type {any} */ (x).is184) row.is184 = true;

@@ -1164,7 +1164,8 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('個人は特定できません');
     expect(html).toContain('放送者のサポーター');
     expect(html).toContain('時刻が違えばそれぞれ数えます');
-    expect(html).toContain('約2秒以内の二重取り込みは除く');
+    expect(html).toContain('公式と画面の二重だけ除く');
+    expect(html).toContain('公式の通知どうしは1秒違ってもそれぞれ数えます');
     expect(html).toContain('好きなタグ');
     expect(html).toContain('同じ5分のコメント');
     expect(html).toContain('来た人が書いたかは記録にありません');

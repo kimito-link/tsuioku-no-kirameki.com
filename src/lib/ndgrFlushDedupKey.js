@@ -17,7 +17,27 @@ import { toEpochMs } from './timeAuthority.js';
  * userId も番号も無い行は識別不能なので null(=受理しない)。設計正本=council/anon-comment-rescue-SYNTHESIS.md。
  * 来場通知だけは番号も userId も無い公式の人数まとめなので、本文と取り込み時刻で受理する。
  * 時刻が違えば別の来場。同じ時刻だけをここで1つにする。
- *
+ */
+/**
+ * 来場行の取り込み元と公式メッセージIDを、フラッシュで作り直す行へ残す。
+ * @param {object|null|undefined} row
+ * @param {object|null|undefined} [prev]
+ * @returns {{ arrivalCapture?: 'ndgr'|'dom', ndgrMessageId?: string }}
+ */
+export function arrivalCaptureExtras(row, prev) {
+  const fromRow = /** @type {{ arrivalCapture?: unknown, ndgrMessageId?: unknown }} */ (row || {});
+  const fromPrev = /** @type {{ arrivalCapture?: unknown, ndgrMessageId?: unknown }} */ (prev || {});
+  const capture = fromRow.arrivalCapture === 'ndgr' || fromRow.arrivalCapture === 'dom'
+    ? fromRow.arrivalCapture
+    : (fromPrev.arrivalCapture === 'ndgr' || fromPrev.arrivalCapture === 'dom' ? fromPrev.arrivalCapture : '');
+  const mid = String(fromRow.ndgrMessageId ?? fromPrev.ndgrMessageId ?? '').trim();
+  return {
+    ...(capture ? { arrivalCapture: capture } : {}),
+    ...(mid ? { ndgrMessageId: mid } : {})
+  };
+}
+
+/**
  * @param {{ commentNo?: unknown, text: string, userId?: unknown, vpos?: unknown, capturedAt?: unknown }} row
  * @returns {string|null} 重複排除キー。識別子が無い番号無し行は null。
  */

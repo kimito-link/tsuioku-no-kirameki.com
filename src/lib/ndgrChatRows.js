@@ -24,7 +24,7 @@ function ndgrChatUserId(chat) {
 }
 
 /**
- * @typedef {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }} NdgrMergeRow
+ * @typedef {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr', ndgrMessageId?: string }} NdgrMergeRow
  */
 
 /**
@@ -66,6 +66,9 @@ export function ndgrChatsToMergeRows(chats, nowMs) {
       const now = toEpochMs(nowMs);
       const cap = at > 0 ? at : now;
       if (cap > 0) row.capturedAt = cap;
+      row.arrivalCapture = 'ndgr';
+      const mid = String(chat.messageId || '').trim();
+      if (mid) row.ndgrMessageId = mid;
     }
     out.push(row);
   }

@@ -11,14 +11,15 @@ const LV = 'lv351831423';
 const BASE = 1_700_000_000_000;
 const TEXT = '「サッカー」が好きな1人が来場しました';
 
-function row(id, capturedAt) {
+function row(id, capturedAt, extra) {
   return {
     id,
     liveId: LV,
     commentNo: '',
     text: TEXT,
     userId: null,
-    capturedAt
+    capturedAt,
+    ...extra
   };
 }
 
@@ -39,10 +40,30 @@ describe('来場は時刻で区別し、二重取り込みだけ畳む', () => {
     expect(got).toEqual({ panel: 3, report: 3, people: 3 });
   });
 
+  it('公式の通知が1秒違いなら、内訳もレポートも2', () => {
+    const rows = [
+      row('n1', BASE, { arrivalCapture: 'ndgr', ndgrMessageId: 'm1' }),
+      row('n2', BASE + 1000, { arrivalCapture: 'ndgr', ndgrMessageId: 'm2' })
+    ];
+    const got = counts(rows);
+    expect(got).toEqual({ panel: 2, report: 2, people: 2 });
+  });
+
   it('公式と画面が1秒以内に同じ通知を取り込んだら1回', () => {
-    const rows = [row('ndgr', BASE), row('dom', BASE + 1000)];
+    const rows = [
+      row('ndgr', BASE, { arrivalCapture: 'ndgr', ndgrMessageId: 'm1' }),
+      row('dom', BASE + 1000, { arrivalCapture: 'dom' })
+    ];
     const got = counts(rows);
     expect(got).toEqual({ panel: 1, report: 1, people: 1 });
+  });
+
+  it('同じ公式メッセージIDは1回', () => {
+    const rows = [
+      row('a', BASE, { arrivalCapture: 'ndgr', ndgrMessageId: 'same' }),
+      row('b', BASE + 1000, { arrivalCapture: 'ndgr', ndgrMessageId: 'same' })
+    ];
+    expect(counts(rows)).toEqual({ panel: 1, report: 1, people: 1 });
   });
 
   it('未保存の末尾も放送の番号を付けて、内訳とレポートが一致する', () => {

@@ -335,7 +335,7 @@ describe('ndgrChatsToMergeRows: a: 無し hashed 匿名 (v0.1.1558)', () => {
       atMs: 1_700_000_000_000
     };
     expect(ndgrChatsToMergeRows([chat], 1_700_000_009_000)).toEqual([
-      { commentNo: '', text, userId: null, capturedAt: 1_700_000_000_000 }
+      { commentNo: '', text, userId: null, capturedAt: 1_700_000_000_000, arrivalCapture: 'ndgr' }
     ]);
     const withoutAt = { ...chat };
     delete withoutAt.atMs;

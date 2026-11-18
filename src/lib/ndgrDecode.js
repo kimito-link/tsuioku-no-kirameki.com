@@ -255,7 +255,7 @@ export function decodeStatistics(buf, start, end) {
 }
 
 /**
- * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean, atMs?: number }} NdgrChat
+ * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean, atMs?: number, messageId?: string }} NdgrChat
  *
  * @typedef {{
  *   itemId: string,
@@ -761,33 +761,42 @@ function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e, propsKey
 }
 
 /**
- * ChunkedMessage の meta.at（field 1 → field 2 の Timestamp）を ms にする。
- * field 1 がメッセージ本体のときは varint の秒が無いので 0。
+ * ChunkedMessage の meta（field 1）。at は field 2 の Timestamp、id は field 1 の文字列。
+ * 時刻が取れないときはメッセージ本体なので、id も採らない。
  * @param {Uint8Array} buf
  * @param {number} start
  * @param {number} end
- * @returns {number}
+ * @returns {{ atMs: number, messageId: string }}
  */
-function chunkMetaAtMs(buf, start, end) {
+function chunkMeta(buf, start, end) {
   let at = 0;
+  let id = '';
   pbForEach(buf, start, end, (fn, wt, _v, s, e) => {
     if (fn !== 1 || wt !== 2) return;
+    let sec = 0;
+    let ns = 0;
+    let cand = '';
     pbForEach(buf, s, e, (gn, gw, _gv, gs, ge) => {
-      if (gn !== 2 || gw !== 2) return;
-      let sec = 0;
-      let ns = 0;
-      pbForEach(buf, gs, ge, (tn, tw, val) => {
-        if (tw !== 0) return;
-        if (tn === 1) sec = Number(val) || 0;
-        if (tn === 2) ns = Number(val) || 0;
-      });
-      // 2001年より前の小さい数は、メッセージ本体の別フィールドの誤読なので捨てる。
-      if (sec < 1_000_000_000) return;
-      const ms = sec * 1000 + Math.floor(ns / 1e6);
-      if (ms > 0) at = ms;
+      if (gn === 1 && gw === 2 && !cand) {
+        const str = decodeStr(buf, gs, ge).trim();
+        if (str && str.length <= 80 && !/来場しました$/.test(str)) cand = str;
+      } else if (gn === 2 && gw === 2) {
+        pbForEach(buf, gs, ge, (tn, tw, val) => {
+          if (tw !== 0) return;
+          if (tn === 1) sec = Number(val) || 0;
+          if (tn === 2) ns = Number(val) || 0;
+        });
+      }
     });
+    // 2001年より前の小さい数は、メッセージ本体の別フィールドの誤読なので捨てる。
+    if (sec < 1_000_000_000) return;
+    const ms = sec * 1000 + Math.floor(ns / 1e6);
+    if (ms > 0) {
+      at = ms;
+      if (cand) id = cand;
+    }
   });
-  return at;
+  return { atMs: at, messageId: id };
 }
 
 /**
@@ -800,7 +809,7 @@ function chunkMetaAtMs(buf, start, end) {
 export function decodeChunkedMessage(buf, start, end) {
   const s0 = start ?? 0;
   const e0 = end ?? buf.length;
-  const metaAtMs = chunkMetaAtMs(buf, s0, e0);
+  const meta = chunkMeta(buf, s0, e0);
   /** @type {NdgrStatistics|null} */
   let stats = null;
   /** @type {NdgrChat[]} */
@@ -875,7 +884,8 @@ export function decodeChunkedMessage(buf, start, end) {
               vpos: null,
               accountStatus: null,
               is184: false,
-              ...(metaAtMs > 0 ? { atMs: metaAtMs } : {})
+              ...(meta.atMs > 0 ? { atMs: meta.atMs } : {}),
+              ...(meta.messageId ? { messageId: meta.messageId } : {})
             });
             return;
           }
