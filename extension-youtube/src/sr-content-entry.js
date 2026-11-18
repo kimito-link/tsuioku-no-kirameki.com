@@ -141,7 +141,6 @@ async function tryJson(url) {
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { roomKey: string, key: string, stop: () => void }} */ (null);
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
-let lastSrFollow = null;
 const slowSrFollow = createSlowFollowerFetch();
 
 /**
@@ -152,7 +151,10 @@ const slowSrFollow = createSlowFollowerFetch();
  */
 function requestSrFollowers(roomId, videoKey, opts = {}) {
   const ticket = slowSrFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
-  if (!ticket) return;
+  if (!ticket) {
+    if (opts.force === true) slowSrFollow.whenIdle(() => requestSrFollowers(roomId, videoKey, opts));
+    return;
+  }
   const url = srRoomProfileUrl(roomId);
   if (!url) {
     slowSrFollow.finish(ticket, false);
@@ -164,12 +166,12 @@ function requestSrFollowers(roomId, videoKey, opts = {}) {
       const res = await fetch(url, {
         credentials: 'omit',
         headers: { Accept: 'application/json' },
+        keepalive: true,
         signal: platformFetchTimeoutSignal(),
       });
       if (!res.ok) throw new Error(`sr_profile_${res.status}`);
       const sample = followerSampleFromShowroom(await res.json());
       if (sample && slowSrFollow.currentKey() === videoKey) {
-        lastSrFollow = sample;
         ok = true;
         safeSendMessage({
           type: 'YT_STREAM_META',
@@ -419,7 +421,7 @@ async function check() {
         current = null;
         safeSendMessage({
           type: 'YT_STREAM_META',
-          payload: { videoId: endedKey, endedAt: Date.now(), ...(lastSrFollow ? { followerSample: { ...lastSrFollow, at: Date.now(), force: true } } : {}) },
+          payload: { videoId: endedKey, endedAt: Date.now() },
         });
       }
       diag.streamKey = '';
@@ -441,7 +443,6 @@ async function check() {
     const poll = await tryJson(srLiveApiUrl('polling', st.roomId));
     const viewers = Number(poll?.online_user_num);
     const srFollow = followerSampleFromShowroom(statusJson) || followerSampleFromShowroom(liveJson) || followerSampleFromShowroom(poll) || followerSampleFromDom(document, 'showroom');
-    if (srFollow) lastSrFollow = srFollow;
     requestSrFollowers(st.roomId, key);
     safeSendMessage({
       type: 'YT_STREAM_META',
@@ -557,8 +558,5 @@ setInterval(() => {
 }, 1000);
 window.addEventListener('pagehide', () => {
   if (current?.key && diag.roomId) requestSrFollowers(diag.roomId, current.key, { force: true });
-  if (current?.key && lastSrFollow) {
-    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastSrFollow, at: Date.now(), force: true } } });
-  }
   current?.stop();
 });

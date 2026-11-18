@@ -20,6 +20,8 @@ import {
   sectionSupportArrivalHtml,
   sectionSupportFlowHtml,
 } from './platform/marketingPlatformChapters.js';
+import { followerKpiTexts } from './platform/followerCountSample.js';
+import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import {
@@ -3483,6 +3485,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // v0.1.1854: りんく「作戦会議とか定型文はいらない・もっと有益なデータに」。どの配信でも同じになる案内・助言・声かけ例の章
   //   (このページでできること/りんく達から/分析スキル/ハーネス/作戦会議・応援が増えそうな時間・初見さん・切り抜き・お返し・お願い・注意/
   //   ファネル優先度・層別の使い方/各グラフ後の助言カード)は出さない。数字の章を「要点→視聴維持→流れ→応援者→ギフト→過去比較→記録」の順に並べる。
+  const followerSeries = followerSeriesForPlatform(view ? view.id : 'niconico', opts.followerSamples);
   const supportArrivalHtml = sectionSupportArrivalHtml({
     platformId: view ? view.id : 'niconico',
     comments: commentsRaw,
@@ -3493,7 +3496,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   });
   const bodyHtml = `${supportArrivalHtml ? `${supportArrivalHtml}\n` : ''}__NL_TOC_PLACEHOLDER__
 ${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts) + sectionStreamerMomentsHtml(commentsRaw, view, sessionSummaryRows, pageCount) : '')}
-${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap))}
+${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap, followerSeries))}
 ${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
 ${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
 ${view && view.hide.has('mkt-audience-gap') ? '' : sectionAudienceEngagementGap(audienceGap, r)}
@@ -3971,11 +3974,18 @@ ${copyScript}
 </section>`;
 }
 
-/** @param {MarketingReport} r @param {import('./audienceEngagementGap.js').AudienceEngagementGap} [gap] */
-function sectionKpi(r, gap) {
+/** @param {MarketingReport} r @param {import('./audienceEngagementGap.js').AudienceEngagementGap} [gap] @param {ReturnType<typeof followerSeriesForPlatform>} [followerSeries] */
+function sectionKpi(r, gap, followerSeries) {
   const participation = gap ? resolveCommentParticipation(r, gap) : null;
   /** @type {{ label: string, value: string, icon: string }[]} */
   const cards = [];
+  if (followerSeries) {
+    const texts = followerKpiTexts(followerSeries);
+    cards.push(
+      { label: 'フォロワー数', value: texts.countText, icon: '👤' },
+      { label: '獲得フォロワー数', value: texts.gainedText, icon: '📈' }
+    );
+  }
   if (participation && participation.totalVisitors > 0) {
     cards.push({
       label: 'コメントした人',

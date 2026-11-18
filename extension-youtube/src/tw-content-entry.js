@@ -239,7 +239,6 @@ async function lookupIcons(logins) {
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { login: string, key: string, stop: () => void }} */ (null);
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
-let lastTwFollow = null;
 const slowTwFollow = createSlowFollowerFetch();
 let twPageClientId = '';
 
@@ -274,7 +273,10 @@ function twitchPageClientId() {
  */
 function requestTwFollowers(login, videoKey, opts = {}) {
   const ticket = slowTwFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
-  if (!ticket) return;
+  if (!ticket) {
+    if (opts.force === true) slowTwFollow.whenIdle(() => requestTwFollowers(login, videoKey, opts));
+    return;
+  }
   const body = buildTwFollowerCountQuery(login);
   if (!body) {
     slowTwFollow.finish(ticket, false);
@@ -288,13 +290,13 @@ function requestTwFollowers(login, videoKey, opts = {}) {
         headers: { 'Client-Id': twitchPageClientId(), 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify(body),
         credentials: 'omit',
+        keepalive: true,
         signal: platformFetchTimeoutSignal(),
       });
       if (!res.ok) throw new Error(`gql_${res.status}`);
       const count = parseTwFollowerCount(await res.json());
       if (count != null && slowTwFollow.currentKey() === videoKey) {
         const sample = { count, rounded: false, source: 'page-count', noun: 'フォロワー' };
-        lastTwFollow = sample;
         ok = true;
         safeSendMessage({
           type: 'YT_STREAM_META',
@@ -735,7 +737,7 @@ async function check() {
         current = null;
         safeSendMessage({
           type: 'YT_STREAM_META',
-          payload: { videoId: endedKey, endedAt: Date.now(), ...(lastTwFollow ? { followerSample: { ...lastTwFollow, at: Date.now(), force: true } } : {}) },
+          payload: { videoId: endedKey, endedAt: Date.now() },
         });
       }
       diag.streamKey = '';
@@ -751,7 +753,6 @@ async function check() {
       diag.streamKey = key;
     }
     const twFollow = followerSampleFromDom(document, 'twitch');
-    if (twFollow) lastTwFollow = twFollow;
     requestTwFollowers(login, key);
     safeSendMessage({
       type: 'YT_STREAM_META',
@@ -884,12 +885,7 @@ setInterval(() => {
   void check();
 }, 1000);
 window.addEventListener('pagehide', () => {
-  if (current?.key) {
-    requestTwFollowers(current.login, current.key, { force: true });
-    if (lastTwFollow) {
-      safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTwFollow, at: Date.now(), force: true } } });
-    }
-  }
+  if (current?.key) requestTwFollowers(current.login, current.key, { force: true });
   current?.stop();
 });
 

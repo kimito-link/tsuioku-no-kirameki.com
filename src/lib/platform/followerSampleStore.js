@@ -1,11 +1,13 @@
 /**
  * ニコ生の配信者プロフィール（すでに取っている nvapi）と、そのフォロワー数の標本を一緒に書く。
  * 新しい通信はしない。標本は nls_follower_samples_<lv>。プロフィールの間隔（5分）のまま。
+ * 画面に出す人数の正本は followerSeriesForPlatform。章と KPI は、この系列だけを見る。
  */
 
-import { appendFollowerSample, followerCountForDisplay } from './followerCountSample.js';
+import { FOLLOWER_NOUN, appendFollowerSample, followerCountForDisplay, getFollowerSeries } from './followerCountSample.js';
 import { broadcasterProfileStorageKey } from '../storageKeys.js';
 import { computePseudoLvForVideoId } from '../youtube/ytPseudoLv.js';
+import { followerNotationOf } from './platformMetrics.js';
 
 const COUNT_MAX = 50_000_000;
 
@@ -35,6 +37,20 @@ export function followerSamplesExportEntry(videoId, summary) {
     followerCount: shown ? shown.count : null,
     capturedAt: shown ? shown.at : null,
   };
+}
+
+/**
+ * 書き出しが章と KPI に渡す人数。能力表の書き方（exact / ja-compact）で一つの系列にする。
+ * 通信はしない。標本が無いサービス（ABEMA）は null。
+ * @param {string} platformId
+ * @param {unknown} samples
+ * @param {{ supportAts?: number[], commentAts?: number[] }} [opts]
+ */
+export function followerSeriesForPlatform(platformId, samples, opts = {}) {
+  const notation = followerNotationOf(platformId);
+  if (!notation) return null;
+  const noun = /** @type {Record<string, string>} */ (FOLLOWER_NOUN)[platformId] || 'フォロワー';
+  return getFollowerSeries(samples, { ...opts, noun, notation });
 }
 
 /**

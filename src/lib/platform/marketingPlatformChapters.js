@@ -9,7 +9,8 @@ import { isMarketingSupportRow } from '../marketingAggregate.js';
 import { GIFT_MOMENT_FORBIDDEN_WORDS } from '../giftMomentAnalytics.js';
 import { panelExtraChips } from './platformMetrics.js';
 import { analyzeSupportArrivals } from './supportArrival.js';
-import { analyzeFollowerGrowth, FOLLOWER_NOUN } from './followerCountSample.js';
+import { followerKpiTexts } from './followerCountSample.js';
+import { followerSeriesForPlatform } from './followerSampleStore.js';
 
 const FLOW_CAP = 24;
 const WORD_CONTEXT_MAX_COMMENTS = 4000;
@@ -575,14 +576,19 @@ function followerWindowTimes(input) {
 }
 
 /**
- * @param {NonNullable<ReturnType<typeof analyzeFollowerGrowth>>} growth
+ * @param {NonNullable<ReturnType<typeof followerSeriesForPlatform>>} series
  */
-function followerBlockHtml(growth) {
-  if (growth.roundedOnly) return `<p class="mkt-arrival-summary">${escapeHtml(growth.label || '')}</p>`;
-  const net = growth.net || 0;
-  const netText = net > 0 ? `＋${net.toLocaleString('ja-JP')}人` : net < 0 ? `${Math.abs(net).toLocaleString('ja-JP')}人減` : '増減なし';
-  const head = `${growth.noun} ${Number(growth.startCount).toLocaleString('ja-JP')}人 → ${Number(growth.endCount).toLocaleString('ja-JP')}人（${netText}）`;
-  const wins = (growth.windows || []).map((w) => {
+function followerBlockHtml(series) {
+  const texts = followerKpiTexts(series);
+  if (series.rounded) {
+    const head = `${series.noun} ${texts.countText}。増えた人数は出していません。`;
+    for (const word of GIFT_MOMENT_FORBIDDEN_WORDS) {
+      if (head.includes(word)) return '';
+    }
+    return `<p class="mkt-arrival-summary">${escapeHtml(head)}</p>`;
+  }
+  const head = `${series.noun} ${texts.countText}（${texts.gainedText}）`;
+  const wins = (series.windows || []).map((w) => {
     const a = clock(w.t0) || '—';
     const b = clock(w.t1) || '—';
     return `${a}〜${b} ＋${w.delta.toLocaleString('ja-JP')}人（そのあいだの応援 ${w.supportCount.toLocaleString('ja-JP')}件・コメント ${w.commentCount.toLocaleString('ja-JP')}件）`;
@@ -609,12 +615,11 @@ export function sectionSupportArrivalHtml(input) {
     cap: input?.cap,
   });
   const times = followerWindowTimes(input);
-  const growth = analyzeFollowerGrowth(input?.followerSamples, {
-    noun: /** @type {Record<string, string>} */ (FOLLOWER_NOUN)[platformId] || 'フォロワー',
+  const series = followerSeriesForPlatform(platformId, input?.followerSamples, {
     supportAts: times.supportAts,
     commentAts: times.commentAts,
   });
-  const followHtml = growth ? followerBlockHtml(growth) : '';
+  const followHtml = series ? followerBlockHtml(series) : '';
   // 応援が無く、人数の標本（正確な2件、または概数の説明）も無ければ章を出さない。
   if (!analysis && !followHtml) return '';
   const mask = input?.maskShare === true;

@@ -141,7 +141,6 @@ async function getJson(url) {
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { liveId: string, stop: () => void }} */ (null);
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string }} */
-let lastWwFollow = null;
 let lastWwKey = '';
 let lastWwUserId = '';
 const slowWwFollow = createSlowFollowerFetch();
@@ -154,7 +153,10 @@ const slowWwFollow = createSlowFollowerFetch();
  */
 function requestWwFollowers(userId, videoKey, opts = {}) {
   const ticket = slowWwFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
-  if (!ticket) return;
+  if (!ticket) {
+    if (opts.force === true) slowWwFollow.whenIdle(() => requestWwFollowers(userId, videoKey, opts));
+    return;
+  }
   const url = wwUserProfileUrl(userId);
   if (!url) {
     slowWwFollow.finish(ticket, false);
@@ -166,12 +168,12 @@ function requestWwFollowers(userId, videoKey, opts = {}) {
       const res = await fetch(url, {
         credentials: 'omit',
         headers: { Accept: 'application/json' },
+        keepalive: true,
         signal: platformFetchTimeoutSignal(),
       });
       if (!res.ok) throw new Error(`ww_profile_${res.status}`);
       const sample = followerSampleFromWhowatchProfile(await res.json());
       if (sample && slowWwFollow.currentKey() === videoKey) {
-        lastWwFollow = sample;
         lastWwKey = videoKey;
         ok = true;
         safeSendMessage({
@@ -241,7 +243,6 @@ function startReader(liveId) {
       },
     });
     if (sample) {
-      lastWwFollow = sample;
       lastWwKey = key;
     }
   };
@@ -354,7 +355,7 @@ function startReader(liveId) {
         if (info.user?.id) requestWwFollowers(info.user.id, key, { force: true });
         safeSendMessage({
           type: 'YT_STREAM_META',
-          payload: { videoId: key, endedAt: Date.now(), ...(lastWwFollow ? { followerSample: { ...lastWwFollow, at: Date.now(), force: true } } : {}) },
+          payload: { videoId: key, endedAt: Date.now() },
         });
       }
       stopped = true;
@@ -481,8 +482,5 @@ setInterval(check, 1000);
 check();
 window.addEventListener('pagehide', () => {
   if (lastWwKey && lastWwUserId) requestWwFollowers(lastWwUserId, lastWwKey, { force: true });
-  if (lastWwKey && lastWwFollow) {
-    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: lastWwKey, followerSample: { ...lastWwFollow, at: Date.now(), force: true } } });
-  }
   current?.stop();
 });

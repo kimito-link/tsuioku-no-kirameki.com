@@ -784,6 +784,7 @@ async function runExport(lid) {
     //   応援者の名前は、分析レポートと同じ「共有用に伏せる」設定に従う。
     setWaitStageText('メディアキットをまとめています…', 85);
     let mediaKitHtml = '';
+    const followerSamples = await followerSamplesForExport(lid, snapshot);
     try {
       const kit = await withTimeout(
         buildMediaKitDocument({
@@ -798,7 +799,9 @@ async function runExport(lid) {
           omitVisitorTotal: marketingView ? marketingView.visitorCard !== true : false,
           // v0.1.1857: 記録は見た配信全部なので、この配信の配信者の配信だけで集計する(他の配信者の数字を混ぜない)。
           broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
-          currentLiveId: lid
+          currentLiveId: lid,
+          followerSamples,
+          platformId: marketingView ? marketingView.id : 'niconico'
         }),
         60_000,
         'media_kit_build_timeout'
@@ -838,7 +841,7 @@ async function runExport(lid) {
       mediaKitHtml,
       htmlReportHtml,
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
-      followerSamples: await followerSamplesForExport(lid, snapshot),
+      followerSamples,
       maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),

@@ -16,6 +16,11 @@ function finiteNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** @param {unknown} text @param {string} fallback */
+function textOr(text, fallback) {
+  return typeof text === 'string' && text ? text : fallback;
+}
+
 /** @param {unknown} value */
 function formatInteger(value) {
   const n = finiteNumber(value);
@@ -306,8 +311,8 @@ export function buildMediaKitHtml(stats, options = {}) {
 
   /** @type {Array<[string, (window: Record<string, unknown>) => string]>} */
   const metricSpecs = [
-    ['フォロワー数', (window) => formatInteger(window.followers)],
-    ['獲得フォロワー数', (window) => formatSignedInteger(window.followersGained)],
+    ['フォロワー数', (window) => textOr(window.followersText, formatInteger(window.followers))],
+    ['獲得フォロワー数', (window) => textOr(window.followersGainedText, formatSignedInteger(window.followersGained))],
     ['平均同時視聴者数', (window) => formatDecimal(window.avgConcurrent)],
     ['最大同時視聴者数', (window) => formatInteger(window.maxConcurrent)],
     ...(omitVisitorTotal

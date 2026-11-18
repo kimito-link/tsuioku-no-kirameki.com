@@ -5,7 +5,8 @@ import { buildMarketingDashboardHtml } from '../marketingChartsHtml.js';
 import { buildMediaKitHtml } from '../mediaKitHtml.js';
 import { buildMediaKitStats } from '../mediaKitStats.js';
 import { mergeYtStreamSummary } from '../youtube/ytStreamStorePolicy.js';
-import { followerSamplesExportEntry, readStoredFollowerSamples } from './followerSampleStore.js';
+import { followerKpiTexts } from './followerCountSample.js';
+import { followerSeriesForPlatform, followerSamplesExportEntry, readStoredFollowerSamples } from './followerSampleStore.js';
 
 const T0 = Date.parse('2026-11-18T06:02:37.000Z');
 
@@ -50,7 +51,14 @@ describe('人数の知らせから書き出しまで', () => {
       { at: T0 + 13 * 60 * 1000, count: 1232778, rounded: false, source: 'page-count', noun: 'フォロワー' },
     ]);
     expect(html).toContain('id="mkt-support-arrival"');
-    expect(html).toContain('フォロワー 1,232,775人 → 1,232,778人（＋3人）');
+    const series = followerSeriesForPlatform('twitch', [
+      { at: T0, count: 1232775, rounded: false, source: 'page-count', noun: 'フォロワー' },
+      { at: T0 + 13 * 60 * 1000, count: 1232778, rounded: false, source: 'page-count', noun: 'フォロワー' },
+    ]);
+    const texts = followerKpiTexts(/** @type {NonNullable<typeof series>} */ (series));
+    expect(html).toContain(`フォロワー ${texts.countText}（${texts.gainedText}）`);
+    expect(html).toContain(`mkt-kpi__val">${texts.countText}`);
+    expect(html).not.toMatch(/mkt-kpi__val">-<\/span><span class="mkt-kpi__label">フォロワー数/);
   });
 
   it('SHOWROOM の増減なしも、保存した標本から出す', () => {
@@ -59,7 +67,13 @@ describe('人数の知らせから書き出しまで', () => {
       { at: T0 + 13 * 60 * 1000, count: 3725, rounded: false, source: 'page-count', noun: 'フォロワー' },
     ]);
     expect(html).toContain('id="mkt-support-arrival"');
-    expect(html).toContain('フォロワー 3,725人 → 3,725人（増減なし）');
+    const series = followerSeriesForPlatform('showroom', [
+      { at: T0, count: 3725, rounded: false, source: 'page-count', noun: 'フォロワー' },
+      { at: T0 + 13 * 60 * 1000, count: 3725, rounded: false, source: 'page-count', noun: 'フォロワー' },
+    ]);
+    const texts = followerKpiTexts(/** @type {NonNullable<typeof series>} */ (series));
+    expect(html).toContain(`フォロワー ${texts.countText}（${texts.gainedText}）`);
+    expect(texts.gainedText).toBe('増減なし');
   });
 
   it('YouTube の概数は桁を落とした139と混ぜず、概数のまま出す', () => {
@@ -71,7 +85,9 @@ describe('人数の知らせから書き出しまで', () => {
     expect(entry.samples).toHaveLength(2);
     expect(entry.followerCount).toBe(139000);
     expect(html).toContain('id="mkt-support-arrival"');
-    expect(html).toContain('139K → 13.9万（概数）');
+    expect(html).toContain('13.9万人');
+    expect(html).toContain('（概数）');
+    expect(html).not.toContain('139K');
     expect(html).not.toContain('139人');
   });
 

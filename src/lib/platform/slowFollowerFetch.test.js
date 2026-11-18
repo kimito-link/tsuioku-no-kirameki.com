@@ -44,4 +44,17 @@ describe('人数を読む間隔', () => {
     expect(second).toBeGreaterThan(0);
     expect(gate.currentKey()).toBe('tw.b.2');
   });
+  it('読んでいる途中に終わりが来たら、失敗したときだけもう1回読む', () => {
+    const gate = createSlowFollowerFetch();
+    const first = gate.claim('tw.a.1', { now: T0 });
+    let end = 0;
+    gate.whenIdle(() => {
+      end = gate.claim('tw.a.1', { now: T0 + 1, force: true });
+    });
+    expect(end).toBe(0);
+    gate.finish(first, false, T0);
+    expect(end).toBeGreaterThan(0);
+    gate.finish(end, true, T0 + 1);
+    expect(gate.claim('tw.a.1', { now: T0 + 2, force: true })).toBe(0);
+  });
 });

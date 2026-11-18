@@ -15,6 +15,34 @@ import { platformOfStreamKey } from './streamPlatform.js';
 export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting', 'tiktok']);
 
 /**
+ * 能力表の「人数」の列。章と KPI はここ以外の書き方を使わない。
+ * exact = ページの整数。ja-compact = 万・億（YouTube の「13.9万人」）。空 = 人数を出さない。
+ */
+export const FOLLOWER_NOTATION = Object.freeze({
+  niconico: 'exact',
+  youtube: 'ja-compact',
+  twitch: 'exact',
+  kick: 'exact',
+  abema: '',
+  showroom: 'exact',
+  mixch: 'exact',
+  whowatch: 'exact',
+  twitcasting: 'exact',
+  tiktok: 'exact',
+});
+
+/**
+ * @param {string} platformId
+ * @returns {'exact' | 'ja-compact' | ''}
+ */
+export function followerNotationOf(platformId) {
+  const id = String(platformId || '').trim().toLowerCase();
+  const noted = /** @type {Record<string, string>} */ (FOLLOWER_NOTATION)[id];
+  if (noted === 'ja-compact' || noted === 'exact' || noted === '') return noted;
+  return 'exact';
+}
+
+/**
  * パネルと会場が同じ表を見る。native のサービスは今までの画面のまま。
  * それ以外は chips に無いカードを描かない（「—」の枠も出さない）。
  * ABEMA はここに1行足せば、横の欄と会場が同じ隠し方に乗る。

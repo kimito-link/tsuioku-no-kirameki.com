@@ -426,11 +426,11 @@ export function followerSampleFromTcDocument(doc) {
 }
 
 /**
+ * 桁を落とした整数を除いた標本。時刻順。章と KPI はこれを分けて読まない。
  * @param {unknown} samples
- * @param {{ noun?: string, supportAts?: number[], commentAts?: number[] }} [opts]
  */
-export function analyzeFollowerGrowth(samples, opts = {}) {
-  const list = (Array.isArray(samples) ? samples : [])
+export function usableFollowerSamples(samples) {
+  return (Array.isArray(samples) ? samples : [])
     .map((s) => {
       const o = asObj(s);
       return {
@@ -439,11 +439,20 @@ export function analyzeFollowerGrowth(samples, opts = {}) {
         rounded: o?.rounded === true,
         noun: typeof o?.noun === 'string' ? o.noun : '',
         raw: typeof o?.raw === 'string' ? o.raw : '',
+        source: typeof o?.source === 'string' ? o.source : '',
       };
     })
     .filter((s) => s.at > 0 && Number.isInteger(s.count) && s.count >= 0 && s.count <= COUNT_MAX)
     .sort((a, b) => a.at - b.at)
     .filter((s, _i, all) => !isMisparsedExactCount(all, s.count, s.rounded));
+}
+
+/**
+ * @param {unknown} samples
+ * @param {{ noun?: string, supportAts?: number[], commentAts?: number[] }} [opts]
+ */
+export function analyzeFollowerGrowth(samples, opts = {}) {
+  const list = usableFollowerSamples(samples);
   if (!list.length) return null;
   const noun = list.find((s) => s.noun)?.noun || opts.noun || 'フォロワー';
   const usable = list.filter((s) => !s.rounded);
@@ -496,20 +505,107 @@ export function analyzeFollowerGrowth(samples, opts = {}) {
  * @returns {{ count: number, at: number, rounded: boolean } | null}
  */
 export function followerCountForDisplay(samples) {
-  const list = (Array.isArray(samples) ? samples : [])
-    .map((s) => {
-      const o = asObj(s);
-      return {
-        at: Math.floor(Number(o?.at)),
-        count: Math.floor(Number(o?.count)),
-        rounded: o?.rounded === true,
-        raw: typeof o?.raw === 'string' ? o.raw : '',
-      };
-    })
-    .filter((s) => s.at > 0 && Number.isInteger(s.count) && s.count >= 0 && s.count <= COUNT_MAX)
-    .filter((s, _i, all) => !isMisparsedExactCount(all, s.count, s.rounded));
+  const list = usableFollowerSamples(samples);
   if (!list.length) return null;
   const exact = list.filter((s) => !s.rounded);
   const pick = exact.length ? exact[exact.length - 1] : list[list.length - 1];
   return { count: pick.count, at: pick.at, rounded: pick.rounded === true };
+}
+
+/**
+ * 概数を、そのサービスがページに書く形にする。K/M は日本語のページでは万・億に戻す。
+ * ページの「13.9万」が残っていれば、それを人付きで使う。
+ * @param {{ count: number, rounded?: boolean, raw?: string }} sample
+ * @param {'exact' | 'ja-compact' | string} notation
+ */
+export function formatFollowerSampleText(sample, notation) {
+  const count = Math.floor(Number(sample?.count));
+  const raw = String(sample?.raw || '').replace(/\s+/g, '');
+  if (notation === 'ja-compact' && sample?.rounded) {
+    const ja = raw.match(/[\d.,]+(?:億|万)人?/);
+    if (ja) return ja[0].endsWith('人') ? ja[0] : `${ja[0]}人`;
+    return `${formatJaCompactCount(count)}人`;
+  }
+  if (!Number.isFinite(count)) return '';
+  return `${count.toLocaleString('ja-JP')}人`;
+}
+
+/**
+ * @param {number} count
+ */
+function formatJaCompactCount(count) {
+  if (count >= 100000000) {
+    const v = Math.round((count / 100000000) * 10) / 10;
+    return `${Number.isInteger(v) ? String(v) : String(v)}億`;
+  }
+  if (count >= 10000) {
+    const v = Math.round((count / 10000) * 10) / 10;
+    return `${Number.isInteger(v) ? String(Math.round(v)) : String(v)}万`;
+  }
+  return count.toLocaleString('ja-JP');
+}
+
+/** @param {number} ms */
+function seriesClock(ms) {
+  if (!(ms > 0)) return '';
+  return new Date(ms).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * 人数の正本。保存した標本から、始まり・終わり・増減だけを返す。
+ * 概数は delta を null にする（増えた人数は出さない）。標本が1件でも null にはしない。
+ * @param {unknown} samples
+ * @param {{ noun?: string, notation?: 'exact' | 'ja-compact' | string }} [opts]
+ * @returns {null | {
+ *   start: { count: number, at: number, text: string },
+ *   end: { count: number, at: number, text: string },
+ *   delta: number | null,
+ *   rounded: boolean,
+ *   source: string,
+ *   noun: string,
+ *   windows: { t0: number, t1: number, delta: number, supportCount: number, commentCount: number }[],
+ * }}
+ */
+export function getFollowerSeries(samples, opts = {}) {
+  const list = usableFollowerSamples(samples);
+  if (!list.length) return null;
+  const notation = opts.notation === 'ja-compact' ? 'ja-compact' : 'exact';
+  const exact = list.filter((s) => !s.rounded);
+  const rounded = list.filter((s) => s.rounded);
+  const useRounded = exact.length < 2 && rounded.length > 0;
+  const rows = useRounded ? rounded : (exact.length ? exact : list);
+  const start = rows[0];
+  const end = rows[rows.length - 1];
+  const growth = analyzeFollowerGrowth(samples, opts);
+  const noun = rows.find((s) => s.noun)?.noun || opts.noun || 'フォロワー';
+  const textOf = (/** @type {typeof start} */ row) => formatFollowerSampleText(row, useRounded ? notation : 'exact');
+  return {
+    start: { count: start.count, at: start.at, text: textOf(start) },
+    end: { count: end.count, at: end.at, text: textOf(end) },
+    delta: !useRounded && exact.length >= 2 ? end.count - start.count : null,
+    rounded: useRounded,
+    source: end.source || start.source || '',
+    noun,
+    windows: growth && !growth.roundedOnly ? growth.windows : [],
+  };
+}
+
+/**
+ * KPI の「フォロワー数」「獲得フォロワー数」と、章の人数の行。同じ文字列を使う。
+ * 終わりの人数には、実際に読んだ時刻を付ける。
+ * @param {NonNullable<ReturnType<typeof getFollowerSeries>>} series
+ */
+export function followerKpiTexts(series) {
+  const endAt = seriesClock(series.end.at);
+  const endMark = endAt ? `（${endAt}）` : '';
+  const same = series.start.at === series.end.at && series.start.text === series.end.text;
+  const span = same ? `${series.end.text}${endMark}` : `${series.start.text} → ${series.end.text}${endMark}`;
+  const countText = series.rounded ? `${span}（概数）` : span;
+  let gainedText = '—';
+  if (series.rounded) gainedText = '—（概数）';
+  else if (series.delta == null) gainedText = '—';
+  else if (series.delta > 0) gainedText = `＋${series.delta.toLocaleString('ja-JP')}人`;
+  else if (series.delta < 0) gainedText = `${Math.abs(series.delta).toLocaleString('ja-JP')}人減`;
+  else gainedText = '増減なし';
+  return { countText, gainedText };
 }

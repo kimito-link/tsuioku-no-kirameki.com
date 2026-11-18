@@ -63,6 +63,8 @@ export function createSlowFollowerFetch() {
   let key = '';
   let busy = false;
   let gen = 1;
+  /** @type {null | (() => void)} */
+  let idle = null;
   return {
     /** @returns {string} */
     currentKey() {
@@ -87,6 +89,18 @@ export function createSlowFollowerFetch() {
       busy = true;
       return gen;
     },
+    /** 読み取り中か。終わりの1回は、空いているときだけすぐ始める。 */
+    isBusy() {
+      return busy;
+    },
+    /**
+     * いま読んでいる1本が終わったあと、1回だけ呼ぶ。空いているときは何もしない。
+     * @param {() => void} fn
+     */
+    whenIdle(fn) {
+      if (typeof fn !== 'function' || !busy) return;
+      idle = fn;
+    },
     /**
      * @param {number} ticket
      * @param {boolean} ok
@@ -94,8 +108,12 @@ export function createSlowFollowerFetch() {
      */
     finish(ticket, ok, now = Date.now()) {
       busy = false;
-      if (ticket !== gen) return;
-      state = slowFollowerFetchAdvance(state, now, ok === true);
+      const current = ticket === gen;
+      if (current) state = slowFollowerFetchAdvance(state, now, ok === true);
+      const fn = idle;
+      idle = null;
+      if (fn && current && ok !== true) state = { ...state, lastTryAt: 0 };
+      if (fn) fn();
     },
   };
 }
