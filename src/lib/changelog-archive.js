@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2143',
+    date: '2026-11-17',
+    summary: '配信の山が来た時刻を出す',
+    items: Object.freeze([
+      '分析レポートに、記録にあるスーパーチャット、Bits、Kicks、アイテム、ギフト、コイン、スコア、ファン登録、コメントが一番多かった時刻を出すようにしました。',
+      'レイドの前後の視聴者数は、同じ時間のサンプルがあるときだけ推定と書いて出します。イベント順位の増え方は記録に無いので出していません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2142',
     date: '2026-11-17',
     summary: '各サービスの記録を章に出す',

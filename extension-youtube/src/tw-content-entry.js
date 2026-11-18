@@ -311,36 +311,6 @@ function requestTwFollowers(login, videoKey, opts = {}) {
   })();
 }
 
-/** 裏方に「このタブの記録」を渡す。終わりの人数はページでは読まない(移動で fetch が消える)。 */
-let twEndArmKey = '';
-let twEndArmAt = 0;
-/** @param {string} login @param {string} videoKey */
-function armTwFollowerEnd(login, videoKey) {
-  const now = Date.now();
-  if (!videoKey || (twEndArmKey === videoKey && now - twEndArmAt < 60_000)) return;
-  twEndArmKey = videoKey;
-  twEndArmAt = now;
-  safeSendMessage({
-    type: 'YT_FOLLOWER_END_ARM',
-    platform: 'twitch',
-    videoKey,
-    login,
-    clientId: twitchPageClientId(),
-  });
-}
-/** @param {string} login @param {string} videoKey */
-function askTwFollowerEnd(login, videoKey) {
-  armTwFollowerEnd(login, videoKey);
-  twEndArmAt = 0;
-  safeSendMessage({
-    type: 'YT_FOLLOWER_END_NOW',
-    platform: 'twitch',
-    videoKey,
-    login,
-    clientId: twitchPageClientId(),
-  });
-}
-
 /** 配信者の表示名(GQL で分かったもの・ハイプトレイン等の行の名前) */
 let lastBroadcasterName = '';
 const broadcasterName = () => lastBroadcasterName;
@@ -742,7 +712,7 @@ async function check() {
   const login = parseTwChannelFromUrl(location.href);
   if (!login) {
     if (current) {
-      askTwFollowerEnd(current.login, current.key);
+      // 別のページへ移ったあとの fetch は消える。最後に読めた人数を、その時刻のまま残す。
       current.stop();
       current = null;
     }
@@ -751,10 +721,7 @@ async function check() {
   }
   const sameChannel = current?.login === login;
   if (sameChannel && Date.now() - lastInfoAt < META_EVERY_MS) {
-    if (current?.key) {
-      armTwFollowerEnd(login, current.key);
-      requestTwFollowers(login, current.key);
-    }
+    if (current?.key) requestTwFollowers(login, current.key);
     return;
   }
   checking = true;
@@ -767,7 +734,8 @@ async function check() {
     if (info && !info.live) {
       if (current) {
         const endedKey = current.key;
-        askTwFollowerEnd(login, endedKey);
+        // ページはまだ開いている。終わりの1回は、ここから時間切れ付きで読む。
+        requestTwFollowers(login, endedKey, { force: true });
         current.stop();
         current = null;
         safeSendMessage({
@@ -783,12 +751,10 @@ async function check() {
     const key = buildTwStreamKey(login, { streamId: info?.streamId, startedAtMs: info?.startedAtMs || null });
     if (!key) return;
     if (!current || current.key !== key) {
-      if (current?.key && current.key !== key) askTwFollowerEnd(current.login, current.key);
       current?.stop();
       current = { login, key, stop: startReader(login, key, info?.userId || '', { streamId: info?.streamId, startedAtMs: info?.startedAtMs }) };
       diag.streamKey = key;
     }
-    armTwFollowerEnd(login, key);
     const twFollow = followerSampleFromDom(document, 'twitch');
     requestTwFollowers(login, key);
     safeSendMessage({

@@ -4,25 +4,22 @@
  * 【書けるstorageキー】なし(保存は background が既存の標本の口で行う)
  *
  * ページが閉じる瞬間の fetch は、移動で消える(0.1.2161 の実機: 停止時刻に通信が無い)。
- * 読むのは拡張の裏方。きっかけはタブを閉じたとき、配信ページから別の URL へ移ったとき、配信が終わったとき。
+ * SHOWROOM とふわっちは、既にあるホスト権限の公開 URL を拡張の裏方が1回読む。
+ * きっかけはタブを閉じたとき、配信ページから別の URL へ移ったとき、配信が終わったとき。
+ * Twitch の公開窓口はホスト権限に無いので、ここでは読まない(ページが生きている間だけ、ページ自身が読む)。
  * 1つの記録につき1回。読めた時刻を標本の時刻にする。失敗しても古い人数の時刻は書き換えない。
  */
 
 import { platformFetchTimeoutSignal } from './fetchTimeout.js';
-import { TW_GQL_URL, TW_WEB_CLIENT_ID, buildTwFollowerCountQuery, parseTwFollowerCount } from '../twitch/twGql.js';
-import { isTwStreamKey } from '../twitch/twStreamKey.js';
-import { parseTwChannelFromUrl } from '../twitch/twIrcParse.js';
 import { isSrStreamKey, srRoomKeyOfStreamKey, srRoomProfileUrl, parseSrRoomKeyFromUrl } from '../showroom/srParse.js';
 import { isWwStreamKey, wwUserProfileUrl, parseWwLiveIdFromUrl } from '../whowatch/wwParse.js';
-import { FOLLOWER_NOUN, followerSampleFromShowroom, followerSampleFromWhowatchProfile } from './followerCountSample.js';
+import { followerSampleFromShowroom, followerSampleFromWhowatchProfile } from './followerCountSample.js';
 
 /**
  * @typedef {{
  *   tabId: number,
- *   platform: 'twitch' | 'showroom' | 'whowatch',
+ *   platform: 'showroom' | 'whowatch',
  *   videoKey: string,
- *   login?: string,
- *   clientId?: string,
  *   roomKey?: string,
  *   roomId?: string,
  *   userId?: string,
@@ -42,12 +39,8 @@ export function normalizeFollowerEndArm(raw, tabId) {
   if (!row || !Number.isInteger(id) || id < 1) return null;
   const platform = String(row.platform || '');
   const videoKey = String(row.videoKey || '');
-  if (platform === 'twitch') {
-    const login = String(row.login || '').toLowerCase();
-    if (!/^[a-z0-9_]{1,25}$/.test(login) || !isTwStreamKey(videoKey) || !videoKey.startsWith(`tw.${login}.`)) return null;
-    const clientId = /^[A-Za-z0-9]{20,40}$/.test(String(row.clientId || '')) ? String(row.clientId) : '';
-    return { tabId: id, platform, videoKey, login, clientId };
-  }
+  // Twitch は新しいホスト権限が要るので、裏方では読まない。
+  if (platform === 'twitch') return null;
   if (platform === 'showroom') {
     const roomId = String(row.roomId || '');
     const roomKey = String(row.roomKey || '');
@@ -70,7 +63,6 @@ export function normalizeFollowerEndArm(raw, tabId) {
  */
 export function stillOnFollowerLive(arm, url) {
   const u = String(url || '');
-  if (arm.platform === 'twitch') return parseTwChannelFromUrl(u) === String(arm.login || '');
   if (arm.platform === 'showroom') return parseSrRoomKeyFromUrl(u) === String(arm.roomKey || '');
   if (arm.platform === 'whowatch') return parseWwLiveIdFromUrl(u) === String(arm.livePageId || '');
   return false;
@@ -109,24 +101,6 @@ export async function fetchFollowerEndSample(arm, deps) {
   if (!arm || typeof fetchFn !== 'function') return null;
   const signal = platformFetchTimeoutSignal(undefined, deps.abortSignalCtor);
   try {
-    if (arm.platform === 'twitch') {
-      const body = buildTwFollowerCountQuery(arm.login || '');
-      if (!body) return null;
-      const res = await fetchFn(TW_GQL_URL, {
-        method: 'POST',
-        credentials: 'omit',
-        headers: {
-          'Client-Id': arm.clientId || TW_WEB_CLIENT_ID,
-          'Content-Type': 'text/plain;charset=UTF-8',
-        },
-        body: JSON.stringify(body),
-        signal,
-      });
-      if (!res?.ok) return null;
-      const count = parseTwFollowerCount(await res.json());
-      if (count == null) return null;
-      return { at: now(), count, rounded: false, source: 'page-count', noun: FOLLOWER_NOUN.twitch, force: true };
-    }
     if (arm.platform === 'showroom') {
       const url = srRoomProfileUrl(arm.roomId || '');
       if (!url) return null;
